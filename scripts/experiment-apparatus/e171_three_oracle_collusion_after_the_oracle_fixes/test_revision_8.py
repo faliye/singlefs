@@ -3,13 +3,18 @@
 （第 2 步那一条起修订 11 单元脚本的 PRINT_ONLY=1，只打命令、一条都不跑）。"""
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
+import re
+import shlex
 import shutil
 import subprocess
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 import contrast_revision_6_against_revision_8 as contrast
 import frozen_tree_lines_revision_8 as judge
@@ -163,10 +168,11 @@ class UnitSchedulerTests(TemporaryDirectoryCase):
         self.assertEqual(units.downstream(units.unit_table(), {"step-7"}), {"step-7", "step-8", "step-9-z1"})
 
     def test_a_unit_does_not_fit_when_the_threads_run_out(self) -> None:
+        # 每个单元都取整份额度（第 2 次重跑登记修订 11 第 11.2 条）：额度就是一个单元的线程时，有一个在跑就放不下第二个
         table = units.unit_table()
-        budget = units.Budget(25)
-        self.assertFalse(units.fits(table["step-9"], [table["step-7"], table["step-3-o1-crash-judge"]], budget))
-        self.assertTrue(units.fits(table["step-9"], [table["step-7"]], budget))
+        budget = units.Budget(table["step-7"].threads)
+        self.assertFalse(units.fits(table["step-9"], [table["step-7"]], budget))
+        self.assertTrue(units.fits(table["step-9"], [], budget))
 
     def test_attempt_tags_start_empty_and_count_from_two(self) -> None:
         self.assertEqual([units.attempt_tag(number) for number in (1, 2, 3)], ["", "-attempt2", "-attempt3"])
@@ -343,6 +349,157 @@ class UnitScriptStepTwoTests(TemporaryDirectoryCase):
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertIn(f"{HERE}/s2_compare.py scripts/experiment-apparatus/target/fake-dumps/s2-e170-export", completed.stdout)
         self.assertIn("s2_differing_files=0 s2_compared_files=18", completed.stdout)
+
+
+UNIT_SCRIPT_REVISION_11 = os.path.join(HERE, "segment_one_unit_revision_11.sh")
+SELFPROOF_UNIT = "reuse-selfproof"
+REVISION_8_UNIT_TABLE = units.unit_table
+EXECUTOR_WORKERS = re.compile(r"frozen_o3\.run_executor\('[^']*', '[^']*', \[[^\]]*\], (\w+), ")
+
+
+def printed_threads(text: str) -> list[str]:
+    """单元脚本 PRINT_ONLY=1 打出的命令（「  $ 」起头、printf %q 打法）里线程那几处：--threads 后面那个词，与 frozen_o3.run_executor(…) 的工作线程那一位。"""
+    found = []
+    for line in text.splitlines():
+        if not line.startswith("  $ "):
+            continue
+        words = shlex.split(line[4:])
+        found += [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--threads"]
+        found += [match.group(1) for word in words for match in [EXECUTOR_WORKERS.search(word)] if match]
+    return found
+
+
+def plan_sections(text: str) -> dict[str, str]:
+    """plan 打出的「单元 <名>（第 N 次）：」之后那几行，按单元分开。"""
+    sections: dict[str, list[str]] = {}
+    current = None
+    for line in text.splitlines():
+        match = re.fullmatch(r"单元 (\S+)（第 \d+ 次）：", line)
+        if match:
+            current = match.group(1)
+            sections[current] = []
+        elif line.startswith("── "):
+            current = None
+        elif current is not None:
+            sections[current].append(line)
+    return {name: "\n".join(lines) for name, lines in sections.items()}
+
+
+def environment_with_the_cap(cap: str | None) -> dict[str, str]:
+    environment = {name: value for name, value in os.environ.items() if name != "SINGLEFS_THREAD_CAP"}
+    if cap is not None:
+        environment["SINGLEFS_THREAD_CAP"] = cap
+    return environment
+
+
+def table_with_the_selfproof_unit() -> dict:
+    """修订 11 单元编排那一层的单元表：修订 8 的加 reuse-selfproof（同 segment_one_units_revision_11.unit_table_with_selfproof，不经它按 sha256 载入）。"""
+    table = REVISION_8_UNIT_TABLE()   # 原件：plan_and_launch 把 units.unit_table 换成这一份时不绕回自己
+    table[SELFPROOF_UNIT] = units.Unit(SELFPROOF_UNIT, ("step-0",), units.registered_threads(), 300)
+    return table
+
+
+class UnitScriptThreadsTests(TemporaryDirectoryCase):
+    """两份单元脚本取线程取的是每台默认重活线程数（heavy_thread_default：SINGLEFS_THREAD_CAP 设了照它），不读自己的 THREADS（第 2 次重跑登记修订 10 第 10.6 条）；
+    单元编排 plan 打出的线程与 launch 设进环境的同一个数（修订 11 第 11.6 条）。环境照自证格 unit-script-commands 的造法；THREADS 设成 10、SINGLEFS_THREAD_CAP 设成 7。"""
+
+    def world(self):
+        world = units.fake_world(self.path("world"))
+        return world, units.settings_from_config(world.repo, world.config)
+
+    def unit_script_environment(self, settings, name: str, cap: str | None, wrap: bool) -> dict[str, str]:
+        with mock.patch.dict(os.environ, environment_with_the_cap(cap), clear=True):
+            table = table_with_the_selfproof_unit()
+            names = {variable: stem + "-attempt2" for unit in table.values() for variable, stem in unit.exports}
+            environment = units.unit_environment(settings, table[name], 2, self.path("unit-" + name), names, True)
+            if wrap:
+                environment = units.within_share(table[name].threads, environment)
+        return dict(environment, THREADS="10", REUSE_LIBRARY=self.path("library"), REUSE_ENTRIES=self.path("no-entries.tsv"),
+                    REUSE_READINGS=self.path("readings.tsv"))
+
+    def print_unit(self, world, script: str, environment: dict[str, str], name: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["bash", script, name], cwd=world.repo, env=environment, capture_output=True, text=True, timeout=60)
+
+    def assert_the_script_takes_seven(self, script: str, names: tuple[str, ...]) -> None:
+        world, settings = self.world()
+        for name in names:
+            completed = self.print_unit(world, script, self.unit_script_environment(settings, name, "7", False), name)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            threads = printed_threads(completed.stdout)
+            self.assertTrue(threads, f"{name} 没打出线程：{completed.stdout}")
+            self.assertEqual(set(threads), {"7"}, f"{name}：{threads}")
+            self.assertNotIn("--threads 10", completed.stdout)
+
+    def test_the_revision_8_unit_script_takes_the_thread_count_from_the_registered_default_not_from_its_own_variable(self) -> None:
+        self.assert_the_script_takes_seven(units.UNIT_SCRIPT, ("step-4-o1-comparison", "step-5"))
+
+    def test_the_revision_11_unit_script_takes_the_thread_count_from_the_registered_default_not_from_its_own_variable(self) -> None:
+        self.assert_the_script_takes_seven(UNIT_SCRIPT_REVISION_11, ("step-4-o1-comparison", "step-5", SELFPROOF_UNIT))
+
+    def assert_the_script_stops_on_a_refused_default(self, script: str) -> None:
+        world, settings = self.world()
+        environment = dict(self.unit_script_environment(settings, "step-4-o1-comparison", "7", False), SINGLEFS_THREAD_CAP="abc")
+        completed = self.print_unit(world, script, environment, "step-4-o1-comparison")
+        self.assertEqual(completed.returncode, 2, completed.stdout + completed.stderr)
+        self.assertEqual([line for line in completed.stdout.splitlines() if line.startswith("  $ ")], [])
+        self.assertIn("✗", completed.stderr)
+
+    def test_the_revision_8_unit_script_stops_with_exit_2_when_the_registered_default_is_refused(self) -> None:
+        self.assert_the_script_stops_on_a_refused_default(units.UNIT_SCRIPT)
+
+    def test_the_revision_11_unit_script_stops_with_exit_2_when_the_registered_default_is_refused(self) -> None:
+        self.assert_the_script_stops_on_a_refused_default(UNIT_SCRIPT_REVISION_11)
+
+    def assert_wrapping_in_the_share_prints_the_same_threads(self, cap: str | None) -> None:
+        # 等价变异留档（修订 11 第 11.6 条）：每个单元的线程就是额度之后，plan 起单元脚本套不套 within_share 打出的线程逐字相同
+        world, settings = self.world()
+        for name in ("step-4-o1-comparison", "step-5", SELFPROOF_UNIT):
+            bare = self.print_unit(world, UNIT_SCRIPT_REVISION_11, self.unit_script_environment(settings, name, cap, False), name)
+            wrapped = self.print_unit(world, UNIT_SCRIPT_REVISION_11, self.unit_script_environment(settings, name, cap, True), name)
+            self.assertEqual((bare.returncode, wrapped.returncode), (0, 0), bare.stderr + wrapped.stderr)
+            self.assertTrue(printed_threads(bare.stdout), f"{name} 没打出线程")
+            self.assertEqual(printed_threads(bare.stdout), printed_threads(wrapped.stdout), name)
+
+    def test_wrapping_the_unit_environment_in_its_share_prints_the_same_threads_at_a_cap_of_7(self) -> None:
+        self.assert_wrapping_in_the_share_prints_the_same_threads("7")
+
+    def test_wrapping_the_unit_environment_in_its_share_prints_the_same_threads_without_a_cap(self) -> None:
+        self.assert_wrapping_in_the_share_prints_the_same_threads(None)
+
+    def plan_and_launch(self, script: str, names: tuple[str, ...]) -> tuple[dict[str, list[str]], dict[str, str | None]]:
+        """plan 在进程里跑（真的单元脚本 script、假前提、假逐行编排），记各单元打出的线程；launch 换成只记环境的假 Popen，记它设进环境的 SINGLEFS_THREAD_CAP。"""
+        world, settings = self.world()
+        environment = {name: value for name, value in world.environment.items() if name != "UNITS_R8_UNIT_SCRIPT"}
+        environment.update(SINGLEFS_THREAD_CAP="7", THREADS="10", UNITS_R8_UNIT_SCRIPT=script, REUSE_LIBRARY=self.path("library"),
+                           REUSE_ENTRIES=self.path("no-entries.tsv"), REUSE_READINGS=self.path("readings.tsv"))
+        launched: dict[str, str | None] = {}
+
+        def fake_popen(command, **options):
+            launched[command[-1]] = (options.get("env") or {}).get("SINGLEFS_THREAD_CAP")
+            return types.SimpleNamespace(pid=0, poll=lambda: 0, returncode=0)
+        printed = io.StringIO()
+        table_of_the_layer = table_with_the_selfproof_unit if script == UNIT_SCRIPT_REVISION_11 else units.unit_table
+        with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(units, "unit_table", table_of_the_layer):
+            with contextlib.redirect_stdout(printed):
+                self.assertEqual(units.plan(settings), 0)
+            table = units.unit_table()
+            with mock.patch.object(subprocess, "Popen", fake_popen):
+                for name in names:
+                    units.launch(settings, table[name], 1, {})
+        sections = plan_sections(printed.getvalue())
+        return {name: printed_threads(sections.get(name, "")) for name in names}, launched
+
+    def assert_plan_prints_what_launch_sets(self, script: str, names: tuple[str, ...]) -> None:
+        threads, launched = self.plan_and_launch(script, names)
+        for name in names:
+            self.assertTrue(threads[name], f"plan 里 {name} 没打出线程")
+            self.assertEqual({(value, launched.get(name)) for value in threads[name]}, {("7", "7")}, f"{name}：plan 打的 {threads[name]}，launch 设的 {launched.get(name)}")
+
+    def test_plan_prints_the_threads_that_launch_sets_for_steps_4_and_5_of_the_revision_8_unit_script(self) -> None:
+        self.assert_plan_prints_what_launch_sets(units.UNIT_SCRIPT, ("step-4-o1-comparison", "step-5"))
+
+    def test_plan_prints_the_threads_that_launch_sets_for_steps_4_5_and_the_reuse_selfproof_of_the_revision_11_unit_script(self) -> None:
+        self.assert_plan_prints_what_launch_sets(UNIT_SCRIPT_REVISION_11, ("step-4-o1-comparison", "step-5", SELFPROOF_UNIT))
 
 
 class ContrastTests(TemporaryDirectoryCase):

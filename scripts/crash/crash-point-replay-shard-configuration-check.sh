@@ -28,11 +28,11 @@
 #   别的 -- 起头的参数是用法错，退 2。
 #
 # 两个开关键只在这一份里定义（别处照这里读，不另写一份）：
-#   ENABLE_ACROSS_MACHINES  双机：写 1 才开；没写或写 0 算关（用户 2026-09-28 定：不设参数不主动开）。关着时不连第二台、退 3。
+#   ENABLE_ACROSS_MACHINES  双机：写 1 才开；没写或写 0 算关（不设参数不主动开）。关着时不连第二台、退 3。
 #   ENABLE_GPU              GPU：写 1 算开，没写或写 0 算关；这里只判写法、报开没开，用不用它归各调用方。
 #   两个键只许写 0 或 1，写别的值判不过（退 1，说清是哪个键）。别的键缺一个都判不过，与开关开没开无关。
 #
-# 主机数组 HOSTS=<地址> <地址>[ <地址>…]（要写；用户 2026-11-02 定「多机就设置 一个数组 把多机的ip写进去」）：各台有线直连段的 IP，空格分隔，至少两项、不许重复，
+# 主机数组 HOSTS=<地址> <地址>[ <地址>…]（要写；多机就设置一个数组、把多机的 ip 写进去）：各台有线直连段的 IP，空格分隔，至少两项、不许重复，
 #   每项是 IPv4 的点分写法或 IPv6（照 ip -o addr show 打的写法）；此刻只认两台：恰好一项是自己、恰好一项是第二台。哪一台是自己照这一台网卡上的地址认（scripts/hosts/peer-host-lib.sh 的 peer_host_resolve_addresses，
 #   python 一侧 scripts/hosts/multi_host_addresses.py 的 resolve 经这一份取），不写死主机名：数组里恰好一项是这一台网卡上的地址，命中 0 项或不止 1 项判不过；
 #   第二台是数组里不是自己的那一项（PEER_HOST_ADDRESS，--emit-hosts 的 MULTI_HOST_2）。ssh 直接连那个地址，用户名归各台自己的 ~/.ssh/config。
@@ -54,13 +54,13 @@
 #   不合的判不过。用它的一方照 --emit-addresses 打的 THIS_HOST_ADDRESS 在不在这个值里，定这一台编判器内核时一个一个编还是一起编
 #   （scripts/crash/crash-amplification-two-hosts.sh 的每一片）；--emit-addresses、--emit-assignments、--emit-hosts 把它原样打出（没写打空串）。
 #
-# 显卡的两个键（可以不写；用户 2026-10-10 定多机配置合成一份，私有显卡配置并进这一份）：GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED。
+# 显卡的两个键（可以不写；多机配置合成一份，私有显卡配置并进这一份）：GPU_CARDS_BY_PRIORITY、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED。
 #   这里只认这两个键名、不判值（task-server 照 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED 挑卡；值每项写 <HOSTS 里的地址>:<卡号>:<额度>，从右切两刀，
 #   判法在 crates/singlefs-verification/src/gpu_card_configuration.rs 与 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_card_list_problem），
 #   --emit-assignments、--emit-hosts 不打它们。
 #
 # NFS 共享的根 NFS_SHARED_ROOTS=<绝对路径>[:<绝对路径>…]（要写、不许空；ENABLE_ACROSS_MACHINES 写 0 也要写）：两台在同一绝对路径上共享的目录，跑出来的结果两台都读得到靠它
-#   （用户 2026-11-01 定「NFS 的配置要写在 task-server 的 readme 中。不要遗漏了。这部分也要作为检测项目。没有 nfs 不启动。要求用户配置。配置相关来自多机配置的配置文件中 不允许增加额外的配置文件」）。
+#   （NFS 的配置要写在 task-server 的 readme 中，也是检测项目；没有 nfs 不启动，要求用户配置；配置相关来自多机配置的配置文件中，不允许增加额外的配置文件）。
 #   这里判写法与本机的目录：冒号分隔、至少一段、每段以 / 起头、不以 / 结尾、不含空白、不许空段，不合的判不过（退 1），点名第几段；每段还要是这一台已在的目录
 #   （两台挂在同一绝对路径上，派到哪一台判的都是同一个结论）。导出了没有、对方挂上没有、两向读写通不通不在这里判，归 task-server
 #   （服务起来时判，control check 与 /health 也判；写法与核法在 task-server/README.md「## NFS 共享」）。--emit-assignments、--emit-hosts 把它原样打出。
@@ -88,7 +88,7 @@
 #       multi-host-run.sh 的「Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录」（「退 0，命令跑了」）
 #   MULTI_HOST_CONFIGURATION_BREAK=switch-value-unchecked  两个开关键写了 0、1 之外的值也不报错
 #       本份 --selftest 的 switch-value-refused
-#   MULTI_HOST_CONFIGURATION_BREAK=switch-missing-defaults-zero  两个开关键没写时照改前当 0（不兜底之前的样子）
+#   MULTI_HOST_CONFIGURATION_BREAK=switch-missing-defaults-zero  两个开关键没写时当 0
 #       本份 --selftest 的 switch-missing-refused
 #   MULTI_HOST_CONFIGURATION_BREAK=gpu-cards-optional  ENABLE_GPU=1 而显卡的两个键没写也判得过
 #       本份 --selftest 的 gpu-on-cards-required
@@ -175,11 +175,12 @@ configuration_break="${MULTI_HOST_CONFIGURATION_BREAK:-}"
 # 弄坏开关只在自证里认（文件头「弄坏开关」）：第一个参数是 --selftest，或祖先进程里有一个命令行带 --selftest（调用方的自证设着开关起它；沿父进程往上至多 16 层，只读 /proc）；
 # 平常跑设了 MULTI_HOST_CONFIGURATION_BREAK（不管值是什么）就在读参数之前退 2，点名它只在自证里认。
 configuration_inside_selftest() { # [<第一个参数>]：这一趟是不是自证起的（第一个参数是 --selftest，或祖先进程的命令行带 --selftest）
-  local ancestor=$PPID
+  local ancestor=$PPID ancestor_command_line
   [[ "${1:-}" == --selftest ]] && return 0
   for _ in {1..16}; do
     [[ "$ancestor" =~ ^[0-9]+$ ]] && (( ancestor > 1 )) || return 1
-    if tr '\0' ' ' < "/proc/$ancestor/cmdline" 2>/dev/null | grep -q -- '--selftest'; then return 0; fi
+    ancestor_command_line="$(tr '\0' ' ' < "/proc/$ancestor/cmdline" 2>/dev/null)"
+    if grep -q -- '--selftest' <<<"$ancestor_command_line"; then return 0; fi
     ancestor="$(sed 's/^.*) //' "/proc/$ancestor/stat" 2>/dev/null | awk '{ print $2 }')"
   done
   return 1
@@ -666,7 +667,7 @@ done
 # 两个开关：没写算 0；只许 0 或 1
 for switch_key in "${MULTI_HOST_SWITCH_KEYS[@]}"; do
   if [[ -z "${configuration[$switch_key]+set}" ]]; then
-    # 没写不算 0：开关一定要明确写出（用户：「配置配错 没有配置 就报错 不允许自动补齐」）；弄坏开关 switch-missing-defaults-zero 下照改前当 0
+    # 没写不算 0：开关一定要明确写出（配置配错、没有配置就报错，不允许自动补齐）；弄坏开关 switch-missing-defaults-zero 下当 0
     [[ "$configuration_break" == switch-missing-defaults-zero ]] || refuse "$configuration_file 里 $switch_key 没写：开关要明确写 0 或 1，没写不算 0（要开写一行 $switch_key=1、要关写 $switch_key=0）"
     configuration[$switch_key]=0
   fi

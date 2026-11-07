@@ -36,7 +36,7 @@
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --list-segments         逐行列件名、做没做完、线程（不起装置、不编译）
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --print-commands        逐件打出会起的完整命令（服务的 shard 那一步的环境变量也算数，不起装置、不建目录）
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --import-work <目录>     把另一台的工作目录（共享工作根下）里做完的块键文件并进本机（不覆盖已有的），不起装置
-#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here            装置用这棵树里 cargo build --release 编出的 target/release 下那两份（不用主 agent 编好的那一份时用）
+#   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here            装置用这一趟 cargo build --release 编出的那两份（取 cargo 报的位置，编译目录由 task-server 给；不用主 agent 编好的那一份时用）
 #   bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --selftest              假装置、假机器清单在临时树里走一遍（不起 cargo、不碰真装置）；只在临时 prune-server 上跑
 #                                                                                           （scripts/prune-server/prune_server_client_selftest.py --with-temporary-service 起），不是就退 2、一格都不跑
 # 环境：E184_BINARY（主装置二进制，默认 编译目录里的 e184_regular_layer_cost_counts）、E184_DUMP_BINARY（转储 bin，默认 E184_BINARY 加 _write_dump）、
@@ -65,7 +65,7 @@
 #   E184_SEGMENT_ONE_BREAK=device-exit-ignored  装置自己退非 0 也当输出收下
 #       「装置退 1：退 1、说退几、不写完成记录」「装置因编译树里没有 preflight.py 退 1：给出路」
 #   E184_SEGMENT_ONE_BREAK=product-name-fixed  产物名不取号、一律用本名
-#       「单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results」「share 没有判部分的族：library 不跑」「原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2」「产物本名已有：另存加 -r2」「换了装置二进制：做完的件全部重做（主装置那几件），转储 bin 没变的沿用」「只换了转储 bin：转储六件作废，吃它们输出的块键六件跟着作废（前提作废了），别的件沿用」「分片、并进、再不带参数跑：块键清单打全、产物拼出」「share 有一族判部分：library 跑、产物里是 library 的输出」「冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起」「--assemble：件齐了不起装置、另存 -r2」
+#       「单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results」「share 没有判部分的族：library 不跑」「原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2」「产物本名已有：另存加 -r2」「换了装置二进制：做完的件全部重做（主装置那几件），转储 bin 没变的沿用」「只换了转储 bin：转储六件作废，吃它们输出的块键六件跟着作废（前提作废了），别的件沿用」「merge：并进各片的块键文件（已有的不覆盖）、块键清单打全、产物拼出」「share 有一族判部分：library 跑、产物里是 library 的输出」「冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起」「--assemble：件齐了不起装置、另存 -r2」
 #   E184_SEGMENT_ONE_BREAK=prerequisite-unchecked  --only 不查前面的件做完没有
 #       「--only 点名的件前面的件没做完退 2、装置一次没起」
 #   E184_SEGMENT_ONE_BREAK=share-restriction-ignored  shard 那一步不分流、每片算全部流的块键
@@ -78,12 +78,12 @@
 #       「单机全新：十七件现跑、library 不跑、产物按带日期的名字落进 research/results」「share 没有判部分的族：library 不跑」「原样重起：做完的件全部沿用（只有读仓里的读数重读）、产物另存 -r2」「换了装置二进制：旧装置打的主装置那十件逐件报作废、旧的整份留在 void 目录、装置自己写的块键目录不留给新装置、转储 bin 那六件不作废」
 #   E184_SEGMENT_ONE_BREAK=pinned-mismatch-ignored  钉住常量与段形现算的两态闭式对不上也往下走
 #       「钉住的常量与段形现算的两态闭式对不上退 3、装置一次没起」「钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值」
-#   E184_SEGMENT_ONE_BREAK=missing-pinned-as-mismatch  有段形而认不出两态闭式钉值的流也记成对不上（改前的认法）
+#   E184_SEGMENT_ONE_BREAK=missing-pinned-as-mismatch  有段形而认不出两态闭式钉值的流也记成对不上
 #       「冒烟层测试钉的是另一个量：记缺钉值（只记一条）、不算对不上、不进钉表、别的流照常、装置照起」「钉值写错的与钉另一个量的同在：对不上仍只有一条（退 3、装置一次没起），钉另一个量的那条只记缺钉值」
 #   E184_SEGMENT_ONE_BREAK=crashflow-hit-ignored  停机 T6 的读数有命中也往下走
 #       「crates 里出现 CrashFlow 退 3（停机 T6）、装置一次没起」「停机 T6 要读的文件一个都读不到：不当零命中，退 3」
 #   E184_SEGMENT_ONE_BREAK=import-overwrites  并进块键文件时覆盖已有的
-#       「--import-work 并进块键文件、已有的不覆盖、不起装置」
+#       「merge：并进各片的块键文件（已有的不覆盖）、块键清单打全、产物拼出」
 #   E184_SEGMENT_ONE_BREAK=exec-root-binary  装置仍按开跑时给的那个路径起、不按私有副本
 #       「装置在一趟里不许换：起装置之前仓根那份被换掉，之后起的每一件自报的 sha256 与完成记录里的、块键文件里的都是开跑时那份」
 #   E184_SEGMENT_ONE_BREAK=owned-files-kept  换了装置作废一件时，装置自己写的转储与块键目录留在原处
@@ -92,6 +92,8 @@
 #       「--import-work 对方的装置 sha256 不同：这一档的块键文件跳过并报作废，别的档照并」
 #   E184_SEGMENT_ONE_BREAK=merge-sha-unchecked  拼产物之前不核各件记的装置 sha256 彼此相同
 #       「拼产物之前各件记的装置 sha256 彼此不同：拒、退 1、不另出产物」
+#   E184_SEGMENT_ONE_BREAK=build-jobs-from-thread-limit  --build-here 编装置时编译线程取本脚本自己的 THREAD_LIMIT（调用方自己定线程），不照服务交的 CARGO_BUILD_JOBS
+#       「--build-here：编一次（两个 bin 一条 cargo，直接起、编译线程照服务交的 CARGO_BUILD_JOBS）、用这棵树 target/release 下的装置」
 #   （上面的 binary-change-ignored 同时管续跑开头那一遍作废：打开后记的 sha256 不同的件照旧沿用。）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -101,7 +103,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：本脚本得留在仓里的 scripts/experiment-apparatus/ 下（它按自己的位置找仓根）；挪走了就放回去再起" >&2; exit 2; }
 
-# 装置二进制的默认位置：主 agent 经 compile-then-swap.py 编好的那个编译目录（编译目录不进仓；--build-here 时改用这棵树的 target/release）。
+# 装置二进制的默认位置：主 agent 经 compile-then-swap.py 编好的那个编译目录（编译目录不进仓；--build-here 时改用这一趟 cargo 报的编出来的位置）。
 #   它与缺省的工作目录都在工作根（.claude/hooks/lib_work_root.py，两台同一份）下：只在没给装置、没给工作目录时取（自证的各格都给了），取不到就停，不退回 $HOME 下
 DEFAULT_BINARY_SUBDIRECTORY="m3-close-w4-e184-runner-b/compile-then-swap/target/release"
 work_root_or_stop() {   # <没给的那个变量名>：成了把工作根放进 WORK_ROOT
@@ -434,7 +436,7 @@ segment_seconds_summary() {
 
 # ───────────────────────────── 装置二进制 ─────────────────────────────
 
-# 要用的两份二进制：--build-here 用这棵树 target/release 下的；E184_BINARY 给了用它；都没有取默认编译目录。
+# 要用的两份二进制：--build-here 先占这棵树 target/release 下的名字，build_here 编完换成 cargo 报的这一趟编出来的位置；E184_BINARY 给了用它；都没有取默认编译目录。
 resolve_binaries() {
   if ((BUILD_HERE)); then
     MAIN_BINARY="target/release/$MAIN_BINARY_NAME"
@@ -449,13 +451,18 @@ resolve_binaries() {
   fi
 }
 
+# 编译直接起、不再套线程包装：整条命令交 task-server，编译线程照服务交的 CARGO_BUILD_JOBS（弄坏开关 build-jobs-from-thread-limit 下改成本脚本的 THREAD_LIMIT）
+# 两份装置取 cargo 报的这一趟编出来的位置（long-run-lib/binary-identity.sh 的 binary_identity_build；编译目录由 task-server 给，不是这棵树的 target/）
 build_here() {
-  bash scripts/hosts/capped.sh "$THREAD_LIMIT" cargo build --release -p singlefs-verification --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
-    > "$WORK_DIRECTORY/logs/build-$RUN_STAMP.log" 2>&1 || {
-    echo "  ✗ 装置编不过（$WORK_DIRECTORY/logs/build-$RUN_STAMP.log）" >&2
-    echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
+  break_is build-jobs-from-thread-limit && export CARGO_BUILD_JOBS="$THREAD_LIMIT"
+  binary_identity_build "$MAIN_BINARY_NAME,$DUMP_BINARY_NAME" --release -p singlefs-verification --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
+    2> "$WORK_DIRECTORY/logs/build-$RUN_STAMP.log" || {
+    echo "  ✗ 装置编不过，或编过了 cargo 没报出它编在哪（$WORK_DIRECTORY/logs/build-$RUN_STAMP.log）" >&2
+    echo "     → 怎么办：照那份日志里 cargo 的第一处 error（或末尾那两行的出路）改，再起本脚本" >&2
     exit 1
   }
+  MAIN_BINARY="${BUILT_BINARIES[0]}"
+  DUMP_BINARY="${BUILT_BINARIES[1]}"
 }
 
 # 两份二进制都得在、能执行；算它们的 sha256。
@@ -561,8 +568,8 @@ run_segment() {
     printf '%s\n' "$(expected_binary_sha "$seg")" > "$(segment_stamp_path "$seg").tmp-$$" && mv -f -- "$(segment_stamp_path "$seg").tmp-$$" "$(segment_stamp_path "$seg")" || return 1
     segment_command "$seg"
     echo "件 $seg：起跑（线程 $threads、日志 $log）"
-    # 装置自己的线程变量 E184_THREADS 排在 capped.sh 设的 SINGLEFS_THREAD_CAP 前面：用户环境里留着旧值时，这一件的线程数以表为准。
-    bash scripts/hosts/capped.sh "$threads" env "E184_THREADS=$threads" nice -n 19 "$binary" "${COMMAND[@]}" > "$out_tmp" 2> "$log"
+    # 直接起、不再套线程包装（整条命令的线程上限由服务定）；这一件的线程照表写进装置自己的线程变量 E184_THREADS（装置先读它，再读 SINGLEFS_THREAD_CAP）。
+    env "E184_THREADS=$threads" nice -n 19 "$binary" "${COMMAND[@]}" > "$out_tmp" 2> "$log"
     exit_code=$?
   fi
   seconds=$(( $(date +%s) - started ))
@@ -812,7 +819,7 @@ print_commands() {
     binary="$MAIN_BINARY"; [[ "$kind" == dump ]] && binary="$DUMP_BINARY"
     threads=$(segment_threads "$seg")
     segment_command "$seg"
-    printf '%s\tbash scripts/hosts/capped.sh %s env E184_THREADS=%s nice -n 19 %s %s\n' "$seg" "$threads" "$threads" "$binary" "${COMMAND[*]}"
+    printf '%s\tenv E184_THREADS=%s nice -n 19 %s %s\n' "$seg" "$threads" "$binary" "${COMMAND[*]}"
   done
 }
 
@@ -840,7 +847,7 @@ list_segments() {
 
 # ───────────────────────────── 自证 ─────────────────────────────
 
-# 自证：假装置（主装置与转储 bin 各一份）、假线程包装、假机器清单，每一格在自己的临时树里从头搭，格与格不共用状态。
+# 自证：假装置（主装置与转储 bin 各一份）、假机器清单、PATH 最前面的假 cargo，每一格在自己的临时树里从头搭，格与格不共用状态。
 # 换不掉的一处：产物名里的日期用 TZ=Asia/Tokyo date +%F 取，自证里同样取，跨零点的那一刻会误红，重跑即可。
 make_selftest_fakes() {
   local fakes="$1"
@@ -848,6 +855,13 @@ make_selftest_fakes() {
   cat > "$fakes/device" <<'FAKE'
 #!/usr/bin/env bash
 # 假装置：按子命令造文件、打 E7RESULT 行；E184_SELFTEST_DEVICE 选一种坏法。
+# E184_SELFTEST_SWAP_TARGET：头一回起来、还没干活之前（脚本已拷过私有副本）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把仓根那份换掉，
+#   再按自己被起的那个路径 exec 一次：按私有副本起的照旧是开跑时那份，按仓根路径起的（弄坏开关 exec-root-binary）就成了换后那份。
+if [[ -n "${E184_SELFTEST_SWAP_TARGET:-}" && ! -e "$E184_SELFTEST_SWAP_TARGET.swapped" ]]; then
+  { cat -- "$E184_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E184_SELFTEST_SWAP_TARGET.swap" \
+    && chmod +x "$E184_SELFTEST_SWAP_TARGET.swap" && mv -f -- "$E184_SELFTEST_SWAP_TARGET.swap" "$E184_SELFTEST_SWAP_TARGET" && : > "$E184_SELFTEST_SWAP_TARGET.swapped" \
+    && exec "$0" "$@"
+fi
 kind=main
 [[ "$(basename "$0")" == *_write_dump ]] && kind=dump
 echo "device $kind $* | threads=${E184_THREADS:-unset}" >> "$E184_SELFTEST_CALLS"
@@ -895,17 +909,6 @@ case "$1" in
     close library_done "flows=1 recorded_blocks=0" ;;
 esac
 FAKE
-  cat > "$fakes/capped.sh" <<'FAKE'
-#!/usr/bin/env bash
-echo "capped $1" >> "$E184_SELFTEST_CALLS"
-# E184_SELFTEST_SWAP_TARGET：起装置之前（脚本已拷过私有副本）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把仓根那份换掉。
-if [[ -n "${E184_SELFTEST_SWAP_TARGET:-}" && "$*" == *"nice -n 19"* && ! -e "$E184_SELFTEST_SWAP_TARGET.swapped" ]]; then
-  { cat -- "$E184_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E184_SELFTEST_SWAP_TARGET.swap" \
-    && chmod +x "$E184_SELFTEST_SWAP_TARGET.swap" && mv -f -- "$E184_SELFTEST_SWAP_TARGET.swap" "$E184_SELFTEST_SWAP_TARGET" && : > "$E184_SELFTEST_SWAP_TARGET.swapped"
-fi
-shift
-exec "$@"
-FAKE
   cat > "$fakes/hosts" <<'FAKE'
 #!/usr/bin/env bash
 case "${E184_SELFTEST_HOSTS:-2}" in
@@ -915,16 +918,20 @@ esac
 FAKE
   cat > "$fakes/cargo" <<'FAKE'
 #!/usr/bin/env bash
-echo "cargo $*" >> "$E184_SELFTEST_CALLS"
+echo "cargo $* | jobs=${CARGO_BUILD_JOBS:-unset}" >> "$E184_SELFTEST_CALLS"
 mkdir -p target/release
 cp "$E184_SELFTEST_DEVICE_SOURCE" target/release/e184_regular_layer_cost_counts
 cp "$E184_SELFTEST_DEVICE_SOURCE" target/release/e184_regular_layer_cost_counts_write_dump
+# 照 cargo 的机读输出报两行 compiler-artifact（脚本照它取装置，不自己拼路径）
+for name in e184_regular_layer_cost_counts e184_regular_layer_cost_counts_write_dump; do
+  printf '{"reason":"compiler-artifact","target":{"name":"%s"},"executable":"%s","fresh":false}\n' "$name" "$PWD/target/release/$name"
+done
 exit 0
 FAKE
-  chmod +x "$fakes/device" "$fakes/capped.sh" "$fakes/hosts" "$fakes/cargo"
+  chmod +x "$fakes/device" "$fakes/hosts" "$fakes/cargo"
 }
 
-# 一格的树：本脚本的拷贝、假的 scripts/hosts 两件与线程取法、指向真仓 .claude 的符号链接、假装置两份、钉住常量的一个测试夹具、
+# 一格的树：本脚本的拷贝、scripts/hosts 下只有线程取法 heavy-threads.sh（没有线程包装，常规路径要是又套上它就起不来、各格照红）、指向真仓 .claude 的符号链接、假装置两份、钉住常量的一个测试夹具、
 # 停机 T6 要读的两处空源文件。
 make_selftest_tree() {
   local cell="$1" fakes="$2" real_root="$3" tree="$1/tree"
@@ -932,7 +939,7 @@ make_selftest_tree() {
     "$tree/crates/singlefs-verification/src" "$tree/crates/singlefs-verification/tests"
   cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/e184-segment-one-long-run.sh"
   cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
-  cp -- "$fakes/capped.sh" "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
+  cp -- "$real_root/scripts/hosts/heavy-threads.sh" "$tree/scripts/hosts/"
   cp -- "$fakes/hosts" "$tree/scripts/crash/crash-point-replay-shard-configuration-check.sh"
   ln -s -- "$real_root/.claude" "$tree/.claude"
   cp -- "$fakes/device" "$cell/bin/e184_regular_layer_cost_counts"
@@ -1059,7 +1066,7 @@ run_selftest() {
   expect "E184_THREADS 不设：线程上限取登记值（.claude/heavy-thread-default）" '((exit_code == 0)) && grep -qF "这台线程上限 $(heavy_thread_default)" "$cell/out"'
   new_cell print
   invoke "$cell" --print-commands; exit_code=$?
-  expect "--print-commands：逐件打出命令、线程落在命令里、命令里没有内存包装、不起装置、不建目录" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s400\tbash scripts/hosts/capped.sh 3 env E184_THREADS=3 nice -n 19 \S+ keys --dump \S+/dumps/random-broad-4g-s400 --out \S+/keys/random-broad-4g-s400 --controls$" "$cell/out" && grep -qP "^share\t.* share --candidates \S+/keys/fixed --candidates \S+/keys/random-broad-4g-s050 .* --against \S+/keys/fixed --out \S+/steps/share.file --pinned-smoke \S+/pinned-smoke.txt$" "$cell/out" && [[ ! -e "$cell/calls" && ! -d "$cell/work/steps" ]]'
+  expect "--print-commands：逐件打出命令、线程落在命令里、命令里没有内存包装、不起装置、不建目录" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s400\tenv E184_THREADS=3 nice -n 19 \S+ keys --dump \S+/dumps/random-broad-4g-s400 --out \S+/keys/random-broad-4g-s400 --controls$" "$cell/out" && grep -qP "^share\t.* share --candidates \S+/keys/fixed --candidates \S+/keys/random-broad-4g-s050 .* --against \S+/keys/fixed --out \S+/steps/share.file --pinned-smoke \S+/pinned-smoke.txt$" "$cell/out" && [[ ! -e "$cell/calls" && ! -d "$cell/work/steps" ]]'
   mkdir -p -- "$cell/plan"
   TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=1/2 TASK_SERVER_SHARD_PLAN_DIRECTORY="$cell/plan" invoke "$cell" --print-commands; exit_code=$?
   expect "--print-commands（shard 1/2）：块键那几件读链接目录、链接目录不建" '((exit_code == 0)) && grep -qP "^keys-random-broad-4g-s050\t.* keys --dump \S+/share-links/random-broad-4g-s050-1-of-2 --out " "$cell/out" && [[ ! -d "$cell/work-share-1-of-2/share-links" ]]'
@@ -1156,8 +1163,9 @@ run_selftest() {
   invoke "$cell" --assemble; exit_code=$?
   expect "--assemble：件齐了不起装置、另存 -r2" '((run_zero_exit == 0 && exit_code == 0)) && is_complete_product "$cell/tree/$stem-$today-r2.out" && (($(count_calls "$cell" "^device main selfcheck") == 1))'
   new_cell build-here
-  INVOKE_BINARY= invoke "$cell" --build-here --only selfcheck; exit_code=$?
-  expect "--build-here：编一次（两个 bin 一条 cargo）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
+  # 这一格的 CARGO_BUILD_JOBS 是 5、E184_THREADS 是 7：编译线程要照前一个
+  CARGO_BUILD_JOBS=5 INVOKE_BINARY= invoke "$cell" --build-here --only selfcheck; exit_code=$?
+  expect "--build-here：编一次（两个 bin 一条 cargo，直接起、编译线程照服务交的 CARGO_BUILD_JOBS）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump --message-format=json-render-diagnostics | jobs=5$") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
   new_cell binary-missing
   INVOKE_BINARY="$cell/bin/not-built" invoke "$cell" --only selfcheck; exit_code=$?
   expect "装置二进制没编好退 78、装置一次没起" '((exit_code == 78)) && grep -qF "装置还没编好" "$cell/out" && [[ ! -e "$cell/calls" ]]'

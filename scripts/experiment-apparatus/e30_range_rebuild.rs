@@ -163,7 +163,7 @@ mod tests {
     }
 
     /// 散布触到的叶数封顶于叶总数：K 超过叶数后每叶都被触到，代价不再涨
-    /// （变异审计补的：此前 k > 叶数只在输出档出现，没有测试走到封顶分支）。
+    /// （变异审计补的：k > 叶数只在输出档出现，没有测试走到封顶分支）。
     #[test]
     fn scattered_leaf_count_saturates_at_the_leaf_total() {
         let writes_at_leaf_total = per_item_writes(4096, LEAF_COUNT, LEAF_COUNT, Layout::Scattered);

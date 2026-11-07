@@ -33,14 +33,15 @@
 # 用法（在仓里任何目录起都行，脚本自己回到仓根）：
 #   bash scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh                          本机跑全部片并出产物（片结果库里已有的片直接取）
 #   bash scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh --list-items             列可点名的历史名（要装置已编好，不编译）
-#   bash scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh --selftest               假装置、假 capped.sh、假 cargo 在临时树里走一遍整库续跑、分片三步、并回服务、产物名取号与完成标记（不起 cargo、编译）
+#   bash scripts/experiment-apparatus/e182-single-device-units-kept-long-run.sh --selftest               假装置、假 cargo 在临时树里走一遍整库续跑、分片三步、并回服务、产物名取号与完成标记（不起 cargo、编译）
 # 环境：E182_LOG_DIRECTORY（进度日志与中转目录放哪，默认工作根下的 e182-long-run，工作根取 .claude/hooks/lib_work_root.py、两台同一份）。
 # 产物名：research/results/e182-unreadable-abandoned-root-forks-single-device-units-kept.out 已有时另存 …-single-device-units-kept-<日期>.out，同一天再跑加 -r2、-r3，已有的一个不动。
 # 退出码：0 做完（分片时是这一份的片判完）；1 装置跑失败或产物不齐；2 用法错、不在 git 工作树里；3 装置报停机（该停下交回主 agent 的，日志里 STOP: 那一行）；
 #   75 prune-server 不可用（片结果库拉不下来或判完的片并不回去）；78 装置没编好（--list-items）。
 #
-# 自证的做法：把本脚本拷进临时树（scripts/experiment-apparatus/ 下），树里放假的 scripts/hosts/capped.sh（记一笔再 exec）、
-#   假的 target/release/ 装置（按 E182_SHARD_SHARE 与 E182_VERDICT_LIBRARY 往中转目录写六个片文件、打现判/复用那一行、按 E182_SELFTEST_DEVICE 装停机/失败/产物不齐/判完几片再失败/判完几片再拿住）、
+# 自证的做法：把本脚本拷进临时树（scripts/experiment-apparatus/ 下；树里没有 scripts/hosts/，常规路径要是又套上线程包装就起不来、各格照红），树里放
+#   假的 target/release/ 装置（按 E182_SHARD_SHARE 与 E182_VERDICT_LIBRARY 往中转目录写六个片文件（片内容带假装置自己的 sha256，只给「装置在一趟里不许换」那一格核私有副本用；真装置的片不记二进制 sha256）、打现判/复用那一行、按 E182_SELFTEST_DEVICE 装停机/失败/产物不齐/判完几片再失败/判完几片再拿住；
+#   E182_SELFTEST_SWAP_TARGET 设了时头一回起来先把仓根那份换掉、再按自己被起的路径 exec 一次）、
 #   PATH 最前面的假 cargo（E182_SELFTEST_CARGO=fail 退 101）、指向真仓 .claude 与 scripts/gate 的符号链接（准入判法、library-files）；每一格各搭一棵树、各用各的日志目录，格与格不共用状态。
 #   片结果库写进临时 prune-server（库名取每一格的树，键带临时目录的命名空间）；库里有几片经 admission.py library-files fetch 拉进这一格的临时目录数。
 #   只在临时 prune-server 上跑：开跑先调客户端 selftest_service_problem，不是临时服务就退 2、一格都不跑，不写真服务。起法：
@@ -70,10 +71,10 @@
 #   E182_UNITS_KEPT_BREAK=product-name-fixed  产物名不取号、一律用本名
 #       「原样重起：六片全取自库」「产物本名已有：另存带日期的」「本名与带日期的都已有：加 -r2」
 #   E182_UNITS_KEPT_BREAK=exec-root-binary  装置仍按仓根那个路径起、不按私有副本
-#       「装置在一趟里不许换：起装置之前仓根那份被换掉，装置自报的 sha256 与片里记的、开跑那句报的都是开跑时那份」
+#       「装置在一趟里不许换：起装置之前仓根那份被换掉，假装置写进片内容的自报 sha256 与开跑那句报的都是开跑时那份」
 #   E182_UNITS_KEPT_BREAK=transit-not-merged  中转目录里判完的片不并回服务（跑着时与装置退出时都不并）
 #       「单机全新：构建一次、六片现判、产物按本名落进 research/results，六片并回服务、本地不建库」「原样重起：六片全取自库」
-#       「shard 两份各自并回服务、merge 那一步片全取自库、合并出产物」「装置在一趟里不许换：起装置之前仓根那份被换掉，装置自报的 sha256 与片里记的、开跑那句报的都是开跑时那份」
+#       「shard 两份各自并回服务、merge 那一步片全取自库、合并出产物」「装置在一趟里不许换：起装置之前仓根那份被换掉，假装置写进片内容的自报 sha256 与开跑那句报的都是开跑时那份」
 #       「装置判完三片再失败：退 1，判完的三片已并回服务」「跑着时定时并回：判完三片之后整趟被 SIGKILL，三片已在服务里」
 #   E182_UNITS_KEPT_BREAK=failed-run-not-merged  装置退非 0 时不并回（改错的样子：失败那一趟判完的片丢了）
 #       「装置判完三片再失败：退 1，判完的三片已并回服务」
@@ -88,7 +89,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：本脚本得留在仓里的 scripts/experiment-apparatus/ 下（它按自己的位置找仓根）；挪走了就放回去再起" >&2; exit 2; }
 
-BINARY="target/release/e182_unreadable_abandoned_root_forks"
+BINARY="target/release/e182_unreadable_abandoned_root_forks"   # 只给 --list-items（不编）读；真跑时 build_the_binary 换成 cargo 报的这一趟编出来的位置（编译目录由 task-server 给，不是仓根 target/）
 DEVICE_MODE="single-device-units-kept"
 PRODUCT_STEM="research/results/e182-unreadable-abandoned-root-forks-single-device-units-kept"
 LIBRARY_KIND="e182-single-device-units-kept"          # 片结果库在 prune-server 里的种类（文件头「片结果库」）
@@ -179,8 +180,14 @@ next_free_product_path() {
   echo "$PRODUCT_STEM-$today-r$revision.out"
 }
 
+# 编译与跑装置都直接起、不再套线程包装：整条命令交 task-server，线程照服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS
 build_the_binary() {
-  bash scripts/hosts/capped.sh default cargo build --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks || break_is build-failure-ignored || {
+  # 装置取 cargo 报的这一趟编出来的位置（long-run-lib/binary-identity.sh 的 binary_identity_build），不拿仓根 target/ 下那一份（可能是早先编的旧二进制）
+  if binary_identity_build e182_unreadable_abandoned_root_forks --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks; then
+    BINARY="$BUILT_BINARY"
+    return 0
+  fi
+  break_is build-failure-ignored || {
     echo "  ✗ 装置编不过" >&2
     echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
     exit 1
@@ -188,7 +195,7 @@ build_the_binary() {
 }
 
 
-# 自证：假装置、假 capped.sh、假 cargo 在每一格自己的临时树里走一遍（做法与换不掉的一处见文件头）。
+# 自证：假装置、假 cargo 在每一格自己的临时树里走一遍（做法与换不掉的一处见文件头）。
 run_selftest() {
   local work failures=0 cell_count=0 fakes real_root today cell exit_code swap_target original_sha service_problem unreachable_address
   local script_name="${SCRIPT_PATH##*/}" script_pid device_pid waited
@@ -209,6 +216,13 @@ run_selftest() {
   echo "$SELFTEST_MARK_TEXT" > "$work/mark"
   cat > "$fakes/device" <<'FAKE'
 #!/usr/bin/env bash
+# E182_SELFTEST_SWAP_TARGET：头一回起来、还没干活之前（脚本已拷过私有副本）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把仓根那份换掉，
+#   再按自己被起的那个路径 exec 一次：按私有副本起的照旧是开跑时那份，按仓根路径起的（弄坏开关 exec-root-binary）就成了换后那份。
+if [[ -n "${E182_SELFTEST_SWAP_TARGET:-}" && ! -e "$E182_SELFTEST_SWAP_TARGET.swapped" ]]; then
+  { cat -- "$E182_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E182_SELFTEST_SWAP_TARGET.swap" \
+    && chmod +x "$E182_SELFTEST_SWAP_TARGET.swap" && mv -f -- "$E182_SELFTEST_SWAP_TARGET.swap" "$E182_SELFTEST_SWAP_TARGET" && : > "$E182_SELFTEST_SWAP_TARGET.swapped" \
+    && exec "$0" "$@"
+fi
 echo "device $* | library=${E182_VERDICT_LIBRARY:-unset} share=${E182_SHARD_SHARE:-unset}" >> "$E182_SELFTEST_CALLS"
 echo "$(sha256sum -- "$0" | cut -d' ' -f1)" >> "$E182_SELFTEST_CALLS.self-sha"
 if [[ "$1" == list-items ]]; then printf 'history_a\nhistory_b\n'; exit 0; fi
@@ -240,33 +254,23 @@ emitted=7
 if [[ "${E182_SELFTEST_DEVICE:-ok}" == truncated ]]; then emitted=99; fi
 printf 'E7RESULT name=done emitted=%s\n' "$emitted"
 FAKE
-  cat > "$fakes/capped.sh" <<'FAKE'
-#!/usr/bin/env bash
-echo "capped $1" >> "$E182_SELFTEST_CALLS"
-# E182_SELFTEST_SWAP_TARGET：起装置之前（脚本已拷过私有副本）把这个路径的装置换成另一份字节不同的，像别的会话的 cargo 把仓根那份换掉。
-if [[ -n "${E182_SELFTEST_SWAP_TARGET:-}" && "${2:-}" != cargo && ! -e "$E182_SELFTEST_SWAP_TARGET.swapped" ]]; then
-  { cat -- "$E182_SELFTEST_SWAP_TARGET"; echo "# swapped by a build while the long run is going"; } > "$E182_SELFTEST_SWAP_TARGET.swap" \
-    && chmod +x "$E182_SELFTEST_SWAP_TARGET.swap" && mv -f -- "$E182_SELFTEST_SWAP_TARGET.swap" "$E182_SELFTEST_SWAP_TARGET" && : > "$E182_SELFTEST_SWAP_TARGET.swapped"
-fi
-shift
-exec "$@"
-FAKE
   cat > "$fakes/bin/cargo" <<'FAKE'
 #!/usr/bin/env bash
 echo "cargo $*" >> "$E182_SELFTEST_CALLS"
 if [[ "${E182_SELFTEST_CARGO:-ok}" == fail ]]; then echo "error: selftest compile error" >&2; exit 101; fi
+# build 时照 cargo 的机读输出报一行 compiler-artifact，executable 指这一格树里放假装置的那一份（脚本照它取装置，不自己拼路径）
+[[ "${1:-}" == build ]] && printf '{"reason":"compiler-artifact","target":{"name":"e182_unreadable_abandoned_root_forks"},"executable":"%s","fresh":false}\n' "$PWD/target/release/e182_unreadable_abandoned_root_forks"
 exit 0
 FAKE
   printf '#!/usr/bin/env bash\nprintf "MULTI_HOST_COUNT=1\\n"\n' > "$fakes/hosts-two"
   printf '#!/usr/bin/env bash\nexit 3\n' > "$fakes/hosts-one"
-  chmod +x "$fakes/device" "$fakes/capped.sh" "$fakes/bin/cargo" "$fakes/hosts-two" "$fakes/hosts-one"
-  # 一格的树：本脚本的拷贝、假的 scripts/hosts 两件、假装置、指向真仓 .claude 与 scripts/gate 的符号链接、空的 git 仓。
+  chmod +x "$fakes/device" "$fakes/bin/cargo" "$fakes/hosts-two" "$fakes/hosts-one"
+  # 一格的树：本脚本的拷贝、假装置、指向真仓 .claude 与 scripts/gate 的符号链接、空的 git 仓。
   make_tree() {
     local tree="$1/tree"
-    mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/scripts/hosts" "$tree/target/release" "$tree/research/results" "$1/logs"
+    mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/target/release" "$tree/research/results" "$1/logs"
     cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/$script_name"
     cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
-    cp -- "$fakes/capped.sh" "$tree/scripts/hosts/"
     cp -- "$fakes/device" "$tree/target/release/e182_unreadable_abandoned_root_forks"
     ln -s -- "$real_root/.claude" "$tree/.claude"
     ln -s -- "$real_root/scripts/gate" "$tree/scripts/gate"
@@ -313,7 +317,7 @@ FAKE
   local first=0 second=0
   cell="$work/fresh"; make_tree "$cell"
   invoke "$cell"; exit_code=$?
-  expect "单机全新：构建一次、六片现判、产物按本名落进 research/results，六片并回服务、本地不建库" '((exit_code == 0)) && grep -qF "产物：$stem.out（7 行）；现判 6、复用 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem.out") == 7)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks") == 1)) && grep -qF "device $DEVICE_MODE | library=$cell/logs/$LIBRARY_KIND-" "$cell/calls" && grep -qF ".transit-shards share=unset" "$cell/calls" && (($(count_calls "$cell" "^capped default$") == 2)) && [[ "$(fetched_count "$cell")" == 6 && ! -e "$cell/tree/.git/singlefs-unit-verdicts" ]] && ! compgen -G "$cell/logs/*.transit-shards" > /dev/null'
+  expect "单机全新：构建一次、六片现判、产物按本名落进 research/results，六片并回服务、本地不建库" '((exit_code == 0)) && grep -qF "产物：$stem.out（7 行）；现判 6、复用 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem.out") == 7)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks") == 1)) && grep -qF "device $DEVICE_MODE | library=$cell/logs/$LIBRARY_KIND-" "$cell/calls" && grep -qF ".transit-shards share=unset" "$cell/calls" && [[ "$(fetched_count "$cell")" == 6 && ! -e "$cell/tree/.git/singlefs-unit-verdicts" ]] && ! compgen -G "$cell/logs/*.transit-shards" > /dev/null'
   cell="$work/restart"; make_tree "$cell"
   invoke "$cell"; first=$?
   invoke "$cell"; exit_code=$?
@@ -372,7 +376,7 @@ FAKE
   swap_target="$cell/tree/target/release/e182_unreadable_abandoned_root_forks"
   original_sha=$(sha256sum -- "$swap_target" | cut -d' ' -f1)
   E182_SELFTEST_SWAP_TARGET="$swap_target" invoke "$cell"; exit_code=$?
-  expect "装置在一趟里不许换：起装置之前仓根那份被换掉，装置自报的 sha256 与片里记的、开跑那句报的都是开跑时那份" '((exit_code == 0)) && [[ -e "$swap_target.swapped" ]] && [[ "$(sha256sum -- "$swap_target" | cut -d" " -f1)" != "$original_sha" ]] && [[ "$(sort -u "$cell/calls.self-sha")" == "$original_sha" ]] && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out" && [[ "$(fetched_count "$cell")" == 6 ]] && (($(grep -l "by device $original_sha" "$cell"/fetched/*.shard | wc -l) == 6))'
+  expect "装置在一趟里不许换：起装置之前仓根那份被换掉，假装置写进片内容的自报 sha256 与开跑那句报的都是开跑时那份" '((exit_code == 0)) && [[ -e "$swap_target.swapped" ]] && [[ "$(sha256sum -- "$swap_target" | cut -d" " -f1)" != "$original_sha" ]] && [[ "$(sort -u "$cell/calls.self-sha")" == "$original_sha" ]] && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out" && [[ "$(fetched_count "$cell")" == 6 ]] && (($(grep -l "by device $original_sha" "$cell"/fetched/*.shard | wc -l) == 6))'
   # 跑着时定时并回（文件头「片结果库」）：并回间隔设 1 秒，装置判完三片之后拿住；等过几次并回再对整趟（脚本这一层，本格自己起的进程）发 SIGKILL，
   # 像撞上限被整组杀掉：三片已在服务里。装置自己拿住 6 秒后退出，这里只等它退、不对它发信号
   cell="$work/periodic-merge"; make_tree "$cell"
@@ -515,7 +519,7 @@ break_is exec-root-binary && launch_binary="$BINARY"
 echo "装置 sha256 $PINNED_BINARY_SHA256（私有副本 $PINNED_BINARY，源 $BINARY）"
 binary_identity_assert_unchanged || exit 1
 # 装置放后台跑，每 merge_interval 秒把判完的片并回服务一次（文件头「片结果库」：被整组杀掉时丢的至多是最后这一段）；被停时把 TERM 转给装置
-env ${environment[@]+"${environment[@]}"} bash scripts/hosts/capped.sh default \
+env ${environment[@]+"${environment[@]}"} \
   "$launch_binary" "${arguments[@]}" > "$product_scratch" 2> "$progress_log" &
 device_pid=$!
 trap 'kill -TERM "$device_pid" 2> /dev/null' TERM INT

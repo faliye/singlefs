@@ -34,7 +34,7 @@
   SUBAGENT_TRANSCRIPT_BREAK=start-by-mtime  first_record_moment() 交文件修改时刻，不读第一条记录
       「✗ subagent_transcript 自证：起点按首条记录」「✗ subagent_transcript 自证：窗口按起点筛」「✗ subagent_transcript 自证：一条带时间戳的记录都没有」
       （另：agent-cost.py 自证里交回与起点那一格同样红）
-  SUBAGENT_TRANSCRIPT_BREAK=honor-break-outside-selftest  refuse_break_outside_selftest() 不拒：直接执行而不是 --selftest 时设了开关也照常往下走（改前的样子）
+  SUBAGENT_TRANSCRIPT_BREAK=honor-break-outside-selftest  refuse_break_outside_selftest() 不拒：直接执行而不是 --selftest 时设了开关也照常往下走
       「✗ subagent_transcript 自证：平常跑设开关要被拒」
 """
 import datetime

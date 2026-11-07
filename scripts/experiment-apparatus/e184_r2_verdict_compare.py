@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # admission: always 每一次调都比此刻点名的两份产物，上一次的结论不替这一次作保
 # run-condition: none 只读点名的两份产物文本，除了 python3 之外没有环境要求，不起 cargo、不编不跑、不碰装置
-"""E184 重跑 r2（research/prompts/e184-r2-prereg.md 5.3 节）的逐格比：改前、改后两份长跑产物上，判定词有没有换。
+"""E184 重跑 r2（research/prompts/e184-r2-prereg.md 5.3 节）的逐格比：改前、改后两份长跑产物（history-kept: 改前改后是被比对的两份产物名）上，判定词有没有换。
 
 只读产物文本的算术，独立手写，不 import crates/ 任何东西，不起装置。
 
 用法：
-  e184_r2_verdict_compare.py <改前产物> <改后产物>
+  e184_r2_verdict_compare.py <改前产物> <改后产物>  # history-kept: 被比对的两份产物名
 
 读法（登记 1.1 节写死）：
   一格 = 一类行里的一把键：stop_check 键 item= 词 result=；anchor 键 identifier= 词 match=；selfcheck_done 一格词 clause_anchor_matches=；
@@ -132,7 +132,7 @@ def word_at(table, key, word_field):
 
 
 def cell_rows_of(before_tables, after_tables, families):
-    """每个范围、每把键一行 {family, key, before, after, same}；键的次序：改前的次序，改后多出来的接在后面。"""
+    """每个范围、每把键一行 {family, key, before, after, same}；键的次序：改前的次序（history-kept: 改前是被比对的产物名），改后多出来的接在后面。"""
     result = []
     for name, _, word_field in FAMILY_FIELDS:
         if name not in families:

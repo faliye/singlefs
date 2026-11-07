@@ -94,7 +94,7 @@ fn write_bytes_of(arm: &str, size: usize) -> u64 { read_bytes_of(arm, size) }
 fn needs_read_modify_write(arm: &str) -> bool { arm != "extent" }
 
 /// ⚠️ `verify_nanoseconds` 必须单独计：E65 首轮没拆，结果 `full` 臂 25.92% 里有 11 个百分点
-/// 是 AES 而不是设备（2026-08-31 三方论证反推腿打中）。同一个坑不踩第二次。
+/// 是 AES 而不是设备（三方论证反推腿打中）。同一个坑不踩第二次。
 struct Arm { elapsed_nanoseconds: u64, verify_nanoseconds: u64, operation_count: u64, sink: u64 }
 
 fn open(path: &str) -> std::fs::File {

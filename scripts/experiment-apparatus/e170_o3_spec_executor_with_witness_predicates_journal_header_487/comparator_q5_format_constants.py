@@ -125,7 +125,7 @@ def write_order_in_the_implementation(text: str, constants: dict[str, tuple[int,
 
 
 def decision_item_four_header_bytes(text: str) -> tuple[int, int]:
-    """D23 已定项 4 那一节以「**定案**」起头那一行里的「头 **N 字节**」：交回 (N, 行号)；恰好一处。
+    """D23 已定项 4 那一节以「**定案**」（history-kept: 代码要匹配的字面）起头那一行里的「头 **N 字节**」：交回 (N, 行号)；恰好一处。
     同一节里 `format-const` 注释行列着旧值（stale=…），不是正文，不取。"""
     lines = text.split("\n")
     start = next(index for index, line in enumerate(lines) if line.startswith("#### 已定项 4："))

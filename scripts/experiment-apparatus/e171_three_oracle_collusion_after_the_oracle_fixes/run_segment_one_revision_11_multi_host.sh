@@ -6,10 +6,11 @@
 #   不给配置取同目录 revision_11_placeholders.json（它点名修订 8 那一份占位）。同一条命令再起就是续跑。
 #   PLAN_ONLY=1 bash <这一份> [<修订 11 占位>]：干跑——修订 8 的 plan 原样，另打每个读数单元的键与库里有没有；一个装置都不起、不编、不写产物、不建库、不写标记。
 # long-run-shards: 同修订 8：第 0–10 步按单元切（第 3、4 步每项、第 10 步每次各一个单元，另加 reuse-selfproof），第 11–13 步按行，每行一个单线道驱动；命中复用库的读数单元在单元脚本里取用、不起装置，命中的行不进派发队列（segment_one_units_revision_11.py、rows_orchestrator_revision_11.py 文件头）
-# long-run-resume: 同一条命令再起就是续跑：第 0–10 步按单元（序列日志有绿行、产物在且行数同、清单 sha256 不变），第 11–13 步只补行目录里还没有 row-result.tsv 的行；取用断在中间的照标记删掉重取，入库经 staging/ 加 rename
+# long-run-resume: 同一条命令再起就是续跑：第 0–10 步按单元（序列日志有绿行、产物在且行数同、清单 sha256 不变），第 11–13 步只补行目录里还没有 row-result.tsv 的行；取用断在中间的照标记删掉重取，入库是拼好整份条目再一次写进 prune-server
+# 每一层（单元编排、逐行编排）各抽一份复用哨兵（种子打进标准错误与账本，红了照 S18 冻库、记红），账本末行报现判、复用、拒算（reuse_library.py 文件头「复用哨兵」「账本」）
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（逐行编排起跑、续跑时算；内存不在这里算，整条命令交 task-server）；第 0–10 步的本机线程额度也取登记值；复用库在共享数据根下（reuse_library.py 文件头「库」），两台读写同一份
-# 这一份只把配置交给单元编排：H31 没填或对不上、库目录写不了、修订 8 那一份占位没填齐，都由编排开跑先核、退 78 并点名。
+# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（逐行编排起跑、续跑时算；内存不在这里算，整条命令交 task-server）；第 0–10 步的本机线程额度也取登记值；复用库在 prune-server 里（reuse_library.py 文件头「库」），两台读写同一份
+# 这一份只把配置交给单元编排：H31 没填或对不上、修订 8 那一份占位没填齐，都由编排开跑先核、退 78 并点名；prune-server 连不上退 75。
 set -u
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)" || exit 2   # 仓根取这一份所在的树（派到哪一台都对），不写死某一台上的路径
 cd "$REPO" || exit 2

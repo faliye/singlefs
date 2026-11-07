@@ -32,7 +32,7 @@ const INITIAL_INODE_WATERMARK: u8 = 2;
 /// 树 ID 的号与水位：树 ID 从 65536 起编，装不进 `u8`，这一族（水位、发号起点、发号个数）用 `u32`。
 /// 第 2 次重跑登记 `research/prompts/e166-r2-prereg.md` 第五节臂 E2 ①，取 `u32`（登记第十二节记）。
 type TreeIdentifierNumber = u32;
-// 两个水位的值出自 D8（核心索引结构） 已定项 11 定案句：mkfs 时水位 65536，第一个文件版本那次之后 65548。
+// 两个水位的值出自 D8（核心索引结构） 已定项 11 条文：mkfs 时水位 65536，第一个文件版本那次之后 65548。
 // 对应 `crates/singlefs-format/src/lib.rs` 的 `TREE_IDENTIFIER_WATERMARK_AT_MKFS`、`TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH`（按名字找，行号会漂）。
 const TREE_IDENTIFIER_WATERMARK_AT_MKFS: TreeIdentifierNumber = 65536;
 const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65548;

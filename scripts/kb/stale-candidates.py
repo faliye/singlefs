@@ -6,7 +6,7 @@
 用法（按次序）：
     stale-candidates.py --changes --base 提交 [--target 提交] --out 变更清单.md
         列出这一阶段在 kb 各文件「## 历史版本」节里新加的每一条变更记录（编号 H1、H2……），以及每个被改过的现状载体
-        里删改前后的差异片段——写事实表的原料
+        里删改的差异片段——写事实表的原料
         不给 --target 时结束取工作区，工作区或暂存区相对 HEAD 有改动（含没进 git 的新文件）就拒跑（退 2）：几个会话共写一个仓，
         别的会话没提交的改动会被当成这一阶段的。出路：用 `scripts/kb/batch-target.py` 把这一批的改动做成提交对象，再给 `--target <哈希>`；
         工作区或暂存区里有改动的路径全部登记在 `.claude/batch-scope`（常设登记、带理由）里的才照跑，输出头一行与变更清单头一行写明「全部登记在 batch-scope 里」；
@@ -76,7 +76,7 @@
   一节从标题含「交实现员」的那一行起，到下一个同级或更高级标题止；节里要有同一个 `文件:行` 的写法（行号后面不再接数字）。几份报告的节合起来认。
   没有这样的行时本脚本不要求有这一节（sweep.md 要求写「0 行」和数行的命令，那一半靠主 agent 读报告）。
 
-管不到的（三方 sweep-rel-r1 第一轮攻方腿打中、机械闸补不上）：
+管不到的（机械闸补不上）：
   写表人给一件真变了的事实选一个基准里从没出现过的检索词、再标「新立：」，新事实里又避开落地 / 实现这类字，过得了闸，
   这件事实的旧说法一行都进不了候选——判别子是写表人自己选的词，闸看不到；靠主 agent 读事实表。
   逐行判的理由引了原话、判定也是五种之一，照样可以是没读懂就判的；靠主 agent 在全部判定里抽查复判。
@@ -133,7 +133,7 @@
       围栏外标题不出候选（「✗ 自证失败：代码围栏外的 markdown 标题行进了候选表」）
   STALE_CANDIDATES_BREAK=fence-comments-left-out  carrier_lines_left_out() 判标题时不认代码围栏，围栏里以 # 起头的行也当标题排掉
       围栏里的 # 行照出候选（「✗ 自证失败：代码围栏里以 # 起头的行、标题与术语表之外的行没进候选表」）
-  QUOTE_KB_BREAK=kb-directories-raw  归 quote-kb.py（设进环境，kb_directories() 载入的那一份照认）：登记位的读法退回改前，原串不规整，`./crates/…` 拼出的模式配不上 git 路径
+  QUOTE_KB_BREAK=kb-directories-raw  归 quote-kb.py（设进环境，kb_directories() 载入的那一份照认）：登记位的读法按原串、不规整，`./crates/…` 拼出的模式配不上 git 路径
       登记位写成 ./ 开头（「✗ 自证失败：登记位写成 ./crates/singlefs-checker/invariants（./ 开头）时不变量清单里的现状句没进候选表」）
 """
 import argparse
@@ -182,7 +182,7 @@ IMPACTED_DECISIONS_HEADING = re.compile(r'^### 影响的决策\s*$')
 CODE_FENCE_MARKERS = ('```', '~~~')
 GLOSSARY_PAGE_NAME = re.compile(r'^(?:term-renames|translation-glossary)[^/]*\.md$')   # 改名登记表与术语表的文件名（含 .en.md、.ja.md）
 # kb 内容住在哪几个目录不在这里写死：读登记位 .claude/kb-directories（读法只在 quote-kb.py 的 kb_candidate_roots 一份，登记是替换不是追加），
-# 登记的每个目录下的 .md 都是现状载体（carrier_patterns）；不变量清单 2026-10-11 拆出 .claude/kb 搬到 crates/singlefs-checker/invariants，靠登记位跟着认
+# 登记的每个目录下的 .md 都是现状载体（carrier_patterns）；不变量清单在 crates/singlefs-checker/invariants（不在 .claude/kb 下），靠登记位跟着认
 KB_DIRECTORIES_FALLBACK = '.claude/kb'   # 只给弄坏开关 invariants-carrier-missing 用：不读登记位、退回写死的这一个目录
 QUOTE_KB_SCRIPT = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'quote-kb.py')
 CHANGE_LOG_ONLY_PATTERNS = [
@@ -281,10 +281,10 @@ def remove_lookahead_conjunctions(pattern):
         index += 1
     return ''.join(kept), removed
 
-# 阳性对照：2026-09-18 知识腐烂回扫里主 agent 逐条现查坐实的 25 处腐烂（research/prompts/knowledge-rot-2026-09-18-sync.md），
+# 阳性对照：一次知识腐烂回扫里主 agent 逐条现查坐实的 25 处腐烂（research/prompts/knowledge-rot-2026-09-18-sync.md），
 # 行号是 BENCHMARK_TARGET 那一版的。只存「载体:行号」的 sha256 前 16 位：回扫员读得到这个文件，明文会被照抄成答案。
 # 事实表 BENCHMARK_FACTS 由一个没读过这 25 处的 agent 照这一段历史的提交正文与变更记录盲写（第四版，
-# research/prompts/sweep-acceptance-2026-09-18-v2-facts.md）；2026-09-19 三方第一轮之后按新闸把 9 行多余的 && 机械地退回第一个词
+# research/prompts/sweep-acceptance-2026-09-18-v2-facts.md）；按新闸把 9 行多余的 && 机械地退回第一个词
 # （research/prompts/sweep-rel-r1-main-verification.md），罩住 25 处。对照守两样：罩住的不少于这个数、候选行数与冻结时相同。
 # 答案在仓里另有明文（那份同步记录），对照只防工具被改窄，不当盲测用。
 BENCHMARK_BASE = 'b1c8cef~1'
@@ -292,7 +292,7 @@ BENCHMARK_TARGET = '00c9d4f'
 BENCHMARK_FACTS = 'scripts/kb/stale-candidates-benchmark-facts.tsv'
 BENCHMARK_MINIMUM_COVERED = 25
 # 候选行数按「records/ 只扫登记表里的、一个载体:行号一行、中文实验页排掉产物行与影响的决策一节、每份载体排掉改名登记表与术语表的行和代码围栏外的标题行」钉：两个数相等（一个位置只出一行）；
-# 原先按事实各出一行是 4190 行、2821 个不同的行，实验页排掉那两类之前是 2483 行，再排掉第三类之前是 2410 行（第三类排掉的 87 行全是围栏外标题，这一段历史里还没有术语表）
+# 第三类排掉的 87 行全是围栏外标题，这一段历史里还没有术语表
 BENCHMARK_EXPECTED_CANDIDATE_ROWS = 2323
 BENCHMARK_EXPECTED_UNIQUE_LINES = 2323
 BENCHMARK_KNOWN_STALE_LOCATION_HASHES = [
@@ -492,7 +492,7 @@ def new_change_entries(repository_root, base, target):
 
 
 def changed_segments(base_text, target_text):
-    """删改前后的差异片段 [(旧片段, 新片段)]：每一行被删的现状句配上同一文件新加的最像的一行，按字符比出改掉的那几段。"""
+    """删改的差异片段 [(旧片段, 新片段)]：每一行被删的现状句配上同一文件新加的最像的一行，按字符比出改掉的那几段。"""
     base_lines = [line for _, line in current_state_lines(base_text)]
     target_lines = [line for _, line in current_state_lines(target_text)]
     target_set, base_set = set(target_lines), set(base_lines)

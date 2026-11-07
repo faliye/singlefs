@@ -12,7 +12,7 @@
 //!
 //! 臂名不用拉丁字母：`A2` 与 D9（加密） 的前提编号 A2（系统配置是明文）撞名，doc-lint 判红。
 //!
-//! ## 判据（跑前写死，2026-09-06）
+//! ## 判据（跑前写死）
 //!
 //! 1. **阳性对照**：臂丙的不可解格数必须**恰好等于**坏盘上的活格数（另行独立数出来）。
 //!    对不上说明这套度量分不出差别，**整轮作废**。
@@ -25,7 +25,7 @@
 //! 5. 代价按 16 TiB、90% 填充、单元 32768 算，报 ppm 绝对值；单元数必须等于 E97
 //!    已入库的 483 183 820（同一口径的交叉校验，对不上说明两个模型有一个算错了）。
 //! 6. 不可解的判定用不动点迭代；**必须证明迭代真的在动**：给出至少一个种子上
-//!    「第一轮解不开、后面几轮解开」的格数非 0，否则那个循环等于没跑。
+//!    「首轮解不开、后面几轮解开」的格数非 0，否则那个循环等于没跑。
 //!
 //! **不答**：挂钟、真实分配器的落点分布、多盘同坏（w = 3 只容一格）、
 //! 修复的写放大（E80 量过那一格）。落点分布取均匀随机是**建模选择**，不是实测。
@@ -67,7 +67,7 @@ struct LayoutParameters {
     /// 加盘窗口：最后一块盘是刚加进来的空盘，其余盘已经写到 `prefilled_slots` 槽。
     /// D2（RAID 条带策略） 已定项 8 的「取最空的」是确定性且全局同步的规则 ⇒ 新盘会被每条新条带选中，
     /// 重平衡重写出来的容器也堆在它上面 ⇒ 容器与它描述的格**正相关**，
-    /// 而「稳态恒 0」的全部承重点正是那个独立性（2026-09-06 第二轮攻击腿 5.3）。
+    /// 而「稳态恒 0」的全部承重点正是那个独立性（攻击腿 5.3）。
     prefilled_slots: u64,
 }
 
@@ -263,7 +263,7 @@ fn build_layout(arm: Arm, ordinary_unit_count: u64, parameters: LayoutParameters
     Layout { grids, stripe_members, containers, record_container }
 }
 
-/// 单盘失效之后重建不出来的格数；`iters` 报不动点迭代真的推进了几轮、第一轮之后又解开多少。
+/// 单盘失效之后重建不出来的格数；`iters` 报不动点迭代真的推进了几轮、首轮之后又解开多少。
 fn count_unsolvable_grids(arm: Arm, layout: &Layout, maybe_failed_device: Option<usize>) -> (u64, u64, u64) {
     let failed_device = match maybe_failed_device { Some(device) => device, None => return (0, 0, 0) };
     let lost_grid_indices: Vec<usize> = layout.grids.iter().enumerate()
@@ -300,7 +300,7 @@ fn count_unsolvable_grids(arm: Arm, layout: &Layout, maybe_failed_device: Option
 
 /// 池刚建好、条带表只有一个容器时，那个容器落在**它自己描述的那条条带**里。
 /// 这一格是第一版提案 P4 说的「成对互指」的真形态：不是互指，是自指，
-/// 而且它落在 w ≥ 3 的第一条条带上（2026-09-06 反推腿第五节）。
+/// 而且它落在 w ≥ 3 的第一条条带上（反推腿第五节）。
 /// 加盘窗口：其余盘已写满 `prefilled_slots` 槽，最后一块是空盘；按「取最空的」摆放，
 /// 新盘一定进每条新条带。返回布局与新盘号。
 fn add_disk_window(arm: Arm, ordinary_unit_count: u64, device_count: usize, prefilled_slots: u64, stripe_widths: &[usize]) -> (Layout, usize) {
@@ -320,7 +320,7 @@ fn lost_count(layout: &Layout, failed_device: usize) -> u64 {
 
 /// 池里被占用的落点总数 = 容量 × 填充率 / 单元大小。**含数据格、parity 格与容器**——
 /// 第一版把它当成「数据格数」，于是往一块声称 90% 填充的盘里摆了 126.3% 的格
-/// （2026-09-06 第二轮攻击腿 5.5 算出来的）。判据 5 只钉了数据格数，没钉这个量。
+/// （攻击腿 5.5 算出来的）。判据 5 只钉了数据格数，没钉这个量。
 fn occupied_slots() -> u64 {
     (POOL_CAPACITY_BYTES as f64 * FILL_RATIO / UNIT_BYTES as f64) as u64
 }
@@ -450,7 +450,7 @@ mod tests {
     /// **摆进去的格不许超过盘上有的槽**。第一版把 `occupied_slots()` 当成数据格数，
     /// 再往上加 parity 与容器 ⇒ 往一块 90% 填充的盘里摆了 126.3% 的格，
     /// 而当时那条钉绝对值的断言只钉了数据格数，对真正喂进成本式的那个量不设防
-    /// （2026-09-06 第二轮攻击腿 5.5）。
+    /// （攻击腿 5.5）。
     #[test]
     fn occupancy_is_self_consistent() {
         let total_slot_count = POOL_CAPACITY_BYTES / UNIT_BYTES;
@@ -536,9 +536,9 @@ mod tests {
     }
 
     /// 代价的绝对值：三条臂各自的 ppm，口径是「相对臂丙少装多少用户数据」。
-    /// 2026-09-06 换过一次口径（第二轮攻击腿 5.5）：第一版报的是「元数据自己占多少字节」，
-    /// 而它把 parity 与容器加在 90% 之上 ⇒ 126.3% 的格。换口径之后三条臂的排序也变了：
-    /// 旧口径「甲 2166 < 乙 3516 < 甲镜 4333」，自洽口径「甲 1544 < 乙 2511 < 甲镜 3088」。
+    /// 自洽口径（攻击腿 5.5）：不报「元数据自己占多少字节」，因为那会把 parity 与容器加在 90% 之上
+    /// ⇒ 126.3% 的格。两种口径下三条臂的排序不同：
+    /// 「元数据占多少字节」口径是「甲 2166 < 乙 3516 < 甲镜 4333」，自洽口径是「甲 1544 < 乙 2511 < 甲镜 3088」。
     #[test]
     fn cost_absolute() {
         assert_eq!(occupied_slots(), 483_183_820);
@@ -593,7 +593,7 @@ mod tests {
         assert_eq!(count_unsolvable_grids(Arm::PooledContainer, &layout_with_container_on_live_device, Some(0)).0, 0);
     }
 
-    /// **加盘窗口那一格：确定性放置让臂甲退化**（2026-09-06 第二轮攻击腿 5.3 给的真实场景）。
+    /// **加盘窗口那一格：确定性放置让臂甲退化**（攻击腿 5.3 给的真实场景）。
     /// 「稳态恒 0」的承重点是「容器落哪块盘」与「它描述的格落哪块盘」独立，
     /// 而 D2（RAID 条带策略） 已定项 8 的「取最空的」把两者绑在一起。
     #[test]
@@ -602,7 +602,7 @@ mod tests {
         let (pooled_unsolvable_count, _, _) = count_unsolvable_grids(Arm::PooledContainer, &pooled_layout, Some(new_device));
         let lost_grid_count = lost_count(&pooled_layout, new_device);
         assert!(lost_grid_count > 0, "新盘上必须真的落了东西");
-        // 2026-09-06 第二轮攻击腿 5.3 预言臂甲在这一格会退化成阳性对照臂丙。**建模之后没复现**：
+        // 攻击腿 5.3 预言臂甲在这一格会退化成阳性对照臂丙。**建模之后没复现**：
         // 一次攒批里的 w−1 个单元被摊到 w−1 个不同的列上，容器与它描述的格因此仍落在不同盘上
         // （实测容器落点 [0,7,2,3,7,5,7,0,1,7]，10 个里 4 个在新盘）。
         // 如实记成 0，并把「为什么没复现」钉成断言：新盘上每条条带至多一个格。
@@ -639,7 +639,7 @@ mod tests {
 
     /// **自指那一格必须报非 0**：池刚建好、条带表只有一个容器、它落在自己描述的那条条带里，
     /// 容器所在盘一坏，这条条带的四条记录全没了 ⇒ 无论按什么顺序都解不开。
-    /// 这一格是 2026-09-06 反推腿第五节打中的，先做成必须报非 0 的世界再改规则
+    /// 这一格是反推腿第五节打中的，先做成必须报非 0 的世界再改规则
     /// （`.claude/singlefs-ai-sop/rules/show-me-test.md`「对抗轮打中的每一条，先在模型里做成一个必须报非 0 的世界」）。
     #[test]
     fn first_stripe_self_reference_is_unsolvable() {

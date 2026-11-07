@@ -14,7 +14,7 @@
 #   分卡与清场由 task-server 管（records/2026-10-30-编译绕过内存总上限.md 收尾批：服务照多机配置的显卡先后挑一张、经 scripts/crash/gpu-quiesce-run.sh 清场再起这一整条，
 #     挑的卡经环境 GPU_CARDS_BY_PRIORITY=<HOSTS 里的地址>:<卡号>:<额度> 交下来）：这里不读多机配置里的显卡先后、不看清没清场，交给用例的就是服务给的那一个值。
 #   crash_amplification_prepare 交回 2：开了 GPU 而环境里没有 GPU_CARDS_BY_PRIORITY（不是经服务起的），调用方退 78、一趟 cargo 都不起。
-#     弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration 下照改前从多机配置读 GPU_CARDS_BY_PRIORITY（不看环境），
+#     弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration 下从多机配置读 GPU_CARDS_BY_PRIORITY（不看环境），
 #     gpu-card-missing-unrefused 下环境里没有也交回 0；两条由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #     （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 # 交给本机那一趟的环境由 crash_amplification_environment_for_this_host 组（数组 this_host_environment，env 的参数）；
@@ -69,11 +69,11 @@
 #   crash_amplification_source_digest <树根>   打「<摘要> files=<文件数>」，读不了、一个源文件都没有交回 1。分项驱动在录入段跑成后记一份、判段起跑前与收尾后各算一次，
 #       双机驱动在计划那一步记、合并那一步核账之前算一次；对不上都是「跑的过程中源码变了」：打 CRASH_AMPLIFICATION_NOT_RUN 行、退 77（本次未跑），不落红。各驱动的开关与自证在各自文件头。
 #
-# 线程数的缺省（用户 2026-10-12 定：所有的默认都跑 31 线程，双机各台各 31，机器忙时固定、不看忙闲）：
+# 线程数的缺省（所有的默认都跑 31 线程，双机各台各 31，机器忙时固定、不看忙闲）：
 #   线程只读统一任务服务交的：crash_amplification_default_threads 打服务交的 SINGLEFS_THREAD_CAP，没交取登记的重活默认并行度
 #   （.claude/heavy-thread-default，经 scripts/hosts/heavy-threads.sh）。引擎的核对线程（crash_amplification_prepare 交的 SINGLEFS_CRASH_AMPLIFICATION_THREADS）取它；
 #   本机那一趟两步 cargo 的线程不在这里定（下面「包装、内存上限与线程」）。
-#   弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=threads-default-cores：缺省取本机核数减一（改前本机跑的那一步的样子），由 scripts/crash/crash-amplification-item.sh --selftest 证红（表在那份文件头）。
+#   弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=threads-default-cores：缺省取本机核数减一，由 scripts/crash/crash-amplification-item.sh --selftest 证红（表在那份文件头）。
 #
 # 包装、内存上限与线程：本机那一趟不套任何包装（records/2026-10-30-编译绕过内存总上限.md 收尾批 M03：一整条一个任务，上限由 task-server 按记录给、撞了放大重排；
 #   records/2026-11-01-判定库服务化.md：包装只认服务起尝试时套的最外一层），两步 cargo 直接起，编译与测试线程照服务交下来的
@@ -102,10 +102,10 @@
 #       term-reaches-cargo（「✗ 自证 term-reaches-cargo：」）、term-reaches-cargo-in-foreground（「✗ 自证 term-reaches-cargo-in-foreground：」）、term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）
 #   CRASH_AMPLIFICATION_LIB_BREAK=term-trap-not-restored  那一趟返回之后不放回调用方原来的 TERM 处理
 #       term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）、caller-term-trap-kept（「✗ 自证 caller-term-trap-kept：」）
-#   CRASH_AMPLIFICATION_LIB_BREAK=rocksdb-entry-unchecked  起这一趟的 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#   CRASH_AMPLIFICATION_LIB_BREAK=rocksdb-entry-unchecked  起这一趟的 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       rocksdb-entry-refused（「✗ 自证 rocksdb-entry-refused：」）
 #
-# 配置（用户 2026-10-10 定：多机配置合成一份，不零散配置；判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J5、J11）：
+# 配置（多机配置合成一份，不零散配置）：
 #   只读一份多机配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（git 忽略、这台机器一份；模板是仓根的 multi-host.env.example）。
 #   主工作树的根按 git common-dir 取（crash_amplification_multi_host_configuration_file，找法与 scripts/crash/crash-point-replay-shard-configuration-check.sh、
 #   scripts/crash/gpu-quiesce-run.sh 相同）：在 HEAD + 暂存区的临时 worktree 里跑也读主工作树那一份；树不是 git 工作树时退回 <树根>/multi-host.env。
@@ -121,7 +121,7 @@
 # 运行目录（分项驱动、双机驱动、崩溃放量入口、崩溃点重放入口与它的分片驱动共用 crash_amplification_home_directory）：日志与这一项的编译目录放在
 #   ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-<工作根>/crash-amplification}/runs/<标签>/；工作根照 .claude/hooks/lib_work_root.py（数据根下的 work，
 #   落在多机配置 NFS_SHARED_ROOTS 点名的共享根里、两台同一绝对路径），不经 ~ 与 $HOME 取：第二台的家目录是另一个，日志两台要读得到同一份。
-#   取不到工作根（数据根没配）交回 1、打原因与出路，调用方退 2；不退回家目录（弄坏开关 home-under-home-directory 下照改前取 $HOME 底下那一份）。
+#   取不到工作根（数据根没配）交回 1、打原因与出路，调用方退 2；不退回家目录（弄坏开关 home-under-home-directory 下取 $HOME 底下那一份）。
 # 判定库（分项驱动与双机驱动共用；崩溃放量入口与崩溃点重放入口经它们用）：崩溃判定只在 prune-server 里那一份库（.claude/rules/verification.md「判定库只有一份」），
 #   引擎经 prune-server 的客户端直接读写，连哪一处照客户端的取法（本机的 unix socket；没有 socket 时多机配置的 PRUNE_SERVER_TCP_ADDRESS，第二台走它）。
 #   本机没有崩溃判定库的目录：这里不拼库目录、不往引擎送库的变量、不删库、不拷库；两台、几个进程判的块都直接写进服务里同一份，判过的块照键复用。
@@ -164,7 +164,7 @@ PYTHON
 
 # 多机配置在哪（文件头「配置」）：打路径。SINGLEFS_MULTI_HOST_CONFIG 设了照它；没设取 <树根> 的 git common-dir 的上一层（主工作树的根）下的 multi-host.env，
 # 取不到 common-dir（不是 git 工作树）退回 <树根>/multi-host.env。文件在不在不判（不在就是两个开关都关、一张卡都没写）。
-# 弄坏开关 configuration-from-tree-root：照改前按 <树根>/multi-host.env 找（在 worktree 里读不到主工作树那一份）。
+# 弄坏开关 configuration-from-tree-root：按 <树根>/multi-host.env 找（在 worktree 里读不到主工作树那一份）。
 crash_amplification_multi_host_configuration_file() { # <树根>
   local root="$1" common_directory=""
   if [[ -n "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then printf '%s\n' "$SINGLEFS_MULTI_HOST_CONFIG"; return 0; fi
@@ -202,7 +202,7 @@ crash_amplification_prepare() {
   [[ "$(crash_amplification_configuration_value "$configuration_file" ENABLE_ACROSS_MACHINES)" == 1 ]] && across_machines_switch=1
   (( gpu_switch )) && features="gpu"
   # 卡是 task-server 挑好、清过场交下来的（文件头「crash_amplification_prepare 之后可用」那一段）：环境里的 GPU_CARDS_BY_PRIORITY，不读多机配置里的显卡先后。
-  #   弄坏开关 cards-read-from-configuration 下照改前从多机配置读（不看环境）
+  #   弄坏开关 cards-read-from-configuration 下从多机配置读（不看环境）
   gpu_cards_by_priority="${GPU_CARDS_BY_PRIORITY:-}"
   if crash_amplification_item_break_is cards-read-from-configuration; then
     gpu_cards_by_priority="$(crash_amplification_configuration_value "$configuration_file" GPU_CARDS_BY_PRIORITY)"
@@ -235,7 +235,7 @@ crash_amplification_environment_for_this_host() { # <share> [<附加环境 键=�
 }
 
 # 一台机器用几个核（文件头「线程数的缺省」）：服务交的 SINGLEFS_THREAD_CAP，没交取登记的重活默认并行度（.claude/heavy-thread-default）；
-# 弄坏开关 threads-default-cores 下是改前本机跑的那一步的样子（核数减一）
+# 弄坏开关 threads-default-cores 下取本机核数减一
 crash_amplification_default_threads() {
   if crash_amplification_item_break_is threads-default-cores; then
     echo $(( $(nproc) > 1 ? $(nproc) - 1 : 1 ))
@@ -364,10 +364,10 @@ crash_amplification_run_on_this_host() { # <share> <日志> [<附加环境 键=�
   return "$step_status"
 }
 
-# 录入段（用户 2026-10-11 定：录入段在 CPU 上跑数据、写进判定库（prune-server）；判段只从服务里读，段与段之间不在内存里交数据）：本机起一趟
+# 录入段（录入段在 CPU 上跑数据、写进判定库（prune-server）；判段只从服务里读，段与段之间不在内存里交数据）：本机起一趟
 # SINGLEFS_CRASH_AMPLIFICATION_STAGE=record，日志写 <日志>；跑成而且打了录入行交回 0 并把那几行转打出来。录入行两种都算：崩溃放量的分项打
 # CRASH_AMPLIFICATION_RECORDED（crates/singlefs-verification/src/crash_amplification.rs），崩溃枚举用例经判定库两段跑的（崩溃点重放双机那几条）打
-# CRASH_LIBRARY_RECORDED（crates/singlefs-verification/src/crash_library.rs 的 record_the_item）；弄坏开关 library-marker-not-accepted 照改前只认前一种，
+# CRASH_LIBRARY_RECORDED（crates/singlefs-verification/src/crash_library.rs 的 record_the_item）；弄坏开关 library-marker-not-accepted 只认前一种，
 # 由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红。
 # 之后的每一趟照 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge 起（调用方 export）。退了非 0 交回照日志分类之后该退的码；退 0 而一行都没打交回 1。
 # 份：不给是 0/1（整份）。引擎录入段带 SHARE=k/n 时，清单、流程、事实表与判表（配了 GPU）照旧整条录（录入键不含份，crates/singlefs-verification/src/crash_state_enumeration.rs
@@ -720,7 +720,12 @@ crash_amplification_switch_wheel() { # <放输出的目录> <取格的正则> <�
   switch_wheel_failures=0; switch_wheel_collected=0
   count="${#switch_wheel_assignments[@]}"
   jobs="${CRASH_AMPLIFICATION_SELFTEST_JOBS:-$(heavy_thread_default)}"
-  [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || jobs=1
+  if [[ ! "$jobs" =~ ^[1-9][0-9]*$ ]]; then   # 取不出就拒，不退回 1（.claude/heavy-thread-default 文件头：取不了就拒）
+    echo "  ✗ 开关轮的并行度取不出（CRASH_AMPLIFICATION_SELFTEST_JOBS 或每台默认重活线程数给的是「$jobs」），一个开关都没起" >&2
+    echo "     → 怎么办：CRASH_AMPLIFICATION_SELFTEST_JOBS 写成正整数或不设；不设时照 .claude/heavy-thread-default 文件头写好登记再跑" >&2
+    switch_wheel_failures=$((count > 0 ? count : 1))
+    return 0
+  fi
   for assignment in ${switch_wheel_assignments[@]+"${switch_wheel_assignments[@]}"}; do
     variable="${assignment%%=*}"
     [[ "$variables" == *" $variable "* ]] && continue

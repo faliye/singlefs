@@ -1,10 +1,12 @@
 """build_approximate_tree.py 与 approximate_tree_lines.py 的单测：登记第五节 5.2 阳性对照 P40（造树 T2–T5）、P41（Q1 判法三种结局）、P42（T4 删七行），
-与第九节 M40–M47 各自会红的那一格。git 仓都是每条用例自己在临时目录里建的，不读真的仓；跑法：在本目录 `python3 -m unittest test_build_approximate_tree`。"""
+与第九节 M40–M47 各自会红的那一格，另有 T3 的 blob 号、Q2-编的拷贝核对（compile_lines 与整条编译包装）各自会红的那一格（变异表里不带 M 号的那几行）。
+git 仓都是每条用例自己在临时目录里建的，不读真的仓；编译包装用假 cargo、假 cp；跑法：在本目录 `python3 -m unittest test_build_approximate_tree`。"""
 
 from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -29,6 +31,11 @@ HISTORY_CONTENT = b"revision 6 history\n"
 
 def sha256_hex(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
+
+
+def git_blob_id(content: bytes) -> str:
+    """git 给这份内容的 blob 号（sha1 of 「blob <长度>\\0<内容>」），用例自己算，不经被测代码。"""
+    return hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
 
 
 class ScenarioRepository:
@@ -132,11 +139,20 @@ class TreeVersionChoice(unittest.TestCase):
             self.assertEqual((row["marker"], row["source"]), (tree_builder.MARKER_EXACT_PINNED, tree_builder.UNREACHABLE))
             self.assertEqual(built.content(PINNED_DANGLING), DANGLING_CONTENT)
 
+    def test_unreachable_pin_records_the_blob_it_was_taken_from(self):
+        """登记读法 4 T3「写 blob 号与出处提交，悬空的写 unreachable」：悬空 blob 只剩 blob 号能取回，清单与 name=file 行都要写它。"""
+        with tempfile.TemporaryDirectory() as root:
+            built = Built(root)
+            self.assertEqual(built.rows[PINNED_DANGLING]["blob"], git_blob_id(DANGLING_CONTENT))
+            line = next(values for values in built.lines_named("file") if values.get("path") == PINNED_DANGLING)
+            self.assertEqual((line["source"], line["blob"]), (tree_builder.UNREACHABLE, git_blob_id(DANGLING_CONTENT)))
+
     def test_pin_found_in_history_is_exact_pinned_with_the_commit_that_wrote_it(self):
         with tempfile.TemporaryDirectory() as root:
             built = Built(root)
             row = built.rows[PINNED_IN_HISTORY]
             self.assertEqual((row["marker"], row["source"]), (tree_builder.MARKER_EXACT_PINNED, built.repository.commits["first"]))
+            self.assertEqual(row["blob"], git_blob_id(HISTORY_CONTENT))
 
     def test_pin_found_nowhere_falls_to_the_first_change_after_the_base(self):
         with tempfile.TemporaryDirectory() as root:
@@ -309,8 +325,11 @@ class Q1Candidate(unittest.TestCase):
     def test_lock_file_and_manifests_count_as_other_verification_packages(self):
         self.assertEqual({tree_builder.classify(path) for path in ("Cargo.lock", "crates/singlefs-core/Cargo.toml")}, {tree_builder.CLASS_OTHER})
 
-    def test_same_length_different_digest_is_unequal(self):
-        self.assertFalse(tree_lines.pin_holds(sha256_hex(b"revision 6\n"), sha256_hex(b"approximate\n")))
+    def test_same_length_different_content_is_unequal(self):
+        """登记第五节 P41 另加的一格「钉值文件与目标同长不同内容」：原式不等。"""
+        pinned_file, target = b"revision 6\n", b"revision 7\n"
+        self.assertEqual(len(pinned_file), len(target))
+        self.assertFalse(tree_lines.pin_holds(sha256_hex(pinned_file), sha256_hex(target)))
         self.assertTrue(tree_lines.pin_holds(sha256_hex(b"same\n"), sha256_hex(b"same\n")))
 
 
@@ -352,19 +371,26 @@ class Q1Lines(unittest.TestCase):
             self.assertEqual(exit_code, 1)
 
 
-class CompileLines(unittest.TestCase):
-    """Q2-编那几行：编过且两个二进制都在、树没变才算编过。"""
+def write_bytes(path: str, content: bytes) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(content)
 
-    def compile_product(self, root: str, exit_code: int, with_binaries: bool, change_tree: bool) -> tuple[int, dict[str, str]]:
-        tree = os.path.join(root, "tree")
+
+class CompileLines(unittest.TestCase):
+    """Q2-编那几行：cargo 退 0、cp 退 0、树里两个二进制与这一趟的构建输出逐字节相同、树没变才算编过。"""
+
+    def compile_product(self, root: str, exit_code: int, in_tree: bytes | None, change_tree: bool, copy_exit_code: int = 0,
+                        built: bytes = b"new-binary\n") -> tuple[int, dict[str, str]]:
+        tree, build_output = os.path.join(root, "tree"), os.path.join(root, "build", "release")
         os.makedirs(os.path.join(tree, "target", "release"))
         with open(os.path.join(tree, "Cargo.toml"), "w", encoding="utf-8") as handle:
             handle.write("[workspace]\n")
         digest_before = tree_builder.snapshot_digest(tree)[0]
-        if with_binaries:
-            for name in tree_lines.BINARIES:
-                with open(os.path.join(tree, "target", "release", name), "wb") as handle:
-                    handle.write(name.encode("utf-8"))
+        for name in tree_lines.BINARIES:
+            write_bytes(os.path.join(build_output, name), built)
+            if in_tree is not None:
+                write_bytes(os.path.join(tree, "target", "release", name), in_tree)
         if change_tree:
             with open(os.path.join(tree, "Cargo.lock"), "w", encoding="utf-8") as handle:
                 handle.write("written by cargo\n")
@@ -373,27 +399,93 @@ class CompileLines(unittest.TestCase):
             handle.write("".join(f"diagnostic {number}\n" for number in range(30)))
         product = os.path.join(root, "compile.out")
         lines = ResultLines(product)
-        result = tree_lines.compile_lines(tree, exit_code, log, digest_before, lines)
+        result = tree_lines.compile_lines(tree, exit_code, copy_exit_code, build_output, log, digest_before, lines)
         lines.finish()
         with open(product, encoding="utf-8") as handle:
             rows = [tree_builder.key_values(line) for line in handle.read().splitlines()]
         self.assertEqual(sum(row.get("name") == "compile_diagnostic" for row in rows), tree_lines.DIAGNOSTIC_TAIL)
         return result, next(row for row in rows if row.get("name") == "verdict")
 
-    def test_compiled_with_both_binaries_and_an_unchanged_tree(self):
+    def test_compiled_with_both_binaries_copied_from_this_build_and_an_unchanged_tree(self):
         with tempfile.TemporaryDirectory() as root:
-            result, verdict = self.compile_product(root, 0, with_binaries=True, change_tree=False)
-            self.assertEqual((result, verdict["compiled"], verdict["tree_unchanged"]), (0, "true", "true"))
+            result, verdict = self.compile_product(root, 0, in_tree=b"new-binary\n", change_tree=False)
+            self.assertEqual((result, verdict["compiled"], verdict["tree_unchanged"], verdict["copy_exit"]), (0, "true", "true", "0"))
 
     def test_cargo_failure_is_not_compiled(self):
         with tempfile.TemporaryDirectory() as root:
-            result, verdict = self.compile_product(root, 101, with_binaries=False, change_tree=False)
+            result, verdict = self.compile_product(root, 101, in_tree=None, change_tree=False)
             self.assertEqual((result, verdict["compiled"]), (1, "false"))
 
     def test_tree_changed_by_the_build_is_reported(self):
         with tempfile.TemporaryDirectory() as root:
-            result, verdict = self.compile_product(root, 0, with_binaries=True, change_tree=True)
+            result, verdict = self.compile_product(root, 0, in_tree=b"new-binary\n", change_tree=True)
             self.assertEqual((result, verdict["tree_unchanged"]), (1, "false"))
+
+    def test_old_binaries_left_in_the_tree_are_not_compiled(self):
+        """拷没成、树里留着上一趟的二进制（同长不同内容）：只看在不在会记成编过。"""
+        with tempfile.TemporaryDirectory() as root:
+            result, verdict = self.compile_product(root, 0, in_tree=b"old-binary\n", change_tree=False)
+            self.assertEqual((result, verdict["compiled"]), (1, "false"))
+
+    def test_copy_failure_is_not_compiled_even_when_the_tree_already_holds_this_build(self):
+        with tempfile.TemporaryDirectory() as root:
+            result, verdict = self.compile_product(root, 0, in_tree=b"new-binary\n", change_tree=False, copy_exit_code=1)
+            self.assertEqual((result, verdict["compiled"], verdict["copy_exit"]), (1, "false", "1"))
+
+
+class CompileWrapper(unittest.TestCase):
+    """compile_in_the_approximate_tree.sh 整条（假 cargo 退 0、按需让某一条 cp 退 1）：拷不进退非 0，产物 compiled=false。
+    复现同 records/2026-11-02-文档代码逐项审核-编译复制复现.py 的两次 cp 都失败那一格。"""
+
+    WRAPPER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "compile_in_the_approximate_tree.sh")
+
+    def run_wrapper(self, root: str, in_tree: bytes, failing_copies: tuple[str, ...]) -> tuple[int, dict[str, str], list[bytes]]:
+        tree, build, fake = os.path.join(root, "tree"), os.path.join(root, "build"), os.path.join(root, "bin")
+        write_bytes(os.path.join(tree, "Cargo.toml"), b"[workspace]\nmembers = []\n")
+        write_bytes(os.path.join(root, "manifest.tsv"), b"place\tpath\tclass\tstatus\tpinned\tmarker\tsource\tblob\tsha256\n")
+        for name in tree_lines.BINARIES:
+            write_bytes(os.path.join(tree, "target", "release", name), in_tree)
+            write_bytes(os.path.join(build, "release", name), b"new-binary\n")
+        write_bytes(os.path.join(fake, "cargo"), b"#!/bin/sh\nexit 0\n")
+        real_cp = shutil.which("cp")
+        write_bytes(os.path.join(fake, "cp"), ("#!/bin/sh\n"
+                                               "for last in \"$@\"; do :; done\n"
+                                               "case \" $FAIL_COPY_OF \" in *\" $(basename \"$last\") \"*) echo injected-copy-failure >&2; exit 1 ;; esac\n"
+                                               f"exec {real_cp} \"$@\"\n").encode("utf-8"))
+        for name in ("cargo", "cp"):
+            os.chmod(os.path.join(fake, name), 0o755)
+        product = os.path.join(root, "product.out")
+        environment = dict(os.environ, PATH=fake + os.pathsep + os.environ["PATH"], CARGO_TARGET_DIR=build, PYTHONDONTWRITEBYTECODE="1",
+                           FAIL_COPY_OF=" ".join(failing_copies))
+        completed = subprocess.run(["bash", self.WRAPPER, product], cwd=tree, env=environment, capture_output=True, text=True, timeout=120)
+        with open(product, encoding="utf-8") as handle:
+            verdict = next(tree_builder.key_values(line) for line in handle.read().splitlines() if " name=verdict " in line)
+        contents = []
+        for name in tree_lines.BINARIES:
+            with open(os.path.join(tree, "target", "release", name), "rb") as handle:
+                contents.append(handle.read())
+        return completed.returncode, verdict, contents
+
+    def test_normal_copy_is_compiled(self):
+        with tempfile.TemporaryDirectory() as root:
+            exit_code, verdict, contents = self.run_wrapper(root, b"old-binary\n", ())
+            self.assertEqual((exit_code, verdict["compiled"], verdict["copy_exit"], contents), (0, "true", "0", [b"new-binary\n"] * 2))
+
+    def test_both_copies_failing_over_old_binaries_exit_non_zero(self):
+        with tempfile.TemporaryDirectory() as root:
+            exit_code, verdict, contents = self.run_wrapper(root, b"old-binary\n", tree_lines.BINARIES)
+            self.assertEqual((exit_code, verdict["compiled"], contents), (1, "false", [b"old-binary\n"] * 2))
+            self.assertNotEqual(verdict["copy_exit"], "0")
+
+    def test_failing_e171_copy_is_passed_on_although_the_tree_already_holds_this_build(self):
+        with tempfile.TemporaryDirectory() as root:
+            exit_code, verdict, _ = self.run_wrapper(root, b"new-binary\n", (tree_lines.BINARIES[0],))
+            self.assertEqual((exit_code, verdict["compiled"], verdict["copy_exit"]), (1, "false", "1"))
+
+    def test_failing_e170_copy_is_passed_on_although_the_tree_already_holds_this_build(self):
+        with tempfile.TemporaryDirectory() as root:
+            exit_code, verdict, _ = self.run_wrapper(root, b"new-binary\n", (tree_lines.BINARIES[1],))
+            self.assertEqual((exit_code, verdict["compiled"], verdict["copy_exit"]), (1, "false", "1"))
 
 
 class WholeTree(unittest.TestCase):
@@ -493,12 +585,13 @@ class ResearchSideChoice(unittest.TestCase):
     def test_pinned_version_found_is_exact_pinned(self):
         with tempfile.TemporaryDirectory() as root:
             choice = self.choose(root, tree_builder.E171_RESEARCH_DIRECTORY + "/row_driver.py", "d" * 64, found=True)
-            self.assertEqual((choice.marker, choice.source, choice.content), (tree_builder.MARKER_EXACT_PINNED, "commit-1", b"pinned version\n"))
+            self.assertEqual((choice.marker, choice.source, choice.blob, choice.content),
+                             (tree_builder.MARKER_EXACT_PINNED, "commit-1", "blob-1", b"pinned version\n"))
 
     def test_pinned_version_not_found_takes_today(self):
         with tempfile.TemporaryDirectory() as root:
             choice = self.choose(root, tree_builder.E171_RESEARCH_DIRECTORY + "/row_driver.py", "d" * 64, found=False)
-            self.assertEqual((choice.marker, choice.content), (tree_builder.MARKER_TODAY, b"today\n"))
+            self.assertEqual((choice.marker, choice.blob, choice.content), (tree_builder.MARKER_TODAY, "-", b"today\n"))
 
     def test_bad_implementation_table_not_found_is_missing(self):
         with tempfile.TemporaryDirectory() as root:

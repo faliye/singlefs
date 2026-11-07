@@ -10,18 +10,18 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
 两种起法（crate 行第四段）：
   不写第四段：Verus 每次都直接起，对 crate 的入口文件 --crate-type=lib，带 --output-json 与 --rlimit <登记的数>；只带它自带的 vstd，crate 的 Cargo.toml
     除 vstd 之外还有依赖，proof、vacuity、must-red-worlds 三格开跑之前判红。
-  第四段写 cargo：经 Verus 安装里的 cargo-verus 起 cargo verus focus -p <包> --offline -- <参数>（第二轮正推 Y4 第 2 条），副本是 crate 连同它经 path 连到的 crate、
+  第四段写 cargo：经 Verus 安装里的 cargo-verus 起 cargo verus focus -p <包> --offline -- <参数>，副本是 crate 连同它经 path 连到的 crate、
     仓根的 Cargo.lock 与一份只列这几个成员的工作区 Cargo.toml（整个工作区的 cargo metadata 在离线机器上过不了）；几处同时验各占一个编译目录，vstd 与依赖在里面只编一次。
-  两种都是一处判定一份新副本：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、stdout 没有判定行（第二轮正推 Y4 第 3 条，
-    2026-10-26 在草稿的小工作区里复现过）；没有判定行的那一处判红，不当绿。
-不带 --no-cheating（出口 5 第三轮判决第三节「门禁」）：assume_specification、external_body、uninterp 与 external_*_specification 照信任清单
+  两种都是一处判定一份新副本：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、stdout 没有判定行。
+    没有判定行的那一处判红，不当绿。
+不带 --no-cheating：assume_specification、external_body、uninterp 与 external_*_specification 照信任清单
   .claude/gate.d/verus-trust-list.tsv 逐条登记（没登记、规格原文的 sha256 对不上、差分测试不在都判红），admit(…)、assume(…)、verifier::external、axiom 在核里一律判红，
   都在起 Verus 之前判（region_problems、cheating_markers）。
 --rlimit 取登记表 rlimit 行；没有这一行时取 DEFAULT_RLIMIT，就是 Verus 0.2026.09.20 自己的默认 10。proof、vacuity、must-red-worlds 三格同一个数，各 crate 同一个数。
 判定取 stdout 的 JSON（verification-results 的 verified / errors / encountered-vir-error，verus 的 commit），报错位置取 stderr（直接起的相对 crate 目录，cargo 那一种相对副本根）。
 只验一个函数（证明逐项、空真每处）时按那个函数所在的核点模块（kernel_module）：--verify-function 只在 --verify-root 或 --verify-only-module 点的那一个模块里找。
   核是 crate 的入口文件（Cargo.toml 的 lib.path，默认 src/lib.rs）的点 --verify-root；入口所在目录下的 <名>.rs 与 <名>/mod.rs 点 --verify-only-module <名>，
-  更深的用 :: 接起来（<甲>/<乙>.rs 与 <甲>/<乙>/mod.rs 是 <甲>::<乙>）。Verus 0.2026.09.20 的认法（2026-10-18 在草稿的三层小 crate 上量的）：
+  更深的用 :: 接起来（<甲>/<乙>.rs 与 <甲>/<乙>/mod.rs 是 <甲>::<乙>）。Verus 0.2026.09.20 的认法：
   模块路径认 outer::inner，不认 crate::outer、outer/inner、outer.inner（报 could not find module … specified by --verify-module or --verify-only-module）；
   --verify-module 与 --verify-function 一起给退 255（Error: When using --verify-function, use --verify-only-module instead of --verify-module）；
   --verify-root 与 --verify-only-module 一起给、两样都不给，也退 255；--verify-only-module 不含子模块，点 outer 找不到 outer::inner 里的函数。
@@ -54,7 +54,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       derive(Clone) 的类型（Verus 验它生成的 <类型>::clone）；impl 与 trait 里的方法照样成项；不带 decreases 的 spec fn、trait 里没有函数体的声明、external_body 的 fn
       没有证明义务、不成项，随用到它的项进键（没有函数体按切出的单元认：单元以 ; 收尾，ensures 里的结构体字面量不算函数体）。另两类不是 fn、Verus 整 crate 验时照样各算条数，各成一项（里程碑四出口 5 规格底座，core 登记 16 条里有这 3 条）：
       verus! 里带值的 const（impl 里的关联 const 与 spec const 也算：真 Verus 整 crate 验时 spec const 各 1 条、点得中名；没写值的不成项）与 assume_specification。
-      项名是全路径 proof:<crate>::<模块>::<名>（第二轮正推 Y4 第 7 条；核是 crate 入口的没有模块那一段），
+      项名是全路径 proof:<crate>::<模块>::<名>（核是 crate 入口的没有模块那一段），
       <名> 是交给 --verify-function 的那一个：自由 fn 写它的名字，impl 里的方法写 <类型>::<方法>（trait impl 也写类型），trait 里的写 <trait>::<方法>，clone 写 <类型>::clone；
       带值的 const 项名写 <类型或 trait>::<名>（自由的写 <名>）；交给 --verify-function 的：自由 const 写 <名>，trait 里带默认值的写 <trait>::<名>，
       impl 里的关联 const（固有 impl 与 trait impl 都算）写 *::<名>（Verus 把它列成 impl&%<号>::<名>，号数这个模块里的全部 impl，verus! 外面的与 derive 生成的也数，
@@ -63,7 +63,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       起 Verus 之前（列项也算）每一项的点名照 Verus 的点法在它那个模块的可点名函数表里点一遍（point_name_problems、verus_listing、verus_function_matches）：
       不带 * 的先找恰好同名的、没有再找包含它的，*<串> 是以它收尾、<串>* 是以它起头、*<串>* 是包含它，带 * 的点中几个 Verus 就一起验几个；
       命中不是恰好一项的判红并点名命中的那几项，出路是改名。Verus 只在 --verify-root 或 --verify-only-module 点的那一个模块里找，表按核（一个核一个模块）各列各的，
-      不同模块里同名的不撞。点名规则是 2026-10-29 用 Verus 0.2026.09.20 在探针 crate 上现量的：<类型>::<关联 const>、<模块>::<类型>::<名>、
+      不同模块里同名的不撞。Verus 0.2026.09.20 的点名规则：<类型>::<关联 const>、<模块>::<类型>::<名>、
       <crate>::<模块>::<类型>::<名>、crate::<模块>::<类型>::<名> 都报 could not find，只有 impl&%<号>::<名> 与 *::<名> 点得中。
       每项起一次 --verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function <名>：出结局、没有 vir 错、encountered-error 不是 true、errors 0、verified 至少 1
       （assume_specification 那一项验出 0 也是绿：指向函数的规格没有义务）、跑的 Verus 的 commit 等于登记。--verify-function 下真 Verus 不给 success 键、is-verifying-entire-crate 报 false，这两样不看（verification_clean）。
@@ -74,7 +74,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       不同模块里同名的各是各的项。整格再做一次不带过滤的 crate 验证，防止义务遗漏；再把产品构建与 Verus 构建的 MIR 逐条目比（compare_mir，不按条入库）：
       产品构建（cargo rustc --emit=mir，RUSTC_BOOTSTRAP=1 -Z trim-diagnostic-paths=false）的每个条目在 Verus 构建（verus --no-verify --compile -- --emit=mir；
       cargo 那一种 cargo verus build -- --no-verify -- --emit=mir：不再验一遍、只编，证明在前面完整 crate 那一步验过；不带 --no-verify 时 cargo verus build 连 vstd 也验，
-      本机 2026-10-26 在小 crate 上量到 1.8 GB 对 1.0 GB）里都有、整段逐字相同，对不上判红（第三轮判决 Z2：宏写法产品构建返回 11、verus --compile 编出返回 12）。
+      小 crate 上内存 1.8 GB 对 1.0 GB）里都有、整段逐字相同，对不上判红（例：宏写法产品构建返回 11、verus --compile 编出返回 12）。
       比之前两边照规整表 MIR_PATH_ALIASES 把同一个函数的两种印法写成一种（整词：前面不接标识符字符或 ::，后面接 ( 或 ::<；今天只有 std::rt::panic_fmt 写成
       core::panicking::panic_fmt），成功句与红句都报两边各改写了几处；表外的名字照红，核过是同一个函数（两份 rlib 引用的符号相同）再往表里加一行。
   verus-proof-check.py vacuity <根> [通用选项]
@@ -85,13 +85,13 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       在临时副本里 { 后面插 assert(false);，一处一份副本、一次 Verus（只验这一处所属的那个 fn：--verify-root 或 --verify-only-module <核所在的模块>，再 --verify-function）；
       每一处都要报 assertion failed 且位置就是插的那一行；失败只表示未检出矛盾，不证明前置条件可满足。关键前提另用构造见证证明。
       验得过 ⇒ 这一处的前置条件不可满足，判红。一次只插一处：插在外层函数入口的 assert(false) 失败之后，Verus 把其后全部当 false 已知，
-      里面闭包的那一处就验得过了（2026-10-01 在草稿里实测：七处一起插只报六处）。
+      里面闭包的那一处就验得过了（七处一起插只报六处）。
   verus-proof-check.py coverage <根>
       静态检查每个带契约的函数与 invariant 块都有唯一锚点负例；不运行 Verus。
   verus-proof-check.py must-red-worlds <根> [通用选项]
       必红世界：登记表 must-red-worlds 行点名的表（六段制表符分隔：变异名、文件、原文、替换文、proof_errors=M、landing=<落点>；\\n 表换行），
       每行原文在文件里恰好命中一次，改坏的副本上 Verus 要出 JSON、errors ≥ 1，证明错的落点等于第六段登记的落点。一行都没有判红。
-      判的是落点，不是条数（C654：条数会随求解环境、无关的 spec 改动漂，攻方在核上加一个没人用的 spec fn，同一行就从 2 条跳到 3 条）：
+      判的是落点，不是条数（C654：条数会随求解环境、无关的 spec 改动漂，核上加一个没人用的 spec fn，同一行就从 2 条跳到 3 条）：
         落点 = 每条证明错取它 --> 位置的那一行，在改坏之后的文件文本里往上找最近一行 fn 的开头（FUNCTION_HEADING），取那个 fn 的名字，去重排序成集合
         （proof_error_landing；位置在 crate 之外或往上没有 fn 记（函数外），输出里有证明错没带位置记（无位置））。第六段 landing=<名>[,<名>…] 写这个集合，顺序随意，
         与实测的集合不相等判红（红句写实测的落点、登记的落点与出路）；同一个 fn 里多报一条循环不变式、条数跳了，落点不变就不红。
@@ -111,11 +111,11 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
             --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N // 4))；每一处的 Verus 取 N // J 条线程（--num-threads），至少 1；
               N = 31 时同时至多验 7 处、每处 4 条线程起（7 处 4 条、1 处 31 条），合计不超过 N（parallel_locations）；
               不按内存收处数：环境里的外层内存上限（RUN_WITH_MEMORY_CAP_OUTER_CAP，task-server 起任务时套的包装设的）不看，整条命令的内存额度
-              由 task-server 按记录给、撞了放大重排（task-server/README.md「提交写法」）；弄坏开关 outer-memory-narrows-jobs 下照改前的样子设了它就收到 1 处
-            每次 Verus 直接起：不套内存包装、capped.sh 与 nice，不设每个进程的内存上限，也不限时（用户定案「工具里不限时」）：卡住由 task-server 判
+              由 task-server 按记录给、撞了放大重排（task-server/README.md「提交写法」）；弄坏开关 outer-memory-narrows-jobs 下设了它就收到 1 处
+            每次 Verus 直接起：不套内存包装、capped.sh 与 nice，不设每个进程的内存上限，也不限时：卡住由 task-server 判
               （日志满 10 分钟不涨、CPU 也几乎不涨，或跑过记录用时 5 倍而日志不涨，停掉记 stalled，task-server/README.md），Verus 没出结局就没有判定，不当通过；
               放进它自己的进程组（start_new_session），退了之后组里还留着的（rust_verify、z3 这类）一并 KILL，stdout 与 stderr 边跑边收
-              （finish_process_group；弄坏开关 group-leftovers-kept 下不停留下的，它拿着输出管道时判法一直等到它自己退）
+              （run_in_own_process_group；弄坏开关 group-leftovers-kept 下不停留下的，它拿着输出管道时判法一直等到它自己退）
             Verus 被信号停了的（直接起时 subprocess 交负的信号号，经 bash 起时退 128 + 信号号，例 137 = 外面 kill -9）：那一处判红，
               ✗ 行写「Verus 被信号停了」、这一次的输出不算判定，→ 查是谁在那一刻停了它（KILLED_HOWTO），不写修证明；整条命令撞了内存上限由 task-server 放大重排，不在这里判
   verus-proof-check.py list-items <根> [--key-mismatches] [--verus-root 目录]
@@ -162,7 +162,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
         必红世界表 Verus 不读：改表里一行只现判那一行，证明与空真照复用；表头、注释与空行不进任何一项的键
           （自证 reuse-must-red-table-row-only、reuse-must-red-table-comment-only）。核 crate 里别的文件加一个空行、被验函数体里加一行注释都不现判
           （自证 reuse-crate-other-file-no-cells、reuse-comment-in-function-body）。
-      记绿、记红、撤绿（用户 2026-10-29 定案）：判绿的照键记绿；判红的（Verus 报错）照同一把键调共用库的 record_red 记红，
+      记绿、记红、撤绿：判绿的照键记绿；判红的（Verus 报错）照同一把键调共用库的 record_red 记红，
         盖掉这把键原有的绿，下一趟这一项现判（自证 reuse-red-withdraws-green）；没判成的（被信号停了，outcome_judged）不碰库。
         证明每项随判定记下 verified 数，复用时各项之和用记下的数。
       库放在哪只由被判那棵仓定，命令行不收别的：library-directory <根> 打的那一行，被判那棵树的 git common-dir 底下的 singlefs-formal-unit-verdicts/
@@ -304,12 +304,12 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       proof-killed-direct（假 Verus kill -9 自己；「✗ proof-killed-direct 这一格判错」）、
       proof-killed-no-proof-howto（「✗ proof-killed-no-proof-howto 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=could-not-compile-counted  cargo 那一种编不过时 cargo 自己那一句「error: could not compile `<包>` (lib) due to N previous error(s)」照算成证明错
-                                                     （改前的样子：core 表每行必红世界多一条、落点多一个（无位置）；假 cargo-verus 照真 cargo 打这一句）
+                                                     （core 表每行必红世界多一条、落点多一个（无位置）；假 cargo-verus 照真 cargo 打这一句）
       cargo-mode-must-red（「✗ cargo-mode-must-red 这一格判错」：落点多出（无位置））
-  VERUS_PROOF_CHECK_BREAK=const-fn-heading-unrecognized  空真插入点的说明（FUNCTION_LINE）不认 const fn（改前的样子：core 的 to_device_offset 那一处写成「fn first_file_byte」）
+  VERUS_PROOF_CHECK_BREAK=const-fn-heading-unrecognized  空真插入点的说明（FUNCTION_LINE）不认 const fn（core 的 to_device_offset 那一处写成「fn first_file_byte」）
       vacuity-const-fn-label（「✗ vacuity-const-fn-label 这一格判错」：说明写成 fn keep_small）
 逐项点名与按条复用的几项：
-  VERUS_PROOF_CHECK_BREAK=default-install-by-home  不设 --verus-root 与 SINGLEFS_VERUS_ROOT 时，Verus 安装目录照改前取 ${XDG_DATA_HOME:-~/.local/share}/<登记表 release 行第五列>（落进各台自己的家目录）
+  VERUS_PROOF_CHECK_BREAK=default-install-by-home  不设 --verus-root 与 SINGLEFS_VERUS_ROOT 时，Verus 安装目录取 ${XDG_DATA_HOME:-~/.local/share}/<登记表 release 行第五列>（落进各台自己的家目录）
       default-install-not-by-home（「✗ default-install-not-by-home 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=list-items-pipe-unhandled  list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
       list-items-closed-pipe（「✗ list-items-closed-pipe 这一格判错」）
@@ -317,7 +317,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       item-select-one、item-unknown、item-proof-one、item-proof-unknown（『… 这一格判错』）
       红的格：「✗ item-select-one 这一格判错」、「✗ item-unknown 这一格判错」、「✗ item-proof-one 这一格判错」、「✗ item-proof-unknown 这一格判错」、
         「✗ multi-crate-item-routed 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=reuse-key-whole-crate  被验函数那一样换回核 crate 整个目录的原文摘要（旧判法：整 crate 一把）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-whole-crate  被验函数那一样换回核 crate 整个目录的原文摘要（整 crate 一把键）
       reuse-comment-in-function-body（N38：被验函数体里只加一行注释，三格全现判；「✗ reuse-comment-in-function-body 这一格判错」）；另有几格跟着判错：
       reuse-crate-other-file-no-cells、reuse-vacuity-line-moved、reuse-proof-function-only、reuse-spec-function-all-users、
       reuse-must-red-renamed、reuse-must-red-table-row-only、reuse-must-red-table-comment-only
@@ -329,7 +329,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       连带红的格：「✗ reuse-spec-function-all-users 这一格判错」、「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-three-questions 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-key-function-only  被验函数那一样只取它自己的单元，不收它 requires / ensures 与函数体用到的 spec fn、proof fn
       reuse-spec-function-all-users（改一个 spec fn，用到它的两项照旧复用；「✗ reuse-spec-function-all-users 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=vacuity-key-by-line-number  空真每处的键另带核的路径与 requires 的行号（旧判法）
+  VERUS_PROOF_CHECK_BREAK=vacuity-key-by-line-number  空真每处的键另带核的路径与 requires 的行号
       reuse-vacuity-line-moved（N39：requires 上面加一个空行，空真两处现判；「✗ reuse-vacuity-line-moved 这一格判错」）；
       另有 1 格跟着判错：reuse-comment-in-function-body（那一行注释让后面那个 fn 的 requires 挪了一行）
       连带红的格：「✗ reuse-comment-in-function-body 这一格判错」、「✗ reuse-three-questions 这一格判错」
@@ -354,28 +354,28 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       连带红的格：「✗ reuse-resume-after-kill 这一格判错」
   VERUS_PROOF_CHECK_BREAK=reuse-records-whole-cell-only  一项判完不当场落盘，整格判完、一处问题都没有才一起记（被打断或有一项红，判过的全不留）
       reuse-resume-after-kill（第一趟 C 那一处被 kill -9，第二趟同一条命令要只判 C：「✗ reuse-resume-after-kill 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=red-keeps-green  判红的那一项不记红（不调共用库的 record_red），同一把键原有的绿留着照复用（改前的样子）
+  VERUS_PROOF_CHECK_BREAK=red-keeps-green  判红的那一项不记红（不调共用库的 record_red），同一把键原有的绿留着照复用
       reuse-red-withdraws-green（先判绿入库，同一把键只写不读地判红一趟，下一趟那一项要现判：「✗ reuse-red-withdraws-green 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=proof-item-narrows  证明那一格同时收到 proof 与 proof:<名> 时只验点名的那一个、不比之和（改前的样子：--item proof --item proof:X 丢了整格）
+  VERUS_PROOF_CHECK_BREAK=proof-item-narrows  证明那一格同时收到 proof 与 proof:<名> 时只验点名的那一个、不比之和（--item proof --item proof:X 丢了整格）
       proof-whole-kept（「✗ proof-whole-kept 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=reuse-key-without-crate-build  键里不带 crate 起法（cargo 还是直接起、Cargo.toml 的 edition 与包名）（改前的样子）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-crate-build  键里不带 crate 起法（cargo 还是直接起、Cargo.toml 的 edition 与包名）
       reuse-key-crate-build（edition 2021 / 2024、cargo 起法三种要三把键：「✗ reuse-key-crate-build 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=reuse-key-without-closure-dependencies  键里不带闭包真点名的外部 crate 在 Cargo.lock 里的版本（改前的样子）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-closure-dependencies  键里不带闭包真点名的外部 crate 在 Cargo.lock 里的版本
       reuse-key-closure-dependencies（Cargo.lock 里 vstd 换版本，点名 vstd:: 的那一项要换键：「✗ reuse-key-closure-dependencies 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=reuse-key-without-entry-unit  证明与空真的键里不带「被验入口单元」「所属函数单元」（改前的样子：一个 trait impl 里几个方法闭包相同、共用一把键）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-entry-unit  证明与空真的键里不带「被验入口单元」「所属函数单元」（一个 trait impl 里几个方法闭包相同、共用一把键）
       reuse-proof-entry-unit-own-key（第二趟 fill 复用到 width 那一份，之和 4 与登记的 5 不同：「✗ reuse-proof-entry-unit-own-key 这一格判错」）、
       reuse-vacuity-owner-unit-own-key（后写的绿盖掉空真那一处的红、第二趟复用成绿：「✗ reuse-vacuity-owner-unit-own-key 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=assume-specification-refused  assume_specification 那一项一律拒算、不入库（改前的样子）
+  VERUS_PROOF_CHECK_BREAK=assume-specification-refused  assume_specification 那一项一律拒算、不入库
       reuse-assume-specification-three-questions（第二趟两条 assume_specification 照样现判，① 红：「✗ reuse-assume-specification-three-questions 这一格判错」）、
       reuse-assume-specification-outside-refused（拒算行不再点名 assume-specification-target：「✗ reuse-assume-specification-outside-refused 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=assume-specification-target-unkeyed  assume_specification 点名的条目不进键
       reuse-assume-specification-three-questions（改 SLOT_WIDTH 的值，指它的那一项照样复用，③ 红：「✗ reuse-assume-specification-three-questions 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=toolchain-key-with-paths  键里工具链那一样照 tool-versions 打的整行，带 RUSTUP_HOME、rustup、VERUS_ROOT、VERUS_Z3_PATH 的路径（改前的样子）
+  VERUS_PROOF_CHECK_BREAK=toolchain-key-with-paths  键里工具链那一样照 tool-versions 打的整行，带 RUSTUP_HOME、rustup、VERUS_ROOT、VERUS_Z3_PATH 的路径
       reuse-key-toolchain-without-paths（同内容的工具链与 rustup 换个位置键要不变：「✗ reuse-key-toolchain-without-paths 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
+  VERUS_PROOF_CHECK_BREAK=threads-default-cpu-count  --threads 的缺省取核数，不取登记的重活默认并行度
       threads-default-registered（「✗ threads-default-registered 这一格判错」）
   证明成哪几项、每项怎么判（proof_items、verification_clean、check_proof；假 Verus 照真 Verus 的形态出 JSON，自证 fake-verus-real-shape 盯着它）：
-  VERUS_PROOF_CHECK_BREAK=spec-fn-as-item  不带 decreases 的 spec fn 也成项（改前的样子：真仓 90 项里 49 个 spec fn 验出 0 条）（样本 verus-must-red-worlds-list-items 判错）
+  VERUS_PROOF_CHECK_BREAK=spec-fn-as-item  不带 decreases 的 spec fn 也成项（真仓 90 项里 49 个 spec fn 验出 0 条）（样本 verus-must-red-worlds-list-items 判错）
       proof-spec-fn-not-item（「✗ proof-spec-fn-not-item 这一格判错」）；另有几格跟着判错：reuse-spec-function-all-users、proof-entire-crate-false-not-red 等
       连带红的格：「✗ reuse-spec-function-all-users 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-spec-decreases-item 这一格判错」、
         「✗ proof-derived-clone-item 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、「✗ proof-sum-short-red-named 这一格判错」、
@@ -389,15 +389,15 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       proof-derived-clone-item（「✗ proof-derived-clone-item 这一格判错」）
       连带红的格：「✗ proof-spec-fn-not-item 这一格判错」、「✗ proof-entire-crate-false-not-red 这一格判错」、「✗ proof-sum-equals-registered-green 这一格判错」、
         「✗ proof-sum-short-red-named 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=valued-const-not-item  verus! 里带值的 const 不成项（改前的样子：core 的 DataUnitIndexInFile::FIRST 那一条没人验，之和少 1）
+  VERUS_PROOF_CHECK_BREAK=valued-const-not-item  verus! 里带值的 const 不成项（core 的 DataUnitIndexInFile::FIRST 那一条没人验，之和少 1）
       proof-valued-const-and-assume-specification-items（「✗ proof-valued-const-and-assume-specification-items 这一格判错」：之和 3 与登记的 5 不同）
       连带红的格：「✗ list-items-associated-const-prefix 这一格判错」、「✗ proof-associated-const-prefix-green 这一格判错」、「✗ proof-associated-const-point-names 这一格判错」、
         「✗ proof-point-name-trait-default-collision-red 这一格判错」、「✗ proof-point-name-two-impls-collision-red 这一格判错」、「✗ proof-spec-const-items 这一格判错」
-        （2026-10-29 逐个开关扫一遍现量的；spec const 也是带值的 const）
-  VERUS_PROOF_CHECK_BREAK=assume-specification-not-item  assume_specification 不成项（改前的样子：core 两条格式常量规格各 1 条没人验，之和少 2）
+        （spec const 也是带值的 const）
+  VERUS_PROOF_CHECK_BREAK=assume-specification-not-item  assume_specification 不成项（core 两条格式常量规格各 1 条没人验，之和少 2）
       proof-valued-const-and-assume-specification-items（「✗ proof-valued-const-and-assume-specification-items 这一格判错」：之和 4 与登记的 5 不同）
       连带红的格：「✗ trust-registered-green 这一格判错」、「✗ no-cheating-dropped 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=require-success-key-per-function  --verify-function 下 JSON 没有 success 键当没验过（改前的样子：真仓 90 项全红）
+  VERUS_PROOF_CHECK_BREAK=require-success-key-per-function  --verify-function 下 JSON 没有 success 键当没验过（真仓 90 项全红）
       proof-fn-verified-one-green（「✗ proof-fn-verified-one-green 这一格判错」）；proof-green、vacuity-vacuous 等跟着判错
       连带红的格：「✗ proof-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-vacuous 这一格判错」、「✗ proof-rlimit-registered 这一格判错」、
         「✗ proof-rlimit-default 这一格判错」、「✗ item-proof-one 这一格判错」、「✗ reuse-proof 这一格判错」、「✗ reuse-comment-in-function-body 这一格判错」、
@@ -426,7 +426,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
   VERUS_PROOF_CHECK_BREAK=nonzero-errors-accepted  errors 不是 0 也当验过（不是 vir 错的）
       proof-errors-one-red（「✗ proof-errors-one-red 这一格判错」）、proof-broken
       连带红的格：「✗ proof-broken 这一格判错」、「✗ proof-rlimit-too-low 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=submodule-verify-root  只验一个函数时不按核所在的模块点，一律 --verify-root（改前的样子：真仓子模块 compaction_plan_proofs 的 20 项证明、9 处空真全红）
+  VERUS_PROOF_CHECK_BREAK=submodule-verify-root  只验一个函数时不按核所在的模块点，一律 --verify-root（真仓子模块 compaction_plan_proofs 的 20 项证明、9 处空真全红）
       module-per-kernel（根、kernel、nested、nested::deep 四份核，逐项核命令行点的模块；「✗ module-per-kernel 这一格判错」）；
       另有几格跟着判错（自证的核在子模块 src/kernel.rs 里，点根找不到函数）：proof-green、vacuity-green、proof-count 等起 Verus 逐函数验的格
       连带红的格：「✗ proof-green 这一格判错」、「✗ vacuity-green 这一格判错」、「✗ proof-count 这一格判错」、「✗ vacuity-vacuous 这一格判错」、「✗ vacuity-closure-found 这一格判错」、
@@ -461,10 +461,10 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       reuse-three-questions（① 第二趟全现判）、reuse-sentinel（复用哨兵判红「复用失灵」，这一格要的就是红：照判；跟着判错的是 ① 那几格）
       连带红的格：「✗ reuse-first-run-records 这一格判错」、「✗ reuse-judging-units-changed 这一格判错」、「✗ reuse-toolchain-changed 这一格判错」、
         「✗ list-items-key-mismatch-count 这一格判错」、「✗ reuse-row-own-key 这一格判错」、「✗ reuse-three-questions 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=body-open-past-unit-end  external_body 的规格原文照改前的取法：把单元的 last_token 当最后一个词（一个 impl 里最后一个 fn 取成空串、
+  VERUS_PROOF_CHECK_BREAK=body-open-past-unit-end  external_body 的规格原文这样取：把单元的 last_token 当最后一个词（一个 impl 里最后一个 fn 取成空串、
                                                    改签名 sha256 不变；别的 fn 取成整个 fn 再多一个词）（样本 verus-proof-trust-digest-last-fn-in-impl-red 判绿）
       trust-digest-signature-only（「✗ trust-digest-signature-only 这一格判错」：impl 里最后一个 fn 是 e3b0c442… 那一个）
-  VERUS_PROOF_CHECK_BREAK=trait-declaration-by-brace  trait 里的声明照改前的认法：单元里一个 { 都没有才不成项（ensures 里的结构体字面量当成函数体）
+  VERUS_PROOF_CHECK_BREAK=trait-declaration-by-brace  trait 里的声明这样认：单元里一个 { 都没有才不成项（ensures 里的结构体字面量当成函数体）
                                                       （样本 verus-proof-list-items-trait-declaration-struct-literal 判错：Store::put 列成了一项）
       proof-trait-declaration-struct-literal（「✗ proof-trait-declaration-struct-literal 这一格判错」：Store::put 成了项、之和 4 与登记的 3 不同）
   VERUS_PROOF_CHECK_BREAK=trait-impl-lag-matched-by-trait-only  放过表的行只按所在文件与 trait 名认、不看实现类型（同一个 trait 在外面的别的 impl 也被放过）
@@ -478,9 +478,9 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
   VERUS_PROOF_CHECK_BREAK=trait-impl-lag-passed-unnamed  放过的 impl 在成功句里只报个数、不逐个点名「契约没证、靠信任」
                                                        （样本 verus-proof-trait-impl-outside-registered-green 判错）
       trait-impl-lag-registered-green（「✗ trait-impl-lag-registered-green 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=trait-impl-lag-not-run-unreported  放过的 impl 不往 $GATE_NOT_RUN_FILE 报本次未跑（改前的样子：只写在成功句里）
+  VERUS_PROOF_CHECK_BREAK=trait-impl-lag-not-run-unreported  放过的 impl 不往 $GATE_NOT_RUN_FILE 报本次未跑（只写在成功句里）
       trait-impl-lag-not-run-reported（「✗ trait-impl-lag-not-run-reported 这一格判错」：文件里 0 行）
-  VERUS_PROOF_CHECK_BREAK=mir-panic-path-unnormalized  MIR 比对不照规整表 MIR_PATH_ALIASES 改写（改前的样子：core 103 个条目红在 std::rt::panic_fmt 对 core::panicking::panic_fmt）
+  VERUS_PROOF_CHECK_BREAK=mir-panic-path-unnormalized  MIR 比对不照规整表 MIR_PATH_ALIASES 改写（core 103 个条目红在 std::rt::panic_fmt 对 core::panicking::panic_fmt）
                                                        （样本 verus-proof-mir-panic-path-green 判红）
       mir-panic-path-normalized-green（「✗ mir-panic-path-normalized-green 这一格判错」）
       连带红的格：「✗ mir-panic-path-divergence-red 这一格判错」、「✗ mir-unlisted-panic-path-red 这一格判错」、「✗ mir-panic-path-boundary-red 这一格判错」（红句里没有改写几处）
@@ -493,21 +493,21 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       mir-panic-path-boundary-red（「✗ mir-panic-path-boundary-red 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=derived-clone-copy-only  derive(Clone) 只在同时 derive(Copy) 时成项（把 Verus 那条「clone is not a copy」的警告当成没有义务）
       proof-derived-clone-not-copy-item（「✗ proof-derived-clone-not-copy-item 这一格判错」：之和 5 与登记的 6 不同）
-  VERUS_PROOF_CHECK_BREAK=whole-entry-past-unit-end  uninterp、external_*_specification、带 external_body 的类型规格与 cfg 原子照改前的取法多取下一个条目的头一个词
+  VERUS_PROOF_CHECK_BREAK=whole-entry-past-unit-end  uninterp、external_*_specification、带 external_body 的类型规格与 cfg 原子多取下一个条目的头一个词
       trust-digest-whole-entry-half-open（「✗ trust-digest-whole-entry-half-open 这一格判错」）
       连带红的格：「✗ trust-digest-cfg-entry-half-open 这一格判错」
-  VERUS_PROOF_CHECK_BREAK=cfg-entry-past-unit-end  只 cfg 原子的「所在条目整个」照改前的取法多取下一个条目的头一个词
+  VERUS_PROOF_CHECK_BREAK=cfg-entry-past-unit-end  只 cfg 原子的「所在条目整个」多取下一个条目的头一个词
       trust-digest-cfg-entry-half-open（「✗ trust-digest-cfg-entry-half-open 这一格判错」：后接 pub 与后接 fn 的 sha256 不同）
-  VERUS_PROOF_CHECK_BREAK=associated-const-bare-name  impl 里的关联 const 交给 --verify-function 的是 <名>（改前的样子），不是 *::<名>
+  VERUS_PROOF_CHECK_BREAK=associated-const-bare-name  impl 里的关联 const 交给 --verify-function 的是 <名>，不是 *::<名>
                                                       （样本 verus-proof-list-items-associated-const-prefix 判错：列项退 1）
       list-items-associated-const-prefix（「✗ list-items-associated-const-prefix 这一格判错」：FIRST 在表里命中 2 项）
       连带红的格：「✗ proof-associated-const-prefix-green 这一格判错」、「✗ proof-associated-const-point-names 这一格判错」、
         「✗ proof-point-name-trait-default-collision-red 这一格判错」、「✗ proof-point-name-two-impls-collision-red 这一格判错」（红句点名的是 LIMIT、FIRST，不是 *::<名>）
-  VERUS_PROOF_CHECK_BREAK=point-names-by-containment  点名不照 Verus 的点法在可点名函数表里点，照改前的判法只比成项的关联 const 与 assume_specification 谁是谁的一段
+  VERUS_PROOF_CHECK_BREAK=point-names-by-containment  点名不照 Verus 的点法在可点名函数表里点，只比成项的关联 const 与 assume_specification 谁是谁的一段
                                                       （样本 verus-proof-list-items-trait-default-collision-red 判错：列项退 0）
       proof-point-name-trait-default-collision-red（「✗ proof-point-name-trait-default-collision-red 这一格判错」：找不到「命中 2 项」）
-      连带红的格：「✗ proof-point-name-two-impls-collision-red 这一格判错」（红句是改前那一句，不点名撞的几项）
-  VERUS_PROOF_CHECK_BREAK=assert-by-requires-as-insertion-point  属于 assert(…) by (…) 的 requires 照改前当空真插入点（往下找不到函数体的 { 判红）
+      连带红的格：「✗ proof-point-name-two-impls-collision-red 这一格判错」（红句不点名撞的几项）
+  VERUS_PROOF_CHECK_BREAK=assert-by-requires-as-insertion-point  属于 assert(…) by (…) 的 requires 当空真插入点（往下找不到函数体的 { 判红）
                                                                  （样本 verus-vacuity-list-items-assert-by-requires-green 判错：列项退 1）
       list-items-assert-by-requires-skipped（「✗ list-items-assert-by-requires-skipped 这一格判错」）、vacuity-assert-by-requires-skipped（「✗ vacuity-assert-by-requires-skipped 这一格判错」）、
       proof-assert-by-requires-skip-reported（「✗ proof-assert-by-requires-skip-reported 这一格判错」：成功句报跳过 0 处）
@@ -515,12 +515,12 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
                                                                 （样本 verus-vacuity-list-items-requires-on-plain-block-red 判错：列项退 0）
       list-items-requires-on-plain-block-red（「✗ list-items-requires-on-plain-block-red 这一格判错」）、
       list-items-requires-on-assert-without-by-red（「✗ list-items-requires-on-assert-without-by-red 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=spec-const-not-item  spec const 不成项（改前的样子：真 Verus 整 crate 验时每个 spec const 多 1 条，之和少）
+  VERUS_PROOF_CHECK_BREAK=spec-const-not-item  spec const 不成项（真 Verus 整 crate 验时每个 spec const 多 1 条，之和少）
                                                （样本 verus-proof-list-items-spec-const 判错：成项 3 个，找不到两个 spec const 那两行）
       proof-spec-const-items（「✗ proof-spec-const-items 这一格判错」：之和 2 与登记的 4 不同）
-  VERUS_PROOF_CHECK_BREAK=outer-memory-narrows-jobs  环境里设了外层内存上限（RUN_WITH_MEMORY_CAP_OUTER_CAP）就把几处同时验收到 1 处（改前按外层上限 ÷ 每个 Verus 进程的上限收的样子）
+  VERUS_PROOF_CHECK_BREAK=outer-memory-narrows-jobs  环境里设了外层内存上限（RUN_WITH_MEMORY_CAP_OUTER_CAP）就把几处同时验收到 1 处
       jobs-not-narrowed-by-outer-memory（「✗ jobs-not-narrowed-by-outer-memory 这一格判错」：外层 1G、--threads 8、两处，每处起的 Verus 带 --num-threads 8）
-  VERUS_PROOF_CHECK_BREAK=group-leftovers-kept  Verus 退了之后不停它的进程组里留下的（改前直接起那一支的样子）
+  VERUS_PROOF_CHECK_BREAK=group-leftovers-kept  Verus 退了之后不停它的进程组里留下的
       group-leftovers-stopped（「✗ group-leftovers-stopped 这一格判错」：直接起的 bash 退了、它在后台起的 sleep 拿着输出管道，判法等到 sleep 自己退才交回）
   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库 scripts/gate/lib_reuse_checks.py 的开关）  哨兵被现判不红
       reuse-sentinel（「✗ reuse-sentinel 这一格判错」）
@@ -535,18 +535,18 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
   这种写法（verusfmt 与本仓的写法），别的写法认不出就判红要求改写法。assert(…) by (…) 接 requires 再接一个证明块 { … }（不是 ; 收尾）的不当 assert-by 跳过，
   照旧往下找到那个块的 { 当插入点（replay-prefix 的 file_range_proofs.rs 有一处：插的 assert(false) 落在那个块里，判的是那几条 requires 在那一处可不可满足）。
   模块按核的文件路径认，不读 mod 声明：#[path = …] 挪了文件、或核写在 mod <名> { … } 内联块里的，点的模块与真的不同，Verus 报 could not find module / function、判红。
-  差分测试只核在 crates/ 下标了 #[test]，不在这里跑（它归 验证包，随改动跑）；被验区域之外对被验类型的构造与对带 requires 的被验函数的调用（第二轮正推 Y4 第 8 条）
-  这一份不判；必红世界还是逐行手写，没有按 ensures 自动造（Y4 第 6 条）；逐函数结局还是逐项起 Verus，没改成读整 crate 一趟的 func-details（Y4 第 4 条）。
+  差分测试只核在 crates/ 下标了 #[test]，不在这里跑（它归 验证包，随改动跑）；被验区域之外对被验类型的构造与对带 requires 的被验函数的调用
+  这一份不判；必红世界逐行手写，不按 ensures 自动造；逐函数结局逐项起 Verus，不读整 crate 一趟的 func-details。
 被验区域与多 crate 的弄坏开关（门禁 formal-verification 那一道的变量 FORMAL_VERIFICATION_BREAK=<项>[,<项>…]，判法这一半在这份脚本里，那一道文件头另列一份
 它们让哪份门禁样本判错）；逐项写开关、弄坏哪一处，下一行起写打开后自证哪几格判错（「」里是那一格判错行的开头）：
-  FORMAL_VERIFICATION_BREAK=single-crate-registry  登记表只认第一个 crate（改前的样子）
+  FORMAL_VERIFICATION_BREAK=single-crate-registry  登记表只认第一个 crate
       multi-crate-proof（「✗ multi-crate-proof 这一格判错」）、multi-crate-list-items（「✗ multi-crate-list-items 这一格判错」）、
       multi-crate-item-routed（「✗ multi-crate-item-routed 这一格判错」）
   FORMAL_VERIFICATION_BREAK=cargo-mode-ignored  crate 行第四段 cargo 不认、照直接起 verus 判（有别的依赖就红）
       cargo-mode-proof（「✗ cargo-mode-proof 这一格判错」）、cargo-mode-vacuity（「✗ cargo-mode-vacuity 这一格判错」）、
       cargo-mode-must-red（「✗ cargo-mode-must-red 这一格判错」）、cargo-mode-command（「✗ cargo-mode-command 这一格判错」）、
       cargo-mode-shared-build-directory（「✗ cargo-mode-shared-build-directory 这一格判错」）
-  FORMAL_VERIFICATION_BREAK=methods-refused  impl 与 trait 里的方法判红、要挪成自由 fn（改前的样子）
+  FORMAL_VERIFICATION_BREAK=methods-refused  impl 与 trait 里的方法判红、要挪成自由 fn
       proof-method-items（「✗ proof-method-items 这一格判错」）、proof-same-point-name（「✗ proof-same-point-name 这一格判错」）
       连带红的格：「✗ trait-impl-lag-registered-green 这一格判错」、「✗ trait-impl-lag-baseline-green 这一格判错」、「✗ proof-trait-declaration-struct-literal 这一格判错」
   FORMAL_VERIFICATION_BREAK=attribute-mode-unrecognized  属性写法（#[verus_verify]、#[verus_spec]）标的文件不当核
@@ -650,7 +650,7 @@ EXCLUDED_PACKAGE_FILES = {"Cargo.toml", "Cargo.toml.orig", ".cargo_vcs_info.json
 # 核里一律不许的标记（不带 --no-cheating 之后这几样 Verus 不拒，由这里判）：admit(…)、assume(…)、verifier::external（让整个条目对 Verus 不可见）。
 # assume_specification、external_body、uninterp 这几样不在这里：照信任清单逐条登记（TRUST_KINDS）；axiom 另判（region_problems，按词法单元认）
 CHEATING_MARKER = re.compile(r"\badmit\s*\(|\bassume\s*\(|verifier\s*::\s*external\b|verifier\s*\(\s*external\s*\)")
-# 信任清单（出口 5 第三轮判决第三节「门禁」）：被验区域里每一处可信声明一行，vstd 按版本整体一行；格式写在表自己的文件头
+# 信任清单：被验区域里每一处可信声明一行，vstd 按版本整体一行；格式写在表自己的文件头
 TRUST_LIST = ".claude/gate.d/verus-trust-list.tsv"
 TRUST_KINDS = ("assume_specification", "external_body", "uninterp", "external_fn_specification", "external_trait_specification",
                "external_type_specification", "external_trait_extension")
@@ -662,7 +662,7 @@ TRAIT_IMPLS_OUTSIDE_LAG = ".claude/gate.d/verus-trait-impls-outside-lag.tsv"
 LAG_BASELINE_LIBRARY = os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "lib-lag-baseline.py")
 TRAIT_IMPL_OUTSIDE_HOWTO = ("把这个 impl 挪进 verus! 里（方法照 trait 的 requires / ensures 证出来）；确是不该被验的类型，改名或挪出被验区域。"
                             f"{TRAIT_IMPLS_OUTSIDE_LAG} 只缩不涨：gate 基准那一版里还没有这张表时照它的文件头初次登记，之后只删不加，新写的 impl 不往里登记")
-# 函数（或模块）上的 rlimit 属性：#[verifier::rlimit(N)] 与旧写法 #[verifier(rlimit(N))] 都盖过命令行的 --rlimit（Verus 0.2026.09.20 实测两种写法都认、--no-cheating 不拒）
+# 函数（或模块）上的 rlimit 属性：#[verifier::rlimit(N)] 与 #[verifier(rlimit(N))] 都盖过命令行的 --rlimit（Verus 0.2026.09.20 两种写法都认、--no-cheating 不拒）
 RLIMIT_ATTRIBUTE = re.compile(r"verifier\s*::\s*rlimit\b|verifier\s*\(\s*rlimit\b")
 # 一行 fn 的开头（空真取插入点的说明用：requires 往上最近的一行）；const fn 也认（core 的 SlotNumber::to_device_offset 就是 const fn）
 FUNCTION_LINE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(proof\s+|spec\s+|exec\s+)?(?:const\s+)?fn\s+(\w+)")
@@ -677,7 +677,7 @@ LANDING_HOWTO = ("必红世界表第六段一律写 landing=<函数名>[,<函数
 FUNCTION_HEADING = re.compile(r"^\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?(?:(?:open|closed|broadcast|proof|spec(?:\([a-z]+\))?|exec|axiom|const|unsafe)\s+)*fn\s+(\w+)")
 DIAGNOSTIC_LOCATION = re.compile(r"^\s*-->\s+(\S+?):(\d+):(\d+)")
 BREAK = {item for item in os.environ.get("VERUS_PROOF_CHECK_BREAK", "").split(",") if item}
-if "const-fn-heading-unrecognized" in BREAK:   # 弄坏开关：FUNCTION_LINE 不认 const fn（改前的样子）
+if "const-fn-heading-unrecognized" in BREAK:   # 弄坏开关：FUNCTION_LINE 不认 const fn
     FUNCTION_LINE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(proof\s+|spec\s+|exec\s+)?fn\s+(\w+)")
 # cargo 那一种（cargo verus focus）编不过时 cargo 自己打的那一句「error: could not compile `<包>` (lib) due to N previous error(s)」：不是证明错，
 # 与 rustc 的「aborting due to」一样不数、不进落点（proof_error_messages、diagnostic_blocks）
@@ -812,7 +812,7 @@ def read_registry(root):
                 problems.append(f"第 {number} 行：verified 的登记数要是正整数，读到 {fields[2]!r}")
             crates.append({"crate_directory": directory, "verified_count": int(fields[2]) if fields[2].isdigit() else None,
                            "kernels": [], "must_red_table": None,
-                           # 弄坏开关 cargo-mode-ignored：第四段 cargo 不认，照直接起 verus 判（改前的样子：有别的依赖就红）
+                           # 弄坏开关 cargo-mode-ignored：第四段 cargo 不认，照直接起 verus 判（有别的依赖就红）
                            "cargo_mode": len(fields) == 4 and fields[3] == "cargo" and "cargo-mode-ignored" not in FORMAL_BREAK})
         elif kind == "kernel":
             kernels.append((number, fields[1]))
@@ -832,7 +832,7 @@ def read_registry(root):
         else:
             tables.append((number, fields[1]))
     if len(crates) > 1 and "single-crate-registry" in FORMAL_BREAK:
-        crates = crates[:1]   # 弄坏开关：只认登记表里第一个 crate（改前的样子）
+        crates = crates[:1]   # 弄坏开关：只认登记表里第一个 crate
     for number, kernel in kernels:
         owner = [crate for crate in crates if kernel.startswith(crate["crate_directory"] + "/")]
         if not owner:
@@ -920,7 +920,7 @@ def work_root_library():
 def verus_directory(registry, override):
     """Verus 安装目录：--verus-root，再 SINGLEFS_VERUS_ROOT，再共享数据根下的登记位置（formal-tools 在共享名单里，两台同一个绝对路径读同一份）。
     不经 ~ 与 XDG_DATA_HOME：第二台的家目录是另一个。登记的第五列是绝对路径就是它自己（门禁样本把它改成替身安装）。
-    弄坏开关 default-install-by-home 下照改前取 ${XDG_DATA_HOME:-~/.local/share}/<第五列>。"""
+    弄坏开关 default-install-by-home 下取 ${XDG_DATA_HOME:-~/.local/share}/<第五列>。"""
     if override:
         return os.path.abspath(override)
     if os.environ.get("SINGLEFS_VERUS_ROOT"):
@@ -1000,7 +1000,7 @@ def path_dependencies(root, crate_directory, seen=None):
 def copy_crate(root, registry, work):
     """一处判定一份副本：直接起 verus 的拷 crate 自己，交 crate 副本的目录（verus 在那里起）；cargo 那一种另拷它的路径依赖、仓根的 Cargo.lock，
     在副本根写一份只列这几个成员的 Cargo.toml（整个工作区的 cargo metadata 在离线机器上过不了），交副本根（cargo verus focus 在那里起）。
-    每处判定都在一份新目录里：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、没有判定行（第二轮正推 Y4 第 3 条）。"""
+    每处判定都在一份新目录里：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、没有判定行。"""
     if not registry.cargo_mode:
         source = os.path.join(root, registry.crate_directory)
         destination = os.path.join(work, registry.crate_directory)
@@ -1023,7 +1023,7 @@ RUST_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 def kernel_module(registry, manifest, relative):
     """核 relative（相对仓根）所在的模块：是 crate 的入口文件（Cargo.toml 的 lib.path，默认 src/lib.rs）交 None（点 --verify-root）；
     入口所在目录下的 <名>.rs 与 <名>/mod.rs 交 <名>，更深的用 :: 接起来（Verus 0.2026.09.20 的 --verify-only-module 认 outer::inner，文件头「只验一个函数」一段）。
-    不在入口所在目录下、或有一段不是 Rust 标识符的判红。弄坏开关 submodule-verify-root 下一律交 None（改前的样子）。"""
+    不在入口所在目录下、或有一段不是 Rust 标识符的判红。弄坏开关 submodule-verify-root 下一律交 None。"""
     if "submodule-verify-root" in BREAK:
         return None
     entry = os.path.normpath(manifest.get("lib", {}).get("path", "src/lib.rs"))
@@ -1046,11 +1046,11 @@ def verus_arguments(registry, manifest, threads, function=None, module=None):
     """Verus 的命令行；function 给了就只验这一个函数（证明逐函数一项、空真只验它所属的那一个函数）：module 是 None（核是 crate 的入口）点 --verify-root，
     不是 None 点 --verify-only-module <module>（kernel_module），再 --verify-function <名>。--verify-function 只在点的那一个模块里找；
     Verus 0.2026.09.20 拒 --verify-module 与 --verify-function 一起给、拒 --verify-root 与 --verify-only-module 一起给（文件头「只验一个函数」一段）。
-    Verus 0.2026.09.20 按子串点名、有恰好同名的就取它（主 agent 2026-10-15 在副本上量的：名字是别人子串的四个都退 0、没报 more than one match），
+    Verus 0.2026.09.20 按子串点名、有恰好同名的就取它（名字是别人子串的四个都退 0、没报 more than one match），
     所以 verus! 里的 fn 同名判红（verus_functions），名字是别人子串的照常用；点名在表里是不是恰好命中一项，起 Verus 之前由 point_name_problems 判。"""
     package = manifest.get("package", {})
     entry = manifest.get("lib", {}).get("path", "src/lib.rs")
-    # 不带 --no-cheating（出口 5 第三轮判决第三节「门禁」）：assume_specification、external_body、uninterp 这几样照信任清单逐条登记（trust_list_problems），
+    # 不带 --no-cheating：assume_specification、external_body、uninterp 这几样照信任清单逐条登记（trust_list_problems），
     # admit、assume(、axiom、verifier::external 在被验区域里一律判红（region_problems），都在起 Verus 之前判
     arguments = [] if registry.cargo_mode else ["--crate-type=lib", f"--edition={package.get('edition', '2021')}", "--crate-name", package.get("name", "crate").replace("-", "_")]
     arguments += ["--num-threads", str(threads), "--output-json"]
@@ -1066,8 +1066,8 @@ def verus_arguments(registry, manifest, threads, function=None, module=None):
 
 def forget_crate_fingerprints(target, package):
     """cargo 那一种几处同时验共用一个编译目录：起之前删掉被验的 crate 在这个编译目录里的指纹目录（<编译目录>/**/.fingerprint/<包>-*），让它每处都现编、出判定行；
-    cargo 的编译指纹不看 --verify-* 参数，换一份副本、改了文件时间也照样当它没变（2026-10-26 在样本上撞到，第二轮正推 Y4 第 3 条）。依赖的指纹不动、照旧复用。
-    弄坏开关 FORMAL_VERIFICATION_BREAK=cargo-fingerprint-kept 下不删（改前的样子：第二处起拿不到判定行）。"""
+    cargo 的编译指纹不看 --verify-* 参数，换一份副本、改了文件时间也照样当它没变。依赖的指纹不动、照旧复用。
+    弄坏开关 FORMAL_VERIFICATION_BREAK=cargo-fingerprint-kept 下不删（第二处起拿不到判定行）。"""
     if "cargo-fingerprint-kept" in FORMAL_BREAK:
         return
     for path in glob.glob(os.path.join(target, "**", ".fingerprint", f"{package}-*"), recursive=True):
@@ -1117,17 +1117,13 @@ def kernel_modules(root, registry, manifest, kernels):
     return modules
 
 
-def stop_process_group(group, signal_number):
-    """对自己起的那一组发信号（start_new_session 起的，进程组号就是直接起的那一个的进程号）；组里已经没有进程了不算错。"""
-    try:
-        os.killpg(group, signal_number)
-    except (ProcessLookupError, PermissionError):
-        pass
-
-
-def finish_process_group(process):
-    """start_new_session 起的、stdout 与 stderr 接了管道的那一个：两条线程边跑边收，它退了先停组里留下的（拿着管道的子进程不让读的一头等到 EOF），
-    再收齐输出，交 (stdout, stderr)。弄坏开关 group-leftovers-kept 下不停留下的（读的一头等到它们自己退）。"""
+def run_in_own_process_group(command, **popen_options):
+    """起 command，放进它自己的进程组（start_new_session），stdout 与 stderr 接管道、两条线程边跑边收；它退了先停组里留下的
+    （拿着管道的子进程不让读的一头等到 EOF；进程组号就是这里起的那一个的进程号，组里已经没有进程了不算错），再收齐输出，交 (process, stdout, stderr)。
+    起与停写在同一个函数里：终止只发给这里自己起的那一组（.claude/hooks/bash-command-detector.sh 文件头 ⑥ 认的写法）。
+    弄坏开关 group-leftovers-kept 下不停留下的（读的一头等到它们自己退）。popen_options 照交给 Popen（cwd、env）。"""
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace", start_new_session=True,
+                               **popen_options)
     collected = {}
     readers = [threading.Thread(target=lambda name=name, stream=stream: collected.__setitem__(name, stream.read()), daemon=True)
                for name, stream in (("stdout", process.stdout), ("stderr", process.stderr))]
@@ -1135,20 +1131,21 @@ def finish_process_group(process):
         reader.start()
     process.wait()
     if "group-leftovers-kept" not in BREAK:
-        stop_process_group(process.pid, signal.SIGKILL)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
     for reader in readers:
         reader.join()
-    return collected.get("stdout", ""), collected.get("stderr", "")
+    return process, collected.get("stdout", ""), collected.get("stderr", "")
 
 
 def run_verus(program, arguments, crate_copy, extra_environment=None):
     """起一次 Verus（program 是 verus_program 交的、arguments 是 verus_program_arguments 交的；MIR 比对的产品构建交 cargo 与它的参数）；交回 {exit, json, diagnostics, stderr}。
     直接起：不套内存包装、capped.sh 与 nice，线程数在 Verus 自己的 --num-threads 上（verus_arguments），整条命令的内存额度由 task-server 给；不限时，卡住由 task-server 判。
-    放进它自己的进程组，输出与收尾照 finish_process_group。extra_environment 另设进环境（cargo 那一种的 CARGO_TARGET_DIR）。"""
+    放进它自己的进程组，输出与收尾照 run_in_own_process_group。extra_environment 另设进环境（cargo 那一种的 CARGO_TARGET_DIR）。"""
     environment = dict(os.environ, **(extra_environment or {}))
-    process = subprocess.Popen([program, *arguments], cwd=crate_copy, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, errors="replace", start_new_session=True)
-    stdout, stderr = finish_process_group(process)
+    process, stdout, stderr = run_in_own_process_group([program, *arguments], cwd=crate_copy, env=environment)
     outcome = {"exit": process.returncode, "json": None, "diagnostics": stderr + "\n" + stdout, "stderr": stderr}
     try:
         outcome["json"] = json.loads(stdout) if stdout.strip().startswith("{") else None
@@ -1176,7 +1173,7 @@ def diagnostic_blocks(text):
 def proof_error_messages(text, count_rlimit=False):
     """输出里 error 起头的报错，除去含 rlimit 用尽的、以「aborting due to」起头的与 cargo 自己那一句「could not compile」之后剩下的（证明错）；
     必红世界表第五段的 M 数的就是它们，只剩 rlimit 用尽的那一行不作数。count_rlimit 只给弄坏开关 rlimit-counted-in-proof-errors 用：rlimit 用尽也算进去。
-    弄坏开关 could-not-compile-counted：cargo 那一句照算（改前的样子：cargo 那一种每行必红世界多一条、落点多一个（无位置））。"""
+    弄坏开关 could-not-compile-counted：cargo 那一句照算（cargo 那一种每行必红世界多一条、落点多一个（无位置））。"""
     messages = []
     for line in text.split("\n"):
         if not line.startswith("error"):
@@ -1310,9 +1307,9 @@ def product_rustc_version(root, options):
 
 
 def rustc_pin_problems(root, registry, version, options, problems):
-    """Verus 与产品的 rustc 版本差进工具链钉表（出口 5 第三轮判决第三节「门禁」）：登记表 rustc 行三段——Verus 用的工具链（version.json 的 toolchain 第一段）、
+    """Verus 与产品的 rustc 版本差进工具链钉表：登记表 rustc 行三段——Verus 用的工具链（version.json 的 toolchain 第一段）、
     产品 rustc 的 release、commit-hash，都与此刻的相同。两边不同不判红（今天 Verus 1.98.1、产品 1.98.0），判的是「差」被钉住：哪一边换了都要改这一行，
-    改之前先在新的一对上把 MIR 比对跑一遍。问题追加进 problems，交一句给成功句。弄坏开关 FORMAL_VERIFICATION_BREAK=rustc-pin-unchecked 下不核。"""
+    要改这一行时先在新的一对上把 MIR 比对跑一遍。问题追加进 problems，交一句给成功句。弄坏开关 FORMAL_VERIFICATION_BREAK=rustc-pin-unchecked 下不核。"""
     if "rustc-pin-unchecked" in FORMAL_BREAK:
         return "Verus 与产品的 rustc 没核（弄坏开关 rustc-pin-unchecked）"
     if registry.rustc is None:
@@ -1353,7 +1350,7 @@ def rlimit_attributes(root, kernels):
     return found
 
 
-# ── 被验区域：信任清单、axiom、cfg 原子、verus! 外面的 trait impl（出口 5 第三轮判决第三节「门禁」；起 Verus 之前判）──
+# ── 被验区域：信任清单、axiom、cfg 原子、verus! 外面的 trait impl（起 Verus 之前判）──
 
 def read_trust_list(root):
     """信任清单 → (vstd 那几行 [(版本, 内容指纹, 行号)], 条目行 [dict], 写坏的行 [说明])；表不在交 None。
@@ -1444,7 +1441,7 @@ NOT_RUN_FILE_VARIABLE = "GATE_NOT_RUN_FILE"
 
 def report_passed_not_run(options, registry):
     """放过表放过的每一处（region_problems 记进 options["trait_impls_passed"]）往 $GATE_NOT_RUN_FILE 追加一行本次未跑：那个 impl 的契约这一次没人验，只写在成功句里不算报了。
-    变量不在时不写（单跑与喂样本时它不在），交一句给成功句说明报了几行或为什么没报。弄坏开关 trait-impl-lag-not-run-unreported 下不写（改前的样子）。"""
+    变量不在时不写（单跑与喂样本时它不在），交一句给成功句说明报了几行或为什么没报。弄坏开关 trait-impl-lag-not-run-unreported 下不写。"""
     passed = options.get("trait_impls_passed") or []
     if not passed:
         return ""
@@ -1534,7 +1531,7 @@ def body_open(rust_file, unit):
 
 
 def body_open_past_unit_end(rust_file, unit):
-    """弄坏开关 body-open-past-unit-end 下 external_body 的规格原文用的取法（改前的样子）：把 last_token 本身当单元最后一个词，
+    """弄坏开关 body-open-past-unit-end 下 external_body 的规格原文用的取法：把 last_token 本身当单元最后一个词，
     一个 impl 里最后一个 fn 落在 impl 的 } 上、配到 impl 的 {，签名那一截取成空串；后面还接着别的条目的 fn 配不上，取成整个 fn 再多一个词。"""
     if unit is None or unit.last_token is None or unit.last_token >= rust_file.count or rust_file.texts[unit.last_token] != "}":
         return None
@@ -1544,7 +1541,7 @@ def body_open_past_unit_end(rust_file, unit):
 def whole_entry_end(unit, cfg_atom=False):
     """取整个条目当规格原文时的上界（uninterp、external_*_specification、带 external_body 的类型规格，与 cfg 原子的「所在条目整个」）：
     单元是半开区间 [first_token, last_token)，取到 last_token 为止、不连下一个条目的头一个词。
-    弄坏开关 whole-entry-past-unit-end 下几处都照改前的取法多取 last_token 那一个词；cfg-entry-past-unit-end 下只 cfg 原子那一处多取（cfg_atom 为真的调用）。"""
+    弄坏开关 whole-entry-past-unit-end 下几处都多取 last_token 那一个词；cfg-entry-past-unit-end 下只 cfg 原子那一处多取（cfg_atom 为真的调用）。"""
     if "whole-entry-past-unit-end" in BREAK or cfg_atom and "cfg-entry-past-unit-end" in BREAK:
         return unit.last_token + 1
     return unit.last_token
@@ -1798,12 +1795,12 @@ def region_problems(root, registry, kernels, options):
     return problems
 
 
-# ── 产品构建与 verus --compile 构建的 MIR 逐函数比（出口 5 第三轮判决 Z2：cfg 分叉、宏里的 cfg 让两边编出的函数体不同，两次产品编译看不见）──
+# ── 产品构建与 verus --compile 构建的 MIR 逐函数比（cfg 分叉、宏里的 cfg 让两边编出的函数体不同，两次产品编译看不见）──
 
 MIR_ITEM_HEAD = re.compile(r"^(fn|const|static|promoted\[\d+\] in) ")
 # MIR 规整表：同一个函数两边印法不同的名字，(另一种印法, 规整成的印法)；比之前两边都把前一个整词写成后一个（mir_path_pattern 卡词边界）。
 # std::rt::panic_fmt 是 core::panicking::panic_fmt 的再导出：Verus 构建里 verus! 的展开经 ::core 用了一次 core，rustc 印路径时改取 core 自己的路径，
-# 产品构建照旧印 std 的再导出。里程碑四出口 5 调查员 2026-10-29 在 core 上现量：103 个条目 124 行不同全是这一处，两份 rlib 引用的都是 core::panicking::panic_fmt 的符号（nm），
+# 产品构建照旧印 std 的再导出。core 上 103 个条目 124 行不同全是这一处，两份 rlib 引用的都是 core::panicking::panic_fmt 的符号（nm），
 # 规整之后 5956 个条目逐字相同，在 verus! 外面造的一处真分叉规整之后照报。表外的名字照红：核过两边是同一个函数（rlib 引用的符号相同）再加一行，不按前缀整片当成同一个。
 MIR_PATH_ALIASES = (("std::rt::panic_fmt", "core::panicking::panic_fmt"),)
 
@@ -1819,7 +1816,7 @@ def mir_path_pattern(alias):
 
 
 def normalized_mir(text):
-    """照 MIR_PATH_ALIASES 规整一份 MIR 文本：交 (规整后的文本, 改写了几处)。弄坏开关 mir-panic-path-unnormalized 下不改（改前的样子）。"""
+    """照 MIR_PATH_ALIASES 规整一份 MIR 文本：交 (规整后的文本, 改写了几处)。弄坏开关 mir-panic-path-unnormalized 下不改。"""
     if "mir-panic-path-unnormalized" in BREAK:
         return text, 0
     total = 0
@@ -1865,7 +1862,7 @@ def compare_mir(root, registry, manifest, executable, options):
     Verus 构建（直接起的 verus --no-verify --compile -- --emit=mir；cargo 那一种 cargo verus build -- --no-verify -- --emit=mir）的 MIR 逐条目比：产品构建的每个条目在 Verus 构建里都有、
     整段逐字相同；Verus 构建多出来的（spec fn、proof fn 擦出来的空壳）不比。比之前两边照 MIR_PATH_ALIASES 规整（normalized_mir），成功句与红句报各改写几处。
     交 ([(卡在哪, 下一步)], 一句给成功句)。弄坏开关 mir-aliased-items-skipped 下改写过的条目整个不比（真分叉也放过）。
-    两边各在这一份副本里编，编译目录各一份，比完删。弄坏开关 FORMAL_VERIFICATION_BREAK=mir-compare-skipped 下不比（改前的样子）。"""
+    两边各在这一份副本里编，编译目录各一份，比完删。弄坏开关 FORMAL_VERIFICATION_BREAK=mir-compare-skipped 下不比。"""
     if "mir-compare-skipped" in FORMAL_BREAK:
         return [], "MIR 比对没跑（弄坏开关 mir-compare-skipped）"
     identifier = crate_identifier(registry, manifest)
@@ -2050,9 +2047,9 @@ def in_verified_region(rust_file, unit, ranges):
 
 def verus_point_name(unit):
     """交给 --verify-function 的名字：自由 fn 是它的名字；impl 里的方法是 <类型>::<方法>（trait impl 也写类型，Verus 0.2026.09.20 列可点名函数就是这么写的，
-    2026-10-26 在草稿的小 crate 上量的：impl Device for GoodDevice 的 read_slot 列成 GoodDevice::read_slot，同一个类型的固有方法与 trait 方法同名时按名点两个一起验）；
+    例：impl Device for GoodDevice 的 read_slot 列成 GoodDevice::read_slot，同一个类型的固有方法与 trait 方法同名时按名点两个一起验）；
     trait 里的方法是 <trait>::<方法>。认不出类型的交 None。
-    弄坏开关 methods-refused 下 impl 与 trait 里的一律交 None（改前的样子：判红要挪成自由 fn）。"""
+    弄坏开关 methods-refused 下 impl 与 trait 里的一律交 None（判红要挪成自由 fn）。"""
     container = unit.container
     if container is None:
         return unit.short
@@ -2104,18 +2101,18 @@ def verus_functions(root, registry, kernels, options):
     return functions
 
 
-# verus! 里的 derive 只有 Clone 生成 Verus 要验的函数（<类型>::clone）。依据是主 agent 2026-10-15 的真 Verus 探针（0.2026.09.20，逐函数 verified 数在
+# verus! 里的 derive 只有 Clone 生成 Verus 要验的函数（<类型>::clone）。依据是真 Verus 探针（0.2026.09.20，逐函数 verified 数在
 # research/prompts/pruning-survey-2026-10-15/verus-probe.log）：--verify-function 点不中时 Verus 列的可点名函数是 90 个自由 fn、8 个 <类型>::clone
 # （核里 derive(Clone, …) 的正好 8 个类型）与 2 个 CoreFailure::arrow_*（spec，没有义务）；Copy、Debug、PartialEq、Eq 的 derive 不在表里。
 # 整 crate 验出 56 条 = 逐函数验出的 48 条 + 这 8 个 clone 各 1 条（推的：clone 那 8 条没有逐个量过）。
 # 不同时 derive(Copy) 的也一样成项：Verus 对它们报「autoderive Clone impl when the clone is not a copy … without adding a specification」，不给规格，
-# 函数体照验、各 1 条义务（里程碑四出口 5 收尾工具员 2026-10-29 用 0.2026.09.20 在探针 crate 上逐个 --verify-function 现量：Copy 的、只有 u64 字段不带 Copy 的、
+# 函数体照验、各 1 条义务（0.2026.09.20 在探针 crate 上逐个 --verify-function 点：Copy 的、只有 u64 字段不带 Copy 的、
 # 带 Vec 字段的、带 Vec 字段又标了 verifier::allow(autoderive_clone_without_spec) 的、带泛型参数的、不带 Copy 的枚举，<类型>::clone 都是 verified 1；整 crate 9 条 = 1 个 exec fn + 8 个 clone）。
 DERIVED_VERIFIED_TRAITS = ("Clone",)
 PROOF_FN, EXEC_FN, SPEC_FN_WITH_DECREASES, DERIVED_CLONE = "proof fn", "exec fn", "带 decreases 的 spec fn", "derive(Clone) 生成的 clone"
-# Verus 整 crate 验时另算条数的两类（里程碑四出口 5 规格底座，工具实现员 2026-10-29 在 core 的草稿副本与探针 crate 上用 Verus 0.2026.09.20 现量）：
+# Verus 整 crate 验时另算条数的两类（Verus 0.2026.09.20）：
 # verus! 里带值的 const（impl 里的关联 const 也算）各 1 条，可点名函数表里自由 const 列成它的名字、trait 里的列成 <trait>::<名>、
-#   impl 里的（固有 impl 与 trait impl）列成 impl&%<号>::<名>（号数这个模块里的全部 impl：2026-10-29 的探针里 verus! 外面一个 impl、一个 derive(Clone, Copy) 的类型
+#   impl 里的（固有 impl 与 trait impl）列成 impl&%<号>::<名>（号数这个模块里的全部 impl：探针里 verus! 外面一个 impl、一个 derive(Clone, Copy) 的类型
 #   排在前面，verus! 里第一个 impl 就是 impl&%4），按 *::<名> 点（valued_const_point_name；探针 crate 的根模块里关联 const FIRST 与自由 const FIRST_ROOT_COUNTER 同在，
 #   点 *::FIRST 验出 1 条，点 FIRST 报 more than one match；同一个模块里两个 impl 各有一个 FIRST 时 *::FIRST 两个一起验、验出 2 条）；
 # assume_specification 各 0 或 1 条：指向常量、写 returns 的 1 条（core 的 singlefs_format::SLOT_BYTES 点它验出 1 条，探针 core::u8::MAX 也是 1 条），
@@ -2171,7 +2168,7 @@ def proof_items(root, registry, kernels, functions, options):
     不成项，随用到它的项进那一项的单元闭包键；trait 里没有函数体的声明与 external_body 的 fn 也不成项。项名 proof:<全路径>（<crate>::<模块>::<名>），
     交给 --verify-function 的 <名> 是 Verus 可点名函数表里恰好那一个（自由 fn 的名字、<类型>::<方法>、<trait>::<方法>、<类型>::clone），
     Verus 有恰好同名的就取它，不会点到别人。另两类不是 fn、Verus 整 crate 验时照样各算条数：verus! 里带值的 const（valued_const_entries）与
-    assume_specification（assume_specification_entries），各一项。弄坏开关：spec-fn-as-item 下 spec fn 一律成项（改前的样子），spec-decreases-not-item 下带 decreases 的 spec fn
+    assume_specification（assume_specification_entries），各一项。弄坏开关：spec-fn-as-item 下 spec fn 一律成项，spec-decreases-not-item 下带 decreases 的 spec fn
     不成项，derived-clone-not-item 下 derive(Clone) 不成项，valued-const-not-item、assume-specification-not-item 下那两类不成项。"""
     workspace = unit_index(root, options).workspace()
     manifest = crate_manifest(root, registry)
@@ -2191,7 +2188,7 @@ def proof_items(root, registry, kernels, functions, options):
             mode = function_mode(rust_file, unit)
             body = rust_file.texts[unit.first_token:unit.last_token]
             # trait 里只有签名与契约、没有函数体的声明：Verus 不验它（义务落在各 impl 上）。按切出的单元认（body_open：单元以 ; 收尾），
-            # ensures 里的结构体字面量不算函数体；弄坏开关 trait-declaration-by-brace 下退回「单元里一个 { 都没有」（改前的样子）
+            # ensures 里的结构体字面量不算函数体；弄坏开关 trait-declaration-by-brace 下退回「单元里一个 { 都没有」
             declared_only = ("{" not in body) if "trait-declaration-by-brace" in BREAK else body_open(rust_file, unit) is None
             if unit.container is not None and unit.container.kind == "trait" and declared_only:
                 left_out.append((function.path, relative))
@@ -2233,12 +2230,12 @@ def proof_items(root, registry, kernels, functions, options):
 def valued_const_entries(rust_file, relative, crate, module, ranges):
     """被验区域里带值的 const 各一项（VALUED_CONST，静态估 1 条）：自由的与 impl、trait 里的关联 const 都算，spec const 也算；没写值的（trait 里的声明）不成项
     （也不进「没成项的 verus! fn」那一份清单：那一份只列 fn）。
-    spec const 照真 Verus 0.2026.09.20（里程碑四收口工具员 2026-10-29 在探针 crate 上现量，草稿 m4-close-formal-judge-fix/spec-const-probe）：自由的整 crate 验多 1 条
+    spec const 照真 Verus 0.2026.09.20：自由的整 crate 验多 1 条
     （去掉它 19 条变 18 条），可点名函数表列成 <名>，点它验出 1 条；impl 里的整 crate 也多 1 条，列成 impl&%<号>::<名>，点 *::<名> 验出 1 条，与 impl 里的关联 const 一样；
     trait 里写 spec const Verus 报语法错（expected `!`），写不出来。所以 spec const 与别的带值的 const 同一种成项、同一种点名，没有点不了名、要另算进之和的。
-    弄坏开关 spec-const-not-item 下 spec const 不成项（改前的样子：之和少 1）。
+    弄坏开关 spec-const-not-item 下 spec const 不成项（之和少 1）。
     交给 --verify-function 的照 valued_const_point_name（自由的写名字、trait 里的写 <trait>::<名>、impl 里的写 *::<名>）；项名的全路径是
-    <crate>::<模块>::<类型或 trait>::<名>（自由 const 没有类型那一段）。算键的入口是 <核>::<单元名>，与 fn 同一种。弄坏开关 valued-const-not-item 下一项都不成（改前的样子）。"""
+    <crate>::<模块>::<类型或 trait>::<名>（自由 const 没有类型那一段）。算键的入口是 <核>::<单元名>，与 fn 同一种。弄坏开关 valued-const-not-item 下一项都不成。"""
     if "valued-const-not-item" in BREAK:
         return []
     entries = []
@@ -2262,10 +2259,10 @@ def valued_const_entries(rust_file, relative, crate, module, ranges):
 
 
 def valued_const_point_name(unit):
-    """带值的 const 交给 --verify-function 的名字（Verus 0.2026.09.20 的可点名函数表，2026-10-29 在探针 crate 上现量）：自由 const 列成 <名>，照写；
+    """带值的 const 交给 --verify-function 的名字（Verus 0.2026.09.20 的可点名函数表）：自由 const 列成 <名>，照写；
     trait 里带默认值的列成 <trait>::<名>，照写；impl 里的（固有 impl 与 trait impl）列成 impl&%<号>::<名>，号数这个模块里的全部 impl（verus! 外面的、derive 生成的也数），
     从源码算不准，写 *::<名>（以 ::<名> 收尾的都点中、一起验；同一个模块里只有它一个以 ::<名> 收尾才点得准，point_name_problems 判）。
-    <类型>::<名> 与带模块、带 crate 的全路径 Verus 都报 could not find。弄坏开关 associated-const-bare-name 下一律交 <名>（改前的样子：
+    <类型>::<名> 与带模块、带 crate 的全路径 Verus 都报 could not find。弄坏开关 associated-const-bare-name 下一律交 <名>（
     与以 <名> 起头的自由 const 同在一个模块时 Verus 报 more than one match）。"""
     container = unit.container
     if container is None or "associated-const-bare-name" in BREAK:
@@ -2276,7 +2273,7 @@ def valued_const_point_name(unit):
 
 
 def verus_listing(rust_file, relative, ranges):
-    """一个核（一个模块）在 Verus 可点名函数表里的样子：[(列出的名字, 说明)]，说明写它在核里的位置。照 Verus 0.2026.09.20 列的（2026-10-29 探针现量）：
+    """一个核（一个模块）在 Verus 可点名函数表里的样子：[(列出的名字, 说明)]，说明写它在核里的位置。照 Verus 0.2026.09.20 列的：
     被验区域里的每个 fn（spec、proof、exec，trait 里的声明与 external_body 的也列）照 verus_point_name；verus! 里 derive(Clone) 的类型列 <类型>::clone；
     const（带不带值、spec 不 spec 都列）自由的列 <名>、trait 里的列 <trait>::<名>、impl 里的列 impl&%?::<名>（号算不准，写 ?：点名里不出现号，只按收尾比）；
     enum 变体的字段 Verus 另生成的 spec fn 照 enum_arrow_names 列；
@@ -2336,7 +2333,7 @@ def top_level_segments(rust_file, low, high):
 
 
 def enum_arrow_names(rust_file, unit):
-    """verus! 里的 enum，Verus 给变体的每个字段生成一个 spec fn、列进可点名函数表（2026-10-29 在 core 上用 Verus 0.2026.09.20 现量，block_device、logged_operations、
+    """verus! 里的 enum，Verus 给变体的每个字段生成一个 spec fn、列进可点名函数表（Verus 0.2026.09.20，block_device、logged_operations、
     pointer、records、verified_model 几个模块的表里都有）：<类型>::arrow_<变体>_<字段>（元组变体的字段写下标 0、1…），只在一个变体里出现的字段名另列 <类型>::arrow_<字段>。
     外属性 #[…] 与 pub、pub(…) 跳过；判别值（= <数>）不算字段。"""
     texts, pairs = rust_file.texts, rust_file.pairs
@@ -2371,7 +2368,7 @@ def enum_arrow_names(rust_file, unit):
 
 
 def verus_function_matches(argument, names):
-    """照 Verus 0.2026.09.20 的 --verify-function 在可点名函数表 names 里点 argument，交点中的下标（2026-10-29 探针现量，帮助原文
+    """照 Verus 0.2026.09.20 的 --verify-function 在可点名函数表 names 里点 argument，交点中的下标（帮助原文
     「matches on unique substring (foo) or wildcards at ends of the argument (*foo, foo*, *foo*)」）：
     *<串>* 是包含它、*<串> 是以它收尾、<串>* 是以它起头，带 * 的点中几个 Verus 就一起验几个；不带 * 的先找恰好同名的，没有再找包含它的
     （包含它的不止一个 Verus 报 more than one match，一个都没有报 could not find）。"""
@@ -2390,7 +2387,7 @@ def assume_specification_entries(rust_file, relative, crate, module):
     交给 --verify-function 的是点名的条目（是一段只有标识符与 :: 的路径时照写，例 singlefs_format::SLOT_BYTES；别的写法取最后一个标识符，例 binary_search）。
     静态估：指向常量（] 后面不是参数表）而写了 returns 的 1 条，别的 0 条；这一类验出 0 条也是绿（指向函数的规格没有义务）。
     算键的入口是 lib_function_units 切出的那个 assume_specification 单元（<核>::assume_specification@<关键字那一行>，单元从属性起、含这个词）；
-    找不到的交 None，那一项拒算（check_proof 里的 assume_specification_components）。弄坏开关 assume-specification-not-item 下一项都不成（改前的样子）。"""
+    找不到的交 None，那一项拒算（check_proof 里的 assume_specification_components）。弄坏开关 assume-specification-not-item 下一项都不成。"""
     if "assume-specification-not-item" in BREAK:
         return []
     entries = []
@@ -2415,7 +2412,7 @@ def assume_specification_entries(rust_file, relative, crate, module):
 def point_name_problems(relative, items, listing):
     """一份核（一个模块）里每一项交给 --verify-function 的名字，照 Verus 的点法（verus_function_matches）在这个模块的可点名函数表（verus_listing）里
     要恰好命中一项：命中几项 Verus 就一起验几项（带 *）或报 more than one match（不带 *），逐项点不准，判红并点名命中的那几项；一项都没命中是表与点名对不上
-    （这份判法的毛病），也判红。fn 之间的同名在 verus_functions 里先判了。弄坏开关 point-names-by-containment 下照改前的判法（point_names_by_containment）。"""
+    （这份判法的毛病），也判红。fn 之间的同名在 verus_functions 里先判了。弄坏开关 point-names-by-containment 下用 point_names_by_containment 的判法。"""
     if "point-names-by-containment" in BREAK:
         point_names_by_containment(relative, items)
         return
@@ -2435,7 +2432,7 @@ def point_name_problems(relative, items, listing):
 
 
 def point_names_by_containment(relative, items):
-    """弄坏开关 point-names-by-containment 下的改前判法：只看关联 const 与 std 方法的 assume_specification 两类，只在成项的几项之间比名字是不是别人的一段，
+    """弄坏开关 point-names-by-containment 下的判法：只看关联 const 与 std 方法的 assume_specification 两类，只在成项的几项之间比名字是不是别人的一段，
     不照 Verus 的点法、不看表里不成项的函数与 const。"""
     names = collections.Counter(item.verus_name for item in items)
     for item in items:
@@ -2522,7 +2519,7 @@ def closure_dependency_lines(root, registry, options, unit_key):
 
 
 def dependency_component(root, registry, options, unit_key):
-    """「依赖版本」那一样（closure_dependency_lines）；单元闭包拒算的不算（那一项本来就每趟现判）。弄坏开关 reuse-key-without-closure-dependencies：不进（改前的样子）。"""
+    """「依赖版本」那一样（closure_dependency_lines）；单元闭包拒算的不算（那一项本来就每趟现判）。弄坏开关 reuse-key-without-closure-dependencies：不进。"""
     if "reuse-key-without-closure-dependencies" in BREAK or not isinstance(unit_key, UnitKey) or unit_key.key is None:
         return []
     return [("依赖版本", digest_text("\n".join(closure_dependency_lines(root, registry, options, unit_key))))]
@@ -2532,8 +2529,8 @@ def shared_components(root, registry, options):
     """Verus 每一项都带的几样：工具链（tool-versions 那一行去掉路径的那一份，tool_versions_text 的 for_key：Verus、它自带的 vstd、z3、rustup 工具链的版本与内容摘要）、
     rlimit（登记的数，改变结论）、crate 起法（crate_build_text：cargo 还是直接起、edition、包名）。
     verus-pins.tsv 整份不进（登记表的注释、verified 的登记数与别的行不改任何一项的结论）。
-    弄坏开关 toolchain-key-with-paths：工具链那一样照 tool-versions 打的整行（带 RUSTUP_HOME、rustup、VERUS_ROOT、VERUS_Z3_PATH 的路径，改前的样子）；
-    reuse-key-without-crate-build：crate 起法不进（改前的样子）。算一次存进 options；没给判定库时不算（交空表，lookup 也不看它）。"""
+    弄坏开关 toolchain-key-with-paths：工具链那一样照 tool-versions 打的整行（带 RUSTUP_HOME、rustup、VERUS_ROOT、VERUS_Z3_PATH 的路径）；
+    reuse-key-without-crate-build：crate 起法不进。算一次存进 options；没给判定库时不算（交空表，lookup 也不看它）。"""
     if not options.get("verdict_library"):
         return []
     if options.get("shared_components") is None:
@@ -2543,7 +2540,7 @@ def shared_components(root, registry, options):
         components.append(("rlimit", digest_text(str(registry.rlimit))))
         if "reuse-key-without-crate-build" not in BREAK:
             components.append(("crate 起法", digest_text(crate_build_text(root, registry))))
-        # 信任清单（vstd 行与这个 crate 的条目行）：登记的规格就是证明的前提，改一行这个 crate 的每一项都现判（第二轮正推 Y4 第 9 条）
+        # 信任清单（vstd 行与这个 crate 的条目行）：登记的规格就是证明的前提，改一行这个 crate 的每一项都现判
         if "reuse-key-without-trust-list" not in FORMAL_BREAK:
             components.append(("信任清单", digest_text(trust_list_text(root, registry))))
         options["shared_components"] = components
@@ -2553,7 +2550,7 @@ def shared_components(root, registry, options):
 def function_components(root, registry, options, entries, label):
     """被验函数那一样：entries（<核>::<fn 名>）的单元闭包键（UnitKey：那个 fn 单元，连同它 requires / ensures / decreases 与函数体里用到的
     spec fn、proof fn、类型、常量、broadcast use 点名的引理，lib_function_units.py 的八条闭包规则）。没给判定库交空表。
-    弄坏开关：reuse-key-whole-crate 换回核 crate 整个目录的原文摘要（旧判法）；reuse-key-function-only 只取入口那几个单元自己的指纹；
+    弄坏开关：reuse-key-whole-crate 换回核 crate 整个目录的原文摘要；reuse-key-function-only 只取入口那几个单元自己的指纹；
     reuse-key-without-units 这一样不进。"""
     if not options.get("verdict_library") or "reuse-key-without-units" in BREAK:
         return []
@@ -2574,7 +2571,7 @@ def entry_unit_component(rust_unit, label):
     """这一项自己是闭包里的哪一个单元（键里「被验入口单元」「所属函数单元」那一样）：入口单元连同包它的 impl / trait 头一层层往外，各取（种类，去注释指纹），
     不带名字、路径与行号。闭包是单元的多重集，同一个 impl 里几个方法经 R-结构、R-隐式互相收进对方的闭包，闭包一模一样，没有这一样就几项共用一把键、
     一份判定（core 的 impl BlockDevice for FileBackedBlockDevice 八个方法共用一把，复用时 write_zeroes_at 拿到 size_in_bytes 那一份的 1 条）。
-    弄坏开关 reuse-key-without-entry-unit：不进（改前的样子）。"""
+    弄坏开关 reuse-key-without-entry-unit：不进。"""
     if "reuse-key-without-entry-unit" in BREAK or rust_unit is None:
         return []
     lines, owner = [], rust_unit
@@ -2603,7 +2600,7 @@ def assume_specification_components(root, registry, options, entry):
     """assume_specification 那一项的被验函数那一样：入口是这一条 assume_specification 单元（lib_function_units 切出的，assume_specification_entries 交的 entry），
     闭包经 R-路径跨包收到它点名的那个条目（工作区包 singlefs_format 里的常量连同它引到的单元），与 fn 同一种算法、同样带依赖版本；它验出几条取决于那个条目。
     找不到这一条的单元、或闭包里没有点名的条目（种类是 const、static、fn，限定名最后一段是点名的最后一个标识符；std 的方法这类不在工作区里的）拒算：
-    这一项照判、不复用，拒算行点名是哪一处。弄坏开关：assume-specification-refused 下一律拒算（改前的样子）；assume-specification-target-unkeyed 下
+    这一项照判、不复用，拒算行点名是哪一处。弄坏开关：assume-specification-refused 下一律拒算；assume-specification-target-unkeyed 下
     点名的条目不进键（改它的值照旧复用）。没给判定库交空表。"""
     place = f"{entry.relative}:{entry.unit.first_line}\t{entry.verus_name}"
     if "assume-specification-refused" in BREAK or entry.entry is None:
@@ -2813,9 +2810,9 @@ def results_text(results):
 
 def verification_clean(results, function_mode):
     """Verus 这一次验过了、一条错都没有：没有 vir 错、encountered-error 不是 true、errors 是整数 0，有 success 键时它是 true。
-    --verify-function 下真 Verus（0.2026.09.20）不给 success 键、is-verifying-entire-crate 报 false（主 agent 2026-10-15 的探针：整 crate 那一趟
+    --verify-function 下真 Verus（0.2026.09.20）不给 success 键、is-verifying-entire-crate 报 false（整 crate 那一趟
     给 success true 与 is-verifying-entire-crate true，逐函数那几趟只有 encountered-error、encountered-vir-error、verified、errors、is-verifying-entire-crate）：
-    两样都不当成没验过。弄坏开关：require-success-key-per-function 下没有 success 键当没验过（改前的样子），
+    两样都不当成没验过。弄坏开关：require-success-key-per-function 下没有 success 键当没验过，
     require-entire-crate-per-function 下按函数验也要 is-verifying-entire-crate 是 true。"""
     if results.get("encountered-vir-error") or results.get("encountered-error"):
         return False
@@ -2854,7 +2851,7 @@ def check_proof(root, options):
     不等判红并点名：verified 与静态估的义务条数不同的项、没成项的 verus! fn。--item proof 或不给 --item 是整格；--item proof:<名> 只验点名的，不比之和。"""
     registry, kernels, manifest, executable = prepared(root, options)
     modules = kernel_modules(root, registry, manifest, kernels)
-    # 被验区域的另几样（出口 5 第三轮判决第三节「门禁」）：信任清单逐条登记、axiom、cfg 原子、被验类型的 trait impl 在 verus! 外面。
+    # 被验区域的另几样：信任清单逐条登记、axiom、cfg 原子、被验类型的 trait impl 在 verus! 外面。
     # 先于切函数判：按 cfg 分叉的两份同名 fn 在切函数那一步就红（逐项点不准），红句要先说 cfg 原子
     region = region_problems(root, registry, kernels, options)
     try:
@@ -2872,7 +2869,7 @@ def check_proof(root, options):
     named = options.get("items") or []
     wanted = [item for item in named if item != "proof"]
     # 点名里有整格 proof：点名的 proof:<名> 加在整格之上，整格照跑（各项之和、完整 crate 证明、MIR 比对），点名的只核项名在不在。
-    # 弄坏开关 proof-item-narrows：proof 与 proof:<名> 一起点名时只验点名的那几个（改前的样子：--item proof --item proof:X 丢了整格）
+    # 弄坏开关 proof-item-narrows：proof 与 proof:<名> 一起点名时只验点名的那几个（--item proof --item proof:X 丢了整格）
     whole_cell_named = "proof" in named and "proof-item-narrows" not in BREAK
     whole = not wanted or whole_cell_named or "item-filter-ignored" in BREAK
     chosen = selected_items(dict(options, items=wanted), ["proof", *available], "verus-proof") if wanted else available
@@ -2972,7 +2969,7 @@ def check_proof(root, options):
         if problem or not verification_clean((outcome.get("json") or {}).get("verification-results", {}), False) or (outcome.get("json") or {}).get("verification-results", {}).get("is-verifying-entire-crate") is not True:
             problems.append((f"完整 crate 验证失败：{problem or outcome['diagnostics'][-3000:]}",
                              "逐项通过不能替代完整验证：检查漏登记、宏生成或未验证的引理"))
-    # 产品构建与 verus --compile 构建的 MIR 逐函数比（出口 5 第三轮判决 Z2）：整格跑、前面都没红时比一次，不按条入库（同完整 crate 证明）
+    # 产品构建与 verus --compile 构建的 MIR 逐函数比：整格跑、前面都没红时比一次，不按条入库（同完整 crate 证明）
     mir_note = "MIR 比对没跑（--item 点名、或前面已经红了）"
     if whole and not problems:
         mir_problems, mir_note = compare_mir(root, registry, manifest, executable, options)
@@ -2999,7 +2996,7 @@ def assert_by_requires_lines(text):
     （外层函数入口那一处照旧插 assert(false)）。按词法单元认：requires 前面紧接 assert(…) by (…)（两组配对的圆括号，中间是 by，头一组前面是 assert），
     往后在同一层先碰到 ; 收尾（配对的圆括号、方括号整段跳过；先碰到 { 或 } 的是函数体或别的块，不算）。没有函数体的 fn 声明、trait 里无体的方法、
     挂在普通块或不带 by 的 assert 上的 requires 都不是这个样子，照旧走 requires_insertion_points 的找函数体那一支。
-    弄坏开关 assert-by-requires-as-insertion-point 下一处都不认（改前的样子：当插入点、找不到函数体判红）；
+    弄坏开关 assert-by-requires-as-insertion-point 下一处都不认（当插入点、找不到函数体判红）；
     assert-by-requires-by-semicolon-line 下照「往下先碰到一行只有 ; 」认（不看前面接的是不是 assert(…) by (…)：普通块与不带 by 的 assert 上的 requires 也放过）。"""
     if "assert-by-requires-as-insertion-point" in BREAK:
         return []
@@ -3106,7 +3103,7 @@ def requires_insertion_points(text, relative=None):
 def parallel_locations(location_count, options):
     """几处同时验、每处几条线程：交 (处数, 每处的线程数)。处数是 --jobs，0 取 min(处数, max(1, N // 4))；每处 N // 处数条、至少 1；N 是 --threads。
     不按内存收：外层内存上限（OUTER_MEMORY_CAP_VARIABLE）不看，整条命令的内存额度归 task-server（文件头「通用选项」--jobs 一段）。
-    弄坏开关 outer-memory-narrows-jobs 下照改前的样子：设了外层上限就收到 1 处。"""
+    弄坏开关 outer-memory-narrows-jobs 下：设了外层上限就收到 1 处。"""
     jobs = options["jobs"] or min(location_count, max(1, options["threads"] // 4))
     if "outer-memory-narrows-jobs" in BREAK and os.environ.get(OUTER_MEMORY_CAP_VARIABLE):
         jobs = 1
@@ -3182,8 +3179,8 @@ class ItemJudging:
             else:
                 failed_record = self.store.record(item, components, summary, run=self.run, details=details)
         elif outcome_judged(outcome) and "red-keeps-green" not in BREAK:
-            # 记红、撤绿（文件头「逐项点名与按条复用」，用户 2026-10-29 定案）：判红的照同一把键记一条红（共用库的 record_red），盖掉这把键原有的绿，
-            # 下一趟这一项现判；没判成的（被信号停了）不碰库。弄坏开关 red-keeps-green：判红不记（改前的样子：原有的绿照复用）
+            # 记红、撤绿（文件头「逐项点名与按条复用」）：判红的照同一把键记一条红（共用库的 record_red），盖掉这把键原有的绿，
+            # 下一趟这一项现判；没判成的（被信号停了）不碰库。弄坏开关 red-keeps-green：判红不记（原有的绿照复用）
             failed_record = self.store.record_red(item, components, one_line(problems[0][0])[:400], run=self.run, details=details)
         with self.lock:
             self.problems[index] = problems
@@ -3196,7 +3193,7 @@ class ItemJudging:
         for index in range(count):
             if index in self.lines:
                 item, verdict, how, seconds, failed_record = self.lines[index]
-                if "item-done-whole-cell-seconds" in BREAK:   # 弄坏开关：每项都记整格从起到收尾的挂钟（改前没有逐项秒数时的样子），不记这一项自己的
+                if "item-done-whole-cell-seconds" in BREAK:   # 弄坏开关：每项都记整格从起到收尾的挂钟，不记这一项自己的
                     seconds = time.monotonic() - self.created
                 report_item(item, verdict, how, seconds)
                 if self.sentinel is not None:
@@ -3806,7 +3803,7 @@ def tool_versions_text(root, override, for_key=False):
 
 def default_threads(environment=os.environ):
     """--threads 的缺省：SINGLEFS_THREAD_CAP 设了取它，否则登记的重活默认并行度（.claude/heavy-thread-default）。"""
-    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：改前的样子
+    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：--threads 的缺省取核数
         return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)
     return default_heavy_threads(environment)
 
@@ -3893,7 +3890,7 @@ def crate_item_lines(root, registry, options):
 
 
 def run_per_crate(name, root, options, registry):
-    """登记了几个 crate 时，一格逐个 crate 判（第二轮正推 Y4 第 1 条：crate 行可以多条、各有各的登记数）：--item 照各 crate 列出的项（crate_item_lines）分过去，
+    """登记了几个 crate 时，一格逐个 crate 判（crate 行可以多条、各有各的登记数）：--item 照各 crate 列出的项（crate_item_lines）分过去，
     点名的项一个 crate 都没有的退 2；一个 crate 一项都没点到的这一趟不判它。各 crate 的按条数合成一行报、往门禁的 FORMAL_ITEM_TALLY_FILE 追加一行。
     退出码：有用法错退 2，有红退 1，全是本次未跑退 77，否则 0。"""
     wanted = list(options.get("items") or [])
@@ -4913,8 +4910,6 @@ pub fn count_up(limit: u64) -> (result: u64)
 """
 
 
-# 自证的开关轮几趟同时起（每趟各用各的临时目录、假 Verus 至多两条线程）
-SELFTEST_BREAK_WORKERS = 6
 
 
 def selftest_break_caught(returncode, output):
@@ -5086,7 +5081,7 @@ def selftest():
         expect("vacuity-closure-vacuous", "vacuity", make_root("closurevacuous", kernel=closure_vacuous), 1, "keep_small 里第 20 行起的闭包：函数体头插 assert(false) 照样验得过")
         expect("crate-extra-dependency", "proof", make_root("extradependency", extra_dependency='singlefs-format = { path = "../format" }\n'), 1, "除 vstd 之外还依赖 singlefs-format")
 
-        # ── 被验区域与多 crate（出口 5 第三轮判决第三节「门禁」；文件头「被验区域与多 crate 的弄坏开关」）──
+        # ── 被验区域与多 crate（文件头「被验区域与多 crate 的弄坏开关」）──
         def expect_true(label, passed, detail):
             nonlocal cases
             cases += 1
@@ -5396,7 +5391,7 @@ def selftest():
                     == ["*::FIRST", "*::LAST_SLOT", "FIRST_COUNTER", "LAST"],
                     f"期望关联 const 点 *::<名>、自由 const 点 <名>，实测交给 --verify-function 的 {prefix_points}")
         # 撞名当场判红并点名撞的几项（起 Verus 之前）：trait 里带默认值的 Limited::LIMIT 与 impl 里覆盖它的 LIMIT，*::LIMIT 两个都以 ::LIMIT 收尾
-        # （开关 point-names-by-containment 下改前的判法只比成项的名字谁是谁的一段，放过它）；同一个模块两个 impl 各有一个 FIRST
+        # （开关 point-names-by-containment 下的判法只比成项的名字谁是谁的一段，放过它）；同一个模块两个 impl 各有一个 FIRST
         expect("proof-point-name-trait-default-collision-red", "proof",
                make_root("consttraitdefault", kernel=selftest_kernel_with(SELFTEST_CONST_TRAIT_DEFAULT_EXTRA), count=4), 1,
                ("proof:core_sample::kernel::Ordinal::LIMIT 交给 --verify-function 的 *::LIMIT 在这个模块的 Verus 可点名函数表里命中 2 项",
@@ -5461,9 +5456,8 @@ def selftest():
         # （开关 group-leftovers-kept 下不停，判法等到 sleep 自己退才交回，判错；留下的 sleep 按记下的进程号停掉）
         child_file = os.path.join(work, "leftover-child-pid")
         group_started = time.monotonic()
-        group_process = subprocess.Popen(["bash", "-c", 'sleep 20 & echo "$!" > "$1"; echo left-a-child', "leftover-group", child_file], cwd=work,
-                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace", start_new_session=True)
-        group_stdout, _group_stderr = finish_process_group(group_process)
+        group_process, group_stdout, _group_stderr = run_in_own_process_group(
+            ["bash", "-c", 'sleep 20 & echo "$!" > "$1"; echo left-a-child', "leftover-group", child_file], cwd=work)
         group_seconds = time.monotonic() - group_started
         child_pid = int(open(child_file, encoding="utf-8").read().strip() or 0) if os.path.isfile(child_file) else 0
         child_alive = False
@@ -5548,7 +5542,7 @@ def selftest():
             "if value > limit { limit } else { value } // SELFTEST_NEEDS_RLIMIT_99 SELFTEST_BROKEN\tproof_errors=1\tlanding=clamp_to_limit"]),
                0, "1 行输出里夹着 rlimit 用尽、另有证明错，红计入")
         expect_absent("must-red-rlimit-with-proof-error-no-count-drift", with_proof_error_output, count_drift_text)
-        # 代码轮第三轮判决 J3 那四行的情形：同一行在 rlimit 10 上输出一条 rlimit 用尽加一条证明错（Verus 把 rlimit 用尽也计进 errors，errors 2），
+        # 同一行在 rlimit 10 上输出一条 rlimit 用尽加一条证明错（Verus 把 rlimit 用尽也计进 errors，errors 2），
         # 在 rlimit 20 上只输出同一条证明错（errors 1）；第五段 proof_errors=1 只数证明错，两份都判绿，成功句里都没有「条数不同」那一段
         # （开关 rlimit-counted-in-proof-errors 下 rlimit 10 那份条数成 2、成功句多出那一段：no-count-drift 一格判错）
         j3_row = ("rlimit 用尽另记\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
@@ -5982,8 +5976,8 @@ def selftest():
                    and "verus-proof：键对不上 1 条、无记录 0 条、键相同 1 条" in after_text and "verus-vacuity：键对不上 1 条、无记录 0 条、键相同 1 条" in after_text
                    and "verus-must-red-worlds：键对不上 3 条、无记录 0 条、键相同 0 条" in after_text and "键对不上共 5 条（3 格比了 7 项" in after_text,
                    f"改之前退 {before_exit}（库与 Verus 没动 {before_untouched}）：{before_text.strip()!r}；改之后退 {after_exit}（没动 {after_untouched}）：{after_text.strip()!r}")
-        # list-items --key-mismatches 逐项往 stderr 打 ITEM_KEY 行（门禁 --list-items --with-keys 转成 ITEM_PLAN 的原料）：改之前 7 项都键相同；
-        # 改 clamp_to_limit 的 ensures 之后它的证明、空真与三行必红世界 5 项键对不上，keep_small 的证明与空真 2 项键相同（开关 item-key-lines-skipped 下一行都不打，这一格判错）
+        # list-items --key-mismatches 逐项往 stderr 打 ITEM_KEY 行（门禁 --list-items --with-keys 转成 ITEM_PLAN 的原料）：改 clamp_to_limit 的 ensures 之前 7 项都键相同；
+        # 改之后它的证明、空真与三行必红世界 5 项键对不上，keep_small 的证明与空真 2 项键相同（开关 item-key-lines-skipped 下一行都不打，这一格判错）
         def item_key_states(text):
             return dict(match.groups() for match in re.finditer(rf"^{ITEM_KEY_PREFIX} item=(.+) state=(\S+)$", text, re.M))
         before_states, after_states = item_key_states(before_text), item_key_states(after_text)
@@ -6090,7 +6084,7 @@ def selftest():
         with open(os.path.join(table_root, "crates", "core", "src", "lib.rs"), "a", encoding="utf-8") as handle:
             handle.write("\n")
         after = {check: run_items(check, table_root, verdict_library=table_store) for check in table_cells}
-        # 核 crate 里别的文件加一个空行：三格一项都不现判（旧判法按核 crate 整个目录取原文，全现判；开关 reuse-key-whole-crate 下判错）
+        # 核 crate 里别的文件加一个空行：三格一项都不现判（若按核 crate 整个目录取原文则全现判；开关 reuse-key-whole-crate 下判错）
         judge_cell("reuse-crate-other-file-no-cells",
                    all(got == 0 for got, _output, _verdicts in after.values())
                    and "现判 0、复用 3" in after["must-red-worlds"][1] and "现判 0、复用 2" in after["proof"][1] and "现判 0、复用 2" in after["vacuity"][1],
@@ -6452,7 +6446,7 @@ def selftest():
                      "item-key-lines-skipped", "key-items-ignored", "item-done-unrecorded", "item-done-whole-cell-seconds", "fake-tools-commit-unpinned",
                      "reuse-key-without-entry-unit", "assume-specification-refused", "assume-specification-target-unkeyed",
                      *(f"FORMAL_VERIFICATION_BREAK={item}" for item in FORMAL_BREAK_ITEMS))
-        # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（至多 SELFTEST_BREAK_WORKERS 趟），按开关的次序收退出码、数份数；
+        # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（每台默认重活线程数趟，按开关条数夹），按开关的次序收退出码、数份数；
         # 写成「变量=项」的是共用库 lib_reuse_checks.py 的开关（复用哨兵被现判不红：reuse-sentinel 那一格判错）
         def run_break(item):
             variable, _equals, value = item.rpartition("=") if "=" in item else ("VERUS_PROOF_CHECK_BREAK", "=", item)
@@ -6462,7 +6456,7 @@ def selftest():
             caught = selftest_break_caught(completed.returncode, output)
             return item, caught, "" if caught else selftest_break_miss_detail(completed.returncode, output)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(SELFTEST_BREAK_WORKERS, int(default_heavy_threads(os.environ))))) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(len(items), int(default_heavy_threads(os.environ))))) as pool:
             outcomes = list(pool.map(run_break, items))
         if len(outcomes) != len(items):
             breaks_missed.append(f"开关轮收回 {len(outcomes)} 趟、派出 {len(items)} 趟")

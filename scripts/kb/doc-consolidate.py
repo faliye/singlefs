@@ -45,7 +45,7 @@ loss-check 0 / 1 / 3 / 5；--selftest 0 / 1 / 2（弄坏开关取值认不得）
   DOC_CONSOLIDATE_BREAK=drop-number  migrate_document() 把正文里第一处两位以上的数（标题行与日期除外）删掉一个，样本里丢的是产物名 e142-r18-… 里的 142
       产物名或引名里的日期被删了（「✗ 自检：产物名或引名里的日期被删了」）、
       干净整理不该有丢失（「✗ 自检：干净整理不该有丢失：」）
-  DOC_CONSOLIDATE_BREAK=history-heading-chinese-only  历史节标题退回只认「## 历史版本」（改前的样子），术语表里那一行的英语、日语写法不认，译文的历史节当正文判
+  DOC_CONSOLIDATE_BREAK=history-heading-chinese-only  历史节标题只认「## 历史版本」，术语表里那一行的英语、日语写法不认，译文的历史节当正文判
       译文的历史节标题（「✗ 自检：译文的历史节标题：」，逐格点名是哪一份、干跑删了几个日期并了几个小节）
       不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 history-heading-chinese-only）
 """
@@ -132,7 +132,7 @@ def load_history_headings(path):
 
 
 def history_headings():
-    """三种语言的历史节标题；弄坏开关 history-heading-chinese-only 退回只认中文（改前的样子）。"""
+    """三种语言的历史节标题；弄坏开关 history-heading-chinese-only 只认中文。"""
     if os.environ.get('DOC_CONSOLIDATE_BREAK') == HISTORY_HEADING_BREAK_MODE:
         return (CHINESE_HISTORY_HEADING,)
     path = glossary_path()

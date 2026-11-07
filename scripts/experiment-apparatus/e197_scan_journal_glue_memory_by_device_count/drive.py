@@ -19,12 +19,12 @@
         不经服务直接起（环境里没有 TASK_SERVER_SHARD_PHASE）退 2。
         段：k64-full、k64-half、k1-full。组：glue-1、glue-2、glue-3（空跑、四个胶水臂、k64-full 另加 measurement_pc，按次序每组 8 格），
         read-stage-cache（丙那几格：read_stage_cache 每段 4 格，k64-half 另加 read_stage_cache_keeps_zeros_pc 4 格）。
-        --round 1–5 是第一轮的重复号；--round 6–10 是 V2 第二轮，组写 rerun-<n>，只跑 --cells 点名的格（list-reruns 打出来的）。
+        --round 1–5 是初测轮的重复号；--round 6–10 是 V2 复测轮，组写 rerun-<n>，只跑 --cells 点名的格（list-reruns 打出来的）。
   drive.py list-submissions --binary <二进制> --date <YYYY-MM-DD> [--batch <n>]
-        逐行打出要交的 task-server/task submit 整条（不交、不跑）：第 0 批是 checks 与 compare，第 1–10 批各 6 件 segment
+        逐行打出要交的 task-server/task submit 整条（不交、不跑）：批 0 是 checks 与 compare，批 1–10 各 6 件 segment
         （段 k64-full、k64-half、k1-full 依次，每段重复号 1–5，每个重复号四组）；不带 --batch 打全部。
   drive.py list-reruns --binary <二进制> --date <YYYY-MM-DD> --artifacts <产物.out…> --status <状态存档.json…>
-        照 report.py 的 V2 判法（第一轮 5 次散布 > 2%）打出第二轮（--round 6–10）要交的整条
+        照 report.py 的 V2 判法（初测轮 5 次散布 > 2%）打出复测轮（--round 6–10）要交的整条
   drive.py --selftest                                       假的二进制、假的服务环境上的自证（不起装置、不起服务）：各项过了之后接着逐个打开弄坏开关
                                                             起自己的 --selftest，要求每个开关都红在点名的那一项（开关生效的那一趟只跑各项）
 退出码：0 做完；1 自证红、有格没跑成、片没跑成或产物文件已在；2 用法错或不经服务起 segment；3 停机条款 S1 / S4（实现不是登记时那一份）。
@@ -477,7 +477,7 @@ def segment_submission(binary, date, segment, repeat, group, cell_list=None):
 
 
 def submissions_by_batch(binary, date):
-    """{批号: [整条…]}：第 0 批 checks 与 compare（不分片）；第 1 批起每批 SEGMENT_TASKS_PER_BATCH 件 segment。"""
+    """{批号: [整条…]}：批 0 是 checks 与 compare（不分片）；批 1 起每批 SEGMENT_TASKS_PER_BATCH 件 segment。"""
     batches = {0: [submission(["checks", "--binary", binary, "--out", f"research/results/e197-{date}-checks.out"]),
                    submission(["compare", "--binary", binary, "--out", f"research/results/e197-{date}-compare.out"])]}
     groups = every_first_round_group()
@@ -491,7 +491,7 @@ def segment_of_geometry(named, fill):
 
 
 def rerun_submissions(binary, date, unstable_cells):
-    """V2 第二轮：report.cells_needing_a_rerun 点名的格按段归拢，每 MAXIMUM_CELLS_PER_GROUP 格一组，每组重复号 6–10 各交一件。"""
+    """V2 复测轮：report.cells_needing_a_rerun 点名的格按段归拢，每 MAXIMUM_CELLS_PER_GROUP 格一组，每组重复号 6–10 各交一件。"""
     by_segment = {}
     for arm, devices, fill, named in unstable_cells:
         by_segment.setdefault(segment_of_geometry(named, fill), []).append(f"{arm}:{devices}")

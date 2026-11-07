@@ -20,7 +20,7 @@
 #   RERUN_TEMPLATE_BREAK=root-from-self-path  仓根改回从本脚本路径往上推四层（旧 rerun.sh 的写法），--repo 不认
 #       「✗ 自检：拷进与仓无关的临时目录、传参应当跑通」那一格红
 #       连带红的格：「✗ 自检：--work 指到已有输出的目录应当退 2、不在旧输出上接着写」
-#   RERUN_TEMPLATE_BREAK=root-check-by-wrapper  判是不是本仓照改前看 scripts/hosts/run-with-memory-cap.sh 在不在（不看 task-server/task）
+#   RERUN_TEMPLATE_BREAK=root-check-by-wrapper  判是不是本仓看 scripts/hosts/run-with-memory-cap.sh 在不在（不看 task-server/task）
 #       「✗ 自检：--repo 指到只有内存包装、没有 task-server/task 的旧仓应当退 2」那一格红
 #       连带红的格（自证里的假仓只有 task-server/task、没有内存包装，被当成不是本仓）：「✗ 自检：拷进与仓无关的临时目录、传参应当跑通」、「✗ 自检：--work 指到已有输出的目录应当退 2、不在旧输出上接着写」
 set -euo pipefail

@@ -139,7 +139,7 @@ pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
     let admission_output = match std::process::Command::new("python3")
         .arg(&admission_script)
         .arg("experiment")
-        .arg(&repository_root)
+        .arg(repository_root)
         .arg(admission_key)
         .stderr(std::process::Stdio::inherit())
         .output()

@@ -36,19 +36,19 @@
       连带红的格：「✗ 登记表点名的 2 处路径已经不在（文件早删了，或这一趟刚删），读那张表的检查拿到的是指空的路径」、「✗ 自检失败：平铺登记表点名的那几份 --apply」、「✗ 自检失败：登记表点名、文件已经不在的那几行（.claude/gate.d/stage.tsv:1、.claude/term-rename…」、「✗ 还留着上一轮及更早的实验记录 4 份（本轮的与判决不算）」
   ARCHIVE_PAST_ROUNDS_BREAK=mutation-replacement-counted   registry_namings() 对变异表也按整行认（原文、替换文里的代码文本也算点名）
       「✗ 自检失败：登记表点名、文件已经不在的那几行」那一格红（变异表替换文里写着的 e27-gone-prereg.md 也报成指空）
-  ARCHIVE_PAST_ROUNDS_BREAK=exclusion-colon-as-path   stale_exclusions() 把排除项整行当路径，<路径>:<串> 的写法也要整串存在（改前的样子）
+  ARCHIVE_PAST_ROUNDS_BREAK=exclusion-colon-as-path   stale_exclusions() 把排除项整行当路径，<路径>:<串> 的写法也要整串存在
       「✗ 自检失败：<路径>:<串> 写法的排除项，路径在就不该报指不到东西」那一格红
-  ARCHIVE_PAST_ROUNDS_BREAK=rerun-crashes   run() --apply 不把磁盘上已删的挑出来，对着它们 os.remove（改前的样子）
+  ARCHIVE_PAST_ROUNDS_BREAK=rerun-crashes   run() --apply 不把磁盘上已删的挑出来，对着它们 os.remove
       「✗ 自检失败：第二次 --apply 抛了 FileNotFoundError」那一格红
-  ARCHIVE_PAST_ROUNDS_BREAK=check-counts-index   run() --check 把磁盘上已删、索引里还跟踪着的也算待归档（改前的样子）
+  ARCHIVE_PAST_ROUNDS_BREAK=check-counts-index   run() --check 把磁盘上已删、索引里还跟踪着的也算待归档
       「✗ 自检失败：磁盘上已删、索引里还跟踪着的不该算待归档」那一格红
-  ARCHIVE_PAST_ROUNDS_BREAK=rewrite-basename-only   rewrite_links() 把引用改成只留文件名（改前的样子），不写 git show <提交>:<原路径>
+  ARCHIVE_PAST_ROUNDS_BREAK=rewrite-basename-only   rewrite_links() 把引用改成只留文件名，不写 git show <提交>:<原路径>
       「✗ 自检失败：改引用后 history-consolidate.py loss-check 要退 0」那一格红（产物名里的日期随目录一起丢了；后面紧跟的『引用没改成 git show』那一格被它挡在前面）
       连带红的格：「✗ 1 个日期块有找不到的数或编号」
-  ARCHIVE_PAST_ROUNDS_BREAK=history-carriers-ignored   rewrite_links() 不读 .claude/history-carriers，登记的变更史也照改（改前的样子）
+  ARCHIVE_PAST_ROUNDS_BREAK=history-carriers-ignored   rewrite_links() 不读 .claude/history-carriers，登记的变更史也照改
       「✗ 自检失败：登记在 .claude/history-carriers 的文件与它们的变更史，--apply 之后要逐字不变」那一格红
       连带红的格：「✗ 自检失败：--apply」
-  ARCHIVE_PAST_ROUNDS_BREAK=still-input-by-basename   still_an_input() 按文件名认「还被代码当输入」（改前的样子），不按代码里写的完整路径
+  ARCHIVE_PAST_ROUNDS_BREAK=still-input-by-basename   still_an_input() 按文件名认「还被代码当输入」，不按代码里写的完整路径
       「✗ 自检失败：只有一个被完整路径引到，另一个同名的该删」那一格红
 
 判据（机械，不靠人记）：
@@ -73,7 +73,7 @@
         （research/ 整个可删，.claude/rules/directory-layout.md「research/：可以整个删掉的研究目录」）：读它的检查要改成读跟着测试放的登记，
         或者文件不在时报本次未跑；still_an_input 按字面文件名留下的那几份是还没改完的旧依赖，留着是免得这一趟当场塌，不是该保护的对象。
         「还被代码当输入」按代码非注释行里写出的**完整路径**（如 research/prompts/leg-a/src/main.rs）认，不按文件名：四个腿目录里各有一份 src/main.rs，
-        只有一个被完整路径引到时，其余三个照删（2026-10-18 实测：按文件名把 4 个腿模型目录里的 src/main.rs 全留下了）。
+        只有一个被完整路径引到时，其余三个照删（按文件名认的话，4 个腿模型目录里的 src/main.rs 全留下了）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用改成 `git show <删之前的提交>:<原路径>`（反引号包着，提交取删之前的 HEAD），
      不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。
      不剥成文件名：产物名里的目录与日期随路径一起丢了，门禁 doc-decisions 的 history-loss 格（`scripts/kb/history-consolidate.py loss-check`）判变更史丢了产物名；
@@ -81,7 +81,7 @@
      markdown 链接目标 `](路径)` 里放不下空格，仍只留文件名。
      不改的：登记在 `.claude/history-carriers` 的文件（读那张表：一行一个目录或文件，目录带结尾的 /），与登记项的变更史
      （登记项 `<目录>/` 或 `<名>.md` 旁的 `<名>-history.md` 及它的 `.en.md`、`.ja.md` 译文：登记 `.claude/kb/decisions/` 的旁边是 `.claude/kb/decisions-history.md`）。
-     变更史记的是当时的原文，指向被删产物的路径在 git 历史里取得回；改写它既丢了原样，又让门禁 doc-decisions 的 history-loss 格当场红（2026-10-18 实测）。
+     变更史记的是当时的原文，指向被删产物的路径在 git 历史里取得回；改写它既丢了原样，又让门禁 doc-decisions 的 history-loss 格当场红。
      --apply 报出跳过了几份文件、几处引用；登记表不在就一份都不跳。
   可重跑：上一趟 --apply 删了文件、还没暂存或提交时，索引里仍跟踪着它们。这类「磁盘上已删、索引里还跟踪着」的不再算待归档（--check 不为它们判红）、
   --apply 不再对它们 os.remove，只报数；它们的引用照改（上一趟被打断时没改完的补上）。
@@ -148,11 +148,11 @@ def base_of(root="."):
     （GATE_BASE，否则 @{upstream} 的 merge-base，都没有就 HEAD）。只认「GATE_BASE，否则 HEAD」时，
     没设 GATE_BASE 又有没推的提交，两道的窗口就不一样（C450 那一形）。
 
-    ⚠️ **基准不一致会让两道直接打架**（C450 实测 2026-09-21，同一天撞了两次）：
-    knowledge-sync 格（当时是单独的一道门禁）的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
-    这一处原先写死 `HEAD`。差这一格的后果是**每次提交之后，上一轮的同步记录必然同时满足
+    ⚠️ **基准不一致会让两道直接打架**：
+    knowledge-sync 格（门禁 doc-process-records 的一格）的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
+    这一处要是写死 `HEAD`，后果是**每次提交之后，上一轮的同步记录必然同时满足
     「这一道说该删」（它已进仓、相对 HEAD 没再改）与「knowledge-sync 格说要留」（它点名的触发文件相对 `HEAD~1` 还在范围里）**，
-    不是偶发。实测那天两份 sync 记录点名的触发文件相对 `HEAD~1` 分别还有 14 个和 7 个在范围里。
+    不是偶发。
     取同一个基准之后，上一轮的记录能正常退场。
     """
     library = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gate", "changed-paths.sh")
@@ -210,9 +210,9 @@ def still_an_input(root, candidates):
     """候选里还被代码当输入的那些：门禁阶段按路径读它去比对、装置源码 include_str! 在编译期读它。
     返回 {相对路径: [点名它的源文件]}。这些**不删**——它们不是上一轮的记录，是这一轮还在跑的东西的输入。
 
-    2026-09-21 实测两次，都是删完才发现：① 段序列登记表那一道门禁（段序列登记表与 E142 产物逐字比对，已搬进 doc-registries 的 segment-registry 那一格）连同它的自证一起塌；
+    删完才发现就晚了：① 段序列登记表那一格（段序列登记表与 E142 产物逐字比对，在 doc-registries 的 segment-registry）连同它的自证会一起塌；
     ② 归档删掉四份跨实验断言读的产物之后，research 整个编不过（e134 读 e133、e136 读 e134 与 e109、e137 读 e136），
-    而 HEAD 上就是这个状态。第一次只把射程补到门禁脚本与 scripts，漏掉装置源码，于是第二次照样发生——
+    而 HEAD 上就是这个状态。射程只补到门禁脚本与 scripts 会漏掉装置源码——
     所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。
 
     只认代码里字面写出的完整路径，不按文件名（文件头「不认」一段）：四个腿目录里各有一份 src/main.rs，按文件名认就全留下了。
@@ -505,9 +505,9 @@ def missing_code_inputs(root):
     """装置源码 include_str! 点名、而磁盘上不在的留存产物：那个 crate 编不过。
     不限于这一轮删的——上一轮删错了，这一轮照样红。
 
-    2026-09-21 实测：上一次提交归档时删掉了四份跨实验断言用 include_str! 读的产物
+    只在**删的那一刻**看、只扫门禁脚本的检查看不出：归档删掉四份跨实验断言用 include_str! 读的产物
     （e134 读 e133、e136 读 e134 与 e109、e137 读 e136），于是 HEAD 上 research 整个编不过，
-    而当时的检查只在**删的那一刻**看、只扫门禁脚本，一个字都没说。
+    而那样的检查一个字都没说。
 
     ⚠️ 只认 include 这一族。别的形态（shell 把产物 cat 出来比、python 读它）**这里不判**：
     实测按「非注释行出现过这个名字」扫，49 处命中里只有 0 处是真的——样本目录 fixtures/ 造的假路径、
@@ -540,7 +540,7 @@ def missing_code_inputs(root):
 def stale_exclusions(root):
     """删完之后指不到东西的排除项：排除表指向不存在的路径时，那道检查自己会判红
     （`.claude/singlefs-ai-sop/rules/show-me-test.md`「排除的每一份都要登记」）。
-    2026-09-21 实测：归档删掉 research/results/e153-s1-probe-tests/ 之后，naming-lint 整道红。"""
+    例：归档删掉 research/results/e153-s1-probe-tests/ 之后，naming-lint 整道红。"""
     import glob as _glob
     stale = []
     for table in sorted(_glob.glob(os.path.join(root, ".claude", "*-exclude"))):
@@ -565,7 +565,6 @@ def run(root, apply_changes, keep_registered=False):
     # 为什么非拒绝不可：门禁跑的时候 GATE_BASE 是设好的，人照着出路抄到自己的 shell 里就没了，
     # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 doc-process-records 的 knowledge-sync 格
     # 当场红（触发文件没人点名），而删掉的文件没进过任何提交就找不回来。
-    # 2026-09-22 实测：这么删掉两份，白跑一趟 20 分钟的全量门禁。
     # 文件头写着 base_of 取 GATE_BASE 拦不住这件事：写下来的提醒不会在动手那一刻拦人（sop-first.md）。
     # `--check` 不拦：它只读不写，而门禁就是不带 GATE_BASE 单跑它也要能报出现状。
     if apply_changes and not os.environ.get("GATE_BASE", ""):
@@ -633,7 +632,7 @@ def run(root, apply_changes, keep_registered=False):
         print("  ✗ 还留着上一轮及更早的实验记录 %d 份（本轮的与判决不算）" % len(doomed))
         # 出路里把基准一起打出来：门禁跑的时候 GATE_BASE 是设好的，人照着抄到自己的 shell 里就没了，
         # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 doc-process-records 的 knowledge-sync 格
-        # 当场红（触发文件没人点名），实测 2026-09-22 多删两份、白跑一轮全量门禁。
+        # 当场红（触发文件没人点名）。
         given_base = os.environ.get("GATE_BASE", "")
         shown_base = given_base if given_base else "<门禁那一行「diff 基准 <sha>」报的那个提交>"
         print("     → 怎么办：跑 GATE_BASE=%s python3 scripts/kb/archive-past-rounds.py --apply 删掉，" % shown_base)

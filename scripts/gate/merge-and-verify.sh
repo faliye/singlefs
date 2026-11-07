@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # admission: always 每一批补丁都要打一次、验一次，上一次的结论不替这一次作保
 # run-condition: command git cargo rsync
-# 一批实现员交回之后的「合入后验证」：开跑那一刻把要验的树拷成一份快照，在快照上打全部补丁、编一次、跑补丁改到的包（与依赖它们的包）的 验证包测试二进制、fmt、clippy 与 build，
-# 再起门禁 crash-point-replay 的三格（按条、按块都照单元键复用，只判键对不上的；下面「验证包那一步」），红的列出来。替掉派一个实现员做这件活。
+# 一批实现员交回之后的「合入后验证」：开跑那一刻把要验的树拷成一份快照，在快照上打全部补丁、编一次、只跑补丁改到的测试目标与变异行点名的测试目标（下面「挑测试目标」）、
+# fmt、clippy 与 build，再把跑到的验证包目标里登记的崩溃枚举用例与挂特性的测试文件逐项交门禁 crash-point-replay（下面「验证包那一步」），红的列出来。
+# 不跑整个包，也不起门禁的整格：判不出改到哪个测试目标的那几种测试那一步不跑、整条退 3（下面「挑测试目标」）。替掉派一个实现员做这件活。
 #
-#   merge-and-verify.sh [--skip-apply] [--all-packages] [--crash-expand-up-to <n>] [--item <包>:<目标根文件>]… <补丁目录> …
+#   merge-and-verify.sh [--skip-apply] [--crash-expand-up-to <n>] [--item <包>:<目标根文件>]… <补丁目录> …
 #   merge-and-verify.sh --list-items [--with-keys] [同一趟的别的参数…]   逐行列这一趟测试那一步可点的项，不编、不跑（下面「逐项点名与按条复用」）
 #     起法：task-server/task submit -- bash scripts/gate/merge-and-verify.sh …（一整条一个任务；内存上限、线程、机器、显卡都由服务定，命令里不写）。
-#     --item <项>（给几次取并集）只跑测试那一步里点名的测试目标（下面「逐项点名与按条复用」）；fmt、clippy、build、重编核对与 验证包那一步照旧。
+#     --item <项>（给几次取并集）在挑出的测试目标里只跑点名的那几个（下面「逐项点名与按条复用」）；fmt、clippy、build、重编核对照旧，验证包那一步只交点名的验证包目标里的。
 #     测试那一步的并行度取 heavy_thread_default（scripts/hosts/heavy-threads.sh；经服务起时是服务套的 capped.sh 设的 SINGLEFS_THREAD_CAP）。
-#     --all-packages 测试步照旧跑工作区成员减掉 验证包的全部包，不按补丁挑。
 #     --crash-expand-up-to <n> 把崩溃放量与崩溃枚举用例的展开深度缩到不超过 n（变量 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO，只往小缩，大于引擎常量的不放宽），
-#     只管 验证包那一步（下面「验证包那一步」）；环境里已设了这个变量的当作给了同一个值；不是非负整数退 2、一样都不做；不给就是整个域。
+#     只管验证包目标的 cargo test 与验证包那一步（下面「验证包那一步」）；环境里已设了这个变量的当作给了同一个值；不是非负整数退 2、一样都不做；不给就是整个域。
 #   merge-and-verify.sh --selftest                     # 用假的 apply-writer-patch 与假 cargo 走一遍；MERGE_AND_VERIFY_BREAK=ignore-red 时必须判红
-#     验证包那三格在门禁样本上起真的 门禁 crash-point-replay（经 admission.py 查库、记库，判定库在 prune-server 里）：只在临时服务底下跑，
+#     验证包那一步换上假的那一道（照真的那一道的写法答 --list-items、打按条复用与崩溃状态块那几行）；逐项与复用那几格经 admission.py 查库、记库（判定库在 prune-server 里）：只在临时服务底下跑，
 #     裸跑开跑前调客户端 selftest_service_problem、退 2、一格都不跑。起法：python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service
 #     --server-binary <prune-server 二进制> -- bash scripts/gate/merge-and-verify.sh --selftest
 #
-# 快照（用户 2026-11-02 定「不要拿锁了」，records/2026-10-31-task-server巡检.md 批 34）：只有这一种跑法，主工作区一个字节不写。
+# 快照（不拿锁）：只有这一种跑法，主工作区一个字节不写。
 #   开跑那一刻把要验的树（主工作区；补丁已打在上面的带 --skip-apply）拷进 <日志目录>/repo（日志目录在工作根下，第二台同一路径读得到）：
 #   rsync --recursive --links，不拷任意一层的 .git、target、target-* 与 __pycache__，带工作区里的全部源码与未提交改动；不保留属性（权限位照建文件时的缺省、
 #   不带属主属组：有的临时目录不认保留属性），不保留修改时刻（拷过去的 mtime 是拷的那一刻：调用方给的编译目录编过也照新内容重编，
@@ -29,36 +29,50 @@
 #   收尾删掉快照（成功、失败、被 INT / TERM 停都删）；日志目录留着（日志小，汇总行指着它）。删完打一行「删了快照 …（共 …）」；删不成退 1、写明没删成。
 #   要留现场：MERGE_AND_VERIFY_KEEP_COPY=1，收尾不删，打出快照与编译目录的路径和删法，看完自己删（command-safety.md「测试镜像一律放临时目录」：
 #   要留着看现场由显式的开关打开、留下时打印路径）。
-# 这一趟的编译目录（用户 2026-10-23 定案「自己用完自己删」，不留给以后的趟复用）：调用方没设 CARGO_TARGET_DIR 时
+# 这一趟的编译目录（自己用完自己删，不留给以后的趟复用）：调用方没设 CARGO_TARGET_DIR 时
 #   在这一台自己的 ${TMPDIR:-/tmp} 下新建 merge-and-verify-target.<随机>、export 成 CARGO_TARGET_DIR，四条 cargo 都用它；不建在日志目录下：
 #   日志目录在工作根下，工作根两台共享（第二台经 NFS 写回本机的盘），编译目录有上百 G（records/2026-10-31-task-server巡检.md 问题 72 之二）。日志照旧在工作根下。
 #   正常结束、红了退出、被 INT / TERM 停都在 EXIT trap 里删掉，而且是 trap 的第一步、在删快照之前（那几步写满盘、出错都挡不住它；删不成退 1，照接着删快照）
 #   （scripts/hosts/run_build_directory.py remove：删之前核本机没有进程开着里面的文件，有就是这一趟的子进程没收干净，不删、逐个报进程、退 1）。
 #   建不成退 2。调用方设了 CARGO_TARGET_DIR（统一任务服务给的编译目录）就照它编、收尾不删（不是这里建的，归调用方删）。
 #
-# 为什么：2026-09-20 起 8 天里「合入后验证」派了 3 个实现员、平均 14.3M 折算，是实现员里最贵的一种；它做的前三步（打补丁、编、逐个跑测试）
+# 为什么：「合入后验证」做的前三步（打补丁、编、逐个跑测试）
 # 是 apply-writer-patch.py 加几条命令，只有「红了改钉值」要判断——那一步红了才派实现员。
 # 做法：每个补丁目录经 scripts/gate/apply-writer-patch.py --root <快照> 打（退 2 就整批停）。调用方给的编译目录（CARGO_TARGET_DIR）可能是编过的，
-# cargo 按 mtime 判本地包新不新鲜，带着旧 mtime 的新内容会被当成已编（records/2026-09-30-里程碑三开工第一轮.md「GPU 与 CPU 不一致调查员交回」那一行）：
+# cargo 按 mtime 判本地包新不新鲜，带着旧 mtime 的新内容会被当成已编：
 # 快照不保留修改时刻（文件头「快照」），里面每个文件都比编译目录里的产物新，不另刷源码戳。
 # 然后在本机直接跑 test、fmt、clippy、build 四步 cargo（clippy 按特性组合各一条；不套内存包装与 capped.sh，这一整条的上限与线程由起它的服务定），与上游 .claude/singlefs-ai-sop/scripts/check.sh 同一套判据：
-#   test   `cargo test --offline --no-fail-fast -p <包>…`：包是工作区成员（树根 Cargo.toml 的 [workspace] members，逐个读成员 Cargo.toml 的包名）
-#          减掉 验证包 singlefs-verification（它的测试函数归下面「验证包那一步」，按条、按块都照单元键复用）；check.sh 跑的是 `cargo test --all`，差的只有这一个包。
-#          成员里没有 singlefs-verification（改了名、挪了）、成员写成通配、读不出包名，都判红、不编：排不掉它就宁可不跑。
-#          退 0 而 test result 行里一条测试都没数到，也判红（check.sh「一条测试都没跑」那一条）。
-#          测试只跑改到的包：上面那几个包里只留这一批补丁改到的包与工作区里依赖它们的包（成员 Cargo.toml 的 [dependencies]、[dev-dependencies]、
-#          [build-dependencies] 与 [target.*] 下的这三张表里写了它，一层层往上传）。改到的包按给的补丁目录里 crates.patch 改过的路径算（路径往上找到的
-#          第一份带 [package] 的 Cargo.toml，scripts/gate/lib_rebuilt_packages.py 的 package_of，与重编核对同一份；包里改过的不论是不是 .rs 都算），
-#          --skip-apply 时照样读给的补丁目录。没挑上的包逐个报「本次未跑：补丁没改到」，成功句里逐个列名；一个包都没挑上（补丁只改了 验证包、
-#          或没有 crates.patch）时测试这一步不跑、报「测试本次未跑」，不记红也不算测过。照旧全跑的：带 --all-packages；没给补丁目录；
-#          补丁改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/；补丁改到不落在任何包里的路径（测试运行时可能读它，判不出归哪个包）。
-#          挑好的包里每条测试函数按单元键入库复用、只跑键对不上的（下面「逐项点名与按条复用」）。
-#          挑好的包不交给一条 cargo test 一个测试二进制接一个地跑（用例少的二进制跑的时候核就空着：2026-10-21 第二台只用了约 5 核、登记 31，
-#          records/2026-10-18-里程碑三收尾与近期欠账.md 第 780 行），交给 scripts/gate/test-targets-parallel.py --jobs <线程上限>：先 --no-run 一次编好，
-#          再按测试目标各起一条 cargo test -p <包> <--lib / --test 名 / --bin 名>、同时至多线程上限那么多条，每条的 RUST_TEST_THREADS 分摊，
-#          各目标的输出按派活的次序回读进 test.log，派出与收回的条数对不上判红；文档测试最后一条 cargo test --doc 一起跑。跑的用例与 cargo test -p … 同一批，
+#   test   只跑挑出的测试目标（下面「挑测试目标」），一个目标一项，一个包一条 `cargo test --offline --no-fail-fast -p <包> <点到的 --lib / --test 名 / --bin 名…>`，几个包的几条依次跑
+#          （日志 test-<序号>.log，接成一份 test.log 与 test.problems.log）；不带上依赖它们的包，也不跑包里没点到的目标。check.sh 跑的是 `cargo test --all`，这里只跑其中点到的目标。
+#          验证包 singlefs-verification 的目标带 --release 跑（与门禁 crash-point-replay 的 crash-case-replay 格同一档、同一种类的判定，下面「逐项点名与按条复用」），
+#          登记成崩溃枚举用例与放量分项的用例函数经 --skip 排掉（崩溃枚举用例交验证包那一步）；验证包的计划算不出时这一包不起（登记的用例排不掉），按条复用失灵照判红。
+#          工作区成员（树根 Cargo.toml 的 [workspace] members，逐个读成员 Cargo.toml 的包名）里没有 singlefs-verification（改了名、挪了）、成员写成通配、读不出包名，都判红、不编：
+#          认不出验证包就排不掉登记的崩溃枚举用例。
+#          退 0 而 test result 行里一条测试都没数到、按条复用也一条都没复用，判红（check.sh「一条测试都没跑」那一条）。挑出的目标一个都没有（补丁只改了要特性的目标、只删了测试目标、
+#          只往变异表里删行）时测试这一步不跑、报「测试本次未跑」，不记红也不算测过。
+#          每一条交给 scripts/gate/test-targets-parallel.py --jobs <线程上限>（用例少的二进制跑的时候核就空着：第二台上只用到约 5 核、登记 31，
+#          records/2026-10-18-里程碑三收尾与近期欠账.md 第 780 行）：先 --no-run 一次编好，再按测试目标各起一条 cargo test -p <包> <挑法>、同时至多线程上限那么多条，
+#          每条的 RUST_TEST_THREADS 分摊，各目标的输出按派活的次序回读，派出与收回的条数对不上判红。跑的用例与 cargo test -p … <挑法> 同一批，
 #          FAILED 行、test result 行与 Compiling 行照旧落进 test.log，下面的判法不变。
 #          MERGE_AND_VERIFY_TEST_TARGETS=serial（只给自证）退回一条 cargo test --offline --no-fail-fast -p …；自证的别的格都这么设，只有「按测试目标并行起」那一格不设。
+# 挑测试目标（测试那一步与验证包那一步都照它；判法在 MERGE_AND_VERIFY_ITEMS_PROGRAM 的 targets 一段）：读给的每个补丁目录里 crates.patch 改到的路径（新旧两侧，
+#   scripts/gate/lib_rebuilt_packages.py 的 collect_paths）与 mutations-append.tsv、mutations-replacements.tsv 的行；--skip-apply 时照样读给的补丁目录，不打。
+#   路径往上找到的第一份带 [package] 的 Cargo.toml 是它的包（lib_rebuilt_packages.py 的 package_of），包里的相对路径照这几条落到测试目标
+#   （目标清单是 scripts/gate/rerun-failed-tests.py 的 test_targets_of_package：cargo test 不带特性会跑的那几个）：
+#     正是一个测试目标的根文件（tests/<目标>.rs、tests/<目标>/main.rs、src/bin/<名>.rs、src/main.rs、[[test]] / [[bin]] 写的 path）→ 那个目标；
+#     tests/<子目录>/ 下的 → tests/<子目录>/main.rs 那个目标；没有它，就是 tests/ 顶层里写了 mod <子目录>（或 #[path = "<子目录>/…"]）的那几个目标；
+#     src/bin/<名>/ 下的 → src/bin/<名>/main.rs 那个目标；
+#     src/ 下别的（不论是不是 .rs）→ 库目标（[lib] 的 path，缺省 src/lib.rs）；包里没有库目标的落到 src/main.rs 那个目标；
+#     写了 required-features 的 [[test]] / [[bin]]（cargo test 不带特性不编）记「要特性」：产品 GPU 包的交验证包那一步（真卡对拍那一格），别的包报本次未跑；
+#     测试目标根文件那一类的路径在树里已经没有（补丁删了这个目标）：报一句、不跑。
+#   变异行第五段（cargo test 的参数）里 -p <包> 与 --lib、--test <名>、--bin <名>、--example <名>、--bench <名>、--doc 点名的目标 → 那个目标
+#     （`--` 之后的筛选词只报一句：跑的是整个目标，键相同的测试函数照复用）。
+#   判不出的这几种：测试那一步与验证包那一步都不跑、整条退 3（fmt、clippy、build 与重编核对照跑，有红照退 1），逐条列原因，
+#     出路写「整包归提交时的整轮门禁；提交之外要整包跑先弹窗问用户」：
+#     没给补丁目录；改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/；改到不落在任何包里的路径；落在包里而照上面几条落不到测试目标的
+#     （包的 Cargo.toml、build.rs、tests/ 顶层的数据文件这类）；变异行只点了包、点了一类目标（--tests、--bins、--examples、--benches、--all-targets、--workspace、--all）、
+#     没点包，或点的目标在包里找不到。
+#   读不了补丁、成员清单或目标清单退 1。挑出的项、各自为什么挑上（补丁改到哪个文件、哪一条变异行点名）逐项打一行。
 #   fmt    此刻是 `cargo fmt --all -- --check`；build 此刻是 `cargo build --offline --all-targets`（参数照 check.sh 那一行现读，下面「cargo 命令现读」）。
 #   clippy 照 check.sh 按特性组合逐个跑：每个组合一条 `cargo clippy --offline --all-targets <特性参数> -- -D warnings` 加编码纪律那张 lint 表
 #          （组合 `default` 不带特性参数，别的照组合里的词带上），日志 <日志目录>/clippy-<组合>.log（组合去掉开头的 -、别的非字母数字换成 -）；
@@ -97,75 +111,80 @@
 # 上限、线程、机器（records/2026-10-30-编译绕过内存总上限.md 收尾批 M03、M06：脚本里层的包装与上限一律删，一整条一个任务，上限、线程、机器由服务定）：
 #   这里没有对应的参数，认不出的参数一律退 2、一样都不做（服务提交时拒这类参数，这里不另拒）。
 #   撞内存上限、显存不够、排不上都是服务那一层的结局（服务放大重排、记错误类型），这里不另认包装的退出码。
-# 退出码：0 全绿；1 有红（测试、fmt、clippy、build、apply 退 1、快照拷不成或 git init 不成、check.sh 读不出、工作区成员排不掉 验证包、
-#   改过的包没重编、起 cargo 之前 RocksDB 预编库的取值判红（下面「RocksDB 预编库的取值」）、验证包红（下面「验证包那一步」））；
-#   2 补丁核不过（apply 退 2）、用法错（含认不出的参数、--item 的项写错）、快照放进了要验的树里面。验证包因补丁没碰而本次未跑、测试本次未跑都不改退出码，汇总行里点名。
-#   75 按条复用那一层连不上 prune-server（admission.py plan-failure 判不可用），别的没有红；有红退 1。
+# 退出码：0 全绿；1 有红（测试、fmt、clippy、build、apply 退 1、快照拷不成或 git init 不成、check.sh 读不出、工作区成员里认不出 验证包、读不了补丁或目标清单、
+#   改过的包没重编、起 cargo 之前 RocksDB 预编库的取值判红（下面「RocksDB 预编库的取值」）、验证包那一步红（下面「验证包那一步」））；
+#   2 补丁核不过（apply 退 2）、用法错（含认不出的参数、--item 的项写错）、快照放进了要验的树里面。验证包那一步本次未跑、测试本次未跑都不改退出码，汇总行里点名。
+#   3 判不出改到哪个测试目标（下面「挑测试目标」那几种）：测试那一步与验证包那一步没跑，别的步照跑、没有红；有红退 1。
+#     出路：整包归提交时的整轮门禁；提交之外要整包跑先弹窗问用户。
+#   75 按条复用那一层连不上 prune-server（admission.py plan-failure 判不可用），别的没有红；有红退 1，判不出测试目标退 3。
 # RocksDB 预编库的取值：clippy --all-features 与 build --all-targets 编工作区全部成员，连同 验证包（编到 librocksdb-sys）。
 #   补丁打完之后、四条 cargo 之前跑 python3 scripts/hosts/rocksdb-prebuilt.py entry --root <快照>（这台装了、此刻进程环境的取值对得上），
 #   判红退 1、一条 cargo 都不起。
 #   entry 的跳过办法：树里没有依赖 rocksdb 的清单（自证的样本工作区就是这样），或 PATH 上的 cargo 是带「# rocksdb-prebuilt-entry: selftest-fake-cargo」那一行的假 cargo。
-# 验证包那一步（records/2026-09-16-subagent拆分提案.md 第九十节 ㉓，用户 2026-10-23 定案合入后验证跑受影响的 验证包；一个门禁，按条与按块都照键复用）：test、fmt、clippy、build 与重编核对之后，
-#   起快照里那一份门禁 <快照>/.claude/gate.d/crash-point-replay.sh 的三格（--check crash-case-replay,feature-gated-tests,product-gpu-real-card-tests <快照>；crash-case-replay 格里包内测试函数按条复用、登记的崩溃枚举用例逐条按块跑（块照块键复用）；
-#   product-gpu-real-card-tests 是产品 GPU 包 singlefs-background-gpu 的真显卡对拍，包里没有挂特性的测试目标时那一格报无对象可判）。
-#   键与复用全在那一道里现读（每条测试函数的单元键、每个崩溃状态块的块键、判定库、只跑键对不上的、判绿照键记库，它文件头「复用」），这里不另算一份键；它各趟打的「按条复用」那一行里的
-#   现判、复用、拒算加总进成功句（读不到那一行不算过）；「✓ 崩溃状态块：现判 …、复用 …、拒算 …」那一行读到了就一并写进汇总。在这一整条里面直接起（run_step：日志 <日志目录>/verification-step.log 与同名 .problems.log），
-#   环境里的 MERGE_AND_VERIFY_BREAK 不交给它。起不起这一步不看环境变量：交给 task-server 的命令什么前缀都不写，什么时候跑由规矩管
-#   （`.claude/main-agent.md`「写与验分两段」验证段第 1 步）。
-#   --crash-expand-up-to <n>（环境里已设了 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO 的当作给了同一个值）把这个变量交给那一道，缩崩溃域（只往小缩）：
-#   缩过域的那一趟汇总里写「缩过域、不算门禁通过」，出路里只重跑那几格的命令也带同一个变量（env 接在 submit -- 之后）。n 不是非负整数退 2、一样都不做。
-#   补丁没碰会改单元键的东西时不起、报「验证包本次未跑」与原因，不记红、不算过：给了补丁目录，crates.patch 改到的路径都落在包里，
-#   这些包都不是 验证包 singlefs-verification、也不在它的依赖闭包里（成员 Cargo.toml 三张依赖表连同 [target.*] 下的，一层层往下找），
-#   也不是那一道 product-gpu-real-card-tests 格守的产品 GPU 包、不在它的依赖闭包里（验证包不依赖产品 GPU 包，只看 验证包闭包时只改产品 GPU 包的补丁那一格一次都不跑；
-#   守哪几个包不在这里写死，照要起的那一道（快照里那一份）里 PRODUCT_GPU_PACKAGE_NAME="<包名>" 那一行现读，此刻是 singlefs-background-gpu），
-#   补丁目录里也没有非空的 mutations-append.tsv（往 crates/mutations.tsv 追加的行）。照跑的：没给补丁目录；改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/；
-#   改到不落在任何包里的路径；追加了变异行；改到 验证包或它依赖的包；改到产品 GPU 包或它依赖的包；那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行、
-#   或读到的包名不是工作区成员（两种同一方向：算不出碰没碰，照跑，原因里点名是哪一种）；
-#   读不了补丁或成员清单（判法是 select_test_packages 那段 python 的 checker_verdict）。
-#   那一道退 0 是过；退 3 只在交给它的根是它的样本根（有 .crash-point-replay-sample-tools 目录，自证用）时算过，别处退 3 判红；退 77 报本次未跑；
-#   别的退出码判红：逐条列出日志里 FAILED 的测试函数、它报的「红的 …」（各自变了的单元）与红的格，
-#   出路写红的测试函数并进写段的下一批，与只重跑那几格的整条命令（task-server/task submit -- … 交，范围声明写在 task-server/task 前面；键相同的照复用，判绿记过库的不重跑，只现判红的那几条与改后键变了的）；
-#   那条命令起的是主工作区那一份门禁、交给它的根是主工作区（快照收尾就删，修完在主工作区上重跑）。
-#   MERGE_AND_VERIFY_CHECKER_TIER_STAGE 换掉那一道（默认是快照里那一份；出路那条命令里也写它）、MERGE_AND_VERIFY_CHECKER_TIER_ROOT 换掉交给它的根
+# 验证包那一步（records/2026-09-16-subagent拆分提案.md 第九十节 ㉓；按块、按条都照单元键复用，不起门禁的整格）：test、fmt、clippy、build 与重编核对之后，
+#   这一趟跑到的验证包目标里要另走门禁的几样，逐样交快照里那一份门禁 <快照>/.claude/gate.d/crash-point-replay.sh（交给它的根是快照），一样一次、一次一份日志：
+#     登记的崩溃枚举用例：先起一次那一道的 --list-items（不起 cargo；日志 verification-list-items.log）读它现列的「crash-case:<用例名><TAB><test=>」，
+#       test= 的测试目标是这一趟跑到的验证包目标的 → --check crash-case-replay --crash-cases-only --item crash-case:<用例名>…
+#       （只走按块那一路：块照块键复用、缺的当场判；不起包里按条复用那一趟，那几个目标的别的测试函数在测试那一步跑过）；日志 verification-crash-cases.log；
+#     挂特性的测试文件：同一次 --list-items 读的「feature-gated:<文件名>」是这一趟跑到的 tests/<文件名> 目标的、跑到了验证包库目标时的 feature-gated:lib →
+#       --check feature-gated-tests --item feature-gated:<文件名>…（只编、只跑点名的目标，特性照整格那一组，按条复用）；日志 verification-feature-gated.log；
+#     产品 GPU 包的真卡对拍：挑测试目标记了「要特性」、包名是那一道里 PRODUCT_GPU_PACKAGE_NAME="<包名>" 那一行现读的那个包（此刻 singlefs-background-gpu；读不出这一行的
+#       照起并点名读不出）→ --check product-gpu-real-card-tests（那一格不收点名，跑的是那个包真卡对拍的几个目标，键相同的照复用）；日志 verification-product-gpu.log；
+#       点了 --item 时不起、报本次未跑。别的包要特性的目标报本次未跑（归提交时）。
+#   三样都没有就不起那一道，报「验证包那一步本次未跑」与原因（不记红、不算过）。放量分项（scripts/crash/crash-amplification.sh 的 ITEMS）经 --skip 排掉之后这里不起，归提交时。
+#   每一次：退 0 是过；退 3 只在交给它的根是它的样本根（有 .crash-point-replay-sample-tools 目录，自证用）时算过，别处退 3 判红；退 77 报本次未跑；别的退出码判红。
+#     过了还要读到那一次的行：崩溃枚举用例那一次「✓ 崩溃状态块：现判 …、复用 …、拒算 …」，另两样「按条复用：…现判 N、复用 M、拒算 R」；读不到不算过。现判、复用、拒算加总进汇总行。
+#     那一道的 --list-items 退非 0：验证包那一步判红，点名那份日志。
+#   红了逐条列出日志里 FAILED 的测试函数、它报的「红的 …」（各自变了的单元）与 ITEM_DONE 里 exit=1 的项，出路写红的测试函数并进写段的下一批，
+#     与只重跑红的那几项的整条命令（task-server/task submit -- … 交，范围声明写在 task-server/task 前面：种类 items，范围数是 --check 的格数加 --item 的项数；
+#     ITEM_DONE 里认不出红在哪一项的，重跑那一次点的全部项）；那条命令起的是主工作区那一份门禁、交给它的根是主工作区（快照收尾就删，修完在主工作区上重跑）。
+#   在这一整条里面直接起（run_step：两份日志），环境里的 MERGE_AND_VERIFY_BREAK 不交给它。起不起这一步不看环境变量：交给 task-server 的命令什么前缀都不写，
+#     什么时候跑由规矩管（`.claude/main-agent.md`「写与验分两段」验证段第 1 步）。
+#   --crash-expand-up-to <n>（环境里已设了 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO 的当作给了同一个值）把这个变量交给门禁那几次与验证包目标的 cargo test（连同算键的请求），
+#     缩崩溃域（只往小缩）：缩过域的那一趟汇总里写「缩过域、不算门禁通过」，出路里只重跑的命令也带同一个变量（env 接在 submit -- 之后）。n 不是非负整数退 2、一样都不做。
+#   MERGE_AND_VERIFY_VERIFICATION_STAGE 换掉那一道（默认是快照里那一份；出路那条命令里也写它）、MERGE_AND_VERIFY_VERIFICATION_ROOT 换掉交给它的根
 #   （默认是快照；出路那条命令里也写它）；都只给自证。
 # 逐项点名与按条复用（测试那一步；.claude/rules/test-script-discipline.md「入口脚本：不带参数就是不指定范围」「判定可复用：按输入存，按前缀剪」）：
-#   项：测试那一步挑好的包里 cargo test 不带特性会跑的测试目标，一个目标一项，写成 <包>:<目标根文件>（目标根文件从包目录起，就是 cargo 段头 `Running …` 里的源文件，
-#     例 singlefs-verification:tests/model_differential.rs、singlefs-core:src/lib.rs），文档测试一个包一项 <包>:doc。哪几项、挑目标的参数、日志里一段归哪一项，
+#   项：挑出的测试目标，一个目标一项，写成 <包>:<目标根文件>（目标根文件从包目录起，就是 cargo 段头 `Running …` 里的源文件，
+#     例 singlefs-verification:tests/model_differential.rs、singlefs-core:src/lib.rs），文档测试 <包>:doc（只有变异行点了 --doc 才有）。项的写法、挑目标的参数、日志里一段归哪一项，
 #     都照 scripts/gate/rerun-failed-tests.py 文件头「项的写法」（test_targets_of_package、section_item；这里经 importlib 调，不另写一份）。
-#   --list-items：逐行打「<项><TAB>挑目标的参数」，不编、不跑、不拷快照、不打补丁、不建日志目录与编译目录；包照这一趟的挑法（给的补丁目录读改到的路径、--all-packages），
-#     读的是要验的树此刻的样子（补丁没打：补丁新加的测试目标这里列不出，真跑时照打了补丁的快照认，点得到）。退 0；挑不出包退 1（同真跑）。
+#   --list-items：逐行打「<项><TAB>挑目标的参数」，不编、不跑、不拷快照、不打补丁、不建日志目录与编译目录；项照这一趟的挑法（给的补丁目录），
+#     读的是要验的树此刻的样子（补丁没打：补丁新加的测试目标这里列不出，真跑时照打了补丁的快照认，点得到）。退 0；判不出测试目标退 3（同真跑，逐条打原因），读不了退 1。
 #     另带 --with-keys 时每项再打一行 ITEM_PLAN item=<项> to_judge=<要现判的条数> reusable=<能复用的条数>（键在要验的树此刻的样子上算，经 admission.py test-plan、连 prune-server；
 #     文档测试一项一件、算要现判；一个 #[test] 都没有的包两样都是 0；算不成的那一包不打它的 ITEM_PLAN，另打一行「算不出」）；同时给了 --item 的只给点名的项打。
-#   --item <项>：只跑点名的项；写错（不在这一趟可点的项里）退 2、列出可点的项（真跑在打了补丁的快照上认）。点了项时测试那一步按包分开起：每个包一条
-#     （test-targets-parallel.py 或自证的 serial 一条 cargo test，`-p <包>` 只带点名的 --lib / --test / --bin / --example / --bench），点了 <包>:doc 的另起一条
-#     cargo test --offline --no-fail-fast -p <包>… --doc；几条依次跑，各自的日志是 test-<序号>.log（两份日志照 run_step），跑完接成一份 test.log 与 test.problems.log 照下面读。
-#     不点就是这一趟的全部项，测试那一步照旧一条（上面 test 一段）。点名单跑一项与它在整趟里跑的判定相同：同一套键、同一份库、同一个判法。
-#   按条复用：每条测试函数一条判定，种类 merge-and-verify.sh:test-functions（unit-verdicts 族，prune-server 那一份库；库名照 admission.py 文件头「判定库」，库根不进键），
-#     键由 admission.py test-plan 算（它文件头「单元键」）：测试函数的单元闭包、闭包真引到的 cfg 原子与这一次编译的真值（dev 档：不交 --profile，cfg 带 debug_assertions）、
+#   --item <项>：只跑点名的项；写错（不在这一趟挑出的项里）退 2、列出可点的项（真跑在打了补丁的快照上认）。不点就是挑出的全部项。
+#     每个包一条（test-targets-parallel.py 或自证的 serial 一条 cargo test，`-p <包>` 只带这个包点到的 --lib / --test / --bin / --example / --bench），点了 <包>:doc 的另起一条
+#     cargo test --offline --no-fail-fast -p <包>… --doc。点名单跑一项与它在整趟里跑的判定相同：同一套键、同一份库、同一个判法。
+#   按条复用：每条测试函数一条判定（unit-verdicts 族，prune-server 那一份库；库名照 admission.py 文件头「判定库」，库根不进键）。种类两样：
+#     验证包之外的包是 merge-and-verify.sh:test-functions（dev 档：不交 --profile，cfg 带 debug_assertions）；验证包是 crash-point-replay.sh:test-functions，
+#     请求照 admission.py test-functions-request crash-point-replay.sh 打的整份交（--profile release，与门禁 crash-point-replay 的 crash-case-replay 格同一种类：
+#     这里判绿记下的那一格照键复用，那一格记下的这里照键复用），另加 --exclude-registered（登记的崩溃枚举用例与放量分项记 registered、不判、经 --skip 排掉）。
+#     键由 admission.py test-plan 算（它文件头「单元键」）：测试函数的单元闭包、闭包真引到的 cfg 原子与这一次编译的真值、
 #     工具链、解析出的闭包真引到的依赖版本、判法 lib_libtest_result_lines.py::recordable_results 的闭包（judge:）、改判定域的环境变量（admission.py test-functions-request 照这一刻的环境打的
-#     variable:；它打的 --profile release 不交：这一步是 dev 档）。路径、名字、行号、提交与树不进键。每个要测、跑到的项所在的包一份计划（$logs/test-plan.<包>.out 与 .plan）；
+#     variable:）。路径、名字、行号、提交与树不进键。每个要测、跑到的项所在的包一份计划（$logs/test-plan.<包>.out 与 .plan）；
 #     包目录下一个 .rs 里都没有测试属性（#[test]、#[<路径>::test]）的不起 test-plan，计划是空的（没有测试函数可复用）。
-#     键相同、库里不红的经 cargo test -- --exact --skip <名> 跳过（名单 admission.py plan-skip-names：整趟一条时全部包的计划并起来算，有一包算不出就一条都不跳；按包分开起时各包只算点到的目标）；
+#     键相同、库里不红的经 cargo test -- --exact --skip <名> 跳过（名单 admission.py plan-skip-names，各包只算点到的目标）；
 #     键对不上与拒算的照跑。跑完照 rerun-failed-tests.py 的 section_item 把 test.log 逐段归到项与包（认不出、拿不准的段不记库，打一行），每个包那几段交 lib_libtest_result_lines.py recordable
 #     逐条认结局、admission.py plan-green-names 取判绿可记的名字；FAILED 的测试函数按（目标根文件，libtest 全名）对到计划里要现判的那一行交 --red-names，与判绿的同一次 verdict-record 记进库：
 #     红的照同一把键记红、撤掉这把键原有的绿，下一趟现判（记红撤绿）。文档测试与拒算的不复用、不入库（每趟照跑）。
 #     逐条结局写进 $logs/test-functions.tsv：「<名字><TAB><项><TAB><现判|复用|拒算><TAB><绿|红|没跑到>」（现判 = 这一趟日志里有它的结果行）。
 #     复用哨兵照 admission.py（test-plan 抽、verdict-record 判；被判的树下有 .unit-verdict-sample/ 的不抽）。
-#     按条复用失灵（test-plan 退非 0 或没打 PLAN、verdict-record 报哨兵红）：照 admission.py plan-failure 判，失灵的那一包一条都不跳、全部现判跑完，测试这一步判红；
+#     按条复用失灵（test-plan 退非 0 或没打 PLAN、verdict-record 报哨兵红）：照 admission.py plan-failure 判，失灵的那一包一条都不跳、全部现判跑完（验证包不起，见 test 一段），测试这一步判红；
 #     它判 prune-server 不可用（退 75）的，测试这一步不起 cargo、报不可用，别的步照跑，整条退 75（另有红退 1）。
 #     成功句报「按条复用：现判 N、复用 M、拒算 R」（跑到的项里计划的条数）；cargo test 退 0 而跑到的与复用的加起来是 0 才判「一条测试都没跑」。
 #   红了只重跑红的：出路打 python3 scripts/gate/rerun-failed-tests.py <test.log> --item <红的项>…（红的测试函数归不到项的另打 -p <包> 那一种）；
-#     修完也可以只重跑那几项：merge-and-verify.sh --skip-apply --item <红的项>…（判绿记过库的照复用，只现判上次红的与改后键变了的）。
+#     修完也可以只重跑那几项的合入后验证：照出路打的那一条（范围声明种类 items、范围是项数，task-server/task submit -- bash scripts/gate/merge-and-verify.sh --skip-apply --item <红的项>… <同一批补丁目录>；
+#     判绿记过库的照复用，只现判上次红的与改后键变了的）。
 #   机读行（写法同 scripts/crash/crash-point-replay.sh 文件头「输出」，task-server/task_server_lib.py 的 ITEM_PLAN_LINE、ITEM_DONE_LINE 认）：
 #     ITEM_PLAN 见上面 --list-items；ITEM_DONE item=<项> seconds=<秒> judged=<现判的件数> reused=<复用的件数> exit=<0|1|77>，真跑测试那一步收尾每项一行（stdout）：
 #     秒数是这一项那几段 libtest 汇总行「finished in <秒>s」之和（只算测试跑的时间，编译几项共用一份、不分摊），四舍五入成整数；件数照这一包的计划（文档测试一件现判）；
 #     exit 1 是这一项有 FAILED 的测试函数（cargo test 退非 0 而一条 FAILED 都归不到项时，跑到的每一项都记 1），77 是日志里没有这一项那一段（没跑到），别的 0。
 # 弄坏开关 MERGE_AND_VERIFY_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
 # （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
-#   MERGE_AND_VERIFY_BREAK=logs-single  每一步的日志只写一份全量的（改前的样子：不经 two-logs.sh，没有 .problems.log）
+#   MERGE_AND_VERIFY_BREAK=logs-single  每一步的日志只写一份全量的（不经 two-logs.sh，没有 .problems.log）
 #       「一条测试红时每一步的日志应当出两份（test.log 全量；test.problems.log 带行号收那条 FAILED）」
-#   MERGE_AND_VERIFY_BREAK=tests-one-binary-at-a-time  测试那一步照改前一条 cargo test 一个测试二进制接一个地跑，不经 test-targets-parallel.py
-#       「测试那一步应当经 test-targets-parallel.py 按测试目标并行起」（实际假 cargo 只收到一条 test --offline --no-fail-fast -p demo）
+#   MERGE_AND_VERIFY_BREAK=tests-one-binary-at-a-time  测试那一步一条 cargo test 一个测试二进制接一个地跑，不经 test-targets-parallel.py
+#       「测试那一步应当经 test-targets-parallel.py 按测试目标并行起」（实际假 cargo 只收到一条 test --offline --no-fail-fast -p demo --lib --test alpha）
 #   MERGE_AND_VERIFY_BREAK=ignore-red  verify() 抓到 FAILED 行、cargo test 退非 0 都不记红，一律报测试全绿
 #       「一条测试红时应当退 1、列出那条测试与只重跑它的命令」（实际退出码 0，报『✓ 测试全绿（0 个测试二进制）』）；
 #       连带「快照：测试红时也应当删掉快照与编译目录」（那一格的测试红被吞掉，退 0 不是要的 1）
@@ -175,11 +194,11 @@
 #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（lib_work_root.py 的开关：工作根退回旧根 /tmp/claude-<uid>）  没设日志目录时日志落进旧根
 #       「没设日志目录时日志应当落在工作根下」「自检：编译目录不在工作根下」（后一格也不给日志目录、工作根指进 scratch，日志目录落进旧根，那一格核日志目录照旧在工作根下那一半判不过；
 #       跑完删掉旧根下这两格多出的两个 merge-and-verify/<日期>-<进程号>）
-#   MERGE_AND_VERIFY_BREAK=snapshot-keeps-times  快照照改前带源树的修改时刻拷（rsync --times）
+#   MERGE_AND_VERIFY_BREAK=snapshot-keeps-times  快照带源树的修改时刻拷（rsync --times）
 #       「快照：MERGE_AND_VERIFY_KEEP_COPY=1 时应当留着快照与编译目录、打出路径，快照里的修改时刻是拷的那一刻」（实际留下的快照里那份文件是源树的 2020 年的 mtime）；
 #       连带「往编过的副本里 rsync -a 铺新内容（旧 mtime）之后再验，应当重编改过的 walk.rs、测试全绿」（实际退出码 1，假 cargo 报 Fresh、那一条 FAILED）、
 #       「编过之后 --skip-apply 再验同一批补丁：改过的 demo 应当重编、退 0」（实际快照里 walk.rs 比上一趟的 dep-info 旧、没有 Compiling demo，退 1）
-#   MERGE_AND_VERIFY_BREAK=verify-in-main-tree  照改前不拷快照，打补丁、编、验、验证包都在要验的树（主工作区）上
+#   MERGE_AND_VERIFY_BREAK=verify-in-main-tree  不拷快照，打补丁、编、验、验证包都在要验的树（主工作区）上
 #       「快照：跑着的时候主工作区里那份源码被改，结论与复用键应当照开跑时那一份算」（实际测试编的是改后的 source_edited_mid_run、验证包那一步起的是改后的那一份门禁）；
 #       连带「快照：测试红时也应当删掉快照与编译目录」「快照：全绿时应当在快照里打补丁、收尾删掉快照与编译目录」（没有删了快照那一行，apply 收到的 --root 是要验的树）、
 #       「快照：MERGE_AND_VERIFY_KEEP_COPY=1 时……」「快照：快照根应当 git init」（没有快照）、
@@ -190,14 +209,14 @@
 #       「check.sh 里读不出 lint 表时应当退 1、不编」与「check.sh 的 clippy 那一行没带 lint 表时应当退 1、不编」（实际退 0、照常编）；
 #       「check.sh 的 fmt 那一条换成认不出的包装时应当退 1、不编」与「check.sh 的 test 那一行带了收窄目标的标志 --lib 时应当退 1、不编」（同上）；
 #       「check.sh 的缺省特性组合只剩一个时应当退 1、不编」与「check.sh 的 clippy 循环改成只取一个组合时应当退 1、不编」（同上）
-#   MERGE_AND_VERIFY_BREAK=cargo-wrapper-fixed  读 check.sh 里 cargo 命令的识别退回改前：只认 run_cargo <子命令> 那一种包装，不带包装的 cargo 一律当找不到（改前的样子，上游去掉 run_cargo 那一天整个挡住）
+#   MERGE_AND_VERIFY_BREAK=cargo-wrapper-fixed  读 check.sh 里 cargo 命令的识别只认 run_cargo <子命令> 那一种包装，不带包装的 cargo 一律当找不到（上游去掉 run_cargo 那一天整个挡住）
 #       「cargo 命令现读：真 check.sh 同一趟 --skip-apply 应当退 0」（真 check.sh 此刻是不带包装的 cargo，读不出 fmt 那一条，退 1、不编）；
 #       连带红的格：「✗ 自检：」（凡是经真 check.sh 往下验的格都停在读 check.sh 那一步，没有一格验得到后面）
 #   MERGE_AND_VERIFY_BREAK=cargo-wrapper-unrecognized  读 cargo 命令的识别只认不带包装的 cargo，run_cargo <子命令> 当找不到（上游哪天改回包装函数就挡住）
 #       「check.sh 的 cargo 命令包了 run_cargo 时应当照读、收到的命令与真 check.sh 相同」（样本里四条都是 run_cargo <子命令>，读不出，退 1、不编）
-#   MERGE_AND_VERIFY_BREAK=cargo-arguments-fixed  四条 cargo 命令的参数照改前用这里写死的，不用从 check.sh 现读
+#   MERGE_AND_VERIFY_BREAK=cargo-arguments-fixed  四条 cargo 命令的参数用这里写死的，不用从 check.sh 现读
 #       「check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们」（实际收到的是不带 --verbose、-W clippy::pedantic、--locked 的）
-#   MERGE_AND_VERIFY_BREAK=single-clippy-pass  clippy 那一步照改前只跑 --all-features 一趟，从 check.sh 读到的特性组合不用
+#   MERGE_AND_VERIFY_BREAK=single-clippy-pass  clippy 那一步只跑 --all-features 一趟，从 check.sh 读到的特性组合不用
 #       「clippy 应当照 check.sh 的特性组合逐个跑」（实际假 cargo 只收到 --all-features 那一条）；
 #       「clippy 一个特性组合红时应当整步红、退 1、点名红的那个组合」（不带特性那一趟没跑，实际退 0）；
 #       连带「check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们」（每个组合的 clippy 都带 -W，实际只收到一条）
@@ -209,17 +228,10 @@
 #       「要验的树里有特性组合登记时应当退 1、不编」（实际退 0、照常编）
 #   MERGE_AND_VERIFY_BREAK=skip-build  不跑 cargo build --offline --all-targets
 #       「应当跑 cargo build --offline --all-targets」（实际假 cargo 没收到 build）；
-#       连带「check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们」（没有 build --locked 那一条）
-#   MERGE_AND_VERIFY_BREAK=mutation-tables-claimed-judged  汇总照改前写「其中 code-source-discipline 红 0 个」，不报 mutation-tables 格本次未跑、不打另交的命令
+#       连带「check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们」（没有 build --locked 那一条）、
+#       「判不出测试目标：」那四格（它们另核别的步照跑、假 cargo 收到 build）
+#   MERGE_AND_VERIFY_BREAK=mutation-tables-claimed-judged  汇总写「其中 code-source-discipline 红 0 个」，不报 mutation-tables 格本次未跑、不打另交的命令
 #       「打补丁之后应当报 code-source-discipline 的 mutation-tables 格本次未跑、打出补丁打进主工作区之后另交的整条命令」（实际汇总写红 0 个，没有那一行）
-#   MERGE_AND_VERIFY_BREAK=fixed-test-packages  cargo test 退回写死的三个包 singlefs-format、singlefs-core、singlefs-checker
-#       「cargo test 应当挑工作区成员减掉 验证包」（实际收到的是写死的四个包，样本树的成员 demo 不在里面）；
-#       「工作区成员里没有 singlefs-verification 时应当退 1、不编」也红（写死的表不读成员，照编）；
-#       按补丁挑包的那几格与别的带补丁目录的格也红（写死的四个包都不在样本工作区里，按补丁挑出来一个不剩，测试本次未跑）
-#       连带红的格：「✗ 自检：快照：测试红时也」、「✗ 自检：一条测试红时」、「✗ 自检：一条测试红时每一步的日志」、「✗ 自检：全绿时」、「✗ 自检：带 --all-packages：cargo test」、「✗ 自检：没设日志目录时日志」、「✗ 自检：测试那一步」、「✗ 自检：编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行」、「✗ 自检：补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑」、「✗ 自检：补丁改到 demo：cargo test」、「✗ 自检：补丁改到工作区根的 Cargo.lock：cargo test」、「✗ 自检：check.sh 的四条 cargo 命令各加一个标志」；
-#       逐项与复用那九格都红（写死的四个包都不在样本工作区里，一项都列不出、没有包起 test-plan）：「逐项与复用：--list-items 逐行列这一趟的项」「逐项与复用：--item 写错的项应当退 2」
-#       「逐项与复用：reuse-three-questions」「逐项与复用：整趟每项一行 ITEM_DONE」「逐项与复用：点名单跑 alpha:tests/beta.rs」「逐项与复用：记红撤绿」
-#       「逐项与复用：--list-items --with-keys 每项一行 ITEM_PLAN」「逐项与复用：按条复用失灵（test-plan 退 1）应当判红」「逐项与复用：prune-server 不可用（test-plan 退 75）应当退 75、测试那一步不起 cargo」
 #   MERGE_AND_VERIFY_BREAK=no-verification-package-guard  工作区成员里找不到 singlefs-verification 也照挑全部成员
 #       「工作区成员里没有 singlefs-verification 时应当退 1、不编」（实际退 0，改了名的 验证包被跑进来）
 #   MERGE_AND_VERIFY_BREAK=zero-tests-green  cargo test 退 0 而一条测试都没数到时照报全绿
@@ -237,32 +249,25 @@
 #   MERGE_AND_VERIFY_BREAK=skip-rebuild-check  编完不核改过的包有没有 Compiling 行
 #       「编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行：应当退 1、点名 demo」（实际退 0）
 #       连带：「头一次编、补丁改过的 demo 有 Compiling 行：应当退 0、报都重编」「编过之后 --skip-apply 再验同一批补丁：改过的 demo 应当重编、退 0」（不核就不报「都重编了」，判这一句的两格跟着红）
-#   MERGE_AND_VERIFY_BREAK=all-packages-always  测试步不按补丁挑包，照旧跑全部（改前的样子）
-#       「补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑」（实际收到四个包）；
-#       连带「补丁改到 demo：…」「补丁只改到 验证包：…」（照旧全跑）与「补丁改到工作区根的 Cargo.lock：…」（挑法那一句写的是开关，不是 Cargo.lock）
-#   MERGE_AND_VERIFY_BREAK=lock-changes-narrowed  补丁改到工作区根的 Cargo.toml、Cargo.lock 或 .cargo/ 时不照旧全跑（当成没改到包）
-#       「补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包」（实际测试本次未跑）
-#   MERGE_AND_VERIFY_BREAK=dependents-dropped  只挑补丁改到的包，不带上工作区里依赖它们的包
-#       「补丁改到 demo：cargo test 应当挑 demo 与依赖它的 delta」（实际只收到 -p demo）
-#   MERGE_AND_VERIFY_BREAK=skip-apply-unchecked  --skip-apply 时不核补丁打过没有（改前的样子）
+#   MERGE_AND_VERIFY_BREAK=skip-apply-unchecked  --skip-apply 时不核补丁打过没有
 #       「--skip-apply 给的补丁没打在树上：应当退 1、点名那份补丁、不编」（实际退 0、照常编，在没打补丁的树上验出绿）；
-#       连带「补丁改到 alpha 与 beta 两个包：…」「--skip-apply 给的两份补丁改同一行、照打的次序给：…」与「临时目录不认保留属性时 --skip-apply 照样核得过补丁已打上、退 0」（这三格另核『核过 N 份补丁都已打在树上』这一行，不核就不打）
-#   MERGE_AND_VERIFY_BREAK=reverse-check-each-alone  --skip-apply 照改前在要验的树上逐份单独 git apply --check --reverse，不在临时副本里照次序倒着逐份倒
+#       连带「补丁改到 alpha 的库与 beta 的测试目标 case：…」「--skip-apply 给的两份补丁改同一行、照打的次序给：…」与「临时目录不认保留属性时 --skip-apply 照样核得过补丁已打上、退 0」（这三格另核『核过 N 份补丁都已打在树上』这一行，不核就不打）
+#   MERGE_AND_VERIFY_BREAK=reverse-check-each-alone  --skip-apply 在要验的树上逐份单独 git apply --check --reverse，不在临时副本里照次序倒着逐份倒
 #       「--skip-apply 给的两份补丁改同一行、照打的次序给：应当判都已打上、退 0」（实际先打的那一份单独反着核不过，退 1）
-#   MERGE_AND_VERIFY_BREAK=reverse-check-copy-preserves  --skip-apply 核补丁打没打的临时副本照改前带 -p 拷（保留权限与属主）
+#   MERGE_AND_VERIFY_BREAK=reverse-check-copy-preserves  --skip-apply 核补丁打没打的临时副本带 -p 拷（保留权限与属主）
 #       「临时目录不认保留属性时 --skip-apply 照样核得过补丁已打上、退 0」（实际 cp 报 preserving permissions … Operation not supported，退 1）
-#   MERGE_AND_VERIFY_BREAK=keep-run-target  收尾不删这一趟自己建的编译目录（改前的样子：编进树根的 target、跨趟留着）
+#   MERGE_AND_VERIFY_BREAK=keep-run-target  收尾不删这一趟自己建的编译目录（编进树根的 target、跨趟留着）
 #       「跑完运行目录里不剩它建的编译目录」（正常、出错、被 TERM 三种结局，实际编译目录还在）；
 #       连带「快照：全绿时应当在快照里打补丁、收尾删掉快照与编译目录」与「快照：测试红时也应当删掉快照与编译目录」（编译目录还在）、
 #       「这一趟的编译目录里还有进程开着文件：应当不删、报出那个进程、退 1」（不删也不核，退 0）、
 #       「收尾时前面一步写满盘（用开关演）编译目录照删」（编译目录还在）
-#   MERGE_AND_VERIFY_BREAK=target-under-work-root  编译目录照改前建在 <日志目录>/target（日志目录在工作根下，派到第二台时上百 G 经 NFS 写回本机的盘）
+#   MERGE_AND_VERIFY_BREAK=target-under-work-root  编译目录建在 <日志目录>/target（日志目录在工作根下，派到第二台时上百 G 经 NFS 写回本机的盘）
 #       「编译目录不在工作根下」（实际在 <工作根>/merge-and-verify/<日期>-<进程号>/target）
-#   MERGE_AND_VERIFY_BREAK=cleanup-after-other-steps  EXIT trap 照改前先删快照，最后才删编译目录（前面一步写满盘停住，编译目录就留下了）
+#   MERGE_AND_VERIFY_BREAK=cleanup-after-other-steps  EXIT trap 先删快照，最后才删编译目录（前面一步写满盘停住，编译目录就留下了）
 #       「收尾时前面一步写满盘（用开关演）编译目录照删」（实际编译目录还在）
 #   MERGE_AND_VERIFY_BREAK=run-target-open-files-unchecked  删这一趟的编译目录之前不核有没有进程开着里面的文件（run_build_directory.py remove --skip-open-check）
 #       「这一趟的编译目录里还有进程开着文件：应当不删、报出那个进程、退 1」（实际删了、退 0）
-#   MERGE_AND_VERIFY_BREAK=rocksdb-entry-unchecked  本机起四条 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#   MERGE_AND_VERIFY_BREAK=rocksdb-entry-unchecked  本机起四条 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       「起 cargo 之前 RocksDB 预编库的取值缺了……应当退 1、一条 cargo 都不起」（实际假 cargo 收到四条）
 #   MERGE_AND_VERIFY_BREAK=copy-not-git-initialized  拷完快照之后不在快照根 git init（快照不是 git 工作树，读写判定库的脚本在快照上退 2）
 #       「快照：快照根应当 git init」（实际留下的快照取不到 git common-dir）；
@@ -270,51 +275,60 @@
 #       「逐项与复用：--list-items --with-keys 每项一行 ITEM_PLAN」（admission.py test-plan 在快照上退 2，按条复用失灵、测试那一步判红，一条都没记库）
 #   MERGE_AND_VERIFY_BREAK=test-arguments-added  测试那一步的 cargo test 在 -- 之后多带一个参数（--show-output）
 #       「测试那一步的 cargo test 在 -- 之后应当什么都不带」（实际假 cargo 收到的测试命令以 -- --show-output 收尾）；
-#       连带按 -p 那几个包核假 cargo 收到的测试命令的各格（挑包的几格、带 --all-packages、check.sh 加标志那一格）：它们逐字比整条命令，多了 -- 之后的参数就对不上
+#       连带逐字比假 cargo 收到的测试命令的各格：「cargo test 应当只起补丁改到的 demo 的库目标」「测试那一步应当经 test-targets-parallel.py 按测试目标并行起」
+#       「补丁改到 alpha 的库与 beta 的测试目标 case：…」「补丁改到 alpha 的 src/lib.rs、变异行点名 alpha 的 case_a：…」「check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们」
+#       「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」（多了 -- 之后的参数就对不上）
+#   挑测试目标（文件头「挑测试目标」）的开关：
+#   MERGE_AND_VERIFY_BREAK=whole-package-tests  改到的包与工作区里依赖它们的包，每个目标都挑（照整包跑）
+#       「补丁改到 alpha 的库与 beta 的测试目标 case：…」「补丁改到 alpha 的 src/lib.rs、变异行点名 alpha 的 case_a：…」（实际 alpha 与依赖它的 beta 的目标都起了）；
+#       连带「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」（另起了依赖 demo 的 delta、验证包的库，交了 feature-gated:lib）、
+#       「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」（验证包那一条另带 --test setting）、
+#       「验证包那一步：跑在第二台上时…」「验证包那一步：--crash-expand-up-to 6 …」「验证包那一步：不给 --crash-expand-up-to 时…」「验证包那一步：环境里已设展开深度变量时…」
+#       （那一道多起了一次 feature-gated:lib：起的次数、记下的变量行数对不上）
+#   MERGE_AND_VERIFY_BREAK=fallback-runs-whole-workspace  判不出测试目标的不拒，改成每个包的每个目标都挑（照旧全跑）
+#       「判不出测试目标：」那四格（没给补丁目录、改 Cargo.lock、改不落在任何包里的路径、改到落不到目标的文件：实际退 0、假 cargo 收到各包的测试命令）
 #   验证包那一步（文件头「验证包那一步」）的开关，点名的格都以「验证包那一步：」起头：
-#   MERGE_AND_VERIFY_BREAK=verification-step-skipped  不跑 验证包那一步（改前的样子）
-#       「验证包那一步：补丁改到 验证包、改了 4 条测试函数闭包里的单元……」「验证包那一步：键都对上时应当现判 0……」
-#       「验证包那一步：样本里 test_t 判 FAILED 时应当退 1……」「验证包那一步：补丁改到 验证包依赖的 demo 时应当照起那一道……」
-#       「验证包那一步：补丁只改到不在 验证包依赖闭包里的 alpha、beta……」「验证包那一步：那一道退 3 而根不是它的样本根……」
-#       「验证包那一步：跑在第二台上时应当照起那一道……」
-#       「验证包那一步：起那一道的 --check 应当带上产品 GPU 包那一格」
-#       「验证包那一步：补丁只改到产品 GPU 包 singlefs-background-gpu……」
-#       「验证包那一步：那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行时……」「验证包那一步：那一道里的产品 GPU 包名 singlefs-background-gpu-renamed 不是工作区成员时……」
-#       （十一格都报不出那一步的行，核那一道被起几次的格里那一道一次都没被起）；
-#       连带「快照：跑着的时候主工作区里那份源码被改……」（验证包那一步不起，日志里没有按条复用那一行）
-#   MERGE_AND_VERIFY_BREAK=product-gpu-cell-dropped  起那一道的 --check 照改前只带 crash-case-replay,feature-gated-tests 两格，产品 GPU 包那一格不起
-#       「验证包那一步：起那一道的 --check 应当带上产品 GPU 包那一格」「验证包那一步：补丁只改到产品 GPU 包 singlefs-background-gpu……」
-#       （实际那一道收到的是 --check crash-case-replay,feature-gated-tests）
-#   MERGE_AND_VERIFY_BREAK=product-gpu-package-ignored  补丁碰没碰只看 验证包与它的依赖闭包（改前的样子），那一道守的产品 GPU 包不算进射程
-#       「验证包那一步：补丁只改到产品 GPU 包 singlefs-background-gpu……」
-#       「验证包那一步：那一道里的产品 GPU 包名 singlefs-background-gpu-renamed 不是工作区成员时……」（实际报补丁没碰、本次未跑、那一道被起 0 次）
-#   MERGE_AND_VERIFY_BREAK=product-gpu-unreadable-as-unaffected  那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行时不照跑，当补丁没碰产品 GPU 包（攻方 d137-ledger-defs-r2 B7 的变异）
-#       「验证包那一步：那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行时……」（实际报补丁没碰、本次未跑、那一道被起 0 次）
-#   MERGE_AND_VERIFY_BREAK=product-gpu-non-member-as-unaffected  读到的产品 GPU 包名不是工作区成员时照改前算空闭包、判没碰（辩方 d137-ledger-defs-r2 A10）
-#       「验证包那一步：那一道里的产品 GPU 包名 singlefs-background-gpu-renamed 不是工作区成员时……」（实际报补丁没碰、本次未跑、那一道被起 0 次）
-#   MERGE_AND_VERIFY_BREAK=verification-step-always-run  不看补丁碰没碰会改单元键的东西，一律照跑
-#       「验证包那一步：补丁只改到不在 验证包依赖闭包里的 alpha、beta……」（实际那一道被起 1 次）；
-#   MERGE_AND_VERIFY_BREAK=verification-step-dependencies-ignored  依赖闭包只算 验证包自己，不往下找它依赖的包
-#       「验证包那一步：补丁改到 验证包依赖的 demo 时应当照起那一道……」（实际报补丁没碰、本次未跑、那一道被起 0 次）
+#   MERGE_AND_VERIFY_BREAK=verification-step-skipped  不跑 验证包那一步
+#       「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」
+#       「验证包那一步：按块那一路判红时…」「验证包那一步：补丁只改到 alpha、beta 时…」「验证包那一步：补丁改到产品 GPU 包的真卡对拍 real_card 时…」
+#       「验证包那一步：那一道退 3 而根不是它的样本根…」「验证包那一步：那一道 --list-items 退 1 时…」「验证包那一步：跑在第二台上时…」
+#       「验证包那一步：--crash-expand-up-to 6 …」「验证包那一步：不给 --crash-expand-up-to 时…」「验证包那一步：环境里已设展开深度变量时…」「验证包那一步：缩过域的那一趟红了…」
+#       （那一道一次都没被起、报不出那一步的行）；连带「快照：跑着的时候主工作区里那份源码被改……」（日志里没有按块那一路的那一行）
+#   MERGE_AND_VERIFY_BREAK=whole-verification-cells  有要交的就起那一道的三格整格（--check crash-case-replay,feature-gated-tests,product-gpu-real-card-tests，不带 --item）
+#       「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」（实际那一道收到的是三格整格）、
+#       「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」「验证包那一步：补丁改到产品 GPU 包的真卡对拍 real_card 时…」（同上）、
+#       「验证包那一步：按块那一路判红时…」（出路里只重跑的命令不带 --item crash-case:demo-case）、「验证包那一步：跑在第二台上时…」（报的是三格整格那一次，不是按块那一路）
+#   MERGE_AND_VERIFY_BREAK=crash-cases-whole-cell  崩溃枚举用例那一次不带 --crash-cases-only（门禁照跑整个包的按条复用那一趟）
+#       「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」「验证包那一步：按块那一路判红时…」（实际收到与打出的都是 --check crash-case-replay --item …）
+#   MERGE_AND_VERIFY_BREAK=feature-gated-unrouted  挂特性的测试文件一样都不交
+#       「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」（实际那一道只被起了 --list-items 那一次）
+#   MERGE_AND_VERIFY_BREAK=product-gpu-unrouted  产品 GPU 包要特性的目标也当别的包，报本次未跑、不交真卡对拍那一格
+#       「验证包那一步：补丁改到产品 GPU 包的真卡对拍 real_card 时…」（实际那一道一次都没被起）
+#   MERGE_AND_VERIFY_BREAK=verification-release-dropped  验证包那一条 cargo test 不带 --release
+#       「验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting…」「验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair…」（实际收到的验证包测试命令没有 --release）
 #   MERGE_AND_VERIFY_BREAK=verification-step-sample-exit-anywhere  那一道退 3 不看根是不是样本根，一律算过
-#       「验证包那一步：那一道退 3 而根不是它的样本根……」（实际退 0）
+#       「验证包那一步：那一道退 3 而根不是它的样本根…」（实际退 0）
 #   MERGE_AND_VERIFY_BREAK=unknown-option-accepted  认不出的选项也照收、不拒（当没给）
-#       「给了认不出的选项应当退 2、点名它、一样都不做」（实际照往下验、退 0）
-#   MERGE_AND_VERIFY_BREAK=rerun-command-wrapped  只重跑 验证包那几格的出路照改前套 capped.sh 与 run-with-memory-cap.sh <上限>，不经 task-server/task submit
-#       「验证包那一步：样本里 test_t 判 FAILED 时应当退 1……」（出路里没有 task-server/task submit --、带了 run-with-memory-cap.sh）
+#       「给了认不出的选项 --never-used-option 应当退 2、点名它」（实际照往下验、退 0）；连带「给了 --all-packages（不认的参数）应当退 2、点名它、一样都不做」
+#   MERGE_AND_VERIFY_BREAK=rerun-command-wrapped  只重跑验证包那一步红的那几项的出路套 capped.sh 与 run-with-memory-cap.sh <上限>，不经 task-server/task submit
+#       「验证包那一步：按块那一路判红时…」（出路里没有 task-server/task submit --、带了 run-with-memory-cap.sh）；
+#       连带「验证包那一步：缩过域的那一趟红了…」（出路里没有 task-server/task submit -- env …）
+#   MERGE_AND_VERIFY_BREAK=rerun-whole-cells  只重跑的出路打三格整格（不带 --item）
+#       「验证包那一步：按块那一路判红时…」（出路里没有 --check crash-case-replay --crash-cases-only --item crash-case:demo-case，范围也不是 2 项）
 #   MERGE_AND_VERIFY_BREAK=verification-step-red-ignored  那一道红了也报过
-#       「验证包那一步：样本里 test_t 判 FAILED 时应当退 1……」与「验证包那一步：那一道退 3 而根不是它的样本根……」（实际都退 0）
+#       「验证包那一步：按块那一路判红时…」与「验证包那一步：那一道退 3 而根不是它的样本根…」（实际都退 0）；
+#       连带「验证包那一步：缩过域的那一趟红了…」（实际退 0、没有只重跑的出路）
 #   MERGE_AND_VERIFY_BREAK=verification-step-failed-lines-ignored  数红的测试函数只认「test <名> ... FAILED」，不认那一道逐个红的测试目标抄下的「FAILED <名>」
 #       「验证包那一步：日志里两种写法的红应当一起数、按名去重……」（实际只数出 1 条）
 #   MERGE_AND_VERIFY_BREAK=expand-up-to-not-passed  给了 --crash-expand-up-to 不把变量交给那一道（汇总照写缩过域）
 #       「验证包那一步：--crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过」（实际那一道收到的是 unset）
 #   MERGE_AND_VERIFY_BREAK=scaled-run-unlabelled  缩过域的那一趟汇总里不写「缩过域、不算门禁通过」
 #       「验证包那一步：--crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过」（实际汇总里没有那一句）；
-#       连带「验证包那一步：环境里已设展开深度变量时当作给了同一个值」「验证包那一步：缩过域的那一趟红了，只重跑那几格的命令应当带同一个变量」
-#   MERGE_AND_VERIFY_BREAK=rerun-command-unscaled  缩过域的那一趟红了，只重跑那几格的命令不带变量
-#       「验证包那一步：缩过域的那一趟红了，只重跑那几格的命令应当带同一个变量」
+#       连带「验证包那一步：环境里已设展开深度变量时当作给了同一个值」「验证包那一步：缩过域的那一趟红了…」
+#   MERGE_AND_VERIFY_BREAK=rerun-command-unscaled  缩过域的那一趟红了，只重跑的命令不带变量
+#       「验证包那一步：缩过域的那一趟红了…」
 #   MERGE_AND_VERIFY_BREAK=expand-up-to-unchecked  --crash-expand-up-to 的值与环境里的变量不核是不是非负整数
-#       「--crash-expand-up-to 不是非负整数时应当退 2、一样都不做」（实际照往下验）
+#       「--crash-expand-up-to 不是非负整数时应当退 2、一样都不做」（参数写 abc 与环境里的变量写 abc 两格，实际照往下验）
 #   逐项点名与按条复用（文件头「逐项点名与按条复用」）的开关，点名的格都以「逐项与复用：」起头：
 #   MERGE_AND_VERIFY_BREAK=items-ignored  --item 点了也照整趟跑（全部项）
 #       「逐项与复用：点名单跑 alpha:tests/beta.rs」（实际假 cargo 收到的测试命令不带 --test beta、alpha 的库也跑了）
@@ -375,29 +389,38 @@ STAMP="$here/../hosts/source-stamp.py"          # 自证里写按 mtime 判新�
 REBUILT="$here/lib_rebuilt_packages.py"          # 改过的包重编了没有（文件头）
 CHECK_PATCH_DIRS=()                              # 算改过的包用的补丁目录（绝对路径；--skip-apply 时也留着）
 RUN_BUILD_DIRECTORY="$here/../hosts/run_build_directory.py"   # 删这一趟自己建的编译目录（文件头「这一趟的编译目录」）
-CHECKER_TIER_STAGE_PATH=".claude/gate.d/crash-point-replay.sh"   # 验证包那一步起的门禁在树里的位置（文件头「验证包那一步」）
-CHECKER_TIER_STAGE=""; CHECKER_TIER_RERUN_STAGE=""   # 建好快照之后填：起的是快照里那一份，出路那条命令写主工作区那一份（MERGE_AND_VERIFY_CHECKER_TIER_STAGE 换掉两样，只给自证）
+VERIFICATION_STAGE_PATH=".claude/gate.d/crash-point-replay.sh"   # 验证包那一步起的门禁在树里的位置（文件头「验证包那一步」）
+VERIFICATION_STAGE=""; VERIFICATION_RERUN_STAGE=""   # 建好快照之后填：起的是快照里那一份，出路那条命令写主工作区那一份（MERGE_AND_VERIFY_VERIFICATION_STAGE 换掉两样，只给自证）
 SOURCE_TREE=""                                    # 要验的树（快照从它拷；出路那条命令交给门禁的根），参数解析之后填
-CHECKER_TIER_CELLS="crash-case-replay,feature-gated-tests,product-gpu-real-card-tests"   # 那一步起的三格：包内测试函数按条复用、登记的崩溃枚举用例按块复用（文件头「验证包那一步」）
-# 弄坏开关 product-gpu-cell-dropped：照改前只起前两格，产品 GPU 包那一格不起
-[[ "${MERGE_AND_VERIFY_BREAK:-}" != "product-gpu-cell-dropped" ]] || CHECKER_TIER_CELLS="crash-case-replay,feature-gated-tests"
-CHECKER_TIER_AFFECTED=""; CHECKER_TIER_REASON=""   # select_test_packages 填：补丁碰没碰会改单元键的东西（1 碰了、0 没碰、空 算不出）与一句原因
-CHECKER_TIER_STATE=""; CHECKER_TIER_SCALED=""     # checker_tier_step 填：汇总行里的一句；缩过域的那一趟置 1
+# 验证包那一步点的三格与只走按块那一路的选项（文件头「验证包那一步」）；WHOLE_VERIFICATION_CELLS 只给弄坏开关 whole-verification-cells 与 rerun-whole-cells 用
+CRASH_CASE_CELL="crash-case-replay"; FEATURE_GATED_CELL="feature-gated-tests"; PRODUCT_GPU_CELL="product-gpu-real-card-tests"
+CRASH_CASES_ONLY_OPTION="--crash-cases-only"
+WHOLE_VERIFICATION_CELLS="$CRASH_CASE_CELL,$FEATURE_GATED_CELL,$PRODUCT_GPU_CELL"
+VERIFICATION_STATE=""; VERIFICATION_SCALED=""     # verification_step 填：汇总行里的一句；缩过域的那一趟置 1
 CRASH_EXPAND_UP_TO=""                             # 缩崩溃域的展开深度上限（--crash-expand-up-to，或环境里已设的变量）；空就是整个域
-CRASH_EXPAND_UP_TO_VARIABLE=SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO   # 交给那一道的变量名（引擎读它，值只往小缩）
+CRASH_EXPAND_UP_TO_VARIABLE=SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO   # 交给那一道与验证包目标的 cargo test 的变量名（引擎读它，值只往小缩）
+# 挑测试目标（文件头「挑测试目标」），select_test_targets 填
+ALL_ITEM_LINES=()            # 挑出的项，一项一行「项<TAB>包<TAB>挑目标的参数」
+ITEM_REASONS=()              # 一项一行「项<TAB>为什么挑上」
+REQUIRED_FEATURE_TARGETS=()  # 要特性的目标，一行「包<TAB>目标名<TAB>特性<TAB>为什么」
+TARGET_REFUSALS=()           # 判不出测试目标的原因；有一条就不跑测试那一步与验证包那一步、整条退 3
+TARGET_NOTES=()              # 报一句的：变异行的筛选词、补丁删掉的目标
+TARGET_PROBLEM=""            # 读不了补丁、成员清单或目标清单的原因
 # 逐项点名与按条复用（文件头「逐项点名与按条复用」）
 RERUN_FAILED_TESTS="$here/rerun-failed-tests.py"   # 项的清单与「日志里一段归哪一项」（它文件头「项的写法」），经 importlib 调
 ADMISSION="$here/admission.py"                     # test-functions-request、test-plan、plan-skip-names、plan-green-names、verdict-record、plan-failure
 LIBTEST_RESULT_LINES="$here/lib_libtest_result_lines.py"   # recordable：逐条认结局
 LIST_ITEMS=0; LIST_WITH_KEYS=0; NAMED_ITEMS=()      # --list-items、--with-keys、--item 点名的项
 RUN_ITEMS=()                                        # collect_test_items 填：这一趟测试那一步跑的项，一项一行「项<TAB>包<TAB>挑目标的参数」
-TESTED_PACKAGES=()                                  # collect_test_items 填：包目录下有测试属性的包（只给它们起 test-plan）
-TEST_FUNCTIONS_KIND=""; TEST_PLAN_ARGUMENTS=()      # plan_test_functions 填：判定种类与交给 test-plan 的参数（admission.py test-functions-request）
+TESTED_PACKAGES=()                                  # select_test_targets 填：挑出的项所在、包目录下有测试属性的包（只给它们起 test-plan）
+TEST_FUNCTIONS_KIND=""; TEST_PLAN_ARGUMENTS=()      # plan_test_functions 填：验证包之外的判定种类与交给 test-plan 的参数（admission.py test-functions-request merge-and-verify.sh）
+VERIFICATION_FUNCTIONS_KIND=""; VERIFICATION_PLAN_ARGUMENTS=()   # plan_test_functions 填：验证包的（test-functions-request crash-point-replay.sh，另加 --exclude-registered）
+TESTS_REFUSED=0                                     # 判不出测试目标，测试那一步与验证包那一步没跑（文件头「退出码」3）
 PLANNED_PACKAGES=(); FAILED_PLAN_PACKAGES=()        # 计划算成了的包、按条复用失灵的包
 PLAN_UNAVAILABLE=0; PLAN_RED=0                      # prune-server 不可用、按条复用失灵（测试这一步判红）
 PLAN_JUDGE=0; PLAN_REUSE=0; PLAN_REFUSED=0          # 跑到的项里计划的条数（成功句）
 CHECK_SH="${MERGE_AND_VERIFY_CHECK_SH:-$root/.claude/singlefs-ai-sop/scripts/check.sh}"
-CHECKER_TIER_PACKAGE=singlefs-verification   # 验证包（.claude/rules/verification.md）：这里的 cargo test 不挑它，它的测试函数归 checker_tier_step
+VERIFICATION_PACKAGE=singlefs-verification   # 验证包（.claude/rules/verification.md）：它的目标带 --release 跑、按门禁 crash-point-replay 的种类复用，登记的崩溃枚举用例归 verification_step
 # check.sh 里 clippy 按特性组合循环的三行结构（不是 cargo 命令本身）：每行在它里面恰好出现一次，这里的 clippy 一步照它们对齐
 # （组合 default 不带特性参数；登记文件那一行是 check.sh 认登记的地方，见文件头 clippy 一段）。
 # fmt、clippy、build、test 四条 cargo 命令的写法不在这里抄第二份：开跑时从 check.sh 现读（read_cargo_command，文件头 clippy 一段之后的「cargo 命令现读」）。
@@ -421,7 +444,7 @@ die() { echo "  ✗ $1"; echo "  → 怎么办：$2"; exit "${3:-2}"; }
 
 # take_snapshot <要验的树> <快照>：文件头「快照」。快照目录这里新建（已有就退 1）；不拷任意一层的 .git、target、target-* 与 __pycache__；
 # 不保留属性（不带 --perms、--owner、--group：权限位照建文件时的缺省，可执行位随源文件带过去）与修改时刻（不带 --times）。
-# rsync 退 24（拷的时候有文件被别的会话删了）算拷成：那一刻已经没有它，快照里也就没有；别的非 0 退 1。弄坏开关 snapshot-keeps-times：照改前带源树的修改时刻拷
+# rsync 退 24（拷的时候有文件被别的会话删了）算拷成：那一刻已经没有它，快照里也就没有；别的非 0 退 1。弄坏开关 snapshot-keeps-times：带源树的修改时刻拷
 take_snapshot() {
   local rc=0
   local -a times=(--no-times)
@@ -450,7 +473,7 @@ finish() {
   elif [[ "${MERGE_AND_VERIFY_KEEP_COPY:-}" == 1 ]]; then
     keep_both=2
   fi
-  # 第一步删编译目录（问题 72 之二：派到第二台那一趟收尾时前面一步写满盘，编译目录没删成）；弄坏开关 cleanup-after-other-steps 照改前挪到最后
+  # 第一步删编译目录（前面一步写满盘时编译目录就删不成）；弄坏开关 cleanup-after-other-steps 挪到最后
   if ((keep_both == 0)) && [[ "${MERGE_AND_VERIFY_BREAK:-}" != "cleanup-after-other-steps" ]]; then
     remove_run_target || rc=1
   fi
@@ -508,7 +531,7 @@ check_patches_applied() {
   fi
   checked_count=${#present[@]}
   if ((checked_count == 0)); then echo "  - 补丁打没打本次未核：给的 ${#CHECK_PATCH_DIRS[@]} 个补丁目录里都没有 crates.patch"; return 0; fi
-  # 弄坏开关 reverse-check-each-alone：照改前在要验的树上逐份单独 git apply --check --reverse（同一批两份补丁改到同一行时前一份反着核不过，误判没打）
+  # 弄坏开关 reverse-check-each-alone：在要验的树上逐份单独 git apply --check --reverse（同一批两份补丁改到同一行时前一份反着核不过，误判没打）
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "reverse-check-each-alone" ]]; then
     for dir in "${present[@]}"; do
       git -C "$tree" apply --check --reverse "$dir/crates.patch" > "$logs/reverse-check-$(basename "$dir").log" 2>&1 \
@@ -591,7 +614,7 @@ clippy_step_name() {
 # read_cargo_command <check.sh> <子命令>：文件头「cargo 命令现读」。check.sh 里命令位置上写 cargo <子命令> 或 run_cargo <子命令>（前面可带 if）的行恰好一条，
 # 子命令之后到第一个 |、;、\ 之前的词（2>&1 不算）进 CARGO_COMMAND_WORDS。找不到、不止一条、词里带 $、引号、括号这类这里不会展开的写法
 # （clippy 那一行的两个占位词除外）返回 1，原因进 CHECK_SH_PROBLEM，原因里写这一条哪一行、哪个词、怎么办。
-# 弄坏开关 cargo-wrapper-fixed：照改前只认 run_cargo 那一种包装；cargo-wrapper-unrecognized：只认不带包装的 cargo。
+# 弄坏开关 cargo-wrapper-fixed：只认 run_cargo 那一种包装；cargo-wrapper-unrecognized：只认不带包装的 cargo。
 read_cargo_command() {
   local file="$1" subcommand="$2" line line_number=0 hits=0 hit_text="" hit_number=0 wrapper_pattern='run_cargo|cargo' word line_re
   local -a words=()
@@ -723,16 +746,14 @@ read_check_sh() {
   return 0
 }
 
-# test_packages <树>：工作区成员减掉 验证包，逐个写成「-p <包名>」进 TEST_PACKAGES；排不掉 验证包、读不出返回 1，原因进 TEST_PACKAGES_PROBLEM。
-test_packages() {
+# verification_member_present <树>：工作区成员逐个写出目录、各有 [package] name，验证包在成员里（文件头 test 一段：认不出验证包就排不掉登记的崩溃枚举用例）；
+#   不是返回 1，原因进 MEMBERS_PROBLEM。弄坏开关 no-verification-package-guard：成员里找不到验证包也照往下验
+verification_member_present() {
   local listing
-  TEST_PACKAGES=(); TEST_PACKAGES_PROBLEM=""
-  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "fixed-test-packages" ]]; then
-    TEST_PACKAGES=(-p singlefs-format -p singlefs-core -p singlefs-checker); return 0
-  fi
-  if ! listing="$(python3 - "$1" "$CHECKER_TIER_PACKAGE" "${MERGE_AND_VERIFY_BREAK:-}" <<'PY_MEMBERS' 2>&1
+  MEMBERS_PROBLEM=""
+  if ! listing="$(python3 - "$1" "$VERIFICATION_PACKAGE" "${MERGE_AND_VERIFY_BREAK:-}" <<'PY_MEMBERS' 2>&1
 import os, sys, tomllib
-tree, excluded, broken = sys.argv[1], sys.argv[2], sys.argv[3]
+tree, wanted, broken = sys.argv[1], sys.argv[2], sys.argv[3]
 def fail(text):
     print(text); sys.exit(1)
 try:
@@ -754,197 +775,49 @@ for member in members:
     if not isinstance(name, str) or not name:
         fail(f"成员 {member} 的 Cargo.toml 没有 [package] name")
     names.append(name)
-if excluded not in names and broken != "no-verification-package-guard":
-    fail(f"工作区成员（{'、'.join(names)}）里没有 {excluded}：验证包改了名或挪了，排不掉它")
-kept = [name for name in names if name != excluded]
-if not kept:
-    fail(f"工作区成员减掉 {excluded} 之后一个包都不剩")
-print("\n".join(kept))
+if wanted not in names and broken != "no-verification-package-guard":
+    fail(f"工作区成员（{'、'.join(names)}）里没有 {wanted}：验证包改了名或挪了，认不出它就排不掉登记的崩溃枚举用例")
 PY_MEMBERS
   )"; then
-    TEST_PACKAGES_PROBLEM="$listing"; return 1
+    MEMBERS_PROBLEM="$listing"; return 1
   fi
-  local name
-  while IFS= read -r name; do [[ -n "$name" ]] && TEST_PACKAGES+=(-p "$name"); done <<< "$listing"
   return 0
 }
 
-# select_test_packages <树>：TEST_PACKAGES 里只留这一批补丁改到的包与工作区里依赖它们的包（文件头「测试只跑改到的包」）；照旧全跑的原样留着。
-# 没挑上的包名进 UNTESTED_PACKAGES，怎么挑的一句进 TEST_SELECTION_NOTE；读不了补丁或成员清单返回 1，原因进 TEST_SELECTION_PROBLEM。
-# 给了补丁目录就同一趟判 验证包那一步起不起（文件头「验证包那一步」），进 CHECKER_TIER_AFFECTED 与 CHECKER_TIER_REASON；带 --all-packages 时照判、读不了不算错。
-select_test_packages() {
-  local listing kind name candidates=() position selected=1 checker_line
-  UNTESTED_PACKAGES=(); TEST_SELECTION_NOTE=""; TEST_SELECTION_PROBLEM=""
-  CHECKER_TIER_AFFECTED=""; CHECKER_TIER_REASON="没给补丁目录，算不出这一批补丁碰没碰 验证包，照跑"
-  for ((position = 1; position < ${#TEST_PACKAGES[@]}; position += 2)); do candidates+=("${TEST_PACKAGES[position]}"); done
-  if ((${#CHECK_PATCH_DIRS[@]})); then
-    if ! listing="$(python3 - "$1" "$REBUILT" "${MERGE_AND_VERIFY_BREAK:-}" "${candidates[*]}" "$CHECKER_TIER_PACKAGE" "$CHECKER_TIER_STAGE" "${CHECK_PATCH_DIRS[@]}" <<'PY_SELECT' 2>&1
-import importlib.util, os, re, sys, tomllib
-tree, library, broken, candidate_text, checker, tier_stage, *patch_directories = sys.argv[1:]
-candidates = candidate_text.split()
-specification = importlib.util.spec_from_file_location("lib_rebuilt_packages_for_merge_and_verify", library)
-rebuilt = importlib.util.module_from_spec(specification)
-specification.loader.exec_module(rebuilt)
-try:
-    paths = rebuilt.collect_paths(patch_directories, [])
-except OSError as error:
-    print(f"读不了补丁：{error}")
-    sys.exit(1)
-WORKSPACE_WIDE = ("Cargo.toml", "Cargo.lock")
-def workspace_wide(path):
-    return path in WORKSPACE_WIDE or path == ".cargo" or path.startswith(".cargo/")
-def load(path):
-    with open(path, "rb") as handle:
-        return tomllib.load(handle)
-manifests, manifest_problem = {}, None
-try:
-    members = load(os.path.join(tree, "Cargo.toml")).get("workspace", {}).get("members") or []
-    for member in members:
-        manifest = load(os.path.join(tree, member, "Cargo.toml"))
-        manifests[manifest["package"]["name"]] = manifest
-except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError) as error:
-    manifests, manifest_problem = {}, f"读不了工作区成员的 Cargo.toml：{error!r}"
-def dependency_names(manifest):
-    """一个成员在三张依赖表（连同 [target.*] 下的）里写的包名（改了名的照 package = 认）。"""
-    tables = [manifest.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
-    for target in (manifest.get("target") or {}).values():
-        if isinstance(target, dict):
-            tables += [target.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
-    for table in tables:
-        for key, value in (table or {}).items():
-            yield value.get("package", key) if isinstance(value, dict) else key
-depends_on = {name: set(dependency_names(manifest)) & set(manifests) for name, manifest in manifests.items()}
-def closure_of(root, follow=True):
-    """root 与它一层层往下依赖的工作区成员；follow 为假只有 root 自己。"""
-    found, frontier = {root}, [root]
-    while frontier and follow:
-        for needed in sorted(depends_on.get(frontier.pop(), ())):
-            if needed not in found:
-                found.add(needed)
-                frontier.append(needed)
-    return found
-PRODUCT_GPU_PACKAGE_LINE = re.compile(r'^PRODUCT_GPU_PACKAGE_NAME="([^"$`]+)"', re.MULTILINE)
-def product_gpu_packages():
-    """那一道的 product-gpu-real-card-tests 格守的产品 GPU 包：照那一道（tier_stage）里 PRODUCT_GPU_PACKAGE_NAME 那一行现读 → (包名列表, 读不出的原因或 None)。"""
-    try:
-        with open(tier_stage, encoding="utf-8") as handle:
-            found = PRODUCT_GPU_PACKAGE_LINE.search(handle.read())
-    except OSError as error:
-        return [], f"读不了 {tier_stage}：{error}"
-    if not found:
-        return [], f"{tier_stage} 里没有 PRODUCT_GPU_PACKAGE_NAME=\"<包名>\" 那一行"
-    return found.group(1).split(), None
-def checker_verdict():
-    """验证包那一步起不起（文件头「验证包那一步」）→ (affected 或 unaffected, 一句原因)。"""
-    for path in paths:
-        if workspace_wide(path):
-            return "affected", f"补丁改到工作区根的 {path}"
-    owners, loose = set(), []
-    for path in paths:
-        name = rebuilt.package_of(tree, path)
-        if name is None:
-            loose.append(path)
-        else:
-            owners.add(name)
-    if loose:
-        return "affected", f"补丁改到不落在任何包里的 {'、'.join(loose[:3])}（验证包的测试运行时可能读它）"
-    appended = [directory for directory in patch_directories if os.path.isfile(os.path.join(directory, "mutations-append.tsv"))
-                and os.path.getsize(os.path.join(directory, "mutations-append.tsv")) > 0]
-    if appended:
-        return "affected", f"补丁往 crates/mutations.tsv 追加了行（{appended[0]} 里的 mutations-append.tsv；验证包的测试运行时可能读它）"
-    if manifest_problem or checker not in manifests:
-        return "affected", f"算不出 验证包 {checker} 依赖哪些包（{manifest_problem or '工作区成员里没有它'}）"
-    closure = closure_of(checker, broken != "verification-step-dependencies-ignored")
-    hit = sorted(owners & closure)
-    if hit:
-        return "affected", f"补丁改到 验证包或它依赖的包：{'、'.join(hit)}"
-    if not owners:
-        return "unaffected", "这一批补丁目录里没有改到文件的 crates.patch"
-    # 产品 GPU 包（验证包不依赖它）也算进射程：那一道的 product-gpu-real-card-tests 格守它；弄坏开关 product-gpu-package-ignored 照改前只看 验证包闭包
-    # 读不出包名与读到的名字不是工作区成员同一方向：都算不出补丁碰没碰它，照跑并点名原因（弄坏开关 product-gpu-unreadable-as-unaffected、
-    #   product-gpu-non-member-as-unaffected 照改前判没碰）
-    guarded, guarded_problem = product_gpu_packages()
-    if guarded_problem and broken != "product-gpu-unreadable-as-unaffected":
-        return "affected", f"算不出补丁碰没碰门禁 product-gpu-real-card-tests 格守的产品 GPU 包（{guarded_problem}），照跑"
-    product_closure = set()
-    if broken != "product-gpu-package-ignored":
-        strangers = [name for name in guarded if name not in manifests]
-        if strangers and broken != "product-gpu-non-member-as-unaffected":
-            return "affected", (f"门禁 product-gpu-real-card-tests 格守的产品 GPU 包 {'、'.join(strangers)}（照 {tier_stage} 里 PRODUCT_GPU_PACKAGE_NAME 那一行现读）"
-                                "不是工作区成员，算不出补丁碰没碰它，照跑")
-        product_closure = set().union(*(closure_of(name) for name in guarded if name in manifests))
-    product_hit = sorted(owners & product_closure)
-    if product_hit:
-        return "affected", f"补丁改到产品 GPU 包 {'、'.join(guarded)} 或它依赖的包：{'、'.join(product_hit)}（门禁 product-gpu-real-card-tests 格守的）"
-    return "unaffected", (f"补丁只改到 {'、'.join(sorted(owners))}，都不是 验证包 {checker}、也不在它的依赖闭包里，"
-                          f"也不是产品 GPU 包 {'、'.join(guarded)} 与它依赖的包（门禁 product-gpu-real-card-tests 格守的），测试函数的单元键与崩溃状态块的块键不会因这一批变")
-print("CHECKER\t%s\t%s" % checker_verdict())
-changed, outside = [], []
-for path in paths:
-    if workspace_wide(path):
-        if broken == "lock-changes-narrowed":
-            continue
-        print(f"ALL\t补丁改到工作区根的 {path}")
-        sys.exit(0)
-    name = rebuilt.package_of(tree, path)
-    if name is None:
-        outside.append(path)
-    elif name not in changed:
-        changed.append(name)
-if outside:
-    print(f"ALL\t补丁改到不落在任何包里的 {'、'.join(outside[:3])}{' 等 ' + str(len(outside)) + ' 处' if len(outside) > 3 else ''}（测试运行时可能读它，判不出归哪个包）")
-    sys.exit(0)
-if manifest_problem:
-    print(manifest_problem)
-    sys.exit(1)
-affected = set(changed)
-dependents = []
-while broken != "dependents-dropped":
-    grown = sorted(name for name, needed in depends_on.items() if name not in affected and needed & affected)
-    if not grown:
-        break
-    affected |= set(grown)
-    dependents += grown
-for name in changed:
-    print(f"CHANGED\t{name}")
-for name in dependents:
-    print(f"DEPENDENT\t{name}")
-for name in candidates:
-    print(f"{'RUN' if name in affected else 'SKIP'}\t{name}")
-PY_SELECT
-    )"; then
-      selected=0
-    fi
-    if checker_line="$(grep -m 1 $'^CHECKER\t' <<< "$listing")"; then
-      if [[ "$(cut -f2 <<< "$checker_line")" == unaffected ]]; then CHECKER_TIER_AFFECTED=0; else CHECKER_TIER_AFFECTED=1; fi
-      CHECKER_TIER_REASON="$(cut -f3- <<< "$checker_line")"
-    else
-      CHECKER_TIER_REASON="算不出这一批补丁碰没碰 验证包（$(tail -n 1 <<< "$listing")），照跑"
-    fi
-    listing="$(grep -v $'^CHECKER\t' <<< "$listing")"
-    if ((selected == 0 && ALL_PACKAGES == 0)) && [[ "${MERGE_AND_VERIFY_BREAK:-}" != "all-packages-always" ]]; then
-      TEST_SELECTION_PROBLEM="$listing"; return 1
-    fi
+# select_test_targets <树>：挑测试目标（文件头「挑测试目标」，判法是 MERGE_AND_VERIFY_ITEMS_PROGRAM 的 targets 一段）：挑出的项进 ALL_ITEM_LINES 与 ITEM_REASONS，
+#   包目录下有测试属性的进 TESTED_PACKAGES，要特性的进 REQUIRED_FEATURE_TARGETS，判不出的进 TARGET_REFUSALS，报一句的进 TARGET_NOTES；读不了返回 1、原因进 TARGET_PROBLEM。
+#   弄坏开关 whole-package-tests、fallback-runs-whole-workspace 在 targets 那一段里认
+select_test_targets() {
+  local listing kind first second third fourth
+  ALL_ITEM_LINES=(); ITEM_REASONS=(); TESTED_PACKAGES=(); REQUIRED_FEATURE_TARGETS=(); TARGET_REFUSALS=(); TARGET_NOTES=(); TARGET_PROBLEM=""
+  if ! listing="$(python3 - targets "$1" "$RERUN_FAILED_TESTS" "$REBUILT" "${MERGE_AND_VERIFY_BREAK:-}" ${CHECK_PATCH_DIRS[@]+"${CHECK_PATCH_DIRS[@]}"} \
+       <<<"$MERGE_AND_VERIFY_ITEMS_PROGRAM" 2>&1)"; then
+    TARGET_PROBLEM="$(tail -n 3 <<<"$listing" | tr '\n' ' ')"; return 1
   fi
-  if ((ALL_PACKAGES)); then TEST_SELECTION_NOTE="带了 --all-packages，照旧全跑"; return 0; fi
-  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "all-packages-always" ]]; then TEST_SELECTION_NOTE="弄坏开关 MERGE_AND_VERIFY_BREAK=all-packages-always，照旧全跑"; return 0; fi
-  if ((${#CHECK_PATCH_DIRS[@]} == 0)); then TEST_SELECTION_NOTE="没给补丁目录，算不出改到的包，照旧全跑"; return 0; fi
-  if grep -q $'^ALL\t' <<< "$listing"; then
-    TEST_SELECTION_NOTE="$(sed -n 's/^ALL\t//p' <<< "$listing" | head -n 1)，照旧全跑"; return 0
-  fi
-  local changed_text="" dependent_text=""
-  TEST_PACKAGES=()
-  while IFS=$'\t' read -r kind name; do
+  while IFS=$'\t' read -r kind first second third fourth; do
     case "$kind" in
-      RUN) TEST_PACKAGES+=(-p "$name") ;;
-      SKIP) UNTESTED_PACKAGES+=("$name") ;;
-      CHANGED) changed_text+="$name、" ;;
-      DEPENDENT) dependent_text+="$name、" ;;
+      REFUSE) TARGET_REFUSALS+=("$first") ;;
+      ITEM) ALL_ITEM_LINES+=("$first"$'\t'"$second"$'\t'"$third"); ITEM_REASONS+=("$first"$'\t'"$fourth") ;;
+      TESTED) TESTED_PACKAGES+=("$first") ;;
+      REQUIRES) REQUIRED_FEATURE_TARGETS+=("$first"$'\t'"$second"$'\t'"$third"$'\t'"$fourth") ;;
+      NOTE) TARGET_NOTES+=("$first") ;;
     esac
-  done <<< "$listing"
-  TEST_SELECTION_NOTE="补丁改到的包：${changed_text:-一个都没有}"
-  TEST_SELECTION_NOTE="${TEST_SELECTION_NOTE%、}"
-  [[ -z "$dependent_text" ]] || TEST_SELECTION_NOTE+="；另带上依赖它们的：${dependent_text%、}"
+  done <<<"$listing"
+  return 0
+}
+
+# report_target_selection：挑出的项与为什么、报一句的、要特性的逐行打（文件头「挑测试目标」）；判不出的不在这里打（verify 里打红句与出路）
+report_target_selection() {
+  local line
+  local -a fields=()
+  ((${#TARGET_REFUSALS[@]})) && return 0
+  echo "  挑测试目标：${#ALL_ITEM_LINES[@]} 项（补丁改到的与变异行点名的；不跑整个包，也不带上依赖它们的包）"
+  for line in ${ITEM_REASONS[@]+"${ITEM_REASONS[@]}"}; do printf '      %s：%s\n' "${line%%$'\t'*}" "${line#*$'\t'}"; done   # gate-lint:detail
+  for line in ${REQUIRED_FEATURE_TARGETS[@]+"${REQUIRED_FEATURE_TARGETS[@]}"}; do
+    IFS=$'\t' read -r -a fields <<<"$line"
+    printf '      %s 的 %s 要特性 %s（%s）：测试那一步不跑，产品 GPU 包的交验证包那一步\n' "${fields[0]}" "${fields[1]}" "${fields[2]}" "${fields[3]}"   # gate-lint:detail
+  done
+  for line in ${TARGET_NOTES[@]+"${TARGET_NOTES[@]}"}; do printf '      · %s\n' "$line"; done   # gate-lint:detail
   return 0
 }
 
@@ -952,110 +825,230 @@ run_step() {   # $1 日志文件，其余是命令：在这一整条里面直接
   local log="$1" rc
   shift
   # 每一步的输出出两份日志（scripts/hosts/two-logs.sh --quiet：$log 是全量，同名的 .problems.log 只收错误与警告，行前带全量日志里的行号；不转打，汇总行点名它们）。
-  # 弄坏开关 logs-single：照改前只写一份全量日志
+  # 弄坏开关 logs-single：只写一份全量日志
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "logs-single" ]]; then "$@" > "$log" 2>&1; rc=$?
   else bash "$TWO_LOGS" --quiet "${log%.log}" -- "$@"; rc=$?; fi
   return "$rc"
 }
 
-# checker_tier_rerun_command <逗号隔开的格名> <根>：只重跑 验证包那几格的整条命令（文件头「验证包那一步」；起主工作区那一份门禁）：范围声明写在 task-server/task 前面，
-# 命令经 task-server/task submit -- 交（不套包装、不写上限与线程，文件头「上限、线程、机器」）；缩过域的那一趟带同一个变量（env 接在 submit -- 之后：变量不在服务的白名单里，写在命令里原样跑）。
-# 弄坏开关 rerun-command-unscaled：缩过域的那一趟也不带变量
-checker_tier_rerun_command() {
-  local cells="$1" count text why="合入后验证这几格红了，修完只重跑它们：键相同的照复用，只现判红的那几条与改后键变了的"
-  local -a scale_words=()
+# verification_rerun_command <交给门禁的参数…>：只重跑验证包那一步红的那几项的整条命令（文件头「验证包那一步」；起主工作区那一份门禁、交给它的根是 VERIFICATION_RERUN_ROOT）：
+#   范围声明写在 task-server/task 前面（种类 items，范围数是 --check 点名的格数加 --item 的项数，同 .claude/hooks/run-scope-guard.sh 文件头「门禁阶段」），
+#   命令经 task-server/task submit -- 交（不套包装、不写上限与线程，文件头「上限、线程、机器」）；缩过域的那一趟带同一个变量（env 接在 submit -- 之后：变量不在服务的白名单里，写在命令里原样跑）。
+#   弄坏开关 rerun-command-unscaled：缩过域的那一趟也不带变量；rerun-command-wrapped：套 capped.sh 与内存包装、不经 task-server；rerun-whole-cells：打整格（三格、不带 --item）
+verification_rerun_command() {
+  local word cells="" previous="" cell_count item_count text why="合入后验证这几项红了，修完只重跑它们：键相同的照复用，只现判红的那几条与改后键变了的"
+  local -a arguments=("$@") scale_words=() items=()
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "rerun-whole-cells" ]]; then arguments=(--check "$WHOLE_VERIFICATION_CELLS"); fi
+  for word in "${arguments[@]}"; do
+    [[ "$previous" == --check ]] && cells="$word"
+    [[ "$previous" == --item ]] && items+=("$word")
+    previous="$word"
+  done
   if [[ -n "$CRASH_EXPAND_UP_TO" && "${MERGE_AND_VERIFY_BREAK:-}" != "rerun-command-unscaled" ]]; then
     scale_words=(env "$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO")
     why+="（缩过域：展开深度上限 $CRASH_EXPAND_UP_TO，不算门禁通过）"
   fi
-  count="$(tr ',' '\n' <<< "$cells" | grep -c .)"
-  # 弄坏开关 rerun-command-wrapped：照改前套 capped.sh 与内存包装，不经 task-server
+  cell_count="$(tr ',' '\n' <<< "$cells" | grep -c .)"; item_count=${#items[@]}
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "rerun-command-wrapped" ]]; then
-    text="$(printf '%q %q %q %q %q 36G bash %q --check %q %q' bash "$root/scripts/hosts/capped.sh" "$THREADS" bash "$root/scripts/hosts/run-with-memory-cap.sh" "$CHECKER_TIER_RERUN_STAGE" "$cells" "$2")"
+    text="$(printf '%q ' bash "$root/scripts/hosts/capped.sh" "$THREADS" bash "$root/scripts/hosts/run-with-memory-cap.sh" 36G bash "$VERIFICATION_RERUN_STAGE" "${arguments[@]}" "$VERIFICATION_RERUN_ROOT")"
   else
-    text="$(printf '%q ' "$root/task-server/task" submit -- ${scale_words[@]+"${scale_words[@]}"} bash "$CHECKER_TIER_RERUN_STAGE" --check "$cells" "$2")"
+    text="$(printf '%q ' "$root/task-server/task" submit -- ${scale_words[@]+"${scale_words[@]}"} bash "$VERIFICATION_RERUN_STAGE" "${arguments[@]}" "$VERIFICATION_RERUN_ROOT")"
   fi
-  printf "SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crash-point-replay.sh 的 %s 格; 范围=%s 格; 为什么=%s' %s" \
-    "${cells//,/、}" "$count" "$why" "${text% }"
+  printf "SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crash-point-replay.sh 的 %s 格%s; 范围=%s 项（%s 格加点名的 %s 项）; 为什么=%s' %s" \
+    "${cells//,/、}" "$( ((item_count)) && printf '点名的 %s' "${items[*]}")" "$((cell_count + item_count))" "$cell_count" "$item_count" "$why" "${text% }"
 }
 
-# checker_tier_red_test_names <日志>：那一道日志里红的测试函数名，逐行、去重。认两种写法：cargo 的「test <名> ... FAILED」，
+# verification_red_test_names <日志>：那一道日志里红的测试函数名，逐行、去重。认两种写法：cargo 的「test <名> ... FAILED」，
 # 与那一道逐个红的测试目标抄下的「FAILED <名>」（汇总行「FAILED. N passed」不算）；只认前一种会把几条红数成 1 条
 # 弄坏开关 verification-step-failed-lines-ignored：只认前一种
-checker_tier_red_test_names() {
+verification_red_test_names() {
   {
     sed -n 's/^ *test \(.*\) \.\.\. FAILED$/\1/p' "$1"
     [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-failed-lines-ignored" ]] || sed -n 's/^ *FAILED \([^ .][^ ]*\)$/\1/p' "$1"
   } | LC_ALL=C sort -u
 }
 
-# checker_tier_step <日志目录>：验证包那一步（文件头「验证包那一步」）。过与本次未跑交 0、红交 1；汇总行里的一句进 CHECKER_TIER_STATE，缩过域的进 CHECKER_TIER_SCALED
-checker_tier_step() {
-  local logs="$1" tier_root="${MERGE_AND_VERIFY_CHECKER_TIER_ROOT:-$tree}" rerun_root="${MERGE_AND_VERIFY_CHECKER_TIER_ROOT:-$SOURCE_TREE}" rc counts judged reused refused passes red_cells name block_text
-  local log="$logs/verification-step.log"
-  local -a red_tests=() scale_words=()
-  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-skipped" ]]; then
-    echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=verification-step-skipped：不跑 验证包那一步"; return 0
+# verification_routes <门禁 --list-items 的日志，没有写 ->：这一趟跑到的验证包目标里要另走门禁的几样（文件头「验证包那一步」）：
+#   崩溃枚举用例进 VERIFICATION_CASE_ITEMS（crash-case:<用例名>），挂特性的进 VERIFICATION_FEATURE_ITEMS（feature-gated:<文件名>、feature-gated:lib）；
+#   产品 GPU 包要特性的目标置 VERIFICATION_PRODUCT_GPU，别的包要特性的目标进 VERIFICATION_UNROUTED。
+#   弄坏开关 feature-gated-unrouted：挂特性的一样都不交；product-gpu-unrouted：产品 GPU 包的也当别的包
+verification_routes() {
+  local listing="$1" line item rest package selector key value target product_gpu_package=""
+  local -a targets=() fields=()
+  VERIFICATION_CASE_ITEMS=(); VERIFICATION_FEATURE_ITEMS=(); VERIFICATION_PRODUCT_GPU=0; VERIFICATION_UNROUTED=(); VERIFICATION_PRODUCT_GPU_WHY=""
+  for line in ${RUN_ITEMS[@]+"${RUN_ITEMS[@]}"}; do
+    item="${line%%$'\t'*}"; rest="${line#*$'\t'}"; package="${rest%%$'\t'*}"; selector="${rest#*$'\t'}"
+    [[ "$package" == "$VERIFICATION_PACKAGE" ]] && targets+=("$selector")
+  done
+  if [[ "$listing" != - ]]; then
+    while IFS=$'\t' read -r key value; do
+      case "$key" in
+        crash-case:*)
+          target="${value#*:}"; target="${target%%:*}"
+          if word_in_list "--test $target" ${targets[@]+"${targets[@]}"} || { [[ "$target" == lib ]] && word_in_list --lib ${targets[@]+"${targets[@]}"}; }; then
+            VERIFICATION_CASE_ITEMS+=("$key")
+          fi ;;
+        feature-gated:lib) word_in_list --lib ${targets[@]+"${targets[@]}"} && VERIFICATION_FEATURE_ITEMS+=("$key") ;;
+        feature-gated:*.rs) target="${key#feature-gated:}"; word_in_list "--test ${target%.rs}" ${targets[@]+"${targets[@]}"} && VERIFICATION_FEATURE_ITEMS+=("$key") ;;
+      esac
+    done < "$listing"
   fi
-  # 弄坏开关 verification-step-always-run：不看补丁碰没碰，一律照跑
-  if [[ "$CHECKER_TIER_AFFECTED" == 0 && "${MERGE_AND_VERIFY_BREAK:-}" != "verification-step-always-run" ]]; then
-    CHECKER_TIER_STATE="本次未跑（补丁没碰 验证包、产品 GPU 包与它们的依赖）"
-    echo "  - 验证包本次未跑：$CHECKER_TIER_REASON（不记红、不算过）${CRASH_EXPAND_UP_TO:+；给的展开深度上限 $CRASH_EXPAND_UP_TO 没起作用}"
-    return 0
-  fi
-  # 缩崩溃域（文件头「验证包那一步」）：把变量交给那一道。弄坏开关 expand-up-to-not-passed：不交
-  if [[ -n "$CRASH_EXPAND_UP_TO" && "${MERGE_AND_VERIFY_BREAK:-}" != "expand-up-to-not-passed" ]]; then
-    scale_words=("$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO")
-  fi
-  echo "  验证包（$CHECKER_TIER_REASON）：起 $(basename "$CHECKER_TIER_STAGE") --check $CHECKER_TIER_CELLS，按条、按块都只现判键对不上的、键相同的复用${CRASH_EXPAND_UP_TO:+；展开深度上限缩到 $CRASH_EXPAND_UP_TO（缩过域、不算门禁通过）}…"
+  [[ "${MERGE_AND_VERIFY_BREAK:-}" != feature-gated-unrouted ]] || VERIFICATION_FEATURE_ITEMS=()
+  ((${#REQUIRED_FEATURE_TARGETS[@]})) || return 0
+  product_gpu_package="$(sed -n 's/^PRODUCT_GPU_PACKAGE_NAME="\([^"$`]*\)".*/\1/p' "$VERIFICATION_STAGE" 2>/dev/null | head -n 1)"
+  for line in "${REQUIRED_FEATURE_TARGETS[@]}"; do
+    IFS=$'\t' read -r -a fields <<<"$line"
+    if [[ "${MERGE_AND_VERIFY_BREAK:-}" != product-gpu-unrouted ]] && { [[ -z "$product_gpu_package" ]] || [[ "${fields[0]}" == "$product_gpu_package" ]]; }; then
+      VERIFICATION_PRODUCT_GPU=1
+      VERIFICATION_PRODUCT_GPU_WHY="${fields[0]} 的 ${fields[1]}（要特性 ${fields[2]}；${fields[3]}）$([[ -z "$product_gpu_package" ]] && echo "；$(basename "$VERIFICATION_STAGE") 里读不出 PRODUCT_GPU_PACKAGE_NAME=\"<包名>\" 那一行，照起")"
+    else
+      VERIFICATION_UNROUTED+=("${fields[0]} 的 ${fields[1]}（要特性 ${fields[2]}）")
+    fi
+  done
+  return 0
+}
+
+# verification_call <说明> <过了要读到的行：blocks 或 functions> <日志> <交给门禁的参数…>：验证包那一步起门禁的一次（文件头「验证包那一步」），
+#   根是 VERIFICATION_CALL_ROOT。过交 0（现判、复用、拒算加进 VERIFICATION_JUDGED、VERIFICATION_REUSED、VERIFICATION_REFUSED，崩溃状态块那一行进 VERIFICATION_BLOCKS），
+#   本次未跑交 77，红交 1（打红的测试函数、红的项与只重跑红的那几项的命令）。
+#   弄坏开关 verification-step-sample-exit-anywhere：退 3 不看根是不是样本根一律算过；verification-step-red-ignored：红了也报过
+verification_call() {
+  local label="$1" expect="$2" log="$3" rc counts judged reused refused passes block_text seen=0 name word previous=""
+  shift 3
+  local -a arguments=("$@") red_tests=() red_items=() named=() rerun_arguments=()
+  echo "  验证包那一步（$label）：起 $(basename "$VERIFICATION_STAGE") ${arguments[*]}，只现判键对不上的、键相同的复用${CRASH_EXPAND_UP_TO:+；展开深度上限缩到 $CRASH_EXPAND_UP_TO（缩过域、不算门禁通过）}…"
   rm -f -- "$log"
-  run_step "$log" env -u MERGE_AND_VERIFY_BREAK ${scale_words[@]+"${scale_words[@]}"} bash "$CHECKER_TIER_STAGE" --check "$CHECKER_TIER_CELLS" "$tier_root"; rc=$?
+  run_step "$log" env -u MERGE_AND_VERIFY_BREAK ${VERIFICATION_SCALE_WORDS[@]+"${VERIFICATION_SCALE_WORDS[@]}"} bash "$VERIFICATION_STAGE" "${arguments[@]}" "$VERIFICATION_CALL_ROOT"; rc=$?
   if ((rc == 77)); then
-    CHECKER_TIER_STATE="本次未跑（那一道退 77）"
-    echo "  - 验证包本次未跑：$(basename "$CHECKER_TIER_STAGE") 退 77（$(grep -E '^ *!' "$log" | tail -n 1 | sed 's/^ *//')），不记红、不算过"
-    return 0
+    VERIFICATION_NOT_RUN+=("$label")
+    echo "  - 验证包那一步（$label）本次未跑：$(basename "$VERIFICATION_STAGE") 退 77（$(grep -E '^ *!' "$log" | tail -n 1 | sed 's/^ *//')），不记红、不算过"
+    return 77
   fi
-  # 缩过域的那一趟汇总里写明（弄坏开关 scaled-run-unlabelled：不写）
-  if [[ -n "$CRASH_EXPAND_UP_TO" && "${MERGE_AND_VERIFY_BREAK:-}" != "scaled-run-unlabelled" ]]; then CHECKER_TIER_SCALED=1; fi
   counts="$(sed -nE 's/^ *· (feature-gated-tests |product-gpu-real-card-tests )?按条复用：.*现判 ([0-9]*)、复用 ([0-9]*)、拒算 ([0-9]*).*/\2 \3 \4/p' "$log")"
   read -r judged reused refused passes < <(awk 'NF { judged += $1; reused += $2; refused += $3; passes++ } END { print judged + 0, reused + 0, refused + 0, passes + 0 }' <<< "$counts")
-  # 登记的崩溃枚举用例按块跑的那一行（那一道成功时打）：读到了就写进汇总，读不到不算红
   block_text="$(sed -nE 's/^ *✓ 崩溃状态块：现判 ([0-9]+)、复用 ([0-9]+)、拒算 ([0-9]+).*/现判 \1、复用 \2、拒算 \3/p' "$log" | head -n 1)"
-  # 弄坏开关 verification-step-sample-exit-anywhere：退 3 不看根是不是样本根一律算过；verification-step-red-ignored：那一道红了也报过
-  if { ((rc == 0)) || { ((rc == 3)) && { [[ -d "$tier_root/.crash-point-replay-sample-tools" ]] || [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-sample-exit-anywhere" ]]; }; }; } && ((passes > 0)) \
+  if [[ "$expect" == blocks ]]; then [[ -n "$block_text" ]] && seen=1; else ((passes > 0)) && seen=1; fi
+  if { { ((rc == 0)) || { ((rc == 3)) && { [[ -d "$VERIFICATION_CALL_ROOT/.crash-point-replay-sample-tools" ]] || [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-sample-exit-anywhere" ]]; }; }; } && ((seen)); } \
      || [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-red-ignored" ]]; then
-    CHECKER_TIER_STATE="过（按条现判 $judged、复用 $reused${block_text:+；崩溃状态块 $block_text}）"
-    echo "  ✓ 验证包过（$(basename "$CHECKER_TIER_STAGE") 的 ${CHECKER_TIER_CELLS//,/、} 那几格退 $rc$( ((rc == 3)) && echo '，样本档：假 cargo 走的流程')；现判 $judged、复用 $reused、拒算 $refused，读到 $passes 趟按条复用的那一行；日志 $log）"
-    [[ -z "$block_text" ]] || echo "    崩溃状态块：$block_text"
+    VERIFICATION_JUDGED=$((VERIFICATION_JUDGED + judged)); VERIFICATION_REUSED=$((VERIFICATION_REUSED + reused)); VERIFICATION_REFUSED=$((VERIFICATION_REFUSED + refused))
+    [[ -z "$block_text" ]] || VERIFICATION_BLOCKS="$block_text"
+    echo "  ✓ 验证包那一步（$label）过（$(basename "$VERIFICATION_STAGE") 退 $rc$( ((rc == 3)) && echo '，样本档：假 cargo 走的流程')；$( [[ "$expect" == blocks ]] && echo "崩溃状态块 ${block_text:-读不到}" || echo "按条现判 $judged、复用 $reused、拒算 $refused，读到 $passes 趟按条复用的那一行")；日志 $log）"
     grep -m 1 '^ *· 逐格：' "$log" | sed 's/^ */    /'
     return 0
   fi
-  mapfile -t red_tests < <(checker_tier_red_test_names "$log")
-  red_cells="$(sed -n 's/.*✗ 有 [0-9]* 格判红：\(.*\)（各自的出路在上面）.*/\1/p' "$log" | tail -n 1)"
-  CHECKER_TIER_STATE="红（${#red_tests[@]} 条测试函数）"
-  echo "  ✗ 验证包红（$(basename "$CHECKER_TIER_STAGE") 退 $rc$( ((rc == 3)) && echo '：退 3 只在样本根上算过，交给它的根不是样本根')$( ((passes == 0)) && echo '，日志里读不到按条复用那一行（现判、复用多少条判不了）')；红的格：${red_cells:-认不出}；日志 $log、错误警告 $logs/checker-tier.problems.log）：FAILED 的测试函数 ${#red_tests[@]} 条"
+  mapfile -t red_tests < <(verification_red_test_names "$log")
+  mapfile -t red_items < <(sed -nE 's/^ITEM_DONE item=([^ ]+) .* exit=1$/\1/p' "$log" | LC_ALL=C sort -u)
+  for word in "${arguments[@]}"; do [[ "$previous" == --item ]] && named+=("$word"); previous="$word"; done
+  # 只重跑红的：ITEM_DONE 里 exit=1 的项落在这一次点的项里就只点它们，认不出的点这一次的全部项（文件头「验证包那一步」）
+  previous=""
+  for word in "${arguments[@]}"; do
+    if [[ "$word" == --item ]]; then previous=--item; continue; fi
+    if [[ "$previous" == --item ]]; then previous=""; continue; fi
+    rerun_arguments+=("$word")
+  done
+  for name in ${named[@]+"${named[@]}"}; do
+    if ((${#red_items[@]} == 0)) || word_in_list "$name" "${red_items[@]}"; then rerun_arguments+=(--item "$name"); fi
+  done
+  echo "  ✗ 验证包那一步（$label）红（$(basename "$VERIFICATION_STAGE") 退 $rc$( ((rc == 3)) && echo '：退 3 只在样本根上算过，交给它的根不是样本根')$( ((seen == 0)) && echo "，日志里读不到$([[ "$expect" == blocks ]] && echo '崩溃状态块' || echo '按条复用')那一行（现判、复用多少判不了）")；红的项：${red_items[*]:-认不出}；日志 $log、错误警告 ${log%.log}.problems.log）：FAILED 的测试函数 ${#red_tests[@]} 条"
   for name in ${red_tests[@]+"${red_tests[@]}"}; do echo "      $name"; done   # gate-lint:detail
   grep -E '^ *红的 |^ *error: test failed, to rerun pass' "$log" | sed 's/^ *//' | LC_ALL=C sort -u | head -n 40 | sed 's/^/      /'   # gate-lint:detail
   ((${#red_tests[@]})) || grep -E '^ *✗' "$log" | head -n 5 | sed 's/^ */      /'   # gate-lint:detail
-  echo "  → 怎么办：FAILED 的那几条测试函数并进写段的下一批派 implementation-writer 改；改完只重跑那几格：$(checker_tier_rerun_command "$(tr ' ' ',' <<< "${red_cells:-${CHECKER_TIER_CELLS//,/ }}")" "$rerun_root")（键相同的照复用：判绿记过库的不重跑，只现判上面红的这几条与改后键变了的）"
+  echo "  → 怎么办：FAILED 的那几条测试函数并进写段的下一批派 implementation-writer 改；改完只重跑红的：$(verification_rerun_command "${rerun_arguments[@]}")（键相同的照复用：判绿记过库的不重跑，只现判上面红的这几条与改后键变了的）"
   return 1
 }
 
-# ── 逐项点名与按条复用（文件头「逐项点名与按条复用」）────────────
+# verification_step <日志目录>：验证包那一步（文件头「验证包那一步」）。过与本次未跑交 0、红交 1；汇总行里的一句进 VERIFICATION_STATE，缩过域的进 VERIFICATION_SCALED。
+#   弄坏开关 verification-step-skipped：不跑；whole-verification-cells：有要交的就起那一道的三格整格；crash-cases-whole-cell：崩溃枚举用例那一次不带 --crash-cases-only；
+#   expand-up-to-not-passed：缩过域也不把变量交给那一道；scaled-run-unlabelled：缩过域的那一趟汇总里不写
+verification_step() {
+  local logs="$1" listing="-" rc reds=0 item verification_targets=0 line joined
+  local -a case_arguments=() feature_arguments=() parts=()
+  VERIFICATION_CALL_ROOT="${MERGE_AND_VERIFY_VERIFICATION_ROOT:-$tree}"; VERIFICATION_RERUN_ROOT="${MERGE_AND_VERIFY_VERIFICATION_ROOT:-$SOURCE_TREE}"
+  VERIFICATION_JUDGED=0; VERIFICATION_REUSED=0; VERIFICATION_REFUSED=0; VERIFICATION_BLOCKS=""; VERIFICATION_NOT_RUN=(); VERIFICATION_SCALE_WORDS=()
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-step-skipped" ]]; then
+    echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=verification-step-skipped：不跑 验证包那一步"; return 0
+  fi
+  if ((${#TARGET_REFUSALS[@]})); then VERIFICATION_STATE="没跑（判不出测试目标，同测试那一步）"; return 0; fi
+  if [[ -n "$CRASH_EXPAND_UP_TO" && "${MERGE_AND_VERIFY_BREAK:-}" != "expand-up-to-not-passed" ]]; then
+    VERIFICATION_SCALE_WORDS=("$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO")
+  fi
+  for line in ${RUN_ITEMS[@]+"${RUN_ITEMS[@]}"}; do
+    line="${line#*$'\t'}"; [[ "${line%%$'\t'*}" == "$VERIFICATION_PACKAGE" ]] && verification_targets=$((verification_targets + 1))
+  done
+  # 登记的崩溃枚举用例与挂特性的测试文件照那一道的 --list-items 现读（不起 cargo）
+  if ((verification_targets)); then
+    listing="$logs/verification-list-items.log"
+    run_step "$listing" env -u MERGE_AND_VERIFY_BREAK bash "$VERIFICATION_STAGE" --list-items "$VERIFICATION_CALL_ROOT"; rc=$?
+    if ((rc != 0)); then
+      VERIFICATION_STATE="红（$(basename "$VERIFICATION_STAGE") --list-items 退 $rc）"
+      echo "  ✗ 验证包那一步：$(basename "$VERIFICATION_STAGE") --list-items 退 $rc（日志 $listing、错误警告 ${listing%.log}.problems.log），读不出跑到的 $verification_targets 个验证包目标里登记的崩溃枚举用例与挂特性的测试文件"
+      echo "  → 怎么办：照那份日志修（那一道的登记表、tests/ 里挂特性的文件读不读得了），再重跑同一条命令"
+      return 1
+    fi
+  fi
+  if item_mode && ((${#REQUIRED_FEATURE_TARGETS[@]})); then
+    VERIFICATION_NOT_RUN+=("产品 GPU 包的真卡对拍（点了 --item）")
+  fi
+  verification_routes "$listing"
+  ! item_mode || VERIFICATION_PRODUCT_GPU=0
+  if ((${#VERIFICATION_CASE_ITEMS[@]} + ${#VERIFICATION_FEATURE_ITEMS[@]} + VERIFICATION_PRODUCT_GPU == 0)); then
+    VERIFICATION_STATE="本次未跑（跑到的目标里没有登记的崩溃枚举用例与挂特性的测试文件，也没有产品 GPU 包的真卡对拍）"
+    echo "  - 验证包那一步本次未跑：这一趟跑到的 $verification_targets 个验证包目标里没有登记的崩溃枚举用例与挂特性的测试文件，补丁也没改到产品 GPU 包的真卡对拍（不记红、不算过）${CRASH_EXPAND_UP_TO:+；给的展开深度上限 $CRASH_EXPAND_UP_TO 没交给门禁}${VERIFICATION_UNROUTED[*]:+；要特性、本次未跑的：${VERIFICATION_UNROUTED[*]}}"
+    return 0
+  fi
+  for item in ${VERIFICATION_CASE_ITEMS[@]+"${VERIFICATION_CASE_ITEMS[@]}"}; do case_arguments+=(--item "$item"); done
+  for item in ${VERIFICATION_FEATURE_ITEMS[@]+"${VERIFICATION_FEATURE_ITEMS[@]}"}; do feature_arguments+=(--item "$item"); done
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "whole-verification-cells" ]]; then
+    verification_call "三格整格（弄坏开关 whole-verification-cells）" functions "$logs/verification-step.log" --check "$WHOLE_VERIFICATION_CELLS"
+    (($? == 1)) && reds=$((reds + 1))
+  else
+    if ((${#case_arguments[@]})); then
+      if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "crash-cases-whole-cell" ]]; then
+        verification_call "登记的崩溃枚举用例" blocks "$logs/verification-crash-cases.log" --check "$CRASH_CASE_CELL" "${case_arguments[@]}"
+      else
+        verification_call "登记的崩溃枚举用例" blocks "$logs/verification-crash-cases.log" --check "$CRASH_CASE_CELL" "$CRASH_CASES_ONLY_OPTION" "${case_arguments[@]}"
+      fi
+      (($? == 1)) && reds=$((reds + 1))
+    fi
+    if ((${#feature_arguments[@]})); then
+      verification_call "挂特性的测试文件" functions "$logs/verification-feature-gated.log" --check "$FEATURE_GATED_CELL" "${feature_arguments[@]}"
+      (($? == 1)) && reds=$((reds + 1))
+    fi
+    if ((VERIFICATION_PRODUCT_GPU)); then
+      echo "  · 产品 GPU 包的真卡对拍：$VERIFICATION_PRODUCT_GPU_WHY"
+      verification_call "产品 GPU 包的真卡对拍" functions "$logs/verification-product-gpu.log" --check "$PRODUCT_GPU_CELL"
+      (($? == 1)) && reds=$((reds + 1))
+    fi
+  fi
+  # 缩过域的那一趟汇总里写明（弄坏开关 scaled-run-unlabelled：不写）
+  if [[ -n "$CRASH_EXPAND_UP_TO" && "${MERGE_AND_VERIFY_BREAK:-}" != "scaled-run-unlabelled" ]]; then VERIFICATION_SCALED=1; fi
+  ((${#VERIFICATION_UNROUTED[@]})) && VERIFICATION_NOT_RUN+=("要特性的 ${VERIFICATION_UNROUTED[*]}")
+  parts=("按条现判 $VERIFICATION_JUDGED、复用 $VERIFICATION_REUSED")
+  [[ -z "$VERIFICATION_BLOCKS" ]] || parts+=("崩溃状态块 $VERIFICATION_BLOCKS")
+  ((${#VERIFICATION_NOT_RUN[@]})) && parts+=("本次未跑：${VERIFICATION_NOT_RUN[*]}")
+  joined="$(printf '%s；' "${parts[@]}")"; joined="${joined%；}"
+  if ((reds)); then VERIFICATION_STATE="红（$reds 次门禁判红；$joined）"; return 1; fi
+  VERIFICATION_STATE="过（$joined）"
+  return 0
+}
+
+# ── 挑测试目标、逐项点名与按条复用（文件头「挑测试目标」「逐项点名与按条复用」）────────────
 # 用的 python 段（python3 - <一样> … <<<"$MERGE_AND_VERIFY_ITEMS_PROGRAM"），照第一个参数做一样：
-#   items <树> <rerun-failed-tests.py> <包>…   每项一行「ITEM<TAB>项<TAB>包<TAB>挑目标的参数」（项与挑法照 rerun-failed-tests.py 的 test_targets_of_package），
-#        包目录下有测试属性的另打「TESTED<TAB>包」，不在工作区里的包打「PROBLEM<TAB>一句」
+#   targets <树> <rerun-failed-tests.py> <lib_rebuilt_packages.py> <弄坏开关> <补丁目录>…   挑测试目标（文件头「挑测试目标」）：判不出的每处一行「REFUSE<TAB>原因」，
+#        挑出的每项一行「ITEM<TAB>项<TAB>包<TAB>挑目标的参数<TAB>为什么挑上」（照包在工作区里的次序、包里目标的次序），挑出的项所在而包目录下有测试属性的「TESTED<TAB>包」，
+#        要特性的目标「REQUIRES<TAB>包<TAB>目标名<TAB>特性,特性<TAB>为什么」，报一句的「NOTE<TAB>一句」；读不了补丁、成员清单或目标清单退 1、打一句原因。
+#        弄坏开关 whole-package-tests：改到的包与工作区里依赖它们的包，每个目标都挑（文档测试除外）；fallback-runs-whole-workspace：判不出的不报、改成每个包的每个目标都挑（文档测试除外）
 #   split <树> <rerun-failed-tests.py> <日志> <输出目录> <项>…   日志逐段归到项（section_item）：每段一行
 #        「SECTION<TAB>项（归不到写 -）<TAB>段头的源文件<TAB>finished in 秒数之和<TAB>FAILED 条数<TAB>结果行条数」，每条 FAILED 一行「FAILED<TAB>项<TAB>libtest 全名」，
 #        段头之前的结果行打「LOOSE<TAB>条数」；归到项的段按包接进 <输出目录>/<包>.log
 #   outcomes <rerun-failed-tests.py> <test-plan 的输出> <这个包那几段的日志，没有写 -> <包> <红的名字落进的文件> <项>…   这个包跑到的项里每条测试函数一行
 #        「<名字><TAB><项><TAB><现判|复用|拒算><TAB><绿|红|没跑到>」（拒算的写拒算；日志里有结果行的写现判；别的照计划写复用或现判）；计划里要现判而 FAILED 的名字写进第五个参数
 MERGE_AND_VERIFY_ITEMS_PROGRAM="$(cat <<'PY_ITEMS'
-import importlib.util, os, re, sys
+import importlib.util, os, re, shlex, sys
 TEST_ATTRIBUTE = re.compile(r"#\[\s*(?:[A-Za-z_][A-Za-z0-9_]*::)*test\s*[\](]")
 FINISHED = re.compile(r"finished in ([0-9]+(?:\.[0-9]+)?)s")
-def load(path):
-    specification = importlib.util.spec_from_file_location("rerun_failed_tests_for_merge_and_verify", path)
+def load(path, name="rerun_failed_tests_for_merge_and_verify"):
+    specification = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)
     return module
@@ -1088,19 +1081,223 @@ def sections_of(rerun, path):
             else:
                 current["lines"].append(line)
     return sections, loose
-mode = sys.argv[1]
-if mode == "items":
-    tree, rerun = sys.argv[2], load(sys.argv[3])
-    packages = rerun.workspace_packages(tree)
-    for name in sys.argv[4:]:
-        if name not in packages:
-            print(f"PROBLEM\t包 {name} 不在 {tree} 的工作区里")
+WORKSPACE_WIDE = ("Cargo.toml", "Cargo.lock")
+SELECTOR_VALUE_OPTIONS = ("--test", "--bin", "--example", "--bench")
+SELECTOR_FLAGS = ("--lib", "--doc")
+WHOLE_CLASS_OPTIONS = ("--tests", "--bins", "--examples", "--benches", "--all-targets", "--workspace", "--all", "--exclude")
+CARGO_VALUE_OPTIONS = ("--features", "-F", "--target", "--target-dir", "--profile", "-j", "--jobs", "--manifest-path", "--color", "--message-format", "--config", "-Z")
+def workspace_wide(path):
+    return path in WORKSPACE_WIDE or path == ".cargo" or path.startswith(".cargo/")
+def target_root_form(relative):
+    """测试目标根文件那一类的路径：tests/<目标>.rs、tests/<目标>/main.rs、src/bin/<名>.rs、src/bin/<名>/main.rs。"""
+    parts = relative.split("/")
+    return (len(parts) == 2 and parts[0] == "tests" and parts[1].endswith(".rs")) or (len(parts) == 3 and parts[0] == "tests" and parts[2] == "main.rs") \
+        or (len(parts) == 3 and parts[:2] == ["src", "bin"] and parts[2].endswith(".rs")) or (len(parts) == 4 and parts[:2] == ["src", "bin"] and parts[3] == "main.rs")
+def module_pattern(name):
+    return re.compile(rf"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+{re.escape(name)}\s*;|#\[\s*path\s*=\s*\"{re.escape(name)}/", re.MULTILINE)
+def mutation_target(words):
+    """变异行第五段 → (包, [挑法…], `--` 之后的筛选词, 点了一类目标时那个选项)。"""
+    cut = words.index("--") if "--" in words else len(words)
+    head, filters = words[:cut], words[cut + 1:]
+    package, selectors, whole_class, position = None, [], None, 0
+    while position < len(head):
+        word = head[position]
+        option, _, value = word.partition("=")
+        if word in ("-p", "--package"):
+            package = head[position + 1] if position + 1 < len(head) else None
+            position += 2
             continue
-        directory, manifest = packages[name]
-        if has_test_attribute(directory):
-            print(f"TESTED\t{name}")
-        for target, found in rerun.test_targets_of_package(directory, manifest, name).items():
-            print(f"ITEM\t{rerun.item_name(name, target)}\t{name}\t{' '.join(found.selector)}")
+        if option == "--package" and value:
+            package = value
+        elif word.startswith("-p") and len(word) > 2:
+            package = word[2:]
+        elif word in SELECTOR_FLAGS:
+            selectors.append([word])
+        elif word in SELECTOR_VALUE_OPTIONS:
+            selectors.append([word, head[position + 1] if position + 1 < len(head) else ""])
+            position += 2
+            continue
+        elif option in SELECTOR_VALUE_OPTIONS and value:
+            selectors.append([option, value])
+        elif option in WHOLE_CLASS_OPTIONS:
+            whole_class = word
+        elif word in CARGO_VALUE_OPTIONS:
+            position += 2
+            continue
+        position += 1
+    return package, selectors, filters, whole_class
+def mutation_rows(directory):
+    for file_name in ("mutations-append.tsv", "mutations-replacements.tsv"):
+        path = os.path.join(directory, file_name)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            for raw in handle:
+                line = raw.rstrip("\n")
+                if line.strip() and not line.startswith("#"):
+                    yield file_name, line.split("\t")
+def select_targets(tree, rerun, rebuilt, broken, patch_directories):
+    packages = rerun.workspace_packages(tree)
+    order = list(packages)
+    targets_of = {name: rerun.test_targets_of_package(directory, manifest, name) for name, (directory, manifest) in packages.items()}
+    selected, refusals, required, notes, touched = {}, [], {}, [], []
+    def select(package, root, why):
+        entry = selected.setdefault((package, root), [])
+        if why not in entry:
+            entry.append(why)
+    def required_entry(package, relative=None, name=None):
+        """写了 required-features 的 [[test]] / [[bin]]：按路径（relative）或按名字（name）找 → (目标名, 特性) 或 None。"""
+        manifest = packages[package][1]
+        for section, folder in (("test", "tests"), ("bin", "src/bin")):
+            for entry in manifest.get(section, []):
+                entry_name, features = entry.get("name"), entry.get("required-features")
+                if not isinstance(entry_name, str) or not features:
+                    continue
+                path = entry.get("path", "src/main.rs" if section == "bin" and entry_name == package else f"{folder}/{entry_name}.rs")
+                folder_root = os.path.dirname(path) if path.endswith("/main.rs") else None
+                if (name is not None and entry_name == name) or (relative is not None and (relative == path or (folder_root and relative.startswith(folder_root + "/")))):
+                    return entry_name, features
+        return None
+    def roots_of_path(package, relative):
+        directory, manifest = packages[package]
+        targets = targets_of[package]
+        if relative in targets and relative != rerun.DOC_TARGET:
+            return [relative]
+        parts = relative.split("/")
+        if parts[0] == "tests" and len(parts) >= 3:
+            main = f"tests/{parts[1]}/main.rs"
+            if main in targets:
+                return [main]
+            pattern, hits = module_pattern(parts[1]), []
+            for root in targets:
+                if root.startswith("tests/") and root.count("/") == 1:
+                    try:
+                        with open(os.path.join(directory, root), encoding="utf-8", errors="replace") as handle:
+                            if pattern.search(handle.read()):
+                                hits.append(root)
+                    except OSError:
+                        continue
+            return hits
+        if parts[:2] == ["src", "bin"]:
+            main = f"src/bin/{parts[2]}/main.rs" if len(parts) >= 4 else None
+            return [main] if main in targets else []
+        if parts[0] == "src" and len(parts) >= 2:
+            library = (manifest.get("lib") or {}).get("path", "src/lib.rs")
+            for root in (library, "src/main.rs"):
+                if root in targets:
+                    return [root]
+        return []
+    if not patch_directories:
+        refusals.append("没给补丁目录：算不出这一批改到哪几个测试目标")
+    for path in rebuilt.collect_paths(patch_directories, []):
+        if workspace_wide(path):
+            refusals.append(f"补丁改到工作区根的 {path}（改的是整个工作区的编法，判不出改到哪个测试目标）")
+            continue
+        package = rebuilt.package_of(tree, path)
+        if package not in packages:
+            refusals.append(f"补丁改到不落在任何包里的 {path}（测试运行时可能读它，判不出归哪个测试目标）")
+            continue
+        touched.append(package)
+        directory = packages[package][0]
+        relative = os.path.relpath(os.path.join(tree, path), directory)
+        feature = required_entry(package, relative=relative)
+        if feature:
+            required.setdefault((package, feature[0]), [",".join(feature[1]), []])[1].append(f"补丁改到 {path}")
+            continue
+        roots = roots_of_path(package, relative)
+        for root in roots:
+            select(package, root, f"补丁改到 {path}")
+        if roots:
+            continue
+        if target_root_form(relative) and not os.path.lexists(os.path.join(directory, relative)):
+            notes.append(f"补丁删掉了 {path}（{package} 的这个测试目标已经没有，不跑）")
+            continue
+        refusals.append(f"补丁改到 {package} 包里的 {relative}，判不出改到哪个测试目标（不是测试目标的根文件、不在 src/ 下，tests/ 下也没有测试目标 mod 它）")
+    for directory in patch_directories:
+        for file_name, columns in mutation_rows(directory):
+            name, label = columns[0], f"变异行「{columns[0]}」（{os.path.basename(directory)}/{file_name}）"
+            if len(columns) < 6:
+                refusals.append(f"{label}不是六段，读不出它点名的测试目标")
+                continue
+            try:
+                words = shlex.split(columns[4])
+            except ValueError as error:
+                refusals.append(f"{label}的 cargo test 参数切不开（{error}）")
+                continue
+            package, selectors, filters, whole_class = mutation_target(words)
+            if whole_class:
+                refusals.append(f"{label}的 cargo test 参数点了一类目标 {whole_class}，判不出是哪一个测试目标")
+                continue
+            if package not in packages:
+                refusals.append(f"{label}的 cargo test 参数{'没点包' if package is None else f'点的包 {package} 不在工作区里'}")
+                continue
+            if not selectors:
+                refusals.append(f"{label}的 cargo test 参数只点了包 {package}、没点测试目标（等于跑整个包）")
+                continue
+            touched.append(package)
+            for selector in selectors:
+                if selector == ["--doc"]:
+                    root = rerun.DOC_TARGET if rerun.DOC_TARGET in targets_of[package] else None
+                else:
+                    root = next((key for key, found in targets_of[package].items() if key != rerun.DOC_TARGET and list(found.selector) == selector), None)
+                feature = required_entry(package, name=selector[1]) if root is None and len(selector) == 2 else None
+                if root:
+                    select(package, root, f"变异行「{name}」点名")
+                    if filters:
+                        notes.append(f"变异行「{name}」在 {rerun.item_name(package, root)} 里的筛选词 {' '.join(filters)}：跑的是整个目标，键相同的测试函数照复用")
+                elif feature:
+                    required.setdefault((package, feature[0]), [",".join(feature[1]), []])[1].append(f"变异行「{name}」点名")
+                else:
+                    refusals.append(f"{label}点名的 {' '.join(selector)} 在包 {package} 里找不到")
+    if broken == "whole-package-tests":
+        depends_on = {}
+        for name, (directory, manifest) in packages.items():
+            tables = [manifest.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
+            for target in (manifest.get("target") or {}).values():
+                if isinstance(target, dict):
+                    tables += [target.get(key) for key in ("dependencies", "dev-dependencies", "build-dependencies")]
+            depends_on[name] = {value.get("package", key) if isinstance(value, dict) else key for table in tables for key, value in (table or {}).items()}
+        widened = set(touched)
+        while True:
+            grown = {name for name, needed in depends_on.items() if name not in widened and needed & widened}
+            if not grown:
+                break
+            widened |= grown
+        for package in widened:
+            for root in targets_of[package]:
+                if root != rerun.DOC_TARGET:
+                    select(package, root, "弄坏开关 whole-package-tests：改到的包与依赖它们的包整包挑")
+    if refusals and broken == "fallback-runs-whole-workspace":
+        notes.append(f"弄坏开关 fallback-runs-whole-workspace：判不出的 {len(refusals)} 处不报，每个包的每个目标都挑")
+        refusals = []
+        for package in order:
+            for root in targets_of[package]:
+                if root != rerun.DOC_TARGET:
+                    select(package, root, "弄坏开关 fallback-runs-whole-workspace")
+    for reason in refusals:
+        print(f"REFUSE\t{reason}")
+    if refusals:
+        return
+    position = {package: index for index, package in enumerate(order)}
+    ranks = {(package, root): rank for package in order for rank, root in enumerate(targets_of[package])}
+    for package, root in sorted(selected, key=lambda key: (position[key[0]], ranks[key])):
+        found = targets_of[package][root]
+        print(f"ITEM\t{rerun.item_name(package, root)}\t{package}\t{' '.join(found.selector)}\t{'；'.join(selected[(package, root)])}")
+    for package in sorted({package for package, _root in selected}, key=position.get):
+        if has_test_attribute(packages[package][0]):
+            print(f"TESTED\t{package}")
+    for (package, name), (features, reasons) in required.items():
+        print(f"REQUIRES\t{package}\t{name}\t{features}\t{'；'.join(dict.fromkeys(reasons))}")
+    for note in dict.fromkeys(notes):
+        print(f"NOTE\t{note}")
+mode = sys.argv[1]
+if mode == "targets":
+    tree, rerun, rebuilt, broken = sys.argv[2], load(sys.argv[3]), load(sys.argv[4], "lib_rebuilt_packages_for_merge_and_verify"), sys.argv[5]
+    try:
+        select_targets(tree, rerun, rebuilt, broken, sys.argv[6:])
+    except (OSError, rerun.PackageNotFound) as error:
+        print(f"读不了补丁、成员清单或目标清单：{error}")
+        sys.exit(1)
 elif mode == "split":
     tree, rerun, log, output = sys.argv[2], load(sys.argv[3]), sys.argv[4], sys.argv[5]
     packages = rerun.workspace_packages(tree)
@@ -1164,25 +1361,13 @@ word_in_list() {
 # item_mode：这一趟点了项（文件头「逐项点名与按条复用」）退 0。弄坏开关 items-ignored 下点了也当没点
 item_mode() { ((${#NAMED_ITEMS[@]})) && [[ "${MERGE_AND_VERIFY_BREAK:-}" != items-ignored ]]; }
 
-# collect_test_items <树>：TEST_PACKAGES 里每个包的项进 ALL_ITEM_LINES（「项<TAB>包<TAB>挑目标的参数」），包目录下有测试属性的进 TESTED_PACKAGES；
-#   点了 --item 的只留点名的进 RUN_ITEMS，写错的进 UNKNOWN_ITEMS；没点的全留。读不出返回 1、原因进 ITEMS_PROBLEM。
+# collect_test_items：挑出的项（ALL_ITEM_LINES，select_test_targets 填）里，点了 --item 的只留点名的进 RUN_ITEMS，写错的进 UNKNOWN_ITEMS；没点的全留。
 #   弄坏开关 item-unknown-accepted 下写错的悄悄丢掉（丢完一项不剩就当没点）；items-ignored 下点了也全留
 collect_test_items() {
-  local listing position kind item package selector line
-  local -a names=() known=() kept_names=()
-  ALL_ITEM_LINES=(); RUN_ITEMS=(); TESTED_PACKAGES=(); UNKNOWN_ITEMS=(); ITEMS_PROBLEM=""
-  for ((position = 1; position < ${#TEST_PACKAGES[@]}; position += 2)); do names+=("${TEST_PACKAGES[position]}"); done
-  if ((${#names[@]})); then
-    if ! listing="$(python3 - items "$1" "$RERUN_FAILED_TESTS" "${names[@]}" <<<"$MERGE_AND_VERIFY_ITEMS_PROGRAM" 2>&1)"; then
-      ITEMS_PROBLEM="$(tail -n 3 <<<"$listing" | tr '\n' ' ')"; return 1
-    fi
-    while IFS=$'\t' read -r kind item package selector; do
-      case "$kind" in
-        ITEM) ALL_ITEM_LINES+=("$item"$'\t'"$package"$'\t'"$selector"); known+=("$item") ;;
-        TESTED) TESTED_PACKAGES+=("$item") ;;
-      esac
-    done <<<"$listing"
-  fi
+  local item line
+  local -a known=() kept_names=()
+  RUN_ITEMS=(); UNKNOWN_ITEMS=()
+  for line in ${ALL_ITEM_LINES[@]+"${ALL_ITEM_LINES[@]}"}; do known+=("${line%%$'\t'*}"); done
   for item in ${NAMED_ITEMS[@]+"${NAMED_ITEMS[@]}"}; do
     word_in_list "$item" ${known[@]+"${known[@]}"} || UNKNOWN_ITEMS+=("$item")
   done
@@ -1207,40 +1392,71 @@ run_item_roots() {
   return 0
 }
 
+# read_test_functions_request <阶段文件名> <去掉 --profile：1 或 0> [<交给 env 的赋值>…]：按条复用的请求（admission.py test-functions-request；同门禁 crash-point-replay 按条复用的取法）
+#   → REQUEST_KIND 与 REQUEST_ARGUMENTS；交不出就打 ✗、两样都空。赋值照写进起它的环境（改判定域的变量要与交给 cargo 的同一份）
+read_test_functions_request() {
+  local stage_name="$1" strip_profile="$2" request_output tag value skip_next=0
+  shift 2
+  REQUEST_KIND=""; REQUEST_ARGUMENTS=()
+  if request_output="$(env "$@" python3 "$ADMISSION" test-functions-request "$stage_name" "$root" 2>&1)"; then
+    while IFS=$'\t' read -r tag value; do
+      case "$tag" in
+        kind) REQUEST_KIND="$value" ;;
+        argument)
+          if ((skip_next)); then skip_next=0
+          elif ((strip_profile)) && [[ "$value" == --profile ]]; then skip_next=1
+          else REQUEST_ARGUMENTS+=("$value"); fi ;;
+      esac
+    done <<<"$request_output"
+  fi
+  if [[ -z "$REQUEST_KIND" ]] || ((${#REQUEST_ARGUMENTS[@]} == 0)); then
+    echo "  ✗ 按条复用：admission.py test-functions-request $stage_name 交不出请求（$(tr '\n' ' ' <<<"$request_output" | cut -c1-300)），用它的包一条都不跳、全部现判"
+    echo "  → 怎么办：单独跑 python3 $ADMISSION test-functions-request $stage_name $root，看它为什么没打出 kind 与 argument 两种行（读不了阶段文件、种类登记缺了这类）；修好它再重跑合入后验证，按条复用才接得上"
+    REQUEST_KIND=""; REQUEST_ARGUMENTS=()
+  fi
+  return 0
+}
+
+# package_kind <包>：这个包的按条复用种类（文件头「逐项点名与按条复用」：验证包是 VERIFICATION_FUNCTIONS_KIND，别的是 TEST_FUNCTIONS_KIND）
+package_kind() { if [[ "$1" == "$VERIFICATION_PACKAGE" ]]; then printf '%s' "$VERIFICATION_FUNCTIONS_KIND"; else printf '%s' "$TEST_FUNCTIONS_KIND"; fi; }
+
 # plan_test_functions <树>：跑到的项所在、有测试属性的包各起一次 admission.py test-plan（文件头「逐项点名与按条复用」的按条复用），计划放 PLAN_DIRECTORY 下
 #   （test-plan.<包>.out 与 .plan）；算成的进 PLANNED_PACKAGES，失灵的进 FAILED_PLAN_PACKAGES 并置 PLAN_RED，判 prune-server 不可用的置 PLAN_UNAVAILABLE；
-#   跑到的项里计划的条数进 PLAN_JUDGE、PLAN_REUSE、PLAN_REFUSED。弄坏开关 plan-failure-ignored 下失灵不置 PLAN_RED；plan-unavailable-run-anyway 下不可用当失灵、照全部现判跑
+#   跑到的项里计划的条数进 PLAN_JUDGE、PLAN_REUSE、PLAN_REFUSED。验证包用 crash-point-replay.sh 的请求（--profile release 照留）另加 --exclude-registered，
+#   缩过域时请求在带那个变量的环境里起。弄坏开关 plan-failure-ignored 下失灵不置 PLAN_RED；plan-unavailable-run-anyway 下不可用当失灵、照全部现判跑
 plan_test_functions() {
-  local tree_root="$1" line package request_output tag value skip_next=0 plan_exit verdict_exit out failure_text judge reuse refused
-  local -a packages=()
-  PLANNED_PACKAGES=(); FAILED_PLAN_PACKAGES=(); PLAN_UNAVAILABLE=0; PLAN_RED=0; PLAN_JUDGE=0; PLAN_REUSE=0; PLAN_REFUSED=0; TEST_FUNCTIONS_KIND=""; TEST_PLAN_ARGUMENTS=()
+  local tree_root="$1" line package plan_exit verdict_exit out failure_text judge reuse refused kind
+  local -a packages=() plan_arguments=() scale_assignments=()
+  PLANNED_PACKAGES=(); FAILED_PLAN_PACKAGES=(); PLAN_UNAVAILABLE=0; PLAN_RED=0; PLAN_JUDGE=0; PLAN_REUSE=0; PLAN_REFUSED=0
+  TEST_FUNCTIONS_KIND=""; TEST_PLAN_ARGUMENTS=(); VERIFICATION_FUNCTIONS_KIND=""; VERIFICATION_PLAN_ARGUMENTS=()
   for line in ${RUN_ITEMS[@]+"${RUN_ITEMS[@]}"}; do
     line="${line#*$'\t'}"; package="${line%%$'\t'*}"
     if word_in_list "$package" ${TESTED_PACKAGES[@]+"${TESTED_PACKAGES[@]}"} && ! word_in_list "$package" ${packages[@]+"${packages[@]}"}; then packages+=("$package"); fi
   done
   ((${#packages[@]})) || return 0
-  # 请求：种类与参数取 admission.py test-functions-request（同门禁 crash-point-replay 按条复用的取法；它打的 --profile release 不交：这一步是 dev 档）
-  if request_output="$(python3 "$ADMISSION" test-functions-request merge-and-verify.sh "$root" 2>&1)"; then
-    while IFS=$'\t' read -r tag value; do
-      case "$tag" in
-        kind) TEST_FUNCTIONS_KIND="$value" ;;
-        argument)
-          if ((skip_next)); then skip_next=0
-          elif [[ "$value" == --profile ]]; then skip_next=1
-          else TEST_PLAN_ARGUMENTS+=("$value"); fi ;;
-      esac
-    done <<<"$request_output"
-  fi
-  if [[ -z "$TEST_FUNCTIONS_KIND" ]] || ((${#TEST_PLAN_ARGUMENTS[@]} == 0)); then
-    echo "  ✗ 按条复用：admission.py test-functions-request 交不出请求（$(tr '\n' ' ' <<<"$request_output" | cut -c1-300)），${packages[*]} 一条都不跳、全部现判"
-    FAILED_PLAN_PACKAGES=("${packages[@]}")
-    [[ "${MERGE_AND_VERIFY_BREAK:-}" == plan-failure-ignored ]] || PLAN_RED=1
-    return 0
-  fi
   for package in "${packages[@]}"; do
+    if [[ "$package" == "$VERIFICATION_PACKAGE" ]]; then
+      [[ -z "$CRASH_EXPAND_UP_TO" ]] || scale_assignments=("$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO")
+      read_test_functions_request crash-point-replay.sh 0 ${scale_assignments[@]+"${scale_assignments[@]}"}
+      VERIFICATION_FUNCTIONS_KIND="$REQUEST_KIND"; VERIFICATION_PLAN_ARGUMENTS=(${REQUEST_ARGUMENTS[@]+"${REQUEST_ARGUMENTS[@]}"})
+      ((${#VERIFICATION_PLAN_ARGUMENTS[@]} == 0)) || VERIFICATION_PLAN_ARGUMENTS+=(--exclude-registered)
+    elif [[ -z "$TEST_FUNCTIONS_KIND" ]]; then
+      read_test_functions_request merge-and-verify.sh 1
+      TEST_FUNCTIONS_KIND="$REQUEST_KIND"; TEST_PLAN_ARGUMENTS=(${REQUEST_ARGUMENTS[@]+"${REQUEST_ARGUMENTS[@]}"})
+    fi
+  done
+  for package in "${packages[@]}"; do
+    kind="$(package_kind "$package")"
+    if [[ "$package" == "$VERIFICATION_PACKAGE" ]]; then plan_arguments=(${VERIFICATION_PLAN_ARGUMENTS[@]+"${VERIFICATION_PLAN_ARGUMENTS[@]}"})
+    else plan_arguments=(${TEST_PLAN_ARGUMENTS[@]+"${TEST_PLAN_ARGUMENTS[@]}"}); fi
+    if [[ -z "$kind" ]] || ((${#plan_arguments[@]} == 0)); then
+      FAILED_PLAN_PACKAGES+=("$package")
+      [[ "${MERGE_AND_VERIFY_BREAK:-}" == plan-failure-ignored ]] || PLAN_RED=1
+      continue
+    fi
     out="$PLAN_DIRECTORY/test-plan.$package.out"
     plan_exit=0
-    python3 "$ADMISSION" test-plan "$tree_root" "$TEST_FUNCTIONS_KIND" "$package" "$PLAN_DIRECTORY/test-plan.$package.plan" "${TEST_PLAN_ARGUMENTS[@]}" >"$out" 2>"$out.err" || plan_exit=$?
+    python3 "$ADMISSION" test-plan "$tree_root" "$kind" "$package" "$PLAN_DIRECTORY/test-plan.$package.plan" "${plan_arguments[@]}" >"$out" 2>"$out.err" || plan_exit=$?
     if ((plan_exit == 0)) && grep -q '^PLAN ' "$out"; then
       PLANNED_PACKAGES+=("$package")
       read -r judge reuse refused < <(awk -F'\t' -v roots="$(run_item_roots "$package" | tr '\n' ' ')" 'BEGIN { n = split(roots, list, " "); for (i = 1; i <= n; i++) keep[list[i]] = 1 }
@@ -1259,41 +1475,34 @@ plan_test_functions() {
       if ((verdict_exit == 1)) && [[ "${MERGE_AND_VERIFY_BREAK:-}" != plan-failure-ignored ]]; then PLAN_RED=1; fi
     fi
   done
-  echo "  · 按条复用（种类 $TEST_FUNCTIONS_KIND）：${#packages[@]} 个包起了 test-plan，算成 ${#PLANNED_PACKAGES[@]} 个${FAILED_PLAN_PACKAGES[*]:+、失灵 ${#FAILED_PLAN_PACKAGES[@]} 个（${FAILED_PLAN_PACKAGES[*]}，一条都不跳）}$( ((PLAN_UNAVAILABLE)) && echo '、prune-server 不可用')；跑到的项里现判 $PLAN_JUDGE、复用 $PLAN_REUSE、拒算 $PLAN_REFUSED"
+  echo "  · 按条复用（种类 ${TEST_FUNCTIONS_KIND:-}${VERIFICATION_FUNCTIONS_KIND:+${TEST_FUNCTIONS_KIND:+、}$VERIFICATION_FUNCTIONS_KIND（验证包）}）：${#packages[@]} 个包起了 test-plan，算成 ${#PLANNED_PACKAGES[@]} 个${FAILED_PLAN_PACKAGES[*]:+、失灵 ${#FAILED_PLAN_PACKAGES[@]} 个（${FAILED_PLAN_PACKAGES[*]}，一条都不跳）}$( ((PLAN_UNAVAILABLE)) && echo '、prune-server 不可用')；跑到的项里现判 $PLAN_JUDGE、复用 $PLAN_REUSE、拒算 $PLAN_REFUSED"
   return 0
 }
 
-# skip_words_of <包，空着是整趟全部包>：键相同、库里不红的测试函数的 --exact --skip <名>…（admission.py plan-skip-names）进 SKIP_WORDS；
-#   整趟一条时全部算成的包的计划并起来算、有一包失灵就一条都不跳；按包时只算这一包跑到的目标。弄坏开关 reuse-skips-dropped 下一条都不跳
+# skip_words_of <包>：键相同、库里不红的测试函数（与验证包登记的用例）的 --exact --skip <名>…（admission.py plan-skip-names）进 SKIP_WORDS；
+#   只算这一包跑到的目标，这一包的计划没算成就一条都不跳。弄坏开关 reuse-skips-dropped 下一条都不跳
 skip_words_of() {
-  local package="$1" names="" name combined
+  local package="$1" names="" name
   local -a roots=() root_options=()
   SKIP_WORDS=()
   [[ "${MERGE_AND_VERIFY_BREAK:-}" != reuse-skips-dropped ]] || return 0
-  if [[ -z "$package" ]]; then
-    ((${#PLANNED_PACKAGES[@]})) && ((${#FAILED_PLAN_PACKAGES[@]} == 0)) || return 0
-    combined="$PLAN_DIRECTORY/test-plan.all.out"
-    : > "$combined"
-    for name in "${PLANNED_PACKAGES[@]}"; do cat -- "$PLAN_DIRECTORY/test-plan.$name.out" >> "$combined"; done
-    names="$(python3 "$ADMISSION" plan-skip-names "$combined" 2>&1)" || names=""
-  else
-    word_in_list "$package" ${PLANNED_PACKAGES[@]+"${PLANNED_PACKAGES[@]}"} || return 0
-    mapfile -t roots < <(run_item_roots "$package")
-    for name in ${roots[@]+"${roots[@]}"}; do root_options+=(--target-root "$name"); done
-    ((${#root_options[@]})) || return 0
-    names="$(python3 "$ADMISSION" plan-skip-names "$PLAN_DIRECTORY/test-plan.$package.out" "${root_options[@]}" 2>&1)" || names=""
-  fi
+  word_in_list "$package" ${PLANNED_PACKAGES[@]+"${PLANNED_PACKAGES[@]}"} || return 0
+  mapfile -t roots < <(run_item_roots "$package")
+  for name in ${roots[@]+"${roots[@]}"}; do root_options+=(--target-root "$name"); done
+  ((${#root_options[@]})) || return 0
+  names="$(python3 "$ADMISSION" plan-skip-names "$PLAN_DIRECTORY/test-plan.$package.out" "${root_options[@]}" 2>&1)" || names=""
   while IFS= read -r name; do [[ -n "$name" ]] && SKIP_WORDS+=(--skip "$name"); done <<<"$names"
   ((${#SKIP_WORDS[@]})) && SKIP_WORDS=(--exact "${SKIP_WORDS[@]}")
   return 0
 }
 
-# run_item_test_commands <日志目录> <测试的标志…>：点了项时测试那一步按包分开起（文件头「逐项点名与按条复用」）：每个包一条只带点名的目标，点了文档测试的另起一条 --doc；
-#   依次跑进 test-<序号>.log，跑完接成 test.log 与 test.problems.log。交头一条退非 0 的退出码
+# run_item_test_commands <日志目录> <测试的标志…>：测试那一步（文件头 test 一段与「逐项点名与按条复用」）：每个包一条只带这个包点到的目标，点了文档测试的另起一条 --doc；
+#   验证包那一条带 --release（缩过域时带那个变量起），计划算不出时不起（登记的用例排不掉）。依次跑进 test-<序号>.log，跑完接成 test.log 与 test.problems.log。
+#   交头一条退非 0 的退出码。弄坏开关 verification-release-dropped：验证包那一条不带 --release
 run_item_test_commands() {
   local logs="$1" line package selector index=0 rc=0 step_rc
   shift
-  local -a flags=("$@") packages=() doc_packages=() selectors=() selector_words=() command=() tail_words=() logs_written=()
+  local -a flags=("$@") packages=() doc_packages=() selectors=() selector_words=() command=() tail_words=() logs_written=() package_flags=() package_environment=()
   for line in "${RUN_ITEMS[@]}"; do
     line="${line#*$'\t'}"; package="${line%%$'\t'*}"
     word_in_list "$package" ${packages[@]+"${packages[@]}"} || packages+=("$package")
@@ -1308,18 +1517,28 @@ run_item_test_commands() {
       read -r -a selector_words <<<"$selector"; selectors+=("${selector_words[@]}")
     done
     ((${#selectors[@]})) || continue
+    package_flags=(${flags[@]+"${flags[@]}"}); package_environment=()
+    if [[ "$package" == "$VERIFICATION_PACKAGE" ]]; then
+      if word_in_list "$package" ${FAILED_PLAN_PACKAGES[@]+"${FAILED_PLAN_PACKAGES[@]}"}; then
+        echo "  ✗ 测试那一步：验证包 $package 的计划算不出（上面那一句），登记的崩溃枚举用例与放量分项排不掉，这一包的 ${selectors[*]} 不起"
+        echo "  → 怎么办：照上面 admission.py plan-failure 那一句修好按条复用，再重跑同一条命令"
+        continue
+      fi
+      [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verification-release-dropped" ]] || package_flags=(--release ${flags[@]+"${flags[@]}"})
+      [[ -z "$CRASH_EXPAND_UP_TO" ]] || package_environment=(env "$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO")
+    fi
     skip_words_of "$package"
     tail_words=()
     [[ "${MERGE_AND_VERIFY_BREAK:-}" != "test-arguments-added" ]] || tail_words+=(--show-output)
     tail_words+=(${SKIP_WORDS[@]+"${SKIP_WORDS[@]}"})
     if [[ "${MERGE_AND_VERIFY_TEST_TARGETS:-}" == serial || "${MERGE_AND_VERIFY_BREAK:-}" == "tests-one-binary-at-a-time" ]]; then
-      command=(cargo test --offline --no-fail-fast ${flags[@]+"${flags[@]}"} -p "$package" "${selectors[@]}")
+      command=(${package_environment[@]+"${package_environment[@]}"} cargo test --offline --no-fail-fast ${package_flags[@]+"${package_flags[@]}"} -p "$package" "${selectors[@]}")
     else
-      command=(python3 "$TEST_TARGETS_PARALLEL" --jobs "$THREADS" -- --offline --no-fail-fast ${flags[@]+"${flags[@]}"} -p "$package" "${selectors[@]}")
+      command=(${package_environment[@]+"${package_environment[@]}"} python3 "$TEST_TARGETS_PARALLEL" --jobs "$THREADS" -- --offline --no-fail-fast ${package_flags[@]+"${package_flags[@]}"} -p "$package" "${selectors[@]}")
     fi
     ((${#tail_words[@]})) && command+=(-- "${tail_words[@]}")
     index=$((index + 1))
-    echo "  · 测试第 $index 条：-p $package ${selectors[*]}（跳过键相同的 $(( ${#SKIP_WORDS[@]} / 2 )) 条）"
+    echo "  · 测试第 $index 条：-p $package ${package_flags[*]} ${selectors[*]}（跳过键相同的 $(( ${#SKIP_WORDS[@]} / 2 )) 条）"
     run_step "$logs/test-$index.log" "${command[@]}"; step_rc=$?
     logs_written+=("$logs/test-$index")
     ((rc != 0)) || rc="$step_rc"
@@ -1346,7 +1565,7 @@ run_item_test_commands() {
 #   算成计划的每个包：逐条结局并进 test-functions.tsv，lib_libtest_result_lines.py recordable 认结局、plan-green-names 取判绿可记的、计划里要现判而 FAILED 的交 --red-names，
 #   同一次 verdict-record 记进库（记红撤绿）。verdict-record 报哨兵红的经 plan-failure 置 PLAN_RED，判不可用的置 PLAN_UNAVAILABLE。弄坏开关 red-not-recorded 下不交 --red-names
 record_test_functions() {
-  local logs="$1" tree_root="$2" line package item unattributed loose record_exit verdict_exit failure_text package_log
+  local logs="$1" tree_root="$2" line package item unattributed loose record_exit verdict_exit failure_text package_log kind how
   local split_directory="$logs/test-split"
   local -a items=()
   : > "$logs/test-functions.tsv"; : > "$logs/test-sections.tsv"
@@ -1377,15 +1596,19 @@ record_test_functions() {
       python3 "$ADMISSION" plan-green-names "$PLAN_DIRECTORY/test-plan.$package.out" "$PLAN_DIRECTORY/test-plan.$package.accounting" "$PLAN_DIRECTORY/test-plan.$package.withheld" \
         > "$PLAN_DIRECTORY/test-plan.$package.green" 2>&1 || : > "$PLAN_DIRECTORY/test-plan.$package.green"
     fi
-    record_exit=0
-    python3 "$ADMISSION" verdict-record "$tree_root" "$TEST_FUNCTIONS_KIND" "$PLAN_DIRECTORY/test-plan.$package.plan" "$PLAN_DIRECTORY/test-plan.$package.green" \
-      --how "合入后验证测试那一步（cargo test，dev 档）" --red-names "$PLAN_DIRECTORY/test-plan.$package.red" > "$PLAN_DIRECTORY/test-plan.$package.record" 2>&1 || record_exit=$?
+    record_exit=0; kind="$(package_kind "$package")"; how="合入后验证测试那一步（cargo test，dev 档）"
+    [[ "$package" != "$VERIFICATION_PACKAGE" ]] || how="合入后验证测试那一步（cargo test --release，验证包点到的目标，登记的崩溃枚举用例与放量分项经 --skip 排掉）"
+    python3 "$ADMISSION" verdict-record "$tree_root" "$kind" "$PLAN_DIRECTORY/test-plan.$package.plan" "$PLAN_DIRECTORY/test-plan.$package.green" \
+      --how "$how" --red-names "$PLAN_DIRECTORY/test-plan.$package.red" > "$PLAN_DIRECTORY/test-plan.$package.record" 2>&1 || record_exit=$?
     if ((record_exit == 0)); then
       echo "  · 按条复用记库（$package）：判绿 $(grep -c . "$PLAN_DIRECTORY/test-plan.$package.green") 条、判红 $(grep -c . "$PLAN_DIRECTORY/test-plan.$package.red") 条（红的照同一把键记红、撤掉原有的绿，下一趟现判）；$(grep '^RECORD ' "$PLAN_DIRECTORY/test-plan.$package.record" | tail -n 1)"
       continue
     fi
     verdict_exit=0
-    failure_text="$(python3 "$ADMISSION" plan-failure "merge-and-verify.sh 测试那一步的包 $package" verdict-record "$record_exit" "$PLAN_DIRECTORY/test-plan.$package.record" 2>&1)" || verdict_exit=$?
+    # 记红没成（admission.py 文件头「按条复用失灵」）：带 --red 交，它判失灵、撤掉判红那几把键原有的绿；判红的名单空着的照只记绿那一支办
+    failure_text="$(python3 "$ADMISSION" plan-failure "merge-and-verify.sh 测试那一步的包 $package" verdict-record "$record_exit" \
+      --red "$tree_root" "$kind" "$PLAN_DIRECTORY/test-plan.$package.plan" "$PLAN_DIRECTORY/test-plan.$package.red" "$PLAN_DIRECTORY/test-plan.$package.record" 2>&1)" \
+      || verdict_exit=$?
     [[ -z "$failure_text" ]] || printf '%s\n' "$failure_text" | sed 's/^ */  /'
     case "$verdict_exit" in
       0) echo "  ! 按条复用（$package）：判定没记进库（verdict-record 退 $record_exit：$(tail -n 2 "$PLAN_DIRECTORY/test-plan.$package.record" | tr '\n' ' ')），下一趟照判" ;;
@@ -1423,14 +1646,18 @@ report_items_done() {
   return 0
 }
 
-# list_items_and_exit：--list-items（文件头「逐项点名与按条复用」）：照这一趟的挑法挑包、列项，带 --with-keys 另每项一行 ITEM_PLAN；不编、不跑、不拷快照。
-#   弄坏开关 item-plan-reusable-zero 下 ITEM_PLAN 的 reusable 一律 0
+# list_items_and_exit：--list-items（文件头「逐项点名与按条复用」）：照这一趟的挑法挑测试目标、列项，带 --with-keys 另每项一行 ITEM_PLAN；不编、不跑、不拷快照。
+#   判不出测试目标的逐条打、退 3。弄坏开关 item-plan-reusable-zero 下 ITEM_PLAN 的 reusable 一律 0
 list_items_and_exit() {
   local tree_root="$SOURCE_TREE" line item package judged reused
-  CHECKER_TIER_STAGE="${MERGE_AND_VERIFY_CHECKER_TIER_STAGE:-$tree_root/$CHECKER_TIER_STAGE_PATH}"
-  test_packages "$tree_root" || die "挑不出要测的包：$TEST_PACKAGES_PROBLEM" "同真跑那一句：工作区成员要逐个写出目录、各有 [package] name，验证包 $CHECKER_TIER_PACKAGE 要在成员里" 1
-  select_test_packages "$tree_root" || die "算不出这一批补丁改到哪几个包：$TEST_SELECTION_PROBLEM" "看补丁目录在不在、crates.patch 与工作区成员的 Cargo.toml 读不读得了；要照旧全跑就加 --all-packages" 1
-  collect_test_items "$tree_root" || die "列不出测试那一步的项：$ITEMS_PROBLEM" "看 scripts/gate/rerun-failed-tests.py 读不读得了、工作区成员的 Cargo.toml 写得对不对" 1
+  VERIFICATION_STAGE="${MERGE_AND_VERIFY_VERIFICATION_STAGE:-$tree_root/$VERIFICATION_STAGE_PATH}"
+  verification_member_present "$tree_root" || die "认不出验证包：$MEMBERS_PROBLEM" "同真跑那一句：工作区成员要逐个写出目录、各有 [package] name，验证包 $VERIFICATION_PACKAGE 要在成员里" 1
+  select_test_targets "$tree_root" || die "挑不出测试目标：$TARGET_PROBLEM" "看补丁目录在不在、crates.patch、变异行与工作区成员的 Cargo.toml 读不读得了" 1
+  if ((${#TARGET_REFUSALS[@]})); then
+    for line in "${TARGET_REFUSALS[@]}"; do echo "  ✗ 判不出测试目标：$line"; done   # gate-lint:detail
+    die "这一趟有 ${#TARGET_REFUSALS[@]} 处判不出改到哪个测试目标（上面逐条），列不出项" "整包归提交时的整轮门禁；提交之外要整包跑先弹窗问用户" 3
+  fi
+  collect_test_items
   for line in ${ALL_ITEM_LINES[@]+"${ALL_ITEM_LINES[@]}"}; do
     item="${line%%$'\t'*}"; line="${line#*$'\t'}"
     printf '%s\t%s\n' "$item" "${line#*$'\t'}"
@@ -1486,9 +1713,9 @@ clippy_command_for() {
 verify() {
   local logs="$1"; shift
   local -a dirs=("$@")
-  local dir rc applied=0 warned=0 failed_tests reds=0 test_count untested_text combination clippy_step="" word
+  local dir rc applied=0 warned=0 failed_tests reds=0 test_count combination clippy_step="" word
   MUTATION_TABLES_STATE=""
-  local -a test_flags=() clippy_lints=() patch_arguments=() compile_logs=() test_command=() fmt_command=() clippy_command=() build_command=() test_tail=() tail_words=() red_items=()
+  local -a test_flags=() clippy_lints=() patch_arguments=() compile_logs=() fmt_command=() clippy_command=() build_command=() red_items=()
   local -a clippy_red_combinations=() clippy_green_combinations=()
   mkdir -p "$logs"
   rm -f -- "$logs/test.log" "$logs/build.log"   # 重编核对只认这一趟的编译输出（日志目录可能是调用方给的旧目录）
@@ -1501,7 +1728,7 @@ verify() {
         "上面一句点名了是 check.sh 的哪一处（lint 表、缺省特性组合、clippy 循环的结构行，或 fmt、clippy、build、test 哪一条 cargo 命令的哪一行哪个词），照它在 read_check_sh、read_cargo_command 里补上这一种写法的识别（cargo 命令只换包装函数名、加删标志不用改这里：现读）；先判得上游这一改是想让提交时跑的事变了，还是只换了写法，再补，让合入后验证与提交时的判据仍是同一套" 1
     fi
   fi
-  # 弄坏开关 cargo-arguments-fixed：四条 cargo 命令的参数照改前用这里写死的，不用从 check.sh 读来的
+  # 弄坏开关 cargo-arguments-fixed：四条 cargo 命令的参数用这里写死的，不用从 check.sh 读来的
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "cargo-arguments-fixed" ]]; then
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=cargo-arguments-fixed：四条 cargo 命令的参数用写死的，不用 check.sh 里读来的"
     CARGO_FMT_WORDS=(--all -- --check); CARGO_BUILD_WORDS=(--all-targets); CARGO_TEST_FLAGS=()
@@ -1516,7 +1743,7 @@ verify() {
         "先把登记的读法（check.sh 里 CLIPPY_COMBINATIONS_FILE 那一段）接进这份脚本的 read_check_sh，让合入后验证与提交时跑同一套组合；或删掉那份登记、回到 check.sh 的缺省组合" 1
     fi
   fi
-  # 弄坏开关 single-clippy-pass：照改前 clippy 只跑 --all-features 一趟
+  # 弄坏开关 single-clippy-pass：clippy 只跑 --all-features 一趟
   if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "single-clippy-pass" ]]; then
     echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=single-clippy-pass：clippy 只跑 --all-features 一趟，不用 check.sh 的特性组合（${CLIPPY_COMBINATIONS[*]-}）"
     CLIPPY_COMBINATIONS=("--all-features")
@@ -1541,15 +1768,14 @@ verify() {
     echo "  · $MUTATION_TABLES_STATE；补丁打进主工作区之后另交："
     echo "    SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.sh 的 mutation-tables 格; 范围=1 格; 为什么=合入后验证没在本进程里跑这一格，补丁打进主工作区之后补判' task-server/task submit --cwd $(printf '%q' "$SOURCE_TREE") -- bash .claude/gate.d/code-source-discipline.sh --check mutation-tables $(printf '%q' "$SOURCE_TREE")"
   fi
-  test_packages "$tree" || die "挑不出要测的包：$TEST_PACKAGES_PROBLEM；没编" \
-    "工作区成员要逐个写出目录、各有 [package] name，验证包 $CHECKER_TIER_PACKAGE 要在成员里（这里靠它的名字把它排掉）；改了名就同步改这份脚本的 CHECKER_TIER_PACKAGE" 1
-  select_test_packages "$tree" || die "算不出这一批补丁改到哪几个包：$TEST_SELECTION_PROBLEM；没编" \
-    "看补丁目录在不在、crates.patch 与工作区成员的 Cargo.toml 读不读得了；要照旧全跑就加 --all-packages" 1
-  untested_text=""
-  if ((${#UNTESTED_PACKAGES[@]})); then untested_text="$(printf '%s、' "${UNTESTED_PACKAGES[@]}")"; untested_text="；本次未跑：补丁没改到 ${#UNTESTED_PACKAGES[@]} 个包：${untested_text%、}"; fi
-  # 逐项点名（文件头「逐项点名与按条复用」）：列这一趟的项、认 --item（在打了补丁的快照上认，写错退 2、一条 cargo 都不起）
-  collect_test_items "$tree" || die "列不出测试那一步的项：$ITEMS_PROBLEM；没编" "看 scripts/gate/rerun-failed-tests.py 读不读得了、工作区成员的 Cargo.toml 写得对不对" 1
-  if ((${#UNKNOWN_ITEMS[@]})); then
+  verification_member_present "$tree" || die "认不出验证包：$MEMBERS_PROBLEM；没编" \
+    "工作区成员要逐个写出目录、各有 [package] name，验证包 $VERIFICATION_PACKAGE 要在成员里（这里靠它的名字给它的目标带 --release、排掉登记的崩溃枚举用例）；改了名就同步改这份脚本的 VERIFICATION_PACKAGE" 1
+  select_test_targets "$tree" || die "挑不出测试目标：$TARGET_PROBLEM；没编" \
+    "看补丁目录在不在、crates.patch、变异行与工作区成员的 Cargo.toml 读不读得了" 1
+  report_target_selection
+  # 逐项点名（文件头「逐项点名与按条复用」）：认 --item（在打了补丁的快照上认，写错退 2、一条 cargo 都不起）；判不出测试目标的这一趟不跑测试，不认
+  collect_test_items
+  if ((${#UNKNOWN_ITEMS[@]})) && ((${#TARGET_REFUSALS[@]} == 0)); then
     echo "  这一趟可点的项（${#ALL_ITEM_LINES[@]} 项）："
     for word in ${ALL_ITEM_LINES[@]+"${ALL_ITEM_LINES[@]}"}; do printf '       %s\n' "${word%%$'\t'*}"; done   # gate-lint:detail
     die "--item 点名的项不在这一趟可点的项里：${UNKNOWN_ITEMS[*]}；没编" \
@@ -1574,37 +1800,26 @@ verify() {
   fi
   # 按条复用（文件头「逐项点名与按条复用」）：跑到的项所在、有测试属性的包各算一份计划（admission.py test-plan 要 cargo -V 与 rustc -vV，放在预编库的取值判过之后）
   PLAN_DIRECTORY="$logs"
-  ((${#TEST_PACKAGES[@]} == 0)) || plan_test_functions "$tree"
-  # 测试二进制的参数：不带（标 #[ignore] 的只剩要 NVIDIA 卡、量显存与量速度、要补丁表副本那几条，带参数把它们起起来不对），只带按条复用跳过键相同的 --exact --skip <名>…；
-  #   点了项时各包各算（run_item_test_commands）。弄坏开关 test-arguments-added：在 -- 之后多带一个参数
-  [[ "${MERGE_AND_VERIFY_BREAK:-}" != "test-arguments-added" ]] || tail_words+=(--show-output)
-  if ! item_mode; then skip_words_of ""; tail_words+=(${SKIP_WORDS[@]+"${SKIP_WORDS[@]}"}); fi
-  ((${#tail_words[@]} == 0)) || test_tail=(-- "${tail_words[@]}")
-  if [[ "${MERGE_AND_VERIFY_TEST_TARGETS:-}" == serial || "${MERGE_AND_VERIFY_BREAK:-}" == "tests-one-binary-at-a-time" ]]; then
-    test_command=(cargo test --offline --no-fail-fast ${test_flags[@]+"${test_flags[@]}"} ${TEST_PACKAGES[@]+"${TEST_PACKAGES[@]}"} ${test_tail[@]+"${test_tail[@]}"})
-  else
-    # 按测试目标并行起（文件头 test 一段）
-    test_command=(python3 "$TEST_TARGETS_PARALLEL"
-      --jobs "$THREADS" -- --offline --no-fail-fast ${test_flags[@]+"${test_flags[@]}"} ${TEST_PACKAGES[@]+"${TEST_PACKAGES[@]}"} ${test_tail[@]+"${test_tail[@]}"})
-  fi
+  ((${#TARGET_REFUSALS[@]} || ${#RUN_ITEMS[@]} == 0)) || plan_test_functions "$tree"
+  # 测试二进制的参数：不带（标 #[ignore] 的只剩要 NVIDIA 卡、量显存与量速度、要补丁表副本那几条，带参数把它们起起来不对），只带按条复用跳过键相同的 --exact --skip <名>…
+  #   （每个包各算，run_item_test_commands；弄坏开关 test-arguments-added：在 -- 之后多带一个参数）
   rc=0; test_count=0; failed_tests=""
-  if ((${#TEST_PACKAGES[@]})) && ((PLAN_UNAVAILABLE == 0)); then
-    if item_mode; then
-      # 点了项：按包分开起，只带点名的目标（文件头「逐项点名与按条复用」）
-      echo "  编译并跑 --item 点名的 ${#RUN_ITEMS[@]} 项（$(printf '%s\n' "${RUN_ITEMS[@]}" | cut -f1 | tr '\n' ' ' | sed 's/ $//')；${TEST_SELECTION_NOTE}；按包分开起；并行度 $THREADS）…"
-      run_item_test_commands "$logs" ${test_flags[@]+"${test_flags[@]}"}; rc=$?
-    else
-      echo "  编译并跑 ${TEST_PACKAGES[*]} 的全部测试二进制（工作区成员减掉 $CHECKER_TIER_PACKAGE，${TEST_SELECTION_NOTE}${untested_text}；$([[ "${test_command[0]}" == cargo ]] && echo '一条 cargo test 逐个二进制跑' || echo '按测试目标并行起')；并行度 $THREADS）…"
-      run_step "$logs/test.log" "${test_command[@]}"; rc=$?
-    fi
+  if ((${#TARGET_REFUSALS[@]} == 0)) && ((${#RUN_ITEMS[@]})) && ((PLAN_UNAVAILABLE == 0)); then
+    echo "  编译并跑挑出的 ${#RUN_ITEMS[@]} 项（$(printf '%s\n' "${RUN_ITEMS[@]}" | cut -f1 | tr '\n' ' ' | sed 's/ $//')$(item_mode && echo "；--item 点名的")；一个包一条；并行度 $THREADS）…"
+    run_item_test_commands "$logs" ${test_flags[@]+"${test_flags[@]}"}; rc=$?
     test_count="$(awk 'match($0, /^test result: [A-Za-z]+\. [0-9]+ passed; [0-9]+ failed/) { split($0, f, " "); passed += f[4]; failed += f[6] } END { print passed + failed + 0 }' "$logs/test.log")"
     failed_tests="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' "$logs/test.log")"
     # 按条复用照键记库、逐项打 ITEM_DONE（文件头「逐项点名与按条复用」）
     record_test_functions "$logs" "$tree"
     report_items_done "$rc"
   fi
-  if ((${#TEST_PACKAGES[@]} == 0)); then
-    echo "  - 测试本次未跑：这一批补丁一个要测的包都没改到（${TEST_SELECTION_NOTE}；验证包 $CHECKER_TIER_PACKAGE 归提交时）${untested_text}"
+  if ((${#TARGET_REFUSALS[@]})); then
+    TESTS_REFUSED=1
+    echo "  ✗ 测试那一步与验证包那一步没跑：${#TARGET_REFUSALS[@]} 处判不出改到哪个测试目标（下面逐条），合入后验证不跑整个包"
+    for word in "${TARGET_REFUSALS[@]}"; do echo "      $word"; done   # gate-lint:detail
+    echo "  → 怎么办：整包归提交时的整轮门禁；提交之外要整包跑先弹窗问用户。补丁本该只改到测试目标的，照上面那几处改（工作区级的改动拆出去、变异行点名 --lib 或 --test <目标>）再交；别的步照跑，整条退 3"
+  elif ((${#RUN_ITEMS[@]} == 0)); then
+    echo "  - 测试本次未跑：这一批补丁没点到要跑的测试目标（要特性的、删掉的见上面挑测试目标那几行）"
   elif ((PLAN_UNAVAILABLE)) && [[ ! -f "$logs/test.log" ]]; then
     echo "  - 测试本次未跑：按条复用那一层连不上 prune-server（上面 admission.py plan-failure 那一句），一条 cargo test 都没起（不记红、不算测过；整条退 75）"
   elif [[ -n "$failed_tests" && "${MERGE_AND_VERIFY_BREAK:-}" != "ignore-red" ]]; then
@@ -1614,7 +1829,7 @@ verify() {
     # 红了只重跑红的（文件头「逐项点名与按条复用」）：红的测试函数归到了项的点名那几项，归不到的照旧 -p <包>
     mapfile -t red_items < <(awk -F'\t' '$1 == "FAILED" && $2 != "-" { print $2 }' "$logs/test-sections.tsv" 2>/dev/null | LC_ALL=C sort -u)
     if ((${#red_items[@]})); then
-      echo "  → 怎么办：只重跑红的这几条：python3 scripts/gate/rerun-failed-tests.py $logs/test.log$(printf ' --item %s' "${red_items[@]}")（红的 ${#red_items[@]} 项）；照实现员报告里的算法改钉值，改完再只跑这几条，或只重跑这几项的合入后验证：bash scripts/gate/merge-and-verify.sh --skip-apply$(printf ' --item %s' "${red_items[@]}")（判绿记过库的照复用）（错误警告日志：$logs/test.problems.log，行前带全量日志里的行号）"
+      echo "  → 怎么办：只重跑红的这几条：python3 scripts/gate/rerun-failed-tests.py $logs/test.log$(printf ' --item %s' "${red_items[@]}")（红的 ${#red_items[@]} 项）；照实现员报告里的算法改钉值，改完再只跑这几条，或只重跑这几项的合入后验证：$(merge_rerun_command "${red_items[@]}")（判绿记过库的照复用）（错误警告日志：$logs/test.problems.log，行前带全量日志里的行号）"
     else
       echo "  → 怎么办：只重跑红的这几条：python3 scripts/gate/rerun-failed-tests.py $logs/test.log -p <包>；照实现员报告里的算法改钉值，改完再只跑这几条（错误警告日志：$logs/test.problems.log，行前带全量日志里的行号）"
     fi
@@ -1627,13 +1842,7 @@ verify() {
     echo "  ✗ cargo test 退 0，却一条测试都没跑（test result 行里 passed 与 failed 加起来是 0，按条复用也一条都没复用；日志 $logs/test.log）"
     echo "  → 怎么办：看那份日志里编了哪些包、有没有 test result 行；一条都没跑的「全绿」与跑过了长得一样（check.sh 同一条）"
   else
-    echo "  ✓ 测试全绿（$(grep -c '^test result: ok' "$logs/test.log") 个测试二进制，共 $test_count 条测试；$(item_mode && echo "跑了 --item 点名的 ${#RUN_ITEMS[@]} 项" || echo "跑了 $((${#TEST_PACKAGES[@]} / 2)) 个包")${untested_text}；按条复用：现判 $PLAN_JUDGE、复用 $PLAN_REUSE、拒算 $PLAN_REFUSED）"
-  fi
-  # 按条复用失灵（文件头「逐项点名与按条复用」）：失灵的包照旧全部现判跑完了，这一步判红
-  if ((PLAN_RED)); then
-    reds=$((reds+1))
-    echo "  ✗ 测试那一步按条复用失灵（上面 admission.py plan-failure 那一句点名了哪一条哨兵、或 test-plan / verdict-record 退了几）：${FAILED_PLAN_PACKAGES[*]:-记库那一步} 一条都不跳、全部现判跑完了；不能复用就判红，不退回全部现判当绿"
-    echo "  → 怎么办：照那一句的出路修 scripts/gate/admission.py 点名的那一段，再重跑同一条命令（键相同的照复用）"
+    echo "  ✓ 测试全绿（$(grep -c '^test result: ok' "$logs/test.log") 个测试二进制，共 $test_count 条测试；跑了 ${#RUN_ITEMS[@]} 项（$(printf '%s\n' "${RUN_ITEMS[@]}" | cut -f2 | LC_ALL=C sort -u | grep -c .) 个包）$(item_mode && echo '，--item 点名的')；按条复用：现判 $PLAN_JUDGE、复用 $PLAN_REUSE、拒算 $PLAN_REFUSED）"
   fi
   run_step "$logs/fmt.log" "${fmt_command[@]}"; rc=$?
   if [[ $rc -ne 0 ]]; then reds=$((reds+1)); echo "  ✗ cargo fmt --check 红（日志 $logs/fmt.log、错误警告 $logs/fmt.problems.log）"; echo "  → 怎么办：cargo fmt --all，再看 diff 只动了格式"; else echo "  ✓ fmt 过"; fi
@@ -1683,13 +1892,24 @@ verify() {
     esac
   fi
   # 验证包那一步：编译与测试之后（文件头「验证包那一步」）
-  checker_tier_step "$logs" || reds=$((reds+1))
+  verification_step "$logs" || reds=$((reds+1))
   local applied_note="其中打补丁脚本退 1 的 $warned 个"
   [[ "${MERGE_AND_VERIFY_BREAK:-}" == "mutation-tables-claimed-judged" ]] && applied_note="其中 code-source-discipline 红 $warned 个"
-  echo "  汇总：打上 ${applied} 个补丁目录（${applied_note}${MUTATION_TABLES_STATE:+；$MUTATION_TABLES_STATE}），验证红 $reds 项${CHECKER_TIER_STATE:+，验证包 $CHECKER_TIER_STATE}${CHECKER_TIER_SCALED:+，缩过域、不算门禁通过（$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO，只往小缩）}$( ((PLAN_UNAVAILABLE)) && echo '，测试那一步按条复用连不上 prune-server（不是红，也不算通过）')，日志在 $logs"
+  echo "  汇总：打上 ${applied} 个补丁目录（${applied_note}${MUTATION_TABLES_STATE:+；$MUTATION_TABLES_STATE}），验证红 $reds 项$( ((TESTS_REFUSED)) && echo '，测试那一步与验证包那一步没跑（判不出测试目标，整包归提交时的整轮门禁）')${VERIFICATION_STATE:+，验证包那一步 $VERIFICATION_STATE}${VERIFICATION_SCALED:+，缩过域、不算门禁通过（$CRASH_EXPAND_UP_TO_VARIABLE=$CRASH_EXPAND_UP_TO，只往小缩）}$( ((PLAN_UNAVAILABLE)) && echo '，测试那一步按条复用连不上 prune-server（不是红，也不算通过）')，日志在 $logs"
   if [[ $reds -ne 0 || $warned -ne 0 ]]; then return 1; fi
+  ((TESTS_REFUSED == 0)) || return 3   # 文件头「退出码」3：判不出测试目标，测试那一步与验证包那一步没跑
   ((PLAN_UNAVAILABLE == 0)) || return 75   # 文件头「退出码」75：按条复用那一层连不上 prune-server，别的没有红
   return 0
+}
+
+# merge_rerun_command <项…>：只重跑这几项的合入后验证的整条命令（文件头「逐项点名与按条复用」）：范围声明种类 items、范围是项数，带 --skip-apply 与这一趟的补丁目录
+merge_rerun_command() {
+  local item text
+  local -a words=("$root/task-server/task" submit -- bash "$root/scripts/gate/merge-and-verify.sh" --skip-apply)
+  for item in "$@"; do words+=(--item "$item"); done
+  words+=(${CHECK_PATCH_DIRS[@]+"${CHECK_PATCH_DIRS[@]}"})
+  text="$(printf '%q ' "${words[@]}")"
+  printf "SINGLEFS_RUN_SCOPE='种类=items; 跑什么=合入后验证点名的 %s; 范围=%s 项; 为什么=合入后验证这几项红了，修完只重跑它们：键相同的照复用，只现判红的那几条与改后键变了的' %s" "$*" "$#" "${text% }"
 }
 
 selftest() {
@@ -1697,7 +1917,7 @@ selftest() {
   local baseline_calls flagged_calls flagged_clippy_count
   local -a expected_combinations=()
   local service_problem
-  # 验证包那一步的三格经门禁写判定库（文件头 --selftest 那一行）：不是临时 prune-server 就一格都不跑，不写真服务
+  # 逐项与复用那几格经 admission.py 写判定库（文件头 --selftest 那一行）：不是临时 prune-server 就一格都不跑，不写真服务
   if ! service_problem="$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import prune_server_client; print(prune_server_client.selftest_service_problem())' "$(dirname "${BASH_SOURCE[0]}")/../prune-server" 2>&1)" || [[ -n "$service_problem" ]]; then
     echo "  ✗ merge-and-verify.sh 自证没跑：${service_problem:-读不了 scripts/prune-server/prune_server_client.py}"
     echo "     → 怎么办：照 scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service 那一条，在临时服务底下起这一份自证（带 --server-binary 就不编）"
@@ -1705,7 +1925,7 @@ selftest() {
   fi
   unset MERGE_AND_VERIFY_KEEP_COPY   # 留现场那一格自己设；调用方设了不能带进别的格
   unset SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO   # 缩崩溃域的格自己设；调用方环境里有的不能带进别的格
-  # 测试那一步：别的格照改前一条 cargo test（它们核假 cargo 收到的那一条），只有「按测试目标并行起」那一格不设它（文件头 test 一段）
+  # 测试那一步：别的格一条 cargo test（它们核假 cargo 收到的那一条），只有「按测试目标并行起」那一格不设它（文件头 test 一段）
   export MERGE_AND_VERIFY_TEST_TARGETS=serial
   scratch="$(mktemp -d)"; fake_cargo_dir="$scratch/bin"; mkdir -p "$fake_cargo_dir" "$scratch/patch-a" "$scratch/patch-b"
   # 各格没设 CARGO_TARGET_DIR 时编译目录建在 TMPDIR 下（文件头「这一趟的编译目录」）：TMPDIR 指进 scratch，留下的随 scratch 一起删
@@ -1714,23 +1934,43 @@ selftest() {
   run_target_of() { sed -n 's/^  这一趟的编译目录：\(.*\)（这里建的，收尾删）$/\1/p' "$1" 2>/dev/null | head -1; }
   # patch-a 改的是 demo 里的一份数据文件（不是 .rs：重编核对不核它，测试照挑 demo）
   printf -- '--- a/crates/demo/src/table.txt\n+++ b/crates/demo/src/table.txt\n@@ -1 +1 @@\n-1\n+2\n' > "$scratch/patch-a/crates.patch"
-  # 验证包那一步（文件头「验证包那一步」）：别的格都换上假的那一道；那一步自己的几格另换回真的门禁，交它的样本根（假 cargo）
+  # 验证包那一步（文件头「验证包那一步」）：各格都换上假的那一道，它照真的那一道的写法答 --list-items、打按条复用与崩溃状态块那几行
   cat > "$scratch/fake-verification-step.sh" <<'FAKE'
 #!/usr/bin/env bash
-# 假的 门禁 crash-point-replay：参数记进 FAKE_CHECKER_TIER_CALLS（设了的话），照真的那一道打一行按条复用与一行逐格，退 FAKE_CHECKER_TIER_EXIT（没设是 0）
-[[ -z "${FAKE_CHECKER_TIER_CALLS:-}" ]] || printf '%s\n' "$*" >> "$FAKE_CHECKER_TIER_CALLS"
+# 假的 门禁 crash-point-replay：--list-items 照真的那一道的写法列一条登记的崩溃枚举用例（测试目标 setting）与挂特性的两项（库、gpu_pair.rs），退 FAKE_VERIFICATION_LIST_EXIT（没设是 0）；
+#   别的起法照真的那一道打一行按条复用、一行崩溃状态块与一行逐格，FAKE_VERIFICATION_EXIT 不是 0 时另打一条 FAILED 与点名的每项一行 exit=1 的 ITEM_DONE，退它（没设是 0）。
+#   每次的参数记进 FAKE_VERIFICATION_CALLS，不是 --list-items 的那几次把展开深度变量记进 FAKE_VERIFICATION_ENVIRONMENT（都是设了的话）
+[[ -z "${FAKE_VERIFICATION_CALLS:-}" ]] || printf '%s\n' "$*" >> "$FAKE_VERIFICATION_CALLS"
 # 照真的那一道写它的产品 GPU 包那一格守哪个包：合入后验证照这一行现读（文件头「验证包那一步」）
 PRODUCT_GPU_PACKAGE_NAME="singlefs-background-gpu"
-[[ -z "${FAKE_CHECKER_TIER_ENVIRONMENT:-}" ]] || printf '%s\n' "${SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO:-unset}" >> "$FAKE_CHECKER_TIER_ENVIRONMENT"
+if [[ "$1" == --list-items ]]; then
+  printf 'crash-case:demo-case\tsinglefs-verification:setting:case_function\n'
+  printf 'feature-gated:lib\t--lib\n'
+  printf 'feature-gated:gpu_pair.rs\twhole-file gpu\n'
+  exit "${FAKE_VERIFICATION_LIST_EXIT:-0}"
+fi
+[[ -z "${FAKE_VERIFICATION_ENVIRONMENT:-}" ]] || printf '%s\n' "${SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO:-unset}" >> "$FAKE_VERIFICATION_ENVIRONMENT"
 echo "  · 按条复用：验证包 2 条编得进的测试函数，现判 0、复用 2、拒算 0；这一组特性下不编 0 条"
 echo "  ✓ 崩溃状态块：现判 3、复用 5、拒算 0、本次未跑 0"
 echo "  · 逐格：crash-case-replay：绿；feature-gated-tests：无对象可判"
-exit "${FAKE_CHECKER_TIER_EXIT:-0}"
+if [[ "${FAKE_VERIFICATION_EXIT:-0}" != 0 ]]; then
+  echo "test case_function ... FAILED"
+  previous=""
+  for word in "$@"; do [[ "$previous" == --item ]] && echo "ITEM_DONE item=$word seconds=1 judged=1 reused=0 exit=1"; previous="$word"; done
+fi
+exit "${FAKE_VERIFICATION_EXIT:-0}"
 FAKE
-  export MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$scratch/fake-verification-step.sh"
-  unset MERGE_AND_VERIFY_CHECKER_TIER_ROOT FAKE_CHECKER_TIER_CALLS FAKE_CHECKER_TIER_EXIT FAKE_CHECKER_TIER_ENVIRONMENT
+  export MERGE_AND_VERIFY_VERIFICATION_STAGE="$scratch/fake-verification-step.sh"
+  unset MERGE_AND_VERIFY_VERIFICATION_ROOT FAKE_VERIFICATION_CALLS FAKE_VERIFICATION_EXIT FAKE_VERIFICATION_ENVIRONMENT FAKE_VERIFICATION_LIST_EXIT
+  # 只有变异行、没有 crates.patch 的补丁目录（--skip-apply 时不核打没打）：变异行点名 demo 的库目标，--skip-apply 的各格拿它挑测试目标（文件头「挑测试目标」）
+  mkdir -p "$scratch/patch-demo-lib"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' 'demo 的库（自证样本）' crates/demo/src/lib.rs 'pub fn f() {}' 'pub fn f() { }' '-p demo --lib' f > "$scratch/patch-demo-lib/mutations-append.tsv"
+  # patch-targets 改 demo 的库里一份数据文件与测试目标 alpha 的根文件（「按测试目标并行起」那一格用）
+  mkdir -p "$scratch/patch-targets"
+  printf -- '--- a/crates/demo/src/table.txt\n+++ b/crates/demo/src/table.txt\n@@ -1 +1 @@\n-1\n+2\n--- a/crates/demo/tests/alpha.rs\n+++ b/crates/demo/tests/alpha.rs\n@@ -1 +1 @@\n-1\n+2\n' \
+    > "$scratch/patch-targets/crates.patch"
   # 自证自己经 task-server 派到第二台时环境里带着第二台那一趟的几样（scripts/hosts/multi-host-run.sh 文件头 ⑤「带到第二台的环境」：本台的多机配置、起活那一方的回读握手、
-  #   这一趟的本地目录）：各格照本机跑，只有「跑在第二台上」那一格自己设那几样；多机配置不带进来（验证包那三格在样本上起真门禁与它调的 admission.py，
+  #   这一趟的本地目录）：各格照本机跑，只有「跑在第二台上」那一格自己设那几样；多机配置不带进来（逐项与复用那几格起 admission.py，
   #   本台那一份的路径不漏进它们起的子进程）。两台对称，没有认台的角色变量
   unset SINGLEFS_MULTI_HOST_CONFIG GPU_QUIESCE_ORIGIN_READ_BACK MULTI_HOST_RUN_PEER_SCRATCH
   cat > "$scratch/fake-apply.py" <<'FAKE'
@@ -1760,7 +2000,7 @@ FAKE
   chmod +x "$fake_cargo_dir/cargo"
   # 快照从临时树拷（MERGE_AND_VERIFY_TREE），不碰本仓的源文件与编译目录
   mkdir -p "$scratch/tree/crates/demo/src"; printf 'pub fn f() {}\n' > "$scratch/tree/crates/demo/src/lib.rs"
-  # 样本工作区两个成员：demo 与 验证包；cargo test 只该挑 demo
+  # 样本工作区两个成员：demo 与 验证包；补丁 patch-a 只改到 demo 的库，cargo test 只该起 demo --lib
   write_workspace() {   # $1 树，$2 验证包那个成员的包名
     mkdir -p "$1/crates/demo" "$1/crates/singlefs-verification"
     printf '[workspace]\nmembers = ["crates/demo", "crates/singlefs-verification"]\n' > "$1/Cargo.toml"
@@ -1873,24 +2113,26 @@ FAKE
   if ! grep -qxF -- "build --offline --all-targets" "$scratch/calls-three.txt"; then
     echo "  ✗ 自检：应当跑 cargo build --offline --all-targets（check.sh 的构建那一条），假 cargo 收到的是：$(tr '\n' '|' < "$scratch/calls-three.txt")"; failures=1; fi   # gate-lint:detail
   checked=$((checked+1))
-  if ! grep -qxF -- "test --offline --no-fail-fast -p demo" < "$scratch/calls-three.txt"; then
-    echo "  ✗ 自检：cargo test 应当挑工作区成员减掉 验证包（样本里只剩 -p demo），假 cargo 收到的是：$(grep '^test' "$scratch/calls-three.txt")"; failures=1; fi   # gate-lint:detail
+  if [[ "$(grep '^test' "$scratch/calls-three.txt" | tr '\n' '|')" != "test --offline --no-fail-fast -p demo --lib|" ]]; then
+    echo "  ✗ 自检：cargo test 应当只起补丁改到的 demo 的库目标（-p demo --lib），假 cargo 收到的是：$(grep '^test' "$scratch/calls-three.txt" | tr '\n' '|')"; failures=1; fi   # gate-lint:detail
   # 测试那一步按测试目标并行起（文件头 test 一段）：这一格不设 MERGE_AND_VERIFY_TEST_TARGETS，假 cargo 的 metadata 与 --no-run 打录好的两个测试目标（demo 的 lib 与 test alpha）；
   # 全绿那一趟两个目标各起一条、汇总数到 2 个测试二进制 4 条测试，红的那一趟两条 FAILED 都列出来、退 1
   printf '%s\n' '{"packages":[{"id":"demo-id","name":"demo","targets":[{"kind":["lib"],"name":"demo","doctest":false},{"kind":["test"],"name":"alpha","doctest":false}]}],"workspace_members":["demo-id"]}' \
     > "$scratch/fake-metadata.json"
   printf '%s\n' '{"reason":"compiler-artifact","package_id":"demo-id","target":{"kind":["lib"],"name":"demo"},"profile":{"test":true},"executable":"/selftest/demo"}' \
     '{"reason":"compiler-artifact","package_id":"demo-id","target":{"kind":["test"],"name":"alpha"},"profile":{"test":true},"executable":"/selftest/alpha"}' > "$scratch/fake-artifacts.jsonl"
+  mkdir -p "$scratch/tree/crates/demo/tests"; printf 'fn main() {}\n' > "$scratch/tree/crates/demo/tests/alpha.rs"   # 这两格之后删掉：别的格的 demo 只有库目标
   out="$scratch/out-targets.txt"; MERGE_AND_VERIFY_TEST_TARGETS= FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-targets.txt" \
-    FAKE_CARGO_METADATA="$scratch/fake-metadata.json" FAKE_CARGO_ARTIFACTS="$scratch/fake-artifacts.jsonl" run_case targets "$scratch/patch-a"; checked=$((checked+1))
+    FAKE_CARGO_METADATA="$scratch/fake-metadata.json" FAKE_CARGO_ARTIFACTS="$scratch/fake-artifacts.jsonl" run_case targets "$scratch/patch-targets"; checked=$((checked+1))
   local targets_green_rc=$rc targets_red_out="$scratch/out-targets-red.txt" targets_red_rc
   # 红的那一趟要假 cargo 照最早那一份打一条 FAILED（全绿那一格之前已把它换成全 ok），跑完换回全 ok
   sed -i.bak 's/subtracts_in_%s \.\.\. ok/subtracts_in_%s ... FAILED/; s/ok\. 2 passed; 0 failed/FAILED. 1 passed; 1 failed/' "$fake_cargo_dir/cargo" && rm -f "$fake_cargo_dir/cargo.bak"
   out="$targets_red_out"; MERGE_AND_VERIFY_TEST_TARGETS= FAKE_CARGO_CALLS="$scratch/calls-targets-red.txt" \
-    FAKE_CARGO_METADATA="$scratch/fake-metadata.json" FAKE_CARGO_ARTIFACTS="$scratch/fake-artifacts.jsonl" run_case targets-red "$scratch/patch-a"; targets_red_rc=$rc
+    FAKE_CARGO_METADATA="$scratch/fake-metadata.json" FAKE_CARGO_ARTIFACTS="$scratch/fake-artifacts.jsonl" run_case targets-red "$scratch/patch-targets"; targets_red_rc=$rc
+  rm -rf -- "${scratch:?}/tree/crates/demo/tests"
   sed -i.bak 's/ \.\.\. FAILED/ ... ok/; s/FAILED\. 1 passed; 1 failed/ok. 2 passed; 0 failed/' "$fake_cargo_dir/cargo" && rm -f "$fake_cargo_dir/cargo.bak"
   out="$scratch/out-targets.txt"
-  if [[ $targets_green_rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo --no-run --message-format=json-render-diagnostics" "$scratch/calls-targets.txt" \
+  if [[ $targets_green_rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast --lib --test alpha -p demo --no-run --message-format=json-render-diagnostics" "$scratch/calls-targets.txt" \
      || ! grep -qxF -- "test --offline --no-fail-fast -p demo --lib" < "$scratch/calls-targets.txt" || ! grep -qxF -- "test --offline --no-fail-fast -p demo --test alpha" < "$scratch/calls-targets.txt" \
      || ! grep -q '✓ 测试全绿（2 个测试二进制，共 4 条测试' "$out" || ! grep -q '^TEST_TARGETS_PARALLEL dispatched=2 collected=2 ' "$scratch/logs-targets/test.log" \
      || [[ $targets_red_rc -ne 1 ]] || ! grep -q '红的测试 2 条' "$targets_red_out"; then
@@ -1899,41 +2141,67 @@ FAKE
   checked=$((checked+1))
   if grep -qE '^test .* -- ' "$scratch/calls-three.txt" "$scratch/calls-targets.txt" \
      || grep -qE '^test .*-p singlefs-verification' "$scratch/calls-three.txt" "$scratch/calls-targets.txt" \
-     || ! grep -qF '共 4 条测试；跑了 1 个包' "$scratch/out-targets.txt"; then
+     || ! grep -qF '共 4 条测试；跑了 2 项（1 个包）' "$scratch/out-targets.txt"; then
     echo "  ✗ 自检：测试那一步的 cargo test 在 -- 之后应当什么都不带（一条 cargo test 与按测试目标并行起两种都一样）、验证包照旧不进、成功句不报标 #[ignore] 的条数，假 cargo 收到的是：$(grep -h '^test' "$scratch/calls-three.txt" "$scratch/calls-targets.txt" 2>/dev/null | tr '\n' '|')；成功句：$(grep '✓ 测试' "$scratch/out-targets.txt" | head -1)"; failures=1; fi   # gate-lint:detail
-  # 测试只跑改到的包（文件头）：样本工作区五个成员 demo、alpha、beta、delta（依赖 demo）与 验证包；补丁改的都是包里的数据文件（重编核对不核）
+  # 挑测试目标（文件头「挑测试目标」）：样本工作区成员 demo、alpha、beta（dev 依赖 alpha）、delta（dev 依赖 demo）、验证包与产品 GPU 包；
+  #   alpha 有测试目标 case_a、beta 有 case，验证包有库与 setting、gpu_pair 两个测试目标，产品 GPU 包的 real_card 写了 required-features
   local narrow_tree="$scratch/narrow-tree" narrow_member
-  mkdir -p "$narrow_tree/crates/singlefs-verification"
-  printf '[workspace]\nmembers = ["crates/demo", "crates/alpha", "crates/beta", "crates/delta", "crates/singlefs-verification"]\n' > "$narrow_tree/Cargo.toml"
-  for narrow_member in demo alpha beta delta; do
+  mkdir -p "$narrow_tree"
+  printf '[workspace]\nmembers = ["crates/demo", "crates/alpha", "crates/beta", "crates/delta", "crates/singlefs-verification", "crates/singlefs-background-gpu"]\n' > "$narrow_tree/Cargo.toml"
+  for narrow_member in demo alpha beta delta singlefs-verification singlefs-background-gpu; do
     mkdir -p "$narrow_tree/crates/$narrow_member/src" "$narrow_tree/crates/$narrow_member/tests"; printf 'pub fn f() {}\n' > "$narrow_tree/crates/$narrow_member/src/lib.rs"
     printf '[package]\nname = "%s"\n' "$narrow_member" > "$narrow_tree/crates/$narrow_member/Cargo.toml"
   done
+  printf '\n[dev-dependencies]\nalpha = { path = "../alpha" }\n' >> "$narrow_tree/crates/beta/Cargo.toml"
   printf '\n[dev-dependencies]\ndemo = { path = "../demo" }\n' >> "$narrow_tree/crates/delta/Cargo.toml"
-  printf '[package]\nname = "singlefs-verification"\n' > "$narrow_tree/crates/singlefs-verification/Cargo.toml"
+  printf '\n[[test]]\nname = "real_card"\nrequired-features = ["tests-on-a-real-gpu"]\n' >> "$narrow_tree/crates/singlefs-background-gpu/Cargo.toml"
+  printf 'fn main() {}\n' > "$narrow_tree/crates/alpha/tests/case_a.rs"
+  printf 'fn main() {}\n' > "$narrow_tree/crates/singlefs-verification/tests/setting.rs"
   narrow_patch() {   # $1 补丁目录，其余是改到的路径；树里那几份写成打过之后的内容（--skip-apply 先核补丁打过没有）
     mkdir -p "$1"; local narrow_path; : > "$1/crates.patch"
     for narrow_path in "${@:2}"; do printf -- '--- a/%s\n+++ b/%s\n@@ -1 +1 @@\n-1\n+2\n' "$narrow_path" "$narrow_path" >> "$1/crates.patch"
       mkdir -p "$(dirname "$narrow_tree/$narrow_path")"; printf '2\n' > "$narrow_tree/$narrow_path"; done
   }
-  narrow_patch "$scratch/narrow-two" crates/alpha/src/table.txt crates/beta/tests/data.txt
-  narrow_patch "$scratch/narrow-demo" crates/demo/src/table.txt
-  narrow_patch "$scratch/narrow-lock" Cargo.lock
   narrow_case() {   # $1 标签，其余是参数
     FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-narrow-$1.txt" PATH="$fake_cargo_dir:$PATH" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" \
       MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-narrow-$1" MERGE_AND_VERIFY_TREE="$narrow_tree" env -u CARGO_TARGET_DIR bash "$0" "${@:2}" > "$out" 2>&1; rc=$?
   }
+  narrow_tests() { grep '^test' "$scratch/calls-narrow-$1.txt" 2>/dev/null | tr '\n' '|'; }   # <标签>：假 cargo 收到的测试命令，| 连起来
+  # 补丁改到 alpha 的库（src 下的数据文件）与 beta 的测试目标 case：只起这两个目标，各一条（不带上依赖 alpha 的 beta 的别的目标、也不跑 demo、delta）
+  narrow_patch "$scratch/narrow-two" crates/alpha/src/table.txt crates/beta/tests/case.rs
   out="$scratch/out-narrow-two.txt"; narrow_case two --skip-apply "$scratch/narrow-two"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p alpha -p beta" < "$scratch/calls-narrow-two.txt" || ! grep -qF '核过 1 份补丁都已打在树上' "$out" \
-     || ! grep -qF '本次未跑：补丁没改到 2 个包：demo、delta' "$out" || ! grep -q '✓ 测试全绿.*跑了 2 个包；本次未跑：补丁没改到 2 个包：demo、delta' "$out"; then
-    echo "  ✗ 自检：补丁改到 alpha 与 beta 两个包：cargo test 只该挑这两个、报 demo 与 delta 本次未跑，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-two.txt" 2>/dev/null)：$(grep -E '✓ 测试|本次未跑|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-narrow-demo.txt"; narrow_case demo --skip-apply "$scratch/narrow-demo"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p delta" < "$scratch/calls-narrow-demo.txt" || ! grep -qF '另带上依赖它们的：delta' "$out"; then
-    echo "  ✗ 自检：补丁改到 demo：cargo test 应当挑 demo 与依赖它的 delta，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-demo.txt" 2>/dev/null)：$(grep -E '编译并跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-narrow-lock.txt"; narrow_case lock --skip-apply "$scratch/narrow-lock"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" < "$scratch/calls-narrow-lock.txt" || ! grep -qF '补丁改到工作区根的 Cargo.lock，照旧全跑' "$out"; then
-    echo "  ✗ 自检：补丁改到工作区根的 Cargo.lock：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-lock.txt" 2>/dev/null)：$(grep -E '编译并跑|本次未跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  # --skip-apply 给的补丁没打在树上（树里那一份还是改前的 1）：退 1、点名那份补丁、不编
+  if [[ $rc -ne 0 || "$(narrow_tests two)" != "test --offline --no-fail-fast -p alpha --lib|test --offline --no-fail-fast -p beta --test case|" ]] \
+     || ! grep -qF '核过 1 份补丁都已打在树上' "$out" || ! grep -q '✓ 测试全绿.*跑了 2 项（2 个包）' "$out"; then
+    echo "  ✗ 自检：补丁改到 alpha 的库与 beta 的测试目标 case：测试那一步只该起 alpha --lib 与 beta --test case 两条，实际退出码 $rc，假 cargo 收到 $(narrow_tests two)：$(grep -E '✓ 测试|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 补丁改到 alpha 的 src/lib.rs、变异行点名 alpha 的测试目标 case_a（带筛选词）：只起 alpha 一条 --lib --test case_a，依赖 alpha 的 beta 一个目标都不起
+  narrow_patch "$scratch/narrow-alpha" crates/alpha/src/lib.rs
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' 'alpha 的 case_a（自证样本）' crates/alpha/src/lib.rs 2 3 '-p alpha --test case_a -- a_filter' a_filter > "$scratch/narrow-alpha/mutations-append.tsv"
+  out="$scratch/out-narrow-alpha.txt"; narrow_case alpha --skip-apply "$scratch/narrow-alpha"; checked=$((checked+1))
+  if [[ $rc -ne 0 || "$(narrow_tests alpha)" != "test --offline --no-fail-fast -p alpha --lib --test case_a|" ]] || ! grep -qF '筛选词 a_filter' "$out"; then
+    echo "  ✗ 自检：补丁改到 alpha 的 src/lib.rs、变异行点名 alpha 的 case_a：测试那一步只该起 alpha --lib 与 --test case_a，不起依赖 alpha 的 beta，实际退出码 $rc，假 cargo 收到 $(narrow_tests alpha)：$(grep -E '✓ 测试|筛选词|✗' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 判不出测试目标的四种（文件头「挑测试目标」）：测试那一步不跑、别的步照跑（build 照起）、整条退 3、逐条报原因与整包归提交时的出路
+  narrow_patch "$scratch/narrow-lock" Cargo.lock
+  narrow_patch "$scratch/narrow-loose" docs/notes.txt
+  narrow_patch "$scratch/narrow-unmapped" crates/alpha/tests/fixture.txt
+  local refusal_label refusal_text
+  for refusal_label in none lock loose unmapped; do
+    out="$scratch/out-narrow-refuse-$refusal_label.txt"; checked=$((checked+1))
+    case "$refusal_label" in
+      none) refusal_text='没给补丁目录'; narrow_case refuse-none --skip-apply ;;
+      lock) refusal_text='补丁改到工作区根的 Cargo.lock'; narrow_case refuse-lock --skip-apply "$scratch/narrow-lock" ;;
+      loose) refusal_text='补丁改到不落在任何包里的 docs/notes.txt'; narrow_case refuse-loose --skip-apply "$scratch/narrow-loose" ;;
+      unmapped) refusal_text='补丁改到 alpha 包里的 tests/fixture.txt，判不出改到哪个测试目标'; narrow_case refuse-unmapped --skip-apply "$scratch/narrow-unmapped" ;;
+    esac
+    if [[ $rc -ne 3 || -n "$(narrow_tests "refuse-$refusal_label")" ]] || ! grep -qF -- "$refusal_text" "$out" || ! grep -qF '整包归提交时的整轮门禁；提交之外要整包跑先弹窗问用户' "$out" \
+       || ! grep -qxF -- "build --offline --all-targets" "$scratch/calls-narrow-refuse-$refusal_label.txt" 2>/dev/null; then
+      echo "  ✗ 自检：判不出测试目标：$refusal_text 时测试那一步不跑、别的步照跑、退 3，实际退出码 $rc，假 cargo 收到的测试命令 $(narrow_tests "refuse-$refusal_label")：$(grep -E '判不出|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  done
+  rm -rf -- "${narrow_tree:?}/docs" "$narrow_tree/crates/alpha/tests/fixture.txt"
+  # --all-packages 不是认得的参数（不留整包跑的选项）：给了就退 2、点名它、一样都不做
+  out="$scratch/out-narrow-all-packages.txt"; narrow_case all-packages --skip-apply --all-packages "$scratch/narrow-two"; checked=$((checked+1))
+  if [[ $rc -ne 2 || -s "$scratch/calls-narrow-all-packages.txt" ]] || ! grep -qF '认不出参数 --all-packages' "$out"; then
+    echo "  ✗ 自检：给了 --all-packages（不认的参数）应当退 2、点名它、一样都不做，实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-all-packages.txt" 2>/dev/null) 条"; failures=1; fi   # gate-lint:detail
+  # --skip-apply 给的补丁没打在树上（树里那一份还是补丁前的 1）：退 1、点名那份补丁、不编
   narrow_patch "$scratch/narrow-unapplied" crates/alpha/src/unapplied.txt
   printf '1\n' > "$narrow_tree/crates/alpha/src/unapplied.txt"
   out="$scratch/out-narrow-unapplied.txt"; narrow_case unapplied --skip-apply "$scratch/narrow-unapplied"; checked=$((checked+1))
@@ -1951,7 +2219,7 @@ FAKE
     echo "  ✗ 自检：--skip-apply 给的两份补丁改同一行、照打的次序给：应当判都已打上、退 0、要验的树不动，实际退出码 $rc，树里那一份是「$(cat "$narrow_tree/crates/alpha/src/stacked.txt" 2>/dev/null)」：$(grep -E '✗|核过|本次未核' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   rm -f "$narrow_tree/crates/alpha/src/stacked.txt"
   # 临时目录不认保留属性（假 cp 见 -p、-a、--preserve 带权限就照那种文件系统报 Operation not supported）：--skip-apply 照样核得过、退 0
-  #   （弄坏开关 reverse-check-copy-preserves 下照改前带 -p 拷，这一格红）
+  #   （弄坏开关 reverse-check-copy-preserves 下带 -p 拷，这一格红）
   mkdir -p "$scratch/fake-cp-no-preserve"; real_cp="$(command -v cp)"
   printf '#!/usr/bin/env bash\nfor a in "$@"; do case "$a" in -p|-a|-*p*|--preserve|--preserve=*mode*|--preserve=all|--archive) [[ "$a" == --no-preserve* || "$a" == --parents ]] && continue; echo "cp: preserving permissions for ‘${@: -1}’: Operation not supported" >&2; exit 1;; esac; done\nexec %q "$@"\n' "$real_cp" > "$scratch/fake-cp-no-preserve/cp"
   chmod +x "$scratch/fake-cp-no-preserve/cp"
@@ -1960,14 +2228,6 @@ FAKE
   rm -f "$narrow_tree/crates/alpha/src/no-preserve.txt"
   if [[ $rc -ne 0 ]] || ! grep -qF '核过 1 份补丁都已打在树上' "$out"; then
     echo "  ✗ 自检：临时目录不认保留属性时 --skip-apply 照样核得过补丁已打上、退 0，实际退出码 $rc：$(grep -E '✗|核过|拷不进' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-narrow-all.txt"; narrow_case all --skip-apply --all-packages "$scratch/narrow-two"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || ! grep -qxF -- "test --offline --no-fail-fast -p demo -p alpha -p beta -p delta" < "$scratch/calls-narrow-all.txt" || ! grep -qF '带了 --all-packages，照旧全跑' "$out"; then
-    echo "  ✗ 自检：带 --all-packages：cargo test 应当照旧挑全部四个包，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-all.txt" 2>/dev/null)"; failures=1; fi   # gate-lint:detail
-  narrow_patch "$scratch/narrow-checker" crates/singlefs-verification/src/table.txt
-  mkdir -p "$narrow_tree/crates/singlefs-verification/src"
-  out="$scratch/out-narrow-checker.txt"; narrow_case checker --skip-apply "$scratch/narrow-checker"; checked=$((checked+1))
-  if [[ $rc -ne 0 ]] || grep -q '^test' "$scratch/calls-narrow-checker.txt" 2>/dev/null || ! grep -qF '测试本次未跑：这一批补丁一个要测的包都没改到' "$out"; then
-    echo "  ✗ 自检：补丁只改到 验证包：测试这一步应当不跑、报测试本次未跑、退 0，实际退出码 $rc，假 cargo 收到 $(grep '^test' "$scratch/calls-narrow-checker.txt" 2>/dev/null)：$(grep -E '本次未跑|✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
   # check.sh 读不出 lint 表、clippy 那一行没带 lint 表、fmt 那一条换成认不出的包装、test 那一行带了收窄目标的标志、缺省特性组合只剩一个（照它 CHECK_BREAK=single-clippy-pass 的写法）、
   # 循环改成只取一个组合：退 1，一个补丁都不打、不编
   sed '/^CODE_DISCIPLINE_LINTS=(/,/^)/d' "$CHECK_SH" > "$scratch/check-no-table.sh"
@@ -1994,7 +2254,7 @@ FAKE
   done
   # cargo 命令现读（文件头「cargo 命令现读」）：check.sh 只换包装、或给命令加标志时，不判红，照读到的写法跑。基线是真 check.sh 同一趟 --skip-apply 收到的假 cargo 命令
   out="$scratch/out-read-baseline.txt"; checked=$((checked+1))
-  FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-read-baseline.txt" run_case read-baseline --skip-apply
+  FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-read-baseline.txt" run_case read-baseline --skip-apply "$scratch/patch-demo-lib"
   baseline_calls="$(sort "$scratch/calls-read-baseline.txt" 2>/dev/null)"
   if [[ $rc -ne 0 || -z "$baseline_calls" ]]; then
     echo "  ✗ 自检：cargo 命令现读：真 check.sh 同一趟 --skip-apply 应当退 0、假 cargo 收到命令（后面两格拿它当基线），实际退出码 $rc：$(grep -E '✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
@@ -2004,7 +2264,7 @@ FAKE
   if [[ "$(grep -cE '^[[:space:]]*(if[[:space:]]+)?run_cargo[[:space:]]+(fmt|clippy|build|test)[[:space:]]' "$scratch/check-wrapper-run-cargo.sh")" != 4 ]]; then
     echo "  ✗ 自检：check.sh 的 cargo 命令包了 run_cargo 时应当照读、收到的命令与真 check.sh 相同，样本没造出来（sed 之后 $CHECK_SH 里命令位置上的 run_cargo <子命令> 不是 4 条）"; failures=1   # gate-lint:detail
   else
-    FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-wrapper-run-cargo.txt" MERGE_AND_VERIFY_CHECK_SH="$scratch/check-wrapper-run-cargo.sh" run_case wrapper-run-cargo --skip-apply
+    FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-wrapper-run-cargo.txt" MERGE_AND_VERIFY_CHECK_SH="$scratch/check-wrapper-run-cargo.sh" run_case wrapper-run-cargo --skip-apply "$scratch/patch-demo-lib"
     if [[ $rc -ne 0 || "$(sort "$scratch/calls-wrapper-run-cargo.txt" 2>/dev/null)" != "$baseline_calls" ]]; then
       echo "  ✗ 自检：check.sh 的 cargo 命令包了 run_cargo 时应当照读、收到的命令与真 check.sh 相同，实际退出码 $rc，假 cargo 收到 $(wc -l < "$scratch/calls-wrapper-run-cargo.txt" 2>/dev/null) 条（基线 $(wc -l <<< "$baseline_calls") 条）：$(grep -E '✗|!' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   fi
@@ -2017,23 +2277,23 @@ FAKE
   if [[ "$(diff "$CHECK_SH" "$scratch/check-flags-added.sh" | grep -c '^>')" != 4 ]]; then
     echo "  ✗ 自检：check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们，样本没造出来（sed 在 $CHECK_SH 里没改到四行）"; failures=1   # gate-lint:detail
   else
-    FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-flags-added.txt" MERGE_AND_VERIFY_CHECK_SH="$scratch/check-flags-added.sh" run_case flags-added --skip-apply
+    FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-flags-added.txt" MERGE_AND_VERIFY_CHECK_SH="$scratch/check-flags-added.sh" run_case flags-added --skip-apply "$scratch/patch-demo-lib"
     flagged_calls="$(cat "$scratch/calls-flags-added.txt")"
     flagged_clippy_count="$(grep -cF -- ' -- -D warnings -W clippy::pedantic -D ' <<< "$flagged_calls")"
     if [[ $rc -ne 0 ]] || ! grep -qxF -- "fmt --all --verbose -- --check" <<< "$flagged_calls" || ! grep -qxF -- "build --offline --all-targets --locked" <<< "$flagged_calls" \
-       || ! grep -qxF -- "test --offline --no-fail-fast --locked -p demo" <<< "$flagged_calls" || [[ "$flagged_clippy_count" != "${#expected_combinations[@]}" ]]; then
+       || ! grep -qxF -- "test --offline --no-fail-fast --locked -p demo --lib" <<< "$flagged_calls" || [[ "$flagged_clippy_count" != "${#expected_combinations[@]}" ]]; then
       echo "  ✗ 自检：check.sh 的四条 cargo 命令各加一个标志时应当照读、收到的命令带上它们（fmt --verbose、build --locked、test --locked、每个组合的 clippy 都带 -W clippy::pedantic），实际退出码 $rc，clippy 带上的有 $flagged_clippy_count 条（要 ${#expected_combinations[@]} 条），假 cargo 收到：$(tr '\n' '|' <<< "$flagged_calls")"; failures=1; fi   # gate-lint:detail
   fi
-  # 工作区成员里没有 singlefs-verification（样本里那个成员改了名）：排不掉它，退 1、不编
+  # 工作区成员里没有 singlefs-verification（样本里那个成员改了名）：认不出验证包，退 1、不编
   write_workspace "$scratch/tree-renamed" singlefs-verification-renamed
   mkdir -p "$scratch/tree-renamed/crates/demo/src"; printf 'pub fn f() {}\n' > "$scratch/tree-renamed/crates/demo/src/lib.rs"
   out="$scratch/out-renamed.txt"; checked=$((checked+1))
   PATH="$fake_cargo_dir:$PATH" FAKE_CARGO_MODE=green FAKE_CARGO_CALLS="$scratch/calls-renamed.txt" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" \
     MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-renamed" MERGE_AND_VERIFY_TREE="$scratch/tree-renamed" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$out" 2>&1; rc=$?
-  if [[ $rc -ne 1 ]] || ! grep -q '排不掉它' "$out" || grep -q '^test' "$scratch/calls-renamed.txt" 2>/dev/null; then
+  if [[ $rc -ne 1 ]] || ! grep -q '认不出它就排不掉登记的崩溃枚举用例' "$out" || grep -q '^test' "$scratch/calls-renamed.txt" 2>/dev/null; then
     echo "  ✗ 自检：工作区成员里没有 singlefs-verification 时应当退 1、不编，实际退出码 $rc：$(grep '^test' "$scratch/calls-renamed.txt" 2>/dev/null | tr '\n' ' ')$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
   # cargo test 退 0 而一条测试都没跑（假 cargo 什么都不打）：退 1
-  out="$scratch/out-empty.txt"; checked=$((checked+1)); FAKE_CARGO_MODE=empty run_case empty --skip-apply
+  out="$scratch/out-empty.txt"; checked=$((checked+1)); FAKE_CARGO_MODE=empty run_case empty --skip-apply "$scratch/patch-demo-lib"
   if [[ $rc -ne 1 ]] || ! grep -q '一条测试都没跑' "$out"; then
     echo "  ✗ 自检：cargo test 退 0 却一条测试都没跑时应当退 1，实际退出码 $rc：$(grep -E '✓ 测试|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   # 没设日志目录：日志落在工作根下（SINGLEFS_WORK_ROOT 指进临时目录）
@@ -2056,7 +2316,7 @@ FAKE
   printf 'pub fn walk() -> u32 { 22 }\n' > "$stale_source/crates/demo/src/walk.rs"
   touch -d @1577836900 "$stale_source/crates/demo/src/walk.rs"
   stale_case() { PATH="$stale_bin:$PATH" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-$1" \
-    MERGE_AND_VERIFY_TREE="$stale_tree" env CARGO_TARGET_DIR="$stale_tree/target" bash "$0" --skip-apply > "$out" 2>&1; rc=$?; }
+    MERGE_AND_VERIFY_TREE="$stale_tree" env CARGO_TARGET_DIR="$stale_tree/target" bash "$0" --skip-apply "$scratch/patch-demo-lib" > "$out" 2>&1; rc=$?; }
   out="$scratch/out5-first.txt"; stale_case five-first
   rsync -a "$stale_source/" "$stale_tree/"
   out="$scratch/out5.txt"; stale_case five; checked=$((checked+1))
@@ -2097,7 +2357,7 @@ FAKE
   [[ -n "$three_target" && ! -e "$three_target" ]] && grep -qF "删了这一趟的编译目录 $three_target" "$scratch/out3.txt" || removal_problems+="全绿那一趟（out3）还剩 $(ls -d "${three_target:-没打编译目录那一行}" 2>/dev/null || echo 没剩、但没打删了那一行)；"
   [[ -n "$one_target" && ! -e "$one_target" ]] && grep -qF "删了这一趟的编译目录 $one_target" "$scratch/out1.txt" || removal_problems+="测试红那一趟（out1）还剩 $(ls -d "${one_target:-没打编译目录那一行}" 2>/dev/null || echo 没剩、但没打删了那一行)；"
   PATH="$rebuilt_bin:$PATH" FAKE_CARGO_TIMELINE="$scratch/term-timeline.txt" FAKE_CARGO_TAG=T FAKE_CARGO_SLEEP=2 MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" \
-    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-term" MERGE_AND_VERIFY_TREE="$rebuilt_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$scratch/out-term.txt" 2>&1 &
+    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-term" MERGE_AND_VERIFY_TREE="$rebuilt_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply "$rebuilt_patch" > "$scratch/out-term.txt" 2>&1 &
   term_pid=$!
   for term_attempt in $(seq 1 200); do grep -q '^start T ' "$scratch/term-timeline.txt" 2>/dev/null && break; kill -0 "$term_pid" 2>/dev/null || break; sleep 0.05; done
   kill -TERM "$term_pid" 2>/dev/null
@@ -2120,7 +2380,7 @@ FAKE
   chmod +x "$holder_bin/cargo"
   out="$scratch/out-holder.txt"; checked=$((checked+1))
   PATH="$holder_bin:$PATH" FAKE_HOLDER_PID="$scratch/holder-pid" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" \
-    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-holder" MERGE_AND_VERIFY_TREE="$rebuilt_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply > "$out" 2>&1; rc=$?
+    MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-holder" MERGE_AND_VERIFY_TREE="$rebuilt_tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply "$rebuilt_patch" > "$out" 2>&1; rc=$?
   holder_pid="$(cat "$scratch/holder-pid" 2>/dev/null)"
   local holder_target; holder_target="$(run_target_of "$out")"
   if [[ $rc -ne 1 || -z "$holder_target" || ! -d "$holder_target" ]] || ! grep -q "还有 1 个进程开着里面的文件" "$out" || ! grep -q "进程 ${holder_pid:-没有}（sleep 30）" "$out"; then
@@ -2152,36 +2412,39 @@ FAKE
     MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-unknown-option" MERGE_AND_VERIFY_TREE="$scratch/tree" env -u CARGO_TARGET_DIR bash "$0" --skip-apply --never-used-option > "$out" 2>&1; rc=$?
   if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-unknown-option.txt" ]] || ! grep -qF '认不出参数 --never-used-option' "$out"; then
     echo "  ✗ 自检：给了认不出的选项 --never-used-option 应当退 2、点名它，一样都不做，实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-unknown-option.txt" 2>/dev/null) 条：$(grep -E '✗|→' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 验证包那一步（文件头「验证包那一步」）：前三格换回真的门禁 crash-point-replay，交它的样本根（门禁样本 unit-key-samples-green / -red 照它的 setup.sh 搭好：
-  #   上一版记进判定库，这一版改了 4 条测试函数闭包里的单元；假 cargo 照收到的 --skip 只打要现判的结果行，-red 那一份让 test_t 判 FAILED）；
-  #   合入的树是测试只挑包那几格的 narrow-tree，补丁 narrow-checker 只改 验证包（测试本次未跑）
-  local tier_fixtures="$root/.claude/gate.d/fixtures/crash-point-replay.sh" tier_calls="$scratch/verification-step-calls.txt" tier_sample_name
-  for tier_sample_name in green red; do
-    cp -dR --preserve=timestamps,links "$tier_fixtures/unit-key-samples-$tier_sample_name" "$scratch/tier-$tier_sample_name" \
-      && (cd "$scratch/tier-$tier_sample_name" && bash ./setup.sh) > "$scratch/tier-$tier_sample_name.setup.log" 2>&1 \
-      || echo "  ! 自检：门禁样本 unit-key-samples-$tier_sample_name 搭不起来（$(tail -n 1 "$scratch/tier-$tier_sample_name.setup.log" 2>/dev/null)），用它的格跟着红"
-  done
-  # 改了 4 条测试函数闭包里的单元：只现判那 4 条，复用的 4 条经 --skip 不跑
-  out="$scratch/out-tier-judge.txt"; checked=$((checked+1))
-  MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$root/$CHECKER_TIER_STAGE_PATH" MERGE_AND_VERIFY_CHECKER_TIER_ROOT="$scratch/tier-green" narrow_case tier-judge --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || ! grep -q '✓ 验证包过.*现判 4、复用 4、拒算 0' "$out" || ! grep -qF '补丁改到 验证包或它依赖的包：singlefs-verification' "$out" \
-     || ! grep -qF 'sample-cargo-arguments: test --release --no-fail-fast -p singlefs-verification --lib --tests -- --nocapture --exact --skip f1_first --skip f1_last --skip h3_test --skip test_v' "$scratch/logs-narrow-tier-judge/verification-step.log" 2>/dev/null; then
-    echo "  ✗ 自检：验证包那一步：补丁改到 验证包、改了 4 条测试函数闭包里的单元，应当只现判那 4 条（另 4 条经 --skip 复用、不跑）、退 0，实际退出码 $rc：$(grep -E '验证包|^  ✗' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 同一个样本根再验一次：键都对上，现判 0、报复用 8 条，那一道一条 cargo 都没起
-  out="$scratch/out-tier-reuse.txt"; checked=$((checked+1))
-  MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$root/$CHECKER_TIER_STAGE_PATH" MERGE_AND_VERIFY_CHECKER_TIER_ROOT="$scratch/tier-green" narrow_case tier-reuse --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || ! grep -q '✓ 验证包过.*现判 0、复用 8、拒算 0' "$out" || grep -q 'sample-cargo-arguments' "$scratch/logs-narrow-tier-reuse/verification-step.log" 2>/dev/null \
-     || ! grep -qF '全部复用，这一趟没起 cargo' "$scratch/logs-narrow-tier-reuse/verification-step.log" 2>/dev/null; then
-    echo "  ✗ 自检：验证包那一步：键都对上时应当现判 0、报复用 8 条、不起 cargo、退 0，实际退出码 $rc：$(grep -E '验证包|^  ✗' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 红了：退 1，逐条列出红的测试函数与它变了的单元，出路写只重跑红的那一格的整条命令（带范围声明；弄坏开关 rerun-command-wrapped 下这一格红）
-  out="$scratch/out-tier-red.txt"; checked=$((checked+1))
-  MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$root/$CHECKER_TIER_STAGE_PATH" MERGE_AND_VERIFY_CHECKER_TIER_ROOT="$scratch/tier-red" narrow_case tier-red --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 1 ]] || ! grep -q '✗ 验证包红.*红的格：crash-case-replay.*FAILED 的测试函数 1 条' "$out" || ! grep -qx '      test_t' "$out" \
-     || ! grep -qF '红的 crates/singlefs-verification/tests/setting.rs::test_t：' "$out" || ! grep -qF '并进写段的下一批' "$out" \
-     || ! grep -qF "SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crash-point-replay.sh 的 crash-case-replay 格; 范围=1 格;" "$out" \
-     || ! grep -qF -- "--check crash-case-replay $scratch/tier-red" "$out" || ! grep -qF "task-server/task submit -- bash" "$out" || grep -qF 'run-with-memory-cap.sh' "$out"; then
-    echo "  ✗ 自检：验证包那一步：样本里 test_t 判 FAILED 时应当退 1、列出 test_t 与它变了的单元、出路写只重跑 crash-case-replay 那一格的整条命令，实际退出码 $rc：$(grep -E '验证包|^      |→' "$out" | head -5 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 数红的测试函数（checker_tier_red_test_names）：「test <名> ... FAILED」与「FAILED <名>」两种写法一起数、按名去重，汇总行「FAILED. N passed」不算
+  # 验证包那一步（文件头「验证包那一步」）：假的那一道答 --list-items（登记的崩溃枚举用例 demo-case 在测试目标 setting 里，挂特性的是库与 gpu_pair.rs），
+  #   别的起法打按条复用与崩溃状态块那几行；合入的树是挑测试目标那几格的 narrow-tree，那一道收到的参数记进 verification_calls
+  local verification_calls="$scratch/verification-step-calls.txt" verification_environment="$scratch/verification-step-environment.txt"
+  verification_starts() { grep -c -- "^$1" "$verification_calls" 2>/dev/null; }   # <参数开头>：那一道被这样起了几次
+  # 补丁只改 demo 一个函数（库里一份数据文件）、变异行点名验证包的 setting：测试那一步只起 demo --lib 与验证包 --release --test setting，
+  #   验证包那一步只起一次 --list-items 与一次按块那一路（--check crash-case-replay --crash-cases-only --item crash-case:demo-case），不起门禁的整格
+  narrow_patch "$scratch/narrow-core" crates/demo/src/table.txt
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' '验证包的 setting（自证样本）' crates/demo/src/lib.rs 2 3 '-p singlefs-verification --release --test setting -- case_filter --exact' case_filter \
+    > "$scratch/narrow-core/mutations-append.tsv"
+  out="$scratch/out-verification-core.txt"; : > "$verification_calls"; checked=$((checked+1))
+  FAKE_VERIFICATION_CALLS="$verification_calls" narrow_case verification-core --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 0 || "$(narrow_tests verification-core)" != "test --offline --no-fail-fast -p demo --lib|test --offline --no-fail-fast --release -p singlefs-verification --test setting|" ]] \
+     || [[ "$(grep -c . "$verification_calls")" -ne 2 || "$(verification_starts '--list-items ')" -ne 1 ]] \
+     || [[ "$(verification_starts '--check crash-case-replay --crash-cases-only --item crash-case:demo-case ')" -ne 1 ]] \
+     || grep -qF 'crash-case-replay,' "$verification_calls" || ! grep -qF '✓ 验证包那一步（登记的崩溃枚举用例）过' "$out"; then
+    echo "  ✗ 自检：验证包那一步：补丁只改 demo 一个函数、变异行点名验证包的 setting，应当只起 demo --lib、验证包 --release --test setting 与按块那一路的 crash-case:demo-case，不起整格，实际退出码 $rc，假 cargo 收到 $(narrow_tests verification-core)，那一道收到 $(tr '\n' '|' < "$verification_calls")：$(grep -E '验证包那一步|✗' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 补丁改到验证包的库与挂特性的 gpu_pair：测试那一步验证包一条 --release --lib --test gpu_pair，验证包那一步只交 feature-gated:lib 与 feature-gated:gpu_pair.rs（不起按块那一路）
+  narrow_patch "$scratch/narrow-features" crates/singlefs-verification/src/table.txt crates/singlefs-verification/tests/gpu_pair.rs
+  out="$scratch/out-verification-features.txt"; : > "$verification_calls"; checked=$((checked+1))
+  FAKE_VERIFICATION_CALLS="$verification_calls" narrow_case verification-features --skip-apply "$scratch/narrow-features"
+  if [[ $rc -ne 0 || "$(narrow_tests verification-features)" != "test --offline --no-fail-fast --release -p singlefs-verification --lib --test gpu_pair|" ]] \
+     || [[ "$(grep -c . "$verification_calls")" -ne 2 || "$(verification_starts '--check feature-gated-tests --item feature-gated:lib --item feature-gated:gpu_pair.rs ')" -ne 1 ]] \
+     || ! grep -qF '✓ 验证包那一步（挂特性的测试文件）过' "$out"; then
+    echo "  ✗ 自检：验证包那一步：补丁改到验证包的库与挂特性的 gpu_pair，应当只交 feature-gated:lib 与 feature-gated:gpu_pair.rs，实际退出码 $rc，假 cargo 收到 $(narrow_tests verification-features)，那一道收到 $(tr '\n' '|' < "$verification_calls")"; failures=1; fi   # gate-lint:detail
+  # 按块那一路红（假的那一道打 case_function FAILED 与 crash-case:demo-case 的 ITEM_DONE exit=1）：退 1、列出红的测试函数，出路只重跑红的那一项（种类 items、范围 2 项：1 格加 1 项）
+  out="$scratch/out-verification-red.txt"; checked=$((checked+1))
+  FAKE_VERIFICATION_EXIT=1 narrow_case verification-red --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 1 ]] || ! grep -qF '✗ 验证包那一步（登记的崩溃枚举用例）红' "$out" || ! grep -qx '      case_function' "$out" \
+     || ! grep -qF "SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crash-point-replay.sh 的 crash-case-replay 格点名的 crash-case:demo-case; 范围=2 项（1 格加点名的 1 项）;" "$out" \
+     || ! grep -qF -- "--check crash-case-replay --crash-cases-only --item crash-case:demo-case" "$out" || ! grep -qF "task-server/task submit -- bash" "$out" \
+     || grep -qF 'run-with-memory-cap.sh' "$out" || ! grep -qF '并进写段的下一批' "$out"; then
+    echo "  ✗ 自检：验证包那一步：按块那一路判红时应当退 1、列出红的测试函数与只重跑红的那一项的命令，实际退出码 $rc：$(grep -E '验证包那一步|^      |→' "$out" | head -4 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 数红的测试函数（verification_red_test_names）：「test <名> ... FAILED」与「FAILED <名>」两种写法一起数、按名去重，汇总行「FAILED. N passed」不算
   checked=$((checked+1))
   printf '    test a_red ... FAILED
       FAILED a_red
@@ -2189,134 +2452,103 @@ FAKE
 test result: FAILED. 6 passed; 1 failed
     红的测试目标 x（汇总行 FAILED. 6 passed; 1 failed）：
 ' > "$scratch/red-names.log"
-  out="$(checker_tier_red_test_names "$scratch/red-names.log" | tr '
+  out="$(verification_red_test_names "$scratch/red-names.log" | tr '
 ' ' ')"
   if [[ "$out" != "a_red tests::b_red " ]]; then
     echo "  ✗ 自检：验证包那一步：日志里两种写法的红应当一起数、按名去重（a_red、tests::b_red 两条），实际：$out"; failures=1; fi   # gate-lint:detail
-  # 补丁改到 验证包依赖的 demo（这一格起 narrow-tree 的 验证包依赖 demo）：照起那一道；
-  printf '\n[dependencies]\ndemo = { path = "../demo" }\n' >> "$narrow_tree/crates/singlefs-verification/Cargo.toml"
-  out="$scratch/out-tier-dependency.txt"; : > "$tier_calls"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_CALLS="$tier_calls" narrow_case tier-dependency --skip-apply "$scratch/narrow-demo"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] || ! grep -qF '✓ 验证包过' "$out" \
-     || ! grep -qF '补丁改到 验证包或它依赖的包：demo' "$out"; then
-    echo "  ✗ 自检：验证包那一步：补丁改到 验证包依赖的 demo 时应当照起那一道、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次：$(grep -E '验证包|→' "$out" | head -3 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 产品 GPU 包（验证包不依赖它）作 narrow-tree 的成员：读到的包名不是工作区成员就照跑（d137-ledger-defs-r2），只改 alpha、beta 要判本次未跑，树里得有这个成员；
-  #   包名照那一道（这一格起是假的那一道）的 PRODUCT_GPU_PACKAGE_NAME 现读
-  mkdir -p "$narrow_tree/crates/singlefs-background-gpu/src"
-  printf 'pub fn f() {}\n' > "$narrow_tree/crates/singlefs-background-gpu/src/lib.rs"
-  printf '[package]\nname = "singlefs-background-gpu"\n' > "$narrow_tree/crates/singlefs-background-gpu/Cargo.toml"
-  printf '[workspace]\nmembers = ["crates/demo", "crates/alpha", "crates/beta", "crates/delta", "crates/singlefs-verification", "crates/singlefs-background-gpu"]\n' > "$narrow_tree/Cargo.toml"
-  # 补丁没碰 验证包与它的依赖闭包、产品 GPU 包（只改 alpha、beta）：报本次未跑与原因，那一道不起
-  out="$scratch/out-tier-unaffected.txt"; : > "$tier_calls"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_CALLS="$tier_calls" narrow_case tier-unaffected --skip-apply "$scratch/narrow-two"
-  if [[ $rc -ne 0 ]] || [[ -s "$tier_calls" ]] || ! grep -qF '  - 验证包本次未跑：补丁只改到 alpha、beta，都不是 验证包 singlefs-verification、也不在它的依赖闭包里' "$out"; then
-    echo "  ✗ 自检：验证包那一步：补丁只改到不在 验证包依赖闭包里的 alpha、beta 时应当报本次未跑与原因、不起那一道、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 跑在第二台上（task-server 经 multi-host-run.sh --peer 派来的那一趟：带着起活那一方的回读握手与这一趟的本地目录，两台对称、没有认台的变量）：
-  #   补丁改到 验证包，照起那一道（判定在服务里，两台都读得到）、报过、退 0
-  out="$scratch/out-tier-peer.txt"; : > "$tier_calls"; checked=$((checked+1))
-  GPU_QUIESCE_ORIGIN_READ_BACK=1 MULTI_HOST_RUN_PEER_SCRATCH="$scratch/peer-scratch" FAKE_CHECKER_TIER_CALLS="$tier_calls" narrow_case tier-peer --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] || ! grep -qF '✓ 验证包过' "$out" || grep -qF '本次未跑：这一整条跑在第二台上' "$out"; then
-    echo "  ✗ 自检：验证包那一步：跑在第二台上时应当照起那一道、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次：$(grep -E '验证包|→' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 起那一道的 --check 带上产品 GPU 包的真显卡对拍那一格（文件头「验证包那一步」三格；弄坏开关 product-gpu-cell-dropped 下这一格红）
-  out="$scratch/out-tier-cells.txt"; : > "$tier_calls"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_CALLS="$tier_calls" narrow_case tier-cells --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] \
-     || [[ "$(head -n 1 "$tier_calls")" != "--check crash-case-replay,feature-gated-tests,product-gpu-real-card-tests "* ]]; then
-    echo "  ✗ 自检：验证包那一步：起那一道的 --check 应当带上产品 GPU 包那一格（--check crash-case-replay,feature-gated-tests,product-gpu-real-card-tests <要验的树>），实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次，收到的参数「$(head -n 1 "$tier_calls")」"; failures=1; fi   # gate-lint:detail
-  # 缩崩溃域（文件头「验证包那一步」）：--crash-expand-up-to 6 把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过、把崩溃状态块那一行的现判与复用写进汇总；
-  #   不给就是整个域：那一道收到的是 unset、汇总不写缩过域；环境里已设的变量当作给了同一个值；值不是非负整数退 2、一样都不做；缩过域的那一趟红了，只重跑那几格的命令带同一个变量
-  #   （弄坏开关 expand-up-to-not-passed、scaled-run-unlabelled、rerun-command-unscaled、expand-up-to-unchecked 下对应的格红）
-  local tier_environment="$scratch/verification-step-environment.txt"
-  out="$scratch/out-tier-scaled.txt"; : > "$tier_calls"; : > "$tier_environment"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_CALLS="$tier_calls" FAKE_CHECKER_TIER_ENVIRONMENT="$tier_environment" narrow_case tier-scaled --skip-apply --crash-expand-up-to 6 "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || [[ "$(cat "$tier_environment")" != 6 ]] || ! grep -q '汇总：.*缩过域、不算门禁通过（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6，只往小缩）' "$out" \
-     || ! grep -q '汇总：.*崩溃状态块 现判 3、复用 5、拒算 0' "$out"; then
-    echo "  ✗ 自检：验证包那一步：--crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过、把崩溃状态块的现判与复用写进汇总，实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$tier_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-unscaled.txt"; : > "$tier_environment"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_ENVIRONMENT="$tier_environment" narrow_case tier-unscaled --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || [[ "$(cat "$tier_environment")" != unset ]] || grep -qF '缩过域' "$out"; then
-    echo "  ✗ 自检：验证包那一步：不给 --crash-expand-up-to 时那一道收到的变量应当是 unset、汇总不写缩过域，实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$tier_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-scaled-environment.txt"; : > "$tier_environment"; checked=$((checked+1))
-  SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=4 FAKE_CHECKER_TIER_ENVIRONMENT="$tier_environment" narrow_case tier-scaled-environment --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 0 ]] || [[ "$(cat "$tier_environment")" != 4 ]] || ! grep -q '汇总：.*缩过域、不算门禁通过（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=4，只往小缩）' "$out"; then
-    echo "  ✗ 自检：验证包那一步：环境里已设展开深度变量时当作给了同一个值（那一道收到 4、汇总写缩过域），实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$tier_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-bad-argument.txt"; checked=$((checked+1))
-  narrow_case tier-bad-argument --skip-apply --crash-expand-up-to abc "$scratch/narrow-checker"
-  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-tier-bad-argument.txt" ]] || ! grep -qF '不是非负整数' "$out"; then
-    echo "  ✗ 自检：--crash-expand-up-to 不是非负整数时应当退 2、一样都不做（参数写 abc），实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-tier-bad-argument.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-bad-environment.txt"; checked=$((checked+1))
-  SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=abc narrow_case tier-bad-environment --skip-apply "$scratch/narrow-checker"
-  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-tier-bad-environment.txt" ]] || ! grep -qF '不是非负整数' "$out"; then
-    echo "  ✗ 自检：--crash-expand-up-to 不是非负整数时应当退 2、一样都不做（环境里的变量写 abc），实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-tier-bad-environment.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-missing-value.txt"; checked=$((checked+1))
-  narrow_case tier-missing-value --skip-apply "$scratch/narrow-checker" --crash-expand-up-to
-  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-tier-missing-value.txt" ]] || ! grep -qF '后面要跟一个非负整数' "$out"; then
-    echo "  ✗ 自检：--crash-expand-up-to 不是非负整数时应当退 2、一样都不做（后面没有值），实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-tier-missing-value.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
-  out="$scratch/out-tier-scaled-red.txt"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_EXIT=1 narrow_case tier-scaled-red --skip-apply --crash-expand-up-to 6 "$scratch/narrow-checker"
-  if [[ $rc -ne 1 ]] || ! grep -qF -- 'task-server/task submit -- env SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 bash' "$out" || ! grep -q '汇总：.*缩过域、不算门禁通过' "$out"; then
-    echo "  ✗ 自检：验证包那一步：缩过域的那一趟红了，只重跑那几格的命令应当带同一个变量（task-server/task submit -- env SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 bash …）、汇总写缩过域，实际退出码 $rc：$(grep -E '→ 怎么办|汇总：' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 那一道退 3 而交给它的根不是样本根（这里是 narrow-tree）：判红
-  out="$scratch/out-tier-exit-three.txt"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_EXIT=3 narrow_case tier-exit-three --skip-apply "$scratch/narrow-checker"
+  # 补丁只改 alpha、beta（跑到的目标里没有验证包的，也没有要特性的）：报本次未跑与原因，那一道一次都不起
+  out="$scratch/out-verification-unaffected.txt"; : > "$verification_calls"; checked=$((checked+1))
+  FAKE_VERIFICATION_CALLS="$verification_calls" narrow_case verification-unaffected --skip-apply "$scratch/narrow-two"
+  if [[ $rc -ne 0 || -s "$verification_calls" ]] || ! grep -qF '  - 验证包那一步本次未跑：' "$out"; then
+    echo "  ✗ 自检：验证包那一步：补丁只改到 alpha、beta 时应当报本次未跑、不起那一道，实际退出码 $rc，那一道被起 $(grep -c . "$verification_calls") 次：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 补丁改到产品 GPU 包写了 required-features 的真卡对拍 real_card：测试那一步不跑它，验证包那一步起一次 --check product-gpu-real-card-tests（那一格不收点名）
+  narrow_patch "$scratch/narrow-product-gpu" crates/singlefs-background-gpu/tests/real_card.rs
+  out="$scratch/out-verification-product-gpu.txt"; : > "$verification_calls"; checked=$((checked+1))
+  FAKE_VERIFICATION_CALLS="$verification_calls" narrow_case verification-product-gpu --skip-apply "$scratch/narrow-product-gpu"
+  if [[ $rc -ne 0 || -n "$(narrow_tests verification-product-gpu)" || "$(grep -c . "$verification_calls")" -ne 1 || "$(verification_starts '--check product-gpu-real-card-tests ')" -ne 1 ]] \
+     || ! grep -qF '产品 GPU 包的真卡对拍：singlefs-background-gpu 的 real_card' "$out"; then
+    echo "  ✗ 自检：验证包那一步：补丁改到产品 GPU 包的真卡对拍 real_card 时应当起 --check product-gpu-real-card-tests、测试那一步不跑它，实际退出码 $rc，假 cargo 收到 $(narrow_tests verification-product-gpu)，那一道收到 $(tr '\n' '|' < "$verification_calls")"; failures=1; fi   # gate-lint:detail
+  # 那一道退 3 而交给它的根不是样本根（这里是快照）：判红
+  out="$scratch/out-verification-exit-three.txt"; checked=$((checked+1))
+  FAKE_VERIFICATION_EXIT=3 narrow_case verification-exit-three --skip-apply "$scratch/narrow-core"
   if [[ $rc -ne 1 ]] || ! grep -qF '退 3：退 3 只在样本根上算过，交给它的根不是样本根' "$out"; then
     echo "  ✗ 自检：验证包那一步：那一道退 3 而根不是它的样本根时应当判红、退 1，实际退出码 $rc：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 补丁只改到产品 GPU 包 singlefs-background-gpu（narrow-tree 里已加这个成员，验证包不依赖它）：
-  #   照起那一道、--check 带上 product-gpu-real-card-tests、报过、退 0（弄坏开关 product-gpu-package-ignored 下照改前只看 验证包闭包、报本次未跑，这一格红）
-  narrow_patch "$scratch/narrow-product-gpu" crates/singlefs-background-gpu/src/table.txt
-  out="$scratch/out-tier-product-package.txt"; : > "$tier_calls"; checked=$((checked+1))
-  FAKE_CHECKER_TIER_CALLS="$tier_calls" narrow_case tier-product-package --skip-apply "$scratch/narrow-product-gpu"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] || [[ "$(head -n 1 "$tier_calls")" != "--check "*",product-gpu-real-card-tests "* ]] \
-     || ! grep -qF '补丁改到产品 GPU 包 singlefs-background-gpu 或它依赖的包：singlefs-background-gpu' "$out"; then
-    echo "  ✗ 自检：验证包那一步：补丁只改到产品 GPU 包 singlefs-background-gpu（不在 验证包的依赖闭包里）时应当照起那一道、--check 带上 product-gpu-real-card-tests、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次，收到的参数「$(head -n 1 "$tier_calls")」：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行（假的那一道去掉这一行）、补丁只改 alpha、beta（不在两个闭包里）：算不出碰没碰产品 GPU 包，照起那一道并点名原因、退 0
-  #   （d137-ledger-defs-r2 攻方 B7；弄坏开关 product-gpu-unreadable-as-unaffected 下照改前判没碰、那一道不起，这一格红）
-  grep -v '^PRODUCT_GPU_PACKAGE_NAME=' "$scratch/fake-verification-step.sh" > "$scratch/fake-verification-step-without-package.sh"
-  out="$scratch/out-tier-product-unreadable.txt"; : > "$tier_calls"; checked=$((checked+1))
-  MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$scratch/fake-verification-step-without-package.sh" FAKE_CHECKER_TIER_CALLS="$tier_calls" \
-    narrow_case tier-product-unreadable --skip-apply "$scratch/narrow-two"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] || ! grep -qF '✓ 验证包过' "$out" \
-     || ! grep -qF '里没有 PRODUCT_GPU_PACKAGE_NAME="<包名>" 那一行），照跑' "$out"; then
-    echo "  ✗ 自检：验证包那一步：那一道里读不出 PRODUCT_GPU_PACKAGE_NAME 那一行时应当照起那一道、点名读不出、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
-  # 那一道里的产品 GPU 包名不是工作区成员（假的那一道改成 singlefs-background-gpu-renamed）、补丁只改 alpha、beta：同样照起那一道并点名不是成员、退 0
-  #   （d137-ledger-defs-r2 辩方 A10：改前闭包是空集、判没碰；弄坏开关 product-gpu-non-member-as-unaffected 下照改前，这一格红）
-  sed 's/^PRODUCT_GPU_PACKAGE_NAME="singlefs-background-gpu"$/PRODUCT_GPU_PACKAGE_NAME="singlefs-background-gpu-renamed"/' "$scratch/fake-verification-step.sh" \
-    > "$scratch/fake-verification-step-renamed-package.sh"
-  out="$scratch/out-tier-product-not-member.txt"; : > "$tier_calls"; checked=$((checked+1))
-  MERGE_AND_VERIFY_CHECKER_TIER_STAGE="$scratch/fake-verification-step-renamed-package.sh" FAKE_CHECKER_TIER_CALLS="$tier_calls" \
-    narrow_case tier-product-not-member --skip-apply "$scratch/narrow-two"
-  if [[ $rc -ne 0 ]] || [[ "$(grep -c . "$tier_calls")" -ne 1 ]] || ! grep -qF '✓ 验证包过' "$out" \
-     || ! grep -qF '产品 GPU 包 singlefs-background-gpu-renamed（照 ' "$out" || ! grep -qF '不是工作区成员，算不出补丁碰没碰它，照跑' "$out"; then
-    echo "  ✗ 自检：验证包那一步：那一道里的产品 GPU 包名 singlefs-background-gpu-renamed 不是工作区成员时应当照起那一道、点名不是成员、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$tier_calls") 次：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 那一道的 --list-items 退 1：读不出登记的用例与挂特性的文件，判红
+  out="$scratch/out-verification-list-red.txt"; checked=$((checked+1))
+  FAKE_VERIFICATION_LIST_EXIT=1 narrow_case verification-list-red --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 1 ]] || ! grep -qF -- '--list-items 退 1' "$out"; then
+    echo "  ✗ 自检：验证包那一步：那一道 --list-items 退 1 时应当判红、退 1，实际退出码 $rc：$(grep -E '验证包' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 跑在第二台上（task-server 经 multi-host-run.sh --peer 派来的那一趟：带着起活那一方的回读握手与这一趟的本地目录，两台对称、没有认台的变量）：照起那一道、报过、退 0
+  out="$scratch/out-verification-peer.txt"; : > "$verification_calls"; checked=$((checked+1))
+  GPU_QUIESCE_ORIGIN_READ_BACK=1 MULTI_HOST_RUN_PEER_SCRATCH="$scratch/peer-scratch" FAKE_VERIFICATION_CALLS="$verification_calls" narrow_case verification-peer --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 0 || "$(verification_starts '--check ')" -ne 1 ]] || ! grep -qF '✓ 验证包那一步（登记的崩溃枚举用例）过' "$out"; then
+    echo "  ✗ 自检：验证包那一步：跑在第二台上时应当照起那一道、报过、退 0，实际退出码 $rc，那一道被起 $(grep -c . "$verification_calls") 次：$(grep -E '验证包|→' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
+  # 缩崩溃域（文件头「验证包那一步」）：--crash-expand-up-to 6 把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过、把崩溃状态块那一行的现判与复用写进汇总；
+  #   不给就是整个域：那一道收到的是 unset、汇总不写缩过域；环境里已设的变量当作给了同一个值；值不是非负整数退 2、一样都不做；缩过域的那一趟红了，只重跑的命令带同一个变量
+  #   （弄坏开关 expand-up-to-not-passed、scaled-run-unlabelled、rerun-command-unscaled、expand-up-to-unchecked 下对应的格红）
+  out="$scratch/out-verification-scaled.txt"; : > "$verification_environment"; checked=$((checked+1))
+  FAKE_VERIFICATION_ENVIRONMENT="$verification_environment" narrow_case verification-scaled --skip-apply --crash-expand-up-to 6 "$scratch/narrow-core"
+  if [[ $rc -ne 0 ]] || [[ "$(cat "$verification_environment")" != 6 ]] || ! grep -q '汇总：.*缩过域、不算门禁通过（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6，只往小缩）' "$out" \
+     || ! grep -q '汇总：.*崩溃状态块 现判 3、复用 5、拒算 0' "$out"; then
+    echo "  ✗ 自检：验证包那一步：--crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给那一道、汇总写缩过域、不算门禁通过、把崩溃状态块的现判与复用写进汇总，实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$verification_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-unscaled.txt"; : > "$verification_environment"; checked=$((checked+1))
+  FAKE_VERIFICATION_ENVIRONMENT="$verification_environment" narrow_case verification-unscaled --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 0 ]] || [[ "$(cat "$verification_environment")" != unset ]] || grep -qF '缩过域' "$out"; then
+    echo "  ✗ 自检：验证包那一步：不给 --crash-expand-up-to 时那一道收到的变量应当是 unset、汇总不写缩过域，实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$verification_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-scaled-environment.txt"; : > "$verification_environment"; checked=$((checked+1))
+  SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=4 FAKE_VERIFICATION_ENVIRONMENT="$verification_environment" narrow_case verification-scaled-environment --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 0 ]] || [[ "$(cat "$verification_environment")" != 4 ]] || ! grep -q '汇总：.*缩过域、不算门禁通过（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=4，只往小缩）' "$out"; then
+    echo "  ✗ 自检：验证包那一步：环境里已设展开深度变量时当作给了同一个值（那一道收到 4、汇总写缩过域），实际退出码 $rc，那一道收到的变量「$(tr '\n' ' ' < "$verification_environment")」：$(grep '汇总：' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-bad-argument.txt"; checked=$((checked+1))
+  narrow_case verification-bad-argument --skip-apply --crash-expand-up-to abc "$scratch/narrow-core"
+  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-verification-bad-argument.txt" ]] || ! grep -qF '不是非负整数' "$out"; then
+    echo "  ✗ 自检：--crash-expand-up-to 不是非负整数时应当退 2、一样都不做（参数写 abc），实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-verification-bad-argument.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-bad-environment.txt"; checked=$((checked+1))
+  SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=abc narrow_case verification-bad-environment --skip-apply "$scratch/narrow-core"
+  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-verification-bad-environment.txt" ]] || ! grep -qF '不是非负整数' "$out"; then
+    echo "  ✗ 自检：--crash-expand-up-to 不是非负整数时应当退 2、一样都不做（环境里的变量写 abc），实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-verification-bad-environment.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-missing-value.txt"; checked=$((checked+1))
+  narrow_case verification-missing-value --skip-apply "$scratch/narrow-core" --crash-expand-up-to
+  if [[ $rc -ne 2 ]] || [[ -s "$scratch/calls-narrow-verification-missing-value.txt" ]] || ! grep -qF '后面要跟一个非负整数' "$out"; then
+    echo "  ✗ 自检：--crash-expand-up-to 后面没有值时应当退 2、一样都不做，实际退出码 $rc，假 cargo 收到 $(grep -c . "$scratch/calls-narrow-verification-missing-value.txt" 2>/dev/null) 条：$(grep -E '✗' "$out" | head -1)"; failures=1; fi   # gate-lint:detail
+  out="$scratch/out-verification-scaled-red.txt"; checked=$((checked+1))
+  FAKE_VERIFICATION_EXIT=1 narrow_case verification-scaled-red --skip-apply --crash-expand-up-to 6 "$scratch/narrow-core"
+  if [[ $rc -ne 1 ]] || ! grep -qF -- 'task-server/task submit -- env SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 bash' "$out" || ! grep -q '汇总：.*缩过域、不算门禁通过' "$out"; then
+    echo "  ✗ 自检：验证包那一步：缩过域的那一趟红了，只重跑的命令应当带同一个变量（task-server/task submit -- env SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 bash …）、汇总写缩过域，实际退出码 $rc：$(grep -E '→ 怎么办|汇总：' "$out" | head -2 | tr '\n' ' ')"; failures=1; fi   # gate-lint:detail
   # 跑着的时候主工作区（要验的树）里那份源码被改（文件头「快照」）：假 cargo 的 test 一开跑就把要验的树里的 lib.rs 与那一道门禁改掉，
-  #   再照它此刻所在目录里的 lib.rs 报一条测试；验证包那一步照默认起快照里那一份门禁（这一格不设 MERGE_AND_VERIFY_CHECKER_TIER_STAGE），
-  #   那一份报它收到的根里 lib.rs 的内容（当成复用键算的是哪一份源码）。测试的结论与按条复用的键都要照开跑时那一份（source_at_start）；
+  #   再照它此刻所在目录里的 lib.rs 报一条测试；补丁目录只有变异行（点名 demo 的库与验证包的 setting），验证包那一步照默认起快照里那一份门禁
+  #   （这一格不设 MERGE_AND_VERIFY_VERIFICATION_STAGE），那一份答 --list-items（setting 里登记了一条崩溃枚举用例）、按块那一路报它收到的根里 lib.rs 的内容
+  #   （当成复用键算的是哪一份源码）。测试的结论与复用的键都要照开跑时那一份（source_at_start）；
   #   弄坏开关 verify-in-main-tree 下测试编的是改后的那一份、验证包那一步起的是改后的那一份门禁，这一格红
   local edited_tree="$scratch/edited-tree" edited_bin="$scratch/edited-bin"
-  mkdir -p "$edited_tree/crates/demo/src" "$edited_tree/.claude/gate.d" "$edited_bin"
+  mkdir -p "$edited_tree/crates/demo/src" "$edited_tree/crates/singlefs-verification/tests" "$edited_tree/.claude/gate.d" "$edited_bin" "$scratch/edited-patch"
   write_workspace "$edited_tree" singlefs-verification
   printf 'source_at_start\n' > "$edited_tree/crates/demo/src/lib.rs"
+  printf 'fn main() {}\n' > "$edited_tree/crates/singlefs-verification/tests/setting.rs"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' 'demo 的库（自证样本）' crates/demo/src/lib.rs a b '-p demo --lib' f '验证包的 setting（自证样本）' crates/demo/src/lib.rs a b '-p singlefs-verification --test setting' f \
+    > "$scratch/edited-patch/mutations-append.tsv"
   cat > "$edited_tree/.claude/gate.d/crash-point-replay.sh" <<'FAKE'
 #!/usr/bin/env bash
-# 开跑时那一份假门禁：报它收到的根（最后一个参数）里 lib.rs 的内容
-echo "  · 按条复用：键照 $(cat "${@: -1}/crates/demo/src/lib.rs") 算（开跑时那一份门禁），现判 1、复用 0、拒算 0"
+# 开跑时那一份假门禁：--list-items 列 setting 里登记的一条崩溃枚举用例；按块那一路报它收到的根（最后一个参数）里 lib.rs 的内容
+if [[ "$1" == --list-items ]]; then printf 'crash-case:edited-case\tsinglefs-verification:setting:case_function\n'; exit 0; fi
+echo "  ✓ 崩溃状态块：现判 1、复用 0、拒算 0（键照 $(cat "${@: -1}/crates/demo/src/lib.rs") 算，开跑时那一份门禁）"
 FAKE
   cat > "$edited_bin/cargo" <<'FAKE'
 #!/usr/bin/env bash
 # 假 cargo：test 一开跑就改要验的树（FAKE_EDITED_TREE）里的 lib.rs 与那一道门禁，再照此刻所在目录里的 lib.rs 报一条测试；别的子命令退 0
 [[ "$1" == test ]] || exit 0
 printf 'source_edited_mid_run\n' > "$FAKE_EDITED_TREE/crates/demo/src/lib.rs"
-printf '%s\n' '#!/usr/bin/env bash' 'echo "  · 按条复用：键照主工作区改后的那一份门禁算，现判 1、复用 0、拒算 0"' > "$FAKE_EDITED_TREE/.claude/gate.d/crash-point-replay.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'echo "  ✓ 崩溃状态块：现判 1、复用 0、拒算 0（键照主工作区改后的那一份门禁算）"' > "$FAKE_EDITED_TREE/.claude/gate.d/crash-point-replay.sh"
 printf 'running 1 test\ntest tests::compiled_%s ... ok\n\ntest result: ok. 1 passed; 0 failed\n' "$(cat crates/demo/src/lib.rs)"
 FAKE
   chmod +x "$edited_bin/cargo"
   out="$scratch/out-edited.txt"; checked=$((checked+1))
   PATH="$edited_bin:$PATH" FAKE_EDITED_TREE="$edited_tree" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/logs-edited" \
-    MERGE_AND_VERIFY_TREE="$edited_tree" env -u CARGO_TARGET_DIR -u MERGE_AND_VERIFY_CHECKER_TIER_STAGE bash "$0" --skip-apply > "$out" 2>&1; rc=$?
+    MERGE_AND_VERIFY_TREE="$edited_tree" env -u CARGO_TARGET_DIR -u MERGE_AND_VERIFY_VERIFICATION_STAGE bash "$0" --skip-apply "$scratch/edited-patch" > "$out" 2>&1; rc=$?
   if [[ $rc -ne 0 || "$(cat "$edited_tree/crates/demo/src/lib.rs" 2>/dev/null)" != source_edited_mid_run ]] \
      || ! grep -qxF 'test tests::compiled_source_at_start ... ok' "$scratch/logs-edited/test.log" 2>/dev/null \
-     || ! grep -qF '键照 source_at_start 算（开跑时那一份门禁）' "$scratch/logs-edited/verification-step.log" 2>/dev/null; then
-    echo "  ✗ 自检：快照：跑着的时候主工作区里那份源码被改，结论与复用键应当照开跑时那一份算（测试编 source_at_start、验证包那一步起快照里那一份门禁、键照 source_at_start 算），实际退出码 $rc，测试：$(grep '^test tests::' "$scratch/logs-edited/test.log" 2>/dev/null | tr '\n' ' ')，验证包那一步：$(grep '按条复用' "$scratch/logs-edited/verification-step.log" 2>/dev/null | head -1)"; failures=1; fi   # gate-lint:detail
+     || ! cat "$scratch/logs-edited/"verification-*.log 2>/dev/null | grep -qF '键照 source_at_start 算，开跑时那一份门禁'; then
+    echo "  ✗ 自检：快照：跑着的时候主工作区里那份源码被改，结论与复用键应当照开跑时那一份算（测试编 source_at_start、验证包那一步起快照里那一份门禁、键照 source_at_start 算），实际退出码 $rc，测试：$(grep '^test tests::' "$scratch/logs-edited/test.log" 2>/dev/null | tr '\n' ' ')，验证包那一步：$(cat "$scratch/logs-edited/"verification-*.log 2>/dev/null | grep '崩溃状态块' | head -1)"; failures=1; fi   # gate-lint:detail
   # ── 逐项点名与按条复用（文件头「逐项点名与按条复用」），点名的格都以「逐项与复用：」起头 ─────────
   #   样本工作区的 alpha 有三条测试函数（库里 tests::plain、tests::uses_helper，tests/beta.rs 里 beta_case），uses_helper 调 helper、spare 谁都不调；
   #   假 cargo 照收到的 --lib / --test / --doc 与 -- 之后的 --exact --skip 打 alpha 的几段（段头、结果行、汇总行带 finished in 0.00s），FAKE_UNITS_RED 点名的那一条打 FAILED。
@@ -2349,6 +2581,12 @@ mod tests {
 }
 RUST
   printf '#[test]\nfn beta_case() {}\n' > "$units_template/crates/alpha/tests/beta.rs"
+  # 每一趟都带的补丁目录：只有变异行，点名 alpha 的库、测试目标 beta 与文档测试（挑测试目标照它挑出这三项，文件头「挑测试目标」）
+  local units_patch="$scratch/units-patch"
+  mkdir -p "$units_patch"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' 'alpha 的库（自证样本）' crates/alpha/src/lib.rs 1 2 '-p alpha --lib -- tests' uses_helper \
+    'alpha 的 beta（自证样本）' crates/alpha/tests/beta.rs a b '-p alpha --test beta -- beta_case' beta_case 'alpha 的文档测试（自证样本）' crates/alpha/src/lib.rs 1 2 '-p alpha --doc' doc \
+    > "$units_patch/mutations-append.tsv"
   cat > "$units_bin/cargo" <<'FAKE'
 #!/usr/bin/env bash
 # 假 cargo（按条复用那几格）：-V 打版本；test 照收到的 --lib / --test <名> / --doc（一个都没点就是全部）与 -- 之后的 --exact --skip <名> 打 alpha 的几段，
@@ -2400,11 +2638,11 @@ exit 0
 FAKE
   chmod +x "$units_bin/cargo" "$units_bin/rustc"
   units_tree() { cp -r -- "$units_template" "$scratch/$1" && git init -q "$scratch/$1"; }   # <格名>：拷一份样本树、git init
-  units_case() {   # <样本树> <日志目录名> <参数…>：起一趟，输出进 $out、退出码进 rc、假 cargo 收到的参数进 $units_calls
+  units_case() {   # <样本树> <日志目录名> <参数…>：起一趟（参数后面接上 units_patch），输出进 $out、退出码进 rc、假 cargo 收到的参数进 $units_calls
     local units_tree_root="$1" units_logs_name="$2"
     shift 2
     PATH="$units_bin:$PATH" FAKE_CARGO_CALLS="$units_calls" MERGE_AND_VERIFY_APPLY="$scratch/fake-apply.py" MERGE_AND_VERIFY_LOG_DIRECTORY="$scratch/$units_logs_name" \
-      MERGE_AND_VERIFY_TREE="$units_tree_root" env -u CARGO_TARGET_DIR bash "$0" "$@" > "$out" 2>&1; rc=$?
+      MERGE_AND_VERIFY_TREE="$units_tree_root" env -u CARGO_TARGET_DIR bash "$0" "$@" "$units_patch" > "$out" 2>&1; rc=$?
   }
   # 列项：--list-items 逐行打「项<TAB>挑目标的参数」、退 0，不编不跑（假 cargo 一次都没起）、不建日志目录
   units_tree units-list
@@ -2507,19 +2745,19 @@ FAKE
   echo "  ✓ 自检通过（查了 $checked 种）：测试红时退 1 并列出红的与重跑命令、补丁核不过整批停退 2、全绿退 0、没设日志目录时日志落在工作根下、"
   echo "    往编过的副本里 rsync -a 铺旧 mtime 的新内容之后照样重编、给了认不出的选项退 2 一样都不做、"
   echo "    clippy 照 check.sh 的 ${#expected_combinations[@]} 个特性组合（${expected_combinations[*]-}）逐个跑、每个带上 check.sh 的 $expected_lint_count 条编码纪律 lint、一个组合红整步红并点名那个组合、"
-  echo "    跑 build、cargo test 挑工作区成员减掉 验证包、测试那一步经 test-targets-parallel.py 按测试目标并行起、"
+  echo "    跑 build、cargo test 只起补丁改到的 demo 的库目标、测试那一步经 test-targets-parallel.py 按测试目标并行起、"
   echo "    四条 cargo 命令从 check.sh 现读（只换包装 run_cargo 与 cargo 来回换、各加一个标志都照读到的写法跑）、"
   echo "    check.sh 读不出 lint 表、clippy 那一行没带 lint 表、fmt 那一条换成认不出的包装、test 那一行带收窄目标的标志、缺省特性组合只剩一个、循环改成只取一个组合都退 1 不编、要验的树里有特性组合登记退 1 不编、"
   echo "    成员里没有 验证包退 1 不编、一条测试都没跑退 1、"
   echo "    开跑时拷快照、在快照里打补丁与编、快照根 git init、快照里的修改时刻是拷的那一刻、全绿与测试红收尾都删掉快照与编译目录、MERGE_AND_VERIFY_KEEP_COPY=1 留着并打出路径、"
-  echo "    跑着的时候主工作区里那份源码被改、测试与 验证包的键照开跑时那一份算、日志目录在要验的树里面退 2 不拷、"
+  echo "    跑着的时候主工作区里那份源码被改、测试与 验证包那一步的键照开跑时那一份算、日志目录在要验的树里面退 2 不拷、"
   echo "    补丁改过的包头一次编与再验同一批补丁都有 Compiling 行、编译目录里的产物比源码新时点名没重编的包退 1、"
-  echo "    测试只挑补丁改到的包（改两个包只跑两个、没改到的逐个报本次未跑）并带上依赖它们的包、改到 Cargo.lock 与带 --all-packages 照旧全跑、只改到 验证包时测试本次未跑、"
+  echo "    只跑补丁改到的与变异行点名的测试目标（不带依赖它们的包、不跑包里没点到的目标）、判不出测试目标的四种（没给补丁目录、改 Cargo.lock、改不落在包里的路径、改到落不到目标的文件）测试不跑退 3、--all-packages 退 2、"
   echo "    --skip-apply 时补丁反着核得过才往下验、没打在树上的退 1 不编、"
   echo "    跑完运行目录里不剩它建的编译目录与快照（全绿、测试红、被 TERM 停三种结局都删，调用方设的 CARGO_TARGET_DIR 不删）、编译目录里还有进程开着文件时不删并报出那个进程、"
   echo "    编译目录建在 TMPDIR 下这一趟新建的一份、不在工作根下（日志照旧在工作根下）、收尾时前面一步写满盘编译目录照删（EXIT trap 第一步就删它）、"
-  echo "    验证包那一步照门禁 crash-point-replay 的样本根只现判闭包里改了单元的 4 条、键都对上时现判 0 并报复用 8 条、红了退 1 并列出红的测试函数与只重跑那一格的命令（经 task-server/task submit 交）、"
-  echo "    补丁改到 验证包依赖的包时照起那一道、补丁没碰 验证包与它的依赖闭包时报本次未跑、那一道退 3 只在样本根上算过、跑在第二台上时照起那一道、起那一道的 --check 带上产品 GPU 包那一格、补丁只改到产品 GPU 包（验证包不依赖它）时照起那一道、"
+  echo "    验证包那一步只把跑到的验证包目标里登记的崩溃枚举用例交按块那一路、挂特性的文件交 feature-gated 点名、产品 GPU 包的真卡对拍交那一格，不起整格、红了退 1 并只重跑红的那一项（经 task-server/task submit 交）、"
+  echo "    跑到的目标里没有要另走门禁的就不起那一道、那一道退 3 只在样本根上算过、--list-items 退非 0 判红、跑在第二台上时照起那一道、"
   echo "    给了 --crash-expand-up-to（或环境里已设展开深度变量）把变量交给 验证包那一步、汇总写缩过域、不算门禁通过，缩过域的那一趟红了出路里只重跑的命令带同一个变量，值不是非负整数退 2 一样都不做、"
   echo "    测试那一步的 cargo test 在 -- 之后什么都不带（标 #[ignore] 的硬件与量数用例不起）、成功句不报标 #[ignore] 的条数、"
   echo "    逐项与复用：--list-items 列项不编不跑、--item 写错退 2、点名单跑一项与整趟里同一项判定相同、每条测试函数按单元键复用（reuse-three-questions 三问都过）、每项一行 ITEM_DONE 与 ITEM_PLAN、"
@@ -2528,7 +2766,7 @@ FAKE
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then selftest; exit $?; fi
-THREADS="$(heavy_thread_default)" || exit 2; skip_apply=0; ALL_PACKAGES=0; dirs=(); crash_expand_up_to_argument=""; crash_expand_up_to_given=0
+THREADS="$(heavy_thread_default)" || exit 2; skip_apply=0; dirs=(); crash_expand_up_to_argument=""; crash_expand_up_to_given=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-apply) skip_apply=1; shift ;;
@@ -2536,7 +2774,6 @@ while [[ $# -gt 0 ]]; do
       # 文件头「验证包那一步」：缩崩溃域的展开深度上限，值是非负整数，下面统一核
       [[ $# -ge 2 ]] || die "--crash-expand-up-to 后面要跟一个非负整数（展开深度上限，只往小缩），一样都没做" "写成 --crash-expand-up-to 6 这样的两个词"
       crash_expand_up_to_argument="$2"; crash_expand_up_to_given=1; shift 2 ;;
-    --all-packages) ALL_PACKAGES=1; shift ;;
     # 逐项点名（文件头「逐项点名与按条复用」）
     --list-items) LIST_ITEMS=1; shift ;;
     --with-keys) LIST_WITH_KEYS=1; shift ;;
@@ -2549,7 +2786,7 @@ while [[ $# -gt 0 ]]; do
     --*)
       # 弄坏开关 unknown-option-accepted：认不出的选项也照收、当没给（不拒）
       if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "unknown-option-accepted" ]]; then shift; continue; fi
-      die "认不出参数 $1" "只认 --skip-apply、--all-packages、--crash-expand-up-to <n>、--item <项>、--list-items [--with-keys]" ;;
+      die "认不出参数 $1" "只认 --skip-apply、--crash-expand-up-to <n>、--item <项>、--list-items [--with-keys]（整包跑归提交时的整轮门禁；提交之外要整包跑先弹窗问用户）" ;;
     *) dirs+=("$1"); shift ;;
   esac
 done
@@ -2583,7 +2820,7 @@ mkdir -p "$logs" && logs="$(cd "$logs" && pwd)" || die "建不了日志目录 $l
 trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-# 快照（文件头「快照」）：开跑这一刻拷，之后打补丁、编、验都在它上面。弄坏开关 verify-in-main-tree：照改前不拷、都在要验的树上
+# 快照（文件头「快照」）：开跑这一刻拷，之后打补丁、编、验都在它上面。弄坏开关 verify-in-main-tree：不拷、都在要验的树上
 if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "verify-in-main-tree" ]]; then
   echo "  ! 弄坏开关 MERGE_AND_VERIFY_BREAK=verify-in-main-tree：不拷快照，打补丁、编、验都在要验的树 $tree 上"
 else
@@ -2599,11 +2836,11 @@ else
   tree="$SNAPSHOT_TREE"
 fi
 # 验证包那一步（文件头「验证包那一步」）：起快照里那一份门禁，出路那条命令写主工作区那一份
-CHECKER_TIER_STAGE="${MERGE_AND_VERIFY_CHECKER_TIER_STAGE:-$tree/$CHECKER_TIER_STAGE_PATH}"
-CHECKER_TIER_RERUN_STAGE="${MERGE_AND_VERIFY_CHECKER_TIER_STAGE:-$root/$CHECKER_TIER_STAGE_PATH}"
+VERIFICATION_STAGE="${MERGE_AND_VERIFY_VERIFICATION_STAGE:-$tree/$VERIFICATION_STAGE_PATH}"
+VERIFICATION_RERUN_STAGE="${MERGE_AND_VERIFY_VERIFICATION_STAGE:-$root/$VERIFICATION_STAGE_PATH}"
 if [[ -z "${CARGO_TARGET_DIR:-}" ]]; then
   # 编译目录放这一台自己的临时目录下、这一趟新建（文件头「这一趟的编译目录」），不放日志目录：日志目录在工作根下，工作根两台共享（第二台经 NFS 写回本机盘）
-  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "target-under-work-root" ]]; then   # 弄坏开关：照改前建在 <日志目录>/target
+  if [[ "${MERGE_AND_VERIFY_BREAK:-}" == "target-under-work-root" ]]; then   # 弄坏开关：建在 <日志目录>/target
     RUN_TARGET="$logs/target"
     mkdir -- "$RUN_TARGET" || die "建不了这一趟的编译目录 $RUN_TARGET" "看日志目录 $logs 可不可写、盘满没满"
   else

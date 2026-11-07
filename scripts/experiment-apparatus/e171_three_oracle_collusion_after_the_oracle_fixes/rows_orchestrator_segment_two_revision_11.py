@@ -8,7 +8,7 @@
 输入清单、S17 联动）由它自己的 run_layer 原样装上；这一层只在第二段编排器上再换四处：
   ① 整表派发之前（phase_rows）：281 行（编排器现算的行集）照第 11.2、11.3 节算键（L 取 T₂ 那份计时的 process_wall），查库、写标记
     （<H23 导出根>/reuse-markers/segment-two-rows/）；取来的行数 M ≥ 1 时照 RC3 挑 k = max(3, ⌈0.02 × M⌉) 行现跑（按 sha256(H23 后缀 ‖ 键) 从小到大，
-    挑中的与挑法记一行 name=reuse_sample，即 H32），其余命中的照第 11.5 节「取用」硬链接进行输出根（row-result.tsv 最后链），编排器原有的续跑当它做完了、
+    挑中的与挑法记一行 name=reuse_sample，即 H32），其余命中的照第 11.5 节「取用」从 prune-server 里那一条解出来写进行输出根（row-result.tsv 最后写），编排器原有的续跑当它做完了、
     不派，合成时由原有的按键复用重报并进产物。跨机对照那一行（编排器现算的那一行）在整表与跨机那一次都永远现跑（RC2）；要补位的行（按名字取不到、
     锚点不是恰 1 次、碰到模块集合）永远现跑、不进库，补位协调照编排器原样；
   ② 一个分片结束（finish_shard_two）：编排器原来那样收尾，再把这一分片现跑完的行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2，抽到的 RC3）；
@@ -21,7 +21,7 @@
   rows_orchestrator_segment_two_revision_11.py run  --config <修订 11 占位> [--repo R]
   rows_orchestrator_segment_two_revision_11.py plan --config <修订 11 占位> [--repo R]   修订 10 的 plan 原样，先打每行永远现跑的缘由与库在不在（只读）
   rows_orchestrator_segment_two_revision_11.py --selftest [--cells 格,…] [--rounds N]
-退出码：同修订 10 第二段编排层（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；H31 不过、库目录写不了退 78。
+退出码：同修订 10 第二段编排层（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；H31 不过退 78；prune-server 连不上退 75（复用库只在服务里，reuse_library.py 文件头「库」）；自证只在临时 prune-server 上跑（不是临时服务退 2）。
 经 task-server：文件头第二行声明了 run 这一种分片，服务照计划、各片、合并三步起（rows_orchestrator.py 文件头「经 task-server」），
   计划、合并与代跑的片在读配置、碰库之前就交了退出码；不经服务直接调只用这一台，跨机对照报 not_run。
 
@@ -57,7 +57,7 @@ import revision_8_selftest_harness as harness  # noqa: E402
 BREAK_VARIABLE = "SEGMENT_TWO_R11_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R11_SELFTEST"
 SEGMENT_TWO_R10_PATH = os.path.join(HERE, "rows_orchestrator_segment_two_revision_10.py")
-SEGMENT_TWO_R10_SHA256 = "ab4f6a78fb489e88c62dfd6070993f2c65a4dbb07c75d8805a8076d436f4703e"
+SEGMENT_TWO_R10_SHA256 = "12eb7a28910597dad9dfd312796ac7f70a64e4e77eca96b8f9d816cd51a85b33"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-two-rows"
@@ -239,14 +239,14 @@ def finish_shard_with_reuse(context, record: dict, code: int) -> bool:
 def plan_lines(context) -> list[str]:
     """plan：整表每行的键与库里有没有、永远现跑的缘由（只读：不建库、不写标记、不挪坏条目）。"""
     state = STATE["reuse"]
-    lines = [f"── 复用（修订 11）── 库 {state.library.root}（{'在' if os.path.isdir(state.library.root) else '还没建'}；冻住 {state.library.frozen_reason() or '否'}）；"
+    lines = [f"── 复用（修订 11）── 库 {state.library.location()}（冻住 {state.library.frozen_reason() or '否'}）；"
              f"查库 {'开' if state.lookup else '关'}；标记 {state.markers}；RC3 挑法 sha256({state.suffix} ‖ 键)"]
     inputs, selected, limit = tree_inputs(context), reuse.selected_row_lines(context.repo), row_limit(context, False)
     counts: dict[str, int] = {}
     for row in reuse.segment_two_row_units(context.rows, context.cross_host_row):
         sections, reason = reuse.row_sections(inputs, row, selected, reuse.limit_lines(limit), [])
         key = reuse.key_of(sections)
-        verdict = f"永远现跑（{reason}）" if reason else ("库里有同键条目" if os.path.isdir(state.library.entry_path(key)) else "库里没有")
+        verdict = f"永远现跑（{reason}）" if reason else ("库里有同键条目" if state.library.present(key) else "库里没有")
         counts[verdict] = counts.get(verdict, 0) + 1
         lines.append(f"行 {row.name}：键 {key[:16]}；{verdict}")
     return lines + ["各类行数：" + "；".join(f"{verdict} {number}" for verdict, number in sorted(counts.items()))]
@@ -327,9 +327,7 @@ def main(argument_list: list[str]) -> int:
             problems = reuse.h31_problems(repo, reuse_config)
             if problems:
                 raise reuse.RunCondition("H31 不过：" + "；".join(problems[:4]))
-            library = reuse.Library(library_roots.require_library_root(reuse_config.get("H30")))
-            library.check_run_condition(repo)
-            library.clear_stale_staging()
+            reuse.Library(library_roots.require_library_root(reuse_config.get("H30"))).check_service_reachable()
         else:
             print(f"修订 11 占位 {os.path.abspath(arguments.config)}（dry_run={str(bool(reuse_config.get('dry_run'))).lower()}；{reuse_config.get('dry_run_note') or '-'}）；"
                   f"{library_roots.library_root_of(reuse_config.get('H30'))[1] or 'H30 库根两台同一个路径'}；"
@@ -500,6 +498,11 @@ SELFTEST_SWITCHES = {"sample-skipped": "reuse-e2e", "peer-checks-skipped": "peer
 
 
 def selftest(argument_list: list[str]) -> int:
+    problem = reuse.prune_server_client.selftest_service_problem()
+    if problem:   # 复用库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「退出码」）
+        print(f"✗ rows_orchestrator_segment_two_revision_11.py 自证没跑：{problem}", file=sys.stderr)
+        print(f"     → 怎么办：{reuse.prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
+        return 2
     os.environ[SELFTEST_VARIABLE] = "1"
     return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
 

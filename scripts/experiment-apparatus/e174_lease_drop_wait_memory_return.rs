@@ -21,17 +21,15 @@
 //! `{cell:?}` 与轮号、驱动与卡那一行）；同一条命令重起，轮键对得上的轮读回不再起；这一段的轮都齐了（或 F1 停机）由库拼出产物原子写到 `--output`
 //! （已在而内容相同报「已经齐了」，不同退 2、一个字节不动）。产物路径、`--skip-light`、`--limit-jobs`、清单位置、日期、机器都不进轮键；
 //! `codes/<代码键>.txt` 存组成清单，`index.tsv` 只当索引。轮库是 prune-server 里的那一份判定库（.claude/rules/verification.md「判定库只有一份」）：
-//! 装置不开本地库目录，读写经 `device-code-key.py run` 开的两根管道转给服务（`device_library/relay.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
+//! 装置不开本地库目录，读写经 `device-code-key.py run` 开的两根管道转给服务（`crates/singlefs-device-library/src/lib.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
 //! 服务连不上照转回的退出码退（75），不退回本地文件。
 
 // admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
 // run-condition: command python3
 use std::collections::BTreeMap;
 
-// 判定库的口子（文件头「续跑」）：写成 `#[path] mod` 而不是条目级 `include!`（单元闭包的键不收条目级 include!）
-#[path = "device_library/relay.rs"]
-mod device_library;
-use device_library::DeviceLibrary;
+// 判定库的口子（文件头「续跑」）：包 `singlefs-device-library`（crates/singlefs-device-library），scripts/experiment-apparatus/Cargo.toml 里按 path 依赖引
+use singlefs_device_library::DeviceLibrary;
 
 // ============================== 常量（登记里的数，各只一处） ==============================
 
@@ -2914,7 +2912,7 @@ const CARD_CHILD_ENTRY_SUFFIX: &str = "::run_child_on_the_card";
 const MODEL_CHILD_ENTRY_SUFFIX: &str = "::run_child_on_the_model";
 const ARGUMENTS_ENTRY_SUFFIX: &str = "::ChildJob::child_arguments";
 
-/// 轮库（prune-server 里这个装置那一种，经 `device_library` 转交）与这一趟的两把代码键；组成清单原文照存进 `codes/`（只给「变了的单元」那一句用），
+/// 轮库（prune-server 里这个装置那一种，经 `singlefs_device_library` 转交）与这一趟的两把代码键；组成清单原文照存进 `codes/`（只给「变了的单元」那一句用），
 /// 取键那天与机器只进轮文件的 meta 行。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RoundLibrary {
@@ -2926,7 +2924,7 @@ struct RoundLibrary {
     host: String,
 }
 
-/// 轮库里的相对键（`device_library/relay.rs` 文件头「相对键」）。
+/// 轮库里的相对键（`crates/singlefs-device-library/src/lib.rs` 文件头「相对键」）。
 impl RoundLibrary {
     fn round_path(&self, round_key: &str) -> String {
         format!("{round_key}.out")

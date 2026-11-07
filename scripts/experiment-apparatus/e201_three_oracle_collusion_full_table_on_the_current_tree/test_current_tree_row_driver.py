@@ -1,5 +1,5 @@
 """current_tree_row_driver.py 的单测：编装置的命令带 gpu 特性、前面不套 nice 与任何包装（假 cargo、假 nice 记下真起的进程）；装置命令不带内存包装；
-超过限时杀整组、退出码记 253。弄坏开关 E201_ROW_DRIVER_BREAK 见 current_tree_row_driver.py 文件头。
+超过限时杀整组、退出码记 253；不给 --lanes 时线道数照跑前登记第十四节按每台重活线程数算（LaneCountTests）。弄坏开关 E201_ROW_DRIVER_BREAK 见 current_tree_row_driver.py 文件头。
 跑法：在本目录 `python3 -B -m unittest test_current_tree_row_driver`。"""
 
 from __future__ import annotations
@@ -97,6 +97,37 @@ class DeviceCommandTests(unittest.TestCase):
         """登记 5.2 第一张表九样：装置八样加 O3；可写挂载探针那一样不收。"""
         self.assertEqual(sorted(driver.DEVICE_POSITIVE_CONTROLS) + [driver.O3_CONTROL],
                          sorted(["O1-对拍", "O1-对拍-卸载", "O1-崩溃判官", "RefFS", "O2", "交回值", "内存对象", "panic"]) + ["O3"])
+
+
+class LaneCountTests(unittest.TestCase):
+    """跑前登记第十四节「线程：」一行：不给 --lanes 时一片开 ⌊SINGLEFS_THREAD_CAP ÷ 6⌋ 条线道、每线道 6 线程；线道数不写死。"""
+
+    REQUIRED_ARGUMENTS = ["--repo-root", "/repository", "--work-root", "/work", "--output-root", "/output",
+                          "--baseline-timing", "/baseline-timing", "--timing-output", "/timing-output"]
+
+    def lanes_and_threads_from_the_command_line(self, extra_arguments: list[str], thread_cap: str) -> tuple[int, int]:
+        arguments = driver.argument_parser().parse_args(self.REQUIRED_ARGUMENTS + extra_arguments)
+        return driver.lanes_and_threads_per_lane(arguments.lanes, arguments.threads, {"SINGLEFS_THREAD_CAP": thread_cap})
+
+    def test_without_lanes_or_threads_a_slice_of_31_threads_opens_five_lanes_of_six_threads(self) -> None:
+        self.assertEqual(self.lanes_and_threads_from_the_command_line([], "31"), (5, 6))
+
+    def test_without_lanes_the_lane_count_follows_the_thread_cap_not_a_fixed_number(self) -> None:
+        self.assertEqual(self.lanes_and_threads_from_the_command_line([], "62"), (10, 6))
+        self.assertEqual(self.lanes_and_threads_from_the_command_line([], "4"), (1, 4), "线程不够一条线道的 6 线程时开一条，线程全给它")
+
+    def test_given_threads_without_lanes_divides_the_thread_cap_by_the_given_threads(self) -> None:
+        self.assertEqual(self.lanes_and_threads_from_the_command_line(["--threads", "10"], "31"), (3, 10))
+
+    def test_given_lanes_without_threads_divides_the_thread_cap_by_the_given_lanes(self) -> None:
+        self.assertEqual(self.lanes_and_threads_from_the_command_line(["--lanes", "2"], "31"), (2, 15))
+
+    def test_given_lanes_and_threads_are_taken_as_given(self) -> None:
+        self.assertEqual(self.lanes_and_threads_from_the_command_line(["--lanes", "3", "--threads", "7"], "31"), (3, 7))
+
+    def test_the_lane_threads_are_the_six_the_registration_names(self) -> None:
+        import full_table_run
+        self.assertEqual(full_table_run.LANE_THREADS, 6)
 
 
 CORE_SOURCE = "crates/singlefs-core/src/allocator.rs"

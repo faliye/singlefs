@@ -1,4 +1,4 @@
-//! E138：按盘生效的动态回退下界与整环 + 推空 —— D16（发布语义） 已定项 1 第二轮判决之后的重跑。
+//! E138：按盘生效的动态回退下界与整环 + 推空 —— D16（发布语义） 已定项 1 判决的重跑。
 //!
 //! 预注册 `research/prompts/e138-preregistration.md`。装置从 E135（动态回退下界） 的源码拷出来改：
 //! ① 准入失败时先把正在攒的窗口发布出去，再按臂处置（D3（空间分配） 已定项 9 允许先做有界的内部工作）；
@@ -14,7 +14,7 @@ const REGION_COUNT: u64 = 3;
 const DISK_COUNT: usize = 2;
 /// 臂 C、臂 D 的 K_min：C222 按轮转算术给的 3。
 const TXG_ARITHMETIC_GENERATIONS: u64 = 3;
-/// 用户定案（2026-09-11）：盘紧时最少保留 4 个持久根。
+/// 盘紧时最少保留 4 个持久根。
 const MINIMUM_RETAINED_ROOTS: usize = 4;
 /// 对照臂 G_count：带新 F 的第一个根之后再数几次持久发布。
 const COUNT_ACTIVATION_PUBLICATIONS: u64 = 3;
@@ -296,7 +296,7 @@ struct Simulation {
     planned_root_write_failures: BTreeSet<u64>,
     root_write_attempts: u64,
     current_window_changes_user_state: bool,
-    /// 非空发布的 txg：空发布与推空的根不改用户可见状态（第二轮反推腿指出「可退代数」该数这个）。
+    /// 非空发布的 txg：空发布与推空的根不改用户可见状态。
     nonempty_txgs: HashSet<u64>,
     admin_rollback_happened: bool,
     halted: bool,
@@ -417,7 +417,7 @@ impl Simulation {
         self.valid_roots_with_disk().iter().filter(|(root_disk, _)| *root_disk == disk).map(|(_, root)| root.txg).max()
     }
 
-    /// 用户定案的上限：min(每块幸存盘上最新的持久有效根, 第 4 新的持久有效根)；有效根不足 4 个时取最旧的那个。
+    /// 上限：min(每块幸存盘上最新的持久有效根, 第 4 新的持久有效根)；有效根不足 4 个时取最旧的那个。
     fn per_disk_retention_upper_limit(&self) -> u64 {
         let distinct_newest_first: Vec<u64> = self.valid_roots().iter().map(|root| root.txg).collect::<BTreeSet<u64>>().into_iter().rev().collect();
         let fourth_newest = if distinct_newest_first.len() >= MINIMUM_RETAINED_ROOTS {
@@ -552,7 +552,7 @@ impl Simulation {
         (fake, candidates.len() as u64, nonempty)
     }
 
-    /// 用户定案的最少保留：没丢盘时 F_候选 ≤ 上限；丢盘之后查幸存盘上最新的有效根在候选集里；管理员回退之后不查。
+    /// 最少保留：没丢盘时 F_候选 ≤ 上限；丢盘之后查幸存盘上最新的有效根在候选集里；管理员回退之后不查。
     fn is_retention_violated(&self) -> bool {
         if !self.arm.uses_floor() || self.admin_rollback_happened {
             return false;

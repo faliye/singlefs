@@ -40,7 +40,7 @@ use std::time::Instant;
 
 const O_DIRECT: i32 = 0o40000; // naming-lint:external Linux open(2) 标志名
 const ALIGNMENT_BYTES: usize = 4096;
-/// 节点 16 KiB：D8 已定项 2（2026-08-30 用户定案）钉成常量，不按设备特性算。
+/// 节点 16 KiB：D8 已定项 2钉成常量，不按设备特性算。
 const NODE_BYTES: usize = 16384;
 /// pivot 条目 = key 8 + D19 指针头部 40。
 const PIVOT_BYTES: usize = 48;
@@ -52,7 +52,7 @@ const NODE_HEADER_BYTES: usize = 16;
 const LEAF_ENTRY_CAPACITY: usize = (NODE_BYTES - NODE_HEADER_BYTES) / MESSAGE_BYTES;
 
 /// 叶数是运行期参数（第 5 个命令行参数），默认 1024。
-/// ⚠️ **它是自变量而不是常量，因为 2026-08-31 三条独立论证腿里有两条都把
+/// ⚠️ **它是自变量而不是常量，因为三条独立论证腿里有两条都把
 /// 「树只有 1024 个叶、缓存占 6.4%」列为这批结论最大的外推威胁**——
 /// 那件事量得出来，不该只靠嘴上让步。main 在构造任何 Geom 之前设定它一次，此后不再改。
 static mut LEAF_COUNT_AT_RUNTIME: usize = 1024;
@@ -106,7 +106,7 @@ fn buffer_capacity_of(epsilon_permille: u32) -> usize {
 /// 自底向上按扇出收敛，返回每一层的节点数，最后一项恒为 1（根）。
 ///
 /// ⚠️ **进度不变量写在函数自己里，不是写在单测里。**
-/// 2026-08-31 变异测试：把 `div_ceil` 换成整除之后 `nodes_in_level` 掉到 0，`nodes_in_level == 1` 永远不成立，
+/// 变异测试：把 `div_ceil` 换成整除之后 `nodes_in_level` 掉到 0，`nodes_in_level == 1` 永远不成立，
 /// 循环无限往 `level_node_counts` 里塞 0 直到内存耗尽 ⇒ 测试进程被 signal 9 打死。
 /// 那种「破坏被看见了，但不是断言抓到的」等于盲区：换个不 OOM 的同类错误就没人发现。
 /// 断言放在单测里救不了它——函数根本不返回，单测里的断言执行不到。
@@ -330,7 +330,7 @@ impl Cache {
     /// 取用一页。**`touch` 的返回值一律不许丢**——丢掉的那次逐出等于一次
     /// 「该写没写」，而它同时把被逐出的那一页变成 `map` 里 LRU 追踪不到的幽灵页，
     /// 幽灵页此后永远免费命中、还会繁殖出新的幽灵页。
-    /// 2026-08-31 实测：丢返回值的写法下声明 66 个节点的缓存，
+    /// 实测：丢返回值的写法下声明 66 个节点的缓存，
     /// 实际常驻集涨到 688（占树 67%），而三条臂互比看不出来——
     /// 只有 Bε 那条臂会在 get 与 put 之间嵌套别的缓存操作。
     fn get(&mut self, device: &mut Device, page_number: u64, node_capacity: usize, buffer: &mut AlignedBuffer) -> Node {
@@ -389,7 +389,7 @@ impl Cache {
     }
 }
 
-/// 正推腿（2026-08-31，盲预测，没看过任何实测）给了三条判别观测，这三个计数器就是它们的读数：
+/// 盲预测（没看过任何实测）给了三条判别观测，这三个计数器就是它们的读数：
 ///   1. 叶压实全程触发几次——它预测 0；非 0 则它给的写次数全是低估。
 ///   2. 一次下刷命中几个孩子——它预测「全刷」形态下 ε=0.25 时每次约 162 个叶、
 ///      下刷事件约 781 次；若实现是「只刷最满的那个孩子」，则每次恰好 1 个、事件约 12.6 万次。
@@ -458,7 +458,7 @@ struct Run {
     touches: u64,
     elapsed_nanoseconds: u64,
     /// 收尾时还停在各层缓冲里、从没到过叶子的消息条数。
-    /// ⚠️ **这一项是 2026-08-31 反推腿指出来的缺口**：不数它，高 ε 档的
+    /// ⚠️ **这一项是反推腿指出来的缺口**：不数它，高 ε 档的
     /// io/op 会把「还没付的账」算成「省下来的钱」——而基线臂的 write buffer
     /// 在每个 checkpoint 与收尾都清空，**两条臂的摊销架构因此不对称**
     /// （E7 硬要求 2 要的正是对称）。
@@ -589,7 +589,7 @@ fn arm_betree(
     let mut random_state = seed;
     let internal_node_capacity = buffer_capacity.max(1).min(LEAF_ENTRY_CAPACITY);
     // ── 预热相：先把各层缓冲填到稳态，**这一段的 I/O 不计费**。
-    // ⚠️ 补它的理由（2026-08-31）：不预热的话各层缓冲一开始全空，进每个节点的前 B 条
+    // ⚠️ 补它的理由：不预热的话各层缓冲一开始全空，进每个节点的前 B 条
     // 消息都是免费的，而**总缓冲容量可以超过整个负载**——实测 nleaf=8192、ε=0.95 时
     // 总缓冲容量约 50 万条 > 20 万次操作 ⇒ 残留 100%，一条消息都没到过叶子，
     // 量到的不是稳态写放大，是「把消息塞进缓冲的成本」，账还没到期。
@@ -608,7 +608,7 @@ fn arm_betree(
     let (reads_before, writes_before, bytes_read_before, bytes_written_before) = (device.reads, device.writes, device.bytes_read, device.bytes_written);
     // ⚠️ **块层采样点必须在预热之后。** 采在外面会把不计费的预热相与数残留那两段
     // 算进块层那一侧，于是「程序计数器 = 块层读数」这条校验退化成「差不多」——
-    // 2026-08-31 虚机首跑实测差 1991 读（ε=0.5），正是那两段。
+    // 虚机首跑实测差 1991 读（ε=0.5），正是那两段。
     let block_counters_before_measurement = read_block_layer_counters(device_path);
     let mut node_cache = Cache::new(cache_node_count);
     let mut touches = 0u64;
@@ -682,7 +682,7 @@ fn push_down(
     // ⚠️ **按「装到满就立刻下刷」分块装，不许一口气全塞进去。**
     // 一口气塞的写法在缓冲恰好装满时会**静默丢消息**（`Node::push` 满了就什么也不做），
     // 而内部缓冲里的 key 来自整个子树、重复率约 0.09%，压实几乎腾不出槽位。
-    // 2026-08-31 由正推腿的「叶压实该是 0 次」这条盲预测查出来：
+    // 由「叶压实该是 0 次」这条盲预测查出来：
     // 实测压实计数非 0，追下去发现计的是**内部缓冲**的压实，而那正是丢消息的现场。
     let mut message_index = 0usize;
     while message_index < messages.len() {
@@ -759,7 +759,7 @@ fn drain_all(
     // ⚠️ **残留必须在动手推之前数完，不能边推边数。**
     // 边推边数会漏掉一类消息：上层排空时把消息推进下层，下层缓冲因此溢出、当场
     // 直接刷到叶子，等外层循环走到那一层时它们已经不在了 —— 于是 landed 计到、
-    // residual 没计到。2026-08-31 守恒闸第一次真跑就是被这一条判红的
+    // residual 没计到。守恒闸靠这一条才判得红
     // （landed_update=199869 residual=109，差 22 条）。
     let mut residual = 0u64;
     for level in 0..geometry.height() {
@@ -1021,7 +1021,7 @@ fn main() {
         run_result.drain_device_operations = drain_device_operations;
         // 守恒闸：落到叶的消息数加上排空时从缓冲里捡出来的，必须恰好等于操作数。
         // 少一条就是有消息被静默丢了——而丢消息在 io/op 上长得像「更省」。
-        // ⚠️ 这道闸是补的：2026-08-31 之前没有它，`push_down` 在缓冲恰好装满时
+        // ⚠️ 没有这道闸时，`push_down` 在缓冲恰好装满时
         // 静默丢消息，而三条臂互比看不出来（丢消息只让 Bε 那条臂显得更便宜）。
         let expected_resident_node_count = cache_node_count.min(geometry.total_nodes());
         if resident_nodes_peak() > expected_resident_node_count {
@@ -1096,7 +1096,7 @@ mod tests {
     use super::*;
 
     /// **绝对值断言 1：几何常量。** 它们一改，下面每一条解析值都静默作废，
-    /// 而 D11 引的数正是这套算术算出来的（E7 的教训：几何常量此前没有任何断言钉住）。
+    /// 而 D11 引的数正是这套算术算出来的（E7 的教训：几何常量要有断言钉住）。
     #[test]
     fn geometry_constants_are_pinned() {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2 钉的是 16 KiB");
@@ -1174,7 +1174,7 @@ mod tests {
     }
 
     /// **层数序列必须严格收敛到 1，每层至少 1 个节点。**
-    /// ⚠️ 补这一条的理由（2026-08-31 变异测试）：把 `div_ceil` 换成整除的那条变异
+    /// ⚠️ 补这一条的理由（变异测试）：把 `div_ceil` 换成整除的那条变异
     /// （M3）只让测试进程被 signal 9 打死——`nodes_in_level` 掉到 0 之后 `nodes_in_level == 1` 永远不成立，
     /// 循环无限往 `levels` 里塞 0 直到内存耗尽。**破坏被看见了，但不是断言抓到的**，
     /// 那是个盲区：换个形状的同类错误（例如少收敛一层）就不会 OOM，也就不会被发现。
@@ -1256,7 +1256,7 @@ mod tests {
     /// 各层缓冲加起来最多能扣住 total_internal × B 条消息，这些消息在收尾时
     /// 还没到过叶子。ε=0.95 时是 66 × 972 = 64152 条，占 20 万次操作的 32%
     /// ⇒ **不做收尾排空的话，高 ε 档的 io/op 把「还没付的账」算成了「省下的钱」。**
-    /// 这条算术就是 2026-08-31 反推腿指出缺口时用的那条，钉在这里免得它只活在散文里。
+    /// 这条算术就是反推腿指出缺口时用的那条，钉在这里免得它只活在散文里。
     #[test]
     fn the_unpaid_buffer_debt_at_high_eps_is_a_third_of_the_workload() {
         let geometry = Geometry::new(950);
@@ -1271,7 +1271,7 @@ mod tests {
     }
 
     /// **绝对值断言 6：三条臂落在同一条曲线上。**
-    /// 2026-08-31 正推腿在**没看过任何实测**的情况下推出
+    /// 盲预测在**没看过任何实测**的情况下推出
     /// `io/op = 2(1 − e^(−x))/x`，x = 一次下刷的消息数 / 该节点的孩子数：
     /// 臂 A 是 x→0（每条消息独占一次下刷），臂 B 是 x = 512/1024 = 0.5，
     /// 臂 C 是 x = B/F = 3ε/(1−ε)。

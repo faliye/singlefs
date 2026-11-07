@@ -1,5 +1,5 @@
 #!/bin/bash
-# E171 第 1 次重跑第二段（整表）·修订 6 树·多机跑法（2026-10-07 写）：登记 research/prompts/e171-r1-prereg.md 第五节 5.5 第二段、修订 2 第 2.5 节、
+# E171 第 1 次重跑第二段（整表）·修订 6 树·多机跑法：登记 research/prompts/e171-r1-prereg.md 第五节 5.5 第二段、修订 2 第 2.5 节、
 # 修订 6 第 6.6 节「第二段（整表）照原文，在修订 6 树上跑」。281 行加补位，流一、流二，批 1 批 2，不跑执行器、不带探针；编排交 rows_orchestrator_segment_two.py
 # （文件头写行集、分配、派发、补位协调、合并、判法、跨机对照、超时重跑、续跑）。第一段那一份入口 run_segment_one_on_the_revision_6_tree_multi_host.sh 不改。
 # 起法（主 agent，仓根；内存、线程、哪台由服务定，这一份不套包装）：task-server/task submit -- bash scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh

@@ -15,7 +15,7 @@
 //! 第四段的分片、续跑与多机（登记修订 2 之十三、修订 4 之五）：997 个工作项，每项一把项键 = sha256（入口 `segment_four_item_lines` 的代码键
 //! 与这一项 `{item:?}` 的全部字段值）；代码键由取键脚本 `scripts/experiment-apparatus/device-code-key.py` 算（单元闭包、工具链行、闭包点到的依赖行），
 //! 经 `--code-key-file` 交进来。项库是 prune-server 里的那一份判定库（.claude/rules/verification.md「判定库只有一份」）：装置不开本地库目录，
-//! 读写经 `device-code-key.py run` 开的两根管道转给服务（`device_library/relay.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
+//! 读写经 `device-code-key.py run` 开的两根管道转给服务（`crates/singlefs-device-library/src/lib.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
 //! 服务连不上照转回的退出码退（75），不退回本地文件。每项算完写进 `items/<项键>.out` 那一条（键行、parameters、meta、产物行、done 行），
 //! 组成清单存 `codes/<代码键>.txt`，不分片的那一趟拼完重写 `index.tsv`（项名 → 项键，只当索引）。同一条命令重起，项键相同的项读回不重算；
 //! 项名、序号、标签都不进键。补算缺的项，997 项齐了按项的次序拼出产物打到 stdout；要两台分判，由统一任务服务分片。
@@ -2038,7 +2038,7 @@ impl Simulation {
         self.unlink_step_for(object, self.version.data_units_of(object))
     }
 
-    /// 把删除队列走空（会话里每次用户改动先做这一步，D8 已定项 16 第 6 条）。
+    /// 把删除队列走空（会话里每次改动先做这一步，D8 已定项 16 第 6 条）。
     fn walk_the_deletion_queue_empty(&mut self) {
         while let Some(object) = self.version.deleted_queue {
             let step = self.next_unlink_step(object);
@@ -2328,7 +2328,7 @@ fn is_readable(unit: &Unit, scan_publish: u64, window: ReadableWindow) -> bool {
     }
 }
 
-/// 已发布谓词（D18 已定项 11 的实例表、C113 定案 P2）：现行实例按现行那一版的事务号判，旧实例按实例表那一行判，没有行的旧实例算已发布。
+/// 已发布谓词（D18 已定项 11 的实例表、C113 P2）：现行实例按现行那一版的事务号判，旧实例按实例表那一行判，没有行的旧实例算已发布。
 fn is_published_by_the_instance_table(unit: &Unit, inputs: &ScanInputs<'_>) -> bool {
     let instance = unit.write_order.instance;
     if instance == inputs.current_instance {
@@ -6201,7 +6201,7 @@ struct SegmentFourOptions {
     library: SegmentFourLibrary,
 }
 
-/// 项库（prune-server 里这个装置那一种，经 `device_library` 转交）与这一趟的代码键：取键脚本 `scripts/experiment-apparatus/device-code-key.py`
+/// 项库（prune-server 里这个装置那一种，经 `singlefs_device_library` 转交）与这一趟的代码键：取键脚本 `scripts/experiment-apparatus/device-code-key.py`
 /// 打的组成清单里 `code_key` 那一行；清单原文照存进 `codes/<代码键>.txt`（只给「变了的单元」那一句用），取键那天与机器只进项文件的 meta 行。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SegmentFourLibrary {
@@ -6212,7 +6212,7 @@ struct SegmentFourLibrary {
     host: String,
 }
 
-/// 项库里的相对键（`device_library/relay.rs` 文件头「相对键」）。
+/// 项库里的相对键（`crates/singlefs-device-library/src/lib.rs` 文件头「相对键」）。
 impl SegmentFourLibrary {
     fn item_path(&self, item_key: &str) -> String {
         format!("items/{item_key}.out")
@@ -7030,10 +7030,8 @@ fn segment_four_options_from(arguments: &[String], environment: &SegmentFourEnvi
 #[path = "heavy_threads_default/threads.rs"]
 mod heavy_threads_default;
 use heavy_threads_default::default_heavy_threads;
-// 判定库的口子（文件头「第四段的分片、续跑与多机」），同样写成 `#[path] mod`。
-#[path = "device_library/relay.rs"]
-mod device_library;
-use device_library::DeviceLibrary;
+// 判定库的口子（文件头「第四段的分片、续跑与多机」）：包 `singlefs-device-library`（crates/singlefs-device-library），scripts/experiment-apparatus/Cargo.toml 里按 path 依赖引
+use singlefs_device_library::DeviceLibrary;
 
 /// 线程数：`E178_THREADS`，没设取 `SINGLEFS_THREAD_CAP`，都没设取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn threads_from_the_environment() -> usize {

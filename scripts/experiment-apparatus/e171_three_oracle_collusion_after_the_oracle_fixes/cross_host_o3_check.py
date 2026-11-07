@@ -53,7 +53,7 @@ import types
 
 # 编排器取同一目录里入库的那一份，开跑核 sha256。钉的是它此刻的内容：跑那一趟的 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
 ORCHESTRATOR_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rows_orchestrator.py")
-ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
+ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
 # 去法：键只在点名的那一种行里去（行种类 → 键）
 SCHEDULING_KEYS_BY_LINE_KIND = {"name=state": ("worker",), "name=timing": ("workers", "worker_processes")}
 EVERY_SCHEDULING_KEY = ("worker", "workers", "worker_processes")

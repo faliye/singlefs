@@ -28,7 +28,7 @@ mkdir -p "$DESTINATION" || fail "建不了 $DESTINATION" "换一个可写的目�
 # ── 一、ZFS 与 bcachefs 的用户态：下载、核 sha256、解包（不装进系统） ──
 ZFS_POOL=http://archive.ubuntu.com/ubuntu/pool/main/z/zfs-linux
 BCACHEFS_POOL=http://archive.ubuntu.com/ubuntu/pool/universe/b/bcachefs-tools
-# 每行：URL、本地文件名、sha256（2026-09-15 下载时算的）。对不上说明仓库里的包换了：改表就是换版本，要另写登记。
+# 每行：URL、本地文件名、sha256（下载时算的）。对不上说明仓库里的包换了：改表就是换版本，要另写登记。
 PACKAGE_TABLE="$ZFS_POOL/zfsutils-linux_2.3.4-1ubuntu2_amd64.deb zfsutils-linux_2.3.4-1ubuntu2_amd64.deb d3f6d9a528abab203c33a57524a79be8ab9ae90c8b919438c2f4eca50e7cfc88
 $ZFS_POOL/libzfs6linux_2.3.4-1ubuntu2_amd64.deb libzfs6linux_2.3.4-1ubuntu2_amd64.deb 751e6d461c10ba41f041a8901e10027028b598c2b09e7aca2d03a9b9843f7704
 $ZFS_POOL/libzpool6linux_2.3.4-1ubuntu2_amd64.deb libzpool6linux_2.3.4-1ubuntu2_amd64.deb a3b14b3ad2c44c4c19c402ec2759827eff0cd62f0d04ec3d30c1342a64c1c8a3
@@ -69,7 +69,7 @@ install_binary_with_libraries() {   # <宿主上的路径> <来宾里的路径>
     [[ -n "$library" ]] || continue
     library_guest_path="${library#"$PACKAGE_ROOT"}"
     # 库一律带执行位：动态加载器 /lib64/ld-linux-x86-64.so.2 本身就是被内核执行的那个文件，
-    # 没有执行位时来宾里每个动态程序都报 Permission denied（2026-09-15 冒烟跑七个配置全卡在这里）
+    # 没有执行位时来宾里每个动态程序都报 Permission denied
     if [[ ! -e "$DESTINATION$library_guest_path" ]]; then
       install -D -m 0755 "$(readlink -f "$library")" "$DESTINATION$library_guest_path" || fail "装不进 $library_guest_path" "看 $DESTINATION 的权限"
     fi

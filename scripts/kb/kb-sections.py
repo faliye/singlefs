@@ -4,25 +4,25 @@
 """生成三方论证材料要带的那张小节清单——**含第一个标题之前的引言段**。
 
 `.claude/rules/three-way-inference.md` 要求材料带一张小节清单，逐节标「抄 / 不抄 /
-为什么不抄」，好让漏掉的那一节留下可见的空格。此前这张表是每轮临时用 awk 抓 `^#{2,5} `
-生成的，于是**文档开头那段正文没有自己的行**：它住在 H2 标题之下、第一个 H3 之前，
+为什么不抄」，好让漏掉的那一节留下可见的空格。按 awk 抓 `^#{2,5} `
+生成的清单里，**文档开头那段正文没有自己的行**：它住在 H2 标题之下、第一个 H3 之前，
 在清单里只表现为那条 H2 标题行。而 H2 标题行看着就是个标题，标「不抄」几乎不需要理由,
 一标下去，那段正文连同它一起无声消失。
 
 ⇒ 本脚本给那段正文**单独发一行**，标出它的行区间，让它必须被单独判一次抄不抄。
 ⚠️ 射程只有开头这一段：别的标题的正文仍然由它自己那一行代表。
 
-**一级标题同样算标题**（2026-09-11 补）。此前只认二到六级，于是顶上是一级标题的文件——
+**一级标题同样算标题**：只认二到六级的话，顶上是一级标题的文件——
 `checks-owed.md`、`crates/singlefs-checker/invariants/README.md`、`layout/01-first-txn.md`——那个一级标题连同它下面、第一个
 下级标题之前的正文**一行都不发**。`checks-owed.md` 的整张欠账表（第 2-243 行）就住在那里，
-清单上根本看不见它，也就没有地方写「不抄，因为……」。实测是给 D19 未定项 6 第二轮备材料时
-逐行对清单才发现的。自证会红：`KB_SECTIONS_NO_H1=1` 强制走回旧行为，自检里那一行必须消失。
+清单上根本看不见它，也就没有地方写「不抄，因为……」。
+自证会红：`KB_SECTIONS_NO_H1=1` 让它只认二到六级，自检里那一行必须消失。
 
-实测（2026-09-10，D6（快照实现模型） 未定项 2 第一轮）：
+例（D6（快照实现模型） 未定项 2 的枢纽问题）：
 `.claude/kb/decisions/05-快照-空间记账机制.md` 的第 1-14 行是整个模型的定义段，
 逐字写着「销毁快照时把它的 deadlist 合并到下一个更新的那一侧……**不做全盘扫描**」。
-它无声消失，而那一轮的枢纽问题正是「销毁快照是不是一次全盘遍历」——
-材料因此把一个假前提发给了三条腿，是正推腿自己去读原文才捞回来的。
+它若无声消失，而枢纽问题正是「销毁快照是不是一次全盘遍历」，
+材料就会把一个假前提发给三条腿。
 
 用法：
 
@@ -32,15 +32,24 @@
 
 供别的脚本 import 的函数：heading_bounds(path) → ([(行号, 级别, 原文)], 总行数)，标题的认法与清单同一份（栅栏里的行不算）；quote-kb.py 用它另算一次 @标题 取法的起止行（C264）。
 
-退出码：0 打出清单（或 --help）；2 没给文件、不认的选项、文件不存在或读不了（stderr 写哪一份、怎么办，不抛 traceback）。
+退出码：0 打出清单（或 --help）；2 没给文件、不认的选项、文件不存在或读不了（stderr 写哪一份、怎么办，不抛 traceback），
+或平常跑设了下面四个弄坏开关里的任何一个（stderr 点名它只在自证里认，什么都不打）。
 
-自证会红：`kb-sections.py --selftest` 造一份「标题之前有正文」的样本，
-断言清单里有那一行；再用 KB_SECTIONS_NO_PREAMBLE=1 强制走回旧行为，确认判红。
-弄坏开关（只给 --selftest 证红用）：
-  KB_SECTIONS_BREAK=raw-arguments  main() 不先判 --help、不认的选项与读不了的文件（改前的样子）
+自证会红：`kb-sections.py --selftest` 造一份「标题之前有正文」的样本，断言清单里有那一行；一级标题、栅栏、heading_bounds、命令行各一格。
+弄坏开关（只给 --selftest 证红用；四个变量同一道入口守卫 settle_break_switches()：平常跑设了任何一个就退 2，被别的脚本当模块读进来时
+三个 NO_ 开关经 selftest_switch() 读，不在自证里一律不认，所以 quote-kb.py 平常跑时节边界不受它们左右）：
+  KB_SECTIONS_BREAK=raw-arguments  main() 不先判 --help、不认的选项与读不了的文件
       命令行那一格（「selftest: 命令行 ['--help'] 应当退 0」）
+  KB_SECTIONS_BREAK=old-switches-unguarded  三个 NO_ 开关不进入口守卫、平常跑也认
+      开关守卫那一格（「selftest: 平常跑设了 KB_SECTIONS_NO_H1」）
+  KB_SECTIONS_NO_PREAMBLE=1  sections() 不给开头那段正文单独发一行
+      开头正文那一格（「selftest: 清单里没有开头正文那一行」）
+  KB_SECTIONS_NO_H1=1  is_head() 只认二到六级标题
+      一级标题那一格（「selftest: 一级标题之下的正文没有自己的行」）
+  KB_SECTIONS_NO_FENCE=1  sections() 与 heading_bounds() 不跳代码栅栏
+      栅栏那一格（「selftest: 代码栅栏里的 `## ` 行被当成标题发了一行」）
 """
-import io, os, re, subprocess, sys, tempfile
+import contextlib, io, os, re, subprocess, sys, tempfile
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -66,22 +75,40 @@ def fenced_lines(lines):
     return inside
 
 
+SELFTEST_CONTEXT = []   # 这个进程在不在自证里，第一次问时算一次（往上数祖先要读 /proc，不逐行重算）
+
+
+def selftest_switch(name, in_selftest=None):
+    """三个 NO_ 弄坏开关的读法：变量设了、而且这一趟在自证里才认。
+    在不在自证里：in_selftest 给了就照它；没给就看本进程的命令行以 --selftest 起头（quote-kb.py --selftest 把本文件当模块读进来时也算），
+    或祖先里有自证（inside_selftest）。弄坏开关 KB_SECTIONS_BREAK=old-switches-unguarded 下三个 NO_ 开关设了就认。"""
+    if not os.environ.get(name):
+        return False
+    if os.environ.get('KB_SECTIONS_BREAK') == 'old-switches-unguarded':
+        return True
+    if in_selftest is not None:
+        return in_selftest
+    if not SELFTEST_CONTEXT:
+        SELFTEST_CONTEXT.append(sys.argv[1:2] == ['--selftest'] or inside_selftest())
+    return SELFTEST_CONTEXT[0]
+
+
 def is_head(i, l, fenced):
-    head = HEAD_NO_H1 if os.environ.get('KB_SECTIONS_NO_H1') else HEAD
+    head = HEAD_NO_H1 if selftest_switch('KB_SECTIONS_NO_H1') else HEAD
     return i not in fenced and head.match(l)
 
 
 def sections(path):
     """返回 [(标签, 首行号)]；开头那段正文单独占一行，紧跟在它所属的标题之后。"""
     lines = io.open(path, encoding='utf-8').read().split('\n')
-    fenced = set() if os.environ.get('KB_SECTIONS_NO_FENCE') else fenced_lines(lines)
+    fenced = set() if selftest_switch('KB_SECTIONS_NO_FENCE') else fenced_lines(lines)
     heads = [i for i, l in enumerate(lines, 1) if is_head(i, l, fenced)]
     out = []
     for i, l in enumerate(lines, 1):
         if not is_head(i, l, fenced):
             continue
         out.append((l.replace('|', '/'), i))
-        if os.environ.get('KB_SECTIONS_NO_PREAMBLE') or i != heads[0]:
+        if selftest_switch('KB_SECTIONS_NO_PREAMBLE') or i != heads[0]:
             continue
         nxt = next((h for h in heads if h > i), len(lines) + 1)
         body = lines[i:nxt - 1]
@@ -96,7 +123,7 @@ def heading_bounds(path):
     标题的认法与 sections() 同一份（is_head、fenced_lines），所以栅栏里的 `#` 行不算；总行数是整份文本按换行切开的段数（文件以换行收尾时最后一段是空串，也算一行），与 quote-kb.py 的 read() 数法一致。
     给 quote-kb.py 另算一次 `@标题` 取法的起止行用（C264）：节从标题起，到下一个级别不更深的标题之前，没有就到文件末。"""
     lines = io.open(path, encoding="utf-8").read().split("\n")
-    fenced = set() if os.environ.get("KB_SECTIONS_NO_FENCE") else fenced_lines(lines)
+    fenced = set() if selftest_switch("KB_SECTIONS_NO_FENCE") else fenced_lines(lines)
     rows = []
     for i, l in enumerate(lines, 1):
         found = is_head(i, l, fenced)
@@ -122,7 +149,7 @@ def selftest_red(problem):
     """自证判错的那一格：打一行以 ✗ 起头的失败行与出路，交回退出码 1。"""
     print(f'  ✗ selftest: {problem}')
     print('     → 怎么办：看那一格测的是哪一支（开头正文、一级标题、栅栏、heading_bounds），对着 sections() / heading_bounds() 修；'
-          'KB_SECTIONS_NO_PREAMBLE、KB_SECTIONS_NO_H1 设着的话这里本来就该红')
+          'KB_SECTIONS_NO_PREAMBLE、KB_SECTIONS_NO_H1、KB_SECTIONS_NO_FENCE 设着的话对应那一格本来就该红')
     return 1
 
 
@@ -133,10 +160,6 @@ def selftest():
             '## D99 样本 —— 已定\n\n这一段在第一个三级标题之前，是承重的定义段。\n\n### 甲节\n\n正文。\n')
         rows = [t for t, _ in sections(f)]
         has_pre = any('之前的正文' in r for r in rows)
-        if os.environ.get('KB_SECTIONS_NO_PREAMBLE'):
-            if has_pre:
-                return selftest_red('强制关掉那一行之后它仍然在 —— 检查坏了')
-            print('selftest: 关掉那条分支确认判红（清单里没有开头正文那一行）'); return 0
         if not has_pre:
             return selftest_red('清单里没有开头正文那一行 —— 正是本脚本要防的形态')
         h = os.path.join(d, 'h1.md')
@@ -144,10 +167,6 @@ def selftest():
             '# 样本清单\n\n| C1 | 一整张表住在一级标题之下 |\n\n### 已还清\n\n正文。\n')
         hrows = [t for t, _ in sections(h)]
         has_h1 = any(r.startswith('（样本清单 标题之下') for r in hrows)
-        if os.environ.get('KB_SECTIONS_NO_H1'):
-            if has_h1:
-                return selftest_red('强制不认一级标题之后那一行仍然在 —— 检查坏了')
-            print('selftest: 关掉一级标题那条分支确认判红（一级标题下的正文没有自己的行）'); return 0
         if not has_h1:
             return selftest_red('一级标题之下的正文没有自己的行 —— 整张表会从清单上消失')
         g = os.path.join(d, 'fenced.md')
@@ -173,9 +192,28 @@ def selftest():
                       f'实际退 {child.returncode}：{said[-300:]}')
                 print('     → 怎么办：看 main() 开头那几道判；KB_SECTIONS_BREAK=raw-arguments 设着的话这里本来就该红')
                 return 1
-        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题；'
-              f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的、不存在的退 2 带出路）')
-        print('           证明会红：KB_SECTIONS_NO_PREAMBLE=1 / KB_SECTIONS_NO_H1=1 各再跑一遍，对应那一行必须消失')
+        # 三个 NO_ 开关与 KB_SECTIONS_BREAK 同一道入口守卫：平常跑设了就退 2 并点名；被别的脚本当模块读进来、不在自证里时读法也不认。
+        # 子进程的祖先里有这一趟自证、守卫会放行，所以这一格在本进程里问守卫与读法，在不在自证里由参数给死
+        saved_no_h1 = os.environ.get('KB_SECTIONS_NO_H1')
+        os.environ['KB_SECTIONS_NO_H1'] = '1'
+        guard_said = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(guard_said):
+                refused = settle_break_switches(['文件.md'], in_selftest=False)
+            honored = selftest_switch('KB_SECTIONS_NO_H1', in_selftest=False)
+        finally:
+            if saved_no_h1 is None:
+                del os.environ['KB_SECTIONS_NO_H1']
+            else:
+                os.environ['KB_SECTIONS_NO_H1'] = saved_no_h1
+        if refused != 2 or 'KB_SECTIONS_NO_H1' not in guard_said.getvalue() or '只在自证' not in guard_said.getvalue() or honored:
+            print(f'  ✗ selftest: 平常跑设了 KB_SECTIONS_NO_H1，入口守卫应当退 2 并点名它只在自证里认、当模块读时读法也不认，'
+                  f'实际守卫交回 {refused}、读法{"认了" if honored else "没认"}：{guard_said.getvalue()[-300:]}')
+            print('     → 怎么办：看 BREAK_VARIABLES 与 selftest_switch()；KB_SECTIONS_BREAK=old-switches-unguarded 设着的话这里本来就该红')
+            return 1
+        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；一级标题下的正文单独占一行；栅栏里的 `## ` 不算标题；'
+              f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的、不存在的退 2 带出路；'
+              f'平常跑设了 NO_ 开关入口退 2、当模块读也不认）')
         return 0
 
 
@@ -210,7 +248,8 @@ def main(args):
     return 0
 
 
-BREAK_VARIABLES = ("KB_SECTIONS_BREAK",)
+# 入口守卫管的变量：KB_SECTIONS_BREAK 与三个 NO_ 开关（文件头「弄坏开关」）；弄坏开关 KB_SECTIONS_BREAK=old-switches-unguarded 下只管第一个
+BREAK_VARIABLES = ("KB_SECTIONS_BREAK", "KB_SECTIONS_NO_H1", "KB_SECTIONS_NO_FENCE", "KB_SECTIONS_NO_PREAMBLE")
 
 
 def inside_selftest():
@@ -228,12 +267,13 @@ def inside_selftest():
     return False
 
 
-def settle_break_switches(arguments):
+def settle_break_switches(arguments, in_selftest=None):
     """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
-    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
+    放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest；in_selftest 给了就照它，自证在本进程里问这一道时用）。
     都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
-    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
-    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+    guarded = BREAK_VARIABLES[:1] if os.environ.get("KB_SECTIONS_BREAK") == "old-switches-unguarded" else BREAK_VARIABLES
+    setting = [name for name in guarded if os.environ.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or (inside_selftest() if in_selftest is None else in_selftest):
         return None
     print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
     print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/kb-sections.py --selftest", file=sys.stderr)

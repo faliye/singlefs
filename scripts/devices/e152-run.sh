@@ -6,8 +6,9 @@
 #   bash scripts/devices/e152-run.sh --selftest                                              自证：缩过的那一趟产物头写「缩过、不当 E152 的产物」（不起虚机、不编译）
 # E152_CONFIGURATIONS 当指定范围（点名哪几个配置），E152_ROUNDS 当缩域（少于登记的 5 轮）；设了与登记不同的值，产物头 E152RUN_HEADER 接
 # reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes，这一份不当 E152 的产物。
-# 弄坏开关 E152_RUN_BREAK=reduced-unmarked（只在 --selftest 起的那一趟里认，别处设了拒、退 2）：缩过的一趟产物头不接缩过那一段
-#   打开后红的格：「缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物」「缩过规模：只点名一个配置，产物头写缩过」
+# 弄坏开关（只在 --selftest 起的那一趟里认，别处设了拒、退 2；一行「开关=值  弄坏哪一处」，下一行起是打开后红的格）：
+#   E152_RUN_BREAK=reduced-unmarked  缩过的一趟产物头不接缩过那一段（reduced_note 直接交空）
+#     「缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物」「缩过规模：只点名一个配置，产物头写缩过」
 #
 # 不嵌套、经 task-server/task submit 交：三条 cargo build 直接起，编译并行度读服务交的 CARGO_BUILD_JOBS（每台默认重活线程数），
 # 内存上限由服务给；脚本里不套 capped.sh、run-with-memory-cap.sh，也不写线程数。
@@ -21,6 +22,8 @@
 set -uo pipefail
 RESEARCH="$(cd "$(dirname "$0")/../experiment-apparatus" && pwd)"
 REPOSITORY="$(cd "$RESEARCH/../.." && pwd)"
+# 三份二进制都取 cargo 报的这一趟编出来的位置（binary_identity_build；编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，不是各自那一层的 target/）
+source "$RESEARCH/long-run-lib/binary-identity.sh"
 REGISTERED_ROUNDS=5
 REGISTERED_CONFIGURATIONS="raw ext4 xfs f2fs btrfs bcachefs zfs singlefs"
 
@@ -56,21 +59,21 @@ case "$OUTPUT" in /*) ;; *) OUTPUT="$PWD/$OUTPUT" ;; esac
 cd "$RESEARCH" || fail "进不了 $RESEARCH" "从仓里跑"
 KERNEL="$(bash ../devices/vm-kernel.sh --release "$RELEASE")" \
   || fail "拿不到 $RELEASE 的内核镜像" "单跑 bash scripts/devices/vm-kernel.sh --release $RELEASE 看报错"
-cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark >/dev/null 2>&1 \
-  || fail "来宾二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark"
-cargo build --release --bin e152-file-system-benchmark >/dev/null 2>&1 \
-  || fail "宿主上的汇总二进制编不过" "cd scripts/experiment-apparatus && cargo build --release --bin e152-file-system-benchmark"
+binary_identity_build e152-file-system-benchmark --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark 2>/dev/null \
+  || fail "来宾二进制编不过，或编过了 cargo 没报出它编在哪" "cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e152-file-system-benchmark --message-format=json-render-diagnostics"
+GUEST_BINARY="$BUILT_BINARY"
+binary_identity_build e152-file-system-benchmark --release --bin e152-file-system-benchmark 2>/dev/null \
+  || fail "宿主上的汇总二进制编不过，或编过了 cargo 没报出它编在哪" "cd scripts/experiment-apparatus && cargo build --release --bin e152-file-system-benchmark --message-format=json-render-diagnostics"
+HOST_BINARY="$BUILT_BINARY"
 # singlefs 的真设备二进制与门禁 qemu-device-streams 同一种编法：glibc 目标加 +crt-static（验证包默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
-( cd "$REPOSITORY" && cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-verification --bin new_pool_file_creation_on_device >/dev/null 2>&1 ) \
+SINGLEFS_BINARY="$(cd "$REPOSITORY" && binary_identity_build new_pool_file_creation_on_device --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-verification --bin new_pool_file_creation_on_device >/dev/null 2>&1 && printf '%s' "$BUILT_BINARY")" \
+  && [[ -n "$SINGLEFS_BINARY" ]] \
   || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-verification --bin new_pool_file_creation_on_device"
-GUEST_BINARY="$RESEARCH/target/x86_64-unknown-linux-musl/release/e152-file-system-benchmark"
-HOST_BINARY="$RESEARCH/target/release/e152-file-system-benchmark"
-SINGLEFS_BINARY="$REPOSITORY/target/x86_64-unknown-linux-gnu/release/new_pool_file_creation_on_device"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e152.XXXXXX")"
 trap 'rm -rf "${WORK:?}"' EXIT
 # 起跑时把要调的脚本复制一份，之后只调副本：bash 边读边执行脚本，仓里的原件中途被别的会话一改，
-# 正在跑的那一次就会读到错位的内容（2026-09-15 第二次正式跑实测：vm-bench.sh 开头注释被改，那一次报语法错退出）。
+# 正在跑的那一次就会读到错位的内容（例：vm-bench.sh 开头注释被改，跑着的那一次报语法错退出）。
 mkdir -p "$WORK/scripts/devices"
 cp "$REPOSITORY/scripts/devices/vm-bench.sh" "$REPOSITORY/scripts/devices/e152-stage-root.sh" "$WORK/scripts/devices/" || fail "复制不了测试台脚本" "看 $WORK 的权限"
 bash "$WORK/scripts/devices/e152-stage-root.sh" "$WORK/root" "$RELEASE" "$SINGLEFS_BINARY" \

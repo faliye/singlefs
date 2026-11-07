@@ -7,7 +7,7 @@
 #   snapshot-check.sh --selftest             # 造一个小仓走三条路；SNAPSHOT_CHECK_BREAK=ignore-mismatch 时必须判红
 #
 # 为什么：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」要主 agent 写判决前拿快照 sha256sum -c 一遍，对不上的倒推；
-# 2026-09-20 起主 agent 为这类核对敲了几百次 grep / sha256sum，每次都在 50 万上下文里。这一条命令把它做完，判决里抄它的输出。
+# 这类核对手敲 grep / sha256sum 要敲很多次，每次都在大上下文里。这一条命令把它做完，判决里抄它的输出。
 # 输出每行一个文件：一致 / 工作区改了（HEAD 与快照一致，是别的会话未提交的改动）/ 提交改了（HEAD 也不是快照那一版）/
 # HEAD 里没有这份文件（`git cat-file -e HEAD:<路径>` 不过：快照时是未跟踪或没提交的，按工作区那一份核）/ 文件不在（工作区里没有）。
 # 退出码：0 全部一致；1 有对不上的；2 用法错、快照目录不在。
@@ -15,7 +15,7 @@
 # （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
 #   SNAPSHOT_CHECK_BREAK=ignore-mismatch  check_snapshot 不比 sha256，对不上的也判「一致」
 #       「三种对不上应当各判各的、退 1」（实际退 1，工作区改了的 one.md 与提交改了的 two.md 都报成「一致」，只有文件不在的 three.md 判对）
-#   SNAPSHOT_CHECK_BREAK=skip-head-presence  check_snapshot 不先核文件在不在 HEAD，不在的拿空输出的哈希去比（改前的样子）
+#   SNAPSHOT_CHECK_BREAK=skip-head-presence  check_snapshot 不先核文件在不在 HEAD，不在的拿空输出的哈希去比
 #       「未跟踪的文件应当判「HEAD 里没有这份文件」」（实际退 1，four.md 被报成「提交改了」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"

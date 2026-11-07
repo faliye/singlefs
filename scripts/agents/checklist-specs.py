@@ -11,10 +11,9 @@
 退出码：0 打出取法或 quote-kb.py 抄成；1 清单本身判红（「随」行父节没取到、标了抄却认不出）；2 不认的选项、选项缺值、清单或正文读不了；
   带 --out 时其余退出码是 quote-kb.py 的（3–8，见它的文件头：7 是 @标题 取法两边算出的节尾不等，8 是清单「不抄」理由声称别处抄了而出口里没有）。
 
-为什么要有它：`.claude/rules/three-way-inference.md` 要求取法「从清单里标『抄』的行自动生成，别手写第二份」，
-而仓里一直没有这个脚本，D16（发布语义） 未定项 1 的三轮材料都是靠 scratchpad 里一份临时脚本生成的。
-第三轮还踩了一次：把取法用不加引号的 `$SPECS` 传给 quote-kb.py，标题里的空格把一条取法拆成几段，
-quote-kb.py 报「标题『###』命中 9 次」。这里用参数列表直接调 quote-kb.py，取法不经过 shell 拆词。
+为什么要有它：`.claude/rules/three-way-inference.md` 要求取法「从清单里标『抄』的行自动生成，别手写第二份」。
+把取法用不加引号的 `$SPECS` 传给 quote-kb.py，标题里的空格会把一条取法拆成几段，
+quote-kb.py 报「标题『###』命中 9 次」；这里用参数列表直接调 quote-kb.py，取法不经过 shell 拆词。
 
 取法怎么定：
 - 清单里标「抄」、理由不以「随」开头的行才取；
@@ -29,9 +28,9 @@ quote-kb.py 报「标题『###』命中 9 次」。这里用参数列表直接�
       带空格的标题（「✗ 自检：取法 」…「≠ 期望」）
   CHECKLIST_SPECS_BREAK=trust-follow  specs_from_checklist() 不判父节没被取到的「随」行
       父节没取到的「随」行（「✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 0」）
-  CHECKLIST_SPECS_BREAK=preamble-without-range  specs_from_checklist() 不判引言段标了抄却没有「第 a-b 行」（改前的样子：取区间时抛 AttributeError）
+  CHECKLIST_SPECS_BREAK=preamble-without-range  specs_from_checklist() 不判引言段标了抄却没有「第 a-b 行」（取区间时抛 AttributeError）
       引言段缺区间（「✗ 自检：引言段标「抄」却没写「第 a-b 行」的清单应当」…）
-  CHECKLIST_SPECS_BREAK=raw-arguments  main() 不先判 --help、不认的选项、选项缺值与读不了的文件（改前的样子）
+  CHECKLIST_SPECS_BREAK=raw-arguments  main() 不先判 --help、不认的选项、选项缺值与读不了的文件
       命令行那一格（「✗ 自检：命令行 ['--help'] 应当退 0」）
 """
 import os

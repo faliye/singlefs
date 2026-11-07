@@ -1,10 +1,10 @@
-//! E105：extent 树的叶改成码 3 打包记录单元的更新代价——C113 定案第六节对立臂 B 的价钱。
+//! E105：extent 树的叶改成码 3 打包记录单元的更新代价——C113 第六节对立臂 B 的价钱。
 //!
 //! **它答的是**：臂 B（写序只上码 2 / 3，extent 树的叶从码 2 索引叶改成码 3 打包记录单元）
 //! 让 extent 树的单次更新、批量更新与点查各贵多少。算法与 E103 同一套（脏叶 + 全部祖先，
 //! D23 已定项 1 甲；k 次散开更新按 L × (1 − (1 − 1/L)^k) 算碰到的节点），
 //! 只换记录宽：extent 记录 = key 24（locality 8 + inode 8 + offset 8）+ 位置指针 59 = 83（D8 已定项 3 / D19 已定项 4），
-//! 另跑一档 52（第四轮反推腿 6.4 的估算：对象 ID 8 + 出生代 8 + 锚点偏移 8 + 位置条目 14 × 2）看灵敏度。
+//! 另跑一档 52（反推腿 6.4 的估算：对象 ID 8 + 出生代 8 + 锚点偏移 8 + 位置条目 14 × 2）看灵敏度。
 //!
 //! ## 判据（跑前写死）
 //!
@@ -24,13 +24,13 @@ const UNIT_BYTES: u64 = 32768;
 /// D18 已定项 7 三档 58 / 67 / 76 加 C113 的写序 10。
 const NODE_HEADERS: [u64; 3] = [68, 77, 86];
 /// 码 3 头 93（D18 已定项 11 登记的现行值）+ 写序 10。不用登记名，免得格式常量门禁把它当成现行值的漂移。
-/// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`；C113 定案 2026-09-05 加写序 10；C288 ① 2026-09-12 加出生序号 4）。
+/// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`；C113 加写序 10；C288 ① 加出生序号 4）。
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 const CHILD_POINTER_BYTES: u64 = 59;
 const EXTENT_KEY: u64 = 24;
 /// extent 记录 = key 24 + 位置指针 59。
 const EXTENT_RECORD_BYTES: u64 = 83;
-/// 第四轮反推腿 6.4 估的窄记录：对象 ID 8 + 出生代 8 + 锚点偏移 8 + 位置条目 14 × 2。
+/// 反推腿 6.4 估的窄记录：对象 ID 8 + 出生代 8 + 锚点偏移 8 + 位置条目 14 × 2。
 const EXTENT_RECORD_NARROW_BYTES: u64 = 52;
 const STRIPE_WIDTH: u64 = 2;
 const EXTENT_RECORD_COUNTS: [u64; 3] = [10_000, 1_000_000, 100_000_000];
@@ -110,7 +110,7 @@ fn heights(record_count: u64, node_header_bytes: u64, record_bytes: u64) -> (usi
     (tree_geometry.index_leaf_tree_levels.len(), tree_geometry.packed_internal_levels.len() + 1)
 }
 
-/// 连续 N 上乙比甲矮一层的区段（第五轮反推腿 6.4）：这些 N 上单次更新的字节比恒 1.000、点查还少读一个节点。
+/// 连续 N 上乙比甲矮一层的区段：这些 N 上单次更新的字节比恒 1.000、点查还少读一个节点。
 /// 两侧树高都是阶跃函数，阶跃点只会落在 leaf_f × inner_f^k（甲）与 b_f × inner_f^k（乙）上；
 /// 把这些点排好序，逐段用模型自己的 `heights` 判两侧高度，矮一层的段收进来。
 fn equal_cost_segments(node_header_bytes: u64, record_bytes: u64, record_count_limit: u64) -> Vec<(u64, u64)> {
@@ -227,7 +227,7 @@ mod tests {
     }
 
     /// 判据 3：点查字节比在三档头、三个 N 上都落在 1.25–2.0 之间（叶从 16 KiB 涨到 32 KiB，树高不增）。
-    /// 第五轮反推腿 6.4：三个取样点上的 1.25–1.5 是取样的性质。连续 N 上存在乙比甲矮一层的区段，
+    /// 反推腿 6.4：三个取样点上的 1.25–1.5 是取样的性质。连续 N 上存在乙比甲矮一层的区段，
     /// 那里单次更新字节比恒 1.000、点查字节相同且少读一个节点；区段边界钉绝对值。
     #[test]
     fn equal_height_segments_are_pinned() {

@@ -47,7 +47,7 @@ struct Snapshot {
     txg: u64,
     /// 本快照**新建**的 extent（归属原创建者用得着）
     /// 本快照自己创建的 extent。**「归属原创建者」这件事只在这里记一份**——
-    /// 曾经在 `Extent` 里另存过一个 `creator`，两份表示会漂移而 `owner_ref` 臂只读这一份，
+    /// 不在 `Extent` 里另存一个 `creator`——两份表示会漂移而 `owner_ref` 臂只读这一份，
     /// 编译器为此一直报 `creator` 从没被读过。⇒ 删掉那一份，不加检查去追漂移。
     created: Vec<u64>,
     live: bool,

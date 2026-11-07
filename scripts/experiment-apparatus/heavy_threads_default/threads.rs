@@ -1,4 +1,4 @@
-// 实验装置没给线程数时的缺省（用户 2026-10-12 定：所有的默认都跑 31 线程，可以输入参数调整，不输入就是登记的默认）。
+// 实验装置没给线程数时的缺省。
 // 每个用到它的装置在文件里 `include!("heavy_threads_default/threads.rs");`（E178 写成 `#[path = "heavy_threads_default/threads.rs"] mod heavy_threads_default;`
 // 再 `use` 它：单元闭包的键不收条目级 `include!`），再把登记文件的原文传进来：
 // `default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))`（include_str 的路径从调用它的那个文件算，所以由装置自己写）。

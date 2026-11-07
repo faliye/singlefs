@@ -3,9 +3,10 @@
 # run-condition: none 只读仓里的三份文本，除了 python3 之外没有环境要求
 """崩溃点重放合表的读法与核法（一份判法，入口 scripts/crash/crash-point-replay.sh 与 scripts/crash/crash-case-check.py 的 placement 共用）。
 
-合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头）：一项一条流，点名它的两部分——
+合表 .claude/gate.d/crash-point-replay-items.tsv（写法在它的表头）：一项是一条流，或一条流里按功能切的一步（一条测试函数），点名它的两部分——
   崩溃点重放那一套（.claude/gate.d/stage-inputs.tsv 的 crash-case: 行）与放量那一套（scripts/crash/crash-amplification.sh 的 ITEMS）。
-  这一项按条复用的测试目标不另登记：就是这两部分的测试目标（list 的第四段现推）。
+  这一项按条复用的测试目标不另登记：就是这两部分的测试目标（list 的第四段现推）；几项点名同一个测试目标里的部分时（一条流按步拆成几项，
+  或几条流住一份测试文件），这个目标归表里第一个点名它的那一项，后面几项只跑自己点名的部分（item_test_targets；一个测试函数只归一项）。
 
 用法：
     lib_crash_point_replay_items.py list [仓根]      逐行打「项名<TAB>crash-case 键（空格隔开，没有是 -）<TAB>放量分项（同上）<TAB>测试目标（合表不登记，
@@ -28,7 +29,7 @@
   registered_functions(root)（合表点名的部分落到哪几个「测试目标、用例函数」，crash-case-check.py 的 placement 与 scripts/gate/admission.py 的 test-plan --exclude-registered 用）、segment_problems(root)；
   核法的判别力由 selftest_cells() 拿造出来的小仓核，它由 scripts/crash/crash-case-check.py --selftest 起（placement 读的就是这一份核法）。
 
-按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、M4 第 15 条；与引擎那一路实现 E2 的接口约定）：
+按段登记（与引擎那一路实现的接口约定）：
   文件 .claude/gate.d/crash-point-replay-segments.tsv，一行 <项名>\t<流名>\t<段号>\t<段写数>\t<段写表摘要>（可再加一段 # 说明），# 开头的行是注释。
   入口开跑时往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>，引擎按第 2 列（流名）取这条流的行，登记了的段按这一趟的展开上限展开（写数不超过上限的展开全部真子集，超过的取甲二）。
   核法（segment_problems）：文件读得了；每行五段；项名是合表里的一项；流名匹配 ^[A-Za-z][A-Za-z0-9_]*$；段号与段写数是非负整数（十进制、不带前导 0）、
@@ -62,9 +63,10 @@
   unknown-as-zero（算不出的项按 0 态放行）、suggestion-dropped（拒绝说明不写算得出的 n）、shrunk-records-used（取最新的一份记录，不看展开深度）；入口里这几个开关的名字与各自该红的格写在两个入口的文件头。
 
 核法（problems）：
-  ① 每行三段（再加 # 说明）；项名是小写字母、数字、-，不重复，不含 layer0、amplification（判决第三节 J1：新名字不用这两个词）；
+  ① 每行三段（再加 # 说明）；项名是小写字母、数字、-，不重复，不含 layer0、amplification（新名字不用这两个词）；
   ② 第二段的每个键是 stage-inputs.tsv 里一行 crash-case: 的键，第三段的每一项是 ITEMS 里的分项名；两段不能都是 -；
   ③ stage-inputs.tsv 的每一条 crash-case: 与 ITEMS 的每一项都恰好被一项点名（漏了的、两项都点名的都红）。
+  测试目标的归属（item_test_targets）不另判红：一个目标归表里第一个点名它里面部分的那一项，所以一条流按步拆项时，流那一项（带放量分项与流里别的用例）排在它的几步前面。
   合表或 stage-inputs.tsv 读不了算一处问题，不抛；放量入口 crash-amplification.sh 不在当成 ITEMS 是空的
   （合表点名了放量分项的那几项照样报「不是 ITEMS 里的分项」；崩溃点重放门禁的样本根里只有合表、没有放量入口）。
 退出码：0 核过（list 打全表）；1 有问题（逐处列）；2 用法错。
@@ -91,6 +93,8 @@
       segments-bad-flow-name
   CRASH_POINT_REPLAY_ITEMS_BREAK=segment-column-count-unchecked  按段登记不核每行五段（段数不对的行不报、跳过）
       segments-field-count
+  CRASH_POINT_REPLAY_ITEMS_BREAK=shared-target-given-to-every-item  测试目标给点名它里面部分的每一项（一条流按步拆成几项，目标里别的测试函数跟着每一步各跑一遍）
+      shared-target-first-item
 """
 import argparse
 import collections
@@ -220,7 +224,7 @@ def problems(root):
                 found.append(f"{where}：第三段的 {name} 不是 {PIPELINE_ENTRY} 的 ITEMS 里的分项")
     if BROKEN != "unreferenced-accepted":
         for key in sorted(set(cases) - set(named_cases)):
-            found.append(f"{REGISTRATION_TABLE} 的 {key} 没有被合表里哪一项点名（一项一条流：放进它那条流的那一项的第二段，或另起一项）")
+            found.append(f"{REGISTRATION_TABLE} 的 {key} 没有被合表里哪一项点名（放进它那条流的那一项的第二段，或为它另起一项：一条流，或一条流里的一步）")
         for name in sorted(set(pipeline_rows) - set(named_pipeline)):
             found.append(f"{PIPELINE_ENTRY} 的 ITEMS 里的 {name} 没有被合表里哪一项点名（放进它那条流的那一项的第三段，或另起一项）")
     if BROKEN != "duplicate-reference-accepted":
@@ -232,14 +236,17 @@ def problems(root):
 
 def item_test_targets(root):
     """合表每一项按条复用的测试目标：{项名: [测试目标]}。取自这一项点名的部分（crash-case 行的 test= 与放量分项在 ITEMS 里的测试目标），
-    去重、照先出现的次序（先 crash-case 后放量分项）；合表读不了是空表，stage-inputs.tsv 读不了抛 OSError。"""
+    去重、照先出现的次序（先 crash-case 后放量分项）；一个目标只归表里第一个点名它里面部分的那一项，后面的项不再列它（文件头「合表」）。
+    合表读不了是空表，stage-inputs.tsv 读不了抛 OSError。弄坏开关 shared-target-given-to-every-item 下每一项都列。"""
     items, _ = read_items(root)
     cases = crash_case_rows(root)
     pipeline_rows = pipeline_items(root)
-    found = {}
+    found, claimed = {}, set()
     for item in items:
         targets = [cases[key][0] for key in item.crash_cases if key in cases] + [pipeline_rows[name][0] for name in item.pipeline_items if name in pipeline_rows]
-        found[item.name] = list(dict.fromkeys(targets))
+        own = [target for target in dict.fromkeys(targets) if target not in claimed or BROKEN == "shared-target-given-to-every-item"]
+        claimed.update(own)
+        found[item.name] = own
     return found
 
 
@@ -414,6 +421,21 @@ def selftest_cells():
     wanted_targets = {"stream-one": ["stream_one"], "stream-two": ["stream_two", "stream_two_piped"]}
     if item_test_targets(named_root) != wanted_targets:
         failures.append(("item-test-targets", f"每一项的测试目标应当由点名的部分推出 {wanted_targets}，实际 {item_test_targets(named_root)}"))
+    # 一条流按步拆项：流那一项（复用机制那一条与放量分项）在前，两步各一项在后，三项点名的用例都在 stream_split 这一个目标里；目标只归流那一项
+    split_cases = cases + [("crash-case:stream-split-rerun", "stream_split"), ("crash-case:stream-split-first-step", "stream_split"),
+                           ("crash-case:stream-split-second-step", "stream_split")]
+    split_rows = good + [["stream-split", "crash-case:stream-split-rerun", "stream-split-piped"],
+                         ["stream-split-first-step", "crash-case:stream-split-first-step", "-"],
+                         ["stream-split-second-step", "crash-case:stream-split-second-step", "-"]]
+    split_root = world("shared-target-first-item", split_rows, split_cases, pipeline_rows + [("stream-split-piped", "stream_split")])
+    cells.append("shared-target-first-item")
+    split_found = problems(split_root)
+    split_targets = item_test_targets(split_root)
+    wanted_split = {"stream-one": ["stream_one"], "stream-two": ["stream_two", "stream_two_piped"], "stream-split": ["stream_split"],
+                    "stream-split-first-step": [], "stream-split-second-step": []}
+    if split_found or split_targets != wanted_split:
+        failures.append(("shared-target-first-item", f"一条流按步拆成三项（流那一项在前）应当核过、目标 stream_split 只归 stream-split，"
+                                                     f"要 {wanted_split}，实际问题 {split_found}、目标 {split_targets}"))
 
     # 按段登记（文件头「按段登记」）：每格一份小仓（合表就是上面那两项），只换按段登记文件
     digest = "0123456789abcdef" * 4
@@ -462,8 +484,8 @@ SCOPED_CRASH_STATES_LIMIT = 200000     # 指定范围（--item）、没缩域的
 SCOPED_DOMAIN_REFUSED_EXIT = 79        # 超上限或算不出而拒：不编、不跑
 ENGINE_CONSTANT_FILE = os.path.join("crates", "singlefs-verification", "src", "crash_amplification.rs")
 ENGINE_EXPAND_CONSTANT = re.compile(r"pub const EXPAND_UP_TO_WRITES_PER_SEGMENT_OF_THE_AMPLIFICATION: usize = ([0-9]+);")
-CHECKER_TIER_MANIFEST = os.path.join("crates", "singlefs-verification", "Cargo.toml")
-CHECKER_TIER_TESTS = "crates/singlefs-verification/tests"
+VERIFICATION_MANIFEST = os.path.join("crates", "singlefs-verification", "Cargo.toml")
+VERIFICATION_TESTS = "crates/singlefs-verification/tests"
 AMPLIFICATION_LINE_PREFIX = "CRASH_AMPLIFICATION "
 ENUMERATION_FINISHED_PREFIX = "CRASH_POINT_REPLAY_PARALLEL_FINISHED "
 LIBRARY_ITEM_TAG = "CRASH_LIBRARY_ITEM"
@@ -481,7 +503,7 @@ class Subject:
         self.label = label
         self.case_keys = list(case_keys)
         self.flows = list(flows)
-        self.setting_files = [f"{CHECKER_TIER_TESTS}/{target}.rs" for target in dict.fromkeys(targets)]
+        self.setting_files = [f"{VERIFICATION_TESTS}/{target}.rs" for target in dict.fromkeys(targets)]
 
     def has_crash_domain(self):
         return bool(self.case_keys or self.flows)
@@ -710,7 +732,7 @@ def read_library_item(root, base_features, subject):
     if not subject.setting_files:
         return None, "这一项没有设点文件"
     try:
-        features = reader_features(os.path.join(root, CHECKER_TIER_MANIFEST), base_features)
+        features = reader_features(os.path.join(root, VERIFICATION_MANIFEST), base_features)
     except (OSError, ValueError):
         features = base_features   # 包清单读不到（自证的小仓）就只带真跑的特性
     command = ["cargo", "run", "--release", "--quiet", "--offline", "-p", "singlefs-verification"] + (["--features", features] if features else []) \

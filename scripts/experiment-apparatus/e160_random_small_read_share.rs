@@ -7,9 +7,9 @@
 //! ## 口径
 //!
 //! - R 类：来源判为随机、且单次请求小于 32768 字节的读；Q 类：其余所有读。
-//! - p_B（用户字节口径，对已定项 5）= R 类用户字节 ÷ 全部读的用户字节；
+//! - p_B（见已定项 5 的用户字节口径）= R 类用户字节 ÷ 全部读的用户字节；
 //!   p_N（I/O 次数口径）= R 类请求数 ÷ 全部读请求数，只报数，不直接进判定。
-//! - 判据 1 只取读法 A（登记第一节第 6 条，主 agent 2026-09-24 定）：逐次倍数，
+//! - 判据 1 只取读法 A（登记第一节第 6 条）：逐次倍数，
 //!   来源的 R 类有多种尺寸时按请求数取「均值之比」。
 //! - 判据 5 的带 [1.0%, 1.5%]（两端都含，登记第一节第 7 条）；判据 1 的阈值 1.136（登记 A1）。
 //!
@@ -17,10 +17,10 @@
 //!
 //! - S1：本文件的页到单元算术只在净荷 32634 上核对（`net_payload_bytes` 常量与 `spans_two_units_given_payload`），
 //!   与 `crates/singlefs-core/src/mounted_read.rs` 的
-//!   `about_one_in_eight_four_kibibyte_pages_spans_two_data_units` 单测 2026-09-24 各自跑过、结论一致
+//!   `about_one_in_eight_four_kibibyte_pages_spans_two_data_units` 单测各自跑过、结论一致
 //!   （一个周期 16317 页、2047 页跨单元）；见报告，这个文件不依赖 `crates`（`.claude/rules/implementation-first.md` 第 4 条）。
 //! - S3：`HEADER_REGISTERED_BYTES`（105）、`NONCE_MAC_RESERVED_BYTES`（29）、`UNIT_BYTES_32`（32768）
-//!   2026-09-24 与 `crates/singlefs-format/src/lib.rs` 的
+//!   与 `crates/singlefs-format/src/lib.rs` 的
 //!   `DATA_UNIT_HEADER_BYTES`、`NONCE_MAC_ALGORITHM_RESERVED_BYTES`、`DATA_UNIT_BYTES` 现值比对过，相同。
 //! - S2 管第二段的 L32h 计时臂，这一轮不适用（第二段不跑）。
 
@@ -151,10 +151,10 @@ const UNIT_BYTES_32: u64 = 32768;
 const UNIT_PAGES_16: u64 = UNIT_BYTES_16 / PAGE_BYTES;
 const UNIT_PAGES_32: u64 = UNIT_BYTES_32 / PAGE_BYTES;
 /// D18（块里携带什么信息） 已定项 7；与 `crates/singlefs-format/src/lib.rs` 的
-/// `DATA_UNIT_HEADER_BYTES` 现值一致（S3，2026-09-24 现查）。
+/// `DATA_UNIT_HEADER_BYTES` 现值一致（S3）。
 const HEADER_REGISTERED_BYTES: u64 = 105;
 /// D18（块里携带什么信息） 已定项 14；与 `crates/singlefs-format/src/lib.rs` 的
-/// `NONCE_MAC_ALGORITHM_RESERVED_BYTES` 现值一致（S3，2026-09-24 现查）。
+/// `NONCE_MAC_ALGORITHM_RESERVED_BYTES` 现值一致（S3）。
 const NONCE_MAC_RESERVED_BYTES: u64 = 29;
 /// 含预留位之后的码 1 头（登记第五节 5.3：「头 134、净荷 32634」）。
 const HEADER_WITH_RESERVE_BYTES: u64 = HEADER_REGISTERED_BYTES + NONCE_MAC_RESERVED_BYTES;
@@ -169,7 +169,7 @@ const ANCHOR_MULTIPLIER_DENOMINATOR: i128 = 1000;
 fn anchor_multiplier() -> RationalNumber {
     RationalNumber::new(ANCHOR_MULTIPLIER_NUMERATOR, ANCHOR_MULTIPLIER_DENOMINATOR)
 }
-/// D4（校验和位置） 已定项 8 定案：「随机小读设备侧倍数 ≥ 1.136（E58 实测 1.086 再高 5 个百分点）」。
+/// D4（校验和位置） 已定项 8：「随机小读设备侧倍数 ≥ 1.136（E58 实测 1.086 再高 5 个百分点）」。
 fn judgement_one_threshold() -> RationalNumber {
     RationalNumber::new(ANCHOR_MULTIPLIER_NUMERATOR, ANCHOR_MULTIPLIER_DENOMINATOR) + RationalNumber::new(5, 100)
 }
@@ -399,7 +399,7 @@ fn random_share_mapping_small_operation_tiers() -> FiveTierShares {
     [RationalNumber::zero(), RationalNumber::one(), RationalNumber::one(), RationalNumber::zero(), RationalNumber::one()]
 }
 
-/// 用户 2026-09-24 给的 D25（目标负载优先级） 已定项 1 表权重列：seq 60、metaheavy 10、rand 10、
+/// D25（目标负载优先级） 已定项 1 表权重列：seq 60、metaheavy 10、rand 10、
 /// multistream 10、smallfile 10（合计 100，单位 %）。原话与选项：
 /// `records/2026-09-24-里程碑二收尾调度.md` 第三节「D25 五档权重」那一行。
 /// 只是 w；b（各档自己的随机小读份额）在 E16、E140 里都读不到（文件头与第三节第 6 条：
@@ -835,7 +835,7 @@ fn main() {
         ),
     );
 
-    // ---------- 甲：用户 2026-09-24 给的真实 D25 权重（w），b 仍缺（岔路单第 1 行的续做） ----------
+    // ---------- 甲：真实 D25 权重（w），b 仍缺（岔路单第 1 行的续做） ----------
     // b（各档自己的随机小读份额）在 E16、E140 里都读不到，登记没有写死能从它们算出 b 的办法
     // （见 five_tier_weights_given_by_user_2026_09_24 的文档注释）；这两行只是把真实 w 代进登记里已有的两组
     // 「拍的」illustrative b（M1、M2），不是甲的真实占比。
@@ -1115,7 +1115,7 @@ mod tests {
         assert_eq!(weighted_byte_share(epsilon_weights(RationalNumber::new(1, 100)), small_operation), RationalNumber::new(3, 400));
     }
 
-    /// D25（目标负载优先级） 已定项 1 表权重列（用户 2026-09-24 给，`records/2026-09-24-里程碑二收尾调度.md`
+    /// D25（目标负载优先级） 已定项 1 表权重列（`records/2026-09-24-里程碑二收尾调度.md`
     /// 第三节「D25 五档权重」）：五个值与合计各钉一遍，任何一个数字错都会破坏合计 = 100%。
     #[test]
     fn five_tier_weights_given_by_user_2026_09_24_sum_to_one_and_match_the_records_table() {

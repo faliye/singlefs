@@ -37,7 +37,7 @@
 #       「源码树里没有补丁那一行」
 #   BUILD_PATCHED_QEMU_BREAK=stamp-ignores-patch  装过的戳不记补丁的 sha256
 #       「补丁变了要重编」
-#   BUILD_PATCHED_QEMU_BREAK=threads-from-nproc  make 的并行数缺省取核数（改前）
+#   BUILD_PATCHED_QEMU_BREAK=threads-from-nproc  make 的并行数缺省取核数
 #       「没设上限时 make 的并行数是登记的重活默认」
 #
 # admission: always 每次调都现判私有目录里装的是不是这一份源码与补丁、核不核得过，装好了它自己什么都不做就退出
@@ -90,7 +90,7 @@ patch_path="${BUILD_PATCHED_QEMU_PATCH:-$repository_root/scripts/devices/qemu/bl
 install_home="${SINGLEFS_QEMU_HOME:-$HOME/.local/share/singlefs/qemu}"
 source "$script_directory/../hosts/heavy-threads.sh"
 build_break="${BUILD_PATCHED_QEMU_BREAK:-}"
-# make 的并行数：SINGLEFS_THREAD_CAP 设了取它，没设取登记的重活默认并行度（.claude/heavy-thread-default）；弄坏开关 threads-from-nproc 下取核数（改前的样子）
+# make 的并行数：SINGLEFS_THREAD_CAP 设了取它，没设取登记的重活默认并行度（.claude/heavy-thread-default）；弄坏开关 threads-from-nproc 下取核数
 default_build_threads() {
   if [[ "$build_break" == threads-from-nproc ]]; then nproc; else heavy_thread_default; fi
 }

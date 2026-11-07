@@ -8,7 +8,7 @@
     three-way-materials.py <轮名> --resume [同样的参数]   # checklist-specs.py 判红、改好清单之后接着做
     three-way-materials.py --selftest      # THREE_WAY_MATERIALS_BREAK=skip-index-extra 时必须判红
 
-它替掉的是材料员（three-way-materials）那份活：2026-09-20 起 8 天里 78 个材料员、每个 83 次 Bash、19 分钟在关键路径上，做的就是这条脚本链
+它替掉的是材料员（three-way-materials）那份活，那份活做的就是这条脚本链
 （kb-sections.py 生成清单 → 逐行标抄 / 不抄 → checklist-specs.py 抽附录 → 拼背景材料 → 写快照）。它自己的判断只有清单上的抄 / 不抄，
 而 `.claude/rules/three-way-inference.md` 要求整节抄、不摘句，默认全抄与规则同向。主 agent 要标例外，改清单再跑 checklist-specs.py。
 
@@ -35,12 +35,12 @@
   THREE_WAY_MATERIALS_BREAK=skip-declared-kind  cited_files() 正文声明了哪个字母的记号，就把这个字母的编号全跳过（没声明的 E165 也不拉）
       not-numbers（「✗ 自检：not-numbers 声明了 E1」）、没声明的照拉（「✗ 自检：没声明的 E165 照拉」）、
       两边同一份读法（「✗ 自检：材料拉的文件不是 --cited 要的超集」）
-  THREE_WAY_MATERIALS_BREAK=own-number-reading  cited_files() 不调 quote-kb.py 的 cited_kb_sources，走回改前自己抄的一份读法（认不出 I-7.4）
+  THREE_WAY_MATERIALS_BREAK=own-number-reading  cited_files() 不调 quote-kb.py 的 cited_kb_sources，走自己抄的一份读法（认不出 I-7.4）
       不变量号（「✗ 自检：正文点名 I-7.4」）、两边同一份读法（「✗ 自检：材料拉的文件不是 --cited 要的超集」）、
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
-  THREE_WAY_MATERIALS_BREAK=no-resume  build() 不认 --resume，checklist-specs.py 判红时只给改前那条只补附录的命令
+  THREE_WAY_MATERIALS_BREAK=no-resume  build() 不认 --resume，checklist-specs.py 判红时只给只补附录的那条命令
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」）
-  THREE_WAY_MATERIALS_BREAK=keep-translations  cited_files() 不排编号引出的 `.en.md`、`.ja.md` 译文，同号的三份都进清单（改前的样子）
+  THREE_WAY_MATERIALS_BREAK=keep-translations  cited_files() 不排编号引出的 `.en.md`、`.ja.md` 译文，同号的三份都进清单
       译文（「✗ 自检：同号有译文时清单里只有中文那一份」）
   QUOTE_KB_BREAK=invariants-to-readme  quote-kb.py 的开关（I 号一律退回不变量目录的 README.md），读法是那一份，这里同样红
       不变量号（「✗ 自检：正文点名 I-7.4」）、续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
@@ -90,7 +90,7 @@ def not_numbers_declared(body_text):
 
 
 def own_number_reading(body_text, root):
-    """弄坏开关 own-number-reading 才走：改前这里自己抄的一份读法（I 编号只认 I<n>，认不出 I-7.4）；I 号指到哪份文件照 quote-kb.py 的 invariant_files_for。"""
+    """弄坏开关 own-number-reading 才走：这里自己抄的一份读法（I 编号只认 I<n>，认不出 I-7.4）；I 号指到哪份文件照 quote-kb.py 的 invariant_files_for。"""
     found = list(KB_PATH.findall(body_text))
     declared = not_numbers_declared(body_text)
     quote_kb = quote_kb_module()

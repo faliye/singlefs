@@ -1,7 +1,7 @@
 //! E153：账本形态与环上有洞的代价 —— 记账第 1 项与可再分配谓词两种形态、各配两种影子账（四条臂）
 //! 与真实基线「今」的确定性计数模型。
 //!
-//! 判据、失败条款、变异表的权威登记在 research/prompts/e153-preregistration.md（跑前写死 2026-09-17）。
+//! 判据、失败条款、变异表的权威登记在 research/prompts/e153-preregistration.md（跑前写死）。
 //! 本文件只实现登记里定义的模型；不与 crates/ 共用代码（.claude/rules/implementation-first.md 第 4 条）。
 //!
 //! ## 骨架（对应登记第五节 M0）
@@ -756,7 +756,7 @@ struct ArmFullSnapshot {
     open_segment_cursor: u64,
     // root_accounts 不在这份快照里：它按自己的注释（496 行）该一直反映「每条仍在环里的根」，
     // 由 World::prune_evicted_accounts 独立维护生命周期，不随 rebuild_allocator 时光倒流
-    // （2026-09-17 S1 对拍发现：把它塞进快照、restore_full 时整份覆盖，会让回退之后
+    // （S1 对拍：把它塞进快照、restore_full 时整份覆盖，会让回退之后
     // recompute_shadow 查不到写行/暖机/C 这些「快照时点还没发生」的 txg 的账，隔离集恒空）。
 }
 
@@ -919,7 +919,7 @@ impl ArmExecutor {
         }
     }
 
-    /// 释放一个角色（若此前存在）：记录改写成已释放，物理上先留在 occupied（回收步再清）。
+    /// 释放一个角色（若已存在）：记录改写成已释放，物理上先留在 occupied（回收步再清）。
     fn release_role_if_present(&mut self, role: Role, release_generation: u64) {
         if let Some(slot) = self.refs.remove(&role) {
             let span = role.span_in_slots();
@@ -999,13 +999,12 @@ impl ArmExecutor {
 
     /// 基线的回收：只在挂载 / 切换 / 回退重建 / 抬 F 时调用；门槛为 max(floor, oldest_valid)。
     /// 只扫描「已释放、物理上还没被回收步清掉」的集合，不扫整本账。
-    /// **修过（2026-09-17，第三段，见跑前登记第十二节）**：此前 `baseline_free_slots` 只在
-    /// `withhold_instead_of_free == false` 时才加，扣住期间账目上的第 2 项（空闲）不涨——但真实实现
+    /// 扣住期间账目上的第 2 项（空闲）照样涨：真实实现
     /// `allocator.rs` 250–269 的 `mark_reclaimed` 与 611–626 的 `reclaim_released_up_to` 显示
     /// `free_slots += span` 与 `hold_until_floor_takes_effect(...)` 是两件独立的事：`free_slots`
     /// 无条件在回收那一刻就涨，「不许发出去」完全靠 `held_until_floor_takes_effect` 这个独立位图
     /// （`is_free` 另外查它，239 行），不影响 `free_slots`/`allocated_slots` 这两个记账计数器。
-    /// 旧写法让抬 F 扣住期间 I-5.2（item1+item2==容量）判红，被冒烟测试
+    /// 不这样记会让抬 F 扣住期间 I-5.2（空闲统计对得上）里的 item1+item2==容量 判红，被冒烟测试
     /// `all_history_families_run_to_completion_on_every_geometry_cell` 的 H2 抓到（S=4，txg=39）。
     fn reclaim_baseline(&mut self, threshold: u64, withhold_instead_of_free: bool) {
         let mut reads = 0u64;
@@ -1196,12 +1195,12 @@ impl ArmExecutor {
                         self.baseline_allocated_slots += entry.span_in_slots;
                         self.baseline_deferred_slots += entry.span_in_slots;
                         self.baseline_deferred_set.insert(slot);
-                        // 修过（2026-09-17，第三段，见跑前登记第十二节）：此前这一支漏了这一行——
+                        // 这一支要扣这一行：
                         // 「已释放但还没达到门槛」的槽仍然占着（进了 item1/deferred），baseline_free_slots
-                        // 却没有跟着扣，让 item1+item2 比容量多出「这一支累计的槽数」（被冒烟测试
+                        // 不跟着扣就会让 item1+item2 比容量多出「这一支累计的槽数」（冒烟测试
                         // all_history_families_run_to_completion_on_every_geometry_cell 的 H2 抓到，
                         // S=4 时多 110，与 `self.item2_total -= entry.span_in_slots;` 那一行是同一件事的
-                        // 两份账，baseline 那份漏抄了）。
+                        // 两份账，baseline 这份要同样扣）。
                         self.baseline_free_slots -= entry.span_in_slots;
                     }
                 }
@@ -1584,7 +1583,7 @@ impl World {
     /// 施加的记录前缀为空，`rebuilt_allocator` 按挂载读法门槛（`reclaim_floor(F_生效, 最旧有效根)`）重建，
     /// `establish_instance`（`mount.rs` 785-811）给上一个实例写一行 `(instance, T=恢复后生效根的 txg, W, false)`
     /// （mkfs 实例 0 不写行；本模型 W 恒 0，见 M0.9），取新实例，写行发布，暖机到两块盘。
-    /// S1(b)(c) 两段历史的「重开取号」那一步靠它：登记第五节 M0.12 定义过这个发布种类，此前没有驱动方法。
+    /// S1(b)(c) 两段历史的「重开取号」那一步靠它：登记第五节 M0.12 定义过这个发布种类。
     fn plain_remount(&mut self) -> Vec<PublishOutcome> {
         let current_txg = self.pool.current_txg;
         let outgoing_instance = self.pool.current_instance;
@@ -1761,7 +1760,7 @@ impl World {
         // （几行之后才 push）——candidate_roots() 用的是旧表，会把 abandoned_extended 里那些「按旧表
         // 还没被判被抛弃、但一旦回退行写下就会被抛弃」的 txg（包括回退自己抛弃的尾巴）算成候选，
         // 与 mount.rs 的 `isolate_slots_referenced_only_by_abandoned_roots` 用同一个 `is_abandoned`
-        // 闭包（含 `extra_abandoned`）过滤候选不同（2026-09-17，S1 对拍第二处发现，见跑前登记第十二节）。
+        // 闭包（含 `extra_abandoned`）过滤候选不同（见跑前登记第十二节）。
         let candidate_txgs: Vec<u64> =
             self.pool.candidate_roots().iter().map(|entry| entry.txg).filter(|txg| !abandoned_extended.contains(txg)).collect();
         let blocking: BTreeSet<u64> = abandoned_extended.iter().chain(candidate_txgs.iter()).copied().collect();
@@ -1936,7 +1935,7 @@ impl World {
 
     // -----------------------------------------------------------------
     // 第五节「历史族、几何格与支线」表列出的族，第三段新增 H2/H3φ/H3²/H5早/H5晚；
-    // H1/H4/H6 也在这里重写成方法，供第三段统一的 Q 系列扫描调用（此前只在 main()/单测里各写一份）。
+    // H1/H4/H6 也在这里重写成方法，供第三段统一的 Q 系列扫描调用。
     // -----------------------------------------------------------------
 
     /// H1：工作负载段 6N 次。
@@ -1981,8 +1980,8 @@ impl World {
     /// （`target` / `write_row_txg` 仍是候选）的时候做第二次回退；若把 H4d 自己的尾段 3N 也跑一遍再
     /// 返回，环早已转过好几圈，`target` 与 `write_row_txg` 必然已被轮转挤出候选集——H5早 / H5晚 的
     /// 第二次回退在任何几何格上都找不到候选，两族 24 行 q_family 全部 `q13_no_candidate=true`
-    /// （2026-09-17，第四段，见跑前登记第十二节；此前 `history_single_rollback` 自带尾段 3N，
-    /// H5 两族借它当「H4（d=S）」前缀时把这段也借了进去）。写死的回退目标不在候选集里（第十一节
+    /// （见跑前登记第十二节；`history_single_rollback` 自带尾段 3N，
+    /// H5 两族借它当「H4（d=S）」前缀会把这段也借进去）。写死的回退目标不在候选集里（第十一节
     /// V8「无候选」）时返回 `None`。返回值另带 (R_old 的 txg, 回退那次写行发布的 txg)。
     fn history_rollback_prefix(&mut self, rollback_depth: u64) -> Option<(Vec<PublishOutcome>, u64, u64)> {
         let ring_capacity = self.geometry.ring_capacity();
@@ -3065,10 +3064,9 @@ mod tests {
     /// 190-198 行与 `rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation`
     /// 223-235 行）：回退发布（D）落 txg 9、实例 3；写的行 = [(1,3),(2,0)]（回退行 + 中间实例，(instance,T) 分量）；
     /// 基线臂（「今」，Arm::Baseline）隔离槽数每盘 34。
-    /// **修过（2026-09-17，第三段，见跑前登记第十二节）**：此前 `rebuild_allocator` 经 `ArmFullSnapshot`
-    /// 把 `root_accounts` 一起「恢复」到回退目标（A，txg3）那一刻的快照，`recompute_shadow` 查
-    /// `abandoned_extended=[5,6,7,8]`（写行、暖机×2、C）时全部落空、隔离集恒空，隔离槽数曾实测为 0。
-    /// 改法：`ArmFullSnapshot` 不再携带 `root_accounts`，`restore_full` 不再覆盖它——它按自己的注释
+    /// `ArmFullSnapshot` 不携带 `root_accounts`，`restore_full` 不覆盖它：带上它会把 `root_accounts` 恢复到回退目标（A，txg3）那一刻的快照，
+    /// `recompute_shadow` 查 `abandoned_extended=[5,6,7,8]`（写行、暖机×2、C）时全部落空、隔离集恒空，隔离槽数为 0。
+    /// `root_accounts` 按自己的注释该一直反映「每条仍在环里的根」，由 `World::prune_evicted_accounts` 独立维护，不随回退时光倒流。
     /// 该一直反映「每条仍在环里的根」，由 `World::prune_evicted_accounts` 独立维护，不随回退时光倒流。
     #[test]
     fn pairing_probe_segment_rollback_matches_real_implementation() {
@@ -3187,9 +3185,9 @@ mod tests {
         }
     }
 
-    /// 回归测试（2026-09-17，第三段）：`rebuild_allocator` 的基线分支漏减 `baseline_free_slots`
-    /// 那一处 bug（见该函数「修过」文档注释）——普通挂载重建之后，item1+item2 必须仍等于容量。
-    /// S=4 时 3N=36 次连续覆盖写让环转三圈，released-但未达门槛的槽有 110 个，改前 sum 会多 110。
+    /// 回归测试：`rebuild_allocator` 的基线分支漏减 `baseline_free_slots`
+    /// 那一处 bug（见该函数的文档注释）——普通挂载重建之后，item1+item2 必须仍等于容量。
+    /// S=4 时 3N=36 次连续覆盖写让环转三圈，released-但未达门槛的槽有 110 个，漏减时 sum 会多 110。
     #[test]
     fn rebuild_allocator_keeps_baseline_item1_plus_item2_at_capacity_across_remount() {
         let cell = GeometryCell { slots_per_region: 4, placement: PlacementPolicy::Impl, workload_period: 1 };
@@ -3285,12 +3283,12 @@ mod tests {
         }
     }
 
-    /// 回归测试（2026-09-17，第四段，见跑前登记第十二节）：`history_double_rollback_shallower_second`
-    /// 与 `history_double_rollback_to_first_rollback_write_row` 此前借用 `history_single_rollback`
-    /// 当「H4（d=S）」前缀，把 H4d 自己的尾段工作负载段 3N 也借了进去——环转过好几圈之后第一次回退的
+    /// 回归测试（见跑前登记第十二节）：`history_double_rollback_shallower_second`
+    /// 与 `history_double_rollback_to_first_rollback_write_row` 用不含尾段的 `history_rollback_prefix` 当「H4（d=S）」前缀：
+    /// 借 `history_single_rollback` 会把 H4d 自己的尾段工作负载段 3N 也借进去——环转过好几圈之后第一次回退的
     /// 目标早被轮转挤出候选集，第二次回退在全部 12 格上都找不到候选，H5早 / H5晚 24 行 q_family 只有
-    /// `q13_no_candidate=true`，5 条臂一次都没跑起来。改用不含尾段的 `history_rollback_prefix` 之后，
-    /// 两族历史必须在全部 12 格上都跑出两次回退（各一条 `label == "write_row"`）。
+    /// `q13_no_candidate=true`，5 条臂一次都没跑起来。
+    /// 用 `history_rollback_prefix`，两族历史必须在全部 12 格上都跑出两次回退（各一条 `label == "write_row"`）。
     #[test]
     fn double_rollback_families_find_second_rollback_candidate_on_every_geometry_cell() {
         for cell in all_geometry_cells() {

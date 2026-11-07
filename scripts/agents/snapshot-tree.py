@@ -20,7 +20,7 @@
     diff 里没有它：取此刻 HEAD 那一份；HEAD 里没有，或 HEAD 那一份的 sha256 不是快照那一版（快照之后有提交改过、diff 里又没有它的基底），报「倒推不出」。
     倒推出的内容逐份算 sha256 与清单比，对不上的点名；对不上的与倒推不出的都不铺进树。
     搬迁换回（.claude/rules/path-moves.md 第 6 步：只差路径的不算改动）：快照之后有登记过的搬迁（<仓根>/.claude/gate.d/path-moves.tsv），搬迁那一趟把快照目录里的
-        diff 与清单也换成了新路径，基底 blob 里却还是旧路径，上下文对不上、sha256 也对不上。照原样倒推不出或对不上时，再照登记反着换一遍
+        diff 与清单也改写成新路径，基底 blob 里却还是旧路径，上下文对不上、sha256 也对不上。照原样倒推不出或对不上时，再照登记反着换一遍
         （每一行新旧对调、次序倒排，换法就是 .claude/gate.d/lib-lag-baseline.py 的 rewrite_moved_paths，只按路径前缀的边界换）：
         diff 里有它的，这一份的那一段整段换回旧路径（逐行先去掉行首的 + - 空格记号再换，「-tools/…」才换得到）再取基底、再打；diff 里没有它的，此刻 HEAD 那一份换回旧路径再比；清单点名的路径在 diff 与 HEAD 里都找不到的，
         照登记往前、往后换一次路径再找。换回之后 sha256 对上的才铺进树（铺在清单点名的路径上），说明里写「照搬迁登记换回旧路径」与登记的行号；照原样已经对上的不换。
@@ -48,7 +48,7 @@
   SNAPSHOT_TREE_BREAK=index-diff-ignored  diff_path() 只认 judged-vs-head.diff，不认 judged-vs-index.diff
       「✗ 自检：对暂存区的旧轮：应当退 0」「✗ 自检：两份 diff 都在：应当退 2」
       「✗ kb/staged.md  倒推不出」「✗ 快照 r4：清单点名 1 份，倒推出 0 份」
-  SNAPSHOT_TREE_BREAK=path-moves-ignored  build_tree() 不读搬迁登记表，diff、HEAD 与清单路径都不照登记换回旧路径（改前的样子）
+  SNAPSHOT_TREE_BREAK=path-moves-ignored  build_tree() 不读搬迁登记表，diff、HEAD 与清单路径都不照登记换回旧路径
       「✗ 自检：搬迁之后的旧轮：应当退 0」「✗ 自检：搬迁之后的旧轮：树里的 tools/new-name/run.sh」
       （失败行里另带那一趟的输出：「✗ tools/new-name/run.sh  diff 打不上」「✗ kb/guide.md  diff 打不上」「✗ kb/plain.md  倒推不出：diff 里没有它」
       「✗ 快照 r5：清单点名 4 份，倒推出 1 份」）
@@ -60,10 +60,10 @@
       「✗ 自检：工作区那一份对得上：应当退 1」（失败行里另带那一趟的输出：「✗ kb/worktree-only.md  倒推不出」「✗ kb/worktree-changed.md  倒推不出」「✗ 快照 r7：清单点名 2 份」）
   SNAPSHOT_TREE_BREAK=guard-off  refuse_break_outside_selftest() 不拒，平常跑设了开关照跑（关守卫项：只在它是唯一一项时认，与别的项同写照拒并点名它）
       「✗ 自检：平常跑设了弄坏开关：应当退 2 并点名 SNAPSHOT_TREE_BREAK 只在自证里认」
-  SNAPSHOT_TREE_BREAK=guard-off-with-others  refuse_break_outside_selftest() 认同写在别的项旁边的 guard-off（改前的样子：「guard-off,skip-sha-check」平常跑照样执行）；
+  SNAPSHOT_TREE_BREAK=guard-off-with-others  refuse_break_outside_selftest() 认同写在别的项旁边的 guard-off（「guard-off,skip-sha-check」平常跑照样执行）；
       只在自证进程里认（平常跑同写着它照拒），自证在进程里探同写那一格
       「✗ 自检：关守卫项与别的项同写：应当退 2 并点名 guard-off 只在它是唯一一项时认」
-  SNAPSHOT_TREE_BREAK=judged-list-only  run() 不给 --list 时只读 judged-sha256.txt（改前的样子），快照目录里别的 *-sha256.txt 不进树也不报
+  SNAPSHOT_TREE_BREAK=judged-list-only  run() 不给 --list 时只读 judged-sha256.txt，快照目录里别的 *-sha256.txt 不进树也不报
       「✗ 自检：带两份清单的快照：应当退 0」「✗ 自检：快照目录里一份清单都没有：应当退 2」（失败行里另带那一趟的输出：「✗ 清单读不了」）
 """
 import hashlib
@@ -85,7 +85,7 @@ BROKEN = set(item for item in os.environ.get(BREAK_VARIABLE, "").split(",") if i
 DEFAULT_LIST = "judged-sha256.txt"   # 自证造快照时写的那一份；不给 --list 时读快照目录里全部 LIST_SUFFIX 结尾的（default_list_names）
 LIST_SUFFIX = "-sha256.txt"
 GUARD_OFF_ITEM = "guard-off"                          # 关守卫项：只在它是唯一一项时认（第一百二十二节 ②）
-GUARD_OFF_WITH_OTHERS_ITEM = "guard-off-with-others"  # 它的弄坏开关：同写也认（改前的样子），只在自证进程里认
+GUARD_OFF_WITH_OTHERS_ITEM = "guard-off-with-others"  # 它的弄坏开关：同写也认，只在自证进程里认
 HEAD_DIFF = "judged-vs-head.diff"
 INDEX_DIFF = "judged-vs-index.diff"
 LIST_LINE = re.compile(r"^([0-9a-fA-F]{64}) [ *](.+)$")
@@ -151,7 +151,7 @@ class UsageError(Exception):
 
 def refuse_break_outside_selftest(arguments, value=None):
     """弄坏开关只在自证里认：命令行不是单独一个 --selftest 而变量非空，交回退出码 2（参数解析之前判，不管值是什么）；否则交 None。
-    关守卫项 guard-off 单独一项时不拒；与别的项同写照拒、点名它（弄坏开关 guard-off-with-others 在自证进程里设着时照认，改前的样子）。
+    关守卫项 guard-off 单独一项时不拒；与别的项同写照拒、点名它（弄坏开关 guard-off-with-others 在自证进程里设着时照认）。
     value 给了就判它、不读环境（自证在进程里探同写那一格用）。"""
     value = os.environ.get(BREAK_VARIABLE, "") if value is None else value
     if not value or arguments == ["--selftest"]:
@@ -515,7 +515,7 @@ def diff_path(snapshot):
 
 
 def default_list_names(snapshot):
-    """不给 --list 时读的清单：快照目录里全部 *-sha256.txt（按文件名排）；弄坏开关 judged-list-only 下只读 judged-sha256.txt（改前的样子）。一份都没有抛 UsageError。"""
+    """不给 --list 时读的清单：快照目录里全部 *-sha256.txt（按文件名排）；弄坏开关 judged-list-only 下只读 judged-sha256.txt。一份都没有抛 UsageError。"""
     if "judged-list-only" in BROKEN:
         return [DEFAULT_LIST]
     names = sorted(name for name in os.listdir(snapshot) if name.endswith(LIST_SUFFIX) and os.path.isfile(os.path.join(snapshot, name)))
@@ -785,7 +785,7 @@ def selftest():
         case("diff 里没有、快照之后被提交改过", ["r1", "--out", os.path.join(work, "tree-later"), "--repository", repository], 1,
              ("kb/later.md  倒推不出：diff 里没有它", "倒推不出 1 份"))
 
-        # 快照之后有一次登记过的搬迁（tools/old-name → tools/new-name）：搬迁那一趟把快照目录里的清单与 diff 也换成了新路径，基底 blob 里还是旧路径
+        # 快照之后有一次登记过的搬迁（tools/old-name → tools/new-name）：搬迁那一趟把快照目录里的清单与 diff 也改写成新路径，基底 blob 里还是旧路径
         # （.claude/rules/path-moves.md 第 6 步：只差路径的不算改动；开关 path-moves-ignored 下这一格红）
         moved = os.path.join(work, "repository-moved")
         os.makedirs(moved)

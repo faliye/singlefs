@@ -24,13 +24,13 @@
 #   把 <放量家目录>/runs/<这一趟的标签>/single.log 抄进 <日志文件>。TASK_SERVER_SHARD_PHASE 是别的值时驱动退 2，这里照它退。
 # 判定库：崩溃判定只在 prune-server 里那一份库（驱动文件头「判定库」）：不交库目录、不送库的变量，引擎经客户端直接读写。
 #   放量家目录照共用库 crash_amplification_home_directory（SINGLEFS_CRASH_AMPLIFICATION_HOME，没设是工作根下的 crash-amplification：共享根里、两台同一份；只放运行目录与日志）。
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：除计划那一步外，建好 <放量家目录>/runs/<这一趟的标签>/ 之后，调用方没设 CARGO_TARGET_DIR 时
+# 编译目录（自己用完自己删，不跨趟复用）：除计划那一步外，建好 <放量家目录>/runs/<这一趟的标签>/ 之后，调用方没设 CARGO_TARGET_DIR 时
 #   在里面建 target、export 给驱动；正常结束、驱动退非 0、被 TERM / INT 停（等手里那一步退出）都在 EXIT 上删
 #   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0）。调用方设了的照它、不删（经 task-server 起时编译目录由服务给）。
 # 发现日志：合并与不分片的那一趟在环境里设 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE=<日志文件>.findings.tsv 交驱动；只有判完整条流的那一趟写一节（各片只判自己领的块、不写，也不交）。
 # 标签：crash-point-replay-<用例名>-<开跑时刻>-<进程号>；分片时各步照计划那一步写下的那一个。
 # 退出码：驱动的退出码（含义见驱动文件头「退出码」）；2 用法错；1 驱动退 0 而该抄的那份日志不在（驱动没跑到那一步却退 0：不当绿）。
-# 驱动跑 验证包用例：只在提交时或用户要求时由主 agent 经 task-server/task submit 交；--selftest 不起 cargo。
+# 驱动跑 验证包用例：只在提交时或用户同意后由主 agent 经 task-server/task submit 交；--selftest 不起 cargo。
 #
 # 只供 --selftest（自证起的每一趟里层设）：
 #   CRASH_POINT_REPLAY_SHARD_RUN_TWO_HOSTS_DRIVER=<脚本>   换掉分片驱动（调法相同：<测试目标> --test-filter … --label …，读同样的环境变量）
@@ -42,9 +42,9 @@
 #       driver-exit-kept、run-target-red
 #   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=merge-log-of-own-label  合并时照这一趟自己的标签找核账那一趟的日志（不读计划目录里的标签）
 #       phases-forwarded
-#   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=findings-file-for-shards  各片也交发现日志（改前的样子：各片与合并那一趟都交）
+#   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=findings-file-for-shards  各片也交发现日志（各片与合并那一趟都交）
 #       phases-forwarded
-#   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=run-target-kept      跑完不删这一趟自己建的编译目录（改前的样子：驱动本机那几趟在树根照树根的 target 编、跨趟留着）
+#   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=run-target-kept      跑完不删这一趟自己建的编译目录（驱动本机那几趟在树根照树根的 target 编、跨趟留着）
 #       run-target-green、run-target-red、run-target-term
 #   CRASH_POINT_REPLAY_SHARD_RUN_BREAK=unknown-option-accepted  认不出的第一个参数也退 0（不退 2）
 #       unknown-option-refused
@@ -103,7 +103,7 @@ run_merged_log() {
       copied_log="$amplification_home/runs/$label/single.log"
       findings=(SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE="$log.findings.tsv") ;;
     *)
-      # 弄坏开关 findings-file-for-shards：各片也交（改前的样子）
+      # 弄坏开关 findings-file-for-shards：各片也交
       if [[ "$phase" == shard ]] && shard_break_is findings-file-for-shards; then findings=(SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE="$log.findings.tsv"); fi ;;
   esac
   echo "  · 崩溃点重放：$key（输入指纹 ${fingerprint:0:16}…）交崩溃放量的分片驱动（${phase:-不分片，本机整份}）：标签 $label，判定写进 prune-server"
@@ -349,7 +349,7 @@ if [[ "${1:-}" == --selftest ]]; then
       rm -f -- "$selftest_base/round-$round_index.exit"
       { selftest_round "$round_index" "${round_environments[round_index]}"; echo "$?" > "$selftest_base/round-$round_index.exit"; } &
     done
-    wait   # 退出码在各轮自己的 round-<序号>.exit 里，下面按次序逐个回读、数份数
+    wait   # shell-lint:exit-collected 退出码在各轮自己的 round-<序号>.exit 里，下面按次序逐个回读、数份数
   done
   collected_rounds=0
   for (( round_index = 0; round_index < round_count; round_index++ )); do

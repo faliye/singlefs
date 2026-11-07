@@ -49,7 +49,7 @@
       连带红的格：「✗ 自检：嵌套括号简称写错：应当判红」、「✗ 自检：嵌套括号简称只写了外层：应当判红」
   KB_SPEC_CHECK_BREAK=dated-time  pointer_problems() 同一行带日期的时间指代也判红（③）
       时间指代带日期不算（「✗ 自检：时间指代带日期不算：应当判绿」）
-  KB_SPEC_CHECK_BREAK=flat-parens  following_name() 简称里一见嵌套括号就认不出（②，改前 FOLLOWING_NAME 的样子）
+  KB_SPEC_CHECK_BREAK=flat-parens  following_name() 简称里一见嵌套括号就认不出（②）
       简称带嵌套括号（「✗ 自检：简称带嵌套括号：应当判绿」）
   KB_SPEC_CHECK_BREAK=no-history  check_entries() 不判决策变更史的形态（⑤）
       变更史用旧形态（「✗ 自检：变更史用旧形态：应当判红」）
@@ -61,13 +61,13 @@
       编号没带简称（「✗ 自检：编号没带简称：应当判红」）、简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）、
       判决段名撞了登记编号（「✗ 自检：判决段名撞了登记编号：应当判红」）
       连带红的格：「✗ 自检：嵌套括号简称写错：应当判红」、「✗ 自检：嵌套括号简称只写了外层：应当判红」、「✗ 自检：嵌套括号简称括号没配平：应当判红」、「✗ 自检：译文写全角中文简称：应当判红」、「✗ 自检：译文写全角日文译名：应当判红」、「✗ 自检：译文编号没带译名：应当判红」、「✗ 自检：译文译名带中文简称原样：应当判红」、「✗ 自检：中文写半角括号简称：应当判红」、「✗ 自检：简称里带别的编号、简称后面另有裸引用：应当判红」
-  KB_SPEC_CHECK_BREAK=translations-as-registry  load_registry() 把译文（.en.md、.ja.md）也当登记位读，译名先于中文简称被认到（②，改前的读法）
+  KB_SPEC_CHECK_BREAK=translations-as-registry  load_registry() 把译文（.en.md、.ja.md）也当登记位读，译名先于中文简称被认到（②）
       译文登记位简称与中文不同（「✗ 自检：译文登记位简称与中文不同：应当判绿」），连带 selftest() 里别的引用了登记编号的绿例（干净的一条、简称带嵌套括号、依据段加实验号带了配对）
       连带红的格：「✗ 自检：干净的一条：应当判绿」、「✗ 自检：简称带嵌套括号：应当判绿」、「✗ 自检：依据段加实验号带了配对：应当判绿」、「✗ 自检：命令行 ['…spec-done.json', '--root', '…'] 应当退 0」、「✗ 规格 1 条（1 份）里有 1 处会让门禁红」
-  KB_SPEC_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、--root 缺值与读不了的规格（改前的样子）
+  KB_SPEC_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、--root 缺值与读不了的规格
       命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
       连带红的格：「✗ 自检：命令行 ['-h'] 应当退 0」、「✗ 自检：命令行 ['--bogus', '…'] 应当退 2」、「✗ 自检：命令行 ['…', '--root', '…'] 应当退 2」、「✗ 自检：命令行 ['…spec.md', '--root'] 应当退 2」
-  KB_SPEC_CHECK_BREAK=translations-as-chinese  reference_problems() 译文也按中文那一份判（只认全角括号加逐字一致的简称，②改前的样子）
+  KB_SPEC_CHECK_BREAK=translations-as-chinese  reference_problems() 译文也按中文那一份判（只认全角括号加逐字一致的简称，②）
       译文写半角译名（「✗ 自检：译文写半角译名：应当判绿」）、译文译名带嵌套半角括号（「✗ 自检：译文译名带嵌套半角括号：应当判绿」）；
       译文写全角中文简称（「✗ 自检：译文写全角中文简称：应当判红」）也变绿（中文那一支认得逐字一致的全角简称）
   KB_SPEC_CHECK_BREAK=translation-fullwidth-ok  reference_problems() 译文里编号后面写全角括号也放行（②）
@@ -85,7 +85,7 @@
       连带红的格：「✗ 自检：跨规格不变量编号状态不一致：应当判红」、「✗ 自检：命令行 ['…spec-done.json', '…spec-open.json', '--root', '…'] 应当退 1」
   KB_SPEC_CHECK_BREAK=cross-spec-any-word  cross_spec_problems() 状态词不同就判红，不分「已实现与已还清同属已完成」这类一族（⑦）
       跨规格状态词同族一致（「✗ 自检：跨规格状态词同族一致：应当判绿」）
-  KB_SPEC_CHECK_BREAK=name-interior-counted  reference_problems() 不跳简称内部，简称里的别的登记编号照判（②，改前的样子）
+  KB_SPEC_CHECK_BREAK=name-interior-counted  reference_problems() 不跳简称内部，简称里的别的登记编号照判（②）
       简称里带别的编号、整行搬家（「✗ 自检：简称里带别的编号、整行搬家：应当判绿」）
 """
 import glob
@@ -143,7 +143,7 @@ def following_name(line, position):
     depth, start = 1, opening.end()
     for cursor in range(start, len(line)):
         if line[cursor] == "（":
-            if BROKEN == "flat-parens":   # 弄坏开关：简称里不许再有括号（改前的样子）
+            if BROKEN == "flat-parens":   # 弄坏开关：简称里不许再有括号
                 return None
             depth += 1
         elif line[cursor] == "）":
@@ -177,7 +177,7 @@ def load_registry(root):
     """→ ({编号: 简称}, {不算编号的记号})。登记位只认中文那一份：译文（<名>.en.md、<名>.ja.md）里的简称是译名，不是登记位。"""
     registry, not_numbers = {}, set()
     for path in sorted(glob.glob(os.path.join(root, ".claude", "kb", "**", "*.md"), recursive=True)):
-        if TRANSLATION_SUFFIX.search(os.path.basename(path)) and BROKEN != "translations-as-registry":   # 弄坏开关：译文也当登记位（改前的读法）
+        if TRANSLATION_SUFFIX.search(os.path.basename(path)) and BROKEN != "translations-as-registry":   # 弄坏开关：译文也当登记位
             continue
         lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
         for index, line in enumerate(lines):

@@ -285,8 +285,8 @@ mod tests {
         assert!(tight_run.false_enospc > 0, "99.9% 填充 + 延迟 16 都没出现假性 ENOSPC");
     }
 
-    /// checkpoint 必须用「能动保留池」的那个视图——第一版误用普通视图，
-    /// 「保留池救不了卡死」整个结论由那一行造成（正文已记）。此前的测试全在
+    /// checkpoint 必须用「能动保留池」的那个视图——用普通视图时
+    /// 「保留池救不了卡死」整个结论就由那一行造成（正文已记）。其余测试全在
     /// reserve=0 上跑，两个视图相等，那一行写错不会有任何测试红（变异审计补的）。
     #[test]
     fn the_reserve_actually_rescues_checkpoint_stalls() {

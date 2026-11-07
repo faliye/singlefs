@@ -148,7 +148,8 @@ class CommittedState:
 
 
 def _lines_unchanged(committed, path, start, end):
-    """写了行号的引用：那几行在 HEAD 里存在，工作区与暂存区（没有的版本跳过不比）的同一行与 HEAD 逐字相同。"""
+    """写了行号的引用：那几行在 HEAD 里存在，且工作区与暂存区里与 HEAD 不同的那一版，同一行与 HEAD 逐字相同。
+    与 HEAD 不同的那一版缺了（工作区删掉、暂存区删掉，读出来是 None）或行数不够，就拒（交 False），不跳过；与 HEAD 相同的那一版不用比。"""
     head = committed.head_lines(path)
     last = end if end is not None else start
     first = start

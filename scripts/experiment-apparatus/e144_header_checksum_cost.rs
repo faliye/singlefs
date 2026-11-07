@@ -443,7 +443,7 @@ fn random_corruption_misses(header: &[u8], arm: Arm, trials: u64, generator: &mu
             let delta = 1 + (generator.below(255) as u8);
             damaged[byte] = damaged[byte].wrapping_add(delta);
         }
-        // 同一字节被改两次可能抵消成原样，那不是损坏，重抽（第一轮跑时每臂每宽误记 1 到 6 次「漏」，全是这一形）。
+        // 同一字节被改两次可能抵消成原样，那不是损坏，重抽（不重抽时每臂每宽会误记 1 到 6 次「漏」，全是这一形）。
         if damaged == header {
             continue;
         }

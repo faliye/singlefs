@@ -4,8 +4,8 @@
 """往公共表里插一行：按锚点定位，写之前复核文件没被别人改过。
 
 几个会话共写一个仓时，`replace-once.py` 只解决「改一处已有的文字」——**插入没有旧串可替**，
-于是只能读整份、插一行、写回，两个会话一前一后就互相覆盖。2026-09-21 实测：两个会话各往
-`.claude/kb/checks-owed.md` 插一行欠账，后写的那份把先写的那一行整行压掉，两边都没报错。
+于是只能读整份、插一行、写回，两个会话一前一后就互相覆盖：两个会话各往
+`.claude/kb/checks-owed.md` 插一行欠账，后写的那份会把先写的那一行整行压掉，两边都没报错。
 
 用法：
   insert-row.py 文件 --after 正则 --line 文本 [--absent 正则] [--dry-run]
@@ -39,15 +39,15 @@
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（括号里是那条「✗ 自检失败：」的开头）：
-  INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 走回改前的说法（「把正则写得更具体些」，不点元字符、不列行号）
+  INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 只说「把正则写得更具体些」，不点元字符、不列行号
       锚点命中多次（「✗ 自检失败：锚点命中两次时没列出每一处的行号」；自证停在第一处失败，排在它后面的
       『✗ 自检失败：锚点带括号命中 0 次』那一格同样判这一支，只在前一格过了时才走到）
       连带红的格：「✗ 锚点在 … 里命中 2 次，只认恰好一次（--after 按正则认）」
   INSERT_ROW_BREAK=literal-as-regex  insert() 把 --<…>-literal 照旧按正则认
       按字面插（「✗ 自检失败：--after-literal 带括号的锚点没插成」）
-  INSERT_ROW_BREAK=no-clock-guard  insert() 不判新行里的钟点（改前的写法）
+  INSERT_ROW_BREAK=no-clock-guard  insert() 不判新行里的钟点
       写 .md 之前判新行（「✗ 自检失败：写 .md 之前判新行没判对」那几条：新行带紧凑时间戳、带日期钟点时区词、带光秃时区词、干跑也拒、入口退出码 6 与不写文件）
-  INSERT_ROW_BREAK=no-session-guard  insert() 不判新行里的会话号（改前的写法）
+  INSERT_ROW_BREAK=no-session-guard  insert() 不判新行里的会话号
       写文件之前判新行里的会话号（「✗ 自检失败：写会话号之前判新行没判对」，下面逐条以「写会话号：」开头：.md 与 .py 目标的新行带会话名、干跑也拒、入口退出码 7 与不写文件）
   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新行带紧凑时间戳的那几条红；
@@ -93,7 +93,7 @@ REGEX_METACHARACTERS = "()[]{}|.*+?^$\\"
 def anchor_hints(lines, anchor, where, literal, matched):
     """锚点不是恰好命中一次时的说明与下一步：→ [行]（已带缩进）。多次：列出每一处的行号；0 次：说明按正则认、点出锚点里的元字符，
     给转义好的写法与按字面匹配的 --<where>-literal，并列出按字面找得到的行号。"""
-    if BROKEN == "vague-anchor-hint":   # 弄坏开关：改前的说法
+    if BROKEN == "vague-anchor-hint":   # 弄坏开关：笼统的说法
         return ["     → 怎么办：把 --%s 的正则写得更具体些，让它只命中要插的那个位置。" % where]
     hints = []
     metacharacters = [] if literal else sorted({character for character in anchor if character in REGEX_METACHARACTERS}, key=anchor.index)

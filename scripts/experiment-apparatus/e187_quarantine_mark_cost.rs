@@ -3234,7 +3234,7 @@ fn crates_source_checks() -> Vec<(&'static str, &'static str, String, bool)> {
     checks
 }
 
-/// 停机条款的读码那一半（登记第十一节逐行）：执行员 2026-10-21 读此刻工作区的 `crates/` 写下的事实，行号是当天现取的。
+/// 停机条款的读码那一半（登记第十一节逐行）：执行员读工作区的 `crates/` 写下的事实，行号是现取的。
 /// 模型照这些写；任一条对不上就停机交回，不跑产物。
 const CODE_READING_STOP_CHECKS: [(&str, &str, &str); 13] = [
     ("quarantine_leaves_both_records_untouched", "crates/singlefs-core/src/allocator.rs:2109 release_leaving_the_record_allocated_on; crates/singlefs-core/src/transaction.rs:12937; transaction.rs:4876 copies_failing_the_release_checksum_check", "devices_whose_record_stays_allocated_are_skipped_record_unchanged_both_copies_returned_when_either_fails_mapping_entry_dropped"),

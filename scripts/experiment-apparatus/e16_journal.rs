@@ -71,7 +71,7 @@ const CHECKSUM_BYTES: u64 = 32;
 /// `wal_full` 点名子树根，它们的父是根，根没发；`wal_leaf` 点名叶，父是内部节点，也没写。
 /// ⇒ **记录必须临时充当父**，否则重放时那些块没有任何完整性凭据。
 /// checkpoint 记录不需要：根在同一次 checkpoint 里发出，校验和住进根里了。
-/// **这是 WAL 逼进格式里的一项额外开销，此前没有任何地方写过。**
+/// **这是 WAL 逼进格式里的一项额外开销，别处没有写过。**
 fn write_ahead_log_record_bytes(named_entry_count: usize, parent_on_disk: bool) -> u64 {
     let bytes_per_entry = if parent_on_disk { ENTRY_BYTES } else { ENTRY_BYTES + CHECKSUM_BYTES };
     48 + bytes_per_entry * named_entry_count as u64
@@ -268,8 +268,8 @@ struct ArmOutcome {
     checkpoint_blocks: u64,
     /// **祖先块**：`checkpoint_blocks` 里属于内部节点（非脏叶）的那一部分。
     /// 单列出来是因为「checkpoint 内摊销把祖先压到几块每操作」这个数
-    /// 被 [decisions.md] D10 当作依据用，而它此前在本实验的产物里**根本不存在**
-    /// （2026-08-31 现查：四个字段、宽松区间零命中）。
+    /// 被 [decisions.md] D10 当作依据用，而它在本实验的产物里**根本不存在**
+    /// （现查：四个字段、宽松区间零命中）。
     /// ⚠️ 它是 `checkpoint_blocks` 的**子集**，不参与 `total_blocks()`——重复计费会把写放大算高。
     ancestor_blocks: u64,
     root_blocks: u64,
@@ -479,7 +479,7 @@ fn sweep() {
     print!("{output}");
 }
 
-// ── 字节口径（2026-09-03 补测，C27 的前置）─────────────────────────────────
+// ── 字节口径（补测，C27 的前置）─────────────────────────────────
 //
 // 块数口径数的是**被触到的节点数**，节点越大树越矮、数出来越省；
 // 字节口径 = 节点数 × 节点字节，节点越大越贵。两种口径给出的排序不同，

@@ -277,7 +277,7 @@ mod tests {
         assert_eq!(LIVE_UNIT_COUNT + LOST_RECORD_UNIT_COUNT + TORN_ORPHAN_COUNT + MISDIRECTED_IMPOSTOR_COUNT + BAD_CHECKSUM_UNIT_COUNT, DROP_POINT_COUNT);
     }
 
-    /// **判据 1：定案形态（hdr91 + 认领）必须全对，逐格钉绝对值。**
+    /// **判据 1：已定形态（hdr91 + 认领）必须全对，逐格钉绝对值。**
     #[test]
     fn settled_form_classifies_everything_exactly() {
         let tally = scan(&build_disk(), true, true);

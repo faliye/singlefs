@@ -3,8 +3,8 @@
 # run-condition: command python3
 """广谱变异驱动（scripts/mutation/broad-mutation.py）的剪枝规则库：每条变异的单元键、结论能不能沿用、按覆盖挑哪些测试、清单按单元存。
 
-依据：用户 2026-10-15 定（剪枝的单元是函数；广谱变异一条一条按内容算，不按 HEAD 算）；复用键普查对账底稿第一节 L22 与第二节第 6、9 条、
-一之三 verify 路的改写；第二轮 design 路报告第三节 3.1；controls 路报告第 5 节（S34、T16、N37、N45、T17 与弄坏开关名）。
+依据：剪枝的单元是函数；广谱变异一条一条按内容算，不按 HEAD 算（出处：复用键普查对账底稿第一节 L22 与第二节第 6、9 条、
+一之三 verify 路的改写；design 路报告第三节 3.1；controls 路报告第 5 节，S34、T16、N37、N45、T17 与弄坏开关名）。
 清单与结论都按单元键存：每条变异过沿用判据，沿用不了才现判；不带参数就是剪枝。
 没有 --changed-since、--sync-tree、changed-since-tree、notice_if_head_moved，没有「一版」与 git archive <提交> 导出的版本树。
 函数外的项各切单元（const、static、struct、impl 头、宏都是单元），切不开当解析缺陷修，不退整文件。判法是判结局那几个函数单元的指纹，没有手写的版本号。
@@ -85,7 +85,7 @@
   弄坏开关打开后本库 --selftest 退 1，汇总行「✗ mutation-prune.py --selftest：<格数> 格里 N 格判错」；驱动 broad-mutation.py 的 --selftest 打开同一个开关时红在哪写在它自己的文件头。
 弄坏开关只在自证里认（refuse_break_outside_selftest）：直接执行本库而命令行不是单独一个 --selftest（--index、不带参数、认不得的参数）时，环境里设了 BROAD_MUTATION_BREAK
   就在参数解析之前退 2，点名这个变量只在自证里认；被驱动当库载入时不判（驱动自己在参数解析之前拒）。
-  BROAD_MUTATION_BREAK=outside-selftest-guard-skipped  父进程是带 --selftest 的本库时（自证起的探针）平常跑设了也照跑（改前的样子）
+  BROAD_MUTATION_BREAK=outside-selftest-guard-skipped  父进程是带 --selftest 的本库时（自证起的探针）平常跑设了也照跑
       「自证：平常跑设了 BROAD_MUTATION_BREAK 没被拒」
 
 gate-similar: broad-mutation.py 它是逐条驱动（库目录、续跑、逐步命令），这里是它载入的纯函数库，判的是同一件事的剪枝那一半，分开是为了自证不碰库目录
@@ -142,7 +142,7 @@ def parent_is_own_selftest():
 
 def refuse_break_outside_selftest(argv):
     """弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」）：命令行不是单独一个 --selftest 而环境里设了 BROAD_MUTATION_BREAK，参数解析之前退 2、点名变量。
-    弄坏开关 outside-selftest-guard-skipped：父进程是带 --selftest 的本库时不拒（改前的样子）。"""
+    弄坏开关 outside-selftest-guard-skipped：父进程是带 --selftest 的本库时不拒。"""
     # 变量名写成字面量、不另立模块级常量：模块级赋值进广谱变异判法单元的闭包（scripts/gate/lib_function_units.py 文件头「import 时执行的模块级语句」）
     value = os.environ.get("BROAD_MUTATION_BREAK", "")
     if not value or argv == ["--selftest"]:
@@ -906,7 +906,7 @@ def coverers_key(tree, unit, tests, global_lines):
     """覆盖者键：静态闭包里有这个容器单元的每一条测试，各自测试键的多重集取 sha256。→ (键或 None, 条数, 为什么)。
     只因 entry-cfg-inactive 拒的测试（这一次编译的 cfg 下它不编进来，整份挂了没开的 #![cfg(feature = "…")]）不可能是这一趟的覆盖者：跳过，不算拒、不进条数；
     键算出来时第三项写跳过了几条（cfg-inactive-skipped:N，没跳过是空串），不静默。别的拒因（闭包收不全、形态认不出……）照旧整条拒。
-    弄坏开关 coverers-cfg-inactive-refused：不跳过，碰到这样的测试照改前整条拒。"""
+    弄坏开关 coverers-cfg-inactive-refused：不跳过，碰到这样的测试整条拒。"""
     keys, skipped = [], 0
     for entry in tests:
         closure, forms = tree.closure(entry["unit"], entry["target"])
@@ -1394,7 +1394,7 @@ SAMPLES = [
       "crates/mcore/src/dep.rs": "pub fn dep(n: u64) -> u64 {\n    extdep::shift(n) + 1\n}\n", T: test_calling("mcore::dep::dep(1)", 2)},
      {"Cargo.lock": dependency_lock("1.0.0", "2.0.1")}, ("crates/mcore/src/dep.rs", "+", "-", 0), "caught", {}),
 ]
-# 按覆盖挑测试的例外（第三轮 X1b、X3 与 K1）：期望「跑全部」
+# 按覆盖挑测试的例外（X1b、X3 与 K1）：期望「跑全部」
 C2_SOURCES = {
     "crates/mharness/tests/golden.rs": '#[test]\nfn golden_parent() {\n    let output = std::process::Command::new(std::env::current_exe().unwrap()).arg("child").output().unwrap();\n    assert!(output.status.success());\n}\n',
     "crates/mcore/src/mixed.rs": "pub const fn square(x: u64) -> u64 {\n    x * x\n}\npub const fn helper(x: u64) -> u64 {\n    square(x) + 0\n}\npub fn runtime_only(x: u64) -> u64 {\n    x + 1\n}\n",
@@ -1573,7 +1573,7 @@ def run_selftest():
         check(covered == [("crates/mcore/src/mixed.rs", "runtime_only"), ("crates/mcore/src/wide.rs", "after")] and len(fingerprints) == 2,
               f"覆盖文件名没归一或行列没对上（得 {covered}，指纹 {len(fingerprints)} 个）",
               "看 normalise_coverage_path（相对路径按树根拼、绝对路径截到 /crates/）、UnitTree.offset_of_byte_column（llvm-cov 的列按字节）与 covered_units")
-        # 挑测试的 -E 按块切：第三轮正推量的全名 133 410 字节
+        # 挑测试的 -E 按块切：量到的全名 133 410 字节
         names = [("singlefs-verification::random_histories", f"module_{index:04d}::a_rather_long_test_name_that_pads_the_filter_out") for index in range(1500)]
         chunks = nextest_filters(names)
         total = sum(len(chunk.encode()) for chunk in chunks)

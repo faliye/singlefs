@@ -2,20 +2,22 @@
 # E171 第 1 次重跑第一段·修订 8 那一趟：第 0–10 步的一个单元（登记 research/prompts/e171-r1-prereg.md 修订 8 第 8.4 节步表与「单元」）。
 # 由 segment_one_units_revision_8.py 起：bash <这一份> <单元名>，环境变量由它给（下面「环境」）；退 0 是这个单元绿，别的是红（判法不过、装置退码不对）。
 # 每个单元的身子照修订 6 那一趟的多机跑法 run_segment_one_on_the_revision_6_tree_multi_host.sh（ec89ec78…，仓里那份 567a8682… 只差两行路径）同一步那几行，
-# 判法、阈值、线程一个字不动（内存包装与各步的内存上限已删，额度由任务服务给；各读数进程外面的线程包装也删了，线程数变量由单元编排
-# 设成这个单元分到的线程，等于 THREADS，E171 第 2 次重跑登记修订 8）；改的只有修订 8 第 8.4 节步表写的几处：
+# 判法、阈值一个字不动（内存包装与各步的内存上限已删，额度由任务服务给；各读数进程外面的线程包装也删了，E171 第 2 次重跑登记修订 8）；线程取每台默认重活线程数
+# （scripts/hosts/heavy-threads.sh 的 heavy_thread_default，第 2 次重跑登记修订 10），单元编排起的单元里 SINGLEFS_THREAD_CAP 是它分到的数，取到的就是那个数；改的只有修订 8 第 8.4 节步表写的几处：
 #   第 0 步冻结树产物换成 frozen_tree_lines_revision_8.py step-0；前提（快照摘要 H3、二进制 H7、S16 ②、H8、Z2）由单元编排每次起跑与续跑核，不再要 S15 要比的旧导出；
 #   新加第 2b 步（第 2 步导出的拷贝上 E170 导出装置 bad-states-second-run，种子 85441ae491419411），第 3 步 O3、第 4 步 o3-p1 改用它；
 #   第 1、6、7、10 步之后不接 S15 ⑤④⑥⑤④（对修订 8 那一趟不设，第 8.6 节），那几种比法改在两趟之间出对照（contrast_revision_6_against_revision_8.py）；
 #   第 6、10 步 q5 states= 的期望取 H14；快照摘要核对另核树里 crates/mutations.tsv 等于 H8（作废 Z5，第 8.6 节）；
 #   第 3、4 步每项、第 10 步每次各一个单元；第 9 步的 Z1 与第 10 步的 Z7 各成一个小单元（它们要等两边都绿，第 9 步装置那一趟与第 7 步同时起）；
 #   单元自己写出的产物名与导出目录都接 TAG（没做完重跑时是 -attempt<N>，第 8.4 节「续跑」）；依赖的单元的名字由编排给，已带它们自己的 TAG。
-# 环境：REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS WORK_ROOT
+# 环境：REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS（编排照旧给，这一份不读） WORK_ROOT
 #   UNIT_LOG（这个单元这一次的日志文件）UNIT_PRODUCTS（逐行追加「产物<TAB>行数」）UNIT_DIRECTORIES（逐行追加这个单元写出的导出目录，相对仓根）
 #   依赖的名字：S2_BASELINE S2_E170_EXPORT E170_SECOND_RUN BASELINE_RUN1 BASELINE_RUN2 Q5_MAIN_RUN_1 Q5_MAIN_RUN_2；H14：Q5_REVERSE_STATES Q5_MAIN_STATES
 #   PRINT_ONLY=1：只打出这个单元会跑的每一条命令（装置、判法、拷贝），一条都不跑（干跑 PLAN_ONLY 用）。
 set -u
 UNIT=${1:?要单元名}
+source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
+THREADS="$(heavy_thread_default)" || exit 2  # 取每台默认重活线程数；单元编排起的单元里 SINGLEFS_THREAD_CAP 就是它分到的数
 cd "$REPO" || exit 2
 TIMING=$RESEARCH/device_timing.py
 CHECK=$RESEARCH/check_product.py

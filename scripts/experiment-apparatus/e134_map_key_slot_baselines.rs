@@ -2,7 +2,7 @@
 //!
 //! E133 的装置原样搬过来，只补两件（跑前登记 `research/prompts/e134-preregistration.md`，写于本文件之前）：
 //! ① D27 的槽两种基线都报——E133 把「槽已有五元组 33 与写序 10」当基线，写序那 10 字节来自 E114 `pack` 臂的定义，
-//!    而 D27 正文里槽只写了五元组；② 补两条臂：按类复用写序键收严后的形态（key 带 1 字节类标签）与第三轮反推腿给的混合路。
+//!    而 D27 正文里槽只写了五元组；② 补两条臂：按类复用写序键收严后的形态（key 带 1 字节类标签）与反推腿给的混合路。
 //! E133 的产物已被三方论证的腿逐行引用，所以不原地改、另起一号；与 E133 共有的十二条臂必须逐字段复现 E133 的留存产物（判据 7）。
 //! ⚠️ **只报数、不判输赢**：`.claude/rules/fs-design.md` 逐字「「比谁省」不构成任何判据」。
 //!
@@ -85,7 +85,7 @@ struct Arm {
 }
 
 const ARMS: [Arm; 14] = [
-    // 今天：指针里没有出生身份；映射 key 按第一轮之前的预想取五元组 33。只当基准。
+    // 今天：指针里没有出生身份；映射 key 按预想取五元组 33。只当基准。
     Arm { name: "bing", data_pointer_extra_bytes: 0, node_pointer_extra_bytes: 0, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 33, code23_key_bytes: None, root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 0, slot_extra_over_five_tuple_bytes: 0 },
     // 逻辑身份键按背景材料的字面：每条指针只加出生树 + 出生 txg（= D19 已定项 7 的甲）；槽缺诞生代号 8。
     Arm { name: "k1", data_pointer_extra_bytes: 16, node_pointer_extra_bytes: 16, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 41, code23_key_bytes: None, root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 8, slot_extra_over_five_tuple_bytes: 8 },
@@ -109,10 +109,10 @@ const ARMS: [Arm; 14] = [
     Arm { name: "uuid16", data_pointer_extra_bytes: 32, node_pointer_extra_bytes: 32, code1_header_extra_bytes: 16, code23_header_extra_bytes: 16, code1_key_bytes: 16, code23_key_bytes: Some(16), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 16, slot_extra_over_five_tuple_bytes: 16 },
     // 本地腿 s2：出生落点 10 + 每槽版本号 2 当 key，指针另加版本号 2 + 出生树 8 + 出生 txg 8；每槽版本号那张持久表的代价不建模。
     Arm { name: "slotgen12", data_pointer_extra_bytes: 18, node_pointer_extra_bytes: 18, code1_header_extra_bytes: 12, code23_header_extra_bytes: 12, code1_key_bytes: 12, code23_key_bytes: Some(12), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 12, slot_extra_over_five_tuple_bytes: 12 },
-    // 按类复用写序键收严后的形态（D19 已定项 6 第三轮三步走）：key 以 1 字节类标签打头，码 1 27、码 2 / 3 25；
+    // 按类复用写序键收严后的形态（D19 已定项 6 三步走）：key 以 1 字节类标签打头，码 1 27、码 2 / 3 25；
     // 指针与头同 `class_reuse`（类标签由查找路径与单元头给出）；槽里的 key 带自己的类标签，不假设能复用五元组那 1 字节单元类型标签。
     Arm { name: "class_reuse_tagged", data_pointer_extra_bytes: 26, node_pointer_extra_bytes: 24, code1_header_extra_bytes: 0, code23_header_extra_bytes: 4, code1_key_bytes: 27, code23_key_bytes: Some(25), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 9, slot_extra_over_five_tuple_bytes: 19 },
-    // 第三轮反推腿的混合路（同样带类标签）：码 1 取逻辑身份 + 写序键的 51（五元组本来就以 1 字节单元类型标签打头），码 2 / 3 取收严后的 25。
+    // 反推腿的混合路（同样带类标签）：码 1 取逻辑身份 + 写序键的 51（五元组本来就以 1 字节单元类型标签打头），码 2 / 3 取收严后的 25。
     Arm { name: "k1_seq_class_reuse", data_pointer_extra_bytes: 50, node_pointer_extra_bytes: 24, code1_header_extra_bytes: 0, code23_header_extra_bytes: 4, code1_key_bytes: 51, code23_key_bytes: Some(25), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 8, slot_extra_over_five_tuple_bytes: 18 },
 ];
 
@@ -398,7 +398,7 @@ mod tests {
 
     /// 每条臂的七个扇出逐个钉死。期望值来自一份独立的 Python 算术（只用登记的原始量，不读本文件的式子）。
     /// 节点头 64 与 76 在已登记的 196 / 164 / 175 / 201 / 267 / 236 上恰好同值（变异 M1 / M2，`.claude/rules/mutation-sampling.md` 第三类），
-    /// 敏感取样点落在别的臂上；映射内部扇出与 extent 内部扇出此前没有断言（变异 M10 / M17）。
+    /// 敏感取样点落在别的臂上；映射内部扇出与 extent 内部扇出没有断言（变异 M10 / M17）。
     #[test]
     fn every_arm_fanout_is_pinned_including_the_header_sensitive_cells() {
         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 14] = [

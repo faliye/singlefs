@@ -7,13 +7,17 @@
       2 用法错或产物已存在；3 存档产物或钉值表与登记不符（同造树的退 3）。
   tree-digest <树根>
       打一行 `<快照摘要> <文件数>`（同 build_approximate_tree.snapshot_digest）；编译脚本编之前、编之后各调一次。
-  compile-lines --tree <树根> --exit-code <cargo 的退出码> --log <cargo 的诊断> --digest-before <编之前的快照摘要> --product <新产物>
-      Q2-编：cargo 退出码、诊断末 20 行（家目录写成 ~）、树里 target/release/ 下两个二进制的 sha256、编之前编之后快照摘要同不同。退出码：0 编过且树没变；1 编不过或树变了；2 用法错。
+  compile-lines --tree <树根> --exit-code <cargo 的退出码> --copy-exit-code <拷二进制那两条 cp 的退出码> --build-output <这一趟编译目录的 release/>
+                --log <cargo 的诊断> --digest-before <编之前的快照摘要> --product <新产物>
+      Q2-编：cargo 退出码、拷的退出码、诊断末 20 行（家目录写成 ~）、两个二进制在树里 target/release/ 与在这一趟编译目录里的 sha256、两份逐字节同不同、
+      编之前编之后快照摘要同不同。编过 = cargo 退 0、cp 退 0、两个二进制在树里都在且与这一趟的构建输出逐字节相同（树里那份在、却不是这一趟拷进来的旧二进制，不算编过）。
+      退出码：0 编过且树没变；1 没编过（含没拷好）或树变了；2 用法错。
 """
 
 from __future__ import annotations
 
 import argparse
+import filecmp
 import os
 import sys
 
@@ -27,6 +31,7 @@ CANDIDATE_PRODUCT = "reaches_product_code_or_pool_checker"
 THIRD_KIND = "third_kind_reaches_other_verification_packages"
 BINARIES = ("e171_three_oracle_collusion_after_the_oracle_fixes", "e170_o3_spec_executor_export")
 DIAGNOSTIC_TAIL = 20
+ABSENT_ROW = {"marker": tree_builder.MARKER_MISSING, "source": "-", "blob": "-", "sha256": "-"}   # 清单里没有这条路径时 Q1 那几行照这一行写
 
 
 def pin_holds(near_sha256: str, target_sha256: str) -> bool:
@@ -80,7 +85,7 @@ def q1_lines(built: str, pins: list, research_pins: list, lines: ResultLines) ->
     research_rows = {row["path"]: row for row in rows if row["place"] == "research_side"}
     unequal_classes = []
     for pin in pins:
-        row = tree_rows.get(pin.path, {"marker": tree_builder.MARKER_MISSING, "source": "-", "sha256": "-"})
+        row = tree_rows.get(pin.path, ABSENT_ROW)
         equals = pin_holds(row["sha256"], pin.target_sha256)
         path_class = tree_builder.classify(pin.path)
         if not equals:
@@ -88,13 +93,14 @@ def q1_lines(built: str, pins: list, research_pins: list, lines: ResultLines) ->
         device = (f" new_tree_sha256={tree_builder.NEW_TREE_DEVICE_SHA256} equals_new_tree={str(row['sha256'] == tree_builder.NEW_TREE_DEVICE_SHA256).lower()}"
                   if pin.path == tree_builder.DEVICE_PATH else "")
         lines.result(f"name=q1_file path={pin.path} class={path_class} role={pin.role} target_sha256={pin.target_sha256} marker={row['marker']} "
-                     f"source={field(row['source'])} near_sha256={row['sha256']} equals={str(equals).lower()}{device}")
+                     f"source={field(row['source'])} blob={row['blob']} near_sha256={row['sha256']} equals={str(equals).lower()}{device}")
     for path, pinned, outside in research_pins:
-        row = research_rows.get(path, {"marker": tree_builder.MARKER_MISSING, "source": "-", "sha256": "-"})
+        row = research_rows.get(path, ABSENT_ROW)
         lines.result(f"name=q1_research_side path={path} pinned_outside_the_repository={str(outside).lower()} target_sha256={pinned} "
-                     f"marker={row['marker']} source={field(row['source'])} near_sha256={row['sha256']} equals={str(pin_holds(row['sha256'], pinned)).lower()}")
+                     f"marker={row['marker']} source={field(row['source'])} blob={row['blob']} near_sha256={row['sha256']} "
+                     f"equals={str(pin_holds(row['sha256'], pinned)).lower()}")
     for path in tree_builder.UNRECORDED_RESEARCH_FILES:
-        row = research_rows.get(path, {"marker": tree_builder.MARKER_MISSING, "source": "-", "sha256": "-"})
+        row = research_rows.get(path, ABSENT_ROW)
         lines.result(f"name=q1_research_side path={path} target_sha256=unrecorded marker={row['marker']} near_sha256={row['sha256']}")
     pinned_paths = {pin.path for pin in pins}
     unpinned = [row for row in tree_rows.values() if row["status"] != "none" and row["path"] not in pinned_paths]
@@ -115,23 +121,30 @@ def q1_lines(built: str, pins: list, research_pins: list, lines: ResultLines) ->
     return 1 if contradiction or mismatched or extra else 0
 
 
-def compile_lines(tree: str, exit_code: int, log: str, digest_before: str, lines: ResultLines) -> int:
-    """Q2-编：cargo 退出码、诊断末 DIAGNOSTIC_TAIL 行、两个二进制的 sha256、编之前编之后树同不同。"""
+def same_bytes(left: str, right: str) -> bool:
+    """两份文件都在、内容逐字节相同。"""
+    return os.path.isfile(left) and os.path.isfile(right) and filecmp.cmp(left, right, shallow=False)
+
+
+def compile_lines(tree: str, exit_code: int, copy_exit_code: int, build_output: str, log: str, digest_before: str, lines: ResultLines) -> int:
+    """Q2-编：cargo 退出码、拷的退出码、诊断末 DIAGNOSTIC_TAIL 行、两个二进制在树里与在构建输出里的 sha256 与逐字节同不同、编之前编之后树同不同。"""
     with open(log, encoding="utf-8", errors="replace") as handle:
         tail = handle.read().splitlines()[-DIAGNOSTIC_TAIL:]
     home = os.path.expanduser("~")
     for index, text in enumerate(tail, start=1):
         lines.result(f"name=compile_diagnostic index={index} text={field(text.replace(home, '~'))}")
-    binaries = {}
+    copied = {}
     for name in BINARIES:
-        path = os.path.join(tree, "target", "release", name)
-        binaries[name] = tree_builder.sha256_of_file(path) if os.path.isfile(path) else "missing"
-        lines.result(f"name=binary_sha256 binary={name} sha256={binaries[name]}")
+        in_tree, built = os.path.join(tree, "target", "release", name), os.path.join(build_output, name)
+        copied[name] = same_bytes(in_tree, built)
+        lines.result(f"name=binary_sha256 binary={name} sha256={tree_builder.sha256_of_file(in_tree) if os.path.isfile(in_tree) else 'missing'} "
+                     f"build_output_sha256={tree_builder.sha256_of_file(built) if os.path.isfile(built) else 'missing'} "
+                     f"same_as_build_output={str(copied[name]).lower()}")
     digest_after, count = tree_builder.snapshot_digest(tree)
     unchanged = digest_after == digest_before
-    compiled = exit_code == 0 and all(value != "missing" for value in binaries.values())
-    lines.result(f"name=verdict cargo_exit={exit_code} compiled={str(compiled).lower()} digest_before={digest_before} digest_after={digest_after} "
-                 f"digest_files={count} tree_unchanged={str(unchanged).lower()}")
+    compiled = exit_code == 0 and copy_exit_code == 0 and all(copied.values())
+    lines.result(f"name=verdict cargo_exit={exit_code} copy_exit={copy_exit_code} compiled={str(compiled).lower()} digest_before={digest_before} "
+                 f"digest_after={digest_after} digest_files={count} tree_unchanged={str(unchanged).lower()}")
     return 0 if compiled and unchanged else 1
 
 
@@ -147,6 +160,8 @@ def main(argument_list: list[str]) -> int:
     compiled = commands.add_parser("compile-lines")
     compiled.add_argument("--tree", required=True)
     compiled.add_argument("--exit-code", required=True, type=int)
+    compiled.add_argument("--copy-exit-code", required=True, type=int)
+    compiled.add_argument("--build-output", required=True)
     compiled.add_argument("--log", required=True)
     compiled.add_argument("--digest-before", required=True)
     compiled.add_argument("--product", required=True)
@@ -160,7 +175,8 @@ def main(argument_list: list[str]) -> int:
     if arguments.command == "compile-lines":
         lines = ResultLines(arguments.product)
         lines.result(f"name=config tree={field(tree_builder.home_relative(arguments.tree))} binaries={','.join(BINARIES)} diagnostic_tail={DIAGNOSTIC_TAIL}")
-        exit_code = compile_lines(arguments.tree, arguments.exit_code, arguments.log, arguments.digest_before, lines)
+        exit_code = compile_lines(arguments.tree, arguments.exit_code, arguments.copy_exit_code, arguments.build_output, arguments.log,
+                                  arguments.digest_before, lines)
         lines.finish()
         return exit_code
     repository = tree_builder.GitRepository(os.path.abspath(arguments.repository))

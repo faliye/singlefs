@@ -216,9 +216,9 @@ mod tests {
         );
     }
 
-    /// **上限按条目宽度各钉一个绝对值**（2026-09-07 补）。
-    /// 此前正文写「512 槽只装得下 2 台盘」，而扫描集合只有 {1,2,8,64,256}，
-    /// 3–7 台一格没跑 ⇒ 表里读不出上限。这条测试把三档上限直接钉住，正文再漂就会红。
+    /// **上限按条目宽度各钉一个绝对值**。
+    /// 扫描集合只有 {1,2,8,64,256}，3–7 台一格没跑 ⇒ 表里读不出上限，
+    /// 所以这条测试把三档上限直接钉住，正文漂了就会红。
     #[test]
     fn criterion2_inline_capacity_per_entry_width_is_absolute() {
         let inline_device_capacity = |entry_width_bytes: u64| (1u64..40).filter(|device_count| total_bytes(*device_count, entry_width_bytes, true, true) <= 512).max().unwrap();

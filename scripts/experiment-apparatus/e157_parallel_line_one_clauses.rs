@@ -60,7 +60,7 @@ const EXTENT_LEAF_POINTER_BYTES: u64 = 88;
 /// extent 叶记录总宽，与 A3 对拍：24 + 88 = 112。
 const EXTENT_LEAF_RECORD_BYTES: u64 = 112;
 
-/// extent 码 2 节点头公式：`86 + 2 × key_bytes + 29`（D18 已定项 2，2026-09-14 用户定案：
+/// extent 码 2 节点头公式：`86 + 2 × key_bytes + 29`（D18 已定项 2，
 /// 全部码 2 节点都带 key 区间，不再按树分）。
 const fn extent_node_header_bytes(key_bytes: u64) -> u64 {
     86 + 2 * key_bytes + 29

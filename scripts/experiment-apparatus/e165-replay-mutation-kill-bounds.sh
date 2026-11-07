@@ -72,17 +72,17 @@
 #       连带红的格：「✗ 自检：r5：--gate r2 整轮」、「✗ 自检：r5：--gate r2 那一套的变异表钉值与仓里的表对不上时」
 #   E165_KILL_BOUNDS_BREAK=r4gateignored  给了 --gate r2 而调装置不带 --gate r2
 #       「r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2」（实际退 7：基线缺 R2 的闸字段、变体一个不编）
-#   E165_KILL_BOUNDS_BREAK=defaultone  --jobs、--threads 都不给时取 1 × 1（改前的样子），不取登记的重活默认并行度
+#   E165_KILL_BOUNDS_BREAK=defaultone  --jobs、--threads 都不给时取 1 × 1，不取登记的重活默认并行度
 #       「--jobs、--threads 的缺省：…」（实际 (1, 1)）
-#   E165_KILL_BOUNDS_BREAK=fixedcopylist  每个变体的副本照写死的 FIXED_COPY_ENTRIES 拷，不取共用库的闭包（改前的样子：没有 path 依赖的 prune-server/ 与编译期读的 .claude/heavy-thread-default）
+#   E165_KILL_BOUNDS_BREAK=fixedcopylist  每个变体的副本照写死的 FIXED_COPY_ENTRIES 拷，不取共用库的闭包（没有 path 依赖的 prune-server/ 与编译期读的 .claude/heavy-thread-default）
 #       「副本应当照共用库的闭包拷：…」（实际只有 Cargo.toml、Cargo.lock 与 crates/ 底下的）
-#   E165_KILL_BOUNDS_BREAK=copyconfigurationunset  副本里编、跑装置不交多机配置（改前的样子：--root 给的根不在 git 里，照它的位置找不到配置）
+#   E165_KILL_BOUNDS_BREAK=copyconfigurationunset  副本里编、跑装置不交多机配置（--root 给的根不在 git 里，照它的位置找不到配置）
 #       「副本里起命令的多机配置应当取脚本所在的仓那一份：…」（实际没设得 None）
 #   下面两项外面打开时自证的每一趟都带着它（drive() 照下面七项那一段的带法）：
 #   E165_KILL_BOUNDS_BREAK=pincheckskipped  钉红例时不跑 --check（当场追加之后不核钉全）
 #       「账写完而钉表没钉时驱动当场核钉全应当判红、退 8、一次不编」（实际退 0）、「已收尾的一对重跑同一条命令应当只重做钉红例」（实际「核了 没核」）、
 #       「整轮写完账与产物要当场钉进钉表、再核钉全」「补跑补齐之后照样当场钉、当场核」（实际成功那句不报核了几行）
-#   E165_KILL_BOUNDS_BREAK=retainedmissingred  留存产物不在时照改前不报本次未跑：V7 读不到（退非 0）、TV7 报 TV8 退 6
+#   E165_KILL_BOUNDS_BREAK=retainedmissingred  留存产物不在时不报本次未跑：V7 读不到（退非 0）、TV7 报 TV8 退 6
 #       「r2：第一段产物不在时 V7 的比对应当逐项报本次未跑」「r3：第二段产物不在时 TV7 的比对应当逐项报本次未跑」「r4：第一段产物不在时 TV7 的比对应当逐项报本次未跑」
 #       连带红的格：「✗ 作废条款 TV8：第一段产物读不到：…」、「✗ 作废条款 TV8：第二段产物读不到：…」
 #
@@ -173,14 +173,14 @@
 #       「假时钟上过了进度间隔（300 秒）应当各打一行、没到不打」（实际：差一秒 None；到了 None；再过一个间隔 None）
 #       「整轮里一个变体跑过进度间隔应当打出点名它的进度行」（实际退 0、进度行 []）
 #   下面三项是入口脚本格式那几格（「每项一行与总计」一段），外面打开时自证的每一趟都带着它：
-#   E165_KILL_BOUNDS_BREAK=itemcountsdropped  每项一行不带 judged=、red=、reused=（改前没有这几样）
+#   E165_KILL_BOUNDS_BREAK=itemcountsdropped  每项一行不带 judged=、red=、reused=
 #       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」、「补跑：已有行的两项应当各打一行 reused=1」
 #   E165_KILL_BOUNDS_BREAK=itemlinedropped  第一个做完的变体（基线除外）不打它那一行、不算收回（造一项收不回）
 #       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」（实际派出 6 项、收回 5 项，退 1）
 #       连带红的格（这几趟都有变体做完，少收回一项就退 1）：「✗ 自检：整轮应当退 0」、「✗ 自检：补跑应当退 0」、「✗ 自检：补跑：已有行的两项」、「✗ 自检：r2：第一段产物不在时 V7 的比对」、
 #       「✗ 自检：--recheck 同一条」、「✗ 自检：整轮里一个变体跑过进度间隔」、「✗ 自检：r2 整轮」、「✗ 自检：r3 整轮」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、
 #       「✗ 自检：r4 整轮」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：r5：--gate r2 整轮」
-#   E165_KILL_BOUNDS_BREAK=unknownitemunlisted  --item 写错时不列可点名的变体（改前只说「--list-items 看」）
+#   E165_KILL_BOUNDS_BREAK=unknownitemunlisted  --item 写错时不列可点名的变体（只说「--list-items 看」）
 #       「--item 写了不认识的变体名应当退 2、列出可点名的 6 项、一次不编」
 #   下面四项是 r2 登记 9.5「驱动」三行加一项，外面打开时自证同样红（自证的 r2 那几趟把外面给的这四项原样传进去）：
 #   E165_KILL_BOUNDS_BREAK=j6qnfromj6  J6Qn 的首红取了 J6 那两行（9.5「J6Qn 的首红取了 J6 的列」）
@@ -284,12 +284,12 @@ SOURCE_FILES = (RECOVERY_PATH, LIB_PATH)     # 变异改的文件取变异行第
 TABLE_PATH = "crates/mutations.tsv"
 CUSTOM_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv"
 TAGS_TABLE_PATH = "scripts/mutation/tables/e165_replay_bounded_enumeration_tags.tsv"   # r1 9.3：每个变体在两版源码上的判定标签集合与依据
-FIXED_COPY_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")   # 弄坏开关 fixedcopylist 下照拷的那几样（改前的样子）
+FIXED_COPY_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")   # 弄坏开关 fixedcopylist 下照拷的那几样
 WORK_DIRECTORY_NAME = "kill-bounds"
 # crates/mutations.tsv 的登记值在第一段收尾之前填不出（第一段要往表里加装置的行）：占位串让开工核对一律停在 RH1，填了真值才跑得起来。
 TABLE_SHA256_PENDING = "pending-segment1-frozen-root"
 # 登记 r2（research/prompts/e165-r2-prereg.md）9.4 第 1 条：两份源文件的 sha256 取第三节记的值（第一段不许动这两份，SH1，冻结的根上应当相同）、
-# crates/mutations.tsv 的 sha256 取第一段收尾冻结的根上的值（没填之前是占位串）、9.2 的函数行区间取 2026-10-02 在工作区上现算的那一张；
+# crates/mutations.tsv 的 sha256 取第一段收尾冻结的根上的值（没填之前是占位串）、9.2 的函数行区间取在工作区上现算的那一张；
 # 冻结的根上重算与这里不同，就以冻结的根为准改这里并写进登记第十二节修订（行号不是判据，名字与函数才是）。
 # 9.1 的 23 个变异名（登记时的表行号与 r1 登记时的标签集合）同 r1；z_tags 是 r1 9.4 给 Z1–Z4 登记的标签集合（r2 不判标签，Z5 没有登记集合）；
 # custom_keys 是 r2 9.3 的 Z1–Z5。变异名取登记时 HEAD:crates/mutations.tsv 的第一列逐字；按名字选行，表行号只在产物里标出登记时在第几行。
@@ -462,7 +462,7 @@ R4_REGISTERED = {
 R4_REGISTERED["kg_columns"] = {rule: {f"{m},{u}": list(reading) for (m, u), reading in cells.items()} for rule, cells in R4_KG_RULE_READINGS.items()}
 
 # ── 第 5 次重跑的钉值（登记 research/prompts/e165-r5-prereg.md 9.3 第 1、2 条，第二段）：--pins r5 选它；不给 --pins 时三个模式照旧取上面三套，一个字不改。
-# 都是第一段根（/tmp/claude-1000/e165-r5-segment1/root，清单 root-manifest-at-start.sha256 的 sha256 95237ecf…）上 2026-10-04 现算的：两份源文件与 crates/mutations.tsv 的整份 sha256，
+# 都是第一段根（/tmp/claude-1000/e165-r5-segment1/root，清单 root-manifest-at-start.sha256 的 sha256 95237ecf…）上现算的：两份源文件与 crates/mutations.tsv 的整份 sha256，
 # 函数区间照 r1 9.2 的取法（fn 行到其后第一个只有 } 的行）；names 的第一项换成根里 crates/mutations.tsv 的表行号（只用来起名），名字、标签、KA 钉值、labels、KG 钉值、custom_keys 不动。
 R5_FILES_SHA256 = {
     RECOVERY_PATH: "4454f6d3eab170121ccb92778e7d4525cdaa6a10a6c6bf16d7c213d0edc22632",
@@ -516,7 +516,7 @@ for mode in BREAK:
 
 def default_jobs_and_threads(jobs, threads, environment=os.environ):
     """没给 --jobs 是 1；没给 --threads 是 N ÷ jobs（向下取整，至少 1），N 是 SINGLEFS_THREAD_CAP，没设取登记的重活默认并行度。"""
-    if "defaultone" in BREAK:   # 弄坏开关：改前的样子
+    if "defaultone" in BREAK:   # 弄坏开关：取 1 × 1
         return jobs or 1, threads or 1
     jobs = jobs or 1
     return jobs, threads or max(1, default_heavy_threads(environment) // jobs)
@@ -734,7 +734,7 @@ _CRATES_MUTATION_ROWS = []
 
 def mutation_table_rows(setup):
     """crates/mutations.tsv 里成形的行：[(表行号, 各段原样)]。切表与成形照 scripts/mutation/crates-mutation-rows.py 的 read_table
-    （门禁 crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下照改前自己切（四段以上就收）。"""
+    （门禁 crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下自己切（四段以上就收）。"""
     if "owntablesplit" in BREAK:
         rows = []
         for number, line in enumerate(read_source(setup, TABLE_PATH).split("\n"), 1):
@@ -1139,7 +1139,7 @@ COPY_ENTRIES_LOCK = threading.Lock()
 
 def copy_root_entries(root, destination):
     """把 root 照 scripts/hosts/lib_repository_copy.py 在它上面现算的共用清单与闭包拷进 destination（不在就建；文件头「做法」第 4 步）。
-    闭包算不成、拷不成抛 Stop（退 1，点名哪一处）。弄坏开关 fixedcopylist：只拷 FIXED_COPY_ENTRIES（改前的样子）。"""
+    闭包算不成、拷不成抛 Stop（退 1，点名哪一处）。弄坏开关 fixedcopylist：只拷 FIXED_COPY_ENTRIES。"""
     if "fixedcopylist" in BREAK:
         entries = FIXED_COPY_ENTRIES
     else:
@@ -1160,7 +1160,7 @@ def copy_root_entries(root, destination):
 
 def environment_in_the_copy(script_root, environment=None):
     """副本里起命令（编、跑副本里编出来的装置）的环境：多机配置取脚本所在的仓那一份（scripts/hosts/lib_repository_copy.py 的
-    environment_for_commands_in_the_copy；--root 给的根与副本都不在 git 里，照它们的位置找不到配置）。弄坏开关 copyconfigurationunset：照原样交（改前的样子）。"""
+    environment_for_commands_in_the_copy；--root 给的根与副本都不在 git 里，照它们的位置找不到配置）。弄坏开关 copyconfigurationunset：照原样交。"""
     if "copyconfigurationunset" in BREAK:
         return dict(os.environ if environment is None else environment)
     return repository_copy.environment_for_commands_in_the_copy(script_root, environment)
@@ -1423,7 +1423,7 @@ def build_and_run_baseline(setup, options, name):
 def retained_product_not_run(setup, clause, paths):
     """比对的对象是 research/ 下的留存产物（可以整个删掉）：有不在的，这一项比对本次未跑——逐个点名不在的产物，记进 setup.not_run、打一行「本次未跑」，
     环境里有 GATE_NOT_RUN_FILE 的另往那份文件追加一行；不当绿、不判红，交 True（调用方不比、比对那一栏写 not_run）。都在交 False（照旧比）。
-    弄坏开关 retainedmissingred 下一律交 False（照改前：不在就判红或读不到）。"""
+    弄坏开关 retainedmissingred 下一律交 False（不在就判红或读不到）。"""
     absent = [path for path in paths if not os.path.exists(path)]
     if not absent or "retainedmissingred" in BREAK:
         return False
@@ -3307,7 +3307,7 @@ def selftest():
                f"已收尾的一对重跑同一条命令应当只重做钉红例：钉回同样的 {len(pinned_rows)} 行、一次不编，实际退 {completed.returncode}、{len(repinned)} 行、编 {len(builds)} 次：{completed.stdout[-300:]}",
                "看 main_run 已收尾那一支")
 
-        # 三之三、留存产物不在（research/ 可以整个删掉）：V7 的比对本次未跑——逐项点名、不当绿也不判红，基线那一行写 not_run（开关 retainedmissingred 下照改前读不到、退非 0）
+        # 三之三、留存产物不在（research/ 可以整个删掉）：V7 的比对本次未跑——逐项点名、不当绿也不判红，基线那一行写 not_run（开关 retainedmissingred 下读不到、退非 0）
         os.rename(os.path.join(root, "seg1.out"), os.path.join(temporary, "seg1.out.aside"))
         completed, builds = drive(paths("no-seg1"))
         os.rename(os.path.join(temporary, "seg1.out.aside"), os.path.join(root, "seg1.out"))
@@ -3561,7 +3561,7 @@ def selftest():
         completed, builds = drive(paths3("r3-tv7"), broken=r3_broken, fake_root=root3)
         expect(completed.returncode == EXIT_VOID_V7 and "TV7" in completed.stdout and len(builds) == 1 and not os.path.exists(os.path.join(temporary, "r3-tv7.out")),
                f"r3：基线与第二段产物不逐行相同应当报作废条款 TV7 退 6、变体一个不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 check_against_segment_two_product")
-        # ⑤之二 第二段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment2_product=not_run（开关 retainedmissingred 下照改前报 TV8 退 6）
+        # ⑤之二 第二段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment2_product=not_run（开关 retainedmissingred 下报 TV8 退 6）
         os.remove(os.path.join(root3, "seg2.out"))
         completed, builds = drive(paths3("r3-no-seg2"), broken=r3_broken, fake_root=root3)
         r3_no_seg2 = read(os.path.join(temporary, "r3-no-seg2.out"))
@@ -3694,7 +3694,7 @@ def selftest():
         completed, builds = drive(paths4("r4-tv7"), broken=r4_broken, fake_root=root4)
         expect(completed.returncode == EXIT_VOID_V7 and "TV7" in completed.stdout and len(builds) == 1 and not os.path.exists(os.path.join(temporary, "r4-tv7.out")),
                f"r4：基线与第一段产物不逐行相同应当报作废条款 TV7 退 6、变体一个不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 check_against_segment_one_product")
-        # ⑤之二 第一段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment1_product=not_run（开关 retainedmissingred 下照改前报 TV8 退 6）
+        # ⑤之二 第一段产物不在（留存产物可以整个删掉）⇒ TV7 的比对本次未跑、逐项点名，照跑完；收尾判决行写 baseline_equals_segment1_product=not_run（开关 retainedmissingred 下报 TV8 退 6）
         os.remove(os.path.join(root4, "seg1.out"))
         completed, builds = drive(paths4("r4-no-seg1"), broken=r4_broken, fake_root=root4)
         r4_no_seg1 = read(os.path.join(temporary, "r4-no-seg1.out"))

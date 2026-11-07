@@ -11,7 +11,7 @@
 用法：
 
     quote-kb.py 出口.md '文件:12-30' '文件@#### 已定项 5' '文件~某个正则'
-    quote-kb.py --checklist 清单.md 出口.md 取法...   # 另核清单里标「抄」的每一节都真的抄进来了
+    quote-kb.py --checklist 清单.md 出口.md 取法...   # 另核清单里标「抄」的每一节都从清单点名的那份文件整节抄进来了
     quote-kb.py --checklist 清单.md --cited 正文.md 出口.md 取法...
         # 再核正文里提到的每个 kb 文件（D / E / C / I 编号所在的，和正文里直接写了路径的）都有一张小节清单（C234）
 
@@ -28,6 +28,13 @@
 两边都只认「一到六个 `#` 加空格开头、且不在代码围栏里」的行当标题（`#123 是单子` 这种井号后无空格的行两边都当正文；C264 复核时 pick() 曾把它当一级标题，
 research/prompts/ 三份历史材料里 9 处节尾因此截短，已改）。
 `文件:A-B` 与 `文件~正则` 两种取法不在这一条射程里：行区间是人给的、正则只取一行，没有节边界可另算。
+
+正向核对（清单标「抄」的每一节真的抄进来了）按「清单点名的文件 + 标题」绑定（check_checklist、checklist_rows_lacking）：
+标题落到「### 小节清单：`文件`」点名的那份文件里的那一节（标题的认法与节边界是 kb-sections.py 的 heading_bounds()，围栏里的 `#` 行不算；
+同名标题在文件里几处、清单里就该有几行，按次序一一对上，数对不上认不准就判缺），这一节从标题行到下一个级别不更深的标题之前，
+去掉清单里另有一行管着的那几段（下级标题各自那一节、开头正文那一行的行区间）之后，每一行非空白的行都要在附录里**这份文件**的抄录块里
+（按出处行写的行区间算，回读比对已核过它们与源文件逐字节相同）。别的文件里的同名标题、别的文件代码围栏里的同名一行、只抄了标题行，都不算抄了。
+清单里的行区间那一行（「…第 a-b 行」）同样要那几行里的非空白行都从这份文件抄进来；既不是 `#` 标题、也没写「第 a-b 行」的「抄」行认不出抄的是哪一段，判缺。
 
 「不抄」的理由也核（C234 「不抄」理由那一条）。清单里标「不抄」的行，理由若声称正文已经抄在别处
 （理由里有「抄了」「抄进」「抄在」「一起抄」「已抄」这类说法，且点名了一个节：「…」或反引号里的名字，或理由里直接写的 `#` 标题），
@@ -46,29 +53,38 @@ research/prompts/ 三份历史材料里 9 处节尾因此截短，已改）。
       not-numbers 那一格（「✗ 自检：正文用 doc-lint:not-numbers 声明了 E1」）
   QUOTE_KB_BREAK=not-numbers-in-fence  not_numbers_declared() 把代码围栏里的声明也算上
       围栏那一格（「✗ 自检：代码围栏里的 not-numbers 声明不算」）
-  QUOTE_KB_BREAK=bare-lacking-hint  lacking_checklist_message() 走回改前的说法：不点是哪个编号引出的、不给照抄的命令
+  QUOTE_KB_BREAK=not-numbers-fence-toggle  not_numbers_declared() 的围栏读法只认行首（去掉空白之后）三个反引号、每见一行就翻转，不认波浪号、不分长度
+      别的围栏那一格（「✗ 自检：波浪号围栏里的 not-numbers 声明不算」）
+  QUOTE_KB_BREAK=checklist-heading-anywhere  check_checklist() 的正向核对改成：标题在整份附录里出现过就算抄了，不绑清单点名的文件、不核整节
+      正向核对绑定那一格（「✗ 自检：正向核对按来源文件与整节绑定——只抄了别的文件里的同名标题」）
+  QUOTE_KB_BREAK=checklist-section-heading-only  checklist_rows_lacking() 只要标题那一行从这份文件抄进来了就算整节抄了，不核正文
+      正向核对绑定那一格（「✗ 自检：正向核对按来源文件与整节绑定——只抄了标题行、没抄正文」）
+  QUOTE_KB_BREAK=checklist-duplicate-first  checklist_rows_lacking() 同名标题在文件里的处数与清单的行数对不上时不判缺，一律落到第一处那一节
+      正向核对绑定那一格（「✗ 自检：正向核对按来源文件与整节绑定——同名标题在文件里两处、清单只一行」）
+  QUOTE_KB_BREAK=bare-lacking-hint  lacking_checklist_message() 的说法不点是哪个编号引出的、不给照抄的命令
       退 5 的说明那一格（『✗ 自检：退 5 的说明应当点出 I-7.4 引出了 02-根环.md』）
       连带红的格：「✗ 自检：正文只按路径引了 .claude/kb/decisions/27-小数据打包容器.md（没有编号）而清单里没有它，--cited」
   QUOTE_KB_BREAK=invariants-to-readme  invariant_files_for() 不按类号找类文件，I 号一律退回不变量目录的 README.md
       不变量号按类那一格（「✗ 自检：正文点名 I-7.4 与 I-8.3」）；three-way-materials.py 调的是同一份，它的自证同样红在「正文点名 I-7.4」
-  QUOTE_KB_BREAK=invariant-carriers-any-page  invariant_class_files() 不挑目录与译文，候选目录里有 `| I-<类>.` 表行的 .md 一律当载体（改前的样子：实验页、决策页与译文被当成 I 号的载体）
+  QUOTE_KB_BREAK=invariant-carriers-any-page  invariant_class_files() 不挑目录与译文，候选目录里有 `| I-<类>.` 表行的 .md 一律当载体：实验页、决策页与译文被当成 I 号的载体
       载体那一格（「✗ 自检：实验页、决策页与不变量目录里的译文都有」开头那条）
   QUOTE_KB_BREAK=no-readme-fallback  invariant_files_for() 类号找不到类文件时什么都不给，不退回 README.md
       退回 README 那一格（「✗ 自检：正文点名 I-10.1」）
-  QUOTE_KB_BREAK=fence-not-skipped  pick() 找节尾时不跳过代码围栏（改前的样子：围栏里一行 `# 注释` 当一级标题，整节在那里截断）
+  QUOTE_KB_BREAK=fence-not-skipped  pick() 找节尾时不跳过代码围栏：围栏里一行 `# 注释` 当一级标题，整节在那里截断
       节边界那一格（「✗ 自检：干净的 pick() 下」开头那条；自证自己在进程内再打开它，断言旧的回读比对仍绿、新的节边界比对红、main 退 7）；
       外面设着它跑 --selftest，红在同一格，后面『代码栅栏里的 `#` 行不被当成标题』那一格不会走到
   QUOTE_KB_BREAK=checklist-reasons-unchecked  check_checklist_reasons() 不核「不抄」理由点名的节，红样本判绿
       理由那一格（「✗ 自检：清单一行「不抄」、理由说正文在「某个没抄的节」里抄了」开头那条）
-  QUOTE_KB_BREAK=colon-first  split_spec() 走回改前的先后（先 `:` 再 `@` 再 `~`），标题带半角冒号的 `文件@标题` 被切成 `文件:行区间`
+  QUOTE_KB_BREAK=colon-first  split_spec() 的先后是先 `:` 再 `@` 再 `~`，标题带半角冒号的 `文件@标题` 被切成 `文件:行区间`
       标题带半角冒号那一格（「✗ 自检：标题带半角冒号」开头那条）
-  QUOTE_KB_BREAK=kb-directories-raw  kb_directory_entries() 走回改前的读法：登记位的原串只去首尾空白与结尾的 `/`，不规整 `./`，绝对路径与走出仓的也认
+  QUOTE_KB_BREAK=kb-directories-raw  kb_directory_entries() 下登记位的原串只去首尾空白与结尾的 `/`，不规整 `./`，绝对路径与走出仓的也认
       登记位规整那一格（「✗ 自检：登记位写成 ./ 开头、/ 结尾、中间重复 / 的三行」开头那条）；
       stale-candidates.py 调的是同一份，它的自证红在『登记位写成 ./crates/singlefs-checker/invariants（./ 开头）时不变量清单里的现状句没进候选表』
-  QUOTE_KB_BREAK=strict-counts-translations  cited_kb_sources() 的严格读法照旧把同号的 .en.md、.ja.md 译文算进 glob（改前的样子：三语之后同号 3 份、一个都不认）
+  QUOTE_KB_BREAK=strict-counts-translations  cited_kb_sources() 的严格读法照旧把同号的 .en.md、.ja.md 译文算进 glob：同号 3 份、一个都不认
       同号三语那一格（「✗ 自检：同号有中英日三份时」开头那条）
 
---cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算，与 doc-lint 同读法）；
+--cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号；代码围栏里的声明不算，围栏照 scripts/kb/lib_markdown.py 的围栏状态认
+（反引号与波浪号都算，记下开围栏的字符与长度，只有同字符、不短于它、尾部只有空白的一行才关上，没关上的围到文末；开围栏与关围栏那两行也算在围栏里）；
 认编号的读法只有 cited_kb_sources() 一份：three-way-materials.py 收材料时调它的宽读法（不要求「（」），--cited 用严格读法，宽读法认出的是超集。
 D / E 编号按 `<号>-*.md` 找决策与实验页时，严格读法只数中文那一份：同号的 `.en.md`、`.ja.md` 译文（TRANSLATION_SUFFIXES，认法同 `.claude/trilingual-documents`）不算，
 三语之后同号 3 份也认得出；宽读法照旧把同号的几份都给（three-way-materials.py 自己排译文）。
@@ -82,7 +98,7 @@ I-<类>[.<号>] 指到哪份文件不认死文件名（invariant_files_for）：
 退出码：
     3   回读比对不一致（抄出来的与源文件不一致）
     7   节边界对不上：`文件@标题` 取法里 pick() 取的起止行与 kb-sections.py 的节边界算出的不等（C264；说明里写两边各自的行区间）
-    4   清单标了「抄」而附录里没有那一节（正向核对）
+    4   清单标了「抄」而附录里没有从清单点名的那份文件整节抄进来（正向核对：别的文件的同名标题、只抄了标题行都算没有；标题在文件里找不到或认不准是哪一处、文件读不了也判这一条）
     5   --cited 缺清单：正文提到的某个 kb 文件，清单里没给它做一张小节清单
     6   清单标了「不抄」的小节，其实整段被 --extra 之类的行区间连带抄进了附录（反向核对，C320）
     8   清单标了「不抄」、理由声称正文已抄在别处并点名了一个节，出口里找不到那一节（C234 「不抄」理由那一条）
@@ -105,7 +121,7 @@ def fence_for(body):
     """围栏要比正文里最长的一串反引号还长一位。
 
     ⚠️ **固定三反引号会抄坏带代码块的条款**：正文里那行 ``` 会被回读当成本块的结尾，
-    于是产物只回读出前两行、与源文件对不上（实测 2026-09-10，抄
+    于是产物只回读出前两行、与源文件对不上（抄
     `05-快照-空间记账机制.md` 的 O(1) 判定那一节时判红）。
     判红不是误报——它确实抄坏了；坏的是围栏，不是比对。
     """
@@ -125,7 +141,7 @@ def split_spec(spec):
     """→ (文件, 参数, 取法)，取法是 'range' / 'head' / 're'。pick() 与节边界另算（check_section_bounds）共用这一份。
     分隔符取前缀是已有文件的那几处里最靠前的一处，一处都不是已有文件就取最靠前的一处（pick() 再报文件不在）：
     `文件@标题` 的标题、`文件~正则` 的正则里有半角冒号时，冒号在分隔符之后，不会被当成 `文件:A-B` 切开。"""
-    if os.environ.get('QUOTE_KB_BREAK') == 'colon-first':   # 弄坏开关：走回改前的先后，先 `:` 再 `@` 再 `~`
+    if os.environ.get('QUOTE_KB_BREAK') == 'colon-first':   # 弄坏开关：先 `:` 再 `@` 再 `~`
         for sep, kind in SPEC_SEPARATORS:
             if sep in spec:
                 path, arg = spec.split(sep, 1)
@@ -153,9 +169,9 @@ def pick(spec):
         return path, a, L[a - 1:b]
     if kind == 'head':
         # 精确匹配优先，找不到再退回「前缀唯一」。只用前缀时，「### 已定项」这种
-        # 裸标题会把「### 已定项 1（…）」「### 已定项 2（…）」一起算进去（实测在 D8 里
-        # 命中 9 次），于是一个本来唯一的标题取不出来（2026-09-10）。
-        # 凡是以前能跑通的调用，结果不变：以前能跑通 ⇒ 前缀只命中一行。
+        # 裸标题会把「### 已定项 1（…）」「### 已定项 2（…）」一起算进去（在 D8 里
+        # 命中 9 次），于是一个本来唯一的标题取不出来。
+        # 前缀只命中一行时，结果与只用前缀相同。
         hits = [i for i, l in enumerate(L) if l == arg]
         if len(hits) != 1:
             hits = [i for i, l in enumerate(L) if l.startswith(arg)]
@@ -165,13 +181,13 @@ def pick(spec):
         lvl = len(re.match(r'#*', L[i]).group(0))
         # ⚠️ 找节尾时要跳过代码栅栏：栅栏里一行 `# 注释` 会被当成一级标题，
         # 整节在那里被截断——而回读比对拿产物去对这同一段截断的区间，**照样逐字节一致**。
-        # 实测（2026-09-10）：E131 正文的复跑命令块里有一行 `# 直接跑装置：`，
-        # `@## E131…` 只取到 15 行就停了，是 `--checklist` 第一次接上时抓到的。
+        # 例：E131 正文的复跑命令块里有一行 `# 直接跑装置：`，
+        # `@## E131…` 只取到 15 行就停了。
         j, fence = i + 1, None
         while j < len(L):
             fm = re.match(r' {0,3}(`{3,}|~{3,})', L[j])
             if fm and os.environ.get('QUOTE_KB_BREAK') == 'fence-not-skipped':
-                fm = None   # 弄坏开关：不认围栏，围栏里的 `# 注释` 当标题（C264 改前的样子）
+                fm = None   # 弄坏开关：不认围栏，围栏里的 `# 注释` 当标题
             if fence is None and fm and not (fm.group(1)[0] == '`' and '`' in L[j][fm.end():]):
                 fence = (fm.group(1)[0], len(fm.group(1)))
             elif fence is not None:
@@ -280,14 +296,148 @@ def normalize_heading(text):
     return text.replace('**', '').strip()
 
 
+CHECKLIST_SECTION_HEADER = re.compile(r'### 小节清单：`([^`]+)`')
+CHECKLIST_LINE_RANGE = re.compile(r'第 (\d+)-(\d+) 行')
+QUOTE_SOURCE_LINE = re.compile(r'\*\*出处 `(.+):(\d+)-(\d+)`')
+
+
+def checklist_rows(checklist):
+    """清单里逐行的 (清单点名的文件, 小节格, 抄不抄格)，按清单里的次序；前面还没有「### 小节清单」的行，文件是 None。
+    不是 `| ` 起头的行与分隔行不算；表头行照收，它的抄不抄格是「抄 / 不抄」，哪一判都不认它。"""
+    cur, rows = None, []
+    for row in open(checklist, encoding='utf-8').read().split('\n'):
+        m = CHECKLIST_SECTION_HEADER.match(row)
+        if m:
+            cur = m.group(1)
+            continue
+        if not row.startswith('| ') or row.startswith('|---'):
+            continue
+        cells = [c.strip() for c in row.strip().strip('|').split('|')]
+        if len(cells) >= 2:
+            rows.append((cur, cells[0], cells[1]))
+    return rows
+
+
+def copied_lines_by_file(produced):
+    """{源文件的绝对路径（相对路径按当前目录算，与 pick() 开文件同一个起点）: 附录里抄进来的这份文件的行号集合}。
+    行号取每段出处行写的行区间：回读比对（verify）已核过区间里的行与源文件逐字节相同。"""
+    copied = {}
+    for line in produced:
+        m = QUOTE_SOURCE_LINE.match(line)
+        if m:
+            copied.setdefault(os.path.abspath(m.group(1)), set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
+    return copied
+
+
+def line_numbers_text(numbers):
+    """行号集合 → 「3、5-7」这种写法，给缺行的说明用。"""
+    pieces, run = [], []
+    for number in sorted(numbers) + [None]:
+        if run and number == run[-1] + 1:
+            run.append(number)
+            continue
+        if run:
+            pieces.append(f'{run[0]}-{run[-1]}' if len(run) > 1 else str(run[0]))
+        run = [number]
+    return '、'.join(pieces)
+
+
+def checklist_rows_lacking(path, file_rows, copied):
+    """一份文件在清单里的那几行（[(小节格, 抄不抄格)]，清单里的次序）→ 标「抄」而附录里没从这份文件整节抄进来的 [(小节格, 为什么)]。
+
+    标题行落到文件里的哪一节：标题与节边界照 kb-sections.py 的 heading_bounds()；同名标题在文件里的处数与清单里的行数相等才按次序一一对上，
+    不等就认不准，判缺（不猜是哪一处）。一节要抄的行：从标题行到下一个级别不更深的标题之前（与 `文件@标题` 取的同一段），
+    去掉清单里另有一行管着的那几段（起头落在这一节里面的别的行：下级标题各自那一节、开头正文那一行的行区间），空白行不算。
+    行区间那一行要抄的是那几行里的非空白行。copied 是 copied_lines_by_file() 的结果。"""
+    marked = [title for title, mark in file_rows if mark == '抄']
+    if not marked:
+        return []
+    try:
+        lines = read(path)
+        headings, total = kb_sections_module().heading_bounds(path)
+    except (OSError, UnicodeDecodeError) as error:
+        return [(title, f'清单点名的这份文件读不了（{error.__class__.__name__}）') for title in marked]
+    occurrences = {}
+    for number, level, text in headings:
+        occurrences.setdefault(normalize_heading(text.replace('|', '/')), []).append((number, level))
+    rows_per_title = {}
+    for title, _mark in file_rows:
+        if title.startswith('#'):
+            rows_per_title[normalize_heading(title)] = rows_per_title.get(normalize_heading(title), 0) + 1
+    duplicate_first = os.environ.get('QUOTE_KB_BREAK') == 'checklist-duplicate-first'   # 弄坏开关：处数与行数对不上时落到第一处
+    landed, seen = [], {}   # 每一行落到的 ((起, 止), None) 或 (None, 认不出的说明)
+    for title, _mark in file_rows:
+        if title.startswith('#'):
+            key = normalize_heading(title)
+            ordinal = seen.get(key, 0)
+            seen[key] = ordinal + 1
+            found = occurrences.get(key, [])
+            if found and (len(found) == rows_per_title[key] or duplicate_first):
+                number, level = found[ordinal] if len(found) == rows_per_title[key] else found[0]
+                end = next((other for other, other_level, _ in headings if other > number and other_level <= level), total + 1) - 1
+                landed.append(((number, end), None))
+            elif not found:
+                landed.append((None, '这份文件里没有这个标题（代码围栏里的不算）'))
+            else:
+                landed.append((None, f'这份文件里有 {len(found)} 处同名标题、清单里有 {rows_per_title[key]} 行，认不准这一行是哪一节'))
+            continue
+        span = CHECKLIST_LINE_RANGE.search(title)
+        landed.append(((int(span.group(1)), int(span.group(2))), None) if span else
+                      (None, '这一行既不是 `#` 标题、也没写「第 a-b 行」，认不出抄的是哪一段'))
+    delegated = [span for span, _why in landed if span]
+    heading_only = os.environ.get('QUOTE_KB_BREAK') == 'checklist-section-heading-only'   # 弄坏开关：只核标题那一行
+    copied_here = copied.get(os.path.abspath(path), set())
+    lacking = []
+    for (title, mark), (span, why) in zip(file_rows, landed):
+        if mark != '抄':
+            continue
+        if span is None:
+            lacking.append((title, why))
+            continue
+        first, last = span
+        if not 1 <= first <= last <= len(lines):
+            lacking.append((title, f'清单写的第 {first}-{last} 行超出这份文件的 {len(lines)} 行'))
+            continue
+        wanted = {number for number in range(first, last + 1) if lines[number - 1].strip()}
+        if title.startswith('#'):
+            for other_first, other_last in delegated:
+                if first < other_first <= last:
+                    wanted -= set(range(other_first, other_last + 1))
+            if heading_only:
+                wanted = {first}
+        absent = wanted - copied_here
+        if absent:
+            lacking.append((title, f'附录里从这份文件抄进来的行没盖住第 {line_numbers_text(absent)} 行'))
+    return lacking
+
+
 def check_checklist(checklist, produced):
-    """清单里标「抄」的每一节，产物里必须真的有。返回缺的那几行（空表 = 对得上）。
+    """清单里标「抄」的每一节，产物里必须从清单点名的那份文件整节抄进来（判法在 checklist_rows_lacking 与文件头「正向核对」一段）。
+    返回缺的那几行（空表 = 对得上），每行写「文件：小节（为什么）」。
 
     清单与附录是两处分别生成的（清单由 kb-sections.py 生成、人逐行填；附录由本脚本抽），
-    此前没有任何东西绑住它们。实测（2026-09-10，D6 未定项 2 第二轮）：清单把 E130 的
-    「臂」那一节标成「抄」，附录里一个字都没有，而那一轮的枢纽结论正建立在把其中一条臂
+    不核的话没有任何东西绑住它们：清单把 E130 的
+    「臂」那一节标成「抄」，附录里一个字都没有，枢纽结论就可能建立在把其中一条臂
     读成另一个形态上（C262）。
     """
+    if os.environ.get('QUOTE_KB_BREAK') == 'checklist-heading-anywhere':   # 弄坏开关：标题在整份附录里出现过就算抄了
+        return check_checklist_heading_anywhere(checklist, produced)
+    copied = copied_lines_by_file(produced)
+    by_file, missing = {}, []
+    for cur, title, mark in checklist_rows(checklist):
+        if cur is None:
+            if mark == '抄':
+                missing.append(f"（清单开头）：{title[:60]}（这一行前面没有「### 小节清单：`文件`」，不知道它抄自哪份文件）")
+            continue
+        by_file.setdefault(cur, []).append((title, mark))
+    for cur, file_rows in by_file.items():
+        for title, why in checklist_rows_lacking(cur, file_rows, copied):
+            missing.append(f"{cur}：{title[:60]}（{why}）")
+    return missing
+
+
+def check_checklist_heading_anywhere(checklist, produced):
+    """弄坏开关 QUOTE_KB_BREAK=checklist-heading-anywhere 才走：标题在整份附录里出现过就算抄了，不绑文件、不核整节。"""
     lines = [l.replace('|', '/') for l in produced]
     heading_lines = {normalize_heading(l) for l in lines if l.strip().startswith('#')}
     sources = []
@@ -341,8 +491,8 @@ def check_checklist_reverse(checklist, produced):
     正向核对（check_checklist）只管「标『抄』的是不是真抄了」，没人管反过来——
     清单标「不抄」的一节，如果被一个 `--extra 文件:A-B` 之类的行区间整段带进了附录，
     清单与附录就各说各的：清单说这一节没引，附录里它的原文躺在那儿。
-    实测（2026-09-13，D3 未定项 8 第二轮）：`_d3-r2-checklist.md` 把 D26 已定项 3 与
-    D3 已定项 9 标「不抄」，而 `_d3-r2-appendix.md` 用来带其他已定项的行区间
+    例：清单把 D26 已定项 3 与
+    D3 已定项 9 标「不抄」，而附录用来带其他已定项的行区间
     （`26-后台整理与放置回收.md:44-219`、`03-空间分配.md:277-358`）恰好整段覆盖了这两条
     已定项自己的标题行，两条「不抄」的标题原样躺在附录里，没有任何东西报警。
 
@@ -372,7 +522,7 @@ def check_checklist_reverse(checklist, produced):
     return hits
 
 
-# 理由里声称「正文已经抄在别处」的说法。「不抄」「只抄」「照抄」不算（它们说的是这一节没抄、或抄了多少），所以前面不许是这三个字。
+# 理由里声称「正文已经抄在别处」的说法。「不抄」「只抄」「照抄」不算（它们说的是这一节没抄、或抄了多少），所以「抄」字左边紧挨着不许是不、只、照这三个字。
 COPIED_ELSEWHERE_CLAIM = re.compile(r'(?<![不只照])抄(?:了|过|进|入|录|在|于|到)|一起抄|一并抄|连带抄|已抄')
 QUOTED_SECTION_NAME = re.compile(r'「([^」]+)」|`([^`]+)`')
 HEADING_IN_REASON = re.compile(r'(#{1,6} .+?)(?=\s+(?:一起|一并|里|中|内|已|的正文|抄)|\s*[，。；,;「」`]|$)')
@@ -392,8 +542,8 @@ def check_checklist_reasons(checklist, produced):
     任何一个抄进来的标题行含这个名字就算在。→ [(文件, 小节, 点名的节名)]，找不到的，空表 = 对得上。
 
     射程：理由里没点名的（「它的正文在别处抄了」）、没声称抄过的（「正文只点名这个实验的装置」）核不了，跳过；
-    清单与反向核对一样只看 `|` 分格的表行。2026-09-09 的实测：清单给「已定项索引表」标的不抄理由逐字
-    「表里四行的正文各自抄或不抄」是假的——现查那张表名下只有两个四级小节，另两条整条只活在被标「不抄」的索引表里。
+    清单与反向核对一样只看 `|` 分格的表行。例：清单给「已定项索引表」标的不抄理由逐字
+    「表里四行的正文各自抄或不抄」是假的——那张表名下只有两个四级小节，另两条整条只活在被标「不抄」的索引表里。
     """
     if os.environ.get('QUOTE_KB_BREAK') == 'checklist-reasons-unchecked':   # 弄坏开关：不核理由
         return []
@@ -417,15 +567,36 @@ def check_checklist_reasons(checklist, produced):
 NOT_NUMBERS_MARK = re.compile(r'<!--\s*doc-lint:not-numbers\s+(.*?)\s*-->')
 
 
+_MARKDOWN_FENCES = None
+
+
+def markdown_fences_module():
+    """scripts/kb/lib_markdown.py 当模块读进来（按本文件的位置找：three-way-materials.py 按路径读本文件时 sys.path 里没有 scripts/kb）。懒加载。"""
+    global _MARKDOWN_FENCES
+    if _MARKDOWN_FENCES is None:
+        spec = importlib.util.spec_from_file_location('kb_markdown_fences', os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib_markdown.py'))
+        _MARKDOWN_FENCES = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_MARKDOWN_FENCES)
+    return _MARKDOWN_FENCES
+
+
 def not_numbers_declared(text):
     """正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号：它们不是编号，不按编号拉 kb 文件。
-    读法与 doc-lint 的 H 段相同：代码围栏里的声明不算。three-way-materials.py 收编号时调的也是这一份。"""
-    declared, fence = set(), False
-    for line in text.split('\n'):
-        if line.lstrip(' \t').startswith('```'):
-            fence = not fence
-            continue
-        if fence and os.environ.get('QUOTE_KB_BREAK') != 'not-numbers-in-fence':
+    代码围栏里的声明不算，围栏照 lib_markdown.fenced_flags() 认（文件头「--cited 认编号时」一段）。three-way-materials.py 收编号时调的也是这一份。"""
+    lines = text.split('\n')
+    if os.environ.get('QUOTE_KB_BREAK') == 'not-numbers-fence-toggle':   # 弄坏开关：行首三个反引号就翻转
+        flags, toggled = [], False
+        for line in lines:
+            if line.lstrip(' \t').startswith('```'):
+                toggled = not toggled
+                flags.append(True)
+            else:
+                flags.append(toggled)
+    else:
+        flags = markdown_fences_module().fenced_flags(lines)
+    declared = set()
+    for line, fenced in zip(lines, flags):
+        if fenced and os.environ.get('QUOTE_KB_BREAK') != 'not-numbers-in-fence':
             continue
         for words in NOT_NUMBERS_MARK.findall(line):
             declared.update(words.split())
@@ -455,7 +626,7 @@ def kb_directory_entries(root):
     空行与 `#` 起头的行跳过，`#` 之后是注释。规整用 os.path.normpath：去掉开头的 `./`、结尾的 `/`、中间的 `./` 与重复的 `/`，
     这样拼出的路径与 git 列出的相对路径同形（stale-candidates.py 拿它拼模式去配 git 路径）。拒：绝对路径、规整之后以 `..` 起头（走出仓）
     或就是仓根本身（`.`）的行。规整过、没被拒、目录不在的照旧不算登记、不报。
-    弄坏开关 QUOTE_KB_BREAK=kb-directories-raw 退回改前的读法：原串只去首尾空白与结尾的 `/`，不规整也不拒。"""
+    弄坏开关 QUOTE_KB_BREAK=kb-directories-raw 下原串只去首尾空白与结尾的 `/`，不规整也不拒。"""
     registered, refused = [], []
     registry = os.path.join(root, KB_DIRECTORIES_REGISTRY)
     if not os.path.isfile(registry):
@@ -509,7 +680,7 @@ def invariant_class_files(root):
     正文引 I-3.21 曾因此拉进 E112（旧写者遇到不认识的树） 的英日两页）。
     回退是这些文件所在目录里的 README.md（在的那几份；一份都不在就是第一个目录的那一份，退 5 时报「这份文件不在」）；
     一份带表行的文件都没有，回退是第一个候选目录的 README.md。
-    弄坏开关 QUOTE_KB_BREAK=invariant-carriers-any-page：不挑目录与译文，候选目录里有表行的 .md 都算载体（改前的样子）。"""
+    弄坏开关 QUOTE_KB_BREAK=invariant-carriers-any-page：不挑目录与译文，候选目录里有表行的 .md 都算载体。"""
     by_class, directories = {}, []
     carriers_any_page = os.environ.get('QUOTE_KB_BREAK') == 'invariant-carriers-any-page'
     for candidate in kb_candidate_roots(root):
@@ -554,8 +725,8 @@ def cited_kb_sources(text, root, loose=False):
     宽读法认出的是严格读法的超集，材料按宽读法拉齐的文件，--cited 按严格读法判时一份不缺。路径不在的照样列，由调用方判。
 
     C234（三方材料的小节清单只覆盖被判那一项所在的文件）：清单只给被判那一项所在的文件做，
-    别的文件里那一半闸门问题就无声消失。2026-09-09 立账、写明了怎么拦，2026-09-11 又被打中一次
-    （D19 未定项 6 第二轮材料漏了 D23 / D16 / D1 三个文件，第 6 格的全部机制住在 D23）。
+    别的文件里那一半闸门问题就无声消失
+    （例：材料漏了 D23 / D16 / D1 三个文件，第 6 格的全部机制住在 D23）。
     """
     declared = set() if os.environ.get('QUOTE_KB_BREAK') == 'ignore-not-numbers' else not_numbers_declared(text)
     sources = [(path, path) for path in KB_PATH_IN_TEXT.findall(text)]
@@ -600,7 +771,7 @@ def lacking_checklist_message(lacking, sources, checklist, root='.'):
     shown_script = relative_script if not relative_script.startswith('..') else script
     trigger = dict(sources)
     lines = [f"quote-kb: 正文提到了 {len(lacking)} 个 kb 文件，清单里没有它们的小节清单："]
-    if os.environ.get('QUOTE_KB_BREAK') == 'bare-lacking-hint':   # 弄坏开关：改前的说法，不点编号、不给命令
+    if os.environ.get('QUOTE_KB_BREAK') == 'bare-lacking-hint':   # 弄坏开关：不点编号、不给命令
         lines += [f"    {m}" for m in lacking]
         lines.append("  → 用 scripts/kb/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）")
         return lines
@@ -710,6 +881,56 @@ def selftest_in(work):
         print("     → 怎么办：check_checklist_reverse() 按文件收窄的逻辑坏了，去看它是不是没把文件名带进匹配条件。")
         return 1
     print("  ✓ 自检：反向核对按文件收窄，不同文件里同名的通用小标题不会互相误报")
+    # 正向核对按「清单点名的文件 + 标题」绑到那份文件的那一节，并核整节正文都从那份文件抄进来（审核记录 A47 的三种漏检与两种认不准）。
+    # 带围栏的那一份用行区间取：不经 pick() 找节尾，QUOTE_KB_BREAK=fence-not-skipped 设着时红在它自己点名的那一格、不红在这里
+    shared_a, shared_b = '## Shared\n\nBODY_A_REQUIRED\n', '## Shared\n\nBODY_B\n'
+    bound_cases = (
+        ('两份文件的同名标题各抄了整节', {'a.md': shared_a, 'b.md': shared_b},
+         [('a.md', '## Shared', '抄'), ('b.md', '## Shared', '抄')], ['a.md@## Shared', 'b.md@## Shared'], 0),
+        ('清单标抄的那一节整个没抄', {'a.md': shared_a, 'b.md': '## Other\n\nBODY_B\n'},
+         [('a.md', '## Shared', '抄'), ('b.md', '## Other', '抄')], ['b.md@## Other'], 4),
+        ('只抄了别的文件里的同名标题', {'a.md': shared_a, 'b.md': shared_b},
+         [('a.md', '## Shared', '抄'), ('b.md', '## Shared', '抄')], ['b.md@## Shared'], 4),
+        ('只抄了标题行、没抄正文', {'a.md': shared_a, 'b.md': shared_b},
+         [('a.md', '## Shared', '抄'), ('b.md', '## Shared', '抄')], ['a.md:1-1', 'b.md@## Shared'], 4),
+        ('标题只出现在别的文件的代码围栏里', {'a.md': shared_a, 'b.md': '## Other\n\n```text\n## Shared\n```\n\nBODY_B\n'},
+         [('a.md', '## Shared', '抄'), ('b.md', '## Other', '抄')], ['b.md:1-8'], 4),
+        ('同名标题在文件里两处、清单只一行', {'a.md': '## Shared\n\n第一处\n\n## Shared\n\n第二处\n'},
+         [('a.md', '## Shared', '抄')], ['a.md:1-4'], 4),
+        ('清单点名的文件不在', {'b.md': shared_b},
+         [('nothere.md', '## Shared', '抄'), ('b.md', '## Shared', '抄')], ['b.md@## Shared'], 4),
+        ('下级标题与开头正文各有一行时，顶上标题只要它自己那一行', {'top.md': '## Top\n\n引言正文\n\n### Sub\n\n子节正文\n'},
+         [('top.md', '## Top', '抄'), ('top.md', '（Top 标题之下、第一个下级标题之前的正文：第 2-4 行）', '抄'), ('top.md', '### Sub', '不抄')],
+         ['top.md:1-4'], 0),
+    )
+    for label, sources, rows, specs, want in bound_cases:
+        case_directory = os.path.join(work, 'bound-checklist', label)
+        os.makedirs(case_directory)
+        for name, text in sources.items():
+            with open(os.path.join(case_directory, name), 'w', encoding='utf-8') as f:
+                f.write(text)
+        tables = {}
+        for name, title, mark in rows:
+            tables.setdefault(name, []).append(f'| {title} | {mark} | 样本 |')
+        bound_checklist = os.path.join(case_directory, 'checklist.md')
+        with open(bound_checklist, 'w', encoding='utf-8') as f:
+            for name, table in tables.items():
+                f.write(f"### 小节清单：`{os.path.join(case_directory, name)}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n" + '\n'.join(table) + '\n\n')
+        bound_output = os.path.join(case_directory, 'output.md')
+        captured_out, captured_err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(captured_out), contextlib.redirect_stderr(captured_err):
+                bound_code = main(['--checklist', bound_checklist, bound_output, *(os.path.join(case_directory, spec) for spec in specs)])
+        except SystemExit as stop:
+            bound_code = f'取法出错退出（{stop.code}）'
+        if bound_code != want or os.path.exists(bound_output) != (want == 0):
+            print(f"  ✗ 自检：正向核对按来源文件与整节绑定——{label}：main 应当退 {want}{'、写出口' if want == 0 else '、不写出口'}，"
+                  f"实际退 {bound_code}、出口{'写了' if os.path.exists(bound_output) else '没写'}：{captured_err.getvalue()[-300:]}")
+            print("     → 怎么办：看 check_checklist() 与 checklist_rows_lacking()：标「抄」的标题要落在「### 小节清单」点名的那份文件的那一节、整节非空白的行都从那份文件抄进来；"
+                  "QUOTE_KB_BREAK=checklist-heading-anywhere、checklist-section-heading-only、checklist-duplicate-first 设着的话这里本来就该红。")
+            return 1
+    print(f"  ✓ 自检：正向核对按「清单点名的文件 + 标题」绑定、核整节正文（{len(bound_cases)} 种：两种对照，"
+          "别的文件的同名标题、只抄标题行、别的文件围栏里的同名一行、同名标题认不准、文件不在都退 4，下级标题与开头正文另有行时顶上标题只要它自己那一行）")
     # C234 「不抄」理由那一条：「不抄」的理由声称正文已抄在别处并点名了一个节，要去出口里核
     reasons_checklist = os.path.join(sample_directory, 'reasons-checklist.md')
     reason_output = os.path.join(sample_directory, 'reasons-output.md')
@@ -894,7 +1115,15 @@ def selftest_in(work):
         print(f"  ✗ 自检：代码围栏里的 not-numbers 声明不算，E1 与 E165 都应当认，实认 {fenced_hits}")
         print("     → 怎么办：not_numbers_declared() 要跳过围栏里的行（与 doc-lint 同读法）；QUOTE_KB_BREAK=not-numbers-in-fence 设着的话这里本来就该红。")
         return 1
-    print("  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），围栏里的声明不算")
+    for label, other_fenced_body in (('波浪号围栏', '~~~\n<!-- doc-lint:not-numbers E1 -->\n~~~\n这一轮判 E1（样本） 与 E165（样本）。\n'),
+                                     ('四反引号围栏里夹一行三反引号', '````\n```\n<!-- doc-lint:not-numbers E1 -->\n````\n这一轮判 E1（样本） 与 E165（样本）。\n')):
+        other_fenced_hits = sorted(cited_kb_files(other_fenced_body, cited_root))
+        if other_fenced_hits != ['.claude/kb/experiments/1-节点大小vs可恢复性.md', '.claude/kb/experiments/165-恢复重放有界穷举.md']:
+            print(f"  ✗ 自检：{label}里的 not-numbers 声明不算，E1 与 E165 都应当认，实认 {other_fenced_hits}")
+            print("     → 怎么办：not_numbers_declared() 的围栏要照 scripts/kb/lib_markdown.py 的 fenced_flags() 认（波浪号也算、关围栏要同字符且不短于开的）；"
+                  "QUOTE_KB_BREAK=not-numbers-fence-toggle、not-numbers-in-fence 设着的话这里本来就该红。")
+            return 1
+    print("  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），三反引号、波浪号、四反引号围栏里的声明都不算")
     # 三语：同号的决策页有中文、英语、日语三份。严格读法只认中文那一份，清单里没有它的小节清单时 --cited 要求补它；宽读法照旧三份都给
     trilingual_chinese = '.claude/kb/decisions/13-验证路线.md'
     for name in ('13-验证路线.md', '13-verification-route.en.md', '13-検証ルート.ja.md'):
@@ -1055,10 +1284,11 @@ def main(argv):
     if checklist:
         miss = check_checklist(checklist, produced)
         if miss:
-            print(f"quote-kb: 清单标了「抄」而附录里没有 {len(miss)} 节：", file=sys.stderr)
+            print(f"quote-kb: 清单标了「抄」而附录里没有从清单点名的那份文件整节抄进来的 {len(miss)} 节：", file=sys.stderr)
             for m in miss:
                 print(f"    {m}", file=sys.stderr)
-            print("  → 把缺的那几节补进取法（优先用 文件@标题），或者把清单那一行改成「不抄」并写理由",
+            print("  → 把缺的那几节补进取法（优先用 文件@标题，文件写清单「### 小节清单」点名的那一份；只抄标题行或别的文件里的同名标题不算），"
+                  "或者把清单那一行改成「不抄」并写理由；同名标题认不准的，清单里这个标题的行数要与文件里的处数相同（照 kb-sections.py 重新生成那一张）",
                   file=sys.stderr)
             return 4
         reverse_hits = check_checklist_reverse(checklist, produced)
@@ -1086,7 +1316,7 @@ def main(argv):
             return 5
     with open(dest, 'w', encoding='utf-8') as f:
         f.write('\n'.join(produced))
-    tail = f"，清单里标「抄」的每一节都在" if checklist else ""
+    tail = f"，清单里标「抄」的每一节都从清单点名的那份文件整节抄进来了" if checklist else ""
     if cited:
         tail += "，正文提到的每个 kb 文件都有清单"
     print(f"  ✓ {len(specs)} 段整抄进 {dest}，回读逐字节一致{tail}")

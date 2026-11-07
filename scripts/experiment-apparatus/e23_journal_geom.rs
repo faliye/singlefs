@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(record_bytes(1, Tail::Inline, 4096) - one_item_record_bytes, 3956);
     }
 
-    /// **pbs 这一维必须真的改变结果。** 它曾经是死代码（按块记时 512 与 4096 完全相同），
+    /// **pbs 这一维必须真的改变结果。** 若按块记时它就是死代码（按块记时 512 与 4096 完全相同），
     /// 由变异测试「把对齐整个删掉、一个测试都没红」抓出来。这条守住它不再退化。
     #[test]
     fn atomic_width_actually_changes_the_cost() {

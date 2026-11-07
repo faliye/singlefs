@@ -235,7 +235,7 @@ mod tests {
 
     /// 阴性对照（作废条款 1）的**直接形态**：零叶的一次发布，两条臂都必须是 0。
     /// ⚠️ 只测 `steady(0, ...)` 不够——那条路径根本不调用单次发布，
-    /// 变异把 `leaves == 0` 的守卫删掉时一个测试都不红（2026-09-06 变异实测抓到的盲区）。
+    /// 变异把 `leaves == 0` 的守卫删掉时一个测试都不红（变异实测抓到的盲区）。
     #[test]
     fn zero_leaf_publish_is_zero_on_both_arms() {
         assert_eq!(publish_on_stripe_table_arm(0, 4, 0), (0, 0, 0));

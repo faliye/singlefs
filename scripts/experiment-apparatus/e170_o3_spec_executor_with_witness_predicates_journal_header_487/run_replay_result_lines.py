@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# admission: always 每一趟照此刻的输入与这份判法现算每一项的键、现查判定库（scripts/experiment-apparatus/long_run_item_verdicts.py）；键相同、库里判绿的复用
+# run-condition: command python3
 """E170 第 2 次重跑进复跑（`scripts/experiment-apparatus/replay.sh` 的 E170 几行）用的结果行出口。文件名以 run_ 起头，不进冻结（登记 5.6）。
 
 产物都走 replay.sh 的 E7RESULT 协议：每行 `E7RESULT name=…`，末行 `E7RESULT name=done emitted=N`，
@@ -12,7 +15,20 @@ N 连 done 行自己一起数（replay.sh 文件头闸 2 的口径）。两个�
 
 用法：
   python3 run_replay_result_lines.py unit-tests --executor-directory <目录> --arm <臂名> --scratch <单测临时目录的父目录> --output <新文件>
-  python3 run_replay_result_lines.py wrap --input <原始输出> --output <新文件>
+  python3 run_replay_result_lines.py wrap --input <原始输出> --output <新文件> [--input <…> --output <…>]…   几对照给的次序逐对改写
+  python3 run_replay_result_lines.py --selftest
+
+按项判定（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：unit-tests 一趟一条、wrap 每一对一条，经 scripts/experiment-apparatus/long_run_item_verdicts.py
+  的 judge_items 存进 prune-server 的 apparatus-items 族、种类 run_replay_result_lines。键 = 判法的单元闭包（unit-tests 是 unit_test_lines，连同 EXECUTOR_DIRECTORIES 里各版执行器的模块；
+  wrap 是 wrapped_lines；admission.py 的 compute_unit_key 算）、解释器版本、unit-tests 的臂名与选的执行器（目录名）连同那个目录里被测的每个文件的内容（@files），
+  wrap 的原始输出的内容（@input）；路径不进键，产物逐字节可比（compare=exact）。键相同、库里判绿的那一项把库里的结果行写进 --output，不重跑单测、不重改写。
+  判定库那几行打到标准错误；成功那句（标准错误末尾的 LONG_RUN_ITEMS 行）报「现判 N、复用 M、拒算 R」。退出码：0 成；1 输入不合（同前）、复用哨兵红或键在跑的中途变了；
+  2 用法错、产物已在；75 prune-server 不可用。
+自证（--selftest）：经 long_run_item_verdicts.py 的复用格跑那六格（reuse-three-questions、key-independent-of-directory、reuse-sentinel 与哨兵的三种红），
+  一趟 wrap 两对，假驱动是 LONG_RUN_ITEMS_SELFTEST_FAKE_JUDGE（判法换成假的）；只在临时 prune-server 上跑（客户端 selftest_service_problem 判，不在退 2），起法：
+    python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_replay_result_lines.py --selftest
+  弄坏开关：复用那一侧的分支都在 long_run_item_verdicts.py 里，开关是它文件头的 LONG_RUN_ITEMS_BREAK（打开后这里的自证红在它点名的同名格）；
+  这一份自己判红的分支（收尾行不对、有行不以 name= 起头）由 replay.sh 的 E170 几行复跑证（产物逐字节比）。
 """
 
 from __future__ import annotations
@@ -22,7 +38,9 @@ import hashlib
 import importlib
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
 
 TEST_MODULE_NAME = "test_executor_on_synthetic_pool"
@@ -163,7 +181,35 @@ def write_result_lines(output_path: str, lines: list[str]) -> None:
         output.write(f"E7RESULT name=done emitted={len(lines) + 1}\n")
 
 
+def lines_bytes(lines: list[str]) -> bytes:
+    return "".join(line + "\n" for line in lines).encode("utf-8")
+
+
+# ── 按项判定（文件头「按项判定」）──
+
+SCRIPT_KEY = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_replay_result_lines.py"
+LIBRARY_KIND = "run_replay_result_lines"
+
+
+def repository_root() -> str:
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+
+
+def item_verdicts_module():
+    """scripts/experiment-apparatus/long_run_item_verdicts.py；这份脚本不在仓里（上一层没有它）时交 None。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+    try:
+        import long_run_item_verdicts
+    except ModuleNotFoundError as error:
+        if error.name != "long_run_item_verdicts":
+            raise
+        return None
+    return long_run_item_verdicts
+
+
 def main(argument_list: list[str]) -> int:
+    if argument_list == ["--selftest"]:
+        return selftest()
     parser = argparse.ArgumentParser(description="E170 第 2 次重跑进复跑用的结果行出口")
     commands = parser.add_subparsers(dest="command", required=True)
     unit_tests = commands.add_parser("unit-tests")
@@ -172,20 +218,79 @@ def main(argument_list: list[str]) -> int:
     unit_tests.add_argument("--scratch", required=True)
     unit_tests.add_argument("--output", required=True)
     wrap = commands.add_parser("wrap")
-    wrap.add_argument("--input", required=True)
-    wrap.add_argument("--output", required=True)
+    wrap.add_argument("--input", required=True, action="append")
+    wrap.add_argument("--output", required=True, action="append")
     arguments = parser.parse_args(argument_list)
-    output_path = os.path.abspath(arguments.output)
-    if os.path.exists(output_path):
-        print(f"产物 {output_path} 已存在，不覆盖", file=sys.stderr)
-        return 2
     if arguments.command == "unit-tests":
-        lines = unit_test_lines(arguments.executor_directory, arguments.arm, arguments.scratch)
+        chosen = registered_executor_directory(arguments.executor_directory)
+        name = f"unit-tests-{re.sub(r'[^A-Za-z0-9._-]', '-', arguments.arm)}"
+        jobs = {name: (os.path.abspath(arguments.output), lambda: unit_test_lines(arguments.executor_directory, arguments.arm, arguments.scratch))}
+        request_lines = ["\t".join([name, f"{SCRIPT_KEY}::unit_test_lines", f"line:arm={arguments.arm}", f"line:executor={os.path.basename(chosen)}",
+                                    "line:compare=exact"])]
+        request_lines += [f"@files\t{name}\t{os.path.join(os.path.abspath(chosen), file_name)}" for file_name in tested_files(os.path.abspath(chosen))]
     else:
-        lines = wrapped_lines(arguments.input)
-    write_result_lines(output_path, lines)
-    return 0
+        if len(arguments.input) != len(arguments.output):
+            print(f"wrap 的 --input 有 {len(arguments.input)} 个、--output 有 {len(arguments.output)} 个，要一对一对给", file=sys.stderr)
+            return 2
+        jobs, request_lines = {}, []
+        for index, (input_path, output_path) in enumerate(zip(arguments.input, arguments.output), start=1):
+            name = f"wrap-{index}-{re.sub(r'[^A-Za-z0-9._-]', '-', os.path.basename(input_path))}"
+            jobs[name] = (os.path.abspath(output_path), lambda input_path=input_path: wrapped_lines(input_path))
+            request_lines += [f"{name}\t{SCRIPT_KEY}::wrapped_lines\tline:compare=exact", f"@input\t{name}\tsource\t{os.path.abspath(input_path)}"]
+    for output_path, _compute in jobs.values():
+        if os.path.exists(output_path):
+            print(f"产物 {output_path} 已存在，不覆盖", file=sys.stderr)
+            return 2
+    verdicts = item_verdicts_module()
+    finish_code = 0
+    if verdicts is None:
+        print(f"  · 拒算：{os.path.realpath(__file__)} 不在仓里（旁边没有 ../long_run_item_verdicts.py），照判、不复用、不入库", file=sys.stderr)
+        results = {name: (0, lines_bytes(compute())) for name, (_output, compute) in jobs.items()}
+    else:
+        finish_code, results = verdicts.judge_items(SCRIPT_KEY, LIBRARY_KIND, repository_root(), "\n".join(request_lines) + "\n",
+                                                    lambda name: (0, lines_bytes(jobs[name][1]()), True),
+                                                    printer=lambda text: print(text, file=sys.stderr))
+    for name, (output_path, _compute) in jobs.items():
+        write_result_lines(output_path, results[name][1].decode("utf-8").split("\n")[:-1])
+    return finish_code
+
+
+def selftest() -> int:
+    """文件头「自证」：样板树里是这份脚本的拷贝，long_run_item_verdicts.py 与 .claude 是指回真仓的符号链接；原始输出是两份假文件（判法换成假的，不读它们）。"""
+    verdicts = item_verdicts_module()
+    if verdicts is None:
+        print(f"  ✗ run_replay_result_lines 自证没跑：{os.path.realpath(__file__)} 旁边找不到 ../long_run_item_verdicts.py")
+        print("     → 怎么办：在仓里的那一份上起自证（起法见文件头「自证」）")
+        return 2
+    problem = verdicts.prune_server_client.selftest_service_problem()
+    if problem:
+        print(f"  ✗ run_replay_result_lines 自证没跑：{problem}")
+        print(f"     → 怎么办：{verdicts.prune_server_client.SELFTEST_SERVICE_REMEDY}")
+        return 2
+    work = tempfile.mkdtemp(prefix="run-replay-result-lines-selftest-")
+    try:
+        template = os.path.join(work, "template")
+        os.makedirs(os.path.join(template, os.path.dirname(SCRIPT_KEY)))
+        shutil.copyfile(os.path.realpath(__file__), os.path.join(template, SCRIPT_KEY))
+        os.symlink(os.path.join(repository_root(), verdicts.SCRIPT_KEY), os.path.join(template, verdicts.SCRIPT_KEY))
+        os.symlink(os.path.join(repository_root(), ".claude"), os.path.join(template, ".claude"))
+        for name in ("alpha.out", "beta.out"):
+            with open(os.path.join(work, name), "w", encoding="utf-8") as handle:
+                handle.write(f"name=selftest source={name}\nname=complete\n")
+        # 产物每一趟一个新名字（--output 已在就拒）：经 bash 拿进程号拼
+        command = ["bash", "-c", 'exec python3 "$1" wrap --input "$2/alpha.out" --output "$2/alpha-$$.result" --input "$2/beta.out" --output "$2/beta-$$.result"',
+                   "run-replay-selftest", "{tree}/" + SCRIPT_KEY, work]
+        red = verdicts.reuse_cells(SCRIPT_KEY, template, ["wrap-1-alpha.out", "wrap-2-beta.out"], os.path.join(work, "reuse"), 0, command, fake_judge=True)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    print(f"run_replay_result_lines.py 自证：6 格，红 {red} 格")
+    return 1 if red else 0
 
 
 if __name__ == "__main__":
+    PREFLIGHT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..", ".claude", "scripts")
+    if os.path.isdir(PREFLIGHT_DIRECTORY):   # 拷到仓外的副本旁边没有 .claude：准入判不了，照「拒算」那一路原样跑
+        sys.path.insert(0, PREFLIGHT_DIRECTORY)
+        from project_preflight import preflight
+        preflight(__file__)
     sys.exit(main(sys.argv[1:]))

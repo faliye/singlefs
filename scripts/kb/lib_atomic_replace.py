@@ -6,8 +6,9 @@
 换上之前就打开了旧文件的进程读的仍是旧 inode 的旧内容。
 
 用法（给 scripts/ 里要改已有文件的脚本 import；脚本按路径跑时 sys.path[0] 就是这个目录）：
-    from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename
+    from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, replace_file_contents_by_rename
     notes = replace_file_contents_by_rename(路径, 新内容, check_before_rename=可选的回调)
+    # ReplaceRefused：没换上；ReplacedThenInterrupted / ReplacedThenFailed：已经换上、之后被打断或失败（见下面「失败分改名之前与改名之后两种」）
 
 做法：
   1. 路径是符号链接就解到它指向的文件，换的是那份文件，链接本身不动（与就地写的效果一致）；
@@ -16,15 +17,20 @@
   3. 在同一目录排他新建临时文件（tempfile.mkstemp，O_CREAT | O_EXCL），写完新内容（UTF-8，与就地写同一种编码）；
   4. 照原文件的属主（能保就保：没有权限就在返回的提示行里写明）与权限位（含执行位）设到临时文件上，fsync；
   5. 调 check_before_rename（调用方的写前复核，例如读时记的 sha256 没变）：它抛异常就不换；
-  6. os.replace 换上，再尽力 fsync 一次目录。
-任何一步失败（OSError、check_before_rename 抛的异常、Ctrl-C）都先删临时文件，原文件一个字节没动；
-OSError 换成 ReplaceRefused 抛出，别的异常原样抛出。
+  6. os.replace 换上，再尽力 fsync 一次目录（开、fsync、关目录的 OSError 都不往外抛：新内容已经换上，这一步只让改名落盘更稳）。
+失败分改名之前与改名之后两种，调用方按异常类分开处理：
+  改名之前失败（OSError、check_before_rename 抛的异常、改名之前的 Ctrl-C）：先删临时文件，原文件一个字节没动；
+      OSError 换成 ReplaceRefused 抛出，别的异常原样抛出。
+  改名之后失败（改名已经做完，之后到的 Ctrl-C 或抛的异常）：新内容已经在原路径上，临时文件已不在；
+      Ctrl-C 换成 ReplacedThenInterrupted（KeyboardInterrupt 的子类，照样停下）、别的 Exception 换成 ReplacedThenFailed 抛出，原异常挂在 __cause__ 上。
+      改名做没做完看原路径此刻是不是临时文件那个 inode，不看异常落在哪一行：改名刚返回、还没出 try 时到的 Ctrl-C 也认得出。
+      调用方见到这两类不能当「没写」重跑，先回读确认新内容在不在。
 
 弄坏开关（只给自证判红用，生效时往 stderr 打一行；平常跑设了拒绝写、点名只在自证里认：祖先进程里有一个的命令行带 --selftest 才认）。
 这份库没有自己的 --selftest，自证是调它的脚本的：python3 scripts/kb/replace-once.py --selftest（insert-row.py、replace-batch.py 的 --selftest 同样走
 problems_with_replacement_by_rename），打开开关后红的项逐条以「✗ [<格名>] 」起头：
-  ATOMIC_REPLACE_BREAK=inplace  走就地写（改前的写法）：inode 不变，在读的进程读到新内容
-      「[读者与 inode]」「[fsync 失败]」「[改名失败]」
+  ATOMIC_REPLACE_BREAK=inplace  走就地写：inode 不变，在读的进程读到新内容
+      「[读者与 inode]」「[fsync 失败]」「[改名失败]」「[改名之后被打断]」
   ATOMIC_REPLACE_BREAK=nochmod  不照原文件的权限位：换上的文件是 mkstemp 给的 0600
       「[读者与 inode]」
   ATOMIC_REPLACE_BREAK=nofsync  不 fsync 临时文件
@@ -37,6 +43,8 @@ problems_with_replacement_by_rename），打开开关后红的项逐条以「✗
       「[硬链接]」
   ATOMIC_REPLACE_BREAK=allowreadonly  不拒绝当前用户只读的文件
       「[只读文件]」
+  ATOMIC_REPLACE_BREAK=rawafterrename  改名之后到的异常原样抛：调用方分不出新内容已经换上
+      「[改名之后被打断]」
 不认识的值直接拒绝写，免得拼错的开关被当成「没开」。
 """
 import contextlib
@@ -49,7 +57,7 @@ import sys
 import tempfile
 
 BREAK_ENVIRONMENT_VARIABLE = 'ATOMIC_REPLACE_BREAK'
-KNOWN_BREAK_MODES = ('inplace', 'nochmod', 'nofsync', 'nocleanup', 'nofollow', 'allowhardlink', 'allowreadonly')
+KNOWN_BREAK_MODES = ('inplace', 'nochmod', 'nofsync', 'nocleanup', 'nofollow', 'allowhardlink', 'allowreadonly', 'rawafterrename')
 SELFTEST_READ_ONLY_MODE = 0o444
 TEMPORARY_FILE_SUFFIX = '.replacing'
 SELFTEST_ORIGINAL_MODE = 0o754
@@ -58,6 +66,37 @@ READER_TIMEOUT_IN_SECONDS = 30
 
 class ReplaceRefused(Exception):
     """没换上：原文件一个字节没动，临时文件已删。str(异常) 的第二行是以「→」开头的下一步。"""
+
+
+class ReplacedThenInterrupted(KeyboardInterrupt):
+    """改名之后到了 Ctrl-C：新内容已经换上，临时文件已不在；原来那个 KeyboardInterrupt 在 __cause__ 上。
+    是 KeyboardInterrupt 的子类，只接 Exception 的调用方照样被它停下。str(异常) 的第二行是以「→」开头的下一步。"""
+
+
+class ReplacedThenFailed(Exception):
+    """改名之后抛了别的 Exception：新内容已经换上，临时文件已不在；原异常在 __cause__ 上。str(异常) 的第二行是以「→」开头的下一步。"""
+
+
+def replaced_then_failed_exception(target_path, error):
+    """改名之后到的异常 → 调用方认得出「新内容已经换上」的那一类；SystemExit 这类别的 BaseException 交 None（原样抛）。"""
+    message = (f'{target_path} 已经换成新内容（改名做完了），之后被打断或失败（{error.__class__.__name__}：{error}），临时文件已不在\n'
+               '     → 怎么办：别当没写重跑；先回读这份文件确认新内容在不在，再决定后面的事')
+    if isinstance(error, KeyboardInterrupt):
+        return ReplacedThenInterrupted(message)
+    if isinstance(error, Exception):
+        return ReplacedThenFailed(message)
+    return None
+
+
+def target_is_temporary_inode(target_path, temporary_identity):
+    """改名做没做完：原路径此刻指的是不是临时文件那个 inode（(st_dev, st_ino)）。读不到状态、没记下临时文件的按没做完算。"""
+    if temporary_identity is None:
+        return False
+    try:
+        status = os.stat(target_path)
+    except OSError:
+        return False
+    return (status.st_dev, status.st_ino) == temporary_identity
 
 
 def inside_selftest():
@@ -102,7 +141,7 @@ def remove_temporary_file_quietly(temporary_path):
 
 
 def fsync_directory_best_effort(directory):
-    # 目录的 fsync 只让「改名」这件事落盘更稳；有的文件系统不支持对目录 fsync，失败不影响已经换上的内容
+    # 目录的 fsync 只让「改名」这件事落盘更稳；有的文件系统不支持对目录 fsync、NFS 上关描述符也可能报错，失败不影响已经换上的内容
     try:
         directory_descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
     except OSError:
@@ -112,7 +151,8 @@ def fsync_directory_best_effort(directory):
     except OSError:
         pass
     finally:
-        os.close(directory_descriptor)
+        with contextlib.suppress(OSError):
+            os.close(directory_descriptor)
 
 
 def keep_owner_where_permitted(temporary_descriptor, target_status, target_path):
@@ -150,7 +190,8 @@ def unchanged_bytes(path, expected_bytes):
 def replace_file_contents_by_rename(path, new_text, check_before_rename=None):
     """把 path 的内容换成 new_text。返回提示行列表（属主没能保留这类，通常为空）。
 
-    拒绝或失败时抛 ReplaceRefused；check_before_rename 抛的异常原样抛出。两种情况原文件都没动、临时文件都已删。
+    改名之前拒绝或失败：抛 ReplaceRefused，check_before_rename 抛的异常与改名之前的 Ctrl-C 原样抛出；这几种原文件都没动、临时文件都已删。
+    改名之后被打断或失败：抛 ReplacedThenInterrupted（Ctrl-C）或 ReplacedThenFailed（别的 Exception）；这两种新内容已经换上，调用方不能当没写处理。
     """
     break_mode = active_break_mode()
     target_path = path if break_mode == 'nofollow' else os.path.realpath(path)
@@ -188,8 +229,11 @@ def replace_file_contents_by_rename(path, new_text, check_before_rename=None):
             f'在 {directory} 里建不了临时文件（{error}），一个字节没写\n'
             f'     → 怎么办：改名换上要对目录有写权限（就地写只要对文件有写权限）；查目录权限与剩余空间') from error
     notes = []
+    temporary_identity = None
     try:
         with os.fdopen(temporary_descriptor, 'wb') as handle:
+            temporary_status = os.fstat(handle.fileno())
+            temporary_identity = (temporary_status.st_dev, temporary_status.st_ino)
             handle.write(new_text.encode('utf-8'))
             handle.flush()
             notes = keep_owner_where_permitted(handle.fileno(), target_status, target_path)
@@ -201,6 +245,12 @@ def replace_file_contents_by_rename(path, new_text, check_before_rename=None):
             check_before_rename()
         os.replace(temporary_path, target_path)
     except BaseException as error:
+        # 改名刚返回、还没出 try 时到的 Ctrl-C 也落在这里：按原路径此刻是不是临时文件那个 inode 判改名做没做完
+        if break_mode != 'rawafterrename' and target_is_temporary_inode(target_path, temporary_identity):
+            late = replaced_then_failed_exception(target_path, error)
+            if late is not None:
+                raise late from error
+            raise
         if break_mode != 'nocleanup':
             remove_temporary_file_quietly(temporary_path)
         if isinstance(error, OSError):
@@ -208,7 +258,13 @@ def replace_file_contents_by_rename(path, new_text, check_before_rename=None):
                 f'写临时文件或改名换上 {target_path} 时失败（{error}），原文件没动，临时文件已删\n'
                 f'     → 怎么办：查目录的剩余空间与权限，再重跑一次') from error
         raise
-    fsync_directory_best_effort(directory)
+    try:
+        fsync_directory_best_effort(directory)
+    except BaseException as error:
+        late = None if break_mode == 'rawafterrename' else replaced_then_failed_exception(target_path, error)
+        if late is not None:
+            raise late from error
+        raise
     return notes
 
 
@@ -266,7 +322,7 @@ def patched_os_function(name, replacement):
 
 
 def problems_with_reader_and_inode(run_tool, original_text, expected_text, workspace):
-    """一个读者进程在改之前打开文件、读到第一处不同的字节之前，改完再接着读：它必须读到旧内容；inode 必须变、权限位不变。"""
+    """一个读者进程在改写之前打开文件、读到第一处不同的字节之前，改完再接着读：它必须读到旧内容；inode 必须变、权限位不变。"""
     problems = []
     original_bytes = original_text.encode('utf-8')
     head_length = first_differing_byte_offset(original_bytes, expected_text.encode('utf-8'))
@@ -407,8 +463,65 @@ def problems_with_injected_failure(run_tool, original_text, workspace, failing_f
     return problems
 
 
-def problems_with_replacement_by_rename(run_tool, original_text, expected_text):
-    """调用方自证用：返回问题列表，空列表就是全过。每一格各用一个新目录，互不干扰。"""
+def interruptions_after_rename():
+    """改名之后到 Ctrl-C 的两个时刻 → [(时刻的说法, 要换掉的 os 函数名, 换上去的函数)]；换上去的函数先照原样做完那一步再抛 KeyboardInterrupt。"""
+    original_fsync, original_replace = os.fsync, os.replace
+
+    def fsync_interrupted_on_directory(descriptor):
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise KeyboardInterrupt('自证注入：改名之后、目录 fsync 时按了 Ctrl-C')
+        return original_fsync(descriptor)
+
+    def replace_then_interrupted(source, destination):
+        original_replace(source, destination)
+        raise KeyboardInterrupt('自证注入：改名刚返回、还没出 try 就按了 Ctrl-C')
+    return [('目录 fsync 时', 'fsync', fsync_interrupted_on_directory), ('改名刚返回时', 'replace', replace_then_interrupted)]
+
+
+def problems_with_interruption_after_rename(run_tool, original_text, expected_text, workspace, exit_code_when_replaced_then_interrupted):
+    """改名之后到了 Ctrl-C：库本身要抛 ReplacedThenInterrupted、新内容已经换上、不留临时文件；
+    给了 exit_code_when_replaced_then_interrupted 的调用方，整条改法要退这个码（新内容已换上、别当没写重跑），文件同样是新内容。"""
+    problems = []
+    for moment, function_name, interrupting in interruptions_after_rename():
+        path = os.path.join(workspace, f'interrupted-at-{function_name}.md')
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(original_text)
+        raised = None
+        with patched_os_function(function_name, interrupting):
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    replace_file_contents_by_rename(path, expected_text)
+            except BaseException as error:   # 注入的是 KeyboardInterrupt，这一格要接住它判，不能让它停掉整个自证
+                raised = error
+        if not isinstance(raised, ReplacedThenInterrupted):
+            problems.append(f'{moment}按了 Ctrl-C：库本该抛 ReplacedThenInterrupted（调用方由此知道新内容已经换上），'
+                            f'实际{"没抛异常" if raised is None else "抛了 " + raised.__class__.__name__}')
+        with open(path, encoding='utf-8') as handle:
+            if handle.read() != expected_text:
+                problems.append(f'{moment}按了 Ctrl-C：改名已经做完，文件本该已是新内容')
+        leftovers = leftover_temporary_files(workspace)
+        if leftovers:
+            problems.append(f'{moment}按了 Ctrl-C：还留着临时文件 {[os.path.basename(name) for name in leftovers]}')
+        if exit_code_when_replaced_then_interrupted is None:
+            continue
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(original_text)
+        with patched_os_function(function_name, interrupting):
+            try:
+                exit_code = run_tool_quietly(run_tool, path)
+            except BaseException as error:   # 调用方没接住改名之后的异常：照问题记下，不停掉整个自证
+                exit_code = f'没接住 {error.__class__.__name__}'
+        if exit_code != exit_code_when_replaced_then_interrupted:
+            problems.append(f'{moment}按了 Ctrl-C：调用方本该退 {exit_code_when_replaced_then_interrupted}（新内容已经换上、别当没写重跑），实际 {exit_code}')
+        with open(path, encoding='utf-8') as handle:
+            if handle.read() != expected_text:
+                problems.append(f'{moment}按了 Ctrl-C：经调用方改，文件本该已是新内容')
+    return problems
+
+
+def problems_with_replacement_by_rename(run_tool, original_text, expected_text, exit_code_when_replaced_then_interrupted=None):
+    """调用方自证用：返回问题列表，空列表就是全过。每一格各用一个新目录，互不干扰。
+    exit_code_when_replaced_then_interrupted：调用方改名之后被 Ctrl-C 打断时该退的码；不给的只核库本身（调用方还没接 ReplacedThenInterrupted）。"""
     problems = []
     for label, check in (
             ('读者与 inode', lambda workspace: problems_with_reader_and_inode(run_tool, original_text, expected_text, workspace)),
@@ -416,7 +529,9 @@ def problems_with_replacement_by_rename(run_tool, original_text, expected_text):
             ('硬链接', lambda workspace: problems_with_hard_link(run_tool, original_text, workspace)),
             ('只读文件', lambda workspace: problems_with_read_only_file(run_tool, original_text, workspace)),
             ('fsync 失败', lambda workspace: problems_with_injected_failure(run_tool, original_text, workspace, 'fsync')),
-            ('改名失败', lambda workspace: problems_with_injected_failure(run_tool, original_text, workspace, 'replace'))):
+            ('改名失败', lambda workspace: problems_with_injected_failure(run_tool, original_text, workspace, 'replace')),
+            ('改名之后被打断', lambda workspace: problems_with_interruption_after_rename(
+                run_tool, original_text, expected_text, workspace, exit_code_when_replaced_then_interrupted))):
         with tempfile.TemporaryDirectory(prefix='atomic-replace-selftest-') as workspace:
             problems.extend(f'[{label}] {problem}' for problem in check(workspace))
     return problems

@@ -28,7 +28,7 @@
   编排那一片落在第二台时，它自己那几行的工作根放这一片的 MULTI_HOST_RUN_PEER_SCRATCH 下（服务派到第二台时给的），不用 --work-root。
 资源与分配（每次起跑、每次续跑都算，写进日志）：每台线程取登记的每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads，
   读 .claude/heavy-thread-default；SINGLEFS_THREAD_CAP 设了照它），每台都是这一个数，不看此刻忙闲，登记读不出退 78。
-  每台槽数 = ⌊每台线程 / 5⌋；每槽线程 = ⌊每台线程 / 槽数⌋（≥ 5：原跑法每道 5，限时基线在这个量级上量的）。
+  每台一槽，那一槽的线程 = 那一台的每台线程；每台线程为 0 的记 0 槽（E171（三oracle合谋测试）第 2 次重跑登记修订 11 第 11.2 条：线道与第 7 步都取整份额度）。
   内存不在这里算：编排器不查机器的内存额度、不按内存定槽数、不给驱动与第二台的命令套内存上限；整条命令交 task-server，内存额度按记录由服务给，
   撞上限由服务放大重排。读不到的台（连不上）在别的台的预检那一步退 78，不悄悄少用一台。
 行与派发：第 11 步 242、269（带探针）、第 12 步空变异 row-0 与 13 行、跨机对照 X（row-0 在另一台再跑一次），同进一个队列，第 11、12 步同时跑；
@@ -69,7 +69,7 @@
 
 弄坏开关 ROWS_ORCHESTRATOR_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，别处设了退 2）。逐项写开关名、弄坏哪一处，
 下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」；开关轮只核每项第一格）：
-  ROWS_ORCHESTRATOR_BREAK=slots-ignore-lane-minimum  槽数取每台线程数、不按每槽至少 5 线程除
+  ROWS_ORCHESTRATOR_BREAK=slots-split-by-five  照改前按每槽 5 线程分槽（槽数 = ⌊每台线程 / 5⌋），不是每台一槽
       「✗ 自证 allocation-threads：」「✗ 自证 allocation-registered：」
   ROWS_ORCHESTRATOR_BREAK=merge-allows-duplicates  合并时同一序号两行取前一行、不拒
       「✗ 自证 merge-refuse-duplicate：」
@@ -115,10 +115,8 @@ RESEARCH_RELATIVE = "scripts/experiment-apparatus/e171_three_oracle_collusion_af
 CHECK_PRODUCT = os.path.join(HERE, "check_product.py")  # 判法脚本：--check 只认这一份（各跑法脚本给的都是研究目录里的它），起它时照字面路径起
 DRIVER_NAME = "row_driver.py"
 GIB = 1 << 30
-LANE_THREADS_MINIMUM = 5
 HOSTS_DIRECTORY = os.path.join(HERE, "..", "..", "hosts")  # scripts/hosts：每台线程的登记取法 heavy_threads.py 在这里
 PEER_DISK_BYTES_PER_SLOT = 3 * GIB
-CARRY_THREADS = 5
 ROW_OVERHEAD_SECONDS = 120
 EXIT_STOPPED_BY_SIGNAL = 143
 EXIT_RUN_CONDITION = 78
@@ -137,7 +135,7 @@ TIMING_COLUMNS = ("copy_ns", "compile_ns", "device_ns", "o3_ns")
 STREAMS = ("new_pool_file_creation", "fixed_script_through_e_then_unmount", "first_file_unlinked_then_inodes_across_one_leaf")
 Z1_FILES = ("oracle-verdicts.tsv", "call-outcomes.tsv", "writable-mount-probe.tsv", "ops.tsv", "states.tsv")
 HOST_NAMES = ("本机", "第二台", "第三台", "第四台", "第五台", "第六台", "第七台", "第八台", "第九台", "第十台")
-BREAK_SWITCHES = ("slots-ignore-lane-minimum", "merge-allows-duplicates", "merge-ignores-time-limit", "cross-host-ignores-dumps",
+BREAK_SWITCHES = ("slots-split-by-five", "merge-allows-duplicates", "merge-ignores-time-limit", "cross-host-ignores-dumps",
                   "resume-reruns-finished", "harvest-skipped", "plan-writes-memory-limit", "driver-gets-memory-cap", "peer-command-gets-memory-cap",
                   "plan-pins-local")
 
@@ -269,12 +267,15 @@ def registered_host_threads(environment=None) -> int:
 
 
 def allocate(hosts: list[Host], threads: int | None = None) -> list[HostAllocation]:
-    """文件头「资源与分配」：每台线程 = 登记值（threads 不给就现读登记，不看忙闲）；槽数 = ⌊每台线程 / 5⌋，每槽线程 = ⌊每台线程 / 槽数⌋。"""
+    """文件头「资源与分配」：每台线程 = 登记值（threads 不给就现读登记，不看忙闲）；每台一槽，那一槽的线程 = 每台线程；每台线程为 0 的记 0 槽。"""
     threads = registered_host_threads() if threads is None else threads
     allocations = []
     for host in hosts:
-        slots = threads if broken("slots-ignore-lane-minimum") else threads // LANE_THREADS_MINIMUM
-        allocations.append(HostAllocation(host.number, threads, slots, threads // slots if slots else 0, f"⌊{threads}/{LANE_THREADS_MINIMUM}⌋={slots}"))
+        if broken("slots-split-by-five"):
+            slots = threads // 5  # 弄坏开关：改前的分法，每槽 5 线程
+        else:
+            slots = 1 if threads > 0 else 0
+        allocations.append(HostAllocation(host.number, threads, slots, threads // slots if slots else 0, f"每台一槽={slots}"))
     return allocations
 
 
@@ -282,7 +283,7 @@ def single_lane_host(allocations: list[HostAllocation], own_host: int) -> HostAl
     """第 13 步挑台：编排那一台（上一次超时的行目录在它的行输出根里，驱动在同一个根里按键复用才看得见；每台线程都是登记值）。"""
     chosen = [allocation for allocation in allocations if allocation.number == own_host and allocation.slots > 0]
     if not chosen:
-        raise RunCondition(f"第 13 步：编排那一台（{host_name(own_host)}）的线程不够一条线道（每槽要 5 线程）")
+        raise RunCondition(f"第 13 步：编排那一台（{host_name(own_host)}）的线程不够一条线道（每台线程是 0）")
     return chosen[0]
 
 
@@ -1056,9 +1057,10 @@ def install(context: Context, path: str, text: str) -> None:
 
 
 def run_carry(context: Context, step: Step, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置），这一趟才有一份覆盖全部行的分片。"""
+    """更早几趟已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置），这一趟才有一份覆盖全部行的分片。
+    线程取每台线程（登记值）：重报在那一步的队列收完之后才起（merge_step 在 run_queue 交回之后调），不与线道同时跑。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
-    process, record = launch_local(context, expected_hashes, f"{step.key}-carry", step, rows, 1, CARRY_THREADS, work_root, "carry")
+    process, record = launch_local(context, expected_hashes, f"{step.key}-carry", step, rows, 1, registered_host_threads(), work_root, "carry")
     code = process.wait()
     if STOP.is_set():
         raise Interrupted()
@@ -1159,7 +1161,7 @@ def phase_rows_and_checks(context: Context, hosts: list[Host], allocations: list
     records: list[dict] = []
     if jobs:
         if sum(allocation.slots for allocation in allocations) == 0:
-            raise RunCondition("各台的线程都不够一条线道（每槽要 5 线程）")
+            raise RunCondition("各台的线程都不够一条线道（每台线程都是 0）")
         placements, deferred = simulate(allocations, jobs, row_zero_host)
         say(context, f"  这一趟要跑 {len(jobs)} 行（已做完的不重跑）：" + " ".join(f"{job.step}:{rows_text(job.rows)}" for job in queue_order(jobs)))
         for line in prediction_text(allocations, placements, deferred):
@@ -1522,13 +1524,13 @@ def two_hosts(peer_cap: str = "50G") -> list[Host]:
 def cells_allocation() -> list[tuple[str, bool, str]]:
     results = []
     threads = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), SAMPLE_HOST_THREADS)]
-    results.append(("allocation-threads", threads == [(6, 5), (6, 5)], f"31 线程两台 (槽, 每槽线程) = {threads}，要 [(6, 5), (6, 5)]"))
-    short = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), 4)]
-    results.append(("allocation-short", short == [(0, 0), (0, 0)], f"4 线程不够一槽 (槽, 每槽线程) = {short}，要 [(0, 0), (0, 0)]"))
+    results.append(("allocation-threads", threads == [(1, 31), (1, 31)], f"31 线程两台 (槽, 每槽线程) = {threads}，要 [(1, 31), (1, 31)]"))
+    short = [(item.slots, item.threads_per_slot) for item in allocate(two_hosts(), 0)]
+    results.append(("allocation-short", short == [(0, 0), (0, 0)], f"每台线程 0 记 0 槽 (槽, 每槽线程) = {short}，要 [(0, 0), (0, 0)]"))
     # 每台线程是登记值、与此刻空闲无关，也与配置的内存上限无关
     registered = registered_host_threads()
     found = [(item.threads, item.slots, item.threads_per_slot) for item in allocate(two_hosts("30G"))]
-    wanted = [(registered, registered // 5, registered // (registered // 5))] * 2
+    wanted = [(registered, 1, registered)] * 2
     results.append(("allocation-registered", registered > 1 and found == wanted, f"每台取登记值 {registered}、配置上限 30G 不卡槽数 → {found}，要 {wanted}"))
     chosen = single_lane_host(allocate(two_hosts("30G")), 1)
     on_peer = single_lane_host(allocate(two_hosts("30G")), 2)
@@ -1888,7 +1890,7 @@ def cells_task_server(scratch: str) -> list[tuple[str, bool, str]]:
                                          f"不经服务直接调 {direct}")]
 
 
-SWITCH_CELLS = {"slots-ignore-lane-minimum": "allocation-threads", "merge-allows-duplicates": "merge-refuse-duplicate",
+SWITCH_CELLS = {"slots-split-by-five": "allocation-threads", "merge-allows-duplicates": "merge-refuse-duplicate",
                 "merge-ignores-time-limit": "merge-refuse-time-limit", "cross-host-ignores-dumps": "cross-host-compare",
                 "resume-reruns-finished": "e2e-resume", "harvest-skipped": "e2e-two-hosts",
                 "plan-writes-memory-limit": "task-server-phases", "driver-gets-memory-cap": "e2e-two-hosts", "peer-command-gets-memory-cap": "e2e-two-hosts",

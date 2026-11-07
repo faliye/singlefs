@@ -349,7 +349,7 @@ fn class_dirty_nodes_this_layer(
         return 1.0;
     }
     let far_fraction: f64 = if let Some((total_units, touched_units)) = data_unit_totals {
-        // R3（2026-09-19 修订）：数据单元旧版远近只看总量 vs 这次持久化触达量，与 K8 策略无关。
+        // R3（修订）：数据单元旧版远近只看总量 vs 这次持久化触达量，与 K8 策略无关。
         if total_units > touched_units {
             1.0
         } else {
@@ -360,7 +360,7 @@ fn class_dirty_nodes_this_layer(
             (PositionPolicy::Near, _) => 0.0,
             (PositionPolicy::Far, _) => 1.0,
             (PositionPolicy::Balanced, Placement::Sequential) => (insert_count / layer_coverage).min(1.0),
-            // R2（2026-09-19 修订）：远的比例 = 1 − q，不是 q 本身（第三节 3.2 ②）。
+            // R2（修订）：远的比例 = 1 − q，不是 q 本身（第三节 3.2 ②）。
             (PositionPolicy::Balanced, Placement::Random) => (1.0 - previous_touch_fraction).clamp(0.0, 1.0),
         }
     };
@@ -1540,7 +1540,7 @@ mod jia_anchor_tests {
         }
     }
 
-    /// F2 第一半（登记第十节，主 agent 2026-09-19 追加要求）：P=10⁸、F1、rand、Lbalanced 一格
+    /// F2 第一半（登记第十节，追加要求）：P=10⁸、F1、rand、Lbalanced 一格
     /// 迭代到上限仍未收敛（`row6_grid` 里这一格 `fixed_point_iterations=1000`），`jia_convergence_and_saturation_status` 要把它
     /// 判成第一半触发；这一格第二半不该触发（extent/alloc/mapping 第 0 层脏节点占比都远低于 50%）。
     #[test]
@@ -2133,7 +2133,7 @@ impl AlignedBuffer {
     }
     /// O_DIRECT 的读必须把数据读进一块按 `ALIGNMENT_BYTES` 对齐的缓冲区，
     /// 不能读进普通的 `Vec`（`RealBlockDevice::read_at` 的 M9/S1 之外那个真实 bug：
-    /// 2026-09-24 冒烟跑在虚机里第一次跑到 `read_at` 时炸出 EINVAL，
+    /// 冒烟跑在虚机里跑到 `read_at` 时炸出 EINVAL，
     /// 因为当时读进的是 `vec![0u8; length]`——那不是对齐缓冲区）。
     fn as_mut(&mut self) -> &mut [u8] {
         unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }

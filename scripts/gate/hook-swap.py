@@ -202,7 +202,7 @@ BUILTIN_FEEDS = {
         {"label": "实现员直接起 qemu-system-x86_64 照拒", "agent_type": WRITER, "command": "qemu-system-x86_64 -nographic", "exit": 2},
         {"label": "主 agent 直接起 herd7 照拒", "command": "herd7 x.litmus", "exit": 2},
         {"label": "实现员只问 herd7 的版本放行", "agent_type": WRITER, "command": "herd7 -version", "exit": 0},
-        # 管道里读 JSON、往标准输出打字的 python3 -c，代码里的 'task' 字样不算写了后面执行的 task-server/task（另一个会话 2026-11-05 报的两条）；真往它写了再执行的照拒
+        # 管道里读 JSON、往标准输出打字的 python3 -c，代码里的 'task' 字样不算写了后面执行的 task-server/task；真往它写了再执行的照拒
         {"label": "主 agent 管道读 JSON 的 python3 -c 提到 'task'，后面再起 task-server/task：放行",
          "command": "task-server/task wait 7191 >/dev/null 2>&1; task-server/task status 7191 --json | python3 -c \"import json,sys; d=json.load(sys.stdin); print(d['task'].get('compiles'))\"; "
                     "task-server/task log 7191 --all 2>&1 | head -6", "exit": 0},

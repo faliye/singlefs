@@ -15,13 +15,17 @@
 | `apply-writer-patch.py`、`merge-and-verify.sh`、`rerun-failed-tests.py`、`lib_libtest_result_lines.py` | 打实现员的补丁、合入后验证（开跑那一刻把要验的树拷成一份快照，打补丁、编、测、验证包按条复用那一步都在快照上）、只重跑红的、libtest 结果行的解析 |
 | `test-targets-parallel.py` | 先编测试目标，再按编译产物逐目标并行跑；元数据跟随指定的清单，执行时去掉会扩大目标范围的选择参数；仅默认目标选择补跑所选包的文档测试 |
 | `lib_rebuilt_packages.py` | 拿副本编时核改过的包都有 `Compiling` 行（合入后验证与证红共用） |
-| `gate-structure-check.py`、`crate-sources-reachable.py`、`selftest-process-guard.py`、`hook-swap.py`、`closeout-status.py` | 门禁结构、crate 源文件可达、登记过的自证与样本档的进程守卫、钩子先验后换、收尾进度表 |
+| `gate-structure-check.py`、`crate-sources-reachable.py`、`selftest-process-guard.py`、`hook-swap.py`、`closeout-status.py` | 门禁结构（含 preflight 那一行之后的守卫）、crate 源文件可达、登记过的自证与样本档的进程守卫、钩子先验后换、收尾进度表 |
+| `lib_process_group.py` | 门禁侧起子进程的共用起法：每条命令放进它自己的会话与进程组，超时、异常、收到信号与正常退出之后都对整组先 TERM、过宽限 KILL，再在 `/proc` 里核会话里没有留下进程；`gate-structure-check.py` 起各道门禁的 `--list` / `--check`、门禁 code-tooling 的 stage-break-switch-replay 与 break-switch-outside-selftest 两格起子进程都调它 |
 | `shared-index-stale-check.py` | 提交之后查共用索引有没有停在旧 HEAD 上（C420：用 `GIT_INDEX_FILE` 指私有索引提交、共用索引没跟上，`git diff --cached` 把刚进仓的文件全列成已暂存的改动）；`.claude/hooks/shared-index-stale-reminder.sh`（PostToolUse:Bash）在 `git commit` 之后自动跑它，只报告、不拦 |
 | `verus-proof-check.py` | 门禁 formal-verification 的 Verus 判法；整格逐项后完整验证，`coverage <根>` 检查函数与不变式负例覆盖，空真筛查不替代构造见证 |
 | `lkmm-selftest.sh` | `.claude/scripts/lkmm.sh` 自己的自证（判它的两趟复用），门禁 lkmm 的样本档另在那一道 |
 | `lib_reuse_checks.py` | 带判定库的门禁与入口共用的三样判法：复用三问（自证里 `reuse-three-questions` 一格）、复用哨兵、上次红的清单；门禁 code-tooling 的 reuse-selftests 格按登记表核那一格 |
 | `directory-layout-check.py` | 门禁 code-tooling 的 directory-layout 格的判法：判 `scripts/` 与 `research/` 的目录形态（`.claude/rules/directory-layout.md`） |
+| `comment-history-check.py` | 门禁 doc-text 的 comment-history 格的判法：代码与脚本的注释、文件头、文档串与 README 里不写历史（`.claude/agent-common.md`「代码与脚本的注释、说明只写现状，不写历史」那一条）；射程、词表、特殊缘由标记、豁免表 `.claude/gate.d/comment-history-exempt.tsv` 与滞后表 `.claude/gate.d/comment-history-lag.tsv`（只缩不涨）的写法都在它的文件头；`--list <根>` 逐行打全部命中，`--lag-table <根>` 按此刻命中现算滞后表，`--selftest` 自证 |
 | `large-file-check.py` | 门禁 code-tooling 的 committed-file-size 格的判法：被提交的东西里没有超过 100 MiB（GitHub 单文件推送上限，常量 `SINGLE_FILE_SIZE_LIMIT_BYTES` 全仓只在这里定义）的文件；甲判 HEAD 加暂存区里跟踪的每个文件，乙判还没推的提交里新增或改过的 blob，没有上游时乙本次未跑；超限的 `gzip -n -9` 压成 `.gz` 入库 |
+| `rust-name-collisions.py` | 门禁 code-tooling 的 rust-name-collisions 格的判法：同一个 Rust 编译目标里不同模块各自定义的同名条目（fn、struct、enum、union、const、static、type、trait，私有的与只在测试里的也算）判红，逐处列出文件:行；单元照 `lib_function_units.py` 的 RustWorkspace 取，与单元图按裸名连的那一份索引同源 |
 | `data-name-lint.py` | 门禁 code-source-discipline 的 data-names 格的判法：字符串字面量（元组首列、=> 右侧、键= 的键名）与 kb 表格里名字形态的串也按命名纪律判，缩写词表读上游 naming-lint.sh，存量登记在 `.claude/data-name-lint-exclude`（只缩不涨） |
+| `refused-test-registry.py` | 门禁 code-source-discipline 的 refused-tests 格的判法：验证包不带特性那一趟里拒算的测试函数（单元键算不出，按条复用时照跑不复用）与登记表 `.claude/gate.d/refused-tests.tsv` 逐条对上；`list` 打此刻的拒算清单与每条登没登记，合入后验证之后主 agent 照它逐条判新出现的拒算 |
 | `wallclock-assert-lint.py` | 门禁 research-build-and-replay 的 wallclock-asserts-registered 格的判法（C465）：`scripts/experiment-apparatus/*.rs` 的 `#[test]` 里按挂钟判的断言要带 `// wallclock-assert: <量的是什么>` 登记位（一行注释，装置不加代码；门禁单测格按 `--list` 的登记名给 `cargo test` 传 `--skip`），或带 `// wallclock-assert-load-safe: <为什么>`；`--list` 逐行列登记了的「文件、函数名」；立判法之前就在仓里还没复核的在 `.claude/gate.d/wallclock-assert-lag.tsv`（只缩不涨） |
 | `checker-direction-overlap.py` | 门禁 checker-independence-and-sync 的 checker-direction-overlap 格的判法（C410）：池级 checker 遍历式与扫描式两个方向各从登记的入口收函数单元闭包（`lib_function_units.py` 的 Rust 闭包），交集只许落在格式解析（`singlefs-format` 整个包与登记的 `crates/singlefs-checker/src/lib.rs` 单元）与常量里，越界、取不到调用图都判红；入口、切点、比对点、局部绑定与允许共享的单元登记在 `.claude/gate.d/checker-direction-entries.tsv` |

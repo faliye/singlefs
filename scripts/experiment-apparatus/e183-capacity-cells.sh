@@ -474,7 +474,7 @@ FAKE
   cell="$work/merge"; phase "$cell" plan; shard_phase "$cell" 0 1
   mkdir -p -- "$cell/product"; echo 占位 > "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today.out"
   phase "$cell" merge; exit_code=$?
-  expect "合并：产物最前面是准入那几行、不覆盖已有的产物名" '((exit_code == 0)) && [[ "$(cat "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today.out")" == 占位 ]] && head -n 1 "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today-r2.out" | grep -q "^E7INPUT name=input_fingerprint key=E183/h2 " && grep -qx "E7RESULT name=merged shards=3" "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today-r2.out"'
+  expect "合并：产物最前面是准入那几行、不覆盖已有的产物名" '((exit_code == 0)) && [[ "$(cat "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today.out")" == 占位 ]] && [[ "$(head -n 1 "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today-r2.out")" == "E7INPUT name=input_fingerprint key=E183/h2 "* ]] && grep -qx "E7RESULT name=merged shards=3" "$cell/product/e183-capacity-read-cache-reserve-and-sweep-costs-h2-$today-r2.out"'
   cell="$work/unsharded"; mkdir -p -- "$cell"
   env -u TASK_SERVER_SHARD_PHASE PATH="$fakes:$PATH" E183_CELLS_SELFTEST_MARK="$work/mark" E183_RUN_ROOT="$cell/run-root" E183_ADMISSION_SCRIPT="$fakes/admission.py" \
     bash "$SCRIPT_PATH" run > "$cell/out" 2>&1; exit_code=$?

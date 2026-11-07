@@ -28,10 +28,10 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
 每行一个单线道驱动（--lanes 1），驱动参数：--rows <行> --streams 1,2 --no-executor --lanes 1 --threads <每槽线程>
   --other-selected-rows <这一行的补位排除表>；不带 --keep-dumps（登记 5.3「第二段的行导出判完即删」，驱动删三个大文件、留判定表与 manifest）；
   限时由驱动照 --baseline-timing 现算（修订 2 第 2.5 节第二段：T 取修订 6 树上 S2 那一趟 --streams 1,2、不带探针的基线的进程挂钟）。
-机器、分配：照第一段编排器文件头「机器」「资源与分配」，调它的 hosts_from_configuration、allocate（每台线程取登记值，每槽 5 线程起，槽数 = ⌊每台线程 / 5⌋，可用线程至多 31；
+机器、分配：照第一段编排器文件头「机器」「资源与分配」，调它的 hosts_from_configuration、allocate（每台线程取登记值，每台一槽、那一槽的线程 = 每台线程，E171（三oracle合谋测试）第 2 次重跑登记修订 11 第 11.2 条；
   内存不在这里算，整条命令交 task-server）。起跑时一台一槽都没有的（例如修订 10 的本机闸没开），每 REGROW_SECONDS 秒重算一次分配，
   那台有槽了就给它加槽（别的台先过预检）；已有槽的台不增不减。线程只在这一条任务（与它在那一台的那一片）里分（第 2 次重跑登记修订 7）：每个驱动只给 --lanes 1
-  --threads <它那一槽的线程>，驱动照它设编译、装置、执行器环境里的线程数变量；一台上各槽合起来 = 槽数 × 每槽线程，不超过那一台那一片的额度。
+  --threads <它那一槽的线程>，驱动照它设编译、装置、执行器环境里的线程数变量；一台一槽，那一槽的线程就是那一台那一片的额度。
 派发：每行推的用时 = T × 权重 + 120 秒；权重 = 那一行在 s4 整表（research/results 下 S4_TIMING_PRODUCTS 那份）里的 device_ns ÷ 各行 device_ns 的中位数，
   读不到的行取 1（推的：s4 是旧树、旧装置，只拿来排先后，不进任何判据）。队列最长先做，用时相同按行号；哪一槽空了就取队头。
   跨机对照那一行 R 取权重最接近 1 的行（平手取行号小的）；R 在本机跑时用新的工作根（冷编译，跨机对照比得了编译那几列之外的一切）。
@@ -111,7 +111,7 @@ import urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
 # 钉的是第一段编排器此刻的内容：跑那一趟的 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
 SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 35 项，红 0"
 TABLE_FILES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
 ROW_FLAGS = ("--streams", "1,2", "--no-executor")
@@ -119,7 +119,7 @@ ROW_FLAGS = ("--streams", "1,2", "--no-executor")
 S4_TIMING_PRODUCTS = ("e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-rows-timing.out",)
 ROW_OVERHEAD_SECONDS = 120
 REGROW_SECONDS = 600
-SAMPLE_THREAD_CAP = "10"  # 自证的假世界里每台线程：两槽、每槽 5 线程（SINGLEFS_THREAD_CAP 设了登记值读它）
+SAMPLE_THREAD_CAP = "10"  # 自证的假世界里每台线程：每台一槽、那一槽 10 线程（SINGLEFS_THREAD_CAP 设了登记值读它）
 LAUNCH_DIRECTORY_NAME = "launch"  # 一个分片的补位排除表写在它的分片目录下的这个目录里（共享根下，别的台照绝对路径读）
 EXCLUSIONS_FILE = "exclusions.tsv"
 EXCLUSION_ROW_NUMBER_BASE = 900000
@@ -728,9 +728,10 @@ def run_queue_two(context: ContextTwo, slots: list[tuple[int, int, int]], jobs: 
 
 
 def run_carry_two(context: ContextTwo, step: StepTwo, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置）。"""
+    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置）。
+    线程取每台线程（登记值）：merge_step_two 在 run_queue_two 交回之后才调它，不与线道同时跑。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
-    process, record = launch_local_two(context, expected_hashes, f"{step.key}-carry", step, rows, one.CARRY_THREADS, work_root, "carry", set())
+    process, record = launch_local_two(context, expected_hashes, f"{step.key}-carry", step, rows, one.registered_host_threads(), work_root, "carry", set())
     code = process.wait()
     if one.STOP.is_set():
         raise one.Interrupted()
@@ -854,7 +855,7 @@ def phase_rows(context: ContextTwo, hosts: list, slots: list[tuple[int, int, int
         jobs = [JobTwo("rows", row, context.row_seconds[row]) for row in context.rows if not one.is_done(context, ROWS_STEP, row)]
         if jobs:
             if not slots:
-                raise one.RunCondition("各台的线程都不够一条线道（每槽要 5 线程）")
+                raise one.RunCondition("各台的线程都不够一条线道（每台线程都是 0）")
             one.say(context, f"  这一趟要跑 {len(jobs)} 行（已做完的不重跑），跨机对照那一行是第 {context.cross_host_row} 行")
             for line in prediction_lines(slots, simulate_two(slots, jobs)):
                 one.say(context, "  " + line)
@@ -1426,9 +1427,9 @@ def two_hosts_cell(scratch: str) -> tuple[str, bool, str]:
 
 def substitution_sequential_cell(scratch: str) -> tuple[str, bool, str]:
     """一台一槽、一次一行：第 2 行补上 g1，第 3 行起的时候排除表里已有 g1，补上 g2，不用重做。
-    一槽靠线程卡：每台线程设成 5，⌊5/5⌋ = 1。每台线程设成 10 是两槽，第 2、第 3 行同时起、排除表里还没有 g1，补位撞车要重做，撞不撞看两行谁先落盘，所以负载一高这一格就红。"""
+    只用本机（双机开关没开），每台一槽（第 2 次重跑登记修订 11），所以一次只起一行，补位不会撞车。"""
     world = fake_world_two(os.path.join(scratch, "substitution-sequential"), rows="1,2,3,4", hosts_code=3,
-                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2", "SINGLEFS_THREAD_CAP": "5"})
+                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2"})
     code, output = world_run_two(world)
     rows = product_rows(world_product_two(world, "rows-driver"))
     mutated = {row: rows[row].get("mutated_row_name") for row in rows}
@@ -1438,16 +1439,18 @@ def substitution_sequential_cell(scratch: str) -> tuple[str, bool, str]:
 
 
 def substitution_collision_cell(scratch: str) -> tuple[str, bool, str]:
-    """一台两槽、两行同时起、都补上 g1：核出重复，行号大的第 3 行挪走、带着 g1 重做，补上 g2。"""
-    world = fake_world_two(os.path.join(scratch, "substitution-collision"), rows="2,3", hosts_code=3,
-                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2", "FAKE_DRIVER_ROW_SECONDS": "0.3"})
+    """两台各一槽（每台一槽，第 2 次重跑登记修订 11；这一格原来在一台两槽上判，改到两台的假世界上），两行同时起、都补上 g1：
+    核出重复，行号大的第 3 行挪走、带着 g1 重做，补上 g2。跨机对照那一行是第 2 行（假世界读不到 s4 计时，权重都是 1，平手取行号小的），另在别的台再跑一次。
+    每行 1.5 秒：转交给第二台那一行起得晚一点，也要在第 2 行落盘之前起，排除表里还没有 g1。"""
+    world = fake_world_two(os.path.join(scratch, "substitution-collision"), rows="2,3",
+                           extra_environment={"FAKE_DRIVER_SUBSTITUTES": "2:g1,g2;3:g1,g2", "FAKE_DRIVER_ROW_SECONDS": "1.5"})
     code, output = world_run_two(world)
     rows = product_rows(world_product_two(world, "rows-driver"))
     mutated = {row: rows[row].get("mutated_row_name") for row in rows}
     verdict = last_verdict(world_product_two(world, COORDINATION_STEM))
     counts = ran_counts_two(world)
     cell_holds = (code == 0 and mutated == {2: "g1", 3: "g2"} and "redone_rows=3" in verdict and "substitute_collisions=0" in verdict
-            and counts == {(2, "false"): 1, (3, "false"): 2}
+            and counts == plain_counts((2, 3), 2) | {(3, "false"): 2} and ran_hosts_two(world) == {"1", "2"}
             and os.path.isdir(os.path.join(world.repo, world.dumps, "segment2-rows-shards", "superseded")))
     return ("e2e-substitution-collision", cell_holds, f"退 {code}；补上的 {mutated}；真跑过 {counts}；{verdict[-80:]}；末行 {output.strip().splitlines()[-1:]}")
 

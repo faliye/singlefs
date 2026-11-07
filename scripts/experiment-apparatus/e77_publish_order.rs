@@ -10,7 +10,7 @@
 //! - D23（journal 的角色与格式）逐字：「journal 记录不是『事务的全部』，是**已经写到盘上的东西的
 //!   发布指令**」——「已经写到盘上」是发出还是持久，没写。
 //!
-//! 记录与根槽之间的顺序、单元与记录之间要不要一道独立屏障，**全仓零覆盖**（2026-09-02 grep 证实）。
+//! 记录与根槽之间的顺序、单元与记录之间要不要一道独立屏障，**全仓零覆盖**（grep 证实）。
 //! 而崩溃点重放 harness 要拿这份顺序当规格——规格不存在，harness 无从写起。
 //!
 //! ## 被引用条款逐字贴在这里（verify-before-claiming.md）
@@ -218,7 +218,7 @@ fn recover(state: u16, replay: Replay) -> Outcome {
 
 /// 独立审计：恢复方**自称**的结局对不对，对照物理真值重判。
 /// 自称新态而有单元没持久 ⇒ 树里挂着垃圾 ⇒ 改判 Corrupt。
-/// 没有这一步，「重放不验证」的静默损坏会被记成成功（2026-09-02 变异测试当场抓到这个形态）。
+/// 没有这一步，「重放不验证」的静默损坏会被记成成功（变异测试当场抓到这个形态）。
 fn audit(state: u16, claim: Outcome) -> Outcome {
     if claim == Outcome::StateNew && (0..UNITS).any(|unit_index| !persisted(state, unit_index)) {
         return Outcome::Corrupt;
@@ -432,7 +432,7 @@ mod tests {
 
     /// **走读的完备性**：6 个单元里任缺哪一个，走读自己（不靠审计兜底）都必须报 BrokenRoot。
     /// 审计会把漏网的改判成 Corrupt，统计上看不出差别——所以这条只能逐单元直接测 recover
-    /// （2026-09-02 第二版变异测试实测：M4 被审计掩住，一个统计测试都没红）。
+    /// （变异测试实测：M4 被审计掩住，一个统计测试都没红）。
     #[test]
     fn walk_checks_every_unit() {
         for missing in 0..UNITS {
@@ -484,7 +484,7 @@ mod tests {
 
     /// **审计的判别力**：自称新态而单元缺席 ⇒ 必须被改判 Corrupt；齐全 ⇒ 不改判。
     /// 审计与被审计不共享判定——没有这一步，「重放不验证」的静默损坏会被记成成功
-    /// （2026-09-02 第一版变异测试实测：M2 一个测试都没红，正是这个形态）。
+    /// （变异测试实测：M2 一个测试都没红，正是这个形态）。
     #[test]
     fn audit_reclassifies_false_success() {
         let missing_one: u16 = 0b111110; // U0 缺席，其余单元在
@@ -497,7 +497,7 @@ mod tests {
     /// **fsync 承诺检查器自身的判别力**：根槽持久 + 回旧态必须算违例。
     /// 正确的 recover 走不到这一格（根槽持久必走走读），所以必须直接测检查器——
     /// 一条走不到的检查与没有这条检查，在统计里长得一模一样
-    /// （2026-09-02 第一版变异测试实测：M6 一个测试都没红）。
+    /// （变异测试实测：M6 一个测试都没红）。
     #[test]
     fn fsync_promise_checker_has_teeth() {
         let crash_state: u16 = 1 << ROOT_SLOT_WRITE_INDEX;

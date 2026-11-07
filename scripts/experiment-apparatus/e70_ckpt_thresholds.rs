@@ -2,7 +2,7 @@
 //!
 //! ## 被引用条款逐字贴在这里
 //!
-//! - D16 已定项 2（2026-08-31 用户定案）：
+//! - D16 已定项 2：
 //!   `触发 ⟺ (now − 上次 checkpoint ≥ T_time) ∨ (脏字节数 ≥ T_dirty)`。
 //! - D16 已定项 5 正文写着两条耦合：「`T_dirty` 的上界绑 journal 环几何
 //!   （I-8.1：一个 checkpoint 的最坏 journal 占用不许超过环装得下的量）；
@@ -166,7 +166,7 @@ mod tests {
     }
 
     /// 环小到装不下一个记录头 ⇒ 上界必须是 0，不许下溢绕回（变异审计补的：
-    /// 此前没有任何测试走过 `journal_bytes_budget_per_checkpoint <= RECORD_HEADER_BYTES` 的护栏）。
+    /// 要有测试走到 `journal_bytes_budget_per_checkpoint <= RECORD_HEADER_BYTES` 的护栏）。
     #[test]
     fn tiny_ring_yields_zero_not_underflow() {
         assert_eq!(dirty_bytes_threshold_upper_bound(100, 2, ENTRY, NODE_SIZE_BYTES), 0);

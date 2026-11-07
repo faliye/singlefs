@@ -1,7 +1,7 @@
 //! E133：映射 key 各候选的格式代价。
 //!
-//! D19 已定项 6 要把「中央映射条目的 key 取哪一族」交给用户定；交之前每条路要有代价数。
-//! 仓里此前没有一份装置同时算过这几条候选：E128 只算了甲（指针加 16），E109 只扫了 key 33 / 40 两档。
+//! D19 已定项 6 要把「中央映射条目的 key 取哪一族」交用户判；交之前每条路要有代价数。
+//! 仓里没有一份装置同时算过这几条候选：E128 只算了甲（指针加 16），E109 只扫了 key 33 / 40 两档。
 //!
 //! **判据、口径、作废条款、以及「结果反过来我接不接受」写在
 //! `research/prompts/e133-preregistration.md`，写于本文件之前；开跑之前补的臂记在它的「补记」一节。**
@@ -86,7 +86,7 @@ struct Arm {
 }
 
 const ARMS: [Arm; 12] = [
-    // 今天：指针里没有出生身份；映射 key 按第一轮之前的预想取五元组 33。只当基准。
+    // 今天：指针里没有出生身份；映射 key 按预想取五元组 33。只当基准。
     Arm { name: "bing", data_pointer_extra_bytes: 0, node_pointer_extra_bytes: 0, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 33, code23_key_bytes: None, root_record_extra_bytes: 0, packed_slot_extra_bytes: 0 },
     // 逻辑身份键按背景材料的字面：每条指针只加出生树 + 出生 txg（= D19 已定项 7 的甲）；槽缺诞生代号 8。
     Arm { name: "k1", data_pointer_extra_bytes: 16, node_pointer_extra_bytes: 16, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 41, code23_key_bytes: None, root_record_extra_bytes: 0, packed_slot_extra_bytes: 8 },
@@ -396,7 +396,7 @@ mod tests {
 
     /// 每条臂的七个扇出逐个钉死。期望值来自一份独立的 Python 算术（只用登记的原始量，不读本文件的式子）。
     /// 节点头 64 与 76 在已登记的 196 / 164 / 175 / 201 / 267 / 236 上恰好同值（变异 M1 / M2，`.claude/rules/mutation-sampling.md` 第三类），
-    /// 敏感取样点落在别的臂上；映射内部扇出与 extent 内部扇出此前没有断言（变异 M10 / M17）。
+    /// 敏感取样点落在别的臂上；映射内部扇出与 extent 内部扇出没有断言（变异 M10 / M17）。
     #[test]
     fn every_arm_fanout_is_pinned_including_the_header_sensitive_cells() {
         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 12] = [

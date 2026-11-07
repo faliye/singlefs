@@ -25,26 +25,26 @@ const DATA_UNIT_HEADER_BYTES: u64 = 105;
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 /// D18（块里携带什么信息） 已定项 7 的共同明文前缀。
 const COMMON_PREFIX_BYTES: u64 = 42;
-/// D18（块里携带什么信息） 已定项 14 / 已定项 16（算法类型那 1 字节 2026-09-14 用户定案加）：
+/// D18（块里携带什么信息） 已定项 14 / 已定项 16：
 /// nonce 12 + MAC 16 + 算法类型 1 = 29 字节预留位，紧接类身份段之后。
 const NONCE_MAC_RESERVED_BYTES: u64 = 29;
 /// D22（单元原子性怎么合成） 已定项 7 的字段表：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8
 /// + 树表单元指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表单元指针 86
-/// + 中央映射树根指针 86 + 分配记录树根指针 86（C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案加）
-/// + 算法类型 1 + nonce 12 + MAC 16（末尾三段 2026-09-14 用户定案加）。
+/// + 中央映射树根指针 86 + 分配记录树根指针 86（C512（树表 0 条的一版上被换下的实例表记在哪没有条款））
+/// + 算法类型 1 + nonce 12 + MAC 16（末尾三段）。
 const ROOT_RECORD_BYTES: u64 = 457;
 /// D19（块指针的结构与宽度预算） 已定项 4：设备 4 + 16 KiB 槽号 6 + 密文校验和 4。
 const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-const 登记位定（D19 已定项 4），门禁按这个名字绑值
 /// D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11 的偏移表：MAC 16（偏移 0）+ nonce 12（16）+ 算法类型 1（28）
 /// + 压缩算法码 1（29）+ 压后长度 2（30）+ extent 距起点偏移 2（32）+ 出生树 8（34）+ 出生 txg 8（42）。
-/// 压缩那两段 2026-09-14 用户定案加，头部从 47 变 50。
+/// 头部共 50 字节，含压缩那两段。
 const POINTER_HEAD_BYTES: u64 = 50;
 /// D19（块指针的结构与宽度预算） 已定项 8：指向码 2 / 码 3 的指针 = 头部 + 位置条目 × 2 + 实例代号 4 + 出生序号 4。
 const NODE_POINTER_BYTES: u64 = 86;
 /// D19（块指针的结构与宽度预算） 已定项 8：指向码 1 的指针 = 头部 + 位置条目 × 2 + 写序 10。
 const DATA_POINTER_BYTES: u64 = 88;
-/// D8（核心索引结构） 已定项 8（2026-09-14 用户定案重排）：树 ID 8 打头 + 条目长度 2 + 树的种类 2 + flags 2
-/// + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8，2026-09-16 用户定案）。
+/// D8（核心索引结构） 已定项 8：树 ID 8 打头 + 条目长度 2 + 树的种类 2 + flags 2
+/// + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8）。
 const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// D8（核心索引结构） 已定项 6。
 const INODE_RECORD_BYTES: u64 = 140;
@@ -83,7 +83,7 @@ const ALLOCATION_RECORD_BYTES: u64 = 20;
 const ALLOCATION_KEY_BYTES: usize = 10;
 /// D5（快照 / 空间记账机制） 已定项 5 + D8 已定项 7：key 22 + value 8 + seq 4。
 const ACCOUNTING_ENTRY_BYTES: u64 = 34;
-/// D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10（2026-09-14 用户定案回定宽）：中央映射的 key **一律 27**——
+/// D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10：中央映射的 key **一律 27**——
 /// 码 1 天然 27（类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10），码 2 / 码 3 的 25 字节末尾补零到 27。
 const MAPPING_KEY_BYTES: u64 = 27;
 /// 码 2 / 码 3 的映射 key 里有含义的那一段：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 出生序号 4 = 25，其后两字节恒零。
@@ -91,13 +91,13 @@ const MAPPING_KEY_NODE_SIGNIFICANT_BYTES: u64 = 25;
 /// 映射条目 = key 27 + value（位置条目 × 2）= **一律 55**（D19 已定项 6 / 已定项 10）。
 const MAPPING_ENTRY_BYTES: u64 = 55;
 /// D18（块里携带什么信息） 已定项 11：实例表一片记录宽 88（kind 1 + 有无下一片 1 + 位置指针 86 + 预留 0；
-/// 2026-09-14 指针从 83 变 86 之后把那 3 字节预留吃掉，记录宽仍 88，打包记录定长要求 kind 0 / kind 1 同宽）。
+/// 记录宽 88，打包记录定长要求 kind 0 / kind 1 同宽）。
 const INSTANCE_ROW_BYTES: u64 = 88;
 /// D23（journal 的角色与格式） 已定项 12。
 const JOURNAL_RECORD_BYTES: u64 = 4096;
 /// 记录头（D23（journal 的角色与格式） 已定项 4 的字段表）：十个字段 78（`JOURNAL_HEADER_TEN_FIELD_BYTES`，
 /// 含「记录标志」那一字节，位 0 = 本次发布末条，已定项 17） + 事务号 8 + 提交标记 1 + 本次发布内序号 4
-/// + 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16 = 487（D23 已定项 4 节标题「头 487 字节」，用户 2026-10-02「回到甲」）。
+/// + 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16 = 487（D23 已定项 4 节标题「头 487 字节」）。
 /// 4096 的记录装 (4096 − 487) / 56 = 64 个点名项（D23 已定项 17），512 扇区上余 25 字节（已定项 4）。
 const JOURNAL_HEADER_BYTES: u64 = 487;
 /// 十个字段那一段另登记成格式常量，好让门禁分得清它与整个头（D23 已定项 4）。
@@ -108,27 +108,27 @@ const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 364;
 const _: () = assert!(JOURNAL_NEW_ROOT_SEGMENT_BYTES == 4 * NODE_POINTER_BYTES + 8 + 8 + 4);
 /// D23（journal 的角色与格式） 已定项 4 口径的点名项宽度；构成无落点，装置按字节表六的预想构成写。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
-/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——
+/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：含四个字段——
 /// 自举头的写入者身份 20 与校验和算法标识 1、几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4，共 29；
-/// 2026-09-26 用户定案在字段表末尾加回退下界 F 8 字节（住 [481, 489)），合计 481 → 489。
+/// 字段表末尾是回退下界 F 8 字节（住 [481, 489)），合计 489。
 const SYSTEM_CONFIGURATION_BYTES: u64 = 489;
 /// 头校验和 / 自证校验和的字段宽度（D18 已定项 7、D22 已定项 7、D23 已定项 4 同口径）。
-/// 算法由 D18（块里携带什么信息） 已定项 17 定（2026-09-13）：字段里放 CRC32C 4 字节 + 28 字节零。
+/// 算法由 D18（块里携带什么信息） 已定项 17 定：字段里放 CRC32C 4 字节 + 28 字节零。
 const WIDE_CHECKSUM_BYTES: u64 = 32;
 const WIDE_CHECKSUM_CRC_BYTES: usize = 4;
 
 /// 码 2 节点头里 key 区间之外的部分（D8（核心索引结构） 已定项 11 + D18（块里携带什么信息） 已定项 18 的偏移表）：
 /// 共同前缀 42 + 树 ID 8 + 层级 1 + key 宽 1 + 诞生代号 8 + fsid 8 + 写序 4 + 出生序号 4 + 载荷 CRC 4
 /// + 预留 2 + 条目数 2 + 条目宽 2 = 86；含 29 字节预留位的头 = 115 + 2 × key 宽。
-/// key 宽 2026-09-14 用户定案从 81 + 2k 挪到**偏移 51**——定位它不再需要先知道 k。
+/// key 宽住**偏移 51**——定位它不需要先知道 k。
 const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
 /// 码 2 头里 key 宽那一格的偏移（D18 已定项 18）：共同前缀 42 + 树 ID 8 + 层级 1 = 51。
 const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;
 
 /// 字节表零：系统配置槽 0 / 1 的设备内偏移。槽距 = 固定结构槽距 4096，与槽宽同值 ⇒ 两个槽首尾相接。
 const SYSTEM_CONFIGURATION_SLOT_OFFSETS: [u64; 2] = [0, 4096];
-/// D22（单元原子性怎么合成） 已定项 2 的槽宽那一格（2026-09-14 三方论证后按主 agent 推荐值写）：
-/// **系统配置槽宽是格式常量 4096**，不再等于挂载时探测到的 `physical_block_size`。
+/// D22（单元原子性怎么合成） 已定项 2 的槽宽那一格：
+/// **系统配置槽宽是格式常量 4096**，不等于挂载时探测到的 `physical_block_size`。
 /// 整槽校验和罩这 4096 字节含补齐（D18（块里携带什么信息） 已定项 17），489 字节的字段表在槽里余 3607。
 /// ⚠️ 它只管系统配置：根槽仍按判定宽度 512 写（字节表七）。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
@@ -139,7 +139,7 @@ const RING_CHUNK_BYTES: u64 = 1 << 20;
 const RING_REGIONS: u64 = 3;
 const RING_SLOTS_PER_REGION: u64 = 8;
 const RING_SLOT_SPACING: u64 = 4096;
-/// D2（RAID 条带策略） 已定项 7（2026-09-14 用户定案）：根环三个区域的设备归属第一版**写死** 0 / 1 / 0，不是 mkfs 参数。
+/// D2（RAID 条带策略） 已定项 7：根环三个区域的设备归属第一版**写死** 0 / 1 / 0，不是 mkfs 参数。
 /// devs = 2、R = 3 时 D22 已定项 14 的鸽笼下界只允许「两个区域在一块盘、一个在另一块」这一种形状，
 /// 区域编号一定之后 0 / 1 / 0 是唯一的规范写法；它也把暖机恒 2 次定死（txg 1 落盘 1、txg 2 落盘 0，两次覆盖两块盘）。
 const RING_REGION_DEVICES: [u32; 3] = [0, 1, 0];
@@ -185,12 +185,12 @@ const SLOT_INSTANCE_TABLE: u64 = 50176;
 const SLOT_TREE_TABLE_GENESIS: u64 = 50178;
 const SLOT_DATA_UNIT: u64 = 50180;
 const OPEN_CLUSTER_SEGMENT_START_SLOT: u64 = 50240;
-/// D3（空间分配） 已定项 10 ⑤（2026-09-14 用户定案）：提交内生块从开放段 bump 的次序 =
+/// D3（空间分配） 已定项 10 ⑤：提交内生块从开放段 bump 的次序 =
 /// 按树 ID 升序、树内先叶后根、中央映射树倒数第二、树表单元最末。游标从 50240 起：
 /// t2 extent 根（树 11）拿 50240 ⇒ 游标 50241；t3 inode 叶是码 3 容器、按「数据单元」那一档要起点 32768 对齐
 /// ⇒ 跳过 50241 拿 50242–50243；其后依次 bump。**槽 50241 因此空着**，它自己是一段空闲 run。
-/// E142 第十五次跑起，分配记录树按位置寻址拆成 5 个节点（第七节 B2）：t5..t9 落 50245..50249，
-/// 记账 / 映射 / 树表跟着顺延到 50250..50252（原来的 SLOT_ALLOCATION_ROOT 等三个名字随之作废）。
+/// 分配记录树按位置寻址拆成 5 个节点（第七节 B2）：t5..t9 落 50245..50249，
+/// 记账 / 映射 / 树表跟着顺延到 50250..50252。
 const SLOT_EXTENT_ROOT: u64 = 50240;
 const SLOT_INODE_LEAF: u64 = 50242;
 const SLOT_INODE_ROOT: u64 = 50244;
@@ -208,7 +208,7 @@ const SLOT_TREE_TABLE_FIRST_PUBLISH: u64 = 50252;
 /// bump 次序留下的那个空洞（上面那段注释里的 50241）：记账的 runs 那一行多一段就是它。
 const SLOT_SKIPPED_BY_ALIGNMENT: u64 = 50241;
 
-/// D8（核心索引结构） 已定项 11（2026-10-01 用户定案 F4）：第一版树 ID 从 65536 起编（种类字段 2 字节取不到的最小值，
+/// D8（核心索引结构） 已定项 11：第一版树 ID 从 65536 起编（种类字段 2 字节取不到的最小值，
 /// 与树的种类码错开）。树表单元与实例表单元的树 ID 段写 0（无归属，D5（快照 / 空间记账机制） 已定项 10 登记的保留值）。
 const TREE_IDENTIFIER_NONE: u64 = 0;
 const TREE_IDENTIFIER_EXTENT: u64 = 65536;
@@ -216,19 +216,19 @@ const TREE_IDENTIFIER_INODE: u64 = 65537;
 const TREE_IDENTIFIER_ALLOCATION: u64 = 65538;
 const TREE_IDENTIFIER_ACCOUNTING: u64 = 65539;
 const TREE_IDENTIFIER_MAPPING: u64 = 65540;
-/// D6 已定项 2（2026-09-13 用户定案）：livelist 共享树 day-1 注册，新池新建文件根指针为零。
+/// D6 已定项 2：livelist 共享树 day-1 注册，新池新建文件根指针为零。
 const TREE_IDENTIFIER_LIVELIST: u64 = 65541;
-/// D5 已定项 6（2026-09-13 用户定案）：稀疏旁表树 day-1 注册，新池新建文件根指针为零。
+/// D5 已定项 6：稀疏旁表树 day-1 注册，新池新建文件根指针为零。
 const TREE_IDENTIFIER_SHARE_COUNT: u64 = 65542;
-/// D5 已定项 11（2026-09-14 用户定案）：deadlist 树 day-1 注册进树表，新池新建文件根指针为零、一条条目都不写。
+/// D5 已定项 11：deadlist 树 day-1 注册进树表，新池新建文件根指针为零、一条条目都不写。
 const TREE_IDENTIFIER_DEADLIST: u64 = 65543;
-/// D18（块里携带什么信息） 已定项 24 第 6 条：`deleted_inodes` 树、墓碑树、谱系树、logged_ops 树 day-1 注册（D8 已定项 11 定案句逐个给号），
+/// D18（块里携带什么信息） 已定项 24 第 6 条：`deleted_inodes` 树、墓碑树、谱系树、logged_ops 树 day-1 注册（D8 已定项 11 条文逐个给号），
 /// 新池新建文件根指针为零。
 const TREE_IDENTIFIER_DELETED_INODES: u64 = 65544;
 const TREE_IDENTIFIER_TOMBSTONE: u64 = 65545;
 const TREE_IDENTIFIER_LINEAGE: u64 = 65546;
 const TREE_IDENTIFIER_LOGGED_OPERATIONS: u64 = 65547;
-/// 退役树：D18（块里携带什么信息） 已定项 24 第 6 条同批 day-1 零根注册，树 ID 照 D8（核心索引结构） 已定项 11 定案句（`layout/03`「树表退役树条目」那一行）。
+/// 退役树：D18（块里携带什么信息） 已定项 24 第 6 条同批 day-1 零根注册，树 ID 照 D8（核心索引结构） 已定项 11 条文（`layout/03`「树表退役树条目」那一行）。
 const TREE_IDENTIFIER_RETIREMENT: u64 = 65548;
 /// mkfs 那一刻一棵树都还没有，水位就是第一个要发的树 ID（D8 已定项 11「mkfs 时水位 65536」，单独一个常量，不借 extent 的号）；
 /// 发布之后 = 本次发出的最高树 ID + 1（D8 已定项 8 ②，最后一棵退役树的号 + 1）。
@@ -236,7 +236,7 @@ const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
 const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_RETIREMENT + 1;
 /// 树的种类的码（D8（核心索引结构） 已定项 9 的登记表：0 无、1 extent、2 inode、3 分配记录、4 记账、
 /// 5 中央映射、6 livelist 共享树、7 稀疏旁表、8 deadlist、9 `deleted_inodes`、10 墓碑树、11 谱系树、12 logged_ops、13 退役树；
-/// 码 8 是 2026-09-14 用户定案加的，码 9..12 随 D18 已定项 24 第 6 条进登记表，码 13 随 D18 已定项 11 的打包记录类型 3 进登记表）。
+/// 码 8 随 D5 已定项 11 进登记表，码 9..12 随 D18 已定项 24 第 6 条进登记表，码 13 随 D18 已定项 11 的打包记录类型 3 进登记表）。
 const TREE_KIND_EXTENT: u16 = 1;
 const TREE_KIND_INODE: u16 = 2;
 const TREE_KIND_ALLOCATION: u16 = 3;
@@ -262,7 +262,7 @@ const PACKED_TYPE_INSTANCE_TABLE: u16 = 4;
 /// 记账统计量标签 = D5（快照 / 空间记账机制） 已定项 4 那张表的行号（已定项 10 立成登记表）。
 const STATISTIC_ALLOCATED_BYTES: u16 = 1;
 const STATISTIC_FREE_BYTES: u16 = 2;
-/// D5 已定项 8（2026-09-14 用户定案）：准入不等式要的四个统计量 day-1 各写一行值 0，标签是 D5 已定项 4 那张表的行号。
+/// D5 已定项 8：准入不等式要的四个统计量 day-1 各写一行值 0，标签是 D5 已定项 4 那张表的行号。
 const STATISTIC_UNRECLAIMABLE_BYTES: u16 = 3;
 const STATISTIC_PENDING_DELETE_BYTES: u16 = 4;
 const STATISTIC_DEFER_QUEUE_BYTES: u16 = 5;
@@ -275,23 +275,23 @@ const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// D8（核心索引结构） 已定项 10：直落记账树叶时 seq 恒 1。
 const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 
-/// D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11（2026-09-14 用户定案）：指针里压缩那两段的第一版取值。
+/// D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11：指针里压缩那两段的第一版取值。
 /// 登记表住 D9（加密） 已定项 14：码 0 = 不压缩；码 0 时压后长度恒 0，非 0 判该指针损坏。
 const POINTER_COMPRESSION_CODE_NONE: u8 = 0;
 const POINTER_COMPRESSED_LENGTH_NONE: u16 = 0;
 
-/// D5（快照 / 空间记账机制） 已定项 9（2026-09-14 用户定案）：树表条目从 32 字节预留里切 8 字节存「头 ID」。
+/// D5（快照 / 空间记账机制） 已定项 9：树表条目从 32 字节预留里切 8 字节存「头 ID」。
 /// inode 树条目写自己（12）、extent 树条目写它服务的那个头（12），分配记录 / 记账 / livelist / 旁表 / deadlist 写 0。
 const TREE_TABLE_HEAD_IDENTIFIER_NONE: u64 = 0;
 
-/// D22（单元原子性怎么合成） 已定项 9（2026-09-14 用户定案）：系统配置自举头的「写入者身份」=
+/// D22（单元原子性怎么合成） 已定项 9：系统配置自举头的「写入者身份」=
 /// 实现标识 16 字节 ASCII 零补齐 + 版本 4 字节；第一版写 `singlefs-rs` 与 1（I-1.5（系统配置记管道身份）、D17（实现分层与第三方管道） 债 3）。
 const WRITER_IDENTITY_NAME: &[u8] = b"singlefs-rs";
 const WRITER_IDENTITY_NAME_BYTES: usize = 16;
 const WRITER_IDENTITY_VERSION: u32 = 1;
-/// 同一条定案的「校验和算法标识」登记表：0 无效、1 CRC-32C；第一版写 1（I-2.2（校验和算法全盘一致）、C309（32 字节校验和的算法没定））。
+/// 同一条已定项的「校验和算法标识」登记表：0 无效、1 CRC-32C；第一版写 1（I-2.2（校验和算法全盘一致）、C309（32 字节校验和的算法没定））。
 const CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI: u8 = 1;
-/// 几何段 2026-09-14 加的两个字段：mkfs 时探测到的 physical_block_size（D13（验证路线） 已定项 5 的比对要它），
+/// 几何段的两个字段：mkfs 时探测到的 physical_block_size（D13（验证路线） 已定项 5 的比对要它），
 /// 与扩展点声明值 N（D21（权威态与派生态的分界） 已定项 8，第一版 0 字节）。
 const MKFS_PHYSICAL_BLOCK_BYTES: u32 = 512;
 const EXTENSION_POINT_DECLARED_BYTES: u32 = 0;
@@ -299,11 +299,11 @@ const EXTENSION_POINT_DECLARED_BYTES: u32 = 0;
 const UNIT_MAGIC: [u8; 4] = *b"SFSU";
 const ROOT_MAGIC: [u8; 4] = *b"SFSR";
 const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
-/// D15（格式冻结政策） 已定项 4 登记表位 1（2026-09-26 用户定案）：第一条纯 SSD 布局线（系统配置带回退
+/// D15（格式冻结政策） 已定项 4 登记表位 1：第一条纯 SSD 布局线（系统配置带回退
 /// 下界 F、根记录带卸载记号、没有回退见证与回退行）。写路径恒写的布局身份位，读者要求它在。
 /// 位图小端、位 0 是第一个字节的最低位（D22 已定项 13）；位 0 空出、没有布局用它（`.claude/kb/feature-bits.md`）。
 const INCOMPAT_LAYOUT_IDENTITY_BIT: u8 = 0x02;
-/// incompat 位 2（用户 2026-10-17 定新开一位，判决 `research/prompts/m4-trunc-r2-main-verification.md` 第六节）：
+/// incompat 位 2（见 `research/prompts/m4-trunc-r2-main-verification.md` 第六节）：
 /// inode 记录带截断字段（偏移 120 起）。mkfs 起就置上；读者要求它在，不带位 2 的池一律拒。
 const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;
 /// mkfs 与之后每一次写系统配置写进 incompat 位图第一个字节的值：位 1 加位 2（0x06）。
@@ -328,7 +328,7 @@ const FIRST_INSTANCE_GENERATION: u32 = 1;
 /// D22（单元原子性怎么合成） 已定项 16：系统配置槽世代号从 1 起、每写一次 +1，写世代号 g 的那一次落在槽 `g mod 2`。
 const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 const SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION: u64 = 2;
-/// D16 已定项 8（暖机取戊，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
+/// D16 已定项 8（暖机取戊）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
 /// 第一版几何区域 1 / 2 分住两块盘 ⇒ 两次（txg 1、2），新池新建文件从 txg 3 起。
 const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
 const NEW_POOL_FILE_CREATION_TXG: u64 = 3;
@@ -360,7 +360,7 @@ impl SlotNumber {
     }
 }
 
-/// C113 定案 P1 的写序：实例代号 4 + 事务号低 48 位。
+/// C113 选定的 P1 写序：实例代号 4 + 事务号低 48 位。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 struct WriteOrder {
     instance: InstanceGeneration,
@@ -498,8 +498,8 @@ fn castagnoli_crc32(bytes: &[u8]) -> u32 {
 }
 
 /// 「校验和字段自身按 0 参与」（I-2.4）：把 `[field_offset, field_offset + 32)` 清零后对 `[0, cover_end)` 求校验和。
-/// D18（块里携带什么信息） 已定项 17（2026-09-13 用户定案）：32 字节的校验和字段里放 CRC32C 4 字节 + 28 字节零，
-/// 根记录自证校验和、系统配置整槽校验和、journal `header_csum` 同口径——此前装置取 SHA-256，那是 gap G5，已收口。
+/// D18（块里携带什么信息） 已定项 17：32 字节的校验和字段里放 CRC32C 4 字节 + 28 字节零，
+/// 根记录自证校验和、系统配置整槽校验和、journal `header_csum` 同口径。
 fn wide_checksum_with_field_zeroed(bytes: &[u8], cover_end: usize, field_offset: usize) -> [u8; 32] {
     let mut covered = bytes[..cover_end].to_vec();
     covered[field_offset..field_offset + WIDE_CHECKSUM_BYTES as usize].fill(0);
@@ -787,7 +787,7 @@ impl RecordingPool {
         self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: Vec::new(), kind: StepKind::ZeroFill }));
     }
     /// 一道池屏障：按设备号升序每块盘记一步，一块盘时恰一步（臂 N19 的 ①）。同一块盘上连着的屏障并成一道
-    /// （臂 N19M 的 ⑫，登记 R46；D13（验证路线） 已定项 4 定案末句「录制流里一道屏障与这块盘上一道屏障之间
+    /// （臂 N19M 的 ⑫，登记 R46；D13（验证路线） 已定项 4 末句「录制流里一道屏障与这块盘上一道屏障之间
     /// 没有任何一次写（别的盘的屏障不算写）时，这一道不记」）：「任何一次写」取任何一块盘上的写。
     fn barrier(&mut self) {
         for device_index in 0..self.pool.devices.len() {
@@ -1112,11 +1112,11 @@ fn index_node_header_bytes(key_width: usize) -> usize {
     INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE as usize + 2 * key_width
 }
 
-/// 码 2 索引节点 16384，偏移照 D18（块里携带什么信息） 已定项 18 的表（2026-09-14 用户定案把 key 宽挪到 51）：
+/// 码 2 索引节点 16384，偏移照 D18（块里携带什么信息） 已定项 18 的表（key 宽在 51）：
 /// 42 树 ID 8 / 50 层级 1 / **51 key 宽 1** / 52 key 区间 2k / 52+2k 诞生代号 8 / 60+2k fsid 8
 /// / 68+2k 写序 4（只实例代号）/ 72+2k 出生序号 4 / 76+2k 载荷 CRC 4 / 80+2k 预留 2 / 82+2k 条目数 2
 /// / 84+2k 条目宽 2 / 86+2k 预留位 29 / 115+2k 条目区。头校验和罩 0..86+2k，载荷 CRC 从 86+2k 到单元末尾。
-/// 条目一律定宽（中央映射的条目 2026-09-14 回到一宽 55），所以条目宽是个单值、声明长度 = 条目数 × 条目宽。
+/// 条目一律定宽（中央映射的条目一宽 55），所以条目宽是个单值、声明长度 = 条目数 × 条目宽。
 #[allow(clippy::too_many_arguments, reason = "字段表就是这么多段，收成结构体只会多一层没人验的名字")]
 fn build_index_node(
     tree: TreeIdentifier,
@@ -1172,7 +1172,7 @@ fn build_index_node(
     bytes
 }
 
-/// 解出来的码 2 节点头。key 宽从 2026-09-14 起住**偏移 51**（D18（块里携带什么信息） 已定项 18），
+/// 解出来的码 2 节点头。key 宽住**偏移 51**（D18（块里携带什么信息） 已定项 18），
 /// 定位它不再需要先知道 k ⇒ 扫描期按 `[0, 51)` 这段定长前缀读出 k、一次定出头末端（gap G2 收口）。
 #[derive(Clone, Debug)]
 struct IndexNodeHeader {
@@ -1217,7 +1217,7 @@ fn check_common_prefix(bytes: &[u8], expected_class: u8) -> Result<u16, UnitErro
     Ok(reader.get_u16())
 }
 
-/// 解码 2 节点：key 宽住**偏移 51**（D18 已定项 18，2026-09-14 用户定案），它自己的偏移不依赖 k
+/// 解码 2 节点：key 宽住**偏移 51**（D18 已定项 18），它自己的偏移不依赖 k
 /// ⇒ 先读 `[0, 51)` 这段定长前缀里的 k、一次定出头末端，再核头校验和。调用方不必先知道这是哪棵树。
 fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
     let declared_length = check_common_prefix(bytes, UNIT_CLASS_INDEX_NODE)?;
@@ -1260,7 +1260,7 @@ fn parse_index_node(bytes: &[u8]) -> Result<IndexNodeHeader, UnitError> {
     }
     // D18（块里携带什么信息） 已定项 18：条目区之后的补齐区恒 0 且参与载荷 CRC。
     if bytes[payload.cursor..].iter().any(|&byte| byte != 0) {
-        return Err(UnitError::Structure("条目区之后的补齐区非零")); // I-2.3 射程 2026-09-13 扩到码 2
+        return Err(UnitError::Structure("条目区之后的补齐区非零")); // I-2.3 射程含码 2
     }
     Ok(IndexNodeHeader { tree, level, key_width: declared_key_width, smallest_key, largest_key, birth_txg, fsid, instance, birth_sequence, entries })
 }
@@ -1355,7 +1355,7 @@ fn data_unit_payload(bytes: &[u8], declared_length: u16) -> &[u8] {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct RootRecord {
     fsid: [u8; 16],
-    /// D22（单元原子性怎么合成） 已定项 7 flags 位 0（2026-09-26 用户定案）：正常卸载那一串写的根置 1，
+    /// D22（单元原子性怎么合成） 已定项 7 flags 位 0：正常卸载那一串写的根置 1，
     /// 其余根写 0；其余位第一版恒 0、非 0 拒收（已定项 17）。这条流里没有正常卸载，恒为 `false`。
     unmount_marker: bool,
     instance: InstanceGeneration,
@@ -1364,9 +1364,9 @@ struct RootRecord {
     tree_identifier_watermark: u64,
     rollback_floor: CheckpointTxg,
     instance_table: NodePointer,
-    /// D19（块指针的结构与宽度预算） 已定项 11（2026-09-13 用户定案）：中央映射树的根住根记录。
+    /// D19（块指针的结构与宽度预算） 已定项 11：中央映射树的根住根记录。
     mapping_root: NodePointer,
-    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案：只有「树表 0 条、写过行」
+    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款）：只有「树表 0 条、写过行」
     /// 的一版指着写行那次发布写的那一片分配记录节点；这个装置从不建那一格（E142（新池新建文件的干跑） 只有
     /// mkfs、暖机与带文件的一版，milestone 二「第三次可写挂载」不在射程内），恒为 `NodePointer::empty_root()`。
     allocation_record_tree_root: NodePointer,
@@ -1376,7 +1376,7 @@ const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + NODE_POINTER_BYTES as u
 
 impl RootRecord {
     /// 写成一个判定宽度的槽：记录 457 字节，其余补 0；
-    /// 自证校验和覆盖**整个 512 槽含补齐**、自身按 0 参与（D18（块里携带什么信息） 已定项 17，2026-09-13 用户定案）。
+    /// 自证校验和覆盖**整个 512 槽含补齐**、自身按 0 参与（D18（块里携带什么信息） 已定项 17）。
     fn to_slot(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new(PHYSICAL_BLOCK_BYTES as usize);
         writer.put(&ROOT_MAGIC);
@@ -1391,10 +1391,10 @@ impl RootRecord {
         writer.skip(WIDE_CHECKSUM_BYTES as usize);
         self.instance_table.write_to(&mut writer);
         self.mapping_root.write_to(&mut writer);
-        // C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案：分配记录树根指针紧跟映射根指针之后。
+        // C512（树表 0 条的一版上被换下的实例表记在哪没有条款）：分配记录树根指针紧跟映射根指针之后。
         writer.assert_position(ROOT_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES + 2 * NODE_POINTER_BYTES, "根记录：分配记录树根指针起点");
         self.allocation_record_tree_root.write_to(&mut writer);
-        // D22 已定项 7 的表尾三段（2026-09-14 用户定案）：算法类型 1 + nonce 12 + MAC 16，第一版全 0 留位。
+        // D22 已定项 7 的表尾三段：算法类型 1 + nonce 12 + MAC 16，第一版全 0 留位。
         writer.put_u8(0);
         writer.skip(12 + 16);
         writer.assert_position(ROOT_RECORD_BYTES, "根记录");
@@ -1436,9 +1436,9 @@ impl RootRecord {
 }
 
 /// 系统配置字段表（D22 已定项 9 + 已定项 15）：**481 字节**，512 槽内余 31。
-/// 2026-09-13 用户定案去掉「间接目录单元指针 59」（第一版显式留白，不是留位），几何段加三个字段：
+/// 没有「间接目录单元指针 59」（第一版显式留白，不是留位），几何段有三个字段：
 /// 单元区起始槽号 8（D3 已定项 10 ④）、mkfs 时的 io_min 4 与固定结构槽距 4（D2 已定项 19）；
-/// 2026-09-14 用户定案再加四个：自举头的写入者身份 20 与校验和算法标识 1、
+/// 另有四个：自举头的写入者身份 20 与校验和算法标识 1、
 /// 几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4。
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct SystemConfiguration {
@@ -1449,7 +1449,7 @@ struct SystemConfiguration {
     region_devices: [DeviceIdentity; 3],
     journal_tail: u64,
     journal_instance: InstanceGeneration,
-    /// D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：回退下界 F 另记一份，
+    /// D22（单元原子性怎么合成） 已定项 9 字段表末行：回退下界 F 另记一份，
     /// 住 journal 实例代号之后 [481, 489)；这条流里没有抬 F，恒为 `CheckpointTxg(0)`（D16 已定项 1）。
     rollback_floor: CheckpointTxg,
 }
@@ -1460,7 +1460,7 @@ const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4
 const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 4 + 2 + 96;
 const SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET: usize = 379;
 const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
-/// D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：journal 实例代号（477，宽 4）之后
+/// D22（单元原子性怎么合成） 已定项 9 字段表末行：journal 实例代号（477，宽 4）之后
 /// 是回退下界 F，按行累加得偏移 481（`.claude/kb/layout/01-first-txn.md`「一」字段表）。
 const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = 481;
 /// D2（RAID 条带策略） 已定项 19：固定结构槽距 = max(4096, mkfs 时探测的 io_min)，两个数各占系统配置一个 4 字节字段。
@@ -1475,11 +1475,11 @@ impl SystemConfiguration {
         let mut writer = ByteWriter::new(SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
         writer.put(&SYSTEM_CONFIGURATION_MAGIC);
         writer.put_u16(FORMAT_VERSION);
-        writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE); // feature bits：incompat 位 1 = 布局身份（D15 已定项 4，2026-09-26 用户定案；位 0 空出）、位 2 = inode 记录带截断字段（2026-10-17 用户定案）
+        writer.put_u8(WRITTEN_FIRST_INCOMPAT_BYTE); // feature bits：incompat 位 1 = 布局身份（D15 已定项 4；位 0 空出）、位 2 = inode 记录带截断字段
         writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
         writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "系统配置 fsid");
         writer.put(&self.fsid);
-        // 写入者身份（D22 已定项 9，2026-09-14 用户定案）：实现标识 16 字节 ASCII 零补齐 + 版本 4 字节。
+        // 写入者身份（D22 已定项 9）：实现标识 16 字节 ASCII 零补齐 + 版本 4 字节。
         let mut writer_identity = [0u8; WRITER_IDENTITY_NAME_BYTES];
         writer_identity[..WRITER_IDENTITY_NAME.len()].copy_from_slice(WRITER_IDENTITY_NAME);
         writer.put(&writer_identity);
@@ -1493,12 +1493,12 @@ impl SystemConfiguration {
         writer.skip(16 + 12 + 4); // 系统配置 MAC、nonce 水位、KDF 标识（4，D22 已定项 9）
         writer.put_u8(0); // 加密类型：关
         writer.put_u8(16); // MAC 长度声明
-        writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0（D22 已定项 9，2026-09-13 用户定案）
+        writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0（D22 已定项 9）
         writer.put_u32(NODE_BYTES as u32);
         writer.put_u32(DATA_UNIT_BYTES as u32);
         writer.put_u32(SLOT_BYTES as u32);
         writer.put_u32(LOC_ENTRY as u32);
-        // 2026-09-14 用户定案加的两个几何字段，排在位置条目宽度之后（字节表一那一节的行序）。
+        // 两个几何字段，排在位置条目宽度之后（字节表一那一节的行序）。
         writer.put_u32(MKFS_PHYSICAL_BLOCK_BYTES);
         writer.put_u32(EXTENSION_POINT_DECLARED_BYTES);
         writer.put_u64(JOURNAL_START_SLOT);
@@ -1507,7 +1507,7 @@ impl SystemConfiguration {
         // D23（journal 的角色与格式） 已定项 18：在飞记录数上限 = 环槽数 ÷ F。
         writer.put_u32(u32::try_from(JOURNAL_IN_FLIGHT_RECORD_LIMIT).expect("在飞上限 4 字节"));
         // journal 最坏占用 = 在飞上限 × 记录宽（字节表 `layout/01-first-txn.md` 那一行逐字
-        // 「268 435 456（65536 条 × 4096）」；此前这里写成了记录宽本身 4096）。
+        // 「268 435 456（65536 条 × 4096）」）。
         writer.put_u64(JOURNAL_WORST_CASE_BYTES);
         writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数 4 字节"));
         writer.put_u8(RING_REGIONS as u8);
@@ -1532,7 +1532,7 @@ impl SystemConfiguration {
         writer.assert_position(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64, "journal tail");
         writer.put_u64(self.journal_tail);
         writer.put_u32(self.journal_instance.0);
-        // D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：回退下界 F 8 字节，
+        // D22（单元原子性怎么合成） 已定项 9 字段表末行：回退下界 F 8 字节，
         // 住 [481, 489)，journal 实例代号之后。
         writer.assert_position(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "系统配置回退下界 F");
         writer.put_u64(self.rollback_floor.0);
@@ -1608,7 +1608,7 @@ fn unit_bytes_for_class(unit_class: u8) -> Option<u64> {
     }
 }
 
-/// 点名项 56（D23（journal 的角色与格式） 已定项 17 的字段表，2026-09-13 用户定案）：
+/// 点名项 56（D23（journal 的角色与格式） 已定项 17 的字段表）：
 /// 位置条目 14 × 2（偏移 0）、单元类型标签 1（28）、出生树 8（29）、出生 txg 8（37）、
 /// key 尾段 10（45：码 1 写序；码 2 / 码 3 实例代号 4 + 出生序号 4 + 补零 2）、flags 1（55）。
 /// 不另带载荷 CRC——位置条目各带 4 字节校验和；重放从点名项直接凑出映射 key。
@@ -1656,7 +1656,7 @@ impl NamedUnit {
     }
 }
 
-/// journal 记录 4096：头 487（字节表六的表序 + D23 已定项 15 的新根段七项 + 2026-09-14 加的 fsid 与 MAC + 2026-09-24 加的记录标志与本次发布内序号）+ 点名项数组。
+/// journal 记录 4096：头 487（字节表六的表序 + D23 已定项 15 的新根段七项 + fsid 与 MAC + 记录标志与本次发布内序号）+ 点名项数组。
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct JournalRecord {
     instance: InstanceGeneration,
@@ -1669,15 +1669,15 @@ struct JournalRecord {
     /// D23（journal 的角色与格式） 已定项 4 / 17：记录标志（位 0 = 本次发布末条），其余位恒 0。
     record_flags: u8,
     back_chain: u32,
-    /// D23（journal 的角色与格式） 已定项 4（2026-09-14 用户定案）：系统配置 fsid 的低 8 字节，与单元头同口径（I-1.4（块头 fsid 一致））。
+    /// D23（journal 的角色与格式） 已定项 4：系统配置 fsid 的低 8 字节，与单元头同口径（I-1.4（块头 fsid 一致））。
     fsid: u64,
     /// D23（journal 的角色与格式） 已定项 15 的新根段：崩在记录持久之后、根槽持久之前时由它重建那次发布的根。
     new_tree_table: NodePointer,
     new_mapping_root: NodePointer,
     new_tree_identifier_watermark: u64,
     new_rollback_floor: CheckpointTxg,
-    /// 新根段后三项（D23 已定项 15，用户 2026-10-02「回到甲」）：实例表单元指针、分配记录树根指针、卸载记号——
-    /// 取这次发布写的那条根的同名字段；恢复施加记录时三项取记录里的、不再照抄所选根。
+    /// 新根段后三项（D23 已定项 15）：实例表单元指针、分配记录树根指针、卸载记号——
+    /// 取这次发布写的那条根的同名字段；恢复施加记录时三项取记录里的、不照抄所选根。
     new_instance_table: NodePointer,
     new_allocation_record_tree_root: NodePointer,
     new_unmount_marker: bool,
@@ -1688,7 +1688,7 @@ const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 1
 /// D23（journal 的角色与格式） 已定项 4：记录标志（位 0 = 本次发布末条）的偏移 = magic 4 + 类型 2 + 算法类型 1。
 const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
 
-/// D23（journal 的角色与格式） 已定项 19 ②（2026-09-14 用户定案改写）：`previous_hash` =
+/// D23（journal 的角色与格式） 已定项 19 ②：`previous_hash` =
 /// CRC32C(**本实例内逻辑前一条**记录的 487 字节头，其中 `header_csum` 那 32 字节按零参与)；本实例第一条恒 0、不读盘。
 fn journal_back_chain(previous_record_bytes: &[u8]) -> u32 {
     let mut header = previous_record_bytes[..JOURNAL_HEADER_BYTES as usize].to_vec();
@@ -1731,7 +1731,7 @@ impl JournalRecord {
         self.new_allocation_record_tree_root.write_to(&mut writer);
         writer.put_u32(if self.new_unmount_marker { 0x0000_0001 } else { 0 });
         assert_eq!(writer.position() - new_root_segment_start, JOURNAL_NEW_ROOT_SEGMENT_BYTES as usize, "新根段");
-        // 2026-09-14 用户定案：新根段之后是 fsid 8，再之后是 MAC 16（第一版全 0 留位，D9（加密） 已定项 12 第 1 项）。
+        // 新根段之后是 fsid 8，再之后是 MAC 16（第一版全 0 留位，D9（加密） 已定项 12 第 1 项）。
         writer.put_u64(self.fsid);
         writer.skip(16);
         writer.assert_position(JOURNAL_HEADER_BYTES, "记录头");
@@ -1743,7 +1743,7 @@ impl JournalRecord {
         // 载荷校验和仍罩点名项数组（D23 已定项 13 的字段保留），它自己住头里、落在头校验和覆盖内。
         let payload_checksum = castagnoli_crc32(&bytes[JOURNAL_HEADER_BYTES as usize..payload_end]);
         bytes[payload_checksum_offset..payload_checksum_offset + 4].copy_from_slice(&payload_checksum.to_le_bytes());
-        // D23 已定项 13（2026-09-14 用户定案改写）：`header_csum` 覆盖**整条记录 [0, 4096) 含补齐**、自身按零参与。
+        // D23 已定项 13：`header_csum` 覆盖**整条记录 [0, 4096) 含补齐**、自身按零参与。
         let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_RECORD_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);
         bytes[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
         bytes
@@ -1818,7 +1818,7 @@ impl JournalRecord {
 
 // ───────────────────────── 树表条目、inode、extent、分配、记账、映射 ─────────────────────────
 
-/// D8（核心索引结构） 已定项 8（2026-09-14 用户定案重排）：树 ID 8 打头（= 码 2 条目的 key）+ 条目长度 2
+/// D8（核心索引结构） 已定项 8：树 ID 8 打头（= 码 2 条目的 key）+ 条目长度 2
 /// + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76 = 200。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct TreeTableEntry {
@@ -1927,7 +1927,7 @@ impl InodeRecord {
         writer.put_u32(1); // nlink
         writer.assert_position(40, "size");
         writer.put_u64(self.size);
-        // C480（inode 记录的 blocks 怎么算全仓没有条款） 2026-09-23 用户定案：blocks = ⌈文件字节数 ÷ 512⌉
+        // C480（inode 记录的 blocks 怎么算全仓没有条款）：blocks = ⌈文件字节数 ÷ 512⌉
         // （逻辑长度的 512 字节块数，不表示分到的空间——不是 DATA_UNIT_BYTES / 512）。
         writer.put_u64(self.size.div_ceil(512));
         writer.put_u64(0); // rdev
@@ -2064,7 +2064,7 @@ impl AccountingEntry {
     }
 }
 
-/// 中央映射 key（D19 已定项 6 / 已定项 10，2026-09-14 用户定案回定宽）：**一律 27**——
+/// 中央映射 key（D19 已定项 6 / 已定项 10）：**一律 27**——
 /// 码 1 = 类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10 天然就是 27；
 /// 码 2 / 码 3 = 类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 出生序号 4 = 25，**末尾补零到 27**。
 fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> Vec<u8> {
@@ -2121,7 +2121,7 @@ fn parse_mapping_entry(bytes: &[u8]) -> (Vec<u8>, [LocationEntry; 2]) {
 }
 
 /// 实例表 kind = 1 链指针记录（D18 已定项 11）：kind 1 | 有无下一片 1 | 位置指针 86（无下一片时清零）= 88。
-/// 2026-09-14 指针从 83 变 86 之后那 3 字节预留被吃掉，记录宽仍 88——**这条记录没有余量了**，
+/// 位置指针 86 占掉了预留，记录宽 88——**这条记录没有余量了**，
 /// 指针再宽一个字节 `INSTANCE_ROW_BYTES` 就要跟着涨（打包记录定长，kind 0 与 kind 1 必须同宽）。
 fn build_instance_table_chain_record() -> Vec<u8> {
     let mut writer = ByteWriter::new(INSTANCE_ROW_BYTES as usize);
@@ -2142,7 +2142,7 @@ enum BarrierPolicy {
     None,
 }
 
-/// 发布尾那道屏障（E142 第十九次跑臂 N19C 的 ⑧；D16（发布语义） 已定项 7 定案句「COW 单元 / 节点 → 屏障 →
+/// 发布尾那道屏障（E142 第十九次跑臂 N19C 的 ⑧；D16（发布语义） 已定项 7 条文「COW 单元 / 节点 → 屏障 →
 /// journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障」）。只在 `BarrierPolicy::Settled` 时才发，
 /// 与另两道同一条件；`Omitted` 是取样点 G11、G12 那一格（登记 R44：⑧ 关时就是臂 N19）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -2272,7 +2272,7 @@ struct MkfsOutput {
 
 fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     let mut pool = RecordingPool { pool: Pool { devices: vec![SparseDevice::default(); parameters.device_count], device_bytes: parameters.device_bytes }, operations: Vec::new() };
-    // D22（单元原子性怎么合成） 已定项 8 第 3 条（追平 C484（mkfs 不清根环，同 fsid 重来旧根还择得中）与用户 2026-10-02 定的 W1）：
+    // D22（单元原子性怎么合成） 已定项 8 第 3 条（追平 C484（mkfs 不清根环，同 fsid 重来旧根还择得中）与 W1）：
     // 写任何元数据之前，每块盘先把 [0, 根环基址) 整段写 0（第一版 [0, 1 MiB) = 64 × 16 KiB），再把根环三个区域与 journal 环
     // 各整段写 0；每块盘上五段各一次调用，区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部五段，共 10 步；
     // 段序列与步数以 `.claude/kb/layout/01-first-txn.md` 八「mkfs 种根」那一行为准（`14+1+1+1+4`、25 次操作（21 次写、
@@ -2341,7 +2341,7 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
         },
         // 中央映射树的根住根记录（D19 已定项 11）；mkfs 那一刻还没有映射树。
         mapping_root: NodePointer::empty_root(),
-        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零。
+        // C512（树表 0 条的一版上被换下的实例表记在哪没有条款）：mkfs 第 0 代写全零。
         allocation_record_tree_root: NodePointer::empty_root(),
     };
     let root_slot = root.to_slot();
@@ -2402,10 +2402,10 @@ enum AllocationNodeRole {
     Root,
 }
 
-/// 新池新建文件写出的十二个单元各自的身份。以前它是自由文本标签，靠 `match` 字符串取类与 key 宽，
-/// 漏一个只能在运行期 panic；做成封闭枚举之后每一处 match 都穷举，漏一种编译不过。
+/// 新池新建文件写出的十二个单元各自的身份。它是封闭枚举：每一处 match 都穷举，
+/// 漏一种编译不过。
 /// 步骤种类（`StepKind`）说的是「这一步是哪一类写」，这个说的是「写的是哪个单元」——两件事分开。
-/// E142 第十五次跑：分配记录树从裸的一个变体拆成 `Allocation(AllocationNodeRole)`，其余七个不变。
+/// 分配记录树的变体是 `Allocation(AllocationNodeRole)`。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 enum TransactionUnit {
     Data,
@@ -2867,7 +2867,7 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
             rollback_floor: genesis.root.rollback_floor,
             instance_table: genesis.root.instance_table,
             mapping_root: genesis.root.mapping_root,
-            // C512 2026-09-23 用户定案：零单元发布照抄上一版。
+            // C512：零单元发布照抄上一版。
             allocation_record_tree_root: genesis.root.allocation_record_tree_root,
         };
         let (region, ring_slot) = ring_target_for_publish(txg);
@@ -2919,7 +2919,7 @@ fn retirement_prepayment_bytes_per_inode_record() -> u64 {
     (2 * SLOT_BYTES).div_ceil(RETIREMENT_RECORDS_PER_CONTAINER)
 }
 
-/// D3（空间分配） 已定项 2 定案句的式子：标签 6（已承诺预留）=
+/// D3（空间分配） 已定项 2 条文的式子：标签 6（已承诺预留）=
 /// 副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录)，单位字节、按副本之和记；
 /// 树表里没有 `deleted_inodes` 条目的版本取 0。
 fn committed_reservation_bytes(
@@ -3005,7 +3005,7 @@ fn publish_first_file(
     // t3 inode 树叶容器
     let inode_leaf_identity = PackedIdentity { birth_tree: TreeIdentifier(TREE_IDENTIFIER_INODE), record_type: PACKED_TYPE_INODE, container: FIRST_INODE_NUMBER, container_birth: txg };
     let inode_leaf_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_INODE), txg, instance);
-    // E142 第十一次跑（2026-09-18）：改动计数从字面 1 改成调用方传入的 change_count（D8 已定项 6 偏移 88 的字段定义 = 最后一次改动所在发布的
+    // 改动计数取调用方传入的 change_count（D8 已定项 6 偏移 88 的字段定义 = 最后一次改动所在发布的
     // checkpoint_txg；主口径传 NEW_POOL_FILE_CREATION_TXG，`crates/` 今天同口径——重跑登记 e142-r11-prereg.md 第三节）。
     let inode_record = InodeRecord { inode: FIRST_INODE_NUMBER, object_birth: txg, size: file_bytes.len() as u64, change_count };
     let inode_leaf_unit = build_packed_unit(inode_leaf_identity, INODE_RECORD_BYTES as u16, &[inode_record.to_bytes()], txg, fsid, write_order, inode_leaf_sequence);
@@ -3098,7 +3098,7 @@ fn publish_first_file(
     );
     index_node_header_widths.push(("allocation", index_node_header_bytes(ALLOCATION_KEY_BYTES)));
 
-    // t6 记账树（D5 已定项 8，2026-09-14 用户定案）：两盘时 **15 行**——
+    // t6 记账树（D5 已定项 8）：两盘时 **15 行**——
     // 带设备维的六项各两行（已分配 1、空闲 2、不可回收 3、defer 待释放 5、碎片度 runs 10、全空聚簇段数 11），
     // 池级三行（待删占用 4、已承诺预留 6、inode 号水位 12）。准入不等式要的四项 day-1 各写一行：不可回收、待删占用两项 0，
     // 已承诺预留照 D3（空间分配） 已定项 2 的式子现算（下面 `committed_reservation`），defer 待释放见下；
@@ -3173,7 +3173,7 @@ fn publish_first_file(
         accounting_entries.push(per_device(STATISTIC_UNRECLAIMABLE_BYTES, 0));
         // defer 待释放 = mkfs 那片第 0 版树表单元（1 槽）：A 重写树表把它换下（D3 已定项 7）。
         accounting_entries.push(per_device(STATISTIC_DEFER_QUEUE_BYTES, SLOT_BYTES));
-        // 第 10 项 2026-09-14 起换口径并带设备维：单元区空闲槽的连续段数，逐设备一行。
+        // 第 10 项带设备维：单元区空闲槽的连续段数，逐设备一行。
         accounting_entries.push(per_device(STATISTIC_FRAGMENTATION_RUNS, free_run_count(&occupied, parameters.unit_area_slots())));
         accounting_entries.push(per_device(STATISTIC_EMPTY_CLUSTER_SEGMENTS, empty_cluster_segment_count(&occupied, parameters.unit_area_slots())));
     }
@@ -3239,9 +3239,9 @@ fn publish_first_file(
 
     // t12 树表单元第 1 版：**十二条**条目按树 ID 升序（D8 已定项 8）；中央映射树的根住根记录、不进树表（D19 已定项 11）；
     // livelist、稀疏旁表、deadlist 与 `deleted_inodes`、墓碑树、谱系树、logged_ops、退役树八棵 day-1 注册、根指针为零（D18 已定项 24 第 6 条）。
-    // 头 ID（D5 已定项 9，2026-09-14 用户定案；D8 已定项 8「头 ID 8 字节的取值」）：inode 树写自己（65537）、extent 树写它服务的那个头（65537）、
+    // 头 ID（D5 已定项 9；D8 已定项 8「头 ID 8 字节的取值」）：inode 树写自己（65537）、extent 树写它服务的那个头（65537）、
     // `deleted_inodes`、墓碑树与退役树写 inode 树的树 ID（65537），其余写 0。
-    // 带指针的四条（extent、inode、分配记录、记账）在这里建，后面接上先建好的八条（树 ID 从 livelist 到退役树，次序同先前）。
+    // 带指针的四条（extent、inode、分配记录、记账）在这里建，后面接上先建好的八条（树 ID 从 livelist 到退役树）。
     let mut tree_table_entries = vec![
         TreeTableEntry { kind: TREE_KIND_EXTENT, tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT), root: extent_pointer, birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
         TreeTableEntry { kind: TREE_KIND_INODE, tree: TreeIdentifier(TREE_IDENTIFIER_INODE), root: inode_root_pointer, birth_txg: txg, head_identifier: TREE_IDENTIFIER_INODE },
@@ -3330,7 +3330,7 @@ fn publish_first_file(
         rollback_floor: CheckpointTxg(0),
         instance_table: genesis.root.instance_table,
         mapping_root: mapping_pointer,
-        // C512 2026-09-23 用户定案：带文件的一版写全零（不是「树表 0 条、写过行」那一格）。
+        // C512：带文件的一版写全零（不是「树表 0 条、写过行」那一格）。
         allocation_record_tree_root: NodePointer::empty_root(),
     };
     let counter = JournalCounter(NEW_POOL_FILE_CREATION_TXG);
@@ -3544,7 +3544,7 @@ fn choose_root(reader: &dyn BlockReader, system_configuration: &SystemConfigurat
 }
 
 /// 全环扫描（D23 已定项 3：不先信 tail），两份镜像任一份合法即算记录在（gap G9）。
-/// 记录头 2026-09-14 起带 fsid（D23 已定项 4）⇒ fsid 不符的记录一律不算数（I-1.4（块头 fsid 一致））。
+/// 记录头带 fsid（D23 已定项 4）⇒ fsid 不符的记录一律不算数（I-1.4（块头 fsid 一致））。
 fn scan_journal(reader: &dyn BlockReader, expected_fsid: u64) -> BTreeMap<(InstanceGeneration, JournalCounter), JournalRecord> {
     let mut records = BTreeMap::new();
     let ring_start = JOURNAL_START_SLOT * SLOT_BYTES;
@@ -3569,7 +3569,7 @@ fn scan_journal(reader: &dyn BlockReader, expected_fsid: u64) -> BTreeMap<(Insta
 
 /// D23 已定项 14 的五条口径里新池新建文件碰得到的三条：jsn 严格连续、(实例代号, checkpoint_txg) 大于根的水位、提交标记齐全；
 /// 在飞记录数上限（D23 已定项 18，第一版 65536）也进前缀判定。
-/// 「施加一条记录」= 把所选根的七个字段换成记录新根段里的那七个（D23 已定项 15，用户 2026-10-02「回到甲」）——
+/// 「施加一条记录」= 把所选根的七个字段换成记录新根段里的那七个（D23 已定项 15）——
 /// 树表单元指针、中央映射树根指针、树 ID 水位、回退下界 F、实例表单元指针、分配记录树根指针、卸载记号；
 /// 只有 fsid 取所选根，实例代号与 checkpoint_txg 照记录头（那次发布的身份就在头里，所以新根段里不重复）。
 fn replay_journal(
@@ -3586,7 +3586,7 @@ fn replay_journal(
     above.sort_by_key(|record| (record.instance, record.counter));
     report.above_water = above.len();
     // 链首接在所选根自己那条记录（同实例、checkpoint_txg 相等）之后；那条读不出时链首只认 checkpoint_txg = 根 txg + 1 的那条
-    // （一次发布一条记录、txg 每次加一；与 crates 同一条规则，里程碑「覆盖写、释放、回退与复用」步 3 三方第一轮攻方腿打中「无锚点时无条件接上」）。
+    // （一次发布一条记录、txg 每次加一；与 crates 同一条规则；无锚点时不能无条件接上）。
     let root_own_record_counter = records.values().find(|record| record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg).map(|record| record.counter.0);
     let mut expected: Option<(InstanceGeneration, JournalCounter)> = root_own_record_counter.map(|counter| (root.instance, JournalCounter(counter + 1)));
     let chain_start_txg_without_anchor = CheckpointTxg(root.checkpoint_txg.0 + 1);
@@ -3623,8 +3623,8 @@ fn replay_journal(
             report.prefix_applied += 1;
             rebuilt = RootRecord {
                 fsid: rebuilt.fsid,
-                // D23 已定项 15（用户 2026-10-02「回到甲」）：卸载记号、实例表指针、分配记录树根指针与前四项一样从记录新根段来，
-                // 不再照抄被施加那条根；只有 fsid 取所选根。
+                // D23 已定项 15：卸载记号、实例表指针、分配记录树根指针与前四项一样从记录新根段来，
+                // 不照抄被施加那条根；只有 fsid 取所选根。
                 unmount_marker: record.new_unmount_marker,
                 instance: record.instance,
                 checkpoint_txg: record.checkpoint_txg,
@@ -3921,7 +3921,7 @@ fn read_tree_root(reader: &dyn BlockReader, kind: u16, tree: TreeIdentifier, poi
     let entry = TreeTableEntry { kind, tree, root: *pointer, birth_txg: CheckpointTxg(0), head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE };
     let key_width = key_width_for_kind(entry.kind).ok_or_else(|| format!("树的种类 {} 没登记", entry.kind))?;
     let bytes = read_unit_via_locations(reader, &entry.root.locations, NODE_BYTES as usize)?;
-    // key 宽住偏移 51（D18 已定项 18，2026-09-14 用户定案）⇒ 解析器自己读得出来，不用调用方先告诉它。
+    // key 宽住偏移 51（D18 已定项 18）⇒ 解析器自己读得出来，不用调用方先告诉它。
     let node = parse_index_node(&bytes).map_err(|error| format!("树 {} 的根 {error:?}", entry.tree.0))?;
     if node.tree != entry.tree {
         return Err(format!("树 {} 的根头里写的树 ID 是 {}", entry.tree.0, node.tree.0)); // I-1.3
@@ -3938,7 +3938,7 @@ fn read_tree_root(reader: &dyn BlockReader, kind: u16, tree: TreeIdentifier, poi
     if node.birth_sequence != entry.root.birth_sequence {
         return Err(format!("树 {} 的根出生序号与指针不符", entry.tree.0));
     }
-    // D8 已定项 11（2026-09-14 用户定案）：条目里 key 一律是条目的前 key 宽 个字节 ⇒ 区间与条目对得上是逐字节比较。
+    // D8 已定项 11：条目里 key 一律是条目的前 key 宽 个字节 ⇒ 区间与条目对得上是逐字节比较。
     if let (Some(first), Some(last)) = (node.entries.first(), node.entries.last()) {
         if first[..key_width] != node.smallest_key[..] || last[..key_width] != node.largest_key[..] {
             return Err(format!("树 {} 的根 key 区间与条目不符", entry.tree.0)); // I-1.1 索引节点那一半
@@ -4036,7 +4036,7 @@ fn walk_to_file(reader: &dyn BlockReader, root: &RootRecord, fsid: &[u8; 16], ma
     if allocation_records.len() != expected_allocation_records {
         return Err(format!("分配记录数 {} 不是 (10 + 2 × 盘数) × 盘数 = {expected_allocation_records}", allocation_records.len()));
     }
-    // D5 已定项 8（2026-09-14 用户定案）：池级三行（待删占用、已承诺预留、inode 号水位）+ 每盘六行
+    // D5 已定项 8：池级三行（待删占用、已承诺预留、inode 号水位）+ 每盘六行
     // （已分配字节、空闲字节、不可回收、defer 待释放、碎片度 runs、全空聚簇段数）⇒ 两盘 15 行。
     if roots.accounting.entries.len() != 3 + 6 * reader.device_count() {
         return Err(format!("记账条目数 {} 不是 3 + 6 × 盘数", roots.accounting.entries.len()));
@@ -4202,11 +4202,11 @@ fn recover(reader: &dyn BlockReader, policy: JournalPolicy, mode: ReaderMode) ->
 
 // ───────────────────────── 层 0 崩溃点枚举（D13 已定项 4）与 oracle（E77 判据 1） ─────────────────────────
 
-/// 关段规则（E142 第十九次跑臂 N19 的 ②；D13（验证路线） 已定项 4 定案句「当前段里每块有写的盘都被自己的屏障或
+/// 关段规则（E142 第十九次跑臂 N19 的 ②；D13（验证路线） 已定项 4 条文「当前段里每块有写的盘都被自己的屏障或
 /// FUA 放行时这一段才关上，有一块盘还没放行，这道屏障（或 FUA）不关段、前后的写同段」「带 FUA 的写只放行它自己那块盘」）。
 /// `split_into_segments` 与 `segment_step_kinds` 共用这一条，两处不各写一份。
 /// 写（含整段清零）把它那块盘记成没放行；屏障放行它那块盘；`fua_is_boundary` 时 FUA 写算一个写、并放行它自己那块盘，
-/// 不开时 FUA 写与普通写一样（只给 `layer0_fua_not_boundary` 与 G6 用，沿用那一格的旧口径）。段里有写且没放行的盘为空才关段。
+/// 不开时 FUA 写与普通写一样（只给 `layer0_fua_not_boundary` 与 G6 用）。段里有写且没放行的盘为空才关段。
 struct SegmentClosingRule {
     fua_is_boundary: bool,
     unreleased_devices: std::collections::BTreeSet<DeviceIdentity>,
@@ -4678,8 +4678,8 @@ fn is_diagonal(predicted: PredictedOutcomeClass, actual: ActualOutcomeClass, act
 /// 不写单元，见 `enumerate_layer0_grouped` 的说明）。
 /// `dependency_groups`：依赖集甲的每一项，一项一组（组内任一份持久就算这一项在——两盘镜像时才用得到分组，
 /// 一盘时每组恰一个下标）。`journal_indices`：这次发布的 journal 记录的全部镜像份数，任一份持久就算记录在
-/// （E142 第十七次跑第二段改成切片：主臂两盘时记录有 2 份镜像，「至少一份持久」才是 D23 已定项 15 的字面；
-/// 单发布流只有一份时切片长度恰 1，行为与改之前的标量 `journal_index` 完全相同）。
+/// （主臂两盘时记录有 2 份镜像，「至少一份持久」才是 D23（journal 的角色与格式） 已定项 15 的字面；
+/// 单发布流只有一份时切片长度恰 1）。
 fn predict_single_publish(persisted: &[bool], root_index: usize, journal_indices: &[usize], dependency_groups: &[Vec<usize>]) -> PredictedOutcomeClass {
     let dependencies_ok = dependency_groups.iter().all(|group| group.iter().any(|&index| persisted[index]));
     let journal_available = journal_indices.iter().any(|&index| persisted[index]);
@@ -4748,7 +4748,7 @@ fn compare_layer0_predictions(
     let mut tally = Layer0Tally::default();
     let mut comparison = PredictionComparison::default();
     for_each_layer0_state(writes.len(), segments, |persisted| {
-        // 单发布流只有一份 journal 镜像；`&[journal_index]` 保持与改之前的标量完全同样的行为。
+        // 单发布流只有一份 journal 镜像，切片长度恰 1。
         let predicted = predict_single_publish(&persisted, root_index, &[journal_index], dependency_groups);
         let predicted_violation = predicted == PredictedOutcomeClass::Violation;
         let role_list = persisted_role_list(&persisted, role_names);
@@ -5088,7 +5088,7 @@ fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &P
 
 /// 并行度取 `SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
 /// 见该脚本文件头注释；这份装置在 `scripts/experiment-apparatus/` 下，不是 `crates/singlefs-verification`，不在它专属
-/// 变量表里）。没设或解析不出正整数就取登记的重活默认并行度（`.claude/heavy-thread-default`，用户 2026-10-12 定）。
+/// 变量表里）。没设或解析不出正整数就取登记的重活默认并行度（`.claude/heavy-thread-default`）。
 fn thread_cap_from_env() -> usize {
     default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))
 }
@@ -6825,8 +6825,8 @@ fn render_g22_text(template: &str, free_bytes_per_device: u64, empty_cluster_seg
         .replace("{FRAGMENTATION_RUNS}", &fragmentation_runs_per_device.to_string())
 }
 
-/// 判据 1：宽度对账的 30 行。「预期」那一列逐格抄自 `.claude/kb/layout/01-first-txn.md` 零到七（2026-09-14 用户定案之后的那一版；
-/// 记录头三行取 D23 已定项 4 / 15 / 17 今天的定案句：头 487、新根段 364、4096 的记录装 64 个点名项），
+/// 判据 1：宽度对账的 30 行。「预期」那一列逐格抄自 `.claude/kb/layout/01-first-txn.md` 零到七（
+/// 记录头三行取 D23 已定项 4 / 15 / 17 的条文：头 487、新根段 364、4096 的记录装 64 个点名项），
 /// 「实测」是装置自己的常量算出来的。两列不等就记一笔 `width_mismatches`。单测钉每一行（M219 把 `journal_header` 的预期写回旧值）。
 fn width_rows() -> [(&'static str, u64, u64); 30] {
     [
@@ -6865,8 +6865,8 @@ fn width_rows() -> [(&'static str, u64, u64); 30] {
 
 // ───────────────────────── E142 第二十一次跑：R56 字段表（登记第七节 7.1 甲表 L1–L21、J1–J24，共 174 行） ─────────────────────────
 //
-// 每一行一个（单元，字段）：**期望值**是登记甲表写的字面量（`layout/01` 今天的原文写了值的取原文，原文还是旧写法或没有这一项的取
-// D8 / D18 / D23 的定案句），**实测值**从这条流写出的字节里按字面字段偏移解出来——偏移、槽号、设备内偏移都是登记 7.2 B5–B11 的字面量，
+// 每一行一个（单元，字段）：**期望值**是登记甲表写的字面量（`layout/01` 原文写了值的取原文，原文没写这一项的取
+// D8 / D18 / D23 的条文），**实测值**从这条流写出的字节里按字面字段偏移解出来——偏移、槽号、设备内偏移都是登记 7.2 B5–B11 的字面量，
 // 不取装置的任何格式常量与解析函数（下面只用几个小端读数的小函数）。`layout/01` 没给具体值的字段（点名项里的出生树、指针里的位置条目校验和、
 // t13 的载荷校验和）不在表里，由 R58 的逐字节比对罩着。
 
@@ -7219,9 +7219,9 @@ fn main() {
         println!("{admission_header_line}");
     }
     let mut emitter = Emitter::new();
-    // 2026-09-18 F1 诊断报告（research/prompts/e142-r11-f1-diagnosis.md）核过：跑前登记第一节第 1 条要求「同 3000 字节内容」，
-    // 这一格此前与 `crates/singlefs-verification/src/scenario.rs::first_file_content()` 的公式不一样，量 5 的 11 处不等全部可以追到这一处；
-    // 主 agent 判定改装置这一侧对齐到 `index % 251`（crates 一侧被 QEMU 读回核对、三份用例与层 0 两条流钉着）。
+    // 跑前登记第一节第 1 条要求「同 3000 字节内容」（F1 诊断报告 research/prompts/e142-r11-f1-diagnosis.md）：
+    // 这一格与 `crates/singlefs-verification/src/scenario.rs::first_file_content()` 用同一个公式 `index % 251`，
+    // crates 一侧被 QEMU 读回核对、三份用例与层 0 两条流钉着，装置这一侧对齐它。
     let file_bytes: Vec<u8> = (0..3000u32).map(|index| u8::try_from(index % 251).expect("小于 256")).collect();
     emit(&mut emitter, &format!(
         "name=config devices=2 physical_block_bytes={PHYSICAL_BLOCK_BYTES} file_bytes={} fsid=fixed device_bytes={DEVICE_BYTES} journal_ring_bytes={JOURNAL_RING_BYTES} journal_ring_slots={JOURNAL_RING_SLOTS} in_flight_limit={JOURNAL_IN_FLIGHT_RECORD_LIMIT} unit_area_start_slot={UNIT_AREA_START_SLOT} unit_area_slots={UNIT_AREA_SLOTS} cluster_segment_slots={CLUSTER_SEGMENT_SLOTS} open_cluster_segment_start={OPEN_CLUSTER_SEGMENT_START_SLOT}",
@@ -7229,7 +7229,7 @@ fn main() {
     ));
 
     // 判据 1：宽度对账。
-    // 「预期」那一列逐格抄自 `.claude/kb/layout/01-first-txn.md` 零到七（2026-09-14 用户定案之后的那一版），
+    // 「预期」那一列逐格抄自 `.claude/kb/layout/01-first-txn.md` 零到七，
     // 「实测」是装置自己的常量算出来的。两列不等就记一笔 `width_mismatches`。
     let width_rows = width_rows();
     let mut width_mismatches = 0u64;
@@ -8002,7 +8002,7 @@ fn main() {
     }
     emit(&mut emitter, &format!("name=gaps count={}", GAPS.len()));
 
-    // 判据 9（2026-09-13 加，D15 已定项 4）：feature bits 的实际字节与「不认识不许挂」。
+    // 判据 9（D15 已定项 4）：feature bits 的实际字节与「不认识不许挂」。
     let system_configuration_slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
     let feature_bits = &system_configuration_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES];
     let mut unknown_incompat_slot = system_configuration_slot.clone();
@@ -8236,7 +8236,7 @@ mod tests {
     use super::*;
 
     fn sample_file() -> Vec<u8> {
-        // 与 main() 里的 file_bytes 同一个公式（2026-09-18 对齐到 crates 的 `index % 251`，见 main() 里的注释）。
+        // 与 main() 里的 file_bytes 同一个公式（对齐 crates 的 `index % 251`，见 main() 里的注释）。
         (0..3000u32).map(|index| u8::try_from(index % 251).expect("小于 256")).collect()
     }
 
@@ -8298,7 +8298,7 @@ mod tests {
         assert_eq!(JOURNAL_HEADER_CHECKSUM_OFFSET, 46);
         assert_eq!(JOURNAL_HEADER_TEN_FIELD_BYTES, 78);
         assert_eq!(JOURNAL_HEADER_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES, JOURNAL_HEADER_TEN_FIELD_BYTES);
-        // 事务号 8 + 提交标记 1 + 本次发布内序号 4（已定项 4，2026-09-24 加）+ 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16 = 409；78 + 409 = 487
+        // 事务号 8 + 提交标记 1 + 本次发布内序号 4（已定项 4）+ 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16 = 409；78 + 409 = 487
         // （第二十一次跑登记 7.2 B5）。
         assert_eq!(JOURNAL_HEADER_TEN_FIELD_BYTES + 8 + 1 + 4 + 4 + 4 + JOURNAL_NEW_ROOT_SEGMENT_BYTES + 8 + 16, JOURNAL_HEADER_BYTES);
         assert_eq!(JOURNAL_HEADER_BYTES, 487);
@@ -8356,7 +8356,7 @@ mod tests {
         assert_eq!(JOURNAL_RING_BYTES, 805_306_368);
         assert_eq!(JOURNAL_RING_SLOTS, 196_608);
         assert_eq!(JOURNAL_IN_FLIGHT_RECORD_LIMIT, 65_536);
-        // 钉绝对值：这一格此前写成记录宽 4096，而合计对账只对宽度不对取值，抓不到。
+        // 钉绝对值：合计对账只对宽度不对取值，取值写错抓不到。
         assert_eq!(JOURNAL_WORST_CASE_BYTES, 268_435_456);
         assert_eq!(JOURNAL_WORST_CASE_BYTES, JOURNAL_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES);
         assert_eq!(UNIT_AREA_START_SLOT, 50_176);
@@ -8385,7 +8385,7 @@ mod tests {
         assert_eq!((NODE_BYTES as usize - with_reserved(8)) / INODE_INTERNAL_ENTRY as usize, 135);
     }
 
-    /// key 宽住偏移 51（D18 已定项 18，2026-09-14 用户定案）：解析器不用先知道这是哪棵树就找得到头末端。
+    /// key 宽住偏移 51（D18 已定项 18）：解析器不用先知道这是哪棵树就找得到头末端。
     /// 这是 G2 收口那一格的会红检查——把 key 宽写进别的偏移，解析当场失败。
     #[test]
     fn the_key_width_field_sits_at_offset_51_so_the_header_locates_itself() {
@@ -8428,7 +8428,7 @@ mod tests {
         assert_eq!(&steps[31..], ["system_configuration_slot", "system_configuration_slot", "barrier", "barrier"]);
         assert_eq!(output.record.named.len(), 12, "t1..t12（第七节 B6「named=12」）");
         assert_eq!(output.record.named.iter().map(|named| named.locations.len()).sum::<usize>(), 24, "第七节 B6「location_entries=24」");
-        // D3 已定项 10 ⑤（2026-09-14 用户定案）：t1 用户数据取不在开放聚簇段里的最低 32768 对齐空槽对；
+        // D3 已定项 10 ⑤：t1 用户数据取不在开放聚簇段里的最低 32768 对齐空槽对；
         // t2..t12 从开放段 [50240, 50304) 按「树 ID 升序、树内先叶后根、映射树倒数第二、树表最末」bump（分配记录树内按
         // 「先叶后根、同层设备升序」），而 t3 是码 3 容器、要起点 32768 对齐 ⇒ 跳过 50241（第七节 B2）。
         let slots: Vec<u64> = output.units_by_slot.iter().map(|(slot, _, _)| slot.0).collect();
@@ -8469,7 +8469,7 @@ mod tests {
         }
         assert_eq!(readable, 3);
         assert_eq!(ring_region_offset(2).0, 7 << 20);
-        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零（这里直接查 mkfs 自己构造的根，不是靠 to_slot/parse_slot 往返——
+        // C512：mkfs 第 0 代写全零（这里直接查 mkfs 自己构造的根，不是靠 to_slot/parse_slot 往返——
         // 往返只证明「写的值读得回来」，证不了写的值就是全零，两者是不同的命题）。
         assert!(genesis.root.allocation_record_tree_root.is_empty_root(), "mkfs 第 0 代的分配记录树根指针全零");
         // D23 已定项 16：mkfs 写实例代号 0，单元写序 (0, 0)；树 ID 水位就是第一个要发的树 ID。
@@ -8489,8 +8489,8 @@ mod tests {
         }
     }
 
-    /// 系统配置 489（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段；2026-09-26 用户定案再加
-    /// 回退下界 F 8 字节，481 → 489）：每个字段按**绝对偏移**读一遍，以及「整槽校验和罩整个 4096 槽」——
+    /// 系统配置 489（D22 已定项 9 + 已定项 15，含自举头与几何段的四个字段、末尾的
+    /// 回退下界 F 8 字节）：每个字段按**绝对偏移**读一遍，以及「整槽校验和罩整个 4096 槽」——
     /// 改 489 之后那 3607 字节补齐里的任何一个字节，解析都要拒绝。
     #[test]
     fn system_configuration_is_489_bytes_and_the_slot_checksum_covers_all_4096() {
@@ -8500,12 +8500,12 @@ mod tests {
         assert!(SystemConfiguration::parse_slot(&slot).is_some());
         let read_u64 = |offset: usize| u64::from_le_bytes(slot[offset..offset + 8].try_into().expect("切了 8 字节"));
         let read_u32 = |offset: usize| u32::from_le_bytes(slot[offset..offset + 4].try_into().expect("切了 4 字节"));
-        // 自举头 2026-09-14 加的两个字段：写入者身份 20（偏移 118）与校验和算法标识 1（偏移 138）。
+        // 自举头的两个字段：写入者身份 20（偏移 118）与校验和算法标识 1（偏移 138）。
         assert_eq!(&slot[118..118 + WRITER_IDENTITY_NAME.len()], WRITER_IDENTITY_NAME, "实现标识 ASCII");
         assert!(slot[118 + WRITER_IDENTITY_NAME.len()..134].iter().all(|byte| *byte == 0), "实现标识零补齐到 16");
         assert_eq!(read_u32(134), 1, "写入者版本（I-1.5、D17 债 3）");
         assert_eq!(slot[138], 1, "校验和算法标识 = 1 CRC-32C（I-2.2、C309）");
-        // 几何段 2026-09-14 加的两个字段：mkfs 时的 physical_block_size（偏移 321）与扩展点声明值 N（325）。
+        // 几何段的两个字段：mkfs 时的 physical_block_size（偏移 321）与扩展点声明值 N（325）。
         assert_eq!(read_u32(317), 512, "mkfs 时的 physical_block_size（D13 已定项 5 的比对输入）");
         assert_eq!(read_u32(321), 0, "扩展点声明值 N（D21 已定项 8，第一版 0）");
         assert_eq!(read_u64(333), 805_306_368, "journal 环长 768 MiB（D23 已定项 19 ③）");
@@ -8518,7 +8518,7 @@ mod tests {
         assert_eq!(read_u32(425), 512, "mkfs 时的 io_min（D2 已定项 19）");
         assert_eq!(read_u32(429), 4096, "固定结构槽距（D2 已定项 19）");
         assert!(slot[445..469].iter().all(|byte| *byte == 0), "整理三条水位 24 字节恒 0（D22 已定项 15）");
-        // 回退下界 F（2026-09-26 用户定案）：住 [481, 489)，新池新建文件里没有抬 F，恒 0（D16 已定项 1）。
+        // 回退下界 F：住 [481, 489)，新池新建文件里没有抬 F，恒 0（D16 已定项 1）。
         assert_eq!(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET, 481);
         assert_eq!(read_u64(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET), 0, "新池新建文件里没有抬 F");
         assert!(slot[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0), "489 之后的 3607 字节补齐恒 0");
@@ -8538,7 +8538,7 @@ mod tests {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, _) = mkfs(&parameters);
         let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        // 2026-09-26 用户定案：布局身份在位 1，位 0 空出（D15 已定项 4）；2026-10-17 用户定案：新开位 2（inode 记录带截断字段），mkfs 起就置上。
+        // 布局身份在位 1，位 0 空出（D15 已定项 4）；位 2 是 inode 记录带截断字段，mkfs 起就置上。
         assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], 0x06, "mkfs 起 incompat 位 1 与位 2 都置 1（判决 m4-trunc-r2 第六节）");
         assert!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
         assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样（byte0 = 0x06）可挂");
@@ -8628,7 +8628,7 @@ mod tests {
         let report = recover(&recording.pool, JournalPolicy::Consult, ReaderMode::Clause);
         assert_eq!(report.outcome, RecoveryOutcome::FileRead { root: (InstanceGeneration(1), CheckpointTxg(3)), content: sample_file() });
         assert_eq!(report.journal.valid_records, 3, "两条暖机空记录 + 事务记录");
-        // 记录头 2026-09-14 带 fsid：把三条记录的 fsid 段全改成别的池，扫描一条都不认（I-1.4）。
+        // 记录头带 fsid：把三条记录的 fsid 段全改成别的池，扫描一条都不认（I-1.4）。
         let mut alien = recording.pool.clone();
         for counter in 1..=3u64 {
             let offset = journal_record_offset(JournalCounter(counter));
@@ -8743,7 +8743,7 @@ mod tests {
         // mkfs 之后的种类字母表仍是这五个：新的 zero_fill 只出现在 mkfs 自己的段里。
         let alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(post_mkfs_operations, true).concat().iter().map(|kind| kind.tag()).collect();
         assert_eq!(alphabet.into_iter().collect::<Vec<_>>(), vec!["barrier", "journal_record", "root_record_fua", "system_configuration_slot", "unit_write"]);
-        // 整条录制流（含 mkfs）的字母表五种改六种（D22 已定项 8 第 3 条 2026-09-23 用户定案改写，新增 zero_fill），
+        // 整条录制流（含 mkfs）的字母表六种（D22 已定项 8 第 3 条，含 zero_fill），
         // 与 layout/01-first-txn.md 八「mkfs 种根」那一行登记的真值（六种）同形。
         let global_alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(&recording.operations, true).concat().iter().map(|kind| kind.tag()).collect();
         assert_eq!(
@@ -9512,7 +9512,7 @@ mod tests {
         assert_eq!(parse_data_unit(&reserved_flipped).unwrap_err(), UnitError::PayloadChecksum, "预留位在载荷 CRC 覆盖内");
     }
 
-    /// D23 已定项 13（2026-09-14 用户定案改写）：`header_csum` 覆盖**整条记录 [0, 4096) 含补齐**。
+    /// D23 已定项 13：`header_csum` 覆盖**整条记录 [0, 4096) 含补齐**。
     /// 三处各翻一个字节，三处都要被抓——尤其最后那处：点名项之后的补齐区，只罩头的那个读法抓不到它。
     #[test]
     fn the_journal_header_checksum_covers_the_whole_record_including_the_padding() {
@@ -9785,8 +9785,8 @@ mod tests {
         assert_eq!(report.journal.above_water, 0, "前缀规则不跨实例边界：above_water 在过滤之后就该是 0");
     }
 
-    /// 根记录 457（D22 已定项 7 的字段表，2026-09-14 用户定案在中央映射树根指针之后加算法类型 1 + nonce 12 + MAC 16；
-    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案在映射树根指针与那三段之间再插分配记录树根指针 86）：
+    /// 根记录 457（D22 已定项 7 的字段表，中央映射树根指针之后是算法类型 1 + nonce 12 + MAC 16；
+    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款）：映射树根指针与那三段之间是分配记录树根指针 86）：
     /// 自证校验和罩整个 512 槽（D18 已定项 17），末尾 29 字节第一版全 0，分配记录树根指针这个装置的场景里也恒 0。
     #[test]
     fn root_record_is_457_bytes_and_carries_the_mapping_tree_root() {
@@ -9817,7 +9817,7 @@ mod tests {
         assert_eq!(NodePointer::read_from(&mut allocation_record_tree_root_bytes), output.root.allocation_record_tree_root);
     }
 
-    /// journal 记录头 487（D23 已定项 15 的新根段 364 七项 + 2026-09-14 加的 fsid 8 与 MAC 16 + 2026-09-24 加的
+    /// journal 记录头 487（D23 已定项 15 的新根段 364 七项 + fsid 8 与 MAC 16 +
     /// 记录标志 1 与本次发布内序号 4）；点名项 56 的 key 尾段凑得出中央映射的 6 条 key（已定项 17 末句），一律 27 字节。
     /// 新根段后三项（实例表指针、分配记录树根指针、卸载记号）按绝对偏移钉（登记 7.2 B6、B10、J18–J21；
     /// M210、M211、M212、M213、M218 的会红检查落在这里）。
@@ -9866,7 +9866,7 @@ mod tests {
     }
 
     /// 中央映射树：**10** 条条目（第七节 B7「mapping_entries=10」，分配记录树的五个新节点各占一条）——
-    /// 一宽 55、key 一律 27（D19 已定项 10，2026-09-14 用户定案回定宽）；码 2 / 码 3 的 25 字节 key 末尾补两个零，
+    /// 一宽 55、key 一律 27（D19 已定项 10）；码 2 / 码 3 的 25 字节 key 末尾补两个零，
     /// 补零进 key 本身而不只是区间字段。
     #[test]
     fn mapping_tree_holds_one_entry_width_and_pads_short_keys_into_the_key_itself() {
@@ -9911,7 +9911,7 @@ mod tests {
     }
 
     /// 条目宽字段写坏了，解析器要当场拒绝（D8（核心索引结构） 已定项 11：声明长度 = 条目数 × 条目宽）。
-    /// 第七次跑的变异 M62 逼出来的：此前那条结构检查一条测试都没碰过，整段删掉也没人红。
+    /// 变异 M62 钉着它：这条结构检查整段删掉要有测试红。
     #[test]
     fn the_parser_refuses_an_entry_width_field_that_contradicts_the_declared_length() {
         let BuiltPool { output, .. } = built_pool();
@@ -9950,7 +9950,7 @@ mod tests {
         assert_eq!(output.allocation_records[0].key_bytes().len(), 10);
         let slots_per_device: Vec<u64> = output.allocation_records.iter().filter(|record| record.device == DeviceIdentity(0)).map(|record| record.slot.0).collect();
         assert_eq!(slots_per_device, vec![50176, 50178, 50180, 50240, 50242, 50244, 50245, 50246, 50247, 50248, 50249, 50250, 50251, 50252]);
-        // D5 已定项 8（2026-09-14 用户定案）：两盘时 **15 行**，seq 一律 1、代一律 3——这一项不随分配记录树的节点数变。
+        // D5 已定项 8：两盘时 **15 行**，seq 一律 1、代一律 3——这一项不随分配记录树的节点数变。
         assert_eq!(output.accounting_entries.len(), 15);
         assert!(output.accounting_entries.iter().all(|entry| entry.sequence == 1 && entry.generation == CheckpointTxg(3)));
         let value_of = |statistic: u16| output.accounting_entries.iter().find(|entry| entry.statistic == statistic).expect("统计量").value;
@@ -10136,7 +10136,7 @@ mod tests {
         let retirement_entry = &parsed[11];
         assert_eq!((retirement_entry.tree, retirement_entry.kind, retirement_entry.head_identifier, retirement_entry.birth_txg), (TreeIdentifier(TREE_IDENTIFIER_RETIREMENT), 13, 65537, CheckpointTxg(3)), "退役树条目");
         assert!(retirement_entry.root.is_empty_root(), "退役树零根");
-        // 条目里 key 一律打头（D8 已定项 11，2026-09-14 用户定案）：区间就是首末两条的前 8 字节。
+        // 条目里 key 一律打头（D8 已定项 11）：区间就是首末两条的前 8 字节。
         assert_eq!(&node.entries[0][..8], &65536u64.to_le_bytes()[..]);
         assert_eq!(&node.entries[11][..8], &TREE_IDENTIFIER_RETIREMENT.to_le_bytes()[..]);
         assert_eq!(node.smallest_key, 65536u64.to_le_bytes().to_vec());
@@ -10172,7 +10172,7 @@ mod tests {
         assert_eq!(leaf.record_width as u64, INODE_RECORD_BYTES);
         assert_eq!(leaf.records.len(), 1);
         assert_eq!(InodeRecord::parse(&leaf.records[0]).expect("记录").size, 3000);
-        // C480（inode 记录的 blocks 怎么算全仓没有条款） 2026-09-23 用户定案：blocks = ⌈文件字节数 ÷ 512⌉ = ⌈3000 ÷ 512⌉ = 6
+        // C480（inode 记录的 blocks 怎么算全仓没有条款）：blocks = ⌈文件字节数 ÷ 512⌉ = ⌈3000 ÷ 512⌉ = 6
         // （逻辑长度的 512 字节块数，不表示分到的空间）；blocks 不在 InodeRecord 结构体里（它是写时算的一个派生量，
         // 不是从盘上读回来再参与判定的那种字段），这里直接按偏移 48 核对写出来的原始字节。
         assert_eq!(u64::from_le_bytes(leaf.records[0][48..56].try_into().expect("切了 8 字节")), 6, "blocks");
@@ -10331,7 +10331,7 @@ mod tests {
 
     #[test]
     fn sha256_of_the_actual_root_record_bytes_matches_the_crates_side_reference_value() {
-        // 这个十六进制串与 sha256 都是 2026-09-18 从 `cargo run -p singlefs-verification --bin new_pool_file_creation_region_bytes`
+        // 这个十六进制串与 sha256 都是从 `cargo run -p singlefs-verification --bin new_pool_file_creation_region_bytes`
         // 的真实产出里摘的一行（`region=root_record device=0`），用来钉住「这份手写 SHA-256 与 crates 侧算的是同一个函数」，
         // 不是只对着标准测试向量自证。
         let hex = "534653525f5346532d453134322d303030312d000000000001000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000048c40000000024acb30e0100000048c40000000024acb30e010000000000000013000000000000000000000000000000afc75d3e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c40000000021aa2fd40100000000c40000000021aa2fd40000000000000000000000000000000000000000000000000000000000000000000000000000000000000f0000000000000003000000000000000000000047c400000000bedfaead0100000047c400000000bedfaead01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";

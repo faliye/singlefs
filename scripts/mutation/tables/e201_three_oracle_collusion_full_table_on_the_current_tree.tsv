@@ -50,3 +50,5 @@ V14 哨兵不挑	    sentinels = tuple(sorted(order[:sentinel_count(len(reusable
 落地 线道树同步不走共用库的闭包	SYNCED_ENTRIES = lib_repository_copy.copy_closure(e171_research_side.REPOSITORY_ROOT).entries	SYNCED_ENTRIES = lib_repository_copy.COMMON_ENTRIES
 落地 入口不交多机配置	    os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(REPOSITORY_ROOT, os.environ))	    pass
 落地 逐行驱动不交多机配置	    os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(e171_research_side.REPOSITORY_ROOT, os.environ))	    pass
+落地 逐行驱动线道数默认写死 1	    parser.add_argument("--lanes", type=int, default=None,	    parser.add_argument("--lanes", type=int, default=1,
+落地 逐行驱动不给线道数时只开一条	        lanes = max(1, registered_threads // max(1, threads if threads is not None else LANE_THREADS))	        lanes = 1

@@ -37,7 +37,7 @@ check 用清单开头记的仓根；改过的逐行写「改过 <路径>（拷�
       「用法错：copy 没给文件」
   COPY_ORIGINALS_BREAK=guard-off  refuse_break_outside_selftest() 不拒平常跑时设上的弄坏开关；它是关守卫项，只在它是唯一一项时认，与别的项同写照拒并点名它
       「平常跑设了弄坏开关退 2 并点名只在自证里认」
-  COPY_ORIGINALS_BREAK=guard-off-with-others  refuse_break_outside_selftest() 关守卫项与别的项同写也照认（改前的样子）；这一项只在自证进程本身里认
+  COPY_ORIGINALS_BREAK=guard-off-with-others  refuse_break_outside_selftest() 关守卫项与别的项同写也照认；这一项只在自证进程本身里认
       「关守卫项与别的项同写：进程里也拒并点名它」
   SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  .claude/hooks/lib_work_root.py 的开关：scratch_roots() 另认会话临时目录根（撤掉之前的放行）
       「拒会话临时目录根下的草稿目录」
@@ -106,7 +106,7 @@ def refuse_break_outside_selftest(arguments, value=None, in_selftest=False):
     if items == [GUARD_OFF_ITEM]:   # 关守卫项单独一项：这一道不拒（给自证里「平常跑设了弄坏开关退 2」那一格证红）
         return None
     if GUARD_OFF_ITEM in items:
-        if in_selftest and break_is_set("guard-off-with-others"):   # 弄坏开关 guard-off-with-others：同写也照认（改前的样子）
+        if in_selftest and break_is_set("guard-off-with-others"):   # 弄坏开关 guard-off-with-others：同写也照认
             return None
         print(f"  ✗ {BREAK_VARIABLE}={value} 是弄坏开关，只在自证（--selftest）里认；关守卫项 {GUARD_OFF_ITEM} 只在它是唯一一项时认，与别的项同写照拒，这一次什么都没做")
         print(f"     → 怎么办：unset {BREAK_VARIABLE} 再来；要关这一道就单独设 {BREAK_VARIABLE}={GUARD_OFF_ITEM}；要看开关红在哪一格，一次只设一项跑 --selftest")

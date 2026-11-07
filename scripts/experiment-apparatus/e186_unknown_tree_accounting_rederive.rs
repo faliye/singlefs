@@ -7,7 +7,7 @@
 //!
 //! ## 谓词直接引的条款句子（整段原文在跑前登记第二节）
 //!
-//! - D5（快照 / 空间记账机制） 已定项 2 定案：「每条根的记账树只装这条根那一代的行，不留多代」；「例外是 inode 号水位那一统计量的台阶行：随根一直留着」。
+//! - D5（快照 / 空间记账机制） 已定项 2：「每条根的记账树只装这条根那一代的行，不留多代」；「例外是 inode 号水位那一统计量的台阶行：随根一直留着」。
 //! - D5（快照 / 空间记账机制） 已定项 2 射程：「记账在 inode 号水位变了的每次发布给这一统计量留一行台阶行 (g, H)」「克隆头的台阶行按 (统计量, 树) 分」
 //!   ⇒ 台阶行按 (统计量, 树) 认、看的是那次发布那个头的水位变没变（`WatermarkChangeHistory`），不按代段语法认。
 //! - D5（快照 / 空间记账机制） 已定项 4 射程：「读一个统计量的现行值 = 取该维度元组下代号最大的那一行，空表示从未维护过、不是 0」
@@ -20,7 +20,7 @@
 //! 1 误释放 → 2 违反语义 → 3 丢行（元组） → 4 静默 → 5 不可写代数 → 6 要改几条已定条款 → 7 每代写行。
 //! 不设「挂得上才比」的筛子：十五格每一格都进比较。
 //!
-//! ## 第二次跑（重跑登记 `research/prompts/e186-preregistration.md` 的「第二次跑（重跑登记，2026-10-20）」一节）
+//! ## 第二次跑（重跑登记 `research/prompts/e186-preregistration.md` 的「第二次跑（重跑登记）」一节）
 //!
 //! 同一个 bin 加参数 `--judgement <vacuous-u5|dangling-u5>`：不带参数等于 `vacuous-u5`，逐行照第一次跑的判据算，
 //! 产物逐字节等于第一次跑的产物；`dangling-u5` 是第二次跑的判据（新 U5 谓词与新的反向接受条款）。
@@ -566,7 +566,7 @@ fn every_step_of_the_previous_version_is_kept(previous: &AccountingVersion, vers
 /// 登记第六节条款清单 U1–U13（一条 = 一个已定项或不变量清单的一行）。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum ClauseUnit {
-    /// U1：D5 已定项 2（定案与射程「inode 号水位的台阶行」）。
+    /// U1：D5 已定项 2（条文与射程「inode 号水位的台阶行」）。
     DecisionFiveItemTwoGenerationAndSteps,
     /// U2：D5 已定项 4 射程第 12 项那一条。
     DecisionFiveItemFourWatermarkRows,
@@ -574,7 +574,7 @@ enum ClauseUnit {
     DecisionEightItemOneWholeBatch,
     /// U4：D8 已定项 6「水位行……照台阶行的规矩写」。
     DecisionEightItemSixWatermarkRowRule,
-    /// U5：D8 已定项 12 定案「含已定项 8 ㊀ 那类旧写者搬运的记账行」。
+    /// U5：D8 已定项 12 条文「含已定项 8 ㊀ 那类旧写者搬运的记账行」。
     DecisionEightItemTwelveCarriedRows,
     /// U6：D16 已定项 9「每次发布把这一代的行全写一遍」。
     DecisionSixteenItemNineRewriteEachPublish,
@@ -1940,7 +1940,7 @@ enum Consequence {
     CarryStandsTieKnownToUser,
     /// ㊀ 翻面成这一条臂。
     FlipsTo(AccountingPolicy),
-    /// ㊀ 翻面，换成哪一条交用户定。
+    /// ㊀ 翻面，换成哪一条交用户判。
     FlipChoiceToUser,
     /// 不判翻面也不判站住，交用户。
     LeftToUser,

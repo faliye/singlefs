@@ -36,15 +36,15 @@
       指到标题行（「✗ 自检：指到标题行：应当判红」）
   CITE_CHECK_BREAK=title-any-section  judge_section() 不要求标题恰好命中一次，原文在整份文件里找
       小节写法：标题不在（「✗ 自检：小节写法：标题不在：应当判红」）
-  CITE_CHECK_BREAK=bare-line-refs-ignored  citations_in() 不收裸行号（改前的样子），超出文件的裸行号既不判红也不数
+  CITE_CHECK_BREAK=bare-line-refs-ignored  citations_in() 不收裸行号，超出文件的裸行号既不判红也不数
       裸行号超出文件（「✗ 自检：裸行号超出文件：应当判红」）、裸行号区间的止超出文件（「✗ 自检：裸行号区间的止超出文件：应当判红」）、
       裸行号只写文件名、仓里唯一（「✗ 自检：裸行号只写文件名、仓里唯一：应当判红」）、
       裸行号在范围内（「✗ 自检：裸行号在范围内：应当数 1 处裸行号、列进没判」）、裸行号区间在范围内（「✗ 自检：裸行号区间在范围内：应当数 1 处裸行号、列进没判」）、
       裸行号路径认不出（「✗ 自检：裸行号路径认不出：应当数 1 处裸行号、列进没判」）、命令行那两格裸行号报数（「✗ 自检：命令行 […/bare-red.md …」「✗ 自检：命令行 […/bare-green.md …」）
-  CITE_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、读不了的文件与写错的 --unchanged-since（改前的样子）
+  CITE_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、读不了的文件与写错的 --unchanged-since
       命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
       连带红的格：「✗ 自检：命令行 ['-h'] 应当退 0」、「✗ 自检：命令行 ['--bogus', '…'] 应当退 2」、「✗ 自检：命令行 ['…nothere.md'] 应当退 2」、「✗ 自检：命令行 ['…', '--background', '…'] 应当退 2」、「✗ 自检：命令行 ['…', '--unchanged-since', '昨天'] 应当退 2」
-  CITE_CHECK_BREAK=non-git-root-unindexed  tracked_files_by_basename() 在不是 git 仓根的 --root 上不按目录找文件名、交空表（改前的样子：只写文件名的引文一律认不出、只列进没判；
+  CITE_CHECK_BREAK=non-git-root-unindexed  tracked_files_by_basename() 在不是 git 仓根的 --root 上不按目录找文件名、交空表（只写文件名的引文一律认不出、只列进没判；
       records/2026-10-23-subagent拆分提案.md 第一百二十二节 ①）
       非 git 根上只写文件名的引文行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）、非 git 根上只写文件名的引文对上（「✗ 自检：非 git 根上只写文件名、对上：应当判绿且判了」）
 """
@@ -92,7 +92,7 @@ def citations_in(report_text):
                 if key not in seen:
                     seen.add(key)
                     found.append((line_number, match.group("path"), first, last, match.group("quote")))
-        if BROKEN == "bare-line-refs-ignored":   # 弄坏开关：裸行号不认（改前的样子）
+        if BROKEN == "bare-line-refs-ignored":   # 弄坏开关：裸行号不认
             continue
         outside_quotes = re.sub(QUOTE, lambda quoted: " " * len(quoted.group(0)), line)   # 引号里的字不扫；长度不变，下标对得上
         for match in BARE_LINE_REF.finditer(outside_quotes):
@@ -117,7 +117,7 @@ def tracked_files_by_basename(root):
             relatives = list(dict.fromkeys(os.fsdecode(path) for path in output.split(b"\0") if path))
     except (OSError, subprocess.CalledProcessError):
         pass
-    if relatives is None and BROKEN == "non-git-root-unindexed":   # 弄坏开关：非 git 根上不按目录找（改前的样子）
+    if relatives is None and BROKEN == "non-git-root-unindexed":   # 弄坏开关：非 git 根上不按目录找
         return {}
     if relatives is None:
         relatives = []

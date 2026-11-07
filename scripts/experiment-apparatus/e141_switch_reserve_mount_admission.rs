@@ -6,14 +6,14 @@
 //! 挂载判定（D2（RAID 条带策略） 已定项 13「实例切换的预留拿得到」）：每块盘上
 //! 容量 − 已分配 − 不可回收 − defer 待释放 ≥ 这块盘的份额。纯算术，确定性。
 //!
-//! 2026-09-13 加暖机那一半（D16（发布语义） 已定项 8 + D28（挂载期承诺量） 已定项 3 的连带）：一次切换还要加
+//! 暖机那一半（D16（发布语义） 已定项 8 + D28（挂载期承诺量） 已定项 3 的连带）：一次切换还要加
 //! 「至多 R = 3 次空发布 × 现算的 c_max」，c_max 按 D28（挂载期承诺量） 已定项 4 每次发布现算、装置把它当输入扫两档
 //! （E148（提交固定点按两棵记录树重算）：新池新建文件规模 4 块、池规模 9 块）。第一个可运行目标两块盘互为镜像
 //! （E142（新池新建文件的干跑） 每个单元写到每块盘），所以空发布的 c_max 块每块盘各占一份，份额按设备加。
 //!
-//! 2026-09-14 预留多一份（C329（写行那次发布之前推抬 F 的空发布没有检查） 三轮三方后用户定案）：每次可写挂载都写行，
+//! 预留多一份（C329（写行那次发布之前推抬 F 的空发布没有检查） ）：每次可写挂载都写行，
 //! 写行那次是新实例的第一次发布、不推抬 F 的空发布，它的元数据走切换预留 ⇒ 份数 = N_switch + 1，链重写与暖机两半都乘这个份数；
-//! 片数仍按 rows0 + N_switch 算（rows0 从这一天起含写行那次要写的行）。
+//! 片数仍按 rows0 + N_switch 算（rows0 含写行那次要写的行）。
 
 use e7_index_bench::Emitter;
 
@@ -27,7 +27,7 @@ const BLOCK_BYTES: u64 = 16384;
 const INSTANCE_TABLE_COPIES: u64 = 2;
 /// 一次挂载允许的实例切换次数 N_switch（D23（journal 的角色与格式） 已定项 14）。
 const SWITCHES_PER_MOUNT: u64 = 3;
-/// 写行那次发布那一份（C329（写行那次发布之前推抬 F 的空发布没有检查） 2026-09-14 用户定案）。
+/// 写行那次发布那一份（C329（写行那次发布之前推抬 F 的空发布没有检查））。
 const ROW_WRITING_PUBLISH_SHARES: u64 = 1;
 /// 预留的份数 = N_switch + 写行那次发布那一份。
 const RESERVED_SHARES_PER_MOUNT: u64 = SWITCHES_PER_MOUNT + ROW_WRITING_PUBLISH_SHARES;
@@ -35,11 +35,11 @@ const RESERVED_SHARES_PER_MOUNT: u64 = SWITCHES_PER_MOUNT + ROW_WRITING_PUBLISH_
 const EMPTY_PUBLISHES_PER_SWITCH: u64 = 3;
 /// c_max 的两档取样：E148（提交固定点按两棵记录树重算） 新池新建文件规模 4 块、池规模 9 块；它是现算的量，装置当输入扫。
 const CHECKPOINT_COST_SAMPLES: [u64; 2] = [4, 9];
-/// 暖机份额的手算表（跑前写死；2026-09-14 第三次跑之前按 N_switch + 1 份重算）：(c_max, 每块盘的暖机块数 = (N_switch + 1) × R × c_max)。
+/// 暖机份额的手算表（跑前写死；按 N_switch + 1 份算）：(c_max, 每块盘的暖机块数 = (N_switch + 1) × R × c_max)。
 const HAND_COMPUTED_WARM_UP_SHARE_BLOCKS: [(u64, u64); 2] = [(4, 48), (9, 108)];
-/// 链指针还是 59 宽时的实例表行宽（2026-09-13 之前 D18（块里携带什么信息） 已定项 11 的值）。
+/// 链指针还是 59 宽时的实例表行宽（D18（块里携带什么信息） 已定项 11 的值）。
 const ROW_BYTES_WITH_59_WIDE_POINTER: u64 = 64;
-/// 2026-09-13 起的实例表行宽：链指针记录 1 + 1 + 83 + 3（C304（实例表链指针记录装不下 83 宽的指针） 收口）。
+/// 现行的实例表行宽：链指针记录 1 + 1 + 83 + 3（C304（实例表链指针记录装不下 83 宽的指针） 收口）。
 const ROW_BYTES_WITH_83_WIDE_POINTER: u64 = 88;
 /// 第一个可运行目标跑两块盘（D2（RAID 条带策略） 已定项 9）。
 const DEVICE_COUNT: usize = 2;
@@ -52,7 +52,7 @@ const SLACK_BLOCKS_ON_OTHER_DEVICE: u64 = 100;
 const DEVICE_DIMENSION_SLACK_BLOCKS: u64 = 50;
 const ROWS_AT_MOUNT_SAMPLES: [u64; 7] = [0, 366, 367, 505, 506, 1014, 4064];
 const ROW_BYTES_SAMPLES: [u64; 2] = [ROW_BYTES_WITH_59_WIDE_POINTER, ROW_BYTES_WITH_83_WIDE_POINTER];
-/// 判据 4 的手算表（跑前登记里写死；2026-09-14 第三次跑之前按 N_switch + 1 份重算，片数不变）：(rows0, 行宽, 总预留的 16 KiB 块数)。
+/// 判据 4 的手算表（跑前登记里写死；按 N_switch + 1 份算，片数不变）：(rows0, 行宽, 总预留的 16 KiB 块数)。
 const HAND_COMPUTED_TOTAL_BLOCKS: [(u64, u64, u64); 14] = [
     (0, 64, 16), (366, 64, 16), (367, 64, 16), (505, 64, 16), (506, 64, 32), (1014, 64, 48), (4064, 64, 144),
     (0, 88, 16), (366, 88, 16), (367, 88, 32), (505, 88, 32), (506, 88, 32), (1014, 88, 48), (4064, 88, 192),
@@ -104,7 +104,7 @@ fn reserve_total_blocks(rows_at_mount: u64, row_bytes: u64, checkpoint_cost_bloc
 /// 判据 5 的错法：取样点要分得开它们与 D28（挂载期承诺量） 已定项 3 的式子。
 #[derive(Clone, Copy, Debug)]
 enum WrongForm {
-    /// C126 第一轮材料的甲：逐次累加、+1、每片 509。
+    /// C126 材料的甲：逐次累加、+1、每片 509。
     FirstRoundCandidate,
     /// 每片不减链指针记录。
     NoChainPointerPerPage,
@@ -112,11 +112,11 @@ enum WrongForm {
     FixedRowWidth,
     /// 逐次累加代替 N_switch × 最坏一次。
     SummedInsteadOfWorstTimesSwitches,
-    /// 漏掉暖机那一半（2026-09-13 之前的式子）。
+    /// 漏掉暖机那一半。
     NoWarmUp,
     /// 暖机只按池级一份算，不按镜像每块盘各一份。
     WarmUpPoolLevelOnly,
-    /// 漏掉写行那次发布那一份：只按 N_switch 份算（2026-09-14 之前的式子）。
+    /// 漏掉写行那次发布那一份：只按 N_switch 份算。
     NoRowWritingPublishShare,
 }
 

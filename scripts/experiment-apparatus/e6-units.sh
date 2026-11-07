@@ -12,22 +12,24 @@
 # ⚠️ **屏蔽 AES-NI 必须同时屏蔽 vaes。** `aes` 0.9.3 用 cpufeatures 分别探
 # `aes` 与 `vaes` 两个 CPUID 位（`src/lib.rs` 第 152–154 行）。只写 `-aes` 时
 # 来宾仍然看得见 VAES ⇒ **跑得和有 AES-NI 一样快，而算出来的标签是错的**
-# （2026-08-31 实测：tag=2112edc9… 而外部实现给 62d27233…）。
+# （实测：tag=2112edc9… 而外部实现给 62d27233…）。
 # 那一档的吞吐数字一个字都不能用，而它看起来完全正常——正是已知答案测试要拦的形态。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
+# 装置取 cargo 报的这一趟编出来的位置（binary_identity_build；编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，不是这一层的 target/）
+source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
 cd "$(dirname "$0")" || { echo "进不去装置目录 $(dirname "$0")"; echo "→ 怎么办：从仓根照文件头的用法起"; exit 2; }
 
 ROUNDS="${1:-5}"
-BIN=target/x86_64-unknown-linux-musl/release/e6-units
 OUT="${E6_OUT:-../../research/results/e6-units-$(date +%Y-%m-%d).out}"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e6units.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 command -v cargo >/dev/null || { echo "没有 cargo"; exit 2; }
-cargo build --release --target x86_64-unknown-linux-musl --bin e6-units >/dev/null 2>&1 \
-  || { echo "musl 构建失败：rustup target add x86_64-unknown-linux-musl"; exit 2; }
+binary_identity_build e6-units --release --target x86_64-unknown-linux-musl --bin e6-units 2>"$TMP/build.log" \
+  || { tail -n 5 "$TMP/build.log"; echo "  ✗ musl 构建失败，或编过了 cargo 没报出它编在哪（上面是构建输出的末尾）"; echo "     → 怎么办：没装 musl 目标的先 rustup target add x86_64-unknown-linux-musl；别的照上面那几行改"; exit 2; }
+BIN="$BUILT_BINARY"
 
 run_arm() { # run_arm <档名> <VM_CPU> <落点>
   local tag="$1" cpu="$2" dst="$3"

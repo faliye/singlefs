@@ -13,7 +13,9 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
   <记录>      records/ 下一份已有的 .md（后缀不分大小写，子目录里的也收；相对路径从当前目录起算，解开符号链接之后要落在 <仓根>/records/ 下）。
               新记录用 Write 新建（写闸 write-guard.sh 照判钟点、会话号与批次代号），之后再经这里追加。
   <文本文件>  要追加的文本，UTF-8。记录不以换行收尾的先补一个换行，文本不以换行收尾的补一个；别的不加（要空一行就写进文本）。
-              文本里不许有一、二级标题（围栏代码块里的不算，三级以下照写）：新开一节用 Edit 接在文件末尾（写闸照判同几样），
+              文本里不许有一、二级标题（去掉 0–3 个前导空格之后以 # 或 ## 加空白或行尾起头的行；四个空格以上缩进的是代码，不算；
+              围栏代码块里的不算，围栏按 scripts/kb/lib_markdown.py 认：0–3 个空格缩进的 ``` 或 ~~~ 起、同字符且不短于开头的那一行收，没收的护到文末；
+              三级以下照写）：新开一节用 Edit 接在文件末尾（写闸照判同几样），
               拆分提案现行账本加节经 scripts/kb/ledger-append-section.py（它现取节号、索引行与节一次写入）。
   --root      仓根，默认是这份脚本所在的仓；判据库取 <仓根>/.claude/gate.d/lib-forbidden-notations.py。
   判文本：钟点、时区词、时间戳（scripts/kb/lib_notation_check.py 的 clock_refusal）与会话号、批次代号（同一份的 session_name_refusal），
@@ -26,6 +28,7 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
 退出码：0 追加了（或干跑）；1 用法不对、文本文件读不到或不是 UTF-8、自检没过；2 记录不在 <仓根>/records/ 下、不是 .md、不在或读不到；
 4 读到写之间记录被改过（没写，重跑）；5 没换上（硬链接、只读、建不了临时文件、写或改名失败）；6 文本带钟点、时区词或时间戳；
 7 文本带会话号或批次代号；8 文本或记录不合（文本是空的、有一二级标题、带 CR；记录带 CR 或不是 UTF-8）。2–8 都是记录没动、没留临时文件。
+9 已经追加了（改名换上做完），之后被 Ctrl-C 打断（lib_atomic_replace.py 的 ReplacedThenInterrupted / ReplacedThenFailed）：别重跑（会追加两遍），先看记录末尾。
 
 弄坏开关（只给 --selftest 证红用，平常跑设了退 2、点名只在自证里认；不认识的值同样退 2）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（括号里是那条「✗ 自检失败：」的开头）：
   APPEND_RECORD_BREAK=no-recheck-before-write  换上之前不复核 sha256，读到写之间别人写进去的那一行被盖掉
@@ -36,6 +39,12 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
       拒绝的几种输入（「✗ 自检失败：拒绝的几种输入没判对」）
   APPEND_RECORD_BREAK=records-only-unchecked  不核记录落不落在 <仓根>/records/ 下、是不是 .md
       只认 records/ 下的 .md（「✗ 自检失败：只认 records/ 下已有的 .md 没判对」）
+  APPEND_RECORD_BREAK=fence-toggle  围栏按布尔翻转认：去掉任意多前导空格之后以 ``` 或 ~~~ 起头的行都翻一次，不记字符与长度
+      正常追加（「✗ 自检失败：正常追加没成」：四个反引号的围栏里那一行 ``` 被当成收尾，后面围栏里的二级标题被拒）
+  APPEND_RECORD_BREAK=heading-indent-unstripped  一、二级标题按没去前导空格的行认
+      拒绝的几种输入（「✗ 自检失败：拒绝的几种输入没判对」：两个空格缩进的二级标题没拒）
+  ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
+      写回的方式（「✗ 自检失败：写回的方式不对」，下面几行以「[改名之后被打断]」起头）
 """
 import argparse
 import contextlib
@@ -47,8 +56,9 @@ import subprocess
 import sys
 import tempfile
 
-from lib_atomic_replace import ReplaceRefused, inside_selftest, leftover_temporary_files, problems_with_replacement_by_rename, \
-    replace_file_contents_by_rename
+from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, inside_selftest, leftover_temporary_files, \
+    problems_with_replacement_by_rename, replace_file_contents_by_rename
+from lib_markdown import fenced_flags
 from lib_notation_check import clock_refusal, copy_library_into, repository_root, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -58,10 +68,12 @@ from project_preflight import preflight  # noqa: E402
 
 BREAK_VARIABLE = "APPEND_RECORD_BREAK"
 BROKEN = os.environ.get(BREAK_VARIABLE, "")
-KNOWN_BREAKS = ("no-recheck-before-write", "no-notation-guard", "headings-allowed", "records-only-unchecked")
+KNOWN_BREAKS = ("no-recheck-before-write", "no-notation-guard", "headings-allowed", "records-only-unchecked", "fence-toggle", "heading-indent-unstripped")
 RECORDS_DIRECTORY = "records"
-TOP_HEADING = re.compile(r"#{1,2}(?:[ \t]|$)")   # 一、二级标题；与 ledger-append-section.py 的 body_problem 同一种认法（三级以下不算）
-FENCE_OPENERS = ("```", "~~~")
+# 一、二级标题：0–3 个前导空格之后 # 或 ##，再接空白或行尾（四个空格以上缩进的是代码；三级以下不算）；与 ledger-append-section.py 的 TOP_HEADING 同一种认法
+TOP_HEADING = re.compile(r" {0,3}#{1,2}(?:[ \t]|$)")
+TOP_HEADING_WITHOUT_INDENT = re.compile(r"#{1,2}(?:[ \t]|$)")   # 弄坏开关 heading-indent-unstripped 用的认法
+FENCE_OPENERS = ("```", "~~~")   # 弄坏开关 fence-toggle 用的认法
 LEDGER_TOOL = "scripts/kb/ledger-append-section.py"
 SELF_TOOL = "scripts/kb/append-record.py"
 
@@ -108,13 +120,27 @@ def text_problem(text):
         return "要追加的文本带 CR（CRLF 换行），这个工具只认 LF"
     if BROKEN == "headings-allowed":   # 弄坏开关：不拒一、二级标题
         return None
-    in_fence = False
-    for number, line in enumerate(text.split("\n"), 1):
-        if line.lstrip(" ").startswith(FENCE_OPENERS):
-            in_fence = not in_fence
-        elif not in_fence and TOP_HEADING.match(line):
+    heading = TOP_HEADING_WITHOUT_INDENT if BROKEN == "heading-indent-unstripped" else TOP_HEADING   # 弄坏开关：标题不去前导空格
+    lines = text.split("\n")
+    for number, (line, fenced) in enumerate(zip(lines, fenced_line_flags(lines)), 1):
+        if not fenced and heading.match(line):
             return f"文本第 {number} 行是一、二级标题「{line[:40]}」"
     return None
+
+
+def fenced_line_flags(lines):
+    """每一行在不在代码围栏里（开合两行也算在里面）：lib_markdown.py 的 fenced_flags（记字符与长度、只认 0–3 个空格缩进、没收的护到文末）。
+    弄坏开关 fence-toggle 换成布尔翻转的认法：去掉任意多前导空格之后以 ``` 或 ~~~ 起头的行都翻一次。"""
+    if BROKEN != "fence-toggle":
+        return fenced_flags(lines)
+    flags, inside = [], False
+    for line in lines:
+        if line.lstrip(" ").startswith(FENCE_OPENERS):
+            inside = not inside
+            flags.append(True)
+        else:
+            flags.append(inside)
+    return flags
 
 
 def plan(original, text):
@@ -190,8 +216,13 @@ def append_text(path, text, dry_run=False, notation_root=None, interleave=None):
         print("     → 怎么办：别的会话刚往这份记录写过，重跑本命令（文本接在它写的后面）")
         return 4
     except ReplaceRefused as refused:
-        print("  ✗ " + str(refused))
+        print("  ✗ " + str(refused))  # str(ReplaceRefused) 第二行是「→」起头的出路（lib_atomic_replace.py 里每个 ReplaceRefused 都带着）
         return 5
+    except (ReplacedThenInterrupted, ReplacedThenFailed) as replaced_then_failed:
+        print(f"  ✗ {path} 已经追加了第 {first_line}–{last_line} 行（改名换上做完），之后被打断"
+              f"（{replaced_then_failed.__class__.__name__}，原因：{replaced_then_failed.__cause__!r}）")
+        print("     → 怎么办：别重跑本命令（会追加两遍）；先看记录末尾，追加的文本在就算写完了")
+        return 9
     print(f"  ✓ 追加了 {last_line - first_line + 1} 行到 {path}（第 {first_line}–{last_line} 行）；写前复核 sha256 {before[:12]} 未变，改名换上新 inode")
     for note in replaced:
         print("  ! " + note)
@@ -259,6 +290,13 @@ def problems_with_plain_append(work):
     code, said = quietly(lambda: append_record(record, "- 丙做完\n", root, dry_run=True))
     if code != 0 or "（干跑）" not in said or read(record) != before:
         problems.append(f"干跑：本该退 0、说「（干跑）」、记录不动，实际退 {code}：{said!r}")
+    # 围栏按字符与长度收：四个反引号开的围栏里，三个反引号那一行不收尾，后面的「## 」仍在代码里
+    before = read(record)
+    nested = "````\n```\n## 仍在围栏里\n````\n"
+    code, said = quietly(lambda: append_record(record, nested, root))
+    if code != 0 or read(record) != before + nested:
+        problems.append(f"四个反引号的围栏里有一行三个反引号、再一行「## 」：本该照写（三个反引号收不了四个反引号开的围栏），实际退 {code}：{said!r}"
+                        "（APPEND_RECORD_BREAK=fence-toggle 设着的话这一条本来就该红）")
     return problems
 
 
@@ -305,6 +343,8 @@ def problems_with_refused_inputs(work):
             ("文本是空的", "\n\n", SAMPLE_RECORD, ""),
             ("文本有二级标题", "前\n## 新一节\n后\n", SAMPLE_RECORD, "一、二级标题"),
             ("文本有一级标题", "# 新文件头\n", SAMPLE_RECORD, "一、二级标题"),
+            ("两个空格缩进的二级标题", "前\n  ## 缩进的新一节\n", SAMPLE_RECORD, "一、二级标题"),
+            ("四个空格缩进的三个反引号（是代码、不是围栏）之后的二级标题", "    ```\n## 真标题\n", SAMPLE_RECORD, "一、二级标题"),
             ("文本有账本节标题", "## 一百九十、新节\n\n正文\n", SAMPLE_RECORD, LEDGER_TOOL),
             ("文本带 CR", "甲\r\n", SAMPLE_RECORD, "CR"),
             ("记录是 CRLF", "乙\n", SAMPLE_RECORD.replace("\n", "\r\n"), "CR"),
@@ -362,7 +402,8 @@ def problems_with_interleaved_write(work):
 
 
 def problems_with_write_back():
-    return problems_with_replacement_by_rename(lambda target: append_text(target, "一句\n"), SAMPLE_RECORD, SAMPLE_RECORD + "一句\n")
+    return problems_with_replacement_by_rename(lambda target: append_text(target, "一句\n"), SAMPLE_RECORD, SAMPLE_RECORD + "一句\n",
+                                               exit_code_when_replaced_then_interrupted=9)
 
 
 def problems_with_entry(work):
@@ -390,11 +431,12 @@ def problems_with_entry(work):
 def selftest():
     with tempfile.TemporaryDirectory(prefix="append-record-selftest-") as work:
         for label, check, remedy in (
-                ("正常追加没成", lambda: problems_with_plain_append(work), "查 plan() 与 append_text()：接在末尾、补换行、行号从追加之前的行数加一算"),
+                ("正常追加没成", lambda: problems_with_plain_append(work),
+                 "查 plan() 与 append_text()：接在末尾、补换行、行号从追加之前的行数加一算；围栏查 fenced_line_flags()（APPEND_RECORD_BREAK=fence-toggle 设着的话这里本来就该红）"),
                 ("只认 records/ 下已有的 .md 没判对", lambda: problems_with_target_checks(work),
                  "查 record_target()：解开符号链接之后比 <仓根>/records/ 加分隔符的前缀（APPEND_RECORD_BREAK=records-only-unchecked 设着的话这里本来就该红）"),
                 ("拒绝的几种输入没判对", lambda: problems_with_refused_inputs(work),
-                 "查 plan() 与 text_problem()：拒绝时记录一个字节不动（APPEND_RECORD_BREAK=headings-allowed 设着的话这里本来就该红）"),
+                 "查 plan() 与 text_problem()：拒绝时记录一个字节不动（APPEND_RECORD_BREAK=headings-allowed 或 heading-indent-unstripped 设着的话这里本来就该红）"),
                 ("写之前判文本没判对", lambda: problems_with_notation_guard(work),
                  "查 notation_refusal() 与 lib_notation_check.py（APPEND_RECORD_BREAK=no-notation-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红）"),
                 ("读到写之间被改过没拒", lambda: problems_with_interleaved_write(work),
@@ -409,10 +451,13 @@ def selftest():
                     print("     " + problem)  # gate-lint:detail
                 print("     → " + remedy)
                 return 1
-    print("  ✓ 自检：追加接在末尾、补换行、行号说对、三级标题与围栏里的二级标题照写、干跑不写；records/ 下的 .tsv、records 外与仓外的 .md、同名前缀的兄弟目录、不在的、"
-          "经 .. 或符号链接爬出去的拒（退 2），子目录、大写后缀、指进 records 的链接放行；空文本、一二级标题、账本节标题、CR、记录 CRLF 或不是 UTF-8 拒（退 8）；"
+    print("  ✓ 自检：追加接在末尾、补换行、行号说对、三级标题与围栏里的二级标题照写（四个反引号的围栏里三个反引号那一行不收尾）、干跑不写；"
+          "records/ 下的 .tsv、records 外与仓外的 .md、同名前缀的兄弟目录、不在的、"
+          "经 .. 或符号链接爬出去的拒（退 2），子目录、大写后缀、指进 records 的链接放行；空文本、一二级标题（两个空格缩进的、四个空格缩进的假围栏之后的也拒）、"
+          "账本节标题、CR、记录 CRLF 或不是 UTF-8 拒（退 8）；"
           "时间戳（6）、会话号与批次代号（7）拒且点名那一行，干跑也拒，只写日期放行；读到写之间被改过拒（4）；"
-          "写回换新 inode、权限位不变、在读的进程读旧内容、符号链接、硬链接与只读文件拒绝、fsync 或改名失败不留临时文件；入口的相对路径、标准输入、会话号与缺参数")
+          "写回换新 inode、权限位不变、在读的进程读旧内容、符号链接、硬链接与只读文件拒绝、fsync 或改名失败不留临时文件、改名之后被 Ctrl-C 打断退 9 且已追加；"
+          "入口的相对路径、标准输入、会话号与缺参数")
     return 0
 
 

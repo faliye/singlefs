@@ -16,11 +16,11 @@
 
 弄坏开关（只给 --selftest 证红用；直接执行而不是 --selftest 时设了它，参数解析之前就拒、退 2，点名它只在自证里认）。
 逐项写开关名、弄坏哪一处、打开后自证哪几格红（失败行「✗ lib_experiment_number_directories 自证：<格名>：…」）：
-  EXPERIMENT_NUMBER_DIRECTORIES_BREAK=model-directories-scanned  numbers_in_tree() 不跳过三方腿的模型目录，照旧逐层扫进去（改前的样子）
+  EXPERIMENT_NUMBER_DIRECTORIES_BREAK=model-directories-scanned  numbers_in_tree() 不跳过三方腿的模型目录，逐层扫进去
       「✗ lib_experiment_number_directories 自证：腿模型目录里的假样本号不算用过」
       「✗ lib_experiment_number_directories 自证：模型目录自己的名字带号时那个号照算、里面的不算」
       「✗ lib_experiment_number_directories 自证：命令行入口：腿模型目录里的号不列」
-两个调用方各有「不读登记、退回改前写死的那组目录」的开关（CLAIM_EXPERIMENT_BREAK=registry-ignored、EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored）。
+两个调用方各有「不读登记、退回写死的那组目录」的开关（CLAIM_EXPERIMENT_BREAK=registry-ignored、EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored）。
 
 用法：
   python3 scripts/kb/lib_experiment_number_directories.py numbers <登记> <树根>

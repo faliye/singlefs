@@ -10,7 +10,7 @@
 F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-step-4-only.tsv --other-selected-rows bad-implementations-step-8.tsv`；
 补位跳过两张表里的每一个名字（「扩表与补位都不重挑已跑过的行」）。
 一次跑里先把仓（或 `--snapshot-from` 给的树）拍一张快照（`Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`，不带 target，外加每台默认重活线程数的登记文件
-`.claude/heavy-thread-default`：harness 包经 include_str! 在编译时读它，线道的树里没有就编不过；快照摘要只算 `.rs` 与 `Cargo.*`，不含它），每条线道从快照同步出自己的树与编译目录（线道之间不共享，
+`.claude/heavy-thread-default`：验证包（`crates/singlefs-verification`）经 include_str! 在编译时读它，线道的树里没有就编不过；快照摘要只算 `.rs` 与 `Cargo.*`，不含它），每条线道从快照同步出自己的树与编译目录（线道之间不共享，
 同一条线道里跨行复用编译目录，所以第一行是冷编译、之后是增量），每行改一处、编、跑、再把改过的文件还原。
 增量编译的前提（登记修订 5）：cargo 只在一个包的源文件修改时间晚于上一次编它的时刻时重编；还原（`copy2`）与同步（`rsync -a`）都把修改时间带回快照那一刻，
 所以每条线道记一份 `build-record.tsv`（上一次编完的时刻、自那以后改过还没干净重编的文件），每行同步之后先把那几个文件的修改时间置成现在，编之前核它们内容与快照相同、
@@ -29,7 +29,7 @@ O3 一步：开跑前核一次冻结行（Z2，不过整趟不跑）；每行装
 线道从一条共用的队列里领行（先到先得），每条线道一次一行。耗时在这个进程里用 `time.monotonic_ns` 计：拷仓与改坏、编、装置、执行器各一段，整表一段（`table` 行）；装置自己的分段耗时在它的 `E7TIMING` 行里。
 弄坏开关只在自证里认：证红的是 test_synced_entries.py（在进程里调 sync_tree）与 test_collusion_pipeline.py（在进程里调 run_with_time_limit），都不经本脚本的命令行；命令行设了 E171_ROW_DRIVER_BREAK 一律在参数解析之前退 2、点名它只在自证里认。
 逐项写开关名、弄坏哪一处，下一行起写打开后红的测试（unittest 的失败行 「FAIL: <测试名> …」 的句首）：
-  E171_ROW_DRIVER_BREAK=registry-not-synced  快照与线道的树都不带 `.claude/heavy-thread-default`（改前的样子）
+  E171_ROW_DRIVER_BREAK=registry-not-synced  快照与线道的树都不带 `.claude/heavy-thread-default`
       「FAIL: test_the_thread_registry_reaches_the_snapshot_and_the_lane_tree」
   E171_ROW_DRIVER_BREAK=timeout-not-enforced  行的限时不执行、一直等（驱动里去掉内存包装时把它的限时一并丢掉的样子）；证红的是 test_collusion_pipeline.py
       「FAIL: test_a_row_over_the_time_limit_is_killed_as_a_group_and_exits_253」
@@ -65,8 +65,8 @@ from bad_implementation_table import (MAXIMUM_SUBSTITUTIONS_PER_ROW, STATUS_ANCH
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEVICE_BINARY_NAME = "e171_three_oracle_collusion"
-DEVICE_PACKAGE = "singlefs-checker-tier"
-THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # harness 经 include_str! 编进来的登记文件（crates/singlefs-harness/src/heavy_threads.rs）
+DEVICE_PACKAGE = "singlefs-verification"
+THREAD_REGISTRY_ENTRY = ".claude/heavy-thread-default"   # 验证包经 include_str! 编进来的登记文件（crates/singlefs-verification/src/heavy_threads.rs）
 SYNCED_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "crates", THREAD_REGISTRY_ENTRY)
 BREAK_VARIABLE = "E171_ROW_DRIVER_BREAK"
 MUTATIONS_TABLE = "crates/mutations.tsv"
@@ -257,7 +257,7 @@ def write_result(directory: str, fields: dict[str, object]) -> None:
 
 
 def run_compile(lane_tree: str, lane_target: str, repo_root: str, threads: int, log_path: str, artifacts_path: str) -> tuple[int, int]:
-    """`cargo build --release --offline --message-format=json-render-diagnostics -p singlefs-checker-tier --bin e171_three_oracle_collusion`
+    """`cargo build --release --offline --message-format=json-render-diagnostics -p singlefs-verification --bin e171_three_oracle_collusion`
     （只编不跑，不是重型测试）：诊断照常写进 `log_path`，每个编译单元的 JSON 消息（带 `fresh`）写进 `artifacts_path`。交回 (退出码, 耗时 ns)。"""
     environment = frozen_o3.thread_environment(threads, dict(os.environ, CARGO_TARGET_DIR=lane_target))
     command = ["nice", "-n", "19", "cargo", "build", "--release",

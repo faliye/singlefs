@@ -1,6 +1,6 @@
 //! E127：分裂合并之下组身份要不要存 —— D26（后台整理与放置回收）已定项 4 卡住的那个模型缺口。
 //!
-//! ## 模型（判据与失败条款的权威登记在 kb/experiments/127-分裂合并之下组身份要不要存.md，跑前写死 2026-09-10）
+//! ## 模型（判据与失败条款的权威登记在 kb/experiments/127-分裂合并之下组身份要不要存.md，跑前写死）
 //!
 //! 沿用 E93（老化下的放置与碎片度）/ E95（老化的节点布局臂）的槽位、defer、碎片度与等预算口径，
 //! **改动只有一处**：放置单位从「静态一一对应的对象」换成会分裂合并的**节点**——
@@ -38,7 +38,7 @@ const SAMPLE_EVERY: u64 = 250;
 /// 等预算三档：额外写倍数 1.5 / 3 / 5 ⇒ 每 checkpoint 额外写 D×(X−1)。
 const BUDGETS: [(usize, &str); 3] = [(32, "1.5x"), (128, "3x"), (256, "5x")];
 
-/// 主格扫的 knob（2026-09-13 第二次跑补齐栅格：两族折成同一组节点宽 1 / 2 / 4 / 8 / 16 / 32）：
+/// 主格扫的 knob（两族折成同一组节点宽 1 / 2 / 4 / 8 / 16 / 32）：
 /// key 区间宽度按「初始每节点 4 个 key、key 步长 2」折算，W = 8 是 1 个节点宽；节点数分组直接取节点数。
 const KEY_INTERVAL_WIDTHS: [usize; 6] = [8, 16, 32, 64, 128, 256];
 const NODE_GROUP_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
@@ -486,7 +486,7 @@ impl Sim {
         survivor_position
     }
 
-    /// 插入一个此前不在的 key；返回被弄脏的节点身份（分裂时两半都脏）。
+    /// 插入一个尚不在的 key；返回被弄脏的节点身份（分裂时两半都脏）。
     fn insert_key(&mut self, key: u32, dirty: &mut BTreeSet<u32>) {
         assert!(!self.presence.is_present(key as usize), "key {key} 已经在");
         let position = self.position_holding(key);
@@ -523,7 +523,7 @@ impl Sim {
         }
     }
 
-    // ---- 放置面：与 E95 逐字同一套，只是「key」换成了「位置」 ----
+    // ---- 放置面：与 E95 逐字同一套，只是「key」取「位置」 ----
 
     fn allocate_first_fit(&mut self) -> u32 {
         let slot = *self

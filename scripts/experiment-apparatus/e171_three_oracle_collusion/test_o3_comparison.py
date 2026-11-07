@@ -269,7 +269,7 @@ class RegisteredTableLinesTests(unittest.TestCase):
 
 
 class RowS5ReportTests(unittest.TestCase):
-    """装置逐行 S5 的比对器一侧进结果行与判决行（代码轮第三轮判决 K4-c 甲、丙）：`name=row_s5` 一行、判决行两个计数。"""
+    """装置逐行 S5 的比对器一侧进结果行与判决行（K4-c 甲、丙）：`name=row_s5` 一行、判决行两个计数。"""
 
     def row_with_calls(self, calls, stopped, states=None) -> report.RowAnalysis:
         run = run_whose_model_stopped_at(calls, states or [state(0), state(1, batch=2)], stopped)

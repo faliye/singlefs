@@ -19,24 +19,24 @@
     （lib_function_units.py 的 verus_ghost_code_blanked 剥过之后与原样不同，例如 verus! 里 assume_specification 与 spec fn 那几行）的这一行，被改坏的单元与点名测试的闭包
     改取形式化视图（UnitKeys.formal_workspace，规格与证明进键；产品行为视图里这几行不在任何单元上，会拒算）：mutated_units 判出来记下这一行用哪个视图，
     紧接着的 resolve_test 与 closure 照它取（resolve_test 的 view 参数另可点名）；原文里没有被剥掉的字的行照旧取产品行为视图。
-  弄坏开关 specification-lines-product-view（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：一律取产品行为视图（改前的样子）；
+  弄坏开关 specification-lines-product-view（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：一律取产品行为视图；
     自证是 specification_line_cell（本库的函数，crates-mutation-rows.py 的 --selftest 跑它）；这个开关下它必须判错。
-  弄坏开关 wgsl-whole-file（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：.wgsl 照改前当数据单元、取整份字节的 sha256；
+  弄坏开关 wgsl-whole-file（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：.wgsl 当数据单元、取整份字节的 sha256；
   crates-mutation-rows.py --selftest 的「WGSL 按 fn 取键」那一格必须判错。
   点名的测试 = cargo test 参数选中的编译目标（--lib、--bin <名>、--test <名>；都没写是这个包的 lib、bin 与 tests/ 目标）里，
     带 #[test]（或 #[<路径>::test]）的 fn 单元里 libtest 全名（文件在目标里的模块路径加单元的限定名）等于点名、或以「::<点名>」收尾的恰好一个；
     一个都没有、对上几个都拒算（测试由宏展开出来的就是一个都没有）。cargo 参数里写了几个 -p（-p a -p b）：每个包的选中目标一起找，对上恰好一个才算；
     同一趟编的几个包，依赖图上共有的包按几个包请求的特性并集编（UnitKeys.features_of：别的 -p 包的缺省特性、命令行里的特性、它们依赖边上请求的特性并进
     「包名/特性」交给 lib_function_units.py；crates-mutation-rows.py 行键里的特性行照这个并集写，只写一个 -p 的行不变）。
-    弄坏开关 multiple-packages-last-only（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK）：只留最后一个 -p（改前的样子）；
+    弄坏开关 multiple-packages-last-only（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK）：只留最后一个 -p；
     自证是 multiple_packages_cell（本库的函数，crates-mutation-rows.py 的 --selftest 跑它）；这个开关下它必须判错。
   闭包 = lib_function_units.py 的 rust_closure_of 从那个单元收的（测试单元按 cfg(test) 编；cargo 参数里有 --release 时 debug_assertions 不进 cfg），
     带上 cargo 参数里的特性；闭包里有拒算，这一个闭包就没有键。
 闭包算不成（precompute_closures 抛 ClosureRefused）：入口在这一组 cfg 下不编（点名的测试带 #[cfg(feature = "gpu")]、cargo 参数没开那个特性）、没有叫这个名字的包这一类
   lib_function_units.py 的 UsageError，不是拒算（拒算是一个闭包没有键、这一行照跑），是这一行的参数与源码对不上。并行算（fork 出来的子进程）与就地算都把别的闭包算完，
   最后抛一个 ClosureRefused，逐处带类名、原消息与点名它的调用方标签；工作进程只交类名与消息，不交异常对象（按路径载入的模块没登记进 sys.modules 时它 pickle 不回父进程，
-  进程池就把真错换成 PicklingError，改前 --list-items 末尾就是这一句）。
-  弄坏开关 closure-error-masked（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：模块不登记进 sys.modules、工作进程把异常原样抛（改前的样子）；
+  进程池就把真错换成 PicklingError，--list-items 末尾就会是这一句）。
+  弄坏开关 closure-error-masked（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：模块不登记进 sys.modules、工作进程把异常原样抛；
   crates-mutation-rows.py --selftest 的「点名的测试在这一组特性下不编」一格必须判错。
 
 工具链行（toolchain_lines）：rustc -vV 与 cargo -V 原样各行；环境里影响编出什么的变量（RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、RUSTDOCFLAGS、
@@ -224,7 +224,7 @@ CargoArguments = collections.namedtuple("CargoArguments", "packages targets feat
 def parse_cargo_arguments(arguments):
     """cargo test 参数 → CargoArguments：包（每个 -p / --package 一个，按出现次序去重）、目标、特性、开关、是否 release、过滤词。
     `--` 前后的测试过滤词都进 switches 的 filter: 项，避免筛掉点名测试后沿用旧结论。
-    弄坏开关 multiple-packages-last-only：只留最后一个 -p（改前的样子）。"""
+    弄坏开关 multiple-packages-last-only：只留最后一个 -p。"""
     words = arguments.split() if isinstance(arguments, str) else list(arguments)
     before, after = (words[:words.index("--")], words[words.index("--") + 1:]) if "--" in words else (words, [])
     packages, targets, features, switches, filters = [], [], [], [], []

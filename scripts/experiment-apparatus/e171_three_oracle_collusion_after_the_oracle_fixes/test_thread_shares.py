@@ -1,6 +1,7 @@
-"""线程额度只在一条任务的进程里分（E171（三oracle合谋测试） 第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 7）的单测：
-第一段单元编排（segment_one_units_revision_8.py）给读数单元、小单元与逐行编排各分多少、合起来不超过额度、没设 SINGLEFS_THREAD_CAP 时照登记值、
-余数怎么给、分到的数设进子进程环境里的线程数变量（直接起，任务里面不套线程包装，登记修订 8）；第 7 步单元 10 线程与逐行驱动每道 5 线程的比例（逐行限时 max(1800 秒, 3T) 依据的那个比例）；
+"""线程额度只在一条任务的进程里分（E171（三oracle合谋测试） 第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 7，线程分法照修订 11 第 11.2 条）的单测：
+第一段单元编排（segment_one_units_revision_8.py）每个单元（含 Z1、Z7 与研究一侧变异表）与逐行编排都取整份额度、同一时刻至多一个单元在跑、
+没设 SINGLEFS_THREAD_CAP 时照登记值、逐行编排不去余数、分到的数设进子进程环境里的线程数变量（直接起，任务里面不套线程包装，登记修订 8）；
+第 7 步取额度、逐行编排每台一槽、那一槽线程等于额度（修订 11 第 11.3、11.4 条：T 与每行装置那一步线程相同）；
 第二段逐行编排（rows_orchestrator_segment_two.py）本机与转交到别的台的驱动各给一条线道、它那一槽的线程；
 逐行驱动的编译、装置、O3 阳性对照，冻结执行器那一步与 RP2 那一趟装置各把线道（这一趟）的线程设进子进程的环境（修订 8）。
 研究一侧变异表 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_threads_and_contrast.tsv
@@ -82,30 +83,44 @@ class TemporaryDirectoryCase(unittest.TestCase):
         shutil.rmtree(self.scratch, ignore_errors=True)
 
 
+def unit_table_under_the_quota(quota: int) -> dict:
+    """SINGLEFS_THREAD_CAP 设成 quota 时的单元表（单元表里的线程取 registered_threads，读的就是这一个变量）。"""
+    with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP=str(quota)), clear=True):
+        return units.unit_table()
+
+
+def rows_thread_variables_under_the_quota(quota: int) -> dict[str, str | None]:
+    with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP=str(quota)), clear=True):
+        return thread_variables_in(units.rows_environment(units.Budget(quota)))
+
+
 class SegmentOneSharesTests(TemporaryDirectoryCase):
-    def test_step_7_gets_ten_threads_and_a_row_lane_five_so_the_ratio_behind_the_row_time_limit_holds(self) -> None:
-        # 逐行限时 max(1800 秒, 3T)：T 是第 7 步单元的进程挂钟，r1 修订 6 那一趟第 7 步 10 线程、逐行驱动每道 5 线程
-        table = units.unit_table()
-        self.assertEqual(table["step-7"].threads, 10)
-        self.assertEqual(units.ROW_LANE_THREADS, 5)
-        self.assertEqual(units.ROW_LANE_THREADS, rows_orchestrator.LANE_THREADS_MINIMUM)
-        self.assertEqual(table["step-7"].threads, 2 * units.ROW_LANE_THREADS)
-        lanes = rows_orchestrator.allocate(rows_orchestrator.two_hosts()[:1], units.rows_threads(31))
-        self.assertEqual([(lane.slots, lane.threads_per_slot) for lane in lanes], [(6, 5)])
+    def test_step_7_takes_the_quota_and_the_rows_get_one_slot_per_host_with_the_quota(self) -> None:
+        # 修订 11 第 11.3、11.4 条：T 是第 7 步单元在额度上的进程挂钟，每行装置那一步在一槽额度线程上跑，两边线程相同
+        table = unit_table_under_the_quota(31)
+        self.assertEqual(table["step-7"].threads, 31)
+        lanes = rows_orchestrator.allocate(rows_orchestrator.two_hosts()[:1], 31)
+        self.assertEqual([(lane.slots, lane.threads_per_slot) for lane in lanes], [(1, 31)])
+        self.assertEqual(lanes[0].threads_per_slot, table["step-7"].threads)
 
-    def test_every_reading_unit_gets_ten_threads_and_the_two_small_units_one(self) -> None:
-        table = units.unit_table()
-        self.assertEqual({table[name].threads for name in READING_UNITS}, {10})
+    def assert_every_unit_takes_the_quota(self, quota: int) -> None:
+        table = unit_table_under_the_quota(quota)
+        self.assertEqual(len(table), 34)
         self.assertEqual(len(READING_UNITS), 32)
-        self.assertEqual((table["step-9-z1"].threads, table["step-10-z7"].threads), (1, 1))
+        self.assertEqual({name: unit.threads for name, unit in table.items() if unit.threads != quota}, {})
+        self.assertEqual((table["step-9-z1"].threads, table["step-10-z7"].threads, table["research-mutations"].threads), (quota, quota, quota))
 
-    def test_the_rows_share_drops_the_remainder_so_every_lane_gets_exactly_five_threads(self) -> None:
-        self.assertEqual(units.rows_threads(31), 30)
-        self.assertEqual(units.rows_threads(30), 30)
-        self.assertEqual(units.rows_threads(14), 10)
-        one_host = rows_orchestrator.two_hosts()[:1]
-        self.assertEqual(rows_orchestrator.allocate(one_host, units.rows_threads(14))[0].threads_per_slot, 5)
-        self.assertEqual(rows_orchestrator.allocate(one_host, 14)[0].threads_per_slot, 7)   # 不去余数时那一道是 7 线程：比例就破了
+    def test_every_unit_including_the_small_ones_and_the_research_mutations_takes_a_quota_of_31(self) -> None:
+        self.assert_every_unit_takes_the_quota(31)
+
+    def test_every_unit_including_the_small_ones_and_the_research_mutations_takes_a_quota_of_12(self) -> None:
+        self.assert_every_unit_takes_the_quota(12)
+
+    def test_the_rows_environment_sets_a_quota_of_31_without_dropping_a_remainder(self) -> None:
+        self.assertEqual(rows_thread_variables_under_the_quota(31), every_thread_variable_set_to(31))
+
+    def test_the_rows_environment_sets_a_quota_of_14_without_dropping_a_remainder(self) -> None:
+        self.assertEqual(rows_thread_variables_under_the_quota(14), every_thread_variable_set_to(14))
 
     def test_the_quota_is_the_cap_the_service_set_and_the_registered_value_when_it_is_unset(self) -> None:
         settings = types.SimpleNamespace(repo=self.scratch)
@@ -114,23 +129,20 @@ class SegmentOneSharesTests(TemporaryDirectoryCase):
         with mock.patch.dict(os.environ, environment_without_the_cap(), clear=True):
             self.assertEqual(units.local_budget(settings).threads, registered_threads_in_the_file())
 
-    def test_units_running_together_never_add_up_past_the_quota(self) -> None:
-        table = units.unit_table()
-        names = [name for name in table if name != "research-mutations"]   # 第 0 步报研究一侧没有不同时不排它（它与第 1 步同时跑，会占住链尾那一刻的一份）
+    def test_at_a_quota_of_31_at_most_one_unit_runs_at_a_time_and_only_step_7_starts_at_the_chain_end(self) -> None:
+        table = unit_table_under_the_quota(31)
+        names = [name for name in table if name != "research-mutations"]   # 第 0 步报研究一侧没有不同时不排它
         placed = units.simulate(table, names, units.Budget(31))
         self.assertEqual(len(placed), len(names))
-        self.assertLessEqual(peak_of_placed(placed, table), 31)
+        self.assertEqual(peak_of_placed(placed, table), 31)
         chain_end = max(end for name, _, end in placed if name == "step-2b")
-        self.assertEqual(sorted(name for name, start, _ in placed if start == chain_end),
-                         ["step-3-o1-crash-judge", "step-7", "step-9"])
+        self.assertEqual(sorted(name for name, start, _ in placed if start == chain_end), ["step-7"])
 
-    def test_the_remainder_left_by_three_reading_units_goes_only_to_a_small_unit(self) -> None:
-        table = units.unit_table()
-        three = [table["step-7"], table["step-9"], table["step-3-o1-crash-judge"]]
+    def test_any_unit_fits_when_none_is_running_and_none_fits_beside_a_running_one(self) -> None:
+        table = unit_table_under_the_quota(31)
         budget = units.Budget(31)
-        self.assertTrue(units.fits(table["step-10-z7"], three, budget))
-        self.assertFalse(units.fits(table["step-3-reference-filesystem"], three, budget))
-        self.assertFalse(units.fits(table["step-9-z1"], three + [table["step-10-z7"]], budget))
+        self.assertEqual([name for name, unit in table.items() if not units.fits(unit, [], budget)], [])
+        self.assertEqual([name for name, unit in table.items() if name != "step-7" and units.fits(unit, [table["step-7"]], budget)], [])
 
     def test_the_rows_start_only_after_every_required_unit_is_green_and_none_is_running(self) -> None:
         required = {"step-0", "step-1", "step-2", "step-2b", "step-7", "step-8"}
@@ -152,7 +164,7 @@ class SegmentOneSharesTests(TemporaryDirectoryCase):
             units.launch(settings, units.unit_table()["step-9-z1"], 1, {})
         self.assertEqual(recorder.commands, [["bash", units.UNIT_SCRIPT, "step-7"], ["bash", units.UNIT_SCRIPT, "step-9-z1"]])
         self.assertEqual([thread_variables_in(environment) for environment in recorder.environments],
-                         [every_thread_variable_set_to(10), every_thread_variable_set_to(1)])
+                         [every_thread_variable_set_to(31), every_thread_variable_set_to(31)])
 
     def test_the_rows_orchestrator_is_started_itself_with_the_rows_share_in_every_thread_variable(self) -> None:
         command = units.rows_command(self.world_settings(), {}, "run", units.Budget(31))
@@ -160,7 +172,7 @@ class SegmentOneSharesTests(TemporaryDirectoryCase):
         self.assertFalse(any(word.endswith(".sh") for word in command[:5]), command)
         with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP="31"), clear=True):
             environment = units.rows_environment(units.Budget(31))
-        self.assertEqual(thread_variables_in(environment), every_thread_variable_set_to(30))
+        self.assertEqual(thread_variables_in(environment), every_thread_variable_set_to(31))
         self.assertEqual(environment.get("PYTHONDONTWRITEBYTECODE"), "1")
 
     def test_the_thread_variables_are_the_twenty_the_service_sets(self) -> None:
@@ -229,8 +241,8 @@ def lane_arguments(command: list[str]) -> list[str]:
 
 
 class SegmentTwoLaneThreadsTests(TemporaryDirectoryCase):
-    """第二段每个驱动只给一条线道、它那一槽的线程（驱动照它设编译、装置、执行器环境里的线程数变量）；这一条任务的额度设成 31，
-    驱动拿到的若是额度而不是那一槽的 5，断言红。"""
+    """第二段每个驱动只给一条线道、它那一槽的线程（驱动照它设编译、装置、执行器环境里的线程数变量）；那一槽传 31（每台一槽、那一槽就是每台线程，
+    修订 11 第 11.2 条）。这一条任务的额度设成 12、与那一槽不同：驱动拿到的若是额度而不是那一槽的 31，断言红（额度与槽同值时这两种取法分不出）。"""
 
     def context(self):
         return types.SimpleNamespace(attempt_dir=os.path.join(self.scratch, "attempt-1"), shards=os.path.join(self.scratch, "shards"),
@@ -240,26 +252,25 @@ class SegmentTwoLaneThreadsTests(TemporaryDirectoryCase):
 
     def test_a_local_row_driver_gets_one_lane_and_the_threads_of_its_slot(self) -> None:
         recorder = LaunchRecorder()
-        with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP="31"), clear=True), \
+        with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP="12"), clear=True), \
                 mock.patch.object(subprocess, "Popen", recorder), mock.patch.object(segment_two.one, "driver_hashes", lambda context: {}):
-            segment_two.launch_local_two(self.context(), {}, "rows-row-15-h1", segment_two.ROWS_STEP, (15,), 5, self.scratch, "local", set())
-        self.assertEqual(lane_arguments(recorder.commands[0]), ["--lanes", "1", "--threads", "5"])
+            segment_two.launch_local_two(self.context(), {}, "rows-row-15-h1", segment_two.ROWS_STEP, (15,), 31, self.scratch, "local", set())
+        self.assertEqual(lane_arguments(recorder.commands[0]), ["--lanes", "1", "--threads", "31"])
 
     def test_a_row_driver_handed_to_the_other_host_gets_one_lane_and_the_threads_of_its_slot(self) -> None:
         recorder = LaunchRecorder()
-        with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP="31"), clear=True), \
+        with mock.patch.dict(os.environ, dict(environment_without_the_cap(), SINGLEFS_THREAD_CAP="12"), clear=True), \
                 mock.patch.object(subprocess, "Popen", recorder):
-            segment_two.launch_peer_two(self.context(), "kit", "rows-row-15-h2", segment_two.ROWS_STEP, 15, 5, 2, set())
+            segment_two.launch_peer_two(self.context(), "kit", "rows-row-15-h2", segment_two.ROWS_STEP, 15, 31, 2, set())
         command = recorder.commands[0]
         driver = command[len(command) - command[::-1].index("--"):]   # 最后一个 -- 之后是交给驱动的参数
-        self.assertEqual(lane_arguments(driver), ["--lanes", "1", "--threads", "5"])
+        self.assertEqual(lane_arguments(driver), ["--lanes", "1", "--threads", "31"])
 
-    def test_the_slots_on_a_host_add_up_to_no_more_than_its_threads(self) -> None:
+    def test_every_quota_from_5_to_64_gives_one_slot_with_the_whole_quota(self) -> None:
         one_host = rows_orchestrator.two_hosts()[:1]
-        over = [(threads, lane.slots, lane.threads_per_slot) for threads in range(5, 65) for lane in rows_orchestrator.allocate(one_host, threads)
-                if lane.slots * lane.threads_per_slot > threads]
-        self.assertEqual(over, [])
-        self.assertEqual([(lane.slots, lane.threads_per_slot) for lane in rows_orchestrator.allocate(one_host, 31)], [(6, 5)])
+        wrong = [(threads, lane.slots, lane.threads_per_slot) for threads in range(5, 65) for lane in rows_orchestrator.allocate(one_host, threads)
+                 if (lane.slots, lane.threads_per_slot) != (1, threads)]
+        self.assertEqual(wrong, [])
 
 
 if __name__ == "__main__":

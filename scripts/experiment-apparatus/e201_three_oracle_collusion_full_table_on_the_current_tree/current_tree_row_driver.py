@@ -656,13 +656,23 @@ def choose_rows(arguments: argparse.Namespace, selected_rows: list[SelectedRow])
     return list(selected_rows)
 
 
-def threads_per_lane(threads: int | None, lanes: int, environment=os.environ) -> int:
-    """每条线道的线程数：给了照它；没给取登记的重活默认并行度（SINGLEFS_THREAD_CAP 设了取它）÷ 线道数，向下取整，至少 1。"""
-    if threads is not None:
-        return threads
-    sys.path.insert(0, os.path.join(HERE, "..", "..", "hosts"))
+def lanes_and_threads_per_lane(lanes: int | None, threads: int | None, environment=os.environ) -> tuple[int, int]:
+    """线道数与每条线道的线程数，交回 (线道数, 每线道线程数)；两样都给了照给的。
+    每台重活线程数取登记位（heavy_threads.default_heavy_threads：SINGLEFS_THREAD_CAP 设了取它，没设取 .claude/heavy-thread-default）。
+    线道数没给：照跑前登记 research/prompts/e201-preregistration.md 第十四节「线程：」一行，⌊每台重活线程数 ÷ 每线道线程数⌋，至少 1；
+      每线道线程数给了 --threads 照它，没给取 full_table_run.LANE_THREADS（各片起本驱动时用的同一个数，不在这里另写一份）。
+    每线道线程数没给：每台重活线程数 ÷ 线道数，向下取整，至少 1。"""
+    if lanes is not None and threads is not None:
+        return lanes, threads
+    # 与 lib_repository_copy 同一处取：模块顶上 `import lib_repository_copy` 之前那一句已把仓根的 scripts/hosts 加进 sys.path（变异驱动把本目录拷到仓外跑单测时仓根经 e171_research_side 交过来）
     from heavy_threads import default_heavy_threads
-    return max(1, default_heavy_threads(environment) // max(1, lanes))
+    registered_threads = default_heavy_threads(environment)
+    if lanes is None:
+        from full_table_run import LANE_THREADS
+        lanes = max(1, registered_threads // max(1, threads if threads is not None else LANE_THREADS))
+    if threads is None:
+        threads = max(1, registered_threads // max(1, lanes))
+    return lanes, threads
 
 
 def use_the_copy_environment() -> None:
@@ -679,6 +689,14 @@ def main(argument_list: list[str]) -> int:
         print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再跑；要证红就在本目录跑 {BREAK_VARIABLE}=<项> python3 -B -m unittest test_current_tree_row_driver", file=sys.stderr)
         return 2
     use_the_copy_environment()
+    parser = argument_parser()
+    arguments = parser.parse_args(argument_list)
+    arguments.lanes, arguments.threads = lanes_and_threads_per_lane(arguments.lanes, arguments.threads)
+    return run_parsed_arguments(parser, arguments)
+
+
+def argument_parser() -> argparse.ArgumentParser:
+    """命令行（单测拿它核不给 --lanes、--threads 时的取值，不起整趟）。"""
     parser = argparse.ArgumentParser(description="E201 逐行驱动")
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--work-root", required=True, help="草稿目录：快照与每条线道的树与编译目录放这里")
@@ -694,8 +712,9 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--rows", default=None, help="指定范围：登记 5.9 表里的序号，逗号隔开（给空串是不跑表里的行，只跑 --empty-mutation）；不给 --rows、--first-slice 就是表里全部行")
     parser.add_argument("--first-slice", action="store_true", help="指定范围：第一刀，每个文件 i = 0 那一行（24 行）")
     parser.add_argument("--empty-mutation", action="store_true", help="另跑空变异：拿表里第一行、把替换文换成原文本身（行目录 row-0）")
-    parser.add_argument("--threads", type=int, default=None, help="每条线道的线程数；不给取登记的重活默认并行度 ÷ --lanes（向下取整，至少 1）")
-    parser.add_argument("--lanes", type=int, default=1)
+    parser.add_argument("--threads", type=int, default=None, help="每条线道的线程数；不给取登记的重活默认并行度 ÷ 线道数（向下取整，至少 1）")
+    parser.add_argument("--lanes", type=int, default=None,
+                        help="线道数；不给照跑前登记第十四节取 ⌊登记的重活默认并行度 ÷ 每线道线程数⌋（每线道线程数不给取 full_table_run.LANE_THREADS），至少 1")
     parser.add_argument("--positive-control", choices=list(DEVICE_POSITIVE_CONTROLS) + [O3_CONTROL])
     parser.add_argument("--disable-oracle", choices=["O1", "O2"])
     parser.add_argument("--no-executor", action="store_true", help="不跑 O3 执行器（Q3-核「驱动不跑执行器」那一次）")
@@ -705,8 +724,11 @@ def main(argument_list: list[str]) -> int:
                         help="同一棵冻结树、同一组 --streams 的基线那一趟的 -timing 产物：T 取它的 process_wall（登记修订 2 第 2.5 节）")
     parser.add_argument("--timing-output", required=True,
                         help="新文件（已存在就拒）：每行装置 device.out 里的 E7TIMING 行原样收进来，每行前一行 row_device（修订 2 第 2.6 节）")
-    arguments = parser.parse_args(argument_list)
-    arguments.threads = threads_per_lane(arguments.threads, arguments.lanes)
+    return parser
+
+
+def run_parsed_arguments(parser: argparse.ArgumentParser, arguments: argparse.Namespace) -> int:
+    """整趟：线道数与每线道线程数已经落定（lanes_and_threads_per_lane）之后的部分。"""
     if os.path.exists(arguments.timing_output):
         parser.error(f"--timing-output {arguments.timing_output} 已存在，不覆盖")
     with open(arguments.baseline_timing, encoding="utf-8") as handle:

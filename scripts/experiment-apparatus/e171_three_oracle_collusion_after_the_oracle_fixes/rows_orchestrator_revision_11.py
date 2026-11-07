@@ -6,7 +6,7 @@
 与冻结树两处运行条件之后重钉）。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
 第一段编排器 2ab19c53… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
   ① 第 11、12 步派发之前（phase_rows_and_checks）：每行照第 11.2、11.3 节算键（L 取 --baseline-timing 那份 step-7 计时的 process_wall），查库、写标记
-    （<H16 导出根>/reuse-markers/segment-one-rows/），命中的行照第 11.5 节「取用」先写标记、再把条目里的行目录硬链接进行输出根（row-result.tsv 最后链），
+    （<H16 导出根>/reuse-markers/segment-one-rows/），命中的行照第 11.5 节「取用」先写标记、再把条目里的行目录从 prune-server 里那一条解出来写进行输出根（row-result.tsv 最后写），
     编排器原有的续跑因此当它做完了、不派；合成时由编排器原有的按键复用重报把它并进产物（合并规则 ①–⑦ 不改）。第 12 步 row-0 与跨机那一份 X
     （RC2）、要补位的行（按名字取不到、锚点不是恰 1 次、碰到模块集合）永远现跑；
   ② 一个分片结束（finish_shard）：编排器原来那样记退出码、收别的台做完的行，再把这一分片现跑完的每一行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2）；
@@ -25,7 +25,7 @@
   rows_orchestrator_revision_11.py run  --config C --repo R --baseline-timing B --stop-file S      （同修订 8；E171_REVISION_11_CONFIG 要给）
   rows_orchestrator_revision_11.py plan --config C --repo R --baseline-timing B --stop-file S      （修订 8 的 plan 原样，另打每行的键与库里有没有；只读）
   rows_orchestrator_revision_11.py --selftest [--cells 格,…] [--rounds N]
-退出码：同修订 8 逐行编排（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；E171_REVISION_11_CONFIG 没给、库目录写不了退 78。
+退出码：同修订 8 逐行编排（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；E171_REVISION_11_CONFIG 没给、H31 不过退 78；prune-server 连不上退 75（复用库只在服务里，reuse_library.py 文件头「库」）；自证只在临时 prune-server 上跑（不是临时服务退 2）。
 
 弄坏开关 ROWS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，ROWS_R11_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
   ROWS_R11_BREAK=peer-checks-skipped  别的台跑的行入库之前不核那三样
@@ -63,7 +63,7 @@ BREAK_VARIABLE = "ROWS_R11_BREAK"
 SELFTEST_VARIABLE = "ROWS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 ROWS_R8_PATH = os.path.join(HERE, "rows_orchestrator_revision_8.py")
-ROWS_R8_SHA256 = "055844678056bfd032017b7a6c35671aa17b6d5f92620716b16aaed02e090526"
+ROWS_R8_SHA256 = "0a060f54f44d61f14cb20786f0d826f9fbb698323265b119ef1398c3db8d6a3d"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-one-rows"
@@ -267,13 +267,13 @@ def finish_and_insert(context, record: dict, code: int) -> bool:
 def plan_lines(context) -> list[str]:
     """plan：每行的键与库里有没有（只读：不建库、不写标记、不挪坏条目）。"""
     state = STATE["reuse"]
-    lines = [f"── 复用（修订 11）── 库 {state.library.root}（{'在' if os.path.isdir(state.library.root) else '还没建'}；冻住 {state.library.frozen_reason() or '否'}）；"
+    lines = [f"── 复用（修订 11）── 库 {state.library.location()}（冻住 {state.library.frozen_reason() or '否'}）；"
              f"查库 {'开' if state.lookup else '关'}；标记 {state.markers}"]
     if row_limit(context, False) is None:
         return lines + [f"限时要的那份计时 {context.baseline_timing} 还不在（修订 8 第 7 步没绿）：各行的键到起跑时现算"]
     for row, sections, reason in row_keys(context, ("s11", "s12")):
         key = reuse.key_of(sections)
-        present = os.path.isdir(state.library.entry_path(key))
+        present = state.library.present(key)
         lines.append(f"行 {row.name}：键 {key[:16]}；{('永远现跑（' + reason + '）') if reason else ('库里有同键条目' if present else '库里没有')}")
     return lines
 
@@ -344,7 +344,7 @@ def main(argument_list: list[str]) -> int:
         try:
             if problems:
                 raise reuse.RunCondition("H31 不过：" + "；".join(problems[:4]))
-            reuse.Library(library_roots.require_library_root(reuse_config.get("H30"))).check_run_condition(repo)
+            reuse.Library(library_roots.require_library_root(reuse_config.get("H30"))).check_service_reachable()
         except reuse.RunCondition as error:
             print(f"✗ 运行条件不满足（退 78）：{error}", file=sys.stderr)
             return one.EXIT_RUN_CONDITION
@@ -489,6 +489,11 @@ SELFTEST_SWITCHES = {"peer-checks-skipped": "peer-checks", "s18-ignored": "s18-s
 
 
 def selftest(argument_list: list[str]) -> int:
+    problem = reuse.prune_server_client.selftest_service_problem()
+    if problem:   # 复用库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「退出码」）
+        print(f"✗ rows_orchestrator_revision_11.py 自证没跑：{problem}", file=sys.stderr)
+        print(f"     → 怎么办：{reuse.prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
+        return 2
     os.environ[SELFTEST_VARIABLE] = "1"
     return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
 

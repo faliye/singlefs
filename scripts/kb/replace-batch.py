@@ -12,16 +12,17 @@
 同一个文件的多处按数组顺序在内存里依次施加，后一处的旧串按前一处改完的文本核。
 
 为什么两阶段：逐处写盘的批量替换在第 k 处锚点不中时，前 k − 1 处已经落盘，留下半套改动。
-2026-09-14 实测：一次 54 处的 kb 写回里有一处原文是「没被」而锚点写成「没有被」，两阶段让它一个文件都没写。
-REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在它下面必须判红。
+例：一次 54 处的 kb 写回里有一处原文是「没被」而锚点写成「没有被」，两阶段让它一个文件都没写。
+REPLACE_BATCH_WRITE_EACH=1 强制逐处写盘（不是 --dry-run 时才走；--dry-run 照常只核不写），--selftest 在它下面必须判红（「✗ 自证：第二处锚点不中时第一处已经落盘」）。
+它与 REPLACE_BATCH_BREAK 同是只给自证用的开关，过同一道入口守卫（settle_break_switches）：平常跑设了哪一个都退 2、什么都没做。
 
 写回不在原文件上就地写：同目录排他新建临时文件、fsync、照原权限位与属主、改名换上（`lib_atomic_replace.py`）。
 正在按偏移边跑边读这份文件的进程（bash 跑脚本）读的仍是旧 inode 的旧内容。
 换之前整批逐个文件预演一遍（临时文件写完、fsync 完，在改名之前停下、删掉）：有一个文件会被拒（多个硬链接、
 当前用户只读、建不了临时文件、写或 fsync 失败），一个文件都不换，与「锚点不中一个文件都不写」同一条。
 
-退出码：0 写成功（或 --dry-run 核过）；1 锚点命中数不对，一个文件都没写；2 用法不对；3 写完回读不一致；
-4 没换上：预演时被拒，一个文件都没换；预演过了、真换时失败，已经换上的文件逐个列出；
+退出码：0 写成功（或 --dry-run 核过）；1 锚点命中数不对，一个文件都没写；2 用法不对，或平常跑设了只给自证用的开关；3 写完回读不一致；
+4 没换上：预演时被拒，一个文件都没换；预演过了、真换时失败或改名之后被 Ctrl-C 打断，已经换上的文件逐个列出（被打断的那一个算已换上）；
 5 目标在仓里（任何后缀），某一处的新串带会话号（ListAgents 列的会话名），一个文件都没写（--dry-run 同样判）；
 6 目标是仓里的 .md、.json 或 .txt，某一处的新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个文件都没写（--dry-run 同样判）。
 核的时候每一处都核完（对不上的那一处不施加、接着核下一处），对不上的逐处列全再退 1（--dry-run 同样）：
@@ -36,12 +37,12 @@ REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在
 带钟点、时区词、时间戳的逐处列出文件、行号、形态与出路。判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判；读不到判据库按拒绝办（退出码 6）。
 
 弄坏开关（只给 --selftest 证红用）：
-  REPLACE_BATCH_BREAK=stop-at-first  plan_in_memory() 第一处对不上就停（改前的判法）
+  REPLACE_BATCH_BREAK=stop-at-first  plan_in_memory() 第一处对不上就停
       一次核完（「✗ 自证：四处里第 1、3、4 处对不上」，失败行下面原样转述 run() 的输出：「✗ 第 1 处 …third.md：期望命中 1 次，实际 0」「✗ 4 处里 1 处对不上」）
-  REPLACE_BATCH_BREAK=no-clock-guard  run() 不判新串里的钟点（改前没有这一道）
+  REPLACE_BATCH_BREAK=no-clock-guard  run() 不判新串里的钟点
       写 .md 之前判新串里的钟点（「✗ 自证：写 .md 之前判新串里的钟点没判对」，下面逐条以「写 .md：」开头：新串带紧凑时间戳、带日期钟点时区词、带光秃时区词、
       --dry-run 也拒、两处里一处带钟点时一个文件都不写、入口退出码 6）
-  REPLACE_BATCH_BREAK=no-session-guard  run() 不判新串里的会话号（改前的写法）
+  REPLACE_BATCH_BREAK=no-session-guard  run() 不判新串里的会话号
       写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」，下面逐条以「写会话号：」开头：.md 与 .py 目标的新串带会话名、--dry-run 也拒、入口退出码 5 与不写文件）
   LIB_FORBIDDEN_NOTATIONS_BREAK=session-names  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：整个会话号形态不判
       写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」，下面「写会话号：」开头的拒绝几条全红）；
@@ -50,6 +51,12 @@ REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在
   LIB_FORBIDDEN_NOTATIONS_BREAK=clock-times  同一个库的钟点形态整个不判，自证同样走它
       写 .md 之前判新串里的钟点（「✗ 自证：写 .md 之前判新串里的钟点没判对」，下面「写 .md：」开头的拒绝几条全红）
   replace-once.py 的 REPLACE_ONCE_BREAK=no-nearest 同样让这一格红（最像的一段是从那里取的）
+  REPLACE_BATCH_BREAK=write-each-unguarded  入口守卫的名单里没有 REPLACE_BATCH_WRITE_EACH：平常跑设了它照走逐处写盘
+      只给自证用的开关过入口守卫（「✗ 自证：平常跑设了 REPLACE_BATCH_WRITE_EACH 本该被入口拒」）
+  REPLACE_BATCH_BREAK=write-each-ignores-dry-run  REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 也逐处写盘：逐处写盘那一支排在干跑之前
+      干跑不写盘（「✗ 自证：REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 写了盘」）
+  ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
+      写回的方式（「✗ 自证：写回的方式不对」，下面几行以「[改名之后被打断]」起头）
 """
 import contextlib
 import importlib.util
@@ -60,8 +67,8 @@ import pathlib
 import sys
 import tempfile
 
-from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
-    replace_file_contents_by_rename, unchanged_bytes
+from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, leftover_temporary_files, \
+    problems_with_replacement_by_rename, replace_file_contents_by_rename, unchanged_bytes
 from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -104,7 +111,7 @@ def plan_in_memory(edits, originals=None):
                 nearest_hint = nearest_hint or replace_once_module().nearest_hint
                 detail += "".join(f"\n  {line.strip()}" for line in nearest_hint(texts[path], edit["old"]))
             errors.append(detail)
-            if os.environ.get("REPLACE_BATCH_BREAK") == "stop-at-first":   # 弄坏开关：改前的判法，第一处对不上就停
+            if os.environ.get("REPLACE_BATCH_BREAK") == "stop-at-first":   # 弄坏开关：第一处对不上就停
                 return None, errors
             continue
         texts[path] = texts[path].replace(edit["old"], edit["new"])
@@ -144,7 +151,7 @@ def session_name_refusals(edits, notation_root=None, originals=None):
 
 
 def apply_each_edit_to_disk(edits):
-    """旧行为：逐处写盘。只给自证强制走一遍，证明它会留下半套改动。"""
+    """逐处写盘（不两阶段）。只给自证强制走一遍（REPLACE_BATCH_WRITE_EACH=1，入口守卫只在自证里放它进来，--dry-run 时 run() 不走这一支），证明它会留下半套改动。"""
     for index, edit in enumerate(edits, 1):
         path = pathlib.Path(edit["file"])
         text = path.read_text(encoding="utf-8")
@@ -192,6 +199,12 @@ def replace_planned_texts(texts, originals=None):
             print(f"→ 预演过了、真换时失败，这一批留了半套：已经换上的 {len(replaced_paths)} 个是 {replaced_paths}；"
                   "先核这几个的内容，再只拿剩下的几处重跑")
             return 4
+        except (ReplacedThenInterrupted, ReplacedThenFailed) as replaced_then_failed:
+            replaced_paths.append(path)
+            print(f"✗ {replaced_then_failed}")
+            print(f"→ 这一个改名之后被打断，新内容已经换上；这一批停在这里、留了半套：已经换上的 {len(replaced_paths)} 个是 {replaced_paths}；"
+                  "先核这几个的内容，再只拿剩下的几处重跑")
+            return 4
         replaced_paths.append(path)
         for note in notes:
             print(f"! {note}")
@@ -208,7 +221,8 @@ def run(edits, dry_run, notation_root=None):
         return 2
     # 同一文件的相对路径、绝对路径与符号链接共用一份计划，防止后写覆盖前写。
     edits = [{**edit, 'file': os.path.realpath(edit['file'])} for edit in edits]
-    if os.environ.get("REPLACE_BATCH_WRITE_EACH") == "1":
+    write_each_skips_dry_run = os.environ.get("REPLACE_BATCH_BREAK") != "write-each-ignores-dry-run"   # 弄坏开关：干跑也逐处写盘
+    if os.environ.get("REPLACE_BATCH_WRITE_EACH") == "1" and not (dry_run and write_each_skips_dry_run):
         error = apply_each_edit_to_disk(edits)
         if error:
             print(f"✗ {error}")
@@ -409,11 +423,46 @@ def selftest():
                       f"一个文件都不写，实际退 {exit_code}：\n{said}")
                 print("→ 看 plan_in_memory() 是不是核完每一处再判；REPLACE_BATCH_BREAK=stop-at-first 设着的话这里本来就该红")
                 return 1
+    # 只给自证用的开关过入口守卫：平常跑（命令行不以 --selftest 起头、祖先里没有自证）设了 REPLACE_BATCH_WRITE_EACH 要拒，--selftest 与自证起的子进程放行
+    write_each_set = {"REPLACE_BATCH_WRITE_EACH": "1"}
+    refused_plain = break_variables_to_refuse(["--dry-run", "规格.json"], write_each_set, lambda: False)
+    refused_selftest = break_variables_to_refuse(["--selftest"], write_each_set, lambda: False)
+    refused_inside = break_variables_to_refuse(["规格.json"], write_each_set, lambda: True)
+    if refused_plain != ["REPLACE_BATCH_WRITE_EACH"] or refused_selftest or refused_inside:
+        print(f"✗ 自证：平常跑设了 REPLACE_BATCH_WRITE_EACH 本该被入口拒（--selftest 与自证起的子进程放行），"
+              f"实际平常跑拒 {refused_plain}、--selftest 拒 {refused_selftest}、自证子进程拒 {refused_inside}")
+        print("→ 看 BREAK_VARIABLES 与 break_variables_to_refuse()；REPLACE_BATCH_BREAK=write-each-unguarded 设着的话这里本来就该红")
+        return 1
+    # 干跑不写盘：REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 照样只核不写，全中的一批与后一处锚点不中的一批都一个字节不写
+    saved_write_each = os.environ.get("REPLACE_BATCH_WRITE_EACH")
+    os.environ["REPLACE_BATCH_WRITE_EACH"] = "1"
+    try:
+        with tempfile.TemporaryDirectory() as directory:
+            target = pathlib.Path(directory, "dry-run.md")
+            for label, batch, wanted_code in (
+                    ("全中的一批", [{"file": str(target), "old": "original", "new": "replacement"}], 0),
+                    ("后一处锚点不中的一批", [{"file": str(target), "old": "original", "new": "replacement"},
+                                       {"file": str(target), "old": "absent", "new": "other"}], 1)):
+                target.write_text("original\n", encoding="utf-8")
+                inode_before = target.stat().st_ino
+                captured = io.StringIO()
+                with contextlib.redirect_stdout(captured):
+                    exit_code = run(batch, dry_run=True)
+                if exit_code != wanted_code or target.read_text(encoding="utf-8") != "original\n" or target.stat().st_ino != inode_before:
+                    print(f"✗ 自证：REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 写了盘（{label}：本该退 {wanted_code}、文件一个字节不动），"
+                          f"实际退 {exit_code}、文件是 {target.read_text(encoding='utf-8')!r}：\n{captured.getvalue()}")
+                    print("→ 看 run() 里逐处写盘那一支是不是排在干跑之前；REPLACE_BATCH_BREAK=write-each-ignores-dry-run 设着的话这里本来就该红")
+                    return 1
+    finally:
+        if saved_write_each is None:
+            os.environ.pop("REPLACE_BATCH_WRITE_EACH", None)
+        else:
+            os.environ["REPLACE_BATCH_WRITE_EACH"] = saved_write_each
     # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接与只读拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
     running_script = "#!/usr/bin/env bash\n" + "echo 前面这几行正在被 bash 边跑边读\n" * 20 + "run_step 甲\nexit $?\n"
     problems = problems_with_replacement_by_rename(
         lambda path: run([{"file": path, "old": "run_step 甲", "new": "run_step 戊"}], dry_run=False),
-        running_script, running_script.replace("run_step 甲", "run_step 戊", 1))
+        running_script, running_script.replace("run_step 甲", "run_step 戊", 1), exit_code_when_replaced_then_interrupted=4)
     if problems:
         print("✗ 自证：写回的方式不对")
         for problem in problems:
@@ -456,8 +505,10 @@ def selftest():
             print("→ 看 replace_planned_texts() 是不是先把整批逐个预演完、全过了才开始改名换上")
             return 1
     print("✓ replace-batch 自证：锚点不中时一个文件都不写，全中时按序写对，命中数不等就拒绝，几处对不上时（--dry-run 同样）一次逐处列全、命中 0 次的附最像的一行；"
+          "平常跑设了 REPLACE_BATCH_WRITE_EACH 入口拒（--selftest 与自证子进程放行），设着它时 --dry-run 全中与后一处不中的两批都不写盘；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
-          "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件；"
+          "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件、"
+          "改名之后（目录 fsync 时、改名刚返回时）被 Ctrl-C 打断时库抛 ReplacedThenInterrupted、新内容已换上、退 4；"
           "批里有一个文件会被拒时一个文件都不换；"
           "写仓里的 .md 之前判每一处新串里的钟点：带紧凑时间戳、日期钟点时区词、光秃时区词的拒绝（6，--dry-run 也拒、两处里一处带钟点一个文件都不写）并点名形态与行号，"
           "非时间戳的 8 位数字加 T、只写日期、删掉钟点的改动、别的后缀与仓外放行，假仓里没有共用库时读不到钟点判据按拒绝办，入口退出码 6；"
@@ -489,7 +540,22 @@ def main(arguments, notation_root=None):
     return run(edits, dry_run, notation_root)
 
 
-BREAK_VARIABLES = ("REPLACE_BATCH_BREAK",)
+BREAK_VARIABLES = ("REPLACE_BATCH_BREAK", "REPLACE_BATCH_WRITE_EACH")
+
+
+def guarded_break_variables():
+    """入口守卫拦的变量名单；弄坏开关 write-each-unguarded 时名单里没有 REPLACE_BATCH_WRITE_EACH（不拦它）。"""
+    if os.environ.get("REPLACE_BATCH_BREAK") == "write-each-unguarded":
+        return ("REPLACE_BATCH_BREAK",)
+    return BREAK_VARIABLES
+
+
+def break_variables_to_refuse(arguments, environment, inside_selftest_now):
+    """入口守卫的判法：environment 里设了的守卫变量，命令行不以 --selftest 起头、inside_selftest_now() 也不是 True 的 → 要拒的那几个名字；放行交空表。"""
+    setting = [name for name in guarded_break_variables() if environment.get(name)]
+    if not setting or arguments[:1] == ["--selftest"] or inside_selftest_now():
+        return []
+    return setting
 
 
 def inside_selftest():
@@ -508,11 +574,11 @@ def inside_selftest():
 
 
 def settle_break_switches(arguments):
-    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道。
+    """弄坏开关只在自证里认（checks-owed.md C622），参数解析之前先过这一道；REPLACE_BATCH_WRITE_EACH 与 REPLACE_BATCH_BREAK 同拦。
     放行：命令行以 --selftest 起头；祖先里有自证（inside_selftest）。
-    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。"""
-    setting = [name for name in BREAK_VARIABLES if os.environ.get(name)]
-    if not setting or arguments[:1] == ["--selftest"] or inside_selftest():
+    都不是而 BREAK_VARIABLES 里有设了的：点名变量、说它只在自证里认，交回退出码 2；否则交回 None。判法在 break_variables_to_refuse。"""
+    setting = break_variables_to_refuse(arguments, os.environ, inside_selftest)
+    if not setting:
         return None
     print(f"  ✗ {'、'.join(setting)} 是弄坏开关，只在自证（--selftest 本身与它起的子进程）里认；平常跑设了就拒，这一次什么都没做", file=sys.stderr)
     print(f"     → 怎么办：unset {' '.join(setting)} 再来；要看开关红在哪一项，跑 {setting[0]}=<项> python3 scripts/kb/replace-batch.py --selftest", file=sys.stderr)

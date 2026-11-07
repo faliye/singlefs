@@ -4,7 +4,7 @@
 # 跑 `gate.sh --staged`，整轮全绿、调用方又没给 GATE_BASE 才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
 # ref 留着只作记录（「上次整轮全绿的树」，别处要拿它当改动基准的照读）：任何复用判定都不读它，复用只看每条判定的单元键（scripts/gate/admission.py 文件头）。
 # 交给 gate.sh 的两样：被判的暂存树另经 GATE_STAGED_TREE 交给上游（上游在 worktree 里 read-tree 这一棵，不自己重算）；
-# 编译目录 CARGO_TARGET_DIR（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：调用方给了 SINGLEFS_GATE_TARGET_DIR 就照它、收尾不删；
+# 编译目录 CARGO_TARGET_DIR（自己用完自己删，不跨趟复用）：调用方给了 SINGLEFS_GATE_TARGET_DIR 就照它、收尾不删；
 # 没给就在这一趟自己的目录 <日志目录>/gate-staged-<日期时刻>-<暂存树前 12 位>-<进程号>/ 里建 target，正常结束、红了、被 TERM / INT 停（等 gate.sh 退出）
 # 都在 EXIT 上删（scripts/hosts/run-build-directory.sh：删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0），再删掉那个空目录。
 #
@@ -20,7 +20,7 @@
 #   ③ 不带 `--staged` 跑不许前移，所以这个外壳只做 `--staged` 这一条路。
 # ref 是覆盖语义，永远只有一条，不累积、不落盘第二份状态。
 #
-# 日志出两份（用户 2026-10-21：整轮门禁的输出动辄上万行，一般只看错误警告）：gate.sh 的输出照常转打，同时经 scripts/hosts/two-logs.sh 写
+# 日志出两份（整轮门禁的输出动辄上万行，一般只看错误警告）：gate.sh 的输出照常转打，同时经 scripts/hosts/two-logs.sh 写
 #   <日志目录>/gate-staged-<日期时刻>-<暂存树前 12 位>-<进程号>.log（全量）与同名的 .problems.log（只收 ✗ 与它的 → 出路、⚠、本次未跑、逐格汇总、
 #   cargo / rustc 的 error 与 warning:、libtest 的 FAILED 与 panicked、Traceback、非 0 退出码，行前带全量日志里的行号，末行写收了几行全量几行）。
 #   日志目录取 SINGLEFS_GATE_STAGED_LOG_DIRECTORY，没给是共享数据根下的 gate-staged-logs（.claude/hooks/lib_work_root.py shared gate-staged-logs，两台同一份；

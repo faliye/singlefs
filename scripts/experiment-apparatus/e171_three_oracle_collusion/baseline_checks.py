@@ -84,7 +84,7 @@ def baseline_red_counts(baseline: str) -> dict[str, int]:
 # ───────────────────────────── S5：比对器自己现算的两个数 ─────────────────────────────
 
 def segments_of_the_write_stream(operation_rows: list[list[str]]) -> list[list[int]]:
-    """切段（`singlefs_harness::segments::SegmentClosingRule` 的规则，比对器自己写一遍）：普通写与清零记进当前段、把它的盘记成「没放行」；
+    """切段（`singlefs_verification::segments::SegmentClosingRule` 的规则，比对器自己写一遍）：普通写与清零记进当前段、把它的盘记成「没放行」；
     FUA 写记进当前段、放行它自己那块盘；屏障放行它那块盘；当前段里有写、而每块盘都放行了，这一段关上。流尾没关的段单独成一段。
     交回每段里的写序号（写序号按非屏障操作的次序数）。"""
     segments: list[list[int]] = []

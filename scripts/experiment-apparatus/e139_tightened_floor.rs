@@ -1,8 +1,8 @@
-//! E139：按盘回退下界的收严形态 —— D16（发布语义） 已定项 1 第三轮判决之后的重跑。
+//! E139：按盘回退下界的收严形态 —— D16（发布语义） 已定项 1 判决的重跑。
 //!
 //! 预注册 `research/prompts/e139-preregistration.md`。装置从 E138（按盘回退下界与推空的空间要求） 的源码拷出来改：
 //! ① 两条被测臂 G2R / G2S：准入按最坏残留收费、界与保留池给 k_tol = 2 次根槽写失败留余量、
-//!    保留池与残留按声明的最坏空发布开销 c_max 算、G2S 的上限按用户 2026-09-12 的口径取第 4 新的非空根；
+//!    保留池与残留按声明的最坏空发布开销 c_max 算、G2S 的上限按「4」数不同用户可见状态的口径取第 4 新的非空根；
 //! ② 新增五个世界：活化区间内崩溃不丢盘、先跳号再抬 F、推空期间根槽写失败、坏槽、空发布开销在挂载之后变大。
 
 use e7_index_bench::Emitter;
@@ -14,7 +14,7 @@ const REGION_COUNT: u64 = 3;
 const DISK_COUNT: usize = 2;
 /// 臂 C、臂 D 的 K_min：C222 按轮转算术给的 3。
 const TXG_ARITHMETIC_GENERATIONS: u64 = 3;
-/// 用户定案（2026-09-11）：盘紧时最少保留 4 个；2026-09-12 澄清「4」数的是不同的用户可见状态（臂 G2S）。
+/// 盘紧时最少保留 4 个；「4」数的是不同的用户可见状态（臂 G2S）。
 const MINIMUM_RETAINED_ROOTS: usize = 4;
 /// 对照臂 G_txgcap：抬 F 的上限按 txg 数几代。
 const TXG_UPPER_LIMIT_GENERATIONS: u64 = 4;
@@ -367,7 +367,7 @@ impl Arm {
             Arm::RingPersisted | Arm::ProtectedGenerationsAtMinimum | Arm::FloorTxg | Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit => false,
         }
     }
-    /// 上限按第 4 新的非空根取（用户 2026-09-12 的口径）。
+    /// 上限按第 4 新的非空根取。
     fn counts_states(self) -> bool {
         match self {
             Arm::TightenedStates | Arm::TightenedStatesWindowed(_) | Arm::ClauseFloorWindowed(_) | Arm::WholeRing(_) => true,
@@ -1144,12 +1144,12 @@ impl Simulation {
         }
     }
 
-    /// 用户定案的上限：min(每块幸存盘上最新的持久有效根, 第 4 新的持久有效根)。
+    /// 上限：min(每块幸存盘上最新的持久有效根, 第 4 新的持久有效根)。
     fn per_disk_retention_upper_limit(&self) -> u64 {
         self.fourth_newest_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())
     }
 
-    /// 用户 2026-09-12 口径的上限：min(每块幸存盘上最新的持久有效根, 第 4 新的非空持久有效根)。
+    /// 「4」数不同用户可见状态的口径下的上限：min(每块幸存盘上最新的持久有效根, 第 4 新的非空持久有效根)。
     fn per_disk_states_upper_limit(&self) -> u64 {
         self.fourth_newest_nonempty_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())
     }
@@ -5241,7 +5241,7 @@ mod tests {
         assert!(newest - disk_one >= 3, "盘 1 上最新的根要落后 3 个 txg 以上（newest={newest} disk_one={disk_one}）");
         assert!(prefix.floor_carried <= disk_one, "按盘取上限：抬到的 F 不许越过盘 1 上最新的根");
     }
-    /// 跑后补的诊断（2026-09-12，第四轮三方论证正推腿打中）：`reserve_sweep` 的产物行不打印失败窗口号，
+    /// 跑后补的诊断：`reserve_sweep` 的产物行不打印失败窗口号，
     /// 所以「按状态数读的删了再写失败全在填满后的前 3 个窗口」对保留池扫描的 18 格没有产物字段撑着。
     /// 这里把 G2S 在 S = 16、保留池 ≥ 跑前式子的每一格按种子重跑一遍，打印首末失败窗口并钉死：
     /// c₀ = 5 的 9 格首 1、末 3；c₀ = 1 的 9 格里 reserve = 式子 + 2..5 的四格末窗口是 6，其余末 3。

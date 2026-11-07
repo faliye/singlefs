@@ -114,7 +114,7 @@ fn sha256_truncated_to_32_bits(data: &[u8]) -> u32 {
 /// `header_csum` 那 32 字节不进 hash 输入（D23（journal 的角色与格式） 已定项 10 的实现纪律：当零）。
 const HEADER_CHECKSUM_BYTES: usize = 32;
 /// ⚠️ 这三档是**跑这一轮时**按当时的字段表建的模（86 = 含 `tail_lsn` 那 8 字节的版本）。
-/// 2026-08-31 `tail_lsn` 随 D23（journal 的角色与格式） 已定项 3 去掉 ⇒ 现行是 78 / 87 / 91。
+/// `tail_lsn` 随 D23（journal 的角色与格式） 已定项 3 去掉 ⇒ 现行是 78 / 87 / 91。
 /// 本文件连同它的产物是那一轮的记录，**不跟着改**——改了产物就不再对应它的输入。
 /// E61（反向链 hash 算法的均匀性） 的量二结论已作废，见该实验正文开头。
 const HEADER_LENGTHS_IN_BYTES: [usize; 3] = [86, 95, 99];

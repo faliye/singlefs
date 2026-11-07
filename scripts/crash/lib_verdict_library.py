@@ -89,11 +89,11 @@ Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。R
       「作废时点名变了的单元」「判法单元指纹变了整项现判」「点名判法的单元」
   VERDICT_LIBRARY_BREAK=judging-files-included  判法单元指纹里留着这份库与 lib_function_units.py 的单元
       「判法单元指纹不含库自己」
-  VERDICT_LIBRARY_BREAK=red-not-recorded  record_red 什么都不写（改前的样子：只记绿，判红不撤同一把键的绿）
+  VERDICT_LIBRARY_BREAK=red-not-recorded  record_red 什么都不写（只记绿，判红不撤同一把键的绿）
       「判绿入库、同一把键判红之后，下一趟这一项现判、不复用」
-  VERDICT_LIBRARY_BREAK=library-directory-outside-git-tolerated  library_directory 取不到 git common-dir 时交 None、不退 2（改前「不读不写、全部现判」的样子）
+  VERDICT_LIBRARY_BREAK=library-directory-outside-git-tolerated  library_directory 取不到 git common-dir 时交 None、不退 2（「不读不写、全部现判」）
       「不在 git 工作树里取库目录退 2」
-  VERDICT_LIBRARY_BREAK=missing-client-tolerated  这棵树里没有客户端时 library_service_store 交 None、不退 2（改前「照没给判定库办」的样子）
+  VERDICT_LIBRARY_BREAK=missing-client-tolerated  这棵树里没有客户端时 library_service_store 交 None、不退 2（「照没给判定库办」）
       「树里没有客户端的命令行 lookup 退 2」
 """
 import collections
@@ -325,7 +325,7 @@ class LibraryUnavailable(SystemExit):
 
 def library_directory(judged_root, name):
     """这一道判定库的库目录（文件头「存放」）：被判那棵树的 git common-dir 下的 <name>，只当名字；取不到 common-dir 退 2（LibraryUnavailable）。
-    弄坏开关 library-directory-outside-git-tolerated 下取不到交 None（改前「不读不写、全部现判」的样子）。"""
+    弄坏开关 library-directory-outside-git-tolerated 下取不到交 None（「不读不写、全部现判」）。"""
     common_directory = git_common_directory(judged_root)
     if common_directory is None:
         if "library-directory-outside-git-tolerated" in BREAK:
@@ -382,7 +382,7 @@ def prune_server_client():
 
 def library_service_store(kind_directory):
     """这一份库（<固定目录>/<kind>）在 prune-server 里的 LibraryStore（文件头「存放」）；这棵树里没有客户端退 2（LibraryUnavailable）。
-    弄坏开关 missing-client-tolerated 下没有客户端交 None（改前「照没给判定库办」的样子），客户端的弄坏开关 unreachable-treated-as-no-library 下客户端交 None。"""
+    弄坏开关 missing-client-tolerated 下没有客户端交 None（「照没给判定库办」），客户端的弄坏开关 unreachable-treated-as-no-library 下客户端交 None。"""
     client = prune_server_client()
     if client is None:
         if "missing-client-tolerated" in BREAK:
@@ -548,7 +548,7 @@ class VerdictLibrary:
 
     def record_red(self, item, components, summary, run=None, details=None):
         """判红之后调：照同一把键写一条 verdict=red 的记录，盖掉这把键原有的绿；下一趟 lookup 答现判、原因「上次判红」。
-        这一项最近判绿的那一份（items/）不动。参数、返回同 record。弄坏开关 red-not-recorded 下什么都不写（改前的样子）。"""
+        这一项最近判绿的那一份（items/）不动。参数、返回同 record。弄坏开关 red-not-recorded 下什么都不写。"""
         if "red-not-recorded" in BREAK:
             return None
         return self._write(item, components, summary, run or "", details, "red")

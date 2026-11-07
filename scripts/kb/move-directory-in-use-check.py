@@ -3,8 +3,8 @@
 # run-condition: none 只读 /proc 与 Claude Code 的会话记录，除了 python3 之外没有环境要求，不起子进程
 """整目录搬迁之前，核还有没有在跑的子 agent 与进程引着旧路径（欠账 C859，.claude/kb/milestone/03-third-txn.md「待优化」第 27 行）。
 
-为什么：2026-10-11 脚本目录在两条线都有子 agent 在跑时整体搬家，在跑的子 agent 用的全路径中途失效，只能逐个发消息改；
-用户 2026-10-18 定「挪出没有问题 但是要解决问题」：搬之前列出在跑的子 agent，有就判红。
+为什么：脚本目录在有子 agent 在跑时整体搬家，在跑的子 agent 用的全路径会中途失效，只能逐个发消息改；
+所以搬之前列出在跑的子 agent，有就判红。
 
 用法：
     move-directory-in-use-check.py <旧目录> [--repository <仓根>] [--projects-directory <目录>] [--active-hours <小时>]
@@ -45,10 +45,11 @@
   MOVE_DIRECTORY_IN_USE_BREAK=ancestors-counted  起这个检查的父进程也算
       「自证 起这个检查的那条命令行写着旧路径不算」
 scripts/agents/lib_session_directory.py 的开关（判法在那一份，开关表也在它的文件头；这里同样只在 --selftest 本身与它起的子进程认），打开后这里红的格：
-  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取 HOME
+  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也取 HOME
       「自证 没给 --projects-directory 时取来源仓根的会话目录」
 """
 import argparse
+import contextlib
 import importlib.util
 import os
 import shutil
@@ -313,7 +314,7 @@ def parse(argv):
 def selftest():
     """临时仓里放旧目录，起两个引着它的进程、一个不相干的；造会话记录：没交回而提到它的、交回了的、提到名字只是前缀相同的目录的。"""
     work = tempfile.mkdtemp(prefix="move-directory-in-use-selftest-")
-    started, failures = [], []
+    failures = []
     os.environ[AGENT_WATCH.SESSION_REGISTRY_ENV] = os.path.join(work, "no-session-registry")   # 判不了会话在不在，一律不当失效
     try:
         repository = os.path.join(work, "repository")
@@ -337,10 +338,21 @@ def selftest():
         in_cwd = subprocess.Popen(["sleep", "60"], cwd=old, start_new_session=True)
         in_arguments = subprocess.Popen(["bash", "-c", "sleep 60; true", os.path.join(old, "x.sh")], cwd=work, start_new_session=True)   # 带 ; true：bash 不把自己 exec 成 sleep，命令行里留着那条路径
         unrelated = subprocess.Popen(["sleep", "61"], cwd=work, start_new_session=True)
-        started += [in_cwd, in_arguments, unrelated]
-        time.sleep(0.3)
-        said = []
-        code = run(parse(["scripts/gate", "--repository", repository, "--projects-directory", projects]), say=said.append)
+        # 三条样本进程各在自己的进程组里（start_new_session=True）：判完逐个点名停整组、收尸（command-safety.md「装置起的样本进程，放进它自己的进程组」）
+        try:
+            time.sleep(0.3)
+            said = []
+            code = run(parse(["scripts/gate", "--repository", repository, "--projects-directory", projects]), say=said.append)
+        finally:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(in_cwd.pid, signal.SIGKILL)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(in_arguments.pid, signal.SIGKILL)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(unrelated.pid, signal.SIGKILL)
+            in_cwd.wait()
+            in_arguments.wait()
+            unrelated.wait()
         text = "\n".join(said)
         if f"进程 {in_cwd.pid}：" not in text or f"进程 {in_arguments.pid}：" not in text or f"进程 {unrelated.pid}：" in text:
             failures.append(("进程的当前目录与命令行引着旧目录", text))
@@ -352,10 +364,6 @@ def selftest():
             failures.append(("名字只是前缀相同的不算", text))
         if code != 1:
             failures.append(("有引着的就退 1", f"退 {code}：{text}"))
-        for process in started:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait()
-        started = []
         said = []
         code = run(parse([os.path.join(repository, "scripts", "gate-x"), "--repository", repository, "--projects-directory", os.path.join(work, "no-projects")]),
                    say=said.append)
@@ -380,17 +388,20 @@ def selftest():
         os.symlink("hooks-new", moved_old)
         in_new = subprocess.Popen(["sleep", "62"], cwd=moved_new, start_new_session=True)
         names_old = subprocess.Popen(["bash", "-c", "sleep 62; true", os.path.join(moved_old, "y.sh")], cwd=work, start_new_session=True)
-        started += [in_new, names_old]
-        time.sleep(0.3)
-        said = []
-        code = run(parse(moved + ["--projects-directory", moved_projects]), say=said.append)
+        try:
+            time.sleep(0.3)
+            said = []
+            code = run(parse(moved + ["--projects-directory", moved_projects]), say=said.append)
+        finally:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(in_new.pid, signal.SIGKILL)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(names_old.pid, signal.SIGKILL)
+            in_new.wait()
+            names_old.wait()
         text = "\n".join(said)
         if code != 3 or "要留着" not in text or f"进程 {names_old.pid}：" not in text or f"进程 {in_new.pid}：" in text:
             failures.append(("搬完还有人引着、链留着：退 3，只认命令行", f"退 {code}：{text}"))
-        for process in started:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait()
-        started = []
 
         said = []
         code = run(parse(moved + ["--projects-directory", os.path.join(work, "no-projects")]), say=said.append)
@@ -444,12 +455,6 @@ def selftest():
         if problems:
             failures.append(("没给 --projects-directory 时取来源仓根的会话目录", "；".join(problems)))
     finally:
-        for process in started:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
         shutil.rmtree(work, ignore_errors=True)
     cells = ("进程的当前目录与命令行引着旧目录", "没交回的子 agent 提到旧目录", "交回了的不算", "名字只是前缀相同的不算", "有引着的就退 1", "没人引着就退 0",
              "搬完还有人引着而没留链", "搬完还有人引着、链留着：退 3，只认命令行", "都交回之后链还在", "都交回、链也删了就退 0", "搬完那一半旧路径还是真目录",

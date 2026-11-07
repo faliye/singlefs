@@ -40,20 +40,20 @@
 #   路径经 MUTATION_SHARD_RUN_SELFTEST_MARK 带给它起的驱动，文件在、内容是 MUTATION_SHARD_SELFTEST_MARK_CONTENT 那一行才认开关；别处设了它，驱动拒、退 2，什么都没分。
 #   逐项写开关名、弄坏哪一处、打开后自证哪几格红
 # （项名是自证 expect 的格名，一行一项；失败行是「✗ <格名>：<细节>」，括号里抄细节的句首，随跑变的路径、进程号、指纹写成 …）：
-#   MUTATION_SHARD_RUN_BREAK=only-rows-ignored  驱动不看 --only-rows，照整张表分两堆（改前的样子：点名的一行连同别的行都分出去）
+#   MUTATION_SHARD_RUN_BREAK=only-rows-ignored  驱动不看 --only-rows，照整张表分两堆：点名的一行连同别的行都分出去
 #       ㉒ 计划那一步带 --only-rows 点名一行：row-plan 只对那一行算键（算键 1 行，不是整张表的 6 行），计划只分那一行（「✗ ㉒ 计划那一步带 --only-rows 点名一行：」；row-plan 那一行写的是算了 6 行的键）
 #       ⑱ ③ 分行带选行文件：只在选中的行里分，要现判的有 1 行也分、两堆用时相等放第二台、本机那一堆空着；有 2 行时第二台拿用时长的那一行（「✗ ⑱ ③ 分行带选行文件：」；两堆里有选行文件之外的行）
-#   MUTATION_SHARD_RUN_BREAK=row-plan-whole-table  驱动调 row-plan 不带 --rows，照整张表算键（改前的样子：点名一行也付整张表算键的代价）
+#   MUTATION_SHARD_RUN_BREAK=row-plan-whole-table  驱动调 row-plan 不带 --rows，照整张表算键：点名一行也付整张表算键的代价
 #       ㉒ 计划那一步带 --only-rows 点名一行：row-plan 只对那一行算键（算键 1 行，不是整张表的 6 行），计划只分那一行（「✗ ㉒ 计划那一步带 --only-rows 点名一行：」；row-plan 那一行写的是算了 6 行的键）
 #   MUTATION_SHARD_RUN_BREAK=row-plan-selection-ignored  自证里直接起 row-plan 点名两行那一趟带 GATE_MUTATION_BREAK=rowplanselectionignored（crates-mutation-rows.py 的 row-plan 不看 --rows）
 #       ㉒ row-plan 点名两行：只对两行算键（算键 2 行），别的 4 行只给用时、键写 -；不点名算整张 6 行（「✗ ㉒ row-plan 点名两行：」；点名两行那一趟写的是算了 6 行的键）
 #   MUTATION_SHARD_RUN_BREAK=anchor-broken-dispatched  ③ 分行不看 row-plan 的第五列：锚点失效、而行键算得出的那一行照样分出去
 #       ⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进两堆、单报几行（「✗ ⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进两堆、单报几行：本机「1 」第二台「2 4 」」）
-#   MUTATION_SHARD_RUN_BREAK=pile-pinned-local  计划给本机那一堆写 pin=local（改前的样子：钉在本机）
+#   MUTATION_SHARD_RUN_BREAK=pile-pinned-local  计划给本机那一堆写 pin=local：钉在本机
 #       ㉔ 经 task-server 分片：计划写两片（两堆都不钉、片里没有 pin 键，都不带内存下限），两堆合起来是全部 6 行、不相交（「✗ ㉔ 经 task-server 分片：计划写两片」；plan.json：pin=local:False unpinned:False）
 #   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认
 #       ⑨ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外（不带自证的标记）：驱动拒、退 2，说设在 --selftest 之外（「退 2；输出：」；输出里没有「设在 --selftest 之外」）
-#   MUTATION_SHARD_RUN_BREAK=llvm-tools-missing-skipped  一片在这一台查出缺 llvm 工具时照改前这一堆不判、退 0（不退 78）
+#   MUTATION_SHARD_RUN_BREAK=llvm-tools-missing-skipped  一片在这一台查出缺 llvm 工具时这一堆不判、退 0（不退 78）
 #       ㉖ 每一片在跑它的这一台现查 llvm 工具：缺了退 78、一条变异都不起，出路写装哪个包；两片同一条规则（「✗ ㉖ 每一片在跑它的这一台现查 llvm 工具：」；两片退「0 0 」）
 #   MUTATION_SHARD_RUN_BREAK=merge-rows-unchecked  合并不查服务，judged-rows 里的行一律当读得到
 #       ㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（写进了别的库）⇒ 退 1、点名那一片（「✗ ㉕ 合并：」；合并退 0）
@@ -157,7 +157,7 @@ mutation_shard_fail() { # <原因> <出路>
 }
 
 # ── 经 task-server 分片（文件头「经 task-server 分片」）───────────────────────────────
-mutation_shard_write_plan() { # <计划目录> <一句说明> [<堆名 local|other> <行数>]…：写 plan.json（先写临时文件再改名）；各片都不钉（文件头「三步」plan），弄坏开关 pile-pinned-local 下本机那一堆照改前钉
+mutation_shard_write_plan() { # <计划目录> <一句说明> [<堆名 local|other> <行数>]…：写 plan.json（先写临时文件再改名）；各片都不钉（文件头「三步」plan），弄坏开关 pile-pinned-local 下本机那一堆钉
   MUTATION_SHARD_PILE_PINNED="$(mutation_shard_break_is pile-pinned-local && echo 1)" python3 - "$@" <<'PY_PLAN'
 import json, os, sys
 directory, note, *rest = sys.argv[1:]
@@ -222,7 +222,7 @@ mutation_shard_task_server_shard() { # 文件头「经 task-server 分片」的 
   plan_directory="$(cd "$plan_directory" && pwd)"
   selection="$plan_directory/shard-$index.selection"
   [[ -s "$selection" ]] || mutation_shard_fail "计划目录里没有第 $index 片的选行文件" "计划那一步没写全：看计划那一步的日志"
-  # 不看派到哪一台：每一片在跑它的这一台现查 llvm 工具与 RocksDB 预编库的取值（文件头「三步」shard），缺了退 78。弄坏开关 llvm-tools-missing-skipped 下缺 llvm 工具照改前不判、退 0
+  # 不看派到哪一台：每一片在跑它的这一台现查 llvm 工具与 RocksDB 预编库的取值（文件头「三步」shard），缺了退 78。弄坏开关 llvm-tools-missing-skipped 下缺 llvm 工具不判、退 0
   if ! llvm_report="$(bash -c "$(mutation_shard_llvm_check_command)" 2>&1)"; then
     if mutation_shard_break_is llvm-tools-missing-skipped; then
       echo "  · 这一台缺 llvm-tools（${llvm_report##*$'\n'}）：这一堆不判"

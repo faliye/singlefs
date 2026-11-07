@@ -39,7 +39,7 @@ def bench(mib, pinned):
     n = mib * 1024 * 1024
     host = torch.empty(n, dtype=torch.uint8, pin_memory=pinned)
     dev = torch.empty(n, dtype=torch.uint8, device=f'cuda:{DEV}')
-    timed(lambda: dev.copy_(host))                      # 丢弃第一轮
+    timed(lambda: dev.copy_(host))                      # 丢弃首轮
     h2d = [timed(lambda: dev.copy_(host)) for _ in range(ROUNDS)]
     d2h = [timed(lambda: host.copy_(dev)) for _ in range(ROUNDS)]
     del dev, host

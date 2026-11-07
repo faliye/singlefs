@@ -56,6 +56,8 @@ class RegisteredHostThreadsTests(unittest.TestCase):
             allocations = rows_orchestrator.allocate(hosts)
         self.assertEqual([allocation.threads for allocation in allocations], [registered, registered])
         self.assertTrue(all(allocation.slots >= 1 for allocation in allocations))
+        # 每台恰一槽、那一槽线程等于登记值（E171（三oracle合谋测试）第 2 次重跑登记修订 11 第 11.2 条）
+        self.assertEqual([(allocation.slots, allocation.threads_per_slot) for allocation in allocations], [(1, registered), (1, registered)])
         self.assertEqual(rows_orchestrator.single_lane_host(allocations, 2).number, 2)
         self.assertEqual(rows_orchestrator.single_lane_host(allocations, 1).threads, registered)
 

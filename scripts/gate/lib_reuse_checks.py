@@ -43,7 +43,8 @@
   第三列三种写法：判定库放哪（有判定库）、「无判定库：<欠账 C 号或「待立」>」（没有判定库的测试入口）、「不算：<理由>」（射程里扫到、只是提到别人的复用）。
   判：路径不在、同一路径登记两行、列数不对 ⇒ 红；射程里注释行写了「判定库」或「复用」（^#.*(判定库|复用)）的脚本登记表里没有 ⇒ 红（漏登记）、
     登记成「无判定库」⇒ 红（声称复用而没有这一格）；有判定库的第四列不是 reuse-three-questions ⇒ 红；
-    自证一律现跑，
+    自证现跑（命令行的 audit 一律现跑；门禁 code-tooling 的 reuse-selftests 格经 audit 的 verdicts 按条复用：一行一条判定，键相同、库里判过绿的不跑、照过算，
+      判绿记绿、判红记红撤绿，键怎么组成写在那一格的注释里；判一行过没过的是 audit_row_judgement），
       输出里要有那一份脚本的规范输出且三问都过（认的脚本名：自证命令里那一份、这一行的路径、这一行自己第三列里点名的判法脚本），没有、或有一问 red ⇒ 红；
       被测脚本的源码里调 selftest_service_problem 的（自证只在临时 prune-server 上跑，裸跑退 2）包一层起：
       python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <--server-binary 给的那一份> -- bash -c <自证命令>；
@@ -89,16 +90,20 @@
       「audit：漏登记判红」那一格判错
   REUSE_CHECKS_BREAK=audit-leaked-library  audit 另认的判法脚本取登记表最后一行的第三列，不取这一行自己的
       「audit：每一行认自己第三列点名的判法脚本」那一格判错
-  REUSE_CHECKS_BREAK=audit-bare-selftest  audit 现跑要临时服务的自证也裸跑、不包 --with-temporary-service（改前的样子）
+  REUSE_CHECKS_BREAK=audit-bare-selftest  audit 现跑要临时服务的自证也裸跑、不包 --with-temporary-service
       「audit：要临时服务的自证包一层起」那一格判错
-  REUSE_CHECKS_BREAK=shared-directories-ignore-data-root  上次红的清单不看 SINGLEFS_DATA_ROOT，一律落在 ~ 下（改前的样子：第二台落进它本地那一份）
+  REUSE_CHECKS_BREAK=audit-reuse-ignored  audit 不认 verdicts 答的复用，要现跑的一律现跑（门禁 code-tooling 的 reuse-selftests 格每趟把登记表里的自证全部现跑）
+      「audit：按条复用（复用的不跑、照过算、不取二进制；现跑的判绿判红各交 record）」那一格判错
+  REUSE_CHECKS_BREAK=shared-directories-ignore-data-root  上次红的清单不看 SINGLEFS_DATA_ROOT，一律落在 ~ 下（第二台落进它本地那一份）
       「上次红：没设目录时取数据根下的 last-runs」那一格判错
 """
 import concurrent.futures
+import contextlib
 import fcntl
 import fnmatch
 import glob
 import importlib.util
+import io
 import json
 import os
 import random
@@ -392,7 +397,7 @@ def verdict_library_candidate(directory, kind, components, judging_units):
 
 def shared_data_path(name, variable):
     """数据根下共享的那一项（.claude/hooks/lib_work_root.py 的 shared_data_path，两台读同一份）；那份库读不到、取不到时抛 OSError，说明里写出路。
-    弄坏开关 shared-directories-ignore-data-root：交给它的环境里摘掉 SINGLEFS_DATA_ROOT（改前的样子：一律落在 ~ 下，第二台落进它本地那一份）。"""
+    弄坏开关 shared-directories-ignore-data-root：交给它的环境里摘掉 SINGLEFS_DATA_ROOT（一律落在 ~ 下，第二台落进它本地那一份）。"""
     try:
         specification = importlib.util.spec_from_file_location("lib_work_root_for_reuse_checks", WORK_ROOT_LIBRARY_PATH)
         module = importlib.util.module_from_spec(specification)
@@ -575,7 +580,18 @@ def run_command(root, command, timeout):
         return None, output + f"\n（{timeout} 秒没跑完）"
 
 
-def audit(root, jobs, timeout, server_binary=None):
+def audit_row_judgement(text, exit_code, script, path, named_library):
+    """一份现跑的自证判过没过（文件头「四」）：交 (过没过, 一句为什么)。named_library 是这一行第三列（里面点名的判法脚本另认）。
+    门禁 code-tooling 的 reuse-selftests 格按条复用时，它与 run_command 是那一格判定键里的判法（judge:）。"""
+    if "audit-line-unchecked" in BREAK:
+        return exit_code == 0, "没看规范输出那一行"
+    return canonical_verdict(text, script, also=(path, *re.findall(r"(?:\.claude|scripts)/[\w./-]+\.(?:sh|py)", named_library)))
+
+
+def audit(root, jobs, timeout, server_binary=None, verdicts=None):
+    """文件头「四」。server_binary 是 prune-server 二进制的路径，或一个不带参数、交 (路径或 None, 取不到的原因) 的函数（要现跑的里有要临时服务的才调，调一次）。
+    verdicts 给了（门禁 code-tooling 的 reuse-selftests 格按条复用）：要现跑的那几行先交 verdicts.decide([(路径, 自证命令, 被测脚本, 第三列, 第四列, 要不要临时服务)])，
+    交回 {路径: (reuse|judge|refused, 原因)}；reuse 的不跑、照过算（报复用），别的照跑；跑完交 verdicts.record(判绿的路径, 判红的路径)（判的是现跑了的那几行）。"""
     # 自证只在临时 prune-server 上跑的脚本（源码里调 selftest_service_problem）包一层起（文件头「四」）；常量放函数里：模块级赋值会进 import 这一份的各家判法单元闭包
     temporary_service_wrapper = "scripts/prune-server/prune_server_client_selftest.py"
     temporary_service_mark = "selftest_service_problem"
@@ -618,15 +634,29 @@ def audit(root, jobs, timeout, server_binary=None):
             red.append((f"{REGISTRY} 第 {number} 行：自证命令「{command}」里认不出被测脚本，或它不在", "命令写成 python3 <脚本> --selftest 或 bash <脚本> --selftest 这种样子"))
             continue
         with open(os.path.join(root, script), encoding="utf-8", errors="replace") as handle:
-            needs_service = temporary_service_mark in handle.read()
-        if needs_service and "audit-bare-selftest" not in BREAK:
-            if not server_binary:
-                red.append((f"{path}：自证只在临时 prune-server 上跑（{script} 调 {temporary_service_mark}，裸跑退 2），audit 没给 --server-binary",
+            needs_service = temporary_service_mark in handle.read() and "audit-bare-selftest" not in BREAK
+        to_run.append((path, command, script, library, cell, needs_service))
+    # 按条复用（verdicts 给了）：键相同、库里判过绿的那几行不跑
+    decisions = verdicts.decide(to_run) if verdicts is not None and to_run else {}
+    reused = [] if "audit-reuse-ignored" in BREAK else [(path, decisions[path][1]) for path, *_rest in to_run if decisions.get(path, ("judge", ""))[0] == "reuse"]
+    reused_paths = {path for path, _reason in reused}
+    judged = []
+    binary, binary_problem, binary_asked = (None, "", False) if callable(server_binary) else (server_binary, "", True)
+    for path, command, script, library, _cell, needs_service in to_run:
+        if path in reused_paths:
+            continue
+        if needs_service:
+            if not binary_asked:
+                binary, binary_problem = server_binary()
+                binary_asked = True
+            if not binary:
+                red.append((f"{path}：自证只在临时 prune-server 上跑（{script} 调 {temporary_service_mark}，裸跑退 2），audit 没给 --server-binary"
+                            + (f"（取二进制没成：{binary_problem}）" if binary_problem else ""),
                             "门禁 code-tooling 的 reuse-selftests 格先取一份 prune-server 二进制再交 --server-binary；单跑写 python3 scripts/gate/lib_reuse_checks.py audit <根> --jobs <N> --server-binary <prune-server 二进制>"))
                 continue
-            command = (f"python3 {temporary_service_wrapper} --with-temporary-service --server-binary {shlex.quote(server_binary)} -- bash -c {shlex.quote(command)}")
-        to_run.append((path, command, script, library))
-    commands = sorted({command for _path, command, _script, _library in to_run})
+            command = (f"python3 {temporary_service_wrapper} --with-temporary-service --server-binary {shlex.quote(binary)} -- bash -c {shlex.quote(command)}")
+        judged.append((path, command, script, library))
+    commands = sorted({command for _path, command, _script, _library in judged})
     outputs = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(commands) or 1))) as pool:
         futures = {command: pool.submit(run_command, root, command, timeout) for command in commands}
@@ -634,22 +664,27 @@ def audit(root, jobs, timeout, server_binary=None):
             outputs[command] = future.result()
     if len(outputs) != len(commands):
         red.append((f"现跑的自证派出 {len(commands)} 条、收回 {len(outputs)} 条", "整格重跑一次；收不全的一趟不算判过"))
-    for path, command, script, row_library in sorted(to_run):
+    green_paths, red_paths = [], []
+    for path, command, script, row_library in sorted(judged):
         exit_code, text = outputs.get(command, (None, ""))
         how = f"现跑「{command}」退 {exit_code}"
-        if "audit-line-unchecked" in BREAK:
-            verdict, why = exit_code == 0, "没看规范输出那一行"
-        else:
-            named = leaked_library if "audit-leaked-library" in BREAK else row_library  # 每一行认它自己第三列点名的判法脚本
-            verdict, why = canonical_verdict(text, script, also=(path, *re.findall(r"(?:\.claude|scripts)/[\w./-]+\.(?:sh|py)", named)))
+        named = leaked_library if "audit-leaked-library" in BREAK else row_library  # 每一行认它自己第三列点名的判法脚本
+        verdict, why = audit_row_judgement(text, exit_code, script, path, named)
         if verdict:
             passed.append(f"{path}（{how}）")
+            green_paths.append(path)
             print(f"  · {path}：{CELL_NAME} 过，{how}")  # gate-lint:detail
         else:
+            red_paths.append(path)
             tail = " | ".join(line for line in text.strip().split("\n")[-4:] if line.strip())[-500:]
             red.append((f"{path}：{why}（{how}；输出末尾：{tail}）",
                         f"在 {script} 的自证里补 {CELL_NAME} 那一格（同一份输入两趟、闭包外改动、闭包内改一个单元），照 scripts/gate/lib_reuse_checks.py 的 report_three_questions 打规范输出；"
                         f"那一行写 red 的就照它点名的那一问修复用"))
+    for path, reason in sorted(reused):
+        passed.append(f"{path}（复用）")
+        print(f"  · {path}：{CELL_NAME} 过，复用（{reason}）")  # gate-lint:detail
+    if verdicts is not None and (green_paths or red_paths):
+        verdicts.record(green_paths, red_paths)
     for path in not_run:
         print(f"  · {path}")  # gate-lint:detail
     if not_counted:
@@ -1143,6 +1178,32 @@ def selftest():
         bare_got, bare_text = audit_of(root)
         cell("audit：要临时服务的自证包一层起", wrapped_got == 0 and "复用三问过 1 份" in wrapped_text and bare_got == 1 and "audit 没给 --server-binary" in bare_text,
              f"给了 --server-binary 退 {wrapped_got}：{wrapped_text.strip()[-300:]}；没给退 {bare_got}：{bare_text.strip()[-300:]}")
+        # 按条复用（audit 的 verdicts，门禁 code-tooling 的 reuse-selftests 格）：decide 答复用的两行（r.sh 一跑就红、w.sh 要临时服务）不跑、照过算、
+        #   不取二进制；现跑的两行 a.sh 判绿、b.sh 判红，各交一份给 record
+        class AuditVerdictsDouble:
+            def __init__(self):
+                self.decided, self.recorded = [], []
+
+            def decide(self, rows):
+                self.decided = [row[0] for row in rows]
+                return {path: ("reuse", "键相同、库里判过绿") for path in ("scripts/gate/r.sh", "scripts/gate/w.sh")}
+
+            def record(self, green, red):
+                self.recorded.append((sorted(green), sorted(red)))
+
+        root = audit_root("audit-verdicts", [row("a.sh"), row("b.sh"), row("r.sh"), row("w.sh")],
+                          {"a.sh": green_body, "b.sh": red_body, "r.sh": red_body, "w.sh": wrapped_body})
+        double, binary_asked = AuditVerdictsDouble(), []
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            got = audit(root, 2, 60, server_binary=lambda: binary_asked.append(1) or (None, "复用了的那一行不该取二进制"), verdicts=double)
+        text = captured.getvalue()
+        cell("audit：按条复用（复用的不跑、照过算、不取二进制；现跑的判绿判红各交 record）",
+             got == 1 and double.decided == [f"scripts/gate/{name}" for name in ("a.sh", "b.sh", "r.sh", "w.sh")]
+             and double.recorded == [(["scripts/gate/a.sh"], ["scripts/gate/b.sh"])] and not binary_asked
+             and "scripts/gate/r.sh：reuse-three-questions 过，复用" in text and "REUSE_SELFTEST script=scripts/gate/r.sh" not in text
+             and "输出里没有 REUSE_SELFTEST script=scripts/gate/b.sh" in text,
+             f"退 {got}；交 decide 的 {double.decided}；交 record 的 {double.recorded}；取了二进制 {len(binary_asked)} 次；输出末尾：{text.strip()[-400:]}")
 
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
@@ -1152,6 +1213,7 @@ def selftest():
                             ("last-run-in-place", "上次红：原子换上"), ("last-run-unlocked", "上次红：并发两趟各写各的、不丢对方的项"),
                             ("audit-line-unchecked", "audit：缺规范输出判红"), ("audit-scan-skipped", "audit：漏登记判红"),
                             ("audit-leaked-library", "audit：每一行认自己第三列点名的判法脚本"), ("audit-bare-selftest", "audit：要临时服务的自证包一层起"),
+                            ("audit-reuse-ignored", "audit：按条复用（复用的不跑、照过算、不取二进制；现跑的判绿判红各交 record）"),
                             ("shared-directories-ignore-data-root", "上次红：没设目录时取数据根下的 last-runs")):
             completed = subprocess.run([sys.executable, SCRIPT_PATH, "--selftest"], capture_output=True, text=True, env=dict(os.environ, REUSE_CHECKS_BREAK=item))
             if completed.returncode == 0 or f"{label} 这一格判错" not in completed.stdout:

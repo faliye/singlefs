@@ -395,7 +395,7 @@ fn run_arm(policy: Policy, load: Load, seed: u64, checkpoint_limit: u64, sample_
                 }
             }
             Policy::BumpSegment | Policy::BumpCompact(_) => {
-                // 用户批次按 D3 已定项 5 的形态顺序写进聚簇段（时间聚簇，不保证 key 连续）
+                // 这批数据按 D3 已定项 5 的形态顺序写进聚簇段（时间聚簇，不保证 key 连续）
                 for &key in &batch {
                     let slot = simulation.allocate_bump();
                     simulation.move_key(key, slot);

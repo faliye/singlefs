@@ -7,7 +7,7 @@
     apply-writer-patch.py <补丁目录> [--root 仓根] [--dry-run]
     apply-writer-patch.py --pending-status [--root 仓根]     # 上一次有没有没换完的（文件头「换上与被杀」）；退 0 没有，3 有
     apply-writer-patch.py --finish-pending [--root 仓根]     # 照记下的暂存接着换完
-    apply-writer-patch.py --rollback-pending [--root 仓根]   # 照记下的改前原样退回
+    apply-writer-patch.py --rollback-pending [--root 仓根]   # 照记下的补丁前原样退回
     apply-writer-patch.py --read-outcome <结局文件> [--root 仓根]   # 只读结局文件、对着主工作区现算 sha256，判打全了没有（文件头「结局文件」）
     apply-writer-patch.py --selftest          # APPLY_WRITER_PATCH_BREAK=<项> 时必须判红
 
@@ -16,23 +16,23 @@
     mutations-append.tsv         要追加的变异行，每行六段（与 crates/mutations.tsv 同），名字在表里不许已有、在这个文件里也不许出现两次
     mutations-replacements.tsv   要整行换掉的变异行，每行六段，按第一段的名字找表里恰好一行换掉
     mutations-delete.txt         要删的变异名，一行一个，表里要恰好一行
-    result.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节
-    baseline/<相对仓根的路径>     可以没有：补丁改的文件改前的原样（实现员副本里 `git show :<路径>` 取），只在补丁头 index 行左边那个 blob 不在 --root 的对象库里时读（文件头「三方合并」）
+    result.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节；补丁在产品代码里新加了走不到的断言或未定条款的错误成员的，报告里要有「走不到的理由」一节（文件头「走不到的理由」）
+    baseline/<相对仓根的路径>     可以没有：补丁改的文件补丁前的原样（实现员副本里 `git show :<路径>` 取），只在补丁头 index 行左边那个 blob 不在 --root 的对象库里时读（文件头「三方合并」）
 上面前四份（crates.patch 与三份变异表文件，RECOGNIZED_PATCH_FILES）是它认得的补丁，每一份单独可以没有，可是一份都没有就拒、退 2、一个字不改：目录里有别的 *.patch（例：all.patch，
   改 task-server、scripts 这类 crates 之外的文件的补丁）的点名那几份、写明它们一个字没打，出路是用 git apply <补丁文件> 直接打、回读核过；一样补丁都没有的（空目录、给错了目录、只有
   result.md）同样拒，出路是核对目录。只管「没认出」这一支：认出了的补丁照下面的次序核。
-次序：先全部核一遍（补丁 git apply --check，不过的照「三方合并」重对；名字在不在、行是不是六段、checker 那一节在不在），有一处不对就一个字不改、退 2；
-都对了才算改后的全文：补丁套在临时目录里改前原样的那几份文件上、变异表按名字合并，每一份改后的全文算出来、sha256 记下（算不出的、套不上的一个字不改、退 2）；
+次序：先全部核一遍（补丁 git apply --check，不过的照「三方合并」重对；名字在不在、行是不是六段、checker 那一节在不在、走不到的理由那一节列没列全），有一处不对就一个字不改、退 2；
+都对了才算改后的全文：补丁套在临时目录里补丁前原样的那几份文件上、变异表按名字合并，每一份改后的全文算出来、sha256 记下（算不出的、套不上的一个字不改、退 2）；
 再照「换上与被杀」一份份改名换上（crates/ 下的源文件与 crates/mutations.tsv 一起，不再用 git apply 在主工作区里就地写）；全部换上、回读核过之后，
 记打补丁记录 <git common-dir>/singlefs-applied-writer-patches.tsv，再打出 .claude/gate.d/code-source-discipline.sh 的 mutation-tables 那一格（--check mutation-tables）要另交的整条命令，
 这一格不在这个进程里跑（文件头「mutation-tables 那一格」）。
-每一步在跑之前先打一行「· 进度：…」到标准输出并立刻刷出去，不再只在最后打结果行（任务 7271：mutation-tables 那一格撞内存上限被杀，脚本自己的输出一行没留）。
+每一步在跑之前先打一行「· 进度：…」到标准输出并立刻刷出去，不只在最后打结果行（被杀时才留得下做到哪一步）。
 换上与被杀（要么整份写完、要么一个字不动）：
-  暂存：<git-dir>/singlefs-apply-writer-patch-pending/ 下 staged/<序号> 放每份改后的全文、before/<序号> 放每份改前原样的备份、journal.json 记每份的路径、动作（改、增、删）、
-    改前与改后的 sha256 与权限位；journal.json 最后一个写（先写临时文件再改名），它在才算暂存齐、核过。暂存目录与仓在同一个文件系统（os.replace 的前提），不在就拒。
-  换上：先核每份主工作区此刻的 sha256 仍等于记下的改前（不等就是核与换之间被别的会话改了，一个字不动、退 2），然后一份份 os.replace（删的 unlink）；
+  暂存：<git-dir>/singlefs-apply-writer-patch-pending/ 下 staged/<序号> 放每份改后的全文、before/<序号> 放每份补丁前原样的备份、journal.json 记每份的路径、动作（改、增、删）、
+    补丁前与改后的 sha256 与权限位；journal.json 最后一个写（先写临时文件再改名），它在才算暂存齐、核过。暂存目录与仓在同一个文件系统（os.replace 的前提），不在就拒。
+  换上：先核每份主工作区此刻的 sha256 仍等于记下的补丁前（不等就是核与换之间被别的会话改了，一个字不动、退 2），然后一份份 os.replace（删的 unlink）；
     换的过程中出错（不是被杀）就地照备份退回已换上的，退回干净了一个字没留、退 2，退不干净的留着暂存目录。全部换上后回读每份算 sha256，与记下的改后对上才写「完成」、删暂存目录；
-    对不上写「异常」、留着暂存目录、退 2。每份换上与否永远按内容判（现在的 sha256 等于改后就是已换上，等于改前就是没换上，都不等就是被别的改动动过），不另记进度，被杀在哪一步都判得出。
+    对不上写「异常」、留着暂存目录、退 2。每份换上与否永远按内容判（现在的 sha256 等于改后就是已换上，等于补丁前就是没换上，都不等就是被别的改动动过），不另记进度，被杀在哪一步都判得出。
   被杀：暂存目录里有 journal.json 就是上一次没换完。下一次起这个脚本（同一个补丁目录或别的补丁目录，真打与 --dry-run 一样）先认出来，退 2，列出已换上、没换上、被别的改动动过的文件，
     出路写两条：--finish-pending（照记下的暂存接着换完，回读、写完成、记打补丁记录、打出 mutation-tables 那一格要另交的命令）、--rollback-pending（照 before/ 里的备份原样退回，回读核过、写退回）；
     有被别的改动动过的文件两条都不做（会盖掉别人的改动），列出来交人。不许在半截上再打别的补丁。
@@ -43,15 +43,22 @@
     对整个工作区做可达性判），不在这个进程里起（文件头「mutation-tables 那一格」）。
 结局文件（真打时写，--dry-run 不写）：补丁目录里的 apply-outcome.tsv，每次真打重写（接着换完、退回在原文件上追加）。格式：制表符分隔，`#` 起头的行是说明，其余每行第一段是行种类：
     开始<TAB>补丁目录绝对路径<TAB>仓根绝对路径<TAB>进程号<TAB>开始秒数
-    文件<TAB>相对仓根的路径<TAB>动作（改、增、删）<TAB>改前 sha256（增写 -）<TAB>计划的改后 sha256（删写 -）      （开始之后、动手换之前写全，每个要动的文件一行）
+    文件<TAB>相对仓根的路径<TAB>动作（改、增、删）<TAB>补丁前 sha256（增写 -）<TAB>计划的改后 sha256（删写 -）      （开始之后、动手换之前写全，每个要动的文件一行）
     回读<TAB>相对仓根的路径<TAB>回读算出的改后 sha256（删了写 -）                                            （全部换上之后每个文件一行）
     完成<TAB>文件数<TAB>结束秒数                                                                          （写入部分最后写这一行）
     退回<TAB>文件数<TAB>结束秒数                                                                          （--rollback-pending 或换的时候出错就地退回干净之后写，替代完成）
     异常<TAB>说明<TAB>点名的文件                                                                          （回读与记下的改后对不上）
     后续<TAB>门禁<TAB>没跑<TAB>要另交的整条命令                                                           （完成之后写：mutation-tables 那一格没在这里跑；被杀没有这一行，不影响打全了没有）
   被杀的那一次只有开始与文件行，没有完成。判打全了没有只读这份文件、对着主工作区现算 sha256：--read-outcome 做这件事，退 0 打全了（有完成，每个文件现在的 sha256 等于回读），
-  1 已退回（有退回，每个文件现在等于改前），3 没打完（没有完成也没有退回：逐个文件列已换上、没换上、被别的改动动过，出路写 --pending-status），
+  1 已退回（有退回，每个文件现在等于补丁前），3 没打完（没有完成也没有退回：逐个文件列已换上、没换上、被别的改动动过，出路写 --pending-status），
   4 完成或退回之后文件又被改了（逐个点名），2 读不了或不是结局文件。
+走不到的理由（.claude/agents/implementation-writer.md「做什么」第 6 步；核在补丁套得上之后、变异锚点静态核之前，有一处不对就拒、退 2、一个字不改）：
+  对象是补丁在产品代码 crates/<包>/src/ 的 .rs 里新加的行（测试基础设施的包 singlefs-verification、singlefs-checker、singlefs-unit-graph 不算，同代码轮的射程）：
+    todo!、unreachable!、assert!（不含 debug_assert!，不含 assert_eq! 一族），与条款没定、第一版不支持的错误成员的定义行（枚举成员，名字以 Undecided、Unsupported 或 OutsideTheFirstVersion 收尾）。
+    注释与字符串、字符字面量里的字不算；#[cfg(test)] 模块、#![cfg(test)] 文件与 #[test]（#[<路径>::test]）函数里的不算。行号是补丁套上之后那份文件里的行。
+  报告 result.md 里要有一节标题恰好是「走不到的理由」（任意级别的标题），节里每一处一行「- <仓根起的文件路径>:<行> <理由>」，理由至少 8 个字；列的行号对不上、少列、理由太短，
+    都拒并逐处点名「文件:行 种类」与出路。多列的（行号指不到任何一处）不拦。
+  管不到的：理由写得对不对、走不走得到，靠代码轮三方照调用点重推（.claude/rules/implementation-workflow.md「代码轮正文的检查单」）；经三方合并重对过的补丁行号以打之后的文件为准，漂了的在拒绝说明里看新行号。
 变异锚点静态核（--dry-run，拆分提案第六十二节 ②：补丁改写的代码弄断别批变异行的锚点，到合入验证才看见）：核完补丁与变异表之后，把 --root 那棵树的拷贝范围
   （scripts/hosts/lib_repository_copy.py 的 copy_closure，带测试代码扫：共用清单 crates/、Cargo.toml、Cargo.lock、.cargo/ 加 path 依赖指到的目录（例：验证包
   依赖的仓根 prune-server/）、编译期与运行期读的仓根文件连同它们 source、起的；另声明 litmus/：变异行可以锚在它下面；闭包算不成的按判不了拒）
@@ -60,29 +67,34 @@
   同时在 --root 那棵没打补丁的树上跑一遍当基线。输出里除 COPIED、LITERAL、CHECKED、IDENTIFIERS_CHECKED 与可达性那一道的四种提示行之外的每一行（MALFORMED、ANCHOR、NAME、ROW、STRAY、UNDEFINED、UNREACHABLE、ERROR）都算红；
   四种提示行是 REACHABILITY_CHECKED、REACHABILITY_NOT_JUDGED、REACHABILITY_EXEMPT、REACHABILITY_UNJUDGED（STATIC_CHECK_HINT_KINDS）：static-check 的退出码不受它们影响（crates-mutation-rows.py
   文件头「点名测试够不着被改坏的函数」），而它们带着随树变的东西——REACHABILITY_NOT_JUDGED 的原因里写着被判那棵树的路径（临时树与 --root 不同），REACHABILITY_CHECKED 是判了几行的计数
-  （补丁追加一行就变）——拿基线比也去不掉，算红就把每个补丁都拒了（任务 7350：门禁样本那种小根上，三格放行的样本都被 REACHABILITY_NOT_JUDGED 那一行拒）；
+  （补丁追加一行就变）——拿基线比也去不掉，算红就把每个补丁都拒了；
   红行去掉行号（变异表追加删除会让行号漂；第二段是变异表行号的几种都去，STATIC_CHECK_ROW_NUMBER_KINDS，UNREACHABLE 也在里面：补丁删掉前面一行，
   补丁前就有的那一行 UNREACHABLE 行号少 1，连行号比就被当成补丁带来的）之后，补丁树上有而基线上没有的才算这个补丁带来的，有一处就拒、退 2、一个字没改；基线上就有的红只报一行提醒、不拦
   （门禁 code-source-discipline 的 mutation-tables 格提交时照样判）。static-check 退出码不是 0 或 1、超时、起不了、补丁树上没有 CHECKED 行，都按判不了拒。
   不加 --dry-run 的真打不跑这一步（打完照「mutation-tables 那一格」打出那一条命令另交）。
-mutation-tables 那一格（.claude/gate.d/code-source-discipline.sh --check mutation-tables）：真打与 --finish-pending 都不在这个进程里起它（量的：任务 7349 单跑这一格，
-  第 5 次尝试撞 13824M 上限被杀、第 6 次要 20.2 GiB；任务 7271 打补丁时起它撞 1628M 被杀）。全部换上、回读核过、写完「完成」、记进打补丁记录之后，
+mutation-tables 那一格（.claude/gate.d/code-source-discipline.sh --check mutation-tables）：真打与 --finish-pending 都不在这个进程里起它（这一格占内存大，在这里起会撞内存上限被杀）。全部换上、回读核过、写完「完成」、记进打补丁记录之后，
   输出末尾打一行要主 agent 经服务另交的整条命令（带范围声明与 --cwd <仓根>，mutation_tables_handoff 拼），结局文件写一行「后续 门禁 没跑 <那一条命令>」。
-  弄坏开关 mutation-tables-in-process 下照改前在这个进程里起它（命令是调用方交进来的 gate33）、把它的退出码当结局。
+  弄坏开关 mutation-tables-in-process 下在这个进程里起它（命令是调用方交进来的 gate33）、把它的退出码当结局。
 自上次崩溃验证全绿（门禁 crash-point-replay 不指定范围判绿那一趟在它的日志目录里留的 all-green：git common-dir 里
 singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级没有全绿标记了）以来打过的补丁到 CRASH_VERIFY_HINT_PATCHES 个（5，推的）就打一行提示：
-只提示、不拦，跑不跑由用户定。
-副本锁（主 agent 2026-10-10 的失误：scripts/mutation/prove-red.sh --copy 正在副本里就地施加变异时，往同一份副本打了补丁）：
+只提示、不拦，跑不跑听用户的。
+副本锁（防 scripts/mutation/prove-red.sh --copy 正在副本里就地施加变异时，往同一份副本打补丁）：
   --root 指的不是这份脚本所在的主工作区时，开头在 <副本根>/.prove-red.lock 上试拿排他锁（flock，不等），拿到了打完再放、拿不到就拒绝、退 2、一个字没改，
   出路写「副本上有证红在跑，等它跑完或换一份副本」。prove-red.sh 跑的时候拿着同一把锁（它按路径载入这里的 hold_copy_lock / release_copy_lock，锁的写法只在这一处）。
   锁随持有的进程放：正常收尾时删掉锁文件；被杀时内核放掉锁、文件留着，下一个照样拿得到。
-  跨机：副本在两台共用的目录里时 flock 不保证两台互斥（任务 7418 与 7419 在同一份副本上两台同时跑了约 18 秒，两边写同一份日志），所以拿到 flock 之后再在 <副本根>/.prove-red.owner
-  上排他新建持有者记录（机器标识 进程号 随机串；机器标识取 /proc/sys/kernel/random/boot_id，不含主机名），持有期间每 15 秒刷新记录的修改时间。记录已在：写的是这一台的机器标识，
+  跨机：副本在两台共用的目录里时 flock 不保证两台互斥（两台会同时在同一份副本上跑、写同一份日志），所以拿到 flock 之后再在 <副本根>/.prove-red.owner
+  上排他新建持有者记录（机器标识 进程号 随机串 任务号 尝试号；机器标识取 /proc/sys/kernel/random/boot_id，不含主机名；任务号与尝试号取统一任务服务给每次尝试设的
+  TASK_SERVER_TASK、TASK_SERVER_ATTEMPT，两台都给，不经服务起的两样都写 -），持有期间每 15 秒刷新记录的修改时间。记录已在：写的是这一台的机器标识，
   flock 拿到了就说明原持有者没了，接手；是别的机器的，修改时间 300 秒内刷新过就当它还占着，拒绝（退 2、一个字不改），超过就当它被杀了，摘掉旧记录接手。
-  放锁时先删自己的记录。别的机器上的持有者被杀时，最多等 300 秒记录过期才让出。
+  同一任务更早的尝试（例：第二台上被 oom-kill 的那一次，服务确认清掉之后在本机重起，正落在这 300 秒里）：这一趟经服务起、
+  别的机器的记录 300 秒内刷新过，而记录里的任务号与这一趟相同、尝试号比这一趟小，当场接手（摘掉旧记录、写自己的），不等过期。
+  依据是服务那一侧的保证：同一任务的第 n+1 次尝试只在第 n 次收尾确认（本机单元与 scope 回读空了、第二台的 peer-cleanup.json 写成 confirmed）之后才排
+  （task-server/task_server.py 的 finish_attempt 确认之前尝试留在 starting/running、任务不回队，settle_attempt 才改回 queued）。
+  任务号不同的、尝试号不比这一趟小的、这一趟或那条记录不经服务起的，照 300 秒判。拒绝那一句写出记录里的任务号与尝试号（copy_lock_holder）。
+  放锁时先删自己的记录。别的任务、不经服务起的持有者在别的机器上被杀时，最多等 300 秒记录过期才让出。
 打进主工作区（--root 是这份脚本所在的仓，不给 --root 就是）不拿锁：照「次序」先 git apply --check、再 git apply；别的会话同时改到补丁碰的那几处、核不过的，
   先照「三方合并」重对，合不上照「核的时候就不对」拒、退 2、一个字没改；核过之后到真打之间被改了的，git apply 失败照退 2。合入后验证不在主工作区上编与验（merge-and-verify.sh 在开跑时拷的快照上打与验）。
-三方合并（拆分提案第一百八十一节：C950 的补丁打的时候 closure.rs 那一段上面被别的会话加了几行，git apply --check 退 2，主 agent 手工 patch -F3 重对、套错了没东西拦）：
+三方合并（拆分提案第一百八十一节：补丁碰的那一段上面被别的会话加了几行，git apply --check 退 2，手工 patch -F3 重对、套错了没东西拦）：
   git apply --check 不过时，补丁里的每个文件照三份合：补丁的基线（补丁头 index 行左边那个 blob：先在 --root 的对象库里找（git rev-parse <号>^{blob}、cat-file），
   没有再读补丁目录的 baseline/<路径>，那一份的 blob 哈希要以 index 行左边那个号起头；新文件的基线是空的）、补丁改后（临时目录里把基线拼成一棵树、git apply 原补丁）、
   主工作区此刻（--root 里那份文件，不在算空），在临时目录里逐个 git merge-file。全部合得上的，在临时仓里照「主工作区此刻 → 合后」重出一份补丁（--full-index、不认改名），
@@ -94,17 +106,16 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
     基线取不到：index 行左边那个 blob 对象库里没有、baseline/ 里也没有，或 baseline/ 那一份的哈希对不上，或基线拼成的树上原补丁套不上（index 行点错了 blob）；
       出路是把基线原样放进补丁目录 baseline/<路径>（实现员副本还在的从副本取），副本删了的退给实现员在主工作区此刻的样子上重建副本、重出补丁。
     补丁里有三方合并不认的段：改名、复制、改权限、二进制、没有 ---/+++ 文件头的段（只认文本文件的改、增、删）；出路同上，退给实现员重出补丁。
-开工快照（主 agent 2026-10-15 的失误：一份改 验证包 9 份文件的补丁打进主工作区，比别的会话开的代码轮 m3-b44-code-r1 取快照晚 3 分钟，改到了快照里的文件）：
+开工快照（别的会话开的代码轮已取了快照，补丁打进主工作区时改到快照里的文件，那一轮的快照就对不上了）：
   打进主工作区（--root 是这份脚本所在的仓，或自证点名的临时仓）之前，补丁改到的文件——crates.patch 里 --- a/ 与 +++ b/ 两侧的路径，
   mutations-replacements.tsv 或 mutations-delete.txt 写了行就另算 crates/mutations.tsv——落在还没判完的三方轮的开工快照里就拒、退 2、一个字没改。
-  只有 mutations-append.tsv 写了行（往 crates/mutations.tsv 只追加）不算改到它、不撞快照（与派发闸 ⑤「crates/mutations.tsv 只追加、不算撞」同义；
-  research/prompts/d165-valves-r1-main-verification.md 攻方 A5）。哪几轮开着、快照清单怎么读、拒绝说明的列表怎么写在 .claude/hooks/lib_snapshot_conflicts.py（派发闸 ⑥ 调同一份）；
+  只有 mutations-append.tsv 写了行（往 crates/mutations.tsv 只追加）不算改到它、不撞快照（与派发闸 ⑤「crates/mutations.tsv 只追加、不算撞」同义）。哪几轮开着、快照清单怎么读、拒绝说明的列表怎么写在 .claude/hooks/lib_snapshot_conflicts.py（派发闸 ⑥ 调同一份）；
   出路只有两条：等那一轮的判决写完再打（或把改动并进判决），用户已叫停、不写判决的轮在 research/prompts/abandoned-rounds.tsv 登记一行收掉（常设，写法与派发闸 ⑥ 同一份判法）。
   没有单次放行的口子：命令行给 --snapshot-ruled 照用法错退 2、一个字没改。副本上不查（副本不是那一轮取快照的工作区）。
   快照清单读不了（是目录、没有读权限、悬空的链接）的那一份不判，照「放行但必记检出」照打：输出里与别的提醒一样以 ! 起头，逐份点名那一轮与那份清单、写出路
   （lib_snapshot_conflicts.py 的 unreadable_lines），检出记录（AGENT_HOOK_DETECTIONS，没设取 .claude/hooks/lib_work_root.py 的 default_detections_path）
   追加一行、结局只记，会话号取 WORK_DIRECTORY_OWNER_SESSION、CLAUDE_CODE_SESSION_ID、CLAUDE_SESSION_ID 里先设了的那个，看门狗据此报给主 agent；退出码照打的结果，不因它变。
-退出码：0 打上了（mutation-tables 那一格没在这里跑，输出末尾打出要另交的整条命令；它红不红看另交的那一趟）；不退 1（弄坏开关 mutation-tables-in-process 下照改前在这个进程里起那一格，红了退 1）；2 核的时候就不对（含三方合并冲突、基线取不到、有不认的段、补丁目录里一样认得的补丁都没有）、补丁改到开着的三方轮开工快照里的文件、副本上有证红在跑、
+退出码：0 打上了（mutation-tables 那一格没在这里跑，输出末尾打出要另交的整条命令；它红不红看另交的那一趟）；不退 1（弄坏开关 mutation-tables-in-process 下在这个进程里起那一格，红了退 1）；2 核的时候就不对（含三方合并冲突、基线取不到、有不认的段、补丁目录里一样认得的补丁都没有）、补丁改到开着的三方轮开工快照里的文件、副本上有证红在跑、
   --dry-run 的变异锚点静态核红、上一次没换完（文件头「换上与被杀」）、同一个仓有别的在换、核与换之间主工作区被别的会话改了、或用法错（含给了 --snapshot-ruled），一个字没改；
   换上时出错（已就地退回干净的，一个字没留）与回读对不上（留着暂存目录，等 --rollback-pending 或 --finish-pending）也退 2。
 
@@ -125,34 +136,53 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
       「✗ 自检：带改名段的补丁上下文漂了时应当退 2、写明三方合并只认文本文件的改、增、删、一个字不改」
   APPLY_WRITER_PATCH_BREAK=checker-section-ignored  plan() 不看动了 checker 的补丁报告里有没有「受影响的层 0 流与崩溃枚举用例」一节
       checker（「✗ 自检：动 checker 而报告没那一节应当拒绝」）
+  APPLY_WRITER_PATCH_BREAK=unreachable-section-ignored  plan() 不核走不到的理由那一节
+      unreachable-unlisted（「✗ 自检：新加 unreachable! 而 result.md 没有「走不到的理由」一节应当拒绝并点名 文件:行」）、
+      unreachable-short-reason（「✗ 自检：走不到的理由写得不足 8 个字应当拒绝」）、
+      unreachable-member-unlisted（「✗ 自检：新加条款没定的错误成员（名字以 Undecided 收尾）而报告没列应当拒绝并点名成员」）
+  APPLY_WRITER_PATCH_BREAK=short-reason-accepted  走不到的理由那一节不核理由的字数
+      unreachable-short-reason（「✗ 自检：走不到的理由写得不足 8 个字应当拒绝」）
+  APPLY_WRITER_PATCH_BREAK=debug-assert-judged  debug_assert! 也当 assert! 要列
+      unreachable-debug-assert（「✗ 自检：debug_assert! 不算要列的断言，应当放行」）
+  APPLY_WRITER_PATCH_BREAK=test-module-judged  测试模块、测试函数里的断言也要列
+      unreachable-test-module（「✗ 自检：测试模块里的 assert! 不算要列的断言，应当放行」）
+  APPLY_WRITER_PATCH_BREAK=error-member-ignored  不认条款没定的错误成员
+      unreachable-member-unlisted（「✗ 自检：新加条款没定的错误成员（名字以 Undecided 收尾）而报告没列应当拒绝并点名成员」）
+  APPLY_WRITER_PATCH_BREAK=non-product-crates-judged  测试基础设施的包（验证包、池级 checker、函数单元图）里新加的断言也要列
+      unreachable-non-product（「✗ 自检：测试基础设施的包（singlefs-verification）里的 assert! 不算产品代码，应当放行」）
   APPLY_WRITER_PATCH_BREAK=no-hint  apply() 打过的补丁数到 CRASH_VERIFY_HINT_PATCHES 也不打提示
       onlytable（「✗ 自检：打过的补丁数到提示线应当打提示」）
   APPLY_WRITER_PATCH_BREAK=all-green-ignored  数「上次崩溃验证全绿以来」时不认 git common-dir 里 singlefs-crash-point-replay-logs/*/all-green（打过的补丁一律从头数）
       allgreen（「✗ 自检：不指定范围判绿那一趟留下 all-green 之后，打过的补丁数应当从它之后重数、没到提示线不打提示」）
   APPLY_WRITER_PATCH_BREAK=copy-lock-ignored  apply() 不试拿副本锁，副本上有证红在跑也照打
       locked（「✗ 自检：副本锁被占着时应当拒绝、退 2、一个字不改」）
-  APPLY_WRITER_PATCH_BREAK=copy-owner-ignored  hold_copy_lock 不核、不写持有者记录（改前的样子：只靠 flock），别的机器上的证红占着副本也照拿
+      连带红的格：owner-same-task 里拒绝那一句的一格（「✗ 自检：副本锁的同任务一段：拒绝那一句应当写出记录里的任务号与尝试号」：apply 不拿锁就照打）、
+        owner 里拒绝那一句的一格（「✗ 自检：副本锁的跨机一段：别的机器上的证红占着副本（持有者记录刚刷新过）时应当拒绝、退 2、一个字不改」：apply 不拿锁、不核持有者记录就照打）
+  APPLY_WRITER_PATCH_BREAK=copy-owner-ignored  hold_copy_lock 不核、不写持有者记录（只靠 flock），别的机器上的证红占着副本也照拿
       owner（「✗ 自检：副本锁的跨机一段：别的机器上的证红占着副本（持有者记录刚刷新过）时应当拒绝」）
-  APPLY_WRITER_PATCH_BREAK=snapshot-ignored  apply() 打进主工作区之前不查开着的三方轮开工快照（改前的样子）
+      连带红的格：owner-same-task 的各格（不核记录就照拿、也不写自己的记录：该拒的拿到了，该接手的记录没换成这一趟的）
+  APPLY_WRITER_PATCH_BREAK=earlier-attempt-waits  copy_owner_alive_elsewhere 不认同一任务更早的尝试，别的机器上刚刷新过的记录一律等 COPY_OWNER_STALE_SECONDS 过期
+      owner-same-task（「✗ 自检：副本锁的同任务一段：别的机器上的持有者记录刚刷新过、任务号与这一趟相同、尝试号更小时应当当场接手」）
+  APPLY_WRITER_PATCH_BREAK=snapshot-ignored  apply() 打进主工作区之前不查开着的三方轮开工快照
       snapshot（「✗ 自检：补丁改到开着的三方轮开工快照里的文件应当拒绝、退 2、一个字不改」）；snapshot-append-only 与 snapshot-ruled-refused 照绿（分不出差别）
       连带红的格：「✗ 自检：快照清单读不了时应当照打、点名那一轮与那几份清单」
-  APPLY_WRITER_PATCH_BREAK=append-only-mutations-conflict  开工快照照改前把只追加变异行也算改到 crates/mutations.tsv
+  APPLY_WRITER_PATCH_BREAK=append-only-mutations-conflict  开工快照把只追加变异行也算改到 crates/mutations.tsv
       snapshot-append-only（「✗ 自检：只追加变异行的补丁不算撞快照（crates/mutations.tsv 在开着的那一轮的清单里），应当照打、退 0」）
       连带红的格：「✗ 自检：快照清单读不了时应当照打、点名那一轮与那几份清单」（那一份补丁也只追加变异行，撞上 r-open 被拒）
   APPLY_WRITER_PATCH_BREAK=snapshot-unreadable-unmarked  转给 lib_snapshot_conflicts.py 的同名开关：读不了的快照清单不分出来、照旧只记进提醒，不打放行但必记检出那几行、不记检出
       snapshot-unreadable（「✗ 自检：快照清单读不了时应当照打、点名那一轮与那几份清单、写明放行但必记检出、检出记录多一行」）
-  APPLY_WRITER_PATCH_BREAK=static-check-skipped  --dry-run 不跑变异锚点静态核（改前的样子）
+  APPLY_WRITER_PATCH_BREAK=static-check-skipped  --dry-run 不跑变异锚点静态核
       anchorbreak（「✗ 自检：弄断变异锚点的补丁 --dry-run 应当拒绝」）
       连带红的格：「✗ 自检：不弄断锚点的补丁 --dry-run 应当放行并报 CHECKED」、「✗ 自检：补丁前就红的锚点不该拦住不相干的补丁」、
       「✗ 自检：弄断了变异锚点、补丁前也有别的红行时，--dry-run 应当只拒补丁带来的那一处」、
       「✗ 自检：补丁与变异行锚在 path 依赖目录里时 --dry-run 应当照收」（pathdep 那一格也要 --dry-run 报 CHECKED，不跑静态核就没有这一句）
-  APPLY_WRITER_PATCH_BREAK=static-check-path-dependencies-skipped  --dry-run 的临时树不调 copy_closure，只拷 crates/ 那几处（改前的样子：锚在 prune-server/src 的变异行
+  APPLY_WRITER_PATCH_BREAK=static-check-path-dependencies-skipped  --dry-run 的临时树不调 copy_closure，只拷 crates/ 那几处（锚在 prune-server/src 的变异行
       与改那里的补丁在临时树上找不到文件，整份被拒）
       pathdep（「✗ 自检：补丁与变异行锚在 path 依赖目录里时 --dry-run 应当照收」）
   APPLY_WRITER_PATCH_BREAK=static-check-baseline-ignored  --dry-run 不拿没打补丁的树当基线，补丁前就红的行也算补丁带来的
       anchorpre（「✗ 自检：补丁前就红的锚点不该拦住不相干的补丁」）
       连带红的格：「✗ 自检：弄断了变异锚点、补丁前也有别的红行时，--dry-run 应当只拒补丁带来的那一处」
-  APPLY_WRITER_PATCH_BREAK=three-way-skipped  plan() 里 git apply --check 不过就拒，不做三方合并（改前的样子）
+  APPLY_WRITER_PATCH_BREAK=three-way-skipped  plan() 里 git apply --check 不过就拒，不做三方合并
       threeway-merged（「✗ 自检：上下文被别的会话改过、改动不重叠的补丁应当三方合上、退 0、报合了哪个文件哪几段」）
       连带红的格：「✗ 自检：别的会话改了补丁改的同一行，应当判冲突、退 2、点名文件与段落、一个字不改」、
       「✗ 自检：补丁头的基线 blob 在对象库里没有、补丁目录里也没有 baseline/ 时应当退 2、写明基线取不到与出路、一个字不改」、
@@ -171,11 +201,11 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
       threeway-baseline-wrong（「✗ 自检：补丁头点到的基线套不上补丁时应当当基线取不到、退 2、一个字不改」）
   APPLY_WRITER_PATCH_BREAK=three-way-kinds-unchecked  不拒改名、复制、改权限、二进制、没有文件头的段，照文本文件去合
       threeway-unsupported（「✗ 自检：带改名段的补丁上下文漂了时应当退 2、写明三方合并只认文本文件的改、增、删、一个字不改」）
-  APPLY_WRITER_PATCH_BREAK=unrecognized-patch-accepted  补丁目录里一样认得的补丁都没有、只有别的 *.patch 时 unrecognized_refusal() 不拒（改前的样子：照「补丁 没有」报打上了、退 0，一个字没打）
+  APPLY_WRITER_PATCH_BREAK=unrecognized-patch-accepted  补丁目录里一样认得的补丁都没有、只有别的 *.patch 时 unrecognized_refusal() 不拒（照「补丁 没有」报打上了、退 0，一个字没打）
       unrecognized（「✗ 自检：补丁目录里只有 all.patch、没有一样认得的补丁，应当拒绝、退 2、点名 all.patch、出路写 git apply、一个字不改」）
   APPLY_WRITER_PATCH_BREAK=empty-directory-accepted  一样补丁都没有（也没有别的 *.patch）的目录 unrecognized_refusal() 不拒
       emptydirectory（「✗ 自检：一样补丁都没有的目录应当拒绝、退 2、点名没有认得的补丁、一个字不改」）
-  APPLY_WRITER_PATCH_BREAK=replace-before-verify  暂存时每暂存一份就把改后全文当场就地写进主工作区（改前的样子：边算边写），不等全部暂存、核过
+  APPLY_WRITER_PATCH_BREAK=replace-before-verify  暂存时每暂存一份就把改后全文当场就地写进主工作区（边算边写），不等全部暂存、核过
       stagekill（「✗ 自检：暂存到一半被杀，主工作区应当一个字不动、下一次照常打上」）、stagecorrupt（「✗ 自检：暂存出来的某一份与算好的 sha256 对不上时应当拒绝、退 2、主工作区一个字不动」）
       连带红的格（暂存时已经全写进主工作区，换上那一步被杀时三份都已经是改后，不是只换上 emit.rs 一份）：halfkill（「✗ 自检：换上换到一半被杀，下一次起应当认出来、列出已换上与没换上的文件和两条出路、不在半截上再打别的补丁、一个字不改」）、
       outcomekilled（「✗ 自检：换到一半被杀的那一次结局文件只有开始与文件行、没有完成，--read-outcome 应当退 3、逐个文件列已换上与没换上」）
@@ -186,32 +216,32 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
       readbackmismatch（「✗ 自检：换上之后回读与记下的改后 sha256 对不上时应当退 2、写异常、不写完成、留着暂存目录」，它靠拒绝说明点名被别的改动动过的文件）
   APPLY_WRITER_PATCH_BREAK=journal-late  journal.json 等全部换上之后才写（被杀在换上中间时暂存目录里没有它，下一次认成暂存到一半被杀）
       halfkill（「✗ 自检：换上换到一半被杀，下一次起应当认出来、列出已换上与没换上的文件和两条出路、不在半截上再打别的补丁、一个字不改」）
-      连带红的格：halfrollback（「✗ 自检：换到一半被杀之后 --rollback-pending 应当照改前原样退回、主工作区与打之前逐字节相同、之后同一个补丁照常打上」）、
+      连带红的格：halfrollback（「✗ 自检：换到一半被杀之后 --rollback-pending 应当照改前原样退回、主工作区与打之前逐字节相同、之后同一个补丁照常打上」）、 history-kept: 引的是自证失败行原文，按原文匹配
       halffinish（「✗ 自检：换到一半被杀之后 --finish-pending 应当接着换完、主工作区与整份打完逐字节相同、结局文件写完成」）、
       gatehandoff（「✗ 自检：真打与 --finish-pending 都不应当在本进程里起 mutation-tables 那一格」：gatehandofffinish 那一份同样被杀在换上中间，--finish-pending 认成暂存到一半、清掉，打不出那一条命令）
   APPLY_WRITER_PATCH_BREAK=rollback-skips-restore  --rollback-pending 不把备份放回去，只清暂存目录
-      halfrollback（「✗ 自检：换到一半被杀之后 --rollback-pending 应当照改前原样退回、主工作区与打之前逐字节相同、之后同一个补丁照常打上」）
+      halfrollback（「✗ 自检：换到一半被杀之后 --rollback-pending 应当照改前原样退回、主工作区与打之前逐字节相同、之后同一个补丁照常打上」） history-kept: 引的是自证失败行原文，按原文匹配
   APPLY_WRITER_PATCH_BREAK=readback-from-plan  回读不读主工作区，直接抄记下的改后 sha256
       readbackmismatch（「✗ 自检：换上之后回读与记下的改后 sha256 对不上时应当退 2、写异常、不写完成、留着暂存目录」）
   APPLY_WRITER_PATCH_BREAK=outcome-complete-first  结局文件开始时就把完成行写上
-      outcomenormal（「✗ 自检：真打之后补丁目录里应当有结局文件：开始、每个文件的改前 sha256、回读、完成、后续依次写全，--read-outcome 应当退 0 判打全了」）、
+      outcomenormal（「✗ 自检：真打之后补丁目录里应当有结局文件：开始、每个文件的改前 sha256、回读、完成、后续依次写全，--read-outcome 应当退 0 判打全了」）、 history-kept: 引的是自证失败行原文，按原文匹配
       outcomekilled（「✗ 自检：换到一半被杀的那一次结局文件只有开始与文件行、没有完成，--read-outcome 应当退 3、逐个文件列已换上与没换上」）、
       readbackmismatch（「✗ 自检：换上之后回读与记下的改后 sha256 对不上时应当退 2、写异常、不写完成、留着暂存目录」，它判结局文件里不该有完成行）
-  APPLY_WRITER_PATCH_BREAK=outcome-before-hash-omitted  结局文件的文件行不写改前 sha256（写 -）
-      outcomenormal（「✗ 自检：真打之后补丁目录里应当有结局文件：开始、每个文件的改前 sha256、回读、完成、后续依次写全，--read-outcome 应当退 0 判打全了」）、
+  APPLY_WRITER_PATCH_BREAK=outcome-before-hash-omitted  结局文件的文件行不写补丁前 sha256（写 -）
+      outcomenormal（「✗ 自检：真打之后补丁目录里应当有结局文件：开始、每个文件的改前 sha256、回读、完成、后续依次写全，--read-outcome 应当退 0 判打全了」）、 history-kept: 引的是自证失败行原文，按原文匹配
       outcomekilled（「✗ 自检：换到一半被杀的那一次结局文件只有开始与文件行、没有完成，--read-outcome 应当退 3、逐个文件列已换上与没换上」）
   APPLY_WRITER_PATCH_BREAK=outcome-reader-no-hash  --read-outcome 不对着主工作区现算 sha256，信文件里写的
       outcomekilled（「✗ 自检：换到一半被杀的那一次结局文件只有开始与文件行、没有完成，--read-outcome 应当退 3、逐个文件列已换上与没换上」）、
       outcomestale（「✗ 自检：打全之后文件又被改了，--read-outcome 应当退 4 并点名那一份」）
-  APPLY_WRITER_PATCH_BREAK=static-check-hints-red  --dry-run 的变异锚点静态核把可达性那一道的四种提示行也算红（改前的样子：REACHABILITY_NOT_JUDGED 的原因里写着被判那棵树的路径，
+  APPLY_WRITER_PATCH_BREAK=static-check-hints-red  --dry-run 的变异锚点静态核把可达性那一道的四种提示行也算红（REACHABILITY_NOT_JUDGED 的原因里写着被判那棵树的路径，
       临时树与 --root 不同，门禁样本那种小根上每个补丁都多一处「补丁前的树上没有」的红）
       anchorkept（「✗ 自检：不弄断锚点的补丁 --dry-run 应当放行并报 CHECKED」）、anchorpre（「✗ 自检：补丁前就红的锚点不该拦住不相干的补丁」）、
       pathdep（「✗ 自检：补丁与变异行锚在 path 依赖目录里时 --dry-run 应当照收」）、
       reachabilityhints（「✗ 自检：可达性那一道的提示行（REACHABILITY_CHECKED、REACHABILITY_NOT_JUDGED、REACHABILITY_EXEMPT、REACHABILITY_UNJUDGED）随树变也不算红」）
-  APPLY_WRITER_PATCH_BREAK=static-check-unreachable-row-number-kept  --dry-run 的变异锚点静态核比基线时 UNREACHABLE 行照改前连第二段的变异表行号一起比
+  APPLY_WRITER_PATCH_BREAK=static-check-unreachable-row-number-kept  --dry-run 的变异锚点静态核比基线时 UNREACHABLE 行连第二段的变异表行号一起比
       （STATIC_CHECK_ROW_NUMBER_KINDS 里没有它：补丁删掉前面一行变异，补丁前就有的 UNREACHABLE 行号少 1，被当成补丁带来的红拒掉）
       unreachablerowshift（「✗ 自检：补丁删了前面一行变异、补丁前就有的 UNREACHABLE 行号跟着漂，--dry-run 应当照补丁前就红的放行」）
-  APPLY_WRITER_PATCH_BREAK=mutation-tables-in-process  真打与 --finish-pending 照改前在本进程里起 mutation-tables 那一格（调用方交进来的 gate33），把它的退出码当结局
+  APPLY_WRITER_PATCH_BREAK=mutation-tables-in-process  真打与 --finish-pending 在本进程里起 mutation-tables 那一格（调用方交进来的 gate33），把它的退出码当结局
       gatehandoff（「✗ 自检：真打与 --finish-pending 都不应当在本进程里起 mutation-tables 那一格」）
 """
 import collections
@@ -240,9 +270,22 @@ from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("APPLY_WRITER_PATCH_BREAK", "")
 CRASH_VERIFY_HINT_PATCHES = int(os.environ.get("CRASH_VERIFY_HINT_PATCHES", "5"))   # 推的，没量过
 CHECKER_SECTION = "受影响的层 0 流与崩溃枚举用例"
+UNREACHABLE_SECTION = "走不到的理由"   # result.md 里逐处列新加的走不到的断言与未定条款的错误成员的那一节的标题（文件头「走不到的理由」）
+UNREACHABLE_ROW = re.compile(r"^\s*(?:[-*]\s+)?`?(crates/\S+?\.rs):(\d+)`?\s+(\S.*?)\s*$")   # 那一节的一行：- <文件>:<行> <理由>
+UNREACHABLE_MINIMUM_REASON_CHARACTERS = 8
+NON_PRODUCT_CRATES = ("singlefs-verification", "singlefs-checker", "singlefs-unit-graph")   # 测试基础设施的包，不算产品代码（同 .claude/rules/implementation-workflow.md 的代码轮射程）
+PRODUCT_SOURCE_PATH = re.compile(r"^crates/([^/]+)/src/.+\.rs$")
+UNREACHABLE_MACRO = re.compile(r"(?<![A-Za-z0-9_])(todo|unreachable|assert)!")   # debug_assert! 的 assert 前是下划线，不命中
+UNREACHABLE_MACRO_LOOSE = re.compile(r"(?<![A-Za-z0-9])(todo|unreachable|assert)!")   # 弄坏开关 debug-assert-judged 下用：debug_assert! 也命中
+UNDECIDED_SUFFIXES = ("Undecided", "Unsupported", "OutsideTheFirstVersion")   # 条款没定、第一版不支持的错误成员，名字以这几个词之一收尾（.claude/agents/implementation-writer.md「做什么」第 6 步）
+UNDECIDED_MEMBER = re.compile(r"^(?:#\[[^\]]*\]\s*)*([A-Z][A-Za-z0-9]*(?:" + "|".join(UNDECIDED_SUFFIXES) + r"))\s*(?:[,({=]|$)")   # 枚举成员的定义行
+HUNK_HEADER = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+RAW_STRING_START = re.compile(r'r(#*)"')
+CHAR_LITERAL = re.compile(r"'(?:\\(?:x[0-9a-fA-F]{2}|u\{[0-9a-fA-F_]+\}|.)|[^\\'\n])'")
+TEST_ATTRIBUTE = re.compile(r"#\[\s*(?:test|cfg\(\s*test\s*\)|cfg\(\s*all\(\s*test\b[^\]]*|[A-Za-z0-9_]+::test(?:\([^\]]*\))?)\s*\]\Z")
 LOG_NAME = "singlefs-applied-writer-patches.tsv"
 STATIC_CHECK_SCRIPT = os.path.join(REPOSITORY_ROOT, "scripts", "mutation", "crates-mutation-rows.py")   # 变异锚点静态核（文件头「变异锚点静态核」），取这份脚本所在仓里那一份
-STATIC_CHECK_TREE_PATHS = ("crates", "litmus", "Cargo.toml", "Cargo.lock", ".cargo")   # 弄坏开关 static-check-path-dependencies-skipped 下临时树里只放这几样（改前的样子）
+STATIC_CHECK_TREE_PATHS = ("crates", "litmus", "Cargo.toml", "Cargo.lock", ".cargo")   # 弄坏开关 static-check-path-dependencies-skipped 下临时树里只放这几样
 STATIC_CHECK_DECLARED = (("litmus", "变异行可以锚在 litmus/ 下的文件上，static-check 要在临时树里读到它们"),)   # 拷贝范围之外另声明的（文件头「变异锚点静态核」）
 REPOSITORY_COPY_LIBRARY = os.path.join(REPOSITORY_ROOT, "scripts", "hosts", "lib_repository_copy.py")   # 拷贝范围的共用库，取这份脚本所在仓里那一份
 STATIC_CHECK_ALLOWED_KINDS = ("COPIED", "LITERAL", "CHECKED", "IDENTIFIERS_CHECKED")   # 输出里不算红的行首
@@ -256,6 +299,10 @@ COPY_OWNER_NAME = ".prove-red.owner"   # 副本锁的持有者记录（文件头
 COPY_OWNER_HEARTBEAT_SECONDS = 15   # 持有者刷新记录修改时间的间隔
 COPY_OWNER_STALE_SECONDS = 300   # 别的机器上的持有者记录这么久没刷新就当持有者没了（推的：NFS 客户端属性缓存最长 60 秒，加两个心跳间隔留足余量）
 MACHINE_IDENTITY_PATH = "/proc/sys/kernel/random/boot_id"   # 这台机器这一次开机的标识：两台、两次开机不同，不含主机名
+SERVICE_TASK_VARIABLE = "TASK_SERVER_TASK"   # 统一任务服务给每次尝试设的任务号（task-server/task_server.py 文件头 ③「环境」，两台都给）：写进持有者记录
+SERVICE_ATTEMPT_VARIABLE = "TASK_SERVER_ATTEMPT"   # 同上，这是第几次尝试
+NOT_FROM_SERVICE = "-"   # 持有者记录里任务号、尝试号那两段：不经服务起的写这个
+COPY_OWNER_FIELDS = 5   # 持有者记录一行几段：机器标识 进程号 随机串 任务号 尝试号
 COPY_OWNERS = {}   # 副本锁描述符 → (持有者记录路径, 记录内容, 停心跳的事件, 心跳线程)
 BASELINE_DIRECTORY = "baseline"   # 补丁目录里放基线原样的子目录（文件头「三方合并」）
 RECOGNIZED_PATCH_FILES = ("crates.patch", "mutations-append.tsv", "mutations-replacements.tsv", "mutations-delete.txt")   # 补丁目录里它认得的补丁（文件头「补丁目录里的文件」）；一份都没有就拒
@@ -331,7 +378,7 @@ def snapshot_library_break(name):
 
 def snapshot_touched_paths(patch_directory):
     """开工快照判的「补丁改到的文件」（文件头「开工快照」）：crates.patch 两侧的路径；mutations-replacements.tsv 或 mutations-delete.txt 写了行另算 crates/mutations.tsv。
-    只有 mutations-append.tsv 写了行（只追加）不算改到它（与派发闸 ⑤ 同义）；弄坏开关 append-only-mutations-conflict 下照改前三份都算。"""
+    只有 mutations-append.tsv 写了行（只追加）不算改到它（与派发闸 ⑤ 同义）；弄坏开关 append-only-mutations-conflict 下三份都算。"""
     if BROKEN == "append-only-mutations-conflict":
         return touched_paths(patch_directory)
     touched = touched_paths(patch_directory, include_mutation_files=False)
@@ -412,9 +459,30 @@ def machine_identity():
         return "不明"
 
 
+def service_attempt_of_this_run():
+    """这一趟是统一任务服务的哪一次尝试：→ (任务号, 尝试号)，取 SERVICE_TASK_VARIABLE、SERVICE_ATTEMPT_VARIABLE；两样里有一样没设或不是正整数的，两样都写 NOT_FROM_SERVICE。"""
+    task, attempt = os.environ.get(SERVICE_TASK_VARIABLE, ""), os.environ.get(SERVICE_ATTEMPT_VARIABLE, "")
+    if task.isdigit() and attempt.isdigit() and int(task) > 0 and int(attempt) > 0:
+        return task, attempt
+    return NOT_FROM_SERVICE, NOT_FROM_SERVICE
+
+
+def earlier_attempt_of_this_task(written):
+    """持有者记录（切好的几段）是这一趟所在任务更早的一次尝试写的吗（文件头「副本锁」的同一任务更早的尝试）：这一趟经服务起、记录有 COPY_OWNER_FIELDS 段、
+    任务号相同、记录的尝试号比这一趟小才写 True。服务保证第 n+1 次只在第 n 次收尾确认之后才起，所以那一次的证红已经没了。
+    弄坏开关 earlier-attempt-waits 下一律 False（同一任务的旧尝试也等记录过期）。"""
+    if BROKEN == "earlier-attempt-waits" or len(written) != COPY_OWNER_FIELDS:
+        return False
+    task, attempt = service_attempt_of_this_run()
+    if task == NOT_FROM_SERVICE or not written[4].isdigit():
+        return False
+    return written[3] == task and int(written[4]) < int(attempt)
+
+
 def copy_owner_alive_elsewhere(path):
     """持有者记录 path 指的持有者此刻还占着副本吗（flock 已经拿到了才问这一句）：记录读不了、不在写 False；
-    记录里的机器标识是这一台的，flock 拿到了就说明原持有者没了，写 False；别的机器上的看记录的修改时间，COPY_OWNER_STALE_SECONDS 内刷新过的写 True。"""
+    记录里的机器标识是这一台的，flock 拿到了就说明原持有者没了，写 False；别的机器上的看记录的修改时间，COPY_OWNER_STALE_SECONDS 内刷新过的写 True，
+    记录是这一趟所在任务更早的尝试写的（earlier_attempt_of_this_task）照 False，当场接手。"""
     try:
         written = open(path, encoding="utf-8").read().split()
         age = time.time() - os.stat(path).st_mtime
@@ -425,7 +493,9 @@ def copy_owner_alive_elsewhere(path):
     identity = machine_identity()
     if written and written[0] == identity and identity != "不明":
         return False
-    return age < COPY_OWNER_STALE_SECONDS
+    if age >= COPY_OWNER_STALE_SECONDS:
+        return False
+    return not earlier_attempt_of_this_task(written)
 
 
 def keep_copy_owner_fresh(path, content, stop):
@@ -439,11 +509,13 @@ def keep_copy_owner_fresh(path, content, stop):
 
 
 def claim_copy_owner(root, descriptor):
-    """在 <root>/.prove-red.owner 上排他新建持有者记录（内容：机器标识 进程号 随机串），成了交 True，登记到 COPY_OWNERS[descriptor] 并起心跳线程；
-    记录已在：持有者还占着（copy_owner_alive_elsewhere）交 False；没人占了就把旧记录改名摘走、删掉再建。
+    """在 <root>/.prove-red.owner 上排他新建持有者记录（内容：机器标识 进程号 随机串 任务号 尝试号，后两样取 service_attempt_of_this_run），
+    成了交 True，登记到 COPY_OWNERS[descriptor] 并起心跳线程；
+    记录已在：持有者还占着（copy_owner_alive_elsewhere）交 False；没人占了（含同一任务更早的尝试写的）就把旧记录改名摘走、删掉再建。
     摘走时核摘到的还是刚才读的那一份：不是（摘走的瞬间别人刚建了新的）就原样放回、交 False。"""
     path = os.path.join(root, COPY_OWNER_NAME)
-    content = f"{machine_identity()} {os.getpid()} {secrets.token_hex(8)}\n"
+    task, attempt = service_attempt_of_this_run()
+    content = f"{machine_identity()} {os.getpid()} {secrets.token_hex(8)} {task} {attempt}\n"
     for _attempt in range(3):
         try:
             owner_descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o644)
@@ -505,11 +577,15 @@ def release_copy_lock(root, descriptor):
 
 
 def copy_lock_holder(root):
-    """持有者记录里写的进程号与机器标识前八位（别的机器上的进程号在这一台上查不了，所以带上机器标识）；没有记录时取锁文件里的进程号，都读不到写「不明」，只给拒绝那一句用。"""
+    """持有者记录里写的进程号、机器标识前八位（别的机器上的进程号在这一台上查不了，所以带上机器标识）与任务号、尝试号；
+    没有记录时取锁文件里的进程号，都读不到写「不明」，只给拒绝那一句用。"""
     try:
         written = open(os.path.join(root, COPY_OWNER_NAME), encoding="utf-8").read().split()
         if len(written) >= 2:
-            return f"{written[1]}（机器标识 {written[0][:8]}；是别的机器上的证红时，它被杀了的话最多等 {COPY_OWNER_STALE_SECONDS} 秒记录过期自动让出）"
+            started = (f"任务 {written[3]} 第 {written[4]} 次尝试" if len(written) == COPY_OWNER_FIELDS and written[3] != NOT_FROM_SERVICE
+                       else "不经统一任务服务起的")
+            return (f"{written[1]}（机器标识 {written[0][:8]}、{started}；是别的机器上的证红时：经服务起的同一任务后面的尝试当场接手，"
+                    f"别的它被杀了的话最多等 {COPY_OWNER_STALE_SECONDS} 秒记录过期自动让出）")
     except OSError:
         pass
     try:
@@ -799,6 +875,245 @@ def three_way_merge(patch, patch_directory, root, check_error):
         return ThreeWay([f"{head}，三方合并没做成：{error}"], None, [], THREE_WAY_REBUILD_REMEDY, work)
 
 
+def added_lines_of_patch(text):
+    """crates.patch 里每个文件新加的行 → {路径: [(改后文件里的行号, 行文)]}；删掉的文件不收。按 @@ 头里的行数配平每一段，段里以 +++ 起头的新加行不会被当成文件头。"""
+    unquoted = snapshot_tree_module().unquoted
+    added, path, lines, index = {}, None, text.splitlines(), 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if line.startswith("+++ "):
+            value = unquoted(line[4:].split("\t", 1)[0])
+            path = None if value == "/dev/null" else (value[2:] if value.startswith("b/") else value)
+            continue
+        header = HUNK_HEADER.match(line)
+        if header is None or path is None:
+            continue
+        old_remaining = int(header.group(1)) if header.group(1) is not None else 1
+        new_line = int(header.group(2))
+        new_remaining = int(header.group(3)) if header.group(3) is not None else 1
+        while (old_remaining > 0 or new_remaining > 0) and index < len(lines):
+            body = lines[index]
+            index += 1
+            tag = body[:1]
+            if tag == "\\":
+                continue
+            if tag == "+":
+                added.setdefault(path, []).append((new_line, body[1:]))
+                new_line += 1
+                new_remaining -= 1
+            elif tag == "-":
+                old_remaining -= 1
+            else:
+                new_line += 1
+                old_remaining -= 1
+                new_remaining -= 1
+    return added
+
+
+def blank_out(text):
+    """去掉注释与字符串、字符字面量里的字（换成空格，换行留着，行号不变）。"""
+    pieces, index, length = [], 0, len(text)
+
+    def blanks(fragment):
+        return re.sub(r"[^\n]", " ", fragment)
+
+    while index < length:
+        character = text[index]
+        raw = RAW_STRING_START.match(text, index) if character == "r" and (index == 0 or text[index - 1] == "b" or not (text[index - 1].isalnum() or text[index - 1] == "_")) else None
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            end = length if end < 0 else end
+            pieces.append(blanks(text[index:end]))
+            index = end
+        elif text.startswith("/*", index):
+            depth, end = 1, index + 2
+            while end < length and depth:
+                if text.startswith("/*", end):
+                    depth, end = depth + 1, end + 2
+                elif text.startswith("*/", end):
+                    depth, end = depth - 1, end + 2
+                else:
+                    end += 1
+            pieces.append(blanks(text[index:end]))
+            index = end
+        elif raw is not None:
+            close = text.find('"' + raw.group(1), raw.end())
+            end = length if close < 0 else close + 1 + len(raw.group(1))
+            pieces.append(blanks(text[index:end]))
+            index = end
+        elif character == '"':
+            end = index + 1
+            while end < length and text[end] != '"':
+                end += 2 if text[end] == "\\" else 1
+            end = min(end + 1, length)
+            pieces.append(blanks(text[index:end]))
+            index = end
+        elif character == "'" and CHAR_LITERAL.match(text, index):
+            end = CHAR_LITERAL.match(text, index).end()
+            pieces.append(blanks(text[index:end]))
+            index = end
+        else:
+            pieces.append(character)
+            index += 1
+    return "".join(pieces)
+
+
+def attribute_end(text, start):
+    """text[start:] 以 #[ 起头：配平方括号，→ 属性结束处（] 之后）的下标。"""
+    depth = 0
+    for position in range(start + 1, len(text)):
+        if text[position] == "[":
+            depth += 1
+        elif text[position] == "]":
+            depth -= 1
+            if depth == 0:
+                return position + 1
+    return len(text)
+
+
+def test_code_lines(cleaned):
+    """去掉注释与字面量之后的源码里，落在测试代码里的行号（1 起）：#[cfg(test)]、#[test]、#[<路径>::test] 标的条目的大括号里；#![cfg(test)] 整份文件都算。"""
+    if re.search(r"#!\[\s*cfg\(\s*test\s*\)\s*\]", cleaned):
+        return set(range(1, cleaned.count("\n") + 2))
+    inside, regions = set(), []
+    depth, line, nesting, awaiting = 0, 1, 0, False
+    for position, character in enumerate(cleaned):
+        if regions:
+            inside.add(line)
+        if character == "#" and cleaned.startswith("#[", position):
+            if TEST_ATTRIBUTE.match(cleaned[position:attribute_end(cleaned, position)]):
+                awaiting, nesting = True, 0
+        elif character == "\n":
+            line += 1
+        elif character in "([":
+            nesting += 1
+        elif character in ")]":
+            nesting = max(nesting - 1, 0)
+        elif character == "{":
+            depth += 1
+            if awaiting and nesting == 0:
+                regions.append(depth)
+                awaiting = False
+                inside.add(line)
+        elif character == "}":
+            if regions and regions[-1] == depth:
+                regions.pop()
+            depth -= 1
+        elif character == ";" and awaiting and nesting == 0:
+            awaiting = False
+    return inside
+
+
+def patched_texts(root, patch, paths):
+    """→ {路径: 套上补丁之后的全文}：补丁前原样的文件拷进临时目录，git apply 套补丁（同 compute_images 的做法）；套不上交 None。"""
+    work = tempfile.mkdtemp(prefix="apply-writer-patch-sites-")
+    try:
+        for path in sorted(patch_file_paths(patch)):
+            source = os.path.join(root, path)
+            if os.path.isfile(source) and unsafe_path_reason(path) is None:
+                copy = os.path.join(work, path)
+                os.makedirs(os.path.dirname(copy), exist_ok=True)
+                shutil.copyfile(source, copy)
+        subprocess.run(["git", "init", "-q", work], capture_output=True, text=True, check=True)
+        applied = subprocess.run(["git", "-C", work, "-c", "core.autocrlf=false", "apply", os.path.abspath(patch)], capture_output=True, text=True)
+        if applied.returncode != 0:
+            return None
+        texts = {}
+        for path in paths:
+            after = os.path.join(work, path)
+            if os.path.isfile(after):
+                with open(after, encoding="utf-8", errors="replace") as handle:
+                    texts[path] = handle.read()
+        return texts
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def unreachable_sites(root, patch):
+    """补丁在产品代码 crates/*/src/ 里新加的、要在 result.md「走不到的理由」一节逐处列的地方 → ([(路径, 行号, 种类)], 套不上补丁时的问题或 None)：
+    todo!、unreachable!、assert!（不含 debug_assert!），与条款没定、第一版不支持的错误成员（枚举成员，名字以 UNDECIDED_SUFFIXES 之一收尾）的定义行；
+    测试代码里的（#[cfg(test)] 模块、#[test] 函数）不算，测试基础设施的包（NON_PRODUCT_CRATES）不算。弄坏开关见文件头。"""
+    with open(patch, encoding="utf-8", errors="surrogateescape") as handle:
+        added = added_lines_of_patch(handle.read())
+    candidates = {}
+    for path, rows in added.items():
+        matched = PRODUCT_SOURCE_PATH.match(path)
+        if matched is None or (matched.group(1) in NON_PRODUCT_CRATES and BROKEN != "non-product-crates-judged"):
+            continue
+        hits = [number for number, text in rows if UNREACHABLE_MACRO_LOOSE.search(text) or any(suffix in text for suffix in UNDECIDED_SUFFIXES)]
+        if hits:
+            candidates[path] = hits
+    if not candidates:
+        return [], None
+    texts = patched_texts(root, patch, sorted(candidates))
+    if texts is None:
+        return [], "补丁套不上（git apply 在临时目录里失败），算不出新加的断言落在哪几行"
+    macro = UNREACHABLE_MACRO_LOOSE if BROKEN == "debug-assert-judged" else UNREACHABLE_MACRO
+    sites = []
+    for path, hits in sorted(candidates.items()):
+        if path not in texts:
+            continue
+        cleaned = blank_out(texts[path])
+        code_lines = cleaned.splitlines()
+        in_test = set() if BROKEN == "test-module-judged" else test_code_lines(cleaned)
+        for number in hits:
+            if number in in_test or number > len(code_lines):
+                continue
+            code = code_lines[number - 1]
+            found = macro.search(code)
+            member = UNDECIDED_MEMBER.match(code.strip()) if BROKEN != "error-member-ignored" else None
+            if found:
+                sites.append((path, number, f"{found.group(1)}!"))
+            elif member:
+                sites.append((path, number, f"错误成员 {member.group(1)}"))
+    return sites, None
+
+
+def unreachable_report_rows(report):
+    """result.md 里标题恰好是 UNREACHABLE_SECTION 的那一节 → ({(路径, 行号): 理由}, 有没有这一节)；节到下一个标题为止。"""
+    rows, inside, found = {}, False, False
+    for line in report.splitlines():
+        heading = re.match(r"^#{1,6}\s*(.*?)\s*#*\s*$", line)
+        if heading and line.lstrip().startswith("#"):
+            inside = heading.group(1) == UNREACHABLE_SECTION
+            found = found or inside
+        elif inside:
+            row = UNREACHABLE_ROW.match(line)
+            if row:
+                rows[(row.group(1), int(row.group(2)))] = row.group(3)
+    return rows, found
+
+
+def unreachable_problems(root, patch, report):
+    """补丁新加的走不到的断言、未定条款的错误成员，result.md「走不到的理由」一节每处要有一行「- <文件>:<行> <理由>」（文件头「走不到的理由」）→ 问题清单。
+    弄坏开关 unreachable-section-ignored 下不核。"""
+    if BROKEN == "unreachable-section-ignored":
+        return []
+    sites, trouble = unreachable_sites(root, patch)
+    if trouble:
+        return [trouble]
+    if not sites:
+        return []
+    rows, found = unreachable_report_rows(report)
+    missing = [site for site in sites if (site[0], site[1]) not in rows]
+    short = [site for site in sites if (site[0], site[1]) in rows and len(rows[(site[0], site[1])]) < UNREACHABLE_MINIMUM_REASON_CHARACTERS and BROKEN != "short-reason-accepted"]
+    problems = []
+    remedy = (f"出路：result.md 加一节「## {UNREACHABLE_SECTION}」，新加的每一处一行「- <文件>:<行> <理由>」（行号是打补丁之后那份文件里的行）；"
+              "断言写哪条构造保证走不到、哪几个调用点，错误成员写哪条条款没定、为什么在任何落盘动作之前返回；理由至少 "
+              f"{UNREACHABLE_MINIMUM_REASON_CHARACTERS} 个字")
+    if missing:
+        listed = "；".join(f"{path}:{number} {kind}" for path, number, kind in missing)
+        where = f"result.md「{UNREACHABLE_SECTION}」一节少列了 {len(missing)} 处" if found else f"result.md 里没有「{UNREACHABLE_SECTION}」一节，{len(missing)} 处都没列"
+        problems.append(f"补丁在产品代码里新加了 {len(sites)} 处走不到的断言或未定条款的错误成员，{where}：{listed}。{remedy}")
+    if short:
+        listed = "；".join(f"{path}:{number}" for path, number, _kind in short)
+        problems.append(f"result.md「{UNREACHABLE_SECTION}」一节里这几处的理由不足 {UNREACHABLE_MINIMUM_REASON_CHARACTERS} 个字：{listed}。{remedy}")
+    return problems
+
+
 def plan(patch_directory, root):
     """→ (问题清单, 新的变异表全文或 None, 补丁路径或 None)：只要核的结论的调用方用；三方合并的临时目录随即删掉，交回的补丁路径是补丁目录里那一份。"""
     problems, merged, _, three_way = plan_with_three_way(patch_directory, root)
@@ -853,6 +1168,8 @@ def plan_with_three_way(patch_directory, root):
             three_way = three_way_merge(patch, patch_directory, root, checked.stderr)
             problems += three_way.problems
             patch = three_way.patch if not three_way.problems else patch
+        if not problems:
+            problems += unreachable_problems(root, patch, report)
     table_path = os.path.join(root, "crates", "mutations.tsv")
     if not os.path.isfile(table_path):
         return problems + ["主工作区没有 crates/mutations.tsv"], None, patch, three_way
@@ -919,8 +1236,8 @@ def run_static_check(command):
 
 def static_check_red(lines):
     """输出里的红行 → [(比对用的键, 原行)]；键去掉变异表行号（追加删除会让行号漂）。
-    可达性那一道的提示行（STATIC_CHECK_HINT_KINDS）不算红；弄坏开关 static-check-hints-red 下照改前算红。
-    弄坏开关 static-check-unreachable-row-number-kept 下 UNREACHABLE 照改前连行号比（补丁删一行，补丁前就有的那一行跟着漂、被当成补丁带来的）。"""
+    可达性那一道的提示行（STATIC_CHECK_HINT_KINDS）不算红；弄坏开关 static-check-hints-red 下算红。
+    弄坏开关 static-check-unreachable-row-number-kept 下 UNREACHABLE 连行号比（补丁删一行，补丁前就有的那一行跟着漂、被当成补丁带来的）。"""
     red = []
     not_red = STATIC_CHECK_ALLOWED_KINDS + (() if BROKEN == "static-check-hints-red" else STATIC_CHECK_HINT_KINDS)
     row_number_kinds = tuple(kind for kind in STATIC_CHECK_ROW_NUMBER_KINDS
@@ -949,7 +1266,7 @@ def repository_copy_module():
 
 def static_check_tree_items(root):
     """临时树里放的几处（文件头「变异锚点静态核」）：root 带测试代码扫的拷贝范围（lib_repository_copy.py 的 copy_closure）再声明 litmus/。
-    闭包算不成抛 ValueError（ClosureRefused 是它的子类）或 OSError。弄坏开关 static-check-path-dependencies-skipped：只放 STATIC_CHECK_TREE_PATHS（改前的样子）。"""
+    闭包算不成抛 ValueError（ClosureRefused 是它的子类）或 OSError。弄坏开关 static-check-path-dependencies-skipped：只放 STATIC_CHECK_TREE_PATHS。"""
     if BROKEN == "static-check-path-dependencies-skipped":
         return list(STATIC_CHECK_TREE_PATHS)
     return list(repository_copy_module().copy_closure(os.path.realpath(root), STATIC_CHECK_DECLARED, test_inputs=True).entries)
@@ -987,7 +1304,7 @@ def static_check_report(root, merged, patch, static_check=None):
     tree = None
     try:
         tree = build_patched_tree(root, merged, patch)
-        # 两趟先后跑、不并行：每趟对整个工作区做可达性判约 16 GiB，并行时峰值 30.90 GiB（任务 7447 第 6 次），挡住两台排着的别的任务
+        # 两趟先后跑、不并行：每趟对整个工作区做可达性判约 16 GiB，并行时峰值 30.90 GiB，挡住两台排着的别的任务
         after_code, after_lines = run_static_check(make_command(tree))
         before_code, before_lines = run_static_check(make_command(root))
     except (OSError, RuntimeError, ValueError, ImportError, subprocess.CalledProcessError) as error:   # ValueError：拷贝范围的闭包算不成（ClosureRefused）
@@ -1093,7 +1410,7 @@ def outcome_append(path, rows):
 
 
 def outcome_start(path, patch_directory, root, entries):
-    """结局文件整份重写，只有开始行、说明、每个要动的文件一行（改前与计划改后的 sha256）；弄坏开关见文件头。"""
+    """结局文件整份重写，只有开始行、说明、每个要动的文件一行（补丁前与计划改后的 sha256）；弄坏开关见文件头。"""
     files = [("文件", entry["path"], entry["action"], ABSENT if BROKEN == "outcome-before-hash-omitted" else entry["before"], entry["after"])
              for entry in entries]
     if BROKEN == "outcome-complete-first":
@@ -1103,7 +1420,7 @@ def outcome_start(path, patch_directory, root, entries):
 
 
 def entry_state(root, entry):
-    """一份文件的换上状态，按内容判：现在的 sha256 等于改后是已换上，等于改前是没换上，都不等是被别的改动动过。"""
+    """一份文件的换上状态，按内容判：现在的 sha256 等于改后是已换上，等于补丁前是没换上，都不等是被别的改动动过。"""
     try:
         current = file_digest(os.path.join(root, entry["path"]))
     except OSError:
@@ -1138,7 +1455,7 @@ def replace_one(root, base, entry):
 
 
 def restore_one(root, base, entry):
-    """把备份的改前原样改名放回去；这一份是新建的就删掉。"""
+    """把备份的补丁前原样改名放回去；这一份是新建的就删掉。"""
     target = os.path.join(root, entry["path"])
     if entry["action"] == ACTION_CREATE:
         os.unlink(target)
@@ -1158,7 +1475,7 @@ def replace_entries(root, base, entries):
 
 
 def restore_entries(root, base, entries):
-    """已换上的照备份退回（倒着退）→ 没退成的说明清单；现在的内容既不是改前也不是改后的不碰（会盖掉别人的改动）。"""
+    """已换上的照备份退回（倒着退）→ 没退成的说明清单；现在的内容既不是补丁前也不是改后的不碰（会盖掉别人的改动）。"""
     failures = []
     for entry in reversed(entries):
         state = entry_state(root, entry)
@@ -1301,8 +1618,8 @@ def unsafe_path_reason(path):
 
 
 def compute_images(root, patch, merged, work):
-    """每一份要动的文件的改后全文，在临时目录 work 里算好 → (Image 清单, 问题清单)：补丁套在临时目录里改前原样的那几份上（git apply），变异表合并后的全文另写一份。
-    只读 root；改前与改后一样的不进清单。问题清单非空就一个字不改。"""
+    """每一份要动的文件的改后全文，在临时目录 work 里算好 → (Image 清单, 问题清单)：补丁套在临时目录里补丁前原样的那几份上（git apply），变异表合并后的全文另写一份。
+    只读 root；补丁前与改后一样的不进清单。问题清单非空就一个字不改。"""
     images, problems = [], []
     tree = os.path.join(work, "tree")
     os.mkdir(tree)
@@ -1347,7 +1664,7 @@ def compute_images(root, patch, merged, work):
 
 
 def stage_images(root, base, images):
-    """每份改后的全文拷进暂存目录 staged/<序号>、改前原样拷进 before/<序号> → entries（journal.json 里记的那些）。"""
+    """每份改后的全文拷进暂存目录 staged/<序号>、补丁前原样拷进 before/<序号> → entries（journal.json 里记的那些）。"""
     entries = []
     for index, image in enumerate(images):
         entry = {"index": index, "path": image.path, "action": image.action, "before": image.before, "after": image.after}
@@ -1366,7 +1683,7 @@ def stage_images(root, base, images):
 
 
 def staging_problems(root, base, entries):
-    """暂存齐了之后回读核：暂存出来的改后全文、备份的改前原样的 sha256 与记下的对得上，主工作区此刻的 sha256 仍是核的时候的改前。"""
+    """暂存齐了之后回读核：暂存出来的改后全文、备份的补丁前原样的 sha256 与记下的对得上，主工作区此刻的 sha256 仍是核的时候的补丁前。"""
     problems = []
     for entry in entries:
         index = str(entry["index"])
@@ -1469,7 +1786,7 @@ def mutation_tables_handoff(root):
 
 def after_landing(patch_directory, root, gate33, lines, outcome):
     """全部换上、回读核过之后的尾巴：记打补丁记录、打出 mutation-tables 那一格要另交的命令、结局文件记一行后续、数提示线 → (退出码, 输出行)。
-    mutation-tables 那一格不在这个进程里起（文件头「mutation-tables 那一格」）；gate33 只在弄坏开关 mutation-tables-in-process 下照改前在这里起。"""
+    mutation-tables 那一格不在这个进程里起（文件头「mutation-tables 那一格」）；gate33 只在弄坏开关 mutation-tables-in-process 下在这里起。"""
     common = git(root, "rev-parse", "--git-common-dir").stdout.strip()
     log_path = os.path.join(common if os.path.isabs(common) else os.path.join(root, common), LOG_NAME)
     handed = os.path.join(patch_directory, "crates.patch")   # 记实现员交的那一份（三方合并重出的那一份只在临时目录里）
@@ -1558,7 +1875,7 @@ def finish_pending(root, gate33):
 
 
 def rollback_pending(root):
-    """--rollback-pending：已换上的照备份退回，回读核过（等于改前），写退回、删暂存目录。有被别的改动动过的文件不做。"""
+    """--rollback-pending：已换上的照备份退回，回读核过（等于补丁前），写退回、删暂存目录。有被别的改动动过的文件不做。"""
     def action(root, base, journal, states):
         if any(state == STATE_TOUCHED for _, state in states):
             return 2, pending_lines("journal", base, journal, states)
@@ -1686,7 +2003,7 @@ def apply_planned(patch_directory, root, dry_run, gate33, static_check, problems
 
 
 SAMPLE_FILES = (("crates/demo/src/emit.rs", "fn emit() -> u32 { 1 }\n", "fn emit() -> u32 { 2 }\n"),
-                ("crates/demo/src/parse.rs", "fn parse() -> u32 { 1 }\n", "fn parse() -> u32 { 2 }\n"))   # (路径, 改前, 改后)：自证里换上的几份样本源文件
+                ("crates/demo/src/parse.rs", "fn parse() -> u32 { 1 }\n", "fn parse() -> u32 { 2 }\n"))   # (路径, 补丁前, 改后)：自证里换上的几份样本源文件
 SAMPLE_TABLE = "# 表头\nkeep\tf\to\tr\t-p demo --lib\tt\n"
 SAMPLE_APPEND = "added\tf\to\tr\t-p demo --lib\tt\n"
 SAMPLE_GATE = ["true"]
@@ -1775,6 +2092,69 @@ def run_in_child(seam, hook, call):
     return os.waitstatus_to_exitcode(status)
 
 
+SAME_TASK_SELFTEST_TASK, SAME_TASK_SELFTEST_ATTEMPT = "7896", "3"   # 副本锁的同任务一段：这一趟当成服务的任务 7896 第 3 次尝试
+
+
+def same_task_owner_failures(root, owner_path, patch_directory, table_path, gate33):
+    """副本锁的同任务一段（文件头「副本锁」的同一任务更早的尝试）→ 失败说明的清单。持有者记录写着别的机器的标识、刚刷新过（这里自己不拿 flock，演 flock 跨机不互斥），
+    这一趟当成服务的任务 7896 第 3 次尝试（设 SERVICE_TASK_VARIABLE、SERVICE_ATTEMPT_VARIABLE，跑完照原样放回）：
+    记录是同一任务第 2 次写的，当场接手、记录换成这一趟的、放锁后不留；任务号不同的、同一任务第 3 次与第 4 次写的拒绝；这一趟不经服务起的，同一任务的记录也照拒；
+    apply 的拒绝那一句写出记录里的任务号与尝试号、一个字不改。"""
+    failures = []
+    saved = {name: os.environ.get(name) for name in (SERVICE_TASK_VARIABLE, SERVICE_ATTEMPT_VARIABLE)}
+
+    def held_with_record(record):
+        """写下持有者记录 record、试拿副本锁：→ (拿到了没有, 拿着时记录切成的几段)；拿到的当场放掉。"""
+        with open(owner_path, "w") as handle:
+            handle.write(record)
+        held = hold_copy_lock(root)
+        if held is None:
+            return False, []
+        written = open(owner_path).read().split() if os.path.exists(owner_path) else []
+        release_copy_lock(root, held)
+        return True, written
+
+    try:
+        os.environ[SERVICE_TASK_VARIABLE], os.environ[SERVICE_ATTEMPT_VARIABLE] = SAME_TASK_SELFTEST_TASK, SAME_TASK_SELFTEST_ATTEMPT
+        held, written = held_with_record(f"other-machine-selftest 4242 selftest-token {SAME_TASK_SELFTEST_TASK} 2\n")
+        if not held or written[:1] != [machine_identity()] or written[3:] != [SAME_TASK_SELFTEST_TASK, SAME_TASK_SELFTEST_ATTEMPT] or os.path.exists(owner_path):
+            failures.append(f"副本锁的同任务一段：别的机器上的持有者记录刚刷新过、任务号与这一趟相同、尝试号更小时应当当场接手（记录换成这一台的标识与任务 "
+                            f"{SAME_TASK_SELFTEST_TASK} 第 {SAME_TASK_SELFTEST_ATTEMPT} 次）、放锁后不留记录，实际{'拿到了' if held else '没拿到'}锁、拿着时记录是 {written}、"
+                            f"放锁后记录{'还在' if os.path.exists(owner_path) else '已删'}")
+        held, _ = held_with_record("other-machine-selftest 4242 selftest-token 7000 1\n")
+        if held:
+            failures.append("副本锁的同任务一段：别的机器上的持有者记录刚刷新过、任务号与这一趟不同（7000）时应当拒绝，实际拿到了锁")
+        for written_attempt in (SAME_TASK_SELFTEST_ATTEMPT, str(int(SAME_TASK_SELFTEST_ATTEMPT) + 1)):
+            held, _ = held_with_record(f"other-machine-selftest 4242 selftest-token {SAME_TASK_SELFTEST_TASK} {written_attempt}\n")
+            if held:
+                failures.append(f"副本锁的同任务一段：别的机器上的持有者记录刚刷新过、任务号相同而尝试号（{written_attempt}）不比这一趟（{SAME_TASK_SELFTEST_ATTEMPT}）小时应当拒绝，"
+                                "实际拿到了锁")
+        before = open(table_path).read()
+        with open(owner_path, "w") as handle:
+            handle.write("other-machine-selftest 4242 selftest-token 7000 1\n")
+        code, lines = apply(patch_directory, root, False, gate33)
+        after_refusal = open(table_path).read()
+        if code != 2 or not any("任务 7000 第 1 次尝试" in line for line in lines) or after_refusal != before:
+            failures.append(f"副本锁的同任务一段：拒绝那一句应当写出记录里的任务号与尝试号（任务 7000 第 1 次尝试）、退 2、一个字不改，实际 {code} {lines}")
+        if after_refusal != before:
+            with open(table_path, "w") as handle:   # 照打了（弄坏开关 copy-owner-ignored）：表退回去，后面的格只判自己的
+                handle.write(before)
+        for name in (SERVICE_TASK_VARIABLE, SERVICE_ATTEMPT_VARIABLE):
+            os.environ.pop(name, None)
+        held, _ = held_with_record(f"other-machine-selftest 4242 selftest-token {SAME_TASK_SELFTEST_TASK} 2\n")
+        if held:
+            failures.append("副本锁的同任务一段：这一趟不经服务起（没有 TASK_SERVER_TASK、TASK_SERVER_ATTEMPT）时，别的机器上刚刷新过的记录照 300 秒判、应当拒绝，实际拿到了锁")
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        if os.path.exists(owner_path):
+            os.unlink(owner_path)
+    return failures
+
+
 def landing_selftest(work):
     """换上与结局文件的自证（文件头「换上与被杀」「结局文件」）：每一格自己一个临时仓，互不连带 → 失败说明的清单。"""
     failures = []
@@ -1825,7 +2205,7 @@ def landing_selftest(work):
             or "--finish-pending" not in text or "--rollback-pending" not in text:
         failures.append(f"换上换到一半被杀，下一次起应当认出来、列出已换上与没换上的文件和两条出路、不在半截上再打别的补丁、一个字不改，"
                         f"实际子进程退 {code}、被杀时动了 {changed}，别的补丁退 {other_code} {other_lines}")
-    # halfrollback：换上 emit.rs 之后被杀，--rollback-pending 照改前原样退回；结局文件写退回；之后同一个补丁照常打上
+    # halfrollback：换上 emit.rs 之后被杀，--rollback-pending 照补丁前原样退回；结局文件写退回；之后同一个补丁照常打上
     repo, directory = sample_repository(work, "halfrollback")
     before = tree_bytes(repo)
     code = run_in_child("AFTER_EACH_REPLACE", killed_after(0), lambda: apply(directory, repo, False, SAMPLE_GATE))
@@ -1860,7 +2240,7 @@ def landing_selftest(work):
     refusal = "\n".join(pending_refusal(repo))
     if code != 2 or "异常" not in kinds or "完成" in kinds or not os.path.isdir(pending_directory(repo)) or f"{STATE_TOUCHED}：{emit_path}" not in refusal:
         failures.append(f"换上之后回读与记下的改后 sha256 对不上时应当退 2、写异常、不写完成、留着暂存目录，实际退 {code} {lines}，结局文件的行种类 {kinds}")
-    # outcomenormal：正常打一次，结局文件依次是开始、每个文件一行（改前与计划改后的 sha256）、回读、完成、后续；--read-outcome 判打全了
+    # outcomenormal：正常打一次，结局文件依次是开始、每个文件一行（补丁前与计划改后的 sha256）、回读、完成、后续；--read-outcome 判打全了
     repo, directory = sample_repository(work, "outcomenormal")
     before = tree_bytes(repo)
     code, lines = apply(directory, repo, False, SAMPLE_GATE)
@@ -1955,6 +2335,49 @@ def selftest():
         code, lines = apply(checker, root, False, gate33)
         if code != 2 or not any("受影响的层 0 流" in line for line in lines):
             failures.append(f"动 checker 而报告没那一节应当拒绝，实际 {code} {lines}")
+        # 走不到的理由（文件头「走不到的理由」）：自己的临时仓，补丁用 plan() 核（不打）；仓里一份产品代码、一份验证包的 src
+        unreachable_root = os.path.join(work, "unreachable-repo")
+        for relative in ("crates/demo/src/lib.rs", "crates/singlefs-verification/src/lib.rs"):
+            os.makedirs(os.path.dirname(os.path.join(unreachable_root, relative)), exist_ok=True)
+            open(os.path.join(unreachable_root, relative), "w").write("fn a() -> u32 { 1 }\n")
+        open(os.path.join(unreachable_root, "crates", "mutations.tsv"), "w").write("# 表头\n")
+        for command in (["init", "-q"], ["add", "-A"], ["-c", "user.name=s", "-c", "user.email=s@s", "commit", "-qm", "base"]):
+            git(unreachable_root, *command, check=True)
+
+        def unreachable_check(name, new_text, report, relative="crates/demo/src/lib.rs"):
+            return plan(patch_directory(name, (relative, new_text), report=report, repo=unreachable_root), unreachable_root)[0]
+
+        macro_source = "fn a(n: u32) -> u32 {\n    if n > 100 {\n        unreachable!()\n    }\n    n\n}\n"
+        macro_section = "## 走不到的理由\n\n- crates/demo/src/lib.rs:3 唯一的调用点先判了 n 不大于 100，这一支进不来\n"
+        found = unreachable_check("unreachable-unlisted", macro_source, "只改了判定\n")
+        if not (len(found) == 1 and "crates/demo/src/lib.rs:3 unreachable!" in found[0] and "走不到的理由" in found[0]):
+            failures.append(f"新加 unreachable! 而 result.md 没有「走不到的理由」一节应当拒绝并点名 文件:行，实际 {found}")
+        found = unreachable_check("unreachable-listed", macro_source, macro_section)
+        if found:
+            failures.append(f"新加 unreachable! 而一节里逐处列了就该放行，实际 {found}")
+        found = unreachable_check("unreachable-short-reason", macro_source, "## 走不到的理由\n\n- crates/demo/src/lib.rs:3 不会到\n")
+        if not any("不足 8 个字" in problem and "crates/demo/src/lib.rs:3" in problem for problem in found):
+            failures.append(f"走不到的理由写得不足 8 个字应当拒绝，实际 {found}")
+        found = unreachable_check("unreachable-debug-assert", "fn a(n: u32) -> u32 {\n    debug_assert!(n < 100);\n    n\n}\n", "")
+        if found:
+            failures.append(f"debug_assert! 不算要列的断言，应当放行，实际 {found}")
+        found = unreachable_check("unreachable-test-module", "fn a() -> u32 { 1 }\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn a_is_one() {\n        assert!(super::a() == 1);\n    }\n}\n", "")
+        if found:
+            failures.append(f"测试模块里的 assert! 不算要列的断言，应当放行，实际 {found}")
+        found = unreachable_check("unreachable-in-comments", "fn a() -> &'static str {\n    // unreachable!() 只在注释里\n    \"todo!\"\n}\n", "")
+        if found:
+            failures.append(f"注释与字符串里的 unreachable!、todo! 不算，应当放行，实际 {found}")
+        found = unreachable_check("unreachable-non-product", "fn a() -> u32 {\n    assert!(true);\n    1\n}\n", "", relative="crates/singlefs-verification/src/lib.rs")
+        if found:
+            failures.append(f"测试基础设施的包（singlefs-verification）里的 assert! 不算产品代码，应当放行，实际 {found}")
+        member_source = "pub enum Refusal {\n    RenameAcrossPoolsUndecided,\n}\n"
+        found = unreachable_check("unreachable-member-unlisted", member_source, "只改了判定\n")
+        if not (len(found) == 1 and "crates/demo/src/lib.rs:2 错误成员 RenameAcrossPoolsUndecided" in found[0]):
+            failures.append(f"新加条款没定的错误成员（名字以 Undecided 收尾）而报告没列应当拒绝并点名成员，实际 {found}")
+        found = unreachable_check("unreachable-member-listed", member_source,
+                                  "## 走不到的理由\n\n- crates/demo/src/lib.rs:2 重命名跨池的条款没定，第一版不支持，在任何落盘动作之前返回这个成员\n")
+        if found:
+            failures.append(f"错误成员逐处列了就该放行，实际 {found}")
         duplicate = patch_directory("duplicate", append="keep\tf\to\tr\t-p demo --lib\tt\n")
         code, lines = apply(duplicate, root, False, gate33)
         if code != 2:
@@ -2036,7 +2459,7 @@ def selftest():
         owned = patch_directory("owned", append="owned-row\tf\to\tr\t-p demo --lib\tt\n")
         before = open(table_path).read()
         with open(owner_path, "w") as handle:
-            handle.write("other-machine-selftest 4242 selftest-token\n")
+            handle.write(f"other-machine-selftest 4242 selftest-token {NOT_FROM_SERVICE} {NOT_FROM_SERVICE}\n")
         code, lines = apply(owned, root, False, gate33)
         after_refusal = open(table_path).read()
         if code != 2 or not any("副本上有证红在跑" in line for line in lines) or after_refusal != before:
@@ -2053,7 +2476,7 @@ def selftest():
         if not took_over or os.path.exists(owner_path):
             owner_wrong.append(f"别的机器上的持有者记录早过过期线（{3 * COPY_OWNER_STALE_SECONDS} 秒没刷新）时应当接手、记录里换成这一台的标识、放锁后不留记录，实际{'拿到了' if held is not None else '没拿到'}锁、接手{'了' if took_over else '没有'}、记录{'还在' if os.path.exists(owner_path) else '已删'}")
         with open(owner_path, "w") as handle:
-            handle.write(f"{machine_identity()} 1 old-token\n")
+            handle.write(f"{machine_identity()} 1 old-token {NOT_FROM_SERVICE} {NOT_FROM_SERVICE}\n")
         held = hold_copy_lock(root)
         if held is not None:
             release_copy_lock(root, held)
@@ -2063,6 +2486,8 @@ def selftest():
             os.unlink(owner_path)
         if owner_wrong:
             failures.append("副本锁的跨机一段：" + "；".join(owner_wrong))
+        failures += same_task_owner_failures(root, owner_path, patch_directory("owner-same-task", append="owner-same-task-row\tf\to\tr\t-p demo --lib\tt\n"),
+                                             table_path, gate33)
         # 开工快照（文件头「开工快照」）：临时仓里开一轮 r-open（快照目录、正文在，判决不在），清单列着 crates/demo/src/lib.rs 与 crates/mutations.tsv；
         # 当主工作区打（main_workspace=True）。snapshot：改 lib.rs 的补丁与整行换掉变异行的补丁都拒、退 2、一个字不改，出路不提单次放行；
         # snapshot-append-only：只追加变异行的补丁不算撞（与派发闸 ⑤ 同义），照打；snapshot-ruled-refused：命令行给 --snapshot-ruled 照用法错退 2、一个字不改
@@ -2316,7 +2741,7 @@ def selftest():
         if code != 0 or after != numbered_source({8: 80, 10: 100}) or not any(f"{BASELINE_DIRECTORY}/{merge_relative}" in line and "合了" in line for line in lines):
             failures.append(f"基线 blob 不在对象库里而补丁目录 baseline/ 里有哈希对得上的那一份时应当照它三方合上、退 0，实际退 {code} {lines}，文件 {after!r}")
         # 没认出补丁（文件头「补丁目录里的文件」）：另一个临时仓。unrecognized：目录里只有 all.patch（补丁本身是好的、套得上；改 crates 之外的文件的补丁就是这样交的，
-        # 改前一个字没打却报「打上了」退 0），拒、退 2、点名 all.patch、出路写 git apply、仓里一个字不改；emptydirectory：一个文件都没有，同样拒；
+        # 不拒就会一个字没打却报「打上了」退 0），拒、退 2、点名 all.patch、出路写 git apply、仓里一个字不改；emptydirectory：一个文件都没有，同样拒；
         # alongside：crates.patch 与别的 *.patch 同在，照打 crates.patch、退 0（只管一份都没认出的这一支）
         loose_root = os.path.join(work, "loose-patch-repo")
         loose_source = os.path.join(loose_root, "crates", "demo", "src", "lib.rs")
@@ -2347,7 +2772,8 @@ def selftest():
         if failures:
             print("  → 看 plan() / apply() 的判法；APPLY_WRITER_PATCH_BREAK 设着的话这里本来就该红")
             return 1
-        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名（表里已有的、追加表自己里两行同名的）、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打、别的机器上的持有者记录刷新过就拒绝、过期的与这一台的旧记录接手，"
+        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名（表里已有的、追加表自己里两行同名的）、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打、别的机器上的持有者记录刷新过就拒绝、过期的与这一台的旧记录接手、"
+              "同一任务更早的尝试写的当场接手（任务号不同、尝试号不比这一趟小、这一趟不经服务起的照拒，拒绝那一句写出记录里的任务号与尝试号），"
               "补丁改到开着的三方轮开工快照里的文件（代码与变异表）拒、命令行给了快照冲突已判的照打，"
               "快照清单读不了的照打、点名那一轮与那份清单并记一条检出，"
               "--dry-run 在套上补丁的临时树上跑变异锚点静态核（弄断锚点的补丁拒、不弄断的放行、补丁前就红的不算补丁带来的、临时树连 path 依赖的目录一起拷、可达性那一道的提示行随树变也不算红），"
@@ -2355,7 +2781,7 @@ def selftest():
               "对不上的拒、index 行点错 blob 套不上的拒、改名段拒，拒的都一个字不改），"
               "补丁目录里一样认得的补丁都没有（只有别的 *.patch、空目录）拒并点名、与 crates.patch 同在的别的 *.patch 不挡，"
               "换上：暂存到一半被杀主工作区不动、暂存出来的文件对不上 sha256 拒、换到一半被杀下一次认出来并列出已换上与没换上、退回与接着换完、回读对不上写异常，"
-              "结局文件开始到完成写全、被杀的只有开始、打全之后又被改的 --read-outcome 点名，真打与接着换完都不在本进程里起 mutation-tables 那一格、打出要另交的命令（查了 39 种）")
+              "结局文件开始到完成写全、被杀的只有开始、打全之后又被改的 --read-outcome 点名，真打与接着换完都不在本进程里起 mutation-tables 那一格、打出要另交的命令（查了 44 种）")
         return 0
     finally:
         import shutil

@@ -11,7 +11,7 @@
 #   --list-items 与「实验号写错」都在建本轮输出目录、truncate 镜像之前判（replay_table_experiments 从本文件原文读复跑表）：
 #   表里没有的实验号（选项只认 --admission-only、--selftest、--list-items）一行都不跑、退 2；裸数字照旧由「没带 E」那一判点名。
 #   每一行一条结果行（实验号、二进制、判定、说明），末尾 REPLAY_TOTAL 一行报派出、收回、现判、复用、拒算与各判定的条数。
-#   弄坏开关 REPLAY_BREAK=unknown-experiment-accepted：表里没有的实验号照收（改前的样子：匹配 0 行、一行都不跑也退 0）。
+#   弄坏开关 REPLAY_BREAK=unknown-experiment-accepted：表里没有的实验号照收（匹配 0 行、一行都不跑也退 0）。
 #
 # 为什么要有它：kb-discipline.md「所有历史数据都只是参考」——每条实测都绑在当时那个
 # 构建上，要拿它支撑新结论，先复跑一遍确认它今天还成立。手工比对会被抄第二遍，所以做成脚本。
@@ -19,11 +19,11 @@
 # 三条完整性闸（command-safety.md「结果抓取要有完整性闸」）：
 #   1. 跑前删本轮输出，不许跨轮复用；
 #   2. 收尾行必须是 `name=done emitted=N`，且 N 必须等于本轮实际 E7RESULT 行数
-#      （口径：emitted 把 config 行与 done 行自己都算进去，2026-08-29 对 8 份入库产物逐份核过）；
+#      （口径：emitted 把 config 行与 done 行自己都算进去）；
 #   3. 退出码非 0 一律判红，不许当成「跑过了」。
 #   三条各有弄坏开关与自证一格（replay_entry_selftest）：闸 1 的删旧记录在 replay_one 里无条件做，自证一格看树里的留存产物先于上一趟取回的那一份；闸 2 的弄坏开关 REPLAY_BREAK=emitted-unchecked、闸 3 的 exit-code-ignored 各配一格。
 #
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」「所有脚本自行编译，完成后自行删除 不再预留生成物」）：调用方没设 CARGO_TARGET_DIR 时，这一趟在
+# 编译目录（自己用完自己删，不预留生成物）：调用方没设 CARGO_TARGET_DIR 时，这一趟在
 #   ${TMPDIR:-/tmp} 下建自己的运行目录 singlefs-replay-build-<进程号>-XXXXXX（scripts/hosts/run-build-directory.sh 的 run_build_directory_begin），
 #   研究工作区（scripts/experiment-apparatus/）与仓根工作区的 cargo 都编进它的 target/（两个工作区的二进制不重名），研究二进制一律从 $REPLAY_RELEASE_DIRECTORY 起；
 #   不再往固定的 scripts/experiment-apparatus/target/、<仓根>/target 编。调用方设了的照它编、不删（相对路径按仓根算）。
@@ -64,12 +64,12 @@
 #   中转目录在这一趟收尾删掉（replay_finish）。服务连不上（replay-row-inputs、library-files 退 75）：整趟退 75，不退回本地、不当库里没有现跑
 #   （弄坏开关 prune-server-failure-swallowed 下不按 75 办，改错的样子）。
 #   不在 git 工作树里（判定库没有名字）退 2；行键整份算不出（replay-row-inputs 退 75 之外的非 0）、中转目录建不了、记录拉不下来（library-files fetch 退 75 之外的非 0）退 1；
-#   都是开跑之前、一行都没跑，不照「不复用、不记」全跑（弄坏开关 row-library-failure-tolerated 下照改前全跑，改错的样子）。只记不删，键不按时限过期。
+#   都是开跑之前、一行都没跑，不照「不复用、不记」全跑（弄坏开关 row-library-failure-tolerated 下照「不复用、不记」全跑）。只记不删，键不按时限过期。
 #   一行判完由 replay_one 在 replay_judge_fresh_product 外面记（remember_row_outcome：判绿的三种记绿，对不上与跑不了记红）；判法不碰库：存库起 admission.py，进了判法闭包每一行的键都拒算。
-#   记红、撤绿、下趟现判（用户 2026-10-29 定案，D13（验证路线）已定项 17）：一行判成对不上（drift，含判据写错）的，照同一把行键记 verdict=drift，盖掉这把键原有的字节一致 / 仅计时不同 / 已归档；下一趟这一行现判、开跑前在 stderr 写「要现跑：上次判红」，不当绿复用，也不进复用哨兵的候选；
+#   记红、撤绿、下趟现判（D13（验证路线） 已定项 17）：一行判成对不上（drift，含判据写错）的，照同一把行键记 verdict=drift，盖掉这把键原有的字节一致 / 仅计时不同 / 已归档；下一趟这一行现判、开跑前在 stderr 写「要现跑：上次判红」，不当绿复用，也不进复用哨兵的候选；
 #   现判又判绿就盖回绿。这一行现跑了而跑不了（broken：装置或驱动退非 0、完整性闸不过、产物头接不上、缺负载字段这几种）照同一种写法记 verdict=broken、撤绿、下一趟现判
 #   （开跑前同样写「要现跑：上次判红」；只在复用哨兵强制现判时碰得到：库里有绿的行别的时候不现跑）。本次不判（负载高）不是判定，不记，也不撤绿
-#   （弄坏开关 red-not-recorded 下对不上的不记、broken-not-recorded 下跑不了的不记，改前的样子）。
+#   （弄坏开关 red-not-recorded 下对不上的不记、broken-not-recorded 下跑不了的不记）。
 #   每一趟末尾打一行 REPLAY_TOTAL dispatched=<派出> collected=<收回> judged=<现判> reused=<复用> refused=<行键拒算> pass= timing_only=
 #     drift= broken= claims_bad= unchanged= load_skipped=（门禁 research-build-and-replay 的 experiment-replay 格读它）。
 #   留存产物不在树里（按「每次提交删上一次的实验记录」归档进了版本库）的行：从 git 历史取回再逐字节比（replay_judge_fresh_product：git log --all --diff-filter=D 找最近一次删它的提交，
@@ -77,11 +77,11 @@
 # E182 的片结果库（E182（被抛弃根读不出的三条岔路）两个段，driver_e182 与 driver_e182_units_kept）：装置读写的是目录、没有缺省的本地库（不设 E182_VERDICT_LIBRARY 退 2），
 #   照两份长跑脚本（scripts/experiment-apparatus/e182-single-device-long-run.sh 文件头「片结果库」）开这一趟自己的中转目录 $OUT_DIR/e182-shards-from-prune-server/<种类>/：
 #   这一趟点到这两个驱动的行时，开跑前经 admission.py library-files fetch 把 prune-server 里那两种（e182-single-device、e182-single-device-units-kept，
-#   库名 <这棵树的 git common-dir>/singlefs-unit-verdicts/<种类>，与长跑脚本同一份）拉进来（全量不拉），两个驱动照 E182_VERDICT_LIBRARY 指到各自那一份，
+#   库名 <这棵树的 git common-dir>/singlefs-unit-verdicts/<种类>，与长跑脚本同一份）拉进来，两个驱动照 E182_VERDICT_LIBRARY 指到各自那一份，
 #   各行收齐之后经 library-files store 并回（replay_store_e182_shards），收尾随 replay_finish 删。fetch 或 store 退 75 整趟退 75，别的非 0 整趟退 1。
 #   拉与并回都在驱动外面做：驱动进行键，驱动里起 admission.py 会连上它的程序入口、这两行的键拒算。
-#   弄坏开关 e182-transit-unset 下两个驱动不设 E182_VERDICT_LIBRARY（改前的样子）。
-# 驱动要读的输入（别的实验的产物、拿来当期望值的留存产物、冻结根、导出根；用户 2026-10-18 定 research/ 可以整个删掉，所以产物缺了是常事）：驱动经 replay_inputs_present 开跑前核。
+#   弄坏开关 e182-transit-unset 下两个驱动不设 E182_VERDICT_LIBRARY。
+# 驱动要读的输入（别的实验的产物、拿来当期望值的留存产物、冻结根、导出根；research/ 可以整个删掉，所以产物缺了是常事）：驱动经 replay_inputs_present 开跑前核。
 #   research/results/ 底下的缺了先从 git 历史取回、放回原处（本趟收尾删掉自己放回去的，replay_finish）；取不回，或冻结根、导出根不在，这一行记「跑不了」（红）：
 #   stderr 里每缺一样一行「✗ 输入不在 test=<这一行> …」，出路在那一行里。冻结根与导出根在固定的位置：工作根下的 replay-frozen-roots/<名>（replay_frozen_root），不经环境变量指。
 #   装置自己读不到输入退 77 并打 NOT_RUN_<原因> test=… 行的（研究一侧 scripts/experiment-apparatus/lib.rs 的 read_archived_products_or_exit_not_run）同样记「跑不了」，
@@ -117,7 +117,7 @@ REPLAY_REPOSITORY_ROOT="$PWD"   # replay_frozen_root 读工作根的库用绝对
 source scripts/hosts/heavy-threads.sh
 REPLAY_BROKEN="${REPLAY_BREAK:-}"   # 弄坏开关（只给 --selftest 证红用），见 replay_selftest 上面那一段
 # 从这里往下载入期执行到的行找不到命令（一句注释丢了 #、写坏的命令名）时，bash 报一句就照样往下跑（脚本不带 set -e）：
-# 记下找不到的命令名，--selftest 最后一格（load-commands-not-found）要它是空的。弄坏开关 load-errors-unchecked：不记（改前的样子）。
+# 记下找不到的命令名，--selftest 最后一格（load-commands-not-found）要它是空的。弄坏开关 load-errors-unchecked：不记。
 # bash 在另一个执行环境里调 command_not_found_handle（改变量带不回来），所以写进一个描述符：开一个临时文件、拿到描述符就删掉文件（不留东西），
 # 处理函数往描述符写，replay_commands_not_found 从 /dev/fd/<号> 从头读回
 replay_not_found_record="$(mktemp "${TMPDIR:-/tmp}/replay-commands-not-found-XXXXXX")" || { echo "  ✗ 建不了临时文件（\$TMPDIR=${TMPDIR:-/tmp}）"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑"; exit 2; }
@@ -130,19 +130,19 @@ command_not_found_handle() {
 }
 replay_commands_not_found() { cat "/dev/fd/$REPLAY_NOT_FOUND_FD" 2>/dev/null; }
 
-# 照写死的清单拷 crates/ 去编译的副本（driver_e175 的仓副本、replay_copy_closure_into 的弄坏开关那一支）都带上每台默认重活线程数的登记文件
+# 照写死的清单拷 crates/ 去编译的副本（只剩 replay_copy_closure_into 的弄坏开关那一支）都带上每台默认重活线程数的登记文件
 # .claude/heavy-thread-default：harness 包经 include_str! 在编译时读它（crates/singlefs-verification/src/heavy_threads.rs），副本里没有就编不过。
 # 拷 crates 的那一行在同一行里接着调它（replay_selftest 的 copy-lines-with-registry 那一格静态核）。在仓根调（脚本开头已 cd 到仓根）。
-# 弄坏开关 REPLAY_BREAK=thread-registry-not-copied：什么都不拷（改前的样子）。
+# 弄坏开关 REPLAY_BREAK=thread-registry-not-copied：什么都不拷。
 copy_thread_registry_into() { # <副本目录>
   [[ "$REPLAY_BROKEN" == thread-registry-not-copied ]] && return 0
   mkdir -p "$1/.claude" && cp -- .claude/heavy-thread-default "$1/.claude/heavy-thread-default"
 }
 
-# 拷今天这棵树去编译的副本（e168_patched_tree 的副本、driver_e171_s4_comparator 的冻结树）：范围取 scripts/hosts/lib_repository_copy.py 的共用清单与闭包
+# 拷今天这棵树去编译的副本（e168_patched_tree 的副本、driver_e171_s4_comparator 的冻结树、driver_e175 的仓副本）：范围取 scripts/hosts/lib_repository_copy.py 的共用清单与闭包
 # （path 依赖的 prune-server/、编译期读的 .claude/heavy-thread-default、运行期起的脚本都在里面），经 scripts/hosts/minimal-copy.py 拷，这里不写清单；
 # 它打的两行进 stderr（驱动的 stdout 是产物）。在仓根调。副本里起命令的，多机配置照 replay_configuration_for_the_copy 交。
-# 弄坏开关 REPLAY_BREAK=copy-list-fixed：照改前写死的那几样拷（共用清单里的四样加登记文件，没有 prune-server/）。
+# 弄坏开关 REPLAY_BREAK=copy-list-fixed：照写死的那几样拷（共用清单里的四样加登记文件，没有 prune-server/）。
 replay_copy_closure_into() { # <副本目录>
   if [[ "$REPLAY_BROKEN" == copy-list-fixed ]]; then
     rsync -a --exclude target Cargo.toml Cargo.lock .cargo crates "$1/" && copy_thread_registry_into "$1"
@@ -152,7 +152,7 @@ replay_copy_closure_into() { # <副本目录>
 }
 
 # 副本里起命令用的多机配置（scripts/hosts/lib_repository_copy.py configuration-path：调用方设了 SINGLEFS_MULTI_HOST_CONFIG 照它，没设取主工作区那一份）：
-# 副本不在 git 里，判法照副本的位置找不到配置。打一行绝对路径。在仓根调。弄坏开关 REPLAY_BREAK=copy-configuration-unset：什么都不打（改前的样子：副本里不交）。
+# 副本不在 git 里，判法照副本的位置找不到配置。打一行绝对路径。在仓根调。弄坏开关 REPLAY_BREAK=copy-configuration-unset：什么都不打（副本里不交）。
 replay_configuration_for_the_copy() {
   [[ "$REPLAY_BROKEN" == copy-configuration-unset ]] && return 0
   python3 scripts/hosts/lib_repository_copy.py configuration-path .
@@ -171,7 +171,7 @@ replay_archived_product_copy() { # <research/results 底下的产物名> <取回
 # 驱动开跑前核它要读的输入。research/results/ 底下缺的先从 git 历史取回、放回原处（记进 $OUT_DIR/restored-archived-products.list，replay_finish 收尾删）；
 # 取不回、或不在 research/results/ 底下（冻结根、导出根）的缺了，每缺一样往 stderr 打一行「✗ 输入不在 test=<这一行> …」，返回 1，这一行记跑不了；都在返回 0。
 # 驱动写成 replay_inputs_present <这一行> <缺了怎么办> <路径…> || return $?，放在编与跑之前。
-# 弄坏开关 REPLAY_BREAK=inputs-not-checked：不核、照起（改前的样子：缺了在装置或比对器里跑不了，或静默少判）。
+# 弄坏开关 REPLAY_BREAK=inputs-not-checked：不核、照起（缺了在装置或比对器里跑不了，或静默少判）。
 replay_inputs_present() { # <这一行> <缺了怎么办> <路径…>
   local row="$1" remedy="$2" path missing=0 commit temporary
   shift 2
@@ -214,12 +214,12 @@ replay_restore_referenced_products() {
 
 # 开跑之前编一次 scripts/experiment-apparatus/ 的装置（在 scripts/experiment-apparatus/ 里跑）：输出落进 $1（构建日志，以 .log 结尾；经 scripts/hosts/two-logs.sh 出两份：
 # $1 是全量，同名的 .problems.log 只收 error、warning: 与它们的位置行、非 0 退出码，行前带全量日志里的行号）。失败时打第一处 error 那一行、日志末尾 20 行、
-# 日志路径、错误警告日志路径与一条单独重现的命令，返回 2；成功什么都不打。弄坏开关 REPLAY_BREAK=build-log-single：只写一份全量日志（改前的样子）。
+# 日志路径、错误警告日志路径与一条单独重现的命令，返回 2；成功什么都不打。弄坏开关 REPLAY_BREAK=build-log-single：只写一份全量日志。
 build_research_binaries() { # <构建日志> [只编这几个 bin…]（不给就整编 research 工作区）
   local log="$1" build_exit bin_options=() name
   shift
   for name in "$@"; do bin_options+=(--bin "$name"); done
-  if [[ "$REPLAY_BROKEN" == build-output-dropped ]]; then   # 弄坏开关：改前的样子，输出丢进 /dev/null、红了只说一句
+  if [[ "$REPLAY_BROKEN" == build-output-dropped ]]; then   # 弄坏开关：输出丢进 /dev/null、红了只说一句
     cargo build --release --manifest-path scripts/experiment-apparatus/Cargo.toml >/dev/null 2>&1 || { echo "replay: 构建失败" >&2; return 2; }
     return 0
   fi
@@ -243,7 +243,7 @@ build_research_binaries() { # <构建日志> [只编这几个 bin…]（不给�
 # 驱动函数开跑前编它要的那一个研究二进制。研究工作区是 scripts/experiment-apparatus/，仓根不是那个工作区（在仓根点那个包再带特性，cargo 拒），
 # 照 build_research_binaries 经 --manifest-path 指过去；cargo 的输出一律进 stderr（驱动的 stderr 是这一行的 .err，stdout 是产物），
 # 编不过另打一句重现命令、返回 1。行键照 --bin 那个名字解到 scripts/experiment-apparatus/ 里那份源码（admission.py 文件头「复跑表每一行的行键」）。
-# 弄坏开关 REPLAY_BREAK=driver-build-output-dropped：改前的样子（不指工作区、输出丢进 /dev/null，.err 是空的）。
+# 弄坏开关 REPLAY_BREAK=driver-build-output-dropped：不指工作区、输出丢进 /dev/null，.err 是空的。
 build_research_driver_binary() { # <特性> <bin 名>
   local features="$1" binary="$2"
   if [[ "$REPLAY_BROKEN" == driver-build-output-dropped ]]; then
@@ -274,7 +274,7 @@ service_gpu_cards_present() {
 # 返回 0：配置没开 GPU（文件不在、没写 ENABLE_GPU、写 0），或开了而 gpu 特性编得过（cargo build --release -p singlefs-verification --features gpu --lib，输出落进 $1）。
 # 返回 78（打 ✗ 与 → 出路）：配置读不出（SINGLEFS_MULTI_HOST_CONFIG 点名的文件不在、文件不可读、读的时候出错、ENABLE_GPU 写了 0、1 之外的值），
 # 或开了 GPU 而 gpu 特性编不过。不悄悄退回不带特性：那样装置会把判段当没编进 gpu 特性、报本次未跑或 panic，复跑结论不是配置要的那一份。
-# 弄坏开关 REPLAY_BREAK=gpu-features-dropped：读配置、编也编，但开了 GPU 也不带特性（改前的样子）。
+# 弄坏开关 REPLAY_BREAK=gpu-features-dropped：读配置、编也编，但开了 GPU 也不带特性。
 # 开了 GPU、试编也过了之后接着核服务交的卡（service_gpu_cards_present）。
 resolve_checker_tier_features() { # <gpu 编译日志>：先读开关、开着再试编与核卡（两步分开的写法见 read_gpu_switch、prepare_checker_tier_features）
   read_gpu_switch "$1" || return $?
@@ -332,7 +332,7 @@ prepare_checker_tier_features() { # <gpu 编译日志>
   local log="$1" configuration_file="${REPLAY_GPU_CONFIGURATION_FILE:-}" build_exit
   CHECKER_TIER_FEATURES=()
   [[ "${REPLAY_GPU_SWITCH:-0}" == 1 ]] || return 0
-  if [[ "$REPLAY_BROKEN" == build-log-single ]]; then   # 弄坏开关：只写一份全量日志（改前的样子）
+  if [[ "$REPLAY_BROKEN" == build-log-single ]]; then   # 弄坏开关：只写一份全量日志
     if cargo build --release -p singlefs-verification --features gpu --lib >"$log" 2>&1; then build_exit=0; else build_exit=$?; fi
   elif bash scripts/hosts/two-logs.sh --quiet "${log%.log}" -- cargo build --release -p singlefs-verification --features gpu --lib; then
     build_exit=0
@@ -355,7 +355,7 @@ prepare_checker_tier_features() { # <gpu 编译日志>
 }
 
 # 复跑表这一行问准入用哪个键：admission.py replay-row-keys 给的（按前三列 实验号|二进制|参数 查 ADMISSION_ROW_KEY），结果放进 ROW_ADMISSION_KEY
-# （不经命令替换带出来）。弄坏开关 REPLAY_BREAK=row-key-by-experiment 下一律用实验号（改前的样子）。
+# （不经命令替换带出来）。弄坏开关 REPLAY_BREAK=row-key-by-experiment 下一律用实验号。
 admission_key_of_row() {
   if [[ "$REPLAY_BROKEN" == row-key-by-experiment ]]; then
     ROW_ADMISSION_KEY="$1"
@@ -447,7 +447,7 @@ load_timing_lag() {
 }
 
 # 同时跑几条实验的缺省：登记的重活默认并行度（.claude/heavy-thread-default，经 scripts/hosts/heavy-threads.sh；SINGLEFS_THREAD_CAP 设了取它）。
-# 弄坏开关 REPLAY_BREAK=jobs-from-nproc 下是改前的样子（核数的一半）。
+# 弄坏开关 REPLAY_BREAK=jobs-from-nproc 下取核数的一半。
 default_replay_jobs() {
   if [[ "$REPLAY_BROKEN" == jobs-from-nproc ]]; then
     echo $(( $(nproc 2>/dev/null || echo 4) / 2 ))
@@ -524,22 +524,22 @@ replay_table_experiments() {
 #     跑绿、编不过、装置开跑之后被 TERM 三种结局之后这一格的 TMPDIR 底下都不剩这一趟的编译目录，调用方给了 CARGO_TARGET_DIR 照它编且不删，
 #     装置在本轮输出目录里造的带 CACHEDIR.TAG 的副本编译目录跑完不在、本轮输出照留
 # 弄坏开关：
-#   REPLAY_BREAK=build-output-dropped  构建输出丢进 /dev/null、红了只说「replay: 构建失败」（改前的样子）
+#   REPLAY_BREAK=build-output-dropped  构建输出丢进 /dev/null、红了只说「replay: 构建失败」
 #       build-red（「✗ 自检：构建失败时应当返回 2、打第一处错」）
 #       连带红的格：「✗ 自检：按行复用 reuse-device-source：改了 E1 装置 main 的一行代码」、「✗ 自检：构建失败时」、「✗ 自检：构建成功时错误警告日志也要在、末行写收了 0 行（build-green.problems.log）；实际：cat: … No s…」
-#   REPLAY_BREAK=build-log-single  构建日志（build.log、gpu-build.log）只写一份全量的（改前的样子：不经 two-logs.sh，没有 .problems.log）
+#   REPLAY_BREAK=build-log-single  构建日志（build.log、gpu-build.log）只写一份全量的（不经 two-logs.sh，没有 .problems.log）
 #       build-two-logs（「✗ 自检：构建失败时应当出两份日志…」）、构建成功那一格的错误警告日志（「✗ 自检：构建成功时错误警告日志也要在、末行写收了 0 行」）
 #   REPLAY_BREAK=gz-read-raw  留存产物 .gz 不解压、原样读（read_stored 的 *.gz 分支退成 cat）
 #       gz-stored-green（「✗ 自检：留存产物 .gz gz-stored-green：…」）
-#   REPLAY_BREAK=driver-build-output-dropped  驱动开跑前编研究二进制不指 scripts/experiment-apparatus 工作区、输出丢进 /dev/null（改前的样子）
+#   REPLAY_BREAK=driver-build-output-dropped  驱动开跑前编研究二进制不指 scripts/experiment-apparatus 工作区、输出丢进 /dev/null
 #       driver-build（「✗ 自检：驱动开跑前编研究二进制（build_research_driver_binary）要经 --manifest-path …」）
 #       与 E162、E163 那三个驱动各一格（「✗ 自检：driver_e162_anchors 开跑前要经 build_research_driver_binary 编…」，driver_e162_power_cut_selftest、driver_e163_r1_merge 同）
 #       连带红的格：「✗ 自检：driver_e162_power_cut_selftest 开跑前要经 build_research_driver_binary…」、「✗ 自检：driver_e163_r1_merge 开跑前要经 build_research_driver_binary 编（cargo 只…」
-#   REPLAY_BREAK=row-key-by-experiment  每一行一律按实验号问准入（改前的样子）
+#   REPLAY_BREAK=row-key-by-experiment  每一行一律按实验号问准入
 #       row-key（「✗ 自检：复跑表那一行指明了准入键 E1/second」）；admission.py --selftest 设着它跑，『复跑表按行的准入键』那几格转红
 #   REPLAY_BREAK=load-field-ignored  不看负载字段：超阈值的与没字段又不在滞后表的，都照判
 #       load-high（「✗ 自检：负载 20.5 / 32 核超过阈值 0.5，这一行应当记本次不判并点名比值」）、load-none（「✗ 自检：收尾行没有字段又不在滞后表，这一行应当判红…」）两格转红
-#   REPLAY_BREAK=gpu-features-dropped  配置开了 GPU 也不带 gpu 特性（改前的样子）
+#   REPLAY_BREAK=gpu-features-dropped  配置开了 GPU 也不带 gpu 特性
 #       gpu-features-on（「✗ 自检：配置写了 ENABLE_GPU=1，应当先试编 gpu 特性…」）
 #   REPLAY_BREAK=run-lines-without-features  自检里核「cargo run 行都带特性数组」时当没有数组（模拟新加的一行忘了带）
 #       run-lines-with-features（「✗ 自检：起 验证包装置的 cargo run 行…应当每一行都带…」）
@@ -547,16 +547,16 @@ replay_table_experiments() {
 #       gpu-service-cards-missing（「✗ 自检：开了 GPU 而环境里没有服务交的 GPU_CARDS_BY_PRIORITY」）
 #   REPLAY_BREAK=run-line-quiesce-wrapped  自检里核「不另套清场」时多塞一行经清场包装起的 cargo run（模拟新加的一行又套了清场）
 #       run-lines-without-quiesce-wrapper（「✗ 自检：起 验证包装置不另套清场」）
-#   REPLAY_BREAK=reuse-ignored  按行复用的判定库只记不读（改前的样子：每一趟全跑）
+#   REPLAY_BREAK=reuse-ignored  按行复用的判定库只记不读（每一趟全跑）
 #       reuse-second-run、reuse-device-source、reuse-comment-only、reuse-three-questions（『✗ 自检：按行复用 <格名>：』）
 #       连带红的格：「✗ 自检：按行复用 reuse-second-run：第二趟行键没变」、「✗ 自检：按行复用 reuse-device-source：改了 E1 装置 main 的一行代码」、「✗ 自检：按行复用 reuse-comment-only：只改 E2 装置源码的一行注释」、「✗ 自检：按行复用 reuse-three-questions：reuse-three-questions：① 同一份输入跑两趟：第二趟现判…」
 #   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库 scripts/gate/lib_reuse_checks.py 的开关）  哨兵被现判不红
 #       reuse-sentinel（「✗ 自检：按行复用 reuse-sentinel：」）
-#   REPLAY_BREAK=red-not-recorded  对不上的行不记红（改前的样子：只记绿，判红的不撤同一把行键原有的绿）
+#   REPLAY_BREAK=red-not-recorded  对不上的行不记红（只记绿，判红的不撤同一把行键原有的绿）
 #       reuse-red-withdraws-green（「✗ 自检：按行复用 reuse-red-withdraws-green：」）
-#   REPLAY_BREAK=broken-not-recorded  现跑了而跑不了的行不记红（改前的样子：不撤同一把行键原有的绿，下一趟照复用）
+#   REPLAY_BREAK=broken-not-recorded  现跑了而跑不了的行不记红（不撤同一把行键原有的绿，下一趟照复用）
 #       reuse-broken-withdraws-green（「✗ 自检：按行复用 reuse-broken-withdraws-green：」）
-#   REPLAY_BREAK=row-library-failure-tolerated  按行复用的库没法用（不在 git 工作树里、行键整份算不出、中转目录建不了、记录拉不下来）时只打一句、往下全跑（改前的样子）
+#   REPLAY_BREAK=row-library-failure-tolerated  按行复用的库没法用（不在 git 工作树里、行键整份算不出、中转目录建不了、记录拉不下来）时只打一句、往下全跑
 #       reuse-outside-git-exits-2（「✗ 自检：按行复用 reuse-outside-git-exits-2：」）
 #   REPLAY_BREAK=prune-server-failure-swallowed  判定库服务连不上（replay-row-inputs、library-files 退 75）不按 75 办（照别的失败退出或照记不下往下跑），不退 75
 #       reuse-unreachable-exits-75（「✗ 自检：按行复用 reuse-unreachable-exits-75：」）
@@ -564,9 +564,9 @@ replay_table_experiments() {
 #       reuse-first-run（「✗ 自检：按行复用 reuse-first-run：」：键不经准入模块算，判定库那两份不带组成清单）、
 #       reuse-device-source（「✗ 自检：按行复用 reuse-device-source：」）
 #       连带红的格：「✗ 自检：按行复用 reuse-three-questions：reuse-three-questions：③ 改闭包里一个函数单元：闭包含…」
-#   REPLAY_BREAK=gpu-for-every-run  开了 GPU 时要现跑的行一律当要卡（改前的样子：不看 admission.py replay-row-inputs 第 4 列，有行要现跑就试编 gpu 特性、要服务交的卡）
+#   REPLAY_BREAK=gpu-for-every-run  开了 GPU 时要现跑的行一律当要卡（不看 admission.py replay-row-inputs 第 4 列，有行要现跑就试编 gpu 特性、要服务交的卡）
 #       reuse-gpu-only-for-feature-rows（「✗ 自检：按行复用 reuse-gpu-only-for-feature-rows：」）
-#   REPLAY_BREAK=build-everything  有行要现跑时一律整编（改前的样子：不按要现跑的行只编那几个 bin）
+#   REPLAY_BREAK=build-everything  有行要现跑时一律整编（不按要现跑的行只编那几个 bin）
 #       reuse-device-source（「✗ 自检：按行复用 reuse-device-source：」）
 #   REPLAY_BREAK=archived-restore-off  留存产物不在树里也不从 git 历史取回（replay_archived_product_copy 一律取不回）
 #       archived-retrieved-green（「✗ 自检：留存产物取回 archived-retrieved-green：」）
@@ -575,26 +575,26 @@ replay_table_experiments() {
 #       「✗ 自检：按行复用 reuse-three-questions：」、「✗ 自检：按行复用 last-run-list：」、「✗ 自检：留存产物取回 device-not-run-red：」、「✗ 自检：入口与完整性闸 integrity-previous-output：」
 #   REPLAY_BREAK=unrecoverable-as-green  取不回的留存产物当字节一致（改错的样子）
 #       archived-unrecoverable-red（「✗ 自检：留存产物取回 archived-unrecoverable-red：」）
-#   REPLAY_BREAK=inputs-not-checked  驱动开跑前不核输入、照起（改前的样子）
+#   REPLAY_BREAK=inputs-not-checked  驱动开跑前不核输入、照起
 #       驱动开跑前核输入那二十五格（「✗ 自检：driver_e142 在没有 research/、冻结根与导出根都没给的目录里」）
 #       连带红的格：「✗ 自检：driver_e170_r2_v2_487_z3_images 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e170_r2_v2_487_z4_images 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s2_images_o3 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s2_o3_control_baseline 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s2_comparator 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s3_comparator_mutations 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s4_comparator 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s4_f4_comparator 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e171_s4_f4_substitutes_comparator 在没有 research/、冻结根与导出根都没给…」、「✗ 自检：driver_e171_r1_s1_revision_6_comparator 在没有 research/、冻结根与导出根都没给的…」、「✗ 自检：driver_e171_r1_s1_revision_6_cross_host_check 在没有 research/、冻结根与导…」、「✗ 自检：driver_e171_r1_s2_revision_6_comparator 在没有 research/、冻结根与导出根都没给的…」、「✗ 自检：driver_e174_simulated_judge 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e174_segment_one_judge 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e174_segment_two_judge 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e158_r3_seg1_compare 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e158_r4_compare 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e165_segment2 在没有 research/、冻结根与导出根都没给的目录里」、「✗ 自检：driver_e165_r3_segment3_root_choice_kill_bounds 在没有 research/、冻结根…」、「✗ 自检：driver_e165_r4_segment2_root_choice_faults_kill_bounds 在没有 resear…」、「✗ 自检：driver_e165_r5_segment2_r2_mode_kill_bounds 在没有 research/、冻结根与导出根…」、「✗ 自检：driver_e165_r5_segment2_r3_mode_kill_bounds 在没有 research/、冻结根与导出根…」、「✗ 自检：driver_e165_r5_segment2_r4_mode_kill_bounds 在没有 research/、冻结根与导出根…」、「✗ 自检：driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds 在没有 research…」
-#   REPLAY_BREAK=thread-registry-not-copied  拷 crates/ 去编译的副本不带 .claude/heavy-thread-default（改前的样子）
+#   REPLAY_BREAK=thread-registry-not-copied  拷 crates/ 去编译的副本不带 .claude/heavy-thread-default
 #       thread-registry-copied（「✗ 自检：拷 crates/ 去编译的副本要带上每台默认重活线程数的登记文件…」）
 #   REPLAY_BREAK=copy-lines-without-registry  自检里核「拷 crates 的行都接着拷登记文件」时当没有那一句（模拟新加的一行忘了带）
 #       copy-lines-with-registry（「✗ 自检：拷 crates/ 去编译的行…应当每一行都接着 copy_thread_registry_into…」）
-#   REPLAY_BREAK=copy-list-fixed  拷今天这棵树去编译的副本（e168_patched_tree、driver_e171_s4_comparator）照写死的四样加登记文件拷，不取共用库的闭包（改前的样子：没有 prune-server/）
+#   REPLAY_BREAK=copy-list-fixed  拷今天这棵树去编译的副本（e168_patched_tree、driver_e171_s4_comparator、driver_e175）照写死的四样加登记文件拷，不取共用库的闭包（没有 prune-server/）
 #       copies-take-the-shared-closure（「✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全…」）
-#   REPLAY_BREAK=copy-configuration-unset  副本里起命令不交多机配置（改前的样子：副本不在 git 里，照副本的位置找不到配置）
+#   REPLAY_BREAK=copy-configuration-unset  副本里起命令不交多机配置（副本不在 git 里，照副本的位置找不到配置）
 #       copy-configuration-from-the-main-tree（「✗ 自检：副本里起命令的多机配置要取主工作区那一份…」）
-#   REPLAY_BREAK=build-directory-kept  收尾不删这一趟自己建的编译目录与运行目录（改前的样子：编进固定的 scripts/experiment-apparatus/target/，跨趟留着）
+#   REPLAY_BREAK=build-directory-kept  收尾不删这一趟自己建的编译目录与运行目录（编进固定的 scripts/experiment-apparatus/target/，跨趟留着）
 #       build-directory-removed-when-green、build-directory-removed-when-build-fails、build-directory-removed-when-stopped、
 #       copy-build-directories-removed（这一格也核 TMPDIR 底下不剩）（『✗ 自检：编译目录 <格名>：』）
 #       连带红的格：「✗ 自检：编译目录 build-directory-removed-when-green：跑绿」、「✗ 自检：编译目录 build-directory-removed-when-build-fails：编不过」、「✗ 自检：编译目录 build-directory-removed-when-stopped：装置开跑之后给副本发 TERM」、「✗ 自检：编译目录 copy-build-directories-removed：装置在本轮输出目录里造的副本编译目录（带 CACHEDIR…」
 #   REPLAY_BREAK=term-not-forwarded  被停时 replay_one 不把 TERM 转给手里那一步（装置照跑、开着编译目录里的文件，编译目录删不掉）
 #       build-directory-removed-when-stopped（「✗ 自检：编译目录 build-directory-removed-when-stopped：」）
-#   REPLAY_BREAK=copy-build-directories-kept  收尾不删驱动在本轮输出目录里的副本编出来的编译目录（改前的样子）
+#   REPLAY_BREAK=copy-build-directories-kept  收尾不删驱动在本轮输出目录里的副本编出来的编译目录
 #       copy-build-directories-removed（「✗ 自检：编译目录 copy-build-directories-removed：」）
-#   REPLAY_BREAK=guard-off  平常跑设了弄坏开关也不拒（改前的样子：认不得的选项先被「复跑表里没有」当用法错拒，不点名变量）
+#   REPLAY_BREAK=guard-off  平常跑设了弄坏开关也不拒（认不得的选项先被「复跑表里没有」当用法错拒，不点名变量）
 #       break-switch-refused-outside-selftest（「✗ 自检：平常跑设了弄坏开关应当退 2 并点名」）
 # 弄坏开关 REPLAY_BREAK 只在 --selftest 起的那几趟里认（自证设 REPLAY_SELFTEST_MARK 指到它建的标记文件，子进程继承）：平常跑设了就在一切之前退 2、点名它只在自证里认。
 # 按行复用的自证（文件头「按行复用」，replay_selftest 调）：<目录> 下建一个临时仓（git init），复跑表换成两行（E1 留存产物在、E2 的留存产物只在 git 历史里），
@@ -605,7 +605,7 @@ replay_table_experiments() {
 # 两个假 research 二进制往 $REPLAY_SELFTEST_RUN_LOG 记一笔，REPLAY_SELFTEST_NOT_RUN_DEVICE 点名它时打一行 NOT_RUN_SAMPLE_INPUT 退 77；
 # REPLAY_SELFTEST_BROKEN_DEVICE 点名它时往 stderr 打一句、退 3（跑不了）。
 # 设了 REPLAY_SELFTEST_DEVICE_HOLD 的，先建旁边那个 .fifo、再把自己的进程号写进它点名的文件，之后在 fifo 上 read -t 8 拿住 8 秒（开着编译目录里自己那份脚本）：
-# 写下进程号之后不再起子进程：TERM 只停装置自己，它 fork 出来、还没 exec 的子进程照样开着同一份脚本，副本收尾核开着的文件时就不删编译目录（改前一趟趟起 sleep 0.1 的样子）。
+# 写下进程号之后不再起子进程：TERM 只停装置自己，它 fork 出来、还没 exec 的子进程照样开着同一份脚本，副本收尾核开着的文件时就不删编译目录（所以不一趟趟起 sleep 0.1）。
 replay_selftest_sample_repository() { # <目录>
   local work="$1" real_root="$PWD" root name
   root="$work/root"
@@ -813,7 +813,7 @@ replay_reuse_selftest() {
     echo "reuse-broken-withdraws-green bad 同一把行键 E1 先字节一致入库、哨兵强制现判跑成跑不了（退 3），下一趟应当现判 E1（只起 e1、开跑前写上次判红、判回字节一致）、E2 复用，再下一趟两行全复用；垫的那一趟退 $broken_primed_exit；强制现判那一趟退 $broken_run_exit；下一趟退 $broken_rejudge_exit、起了「$broken_rejudge_ran」、$(grep -F 'E1 要现跑' "$broken_rejudge_out" | head -n 1 | cut -c1-200 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)；再下一趟退 $reuse_exit、起了「$(ran)」、$total"
   fi
   # 不在 git 工作树里（文件头「按行复用」，reuse-outside-git-exits-2）：另搭一棵样本仓、删掉它的 .git（样本仓在临时目录里，往上找不到别的仓），跑一趟：
-  # 整趟应当退 2、点名不是 git 工作树、一个装置都不起、不打 REPLAY_TOTAL。弄坏开关 row-library-failure-tolerated（照改前不复用、不记、全跑）让它往下跑；这一格只接这一个开关
+  # 整趟应当退 2、点名不是 git 工作树、一个装置都不起、不打 REPLAY_TOTAL。弄坏开关 row-library-failure-tolerated（不复用、不记、全跑）让它往下跑；这一格只接这一个开关
   local outside_break="" first_root="$root"
   [[ "$REPLAY_BROKEN" == row-library-failure-tolerated ]] && outside_break=row-library-failure-tolerated
   replay_selftest_sample_repository "$work/outside-git-cell" || return 1
@@ -845,7 +845,7 @@ replay_reuse_selftest() {
   # 开了 GPU 只在要现跑的行里有要卡的行时才试编、要服务交的卡（文件头「GPU」，reuse-gpu-only-for-feature-rows）：另搭一棵样本仓，复跑表加一行
   # E3|@replay_selftest_gpu_driver（驱动闭包点到 CHECKER_TIER_FEATURES，admission.py replay-row-inputs 第 4 列给 1），多机配置写 ENABLE_GPU=1、环境里 GPU_CARDS_BY_PRIORITY 是空的：
   # 只跑 E1 E2（都不点）整趟退 0、两行都起、cargo 一次 --features gpu 都没收到、stderr 写「都不点 CHECKER_TIER_FEATURES」；只跑 E3 退 78、点名 GPU_CARDS_BY_PRIORITY、一个装置都不起。
-  # 弄坏开关 gpu-for-every-run（要现跑的行一律当要卡，改前的样子）让只跑 E1 E2 那一趟退 78；这一格只接这一个开关
+  # 弄坏开关 gpu-for-every-run（要现跑的行一律当要卡）让只跑 E1 E2 那一趟退 78；这一格只接这一个开关
   local gpu_break="" gpu_plain_exit gpu_plain_out gpu_plain_ran gpu_plain_cargo
   [[ "$REPLAY_BROKEN" == gpu-for-every-run ]] && gpu_break=gpu-for-every-run
   replay_selftest_sample_repository "$work/gpu-cell" || return 1
@@ -1162,19 +1162,19 @@ replay_build_directory_selftest() {
   fi
 }
 
-#   REPLAY_BREAK=jobs-from-nproc  同时跑几条实验的缺省取核数的一半（改前的样子）
+#   REPLAY_BREAK=jobs-from-nproc  同时跑几条实验的缺省取核数的一半
 #       jobs-default（「✗ 自检：没设 REPLAY_JOBS 时同时跑几条实验要取登记的重活默认」）
-#   REPLAY_BREAK=unknown-experiment-accepted  表里没有的实验号照收（改前的样子）
+#   REPLAY_BREAK=unknown-experiment-accepted  表里没有的实验号照收
 #       unknown-experiment（「✗ 自检：入口与完整性闸 unknown-experiment：」）
 #   REPLAY_BREAK=emitted-unchecked  闸 2 不核收尾行的 emitted= 与实收条数
 #       integrity-emitted（「✗ 自检：入口与完整性闸 integrity-emitted：」）
 #   REPLAY_BREAK=exit-code-ignored  闸 3 不看装置的退出码
 #       integrity-exit-code（「✗ 自检：入口与完整性闸 integrity-exit-code：」）
 #       连带红的格：「✗ 自检：留存产物取回 device-not-run-red：E1 的装置退 77 应当记跑不了、退出码 77」
-#   REPLAY_BREAK=e182-transit-unset  driver_e182 与 driver_e182_units_kept 起装置时不设 E182_VERDICT_LIBRARY（改前的样子：装置删了缺省本地库之后退 2）
+#   REPLAY_BREAK=e182-transit-unset  driver_e182 与 driver_e182_units_kept 起装置时不设 E182_VERDICT_LIBRARY（装置删了缺省本地库之后退 2）
 #       e182-transit 两个驱动各一格（「✗ 自检：driver_e182 起装置时要把 E182_VERDICT_LIBRARY 设成这一趟的中转目录」
 #       「✗ 自检：driver_e182_units_kept 起装置时要把 E182_VERDICT_LIBRARY 设成这一趟的中转目录」）
-#   REPLAY_BREAK=load-errors-unchecked  command_not_found_handle 不记找不到的命令（改前的样子：载入期一句注释丢了 # 只在 stderr 打一句、自证照判通过）
+#   REPLAY_BREAK=load-errors-unchecked  command_not_found_handle 不记找不到的命令（载入期一句注释丢了 # 只在 stderr 打一句、自证照判通过）
 #       load-commands-not-found 的第二格（「✗ 自检：现调一个不存在的命令，command_not_found_handle 应当记下它的名字」）
 replay_selftest() {
   local scratch failures=0 checked=0 status problems_last_line
@@ -1427,12 +1427,13 @@ replay_selftest() {
     failures=$((failures + 1))
   fi
   # 拷今天这棵树去编译的副本照共用库的闭包拷全（replay_copy_closure_into）：lib_repository_copy.py entries 列的每一条（path 依赖的 prune-server/、
-  # 编译期读的 .claude/heavy-thread-default、运行期起的脚本）在副本里都在；e168_patched_tree 与 driver_e171_s4_comparator 都经它拷
-  local closure_entries closure_entry closure_missing="" patched_tree_definition frozen_tree_definition positive_controls_definition
-  # 驱动定义在这个函数被调用之后才读到：从本文件里取出那三段定义，落进变量再比（管道收尾的 grep -q 在 pipefail 下会把命中读成没命中）
+  # 编译期读的 .claude/heavy-thread-default、运行期起的脚本）在副本里都在；e168_patched_tree、driver_e171_s4_comparator 与 driver_e175 都经它拷
+  local closure_entries closure_entry closure_missing="" patched_tree_definition frozen_tree_definition positive_controls_definition repository_copy_definition
+  # 驱动定义在这个函数被调用之后才读到：从本文件里取出那四段定义，落进变量再比（管道收尾的 grep -q 在 pipefail 下会把命中读成没命中）
   patched_tree_definition="$(awk '/^e168_patched_tree\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   frozen_tree_definition="$(awk '/^driver_e171_s4_comparator\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   positive_controls_definition="$(awk '/^driver_e168_positive_controls\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
+  repository_copy_definition="$(awk '/^driver_e175\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   checked=$((checked + 1))
   closure_entries="$(python3 scripts/hosts/lib_repository_copy.py entries . | awk -F'\t' '/^REPOSITORY_COPY entry /{ sub(/^REPOSITORY_COPY entry /, "", $1); print $1 }')"
   replay_copy_closure_into "$scratch/closure-tree" 2>"$scratch/closure-tree.err"
@@ -1440,11 +1441,11 @@ replay_selftest() {
     [[ -z "$closure_entry" || -e "$scratch/closure-tree/$closure_entry" ]] || closure_missing+=" $closure_entry"
   done <<<"$closure_entries"
   if [[ -z "$closure_entries" || -n "$closure_missing" || "$patched_tree_definition" != *replay_copy_closure_into* \
-        || "$frozen_tree_definition" != *replay_copy_closure_into* ]]; then
-    echo "  ✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全（lib_repository_copy.py entries 列的 $(grep -c . <<<"$closure_entries") 条都在，e168_patched_tree 与 driver_e171_s4_comparator 都经 replay_copy_closure_into 拷）；副本里缺的：${closure_missing:- 没有}；$(tail -n 2 "$scratch/closure-tree.err" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"  # gate-lint:detail
+        || "$frozen_tree_definition" != *replay_copy_closure_into* || "$repository_copy_definition" != *replay_copy_closure_into* ]]; then
+    echo "  ✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全（lib_repository_copy.py entries 列的 $(grep -c . <<<"$closure_entries") 条都在，e168_patched_tree、driver_e171_s4_comparator 与 driver_e175 都经 replay_copy_closure_into 拷）；副本里缺的：${closure_missing:- 没有}；$(tail -n 2 "$scratch/closure-tree.err" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"  # gate-lint:detail
     failures=$((failures + 1))
   fi
-  rm -rf -- "$scratch/closure-tree"
+  rm -rf -- "${scratch:?}/closure-tree"
   # 副本里起命令的多机配置取主工作区那一份（replay_configuration_for_the_copy）：没设 SINGLEFS_MULTI_HOST_CONFIG 时打 <主工作区>/multi-host.env，设了的照原样；
   # driver_e168_positive_controls 在副本里起 cargo 之前把它交给 SINGLEFS_MULTI_HOST_CONFIG
   local configuration_unset configuration_given main_tree
@@ -1676,7 +1677,7 @@ source scripts/hosts/run-build-directory.sh
 REPLAY_BUILD_RUN_DIRECTORY=""
 # 驱动在本轮输出目录（$OUT_DIR）里拷 crates/ 去编的副本编出来的编译目录（文件头「编译目录」）：逐个找带签名对得上的 CACHEDIR.TAG（不跟符号链接、不出这个文件系统），
 # 经 scripts/hosts/run_build_directory.py remove 删（删之前核本机没有进程开着里面的文件，有就不删、报出进程，交回 1）；调用方给的 CARGO_TARGET_DIR 落在里面的不碰。
-# 弄坏开关 REPLAY_BREAK=copy-build-directories-kept：不删（改前的样子）
+# 弄坏开关 REPLAY_BREAK=copy-build-directories-kept：不删
 replay_remove_copy_build_directories() {
   local marker directory output failed=0
   [[ -d "${OUT_DIR:-}" && "$REPLAY_BROKEN" != copy-build-directories-kept ]] || return 0
@@ -1692,7 +1693,7 @@ replay_remove_copy_build_directories() {
   return "$failed"
 }
 # 收尾（EXIT）：正常结束、出错、被停都走到这里。删不成（有进程开着、删完回读还在、运行目录删完编译目录之后不是空的）的，本来要退 0 的改退 1。
-# 弄坏开关 REPLAY_BREAK=build-directory-kept：这一趟自己的编译目录与运行目录不删（改前的样子）
+# 弄坏开关 REPLAY_BREAK=build-directory-kept：这一趟自己的编译目录与运行目录不删
 replay_finish() {
   local status=$? problems=0
   trap - EXIT TERM INT
@@ -2052,6 +2053,10 @@ E187|e187-quarantine-mark-cost|segment-two|e187-quarantine-mark-cost-segment-two
 E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out|exact
 E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact
 E199|e199-transaction-output-copy||e199-transaction-output-copy-2026-11-05-r2.out|exact
+E205|@driver_e205||e205-c971-inverted-first-txg-arm-costs-six-cells.out|exact
+E205|@driver_e205_torn_rotation||e205-c971-inverted-first-txg-arm-costs-torn-rotation.out|exact
+E205|@driver_e205_first_txg_skips_s8||e205-c971-inverted-first-txg-arm-costs-first-txg-skips-s8.out|exact
+E205|@driver_e205_first_txg_skips_s4_s16||e205-c971-inverted-first-txg-arm-costs-first-txg-skips-s4-s16.out|exact
 TSV
 )
 
@@ -2090,12 +2095,11 @@ check_claims() {
   local exp="$1" f="$2" bad=0 v w x y
   case "$exp" in
   E17)
-    # kb 记的是 29.9–31.8M 条目/秒（八轮独立运行：2026-08-28 起四轮、2026-09-16 四轮）。
+    # kb 记的是 29.9–31.8M 条目/秒（八轮独立运行）。
     # 留 1% 余量给机器状态波动，超出就是该改 kb 那个区间了。
-    # ⚠️ **下界 2026-09-16 从 30591000 放到 29636000**：当天四轮里三轮落在旧下界之外
-    # （29.94 / 30.10 / 30.47 / 30.71M），不是一次抖动，所以按八轮的并集改区间。
-    # 放宽的依据是那四轮的读数本身，不是为了让门禁变绿——同一天的并行加速与阳性对照
-    # 一起偏低，而装置不记录跑时的机器负载，「漂移还是被别的负载挤」这一轮分不开，
+    # 下界 29636000 按八轮读数的并集定（最低一轮 29.94M），不是为了让门禁变绿：
+    # 同一批读数里并行加速与阳性对照一起偏低，
+    # 而装置不记录跑时的机器负载，「漂移还是被别的负载挤」分不开，
     # 账在 C350（计时实验不记录跑时的机器负载）。
     v=$(grep 'arm=single' "$f" | sed -n 's/.*entries_per_s=\([0-9]*\).*/\1/p')
     claim E17 "单线程合并吞吐（条目/秒）" "$v" 29636000 32118000 || bad=1
@@ -2151,8 +2155,8 @@ check_claims() {
     fi
     ri=$(grep 'name=verdict pair=inode ' "$f" | sed -n 's/.*ratio_median=\([0-9.]*\).*/\1/p')
     rl=$(grep 'name=verdict pair=ledger ' "$f" | sed -n 's/.*ratio_median=\([0-9.]*\).*/\1/p')
-    # ⚠️ **inode 那一对不钉方向。** 2026-09-10 四整轮里三轮判 `0/5 jia_never_slower`、
-    # 第四轮判 `5/5 jia_slower_every_round`，方向相反 ⇒ kb 记的是「不稳定」，没有方向可钉。
+    # ⚠️ **inode 那一对不钉方向。** 四整轮里三轮判 `0/5 jia_never_slower`、
+    # 另一轮判 `5/5 jia_slower_every_round`，方向相反 ⇒ kb 记的是「不稳定」，没有方向可钉。
     # 钉任何一边都是把一条不稳定的观测写成断言。这里只把观测值打出来，不判绿也不判红。
     # 真正兜着它的是上面那一步**逐字节结构比对**：`strip_timing` 有意不抹 `verdict=` 与
     # `rounds_jia_slower=`（它们是结论不是计时）⇒ 判决再翻一次，那一步就判红。
@@ -2198,7 +2202,7 @@ check_claims() {
     claim E58 "阳性对照：内核记的字节 ÷ (ops×G)" "$x" 0.98 1.02 || bad=1 ;;
   E140)
     # kb 的承重结论：含头随机页读比补齐慢 7.7%–9.1%，顺序读补齐少 7.6%–9.2% 带宽。复跑用的是种子 1、装置默认 ops 8192 的单轮，
-    # 抽样比第三轮少，区间按第三轮五个种子的极差再各放 5 个百分点。
+    # 抽样比 kb 记的五个种子那一轮少，区间按那五个种子的极差再各放 5 个百分点。
     v=$(grep 'name=verdict' "$f" | sed -n 's/.*r_rand_qd1=\([0-9.]*\).*/\1/p')
     claim E140 "随机 4 KiB 页读：含头是补齐的几倍" "$v" 1.03 1.15 || bad=1
     w=$(grep 'name=verdict' "$f" | sed -n 's/.* r_seq=\([0-9.]*\).*/\1/p')
@@ -2243,7 +2247,7 @@ check_claims() {
 }
 
 # E9 的入库产物是 25 次运行拼起来的（5 种子 × 5 改名档），而这个循环从没被写进 kb。
-# 2026-08-29 审计时按产物里的 config 行反推出来，重建结果与入库产物**逐字节一致**。
+# 按产物里的 config 行反推出来，重建结果与入库产物**逐字节一致**。
 # 25 次调用整条包一层（不是每次调用各包一层）：省掉 24 次多余的 systemd scope 建立。
 driver_e9() {
   bash -c '
@@ -2258,7 +2262,7 @@ driver_e9() {
 
 # E139（按盘回退下界的收严形态） 第 3 次重跑（重跑登记 `research/prompts/e139-r3-prereg.md` 第六节第 2 行「旧行回归」、第十一节比对对象表 #1）：
 # 比对对象是第 2 次产物 e139-tightened-floor-2026-10-05.out。今天的装置不带参数跑一遍，删掉第 3 次新加的 core_gate_*、verdict_core_gate_* 行与
-# name=done 行，按删剩的行数补回 name=done，要与第 2 次产物逐字节相同（2026-10-29 在第 3 次产物 e139-tightened-floor-2026-10-29.out 上照这个过滤量过：
+# name=done 行，按删剩的行数补回 name=done，要与第 2 次产物逐字节相同（在第 3 次产物 e139-tightened-floor-2026-10-29.out 上照这个过滤量过：
 # sha256 f4c079adc75abcd8c44765c160088c0a2650746a05619af8c07ba56662575135，与第 2 次产物相同）。第 3 次产物整份由复跑表里 E139 的装置行 exact 比。
 # E139 没有单元表：单元名是这个函数里的字符串字面量，登记在 .claude/gate.d/replay-comparison-units.tsv；第 2 次产物归档出工作区时这一行从 git 历史取回再比。
 driver_e139() {
@@ -2301,7 +2305,7 @@ driver_e139() {
 # （S7：改动前后 29 行 `name=device_region_bytes` 逐字节相同），`driver_e142` 本身不用改；
 # 存盘文件名从 `-r16-combined.out` 改成 `-r17-main.out`（登记步③给的文件名）。
 # 臂 N15 参照是第十六次跑步①的产物，放在 research/results/ 下、可以被归档删掉：不在时这一行记跑不了（文件头「驱动要读的输入」），不编、不跑。
-# E142 的层 0 主臂枚举不设变量就跑（按键复用），复跑表里没有单独的第二段；准入键 E142/layer0 的同一趟前提（.claude/gate.d/stage-inputs.tsv 那一行的 same-run-field=）由准入模块自己判。
+# E142 的崩溃点重放 主臂枚举不设变量就跑（按键复用），复跑表里没有单独的第二段；准入键 E142/layer0 的同一趟前提（.claude/gate.d/stage-inputs.tsv 那一行的 same-run-field=）由准入模块自己判。
 driver_e142() {
   local impl_snapshot="$OUT_DIR/e142-crates-write-dump.tmp"
   local arm_n15_reference="research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out"
@@ -2320,17 +2324,17 @@ driver_e142_p8g_crates_dump() {
 }
 
 # E156（入库装置，跑前登记「一」读法写死第 1 行；重跑登记 `research/prompts/e156-r2-prereg.md`「五、5.7」
-# 第一、二、三段都在同一个二进制里，产物是累计的：2026-09-24 stage2.out 前 324 行是第一段（岔路 7），
+# 第一、二、三段都在同一个二进制里，产物是累计的：stage2.out 前 324 行是第一段（岔路 7），
 # 之后是第二段（岔路 3，run_hf_single_cell）与第三段（岔路 1，run_hh_cell）新加的行。
-# stage3.out（2026-09-24，重跑登记「十二」修订这一段）在 stage2.out 的基础上追加：Q1 诊断溯源
+# stage3.out（重跑登记「十二」修订这一段）在 stage2.out 的基础上追加：Q1 诊断溯源
 # （`q1_delta_debug`／已回收未覆盖记录过滤，见修订）、岔路 1 的 S = 4 第二个几何取样点（`q1_hh`／
 # `q1d_*` 的 `s=` 字段、`anchor_k8`、`q1_geometry_sensitivity_s`）、K9 前提现核（`k9_precondition`）；
 # 在 stage2.out 原有的 329 行共有格式上逐字节相同（`e156-s4/report.md` 的对拍命令），Q3e（X8-A）仍
-# `status=not_done`，未做。stage4.out（2026-09-24，续派第二段）在 stage3.out 的基础上追加：岔路 1
+# `status=not_done`，未做。stage4.out（续派第二段）在 stage3.out 的基础上追加：岔路 1
 # 步数对齐对照（`q1_step_matched_diff`，`run_hh_cell` 新增 `matched_to_holes` 参数）、岔路 3 的
 # Q3e（X8-A/HY，`run_x8a_cell`，独立 128 槽小池）与 Q3d（`q3d_derived`）；在 stage3.out 原有的 323 行
 # （K1/legal_state/s1d_step/Q7 全家/PC-检查三条/HK-HR-H0 构造）共有格式上逐字节相同。
-# r3.out（2026-09-25，第 3 次重跑登记 `research/prompts/e156-r3-prereg.md`：分配记录树按位置寻址之后
+# r3.out（第 3 次重跑登记 `research/prompts/e156-r3-prereg.md`：分配记录树按位置寻址之后
 # 重算钉着旧布局的常量）在 stage4.out 的基础上结构性改动，不是逐字节追加：分配记录树不再是单节点，
 # 装置里的三处常量与另外六处改成第七节 7.2 算出的闭式与绝对值（K1-1 第 1 项 13→17、β0 走读引用 12→16、
 # S1(c) 隔离槽数 34→54，其余变成随「这次改动的记录落在几片叶」现算的闭式，不再是常数）；新增
@@ -2342,12 +2346,12 @@ driver_e142_p8g_crates_dump() {
 # 的比对命令与判定表见交回报告；核心结论：岔路 1（Q1d 在 S = 4 上从「单调」变「不单调」）与岔路 7
 # （`q7d2_min_item5` 从「非 0」变「= 0」，F16 从「触发」变「不触发」）判定变了，岔路 3（Q3c/Q3e/K9）
 # 在已核的量上不变。
-# fork7-selfproof.out（2026-09-25，续派，E156 第 3 次重跑登记「十二」修订 4）在 r3.out 的基础上加
+# fork7-selfproof.out（续派，E156 第 3 次重跑登记「十二」修订 4）在 r3.out 的基础上加
 # 一个第 10 个基底 `beta_hr_rollback_row`：r3.out 的 `q7d2_min_item5` 第一次在可达状态上读到
-# `min_item5=0 family=HR kind=rollback_row txg=76`（此前 7 个可达基底第 5 项最小是 1），这里把这一步
+# `min_item5=0 family=HR kind=rollback_row txg=76`（其余 7 个可达基底第 5 项最小是 1），这里把这一步
 # 也捕成一个基底、并入既有的 `bases` 数组（9→10），让已有的 Q7a/Q7c①②/PC-检查循环再跑一遍，不改
 # `q7c_self_test` 的公式、不新写判定逻辑。核心结论：Q7c① 在这个基底上第一次转色（`q7c1_not_subtracting_defer
-# basis=beta_hr_rollback_row … flips_red_to_green=true`）——此前只有不可达的 β_syn 转过色；`basis_count`
+# basis=beta_hr_rollback_row … flips_red_to_green=true`）——另外只有不可达的 β_syn 转过色；`basis_count`
 # 9→10，`q7a_summary` 的 `all_red_count` 18→20（该基底 delta=1/8 各命中一次），`q7c1_flip_seen`/
 # `q7c2_flip_seen` 字面不变（β_syn 已经让它们是 true）。在 r3.out 原有的 1076 行共有格式上逐字节相同，
 # 只在旧的 `q7a_summary`/`integrity` 两行与新增 9 行（`basis_snapshot`/`q7a` ×3/`q7c1`/`q7c2`/
@@ -2357,13 +2361,13 @@ driver_e142_p8g_crates_dump() {
 # 与第二段（Hh(k, 位置, S, ρ) 38 条排得下的历史 × 「实」「每」两个回收时点、Q1c/Q1c-洞/Q1c-前/Q1c-后/Q1d、PC-多扣/洞/分配器/判定器）；
 # 第一段任一停机条款触发就只出第一段（`name=stage_two_not_run`）。不是在 fork7-selfproof.out 上追加，两份没有共同格式。
 # 整个装置就活在 crates/singlefs-verification 里，没有 scripts/experiment-apparatus 侧的配对二进制，先例同 E142（第 371 行注释）——
-# 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-25 现查：
+# 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（现查：
 # 这一段的产物两次跑出 `cmp` 逐字节一致）。
 # 2026-10-05.out（第 5 次重跑登记 `research/prompts/e156-r5-prereg.md`）：core 在分配器没装根环表而记了一条根时断言（C551），装置的
 # PC-分配器 撤了、换成 PC-钉门槛（格表里 Hh(1, 后, S, ρ) 六格的两份滞后集合交 k = 0 的 A10 判定，打 `name=pc_pinned_floor` 七行）；
 # `v2_pc_allocator_seen` 换名 `v2_pc_pinned_floor_seen`。与 2026-09-26-r2.out 在新 crates/ 上规范化之后有 294 行不同（登记 Q2b；
 # `…-2026-10-05-attribution-without-31-1.out` 是副本里反打 31-1 那一块的归属跑，与本份逐字节相同，不进这里），r2 那一份留着、不再登记。
-# 2026-10-05-r2.out（第 6 次重跑登记 `research/prompts/e156-r6-prereg.md`）：回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽
+# 2026-10-05-r2.out（第 6 次重跑登记 `research/prompts/e156-r6-prereg.md`）：回收门槛照乙读（挂载时读回全零的根环槽
 # 钉在它可能住过的最旧 txg，直到这个进程写掉那一槽），K10 守门、「每」列与锚点模型同改；新加 `name=all_zero_pins_at_mount`、
 # `name=all_zero_pin_cell`、`name=all_zero_pin_summary` 三种行，已有行格式不变。产物用仓根 `target/release/` 的二进制跑（debug 一遍约 13 分钟，
 # 子 agent 前台跑不完）；debug 二进制前 1803 行与之逐字节相同，整份 debug 复跑由这一行的 exact 比对。`…-2026-10-05-all-zero-pin-removed.out`
@@ -2376,26 +2380,26 @@ driver_e142_p8g_crates_dump() {
 # 用 `--release`（产物用 release 二进制跑出来，debug 整份要几小时）。核对用的锚点输入与脚本在 `…-2026-10-18-support/`，不进这里。
 # E161（崩溃放量的去重与分段耗时）登记档（登记 5.5 的 `segment-one`）：入库装置 `segment-one` 模式；可行性档 `feasibility` 是缩域（只验能跑能用，产物写 not_judged，不当正式产物），复跑表不跑它。
 # crates 的崩溃点重放枚举（S3、S4 对拍时调的）往标准输出打 LAYER0_* 进度行（带墙钟秒数），产物只留 E7RESULT 行。
-# 计时字段一律以 _elapsed_ns 或 _ratio 结尾，按 timing 比结构；PC3 的判定行随计时可能翻，翻了是新观测。线程数钉 31（第 3 次重跑登记 research/prompts/e161-r3-prereg.md J-8 与第十四节：登记值，产物 config 行记 threads=，timing 比法不去这个字段，2026-10-23 之前钉 10）；内存额度由 task-server 给，驱动里不套内存包装。
+# 计时字段一律以 _elapsed_ns 或 _ratio 结尾，按 timing 比结构；PC3 的判定行随计时可能翻，翻了是新观测。线程数钉 31（第 3 次重跑登记 research/prompts/e161-r3-prereg.md J-8 与第十四节：登记值，产物 config 行记 threads=，timing 比法不去这个字段）；内存额度由 task-server 给，驱动里不套内存包装。
 driver_e161_segment_one() {
   (set -o pipefail && E161_THREADS=31 cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e161_crash_state_dedup_and_time_split -- segment-one | grep '^E7RESULT ')
 }
 
 # E165（恢复重放有界穷举与变异杀伤界）第一段（登记 `research/prompts/e165-preregistration.md` 5.5）：入库装置，只跑合法历史一族
 # （`--family legal`；对抗一族停在登记停机条款 H4，见登记第十二节修订 7，数没入库）。装置另打 `E7TIMING` 耗时行，产物只留 E7RESULT 行；
-# 计数与线程数无关（10 线程与 7 线程两遍逐字节相同），线程数钉 10。
+# 计数与线程数无关（10 线程与 7 线程两遍逐字节相同），线程数不钉、装置取每台默认重活线程数（.claude/heavy-thread-default）。
 driver_e165() {
-  (set -o pipefail && E165_THREADS=10 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal | grep '^E7RESULT ')
 }
-# 第一段对抗一族（登记修订第 9 条收窄 H4 之后，2026-10-01 入库；16 线程与 7 线程两遍逐字节相同）。
+# 第一段对抗一族（登记修订第 9 条收窄 H4 之后入库；16 线程与 7 线程两遍逐字节相同）。
 driver_e165_adversarial() {
-  (set -o pipefail && E165_THREADS=10 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial | grep '^E7RESULT ')
 }
-# 第二段（第 2 次重跑 r2 登记 `research/prompts/e165-r2-prereg.md` 5.6、9.1–9.5，补跑 2c）：26 个变体各一份副本、各编一次，整段约 15 分钟（2026-10-02 同机负载 12–30，--jobs 2 --threads 4；26 个变体都跑，估计 15 至 20 分钟，没整轮量过）。
+# 第二段（第 2 次重跑 r2 登记 `research/prompts/e165-r2-prereg.md` 5.6、9.1–9.5，补跑 2c）：26 个变体各一份副本、各编一次，整段约 15 分钟（同机负载 12–30，--jobs 2 --threads 4；26 个变体都跑，估计 15 至 20 分钟，没整轮量过）。
 # 驱动在副本里改 recovery.rs、自己经内存包装跑每个二进制，这里不再包一层。产物里每行的复跑命令写的是 research/results/ 下的路径，
 # 这里的输出落在临时目录，比对前把两个文件名换回那个写法；红例账的 sha256 在产物的 name=verdict 行里，账一字不差才对得上。
 # 驱动的 REGISTERED 钉的是第四段冻结根的表（`crates/mutations.tsv` 9d5fd9fc…）与 recovery.rs、lib.rs 的哈希，主工作区的 crates/ 变了它就停在 RH1，
-# 所以复跑要 --root 指冻结根：原先默认 /tmp/claude-1000/e165-r2-segment4/root（已丢，现在没有默认、不在记跑不了；清单与建法见登记 r2 修订 4，第 819–820 行一带），那份没了就照修订 4 重建一份、
+# 所以复跑要 --root 指冻结根：没有默认、不在记跑不了（清单与建法见登记 r2 修订 4，第 819–820 行一带），那份没了就照修订 4 重建一份、
 # 放到固定位置（工作根下 replay-frozen-roots/e165-r2-segment4）；根里要有 scripts、scripts/mutation/tables、第一段 r2 的 segment1b 两份产物与 .claude/scripts/preflight.sh。
 # 驱动 --selftest 不带 --root；这一份基线是 1373 行（修订 4 挪了三项自检之后），同一棵根上复得出，别的树复不出来先对冻结根清单。
 driver_e165_segment2() {
@@ -2407,7 +2411,7 @@ driver_e165_segment2() {
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --root "$frozen_root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out" \
-      --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-red-examples.tsv" --jobs 2 --threads 4 >&2) || return 1
+      --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-red-examples.tsv" >&2) || return 1
   sed -e 's#--output e165-#--output research/results/e165-#' -e 's#--ledger e165-#--ledger research/results/e165-#' \
     "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out"
 }
@@ -2416,27 +2420,27 @@ driver_e165_segment2() {
 # （`/tmp/claude-1000/e165-r5-segment1/root`，清单 `root-manifest-at-start.sha256`，sha256 95237ecf…）上编出的二进制、7 线程跑的；第 2 次重跑的旧产物
 # （`…-2026-10-02-r2-segment3-multi-disk-2026-10-02.out`、`…-2026-10-02-r2-segment4-*.out`）留着，今天的装置在 J7a 两格上复不出它们（根环那条线 7-2 改了施加规则，登记 r5 PF2）。
 # 这里在主工作区上 `cargo run`：`crates/` 里的文件主工作区与第一段根可能不同（别的会话在改），那样复出来对不上是新观测，先对着第一段根的清单查。
-# 计数与线程数无关（第 2 次重跑多盘一族 8 与 4 线程两遍逐字节相同），线程数钉 8。
+# 计数与线程数无关（第 2 次重跑多盘一族 8 与 4 线程两遍逐字节相同），线程数不钉、装置取每台默认重活线程数（.claude/heavy-thread-default）。
 driver_e165_r2_segment3_multi_disk() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_legal() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r2 --table both | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_adversarial() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r2 --table both | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_table_both_multi_disk() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 --table both | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 --table both | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_reversed_disk_order_legal() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --only R --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --only R --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
 }
 driver_e165_r2_segment4_reversed_disk_order_multi_disk() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
 }
 # 第 3 次重跑（登记 `research/prompts/e165-r3-prereg.md`）：`--profile r3`，入库装置；第一段是对抗一族按「同一实例里 journal 记录的 txg 随计数器不减」拆行（5.6），
-# 第二段是择根与重放合判一族 `--family root_choice`（5.3、5.5），计数与线程数无关（两段都是 8 与 4 线程两遍整份逐字节相同），线程数钉 8。
+# 第二段是择根与重放合判一族 `--family root_choice`（5.3、5.5），计数与线程数无关（两段都是 8 与 4 线程两遍整份逐字节相同），线程数不钉、装置取每台默认重活线程数（.claude/heavy-thread-default）。
 # 对抗一族那一行指的产物是第 5 次重跑第一段（登记 `research/prompts/e165-r5-prereg.md` 比对对象表第 14 行，主 agent 认定第 4 条）在第一段根
 # （`/tmp/claude-1000/e165-r5-segment1/root`，清单 sha256 95237ecf…）上编出的二进制跑的；第 3 次重跑第一段的旧产物（`…-2026-10-02-r3-segment1-adversarial-family.out`）留着，
 # 今天的装置在 J7a 分配记录树根那一格上复不出它。择根那一行由第 7 次重跑（KA → KL，登记 `research/prompts/e165-r7-prereg.md` 5.6 H9）改指
@@ -2446,26 +2450,26 @@ driver_e165_r2_segment4_reversed_disk_order_multi_disk() {
 # 这里在主工作区上 `cargo run`，`crates/` 里的文件（别的会话在改）与两份根可能不同，复出来对不上是新观测，先对着根的清单查（对抗一族：第 5 次第一段
 # `root-manifest-at-start.sha256`；择根：先核主工作区的装置是不是 25a298d8…，再查 `crates/` 别处的改动）。
 driver_e165_r3_segment1_adversarial() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r3 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r3 | grep '^E7RESULT ')
 }
 driver_e165_r3_segment2_root_choice() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice --profile r3 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice --profile r3 | grep '^E7RESULT ')
 }
 # 第 6 次重跑（登记 `research/prompts/e165-r6-prereg.md`）：入库装置，`--profile r3 --family legal`（偶数卸载记号、直接建表、盘次序照常），r3 档合法一族的正式跑，
-# J6Qn 与 J7 五行的阳性对照在这一档只在这一跑里出。产物是 2026-10-09 开工那一刻主工作区 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝
+# J6Qn 与 J7 五行的阳性对照在这一档只在这一跑里出。产物是开工那一刻主工作区 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝
 # （~/.local/share/singlefs/work/e165-r6-runner/root，清单 `root-manifest-at-start.sha256`，340 个文件，清单 sha256 56d52a1c…）上编出的二进制跑的；
-# 计数与线程数无关（8 与 4 线程两遍整份逐字节相同，`…-r6-r3-legal-family-threads-second.out`），线程数钉 8。同一份根上的 r2 合法一族只当比较对象，不登记复跑。
+# 计数与线程数无关（8 与 4 线程两遍整份逐字节相同，`…-r6-r3-legal-family-threads-second.out`），线程数不钉、装置取每台默认重活线程数（.claude/heavy-thread-default）。同一份根上的 r2 合法一族只当比较对象，不登记复跑。
 # 这里在主工作区上 `cargo run`，`crates/` 里的文件（别的会话在改）与那份根可能不同，复出来对不上是新观测，先对着根的清单查。
 driver_e165_r6_r3_legal() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r3 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r3 | grep '^E7RESULT ')
 }
 # 第 3 次重跑第三段（登记 `research/prompts/e165-r3-prereg.md` 5.8、9.1、9.3）：变体 1822–1827 各一份副本、各编一次，驱动带 --profile r3 调装置
 # （--profile r3 --bounds segment1 --family root_choice），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层；
 # 产物里每行的复跑命令写的 --output 是产物的文件名（--root 指冻结根时驱动只写 basename，不管产物落在哪），这里的输出落在临时目录，同样只写 basename，原样比，不做替换。
 # 驱动的 REGISTERED_R3 钉的是第二段冻结根的 recovery.rs、lib.rs、crates/mutations.tsv 的哈希与两个函数的区间，主工作区的 crates/ 变了它就停在 RH1，
-# 所以复跑要 --root 指冻结根：原先默认 /tmp/claude-1000/e165-r3-segment2/root（已丢，现在没有默认、不在记跑不了；清单 `segment2-root-after-overlay.sha256`，233 个文件），那份没了就照登记第十二节修订 2 的第 10 条重建一份、
+# 所以复跑要 --root 指冻结根：没有默认、不在记跑不了（清单 `segment2-root-after-overlay.sha256`，233 个文件），那份没了就照登记第十二节修订 2 的第 10 条重建一份、
 # 放到固定位置（工作根下 replay-frozen-roots/e165-r3-segment2）。TV7 的比对对象是脚本所在的仓里的第二段产物（research/results/e165-replay-bounded-enumeration-2026-10-03-r3-segment2-root-choice.out）。
-# 整段（基线两遍加变体六个，每个冷编一次再跑一遍 70 秒量级的装置）的用时跑之前没量过；--jobs × --threads 不超过 6，只在提交时由主 agent 跑。
+# 整段（基线两遍加变体六个，每个冷编一次再跑一遍 70 秒量级的装置）的用时跑之前没量过；驱动不给 --jobs、--threads（照驱动的缺省：1 份、每份取每台默认重活线程数），只在提交时由主 agent 跑。
 driver_e165_r3_segment3_root_choice_kill_bounds() {
   local scratch="$OUT_DIR/e165-r3-segment3"
   # 根在固定的位置（replay_frozen_root e165-r3-segment2，工作根下 replay-frozen-roots/e165-r3-segment2），不经环境变量指；根不在，这一行记跑不了（文件头「驱动要读的输入」），不报本次未跑
@@ -2474,11 +2478,11 @@ driver_e165_r3_segment3_root_choice_kill_bounds() {
   replay_inputs_present "${FUNCNAME[0]}" "冻结根：照登记 research/prompts/e165-r3-prereg.md 第十二节修订 2 的第 10 条重建一份（清单 segment2-root-after-overlay.sha256，233 个文件）、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r3-segment2，replay_frozen_root 取）" "$frozen_root" || return $?
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r3 --root "$frozen_root" --scratch "$scratch" \
-      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out"
 }
 # 第 4 次重跑第一段（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6、第七节与修订 1、2）：入库装置，`--profile r4 --family root_choice_faults`，
-# 带读故障的择根合判一族（KF、KF3、KF9、KFW、KG、KA；闸取实现的取甲）。计数与线程数无关（6 与 3 线程两遍整份逐字节相同，线程数钉 8）；整遍峰值 RSS 约 1.7 GB，
+# 带读故障的择根合判一族（KF、KF3、KF9、KFW、KG、KA；闸取实现的取甲）。计数与线程数无关（6 与 3 线程两遍整份逐字节相同，线程数不钉、取每台默认重活线程数）；整遍峰值 RSS 约 1.7 GB，
 # 产物是第一段根（`/tmp/claude-1000/e165-r4-segment1b/root`，清单 `root-manifest-after-overlay.sha256`）上编出的二进制跑的；
 # 这里在主工作区上 `cargo run`，`crates/` 里别的文件（别的会话在改，尤其 `mount.rs`、`transaction.rs`：条款改取 R2 之后实现一落地，这一族要重跑、产物会变）与那份根可能不同，
 # 复出来对不上是新观测，先对着根清单查。
@@ -2486,14 +2490,14 @@ driver_e165_r3_segment3_root_choice_kill_bounds() {
 # （与 r3 档 KL 出自同一个生成函数），KL 那几行之外与第 4 次的旧产物（`…-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out`，留着）逐字节相同，
 # 汇总行状态数差 −98（登记 L2、B4）。二进制同 r3 择根那一行的第 7 次产物（装置 25a298d8…，二进制 ce552d8d…，31 线程），复不出时先核主工作区的装置是不是 25a298d8…。
 driver_e165_r4_segment1_root_choice_faults() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 | grep '^E7RESULT ')
 }
 # 第 4 次重跑第二段（登记 `research/prompts/e165-r4-prereg.md` 9.1、9.3 与修订 3）：变体 v1822–v1827（在根里的 `crates/mutations.tsv` 按第一列的名字选行）各一份副本、各编一次，
 # 驱动带 --profile r4 调装置（--profile r4 --bounds segment1 --family root_choice_faults），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层。
 # 驱动的 R4_REGISTERED 钉的是第一段根的 recovery.rs、lib.rs、crates/mutations.tsv 的哈希与两个函数的区间，主工作区的 crates/ 变了它就停在开工核对，
-# 所以复跑要 --root 指第一段根：原先默认 /tmp/claude-1000/e165-r4-segment1b/root（已丢，现在没有默认、不在记跑不了；清单 `root-manifest-after-overlay-final.sha256`，246 个文件），那份没了就照登记第十二节修订 2 的「根」条重建一份、
+# 所以复跑要 --root 指第一段根：没有默认、不在记跑不了（清单 `root-manifest-after-overlay-final.sha256`，246 个文件），那份没了就照登记第十二节修订 2 的「根」条重建一份、
 # 放到固定位置（工作根下 replay-frozen-roots/e165-r4-segment1b）。TV7 的比对对象是脚本所在的仓里的第一段产物（research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out）。
-# 内存额度由统一任务服务给，这里不写上限（第一段整遍峰值约 1.66 GB；登记修订 3 记着 2026-10-03 第一趟限 4G、--jobs 2 时 tsv-1823 撞顶退 250，补跑限 8G 才得出结果）；--jobs 2 --threads 3，整轮约 10 分钟
+# 内存额度由统一任务服务给，这里不写上限（第一段整遍峰值约 1.66 GB；登记修订 3 记着第一趟限 4G、--jobs 2 时 tsv-1823 撞顶退 250，补跑限 8G 才得出结果）；那一次 --jobs 2 --threads 3、整轮约 10 分钟，这里不给这两项（驱动缺省 1 份、每份取每台默认重活线程数）
 # （第二段那一次变体各编各跑 130 秒量级，开头收尾基线各 66 秒量级），只在提交时由主 agent 跑。
 # 产物里每行的复跑命令写的 --output 是产物的文件名（--root 指第一段根时驱动只写 basename），这里的输出落在临时目录，同样只写 basename，原样比。
 driver_e165_r4_segment2_root_choice_faults_kill_bounds() {
@@ -2504,15 +2508,15 @@ driver_e165_r4_segment2_root_choice_faults_kill_bounds() {
   replay_inputs_present "${FUNCNAME[0]}" "第一段根：照登记 research/prompts/e165-r4-prereg.md 第十二节修订 2 的「根」条重建一份（清单 root-manifest-after-overlay-final.sha256，246 个文件）、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r4-segment1b，replay_frozen_root 取）" "$frozen_root" || return $?
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r4 --root "$frozen_root" --scratch "$scratch" \
-      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out"
 }
 # 第 5 次重跑第二段（登记 `research/prompts/e165-r5-prereg.md` 5.6、9.1、9.3）：驱动三个模式加 `--pins r5`，变体同第 2–4 次（r2 模式 27 个变体、r3 / r4 模式各 7 个），
 # r2 模式另落红例账。驱动的 R5_PINS 钉的是第 5 次第一段根的 recovery.rs、lib.rs、crates/mutations.tsv 的哈希与函数区间，主工作区的 crates/ 变了它就停在开工核对，
-# 所以复跑要 --root 指那份根：原先默认 /tmp/claude-1000/e165-r5-segment1/root（已丢，现在没有默认、不在记跑不了；主工作区当时的 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝，清单
+# 所以复跑要 --root 指那份根：没有默认、不在记跑不了（主工作区当时的 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝，清单
 # `root-manifest-at-start.sha256`，291 个文件，清单 sha256 95237ecf…），那份没了就照登记第十一节「根、清单、在哪编」重建一份、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r5-segment1）。
 # 自造表、内存包装与 V7 / TV7 的比对对象（第 5 次第一段的重跑产物）取脚本所在的仓。产物里每行的复跑命令写的 --output / --ledger 是文件名，这里原样比，不做替换。
-# 内存额度由统一任务服务给，这里不写上限（那一次限的是 r2、r4 模式 8G，r3 模式 1G）；线程照那一次 --jobs 2 --threads 3；用时那一次 r3 约 10 分钟、r4 约 15 分钟、r2 约 20 分钟量级（`-timing.out`），只在提交时由主 agent 跑。
+# 内存额度由统一任务服务给，这里不写上限（那一次限的是 r2、r4 模式 8G，r3 模式 1G）；那一次 --jobs 2 --threads 3，这里不给这两项（驱动缺省 1 份、每份取每台默认重活线程数）；用时那一次 r3 约 10 分钟、r4 约 15 分钟、r2 约 20 分钟量级（`-timing.out`），只在提交时由主 agent 跑。
 driver_e165_r5_segment2_r2_mode_kill_bounds() {
   local scratch="$OUT_DIR/e165-r5-segment2-r2"
   # 根在固定的位置（replay_frozen_root e165-r5-segment1，工作根下 replay-frozen-roots/e165-r5-segment1），不经环境变量指；根不在，这一行记跑不了（文件头「驱动要读的输入」），不报本次未跑
@@ -2522,7 +2526,7 @@ driver_e165_r5_segment2_r2_mode_kill_bounds() {
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --pins r5 --root "$root" --scratch "$scratch" \
       --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-kill-bounds.out" \
-      --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-red-examples.tsv" --jobs 2 --threads 3 >&2) || return 1
+      --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-red-examples.tsv" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-kill-bounds.out"
 }
 driver_e165_r5_segment2_r3_mode_kill_bounds() {
@@ -2533,7 +2537,7 @@ driver_e165_r5_segment2_r3_mode_kill_bounds() {
   replay_inputs_present "${FUNCNAME[0]}" "第一段根：照登记 research/prompts/e165-r5-prereg.md 第十一节「根、清单、在哪编」重建一份（主工作区当时的 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝，清单 root-manifest-at-start.sha256，291 个文件，清单 sha256 95237ecf…）、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r5-segment1，replay_frozen_root 取）" "$root" || return $?
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r3 --pins r5 --root "$root" --scratch "$scratch" \
-      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r3-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r3-mode-kill-bounds.out" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r3-mode-kill-bounds.out"
 }
 driver_e165_r5_segment2_r4_mode_kill_bounds() {
@@ -2544,7 +2548,7 @@ driver_e165_r5_segment2_r4_mode_kill_bounds() {
   replay_inputs_present "${FUNCNAME[0]}" "第一段根：照登记 research/prompts/e165-r5-prereg.md 第十一节「根、清单、在哪编」重建一份（主工作区当时的 Cargo.toml、Cargo.lock、.cargo/、crates/ 的拷贝，清单 root-manifest-at-start.sha256，291 个文件，清单 sha256 95237ecf…）、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r5-segment1，replay_frozen_root 取）" "$root" || return $?
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --root "$root" --scratch "$scratch" \
-      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r4-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r4-mode-kill-bounds.out" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r4-mode-kill-bounds.out"
 }
 # 第 5 次重跑第三段（登记 5.3、5.4，`--profile r5`：记录后三项照 D23（journal 的角色与格式） 已定项 15 生成，J8 五行）与第五段 5-甲（修订 1，`--profile r4
@@ -2552,33 +2556,33 @@ driver_e165_r5_segment2_r4_mode_kill_bounds() {
 # （第三段根 /tmp/claude-1000/e165-r5-segment3/root，装置 f72fc1a4…，清单 `root-manifest-after-overlay.sha256`；5-甲 的根 …/root5，装置 8006b251…，清单 sha256 47c6d349…）。
 # 主工作区今天的装置是 8006b251…；5-甲 的二进制在 5-甲 的根上重跑第三段的合法历史那一份整份逐字节相同（`…-r5-segment5-profile-check.out` 的 pv13 行），另外四份没在它上面重跑过。
 # 这里在主工作区上 `cargo run`，`crates/` 里别的文件（别的会话在改）与那两份根可能不同，复出来对不上是新观测，先对着根清单查。
-# 计数与线程数无关（合法历史、对抗两族 7 与 3 线程逐字节相同；R2 一族 7 与 3 线程逐字节相同，`…-threads-second.out`），线程数钉 8；R2 一族整遍峰值没读到。
+# 计数与线程数无关（合法历史、对抗两族 7 与 3 线程逐字节相同；R2 一族 7 与 3 线程逐字节相同，`…-threads-second.out`），线程数不钉、取每台默认重活线程数；R2 一族整遍峰值没读到。
 # 第 7 次重跑（KA → KL，登记 `research/prompts/e165-r7-prereg.md` 5.6 H9）起 5-甲 那一行改指 `…-2026-10-23-r7-r5-gate-r2-root-choice-faults.out`：KA 换成照落点公式摆根的 KL，
 # KL 那几行之外与 5-甲 的旧产物（`…-2026-10-04-r5-segment5-r2-gate-root-choice-faults.out`，留着）逐字节相同，汇总行状态数差 −98（登记 L2、B4）；
 # 二进制同 r3 择根那一行的第 7 次产物（装置 25a298d8…，二进制 ce552d8d…，31 线程，8G 跑完），复不出时先核主工作区的装置是不是 25a298d8…。
 driver_e165_r5_segment3_legal() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_adversarial() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_multi_disk() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r5 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r5 | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_odd_marker_legal() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 --marker-parity odd | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r5 --marker-parity odd | grep '^E7RESULT ')
 }
 driver_e165_r5_segment3_odd_marker_adversarial() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 --marker-parity odd | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r5 --marker-parity odd | grep '^E7RESULT ')
 }
 driver_e165_r5_segment5_r2_gate_root_choice_faults() {
-  (set -o pipefail && E165_THREADS=8 cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 --gate r2 | grep '^E7RESULT ')
+  (set -o pipefail && cargo run -q --release -p singlefs-verification --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 --gate r2 | grep '^E7RESULT ')
 }
 # 第 5 次重跑第五段 5-乙（登记修订 1 修1.九乙）：驱动 r4 模式 `--pins r5 --gate r2`，变体 v1822–v1827 在 R2 那一族上各编各跑。驱动的 R5_GATE_R2_PINS 钉的是 5-甲 的根
 # （/tmp/claude-1000/e165-r5-segment3/root5：第一段根盖上装置 8006b251… 与 crates/mutations.tsv c9a03eb4…，清单 `root5-manifest-after-overlay.sha256`，sha256 47c6d349…），
 # 那份没了就照登记修1.十一「根、清单、在哪编」重建一份、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r5-segment3-root5）；TV7 的比对对象是脚本所在的仓里的 `…-r5-segment5-r2-gate-root-choice-faults.out`。
 # 那一次第一趟 8G、--jobs 2 时 tsv-1812 撞顶退 250，第二趟 16G 只补了它（登记修1.十一；两趟的驱动日志与计时各一份 `…-first-pass-*.out`、`…-second-pass-*.out`）；
-# 这里不设内存上限（由统一任务服务定，撞顶由服务放大重排），驱动照那一次的 --jobs 2 --threads 3 一趟跑全部变体。
+# 这里不设内存上限（由统一任务服务定，撞顶由服务放大重排），驱动不给 --jobs、--threads（缺省 1 份、每份取每台默认重活线程数）一趟跑全部变体。
 # 产物里每行的复跑命令写的 --output 是文件名、--root 写的是「<第一段根>」字样（驱动的写法，实际指的是 5-甲 的根），这里原样比。只在提交时由主 agent 跑。
 driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds() {
   local scratch="$OUT_DIR/e165-r5-segment5b"
@@ -2588,20 +2592,20 @@ driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds() {
   replay_inputs_present "${FUNCNAME[0]}" "5-甲 的根：照登记 research/prompts/e165-r5-prereg.md 修1.十一「根、清单、在哪编」重建一份（清单 root5-manifest-after-overlay.sha256，sha256 47c6d349…）、核过清单，放到固定位置（工作根下 replay-frozen-roots/e165-r5-segment3-root5，replay_frozen_root 取）" "$root" || return $?
   mkdir -p "$scratch/out"
   (bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r4 --pins r5 --gate r2 --root "$root" --scratch "$scratch" \
-      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out" >&2) || return 1
   cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out"
 }
 
 # E168（删除借保留量的环窗口）第一段（登记 `research/prompts/e168-preregistration.md` 5.0、5.8、第十一节 S1、S2 与第十二节修订 1–17）：入库装置
 # `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`。装置的行以 `E name=` 开头、收尾 `E name=done`，不用 E7RESULT 协议：
 # 照 driver_e163_r1_merge 的先例在驱动里包一层（e168_wrap：行首 `E name=` 换成 `E7RESULT name=`，收尾行补 `emitted=`），入库产物就是包过的样子，
-# 换回去与装置的原样输出逐字节相同（2026-10-03 四份逐份核过）。
+# 换回去与装置的原样输出逐字节相同（四份逐份核过）。
 # s1-history 在主工作区上跑（不调删除入口）。positive-controls 与 segment1 要删除入口，主工作区那一份是桩、一调就打停机行退 3，
 # positive-controls 在临时目录里拷一份 `crates/`、套删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`
-# （每行旧串恰好命中一次，不中就整行跑不了：登记停机条款 S2）再编、跑（先例：driver_e165_segment2 在副本里改了再编）。segment1 一遍约 9 小时、36G，不进登记表（用户 2026-10-03 定），复跑照实验页「复跑」那一节手工步骤、由用户点名跑。
-# 入库产物是 2026-10-03 那一次（第一段 r8）在当时主工作区 `crates/` 的快照上编、跑的，快照逐文件的 sha256 在
-# `e168-delete-ring-window-borrow-segment1-tree-2026-10-03.sha256`（不含补丁表）；之后别的会话改过 `crates/singlefs-core/` 里的几份文件
-# （extent_tree.rs、records.rs、recovery.rs 等），今天复出来对不上是新观测，先对着那份清单查。
+# （每行旧串恰好命中一次，不中就整行跑不了：登记停机条款 S2）再编、跑（先例：driver_e165_segment2 在副本里改了再编）。segment1 一遍约 9 小时、36G，不进登记表，复跑照实验页「复跑」那一节手工步骤、由用户点名跑。
+# 入库产物是第一段 r8 那一次在当时主工作区 `crates/` 的快照上编、跑的，快照逐文件的 sha256 在
+# `e168-delete-ring-window-borrow-segment1-tree-2026-10-03.sha256`（不含补丁表）； `crates/singlefs-core/` 里的几份文件
+# （extent_tree.rs、records.rs、recovery.rs 等）会随主工作区变，今天复出来对不上是新观测，先对着那份清单查。
 # 计数与线程数无关（单测 segment_one_on_p2_s4_prints_the_same_lines_on_one_thread_and_on_eight_threads），线程数照那一次钉 4、P4 的片一次一片。
 # positive-controls 峰值约 15 GB，s1-history 峰值约 2.3 GB，
 # 只在提交时由主 agent 跑。
@@ -2631,12 +2635,12 @@ driver_e168_positive_controls() {
   local tree="$OUT_DIR/e168-positive-controls-tree" configuration
   e168_patched_tree "$tree" || return 1
   configuration="$(replay_configuration_for_the_copy)" || return 1
-  (cd "$tree" && unset CARGO_TARGET_DIR && export SINGLEFS_MULTI_HOST_CONFIG="$configuration" && set -o pipefail && E168_THREADS=4 E168_LARGE_SLICE_THREADS=1 cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e168_delete_ring_window_borrow -- positive-controls | e168_wrap)
+  (cd "$tree" && unset CARGO_TARGET_DIR && export SINGLEFS_MULTI_HOST_CONFIG="$configuration" && set -o pipefail && E168_LARGE_SLICE_THREADS=1 cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e168_delete_ring_window_borrow -- positive-controls | e168_wrap)
 }
 
 # E170（O3规约执行器第一版）第 2 次重跑（登记 `research/prompts/e170-r2-prereg.md` 5.5「复跑行」、12.6、12.11 方案甲；取舍由主 agent 定，
-# 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 22 批）。今天的导出装置照 `crates/` 写 487 字节记录头，读 311 的第一代执行器与第 1 次重跑执行器
-# 那几行（第一代的坏状态导出、Q3 比对器、Q2 比对器、变异表，第 1 次重跑的 Q2 比对器）在今天的格式下没有对应物，已从这张表删掉，历史在 git 里。
+# 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 22 批）。今天的导出装置照 `crates/` 写 487 字节记录头，读 311 的第一代执行器与第 1 次重跑执行器（history-kept: 批号是调度记录里的登记位，只用来指出处）
+# 那几行（第一代的坏状态导出、Q3 比对器、Q2 比对器、变异表，第 1 次重跑的 Q2 比对器）在今天的格式下没有对应物，不在这张表里。
 # 九行：导出装置自己的两趟（`dump --compare-with`、`bad-states-second-run`），v2-487、v1-487 的单测与单测层变异（纯 Python），
 # v2-487 判今天现导的 Z1（批 1–3）、Z3、Z4（造法照登记 12.6 与读法 13，种子 85441ae491419411 照抄）。v2（311）那几份不进复跑。
 # 导出分两组、各造一次，同组的几行共用（flock 排着，复跑是并发起的；造好留完成标记，后来的直接用）：
@@ -2893,7 +2897,7 @@ driver_e171_s3_comparator_mutations() {
   grep '^E7RESULT ' "$scratch/mutations.out"
 }
 # E171 s4 整表（登记修订 5）：第二段比对器那一串前置（基线两趟、E170 导出装置 dump 与 bad-states、已知坏镜像、关一条两趟、冻结执行器在基线与坏镜像上、
-# 阳性对照四条在基线与空变异各一趟），加修过的逐行驱动跑全部 117 行（两条线道、每条 2 线程，各趟都从同一份冻住的树拍快照）与 Q3-核三趟，再出比对器。
+# 阳性对照四条在基线与空变异各一趟），加逐行驱动跑全部 117 行（两条线道、每条 2 线程，各趟都从同一份冻住的树拍快照）与 Q3-核三趟，再出比对器。
 # 推的挂钟约两小时（s4 整表 5 569.6 秒、Q3-核三趟各约两分钟）。117 行的读数与 A4–A7 都读今天的 `crates/`：实现、O2、O1、装置或 `crates/mutations.tsv`
 # 里那 117 行变了，产物就变，不是复跑坏了。目录的名字（baseline-run1、rows-s4、disable-O1、disable-O2）进产物，改了名产物就变。
 driver_e171_s4_comparator() {
@@ -3022,9 +3026,9 @@ driver_e171_s4_f4_substitutes_comparator() {
 }
 # E171 第 1 次重跑第一段·修订 6 那一趟（登记 `research/prompts/e171-r1-prereg.md` 修订 6–8 与其后各条「主 agent 认定」；第 0–10 步后缀 -r6-r3，
 # 第 11–13 步 -resume2）：只在这一趟已有的导出与产物上重出，不起装置、不起 cargo、不碰别的台（研究一侧是 Python，不是编译出来的代码，不经内存包装）。
-# 导出根是这一趟在本机的留存（不进仓）：原先放在编译树 scripts/experiment-apparatus/target/e171-r1-dumps/ 下（已不在；编译树不当数据放处），
-# 现在没有默认，重出到固定位置（工作根下 replay-frozen-roots/e171-r1-dumps）（下面 revision-6-2026-10-05-r3/、revision-6-segment-2/ 两个子目录照原样）。
-# 比对器在这一趟自己的临时目录里搭的视图（e171_r1_view）里起，照原来的相对路径读：产物里写的路径逐字不变，仓里的 scripts/experiment-apparatus/target/ 一个字节不读。
+# 导出根是这一趟在本机的留存（不进仓）：编译树 scripts/experiment-apparatus/target/ 不当数据放处，没有默认，
+# 重出到固定位置（工作根下 replay-frozen-roots/e171-r1-dumps）（下面 revision-6-2026-10-05-r3/、revision-6-segment-2/ 两个子目录照原样）。
+# 比对器在这一趟自己的临时目录里搭的视图（e171_r1_view）里起，照产物里记的相对路径读：产物里写的路径逐字不变，仓里的 scripts/experiment-apparatus/target/ 一个字节不读。
 # 导出根没给、它或要读的子目录与 research/results/ 下的产物缺了，这几行逐项记跑不了（文件头「驱动要读的输入」），不起比对器。
 # 第 0–13 步本身（装置各趟、逐行驱动、O3 执行器、多机编排）要冻结树、真跑各行或第二台，推的挂钟几十小时，不登记。
 E171_R1_DUMPS_REMEDY="导出根：照登记 research/prompts/e171-r1-prereg.md 修订 6–8 的第 0–13 步重出那一趟的导出，放到固定位置（工作根下 replay-frozen-roots/e171-r1-dumps，replay_frozen_root 取；不放 scripts/experiment-apparatus/target/）"
@@ -3110,8 +3114,8 @@ driver_e171_r1_s1_research_mutations() {
 }
 # E171 第 1 次重跑第二段（整表）·修订 6 树：比对器只读已有的导出与合成产物重出（不起装置、不起 cargo、不碰别的台）。基线是修订 6 那一趟第 1 步
 # S2 新装置基线，稳定性基线是同一趟第 7、9 步两次基线；行输出根 revision-6-segment-2/segment2-rows 是这一段在本机的留存（不进仓），
-# 与第一段同在 固定位置（工作根下 replay-frozen-roots/e171-r1-dumps）的导出根下；冻结树的变异表原先在编译树 scripts/experiment-apparatus/target/e171-r1-frozen-tree-revision-6/crates/mutations.tsv
-# （已不在），现在在固定位置（工作根下 replay-frozen-roots/e171-r1-frozen-tree-revision-6）的冻结树；比对器同样在 e171_r1_view 搭的视图里照原来的相对路径读。
+# 与第一段同在 固定位置（工作根下 replay-frozen-roots/e171-r1-dumps）的导出根下；冻结树的变异表在固定位置（工作根下 replay-frozen-roots/e171-r1-frozen-tree-revision-6）的冻结树里；
+# 比对器同样在 e171_r1_view 搭的视图里照产物里记的相对路径读。
 # 缺哪一样逐项记跑不了（文件头「驱动要读的输入」）。整表本身（281 行逐行改坏、编、跑装置，两台推约五个多小时）不登记。
 driver_e171_r1_s2_revision_6_comparator() {
   local scratch="$OUT_DIR/e171-r1-s2-revision-6-comparator" dumps="scripts/experiment-apparatus/target/e171-r1-dumps" frozen_tree status=0
@@ -3159,11 +3163,15 @@ driver_e171_r1_s2_revision_10_tools_research_mutations() {
   cat "$scratch/mutations.out"
 }
 
+# E171 修订 11 的研究一侧变异表（这一个，与下面 driver_e171_second_rerun_current_state_library_root_research_mutations 那一张）带单测 test_revision_11 跑
+# （两份登记的产物 config 行都是 unit_test_modules=test_revision_11）；那几条单测读写复用库，
+# 复用库只在 prune-server 里、单测只在临时服务上跑（reuse_library.py 文件头「库」）：变异驱动整条套在临时服务底下起（客户端文件头「命令行」--with-temporary-service）
 driver_e171_r1_revision_11_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-revision-11-tools-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
-  (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv" \
+  (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B \
+      "$repository_root/scripts/prune-server/prune_server_client_selftest.py" --with-temporary-service -- python3 -B mutation_driver.py \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv" --unit-test-module test_revision_11 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -3232,9 +3240,10 @@ driver_e171_second_rerun_current_state_preconditions_research_mutations() {
 driver_e171_second_rerun_current_state_library_root_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-current-state-library-root-research-mutations" repository_root="$PWD"
   rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
-  (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
+  (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B \
+      "$repository_root/scripts/prune-server/prune_server_client_selftest.py" --with-temporary-service -- python3 -B mutation_driver.py \
       --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv" \
-      --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
+      --unit-test-module test_revision_11 --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 # E171 第 2 次重跑修订 5（登记 research/prompts/e171-r2-prereg.md 第 5.6 条）：第 0 步判法读宣布行的行首与调度记录（单测 test_revision_8）；exact 比。
@@ -3271,42 +3280,24 @@ driver_e156() {
 # E158（第一段，入库装置，跑前登记「装置写在哪」写死第 5 行）：同 E156 的先例，两个 cargo workspace
 # 互相看不到对方，不能合并成一次调用。`all` 模式跑 5.7 常量回比、第七节锚点、S5 独立解码对拍、
 # H3（岔路 3）四个几何点不注入全枚举、Q3-2/Q2-3 算术、PC3。
-# 2026-09-23 产物在 `crates/` 落地 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 定案（拿掉
-# 「回退到无文件那一版」的拒绝）之后结构性对不上（50 行不同，原因见实验页与
-# `/tmp/claude-1000/e158-s2/report.md` 第 1 节）；2026-09-24 主 agent 定这一行承重
-# `e158-root-choice-repair-2026-09-24-segment1-rerun.out`（旧产物 `…-2026-09-23-segment1.out`
-# 原样留着，对应 C512 落地之前的代码，不再是这一行比对的对象）。
-# ⚠️ **2026-09-25（session s10）**：另一条并行线（主 agent 知会「实二六」）此刻在改
-# `mount.rs`/`allocator.rs`/`allocation_record_tree.rs`（抬 F、挂载读、分配记录树根层），这一份
-# `2026-09-24` 产物与今天重出的产物对不上，`pc3` 一行从 `recover_verdict=pass recover_root=
-# Some((1, 6))` 变成 `recover_verdict=fail recover_root=Some((0, 0))`——按今天日期另存
-# `e158-root-choice-repair-2026-09-25-segment1-rerun.out`，登记表这一行已改指向它；`…-09-24-…`
-# 原样留着不删。**这不是本轮代码改动引起的**（e158 装置本身这一段只加了 op1 第三种变体，没碰
-# `driver_e158`/`pc3` 这条路径），是不是要等 `crates/` 落定后再复核一遍交主 agent 定，详见跑前
-# 登记「十二、修订」session s10 条目第 6 条与交回报告。
+# 这一行承重 `e158-root-choice-repair-2026-09-25-segment1-rerun.out`。`…-2026-09-24-segment1-rerun.out` 与 `…-2026-09-23-segment1.out`（后者对应 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 落地之前的代码）
+# 原样留着，不是这一行比对的对象。工作树 `crates/` 里 mount.rs、allocator.rs、allocation_record_tree.rs 一变，`pc3` 一行（`recover_verdict`、`recover_root`）会随之变，
+# 对不上是新观测，先对着实验页与跑前登记「十二、修订」查。
 driver_e158() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- all)
 }
 
-# E158 第二段 Q3-1（岔路 3 候选 3 那一半，2026-09-24）：`q3-1-g0` 模式只跑 G0 几何上的
+# E158 第二段 Q3-1（岔路 3 候选 3 那一半）：`q3-1-g0` 模式只跑 G0 几何上的
 # H3 × Φ3（|F|≤2）违例枚举，不跑第一段的 H3 全枚举（那部分归 `driver_e158`）。
-# ⚠️ **2026-09-25（session s10）：值得单独点名的一处现查**——G0/S16/小环三点，今天重出的
-# `pairs_with_any_violation` 从旧产物的 213 变成 0（`cold_recover_with_fault_failed`/
-# `mount_writable_with_fault_failed` 两点都仍是 0，不是新增了报错，是判定本身不再违例）；S4 那一点
-# 除了 `pairs_with_any_violation`（1355→0）之外，`cold_recover_with_fault_failed`/`mount_
-# writable_with_fault_failed` 还从 0 变成 239——即同一批构造里，以前是「成功但违例」，现在有 239
-# 个变成了「调用直接报错」，是两种不同的失效形态，不只是数字变化。与 `driver_e158` 的 `pc3` 翻转
-# 同一批文件改动引起（`mount.rs`/`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮
-# e158 装置改动）。**这条现查可能动到岔路单第 3 行「候选 3 = 今天」这个前提与 F2 的触发条件**——
-# C332 正文钉的「2 个故障就能撤销回退」在今天这份 `crates/` 上现在测不出来了，交主 agent 判断是要
-# 重新核对 F2、还是等这条并行线落定再复核；详见跑前登记「十二、修订」session s10 与交回报告。今天
-# 重出的产物按日期另存 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,
-# q3-1-s4}.out`，`…-09-24-…` 原样留着，登记表已改指向新文件。
+# 产物里 G0/S16/小环三点的 `pairs_with_any_violation` 是 0（`cold_recover_with_fault_failed`/`mount_writable_with_fault_failed` 也是 0：判定本身不再违例）；S4 那一点
+# `pairs_with_any_violation` 是 0，`cold_recover_with_fault_failed`/`mount_writable_with_fault_failed` 是 239：同一批构造里有 239 个是「调用直接报错」，
+# 与「成功但违例」是两种不同的失效形态。C332 正文钉的「2 个故障就能撤销回退」在这份 `crates/` 上测不出来，详见跑前登记「十二、修订」。
+# 登记的产物是 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,q3-1-s4}.out`，`…-09-24-…` 原样留着、不登记。
 driver_e158_q3_1_g0() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q3-1-g0)
 }
 # 第八节敏感性（行 3）三个取样点：S16、小环（环长现算，产物里的 `small_ring_search` 那行同时钉住取到的环长）、
-# S4（`sigma_length_limit=4`，比其余三点多穷举一层，代价数量级最大，real 约 18 分钟，2026-09-24 现查）。
+# S4（`sigma_length_limit=4`，比其余三点多穷举一层，代价数量级最大，real 约 18 分钟）。
 driver_e158_q3_1_s16() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q3-1-s16)
 }
@@ -3317,68 +3308,59 @@ driver_e158_q3_1_s4() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q3-1-s4)
 }
 # E158 岔路单第 1 行（C393）：`q1-g0` 模式在今天的 `crates/`（候选 (c)）上跑 H1 家族 + Φ1 故障注入 +
-# PC1-a/PC1-b，只跑 G0 几何（2026-09-24 session s3，见实验页）。候选 (a)（A1 副本）的同一份数只存产物
+# PC1-a/PC1-b，只跑 G0 几何（见实验页）。候选 (a)（A1 副本）的同一份数只存产物
 # `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，**不登记在这张表里**：它要在
 # `scripts/mutation/tables/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
-# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。session s9 起产物里
+# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。产物里
 # 多了 171 格差集的分类诊断（`q1_2_subset_diff_pair*`，根因是 `RootRecord::instance_table` 没被走
-# 全版本走到）与 op1 起三步挂载的持续/瞬时故障轨迹（`q1_1a_op1_trajectory`），纯增量追加。
-# **2026-09-25（session s10）**：加了 op1 第三种变体（`MountWritableThenRaiseFloorTo`），新增
-# `q1_1a_raise_floor_trigger_summary`/`q1_1a_raise_floor_by_aspect_severity`（G0：
+# 全版本走到）与 op1 起三步挂载的持续/瞬时故障轨迹（`q1_1a_op1_trajectory`）。
+# op1 有第三种变体（`MountWritableThenRaiseFloorTo`），对应 `q1_1a_raise_floor_trigger_summary`/`q1_1a_raise_floor_by_aspect_severity`（G0：
 # `pairs=96 trigger_count=32 history_nodes_without_room=26`，both_copies 两个指称各 16/16 触发、
-# disk0_only/disk1_only 各 0/16，与既有 op1 两种同一批构造上的模式一致）——这一段是本轮新增、真实
-# 数据，不是噪声。⚠️ 同一份产物里还混着另一条并行线（`mount.rs`/`recovery.rs`）造成的漂移：
-# `q1_2_tree_table_crates_has_a_path`（`verify_named_units=false`）从「108+81」变成「189+0」（原来
-# 能不碰物理拷贝复算出指针的 81 格现在全部走不到了）、`pc1_a` 的 `device_write_bytes` 从 157184 变
-# 353792（`AllocationRecordTreeNode` 写得更多，与 `q2_2a_g0` 那条同一根因）——这两条与本轮 e158 装置
-# 改动无关，是现查到的既有漂移（与 session s9 报告的方向一致）。今天重出的产物按日期另存
-# `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着。
+# disk0_only/disk1_only 各 0/16，与另外两种 op1 变体同一批构造上的模式一致），是真实数据、不是噪声。
+# 同一份产物里还有随 `crates/`（`mount.rs`/`recovery.rs`）变的量：
+# `q1_2_tree_table_crates_has_a_path`（`verify_named_units=false`）是「189+0」（不碰物理拷贝就能复算出指针的格数是 0）、`pc1_a` 的 `device_write_bytes` 是
+# 353792（`AllocationRecordTreeNode` 写得更多，与 `q2_2a_g0` 那条同一根因），
+# 这两条与 e158 装置本身无关，随 `crates/` 变。
+# 登记的产物是 `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着、不登记。
 driver_e158_q1_g0() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q1-g0)
 }
-# E158 岔路单第 2 行 ①（C331 修法，session s4，2026-09-24 session s5 起废弃，见下）：`q2-1-g0` 在
-# 今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
-# 下界搜索。**session s5 查出这条产物是在故障装配 bug 存在时跑出来的**（`attempt_rootback_probe_
-# and_advance` 一块盘只装得上一个故障目标，权重 ≥ 2 就可能漏装——见跑前登记「十二、修订」session s5
-# 条目第 2 条）：bug 修好之后同一个 n1 范围重跑给出不同结果（甲-txg 臂从「0 命中」变成「k_min=4」），
-# 这条产物与它对应的 `driver_e158_q2_1_g0` 不能再当「今天/丙 0 命中」的依据引用，只留着当「bug 修前
-# 长什么样」的历史对照。承重的是下面 `driver_e158_q2_1_g0_session_s5`。
+# E158 岔路单第 2 行 ①（C331 修法）：`q2-1-g0` 在今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
+# 下界搜索。这条产物是在故障装配 bug 存在时跑出来的（`attempt_rootback_probe_and_advance` 一块盘只装得上一个故障目标，权重 ≥ 2 就可能漏装——见跑前登记「十二、修订」）：
+# 修好之后同一个 n1 范围给出不同结果（甲-txg 臂是「k_min=4」，不是「0 命中」），这条产物不当「今天/丙 0 命中」的依据引用，只当 bug 在时的对照；
+# 承重的是下面 `driver_e158_q2_1_g0_session_s5`。
 driver_e158_q2_1_g0() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-g0)
 }
-# E158 岔路单第 2 行 ②（每条修法每次发布多写几字节，session s4）：`q2-2a-g0` 在今天的 `crates/` 上跑
+# E158 岔路单第 2 行 ②（每条修法每次发布多写几字节）：`q2-2a-g0` 在今天的 `crates/` 上跑
 # 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
-# ⚠️ **2026-09-25（session s10）**：`AllocationRecordTreeNode` 每次发布的 `write_calls`/
-# `written_bytes` 全面上涨（例如 `second_mount_row_publish` 从 `write_calls=2 written_bytes=32768`
-# 变成 `write_calls=10 written_bytes=163840`），与 `q1_g0` 的 `pc1_a` 字节变化同一根因
-# （`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮 e158 装置改动）。今天重出的
-# 产物按日期另存 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
+# `AllocationRecordTreeNode` 每次发布的 `write_calls`/
+# `written_bytes` 较大（例如 `second_mount_row_publish` 是 `write_calls=10 written_bytes=163840`），
+# 与 `q1_g0` 的 `pc1_a` 字节同一根因
+# （`allocator.rs`/`allocation_record_tree.rs`，与 e158 装置本身无关）。
+# 登记的产物是 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
 driver_e158_q2_2a_g0() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-2a-g0)
 }
-# E158 岔路单第 2 行 PC2（阳性对照，session s5）：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
-# 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」session s5。
+# E158 岔路单第 2 行 PC2 是阳性对照：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
+# 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」。
 # 乙-只配置候选的同一份数只存产物（副本上的数，副本没有 `published_txg` 字段就编不过，不登记在这张
 # 表里，复跑步骤见实验页与 `scripts/mutation/tables/e158_arms.tsv`）。
 driver_e158_q2_1_pc2() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-pc2)
 }
-# E158 岔路单第 2 行 ①（C331 修法，2026-09-24 session s5，承重）：修好故障装配 bug 之后，`q2-1-g0`
-# 在今天的 `crates/`（丙 = 甲-jsn）上重跑 H2 主族，n1 范围从 {0,1,2,3} 补齐到跑前登记 5.1 要求的
-# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。**session s9
-# 撤掉了旧的计数上限（`SUBSET_ENUMERATION_CAP`，会在权重档中途停手）**，换成按权重档边界停的
-# `weight_ceiling` 机制：n1=0..3 仍是完整穷举（`subsets_tried`==`full_space_subset_count`）；n1=4、
-# 6 用新机制找到 `k_min=12`（此前因为撞旧计数上限报 `capped`，没有找到）；n1=5 如实报
+# E158 岔路单第 2 行 ①（C331 修法，承重）：`q2-1-g0` 在今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族，n1 范围是跑前登记 5.1 要求的
+# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。穷举按权重档边界停（`weight_ceiling`），
+# 没有会在权重档中途停手的计数上限：n1=0..3 是完整穷举（`subsets_tried`==`full_space_subset_count`）；n1=4、
+# 6 找到 `k_min=12`；n1=5 如实报
 # `k_min=not_found_up_to_weight_ceiling`（完整空间 131072、只搜到权重 12 为止，未截断，见跑前登记
-# 「十二、修订」session s9）。**2026-09-25（session s10）复跑确认字节一致**——与 `q2_1_pc2`/
-# `q2_1_hc1`/`q2_1_hc1_lower_bound` 三行一样不受另一条并行线这一刻改动的影响（那条线动的是
-# `mount.rs`/`allocator.rs`/`allocation_record_tree.rs` 里 `q3-1`/`q1-g0`/`q2-2a-g0` 会读到的
-# 路径，H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过
-# 那几处改动），行 2「够判」的结论不受这一刻 crates/ 波动影响。
+# 「十二、修订」）。与 `q2_1_pc2`/`q2_1_hc1`/`q2_1_hc1_lower_bound` 三行一样不受 `crates/` 里 `mount.rs`/`allocator.rs`/`allocation_record_tree.rs`（`q3-1`/`q1-g0`/`q2-2a-g0` 会读到的路径）变动的影响：
+# H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过那几处，
+# 行 2「够判」的结论不随这几处变。
 driver_e158_q2_1_g0_session_s5() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-g0)
 }
-# 第八节几何敏感性（行 1，2026-09-24 session s6）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
+# 第八节几何敏感性（行 1）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
 # 大一倍）与 S4（根环小一半）两个方向相反的取样点，复用 H1 装置代码（`run_ledger_fault_family` 本身
 # 就是几何参数化的）。两点都与 G0 逐字节等值（N_trig=798），判定不翻面，判别力自证「两点同值，自证
 # 不适用」。
@@ -3388,23 +3370,23 @@ driver_e158_q1_s16() {
 driver_e158_q1_s4() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q1-s4)
 }
-# H-C1 直接构造（2026-09-24 session s6，岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
-# 故障（4 根槽 + 4 条记录各两块盘）才打得中；`run_rootback_tolerance_family` 的穷举在 n1∈{4,5,6}
-# 会撞 `SUBSET_ENUMERATION_CAP`，这里不靠穷举，直接按这个具体构造跑一次（hit=true, weight=12），
+# H-C1 直接构造（岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
+# 故障（4 根槽 + 4 条记录各两块盘）才打得中；这里不靠 `run_rootback_tolerance_family` 的穷举，
+# 直接按这个具体构造跑一次（hit=true, weight=12），
 # 附一个只挡 4 条根槽、不挡记录的负对照（hit=false，证明「只挡根环挡不住丙」）。
 driver_e158_q2_1_hc1() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-hc1)
 }
-# H-C1 下界探针（2026-09-24 session s6；session s9 改参数为 weight_ceiling）：在同一个 n1=4 节点
+# H-C1 下界探针（参数 weight_ceiling）：在同一个 n1=4 节点
 # 上，穷举权重 0..11 的全部组合（`subsets_tried=22558`，`full_space_subset_count=32768`，没有撞
 # 顶）都没有命中，权重 12 上第一个尝试的组合就命中。**这是「恰好 12」的严格证据**：不是构造上界，是
 # 穷举下界真正走到了 12 且之下全空。不传第二个参数时 `weight_ceiling=None`——n1=4 这个节点的完整
 # 空间只有 2^15=32768，在 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`=100000 预算内，`None` 就等于穷举到
-# 完整空间的顶，与 session s6 当年手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
+# 完整空间的顶，与手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
 driver_e158_q2_1_hc1_lower_bound() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
 }
-# E158 第 2 次跑第一段（重跑登记 `research/prompts/e158-r2-prereg.md`，2026-09-26）：`r2-all` 在工作树的 `crates/`（今天那一臂）上
+# E158 第 2 次跑第一段（重跑登记 `research/prompts/e158-r2-prereg.md`）：`r2-all` 在工作树的 `crates/`（今天那一臂）上
 # 跑第 2 次跑的开跑检查、H1d、Q1-0、PC1-a/b/c 与实七两段复现历史。另外七臂（A1、甲-txg、乙F-留环、乙 / 丁四臂）的产物
 # `e158-root-choice-repair-2026-09-26-r2-all-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 套出来的副本上重编才跑得出来，
 # 不登记在这张表里（同第一次跑 A1 产物的先例）；`…-r2-all-today-snapshot.out` 是同一装置在那几份副本共用的快照上跑的今天那一臂，
@@ -3412,12 +3394,12 @@ driver_e158_q2_1_hc1_lower_bound() {
 driver_e158_r2_all() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r2-all)
 }
-# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`，2026-09-27）：`r2-all` 那一行 2026-09-27 在
-# 开工快照上重出（工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8），改指 `…-2026-09-27-r2-all-today.out`，旧产物原样留着。
+# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`）：`r2-all` 那一行的产物是在开工快照上重出的
+# （工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8）`…-2026-09-27-r2-all-today.out`，更早的产物原样留着。
 # `r3-seg1` 在九份臂副本上各跑一遍，这里只登记今天那一臂（工作树的 `crates/` 就是它）；另外八臂的产物
 # `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，
 # 不登记（同第 2 次跑的先例）。`r3-compare` 只读 `research/results/` 下九份产物、不碰 `crates/`，复跑逐字节可比。
-# 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。工作树的 `crates/` 在快照之后又被改过，
+# 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。工作树的 `crates/` 与快照不同时，
 # 这两行里读 `crates/` 的那一行（r3-seg1 今天、r2-all）会随之漂，不归这一次（登记第一节「上一次执行员交来的两件」）。
 driver_e158_r3_seg1_today() {
   (SINGLEFS_E158_ARM=today cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r3-seg1)
@@ -3436,10 +3418,10 @@ driver_e158_r3_seg1_compare() {
   replay_inputs_present "${FUNCNAME[0]}" "臂产物：${REPLAY_ARCHIVED_REMEDY}；或照 scripts/mutation/tables/e158_arms.tsv 的 r3 行套出臂副本重跑 r3-seg1" "${inputs[@]}" || return $?
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r3-compare research/results/e158-root-choice-repair-2026-09-27-r3-seg1)
 }
-# E158 第 4 次跑（重跑登记 `research/prompts/e158-r4-prereg.md`，2026-09-27）：五段（seg1、seg2b、seg3、seg4、seg5）的臂产物都在
+# E158 第 4 次跑（重跑登记 `research/prompts/e158-r4-prereg.md`）：五段（seg1、seg2b、seg3、seg4、seg5）的臂产物都在
 # `scripts/mutation/tables/e158_arms.tsv` 的 r4 行套出来的快照副本上编、跑，今天那一臂也是快照副本（工作树的 `crates/` 在快照之后
 # 已合进 C554 乙，不再是「今天那一臂」），各段的臂产物都不登记（同第 2、3 次跑的先例）。这里只登记五段合并的 `r4-compare`：
-# 它只读 `research/results/` 下那五组臂产物、不碰 `crates/`，复跑逐字节可比；第二段以装置撞键修过之后重跑的 seg2b 为准，
+# 它只读 `research/results/` 下那五组臂产物、不碰 `crates/`，复跑逐字节可比；第二段用 seg2b，
 # 撞键之前那一份 seg2 不喂进来。产物头的 `E7INPUT name=crates_snapshot` 那一行比对前删掉。
 driver_e158_r4_compare() {
   local prefix=research/results/e158-root-choice-repair-2026-09-27-r4 segment arm arms inputs=()
@@ -3602,18 +3584,20 @@ driver_e172() {
 
 # E175（产品路径上 inode 号水位退回与重发号）：仓副本装置（跑前登记 research/prompts/e175-preregistration.md 第五节「装置写在哪」写死，
 # 形式化线冻结期主工作区 crates/ 不动），装置源码在 scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs
-# （2026-10-18 从 research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs 搬进来：反复要用的装置不放 research/，
-# .claude/rules/directory-layout.md；内容一个字节没改，sha256 cdb5d7be…）。驱动把今天的工作区清单与 crates/ 拷进
-# $OUT_DIR 下的副本、放进那份源码、编一次，跑 D 族 P 臂（8 段，D 族结果行不带挂钟），只留 E7RESULT 行并补收尾行（闸 2）。
+# （反复要用的装置不放 research/，
+# .claude/rules/directory-layout.md；sha256 cdb5d7be…）。驱动照共用库的闭包把今天的工作区拷进
+# $OUT_DIR 下的副本（replay_copy_closure_into，不写清单）、放进那份源码、编一次，跑 D 族 P 臂（8 段，D 族结果行不带挂钟），只留 E7RESULT 行并补收尾行（闸 2）。
 driver_e175() {
-  local scratch="$OUT_DIR/e175-repository-copy" device_source="$PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs" binary
+  local scratch="$OUT_DIR/e175-repository-copy" device_source="$PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs" binary worker_threads
   rm -rf "$scratch" && mkdir -p "$scratch" || return 1
-  (cp -dR --preserve=timestamps,links Cargo.toml Cargo.lock .cargo crates prune-server "$scratch"/ && copy_thread_registry_into "$scratch") || return 1
+  replay_copy_closure_into "$scratch" || return 1
   cp "$device_source" "$scratch/crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs" || return 1
   (cd "$scratch" && unset CARGO_TARGET_DIR && nice -n 19 cargo test -q --release -p singlefs-verification --test e175_product_path_inode_watermark_regression --no-run >&2) || return 1
   binary="$(find "$scratch/target/release/deps" -maxdepth 1 -type f -executable -name 'e175_product_path_inode_watermark_regression-*' | head -n 1)"
   [[ -n "$binary" ]] || return 1
-  E175_ARM=P E175_FAMILY=D E175_RESULT_FILE="$scratch/d-P.out" E175_WORKER_THREADS=4 \
+  # 装置没给 E175_WORKER_THREADS 时取本机可用并行度（装置源码冻结、不改），这里交每台默认重活线程数
+  worker_threads="$(heavy_thread_default)" || return 1
+  E175_ARM=P E175_FAMILY=D E175_RESULT_FILE="$scratch/d-P.out" E175_WORKER_THREADS="$worker_threads" \
     "$binary" --exact run_one_family_on_one_arm_into_the_result_file >&2 || return 1
   awk '/^E7RESULT /{print; n++} END{print "E7RESULT name=done emitted=" n + 1}' "$scratch/d-P.out"
 }
@@ -3672,6 +3656,25 @@ driver_e198_segment_two() {
   (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e198_instance_table_pointer_birth_skip_premise -- segment-two | grep '^E7RESULT ')
 }
 
+# E205（多处读坏倒挂三条改法的代价）三段（入库装置，跑前登记 research/prompts/e205-preregistration.md 第五节「装置写在哪」写死）：
+# 一段一个进程，全部判完之后按件号的次序一次打出，产物里没有计时（进度打到标准错误），exact 比。
+# 配置行报线程数：装置没设 E205_THREADS 时取每台默认重活线程数（task-server 设的 SINGLEFS_THREAD_CAP，再没设取 .claude/heavy-thread-default），这里不写死；换了线程数只有配置行那一格不同。
+driver_e205() {
+  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- six-cells | grep '^E7RESULT ')
+}
+
+driver_e205_torn_rotation() {
+  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- torn-rotation | grep '^E7RESULT ')
+}
+
+driver_e205_first_txg_skips_s8() {
+  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- first-txg-skips s8 | grep '^E7RESULT ')
+}
+
+driver_e205_first_txg_skips_s4_s16() {
+  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- first-txg-skips s4-s16 | grep '^E7RESULT ')
+}
+
 # --admission-only：只问准入（scripts/gate/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。
 ADMISSION_ONLY=0
 ONLY=()
@@ -3679,7 +3682,7 @@ for replay_argument in "$@"; do
   if [[ "$replay_argument" == "--admission-only" ]]; then ADMISSION_ONLY=1
   else ONLY+=("$replay_argument"); fi
 done
-# 替换表按 E103 这种带 E 的形态登记；裸数字会匹配 0 条并报全零（2026-09-05 在 E103 上踩过两次）。
+# 替换表按 E103 这种带 E 的形态登记；裸数字会匹配 0 条并报全零。
 for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
   if [[ "$wanted" =~ ^[0-9]+$ ]]; then
     echo "  ✗ 实验号 $wanted 没带 E：这样匹配不到任何一行，跑出来全是零" >&2
@@ -3690,8 +3693,7 @@ done
 want() { [[ ${#ONLY[@]} -eq 0 ]] && return 0; local e; for e in "${ONLY[@]}"; do [[ "$e" == "$1" ]] && return 0; done; return 1; }
 
 # 产物列是 research/results/ 底下的纯文件名，不是仓库根起的路径：写成路径时下面拼出 research/results/research/results/… 指不到文件，
-# 而 diff 失败会被报成「对不上，N 行不同」——看着像产物变了，其实是登记表坏了。2026-09-21 被一次全仓路径回写
-# 的路径回写踩中一次（它把第 4 列升级成了仓库根路径）。
+# 而 diff 失败会被报成「对不上，N 行不同」——看着像产物变了，其实是登记表坏了。
 bad_rows=$(printf "%s\n" "$TABLE" | awk -F"|" '/^E[0-9]+\|/ && $4 ~ /\// {print "      " $1 "：第 4 列 " $4}')
 if [[ -n "$bad_rows" ]]; then
   echo "  ✗ 登记表第 4 列（留存产物）写成了带斜杠的路径，应当是 research/results/ 底下的纯文件名：" >&2
@@ -3796,7 +3798,7 @@ replay_prune_server_unavailable() { # <退 75 的那一条命令>
   exit 75
 }
 # 按行复用的库没法用（文件头「按行复用」）：开跑之前整趟退出（不在 git 工作树里退 2，别的退 1），不照「不复用、不记」全跑。
-# 弄坏开关 row-library-failure-tolerated 下照改前只打一句、往下全跑（改错的样子）
+# 弄坏开关 row-library-failure-tolerated 下只打一句、往下全跑
 replay_row_library_failure() { # <退出码> <一句为什么> <出路>
   if [[ "$REPLAY_BROKEN" == row-library-failure-tolerated ]]; then
     echo "  ! 按行复用：$2：这一趟一行都不复用、也不记" >&2
@@ -3865,7 +3867,7 @@ if (( ${#ROW_REUSE_KEY[@]} )); then
   fi
 fi
 
-# E182 的片结果库（文件头「E182 的片结果库」）：这一趟点到 driver_e182 或 driver_e182_units_kept 的行，开跑前把两种片拉进各自的中转目录（全量不拉），
+# E182 的片结果库（文件头「E182 的片结果库」）：这一趟点到 driver_e182 或 driver_e182_units_kept 的行，开跑前把两种片拉进各自的中转目录，
 #   各行收齐之后 replay_store_e182_shards 并回
 REPLAY_E182_SHARD_KINDS=(e182-single-device e182-single-device-units-kept)
 REPLAY_E182_SHARDS=""   # 拉过才设：$OUT_DIR/e182-shards-from-prune-server（底下 <种类>/ 一种一份）
@@ -3922,11 +3924,6 @@ REPLAY_FORCED_TAG=""
 if [[ ! -f "$REPLAY_REUSE_CHECKS" ]]; then
   # 拷进不带共用库的小树里跑的这一份（scripts/gate/admission.py 的自证那一类）：哨兵与上次红的清单都不做，说一句；真仓里这份库一直在
   echo "  ! 复用哨兵：找不到 $REPLAY_REUSE_CHECKS（这一份 replay.sh 跑在不带它的树里），这一趟不抽哨兵、不写上次红的清单" >&2
-elif [[ -z "$REPLAY_ROW_LIBRARY" ]]; then
-  # 库名空着只在弄坏开关 row-library-failure-tolerated 下走到（replay_row_library_failure 置空，改错的样子）
-  replay_sentinel_off="没有判定库"
-  python3 "$REPLAY_REUSE_CHECKS" sentinel-plan "$REPLAY_SENTINEL" --script scripts/experiment-apparatus/replay.sh --label 复跑表 --off "$replay_sentinel_off" >&2 \
-    || { echo "  ✗ 复用哨兵没抽成（$REPLAY_REUSE_CHECKS sentinel-plan）" >&2; echo "     → 怎么办：照它的报错修 scripts/gate/lib_reuse_checks.py；抽不成这一趟判不了复用" >&2; exit 1; }
 else
   candidate_sequence=0
   while IFS='|' read -r exp bin args stored kind; do
@@ -4157,7 +4154,7 @@ replay_one() {
 #   记红、撤绿：判成对不上（drift）或跑不了（broken）的照同一把键记下、盖掉这把键原有的绿，下一趟这一行现判。本次不判不碰库。
 #   记在 replay_judge_fresh_product 外面：它的正文进每一行的行键，存库那一步（起 admission.py library-files store）进了它的闭包，每一行的键都拒算。
 #   新产物不在（跑不了的那几种可能一个字都没写）记一份空的，不因为拷不了产物就留着原有的绿。
-#   弄坏开关 red-not-recorded 下对不上的不记、broken-not-recorded 下跑不了的不记（改前的样子）
+#   弄坏开关 red-not-recorded 下对不上的不记、broken-not-recorded 下跑不了的不记
 remember_row_outcome() { # <tag> <记录目录，空串不记> <新产物> <前三列>
   local verdict product="$3"
   verdict="$(cat -- "$OUT_DIR/$1.verdict" 2>/dev/null)"
@@ -4174,7 +4171,7 @@ remember_row_outcome() { # <tag> <记录目录，空串不记> <新产物> <前�
 
 # 开跑前那一判：按表里的次序给每一行定 tag 与判定（decide_row），数出要现跑的几行；一行都不用现跑就不试编 gpu 特性、不编（文件头「按行复用」）；
 # 要现跑的行里一行要卡的都没有（admission.py replay-row-inputs 第 4 列全是 0）就不试编 gpu 特性、不要服务交的卡（文件头「GPU」）。
-# 弄坏开关 REPLAY_BREAK=gpu-for-every-run：要现跑的行一律当要卡（改前的样子）
+# 弄坏开关 REPLAY_BREAK=gpu-for-every-run：要现跑的行一律当要卡
 declare -a ROW_TEXTS=() REPLAY_ORDER=() TO_RUN_BINARIES=()
 row_sequence=0; to_run=0; to_run_drivers=0; to_run_gpu=0
 while IFS='|' read -r exp bin args stored kind; do

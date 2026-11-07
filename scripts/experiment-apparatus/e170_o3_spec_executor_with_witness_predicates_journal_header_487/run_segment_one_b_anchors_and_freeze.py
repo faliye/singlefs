@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# admission: always 每一趟照此刻的导出、产物、两条臂的文件与这份判法现算每份产物的键、现查判定库（scripts/experiment-apparatus/long_run_item_verdicts.py）；键相同、库里判绿的复用
+# run-condition: command python3
 """E170（O3规约执行器第一版） 第 2 次重跑第一段乙（登记 research/prompts/e170-r2-prereg.md 12.8 分段表「第一段乙」）。
 
 executor_main.py（v2-487）判完 Z1 批 1、批 2 之后，往同一份产物末尾追加（只追加，不改已写的行）：
@@ -9,7 +12,20 @@ executor_main.py（v2-487）判完 Z1 批 1、批 2 之后，往同一份产物�
 文件名以 run_ 开头，不进冻结（5.6）。锚点不符走 F10（两边都查，不作废、不改锚点），这里照打 holds=false。
 
 跑法（仓根，整条命令交 `task-server/task submit --`；PYTHONDONTWRITEBYTECODE=1，不在执行器目录里留 __pycache__）：
-  python3 <本文件> --dumps scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-dump --product <executor_main 写的那份产物>
+  python3 <本文件> --dumps scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-dump --product <executor_main 写的那份产物> [--product <…>]…
+  python3 <本文件> --selftest
+
+按份判定（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：每一份 --product 一条判定，经 scripts/experiment-apparatus/long_run_item_verdicts.py 的
+  judge_items 存进 prune-server 的 apparatus-items 族、种类 run_segment_one_b_anchors_and_freeze。键 = 判法 appended_lines 的单元闭包（admission.py 的 compute_unit_key 算）、
+  解释器版本、那份产物追加之前的内容（@input）、导出两条流里每个文件的内容与两条臂、两份原目录里冻结的每个文件的内容（@files；路径不进键）；追加的行逐字节可比（compare=exact）。
+  键相同、库里判绿的那一份把库里的行照原样追加上去，不重算锚点、不重跑单测。判完之后才追加（收尾重算键时产物还是追加之前那一份）。
+  判定库那几行打到标准错误；成功那句（标准错误末尾的 LONG_RUN_ITEMS 行）报「现判 N、复用 M、拒算 R」。退出码：0 成；1 复用哨兵红或键在跑的中途变了；
+  2 用法错、产物末行不是 name=complete 或已经追加过；75 prune-server 不可用。
+自证（--selftest）：经 long_run_item_verdicts.py 的复用格跑那六格（reuse-three-questions、key-independent-of-directory、reuse-sentinel 与哨兵的三种红），
+  一趟两份 --product，假驱动是 LONG_RUN_ITEMS_SELFTEST_FAKE_JUDGE（判法换成假的）；样板树里这一份的同目录别的文件是指回真仓的符号链接（模块级 import 要它们）。
+  只在临时 prune-server 上跑（客户端 selftest_service_problem 判，不在退 2），起法：
+    python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py --selftest
+  弄坏开关：复用那一侧的分支都在 long_run_item_verdicts.py 里，开关是它文件头的 LONG_RUN_ITEMS_BREAK（打开后这里的自证红在它点名的同名格）；这一份自己不判红（锚点照打 holds=）。
 """
 
 from __future__ import annotations
@@ -19,8 +35,10 @@ import collections
 import difflib
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 THIS_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 BIN_DIRECTORY = os.path.dirname(THIS_DIRECTORY)
@@ -340,25 +358,14 @@ def executor_freeze_cross_check_line(product_lines: list[str], wrapper_pairs: li
             f"files_equal={str(executor_pairs == wrapper_pairs).lower()} seed_equal={str(executor_seed == [wrapper_seed]).lower()}")
 
 
-def main(argument_list: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="E170 第 2 次重跑第一段乙：Z1 上的格式锚点与两条新臂的冻结，追加进 executor_main 的产物")
-    parser.add_argument("--dumps", required=True, help="Z1 导出目录（scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-dump）")
-    parser.add_argument("--product", required=True, help="executor_main.py 刚写完的产物；只追加")
-    arguments = parser.parse_args(argument_list)
-    with open(arguments.product, encoding="utf-8") as handle:
-        product_lines = handle.read().splitlines()
-    if not product_lines or product_lines[-1] != "name=complete":
-        print(f"{arguments.product} 末行不是 name=complete，executor_main 没跑完，不追加", file=sys.stderr)
-        return 2
-    if any(line.startswith("name=segment_one_b") for line in product_lines):
-        print(f"{arguments.product} 已经追加过，不再追加", file=sys.stderr)
-        return 2
-    dump = load_stream_dump(os.path.join(arguments.dumps, FIRST_STREAM))
+def appended_lines(dumps: str, product_lines: list[str]) -> list[str]:
+    """追加进一份产物的那几行（文件头第一段）：dumps 是 Z1 导出目录，product_lines 是追加之前的产物。"""
+    dump = load_stream_dump(os.path.join(dumps, FIRST_STREAM))
     context = prepare_stream_context(dump)
-    appended = [f"name=segment_one_b_begin dumps={arguments.dumps} appended_after_line={len(product_lines)}"]
-    appended += manifest_check_lines(arguments.dumps)
+    appended = [f"name=segment_one_b_begin dumps={dumps} appended_after_line={len(product_lines)}"]
+    appended += manifest_check_lines(dumps)
     appended += crc_anchor_lines()
-    appended += batch_count_lines(arguments.dumps, product_lines)
+    appended += batch_count_lines(dumps, product_lines)
     appended += full_state_anchor_lines(context, dump)
     appended.append(replay_class_anchor_line(context, dump, product_lines))
     appended.append(b16_line(product_lines))
@@ -370,10 +377,130 @@ def main(argument_list: list[str]) -> int:
     v2_lines, v2_pairs = freeze_by_arm["v2_487"]
     appended.append(executor_freeze_cross_check_line(product_lines, v2_pairs, v2_lines[-1]))
     appended.append("name=segment_one_b_complete")
-    with open(arguments.product, "a", encoding="utf-8") as output:
-        output.write("\n".join(appended) + "\n")
-    return 0
+    return appended
+
+
+# ── 按份判定（文件头「按份判定」）──
+
+SCRIPT_KEY = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py"
+LIBRARY_KIND = "run_segment_one_b_anchors_and_freeze"
+
+
+def repository_root() -> str:
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+
+
+def item_verdicts_module():
+    """scripts/experiment-apparatus/long_run_item_verdicts.py；这份脚本不在仓里（上一层没有它）时交 None。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), ".."))
+    try:
+        import long_run_item_verdicts
+    except ModuleNotFoundError as error:
+        if error.name != "long_run_item_verdicts":
+            raise
+        return None
+    return long_run_item_verdicts
+
+
+def product_lines_of(path: str) -> list[str]:
+    with open(path, encoding="utf-8") as handle:
+        return handle.read().splitlines()
+
+
+def lines_bytes(lines: list[str]) -> bytes:
+    return "".join(line + "\n" for line in lines).encode("utf-8")
+
+
+def item_request_lines(name: str, dumps: str, product: str) -> list[str]:
+    """一份产物的判定请求（long_run_item_verdicts.py 文件头「请求文件」）：路径只经 @input、@files 进内容。"""
+    lines = [f"{name}\t{SCRIPT_KEY}::appended_lines\tline:compare=exact", f"@input\t{name}\tproduct\t{os.path.abspath(product)}"]
+    lines += [f"@files\t{name}\t{os.path.abspath(os.path.join(dumps, stream))}" for stream in STREAM_NAMES]
+    for directory in sorted(set(ARM_DIRECTORY_BY_NAME.values()) | set(ORIGIN_DIRECTORY_BY_ARM.values())):
+        if os.path.isdir(directory):
+            lines += [f"@files\t{name}\t{os.path.join(directory, file_name)}" for file_name in frozen_file_names(directory)]
+    return lines
+
+
+def main(argument_list: list[str]) -> int:
+    if argument_list == ["--selftest"]:
+        return selftest()
+    parser = argparse.ArgumentParser(description="E170 第 2 次重跑第一段乙：Z1 上的格式锚点与两条新臂的冻结，追加进 executor_main 的产物")
+    parser.add_argument("--dumps", required=True, help="Z1 导出目录（scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-dump）")
+    parser.add_argument("--product", required=True, action="append", help="executor_main.py 刚写完的产物；只追加；可以给几份")
+    arguments = parser.parse_args(argument_list)
+    for product in arguments.product:
+        product_lines = product_lines_of(product)
+        if not product_lines or product_lines[-1] != "name=complete":
+            print(f"{product} 末行不是 name=complete，executor_main 没跑完，不追加", file=sys.stderr)
+            return 2
+        if any(line.startswith("name=segment_one_b") for line in product_lines):
+            print(f"{product} 已经追加过，不再追加", file=sys.stderr)
+            return 2
+    names = [f"segment-one-b-{index}-{''.join(character if character.isalnum() or character in '._-' else '-' for character in os.path.basename(product))}"
+             for index, product in enumerate(arguments.product, start=1)]
+    by_name = dict(zip(names, arguments.product))
+    verdicts = item_verdicts_module()
+    finish_code = 0
+    if verdicts is None:
+        print(f"  · 拒算：{os.path.realpath(__file__)} 不在仓里（旁边没有 ../long_run_item_verdicts.py），照判、不复用、不入库", file=sys.stderr)
+        results = {name: (0, lines_bytes(appended_lines(arguments.dumps, product_lines_of(by_name[name])))) for name in names}
+    else:
+        request_lines = [line for name in names for line in item_request_lines(name, arguments.dumps, by_name[name])]
+        finish_code, results = verdicts.judge_items(SCRIPT_KEY, LIBRARY_KIND, repository_root(), "\n".join(request_lines) + "\n",
+                                                    lambda name: (0, lines_bytes(appended_lines(arguments.dumps, product_lines_of(by_name[name]))), True),
+                                                    printer=lambda text: print(text, file=sys.stderr))
+    for name in names:   # 判完才追加：收尾重算键时产物还是追加之前那一份
+        with open(by_name[name], "a", encoding="utf-8") as output:
+            output.write(results[name][1].decode("utf-8"))
+    return finish_code
+
+
+def selftest() -> int:
+    """文件头「自证」：样板树里是这份脚本的拷贝，同目录别的文件、long_run_item_verdicts.py 与 .claude 是指回真仓的符号链接；导出与产物是假的（判法换成假的）。"""
+    verdicts = item_verdicts_module()
+    if verdicts is None:
+        print(f"  ✗ run_segment_one_b_anchors_and_freeze 自证没跑：{os.path.realpath(__file__)} 旁边找不到 ../long_run_item_verdicts.py")
+        print("     → 怎么办：在仓里的那一份上起自证（起法见文件头「自证」）")
+        return 2
+    problem = verdicts.prune_server_client.selftest_service_problem()
+    if problem:
+        print(f"  ✗ run_segment_one_b_anchors_and_freeze 自证没跑：{problem}")
+        print(f"     → 怎么办：{verdicts.prune_server_client.SELFTEST_SERVICE_REMEDY}")
+        return 2
+    work = tempfile.mkdtemp(prefix="run-segment-one-b-selftest-")
+    try:
+        template = os.path.join(work, "template")
+        own_directory = os.path.dirname(os.path.realpath(__file__))
+        os.makedirs(os.path.join(template, os.path.dirname(SCRIPT_KEY)))
+        shutil.copyfile(os.path.realpath(__file__), os.path.join(template, SCRIPT_KEY))
+        for file_name in sorted(os.listdir(own_directory)):
+            if file_name != os.path.basename(SCRIPT_KEY) and os.path.isfile(os.path.join(own_directory, file_name)):
+                os.symlink(os.path.join(own_directory, file_name), os.path.join(template, os.path.dirname(SCRIPT_KEY), file_name))
+        os.symlink(os.path.join(repository_root(), verdicts.SCRIPT_KEY), os.path.join(template, verdicts.SCRIPT_KEY))
+        os.symlink(os.path.join(repository_root(), ".claude"), os.path.join(template, ".claude"))
+        for stream in STREAM_NAMES:
+            os.makedirs(os.path.join(work, "dumps", stream))
+            with open(os.path.join(work, "dumps", stream, "manifest.tsv"), "w", encoding="utf-8") as handle:
+                handle.write(f"自证的假导出 {stream}\n")
+        for name in ("alpha.out", "beta.out"):
+            with open(os.path.join(work, name), "w", encoding="utf-8") as handle:
+                handle.write(f"name=selftest product={name}\nname=complete\n")
+        # 产物每一趟要一份没追加过的：拷进这一趟自己的目录（名字照旧，项名不变）再起
+        command = ["bash", "-c", 'mkdir "$3/run-$$" && cp -- "$3/alpha.out" "$3/beta.out" "$3/run-$$/" && '
+                   'exec python3 "$1" --dumps "$2" --product "$3/run-$$/alpha.out" --product "$3/run-$$/beta.out"',
+                   "run-segment-one-b-selftest", "{tree}/" + SCRIPT_KEY, os.path.join(work, "dumps"), work]
+        red = verdicts.reuse_cells(SCRIPT_KEY, template, ["segment-one-b-1-alpha.out", "segment-one-b-2-beta.out"], os.path.join(work, "reuse"), 0,
+                                   command, fake_judge=True)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    print(f"run_segment_one_b_anchors_and_freeze.py 自证：6 格，红 {red} 格")
+    return 1 if red else 0
 
 
 if __name__ == "__main__":
+    PREFLIGHT_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..", ".claude", "scripts")
+    if os.path.isdir(PREFLIGHT_DIRECTORY):   # 拷到仓外的副本旁边没有 .claude：准入判不了，照「拒算」那一路原样跑
+        sys.path.insert(0, PREFLIGHT_DIRECTORY)
+        from project_preflight import preflight
+        preflight(__file__)
     sys.exit(main(sys.argv[1:]))

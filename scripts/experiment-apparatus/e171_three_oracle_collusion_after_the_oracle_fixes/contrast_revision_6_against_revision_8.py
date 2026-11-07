@@ -7,7 +7,7 @@
   ① 两趟比对器产物里的每一行：按行种认身份（下面 IDENTITY_FIELDS；没列的行种按出现次序配），身份之外每个字段一行 name=contrast_cell，
      revision_6=… revision_8=…（一边没有写 absent）same=…；Q1–Q5 的各格（红态数、适用数、峰值、为正段数、期末值、判定……）都在这里；
   ② 第 1、6、7、10 步之后那几样比、③ 两棵树的逐文件差表：都要修订 6 那一趟的树（快照摘要 7726cdd6…）与它的导出，两样造不回来
-     （第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 6：用户 2026-11-02 选第一段对照只出 ①④、②③ 记「修订 6 树与导出造不回来」）。
+     （第 2 次重跑登记 research/prompts/e171-r2-prereg.md 修订 6：第一段对照只出 ①④、②③ 记「修订 6 树与导出造不回来」）。
      这两项不比、不起任何比对脚本，各写一行 name=contrast_s15 / name=contrast_tree_file status=not_reconstructible reason=…（② 按步各一行），
      收尾那一行这两格也写 not_reconstructible，不写数（读不到不当 0）；
   ④ 两趟第 11–13 步各行装置那一步的耗时（行产物的 device_ns），按台分开（编排器的账 row-hosts.tsv）：name=contrast_row_time，每台一行汇总 name=contrast_row_time_by_host；
@@ -29,7 +29,7 @@
       「✗ 自证 parts-not-reconstructible：」
   CONTRAST_R8_BREAK=row-host-ignored  行耗时一律记在本机
       「✗ 自证 row-times-by-host：」
-  CONTRAST_R8_BREAK=absent-ledger-as-host-1  那一趟的账不在时各行记在本机（改前的取法）
+  CONTRAST_R8_BREAK=absent-ledger-as-host-1  那一趟的账不在时各行记在本机
       「✗ 自证 row-times-without-ledger：」
   CONTRAST_R8_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
       「✗ 自证 no-leftover-processes：」

@@ -4,7 +4,7 @@
 `scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`：产物里 `name=freeze file=… sha256=…` 每个文件一行（不含 `comparator*`
 与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是这一份目录内容的指纹（盲测族给导出装置的种子取登记的 `85441ae491419411`，写死在各驱动与复跑里，不随重冻结变）。本实验不改那一份，只读、只起它。
 
-那份参照产物在 research/results/ 下、可以被归档删掉（用户 2026-10-18 定：别的实验的产物缺了报本次未跑）：读不到时
+那份参照产物在 research/results/ 下、可以被归档删掉：读不到时
 `freeze_reference_lines` 抛 `FreezeReferenceMissing`；comparator.py、o3_bad_image_judge.py（judge）、row_driver.py 开跑前经
 `report_missing_freeze_reference` 打一行 `NOT_RUN_ARCHIVED_PRODUCT test=<哪一个> reason=…`、退 77，一行产物都不写；单测 test_o3_columns 报同一行后跳过。
 那一份搬了家、只改了路径的文件（`.claude/rules/path-moves.md`「怎么做」第 6 步：路径不在冻结范围内），逐个登记在同目录

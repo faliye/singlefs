@@ -316,7 +316,7 @@ mod tests {
     }
 
     /// D5 正文那条保守 death 在多可写头下不许出现判死实活——数据丢失方向
-    /// 结构性为零（E18 的主结论）。变异审计补的：此前测试只跑 Earliest，
+    /// 结构性为零（E18 的主结论）。变异审计补的：测试不能只跑 Earliest，
     /// 把「全部分支删过才写有限值」改成「任一分支删过」不会有任何测试红。
     #[test]
     fn conservative_rule_never_loses_data_even_with_many_heads() {

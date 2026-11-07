@@ -1,20 +1,22 @@
 #!/bin/bash
 # E171 第 1 次重跑·修订 11：修订 8 那一趟第 0–10 步的一个单元，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.5、11.10 节）。
 # 由 segment_one_units_revision_11.py 起：bash <这一份> <单元名>，环境变量由它给；退 0 是这个单元绿，别的是红。
-# 照抄修订 8 单元脚本 segment_one_unit_revision_8.sh；判法、阈值、线程那几行一个字不动，内存包装与各步的内存上限同它一样已删（额度由任务服务给）；各读数进程外面的 nice 与线程包装也删了（第 2 次重跑登记修订 5）；单元整条由单元编排直接起，环境里的线程数变量设成它分到的线程（读数单元 10，第 2 次重跑登记修订 7、8），里面各进程读到的上限就是 THREADS。改的只有：
+# 照抄修订 8 单元脚本 segment_one_unit_revision_8.sh；判法、阈值一个字不动，内存包装与各步的内存上限同它一样已删（额度由任务服务给）；各读数进程外面的 nice 与线程包装也删了（第 2 次重跑登记修订 5）；线程取每台默认重活线程数（scripts/hosts/heavy-threads.sh 的 heavy_thread_default，第 2 次重跑登记修订 10），单元编排起的单元里 SINGLEFS_THREAD_CAP 是它分到的数，取到的就是那个数。改的只有：
 #   device_step、driver_step、run_executor 三处，与第 3 步 O3 阳性对照（o3_bad_image_judge.py control）、研究一侧变异表两处读数进程：编排给了这一步的条目
-#   （REUSE_ENTRIES 里「步名<TAB>条目」）就取用（reuse_library.py fetch：核 RC5、按角色硬链接到这一趟的名字），不起那个进程；判法照跑；
+#   （REUSE_ENTRIES 里「步名<TAB>条目」）就取用（reuse_library.py fetch：条目在 prune-server 里，解出来核 RC5、按角色写到这一趟的名字），不起那个进程；判法照跑；
 #   驱动行取用之后照旧起驱动、参数不变，由驱动按键复用从取来的行目录重报产物与计时（行目录里 reuse_key 与这一趟相同才读回、不编、不跑装置与执行器；冻结行前后照核）；
 #   每一步的读数（现跑的、取来的）记一行进 REUSE_READINGS（步名、fresh|reused、退出码、角色=路径…；现跑的驱动行另记 compiled=<编译用的线道目录> 给 RC4），
 #   由编排在单元结束时照入库条件入库；
 #   第 2b 步取用时不拷第 2 步导出（取来的那份导出目录已是拷贝加写入之后的整份）；
 #   新加单元 reuse-selfproof（RP2：H7 那个装置二进制跑三次 stream-constants，reuse_library.py selfproof）；
 #   第 2 步的逐文件比改用研究目录里的 s2_compare.py（当年仓外那一份丢了，照登记重写入库，第 2 次重跑登记修订 4）。
-# 环境：修订 8 那几个（REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS WORK_ROOT
+# 环境：修订 8 那几个（REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS（编排照旧给，这一份不读） WORK_ROOT
 #   UNIT_LOG UNIT_PRODUCTS UNIT_DIRECTORIES，依赖的名字，Q5_REVERSE_STATES Q5_MAIN_STATES，PRINT_ONLY）加 REUSE_LIBRARY（H30）、REUSE_ENTRIES、REUSE_READINGS。
 #   PRINT_ONLY=1：只打出这个单元会跑的每一条命令（取用的那几步打 fetch 那一条），一条都不跑。
 set -u
 UNIT=${1:?要单元名}
+source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
+THREADS="$(heavy_thread_default)" || exit 2  # 取每台默认重活线程数；单元编排起的单元里 SINGLEFS_THREAD_CAP 就是它分到的数
 cd "$REPO" || exit 2
 # 编排给的 RESEARCH 是这一份所在的研究目录（相对 REPO 的 RESEARCH_RELATIVE，自证里是它的绝对路径）；缺省写成那个字面路径
 RESEARCH="${RESEARCH:-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes}"
@@ -93,7 +95,7 @@ device_step() {
   fi
   snapshot_check
   if [ -n "$entry" ]; then
-    fetch_into "$entry" "product=$product" "timing=$timing" ${directory:+"directory=$directory"} || stop "$name 取用不成（条目坏了已挪进隔离目录，或目标已在；见 $UNIT_LOG）"
+    fetch_into "$entry" "product=$product" "timing=$timing" ${directory:+"directory=$directory"} || stop "$name 取用不成（条目坏了已挪进库里的 quarantine/，或目标已在；见 $UNIT_LOG）"
     code=$FETCHED_EXIT
     note_reading "$name" reused "$code" "product=$product" "timing=$timing" ${directory:+"directory=$directory"}
   else
@@ -117,7 +119,7 @@ driver_step() {
   entry=$(reuse_entry_for "$name")
   row=$(option_value --output-root "$@")/row-0
   if [ -n "$entry" ]; then  # 取来的行目录放进输出根，驱动照旧起、参数不变，按键复用从它重报（不编、不跑装置与执行器）
-    fetch_into "$entry" "row=$row" || stop "$name 取用不成（条目坏了已挪进隔离目录，或目标已在；见 $UNIT_LOG）"
+    fetch_into "$entry" "row=$row" || stop "$name 取用不成（条目坏了已挪进库里的 quarantine/，或目标已在；见 $UNIT_LOG）"
   fi
   if [ "$PRINT_ONLY" = 1 ]; then
     show python3 -B "$RESEARCH/row_driver.py" --repo-root "$REPO" --work-root "$WORK_ROOT" --snapshot-from "$REPO/$TREE" \

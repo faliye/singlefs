@@ -18,7 +18,7 @@
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-/// D23（journal 的角色与格式） 已定项 18 定案句：默认环下 196608 ÷ 3 = 65536
+/// D23（journal 的角色与格式） 已定项 18 条文：默认环下 196608 ÷ 3 = 65536
 /// （抄自 `.claude/kb/decisions/23-journal的角色与格式.md` 已定项 18，登记第二节第 266 行原样抄录）。
 const IN_FLIGHT_RECORD_LIMIT: usize = 65_536;
 /// 登记第七节 A6：k = 3、r = 2 时严格连续段至多 6 条。

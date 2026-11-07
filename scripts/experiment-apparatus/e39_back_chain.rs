@@ -1,4 +1,4 @@
-//! E39：反向链挡不挡得住残留记录 —— D23 已定项 8 的方向定案要验的那一步。
+//! E39：反向链挡不挡得住残留记录 —— D23 已定项 8 的方向要验的那一步。
 //!
 //! ## 方向已定不等于有效性已证
 //!
@@ -175,7 +175,7 @@ fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
 
 /// 记录头现在是 84 字节（E23 逐字列出的 11 个字段）。反向链要在它之上加 `bits/8` 字节。
 const RECORD_HEADER_BYTES: u64 = 84;
-/// D23 已定项 7 定案新增：事务号 8 + 提交标记 1。
+/// D23 已定项 7 新增：事务号 8 + 提交标记 1。
 const TRANSACTION_FIELD_BYTES: u64 = 9;
 /// E23 的点名项宽度。
 const ITEM_BYTES: u64 = 56;
@@ -316,7 +316,7 @@ mod tests {
     /// 新时间线从 `jsn = settled` 起写 `new_after` 条，`slot = jsn % 槽数` ⇒
     /// 它盖掉的是空洞那一格加其后 `new_after − 1` 条残留
     /// ⇒ **还活着的残留 = stale − (new_after − 1)**。
-    /// ⚠️ 这个减项是写这条断言时被实测打出来的：原先按 `STALE_COUNT` 写，实测 6 ≠ 8。
+    /// ⚠️ 这个减项是写这条断言时被实测打出来的：按 `STALE_COUNT` 写，实测 6 ≠ 8。
     /// **模型没错，是断言少算了覆盖。**
     #[test]
     fn the_number_of_leftovers_replayed_equals_the_number_constructed() {

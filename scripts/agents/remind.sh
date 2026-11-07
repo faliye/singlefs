@@ -2,8 +2,8 @@
 # admission: always 每一次调都是用户或主 agent 要登记、关掉或查看一条提醒，登记目录随时在变，上一次的结论不替这一次作保
 # run-condition: command sleep awk python3
 # gate-similar: cache-keepalive.sh 同样是 run_in_background 起、到点退出叫醒会话的计时脚本，但它只给子 agent 续提示缓存（固定 230 秒、不登记、不循环）；这里按分钟登记、可循环、有 stop 与 list，到点之后靠 Stop 钩子 remind-rearm-stop-guard.sh 自启动，并进去会把两种用途的退出语义搅在一起
-# 本工程唯一的定时提醒（用户 2026-10-14 定：「这个脚本可以输入提醒周期时间 提醒内容 和是否循环」「脚本到时间提醒 然后自启动」
-# 「没有 --once 的时候就无限自启动或者被关闭」「禁止其他的设置时间的防止，仅仅允许这一个」）。别的定时办法（CronCreate、ScheduleWakeup、
+# 本工程唯一的定时提醒：输入提醒周期时间、提醒内容和是否循环；脚本到时间提醒、然后自启动；
+# 没有 --once 的时候就无限自启动或者被关闭；别的设置时间的办法一概不许，仅仅允许这一个。别的定时办法（CronCreate、ScheduleWakeup、
 # RemoteTrigger、只为定时而 sleep 的 Bash 与 Monitor）由 .claude/hooks/timer-only-remind-guard.sh 在执行前拒绝。写法与到点之后做什么在 .claude/skills/remind/SKILL.md。
 #
 # 用法（主 agent 用 Bash 的 run_in_background 起 start；它等到点、打一行「REMIND …」、退出，退出就叫醒主 agent）：
@@ -47,7 +47,7 @@
 #       「✗ 自证 usage-every：」
 #   REMIND_BREAK=identity-by-name  认在等退回只看进程活着、命令行任意位置含 remind.sh
 #       「✗ 自证 unrelated-process：」、「✗ 自证 start-time-mismatch：」
-#   REMIND_BREAK=pidfile-removed-unchecked  到点与被停时不核登记、无条件删进程号文件（改前的样子）
+#   REMIND_BREAK=pidfile-removed-unchecked  到点与被停时不核登记、无条件删进程号文件
 #       「✗ 自证 foreign-registration-at-end：」、「✗ 自证 foreign-registration-on-term：」
 set -u
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"

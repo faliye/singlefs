@@ -12,7 +12,7 @@
 | `hosts/` | 内存包装（每条上限与 slice 总上限的内核层兜底）、线程上限、第二台那几段（在同一个绝对路径的共享树里起命令，不拷树、不取回）、task-server 载入的预测与余量判法、长活脱离、每台只编一次的 C++ 依赖（RocksDB、snappy）；排队、挑机器、定额度与起任务在仓根 `task-server/`（不在 `scripts/` 下） |
 | `kb/` | kb 的定点改写、引文与文献、回扫与变更史整理 |
 | `mutation/` | 变异驱动、证红、广谱变异，变异表在 `mutation/tables/` |
-| `prune-server/` | 判定库服务 prune-server 的 Python 一侧：被三家判定库载入的客户端、导入旧库、模拟负载（服务本体在仓根 `prune-server/`） |
+| `prune-server/` | 判定库服务 prune-server 的 Python 一侧：被三家判定库载入的客户端、客户端的自证（连同起临时服务）、照三家读写形态压服务的模拟负载（服务本体在仓根 `prune-server/`） |
 
 - 层级：`scripts/` 下最多三层，`scripts/<子目录>/<装置目录>/<文件>`。
 - 不放结果：产物、日志、实测表不进这里。实验产物进 `research/results/`；运行记录（峰值表这类）放多机配置 `NFS_SHARED_ROOTS` 点名的共享根下、两台读同一份，不经 `~` 取（`.claude/rules/verification.md`「判定库只有一份」）。

@@ -123,11 +123,11 @@ const PASSES: [(&str, f64); 2] = [("weekly", 522.0), ("daily", 3650.0)];
 const BACK_CHAIN_BYTES_TODAY: u64 = 4;
 /// 记录头总字节（今天）：D23 已定项 4「头 487 字节」。门禁 27 号把这个名字与 kb 标记绑住。
 const JOURNAL_HEADER_BYTES: u64 = 487;
-/// 改之前那一档（2026-09-24 到这一次格式改动之前现行）的记录头总字节。
+/// 上一档格式的记录头总字节。
 const HEADER_BYTES_BEFORE: u64 = 311;
 /// 今天的 base = 今天的记录头总字节 − 反向链宽度。
 const BASE_TODAY: u64 = JOURNAL_HEADER_BYTES - BACK_CHAIN_BYTES_TODAY;
-/// 改之前那一档的 base，同一个减法。
+/// 上一档格式的 base，同一个减法。
 const BASE_BEFORE: u64 = HEADER_BYTES_BEFORE - BACK_CHAIN_BYTES_TODAY;
 /// 读法乙：记录尺寸定长（D23 已定项 12）。
 const RECORD_BYTES_FIXED: u64 = 4096;
@@ -490,7 +490,7 @@ mod tests {
 
     // ═══ E49 第 2 次重跑登记（记录头 487）：第七节 A1–A4、B1–B11 ═══
 
-    /// **A1 / A2**：今天的 base = 头 487 − 链 4 = 483；改之前那一档 = 311 − 4 = 307。
+    /// **A1 / A2**：今天的 base = 头 487 − 链 4 = 483；上一档 = 311 − 4 = 307。
     #[test]
     fn base_today_and_base_before_are_derived_correctly() {
         assert_eq!(JOURNAL_HEADER_BYTES, 487);
@@ -530,8 +530,8 @@ mod tests {
         }
     }
 
-    /// **B1**：读法甲，base=307（改之前那一档）四格——2v4 两档都免费；4v8 在 512 上 31 处（首个 31）、
-    /// 4096 上 4 处（首个 287）；`cap_items` 512 上 3、4096 上 67。这一侧由改装置之前的现跑复现，不拿登记里的数当基线。
+    /// **B1**：读法甲，base=307（上一档）四格——2v4 两档都免费；4v8 在 512 上 31 处（首个 31）、
+    /// 4096 上 4 处（首个 287）；`cap_items` 512 上 3、4096 上 67。这一侧由现跑复现，不拿登记里的数当基线。
     #[test]
     fn base_before_diverges_on_four_versus_eight_only() {
         assert_eq!(divergences(BASE_BEFORE, 2, 4, 512, LARGEST_ITEM_COUNT), (0, None));

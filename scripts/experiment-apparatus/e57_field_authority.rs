@@ -59,7 +59,7 @@ struct Arm {
     ///
     /// ⚠️ **这一格才是本实验的要害，而第一版把它写死成 true。**
     /// D18 已定项 3 的禁放清单逐字写着块头**永远禁放**物理落点 / 设备 ID，
-    /// 依据是 D9 已定项 5（2026-08-26 用户定案）把「一个块的**物理地址的
+    /// 依据是 D9 已定项 5把「一个块的**物理地址的
     /// 权威记录点**」定在明文映射层。⇒ 扫描到的落点是**观测**，不是权威记录；
     /// 拿它替块头供出 Dev/Off，等于让块头借用了对面那一侧的权威。
     scan_supplies_physical: bool,
@@ -165,7 +165,7 @@ const METADATA_ONLY_HEADER: Arm = Arm { header_on_metadata: true, header_on_data
 /// 戊：本地腿要求的对称臂——方向 B 也拿到免费输入。
 const SYMMETRIC: Arm = Arm { header_on_metadata: true, header_on_data: true, mapping_carries_kind: false, symmetric_free_inputs: true, scan_supplies_physical: true };
 /// 己：把「块头永远禁放物理落点」这条已定条款喂进模型。
-/// 这是正推腿提出的证伪观测：不喂扫描落点重跑方向 A，看缺口还在不在。
+/// 这是盲预测提出的证伪观测：不喂扫描落点重跑方向 A，看缺口还在不在。
 const CORRECTED: Arm = Arm { header_on_metadata: true, header_on_data: true, mapping_carries_kind: false, symmetric_free_inputs: false, scan_supplies_physical: false };
 const NEGATIVE: Arm = Arm { header_on_metadata: false, header_on_data: false, mapping_carries_kind: false, symmetric_free_inputs: false, scan_supplies_physical: true };
 

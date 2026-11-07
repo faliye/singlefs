@@ -13,15 +13,20 @@
   entry <入口闭包的键>   同目录 lib_function_units.py 的 closure_key：入口目标的生效 cfg 集、闭包里每个单元（种类、去注释指纹）的多重集、数据单元摘要、
                           工具链行、依赖版本行、闭包里点名的外部程序（cargo、herd7、busybox、qemu-system-*：内容 sha256 与 --version 第一行）
     工具链行（Rust 入口）  rustc -vV 每一行、cargo -V、构建环境的生效值（build_environment_setting_lines：环境变量 RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、CARGO_PROFILE_*、
-                          CARGO_BUILD_*（CARGO_BUILD_JOBS 除外）、CARGO_TARGET_*_RUSTFLAGS / _RUNNER、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER 的值；
-                          闭包根往上各层与 CARGO_HOME 的 .cargo/config(.toml) 照 cargo 的合法合成之后逐键摊开的值（注释、空白、写的次序都不进）；
+                          CARGO_BUILD_*（CARGO_BUILD_JOBS、CARGO_BUILD_TARGET_DIR、CARGO_BUILD_INCREMENTAL 除外）、CARGO_TARGET_*_RUSTFLAGS / _RUNNER、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER 的值；
+                          闭包根往上各层与 CARGO_HOME 的 .cargo/config(.toml) 照 cargo 的合法合成之后逐键摊开的值（注释、空白、写的次序都不进），
+                          只取改结局的四张表 build（去掉 jobs、target-dir、incremental）、target、profile、env，[alias]、[net]、[http]、[term] 这类不进
+                          （与 scripts/mutation/lib_mutation_units.py 的 toolchain_lines 同一种收法：BUILD_CONFIGURATION_SECTIONS、BUILD_KEYS_LEFT_OUT）；
                           rust-toolchain(.toml) 摊开的值；runner / wrapper 指的程序与参数里的脚本的内容 sha256；RUSTC 的 -V），
                           请求带 profile:<名> 的另加「profile <名>」与清单 [profile.<名>] 摊开的值；release 这一类档的 cfg 不带 debug_assertions
-    工具链行（Python、shell 入口）  python3 --version 或 bash --version 的第一行
+    工具链行（Python、shell 入口）  python3 --version 或 bash --version 的第一行；闭包里有工具链询问（[<RUSTC 或 build.rustc 给的编译器>, "-V"]）的，
+                          询问打的版本由闭包里的工具链单元进键（lib_function_units.py 文件头「版本询问」），这里不另加，判法闭包同（judge_key）
     依赖版本行  闭包里有单元的工作区包，Cargo.toml 写的外部依赖（测试编译的入口另加它那个包的 dev-dependencies；本机目标不要的 target 段不收），
                 顺着 Cargo.lock 收传递依赖（名字、版本、来源、checksum）；外部包的 Cargo.toml 在 cargo 缓存里找得到时，只在别的平台才要的依赖不收
-  judge <判法入口闭包的键>   请求带 judge:<入口> 的：判这一条结局的那几个函数（例 scripts/gate/lib_libtest_result_lines.py::result_line）的闭包键，连同解释器版本
+  judge <判法入口闭包的键>   请求带 judge:<入口> 的：判这一条结局的那几个函数（例 scripts/gate/lib_libtest_result_lines.py::result_line）的闭包键，连同解释器版本；
+                            判法闭包里按行进键的登记表只进它按这一条的入口文件查的那几行（lib_function_units.py 文件头「按行进键的登记表」，row_keyed_closure）
   tool <内容 sha256> <版本>   请求带 tool:<程序> 的
+  program-arguments <json>  请求带 program-argument:<词> 的：python 程序入口带的参数照次序（闭包也照它剪，lib_function_units.py 文件头「程序入口带参数」）
   line <文本>               请求带 line:<文本> 的：这一条判定自己的内容输入（这一行的参数、GPU 开关与特性集这一类），调用方不许把名字、路径、上限、限时写进来
   file <内容 sha256>        请求带 file:<仓根起的路径> 的：数据（期望产物这一类）只进内容，不进路径；不在也是一种取值
   environment <第一行>       请求带 environment-of:<登记键> 的：那一行 environment= 探针打的工具版本（QEMU、herd7、Verus 这类不在 cargo 工具链里的）
@@ -34,12 +39,17 @@
   这一趟照跑、不复用、不入库；红句与成功句报拒算条数与头几处形态。
 
 判定请求（verdict-plan 的请求文件一行一条，制表符分隔；unit-key 的参数同一套）：<名字><制表符><入口>[<制表符><项>…]
-  名字是这一条判定在库里的索引（门禁写测试函数的入口原样、格名、自证的命令），不进键。入口照 lib_function_units.py 的写法，相对 root: 那个目录。项：
+  名字是这一条判定在库里的索引（门禁写测试函数的入口原样、格名、自证的命令），不进键。入口照 lib_function_units.py 的写法，相对 root: 那个目录。
+  入口写 -（JUDGE_ONLY_ENTRY）的：被判那棵树里没有程序入口，判的是判法拿被判那棵树当数据跑（门禁 code-tooling 的 function-units-two-implementations-agree、
+    mutation-list-items、entry-scripts 三格）：键里的 entry 行是「entry -」，其余只由 judge:、tool:、line:、file:、environment-of: 组成；没有入口闭包，variable 行不进；
+    一个 judge: 都没有的拒算（key-uncomputable）。弄坏开关 judge-only-entry-judges-unkeyed 下这种请求的 judge: 不进键。项：
     root:<仓根起的目录>   闭包从哪棵树算（research 工作区写 root:scripts/experiment-apparatus；不写是仓根）
     target:<目标号>        lib_function_units 的目标号 <包目录名>:<lib|bin|test|…>:<名>（不写照它的默认挑）
     feature:<包>/<特性>    no-default-features    cfg:<名或 名="值">    profile:<名>（cargo 的编译档，例 release）
     judge:<入口>   judge-root:<目录>（判法在哪棵树里算闭包：门禁写它自己所在的仓，样本档被判的是样本；不写是被判的根；只当索引，不进键）
     tool:<程序>   line:<文本>   file:<路径>   environment-of:<登记键>
+    program-argument:<词>  python 程序入口（只写 <文件> 的入口）带的参数，可给几次、照次序；闭包只收这组参数真走到的那一支（break-switch-replay 这类
+                           「这份脚本带这组参数跑」的判定写它），这组参数另进键
     variable:<名>=<值>   这一趟起判定时这个环境变量的取值（名要是 DOMAIN_ENVIRONMENT_VARIABLES 登记的或以登记的前缀起头；没设的不写这一项）。
                          test-functions-request 照它起那一刻的环境逐个打（调用方在交给 cargo 的同一份环境里起它）；进不进键、怎么进见「单元键」的 variable 一行
 
@@ -47,9 +57,9 @@
   名字是 <被判的根的 git common-dir>/singlefs-unit-verdicts/<种类>（本地不建、不读、不写；键里只用种类名，哪棵仓不进键，命名空间只在临时服务底下给，
   客户端文件头「键空间」），两台、各 worktree 与仓副本读写同一份、跨轮留着，不随判法换目录、没有版本目录、不按个数删。服务连不上客户端退 75，调用方不当「库里没有」现判。
   被判的根不是 git 工作树（取不到 git common-dir）、这棵树里没有客户端：退 2（LibraryUnavailable），一条都不判，没有「不读不写、全部现判」的那条路
-  （弄坏开关 library-outside-git-tolerated 下照改前不读不写）。样本档要在上一版的树上算键、记进样本自己的库的，把上一版的树放在样本根底下（取到的是同一个 common-dir）。
+  （弄坏开关 library-outside-git-tolerated 下不读不写）。样本档要在上一版的树上算键、记进样本自己的库的，把上一版的树放在样本根底下（取到的是同一个 common-dir）。
   记红、撤绿、下趟现判：verdict-record 收 --red-names 的那几条照计划里的键写一条 verdict=red 的 keys/<键>.json，盖掉这把键原有的绿；lookup 遇到键记着红答 judge、
-  原因以「上次判红」起头；之后判绿照常盖回绿（弄坏开关 red-verdict-not-recorded 下判红不写，改前的样子）。
+  原因以「上次判红」起头；之后判绿照常盖回绿（弄坏开关 red-verdict-not-recorded 下判红不写）。
   种类由调用方定（门禁写登记键：阶段文件名或 <阶段>:<格>）。keys/<键>.json 是一条判定（verdict 是 green 或 red、key、item、request、how（跑法）、summary、
   judged（判定日期）、composition（组成清单）），items/<名字的 sha256>.json 是这个名字最近一次判绿的那一份，只用来在键对不上时比组成清单、报出变了的单元。
   键相同就复用，不看记下来的是哪个名字（两条判定内容相同，判定就相同）。
@@ -82,17 +92,32 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
   调用方在 verdict-plan / test-plan 退非 0、退 0 而没打 PLAN 那一行、verdict-record 退非 0 时调 plan-failure，把那一趟的输出交给它；
   失灵 = 输出里有复用哨兵的红句（「复用失灵：」「判定不稳：」「…强制现判没起作用」那几行 ✗），或计划那两条退非 0、没打 PLAN。
   plan-failure 退 1 并打 ✗ 与出路（点名哪一条哨兵、或退了几，出路指到本文件头的哪一段）；调用方照旧全部现判跑完那一趟，那一道（那一格）结论判红。
-  verdict-record 退非 0 而输出里没有哨兵红句的（记不进库）不算失灵：plan-failure 退 0，调用方照旧只报一句、下一趟照判。
+  记红没成算失灵：verdict-record 照计划里的键记红没成（写帧出错、读不了计划或名字文件、样本档造的）的，每条打一行「✗ 判红没记进判定库：…」、末行 RECORD 带
+    red-unrecorded=<条数>、退 1；调用方交 plan-failure 时带 --red <根> <种类> <计划文件> <判红的名字文件>（交 --red-names 的那一趟都带）。plan-failure 见了那一句，
+    或带了 --red、名字文件不空、verdict-record 退非 0 而输出里没有 RECORD 那一行（没跑完：被停、崩了）的，改走撤绿：计划里那几个名字的键在库里记着绿的删掉
+    （VerdictLibrary.withdraw_green，删完回读），打 ✗、退 1，那一道（那一格）判红；撤也撤不掉（没带 --red、读不了计划、开不了库、删不成）的打 ✗「整道判红」，
+    出路写服务好了之后照键逐条删（prune_server_client.py delete-prefix）。这一条不归弄坏开关 plan-failure-not-red。
+    样本档造记红没成：被判的根下有 .unit-verdict-sample/red-record-failure 时，verdict-record 照它当每条判红都没记成（记绿照常）。
+  只交判绿的那一趟 verdict-record 退非 0 而输出里没有哨兵红句的（记绿记不进库）不算失灵：plan-failure 退 0，调用方照旧只报一句、下一趟照判（查不到绿，不会错复用）。
   prune-server 客户端退 3 不是记不进库：三条子命令哪一条退 3、输出里有客户端「✗ prune-server 客户端：…（退 3）」那一行（没写服务地址、多机配置读不了、服务拒了这一帧），
     plan-failure 打 ✗「prune-server 客户端退 3」与客户端给的出路、退 1，调用方照红办（配置错不当本次未跑，也不当服务不可用）。
   prune-server 不可用不是失灵：三条子命令哪一条退 75（scripts/prune-server/prune_server_client.py 文件头「退出码」），plan-failure 打 ✗「prune-server 不可用」与出路
     （python3 prune-server/control check、报给主 agent），退 75、不判复用失灵；调用方照「服务不可用」那一格退 75（不现判、不判红也不判绿），
     整道由 .claude/gate.d/lib/stage-cells.sh 汇总成 75（有一格真红仍整道退 1）。
+  欠撤：判红那一趟记红时 prune-server 正好不可用（verdict-record 退 75，同一把键原有的绿还在），调用方带 --red 交的 plan-failure 照旧退 75，
+    同时把判红那几条（计划里有键的）的键与种类记成「欠撤」：运行记录，不是判定库（.claude/rules/verification.md「判定库只有一份」里不进库的那一类），
+    放在上次红的清单那一层（scripts/gate/lib_reuse_checks.py 的 last_runs_directory：SINGLEFS_LAST_RUNS_DIRECTORY 或共享数据根下的 last-runs）底下的
+    withdrawals-owed/<库名的 sha256>/<键>.json，一把键一份（种类、库名、名字、键、日期），写完回读；记不下的打 ✗ 与手删的出路。
+    下一趟 verdict-plan / test-plan 开跑、算计划之前先读这份库的欠撤：逐把键撤掉原有的绿（VerdictLibrary.withdraw_green，删完回读）、删掉那一份再核不在；
+    有一份撤不掉（服务不可用、回读还是绿、记录读不了、删不掉）打 ✗、整道退 75、不算计划、不判绿，欠撤留到下一趟。上次红的清单那一层取不到的打一行 ! 照算（记的那一趟同样取不到、记不下）。
+    样本档造：被判的根下有 .unit-verdict-sample/red-record-unavailable 时 verdict-record 记红那一帧照服务不可用退 75；有 .unit-verdict-sample/owed-withdrawal-unavailable
+    时 verdict-plan / test-plan 撤欠撤那一帧照服务不可用、整道退 75。自证两格在 run_reuse_fix_cells（记红时服务不可用 ⇒ 记欠撤、下一趟撤成现判；撤不掉 ⇒ 整道 75、欠撤留着）。
   样本档造失灵：被判的根下有 .unit-verdict-sample/plan-failure（一行 exit-1 或 sentinel-reuse-failed）时，verdict-plan / test-plan 照它装失灵——
     exit-1 不算键、不查库、打一行 ✗ 退 1；exit-75 不连服务、打一行 ✗「样本档造的服务不可用」退 75（各调用方照「服务不可用」退 75 的样本用它）；
     sentinel-reuse-failed 照常算、照常打计划，再添一条「复用失灵：<头一条请求> 键相同却现判了（样本档造的假哨兵…）」退 1。
     只有门禁样本档放这份文件；写的不是这三样退 2。
-  自证：plan-failure 那几格（run_plan_failure_cells：哨兵三种红句、退 1 / 2、没打 PLAN、记库退非 0 而没有红句、三条子命令退 75 判不可用、三种样本标记）。
+  自证：plan-failure 那几格（run_plan_failure_cells：哨兵三种红句、退 1 / 2、没打 PLAN、记库退非 0 而没有红句、记红没成没带 --red、三条子命令退 75 判不可用、三种样本标记）；
+    记红没成撤绿那两格在 run_reuse_fix_cells（样本标记 red-record-failure 下 verdict-record 退 1、plan-failure --red 撤绿、下一趟现判；verdict-record 没跑完、带 --red 照样撤绿）。
 
 登记表是 .claude/gate.d/stage-inputs.tsv（唯一登记位，门禁阶段与实验各占几行；写法在它文件头）。一行一条，制表符分隔：
     <键> <制表符> <入口，空格分隔；没有就写 -> [<制表符> <准入条件与跑法字段，空格分隔>] <制表符> #<为什么是这几个入口>
@@ -106,8 +131,7 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       product-field=<实验键>:<行名>:<字段>=<值>   scripts/experiment-apparatus/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>
       same-run-field=<行名>:<字段>=<值>           同一趟里先跑的那一段这一趟的输出（路径由调用方经环境变量 SINGLEFS_ADMISSION_SAME_RUN_PRODUCT 交来）里，
-                                                  最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>；不读 research/results/ 下的留存产物（用户 2026-10-18 定
-                                                  「改成同一趟现判」：research/ 可以整个删掉）。变量没设、指的文件不在、没有那一行或字段、值不等，都算前提没齐（退 3）
+                                                  最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>；不读 research/results/ 下的留存产物（同一趟现判：research/ 可以整个删掉）。变量没设、指的文件不在、没有那一行或字段、值不等，都算前提没齐（退 3）
     question-row 与 product-field 点名的文件（那份问题单、replay.sh 给那个实验键登记的留存产物）不在仓里，登记表自查（lint_registration_rows）判红：
       前提指的是可以被归档删掉的东西，登记就靠不住；上一段的结论改用 same-run-field 在同一趟里现判。
     门禁行认五种：
@@ -183,21 +207,26 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
                                  之后每条测试函数「编不编（收 Rust 闭包）、编得进就算键」按测试函数交错分到每台默认重活线程数（registered_heavy_threads：
                                  SINGLEFS_THREAD_CAP 设了照它，不然 .claude/heavy-thread-default）个 fork 出来的子进程里算，按原来的次序合回来，
                                  查库、写计划文件与逐条打照旧在本进程里一条一条做：键、stdout、计划文件与一个进程算的逐字相同。
-                                 线程数是 1、要算的不到两条、线程数取不了（照 1 算）时在本进程里算。
+                                 线程数是 1、要算的不到两条时在本进程里算；线程数取不了（登记文件写坏、SINGLEFS_THREAD_CAP 不是正整数）整次列不出、退 2，不退回 1 个子进程
+                                 （.claude/heavy-thread-default 文件头：取不了就拒）。
                                  ADMISSION_TEST_PLAN_WORKERS_FILE（只给自证）设了就往里写一行「processes=<子进程数，本进程里算是 0> items=<算了几条>」
   unit-key <根> <入口> [<项>…]   打「key <键>」与组成清单；拒算打拒算行、退 4
   verdict-plan <根> <种类> <请求文件> <计划文件>
                                  逐条算键、查库：stdout 一条一行「<名字><制表符><reuse|judge|refused><制表符><键或 -><制表符><原因>」，末行
                                  「PLAN judge=<N> reuse=<M> refused=<R>」；计划文件记下请求与键，交给 verdict-record。库是 <根> 的 git common-dir 那一份（样本档要在上一版的树上算键、记进这一版的库的，把上一版的树放在样本根底下）。
-                                 复用哨兵（下面「复用哨兵」）那几行打在逐条的行之后、PLAN 之前；哨兵被现判时 PLAN 之后另打 ✗ 与出路、退 1
+                                 复用哨兵（下面「复用哨兵」）那几行打在逐条的行之后、PLAN 之前；哨兵被现判时 PLAN 之后另打 ✗ 与出路、退 1。
+                                 开跑先撤这份库的欠撤（上面「按条复用失灵」欠撤，test-plan 同）：撤成打一行「· 欠撤：…」，撤不掉打 ✗、退 75、不打 PLAN
   verdict-record <根> <种类> <计划文件> <判绿的名字文件> --how <跑法> [--summary <一句>] [--red-names <判红的名字文件>]
                                  名字文件里每个名字（一行一个）照计划文件里的请求重算一次键：与计划里的相同才记（跑的过程中输入变了的不记、点名报出来）；
                                  --red-names 给的名字（一行一个，这一趟真跑到而判红的）照计划里的键记红、撤掉这把键的绿（不重算：记红只会多现判）；
-                                 一个名字两份文件里都有的按红办；末行「RECORD recorded=<N> changed=<K> refused=<R> red=<记红的条数> library=<库目录>」
+                                 一个名字两份文件里都有的按红办；末行「RECORD recorded=<N> changed=<K> refused=<R> red=<记红的条数> red-unrecorded=<记红没成的条数> library=<库目录>」；
+                                 记红没成的每条打「✗ 判红没记进判定库：…」、退 1（上面「按条复用失灵」）
                                  计划文件旁边有 verdict-plan 存的复用哨兵状态（<计划文件>.reuse-sentinel.json）就在 RECORD 之前打哨兵的判定：
                                  强制现判那一条判绿了报与库里同为绿；没判绿的（红了或没跑到）只说一句，它的红由门禁这一趟自己报
-  plan-failure <调用方> <verdict-plan|test-plan|verdict-record> <退出码> [<输出文件>…]
+  plan-failure <调用方> <verdict-plan|test-plan|verdict-record> <退出码> [--red <根> <种类> <计划文件> <判红的名字文件>] [<输出文件>…]
                                  那一趟按条复用失灵没有（上面「按条复用失灵」）：失灵退 1、打 ✗ 与出路（<调用方> 写进红句，例「code-tooling 的 research-script-selftests 格」）；
+                                 --red 只跟 verdict-record，给那一趟交的根、种类、计划文件与 --red-names 那一份：记红没成时照它撤掉那几把键原有的绿；
+                                 那一趟退 75（服务不可用）时照旧退 75，照它记欠撤（上面「按条复用失灵」欠撤）；
                                  没失灵退 0、一个字不打；用法错退 2
   按条复用的共用段（门禁 crash-point-replay 按条复用的几格与 scripts/crash/crash-point-replay.sh 按条复用的那一段都只调这三条，判定种类、请求、跳过与记库的名单全仓一份）：
   test-functions-request <阶段文件名> <判法根>
@@ -259,8 +288,8 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
 没有强制重跑：实验键与上一份产物头相同就退 77，没有越过「输入没变」的变量或参数；要重跑就改输入（装置入口闭包、复跑表那一行的参数），键变了自然放行。
 弄坏开关（ADMISSION_BREAK=<项>[,<项>…]，只给自证与样本档证红用：--selftest 本身与它起的子进程认，门禁样本根（当前目录有 .gate-cells 或 .gate-break-sample）里由阶段转来的认，
 平常跑设了退 2、点名只在自证里认。逐条写开关名、弄坏哪一处，下一行起写打开后红的项：`ADMISSION_BREAK=<项> python3 scripts/gate/admission.py --selftest` 里逐条以 `✗ ` 起头的失败行的句首，
-「⇒」之前的那一段；里面再带「」的要配平，没配平的那一项连同同一条后面几项门禁 code-tooling 的 break-switch-replay 格都认不出；2026-10-29 逐个打开实测）：
-  ADMISSION_BREAK=experiment-key-with-kb-documents  .claude/kb/decisions/ 下的文件整份进键（改前实验准入收 kb 决策文档的样子）
+「⇒」之前的那一段；里面再带「」的要配平，没配平的那一项连同同一条后面几项门禁 code-tooling 的 break-switch-replay 格都认不出）：
+  ADMISSION_BREAK=experiment-key-with-kb-documents  .claude/kb/decisions/ 下的文件整份进键（实验准入收 kb 决策文档）
       「单元键：弄坏开关 skip-build-environment 下 RUSTFLAGS 那一格转红（键不变）」「reuse-sentinel：哨兵 1 条、种子 7 那一趟退 0、种子打进输出、一条强制现判（verdict-reco」
       「实验准入：T19（kb 决策文档改一句）⇒ 实验键不变，照判没变（退 77）：退 0」「实验准入：N22（登记表加注释、别的实验行多登记入口）⇒ 照判没变（退 77）：退 0」
       「给 doc-experiments：产物头的实验键对得上时状态是 matched：实际 stale」
@@ -287,6 +316,7 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「单元键：RUSTFLAGS 加 -C target-cpu=native（E02）」「单元键：.cargo/config.toml 只改注释键不变（N42）、改 rustflags 的值键变：只改注释 Tr」
       「单元键：cargo 配置 runner 写 `bash tools/runner.sh`，参数里的脚本（.cargo 那一层下）改一个字」
       「单元键：cargo 配置 runner 写 `bash package-runner.sh`，脚本只在登记用例的包目录 crates/demo 下，改一个字」（runner 指的脚本的内容摘要也在构建环境那几行里）
+      「单元键：构建环境只收改结局的设置：CARGO_BUILD_INCREMENTAL 与 [build] incremental 两种取值键相同、[alias] 加一条键不变，[profile.release] 改一项键变」
   ADMISSION_BREAK=ignore-row-keys  复跑表按行的准入键那一段不认
       「replay.sh：老产物没有产物头、新跑的有，比对前删掉产物头之后判字节一致：退 1，输出：」「弄坏 replay.sh 比对前删产物头那一步（换成 cat）判对不上：上一格分得出差别：退 1，输出：」
       「replay.sh：留存产物头上的实验键与今天的相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行（只改复跑表里的」「复跑表按行的准入键：两行各给键、各自登记时两行都跑、都判字节一致；第一行产物头是装置打的 key=E903，第二行是 r」
@@ -295,11 +325,12 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「复跑表按行的准入键：指到复跑表里没有的行时整份退 2，点名那一条：退 2，跑了 []，输出：」「复跑表按行的准入键：product-field=E903 只认键是 E903 的那一行产物（复跑表里 E903 两行），」
       「真仓 replay.sh 复跑表每一行定得下准入键：按行的准入键那一段写得对、指明的键都登记了、没有登记了准入的键被两行」
       「replay.sh：起自证的环境里设着多机配置变量（指到一份在的配置）时，样本仓的 replay.sh 照样跑、判字节一致」
-  ADMISSION_BREAK=replay-build-tools-unlinked  自证的临时仓不链 scripts/hosts/two-logs.sh 与 two_logs.py（replay.sh 开跑前的构建经它们起；改前的样子），要真跑 replay.sh 的几格构建退 127、replay.sh 整份退 2
+  ADMISSION_BREAK=replay-build-tools-unlinked  自证的临时仓不链 scripts/hosts/two-logs.sh 与 two_logs.py（replay.sh 开跑前的构建经它们起），要真跑 replay.sh 的几格构建退 127、replay.sh 整份退 2
       （失败行里输出那一段是 replay.sh 输出的末 600 字，起头随临时目录的长短挪，点名的原文只写到冒号为止）
       「replay.sh：老产物没有产物头、新跑的有，比对前删掉产物头之后判字节一致：退 2，输出：」「弄坏 replay.sh 比对前删产物头那一步（换成 cat）判对不上：上一格分得出差别：退 2，输出：」
       「replay.sh：留存产物头上的实验键与今天的相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行（只改复跑表里的」「replay.sh：前提没齐时判跑不了（准入退 3）、装置一次都没跑：退 2，输出：」
       「replay.sh：登记了准入、装置却没打实验键行时判跑不了：退 2，输出：」「复跑表按行的准入键：同一实验两行、只按实验号登记时 replay.sh 整份退 2，红在「准入只按实验号比产物」那一句，」
+      「replay.sh：起自证的环境里设着多机配置变量（指到一份在的配置）时，样本仓的 replay.sh 照样跑、判字节一致：退 2，输出：」（同一棵样本仓、同一行 E900，构建照样退 127）
       「复跑表按行的准入键：两行各给键、各自登记时两行都跑、都判字节一致；第一行产物头是装置打的 key=E903，第二行是 r」「复跑表按行的准入键：--admission-only 逐行列出各自的键与判定，一行都没跑：退 2，跑了 []，输出：」
       「复跑表按行的准入键：两行各给键而其中一个没在登记表登记时整份退 2，点名那个键，一行都没跑：退 2，跑了 []，输出：」「复跑表按行的准入键：指到复跑表里没有的行时整份退 2，点名那一条：退 2，跑了 []，输出：」
       「replay.sh：起自证的环境里设着多机配置变量（指到一份在的配置）时，样本仓的 replay.sh 照样跑、判字节一致」
@@ -307,30 +338,32 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「行键：R03 E23 产物改名（内容相同）」
   ADMISSION_BREAK=row-key-without-gpu  行键不加 GPU 开关
       「行键：E22 切 GPU 开关（--gpu 1）」
-  ADMISSION_BREAK=research-package-unresolved  驱动点名 -p <研究包> --bin <名> 时照仓根工作区去找 bin（改前的样子）
+  ADMISSION_BREAK=research-package-unresolved  驱动点名 -p <研究包> --bin <名> 时照仓根工作区去找 bin
       「行键：驱动点名 -p e7-index-bench --bin e900（研究工作区的包）⇒ E900 算得出行键、不拒」
   ADMISSION_BREAK=test-key-with-whole-file  test-plan 给每条测试函数的键另加它所在的整份文件（门禁 crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=setting-file-whole-closure 转成它，红在那一道的样本 unit-key-samples-green 里的 N19）
       「test-plan：同一设点文件里只改 test_t 闭包里的 observer」
   ADMISSION_BREAK=exclude-registered-ignored  test-plan 不认 --exclude-registered（登记的用例与放量分项照判）
       「test-plan --exclude-registered：登记成 crash-case: 的用例与放量分项记 registered」
-  ADMISSION_BREAK=test-plan-single-process  test-plan 算键照改前在一个进程里一条一条算
+  ADMISSION_BREAK=test-plan-single-process  test-plan 算键在一个进程里一条一条算
       「test-plan：同一份输入单线程与并行算出的 stdout 与计划文件逐字相同，并行那一趟真分到了子进程：单线程退」
+  ADMISSION_BREAK=test-plan-jobs-fallback-one  test-plan 取不了每台默认重活线程数时退回 1 个子进程照算
+      「test-plan：取不了每台默认重活线程数（SINGLEFS_THREAD_CAP=abc）⇒ 整次列不出、退 2，不退回 1 个子进程照算」
   ADMISSION_BREAK=dependencies-by-crate  外部依赖照包收（闭包碰到一个工作区包就收它 Cargo.toml 写的全部外部依赖，不看单元点没点它的名字）
       「单元键：Cargo.lock 里 formats 用到的 itoa 抬版本（S14 形态）」「单元键：弄坏开关 skip-build-environment 下 RUSTFLAGS 那一格转红（键不变）」
       「行键：R05 Cargo.lock 里 aes-gcm 抬版本」
-  ADMISSION_BREAK=rocksdb-entry-unchecked  crash-case-command 交命令之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+  ADMISSION_BREAK=rocksdb-entry-unchecked  crash-case-command 交命令之前不调 scripts/hosts/rocksdb-prebuilt.py entry
       「crash-case-command：验证包依赖 rocksdb 而进程环境里没有预编库的取值」
   ADMISSION_BREAK=blocks-count-unchecked  crash-case-blocks 不核 blocks = reused + fresh + refused
       「crash-case-blocks：多流用例里一行数对不上」「crash-case-blocks：blocks 不等于 reused + fresh + refused」
       「crash-case-blocks：--ran：blocks 不等于 reused + fresh + refused」
-  ADMISSION_BREAK=zero-blocks-covered  crash-case-blocks 照改前放行按用例合计 blocks = 0 的日志
+  ADMISSION_BREAK=zero-blocks-covered  crash-case-blocks 放行按用例合计 blocks = 0 的日志
       「crash-case-blocks：平常跑：blocks = 0（一块都没判）」
       「crash-case-blocks：多流用例两行合计 blocks = 0」「crash-case-blocks：--ran：blocks = 0（一块都没判）」
   ADMISSION_BREAK=keep-caller-stage-variables  crash-case-command 起用例时不清调用方环境里的 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS
       「crash-case-command：调用方环境里设着给定状态引擎的阶段 record 与各台权重 1,3」
-  ADMISSION_BREAK=blocks-count-without-refused  crash-case-blocks 照改前核 blocks = reused + fresh（拒算的块不算进去）
+  ADMISSION_BREAK=blocks-count-without-refused  crash-case-blocks 核 blocks = reused + fresh（拒算的块不算进去）
       「crash-case-blocks：平常跑：拒算 1 块计在 refused、数对得上」
-  ADMISSION_BREAK=blocks-single-line-only  crash-case-blocks 照改前要日志里恰好一行
+  ADMISSION_BREAK=blocks-single-line-only  crash-case-blocks 要日志里恰好一行
       「crash-case-blocks：多流用例每条流一行：逐行收、按用例合计」
       「crash-case-blocks：多流用例里一条流有红」
       「crash-case-blocks：多流用例两行合计 blocks = 0」「crash-case-blocks：多流用例一条流 0 块、另一条流 2 块有判定：合计不是 0」
@@ -349,29 +382,47 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「复用失灵：crates/demo/tests/setting.rs::test_v 键相同却现判了（复用哨兵（reuse」「reuse-sentinel：哨兵 1 条、种子 7 那一趟退 0、种子打进输出、一条强制现判（verdict-reco」
       「复用失灵：crates/demo/tests/setting.rs::test_u 键相同却现判了（复用哨兵（reuse」
       「判定库：同一把键判绿入库、后来判红（--red-names）⇒ 下一趟这一条现判、原因以「上次判红」起头」「判定库：红之后再判绿 ⇒ 下一趟复用」
+      「判定库：记红没成（样本标记 red-record-failure）⇒ verdict-record 退 1、plan-failure --red 撤掉原有的绿、下一趟这一条现判」
+      「判定库：verdict-record 没跑完（退 137、没有 RECORD 那一行）⇒ plan-failure --red 照样撤绿、判红、下一趟这一条现判」
+      「判定库：记红时 prune-server 不可用（样本标记 red-record-unavailable）⇒ plan-failure --red 照旧退」（撤之前那一趟要全部复用、撤完那一趟要只 test_u 现判，不读库都对不上）
+      「判定库：欠撤撤不掉（样本标记 owed-withdrawal-unavailable）⇒ verdict-plan 整道退 75、不打 PLAN、欠撤留着；」（撤得掉之后要只 test_u 现判，不读库三条都现判）
+  ADMISSION_BREAK=judge-only-entry-judges-unkeyed  入口写 - 的请求 judge: 不进键（只按 line:、file: 算）
+      「单元键：入口写 -（键只由判法与内容输入组成）」
   ADMISSION_BREAK=red-verdict-reused  VerdictLibrary 读库时判定不是绿的记录也当判定读（scripts/crash/crash-point-replay.sh 的 CRASH_POINT_REPLAY_BREAK=red-reused-as-green 转成它，那一份自证的 red-rejudged 格也红）
       「判定库：同一把键判绿入库、后来判红（--red-names）⇒ 下一趟这一条现判、原因以「上次判红」起头」
-  ADMISSION_BREAK=red-verdict-not-recorded  verdict-record 收了 --red-names 也不记红、不撤绿（改前的样子：只记绿）
+  ADMISSION_BREAK=red-verdict-not-recorded  verdict-record 收了 --red-names 也不记红、不撤绿（只记绿）
       「判定库：同一把键判绿入库、后来判红（--red-names）⇒ 下一趟这一条现判、原因以「上次判红」起头」
-  ADMISSION_BREAK=replay-store-inside-judge  自证往拷来的 replay.sh 的 replay_judge_fresh_product 开头接回改前那一句（判完当场起 admission.py library-files store 存库）
+  ADMISSION_BREAK=replay-store-inside-judge  自证往拷来的 replay.sh 的 replay_judge_fresh_product 开头接回一句（判完当场起 admission.py library-files store 存库）
       「replay.sh 判法闭包：REPLAY_JUDGING_FUNCTIONS 每个都算得出键、没有拒算、闭包里没有 admission.py 的单元（存库不在判法里）」
-  ADMISSION_BREAK=library-outside-git-tolerated  被判的根取不到 git common-dir 时 VerdictLibrary 不退 2、照改前没有库（store 是 None）往下走
+  ADMISSION_BREAK=library-outside-git-tolerated  被判的根取不到 git common-dir 时 VerdictLibrary 不退 2、没有库（store 是 None）往下走
       「判定库：不是 git 工作树的副本里判，verdict-plan 与 verdict-record 都退 2、点名那棵树，一条都不判」
-  ADMISSION_BREAK=domain-environment-unkeyed  test-functions-request 不打 variable: 那几项、单元键不加 variable 行（改前的样子：改判定域的环境变量不进键）
+  ADMISSION_BREAK=domain-environment-unkeyed  test-functions-request 不打 variable: 那几项、单元键不加 variable 行（改判定域的环境变量不进键）
       「单元键：闭包读按段登记文件与片长两个变量的那条，登记文件的内容变、片长变、设与没设，键都变；闭包不读的那条键不变」
       「test-functions-request：起它的环境里设了的改判定域的变量打成 --token variable:<名>=<值>」
-  ADMISSION_BREAK=entry-homonyms-pulled  Rust 入口自己名字的定义那一处照改前当引用解，把同名（短名相同）的单元收进入口的闭包
+  ADMISSION_BREAK=entry-homonyms-pulled  Rust 入口自己名字的定义那一处当引用解，把同名（短名相同）的单元收进入口的闭包
       「单元键：同一目标里两条短名相同、不在同一模块的测试函数键不同，改其中一条只它的键变」
-  ADMISSION_BREAK=plan-unavailable-as-failure  plan-failure 把计划与记库退 75 照别的非 0 判复用失灵、退 1（改前的样子）
+  ADMISSION_BREAK=plan-unavailable-as-failure  plan-failure 把计划与记库退 75 照别的非 0 判复用失灵、退 1
       「plan-failure：verdict-plan 退 75：判 prune-server 不可用、退 75、不说复用失灵」「plan-failure：test-plan 退 75：…」「plan-failure：verdict-record 退 75：…」
       「plan-failure：样本标记 exit-75 下 verdict-plan 退 75、plan-failure 判不可用、退 75」
-  ADMISSION_BREAK=client-failure-swallowed  plan-failure 不认客户端退 3 那一行：verdict-record 退 3 照「记不进库」退 0，计划两条照别的非 0 判（改前的样子）
+      「判定库：记红时 prune-server 不可用（样本标记 red-record-unavailable）⇒ plan-failure --red 照旧退」（退 75 当复用失灵退 1，欠撤记的那一支在退 75 那一支里，一笔都不记）
+      「判定库：欠撤撤不掉（样本标记 owed-withdrawal-unavailable）⇒ verdict-plan 整道退 75、不打 PLAN、欠撤留着；」（记红那一步同上一笔欠撤都没记，撤不掉那一趟无从说起）
+  ADMISSION_BREAK=client-failure-swallowed  plan-failure 不认客户端退 3 那一行：verdict-record 退 3 照「记不进库」退 0，计划两条照别的非 0 判
       「plan-failure：verdict-record 退 3（prune-server 客户端没配服务地址）」「plan-failure：test-plan 退 3（prune-server 客户端没配服务地址）」
-  ADMISSION_BREAK=plan-failure-not-red  plan-failure 认出失灵也退 0、只打一行 !（改前四处调用方退回全部现判、不判红的样子）
+  ADMISSION_BREAK=plan-failure-not-red  plan-failure 认出失灵也退 0、只打一行 !（四处调用方退回全部现判、不判红）
       「plan-failure：哨兵报复用失灵：verdict-plan 退 1、红句点名那一项与「复用失灵」：退 0（要 1」「plan-failure：哨兵报判定不稳：verdict-record 退 1 也判红：退 0（要 1），输出：! 样本」
       「plan-failure：哨兵报强制现判没起作用：test-plan 退 1 判红：退 0（要 1），输出：! 样本调用」「plan-failure：verdict-plan 退 2（读不了请求文件）：红句写退 2 与那一行 ✗、出路指到子命令」
       「plan-failure：test-plan 退 0 却没打 PLAN 那一行：判红：退 0（要 1），输出：! 样本调」「plan-failure：样本标记 exit-1 下 verdict-plan 退 1、plan-failure 判红：」
       「plan-failure：样本标记 sentinel-reuse-failed 下 verdict-plan 退 1、p」「复用失灵：crates/demo/tests/setting.rs::test_t 键相同却现判了（样本档造的假哨兵：/」
+  ADMISSION_BREAK=red-record-failure-swallowed  记红没成：verdict-record 只打一行 !、照退 0，plan-failure 不认「判红没记进判定库」、不照 --red 撤绿（同一把键原有的绿留着、下一趟照复用）
+      「plan-failure：verdict-record 打了「判红没记进判定库」而没带 --red：判红、说撤不了」
+      「判定库：记红没成（样本标记 red-record-failure）⇒ verdict-record 退 1、plan-failure --red 撤掉原有的绿、下一趟这一条现判」
+      「判定库：verdict-record 没跑完（退 137、没有 RECORD 那一行）⇒ plan-failure --red 照样撤绿、判红、下一趟这一条现判」
+  ADMISSION_BREAK=build-environment-all-settings  构建环境整份收：CARGO_BUILD_TARGET_DIR、CARGO_BUILD_INCREMENTAL 与 cargo 配置的每一张表（[alias]、[net]、[build] 的 incremental 这类）都进
+      「单元键：构建环境只收改结局的设置：CARGO_BUILD_INCREMENTAL 与 [build] incremental 两种取值键相同、[alias] 加一条键不变，[profile.release] 改一项键变」
+  ADMISSION_BREAK=withdrawal-owed-unrecorded  记红时 prune-server 不可用：plan-failure --red 收到 verdict-record 退 75 只退 75、不记欠撤，verdict-plan / test-plan 开跑也不读欠撤
+      （同一把键原有的绿留着、下一趟照复用）
+      「判定库：记红时 prune-server 不可用（样本标记 red-record-unavailable）⇒ plan-failure --red 照旧退 75、记一笔欠撤，下一趟开跑先撤同一把键的绿、回读，这一条现判」
+      「判定库：欠撤撤不掉（样本标记 owed-withdrawal-unavailable）⇒ verdict-plan 整道退 75、不打 PLAN、欠撤留着；撤得掉之后这一条现判」
   ADMISSION_BREAK=threads-by-worker-count  线程数按实际起的工作线程个数判，不照每台默认重活线程数比
       「判用例日志：读回 63 片、只剩 1 片要跑、起 1 个线程」
   ADMISSION_BREAK=first-definition-only  crash-cases 自查同名函数只认第一份定义（cfg 二选一、子模块同名、带进来的源文件里的同名标的 ignore 都漏）
@@ -390,8 +441,8 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「crash-cases 自查（带进来的源文件）：debug 下不标、release 下 include!("common/release_case.rs") 进来一份标 ignore 的同名用例」「crash-cases 自查（带进来的源文件）：include! 的参数是 concat!(…)（读的是哪一份判不出）」
       「crash-cases 自查（带进来的源文件）：#[path = "common/p.rs"] mod p; 里有一份标 ignore 的同名用例」「crash-cases 自查（带进来的源文件）：mod 指的文件找不到」
       「crash-cases 自查（带进来的源文件）：use core::include as pull; 把 include! 改名引进来」
-  ADMISSION_BREAK=judge-takes-forwarded-threads  crash-case-judge 照旧收 crash-point-replay 转过来的 --machine-cores / --threads / --threads-origin（改前的写法）
-      「crash-case-judge 自己现取线程数：没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS、转过来 --threads 1 --threads-origin explicit（crash-point-replay 改前的转法）」
+  ADMISSION_BREAK=judge-takes-forwarded-threads  crash-case-judge 照旧收 crash-point-replay 转过来的 --machine-cores / --threads / --threads-origin
+      「crash-case-judge 自己现取线程数：没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS、转过来 --threads 1 --threads-origin explicit（crash-point-replay 改前的转法）」 history-kept: 引的是自证用例标签原文，按原文匹配
   ADMISSION_BREAK=cores-from-nproc  本机核数照旧取 nproc（认 OMP_NUM_THREADS），不取 os.cpu_count() 与 CPU 亲和的小者
       「本机核数：PATH 里的 nproc 打 1、OMP_NUM_THREADS=1」「没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_THREAD_CAP=3」
       「没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS 与 SINGLEFS_THREAD_CAP」
@@ -402,10 +453,10 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「crash-case-command：登记了 features=sample-engine 的行（GPU 关）：-p p」「crash-case-command：登记了 features=sample-engine 的行、多机配置 ENABLE」
   ADMISSION_BREAK=features-passed-to-every-case  没登记 features= 的用例也一律带 --features（带开关自己的占位特性 unregistered-feature）
       「crash-case-command：没登记 features= 的行、多机配置没开 GPU：命令照旧，不带 --fea」「crash-case-command：没登记 features= 的行、多机配置开着 GPU：一律带 --feature」
-  ADMISSION_BREAK=gpu-case-quiesced-by-itself  上卡的用例照改前整条前面接 bash scripts/crash/gpu-quiesce-run.sh --（清场归 task-server 之前的样子）
+  ADMISSION_BREAK=gpu-case-quiesced-by-itself  上卡的用例整条前面接 bash scripts/crash/gpu-quiesce-run.sh --（清场归 task-server，用例自己不清场）
       「crash-case-command：没登记 features= 的行、多机配置开着 GPU：一律带 --feature」「crash-case-command：登记了 features=sample-engine 的行、多机配置 ENABLE」
       「crash-case-command：开着 GPU 而调用方环境里没有 GPU_CARDS_BY_PRIORITY」
-  ADMISSION_BREAK=gpu-cards-from-configuration  上卡的用例照改前从多机配置取显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY），不认调用方环境里 task-server 交的那一份
+  ADMISSION_BREAK=gpu-cards-from-configuration  上卡的用例从多机配置取显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY），不认调用方环境里 task-server 交的那一份
       「crash-case-command：没登记 features= 的行、多机配置开着 GPU：一律带 --feature」「crash-case-command：登记了 features=sample-engine 的行、多机配置 ENABLE」
       「crash-case-command：开着 GPU 而调用方环境里没有 GPU_CARDS_BY_PRIORITY」
   ADMISSION_BREAK=gpu-test-threads-unset  开着 GPU 的用例 cargo 参数收尾不带 --test-threads 1
@@ -422,19 +473,25 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 �
       「crash-case-command：登记了 threads-variable=SINGLEFS_SAMPLE_CASE_THREADS、调用方设着它等于 1」「本机核数：PATH 里的 nproc 打 1、OMP_NUM_THREADS=1」
       「没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_THREAD_CAP=3」「没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_THREAD_CAP=abc」
       「没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS 与 SINGLEFS_THREAD_CAP」
-  ADMISSION_BREAK=runner-program-only  cargo runner 配置只读程序本身，不读它的参数（改前的判法）
+  ADMISSION_BREAK=runner-program-only  cargo runner 配置只读程序本身，不读它的参数
       「单元键：cargo 配置 runner 写 `bash tools/runner.sh`，参数里的脚本（.cargo 那一层下）改一个字（runner-script-argument）」
       「单元键：cargo 配置 runner 写 `bash package-runner.sh`，脚本只在登记用例的包目录 crates/demo 下，改一个字（runner-script-in-package-directory）」
-  ADMISSION_BREAK=runner-arguments-from-configuration-directory-only  runner 参数里的相对路径只从 .cargo 那一层 / 仓根解，不从各崩溃枚举用例的包目录解（改前的判法）
+  ADMISSION_BREAK=runner-arguments-from-configuration-directory-only  runner 参数里的相对路径只从 .cargo 那一层 / 仓根解，不从各崩溃枚举用例的包目录解
       「单元键：cargo 配置 runner 写 `bash package-runner.sh`，脚本只在登记用例的包目录 crates/demo 下，改一个字（runner-script-in-package-directory）」
   ADMISSION_BREAK=library-files-unreachable-as-absent  library-files fetch 连不上服务时照「库里没有」交 0 条、退 0（改错的样子：调用方当全部没判过现判）
       「library-files：服务连不上时 fetch 退 75、中转目录里一个文件都没写」
-  ADMISSION_BREAK=multi-host-config-inherited  起自证的环境里多机配置变量设着的那一格，起样本仓的 replay.sh 时不清 SINGLEFS_MULTI_HOST_CONFIG（改前的样子：继承来的变量让样本里的
+  ADMISSION_BREAK=multi-host-config-inherited  起自证的环境里多机配置变量设着的那一格，起样本仓的 replay.sh 时不清 SINGLEFS_MULTI_HOST_CONFIG（继承来的变量让样本里的
       replay.sh 去读不在的 scripts/crash/crash-amplification-lib.sh，一条实验都没跑）
       「replay.sh：起自证的环境里设着多机配置变量（指到一份在的配置）时，样本仓的 replay.sh 照样跑、判字节一致」
   共用库的 REUSE_CHECKS_BREAK=rejudged-sentinel-passes（哨兵被现判不红）：自证 reuse-sentinel 那一格判错
   函数单元库的 FUNCTION_UNITS_BREAK=rust-manifest-directory-reads-unrefused（清单目录拼出的目录也不拒算 runtime-path）：
       自证「实验准入入口 scripts/experiment-apparatus/lib.rs::admit_experiment_run_or_exit 的闭包不拒算；…」那一格红
+  函数单元库的 FUNCTION_UNITS_BREAK=python-parameter-callers-unresolved（别的模块里没有调用处的参数读的文件拒算）与 python-data-reads-ignored（读的文件不收）：
+      自证「单元键：请求文件内容变而判法没变：这一份判法键不变、调用方那一条键变（file: 折进键）；判法自己读的规则表改了判法键变」那一格红
+  函数单元库的 FUNCTION_UNITS_BREAK=python-toolchain-queries-unkeyed（工具链询问不收工具链单元，询问打的版本不进键）：
+      自证「单元键：判法闭包里有工具链询问（[os.environ["RUSTC"], "-V"]）：工具链单元进判法键、算得出，假 rustc 换一版判法键变」那一格红
+  函数单元库的 FUNCTION_UNITS_BREAK=row-keyed-tables-whole（按行进键的登记表照旧整份进键）：
+      自证「单元键：判法经登记的取用函数按入口查 .claude/hooks/selftest-registry.tsv 的一行（lib_function_units.py 文件头「按行进键的登记表」）：改表里别的脚本那一行，这一条的键不变；改它自己那一行，键变」那一格红
 
 管不到的：跑的是不是按今天的源码编出来的二进制（键按源码算，跑的是 target/ 里的旧二进制时两边对不上，cargo test 与 replay.sh 开跑前都会重编）；
   闭包收全没收全以 lib_function_units.py 为准（它文件头「管不到的」）：收不全而没认出来的形态，改了那一处不让判定作废。
@@ -467,7 +524,7 @@ from project_preflight import preflight  # noqa: E402
 REGISTRATION_TABLE = ".claude/gate.d/stage-inputs.tsv"
 REPLAY_SCRIPT = "scripts/experiment-apparatus/replay.sh"
 RESULTS_DIRECTORY = "research/results"
-GATE_GREEN_TREE_RECORD = "refs/sop/staged-green"   # 只有弄坏开关 tree-compare-reuse 读它（改前的复用路）；平常一处都不读
+GATE_GREEN_TREE_RECORD = "refs/sop/staged-green"   # 只有弄坏开关 tree-compare-reuse 读它（按树比的复用路）；平常一处都不读
 BREAK_VARIABLE = "ADMISSION_BREAK"
 HEADER_PREFIX = "E7INPUT "
 HEADER_LINES_READ_AT_MOST = 20
@@ -523,7 +580,7 @@ CRASH_CASE_FEATURES_FORM = re.compile(r"^[a-z0-9][a-z0-9_-]*(,[a-z0-9][a-z0-9_-]
 # 弄坏开关 features-passed-to-every-case 给没登记 features= 的用例塞的占位特性（不是哪个包真有的特性）
 UNREGISTERED_FEATURE_OF_BREAK = "unregistered-feature"
 GPU_FEATURE = "gpu"
-# GPU 测试里放开 --test-threads 1 的测试目标（.claude/rules/verification.md 里 GPU 那一条的例外，用户 2026-10-28 定案「放开并按显存排队」）：
+# GPU 测试里放开 --test-threads 1 的测试目标（.claude/rules/verification.md 里 GPU 那一条的例外，放开并按显存排队）：
 #   它的测试按显存额度排队（排队在 crates 里），特性里有 gpu 时测试线程取每台默认重活线程数（registered_heavy_threads）；
 #   scripts/crash/crash-point-replay.sh 与门禁 crash-point-replay 的 GPU_TEST_THREADS_RELEASED_TARGETS 是同一份名单，三处一起改
 GPU_TEST_THREADS_RELEASED_TARGETS = ("crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state",)
@@ -559,7 +616,7 @@ HEAVY_THREAD_COMMENT_OR_BLANK_FORM = re.compile(r"[ \t]*(#|$)")
 HEAVY_THREAD_REGISTRATION_FORM = re.compile(r"[ \t]*([1-9][0-9]*)[ \t]+#[ \t]*[^ \t]")
 DEFAULT_WORKER_THREAD_SOURCES = ("available_parallelism",)
 IGNORE_ATTRIBUTE_FORM = re.compile(r"^#\s*\[\s*ignore\s*(?:\]|=)")
-IGNORE_ATTRIBUTE_FORM_WITHOUT_SPACE = re.compile(r"^#\[\s*ignore\s*(?:\]|=)")  # 弄坏开关 ignore-attribute-without-space 换回的旧写法
+IGNORE_ATTRIBUTE_FORM_WITHOUT_SPACE = re.compile(r"^#\[\s*ignore\s*(?:\]|=)")  # 弄坏开关 ignore-attribute-without-space 换成不带空格的写法
 ATTRIBUTE_START = re.compile(r"#!?\s*\[")
 FUNCTION_QUALIFIER_AT_END = re.compile(r'(?:\bpub(?:\s*\([^()]*\))?|\basync|\bunsafe|\bconst|\bextern(?:\s*"[^"]*")?)$')
 TEST_ATTRIBUTE_FORM = re.compile(r"#\s*\[\s*test\s*\]")
@@ -571,7 +628,13 @@ TOOLCHAIN_FILE_NAMES = ("rust-toolchain", "rust-toolchain.toml")
 BUILD_ENVIRONMENT_EXACT_VARIABLES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER")
 BUILD_ENVIRONMENT_VARIABLE_FORMS = (re.compile(r"^CARGO_PROFILE_"), re.compile(r"^CARGO_BUILD_"),
                                     re.compile(r"^CARGO_TARGET_.+_RUSTFLAGS$"), re.compile(r"^CARGO_TARGET_.+_RUNNER$"))
-BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT = {"CARGO_BUILD_JOBS": "只定编译并行度；scripts/hosts/capped.sh 与 mutate.sh 会设它"}
+BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT = {"CARGO_BUILD_JOBS": "只定编译并行度；scripts/hosts/capped.sh 与 mutate.sh 会设它",
+                                        "CARGO_BUILD_TARGET_DIR": "只定编译目录放哪（路径）；task-server 认调用方给的这一个",
+                                        "CARGO_BUILD_INCREMENTAL": "只定增量编译的缓存，编出来的代码一样"}
+# cargo 配置里改结局的那几张表与 build 表里不改结局的键（scripts/mutation/lib_mutation_units.py 的 CONFIGURATION_SECTIONS、BUILD_KEYS_NOT_AFFECTING_OUTPUT 同一种收法）
+BUILD_CONFIGURATION_SECTIONS = ("build", "target", "profile", "env")
+BUILD_KEYS_LEFT_OUT = frozenset(("jobs", "target-dir", "incremental"))
+BUILD_ENVIRONMENT_ALL_SETTINGS_BREAK = "build-environment-all-settings"
 BUILD_ENVIRONMENT_PROGRAM_VARIABLES = ("RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC_WRAPPER", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
 BUILD_ENVIRONMENT_PROGRAM_VARIABLE_FORMS = (re.compile(r"^CARGO_TARGET_.+_RUNNER$"),)
 BUILD_ENVIRONMENT_COMPILER_VARIABLES = ("RUSTC", "CARGO_BUILD_RUSTC")
@@ -782,6 +845,9 @@ class UnitKeyError(Exception):
     """算不出一把单元键（库载不进、入口找不到、工具链起不来）：这一条判定按拒算处置，红句与 --list-items 报出来。"""
 
 
+JUDGE_ONLY_ENTRY = "-"   # 请求的入口写它：被判那棵树里没有程序入口，键只由判法与内容输入组成（文件头「判定请求」）
+
+
 class Request:
     """一条判定的请求：入口与它的键要拼进来的东西（请求的写法见文件头「判定请求」）。tokens 原样存进库，下一趟 gate-reuse 拿它重算。"""
 
@@ -802,6 +868,8 @@ class Request:
         self.files = []
         self.environment_keys = []
         self.variables = {}
+        # program-argument:<词>：python 程序入口带的参数，照次序（lib_function_units.py 文件头「程序入口带参数」）；None 是没给
+        self.program_arguments = None
         for token in self.tokens:
             kind, _separator, value = token.partition(":")
             if token == "no-default-features":
@@ -828,6 +896,8 @@ class Request:
                 self.files.append(value)
             elif kind == "environment-of" and value:
                 self.environment_keys.append(value)
+            elif kind == "program-argument" and value:
+                self.program_arguments = (self.program_arguments or []) + [value]
             elif kind == "variable" and "=" in value and domain_variable_form(value.partition("=")[0]) is not None:
                 variable_name, _equals, setting = value.partition("=")
                 self.variables[variable_name] = setting
@@ -901,6 +971,21 @@ def merged_configuration(layers):
     return merged
 
 
+def configuration_affecting_output(merged):
+    """合成好的 cargo 配置里改编出结果的那几张表（文件头「单元键」工具链行）：build（去掉 jobs、target-dir、incremental）、target、profile、env；
+    [alias]、[net]、[http]、[term] 这类不进。弄坏开关 build-environment-all-settings 下整份交回。"""
+    if break_is_set(BUILD_ENVIRONMENT_ALL_SETTINGS_BREAK):
+        return merged
+    kept = {}
+    for section in BUILD_CONFIGURATION_SECTIONS:
+        value = merged.get(section)
+        if section == "build" and isinstance(value, dict):
+            value = {name: item for name, item in value.items() if name not in BUILD_KEYS_LEFT_OUT}
+        if value:
+            kept[section] = value
+    return kept
+
+
 class KeyContext:
     """一趟里算单元键的共用状态：每个闭包根一份 Rust 工作区、工具链行与 Cargo.lock；外部程序的版本与内容摘要只取一次。"""
 
@@ -915,7 +1000,7 @@ class KeyContext:
         self.registration_rows = None
         self.host = None
         self.script_indices = {}
-        self.judge_keys = {}
+        self.judge_keys, self.judge_closures = {}, {}
         self.rust_closures = {}
         self.source_lines = {}
         self.unit_literals = {}
@@ -925,14 +1010,15 @@ class KeyContext:
         cache_key = (closure_root, id(unit), target_id, tuple(cfg), tuple(features), no_default_features)
         if cache_key not in self.rust_closures:
             # 入口自己名字的定义那一处不当引用（lib_function_units.py 的 rust_closure_of「entry_definition_name_unresolved」）：同一目标里短名相同、
-            #   不在同一模块的两条测试函数不互相收进闭包、不共用一把键。弄坏开关 entry-homonyms-pulled 下照改前收
+            #   不在同一模块的两条测试函数不互相收进闭包、不共用一把键。弄坏开关 entry-homonyms-pulled 下收
             self.rust_closures[cache_key] = function_units().rust_closure_of(
                 workspace, unit, target_id, list(cfg), True, list(features), no_default_features,
                 entry_definition_name_unresolved=not break_is_set("entry-homonyms-pulled"))
         return self.rust_closures[cache_key]
 
     # Python 与 shell 那一侧：同一棵树的脚本索引（解析过的模块、bash 规范化过的脚本）一趟只建一份，每个入口各收各的闭包
-    def script_closure(self, closure_root, entry):
+    def script_closure(self, closure_root, entry, program_arguments=None):
+        """python / shell 入口的闭包；program_arguments 是 python 程序入口带的参数（只写 <文件> 的入口才用；lib_function_units.py 文件头「程序入口带参数」）。"""
         library = function_units()
         path, _separator, qualified = entry.partition("::")
         under = [place for place in library.DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(closure_root, place))]
@@ -957,7 +1043,7 @@ class KeyContext:
                 else:
                     entries = module.program_entries()[:1]
                 script.closure.refusals.update(module.refusals)
-                closure = script.run(entries)
+                closure = script.run(entries, None if qualified else program_arguments)
                 if base.shell is None:
                     base.shell = script.shell
                 return closure
@@ -979,17 +1065,25 @@ class KeyContext:
         except (library.FunctionUnitsError, library.UsageError) as error:
             raise UnitKeyError(f"{entry}：{error}") from error
 
-    def judge_key(self, judge, judge_root=None):
-        """判法入口的闭包键（连同解释器版本与它点名的外部程序）：(键或 None, 组成清单, 拒算行)；同一个判法一趟只算一次。
-        judge_root 是判法所在的那棵树（门禁写它自己所在的仓：样本档被判的是样本，判法在门禁那一份仓里）；不给是被判的根。"""
+    def judge_key(self, judge, judge_root=None, entry_file=None):
+        """判法入口的闭包键（连同解释器版本与它点名的外部程序）：(键或 None, 组成清单, 拒算行)；同一个判法、同一个入口文件一趟只算一次。
+        judge_root 是判法所在的那棵树（门禁写它自己所在的仓：样本档被判的是样本，判法在门禁那一份仓里）；不给是被判的根。
+        entry_file 是这一条判定的入口文件（相对根）：判法闭包里按行进键的登记表只进它查的那几行（lib_function_units.py 文件头「按行进键的登记表」）；
+        不给照整份。"""
         root = os.path.normpath(os.path.join(self.root, judge_root)) if judge_root else self.root
-        cache_key = (root, judge)
+        cache_key = (root, judge, entry_file)
         if cache_key not in self.judge_keys:
             library = function_units()
+            closure_slot = (root, judge)
             try:
-                closure = self.script_closure(root, judge) if entry_language(judge) in ("python", "shell") else \
-                    closure_of_entry(self, root, Request(judge, judge, []), judge)[0]
-                toolchain = [f"interpreter {name}: {self.interpreter(name)}" for name in interpreter_lines(entry_language(judge))]
+                if closure_slot not in self.judge_closures:
+                    # 判法的闭包与工具链行按判法算一次；按行进键的登记表随入口文件换（row_keyed_closure），键按入口文件各算
+                    closure = self.script_closure(root, judge) if entry_language(judge) in ("python", "shell") else \
+                        closure_of_entry(self, root, Request(judge, judge, []), judge)[0]
+                    toolchain = [f"interpreter {name}: {self.interpreter(name)}" for name in interpreter_lines(entry_language(judge))]
+                    self.judge_closures[closure_slot] = (closure, toolchain)
+                closure, toolchain = self.judge_closures[closure_slot]
+                closure = library.row_keyed_closure(closure, root, entry_file)
                 key, refusals = library.closure_key(closure, toolchain, (), closure_programs_externals(self, closure))
                 self.judge_keys[cache_key] = (key, closure_unit_lines(closure, prefix="judge "), [refusal.text() for refusal in refusals])
             except UnitKeyError as error:
@@ -1266,7 +1360,7 @@ def closure_of_entry(context, closure_root, request, entry):
             closure = context.rust_closure(closure_root, workspace, unit, target_id, cfg, request.features, request.no_default_features)
             return closure, target_id, workspace
         if language in ("python", "shell"):
-            return context.script_closure(closure_root, entry), None, None
+            return context.script_closure(closure_root, entry, request.program_arguments), None, None
         closure = library.closure_of(closure_root, entry, library.Options())
         return closure, None, None
     except (library.FunctionUnitsError, library.UsageError) as error:
@@ -1358,36 +1452,58 @@ def domain_variable_lines(context, closure_root, closure, request):
     return out
 
 
+def request_entry_file(request):
+    """请求的入口文件（相对根）：<文件>::<限定名> 取文件，root: 给了的接在它后面；不是文件的入口（tests-of:、vm: 这一类）交 None。"""
+    file = request.entry.split("::", 1)[0]
+    if ":" in file:
+        return None
+    return os.path.normpath(os.path.join(request.root, file))
+
+
 def compute_unit_key(context, request):
     """一条判定请求的单元键（键的组成见文件头「单元键」）：交 UnitKey。算不出（库载不进、入口找不到、工具链起不来）的交拒算（key 是 None），不抛。"""
     kb_documents_in_key = break_is_set("experiment-key-with-kb-documents")
     closure_root = os.path.normpath(os.path.join(context.root, request.root))
     lines, composition, refusals = [], [], []
+    judge_only = request.entry == JUDGE_ONLY_ENTRY
+    closure = None
     try:
         library = function_units()
-        closure, target_id, workspace = closure_of_entry(context, closure_root, request, request.entry)
-        language = entry_language(request.entry)
-        toolchain = list(context.rust_toolchain_lines(closure_root)) if language == "rust" else []
-        toolchain += [f"interpreter {name}: {context.interpreter(name)}" for name in interpreter_lines(language)]
-        if request.profile and language == "rust":
-            toolchain += profile_lines(closure_root, request.profile)
-        dependencies = context.dependency_lines(closure_root, workspace, closure, target_id) if workspace is not None else []
-        externals = closure_programs_externals(context, closure)
-        entry_key, entry_refusals = library.closure_key(closure, toolchain, dependencies, externals)
-        refusals += [refusal.text() for refusal in entry_refusals]
-        lines.append(f"entry\t{entry_key}")
-        composition += closure_unit_lines(closure)
-        composition += [f"cfg\t{item}" for item in sorted(closure.cfg_lines)] + [f"toolchain\t{item}" for item in toolchain]
-        composition += [f"dependency\t{item}" for item in dependencies]
-        composition += [f"external\t{name}\t{sha}\t{version}" for name, (sha, version) in externals.items()]
+        if judge_only:
+            # 入口写 -（文件头「判定请求」）：被判那棵树里没有程序入口，键只由判法与内容输入组成；一个判法都没有就没有可比的东西，拒算
+            if not request.judges:
+                raise UnitKeyError(f"入口写 {JUDGE_ONLY_ENTRY} 的请求至少要一个 judge:（键只由判法与内容输入组成）")
+            lines.append(f"entry\t{JUDGE_ONLY_ENTRY}")
+        else:
+            closure, target_id, workspace = closure_of_entry(context, closure_root, request, request.entry)
+            language = entry_language(request.entry)
+            toolchain = list(context.rust_toolchain_lines(closure_root)) if language == "rust" else []
+            toolchain += [f"interpreter {name}: {context.interpreter(name)}" for name in interpreter_lines(language)]
+            if request.profile and language == "rust":
+                toolchain += profile_lines(closure_root, request.profile)
+            dependencies = context.dependency_lines(closure_root, workspace, closure, target_id) if workspace is not None else []
+            externals = closure_programs_externals(context, closure)
+            entry_key, entry_refusals = library.closure_key(closure, toolchain, dependencies, externals)
+            refusals += [refusal.text() for refusal in entry_refusals]
+            lines.append(f"entry\t{entry_key}")
+            composition += closure_unit_lines(closure)
+            composition += [f"cfg\t{item}" for item in sorted(closure.cfg_lines)] + [f"toolchain\t{item}" for item in toolchain]
+            composition += [f"dependency\t{item}" for item in dependencies]
+            composition += [f"external\t{name}\t{sha}\t{version}" for name, (sha, version) in externals.items()]
         for judge in request.judges:
-            judge_key, judge_composition, judge_refusals = context.judge_key(judge, request.judge_root)
+            if judge_only and break_is_set("judge-only-entry-judges-unkeyed"):   # 弄坏开关：入口写 - 的请求判法不进键
+                continue
+            judge_key, judge_composition, judge_refusals = context.judge_key(judge, request.judge_root, None if judge_only else request_entry_file(request))
             refusals += judge_refusals
             lines.append(f"judge\t{judge_key}")
             present = set(composition)
             composition += [line for line in judge_composition if line not in present]
     except UnitKeyError as error:
         return UnitKey(None, composition, refusals + [f"refused\tkey-uncomputable\t{request.entry}\t{error}"])
+    if request.program_arguments is not None:
+        # 程序入口带的参数照次序进一行（文件头「单元键」program-arguments）：闭包相同、参数不同的两条判定不共用键
+        lines.append("program-arguments\t" + json.dumps(request.program_arguments, ensure_ascii=False))
+        composition.append("program-arguments\t" + json.dumps(request.program_arguments, ensure_ascii=False))
     for tool in request.tools:
         sha, version = context.external(tool)
         lines.append(f"tool\t{sha}\t{version}")
@@ -1409,12 +1525,12 @@ def compute_unit_key(context, request):
         for token, first_line in environment_lines:
             lines.append(f"environment\t{first_line}")
             composition.append(f"environment\t{token}\t{first_line}")
-    if not break_is_set("domain-environment-unkeyed"):
+    if closure is not None and not break_is_set("domain-environment-unkeyed"):
         for key_line, composition_lines in domain_variable_lines(context, closure_root, closure, request):
             lines.append(key_line)
             composition += composition_lines
     if kb_documents_in_key:
-        # 弄坏开关 experiment-key-with-kb-documents：.claude/kb/decisions/ 下的文件整份进键（改前实验准入的样子：kb 决策文档进指纹）
+        # 弄坏开关 experiment-key-with-kb-documents：.claude/kb/decisions/ 下的文件整份进键（kb 决策文档进指纹）
         for path in sorted(glob.glob(os.path.join(context.root, ".claude", "kb", "decisions", "*"))):
             if os.path.isfile(path):
                 lines.append(f"file\t{sha256_of_file(path)}")
@@ -1466,7 +1582,7 @@ class VerdictLibrary:
         self.kind = kind
         common_directory = git_common_directory(root)
         if common_directory is None:
-            if break_is_set("library-outside-git-tolerated"):   # 弄坏开关：改前取不到 common-dir 就没有库（store 是 None）
+            if break_is_set("library-outside-git-tolerated"):   # 弄坏开关：取不到 common-dir 就没有库（store 是 None）
                 self.directory = self.store = None
                 return
             raise LibraryUnavailable(f"{os.path.abspath(root)} 不是 git 工作树（取不到 git common-dir），判定库没有名字，一条都没判",
@@ -1591,7 +1707,7 @@ class VerdictLibrary:
 
     def record_red(self, request_text, name, key, how, summary=""):
         """判红之后记一条（文件头「判定库」记红、撤绿、下趟现判）：照同一把键写 verdict=red 的 keys/<键>.json，盖掉这把键原有的绿；items/ 那一份
-        （这个名字最近判绿的那一份）不动。没记交原因，记了交空串。弄坏开关 red-verdict-not-recorded 下不写（改前的样子）。"""
+        （这个名字最近判绿的那一份）不动。没记交原因，记了交空串。弄坏开关 red-verdict-not-recorded 下不写。"""
         if not key:
             return "这一条拒算，不记"
         if break_is_set("red-verdict-not-recorded"):
@@ -1599,6 +1715,22 @@ class VerdictLibrary:
         record = {"verdict": "red", "key": key, "item": name, "request": request_text, "how": how, "summary": summary, "judged": judged_date()}
         self.store.write_many([(self.path_of_key(key), json.dumps(record, ensure_ascii=False, indent=1) + "\n")])
         return ""
+
+    def withdraw_green(self, name, key):
+        """记红没成时撤掉这把键原有的绿（文件头「按条复用失灵」，plan-failure --red 调）：keys/<键>.json 记着绿才删（记着红的不动），
+        items/ 那一份记的也是这把键就一起删；删完回读，还读得到这把键的绿就抛 RuntimeError。交撤掉的条数（0 或 1）。服务不可用客户端退 75。"""
+        def green_of(relative):
+            record = self.load_stored_json(relative)
+            return isinstance(record, dict) and record.get("verdict") == "green" and record.get("key") == key
+        withdrawn = 0
+        if green_of(self.path_of_key(key)):
+            self.store.delete_prefix(self.path_of_key(key))
+            withdrawn = 1
+        if green_of(self.path_of_item(name)):
+            self.store.delete_prefix(self.path_of_item(name))
+        if green_of(self.path_of_key(key)):
+            raise RuntimeError("删完回读还是这把键的绿")
+        return withdrawn
 
     def items(self):
         """库里每个名字最近一次判绿的那一份：[(名字, 记录)]。"""
@@ -1811,7 +1943,7 @@ def resolved_program(program, base_directory, environment):
 def runner_argument_directories(root):
     """runner / wrapper 参数里的相对路径另从哪几个目录解：登记的每条崩溃枚举用例的包目录（cargo 起 runner 时当前目录是包目录）。
     交 [(仓根起的包目录, 绝对路径)]，按包目录排好；登记表读不了、写错的交空表（登记行本身另有自查）。弄坏开关
-    runner-arguments-from-configuration-directory-only 下交空表（只从 .cargo 那一层 / 仓根解，改前的判法）。"""
+    runner-arguments-from-configuration-directory-only 下交空表（只从 .cargo 那一层 / 仓根解）。"""
     if break_is_set("runner-arguments-from-configuration-directory-only"):
         return []
     try:
@@ -1986,7 +2118,7 @@ def replay_row_key_entries(text):
 
 def replay_rows_with_keys(root):
     """scripts/experiment-apparatus/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
-    没被那一段指明的行，键是实验号、产物头由装置写。弄坏开关 ignore-row-keys 下那一段整个不认（改前的样子）。"""
+    没被那一段指明的行，键是实验号、产物头由装置写。弄坏开关 ignore-row-keys 下那一段整个不认。"""
     replay_path = os.path.join(root, REPLAY_SCRIPT)
     if not os.path.isfile(replay_path):
         return [], []
@@ -2129,6 +2261,11 @@ def judge_preconditions(root, key, conditions):
                 missing.append(f"{product} 的 name={parts['line_name']} {parts['field']}={value}，要 {parts['value']}")
     return missing, satisfied
 
+
+
+# run_probe 起的探针脚本都是登记表第三列 probe= 与 environment= 点名的（lib_function_units.py 文件头「登记表点名的程序」）：
+# 收 run_probe 的闭包时照这张表认出它起的是环境探针，不连、不拒算（前提由 gate-preconditions 每趟现判，版本经 environment-of: 进各条判定的键）
+REGISTRY_LISTED_PROGRAMS = {"run_probe": (REGISTRATION_TABLE, r"(?:^|\s)(?:probe|environment)=([^\s:]+)")}
 
 
 def run_probe(root, parts):
@@ -2368,7 +2505,7 @@ def files_brought_in_by_target(root, relative_files):
     带进来的全部源文件（相对 root，按找到的次序，头几份是 relative_files 本身）：返回 (文件清单, 判不出的原因或 None)。
     判不出：include! 的参数不是字符串字面量（套 concat!、env! 这一类）、带进来的文件找不到或读不了、有代码用 use 把 include 族宏引进来、带进来的超过上限。
     路径的起点照 rustc：include! 与 #[path] 从写它的那份文件所在的目录起；mod <名>; 在测试目标的根文件与 mod.rs 里从所在目录起，别的文件从「所在目录/文件名」起。
-    弄坏开关 target-own-files-only 下只交 relative_files 本身（改前的判法）。"""
+    弄坏开关 target-own-files-only 下只交 relative_files 本身。"""
     if break_is_set("target-own-files-only"):
         return list(relative_files), None
     roots = set(relative_files)
@@ -2800,7 +2937,7 @@ def registered_heavy_threads(environment, registration_file=None):
 def crash_case_worker_threads(case, environment):
     """跑崩溃枚举用例的线程数：(本机核数, 线程数, "explicit" 或 "default")。调用方设了 SINGLEFS_CRASH_POINT_REPLAY_THREADS（非空）就用它，
     没设取每台默认重活线程数（registered_heavy_threads）；用例读的线程变量（case.thread_variable）调用方设着什么都不认，由 crash-case-command 盖成这个数。
-    本机核数（machine_core_count）只用来判「本机多于 1 核」，不定线程数（弄坏开关 threads-default-from-cores 下照改前拿它当线程数）。
+    本机核数（machine_core_count）只用来判「本机多于 1 核」，不定线程数（弄坏开关 threads-default-from-cores 下拿它当线程数）。
     crash-case-command、crash-case-judge 各自现取（crash-point-replay 不转线程参数）。
     核数读不到、SINGLEFS_CRASH_POINT_REPLAY_THREADS 不是正整数、每台默认重活线程数取不了，都抛 InputManifestError。"""
     cores = machine_core_count(environment)
@@ -2823,9 +2960,9 @@ def crash_case_launch(root, case, environment):
     （登记行的 threads-variable=）不是它时另设成同一个数，盖掉调用方环境里的（弄坏开关 thread-variable-ignored 下只设 SINGLEFS_CRASH_POINT_REPLAY_THREADS）。
     cargo test 带的特性：登记行的 features=，多机配置写了 ENABLE_GPU=1 的一律加 gpu（崩溃枚举用例的判段也上卡）；env 里一律另设 BINDGEN_EXTRA_CLANG_ARGS（验证包常编 librocksdb-sys）；
     上卡的用例（crash_case_cargo_features）不经清场包装（清场与分卡归 task-server），环境里交调用方环境里那一份 GPU_CARDS_BY_PRIORITY（没有就不设）与多机配置的路径；
-    弄坏开关 gpu-case-quiesced-by-itself 下照改前整条前面接清场包装，gpu-cards-from-configuration 下照改前从多机配置取显卡先后。
+    弄坏开关 gpu-case-quiesced-by-itself 下整条前面接清场包装，gpu-cards-from-configuration 下从多机配置取显卡先后。
     特性里有 gpu 的，测试参数收尾另带 --test-threads 1（弄坏开关 gpu-test-threads-unset 下不带）；GPU 关的命令不带。测试目标在 GPU_TEST_THREADS_RELEASED_TARGETS 里的
-    带 --test-threads <每台默认重活线程数>（registered_heavy_threads；弄坏开关 gpu-agreement-test-threads-one 下照改前带 1）。
+    带 --test-threads <每台默认重活线程数>（registered_heavy_threads；弄坏开关 gpu-agreement-test-threads-one 下带 1）。
     线程数取不到、多机配置在而读不了抛 InputManifestError。"""
     machine_cores, threads, threads_origin = crash_case_worker_threads(case, environment)
     thread_settings = [f"{CRASH_POINT_REPLAY_THREADS_VARIABLE}={threads}"]
@@ -2842,7 +2979,7 @@ def crash_case_launch(root, case, environment):
     bindgen_setting = bindgen_include_setting(root)
     card_settings = []
     if on_card:
-        if break_is_set("gpu-cards-from-configuration"):   # 弄坏开关：改前从多机配置取显卡先后
+        if break_is_set("gpu-cards-from-configuration"):   # 弄坏开关：从多机配置取显卡先后
             cards = (configuration_value(configuration_file, "GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED")
                      or configuration_value(configuration_file, "GPU_CARDS_BY_PRIORITY"))
         else:
@@ -2851,7 +2988,7 @@ def crash_case_launch(root, case, environment):
         if os.path.isfile(configuration_file):
             card_settings.append(f"{MULTI_HOST_CONFIGURATION_VARIABLE}={os.path.abspath(configuration_file)}")
     # GPU 对拍的测试各占卡的显存，不并行起：特性里有 gpu 的（开了 GPU 的）带 --test-threads 1（.claude/rules/verification.md）；GPU 关的不加。弄坏开关 gpu-test-threads-unset 下不加
-    #   放开的测试目标（GPU_TEST_THREADS_RELEASED_TARGETS）带每台默认重活线程数：它的测试按显存额度排队；弄坏开关 gpu-agreement-test-threads-one 下照改前带 1
+    #   放开的测试目标（GPU_TEST_THREADS_RELEASED_TARGETS）带每台默认重活线程数：它的测试按显存额度排队；弄坏开关 gpu-agreement-test-threads-one 下带 1
     test_threads_words = []
     if GPU_FEATURE in features and not break_is_set("gpu-test-threads-unset"):
         test_threads_words = ["--test-threads", "1"]
@@ -2860,7 +2997,7 @@ def crash_case_launch(root, case, environment):
     command = ["env", *share_unsets, *library_unsets, *thread_settings, *bindgen_setting, *card_settings,
                "cargo", "test", "--release", "-p", case.package, *feature_words, "--test", case.target,
                "--", "--include-ignored", "--exact", case.function, "--nocapture", *test_threads_words]
-    if on_card and break_is_set("gpu-case-quiesced-by-itself"):   # 弄坏开关：改前整条经清场包装起
+    if on_card and break_is_set("gpu-case-quiesced-by-itself"):   # 弄坏开关：整条经清场包装起
         command = ["bash", os.path.join(root, GPU_QUIESCE_SCRIPT), "--", *command]
     return machine_cores, threads, threads_origin, command
 
@@ -2975,7 +3112,7 @@ def build_environment_setting_lines(closure_root, environment=None):
         for label, program_bytes in configured_program_lines("cargo 配置", content, base_directory, closure_root, environment, argument_directories):
             lines.append(f"build-environment program {label}: {hashlib.sha256(program_bytes).hexdigest()}")
     flattened = []
-    flattened_setting_lines("", merged_configuration(layers), flattened)
+    flattened_setting_lines("", configuration_affecting_output(merged_configuration(layers)), flattened)
     lines += [f"build-environment config {line}" for line in flattened]
     lines += [f"build-environment config 读不出的一层 {digest}" for digest in unreadable]
     directory = os.path.realpath(closure_root)
@@ -2997,7 +3134,7 @@ def build_environment_setting_lines(closure_root, environment=None):
             break
         directory = parent
     for variable in sorted(environment):
-        if variable in BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT:
+        if variable in BUILD_ENVIRONMENT_VARIABLES_LEFT_OUT and (variable == "CARGO_BUILD_JOBS" or not break_is_set(BUILD_ENVIRONMENT_ALL_SETTINGS_BREAK)):
             continue
         if variable in BUILD_ENVIRONMENT_EXACT_VARIABLES or any(form.match(variable) for form in BUILD_ENVIRONMENT_VARIABLE_FORMS):
             lines.append(f"build-environment env {variable}={environment[variable]}")
@@ -3139,7 +3276,7 @@ def gate_reuse(root, key, request_file=None):
 
 
 def tree_compare_reuse(root, key):
-    """弄坏开关 tree-compare-reuse：改前的复用路——refs/sop/staged-green 那棵树（没有取 HEAD 的树）与工作区在登记入口的文件上逐字相同就答可跳过。"""
+    """弄坏开关 tree-compare-reuse：按树比的复用路——refs/sop/staged-green 那棵树（没有取 HEAD 的树）与工作区在登记入口的文件上逐字相同就答可跳过。"""
     entries = resolve_entries(read_registration_rows(root), key)
     files = sorted({path for path in (entry_file(entry) for entry in entries) if path})
     for reference in (f"{GATE_GREEN_TREE_RECORD}^{{tree}}", "HEAD^{tree}"):
@@ -3442,10 +3579,10 @@ def judge_crash_case_blocks(log_text, ran=False):
     """日志里的 CRASH_CASE_BLOCKS 行：交 (退出码, 一句)。退出码见文件头 crash-case-blocks。
     多流的用例每条流各打一行：逐行认（每一行 blocks = reused + fresh + refused），按用例合计再判。
     ran（--ran，跑登记了 red-blocks=judged-by-test 的用例）：只核行在、数对得上，红块与现判块不判（用例的退出码由门禁判）。
-    弄坏开关 blocks-single-line-only 下照改前要恰好一行，blocks-count-without-refused 下照改前核 blocks = reused + fresh；
+    弄坏开关 blocks-single-line-only 下要恰好一行，blocks-count-without-refused 下核 blocks = reused + fresh；
     ran-blocks-line-optional 下 --ran 一行都没有也退 0。
     按用例合计 blocks == 0（只录、配了 GPU 而没编进 gpu 特性、全部表留给别的机器，引擎都打 blocks=0）不算判过：退 4；
-    弄坏开关 zero-blocks-covered 下照改前放行。"""
+    弄坏开关 zero-blocks-covered 下放行。"""
     lines = [line.strip() for line in log_text.split("\n") if line.strip().startswith(CRASH_CASE_BLOCKS_PREFIX)]
     if ran and not lines and break_is_set("ran-blocks-line-optional"):
         return 0, "块那一行没有（弄坏开关 ran-blocks-line-optional：没有也当对得上）"
@@ -3605,6 +3742,8 @@ def command_verdict_plan(arguments):
     sample_failure = plan_failure_sample(root)
     if sample_failure != "sentinel-reuse-failed" and sample_failure is not None:
         return sample_plan_failure_exit("verdict-plan", root, sample_failure)
+    if settle_owed_withdrawals(root, kind):   # 欠撤（文件头「按条复用失灵」）：撤不掉整道退 75，不算计划
+        return PLAN_SERVICE_UNAVAILABLE_EXIT
     if break_is_set("verdict-key-with-entry-file"):
         # 弄坏开关：每条请求的键另加它入口所在的整份文件（闭包外的改动——同文件里没人调的函数、注释——也让它作废）：自证 reuse-three-questions 的 ② 红
         requests = [Request(request.name, request.entry,
@@ -3643,7 +3782,10 @@ def test_plan_resolve_all(context, functions, request_of):
     pending = [index for index, function in enumerate(functions) if function.state == "pending"]
     try:
         jobs = registered_heavy_threads(os.environ)
-    except InputManifestError:
+    except InputManifestError as error:
+        if not break_is_set("test-plan-jobs-fallback-one"):   # 弄坏开关：取不了照 1 个子进程算
+            raise UnitKeyError(f"取不了每台默认重活线程数（{error}），test-plan 不退回 1 个子进程照算：照 .claude/heavy-thread-default 文件头写好登记，"
+                               "或 unset 写坏的 SINGLEFS_THREAD_CAP 再跑") from error
         jobs = 1
     jobs = max(1, min(jobs, len(pending)))
     TEST_PLAN_SHARED.update(context=context, functions=functions, request_of=request_of)
@@ -3706,11 +3848,13 @@ def command_test_plan(arguments):
     sample_failure = plan_failure_sample(root)
     if sample_failure != "sentinel-reuse-failed" and sample_failure is not None:
         return sample_plan_failure_exit("test-plan", root, sample_failure)
+    if settle_owed_withdrawals(root, kind):   # 欠撤（文件头「按条复用失灵」）：撤不掉整道退 75，不算计划
+        return PLAN_SERVICE_UNAVAILABLE_EXIT
     context = KeyContext(root)
     tokens_common = ([f"root:{closure_relative}"] if closure_relative != "." else []) + ([f"profile:{profile}"] if profile else [])
     tokens_common += [f"feature:{feature}" for feature in features] + values.get("--token", [])
     def whole_file(function):
-        # 弄坏开关 test-key-with-whole-file：每条测试函数的键另加它所在的整份文件（改前那种按文件收的样子：改同文件里别的测试也作废）
+        # 弄坏开关 test-key-with-whole-file：每条测试函数的键另加它所在的整份文件（按文件收：改同文件里别的测试也作废）
         if not break_is_set("test-key-with-whole-file"):
             return []
         return [f"file:{os.path.normpath(os.path.join(closure_relative, function.entry.split('::', 1)[0]))}"]
@@ -3769,18 +3913,39 @@ def command_verdict_record(arguments):
     except (OSError, ValueError) as error:
         print(f"  ✗ 读不了计划文件或名字文件：{error}")
         print("     → 怎么办：计划文件取 verdict-plan 那一趟写的；名字文件一行一个名字")
+        if values.get("--red-names") and not break_is_set(RED_RECORD_FAILURE_BREAK):
+            # 记红没成（文件头「按条复用失灵」）：交了判红的名字却一条都没记，plan-failure 认这一句判红、照 --red 撤绿
+            print(f"  ✗ {RED_RECORD_FAILURE_HEAD}这一趟交了 --red-names，判红的一条都没记（读不了计划文件或名字文件）")
+            print(f"     → 怎么办：{RED_RECORD_FAILURE_HOWTO}")
         return EXIT_REGISTRATION_ERROR
     green -= red_names   # 两份都有的按红办（文件头 verdict-record）
     context = KeyContext(root)
     library = VerdictLibrary(root, kind)
-    recorded = changed = refused = red_recorded = 0
+    recorded = changed = refused = red_recorded = red_unrecorded = 0
+    sample_red_failure = os.path.join(root, RED_RECORD_FAILURE_SAMPLE_MARKER)
     for item in planned:
         request = parse_request_line(item["request"])
         if request.name in red_names and item.get("key"):
-            # 记红、撤绿（文件头「判定库」）：照计划里的键记，不重算（跑的过程中输入变了也只是多现判一次）
-            problem = library.record_red(item["request"], request.name, item["key"], values["--how"][-1], values.get("--summary", [""])[-1])
-            if problem:
+            # 记红、撤绿（文件头「判定库」）：照计划里的键记，不重算（跑的过程中输入变了也只是多现判一次）；
+            #   客户端退 75、3（SystemExit）照退，别的异常与没记成都是记红没成（文件头「按条复用失灵」）
+            if os.path.isfile(os.path.join(root, RED_RECORD_UNAVAILABLE_SAMPLE_MARKER)):
+                # 样本档造的：记红那一帧 prune-server 不可用，照客户端退 75（文件头「按条复用失灵」欠撤）
+                print(f"  ✗ prune-server 不可用（样本档造的：{request.name} 记红那一帧连不上服务）")
+                print(f"     → 怎么办：样本根里有 {RED_RECORD_UNAVAILABLE_SAMPLE_MARKER} 才走到这里，plan-failure --red 照退 {PLAN_SERVICE_UNAVAILABLE_EXIT} 记一笔欠撤；"
+                      "真跑时遇到连不上，python3 prune-server/control check 看服务在不在，起不来报给主 agent")
+                raise SystemExit(PLAN_SERVICE_UNAVAILABLE_EXIT)
+            try:
+                problem = (f"样本档造的记红没成（{sample_red_failure} 在）" if os.path.isfile(sample_red_failure)
+                           else library.record_red(item["request"], request.name, item["key"], values["--how"][-1], values.get("--summary", [""])[-1]))
+            except Exception as error:   # 记红那一帧出的任何异常都按记红没成办，不让同一把键的绿留着
+                problem = f"写进服务时出错（{type(error).__name__}：{error}）"
+            if problem and break_is_set(RED_RECORD_FAILURE_BREAK):
+                # 弄坏开关：只打一行 !、照退 0，同一把键原有的绿留着
                 print(f"  ! {request.name} 判红没记进判定库：{problem}（同一把键原有的绿还在，下一趟可能照复用）")
+            elif problem:
+                red_unrecorded += 1
+                print(f"  ✗ {RED_RECORD_FAILURE_HEAD}{request.name}（键 {item['key'][:12]}）：{problem}")
+                print(f"     → 怎么办：{RED_RECORD_FAILURE_HOWTO}")
             elif not break_is_set("red-verdict-not-recorded"):
                 red_recorded += 1
             continue
@@ -3804,8 +3969,8 @@ def command_verdict_record(arguments):
             continue
         recorded += 1
     sentinel_red = report_forced_rejudge(plan_file, green)
-    print(f"RECORD recorded={recorded} changed={changed} refused={refused} red={red_recorded} library={library.directory}")
-    return 1 if sentinel_red else 0
+    print(f"RECORD recorded={recorded} changed={changed} refused={refused} red={red_recorded} red-unrecorded={red_unrecorded} library={library.directory}")
+    return 1 if sentinel_red or red_unrecorded else 0
 
 
 def report_forced_rejudge(plan_file, green):
@@ -3836,6 +4001,131 @@ def report_forced_rejudge(plan_file, green):
 # ── 按条复用失灵（文件头「按条复用失灵」）：四处调用方共用这一份判法 ──
 PLAN_FAILURE_SAMPLE_MARKER = os.path.join(UNIT_VERDICT_SAMPLE_DIRECTORY, "plan-failure")
 PLAN_FAILURE_SAMPLE_FORMS = ("exit-1", "exit-75", "sentinel-reuse-failed")
+# 记红没成（文件头「按条复用失灵」）：verdict-record 照计划里的键记红没成时打的红句头（plan-failure 认它）、样本档造它的标记、弄坏开关
+RED_RECORD_FAILURE_HEAD = "判红没记进判定库："
+RED_RECORD_FAILURE_FORM = re.compile(r"^\s*✗ (判红没记进判定库：.*)$")
+RED_RECORD_FAILURE_SAMPLE_MARKER = os.path.join(UNIT_VERDICT_SAMPLE_DIRECTORY, "red-record-failure")
+RED_RECORD_FAILURE_BREAK = "red-record-failure-swallowed"
+RED_RECORD_FAILURE_HOWTO = ("调用方把这一趟的输出交 plan-failure，带 --red <根> <种类> <计划文件> <判红的名字文件>：它判红、撤掉这几把键原有的绿（文件头「按条复用失灵」）；"
+                            "记红没成的原因看这一句，修好之后重跑这一格（下一趟这几条现判）")
+# 欠撤（文件头「按条复用失灵」）：记红那一趟 prune-server 不可用（verdict-record 退 75）时 plan-failure --red 记下判红那几条的键与种类，下一趟 verdict-plan / test-plan
+#   开跑先撤这几把键原有的绿。记在运行记录里（不是判定库）：上次红的清单那一层（lib_reuse_checks.py 的 last_runs_directory）底下的这个目录，再按库名的 sha256 分一层，一把键一份
+OWED_WITHDRAWALS_DIRECTORY = "withdrawals-owed"
+OWED_WITHDRAWAL_BREAK = "withdrawal-owed-unrecorded"
+RED_RECORD_UNAVAILABLE_SAMPLE_MARKER = os.path.join(UNIT_VERDICT_SAMPLE_DIRECTORY, "red-record-unavailable")
+OWED_WITHDRAWAL_UNAVAILABLE_SAMPLE_MARKER = os.path.join(UNIT_VERDICT_SAMPLE_DIRECTORY, "owed-withdrawal-unavailable")
+
+
+def verdict_library_name(root, kind):
+    """这一种类的判定库名（VerdictLibrary.directory 的同一种取法，不开库、不连服务）；不是 git 工作树交 None。"""
+    common_directory = git_common_directory(root)
+    return None if common_directory is None else os.path.join(common_directory, VERDICT_LIBRARY_DIRECTORY_NAME, kind_directory_name(kind))
+
+
+def owed_withdrawals_directory(root, kind):
+    """这份库的欠撤放哪：交 (目录, 库名, 取不到的原因)；不是 git 工作树交 (None, None, "")（开库那一步自己报）。"""
+    library_name = verdict_library_name(root, kind)
+    if library_name is None:
+        return None, None, ""
+    checks = reuse_checks_module()
+    if checks is None:
+        return None, library_name, f"同目录没有 {REUSE_CHECKS_LIBRARY}，上次红的清单那一层取不到"
+    try:
+        base = checks.last_runs_directory()
+    except OSError as error:
+        return None, library_name, str(error)
+    digest = hashlib.sha256(library_name.encode("utf-8", "surrogateescape")).hexdigest()
+    return os.path.join(base, OWED_WITHDRAWALS_DIRECTORY, digest), library_name, ""
+
+
+def record_owed_withdrawals(withdrawal):
+    """plan-failure --red 收到 verdict-record 退 75 时调（文件头「按条复用失灵」欠撤）：withdrawal 是（根、种类、计划文件、判红的名字文件），
+    计划里这几个名字各有键的，一把键写一份 <键>.json（种类、库名、名字、键、日期），写完回读。交 (记下的条数, 没记成的原因或空串, 目录)。"""
+    root, kind, plan_file, red_file = withdrawal
+    try:
+        with open(red_file, encoding="utf-8", errors="surrogateescape") as handle:
+            names = {line.rstrip("\n") for line in handle if line.strip()}
+        with open(plan_file, encoding="utf-8") as handle:
+            planned = [json.loads(line) for line in handle if line.strip()]
+    except (OSError, ValueError) as error:
+        return 0, f"读不了计划文件或判红的名字文件：{error}", ""
+    keys = {}
+    for item in planned:
+        name = parse_request_line(item["request"]).name
+        if name in names and item.get("key"):
+            keys[name] = item["key"]
+    if not keys:
+        return 0, "", ""
+    directory, library_name, problem = owed_withdrawals_directory(os.path.abspath(root), kind)
+    if directory is None:
+        return 0, problem or f"{os.path.abspath(root)} 不是 git 工作树，判定库没有名字", ""
+    written = 0
+    for name, key in sorted(keys.items()):
+        entry = {"kind": kind, "library": library_name, "name": name, "key": key, "recorded": judged_date()}
+        path = os.path.join(directory, f"{key}.json")
+        problem = write_atomically(path, json.dumps(entry, ensure_ascii=False) + "\n")
+        if not problem and read_owed_withdrawal(path) != entry:
+            problem = f"{path} 写完回读对不上"
+        if problem:
+            return written, problem, directory
+        written += 1
+    return written, "", directory
+
+
+def read_owed_withdrawal(path):
+    """一份欠撤记录；读不了、不是那几个字段交 None。"""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            entry = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    return entry if isinstance(entry, dict) and all(isinstance(entry.get(field), str) and entry.get(field) for field in ("kind", "library", "name", "key")) else None
+
+
+def settle_owed_withdrawals(root, kind):
+    """verdict-plan / test-plan 算计划之前（文件头「按条复用失灵」欠撤）：这份库记着欠撤的，逐把键撤掉原有的绿（VerdictLibrary.withdraw_green，删完回读）、
+    删掉那一份欠撤再核它不在了。全撤成交 0；有一份撤不掉（服务不可用、回读还是绿、记录读不了、删不掉）打 ✗ 与出路、交 75（整道退 75，不判绿）。"""
+    if break_is_set(OWED_WITHDRAWAL_BREAK):   # 弄坏开关：不读欠撤
+        return 0
+    directory, library_name, problem = owed_withdrawals_directory(root, kind)
+    if directory is None:
+        if problem:
+            print(f"  ! 欠撤：{kind} 的欠撤记录放哪取不到（{problem}），这一趟没查欠撤")
+        return 0
+    try:
+        files = sorted(name for name in os.listdir(directory) if name.endswith(".json"))
+    except FileNotFoundError:
+        return 0
+    except OSError as error:
+        files, problem = [], f"列不了 {directory}：{error}"
+    remove = (f"python3 scripts/prune-server/prune_server_client.py delete-prefix --dry-run unit-verdicts {kind_directory_name(kind)} {library_name} keys/<键>.json"
+              "（先 --dry-run 数、再不带它删、再数到 0；记着红的那一份不删），删完再删 " + directory + " 里那一份")
+    if not problem and files and os.path.isfile(os.path.join(root, OWED_WITHDRAWAL_UNAVAILABLE_SAMPLE_MARKER)):
+        problem = "样本档造的服务不可用（撤欠撤那一帧连不上服务）"
+    withdrawn, library = 0, None
+    for file_name in files if not problem else []:
+        path = os.path.join(directory, file_name)
+        entry = read_owed_withdrawal(path)
+        if entry is None or entry["library"] != library_name or entry["kind"] != kind or file_name != f"{entry['key']}.json":
+            problem = f"{path} 读不了或不是这份库的欠撤"
+            break
+        try:
+            library = library or VerdictLibrary(root, kind)
+            withdrawn += library.withdraw_green(entry["name"], entry["key"])
+            os.unlink(path)
+        except (Exception, SystemExit) as error:   # 客户端退 75、3 与别的异常：这一把没撤成
+            problem = f"键 {entry['key'][:12]}（{entry['name']}）：{type(error).__name__} {getattr(error, 'code', error)}"
+            break
+        if os.path.exists(path):
+            problem = f"{path} 删完还在"
+            break
+    if problem:
+        print(f"  ✗ 欠撤：{kind} 上一趟记红时 prune-server 不可用、记下的 {len(files)} 把键原有的绿撤不掉（{problem}），这一趟不算计划、整道退 75，不判绿")
+        print(f"     → 怎么办：python3 prune-server/control check 看服务，服务好了再跑这一格（开跑先撤）；服务好了还撤不掉的照键手删：{remove}")
+        return PLAN_SERVICE_UNAVAILABLE_EXIT
+    if files:
+        print(f"  · 欠撤：{kind} 上一趟记红时 prune-server 不可用、记下的 {len(files)} 把键，开跑先撤：撤掉原有的绿 {withdrawn} 条（回读都不是绿），欠撤记录已删，这几条现判")
+    return 0
 # prune-server 客户端退 3 的那一行（scripts/prune-server/prune_server_client.py 的 fail：没写服务地址、多机配置读不了、服务拒了这一帧这一类）：配置错，
 #   不是服务不可用，也不是「记不进库」（文件头「按条复用失灵」）
 PLAN_CLIENT_FAILURE_EXIT = 3
@@ -3911,15 +4201,77 @@ def plan_failure_findings(command, exit_code, text):
     return findings
 
 
+def red_record_failure_findings(exit_code, text, withdrawal):
+    """记红没成（文件头「按条复用失灵」）：verdict-record 那一趟判红的几条没记进库 ⇒ [(红句, 出路)]，并照 withdrawal（--red 给的 根、种类、计划文件、
+    判红的名字文件）撤掉这几把键原有的绿；记红都成了、这一趟没有判红的（只交判绿那一支记不进库，下一趟照判）交 []。
+    认记红没成：输出里有 verdict-record 的「✗ 判红没记进判定库：」，或交了 --red、名字文件不空、退非 0 而输出里没有 RECORD 那一行（没跑完）。"""
+    marked = [match.group(1).strip() for match in (RED_RECORD_FAILURE_FORM.match(line) for line in text.split("\n")) if match is not None]
+    finished = re.search(r"^RECORD ", text, re.M) is not None
+    names = set()
+    if withdrawal is not None:
+        try:
+            with open(withdrawal[3], encoding="utf-8", errors="surrogateescape") as handle:
+                names = {line.rstrip("\n") for line in handle if line.strip()}
+        except OSError as error:
+            marked.append(f"读不了判红的名字文件 {withdrawal[3]}：{error}")
+    if not marked and (finished or exit_code == 0 or not names):
+        return []
+    said = marked[0] if marked else f"verdict-record 退 {exit_code}、没跑完（输出里没有 RECORD 那一行），判红的 {len(names)} 条记没记进库不知道"
+    if len(marked) > 1:
+        said += f"（另有 {len(marked) - 1} 句同样的）"
+    if withdrawal is None:
+        return [(f"{said}；调用方没交 --red，同一把键原有的绿撤不了，整道判红",
+                 "调用方交 plan-failure 时带上 --red <根> <种类> <计划文件> <判红的名字文件>（文件头「按条复用失灵」），这一趟就撤得掉；"
+                 "撤之前下一趟会照复用那几把键原有的绿，先修好调用方，再重跑这一格")]
+    withdrawn, kept, library_name = withdraw_red_greens(*withdrawal, names)
+    if not kept:
+        return [(f"{said}；同一把键原有的绿已撤掉 {withdrawn} 条，下一趟这几条现判",
+                 "记红没成的原因看这一句（服务的写帧被拒、调用方的名字文件或计划文件不对、verdict-record 被停在半路），修好再重跑这一格")]
+    shown = "；".join(f"{name}：{reason}" for name, reason in kept[:3])
+    remove = (f"python3 scripts/prune-server/prune_server_client.py delete-prefix --dry-run unit-verdicts {kind_directory_name(withdrawal[1])} {library_name} keys/<键>.json"
+              if library_name else "python3 scripts/prune-server/prune_server_client.py delete-prefix --dry-run unit-verdicts <种类> <库目录> keys/<键>.json")
+    return [(f"{said}；同一把键原有的绿也撤不掉（{len(kept)} 条：{shown}），下一趟会照复用，整道判红",
+             f"服务好了之后照计划文件里那几条的键逐条删掉原有的绿：{remove}（先 --dry-run 数、再不带它删、再数到 0），再重跑这一格；"
+             "删之前不许当这几条判过绿")]
+
+
+def withdraw_red_greens(root, kind, plan_file, _red_file, names):
+    """记红没成时改走撤绿（文件头「按条复用失灵」）：计划里这几个名字各自的键，库里记着绿的删掉（VerdictLibrary.withdraw_green）。
+    交 (撤掉的条数, 没撤成的 [(名字, 原因)], 库名或 "")；读不了计划、开不了库的整份算没撤成。拒算（计划里没有键）的那几条库里没有它的绿，不算。"""
+    try:
+        with open(plan_file, encoding="utf-8") as handle:
+            planned = [json.loads(line) for line in handle if line.strip()]
+    except (OSError, ValueError) as error:
+        return 0, [("整份计划", f"读不了计划文件 {plan_file}：{error}")], ""
+    keys = {}
+    for item in planned:
+        name = parse_request_line(item["request"]).name
+        if name in names and item.get("key"):
+            keys[name] = item["key"]
+    try:
+        library = VerdictLibrary(os.path.abspath(root), kind)
+    except SystemExit as error:   # LibraryUnavailable 与客户端退出（75、3）
+        return 0, [(name, f"开不了库（退 {error.code}）") for name in sorted(keys)] or [("整份", f"开不了库（退 {error.code}）")], ""
+    withdrawn, kept = 0, []
+    for name, key in sorted(keys.items()):
+        try:
+            withdrawn += library.withdraw_green(name, key)
+        except (Exception, SystemExit) as error:   # 客户端退 75、3 与别的异常：这一条没撤成，接着撤下一条
+            kept.append((name, f"键 {key[:12]}：{type(error).__name__} {getattr(error, 'code', error)}"))
+    return withdrawn, kept, library.directory
+
+
 def command_plan_failure(arguments):
-    """plan-failure <调用方> <子命令> <退出码> [<输出文件>…]（文件头「按条复用失灵」）。"""
-    if len(arguments) < 3 or arguments[1] not in (*PLAN_COMMANDS, "verdict-record") or not re.fullmatch(r"[0-9]+", arguments[2]):
-        print("  ✗ 用法：admission.py plan-failure <调用方> <verdict-plan|test-plan|verdict-record> <退出码> [<输出文件>…]")
-        print("     → 怎么办：输出文件给那一趟 admission.py 的标准输出与标准错误落的文件（文件头「按条复用失灵」）")
+    """plan-failure <调用方> <子命令> <退出码> [--red <根> <种类> <计划文件> <判红的名字文件>] [<输出文件>…]（文件头「按条复用失灵」）。"""
+    if len(arguments) < 3 or arguments[1] not in (*PLAN_COMMANDS, "verdict-record") or not re.fullmatch(r"[0-9]+", arguments[2]) \
+            or (arguments[3:4] == ["--red"] and (arguments[1] != "verdict-record" or len(arguments) < 8)):
+        print("  ✗ 用法：admission.py plan-failure <调用方> <verdict-plan|test-plan|verdict-record> <退出码> [--red <根> <种类> <计划文件> <判红的名字文件>] [<输出文件>…]")
+        print("     → 怎么办：输出文件给那一趟 admission.py 的标准输出与标准错误落的文件；--red 只跟 verdict-record，给那一趟交的根、种类、计划文件与 --red-names 那一份（文件头「按条复用失灵」）")
         return EXIT_REGISTRATION_ERROR
     caller, command, exit_code = arguments[0], arguments[1], int(arguments[2])
+    withdrawal, output_paths = (arguments[4:8], arguments[8:]) if arguments[3:4] == ["--red"] else (None, arguments[3:])
     texts = []
-    for path in arguments[3:]:
+    for path in output_paths:
         try:
             with open(path, encoding="utf-8", errors="replace") as handle:
                 texts.append(handle.read())
@@ -3930,24 +4282,39 @@ def command_plan_failure(arguments):
         shown = [line.strip() for line in "\n".join(texts).split("\n") if line.strip().startswith("✗ ")]
         print(f"  ✗ {caller}：prune-server 不可用（scripts/gate/admission.py {command} 退 75{'：' + shown[-1][:300] if shown else ''}），这一趟没判、不是复用失灵")
         print(f"     → 怎么办：{PLAN_SERVICE_UNAVAILABLE_HOWTO}")
+        if command == "verdict-record" and withdrawal is not None and not break_is_set(OWED_WITHDRAWAL_BREAK):
+            # 欠撤（文件头「按条复用失灵」）：判红那几条记红时服务不可用，同一把键原有的绿还在；记下键与种类，下一趟开跑先撤（弄坏开关 withdrawal-owed-unrecorded 下不记）
+            written, problem, directory = record_owed_withdrawals(withdrawal)
+            if problem:
+                print(f"  ✗ {caller}：判红那几条的欠撤没记全（记下 {written} 条；{problem}），同一把键原有的绿还在，下一趟可能照复用")
+                print("     → 怎么办：服务好了之后照计划文件里那几条的键逐条删掉原有的绿（python3 scripts/prune-server/prune_server_client.py delete-prefix --dry-run "
+                      "unit-verdicts <种类> <库名> keys/<键>.json，先数、再删、再数到 0），删完之前不许当这几条判过绿；欠撤记不下的原因看括号里那一句")
+            elif written:
+                print(f"  · {caller}：判红的 {written} 条记红时服务不可用，欠撤（键与种类）记在 {directory}，下一趟开跑先撤这几把键原有的绿、撤不掉整道退 75")
         return PLAN_SERVICE_UNAVAILABLE_EXIT
     lines = "\n".join(texts).split("\n")
     client_failures = [index for index, line in enumerate(lines) if PLAN_CLIENT_FAILURE_FORM.search(line)]
     if exit_code == PLAN_CLIENT_FAILURE_EXIT and client_failures and not break_is_set("client-failure-swallowed"):
-        # 客户端退 3（配置错、请求被拒）：三条子命令都判红，verdict-record 也不当「记不进库」放过；弄坏开关 client-failure-swallowed 下照改前
+        # 客户端退 3（配置错、请求被拒）：三条子命令都判红，verdict-record 也不当「记不进库」放过；弄坏开关 client-failure-swallowed 下不认这一行
         shown = lines[client_failures[-1]].strip()
         remedy = next((line.strip() for line in lines[client_failures[-1] + 1:client_failures[-1] + 3] if line.strip().startswith("→ 怎么办：")), "")
         print(f"  ✗ {caller}：prune-server 客户端退 3（配置错或请求被拒，不是服务不可用，也不是复用失灵；scripts/gate/admission.py {command}：{shown[:300]}），这一趟判红")
         print(f"     {remedy or '→ 怎么办：照 scripts/prune-server/prune_server_client.py 文件头「退出码」那一行配好（本机要有服务的 socket，第二台要有多机配置里的服务地址），再重交同一条命令'}")
         return 1
+    red_findings = [] if command != "verdict-record" or break_is_set(RED_RECORD_FAILURE_BREAK) \
+        else red_record_failure_findings(exit_code, "\n".join(texts), withdrawal)
+    for message, howto in red_findings:
+        # 记红没成（文件头「按条复用失灵」）：不归弄坏开关 plan-failure-not-red（撤绿照做、照判红）；弄坏开关 red-record-failure-swallowed 下退 0
+        print(f"  ✗ {caller}按条复用失灵：{RED_RECORD_FAILURE_HEAD}{message.removeprefix(RED_RECORD_FAILURE_HEAD)}")
+        print(f"     → 怎么办：{howto}")
     findings = plan_failure_findings(command, exit_code, "\n".join(texts))
     if not findings:
-        return 0
+        return 1 if red_findings else 0
     if break_is_set("plan-failure-not-red"):
-        # 弄坏开关：认出失灵也不判红（改前四处调用方退回全部现判、不判红的样子）
+        # 弄坏开关：认出失灵也不判红（四处调用方退回全部现判、不判红）
         for message, _howto in findings:
             print(f"  ! {caller}按条复用失灵（弄坏开关 plan-failure-not-red：退回全部现判、不判红）：{message}")
-        return 0
+        return 1 if red_findings else 0
     for message, howto in findings:
         print(f"  ✗ {caller}按条复用失灵：{message}；这一趟照旧全部现判跑完，结论判红（不能复用就判红）")
         print(f"     → 怎么办：{howto}")
@@ -4390,7 +4757,7 @@ def option_values(options, names):
 
 def forwarded_worker_threads(arguments):
     """弄坏开关 judge-takes-forwarded-threads 下 crash-case-judge 照旧收的 --machine-cores / --threads / --threads-origin
-    （crash-point-replay 转过来的，改前的写法）：交 (核数, 线程数, 来源) 或 None。开关没开时交 None、调用方不认这三个参数。"""
+    （crash-point-replay 转过来的）：交 (核数, 线程数, 来源) 或 None。开关没开时交 None、调用方不认这三个参数。"""
     if not break_is_set("judge-takes-forwarded-threads"):
         return None
     values = option_values(arguments, ("--machine-cores", "--threads", "--threads-origin"))
@@ -4539,10 +4906,11 @@ REPLAY_LOAD_LIBRARIES = ("scripts/hosts/heavy-threads.sh",)
 
 def link_replay_build_log_tools(work):
     """REPLAY_LOAD_LIBRARIES、REPLAY_BUILD_LOG_TOOLS 与 REPLAY_ROW_LIBRARY_TOOLS 在临时仓里建成指向真仓那一份的符号链接，写进临时仓的 .gitignore（同 link_sop_copy）。
-    弄坏开关 ADMISSION_BREAK=replay-build-tools-unlinked：后两样不链（改前的样子），replay.sh 那几格的构建退 127、一条实验都没跑。"""
-    linked = REPLAY_LOAD_LIBRARIES
+    弄坏开关 ADMISSION_BREAK=replay-build-tools-unlinked：构建那两样（REPLAY_BUILD_LOG_TOOLS）不链，replay.sh 那几格的构建退 127、一条实验都没跑；
+    判定库客户端照链（不链它 replay.sh 在按行复用那一步就退 1、走不到这条开关弄坏的构建）。"""
+    linked = REPLAY_LOAD_LIBRARIES + REPLAY_ROW_LIBRARY_TOOLS
     if not break_is_set("replay-build-tools-unlinked"):
-        linked = linked + REPLAY_BUILD_LOG_TOOLS + REPLAY_ROW_LIBRARY_TOOLS
+        linked = linked + REPLAY_BUILD_LOG_TOOLS
     real_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
     with open(os.path.join(work, ".gitignore"), "a", encoding="utf-8") as handle:
         for relative_path in linked:
@@ -4712,6 +5080,25 @@ def run_unit_key_cells(selftest, module):
         selftest.expect("单元键：.cargo/config.toml 只改注释键不变（N42）、改 rustflags 的值键变",
                         comment_only == with_configuration and all(value_changed[name] != with_configuration[name] for name in with_configuration),
                         f"只改注释 {comment_only == with_configuration}，改值 {[value_changed[name] != with_configuration[name] for name in with_configuration]}")
+        # 构建环境只收改结局的设置（文件头「单元键」工具链行）：增量编译开不开、别名不进键，cargo 配置里的 profile 进键；
+        # 弄坏开关 build-environment-all-settings 下整份收，这一格转红
+        settings_file = os.path.join(work, ".cargo/config.toml")
+        write_text(settings_file, "[build]\nincremental = false\n\n[alias]\nxt = \"test\"\n")
+        settings_off = sample_keys(work, dict(environment, CARGO_BUILD_INCREMENTAL="false"))
+        settings_on = sample_keys(work, dict(environment, CARGO_BUILD_INCREMENTAL="true"))
+        edit_once(settings_file, "incremental = false", "incremental = true")
+        settings_configured_on = sample_keys(work, dict(environment, CARGO_BUILD_INCREMENTAL="false"))
+        edit_once(settings_file, "xt = \"test\"\n", "xt = \"test\"\nxb = \"build\"\n")
+        settings_alias_added = sample_keys(work, dict(environment, CARGO_BUILD_INCREMENTAL="false"))
+        edit_once(settings_file, "[alias]\n", "[profile.release]\nopt-level = 2\n\n[alias]\n")
+        settings_profile_changed = sample_keys(work, dict(environment, CARGO_BUILD_INCREMENTAL="false"))
+        os.remove(settings_file)
+        selftest.expect("单元键：构建环境只收改结局的设置：CARGO_BUILD_INCREMENTAL 与 [build] incremental 两种取值键相同、[alias] 加一条键不变，[profile.release] 改一项键变",
+                        all(settings_off.values()) and settings_on == settings_off and settings_configured_on == settings_off and settings_alias_added == settings_off
+                        and all(settings_profile_changed[name] not in (None, settings_off[name]) for name in settings_off),
+                        f"CARGO_BUILD_INCREMENTAL 两种取值相同 {settings_on == settings_off}，[build] incremental 改了相同 {settings_configured_on == settings_off}，"
+                        f"[alias] 加一条相同 {settings_alias_added == settings_off}，[profile.release] 改了变的 "
+                        f"{[short_name(name) for name in settings_off if settings_profile_changed[name] not in (None, settings_off[name])]}，键 {settings_off}")
         python_requests = [Request("tool", "scripts/tool.py", []), Request("other", "scripts/other.py", [])]
         python_before = sample_keys(work, environment, python_requests)
         edit_once(os.path.join(work, "scripts/tool.py"), "return text.split()", "return text.split(None)")
@@ -4720,6 +5107,25 @@ def run_unit_key_cells(selftest, module):
         selftest.expect("单元键：研究脚本自证走到的 anchor_hints 改一个字（T21）⇒ 只 scripts/tool.py 那一条变",
                         python_before["tool"] and python_before["tool"] != python_after["tool"] and python_before["other"] == python_after["other"],
                         f"改前 {python_before}，改后 {python_after}")
+        # 入口写 -（文件头「判定请求」）：键只由判法与内容输入组成，没有判法的拒算
+        judge_file = os.path.join(work, "scripts/judge.py")
+        judge_only_tokens = ["judge:scripts/judge.py::judge", "line:data=alpha"]
+        judge_only_requests = [Request("judged-by-judge", JUDGE_ONLY_ENTRY, judge_only_tokens), Request("no-judge", JUDGE_ONLY_ENTRY, ["line:data=alpha"])]
+        judge_only_before = sample_keys(work, environment, judge_only_requests)
+        judge_only_line = sample_keys(work, environment, [Request("judged-by-judge", JUDGE_ONLY_ENTRY, ["judge:scripts/judge.py::judge", "line:data=beta"])])
+        edit_once(judge_file, "    return line.endswith(' ok')", "    # 只是注释\n    return line.endswith(' ok')")
+        judge_only_comment = sample_keys(work, environment, judge_only_requests[:1])
+        edit_once(judge_file, "    # 只是注释\n    return line.endswith(' ok')", "    return line.endswith(' ok')")
+        edit_once(judge_file, "line.endswith(' ok')", "line.endswith(' ok ')")
+        judge_only_changed = sample_keys(work, environment, judge_only_requests[:1])
+        edit_once(judge_file, "line.endswith(' ok ')", "line.endswith(' ok')")
+        base_key = judge_only_before["judged-by-judge"]
+        selftest.expect("单元键：入口写 -（键只由判法与内容输入组成）：判法改一个字键变、判法只改注释键不变、line: 变键变、一个 judge: 都没有拒算",
+                        base_key is not None and judge_only_before["no-judge"] is None and judge_only_line["judged-by-judge"] != base_key
+                        and judge_only_comment["judged-by-judge"] == base_key and judge_only_changed["judged-by-judge"] not in (None, base_key),
+                        f"改前 {base_key}，没有 judge: 的 {judge_only_before['no-judge']}，line 变了 {judge_only_line['judged-by-judge']}，"
+                        f"判法只改注释 {judge_only_comment['judged-by-judge']}，判法改一个字 {judge_only_changed['judged-by-judge']}")
+        run_caller_input_key_cells(selftest, work, environment)
         exit_code, output, _messages = run_in_environment([sys.executable, module, "unit-key", work, "crates/demo/tests/setting.rs::no_such_test"], environment)
         selftest.expect("unit-key：入口找不到 ⇒ 拒算退 4、打拒算行", exit_code == EXIT_UNIT_KEY_REFUSED and output.startswith("refused\tkey-uncomputable"),
                         f"退 {exit_code}，stdout「{output.strip()[:300]}」")
@@ -4733,6 +5139,77 @@ def run_unit_key_cells(selftest, module):
         selftest.expect("单元键的样本改得动", False, str(error))
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+# 运行期读的文件分两类（lib_function_units.py 文件头「运行期读的数据文件」）那一格的样本：判法经别的模块的函数读请求文件（实参是判法入口的参数）
+# 与它自己的规则表（实参是模块常量）；工具链询问那一格的判法起 [os.environ["RUSTC"], "-V"]
+CALLER_INPUT_SAMPLE_FILES = {
+    "scripts/request_rows.py": 'def read_rows(path):\n    with open(path, encoding="utf-8") as handle:\n        return handle.read().splitlines()\n',
+    "scripts/request_judge.py": ('import os\n\nimport request_rows\n\nHERE = os.path.dirname(os.path.abspath(__file__))\nRULES = os.path.join(HERE, "request_rules.tsv")\n\n\n'
+                                 'def judge_request(request_file):\n    return len(request_rows.read_rows(request_file)) == len(request_rows.read_rows(RULES))\n'),
+    "scripts/request_rules.tsv": "rule\n",
+    "requests/one.tsv": "alpha\n",
+    "scripts/compiler_judge.py": ('import os\nimport subprocess\n\n\ndef judge_version(line):\n    program = os.environ["RUSTC"]\n'
+                                  '    return subprocess.run([program, "-V"], capture_output=True, text=True, check=False).stdout.strip() in line\n'),
+    ".claude/hooks/selftest-registry.tsv": "scripts/one.py\tselftest\t# 甲\nscripts/two.py\tselftest\t# 乙\n",
+    "scripts/one.py": "print(1)\n",
+    "scripts/registry_judge.py": ('import os\n\nREGISTRY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".claude", "hooks", '
+                                  '"selftest-registry.tsv")\n\n\ndef selftest_registry_at(path):\n    with open(path, encoding="utf-8") as handle:\n'
+                                  '        return dict(line.split("\\t", 1) for line in handle.read().splitlines() if "\\t" in line)\n\n\n'
+                                  'def read_selftest_registry(path):\n    return selftest_registry_at(path)\n\n\n'
+                                  'def registered_selftest(key):\n    return read_selftest_registry(REGISTRY).get(key)\n\n\n'
+                                  'def judge(key):\n    return registered_selftest(key) is not None\n'),
+}
+REQUEST_FILE_CELL = "单元键：请求文件内容变而判法没变：这一份判法键不变、调用方那一条键变（file: 折进键）；判法自己读的规则表改了判法键变"
+TOOLCHAIN_QUERY_KEY_CELL = "单元键：判法闭包里有工具链询问（[os.environ[\"RUSTC\"], \"-V\"]）：工具链单元进判法键、算得出，假 rustc 换一版判法键变"
+PROGRAM_ARGUMENTS_KEY_CELL = "单元键：program-argument: 进键：同一程序入口两组参数各算得出、键不同"
+ROW_KEYED_JUDGE_CELL = ("单元键：判法经登记的取用函数按入口查 .claude/hooks/selftest-registry.tsv 的一行（lib_function_units.py 文件头「按行进键的登记表」）："
+                        "改表里别的脚本那一行，这一条的键不变；改它自己那一行，键变")
+
+
+def run_caller_input_key_cells(selftest, work, environment):
+    """单元键样本仓里另写几份文件（CALLER_INPUT_SAMPLE_FILES，格完删掉）判四格：REQUEST_FILE_CELL（函数单元库的 FUNCTION_UNITS_BREAK=python-parameter-callers-unresolved、
+    python-data-reads-ignored 下红）、TOOLCHAIN_QUERY_KEY_CELL（函数单元库的 FUNCTION_UNITS_BREAK=python-toolchain-queries-unkeyed 下红）、PROGRAM_ARGUMENTS_KEY_CELL、
+    ROW_KEYED_JUDGE_CELL（函数单元库的 FUNCTION_UNITS_BREAK=row-keyed-tables-whole 下红）。"""
+    for path, text in CALLER_INPUT_SAMPLE_FILES.items():
+        write_text(os.path.join(work, path), text)
+    request = Request("request-judged", JUDGE_ONLY_ENTRY, ["judge:scripts/request_judge.py::judge_request", "file:requests/one.tsv"])
+
+    def judged(judge):
+        with EnvironmentPatch({name: environment.get(name) for name in ("PATH", "CARGO_HOME", "RUSTFLAGS", BREAK_VARIABLE)}):
+            context = KeyContext(work, environment)
+            return context.judge_key(judge)[0], compute_unit_key(context, request).key
+    try:
+        judge_before, request_before = judged("scripts/request_judge.py::judge_request")
+        edit_once(os.path.join(work, "requests/one.tsv"), "alpha", "beta")
+        judge_input, request_input = judged("scripts/request_judge.py::judge_request")
+        edit_once(os.path.join(work, "scripts/request_rules.tsv"), "rule", "rules")
+        judge_rules, _request_rules = judged("scripts/request_judge.py::judge_request")
+        selftest.expect(REQUEST_FILE_CELL,
+                        None not in (judge_before, request_before) and judge_input == judge_before and request_input not in (None, request_before)
+                        and judge_rules not in (None, judge_input),
+                        f"判法键 改前 {judge_before}、改请求文件后 {judge_input}、改规则表后 {judge_rules}；调用方那一条 改前 {request_before}、改请求文件后 {request_input}")
+        compiler_before = judged("scripts/compiler_judge.py::judge_version")[0]
+        write_text(os.path.join(work, FAKE_RUSTC_VERSION_FILE), "1.98.0-selftest\n")
+        compiler_after = judged("scripts/compiler_judge.py::judge_version")[0]
+        os.remove(os.path.join(work, FAKE_RUSTC_VERSION_FILE))
+        selftest.expect(TOOLCHAIN_QUERY_KEY_CELL, compiler_before is not None and compiler_after not in (None, compiler_before),
+                        f"判法键 换工具链前 {compiler_before}、换后 {compiler_after}")
+        argument_keys = sample_keys(work, environment, [Request("selftest", "scripts/tool.py", ["program-argument:--selftest"]),
+                                                        Request("other", "scripts/tool.py", ["program-argument:--other"])])
+        selftest.expect(PROGRAM_ARGUMENTS_KEY_CELL, None not in argument_keys.values() and argument_keys["selftest"] != argument_keys["other"], f"{argument_keys}")
+        registry_request = [Request("one", "scripts/one.py", ["judge:scripts/registry_judge.py::judge"])]
+        registry_before = sample_keys(work, environment, registry_request)["one"]
+        edit_once(os.path.join(work, ".claude/hooks/selftest-registry.tsv"), "# 乙", "# 乙改")
+        registry_other = sample_keys(work, environment, registry_request)["one"]
+        edit_once(os.path.join(work, ".claude/hooks/selftest-registry.tsv"), "# 甲", "# 甲改")
+        registry_own = sample_keys(work, environment, registry_request)["one"]
+        selftest.expect(ROW_KEYED_JUDGE_CELL, registry_before is not None and registry_other == registry_before and registry_own not in (None, registry_before),
+                        f"改前 {registry_before}；改别的脚本那一行之后 {registry_other}；改它自己那一行之后 {registry_own}")
+    finally:
+        for path in CALLER_INPUT_SAMPLE_FILES:
+            if os.path.exists(os.path.join(work, path)):
+                os.remove(os.path.join(work, path))
 
 
 def run_runner_script_cells(selftest):
@@ -4799,6 +5276,13 @@ def run_test_plan_parallel_cells(selftest, module):
                         and "PLAN judge=3" in single[1] and bool(processes and int(processes.group(1)) > 1),
                         f"单线程退 {single[0]}、并行退 {parallel[0]}；stdout 相同 {single[1] == parallel[1]}、计划文件相同 {single[2] == parallel[2]}；"
                         f"并行那一趟记的「{parallel[3] or '没写'}」；单线程 stdout 尾部「{single[1].strip()[-200:]}」；stderr「{parallel[4].strip()[-200:]}」")
+        # 线程数取不了（SINGLEFS_THREAD_CAP 写坏）：整次列不出、退 2、不写计划文件，不退回 1 个子进程照算（弄坏开关 test-plan-jobs-fallback-one 下这一格红）
+        refused_plan = os.path.join(work, "plan.unreadable-threads")
+        exit_code, output, messages = run_in_environment([sys.executable, module, "test-plan", work, "demo-gate.sh:test-plan-parallel", "demo", refused_plan],
+                                                         dict(environment, **{THREAD_CAP_VARIABLE: "abc", "SINGLEFS_REUSE_SENTINEL_SEED": "1"}))
+        selftest.expect("test-plan：取不了每台默认重活线程数（SINGLEFS_THREAD_CAP=abc）⇒ 整次列不出、退 2，不退回 1 个子进程照算",
+                        exit_code == EXIT_REGISTRATION_ERROR and "取不了每台默认重活线程数" in output + messages and not os.path.exists(refused_plan),
+                        f"退 {exit_code}、计划文件{'写了' if os.path.exists(refused_plan) else '没写'}；stdout 尾部「{output.strip()[-200:]}」；stderr「{messages.strip()[-200:]}」")
     except AssertionError as error:
         selftest.expect("test-plan 并行那一格的样本搭得起来", False, str(error))
     finally:
@@ -5019,6 +5503,86 @@ def run_reuse_fix_cells(selftest, module):
         record(["test_t"])
         _exit_code, decisions, _reasons, output = plan()
         selftest.expect("判定库：红之后再判绿 ⇒ 下一趟复用", decisions == {"test_t": "reuse", "test_u": "reuse", "test_v": "reuse"}, f"{decisions}")
+        # 记红没成（文件头「按条复用失灵」）：样本标记 red-record-failure 下 test_u 判红 ⇒ verdict-record 退 1、打「判红没记进判定库」；plan-failure 带 --red
+        #   撤掉 test_u 原有的绿、判红 ⇒ 下一趟 test_u 现判，别的复用。弄坏开关 red-record-failure-swallowed 下这一格转红（只打 !、绿留着、下一趟复用）
+        all_reused = {"test_t": "reuse", "test_u": "reuse", "test_v": "reuse"}
+        only_u_judged = {"test_t": "reuse", "test_u": "judge", "test_v": "reuse"}
+        marker = os.path.join(work, RED_RECORD_FAILURE_SAMPLE_MARKER)
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        write_text(marker, "样本：记红没成\n")
+        record_exit, record_output, record_messages = record([], ["test_u"])
+        os.unlink(marker)
+        record_output_path = os.path.join(work, "red-record-failure.out")
+        write_text(record_output_path, record_output + record_messages)
+        failure_exit, failure_output, failure_messages = admission("plan-failure", "样本调用方的", "verdict-record", str(record_exit), "--red", work, "demo-gate.sh",
+                                                                   plan_file, red_file, record_output_path)
+        _exit_code, decisions, _reasons, output = plan()
+        selftest.expect("判定库：记红没成（样本标记 red-record-failure）⇒ verdict-record 退 1、plan-failure --red 撤掉原有的绿、下一趟这一条现判",
+                        record_exit == 1 and RED_RECORD_FAILURE_HEAD in record_output and " red-unrecorded=1 " in record_output
+                        and failure_exit == 1 and "同一把键原有的绿已撤掉 1 条" in failure_output and decisions == only_u_judged,
+                        f"verdict-record 退 {record_exit}「{(record_output + record_messages).strip()[-200:]}」；"
+                        f"plan-failure 退 {failure_exit}「{(failure_output + failure_messages).strip()[-300:]}」；下一趟 {decisions}")
+        # verdict-record 没跑完（被停：退 137、一个字没打）：带 --red 的 plan-failure 照样撤绿、判红 ⇒ 下一趟 test_u 现判；格末把 test_u 判绿记回去（后面几格照三条都绿往下）
+        record(["test_u"])
+        _exit_code, before, _reasons, output = plan()
+        write_text(red_file, "crates/demo/tests/setting.rs::test_u\n")
+        killed_output_path = os.path.join(work, "killed-record.out")
+        write_text(killed_output_path, "")
+        failure_exit, failure_output, failure_messages = admission("plan-failure", "样本调用方的", "verdict-record", "137", "--red", work, "demo-gate.sh",
+                                                                   plan_file, red_file, killed_output_path)
+        _exit_code, decisions, _reasons, output = plan()
+        selftest.expect("判定库：verdict-record 没跑完（退 137、没有 RECORD 那一行）⇒ plan-failure --red 照样撤绿、判红、下一趟这一条现判",
+                        before == all_reused and failure_exit == 1 and "没跑完" in failure_output and "同一把键原有的绿已撤掉 1 条" in failure_output
+                        and decisions == only_u_judged,
+                        f"撤之前 {before}；plan-failure 退 {failure_exit}「{(failure_output + failure_messages).strip()[-300:]}」；下一趟 {decisions}")
+        record(["test_u"])
+        # 欠撤（文件头「按条复用失灵」）：样本标记 red-record-unavailable 下 test_u 判红 ⇒ verdict-record 退 75；plan-failure --red 照旧退 75、记一笔欠撤（键与种类，
+        #   一把键一份，放在 SINGLEFS_LAST_RUNS_DIRECTORY 底下）；下一趟 verdict-plan 开跑先撤 test_u 原有的绿、回读、删掉欠撤 ⇒ test_u 现判，别的复用。
+        #   再记一笔欠撤，样本标记 owed-withdrawal-unavailable 下下一趟撤不掉 ⇒ verdict-plan 整道退 75、不打 PLAN、欠撤留着；标记撤掉之后撤成、test_u 现判。
+        #   弄坏开关 withdrawal-owed-unrecorded 下两格都转红（不记欠撤、不读欠撤：下一趟照复用 test_u 原有的绿）。每格末把 test_u 判绿记回去
+        owed_root = os.path.join(environment["SINGLEFS_LAST_RUNS_DIRECTORY"], OWED_WITHDRAWALS_DIRECTORY)
+
+        def owed_files():
+            return sorted(os.path.join(directory, name) for directory, _subdirectories, names in os.walk(owed_root) for name in names if name.endswith(".json"))
+
+        def red_record_unavailable():
+            """test_u 判红、记红那一帧服务不可用 ⇒ (verdict-record 的退出码与输出, plan-failure 的退出码与输出)。"""
+            marker_path = os.path.join(work, RED_RECORD_UNAVAILABLE_SAMPLE_MARKER)
+            write_text(marker_path, "样本：记红那一帧服务不可用\n")
+            unavailable_exit, unavailable_output, unavailable_messages = record([], ["test_u"])
+            os.unlink(marker_path)
+            output_path = os.path.join(work, "red-record-unavailable.out")
+            write_text(output_path, unavailable_output + unavailable_messages)
+            owed_exit, owed_output, owed_messages = admission("plan-failure", "样本调用方的", "verdict-record", str(unavailable_exit), "--red", work, "demo-gate.sh",
+                                                              plan_file, red_file, output_path)
+            return unavailable_exit, unavailable_output + unavailable_messages, owed_exit, owed_output + owed_messages
+
+        _exit_code, before, _reasons, output = plan()
+        record_exit, record_text, failure_exit, failure_text = red_record_unavailable()
+        owed_after_failure = owed_files()
+        plan_exit, decisions, _reasons, output = plan()
+        selftest.expect("判定库：记红时 prune-server 不可用（样本标记 red-record-unavailable）⇒ plan-failure --red 照旧退 75、记一笔欠撤，下一趟开跑先撤同一把键的绿、回读，这一条现判",
+                        before == all_reused and record_exit == PLAN_SERVICE_UNAVAILABLE_EXIT and failure_exit == PLAN_SERVICE_UNAVAILABLE_EXIT
+                        and len(owed_after_failure) == 1 and "欠撤（键与种类）记在" in failure_text and plan_exit == 0 and "撤掉原有的绿 1 条" in output
+                        and decisions == only_u_judged and not owed_files(),
+                        f"撤之前 {before}；verdict-record 退 {record_exit}「{record_text.strip()[-160:]}」；plan-failure 退 {failure_exit}「{failure_text.strip()[-260:]}」；"
+                        f"欠撤 {len(owed_after_failure)} 份；下一趟退 {plan_exit}、{decisions}、欠撤剩 {len(owed_files())} 份「{output.strip()[-200:]}」")
+        record(["test_u"])
+        plan()
+        red_record_unavailable()
+        owed_after_failure = owed_files()
+        withdrawal_marker = os.path.join(work, OWED_WITHDRAWAL_UNAVAILABLE_SAMPLE_MARKER)
+        write_text(withdrawal_marker, "样本：撤欠撤那一帧服务不可用\n")
+        blocked_exit, blocked, _reasons, blocked_output = plan()
+        owed_while_blocked = owed_files()
+        os.unlink(withdrawal_marker)
+        plan_exit, decisions, _reasons, output = plan()
+        selftest.expect("判定库：欠撤撤不掉（样本标记 owed-withdrawal-unavailable）⇒ verdict-plan 整道退 75、不打 PLAN、欠撤留着；撤得掉之后这一条现判",
+                        len(owed_after_failure) == 1 and blocked_exit == PLAN_SERVICE_UNAVAILABLE_EXIT and not blocked and "PLAN " not in blocked_output
+                        and "撤不掉" in blocked_output and owed_while_blocked == owed_after_failure and plan_exit == 0 and decisions == only_u_judged and not owed_files(),
+                        f"欠撤 {len(owed_after_failure)} 份；撤不掉那一趟退 {blocked_exit}、判了 {blocked}、欠撤 {len(owed_while_blocked)} 份「{blocked_output.strip()[-200:]}」；"
+                        f"标记撤掉之后退 {plan_exit}、{decisions}、欠撤剩 {len(owed_files())} 份")
+        record(["test_u"])
         # 不是 git 工作树的副本（照样本拷一份、不带 .git）里判：verdict-plan 与 verdict-record 都退 2、点名那棵树，一条都不判、不打 PLAN 与 RECORD
         copy = os.path.join(copy_parent, "copy-without-git")   # 放在样本仓外面：放里面 git 照样找得到样本仓的 common-dir
         shutil.copytree(work, copy, ignore=shutil.ignore_patterns(".git"))
@@ -5457,9 +6021,12 @@ def run_crash_case_blocks_cells(selftest, module):
                  ("平常跑：blocks = 0（一块都没判）", crash_blocks_log(0, 0, 0, 0, 0), EXIT_BLOCKS_LINE_BAD),
                  ("多流用例两行合计 blocks = 0", crash_blocks_streams_log((0, 0, 0, 0, 0), (0, 0, 0, 0, 0)), EXIT_BLOCKS_LINE_BAD),
                  ("多流用例一条流 0 块、另一条流 2 块有判定：合计不是 0", crash_blocks_streams_log((0, 0, 0, 0, 0), (2, 2, 0, 0, 0)), 0)]
+        # 合计 blocks = 0 的两格另核退 4 的原因是「一块都没判」：多流用例两行都是 0 块时，按行数判的那一支（弄坏开关 blocks-single-line-only）也退 4，
+        # 只看退出码分不出是合计那一判在起作用
+        reasons = {"平常跑：blocks = 0（一块都没判）": "一块都没判", "多流用例两行合计 blocks = 0": "一块都没判"}
         for label, log_text, expected in cells:
             exit_code, output = blocks(log_text)
-            selftest.expect(f"crash-case-blocks：{label} ⇒ 退 {expected}", exit_code == expected, f"退 {exit_code}：{output.strip()}")
+            selftest.expect(f"crash-case-blocks：{label} ⇒ 退 {expected}", exit_code == expected and reasons.get(label, "") in output, f"退 {exit_code}：{output.strip()}")
         exit_code, output = blocks(crash_blocks_streams_log((3, 3, 0, 0, 0), (2, 1, 1, 0, 0)))
         selftest.expect("crash-case-blocks：多流用例的一句报两条流合计的块数（块 5、复用 4、现判 1）",
                         "块 5（2 条流合计）：复用 4、现判 1" in output, output.strip())
@@ -5525,7 +6092,7 @@ class Selftest:
 def run_quietly(command, environment_changes=None, working_directory=None, keep_multi_host_configuration=False):
     """外面设的 ADMISSION_BREAK 照样传给子进程：`ADMISSION_BREAK=skip-unchanged admission.py --selftest` 要看到「输入没变」那几格红。
     本台的多机配置（task-server 把 SINGLEFS_MULTI_HOST_CONFIG 设成派到的那一台树里的 multi-host.env）与起活那一方清场的握手变量不传：
-    临时仓的格要配置的经 environment_changes 显式给。keep_multi_host_configuration 只给弄坏开关 multi-host-config-inherited 那一格（照改前不清多机配置变量）。"""
+    临时仓的格要配置的经 environment_changes 显式给。keep_multi_host_configuration 只给弄坏开关 multi-host-config-inherited 那一格（不清多机配置变量）。"""
     environment = dict(os.environ)
     cleared = ["SINGLEFS_STAGED_TREE", "GPU_QUIESCE_ORIGIN_READ_BACK"]
     if not keep_multi_host_configuration:
@@ -6084,7 +6651,7 @@ def run_crash_case_features_cells(selftest):
                         and "--test-threads" not in plain and "--test-threads" not in engine, f"开 GPU 带特性行的收尾是 {engine_on_gpu_tail}，不带特性行是 {plain_on_gpu[-2:]}，GPU 关的是 {plain[-2:]}、{engine[-2:]}")
         with BreakSwitch("gpu-test-threads-unset"):
             broken_threads_gpu = launched("crash-case:engine", gpu_on)
-        # 放开的测试目标（GPU_TEST_THREADS_RELEASED_TARGETS）：开 GPU 时带 --test-threads <每台默认重活线程数>、不带 1；GPU 关时不带；弄坏开关 gpu-agreement-test-threads-one 下照改前带 1
+        # 放开的测试目标（GPU_TEST_THREADS_RELEASED_TARGETS）：开 GPU 时带 --test-threads <每台默认重活线程数>、不带 1；GPU 关时不带；弄坏开关 gpu-agreement-test-threads-one 下带 1
         released_threads = str(registered_heavy_threads(dict(os.environ)))
         released_on_gpu = launched("crash-case:released", gpu_on)
         released_off = launched("crash-case:released", gpu_off)
@@ -6203,12 +6770,12 @@ def run_heavy_thread_default_cells(selftest, case, environment, cores, work):
 
 
 def run_thread_source_cells(selftest, module):
-    """门禁批第三轮 FM 与 FD3：线程从哪来、判法自己现取。
+    """线程从哪来、判法自己现取。
     FM：登记行的 threads-variable= 由 crash-case-command 设成配的线程数（调用方设着的不认，弄坏开关 thread-variable-ignored 下漏进来）、
     标记里 configured_worker_threads= 记这个变量；本机核数不认 OMP_NUM_THREADS 与 PATH 里的 nproc（弄坏开关 cores-from-nproc 下认）。
     FD3：crash-case-judge 自己现取线程数：显式设 SINGLEFS_CRASH_POINT_REPLAY_THREADS=1 的 64 片 1 线程判绿、没设的判红；转过来的 --threads 1 --threads-origin explicit
     是用法错（退 2），翻不了判定（弄坏开关 judge-takes-forwarded-threads 下照旧收、判绿）。
-    每台默认重活线程数：没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS 时线程数取它（SINGLEFS_THREAD_CAP 设了照它、不是正整数拒；弄坏开关 threads-default-from-cores 下照改前取本机核数），
+    每台默认重活线程数：没设 SINGLEFS_CRASH_POINT_REPLAY_THREADS 时线程数取它（SINGLEFS_THREAD_CAP 设了照它、不是正整数拒；弄坏开关 threads-default-from-cores 下取本机核数），
     registered_heavy_threads 与 scripts/hosts/heavy_threads.py 的 default_heavy_threads 拿同几份登记逐格对拍。"""
     work = tempfile.mkdtemp(prefix="admission-selftest-threads-")
     try:
@@ -6518,7 +7085,7 @@ def run_replay_cells(selftest, module):
 
 
 REPLAY_JUDGE_FUNCTION_START = "replay_judge_fresh_product() {"
-# 弄坏开关 replay-store-inside-judge 往拷来的判法开头接回的那一句（改前的样子：判完当场经 admission.py library-files store 存库）
+# 弄坏开关 replay-store-inside-judge 往拷来的判法开头接回的那一句（判完当场经 admission.py library-files store 存库）
 REPLAY_STORE_INSIDE_JUDGE_UNDER_BREAK = '  python3 "$ADMISSION_MODULE" library-files store "$REPLAY_ROW_LIBRARY" "$REPLAY_ROW_RECORDS" >/dev/null 2>&1\n'
 REPLAY_JUDGING_CLOSURE_CELL = "replay.sh 判法闭包：REPLAY_JUDGING_FUNCTIONS 每个都算得出键、没有拒算、闭包里没有 admission.py 的单元（存库不在判法里）"
 
@@ -6526,7 +7093,7 @@ REPLAY_JUDGING_CLOSURE_CELL = "replay.sh 判法闭包：REPLAY_JUDGING_FUNCTIONS
 def run_replay_judging_closure_cell(selftest, module):
     """replay.sh 的判法（REPLAY_JUDGING_FUNCTIONS，文件头「复跑表的行键」判法那一行）闭包里没有拒算、没有 admission.py 的单元：存库（起 admission.py library-files store）
     在 replay_one 里做、不进判法闭包（进了就连上 admission.py 的程序入口，每一行的实验键与行键都拒算）。临时仓里拷真仓 replay.sh、admission.py 与
-    lib_function_units.py，逐个算判法键。弄坏开关 replay-store-inside-judge 下往拷来的 replay_judge_fresh_product 开头接回改前那一句，这一格必须红。"""
+    lib_function_units.py，逐个算判法键。弄坏开关 replay-store-inside-judge 下往拷来的 replay_judge_fresh_product 开头接回那一句，这一格必须红。"""
     work = tempfile.mkdtemp(prefix="admission-selftest-replay-judge-")
     try:
         run_quietly(["git", "init", "-q", "-b", "master", work], GIT_IDENTITY)
@@ -6659,6 +7226,9 @@ def run_plan_failure_cells(selftest, module):
             ("test-plan 退 0 却没打 PLAN 那一行：判红", "test-plan", 0, "x\tjudge\tk\n", 1, ("test-plan 退 0 却没打 PLAN 那一行",)),
             ("verdict-plan 退 0、打了 PLAN、没有哨兵红句：不判、一个字不打", "verdict-plan", 0, "a\tjudge\tk\t空库\nPLAN judge=1 reuse=0 refused=0 library=x\n", 0, ()),
             ("verdict-record 退 2 而没有哨兵红句（记不进库）：不算失灵、退 0", "verdict-record", 2, "  ✗ 读不了计划文件或名字文件：不在\n", 0, ()),
+            ("verdict-record 打了「判红没记进判定库」而没带 --red：判红、说撤不了", "verdict-record", 1,
+             "  ✗ 判红没记进判定库：a（键 0123456789ab）：样本档造的记红没成\nRECORD recorded=0 changed=0 refused=0 red=0 red-unrecorded=1 library=x\n",
+             1, ("样本调用方的按条复用失灵：判红没记进判定库：a（键 0123456789ab）", "调用方没交 --red", "整道判红")),
             ("verdict-record 退 3（prune-server 客户端没配服务地址）：判红、点名客户端那一行与它的出路，不当记不进库放过", "verdict-record", 3,
              "  ✗ prune-server 客户端：没有 socket 文件（样本），也没有 TCP 地址（退 3）\n     → 怎么办：本机要有服务的 socket（样本）\n",
              1, ("样本调用方的：prune-server 客户端退 3", "没有 socket 文件（样本）", "→ 怎么办：本机要有服务的 socket（样本）")),
@@ -6725,7 +7295,7 @@ pub fn root_by_parent_directories() -> std::path::PathBuf {
 
 def run_experiment_admission_entry_cells(selftest):
     """实验准入入口不拒算（它拒算时每个调它的实验键都是 refused，「输入没变不重跑」用不上）：真仓研究工作区里 EXPERIMENT_ADMISSION_ENTRY 的闭包没有拒算；
-    同一份 lib.rs 拷进临时目录、补一个照改前写法（清单目录往上两级拼出仓根）取路径的函数，它要拒算 runtime-path。
+    同一份 lib.rs 拷进临时目录、补一个取路径的函数（写法：清单目录往上两级拼出仓根），它要拒算 runtime-path。
     lib_function_units.py 的弄坏开关 FUNCTION_UNITS_BREAK=rust-manifest-directory-reads-unrefused（拼出目录也不拒算）下这一格转红。"""
     work = tempfile.mkdtemp(prefix="admission-selftest-admission-entry-")
     try:

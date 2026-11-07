@@ -7,8 +7,8 @@
 #   bash scripts/kb/claim-experiment.sh E139 简称            # 占住 E139：建 research/prompts/e139-preregistration.md
 #   bash scripts/kb/claim-experiment.sh --selftest
 #
-# 为什么要有它：2026-09-11 两个会话前后几分钟都取了 E137——一边查过号、隔几轮对话才写文件，
-# 另一边在这中间写了同名的未提交跑前登记，被 Write 整份盖掉（没进过 git），靠对话记录逐字复原。
+# 为什么要有它：两个会话前后几分钟都能取同一个 E 号——一边查过号、隔几轮对话才写文件，
+# 另一边在这中间写了同名的未提交跑前登记，会被 Write 整份盖掉（没进过 git）。
 # 查号与写文件分两步，中间就有窗口；这里把两步并成一步，写文件用 O_EXCL（set -C），
 # 两个会话同时占同一个号时只有一个成功。
 #
@@ -20,14 +20,16 @@
 # 不在 git 仓里（临时目录）就只查给定的那一棵；在 git 仓里而 git 读不出工作树清单时拒绝给号（宁可不给，不能少查一棵）。
 # 自证会红：--selftest 在临时目录里摆几处已用的号，确认 --next、「已用的号被拒」「同一个号第二次占被拒」；
 # 再起一个临时 git 仓和它的另一棵工作树，确认另一棵里用过的号在本棵被拒、--next 取两棵的最大号加一、两棵工作树互相占不到同一个号；
-# 再摆一棵带目录登记的临时树，确认入库装置目录里的号被拒、登记里加一行 notes 之后 notes 下的号被拒且 --next 跟着涨、登记不在时拒绝给号。
+# 再摆一棵带目录登记的临时树，确认入库装置目录里的号被拒、登记里加一行 notes 之后 notes 下的号被拒且 --next 跟着涨、登记不在时拒绝给号；
+# 再按现行登记逐行摆号：登记里的每一处各摆一个号（目录形态摆一个带号的文件，索引形态写一行索引），--next 取最大号加一、每一处的号都被拒。
+# 自证的临时树一律拷仓里现行的那份登记（本脚本旁边 ../../ 那一份，不是写死的一组）：登记加一处、删一处，自证跟着变；读不到就判红。
 # 弄坏开关（都让 --selftest 判红，门禁 code-tooling 的 break-switch-replay 格逐条复跑，登记在 .claude/gate.d/break-switch-replay-files.tsv）：
 #   CLAIM_EXPERIMENT_BREAK=used-check-skipped  claim() 跳过「已经有人用了」那一判：已有源码的号被占成功
 #     查号那一格（「✗ selftest: E6 已有源码却没被拒」）
 #   CLAIM_EXPERIMENT_BREAK=worktrees-skipped  worktree_roots() 不读工作树清单、只给给定的那一棵：另一棵里用过的号被占成功、--next 少数
 #     跨工作树那一格（「✗ selftest: 另一棵工作树用过 E12，本棵 --next 该是 E13」）
-#   CLAIM_EXPERIMENT_BREAK=registry-ignored  查号不读目录登记，退回改前写死的那组目录（不看入库装置目录、不认登记里新加的一处、登记不在也照给号）
-#     目录登记那一格（「✗ selftest: 目录登记：」）
+#   CLAIM_EXPERIMENT_BREAK=registry-ignored  查号不读目录登记，退回写死的那组目录（不看入库装置目录、不认登记里新加的一处、登记不在也照给号）
+#     目录登记那几格（「✗ selftest: 目录登记：」：照现行登记逐行摆号那一格先红）
 #   CLAIM_EXPERIMENT_BREAK 只在 --selftest 里认：平常占号、--next 设了它退 2 并点名这个变量。
 set -uo pipefail
 
@@ -42,7 +44,7 @@ fi
 
 LIB_EXPERIMENT_NUMBER_DIRECTORIES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib_experiment_number_directories.py"
 REGISTRY_RELATIVE_PATH=.claude/gate.d/experiment-number-directories.tsv
-# 改前写死的那组目录：只给弄坏开关 CLAIM_EXPERIMENT_BREAK=registry-ignored 用
+# 写死的那组目录：只给弄坏开关 CLAIM_EXPERIMENT_BREAK=registry-ignored 用
 PRE_REGISTRY_DIRECTORIES=$'research/prompts\te-number-names\t# 改前写死的那一组\nscripts/experiment-apparatus\te-number-names\t# 改前写死的那一组\nresearch/results\te-number-names\t# 改前写死的那一组\nscripts/mutation/tables\te-number-names\t# 改前写死的那一组\n.claude/kb/experiments\tnumber-names\t# 改前写死的那一组\n.claude/kb/experiments.md\tindex-rows\t# 改前写死的那一组'
 
 # 给定的这一棵加上同一个仓的其余工作树，一行一个根；清单读不出（在 git 仓里而 git 失败）退 1，不在 git 仓里只给这一棵。
@@ -161,8 +163,8 @@ claim_locked() {
   echo "  ✓ 占住 E$number：$file（对过 $tree_count 棵工作树里用过的 $used_count 个号）"
 }
 
-# 自证的临时树用的目录登记：与仓里那份同样五处，自证不依赖仓里那份的内容。
-SELFTEST_REGISTRY=$'research\te-number-names\t# 样本：跑前登记与产物\nscripts\te-number-names\t# 样本：实验源码与变异表\ncrates/singlefs-verification/src/bin\te-number-names\t# 样本：入库装置\n.claude/kb/experiments\tnumber-names\t# 样本：实验页\n.claude/kb/experiments.md\tindex-rows\t# 样本：实验索引'
+# 自证的临时树用的目录登记：仓里现行的那一份（本脚本所在的仓），自证照它摆号、照它查，登记改了自证跟着改。
+LIVE_REGISTRY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/$REGISTRY_RELATIVE_PATH"
 
 # 自证的一条失败：失败行带 ✗（门禁 break-switch-replay 格只在带 ✗ 的行里找点名的项），下一行写怎么办。
 selftest_fail() {
@@ -171,21 +173,26 @@ selftest_fail() {
   return 1
 }
 
-write_selftest_registry() {
-  mkdir -p "$1/.claude/gate.d" && printf '%s\n' "$SELFTEST_REGISTRY" > "$1/$REGISTRY_RELATIVE_PATH"
+write_selftest_registry() { # write_selftest_registry <临时树根> —— 把仓里现行的目录登记原样拷进去；读不到退 1
+  [[ -f "$LIVE_REGISTRY" ]] || return 1
+  mkdir -p "$1/.claude/gate.d" && cp -- "$LIVE_REGISTRY" "$1/$REGISTRY_RELATIVE_PATH"
 }
 
 selftest() {
   local root next rc_used rc_first rc_again
   local repo other repo_next other_next rc_other rc_repo_first rc_other_again rc_other_second
   local registry_root bare_root next_before next_after rc_bin rc_notes bare_next rc_bare
+  local rows_root row_path row_form row_rest row_number row_count rows_next rc_row
+  local -a row_paths=()
   root="$(mktemp -d)"
   repo="$(mktemp -d)"
   other="$(mktemp -d)"
   registry_root="$(mktemp -d)"
   bare_root="$(mktemp -d)"
+  rows_root="$(mktemp -d)"
   # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
-  trap "rm -rf -- '$root' '$repo' '$other' '$registry_root' '$bare_root'" EXIT
+  trap "rm -rf -- '$root' '$repo' '$other' '$registry_root' '$bare_root' '$rows_root'" EXIT
+  [[ -f "$LIVE_REGISTRY" ]] || { selftest_fail "目录登记：读不到仓里现行的登记 $LIVE_REGISTRY，自证照它摆号"; return 1; }
   mkdir -p "$root/research/prompts" "$root/scripts/experiment-apparatus" "$root/.claude/kb/experiments"
   write_selftest_registry "$root"
   : > "$root/research/prompts/e5-preregistration.md"
@@ -226,6 +233,27 @@ selftest() {
   [[ $rc_other_again -eq 1 ]] || { selftest_fail "E13 刚被本棵占了，另一棵又占成功了（退 $rc_other_again）"; return 1; }
   [[ $rc_other_second -eq 0 ]] || { selftest_fail "E14 两棵里都没人用，另一棵没占成（退 $rc_other_second）"; return 1; }
 
+  # 目录登记，照现行登记逐行摆号：每一处各摆一个号（从 E61 起，一处一个），--next 取最大号加一，每一处的号都被拒（少查哪一处，那一处的号就占得成）
+  write_selftest_registry "$rows_root"
+  row_count=0
+  while IFS=$'\t' read -r row_path row_form row_rest; do
+    [[ -z "$row_path" || "$row_path" == \#* ]] && continue
+    row_count=$((row_count + 1)); row_number=$((60 + row_count)); row_paths+=("$row_path")
+    case "$row_form" in
+      e-number-names) mkdir -p "$rows_root/$row_path" && : > "$rows_root/$row_path/e${row_number}_sample.rs" ;;
+      number-names) mkdir -p "$rows_root/$row_path" && : > "$rows_root/$row_path/${row_number}-样本.md" ;;
+      index-rows) mkdir -p "$(dirname "$rows_root/$row_path")" && printf '| E%s（%s） | 已跑 |\n' "$row_number" 样本 >> "$rows_root/$row_path" ;;
+      *) selftest_fail "目录登记：现行登记里 $row_path 的名字形态「$row_form」自证不认得，不知道怎么摆号"; return 1 ;;
+    esac
+  done < "$LIVE_REGISTRY"
+  (( row_count > 0 )) || { selftest_fail "目录登记：现行登记 $LIVE_REGISTRY 一行都没有"; return 1; }
+  rows_next="$(next_number "$rows_root" 2>/dev/null)"
+  [[ "$rows_next" == "E$((61 + row_count))" ]] || { selftest_fail "目录登记：照现行登记 $row_count 处各摆一个号（E61 到 E$((60 + row_count))），--next 该是 E$((61 + row_count))，拿到 ${rows_next:-（空）}"; return 1; }
+  for (( row_number = 61; row_number <= 60 + row_count; row_number++ )); do
+    claim "$rows_root" "E$row_number" 样本 >/dev/null 2>&1; rc_row=$?
+    [[ $rc_row -eq 1 ]] || { selftest_fail "目录登记：现行登记的 ${row_paths[row_number - 61]} 下摆了 E$row_number，占它却没被拒（退 $rc_row）"; return 1; }
+  done
+
   # 目录登记：入库装置目录里的 E40 被拒；登记里加一行 notes 之后 notes 下的 E50 被拒、--next 从 E41 涨到 E51；登记不在时拒绝给号。
   mkdir -p "$registry_root/crates/singlefs-verification/src/bin" "$registry_root/notes"
   write_selftest_registry "$registry_root"
@@ -243,7 +271,7 @@ selftest() {
   [[ $rc_notes -eq 1 ]] || { selftest_fail "目录登记：登记里加了 notes 那一行，notes 下用过的 E50 占它却没被拒（退 $rc_notes）"; return 1; }
   [[ $rc_bare -ne 0 && -z "$bare_next" ]] || { selftest_fail "目录登记：树里没有目录登记，该拒绝给号，却给了 ${bare_next:-（空）}（退 $rc_bare）"; return 1; }
   echo "selftest: 通过（--next 取到 E9；已有源码的 E6 被拒；E9 第一次占成、第二次被拒；两棵工作树：另一棵的 E12 在本棵被拒、--next 取两棵最大号加一、E13 只有一棵占得成；" \
-    "目录登记：入库装置目录里的 E40 被拒，登记里加 notes 一行之后 --next 从 E41 涨到 E51、E50 被拒，没有登记时拒绝给号）"
+    "目录登记：照现行登记 $row_count 处逐处摆号，--next 取到 E$((61 + row_count))、每一处的号都被拒；入库装置目录里的 E40 被拒，登记里加 notes 一行之后 --next 从 E41 涨到 E51、E50 被拒，没有登记时拒绝给号）"
 }
 
 case "${1:-}" in

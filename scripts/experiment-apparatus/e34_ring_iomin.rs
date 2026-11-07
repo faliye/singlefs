@@ -5,11 +5,11 @@
 //! - D20（承重面：单元的原子性与自包含）已定：自证单元的原子宽度「**等于运行时探测到的 `physical_block_size`**，不许硬编码」。
 //! - D2 已定硬要求 1：「**不发出小于设备物理映射单元的写**。在 Linux 上这个量是 `io_min`，
 //!   不是 `physical_block_size`」。硬要求 2：「**不让两个生命周期不同的对象共享同一个物理映射单元**」。
-//! - Linux 稳定 ABI（`Documentation/ABI/stable/sysfs-block`，2026-08-29 现查）：
+//! - Linux 稳定 ABI（`Documentation/ABI/stable/sysfs-block`，2026-08-29 现查；history-kept: 外部文档的现查日期）：
 //!   `minimum_io_size`「For RAID arrays it is often the **stripe chunk size**」；
 //!   `physical_block_size` 是「the smallest unit a physical storage device can write **atomically**」。
 //!   ⇒ 两个量管的不是一件事，内核里 `physical_block_size ≤ io_min` 恒成立。
-//! - **D22 已定项 2（2026-08-31 用户定案，E34 建档之后两天才定）**：
+//! - **D22 已定项 2**：
 //!   「**R = 3 个区域；区域按素数步长放置**（区域 r 落在 `r × P × chunk`，P 素数且 `P > devs`）**、
 //!   槽序跨区轮转**（区域 = `txg mod R`）**；槽宽 = 挂载时探测的 `physical_block_size`；不留保留槽。**」
 //!   同处逐字记着：「**候选形态 2 区 × 4 槽 × 256 字节整个被换掉**」。
@@ -18,7 +18,7 @@
 //! ## ⚠️ E34 的原始前提已经过期，这里只换前提，不换判据
 //!
 //! E34 正文写的是「D22 已定项 2 **提出的那个候选**根环几何（2 区域 × 4 槽 × 256 字节）」。
-//! 那个候选**已于 2026-08-31 被整个换掉**（槽宽 256 由 E41 否掉，R=4 由 E47 否掉）。
+//! 那个候选**已被整个换掉**（槽宽 256 由 E41 否掉，R=4 由 E47 否掉）。
 //! ⇒ **主张 1 的那个具体参数点已由 E41 答过**；这里把 E34 的判据**原样**跑在
 //! **已定的**几何上——判据本来就是按 `(physical_block_size, io_min, 槽宽, 区域间距)` 参数化写的，
 //! 没有一个字绑在 256 上。

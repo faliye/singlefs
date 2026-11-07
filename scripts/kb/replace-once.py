@@ -9,12 +9,13 @@
 
 为什么要有它：几个会话共写一批 kb 文件时只许定点改、不许整份重写（`.claude/singlefs-ai-sop/rules/session-wrapup.md`），
 而 `sed -i` 匹配不上不报错、匹配多处全改，都是静默失效（`rules/command-safety.md`「脚本改文件之后要回读确认」）。
-这一段「count == 1 才 replace」的 python 在 2026-09-13 一天里手敲了二十多遍，按 session-wrapup 的判据（会不会被抄第二遍）收进这里。
+这一段「count == 1 才 replace」的 python 会被反复手敲，按 session-wrapup 的判据（会不会被抄第二遍）收进这里。
 
 写回不在原文件上就地写：同目录排他新建临时文件、fsync、照原权限位与属主、改名换上（`lib_atomic_replace.py`）。
 正在按偏移边跑边读这份文件的进程（bash 跑脚本）读的仍是旧 inode 的旧内容，不会从改后文件的同一偏移接着读到别的东西。
 
-退出码：0 写成功；2 参数或文件问题；3 旧串命中 0 次；4 旧串命中多于一次；5 写完回读与预期不符；
+退出码：0 写成功；2 参数或文件问题；3 旧串命中 0 次；4 旧串命中多于一次；
+5 文件已经改了、写后这一步没过：改名换上之后回读与预期不符，或改名之后被 Ctrl-C 打断（lib_atomic_replace.py 的 ReplacedThenInterrupted / ReplacedThenFailed），不回滚，别当没写重跑；
 6 没换上（有多个硬链接、建不了临时文件、写或改名失败），原文件没动、临时文件已删；
 7 目标是仓里的 .md，新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个字节没写；
 8 目标在仓里（任何后缀），新串带会话号（ListAgents 列的会话名），一个字节没写。
@@ -30,22 +31,24 @@
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出判错的格，末尾一句「✗ --selftest 没通过：N 项」是汇总）：
-  REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给（改前的说法）
+  REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给
       「✗ 命中 0 次时本该附上最像的一行」
-  REPLACE_ONCE_BREAK=no-clock-guard  replace_once() 不判新串里的钟点（改前的写法）
+  REPLACE_ONCE_BREAK=no-clock-guard  replace_once() 不判新串里的钟点
       「✗ 写 .md：新串带紧凑时间戳本该退出码 7」、「✗ 写 .md：新串带紧凑时间戳被拒绝之后文件或目录变了」
       「✗ 写 .md：新串带日期、时区词、时分本该退出码 7」、「✗ 写 .md：新串带日期、时区词、时分被拒绝之后文件或目录变了」
       「✗ 写 .md：新串带光秃的时区词本该退出码 7」、「✗ 写 .md：新串带光秃的时区词被拒绝之后文件或目录变了」
       「✗ 写 .md：8 位数字后跟 T 但不是时间戳的新串本该放行」（前面那几格写进去之后旧串找不到了，连带红）
       「✗ 写 .md：假仓里没有共用库，本该退出码 7」（不判钟点就走到会话号那一道，退 8）
       「✗ 写 .md：入口本该退出码 7、打 ✗ 开头的说明且不写文件」
-  REPLACE_ONCE_BREAK=no-session-guard  replace_once() 不判新串里的会话号（改前的写法）
+  REPLACE_ONCE_BREAK=no-session-guard  replace_once() 不判新串里的会话号
       写之前判新串里的会话号，逐格以「✗ 写会话号：」起头（.md 与 .py 目标的新串带会话名、干跑、入口退出码 8、假仓里没有共用库与不写文件）
   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新串带紧凑时间戳的那几条红；
       compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
       session-names（整个会话号形态不判）时「写会话号：」的拒绝几条全红；LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一条红，
       LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红
+  ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
+      「✗ [改名之后被打断]」（目录 fsync 时与改名刚返回时两个时刻：库没抛 ReplacedThenInterrupted、replace_once 没接住、没退 5）
 """
 import contextlib
 import difflib
@@ -54,7 +57,8 @@ import os
 import sys
 import tempfile
 
-from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
+from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, problems_with_replacement_by_rename, \
+    replace_file_contents_by_rename
 from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -76,7 +80,7 @@ def nearest_hint(content, old_text):
     的 matching blocks 之和），占旧串的比例最高的一窗算最像（同分取 ratio 高的、再同取靠前的），旧串只是长行里的一截时也认得出。
     再按它的 opcodes 找出第一处不同（跳过这一窗在旧串两头之外多出来的字），写出旧串在那里是什么、文件里是什么。
     replace-batch.py 命中 0 次时调的也是这一份。"""
-    if os.environ.get('REPLACE_ONCE_BREAK') == 'no-nearest':   # 弄坏开关：改前的说法，不附最像的一行
+    if os.environ.get('REPLACE_ONCE_BREAK') == 'no-nearest':   # 弄坏开关：不附最像的一行
         return []
     target = old_text.strip('\n')
     if not target:
@@ -115,7 +119,9 @@ def nearest_hint(content, old_text):
 
 
 def replace_once(path, old_text, new_text, notation_root=None):
-    """返回 (退出码, 说明)。只有退出码 0 时文件被改过。notation_root 只给自证传（判新串时把哪个目录当仓根）。"""
+    """返回 (退出码, 说明)。notation_root 只给自证传（判新串时把哪个目录当仓根）。
+    写前拒绝（2、3、4、6、7、8）：文件一个字节没动；0：改了并回读确认；
+    5：文件已经改了（改名换上已做完），写后回读与预期不符、或改名之后被打断，不回滚，调用方不能当没写重跑。"""
     if old_text == '':
         return 2, '旧串是空串，拒绝：空串在每个位置都命中\n     → 把旧串换成文件里真实存在、唯一定位那处的一段文字'
     if not os.path.isfile(path):
@@ -145,10 +151,13 @@ def replace_once(path, old_text, new_text, notation_root=None):
             path, replaced, check_before_rename=lambda: unchanged_bytes(path, original_bytes))
     except ReplaceRefused as refused:
         return 6, str(refused)
+    except (ReplacedThenInterrupted, ReplacedThenFailed) as replaced_then_failed:
+        return 5, str(replaced_then_failed)
     with open(path, 'rb') as handle:
         written = handle.read().decode('utf-8')
     if written != replaced or written.count(new_text) < 1:
-        return 5, f'写完回读 {path} 与预期不一致\n     → 检查文件是不是被别的进程同时改了'
+        return 5, (f'{path} 已经改名换上了新内容，但写完回读与预期不一致（文件已改、没回滚）\n'
+                   '     → 怎么办：别当没写重跑；先看文件现在的内容，查是不是被别的进程同时改了')
     return 0, f'{path}：命中 1 次，已替换（改名换上新 inode）并回读确认' + ''.join(f'\n  ! {note}' for note in notes)
 
 
@@ -284,7 +293,7 @@ def selftest_in(workspace):
     running_script = '#!/usr/bin/env bash\n' + 'echo 前面这几行正在被 bash 边跑边读\n' * 20 + 'run_step 甲\nexit $?\n'
     problems.extend(problems_with_replacement_by_rename(
         lambda path: replace_once(path, 'run_step 甲', 'run_step 戊')[0],
-        running_script, running_script.replace('run_step 甲', 'run_step 戊', 1)))
+        running_script, running_script.replace('run_step 甲', 'run_step 戊', 1), exit_code_when_replaced_then_interrupted=5))
     if os.environ.get('REPLACE_ONCE_CORRUPT') == '1':
         # 测试缝：强制走「多次命中也写」那条旧毛病，自检必须判红
         problems.append('REPLACE_ONCE_CORRUPT=1：强制走旧毛病（多次命中也写）')
@@ -300,7 +309,8 @@ def selftest_in(workspace):
           '写仓里任何后缀的文件之前判新串里的会话号：.md 与 .py 目标带会话名的拒绝（8）并点名行号与出路「别的会话」且不写文件，干净的新串、.py 里带放行标记的一行、排除前缀下的文件、仓外的文件放行，'
           '假仓里没有共用库时读不到会话号判据按拒绝办（退出码 8），入口退出码 8；'
           '换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、'
-          '经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件')
+          '经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件、'
+          '改名之后（目录 fsync 时、改名刚返回时）被 Ctrl-C 打断时库抛 ReplacedThenInterrupted、新内容已换上、退 5')
     return 0
 
 

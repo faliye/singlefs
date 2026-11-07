@@ -5,7 +5,8 @@
 //! 用户关心的规模上的外推（Q4）与外推核对（Q5）、阳性与阴性对照、计时包含自检，以及读量的那一路（插了计数的副本）
 //! 打出的 `E203RESULT` 行，逐段逐行算 B1 的数并与站点读数对账（登记第七节 ③2）。
 //!
-//! 报告另做的事：Q6、Q8、Q9 在用户关心规模上的值（与 Q4 同一个外推法，`user_scale` 行）；第七节 ③2 的对账（五行式子，别的行点名「没接」）；
+//! 报告另做的事：Q6、Q8、Q9 在用户关心规模上的值（与 Q4 同一个外推法，`user_scale` 行）；第七节 ③2 的对账（26 行：16 行吃入口、出口读数的式子
+//! 逐格相等，修订 4 那十行吃调用处读的表长，全表扫那一部分逐格相等、走到命中为止那一部分不超过上界；没接的行点名）；
 //! 作废条款 8（补满五轮仍不满的覆盖写格整格拿掉并点名）；停机条款 3、4 与失败条款 F1–F6 的判读行。
 //!
 //! 用法：
@@ -170,7 +171,7 @@ struct ByDeltaInput {
     changed_slots_and_records_per_round: Vec<u64>,
     /// 全部轮里进出 `mapped_units` 的条目数之和。
     mapped_units_changed_over_all_rounds: u64,
-    /// 整表那一步的按角色查询的同一个和。
+    /// s36 按差量要问的角色（全部轮里进出 `mapped_units` 的角色数）各乘 ⌈log₂(M + 1)⌉ 之和。
     mapped_units_query_levels: u64,
 }
 
@@ -628,6 +629,11 @@ struct RowCell {
     calls: u64,
     steps: u64,
     scale: u64,
+    /// 修订 4：`steps` 里走到命中为止那一部分的步，与那一部分每次调用处读的表长之和。
+    steps_to_the_hit: u64,
+    scale_to_the_hit: u64,
+    /// 没带上面两样的行读数条数（插计数脚本修订 4 之前的产物）：不为 0 时调用处那十行这一格读不到。
+    lines_without_the_part_to_the_hit: u64,
     exclusive_nanos: u64,
     queries: u64,
     query_levels: u64,
@@ -690,6 +696,16 @@ fn read_product(text: &str) -> Product {
                 cell.calls += number(&fields, "calls").unwrap_or(0);
                 cell.steps += number(&fields, "steps").unwrap_or(0);
                 cell.scale += number(&fields, "scale").unwrap_or(0);
+                match (
+                    number(&fields, "steps_to_the_hit"),
+                    number(&fields, "scale_to_the_hit"),
+                ) {
+                    (Some(steps_to_the_hit), Some(scale_to_the_hit)) => {
+                        cell.steps_to_the_hit += steps_to_the_hit;
+                        cell.scale_to_the_hit += scale_to_the_hit;
+                    }
+                    _ => cell.lines_without_the_part_to_the_hit += 1,
+                }
                 cell.exclusive_nanos += number(&fields, "exclusive_nanos").unwrap_or(0);
                 cell.queries += number(&fields, "queries").unwrap_or(0);
                 cell.query_levels += number(&fields, "query_levels").unwrap_or(0);
@@ -1026,6 +1042,23 @@ fn axis_points_for_alpha<'borrowed>(
         .collect()
 }
 
+/// 这根轴上外推要用的点，按轴值升序：低端同 α（x = 1 那一点不用）。U 轴高端不封顶——第三段量了 X2（每盘 16 TiB 的单元区）之后，
+/// Q4 在 U 那一部分直接取 X2 的量（登记第十节 F6「X2 量过之后 Q4 在 U 那一部分改用 X2 的量」）；记录数那三根轴封在登记取样点表的 10⁴：
+/// Y1 的单元区加大到 2¹⁷ 那一档时它是 (2¹⁷, 10⁵, 10, 10)，四根轴里三根取 B0，会被当成 u 轴上的一点，封了它才不进 u 轴的外推（登记 u 轴只取到 10⁴）。
+fn axis_points_for_extrapolation<'borrowed>(
+    product: &'borrowed Product,
+    axis: &str,
+) -> Vec<(&'borrowed String, &'borrowed PointAxes)> {
+    axis_points(product, axis)
+        .into_iter()
+        .filter(|(_, point_axes)| {
+            let position = axis_value(axis, point_axes);
+            position >= axis_lowest_position(axis)
+                && (axis == "U" || position <= axis_highest_position(axis))
+        })
+        .collect()
+}
+
 /// 一个量在一根轴上的读数。
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum AxisReading {
@@ -1255,111 +1288,435 @@ fn counts_report(product: &Product, out: &mut String) {
 // ---- 第七节 ③2：B1 式子与量的逐格对账 ----
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Relation {
-    /// 站点读到的步数恰好等于式子值。
+    /// 站点读到的步数恰好等于式子值（式子吃入口、出口读数与调用次数）。
     Equals,
-    /// 站点读到的步数不大于式子值（线性找走到找到的那一个为止，至多走完整张表）。
-    AtMost,
+    /// 修订 4，整行是全表扫：步数逐格等于各次调用那一刻读的表长之和；走到命中为止那一部分没有，它的步与表长都该是 0。
+    WholeTableAtTheCallSite,
+    /// 修订 4，整行走到命中为止：步数全记在那一部分、不超过各次调用那一刻读的表长之和；全表扫那一部分没有，表长该是 0。
+    UpToTheHitAtTheCallSite,
+    /// 修订 4，两部分都有：全表扫那一部分（步数减走到命中为止的步）逐格等于它的表长之和，走到命中为止那一部分不超过它的表长之和。
+    WholeTableAndUpToTheHitAtTheCallSite,
+}
+
+impl Relation {
+    /// 有走到命中为止、只核上界的那一部分（汇总行按这个分两类数行）。
+    fn has_a_bounded_part(self) -> bool {
+        matches!(
+            self,
+            Relation::UpToTheHitAtTheCallSite | Relation::WholeTableAndUpToTheHitAtTheCallSite
+        )
+    }
 }
 
 struct ReconciledRow {
     row: &'static str,
     relation: Relation,
-    /// 对账的发布种类：规模读数取的是被量的发布做之前那一版，最后一批取的是整个 unlink 做完的一版，所以最后一批多数行不对账。
+    /// 对账的发布种类：入口、出口与调用处的读数都是计数构建在这一次发布里读的，三种发布（含最后一批）都对。
     kinds: &'static [&'static str],
     segments: &'static [&'static str],
 }
 
-/// 站点的步数能直接由规模读数写成式子的几行（读码判过：式子里的表在这几种发布里不随被量的发布变长）。
-/// 别的行（步数吃这一版之外的表长、答案位置、每轮的差量）写不出只吃规模读数的式子，在 `three_two_rows_not_reconciled` 里点名，不拿 0 补。
-const RECONCILED_ROWS: [ReconciledRow; 5] = [
-    ReconciledRow {
-        row: "files_other_than_the_first_plan",
-        relation: Relation::Equals,
-        kinds: &["overwrite", "unlink_intent"],
-        segments: &["caller", "before_landing", "between"],
-    },
-    ReconciledRow {
-        row: "inodes_with_an_extent_entry_set",
-        relation: Relation::Equals,
-        kinds: &["overwrite"],
-        segments: &["caller", "before_landing", "between"],
-    },
-    ReconciledRow {
-        row: "file_other_than_the_first_linear_find",
-        relation: Relation::AtMost,
-        kinds: &["overwrite", "unlink_intent"],
-        segments: &["caller", "before_landing", "between"],
-    },
-    ReconciledRow {
-        row: "cluster_segment_sum",
-        relation: Relation::AtMost,
-        kinds: &["overwrite", "unlink_intent"],
-        segments: &["before_landing"],
-    },
-    ReconciledRow {
-        row: "empty_segment_linear_scan",
-        relation: Relation::AtMost,
-        kinds: &["overwrite", "unlink_intent", "unlink_final"],
-        segments: &["caller", "before_landing", "between"],
-    },
+/// 三种被量的发布都对账（入口、出口读数是计数构建在这一次发布里读的，最后一批也有自己的那一版）。
+const EVERY_KIND: &[&str] = &["overwrite", "unlink_intent", "unlink_final"];
+
+/// 记账行：池级三行（`transaction.rs:7941` `PoolWideAccountingRow::ALL`），每块盘六行（`transaction.rs:7981` `PerDeviceAccountingRow::ALL`）。
+const POOL_WIDE_ACCOUNTING_ROWS: u64 = 3;
+const PER_DEVICE_ACCOUNTING_ROWS: u64 = 6;
+
+/// 第三节清单里扫类的 26 行（两行整份拷走第七节 ③1，不在这里）全对账，三种发布、准入之前三段：
+/// 16 行吃计数构建在这一次发布进判之前读上一版（`entry_` 起头的差量）、发完之后读这一次那一版（`exit_` 起头的差量）的表长，
+/// 与发布行的固定点轮数、这一行的调用次数，逐格相等（登记第十二节修订 3 ②；s5、s7、s14 是修订 4 换吃入口读数的）；
+/// 修订 4 那十行吃插计数脚本在每次调用那一刻读的表长，全表扫那一部分逐格相等、走到命中为止那一部分不超过上界（拆开记的，没有整行走上界的）。
+const RECONCILED_ROWS: [ReconciledRow; 26] = [
+    reconciled_on_every_kind("files_other_than_the_first_plan"),
+    reconciled_on_every_kind("inodes_with_an_extent_entry_set"),
+    reconciled_on_every_kind("cluster_segment_sum"),
+    read_at_the_call_site(
+        "file_other_than_the_first_linear_find",
+        Relation::UpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "extent_upper_segment_plan",
+        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site("root_header_linear_find", Relation::UpToTheHitAtTheCallSite),
+    read_at_the_call_site(
+        "allocation_record_tree_plan",
+        Relation::WholeTableAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "allocator_release_linear_find",
+        Relation::UpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "user_data_slot_linear_scan",
+        Relation::UpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "record_intersection_filter",
+        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "empty_segment_linear_scan",
+        Relation::UpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site(
+        "fallback_slot_linear_scan",
+        Relation::UpToTheHitAtTheCallSite,
+    ),
+    read_at_the_call_site("records_of_each_leaf", Relation::WholeTableAtTheCallSite),
+    reconciled_on_every_kind("inode_record_linear_find"),
+    reconciled_on_every_kind("extent_roles_rewritten_scan"),
+    reconciled_on_every_kind("checkpoint_cost_accounting_tree_plan"),
+    reconciled_on_every_kind("allocation_record_tree_node_set"),
+    reconciled_on_every_kind("inode_number_watermark_steps"),
+    reconciled_on_every_kind("deadlist_changes_indexes"),
+    reconciled_on_every_kind("multi_level_tree_planning"),
+    reconciled_on_every_kind("mapped_units_of_container_trees"),
+    reconciled_on_every_kind("moved_entries_path_tail_filter"),
+    reconciled_on_every_kind("release_judgement_version_indexes"),
+    reconciled_on_every_kind("accounting_entries_of_this_publish"),
+    reconciled_on_every_kind("instance_table_chain"),
+    reconciled_on_every_kind("mapped_units_whole_table"),
 ];
 
-/// 一行在一格里的式子值：调用次数乘一次调用走的步数（规模读数给的表长）。读不到规模时交回 `None`。
-fn expected_steps_by_the_formula(
+/// 逐格相等、三种发布、准入之前三段：吃入口、出口读数的 16 行一律这样对。
+const fn reconciled_on_every_kind(row: &'static str) -> ReconciledRow {
+    ReconciledRow {
+        row,
+        relation: Relation::Equals,
+        kinds: EVERY_KIND,
+        segments: &["caller", "before_landing", "between"],
+    }
+}
+
+/// 修订 4 那十行：吃调用处读的表长，三种发布、准入之前三段。
+const fn read_at_the_call_site(row: &'static str, relation: Relation) -> ReconciledRow {
+    ReconciledRow {
+        row,
+        relation,
+        kinds: EVERY_KIND,
+        segments: &["caller", "before_landing", "between"],
+    }
+}
+
+/// 修订 4 那十行一格的读数（准入之前三段合起来）。
+struct CallSiteCell {
+    steps: u64,
+    steps_to_the_hit: u64,
+    /// 全表扫那一部分各次调用处表长之和（行读数的 `scale`）。
+    whole_table_lengths: u64,
+    /// 走到命中为止那一部分各次调用处表长之和（行读数的 `scale_to_the_hit`）。
+    lengths_to_the_hit: u64,
+}
+
+/// 一格的调用处读数；有一条行读数没带走到命中为止那两样时读不到（不拿 0 补）。
+fn call_site_cell(
+    product: &Product,
+    at: &RoundKey,
+    segments: &[&str],
     row: &str,
-    calls: u64,
-    state: &Fields,
-    axes: &PointAxes,
-) -> Option<u64> {
-    match row {
-        "files_other_than_the_first_plan" | "file_other_than_the_first_linear_find" => {
-            Some(calls * number(state, "other_files")?)
+) -> Option<CallSiteCell> {
+    let mut cell = CallSiteCell {
+        steps: 0,
+        steps_to_the_hit: 0,
+        whole_table_lengths: 0,
+        lengths_to_the_hit: 0,
+    };
+    for segment in segments {
+        let read = product.row_cell(&at.0, &at.1, &at.2, at.3, segment, row);
+        if read.lines_without_the_part_to_the_hit > 0 {
+            return None;
         }
-        "inodes_with_an_extent_entry_set" => Some(calls * (1 + number(state, "other_files")?)),
-        "cluster_segment_sum" => Some(calls * number(state, "cluster_segments")?),
-        "empty_segment_linear_scan" => Some(calls * segments_of(axes.unit_area_slots)),
+        cell.steps += read.steps;
+        cell.steps_to_the_hit += read.steps_to_the_hit;
+        cell.whole_table_lengths += read.scale;
+        cell.lengths_to_the_hit += read.scale_to_the_hit;
+    }
+    Some(cell)
+}
+
+/// 修订 4 的判法：(这一格对不对, 走到命中为止那一部分超没超上界)。超上界也算不对（停机条款第 2 条的不符）。
+fn call_site_cell_agrees(relation: Relation, cell: &CallSiteCell) -> (bool, bool) {
+    let Some(whole_table_steps) = cell.steps.checked_sub(cell.steps_to_the_hit) else {
+        return (false, false);
+    };
+    let over_the_bound = cell.steps_to_the_hit > cell.lengths_to_the_hit;
+    let absent_part_reads_nothing = match relation {
+        Relation::WholeTableAtTheCallSite => cell.lengths_to_the_hit == 0,
+        Relation::UpToTheHitAtTheCallSite => cell.whole_table_lengths == 0,
+        Relation::Equals | Relation::WholeTableAndUpToTheHitAtTheCallSite => true,
+    };
+    let agrees = whole_table_steps == cell.whole_table_lengths
+        && !over_the_bound
+        && absent_part_reads_nothing;
+    (agrees, over_the_bound)
+}
+
+/// 计数构建在被量的发布进判之前读的上一版（`entry_`）或发完之后读的这一版（`exit_`）：一次发布恰好一条，多一条少一条都读不到。
+fn reading_of_the_publish(product: &Product, at: &RoundKey, key: &str) -> Option<u64> {
+    let segment = if key.starts_with("entry_") {
+        "before_landing"
+    } else {
+        "after"
+    };
+    match product.deltas_of(at, key, &[segment]).as_slice() {
+        [(0, value)] => Some(*value),
         _ => None,
     }
 }
 
-/// 对账：每个量过的点、状态、种类、轮上，`RECONCILED_ROWS` 每行的站点读数与式子值比。交回 (对了几格, 不符几格, 读不到规模几格)。
-fn reconciliation_report(product: &Product, out: &mut String) -> (u64, u64, u64) {
-    let (mut cells, mut disagreements, mut unread) = (0_u64, 0_u64, 0_u64);
+/// 这一次发布的固定点走了几轮（发布行）。
+fn fixed_point_rounds_of(product: &Product, at: &RoundKey) -> Option<u64> {
+    number(product.publishes.get(at)?, "fixed_point_rounds")
+}
+
+/// 固定点每一轮的分配记录树节点数都等于发出来的那一版的：这时每一轮的映射单元数、中央映射树的 key 与节点，就是出口读到的那一份
+/// （它们只经分配记录树的节点随轮变；节点数一轮一条，取自 s16 那一处的入参，不是 s20、s36 那一步的结果）。不满足的那一格读不到。
+fn allocation_nodes_stay_put_in_every_round(
+    product: &Product,
+    at: &RoundKey,
+    rounds: u64,
+) -> Option<()> {
+    let after = reading_of_the_publish(product, at, "exit_allocation_record_tree_nodes")?;
+    let per_round = product.deltas_of(at, "allocation_plan_nodes_after", &["between"]);
+    let every_round_once = u64::try_from(per_round.len()).ok()? == rounds
+        && (1..=rounds).all(|round| {
+            per_round
+                .iter()
+                .filter(|(fixed_point_round, _)| *fixed_point_round == round)
+                .count()
+                == 1
+        });
+    (every_round_once && per_round.iter().all(|(_, nodes)| *nodes == after)).then_some(())
+}
+
+/// 码 2 规划一次记的步：上一版的 key、这一版的 key、这一版的节点与它们的出处各一遍、上一版的节点（`code_two_tree.rs:637` 规划函数末尾那一处）。
+fn code_two_plan_steps(
+    previous_keys: u64,
+    keys_after: u64,
+    nodes_after: u64,
+    previous_nodes: u64,
+) -> u64 {
+    previous_keys + keys_after + 2 * nodes_after + previous_nodes
+}
+
+/// 修订 3 ② 补上的 13 行的式子（读码写的，出处是主工作区 `crates/singlefs-core/src/` 的 文件:行，登记第三节「一步是什么」与插计数脚本那一处的记法）。
+fn expected_steps_of_the_rows_read_at_the_entry_and_the_exit(
+    row: &str,
+    calls: u64,
+    state: &Fields,
+    product: &Product,
+    at: &RoundKey,
+) -> Option<u64> {
+    let entry = |key: &str| reading_of_the_publish(product, at, &format!("entry_{key}"));
+    let exit = |key: &str| reading_of_the_publish(product, at, &format!("exit_{key}"));
+    match row {
+        // s5 `transaction.rs:7686`：规划别的文件时上一版的别的文件各看一遍（修订 4 换吃入口读数）
+        "files_other_than_the_first_plan" => Some(calls * entry("files_other_than_the_first")?),
+        // s7 `transaction.rs:4116`：第一个文件一步，加上一版的别的文件各一步（修订 4 换吃入口读数）
+        "inodes_with_an_extent_entry_set" => {
+            Some(calls * (1 + entry("files_other_than_the_first")?))
+        }
+        // s14 `allocator.rs:574`：每块盘调一次、每次走完这一刻的聚簇段（修订 4 收严成相等，吃入口聚簇段数）
+        "cluster_segment_sum" => Some(calls * entry("cluster_segments")?),
+        // s4 `transaction.rs:4202`：find 走到改 size 的那条记录为止；记录按号升序，走过的条数 = 号更小的条数 + 1（入口按号数，不走 find）
+        "inode_record_linear_find" => {
+            Some(calls * entry("position_of_the_inode_whose_size_changes")?)
+        }
+        // s11 `transaction.rs:7873`：这一次规划出的 extent 树下段、上段与别的文件的下段节点各看一遍；规划出的就是发出来的那一版
+        "extent_roles_rewritten_scan" => Some(calls * exit("extent_tree_nodes")?),
+        // s13 `admission.rs:1325`：一次 ckpt 记两次调用（入口一次、码 2 规划一次）；这一版的记账行、接在它后面那次的 key（与这一次发布同一组 key：
+        // 池级三行加每盘六行、照抄的台阶行，只差代段）、码 2 规划（上一版就是这一版的记账树，规划出的节点数与这一次发出来的记账树相同）
+        "checkpoint_cost_accounting_tree_plan" => {
+            if !calls.is_multiple_of(2) {
+                return None;
+            }
+            let keys_after = exit("accounting_tree_keys")?;
+            let per_judgement = entry("accounting_rows")?
+                + keys_after
+                + code_two_plan_steps(
+                    entry("accounting_tree_keys")?,
+                    keys_after,
+                    exit("accounting_tree_nodes")?,
+                    entry("accounting_tree_nodes")?,
+                );
+            Some(calls / 2 * per_judgement)
+        }
+        // s15 `transaction.rs:13312` 起：上一版分配记录树的节点收成集合，又拷一份当这一版的起点，每个节点两步
+        "allocation_record_tree_node_set" => {
+            Some(calls * 2 * entry("allocation_record_tree_nodes")?)
+        }
+        // s18 `transaction.rs:4269`：过滤与找这一版那一行各记一遍记账行；台阶行（水位、代段小于这一版的 txg）按记账行的次序收进来就是代段升序，
+        // 稳定排序在已排好的输入上恰好比 n − 1 次（标准库插入排序与找已有的段都是相邻两两比一遍）
+        "inode_number_watermark_steps" => Some(
+            calls
+                * (2 * entry("accounting_rows")?
+                    + entry("watermark_rows_before_its_txg")?.saturating_sub(1)),
+        ),
+        // s19 `transaction.rs:6566`：每轮一次；上一版的 deadlist 条目与留存的映射条目各收一遍、按角色建上一版映射单元的索引；
+        // 换下的角色里有第一个文件之外一个文件的单元时再建一份按号的文件索引（多出的那一次调用）
+        "deadlist_changes_indexes" => {
+            let rounds = fixed_point_rounds_of(product, at)?;
+            let every_round = entry("deadlist_entries")?
+                + entry("kept_mapping_entries")?
+                + entry("mapped_units")?;
+            match calls.checked_sub(2 * rounds)? {
+                0 => Some(rounds * every_round),
+                extra if extra == rounds => {
+                    Some(rounds * (every_round + entry("files_other_than_the_first")?))
+                }
+                _ => None,
+            }
+        }
+        // s20 `transaction.rs:9002`：每轮三棵码 2 树各收 key 一遍、规划一次；deadlist 树一把 key 都没有时走零根那一支，只走上一版的节点
+        "multi_level_tree_planning" => {
+            let rounds = fixed_point_rounds_of(product, at)?;
+            allocation_nodes_stay_put_in_every_round(product, at, rounds)?;
+            let accounting_keys = exit("accounting_tree_keys")?;
+            let accounting = accounting_keys
+                + code_two_plan_steps(
+                    entry("accounting_tree_keys")?,
+                    accounting_keys,
+                    exit("accounting_tree_nodes")?,
+                    entry("accounting_tree_nodes")?,
+                );
+            let deadlist_keys = exit("deadlist_tree_keys")?;
+            let deadlist = deadlist_keys
+                + if deadlist_keys == 0 {
+                    entry("deadlist_tree_nodes")?
+                } else {
+                    code_two_plan_steps(
+                        entry("deadlist_tree_keys")?,
+                        deadlist_keys,
+                        exit("deadlist_tree_nodes")?,
+                        entry("deadlist_tree_nodes")?,
+                    )
+                };
+            let mapping_keys = exit("central_mapping_tree_keys")?;
+            let mapping = mapping_keys
+                + code_two_plan_steps(
+                    entry("central_mapping_tree_keys")?,
+                    mapping_keys,
+                    exit("central_mapping_tree_nodes")?,
+                    entry("central_mapping_tree_nodes")?,
+                );
+            Some(rounds * (accounting + deadlist + mapping))
+        }
+        // s21 `transaction.rs:6938`：每轮三棵容器树各一次，每片容器、每个码 2 节点出一条
+        "mapped_units_of_container_trees" => {
+            Some(fixed_point_rounds_of(product, at)? * exit("container_tree_units")?)
+        }
+        // s22 `transaction.rs:9469`：每轮一次，尾部过滤看上一版中央映射树的每个节点
+        "moved_entries_path_tail_filter" => Some(calls * entry("central_mapping_tree_nodes")?),
+        // s23 `transaction.rs:4628`：每轮一次；留存给快照的角色建一份索引（这一次新进 deadlist 的条目数，量的历史里没有删快照那一步，
+        // 不放出条目）；第一次按角色查映射时建上一版映射单元与单元两份索引（多出两次调用），查到第一个文件之外一个文件的单元时再建按号的文件索引（再多一次）
+        "release_judgement_version_indexes" => {
+            let rounds = fixed_point_rounds_of(product, at)?;
+            let kept = exit("deadlist_entries")?.checked_sub(entry("deadlist_entries")?)?;
+            let by_role = entry("mapped_units")? + entry("units")?;
+            match calls.checked_sub(2 * rounds)? {
+                0 => Some(rounds * kept),
+                extra if extra == 2 * rounds => Some(rounds * (kept + by_role)),
+                extra if extra == 3 * rounds => {
+                    Some(rounds * (kept + by_role + entry("files_other_than_the_first")?))
+                }
+                _ => None,
+            }
+        }
+        // s31 `transaction.rs:8006`：照抄台阶行之前每出一行记一步，池级三行加每盘六行
+        "accounting_entries_of_this_publish" => Some(
+            calls
+                * (POOL_WIDE_ACCOUNTING_ROWS
+                    + PER_DEVICE_ACCOUNTING_ROWS * number(state, "devices")?),
+        ),
+        // s32 `transaction.rs:4724`：整条实例表链重写时，被换下的那条旧链每一片走一步（链取自这一次的计划）
+        "instance_table_chain" => Some(calls * entry("instance_table_chain_replaced")?),
+        // s36 `transaction.rs:9002` 那一段：每轮按角色建上一版映射单元的索引，再出这一版的映射单元表
+        "mapped_units_whole_table" => {
+            let rounds = fixed_point_rounds_of(product, at)?;
+            allocation_nodes_stay_put_in_every_round(product, at, rounds)?;
+            Some(rounds * (entry("mapped_units")? + exit("mapped_units")?))
+        }
+        _ => None,
+    }
+}
+
+/// 对账的合计：核了几格、不符几格（超上界的格也在里面）、其中超上界几格、读不到几格。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct ReconciliationTotals {
+    cells: u64,
+    disagreements: u64,
+    over_the_bound: u64,
+    unread: u64,
+}
+
+/// 一行一格比的结果：(对不对, 超没超上界, 不符时那一行要打的两边值)；读不到交回 `None`。
+fn reconcile_one_cell(
+    entry: &ReconciledRow,
+    product: &Product,
+    at: &RoundKey,
+    state: &Fields,
+    calls: u64,
+) -> Option<(bool, bool, String)> {
+    if entry.relation == Relation::Equals {
+        let steps = product.steps_of(at, entry.segments, entry.row);
+        let expected = expected_steps_of_the_rows_read_at_the_entry_and_the_exit(
+            entry.row, calls, state, product, at,
+        )?;
+        return Some((
+            steps == expected,
+            false,
+            format!("steps={steps} formula={expected}"),
+        ));
+    }
+    let cell = call_site_cell(product, at, entry.segments, entry.row)?;
+    let (agrees, over_the_bound) = call_site_cell_agrees(entry.relation, &cell);
+    let sides = format!(
+        "steps={} steps_to_the_hit={} whole_table_lengths={} lengths_to_the_hit={}",
+        cell.steps, cell.steps_to_the_hit, cell.whole_table_lengths, cell.lengths_to_the_hit
+    );
+    Some((agrees, over_the_bound, sides))
+}
+
+/// 对账：每个量过的点、状态、种类、轮上，`RECONCILED_ROWS` 每行的站点读数与式子值（或调用处表长）比。
+fn reconciliation_report(product: &Product, out: &mut String) -> ReconciliationTotals {
+    let mut totals = ReconciliationTotals::default();
     for entry in &RECONCILED_ROWS {
-        let (mut row_cells, mut row_disagreements) = (0_u64, 0_u64);
+        let (mut row_cells, mut row_disagreements, mut row_over) = (0_u64, 0_u64, 0_u64);
         for (at, state) in &product.states {
-            if !entry.kinds.contains(&at.2.as_str()) {
+            if !entry.kinds.contains(&at.2.as_str()) || !product.points.contains_key(&at.0) {
                 continue;
             }
-            let Some(axes) = product.points.get(&at.0) else {
-                continue;
-            };
             let calls = product.calls_of(at, entry.segments, entry.row);
-            let steps = product.steps_of(at, entry.segments, entry.row);
-            let Some(expected) = expected_steps_by_the_formula(entry.row, calls, state, axes)
+            let Some((agrees, over_the_bound, sides)) =
+                reconcile_one_cell(entry, product, at, state, calls)
             else {
-                unread += 1;
+                totals.unread += 1;
+                let _ = writeln!(
+                    out,
+                    "name=three_two_unread point={} state={} kind={} round={} row={} steps={} calls={calls}",
+                    at.0, at.1, at.2, at.3, entry.row, product.steps_of(at, entry.segments, entry.row)
+                );
                 continue;
             };
             row_cells += 1;
-            let agrees = match entry.relation {
-                Relation::Equals => steps == expected,
-                Relation::AtMost => steps <= expected,
-            };
+            row_over += u64::from(over_the_bound);
             if !agrees {
                 row_disagreements += 1;
                 let _ = writeln!(
                     out,
-                    "name=three_two_disagreement point={} state={} kind={} round={} row={} relation={:?} steps={steps} formula={expected} calls={calls}",
+                    "name=three_two_disagreement point={} state={} kind={} round={} row={} relation={:?} {sides} over_the_bound={over_the_bound} calls={calls}",
                     at.0, at.1, at.2, at.3, entry.row, entry.relation
                 );
             }
         }
-        cells += row_cells;
-        disagreements += row_disagreements;
+        totals.cells += row_cells;
+        totals.disagreements += row_disagreements;
+        totals.over_the_bound += row_over;
         let _ = writeln!(
             out,
-            "name=three_two_row row={} relation={:?} cells_checked={row_cells} disagreements={row_disagreements}",
+            "name=three_two_row row={} relation={:?} cells_checked={row_cells} disagreements={row_disagreements} over_the_bound={row_over}",
             entry.row, entry.relation
         );
     }
@@ -1377,13 +1734,22 @@ fn reconciliation_report(product: &Product, out: &mut String) -> (u64, u64, u64)
         not_reconciled.len(),
         not_reconciled.join(",")
     );
+    let rows_with_a_bounded_part = RECONCILED_ROWS
+        .iter()
+        .filter(|entry| entry.relation.has_a_bounded_part())
+        .count();
     let _ = writeln!(
         out,
-        "name=verdict quantity=three_two cells_checked={cells} disagreements={disagreements} cells_with_the_scale_unread={unread} rows_reconciled={} rows_not_reconciled={}",
+        "name=verdict quantity=three_two cells_checked={} disagreements={} cells_over_the_bound={} cells_with_the_scale_unread={} rows_reconciled={} rows_equal_only={} rows_with_a_bounded_part={rows_with_a_bounded_part} rows_not_reconciled={}",
+        totals.cells,
+        totals.disagreements,
+        totals.over_the_bound,
+        totals.unread,
         RECONCILED_ROWS.len(),
+        RECONCILED_ROWS.len() - rows_with_a_bounded_part,
         not_reconciled.len()
     );
-    (cells, disagreements, unread)
+    totals
 }
 
 // ---- 计时：Q3、Q10 与包含自检 ----
@@ -1481,9 +1847,53 @@ fn rounds_band(
     Some((alphas, verdict))
 }
 
-/// Q3 与 Q10。交回 F3 是否触发：某一段的残差在某根轴上五轮都 α ≥ 0.5。
-fn timing_report(timing: &Product, out: &mut String) -> bool {
+/// 计时产物里出现过的点名（行、段挂钟、完成标记）。
+fn point_names_of_the_timing(timing: &Product) -> BTreeSet<String> {
+    timing
+        .rows
+        .keys()
+        .map(|key| key.0.clone())
+        .chain(timing.segment_nanos.keys().map(|key| key.0.clone()))
+        .chain(timing.items_done.iter().cloned())
+        .filter(|point| !point.is_empty())
+        .collect()
+}
+
+/// 计时产物不打 `name=point` 行（登记第十二节修订 7）：每个点的轴值取同名计数产物里那一行。
+/// 两边都没有的点交回读不到：它进不了任何一根轴，Q3、Q10 报读不到，F3 不判。
+fn timing_with_the_point_axes_of_the_counts(
+    counts: &Product,
+    timing: &Product,
+) -> (Product, Vec<String>) {
+    let mut with_axes = timing.clone();
+    let mut unread = Vec::new();
+    for point in point_names_of_the_timing(timing) {
+        if with_axes.points.contains_key(&point) {
+            continue;
+        }
+        match counts.points.get(&point) {
+            Some(axes) => {
+                with_axes.points.insert(point, *axes);
+            }
+            None => unread.push(point),
+        }
+    }
+    (with_axes, unread)
+}
+
+/// Q3 与 Q10。交回 F3 是否触发：某一段的残差在某根轴上五轮都 α ≥ 0.5 记触发；
+/// 没触发而有点读不到轴值、或一根轴都没算成的，记不判（`None`），不当没触发。
+fn timing_report(
+    timing: &Product,
+    points_with_the_axes_unread: &[String],
+    out: &mut String,
+) -> Option<bool> {
     let mut residual_grows = false;
+    let mut judged_any_axis = false;
+    for point in points_with_the_axes_unread {
+        let _ = writeln!(out, "name=q3 point={point} result=axes_unread");
+        let _ = writeln!(out, "name=q10 point={point} result=axes_unread");
+    }
     for state in STATES {
         for kind in KINDS {
             for axis in AXES {
@@ -1508,6 +1918,7 @@ fn timing_report(timing: &Product, out: &mut String) -> bool {
                     if let Some((alphas, verdict)) =
                         rounds_band(timing, axis, state, kind, &residual)
                     {
+                        judged_any_axis = true;
                         if verdict == "GrowsWithTheAxis" {
                             residual_grows = true;
                         }
@@ -1530,7 +1941,13 @@ fn timing_report(timing: &Product, out: &mut String) -> bool {
             }
         }
     }
-    residual_grows
+    if residual_grows {
+        Some(true)
+    } else if !judged_any_axis || !points_with_the_axes_unread.is_empty() {
+        None
+    } else {
+        Some(false)
+    }
 }
 
 // ---- Q4、Q5：用户关心的规模上的外推 ----
@@ -1599,7 +2016,7 @@ fn user_scale_value(
     let mut total = base;
     let mut missing = Vec::new();
     for axis in AXES {
-        let points: Vec<(f64, f64)> = axis_points_for_alpha(product, axis)
+        let points: Vec<(f64, f64)> = axis_points_for_extrapolation(product, axis)
             .iter()
             .map(|(point, axes)| {
                 (
@@ -1726,11 +2143,96 @@ fn one_millisecond_report(
     (cells, reference_only)
 }
 
-/// Q5 外推核对：从更小的点推最大的那个点，步数相对差 ≤ 10%、挂钟比在 [0.5, 2]。交回每格是否核过。
+/// 第二段的对角点 X1 = (2²⁰, 10⁴, 10⁴, 1000)（登记第五节取样点）：Q5 另拿 B0 与各轴推它。
+const DIAGONAL_POINT: PointAxes = PointAxes {
+    unit_area_slots: 1 << 20,
+    unlinks: 10_000,
+    data_units: 10_000,
+    files: 1000,
+};
+
+/// Q5 一格的判定行：五轮挂钟比都量到、每一轮都满足 [`extrapolation_is_checked`] 才算核过。交回核过没有。
+fn extrapolation_cell_line(
+    out: &mut String,
+    axis: &str,
+    state: &str,
+    predicted_steps: f64,
+    measured_steps: f64,
+    ratios: &[f64],
+) -> bool {
+    let passed = ratios.len() as u64 == ROUNDS
+        && ratios
+            .iter()
+            .all(|ratio| extrapolation_is_checked(predicted_steps, measured_steps, *ratio));
+    let _ = writeln!(
+        out,
+        "name=q5 axis={axis} state={state} predicted_steps={predicted_steps:.0} measured_steps={measured_steps:.0} nanos_ratios={} passed={passed}",
+        join_numbers(&ratios.iter().map(|ratio| format!("{ratio:.3}")).collect::<Vec<_>>())
+    );
+    passed
+}
+
+/// Q5 对角点那一格：B0 加各轴从 B0 到 X1 那一轴取值的增量（同 Q4 的外推法），与 X1 量的比。
+/// 产物里没有 X1、或有一根轴没有两个点可外推，这一格不出（不记核过）。
+fn diagonal_extrapolation_cell(
+    counts: &Product,
+    timing: &Product,
+    state: &str,
+    out: &mut String,
+) -> Option<bool> {
+    let diagonal = counts
+        .points
+        .iter()
+        .find(|(_, point_axes)| **point_axes == DIAGONAL_POINT)
+        .map(|(name, _)| name)?;
+    let scale = UserScale {
+        unit_area_slots: to_f64(DIAGONAL_POINT.unit_area_slots),
+        unlinks: to_f64(DIAGONAL_POINT.unlinks),
+        data_units: to_f64(DIAGONAL_POINT.data_units),
+        files: to_f64(DIAGONAL_POINT.files),
+    };
+    let steps = |at: &RoundKey| to_f64(scan_steps_at(counts, at, &SEGMENTS_BEFORE_ADMISSION));
+    let (predicted_steps, missing) =
+        user_scale_value(counts, state, "overwrite", 1, &steps, &scale);
+    if !missing.is_empty() {
+        return None;
+    }
+    let measured_steps = to_f64(scan_steps(
+        counts,
+        diagonal,
+        state,
+        "overwrite",
+        &SEGMENTS_BEFORE_ADMISSION,
+    ));
+    let nanos = |at: &RoundKey| to_f64(scan_nanos(timing, at));
+    let mut ratios = Vec::new();
+    for round in 1..=ROUNDS {
+        let (predicted, _) = user_scale_value(timing, state, "overwrite", round, &nanos, &scale);
+        let measured = to_f64(scan_nanos(
+            timing,
+            &round_key(diagonal, state, "overwrite", round),
+        ));
+        if measured > 0.0 {
+            ratios.push(predicted / measured);
+        }
+    }
+    Some(extrapolation_cell_line(
+        out,
+        "diagonal",
+        state,
+        predicted_steps,
+        measured_steps,
+        &ratios,
+    ))
+}
+
+/// Q5 外推核对：每根轴从更小的点推这根轴上最大的那个点（U 轴拿 2¹⁴、2¹⁷、2²⁰ 推 2²⁴，u、D、F 三轴拿 ≤ 10³ 推 10⁴），
+/// 第二段另拿 B0 与各轴推对角点 X1；步数相对差 ≤ 10%、挂钟比在 [0.5, 2]。交回每格是否核过。
+/// 一根轴上不足三个点的那一格不出（第一段只有 U、u 两根轴）。
 fn extrapolation_check_report(counts: &Product, timing: &Product, out: &mut String) -> Vec<bool> {
     let mut checks = Vec::new();
     for state in STATES {
-        for axis in ["U", "u"] {
+        for axis in AXES {
             let points = axis_points_for_alpha(counts, axis);
             let Some((target, smaller)) = points.split_last() else {
                 continue;
@@ -1784,16 +2286,17 @@ fn extrapolation_check_report(counts: &Product, timing: &Product, out: &mut Stri
                     ratios.push(predicted / measured);
                 }
             }
-            let checked = ratios.len() as u64 == ROUNDS
-                && ratios
-                    .iter()
-                    .all(|ratio| extrapolation_is_checked(predicted_steps, measured_steps, *ratio));
-            let _ = writeln!(
+            checks.push(extrapolation_cell_line(
                 out,
-                "name=q5 axis={axis} state={state} predicted_steps={predicted_steps:.0} measured_steps={measured_steps:.0} nanos_ratios={} checked={checked}",
-                join_numbers(&ratios.iter().map(|ratio| format!("{ratio:.3}")).collect::<Vec<_>>())
-            );
-            checks.push(checked);
+                axis,
+                state,
+                predicted_steps,
+                measured_steps,
+                &ratios,
+            ));
+        }
+        if let Some(passed) = diagonal_extrapolation_cell(counts, timing, state, out) {
+            checks.push(passed);
         }
     }
     checks
@@ -1974,8 +2477,9 @@ fn by_delta_input_from_the_product(
     let release_query_levels =
         product.query_levels_of(&at, segments, "release_judgement_version_indexes");
     let deadlist_query_levels = product.query_levels_of(&at, segments, "deadlist_changes_indexes");
+    let mapped_units_changed_over_all_rounds = 2 * rewritten_per_round.iter().sum::<u64>();
     let mapped_units_query_levels =
-        product.query_levels_of(&at, segments, "mapped_units_whole_table");
+        mapped_units_queries_by_delta(mapped_units_changed_over_all_rounds, mapped_units);
     if !gaps.is_empty() {
         return Err(gaps);
     }
@@ -2007,9 +2511,16 @@ fn by_delta_input_from_the_product(
         deadlist_changed_entries,
         release_query_levels,
         changed_slots_and_records_per_round,
-        mapped_units_changed_over_all_rounds: 2 * rewritten_per_round.iter().sum::<u64>(),
+        mapped_units_changed_over_all_rounds,
         mapped_units_query_levels,
     })
+}
+
+/// s36 在 B8 下按角色查的那一项（登记第五节 s36 一行「`mapped_units` 整表换成差量，按角色查走随一版维护的索引」，第十二节修订 7）：
+/// 要问的只有这一轮进出 `mapped_units` 的角色，每个查一次上一版 M 条的按角色索引，记 ⌈log₂(M + 1)⌉ 步。
+/// B1 照抄每个角色逐个查的次数（产物里这一行的 `query_levels`）是整表的量，不进 B8。
+fn mapped_units_queries_by_delta(changed_roles_over_all_rounds: u64, mapped_units: u64) -> u64 {
+    changed_roles_over_all_rounds * lg(mapped_units)
 }
 
 // ---- Q6、Q7、Q8、Q9：B8、B4 的式子在量过的点上 ----
@@ -2103,9 +2614,7 @@ enum Summary {
 }
 
 fn summarize(bands: &[Option<Band>], any_unread: bool) -> Summary {
-    if bands
-        .iter()
-        .any(|one_band| *one_band == Some(Band::GrowsWithTheAxis))
+    if bands.contains(&Some(Band::GrowsWithTheAxis))
     {
         Summary::GrowsOnSomeAxis
     } else if any_unread || bands.is_empty() {
@@ -2615,7 +3124,7 @@ fn narrowed_between_nanos_at_user_scale(
 
 /// Q11、Q12、Q13：附带，只报数。
 fn side_quantities_report(counts: &Product, out: &mut String) {
-    for (point, _) in &counts.points {
+    for point in counts.points.keys() {
         for state in STATES {
             let at = round_key(point, state, "overwrite", 1);
             let after: u64 = scan_rows()
@@ -2897,6 +3406,22 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
     let cleaned_timing =
         timing.map(|product| without_the_cells_not_measurable(product, &cells_of_timing));
     let (counts, timing) = (&cleaned_counts, cleaned_timing.as_ref());
+    // 计时产物里各点的轴值从同名计数产物取（修订 7）；计时这一侧的每个量都读这一份
+    let (timing_with_axes, points_with_the_axes_unread) = match timing {
+        Some(product) => {
+            let (with_axes, unread) = timing_with_the_point_axes_of_the_counts(counts, product);
+            let _ = writeln!(
+                out,
+                "name=timing_point_axes points_of_the_timing={} taken_from_the_counts={} unread={}",
+                point_names_of_the_timing(product).len(),
+                with_axes.points.len() - product.points.len(),
+                unread.len()
+            );
+            (Some(with_axes), unread)
+        }
+        None => (None, Vec::new()),
+    };
+    let timing = timing_with_axes.as_ref();
     for (build, cells) in [("counts", &cells_of_counts), ("timing", &cells_of_timing)] {
         for (point, state, taken, attempts) in cells {
             let _ = writeln!(
@@ -2932,10 +3457,12 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
         .lines()
         .filter(|line| line.starts_with("name=constant_check") && line.ends_with("match=false"))
         .count();
-    let (_, three_two_disagreements, _) = reconciliation_report(counts, out);
+    // 修订 4：超上界的格与不等的格一样算不符（`disagreements` 里含着，另报其中超上界的几格）
+    let three_two = reconciliation_report(counts, out);
     let _ = writeln!(
         out,
-        "name=verdict clause=stop_2 constants_not_matching_or_unread={constant_mismatches} three_two_disagreements={three_two_disagreements}"
+        "name=verdict clause=stop_2 constants_not_matching_or_unread={constant_mismatches} three_two_disagreements={} three_two_cells_over_the_bound={}",
+        three_two.disagreements, three_two.over_the_bound
     );
     let _ = writeln!(
         out,
@@ -2962,12 +3489,14 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
             && timing.header.get("opt_level").map(String::as_str) == Some("3")
             && timing.header.get("test_threads").map(String::as_str) == Some("1");
         let _ = writeln!(out, "name=verdict clause=void_7 timing_header_is_release_opt_level_3_single_thread={header_ok}");
-        residual_clause = Some(timing_report(timing, out));
+        residual_clause = timing_report(timing, &points_with_the_axes_unread, out);
         let (cells, reference_only) = one_millisecond_report(counts, timing, out);
         let checks = extrapolation_check_report(counts, timing, out);
         // 一格都没核（轴上不足三个点）就是没判，不记「核过」。
         extrapolation_clause = (!checks.is_empty()).then(|| checks.iter().any(|ok| !*ok));
-        flips_today_clause = if cells.len() == 4 && !reference_only {
+        // F6 打中（Q5 有一格核不过）：Q4 记「外推不可信，不判」，F1 跟着不判（登记第十节 F6）
+        let extrapolation_not_trusted = extrapolation_clause == Some(true);
+        flips_today_clause = if cells.len() == 4 && !reference_only && !extrapolation_not_trusted {
             Some(
                 cells
                     .iter()
@@ -2976,10 +3505,10 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
         } else {
             None
         };
-        let _ = writeln!(out, "name=verdict quantity=Q4 cells={} reference_only_because_data_or_files_axes_are_missing={reference_only}", cells.iter().map(|one_cell| format!("{one_cell:?}")).collect::<Vec<_>>().join(","));
+        let _ = writeln!(out, "name=verdict quantity=Q4 cells={} reference_only_because_data_or_files_axes_are_missing={reference_only} not_judged_because_the_extrapolation_is_not_trusted={extrapolation_not_trusted}", cells.iter().map(|one_cell| format!("{one_cell:?}")).collect::<Vec<_>>().join(","));
         let _ = writeln!(
             out,
-            "name=verdict quantity=Q5 cells_checked={} cells_not_checked={}",
+            "name=verdict quantity=Q5 cells_passed={} cells_failed={}",
             checks.iter().filter(|ok| **ok).count(),
             checks.iter().filter(|ok| !**ok).count()
         );
@@ -3033,7 +3562,7 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
         out,
         "F6",
         extrapolation_clause,
-        "meaning=some_Q5_cell_not_checked",
+        "meaning=some_Q5_cell_failed",
     );
 }
 
@@ -3572,11 +4101,41 @@ mod tests {
             &SEGMENTS_BEFORE_ADMISSION,
         )
         .expect("Δ0 的每个读数都给了");
-        assert_eq!(by_delta_total(&input), 1336);
+        // 登记第七节 ③3 的 Δ0 写着「s36 每轮 dm 2、查询 0」，合计 1336（`delta_zero` 那一份直接喂式子，照旧钉 1336）。
+        // 从产物读时 s36 的查询次数照修订 7 取这一轮进出 `mapped_units` 的角色数：两轮各 2 个，各查 lg(1500) = 11 步，
+        // s36 = 4 + 4 × 11 = 48，合计 1336 − 4 + 48 = 1380
+        assert_eq!(by_delta_total(&input), 1380);
         let by_row: BTreeMap<&str, u64> = by_delta_rows(&input).into_iter().collect();
         assert_eq!(by_row["release_judgement_version_indexes"], 138);
         assert_eq!(by_row["multi_level_tree_planning"], 68);
         assert_eq!(by_row["record_intersection_filter"], 480);
+        assert_eq!(by_row["mapped_units_whole_table"], 48);
+    }
+
+    #[test]
+    fn the_mapped_units_queries_of_the_by_delta_arm_are_the_roles_moved_and_not_the_whole_table() {
+        // B1 那一行照抄每个角色逐个查上一版的索引：产物里这一行的 query_levels 是整表的量（这里写 1500 次 × 11 = 16500）。
+        // B8 只问这一轮进出 `mapped_units` 的角色（两轮各 2 个，M = 1500，lg 11）：s36 = 4 + 4 × 11 = 48，与产物里那个整表的数无关
+        let text = delta_zero_product_text()
+            + "E203RESULT name=row point=base state=same_mount kind=overwrite round=1 segment=between row=mapped_units_whole_table calls=2 steps=3000 query_levels=16500\n";
+        let input = by_delta_input_from_the_product(
+            &read_product(&text),
+            "base",
+            "same_mount",
+            "overwrite",
+            &SEGMENTS_BEFORE_ADMISSION,
+        )
+        .expect("Δ0 的每个读数都给了");
+        assert_eq!(input.mapped_units_changed_over_all_rounds, 4);
+        assert_eq!(input.mapped_units_query_levels, 44);
+        let by_row: BTreeMap<&str, u64> = by_delta_rows(&input).into_iter().collect();
+        assert_eq!(by_row["mapped_units_whole_table"], 48);
+        assert_eq!(
+            mapped_units_queries_by_delta(0, 1500),
+            0,
+            "这一轮没有角色进出就一次不问"
+        );
+        assert_eq!(mapped_units_queries_by_delta(6, 10_145), 6 * 14);
     }
 
     #[test]
@@ -3597,6 +4156,148 @@ mod tests {
                 .any(|gap| gap.starts_with("changed_leaves@round")),
             "{gaps:?}"
         );
+    }
+
+    /// 整份拷那一行（s1）在 U 轴三个点、两种挂载状态上的产物行，步数与 scale 各由一个式子给，可以取不同的值。
+    /// 第一段真产物的形态是步数恒为 0、元素数只在 scale 里（计数构建只插了 scale）。
+    fn whole_copy_rows_text(
+        steps_of_the_copy: fn(u64) -> u64,
+        scale_of_the_copy: fn(u64) -> u64,
+    ) -> String {
+        let mut text = String::new();
+        for (point, unit_area_slots) in [
+            ("unit_area_2_pow_14", 1_u64 << 14),
+            ("base", 1 << 17),
+            ("unit_area_2_pow_24", 1 << 24),
+        ] {
+            let _ = writeln!(text, "E203RESULT name=point point={point} unit_area_slots={unit_area_slots} unlinks=10 data_units=10 files=10");
+            for state in STATES {
+                let _ = writeln!(
+                    text,
+                    "E203RESULT name=row point={point} state={state} kind=overwrite round=1 segment=caller row=whole_allocator_copy_before_the_judgement calls=1 steps={} scale={}",
+                    steps_of_the_copy(unit_area_slots),
+                    scale_of_the_copy(unit_area_slots)
+                );
+            }
+        }
+        text
+    }
+
+    fn the_copied_elements(unit_area_slots: u64) -> u64 {
+        2 * elements_per_disk(unit_area_slots)
+    }
+
+    fn no_elements(_unit_area_slots: u64) -> u64 {
+        0
+    }
+
+    fn constant_seven_elements(_unit_area_slots: u64) -> u64 {
+        7
+    }
+
+    #[test]
+    fn the_counts_positive_control_reads_the_steps_and_not_the_scale() {
+        // 第一段真产物的形态：步数 0、scale 是元素数。阳性对照读步数，所以过不了（读成 scale 的错法在这一半红）
+        let mut elements_only_in_the_scale = String::new();
+        controls_report(
+            &read_product(&whole_copy_rows_text(no_elements, the_copied_elements)),
+            None,
+            &mut elements_only_in_the_scale,
+        );
+        for state in STATES {
+            assert!(
+                elements_only_in_the_scale.contains(&format!("name=verdict control=b1_counts_whole_copy_alpha_at_least_0_95 state={state} passed=false alpha=0.000000")),
+                "{elements_only_in_the_scale}"
+            );
+        }
+        // 反过来：步数是元素数、scale 是一个不随 U 变的数。阳性对照照样过（读成 scale 的错法在这一半也红）
+        let mut steps_only = String::new();
+        controls_report(
+            &read_product(&whole_copy_rows_text(
+                the_copied_elements,
+                constant_seven_elements,
+            )),
+            None,
+            &mut steps_only,
+        );
+        for state in STATES {
+            assert!(
+                steps_only.contains(&format!("name=verdict control=b1_counts_whole_copy_alpha_at_least_0_95 state={state} passed=true alpha=1.000000")),
+                "{steps_only}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_copy_elements_check_reads_the_scale_and_not_the_steps() {
+        // 第七节 ③1 拿站点另读的 scale 比 U 那一部分：scale 是元素数时 0 处不符，步数是多少都不管
+        let mut elements_only_in_the_scale = String::new();
+        counts_report(
+            &read_product(&whole_copy_rows_text(no_elements, the_copied_elements)),
+            &mut elements_only_in_the_scale,
+        );
+        assert!(
+            elements_only_in_the_scale
+                .contains("name=verdict quantity=three_one_copy_elements disagreements=0"),
+            "{elements_only_in_the_scale}"
+        );
+        // scale 是 7（比 U 那一部分小）而步数是元素数：三个点 × 两种状态 6 格都不符（读成步数的错法在这里红）
+        let mut scale_too_small = String::new();
+        counts_report(
+            &read_product(&whole_copy_rows_text(
+                the_copied_elements,
+                constant_seven_elements,
+            )),
+            &mut scale_too_small,
+        );
+        assert!(
+            scale_too_small
+                .contains("name=verdict quantity=three_one_copy_elements disagreements=6"),
+            "{scale_too_small}"
+        );
+    }
+
+    #[test]
+    fn fixed_point_round_with_two_code_two_trees_is_a_gap() {
+        // 第一段真产物的形态：deadlist 树走零根那一支没记，每轮只有记账树与中央映射树两条。每轮要三条，少了记读不到，不拿 0 补
+        let text = delta_zero_product_text().replace(
+            "key=code_two_keys_changed value=0\n",
+            "key=code_two_keys_changed_not_recorded value=0\n",
+        );
+        let product = read_product(&text);
+        let gaps = by_delta_input_from_the_product(
+            &product,
+            "base",
+            "same_mount",
+            "overwrite",
+            &SEGMENTS_BEFORE_ADMISSION,
+        )
+        .expect_err("每轮只有两棵码 2 树的读数");
+        assert!(
+            gaps.iter()
+                .any(|gap| gap == "delta.code_two_keys_changed:4_for_2_rounds"),
+            "{gaps:?}"
+        );
+    }
+
+    #[test]
+    fn the_deadlist_tree_keys_are_weighted_by_the_deadlist_tree_height() {
+        // 每轮三条按记账树、deadlist 树、中央映射树的次序读，各乘各自的层数（Δ0：2、1、2）。
+        // deadlist 那一条从 0 改成 3：每轮多 3 × 1，两轮共多 6，s20 从 68 到 74；deadlist 与中央映射两条的层数配反了会是 76
+        let text = delta_zero_product_text().replace(
+            "key=code_two_keys_changed value=0\n",
+            "key=code_two_keys_changed value=3\n",
+        );
+        let input = by_delta_input_from_the_product(
+            &read_product(&text),
+            "base",
+            "same_mount",
+            "overwrite",
+            &SEGMENTS_BEFORE_ADMISSION,
+        )
+        .expect("每轮三条都在");
+        let by_row: BTreeMap<&str, u64> = by_delta_rows(&input).into_iter().collect();
+        assert_eq!(by_row["multi_level_tree_planning"], 68 + 2 * 3);
     }
 
     #[test]
@@ -3657,15 +4358,15 @@ mod tests {
     fn the_timing_report_bands_five_rounds_and_drops_a_round_that_breaks_the_inclusion_check() {
         let mut out = String::new();
         let timing = read_product(&timing_product_text(1_000_005));
-        let residual_grows = timing_report(&timing, &mut out);
-        assert!(!residual_grows, "残差只有 5 纳秒，不随轴涨");
+        let residual_grows = timing_report(&timing, &[], &mut out);
+        assert_eq!(residual_grows, Some(false), "残差只有 5 纳秒，不随轴涨");
         let line = out
             .lines()
             .find(|line| line.starts_with("name=q3 axis=U state=same_mount kind=overwrite"))
             .expect("U 轴一行");
         assert!(line.ends_with("band=GrowsWithTheAxis"), "{line}");
         let mut broken = String::new();
-        timing_report(&read_product(&timing_product_text(10)), &mut broken);
+        let _ = timing_report(&read_product(&timing_product_text(10)), &[], &mut broken);
         let line = broken
             .lines()
             .find(|line| line.starts_with("name=q3 axis=U state=same_mount kind=overwrite"))
@@ -3949,6 +4650,22 @@ mod tests {
         out
     }
 
+    /// 同 [`report_of_the_grid`]，只是独占计时是 0 的行改成 1 纳秒：Q5 那几格才有挂钟可比、核得过，
+    /// F1 才判（F6 打中时 F1 不判）。Q4 照旧：步数是 0 的那一种推出来仍是 0，一纳秒一步的那一种仍远小于 0.5 毫秒。
+    fn report_of_the_grid_timed_at_least_one_nanosecond(
+        shape: &GridShape,
+        points: &[(&'static str, u64, u64, u64, u64)],
+    ) -> String {
+        let text = grid_text(shape, points).replace(" exclusive_nanos=0\n", " exclusive_nanos=1\n");
+        let mut out = String::new();
+        full_report(&read_product(&text), Some(&read_product(&text)), &mut out);
+        assert!(
+            out.contains("name=verdict clause=F6 fired=false"),
+            "这张格子的外推要核得过 {out}"
+        );
+        out
+    }
+
     #[test]
     fn failure_clause_one_fires_only_when_all_four_cells_reach_one_millisecond() {
         let all_reach = report_of_the_grid(
@@ -3968,7 +4685,7 @@ mod tests {
             all_reach.contains("name=verdict clause=F1 fired=true"),
             "{all_reach}"
         );
-        let none_reach = report_of_the_grid(
+        let none_reach = report_of_the_grid_timed_at_least_one_nanosecond(
             &GridShape {
                 nanos_per_step: 0,
                 high_end_factor: 1,
@@ -3985,7 +4702,7 @@ mod tests {
             none_reach.contains("name=verdict clause=F1 fired=false"),
             "{none_reach}"
         );
-        let mixed = report_of_the_grid(
+        let mixed = report_of_the_grid_timed_at_least_one_nanosecond(
             &GridShape {
                 nanos_per_step: 1,
                 high_end_factor: 1,
@@ -4034,6 +4751,96 @@ mod tests {
         );
     }
 
+    /// 计时产物的真形态：不打 `name=point` 行，轴值只在计数产物里。
+    fn without_the_point_lines(text: &str) -> String {
+        text.lines()
+            .filter(|line| !line.starts_with("E203RESULT name=point "))
+            .map(|line| format!("{line}\n"))
+            .collect()
+    }
+
+    fn report_of_the_grid_with_the_timing_without_points(
+        shape: &GridShape,
+        counts_have_the_points: bool,
+    ) -> String {
+        let text = grid_text(shape, &grid_points());
+        let timing_text = without_the_point_lines(&text);
+        let counts_text = if counts_have_the_points {
+            text
+        } else {
+            timing_text.clone()
+        };
+        let mut out = String::new();
+        full_report(
+            &read_product(&counts_text),
+            Some(&read_product(&timing_text)),
+            &mut out,
+        );
+        out
+    }
+
+    #[test]
+    fn failure_clause_three_is_unknown_when_no_counts_product_gives_the_points() {
+        let shape = GridShape {
+            nanos_per_step: 1,
+            high_end_factor: 1,
+            high_end_residual: 5,
+            remounted_has_no_steps: false,
+        };
+        let out = report_of_the_grid_with_the_timing_without_points(&shape, false);
+        assert!(
+            out.contains("name=verdict clause=F3 fired=unknown"),
+            "计时与计数两边都没有点的轴值：F3 不判，不报没打中 {out}"
+        );
+        assert!(
+            out.contains(
+                "name=timing_point_axes points_of_the_timing=10 taken_from_the_counts=0 unread=10"
+            ),
+            "{out}"
+        );
+        assert!(
+            out.contains("name=q10 point=unit_area_2_pow_24 result=axes_unread"),
+            "{out}"
+        );
+        assert!(!out.contains("name=q10 axis="), "一根轴都算不成 {out}");
+    }
+
+    #[test]
+    fn failure_clause_three_is_judged_on_the_point_axes_of_the_counts_product() {
+        let mut shape = GridShape {
+            nanos_per_step: 1,
+            high_end_factor: 1,
+            high_end_residual: 5,
+            remounted_has_no_steps: false,
+        };
+        let small_residual = report_of_the_grid_with_the_timing_without_points(&shape, true);
+        assert!(
+            small_residual.contains("name=verdict clause=F3 fired=false"),
+            "{small_residual}"
+        );
+        assert!(
+            small_residual.contains(
+                "name=timing_point_axes points_of_the_timing=10 taken_from_the_counts=10 unread=0"
+            ),
+            "{small_residual}"
+        );
+        assert!(
+            small_residual
+                .contains("name=q10 axis=U state=same_mount kind=overwrite segment=caller "),
+            "Q10 照打 {small_residual}"
+        );
+        assert!(
+            small_residual.contains("name=q3 axis=U state=same_mount kind=overwrite "),
+            "Q3 照打 {small_residual}"
+        );
+        shape.high_end_residual = 5_000_000;
+        let growing_residual = report_of_the_grid_with_the_timing_without_points(&shape, true);
+        assert!(
+            growing_residual.contains("name=verdict clause=F3 fired=true"),
+            "{growing_residual}"
+        );
+    }
+
     #[test]
     fn failure_clause_six_fires_on_a_cell_the_extrapolation_misses_and_is_unknown_without_cells() {
         let proportional = report_of_the_grid(
@@ -4046,8 +4853,8 @@ mod tests {
             &grid_points(),
         );
         assert!(
-            proportional.contains("name=verdict quantity=Q5 cells_checked=4 cells_not_checked=0"),
-            "{proportional}"
+            proportional.contains("name=verdict quantity=Q5 cells_passed=8 cells_failed=0"),
+            "四根轴各有三个点、两种状态：八格都核过 {proportional}"
         );
         assert!(
             proportional.contains("name=verdict clause=F6 fired=false"),
@@ -4078,6 +4885,203 @@ mod tests {
         assert!(
             only_the_base.contains("name=verdict clause=F6 fired=unknown"),
             "一格都没核：没判，不记核过 {only_the_base}"
+        );
+    }
+
+    #[test]
+    fn failure_clause_one_is_not_judged_when_the_extrapolation_check_fails() {
+        let high_end_four_times = report_of_the_grid(
+            &GridShape {
+                nanos_per_step: 1,
+                high_end_factor: 4,
+                high_end_residual: 5,
+                remounted_has_no_steps: false,
+            },
+            &grid_points(),
+        );
+        assert!(
+            high_end_four_times.contains("name=verdict quantity=Q4 cells=AtLeastOneMillisecond,AtLeastOneMillisecond,AtLeastOneMillisecond,AtLeastOneMillisecond reference_only_because_data_or_files_axes_are_missing=false not_judged_because_the_extrapolation_is_not_trusted=true"),
+            "{high_end_four_times}"
+        );
+        assert!(
+            high_end_four_times.contains("name=verdict clause=F1 fired=unknown"),
+            "Q5 有一格核不过：Q4 外推不可信、不判，四格都到 1 毫秒也不记 F1 打中（变异 m36）{high_end_four_times}"
+        );
+    }
+
+    /// 一份格子文字里，点名那一点的 `name=row` 行步数翻倍（别的字段不动）。
+    fn grid_text_with_the_steps_of_one_point_doubled(text: &str, point: &str) -> String {
+        let marker = format!(" point={point} ");
+        let mut changed = String::new();
+        for line in text.lines() {
+            if line.starts_with("E203RESULT name=row ") && line.contains(&marker) {
+                let words: Vec<String> = line
+                    .split(' ')
+                    .map(|word| match word.strip_prefix("steps=") {
+                        Some(value) => format!(
+                            "steps={}",
+                            2 * value.parse::<u64>().expect("合成行的步数是整数")
+                        ),
+                        None => word.to_string(),
+                    })
+                    .collect();
+                push_line(
+                    &mut changed,
+                    words
+                        .join(" ")
+                        .strip_prefix("E203RESULT ")
+                        .expect("合成行以 E203RESULT 起头"),
+                );
+            } else {
+                changed.push_str(line);
+                changed.push('\n');
+            }
+        }
+        changed
+    }
+
+    #[test]
+    fn the_extrapolation_check_covers_every_axis_with_three_points_and_the_diagonal() {
+        let shape = GridShape {
+            nanos_per_step: 1,
+            high_end_factor: 1,
+            high_end_residual: 5,
+            remounted_has_no_steps: false,
+        };
+        let mut points = grid_points();
+        points.push(("diagonal", 1 << 20, 10_000, 10_000, 1000));
+        let text = grid_text(&shape, &points);
+        let mut matching = String::new();
+        full_report(
+            &read_product(&text),
+            Some(&read_product(&text)),
+            &mut matching,
+        );
+        for axis in ["U", "u", "D", "F"] {
+            assert!(
+                matching.contains(&format!("name=q5 axis={axis} state=same_mount ")),
+                "轴 {axis} 上有三个点：要有一格（第一段只核 U、u 时 D、F 两格漏掉，变异 m34）{matching}"
+            );
+        }
+        let diagonal_steps = 2 * elements_per_disk(1 << 20);
+        assert!(
+            matching.contains(&format!("name=q5 axis=diagonal state=same_mount predicted_steps={diagonal_steps} measured_steps={diagonal_steps} nanos_ratios=1.000,1.000,1.000,1.000,1.000 passed=true")),
+            "B0 加各轴的增量推 X1，只有 U 那一轴有增量：推的等于量的（变异 m35）{matching}"
+        );
+        assert!(
+            matching.contains("name=verdict quantity=Q5 cells_passed=10 cells_failed=0"),
+            "四根轴两种状态八格、对角点两格 {matching}"
+        );
+        let doubled = grid_text_with_the_steps_of_one_point_doubled(&text, "diagonal");
+        let mut missed = String::new();
+        full_report(
+            &read_product(&doubled),
+            Some(&read_product(&text)),
+            &mut missed,
+        );
+        assert!(
+            missed.contains(&format!("name=q5 axis=diagonal state=same_mount predicted_steps={diagonal_steps} measured_steps={} ", 2 * diagonal_steps)),
+            "{missed}"
+        );
+        assert!(
+            missed.contains("name=verdict quantity=Q5 cells_passed=8 cells_failed=2"),
+            "X1 量的步数是推的两倍：对角点两格核不过 {missed}"
+        );
+    }
+
+    #[test]
+    fn the_user_scale_value_takes_the_measured_unit_area_at_the_user_scale() {
+        let shape = GridShape {
+            nanos_per_step: 1,
+            high_end_factor: 1,
+            high_end_residual: 5,
+            remounted_has_no_steps: false,
+        };
+        let mut points = grid_points();
+        points.push((
+            "user_scale_unit_area",
+            user_scale_unit_area_slots(),
+            10,
+            10,
+            10,
+        ));
+        let text = grid_text(&shape, &points);
+        let measured_at_the_user_scale = 2 * elements_per_disk(user_scale_unit_area_slots());
+        // X2 量的步数改成一个外推推不出来的数：取到的就是它
+        let marked = text.replace(&format!("steps={measured_at_the_user_scale} "), "steps=7 ");
+        let product = read_product(&marked);
+        let steps = |at: &RoundKey| {
+            to_f64(product.steps_of(
+                at,
+                &SEGMENTS_BEFORE_ADMISSION,
+                "whole_allocator_copy_before_the_judgement",
+            ))
+        };
+        let (value, missing) = user_scale_value(
+            &product,
+            "same_mount",
+            "overwrite",
+            1,
+            &steps,
+            &user_scale(10.0),
+        );
+        assert!(missing.is_empty(), "四根轴都有两个点：{missing:?}");
+        assert!(
+            (value - 7.0).abs() < 1e-6,
+            "X2 量过：U 那一部分取 X2 的量，记录数三根轴的增量是 0（变异 m37：照旧只拿 ≤ 2²⁴ 的点外推时得 {}）；得 {value}",
+            measured_at_the_user_scale
+        );
+    }
+
+    /// Y1 的单元区加大到 2¹⁷ 那一档：(2¹⁷, 10⁵, 10, 10) 落在 u 轴的筛子里，外推只取登记 u 轴到 10⁴ 的点，
+    /// 多了它（且它量的步数翻倍）G-user 上的推值不变（变异 m70：记录数那三根轴不封顶时 u 那一部分多出增量）。
+    #[test]
+    fn the_many_unlinks_point_on_the_unit_area_of_the_base_stays_out_of_the_unlinks_axis_extrapolation() {
+        let shape = GridShape {
+            nanos_per_step: 1,
+            high_end_factor: 1,
+            high_end_residual: 5,
+            remounted_has_no_steps: false,
+        };
+        let without = read_product(&grid_text(&shape, &grid_points()));
+        let mut points = grid_points();
+        points.push(("many_unlinks_unit_area_2_pow_17", 1 << 17, 100_000, 10, 10));
+        let with = read_product(&grid_text_with_the_steps_of_one_point_doubled(
+            &grid_text(&shape, &points),
+            "many_unlinks_unit_area_2_pow_17",
+        ));
+        let value_of = |product: &Product| {
+            let steps = |at: &RoundKey| {
+                to_f64(product.steps_of(
+                    at,
+                    &SEGMENTS_BEFORE_ADMISSION,
+                    "whole_allocator_copy_before_the_judgement",
+                ))
+            };
+            user_scale_value(
+                product,
+                "same_mount",
+                "overwrite",
+                1,
+                &steps,
+                &user_scale(10.0),
+            )
+        };
+        let (value_without, missing_without) = value_of(&without);
+        let (value_with, missing_with) = value_of(&with);
+        assert_eq!(missing_without, missing_with);
+        assert!(
+            (value_with - value_without).abs() < 1e-6,
+            "多了 Y1 那一点，G-user 上的推值不该变：没有它 {value_without}，有它 {value_with}"
+        );
+        assert_eq!(
+            axis_points_for_extrapolation(&with, "u").len(),
+            axis_points_for_extrapolation(&without, "u").len()
+        );
+        assert_eq!(
+            axis_points(&with, "u").len(),
+            axis_points(&without, "u").len() + 1,
+            "筛子本身照旧收它（α 与外推各自封顶）"
         );
     }
 
@@ -4145,82 +5149,688 @@ mod tests {
         );
     }
 
-    /// 对账用的一格：规模读数给 other_files = 1000、cluster_segments = 7，单元区 2¹⁷（每盘 2048 段）。
-    fn reconciliation_text(plan_steps: u64, cluster_steps: u64, kind: &str) -> String {
-        let at = format!("point=base state=same_mount kind={kind} round=1");
+    /// 对账用的一格（base、同一次挂载、覆盖写第 1 轮）：两块盘、固定点 2 轮，入口、出口读数一条都没有，行读数只有 `rows` 给的
+    /// （`rows` 里的每行带不带走到命中为止那两样，照第三段给的原样写）。
+    fn reconciliation_text(rows: &[(&str, &str)]) -> String {
+        let at = "point=base state=same_mount kind=overwrite round=1";
         let mut text = String::from("E203RESULT name=point point=base unit_area_slots=131072 unlinks=10 data_units=10 files=10\n");
+        push_line(&mut text, &format!("name=state {at} devices=2"));
         push_line(
             &mut text,
-            &format!("name=state {at} other_files=1000 cluster_segments=7"),
+            &format!("name=publish {at} had_caller_segment=true fixed_point_rounds=2"),
         );
-        for (row, calls, steps) in [
-            ("files_other_than_the_first_plan", 2, plan_steps),
-            ("inodes_with_an_extent_entry_set", 2, 2002),
-            ("file_other_than_the_first_linear_find", 2, 1500),
-            ("cluster_segment_sum", 4, cluster_steps),
-            ("empty_segment_linear_scan", 4, 100),
-        ] {
+        for (row, readings) in rows {
             push_line(
                 &mut text,
-                &format!(
-                    "name=row {at} segment=before_landing row={row} calls={calls} steps={steps}"
-                ),
+                &format!("name=row {at} segment=between row={row} {readings}"),
             );
         }
         text
     }
 
     #[test]
-    fn the_reconciliation_compares_the_rows_it_can_and_names_the_rows_it_cannot() {
-        assert_eq!(scan_rows().len(), 28);
-        let mut matching = String::new();
-        let (cells, disagreements, unread) = reconciliation_report(
-            &read_product(&reconciliation_text(2000, 28, "overwrite")),
-            &mut matching,
-        );
-        assert_eq!((cells, disagreements, unread), (5, 0, 0), "{matching}");
-        assert!(
-            matching.contains("name=verdict quantity=three_two cells_checked=5 disagreements=0 cells_with_the_scale_unread=0 rows_reconciled=5 rows_not_reconciled=21"),
-            "{matching}"
-        );
-        let mut plan_off = String::new();
-        let (_, disagreements, _) = reconciliation_report(
-            &read_product(&reconciliation_text(2001, 28, "overwrite")),
-            &mut plan_off,
-        );
-        assert_eq!(disagreements, 1, "{plan_off}");
-        assert!(
-            plan_off.contains("name=three_two_disagreement point=base state=same_mount kind=overwrite round=1 row=files_other_than_the_first_plan relation=Equals steps=2001 formula=2000 calls=2"),
-            "{plan_off}"
-        );
-        let mut over_the_bound = String::new();
-        let (_, disagreements, _) = reconciliation_report(
-            &read_product(&reconciliation_text(2000, 29, "overwrite")),
-            &mut over_the_bound,
-        );
+    fn the_reconciliation_covers_every_scan_row_and_counts_the_bounded_rows_apart() {
+        assert_eq!(scan_rows().len(), 28, "26 行扫类加两行整份拷");
+        let totals = |text: &str| {
+            let mut out = String::new();
+            (reconciliation_report(&read_product(text), &mut out), out)
+        };
+        // 入口、出口读数一条都没有：吃它们的 15 行读不到；记账行那一行只吃盘数（0 次调用、0 步）核过；调用处那十行没有行读数，0 步对 0 表长核过
+        let (empty, out) = totals(&reconciliation_text(&[]));
         assert_eq!(
-            disagreements, 1,
-            "上界 4 × 7 = 28，29 步超了：{over_the_bound}"
+            empty,
+            ReconciliationTotals {
+                cells: 11,
+                disagreements: 0,
+                over_the_bound: 0,
+                unread: 15,
+            },
+            "{out}"
         );
-        let mut last_batch = String::new();
-        let (cells, disagreements, _) = reconciliation_report(
-            &read_product(&reconciliation_text(9999, 9999, "unlink_final")),
-            &mut last_batch,
+        assert!(
+            out.contains("name=verdict quantity=three_two cells_checked=11 disagreements=0 cells_over_the_bound=0 cells_with_the_scale_unread=15 rows_reconciled=26 rows_equal_only=18 rows_with_a_bounded_part=8 rows_not_reconciled=0"),
+            "{out}"
         );
+        assert!(
+            out.contains("name=three_two_rows_not_reconciled count=0 rows=\n"),
+            "{out}"
+        );
+        // 插计数脚本修订 4 之前的行读数（没带走到命中为止那两样）：那一格读不到，不拿 0 补
+        let (old_product, out) = totals(&reconciliation_text(&[(
+            "root_header_linear_find",
+            "calls=3 steps=12",
+        )]));
+        assert_eq!((old_product.cells, old_product.unread), (10, 16), "{out}");
+        // 走到命中为止那一部分超了上界：算不符，另记超上界；不符那一行带两边四个数
+        let (over, out) = totals(&reconciliation_text(&[(
+            "record_intersection_filter",
+            "calls=3 steps=10 scale=6 steps_to_the_hit=4 scale_to_the_hit=3",
+        )]));
+        assert_eq!((over.disagreements, over.over_the_bound), (1, 1), "{out}");
+        assert!(
+            out.contains("name=three_two_disagreement point=base state=same_mount kind=overwrite round=1 row=record_intersection_filter relation=WholeTableAndUpToTheHitAtTheCallSite steps=10 steps_to_the_hit=4 whole_table_lengths=6 lengths_to_the_hit=3 over_the_bound=true calls=3"),
+            "{out}"
+        );
+        assert!(
+            out.contains("name=three_two_row row=record_intersection_filter relation=WholeTableAndUpToTheHitAtTheCallSite cells_checked=1 disagreements=1 over_the_bound=1"),
+            "{out}"
+        );
+    }
+
+    /// 修订 3 ② 那 13 行对账用的一格（base、同一次挂载、第 1 轮）：两块盘，固定点 `rounds` 轮、每轮分配记录树节点数取 `nodes_each_round`，
+    /// 入口读数记在落点判之前那一段、出口读数记在准入之后那一段，这一行的读数都记在两道之间那一段。
+    fn entry_and_exit_text(
+        kind: &str,
+        rounds: u64,
+        nodes_each_round: &[u64],
+        readings: &[(&str, u64)],
+        row: &str,
+        calls: u64,
+        steps: u64,
+    ) -> String {
+        let at = format!("point=base state=same_mount kind={kind} round=1");
+        let mut text = String::from("E203RESULT name=point point=base unit_area_slots=131072 unlinks=10 data_units=10 files=10\n");
+        push_line(&mut text, &format!("name=state {at} devices=2"));
+        push_line(
+            &mut text,
+            &format!("name=publish {at} had_caller_segment=true fixed_point_rounds={rounds}"),
+        );
+        for (key, value) in readings {
+            let segment = if key.starts_with("entry_") {
+                "before_landing"
+            } else {
+                "after"
+            };
+            push_line(
+                &mut text,
+                &format!(
+                    "name=delta {at} segment={segment} fixed_point_round=0 key={key} value={value}"
+                ),
+            );
+        }
+        for (index, nodes) in nodes_each_round.iter().enumerate() {
+            push_line(
+                &mut text,
+                &format!(
+                    "name=delta {at} segment=between fixed_point_round={} key=allocation_plan_nodes_after value={nodes}",
+                    index + 1
+                ),
+            );
+        }
+        push_line(
+            &mut text,
+            &format!("name=row {at} segment=between row={row} calls={calls} steps={steps}"),
+        );
+        text
+    }
+
+    /// 对账之后这一行那一条 `name=three_two_row` 的「核了几格、不符几格」。
+    fn cells_and_disagreements_of(text: &str, row: &str) -> (u64, u64) {
+        let mut out = String::new();
+        reconciliation_report(&read_product(text), &mut out);
+        let line = out
+            .lines()
+            .find(|line| line.starts_with(&format!("name=three_two_row row={row} ")))
+            .unwrap_or_else(|| panic!("没有 {row} 那一行：{out}"));
+        let fields = parse_line(&format!("E203RESULT {line}")).expect("这一行是 name= 起头的");
+        (
+            number(&fields, "cells_checked").expect("核了几格"),
+            number(&fields, "disagreements").expect("不符几格"),
+        )
+    }
+
+    /// 一行在同一份读数上：步数等于式子值时核过、多一步时不符（登记第七节 ③2 逐格相等，不按上界放过）。
+    fn assert_the_row_reconciles_exactly(
+        kind: &str,
+        rounds: u64,
+        nodes_each_round: &[u64],
+        readings: &[(&str, u64)],
+        row: &str,
+        calls: u64,
+        expected_steps: u64,
+    ) {
+        let cell = |steps: u64| {
+            cells_and_disagreements_of(
+                &entry_and_exit_text(kind, rounds, nodes_each_round, readings, row, calls, steps),
+                row,
+            )
+        };
         assert_eq!(
-            (cells, disagreements),
+            cell(expected_steps),
             (1, 0),
-            "最后一批的规模读数是整个 unlink 做完的一版，只对不依赖那一版表长的一行对账：{last_batch}"
+            "{row}：{expected_steps} 步该与式子相等"
         );
-        let mut unread_scale = String::new();
-        let without_scale = reconciliation_text(2000, 28, "overwrite")
-            .replace("other_files=1000 cluster_segments=7", "other_files=1000");
-        let (_, _, unread) =
-            reconciliation_report(&read_product(&without_scale), &mut unread_scale);
+        assert_eq!(cell(expected_steps + 1), (1, 1), "{row}：多一步该记不符");
+    }
+
+    #[test]
+    fn the_inode_record_find_walks_to_the_position_of_the_inode_whose_size_changes() {
+        // 3 次调用，每次走到排第 7 的那条记录：3 × 7
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &[("entry_position_of_the_inode_whose_size_changes", 7)],
+            "inode_record_linear_find",
+            3,
+            21,
+        );
+    }
+
+    #[test]
+    fn the_extent_roles_scan_looks_at_every_node_of_the_planned_extent_tree() {
+        // 3 次调用，发出来的那一版 extent 树下段、上段与别的文件的下段节点共 5 个：3 × 5
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &[("exit_extent_tree_nodes", 5)],
+            "extent_roles_rewritten_scan",
+            3,
+            15,
+        );
+    }
+
+    #[test]
+    fn the_checkpoint_cost_accounting_plan_counts_two_calls_per_judgement() {
+        let readings = [
+            ("entry_accounting_rows", 28),
+            ("exit_accounting_tree_keys", 29),
+            ("entry_accounting_tree_keys", 27),
+            ("exit_accounting_tree_nodes", 3),
+            ("entry_accounting_tree_nodes", 2),
+        ];
+        // 两次 ckpt（4 次调用）：每次 28 行 + 29 把 key + 规划 (27 + 29 + 2 × 3 + 2) = 121，共 2 × 121
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &readings,
+            "checkpoint_cost_accounting_tree_plan",
+            4,
+            242,
+        );
+        let odd = entry_and_exit_text(
+            "overwrite",
+            2,
+            &[],
+            &readings,
+            "checkpoint_cost_accounting_tree_plan",
+            5,
+            242,
+        );
         assert_eq!(
-            unread, 1,
-            "读不到 cluster_segments：记读不到，不拿 0 比 {unread_scale}"
+            cells_and_disagreements_of(&odd, "checkpoint_cost_accounting_tree_plan"),
+            (0, 0),
+            "调用次数是奇数：有一次规划没走到，式子不成立，记读不到，不按一半算"
         );
+    }
+
+    #[test]
+    fn the_allocation_record_tree_node_set_takes_two_steps_per_node_of_the_previous_tree() {
+        // 1 次调用，上一版分配记录树 7 个节点：1 × 2 × 7
+        assert_the_row_reconciles_exactly(
+            "unlink_intent",
+            2,
+            &[],
+            &[("entry_allocation_record_tree_nodes", 7)],
+            "allocation_record_tree_node_set",
+            1,
+            14,
+        );
+        let twice = entry_and_exit_text(
+            "unlink_intent",
+            2,
+            &[],
+            &[
+                ("entry_allocation_record_tree_nodes", 7),
+                ("entry_allocation_record_tree_nodes", 7),
+            ],
+            "allocation_record_tree_node_set",
+            1,
+            14,
+        );
+        assert_eq!(
+            cells_and_disagreements_of(&twice, "allocation_record_tree_node_set"),
+            (0, 0),
+            "一次发布读到两条入口读数：不知道是哪一次的，记读不到"
+        );
+    }
+
+    #[test]
+    fn the_watermark_steps_walk_the_rows_twice_and_compare_the_sorted_steps_once_each() {
+        let readings = |steps_rows: u64| {
+            [
+                ("entry_accounting_rows", 28),
+                ("entry_watermark_rows_before_its_txg", steps_rows),
+            ]
+        };
+        // 3 次调用：2 × 28 行 + 13 条台阶行排好序的输入比 12 次，3 × 68
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &readings(13),
+            "inode_number_watermark_steps",
+            3,
+            204,
+        );
+        // 一条台阶行都没有：排序不比，3 × 56（不按 0 − 1 下溢）
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &readings(0),
+            "inode_number_watermark_steps",
+            3,
+            168,
+        );
+    }
+
+    #[test]
+    fn the_deadlist_changes_build_the_file_index_only_on_the_extra_call() {
+        let readings = [
+            ("entry_deadlist_entries", 1),
+            ("entry_kept_mapping_entries", 2),
+            ("entry_mapped_units", 37),
+            ("entry_files_other_than_the_first", 12),
+        ];
+        // 2 轮、6 次调用（每轮多一次：按号的文件索引）：2 × (1 + 2 + 37 + 12)
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &readings,
+            "deadlist_changes_indexes",
+            6,
+            104,
+        );
+        // 2 轮、4 次调用（不建文件索引）：2 × (1 + 2 + 37)
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &readings,
+            "deadlist_changes_indexes",
+            4,
+            80,
+        );
+    }
+
+    /// s20 那一格的读数：三棵码 2 树入口、出口各两样，deadlist 树出口 key 数由调用方给。
+    fn multi_level_readings(deadlist_keys_after: u64) -> Vec<(&'static str, u64)> {
+        vec![
+            ("exit_allocation_record_tree_nodes", 17),
+            ("exit_accounting_tree_keys", 28),
+            ("entry_accounting_tree_keys", 28),
+            ("exit_accounting_tree_nodes", 1),
+            ("entry_accounting_tree_nodes", 1),
+            ("exit_deadlist_tree_keys", deadlist_keys_after),
+            ("entry_deadlist_tree_keys", 3),
+            ("exit_deadlist_tree_nodes", 1),
+            ("entry_deadlist_tree_nodes", 2),
+            ("exit_central_mapping_tree_keys", 35),
+            ("entry_central_mapping_tree_keys", 34),
+            ("exit_central_mapping_tree_nodes", 1),
+            ("entry_central_mapping_tree_nodes", 1),
+        ]
+    }
+
+    #[test]
+    fn the_multi_level_planning_sums_the_three_code_two_trees_in_every_round() {
+        // 每轮：记账 28 + (28 + 28 + 2 × 1 + 1) = 87；deadlist 删到零根只走上一版 2 个节点 = 0 + 2；
+        // 映射 35 + (34 + 35 + 2 × 1 + 1) = 107；2 轮 × 196
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[17, 17],
+            &multi_level_readings(0),
+            "multi_level_tree_planning",
+            6,
+            392,
+        );
+        // deadlist 这一版还有 4 把 key：4 + (3 + 4 + 2 × 1 + 2) = 15；2 轮 × (87 + 15 + 107)
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[17, 17],
+            &multi_level_readings(4),
+            "multi_level_tree_planning",
+            6,
+            418,
+        );
+        let moved = entry_and_exit_text(
+            "overwrite",
+            2,
+            &[16, 17],
+            &multi_level_readings(0),
+            "multi_level_tree_planning",
+            6,
+            392,
+        );
+        assert_eq!(
+            cells_and_disagreements_of(&moved, "multi_level_tree_planning"),
+            (0, 0),
+            "第一轮的分配记录树少一个节点：那一轮的映射单元不是出口那一份，记读不到"
+        );
+    }
+
+    #[test]
+    fn the_container_trees_put_out_every_container_and_node_in_every_round() {
+        // 3 轮，三棵容器树发出来共 14 片容器与节点：3 × 14
+        assert_the_row_reconciles_exactly(
+            "unlink_intent",
+            3,
+            &[],
+            &[("exit_container_tree_units", 14)],
+            "mapped_units_of_container_trees",
+            9,
+            42,
+        );
+    }
+
+    #[test]
+    fn the_moved_entries_tail_filter_looks_at_every_node_of_the_previous_mapping_tree() {
+        // 2 次调用，上一版中央映射树 4 个节点：2 × 4（不是 key 数 9）
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &[
+                ("entry_central_mapping_tree_nodes", 4),
+                ("entry_central_mapping_tree_keys", 9),
+            ],
+            "moved_entries_path_tail_filter",
+            2,
+            8,
+        );
+    }
+
+    #[test]
+    fn the_release_judgement_builds_its_indexes_by_the_number_of_extra_calls() {
+        let readings = [
+            ("entry_deadlist_entries", 1),
+            ("exit_deadlist_entries", 3),
+            ("entry_mapped_units", 37),
+            ("entry_units", 39),
+            ("entry_files_other_than_the_first", 12),
+        ];
+        // 2 轮、10 次调用（每轮留存索引一次加三份索引）：2 × (2 + 37 + 39 + 12)
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &readings,
+            "release_judgement_version_indexes",
+            10,
+            180,
+        );
+        // 2 轮、8 次调用（没查到别的文件的单元，不建文件索引）：2 × (2 + 37 + 39)
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &readings,
+            "release_judgement_version_indexes",
+            8,
+            156,
+        );
+    }
+
+    #[test]
+    fn the_accounting_entries_of_a_publish_are_three_pool_rows_and_six_per_device() {
+        // 2 次调用，两块盘：2 × (3 + 6 × 2)
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &[],
+            "accounting_entries_of_this_publish",
+            2,
+            30,
+        );
+    }
+
+    #[test]
+    fn the_instance_table_chain_walks_every_page_of_the_replaced_chain() {
+        // 2 次调用，被换下的旧链 3 片：2 × 3
+        assert_the_row_reconciles_exactly(
+            "overwrite",
+            2,
+            &[],
+            &[("entry_instance_table_chain_replaced", 3)],
+            "instance_table_chain",
+            2,
+            6,
+        );
+    }
+
+    #[test]
+    fn the_mapped_units_table_indexes_the_previous_version_and_puts_out_this_one_in_every_round() {
+        let readings = [
+            ("exit_allocation_record_tree_nodes", 7),
+            ("entry_mapped_units", 35),
+            ("exit_mapped_units", 37),
+        ];
+        // 2 轮：上一版 35 条建索引 + 这一版 37 条，2 × 72
+        assert_the_row_reconciles_exactly(
+            "unlink_intent",
+            2,
+            &[7, 7],
+            &readings,
+            "mapped_units_whole_table",
+            4,
+            144,
+        );
+    }
+
+    #[test]
+    fn the_files_plan_walks_every_other_file_of_the_previous_version_in_the_last_batch_too() {
+        // s5，修订 4 换吃入口读数：2 次调用，上一版别的文件 1000 个：2 × 1000（最后一批也对）
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &[("entry_files_other_than_the_first", 1000)],
+            "files_other_than_the_first_plan",
+            2,
+            2000,
+        );
+    }
+
+    #[test]
+    fn the_inodes_with_an_entry_take_the_first_file_and_every_other_file_in_the_last_batch_too() {
+        // s7，修订 4 换吃入口读数：2 次调用，每次第一个文件一步加别的文件 1000 步：2 × 1001
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &[("entry_files_other_than_the_first", 1000)],
+            "inodes_with_an_extent_entry_set",
+            2,
+            2002,
+        );
+    }
+
+    #[test]
+    fn the_cluster_segment_sum_walks_every_cluster_segment_once_per_device() {
+        // s14，修订 4 由上界收严成相等：两块盘各调一次，入口聚簇段 7 段：2 × 7（最后一批也对）
+        assert_the_row_reconciles_exactly(
+            "unlink_final",
+            2,
+            &[],
+            &[("entry_cluster_segments", 7)],
+            "cluster_segment_sum",
+            2,
+            14,
+        );
+    }
+
+    /// 修订 4 那十行对账用的一格（base、同一次挂载、第 1 轮）：这一行两道之间那一段的四个读数。
+    fn call_site_text(
+        kind: &str,
+        row: &str,
+        steps: u64,
+        steps_to_the_hit: u64,
+        whole_table_lengths: u64,
+        lengths_to_the_hit: u64,
+    ) -> String {
+        let at = format!("point=base state=same_mount kind={kind} round=1");
+        let mut text = String::from("E203RESULT name=point point=base unit_area_slots=131072 unlinks=10 data_units=10 files=10\n");
+        push_line(&mut text, &format!("name=state {at} devices=2"));
+        push_line(
+            &mut text,
+            &format!("name=row {at} segment=between row={row} calls=2 steps={steps} scale={whole_table_lengths} steps_to_the_hit={steps_to_the_hit} scale_to_the_hit={lengths_to_the_hit}"),
+        );
+        text
+    }
+
+    /// 对账之后这一行那一条 `name=three_two_row` 的「核了几格、不符几格、超上界几格」。
+    fn row_totals_of(text: &str, row: &str) -> (u64, u64, u64) {
+        let mut out = String::new();
+        reconciliation_report(&read_product(text), &mut out);
+        let line = out
+            .lines()
+            .find(|line| line.starts_with(&format!("name=three_two_row row={row} ")))
+            .unwrap_or_else(|| panic!("没有 {row} 那一行：{out}"));
+        let fields = parse_line(&format!("E203RESULT {line}")).expect("这一行是 name= 起头的");
+        let read = |key: &str| number(&fields, key).unwrap_or_else(|| panic!("{key}：{line}"));
+        (
+            read("cells_checked"),
+            read("disagreements"),
+            read("over_the_bound"),
+        )
+    }
+
+    /// 修订 4 的一行：全表扫那一部分等于各次调用处表长之和时核过、差一（多一、少一）时不符；走到命中为止那一部分恰好等于上界时核过、
+    /// 在上界以内核过、超一时不符并记超上界；这一行没有的那一部分读到了表长就不符（读数插错了地方）。
+    fn assert_the_call_site_row_reconciles(
+        kind: &str,
+        row: &str,
+        whole_table_lengths: u64,
+        lengths_to_the_hit: u64,
+    ) {
+        let (whole, bound) = (whole_table_lengths, lengths_to_the_hit);
+        let cell = |steps: u64, to_the_hit: u64, whole_read: u64, bound_read: u64| {
+            row_totals_of(
+                &call_site_text(kind, row, steps, to_the_hit, whole_read, bound_read),
+                row,
+            )
+        };
+        assert_eq!(
+            cell(whole + bound, bound, whole, bound),
+            (1, 0, 0),
+            "{row}：恰好等于表长与上界该核过"
+        );
+        assert_eq!(
+            cell(whole + bound + 1, bound, whole, bound),
+            (1, 1, 0),
+            "{row}：全表扫那一部分多一步该记不符"
+        );
+        if whole > 0 {
+            assert_eq!(
+                cell(whole + bound - 1, bound, whole, bound),
+                (1, 1, 0),
+                "{row}：全表扫那一部分少一步该记不符"
+            );
+        }
+        assert_eq!(
+            cell(whole + bound + 1, bound + 1, whole, bound),
+            (1, 1, 1),
+            "{row}：超上界一步该记不符、记超上界"
+        );
+        if bound > 0 {
+            assert_eq!(
+                cell(whole + bound - 1, bound - 1, whole, bound),
+                (1, 0, 0),
+                "{row}：上界以内该核过"
+            );
+        } else {
+            assert_eq!(
+                cell(whole, 0, whole, 1),
+                (1, 1, 0),
+                "{row}：没有走到命中为止那一部分，读到它的表长该记不符"
+            );
+        }
+        if whole == 0 {
+            assert_eq!(
+                cell(bound + 1, bound, 1, bound),
+                (1, 1, 0),
+                "{row}：没有全表扫那一部分，读到它的表长该记不符"
+            );
+        }
+    }
+
+    #[test]
+    fn the_file_find_walks_at_most_every_other_file_at_each_call() {
+        // s6：2 次调用，每次调用那一刻那一版别的文件 1000 个：上界 2000，全走到命中为止
+        assert_the_call_site_row_reconciles(
+            "unlink_final",
+            "file_other_than_the_first_linear_find",
+            0,
+            2000,
+        );
+    }
+
+    #[test]
+    fn the_extent_upper_plan_walks_every_path_and_previous_node_and_at_most_the_previous_nodes_per_contains(
+    ) {
+        // s8：3 个有条目的号 × (1 + 最高层 2) = 9 步路径，换下那一遍 filter 走上一版 4 个节点：全表扫 13；
+        // 3 次 contains 没被短路，每次那一刻上一版 4 个节点：上界 12
+        assert_the_call_site_row_reconciles("unlink_intent", "extent_upper_segment_plan", 13, 12);
+    }
+
+    #[test]
+    fn the_root_header_find_walks_at_most_every_unit_at_each_call() {
+        // s12：8 次调用，每次那一版 30 个单元：上界 240
+        assert_the_call_site_row_reconciles("overwrite", "root_header_linear_find", 0, 240);
+    }
+
+    #[test]
+    fn the_allocation_record_tree_plan_walks_both_node_sets_in_every_round() {
+        // s16：两轮，规划各走这一轮的 7 个节点与上一版 7 个（28），intersection 首轮 3 + 7、次轮 5 + 7（22）：全表扫 50
+        assert_the_call_site_row_reconciles("unlink_final", "allocation_record_tree_plan", 50, 0);
+    }
+
+    #[test]
+    fn the_release_find_walks_at_most_the_records_of_that_moment() {
+        // s25：两次找，那一刻记录 10 条、12 条：上界 22
+        assert_the_call_site_row_reconciles(
+            "unlink_intent",
+            "allocator_release_linear_find",
+            0,
+            22,
+        );
+    }
+
+    #[test]
+    fn the_user_data_slot_scan_walks_at_most_every_candidate_and_cluster_segment() {
+        // s26：两次调用，每次 8 个候选对 × (1 + 3 个聚簇段)：上界 64
+        assert_the_call_site_row_reconciles("overwrite", "user_data_slot_linear_scan", 0, 64);
+    }
+
+    #[test]
+    fn the_record_intersection_filters_and_retains_every_record_and_finds_within_them() {
+        // s27：filter 那一刻 40 条、retain 那一刻 39 条：全表扫 79；find 那一刻 39 条：上界 39
+        assert_the_call_site_row_reconciles("unlink_final", "record_intersection_filter", 79, 39);
+    }
+
+    #[test]
+    fn the_empty_segment_scan_walks_at_most_every_whole_segment() {
+        // s28：4 次调用，每次那一刻 2048 个整段：上界 8192
+        assert_the_call_site_row_reconciles("unlink_intent", "empty_segment_linear_scan", 0, 8192);
+    }
+
+    #[test]
+    fn the_fallback_slot_scan_walks_at_most_every_candidate_and_slot_of_its_span() {
+        // s29：一次调用，10 个候选 × (1 + 跨度 2 槽)：上界 30
+        assert_the_call_site_row_reconciles("overwrite", "fallback_slot_linear_scan", 0, 30);
+    }
+
+    #[test]
+    fn the_records_of_each_leaf_take_every_record_and_every_leaf_of_the_union() {
+        // s30：四次分叶，那一刻记录 900、905、905、910 条（3620），两次比叶各 5 片与 15 片（20）：全表扫 3640
+        assert_the_call_site_row_reconciles("unlink_final", "records_of_each_leaf", 3640, 0);
     }
 
     #[test]

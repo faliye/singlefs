@@ -1,15 +1,15 @@
-# E171（三oracle合谋测试） 第 2 次重跑现状整表段前置的研究一侧变异表之四（登记 research/prompts/e171-r2-prereg.md 修订 6、修订 7、修订 8）：线程额度在一条任务的进程里分（第一段单元编排给读数单元、小单元、逐行编排各分多少，设进子进程环境里的线程数变量；第二段每个驱动一条线道、它那一槽的线程）、任务里面不再套线程包装（逐行驱动的编译、装置、O3 阳性对照，冻结执行器与 RP2 那一趟装置各把线道或这一趟的线程设进环境）、第一段对照 ②③ 报造不回来与 ④ 没账时的台。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py 带 --unit-test-module test_thread_shares --unit-test-module test_revision_8 跑；原文在研究目录的源文件里合起来恰命中一次。rows_orchestrator.py 里的分法不进这张表：test_revision_8 载入的 rows_orchestrator_revision_8.py 按 sha256 钉它，改它一处整份单测就退 3，红得不是因为那一处。
+# E171（三oracle合谋测试） 第 2 次重跑现状整表段前置的研究一侧变异表之四（登记 research/prompts/e171-r2-prereg.md 修订 6、修订 7、修订 8，修订 11 第 11.7 条换了三条、加了一条）：线程额度在一条任务的进程里分（第一段单元编排给每个单元与逐行编排各取整份额度，设进子进程环境里的线程数变量；第二段每个驱动一条线道、它那一槽的线程）、任务里面不再套线程包装（逐行驱动的编译、装置、O3 阳性对照，冻结执行器与 RP2 那一趟装置各把线道或这一趟的线程设进环境）、第一段对照 ②③ 报造不回来与 ④ 没账时的台。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py 带 --unit-test-module test_thread_shares --unit-test-module test_revision_8 跑；原文在研究目录的源文件里合起来恰命中一次。rows_orchestrator.py 里的分法不进这张表：test_revision_8 载入的 rows_orchestrator_revision_8.py 按 sha256 钉它，改它一处整份单测就退 3，红得不是因为那一处。
 R2P-33 对照 ②③ 造不回来的两格写成 0	    unavailable = "0" if broken("not-reconstructible-as-zero") else NOT_RECONSTRUCTIBLE	    unavailable = "0"
 R2P-34 对照 ② 不按步各写一行	    lines = [f"name=contrast_s15{role} step={step} status={NOT_RECONSTRUCTIBLE} reason={NOT_RECONSTRUCTIBLE_REASON}" for step in S15_STEPS]	    lines = []
 R2P-35 对照照改前要 H15 的导出根	H15_KEYS_FOR_CELLS_AND_ROW_TIMES = ("comparator_product", "product_prefix", "product_suffix", "rows_tag")	H15_KEYS_FOR_CELLS_AND_ROW_TIMES = ("comparator_product", "dumps_root", "product_prefix", "product_suffix", "rows_tag")
 R2P-36 对照里那一趟的账不在时各行记本机	        return "1" if broken("absent-ledger-as-host-1") else LEDGER_ABSENT	        return "1"
 R2P-37 对照不报行产物不在	present={str(os.path.exists(path)).lower()}")	present=true")
 R2P-38 占位核对 H15 导出根没填也要它在	    dumps = h15.get("dumps_root") is None or os.path.isdir(judge.resolve(repo, h15["dumps_root"]))	    dumps = os.path.isdir(judge.resolve(repo, str(h15["dumps_root"])))
-R2P-39 读数单元照登记值分（第 7 步不再是 10 线程）	READING_UNIT_THREADS = 10	READING_UNIT_THREADS = 31
-R2P-40 逐行编排拿整份额度、不去除不尽 5 的余数	    return quota - quota % ROW_LANE_THREADS	    return quota
+R2P-56 单元不取额度、取一个固定数（修订 11 第 11.2 条之前的读数单元 10 线程）	    threads = registered_threads()	    threads = 10
+R2P-57 逐行编排的线程去掉除不尽 5 的余数	    return within_share(budget.threads, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))	    return within_share(budget.threads - budget.threads % 5, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
 R2P-41 逐行编排照修订 8 的旧闸起（与单元同时跑）	    return required <= done and running_count == 0	    return set(ROWS_GATE) <= done
 R2P-42 单元的环境里不设它分到的线程（分到的线程不落到单元里）	stderr=err, env=within_share(unit.threads, environment),	stderr=err, env=environment,
-R2P-43 逐行编排照整份额度起	    return within_share(rows_threads(budget.threads), dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))	    return within_share(budget.threads, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
+R2P-58 逐行编排不照额度起、照一个固定数起	within_share(budget.threads, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))	within_share(10, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
 R2P-44 分到的线程不落到子进程里	else frozen_o3.thread_environment(threads, environment)	else dict(environment)
 R2P-45 余数恰好放得下小单元也不给	sum(item.threads for item in running) + unit.threads <= budget.threads	sum(item.threads for item in running) + unit.threads < budget.threads
 R2P-46 额度不认服务设的 SINGLEFS_THREAD_CAP	        return heavy_threads.default_heavy_threads(os.environ)	        return heavy_threads.default_heavy_threads({})
@@ -22,3 +22,4 @@ R2P-52 逐行驱动的编译不带线道的线程	    environment = frozen_o3.th
 R2P-53 O3 阳性对照不带线道的线程	    environment = frozen_o3.thread_environment(arguments.threads, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))	    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
 R2P-54 冻结执行器不带线道的线程	    environment = thread_environment(workers, dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))	    environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
 R2P-55 RP2 那一趟装置不带给它的线程	env=frozen_o3.thread_environment(threads), capture_output=True	env=dict(os.environ), capture_output=True
+R2P-59 小单元不取额度、取 1 线程（修订 11 第 11.2 条之前的分法）	        Unit("step-9-z1", ("step-7", "step-9"), threads, 60),	        Unit("step-9-z1", ("step-7", "step-9"), 1, 60),

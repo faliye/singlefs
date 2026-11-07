@@ -81,7 +81,7 @@ const CRASH_LARGE_SAMPLED_OLD_BLOCKS: usize = 1_000;
 /// S1 校准趟与各阳性对照的块数；S2 每趟 10⁵ 块（登记 5.5）。
 const CALIBRATION_BLOCK_COUNT: u64 = 1_000;
 const THROUGHPUT_BLOCK_COUNT: u64 = 100_000;
-/// 可行性档（用户 2026-09-27 定，登记修订六）：S1 杀 20 次、S2 写 10⁴ 块，各缩十倍；S1-large 与几何取样点不跑。
+/// 可行性档：S1 杀 20 次、S2 写 10⁴ 块，各缩十倍；S1-large 与几何取样点不跑。
 const FEASIBILITY_KILL_CYCLES: usize = 20;
 const FEASIBILITY_THROUGHPUT_BLOCK_COUNT: u64 = 10_000;
 
@@ -115,7 +115,7 @@ impl RunTier {
         }
     }
 
-    /// V15 等安静的上限（用户 2026-09-27 定，登记修订七）：可行性档不要求计时干净，上限设成 0——
+    /// V15 等安静的上限：可行性档不要求计时干净，上限设成 0——
     /// 机器上一直有别的实验与编译在跑，等满 20 分钟对这一档没有意义，干扰进程照实记进产物就够。
     fn quiet_wait_maximum_seconds(self) -> u64 {
         match self {
@@ -2041,7 +2041,7 @@ struct KillCampaign {
     /// 前缀：[0, confirmed_end) 已确认，[confirmed_end, started_end) 在途。
     confirmed_end: u64,
     started_end: u64,
-    /// 这条臂此前各次写入子进程自报的打开用时（给打开中途的杀点）。
+    /// 这条臂各次写入子进程自报的打开用时（给打开中途的杀点）。
     open_times_microseconds: Vec<u64>,
     /// S1-large：每次杀后怎么挑要核的块（None 是核 [0, started_end + 64) 全部）。
     large_library_sampling: Option<u64>,
@@ -2923,16 +2923,16 @@ fn peer_logical_processors() -> (String, String) {
         .filter(|output| output.status.success())
         .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
         .unwrap_or_default();
-    let address = emitted
+    let host = emitted
         .lines()
         .find_map(|line| line.trim().strip_prefix("PEER_HOST_ADDRESS="))
         .map(|value| value.trim_matches('\'').to_string())
         .unwrap_or_default();
-    if address.is_empty() {
+    if host.is_empty() {
         return ("-".to_string(), "no_peer_host_configured".to_string());
     }
     let answer = Command::new("ssh")
-        .args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", &address, "nproc"])
+        .args(["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", &host, "nproc"])
         .stdin(Stdio::null())
         .output()
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())

@@ -15,7 +15,7 @@
 #   lib_mutation_units.py 文件头「依赖版本行」；落不到包的那一条拒算）；
 #   不带变异名、表名、行号。平常跑复用另要：抓到的，红了的那几条测试此刻的闭包键与记录里的相同；没红、无效的，
 #   这个 bin 全部 #[test] 的闭包键合起来与记录里的相同。测试进程没跑完、抓名字的规则有盲区那两种不记、每趟照跑。原文不落在任何单元上（只在注释里）、闭包里有拒算的那一条拒算：每趟照跑、不写库。
-#   记红、撤绿、下趟现判（用户 2026-10-29 定案，D13 已定项 17）：判失败的那几档（没红，记录里 fails=1）也照键写 records/<键>（mutate_record），
+#   记红、撤绿、下趟现判（D13（验证路线） 已定项 17）：判失败的那几档（没红，记录里 fails=1）也照键写 records/<键>（mutate_record），
 #   盖掉同一把键原有的抓到；下一趟这一条现判、stderr 写「现判：[<名>] 上次判红（<档>）：键相同的判定是红，现判」，不当绿复用，也不进复用哨兵的候选；
 #   现判又判绿（抓到）就盖回绿，再下一趟复用。判法在下面「按条入库」那段 python 里（复用得上的 fails 不是 0 的改成现判），弄坏开关 redreused 下照旧复用。
 #   判定库在 prune-server 里（scripts/mutation/lib_mutation_units.py 的 Library，键前缀 mutation-units[@命名空间]/singlefs-mutate-library/，
@@ -41,7 +41,7 @@
 #   stderr 逐条写现判与拒算的原因。判法（这份脚本判结局的那几支）不进键：改了判法，库里已有的判定照键复用、不会自己作废（这份 bash 的函数闭包在 lib_function_units.py 里拒算）。
 #   mutate.sh --binary-of <源文件>            # 打 cargo 从这份源文件编出的 bin 名（与下面「改的文件与跑的二进制对得上」那道核对同一份读法），在 scripts/experiment-apparatus/ 里跑
 #
-# 在仓根下起：当前目录下有 scripts/experiment-apparatus/Cargo.toml、里面是 [workspace]（仓根自己的 Cargo.toml 也是 [workspace]，改前目录检查照样放过、
+# 在仓根下起：当前目录下有 scripts/experiment-apparatus/Cargo.toml、里面是 [workspace]（仓根自己的 Cargo.toml 也是 [workspace]，只看有没有 [workspace] 的目录检查照样放过、
 #   接着报成「基线就是红的」），就先 cd 进 scripts/experiment-apparatus/，参数里的路径从仓根起的写法改写成从那里起的：
 #   scripts/experiment-apparatus/ 起头的剥掉这一段（./ 起头的同样），scripts/ 下别处的写成 ../<其余>（变异表 scripts/mutation/tables/x.tsv → ../mutation/tables/x.tsv），
 #   别的相对路径接 ../../，绝对路径原样；改写的是 --binary-of 的源文件与平常跑的 <源文件>、<变异表>，bin 名不动。这样 kb 里按仓根写的复跑命令
@@ -55,12 +55,12 @@
 #
 # 锚点失效（.claude/rules/mutation-sampling.md 第七类）：原文在源码里命中 0 次或多次的那一条，派活之前就记成「⚓ [<名>] 锚点失效：原文在 <源文件> 里命中 N 次……」，
 #   不起 cargo、不进按条判定库、不复用；别的条照跑照判、照入库。收尾「计数：」里一栏「锚点失效 A 条」（接在现判、复用、拒算那三栏前面），A 不为 0 整轮退 3（判完别的条之后）。
-#   弄坏开关 MUTATE_BREAK=anchorstopsall 照改前的跑法：一条锚点失效就派活之前退 3、一条变异都不跑。
+#   弄坏开关 MUTATE_BREAK=anchorstopsall 下：一条锚点失效就派活之前退 3、一条变异都不跑。
 #
 #   mutate.sh --selftest    拿一个假的 cargo（PATH 前面放它，直接起）走一遍各种结局（抓到、没红、无效），
 #                           再走一遍并行的几样（进程数不同 stdout 逐字相同、各用各的副本、丢一份结果整道判红、锚点失效那一条记 ⚓ 而别的照跑、整轮退 3），
 #                           工作进程数取每台默认重活线程数（SINGLEFS_THREAD_CAP 顶），取不到退 2、一次 cargo 都不调；
-#                           再走一遍 required-features（挂了的 bin 带上 --features 跑得起来，没挂的 bin 的 cargo 参数与改前逐字相同），
+#                           再走一遍 required-features（挂了的 bin 带上 --features 跑得起来，没挂的 bin 的 cargo 参数不变），
 #                           再走一遍平常跑带只供自证的变量（MUTATE_BREAK：退 2、一次 cargo 都不调），
 #                           再走一遍不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY（临时服务的标记设成空串：退 2、点名它、一次 cargo 都不调），
 #                           基线编不过退 2；--binary-of 显式 [[bin]] 打声明的名字、没写的打文件名去掉 .rs。
@@ -87,7 +87,7 @@
 #                           复用哨兵的状态在每一趟自己的临时根（SHARD_ROOT）里。经统一任务服务交，登记为 selftest（.claude/hooks/selftest-registry.tsv）。
 #
 # bin 在 Cargo.toml 的 [[bin]] 里挂了 required-features 的：每次 cargo test 带 `--features <包名>/<feature>,…`，
-#   feature 从那一节现读，不在命令行上手敲、不写死在这里；没挂的 bin，cargo 的参数与改前逐字相同（`test --release --bin <名>`）。
+#   feature 从那一节现读，不在命令行上手敲、不写死在这里；没挂的 bin，cargo 的参数不带 --features（`test --release --bin <名>`）。
 #   不带的话 cargo 不编这个 bin、直接退 101，基线停在「基线就是红的」，一条变异都没跑。
 #   那几个 feature 的依赖要的环境（E162 的 rocksdb 要 BINDGEN_EXTRA_CLANG_ARGS）由调用方设，原样传给 cargo。
 #
@@ -104,7 +104,7 @@
 # gate-overlap:copy-kept scripts/mutation/crates-mutation-rows.py 开几个工作进程（worker_count_and_head_line）照那边的 worker_count_for 写：各项取最小、至少 1、头一项是每台默认重活线程数；两边的项不同（这里 MUTATE_JOBS 只能压小、第二项是表里的条数、另算每个 cargo 的编译并行度；那边 GATE_MUTATION_WORKERS 顶掉核数那一项、第二项是要现跑的条数），派活一边是 bash 子 shell 按目录认领、一边是 python 进程池，共用的只剩一个取最小值，抽成共用要这里每趟多起一个 python 只为算一个数、两边头一行的字也不同
 # 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/crates-mutation-replay.sh 与它的判法 scripts/mutation/crates-mutation-rows.py）：
 #   每个工作进程一份被测装置的副本（scripts/experiment-apparatus/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
-#   第 1 个用 MUTATE_TARGET_DIR，第 i 个用它后面加 -w<i>；MUTATE_TARGET_DIR 没设时取这一趟自己的 <分片根>/target（用户 2026-10-23 定案「自己用完自己删」，
+#   第 1 个用 MUTATE_TARGET_DIR，第 i 个用它后面加 -w<i>；MUTATE_TARGET_DIR 没设时取这一趟自己的 <分片根>/target（自己用完自己删，
 #   不跨轮复用）：分片根（$TMPDIR 下这一趟建的临时目录）连同各份编译目录在 EXIT 上删，删之前停掉工作进程、核本机没有进程开着里面的文件
 #   （scripts/hosts/run_build_directory.py holders），有就不删、报出进程、退出码改 1。调用方设了的照它、不删。
 #   工作进程数取 min(每台默认重活线程数、表里的条数)，至少 1；每台默认重活线程数照登记取法取（scripts/hosts/heavy-threads.sh 的 heavy_thread_default：
@@ -112,7 +112,7 @@
 #   MUTATE_JOBS 只能压小、不能加大（设成 1 就是原来的串行跑法）。
 #   实际开几个、各项给几个、卡在哪一项、每个 cargo 的编译并行度，打在 stderr 的头一行。
 #   内存不在这里判、不按内存收工作进程数：见下面「上限、限时与卡住」。
-#   每个 cargo 的编译并行度：先用 MUTATE_CARGO_JOBS，其次调用方已经设了的 CARGO_BUILD_JOBS，都没有就取 核数 ÷ 工作进程数（至少 1），免得 N 个 cargo 各按核数开 rustc。
+#   每个 cargo 的编译并行度：先用 MUTATE_CARGO_JOBS，其次调用方已经设了的 CARGO_BUILD_JOBS，都没有就取 每台默认重活线程数 ÷ 工作进程数（至少 1；弄坏开关 workersbyprocessor 下取 核数 ÷ 工作进程数），免得 N 个 cargo 各按核数开 rustc。
 #   每条 cargo test 的测试线程数（基线、每条变异、还原之后那一次）：调用方设了 RUST_TEST_THREADS（非空）原样传、不覆盖；没设的给每次 cargo test 设
 #   RUST_TEST_THREADS=max(1, 线程上限 ÷ 工作进程数)，线程上限与工作进程数那一项取同一个登记值；免得 N 个工作进程的测试二进制各按整机核数起线程。
 #   只设在自己起的那几次 cargo test 的环境里、不 export。stderr 在头一行之后报一行设了几、怎么算的（或照调用方的）。
@@ -133,7 +133,7 @@
 #   基线就是红的（退 2）：stderr 点出红的测试名（libtest 的「test <名字> ... FAILED」行）、打基线输出末尾 15 行，
 #   整份基线输出拷到 ${TMPDIR:-/tmp}/singlefs-mutate-baseline-XXXXXX.log 留着（点出路径，看完自己删），再给单独重现的命令。
 #
-# 上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md SC02，用户定「照字面全删」「照旧交服务，服务加一条 工具里不限时」）：
+# 上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md：工具里不限时，整条照旧交服务）：
 #   每次 cargo test（基线、每条变异、还原之后那一次）直接起，不设内存上限、不限时；cargo 的 stdout 与 stderr 并成一路交判结局（bash -c 'exec "$@" 2>&1' 那一层）。
 #   整条 mutate.sh 交统一任务服务（task-server/），一整条一个任务：内存上限由服务按记录给、撞了放大重排；死循环的变异由服务停整条任务
 #   （用时远超记录而日志又满 10 分钟不涨就停掉、打回）。
@@ -159,35 +159,35 @@
 #   MUTATE_BREAK=unknownoptionaccepted  认不出的选项照旧当第一个位置参数往下走（没有这一道检查的样子）
 #       unknown-option（「认不出的选项 --no-such-option 应当退 2、点名它、一次 cargo 都不调」：当 bin 名往下走，退的不是 2、也点不到「认不出的选项」）
 #       「✗ 自检：认不出的选项」
-#   MUTATE_BREAK=runtargetkept   没设 MUTATE_TARGET_DIR 时跑完不删这一趟的分片根与里面的编译目录（改前的样子：编译目录在 $TMPDIR 下跨轮留着）
+#   MUTATE_BREAK=runtargetkept   没设 MUTATE_TARGET_DIR 时跑完不删这一趟的分片根与里面的编译目录：编译目录在 $TMPDIR 下跨轮留着
 #       own-target（「没设 MUTATE_TARGET_DIR：编译目录应当建在这一趟的分片根里、跑完删了」）
 #   MUTATE_BREAK=countblind      父进程不数派出去与收回来的条数（只读在的那几份）
 #       lost-result（「丢了一份判定时应当退 8」）
 #   MUTATE_BREAK=sharedcopy      所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）；
 #       各工作进程逐条加锁轮流占那一份（run_worker），不真的并发改同一份源码：并发改坏的那几例红不红不定，开关只证挤在一份副本上那一格
 #       parallel（「✗ 自检：MUTATE_JOBS=4 时变异应当落在至少 2 份副本上」，核数 ≥ 4 才判这一条）
-#   MUTATE_BREAK=nofeatures      不读 required-features、cargo test 一律不带 --features（改前的跑法）
+#   MUTATE_BREAK=nofeatures      不读 required-features、cargo test 一律不带 --features
 #       required-features（「挂了 required-features 的 bin 应当每次带」：基线退 101、整轮退 2）
-#   MUTATE_BREAK=honorbreakoutsideselftest  平常跑时也认只供自证的变量，不拒（改前的跑法）；它是关守卫项，只在它是 MUTATE_BREAK 唯一一项时认（guard_off_honored），与别的项同写平常跑照拒并点名它
+#   MUTATE_BREAK=honorbreakoutsideselftest  平常跑时也认只供自证的变量，不拒；它是关守卫项，只在它是 MUTATE_BREAK 唯一一项时认（guard_off_honored），与别的项同写平常跑照拒并点名它
 #       outside-selftest-MUTATE_BREAK 与 outside-selftest-MUTATE_SELFTEST_RECORD_UNREACHABLE 两格（『平常跑时带了只供自证的变量 … 应当退 2』：
 #       自证起这两例的子进程从环境里接着这一项，守卫关了，两个变量都照跑、不拒）
 #       「✗ 自检：平常跑时带了只供自证的变量 MUTATE_BREAK」「✗ 自检：平常跑时带了只供自证的变量 MUTATE_SELFTEST_RECORD_UNREACHABLE」
-#   MUTATE_BREAK=honorbreakoutsideselftest-with-others  关守卫项与别的项同写也照认（改前的样子）；这一项只在自证进程本身里认，自证起的子进程与不带 --selftest 的跑法都不认它
+#   MUTATE_BREAK=honorbreakoutsideselftest-with-others  关守卫项与别的项同写也照认；这一项只在自证进程本身里认，自证起的子进程与不带 --selftest 的跑法都不认它
 #       进程里判关守卫项那一格（『关守卫项与别的项同写：guard_off_honored 应当只认单独一项』：同写的那一次认了）；
 #       outside-selftest-guard-combined 不红（它起的是平常跑的子进程，那边不认这一项）
 #       「✗ 自检：关守卫项与别的项同写：guard_off_honored 应当只认单独一项 honorbreakoutsideselftest」
-#   MUTATE_BREAK=baselinelogdropped  基线输出丢进 /dev/null，红了只报一句「基线就是红的」（改前的跑法）
+#   MUTATE_BREAK=baselinelogdropped  基线输出丢进 /dev/null，红了只报一句「基线就是红的」
 #       baseline-red（「基线就是红的时应当退 2、点出红的测试 tests::adds」）
 #       「✗ 自检：基线里 should panic 的用例红了」
-#   MUTATE_BREAK=bareusage  参数不够三个时不先判，set -u 报 unbound variable 退 1（改前的样子）
+#   MUTATE_BREAK=bareusage  参数不够三个时不先判，set -u 报 unbound variable 退 1
 #       usage（「参数不够三个时应当退 2、打用法与一条例子」）
-#   MUTATE_BREAK=ownnameparse  红了哪几个回到自己的 sed / awk（`test ` 与 ` ... FAILED` 之间整段算名字，改前的取法），不经 lib_libtest_result_lines.py
+#   MUTATE_BREAK=ownnameparse  红了哪几个回到自己的 sed / awk（`test ` 与 ` ... FAILED` 之间整段算名字），不经 lib_libtest_result_lines.py
 #       should-panic（「#[should_panic] 的用例红了应当记「✅ [抓到] 红：tests::answer_panics」……」：名字带上了「 - should panic」）、
 #       baseline-red-should-panic（「基线里 should panic 的用例红了……」）
 #   LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  原样传给 lib_libtest_result_lines.py（它文件头）：「 - should panic」当成名字的一部分
 #       should-panic（「✗ 自检：#[should_panic] 的用例红了应当记「✅ [抓到] 红：tests::answer_panics」」）、
 #       baseline-red-should-panic（「✗ 自检：基线里 should panic 的用例红了」）
-#   MUTATE_BREAK=libraryunread  不读按条判定库（改前的样子：每趟整张现判）
+#   MUTATE_BREAK=libraryunread  不读按条判定库：每趟整张现判
 #       unit-library（「同一条第二趟应当复用……」）、
 #       unit-library-callee（「改了被改坏函数调到的函数之后那一条应当现判……stderr 写库里没有这把键」：现判的原因写成了不读库）、
 #       reuse-three-questions（「复用三问 reuse-three-questions」：①②③ 全红）、reuse-sentinel（「复用哨兵 reuse-sentinel」：照常那一趟就红「复用失灵」退 1）；
@@ -198,19 +198,19 @@
 #       「✗ 自检：记红撤绿：同一把键经哨兵强制现判一条」
 #       「✗ 自检：记红撤绿：库里同一把键最近一次是没红，下一趟应当现判」
 #       「✗ 自检：记红撤绿：现判又判抓到之后再下一趟应当复用」
-#   MUTATE_BREAK=libraryoverridehonored  不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY 也照旧认、拿它当库目录（改前的样子）
+#   MUTATE_BREAK=libraryoverridehonored  不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY 也照旧认、拿它当库目录
 #       library-directory-outside-service（「不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY 应当退 2……」：照常跑完、调了 cargo）
 #       「✗ 自检：不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY」
-#   MUTATE_BREAK=libraryrootfallback  取不到 git common-dir 时照常跑完，判定写进开关分支里写死的键前缀 mutation-units/mutate-library/（改前的样子：退到另一个键前缀）
+#   MUTATE_BREAK=libraryrootfallback  取不到 git common-dir 时照常跑完，判定写进开关分支里写死的键前缀 mutation-units/mutate-library/：退到另一个键前缀
 #       library-common-directory-unavailable（「取不到 git common-dir 时应当退 2……」：退到那个键前缀、照常跑完、调了 cargo）
 #       「✗ 自检：取不到 git common-dir 时」
-#   MUTATE_BREAK=recordunavailableignored  每条判完写库那一步客户端退 75（prune-server 不可用）当「没写进、下一趟照跑」放过（改前的样子），整轮照退 0
+#   MUTATE_BREAK=recordunavailableignored  每条判完写库那一步客户端退 75（prune-server 不可用）当「没写进、下一趟照跑」放过，整轮照退 0
 #       record-unavailable（「判完写库那一步 prune-server 不可用：应当整轮退 75……」）
-#   MUTATE_BREAK=recordclienterrorignored  每条判完写库那一步客户端退 3（客户端别的错）当「没写进、下一趟照跑」放过（改前的样子），整轮照退 0
+#   MUTATE_BREAK=recordclienterrorignored  每条判完写库那一步客户端退 3（客户端别的错）当「没写进、下一趟照跑」放过，整轮照退 0
 #       record-client-error（「判完写库那一步客户端退 3：应当整轮退 2……」）
-#   MUTATE_BREAK=planclienterrorfallback  查库那一段客户端退 3（客户端别的错）照改前退回「每条现判、不写库」，照起 cargo
+#   MUTATE_BREAK=planclienterrorfallback  查库那一段客户端退 3（客户端别的错）退回「每条现判、不写库」，照起 cargo
 #       plan-client-error（「查库那一段客户端退 3：应当退 2……」）
-#   MUTATE_BREAK=redreused  判红的（记录里 fails=1：没红、编不过）照旧当绿复用、进复用哨兵的候选（改前的样子：只要档在可复用的几种里就复用）
+#   MUTATE_BREAK=redreused  判红的（记录里 fails=1：没红、编不过）照旧当绿复用、进复用哨兵的候选：只要档在可复用的几种里就复用
 #       unit-library-red（「记红撤绿：库里同一把键最近一次是没红，下一趟应当现判……」：下一趟复用、cargo 一次都不起；同一格下一问「记红撤绿：现判又判抓到之后再下一趟应当复用……」跟着红）
 #   MUTATE_BREAK=calleesignored  键里包住原文的那个函数只取它自己的指纹、不收它调到的单元（依赖版本行也只看它自己）
 #       unit-library-callee（「改了被改坏函数调到的函数之后那一条应当现判……」：helper 改了照样复用、cargo 一次都不起）、
@@ -218,22 +218,22 @@
 #       unit-library-dependency（「依赖版本行：头一趟库里那一条应当逐字只记 extdep……」：adds 自己不点 extdep，记成空的）
 #       「✗ 自检：依赖版本行：改了点名的 extdep 的传递依赖 inner 的版本之后那一条」
 #       「✗ 自检：依赖版本行：helper 改点 alias_dep:: 之后库里那一条」
-#   MUTATE_BREAK=dependenciesbycrate  依赖版本行按整包收：单元所在 crate 清单里的外部依赖不看点没点名全收（改前的收法）
+#   MUTATE_BREAK=dependenciesbycrate  依赖版本行按整包收：单元所在 crate 清单里的外部依赖不看点没点名全收
 #       unit-library-dependency（「依赖版本行：头一趟库里那一条应当逐字只记 extdep……」多出 aliased、other、「……改了闭包没点名的外部包 other 的版本之后那一条应当照样复用……」现判了、
 #       「……helper 改点 alias_dep:: 之后……逐字只记 aliased 一行」多出 extdep、inner、other）
-#   MUTATE_BREAK=includesunlinked  副本根下不链 lib_repository_copy.py 闭包里 scripts/experiment-apparatus/ 之外的仓内文件，也不判闭包算不算得成（改前的样子）
+#   MUTATE_BREAK=includesunlinked  副本根下不链 lib_repository_copy.py 闭包里 scripts/experiment-apparatus/ 之外的仓内文件，也不判闭包算不算得成
 #       include-outside（「装置 include_str 读仓根下别处的文件……应当链上、基线编得过」：基线编不过、退 2）、
 #       include-unrecognized（「认不出的 include_str! 写法……应当退 2、逐行点名、一次 cargo 都不起」：不判就起了 cargo）
 #   REUSE_CHECKS_BREAK=rejudged-sentinel-passes（共用库 scripts/gate/lib_reuse_checks.py 的开关，原样传下去）  哨兵被现判不红
 #       reuse-sentinel（「复用哨兵 reuse-sentinel」：不读库那一趟退 0）
-#   MUTATE_BREAK=no-cap-lints  起 cargo 时不加 --cap-lints warn，RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样（改前的跑法：装置的 deny 警告让留死代码的替换文编不过）
+#   MUTATE_BREAK=no-cap-lints  起 cargo 时不加 --cap-lints warn，RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样：装置的 deny 警告让留死代码的替换文编不过
 #       cap-lints、cap-lints-existing、encoded-empty、encoded-other（「deny 警告：平常跑……留死代码那一条应当判抓到、整轮退 0」：记成『⏭  [留死代码]』无效），
 #       四例都另红「deny 警告：……每个 cargo 收到的 RUSTFLAGS 应当逐字是」与「……stderr 应当报」，encoded-empty、encoded-other 两例再红「……收到的 CARGO_ENCODED_RUSTFLAGS 应当逐字是」
-#   MUTATE_BREAK=anchorstopsall  锚点失效一条就派活之前退 3、一条变异都不跑（改前的跑法）
+#   MUTATE_BREAK=anchorstopsall  锚点失效一条就派活之前退 3、一条变异都不跑
 #       stale-anchor（「锚点失效的那一条应当记「⚓ 锚点失效」……」：退 3、一次 cargo 都没调、stdout 是空的）
-#   MUTATE_BREAK=rocksdb-entry-unchecked  bin 编得到 librocksdb-sys 也不在起 cargo 之前调 scripts/hosts/rocksdb-prebuilt.py entry（改前的跑法）
+#   MUTATE_BREAK=rocksdb-entry-unchecked  bin 编得到 librocksdb-sys 也不在起 cargo 之前调 scripts/hosts/rocksdb-prebuilt.py entry
 #       rocksdb-entry-refused（「bin 的 required-features 点到 rocksdb、进程环境里没有预编库的取值，应当在起 cargo 之前退 2……」：假 cargo 照起了）
-#   MUTATE_BREAK=rootnotentered  不认仓根（改前的样子：仓根的 Cargo.toml 也是 [workspace]，目录检查照样放过，参数照仓根的写法原样用）
+#   MUTATE_BREAK=rootnotentered  不认仓根：仓根的 Cargo.toml 也是 [workspace]，目录检查照样放过，参数照仓根的写法原样用
 #       from-root-kb-form、from-root-other-form（「在仓根下起……」：没有『在仓根下起的』那一行，源文件没剥掉 scripts/experiment-apparatus/，
 #       失败行接的 stderr 头一行就是 bin 名对不上那一句：「实际退 6……mutate: 源文件 scripts/experiment-apparatus/bench/src/bin/fake_bench.rs 在 Cargo.toml 里声明的二进制是 'fake-bench'」；
 #       退 6 报的复跑命令是没改写的参数）、
@@ -241,12 +241,12 @@
 #       「✗ 自检：在仓根下起（kb 的写法、bin 名写错）」
 #       「✗ 自检：在仓根下起（./ 起头的源文件、scripts/ 之外的变异表）」
 #       「✗ 自检：在仓根下起 --binary-of」
-#   MUTATE_BREAK=workersbyprocessor  工作进程数头一项照改前取核数一半、至多 16，不取每台默认重活线程数、取不到也不拒
+#   MUTATE_BREAK=workersbyprocessor  工作进程数头一项取核数一半、至多 16，不取每台默认重活线程数、取不到也不拒
 #       parallel（头一行报的头一项叫核数，不叫每台默认重活线程数）、workers-registry（SINGLEFS_THREAD_CAP=2、MUTATE_JOBS 没设，开的个数是核数那一项给的）、workers-unregistered（SINGLEFS_THREAD_CAP=abc 取不到每台默认重活线程数，照跑了、没退 2）
 #       「✗ 自检：MUTATE_JOBS=4、三条的表，stderr 头一行应当报」
 #       「✗ 自检：工作进程数：SINGLEFS_THREAD_CAP=2」
 #       「✗ 自检：工作进程数：取不到每台默认重活线程数」
-#   MUTATE_BREAK=testthreadsunset  不给 cargo test 设 RUST_TEST_THREADS（改前的跑法：每条 cargo test 照 libtest 默认按整机核数起线程）
+#   MUTATE_BREAK=testthreadsunset  不给 cargo test 设 RUST_TEST_THREADS：每条 cargo test 照 libtest 默认按整机核数起线程
 #       test-threads（假 cargo 收到的是调用方那个空串）、test-threads-floor（同）、test-threads-caller（7 照样传到，但 stderr 没有「不覆盖」那一行）
 #       「✗ 自检：测试线程：调用方没设 RUST_TEST_THREADS」
 #       「✗ 自检：测试线程：线程上限 1」
@@ -263,13 +263,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"
-MAXIMUM_WORKERS_BY_PROCESSOR=16  # 只在弄坏开关 workersbyprocessor 下用：照改前取核数一半、至多这么多个
+MAXIMUM_WORKERS_BY_PROCESSOR=16  # 只在弄坏开关 workersbyprocessor 下用：取核数一半、至多这么多个
 COLLECTION_POLL_SECONDS=0.5      # 父进程隔这么久看一次哪几条判完了，按表序接着往 stdout 打
 
 is_broken() { [[ ",$BROKEN_JUDGEMENT," == *",$1,"* ]]; }
 
 # 关守卫项 honorbreakoutsideselftest（文件头开关表）整值比：只在它是 MUTATE_BREAK 唯一一项时认；与别的项同写，平常跑照拒并点名它。
-# 弄坏开关 honorbreakoutsideselftest-with-others（改前的样子：同写也照认）只在自证进程本身里认（in_selftest_process，run_selftest 里设），
+# 弄坏开关 honorbreakoutsideselftest-with-others（同写也照认）只在自证进程本身里认（in_selftest_process，run_selftest 里设），
 # 平常跑与自证起的子进程都不认它：平常跑同写着它照拒，它自己不成借道
 GUARD_OFF_ITEM=honorbreakoutsideselftest
 in_selftest_process=0
@@ -410,7 +410,7 @@ FAKE_CARGO
     checked=$((checked + 1))
     grep -qF -- "$wanted" <<<"$output" || fail "三种结局的表输出里应当有「$wanted」，实际：$output"
   done
-  # 没挂 required-features 的 bin、正常的变异：照旧判抓到、整轮退 0，每次 cargo 的参数与改前逐字相同（这一例自己的调用记录）
+  # 没挂 required-features 的 bin、正常的变异：照旧判抓到、整轮退 0，每次 cargo 的参数不带 --features（这一例自己的调用记录）
   # own-target：没设 MUTATE_TARGET_DIR（文件头「并行」）：假 cargo 收到的编译目录在这一趟的分片根（这一例自己的 TMPDIR 下 singlefs-mutate-*）里，跑完连同分片根删了
   prepare_case own-target
   mkdir -p "$scratch/own-target-tmp"
@@ -463,7 +463,7 @@ FAKE_CARGO
   [[ "$(head -1 "$scratch/parallel.stderr")" == *"这一轮开 $expected_workers 个工作进程"*"每台默认重活线程数 $registered_threads"* ]] \
     || fail "MUTATE_JOBS=4、三条的表，stderr 头一行应当报「这一轮开 $expected_workers 个工作进程」、头一项是「每台默认重活线程数 $registered_threads」，实际：$(head -1 "$scratch/parallel.stderr")"
   # 工作进程数取每台默认重活线程数（文件头「并行」）：SINGLEFS_THREAD_CAP=2、MUTATE_JOBS 没设、三条的表开 2 个；取不到（SINGLEFS_THREAD_CAP=abc）退 2、一次 cargo 都不调。
-  # 弄坏开关 workersbyprocessor（改前取核数一半至多 16）下这两格判错
+  # 弄坏开关 workersbyprocessor（取核数一半至多 16）下这两格判错
   prepare_case workers-registry
   run_case workers-registry ../mutation/tables/three-caught.tsv MUTATE_JOBS= SINGLEFS_THREAD_CAP=2
   checked=$((checked + 1))
@@ -529,7 +529,7 @@ FAKE_CARGO
   fi
 
   # 锚点失效按条判（文件头「锚点失效」）：两条的表，原文命中 0 次的那一条记「⚓ 锚点失效」、不入判定库，另一条照跑抓到；
-  # 收尾「计数：」报锚点失效 1 条、整轮退 3。弄坏开关 anchorstopsall（改前的跑法：派活之前就退 3、一次 cargo 都不调）下这一格判错
+  # 收尾「计数：」报锚点失效 1 条、整轮退 3。弄坏开关 anchorstopsall（派活之前就退 3、一次 cargo 都不调）下这一格判错
   library_record_names() { # <按条判定库的目录>：库里 records/ 底下的名字，一行一个（判定库在临时 prune-server 里，库目录只当名字，本地没有文件）
     python3 - "$(dirname "$SELF_PATH")/lib_mutation_units.py" "$1" <<'PY'
 import importlib.util, sys
@@ -556,7 +556,7 @@ PY
 
   # ── required-features ──
   # 挂了两个 feature 的 bin：从清单现读、带「包名/feature」跑，基线绿、变异照常判抓到；
-  # 不读（MUTATE_BREAK=nofeatures，改前的跑法）假 cargo 照真 cargo 退 101，停在基线、退 2
+  # 不读（MUTATE_BREAK=nofeatures）假 cargo 照真 cargo 退 101，停在基线、退 2
   prepare_case required-features PASS 'required-features = ["fake-feature", "fake-other"]'
   run_case required-features ../mutation/tables/caught-only.tsv
   checked=$((checked + 1))
@@ -1204,7 +1204,7 @@ if ((!running_under_selftest)) && ! guard_off_honored "${MUTATE_BREAK:-}"; then
   fi
 fi
 # 库目录只由被判那棵仓定（文件头「按条入库」）：MUTATE_LIBRARY_DIRECTORY 只在临时 prune-server 底下认，不在就拒，一次 cargo 都不调；
-#   弄坏开关 libraryoverridehonored 下照旧认（改前的样子）
+#   弄坏开关 libraryoverridehonored 下认
 if [[ -n "${MUTATE_LIBRARY_DIRECTORY:-}" ]] && ! is_broken libraryoverridehonored && ! service_problem="$(temporary_service_problem)"; then
   echo "mutate: 不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY（「$MUTATE_LIBRARY_DIRECTORY」；${service_problem%%$'\t'*}）：库目录只由被判那棵仓定，拒跑，一条变异都没跑" >&2
   echo "        → 怎么办：unset MUTATE_LIBRARY_DIRECTORY 再跑（判定记进被判那棵仓的 git common-dir 底下那一份，键里不带哪棵仓）；自证与样本要另一份库：${service_problem#*$'\t'}" >&2
@@ -1228,7 +1228,7 @@ while (($#)); do
 done
 # 在仓根下起的（文件头「在仓根下起」）：当前目录下有 scripts/experiment-apparatus/Cargo.toml、里面是 [workspace]，就 cd 进去，
 # 参数里的路径（--binary-of 的源文件；平常跑的 <源文件> 与 <变异表>）从仓根起的写法改写成从 scripts/experiment-apparatus/ 起；bin 名不动。
-# 弄坏开关 rootnotentered：不认仓根（改前的样子，仓根的 Cargo.toml 也有 [workspace]，下面的目录检查照样放过）
+# 弄坏开关 rootnotentered：不认仓根（仓根的 Cargo.toml 也有 [workspace]，下面的目录检查照样放过）
 ROOT_INVOCATION_NOTE=""
 # relative_to_apparatus <从仓根起的路径>：打从 scripts/experiment-apparatus/ 起的写法（绝对路径原样；scripts/experiment-apparatus/ 起头的剥掉这一段，
 # scripts/ 下别处的写成 ../<其余>，别的接 ../../）
@@ -1258,7 +1258,7 @@ print_root_invocation_note() { [[ -z "$ROOT_INVOCATION_NOTE" ]] || echo "$ROOT_I
 
 # ⚠️ **先确认「改的文件」与「跑的二进制」对得上。**
 # 不确认的话，变异会改 X 而跑 Y 的测试：一条真能被抓的破坏被报成盲区
-# （2026-08-29 实测踩过：`e7_index.rs` 配上 crate 主二进制的名字，
+# （例：`e7_index.rs` 配上 crate 主二进制的名字，
 # 三条变异全被误报成盲区，换对名字后三条全被抓）。
 # 反方向更坏：Y 的测试恰好因别的原因红了，会被记成「变异被抓」。
 # 清单：从源文件所在目录一层层往上找最近的 Cargo.toml（实验工作区根是 scripts/experiment-apparatus，src/bin 布局与自带清单的子 crate 同样认得）。
@@ -1392,7 +1392,7 @@ if ! is_broken rocksdb-entry-unchecked && bin_builds_rocksdb; then
   fi
 fi
 
-# ⚠️ **变异只改副本，不碰工作区里的源文件**（2026-09-12 改）。此前是就地改 $SRC 再还原：一轮变异要几分钟，
+# ⚠️ **变异只改副本，不碰工作区里的源文件**：就地改 $SRC 再还原的话，一轮变异要几分钟，
 # 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（research-build-and-replay 阶段会编译并跑实验装置的全部单测）
 # 就编到被改坏的源码，红得莫名其妙、还可能当成自己改坏的；此刻有人整份提交这个文件，提交进去的就是变异。
 # ⇒ 把 scripts/experiment-apparatus/ 整个工作区（不带 target）拷到临时目录，include_str! 读的 research/results/ 与别的仓内文件（.claude/heavy-thread-default 这类）
@@ -1411,7 +1411,7 @@ fi
 REQUESTED_CARGO_JOBS="${MUTATE_CARGO_JOBS:-}"
 if [[ -n "$REQUESTED_CARGO_JOBS" && ! "$REQUESTED_CARGO_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "mutate: MUTATE_CARGO_JOBS 写成了「$REQUESTED_CARGO_JOBS」，要写正整数，一条变异都没跑" >&2
-  echo "        → 怎么办：写成正整数再跑；不设就用调用方的 CARGO_BUILD_JOBS，那也没设就取 核数 ÷ 工作进程数" >&2
+  echo "        → 怎么办：写成正整数再跑；不设就用调用方的 CARGO_BUILD_JOBS，那也没设就取 每台默认重活线程数 ÷ 工作进程数" >&2
   exit 2
 fi
 
@@ -1433,10 +1433,10 @@ if ! is_broken workersbyprocessor && ! HOST_HEAVY_THREADS="$(heavy_thread_defaul
   exit 2
 fi
 worker_count_and_head_line() {
-  local processor_count by_processor smallest binding="" floor_note="" bound_index
+  local processor_count by_processor thread_budget smallest binding="" floor_note="" bound_index
   local -a bound_names=() bound_counts=() bound_texts=()
-  processor_count="$(nproc 2>/dev/null || echo 2)"
-  if is_broken workersbyprocessor; then   # 弄坏开关（文件头）：照改前取核数一半、至多 16
+  if is_broken workersbyprocessor; then   # 弄坏开关（文件头）：取核数一半、至多 16
+    processor_count="$(nproc 2>/dev/null || echo 2)"
     by_processor=$((processor_count / 2))
     ((by_processor > MAXIMUM_WORKERS_BY_PROCESSOR)) && by_processor=$MAXIMUM_WORKERS_BY_PROCESSOR
     ((by_processor < 1)) && by_processor=1
@@ -1462,7 +1462,8 @@ worker_count_and_head_line() {
   elif [[ -n "${CARGO_BUILD_JOBS:-}" ]]; then
     CARGO_JOBS_PER_WORKER="$CARGO_BUILD_JOBS"; CARGO_JOBS_SOURCE="调用方的 CARGO_BUILD_JOBS"
   else
-    CARGO_JOBS_PER_WORKER=$((processor_count / WORKER_COUNT < 1 ? 1 : processor_count / WORKER_COUNT)); CARGO_JOBS_SOURCE="核数 ÷ 工作进程数"
+    if is_broken workersbyprocessor; then thread_budget=$processor_count; else thread_budget=$HOST_HEAVY_THREADS; fi   # 弄坏开关下按核数
+    CARGO_JOBS_PER_WORKER=$((thread_budget / WORKER_COUNT < 1 ? 1 : thread_budget / WORKER_COUNT)); CARGO_JOBS_SOURCE="每台默认重活线程数 ÷ 工作进程数"
   fi
   local joined_texts
   joined_texts="$(printf '%s；' "${bound_texts[@]}")"
@@ -1478,7 +1479,7 @@ print_root_invocation_note
 # 线程上限是工作进程数那一项的同一个登记值（HOST_HEAVY_THREADS；弄坏开关 workersbyprocessor 下现取，取不到退 2）。
 # 只设在 run_cargo_test 起的那几次 cargo test 的环境里（TEST_THREADS_ENVIRONMENT），不 export
 TEST_THREADS_ENVIRONMENT=()
-if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设（改前的跑法）
+if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设
   if [[ -n "${RUST_TEST_THREADS:-}" ]] && ! is_broken overridecallertestthreads; then   # 弄坏开关 overridecallertestthreads：调用方设了的也换成算出来的
     echo "mutate: 每条 cargo test 照调用方设的 RUST_TEST_THREADS=$RUST_TEST_THREADS 跑（不覆盖）" >&2
   else
@@ -1544,7 +1545,7 @@ fi
 # --workspace scripts/experiment-apparatus，连测试代码一起扫——变异要跑测试），闭包里副本根下还没有的仓根条目（编译期 include_str! / include_bytes! / #[path]
 # 读的、运行期读的、它们 source 与起的、path 依赖指到的）逐个放一个符号链接指回仓里那一份（只读，变异不改它；research/results 上面已经链了，经 --present 点名）。
 # 闭包算不成的（认不出的 include 写法、绝对路径、落到仓根之外的、仓里没有那份编译期读的文件、path 依赖指到仓根之外）退 2 逐处点名，一条变异都不跑。
-# 弄坏开关 includesunlinked：不链（改前的样子，副本里读不到就编不过）
+# 弄坏开关 includesunlinked：不链（副本里读不到就编不过）
 REPOSITORY_COPY_LIBRARY="$(dirname "$SELF_PATH")/../hosts/lib_repository_copy.py"
 if ! is_broken includesunlinked && ! python3 "$REPOSITORY_COPY_LIBRARY" link-into "$(copy_root_of 1)" --root "$REPOSITORY_OF_WORKSPACE" \
     --workspace scripts/experiment-apparatus --present research/results --test-inputs; then
@@ -1585,7 +1586,7 @@ ANCHOR_BROKEN_INDEXES="$SHARD_ROOT/anchor-broken.indexes"
 ANCHOR_BROKEN_COUNT=0
 for ((row_index = 0; row_index < mutation_count; row_index++)); do
   if ! anchor_hits="$(write_mutated_source "${mutation_originals[row_index]}" "${mutation_replacements[row_index]}" "" 2>&1)"; then
-    if is_broken anchorstopsall; then   # 弄坏开关：改前的跑法，一条锚点失效整轮退 3、一条变异都不跑
+    if is_broken anchorstopsall; then   # 弄坏开关：一条锚点失效整轮退 3、一条变异都不跑
       echo "mutate: [${mutation_names[row_index]}] 替换没命中，证明作废（锚点在派活之前逐条核，这一轮一条变异都没跑）" >&2
       echo "        → 怎么办：把变异表里这一条的原文改到源码今天的写法、让它恰好命中一次，再整张表重跑" >&2
       exit 3
@@ -1612,7 +1613,7 @@ for ((worker_index = 2; worker_index <= WORKER_COUNT; worker_index++)); do
 done
 # ⚠️ rsync -a 保留源码的旧 mtime，而编译目录跨轮共用：上一轮在一条变异写进副本之后中途退出时
 # 那里留着一份**打着变异**编出来的二进制，它比副本里的源码新 ⇒ cargo 判「不用重编」，基线直接跑变异版。
-# 实测（2026-09-12）：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
+# 例：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
 # 先 touch 每份副本里的被测源码，逼 cargo 按这一轮的副本重编（每个工作进程的编译目录都跨轮留着，每份都要 touch）。
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
   touch "$(copy_directory_of "$worker_index")/$SRC"
@@ -1633,7 +1634,7 @@ if [[ -v CARGO_ENCODED_RUSTFLAGS ]]; then
   MUTATE_FLAGS_HINT="CARGO_ENCODED_RUSTFLAGS=$(printf '%q' "$MUTATE_ENCODED_RUSTFLAGS")"
   MUTATE_FLAGS_REPORT="CARGO_ENCODED_RUSTFLAGS=「${MUTATE_ENCODED_RUSTFLAGS//$MUTATE_UNIT_SEPARATOR/␟}」（环境里设了它，cargo 只读它、不读 RUSTFLAGS，所以 cap 接在它里面，RUSTFLAGS 也同样带着；各项以 0x1f 分隔、这里显示成 ␟；调用方设了的在前；--cap-lints warn 把装置的 deny 警告压成警告，替换文留下的死代码不算编不过）"
 fi
-if is_broken no-cap-lints; then   # 弄坏开关：改前的跑法，RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样传（没设就不设）
+if is_broken no-cap-lints; then   # 弄坏开关：RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 都照调用方的原样传（没设就不设）
   MUTATE_RUSTFLAGS="${RUSTFLAGS:-}"; RUSTFLAGS_ENVIRONMENT=(); MUTATE_ENCODED_RUSTFLAGS=""
   MUTATE_FLAGS_HINT="RUSTFLAGS='$MUTATE_RUSTFLAGS'"
   MUTATE_FLAGS_REPORT="RUSTFLAGS=「$MUTATE_RUSTFLAGS」（调用方设了的在前；--cap-lints warn 把装置的 deny 警告压成警告，替换文留下的死代码不算编不过）"
@@ -1654,7 +1655,7 @@ elif library_common_directory="$(git -C "$REPOSITORY_OF_WORKSPACE" rev-parse --p
   # 库目录：被判那棵仓的 git common-dir 底下那一份（文件头「按条入库」），只当名字
   MUTATE_LIBRARY="$library_common_directory/singlefs-mutate-library"
 elif is_broken libraryrootfallback; then
-  # 弄坏开关 libraryrootfallback：改前的样子，取不到 git common-dir 也照常跑完、判定写进另一个键前缀。库名写死在这里、不经共享目录名单取：
+  # 弄坏开关 libraryrootfallback：取不到 git common-dir 也照常跑完、判定写进另一个键前缀。库名写死在这里、不经共享目录名单取：
   #   名单只登记真在用的目录。Library 只拿末段当种类、本地不建，不在临时目录底下不加命名空间，键前缀是 mutation-units/mutate-library/
   MUTATE_LIBRARY=/libraryrootfallback/mutate-library
 else
@@ -1788,7 +1789,7 @@ else
     exit "$library_status"
   fi
   # 客户端退 3（客户端别的错：没配服务地址、时限写坏、帧被拒这类，客户端文件头「退出码」）：同样读不了库，不退回每条现判，退 2（文件头「退出码」）。
-  #   弄坏开关 planclienterrorfallback 下照改前退回每条现判
+  #   弄坏开关 planclienterrorfallback 下退回每条现判
   if ((library_status == 3)) && ! is_broken planclienterrorfallback; then
     echo "  ✗ mutate: 判定库客户端报错（退 3，上面「✗ prune-server 客户端」那一行是原因）：判定库读不了，不每条现判，一次 cargo 都没起" >&2
     echo "     → 怎么办：照上面那一行的出路改（本机要有服务的 socket，第二台要有多机配置里的 PRUNE_SERVER_TCP_ADDRESS；帧被拒是客户端或服务的缺陷，交主 agent）；改好之后重跑同一条命令" >&2
@@ -1822,9 +1823,9 @@ sys.modules[specification.name] = units
 specification.loader.exec_module(units)
 units.mutate_record(plan, index, verdict, fails, line, sys.argv[7] if len(sys.argv) > 7 else "")
 PY
-  if ((record_status == 75)) && ! is_broken recordunavailableignored; then   # 弄坏开关 recordunavailableignored：75 当「没写进」放过（改前的样子）
+  if ((record_status == 75)) && ! is_broken recordunavailableignored; then   # 弄坏开关 recordunavailableignored：75 当「没写进」放过
     echo "第 $(($1 + 1)) 条（$2）：prune-server 不可用（退 75）" >>"$LIBRARY_UNAVAILABLE"
-  elif ((record_status == 3)) && ! is_broken recordclienterrorignored; then   # 弄坏开关 recordclienterrorignored：3 当「没写进」放过（改前的样子）
+  elif ((record_status == 3)) && ! is_broken recordclienterrorignored; then   # 弄坏开关 recordclienterrorignored：3 当「没写进」放过
     echo "第 $(($1 + 1)) 条（$2）：判定库客户端报错（退 3）" >>"$LIBRARY_CLIENT_ERRORS"
   elif ((record_status != 0)); then
     echo "第 $(($1 + 1)) 条（$2）没写进判定库" >>"$LIBRARY_RECORD_ERRORS"
@@ -1925,7 +1926,7 @@ run_tests_in_copy() { run_cargo_test "$(copy_directory_of "$1")" "$(target_direc
 # 从一份 cargo test 输出（$1 是文件，- 是标准输入）取红了的用例名，一行一个；退出码照 lib_libtest_result_lines.py failed-names：
 # 0 取完了（可以一个都没有），3 汇总行报了失败而一个名字都没取到，别的是解析没跑成
 failed_test_names() {
-  if is_broken ownnameparse; then   # 弄坏开关：改前自己的取法，「 - should panic」算进名字
+  if is_broken ownnameparse; then   # 弄坏开关：自己的取法，「 - should panic」算进名字
     local text names
     text="$(cat -- "$1")"
     names="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' <<<"$text")"
@@ -1940,7 +1941,7 @@ failed_test_names() {
 # 打红的测试名（libtest 的「test <名字> ... FAILED」行）、末尾 15 行与留下的日志路径，再给单独重现的命令
 report_red_baseline() {
   local log="$SHARD_ROOT/baseline-$1.log" kept failed
-  is_broken baselinelogdropped && return 0   # 弄坏开关：改前的样子，基线输出丢进 /dev/null、什么都不留
+  is_broken baselinelogdropped && return 0   # 弄坏开关：基线输出丢进 /dev/null、什么都不留
   if [[ ! -s "$log" ]]; then
     echo "        这份副本的基线一行输出都没有（cargo 没起来就退了）" >&2
     return 0
@@ -2017,21 +2018,21 @@ judge_mutation() {
     record_verdict "$row_index" anchor 1 "⚓ [$name] 锚点失效：原文在 $SRC 里$(sed -n '1s/：.*//p' "$RESULTS/$row_index.anchor")—— 这一条没跑，不算抓到也不算没红" ""
     return
   fi
-  # ⚠️ **测试根本不终止、或无界分配：** 一条破坏可以让被测代码进死循环或吃满内存（2026-09-01 E73 整轮挂死，2026-09-25 E142 两次把整机拖进 OOM）。
-  # ⇒ 这里不限时、不设内存上限（用户 2026-10-31 定「照旧交服务，服务加一条 工具里不限时」）：整条 mutate.sh 交统一任务服务，
+  # ⚠️ **测试根本不终止、或无界分配：** 一条破坏可以让被测代码进死循环或吃满内存（例：E73 整轮挂死，E142 把整机拖进 OOM）。
+  # ⇒ 这里不限时、不设内存上限：整条 mutate.sh 交统一任务服务，
   #   内存上限由服务给、撞了放大重排，用时远超记录而日志又满 10 分钟不涨由服务停掉、打回（文件头「上限、限时与卡住」）。
   out="$(run_cargo_test "$copy_directory" "$target_directory")"
   cp "$PRISTINE" "$copy_directory/$SRC"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
   # 测试进程退几都照输出判（文件头「退出码」）：点名的测试红了就是抓到。
   # ⚠️ **编译失败不等于「没抓到」。** 一个改坏了语法或穷尽性的变异根本跑不到测试，
   # 那时既不能记成「测试抓到了」，也不能记成「测试没抓到」——它是一条**无效变异**。
-  # 混成一类的话，一个编译不过的变异会被报成测试盲区，把人引去改测试（实测踩过）。
+  # 混成一类的话，一个编译不过的变异会被报成测试盲区，把人引去改测试。
   # ⚠️ 判据是「测试进程有没有跑起来」，**不是「输出里有没有 error」**——
   # `cargo test` 在测试变红时也会打 `error: test failed`，
-  # 拿它当编译失败的判据会把每一条成功的变异都误判成无效（实测踩过，全套复跑才发现）。
+  # 拿它当编译失败的判据会把每一条成功的变异都误判成无效。
   # ⚠️ **不许写成 `printf ... | grep -q ...`。** `grep -q` 命中后立刻退出并关闭管道，
   # 上游 printf 收到 SIGPIPE；本脚本开了 `pipefail` ⇒ **整条管道判失败，命中被读成没命中**。
-  # 实测：那样写会让每一条「测试确实变红了」的变异都被误报成「编译失败」。
+  # 那样写会让每一条「测试确实变红了」的变异都被误报成「编译失败」。
   # 这正是 `.claude/singlefs-ai-sop/rules/command-safety.md`「管道里的退出码不是你想要的那个」。
   # ⇒ 用 here-string，根本不建管道。
   if ! grep -q '^running [0-9]* test' <<<"$out"; then
@@ -2040,29 +2041,29 @@ judge_mutation() {
   fi
   # ⚠️ **第四种结局：测试进程根本没跑完**（挂死被 OOM 杀、段错误、abort）。
   # 它既不是「编译失败」也不是「一个测试都没红」——报成后者会把人引去改测试，
-  # 而实际发生的事是「这条破坏让被测代码不终止了」。实测踩过：
+  # 而实际发生的事是「这条破坏让被测代码不终止了」。例：
   # 摘掉一条循环终止条件之后 recover 无限接受记录，进程 SIGKILL，
-  # 当时被报成「没有被任何检查看见」。
+  # 会被报成「没有被任何检查看见」。
   if grep -q "process didn't exit successfully" <<<"$out"; then
     sig="$(sed -n 's/.*(signal: \([0-9]*\).*/\1/p' <<<"$out" | head -1)"
     record_verdict "$row_index" crashed 0 "💥 [$name] 测试进程没跑完（signal ${sig:-?}）——破坏被看见了，但不是断言抓到的" ""
     return
   fi
-  # ⚠️ **不许枚举字符类——这个坑犯过两次，形状一模一样。**
-  # 2026-08-29 写成 `[a-z_]*`，名字带数字的测试匹配不上；
-  # 2026-08-31 写成 `[A-Za-z0-9_]*`，**中文测试名**匹配不上——E57 的 9 条变异
-  # 全被报成「一个测试都没红」，实际 9 条全红。两次都是**谎报盲区**（把人引去补
-  # 一条本来就有的检查），而不是漏报命中，所以两次都很难自己发现。
-  # ⇒ 改成「`...` 之前的都算名字」：Rust 的测试名可以是任意 Unicode 标识符，
-  #   枚举允许的字符永远追不上。下面那条旧注释留着，它记的是同一个坑的第一次。
+  # ⚠️ **不许枚举字符类——枚举过的写法都漏过名字。**
+  # `[a-z_]*` 匹配不上名字带数字的测试；
+  # `[A-Za-z0-9_]*` 匹配不上**中文测试名**——E57 的 9 条变异
+  # 全被报成「一个测试都没红」，实际 9 条全红。两种都是**谎报盲区**（把人引去补
+  # 一条本来就有的检查），而不是漏报命中，所以都很难自己发现。
+  # ⇒ 「`...` 之前的都算名字」：Rust 的测试名可以是任意 Unicode 标识符，
+  #   枚举允许的字符永远追不上。
   # ⚠️ **字符类必须含数字与大写。** 写成 `[a-z_]*` 时，任何名字里带数字的测试
   # （例如 `..._analytic_io_per_op_of_1_9375`、`..._reads_exactly_122`）匹配不上，
   # `red` 为空 ⇒ **一条确实红了的变异被报成「一个测试都没红」**。
-  # 方向是谎报盲区，会把人引去补一条本来就有的检查。2026-08-29 实测踩过并修。
-  # ⚠️ **第三次同形：模块名也不许写死。** 2026-09-17 写的是 `^test tests::`，E154 的单测分在
+  # 方向是谎报盲区，会把人引去补一条本来就有的检查。
+  # ⚠️ **模块名也不许写死。** 写成 `^test tests::` 的话，E154 的单测分在
   # `gate_tests` 与 `integration_tests` 两个模块里，7 条变异全被报成「一个测试都没红」，合并成 `mod tests` 之后 7 条全红。
   # ⇒ `test ` 与 ` ... FAILED` 之间的整段都算名字（含模块路径）；另加一道兜底：测试进程报了失败、名字却一个没抓到，
-  #   说明抓取规则又有盲区，单独报，不报成「没被看见」。
+  #   说明抓取规则有盲区，单独报，不报成「没被看见」。
   #   名字的解析在 lib_libtest_result_lines.py（failed_test_names）：「 - should panic」不进名字，汇总行报了失败而名字一个没取到时它退 3。
   if red_names="$(failed_test_names - <<<"$out")"; then names_status=0; else names_status=$?; fi
   red="$(paste -sd, - <<<"$red_names")"

@@ -25,12 +25,16 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
                                                                                          （replacement_undefined_identifiers；替换文自己绑定的、方法与路径里的段、宏、属性里的、_ 起头的、
                                                                                          标准库预导入与基本类型不算；只 static-check 判，crates-mutation-replay 派活之前不判、套用后编不过记无效）
                                           IDENTIFIERS_CHECKED <判了标识符的行数> <没判的行数（文件不是 .rs 或锚点失效）>
+                                          RELEASE  <行号> <变异名> <依据，；分隔>                命中重测试目标而第五段没写 release（见「重测试目标只许 release」；--profile release 也算写了）：
+                                                                                         有这一行退 1，这几行之后一行「     → 怎么办：…」写出路（第五段补上 --release）；
+                                                                                         判的是表里每一行（行数在 CHECKED 那一行），只 static-check 判，crates-mutation-replay 派活之前不判、照补 --release 起；
+                                                                                         登记表读不了打 ERROR 行与「→ 怎么办」、退 2
                                         另判「点名测试够不着被改坏的函数」（判法见文件头那一节，一律判），打这几种行：
                                           UNREACHABLE <行号> <变异名> <closure 或 gpu-route> <被改坏的单元，、分隔> <点名测试> <门禁给这一行用的 cargo 参数>
                                                                                          点名测试在门禁实际的特性与多机配置下调不到被改坏的函数；有这一行退 1，
                                                                                          这几行之后一行「     → 怎么办：…」写出路
                                           REACHABILITY_EXEMPT <行号> <变异名> <cpu-configuration 或 gpu-tables-refused> <凭据单元>  照豁免认了、不判的行
-                                          REACHABILITY_UNJUDGED <行号> <变异名> <为什么>   判不了的行（锚点失效、拒算、闭包算不成或拒算）
+                                          REACHABILITY_UNJUDGED <行号> <变异名> <为什么>   判不了的行（锚点失效、被改坏的单元或点名测试拒算、闭包算不成、闭包拒算而已收部分里没有被改坏的单元）
                                           REACHABILITY_CHECKED <判了的行数> <没判的行数> <豁免的行数> <截过闭包的行数> <多机配置> <ENABLE_GPU=1 或 GPU 没开>
                                           REACHABILITY_NOT_JUDGED <为什么>               选路表、截断表、豁免表点名的函数在 <根> 的源码里一个都没有（门禁样本那种小根）：这一趟没判可达性，
                                                                                          照实报，替换上面 REACHABILITY_CHECKED 那一行（门禁成功句写「可达性本次未判」，不算判过）
@@ -73,7 +77,8 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   共用清单加 path 依赖指到的目录（例：验证包常在依赖的仓根 prune-server/）、编译期与运行期读的仓根文件连同它们 source、起的；那份文件头「闭包」），
   再加 .claude/gate.d/stage-inputs.tsv 里 crates-mutation-replay 那一行登记的路径（读本模块所在那一份仓的登记表：判别力样本的目录里没有登记表；
   经 declared 声明给 copy_closure，为什么是 REGISTERED_COPY_RANGE_REASON）；闭包算不成（path 依赖指到树之外、编译期读的文件认不出或不在）拒绝，
-  run_stage 一条都不跑、static-check 打 ERROR 退 2。多机配置怎么交给副本里真跑的测试见「真跑测试的格把多机配置交给测试」一段，只编不跑的不带，
+  run_stage 一条都不跑、static-check 打 ERROR 退 2，出路另写 <根> 是仓副本、缺的是闭包里的仓根文件那一种（照 minimal-copy.py 另建副本，COPY_REBUILD_HOWTO）。
+  多机配置怎么交给副本里真跑的测试见「真跑测试的格把多机配置交给测试」一段，只编不跑的不带，
   再加变异行 --manifest-path 指的包目录里还不在范围里的（copied_with_manifest_directories，见「--manifest-path」；连同它的 path 依赖），
   底下每一段都不叫 target（各 crate 自己的编译目录）。crates-mutation-replay 照它拷每片的源码副本，code-source-discipline 照它静态判；判法只有 is_copied_into_each_shard 一处。
   ② 管不到的：路径拼在变量里、环境变量给的、format! 拼出来的、不以 "../ 起头而运行期再 join("..") 的；#[path = …] 不算（编译期带进来的源文件，
@@ -94,7 +99,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     工具链行取 <根> 那一份、manifest 那几行换成那个包的 Cargo.toml 里的（KeyContext.toolchain_of）；记覆盖的工作进程与覆盖复用判据照同一份单元键核；
   · 写坏了拒：写了不止一次、后面缺路径、绝对路径、文件名不是 Cargo.toml、落在 <根> 之外、文件不在——run_stage 一条都不跑（prechecks）、
     static-check 打 ERROR 退 2，plan、row-plan、--list-items 把那一行记拒算。
-  弄坏开关 manifest-path-ignored：不认 --manifest-path（改前的样子）。
+  弄坏开关 manifest-path-ignored：不认 --manifest-path。
 
 牵连面（impact_summary，只报数、不判红）：每一行的键依赖的单元 = 点名测试的单元闭包（KeyContext 为这一行算好的那一份，不另算）连同被改坏的单元；
   一个单元进了几行的这一份，改它一次就作废几行的判定。成功句之后与 --list-items 末了各打一行
@@ -117,8 +122,8 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   经 init_worker 交进 WORKER_STATE 的引用调，不进闭包（起的程序各有身份；多机配置是交给测试的一份文件；临时服务是这一次自己的一份空库，起它的
   scripts/prune-server/prune_server_client_selftest.py 是客户端的自证，载入它会经按名字连的边把自证起的 admission.py 与 lib_function_units.py 自证里
   折不出命令的 subprocess 一起拉进闭包，整张表拒算）；记覆盖的 judge_coverage 不进（它的闭包够到 lib_function_units.py 的自证夹具，折不出路径的 subprocess 拒算），
-  覆盖落单元的判法另由 executed_units 管。弄坏开关 judging-entries-verdict-only：只收结局分类那几个（改前的样子）；
-  judging-entries-with-temporary-service：另从 mutation_run_prune_server 收闭包（改前的样子：run_cargo_command 直接调它）。
+  覆盖落单元的判法另由 executed_units 管。弄坏开关 judging-entries-verdict-only：只收结局分类那几个；
+  judging-entries-with-temporary-service：另从 mutation_run_prune_server 收闭包，run_cargo_command 直接调它。
   指纹 = 闭包里单元（种类，去注释指纹）的多重集；scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES 那两份（D13 已定项 17 的文件级排除）不在这里排：
   lib_function_units.py 经 executed_units 管覆盖落进哪几个单元，覆盖决定基线复用，是判对错的一环，它的单元照进指纹、里面的拒算照算。
   只改注释、文档串、别的函数（阶段脚本的调度、判定库的存放、派活与报数）指纹不变；
@@ -140,7 +145,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   工具链         lib_mutation_units.py 的 toolchain_lines（rustc -vV、cargo -V、构建环境解析后的值），照起 cargo 时的环境算：含关调试信息那四个变量（见「调试信息」）
   依赖版本       点名测试的闭包与被改坏的单元真点名的外部 crate 在 Cargo.lock 里落到的包与传递依赖（lib_mutation_units.py 的 dependency_lines）
   拒算的行每趟照跑、不复用、不写记录，成功句另报「拒算 R 条」，stderr 逐行写为什么。
-  撞键（refuse_colliding_row_keys，用户 2026-10-29 定「撞键就拒算」）：表里两行以上算出同一把行键（两份内容相同的函数各改一处、点名同一条测试），
+  撞键就拒算（refuse_colliding_row_keys）：表里两行以上算出同一把行键（两份内容相同的函数各改一处、点名同一条测试），
     这几行拒算：照跑、不复用、不写记录；stderr 逐行写「拒算（行键撞键：与第 N 行同键）」，成功句末尾另接「；其中撞键拒算 K 条：第 <行> 行拒算（行键撞键：与第 N 行同键）、…」。
     基线键与覆盖号不带被改坏的单元，不跟着拒算（两行各自的基线照常复用）。选行（--item、双机分片的驱动、row-plan --rows）只对选中的行算键时，
     整张表里原文与替换文都与选中的某一行相同的行（键撞得上的只有这几行）一起算键，撞键照整张表判。弄坏开关 row-key-collision-unrefused：不判撞键。
@@ -148,13 +153,13 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
 判定库（crates-mutation-replay 每条判完立刻写，下一趟按「复用判据」逐行判复用还是现判；存放在 lib_mutation_units.py 的 Library，读写都经 prune-server）：
   库的名字是库根的 singlefs-crates-mutation-library（只当 prune-server 里的名字与命名空间，本地不建、不读、不写；键前缀照
   scripts/prune-server/prune_server_client.py 文件头「键空间」：mutation-units[@命名空间]/singlefs-crates-mutation-library/）。库根是被判那棵树的 git common-dir
-  （records_home）；取不到（不是 git 工作树）一条都不跑（run_stage 退 1、library-directory 退 2），不退回别处（弄坏开关 library-outside-git-tolerated 下照改前拿被判的根当库根往下跑）。
+  （records_home）；取不到（不是 git 工作树）一条都不跑（run_stage 退 1、library-directory 退 2），不退回别处（弄坏开关 library-outside-git-tolerated 下拿被判的根当库根往下跑）。
   键里只用库名，哪棵仓不进键：主仓与仓副本（git init 过的）写进同一份；命名空间只在临时服务底下给（客户端 namespace_of，自证一趟一个库）。
   成功句末尾点名库在哪。服务连不上客户端退 75，这一道照 75 退出，不当「库里没有」现判：
     records/<行键>        一条变异的判定（判定、要打的那一行、判定日期、跑法、点名测试的闭包号、被改坏的单元号、工具链与依赖的号）
     baselines/<基线键>    一条点名测试在没改坏的副本上的基线（基线键 = 判法单元、测试 fn 单元指纹、点名测试所在的包与测试目标、开关与特性、工具链、依赖）
     coverage/<覆盖号>     覆盖记录（覆盖号 = 判法单元指纹、测试 fn 单元指纹、点名测试所在的包与测试目标、开关与特性、工具链）：那条测试执行过的单元及各自的指纹，不带用例全名与快照号；
-                          两个测试目标里字面相同的测试，基线与覆盖不互相顶替（弄坏开关 baseline-key-without-target：不带包与目标，改前的样子）；
+                          两个测试目标里字面相同的测试，基线与覆盖不互相顶替（弄坏开关 baseline-key-without-target：不带包与目标）；
                           判法单元变了（含 lib_function_units.py 切单元的改动）覆盖号跟着变，旧记录不再被引用，下一趟重记
     compositions/、units/  组成清单（判法单元、每份点名测试的闭包、工具链行、依赖版本行）与单元表：作废时照它报变了哪几个单元
     index/<变异名与文件>  这一行上一次的键与几样组成的号：只用来说清现判的原因，不当复用的依据
@@ -162,7 +167,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   只给自证换的两个变量只在临时 prune-server 底下认（连哪一处与临时服务的标记都指同一份临时服务，判法同客户端的 selftest_service_problem；refuse_overrides_outside_service）：
     GATE_MUTATION_RUN_RECORDS_DIRECTORY=<目录>（运行记录的共享根取它）、GATE_MUTATION_MULTI_HOST_CONFIG=<文件>（真跑测试的格交给测试的多机配置）。
     不在临时服务底下设了任一个，点名设了的几个、一条都不跑（run_stage 退 1、library-directory 退 2）。
-    弄坏开关 run-overrides-honored-outside-service 下这两个不在临时服务底下也照旧认（改前的样子）。
+    弄坏开关 run-overrides-honored-outside-service 下这两个不在临时服务底下也照旧认。
   运行记录不进库（run_records_directory）：用时表 timings/<这一行六段原样的 sha256>（上一次现跑的用时，派活次序用；另一台的快慢不代表本机）
   与占盘记录 target-occupancy.tsv（文件头「磁盘余量」）放在共享根下的 crates-mutation-run-records<库的命名空间>/：共享根是多机配置
   （SINGLEFS_MULTI_HOST_CONFIG 指的那一份，没设取本模块所在仓的 multi-host.env，同 scripts/gate/admission.py 的 multi_host_configuration_file）里
@@ -173,7 +178,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   拒算            这一行算不出键，或与表里别的行撞键（见「行键」）：照跑，不复用
   复用            库里有这把行键的记录，判的是抓到
   上次没判成抓到  有这把键的记录，判的是别的档（没红、无效、基线不绿、本次未跑……只有抓到的复用）
-  记红、撤绿（用户 2026-10-29 定案）：判出的每一档都照行键写 records/（judge_row），没红、无效这些不是抓到的盖掉同一把行键原有的抓到（弄坏开关 red-not-recorded：只记抓到）；
+  记红、撤绿：判出的每一档都照行键写 records/（judge_row），没红、无效这些不是抓到的盖掉同一把行键原有的抓到（弄坏开关 red-not-recorded：只记抓到）；
   不算数的结局（本次未跑：VERDICTS_UNCOUNTED）不盖同一把行键原有的算数结论
   （抓到、没红、无效：VERDICTS_COUNTED），那一条不写、原有的留着；库里没有这把键的算数结论时照写（uncounted_verdict_keeps_counted_record；
   弄坏开关 uncounted-overwrites-counted：不算数的照写、盖掉原有的算数结论）。
@@ -201,7 +206,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   用时表：运行记录目录（文件头「判定库」末段，run_records_directory）里 timings/<这一行六段原样的 sha256>，记上一次现跑的用时；不进判定库。
   用时：从起 cargo 到它返回的秒数（seconds_running）。
 
-上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md SC02，用户定「照字面全删」「照旧交服务，服务加一条 工具里不限时」）：每条 cargo 直接起，不套内存包装、不设上限、不限时；
+上限、限时与卡住（records/2026-10-30-编译绕过内存总上限.md：工具里不限时，整条照旧交服务）：每条 cargo 直接起，不套内存包装、不设上限、不限时；
   一整条门禁交给统一任务服务（task-server/），内存上限由服务按记录给、撞了放大重排，死循环的变异由服务停整条任务（用时远超记录而日志又满 10 分钟不涨就停掉、打回）；
   不判「内存撞顶」「超时」「显存不够」：显存不够而红的照抓到记。
 
@@ -210,17 +215,17 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   有一行没有过滤词就整批不带过滤词。要单独带值的开关（`--skip 名字`、`--test-threads 4`）写成 `--test-threads=4`：分开写时那个值会被当成过滤词。
   与变异一样直接起 cargo，不设上限与限时。
   一行的基线结局不随这一趟拼进了哪几行而变（--item 只选几行、整张表一批几十行，同一行判同一个结论）：每行只看它自己的过滤词（连同 --exact、--skip=）选得中的结果行
-  （row_baseline_output，选法照 libtest：带 --exact 名字逐字相同、不带是子串）。弄坏开关 baseline-batch-composition：照整批的输出判（改前的样子）。
+  （row_baseline_output，选法照 libtest：带 --exact 名字逐字相同、不带是子串）。弄坏开关 baseline-batch-composition：照整批的输出判。
   每一行的点名测试在基线输出里要恰好对上一个用例、结果都是 ok，否则这一行记「基线不绿」：
   不算抓到、不算没红、它的变异不跑，整道判红。已有作数的抓到记录或基线 ok 记录的行不再跑基线。
 
-本次未跑（2026-10-01 加）：点名的测试在本机没跑到被改坏的那一处时，打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 后返回成功（GPU 对拍用例在没卡的机器上）。
+本次未跑：点名的测试在本机没跑到被改坏的那一处时，打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 后返回成功（GPU 对拍用例在没卡的机器上）。
   变异那一趟的 libtest 参数里补 --show-output（with_shown_output，插在第一个 `--` 之后）：成功用例的输出 libtest 默认不交出来；
   不用 --nocapture：单线程跑时它把用例的输出插进「test <名字> ... 」与结果之间（隔开的结果行由 joined_result_lines 接回，但整段输出会长得多）。基线那一批不补。
   点名的测试结果是 ok、输出里有这一族本次未跑行的，这一条记「本次未跑」（not_run_reason）：不算抓到、不算没红，逐条打出来；
   test= 对上点名的测试（只比 :: 分开的末一段）的那一行先取它的 reason=；都对不上的照样记本次未跑（崩溃枚举用例判段不跑时打的是
   test=crash_state_enumeration::<项名>，项名不是测试名），那一句写明 test= 是什么、对不上测试名：宁可记本次未跑，不记没红
-  （弄坏开关 not-run-test-name-only：只认 test= 对得上的，改前的样子）；
+  （弄坏开关 not-run-test-name-only：只认 test= 对得上的）；
   整道不因它判红，成功句写明抓到几条、本次未跑几条；一条抓到的都没有、只有本次未跑的退 77（选行模式照旧退 3 / 1）。
   GATE_MUTATION_NOT_RUN_RECORD=<文件> 设了，每条本次未跑往里追加一行（阶段把它转给 gate.sh 的 GATE_NOT_RUN_FILE）；写不进去整道判红。
   只有「抓到」复用，本次未跑的下一趟照跑。
@@ -249,7 +254,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     有卡而一张都起不来当场 panic（测试红），没有悄悄改交 CPU 判的一支；不要卡的（源码扫描、假设备的账本单测）判的东西跟卡无关。
   弄坏开关 test-runs-configuration-unpassed、gpu-unused-as-missed、given-states-count-ignored（见下）。
 
-开 GPU 时崩溃判段那几行补 gpu 特性（gpu_route_rows，plan_rows 里；用户 2026-10-13 定「配 GPU 必用 GPU，不降级」）：
+开 GPU 时崩溃判段那几行补 gpu 特性（gpu_route_rows，plan_rows 里；配 GPU 必用 GPU，不降级）：
   多机配置（上一段的找法，test_runs_multi_host_configuration）写了 ENABLE_GPU=1 时，点名测试的单元闭包够得着 GPU_ROUTE_UNITS 里一处选路函数
   （crate singlefs-verification 的 crash_state_enumeration::crash_point_replay_judge_route 与 crash_amplification::judge_not_run_without_the_gpu_feature：
   配了 GPU 而二进制没编进 gpu 就判段不跑、只录就返回 ok）、cargo 参数里没开 gpu（也没 --all-features）的行，这一趟的 cargo 参数补 --features gpu
@@ -257,9 +262,9 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   真跑测试的那几次照上面一段交多机配置；键照补了之后的特性算（闭包按这一组特性收、特性进键），配置换了开关键跟着换。
   变异表里那一行原样（Row.fields 不动，用时表与索引照它取名字）；stderr 一行点名补了哪几行。闭包算不出（拒算）的行判不了够不够得着，照原样跑；
   补了之后点名的测试不编的（#[cfg(not(feature = "gpu"))] 的用例，判的就是没编 gpu 的二进制）照原样跑，stderr 逐行点名。
-  弄坏开关 gpu-route-feature-unadded：不补（改前的样子）。
+  弄坏开关 gpu-route-feature-unadded：不补。
 
-点名测试够不着被改坏的函数（static-check 可达性，reachability_of_rows；用户 2026-11-02 定案「空转代码要全部优化 跑不到的代码没有存在的意义」，
+点名测试够不着被改坏的函数（static-check 可达性，reachability_of_rows；空转代码要全部优化，跑不到的代码没有存在的意义，
   records/2026-11-02-一百七十六节欠账.md）：静态判，不编、不跑、不插桩（覆盖判不了：GPU 路上排计划时对基镜像恢复一次，被改坏的那几行执行过、结局不看）。
   每一行照门禁实际给它用的那一组参数与多机配置判：
   · 参数：多机配置（test_runs_multi_host_configuration 的找法）写了 ENABLE_GPU=1、点名测试的单元闭包够得着 GPU_ROUTE_UNITS 的，照 gpu_route_rows 补 gpu 特性
@@ -268,6 +273,9 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     点名测试读被改坏那份文件的源码文本的（闭包里有那份文件的 data-file 单元，或罩住它的 data-directory 单元：include_str! 与运行期读文件、读目录），
     算够得着、不判这一行（gpu-route 也不判：读到的文本看得见改动，与走哪条判段无关；source_text_reader）。按整份文件算，偏宽：测试只扫文件的一段时，
     改在别的段也算够得着。
+  · 闭包拒算（算不出键：runtime-path 读真仓的测试、current-exe 起自己的子进程这一类，ClosureInfo.key 是 None）：行键那一路照旧拒算、不打键行；可达性照已收的成员
+    同一套判：被改坏的单元（或读到那份源码文本的数据单元）落在已收部分里算够得着，不报；没落进去的报 REACHABILITY_UNJUDGED，原因句写「闭包拒算、已收部分里没有被改坏的单元」
+    （没收进来的那一段可能调得到它，所以不报够不着）。开 GPU 时截过的闭包同理：已收部分里有就照截过的闭包判，截过的已收部分里没有的同样报没判，不报 gpu-route。豁免照旧。
   · gpu-route：多机配置开了 GPU、闭包够得着 GPU_ROUTE_UNITS 的行，从同一个测试单元、同一组 cfg 与特性另收一份截过的闭包（lib_function_units.py 的
     rust_closure_of 的 stop_at，它文件头 Rust 闭包「到这些单元就停」），截在 REACHABILITY_GPU_ROUTE_STOPS：崩溃枚举与崩溃放量判段 CPU 那一臂连到 CPU 判块的
     那一条边（按边停：测试或别的函数直接调 check_blocks_where_until 一族照连），给定状态引擎的 judged_on_the_cpu_here 与排计划时那一处宽松的基镜像恢复（按单元停）。
@@ -279,14 +287,15 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   起跑先核 GPU_ROUTE_UNITS、REACHABILITY_GPU_ROUTE_STOPS、REACHABILITY_CPU_FALLBACK_ROOTS 里每个函数在 <根> 的源码里都在（reachability_names_missing），有的不在报配置错、退 2；
   一个都不在的（门禁样本那种小根，没有崩溃放量那一族函数）不是配置错：打 REACHABILITY_NOT_JUDGED 一行写原因，一行都不判，退出码不受它影响（reachability_of_rows 抛 ReachabilityNotJudged）。
   static-check 一律判可达性（没有开关参数）；门禁 code-source-discipline 的 mutation-tables 格与 scripts/gate/apply-writer-patch.py 的变异锚点静态核都经它。
-  判不了的行逐行打 REACHABILITY_UNJUDGED：锚点失效、--manifest-path 写坏、被改坏的单元或点名测试拒算、闭包算不成或拒算（闭包不全，够不够得着说不准）、截过的闭包算不成。
+  判不了的行逐行打 REACHABILITY_UNJUDGED：锚点失效、--manifest-path 写坏、被改坏的单元或点名测试拒算、闭包算不成、闭包拒算而已收部分里没有被改坏的单元
+  （已收部分里有的照判，不在此列）、闭包拒算而截过的闭包已收部分里没有被改坏的单元、截过的闭包算不成。
   已知会漏：闭包同名就连、偏宽，被改坏的函数经同名的别处连进截过的闭包就不判；GPU 路上将来再出一处调 CPU 判器而结局不看的，要补进截断表。
   点名测试的闭包照 KeyContext 那一份算法并行算（key_workers），截过的闭包另开同样多的 fork 子进程并行算（reachability_cut_answers）；截过的闭包不算键、不进判定库。
   弄坏开关 reachability-stops-ignored、reachability-edges-as-units、reachability-closure-unchecked、reachability-cpu-configuration-ignored、
-  reachability-fallback-roots-ignored、reachability-stops-unverified、reachability-source-text-ignored（弄坏开关那一节）。
+  reachability-fallback-roots-ignored、reachability-stops-unverified、reachability-source-text-ignored、reachability-refused-unjudged（弄坏开关那一节）。
 
 带 gpu 特性的格测试参数收尾带 --test-threads（with_gpu_test_threads，run_cargo_command 起命令前调；.claude/rules/verification.md 里 GPU 那一条：
-  单个 GPU 测试二进制只用本机点名的卡，带 --test-threads 1 跑；用户 2026-10-28 定案放开 GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标）：
+  单个 GPU 测试二进制只用本机点名的卡，带 --test-threads 1 跑；GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标放开）：
   这一次起的 cargo test 是 gpu_test_run 认的那一种（`--` 之前开了上卡的特性、真跑测试）时，libtest 参数收尾带 --test-threads：
     · 基线的批、变异、记覆盖的插桩跑同样照办（都经 run_cargo_command）；只编不跑的几次（--no-run）与不带 gpu 特性的不带；
     · cargo 参数点名的测试目标（--test <名>，可以几个）全在 scripts/gate/admission.py 的 GPU_TEST_THREADS_RELEASED_TARGETS 里（直接取它，本模块不抄一份）的，
@@ -296,54 +305,72 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
       与 --exact 并存时各只出现一次（--test-threads 补在末尾，在点名用例之后）；没有 `--` 的参数先补 `--`。
   线程参数不进行键（文件头「行键」那一份）：行里自己写的 --test-threads=N 是 libtest 开关、照 lib_mutation_units.py 的 parse_cargo_arguments 进键（libtest:--test-threads=N）；
   这里补的不改行的六段，也不进键——它由键里已有的两样（带不带 gpu 特性、测试目标）加一个每台的常数（登记的线程数）决定，没有新的输入；线程数只管用例并行多少、
-  放开的目标按显存额度排队，与 -j / --jobs 同属不改判定的调度参数；进键则登记值一改（每台默认重活线程数是用户定的值），所有带 gpu 的行已入库的判定无故作废、全部现判。
-  弄坏开关 gpu-test-threads-unadded：不补（改前的样子：带 gpu 特性的格多个 GPU 对拍用例并行抢显存）。
+  放开的目标按显存额度排队，与 -j / --jobs 同属不改判定的调度参数；进键则登记值一改（每台默认重活线程数是登记的值），所有带 gpu 的行已入库的判定无故作废、全部现判。
+  弄坏开关 gpu-test-threads-unadded：不补，带 gpu 特性的格多个 GPU 对拍用例并行抢显存。
+
+重测试目标只许 release（release_forced_row、release_unwritten_rows；.claude/rules/test-script-discipline.md「编译与算法都要快」第一句：穷举、长时间随机、真设备这类用例用优化构建跑）：
+  判法只在 scripts/mutation/lib_release_only_tests.py（它文件头写全了怎么算命中、怎么算已带 release），这里不另写：命中 = cargo 参数选中了登记的崩溃枚举用例目标
+  （.claude/gate.d/stage-inputs.tsv 的 crash-case: 行 test= 点到的包与测试目标），或特性里带 gpu（gpu、<包>/gpu、tests-on-a-real-gpu、--all-features）。
+  登记表读本模块所在那一份仓的（RELEASE_REGISTRY_ROOT，同拷贝范围：判别力样本的目录里没有登记表；自证换成自己造的一份）。
+  · 门禁（plan_rows：run_stage、plan、row-plan、--list-items 同一份）：命中而没带 release 的行，这一趟的 cargo 参数补 --release（插在第一个 `--` 之前；
+    行里已带 --release 或 --profile release 的不重复加）；之后这一行起的每一次 cargo（基线的批、变异的先编与跑、插桩编译与插桩跑、先编一份依赖）都照补了之后的参数。
+    开 GPU 时补了 gpu 特性的行（gpu_route_rows）补完特性再照判一次。变异表那一行原样（Row.fields 不动，用时表与索引照它取名字）；
+    stderr 一行报补了几行，点名前 REASONS_SHOWN 行与依据。
+  · 档进键：--release 是 cargo 参数里的开关，照 lib_mutation_units.py 的 parse_cargo_arguments 进行键的「开关与特性」，闭包照 release 档的 cfg 收（不带 debug_assertions）；
+    release 档的调试信息照「调试信息」那一段关、取值进工具链行。补了之后的键与行里自己写 --release 的键相同，与不带 release 的键不同：头一趟这几行现判，不迁移旧键。
+  · static-check：命中而第五段没写 release 的行逐行打 RELEASE（文件头 static-check 那一段），退 1；crates-mutation-replay 派活之前不判（那边照上一条补 --release 起）。
+  登记表不在、读不了、crash-case: 行写法认不出：run_stage 一条都不跑（退 1），plan、row-plan、--list-items 照算不出键拒，static-check 打 ERROR 退 2；不当不命中。
+  弄坏开关 release-unforced、release-unchecked（弄坏开关那一节末尾「重测试目标只许 release」那两行）。
 
 
 弄坏开关（GATE_MUTATION_BREAK，只给证红用，逗号分隔可给几个；CRATES_MUTATION_ROWS_BREAK 是同义名，直接起本模块自证时用，两个变量都认）：
   nobaseline           跳过基线：点名的测试在没改坏的副本上本来就红的行照样记抓到（crates-mutation-replay 红样本、本模块自证都必须判错）
   timingsignored       派活不看用时表（自证「上一次跑得久的先派」那一格必须判错）
-  workers-by-processor-half  没给 GATE_MUTATION_WORKERS 时工作进程数取核数一半、至多 16，不取每台默认重活线程数、取不到也不拒（改前的样子）
+  workers-by-processor-half  没给 GATE_MUTATION_WORKERS 时工作进程数取核数一半、至多 16，不取每台默认重活线程数、取不到也不拒
                        （本模块自证「没给 GATE_MUTATION_WORKERS：工作进程数取每台默认重活线程数…」「…取不到每台默认重活线程数（SINGLEFS_THREAD_CAP=abc）…」两格必须判错）
-  memory-cap-ignored   开几个工作进程不看内存上限（TASK_SERVER_MEMORY_CAP_BYTES、自己 scope 的 memory.max），照线程数开满（改前的样子）
-                       （本模块自证 selftest_memory_cells 的十五格全部必须判错，头一格是「服务交的内存上限 20 GiB、每个工作进程的峰值 4 GiB（编译并行度 4 下的实测）…」；
+  workers-beyond-rows  工作进程数不收「这一趟要现跑的条数」那一项（文件头「工作进程数」），行少而线程数、上限大时开得比要判的行多
+                       （本模块自证「工作进程数取 GATE_MUTATION_WORKERS 与要现跑的条数的小者，没给内存项时头一行不提内存（20 条开 16 个、5 条开 5 个）」必须判错）
+  memory-cap-ignored   开几个工作进程不看内存上限（TASK_SERVER_MEMORY_CAP_BYTES、自己 scope 的 memory.max），照线程数开满
+                       （本模块自证 selftest_memory_cells 的十六格全部必须判错，头一格是「服务交的内存上限 20 GiB、每个工作进程的峰值 4 GiB（编译并行度 4 下的实测）…」；
                        selftest_worker_peak_cells 里经 memory_bound_for 的七格也判错：「固定编译并行度：…」「编译并行度跟着进程数走：…」「从没量过：…」
                        「只有更低编译并行度的实测：…」「峰值记录里有一份内容不是正整数：…」「峰值记录的 worker-peaks 是一份文件、不是目录：…」「交给 run_stage：…开 2 个工作进程…」）
-  memory-max-not-hard-cap  内存上限取到服务交的变量或多机配置的值就不看自己 scope 的 memory.max（改前的样子：scope 真实上限只有 20 GiB，多机配置写 50G 就按 50G 开）
+  memory-cap-short-run-anyway  内存上限装不下一个工作进程的峰值时开 1 个硬跑，不按撞内存上限退 250
+                       （本模块自证 selftest_memory_cells 里「内存上限装不下一个工作进程的峰值：run_stage 按撞内存上限退 250…」那一格必须判错，别的格不红）
+  memory-max-not-hard-cap  内存上限取到服务交的变量或多机配置的值就不看自己 scope 的 memory.max：scope 真实上限只有 20 GiB，多机配置写 50G 就按 50G 开
                        （本模块自证 selftest_memory_cells 里「多机配置 50G、scope 的 memory.max 20 GiB」「服务交的变量 50 GiB、scope 的 memory.max 20 GiB」两格与
                        「run_stage 整趟：服务交的变量 50 GiB、scope 的 memory.max 8 GiB」一格必须判错，别的格不红）
   records-written-at-end  判定库记录（基线、变异）先攒在工作进程内存里，进程池正常收尾时才一并写（被怀疑过的样子：整组被杀、判过的格不留下），init_worker 换上 DeferredWriteLibrary
                        （本模块自证 selftest_killed_run_resume_cell「一趟跑到一半整组硬杀，重跑同一条命令」那一格必须判错，别的格不红）
   killed-run-rerun-keyed-by-other-code  只在自证 selftest_killed_run_resume_cell 里认：重跑那一趟的子进程另加 judge-units-whole-file，判法单元指纹换一种算法
-                       （照任务 4304 的样子：两趟算键的判法代码不同，判完的那几条一条都复用不上；那一格必须判错，别的格不红）
+                       （两趟算键的判法代码不同，判完的那几条一条都复用不上；那一格必须判错，别的格不红）
   worker-peaks-unkeyed-by-jobs  读每个工作进程的峰值记录时不分编译并行度，各编译并行度都取全部记录里最大的（量与除不认编译并行度的样子）
                        （本模块自证「记下的峰值按编译并行度分开、读得回来：…」「固定编译并行度：…」「编译并行度跟着进程数走：…」三格必须判错）
   worker-peaks-window-unbounded  读峰值记录时每个编译并行度取全部记录的最大、不只看最新的 WORKER_PEAKS_RECENT 份，也不删更旧的
                        （本模块自证「每个编译并行度只看最新的 256 份：…」那一格必须判错）
-  jobs-feedback-ignored  试每个进程数时编译并行度都照天花板那个进程数算，不照这个进程数算（改前的样子：开的进程少了、编译并行度跟着变大，峰值没跟着算）
+  jobs-feedback-ignored  试每个进程数时编译并行度都照天花板那个进程数算，不照这个进程数算：开的进程少了、编译并行度跟着变大，峰值没跟着算
                        （本模块自证「编译并行度跟着进程数走：…」那一格必须判错）
-  unmeasured-worker-peak-guessed  某个编译并行度与更高的都没有实测时，每个工作进程的峰值照写死的默认 3G（改前的样子），不取保守值
+  unmeasured-worker-peak-guessed  某个编译并行度与更高的都没有实测时，每个工作进程的峰值照写死的默认 3G，不取保守值
                        （本模块自证「从没量过：…」「只有更低编译并行度的实测：…」两格必须判错）
-  unreadable-worker-peaks-guessed  峰值记录读不了时每个工作进程的峰值照写死的默认 3G（改前的样子），不取保守值
+  unreadable-worker-peaks-guessed  峰值记录读不了时每个工作进程的峰值照写死的默认 3G，不取保守值
                        （本模块自证「峰值记录里有一份内容不是正整数：…」「峰值记录的 worker-peaks 是一份文件、不是目录：…」两格必须判错）
   worker-tree-self-only  量一个工作进程的用量时只算它自己，不算它起的整棵进程树
                        （本模块自证「量一棵进程树：…」那一格必须判错）
-  worker-peaks-unrecorded  工作进程起来时不起采样线程，一份峰值记录都不写（改前的样子）
+  worker-peaks-unrecorded  工作进程起来时不起采样线程，一份峰值记录都不写
                        （本模块自证「交给 run_stage 的工作进程各写一份峰值记录：…」那一格必须判错）
   sample-root-peaks-recorded  被判的不是本仓（门禁样本根）、也不在临时 prune-server 底下时，工作进程照样写峰值记录（样本 crate 的小读数掺进本仓那一份的样子）
                        （本模块自证「样本根上的工作进程不写峰值记录：…」那一格必须判错）
   multiple-packages-last-only  cargo 参数里有多个 -p 只认最后一个（lib_mutation_units.py 的 parse_cargo_arguments）
                        （本模块自证「多个 -p：…」那一格（selftest_multiple_packages_cell 调 lib_mutation_units.py 的 multiple_packages_cell）必须判错）
-  rowplanselectionignored  row-plan 不看 --rows，照整张表算键（改前的样子）（mutation-shard-run.sh --selftest 里 row-plan 点名两行那一格设它起 row-plan，必须判错）
+  rowplanselectionignored  row-plan 不看 --rows，照整张表算键（mutation-shard-run.sh --selftest 里 row-plan 点名两行那一格设它起 row-plan，必须判错）
   rowkeywithouttoolchain  行键不带工具链（自证「工具链变了：每一行都现判」那一格必须判错）
   mutated-unit-ignored  行键不带被改坏的单元指纹（自证「改了被改坏、点名测试够不着的函数：只现判那一行」那一格必须判错）
-  row-key-collision-unrefused  表里两行算出同一把行键时不判撞键，两行共用一把键、互相复用（改前的样子）
+  row-key-collision-unrefused  表里两行算出同一把行键时不判撞键，两行共用一把键、互相复用
                        （本模块自证「撞键拒算：left.rs 与 right.rs 里内容相同的函数各改一处…」那一格必须判错）
-  not-run-test-name-only  本次未跑只认 test= 对得上点名的测试名（只比 :: 末段）的那一行（改前的样子：test=crash_state_enumeration::<项名> 记成没红）
+  not-run-test-name-only  本次未跑只认 test= 对得上点名的测试名（只比 :: 末段）的那一行：test=crash_state_enumeration::<项名> 记成没红
                        （本模块自证「本次未跑认项名：…」那一格必须判错）
-  gpu-route-feature-unadded  多机配置开了 GPU 时，点名测试走崩溃判段、不带 gpu 特性的行不补 gpu 特性（改前的样子：判段不跑、只录就返回 ok）
+  gpu-route-feature-unadded  多机配置开了 GPU 时，点名测试走崩溃判段、不带 gpu 特性的行不补 gpu 特性：判段不跑、只录就返回 ok
                        （本模块自证「开 GPU 时点名测试走崩溃判段的那一行补 gpu 特性：…」那一格必须判错）
-  gpu-test-threads-unadded  带 gpu 特性、真跑测试的 cargo test 的 libtest 参数收尾不带 --test-threads（改前的样子）
+  gpu-test-threads-unadded  带 gpu 特性、真跑测试的 cargo test 的 libtest 参数收尾不带 --test-threads
   reachability-stops-ignored  static-check 可达性截闭包时不截（stop_at 给空）
                        （本模块自证「static-check 可达性的 gpu-route：…」那一格必须判错）
   reachability-edges-as-units  static-check 可达性截断表里按边停的也按单元停（测试直接调的 CPU 判器入口也截掉）
@@ -356,44 +383,46 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
                        （本模块自证「static-check 可达性的 gpu-tables-refused 豁免：…」那一格必须判错）
   reachability-stops-unverified  static-check 可达性起跑不核选路表、截断表、豁免表里的函数在不在源码里
                        （本模块自证「static-check 可达性起跑先核截断表：…」那一格必须判错）
-  reachability-source-text-ignored  static-check 可达性不认读源码文本的点名测试（改前的样子：只拿函数单元比，闭包里有那份文件的数据单元照报 closure）
+  reachability-source-text-ignored  static-check 可达性不认读源码文本的点名测试：只拿函数单元比，闭包里有那份文件的数据单元照报 closure
                        （本模块自证「static-check 可达性放行读源码文本的：…」那一格必须判错）
+  reachability-refused-unjudged  static-check 可达性遇到闭包拒算的行一律报没判，不看已收的成员
+                       （本模块自证「static-check 可达性的闭包拒算：点名测试的闭包拒算…」那一格必须判错；同一开关下后面三格也红）
                        （本模块自证「带 gpu 的行收尾带 --test-threads 1、放开名单里的目标带登记值、不带 gpu 的行不带…」那一格必须判错）
-  baseline-key-without-target  基线键与覆盖号不带点名测试所在的包与测试目标（改前的样子）
+  baseline-key-without-target  基线键与覆盖号不带点名测试所在的包与测试目标
                        （本模块自证「基线键与覆盖号带包与测试目标：…两行的基线键、覆盖号都不同」那一格必须判错）
-  baseline-batch-composition  一批基线照整批的输出判每一行（改前的样子：同一行单跑与整张表判出不同的基线结局）
+  baseline-batch-composition  一批基线照整批的输出判每一行：同一行单跑与整张表判出不同的基线结局
                        （本模块自证「一行的基线结局不随这一批拼进了哪几行而变：…」那一格必须判错）
-  judging-entries-verdict-only  判法单元只从结局分类那几个入口收闭包，judge_row、judge_batch、run_cargo_command 这几段不进（改前的样子）
+  judging-entries-verdict-only  判法单元只从结局分类那几个入口收闭包，judge_row、judge_batch、run_cargo_command 这几段不进
                        （本模块自证「判法单元收全：改判法拷贝里 judge_row 的一处，每一行都现判（栏是判法单元变了）」那一格必须判错）
-  judging-entries-with-temporary-service  判法单元另从 mutation_run_prune_server 收闭包（改前的样子：run_cargo_command 直接调它，闭包经它载入的
-                       scripts/prune-server/prune_server_client_selftest.py 连到自证起的 admission.py 与 lib_function_units.py 自证里折不出命令的 subprocess）
+  judging-entries-with-temporary-service  判法单元另从 mutation_run_prune_server 收闭包：run_cargo_command 直接调它，闭包经它载入的
+                       scripts/prune-server/prune_server_client_selftest.py 连到自证起的 admission.py 与 lib_function_units.py 自证里折不出命令的 subprocess
                        （本模块自证「判法单元算得出（闭包里没有拒算）」那一格必须判错）
   red-not-recorded     judge_row 只记「抓到」，没红、无效这些不写，同一把行键原有的「抓到」留着照复用
                        （本模块自证「记红撤绿：先抓到入库，同一把键改判没红之后，下一趟这几行现判…」那一格必须判错）
-  uncounted-overwrites-counted  不算数的结局（VERDICTS_UNCOUNTED）照行键写、盖掉同一把行键原有的抓到、没红、无效（改前的样子）
+  uncounted-overwrites-counted  不算数的结局（VERDICTS_UNCOUNTED）照行键写、盖掉同一把行键原有的抓到、没红、无效
                        （本模块自证「不算数的结局不盖算数的：库里一行抓到，同一把键经哨兵强制现判出本次未跑之后…」那一格必须判错）
-  baseline-red-keeps-caught  基线不绿的行不照行键记「基线不绿」，同一把行键原有的「抓到」留着照复用（改前的样子）
+  baseline-red-keeps-caught  基线不绿的行不照行键记「基线不绿」，同一把行键原有的「抓到」留着照复用
                        （本模块自证「记红撤绿：先抓到入库，同一把键判一趟基线不绿之后，下一趟这几行现判…」那一格必须判错）
-  library-outside-git-tolerated  被判的树取不到 git common-dir 时拿被判的根当库根往下跑（改前「没处放也照跑」的样子）
+  library-outside-git-tolerated  被判的树取不到 git common-dir 时拿被判的根当库根往下跑（没处放也照跑）
                        （本模块自证「库根：被判的树不是 git 工作树：退 1、点名它、一条都不跑」那一格必须判错）
-  run-overrides-honored-outside-service  不在临时 prune-server 底下设了 GATE_MUTATION_RUN_RECORDS_DIRECTORY、GATE_MUTATION_MULTI_HOST_CONFIG 也照旧认（改前的样子）
+  run-overrides-honored-outside-service  不在临时 prune-server 底下设了 GATE_MUTATION_RUN_RECORDS_DIRECTORY、GATE_MUTATION_MULTI_HOST_CONFIG 也照旧认
                        （本模块自证「不在临时 prune-server 底下设了只给自证换的运行记录、多机配置两个变量：…」那一格必须判错）
-  mutation-run-on-real-service  起 cargo test 真跑测试的那一次不起自己的临时 prune-server，照调用方的环境连那一份服务（改前的样子：变异版判出的崩溃结论写进真库）
+  mutation-run-on-real-service  起 cargo test 真跑测试的那一次不起自己的临时 prune-server，照调用方的环境连那一份服务：变异版判出的崩溃结论写进真库
                        （本模块自证「变异复跑各对自己的临时 prune-server 跑：…」那一格必须判错）
   test-closure-ignored  行键不带点名测试的闭包键（自证「改了点名测试调到、不是被改坏的函数：点名它的那一行现判」
                        「改了被改坏函数用的常量（V5 那一类）：原文在那个函数里的两行现判」「改了点名测试够得着、没执行到的函数：那一行现判」三格必须判错）
-  baseline-by-tree-snapshot  基线 ok 只按整树快照复用（改前的判法）（自证「加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用」
+  baseline-by-tree-snapshot  基线 ok 只按整树快照复用（自证「加一个没人调的函数、同时改一行的替换文：只那一行现判、它的基线复用」
                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错）
-  judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（改前的取法）（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
+  judge-units-whole-file  判法单元指纹取闭包碰到的那几份文件的整份原文（自证「只改判法脚本的注释：判法单元指纹不变」那一格必须判错）
   judging-function-units-excluded  判法单元指纹不收 lib_function_units.py 的单元（D13 已定项 17 文件级排除用在 crates 变异判法上的样子）
                        （本模块自证「改 lib_function_units.py 的 RustFile.row 一处函数体：判法单元指纹变，闭包里有 lib_function_units.py 的单元」那一格必须判错）
-  coverage-id-without-judging  覆盖号不带判法单元指纹（改前的样子）
+  coverage-id-without-judging  覆盖号不带判法单元指纹
                        （本模块自证「覆盖号随判法单元指纹变：改 lib_function_units.py 的 RustFile.row 一处函数体，同一条点名测试的覆盖号跟着变」那一格必须判错）
   coveragenotrecorded  抓到之后不记覆盖（自证「头一趟每条点名测试记一份覆盖、同一条测试的几行共用一份」
                        「改了点名测试够得着、没执行到的函数：那一行现判，基线按覆盖复用」两格必须判错；另有记覆盖次数的四格跟着判错：
                        「头一趟起 1 批基线 + 4 条变异，另记 4 份覆盖」「下一趟只跑剩下的 2 条」「插桩编译那一步写出的剖析文件」）
   llvmversionunchecked 不核 llvm 工具与 rustc 的 LLVM 版本（自证「llvm 工具的 LLVM 版本与 rustc 对不上：判红、一条都不跑」那一格必须判错）
-  buildprofilesunset   插桩编译那一步不设 LLVM_PROFILE_FILE（改前的样子：构建脚本与过程宏的剖析文件落进它们起的目录）
+  buildprofilesunset   插桩编译那一步不设 LLVM_PROFILE_FILE：构建脚本与过程宏的剖析文件落进它们起的目录
                        （本模块自证「插桩编译那一步写出的剖析文件只落在这一格的临时目录」那一格必须判错）
   keepmutationtmp      每条变异的 TMPDIR 不删（crates-mutation-replay 两份样本都必须判错）
   notrunasmissed       点名的测试打了 NOT_RUN_NO_GPU_ADAPTER 也当没红记（crates-mutation-replay 的 not-run 样本、本模块自证「点名的测试打了 NOT_RUN」那一格都必须判错）
@@ -401,64 +430,64 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   cargoconfignotcopied 拷每片源码副本时跳过拷贝范围里的 .cargo/（登记漏了它时的样子）：副本里的 cargo 读不到 .cargo/config.toml 的 [env]
                        （本模块自证「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」那一格必须判错）
   path-dependencies-not-copied  拷贝范围不调 lib_repository_copy.py 的 copy_closure（不跟 path 依赖、不认编译期与运行期读的仓根文件），只拷登记的那几处
-                       （改前的样子：副本里缺 prune-server/，cargo 解析工作区就失败）
+                       （副本里缺 prune-server/，cargo 解析工作区就失败）
                        （本模块自证「拷贝范围跟 path 依赖：…」「拷贝范围跟 path 依赖指到树之外：…」两格必须判错）
-  manifest-path-ignored  不认变异行 cargo 参数里的 --manifest-path：拷贝范围不补那个包目录，单元键照 <根> 那一份工作区算，写坏了也不拒（改前的样子）
+  manifest-path-ignored  不认变异行 cargo 参数里的 --manifest-path：拷贝范围不补那个包目录，单元键照 <根> 那一份工作区算，写坏了也不拒
                        （本模块自证「--manifest-path 静态核：…」「--manifest-path 基线与判红：…」「--manifest-path 单元键照那个包的源码算：…」
                        「--manifest-path 不在仓内：…」四格必须判错）
-  product-gpu-feature-unquiesced  产品 GPU 包的 tests-on-a-real-gpu 不当上卡的特性认，只认 gpu（改前的样子：这一包的真显卡对拍行不补 --test-threads、不核用没用上卡）
+  product-gpu-feature-unquiesced  产品 GPU 包的 tests-on-a-real-gpu 不当上卡的特性认，只认 gpu：这一包的真显卡对拍行不补 --test-threads、不核用没用上卡
                        （本模块自证「产品 GPU 包（--features tests-on-a-real-gpu）的行：真跑测试的那几次各收尾带 --test-threads 1…」
                        「产品 GPU 包（--features tests-on-a-real-gpu）的行：点名的测试没卡打 NOT_RUN_NO_GPU_ADAPTER…」两格必须判错）
-  test-runs-configuration-unpassed  真跑测试的格不往环境里设 SINGLEFS_MULTI_HOST_CONFIG、也不判多机配置在不在（改前的样子）
+  test-runs-configuration-unpassed  真跑测试的格不往环境里设 SINGLEFS_MULTI_HOST_CONFIG、也不判多机配置在不在
                        （本模块自证「真跑测试的每一次在副本里起的 cargo 环境里有 SINGLEFS_MULTI_HOST_CONFIG…」
                        「多机配置不在：run_stage 退 2…」两格必须判错）
-  gpu-unused-as-missed  带 gpu 特性的格判出没红时不核用没用上卡（改前的样子：给定状态全交 CPU 判的也记没红）
+  gpu-unused-as-missed  带 gpu 特性的格判出没红时不核用没用上卡：给定状态全交 CPU 判的也记没红
                        （本模块自证「带 gpu 特性的行：给定状态全交 CPU 判…」那一格必须判错）
   given-states-count-ignored  有 CRASH_POINT_REPLAY_GIVEN_STATES 行就当没用上卡，不读 states_judged_by_the_gpu_here 的数
                        （本模块自证「带 gpu 特性的行：给定状态有 GPU 判过的…照常判」那一格必须判错）
-  undefinedidentifiersunchecked  static-check 不判替换文里新引的标识符（改前的样子）
+  undefinedidentifiersunchecked  static-check 不判替换文里新引的标识符
                        （本模块自证「static-check 的 UNDEFINED：替换文引了已删的标识符 halved_before 的那一行报一行…」那一格必须判错）
-  overlapunchecked     并发领片号那一格不核两次调用重叠没有、照判对错（改前的样子）
+  overlapunchecked     并发领片号那一格不核两次调用重叠没有、照判对错
                        （本模块自证「先起的那次在后起的那次开始之前就退了（样本）：并发领片号那一格认出两次调用没重叠、记本次未跑…」那一格必须判错）
-  staticusagebare      static-check 参数不对时只打改前那一行用法，不写缺了什么、不给「→ 怎么办」（本模块自证「static-check 缺 <根>」那一格必须判错）
+  staticusagebare      static-check 参数不对时只打那一行用法，不写缺了什么、不给「→ 怎么办」（本模块自证「static-check 缺 <根>」那一格必须判错）
   tablemissingok       static-check --table 指的文件不在时照旧当空表判、报「CHECKED 0 …」退 0（本模块自证「static-check --table 指的文件不在」那一格必须判错）
-  shardrootkeptonsignal  run_pool 不接 TERM / HUP（改前的样子：收到就停，$TMPDIR 下的 singlefs-mutation-replay-* 留着）
+  shardrootkeptonsignal  run_pool 不接 TERM / HUP：收到就停，$TMPDIR 下的 singlefs-mutation-replay-* 留着
                        （本模块自证「被 TERM 停：$TMPDIR 下的 singlefs-mutation-replay-* … 停完删掉，退 143」那一格必须判错）
-  broken-pool-looked-up-late  「有工作进程中途死了」那一句判 except 的时候才按 concurrent.futures.process 属性找 BrokenProcessPool（改前的样子：进程池还没起就被停时
-                       那个子模块没载入，判 except 抛 AttributeError、盖掉 StopRequested）（本模块自证「进程池还没起就被 TERM 停」那一格必须判错）
-  term-sent-unwaited   自证「被 TERM 停」那一格不等「临时目录在、假 cargo 在工作进程里挂住」就发 TERM（改前碰上忙机器的样子：run_pool 还没装好信号处理，默认处理退 -15）
+  broken-pool-looked-up-late  「有工作进程中途死了」那一句判 except 的时候才按 concurrent.futures.process 属性找 BrokenProcessPool：进程池还没起就被停时
+                       那个子模块没载入，判 except 抛 AttributeError、盖掉 StopRequested（本模块自证「进程池还没起就被 TERM 停」那一格必须判错）
+  term-sent-unwaited   自证「被 TERM 停」那一格不等「临时目录在、假 cargo 在工作进程里挂住」就发 TERM（碰上忙机器：run_pool 还没装好信号处理，默认处理退 -15）
                        （本模块自证「被 TERM 停：$TMPDIR 下的 singlefs-mutation-replay-* 跑的时候在、停完删掉，退 143 …」那一格必须判错）
-  shardrootnamedlate   run_pool 建 shard_root 照改前用 tempfile.mkdtemp（目录在 mkdir 里建出来、名字要等它返回才到调用方手里：TERM 落在这两步之间，名字丢了、目录漏在 $TMPDIR）
+  shardrootnamedlate   run_pool 建 shard_root 用 tempfile.mkdtemp（目录在 mkdir 里建出来、名字要等它返回才到调用方手里：TERM 落在这两步之间，名字丢了、目录漏在 $TMPDIR）
                        （本模块自证「TERM 落在建 shard_root 的 mkdir 之后、名字交到调用方手里之前：收尾照样删掉」那一格必须判错）
   listitemspipeunhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
                        （本模块自证「--list-items 接 | head」那一格必须判错）
-  extratargetskept     开跑时不回收片号大于这一趟工作进程数的 -w<片号> 编译目录（改前的样子：分片各一份、只增不减）
+  extratargetskept     开跑时不回收片号大于这一趟工作进程数的 -w<片号> 编译目录：分片各一份、只增不减
                        （本模块自证「片号大于这一趟工作进程数的 -w<片号> 连同 -coverage 开跑时回收、不大于的留着、打一行删了几份多大」那一格必须判错）
   inusetargetremoved   回收之前不核有没有进程在用（工作目录、命令行、CARGO_TARGET_DIR、在用标记），多出来的照删
                        （本模块自证「多出来的 -w<片号> 有进程在用的不删」那一格必须判错）
-  targetdefaulttmp     没设 GATE_MUTATION_TARGET_DIR 时编译目录照更早的样子放 ${TMPDIR:-/tmp}/singlefs-crates-mutation-target（跨轮共用、跑完不删）
+  targetdefaulttmp     没设 GATE_MUTATION_TARGET_DIR 时编译目录放 ${TMPDIR:-/tmp}/singlefs-crates-mutation-target（跨轮共用、跑完不删）
                        （本模块自证「跑完运行目录里不剩它建的编译目录（没设 GATE_MUTATION_TARGET_DIR：…）」与「跑完运行目录里不剩它建的编译目录（被 TERM 停）」两格必须判错）
-  runtargetkept        跑完不删这一趟自己建的编译目录（连同它所在的 $TMPDIR 下的 singlefs-mutation-replay-*；改前的样子：编译目录跨轮留着）
+  runtargetkept        跑完不删这一趟自己建的编译目录（连同它所在的 $TMPDIR 下的 singlefs-mutation-replay-*；编译目录跨轮留着）
                        （本模块自证「跑完运行目录里不剩它建的编译目录（没设 GATE_MUTATION_TARGET_DIR：…）」与「跑完运行目录里不剩它建的编译目录（被 TERM 停）」两格必须判错；
                        连带「被 TERM 停（双机分片的驱动停这一份的样子）：…」那一格，$TMPDIR 下的 singlefs-mutation-replay-* 留着）
   runtargetopenfilesunchecked  删这一趟的编译目录之前不核有没有进程开着里面的文件
                        （本模块自证「这一趟的编译目录里还有进程开着文件：不删、报出那个进程」那一格必须判错）
-  local-shard-numbering  工作进程的片号不领锁、照改前从本调用的共享计数器现领本地序号（改前的样子：两次并发调用的第 2 片都指向同一个 -w2）
+  local-shard-numbering  工作进程的片号不领锁、从本调用的共享计数器现领本地序号：两次并发调用的第 2 片都指向同一个 -w2
                        （本模块自证「同一个共用编译目录上并发的两次调用各起 2 个工作进程：领到的片号集合不相交、四把片号锁都被占」那一格必须判错）
-  anchor-stops-table   锚点失效的一行让整张表退出、一个工作进程都不起（改前的样子）
-  anchor-mid-run-asserts  派活之后工作副本里原文不再恰好一次时 judge_row 抛 AssertionError、整个进程池跟着炸（改前的样子）
+  anchor-stops-table   锚点失效的一行让整张表退出、一个工作进程都不起
+  anchor-mid-run-asserts  派活之后工作副本里原文不再恰好一次时 judge_row 抛 AssertionError、整个进程池跟着炸
                        （本模块自证「派活之后锚点失效：那一行记锚点失效，别的行照判照入库」那一格必须判错）
                        （本模块自证「锚点失效按行判：那一行记锚点失效、别的行照跑照入库」那一格必须判错）
-  anchor-rows-planned  plan、row-plan、--list-items 不先剔掉锚点失效的行，照常算键（改前的样子：文件不是 .rs 的那一行算得出键、会被分给第二台）
+  anchor-rows-planned  plan、row-plan、--list-items 不先剔掉锚点失效的行，照常算键：文件不是 .rs 的那一行算得出键、会被分给第二台
                        （本模块自证「row-plan、plan、--list-items 把锚点失效的行单列」那一格必须判错）
   impact-row-dropped   牵连面少算一行（算进的头一行不数）
                        （本模块自证「牵连面：样本 crate 上牵连最大的单元与行数」那一格必须判错）
   reuse-lookup-skipped 复用判据一律不复用（键相同、判过抓到照样现判）
                        （本模块自证 reuse-three-questions 那一格必须判错；reuse-sentinel 那一格要的就是这一趟复用哨兵判红「复用失灵」）
   共用库 scripts/gate/lib_reuse_checks.py 的开关 REUSE_CHECKS_BREAK=rejudged-sentinel-passes（哨兵被现判不红）：本模块自证 reuse-sentinel 那一格必须判错
-  uncounted-forced-observed  强制现判那一条落在不算数的结局（VERDICTS_UNCOUNTED：本次未跑）上也当现判结论交哨兵（改前的样子：拿它比库里的「抓到」判成「判定不稳」）
+  uncounted-forced-observed  强制现判那一条落在不算数的结局（VERDICTS_UNCOUNTED：本次未跑）上也当现判结论交哨兵，拿它比库里的「抓到」判成「判定不稳」
                        （本模块自证「复用哨兵：强制现判那一条本次未跑（notrun）：不当现判结论交哨兵，打一行不判、不判成不稳」那一格必须判错）
-  exactduplicated      记覆盖那一趟把行里已有的 --exact 与自己补的叠成两个（改前的样子，libtest 报 Option 'exact' given more than once、覆盖记不成）
+  exactduplicated      记覆盖那一趟把行里已有的 --exact 与自己补的叠成两个（libtest 报 Option 'exact' given more than once、覆盖记不成）
                        （本模块自证「行里已带 --exact 的变异…」那一格必须判错）
   item-plan-reusable-zero  --list-items --with-keys 的 ITEM_PLAN 里 reusable 一律 0（能复用的行不数）
                        （本模块自证「--list-items --with-keys：每项一行 ITEM_PLAN…」那一格必须判错）
@@ -468,18 +497,18 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
                        （本模块自证「真跑：全复用的第二趟每项一行 ITEM_DONE…」那一格必须判错）
   item-done-seconds-whole-run  ITEM_DONE 的 seconds 记自开跑起的整趟，不记这一项自己的
                        （本模块自证「真跑：每项各记各的挂钟…」那一格必须判错）
-  split-result-line-unseen  结果词被测试中途打的行隔开的结果行不接回一行（改前的样子：认不出、基线记成「一行都没出现」）
+  split-result-line-unseen  结果词被测试中途打的行隔开的结果行不接回一行：认不出、基线记成「一行都没出现」
                        （本模块自证「结果词被插进来的 GPU_LIFECYCLE 行隔开时照认基线绿」那一格必须判错）
   closure-error-masked  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：按路径载入的 lib_function_units.py
-                       不登记进 sys.modules、算闭包的工作进程把异常原样抛（改前的样子，--list-items 末尾是 PicklingError，真错被盖住）
+                       不登记进 sys.modules、算闭包的工作进程把异常原样抛（--list-items 末尾是 PicklingError，真错被盖住）
                        （本模块自证「闭包算不成（并行算…）」与「--list-items 遇到闭包算不成」两格必须判错）
-  wgsl-whole-file      scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：.wgsl 照改前当数据单元、
+  wgsl-whole-file      scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：.wgsl 当数据单元、
                        取整份字节的 sha256（本模块自证「WGSL 按 fn 取键」那一格必须判错）
   judging-cache-unverified  判法单元指纹的磁盘缓存不核读过的内容，有存的就一直沿用（不看内容的缓存）
                        （本模块自证「判法单元指纹的磁盘缓存」那一格必须判错）
-  specification-lines-product-view  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：规格行（原文落在 verus! 里产品行为视图剥掉的字上的变异行）也取产品行为视图（改前的样子；本模块 row_view 同样认它）
+  specification-lines-product-view  scripts/mutation/lib_mutation_units.py 里的开关（同样从 GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK 认）：规格行（原文落在 verus! 里产品行为视图剥掉的字上的变异行）也取产品行为视图（本模块 row_view 同样认它）
                        （本模块自证「verus! 里的规格行：原文落在产品行为视图剥掉的字上」那一格（selftest_specification_line_cell 调 lib_mutation_units.py 的 specification_line_cell）必须判错）
-  rocksdb-entry-unchecked  起任何 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+  rocksdb-entry-unchecked  起任何 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
                        （本模块自证「RocksDB 预编库的取值缺了：起 cargo 之前判红、退 1、假 cargo 一次都不起」那一格必须判错）。
                        entry 的跳过办法：被判的树里没有依赖 rocksdb 的清单（自证的小仓就是这样），或 PATH 上的 cargo 是带
                        「# rocksdb-prebuilt-entry: selftest-fake-cargo」那一行的假 cargo（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）
@@ -504,7 +533,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     开跑时复用的与锚点失效的项立刻打，现判的项在它最后一行判完时打，被停（只供测试的开关、编译目录停派）没判到的项在收尾补一行（judged=0 reused=0 exit=1）：
     跑到的每一项恰好一行。弄坏开关 item-plan-reusable-zero（ITEM_PLAN 的 reusable 一律 0）、item-done-reused-silent（只复用的项不打 ITEM_DONE）、
     item-done-seconds-whole-run（seconds 记自开跑起的整趟）、item-plan-selection-ignored（--rows 点名也算整表）各让自证 selftest_item_lines_cells 的一格判错。
-编译目录（default_shared_target_directory，阶段脚本不另算；用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；
+编译目录（default_shared_target_directory，阶段脚本不另算；自己用完自己删，不跨轮复用）：GATE_MUTATION_TARGET_DIR 设了用它（调用方给的，跑完不删）；
   没设时 run_pool 在这一趟自己的运行目录（$TMPDIR 下的 singlefs-mutation-replay-*，下称 shard_root）里建 <shard_root>/build/singlefs-crates-mutation-target，
   这一趟的全部编译目录（第 1 片用它，其余片加 -w<片号>，记覆盖的再加 -coverage，先编一份依赖的 -seed、-seed-coverage、-seed-source，片号锁 .slot）都在 <shard_root>/build 里；
   正常结束、判红、被 TERM / HUP 停都在 run_pool 的收尾删掉（scripts/hosts/run_build_directory.py：删之前核本机没有进程开着里面的文件，有就是这一趟的子进程没收干净，
@@ -518,22 +547,27 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   片号锁文件建不了、或前 4096 片都被占：报一行，退回本调用内的本地序号。回收同样核片号锁：别的调用的工作进程刚领到的那一片，被占着的不删。
 工作进程数（worker_count_for）：四项取最小、至少 1：每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads：SINGLEFS_THREAD_CAP 设了照它，
   否则 .claude/heavy-thread-default；GATE_MUTATION_WORKERS 给了顶掉它）、这一趟要现跑的条数、磁盘余量（再下一段）、内存上限 ÷ 每个工作进程的峰值（下一段「内存上限」）。
+  这一趟要现跑的条数就是这一趟要判的单位数（records/2026-10-31-task-server巡检.md）：
+  点到的行里没有作数的抓到记录的那几行（run_stage 的 candidates，拒算的照算），不照拿到的上限开满；基线的批（baseline_batches：要现跑基线的几行合成一批，
+  批里的行都在这几行里）与覆盖（一行抓到之后补记的那一份、开跑时就要记的那几份，都是这几行的）跟着这几行走，进同一个进程池、不另算工作进程，
+  所以工作进程数不超过这几行的行数（统一任务服务对登记了的这一道照「底座 + 每件峰值 × min(--item 个数, 线程数)」给上限，与这一项同一个口径：.claude/memory-bounded-parallelism.tsv）。
+  弄坏开关 workers-beyond-rows 下不收这一项（工作进程数只照线程数、磁盘与内存那几项开，行少而上限大时开得比行多）。
   次序：线程数与条数的小者当天花板交给磁盘那一项，这三项的小者再当天花板交给内存那一项（内存那一项要按真开的进程数算编译并行度，天花板要含磁盘那一项）。取不到每台默认重活线程数（登记文件不在、写坏、
-  SINGLEFS_THREAD_CAP 不是正整数）而又没给 GATE_MUTATION_WORKERS 的，整道判红退 2、一条都不跑，不退回按核数算（弄坏开关 workers-by-processor-half：照改前取核数一半、至多 16）。
+  SINGLEFS_THREAD_CAP 不是正整数）而又没给 GATE_MUTATION_WORKERS 的，整道判红退 2、一条都不跑，不退回按核数算（弄坏开关 workers-by-processor-half：取核数一半、至多 16）。
   不在这里设内存上限：一整条门禁的内存上限仍由统一任务服务按记录给（上面「上限、限时与卡住」），开几个工作进程照下一段按拿到的上限收。
 编译并行度（cargo_jobs_for）：每个 cargo 的 CARGO_BUILD_JOBS 取 GATE_MUTATION_CARGO_JOBS（正整数，写法不对整道拒）给了照它，不然 max(1, 核数 ÷ 工作进程数)；
   内存那一项算每个进程数要的编译并行度、run_stage 设 CARGO_BUILD_JOBS 用的是同一个函数。选的是「编译并行度跟着进程数走、算到自洽」，不是固定编译并行度：
   进程数被内存卡小时，固定的编译并行度会让核空着；跟着走则每试一个进程数 n 就照 n 算出编译并行度、再取那个编译并行度下的每进程峰值，满足 n × 峰值 ≤ 上限的最大 n 才开。
-内存上限（memory_bound_for）：开几个工作进程按这一条拿到的内存上限 ÷ 每个工作进程的峰值算，与另外三项取最小、至少 1（1 个都放不下按 1 个开，头一行写「那一项不足 1」）。
+内存上限（memory_bound_for）：开几个工作进程按这一条拿到的内存上限 ÷ 每个工作进程的峰值算，与另外三项取最小、至少 1（worker_count_for 里 1 个都放不下按 1 个算、头一行写「那一项不足 1」；run_stage 见到内存那一项是 0 就按撞内存上限退 250，下面「撞内存上限」）。
   内存上限的取法（task_memory_cap_bytes，次序）：① 统一任务服务交的环境变量 TASK_SERVER_MEMORY_CAP_BYTES（这一次尝试的上限，字节十进制整数；写法不对的头一行点名、改走②）；
-  ② 仓根多机配置 multi-host.env 的 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项（用户定「变异的内存上限直接按照根目录设置的 50gb 走」；值是 <地址>=<systemd 写法> 的若干项，
+  ② 仓根多机配置 multi-host.env 的 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项（变异的内存上限直接按仓根目录设置的 50G 走；值是 <地址>=<systemd 写法> 的若干项，
   读法用 scripts/gate/admission.py 的 configuration_value，这一台照多机配置判法 --emit-addresses 认（scripts/hosts/multi_host_addresses.py 的 resolve，整份配置判过才给地址），
   找文件同 test_runs_multi_host_configuration；文件不在、键没写、认不出这一台、读不了都往下走，头一行点名）；
   ③ 自己 scope 的 memory.max（scope_memory_max：/proc/self/cgroup 里 `0::<路径>` 那一行接 /sys/fs/cgroup 再接 /memory.max；只读自己这一层，不往上找父 cgroup）；
   ④ 三样都没有（memory.max 写 max、读不到、写法不认）这一项不收，工作进程数照线程数，头一行写明原因。
   memory.max 是有限值就是硬顶（超了整个 scope 被杀）：①② 取到的值比它大，取 memory.max（两者取小）；①② 都没有，取 memory.max 本身；memory.max 是 max 或读不到，不收窄，照①②。
-  头一行写各档读到的值、取了哪一个、为什么（「各档读到：…」）。依据：2026-10-31 变异任务 1711 第五次，scope 的真实上限只有 20736M，服务还没换上交变量，门禁按多机配置的 50G 开了 12 个工作进程。
-  弄坏开关 memory-max-not-hard-cap：①② 取到了就不看 memory.max（改前的样子）。自证用 GATE_MUTATION_CGROUP_LISTING、GATE_MUTATION_CGROUP_ROOT 换掉 /proc/self/cgroup 与 /sys/fs/cgroup（生产不设）。
+  头一行写各档读到的值、取了哪一个、为什么（「各档读到：…」）。依据：scope 的真实上限（如 20736M）可以比多机配置写的 50G 小，只按 50G 开会开太多工作进程。
+  弄坏开关 memory-max-not-hard-cap：①② 取到了就不看 memory.max。自证用 GATE_MUTATION_CGROUP_LISTING、GATE_MUTATION_CGROUP_ROOT 换掉 /proc/self/cgroup 与 /sys/fs/cgroup（生产不设）。
   每个工作进程的峰值（门禁自己量，不查内存包装的峰值表：各格的 cargo 是工作进程直接起的、不经包装，那张表里永远没有它们）：
   · 量什么：一个工作进程连同它起的整棵进程树（cargo、rustc、测试二进制、各格的临时 prune-server）此刻的用量，口径是每个进程 /proc/<pid>/status 的
     RssAnon + RssShmem + VmPTE 加总（process_tree_usage；子进程顺 /proc/<pid>/task/<tid>/children 往下找，读不到的刚退出、不算）。
@@ -559,10 +593,19 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     GATE_MUTATION_CARGO_JOBS 给了时 j 固定，这一项就是 ⌊上限 ÷ P(j)⌋。
   · 头一行与收尾一行（stderr）写「内存上限 X（来源）÷ 每个工作进程的峰值 P（编译并行度 j 下：取法）= 同时开 N 个工作进程（n × P = 合计，不超过上限）」，
     卡在这一项时再写多开 1 个要的编译并行度、峰值与合计；末了写峰值记录的位置与各编译并行度的读数。stdout 不写（stdout 与进程数无关）。
-  依据：2026-11-02 起这一道经服务约 25 次一次没跑成：改前查内存包装的峰值表永远查不到，一律按写死的默认每格峰值开（日志里是 2G）；任务 4279 只开 4 个（编译并行度约 8）就到 48G，平摊约 12G。
-  弄坏开关 memory-cap-ignored：不看内存上限、照线程数开满（改前的样子）；worker-peaks-unkeyed-by-jobs、worker-peaks-window-unbounded、jobs-feedback-ignored、
+  依据：查内存包装的峰值表永远查不到（工作进程的 cargo 不经包装），按写死的默认每格峰值（2G）开会低估：只开 4 个（编译并行度约 8）就到 48G，平摊约 12G。
+  弄坏开关 memory-cap-ignored：不看内存上限、照线程数开满；worker-peaks-unkeyed-by-jobs、worker-peaks-window-unbounded、jobs-feedback-ignored、
   unmeasured-worker-peak-guessed、unreadable-worker-peaks-guessed、worker-tree-self-only、worker-peaks-unrecorded、sample-root-peaks-recorded（弄坏开关那一节）。
   自证在 --selftest 的 selftest_memory_cells（上限的取法）与 selftest_worker_peak_cells（量、记、读、除）。
+  撞内存上限（run_stage）：内存那一项是 0（量到的每个工作进程的峰值比这一条拿到的上限还大，一个都放不下），派活之前整道退 250，
+    红句写上限、峰值与「按撞内存上限退出」：250 是统一任务服务错误类型表里 memory-cap-hit 那一行（task-server/task_server_lib.py 文件头「错误类型」），服务据此照「重试」加额度重排；
+    不起 1 个工作进程硬跑（硬跑在中途被杀，判过的格白判），也不改成别的拒绝。没有实测时取保守值（上限本身），1 个放得下，不走这一条。
+    弄坏开关 memory-cap-short-run-anyway：开 1 个硬跑（自证 selftest_memory_cells 里「内存上限装不下一个工作进程的峰值」那一格必须判错）。
+  底座读数（行名 MUTATION_BASE_READING，stderr 一行）：派活之前量起这一道的父进程（门禁这一层 python）自己此刻的用量，与「先编一份依赖」那一步（工作进程起来之前）
+    父进程整棵进程树的峰值，口径同每个工作进程的读数（RssAnon + RssShmem + VmPTE 加总）：
+    MUTATION_BASE_READING parent_bytes=<字节或 none> seed_step_tree_peak_bytes=<字节或 none> seed_step=built|not-built
+    先编那一步没起（只开 1 个工作进程、够不着外部依赖、弄坏开关 compile-per-worker）时 seed_step=not-built，那一段只量到父进程自己；只报数、不判红。
+    登记表 .claude/memory-bounded-parallelism.tsv 这一道那一行的底座照它取：两个数里大的那一个（推的口径同上「量什么」，几个进程共享的匿名页重复算）。
 磁盘余量（disk_bound_for）：每个工作进程最多占两份编译目录（普通一份、插桩一份，prepare_shard 与 judge_coverage 起的），一份涨到多少按实测峰值算：
   每个工作进程每判完一格（trim_worker_target，清之前）量一次自己那份编译目录的占盘，追加进运行记录目录（文件头「判定库」末段，run_records_directory）下的 target-occupancy.tsv（一行「<时刻秒><TAB>普通|插桩<TAB><字节>」，
   record_target_occupancy），派活之前两种各取最近 20 次里最大的当这一种的涨幅（measured_target_peaks；记录多过 1000 行时只留每种最近 20 行）；
@@ -575,7 +618,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   余量的来源：外层给了 GATE_MUTATION_DISK_FREE（systemd 写法，例 400G）就用它（双机分片的驱动、自证用）；没给读编译目录往上第一层存在的目录所在的盘此刻可用的字节（statvfs）；
   两样都读不到（写法不认的整道拒；statvfs 失败的）没有这一项，头一行写「磁盘余量没读到」及原因，工作进程数不按磁盘收。已有的编译目录按此刻占盘量，
   回收（reclaim_extra_target_directories）发生在这一步之后，所以只回收得掉的多出来的目录不算作余量（偏保守）。
-  依据：2026-10-20 第二台 9 个工作进程各一份 -w<片号> 加各一份插桩，1.8T 的盘写满（tempfile.mkdtemp 抛 OSError: [Errno 28]）；2026-10-21 压到 4 个仍涨到普通 39–71G、插桩 30–68G。
+  依据：第二台 9 个工作进程各一份 -w<片号> 加各一份插桩，会把 1.8T 的盘写满（tempfile.mkdtemp 抛 OSError: [Errno 28]）；压到 4 个仍涨到普通 39–71G、插桩 30–68G。
 派活那一段（run_pool）：基线的批、变异与覆盖进同一个进程池，
   互相独立的几格按工作进程并行（同时在跑至多 worker_count 格）；一个工作进程只有一份编译目录（-w<片号>），cargo 锁着它，同一个工作进程里的几格只能逐格跑。
 编译目录上限（trim_target_directory、trim_worker_target，GATE_MUTATION_TARGET_DIR_CAP，默认 64G 是推的）：每个工作进程每判完一格（基线的批、一条变异、一组覆盖），
@@ -585,15 +628,16 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   按（目录、名字、后缀）归堆，每堆按修改时刻只留最新那一版；同一个包换了特性或档编出的另一版也算同名，之后的格要用它时 cargo 照「产物不在」重编（慢，判定不变）。
   清完回读仍超上限就停派：工作进程往这一趟 shard_root 里的停派目录（target_over_cap_directory）写一句，run_pool 每收一格看一眼，有就不再派活、等在跑的收完，
   整道判红，拒绝说明逐份点名清后仍超线的编译目录、出路是调大上限或换盘（判完的格已入库，再跑一趟只跑剩下的）。清不成（权限、文件被占）只报、不丢这一格的判定、不停派。
-  本机量到的一份普通编译目录 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（2026-10-21），所以清增量产物不保证清到线下；磁盘余量那一项按实测峰值算，不依赖清得掉。
+  本机量到的一份普通编译目录 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G，所以清增量产物不保证清到线下；磁盘余量那一项按实测峰值算，不依赖清得掉。
 调试信息（cargo_debug_overrides、key_toolchain_lines）：这一道起的每条 cargo（基线、变异的先编与跑、插桩编译与插桩跑、先编一份依赖）都带
   CARGO_PROFILE_DEV_DEBUG、CARGO_PROFILE_TEST_DEBUG、CARGO_PROFILE_RELEASE_DEBUG、CARGO_PROFILE_BENCH_DEBUG = CARGO_DEBUG_SETTING（false）：cargo test 用 test 档（承 dev），
   cargo test --release 用 release 档（bench 承 release），四档都设，顶掉调用方设的同名变量与仓根 Cargo.toml 的 [profile.release] debug = true。只设在起 cargo 的那一份环境里。
+  命中重测试目标、这一趟补了 --release 的行（「重测试目标只许 release」）走的就是 release 档，同样关调试信息；档本身照 --release 进行键的「开关与特性」。
   取值进行键：算工具链行时照起 cargo 的环境算（lib_mutation_units.py 的 toolchain_lines 收 CARGO_PROFILE_*），run_stage、plan、row-plan、--list-items 与 toolchain 子命令同一份；
   取值改了（连同这一段头一次进来）整张表现判一次，栏是「工具链或依赖变了」，不迁移旧键。
-  不改判定：调试信息只进 DWARF 段，opt-level、overflow-checks、debug-assertions 不动；插桩的覆盖映射不靠 DWARF（2026-10-22 量过：一个探针包关掉调试信息、带 -Cinstrument-coverage
+  不改判定：调试信息只进 DWARF 段，opt-level、overflow-checks、debug-assertions 不动；插桩的覆盖映射不靠 DWARF（量过：一个探针包关掉调试信息、带 -Cinstrument-coverage
   编出来的测试二进制没有 .debug_info 段，llvm-cov export 照样报执行过的函数计数 1、没执行的 0）。
-  量到的（本机，2026-10-22，singlefs-core 的测试目标冷编）：开着时写盘 916 MB、编译目录 826 MB、测试二进制 79 MB；关掉后 510 MB、421 MB、17 MB。
+  量到的（本机，singlefs-core 的测试目标冷编）：开着时写盘 916 MB、编译目录 826 MB、测试二进制 79 MB；关掉后 510 MB、421 MB、17 MB。
 先编一份依赖（prepare_seed、sync_dependency_artifacts）：每个工作进程各有一份源码副本与一份编译目录（-w<片号>，插桩的再加 -coverage），冷的那几份各自把外部依赖
   （Cargo.lock 里带 source 的包：libc、vstd、wgpu、rocksdb 这一类）编一遍。这一趟开 2 个以上工作进程、要现跑的行（基线与变异）选的包顺 Cargo.lock 够得着外部依赖时，
   派活之前先在 <编译目录>-seed（插桩的 <编译目录>-seed-coverage）里按组各编一次（组 = 一行 `--` 之前的参数只留选包、特性、档与目标三元组，seed_group_of；
@@ -613,7 +657,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
     再分到 CARGO_BUILD_JOBS（核数 ÷ 工作进程数）条线程上拷。
   先编没编成（退出码不是 0）的那一份只报、不判红，工作进程照旧自己编依赖（判定不受影响，只是慢）；拷的时候出错同样只报。编完照「编译目录上限」清一次那两份的增量产物；
   「磁盘余量」给这两份各留一份上限（每一趟新编）。只开 1 个工作进程、要现跑的行都够不着外部依赖（树里没有 Cargo.lock 的自证小仓就是这样）时不起，stderr 写明没起的原因。
-  量到的（本机，2026-10-22，singlefs-core 的测试目标、关掉调试信息）：冷编一份写盘 510 MB、CPU 31.6 秒；拷依赖产物 175 个文件 98 MB；拷完之后在另一份新副本里编，
+  量到的（本机，singlefs-core 的测试目标、关掉调试信息）：冷编一份写盘 510 MB、CPU 31.6 秒；拷依赖产物 175 个文件 98 MB；拷完之后在另一份新副本里编，
   只有 singlefs-core、singlefs-format、singlefs-replay-prefix 三个工作区包重编，依赖 16 个全 Fresh，写盘 343 MB、CPU 21.3 秒（与拿着整份旧编译目录的工作进程 343 MB、20.6 秒相同）。
 测试线程数：不压。起 cargo test 时 RUST_TEST_THREADS 与仓里各测试读的线程数变量（SINGLEFS_THREAD_CAP 等）调用方设了什么就原样透传；只有 CARGO_BUILD_JOBS（编译并行度）按核数 ÷ 工作进程数收。
 变异复跑的崩溃判定：起 cargo test 真跑测试的每一次（基线的批、变异、记覆盖的插桩跑；只编不跑的 --no-run 不起）各起一份自己的临时 prune-server
@@ -623,7 +667,7 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
   服务二进制取 PRUNE_SERVER_BINARY（绝对路径、可执行；与客户端自证的 resolve_binary 认同一个变量），没设由 run_pool 开派之前照本模块所在仓的 prune-server/
   编一份进这一趟的 <shard_root>/prune-server-build（cargo build --release --offline，收尾随 shard_root 删）；取不到整道判红、一条都不跑。
   起服务经 <shard_root> 里写的一份包装：先设父进程死亡信号再换成真二进制，工作进程被停或被硬杀时（finally 不跑）服务跟着停，不留孤儿。
-  弄坏开关 mutation-run-on-real-service：不起临时服务，照调用方的环境连那一份服务（改前的样子：变异版判出的崩溃结论写进真库同一把键下）。
+  弄坏开关 mutation-run-on-real-service：不起临时服务，照调用方的环境连那一份服务，变异版判出的崩溃结论写进真库同一把键下。
 libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总行只在 scripts/gate/lib_libtest_result_lines.py 解析一份（results_by_test 调它）；
   结果词被测试中途打的行隔开的写法（`test <名> ... ` 之后隔着别的输出、结局另起一行；测试里的线程直接写标准输出时出现）由 joined_result_lines 先接回一行再交它：
   结局单独一行，起头与结局之间的行不算，起头之后先来了别的结果起头的不接，单独的结局行多出来没处接的整段不接（同 lib_libtest_result_lines.py 的 account_binary）。
@@ -631,23 +675,23 @@ libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总
   它的弄坏开关 LIBTEST_RESULT_LINES_BREAK 写在它文件头；本模块自证里认得它的那一格：
   LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  本模块自证「should panic 的用例红了判抓到、点名省掉模块路径只对上那一个」那一格必须判错
 下面五个开关（磁盘余量、编译目录上限）一行一个，下一行起写打开后必须判错的自证项：
-  disknotchecked       工作进程数不看磁盘余量（改前的样子：2026-10-20 第二台 9 个工作进程把盘写满）
+  disknotchecked       工作进程数不看磁盘余量：第二台 9 个工作进程把盘写满
     本模块自证「磁盘余量放不下 16 份…」「已有的编译目录只算还能涨的…」「磁盘余量交给 run_stage…」「外层没给磁盘余量时读编译目录所在的盘…」四格必须判错
-  targetcapignored     编译目录超过上限也不清增量产物（改前的样子：产物只增不减）
+  targetcapignored     编译目录超过上限也不清增量产物：产物只增不减
     本模块自证「编译目录超过上限：清掉两处增量产物…」「清完仍超线：只清增量产物…」「编译目录上限交给 run_stage…」「编译目录清完增量仍超上限：deps 里同名产物只留最新一版…」
     「编译目录清完仍超上限（1K）：头一格判完就停派…」五格必须判错
-  depsnotpruned        清完增量仍超上限也不清 deps 里同名产物的旧版本（改前的样子）
+  depsnotpruned        清完增量仍超上限也不清 deps 里同名产物的旧版本
     本模块自证「编译目录清完增量仍超上限：deps 里同名产物只留最新一版…」那一格必须判错
-  overcapdispatched    清完仍超上限只报、照派（改前的样子）
+  overcapdispatched    清完仍超上限只报、照派
     本模块自证「编译目录清完仍超上限（1K）：头一格判完就停派…」那一格必须判错
-  diskbudgetbycap      磁盘预算不看实测峰值、每份编译目录一律按上限算（改前的样子）
+  diskbudgetbycap      磁盘预算不看实测峰值、每份编译目录一律按上限算
     本模块自证「磁盘预算按实测峰值算：…」那一格必须判错
 下面九个开关（调试信息、先编一份依赖）一行一个，下一行起写打开后必须判错的自证项：
-  debuginfo-kept       起 cargo 时不设 CARGO_PROFILE_<档>_DEBUG（改前的样子：调试信息开着）
+  debuginfo-kept       起 cargo 时不设 CARGO_PROFILE_<档>_DEBUG：调试信息开着
     本模块自证「门禁起的每条 cargo 都关了调试信息」「改了构建档的取值之后行键变了」两格必须判错
   debuginfo-unkeyed    起 cargo 时照设，算工具链行时不算进去（构建档的取值不进行键）
     本模块自证「改了构建档的取值之后行键变了」那一格必须判错
-  compile-per-worker   不起先编那一份，每个工作进程自己编外部依赖（改前的样子）
+  compile-per-worker   不起先编那一份，每个工作进程自己编外部依赖
     本模块自证「4 个工作进程：外部依赖只在先编那一份里各编一次」那一格必须判错；「先编那一份的源码按内容同步」「先编那一份的修改时刻被留住」两格跟着判错（先编那一趟没起）
   workspaceunitsshared 从先编那一份拷产物时连工作区的包一起拷
     本模块自证「先编那一份只拷外部依赖的产物」那一格必须判错
@@ -655,13 +699,18 @@ libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总
     本模块自证「先编那一份的源码按内容同步：改过的包重编、整道照常」那一格必须判错（先编那一趟判红）
   seedfreshunchecked   先编那一趟不核摸过的包有没有重编
     本模块自证「先编那一份的修改时刻被留住：先编那一趟判红、一条都不跑」那一格必须判错
-  seedfreshacrossgroups 先编那一趟每一组各判各的（改前的样子）：前面的组已经编过的产物，后面的组里 fresh 也记成坏的
+  seedfreshacrossgroups 先编那一趟每一组各判各的：前面的组已经编过的产物，后面的组里 fresh 也记成坏的
     本模块自证「先编那一份有两组：后一组复用前一组编出来的产物、cargo 报 fresh 不算坏，整道照常」那一格必须判错（先编那一趟判红）
-  seed-copy-serial     工作进程从先编那一份拷依赖产物时照改前在一条线程上逐个拷
+  seed-copy-serial     工作进程从先编那一份拷依赖产物时在一条线程上逐个拷
     本模块自证「工作进程拷依赖产物分到几条线程上同时拷」那一格必须判错
 下面这个开关（基线的批按工作进程并行），下一行起写打开后必须判错的自证项：
   baseline-one-at-a-time 基线的批一次只派一批（在跑的那一批收完才派下一批）
     本模块自证「4 个工作进程、8 批基线：同时在跑的基线不少于工作进程数…」那一格必须判错
+重测试目标只许 release 那两个开关（文件头同名一段；写成 CRATES_MUTATION_ROWS_BREAK=<项>，GATE_MUTATION_BREAK 同样认），一行一个，下一行起写打开后必须判错的自证项：
+  CRATES_MUTATION_ROWS_BREAK=release-unforced  命中重测试目标而 cargo 参数没带 release 的行不补 --release：崩溃枚举用例目标与 gpu 行在 debug 档跑
+    本模块自证「重测试目标只许 release：命中的两行（crash-case 目标、gpu 特性）起的每一次 cargo 都带 --release、只带一个，不命中的那一行一次都不带，stderr 点名补了哪两行」那一格必须判错
+  CRATES_MUTATION_ROWS_BREAK=release-unchecked  static-check 不判命中重测试目标而第五段没写 --release 的行
+    本模块自证「static-check 的 RELEASE：命中而第五段没写 --release 的两行（gpu 特性、crash-case 目标）各报一行、带依据、跟一行写出路，退 1；命中写了的与不命中的不报，两行都写上之后退 0」那一格必须判错
 只供测试的开关：GATE_MUTATION_STOP_AFTER_ROWS=<k> 现跑的变异判完 k 条就不再派活、等在跑的收完，整道判红退出（造「跑到一半被杀」）。
 """
 import ast
@@ -736,8 +785,8 @@ JUDGING_ENTRIES_VERDICT_ONLY = (
     "scripts/mutation/lib_mutation_units.py::UnitKeys.executed_units",     # 覆盖落进哪几个单元
 )
 # 施加变异、还原源码、拼基线与变异的命令、起 cargo、拷每片的源码副本：这几段改了，同一把行键下判出的结局就会变，一并进判法单元
-# （弄坏开关 judging-entries-verdict-only 下只收上面那几个，改前的样子）。起进程那一下、找多机配置文件与起临时 prune-server 经 init_worker 交的引用，不进闭包
-# （judge_row 那几个的闭包里没有折不出命令的 Popen，也不载入客户端自证那一份；弄坏开关 judging-entries-with-temporary-service 下另收 mutation_run_prune_server，改前的样子）；记覆盖的 judge_coverage 不进：它的闭包够到 scripts/gate/lib_function_units.py 的自证夹具（折不出路径的 subprocess），覆盖落单元的判法另由
+# （弄坏开关 judging-entries-verdict-only 下只收上面那几个）。起进程那一下、找多机配置文件与起临时 prune-server 经 init_worker 交的引用，不进闭包
+# （judge_row 那几个的闭包里没有折不出命令的 Popen，也不载入客户端自证那一份；弄坏开关 judging-entries-with-temporary-service 下另收 mutation_run_prune_server）；记覆盖的 judge_coverage 不进：它的闭包够到 scripts/gate/lib_function_units.py 的自证夹具（折不出路径的 subprocess），覆盖落单元的判法另由
 # UnitKeys.executed_units 管
 JUDGING_ENTRIES = JUDGING_ENTRIES_VERDICT_ONLY + (
     "scripts/mutation/crates-mutation-rows.py::judge_row",                 # 改坏那一处、跑点名的测试、还原、判结局、写记录
@@ -754,8 +803,8 @@ JUDGING_ENTRY_TEMPORARY_SERVICE = "scripts/mutation/crates-mutation-rows.py::mut
 
 
 def judging_entries(environment):
-    """这一趟判法单元从哪几个入口收闭包（文件头「判法单元」）。弄坏开关 judging-entries-verdict-only：只收结局分类那几个（改前的样子）；
-    judging-entries-with-temporary-service：另收起临时 prune-server 那一段（改前的样子：run_cargo_command 直接调 mutation_run_prune_server）。"""
+    """这一趟判法单元从哪几个入口收闭包（文件头「判法单元」）。弄坏开关 judging-entries-verdict-only：只收结局分类那几个；
+    judging-entries-with-temporary-service：另收起临时 prune-server 那一段，run_cargo_command 直接调 mutation_run_prune_server。"""
     if break_is(environment, "judging-entries-verdict-only"):
         return JUDGING_ENTRIES_VERDICT_ONLY
     if break_is(environment, "judging-entries-with-temporary-service"):
@@ -814,9 +863,9 @@ PER_MUTATION_TEMPORARY_DIRECTORY_NAME = "per-mutation-tmp"
 SIZE_TEXT = re.compile(r"^([1-9][0-9]*)([KMGT])$")             # 磁盘余量与编译目录上限的写法：systemd 的写法，1024 进制
 SIZE_UNIT_BYTES = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}
 # 编译目录占盘（文件头「磁盘余量」「编译目录上限」）：每个工作进程最多占两份编译目录（普通一份、插桩一份），一份涨满按 TARGET_DIRECTORY_CAP 算。
-# 默认 64G 是推的：第二台量到的 -w<片号> 普通 39–71G、插桩 30–68G（records/2026-09-16-subagent拆分提案.md 第七十八节追记，2026-10-21），取中偏上；
-# 本机一份普通的此刻 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（量的，2026-10-21），所以清增量产物不一定清到线下，清完仍超线的只报、不动别的。
-# 备用 30G 是推的：留给别的会话与系统，不让工作进程把盘写满（2026-10-20 第二台 1.8T 写满过一次、2026-10-21 又只剩 4.2G）。
+# 默认 64G 是推的：第二台量到的 -w<片号> 普通 39–71G、插桩 30–68G（records/2026-09-16-subagent拆分提案.md 第七十八节追记），取中偏上；
+# 本机一份普通的此刻 77G，其中 debug/incremental 13G、debug/deps 30G、release 30G（量的），所以清增量产物不一定清到线下，清完仍超线的只报、不动别的。
+# 备用 30G 是推的：留给别的会话与系统，不让工作进程把盘写满（第二台 1.8T 的盘会被写满）。
 TARGET_DIRECTORY_CAP_VARIABLE = "GATE_MUTATION_TARGET_DIR_CAP"
 DEFAULT_TARGET_DIRECTORY_CAP = "64G"
 DISK_FREE_VARIABLE = "GATE_MUTATION_DISK_FREE"          # 外层给的目标盘余量（systemd 写法）；不设就读编译目录所在那块盘
@@ -835,7 +884,7 @@ WORKER_PEAKS_RECENT = 256                # 每个编译并行度只看最新的�
 WORKER_PEAK_SAMPLE_SECONDS = 0.2         # 工作进程里的采样线程隔多久量一次整棵进程树
 WORKER_PEAK_WRITE_STEP_BYTES = 16 << 20  # 这一趟的最大涨了这么多才重写一次记录：记下的比真峰值至多少这么多
 WORKER_PEAK_RECORD_NAME = re.compile(r"[0-9]{20}-[0-9]+-[0-9a-z]{8}")   # worker-peaks/<编译并行度>/ 下一份记录的名字：起采样的时刻纳秒、进程号、随机字符
-SLICE_MEMORY_CAP_KEY = "SLICE_MEMORY_CAP_BY_HOST"   # 仓根多机配置 multi-host.env 里各台 slice 的总上限（<地址>=<systemd 写法> 的若干项，取这一台那一项；用户定「变异的内存上限直接按照根目录设置的 50gb 走」）
+SLICE_MEMORY_CAP_KEY = "SLICE_MEMORY_CAP_BY_HOST"   # 仓根多机配置 multi-host.env 里各台 slice 的总上限（<地址>=<systemd 写法> 的若干项，取这一台那一项；变异的内存上限直接按根目录设置的 50G 走）
 CGROUP_LISTING = "/proc/self/cgroup"
 CGROUP_ROOT = "/sys/fs/cgroup"
 TARGET_DIRECTORY_COPIES_PER_WORKER = 2                  # 普通一份、插桩一份
@@ -923,9 +972,21 @@ ROW_PROBLEM_KINDS = ("MALFORMED", "ANCHOR", "NAME", "ROW", "STRAY")
 _ADMISSION_MODULE = []
 # 拷贝范围（copied_with_path_dependencies）用 scripts/hosts/lib_repository_copy.py 的 copy_closure，不另抄一份；多机配置只交给真跑的测试（test_runs_multi_host_configuration）
 REPOSITORY_COPY_PATH = os.path.join(SCRIPT_DIRECTORY, "..", "hosts", "lib_repository_copy.py")
+# 拷贝范围跟不全时 <根> 是仓副本的那一种出路（编译期、运行期读的仓根文件在副本里没有：副本拷不全）；建法与 lib_repository_copy.py 的 copy_rebuild_howto 同一句
+COPY_REBUILD_HOWTO = ("<根> 是仓副本、报的是读的仓根文件「在仓里没有」的，是副本拷不全：仓副本只用 python3 scripts/hosts/minimal-copy.py <仓根> <新副本目录> --with-test-inputs 建"
+                      "（拷哪些由 scripts/hosts/lib_repository_copy.py 的闭包现算），副本里自己的改动搬进新副本再判；不手拷、不手补缺的条目")
 REGISTERED_COPY_RANGE_REASON = "登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行的 copy-range"
 _REPOSITORY_COPY_MODULE = []
 _PRUNE_SERVER_TEMPORARY_SERVICE_MODULE = []
+# 重测试目标只许 release（文件头同名一段）：判法只在 lib_release_only_tests.py，这里按路径载入调它
+RELEASE_ONLY_TESTS_PATH = os.path.join(SCRIPT_DIRECTORY, "lib_release_only_tests.py")
+_RELEASE_ONLY_TESTS_MODULE = []
+# 登记表从哪一份仓根读：本模块所在那一份（判别力样本的目录里没有登记表，同拷贝范围）；自证那两格换成自己造的一份再换回
+RELEASE_REGISTRY_ROOT = [STAGE_REPOSITORY]
+RELEASE_HOWTO = ("第五段补上 --release（插在第一个 -- 之前）：穷举、长时间随机、真设备这类用例用优化构建跑（.claude/rules/test-script-discipline.md「编译与算法都要快」）；"
+                 "命中哪一样写在每行的依据里，判法在 scripts/mutation/lib_release_only_tests.py；补完单跑 python3 scripts/mutation/crates-mutation-rows.py static-check . 看那一行不再报 RELEASE")
+RELEASE_REGISTRY_HOWTO = ("照报错改 .claude/gate.d/stage-inputs.tsv 的 crash-case: 行（写法在那张表的文件头与 scripts/gate/admission.py 的 parse_crash_case）；"
+                          "登记表读不了就判不了哪几行是重测试目标，不当不命中")
 
 
 def admission_module():
@@ -957,7 +1018,7 @@ def note(text):
 
 def cargo_debug_overrides(environment):
     """这一道起的 cargo 的构建档覆盖（文件头「调试信息」）：{CARGO_PROFILE_<档>_DEBUG: 取值}，起 cargo 的环境照它顶掉调用方的同名变量。
-    弄坏开关 debuginfo-kept：交空（改前的样子，调试信息照 Cargo.toml 与调用方的环境开着）。"""
+    弄坏开关 debuginfo-kept：交空（调试信息照 Cargo.toml 与调用方的环境开着）。"""
     if break_is(environment, "debuginfo-kept"):
         return {}
     return {f"CARGO_PROFILE_{profile}_DEBUG": CARGO_DEBUG_SETTING[0] for profile in CARGO_DEBUG_PROFILES}
@@ -1025,11 +1086,52 @@ def repository_copy_module():
     return _REPOSITORY_COPY_MODULE[0]
 
 
+def release_only_tests_module():
+    """scripts/mutation/lib_release_only_tests.py（重测试目标只许 release 的判法），第一次用到时才读进来。"""
+    if not _RELEASE_ONLY_TESTS_MODULE:
+        specification = importlib.util.spec_from_file_location("lib_release_only_tests_for_crates_mutation_rows", RELEASE_ONLY_TESTS_PATH)
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        _RELEASE_ONLY_TESTS_MODULE.append(module)
+    return _RELEASE_ONLY_TESTS_MODULE[0]
+
+
+def release_registered_targets():
+    """登记表里 crash-case: 行点到的测试目标（lib_release_only_tests.py 的 crash_case_targets，读 RELEASE_REGISTRY_ROOT 那一份）；读不了抛它的 RegistryUnreadable。"""
+    return release_only_tests_module().crash_case_targets(RELEASE_REGISTRY_ROOT[0])
+
+
+def release_forced_row(row, registered, environment):
+    """(行, 依据或 None)：命中重测试目标而 cargo 参数没带 release 的行换成补了 --release 的（文件头「重测试目标只许 release」），依据是补的理由；
+    别的原样、依据交 None。Row.fields 不动（用时表与索引照它取名字）。弄坏开关 release-unforced：一律原样。"""
+    if break_is(environment, "release-unforced"):
+        return row, None
+    arguments, requirement = release_only_tests_module().release_forced(row.arguments, registered=registered)
+    if arguments == row.arguments:
+        return row, None
+    return row._replace(arguments=arguments), requirement.basis
+
+
+def release_unwritten_rows(rows, environment):
+    """static-check 的 RELEASE（文件头 static-check 那一段）：命中重测试目标而第五段没写 release 的行 [(行号, 变异名, 依据)]，按表的次序；
+    登记表读不了抛 lib_release_only_tests.py 的 RegistryUnreadable。弄坏开关 release-unchecked：一行都不报。"""
+    if break_is(environment, "release-unchecked"):
+        return []
+    module = release_only_tests_module()
+    registered = release_registered_targets()
+    unwritten = []
+    for row in rows:
+        requirement = module.release_requirement(row.arguments, registered=registered)
+        if requirement.release_missing:
+            unwritten.append((row.line_number, row.name, requirement.basis))
+    return unwritten
+
+
 def copied_with_path_dependencies(root, copied, environment):
     """登记的拷贝范围 copied 再加被判那棵树 root 的共用拷贝范围（文件头「拷贝范围」）：lib_repository_copy.py 的 copy_closure（带测试代码扫，
     登记的那几处经 declared 声明，它们的 path 依赖照跟）。登记的在前、照原次序，闭包算出的接在后面（已落在登记那几处里的不重复交）。
     闭包算不成抛 ValueError（ClosureRefused 是它的子类）或 OSError。
-    弄坏开关 path-dependencies-not-copied：不调 copy_closure，只交登记的那几处（改前的样子：副本里缺 prune-server/，cargo 解析工作区就失败）。"""
+    弄坏开关 path-dependencies-not-copied：不调 copy_closure，只交登记的那几处，副本里缺 prune-server/，cargo 解析工作区就失败。"""
     if break_is(environment, "path-dependencies-not-copied"):
         return list(copied)
     library = repository_copy_module()
@@ -1061,7 +1163,7 @@ def manifest_directory_of(root, arguments, environment):
     没写 --manifest-path 交 ("", None)，是 <根> 那一份工作区。写坏了交 (None, 为什么)：写了不止一次、后面缺路径、是绝对路径
     （每片在自己的源码副本根起 cargo，绝对路径指不进副本）、文件名不是 Cargo.toml、落在 <根> 之外（经符号链接出去的同样算）、那份文件不在。
     相对路径照 cargo 在副本根起时的解法，相对 <根> 算。
-    弄坏开关 manifest-path-ignored：一律交 ("", None)（改前的样子：拷贝范围不补那个包目录，单元键照 <根> 那一份工作区算）。"""
+    弄坏开关 manifest-path-ignored：一律交 ("", None)，拷贝范围不补那个包目录，单元键照 <根> 那一份工作区算。"""
     if break_is(environment, "manifest-path-ignored"):
         return "", None
     before = split_at_double_dash(arguments)[0]
@@ -1739,7 +1841,7 @@ def utc_now_text():
 
 def refuse_overrides_outside_service(environment):
     """只给自证换的变量（文件头「判定库」）不在临时 prune-server 底下设了：抛 InputManifestError、点名设了的几个，一条都不跑。
-    弄坏开关 run-overrides-honored-outside-service 下放过这两个（改前的样子）。"""
+    弄坏开关 run-overrides-honored-outside-service 下放过这两个。"""
     admission = admission_module()
     if under_temporary_prune_server(environment):
         return
@@ -1753,7 +1855,7 @@ def refuse_overrides_outside_service(environment):
 
 def records_home(root, environment):
     """判定库放在哪个目录底下（文件头「判定库」）：被判那棵树的 git common-dir；
-    取不到抛 InputManifestError（弄坏开关 library-outside-git-tolerated 下照改前拿被判的根当库根）。先过 refuse_overrides_outside_service。"""
+    取不到抛 InputManifestError（弄坏开关 library-outside-git-tolerated 下拿被判的根当库根）。先过 refuse_overrides_outside_service。"""
     refuse_overrides_outside_service(environment)
     admission = admission_module()
     common_directory = admission.git_common_directory(root)
@@ -1805,7 +1907,7 @@ def run_records_directory(root, environment):
 
 
 def snapshot_of(base, copied):
-    """base 底下拷贝范围里（跳过 target 与 crates/mutations.tsv）每个文件的 {路径: sha256}：只给弄坏开关 baseline-by-tree-snapshot 用（基线按整树快照比，改前的判法），
+    """base 底下拷贝范围里（跳过 target 与 crates/mutations.tsv）每个文件的 {路径: sha256}：只给弄坏开关 baseline-by-tree-snapshot 用（基线按整树快照比），
     基线记录里照记一份当属性，不当复用的依据。"""
     files = {}
     for item in copied:
@@ -1892,6 +1994,8 @@ class KeyContext:
         self.collisions = []   # 撞键的几组行号（refuse_colliding_row_keys）
         self.gpu_route_lines, self.gpu_route_configuration = [], None   # 补了 gpu 特性的行（行号, 补的特性）与那份多机配置（gpu_route_rows）
         self.gpu_route_unbuilt = []   # 补了 gpu 特性点名的测试就不编、照原样留着的行（行号, 为什么）
+        # 命中重测试目标、补了 --release 的行（行号, 依据）与那一份登记的测试目标（plan_rows、gpu_route_rows；文件头「重测试目标只许 release」）
+        self.release_lines, self.release_registered = [], None
 
     def keys_for(self, row):
         """(这一行的单元键, None) 或 (None, 拒算那一句)：单元键与工具链行按行的包目录取（文件头「--manifest-path」，工具链行见 toolchain_of）。
@@ -1972,7 +2076,7 @@ class KeyContext:
         # 算出同一把键，由 refuse_colliding_row_keys 判成拒算（文件头「行键」）
         mutated_lines = [] if break_is(self.environment, "mutated-unit-ignored") else [f"{reference.kind}\t{reference.fingerprint}" for reference in mutated]
         # 基线键与覆盖号带点名测试所在的包与测试目标：两个目标里各有一条字面相同的测试，基线与覆盖不互相顶替（文件头「判定库」）。
-        # 弄坏开关 baseline-key-without-target：不带（改前的样子）
+        # 弄坏开关 baseline-key-without-target：不带
         test_target = [] if break_is(self.environment, "baseline-key-without-target") else [
             ("test-target", [f"{keys.workspace.targets[test.target].crate.package}\t{test.target}"])]
         test_key = "" if break_is(self.environment, "test-closure-ignored") else closure.key
@@ -2072,7 +2176,7 @@ def executed_set_is_current(keys, coverage):
 def baseline_reuse_problem(record, components, keys, coverage, snapshot, environment):
     """覆盖复用判据（基线 ok 那一条复用不复用）：成立交 None，不成立交那一句。判据（按次序，头一条成立就复用）：
       覆盖记录里点名测试执行过的单元此刻逐个没变（executed_set_is_current）；或者点名测试的闭包键与记录里的相同。
-    不按整树快照比：同一个文件里加一个没人调的函数、改别的测试，基线照样复用。弄坏开关 baseline-by-tree-snapshot：只按整树快照比（改前的判法）。"""
+    不按整树快照比：同一个文件里加一个没人调的函数、改别的测试，基线照样复用。弄坏开关 baseline-by-tree-snapshot：只按整树快照比。"""
     if record is None or record.get("verdict") != REUSABLE_VERDICT["baseline"]:
         return "没有基线 ok 的记录"
     if break_is(environment, "baseline-by-tree-snapshot"):
@@ -2153,7 +2257,7 @@ def libtest_selects(full_name, filters, exact, skips):
 def row_baseline_output(row, output, environment):
     """一批基线的输出里这一行看得见的那一份（文件头「基线」）：只留这一行自己的过滤词选得中的用例的结果行，别的结果行去掉。
     一批的过滤词是这一趟拼进来的各行的并集，拼进了哪几行随这一趟选了哪几行变；这样一行的基线结局与它单跑时相同，点名单跑与整张表对同一行判同一个结论。
-    弄坏开关 baseline-batch-composition：照整批的输出判（改前的样子）。结果词被隔开的结果行先接回一行再按名字选（joined_result_lines）。"""
+    弄坏开关 baseline-batch-composition：照整批的输出判。结果词被隔开的结果行先接回一行再按名字选（joined_result_lines）。"""
     if break_is(environment, "baseline-batch-composition"):
         return output
     filters, exact, skips = row_libtest_selection(row.arguments)
@@ -2202,7 +2306,7 @@ def joined_result_lines(output, environment=None):
     把结局接到起头那一行上、单独那一行去掉，别的行原样留着（libtest 打 `test <名> ... ` 与结局是两次写，别的线程的输出插在中间）。
     起头之后先来了别的 `test <名> ... ` 或整行结果行的，前一条认不出结局、不接；这一段另有没有起头可接的单独一行结局，接出来的都不认
     （同 lib_libtest_result_lines.py 的 account_binary），原文照旧交回。
-    弄坏开关 split-result-line-unseen（environment 没给取进程环境）：不接，照改前的样子只认同一行写全的结果行。"""
+    弄坏开关 split-result-line-unseen（environment 没给取进程环境）：不接，只认同一行写全的结果行。"""
     environment = os.environ if environment is None else environment
     if break_is(environment, "split-result-line-unseen"):
         return output
@@ -2288,7 +2392,7 @@ def not_run_reason(expected, output, environment=None):
     """输出里有 NOT_RUN_NO_GPU_ADAPTER 那一族本次未跑行时交接在「打了 NOT_RUN_NO_GPU_ADAPTER」后面括号里的那一句（文件头「本次未跑」），一行都没有交 None：
     test= 对上点名的测试（只比 :: 分开的末一段）的那一行先取，交它 reason= 之后那一句（没写交「没写为什么」）；
     都对不上的（崩溃枚举用例判段不跑时打的是 test=crash_state_enumeration::<项名>，项名不是测试名）照样交，写明 test= 是什么、对不上测试名：
-    宁可记本次未跑，不记没红。弄坏开关 not-run-test-name-only（environment 给了才认）：只认 test= 对得上的（改前的样子）。"""
+    宁可记本次未跑，不记没红。弄坏开关 not-run-test-name-only（environment 给了才认）：只认 test= 对得上的。"""
     wanted = expected.split("::")[-1]
     found_lines = list(NOT_RUN_LINE.finditer(output))
     for found in found_lines:
@@ -2422,7 +2526,7 @@ def init_worker(sequence_counter, shard_root, context):
     for signal_number in STOP_SIGNALS:
         signal.signal(signal_number, signal.SIG_DFL)
     # 每个工作进程的峰值（文件头「内存上限」的「每个工作进程的峰值」）：起采样线程量本进程整棵树（连拷副本、先编依赖的拷贝在内），按编译并行度记进运行记录目录。
-    #   被判的不是本仓（门禁样本根）不起（worker_peaks_recorded_for）；弄坏开关 worker-peaks-unrecorded：都不起（改前的样子）
+    #   被判的不是本仓（门禁样本根）不起（worker_peaks_recorded_for）；弄坏开关 worker-peaks-unrecorded：都不起
     if context.get("worker_peaks_recorded") and not break_is(context["environment"], "worker-peaks-unrecorded"):
         threading.Thread(target=sample_worker_peak, name="worker-peak-sampler", daemon=True,
                          args=(context["run_records_directory"], context["environment"]["CARGO_BUILD_JOBS"], context["environment"])).start()
@@ -2465,7 +2569,7 @@ def claim_worker_slot(shared, local_counter, environment):
     """领片号：从 1 往上，对每一片的锁文件试拿排他 flock（不阻塞），拿到第一个空闲的就是这个工作进程的片号。回 (片号, 锁文件句柄或 None)。
     锁文件拿在句柄上，工作进程退出内核放；同一台机器上并发的几次调用因此拿到不相交的片号集合，缓存目录（-w<片号>）照旧跨轮复用。
     锁文件建不了、或 WORKER_SLOT_SEARCH_LIMIT 片都被占：报一行，退回本地序号（本调用内不重，跨调用可能重）。
-    弄坏开关 local-shard-numbering：不看锁文件，照改前从本调用的共享计数器现领序号。"""
+    弄坏开关 local-shard-numbering：不看锁文件，从本调用的共享计数器现领序号。"""
     import fcntl
     if not break_is(environment, "local-shard-numbering"):
         reason = None
@@ -2492,7 +2596,7 @@ def prepare_shard(worker_sequence, shard_root, context):
     """一个工作进程自己的一份源码副本加一个编译目录。第 1 片用共用的编译目录（跨轮热着），其余片 -w<片号> 自己冷编译一次，不从共用目录拷种子。
     ⚠️ 拷的时候不留原来的修改时刻（shutil.copy，不用 copy2）：编译目录跨轮复用，里面最后一次编的可能是上一轮改坏的源码、
     带着上一轮副本的 CARGO_MANIFEST_DIR；副本留着原来较早的修改时刻，cargo 就判它不用重编，没改坏的基线跑的是上一轮改坏的二进制
-    （2026-09-28 样本里实测：基线报 attempt to subtract with overflow、读 litmus 读到上一轮已经删掉的副本路径）。
+    （基线会报 attempt to subtract with overflow、读 litmus 读到上一轮已经删掉的副本路径）。
     修改时刻取拷的那一刻，每片头一次编译把工作区的几个 crate 重编一遍（外部依赖不在副本里，照旧热着）。"""
     work = tempfile.mkdtemp(prefix=f"shard-{worker_sequence}-", dir=shard_root)
     for item in context["copied"]:
@@ -2500,7 +2604,7 @@ def prepare_shard(worker_sequence, shard_root, context):
         if not os.path.exists(source):
             continue
         if item == CARGO_CONFIGURATION_DIRECTORY and break_is(context["environment"], "cargoconfignotcopied"):
-            continue   # 弄坏开关（文件头）：照改前的拷贝范围，副本里没有 .cargo/
+            continue   # 弄坏开关（文件头）：不拷 .cargo/，副本里没有它
         target = os.path.join(work, item)
         if os.path.isdir(source):
             shutil.copytree(source, target, ignore=shutil.ignore_patterns(*IGNORED_WHEN_COPYING_INTO_EACH_SHARD), copy_function=shutil.copy)
@@ -2513,7 +2617,7 @@ def prepare_shard(worker_sequence, shard_root, context):
 
 def default_shared_target_directory(environment):
     """调用方给的第 1 片编译目录（其余片加 -w<片号>，记覆盖的再加 -coverage）：GATE_MUTATION_TARGET_DIR 设了交它（跑完不删）；没设交 None，
-    run_pool 在这一趟的 <shard_root>/build 里建（run_build_target_directory）、收尾删。弄坏开关 targetdefaulttmp：没设时照更早的样子交
+    run_pool 在这一趟的 <shard_root>/build 里建（run_build_target_directory）、收尾删。弄坏开关 targetdefaulttmp：没设时交
     ${TMPDIR:-/tmp}/singlefs-crates-mutation-target（跨轮共用、不删）。"""
     explicit = environment.get("GATE_MUTATION_TARGET_DIR", "").strip()
     if explicit:
@@ -2749,7 +2853,7 @@ def disk_bound_for(shared, environment, ceiling, peaks):
     n 从 1 数到 ceiling（前几项取最小的那个数，再多开也用不上）。一个都放不下交 0（调用方按 1 个开）。
     每份的涨幅：peaks（measured_target_peaks 交的 {"普通": 字节或 None, "插桩": 字节或 None}，运行记录目录里近几次每格判完量到的占盘峰值）里有那一种的读数就用它，
     没有读数、peaks 是 None 的按 TARGET_DIRECTORY_CAP 算（上限只当清理线，没实测时才拿它顶）。
-    余量没读到、写法不认交 None 与原因，头一行写明。弄坏开关 disknotchecked：不看磁盘（改前的样子）；diskbudgetbycap：不看实测峰值、一律按上限算（改前的样子）。"""
+    余量没读到、写法不认交 None 与原因，头一行写明。弄坏开关 disknotchecked：不看磁盘；diskbudgetbycap：不看实测峰值、一律按上限算。"""
     if break_is(environment, "disknotchecked"):
         return None, "弄坏开关 disknotchecked：不看磁盘余量"
     free, source = disk_free_bytes(shared, environment)
@@ -2832,7 +2936,7 @@ def task_memory_cap_bytes(environment, cgroup_listing=CGROUP_LISTING, cgroup_roo
     memory.max 是 max（不限）或读不到，不收窄，照 ① ② 的值，① ② 也没有就交 None 与原因，调用方照线程数开。
     cgroup_listing、cgroup_root 是默认值（/proc/self/cgroup、/sys/fs/cgroup）时，环境里的 GATE_MUTATION_CGROUP_LISTING、GATE_MUTATION_CGROUP_ROOT 设了就换成它们（只给自证用，生产不设）。
     这两个变量名与默认值写在函数体里、不做模块级常量：模块级的赋值与 def 头缺省值都在判法单元的闭包里（文件头「判法单元」），多一个整库的行键就全变。
-    说明写各档读到的值、取了哪一个、为什么（开跑行原样打出）。弄坏开关 memory-max-not-hard-cap：①② 取到了就不拿 memory.max 当硬顶（改前的样子）；memory-cap-ignored 在 memory_bound_for。"""
+    说明写各档读到的值、取了哪一个、为什么（开跑行原样打出）。弄坏开关 memory-max-not-hard-cap：①② 取到了就不拿 memory.max 当硬顶；memory-cap-ignored 在 memory_bound_for。"""
     if cgroup_listing == CGROUP_LISTING:
         cgroup_listing = environment.get("GATE_MUTATION_CGROUP_LISTING", "").strip() or cgroup_listing
     if cgroup_root == CGROUP_ROOT:
@@ -2879,7 +2983,7 @@ def task_memory_cap_bytes(environment, cgroup_listing=CGROUP_LISTING, cgroup_roo
         # ① ② 都没有：memory.max 是有限值就取它（它自己就是这一条拿到的上限），不然这一项不收
         return scope_cap, "；".join(notes + [scope_text])
     readings_text = "各档读到：" + "、".join(readings)
-    hard_cap = None if break_is(environment, "memory-max-not-hard-cap") else scope_cap   # 弄坏开关：改前的样子，①② 取到了就不拿 memory.max 当硬顶
+    hard_cap = None if break_is(environment, "memory-max-not-hard-cap") else scope_cap   # 弄坏开关：①② 取到了就不拿 memory.max 当硬顶
     if hard_cap is not None and hard_cap < chosen[0]:
         return scope_cap, "；".join(notes + [f"{scope_text}（硬顶：超了整组被杀）；比它大的 {chosen[1]}（{format_size(chosen[0])}）不取，取两者里小的", readings_text])
     why = ("scope 的 memory.max 没有硬顶可比，取服务交的变量，没有就取多机配置的" if scope_cap is None
@@ -2914,7 +3018,7 @@ def record_worker_peak(records_directory, jobs, name, peak_bytes):
 def worker_peaks_recorded_for(root, environment):
     """这一趟的工作进程写不写峰值记录（文件头「内存上限」的「记在哪」）：被判的是本模块所在的仓、或 --staged 的临时树（GATE_STAGED_FROM 设着）、
     或在临时 prune-server 底下（自证：运行记录目录按库所在的目录分开）才写；别处（门禁样本根这一类）不写：样本 crate 的峰值不代表本仓，
-    不在临时服务底下时它的运行记录目录就是本仓那一份，写进去会把小读数掺进去。弄坏开关 sample-root-peaks-recorded：都写（改前的样子）。"""
+    不在临时服务底下时它的运行记录目录就是本仓那一份，写进去会把小读数掺进去。弄坏开关 sample-root-peaks-recorded：都写。"""
     return (break_is(environment, "sample-root-peaks-recorded") or os.path.realpath(root) == os.path.realpath(STAGE_REPOSITORY)
             or bool(environment.get("GATE_STAGED_FROM", "").strip()) or under_temporary_prune_server(environment))
 
@@ -2933,6 +3037,17 @@ def process_usage_bytes(pid):
         if name in ("RssAnon", "RssShmem", "VmPTE") and words and words[0].isdigit():
             total += int(words[0]) * 1024
     return total
+
+
+def base_reading_line(parent_bytes, seed_tree_peak_bytes, seed_built):
+    """底座读数那一行（文件头「内存上限」的「底座读数」）：机读的 MUTATION_BASE_READING 三个字段，后面接一句人读的。"""
+    parent = "none" if parent_bytes is None else str(parent_bytes)
+    seed = "none" if seed_tree_peak_bytes is None else str(seed_tree_peak_bytes)
+    parent_text = "读不到" if parent_bytes is None else format_size(parent_bytes)
+    seed_text = "读不到" if seed_tree_peak_bytes is None else format_size(seed_tree_peak_bytes)
+    return (f"MUTATION_BASE_READING parent_bytes={parent} seed_step_tree_peak_bytes={seed} seed_step={'built' if seed_built else 'not-built'}"
+            f"  （底座读数：派活之前起这一道的父进程自己 {parent_text}；先编一份依赖那一步（工作进程起来之前）父进程整棵进程树的峰值 {seed_text}"
+            f"{'' if seed_built else '，这一趟没先编，只量到父进程自己'}；口径同每个工作进程的读数：RssAnon + RssShmem + VmPTE 加总）")
 
 
 def process_tree_usage(root_pid, environment):
@@ -3045,7 +3160,7 @@ def measured_worker_peaks(records_directory, environment):
 def worker_peak_for_jobs(peaks, jobs, cap, environment):
     """编译并行度 jobs 下每个工作进程的峰值（文件头「内存上限」的「怎么除」）：(字节, 取法)。peaks 是 measured_worker_peaks 交的（None 是整份读不了）。
     ① jobs 有实测取它；② 没有而更高的编译并行度有，借比它大的里最小那一个的；③ 都没有、或整份读不了，取保守值 = 内存上限 cap 本身（只开 1 个）。
-    弄坏开关 unmeasured-worker-peak-guessed（③ 里没有实测那一种）、unreadable-worker-peaks-guessed（读不了那一种）：照改前写死的默认 3G。"""
+    弄坏开关 unmeasured-worker-peak-guessed（③ 里没有实测那一种）、unreadable-worker-peaks-guessed（读不了那一种）：写死的默认 3G。"""
     if peaks is None:
         if break_is(environment, "unreadable-worker-peaks-guessed"):
             return bytes_of_size("3G"), "峰值记录读不了，照写死的默认 3G（弄坏开关 unreadable-worker-peaks-guessed）"
@@ -3068,7 +3183,7 @@ def memory_bound_for(environment, ceiling, processor_count, records_directory, c
     n 从 1 试到 ceiling：编译并行度 j = cargo_jobs_for(n)，每个工作进程的峰值 P = worker_peak_for_jobs(j)，满足 n × P ≤ 上限的最大 n 是这一项；
     到了 ceiling 还满足报 ⌊上限 ÷ P⌋（编译并行度照 ceiling 算，不与另外三项并列成「卡在」）；一个都不满足交 0（调用方按 1 个开）。
     没有内存上限（memory.max 是 max、读不到）交 None 与原因，这一项不收、照线程数开。
-    弄坏开关 memory-cap-ignored：不看内存上限（改前的样子）；jobs-feedback-ignored：每个 n 的编译并行度都照 ceiling 算。"""
+    弄坏开关 memory-cap-ignored：不看内存上限；jobs-feedback-ignored：每个 n 的编译并行度都照 ceiling 算。"""
     if break_is(environment, "memory-cap-ignored"):
         return None, "弄坏开关 memory-cap-ignored：不看内存上限"
     cap, cap_source = task_memory_cap_bytes(environment, cgroup_listing, cgroup_root, configuration_path)
@@ -3116,7 +3231,7 @@ def trim_target_directory(directory, cap_bytes, environment):
     """一份编译目录占盘超过 cap_bytes 时清掉它底下的增量产物（incremental，rustc 每编一次改坏的副本都往里加、只增不减），回 (清前占盘, 清后占盘, [(清掉的目录或文件, 字节)])。
     清完增量仍超线的，再清 deps 里同名产物的旧版本（stale_dependency_artifacts：每个产物只留最新那一版）。
     没超线、目录不在、cap_bytes 是 None 都不动，清前清后交同一个数。清完回读再量一遍，不拿清前减清掉的估。只在两格之间调（run_pool 里每格判完），那时没有 cargo 在这份目录上跑。
-    每个产物的最新一版不动，清完仍超线的由调用方报并停派（trim_worker_target）。弄坏开关 targetcapignored：不清（改前的样子）；depsnotpruned：只清增量、不清 deps 里的旧版本。"""
+    每个产物的最新一版不动，清完仍超线的由调用方报并停派（trim_worker_target）。弄坏开关 targetcapignored：不清；depsnotpruned：只清增量、不清 deps 里的旧版本。"""
     if break_is(environment, "targetcapignored") or cap_bytes is None or not os.path.isdir(directory):
         return 0, 0, []
     before = allocated_bytes_of_tree(directory)
@@ -3190,7 +3305,7 @@ def trim_worker_target(coverage):
              + f"，清后 {format_size(after)}"
              + ("；清后仍超上限（剩下的是每个依赖与测试二进制的最新一版）：停派（文件头「编译目录上限」）" if still_over else ""))
         if still_over and not break_is(context["environment"], "overcapdispatched"):
-            # 停派（文件头「编译目录上限」）：往这一趟 shard_root 里的停派目录写一份，父进程每收一格看一眼，有就不再派活。弄坏开关 overcapdispatched：只报不停（改前的样子）
+            # 停派（文件头「编译目录上限」）：往这一趟 shard_root 里的停派目录写一份，父进程每收一格看一眼，有就不再派活。弄坏开关 overcapdispatched：只报不停
             report = (f"第 {WORKER_STATE.get('worker_sequence', '?')} 片的{'插桩' if coverage else '普通'}编译目录 {directory}："
                       f"清前 {format_size(before)}、清后 {format_size(after)}，上限 {format_size(cap)}")
             try:
@@ -3485,7 +3600,7 @@ def build_seed_group(context, command, seed_source, extra_environment, temporary
 
 def prepare_seed(context, batches, ordered_rows, coverage_planner, temporary_root):
     """派活之前先编一份依赖：交 (要报的话, 判红的那几句)。编成的记进 context["seed_targets"]（{"plain" 或 "coverage": 编译目录}），
-    工作进程起来时照它拷（copy_seed_dependencies）；没起、没编成的不在里面。弄坏开关 compile-per-worker：不起（改前的样子）。"""
+    工作进程起来时照它拷（copy_seed_dependencies）；没起、没编成的不在里面。弄坏开关 compile-per-worker：不起。"""
     context["seed_targets"] = {}
     environment = context["environment"]
     if break_is(environment, "compile-per-worker"):
@@ -3586,7 +3701,7 @@ def dependency_info_sources(path):
 
 def sync_dependency_artifacts(seed_target, destination, seed_source, environment, threads):
     """把先编那一份里外部依赖的产物（dependency_artifact_entries）拷进 destination：大小与修改时刻都对得上的不拷，拷的保留修改时刻、同目录临时文件写完改名。
-    要拷的文件分到 threads 条线程上同时拷（弄坏开关 seed-copy-serial：照改前在一条线程上逐个拷）；哪一个拷不成，OSError 照抛给调用方。回 (拷了几个文件, 几字节)。"""
+    要拷的文件分到 threads 条线程上同时拷（弄坏开关 seed-copy-serial：在一条线程上逐个拷）；哪一个拷不成，OSError 照抛给调用方。回 (拷了几个文件, 几字节)。"""
     pending = dependency_copy_jobs(seed_target, destination, seed_source, environment)
     copy_dependency_files(pending, threads, environment)
     return len(pending), sum(size for _path, _target, size in pending)
@@ -3725,7 +3840,7 @@ def run_capturing_output(command, **popen_keywords):
 def gpu_test_run(command, environment=None):
     """这一次起的是不是带 gpu 特性、真跑测试的 cargo test：`--` 之前开了上卡的特性（--features / -F 里有 GPU_TEST_FEATURES 里的名字或 <包>/<名字>，或 --all-features），
     而且不带 --no-run。收尾补 --test-threads（with_gpu_test_threads）与核用没用上卡（文件头「真跑测试的格把多机配置交给测试、带 gpu 特性的格跑完核真用了卡」）都照它认。
-    弄坏开关 product-gpu-feature-unquiesced（environment 给了才认）：只认 gpu，产品 GPU 包的 tests-on-a-real-gpu 不算（改前的样子）。"""
+    弄坏开关 product-gpu-feature-unquiesced（environment 给了才认）：只认 gpu，产品 GPU 包的 tests-on-a-real-gpu 不算。"""
     if "cargo" not in command:
         return False
     words = command[command.index("cargo") + 1:]
@@ -3753,7 +3868,7 @@ def with_gpu_test_threads(command, environment, released_targets):
     cargo 参数点名的测试目标（--test <名>）全在 scripts/gate/admission.py 的 GPU_TEST_THREADS_RELEASED_TARGETS 里的补每台默认重活线程数
     （scripts/hosts/heavy_threads.py 的 default_heavy_threads；取不到打一行说明、照旧带 1）。只编不跑的、不带 gpu 特性的原样交回。
     released_targets 是调用方交的取名单的函数（init_worker 交的 gpu_released_test_targets：名单在 admission.py，不进判法单元的闭包）。
-    补的是起命令时的参数，不进行键（文件头「行键」）。弄坏开关 gpu-test-threads-unadded：不补（改前的样子）。"""
+    补的是起命令时的参数，不进行键（文件头「行键」）。弄坏开关 gpu-test-threads-unadded：不补。"""
     if break_is(environment, "gpu-test-threads-unadded") or not gpu_test_run(command, environment):
         return list(command)
     words = list(command)
@@ -3905,7 +4020,7 @@ def run_cargo_command(command, temporary_directory, label, extra_environment=Non
     environment = dict(state["environment"], TMPDIR=temporary_directory)
     environment.update(extra_environment or {})
     # 真跑测试的每一次把多机配置交给测试（文件头「真跑测试的格把多机配置交给测试」）：副本里它自己找不到，crates 那侧找不到就报错；
-    # 文件在不在 run_stage 起 cargo 之前判过。弄坏开关 test-runs-configuration-unpassed：不设（改前的样子）
+    # 文件在不在 run_stage 起 cargo 之前判过。弄坏开关 test-runs-configuration-unpassed：不设
     if "--no-run" not in command and not break_is(context["environment"], "test-runs-configuration-unpassed"):
         environment["SINGLEFS_MULTI_HOST_CONFIG"] = state["multi_host_configuration"](context["environment"])[0]   # init_worker 交的 test_runs_multi_host_configuration
     with state["temporary_service"](context["prune_server_binary"], command, temporary_directory, context["environment"]) as service_settings:   # init_worker 交的 mutation_run_prune_server
@@ -3919,7 +4034,7 @@ def run_cargo_command(command, temporary_directory, label, extra_environment=Non
 def uncounted_verdict_keeps_counted_record(existing, verdict, row_key, environment):
     """这一条要写进 records/<row_key> 的结局 verdict 不算数（VERDICTS_UNCOUNTED），而库里同一把行键原有的记录 existing（读不到交 None）是算数的结论
     （VERDICTS_COUNTED）时交 True：这一条不写，原有的留着（文件头「复用判据」记红撤绿那一段）；judge_row 与 judge_batch 共用这一份。
-    弄坏开关 uncounted-overwrites-counted：一律交 False（改前的样子：不算数的照写、盖掉原有的算数结论）。"""
+    弄坏开关 uncounted-overwrites-counted：一律交 False，不算数的照写、盖掉原有的算数结论。"""
     if break_is(environment, "uncounted-overwrites-counted"):
         return False
     return (verdict in VERDICTS_UNCOUNTED and existing is not None and existing.get("row_key") == row_key
@@ -3954,7 +4069,7 @@ def run_baseline_batch(key, batch_rows, context):
 def judge_batch(batch):
     """进程池里的一格活：一批基线（没改坏的副本上跑一遍这一批各行点名的测试）。回 (每行的 (行号, 问题或 None), 那一批的尾巴, 写不进去的记录)。
     一行的基线结局不随这一趟拼进了哪几行而变（文件头「基线」）：每行只看它自己的过滤词选得中的结果行（row_baseline_output）。
-    弄坏开关 baseline-batch-composition：照整批那一趟的输出判（改前的样子）。"""
+    弄坏开关 baseline-batch-composition：照整批那一趟的输出判。"""
     key, batch_rows = batch
     context = WORKER_STATE["context"]
     arguments, run, seconds = run_baseline_batch(key, batch_rows, context)
@@ -3977,7 +4092,7 @@ def judge_batch(batch):
             if failed_to_write:
                 record_problems.append(failed_to_write)
         # 记红、撤绿（文件头「复用判据」）：基线不绿的这一行，按它的行键记一条「基线不绿」，盖掉同一把行键原有的「抓到」，下一趟它照现判（先跑基线）。
-        # 弄坏开关 baseline-red-keeps-caught：不记（改前的样子：同一把行键上次抓到的那一份照复用、基线也不再跑）
+        # 弄坏开关 baseline-red-keeps-caught：不记，同一把行键上次抓到的那一份照复用、基线也不再跑
         if problem is not None and components.get("row_key") and not break_is(context["environment"], "baseline-red-keeps-caught"):
             fields = collections.OrderedDict(
                 kind="mutation", row_key=components["row_key"], judging=context["judging"], verdict="baseline-not-ok",
@@ -4001,7 +4116,7 @@ def judge_row(row):
         pristine = handle.read()
     if pristine.count(row.old) != 1:
         # 派活之后源码被改、这一份工作副本里原文不再恰好一次（文件头「锚点失效」）：照锚点失效记这一行，不改坏、不跑、不入库，别的行照判
-        # 弄坏开关 anchor-mid-run-asserts：照改前在这里抛 AssertionError，整个进程池跟着炸
+        # 弄坏开关 anchor-mid-run-asserts：在这里抛 AssertionError，整个进程池跟着炸
         assert not break_is(context["environment"], "anchor-mid-run-asserts"), (row.path, row.name)
         why = f"派活之后源码被改了：工作副本里的原文命中 {pristine.count(row.old)} 次，要恰好 1 次"
         return ((row.line_number, "anchor", anchor_broken_text(row, why), None), {}), []
@@ -4133,7 +4248,7 @@ def record_coverage(job, overrides, configuration, temporary_directory, profiles
     if not executables:
         return "插桩编译没交出一个本仓的可执行文件"
     # 点名用例前自己补 --exact：行的 libtest 参数里已经带了的不再重复补（libtest 报 Option 'exact' given more than once、退 101，覆盖就记不成）；
-    # 弄坏开关 exactduplicated：照改前原样接在后面
+    # 弄坏开关 exactduplicated：原样接在后面
     switches = list(job["switches"]) if break_is(context["environment"], "exactduplicated") else [word for word in job["switches"] if word != "--exact"]
     run, _seconds = run_cargo_command(["cargo", *configuration, "test", "--offline", *job["before"], "--", *switches, "--exact", job["test"]],
                                       temporary_directory, label, dict(overrides, LLVM_PROFILE_FILE=os.path.join(profiles, "cov-%p-%m.profraw")))
@@ -4164,7 +4279,7 @@ def record_coverage(job, overrides, configuration, temporary_directory, profiles
     if directory not in state["unit_keys"]:
         state["unit_keys"][directory] = unit_keys_for_directory(state["work"], directory)
     keys = state["unit_keys"][directory]
-    # 覆盖记的是副本上执行过的单元，没有被改坏的那一行：一律取产品行为视图（与改前一样；这里的 UnitKeys 没问过 mutated_units）
+    # 覆盖记的是副本上执行过的单元，没有被改坏的那一行：一律取产品行为视图（这里的 UnitKeys 没问过 mutated_units）
     test, refusal = keys.resolve_test(job["arguments"], job["expected"], view=mutation_units.function_units().PRODUCT_BEHAVIOR)
     if refusal is not None:
         return f"副本里认不出点名的测试（{refusal}）"
@@ -4207,7 +4322,9 @@ def worker_count_for(row_count, environment, disk=None, memory=None):
     else:
         registered = int(default_heavy_threads(environment))   # 取不到抛 HeavyThreadDefaultError，run_stage 判红退 2
         bounds.append(("每台默认重活线程数", registered, f"每台默认重活线程数 {registered}（scripts/hosts/heavy_threads.py：SINGLEFS_THREAD_CAP 或 .claude/heavy-thread-default）"))
-    bounds.append(("这一趟要现跑的条数", row_count, f"这一趟要现跑 {row_count} 条（没有作数的抓到记录的）"))
+    # 要判的单位（文件头「工作进程数」）：工作进程数不超过它，不照拿到的上限开满；弄坏开关 workers-beyond-rows 下不收这一项
+    if not break_is(environment, "workers-beyond-rows"):
+        bounds.append(("这一趟要现跑的条数", row_count, f"这一趟要现跑 {row_count} 条（没有作数的抓到记录的；基线的批与覆盖跟着这几行走，不另算工作进程）"))
     disk_unread = None
     if disk is not None:
         disk_count, disk_text = disk(max(1, min(count for _name, count, _text in bounds)))
@@ -4253,8 +4370,8 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
     sequence_counter = multiprocessing.Value("i", 0)
     # 被停的信号也要删掉 shard_root（$TMPDIR 下的 singlefs-mutation-replay-*）：先接住再建，建完之后收到的都走 finally；
     # 接信号、起名、建目录都在 try 里：哪一步之后收到都走 finally（信号处理还原、按已记下的名字删目录），名字先记进 shard_root 再 os.mkdir（new_shard_root_path）。
-    # 只在主线程接得了。弄坏开关 shardrootkeptonsignal 下不接（改前的样子：收到就停，shard_root 留在 $TMPDIR）；
-    # 弄坏开关 shardrootnamedlate 下照改前用 tempfile.mkdtemp 建（名字要等它返回才记得下）
+    # 只在主线程接得了。弄坏开关 shardrootkeptonsignal 下不接：收到就停，shard_root 留在 $TMPDIR；
+    # 弄坏开关 shardrootnamedlate 下用 tempfile.mkdtemp 建（名字要等它返回才记得下）
     previous_handlers = {}
     shard_root = None
     try:
@@ -4281,9 +4398,27 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
             for line in target_reclaim_lines(context["shared_target_directory"], worker_count, ([], [], []), owned=True):
                 note(line)
         # 先编一份依赖（文件头「先编一份依赖」）：工作进程起来之前编好，编成的由 init_worker 拷进各自的编译目录；摸过的包没重编整道判红、一个工作进程都不起
-        seed_lines, seed_problems = prepare_seed(context, batches, ordered_rows, coverage_planner, shard_root)
+        # 底座读数（文件头「内存上限」的「底座读数」）：父进程自己此刻的用量，与先编一份依赖那一步（工作进程还没起）父进程整棵树的峰值，口径同每个工作进程的读数
+        base_parent_bytes = process_usage_bytes(os.getpid())
+        seed_tree_peak, seed_sampling_done = [None], threading.Event()
+
+        def sample_seed_step_tree():
+            while True:
+                usage = process_tree_usage(os.getpid(), context["environment"])
+                if usage is not None:
+                    seed_tree_peak[0] = max(seed_tree_peak[0] or 0, usage)
+                if seed_sampling_done.wait(WORKER_PEAK_SAMPLE_SECONDS):
+                    return
+        seed_sampler = threading.Thread(target=sample_seed_step_tree, daemon=True)
+        seed_sampler.start()
+        try:
+            seed_lines, seed_problems = prepare_seed(context, batches, ordered_rows, coverage_planner, shard_root)
+        finally:
+            seed_sampling_done.set()
+            seed_sampler.join(timeout=5)
         for line in seed_lines:
             note(line)
+        note(base_reading_line(base_parent_bytes, seed_tree_peak[0], bool(context["seed_targets"])))
         if seed_problems:
             return dict(mutation=[], mutation_info={}, baseline={}, coverage=[], submitted=0, received=0, stopped=False, left_behind=[], record_problems=[],
                         left_behind_contents={}, per_mutation_temporary_root=per_mutation_temporary_root, seed_problems=seed_problems)
@@ -4378,7 +4513,7 @@ def run_pool(context, worker_count, batches, ordered_rows, baseline_ok_lines, st
 def broken_pool_error_type(environment):
     """「有工作进程中途死了」认的异常类：模块载入时绑定的 BrokenProcessPool。concurrent.futures 不自己载入 process 子模块，进程池还没起（先编一份依赖那一段）
     就被停时按 concurrent.futures.process 属性找它，判 except 的那一刻抛 AttributeError、盖掉原来的 StopRequested（被停退 143 成了回溯退 1）。
-    弄坏开关 broken-pool-looked-up-late：照改前在判 except 的时候按属性找。"""
+    弄坏开关 broken-pool-looked-up-late：在判 except 的时候按属性找。"""
     if break_is(environment, "broken-pool-looked-up-late"):
         return concurrent.futures.process.BrokenProcessPool
     return BrokenProcessPool
@@ -4436,7 +4571,7 @@ def print_rejection(headline, details, howto_lines):
 def prechecks(root, rows, malformed, environment):
     """派活之前先判、一个工作进程都不起的那几样（row_problems，与门禁 code-source-discipline 经 static-check 判的是同一份）。回 (拷贝范围, 整道判红了没有, {行号: 锚点失效的原因})。
     锚点失效按行判（文件头「锚点失效」）：只有它的时候不判整道，交回那几行由 run_stage 单记一档；别的几样有一样就整道判红，锚点失效的行一起列出。
-    弄坏开关 anchor-stops-table：锚点失效也让整道判红（改前的样子）。"""
+    弄坏开关 anchor-stops-table：锚点失效也让整道判红。"""
     admission = admission_module()
     try:
         copied = copied_paths()
@@ -4452,7 +4587,8 @@ def prechecks(root, rows, malformed, environment):
         copied = copied_with_path_dependencies(root, copied, environment)
     except (ValueError, OSError) as error:
         print_rejection(f"拷贝范围跟不全 path 依赖（{error}）：判不出每片的源码副本该拷哪些，一个工作进程都没起", [],
-                        ["path 依赖指到被判那棵树之外的，改成树里的目录（判定库服务 prune-server/ 这一类放仓根下）；Cargo.toml 读不懂的照报错修，再跑。"])
+                        ["path 依赖指到被判那棵树之外的，改成树里的目录（判定库服务 prune-server/ 这一类放仓根下）；Cargo.toml 读不懂的照报错修，再跑。",
+                         COPY_REBUILD_HOWTO + "。"])
         return None, True, {}
     try:
         copied = copied_with_manifest_directories(root, copied, rows, environment)
@@ -4514,12 +4650,20 @@ def baseline_check(library, row, components, key_context, snapshot, environment)
 
 def plan_rows(root, rows, environment, judging_repository=None, table_rows=()):
     """(KeyContext, 这一趟的行, {行号: Components}, 判定库)：run_stage、plan、row-plan、--list-items、import 共用这一份算法；只读（不写库）。
-    交回的行：多机配置开了 GPU 时点名测试走崩溃判段的那几行换成补了 gpu 特性的（gpu_route_rows），别的原样。
-    table_rows 是整张表成形的行（选行时给）：没选中、而原文与替换文都与选中的某一行相同的行（行键撞得上的只有这几行）一起算键，撞键照整张表判（refuse_colliding_row_keys）。"""
+    交回的行：命中重测试目标而没带 release 的换成补了 --release 的（release_forced_row，文件头「重测试目标只许 release」），
+    多机配置开了 GPU 时点名测试走崩溃判段的那几行换成补了 gpu 特性的（gpu_route_rows），别的原样；键都照换了之后的参数算。
+    table_rows 是整张表成形的行（选行时给）：没选中、而原文与替换文都与选中的某一行相同的行（行键撞得上的只有这几行）一起算键，撞键照整张表判（refuse_colliding_row_keys）。
+    重测试目标的登记表读不了抛 lib_release_only_tests.py 的 RegistryUnreadable（调用方拒、一条都不跑）。"""
     key_context = KeyContext(root, environment, judging_repository)
     planned_lines = {row.line_number for row in rows}
     texts = {(row.old, row.new) for row in rows}
     peers = [row for row in table_rows if row.line_number not in planned_lines and (row.old, row.new) in texts]
+    key_context.release_registered = release_registered_targets()
+    forced_rows = [release_forced_row(row, key_context.release_registered, environment) for row in rows]
+    forced_peers = [release_forced_row(row, key_context.release_registered, environment) for row in peers]
+    # 报出来的只是这一趟判的行：一起算键的别的行（peers）补没补 --release 不报
+    key_context.release_lines = [(row.line_number, basis) for row, basis in forced_rows if basis is not None]
+    rows, peers = [row for row, _basis in forced_rows], [row for row, _basis in forced_peers]
     key_context.prepare(list(rows) + peers)
     components = {row.line_number: key_context.components(row) for row in list(rows) + peers}
     every_row, components = gpu_route_rows(key_context, list(rows) + peers, components, environment)
@@ -4527,12 +4671,13 @@ def plan_rows(root, rows, environment, judging_repository=None, table_rows=()):
     # 报出来的只是这一趟判的行：一起算键的别的行（peers）补没补特性不报
     key_context.gpu_route_lines = [item for item in key_context.gpu_route_lines if item[0] in planned_lines]
     key_context.gpu_route_unbuilt = [item for item in key_context.gpu_route_unbuilt if item[0] in planned_lines]
+    key_context.release_lines = sorted(item for item in key_context.release_lines if item[0] in planned_lines)
     rows = [row for row in every_row if row.line_number in planned_lines]
     return key_context, rows, {row.line_number: components[row.line_number] for row in rows}, open_library(root, environment)
 
 
 def refuse_colliding_row_keys(components, environment):
-    """表里两行以上算出同一把行键时这几行拒算（文件头「行键」，用户 2026-10-29 定「撞键就拒算」）：行键不带路径与名字（D13（验证路线） 已定项 17），
+    """表里两行以上算出同一把行键时这几行拒算（文件头「行键」）：行键不带路径与名字（D13（验证路线） 已定项 17），
     两份内容相同的函数各改一处、点名同一条测试的两行算得出同一把键，谁的判定都不能替另一行作保；拒算的照跑、不复用、不写记录。
     就地换掉 components 里撞键的那几份（row_key 置空、refusal 写「行键撞键：与第 N 行同键」，基线键与覆盖号不动：它们不带被改坏的单元，两行各自的基线照常复用），
     交撞键的几组行号（每组从小到大，组按头一个行号排）。弄坏开关 row-key-collision-unrefused：不判撞键（撞键的两行共用一把键、互相复用）。"""
@@ -4599,22 +4744,26 @@ def with_feature(arguments, feature):
 
 def gpu_route_rows(key_context, rows, components, environment):
     """(这一趟的行, {行号: Components})：多机配置开了 GPU（gpu_route_enabled）时，点名测试走崩溃判段、cargo 参数没开 gpu 的那几行换成补了 gpu 特性的
-    （用户 2026-10-13 定「配 GPU 必用 GPU，不降级」：不补，二进制没编进 gpu，测试判段不跑、只录就返回 ok，改坏的那一处没判过），按补了之后的参数重算键
+    （配 GPU 必用 GPU，不降级：不补的话二进制没编进 gpu，测试判段不跑、只录就返回 ok，改坏的那一处没判过），按补了之后的参数重算键
     （闭包照这一组特性收，特性进键）；之后起的 cargo 都照这份参数，真跑测试的那几次照旧交多机配置、带 gpu 特性的收尾补 --test-threads（with_gpu_test_threads、gpu_test_run）。
     原样的六段（Row.fields）不动：用时表与索引照它取名字。换了哪几行记在 key_context.gpu_route_lines（行号, 补的特性）。
     补了之后点名的测试不编的（#[cfg(not(feature = "gpu"))] 的用例，判的就是没编 gpu 的二进制）照原样留着，记在 key_context.gpu_route_unbuilt（行号, 为什么）。
-    弄坏开关 gpu-route-feature-unadded：不补（改前的样子）。"""
+    弄坏开关 gpu-route-feature-unadded：不补。"""
     if break_is(environment, "gpu-route-feature-unadded"):
         return rows, components
     enabled, configuration = gpu_route_enabled(environment)
     if not enabled:
         return rows, components
     key_context.gpu_route_configuration = configuration
-    replaced = {}
+    replaced, release_bases = {}, {}
     for row in rows:
         feature = gpu_route_feature_word(row, components[row.line_number], key_context)
         if feature is not None:
-            replaced[row.line_number] = (row._replace(arguments=with_feature(row.arguments, feature)), feature)
+            # 补了 gpu 特性就命中重测试目标（文件头「重测试目标只许 release」）：补完特性再照判一次，没带 release 的补 --release
+            featured, basis = release_forced_row(row._replace(arguments=with_feature(row.arguments, feature)), key_context.release_registered, environment)
+            if basis is not None:
+                release_bases[row.line_number] = basis
+            replaced[row.line_number] = (featured, feature)
     try:
         key_context.prepare([row for row, _feature in replaced.values()])
     except mutation_units.ClosureRefused as error:
@@ -4627,9 +4776,12 @@ def gpu_route_rows(key_context, rows, components, environment):
         key_context.prepare([row for row, _feature in replaced.values()])   # 剩下的照旧算；再有算不成的照常抛（不是补特性带出来的）
     if not replaced:
         return rows, components
+    already_released = {line_number for line_number, _basis in key_context.release_lines}
     for line_number, (row, feature) in replaced.items():
         components[line_number] = key_context.components(row)
         key_context.gpu_route_lines.append((line_number, feature))
+        if line_number in release_bases and line_number not in already_released:
+            key_context.release_lines.append((line_number, release_bases[line_number]))
     return [replaced[row.line_number][0] if row.line_number in replaced else row for row in rows], components
 
 
@@ -4785,7 +4937,7 @@ def reachability_closure(plan, arguments_text):
 def source_text_reader(data_units, path, environment):
     """点名测试的闭包里罩住被改坏的文件 path 的那个数据单元（文件头「点名测试够不着被改坏的函数」closure 那一条）：data-file 的路径就是 path，
     或 data-directory 的目录在 path 之上；交「data-file <路径>」这一类，没有交 None。data_units 是闭包里的 (种类, 路径) 集合。
-    弄坏开关 reachability-source-text-ignored：一律交 None（改前的样子：只拿函数单元比，读源码文本的测试报够不着）。"""
+    弄坏开关 reachability-source-text-ignored：一律交 None，只拿函数单元比，读源码文本的测试报够不着。"""
     if break_is(environment, "reachability-source-text-ignored"):
         return None
     if ("data-file", path) in data_units:
@@ -4796,12 +4948,22 @@ def source_text_reader(data_units, path, environment):
     return None
 
 
+def reachability_refused_reason(plan, where, probes):
+    """闭包拒算的行判不了时的原因句：where 是「已收部分」（全闭包）或「截过的闭包已收部分」，probes 是被改坏的单元（种类、文件、限定名）。
+    拒算的闭包不全，没收进来的那一段可能调得到被改坏的单元，所以没落在已收部分里的不报够不着，只报判不了。"""
+    mutated = "、".join(sorted(f"{file}::{name}" for _kind, file, name in probes))
+    return (f"点名测试 {plan['test'].full_name} 闭包拒算、{where}里没有被改坏的单元（{mutated}）：拒算原因 {plan['refusal']}；"
+            f"拒算的闭包不全，够不够得着判不了")
+
+
 def reachability_of_rows(root, rows, environment):
     """static-check 的可达性判法（文件头「点名测试够不着被改坏的函数」）：→ (够不着的行, 豁免的行, 没判的行, 截过闭包的行数, 多机配置, 开没开 GPU)。
       够不着的行 [(行号, 变异名, 哪一路 gpu-route 或 closure, 被改坏的单元, 点名测试, 门禁给这一行用的 cargo 参数)]；豁免的行 [(行号, 变异名, 哪一种, 凭据)]；
       没判的行 [(行号, 变异名, 为什么)]；三样都按行号排。截断表、豁免表或选路表里有函数在 <根> 的源码里找不到抛 ReachabilityConfigurationError；
       这些函数在 <根> 的源码里一个都没有（门禁样本那种小根）抛 ReachabilityNotJudged，一行都不判；
-      多机配置在而读不了抛 admission.py 的 InputManifestError。弄坏开关 reachability-closure-unchecked：不判「闭包里根本没有」那一路。"""
+      多机配置在而读不了抛 admission.py 的 InputManifestError。弄坏开关 reachability-closure-unchecked：不判「闭包里根本没有」那一路。
+      闭包拒算（ClosureInfo.key 是 None）的行照已收的成员同一套判：被改坏的单元或读到的源码文本落在已收部分里算够得着；不在的报没判（reachability_refused_reason），
+      不报够不着（全闭包与截过的闭包两处一样）。弄坏开关 reachability-refused-unjudged：拒算的一律报没判。"""
     lfu = mutation_units.function_units()
     keys_by_directory = {"": mutation_units.UnitKeys(root)}
     root_keys = keys_by_directory[""]
@@ -4849,10 +5011,11 @@ def reachability_of_rows(root, rows, environment):
             if closure is not None:
                 plan["closure"], plan["arguments"] = closure, plan["gpu_arguments"]
         closure = plan["closure"]
-        if closure.key is None:
-            why = closure.refusals[0] if closure.refusals else "没写原因"
-            unjudged.append((row.line_number, row.name, f"点名测试 {plan['test'].full_name} 的闭包拒算（{why}），够不够得着判不了"))
-            continue
+        if closure.key is None:   # 闭包拒算：键算不出，但已收的成员照用（文件头「点名测试够不着被改坏的函数」拒算那一条）
+            plan["refusal"] = closure.refusals[0] if closure.refusals else "没写原因"
+            if break_is(environment, "reachability-refused-unjudged"):
+                unjudged.append((row.line_number, row.name, f"点名测试 {plan['test'].full_name} 的闭包拒算（{plan['refusal']}），够不够得着判不了"))
+                continue
         if id(closure) not in member_sets:   # 几行点名同一条测试共用一份闭包：成员集合只摊开一次
             member_sets[id(closure)] = frozenset((member.kind, member.file, member.name) for member in closure.members)
             data_sets[id(closure)] = frozenset((kind, name) for kind, _file, name in member_sets[id(closure)] if kind in ("data-file", "data-directory"))
@@ -4860,6 +5023,9 @@ def reachability_of_rows(root, rows, environment):
         present = probes & member_sets[id(closure)]
         if source_text_reader(data_sets[id(closure)], row.path, environment) is not None:
             continue   # 点名测试读被改坏那份文件的源码文本（include_str! 或运行期读文件、读目录）：读到的文本就看得见这一处改动，够得着，也不看 GPU 那一路
+        if not present and "refusal" in plan:   # 拒算的闭包不全：已收部分里没有，说不准够不够得着，不报够不着
+            unjudged.append((row.line_number, row.name, reachability_refused_reason(plan, "已收部分", probes)))
+            continue
         if not present and not break_is(environment, "reachability-closure-unchecked"):
             unreachable.append((row.line_number, row.name, "closure", "、".join(sorted(f"{file}::{name}" for _kind, file, name in probes)),
                                 plan["test"].full_name, plan["arguments"]))
@@ -4887,6 +5053,8 @@ def reachability_of_rows(root, rows, environment):
         elif exemption is not None:
             # 认得出豁免的行不判 gpu-route（够不够得着都打 REACHABILITY_EXEMPT：这一行的判段不走或不只走 GPU 路，截过的闭包不代表它）
             exempt.append((row.line_number, row.name) + exemption)
+        elif not present & probes and "refusal" in plan:   # 全闭包拒算：截过的闭包已收部分里没有，也说不准（拒算的那一段可能经 CPU 判器连到）
+            unjudged.append((row.line_number, row.name, reachability_refused_reason(plan, "截过的闭包已收部分", probes)))
         elif not present & probes:
             unreachable.append((row.line_number, row.name, "gpu-route", "、".join(sorted(f"{file}::{name}" for _kind, file, name in probes)),
                                 plan["test"].full_name, plan["arguments"]))
@@ -5074,6 +5242,9 @@ def run_stage(root, environment=None, judging_repository=None):
     except mutation_units.ClosureRefused as error:
         print_rejection(f"点名的测试在 cargo 参数选的这一组特性下认不出或不编（{len(error.failures)} 处），键算不出来：一条都没跑", error.detail_lines(), CLOSURE_REFUSED_HOWTO)
         return 1
+    except release_only_tests_module().RegistryUnreadable as error:
+        print_rejection(f"判不了哪几行是重测试目标（{error}），补不了 --release：一条都没跑", [], [RELEASE_REGISTRY_HOWTO])
+        return 1
     except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
         print_rejection(f"算不出判法单元指纹、工具链、依赖版本或判定库的位置（{error}），判定库没处对：一条都没跑", [],
                         ["被判的要是 git 工作树（rsync 拷的副本先在副本根 git init；只给自证换的几个变量只在临时 prune-server 底下认）、rustc -vV 与 cargo -V 跑得通、Cargo.lock 读得懂；",
@@ -5089,7 +5260,7 @@ def run_stage(root, environment=None, judging_repository=None):
                         ["多机配置（仓根 multi-host.env，或 SINGLEFS_MULTI_HOST_CONFIG 指的那一份）写上 NFS_SHARED_ROOTS（两台同一绝对路径的共享根）；不补缺省。"])
         return 2
     # 真跑测试的每一次都要把多机配置交给测试（文件头「真跑测试的格把多机配置交给测试」）：那份文件不在，起任何 cargo 之前就拒（配置错，不当本次未跑）。
-    #   弄坏开关 test-runs-configuration-unpassed 下不判（改前的样子）
+    #   弄坏开关 test-runs-configuration-unpassed 下不判
     configuration_path, configuration_present = test_runs_multi_host_configuration(environment)
     if not configuration_present and not break_is(environment, "test-runs-configuration-unpassed"):
         print_rejection(f"多机配置 {configuration_path} 不在：真跑测试的每一次都要把它交给测试（副本不是 git 工作树，测试自己找不到，crates 那侧找不到就报错），一条都没跑", [],
@@ -5151,6 +5322,13 @@ def run_stage(root, environment=None, judging_repository=None):
              + "、".join(f"{TABLE}:{line_number}（--features {feature}）" for line_number, feature in key_context.gpu_route_lines))
     for line_number, why in key_context.gpu_route_unbuilt:   # 补了 gpu 特性点名的测试就不编（判的是没编 gpu 的二进制）：照原样跑
         note(f"  … 多机配置开了 GPU，{TABLE}:{line_number} 点名的测试走崩溃判段，补 gpu 特性之后不编（{why}），照原样跑")
+    # 命中重测试目标而没带 release 的行补了 --release（文件头「重测试目标只许 release」）：报行数，点名前 REASONS_SHOWN 行与依据
+    if key_context.release_lines:
+        shown = key_context.release_lines[:REASONS_SHOWN]
+        note(f"  … 重测试目标只许 release：{len(key_context.release_lines)} 行命中而 cargo 参数没带 release，这一趟补上 --release 起（键照补了之后的参数算）："
+             + "、".join(f"{TABLE}:{line_number}（{'；'.join(basis)}）" for line_number, basis in shown)
+             + (f"，另 {len(key_context.release_lines) - len(shown)} 行没列" if len(key_context.release_lines) > len(shown) else "")
+             + "；变异表那几行的第五段补上 --release 之后不再补（static-check 报 RELEASE 的就是它们）")
     # 现判与拒算的原因逐行进 stderr（作废时报出变了哪几个单元，文件头「复用判据」）；多了只列前 REASONS_SHOWN 行，全部的看 plan
     fresh_reasons = [row for row in rows if row.line_number not in reused and row.line_number not in refused_lines]
     for row in fresh_reasons[:REASONS_SHOWN]:
@@ -5197,6 +5375,14 @@ def run_stage(root, environment=None, judging_repository=None):
                             [error.howto, "或给 GATE_MUTATION_WORKERS=<正整数> 指定工作进程数；不退回按核数算。"])
             return 2
         note(worker_count_head_line)
+        # 撞内存上限（文件头「内存上限」的「撞内存上限」）：内存那一项是 0、一个工作进程都放不下，按统一任务服务错误类型表里 memory-cap-hit 的退出码 250 退，
+        #   服务据此加额度重排；不起 1 个硬跑。250 写在这里、不做模块级常量：模块级的赋值进判法单元的闭包，多一个整库的行键就全变
+        if memory_results and memory_results[-1][0] == 0 and not break_is(environment, "memory-cap-short-run-anyway"):
+            print_rejection(f"内存上限装不下一个工作进程的峰值（{memory_results[-1][1]}），按撞内存上限退出（退 250，统一任务服务错误类型表里 memory-cap-hit 那一行），"
+                            "一条变异都没跑：", [],
+                            ["经 task-server/task submit 交的，服务照「重试」加额度重排，不用改命令；手跑的给更大的内存上限再跑。",
+                             "不开 1 个工作进程硬跑：硬跑会在中途被杀，判过的格白判（任务 7498）。"])
+            return 250
         memory_text = (memory_results[-1][1] if memory_results[-1][0] is not None
                        else f"没有内存上限这一项（{memory_results[-1][1]}），照线程数")
         # 每个 cargo 的编译并行度（文件头「编译并行度」）：进程数 × 它 ≈ 核数，免得 N 个 cargo 各自按核数开 rustc、互相抢；与内存那一项试进程数时同一个函数
@@ -5317,7 +5503,7 @@ def observe_fresh_outcomes(sentinel, mutation_outcomes, rows_by_line, environmen
     """现判那几行的结局交复用哨兵。派活之后才锚点失效的那一行没跑（judge_row），不交；强制现判那一条落在不算数的结局上
     （VERDICTS_UNCOUNTED：本次未跑）也不交，哨兵照「这一趟没报结局」打一行不判（lib_reuse_checks.ReuseSentinel.finish）——
     没跑成的那一次不是现判结论，拿它去比库里的「抓到」会判成不稳。别的行不算数的照交：哨兵被派去现判就已是复用失灵，哨兵看的是状态、不看结论。
-    弄坏开关 uncounted-forced-observed 下强制现判那一条不算数的也照交（改前的样子）。"""
+    弄坏开关 uncounted-forced-observed 下强制现判那一条不算数的也照交。"""
     for line_number, verdict, _text, _removal in mutation_outcomes:
         if verdict == "anchor":
             continue
@@ -5584,7 +5770,7 @@ def command_static_check(arguments):
         copied = copied_with_path_dependencies(root, copied, os.environ)
     except (ValueError, OSError) as error:
         print(f"ERROR\t拷贝范围跟不全 path 依赖：{error}")
-        print("     → 怎么办：path 依赖指到被判那棵树之外的，改成树里的目录；Cargo.toml 读不懂的照报错修，再跑")
+        print(f"     → 怎么办：path 依赖指到被判那棵树之外的，改成树里的目录；Cargo.toml 读不懂的照报错修，再跑；{COPY_REBUILD_HOWTO}")
         return 2
     rows, malformed = [], []
     if os.path.isfile(table_path):
@@ -5620,6 +5806,17 @@ def command_static_check(arguments):
             undefined_rows += 1
             print(f"UNDEFINED\t{row.line_number}\t{row.name}\t{row.path}\t{','.join(missing)}")
     print(f"IDENTIFIERS_CHECKED\t{len(rows) - identifiers_unjudged}\t{identifiers_unjudged}")
+    # 命中重测试目标而第五段没写 release（文件头「重测试目标只许 release」）：只 static-check 判，crates-mutation-replay 派活之前不判（那边照补 --release 起）
+    try:
+        release_unwritten = release_unwritten_rows(rows, os.environ)
+    except release_only_tests_module().RegistryUnreadable as error:
+        print(f"ERROR\t判不了哪几行是重测试目标：{error}")
+        print(f"     → 怎么办：{RELEASE_REGISTRY_HOWTO}")
+        return 2
+    for line_number, name, basis in release_unwritten:
+        print(f"RELEASE\t{line_number}\t{name}\t{'；'.join(basis)}")
+    if release_unwritten:
+        print(f"     → 怎么办：{RELEASE_HOWTO}")
     unreachable = []
     try:
         unreachable, exempted, unjudged, cut, configuration, enabled = reachability_of_rows(root, rows, os.environ)
@@ -5649,7 +5846,7 @@ def command_static_check(arguments):
         print(f"REACHABILITY_CHECKED\t{len(rows) - len(unjudged)}\t{len(unjudged)}\t{len(exempted)}\t{cut}\t{configuration}\t"
               f"{'ENABLE_GPU=1' if enabled else 'GPU 没开'}")
     print(f"CHECKED\t{len(rows)}\t{scanned}\t{len(literals)}")
-    return 1 if any(problems.values()) or outside_literals or undefined_rows or unreachable else 0
+    return 1 if any(problems.values()) or outside_literals or undefined_rows or release_unwritten or unreachable else 0
 
 
 
@@ -5733,6 +5930,9 @@ def plan_context(root, environment, selection_path=""):
         key_context, rows, components, library = plan_rows(root, rows, environment, table_rows=rows + unselected_rows)
     except mutation_units.ClosureRefused as error:
         print_rejection(f"点名的测试在 cargo 参数选的这一组特性下认不出或不编（{len(error.failures)} 处），键算不出来", error.detail_lines(), CLOSURE_REFUSED_HOWTO)
+        return None
+    except release_only_tests_module().RegistryUnreadable as error:
+        print_rejection(f"判不了哪几行是重测试目标（{error}），键算不出来", [], [RELEASE_REGISTRY_HOWTO])
         return None
     except (JudgingUnitsRefused, mutation_units.MutationUnitsError, admission.InputManifestError, HeavyThreadDefaultError, OSError) as error:
         print(f"  ✗ 算不出判法单元指纹、工具链、依赖版本或判定库的位置：{error}")
@@ -6341,7 +6541,7 @@ SELFTEST_COVERAGE_ROWS = [
     "double-becomes-triple\tcrates/tiny/src/lib.rs\t{ value * 2 }\t{ value * 3 }\t-p tiny --lib -- doubles\tdoubles",
     "helper-becomes-eight\tcrates/tiny/src/lib.rs\t{ value + 7 }\t{ value + 8 }\t-p tiny --lib -- helps\thelps",
 ]
-# 单元键那几格（第二轮复查 controls 路第 5 节 crates 变异那一行的 S34、S30、N33、N34、N45，加上被改坏的单元、点名测试的闭包、常量、覆盖复用基线几格）的样本 crate：
+# 单元键那几格（controls 路第 5 节 crates 变异那一行的 S34、S30、N33、N34、N45，加上被改坏的单元、点名测试的闭包、常量、覆盖复用基线几格）的样本 crate：
 #   check_root 里有两条变异（root-457、root-double），点名 checks_root；sum 的变异点名 sums（它还调 pad）；helper 的变异点名 helps（它只调 add，够不着 helper）；
 #   taken 的变异点名 branches（它静态上还调 untaken，执行的只有 taken）；OFFSET 是 check_root 用的常量（V5 那一类）
 SELFTEST_UNIT_SOURCE = '''// 单元键那几格的样本 crate（假 cargo 按下面几行判）
@@ -6632,7 +6832,7 @@ SELFTEST_SPLIT_LIFECYCLE_LINE = ('GPU_LIFECYCLE unix_us=1793843585212043 elapsed
 
 
 def selftest_split_result_line_cell(selftest, work):
-    """结果词被测试中途打的行隔开：`test <名> ... ` 之后隔着 GPU_LIFECYCLE 行、结局另起一行单独写（任务 6688 的基线输出那一形态）。
+    """结果词被测试中途打的行隔开：`test <名> ... ` 之后隔着 GPU_LIFECYCLE 行、结局另起一行单独写。
     两条行共一批基线：各自照认基线绿（只看自己过滤词选中的那条）；隔开的 FAILED 照认抓到；起头之后先来了别的起头的那一条认不出结局，不接；
     没起头可接的单独结局行多出来时整段不接。弄坏开关 split-result-line-unseen：不接，头一问判成「一行都没出现」。"""
     environment = os.environ
@@ -6691,7 +6891,7 @@ def selftest_signal_and_pipe_cells(selftest, work):
     # TERM 发在「$TMPDIR 下的临时目录建出来了、假 cargo 在工作进程里挂住了（标记文件里有工作进程的进程号）」之后：run_pool 装好信号处理、建了临时目录、
     # 起了工作进程，那时收到 TERM 才走「收尾再退」；在那之前（解释器还在载入、run_stage 还在算键）收到的就是默认处理，退 -15、什么也没建。
     # 机器忙时头一步可以慢到分钟，所以按条件等（轮询，带超时），不靠定长；等不到就不发（子进程自证自己停掉），这一格判错并写明没等到什么。
-    # 弄坏开关 term-sent-unwaited：不等条件，起了子进程立刻发 TERM（改前碰上忙机器的样子），这一格必须判错
+    # 弄坏开关 term-sent-unwaited：不等条件，起了子进程立刻发 TERM（碰上忙机器的样子），这一格必须判错
     ready_seconds = 300
     ready_deadline = time.monotonic() + ready_seconds
 
@@ -6760,7 +6960,7 @@ def selftest_killed_run_resume_cell(selftest, work):
     等到第三条变异的 cargo 起来（前两条判完、记录写完，第三条在睡）就对整组发 SIGKILL（进程池的工作进程连同父进程一起死，与内存包装杀整组一样不给任何收尾的机会），
     等第三条的假 cargo 自己退出，再重跑同一条命令：判完的 2 条照键复用，只现判剩下的 2 条（基线记录也留着，基线不再跑）。
     重跑同样起子进程、现载入本仓的代码，不在自证进程里调 run_stage：自证进程里的是开跑时载入的那一份，一趟自证跑二十多分钟，别的会话中途改了判法代码
-    （任务 4304：lib_function_units.py）时两趟算出的键就不同。两趟的判法单元都照本仓现在那一份算（不照开跑时冻好的拷贝：新代码在旧拷贝上算，闭包多出的文件拷贝里没有）。
+    （如 lib_function_units.py）时两趟算出的键就不同。两趟的判法单元都照本仓现在那一份算（不照开跑时冻好的拷贝：新代码在旧拷贝上算，闭包多出的文件拷贝里没有）。
     两趟之间本进程载入的本仓代码与冻好的那份拷贝里列着的判法文件（loaded_repository_code）有哪一份变了，这一格记本次未跑。
     前提没造出来（第三条起来时前两条没恰好判完：机器忙到 2 秒内没轮询到）也记本次未跑。
     弄坏开关 records-written-at-end（记录攒在工作进程内存里、进程池正常收尾才写）下被杀之后库里一条都没有，这一格必须判错；
@@ -6866,9 +7066,9 @@ def selftest_killed_run_resume_cell(selftest, work):
 
 
 def selftest_shard_root_window_cell(selftest, work):
-    """TERM 落在 run_pool 建 shard_root 的 mkdir 之后、名字交到调用方手里之前（改前 tempfile.mkdtemp 的窗口）：在进程内把 os.mkdir 换成「真建出
+    """TERM 落在 run_pool 建 shard_root 的 mkdir 之后、名字交到调用方手里之前（tempfile.mkdtemp 的窗口）：在进程内把 os.mkdir 换成「真建出
     SHARD_ROOT_PREFIX 起头的目录之后抛 StopRequested」（等同 TERM 恰好落在那一瞬），跑 run_pool，退出码是 143、$TMPDIR 下一个目录都不剩。
-    弄坏开关 shardrootnamedlate（照改前用 tempfile.mkdtemp，名字丢了）下这一格必须判错。"""
+    弄坏开关 shardrootnamedlate（用 tempfile.mkdtemp，名字丢了）下这一格必须判错。"""
     temporary = os.path.join(work, "shard-root-window-tmp")
     os.makedirs(temporary)
     real_mkdir, saved_tempdir = os.mkdir, tempfile.tempdir
@@ -7158,7 +7358,7 @@ SELFTEST_OTHER_BATCH_ROW = "double-becomes-triple\tcrates/tiny/src/lib.rs\t{ val
 
 def selftest_slot_overlap_problem(selftest, earlier_process, earlier_slots, shared):
     """后起的那次领到片号的那一刻，两次调用重叠了没有：先起的那次的子进程还活着、它领到的两片的片号锁都被占，重叠回 None，没重叠回原因。
-    弄坏开关 overlapunchecked：不核，一律回 None（改前的样子：两次没重叠也照判对错）。"""
+    弄坏开关 overlapunchecked：不核，一律回 None，两次没重叠也照判对错。"""
     if break_is(selftest.base_environment, "overlapunchecked"):
         return None
     if earlier_process.poll() is not None:
@@ -7314,8 +7514,9 @@ def selftest_memory_cells(selftest, work):
     ② 上限 100 GiB 放得下 25 个，线程数 16 更小：开 16 个，卡在 GATE_MUTATION_WORKERS；③ 上限 1 GiB 一个都放不下：按 1 个开，头一行写「那一项不足 1」；
     ⑤ 没有服务交的变量、假 memory.max 写 8589934592：开 2 个，头一行写 memory.max 的路径；写 max：不收，照线程数开 16 个，头一行写「是 max」；假 /proc/self/cgroup 读不到：同样不收；
     ⑥ TASK_SERVER_MEMORY_CAP_BYTES 写成 abc：改读 memory.max（8 GiB 开 2 个），头一行点名写法不对。再起一趟 run_stage：线程数 16，上限 8 GiB、每个 4 GiB，开 2 个、卡在「内存上限」，
-    收尾那一行也写个数。弄坏开关 memory-cap-ignored（不看内存上限，照线程数开满）下这十五格全部判错。
-    memory.max 是硬顶（任务 1711 第五次：scope 真上限 20736M，门禁按多机配置的 50G 开）：⑦ 多机配置 50G（无服务变量）、memory.max 20 GiB：按 20 GiB 开 5 个，头一行写各档读到的值与取 memory.max 的原因；
+    收尾那一行也写个数。⑧ 再起一趟 run_stage：上限 2 GiB、每个 4 GiB，一个都放不下：退 250（撞内存上限），红句写上限与峰值，假 cargo 一次基线与变异都没起。
+    弄坏开关 memory-cap-ignored（不看内存上限，照线程数开满）下这十六格全部判错；memory-cap-short-run-anyway（开 1 个硬跑）下 ⑧ 那一格判错。
+    memory.max 是硬顶（scope 真上限 20736M，多机配置写 50G）：⑦ 多机配置 50G（无服务变量）、memory.max 20 GiB：按 20 GiB 开 5 个，头一行写各档读到的值与取 memory.max 的原因；
     服务交的变量 50 GiB、memory.max 20 GiB：同样按 20 GiB 开 5 个；服务交的变量 50 GiB、memory.max 写 max：照 50 GiB 开 12 个（没有硬顶可比）；服务交的变量 50 GiB、/proc/self/cgroup 读不到：照 50 GiB 开 12 个；
     再起一趟 run_stage：服务交的变量 50 GiB、经 GATE_MUTATION_CGROUP_LISTING / GATE_MUTATION_CGROUP_ROOT 指到 memory.max 8 GiB：开 2 个。
     弄坏开关 memory-max-not-hard-cap（取到变量或多机配置的值就不看 memory.max）下 ⑦ 的三格（多机配置、服务交的变量、run_stage）判错，写 max 与读不到那两格不红。"""
@@ -7404,7 +7605,7 @@ def selftest_memory_cells(selftest, work):
     count, head = counted(20, garbled)
     selftest.check("TASK_SERVER_MEMORY_CAP_BYTES 写成 abc：头一行点名写法不对、改读 memory.max（8 GiB 开 2 个）",
                    count == 2 and "TASK_SERVER_MEMORY_CAP_BYTES 写成「abc」" in head, f"{count}：{head}")
-    # 自己 scope 的 memory.max 是硬顶（任务 1711 第五次：scope 真上限只有 20736M，门禁按多机配置的 50G 开了 12 个工作进程，五次都顶满被杀）
+    # 自己 scope 的 memory.max 是硬顶（scope 真上限只有 20736M，按多机配置的 50G 会开 12 个工作进程，顶满被杀）
     write_memory_max(str(20 * gibibyte) + "\n")
     write_slice_configuration("127.0.0.1=50G 192.0.2.70=8G")
     count, head = counted(20, sliced)
@@ -7451,6 +7652,16 @@ def selftest_memory_cells(selftest, work):
                    "开的工作进程数按 8 GiB 收（2 个，不是按 50 GiB 的 12 与条数 4），开跑行写 memory.max 是硬顶",
                    exit_code == 0 and "这一轮开 2 个工作进程" in stderr and "内存上限 8.0 GiB（" in stderr and "（硬顶：超了整组被杀）" in stderr
                    and "卡在「内存上限」这一项" in stderr, f"退 {exit_code}；{stderr[:1500]}")
+    # ⑧ 撞内存上限：上限 2 GiB 装不下一个 4 GiB 的工作进程，派活之前退 250（统一任务服务错误类型表里 memory-cap-hit 那一行），不开 1 个硬跑
+    short_repository = selftest_new_library_copy(work, repository, "memory-workers-short")
+    record_worker_peak(run_records_directory(short_repository, dict(selftest.base_environment, **stage_changes)), 4, f"{1:020d}-1-selftest", 4 * gibibyte)
+    exit_code, stdout, stderr, invocations = selftest.run(
+        short_repository, GATE_MUTATION_WORKERS="16", GATE_MUTATION_TARGET_DIR=target, **stage_changes, **{TASK_MEMORY_CAP_VARIABLE: str(2 * gibibyte)})
+    selftest.check("内存上限装不下一个工作进程的峰值：run_stage 按撞内存上限退 250（上限 2 GiB、每个工作进程的峰值 4 GiB），红句写上限、峰值与 memory-cap-hit，"
+                   "假 cargo 基线与变异一次都没起",
+                   exit_code == 250 and "内存上限装不下一个工作进程的峰值" in stdout and "按撞内存上限退出（退 250" in stdout and "memory-cap-hit" in stdout
+                   and "内存上限 2.0 GiB" in stdout and peak_text in stdout and not plain_invocations(invocations),
+                   f"退 {exit_code}；假 cargo 起了 {len(plain_invocations(invocations))} 次基线与变异；stdout「{stdout[-800:]}」；stderr「{stderr[-600:]}」")
 
 
 def selftest_worker_peak_cells(selftest, work):
@@ -7793,6 +8004,9 @@ SELFTEST_REACHABILITY_ROWS = [
     "never-called-read-as-text\tcrates/tiny/src/lib.rs\t{ value * 7 }\t{ value * 9 }\t-p tiny --lib -- source_names_every_function\tsource_names_every_function",
 ]
 SELFTEST_REACHABILITY_FILE = "crates/tiny/src/lib.rs"
+# 样本 crate 的截断表：run_enumeration 连到 cpu_judge_entry 的那一条边（按边停）与 lax_base_recovery（按单元停）
+SELFTEST_REACHABILITY_STOPS = (((SELFTEST_REACHABILITY_FILE, "run_enumeration"), (SELFTEST_REACHABILITY_FILE, "cpu_judge_entry")),
+                               (None, (SELFTEST_REACHABILITY_FILE, "lax_base_recovery")))
 
 
 def selftest_reachability_static_check(root, stops, environment_changes=None):
@@ -7824,8 +8038,7 @@ def selftest_reachability_cells(selftest, work):
     每格配一个弄坏开关（文件头弄坏开关那一节 reachability-*）。"""
     root = os.path.join(work, "reachability")
     build_selftest_repository(root, SELFTEST_REACHABILITY_ROWS, source=SELFTEST_REACHABILITY_SOURCE)
-    stops = (((SELFTEST_REACHABILITY_FILE, "run_enumeration"), (SELFTEST_REACHABILITY_FILE, "cpu_judge_entry")),
-             (None, (SELFTEST_REACHABILITY_FILE, "lax_base_recovery")))
+    stops = SELFTEST_REACHABILITY_STOPS
     exit_code, output, routes, exempted = selftest_reachability_static_check(root, stops)
     gpu_off = os.path.join(work, "reachability-gpu-off", "multi-host.env")
     selftest_write(gpu_off, "# 自证用的多机配置：GPU 关\nENABLE_GPU=0\n")
@@ -7866,6 +8079,51 @@ def selftest_reachability_cells(selftest, work):
     selftest.check("static-check 认不出的选项：打 ERROR 与「→ 怎么办」、退 2，一行都不判",
                    unknown_code == 2 and "ERROR\t" in unknown_output and "→ 怎么办" in unknown_output and "CHECKED" not in unknown_output,
                    f"退 {unknown_code}；{unknown_output[-400:]}")
+
+
+# 闭包拒算的样本测试（读 CARGO_MANIFEST_DIR 的函数拒算 runtime-path，调它的测试闭包算不出键、已收的成员照有）插进 SELFTEST_REACHABILITY_SOURCE 的 mod tests 开头
+SELFTEST_REACHABILITY_REFUSED_TESTS = '''    fn reads_the_manifest_directory() -> bool { std::env::var("CARGO_MANIFEST_DIR").is_ok() }
+
+    #[test]
+    fn refused_calls_never_called() { assert!(reads_the_manifest_directory()); assert_eq!(super::never_called(1), 7); }
+    #[test]
+    fn refused_calls_plain_only() { assert!(reads_the_manifest_directory()); assert_eq!(super::plain(), 4); }
+    #[test]
+    fn refused_enumeration_on_the_gpu_route() { assert!(reads_the_manifest_directory()); assert!(super::run_enumeration(1)); }
+
+'''
+SELFTEST_REACHABILITY_REFUSED_ROWS = [
+    "refused-reaches-never-called\tcrates/tiny/src/lib.rs\t{ value * 7 }\t{ value * 8 }\t-p tiny --lib -- refused_calls_never_called\trefused_calls_never_called",
+    "refused-misses-never-called\tcrates/tiny/src/lib.rs\t{ value * 7 }\t{ value * 8 }\t-p tiny --lib -- refused_calls_plain_only\trefused_calls_plain_only",
+    "refused-behind-the-cpu-judge\tcrates/tiny/src/lib.rs\t{ value + 1 > 0 }\t{ value + 1 > 5 }\t-p tiny --lib -- refused_enumeration_on_the_gpu_route\trefused_enumeration_on_the_gpu_route",
+    "whole-misses-never-called\tcrates/tiny/src/lib.rs\t{ value * 7 }\t{ value * 8 }\t-p tiny --lib -- plain_sum\tplain_sum",
+    "whole-behind-the-cpu-judge\tcrates/tiny/src/lib.rs\t{ value + 1 > 0 }\t{ value + 1 > 5 }\t-p tiny --lib -- enumeration_judges\tenumeration_judges",
+]
+
+
+def selftest_reachability_refused_cells(selftest, work):
+    """static-check 可达性遇到点名测试的闭包拒算（文件头「点名测试够不着被改坏的函数」闭包拒算那一条）：样本里 refused_* 三条测试调了读 CARGO_MANIFEST_DIR 的函数
+    （闭包算不出键），whole_* 两行点名的测试闭包不拒算作对照。截断表、多机配置与 selftest_reachability_cells 同一份。
+    弄坏开关 reachability-refused-unjudged（拒算的一律报没判）下头一格必须判错。"""
+    root = os.path.join(work, "reachability-refused")
+    source = SELFTEST_REACHABILITY_SOURCE.replace("mod tests {\n", "mod tests {\n" + SELFTEST_REACHABILITY_REFUSED_TESTS, 1)
+    build_selftest_repository(root, SELFTEST_REACHABILITY_REFUSED_ROWS, source=source)
+    exit_code, output, routes, exempted = selftest_reachability_static_check(root, SELFTEST_REACHABILITY_STOPS)
+    unjudged = {fields[2]: fields[3] for fields in (line.split("\t") for line in output.splitlines()) if fields[0] == "REACHABILITY_UNJUDGED" and len(fields) > 3}
+    selftest.check("static-check 可达性的闭包拒算：点名测试的闭包拒算（调了读 CARGO_MANIFEST_DIR 的函数）、被改坏的函数 never_called 落在已收部分里的那一行不报够不着、不报没判",
+                   "refused-reaches-never-called" not in routes and "refused-reaches-never-called" not in unjudged and "refused-reaches-never-called" not in exempted,
+                   f"{routes}；没判 {unjudged}；{output[-800:]}")
+    selftest.check("static-check 可达性的闭包拒算：被改坏的函数不在已收部分里的那一行不报 UNREACHABLE closure、报 REACHABILITY_UNJUDGED，原因句写「闭包拒算、已收部分里没有被改坏的单元」与拒算原因 runtime-path",
+                   "refused-misses-never-called" not in routes and "闭包拒算、已收部分里没有被改坏的单元" in unjudged.get("refused-misses-never-called", "")
+                   and "runtime-path" in unjudged.get("refused-misses-never-called", ""), f"{routes}；没判 {unjudged}；{output[-800:]}")
+    selftest.check("static-check 可达性的闭包拒算：开 GPU、被改坏的 CPU 判器只在截过的闭包之外的那一行不报 gpu-route、报 REACHABILITY_UNJUDGED，原因句写「闭包拒算、截过的闭包已收部分里没有被改坏的单元」",
+                   "refused-behind-the-cpu-judge" not in routes
+                   and "闭包拒算、截过的闭包已收部分里没有被改坏的单元" in unjudged.get("refused-behind-the-cpu-judge", ""), f"{routes}；没判 {unjudged}；{output[-800:]}")
+    checked = next((line.split("\t") for line in output.splitlines() if line.startswith("REACHABILITY_CHECKED\t")), [])
+    selftest.check("static-check 可达性的闭包拒算，不拒算的行判法不变：点名测试闭包不拒算的两行照报（never_called 不在 plain_sum 的闭包里报 closure、CPU 判器只在 CPU 那一臂后面报 gpu-route），"
+                   "退 1，REACHABILITY_CHECKED 判了 3 行、没判 2 行",
+                   exit_code == 1 and routes.get("whole-misses-never-called") == "closure" and routes.get("whole-behind-the-cpu-judge") == "gpu-route"
+                   and checked[1:3] == ["3", "2"], f"退 {exit_code}；{routes}；{checked}；{output[-800:]}")
 
 
 def selftest_closure_refused_cell(selftest, work):
@@ -7936,7 +8194,7 @@ SELFTEST_NOT_RUN_ITEM_OUTPUT = ("running 1 test\ntest tests::stale_tail_recovers
 def selftest_not_run_item_name_cell(selftest, work):
     """本次未跑认项名形态（not_run_reason，文件头「本次未跑」）：点名的测试 ok、它那一段输出里是崩溃枚举用例判段不跑打的
     NOT_RUN_NO_GPU_ADAPTER test=crash_state_enumeration::<项名>（项名 fixed_script::stale_tail 的末一段不是测试名），记本次未跑、不记没红；
-    同一份输出去掉那一行照记没红。弄坏开关 not-run-test-name-only（只认 test= 对得上测试名的，改前的样子）下这一格判错。"""
+    同一份输出去掉那一行照记没红。弄坏开关 not-run-test-name-only（只认 test= 对得上测试名的）下这一格判错。"""
     environment = dict(selftest.base_environment)
     row = Row(7, "judge-step-skipped", "crates/tiny/src/lib.rs", "{ 1 }", "{ 2 }", "-p tiny --lib -- stale_tail_recovers_every_crash_state",
               "stale_tail_recovers_every_crash_state", ())
@@ -8075,6 +8333,82 @@ def selftest_gpu_test_threads_cell(selftest, work):
                    and all(seven_components[number].row_key and seven_components[number].row_key == nine_components[number].row_key for number in seven_components),
                    f"退 {exit_code}；放开目标 {released_runs}；--lib {lib_runs}；不带 gpu {plain_runs}；带 --exact {exact_runs}；自带 --test-threads=3 {own_runs}；"
                    f"先编 {compile_runs}；{stdout[-300:]}{stderr[-300:]}")
+
+
+# 重测试目标只许 release 那两格（文件头同名一段）：tiny 另有一个集成测试目标 tiny_crash_stream，自证自己的登记表只登记它一条崩溃枚举用例
+SELFTEST_RELEASE_SOURCE = '''
+// TEST streams_agree NEEDS 3 + 4 RUNS streams_agree,stream_total
+pub fn stream_total() -> u32 { 3 + 4 }
+'''
+SELFTEST_RELEASE_REGISTRY = ("# 自证用的登记表：一条崩溃枚举用例点 tiny 的集成测试目标 tiny_crash_stream\n"
+                             "crash-case:tiny-stream\t-\ttest=tiny:tiny_crash_stream:streams_agree count-line=TINY\t# 自证样本\n")
+SELFTEST_RELEASE_CRASH_ROW = "stream-seven-becomes-eight\tcrates/tiny/src/lib.rs\t{ 3 + 4 }\t{ 3 + 5 }\t-p tiny --test tiny_crash_stream -- streams_agree\tstreams_agree"
+SELFTEST_RELEASE_WRITTEN_ROW = ("halve-released-becomes-third\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ value / 3 }\t"
+                                "-p tiny --release --features gpu --lib -- halves\thalves")
+
+
+def selftest_release_repository(work, name, rows):
+    """→ (小仓, 登记表的根)：小仓带 tiny 的集成测试目标 tiny_crash_stream（.cargo/ 里有 gpu 那几行要的 [env]）；登记表另放一个根，那两格把 RELEASE_REGISTRY_ROOT 换成它。"""
+    repository = os.path.join(work, name)
+    build_selftest_repository(repository, rows, extra_source=SELFTEST_RELEASE_SOURCE)
+    selftest_write(os.path.join(repository, "crates", "tiny", "tests", "tiny_crash_stream.rs"),
+                   "mod tests {\n    #[test]\n    fn streams_agree() { assert_eq!(tiny::stream_total(), 7); }\n}\n")
+    selftest_write(os.path.join(repository, CARGO_CONFIGURATION_DIRECTORY, "config.toml"), SELFTEST_CARGO_CONFIGURATION)
+    registry_root = os.path.join(work, name + "-registry")
+    selftest_write(os.path.join(registry_root, ".claude", "gate.d", "stage-inputs.tsv"), SELFTEST_RELEASE_REGISTRY)
+    return repository, registry_root
+
+
+def selftest_release_forced_cell(selftest, work):
+    """门禁补 --release（release_forced_row，文件头「重测试目标只许 release」）：三行同跑一趟——点名登记的崩溃枚举用例目标的一行、带 gpu 特性的一行、
+    两样都不中的一行；前两行起的每一次 cargo（基线、变异、插桩编译与插桩跑）`--` 之前都带 --release、只带一个，第三行一次都不带；stderr 那一行点名前两行、不点第三行。
+    弄坏开关 release-unforced（不补）下这一格判错。"""
+    repository, registry_root = selftest_release_repository(work, "release-forced", [SELFTEST_RELEASE_CRASH_ROW, SELFTEST_GPU_FEATURE_ROW, SELFTEST_TABLE_ROWS[0]])
+    saved = RELEASE_REGISTRY_ROOT[0]
+    try:
+        RELEASE_REGISTRY_ROOT[0] = registry_root
+        exit_code, stdout, stderr, invocations = selftest.run(repository)
+    finally:
+        RELEASE_REGISTRY_ROOT[0] = saved
+
+    def cargo_words(line):
+        words = line.split("\t")[0].split()
+        return words[:words.index("--")] if "--" in words else words
+    calls = [cargo_words(line) for line in invocations]
+    hit_calls = [words for words in calls if "tiny_crash_stream" in words or "gpu" in words]
+    plain_calls = [words for words in calls if "tiny_crash_stream" not in words and "gpu" not in words and "-p" in words]
+    release_note = next((line for line in stderr.splitlines() if "重测试目标只许 release" in line), "")
+    selftest.check("重测试目标只许 release：命中的两行（crash-case 目标、gpu 特性）起的每一次 cargo 都带 --release、只带一个，不命中的那一行一次都不带，stderr 点名补了哪两行",
+                   exit_code == 0 and len(hit_calls) >= 4 and all(words.count("--release") == 1 for words in hit_calls)
+                   and plain_calls and not any("--release" in words for words in plain_calls)
+                   and f"{TABLE}:2（crash-case 目标 tiny:tiny_crash_stream" in release_note and f"{TABLE}:3（gpu 特性 gpu）" in release_note
+                   and f"{TABLE}:4（" not in release_note,
+                   f"退 {exit_code}；命中的 {hit_calls}；不命中的 {plain_calls}；stderr 那一行 {release_note!r}；{stdout[-300:]}{stderr[-300:]}")
+
+
+def selftest_release_static_check_cell(selftest, work):
+    """static-check 的 RELEASE（文件头「重测试目标只许 release」）：一张表四行——带 gpu 特性没写 --release、点名登记的目标没写、命中而写了 --release、两样都不中：
+    前两行各报一行 RELEASE（带依据），跟一行「→ 怎么办」写「第五段补上 --release」，退 1；另一张表把前两行写上 --release，一行都不报、退 0。
+    弄坏开关 release-unchecked（不判）下这一格判错。"""
+    rows = [SELFTEST_GPU_FEATURE_ROW, SELFTEST_RELEASE_CRASH_ROW, SELFTEST_RELEASE_WRITTEN_ROW, SELFTEST_TABLE_ROWS[0]]
+    repository, registry_root = selftest_release_repository(work, "release-static", rows)
+    written = [row.replace("--lib -- doubles", "--lib --release -- doubles").replace("--test tiny_crash_stream --", "--test tiny_crash_stream --release --") for row in rows]
+    written_repository, _written_registry = selftest_release_repository(work, "release-static-written", written)
+    saved = RELEASE_REGISTRY_ROOT[0]
+    try:
+        RELEASE_REGISTRY_ROOT[0] = registry_root
+        exit_code, output = run_command_capturing(command_static_check, [repository])
+        written_code, written_output = run_command_capturing(command_static_check, [written_repository])
+    finally:
+        RELEASE_REGISTRY_ROOT[0] = saved
+    release_lines = [line for line in output.splitlines() if line.startswith("RELEASE\t")]
+    selftest.check("static-check 的 RELEASE：命中而第五段没写 --release 的两行（gpu 特性、crash-case 目标）各报一行、带依据、跟一行写出路，退 1；命中写了的与不命中的不报，两行都写上之后退 0",
+                   exit_code == 1 and len(release_lines) == 2
+                   and release_lines[0] == "RELEASE\t2\tgpu-double-becomes-triple\tgpu 特性 gpu"
+                   and release_lines[1].startswith("RELEASE\t3\tstream-seven-becomes-eight\tcrash-case 目标 tiny:tiny_crash_stream（--test 点名；登记 crash-case:tiny-stream）")
+                   and "     → 怎么办：第五段补上 --release" in output
+                   and written_code == 0 and "RELEASE\t" not in written_output,
+                   f"退 {exit_code}：{output}；都写上之后退 {written_code}：{written_output}")
 
 
 def selftest_debuginfo_cells(selftest, work):
@@ -8395,8 +8729,8 @@ def selftest_path_dependency_copy_cells(selftest, work):
         handle.write('\n[dependencies]\nstray = { path = "../../../stray" }\n')
     selftest_write(os.path.join(work, "path-dependency-outside", "stray", "Cargo.toml"), '[package]\nname = "stray"\nversion = "0.1.0"\n')
     exit_code, output = run_command_capturing(command_static_check, [outside])
-    selftest.check("拷贝范围跟 path 依赖指到树之外：static-check 打 ERROR（拷贝范围跟不全 path 依赖）、退 2",
-                   exit_code == 2 and "ERROR\t拷贝范围跟不全 path 依赖" in output, f"退 {exit_code}；{output[-400:]}")
+    selftest.check("拷贝范围跟 path 依赖指到树之外：static-check 打 ERROR（拷贝范围跟不全 path 依赖）、退 2，出路连副本拷不全那一种指到 minimal-copy.py",
+                   exit_code == 2 and "ERROR\t拷贝范围跟不全 path 依赖" in output and "minimal-copy.py" in output, f"退 {exit_code}；{output[-400:]}")
 
 
 def selftest_manifest_path_cells(selftest, work):
@@ -8539,9 +8873,12 @@ def run_selftest():
             selftest_not_run_item_name_cell(selftest, work)
             selftest_gpu_route_feature_cell(selftest, work)
             selftest_gpu_test_threads_cell(selftest, work)
+            selftest_release_forced_cell(selftest, work)
+            selftest_release_static_check_cell(selftest, work)
             selftest_anchor_and_impact_cells(selftest, work)
             selftest_undefined_identifier_cell(selftest, work)
             selftest_reachability_cells(selftest, work)
+            selftest_reachability_refused_cells(selftest, work)
             selftest_debuginfo_cells(selftest, work)
             selftest_seed_cells(selftest, work)
             selftest_pool_parallel_cells(selftest, work)
@@ -8592,6 +8929,7 @@ def run_selftest():
           "--list-items 接 | head 时安静退、"
           "点名的测试在这一组特性下不编时 run_stage 与 --list-items 打真错并点名变异表的行（并行算与就地算一样）、行里已带 --exact 的变异记覆盖时 --exact 只出现一次、"
           "本次未跑认项名（test=crash_state_enumeration::<项名> 对不上测试名也记本次未跑）、开 GPU 时点名测试走崩溃判段的行补 gpu 特性起且键照补了之后的特性算、"
+          "命中重测试目标的行（crash-case 目标、gpu 特性）补 --release 起而不命中的不补、static-check 报命中而第五段没写 --release 的行、"
           "工具链变了全现判、不按时限过期、llvm 工具不对判红、plan 只读且逐栏报数、"
           "锚点失效按行判（那一行记锚点失效、不入库、整道判红，别的行照跑照入库）而 row-plan、plan、--list-items 把锚点失效的行单列（数据文件那一行也不算键）、"
           "牵连面在样本 crate 上报对牵连最大的单元与行数、"
@@ -8789,7 +9127,7 @@ def run_selftest_cells(selftest, work):
 
 
 def selftest_unit_key_cells(selftest, work):
-    """单元键几格（第二轮复查 controls 路第 5 节 crates 变异那一行：S34、S30、N33、N34、N45；另加被改坏的单元、点名测试的闭包、V5 那一类常量、
+    """单元键几格（controls 路第 5 节 crates 变异那一行：S34、S30、N33、N34、N45；另加被改坏的单元、点名测试的闭包、V5 那一类常量、
     覆盖复用基线、拒算、plan、工具链、llvm 工具几格）：每格施加一处改动，看哪几行现判、栏对不对；弄坏开关各让点名的那一格判错。"""
     repository = os.path.join(work, "units")
     build_selftest_repository(repository, SELFTEST_UNIT_ROWS, source=SELFTEST_UNIT_SOURCE)
@@ -9007,7 +9345,7 @@ SELFTEST_WGSL_ROWS = [
 def selftest_wgsl_unit_key_cell(selftest, work):
     """WGSL 按 fn 取键（lib_mutation_units.py 文件头「单元」）：一份 .wgsl 两个 fn（scaled、untouched）加一个模块级常量 SCALE，
     改坏 scaled 的一行与改坏常量的一行键算得出、原文只在注释里的一行拒算；改 untouched 之后两行的键都不变，改 scaled 的别一行之后只有改坏 scaled 的那一行键变。
-    键从 row-plan 读（只读，不起 cargo）。弄坏开关 wgsl-whole-file（.wgsl 照改前取整份字节的 sha256）下这一格必须判错。"""
+    键从 row-plan 读（只读，不起 cargo）。弄坏开关 wgsl-whole-file（.wgsl 取整份字节的 sha256）下这一格必须判错。"""
     repository = os.path.join(work, "wgsl-units")
     build_selftest_repository(repository, SELFTEST_WGSL_ROWS)
     kernel = os.path.join(repository, "crates", "tiny", "src", "kernel.wgsl")

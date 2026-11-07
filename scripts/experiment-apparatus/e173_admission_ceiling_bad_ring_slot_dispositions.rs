@@ -8,7 +8,7 @@
 //! - 根环：R = 3 个区域、每区 S 个槽，txg t 落区域 t mod 3、区内槽 (t ÷ 3) mod S；区域归属 0 / 1 / 0。
 //! - 空间：计数单位是块；覆盖写新占 d + c 块、放掉 d + c 块，空发布新占 c 块、放掉 c 块，放掉的块带释放代 = 这次发布的 txg，进待回收；
 //!   每记一条根之后待回收里释放代不高于门槛 max(F_生效, 环里最旧有效根) 的转成空闲；抬 F 那一串回收出来的扣到这一串做完才放开。
-//! - 准入：用户发布要求 空闲 − P保留 ≥ d + c；空发布（抬 F 那一串、推空）只要求 空闲 ≥ c；一次准入最多 B = 4 + 2 k_tol = 8 次发布。
+//! - 准入：发布要求 空闲 − P保留 ≥ d + c；空发布（抬 F 那一串、推空）只要求 空闲 ≥ c；一次准入最多 B = 4 + 2 k_tol = 8 次发布。
 //!
 //! 子命令：`checks` 跑登记第十一节的对拍与第七节的锚点、第五节的阳性对照；`first` 是第一段（补 Q1）；`second` 是第二段（补 Q2）；
 //! `checkpoint-cost-reserve` 是第一次重跑的第二段（重跑登记 `research/prompts/e173-r1-prereg.md`：保留池按第一段在真盘面上量出的 κ_G 现算，
@@ -29,7 +29,7 @@ const DEVICES_IN_THE_POOL: usize = 2;
 /// k_tol = 2（D16 已定项 1 射程「按 k_tol」，「准入」那一行 B = 4 + 2 k_tol ⇒ 8，登记 A1）。
 const TOLERATED_ROOT_SLOT_WRITE_FAILURES: usize = 2;
 const PUBLISHES_PER_ADMISSION_AT_MOST: usize = 4 + 2 * TOLERATED_ROOT_SLOT_WRITE_FAILURES;
-/// 上限取「第 4 新的非空有效根」：最近 4 个不同状态（D16 已定项 1 定案首句）。
+/// 上限取「第 4 新的非空有效根」：最近 4 个不同状态（D16 已定项 1 首句）。
 const NEWEST_DISTINCT_STATES_THE_CEILING_KEEPS: usize = 4;
 /// 一个文件 64 块，覆盖写每次换 8 块（登记第五节「历史族」）。
 const DATA_BLOCKS_PER_OVERWRITE: i64 = 8;
@@ -4579,7 +4579,7 @@ mod checkpoint_cost_reserve_readings {
         assert_eq!((tally.self_checks_passed, tally.void_conditions.len()), (2, 0), "两条被比的臂都配得上对");
     }
 
-    /// 场景：抄进常量表的 9 个几何（第一段产物 2026-11-02 那份）。
+    /// 场景：抄进常量表的 9 个几何（第一段产物那份）。
     /// 预期：S 取 4、8、16 各三个池大小；κ_G 与 c实_G 是产物抄下的数（`reserve_fit.py` 的 B11 读数：18/6 装 3 次、130/6 装 21 次、543/10 装 54 次、26/6 装 4 次）；
     /// 只有 S = 4 的三行带第一次请求的期望（B9）；行号两两不同且递增。
     #[test]

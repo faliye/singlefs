@@ -1,6 +1,6 @@
 //! E150：回退复用被抛弃的根引用的单元 —— C314 那两格的计数模型，与两种修法各付什么。
 //!
-//! ## 模型（判据与失败条款的权威登记在 research/prompts/e150-preregistration.md，跑前写死 2026-09-13）
+//! ## 模型（判据与失败条款的权威登记在 research/prompts/e150-preregistration.md，跑前写死）
 //!
 //! 一块盘。根环 3 区域 × 4 槽（区域 = txg mod 3、槽 = (txg div 3) mod 4，D22 已定项 2），单元区 32 个槽。
 //! 每个根记录 = (实例代号, txg, 引用的单元 → 期望的写者, 实例表单元槽号 → 期望的表号)；根的「账」= 引用的单元 + 实例表单元。
@@ -269,7 +269,7 @@ impl Model {
     }
 
     /// 准入不等式里与这个模型有关的三项（D28 已定项 1），各自独立算：已分配 = 当前根的账；
-    /// defer 待释放 = 回退候选集里有效根引用而当前根不引用的；被抛弃根独占量 = 只被被抛弃的根引用的（第九项，2026-09-13 用户定案）。
+    /// defer 待释放 = 回退候选集里有效根引用而当前根不引用的；被抛弃根独占量 = 只被被抛弃的根引用的（第九项）。
     fn admission_terms(&self) -> AdmissionTerms {
         let table = &self.tables[self.current.instance_table as usize];
         let current = self.current.account();

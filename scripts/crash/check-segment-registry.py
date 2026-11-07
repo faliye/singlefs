@@ -66,13 +66,13 @@ name=segments 五行的数换成现行钉值，出处写在样本文件头；只
       与钉它的用例比的两格同样退 2（「✗ 把「…」（path=instance_acquisition）的段序列…本该退 1」、「✗ 把「…」的「6 次操作」改成「7 次操作」之后…本该退 1」）；
       覆盖写固定脚本流那两格的拷贝同样不摆产物、退 2（「✗ 覆盖写固定脚本流的登记句改成认不出的形状…本该退 1」、「✗ 钉它的用例文件拷贝里状态数只剩带下划线的写法…本该判绿」）；
       摆上产物那一格比不上别的路径（「✗ 只能与产物比、摆上照登记现造的产物之后本该判绿」）
-  CHECK_SEGMENT_REGISTRY_BREAK=product-required  要与产物比而产物不在时退回改之前的判法：退 2 记红，不报本次未跑
+  CHECK_SEGMENT_REGISTRY_BREAK=product-required  要与产物比而产物不在时退 2 记红，不报本次未跑
       （「✗ 只能与产物比、产物不在的那一行本该退 77（本次未跑）」）
-  CHECK_SEGMENT_REGISTRY_BREAK=unrecognized-note-accepted  check_device_pinned_notes() 一句覆盖写固定脚本流的登记都认不出时照改之前的判法当成没有要核的（不记对不上）
+  CHECK_SEGMENT_REGISTRY_BREAK=unrecognized-note-accepted  check_device_pinned_notes() 一句覆盖写固定脚本流的登记都认不出时当成没有要核的（不记对不上）
       （「✗ 覆盖写固定脚本流的登记句改成认不出的形状…本该退 1」）
-  CHECK_SEGMENT_REGISTRY_BREAK=underscore-kept  check_device_pinned_notes() 比状态数之前照改之前不去掉数字间的下划线
+  CHECK_SEGMENT_REGISTRY_BREAK=underscore-kept  check_device_pinned_notes() 比状态数之前不去掉数字间的下划线
       （「✗ 钉它的用例文件拷贝里状态数只剩带下划线的写法…本该判绿」）
-  CHECK_SEGMENT_REGISTRY_BREAK=segment-cell-unscoped  「同一行两处同串」那一格里 mutate_one_segment_number() 照改之前在整行里换（同一行里那一串出现两次就备料失败）
+  CHECK_SEGMENT_REGISTRY_BREAK=segment-cell-unscoped  「同一行两处同串」那一格里 mutate_one_segment_number() 在整行里换（同一行里那一串出现两次就备料失败）
       （「✗ 同一行里同一串出现两次（段序列栏一处、出处栏一处）时自证本该只换段序列栏那一处」）
 """
 import argparse
@@ -606,7 +606,7 @@ def mutate_device_pinned_note(layout_text):
 
 def mutate_device_pinned_note_shape(layout_text):
     """--selftest 用：把八节里每一句「覆盖写固定脚本流的段序列」登记的「N 次写」改成「N 笔写」，句子留着、数不动，DEVICE_PINNED_NOTE_PATTERN 一句都认不出。
-    返回 (改过的全文, 改前那一段, 改后那一段)。改完还认得出一句就抛 CheckError（造不出「认不出」的输入）。"""
+    返回 (改过的全文, 被换掉的那一段, 换上的那一段)。改完还认得出一句就抛 CheckError（造不出「认不出」的输入）。"""
     section_text = extract_section_eight(layout_text)
     matches = list(DEVICE_PINNED_NOTE_PATTERN.finditer(section_text))
     if not matches:
@@ -655,7 +655,7 @@ def mutate_one_segment_number(layout_text, row_label=None, whole_line=False):
     """--selftest 用：把八节表格第一条可比对的行（给了 row_label 就只看第一列是它的那一行），段序列的最后一项加 1。
 
     只在那一行的段序列栏里换（`segment_cell_replaced`），免得替换的时候顺手改坏了别的地方——那样测出来的「判红」证明的是别的东西，不是这条检查本身；
-    同一行的出处栏里引着同一串也不碍事。whole_line=True 是改前的换法（在整行里换，同一行里那一串出现两次就定位不到）：
+    同一行的出处栏里引着同一串也不碍事。whole_line=True 是在整行里换（同一行里那一串出现两次就定位不到）：
     只给「同一行两处同串」那一格在弄坏开关 segment-cell-unscoped 下用，真仓备料的几处一律照段序列栏换。
     """
     section_text = extract_section_eight(layout_text)
@@ -796,7 +796,7 @@ def perform_check(repository_root, path_pinning_tests=None):
             continue
         if entry.product_path_name is None:
             # 出处指到一条钉住活代码的用例（`<文件>.rs` 加一个测试函数名）时，按那条用例里写死的串比：
-            # mkfs 那一行 2026-09-22 起就是这一种（C485（segment-registry 格不读活代码，段序列变了照样绿））。
+            # mkfs 那一行就是这一种（C485（segment-registry 格不读活代码，段序列变了照样绿））。
             pinned = compare_against_pinning_test(entry, repository_root)
             if pinned is None:
                 mismatches.append(f'{entry.row_label}：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修')

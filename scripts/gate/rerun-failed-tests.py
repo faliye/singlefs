@@ -44,11 +44,11 @@
   RERUN_FAILED_TESTS_BREAK=own-failed-line  回到自己的正则 `^test (\\S+) \\.\\.\\. FAILED`，不经 lib_libtest_result_lines.py（认不了「 - should panic」）
       「should panic 的失败用例按全名重跑」
   lib_libtest_result_lines.py 的 LIBTEST_RESULT_LINES_BREAK=should-panic-in-name 同样让「should panic 的失败用例按全名重跑」判错。
-  RERUN_FAILED_TESTS_BREAK=scope-dropped  打出的命令不带范围声明（改前的写法）
+  RERUN_FAILED_TESTS_BREAK=scope-dropped  打出的命令不带范围声明
       「打出的每条命令开头带范围声明、范围声明闸照主 agent 判放行」
-  RERUN_FAILED_TESTS_BREAK=submit-dropped  打出的命令不经 task-server/task submit、照改前直接是 cargo test
+  RERUN_FAILED_TESTS_BREAK=submit-dropped  打出的命令不经 task-server/task submit、直接是 cargo test
       「打出的每条命令经 task-server/task submit -- 起」
-  RERUN_FAILED_TESTS_BREAK=package-filter-dropped  不按包筛目标，日志里每个有失败的段都打（改前的样子）
+  RERUN_FAILED_TESTS_BREAK=package-filter-dropped  不按包筛目标，日志里每个有失败的段都打
       「按包筛目标：两个包各有失败的段，-p 那个包只打它自己的两条、stderr 点名别的包那两段」
   RERUN_FAILED_TESTS_BREAK=test-arguments-added  打出的 cargo test 在 -- 之后，--exact 前面多带一个参数（--show-output）
       「按段取失败用例」「should panic 的失败用例按全名重跑」「按包筛目标：两个包各有失败的段，-p 那个包只打它自己的两条、stderr 点名别的包那两段」
@@ -78,7 +78,7 @@ from collections import namedtuple  # noqa: E402
 SECTION_HEADER = re.compile(r"^\s*Running (?:unittests )?(\S+?\.rs) \(([^)]*)")
 BUILT_CRATE_NAME = re.compile(r"(?:^|/)([A-Za-z0-9_]+)-[0-9a-f]+(?:\.exe)?$")   # 段头括号里 deps 文件名：<crate 名>-<哈希>
 DOCTEST_HEADER = re.compile(r"^\s*Doc-tests (\S+)")
-OWN_FAILED_LINE = re.compile(r"^test (\S+) \.\.\. FAILED\s*$")   # 只给弄坏开关 own-failed-line 用：改前自己的那一份
+OWN_FAILED_LINE = re.compile(r"^test (\S+) \.\.\. FAILED\s*$")   # 只给弄坏开关 own-failed-line 用：自己的那一份
 BREAK_VARIABLE = "RERUN_FAILED_TESTS_BREAK"
 SCOPE_VARIABLE = "SINGLEFS_RUN_SCOPE"
 SUBMIT_WORDS = ["task-server/task", "submit", "--"]   # 打出的命令经提交客户端交 task-server（文件头）
@@ -304,7 +304,7 @@ def target_belongs_to_package(failed_target, package, package_directory, manifes
 
 
 def targets_of_package(commands, package, workspace_root):
-    """(属于这个包的段, 属于别的包的段)。包找不到抛 PackageNotFound。弄坏开关 package-filter-dropped 下照改前全算属于。"""
+    """(属于这个包的段, 属于别的包的段)。包找不到抛 PackageNotFound。弄坏开关 package-filter-dropped 下全算属于。"""
     package_directory, manifest = package_directory_of(workspace_root, package)
     if os.environ.get(BREAK_VARIABLE) == "package-filter-dropped":
         return list(commands), []
@@ -329,7 +329,7 @@ def cargo_command_line(selector, names, package):
 
 
 def submitted_command_line(selector, names, package):
-    """经提交客户端交 task-server 的那一截；弄坏开关 submit-dropped 下照改前直接是 cargo test。"""
+    """经提交客户端交 task-server 的那一截；弄坏开关 submit-dropped 下直接是 cargo test。"""
     if os.environ.get(BREAK_VARIABLE) == "submit-dropped":
         return cargo_command_line(selector, names, package)
     return f"{shlex.join(SUBMIT_WORDS)} {cargo_command_line(selector, names, package)}"

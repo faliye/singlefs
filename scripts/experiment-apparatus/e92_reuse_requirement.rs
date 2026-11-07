@@ -4,7 +4,7 @@
 //! 本实验逐个枚举「消费旧代根的人」，对每个消费者推导它对块重用延迟的需求，
 //! **并回答需求用什么单位计价**——按代数（发布次数）、按墙钟、还是按外部事件。
 //!
-//! ## 判据（2026-09-03 跑前写死，跑完一个字没改）
+//! ## 判据（跑前写死，跑完不许改）
 //!
 //! 1. 枚举完备性挂闸：消费者清单逐条给出处，模型里每个消费者至少一格。
 //! 2. 单位判定：每个消费者写成（代数 | 墙钟 | 外部事件）三选一并给机制推导；
@@ -15,15 +15,15 @@
 //! 4. 绝对值：慢消费者的违例数由「扫描时长 × 发布率 − K」的算术独立给出，
 //!    模拟与闭式恰等。
 //!
-//! ## 补列重跑（2026-09-08，判据 1 的枚举挂闸触发）
+//! ## 补列重跑（判据 1 的枚举挂闸触发）
 //!
-//! 判据 1 逐字「跑后发现清单外的消费者 ⇒ 补列重跑，不许悄悄漏」。第一轮之后查出三处：
-//! I-4.8（近 K 代根校验和自洽）、记录核对器、管理员回退（D23 已定项 14，2026-09-05 用户定案，
-//! 早于第一轮）。**同一轮还查出 c3 建错了形状**：第一轮把代际增量 scrub 建成「钉住一代根走到底」，
+//! 判据 1 逐字「跑后发现清单外的消费者 ⇒ 补列重跑，不许悄悄漏」。清单外查出三处：
+//! I-4.8（近 K 代根校验和自洽）、记录核对器、管理员回退（D23 已定项 14）。**c3 的形状也要按 D13 建**：
+//! 代际增量 scrub 不是「钉住一代根走到底」，
 //! 而 D13 对它的逐字定义是「维护一个『上次 scrub 扫到的 generation 水位』，只遍历
 //! `birth generation > 水位` 的块」——水位型，不持有旧根。全仓 grep「scrub…旧根」只命中
-//! 第一轮自己写进 D22 与 C213 的那两处 ⇒ 那是稻草人形状，按 evidence-discipline 作废。
-//! **判据 1-4 与失败条款一个字没改**，改的是消费者清单与 c3 的机制推导。
+//! D22 与 C213 的那两处 ⇒ 那是稻草人形状，按 evidence-discipline 作废。
+//! **判据 1-4 与失败条款不随消费者清单与 c3 的机制推导变。**
 
 //! ## 失败条款（跑前写死）
 //!
@@ -41,7 +41,7 @@ enum Pricing {
     /// 按墙钟计价。
     WallClock,
     /// 按外部事件计价——发生的时刻由本工程之外的东西决定（例如管理员什么时候决定回退）。
-    /// 判据 2 的三选一本来就有这一类，第一轮没有任何消费者落进来。
+    /// 判据 2 的三选一本来就有这一类。
     ExternalEvent,
     /// 未知——消费者本身还没实现，需求推不出来。**不许当成 0。**
     Blank,
@@ -66,7 +66,7 @@ struct Consumer {
     required_generations: Option<u64>,
 }
 
-/// 消费者清单（2026-09-08 补列重跑后的第二版）。判据 1：逐条给出处，一条都不许少列。
+/// 消费者清单。判据 1：逐条给出处，一条都不许少列。
 const CONSUMERS: [Consumer; 9] = [
     // c1 恢复择根回退：最新根撕裂 ⇒ 退一代。需求是 2 代不是 1 代——要判定最新那代坏了，
     // 上一代必须在它被验证的整段时间里都还活着（验证滞后）。
@@ -76,27 +76,27 @@ const CONSUMERS: [Consumer; 9] = [
     Consumer { identifier: "c2_replay_watermark", source: "D23-item14", pricing: Pricing::Generations, required_generations: None },
     // c3 代际增量 scrub：D13 逐字「维护一个『上次 scrub 扫到的 generation 水位』，
     // 只遍历 `birth generation > 水位` 的块」⇒ **水位型，不持有旧根**，对旧根的需求恒 0。
-    // ⚠️ 第一轮把它建成「钉住一代根走到底」，那个形状全仓没有一条条款要求。
+    // ⚠️ 它不是「钉住一代根走到底」：那个形状全仓没有一条条款要求。
     Consumer { identifier: "c3_scrub_watermark", source: "D13-scrub", pricing: Pricing::Generations, required_generations: Some(0) },
     // c4 时间线判别（设备失而复得）：C88 未实现，需求未知。**空白不是 0。**
     Consumer { identifier: "c4_timeline_discriminate", source: "C88", pricing: Pricing::Blank, required_generations: None },
     // c5 两条钉块规则的相位：E33 逐字「有帮助的相位数是 根环(K) − 1」⇒ 需求由 K 自己定义。
     Consumer { identifier: "c5_pinning_phase", source: "E33", pricing: Pricing::Generations, required_generations: None },
     // c6 I-4.8 近 K 代根校验和自洽：跑在崩溃点重放之后的**冻结镜像**上，没有并发分配器
-    // 在跟它抢 ⇒ 对块重用延迟的需求退化为 0。第一轮漏列。
+    // 在跟它抢 ⇒ 对块重用延迟的需求退化为 0。
     Consumer { identifier: "c6_i48_frozen_image", source: "I-4.8", pricing: Pricing::Generations, required_generations: Some(0) },
     // c7 记录核对器：入参 D13 逐字 `(崩溃前镜像, 记录流, 崩溃后镜像)`，三个都是冻结的 ⇒ 同上。
     Consumer { identifier: "c7_record_verifier", source: "D13-verifier", pricing: Pricing::Generations, required_generations: Some(0) },
-    // c8 管理员回退：D23 已定项 14（2026-09-05 用户定案）逐字「回退深度 ≤ 根环深度」，
+    // c8 管理员回退：D23 已定项 14逐字「回退深度 ≤ 根环深度」，
     // 候选集逐字「根环里按实例表判仍然有效的根」——**判据里一个 K 字都没有**。
     // 触发**时刻**由管理员定 ⇒ 外部事件；但它的**需求**是「环里任何一个幸存槽都要能退得回去」
     // ⇒ 需求 = 根环深度 N，不是 2。
-    // ⚠️ 第二轮给它判的「由根环深度定义、不反过来要求 K」是**循环论证**——
+    // ⚠️ 「由根环深度定义、不反过来要求 K」是**循环论证**——
     // 那句话把待证的 `K = 深度` 当成了前提。需求由 `demand_is_ring_depth` 标出，
     // 逐 (N, K) 算假候选数，不再写成 None。
     Consumer { identifier: "c8_admin_rollback", source: "D23-item14", pricing: Pricing::ExternalEvent, required_generations: None },
     // c9 遍历跳：任何活树遍历读完父指针、再去读子块，这中间子块不许被释放并重用。
-    // 这是清单里**唯一真正按墙钟计价**的一格，需求 = 一跳的耗时。第一轮没建。
+    // 这是清单里**唯一真正按墙钟计价**的一格，需求 = 一跳的耗时。
     Consumer { identifier: "c9_traversal_hop", source: "D4-parent-checksum", pricing: Pricing::WallClock, required_generations: None },
 ];
 
@@ -145,7 +145,7 @@ const WINDOW_GENERATION_VALUES: [u64; 5] = [1, 2, 3, 4, 8];
 /// 根环深度 N = R × S，R = 3 已定（D22 已定项 2），S ∈ {1,2,4,8,16}（D22 那一格自陈不碰任何一条边）。
 const RING_DEPTHS: [(u64, u64); 5] = [(1, 3), (2, 6), (4, 12), (8, 24), (16, 48)];
 /// 假想的墙钟消费者持续多久（秒）。**这是定价表的自变量，不是任何条款要求的形状**——
-/// 第一轮把 scrub 当成这种形状是错的（D13 的 scrub 是水位型）。留着它是为了回答
+/// 把 scrub 当成这种形状是错的（D13 的 scrub 是水位型）。留着它是为了回答
 /// 「若将来出现一个持续 D 秒的墙钟消费者，要多少代才罩得住」。
 const DURATIONS: [(&str, f64); 4] = [
     ("hop_100us", 0.000_1),
@@ -277,7 +277,7 @@ mod tests {
     use super::*;
 
     /// **判据 1**：清单九条，逐条有出处，出处不许为空。
-    /// 补列重跑之后必须比第一轮多出四条（I-4.8、记录核对器、管理员回退、遍历跳）。
+    /// 清单里必须有 I-4.8、记录核对器、管理员回退、遍历跳这四条补列的消费者。
     #[test]
     fn consumer_list_is_complete_and_sourced() {
         assert_eq!(CONSUMERS.len(), 9);
@@ -287,7 +287,7 @@ mod tests {
         }
     }
 
-    /// **判据 2 的三选一必须都有对象**：第一轮「外部事件」是空的，补列之后不空。
+    /// **判据 2 的三选一必须都有对象**：「外部事件」不空。
     /// **而墙钟那一类只剩一个成员：遍历跳。** scrub 不在里面。
     #[test]
     fn pricing_census_absolute_values() {
@@ -397,7 +397,7 @@ mod tests {
     }
 
     /// **管理员回退的触发按外部事件计价，但它的需求是根环深度，不是 2。**
-    /// ⚠️ 这条替下第二轮那个只断言表里字面值的测试——那个测试锁死了一个错的分类，
+    /// ⚠️ 这条不只断言表里字面值——只断言字面值会锁死一个错的分类，
     /// c8 判错时十条变异照样全绿（`.claude/singlefs-ai-sop/rules/show-me-test.md`
     /// 「测试测的是实现，不是契约」那一格）。这一条断的是机制：**假候选数**。
     #[test]

@@ -407,7 +407,7 @@ impl PublishKind {
         }
     }
 
-    /// 合取 7 只判前台写入类（D3（空间分配） 已定项 7 第 7 行，用户 2026-10-13 定）。
+    /// 合取 7 只判前台写入类（D3（空间分配） 已定项 7 第 7 行）。
     fn is_judged_by_conjunct_seven(self) -> bool {
         match self {
             PublishKind::ForegroundWrite => true,
@@ -513,7 +513,7 @@ struct PendingTruthJudgement {
 /// 停机臂（登记第五节第 2 行）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StopArm {
-    /// 停乙（用户已定）：签发前判空洞够不够；一条意图完成而 `P_G` 假就不签下一条。
+    /// 停乙：签发前判空洞够不够；一条意图完成而 `P_G` 假就不签下一条。
     LocalRegionPredicate,
     /// 停甲（维持全局差值）：不判空洞；`P_G` 真就返回，假就接着签，到 `B_gc` 用完为止。
     #[cfg_attr(not(test), expect(dead_code, reason = "第一段的正式跑只跑停乙；停甲在第二段跑，这一段只在单测的阳性对照 P2、P3 里构造"))]

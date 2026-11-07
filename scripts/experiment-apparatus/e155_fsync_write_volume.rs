@@ -1,6 +1,6 @@
 //! E155：每次持久化写多少 —— 三种 fsync 形态（甲 / write_ahead_log_full / 乙）的确定性计数模型。
 //!
-//! 判据、失败条款、变异表的权威登记在 `research/prompts/e155-preregistration.md`（跑前写死 2026-09-18）。
+//! 判据、失败条款、变异表的权威登记在 `research/prompts/e155-preregistration.md`（跑前写死）。
 //! 本文件只实现登记第五节定义的模型，不与 `crates/` 共用代码
 //! （`.claude/rules/implementation-first.md` 第 4 条）。
 //!

@@ -14,7 +14,7 @@
 #   crash-point-replay.sh                       全部项（连同整趟才跑的那几类 whole-run:<类>）：测试函数那一段照测试函数判定库复用、崩溃点重放部分照块判定库复用、放量部分照判定库复用
 #   crash-point-replay.sh --item <项> […]       只跑点名的项（给几次取并集；整趟才跑的那几类也是项，写 whole-run:<类>）；缩小范围就用它（--list-items 列可点的项）
 #   crash-point-replay.sh [--item <项>]… --crash-expand-up-to <n>
-#                                               缩崩溃域（用户 2026-11-05 弹窗定：指定范围的参数允许缩域）：把崩溃放量与崩溃枚举用例的展开深度缩到不超过 n，
+#                                               缩崩溃域（指定范围的参数允许缩域）：把崩溃放量与崩溃枚举用例的展开深度缩到不超过 n，
 #                                               把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=<n> 交给测试函数、崩溃点重放、放量三段（引擎只往小缩，大于引擎里放量的展开上限常量的不放宽）；
 #                                               值不是非负整数、后面没有值都退 2、什么都不做；环境里已设了这个变量的当作给了同一个值，两样都给取参数；
 #                                               环境里设了 SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO（判器的展开深度）同样要是非负整数。缩过域的那一趟 ITEM、TOTAL 行末尾接
@@ -37,8 +37,8 @@
 #                                               自证 keys-reader-same-build 格钉它
 #   crash-point-replay.sh --selftest            假 cargo、假的两套驱动、假的准入模块走一遍各格，末尾一轮从下面「弄坏开关」那张表现读开关、逐个打开
 #   别的参数一律当认不出的参数退 2（用法里只写正确用法）。
-#   引擎配了 GPU 只由 GPU 判、没配只由 CPU 判，同一批状态一趟只判一次；GPU 判与 CPU 判的对拍是另立的测试，不在这里跑（用户 2026-10-11 定）。
-#   不带 --item 的跑法（不指定范围）只在提交时或用户要求时由主 agent 交，崩溃状态数不设上限；带 --item 的（指定范围）主 agent 随时可以交（项目 settings 里注册的钩子判），
+#   引擎配了 GPU 只由 GPU 判、没配只由 CPU 判，同一批状态一趟只判一次；GPU 判与 CPU 判的对拍是另立的测试，不在这里跑。
+#   不带 --item 的跑法（不指定范围）只在提交时或用户同意后由主 agent 交，崩溃状态数不设上限；带 --item 的（指定范围）主 agent 随时可以交（项目 settings 里注册的钩子判），
 #   但没缩域时开跑之前先估这一趟点名的项要现判多少崩溃状态（只数键对不上、要现判的；估法与记录来源在 scripts/crash/lib_crash_point_replay_items.py 文件头「指定范围的崩溃域上限」），
 #   超过 200000 态（常量 SCOPED_CRASH_STATES_LIMIT，只登记在那份库里，放量入口共用）或估不出就拒：不编、不跑，退 79，说明里给两条出路——带 --crash-expand-up-to <n> 缩域再交
 #   （算得出就写出能压到上限以内的 n；缩过域的那一趟成功句写缩过域、不算门禁通过），或留给提交时不指定范围的那一趟。--crash-expand-up-to 的值不小于引擎展开上限常量的不算缩域，照判。
@@ -59,7 +59,7 @@
 #     剪枝自证、钉回来的红例），带 --item 只是点名的项。三段都照键复用：键相同、库里不红的不重跑，单元键对不上的（这一次改到的）与红过的才现判。
 #   崩溃点重放部分里登记行第三列写了 red-blocks=judged-by-test 的用例，判法在那道门禁，这里只收它的退出码：按 cargo test 的退出码判，块那一行只核数，库里的红块不判。
 #   三段各跑各的、各判各的：一段红了另两段照旧起（一项的结论是几段的合：有一段红就 red）。
-# 按条复用（用户 2026-10-29 定：跑过的要入库、照键复用，红过的要复判）：测试函数那一段在两种跑法里是同一段：
+# 按条复用（跑过的要入库、照键复用，红过的要复判）：测试函数那一段在两种跑法里是同一段：
 #   每条测试函数各是一条判定，种类、请求、跳过名单与判绿名单只在 scripts/gate/admission.py 的 test-functions-request、test-plan、plan-skip-names、plan-green-names、
 #   verdict-record（它文件头「按条复用的共用段」），与门禁 crash-point-replay 测试函数几格同一类判定库
 #   （<git common-dir>/singlefs-unit-verdicts/crash-point-replay.sh:test-functions/）：这里写进的门禁照键复用，门禁写进的这里照键复用。
@@ -73,7 +73,7 @@
 #   判定库的名字是被判的根（这份脚本所在的仓，自证里是 CRASH_POINT_REPLAY_ROOT）的 git common-dir 下的种类目录（只当名字，键里不带哪棵仓，
 #   命名空间只在临时服务底下给；admission.py 文件头「判定库」）；成功那一行点名库在哪。
 #   逐条打一行「· <测试函数>：绿|红，现判|复用|强制现判（…）」（scripts/gate/lib_reuse_checks.py 的 ITEM_LINE），末了一行「· 按条复用（判定库 <种类>）：现判 N、复用 M、拒算 R……」。
-#   被判的根不是一棵 git 工作树的顶（判定库没有名字）：测试函数一个测试目标都不编不起，整趟退 2、点名那棵树（弄坏开关 test-functions-without-library-tolerated 下照改前全部现判、不入库）。
+#   被判的根不是一棵 git 工作树的顶（判定库没有名字）：测试函数一个测试目标都不编不起，整趟退 2、点名那棵树（弄坏开关 test-functions-without-library-tolerated 下全部现判、不入库）。
 #   放量入口那一趟编的特性与这里算键的特性同取这一趟交给驱动的那份多机配置（SINGLEFS_MULTI_HOST_CONFIG）的 ENABLE_GPU，所以判定照这里的键记。
 #   按条复用失灵（test-plan 退非 0 或没打 PLAN、verdict-record 退非 0 而复用哨兵报红；判法只在 admission.py 的 plan-failure，它文件头「按条复用失灵」）：
 #   照旧全部现判跑完，每个点到测试函数测试目标的项另记一笔红（不能复用就判红）。
@@ -89,9 +89,9 @@
 #   开了 GPU 而环境里没有 GPU_CARDS_BY_PRIORITY（不是经服务起的）退 78、一项都不起（自证 gpu-card-missing）；走 GPU 的计算类不送（引擎开了 GPU 就三类全走 GPU，
 #   crash-amplification-lib.sh 文件头「配置」）。
 #   开了 GPU 时单机路径的每一趟测试函数测试参数带 `-- --nocapture --test-threads 1`（GPU 对拍的测试各占卡的显存，不并行起）；没开的不加。
-#   例外是 GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标（今天是 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state；用户 2026-10-28 定案「放开并按显存排队」）：
+#   例外是 GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标（今天是 crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state；放开并按显存排队）：
 #   它的测试按显存额度排队（排队在 crates 里），这里带 `--test-threads <登记的重活默认并行度>`（scripts/hosts/heavy-threads.sh 的 heavy_thread_default，SINGLEFS_THREAD_CAP 设了取它）；
-#   自证 gpu-agreement-test-threads-released 一格钉它，弄坏开关 gpu-agreement-test-threads-one 下照改前带 1。
+#   自证 gpu-agreement-test-threads-released 一格钉它，弄坏开关 gpu-agreement-test-threads-one 下带 1。
 #   准入模块 admission.py 拼的 crash-case 命令里特性带 gpu 的也带。
 #   还没带的：崩溃放量单机那几趟（crash-amplification.sh 经共用库 crash-amplification-lib.sh 拼的 cargo test 参数，里面没有这个参数）；改成带时同时改 .claude/rules/verification.md里 GPU 测试那一条。
 #   这个参数只管同时起几个测试，不管一个测试里 CPU 判器自己开的线程：GPU 对拍的测试读 SINGLEFS_CRASH_JUDGE_CPU_THREADS（服务交下来的线程变量之一），
@@ -160,7 +160,7 @@
 #   只有测试函数或本次未跑的项（整趟才跑的那几类）各算一件。这一份照环境里的 TASK_SERVER_SHARD_PHASE 只跑其中一步：
 #   plan   往计划目录写 plan.tsv（整趟的计划）、shard-plan.tsv（片号加计划行，每片带上它的件所在项的测试函数那一段）与 plan.json，退 0；不起测试函数与两套驱动。
 #   shard  照 TASK_SERVER_SHARD=<片号>/<片数> 只跑 shard-plan.tsv 里自己那一片的行，判法同不分片：结论写进产物目录（TASK_SERVER_SHARD_OUTPUT_DIRECTORY 下的 parts.tsv、
-#          crash-flow-records.tsv，各份 .problems.log，末了 shard-finished）。判红（退 1）或本次未跑（退 77）这一片退 0：判红不影响后面的片（用户定），结论交合并那一步判、
+#          crash-flow-records.tsv，各份 .problems.log，末了 shard-finished）。判红（退 1）或本次未跑（退 77）这一片退 0：判红不影响后面的片，结论交合并那一步判、
 #          整件的退出码在合并；退 78 与别的非 0 照原样退（服务照那一片的结局收尾）。
 #   merge  不起测试函数与两套驱动，照各片存下的 parts.tsv 判，ITEM、TOTAL、上次红的清单与退出码同不分片的那一趟（同一个测试目标几片都跑了的测试函数行只算一次，有红取红）。
 #          有一片的产物不全（产物表里没有那一片、或缺 shard-finished）退 1。
@@ -177,10 +177,10 @@
 #       放量入口退 78 而这一项没打 ITEM 行）而这一趟没有红；或开了 GPU 而环境里没有 task-server 交的 GPU_CARDS_BY_PRIORITY（一项都没起）；
 #       或起任何 cargo 之前 scripts/hosts/rocksdb-prebuilt.py entry 判红（这台没装预编库、此刻进程环境的取值缺了或对不上；一项都没起，出路是开新会话
 #       或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）。--list-items --with-keys 起读库程序之前同样判，判红退 1
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：建好这一趟的日志目录之后，调用方没设 CARGO_TARGET_DIR 时在里面建 target、export 给测试函数、
+# 编译目录（自己用完自己删，不跨趟复用）：建好这一趟的日志目录之后，调用方没设 CARGO_TARGET_DIR 时在里面建 target、export 给测试函数、
 #   崩溃点重放那一道与放量入口（它们看到设了就不另建）；正常结束、红了、被 TERM / INT 停（等手里那一步退出）都在 EXIT 上删
 #   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、整趟退非 0）。调用方设了的照它、不删。
-# 日志出两份（用户 2026-10-21：过万行的全量日志太长，一般只看错误警告）：测试函数、崩溃点重放部分、放量部分各自的日志都经 scripts/hosts/two-logs.sh 写，
+# 日志出两份（过万行的全量日志太长，一般只看错误警告）：测试函数、崩溃点重放部分、放量部分各自的日志都经 scripts/hosts/two-logs.sh 写，
 #   <日志目录>/<段>.log 是全量，旁边同名的 <段>.problems.log 只收错误与警告（门禁的 ✗ 与 → 出路、⚠、本次未跑、汇总，cargo / rustc 的 error 与 warning:，libtest 的 FAILED 与 panicked，
 #   Traceback，非 0 退出码），每行前带它在全量日志里的行号，末行写收了几行、全量几行；开跑时打日志目录，收尾逐份列出 .problems.log，红的原因里点名这一份。
 # 弄坏开关 CRASH_POINT_REPLAY_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。写法同 scripts/crash/crash-amplification.sh 文件头「弄坏开关」一段：
@@ -190,15 +190,15 @@
 #       unknown-item（「项名写错应当退 2、列出可点名的项、什么都不起」）
 #   CRASH_POINT_REPLAY_BREAK=list-items-builds  --list-items 先起一趟 cargo build 再列
 #       list-items（「--list-items 应当退 0、逐项列出、不起 cargo 与驱动」）、list-items-with-keys（「--list-items --with-keys 应当照读库程序文件头「输出」那一段的写法报键对不上的块数、不起 cargo」）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-reuse-not-counted  测试函数每个测试目标的复用数写死 none（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-reuse-not-counted  测试函数每个测试目标的复用数写死 none
 #       test-functions-reuse-counted（「测试函数日志里有复用计数行时 ITEM 行应当报同一个数……」）
 #   CRASH_POINT_REPLAY_BREAK=gpu-card-missing-unrefused  开了 GPU 而环境里没有 task-server 交的 GPU_CARDS_BY_PRIORITY 也照跑（不退 78）
 #       gpu-card-missing（「开了 GPU 而环境里没有 task-server 交的卡，应当退 78、一项都不起」）
 #   CRASH_POINT_REPLAY_BREAK=gpu-cards-not-sent  开了 GPU 时测试函数那几趟不交显卡先后
 #       gpu-test-functions（「开了 GPU 测试函数应当带 gpu 特性、不自己清场…交 task-server 给的那张卡」）
-#   CRASH_POINT_REPLAY_BREAK=gpu-test-threads-unset  开了 GPU 时测试函数那几趟测试参数不带 --test-threads 1（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=gpu-test-threads-unset  开了 GPU 时测试函数那几趟测试参数不带 --test-threads 1
 #       gpu-test-functions（「开了 GPU 测试函数应当带 gpu 特性、不自己清场、测试参数带 --test-threads 1」：调用记录里 gpu 那几趟（三项的测试目标加 WHOLE_RUN_GROUPS 里的测试目标，个数自证现数）的 -- --nocapture 后面不是 --test-threads 1；没开 GPU 的 whole 那一格数的是 -- --nocapture 那几趟，这个开关不动它）
-#   CRASH_POINT_REPLAY_BREAK=gpu-agreement-test-threads-one  开了 GPU 时 GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标也照改前带 --test-threads 1
+#   CRASH_POINT_REPLAY_BREAK=gpu-agreement-test-threads-one  开了 GPU 时 GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标也带 --test-threads 1
 #       gpu-test-functions（「开了 GPU 测试函数应当带 gpu 特性、不自己清场、测试参数带 --test-threads 1（GPU_TEST_THREADS_RELEASED_TARGETS 那几个除外）」：带 1 的那几趟多了放开的那一个）、
 #       gpu-agreement-test-threads-released（「✗ 自证 gpu-agreement-test-threads-released：」：放开的测试目标带了 --test-threads 1）
 #   CRASH_POINT_REPLAY_BREAK=red-as-green  测试函数 cargo 退非 0、有 FAILED 也记绿
@@ -225,21 +225,21 @@
 #       test-functions-run-condition-not-met（「测试函数日志里有给定状态表借不到显存那一行……整趟退 78」）
 #   CRASH_POINT_REPLAY_BREAK=service-threads-dropped  测试函数的 cargo 起之前清掉服务交下来的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，吃 cargo 自己的缺省
 #       test-functions-threads-from-service（「测试函数每一趟 cargo 都应当原样收到服务交的线程数」）
-#   CRASH_POINT_REPLAY_BREAK=logs-single  每一段的日志只写一份全量的（改前的样子：tee，不经 two-logs.sh，没有 .problems.log）
+#   CRASH_POINT_REPLAY_BREAK=logs-single  每一段的日志只写一份全量的（tee，不经 two-logs.sh，没有 .problems.log）
 #       two-logs-per-part（「测试函数红的那一段应当出两份日志……」）
-#   CRASH_POINT_REPLAY_BREAK=pipeline-78-as-red  放量入口退 78 而没打 ITEM 行，照旧记红（收不回，改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=pipeline-78-as-red  放量入口退 78 而没打 ITEM 行，照旧记红（收不回）
 #       pipeline-entry-78-not-run（「放量入口退 78 而没打 ITEM 行，两项应当记本次未跑……」）、pipeline-entry-78-red-first（「✗ 自证 pipeline-entry-78-red-first：」：gamma 记了红，不是本次未跑）
 #   CRASH_POINT_REPLAY_BREAK=source-changed-reason-dropped  放量分项驱动报判段跑的过程中源码变了（退 77、verdict=not-run）时，本次未跑的原因不点名源码变了（只写 exit=77）
 #       pipeline-source-changed-not-run（「放量分项驱动报跑的过程中源码变了，那一项应当记本次未跑、不记红，原因点名源码变了……」）
-#   CRASH_POINT_REPLAY_BREAK=flow-coverage-table-skipped  跑完不往这一趟的日志目录落覆盖表与记录（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=flow-coverage-table-skipped  跑完不往这一趟的日志目录落覆盖表与记录
 #       flow-coverage-table（「跑完应当在这一趟的日志目录里落覆盖表 crash-flow-coverage.md 与记录 crash-flow-records.tsv…」）
-#   CRASH_POINT_REPLAY_BREAK=rocksdb-entry-unchecked  起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=rocksdb-entry-unchecked  起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       rocksdb-entry-refused（「验证包依赖 rocksdb 而进程环境里没有预编库的取值，应当在起 cargo 之前退 78…」：往下走起了假 cargo）
-#   CRASH_POINT_REPLAY_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（改前的样子：测试函数在仓根照仓根的 target 编、跨趟留着）
+#   CRASH_POINT_REPLAY_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（测试函数在仓根照仓根的 target 编、跨趟留着）
 #       run-target-green（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、run-target-red（「跑完运行目录里不剩它建的编译目录（测试函数红退 1）」）、
 #       run-target-term（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
 #   CRASH_POINT_REPLAY_BREAK=shard-phase-ignored  不认 TASK_SERVER_SHARD_PHASE 这几个变量，计划、一片、合并都照不分片跑（文件头「经 task-server 按件分片」）
-#       shard-default-plan（「不带参数应当默认分片」）、shard-default-one-part（「默认分片的一片应当只跑自己的件」）、shard-default-merge-red（「判红的片应当退 0」）、shard-default-merge-green（「全绿的默认分片，合并应当退 0」）、
+#       shard-default-plan（「不带参数应当默认分片」）、shard-default-one-part（「默认分片的一片应当只跑自己的件」）、shard-default-merge-red（「判红的片应当退 0」）、
 #       shard-default-many-parts（「件数超过片数上限应当合成」）、shard-position-refused（「片号对不上计划或阶段认不得应当退 2」）、shard-merge-refuses-incomplete（「有一片的产物不全」）、shard-no-shard（「带 --no-shard 应当计划一片」）、shard-plan-lines（「分片计划行每片每项一行、条数之和等于不分片那一趟」）
 #   CRASH_POINT_REPLAY_BREAK=shard-red-exit-kept  一片判红照原样退 1（别的片被服务收掉、合并起不来）
 #       shard-default-merge-red（「判红的片应当退 0」）
@@ -249,13 +249,13 @@
 #       shard-merge-refuses-incomplete（「有一片的产物不全」：退了别的码）
 #   CRASH_POINT_REPLAY_BREAK=plan-shards-not-merged  件数超过服务的片数上限也一件一片（服务记 shard-plan-refused）
 #       shard-default-many-parts（「件数超过片数上限应当合成」）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-skip-ignored  测试函数照算计划，键相同的也不经 --skip 跳过、照编照跑（改前的样子：每个测试目标整趟现判）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-skip-ignored  测试函数照算计划，键相同的也不经 --skip 跳过、照编照跑（每个测试目标整趟现判）
 #       reuse-three-questions（「✗ 自证 reuse-three-questions：」：测试函数那一半第二趟照样全现判）、
 #       test-functions-reuse-shared-with-the-gate（「✗ 自证 test-functions-reuse-shared-with-the-gate：」：剪枝那一趟没复用逐条写进的）、
 #       red-rejudged（「✗ 自证 red-rejudged：」：上一趟判绿的那一条没复用）、
 #       test-functions-domain-environment-keyed（「✗ 自证 test-functions-domain-environment-keyed：」连带：它判的复用或域环境跟着这一处变）、red-revokes-green（「✗ 自证 red-revokes-green：」连带：它判的复用或域环境跟着这一处变）
 #       registered-excluded（「按项跑时登记成 crash-case: 的用例与放量分项应当经 --skip 排掉」：参数里没有 --skip）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-not-recorded  测试函数现判出的判定不经 verdict-record 写回（改前的样子：测试函数跑了不入库）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-not-recorded  测试函数现判出的判定不经 verdict-record 写回（测试函数跑了不入库）
 #       reuse-three-questions（「✗ 自证 reuse-three-questions：」：测试函数那一半第二趟照样全现判）、
 #       test-functions-reuse-shared-with-the-gate（「✗ 自证 test-functions-reuse-shared-with-the-gate：」：库里一条都没有）、
 #       red-rejudged（「✗ 自证 red-rejudged：」：上一趟判绿的那一条没复用）、
@@ -268,15 +268,15 @@
 #       red-revokes-green（「✗ 自证 red-revokes-green：」连带：它判的复用或域环境跟着这一处变）
 #   CRASH_POINT_REPLAY_BREAK=test-functions-plan-failure-not-red  按条复用失灵（test-plan 退非 0）只全部现判、不判红
 #       test-functions-plan-failure-red（「✗ 自证 test-functions-plan-failure-red：」）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-plan-unavailable-as-failure  测试函数 test-plan 退 75 照按条复用失灵办（全部现判、判红、整趟退 1），不退 75（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-plan-unavailable-as-failure  测试函数 test-plan 退 75 照按条复用失灵办（全部现判、判红、整趟退 1），不退 75
 #       test-functions-plan-unavailable（「✗ 自证 test-functions-plan-unavailable：」）
-#   CRASH_POINT_REPLAY_BREAK=last-run-whole-overwrite  上次红的清单照改前整份覆盖（不点名的跑法不交这一趟真判过的项）
+#   CRASH_POINT_REPLAY_BREAK=last-run-whole-overwrite  上次红的清单整份覆盖（不点名的跑法不交这一趟真判过的项）
 #       last-run-list（「✗ 自证 last-run-list：」：本次未跑的那一项上一份的红丢了）
-#   CRASH_POINT_REPLAY_BREAK=red-not-recorded  测试函数现判红的测试函数不交 verdict-record --red-names（改前的样子：只记绿，判红不撤同一把键的绿）
+#   CRASH_POINT_REPLAY_BREAK=red-not-recorded  测试函数现判红的测试函数不交 verdict-record --red-names（只记绿，判红不撤同一把键的绿）
 #       red-revokes-green（「✗ 自证 red-revokes-green：」：同键现判那一趟判红之后，下一趟那一条照复用）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-without-library-tolerated  被判的根不是一棵 git 工作树的顶时照改前测试函数全部现判、不入库、往下跑（不退 2）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-without-library-tolerated  被判的根不是一棵 git 工作树的顶时测试函数全部现判、不入库、往下跑（不退 2）
 #       test-functions-outside-git-exits-2（「✗ 自证 test-functions-outside-git-exits-2：」：不是 git 工作树的副本那一趟没退 2、照编照跑）
-#   CRASH_POINT_REPLAY_BREAK=test-functions-domain-environment-unkeyed  test-functions-request 带 ADMISSION_BREAK=domain-environment-unkeyed 起（改前的样子：改判定域的环境变量不进键）
+#   CRASH_POINT_REPLAY_BREAK=test-functions-domain-environment-unkeyed  test-functions-request 带 ADMISSION_BREAK=domain-environment-unkeyed 起（改判定域的环境变量不进键）
 #       test-functions-domain-environment-keyed（「✗ 自证 test-functions-domain-environment-keyed：」：按段登记文件改了，闭包读它的那一条照复用）
 #   CRASH_POINT_REPLAY_BREAK=registered-not-excluded  不排登记成 crash-case: 的用例与放量分项（test-plan 不带 --exclude-registered），它们也按条复用地跑
 #       registered-excluded（「按项跑时登记成 crash-case: 的用例与放量分项应当经 --skip 排掉……」）
@@ -298,9 +298,10 @@
 #       shard-plan-lines
 #   CRASH_POINT_REPLAY_BREAK=keys-reader-build-differs  --with-keys 的读库程序那一趟 cargo run 不带真跑那一套特性
 #       keys-reader-same-build（「同一棵树 --with-keys 算的键与真跑记库的键相同：读库程序带的特性要与真跑的相同」）
-#   CRASH_POINT_REPLAY_BREAK=scoped-domain-unbounded  带 --item、没缩域也不判指定范围的崩溃域上限（改前的样子）
+#   CRASH_POINT_REPLAY_BREAK=scoped-domain-unbounded  带 --item、没缩域也不判指定范围的崩溃域上限
 #       scoped-domain-over-limit（「估数超过 200000 态应当退 79、不编不跑」）、scoped-domain-unknown-refused（「估不出应当退 79」）、
-#       scoped-domain-shrunk-record-skipped（「只有缩过域的记录算不出全域态数，应当退 79」）
+#       scoped-domain-shrunk-record-skipped（「只有缩过域的记录算不出全域态数，应当退 79」）、
+#       scoped-domain-reusable-passes（「点名项全部可复用的放行，不论上一趟的态数多大」连带：守卫不跑，「全部复用，现判 0 态」那一句不打）
 #   CRASH_POINT_REPLAY_BREAK=scoped-domain-narrowed-refused  缩了域（--crash-expand-up-to 小于引擎常量）也照没缩判：缩域值不交给判法
 #       scoped-domain-narrowed-passes（「缩过域的放行，不读库、不判上限」）
 #   CRASH_POINT_REPLAY_BREAK=scoped-domain-reusable-counted  库里录下的块键都对得上、全部可复用的项也按上一趟全域真跑的态数算（上一趟有记录才算）
@@ -312,7 +313,7 @@
 #   CRASH_POINT_REPLAY_BREAK=scoped-domain-shrunk-records-used  估上一趟全域态数时不看展开深度，取最新的一份记录（缩过域的那趟也当全域）
 #       scoped-domain-shrunk-record-skipped（「只有缩过域的记录算不出全域态数，应当退 79」）
 #   CRASH_POINT_REPLAY_BREAK=enumeration-scope-not-recorded  崩溃点重放部分跑完不在日志旁写 .scope（展开深度与用例日志目录）
-#       scoped-domain-enumeration-records（「跑完应当在日志旁写 .scope，下一趟估上限时读得到这一项的崩溃点重放态数」）、item-domain-line
+#       scoped-domain-enumeration-records（「跑完应当在日志旁写 .scope，下一趟估上限时读得到这一项的崩溃点重放态数」）
 #   CRASH_POINT_REPLAY_BREAK=item-domain-line-dropped  --list-items --with-keys 不打 ITEM_DOMAIN 行
 #       item-domain-line（「每个列出的项一行 ITEM_DOMAIN、态数照估法、点名了只打点名的项」）、scoped-domain-enumeration-records（「跑完应当在日志旁写 .scope……」：ITEM_DOMAIN 行没有）
 #   CRASH_POINT_REPLAY_BREAK=scoped-domain-handshake-dropped  起放量入口时不交 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（放量入口会再判一遍）
@@ -341,7 +342,7 @@ WHOLE_RUN_GROUPS=(
   $'pruning-self-proof\tcrash_amplification_two_flows_share_their_prefix crash_amplification_pipeline_records_checks_and_reuses'
   $'pinned-red-examples\t-'
 )
-# GPU 测试里放开 --test-threads 1 的测试目标（文件头「GPU」；.claude/rules/verification.mdGPU 那一条的例外，用户 2026-10-28 定案「放开并按显存排队」）：
+# GPU 测试里放开 --test-threads 1 的测试目标（文件头「GPU」；.claude/rules/verification.mdGPU 那一条的例外，放开并按显存排队）：
 #   它的测试按显存额度排队（排队在 crates 里），开了 GPU 时测试线程取登记的重活默认并行度；门禁 crash-point-replay 的 GPU_TEST_THREADS_RELEASED_TARGETS 与
 #   scripts/gate/admission.py 的 GPU_TEST_THREADS_RELEASED_TARGETS 是同一份名单，三处一起改
 GPU_TEST_THREADS_RELEASED_TARGETS=(crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state)
@@ -391,10 +392,11 @@ test_functions_environment() {
   local variable
   functions_environment=(env -u SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE -u GPU_CARDS_BY_PRIORITY)
   for variable in $(compgen -e); do [[ "$variable" == SINGLEFS_CRASH_AMPLIFICATION_* ]] && functions_environment+=(-u "$variable"); done
+  # -u 一律写在「变量=值」之前：env 见到头一个「变量=值」之后就不再认选项，后面的 -u 会被当成要起的命令
+  replay_break_is service-threads-dropped && functions_environment+=(-u CARGO_BUILD_JOBS -u RUST_TEST_THREADS)
   if [[ -n "$crash_expand_up_to_origin" ]] && ! replay_break_is expand-up-to-not-passed; then
     functions_environment+=("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=$crash_expand_up_to")
   fi
-  replay_break_is service-threads-dropped && functions_environment+=(-u CARGO_BUILD_JOBS -u RUST_TEST_THREADS)
   functions_environment+=("BINDGEN_EXTRA_CLANG_ARGS=$CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS")
   [[ -f "$configuration_file" ]] && functions_environment+=("SINGLEFS_MULTI_HOST_CONFIG=$(cd "$(dirname "$configuration_file")" && pwd)/$(basename "$configuration_file")")
 }
@@ -675,7 +677,7 @@ PYTHON
   [[ "$counts" == *$'\n'* ]] && condition_line="${counts#*$'\n'}"
   read -r passed failed not_run_lines condition_lines functions_reused <<<"${first_line:-0 0 0 0 unknown}"
   [[ "$functions_reused" =~ ^[0-9]+$ ]] || functions_reused=unknown
-  replay_break_is test-functions-reuse-not-counted && functions_reused=none   # 弄坏开关：改前写死 none
+  replay_break_is test-functions-reuse-not-counted && functions_reused=none   # 弄坏开关：写死 none
   [[ "$passed" =~ ^[0-9]+$ ]] || passed=0
   [[ "$failed" =~ ^[0-9]+$ ]] || failed=0
   [[ "$not_run_lines" =~ ^[0-9]+$ ]] || not_run_lines=0
@@ -720,7 +722,7 @@ record_part() { # 十个字段；第十一个是这一段的件数「现判:复�
 }
 
 # 跑一条命令：输出边跑边转打，同时出两份日志（scripts/hosts/two-logs.sh：<日志> 是全量，同名的 .problems.log 只收错误与警告、行前带全量日志里的行号，一般只看它）；
-# 退出码写进 <日志>.exit。弄坏开关 logs-single：照改前只写一份全量日志（tee）
+# 退出码写进 <日志>.exit。弄坏开关 logs-single：只写一份全量日志（tee）
 run_logged() { # <日志，以 .log 结尾> <命令…>
   local log="$1" exit_code
   shift
@@ -741,7 +743,7 @@ functions_red_recorded=0                                                        
 functions_target_judge=0; functions_target_reuse=0; functions_target_refused=0; functions_target_registered=0; functions_target_skip_arguments=(); functions_target_record_red=""
 
 # plan_test_functions：算这一趟测试函数的计划（test-plan 落进 functions_plan_output，计划文件 functions_plan_file），设 functions_plan_state 与 functions_plan_note。
-#   被判的根不是 git 工作树的顶（判定库没有名字）：nolibrary，run_test_functions 照它整趟退 2（弄坏开关 test-functions-without-library-tolerated 下照改前 off：全部现判、不入库）；
+#   被判的根不是 git 工作树的顶（判定库没有名字）：nolibrary，run_test_functions 照它整趟退 2（弄坏开关 test-functions-without-library-tolerated 下 off：全部现判、不入库）；
 #   test-plan 退非 0 或没打 PLAN：交 admission.py plan-failure 判，失灵是 failed（弄坏开关
 #   test-functions-plan-failure-not-red 下照 off 办：全部现判、不判红）。弄坏开关 test-functions-kind-not-gate 下种类换成另一类，red-reused-as-green 下读库带 ADMISSION_BREAK=red-verdict-reused
 #   参数是交给测试函数 cargo 的那一份环境（env -u … 变量=值 … 那一串）：test-functions-request 在它里面起（文件头「按条复用」：改判定域的环境变量照它进键）。
@@ -778,7 +780,8 @@ plan_test_functions() { # <交给测试函数 cargo 的那一份环境…>
       argument) request_arguments+=("$request_value") ;;
     esac
   done <<<"$request_output"
-  replay_break_is test-functions-kind-not-gate && functions_plan_kind="crash-point-replay.sh:test-functions"   # 弄坏开关：种类与门禁不同（记进、读另一份库）
+  # 弄坏开关：种类与门禁不同（记进、读另一份库）。在门禁那一类前面加一段，不写死另一个名字：入口与门禁同名（crash-point-replay.sh）之后，写死的名字就是门禁那一类，开关什么都不弄坏
+  replay_break_is test-functions-kind-not-gate && functions_plan_kind="entry-only-$functions_plan_kind"
   for feature in ${features//,/ }; do feature_options+=(--feature "$package/$feature"); done
   replay_break_is registered-not-excluded && exclude_option=()   # 弄坏开关：不排登记的用例与放量分项，它们也按条复用地跑
   replay_break_is red-reused-as-green && admission_break=("ADMISSION_BREAK=red-verdict-reused")
@@ -927,11 +930,11 @@ with open(counts_file, "a", encoding="utf-8") as handle:
     handle.write(f"{target}\t{judged}\t{reused}\t{refused}\t{'reused' if log == '-' else 'ran'}\n")
 PYTHON
   if replay_break_is red-reused-as-green; then cat -- "$prefix.red-names" >>"$prefix.green-names"; fi   # 弄坏开关：红的也照判绿写回
-  # 判红的记红、撤掉同一把键原有的绿（文件头「按条复用」）：现判红的名单交 --red-names。弄坏开关 red-not-recorded 下不交（改前的样子），red-reused-as-green 下已并进判绿的名单
+  # 判红的记红、撤掉同一把键原有的绿（文件头「按条复用」）：现判红的名单交 --red-names。弄坏开关 red-not-recorded 下不交，red-reused-as-green 下已并进判绿的名单
   red_option=()
   if [[ -s "$prefix.red-names" ]] && ! replay_break_is red-reused-as-green && ! replay_break_is red-not-recorded; then red_option=(--red-names "$prefix.red-names"); fi
   [[ -s "$prefix.green-names" ]] || (( ${#red_option[@]} )) || return 0
-  replay_break_is test-functions-not-recorded && return 0   # 弄坏开关：不写回（改前的样子）
+  replay_break_is test-functions-not-recorded && return 0   # 弄坏开关：不写回
   if python3 "$replay_admission_module" verdict-record "$repository_root" "$functions_plan_kind" "$functions_plan_file" "$prefix.green-names" ${red_option[@]+"${red_option[@]}"} \
        --how "crash-point-replay.sh 测试函数那一段（$scope）：cargo test --release -p singlefs-verification ${features:+--features $features }--test $target" >"$prefix.record" 2>&1; then
     record_exit=0
@@ -945,8 +948,11 @@ PYTHON
   (( record_exit == 0 )) && return 0
   echo "  ! 按条复用：$target 判绿写回 admission.py verdict-record 退 $record_exit（$(tail -n 2 "$prefix.record" | tr '\n' ' ' | cut -c1-300)），下一趟这几条照判"
   local record_failure_exit=0
-  python3 "$replay_admission_module" plan-failure "crash-point-replay.sh 测试函数那一段（$target）" verdict-record "$record_exit" "$prefix.record" >"$prefix.record.failure" 2>&1 \
-    || record_failure_exit=$?
+  local -a red_withdrawal=()
+  # 记红没成（admission.py 文件头「按条复用失灵」）：交了红的带 --red，它判失灵、撤掉那几把键原有的绿
+  (( ${#red_option[@]} )) && red_withdrawal=(--red "$repository_root" "$functions_plan_kind" "$functions_plan_file" "$prefix.red-names")
+  python3 "$replay_admission_module" plan-failure "crash-point-replay.sh 测试函数那一段（$target）" verdict-record "$record_exit" ${red_withdrawal[@]+"${red_withdrawal[@]}"} \
+    "$prefix.record" >"$prefix.record.failure" 2>&1 || record_failure_exit=$?
   if (( record_failure_exit == 75 )) && ! replay_break_is test-functions-plan-unavailable-as-failure; then
     # 记库时 prune-server 不可用（文件头「按条复用」）：这一趟判出的判定记不下，整趟退 75
     cat -- "$prefix.record.failure"
@@ -980,7 +986,7 @@ run_test_functions() { # <计划文件>：测试函数那一段（test-functions
     # 一个测试里 CPU 判器自己的线程不受这个参数管（读 SINGLEFS_CRASH_JUDGE_CPU_THREADS，没设取本机可用并行度）
     replay_break_is gpu-test-threads-unset || test_threads_arguments=(--test-threads 1)
     # GPU_TEST_THREADS_RELEASED_TARGETS 里的测试目标不带 --test-threads 1，测试线程取登记的重活默认并行度（它的测试按显存额度排队）；
-    #   取不出登记值就照旧 1 个并打一句。弄坏开关 gpu-agreement-test-threads-one 下照改前带 --test-threads 1
+    #   取不出登记值就照旧 1 个并打一句。弄坏开关 gpu-agreement-test-threads-one 下带 --test-threads 1
     if ! released_test_threads="$(heavy_thread_default)"; then
       echo "  ! 取不出登记的重活默认并行度（scripts/hosts/heavy-threads.sh 的 heavy_thread_default），${GPU_TEST_THREADS_RELEASED_TARGETS[*]} 照旧带 --test-threads 1" >&2
       released_test_threads=1
@@ -1664,6 +1670,8 @@ STUB
   cell_failed() { # <格名> <判错的一句> <出路>
     echo "  ✗ 自证 $1：$2（退 $exit_code；调用记录：$(tr '\n' '|' <"$calls" | cut -c1-600)）" >&2
     echo "     → 怎么办：$3" >&2
+    # 这一格那一趟子进程打的红行与输出末尾（只读不判）：退出码不对的格看得出是哪一段判的红，不用再复跑一次去找（任务 8116 那一格只留下「退 1」）
+    echo "     那一趟打的红行：$(grep -F '✗' "$work/out" 2>/dev/null | head -n 5 | tr '\n' '|' | cut -c1-600)；输出末尾：$(tail -n 5 "$work/out" 2>/dev/null | tr '\n' '|' | cut -c1-600)" >&2   # gate-lint:detail
     failures=$((failures + 1))
   }
   entry() { # [<变量=值>…] -- <参数…>：在小仓上起这一份（子进程认自证标记），输出进 $work/out、退出码进 exit_code
@@ -1875,7 +1883,8 @@ STUB
   { [[ "$exit_code" == 2 && ! -s "$calls" ]]; } || expand_wrong+="环境变量 SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO 写 abc 退 $exit_code；"
   [[ -z "$expand_wrong" ]] || cell_failed expand-up-to-refused "缩域的值不是非负整数、后面没有值都应当退 2、什么都不起、点名用法（$expand_wrong）" "看参数之后核缩域值的那一段（crash_expand_up_to_origin）"
   # expand-up-to-passed：给了 --crash-expand-up-to 6（或环境里已设变量）⇒ 测试函数、崩溃点重放、放量三段都收到同一个值，ITEM 与 TOTAL 行末尾接 expand_up_to=6，
-  #   成功句写缩过域、不算门禁通过；参数与环境变量都给取参数；不缩的那一趟三段看到的是 unset，行里与句里都没有缩域的说法
+  #   成功句写缩过域、不算门禁通过；参数与环境变量都给取参数；不缩的那一趟三段看到的是 unset，ITEM、TOTAL 行里与句里都没有缩域的说法
+  #   （放量入口转打过来的 CRASH_AMPLIFICATION_ITEM 行照真入口的样子总带 expand_up_to=<引擎报的展开深度>，不算缩域的说法，不在这里判）
   local expand_passed_wrong=""
   expand_check() { # <要的值> <说明>：上一趟 entry 的结果对不对
     local value="$1" cargo_runs
@@ -1891,7 +1900,7 @@ STUB
   entry --
   { [[ "$exit_code" == 0 ]] && [[ "$(calls_count '^cargo-env expand=\[unset\]$')" == "$(calls_count '^cargo-env expand=')" ]] \
     && calls_have '^enumeration-env expand=\[unset\]$' && calls_have '^pipeline-env expand=\[unset\]$' \
-    && ! grep -q 'expand_up_to=' "$work/out" && ! out_has "缩过域"; } || expand_passed_wrong+="不缩的那一趟三段应当看到 unset、行里与句里没有缩域的说法（退 $exit_code）；"
+    && ! grep -qE '^CRASH_POINT_REPLAY_(ITEM|TOTAL) .*expand_up_to=' "$work/out" && ! out_has "缩过域"; } || expand_passed_wrong+="不缩的那一趟三段应当看到 unset、行里与句里没有缩域的说法（退 $exit_code）；"
   [[ -z "$expand_passed_wrong" ]] || cell_failed expand-up-to-passed "给了缩域值，三段都应当收到变量、ITEM 与 TOTAL 行带 expand_up_to、成功句写缩过域（$expand_passed_wrong）" \
     "看参数之后「缩崩溃域」那一段与 test_functions_environment"
   # item-done-lines：真跑每项跑完一行 ITEM_DONE（stderr），行数等于 ITEM 行数；alpha（崩溃枚举用例全复用、放量判了 10 态）judged=1 reused=1，beta（用例全复用）judged=0 reused=1，
@@ -2276,7 +2285,7 @@ PY_UNIT_LIBRARY
   [[ -z "$unit_wrong" ]] || cell_failed red-revokes-green "判红要记红、撤掉同一把键原有的绿，下一趟照现判：$unit_wrong" \
     "看 record_test_functions_target 交 verdict-record 的 --red-names 与 scripts/gate/admission.py 的 VerdictLibrary.record_red、lookup 里认红的那一句"
   # test-functions-outside-git-exits-2（文件头「按条复用」）：照 unit-root 拷一份不带 .git 的副本（临时目录里，往上找不到别的仓），在副本上跑剪枝
-  #   ⇒ 整趟退 2、点名不是 git 工作树的顶、测试函数一个测试目标都不编不起（弄坏开关 test-functions-without-library-tolerated 下照改前全部现判、往下跑）
+  #   ⇒ 整趟退 2、点名不是 git 工作树的顶、测试函数一个测试目标都不编不起（弄坏开关 test-functions-without-library-tolerated 下全部现判、往下跑）
   local unit_copy="$work/unit-copy"
   rm -rf -- "$unit_copy"
   cp -dR --preserve=timestamps,links -- "$unit_root" "$unit_copy" && rm -rf -- "${unit_copy:?}/.git"
@@ -2837,7 +2846,7 @@ else
 fi
 summarize "$plan_file" "$scope_title"
 echo "  · 错误警告日志（每份全量日志旁边同名的 .problems.log，一般只看它）：$(find "$run_directory" -maxdepth 1 -name '*.problems.log' | LC_ALL=C sort | tr '\n' ' ')"
-# 覆盖行与计数行落成产物（文件头「输出」末段）：只落产物、不判红、不改退出码；弄坏开关 flow-coverage-table-skipped 下照改前不落
+# 覆盖行与计数行落成产物（文件头「输出」末段）：只落产物、不判红、不改退出码；弄坏开关 flow-coverage-table-skipped 下不落
 if ! replay_break_is flow-coverage-table-skipped; then
   flow_coverage_judge="$replay_script_directory/crash-flow-coverage.py"
   # 合并那一步的记录是各片存下的（shard_collect_the_outputs 并好了），这一趟的目录里没有日志可读
@@ -2850,7 +2859,7 @@ if ! replay_break_is flow-coverage-table-skipped; then
 fi
 # 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：红的项一行一个；
 # 点不点名都只换这一趟真判过的项（summarize 写的 exit.judged-items：判绿或判红的），本次未跑、没判的项照留上一份的记录；读、合、换上在共用库的锁里做，
-# 几趟同时跑不互盖。弄坏开关 last-run-whole-overwrite 下照改前：不点名的跑法整份写、点名的交点名的项。分片时由合并那一步写，一片不写
+# 几趟同时跑不互盖。弄坏开关 last-run-whole-overwrite 下：不点名的跑法整份写、点名的交点名的项。分片时由合并那一步写，一片不写
 if [[ -f "$run_directory/exit.red-items" && "$shard_phase" != shard ]]; then
   if replay_break_is last-run-whole-overwrite; then
     if (( ${#named_items[@]} > 0 )); then

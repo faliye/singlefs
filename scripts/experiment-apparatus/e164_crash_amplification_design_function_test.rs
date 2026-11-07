@@ -2865,7 +2865,7 @@ mod repository_scans {
     use crate::json::{parse_json, JsonValue};
     use crate::lexical::combined_digest;
 
-    /// 身份串（第三轮判决第四节）：`<登记时冻结的代码文件名>::<验证目标名>::<流程步号>::<哈希串>`。
+    /// 身份串：`<登记时冻结的代码文件名>::<验证目标名>::<流程步号>::<哈希串>`。
     pub fn identity_text(code_file_name: &str, target_name: &str, step_number: u32, hash_text: &str) -> String {
         format!("{code_file_name}::{target_name}::{step_number}::{hash_text}")
     }

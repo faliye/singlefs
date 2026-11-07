@@ -2,7 +2,9 @@
 （RV1–RV15，登记修订 11 第 11.8 节）经 mutation_driver.py --unit-test-module test_revision_11 跑；库根两台同一那几条（第 2 次重跑登记修订 4）
 另由 scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv 带它跑。
 每条用例一个场景、自己建自己删临时目录；调 reuse_library.py 与 segment_one_units_revision_11.py 自证的那几格（假树、假装置、假驱动行、假单元脚本，
-另有一格起真的修订 11 单元脚本取用一份造好的条目），不起装置、不编、不连别的台。"""
+另有一格起真的修订 11 单元脚本取用一份造好的条目），不起装置、不编、不连别的台。
+复用库在 prune-server 里（reuse_library.py 文件头「库」）：跑格的用例只在临时 prune-server 上跑（scripts/prune-server/prune_server_client.py 文件头「命令行」
+--with-temporary-service），不是临时服务那一条判错、点名出路，不写真服务。"""
 from __future__ import annotations
 
 import os
@@ -19,6 +21,8 @@ class CellCase(unittest.TestCase):
     """跑一格：格函数收一个临时目录，交回 (过没过, 细节)。"""
 
     def run_cell(self, cell) -> None:
+        problem = reuse.prune_server_client.selftest_service_problem()
+        self.assertEqual(problem, "", f"格里读写复用库，只在临时 prune-server 上跑：{reuse.prune_server_client.SELFTEST_SERVICE_REMEDY}")
         scratch = tempfile.mkdtemp(prefix="e171-r11-test-")
         try:
             passed, detail = cell(scratch)

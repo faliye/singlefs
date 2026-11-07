@@ -94,7 +94,7 @@ fn rate_in_thousandths_per_second(sync_count: u64, elapsed_nanoseconds: u128) ->
 /// E23 已定的头部 84 字节里，`jsn` 占 8 字节。把它换成 `jsn_bytes` 之后的头部。
 const BASE_RECORD_HEADER_BYTES: u64 = 84;
 const BASE_RECORD_JSN_BYTES: u64 = 8;
-/// D23 已定项 7 定案新增：事务号 8 + 提交标记 1。
+/// D23 已定项 7 新增：事务号 8 + 提交标记 1。
 const TRANSACTION_FIELD_BYTES: u64 = 9;
 /// D23 已定项 8 方向已定的反向链，按 32 位算。
 const BACK_CHAIN_BYTES: u64 = 4;
@@ -139,7 +139,7 @@ fn main() {
 
     let mut median_rate_by_arm = std::collections::BTreeMap::new();
     for arm in [Arm::Sync1, Arm::Sync8, Arm::NoSync] {
-        // ⚠️ **第一轮是冷的，显式跑一轮预热并把它报出来、不计入**。
+        // ⚠️ **首轮是冷的，显式跑一轮预热并把它报出来、不计入**。
         // 实测：不预热时第 0 轮耗时是其余轮的 2 倍，五轮离散 49.7%，
         // 按本实验自己的失败条款（离散 > ±20% 报「不稳定」）就下不了结论。
         // 预热要**可见**——藏起来等于偷偷把最慢那轮删掉。
@@ -247,7 +247,7 @@ mod tests {
     // wallclock-assert: 不 fdatasync 的臂每秒完成的同步次数至少是 fdatasync 臂的两倍
     fn fdatasync_actually_reaches_the_device() {
         // ⚠️ **这是计时断言，跑在与整个 workspace 并行的测试进程里**：60 轮的样本
-        // 在负载高时会被调度噪声盖过（2026-08-31 实测：单跑 3/3 过，全量套件里 1 过 1 红）。
+        // 在负载高时会被调度噪声盖过（实测：单跑 3/3 过，全量套件里 1 过 1 红）。
         // ⇒ 最多试 3 次，任意一次拿到 ≥2× 就算过；三次都拿不到才判红。
         // **判别力不受影响**：`if arm.issues_fdatasync()` 被改成 `if false` 时三次都不可能出现那个差距。
         let image_file_path = std::env::temp_dir().join(format!("e44-selftest-{}.img", std::process::id()));

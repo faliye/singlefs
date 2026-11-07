@@ -196,7 +196,7 @@ DISAGREES = "disagrees:模型说该成、实现拒了"
 
 
 class RowS5MirrorTests(unittest.TestCase):
-    """装置逐行那一趟 S5 的比对器一侧（代码轮第三轮判决 K4-c 甲、丙）：返回了错误而对拍没问模型的调用、与不适用来源不合规的态，各自数出来，期望 0。"""
+    """装置逐行那一趟 S5 的比对器一侧（K4-c 甲、丙）：返回了错误而对拍没问模型的调用、与不适用来源不合规的态，各自数出来，期望 0。"""
 
     def test_an_errored_acquire_left_in_not_modelled_is_counted_and_a_recorded_red_is_not(self) -> None:
         silent = run_whose_model_stopped_at([labelled_call(0, "acquire", "err:X", "not_modelled")], [], 0)

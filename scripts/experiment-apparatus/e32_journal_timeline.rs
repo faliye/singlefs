@@ -117,7 +117,7 @@ fn record_hash(record: &JournalRecord) -> u64 {
 
 /// 定长环，且**槽位由 `jsn % slots` 决定**。
 ///
-/// ⚠️ **这是一个选择，不是「定长环」的含义**（此处原先那么写过，是过头的）：
+/// ⚠️ **这是一个选择，不是「定长环」的含义**：
 /// jbd2 与 XFS 的日志同样是定长环，但**槽位由 head 指针顺序推进、与序号解耦**。
 /// 现查 jbd2 恢复收尾（`fs/jbd2/recovery.c:318-321`，本机 7.2.0 树）：
 /// `j_transaction_sequence = ++info.end_transaction; j_head = info.head_block;`

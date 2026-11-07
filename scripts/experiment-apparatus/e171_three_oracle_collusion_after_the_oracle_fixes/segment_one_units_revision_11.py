@@ -3,7 +3,7 @@
 与其后「主 agent 认定：修订 11 交回」）。由 run_segment_one_revision_11_multi_host.sh 起，在仓根跑。
 
 为什么另写一层：segment_one_units_revision_8.py 与单元脚本 segment_one_unit_revision_8.sh 一个字节不改（第 2 次重跑登记修订 7、8 改了前者的线程分法、
-删了两份里的线程包装，之后按现内容重钉了 UNITS_R8_SHA256，现钉的值就是那个常量）。这一层按路径载入前者（开跑先核 sha256，
+删了两份里的线程包装，之后按现内容重钉了 UNITS_R8_SHA256，现钉的值就是那个常量；修订 10 把两份单元脚本取线程那一处改成取每台默认重活线程数，修订 11 把前者每个单元的线程改成取额度，同样按现内容重钉）。这一层按路径载入前者（开跑先核 sha256，
 不是就退 3），单元表、依赖、次序与资源、续跑、一步停、逐行编排的起法都调它原来的函数；改的只有第 11.10 节表那几处：
   ① 单元脚本换成 segment_one_unit_revision_11.sh（修订 8 那份照抄，只在读数进程那几处加取用），逐行编排换成 rows_orchestrator_revision_11.py
     （修订 11 占位的路径经环境变量 E171_REVISION_11_CONFIG 交给它）；
@@ -17,7 +17,8 @@
   ⑤ 收尾：由标记现合复用账本 <H16 前缀>-reuse-ledger-units<H16 后缀>.out（登记的读数单元：第 0–10 步各单元装的，research-mutations 排了才算），
     N + M 不等于登记数退 1；没跑完时账本只写进日志目录 reuse-ledger-units.out。
 修订 11 占位（revision_11_placeholders.json，路径不是绝对的相对仓根）：revision_8_config、H30（library_root、lookup）、H31（新文件 → sha256：
-  run 之前核，没填或对不上退 78；主 agent 认过才起跑）；dry_run=true 的只给 plan。库目录写不了、与 scripts/experiment-apparatus/target 不在同一个文件系统退 78。
+  run 之前核，没填或对不上退 78；主 agent 认过才起跑）；dry_run=true 的只给 plan。复用库在 prune-server 里（reuse_library.py 文件头「库」），连不上退 75。
+  自证只在临时 prune-server 上跑（开跑前调 selftest_service_problem()，不是临时服务退 2、一格都不跑）。
 用法：
   segment_one_units_revision_11.py run  --config <修订 11 占位> [--repo R]
   segment_one_units_revision_11.py plan --config <修订 11 占位> [--repo R]   修订 8 的 plan 全部原样，另打每个读数单元的键与库里有没有（只读，不建库、不写标记）
@@ -58,7 +59,7 @@ BREAK_VARIABLE = "UNITS_R11_BREAK"
 SELFTEST_VARIABLE = "UNITS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 UNITS_R8_PATH = os.path.join(HERE, "segment_one_units_revision_8.py")
-UNITS_R8_SHA256 = "b2d4c89a8e1a7c63c264d5841d4f5e3bedfe405df91d7fadf525229c71f7411f"
+UNITS_R8_SHA256 = "802ef7d71897c8e1a1fb334db17a0a8c6b90002887f6e933716d999bf158079b"
 UNIT_SCRIPT = os.path.join(HERE, "segment_one_unit_revision_11.sh")
 ROWS_ORCHESTRATOR = os.path.join(HERE, "rows_orchestrator_revision_11.py")
 EXIT_WRONG_PINNED_FILE = 3
@@ -120,7 +121,7 @@ ORIGINAL = {"unit_table": units8.unit_table, "unit_environment": units8.unit_env
 def unit_table_with_selfproof() -> dict:
     """修订 8 的单元表加 reuse-selfproof（RP2，依赖 step-0；只打 S1 常量的三趟 stream-constants）。"""
     units = ORIGINAL["unit_table"]()
-    units[SELFPROOF_UNIT] = units8.Unit(SELFPROOF_UNIT, ("step-0",), units8.READING_UNIT_THREADS, 300)
+    units[SELFPROOF_UNIT] = units8.Unit(SELFPROOF_UNIT, ("step-0",), units8.registered_threads(), 300)  # 同修订 8 每个单元：取整份额度（第 2 次重跑登记修订 11）
     return units
 
 
@@ -274,7 +275,7 @@ def plan_with_reuse(settings) -> int:
     code = ORIGINAL["plan"](settings)
     state = STATE["reuse"]
     print("── 复用（修订 11）──")
-    print(f"库 {state.library.root}（{'在' if os.path.isdir(state.library.root) else '还没建'}；冻住 {state.library.frozen_reason() or '否'}）；"
+    print(f"库 {state.library.location()}（冻住 {state.library.frozen_reason() or '否'}）；"
           f"查库 {'开' if state.lookup else '关'}；标记 {state.markers}")
     try:
         inputs = tree_inputs(settings)
@@ -298,7 +299,7 @@ def plan_with_reuse(settings) -> int:
         else:
             sections = reuse.reading_unit_sections(inputs, reading, upstream_for(settings, reading))
         key = reuse.key_of(sections)
-        present = os.path.isdir(state.library.entry_path(key))
+        present = state.library.present(key)
         print(f"读数单元 {name}：键 {key[:16]}；{'永远现跑（RC2）' if reading.fresh_always else ('库里有同键条目' if present else '库里没有')}")
     return code
 
@@ -349,10 +350,7 @@ def main(argument_list: list[str]) -> int:
         problems = [] if broken("h31-unchecked") else reuse.h31_problems(repo, config)
         if problems:
             raise units8.RunCondition("H31 不过：" + "；".join(problems[:4]))
-        STATE["reuse"].library.check_run_condition(repo)
-        removed = STATE["reuse"].library.clear_stale_staging()
-        if removed:
-            units8.say(settings, f"  复用库 staging/ 里上一趟留下的 {len(removed)} 份残留删了")
+        STATE["reuse"].library.check_service_reachable()
         return run_with_ledger(settings)
     except (units8.RunCondition, judge.RunConditionError, reuse.RunCondition) as error:
         print(f"{units8.today()} ✗ 运行条件不满足（退 78）：{error}", flush=True)
@@ -506,7 +504,7 @@ STEP_1_VERDICT = ("E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches
 
 
 def real_script_step_1(scratch: str, label: str, world, library: reuse.Library, o2_red_states: int) -> tuple[int, list, str, str]:
-    """真的 segment_one_unit_revision_11.sh 跑 step-1，编排给的条目里的产物 o2_red_states 取给定值。交回 (退出码, 记下的读数, 产物路径, 条目里那份产物)。"""
+    """真的 segment_one_unit_revision_11.sh 跑 step-1，编排给的条目里的产物 o2_red_states 取给定值。交回 (退出码, 记下的读数, 产物路径, 入库时那份产物)。"""
     source = os.path.join(scratch, f"reading-{label}")
     reading = {"product": judge.write_text(os.path.join(source, "product"), STEP_1_VERDICT.format(o2=o2_red_states)),
                "timing": judge.write_text(os.path.join(source, "timing"), "E7TIMING name=stream_time stream=a elapsed_ns=1000000000\n"
@@ -516,7 +514,7 @@ def real_script_step_1(scratch: str, label: str, world, library: reuse.Library, 
     library.insert(key, f"selftest {label}\n", "device", reading, {"exit": "0"})
     unit_directory = os.path.join(scratch, f"unit-{label}")
     os.makedirs(unit_directory)
-    entries = judge.write_text(os.path.join(unit_directory, "reuse-entries.tsv"), f"s2-device-baseline-streams-1-2\t{library.entry_path(key)}\n")
+    entries = judge.write_text(os.path.join(unit_directory, "reuse-entries.tsv"), f"s2-device-baseline-streams-1-2\t{key}\n")
     tree = os.path.relpath(world.tree, world.repo)
     environment = dict(os.environ, REPO=world.repo, RESEARCH=HERE, PREFIX=f"research/results/fake-{label}", SUFFIX="-r8", TAG="", DUMPS=f"scripts/experiment-apparatus/target/fake-dumps-{label}",
                        TREE=tree, BIN="/bin/false", E170_BIN="/bin/false", SNAPSHOT_DIGEST=judge.row_driver.snapshot_digest(world.tree)[0],
@@ -526,20 +524,20 @@ def real_script_step_1(scratch: str, label: str, world, library: reuse.Library, 
                        REUSE_LIBRARY=library.root, REUSE_ENTRIES=entries, REUSE_READINGS=os.path.join(unit_directory, "reuse-readings.tsv"), PRINT_ONLY="0")
     code = subprocess.run(["bash", UNIT_SCRIPT, "step-1"], cwd=world.repo, env=environment, capture_output=True, text=True, timeout=120).returncode
     product = os.path.join(world.repo, f"research/results/fake-{label}-s2-device-baseline-streams-1-2-r8.out")
-    return code, reuse.readings_file_lines(environment["REUSE_READINGS"]), product, os.path.join(library.entry_path(key), "reading", "product")
+    return code, reuse.readings_file_lines(environment["REUSE_READINGS"]), product, reading["product"]
 
 
 def cell_unit_script_fetch(scratch: str) -> tuple[bool, str]:
-    """真的单元脚本：编排给了条目就取用（硬链接、不起装置），记一行 reused，判法（check_product.py verdict、device_timing.py check）照跑；
-    条目里的产物不合判法（o2_red_states=1）时单元红。"""
+    """真的单元脚本：编排给了条目就取用（从 prune-server 里那一条解出来写到这一趟的名字、不起装置），记一行 reused，判法（check_product.py verdict、
+    device_timing.py check）照跑；条目里的产物不合判法（o2_red_states=1）时单元红。"""
     world, library = reuse.fake_world(os.path.join(scratch, "world")), reuse.library_in(scratch)
-    good_code, good_lines, good_product, good_entry = real_script_step_1(scratch, "good", world, library, 0)
+    good_code, good_lines, good_product, good_source = real_script_step_1(scratch, "good", world, library, 0)
     red_code, red_lines, _, _ = real_script_step_1(scratch, "red", world, library, 1)
-    linked = os.path.exists(good_product) and os.stat(good_product).st_ino == os.stat(good_entry).st_ino
+    same = os.path.exists(good_product) and open(good_product, "rb").read() == open(good_source, "rb").read()
     states = [(step, state, roles.keys() and sorted(roles)) for step, state, _, roles in good_lines]
-    good = good_code == 0 and linked and states == [("s2-device-baseline-streams-1-2", "reused", ["directory", "product", "timing"])] \
+    good = good_code == 0 and same and states == [("s2-device-baseline-streams-1-2", "reused", ["directory", "product", "timing"])] \
         and red_code == 1 and [state for _, state, _, _ in red_lines] == ["reused"]
-    return good, f"合判法的条目：退 {good_code}，产物是条目的硬链接 {linked}，记下 {states}；不合判法的：退 {red_code}"
+    return good, f"合判法的条目：退 {good_code}，产物与入库时那一份逐字节相同 {same}，记下 {states}；不合判法的：退 {red_code}"
 
 
 SELFTEST_CELLS = {"reuse-e2e": cell_reuse_end_to_end, "unit-script-fetch": cell_unit_script_fetch, "h31-refused": cell_h31_refused,
@@ -548,6 +546,11 @@ SELFTEST_SWITCHES = {"h31-unchecked": "h31-refused", "s18-ignored": "s18-stops"}
 
 
 def selftest(argument_list: list[str]) -> int:
+    problem = reuse.prune_server_client.selftest_service_problem()
+    if problem:   # 复用库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「修订 11 占位」那一段末句）
+        print(f"✗ segment_one_units_revision_11.py 自证没跑：{problem}", file=sys.stderr)
+        print(f"     → 怎么办：{reuse.prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
+        return 2
     os.environ[SELFTEST_VARIABLE] = "1"
     return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
 

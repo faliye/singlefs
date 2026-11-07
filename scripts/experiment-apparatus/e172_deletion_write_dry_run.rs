@@ -2351,7 +2351,7 @@ fn allocation_ordinals_of(roles: &[String]) -> String {
     if ordinals.is_empty() { "none".to_string() } else { ordinals.join(",") }
 }
 
-/// 第 3 行（原第 3 行）判定的射程（主 agent 2026-10-05 定读法乙）：H1、H3 全部删除类发布，H2 只拿意图那一次。
+/// 第 3 行（原第 3 行）判定的射程（读法乙）：H1、H3 全部删除类发布，H2 只拿意图那一次。
 fn segment_counts_for_row_three(history_name: &str, publish_kind: &str) -> bool {
     match history_name {
         "h1" | "h3" => true,
@@ -4485,7 +4485,7 @@ mod tests {
     use std::sync::OnceLock;
 
     /// 入库的两份导出（`research/results/` 下的文件名）。跑前登记 e172-r2 第九节原写「找不到就判红，不跳过」；
-    /// `research/` 可以整个删掉，用户 2026-10-18 定别的实验的产物缺了报本次未跑：读不到时用到它们的单测逐份报一行本次未跑、照常返回。
+    /// `research/` 可以整个删掉，别的实验的产物缺了报本次未跑：读不到时用到它们的单测逐份报一行本次未跑、照常返回。
     /// 路径写成字面的 `concat!`（写法与为什么见 `e7_index_bench::ARCHIVED_PRODUCT_NOT_RUN_MARKER`）。
     /// 第 3 次重跑登记 `research/prompts/e172-r3-prereg.md` 第五节 5.7 第 1 步的两份导出（主 agent 跑、入库）。
     const H1H2_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h1h2-2026-11-02.out");

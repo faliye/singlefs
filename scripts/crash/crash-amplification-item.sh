@@ -3,8 +3,8 @@
 # run-condition: command bash cargo python3
 # run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
 # 崩溃放量一个分项的一趟：用不用 GPU 照配置，做不到就报错退出，不退回 CPU
-# （用户 2026-09-29 定：「配置中有gpu就一定要让GPU工作 如果不行就明确报错拒绝，不接受默认降级」）。
-# 在哪台机器跑、上限、线程、分卡与清场由 task-server 管（records/2026-10-30-编译绕过内存总上限.md 收尾批：「把以前分散到各个任务中的脚本启动和判定 统一收起来。 统一管理。」）：
+# （配置中有 gpu 就一定要让 GPU 工作，如果不行就明确报错拒绝，不接受默认降级）。
+# 在哪台机器跑、上限、线程、分卡与清场由 task-server 统一管理：
 #   这一份一律在起它的那一台上一趟跑完（SHARE 0/1），不自己连第二台、不调双机驱动、不清场、不读多机配置里的显卡先后；两台分着判的是崩溃放量的分片驱动
 #   scripts/crash/crash-amplification-two-hosts.sh，由 task-server 照分片协议起，不经这里。
 #
@@ -67,7 +67,7 @@
 #   「<测试目标>」，带 --test-filter 的「<测试目标>::<用例函数>」；退 0 是绿、退 2 / 77 / 130 / 143 照留，别的退出码是红；整个目标跑的那一趟换掉这个目标的全部项，
 #   点名用例的那一趟只换那一项。开跑之后每一种退法都写（EXIT 钩子 item_write_last_run）；只判不跑那一支不写；
 #   测试目标的源文件不在、又没显式设 SINGLEFS_LAST_RUNS_DIRECTORY 的（别的自证拿假目标起这一份）不写。
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：建好这一项的运行目录（<家目录>/runs/<标签>/）之后，调用方没设 CARGO_TARGET_DIR 时
+# 编译目录（自己用完自己删，不跨趟复用）：建好这一项的运行目录（<家目录>/runs/<标签>/）之后，调用方没设 CARGO_TARGET_DIR 时
 #   在里面建 target、export 给本机那几趟 cargo；正常结束、红了、被 TERM / INT 停（等手里那一趟退出）都在 EXIT 钩子里删
 #   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0）。调用方（崩溃放量入口、task-server）设了的照它、不删。
 # 两台对称（task-server 把这一项派到哪一台都一样）：运行条件里显卡先后每项写 <HOSTS 里的地址>:<卡号>:<额度>，哪几项是这一台的照多机配置判法 --emit-addresses 认
@@ -80,14 +80,14 @@
 #   placement-not-run-as-refusal       排计划那一趟借不到显存的那一行不认，照没有计划行退 247（「本次未跑不是拒绝」判错）  第 19 格
 #   accept-any-not-run-line            别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行也当产品路径借不到显存（「只认产品路径那一行」判错）  第 19 格
 #   accept-not-run-after-failed-placement  排计划那一趟退了非 0 也照那一行记本次未跑（「退了非 0 就照日志分类」判错）  第 19 格
-#   not-run-exits-0                    一项都没跑到（排计划那一趟借不到显存）照改前退 0（「一项都没跑到退 77」判错）  第 19 格
-#   partial-not-run-unreported         有计划行时那几条借不到显存的流不报（改前：只照计划行往下跑）（「没借到的流逐条报本次未跑」判错）  第 20 格
+#   not-run-exits-0                    一项都没跑到（排计划那一趟借不到显存）也退 0（「一项都没跑到退 77」判错）  第 19 格
+#   partial-not-run-unreported         有计划行时那几条借不到显存的流不报（只照计划行往下跑）（「没借到的流逐条报本次未跑」判错）  第 20 格
 #   device-unusable-as-run-failure     日志里卡用不上的原话不认（不退 78）                                    第 8 格、第 11 格
 #   algorithm-refusal-as-run-failure   日志里算法判不了的原话不认（不退 248）                                 第 9 格
 #   accept-missing-card-list           开了 GPU、多机配置里一份卡都没写也照跑（「没写卡就退 78」判错）           第 10 格、第 13 格
 #   missing-value-exits-1              带值的选项缺值时退 1（不按用法错退 2）                                    第 12 格
 #   （共用库 crash-amplification-lib.sh 里配置那几处的开关：configuration-from-tree-root（多机配置按树根找、不按 git common-dir 找）红在第 21 格；
-#    home-under-home-directory（没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时运行目录照改前取 $HOME 底下那一份、不取工作根）红在第 38 格；cards-read-from-configuration（显卡先后照改前从多机配置读、不看环境里 task-server 交的那一张）
+#    home-under-home-directory（没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时运行目录取 $HOME 底下那一份、不取工作根）红在第 38 格；cards-read-from-configuration（显卡先后从多机配置读、不看环境里 task-server 交的那一张）
 #    红在第 15 格、第 17 格；gpu-card-missing-unrefused（开了 GPU 而环境里没有服务交的卡也照跑）红在第 17 格）
 #   （共用库的开关 given-states-run-condition-as-run-failure（给定状态表的判器借不到显存那一行 CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 不认、不退 78）
 #    打开时这里一格不红：这里的格都不造那一行；它由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红，红在 shard-given-states-run-condition 格）
@@ -96,16 +96,16 @@
 #   version-differs-as-run-failure     日志里结论版本对不上那一行不认（不退 78）                               第 23 格
 #   gpu-feature-missing-as-run-failure 日志里「这份二进制没有编进 gpu 特性」不认（不退 78）                    第 24 格
 #   record-failure-ignored             录入段没跑成也照样往下排计划、判（「录入段没跑成，判段一趟都不起」判错）   第 26 格
-#   segments-registry-not-sent         调用方没送按段登记文件时也不送本树那一份（改前的样子）（「每一趟都带按段登记文件的绝对路径」判错）   第 27 格
+#   segments-registry-not-sent         调用方没送按段登记文件时也不送本树那一份（「每一趟都带按段登记文件的绝对路径」判错）   第 27 格
 #   judge-not-run-dropped              本机一台跑的那一趟打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行不转打（「判段没跑记本次未跑」判错）   第 29 格
-#   threads-default-cores              线程数取本机核数减一（改前的样子），不取服务交的 SINGLEFS_THREAD_CAP 与登记的重活默认并行度        第 30 格
+#   threads-default-cores              线程数取本机核数减一，不取服务交的 SINGLEFS_THREAD_CAP 与登记的重活默认并行度        第 30 格
 #   unknown-option-accepted            认不出的选项也照收、当没给（「认不出的选项退 2」判错）   第 18 格
-#   last-run-unwritten                 跑完不写上次红的清单（改前的样子）                                        第 31 格
-#   run-target-kept                    跑完不删这一项自己建的编译目录（改前的样子：在仓根照仓根的 target 编、跨趟留着）（「跑完运行目录里不剩它建的编译目录」判错）   第 33 格、第 34 格、第 35 格
+#   last-run-unwritten                 跑完不写上次红的清单                                        第 31 格
+#   run-target-kept                    跑完不删这一项自己建的编译目录（在仓根照仓根的 target 编、跨趟留着）（「跑完运行目录里不剩它建的编译目录」判错）   第 33 格、第 34 格、第 35 格
 #   this-host-from-hosts-order         共用库不问多机配置判法 --emit-addresses，一律当 HOSTS 头一项是这一台（「哪一台是这一台照网卡上的地址认」判错）   第 37 格
 #   card-address-outside-hosts-accepted  共用库照认显卡先后里地址不在 HOSTS 的项（「写坏的显卡先后退 78」判错）   第 40 格
-#   test-variables-honored-outside-selftest  不在自证里设了只供测试的变量也照认（改前的样子）（「只供测试的变量不在自证里设了退 2」判错）   第 39 格
-#   record-judge-source-unchecked      录入段之后、判段起跑前与收尾后不核被测源码的摘要（改前的样子：源码中途变了照样往下判，判红按红退）（「跑的过程中源码变了记本次未跑、退 77、不落红」判错）   第 41 格
+#   test-variables-honored-outside-selftest  不在自证里设了只供测试的变量也照认（「只供测试的变量不在自证里设了退 2」判错）   第 39 格
+#   record-judge-source-unchecked      录入段之后、判段起跑前与收尾后不核被测源码的摘要（源码中途变了照样往下判，判红按红退）（「跑的过程中源码变了记本次未跑、退 77、不落红」判错）   第 41 格
 #   （多机配置判法 scripts/crash/crash-point-replay-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
 # 只供测试（只在 --selftest 里认：run_selftest 给它起的子进程设 CRASH_AMPLIFICATION_ITEM_SELFTEST=1；没有这个标记而设了下面任一个，参数解析之后退 2、点名设了的几个、一趟都不起）：
 #   CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY=<造好的 placement.log> 时不编不跑，只拿那份日志判、打 CRASH_AMPLIFICATION_DECISION 行就退
@@ -815,7 +815,7 @@ if (( selftest )); then run_selftest; fi
 [[ -n "$test_target" ]] || usage
 
 # 只供测试的变量（文件头「只供测试」）只在自证里认：没有 CRASH_AMPLIFICATION_ITEM_SELFTEST=1 而设了，退 2、点名、一趟都不起。
-#   弄坏开关 test-variables-honored-outside-selftest 下照认（改前的样子）
+#   弄坏开关 test-variables-honored-outside-selftest 下照认
 if [[ "${CRASH_AMPLIFICATION_ITEM_SELFTEST:-}" != 1 ]] && ! item_break_is test-variables-honored-outside-selftest; then
   test_only_set=()
   for test_only_variable in CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS CRASH_AMPLIFICATION_ITEM_LOCAL_RUN CRASH_AMPLIFICATION_ITEM_SOURCE_ROOT; do
@@ -846,7 +846,7 @@ fi
 
 # 上次红的清单（文件头「上次红的清单」）：从这里起每一种退法都经 EXIT 钩子写一次；只判不跑的那一支不写
 item_write_last_run() { # <这一趟的退出码>
-  item_break_is last-run-unwritten && return 0   # 弄坏开关：跑完不写（改前的样子）
+  item_break_is last-run-unwritten && return 0   # 弄坏开关：跑完不写
   python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run-target scripts/crash/crash-amplification-item.sh "$test_target" "$1" \
     ${test_filter:+--test-filter "$test_filter"} --target-file "$repository_root/crates/singlefs-verification/tests/$test_target.rs" >/dev/null 2>&1 \
     || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run-target），这一趟的判定不受影响" >&2
@@ -883,7 +883,7 @@ run_directory="$crash_amplification_home/runs/$label"
 mkdir -p "$run_directory" || { echo "  ✗ 建不了 $run_directory" >&2; echo "  → 怎么办：看放量家目录 $crash_amplification_home 可不可写，或把 SINGLEFS_CRASH_AMPLIFICATION_HOME 指到可写的目录" >&2; exit 2; }
 run_build_directory_begin "$run_directory" || exit 78   # 这一项的编译目录（文件头「编译目录」），EXIT 钩子 item_finish 删
 
-# 两段（用户 2026-10-11 定）：先在本机跑录入段，把这一项的流程写进判定库（prune-server）；之后排计划、本机判每一趟都只跑判段（从服务里读）
+# 两段：先在本机跑录入段，把这一项的流程写进判定库（prune-server）；之后排计划、本机判每一趟都只跑判段（从服务里读）
 crash_amplification_record_on_this_host "$run_directory/record.log"; record_exit=$?
 if (( record_exit != 0 )) && ! item_break_is record-failure-ignored; then exit "$record_exit"; fi
 export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
@@ -954,7 +954,7 @@ refused_exit_code=""; decided_not_run_line=""
 decide_where_to_run "$run_directory/placement.log" "$placement_exit"; decision=$?
 case "$decision" in
   0) run_on_this_host_alone; exit $? ;;
-  20) # 一项都没跑到（文件头步骤 ②、退出码 77）：不跑；弄坏开关 not-run-exits-0 下照改前退 0
+  20) # 一项都没跑到（文件头步骤 ②、退出码 77）：不跑；弄坏开关 not-run-exits-0 下退 0
     report_placement_not_run "$decided_not_run_line"
     item_break_is not-run-exits-0 && exit 0
     exit 77 ;;

@@ -1,4 +1,4 @@
-//! E104：扫描重建时多版单元的现行版本判定 —— C113 定案提案（第一版）P1–P6 的机制验证。
+//! E104：扫描重建时多版单元的现行版本判定 —— C113 提案 P1–P6 的机制验证。
 //!
 //! **它答的是**：只剩单元 + 记账 + 根的时候，同一逻辑身份的多个物理版本里哪一版是哪个根的
 //! 现行版本，提案给的那组输入（写序、实例水位、祖先表、死亡写序、容器退役记录、scrub 门）
@@ -130,7 +130,7 @@ struct WorldConfiguration {
     /// P4：墓碑回收多一道抹头水位门
     scrub_gate: bool,
     /// P4 第二版：门的下限取「被杀版本变成垃圾的时刻」= max(死亡代号, 最近一次根被销毁的代号)，
-    /// 而不只是死亡代号（第一版的写法，E104 第一轮在混合世界上打出复活）
+    /// 而不只是死亡代号（只取死亡代号会在混合世界上复活）
     gate_floor_includes_root_removal: bool,
     /// W1 第二句：事务内先写后删的单元在记录写出前作废
     invalidate_in_transaction: bool,
@@ -148,18 +148,18 @@ struct WorldConfiguration {
     /// 第六版 P1 失败表 ③：一个事务在发出单元写之后失败 ⇒ 实例结束，号更大的事务的记录一条都不再追加
     /// （记录按事务号顺序追加）。关掉 = 第五版的形态：后续事务照常追加，失败事务的作废信息随崩溃丢失
     records_stop_at_failure: bool,
-    /// 第六版 P2 行回收：kind 0 行可删还要求根环里没有该实例发布的根（第五轮反推腿 4.1）
+    /// 第六版 P2 行回收：kind 0 行可删还要求根环里没有该实例发布的根
     #[cfg_attr(not(test), expect(dead_code, reason = "只在单测里读"))]
     row_reclaim_checks_ring: bool,
     /// 第八版 P2：恢复行的 W 按实例分——只有所选根那个实例的 W 可能非 0（jsn 在实例边界必然断号）。
-    /// 关掉 = 第七版落地那句的字面：一个全局的「最大已施加事务号」写给每一个实例（第七轮反推腿 3.1）
+    /// 关掉 = 第七版落地那句的字面：一个全局的「最大已施加事务号」写给每一个实例
     row_applied_counter_per_instance: bool,
-    /// 生成器手工冻结容器写序的事务号那一维（只有第七轮反推腿 2.1 的世界用）：
+    /// 生成器手工冻结容器写序的事务号那一维（只有靶子世界一之九用）：
     /// 真实形态里容器只在 checkpoint 的固定点写出、写序 = 那次 checkpoint 已分配的最大事务号，
     /// 模型按事务写容器，冻结是把「同一 checkpoint 内写序不变」这个性质手工造出来
     container_write_sequence_frozen: bool,
     /// 第七版 P2：恢复行的 T_pub 取所选根的 checkpoint_txg。关掉 = 第六版的字面「在飞 txg − 1」——
-    /// 所选根不是最新已发布根时（最新根的槽坏了、它之后的记录又不可重放），把丢掉的那个 checkpoint 判成已发布（第六轮反推腿 2.1）
+    /// 所选根不是最新已发布根时（最新根的槽坏了、它之后的记录又不可重放），把丢掉的那个 checkpoint 判成已发布
     row_published_txg_from_chosen_root: bool,
 }
 
@@ -266,7 +266,7 @@ struct World {
     instance_last_txg: BTreeMap<u32, (Txg, bool)>,
     /// 哪些行是回退行（第八版：不许被后来的恢复覆盖）
     rollback_rows: BTreeSet<u32>,
-    /// 回退行保护实际挡下过几次写（第八轮反推腿 12.1：这条规则今天就量得出，不必等崩溃点重放）
+    /// 回退行保护实际挡下过几次写（这条规则在模型里就量得出，不必等崩溃点重放）
     rollback_row_writes_blocked: u32,
     /// 冻结容器写序时用的事务号（`container_write_sequence_frozen`）
     frozen_container_counter: u64,
@@ -290,7 +290,7 @@ struct World {
     overwritten_location_count: u64,
 }
 
-/// 写一行；回退行按第八版 P2 不许被后来的恢复覆盖（第七轮反推腿 9.1）。
+/// 写一行；回退行按第八版 P2 不许被后来的恢复覆盖。
 /// ⚠️ 模型没有 journal，那条攻击真正的害处（被抛弃的记录被重放回来、回退被静默撤销）落在 E104 的度量之外，
 /// 这里只实现规则、没有能分辨它的世界（见「它答不了的」）。
 fn put_row(rows: &mut BTreeMap<u32, (Txg, u64)>, sticky: &BTreeSet<u32>, protect: bool, instance_number: u32, row: (Txg, u64), blocked: &mut u32) {
@@ -499,7 +499,7 @@ impl World {
                 let container_number = match container.key { Key::Container { container_number, .. } => container_number, _ => unreachable!() };
                 key = Key::Container { birth_tree: tree, kind: 2, container_number, birth: self.txg };
                 assert_ne!(key, container.key, "重生产出了同一个身份：tree={tree} txg={} inst={} ctr={} loc={}", self.txg, self.instance, self.counter, container.location);
-                // 第二轮模型发现：新身份只覆盖冲突的 inode，覆盖不了「旧身份里有、新身份里没有」的那些
+                // 新身份只覆盖冲突的 inode，覆盖不了「旧身份里有、新身份里没有」的那些
                 // ⇒ 重生同时要在本头的墓碑容器里给旧身份写一条退役记录（只对本头的谱系可见）
                 if self.configuration.retire_record {
                     new_tombstone_records.push(TombstoneRecord::Retire { retired_container: container.key, at_txg: self.txg });
@@ -678,7 +678,7 @@ impl World {
         let abandoned_allocations: Vec<u64> = self.allocation_records.iter().filter(|(location, allocation_state)| **allocation_state == AllocationState::Allocated && !live.contains(location)).map(|(location, _)| *location).collect();
         for location in abandoned_allocations { self.allocation_records.remove(&location); }
         for (root_txg, root_instance, _, _, _) in &self.history[self.history.len() - depth..] { self.abandoned_roots.push((*root_txg, *root_instance)); }
-        // 回退后第一个新根的 txg 必须压过根环里全部根（第三轮反推腿 5.2：否则下次择新挑回被抛弃的线）
+        // 回退后第一个新根的 txg 必须压过根环里全部根（否则下次择新挑回被抛弃的线）
         let highest_ring_txg = self.history.iter().map(|history_entry| history_entry.0).max().unwrap();
         self.history.truncate(self.history.len() - depth);
         self.pending_free.clear();
@@ -823,7 +823,7 @@ impl World {
             .collect()
     }
 
-    /// 恢复选了非最新根（第六轮反推腿 2.1）：最新已发布根的槽自证不过，它之后的记录又已回收、不可重放
+    /// 恢复选了非最新根：最新已发布根的槽自证不过，它之后的记录又已回收、不可重放
     /// ⇒ 所选根 = 上一个根，什么都重放不了，行 = (崩溃实例, 所选根的 txg, 0)。丢掉的那个 checkpoint 与在飞 checkpoint
     /// 里写下的单元全是孤儿。开关关掉时行按第六版字面写 (在飞 txg − 1, 0)，把丢掉的 checkpoint 判成已发布。
     fn crash_and_recover_lost_latest_root(&mut self) { self.crash_and_recover_lost_roots(1); }
@@ -843,7 +843,7 @@ impl World {
         self.counter = 0;
         let row_published_txg = if self.configuration.row_published_txg_from_chosen_root { chosen_txg } else { self.txg - 1 };
         // 第七版落地逐字：给 [所选根的实例, 新实例) 每个实例写行。所选根可能是更早的实例发布的
-        // ⇒ 这一段会覆盖到回退行（第七轮反推腿 9.1），第八版靠 `rollback_row_sticky` 挡住
+        // ⇒ 这一段会覆盖到回退行，第八版靠 `rollback_row_sticky` 挡住
         let chosen_instance = self.history.last().unwrap().1;
         if self.configuration.write_watermarks {
             let sticky = self.rollback_rows.clone();
@@ -871,7 +871,7 @@ impl World {
         self.publish();
     }
 
-    /// 第七轮反推腿 3.1：恢复实例重放完上一实例的事务并发布之后，又施加了自己的几个事务，然后在下一个根之前再崩。
+    /// 恢复实例重放完上一实例的事务并发布之后，又施加了自己的几个事务，然后在下一个根之前再崩。
     /// 下一次恢复的所选根仍是恢复实例发布的那个之前的那一个吗——不是：恢复实例发布过根，所选根就是它发的那个；
     /// 真正承重的是**它自己的记录跨不过实例边界**（jsn 断号）⇒ 它在下一个 checkpoint 里施加的事务一条也重放不了。
     /// 行的 W 按实例分 ⇒ 它那行 W = 0；按第七版落地那句的字面写全局量 ⇒ 它的孤儿 n ≤ W 判已发布。
@@ -923,13 +923,12 @@ impl World {
             for (key, location, tombstone_records) in head.closed_tombstone_containers.drain(..) {
                 let keep: Vec<TombstoneRecord> = tombstone_records.iter().copied().filter(|tombstone_record| match tombstone_record {
                     TombstoneRecord::Kill { key, death_txg, .. } => {
-                        // D18 已定项 10 的量词 2026-09-05 从「全部还引用它的快照」放宽到「全部还引用它的根（含快照与可写头）」：
-                        // 克隆头是头不是快照，凡是它里面还活着、而 origin 后来删掉的对象，按旧量词它的 kill 记录可以被回收，
-                        // 而克隆引用的那具尸体一直可读（第七轮反推腿 7.2、第八轮反推腿 14.1）
-                        // D18 已定项 10 的量词 2026-09-05 从「快照」放宽到「根（含快照与可写头）」。
+                        // D18 已定项 10 的量词是「全部还引用它的根（含快照与可写头）」：
+                        // 克隆头是头不是快照，凡是它里面还活着、而 origin 后来删掉的对象，按「全部还引用它的快照」这个窄量词它的 kill 记录可以被回收，
+                        // 而克隆引用的那具尸体一直可读
                         // ⚠️ 模型这道门是**按 key** 判的，而规则问的是「还有没有根引用那个死掉的版本」——
                         // 两者在「先删后重建」上就分岔（同一个 key 既有 kill 记录、又被本头引用着新版本）。
-                        // 所以模型分不出两个量词：加上可写头这一半只是更保守，没有能让它承重的世界（第八轮反推腿 14.1）。
+                        // 所以模型分不出两个量词：加上可写头这一半只是更保守，没有能让它承重的世界。
                         let referenced_by_snapshot_or_head = snapshots.iter().any(|snapshot_view| snapshot_view.data.contains_key(key)) || heads.values().any(|head_view: &View| head_view.data.contains_key(key));
                         let gated = gate && scrub_watermark < (*death_txg).max(floor);
                         referenced_by_snapshot_or_head || gated
@@ -1262,7 +1261,7 @@ fn world_crash(seed: u64, configuration: WorldConfiguration, double: bool) -> (W
     (world, closed_form)
 }
 
-/// 靶子世界一之六（第五轮反推腿 1.1）：在飞 txg 里事务 A 施加，事务 B 发出单元写之后失败，C、D 也写了单元。
+/// 靶子世界一之六：在飞 txg 里事务 A 施加，事务 B 发出单元写之后失败，C、D 也写了单元。
 /// 第六版：失败 ⇒ 实例结束，C、D 的记录一条都不追加（记录按事务号顺序），恢复行 W = A 的号 ⇒ B、C、D 全部判未发布。
 /// 第五版的形态（开关关掉）：C、D 照常追加并被重放，W = D 的号 ⇒ B 的单元 n ≤ W 判已发布 ⇒ 复活。
 fn world_transaction_fail(seed: u64, configuration: WorldConfiguration) -> (World, ClosedFormCounts) {
@@ -1282,7 +1281,7 @@ fn world_transaction_fail(seed: u64, configuration: WorldConfiguration) -> (Worl
     (world, closed_form)
 }
 
-/// 靶子世界一之十一（第八轮反推腿 12.1）：回退之后新时间线的根不可读，恢复落回 R_old。
+/// 靶子世界一之十一：回退之后新时间线的根不可读，恢复落回 R_old。
 /// 那次恢复要给 [所选根的实例, 新实例) 每个实例写行，范围里包含 r_old ⇒ 正好盖到回退行；第八版靠标志挡住。
 /// ⚠️ 模型量得出的只有「保护确实挡下过写」这一件事：模型没有 journal，恢复算不出非 0 的 W，
 /// 盖上去的值与回退行恰好相同 ⇒ 值层面看不出差别（被抛弃的记录被重放回来那一半落在 C124 里）。
@@ -1303,7 +1302,7 @@ fn world_rollback_row_protected(seed: u64, configuration: WorldConfiguration) ->
     (world, closed_form)
 }
 
-/// 靶子世界一之八（第七轮反推腿 3.1）：恢复实例重放完上一实例的事务、又施加了自己的几个事务，然后在发布第一个根之前崩。
+/// 靶子世界一之八：恢复实例重放完上一实例的事务、又施加了自己的几个事务，然后在发布第一个根之前崩。
 /// 下一次恢复要给 [所选根的实例, 新实例) 每个实例写行：按第八版 W 按实例分 ⇒ 恢复实例那行 W = 0（jsn 在实例边界断号，
 /// 它的记录一条也重放不了）⇒ 它的单元判未发布；按第七版落地那句的字面把全局最大已施加号写给它 ⇒ 判已发布 ⇒ 复活。
 fn world_recovery_own_transactions(seed: u64, configuration: WorldConfiguration) -> (World, ClosedFormCounts) {
@@ -1323,7 +1322,7 @@ fn world_recovery_own_transactions(seed: u64, configuration: WorldConfiguration)
     (world, closed_form)
 }
 
-/// 靶子世界一之九（第七轮反推腿 2.1）：同一实例连着两个 checkpoint 都不分配新事务号（后台把同一个已关闭墓碑容器
+/// 靶子世界一之九：同一实例连着两个 checkpoint 都不分配新事务号（后台把同一个已关闭墓碑容器
 /// 重写两版），容器写序逐字节相同。按写序择新是平局；按 (诞生代号, 实例代号) 择新分得开。
 /// 写序冻结是生成器手工造的形状——模型按事务写容器，真实形态是固定点一次（见「它答不了的」）。
 fn world_container_same_write_sequence(seed: u64, configuration: WorldConfiguration) -> (World, ClosedFormCounts) {
@@ -1343,7 +1342,7 @@ fn world_container_same_write_sequence(seed: u64, configuration: WorldConfigurat
     (world, ClosedFormCounts::default())
 }
 
-/// 靶子世界一之七（第六轮反推腿 2.1）：最新已发布根的槽坏了、它之后的记录不可重放，恢复退到上一个根。
+/// 靶子世界一之七：最新已发布根的槽坏了、它之后的记录不可重放，恢复退到上一个根。
 fn world_lost_root(seed: u64, configuration: WorldConfiguration) -> (World, ClosedFormCounts) {
     let mut world = World::new(seed, configuration);
     let tree = 1;
@@ -1411,7 +1410,7 @@ fn world_rollback_after_crash(seed: u64, configuration: WorldConfiguration) -> (
     (world, closed_form)
 }
 
-/// 靶子世界一之五：w = 2，每个单元两份逐字节相同的副本（第三轮反推腿 2.1：第一版每个单元都破「写序全序」的字面）。
+/// 靶子世界一之五：w = 2，每个单元两份逐字节相同的副本（每个单元都破「写序全序」的字面）。
 fn world_replicas(seed: u64, configuration: WorldConfiguration) -> (World, ClosedFormCounts) {
     let mut world = World::new(seed, WorldConfiguration { replica_count: 2, ..configuration });
     let tree = 1;
@@ -1801,7 +1800,7 @@ mod tests {
         assert_eq!(outcome.resurrected, second_closed_form.abandoned_unrewritten * outcome.roots, "部分重放：{outcome:?}");
     }
 
-    /// 第二轮正推腿：管理员回退到旧根是一次恢复。回退行缺席 ⇒ 被抛弃时间线里的单元全部复活。钉闭式。
+    /// 管理员回退到旧根是一次恢复。回退行缺席 ⇒ 被抛弃时间线里的单元全部复活。钉闭式。
     #[test]
     fn rollback_rows_pin_abandoned_timeline() {
         let (world, closed_form) = world_rollback(1, WorldConfiguration::FULL);
@@ -1847,7 +1846,7 @@ mod tests {
         assert_eq!(outcome.resurrected, closed_form.rollback_abandoned * outcome.roots, "{outcome:?}");
     }
 
-    /// 第三轮反推腿 5.2：回退后的新根必须压过根环里被抛弃的根，否则下次择新（按 txg 最大者）挑回被抛弃的线。
+    /// 回退后的新根必须压过根环里被抛弃的根，否则下次择新（按 txg 最大者）挑回被抛弃的线。
     #[test]
     fn rollback_new_root_outranks_abandoned_roots() {
         for skip in [true, false] {
@@ -1863,7 +1862,7 @@ mod tests {
         }
     }
 
-    /// 第四轮反推腿 6.3：对立臂 B（写序只上码 3、数据单元只有诞生代号）的残余错误钉成闭式。
+    /// 对立臂 B（写序只上码 3、数据单元只有诞生代号）的残余错误钉成闭式。
     /// 崩溃部分重放那一格：数据孤儿的诞生代号 == 重发后已发布的 txg，只靠诞生代号判不出 ⇒ 全部复活；
     /// 同 txg 跨事务改同一数据 key ⇒ 歧义；容器那一格由写序解掉。
     #[test]
@@ -1884,7 +1883,7 @@ mod tests {
         }
     }
 
-    /// 第三轮反推腿 7.4：清扫按规则（已释放标志 + 释放代 ≤ 最旧根 txg；孤儿按实例表）而不是真值。
+    /// 清扫按规则（已释放标志 + 释放代 ≤ 最旧根 txg；孤儿按实例表）而不是真值。
     /// 规则清掉的 ⊆ 真值清掉的，且从不碰任何一个根环里的根引用的落点。
     #[test]
     fn rule_sweep_is_sound_against_oracle() {
@@ -1920,7 +1919,7 @@ mod tests {
         }
     }
 
-    /// 第三轮反推腿 2.1：w = 2 下每个逻辑版本都有两份同写序的可读副本。
+    /// w = 2 下每个逻辑版本都有两份同写序的可读副本。
     /// 先归并副本再择版本 ⇒ 全规则臂 0；不归并 ⇒ 每个活着的逻辑版本一次平局。钉闭式。
     #[test]
     fn replica_merge_is_load_bearing() {
@@ -1937,7 +1936,7 @@ mod tests {
         }
     }
 
-    /// 第五轮反推腿 1.1：事务在发出单元写之后失败。第六版让它成为实例结束、后续记录不追加 ⇒ 行的 W 是前缀、全规则臂 0；
+    /// 事务在发出单元写之后失败。第六版让它成为实例结束、后续记录不追加 ⇒ 行的 W 是前缀、全规则臂 0；
     /// 第五版的形态（后续事务照常追加、作废信息随崩溃丢失）⇒ 失败事务的单元 n ≤ W 判已发布 ⇒ 复活。钉闭式。
     #[test]
     fn failed_transaction_after_write_is_pinned() {
@@ -1951,7 +1950,7 @@ mod tests {
         assert_eq!(outcome.resurrected, second_closed_form.abandoned_unrewritten * outcome.roots, "作废信息丢失：{outcome:?}");
     }
 
-    /// 第八轮反推腿 12.1：回退行不许被后来的恢复覆盖这条规则，今天在模型里就量得出「保护确实挡下过写」——
+    /// 回退行不许被后来的恢复覆盖这条规则，今天在模型里就量得出「保护确实挡下过写」——
     /// 不必等崩溃点重放。关掉保护 ⇒ 挡下次数归零（值层面看不出差别：模型没有 journal，恢复算不出非 0 的 W）。
     #[test]
     fn rollback_row_protection_actually_blocks_a_write() {
@@ -1978,7 +1977,7 @@ mod tests {
         assert_eq!(world.rollback_abandoned_count, 3, "被回退抛弃的那次发布建了三个对象");
     }
 
-    /// 第七轮反推腿 3.1：恢复实例施加过自己的事务之后再崩。W 按实例分 ⇒ 它那行 W = 0、它的单元判未发布；
+    /// 恢复实例施加过自己的事务之后再崩。W 按实例分 ⇒ 它那行 W = 0、它的单元判未发布；
     /// 按第七版落地那句的字面把全局最大已施加号写给它 ⇒ 它的单元 n ≤ W 判已发布 ⇒ 复活。钉闭式。
     #[test]
     fn recovery_instance_row_applied_counter_is_per_instance() {
@@ -1991,7 +1990,7 @@ mod tests {
         assert_eq!(outcome.resurrected, second_closed_form.abandoned_unrewritten * outcome.roots, "全局 W 写给恢复实例：{outcome:?}");
     }
 
-    /// 第七轮反推腿 2.1：同实例连着两个 checkpoint 都不分配新事务号时，两版容器的写序逐字节相同。
+    /// 同实例连着两个 checkpoint 都不分配新事务号时，两版容器的写序逐字节相同。
     /// 码 3 按 (诞生代号, 实例代号) 择新 ⇒ 0；按写序择新 ⇒ 平局记歧义。钉闭式。
     #[test]
     fn container_key_by_birth_breaks_the_write_sequence_tie() {
@@ -2006,7 +2005,7 @@ mod tests {
         assert_eq!(outcome.ambiguous, same_write_sequence_pairs as u64, "按写序择新的平局数：{outcome:?}");
     }
 
-    /// 第六轮反推腿 2.1：恢复选了非最新根时，行的 T_pub 必须是所选根的 txg。按第六版字面取「在飞 txg − 1」
+    /// 恢复选了非最新根时，行的 T_pub 必须是所选根的 txg。按第六版字面取「在飞 txg − 1」
     /// 会把槽坏掉的那个 checkpoint 里的单元判成已发布 ⇒ 复活；取所选根 txg ⇒ 0。钉闭式。
     #[test]
     fn lost_root_row_uses_chosen_root_txg() {
@@ -2020,7 +2019,7 @@ mod tests {
         assert_eq!(outcome.resurrected + outcome.wrong, second_closed_form.abandoned_unrewritten - 1, "{outcome:?}");
     }
 
-    /// 第五轮反推腿 4.1：回退之后被抛弃的根留在环里；清扫把它独占的单元抹掉之后，若 kind 0 行按「没有未发布的可读单元」
+    /// 回退之后被抛弃的根留在环里；清扫把它独占的单元抹掉之后，若 kind 0 行按「没有未发布的可读单元」
     /// 就回收，被抛弃的根整批回到回退候选集。第六版加合取「根环里没有该实例的根」⇒ 行留着、候选集正确。钉闭式。
     #[test]
     fn row_reclaim_keeps_abandoned_roots_out_of_candidates() {
@@ -2047,7 +2046,7 @@ mod tests {
         }
     }
 
-    /// 第五轮反推腿 2.2：容器在 checkpoint 固定点写出，一个没发布的 checkpoint 的容器版本一律未发布，
+    /// 容器在 checkpoint 固定点写出，一个没发布的 checkpoint 的容器版本一律未发布，
     /// 恢复实例重写它们。崩溃世界里每个被重放事务碰过的容器都留下一版旧实例的孤儿，清扫按行把它们清掉。
     #[test]
     fn inflight_containers_are_rewritten_by_recovery() {

@@ -143,7 +143,7 @@ def crash_judge_not_applicable_counts(run: RunDirectory, batch: int) -> dict[str
 
 
 def errored_calls_left_unjudged(run: RunDirectory) -> dict[str, int]:
-    """O1-对拍的回查（装置逐行那一趟 S5 的比对器一侧，代码轮第三轮判决 K4-c 甲）：返回了错误、而 `call-outcomes.tsv` 里 O1-对拍一栏写的是
+    """O1-对拍的回查（装置逐行那一趟 S5 的比对器一侧，K4-c 甲）：返回了错误、而 `call-outcomes.tsv` 里 O1-对拍一栏写的是
     没问模型（`not_modelled`）的调用数，每条流各一个数。卸载除外：模型没有卸载的答（登记第一节读法 6）；模型因对拍判出不同停下之后没比的调用
     （`skipped_after_the_model_stopped`）不数：读法 6「一次对拍判出不同之后模型不再往前走」，那一行的 O1 已经红在停下的那次调用上（登记修订 4）；
     实现 panic 的调用（结局 `panic`）走自崩那一类，不数。这个数不是 0，就是装置没把「模型说该成、实现拒了」记成对拍的红。"""
@@ -154,7 +154,7 @@ def errored_calls_left_unjudged(run: RunDirectory) -> dict[str, int]:
 
 def not_applicable_states_with_another_source(run: RunDirectory) -> dict[str, int]:
     """O1-崩溃判官的不适用只许来自两处（登记第一节读法 6、第十一节 S5）：模型停在卸载，或停在对拍判出不同的那次调用（装置逐行 S5 的比对器一侧，
-    代码轮第三轮判决 K4-c 丙）。模型停下的那次调用不是这两种，这条流里记「不适用」的态数（两批合计）就是来源不合规的态数；模型没停、或停在这两种上，数 0。"""
+    K4-c 丙）。模型停下的那次调用不是这两种，这条流里记「不适用」的态数（两批合计）就是来源不合规的态数；模型没停、或停在这两种上，数 0。"""
     counts = {}
     for name in STREAM_NAMES:
         stream = run.streams[name]

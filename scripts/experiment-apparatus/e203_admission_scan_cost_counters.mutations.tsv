@@ -10,3 +10,63 @@ c9_a_half_copy_is_not_wiped_before_the_copy_again	shutil.rmtree(entry)	pass
 c10_the_key_ignores_the_content_of_the_copied_files	digest.update(hashlib.sha256((pathlib.Path(source) / relative).read_bytes()).digest())	digest.update(b"")
 c11_the_key_ignores_the_build_kind	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))	(b"", pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))
 c12_the_key_ignores_the_diff	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), diff_text.encode("utf-8"))	(kind.encode("utf-8"), pathlib.Path(__file__).read_bytes(), b"")
+c13_the_caller_copy_records_no_steps	{P}steps({row('WholeAllocatorCopyBeforeTheJudgement')}, e203_copied_elements);	{P}scale({row('WholeAllocatorCopyBeforeTheJudgement')}, 0);
+c14_the_settling_round_copy_records_no_steps	{P}steps({row('WholeAllocatorCopyInASettlingRound')}, e203_copied_elements);	{P}scale({row('WholeAllocatorCopyInASettlingRound')}, 0);
+c15_the_zero_root_deadlist_plan_records_no_keys_changed	+ zero_root_keys_changed,	,
+c16_the_unlink_intent_scale_is_read_before_the_file_is_written	    overwrite_inode(pool, inode);\n    let scanned_by_the_intent = state_text(build, point, state, "unlink_intent", round, pool);\n	    let scanned_by_the_intent = state_text(build, point, state, "unlink_intent", round, pool);\n    overwrite_inode(pool, inode);\n	histories
+c17_entry_accounting_rows_off_by_one	("entry_accounting_rows", "e203_version.accounting_entries.len()")	("entry_accounting_rows", "e203_version.accounting_entries.len() + 1")
+c18_entry_watermark_rows_take_the_row_of_its_txg	" && entry.generation < e203_version.root.checkpoint_txg).count()"	" && entry.generation <= e203_version.root.checkpoint_txg).count()"
+c19_entry_accounting_tree_keys_read_the_nodes	("entry_accounting_tree_keys", "e203_version.accounting_tree.shape.keys_in_order().len()")	("entry_accounting_tree_keys", "e203_version.accounting_tree.shape.nodes().len()")
+c20_entry_accounting_tree_nodes_read_another_tree	("entry_accounting_tree_nodes", "e203_version.accounting_tree.shape.nodes().len()")	("entry_accounting_tree_nodes", "e203_version.central_mapping_tree.shape.nodes().len()")
+c21_entry_deadlist_tree_keys_read_the_nodes	("entry_deadlist_tree_keys", "e203_version.deadlist_tree.shape.keys_in_order().len()")	("entry_deadlist_tree_keys", "e203_version.deadlist_tree.shape.nodes().len()")
+c22_entry_deadlist_tree_nodes_read_another_tree	("entry_deadlist_tree_nodes", "e203_version.deadlist_tree.shape.nodes().len()")	("entry_deadlist_tree_nodes", "e203_version.accounting_tree.shape.nodes().len()")
+c23_entry_central_mapping_tree_keys_read_the_nodes	("entry_central_mapping_tree_keys", "e203_version.central_mapping_tree.shape.keys_in_order().len()")	("entry_central_mapping_tree_keys", "e203_version.central_mapping_tree.shape.nodes().len()")
+c24_entry_central_mapping_tree_nodes_read_another_tree	("entry_central_mapping_tree_nodes", "e203_version.central_mapping_tree.shape.nodes().len()")	("entry_central_mapping_tree_nodes", "e203_version.deadlist_tree.shape.nodes().len()")
+c25_entry_allocation_record_tree_nodes_off_by_one	("entry_allocation_record_tree_nodes", "e203_version.allocation_record_tree.node_set().len()")	("entry_allocation_record_tree_nodes", "e203_version.allocation_record_tree.node_set().len() + 1")
+c26_entry_units_read_the_mapped_units	("entry_units", "e203_version.units.len()")	("entry_units", "e203_version.mapped_units.len()")
+c27_entry_mapped_units_read_the_units	("entry_mapped_units", "e203_version.mapped_units.len()")	("entry_mapped_units", "e203_version.units.len()")
+c28_entry_files_off_by_one	("entry_files_other_than_the_first", "e203_version.files_other_than_the_first.len()")	("entry_files_other_than_the_first", "e203_version.files_other_than_the_first.len() + 1")
+c29_entry_deadlist_entries_read_the_kept_entries	("entry_deadlist_entries", "e203_version.deadlist_entries.len()")	("entry_deadlist_entries", "e203_version.mapping_entries_kept_for_the_snapshots.len()")
+c30_entry_kept_entries_read_the_deadlist_entries	("entry_kept_mapping_entries", "e203_version.mapping_entries_kept_for_the_snapshots.len()")	("entry_kept_mapping_entries", "e203_version.deadlist_entries.len()")
+c31_entry_position_of_the_inode_misses_the_step_that_finds	" e203_records().filter(|record| record.inode < e203_inode.0).count() + 1 } else { e203_records().count() } })"	" e203_records().filter(|record| record.inode < e203_inode.0).count() } else { e203_records().count() } })"
+c32_entry_instance_table_chain_counts_a_carried_table	" InstanceTablePlan::Carry(_) => 0 }"	" InstanceTablePlan::Carry(_) => 1 }"
+c33_exit_accounting_tree_keys_read_the_nodes	("exit_accounting_tree_keys", "e203_output.accounting_tree.shape.keys_in_order().len()")	("exit_accounting_tree_keys", "e203_output.accounting_tree.shape.nodes().len()")
+c34_exit_accounting_tree_nodes_read_another_tree	("exit_accounting_tree_nodes", "e203_output.accounting_tree.shape.nodes().len()")	("exit_accounting_tree_nodes", "e203_output.central_mapping_tree.shape.nodes().len()")
+c35_exit_deadlist_tree_keys_read_the_nodes	("exit_deadlist_tree_keys", "e203_output.deadlist_tree.shape.keys_in_order().len()")	("exit_deadlist_tree_keys", "e203_output.deadlist_tree.shape.nodes().len()")
+c36_exit_deadlist_tree_nodes_read_another_tree	("exit_deadlist_tree_nodes", "e203_output.deadlist_tree.shape.nodes().len()")	("exit_deadlist_tree_nodes", "e203_output.accounting_tree.shape.nodes().len()")
+c37_exit_central_mapping_tree_keys_read_the_nodes	("exit_central_mapping_tree_keys", "e203_output.central_mapping_tree.shape.keys_in_order().len()")	("exit_central_mapping_tree_keys", "e203_output.central_mapping_tree.shape.nodes().len()")
+c38_exit_central_mapping_tree_nodes_read_another_tree	("exit_central_mapping_tree_nodes", "e203_output.central_mapping_tree.shape.nodes().len()")	("exit_central_mapping_tree_nodes", "e203_output.deadlist_tree.shape.nodes().len()")
+c39_exit_mapped_units_read_the_units	("exit_mapped_units", "e203_output.mapped_units.len()")	("exit_mapped_units", "e203_output.units.len()")
+c40_exit_allocation_record_tree_nodes_off_by_one	("exit_allocation_record_tree_nodes", "e203_output.allocation_record_tree.node_set().len()")	("exit_allocation_record_tree_nodes", "e203_output.allocation_record_tree.node_set().len() + 1")
+c41_exit_deadlist_entries_read_the_kept_entries	("exit_deadlist_entries", "e203_output.deadlist_entries.len()")	("exit_deadlist_entries", "e203_output.mapping_entries_kept_for_the_snapshots.len()")
+c42_exit_container_tree_units_drop_the_retirement_nodes	" + e203_output.retirement_containers.len() + e203_output.retirement_tree_index_nodes.shape.positions_in_bump_order().len()"),	" + e203_output.retirement_containers.len()"),
+c43_exit_extent_tree_nodes_drop_the_other_files	" + e203_output.files_other_than_the_first.iter().map(|file| file.extent_lower_nodes.len()).sum::<usize>()"),	"),
+c44_entry_readings_also_in_the_timing_build	readings_text(SCALE_READINGS_AT_THE_ENTRY), None))	*BOTH(readings_text(SCALE_READINGS_AT_THE_ENTRY))))
+c45_exit_readings_after_the_segment_closes	"    let (writes, output) = match built {\n", "before", readings_text(SCALE_READINGS_AT_THE_EXIT), None))	"    let (writes, output) = match built {\n", "after", readings_text(SCALE_READINGS_AT_THE_EXIT), None))
+c46_entry_cluster_segments_off_by_one	("entry_cluster_segments", "allocator.cluster_segments().len()")	("entry_cluster_segments", "allocator.cluster_segments().len() + 1")
+c47_file_find_bound_off_by_one	{row('FileOtherThanTheFirstLinearFind')}, self.files_other_than_the_first.len())	{row('FileOtherThanTheFirstLinearFind')}, self.files_other_than_the_first.len() + 1)
+c48_extent_path_table_drops_the_root_step	{P}scale({row('ExtentUpperSegmentPlan')}, inodes_with_an_entry_after_this_publish.len() * (1 + positions	{P}scale({row('ExtentUpperSegmentPlan')}, inodes_with_an_entry_after_this_publish.len() * (positions
+c49_extent_contains_bound_read_as_a_whole_table	!{{ {P}scale_to_the_hit({row('ExtentUpperSegmentPlan')}	!{{ {P}scale({row('ExtentUpperSegmentPlan')}
+c50_extent_replaced_filter_table_read_inside_the_filter	"    let replaced_previous_positions = previous_upper_nodes\n", "before",	"    let replaced_previous_positions = previous_upper_nodes\n", "after",
+c51_root_header_bound_off_by_one	{row('RootHeaderLinearFind')}, self.units.len())	{row('RootHeaderLinearFind')}, self.units.len() + 1)
+c52_allocation_plan_table_drops_the_previous_nodes	{P}scale({row('AllocationRecordTreePlan')}, nodes_after.len() + previous_nodes.len())	{P}scale({row('AllocationRecordTreePlan')}, nodes_after.len())
+c53_allocation_intersection_table_drops_the_nodes_after	{P}scale({row('AllocationRecordTreePlan')}, rewritten.len() + nodes_after.len())	{P}scale({row('AllocationRecordTreePlan')}, rewritten.len())
+c54_record_for_bound_off_by_one	f"        {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len())	f"        {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len() + 1)
+c55_release_bound_not_read	f"            {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len());\n", None))	f"            // 不读（变异 c55）\n", None))
+c56_user_data_slot_bound_counts_slots_not_pairs	{row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate) / 2)	{row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate))
+c57_record_filter_table_read_as_the_part_to_the_hit	f"    {P}scale({row('RecordIntersectionFilter')}, records.len())	f"    {P}scale_to_the_hit({row('RecordIntersectionFilter')}, records.len())
+c58_record_find_bound_not_read	counts_begin=f"            {P}scale_to_the_hit({row('RecordIntersectionFilter')}, records.len());\n"))	counts_begin=""))
+c59_record_retain_table_one_short	f"            {P}scale({row('RecordIntersectionFilter')}, records.len());\n"	f"            {P}scale({row('RecordIntersectionFilter')}, records.len() - 1);\n"
+c60_empty_segment_bound_counts_slots	{row('EmptySegmentLinearScan')}, self.allocated.len() / per_segment)	{row('EmptySegmentLinearScan')}, self.allocated.len())
+c61_fallback_bound_forgets_the_span	{row('FallbackSlotLinearScan')}, usize::try_from(unit_area_end.checked_sub(candidate + footprint.slots())	{row('FallbackSlotLinearScan')}, usize::try_from(unit_area_end.checked_sub(candidate)
+c62_records_of_each_leaf_table_off_by_one	{P}scale({row('RecordsOfEachLeaf')}, records.len())	{P}scale({row('RecordsOfEachLeaf')}, records.len() + 1)
+c63_leaves_table_off_by_one	{P}scale({row('RecordsOfEachLeaf')}, leaves.len())	{P}scale({row('RecordsOfEachLeaf')}, leaves.len() + 1)
+c64_file_find_steps_not_set_apart	{P}step_to_the_hit({row('FileOtherThanTheFirstLinearFind')})	{P}step({row('FileOtherThanTheFirstLinearFind')})
+c65_contains_steps_not_set_apart	//C         steps_to_the_hit(row, walked.map_or(	//C         steps(row, walked.map_or(
+c66_a_step_to_the_hit_is_left_out_of_its_part	//C             open.steps_to_the_hit[cell] += count;	//C             open.steps_to_the_hit[cell] += 0;
+c67_the_pause_switch_never_reports_paused	        READINGS_PAUSED.with(std::cell::Cell::get)	        false
+c68_scale_readings_are_read_while_paused	    text = f"    if !{P}readings_paused() {{\n"	    text = f"    {{\n"
+c69_a_timing_guard_times_while_paused	//T             return TimerGuard { active: false };	//T             let _ = 0;
+c70_an_attributed_delta_is_recorded_while_paused	//C         if !readings_paused() && attributed_row() == row {	//C         if attributed_row() == row {
+c71_the_release_find_records_no_call	counted_call("AllocatorReleaseLinearFind", "            "), None))	None, None))
+c72_the_release_find_is_not_timed	"            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            "))	"            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            ", timer=False))

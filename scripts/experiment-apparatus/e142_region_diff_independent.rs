@@ -13,7 +13,7 @@
 //!       没有 `name=done` 就报错退出；第二个参数（crates 导出）整份取。
 //!
 //!   e142-region-diff-independent old-new <新产物路径> <旧产物路径>
-//!       两个参数都按「模型那一侧」的取法（R26）取，按 (设备, 偏移, 长度) 配对，找出改前改后不同的区域与段，
+//!       两个参数都按「模型那一侧」的取法（R26）取，按 (设备, 偏移, 长度) 配对，找出前后两份不同的区域与段，
 //!       按 R28 的字段表把每个不同字节归到 clause_d15_4 / clause_d22_9 / clause_d22_7 / derived / unmapped
 //!       一类，重算受影响区域的校验和字段（D18 已定项 17），判每个变了的区域「对不对得到」。
 
@@ -179,7 +179,7 @@ fn checksum_span(kind: RegionKind) -> Option<(usize, usize)> {
 }
 
 /// A25：incompat 第一个字节住系统配置槽内偏移 6（magic 4 + 格式版本 2 之后），不是槽的第 0 个字节
-/// （那是 magic 的第一个字节 `S`，`b"SFSB"` 首字节恰是 `0x53`——这一条曾经被写成 `bytes.first()`，
+/// （那是 magic 的第一个字节 `S`，`b"SFSB"` 首字节恰是 `0x53`——这一条不能写成 `bytes.first()`，
 /// 在真实产物上把 incompat 读成了 magic，见这个函数下面那条回归单测）。
 fn system_configuration_incompat_byte0(bytes: &[u8]) -> u8 {
     bytes.get(6).copied().unwrap_or(0)
@@ -302,7 +302,7 @@ fn field_labels_for_segments(kind: RegionKind, segments: &[(usize, usize)]) -> S
     labels.join(",")
 }
 
-// ───────────────────────── R28：改前改后每个字节归到哪一类 ─────────────────────────
+// ───────────────────────── R28：前后两份每个字节归到哪一类 ─────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ClauseClass {
@@ -749,7 +749,7 @@ mod tests {
 
     /// incompat 位 1（布局身份）：截断字段之前的系统配置第一个 incompat 字节只带它（0x02）。
     const FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS: u8 = 0x02;
-    /// incompat 位 2（inode 记录带截断字段，用户 2026-10-17 定新开）：mkfs 从此写位 1 加位 2（0x06）。
+    /// incompat 位 2（inode 记录带截断字段）：mkfs 从此写位 1 加位 2（0x06）。
     const INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT: u8 = 0x04;
     const FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS: u8 = FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS | INCOMPAT_INODE_RECORD_TRUNCATION_FIELDS_BIT;
 

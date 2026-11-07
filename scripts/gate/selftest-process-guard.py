@@ -56,8 +56,29 @@
   watched	findings=<N>	scan=yes|no	examined=<扫到的进程形态数>	exit=<命令的退出码>	trace=yes|no|outer|nested	execs=<跟踪到的成功 execve 次数>
     trace=nested 是命令本身就是另一份 selftest-process-guard.py（外层不跟它，它自己起 strace 判）；trace=outer 是这一份自己已经在 strace 之下。
   not-watched	<为什么不盯>
+判定库（单独起、不带 --verdict-file 的那一种；.claude/rules/verification.md「判定库只有一份」）：
+  每一条被盯的自证一条判定，记进 prune-server 那一份判定库：unit-verdicts 族，种类 LIBRARY_KIND（selftest-process-guard.py:watched-selftests），
+  库名是 <被判那棵树的 git common-dir>/singlefs-unit-verdicts/<种类>，只当名字与命名空间，本地不建、不读、不写（scripts/gate/admission.py 文件头「判定库」）。
+  算键、查库、记库都经 scripts/gate/admission.py 的 verdict-plan / verdict-record（同目录那一份；这里不另写算法）：一条请求
+    <名字> <入口> judge:<SELFTEST_JUDGE_ENTRIES 每一个> judge-root:<这份脚本所在的仓> line:command=<名字> [file:scripts/prune-server/prune_server_client_selftest.py]
+  名字是被盯那条原命令（临时 prune-server 的包装剥掉之后）的 shlex.join；入口是它起的那份自证脚本（相对 --registry-root，不给取这份脚本所在的仓），
+  键是那份脚本的单元闭包加判法那几个函数的闭包加命令行（包装写法另加包装脚本的内容），路径、行号、二进制位置不进键。
+  键相同、库里判绿的复用：不起那条命令，退 0，打「· <名字>：绿，复用」；对不上的、库里记着红的现判（盯着跑），跑完照结局记：
+    绿（命令退 0、一处真重活都没见、execve 跟踪不是 no）记绿；红（命令退非 0 而不是 77，或见了真重活）照同一把键记红、撤掉这把键原有的绿（verdict-record --red-names），
+    下一趟现判、原因以「上次判红」起头；退 77 的不是判定、不记；execve 跟踪本次未跑（trace=no）的绿不记。逐条打「· <名字>：绿|红，现判|强制现判」。
+  复用哨兵在 verdict-plan / verdict-record 里（admission.py 文件头「复用哨兵」，判法是 scripts/gate/lib_reuse_checks.py 的 ReuseSentinel）：抽中的种子与几行照转打。
+  按条复用失灵（计划退非 0、没打 PLAN 或没有这一条的那一行、记库退非 0），判法只在 admission.py plan-failure：它判失灵（哨兵红句、计划退非 0），
+    这一条照旧盯着现判跑完、不记库，结论判红（命令自己退 0 时这里退 1）；它判 prune-server 不可用退 75，这里不起那条命令、退 75；
+    记库退非 0 而 plan-failure 退 0（记不进库）只报一句、照命令的退出码退。
+  不经判定库的三种：带 --verdict-file 的（调用方自己按条复用：门禁 code-tooling 的 research-script-selftests 格，它的判定在它的种类里，这里再查库会把
+    它的复用哨兵抽中的强制现判吞成复用）；stage-selftest.sh 喂的样本档（喂进来的样本不在单元闭包里，键罩不住它）；命令起的脚本不在被判那棵树里。
+    后两种照盯、照跑、不入库，打一句为什么。
+  自证 reuse-three-questions 那一格（第 17 格）打规范输出「REUSE_SELFTEST script=scripts/gate/selftest-process-guard.py …」（scripts/gate/lib_reuse_checks.py 文件头「一」）。
+
 退出码：命令起了而没见真重活，交命令自己的退出码；见了真重活退 3（命令自己退几写进 ✗ 那一句与判定文件）；用法错退 2；
-  不盯时就是那条命令的退出码（exec 过去了）；--selftest 需要 strace 的几格没跑时退 77。
+  不盯时就是那条命令的退出码（exec 过去了）；--selftest 需要 strace 的几格没跑时退 77；
+  单独起时键相同、库里判绿的复用退 0；按条复用失灵、命令自己退 0 时退 1；prune-server 不可用退 75（判定库那一段）；
+  --selftest 不在临时 prune-server 底下退 2、一格都不跑（scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service）。
 
 弄坏开关 SELFTEST_PROCESS_GUARD_BREAK=<项>（逗号连几个；只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认）。
 逐项写开关名、弄坏哪一处，下一行起写打开后 --selftest 哪几格判错（括号里是那一格「✗ 自证第 <号> 格」之后那一句的句首）：
@@ -80,13 +101,22 @@
       第 8 格（「退出途中读到的空环境应当不报」）
   SELFTEST_PROCESS_GUARD_BREAK=exec-trace-skipped  不经 strace 跟踪 execve，退回只有采样与替身
       第 9 格（「立刻失败的真 cargo build 要被 execve 跟踪抓到」）、第 10 格（「execve 跟踪下假 cargo 与只问版本的真工具不红」）、
-      第 11 格（「按文件名认 qemu、herd7、verus」）、第 12 格（「样本档的 setup.sh 里起真 cargo」）
+      第 11 格（「按文件名认 qemu、herd7、verus」）、第 12 格（「样本档的 setup.sh 里起真 cargo」）、
+      第 17 格（「reuse-three-questions」；execve 跟踪没跑的绿不记库，第二趟复用不了）
   SELFTEST_PROCESS_GUARD_BREAK=shim-argv0-dropped  替身把版本查询交给真的那一份时 argv[0] 不留成 cargo / rustc（真的那一份常是 rustup 代理的符号链接，解开是 rustup，答出来的是 rustup 的版本）
       第 3 格（「只用假 cargo、真 cargo 与 rustc 只问版本的绿样本」，那份假自证核版本行是 cargo、rustc 自己的）
   SELFTEST_PROCESS_GUARD_BREAK=launcher-not-stripped  认替身那一行时不剥掉前面的 env（经 shebang 起的替身 cmdline 是 /usr/bin/env bash <替身> -V）
       第 14 格（「替身刚 exec 成真工具链那一瞬的版本查询」）
   SELFTEST_PROCESS_GUARD_BREAK=temporary-service-wrapper-unseen  不剥临时 prune-server 的包装，包装当它自己起的那份脚本判（不是登记表管的自证，不盯）
       第 15 格（「临时 prune-server 的包装要按里面那条原命令判盯不盯」）
+  SELFTEST_PROCESS_GUARD_BREAK=library-skipped  单独起时也不经判定库（每一趟都现判、不记库）
+      第 17 格（「reuse-three-questions」）、第 18 格（「记红撤绿」）、第 19 格（「按条复用失灵判红、服务不可用退 75」）
+  SELFTEST_PROCESS_GUARD_BREAK=red-not-recorded  现判判红的不交 verdict-record --red-names（不记红、不撤绿）
+      第 18 格（「记红撤绿」）
+  SELFTEST_PROCESS_GUARD_BREAK=plan-failure-ignored  计划退非 0 时不问 plan-failure，照「库里没有」现判、照命令的退出码退
+      第 19 格（「按条复用失灵判红、服务不可用退 75」）
+  SELFTEST_PROCESS_GUARD_BREAK=caller-verdict-file-looked-up  带 --verdict-file 的也查库、记库（调用方按条复用的那一趟被吞成复用）
+      第 20 格（「带 --verdict-file 的不经判定库」）
 """
 import contextlib
 import importlib.util
@@ -124,9 +154,23 @@ VERSION_QUERIES = {("-V",), ("--version",), ("-vV",), ("-Vv",), ("-V", "-v"), ("
 BREAK_VARIABLE = "SELFTEST_PROCESS_GUARD_BREAK"
 KNOWN_BREAKS = ("no-path-shims", "no-process-scan", "version-query-flagged", "quiesce-always-fake", "private-script-ignored",
                 "nested-guard-scanned", "sample-tools-unread", "empty-environment-as-unset", "exec-trace-skipped",
-                "shim-argv0-dropped", "launcher-not-stripped", "temporary-service-wrapper-unseen")
+                "shim-argv0-dropped", "launcher-not-stripped", "temporary-service-wrapper-unseen",
+                "library-skipped", "red-not-recorded", "plan-failure-ignored", "caller-verdict-file-looked-up")
 LAUNCHER_NAMES = {"env"}
-SELFTEST_CELL_COUNT = 16
+SELFTEST_CELL_COUNT = 20
+# 判定库（文件头「判定库」）：种类、判法那几个函数、记库时交的跑法；算键与库都在同目录的 admission.py
+LIBRARY_KIND = "selftest-process-guard.py:watched-selftests"
+SELFTEST_JUDGE_ENTRIES = ("scripts/gate/selftest-process-guard.py::watch_judgement", "scripts/gate/selftest-process-guard.py::default_settings",
+                          "scripts/gate/selftest-process-guard.py::write_shims", "scripts/gate/selftest-process-guard.py::Watch.scan",
+                          "scripts/gate/selftest-process-guard.py::ExecTrace.poll")
+WRAPPER_SCRIPT_RELATIVE = "scripts/prune-server/prune_server_client_selftest.py"
+ADMISSION_PATH = os.path.join(SCRIPT_DIRECTORY, "admission.py")
+REUSE_CHECKS_PATH = os.path.join(SCRIPT_DIRECTORY, "lib_reuse_checks.py")
+PRUNE_SERVER_CLIENT_PATH = os.path.join(REPOSITORY_ROOT, "scripts", "prune-server", "prune_server_client.py")
+SCRIPT_KEY = "scripts/gate/selftest-process-guard.py"   # 复用三问规范输出认的脚本名
+RECORD_HOW = "selftest-process-guard.py 单独起"
+LIBRARY_RED_EXIT = 1
+SERVICE_UNAVAILABLE_EXIT = 75
 SELFTEST_SAMPLE_TOOLS = ".sample-tools"   # 自证里样本根放假工具的目录，登记在自证造的登记表里（.claude/gate.d/sample-stage.sh 那一行 samples:<目录>）
 NOT_RUN_EXIT = 77
 STAGE_SELFTEST_NAME = "stage-selftest.sh"
@@ -680,6 +724,22 @@ def project_code_runs_library():
     return module
 
 
+def launched_script(library, command):
+    """命令起的是哪一份脚本：(脚本词, 它的参数)；bash / sh、python 照 lib_shell_words 的起法认，起的不是一份脚本（bash -c、python -c / -m、从标准输入读）交 (None, [])。"""
+    shell_words, name = library.shell_words, os.path.basename(command[0])
+    if name in shell_words.SHELL_NAMES:
+        invocation = shell_words.shell_invocation(command[1:])
+        launched = invocation.code_string is None and invocation.script_index is not None
+    elif shell_words.PYTHON_NAME.match(name):
+        invocation = shell_words.python_invocation(command[1:])
+        launched = invocation.code_string is None and invocation.module is None and invocation.script_index is not None
+    else:
+        return command[0], command[1:]
+    if not launched or 1 + invocation.script_index >= len(command):
+        return None, []
+    return command[1 + invocation.script_index], command[2 + invocation.script_index:]
+
+
 def watch_judgement(command, directory, registry_root, environment, broken):
     """(盯不盯, 一句理由)：命令起的脚本照 lib_project_code_runs.py 的 registered_selftest 判，是登记表里登记过的单独 --selftest 才盯；
     起的是 stage-selftest.sh 的，照 stage_selftest_problems 判它喂的样本档是不是都登记在表里、样本与 HEAD 加暂存区相同，是就盯。
@@ -688,20 +748,7 @@ def watch_judgement(command, directory, registry_root, environment, broken):
         library = project_code_runs_library()
     except Exception as error:   # 文件不在、语法错、它导入 lib_shell_words 失败：认不出登记没有，照登记过的盯（宁可多盯）
         return True, f"导入 {PROJECT_CODE_RUNS_LIBRARY_PATH} 失败（{type(error).__name__}：{error}），认不出登记没有，照登记过的盯"
-    shell_words, name = library.shell_words, os.path.basename(command[0])
-    script, rest = command[0], command[1:]
-    if name in shell_words.SHELL_NAMES:
-        invocation = shell_words.shell_invocation(command[1:])
-        launched = invocation.code_string is None and invocation.script_index is not None
-    elif shell_words.PYTHON_NAME.match(name):
-        invocation = shell_words.python_invocation(command[1:])
-        launched = invocation.code_string is None and invocation.module is None and invocation.script_index is not None
-    else:
-        invocation, launched = None, True
-    if invocation is not None and launched and 1 + invocation.script_index >= len(command):
-        launched = False
-    if invocation is not None:
-        script, rest = (command[1 + invocation.script_index], command[2 + invocation.script_index:]) if launched else (None, [])
+    script, rest = launched_script(library, command)
     if script is None:
         return False, "起的不是一份脚本（bash -c、python -c / -m 或从标准输入读）"
     # 临时 prune-server 的包装（文件头「判据」④ 那一段末尾）：给了 --server-binary 的按里面那条原命令判，没给的（退 2，或在服务给的编译目录里现编 prune-server）不盯。
@@ -729,6 +776,132 @@ def watch_judgement(command, directory, registry_root, environment, broken):
     if row is None:
         return False, f"{script} 不是登记表管的自证（不在登记目录下、没登记、没带 --selftest，或带了 --selftest 之外的参数）"
     return True, f"{script} 在 {registry} 里登记过（第 {row.line} 行）"
+
+
+# ── 判定库（文件头「判定库」）────────────────────────────────────────────────
+
+def library_request(command, directory, root):
+    """被盯的这条命令在判定库里的请求（文件头「判定库」）：交 (名字, 请求行) 或 (None, 不按键复用的一句为什么)。
+    临时 prune-server 的包装剥掉、按里面那条原命令取；stage-selftest.sh 喂的样本档与起的脚本不在 root 里的不按键复用。"""
+    try:
+        library = project_code_runs_library()
+    except Exception as error:   # 认不出起的是哪一份脚本：没有入口可算键
+        return None, f"导入 {PROJECT_CODE_RUNS_LIBRARY_PATH} 失败（{type(error).__name__}：{error}），认不出起的是哪一份脚本"
+    script, rest = launched_script(library, command)
+    wrapped = library.temporary_service_wrapped([script] + list(rest), directory) if script is not None else None
+    if wrapped is not None:
+        command = wrapped[0]
+        script, rest = launched_script(library, command)
+    if script is None:
+        return None, "起的不是一份脚本"
+    if os.path.basename(script) == STAGE_SELFTEST_NAME:
+        return None, "stage-selftest.sh 喂的样本档：喂进来的样本不在单元闭包里，键罩不住它"
+    real_root, path = os.path.realpath(root), os.path.realpath(os.path.join(directory, script))
+    if not path.startswith(real_root + os.sep):
+        return None, f"起的脚本 {path} 不在被判那棵树 {real_root} 里"
+    name = shlex.join(command)
+    tokens = [f"judge:{entry}" for entry in SELFTEST_JUDGE_ENTRIES] + [f"judge-root:{REPOSITORY_ROOT}", f"line:command={name}"]
+    if wrapped is not None:
+        tokens.append(f"file:{WRAPPER_SCRIPT_RELATIVE}")
+    return name, "\t".join([name, os.path.relpath(path, real_root)] + tokens) + "\n"
+
+
+def run_admission(arguments, output_path):
+    """起同目录的 admission.py（子命令与参数照给），标准输出与标准错误合进 output_path；交退出码。"""
+    with open(output_path, "w", encoding="utf-8") as handle:
+        return subprocess.run([sys.executable, ADMISSION_PATH, *arguments], stdout=handle, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL).returncode
+
+
+def plan_failure_verdict(subcommand, exit_code, output_path, red_withdrawal=()):
+    """这一趟按条复用失灵没有（判法只在 admission.py plan-failure，文件头「判定库」）：交它的退出码（0 没失灵、1 失灵、75 服务不可用），它的 ✗ 照打。
+    red_withdrawal 是交了红的那一趟 verdict-record 的（根, 种类, 计划文件, 判红的名字文件）：带 --red 交，记红没成时它撤掉那几把键原有的绿（它文件头「按条复用失灵」）。"""
+    red_arguments = ["--red", *red_withdrawal] if red_withdrawal else []
+    return subprocess.run([sys.executable, ADMISSION_PATH, "plan-failure", "selftest-process-guard.py 单独起", subcommand, str(exit_code), *red_arguments, output_path],
+                          stdin=subprocess.DEVNULL).returncode
+
+
+def echo_lines(path, keep):
+    """把 admission.py 输出里 keep(行) 为真的那几行原样转打到标准错误。"""
+    for line in read_lines(path):
+        if keep(line):
+            print(line, file=sys.stderr)   # gate-lint:detail
+
+
+def decision_of(plan_path, name):
+    """verdict-plan 输出里这一条那一行 → (reuse|judge|refused, 原因)；没有那一行、或没有末行 PLAN 交 (None, "")。"""
+    lines = read_lines(plan_path)
+    if not any(line.startswith("PLAN ") for line in lines):
+        return None, ""
+    for line in lines:
+        columns = line.split("\t")
+        if len(columns) >= 4 and columns[0] == name:
+            return columns[1], columns[3]
+    return None, ""
+
+
+def guarded_through_library(command, options, settings, broken):
+    """单独起的那一种（文件头「判定库」）：算键、查库，键相同判绿的复用（不起命令），对不上的盯着现判、照结局记库。交退出码。"""
+    root = options["registry_root"] or REPOSITORY_ROOT
+    name, request = library_request(command, os.getcwd(), root)
+    interval = options["interval"]
+    if name is None:
+        print(f"  · selftest-process-guard：{shlex.join(command)} 不按单元键复用（{request}），照盯、照跑、不入库", file=sys.stderr)
+        return guard(command, settings, broken, interval)[0]
+    scratch = tempfile.mkdtemp(prefix="selftest-process-guard-library-")
+    try:
+        requests, plan, plan_output = (os.path.join(scratch, part) for part in ("requests", "plan", "plan.out"))
+        with open(requests, "w", encoding="utf-8") as handle:
+            handle.write(request)
+        plan_exit = run_admission(["verdict-plan", root, LIBRARY_KIND, requests, plan], plan_output)
+        decision, reason = decision_of(plan_output, name)
+        echo_lines(plan_output, lambda line: not line.startswith(f"{name}\t"))
+        if plan_exit != 0 or decision is None:
+            failure = 0 if "plan-failure-ignored" in broken else plan_failure_verdict("verdict-plan", plan_exit, plan_output)
+            if failure == SERVICE_UNAVAILABLE_EXIT:
+                print(f"  ✗ selftest-process-guard：prune-server 不可用，{name} 没起（不现判、不当绿）", file=sys.stderr)
+                print("     → 怎么办：python3 prune-server/control check 看服务，修好之后重交同一条命令（报给主 agent）", file=sys.stderr)
+                return SERVICE_UNAVAILABLE_EXIT
+            exit_code = guard(command, settings, broken, interval)[0]
+            if failure == 0:
+                return exit_code
+            print(f"  ✗ selftest-process-guard：{name} 按条复用失灵（admission.py plan-failure 判的，上面一句点名在哪），照盯着现判跑完、不记库，这一趟判红",
+                  file=sys.stderr)
+            print("     → 怎么办：看上面 admission.py plan-failure 那一句点名的条件（计划退非 0、没打 PLAN 或复用哨兵红）修好，再重起同一条命令",
+                  file=sys.stderr)
+            return exit_code if exit_code != 0 else LIBRARY_RED_EXIT
+        if decision == "reuse":
+            print(f"  ✓ selftest-process-guard：{name} 键相同、库里判绿，复用（{reason}），这一趟不起", file=sys.stderr)
+            print(f"  · {name}：绿，复用", file=sys.stderr)   # gate-lint:detail
+            return 0
+        state = "强制现判" if reason.startswith("强制现判") else "现判"
+        exit_code, findings, verdict = guard(command, settings, broken, interval)
+        if exit_code == NOT_RUN_EXIT and not findings:
+            print(f"  · {name}：本次未跑（自证退 {NOT_RUN_EXIT}），不入库", file=sys.stderr)   # gate-lint:detail
+            return exit_code
+        red = exit_code != 0 or bool(findings)
+        recordable = decision == "judge" and (red or "\ttrace=no\t" not in verdict)
+        print(f"  · {name}：{'红' if red else '绿'}，{state}（{reason}）" + ("" if recordable else f"；不记库：{'拒算' if decision != 'judge' else 'execve 跟踪本次未跑'}"),
+              file=sys.stderr)   # gate-lint:detail
+        if not recordable or (red and "red-not-recorded" in broken):
+            return exit_code
+        names, red_names, record_output = (os.path.join(scratch, part) for part in ("green-names", "red-names", "record.out"))
+        with open(names, "w", encoding="utf-8") as handle:
+            handle.write("" if red else name + "\n")
+        with open(red_names, "w", encoding="utf-8") as handle:
+            handle.write(name + "\n" if red else "")
+        record_exit = run_admission(["verdict-record", root, LIBRARY_KIND, plan, names, "--how", RECORD_HOW, "--red-names", red_names], record_output)
+        echo_lines(record_output, lambda line: True)
+        if record_exit == 0:
+            return exit_code
+        failure = plan_failure_verdict("verdict-record", record_exit, record_output, (root, LIBRARY_KIND, plan, red_names) if red else ())
+        if failure == SERVICE_UNAVAILABLE_EXIT:
+            return SERVICE_UNAVAILABLE_EXIT
+        if failure != 0:
+            return exit_code if exit_code != 0 else LIBRARY_RED_EXIT
+        print(f"  ! selftest-process-guard：{name} 这一条没记进库（verdict-record 退 {record_exit}），下一趟照现判", file=sys.stderr)
+        return exit_code
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
 
 
 # ── 入口 ─────────────────────────────────────────────────────────────────────
@@ -788,8 +961,14 @@ def main(arguments):
             return 127
     # 被判的那棵树（--registry-root，不给取这份脚本所在的仓）里随样本带的假 cargo 之类（样本根的 sample-tools/cargo）不算真工具
     settings = default_settings([options["registry_root"] or REPOSITORY_ROOT])
-    exit_code, _findings, _verdict = guard(command, settings, interval=options["interval"], verdict_file=options["verdict_file"] or None)
-    return exit_code
+    broken = frozenset(item for item in os.environ.get(BREAK_VARIABLE, "").split(",") if item)   # 平常跑设了它在 settle_break_switches 就退 2 了
+    if options["verdict_file"] and "caller-verdict-file-looked-up" not in broken:
+        # 调用方自己按条复用（文件头「判定库」不经判定库的三种）：这里只盯、写判定文件
+        exit_code, _findings, _verdict = guard(command, settings, broken, options["interval"], verdict_file=options["verdict_file"])
+        return exit_code
+    if "library-skipped" in broken:
+        return guard(command, settings, broken, options["interval"], verdict_file=options["verdict_file"] or None)[0]
+    return guarded_through_library(command, options, settings, broken)
 
 
 # ── 自证 ─────────────────────────────────────────────────────────────────────
@@ -809,6 +988,12 @@ def run_selftest():
         print(f"  ✗ {BREAK_VARIABLE} 里有认不出的开关：{'、'.join(unknown)}", file=sys.stderr)
         print(f"     → 怎么办：只认 {'、'.join(KNOWN_BREAKS)}（文件头「弄坏开关」一段）", file=sys.stderr)
         return USAGE_EXIT
+    client = prune_server_client_module()
+    problem = client.selftest_service_problem()
+    if problem:   # 判定库那几格写库：自证只在临时 prune-server 上跑，不写真服务
+        print(f"  ✗ selftest-process-guard.py 自证没跑：{problem}", file=sys.stderr)
+        print(f"     → 怎么办：{client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
+        return USAGE_EXIT
     work = tempfile.mkdtemp(prefix="selftest-process-guard-selftest-")
     outside = tempfile.mkdtemp(prefix="selftest-process-guard-outside-")   # 不在 work 之下：execve 跟踪里这里的假 qemu、herd7、verus 不被当「自证自己建的临时目录」放过
     failures, cells, not_run = [], 0, []
@@ -822,7 +1007,8 @@ def run_selftest():
             print(f"  ✗ 自证第 {number} 格：{sentence}", file=sys.stderr)   # gate-lint:detail
         print(f"  ✗ selftest-process-guard.py 自证 {cells} 格里 {len(failures)} 格判错", file=sys.stderr)
         print("     → 怎么办：设了 SELFTEST_PROCESS_GUARD_BREAK 的，这就是要的结果（文件头「弄坏开关」点名的那几格）；没设的，照判错那一格看 "
-              "watch_judgement、write_shims、Watch.scan、judge_process、ExecTrace 与 judge_execution 里对应的一段", file=sys.stderr)
+              "watch_judgement、write_shims、Watch.scan、judge_process、ExecTrace 与 judge_execution 里对应的一段（第 17 到 20 格看 guarded_through_library 与 library_request）",
+              file=sys.stderr)
         return 1
     if not_run:
         for number, sentence in not_run:
@@ -834,12 +1020,22 @@ def run_selftest():
     print(f"  ✓ selftest-process-guard.py 自证 {cells} 格都对（照登记表分盯不盯、登记过的假自证经 PATH 起真 cargo build 被替身拒并判红、"
           "只用假 cargo 与只问版本的绿、绝对路径起的真工具链扫得到、真清场与假配置分得开、私有清场脚本认得出、另一份守卫那一支不扫、退出途中读到的空环境不当没设配置、"
           "立刻失败的真 cargo build 被 execve 跟踪抓到、假 cargo 与只问版本的真工具不红、qemu / herd7 / verus 按文件名认、样本档 setup.sh 里起真 cargo 判红、"
-          "strace 不在时报本次未跑、替身刚 exec 成真工具链那一瞬的版本查询不报、临时 prune-server 的包装按里面那条原命令判盯不盯）")
+          "strace 不在时报本次未跑、替身刚 exec 成真工具链那一瞬的版本查询不报、临时 prune-server 的包装按里面那条原命令判盯不盯、"
+          "单独起时按单元键复用三问都过、判红记红撤绿、按条复用失灵判红与服务不可用退 75、带 --verdict-file 的不经判定库）")
     return 0
 
 
+def prune_server_client_module():
+    """scripts/prune-server/prune_server_client.py（只用它判这一趟是不是临时服务；import 本身不连服务）。"""
+    specification = importlib.util.spec_from_file_location("prune_server_client_for_selftest_process_guard", PRUNE_SERVER_CLIENT_PATH)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
 def selftest_cells(work, outside, broken):
-    """十五格；交 (格数, [(格号, 判错的一句)], [(格号, 本次未跑的一句)])。真家伙只起 cargo / rustc 的版本查询与立刻报错退出的 cargo build（清单不在）。
+    """二十格；交 (格数, [(格号, 判错的一句)], [(格号, 本次未跑的一句)])。真家伙只起 cargo / rustc 的版本查询与立刻报错退出的 cargo build（清单不在）；
+    第 17 到 20 格另起 admission.py 算键、读写临时 prune-server（run_selftest 开跑前核过是临时服务）。
     第 9 到 12 格要 strace 与一份真 cargo 的路径，没有就记本次未跑（弄坏开关 exec-trace-skipped 下照跑、照判错）。"""
     global process_environment, process_arguments, process_executable  # 第 8、14 格拿替身换掉读 /proc 的这几个函数、判完换回
     failures, not_run = [], []
@@ -996,8 +1192,132 @@ def selftest_cells(work, outside, broken):
     unlisted = judge_execution(os.path.join(outside, "other-root", ".unlisted-tools", "cargo"), ["cargo", "build"], sample_settings, [], broken, repository)
     if registered != frozenset({SELFTEST_SAMPLE_TOOLS}) or listed is not None or unlisted is None:
         failures.append((16, f"样本档的假工具目录应当照登记表认（读到 {sorted(registered)}，登记的目录里的 cargo 报了 {listed!r}，没登记的目录里的 cargo 报了 {unlisted!r}）"))
-
+    not_run.extend(library_cells(work, broken, environment, failures))
     return SELFTEST_CELL_COUNT, failures, not_run
+
+
+# ── 自证：判定库那几格（第 17 到 20 格；文件头「判定库」）──────────────────
+
+LIBRARY_FAKE_SCRIPTS = ("fake-reuse-a.py", "fake-reuse-b.py", "fake-reuse-c.py", "fake-reuse-red.py")
+LIBRARY_FAKE_SOURCE = '''import os
+import sys
+
+
+def answer_{name}():
+    return 1 if os.environ.get("FAKE_SELFTEST_RED") == "1" else 0
+
+
+if __name__ == "__main__":
+    sys.exit(answer_{name}())
+'''
+LIBRARY_CELL_SECONDS = 600   # 起一次守卫（连同它起的 admission.py 算键）的上限：卡住那一格照超时记判错，不一直等
+
+
+def library_repository(directory, sample_marker=None):
+    """一棵 git 小树（admission.py 的库名取 git common-dir）：登记表登记四份只读环境变量、不起任何工具的假自证。
+    sample_marker 给了就放 .unit-verdict-sample/（不抽哨兵：样本钉死了现判与复用的条数），是串就写进 .unit-verdict-sample/plan-failure。"""
+    os.makedirs(directory)
+    subprocess.run(["git", "init", "-q", directory], check=True, stdin=subprocess.DEVNULL)
+    selftest_write(os.path.join(directory, REGISTRY_RELATIVE_PATH),
+                   "".join(f"scripts/gate/{script}\tselftest\t# 自证造的：只读一个环境变量、照它退 0 或 1\n" for script in LIBRARY_FAKE_SCRIPTS))
+    for script in LIBRARY_FAKE_SCRIPTS:
+        selftest_write(os.path.join(directory, "scripts", "gate", script), LIBRARY_FAKE_SOURCE.format(name=script[len("fake-reuse-"):-len(".py")]))
+    if sample_marker is not None:
+        os.makedirs(os.path.join(directory, ".unit-verdict-sample"))
+        if sample_marker:
+            selftest_write(os.path.join(directory, ".unit-verdict-sample", "plan-failure"), sample_marker + "\n")
+    return directory
+
+
+def library_command(script):
+    return ["python3", f"scripts/gate/{script}", "--selftest"]
+
+
+def run_guard_alone(repository, script, environment, broken, extra=(), variables=None):
+    """单独起一次守卫（不带 --verdict-file，除非 extra 里给）盯 script 的自证：交 (退出码, 合起来的输出)。弄坏开关照交给它（它是这份自证的子进程，认）。"""
+    run_environment = dict(environment, **(variables or {}))
+    if broken:
+        run_environment[BREAK_VARIABLE] = ",".join(sorted(broken))
+    completed = subprocess.run([sys.executable, SCRIPT_PATH, "--registry-root", repository, "--interval", "0.05", *extra, "--", *library_command(script)],
+                               cwd=repository, env=run_environment, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=LIBRARY_CELL_SECONDS)
+    return completed.returncode, completed.stdout + completed.stderr
+
+
+def reuse_checks_module():
+    specification = importlib.util.spec_from_file_location("lib_reuse_checks_for_selftest_process_guard", REUSE_CHECKS_PATH)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def library_cells(work, broken, environment, failures):
+    """第 17 到 20 格：单独起时的判定库。交本次未跑的 [(格号, 一句)]，判错的追加进 failures。要 strace（execve 跟踪没跑的绿不记库，问不出复用）。"""
+    _strace, trace_state, trace_reason = find_strace(frozenset())
+    if trace_state != "yes":
+        return [(number, f"strace 起不了（{trace_reason}）：execve 跟踪没跑的绿不记库，问不出复用") for number in (17, 18, 19, 20)]
+    checks = reuse_checks_module()
+    names = {script: shlex.join(library_command(script)) for script in LIBRARY_FAKE_SCRIPTS}
+
+    # 第 17 格（reuse-three-questions）：a、b、c 三份自证各一条判定，四趟——库是空的、同一份输入、改闭包外（a 加一行注释、树里另加一份没人读的文件）、
+    # 改只有 c 那一份闭包里有的函数单元；每趟逐条读「· <名字>：绿|红，现判|复用」那一行
+    repository = library_repository(os.path.join(work, "library-three-questions"))
+    runs, problems = [], []
+    for edit in (None, None, "unrelated", "unit"):
+        if edit == "unrelated":
+            path = os.path.join(repository, "scripts", "gate", "fake-reuse-a.py")
+            selftest_write(path, "# 闭包外的改动：一行注释\n" + open(path, encoding="utf-8").read())
+            selftest_write(os.path.join(repository, "docs", "notes.md"), "没有哪一份自证读它\n")
+        elif edit == "unit":
+            path = os.path.join(repository, "scripts", "gate", "fake-reuse-c.py")
+            text = open(path, encoding="utf-8").read()
+            selftest_write(path, text.replace('    return 1 if os.environ.get("FAKE_SELFTEST_RED") == "1" else 0\n',
+                                              '    red = os.environ.get("FAKE_SELFTEST_RED") == "1"\n    return 1 if red else 0\n'))
+        states = {}
+        for script in LIBRARY_FAKE_SCRIPTS[:3]:
+            code, output = run_guard_alone(repository, script, environment, broken)
+            states.update(checks.states_from_output(output))
+            if code != 0:
+                problems.append(f"第 {len(runs) + 1} 趟 {script} 退 {code}：{output.strip()[-300:]}")
+        runs.append({name: states.get(name, "没报结局") for name in (names[script] for script in LIBRARY_FAKE_SCRIPTS[:3])})
+    with contextlib.redirect_stdout(io.StringIO()) as captured:
+        passed, question_problems = checks.report_three_questions(SCRIPT_KEY, *runs, [names["fake-reuse-c.py"]])
+    print(captured.getvalue(), end="")   # 规范输出那一行（门禁 code-tooling 的 reuse-selftests 格认标准输出里这一行）
+    if problems or not passed:
+        failures.append((17, "reuse-three-questions：" + "；".join(problems + question_problems)))
+
+    # 第 18 格（记红撤绿）：red 那一份先判绿记库；再设 FAKE_SELFTEST_RED=1、计划不读库（ADMISSION_BREAK=verdict-lookup-skipped）现判红，照同一把键记红盖掉绿；
+    # 之后不设变量、照常查库：要现判、原因以「上次判红」起头，判绿。树下有 .unit-verdict-sample/：不抽哨兵（不读库那一趟哨兵会报复用失灵）
+    repository = library_repository(os.path.join(work, "library-red-over-green"), sample_marker="")
+    name = names["fake-reuse-red.py"]
+    first = run_guard_alone(repository, "fake-reuse-red.py", environment, broken)
+    second = run_guard_alone(repository, "fake-reuse-red.py", environment, broken, variables={"FAKE_SELFTEST_RED": "1", "ADMISSION_BREAK": "verdict-lookup-skipped"})
+    third = run_guard_alone(repository, "fake-reuse-red.py", environment, broken)
+    states = [checks.states_from_output(output).get(name) for _code, output in (first, second, third)]
+    rejudged = "上次判红" in third[1]
+    if not ([code for code, _output in (first, second, third)] == [0, 1, 0] and states == ["现判", "现判", "现判"] and rejudged):
+        failures.append((18, f"记红撤绿：三趟退 {[first[0], second[0], third[0]]}（要 [0, 1, 0]）、结局 {states}（要三趟都现判），"
+                             f"第三趟{'说了' if rejudged else '没说'}「上次判红」：{third[1].strip()[-300:]}"))
+
+    # 第 19 格（按条复用失灵判红、服务不可用退 75）：样本标记 sentinel-reuse-failed（计划照算、另添一条复用失灵、退 1）下照盯着现判跑完、退 1；
+    # 标记 exit-75（计划不连服务、退 75）下不起那条命令、退 75
+    failed_repository = library_repository(os.path.join(work, "library-sentinel-failed"), sample_marker="sentinel-reuse-failed")
+    failed = run_guard_alone(failed_repository, "fake-reuse-a.py", environment, broken)
+    unavailable_repository = library_repository(os.path.join(work, "library-unavailable"), sample_marker="exit-75")
+    unavailable = run_guard_alone(unavailable_repository, "fake-reuse-a.py", environment, broken)
+    if not (failed[0] == LIBRARY_RED_EXIT and "复用失灵" in failed[1] and "selftest-process-guard：python3 scripts/gate/fake-reuse-a.py --selftest 跑完" in failed[1]
+            and unavailable[0] == SERVICE_UNAVAILABLE_EXIT and "跑完" not in unavailable[1]):
+        failures.append((19, f"按条复用失灵判红、服务不可用退 75：哨兵报复用失灵那一趟退 {failed[0]}（要 {LIBRARY_RED_EXIT}，且照跑完），"
+                             f"服务不可用那一趟退 {unavailable[0]}（要 {SERVICE_UNAVAILABLE_EXIT}，且不起命令）：{failed[1].strip()[-200:]}｜{unavailable[1].strip()[-200:]}"))
+
+    # 第 20 格（带 --verdict-file 的不经判定库）：同一条起两趟，第二趟照样现判（不打「复用」那一行），判定文件两趟都写了 watched
+    repository = library_repository(os.path.join(work, "library-caller-owned"))
+    verdict_file = os.path.join(work, "library-caller-owned.verdict")
+    outputs = [run_guard_alone(repository, "fake-reuse-b.py", environment, broken, extra=("--verdict-file", verdict_file)) for _ in range(2)]
+    written = (read_lines(verdict_file) or [""])[0]
+    if not (all(code == 0 for code, _output in outputs) and not any("，复用" in output for _code, output in outputs) and written.startswith("watched\t")):
+        failures.append((20, f"带 --verdict-file 的不经判定库：两趟退 {[code for code, _output in outputs]}、第二趟"
+                             f"{'复用了' if '，复用' in outputs[1][1] else '没复用'}、判定文件「{written}」：{outputs[1][1].strip()[-200:]}"))
+    return []
 
 
 def execve_cells(work, outside, broken, quiet_settings, environment, repository, failures):

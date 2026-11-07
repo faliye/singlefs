@@ -21,10 +21,16 @@
 
 用法：
   history-consolidate.py migrate <变更史文件> --out <输出文件> [--report <报告.md>] [--repo <仓根>]
-  history-consolidate.py loss-check <改前文件> <改后文件> [--report <报告.md>] [--repo <仓根>]
+  history-consolidate.py loss-check <改前文件> <改后文件> [--report <报告.md>] [--repo <仓根>] [--moves-base <提交>]
+    --moves-base：改前文件是那个提交里的一版（门禁 doc-decisions 的 history-loss 格交 gate 基准）时，比之前先把改前文件里的路径照搬迁登记
+    （<仓根>/.claude/gate.d/path-moves.tsv）换成新前缀：只换「那个提交的树里旧前缀下有文件、新前缀下没有文件」的登记行（基准之后才搬的），
+    登记行已经在那个提交的登记表里也换（登记先提交、搬迁后做的，lib-lag-baseline.py 的 effective_among 不认它，变更史里照
+    .claude/rules/path-moves.md「怎么做」第 3 步换成新前缀的产物行就成了「丢了」）；判法与换法借 .claude/gate.d/lib-lag-baseline.py 的
+    path_moves、effective_among（registered 给空集）、rewrite_moved_paths（「<提交哈希>:」后面的路径不换）。换不了（登记表写坏、git 取不到）退 1、打原因。
+    术语改名表（.claude/kb/term-renames.md）不在这里换：变更史里的旧叫法是当时的原话，换了会把真丢的那一句也当成找得到。
   history-consolidate.py --selftest
 
-退出码：0 没有丢失；3 有丢失（报告里逐个列出）；1 用法不对或自检没过；2 --selftest 时弄坏开关设了认不得的取值。
+退出码：0 没有丢失；3 有丢失（报告里逐个列出）；1 用法不对、自检没过或 --moves-base 换不了；2 --selftest 时弄坏开关设了认不得的取值。
 
 弄坏开关（只给 --selftest 证红用，migrate 与 loss-check 不认）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句冒号前的名字，
 括号里是那条「✗ 自检：」的开头）。不设开关时 --selftest 把 BREAK_MODES 里每个开关各开一次跑 migrate()，核 loss-check 都红
@@ -35,7 +41,7 @@
   HISTORY_CONSOLIDATE_BREAK=git-show-ignores-path  normalized_line() 比产物行时把反引号里的 `.out` `.tsv` `.log` `.json` `.csv` 产物名一律抹成同一个记号，路径与产物名不同也算同一行
       产物行换成 git show 写法又改了产物名或目录，要判丢而没判（「✗ 自检：git show 引用写法：」，逐格点名是哪个后缀、改了什么）
       不设开关时 --selftest 也把这个开关打开一次，核上面那几格都红（没红的是『弄坏开关 git-show-ignores-path』）
-  HISTORY_CONSOLIDATE_BREAK=english-quotes-unprotected  引名的引号退回只认「」『』（改前的样子）：strip_same_date() 把英语 "…" 与 “…” 里的同日日期当重复日期删，引名核对也不认这两种引号
+  HISTORY_CONSOLIDATE_BREAK=english-quotes-unprotected  引名的引号只认「」『』：strip_same_date() 把英语 "…" 与 “…” 里的同日日期当重复日期删，引名核对也不认这两种引号
       英语引号里的同日日期被删了（「✗ 自检：英语引号里的引名：」，逐格点名是哪种引号、删成了什么）
       不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 english-quotes-unprotected）
 
@@ -618,6 +624,29 @@ def loss_check(before_text, after_text, repo):
     return checked, losses
 
 
+def lag_baseline_module():
+    """.claude/gate.d/lib-lag-baseline.py（搬迁登记的读法、生效判法与换法），按本文件的位置载入。"""
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', '.claude', 'gate.d', 'lib-lag-baseline.py')
+    specification = importlib.util.spec_from_file_location('lib_lag_baseline_for_history_loss', path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def moved_before_text(before_text, base, repo):
+    """loss-check --moves-base（文件头「用法」）：改前文件照基准之后才搬的登记行换成新前缀。交 (全文, 换了几条登记, 问题句或 None)。"""
+    module = lag_baseline_module()
+    moves, problems = module.path_moves(repo)
+    if problems:
+        return before_text, 0, '搬迁登记表写坏了：' + '；'.join(problems)
+    pending, problem = module.effective_among(base, moves, repo, registered=set())
+    if problem is not None:
+        return before_text, 0, problem.sentence()
+    if not pending:
+        return before_text, 0, None
+    return module.rewrite_moved_paths(before_text, pending, module.default_roots(repo)), len(pending), None
+
+
 def write_report(path, report, checked, losses, before_text, after_text):
     lines = ['# 变更史整理报告', '',
              f'- 行数：{before_text.count(chr(10))} → {after_text.count(chr(10))}；字节：{len(before_text.encode())} → {len(after_text.encode())}',
@@ -848,6 +877,7 @@ def main():
     parser.add_argument('--out')
     parser.add_argument('--report')
     parser.add_argument('--repo', default=os.getcwd())
+    parser.add_argument('--moves-base')
     parser.add_argument('--selftest', action='store_true')
     arguments = parser.parse_args()
     if arguments.selftest:
@@ -879,6 +909,14 @@ def main():
             sys.exit(1)
         before_text = open(arguments.files[0], encoding='utf-8').read()
         after_text = open(arguments.files[1], encoding='utf-8').read()
+        if arguments.moves_base:
+            before_text, moved, problem = moved_before_text(before_text, arguments.moves_base, arguments.repo)
+            if problem is not None:
+                print(f'  ✗ 改前文件照搬迁登记换不了新前缀（{problem}），丢没丢没比')
+                print('  → 照括号里的原因修登记表或仓库状态，再跑同一条命令')
+                sys.exit(1)
+            if moved:
+                print(f'  · 改前文件照 {moved} 条基准之后才搬的登记行换成了新前缀再比（--moves-base {arguments.moves_base}）')
         checked, losses = loss_check(before_text, after_text, arguments.repo)
         if arguments.report:
             write_report(arguments.report, new_report(), checked, losses, before_text, after_text)

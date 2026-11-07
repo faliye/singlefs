@@ -1,4 +1,4 @@
-"""row_driver.py 的快照与线道的树带上每台默认重活线程数的登记文件 .claude/heavy-thread-default（harness 包经 include_str! 在编译时读它，
+"""row_driver.py 的快照与线道的树带上每台默认重活线程数的登记文件 .claude/heavy-thread-default（验证包经 include_str! 在编译时读它，
 没有就编不过），快照摘要只算 .rs 与 Cargo.*、不因它而变。sync_tree 用真的 rsync，在临时目录里造源树。
 
 跑法：在这个目录里 `python3 -B -m unittest test_synced_entries`。

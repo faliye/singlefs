@@ -36,8 +36,8 @@
      cargo test --test <测试目标>，点不到内联测试，它们跟着门禁的测试函数那一段按条复用地跑；别的包 src/ 下的内联测试照 ② 报住错了包。
   豁免（确实不是崩溃用例，只录流不枚举、只建判表、两份造法对拍这类）只有一种写法：测试函数上面的注释
   「crash-case-check:not-a-crash-case <理由>」，理由至少 4 个字；没有豁免表。
-  modules：crates/singlefs-verification/tests/*.rs 里代码（去掉字符串字面量与 // 注释）从 singlefs_verification:: 导入了 TIER_MODULES 里模块的、
-     与第一行写了声明的，第一行「//! 验证包模块：<模块，按 TIER_MODULES 的次序用、隔开>」与它从
+  modules：crates/singlefs-verification/tests/*.rs 里代码（去掉字符串字面量与 // 注释）从 singlefs_verification:: 导入了 CRASH_ENGINE_MODULES 里模块的、
+     与第一行写了声明的，第一行「//! 验证包模块：<模块，按 CRASH_ENGINE_MODULES 的次序用、隔开>」与它从
      singlefs_verification:: 导入的模块逐个相同；一个都不导入的写「无（为什么）」。
   file-names：crates/singlefs-verification/tests/*.rs 与 crates/singlefs-verification/tests/*.rs 的文件名不带里程碑序数、步号、增补号、
      并行线号、欠账号（MILESTONE_FILE_NAME）。
@@ -92,9 +92,9 @@
       字符串字面量提了没真导入的模块（「✗ 自检：字符串字面量里提过的模块不该算成真的导入」）
   CRASH_CASE_CHECK_BREAK=module-declaration-required-everywhere  module_declaration_problems() 对只用脚手架模块、没写声明的测试文件也要求声明
       只用脚手架模块（「✗ 自检：只用脚手架模块、注释里提到崩溃引擎模块、没写声明的测试文件不该报」）
-  CRASH_CASE_CHECK_BREAK=writable-mount-phases-unlisted  TIER_MODULES 里去掉 writable_mount_phases（模块表缺了这一项）
+  CRASH_CASE_CHECK_BREAK=writable-mount-phases-unlisted  CRASH_ENGINE_MODULES 里去掉 writable_mount_phases（模块表缺了这一项）
       声明了它、也导入了它的测试文件（「✗ 自检：声明并导入 writable_mount_phases、次序对的测试文件不该报」）
-  CRASH_CASE_CHECK_BREAK=given-states-unlisted  TIER_MODULES 里去掉 crash_given_states（模块表缺了这一项）
+  CRASH_CASE_CHECK_BREAK=given-states-unlisted  CRASH_ENGINE_MODULES 里去掉 crash_given_states（模块表缺了这一项）
       声明了它、也导入了它的测试文件（「✗ 自检：声明并导入 crash_given_states、次序对的测试文件不该报」）
   CRASH_CASE_CHECK_BREAK=only-ignored  judge() 不认 --only，四样都判
       --only file-names（「✗ 自检：--only file-names 应当只判 file-names 一样」）
@@ -113,7 +113,7 @@
       through_a_named_sweep（「✗ 自检：别的包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
   CRASH_CASE_CHECK_BREAK=waiver-ignored  crash_enumeration_tests() 不认「crash-case-check:not-a-crash-case」的注明
       干净的样本（「✗ 自检：干净的样本应当认出 1 条（注明不是用例的那条不算）、0 处问题」）
-  CRASH_CASE_CHECK_BREAK=crash-case-rows-only  problems_in() 照改前只认 stage-inputs.tsv 的 crash-case: 行，不认合表点名的放量分项
+  CRASH_CASE_CHECK_BREAK=crash-case-rows-only  problems_in() 只认 stage-inputs.tsv 的 crash-case: 行，不认合表点名的放量分项
       合表点名的放量分项（「✗ 自检：只由合表点名的放量分项登记的用例不该报缺登记」）、
       登记了的用例标了 ignore（「✗ 自检：登记了的崩溃枚举用例标了 ignore 应当报出来」：那条用例只由放量分项登记，开关下判成没登记，报的是缺登记、不是标了 ignore）
   CRASH_CASE_CHECK_BREAK=items-table-unchecked  problems_in() 不报合表的问题（④）
@@ -271,7 +271,7 @@ def registered_cases(root):
     return registered
 
 
-def is_inline_test_of_the_checker_package(where):
+def is_inline_test_of_the_verification_package(where):
     """where（相对仓根的路径:行号）是 验证包 src/ 下的内联测试：库与装置二进制里的 #[cfg(test)] 测试。
     崩溃枚举用例的跑法是 cargo test --test <测试目标>，点不到内联测试，所以既登记不了也不要求登记。"""
     return where.startswith(f"crates/{VERIFICATION_PACKAGE}/src/")
@@ -286,7 +286,7 @@ def problems_in(root):
     tests = crash_enumeration_tests(root)
     problems = []
     for package_directory, target, function, ignored, where in tests:
-        if package_directory == VERIFICATION_PACKAGE and is_inline_test_of_the_checker_package(where) and BROKEN != "inline-tests-require-rows":
+        if package_directory == VERIFICATION_PACKAGE and is_inline_test_of_the_verification_package(where) and BROKEN != "inline-tests-require-rows":
             continue
         if package_directory != VERIFICATION_PACKAGE and BROKEN != "package-unchecked":
             problems.append(f"{where} {function}：直接调全量崩溃枚举，却写在 {package_directory} 包里（崩溃枚举用例要住在 crates/{VERIFICATION_PACKAGE}/tests/）")
@@ -304,7 +304,7 @@ def problems_in(root):
 
 
 FRESH_POOL_CALL = re.compile(r"\b(?:build_pool\w*|build_through_\w+|format_pool)\s*\(|\bMemoryPool::with_devices\s*\(")
-TIER_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_library", "crash_amplification", "verdict_store", "gpu_unit_checks",
+CRASH_ENGINE_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress", "crash_injection", "writable_mount_phases", "crash_given_states", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_library", "crash_amplification", "verdict_store", "gpu_unit_checks",
     "crash_facts",
     "crash_verify_gpu",
     "crash_judge_tables",
@@ -312,9 +312,9 @@ TIER_MODULES = ["crash", "crash_state_enumeration", "crash_point_replay_progress
     "crash_judge_dispatch",
 ]
 if BROKEN == "writable-mount-phases-unlisted":
-    TIER_MODULES.remove("writable_mount_phases")
+    CRASH_ENGINE_MODULES.remove("writable_mount_phases")
 if BROKEN == "given-states-unlisted":
-    TIER_MODULES.remove("crash_given_states")
+    CRASH_ENGINE_MODULES.remove("crash_given_states")
 MODULE_DECLARATION = re.compile(r"^//! 验证包模块：(.+)$")
 # 字符串字面量：扫「从 singlefs_verification:: 导入了什么」之前先挖掉，不然字符串里提它（例如某个绕开
 # 入口的调用整行抄进字符串常量里当样本）会被认成真的导入。只认转义写法的普通双引号串，原始字符串
@@ -422,16 +422,16 @@ def test_file_name_problems(root):
 
 def module_declaration_problems(root):
     """modules：→ (查了几份验证包测试文件, 要声明的几份, 问题)。导入（去掉字符串字面量与 // 注释之后的代码里 singlefs_verification::<模块>）了
-    TIER_MODULES 里模块的、或第一行写了声明的要声明、要对得上；两样都没有的（只用 model、memory_pool 这类脚手架模块的）不判。"""
+    CRASH_ENGINE_MODULES 里模块的、或第一行写了声明的要声明、要对得上；两样都没有的（只用 model、memory_pool 这类脚手架模块的）不判。"""
     problems, scanned_files, declaring_files = [], 0, 0
     for path in verification_test_paths(root):
         scanned_files += 1
         text = open(path, encoding="utf-8", errors="replace").read()
         declared = MODULE_DECLARATION.match(text.split("\n", 1)[0])
         scan_text = text if BROKEN == "module-declaration-scans-strings" else STRING_LITERAL.sub("", text)
-        used = sorted({name for name in re.findall(r"singlefs_verification::(\w+)", scan_text) if name in TIER_MODULES}, key=TIER_MODULES.index)
+        used = sorted({name for name in re.findall(r"singlefs_verification::(\w+)", scan_text) if name in CRASH_ENGINE_MODULES}, key=CRASH_ENGINE_MODULES.index)
         code_text = re.sub(r"//[^\n]*", "", scan_text)
-        imported_in_code = any(name in TIER_MODULES for name in re.findall(r"singlefs_verification::(\w+)", code_text))
+        imported_in_code = any(name in CRASH_ENGINE_MODULES for name in re.findall(r"singlefs_verification::(\w+)", code_text))
         if not declared and not imported_in_code and BROKEN != "module-declaration-required-everywhere":
             continue
         declaring_files += 1
@@ -575,7 +575,7 @@ def judge(root, items):
             scanned = len(placement_source_paths(root))
             tests, problems = problems_in(root)
             table_items, _ = replay_items.read_items(root)
-            inline_count = sum(1 for test in tests if test[0] == VERIFICATION_PACKAGE and is_inline_test_of_the_checker_package(test[4]))
+            inline_count = sum(1 for test in tests if test[0] == VERIFICATION_PACKAGE and is_inline_test_of_the_verification_package(test[4]))
             results[item] = (scanned, problems,
                              f"崩溃枚举用例都住在 {VERIFICATION_PACKAGE} 包里、都登记进了崩溃点重放合表、没有标 #[ignore] 的（扫了 {scanned} 份测试源码，认出 {len(tests)} 条，"
                              f"其中 src/ 下的内联测试 {inline_count} 条点不到、不要求登记，源码注释注明不是崩溃用例的不算；"
@@ -616,7 +616,7 @@ REMEDIES = {
                   ".claude/gate.d/stage-inputs.tsv，再放进崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv 它那条流的那一项（写法在合表表头）；",
                   "合表报的问题照那一句改（.claude/rules/verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行）；不调枚举函数的小流测试不用登记；",
                   "调了枚举一族函数又确实不是崩溃用例的（只录流不枚举、只建判表、两份造法对拍），在函数上面写 // crash-case-check:not-a-crash-case <理由>（理由至少 4 个字）。"],
-    "modules": ["验证包里导入崩溃引擎模块的测试文件第一行写「//! 验证包模块：<它导入的模块，按 " + "、".join(TIER_MODULES) + " 的次序用、隔开>」，",
+    "modules": ["验证包里导入崩溃引擎模块的测试文件第一行写「//! 验证包模块：<它导入的模块，按 " + "、".join(CRASH_ENGINE_MODULES) + " 的次序用、隔开>」，",
                 "写了声明而一个都不导入的写「无（为什么）」（.claude/rules/verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行）。"],
     "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
                    "（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；改名照 .claude/rules/path-moves.md「怎么做」改全仓引用。"],
@@ -786,23 +786,23 @@ def selftest():
         if len(tests) != 1 or problems:
             failures.append(f"干净的样本应当认出 1 条（注明不是用例的那条不算）、0 处问题，实际 {len(tests)} 条、{problems}")
         open(os.path.join(tests_directory, "plain.rs"), "a").write("\n#[test]\nfn forgot_to_register() {\n    enumerate_crash_states_selecting(&s, 1);\n}\n")
-        open(os.path.join(other_package_tests_directory, "daily.rs"), "a").write("\n#[test]\nfn full_in_harness() {\n    enumerate_crash_states(&s);\n}\n"
+        open(os.path.join(other_package_tests_directory, "daily.rs"), "a").write("\n#[test]\nfn full_in_the_core_package() {\n    enumerate_crash_states(&s);\n}\n"
             "\nfn prepare_and_enumerate(s: &S) {\n    enumerate_crash_states_selecting(s, 1);\n}\n\n#[test]\nfn full_through_a_helper() {\n    prepare_and_enumerate(&s);\n}\n"
             "\n#[test]\nfn sweeps_every_prefix() {\n    for prefix in before..=operations.len() {\n        let mut image = pool();\n        image.apply(&operations[..prefix]);\n    }\n}\n"
             "\n#[test]\nfn crash_image_on_each_boundary() {\n    for count in 0..=segments.len() {\n        let image = CrashImage { persisted: through(count) };\n    }\n}\n"
             "\nfn lowest_at_every_crash_point(o: &[Op]) -> u64 {\n    0\n}\n\n#[test]\nfn through_a_named_sweep() {\n    lowest_at_every_crash_point(&o);\n}\n"
-            "\n#[test]\nfn one_fixed_crash_state_stays_in_the_harness() {\n    for request in requests {\n        check(request);\n    }\n    let image = CrashImage { persisted: all() };\n    base.apply(&operations[..last_root_slot_write]);\n}\n")
+            "\n#[test]\nfn one_fixed_crash_state_stays_in_the_core_package() {\n    for request in requests {\n        check(request);\n    }\n    let image = CrashImage { persisted: all() };\n    base.apply(&operations[..last_root_slot_write]);\n}\n")
         _, problems = problems_in(work)
         if not any("forgot_to_register" in problem and "没有登记" in problem for problem in problems):
             failures.append(f"验证包里调枚举函数没登记的用例应当报缺登记，实际 {problems}")
-        if not any("full_in_harness" in problem and "singlefs-core 包里" in problem for problem in problems):
+        if not any("full_in_the_core_package" in problem and "singlefs-core 包里" in problem for problem in problems):
             failures.append(f"写在别的包里的崩溃枚举用例应当报住错了包，实际 {problems}")
         if not any("full_through_a_helper" in problem and "singlefs-core 包里" in problem for problem in problems):
             failures.append(f"别的包里经同文件 helper 调全量枚举的用例应当报住错了包，实际 {problems}")
         for swept in ("sweeps_every_prefix", "crash_image_on_each_boundary", "through_a_named_sweep"):
             if not any(swept in problem and "singlefs-core 包里" in problem for problem in problems):
                 failures.append(f"别的包里自己逐个造崩溃状态的 {swept} 应当报住错了包，实际 {problems}")
-        if any("one_fixed_crash_state_stays_in_the_harness" in problem for problem in problems):
+        if any("one_fixed_crash_state_stays_in_the_core_package" in problem for problem in problems):
             failures.append(f"只造一个固定崩溃态的用例不该判成枚举，实际 {problems}")
         open(os.path.join(tests_directory, "granular.rs"), "w").write(
             "#[test]\nfn several_scenarios() {\n    for size in [1, 2] {\n        let pool = build_pool(\"x\");\n    }\n}\n"
@@ -831,12 +831,12 @@ def selftest():
         # 按参数循环（C637）：一条每轮新建池的报出来，一条写了 one-scenario 豁免的不报
         open(os.path.join(tests_directory, "rollback_parameters.rs"), "w").write(
             "//! 验证包模块：无（样本：只造池）\n#[test]\nfn every_rollback_parameter() {\n    for floor in [1, 2] {\n        let pool = build_pool(\"z\");\n    }\n}\n"
-            "\n// harness-test-granularity:one-scenario 同一个池按次序回退两次，合起来是一个场景\n#[test]\nfn tier_scenario_waived() {\n"
+            "\n// harness-test-granularity:one-scenario 同一个池按次序回退两次，合起来是一个场景\n#[test]\nfn rollback_scenario_waived() {\n"
             "    for floor in [1, 2] {\n        let pool = build_pool(\"w\");\n    }\n}\n")
         scenario_count, scenario = one_scenario_problems(work)
         if not any("several_scenarios" in problem for problem in scenario):
             failures.append(f"循环里每轮新建池的用例应当报出来，实际 {scenario}")
-        if any("one_scenario_waived" in problem or "tier_scenario_waived" in problem for problem in scenario):
+        if any("one_scenario_waived" in problem or "rollback_scenario_waived" in problem for problem in scenario):
             failures.append(f"写了 one-scenario 豁免的不该报，实际 {scenario}")
         if not any("rollback_parameters.rs" in problem and "every_rollback_parameter" in problem for problem in scenario):
             failures.append(f"按参数循环、每轮新建池的用例应当报出来（查了 {scenario_count} 条），实际 {scenario}")
@@ -889,7 +889,7 @@ def selftest():
         open(os.path.join(work, "crates", "mutations.tsv"), "w").write(
             "# 样本变异表\n"
             f"改坏一处\tcrates/singlefs-core/src/a.rs\tx\ty\t-p {VERIFICATION_PACKAGE} --test covered_stream -- covered_quick --exact\tcovered_quick\n"
-            f"别的包\tcrates/singlefs-core/src/a.rs\tx\tz\t-p singlefs-verification --test shared_name -- t --exact\tt\n")
+            f"别的包\tcrates/singlefs-core/src/a.rs\tx\tz\t-p singlefs-core --test shared_name -- t --exact\tt\n")
         cases, red_problems = must_red_problems(work)
         if not any("crash-case:demo" in problem for problem in red_problems) or any("crash-case:covered" in problem for problem in red_problems) or cases != 3:
             failures.append(f"一行变异都没有的崩溃枚举用例应当报出来（crash-case:demo 报、crash-case:covered 不报，查 3 条），实际 {cases} 条、{red_problems}")

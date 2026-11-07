@@ -169,7 +169,7 @@ run_one() {
     # 录制在来宾之外，与被测程序自己的录制器不共享一行代码。数据盘也放进这个目录，跑完宿主还能直接读。
     # 镜像一律排他新建，撞名就停：`truncate` 对一个已经存在、大小相同的文件什么都不做，
     # 字节原样留着，于是来宾读到的是上一轮的盘面——而这件事不报错。工作目录由调用方给，
-    # 复用目录就会撞上；每一轮要一个新环境（用户 2026-09-20 定案，门禁 harness-test-environment 是同一条纪律的另一半）。
+    # 复用目录就会撞上；每一轮要一个新环境（门禁 test-environment 是同一条纪律的另一半）。
     drivearg=()
     for ((d=0; d<VM_DISKS; d++)); do
       for image in "disk$d.img:${VM_DISK_MB}M" "log$d.img:${VM_LOG_MB:-256}M"; do
@@ -211,8 +211,8 @@ run_one() {
   # 子 shell 里的变量赋值传不回父进程——日志路径必须落文件传出去，
   # 否则父进程抓不到 E7RESULT，结果会静默变成「零条」。
   printf '%s' "$logf" > "$VM_LOGPTR"
-  # **每次都登记工作目录**——`--selftest` 会连跑三次，只记最后一次会漏掉前两个
-  # （2026-08-29 实测：修了「只删最后一个」之后仍剩 2 个）。追加写，父进程在 EXIT 里逐个删。
+  # **每次都登记工作目录**——`--selftest` 会连跑三次，只记最后一次会漏掉前两个。
+  # 追加写，父进程在 EXIT 里逐个删。
   printf '%s\n' "$work" >> "$VM_WORKLIST"
   local rc; rc="$(sed -n 's/.*SINGLEFS_EXIT=\([0-9]\+\).*/\1/p' "$logf" | tail -1)"
   [[ -n "$rc" ]] && { printf '%s' "$rc"; return 0; }
@@ -225,7 +225,7 @@ VM_WORKLIST="$(mktemp "${TMPDIR:-/tmp}/singlefs-vmwork.XXXXXX")"
 # ⚠️ **工作目录必须收掉。** `run_one` 在命令替换里跑（子 shell），
 # 它 `mktemp -d` 出来的路径传不回父进程——正是
 # `.claude/singlefs-ai-sop/rules/command-safety.md`「子 shell 里的赋值传不回父进程」那一条。
-# 实测后果：2026-08-29 清出 **154 个残留目录、4.5 GB**。
+# 不收的后果：每跑一轮残留一个目录，攒下来占几个 GB。
 # 修法沿用本脚本已有的指针文件模式：日志路径在 `$VM_LOGPTR` 里，工作目录是它的父目录。
 # 只删名字对得上 `singlefs-vmbench.*` 的那一个，删错目录的风险按模式挡住。
 # `VM_KEEP=1` 时保留，供失败后翻现场。
@@ -467,7 +467,7 @@ if [[ "$n" -ne "$declared" ]]; then
   exit 1
 fi
 # ⚠️ **屏蔽了 CPU 特性的那一档，必须自带已知答案测试。**
-# 2026-08-31 实测踩过：`-cpu host,-aes` 只摘掉 CPUID 的 `aes` 位，而 RustCrypto 的 `aes` 0.9.3
+# `-cpu host,-aes` 只摘掉 CPUID 的 `aes` 位，而 RustCrypto 的 `aes` 0.9.3
 # 还会去探 `vaes`（`src/lib.rs` 第 152–154 行）⇒ 来宾仍走 AES 指令，**跑得和没屏蔽一样快，
 # 而算出来的标签是错的**（tag=2112edc9… 而外部实现给 62d27233…）。
 # 那一档单看完全正常：吞吐合理、条数对得上、退出码 0 —— 只有拿外部实现算出的期望值比一比才看得见。

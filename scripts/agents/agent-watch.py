@@ -3,14 +3,11 @@
 # run-condition: none 只读仓里的文本（与它点名的会话记录），除了 python3 之外没有环境要求
 """子 agent 的定时监控：卡死、空转、永久等待当场报出来。任务（卡住、过长、内存、核数、判定行、排队、撞上限、显卡与异常结局）归 task-server 判、停，经 `task wait` 叫醒提交它的 agent；这里不读服务、不判任务、不停任务。
 
-为什么：2026-09-17 一个实验执行员把 `echo "exit=$?"` 打到标准输出、却在日志里 `until grep -q "^exit="`，
-等一行永远不会出现的字，主 agent 查进度才发现。经过：records/2026-09-17-已分配口径三方与两个实验.md 第六节。
-任务进程那一半原来也在这里（进程写的文件不涨与跑得过久、没经 task-server 跑的项目代码、常驻内存过线、在用核数过少、日志里的判红行、显卡坏了，以及读内存包装、
-multi-host-run.sh 写的告警记录）。用户 2026-10-31 定「任务监控以后让 task-server 做」：任务卡住只按「距这条任务的日志上一次增长满 10 分钟」由服务停掉、
-报错、经 `task wait` 叫醒提交它的 agent，远超记录用时、核数过少只写进服务的 `task status`；经过：records/2026-10-30-编译绕过内存总上限.md「收尾批」。
-这一份不再判那些，对应的告警、自证格、弄坏开关与配置键一并删了，不留兼容。
-后来加的盯任务服务那一半（起 control check 判服务通不通、读 task status 列没 clean 的编译目录与判本会话任务正不正常）同样删了：
-用户 2026-11-05 定「只删盯任务那一半」（任务系统自带提醒）；经过：records/2026-10-31-task-server巡检.md「待办现状（2026-11-04）」里「看门狗删掉盯任务服务那一半」一行。
+为什么：子 agent 会等一行永远不会出现的字（例：把 `echo "exit=$?"` 打到标准输出、却在日志里 `until grep -q "^exit="`），主 agent 查进度才发现；这里把它当场报出来。
+任务监控归 task-server：任务卡住只按「距这条任务的日志上一次增长满 10 分钟」由服务停掉、
+报错、经 `task wait` 叫醒提交它的 agent，远超记录用时、核数过少只写进服务的 `task status`。
+这一份不判任务进程（进程写的文件不涨与跑得过久、没经 task-server 跑的项目代码、常驻内存过线、在用核数过少、日志里的判红行、显卡坏了，以及读内存包装、
+multi-host-run.sh 写的告警记录），也不盯任务服务（起 control check 判服务通不通、读 task status 列没 clean 的编译目录与判本会话任务正不正常）：任务系统自带提醒。
 
 用法：
     agent-watch.py report --agents ID[,ID…]          # 看一眼：每个子 agent 的状态、最后一条命令、告警
@@ -22,8 +19,7 @@ multi-host-run.sh 写的告警记录）。用户 2026-10-31 定「任务监控�
     agent-watch.py --selftest                         # 造假的会话记录与假进程走一遍各种告警；AGENT_WATCH_BREAK=<项> 时必须判红
 
 主 agent 派发之后用 Bash 的 run_in_background 起 watch：它一退出，harness 就会叫醒主 agent。
-它看、它报，不停子 agent、不停进程：结束不结束、停不停由主 agent 看了报告定（用户 2026-09-17）。原来「进程卡住」类告警连报到阈值次没处置就经 proc.py stop 终止进程的做法
-（用户 2026-10-13 定）随进程告警一起删了：卡住的任务由 task-server 按日志停。
+它看、它报，不停子 agent、不停进程：结束不结束、停不停由主 agent 看了报告定；卡住的任务由 task-server 按日志停。
 退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
 带 --processes-only 时 0 是看门狗起的时候就在跑的那些进程都退出了（起的时候一个都没有也退 0，报告里写明是哪一种）。
 退出时出路句印的重起命令是 watch.sh 认得的写法（主 agent 经它起看门狗，它不认这里的 --agents / --processes-only）：盯点名的子 agent 印
@@ -44,14 +40,14 @@ AGENT_WATCH_BREAK=restarthint 印回这里自己的选项，自检里出路句�
 是活干到一半结束了本轮、没调交回工具。告警写结束本轮多久、最后一句话，出路给续做与重派两条：发消息让它接着做或交回；不回应的，
 `python3 scripts/agents/agent-handover.py --agent <agent 号> --out <交接摘要>` 抽交接摘要、新派一个同类 agent 接着做。
 报告里另起一节「中途停下没交回的子 agent」，被看的子 agent 里这一类几个、逐个一行（agent 号、类型、描述、最后一句、重派命令），一个都没有也写 0 个。
-起过后台任务、都完了而没东西叫醒的照旧报「结束本轮却不会醒」。弄坏开关 AGENT_WATCH_BREAK=midwaymerged 照改前并进「结束本轮却不会醒」、不出那一节。
+起过后台任务、都完了而没东西叫醒的照旧报「结束本轮却不会醒」。弄坏开关 AGENT_WATCH_BREAK=midwaymerged 把「中途停下没交回」并进「结束本轮却不会醒」、不出那一节。
 
 hook 的检出也在这里汇给主 agent：`.claude/hooks/bash-command-detector.sh` 执行前拒绝几种写法（列在它的文件头），其余只记不拦，把检出写进检出记录；
 watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出、叫醒主 agent。
 告警的下一步按检出记录的 outcome 一栏说：「被拒」是执行前已拒、没执行，「只记」是照常执行；没写这一栏的旧记录按发现的起头认（detection_outcome）。
 「被拒」的检出（钩子在执行前已经拒掉：写被拒、越出写范围、不经 task-server 跑项目代码被拒、认不出起什么的写法被拒……）与判不了的脚本（项目代码闸没判全）一样，
 只写进报告、不叫醒主 agent（.claude/main-agent.md「派出去之后」说的「记录不处置」那一类：拒绝信息与出路在它的工具结果里，主 agent 醒了没有可处置的）；
-叫醒的只有「只记」的、照常在跑的命令。2026-10-10、2026-10-11 被拒的命令让看门狗退出，主 agent 重起了十来次。弄坏开关 AGENT_WATCH_BREAK=refusedwakes。
+叫醒的只有「只记」的、照常在跑的命令；被拒的命令叫醒看门狗，主 agent 只会反复重起它。弄坏开关 AGENT_WATCH_BREAK=refusedwakes。
 钩子判不了而照常放行、往检出记录补一行的（findings 以「<闸>没判、照常放行」「<闸>没判全」「<脚本名>.sh 」「判不了 」这类起头，全表是 UNJUDGED_DETECTION_PREFIXES）同样只写进报告、不叫醒：
 判不了不是出了事，主 agent 醒了没有可处置的（.claude/main-agent.md「派出去之后」：钩子已经拒掉的事与判不了的检出只记进调度记录）。表里没有的新起头真碰到会叫醒，
 所以自证 selftest_unjudged_prefixes 从 .claude/hooks/ 的源码里抽出全部这类起头（名字以 PREFIX 收尾的常量、findings 那一行里的 f"<起头>：…"、入口自己记检出时的脚本名）与这张表比，
@@ -77,7 +73,7 @@ watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出
 「交回之后后台还在跑」：扫会话目录里全部子 agent（不只被看的那几个）。已交回、被停、或主会话记录里最近一次任务通知是
 failed / killed / stopped（stopped：上一个 Claude 进程退出时它还没跑完）的子 agent，它用 run_in_background 起过的后台任务的输出文件
 还有进程开着、而且它结束已过 --leftover-background-grace-minutes（交回那一刻最后一条完成通知可能还在路上），每个最上层的进程报一条，
---ack 进程:PID 确认。2026-09-24 查到两条交回之后丢下的 `until … do sleep` 跑了 5 个多小时，看门狗只盯没交回的，没人报。
+--ack 进程:PID 确认。交回之后丢下的 `until … do sleep` 会一直跑下去，只盯没交回的子 agent 就没人报它。
 被看的子 agent 全部交回时照旧退出，但退出前查一遍这一类；只剩宽限里的，等宽限过了再查一次才退。
 只认会话记录里写着输出文件路径的后台任务：命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程，与子 agent 之间没有可认的联系，这里认不出。
 交回那一刻由交回闸 .claude/hooks/handback-guard.sh ④ 拦（同一套认法，从这里导入 background_start_in_result 与 own_background_tasks_still_running）：
@@ -88,8 +84,8 @@ failed / killed / stopped（stopped：上一个 Claude 进程退出时它还没�
 那一格之后主 agent 给它发过消息就算问过了、这一格不再报：看门狗每次起都从头读，按「那一格之后有没有消息」判才做得到每个整点只报一次。
 主 agent 的消息取两处里晚的那个：子 agent 会话记录里送达的（origin 为 coordinator 的消息，或忙时排进队、附件自己带 origin coordinator 的
 queued_command），与主会话记录里 SendMessage 发给它的成功结果（忙着跑一条长工具调用的子 agent，消息要等它下一轮才落进它自己的会话记录）。
---ack <agent 号>:跑满 N 小时 只确认那一格，下一格照报。2026-09-24 几个子 agent 结束本轮去等后台任务、一等两个多小时，
-主 agent 发了一条消息它们当场醒来、很快交回；看门狗只在后台任务全结束、通知没到时报「结束本轮却不会醒」，等的还开着就不报。
+--ack <agent 号>:跑满 N 小时 只确认那一格，下一格照报。子 agent 结束本轮去等后台任务、一等很久的，
+主 agent 发一条消息它就当场醒来；看门狗只在后台任务全结束、通知没到时报「结束本轮却不会醒」，等的还开着就不报。
 
 --ack 的写法（可给多次；watch.sh 也认逗号连写，逗号后面接「进程:」「类:」或「<agent 号>:」才算下一条）：
   进程:<pid>               确认那一个进程的告警（「交回之后后台还在跑」报进程号的）
@@ -104,7 +100,6 @@ queued_command），与主会话记录里 SendMessage 发给它的成功结果�
 （上游交回闸 handback-scratch-check.sh 要子 agent 写的就是这一行），而那个路径还在的，每处报一条，交主 agent 核过没人在用之后删。
 只认落在工作根、/tmp（会话临时目录根 /tmp/claude-<uid> 在内）与本进程临时目录底下的路径（仓副本与编译目录只建在那里）；交回不到阈值的、已经删掉的、没交回的不报；
 --ack <agent 号>:交回之后副本还在 确认（条件类，路径都删了就作废）。只报不删。会话记录按大小与修改时刻缓存，没变就不重读。
-2026-10-10 草稿根下攒了 292 个交回后没删的仓副本与编译目录（records/2026-09-16-subagent拆分提案.md 第六十八节）。
 
 「草稿根里超阈值的编译目录与仓副本」：被看的子 agent 里有交回（或被停）的，报告里带一节：工作根整个、会话临时目录根 /tmp/claude-<uid> 下只看本会话的那一份（<会话临时目录根>/<项目>/<会话号>，Claude Code 的 scratchpad 在里面）里，
 编译目录（目录里有签名对得上的 CACHEDIR.TAG）与仓副本（有 .git，或同时有 Cargo.toml 与 crates/）最后修改距今超过 --scratch-idle-hours（默认 6，watch.conf 里写着，依据是推的）的，
@@ -120,8 +115,7 @@ runs/ 下的各运行目录，以 du 为准，大的先看；只删没有进程�
 条件类告警：--ack 类:根分区余量过低 确认之后只进报告，可用量回到阈值以上这条确认就作废；只报不删、不终止。写 0 不查。
 经 watch.sh 起只认类:这一种写法（它不认「本机:」这个头）；直接调 agent-watch.py 时 --ack 本机:根分区余量过低 同样认。
 可用量的读法换得掉：root_free_report 收一个读可用字节数的函数（自证传假的）；环境变量 AGENT_WATCH_ROOT_FREE_BYTES 设了就当可用字节数、不读 statvfs（只给 --selftest 起的看门狗子进程用）。
-2026-10-22 本机根分区写满、只剩 113M，是写文件撞上 No space left on device 才发现的，看门狗只报草稿根里闲置的编译目录、不看余量
-（records/2026-10-13-里程碑四预开发.md 第 951 行）。弄坏开关 AGENT_WATCH_BREAK=rootfree。
+不看余量的话，根分区写满只会在写文件撞上 No space left on device 时才发现。弄坏开关 AGENT_WATCH_BREAK=rootfree。
 
 「重启前旧进程留下的记录判已失效」：每次整查读 ~/.claude/sessions/<pid>.json（Claude Code 给每个进程登记的会话号、启动时刻与 procStart，pid 还在而且 /proc/<pid>/stat 第 22 列对得上才算活着），
 没交回的子 agent 记录有一种算已失效：一、它所在的会话号不是本会话（--session-dir 的目录名，没给取 CLAUDE_CODE_SESSION_ID）、登记里也没有活着的 Claude 进程；
@@ -142,13 +136,13 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
   AGENT_WATCH_BREAK=acksneverpruned  pruned_acks() 不作废条件已经不在的确认，全部留着
       selftest_session_watch_in（「✗ 自检：条件类告警的确认」）
       selftest_ack_scopes（「✗ 自检：记进状态目录的 类: 确认应当在告警还在时留着」）
-  AGENT_WATCH_BREAK=acksunlocked  update_acks() 读改写 watch-acks.tsv 不拿 watch-acks.lock 的 flock（改前的样子）
+  AGENT_WATCH_BREAK=acksunlocked  update_acks() 读改写 watch-acks.tsv 不拿 watch-acks.lock 的 flock
       selftest_ack_concurrency（「✗ 自检：watch-acks.tsv 两只同时写」）
   AGENT_WATCH_BREAK=acksnotpersisted  read_acks() 不读状态目录里记下的确认
       selftest_session_watch_in（「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」、「✗ 自检：已有一个在盯时给的 --ack 应当记进状态目录」、
       「✗ 自检：条件类告警的确认」）、
       selftest_ack_concurrency（「✗ 自检：watch-acks.tsv 两只同时写」）
-  AGENT_WATCH_BREAK=amplificationhome  crash_amplification_home() 没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时照改前取家目录下那一份
+  AGENT_WATCH_BREAK=amplificationhome  crash_amplification_home() 没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时取家目录下那一份
       selftest_root_free（「✗ 自检：没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时崩溃放量家目录应当是工作根下的 crash-amplification」）
   AGENT_WATCH_BREAK=backgroundwait  waiting_on_its_own_background_tasks() 一律交 False，结束本轮在等自己后台任务的也报「无动静」
       selftest_in（「✗ 自检：子 agent waitinglong」、「✗ 自检：子 agent textsettled」、「✗ 自检：子 agent stopsequence」、「✗ 自检：前台命令超时被挪进后台」）、
@@ -229,11 +223,11 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
       selftest_in（「✗ 自检：子 agent inquirydeliveredafter」、「✗ 自检：子 agent inquiryqueuedafter」）
   AGENT_WATCH_BREAK=inquiryended  routine_inquiry_alert() 不看主会话里的任务通知，已结束（failed / killed / stopped）的也报
       selftest_in（「✗ 自检：子 agent inquiryfailed」）
-  AGENT_WATCH_BREAK=inquiryreset  routine_inquiry_alert() 从主 agent 上一次消息起重新计时（改前的判法）
+  AGENT_WATCH_BREAK=inquiryreset  routine_inquiry_alert() 从主 agent 上一次消息起重新计时
       selftest_in（「✗ 自检：子 agent inquirymessagebefore」）
   AGENT_WATCH_BREAK=inquirysent  AgentTranscript.last_main_agent_message_timestamp() 不读主会话记录里 SendMessage 的成功结果
       selftest_in（「✗ 自检：子 agent inquirysentafter」）
-  AGENT_WATCH_BREAK=staleselftestscratch  remove_stale_selftest_scratch() 一个都不删（改前的样子：自证被 SIGKILL 打断留下的 agent-watch-selftest-scratch-* 一直留着）
+  AGENT_WATCH_BREAK=staleselftestscratch  remove_stale_selftest_scratch() 一个都不删（自证被 SIGKILL 打断留下的 agent-watch-selftest-scratch-* 一直留着）
       selftest_stale_scratch_cleanup（「✗ 自检：被杀的自证留下的 agent-watch-selftest-scratch-*」）
   AGENT_WATCH_BREAK=keepscratch  selftest() 的临时目录走回 mkdtemp 不删
       通过那条路（「✗ 自检：通过那条路上临时目录没删」）、red 那条路（「✗ 自检：red 那条路上临时目录没删」）、crash 那条路（「✗ 自检：crash 那条路上临时目录没删」）
@@ -258,7 +252,7 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
       selftest_in（「✗ 自检：子 agent waitloop」、「✗ 自检：只有「等待循环」这类只记不叫醒的告警时」）
   AGENT_WATCH_BREAK=loopnoise  read_detections() 只有「没有 timeout 的等待循环」的检出也叫醒
       selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner healthy」」）
-  AGENT_WATCH_BREAK=midwaymerged  agent_alerts() 把没起过后台任务、结束本轮没交回的照改前报成「结束本轮却不会醒」，run() 不出「中途停下没交回的子 agent」一节
+  AGENT_WATCH_BREAK=midwaymerged  agent_alerts() 把没起过后台任务、结束本轮没交回的也报成「结束本轮却不会醒」，run() 不出「中途停下没交回的子 agent」一节
       selftest_in（「✗ 自检：子 agent queuedresume」、「✗ 自检：子 agent inquiryfailed」、「✗ 自检：子 agent midway：应当告警 ['中途停下没交回']」、『✗ 自检：报告里应当另起一节『中途停下没交回的子 agent』』）
       「✗ 自检：报告里应当另起一节「中途停下没交回的子 agent：被看的 3 个里 2 个」」
       「✗ 自检：子 agent textthenended」
@@ -282,7 +276,7 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
       selftest_in（「✗ 自检：检出记录属于「session」「主 agent None」」）
   AGENT_WATCH_BREAK=processexit  run_processes_only() 盯的进程都退出了也不退
       selftest_in（「✗ 自检：--processes-only 盯着的进程退出了」、「✗ 自检：--processes-only 起的时候一个要盯的进程都没有」）
-  AGENT_WATCH_BREAK=progressanypath  progress_file_of() 照改前的取法：派发提示里点名的工作根或会话临时目录根下的路径都算候选、取改得最晚的那一份，不只认行首「草稿目录：」那一行
+  AGENT_WATCH_BREAK=progressanypath  progress_file_of() 放宽取法：派发提示里点名的工作根或会话临时目录根下的路径都算候选、取改得最晚的那一份，不只认行首「草稿目录：」那一行
       selftest_scratch_mentions（「✗ 自检：派发提示有本提示的草稿目录一行、另叫它先读别的子 agent 的报告…」、「✗ 自检：派发提示没有行首「草稿目录：」一行、只点名别的子 agent 的报告…」、
       「✗ 自检：派发提示没有行首「草稿目录：」一行时，告警里附的一句应当写取不到 progress.md…」、「✗ 自检：派发提示点名会话临时目录根下的草稿目录不认」）
   AGENT_WATCH_BREAK=progressnote  progress_note() 告警里不附 progress.md 的末几行
@@ -304,7 +298,7 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
       「✗ 自检：报告里应当另起一节「中途停下没交回的子 agent：被看的 3 个里 2 个」」
   AGENT_WATCH_BREAK=resumeturn  AgentTranscript._read() 结束本轮之后来的续做消息不算被叫醒
       selftest_in（「✗ 自检：子 agent resumedafterturnend」、「✗ 自检：子 agent resumedafterturnend 的状态应当是「思考中」」）
-  AGENT_WATCH_BREAK=rootfree  root_free_report() 不看余量（改前的样子），根分区可用量低于 --root-free-gib-alert 也不报
+  AGENT_WATCH_BREAK=rootfree  root_free_report() 不看余量，根分区可用量低于 --root-free-gib-alert 也不报
       selftest_root_free（「✗ 自检：根分区可用 40 GiB、阈值 128 GiB 时应当报」、「✗ 自检：根分区可用量应当只读一次」、「✗ 自检：根分区可用 500 GiB、阈值 128 GiB 时不该报」、
       「✗ 自检：看门狗 report 在根分区可用 40 GiB 时」、「✗ 自检：根分区余量过低被 --ack 本机:根分区余量过低 确认之后」、「✗ 自检：看门狗 report 在根分区可用 500 GiB 时」、
       「✗ 自检：--processes-only 的 report 在根分区可用 40 GiB 时」）
@@ -324,7 +318,7 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
   AGENT_WATCH_BREAK=settle  AgentTranscript._read() 最后一条是纯文字、stop_reason 为空的一概不判结束本轮（主会话记录里有这一轮的任务通知、主会话记录不在而过了 TEXT_SETTLE_SECONDS 都不认）
       selftest_in（「✗ 自检：子 agent textsettled」、「✗ 自检：子 agent inquiryfailed」、「✗ 自检：子 agent textsettled 的状态应当是「本轮结束、没交回」」、
       「✗ 自检：子 agent textthenended」、「✗ 自检：子 agent textthenended 的状态应当是「本轮结束、没交回」」、「✗ 自检：子 agent noparenttext 的状态应当是「本轮结束、没交回」」）
-  AGENT_WATCH_BREAK=settlenotification  AgentTranscript.text_turn_ended() 不看主会话记录里的任务通知，纯文字记录过了 TEXT_SETTLE_SECONDS 就判结束本轮（改前的判法）
+  AGENT_WATCH_BREAK=settlenotification  AgentTranscript.text_turn_ended() 不看主会话记录里的任务通知，纯文字记录过了 TEXT_SETTLE_SECONDS 就判结束本轮
       selftest_in（「✗ 自检：子 agent textthenwrite」、「✗ 自检：子 agent textthenwrite 的状态应当是「思考中」」）
   AGENT_WATCH_BREAK=stalepending  AgentTranscript._read() 不剔掉只落了发起、等不到结果的工具调用
       selftest_in（「✗ 自检：子 agent stalependingthenresult：应当告警 无，实际 ['工具调用过长']」）
@@ -343,23 +337,23 @@ selftest_root_free、selftest_ack_concurrency、selftest_unjudged_prefixes、sel
       selftest_in（「✗ 自检：子 agent toolafterhandback」、「✗ 自检：子 agent toolafterhandback 应当算交回或被停」）
   AGENT_WATCH_BREAK=zombie  still_running() 把僵尸当还在跑
       selftest_in（「✗ 自检：--processes-only 盯着的进程退出了」）
-  AGENT_WATCH_BREAK=ackscope  ack_scope_keys() 一个键都不认：--ack 类:<告警名> 不起作用（改前的样子：只能按进程号、按 agent 号逐个确认）
+  AGENT_WATCH_BREAK=ackscope  ack_scope_keys() 一个键都不认：--ack 类:<告警名> 不起作用（只能按进程号、按 agent 号逐个确认）
       selftest_ack_scopes（「✗ 自检：--ack 类:根分区余量过低 应当只确认告警」、「✗ 自检：--ack 类:交回之后后台还在跑 应当只确认告警」、「✗ 自检：记进状态目录的 类: 确认应当在告警还在时留着」）
   AGENT_WATCH_BREAK=ackscopepersist  alert_keys() 不带 类: 这种键：记进状态目录的类确认在下一次整查被当成条件已消失而作废
       selftest_ack_scopes（「✗ 自检：记进状态目录的 类: 确认应当在告警还在时留着」）
-  AGENT_WATCH_BREAK=unjudgedwakes  INFO_DETECTION_PREFIXES 不含 UNJUDGED_DETECTION_PREFIXES：钩子判不了而照常放行记下的检出真碰到都叫醒（改前的样子）
+  AGENT_WATCH_BREAK=unjudgedwakes  INFO_DETECTION_PREFIXES 不含 UNJUDGED_DETECTION_PREFIXES：钩子判不了而照常放行记下的检出真碰到都叫醒
       selftest_unjudged_prefixes（「✗ 自检：钩子源码里记检出用的」、「✗ 自检：UNJUDGED_DETECTION_PREFIXES 里」）
 工作根（草稿目录、检出记录与状态目录的默认位置）与会话临时目录根只在 .claude/hooks/lib_work_root.py 里定义，它的两个弄坏开关：
   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown  工作根退回会话临时目录根：派发提示里工作根下的草稿目录认不出
       selftest_scratch_mentions（「✗ 自检：派发提示点名工作根下的草稿目录」两格、「✗ 自检：派发提示点名会话临时目录根下的草稿目录不认」（工作根就是会话临时目录根，那边的目录认得出了）、「✗ 自检：派发提示有本提示的草稿目录一行、另叫它先读别的子 agent 的报告…」）、
       selftest_session_watch_in（「✗ 自检：子 agent progressstale」、「✗ 自检：整点询问应当附上 progress.md 的末几行」）、
-  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  草稿根另认会话临时目录根（撤掉之前的放行）：派发提示里会话临时目录根下的草稿目录认得出
+  SINGLEFS_WORK_ROOT_BREAK=legacy-root-accepted  草稿根另认会话临时目录根：派发提示里会话临时目录根下的草稿目录认得出
       selftest_scratch_mentions（「✗ 自检：派发提示点名会话临时目录根下的草稿目录不认」）
 「交回」送没送达只在同目录 subagent_transcript.py 里认，它的开关（开关表在它的文件头）：
   SUBAGENT_TRANSCRIPT_BREAK=refused-counts-delivered  被交回闸拒的交回也算送达
       selftest_in（「✗ 自检：子 agent refusedonly 应当不算交回或被停」）
 会话记录目录（<家目录>/.claude/projects）只在同目录 lib_session_directory.py 里取（统一任务服务给的来源仓根 TASK_SERVER_SOURCE_REPOSITORY 定家目录，不经 $HOME），它的开关（开关表在它的文件头）：
-  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取 HOME
+  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也仍取 HOME
       selftest_projects_root（「✗ 自检：按 id 找会话记录取来源仓根的会话目录：」）
 """
 import argparse
@@ -422,12 +416,11 @@ def command_without_heredoc_bodies(command):
 
 STOP_AFTER_LAST_RECORD_SECONDS = 30  # 停在工具中途时，被停之后还可能落几条收尾记录
 NO_WAKE_GRACE_SECONDS = 60           # 结束本轮之后，完成通知可能还在路上
-TURN_END_STOP_REASONS = ("end_turn", "stop_sequence")   # 会话记录里结束本轮的两种写法（2026-09-19 实测两种都有）
+TURN_END_STOP_REASONS = ("end_turn", "stop_sequence")   # 会话记录里结束本轮的两种写法
 TEXT_SETTLE_SECONDS = 120            # 最后一条是纯文字、stop_reason 为空而主会话记录不在时：过了这么久没接下文就算结束本轮（AgentTranscript.text_turn_ended）
 CPU_SAMPLE_SECONDS = 2               # 子 agent 在等的后台任务，隔这么久取两次 CPU 时间，报此刻占几个核（background_task_processes）
 BACKGROUND_STARTED = re.compile(r"^Command running in background with ID: (\w+)")
 # 前台命令跑满超时被 harness 挪进后台，工具结果是另一种写法，之后同样会来完成通知。不认它，在等这种任务的子 agent 会被报「结束本轮却不会醒」
-# （2026-09-23 门禁审计会话的 ac26abd494cda0968：doc-lint 超时转后台，看门狗报「起过的 0 个后台任务」；本机这个项目的子 agent 会话记录里 79 份有这种写法）。
 BACKGROUND_MOVED = re.compile(r"^Command did not complete within its \d+s timeout and was moved to the background \(ID: (\w+)\)")
 NEW_INSTRUCTION_ORIGINS = ("coordinator", "peer")   # 续做消息与别的会话发来的消息；task-notification 是自己后台任务的完成通知，不算
 BACKGROUND_OUTPUT_PATH = re.compile(r"Output is being written to: (\S+?\.output)")
@@ -472,7 +465,7 @@ ROUTINE_INQUIRY_ALERT_PREFIX = "跑满 "
 ROUTINE_INQUIRY_ALERT_SUFFIX = "要主 agent 问一次"
 ROUTINE_INQUIRY_NEXT_STEP = ("主 agent 给它发一条例行询问，并写明「把回答写进它草稿目录的 progress.md」（在做什么、还差几步、在等哪个进程、预计多久；"
                              "等的已经结束就接着做或交回），发完再起看门狗")
-# 主会话记录里 SendMessage 发给子 agent 的成功结果的两种写法（2026-09-24 查本机这个项目的主会话记录：157 条排队、另有续做的「Resuming agent」），
+# 主会话记录里 SendMessage 发给子 agent 的成功结果的两种写法（排队的，与续做的「Resuming agent」），
 # 都带 pin，续做的另带 resumedAgentId；发给别的会话的写法不同，不认
 MAIN_AGENT_MESSAGE_QUEUED = "Message queued for delivery to "
 MAIN_AGENT_MESSAGE_RESUMED = "resumedAgentId"
@@ -494,17 +487,17 @@ HANDOVER_TOP_OUTPUTS_SHOWN = 3
 PROGRESS_FILE_NAME = "progress.md"
 PROGRESS_STALE_ALERT = "进度文件不涨"
 PROGRESS_TAIL_LINES = 3
-# 提示里点名的工作根下的路径：只给弄坏开关 progressanypath 照改前的取法用（平常只认行首「草稿目录：」那一行，progress_file_of）
+# 提示里点名的工作根下的路径：只给弄坏开关 progressanypath 的宽松取法用（平常只认行首「草稿目录：」那一行，progress_file_of）
 SCRATCH_PATH_MENTION = re.compile(work_roots.mention_prefix_pattern() + r"[^\s`'\"，。；：、（）()「」<>]+")
 # 一个会话一个看门狗（--discover）：锁、确认过的告警与见过没结束的子 agent 都放在这个会话的状态目录里
 STATE_ROOT_VARIABLE = "AGENT_WATCH_STATE_ROOT"   # 环境变量只给 --selftest 换成临时的状态目录
 STATE_ROOT = os.environ.get(STATE_ROOT_VARIABLE) or work_roots.state_directory("watch-state")
 SINGLE_INSTANCE_EXIT = 5
-# 钩子已经拒掉的写与判不了的脚本：只记进报告，不叫醒主 agent（2026-09-28 量到 8 天里看门狗转报的检出大半是这两类，主 agent 醒了也没事可做）
+# 钩子已经拒掉的写与判不了的脚本：只记进报告，不叫醒主 agent（主 agent 醒了也没事可做）
 # 钩子判不了而照常放行、往检出记录补一行（「放行但必记检出」，.claude/agent-common.md「不做」一节）的 findings 起头：同样只记不叫醒——
 # 判不了的事主 agent 醒了没有可处置的（.claude/main-agent.md「派出去之后」：钩子已经拒掉的事与判不了的检出只记进调度记录）。
 # 钩子里加了新的这类起头而没登进这一张表，自证 selftest_unjudged_prefixes 判红（它从 .claude/hooks/ 的源码里抽出全部这类起头与这张表比）。
-# 弄坏开关 unjudgedwakes 去掉这一组（改前的样子：这些检出真碰到都叫醒）
+# 弄坏开关 unjudgedwakes 去掉这一组（这些检出真碰到都叫醒）
 UNJUDGED_DETECTION_PREFIXES = (
     "开会话提示没判、照常放行", "资源提醒没判、照常放行", "弹窗闸没判、照常放行", "定时闸没判、照常放行",
     "完工清理闸没判全、照常放行", "完工清理闸没判、照常放行", "交回正文闸没判全、照常放行", "派发闸没判全、照常放行",
@@ -513,7 +506,7 @@ UNJUDGED_DETECTION_PREFIXES = (
     "bash-command-detector.sh ", "run-scope-guard.sh ", "two-logs-guard.sh ", "判不了 ",
     "project-code-guard.sh 没判成", "项目代码闸没判全")
 INFO_DETECTION_PREFIXES = ("写被拒", "项目代码闸没判全") + (() if BROKEN_DETECTION == "unjudgedwakes" else UNJUDGED_DETECTION_PREFIXES)
-# 只记进报告、不叫醒主 agent 的三类条件告警（2026-09-28 量到 8 天里看门狗按告警退出 533 次，这三类醒来多半只是重起一只）
+# 只记进报告、不叫醒主 agent 的三类条件告警（这三类醒来多半只是重起一只）
 INFO_ALERT_NAMES = {"等待循环", "同一命令反复且输出不变", PROGRESS_STALE_ALERT}
 EVENT_ALERT_NAMES = {"hook 检出"}   # 事件类告警：确认之后到那个子 agent 结束都不再叫醒；别的是条件类，条件消失就作废
 
@@ -756,8 +749,7 @@ class AgentTranscript:
                             if block.get("name") == "Bash":
                                 self.bash_commands.append([timestamp, tool_input.get("command", ""), None, block.get("id")])
                             # 交回之后它自己再调工具不撤销交回，撤销只认新指令：交回之后被自己后台任务的完成通知叫醒、看一眼输出再结束本轮的，
-                            # 按调工具撤销会被判成没交回、报「结束本轮却不会醒」（2026-09-23 门禁审计会话的 ac26abd494cda0968：交回、结束本轮、
-                            # 超时转后台的 doc-lint 的完成通知进来、grep 一次输出、结束本轮）。
+                            # 按调工具撤销会被判成没交回、报「结束本轮却不会醒」。
                             if block.get("name") != transcripts.HANDBACK_TOOL and BROKEN_DETECTION == "toolrevoke":
                                 is_handed_back = False
                             last_kind = "tool_use"
@@ -795,20 +787,19 @@ class AgentTranscript:
                     last_kind = "interrupted"
                     self.interrupted_timestamp = timestamp
                 # 结束本轮之后来的续做消息：它被叫醒了，在想下一步，不再是「结束本轮」——不改的话续做头几秒它还没落下新记录，
-                # 看门狗照上一轮的结束时刻报「结束本轮却不会醒」（2026-09-19 E155 执行员续派第二段，最后动作 4 秒前就被报了）。
+                # 看门狗照上一轮的结束时刻报「结束本轮却不会醒」。
                 if (record.get("origin") or {}).get("kind") == "coordinator" and BROKEN_DETECTION != "resumeturn":
                     last_kind = "resumed"
         # 一次工具调用只有在「它之后再没有别的记录」时才算还在跑。断网 / 被停时砍掉的那一次调用
-        # 只落了发起、永远等不到结果，旧写法会一直把它当成在跑，于是「工具调用过长」每一轮都假报一次
-        # （2026-09-22 实测：三条腿被断网停掉、续做之后又调了 5 次，看门狗照旧报那条已死的 Bash 跑了 10 分 55 秒）。
+        # 只落了发起、永远等不到结果，一直当成在跑会让「工具调用过长」每一轮都假报一次。
         if BROKEN_DETECTION != "stalepending" and self.last_timestamp is not None:
             pending_by_id = {
                 key: item for key, item in pending_by_id.items() if item[0] >= self.last_timestamp
             }
         self.pending_tool = max(pending_by_id.values(), key=lambda item: item[0]) if pending_by_id else None
         # 最后一条是纯文字、stop_reason 为空：流式写入时同一条消息后面还会接工具调用，一次 Write 整份生成能隔几分钟才落下来；
-        # 结束本轮了的认主会话记录里的任务通知（text_turn_ended。2026-09-19 c381-r1 攻方腿写一句「等 phase B」就等后台任务，
-        # 最后两条记录 stop_reason 都是空的，看门狗判成「思考中」，12 分钟后报「无动静」）。
+        # 结束本轮了的认主会话记录里的任务通知（text_turn_ended）：写一句文字就等后台任务的，
+        # 最后两条记录 stop_reason 都是空的，不认通知会判成「思考中」、过一阵报「无动静」。
         if (last_kind == "text" and last_text_timestamp is not None and BROKEN_DETECTION != "settle"
                 and self.text_turn_ended(last_text_timestamp)):
             last_kind = "end_turn"
@@ -831,7 +822,7 @@ class AgentTranscript:
     def text_turn_ended(self, text_timestamp):
         """最后一条是纯文字、stop_reason 为空时，这一轮结束了没有：主会话记录里这个子 agent 的任务通知（completed，或 failed / killed / stopped）
         不早于这条文字才算。只按时长认，文字之后一次 Write 生成几分钟的会被当成结束本轮、报「中途停下没交回」（records/2026-10-23-subagent拆分提案.md
-        第三十五节）。主会话记录不在时退回按时长认：过了 TEXT_SETTLE_SECONDS 没接下文算结束。弄坏开关 settlenotification 退回改前只按时长认。"""
+        第三十五节）。主会话记录不在时退回按时长认：过了 TEXT_SETTLE_SECONDS 没接下文算结束。弄坏开关 settlenotification 只按时长认。"""
         parent_path = parent_session_transcript(self.transcript_path)
         if BROKEN_DETECTION == "settlenotification" or not os.path.isfile(parent_path):
             return (datetime.now(timezone.utc) - text_timestamp).total_seconds() >= TEXT_SETTLE_SECONDS
@@ -863,7 +854,7 @@ class AgentTranscript:
 
     def orphaned_background_tasks(self):
         """起过、没收到完成通知，而 harness 写它输出的那个文件还在、却没有任何进程开着它：进程已经没了，通知不会再来。
-        2026-09-19 c381-r1 攻方腿失败中断，失败之前起的探针任务就停在这个样子，看门狗一直把它当「还在跑」。
+        子 agent 失败中断时，失败之前起的探针任务就停在这个样子，不判的话看门狗一直把它当「还在跑」。
         输出文件路径不知道、或文件不在的，判不了，照旧算还在跑。"""
         if BROKEN_DETECTION == "orphan":
             return []
@@ -880,7 +871,7 @@ class AgentTranscript:
 
     def waiting_on_its_own_background_tasks(self):
         """结束本轮、没交回，手里还有没收到完成通知的后台任务：它在等，会话记录里本来就一个字都不写，醒不醒由那些任务决定，
-        不按会话记录的「无动静」判——2026-09-19 c381-r1 攻方腿等两个吃满 CPU 的探针，看门狗每次重起都当场报「无动静」退出，盯不住。"""
+        不按会话记录的「无动静」判——等吃满 CPU 的探针时，看门狗每次重起都会当场报「无动静」退出，盯不住。"""
         if BROKEN_DETECTION == "backgroundwait":
             return False
         return self.state == "本轮结束、没交回" and bool(self.effectively_live_background_tasks())
@@ -1341,7 +1332,7 @@ def root_free_bytes(path):
 
 def crash_amplification_home(environment=None):
     """崩溃放量家目录（文件头「根分区余量过低」）：SINGLEFS_CRASH_AMPLIFICATION_HOME 设了用它，没设是工作根下的 crash-amplification（共享根里、两台同一份）。
-    environment 不给取 os.environ。弄坏开关 amplificationhome：没设时照改前取家目录下那一份。"""
+    environment 不给取 os.environ。弄坏开关 amplificationhome：没设时取家目录下那一份。"""
     environment = os.environ if environment is None else environment
     configured = environment.get(CRASH_AMPLIFICATION_HOME_VARIABLE, "")
     if configured:
@@ -1353,7 +1344,7 @@ def crash_amplification_home(environment=None):
 
 def root_free_report(thresholds, free_bytes_of=root_free_bytes):
     """根分区（工作根所在的文件系统）的可用量：返回 (报告行, [(告警名, 说明, 下一步)])，低于 --root-free-gib-alert 报「根分区余量过低」。
-    free_bytes_of 是读可用字节数的函数（收路径），自证传假的。弄坏开关 rootfree：不看余量、一条都不报（改前的样子）。"""
+    free_bytes_of 是读可用字节数的函数（收路径），自证传假的。弄坏开关 rootfree：不看余量、一条都不报。"""
     threshold = getattr(thresholds, "root_free_gib_alert", ROOT_FREE_GIB_ALERT_DEFAULT)
     if threshold <= 0:
         return ["根分区余量：--root-free-gib-alert 写的是 0，这一类没查"], []
@@ -1478,7 +1469,7 @@ def readable_mtime(path):
 def progress_file_of(transcript):
     """本提示草稿目录（own_scratch_directories）下的 progress.md，几行点名几个目录的取改得最晚的那一份；没有那一行、或那几个目录下都没有，返回 None，
     不到提示里点名的别处（别的子 agent 的报告、目录）去找。
-    弄坏开关 progressanypath 下照改前的取法：提示里点名的工作根或会话临时目录根下的路径都算候选（是 progress.md 就是它，是目录取目录下的，是文件取同目录的）。"""
+    弄坏开关 progressanypath 下取法放宽：提示里点名的工作根或会话临时目录根下的路径都算候选（是 progress.md 就是它，是目录取目录下的，是文件取同目录的）。"""
     if BROKEN_DETECTION == "progressanypath":
         candidates = set()
         for mention in SCRATCH_PATH_MENTION.findall(transcript.dispatch_prompt or ""):
@@ -1586,9 +1577,7 @@ def agent_alerts(transcript, now, thresholds):
         alerts.append(("无动静", f"最后一条记录在 {format_duration((now - transcript.last_timestamp).total_seconds())} 以前，没有工具在跑",
                        "主 agent 判断：模型调用是不是卡住或失败；看会话记录最后几条，再决定等、发消息续做、还是停掉重派"))
     # 上下文越过一条线：每次调用都要把整段上下文从缓存再读一遍，一旦隔久了还要整份重写，越往后每一步越贵，逼近窗口上限还会被迫压缩。
-    # 2026-09-19 实测：同一个执行员被续派三次（第一段、补判、第二段），上下文涨到 95 万，平均每次调用 62.6 万、累计读缓存 2.36 亿，
-    # 真正的输出只有 2.9 万——没有任何告警，是用户问起才看见的。
-    # 这条只叫主 agent 来看，不是停的理由（用户同日：「不应该限制 280K……应该告诉主 agent 看看任务是不是异常，如果不是就继续跑」）。
+    # 这条只叫主 agent 来看，不是停的理由：主 agent 看任务是不是异常，不是就继续跑。
     # 只对实现员与执行员报「该交接」，别的类型不报；线写 0 不报（子 agent 上下文多大都不交回）
     if (BROKEN_DETECTION != "context" and (thresholds.context_tokens > 0 or BROKEN_DETECTION == "contextzero")
             and transcript.last_context_tokens >= thresholds.context_tokens
@@ -1638,7 +1627,7 @@ def agent_alerts(transcript, now, thresholds):
 
 def background_task_processes(transcript):
     """子 agent 在等的后台任务：开着它输出文件的最上层进程，连同子孙进程跑了多久、累计用了多少 CPU、最新的子孙进程多久前起的。
-    2026-09-19：批次脚本一轮轮起一分钟的探针，按进程跑了多久列的那一节一个都不够格，那一节根本不出现，主 agent 只好自己去翻 ps；
+    批次脚本一轮轮起一分钟的探针时，按进程跑了多久列的那一节一个都不够格、根本不出现，主 agent 只好自己去翻 ps；
     所以这里按开着输出文件认，不按进程跑了多久认。"""
     if BROKEN_DETECTION == "holders":
         return []
@@ -1684,7 +1673,6 @@ def background_task_processes(transcript):
         return total
 
     # 报「此刻占几个核」（隔 CPU_SAMPLE_SECONDS 取两次样），不报累计 CPU：累计量读起来像跑了很久或重跑过，
-    # 用户 2026-09-19 看到「累计 11 小时 CPU」以为是重跑的，并明说累计没有意义。
     tops = sorted(pid for pid in holders if table[pid]["parent"] not in holders)
     subtrees = {top: subtree_of(top) for top in tops}
     first_sample = {top: cpu_ticks_of(subtrees[top]) for top in tops}
@@ -1997,14 +1985,14 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
                 continue
             if (watched_agent_ids and entry.get("agent_id") and entry.get("agent_id") not in watched_agent_ids
                     and BROKEN_DETECTION != "otheragent"):
-                continue   # 同一会话里别的子 agent 的检出归盯它的那个看门狗（2026-09-19：盯攻方腿的看门狗被上游那个 agent 的检出叫醒）
+                continue   # 同一会话里别的子 agent 的检出归盯它的那个看门狗
             findings = [str(finding) for finding in (entry.get("findings") or [])]
             if findings and all(finding.startswith("没有 timeout 的等待循环") for finding in findings) and BROKEN_DETECTION != "loopnoise":
                 # 只检出等待循环的不立刻叫醒：正常等编译、等全量跑也是这个形状。会话记录那一路在它跑满 --wait-loop-minutes 时再报。
                 continue
             refused = any(finding.startswith("写被拒") for finding in findings)
             if entry.get("agent_type") == "主 agent" and refused and BROKEN_DETECTION != "ownrefusal":
-                # 主 agent 自己的写被拒：拒绝信息已经在它的工具结果里，再叫醒一次只是打断（2026-09-19 一晚上被自己被拒的命令叫醒两次）。
+                # 主 agent 自己的写被拒：拒绝信息已经在它的工具结果里，再叫醒一次只是打断。
                 # 按模式找进程由上游钩子在执行前拒绝，不写检出记录，这里读不到它。
                 notes.append(f"主 agent 自己的命令被 hook 拒了（不叫醒，拒绝信息在它的工具结果里）：{(entry.get('command') or '')[:120]}")
                 continue
@@ -2014,7 +2002,7 @@ def read_detections(detections_path, start_offset, session_ids, watched_agent_id
                 continue
             if findings and detection_outcome(entry) == DETECTION_REFUSED and BROKEN_DETECTION != "refusedwakes":
                 # 钩子在执行前已经拒掉的命令（不经 task-server 跑项目代码被拒、认不出起什么的写法被拒……）：没有执行，拒绝信息与出路在它的工具结果里，
-                # 主 agent 醒了也没有可处置的；只进报告，不叫醒（「记录不处置」那一类。2026-10-10、2026-10-11 看门狗为它们被叫醒、重起了十来次）。
+                # 主 agent 醒了也没有可处置的；只进报告，不叫醒（「记录不处置」那一类）。
                 notes.append(f"hook 检出（执行前已被 hook 拒了、没有执行，只记不叫醒）：{entry.get('agent_type') or '?'} {entry.get('agent_id') or ''}："
                              f"{'、'.join(findings)}：{(entry.get('command') or '')[:120]}")
                 continue
@@ -2099,7 +2087,7 @@ def split_informational(alerts):
 
 
 # --ack 的范围写法（文件头「--ack 的写法」）：类:<告警名> 确认这一类告警的全部（不分子 agent、不分进程）。
-# 弄坏开关 ackscope 不认它（改前：只能按进程号、按 agent 号逐个确认）；ackscopepersist 下记进状态目录的这种确认在下一次整查被当成条件已消失而作废
+# 弄坏开关 ackscope 不认它（只能按进程号、按 agent 号逐个确认）；ackscopepersist 下记进状态目录的这种确认在下一次整查被当成条件已消失而作废
 ACK_CLASS_PREFIX = "类:"
 
 
@@ -2112,7 +2100,7 @@ def ack_scope_keys(alert):
 
 def split_acknowledged(alerts, acknowledgements):
     """主 agent 用 --ack 确认过「只是慢、接着盯」的告警：只写进报告，不叫醒主 agent。
-    2026-09-19：规程写「只是慢就再起一个看门狗接着盯」，而「工具调用过长」这类条件在那次调用结束之前一直成立，
+    规程写「只是慢就再起一个看门狗接着盯」，而「工具调用过长」这类条件在那次调用结束之前一直成立，
     新起的看门狗当场又报同一句退出，等于盯不住；确认只在这一次看门狗里有效，下一次起不带就失效。"""
     if BROKEN_DETECTION == "ack" or not acknowledgements:
         return alerts, []
@@ -2178,7 +2166,7 @@ ACK_UPDATE_PAUSE_SECONDS = 0.0   # 读与写之间停多久：只给 --selftest 
 def update_acks(state_dir, change):
     """watch-acks.tsv 的读改写：change(读到的确认集合) 交回要写下的集合。整段拿着同目录 watch-acks.lock 的 flock（进程退出就放）：
     两只看门狗同时写（在盯的那一只剪掉作废的确认、另起被拒的那一只记下新的 --ack），不加锁时后写的冲掉先写的，新给的 --ack 丢掉
-    （records/2026-10-23-subagent拆分提案.md 第一百二十一节）。弄坏开关 acksunlocked 不拿锁（改前的样子）。"""
+    （records/2026-10-23-subagent拆分提案.md 第一百二十一节）。弄坏开关 acksunlocked 不拿锁。"""
     import fcntl
     os.makedirs(state_dir, exist_ok=True)
     with open(os.path.join(state_dir, "watch-acks.lock"), "a", encoding="utf-8") as lock:
@@ -2218,7 +2206,7 @@ def pruned_acks(acks, alerts, unfinished_agent_ids):
 
 
 def discovered_agent_ids(session_dir, state_dir, cache, thresholds):
-    """这个会话里还没交回、没被停、没失败的子 agent：会话记录 --active-minutes 以内动过的，加上此前的看门狗见过、还没结束的
+    """这个会话里还没交回、没被停、没失败的子 agent：会话记录 --active-minutes 以内动过的，加上更早起的看门狗见过、还没结束的
     （记在状态目录的 watch-agents.tsv，等后台任务等得久、会话记录好久没动的也接得上）。cache：路径 → (大小, 修改时刻, 结束了没有)。"""
     if BROKEN_DETECTION == "discovernone":
         return []
@@ -2377,7 +2365,7 @@ def write_transcript(directory, agent_id, records, meta=None):
 
 
 def write_session_stops(session_directory, minutes_ago_by_agent):
-    """主会话记录里 TaskStop 的调用与成功结果，结果的形态照 2026-09-18 主会话记录里的原样。"""
+    """主会话记录里 TaskStop 的调用与成功结果，结果的形态照主会话记录里的原样。"""
     with open(session_directory + ".jsonl", "w", encoding="utf-8") as handle:
         for index, (agent_id, minutes_ago) in enumerate(minutes_ago_by_agent.items()):
             use = record_at(minutes_ago, "assistant", [{"type": "tool_use", "id": f"s{index}", "name": "TaskStop", "input": {"task_id": agent_id}}],
@@ -2419,7 +2407,7 @@ def bash_result(minutes_ago, tool_id):
 
 
 def handback_records(minutes_ago, tool_id, message_id):
-    """交回工具的调用与成功返回，返回的形态照 2026-09-18 会话记录里的原样。"""
+    """交回工具的调用与成功返回，返回的形态照会话记录里的原样。"""
     return [record_at(minutes_ago, "assistant", [{"type": "tool_use", "id": tool_id, "name": "SubagentHandback", "input": {"message": "报告"}}],
                       stop_reason="tool_use", message_id=message_id, usage={"input_tokens": 10, "cache_read_input_tokens": 1000}),
             record_at(minutes_ago - 0.1, "user", [{"type": "tool_result", "tool_use_id": tool_id,
@@ -2970,8 +2958,8 @@ STALE_SELFTEST_SCRATCH_SECONDS = 3600
 
 def remove_stale_selftest_scratch(parent):
     """上一次自证被 SIGKILL 打断时留在 parent 里的 agent-watch-selftest-scratch-* 目录：里面 .selftest-pid 写的进程已不在的删掉；
-    没有 .selftest-pid 的（旧版留下的）最后修改超过 STALE_SELFTEST_SCRATCH_SECONDS 的删掉；进程还在的、没到时候的不动。交回删掉的名字。
-    弄坏开关 AGENT_WATCH_BREAK=staleselftestscratch 下一个都不删（改前的样子）。"""
+    没有 .selftest-pid 的最后修改超过 STALE_SELFTEST_SCRATCH_SECONDS 的删掉；进程还在的、没到时候的不动。交回删掉的名字。
+    弄坏开关 AGENT_WATCH_BREAK=staleselftestscratch 下一个都不删。"""
     removed = []
     if BROKEN_DETECTION == "staleselftestscratch":
         return removed
@@ -3107,7 +3095,7 @@ def selftest_scratch_mentions(failures):
             if found != expected:
                 failures.append(f"{label}：应当找到 {expected}，实际 {found}")
         # 只认行首「草稿目录：」那一行（lib_prompt_scratch_line.py）：提示里另点名别的子 agent 的目录、它的 progress.md 改得更晚，也不取它；
-        # 没有那一行的取不到、告警里写取不到（AGENT_WATCH_BREAK=progressanypath 下照改前取改得最晚的那一份，会话临时目录根下的草稿目录也认得出：那一格与下面这三格共四格红）
+        # 没有那一行的取不到、告警里写取不到（AGENT_WATCH_BREAK=progressanypath 下取改得最晚的那一份，会话临时目录根下的草稿目录也认得出：那一格与下面这三格共四格红）
         made.append(tempfile.mkdtemp(prefix="agent-watch-selftest-mention-other-", dir=work_roots.configured_work_root()))
         other_directory = made[-1]
         open(os.path.join(other_directory, PROGRESS_FILE_NAME), "w", encoding="utf-8").write("别的子 agent 的一格\n")
@@ -3349,7 +3337,7 @@ def selftest_in(work):
                                                         record_at(0.2, "user", "[SYSTEM NOTIFICATION - NOT USER INPUT] 后台任务跑完了", origin_kind="task-notification")],
                      {"agentType": "implementation-writer", "description": "交回之后收到后台任务的完成通知"})
     # 交回之后被自己后台任务的完成通知叫醒、看一眼输出再结束本轮：仍算交回，不许判成没交回、报「结束本轮却不会醒」
-    # （2026-09-23 门禁审计会话 ac26abd494cda0968 实测误报，次序照它的会话记录：前台 doc-lint 超时转后台、交回、结束本轮、完成通知、grep 一次、结束本轮）。
+    # （样本次序：前台命令超时转后台、交回、结束本轮、完成通知、grep 一次、结束本轮）。
     moved_task_started = record_at(4, "user", [{"type": "tool_result", "tool_use_id": "t1",
                                                 "content": "Command did not complete within its 120s timeout and was moved to the background (ID: bl1). "
                                                            f"Output is being written to: {os.path.join(work, 'bl1.output')}. You will be notified when it completes."}])
@@ -3379,7 +3367,7 @@ def selftest_in(work):
     write_transcript(session, "waitloop", [bash_use(5, "t1", 'until grep -q "^exit=" log; do sleep 10; done', "m1")])
     write_transcript(session, "longtool", [bash_use(20, "t1", "cargo test --release", "m1")])
     # 断网 / 被停砍掉的那一次调用：只有发起、永远没有结果，而它之后 agent 又接着动了。
-    # 那条调用已经死了，不许再按「工具调用过长」报（2026-09-22 三条腿续做后实测假报）。
+    # 那条调用已经死了，不许再按「工具调用过长」报。
     write_transcript(session, "stalepending", [bash_use(20, "t1", "cargo test --release", "m1"),
                                               bash_use(0.5, "t2", "cargo build", "m2")])
     # 同一种死掉的调用，之后接的是一次跑完的工具调用（有结果）：最后一条记录是结果，不是新的发起。
@@ -3455,7 +3443,7 @@ def selftest_in(work):
     write_transcript(session, "inquiryfailed", [bash_use(90, "t1", "ls", "m1"), bash_result(89.9, "t1"),
                                                 record_at(80, "assistant", [{"type": "text", "text": "接着跑"}], message_id="m2")],
                      {"agentType": "implementation-writer", "description": "派发 90 分钟、失败（任务通知 failed）"})
-    with open(session + ".jsonl", "a", encoding="utf-8") as handle:   # 主会话记录里 SendMessage 结果的形态照 2026-09-24 主会话记录里的原样
+    with open(session + ".jsonl", "a", encoding="utf-8") as handle:   # 主会话记录里 SendMessage 结果的形态照主会话记录里的原样
         for sent_minutes_ago, sent_result in (
                 (20, {"success": True, "message": "Message queued for delivery to inquirysentafter at its next tool round.",
                       "pin": {"id": "inquirysentafter", "name": "inquirysentafter", "ref": "e00001"}}),

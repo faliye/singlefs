@@ -3,8 +3,8 @@
 # run-condition: command git
 # 把 kb 里承重的外部逐行引用做成可重跑的检查。
 #
-# **它要拦的是「证据蒸发」**：kb 里一批引用曾标着「本机核实」，
-# 而 2026-08-29 的 find 发现那批 PDF 已经不在本机了（checks-owed.md C38）。
+# **它要拦的是「证据蒸发」**：kb 里一批引用标着「本机核实」，
+# 而那批 PDF 已经不在本机了（checks-owed.md C38）。
 # 源码这一侧同样会蒸发——路径变了、版本升了、树被删了，
 # 而 kb 里的结论仍旧标着「已核实」。
 #
@@ -12,9 +12,12 @@
 # 不许因为「树不在」就静默跳过——那正是 C38 的形状。
 #
 # **判据二（checks-owed.md C44）**：每条断言还要说清它核的是哪棵树。
-# 一部分引用核的是 fetch-refs.sh 按 URL + sha256 固定下来的那份拷贝，
-# 另一部分核的是由环境变量默认值指到的本机内核树——后者不在固定点里，
-# 随时会被升级、改动或删掉，而两类此前混在同一个绿色汇总里，读的人分不出来。
+# 一部分引用核的是固定点的三棵（refs-linux、refs-zfs、refs-docs：版本写在树名或登记里，不随本机系统升级改动），
+# 另一部分核的是由环境变量默认值指到的本机内核树——后者不是固定点，
+# 随时会被升级、改动或删掉，两类混在同一个绿色汇总里的话，读的人分不出来。
+# 固定点三棵各自怎么取得、版本是哪一个、核到哪一步，写在树登记表 TREE_LIST 的第四格（开跑时逐棵打出来）；
+# 只有 docs/ 下那七份 PDF 是 fetch-refs.sh 按 URL 取回、记了 sha256 的，另两棵与 docs/rfc8439.txt 不归它。
+# 本脚本只按根路径读，不核任何一棵树的版本、提交号或摘要（PDF 的摘要由 fetch-refs.sh --check 核）。
 # ⇒ 树名写在每条断言的**第二格**，路径相对那棵树的根写；树名认不出就判红；
 # 末尾按树分组报数，非固定点的那几类单独标出来。
 #
@@ -30,7 +33,7 @@
 # 弄坏开关（只给 --selftest 证红用）：只有一个变量 VERIFY_CITATIONS_BREAK=<项>，一次给一个项。
 # 逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出没过的格，格号随增删格移动，写 …；
 # 红格里转述的被测程序输出也以 ✗ 起头，一并列出）：
-#   VERIFY_CITATIONS_BREAK=home-trees  verify_citations_shared_tree() 缺省照改前取家目录下的 code/fs-refs 与 kbuild/linux-om，不取共享数据根
+#   VERIFY_CITATIONS_BREAK=home-trees  verify_citations_shared_tree() 缺省取家目录下的 code/fs-refs 与 kbuild/linux-om，不取共享数据根
 #       「✗ 自证第 … 格「缺省取共享数据根下的两棵树」没过」、「✗ 自证第 … 格「缺省取共享数据根下的两棵树：非固定点那一棵」没过」
 #       （两格里转述的合成表输出：「✗ D… 源码不在」、「✗ D… 取数命令失败（退 2）」）
 #   VERIFY_CITATIONS_BREAK=tally  score() 漏记一格分组计数（造「分组报数算错」的输入；每一趟子进程都继承它，凡是有命中的合成表都在末尾那道对账上红）
@@ -38,8 +41,9 @@
 #       「✗ 自证第 … 格「C44 汇总闸自己判红」没过」、「✗ 自证第 … 格「文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留」没过」
 #       「✗ 自证第 … 格「钉零命中：递归 grep 数成 0」没过」、「✗ 自证第 … 格「钉零命中：grep -c 数成 0」没过」、「✗ 自证第 … 格「文献里钉零命中数成 0」没过」
 #       「✗ 自证第 … 格「缺省取共享数据根下的两棵树」没过」、「✗ 自证第 … 格「缺省取共享数据根下的两棵树：非固定点那一棵」没过」
+#       「✗ 自证第 … 格「结构体里三字段都在判绿」没过」
 #       （这些格里转述的被测程序输出：「✗ 分组报数与被扫集合对不上」、「✗ ck 的格数不对」）
-#   VERIFY_CITATIONS_BREAK=cache-kept  文本缓存照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
+#   VERIFY_CITATIONS_BREAK=cache-kept  文本缓存放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
 #       「✗ 自证第 … 格「文本缓存跑完连目录删、TMPDIR 与 GATE_CROSS_RUN_TMPDIR 里都不留」没过」
 #   VERIFY_CITATIONS_BREAK=grep-no-match-fails  grep_counting() 不把 grep 的零命中（退 1）改成退 0，零命中照取数失败判
 #       「✗ 自证第 … 格「钉零命中：递归 grep 数成 0」没过」、「✗ 自证第 … 格「钉零命中：grep -c 数成 0」没过」、「✗ 自证第 … 格「文献里钉零命中数成 0」没过」
@@ -47,12 +51,18 @@
 #   VERIFY_CITATIONS_BREAK=count-status-ignored  ckn、ckdocn 不看取数命令的退出码，只比输出
 #       「✗ 自证第 … 格「取数读的目录不在判红」没过」、「✗ 自证第 … 格「取数程序起不来判红」没过」
 #       「✗ 自证第 … 格「管道里 awk 写坏判红」没过」、「✗ 自证第 … 格「文献计数的模式写坏判红」没过」
-#   VERIFY_CITATIONS_BREAK=guard-off  平常跑设了弄坏开关也不拒（关守卫项：自证里探针往下跑完合成表退 0）
+#   VERIFY_CITATIONS_BREAK=guard-off  平常跑设了弄坏开关也不拒（关守卫项：自证里探针过了这一道，被后面合成断言表开关那一道拒，点名的不是弄坏开关）
 #       「✗ 自证第 … 格「平常跑设了弄坏开关退 2 并点名只在自证里认」没过」
 #   VERIFY_CITATIONS_BREAK=guard-off-with-others  关守卫项 guard-off 与别的项按逗号同写时也照放过（只在自证进程里认：子进程里变量值就是那串逗号，认不到这一项）
 #       「✗ 自证第 … 格「关守卫项与别的项同写，守卫照拒」没过」
+#   VERIFY_CITATIONS_BREAK=assertions-unguarded  verify_citations_assertions_refused() 对设了 VERIFY_CITATIONS_ASSERTIONS 的普通复核放行：合成表顶替内置表照跑
+#       「✗ 自证第 … 格「平常跑设了 VERIFY_CITATIONS_ASSERTIONS，守卫那一判拒」没过」
+#   VERIFY_CITATIONS_BREAK=struct-fields-anywhere  struct_fields_present() 不只看那个结构体的定义，整份文件里命中就算（那条断言只要文件里有 dev:8 就过）
+#       「✗ 自证第 … 格「三字段散在别的结构体里判红」没过」
 # 弄坏开关只在 --selftest 起的那几趟里认（自证设 VERIFY_CITATIONS_SELFTEST_MARK 指到它建的标记文件）：平常跑设了就在一切之前退 2、点名它只在自证里认；
 #   guard-off 整值比，只在它是唯一一项时放过，与别的项同写照拒。
+# 只供自证用的断言表开关 VERIFY_CITATIONS_ASSERTIONS（拿本文件里的一张合成表顶替内置那一份）同样只在自证那几趟里认：平常跑设了就在一切之前退 2、
+#   点名它只在自证里认（不然普通复核会静默缩成合成表的几条还报全绿）；判法 verify_citations_assertions_refused()。
 set -uo pipefail
 VERIFY_CITATIONS_SELFTEST_MARK_CONTENT=verify-citations-selftest
 verify_citations_guard_lets_through() { # verify_citations_guard_lets_through <VERIFY_CITATIONS_BREAK 的值> —— 平常跑的守卫放过它就返回 0：空，或整值是 guard-off
@@ -60,10 +70,25 @@ verify_citations_guard_lets_through() { # verify_citations_guard_lets_through <V
   [[ "${VERIFY_CITATIONS_BREAK:-}" == guard-off-with-others && ",$1," == *,guard-off,* ]] && return 0
   return 1
 }
+verify_citations_marked_selftest() { # verify_citations_marked_selftest <标记文件路径> —— 自证起的那几趟（标记文件内容对得上）返回 0
+  [[ -n "$1" && "$(cat -- "$1" 2>/dev/null)" == "$VERIFY_CITATIONS_SELFTEST_MARK_CONTENT" ]]
+}
 if [[ -n "${VERIFY_CITATIONS_BREAK:-}" && "${1:-}" != --selftest ]] && ! verify_citations_guard_lets_through "$VERIFY_CITATIONS_BREAK" \
-    && [[ -z "${VERIFY_CITATIONS_SELFTEST_MARK:-}" || "$(cat -- "$VERIFY_CITATIONS_SELFTEST_MARK" 2>/dev/null)" != "$VERIFY_CITATIONS_SELFTEST_MARK_CONTENT" ]]; then
+    && ! verify_citations_marked_selftest "${VERIFY_CITATIONS_SELFTEST_MARK:-}"; then
   echo "  ✗ VERIFY_CITATIONS_BREAK=$VERIFY_CITATIONS_BREAK 是弄坏开关，只在自证（--selftest）里认；平常跑设了就拒，这一次什么都没跑" >&2
   echo "  → 怎么办：去掉 VERIFY_CITATIONS_BREAK 再跑；要证红就跑 VERIFY_CITATIONS_BREAK=<项> bash scripts/kb/verify-citations.sh --selftest" >&2
+  exit 2
+fi
+verify_citations_assertions_refused() { # verify_citations_assertions_refused <VERIFY_CITATIONS_ASSERTIONS 的值> <标记文件路径> <第一个参数> —— 平常跑设了它（要拒）返回 0
+  [[ -n "$1" ]] || return 1
+  [[ "${VERIFY_CITATIONS_BREAK:-}" == assertions-unguarded ]] && return 1
+  [[ "$3" == --selftest ]] && return 1
+  verify_citations_marked_selftest "$2" && return 1
+  return 0
+}
+if verify_citations_assertions_refused "${VERIFY_CITATIONS_ASSERTIONS:-}" "${VERIFY_CITATIONS_SELFTEST_MARK:-}" "${1:-}"; then
+  echo "  ✗ VERIFY_CITATIONS_ASSERTIONS=$VERIFY_CITATIONS_ASSERTIONS 只在自证（--selftest）里认：它拿合成断言表顶替内置那一份，平常跑设了复核会缩成合成表的几条；这一次什么都没跑" >&2
+  echo "  → 怎么办：去掉 VERIFY_CITATIONS_ASSERTIONS 再跑（复核内置的全部断言）；要看合成表就跑 bash scripts/kb/verify-citations.sh --selftest" >&2
   exit 2
 fi
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -91,24 +116,26 @@ else
   KERN="${KERNEL_TREE:-$(verify_citations_shared_tree kernel-tree KERNEL_TREE)}" || exit 2
 fi
 
-# ── 树登记表：一行一棵树，树名 | 根路径 | 固定点还是非固定点 ──────────────
-# 固定点＝scripts/kb/fetch-refs.sh 按 URL + sha256 取回、放在 $FS_REFS 底下的那一份。
+# ── 树登记表：一行一棵树，树名 | 根路径 | 固定点还是非固定点 | 取得方式、版本与校验边界 ──────────────
+# 固定点＝放在 $FS_REFS 底下、版本写在树名或这一格里、不随本机系统升级改动的那几棵；它们不全是脚本取回的，也没有一棵在这里核摘要，
+#   逐棵怎么取得、核到哪一步看第四格（出处：.claude/kb/prior-art.md 开头「来源固定点与复核机制」一段、scripts/kb/fetch-refs.sh 的清单）；记不清的写「未固定」。
 # 非固定点＝由环境变量默认值指到的本机树：它随时会被别的活动升级、改动或删掉，
 # 所以它上面的「已核实」只在这台机器的今天成立。
 # 这张表登记的是**树**，不是断言——断言归哪棵树由它自己那一格说了算。
 TREE_LIST=$(cat <<TSV
-refs-linux|$REFS/linux-6.17|固定点
-refs-zfs|$REFS/zfs|固定点
-refs-docs|$REFS/docs|固定点
-host-kernel|$KERN|非固定点
+refs-linux|$REFS/linux-6.17|固定点|kernel.org 的 linux-6.17.tar.xz 解开的树，手工取得、没有脚本；版本只由目录名 linux-6.17 表示；tarball 的 URL 与 sha256 未固定，本脚本不核版本与摘要
+refs-zfs|$REFS/zfs|固定点|OpenZFS master 的 git 克隆，手工取得、没有脚本；kb 记的提交是 58d73c9（2026-08-27），本脚本不核提交号；摘要未固定
+refs-docs|$REFS/docs|固定点|七份 PDF 由 scripts/kb/fetch-refs.sh 按 URL 取回、sha256 记在各自旁边的 .sha256（fetch-refs.sh --check 核，本脚本不核）；rfc8439.txt 不归 fetch-refs.sh，取得方式与摘要未固定
+host-kernel|$KERN|非固定点|本机内核构建树（共享数据根下的 kernel-tree，或 KERNEL_TREE），版本读它自己的 Makefile；不固定，本脚本不核版本与摘要
 TSV
 )
-declare -A TREE_ROOT=() TREE_PINNED=() TREE_PASS=() TREE_FAIL=()
+declare -A TREE_ROOT=() TREE_PINNED=() TREE_SOURCE=() TREE_PASS=() TREE_FAIL=()
 TREE_ORDER=()
-while IFS='|' read -r tree_name tree_root tree_pinned; do
+while IFS='|' read -r tree_name tree_root tree_pinned tree_source; do
   [[ -z "$tree_name" ]] && continue
   TREE_ROOT["$tree_name"]="$tree_root"
   TREE_PINNED["$tree_name"]="$tree_pinned"
+  TREE_SOURCE["$tree_name"]="$tree_source"
   TREE_PASS["$tree_name"]=0
   TREE_FAIL["$tree_name"]=0
   TREE_ORDER+=("$tree_name")
@@ -214,6 +241,24 @@ ck() { # ck <决策> <树名> <说的是什么> <树内相对路径> <ERE 模式
   fi
 }
 
+# 取数命令里用的一判（命令在 count_run 的子 shell 里 eval，看得到本文件的函数）：结构体定义里出现了几个给定的字段。
+# 定义取 `struct <名> {` 在行首起头的那一行，到行首的 `}` 为止（同一行里就收尾的单行定义只取那一行）；字段按整词认（grep -w，`nr_dev:8` 不算 `dev:8`），
+# 出现几次都只算一个。文件读不了退 2（取数失败）；结构体不在打 0。用的是 command grep，不走 count_run 里把零命中改成成功的那一层。
+struct_fields_present() { # struct_fields_present <文件> <结构体名> <字段…>
+  local file="$1" name="$2" body="" field hits=0
+  shift 2
+  if [[ "${VERIFY_CITATIONS_BREAK:-}" == struct-fields-anywhere ]]; then
+    body="$(cat -- "$file")" || return 2
+  else
+    body="$(awk -v head="struct $name {" 'index($0, head) == 1 { inside = 1; print; if (index(substr($0, length(head) + 1), "}")) exit; next }
+      inside { print; if (substr($0, 1, 1) == "}") exit }' "$file")" || return 2
+  fi
+  for field in "$@"; do
+    if command grep -qwF -- "$field" <<<"$body"; then hits=$((hits + 1)); fi
+  done
+  echo "$hits"
+}
+
 ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，拿 %ROOT% 指那棵树的根>
   (( $# == 5 )) || { arity_red ckn 5 "$@"; return; }
   local d="$1" tree="$2" what="$3" want="$4" cmd="$5" got count_status
@@ -231,13 +276,13 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 }
 
 # ── 外部文献（PDF）──────────────────────────────────────────────────────
-# checks-owed.md C38 欠的另一半：源码那一侧 2026-08-29 已还，文献这一侧当时只还了 RFC 8439。
+# checks-owed.md C38 欠的文献这一侧：RFC 8439 与下面表里的 PDF。
 # 取回方式 scripts/kb/fetch-refs.sh（含 URL 与 sha256），抽取器 scripts/kb/pdf-text.py。
 # ⚠️ 抽取器只解 FlateDecode + 单字节字体。抽出乱码要当**抽取失败**处理，不许当成「原文没这句」——
 #    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在那张表里，见 fetch-refs.sh 的说明。
 # 抽出的文本放这一趟自己的临时目录 PDFTXT_CACHE（下面「跑」那一段开头在 ${TMPDIR:-/tmp} 下 mktemp -d），同一趟里一份文献只抽一次，
-# 退出时（跑完、判红、被 TERM / INT 停）连同目录删掉，不留给以后的趟复用（用户 2026-10-23 定案「自己用完自己删」）。
-# 只供自证使用的开关 VERIFY_CITATIONS_BREAK=cache-kept：照改前放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
+# 退出时（跑完、判红、被 TERM / INT 停）连同目录删掉，不留给以后的趟复用（自己用完自己删）。
+# 只供自证使用的开关 VERIFY_CITATIONS_BREAK=cache-kept：放进跨轮共用的 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-pdftext-<uid>、跑完留着
 #   （自证「文本缓存跑完连目录删」那一格由绿转红）。
 pdftxt() { # pdftxt <树名> <文献名> —— 这一趟里抽一次缓存一次，打印缓存路径；抽不出就打印空
   local tree="$1" name="$2" pdf="" out="" partial=""
@@ -298,7 +343,7 @@ ckdocn() { # ckdocn <决策> <树名> <说的是什么> <文献名> <ERE 模式>
 builtin_assertions() {
 echo "── bcachefs（Linux 6.17）──"
 ckn D8  refs-linux  "btree 树数"                 21 "grep -oE '^\	x\\([a-z_]+,[[:space:]]+[0-9]+' <(awk '/^#define BCH_BTREE_IDS\\(\\)/{f=1} f{print}' '%ROOT%/fs/bcachefs/bcachefs_format.h') | awk -F, '{gsub(/[ \t]/,\"\",\$2);print \$2}' | sort -nu | wc -l"
-ck  D19 refs-linux  "bch_extent_ptr 是 offset:44/dev:8/gen:8" fs/bcachefs/extents_format.h 'offset:44,.*$|dev:8'
+ckn D19 refs-linux  "struct bch_extent_ptr 的定义里 offset:44、dev:8、gen:8 三字段都在" 3 "struct_fields_present '%ROOT%/fs/bcachefs/extents_format.h' bch_extent_ptr offset:44 dev:8 gen:8"
 ck  D19 refs-linux  "crc128 的 offset 是 13 位"   fs/bcachefs/extents_format.h 'CRC128_SIZE_MAX[[:space:]]+\(1U << 13\)'
 ck  D9  refs-linux  "crc64 的 80 位由 csum_hi:16 + csum_lo 拼出" fs/bcachefs/extents_format.h 'csum_hi:16'
 ckn D9  refs-linux  "对 crypto_aead/setauthsize 零命中" 0 "grep -rE 'crypto_aead|setauthsize' '%ROOT%/fs/bcachefs' | wc -l"
@@ -463,6 +508,10 @@ selftest_assertions() {
       ckdocn D9 refs-docs "合成：文献里钉零命中"     whole.pdf '这个串不在原文里' 0 ;;
     doc-broken-pattern)
       ckdocn D9 refs-docs "合成：文献计数的模式写坏" whole.pdf '(' 0 ;;
+    struct-fields-green)
+      ckn D19 refs-linux  "合成：结构体里三字段都在" 3 "struct_fields_present '%ROOT%/fs/bcachefs/extents_format.h' bch_extent_ptr offset:44 dev:8 gen:8" ;;
+    struct-fields-elsewhere)
+      ckn D19 refs-linux  "合成：三字段散在别的结构体里" 3 "struct_fields_present '%ROOT%/fs/bcachefs/extents_scattered.h' bch_extent_ptr offset:44 dev:8 gen:8" ;;
     *)
       echo "  ✗ VERIFY_CITATIONS_ASSERTIONS=$1：本文件里没有这一张自证断言表"
       echo "  → 怎么办：这个变量只给 --selftest 用，写 selftest_assertions 里的表名之一；平常跑不设它"
@@ -485,6 +534,10 @@ selftest() {
   printf '#define BUCKET_GC_GEN_MAX\t96U\n' >"$work/refs/linux-6.17/fs/bcachefs/alloc_background.h"
   printf '#define SPA_BLKPTRSHIFT\t7\n'     >"$work/refs/zfs/include/sys/spa.h"
   printf '#define XLOG_MAX_ICLOGS\t8\n'     >"$work/kern/fs/xfs/xfs_log_format.h"
+  printf 'struct bch_extent_ptr {\n\t__u64\t\t\ttype:1,\n\t\t\t\toffset:44, /* 8 petabytes */\n\t\t\t\tdev:8,\n\t\t\t\tgen:8;\n} __packed __aligned(8);\n' \
+    >"$work/refs/linux-6.17/fs/bcachefs/extents_format.h"
+  printf 'struct example { unsigned dev:8; };\nstruct other {\n\tunsigned offset:44, gen:8;\n};\nstruct bch_extent_ptr {\n\tunsigned nr_dev:8, dev:8;\n};\n' \
+    >"$work/refs/linux-6.17/fs/bcachefs/extents_scattered.h"
 
 
 
@@ -513,6 +566,18 @@ selftest() {
   # 关守卫项 guard-off 只在它是唯一一项时放过：与别的项按逗号同写，守卫照拒（本进程里直接问守卫那一判；弄坏开关 guard-off-with-others 下它放过）
   if verify_citations_guard_lets_through guard-off,tally; then out="守卫放过了 guard-off,tally"; rc=0; else out="守卫拒了 guard-off,tally"; rc=1; fi
   st_case "关守卫项与别的项同写，守卫照拒" 红 "$rc" "$out" '守卫拒了'
+  # 只供自证用的断言表开关 VERIFY_CITATIONS_ASSERTIONS：平常跑（不带 --selftest、没有自证标记）设了它要在一切之前退 2 并点名，不许把复核缩成合成表。
+  # 整条路走一遍（清掉标记与弄坏开关，指到合成树，不碰真树），再在本进程里问守卫那一判（弄坏开关 assertions-unguarded 下它放过）
+  out="$(env -u VERIFY_CITATIONS_BREAK VERIFY_CITATIONS_SELFTEST_MARK= TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" \
+         VERIFY_CITATIONS_ASSERTIONS=green bash "$SELF" 2>&1)"; rc=$?
+  st_case "平常跑设了 VERIFY_CITATIONS_ASSERTIONS 退 2 并点名只在自证里认" 红 "$rc" "$out" 'VERIFY_CITATIONS_ASSERTIONS=green 只在自证'
+  if verify_citations_assertions_refused green "" ""; then out="守卫拒了平常跑设的 VERIFY_CITATIONS_ASSERTIONS=green"; rc=1; else out="守卫放过了平常跑设的 VERIFY_CITATIONS_ASSERTIONS=green"; rc=0; fi
+  st_case "平常跑设了 VERIFY_CITATIONS_ASSERTIONS，守卫那一判拒" 红 "$rc" "$out" '守卫拒了'
+  # bch_extent_ptr 那一类断言（struct_fields_present）：字段要都在那个结构体的定义里；只在别的结构体里、或只有一个字段，判红
+  out="$(st_run "$work" struct-fields-green)"; rc=$?
+  st_case "结构体里三字段都在判绿" 绿 "$rc" "$out" '合成：结构体里三字段都在（3）'
+  out="$(st_run "$work" struct-fields-elsewhere)"; rc=$?
+  st_case "三字段散在别的结构体里判红" 红 "$rc" "$out" '期望 3，实测 1'
   # 缺省取共享数据根下的两棵树（文件头「两棵树的根」）：FS_REFS、KERNEL_TREE 都不设，数据根给这一格自己的（SINGLEFS_DATA_ROOT），家目录指到不在的地方（第二台的条件）
   mkdir -p "$work/data-root"
   ln -s "$work/refs" "$work/data-root/fs-refs"
@@ -583,10 +648,11 @@ WHOLE_EXTRACTOR_EOF
   if (( st_failed )); then
     echo "    → 怎么办：上面逐格列出了要什么、实测什么。分组报数那几格看本脚本末尾那道"
     echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree；文本缓存那一格看 PDFTXT_CACHE 那一行；"
-    echo "      钉零命中与取数失败那几格看 grep_counting、count_run 与 ckn、ckdocn 里判 count_status 的那几行。"
+    echo "      钉零命中与取数失败那几格看 grep_counting、count_run 与 ckn、ckdocn 里判 count_status 的那几行；"
+    echo "      合成断言表开关那两格看文件头的 verify_citations_assertions_refused；结构体字段那两格看 struct_fields_present。"
     exit 1
   fi
-  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2、关守卫项与别的项同写照拒、钉零命中数成 0 三格、取数命令坏了判红四格、缺省取共享数据根下的两棵树两格）"
+  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格、文本缓存跑完连目录删、平常跑设了弄坏开关退 2、关守卫项与别的项同写照拒、平常跑设了合成断言表开关被拒两格、结构体字段两格、钉零命中数成 0 三格、取数命令坏了判红四格、缺省取共享数据根下的两棵树两格）"
   exit 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then selftest; fi
@@ -608,11 +674,11 @@ else
 fi
 echo "══ 外部引用复核 ══"
 for tree_name in "${TREE_ORDER[@]}"; do
-  printf '  %s（%s）根：%s\n' "$tree_name" "${TREE_PINNED[$tree_name]}" "${TREE_ROOT[$tree_name]}"
+  printf '  %s（%s）根：%s\n      取得与校验：%s\n' "$tree_name" "${TREE_PINNED[$tree_name]}" "${TREE_ROOT[$tree_name]}" "${TREE_SOURCE[$tree_name]}"
 done
 echo
 if [[ -n "${VERIFY_CITATIONS_ASSERTIONS:-}" ]]; then
-  # 只供自证使用：拿本文件里的一张合成断言表（selftest_assertions）顶替内置那一份
+  # 只供自证使用（平常跑设了已在文件头那一道退 2）：拿本文件里的一张合成断言表（selftest_assertions）顶替内置那一份
   selftest_assertions "$VERIFY_CITATIONS_ASSERTIONS"
 else
   builtin_assertions
@@ -633,7 +699,7 @@ echo "  没标树来源：$unmarked 条"
 for tree_name in "${TREE_ORDER[@]}"; do
   [[ "${TREE_PINNED[$tree_name]}" == 非固定点 ]] || continue
   tree_total=$(( ${TREE_PASS[$tree_name]} + ${TREE_FAIL[$tree_name]} ))
-  echo "  ⚠️ $tree_name 上的 $tree_total 条核的不是固定点：${TREE_ROOT[$tree_name]} 不在 fetch-refs.sh 的固定点里，"
+  echo "  ⚠️ $tree_name 上的 $tree_total 条核的不是固定点：${TREE_ROOT[$tree_name]} 是本机的树，"
   echo "     随时会被升级、改动或删掉 ⇒ 这一批的「已核实」只在这台机器的今天成立。"
 done
 

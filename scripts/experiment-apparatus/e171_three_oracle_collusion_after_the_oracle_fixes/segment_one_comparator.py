@@ -543,7 +543,7 @@ def inputs_outside_this_run(dumps_root: str, product_prefix: str, product_suffix
     return outside
 
 
-# 本次未跑（用户 2026-10-18 定：拿留存产物与那一趟的导出比的，缺了一律报本次未跑，不静默跳过、不当绿、不判红）：
+# 本次未跑：
 # 给的输入有不在的，每一样往 stderr 打一行 NOT_RUN_ARCHIVED_PRODUCT test=<比对器> reason=<哪一样不在>，退 77，一行产物都不写。
 # 写法照 scripts/experiment-apparatus/lib.rs 的 ARCHIVED_PRODUCT_NOT_RUN_MARKER；segment_two_comparator.py 用同一个。
 NOT_RUN_MARKER = "NOT_RUN_ARCHIVED_PRODUCT"

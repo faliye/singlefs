@@ -1,6 +1,6 @@
 //! E151：用户数据落点的到达序与容器臂 —— D3（空间分配）已定项 8 与 D14 已定项 2 欠的基线臂（C239 第 ② 笔）。
 //!
-//! ## 模型（判据与失败条款的权威登记在 research/prompts/e151-preregistration.md，跑前写死 2026-09-13）
+//! ## 模型（判据与失败条款的权威登记在 research/prompts/e151-preregistration.md，跑前写死）
 //!
 //! 沿用 E93（老化下的放置与碎片度）的槽位 / defer / runs 口径，节点骨架照 E127（分裂合并之下组身份要不要存）但不分裂不合并：
 //! 单对象节点装 1 个 key，容器节点装 ≤ 7 个连续 key（D27 已定项 6 的打包，cap 7）。
@@ -34,7 +34,7 @@ const CHECKPOINT_COUNT: u64 = 2000; // checkpoint 数
 const SAMPLE_EVERY: u64 = 250;
 const SEED_COUNT: u64 = 5;
 
-/// D27 已定项 6：界线 4 KiB、一个容器装 7 个对象（2026-09-13 用户定案）。
+/// D27 已定项 6：界线 4 KiB、一个容器装 7 个对象。
 const CONTAINER_CAPACITY: usize = 7;
 /// 打包巡回：每 checkpoint 最多看 64 个 key（取法，不是条款）。它与 DIRTY_PER_CHECKPOINT 相等这件事没有条款钉着，
 /// 第三次跑把它做成参数扫三点（C317 那一例）。
@@ -92,7 +92,7 @@ enum Arm {
     DirectoryHint,
     /// 辛：目录的家固定为初始所在段 + 一个溢出段，重写落到家里槽号最小的空槽，家满才回落，回落不改变家。
     DirectoryHome,
-    /// 第六次跑（C146 / C243 的模型形态）：用户数据按 D3 已定项 8 落最低空槽，每轮一条整理意图搬空占用最少的段 R；
+    /// 第六次跑（C146 / C243 的模型形态）：写入的数据落最低空槽（D3 已定项 8），每轮一条整理意图搬空占用最少的段 R；
     /// protect_region 为真时落点与搬迁目的地都排除 R（D26 已定项 1 第 3 条），为假是判别力自证那一半。
     CompactRegion { protect_region: bool },
     BumpNeighbor(usize),

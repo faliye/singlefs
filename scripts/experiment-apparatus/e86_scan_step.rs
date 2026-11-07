@@ -283,7 +283,7 @@ mod tests {
     }
 
     /// 臂到步进的映射本身要钉住——统计测试都直接传步进常量，绕过了这层映射，
-    /// 映射写反时只有 main 的输出错（2026-09-02 变异测试实测 M5 漏网，补此测）。
+    /// 映射写反时只有 main 的输出错（变异测试实测 M5 漏网，补此测）。
     #[test]
     fn step_mapping_is_correct() {
         assert_eq!(ScanStepArm::Step16kAny.step_slots(), 1);

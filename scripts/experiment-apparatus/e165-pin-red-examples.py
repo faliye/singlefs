@@ -3,7 +3,7 @@
 # run-condition: none 追加与 --check 只读写点名的文件，--check-table 只读钉表与变异表；--replay 要的 cargo 与装置由它自己判，缺了判红或报本次未跑
 """E165 红例钉进门禁：把 E165 第二段驱动写出的红例账里的每个红例按输入原样钉进 .claude/gate.d/e165-pinned-red-examples.tsv，并判钉得全不全、今天还绿不绿。
 
-用户 2026-10-01 定「全量形式化红了的例子 可以加到快速形式化中」「这个应该在每一次跑完之后就加入 门禁来控制比较好」
+全量形式化红了的例子加到快速形式化中，每一次跑完之后就加入门禁来控制
 （调度记录 records/2026-10-01-里程碑三形式化接入.md 第三节）。表的格式写在表自己的文件头。
 
 用法（<根> 默认取这份脚本往上两级的仓；--table 默认 <根>/.claude/gate.d/e165-pinned-red-examples.tsv）：
@@ -63,7 +63,7 @@
       块表只留这一块的行、每行只留 ①–㉑（装置只认 21 段，㉒ 不交给它），别的数据行换成 #、行号不变。
       不给 --binary 时：cargo build --release --locked -p singlefs-verification --bin e165_replay_bounded_enumeration
       （CARGO_TARGET_DIR：--target 给了用它、不删；没给是这一趟自己建的 ${TMPDIR:-/tmp}/singlefs-e165-pinned-target-*，跑完删——删之前核没有进程开着里面的文件，
-      有就不删、报出进程、退 1；用户 2026-10-23 定案「自己用完自己删」，不跨轮复用）再跑。
+      有就不删、报出进程、退 1；自己用完自己删，不跨轮复用）再跑。
       装置线程取 --threads（或 SINGLEFS_THREAD_CAP、登记的默认并行度），不套内存包装、不设内层上限：整条命令交 task-server，内存额度按记录由服务给，撞上限由服务放大重排；
       装置被信号停了的（subprocess 交负的信号号，或经 bash 起时退 128 + 信号号，例 137 = 外面 kill -9），判红，
       ✗ 行写「装置被信号停了」、这一次的输出不算判定，→ 查是谁在那一刻停了它，不写修实现；
@@ -82,12 +82,12 @@
         点名单跑一行与它在整格里跑的判定相同（自证 item-alone-equals-whole）：装置按块起，一块只留这一块的几行（别的数据行换成 #，行号不变），
         一行的判定只看它自己打的那一行与 ⑦ 相同、装置的报错里没点它的行号；同一块里别的行红不连累它。
       --block-rows N（默认 DEFAULT_BLOCK_ROWS）一块交给装置几行；一块判完，那一块里判绿的行当场落盘：配上了自己那一行结果、与 ⑦ 相同、报错里没点它行号的照键记绿，
-        块不干净（装置退非 0、行数对不上）也照记（用户 2026-10-29：「不写库等于没有实现复用的功能」）；配不上的不记，
+        块不干净（装置退非 0、行数对不上）也照记；配不上的不记，
         被打断之后同一条命令重跑，判过的块复用、只补没判的。
       --replay 按条记判定（判定库 scripts/crash/lib_verdict_library.py）：每一行的键相同就复用，一行都不用现判时不编装置、不起重放；
         table（--check-table）每趟现判、不复用。
         判红的那一行（装置给它出了结果：打了一行与 ⑦ 不同、或报错里点了它的行号）照同一把键调共用库的 record_red 记红，盖掉原有的绿，下一趟这一行现判
-        （用户 2026-10-29「记红、撤绿、下趟现判」；自证 reuse-red-withdraws-green）；装置没给它出结果的不碰库。
+        （自证 reuse-red-withdraws-green）；装置没给它出结果的不碰库。
         库位置只由被判那棵仓（--root）定，命令行不收别的：python3 scripts/gate/verus-proof-check.py library-directory <根> 打的那一份（judged_library_directory，
         被判那棵树的 git common-dir 底下的 singlefs-formal-unit-verdicts）；取不到（不是 git 工作树）参数解析之后一项都不判、退 2（自证 replay-outside-git-exits-2）。
         自证在进程里调 main 时给各格各自的临时库目录（main 的 selftest_library；临时服务底下各占一个命名空间）。
@@ -112,7 +112,7 @@
       python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <prune-server 二进制> -- python3 scripts/experiment-apparatus/e165-pin-red-examples.py --selftest
 退出码：0 绿（追加：钉好了或没有要钉的）；1 红；2 用法错；77 本次未跑（--check-table 与 --replay 的表一行数据都没有）。
 
-弄坏开关 E165_PIN_RED_EXAMPLES_BREAK=<项>[,<项>…]（只在 --selftest 与门禁样本根上认：命令行第一个参数不是 --selftest、又不是自证起的子进程（自证设 E165_PIN_RED_EXAMPLES_SELFTEST=1）、--root 给的也不是样本根（有 .gate-cells 或 .gate-break-sample）时设了它，参数解析之前退 2、点名它只在自证里认；--selftest 与门禁样本在开着时都必须判错）。逐项写开关名、弄坏哪一处，下一行起写打开后自证红的格（自证末尾一句「✗ e165-pin-red-examples 自证 N 格里 M 格判错：<格名 格名 …>」，下面的名字就是那一句列的格名；2026-10-29 逐项实测）：
+弄坏开关 E165_PIN_RED_EXAMPLES_BREAK=<项>[,<项>…]（只在 --selftest 与门禁样本根上认：命令行第一个参数不是 --selftest、又不是自证起的子进程（自证设 E165_PIN_RED_EXAMPLES_SELFTEST=1）、--root 给的也不是样本根（有 .gate-cells 或 .gate-break-sample）时设了它，参数解析之前退 2、点名它只在自证里认；--selftest 与门禁样本在开着时都必须判错）。逐项写开关名、弄坏哪一处，下一行起写打开后自证红的格（自证末尾一句「✗ e165-pin-red-examples 自证 N 格里 M 格判错：<格名 格名 …>」，下面的名字就是那一句列的格名；逐项实测）：
   E165_PIN_RED_EXAMPLES_BREAK=pin-twice  追加不去重
       「pin-again」「check-green」「check-missing」「check-tampered-setup」「check-whole-row-differs」「check-table-without-research」「check-table-archived-ledger」「check-table-variant-missing」「check-run-names」「check-explicit-kill-bounds」「check-explicit-kill-bounds-digest」「pin-whole-row-variant」「check-whole-row-variant」「pin-kill-bounds-missing」「pin-ledger-digest」「pin-explicit-kill-bounds-digest」「pin-deleted-row」「pin-deleted-row-names」「check-deleted-row」「check-shifted-table」「check-title-other-variant」「check-title-other-variant-howto」「check-title-missing」「check-kill-bounds-missing」「check-variant-sets-differ」「check-ledger-digest」「check-run-unfinished」「conflict」「replay-green」「replay-mismatch」「replay-fail」「replay-progress-green」「replay-progress」「replay-killed」「replay-killed-howto」「replay-exit-137」「replay-variant-missing」「list-items」「item-select-one」「item-unknown」「item-alone-equals-whole」「reuse-first-run-records」「reuse-second-run-reuses」「reuse-judging-units-changed」「reuse-mutation-row-changed」「reuse-mutation-row-restored」「reuse-device-changed」「reuse-device-stand-in-swapped」「reuse-ledger-path-renamed」「reuse-mutation-renamed」「reuse-row-own-key」「reuse-red-withdraws-green」「reuse-red-not-recorded」「reuse-resume-after-kill」「replay-unclean-block-records-green」「replay-missing-line-no-mispair」「prune-unchanged-input」「prune-after-change」「reuse-closure-changed」「reuse-closure-unrelated-function」「reuse-closure-unchanged」「reuse-crate-root-file-unchanged」「reuse-device-source-function-changed」「pin-two-profiles」「pin-profile-r2」「check-two-profiles」「check-profile-differs」「conflict-same-profile」「pin-profile-unknown-argument」「pin-product-without-config」「pin-product-without-arguments」「pin-product-empty-arguments」「pin-product-howto」「check-product-without-config」「replay-two-profiles」「replay-profile-arguments」「list-items-profile」「reuse-row-own-profile」
   E165_PIN_RED_EXAMPLES_BREAK=titles-unchecked  追加按 title 找不到变异时，退回按今天的行号换名、不报
@@ -143,21 +143,21 @@
   E165_PIN_RED_EXAMPLES_BREAK=ledger-digest-unchecked  --check 不核产物收尾行记的账 sha256、不认没收尾
       「check-explicit-kill-bounds-digest」「pin-ledger-digest」「pin-explicit-kill-bounds-digest」「pin-deleted-row」「check-ledger-digest」「check-run-unfinished」
 --check 与 --check-table 不读调用方没点名的账（门禁那一格只判钉表自己）的三项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
-  E165_PIN_RED_EXAMPLES_BREAK=table-check-globs-research  --check-table 照改前门禁那一格的判法：取 research/results/e165-*-red-examples.tsv、按文件名配产物判钉全
+  E165_PIN_RED_EXAMPLES_BREAK=table-check-globs-research  --check-table 取 research/results/e165-*-red-examples.tsv、按文件名配产物判钉全
       「check-table-without-research」「check-table-archived-ledger」「check-table-variant-missing」「check-table-empty」
       样本 pinned-red-examples-table-archived-ledger-green 判红、pinned-red-examples-table-green 退 77
-  E165_PIN_RED_EXAMPLES_BREAK=check-globs-by-default  --check 不给账时照改前取 research/results/e165-*-red-examples.tsv，不退 2
+  E165_PIN_RED_EXAMPLES_BREAK=check-globs-by-default  --check 不给账时取 research/results/e165-*-red-examples.tsv，不退 2
       「check-without-ledgers」
   E165_PIN_RED_EXAMPLES_BREAK=check-kill-bounds-ignored  --check 给了 --kill-bounds 也不用，照旧按文件名配同一目录的产物
       「check-explicit-kill-bounds」「check-explicit-kill-bounds-digest」
 整行抄红例账（钉表一行 22 段：自己的 8 段、账一行的 13 段、㉒ 档）的几项，开关一行、下一行起写打开之后判错的自证格与门禁样本（样本在 .claude/gate.d/fixtures/formal-verification.sh/ 下）：
-  E165_PIN_RED_EXAMPLES_BREAK=whole-row-unchecked  --check 不比 ⑨ 起的整行，只认 ①、⑦ 与 ⑤ / ⑥（整行抄之前的判法）
+  E165_PIN_RED_EXAMPLES_BREAK=whole-row-unchecked  --check 不比 ⑨ 起的整行，只认 ①、⑦ 与 ⑤ / ⑥
       「check-whole-row-differs」
   E165_PIN_RED_EXAMPLES_BREAK=copied-columns-unchecked  不核 ⑪⑫⑬ 与 ②③④、⑳㉑ 与 ⑦⑧
       「replay-copied-domain-differs」「replay-copied-original-differs」「check-table-copied-differs」
-  E165_PIN_RED_EXAMPLES_BREAK=dedupe-by-input-variant  追加按（①, ⑥）去重：另一趟的账 ⑨ 起不同也算已钉（整行抄之前的判法）
+  E165_PIN_RED_EXAMPLES_BREAK=dedupe-by-input-variant  追加按（①, ⑥）去重：另一趟的账 ⑨ 起不同也算已钉
       「pin-whole-row-variant」「check-whole-row-variant」
-  E165_PIN_RED_EXAMPLES_BREAK=variant-by-line-number  追加配上了产物也按今天的行号换名、再核 title 相同（按名字找之前的判法：那一趟之后变异表增删过行就一行都不钉）
+  E165_PIN_RED_EXAMPLES_BREAK=variant-by-line-number  追加配上了产物也按今天的行号换名、再核 title 相同（那一趟之后变异表增删过行就一行都不钉）
       「pin-by-title-shifted-table」「check-by-title-shifted-table」「pin-by-title-not-found」「pin-by-title-not-found-detail」「pin-by-title-ambiguous」「pin-by-title-ambiguous-detail」「pin-by-title-same-names」「pin-deleted-row」「pin-deleted-row-names」「check-deleted-row」
       pin-by-title-not-found、pin-by-title-not-found-detail、pin-by-title-ambiguous、pin-by-title-ambiguous-detail 判错（不报按名字找不到 / 找到几行，同名的照行号钉了进去）
 追加按文件名配同一趟产物（与 --check 同一套）的两项：
@@ -184,7 +184,7 @@
       「judging-units-comment-only」
   E165_PIN_RED_EXAMPLES_BREAK=spawn-inside-judging-closure  起装置那一下（run_reporting_progress）算进判法入口：起 --binary 给的程序那一段回到闭包里，库折不出那条命令，判法单元指纹拒算、每趟现判
       「reuse-first-run-records」「reuse-second-run-reuses」「reuse-judging-units-changed」「reuse-mutation-row-changed」「reuse-mutation-row-restored」「reuse-device-changed」「reuse-device-stand-in-swapped」「reuse-ledger-path-renamed」「reuse-mutation-renamed」「reuse-row-own-key」「reuse-red-not-recorded」「reuse-resume-after-kill」「prune-unchanged-input」「reuse-closure-changed」「reuse-closure-unrelated-function」「reuse-closure-unchanged」「reuse-crate-root-file-unchanged」「reuse-device-source-function-changed」「judging-units-no-refusal」「judging-units-comment-only」「reuse-row-own-profile」「replay-unclean-block-records-green」「replay-missing-line-no-mispair」
-  E165_PIN_RED_EXAMPLES_BREAK=row-key-with-ledger-path  每一行的键另带 ⑤（红例账的路径与行号，旧判法）
+  E165_PIN_RED_EXAMPLES_BREAK=row-key-with-ledger-path  每一行的键另带 ⑤（红例账的路径与行号）
       「reuse-ledger-path-renamed」
   E165_PIN_RED_EXAMPLES_BREAK=row-key-with-mutation-name  变异原文与替换文那一样另带 ⑥ 的表与变异名
       「reuse-mutation-renamed」
@@ -200,16 +200,16 @@
   E165_PIN_RED_EXAMPLES_BREAK=reuse-records-whole-cell-only  一块判完不当场落盘，整格判完、一行红都没有才一起记（被打断或有一行红，判过的全不留）
       「reuse-red-not-recorded」「reuse-resume-after-kill」「replay-unclean-block-records-green」「replay-missing-line-no-mispair」
 
-  E165_PIN_RED_EXAMPLES_BREAK=red-keeps-green  判红的那一行不记红（不调共用库的 record_red），同一把键原有的绿留着照复用（改前的样子）
+  E165_PIN_RED_EXAMPLES_BREAK=red-keeps-green  判红的那一行不记红（不调共用库的 record_red），同一把键原有的绿留着照复用
       「reuse-red-withdraws-green」
-  E165_PIN_RED_EXAMPLES_BREAK=unclean-block-records-nothing  块不干净（装置退非 0、行数对不上）时那一块一行都不记绿（改前的样子）
+  E165_PIN_RED_EXAMPLES_BREAK=unclean-block-records-nothing  块不干净（装置退非 0、行数对不上）时那一块一行都不记绿
       「replay-unclean-block-records-green」「replay-missing-line-no-mispair」
-  E165_PIN_RED_EXAMPLES_BREAK=results-paired-by-position  结果行按下标配到块里的登记行（改前的样子：块里少打一行，后面的行错配）
+  E165_PIN_RED_EXAMPLES_BREAK=results-paired-by-position  结果行按下标配到块里的登记行（块里少打一行，后面的行错配）
       「replay-missing-line-no-mispair」
 钉表认档（㉒）的几项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
   E165_PIN_RED_EXAMPLES_BREAK=profile-read-as-r1  取档不读产物的 device_arguments=，一律当 --profile r1（r2 档的账钉成 r1 档）
       「pin-two-profiles」「pin-profile-r2」「check-two-profiles」「check-profile-differs」「pin-profile-unknown-argument」「profile-normalized」「replay-two-profiles」「replay-profile-arguments」「list-items-profile」
-  E165_PIN_RED_EXAMPLES_BREAK=product-profile-defaulted  产物没有 config 行、config 行没有 device_arguments=、或它的值是空的，照取 --profile r1（改前的样子），不判红
+  E165_PIN_RED_EXAMPLES_BREAK=product-profile-defaulted  产物没有 config 行、config 行没有 device_arguments=、或它的值是空的，照取 --profile r1，不判红
       「pin-product-without-config」「pin-product-without-arguments」「pin-product-empty-arguments」「pin-product-howto」「check-product-without-config」「profile-empty-refused」
   E165_PIN_RED_EXAMPLES_BREAK=same-profile-conflict-ignored  追加不判同一档下同一个（①, ⑥）⑦ 不同，照钉
       「conflict」「replay-progress」「conflict-same-profile」「conflict-same-profile-unwritten」
@@ -225,7 +225,7 @@
       「pin-profile-unknown-argument」
   E165_PIN_RED_EXAMPLES_BREAK=reuse-key-without-profile  按条复用的键不带档（「这一行」不算 ㉒、不单列「档」）
       「reuse-row-own-profile」
-  E165_PIN_RED_EXAMPLES_BREAK=threads-default-cpu-count  --threads 的缺省取核数（改前的样子），不取登记的重活默认并行度
+  E165_PIN_RED_EXAMPLES_BREAK=threads-default-cpu-count  --threads 的缺省取核数，不取登记的重活默认并行度
       「threads-default-registered」
 """
 import concurrent.futures
@@ -258,7 +258,7 @@ from project_preflight import preflight  # noqa: E402
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 TABLE = ".claude/gate.d/e165-pinned-red-examples.tsv"
-# 只给两个弄坏开关用（table-check-globs-research、check-globs-by-default）：改前门禁那一格不给账时扫的那一批账
+# 只给两个弄坏开关用（table-check-globs-research、check-globs-by-default）：不给账时扫的那一批账
 LEGACY_LEDGER_GLOB = "research/results/e165-*-red-examples.tsv"
 LEDGER_SUFFIX, KILL_BOUNDS_SUFFIX = "-red-examples.tsv", "-kill-bounds.out"
 CHECK_NEEDS_LEDGERS = "--check 要显式给账与同一趟的产物"
@@ -780,7 +780,7 @@ def current_digest(path):
 
 def check(root, table, ledgers, products):
     """点名的每份账（products 与它逐份对应，是同一趟的 kill-bounds 产物；空就按文件名配）里有反例状态的每一行都钉在表里（文件头 --check 一段）。
-    不扫任何目录：账由调用方给（main 拦了不给账的那一种）。开关 check-globs-by-default 下不给账照改前的判法取 LEGACY_LEDGER_GLOB；
+    不扫任何目录：账由调用方给（main 拦了不给账的那一种）。开关 check-globs-by-default 下不给账取 LEGACY_LEDGER_GLOB；
     check-kill-bounds-ignored 下给了 products 也不用、照旧按文件名配。"""
     if not ledgers and "check-globs-by-default" in BREAK:
         ledgers = sorted(glob.glob(os.path.join(root, LEGACY_LEDGER_GLOB)))
@@ -899,7 +899,7 @@ def raise_missing_variants(rows, missing):
 
 def check_table(root, table):
     """门禁 pinned-red-examples-table 格：只判钉表自己（table_problems）与 ⑥ 点名的变异还在（missing_variants），不读红例账、kill-bounds 产物与 research/ 下的任何文件。
-    表一行数据都没有 raise NotRun。开关 table-check-globs-research 下照改前那一格的判法：取 LEGACY_LEDGER_GLOB 的账、按文件名配产物判钉全。"""
+    表一行数据都没有 raise NotRun。开关 table-check-globs-research 下取 LEGACY_LEDGER_GLOB 的账、按文件名配产物判钉全。"""
     if "table-check-globs-research" in BREAK:
         ledgers = sorted(glob.glob(os.path.join(root, LEGACY_LEDGER_GLOB)))
         if not ledgers:
@@ -1208,7 +1208,7 @@ def result_identity(line):
 def pair_result_lines(results, rows):
     """装置打的结果行按行身份配到块里的登记行，交与 rows 等长的列表（配不上的是 None）。身份是逐态行的 domain=、n=、ordinal=，对表行的 ②③④。
     同一个身份块里有几行，装置就该给它打几行：打的行数与块里的行数相同才按次序配（同一个身份、同一个档重放的是同一个状态）；
-    不同就这个身份的几行都不配（分不出少打的是哪一行）。认不出身份的结果行不配给任何一行。弄坏开关 results-paired-by-position：按下标配（改前的样子）。"""
+    不同就这个身份的几行都不配（分不出少打的是哪一行）。认不出身份的结果行不配给任何一行。弄坏开关 results-paired-by-position：按下标配。"""
     if "results-paired-by-position" in BREAK:
         return [results[index] if index < len(results) else None for index in range(len(rows))]
     lines_by_identity = {}
@@ -1298,13 +1298,13 @@ def replay(root, table, options):
                 # 落盘只认配上了自己那一行结果的：块不干净（装置退非 0、行数对不上）时配得上、判绿的照键记绿，配不上的不记
                 green = matched and not named_in_errors
                 recordable = green and (got_line is not None or "replay-ignores-output" in BREAK)
-                if "unclean-block-records-nothing" in BREAK:   # 弄坏开关：不干净的块一行都不记（改前的样子）
+                if "unclean-block-records-nothing" in BREAK:   # 弄坏开关：不干净的块一行都不记
                     recordable = green and (block_clean or "replay-ignores-output" in BREAK)
                 if not matched:
                     mismatches.append(f"第 {row['number']} 行（{row['fields'][4]}，档 {profile}）：要 {row['fields'][6][:160]}，装置打的是 {(got_line or '（没打或配不上）')[:160]}")
                 report_item(pinned_item(row), "绿" if green else "红", f"现判（{reason}）", seconds)
-                # 记红、撤绿（文件头「复用」，用户 2026-10-29 定案）：这一行判红而装置真给它出了结果（打了一行、或报错里点了它的行号），照同一把键调共用库的 record_red
-                # 记红，盖掉原有的绿，下一趟这一行现判；装置没给它出结果的（这一块半路停了、行数不够）不碰库。弄坏开关 red-keeps-green：不记（改前的样子）
+                # 记红、撤绿（文件头「复用」）：这一行判红而装置真给它出了结果（打了一行、或报错里点了它的行号），照同一把键调共用库的 record_red
+                # 记红，盖掉原有的绿，下一趟这一行现判；装置没给它出结果的（这一块半路停了、行数不够）不碰库。弄坏开关 red-keeps-green：不记
                 if not green and (got_line is not None or named_in_errors) and store.directory and "red-keeps-green" not in BREAK and "reuse-records-red" not in BREAK:
                     failed_record = store.record_red(pinned_item(row), components, (f"第 {row['number']} 行装置打的结果与 ⑦ 不同" if not matched
                                                                                      else f"装置的报错点了第 {row['number']} 行"),
@@ -1340,7 +1340,7 @@ def replay(root, table, options):
 
 def default_threads(environment=os.environ):
     """--threads 的缺省：SINGLEFS_THREAD_CAP 设了取它，否则登记的重活默认并行度（.claude/heavy-thread-default）。"""
-    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：改前的样子
+    if "threads-default-cpu-count" in BREAK:   # 弄坏开关：取核数
         return int(environment.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1)
     return default_heavy_threads(environment)
 
@@ -1494,9 +1494,6 @@ def replay_in_own_target(root, table, options):
 
 # ── 自证 ──
 
-# 自证的开关轮几趟同时起（每趟各用各的临时目录、桩装置不起 cargo）
-SELFTEST_BREAK_WORKERS = 8
-
 
 def selftest():
     global current_digest, PROGRESS_CLOCK, PROGRESS_POLL_SECONDS, PROGRESS_SINK
@@ -1644,7 +1641,7 @@ def selftest():
         cases += 1
         expect("pin-again", [ledger], 0, "3 行已钉")
         expect("check-green", ["--check", ledger], 0, "3 行都钉在")
-        # --check 不扫目录：不给账退 2（开关 check-globs-by-default 下照改前取 research/results 下的账，这里退 0）
+        # --check 不扫目录：不给账退 2（开关 check-globs-by-default 下取 research/results 下的账，这里退 0）
         expect("check-without-ledgers", ["--check"], 2, CHECK_NEEDS_LEDGERS)
         pinned_text = open(table_path, encoding="utf-8").read()
         write(TABLE, "\n".join(line for line in pinned_text.split("\n") if "\tZ1 " not in line and "#Z1" not in line) + "\n")
@@ -2050,7 +2047,7 @@ def selftest():
         named_error = io.StringIO()
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(named_error):
             named_exit = main(["--root", root, "--list-items", "--key-mismatches", "--binary", stub, "--item", pinned_items[1]], selftest_library=key_store)
-        named_states = dict(match.groups() for match in re.finditer(rf"^{ITEM_KEY_PREFIX} item=(\\S+) state=(\\S+)$", named_error.getvalue(), re.M))
+        named_states = dict(match.groups() for match in re.finditer(rf"^{ITEM_KEY_PREFIX} item=(\S+) state=(\S+)$", named_error.getvalue(), re.M))
         judge_cell("list-items-item-key-with-item", named_exit == 0 and named_states == {pinned_items[1]: "无记录"}, f"点名 {pinned_items[1]} 期望只打这一行，实测退 {named_exit}：{named_states}")
         run_items([*replay_arguments, "--selftest-library", key_store])
         same_exit, same_states = item_key_states(key_store)
@@ -2330,12 +2327,12 @@ def selftest():
                      "threads-default-cpu-count", "stand-in-unkeyed", "judging-units-raw-text",
                      "spawn-inside-judging-closure", "table-check-globs-research", "check-globs-by-default", "check-kill-bounds-ignored", "profile-form-unchecked", "product-profile-defaulted",
                      "item-key-lines-skipped", "item-done-unrecorded", "key-mismatch-by-item-only", "key-items-ignored")
-        # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（至多 SELFTEST_BREAK_WORKERS 趟），按开关的次序收退出码、数份数
+        # 各开关的那一趟互不依赖、各用各的临时目录（桩装置不起 cargo）：几趟同时起（至多登记的每台默认重活线程数那么多趟，.claude/heavy-thread-default），按开关的次序收退出码、数份数
         def run_break(item):
             return item, subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                         env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item)).returncode
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(SELFTEST_BREAK_WORKERS, int(default_heavy_threads(os.environ))))) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, int(default_heavy_threads(os.environ)))) as pool:
             outcomes = list(pool.map(run_break, items))
         if len(outcomes) != len(items):
             breaks_missed.append(f"开关轮收回 {len(outcomes)} 趟、派出 {len(items)} 趟")

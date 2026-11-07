@@ -2,7 +2,7 @@
 # admission: always 每次调都在这一刻的树上跑：经 task-server 分片时各片判自己那一份、直接写进 prune-server，合并那一步核两片判的块按此刻的键在服务里读得到，不分片时本机整份判；上一次的结论不替这一次作保，块的复用在判定库（prune-server）里
 # run-condition: command cargo python3
 # 崩溃放量一条用例分两片判（里程碑二「增补 4」第一、四、十一项）。分不分、哪一片去哪台机器、上限、线程、分卡与清场都由 task-server 管
-# （records/2026-10-30-编译绕过内存总上限.md 收尾批 #5：「把以前分散到各个任务中的脚本启动和判定 统一收起来。 统一管理。」）；这一份只照服务的分片协议跑交给它的那一步，不自己连第二台：
+# （脚本启动和判定统一收起来、统一管理）；这一份只照服务的分片协议跑交给它的那一步，不自己连第二台：
 #
 #   crash-amplification-two-hosts.sh <测试目标> [--test-filter <用例函数名>] [--label <标签>] [--given-states] [--skip <测试函数名>]…
 #   crash-amplification-two-hosts.sh --selftest
@@ -81,7 +81,7 @@
 #      crash_amplification_failure_kind 判 device）、这份二进制跑不了这一趟（结论版本与树对不上、开了 GPU 而没编进 gpu 特性；同一个函数判 build）；本机起 cargo 之前 RocksDB 预编库的取值没判过
 #      （共用库 crash_amplification_run_on_this_host 里 scripts/hosts/rocksdb-prebuilt.py entry）；观察者版本变了而核账那一趟红了；
 #   75 prune-server 不可用（引擎读写判定库连不上服务，那一趟原样退）；248 算法上判不了（同一个函数判 algorithm）；其余是那一趟 cargo test 的退出码，原样。
-# 跑 验证包用例：只在提交时或用户要求时由主 agent 经 task-server/task submit 交；--selftest 不起 cargo。
+# 跑 验证包用例：只在提交时或用户同意后由主 agent 经 task-server/task submit 交；--selftest 不起 cargo。
 #
 # 只供测试（--selftest 给它起的每一趟里层设；平常跑时设了也照认）：
 #   CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN=<脚本>      换掉本机那一趟（调法同 crash-amplification-lib.sh 的 crash_amplification_run_on_this_host：
@@ -96,10 +96,10 @@
 # --selftest 末尾的开关轮从这一段与下面「共用库」那一段现读（crash-amplification-lib.sh 的 crash_amplification_read_switch_table），判法是同一份库的 crash_amplification_switch_wheel：
 # 表里的双机开关与代码里认的要相等、表里的共用库开关要是共用库里认的，每个逐个打开、要退 1、红的格与点名的逐格相等；共用库认而表里没列的开关也逐个打开，要退 0、一格不红。
 # 并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS（没给取 SINGLEFS_THREAD_CAP，再没给取登记的重活默认并行度）。
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=plan-single-shard  计划照改前只写一片（整件）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=plan-single-shard  计划只写一片（整件）
 #       plan-writes-two-shards、shards-run-own-share、merge-checks-both-shards-readable（只有第 0 片、领 0/1，产物表里没有第 1 片，退 1）、judge-only-when-caller-recorded、registry-from-plan（第 1 片没起）、
 #       serial-compile-follows-the-address（第 1 片没起，两片的一个一个编看不全）、serial-compile-unjudged-exits-78（第 1 片没起，没有它那个 78）
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=first-shard-pinned  第 0 片照改前写 pin=local（服务拒：片里写了 pin 键）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=first-shard-pinned  第 0 片写 pin=local（服务拒：片里写了 pin 键）
 #       plan-writes-two-shards
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=same-share-on-both-shards  第 1 片也领 0/2（两片判同一半）
 #       shards-run-own-share、merge-checks-both-shards-readable（3、5 两块没人录也没人判，核账那一趟报先跑录入段、退 101）、judge-only-when-caller-recorded（第 1 片领的是 0/2）、
@@ -114,9 +114,9 @@
 #       shards-run-own-share（第 0 片只起一趟、不设选段）、merge-checks-both-shards-readable（核账那一趟没设成只判）、single-host-without-phase、crash-case-shaped-records
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-for-given-states  带了 --given-states 也先起录入段
 #       given-states-not-recorded、serial-compile-follows-the-address（带 --given-states 跑的两片各多起一趟录入段）
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=other-shard-judges-only  单独起时第 1 片也照改前设 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge（只判，它那一份观察者没人录）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=other-shard-judges-only  单独起时第 1 片也设 SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge（只判，它那一份观察者没人录）
 #       shards-run-own-share（第 1 片报先跑录入段、退 101）、merge-checks-both-shards-readable（合并没起）
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=merge-does-nothing  合并那一步照改前什么都不做、退 0
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=merge-does-nothing  合并那一步什么都不做、退 0
 #       merge-checks-both-shards-readable、merge-shard-row-missing-refused、merge-unreadable-blocks-refused、merge-red-kept、source-change-not-run、observer-version-changed-red、judge-not-run-forwarded
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=merge-blocks-unchecked  合并不核核账那一趟现判了几块、打没打计数行，一律当两片判的块都读得到
 #       merge-unreadable-blocks-refused（三种现场都退 0，不退 1）
@@ -128,13 +128,13 @@
 #       merge-checks-both-shards-readable
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=judge-not-run-dropped  核账那一趟打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行不转打（入口认不出这一项判段没跑）
 #       judge-not-run-forwarded
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=source-unchecked  合并那一步核账之前不核被测源码的摘要（改前的样子：源码中途变了照样按新源码重编、起核账那一趟）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=source-unchecked  合并那一步核账之前不核被测源码的摘要（源码中途变了照样按新源码重编、起核账那一趟）
 #       source-change-not-run
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=observer-version-unchecked  核账那一趟之后不核观察者版本（改前的样子：版本变了落成假用例「先跑录入段」那一句，退核账那一趟的码）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=observer-version-unchecked  核账那一趟之后不核观察者版本（版本变了落成假用例「先跑录入段」那一句，退核账那一趟的码）
 #       observer-version-changed-red（退 101，不退 78）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=skip-not-passed-to-cargo  收了 --skip 也不接到 cargo test 的参数后面
 #       skip-names-passed
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=gpu-test-threads-unset  开了 GPU 照改前不给 cargo test 参数加 --test-threads 1
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=gpu-test-threads-unset  开了 GPU 不给 cargo test 参数加 --test-threads 1
 #       service-card-passed
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=segments-registry-not-planned  计划那一步不拷按段登记文件，各片照调用方环境里的路径（派到第二台的那一片读不到）
 #       registry-from-plan
@@ -144,9 +144,9 @@
 #       shard-card-unusable、shard-given-states-run-condition
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=prepare-failure-ignored  crash_amplification_prepare 交回非 0（开了 GPU 而环境里没有服务交的卡）也照跑
 #       service-card-missing-refused
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=last-run-unwritten  跑完不写上次红的清单（改前的样子）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=last-run-unwritten  跑完不写上次红的清单
 #       last-run-list
-#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=run-directory-owner-unrecorded  建运行目录之后不写归属记录 .owner（改前的样子：起它的进程不在了，完工清理闸认不出这一趟归哪个会话）
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=run-directory-owner-unrecorded  建运行目录之后不写归属记录 .owner（起它的进程不在了，完工清理闸认不出这一趟归哪个会话）
 #       run-directory-owner-recorded
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=usage-exits-1  用法错退 1（不退 2）
 #       usage-refused
@@ -159,11 +159,11 @@
 #       single-host-algorithm-refused（退 101，不退 248）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=given-states-run-condition-as-run-failure  给定状态表的判器借不到显存那一行（CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET）不认
 #       shard-given-states-run-condition（退 101，不退 78）
-#   CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration  显卡先后照改前从多机配置读（不看环境里 task-server 交的那一张）
+#   CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration  显卡先后从多机配置读（不看环境里 task-server 交的那一张）
 #       service-card-passed（调用记录里 cards= 是多机配置里的 127.0.0.1:0:8G）、service-card-missing-refused（多机配置里写着卡，照跑、退 0）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=gpu-card-missing-unrefused  开了 GPU 而环境里没有服务交的卡也照跑
 #       service-card-missing-refused
-#   CRASH_AMPLIFICATION_ITEM_BREAK=library-marker-not-accepted  录入段照改前只认 CRASH_AMPLIFICATION_RECORDED 行，不认崩溃枚举用例经判定库两段跑时打的 CRASH_LIBRARY_RECORDED 行
+#   CRASH_AMPLIFICATION_ITEM_BREAK=library-marker-not-accepted  录入段只认 CRASH_AMPLIFICATION_RECORDED 行，不认崩溃枚举用例经判定库两段跑时打的 CRASH_LIBRARY_RECORDED 行
 #       crash-case-shaped-records（退 1、一趟判段都不起）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=this-host-service-threads-dropped  本机那一趟两步 cargo 起之前清掉服务交下来的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，吃 cargo 自己的缺省
 #       this-host-cargo-direct（两步 cargo 收到的 CARGO_BUILD_JOBS、RUST_TEST_THREADS 是 unset）
@@ -330,7 +330,7 @@ two_hosts_prepare() {
   fi
 }
 
-two_hosts_open_run_directory() { # <运行目录>：建好、写归属记录（文件头「运行目录的归属记录」；弄坏开关 run-directory-owner-unrecorded 照改前不写）
+two_hosts_open_run_directory() { # <运行目录>：建好、写归属记录（文件头「运行目录的归属记录」；弄坏开关 run-directory-owner-unrecorded 不写）
   if ! mkdir -p -- "$1"; then
     echo "  ✗ 建不了运行目录 $1" >&2
     echo "  → 怎么办：看 $crash_amplification_home 可不可写，或把 SINGLEFS_CRASH_AMPLIFICATION_HOME 指到可写的目录" >&2
@@ -795,7 +795,11 @@ print(" ".join(("pin=" + shard["pin"] if "pin" in shard else "unpinned") + ":" +
   driver_step "$scene" main "$scene" SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" GPU_CARDS_BY_PRIORITY=127.0.0.1:1:20G \
     -- some-target --given-states
   cells=$((cells + 1))
-  if [[ "$step_exit" != 0 || ! -s "$scene/calls" ]] || grep -vF ' cards=[127.0.0.1:1:20G] ' "$scene/calls" | grep -q . || grep -v -- '--test-threads 1' "$scene/calls" | grep -q .; then
+  # 管道不以 grep -q 收尾（pipefail 下前段吃 SIGPIPE 会把命中读成没命中）：先数出不合的行数再判
+  local calls_without_the_card calls_without_one_thread
+  calls_without_the_card="$(grep -cvF ' cards=[127.0.0.1:1:20G] ' "$scene/calls")"
+  calls_without_one_thread="$(grep -cv -- '--test-threads 1' "$scene/calls")"
+  if [[ "$step_exit" != 0 || ! -s "$scene/calls" || "$calls_without_the_card" != 0 || "$calls_without_one_thread" != 0 ]]; then
     cell_failed service-card-passed "开了 GPU：每一趟应当收到环境里服务交的那一张卡（127.0.0.1:1:20G）、cargo test 带 --test-threads 1（退 $step_exit）" \
       "看 crash-amplification-lib.sh 的 crash_amplification_prepare 取卡那一段、crash_amplification_environment_for_this_host 与 two_hosts_prepare"
   fi
@@ -975,7 +979,7 @@ two_hosts_plan() {
       exit 1
     fi
   fi
-  # 两片、都不钉（文件头「经 task-server 分片」plan：片里没有 pin 键）；弄坏开关 plan-single-shard 下照改前只写一片，first-shard-pinned 下第 0 片照改前写 pin=local
+  # 两片、都不钉（文件头「经 task-server 分片」plan：片里没有 pin 键）；弄坏开关 plan-single-shard 下只写一片，first-shard-pinned 下第 0 片写 pin=local
   two_hosts_break_is plan-single-shard && shard_layout=single
   two_hosts_break_is first-shard-pinned && first_pin=local
   if ! python3 - "$plan_directory" "$shard_layout" "$first_pin" "$test_target${test_filter:+::$test_filter}" <<'PLAN_PYTHON'; then
@@ -1067,7 +1071,7 @@ two_hosts_shard() {
       export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
     fi
   else
-    # 单独起：第 1 片的观察者那一份只有它自己录（第 0 片只录自己那一份），不设选段、引擎先录再判；弄坏开关 other-shard-judges-only 下照改前只判
+    # 单独起：第 1 片的观察者那一份只有它自己录（第 0 片只录自己那一份），不设选段、引擎先录再判；弄坏开关 other-shard-judges-only 下只判
     if (( record_wanted )); then
       if two_hosts_break_is other-shard-judges-only; then export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge; else unset SINGLEFS_CRASH_AMPLIFICATION_STAGE; fi
     fi
@@ -1107,7 +1111,7 @@ two_hosts_blocks_judged_in_the_check() { # <核账那一趟的日志>
     END { printf "%d %d\n", judged, lines }' "$1" 2>/dev/null || echo "0 0"
 }
 
-# 合并（文件头「经 task-server 分片」merge）：两片判的块都已在 prune-server 里，这里只核它们按此刻的键读得到；不拷库、不导入。弄坏开关 merge-does-nothing 下照改前什么都不做
+# 合并（文件头「经 task-server 分片」merge）：两片判的块都已在 prune-server 里，这里只核它们按此刻的键读得到；不拷库、不导入。弄坏开关 merge-does-nothing 下什么都不做
 two_hosts_merge() {
   local plan_directory="${TASK_SERVER_SHARD_PLAN_DIRECTORY:-}" outputs="${TASK_SERVER_SHARD_OUTPUTS:-}" index host directory
   local first_directory="" first_host="" other_host="" other_count=0 check_exit judged_blocks counted_lines
@@ -1230,7 +1234,7 @@ case "$phase" in
     fi ;;
 esac
 crash_amplification_home="$(crash_amplification_home_directory)" || exit 2
-# 两段（用户 2026-10-11 定）：单独起（选段没设成 judge）先录入段、之后的判段只从判定库（prune-server）里读；选段交过来就是 judge 的（调用方整份录过）只判；带 --given-states 的引擎自己先录再判。
+# 两段：单独起（选段没设成 judge）先录入段、之后的判段只从判定库（prune-server）里读；选段交过来就是 judge 的（调用方整份录过）只判；带 --given-states 的引擎自己先录再判。
 #   弄坏开关 record-skipped-when-not-judging 下单独起也不录；record-for-given-states 下带 --given-states 也录
 record_wanted=0
 if [[ "${SINGLEFS_CRASH_AMPLIFICATION_STAGE:-}" != judge ]] && { (( ! given_states )) || two_hosts_break_is record-for-given-states; } \

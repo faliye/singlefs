@@ -18,7 +18,7 @@
 **挪了位置的行**：一行被挪到别处、内容又顺手改过时，逐行比对给出的是「这里删一行、那里插一行」两段，
 插进来的那一段命中 --match，删掉的旧行却不命中——只挑前者，暂存区里就有新旧两份同一行。
 所以删掉的行若是某个「我的」插入行的旧版（开头 12 个字相同、整行相似度 ≥ 0.6），跟着一起算我的，反过来也一样。
-实测（2026-09-12）：experiments.md 里 E137 那一行在 HEAD 里排在 E138 后面，工作区里挪到 E138 前面并改了一个标签，
+例：experiments.md 里 E137 那一行在 HEAD 里排在 E138 后面，工作区里挪到 E138 前面并改了一个标签，
 dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
 
 **--by-row（整表重排时按整行挑）**：另一个会话把一张表整体重排（行序全变、别的行改了标签）时，一次比对把整张表变成少数几个大块，
@@ -63,9 +63,9 @@ dry-run 报「留在工作区 1 块」，留下的正是那一行的旧版。
       红在整表重排按整行挑：「✗ selftest: 整表重排应当只暂存我那一行」，连带「✗ table.md：要写进索引的内容里…命中 --foreign，一个字没写」（整块进之后写索引那一道拒了）
   STAGE_MINE_BREAK=write-index-unchecked   write_index() 写之前不核 --foreign
       红在 --write-index 带别人新增行：「✗ selftest: --write-index 带别人新增行应当退 3」
-  STAGE_MINE_BREAK=first-occurrence-anchor   choose_rows() 找锚点退回取底的块里第一处命中（改前的写法）
+  STAGE_MINE_BREAK=first-occurrence-anchor   choose_rows() 找锚点取底的块里第一处命中
       红在块里有重复行：「✗ selftest: 重复行：| MINE | 应当落在第二张表的 |---| 之后」
-  STAGE_MINE_BREAK=keep-foreign-refuses   --keep-foreign 不生效：命中 --foreign 的块照旧整份拒（改前的样子）
+  STAGE_MINE_BREAK=keep-foreign-refuses   --keep-foreign 不生效：命中 --foreign 的块照旧整份拒
       红在 --keep-foreign：「✗ record.md：进暂存区的一块里有命中 --foreign 的行」、「✗ selftest: --keep-foreign 应当只暂存我那一块」
   STAGE_MINE_BREAK=verify-without-rename   --verify 不套改名：删除行原样与新增行相减
       红在 --verify 只改名：「✗ selftest: --verify 只改名的暂存应当剩 0 行、退 0」

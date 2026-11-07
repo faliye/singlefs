@@ -18,23 +18,48 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
   [research]  研究一侧运行期闭包各文件的 sha256（装置单元 device_timing.py；驱动行是驱动与它 import 的四份；跑执行器的另加执行器目录、冻结行那份产物、
               frozen_o3.py、o3_bad_image_judge.py、result_lines.py；变异驱动是研究一侧整个目录与它的变异表）
   [python]    python3 -VV 原样
-库（H30，默认 <数据根>/reuse/e171-r1/，数据根取 .claude/hooks/lib_work_root.py 的 shared_data_path，两台同一份）：entries/<键前 2 位>/<键>/ 下 key.txt、reading/<角色>…、meta.tsv、manifest.sha256（最后写）；
-  staging/<进程号>-<随机>/（先写这里再 rename；起跑时清残留）；quarantine/（RC5 不符的条目挪进来）；frozen-by-s18（S18 触发时写，在就不取、不入）。
+库：prune-server 那一份判定库（.claude/rules/verification.md「判定库只有一份」），经 scripts/prune-server/prune_server_client.py 读写；
+  族 apparatus-items，种类是装置名 DEVICE_BINARY（客户端文件头「键空间」）。本地不建、不读、不写库目录，旧的本地库不导入（那一族「接完」的 ① ②）。
+  H30 的库根（reuse_library_root.py 取）只当名字与命名空间：不在临时服务底下不进键，两台、哪个库根读写同一份；临时服务底下按它给命名空间（自证各格各占一份）。
+  条目：entries/<键>.tar.gz 一条值，是整份条目打成的 tar（gzip）：key.txt、reading/<角色>…、meta.tsv、manifest.sha256。
+    入库先在这一趟自己的临时目录里拼好整份（manifest.sha256 最后写），再一次写进服务（写在服务确认之后才算数，大值由客户端分段、读时核 sha256）；
+    拼到一半被停，服务里什么都没有，临时目录随这一趟的 TMPDIR 走。查库、取用、比读数都先把那一条解进临时目录（中转，用完即删）再照原样核。
+  quarantine/<键>-<纳秒>.tar.gz：RC5 不符的条目原样挪进来（写一份、删掉 entries/ 那一条）；frozen-by-s18：S18 触发时写的一条（在就不取、不入）。
+  RP2（selfproof）一趟另占 selfproof/<日期>-<进程号>-<随机>/ 那一层相对路径，跑完删掉。
   读数按角色存：product、timing（文件），directory（装置的导出目录），row（驱动行的行目录）；meta.tsv 记这一单元原来的名字（前缀后缀换成占位）。
+  服务连不上客户端退 75（PruneServerFailure，是 SystemExit）：不现判、不当「库里没有」。
 账本：<导出根>/reuse-markers/<层>/ 下每个单元一份标记（先写标记、再链接、最后链 row-result.tsv 或写绿行），events.tsv 收 RC1–RC5 的每一次；
   每层收尾由标记现合成 E7RESULT name=reuse / name=reuse_check / name=reuse_insert 各行与末行 name=verdict（N + M 不等于这一层登记的单元数判红）。
+  末行另报 judged_now（现判：查过库没有、条目坏了、库冻住、RC3 与强制现判抽去现跑的）、reused（复用）、refused（拒算：永远现跑的几类、
+  环境变量设了的、闭包认不全的），三个数加起来等于 units；三层编排打「复用账本 …：<末行>」就是这一层的成功句「现判 N、复用 M、拒算 R」。
+复用哨兵（.claude/rules/verification.md「一个门禁：两种跑法」末条；判法借 scripts/gate/lib_reuse_checks.py 的种子与条数）：
+  一个进程一份（三层编排各是一个进程）。种子取 SINGLEFS_REUSE_SENTINEL_SEED（不设现取）、条数取 SINGLEFS_REUSE_SENTINEL_COUNT（不设 3），
+  第一次命中时打进标准错误、标记里每个被抽中的单元记 sentinel 与 sentinel_seed，事件里记一行 name=reuse_sentinel_plan。查库是逐个单元当场答的，
+  事先不知道一共命中几条：强制现判与哨兵都从这一趟头 SENTINEL_HIT_WINDOW 条命中里按种子抽（random.Random(种子) 抽 条数 + 1 个序号，头一个是强制现判）。
+  强制现判那一条 decide 交 fresh-check（reason=sentinel-forced），照现跑、入库时与库里那一条照 RC1 比（reuse_check kind=forced）。
+  三种情形记一行 E7RESULT name=reuse_sentinel problem=…，s18_problems 收进去，三层编排照 S18 冻库、记红（第 11.9 节 S18 另加的第 ③ 样）：
+    sentinel-rejudged  哨兵（键相同、库里有、决定是取来）却照现跑交了 record_finished；
+    forced-reused  强制现判那一条的标记仍是 reused；
+    forced-not-compared  强制现判跑完没与库里那一条比上（入库条件不过、或库里那一条已经不在）。
+  强制现判的读数与库里不同就是 identical=false，照 S18 第 ① 样红。RC3 抽去现跑的哨兵不算被现判；取用时条目坏了改现跑的哨兵不判。
+  RP2（selfproof，另占一层的库）不抽。临时 prune-server 底下（自证与单测）不抽：三层编排的端到端格与 test_revision_11 照数复用条数，
+  只有 reuse-sentinel 一格自己装一份哨兵；真跑没有关哨兵的开关。
 
 用法：
   reuse_library.py fetch --library L --entry E --map <角色>=<目标路径> [--map …]
-      单元脚本取用：核 RC5（不符的挪进隔离目录、退 1）、按角色把条目里的读数硬链接到这一趟的名字（目标已在就拒、退 1）；标准输出一行条目 meta 里的退出码。
+      单元脚本取用（E 是条目的键）：核 RC5（不符的挪进 quarantine/、退 1）、按角色把条目里的读数写到这一趟的名字（目标已在就拒、退 1）；标准输出一行条目 meta 里的退出码。
   reuse_library.py selfproof --library L --binary B --scratch S --output O --threads N
       RP2（修订 8 那一趟 step-0 绿之后的 reuse-selfproof 单元）：H7 那个装置二进制跑三次 stream-constants --streams 1,2,3。
   reuse_library.py --selftest [--cells 格,…] [--rounds N]
-      RP1、RP3–RP8（假树、假装置、假驱动、假判法；RP1 另起三层编排各自的端到端格），钉值认搬迁登记的两格（pin-moves：假前缀的红绿红样本；
+      RP1、RP3–RP8（假树、假装置、假驱动、假判法；RP1 另起三层编排各自的端到端格），复用三问一格（reuse-three-questions：第二段三行四趟，
+      打规范输出「REUSE_SELFTEST script=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py …」），
+      复用哨兵一格（reuse-sentinel：一绿四红，见「复用哨兵」），键不随所在目录变一格（key-independent-of-location：同一份假仓与假树放在两处、
+      一处在另一处的副本目录底下，各类单元的键逐个相同），钉值认搬迁登记的两格（pin-moves：假前缀的红绿红样本；
       pin-moves-real-files：本目录每一处钉值的被钉文件照一次假搬迁换过之后照样认、多改一处就不认）与冻结执行器核对认搬迁登记的单测（frozen-o3-moves：
       子进程跑 test_frozen_o3），倒换只认正着换一遍不动的、逐次倒的两格（pin-moves-partial：钉值核对；frozen-o3-reverse-moves：本目录与 E171 第 1 次那两份
       冻结执行器核对），末尾逐个打开弄坏开关核红在点名格。末行「自证 N 项，红 M」。
-退出码：0 成；1 取用不成或 RP2 不过；2 用法错；78 库目录写不了或与 scripts/experiment-apparatus/target 不在同一个文件系统（硬链接不成）。
+      只在临时 prune-server 上跑（客户端文件头「命令行」--with-temporary-service；开跑前调 selftest_service_problem()，不是临时服务退 2、一格都不跑，不写真服务）。
+退出码：0 成；1 取用不成或 RP2 不过；2 用法错、自证没有临时服务；75 prune-server 不可用（客户端的码）。
 
 弄坏开关 REUSE_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，REUSE_SELFTEST=1；别处设了退 2）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
   REUSE_BREAK=drop-kind  键文本里不写 [kind]
@@ -63,10 +88,18 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
       「✗ 自证 rp6-closure-extra-file：」
   REUSE_BREAK=manifest-unchecked  RC5 不核 manifest.sha256
       「✗ 自证 rp8-corrupted-entry：」
-  REUSE_BREAK=insert-in-place  入库直接写进 entries/、不经 staging/
+  REUSE_BREAK=insert-in-place  入库时没有 manifest 的半份先写进服务、再写整份（不是拼好整份才写的那一类）
       「✗ 自证 rp5-atomic-insert：」
   REUSE_BREAK=fresh-always-ignored  永远现跑的几类（step-9 等）也查库
       「✗ 自证 rp1-two-passes：」
+  REUSE_BREAK=sentinel-skipped  查库命中时不抽强制现判、不抽哨兵
+      「✗ 自证 reuse-sentinel：」
+  REUSE_BREAK=forced-read-answered-found  抽中强制现判的那一条照取来交出去（标记仍记 forced）
+      「✗ 自证 reuse-sentinel：」
+  REUSE_BREAK=sentinel-problems-ignored  s18_problems 不收 name=reuse_sentinel 那几行（哨兵红了不冻库、不记红）
+      「✗ 自证 reuse-sentinel：」
+  REUSE_BREAK=location-in-key  [closure] 每行写文件的绝对路径（键随树所在的目录变）
+      「✗ 自证 key-independent-of-location：」
   REUSE_BREAK=pin-moves-ignored  钉值核对不看搬迁登记（pinned_sha256_now 只认逐字节相同）
       「✗ 自证 pin-moves：」
   REUSE_BREAK=frozen-o3-moves-ignored  冻结执行器核对不看搬迁登记（子进程设 FROZEN_O3_BREAK=path-moves-ignored）
@@ -81,37 +114,42 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
       「✗ 自证 no-leftover-processes：」
   REUSE_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
       「✗ 自证 temporary-directory-removed：」
-自证只换假件的变量（只在 REUSE_SELFTEST=1 时认）：REUSE_SELFTEST_KILL_AT=before-manifest|before-rename|before-row-result:<行目录名>
+自证只换假件的变量（只在 REUSE_SELFTEST=1 时认）：REUSE_SELFTEST_KILL_AT=before-manifest|before-store|before-row-result:<行目录名>
   （入库或取用走到那一处时进程给自己发 SIGKILL，RP4、RP5 用）。
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import hashlib
 import importlib.machinery
 import importlib.util
+import io
 import math
 import os
+import random
 import re
 import secrets
 import shutil
 import signal
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.append(os.path.join(HERE, "..", "..", "prune-server"))
 import revision_8_selftest_harness as harness  # noqa: E402
 import frozen_o3  # noqa: E402（搬迁登记的读法：钉值核对与冻结执行器核对共用 frozen_o3 那一份）
+import prune_server_client  # noqa: E402（复用库只经它读写 prune-server 那一份：文件头「库」）
 
 BREAK_VARIABLE = "REUSE_BREAK"
 SELFTEST_VARIABLE = "REUSE_SELFTEST"
 KILL_POINT_VARIABLE = "REUSE_SELFTEST_KILL_AT"
-EXIT_RUN_CONDITION = 78
 RESEARCH_RELATIVE = "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes"
 EXECUTOR_RELATIVE = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487"
 FREEZE_REFERENCE_RELATIVE = "research/results/e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
@@ -128,7 +166,10 @@ def shared_reuse_root():
     return module.shared_data_path("reuse")
 
 
-DEFAULT_LIBRARY_ROOT = os.path.join(shared_reuse_root(), "e171-r1")
+DEFAULT_LIBRARY_ROOT = os.path.join(shared_reuse_root(), "e171-r1")   # 库根缺省的名字：只当名字与命名空间（文件头「库」），这个目录不建、不读、不写
+LIBRARY_FAMILY = prune_server_client.FAMILY_APPARATUS_ITEMS
+ENTRY_PREFIX, QUARANTINE_PREFIX, ARCHIVE_SUFFIX = "entries/", "quarantine/", ".tar.gz"
+SELFPROOF_AREA = "selfproof"
 KEY_SCHEMA_LINE = "schema e171-r1-reuse-key 1"
 SECTION_ORDER = ("kind", "build", "closure", "env", "mutation", "args", "limit", "upstream", "research", "python")
 UNIT_KINDS = ("device", "e170", "driver-row", "o3-executor", "mutation-driver")
@@ -151,6 +192,10 @@ ROW_RESULT_VOLATILE_KEYS = ("copy_ns", "compile_ns", "device_ns", "o3_ns", "lane
 REBUILD_CHECK_FIELD = "packages_checked_rebuilt"
 STATE_FRESH, STATE_REUSED, STATE_FRESH_CHECK, STATE_FRESH_ALWAYS = "fresh", "reused", "fresh-check", "fresh-always"
 FROZEN_FILE = "frozen-by-s18"
+# 复用哨兵（文件头「复用哨兵」）：抽的范围、标记里 sentinel 一项的三种值、强制现判那一条的 reason
+SENTINEL_HIT_WINDOW = 8
+SENTINEL_NONE, SENTINEL_WATCHED, SENTINEL_FORCED = "-", "sentinel", "forced"
+FORCED_REASON = "sentinel-forced"
 
 
 def broken(item: str) -> bool:
@@ -217,7 +262,7 @@ def closure_lines(tree: str, files: list[str], overrides: dict[str, bytes]) -> l
     lines = []
     for relative in files:
         digest = sha256_bytes(overrides[relative]) if relative in overrides else sha256_file(os.path.join(tree, relative))
-        lines.append(f"{relative} {digest}")
+        lines.append(f"{os.path.join(tree, relative) if broken('location-in-key') else relative} {digest}")
     return lines
 
 
@@ -451,10 +496,10 @@ _pinned_modules: dict[str, types.ModuleType] = {}
 # 用全部登记行倒换（不只此刻生效的）：换回去之后逐字节等于钉住的那一版，此刻与它就只差登记过的前缀；还改了别处的换回去也对不上。登记表不在或没有内容行时与改前逐字节同判。
 # 关不住的一种：登记表里留着一行老行（旧前缀下已没有文件、新前缀是早就在的另一份实现），再加一行真搬迁，钉住的文件改指那一份早就在的实现，换回去照样等于钉值，这里认；
 # 门禁一侧这份文件照算改动，要人看（.claude/rules/path-moves.md「门禁管哪一半」）。换算只认仓根起的前缀（lib-lag-baseline.py 文件头「搬迁登记」）。
-ORCHESTRATOR_SHA256 = "d2ebaaaf914db01f384004676d9e127593c11d1796a4694b50924db38b2255c1"
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "413ce4a869667696acd62b05caba6441d3936e022d49db5fce72f437df5f0b39"
+ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "50d59d280fac19e7a935b22d05b74b66f71d8ba0b4ffbd8a4765ece1efbb45ca"
 # 冻结的修订 8（rows_orchestrator_revision_8.py 的 CROSS_HOST_CHECK_SHA256）钉的跨机对照入口：载入修订 8 时同样按此刻认不认换
-CROSS_HOST_CHECK_SHA256 = "7247276e8046551e18bbfe2a3402babfb3e4e8554f467bac56796c2e6975fc42"
+CROSS_HOST_CHECK_SHA256 = "1f6e39b245a203c6869107dca70b03a52fdf5e457529e2b9ada7bbdb1d5a488b"
 PIN_REPOSITORY_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # 搬迁登记表从这一个仓根取
 # 钉住的编排器：模块名 → 路径、模块名 → sha256 两张表（路径表照字面拼，函数单元库认得出载的是哪几份）；PINNED_REPINS 是载入时正文里要换的钉值（现算）
 PINNED_PATHS = {"rows_orchestrator_1dcfb8d0": os.path.join(HERE, "rows_orchestrator.py"),
@@ -689,11 +734,11 @@ def mutated_closure_paths(inputs: TreeInputs) -> tuple[str, ...]:
 
 # ── 复用库（第 11.5 节）──
 class RunCondition(Exception):
-    """库目录写不了，或与 scripts/experiment-apparatus/target 不在同一个文件系统：退 78。"""
+    """运行条件不满足（三层编排的 H30 库根、H31、干跑配置这一类）：调用方退 78。"""
 
 
 class CorruptedEntry(Exception):
-    """RC5：条目的读数与 manifest.sha256 对不上（已挪进隔离目录）。"""
+    """RC5：条目的读数与 manifest.sha256 对不上（已挪进 quarantine/），或条目不在库里。"""
 
 
 def link_or_copy(source: str, destination: str) -> None:
@@ -763,124 +808,161 @@ def entry_reading(entry: str) -> dict[str, str]:
     return {role: os.path.join(reading, role) for role in sorted(os.listdir(reading))} if os.path.isdir(reading) else {}
 
 
+def packed_entry(directory: str) -> bytes:
+    """拼好的条目目录（key.txt、reading/、meta.tsv、manifest.sha256）打成一份 tar（gzip），就是服务里那一条的值（文件头「库」）。"""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for name in sorted(os.listdir(directory)):
+            archive.add(os.path.join(directory, name), arcname=name)
+    return buffer.getvalue()
+
+
 class Library:
-    """H30 那个目录。frozen-by-s18 在时不取、不入（S18：库冻住，直到主 agent 查出漏的输入、键 schema 加一或另判）。"""
+    """H30 的复用库：prune-server 里 apparatus-items 族、种类 DEVICE_BINARY 那一份（文件头「库」）。root 只当名字与命名空间；
+    area 是这一份另占的那一层相对路径（RP2 一趟一份，空串是整个库）。frozen-by-s18 在时不取、不入（S18：库冻住，直到主 agent 查出漏的输入、键 schema 加一或另判）。"""
 
-    def __init__(self, root: str) -> None:
-        self.root = os.path.abspath(os.path.expanduser(root))
-        self.entries, self.staging, self.quarantine_directory = (os.path.join(self.root, name) for name in ("entries", "staging", "quarantine"))
+    def __init__(self, root: str, area: str = "") -> None:
+        self.root = root
+        self.area = area
+        self.store = prune_server_client.LibraryStore(LIBRARY_FAMILY, DEVICE_BINARY, root)
 
-    def entry_path(self, key: str) -> str:
-        return os.path.join(self.entries, key[:2], key)
+    def relative(self, name: str) -> str:
+        return self.area + name
+
+    def entry_name(self, key: str) -> str:
+        return self.relative(f"{ENTRY_PREFIX}{key}{ARCHIVE_SUFFIX}")
+
+    def location(self) -> str:
+        return self.store.location() + self.area
 
     def frozen_reason(self) -> str | None:
-        path = os.path.join(self.root, FROZEN_FILE)
-        return open(path, encoding="utf-8").read().strip() or "frozen" if os.path.exists(path) else None
+        data = self.store.read(self.relative(FROZEN_FILE))
+        return (data.decode("utf-8", "replace").strip() or "frozen") if data is not None else None
 
     def freeze(self, reason: str) -> None:
-        os.makedirs(self.root, exist_ok=True)
-        with open(os.path.join(self.root, FROZEN_FILE), "a", encoding="utf-8") as handle:
-            handle.write(reason.replace("\n", " ") + "\n")
+        earlier = self.store.read(self.relative(FROZEN_FILE)) or b""
+        self.store.write(self.relative(FROZEN_FILE), earlier + (reason.replace("\n", " ") + "\n").encode("utf-8"))
 
-    def check_run_condition(self, repo: str) -> None:
-        """运行条件（第 11.9 节）：库目录写得了、与 scripts/experiment-apparatus/target 同一个文件系统（硬链接成得了）。"""
+    def check_service_reachable(self) -> None:
+        """运行条件（第 11.9 节）：prune-server 连得上。连不上客户端抛 PruneServerFailure（退 75），不当「库里没有」现判。"""
+        self.store.read(self.relative(FROZEN_FILE))
+
+    def archive(self, key: str) -> bytes | None:
+        return self.store.read(self.entry_name(key))
+
+    def present(self, key: str) -> bool:
+        return self.archive(key) is not None
+
+    @contextlib.contextmanager
+    def extracted(self, key: str, archive: bytes | None = None):
+        """库里这把键的条目解进一个临时目录（中转，出 with 就删）：交 (目录, 解不开的一句)；库里没有交 (None, "absent")，解不开交 (None, 那一句)。"""
+        archive = self.archive(key) if archive is None else archive
+        if archive is None:
+            yield None, "absent"
+            return
+        directory = tempfile.mkdtemp(prefix="e171-reuse-entry-")
         try:
-            for directory in (self.entries, self.staging, self.quarantine_directory):
-                os.makedirs(directory, exist_ok=True)
-            probe = tempfile.NamedTemporaryFile(dir=self.staging, delete=True)
-            probe.close()
-        except OSError as error:
-            raise RunCondition(f"复用库 {self.root} 写不了：{error}") from error
-        target = os.path.join(repo, "scripts", "experiment-apparatus", "target")
-        if os.stat(self.root).st_dev != os.stat(target).st_dev:
-            raise RunCondition(f"复用库 {self.root} 与 {target} 不在同一个文件系统（硬链接不成）")
+            try:
+                with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as handle:
+                    handle.extractall(directory, filter="data")
+            except (tarfile.TarError, OSError, EOFError) as error:
+                yield None, f"archive-unreadable:{type(error).__name__}"
+                return
+            yield directory, ""
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
 
-    def clear_stale_staging(self) -> list[str]:
-        """起跑时删 staging/ 下的残留：只删进程已经不在的那几个（几层编排同时用一个库，别人正写的不动）。"""
-        removed = []
-        for name in sorted(os.listdir(self.staging)) if os.path.isdir(self.staging) else []:
-            process = name.split("-", 1)[0]
-            if process.isdigit() and os.path.exists(f"/proc/{process}"):
-                continue
-            shutil.rmtree(os.path.join(self.staging, name), ignore_errors=True)
-            removed.append(name)
-        return removed
-
-    def quarantine(self, entry: str) -> str:
-        os.makedirs(self.quarantine_directory, exist_ok=True)
-        destination = os.path.join(self.quarantine_directory, f"{os.path.basename(entry)}-{time.time_ns()}")
-        os.rename(entry, destination)
+    def quarantine(self, key: str, archive: bytes) -> str:
+        """RC5 不符的条目原样挪进 quarantine/（写一份、删掉 entries/ 那一条）；交回它在 quarantine/ 下的相对路径。"""
+        destination = self.relative(f"{QUARANTINE_PREFIX}{key}-{time.time_ns()}{ARCHIVE_SUFFIX}")
+        self.store.write(destination, archive)
+        self.store.delete_prefix(self.entry_name(key))
         return destination
 
-    def lookup(self, key: str) -> tuple[str | None, str, list[str]]:
-        """交回 (条目路径, hit|miss|corrupted|frozen, RC5 不符的那几样)。不符的条目挪进隔离目录。"""
+    def entry_keys(self) -> list[str]:
+        """库里每一条条目的键（自证数条数用）。"""
+        prefix = self.relative(ENTRY_PREFIX)
+        return [relative[len(prefix):-len(ARCHIVE_SUFFIX)] for relative, _data in self.store.scan(prefix) if relative.endswith(ARCHIVE_SUFFIX)]
+
+    def quarantined(self) -> list[str]:
+        return [relative for relative, _data in self.store.scan(self.relative(QUARANTINE_PREFIX))]
+
+    def lookup(self, key: str) -> tuple[str | None, str, list[str], dict[str, str]]:
+        """交回 (条目的键, hit|miss|corrupted|frozen, RC5 不符的那几样, 条目的 meta)。不符的条目挪进 quarantine/。"""
         if self.frozen_reason():
-            return None, "frozen", []
-        path = self.entry_path(key)
-        if not os.path.isdir(path):
-            return None, "miss", []
-        problems = entry_problems(path)
+            return None, "frozen", [], {}
+        archive = self.archive(key)
+        if archive is None:
+            return None, "miss", [], {}
+        with self.extracted(key, archive) as (entry, unreadable):
+            problems = [unreadable] if unreadable else entry_problems(entry)
+            meta = read_meta(entry) if entry is not None else {}
         if problems:
-            self.quarantine(path)
-            return None, "corrupted", problems
-        return path, "hit", []
+            self.quarantine(key, archive)
+            return None, "corrupted", problems, {}
+        return key, "hit", [], meta
 
     def insert(self, key: str, text: str, kind: str, reading: dict[str, str], meta: dict[str, str]) -> tuple[str, list[str]]:
-        """原子入库：先写进 staging/<进程号>-<随机>/（key.txt、reading/<角色>、meta.tsv，manifest.sha256 最后写），再 rename 到 entries/…/<键>/。
-        目标已在（别人先入了）就不覆盖、照 RC1 比读数。交回 (inserted|present-identical|present-differs|frozen, 不同的那几样)。"""
+        """入库：先在这一趟自己的临时目录里拼好整份条目（key.txt、reading/<角色>、meta.tsv，manifest.sha256 最后写），再一次写进服务。
+        库里已有同键条目（别人先入了）就不覆盖、照 RC1 比读数。交回 (inserted|present-identical|present-differs|frozen, 不同的那几样)。"""
         if self.frozen_reason():
             return "frozen", []
-        target = self.entry_path(key)
-        if os.path.isdir(target):
-            if entry_problems(target):
-                self.quarantine(target)
-            else:
-                return self.compare_with(target, kind, reading)
-        building = os.path.join(self.staging, f"{os.getpid()}-{secrets.token_hex(8)}")
-        if broken("insert-in-place"):
-            building = target
-        os.makedirs(os.path.join(building, "reading"))
-        with open(os.path.join(building, "key.txt"), "w", encoding="utf-8") as handle:
-            handle.write(text)
-        for role, source in sorted(reading.items()):
-            link_reading(source, os.path.join(building, "reading", role), "row-result.tsv" if role == "row" else None)
-        with open(os.path.join(building, "meta.tsv"), "w", encoding="utf-8") as handle:
-            handle.writelines(f"{name}\t{value}\n" for name, value in sorted(meta.items()))
-        stop_here_if_asked("before-manifest")
-        with open(os.path.join(building, "manifest.sha256"), "w", encoding="utf-8") as handle:
-            handle.write(manifest_text(building))
-        stop_here_if_asked("before-rename")
-        if building == target:
-            return "inserted", []
-        os.makedirs(os.path.dirname(target), exist_ok=True)
+        archive = self.archive(key)
+        if archive is not None:
+            with self.extracted(key, archive) as (entry, unreadable):
+                if not unreadable and not entry_problems(entry):
+                    return self.compare_with(entry, kind, reading)
+            self.quarantine(key, archive)
+        building = tempfile.mkdtemp(prefix="e171-reuse-insert-")   # 中转：拼好整份再写进服务，出这一段就删
         try:
-            os.rename(building, target)
-        except OSError:
+            os.makedirs(os.path.join(building, "reading"))
+            with open(os.path.join(building, "key.txt"), "w", encoding="utf-8") as handle:
+                handle.write(text)
+            for role, source in sorted(reading.items()):
+                link_reading(source, os.path.join(building, "reading", role), "row-result.tsv" if role == "row" else None)
+            with open(os.path.join(building, "meta.tsv"), "w", encoding="utf-8") as handle:
+                handle.writelines(f"{name}\t{value}\n" for name, value in sorted(meta.items()))
+            if broken("insert-in-place"):
+                self.store.write(self.entry_name(key), packed_entry(building))   # 弄坏开关：没有 manifest 的半份先进服务
+            stop_here_if_asked("before-manifest")
+            with open(os.path.join(building, "manifest.sha256"), "w", encoding="utf-8") as handle:
+                handle.write(manifest_text(building))
+            stop_here_if_asked("before-store")
+            self.store.write(self.entry_name(key), packed_entry(building))
+        finally:
             shutil.rmtree(building, ignore_errors=True)
-            return self.compare_with(target, kind, reading)
         return "inserted", []
 
     def compare_with(self, entry: str, kind: str, reading: dict[str, str]) -> tuple[str, list[str]]:
-        """RC1–RC3 的比法：条目里的读数与这一次的。"""
+        """RC1–RC3 的比法：条目里的读数与这一次的（entry 是解开的那个临时目录）。"""
         if broken("check-skipped"):
             return "present-identical", []
         differing = reading_differences(kind, entry_reading(entry), reading)
         return ("present-differs" if differing else "present-identical"), differing
 
+    def reading_roles(self, key: str) -> list[str]:
+        """这把键的条目里有哪几个角色（自证照它拼取用的目标）；不在、解不开交空表。"""
+        with self.extracted(key) as (entry, _unreadable):
+            return sorted(entry_reading(entry)) if entry is not None else []
+
 
 def fetch(library: Library, entry: str, targets: dict[str, str]) -> dict[str, str]:
-    """取用：核 RC5（不符的挪进隔离目录、抛 CorruptedEntry）→ 按角色硬链接到这一趟的名字（目标已在就拒）。交回条目的 meta。"""
-    problems = entry_problems(entry)
-    if problems:
-        library.quarantine(entry)
-        raise CorruptedEntry(f"条目 {entry} 与 manifest.sha256 对不上：{','.join(problems[:4])}")
-    stored = entry_reading(entry)
-    missing = sorted(set(targets) - set(stored))
-    if missing:
-        raise CorruptedEntry(f"条目 {entry} 里没有角色 {','.join(missing)}")
-    for role, target in sorted(targets.items()):
-        link_reading(stored[role], target, "row-result.tsv" if role == "row" else None)
-    return read_meta(entry)
+    """取用（entry 是条目的键）：解进临时目录、核 RC5（不符的挪进 quarantine/、抛 CorruptedEntry；不在库里也抛）→ 按角色写到这一趟的名字（目标已在就拒）。交回条目的 meta。"""
+    archive = library.archive(entry)
+    if archive is None:
+        raise CorruptedEntry(f"条目 {entry[:16]}… 不在库里（{library.location()}）")
+    with library.extracted(entry, archive) as (directory, unreadable):
+        problems = [unreadable] if unreadable else entry_problems(directory)
+        if problems:
+            library.quarantine(entry, archive)
+            raise CorruptedEntry(f"条目 {entry[:16]}… 与 manifest.sha256 对不上：{','.join(problems[:4])}")
+        stored = entry_reading(directory)
+        missing = sorted(set(targets) - set(stored))
+        if missing:
+            raise CorruptedEntry(f"条目 {entry[:16]}… 里没有角色 {','.join(missing)}")
+        for role, target in sorted(targets.items()):
+            link_reading(stored[role], target, "row-result.tsv" if role == "row" else None)
+        return read_meta(directory)
 
 
 # ── 读数相等（第 11.5 节「读数相等」）──
@@ -1026,10 +1108,77 @@ class Decision:
     reason: str
     entry: str = "-"
     meta: dict = dataclasses.field(default_factory=dict)
+    sentinel: str = SENTINEL_NONE   # 复用哨兵抽中的：sentinel（哨兵）、forced（强制现判）；没抽中写 -
+    sentinel_seed: str = "-"
 
 
 # 这几种缘由的单元现跑完也不入库（读数依赖别的行与次序，或环境变量设了）
 NEVER_INSERTED_REASONS = ("env-set", "not-located", "anchor-not-once", "touches-module-set")
+# 拒算（账本末行 refused）：键认不全或照登记永远现跑、从不复用的几类
+REFUSED_REASONS = ("env-set", "closure-outside-the-tree")
+REUSE_CHECKS_PATH = os.path.join(HERE, "..", "..", "gate", "lib_reuse_checks.py")   # 复用三问的判法与规范输出、哨兵的种子与条数全仓一份
+_reuse_checks_module: dict[str, types.ModuleType] = {}
+
+
+def reuse_checks_library() -> types.ModuleType:
+    """scripts/gate/lib_reuse_checks.py（按路径载入一次、不写 .pyc）。"""
+    if "module" not in _reuse_checks_module:
+        specification = importlib.util.spec_from_file_location("lib_reuse_checks_for_e171_reuse_library", REUSE_CHECKS_PATH)
+        module = importlib.util.module_from_spec(specification)
+        sys.dont_write_bytecode = True
+        specification.loader.exec_module(module)
+        _reuse_checks_module["module"] = module
+    return _reuse_checks_module["module"]
+
+
+class RunSentinel:
+    """这一个进程的复用哨兵（文件头「复用哨兵」）：命中按到达次序数，第 forced_hit 条强制现判，sentinel_hits 那几条当哨兵。"""
+
+    def __init__(self, seed: int, count: int) -> None:
+        self.seed = seed
+        picks = random.Random(seed).sample(range(1, SENTINEL_HIT_WINDOW + 1), min(count + 1, SENTINEL_HIT_WINDOW))
+        self.forced_hit, self.sentinel_hits = picks[0], tuple(sorted(picks[1:]))
+        self.hits = 0
+
+    def announcement(self) -> str:
+        variable = reuse_checks_library().SENTINEL_SEED_VARIABLE
+        return (f"  · 复用哨兵（{RESEARCH_RELATIVE}/reuse_library.py）：种子 {self.seed}（{variable}={self.seed} 复现）；强制现判取这一趟第 "
+                f"{self.forced_hit} 条命中，哨兵取第 {'、'.join(str(hit) for hit in self.sentinel_hits) or '-'} 条命中（头 {SENTINEL_HIT_WINDOW} 条里抽；"
+                f"命中不够那几条的，那几条不抽、不因此判红）")
+
+    def plan_event(self) -> str:
+        return (f"E7RESULT name=reuse_sentinel_plan seed={self.seed} forced_hit={self.forced_hit} "
+                f"sentinel_hits={','.join(str(hit) for hit in self.sentinel_hits) or '-'} window={SENTINEL_HIT_WINDOW}")
+
+    def tagged(self, decision: Decision) -> Decision:
+        """一条命中（decision 是 reused）：照到达次序交回强制现判、哨兵或原样。"""
+        if broken("sentinel-skipped"):
+            return decision
+        self.hits += 1
+        seed = str(self.seed)
+        if self.hits == self.forced_hit:
+            if broken("forced-read-answered-found"):
+                return dataclasses.replace(decision, sentinel=SENTINEL_FORCED, sentinel_seed=seed)
+            return dataclasses.replace(decision, state=STATE_FRESH_CHECK, reason=FORCED_REASON, sentinel=SENTINEL_FORCED, sentinel_seed=seed)
+        if self.hits in self.sentinel_hits:
+            return dataclasses.replace(decision, sentinel=SENTINEL_WATCHED, sentinel_seed=seed)
+        return decision
+
+
+_run_sentinel: list[RunSentinel] = []
+
+
+def run_sentinel(library: Library) -> RunSentinel | None:
+    """这一个进程的哨兵：已装的（reuse-sentinel 那一格自己装）就用它；没装的，真跑现装一份、打种子，临时 prune-server 底下与 RP2 那一层不抽。"""
+    if library.area:
+        return None
+    if not _run_sentinel:
+        if not prune_server_client.selftest_service_problem():
+            return None
+        checks = reuse_checks_library()
+        _run_sentinel.append(RunSentinel(checks.sentinel_seed(), checks.sentinel_count()))
+        print(_run_sentinel[0].announcement(), file=sys.stderr, flush=True)
+    return _run_sentinel[0]
 
 
 def decide(library: Library | None, unit: str, kind: str, sections: dict[str, list[str]], always_reason: str, lookup_enabled: bool) -> tuple[Decision, list[str]]:
@@ -1043,9 +1192,11 @@ def decide(library: Library | None, unit: str, kind: str, sections: dict[str, li
         return Decision(unit, kind, key, text, STATE_FRESH, "env-set"), []
     if library is None or not lookup_enabled:
         return Decision(unit, kind, key, text, STATE_FRESH, "lookup-off"), []
-    entry, outcome, problems = library.lookup(key)
+    entry, outcome, problems, meta = library.lookup(key)
     if outcome == "hit":
-        return Decision(unit, kind, key, text, STATE_REUSED, "hit", entry, read_meta(entry)), []
+        decision = Decision(unit, kind, key, text, STATE_REUSED, "hit", entry, meta)
+        sentinel = run_sentinel(library)
+        return (sentinel.tagged(decision) if sentinel else decision), []
     return Decision(unit, kind, key, text, STATE_FRESH, {"miss": "no-entry", "corrupted": "corrupted-entry", "frozen": "library-frozen"}[outcome]), problems
 
 
@@ -1058,13 +1209,35 @@ def write_marker(markers: str, decision: Decision, extra: dict[str, str] | None 
     os.makedirs(markers, exist_ok=True)
     fields = {"unit": decision.unit, "kind": decision.kind, "key": decision.key, "state": decision.state, "reason": decision.reason,
               "entry": decision.entry, "origin_run": decision.meta.get("origin_run", "-"), "origin_product": decision.meta.get("origin_product", "-"),
-              "origin_host": decision.meta.get("origin_host", "-")}
+              "origin_host": decision.meta.get("origin_host", "-"), "sentinel": decision.sentinel, "sentinel_seed": decision.sentinel_seed}
     fields.update(extra or {})
     path = marker_path(markers, decision.unit)
     partial = f"{path}.{os.getpid()}.partial"
     with open(partial, "w", encoding="utf-8") as handle:
         handle.writelines(f"{name}\t{value}\n" for name, value in fields.items())
     os.replace(partial, path)
+    if decision.sentinel != SENTINEL_NONE:
+        note_sentinel(markers, decision)
+
+
+def append_event_once(markers: str, line: str) -> None:
+    """同一行事件只记一次（标记会重写几次，哨兵的事件跟着标记走）。"""
+    if line not in event_lines(markers):
+        append_event(markers, line)
+
+
+def note_sentinel_problem(markers: str, decision: Decision, problem: str, detail: str = "-") -> None:
+    append_event_once(markers, f"E7RESULT name=reuse_sentinel unit={value(decision.unit)} key={decision.key} seed={decision.sentinel_seed} "
+                               f"role={decision.sentinel} problem={problem} detail={value(detail)}")
+
+
+def note_sentinel(markers: str, decision: Decision) -> None:
+    """抽中的单元写标记时：这一趟哨兵的种子与抽法记一行（每个种子一行）；强制现判那一条的标记仍是 reused 就记 forced-reused。"""
+    sentinel = _run_sentinel[0] if _run_sentinel and str(_run_sentinel[0].seed) == decision.sentinel_seed else None
+    if sentinel is not None:
+        append_event_once(markers, sentinel.plan_event())
+    if decision.sentinel == SENTINEL_FORCED and decision.state == STATE_REUSED:
+        note_sentinel_problem(markers, decision, "forced-reused", "抽中强制现判的那一条照取来交出去")
 
 
 def read_markers(markers: str) -> dict[str, dict[str, str]]:
@@ -1100,9 +1273,21 @@ def note_decision(markers: str, decision: Decision, problems: list[str]) -> None
 def record_finished(library: Library | None, markers: str, decision: Decision, reading: dict[str, str], insertable: tuple[bool, str],
                     meta: dict[str, str]) -> str:
     """一个现跑完的单元（取来的不进这里）：照入库条件入库；库里已有同键条目时比读数——普通单元是 RC1（kind=insert），永远现跑的第二趟是 RC2
-    （kind=second-run），RC3 抽到的是 kind=sample。交回入库的结局（not-inserted 也是一种）。"""
+    （kind=second-run），RC3 抽到的是 kind=sample，复用哨兵的强制现判是 kind=forced。交回入库的结局（not-inserted 也是一种）。
+    决定是取来的单元交到这里就是照现跑了：哨兵记 sentinel-rejudged；强制现判跑完没与库里那一条比上记 forced-not-compared（文件头「复用哨兵」）。"""
     if decision.state == STATE_REUSED:
+        if decision.sentinel == SENTINEL_WATCHED:
+            note_sentinel_problem(markers, decision, "sentinel-rejudged", "键相同、库里有、决定是取来，却照现跑了")
         return "not-applicable"
+    state = record_fresh_reading(library, markers, decision, reading, insertable, meta)
+    if decision.sentinel == SENTINEL_FORCED and state not in ("present-identical", "present-differs", "frozen"):
+        note_sentinel_problem(markers, decision, "forced-not-compared", f"入库的结局 {state}（{insertable[1] or '入库条件过'}）")
+    return state
+
+
+def record_fresh_reading(library: Library | None, markers: str, decision: Decision, reading: dict[str, str], insertable: tuple[bool, str],
+                         meta: dict[str, str]) -> str:
+    """record_finished 的现跑那一半：照入库条件入库或比读数，记 reuse_check 与 reuse_insert 两行事件。"""
     ok, why = insertable
     if decision.reason in NEVER_INSERTED_REASONS:
         ok, why = False, decision.reason
@@ -1112,7 +1297,7 @@ def record_finished(library: Library | None, markers: str, decision: Decision, r
         meta = dict(meta, unit=decision.unit, kind=decision.kind, inserted=time.strftime("%Y-%m-%d"))
         state, differing = library.insert(decision.key, decision.text, decision.kind, reading, meta)
     if state in ("present-identical", "present-differs"):
-        check_kind = {STATE_FRESH_ALWAYS: "second-run", STATE_FRESH_CHECK: "sample"}.get(decision.state, "insert")
+        check_kind = "forced" if decision.reason == FORCED_REASON else {STATE_FRESH_ALWAYS: "second-run", STATE_FRESH_CHECK: "sample"}.get(decision.state, "insert")
         append_event(markers, f"E7RESULT name=reuse_check kind={check_kind} unit={value(decision.unit)} key={decision.key} "
                               f"identical={str(state == 'present-identical').lower()} differing={value(','.join(differing[:12]))}")
     append_event(markers, f"E7RESULT name=reuse_insert unit={value(decision.unit)} key={decision.key} state={state} reason={value(why)}")
@@ -1141,9 +1326,10 @@ def event_lines(markers: str) -> list[str]:
 
 
 def s18_problems(markers: str) -> list[str]:
-    """S18（第 11.9 节）：① RC1–RC3 任一次 identical=false；② RC4 不符。交回触发的那几行事件。"""
+    """S18（第 11.9 节）：① RC1–RC3（与强制现判）任一次 identical=false；② RC4 不符；③ 复用哨兵红（文件头「复用哨兵」）。交回触发的那几行事件。"""
     return [line for line in event_lines(markers) if (" name=reuse_check " in f" {line} " and " identical=false " in f" {line} ")
-            or (" name=reuse_closure_check " in f" {line} " and " matches=false " in f" {line} ")]
+            or (" name=reuse_closure_check " in f" {line} " and " matches=false " in f" {line} ")
+            or (" name=reuse_sentinel " in f" {line} " and not broken("sentinel-problems-ignored"))]
 
 
 def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
@@ -1151,7 +1337,7 @@ def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
     found = read_markers(markers)
     counts = {STATE_FRESH: 0, STATE_REUSED: 0, STATE_FRESH_CHECK: 0, STATE_FRESH_ALWAYS: 0}
     lines = [f"E7RESULT name=reuse_columns registered_units={len(registered)} states=fresh,reused,fresh-check,fresh-always"]
-    environment_set = 0
+    environment_set = refused = 0
     for unit in registered:
         marker = found.get(unit)
         if marker is None:
@@ -1159,6 +1345,7 @@ def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
         state = marker["state"]
         counts[state] += 1
         environment_set += marker.get("reason") == "env-set"
+        refused += state == STATE_FRESH_ALWAYS or marker.get("reason") in REFUSED_REASONS
         lines.append(f"E7RESULT name=reuse unit={value(unit)} key={marker['key']} state={state} reason={value(marker.get('reason'))} "
                      f"entry={value(marker.get('entry'))} origin_run={value(marker.get('origin_run'))} origin_product={value(marker.get('origin_product'))} "
                      f"origin_host={value(marker.get('origin_host'))}")
@@ -1169,14 +1356,29 @@ def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
     unregistered = sorted(set(found) - set(registered))
     sample_sizes = [int(line.split(" k=", 1)[1].split()[0]) for line in events if " name=reuse_sample " in f" {line} "]
     covers = judged_fresh + counts[STATE_REUSED] == len(registered)
+    sentinel_outcome, sentinel_problems = sentinel_outcome_line({unit: found[unit] for unit in registered if unit in found}, events)
+    lines.append(sentinel_outcome)
     lines.append(f"E7RESULT name=verdict units={judged_fresh + counts[STATE_REUSED]} judged_fresh={judged_fresh} reused={counts[STATE_REUSED]} "
                  f"fresh_check={counts[STATE_FRESH_CHECK]} fresh_always={counts[STATE_FRESH_ALWAYS]} sample_size={sample_sizes[-1] if sample_sizes else 0} "
                  f"check_mismatches={sum(1 for line in events if ' name=reuse_check ' in f' {line} ' and ' identical=false ' in f' {line} ')} "
                  f"closure_mismatches={sum(1 for line in events if ' name=reuse_closure_check ' in f' {line} ' and ' matches=false ' in f' {line} ')} "
                  f"corrupted_entries={sum(1 for line in events if ' name=reuse_corrupted ' in f' {line} ')} env_set_units={environment_set} "
                  f"registered_units={len(registered)} units_cover_registered={str(covers).lower()} missing={value(','.join(missing[:8]))} "
-                 f"unregistered={value(','.join(unregistered[:8]))}")
+                 f"unregistered={value(','.join(unregistered[:8]))} judged_now={judged_fresh - refused} refused={refused} "
+                 f"sentinel_problems={sentinel_problems}")
     return "\n".join(lines) + "\n", covers
+
+
+def sentinel_outcome_line(markers: dict[str, dict[str, str]], events: list[str]) -> tuple[str, int]:
+    """账本里复用哨兵那一行（文件头「复用哨兵」）：种子、强制现判的单元与它比上没有、哨兵几条、几条照旧取来、红了几样。交回 (那一行, 红了几样)。"""
+    forced = [unit for unit, marker in markers.items() if marker.get("sentinel") == SENTINEL_FORCED]
+    watched = [unit for unit, marker in markers.items() if marker.get("sentinel") == SENTINEL_WATCHED]
+    seeds = sorted({marker.get("sentinel_seed", "-") for marker in markers.values() if marker.get("sentinel", SENTINEL_NONE) != SENTINEL_NONE})
+    compared = [unit for unit in forced if any(" name=reuse_check kind=forced " in f" {line} " and f" unit={value(unit)} " in f" {line} " for line in events)]
+    still_reused = sum(1 for unit in watched if markers[unit].get("state") == STATE_REUSED)
+    problems = sum(1 for line in events if " name=reuse_sentinel " in f" {line} ")
+    return (f"E7RESULT name=reuse_sentinel_outcome seeds={value(','.join(seeds))} forced={value(','.join(forced))} "
+            f"forced_compared={len(compared)} sentinels={value(','.join(watched))} sentinels_reused={still_reused} problems={problems}"), problems
 
 
 def install_ledger(path: str, text: str) -> str:
@@ -1307,7 +1509,7 @@ def command_fetch(arguments: argparse.Namespace) -> int:
         meta = fetch(Library(arguments.library), arguments.entry, targets)
     except (CorruptedEntry, FileExistsError) as error:
         print(f"✗ 取用不成：{error}", file=sys.stderr)
-        print('     → 怎么办：目标已在就先挪走再取；库里那一条坏了就删掉那一条，让下一趟重算', file=sys.stderr)
+        print('     → 怎么办：目标已在就先挪走再取；库里那一条坏了已挪进 quarantine/，下一趟照现跑重算', file=sys.stderr)
         return 1
     print(meta.get("exit", "0"))
     return 0
@@ -1327,13 +1529,21 @@ def selfproof_run(repo: str, binary: str, threads: str, directory: str) -> tuple
 def command_selfproof(arguments: argparse.Namespace) -> int:
     """RP2（第 11.8 节）：①复用关、入一个只给这一单元用的库；②复用开、取来，与①逐字节比；③另一个目录现跑、照 RC1 比。"""
     repo = os.path.abspath(arguments.repo)
-    root = os.path.join(os.path.abspath(os.path.expanduser(arguments.library)), f"{time.strftime('%Y%m%d')}-{os.getpid()}")
-    library = Library(root)
-    library.check_run_condition(repo)
+    # 只给这一单元用的那一层（文件头「库」RP2 那一行）：这一趟独占，跑完删
+    library = Library(arguments.library, area=f"{SELFPROOF_AREA}/{time.strftime('%Y%m%d')}-{os.getpid()}-{secrets.token_hex(4)}/")
+    library.check_service_reachable()
+    try:
+        return selfproof_steps(repo, arguments, library)
+    finally:
+        library.store.delete_prefix(library.area)
+
+
+def selfproof_steps(repo: str, arguments: argparse.Namespace, library: Library) -> int:
+    """RP2 的三步（command_selfproof 的文件头）：库是这一趟独占的那一层。"""
     markers = os.path.join(arguments.scratch, "markers")
     sections = {"kind": ["device"], "build": [f"binary {sha256_file(arguments.binary)}"], "args": ["stream-constants --streams 1,2,3"],
                 "limit": limit_lines(None), "python": [python_text()]}
-    lines = [f"E7RESULT name=reuse_selfproof_config library={value(root)} binary_sha256={sha256_file(arguments.binary)} key={key_of(sections)}"]
+    lines = [f"E7RESULT name=reuse_selfproof_config library={value(library.location())} binary_sha256={sha256_file(arguments.binary)} key={key_of(sections)}"]
     first_exit, first_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-1"))
     first, _ = decide(library, "reuse-selfproof", "device", sections, "", False)
     inserted = record_finished(library, markers, first, {"product": first_product}, device_exit_insertable(first_exit, (0,)),
@@ -1375,11 +1585,7 @@ def main(argument_list: list[str]) -> int:
         proof.add_argument(name, required=True)
     proof.add_argument("--repo", default=os.getcwd())
     arguments = parser.parse_args(argument_list)
-    try:
-        return command_fetch(arguments) if arguments.command == "fetch" else command_selfproof(arguments)
-    except RunCondition as error:
-        print(f"✗ 运行条件不满足（退 78）：{error}", file=sys.stderr)
-        return EXIT_RUN_CONDITION
+    return command_fetch(arguments) if arguments.command == "fetch" else command_selfproof(arguments)
 
 
 # ── 自证：假仓、假树、假装置、假驱动、假判法；键、库、账本都调上面的真函数 ──
@@ -1510,10 +1716,8 @@ def fake_judge(reading: dict[str, str]) -> str:
 
 
 def library_in(scratch: str) -> Library:
-    library = Library(os.path.join(scratch, "library"))
-    for directory in (library.entries, library.staging, library.quarantine_directory):
-        os.makedirs(directory, exist_ok=True)
-    return library
+    """这一格自己的那一份库：库根取格的临时目录下的名字，临时服务底下各占一份命名空间（文件头「库」）。"""
+    return Library(os.path.join(scratch, "library"))
 
 
 def reuse_across(scratch: str, first_sections: dict, second_sections: dict, kind: str = "device") -> tuple[bool, str]:
@@ -1636,30 +1840,29 @@ def killed_in_child(point: str, action) -> int:
 
 
 def half_entries(library: Library) -> list[str]:
-    """entries/ 下读数与 manifest 对不上（含没有 manifest）的条目。"""
+    """服务里读数与 manifest 对不上（含没有 manifest、解不开）的条目。"""
     found = []
-    for prefix in sorted(os.listdir(library.entries)) if os.path.isdir(library.entries) else []:
-        for key in sorted(os.listdir(os.path.join(library.entries, prefix))):
-            if manifest_problems(os.path.join(library.entries, prefix, key)):
+    for key in library.entry_keys():
+        with library.extracted(key) as (entry, unreadable):
+            if unreadable or manifest_problems(entry):
                 found.append(key[:12])
     return found
 
 
 def cell_rp5_atomic_insert(scratch: str) -> tuple[bool, str]:
-    """在 manifest 写之前、rename 之前各杀一次：entries/ 下没有半条条目；再起时 staging/ 残留删掉；那一单元照常入库。"""
+    """在拼 manifest 之前、写进服务之前各杀一次：服务里没有这把键的条目、也没有半条；那一单元再入库照常 inserted、整份核得过。"""
     library = library_in(scratch)
     reading = fake_device_reading(os.path.join(scratch, "reading"), "unit")
     sections = {"kind": ["device"], "args": ["baseline --streams 1"]}
-    codes, half = [], []
-    for point in ("before-manifest", "before-rename"):  # 每杀一次就数一遍：第二次入库会把第一次留下的坏条目挪走，攒到最后再数就看不见
+    codes, half, present = [], [], []
+    for point in ("before-manifest", "before-store"):  # 每杀一次就数一遍：第二次入库会把第一次留下的坏条目挪走，攒到最后再数就看不见
         codes.append(killed_in_child(point, lambda: library.insert(key_of(sections), key_text(sections), "device", reading, {"exit": "0"})))
         half += [f"{point}:{key}" for key in half_entries(library)]
-    leftover = sorted(os.listdir(library.staging))
-    removed = library.clear_stale_staging()
+        present.append(library.present(key_of(sections)))
     state, _ = library.insert(key_of(sections), key_text(sections), "device", reading, {"exit": "0"})
-    good = codes == [-signal.SIGKILL, -signal.SIGKILL] and not half and len(leftover) == 2 and len(removed) == 2 and state == "inserted" \
-        and not os.listdir(library.staging) and not half_entries(library)
-    return good, f"子进程退出码 {codes}；被杀之后 entries/ 里半条条目 {half or '无'}；staging/ 残留 {len(leftover)}、清掉 {len(removed)}；再入库 {state}"
+    good = codes == [-signal.SIGKILL, -signal.SIGKILL] and not half and present == [False, False] and state == "inserted" \
+        and not half_entries(library) and library.entry_keys() == [key_of(sections)]
+    return good, f"子进程退出码 {codes}；被杀之后服务里半条条目 {half or '无'}、这把键在不在 {present}；再入库 {state}；库里条目 {len(library.entry_keys())} 条"
 
 
 def cell_rp6_closure(scratch: str, extra_file) -> tuple[bool, str]:
@@ -1703,25 +1906,30 @@ def cell_rp7_check_mismatch(scratch: str) -> tuple[bool, str]:
     write_marker(markers, second)
     state = record_finished(library, markers, second, second_reading, (True, ""), {"exit": "0"})
     text, _ = ledger_text(markers, ["step-7", "step-9"])
-    same_product = open(second_reading["product"], "rb").read() == open(entry_reading(library.entry_path(first.key))["product"], "rb").read()
+    with library.extracted(first.key) as (entry, _unreadable):
+        same_product = entry is not None and open(second_reading["product"], "rb").read() == open(entry_reading(entry)["product"], "rb").read()
     good = state == "present-differs" and " check_mismatches=1 " in text and bool(s18_problems(markers)) and same_product
     return good, f"第二次入库 {state}；产物相同 {same_product}；账本末行 {text.strip().splitlines()[-1][:110]}"
 
 
 def cell_rp8_corrupted_entry(scratch: str) -> tuple[bool, str]:
-    """库里一条条目的读数改一字节：不取它、挪进隔离目录、现跑；账本 corrupted_entries=1；现跑完照常入库。"""
+    """库里一条条目的读数改一字节（manifest 不动，重新打包写回服务）：不取它、挪进 quarantine/、现跑；账本 corrupted_entries=1；现跑完照常入库。"""
     library, markers = library_in(scratch), os.path.join(scratch, "markers")
     sections = {"kind": ["device"], "args": ["baseline --streams 1,2"]}
     first, _ = decide(library, "step-1", "device", sections, "", False)
     record_finished(library, markers, first, fake_device_reading(os.path.join(scratch, "first"), "s2"), (True, ""), {"exit": "0"})
-    entry_file = os.path.join(library.entry_path(first.key), "reading", "product")
-    damaged = open(entry_file, "rb").read() + b"x"
-    os.remove(entry_file)
-    with open(entry_file, "wb") as handle:
-        handle.write(damaged)
+    with library.extracted(first.key) as (entry, unreadable):
+        if entry is None:
+            return False, f"头一次入库之后条目读不回（{unreadable}）"
+        entry_file = os.path.join(entry, "reading", "product")
+        damaged = open(entry_file, "rb").read() + b"x"
+        os.remove(entry_file)
+        with open(entry_file, "wb") as handle:
+            handle.write(damaged)
+        library.store.write(library.entry_name(first.key), packed_entry(entry))
     second, problems = decide(library, "step-1", "device", sections, "", True)
     note_decision(markers, second, problems)
-    quarantined = len(os.listdir(library.quarantine_directory))
+    quarantined = len(library.quarantined())
     state = record_finished(library, markers, second, fake_device_reading(os.path.join(scratch, "second"), "s2"), (True, ""), {"exit": "0"})
     text, _ = ledger_text(markers, ["step-1"])
     good = second.state == STATE_FRESH and second.reason == "corrupted-entry" and quarantined == 1 and " corrupted_entries=1 " in text and state == "inserted"
@@ -1778,7 +1986,7 @@ def cell_rp4_resume_fetch(scratch: str) -> tuple[bool, str]:
     partial = os.path.isdir(os.path.join(root, "row-4")) and not os.path.exists(os.path.join(root, "row-4", "row-result.tsv"))
     fetched, demoted = fetch_rows(library, second_markers, pairs)
     inodes_after = {row: os.stat(os.path.join(root, f"row-{row}", "row-result.tsv")).st_ino for row in (1, 2, 5, 3)}
-    entries = sum(len(os.listdir(os.path.join(library.entries, prefix))) for prefix in os.listdir(library.entries))
+    entries = len(library.entry_keys())
     text_one, covers_one = ledger_text(first_markers, [row.name for row in rows])
     text_two, covers_two = ledger_text(second_markers, [row.name for row in rows])
     good = (code == -signal.SIGKILL and partial and fetched == ["seg2-row-4"] and not demoted and inodes_before == inodes_after and entries == 3
@@ -1824,7 +2032,7 @@ def rp1_pass(world: FakeWorld, library: Library, markers: str, lookup: bool, roo
         directory = os.path.join(root, unit.name.replace("/", "-"))
         exit_code = RP1_EXITS.get(unit.name, 0)
         if decision.state == STATE_REUSED:
-            reading = {role: os.path.join(directory, role) for role in entry_reading(decision.entry)}
+            reading = {role: os.path.join(directory, role) for role in library.reading_roles(decision.entry)}
             fetch(library, decision.entry, reading)
         elif isinstance(unit, RowUnit):
             reading = fake_row_reading(directory, decision.key[:16], exit_code, unit.executor)
@@ -1870,6 +2078,136 @@ def cell_rp1_two_passes(scratch: str) -> tuple[bool, str]:
             and " check_mismatches=0 " in verdict and not s18_problems(os.path.join(scratch, "markers-1")))
     return good, (f"{len(names)} 个单元；第二遍现跑的 {fresh if fresh != expected_fresh else len(fresh)}（要 {len(expected_fresh)} 个）；读数不同的 {differing or '无'}；"
                   f"判法不同的 {judge_differences or '无'}；账本 {verdict[:120]}")
+
+
+def cell_reuse_three_questions(scratch: str) -> tuple[bool, str]:
+    """复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）：第二段三行（1、2、4）各一项，四趟查库、现跑的照入库条件入库——库是空的、同一份输入、
+    仓里另加一份没有哪一项的键读的文件（闭包外）、只改第 4 行行表那一行（只在它的键里，[mutation]）；打规范输出 REUSE_SELFTEST script=<本文件>。
+    键按文件内容取（第 11.2 节），注释也进键，闭包外的改动取不在任何一项键里的文件。"""
+    checks = reuse_checks_library()
+    world, library = fake_world(os.path.join(scratch, "world")), library_in(scratch)
+    rows = [RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False) for number in (1, 2, 4)]
+    selected = selected_row_lines(world.repo)
+    runs = []
+    for edit in (None, None, "unrelated", "unit"):
+        if edit == "unrelated":
+            write_text(os.path.join(world.repo, "docs", "not-read-by-any-key.md"), "没有哪一项的键读这一份\n")
+        elif edit == "unit":
+            selected = {**selected, 4: selected[4].replace("dddddddddddd", "dddddddddddf")}
+        states = {}
+        for row in rows:
+            sections, reason = row_sections(world.inputs(), row, selected, limit_lines(1800), [])
+            decision, _problems = decide(library, row.name, "driver-row", sections, reason, True)
+            if decision.state == STATE_REUSED:
+                states[row.name] = checks.REUSED
+                continue
+            reading = fake_row_reading(os.path.join(scratch, f"pass-{len(runs) + 1}", row.name), decision.key[:16], 0, False)
+            record_finished(library, os.path.join(scratch, f"markers-{len(runs) + 1}"), decision, reading, row_insertable(reading["row"]), {"exit": "0"})
+            states[row.name] = checks.JUDGED
+        runs.append(states)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        passed, problems = checks.report_three_questions(f"{RESEARCH_RELATIVE}/reuse_library.py", *runs, ["seg2-row-4"])
+    print(output.getvalue(), end="", flush=True)   # 规范输出那一行（门禁 code-tooling 的 reuse-selftests 格认标准输出里这一行）
+    return passed, "；".join(problems) or f"四趟：{runs}"
+
+
+SENTINEL_CELL_ROWS = (1, 2, 4, 5)   # 第二段四行：都入得了库，第二遍四条都命中
+SENTINEL_CELL_COUNT = 2
+
+
+def sentinel_seed_within(hits: int, count: int) -> int:
+    """头一个让强制现判与 count 条哨兵都落在头 hits 条命中里的种子（这一格的四行全用上）。"""
+    for seed in range(100000):
+        sentinel = RunSentinel(seed, count)
+        if max((sentinel.forced_hit,) + sentinel.sentinel_hits) <= hits:
+            return seed
+    raise RuntimeError(f"十万个种子里没有一个把强制现判与 {count} 条哨兵都抽在头 {hits} 条命中里")
+
+
+def sentinel_case(scratch: str, name: str, seed: int) -> tuple[list[Decision], list[str], str]:
+    """一种情形：第一遍查库关、四行现跑入库；第二遍装一份哨兵（种子 seed）查库，照情形 name 做，再照真编排的样子取来、现跑、入库。
+    交回 (第二遍的决定, s18_problems, 账本里哨兵那一行)。情形：as-registered 照规矩；sentinel-rejudged 一条哨兵照现跑；
+    forced-differs 强制现判那一行的读数换一份；forced-reused 强制现判那一条的标记写成取来；forced-not-compared 强制现判那一行超时、入库条件不过。"""
+    world, library = fake_world(os.path.join(scratch, name, "world")), library_in(os.path.join(scratch, name))
+    rows = [RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False) for number in SENTINEL_CELL_ROWS]
+    first_markers, markers = os.path.join(scratch, name, "markers-1"), os.path.join(scratch, name, "markers-2")
+    identities = {}
+    for decision, row in zip(row_decisions(world, library, rows, False), rows):
+        identities[row.name] = decision.key[:16]
+        reading = fake_row_into(os.path.join(scratch, name, "rows-1", f"row-{row.number}"), identities[row.name], 0, False)
+        record_finished(library, first_markers, decision, reading, row_insertable(reading["row"]), {"exit": "0"})
+    _run_sentinel[:] = [RunSentinel(seed, SENTINEL_CELL_COUNT)]
+    try:
+        decisions = row_decisions(world, library, rows, True)
+        root = os.path.join(scratch, name, "rows-2")
+        pairs = [(decision, os.path.join(root, f"row-{row.number}")) for decision, row in zip(decisions, rows)]
+        fetch_rows(library, markers, pairs)
+        for decision, row_directory in pairs:
+            if decision.sentinel == SENTINEL_FORCED and name == "forced-reused":
+                write_marker(markers, dataclasses.replace(decision, state=STATE_REUSED))
+            if decision.state == STATE_REUSED and not (decision.sentinel == SENTINEL_WATCHED and name == "sentinel-rejudged"):
+                continue
+            identity = identities[decision.unit] + ("-changed" if decision.sentinel == SENTINEL_FORCED and name == "forced-differs" else "")
+            device_exit = TIMEOUT_EXIT_CODE if decision.sentinel == SENTINEL_FORCED and name == "forced-not-compared" else 0
+            if os.path.isdir(row_directory):
+                shutil.rmtree(row_directory)
+            reading = fake_row_into(row_directory, identity, device_exit, False)
+            record_finished(library, markers, decision, reading, row_insertable(reading["row"]), {"exit": str(device_exit)})
+    finally:
+        _run_sentinel.clear()
+    text, _covers = ledger_text(markers, [row.name for row in rows])
+    outcome = [line for line in text.splitlines() if line.startswith("E7RESULT name=reuse_sentinel_outcome ")]
+    return decisions, s18_problems(markers), (outcome or ["没有哨兵那一行"])[0]
+
+
+# 四种红各自该出的那一样（s18_problems 里认的字样）
+SENTINEL_RED_CASES = (("sentinel-rejudged", " problem=sentinel-rejudged "), ("forced-differs", " kind=forced "),
+                      ("forced-reused", " problem=forced-reused "), ("forced-not-compared", " problem=forced-not-compared "))
+
+
+def cell_reuse_sentinel(scratch: str) -> tuple[bool, str]:
+    """复用哨兵（文件头「复用哨兵」）一绿四红：照规矩那一种——强制现判恰一条、交 fresh-check 现跑、与库里那一条比上且相同，哨兵 2 条照旧取来，
+    s18_problems 空、账本哨兵那一行 problems=0；四种红各在 s18_problems 里出自己那一样。种子取头一个让四行全用上的。"""
+    seed = sentinel_seed_within(len(SENTINEL_CELL_ROWS), SENTINEL_CELL_COUNT)
+    decisions, problems, outcome = sentinel_case(scratch, "as-registered", seed)
+    forced = [decision for decision in decisions if decision.sentinel == SENTINEL_FORCED]
+    watched = [decision for decision in decisions if decision.sentinel == SENTINEL_WATCHED]
+    wrong = []
+    if len(forced) != 1 or forced[0].state != STATE_FRESH_CHECK or len(watched) != SENTINEL_CELL_COUNT:
+        wrong.append(f"照规矩：强制现判 {[(decision.unit, decision.state) for decision in forced]}、哨兵 {len(watched)} 条（要 1 条 fresh-check、{SENTINEL_CELL_COUNT} 条）")
+    if problems or " problems=0 " not in f"{outcome} " or " forced_compared=1 " not in f" {outcome} " or f" seeds={seed} " not in f" {outcome} ":
+        wrong.append(f"照规矩：s18 {problems[:2] or '空'}；账本 {outcome}")
+    for name, expected in SENTINEL_RED_CASES:
+        _decisions, red_problems, red_outcome = sentinel_case(scratch, name, seed)
+        if not any(expected in f" {line} " for line in red_problems):
+            wrong.append(f"{name}：s18 里没有「{expected.strip()}」（{red_problems[:2] or '空'}；账本 {red_outcome}）")
+    return not wrong, "；".join(wrong) or f"种子 {seed}：照规矩那一种 {outcome}；四种红各出自己那一样"
+
+
+def location_keys(root: str) -> dict[str, str]:
+    """root 底下一份假仓与假树上各类单元的键：装置（带上游导出目录）、E170、执行器、变异驱动、第二段一行、第一段一行（空变异）。"""
+    world = fake_world(root)
+    inputs = world.inputs()
+    upstream_directory = os.path.join(root, "upstream-export")
+    write_text(os.path.join(upstream_directory, "new_pool_file_creation", "states.tsv"), "上游导出\n")
+    upstream = upstream_lines([("e170-export", "step-2", upstream_directory)])
+    units = {"device": ReadingUnit("step-1", "step-1", "s", "device", "baseline --streams 1,2 --output-directory " + os.path.join(root, "dumps")),
+             "e170": ReadingUnit("step-2b", "step-2b", "s", "e170", "bad-states-second-run --seed-hex 85441ae491419411"),
+             "o3-executor": ReadingUnit("step-5", "step-5", "s", "o3-executor", f"executor --streams {STREAMS_ONE_TWO}"),
+             "mutation-driver": ReadingUnit("research-mutations", "research-mutations", "s", "mutation-driver", MUTATIONS_TABLE_RELATIVE)}
+    keys = {kind: key_of(reading_unit_sections(inputs, unit, upstream)) for kind, unit in units.items()}
+    keys["segment-two-row"] = key_of(row_two(world, inputs))
+    empty = RowUnit("seg1-s12-row-0", 0, True, ("--empty-mutation", "--keep-dumps", "--streams", "1,2,3"), True, True, owner="s12")
+    keys["segment-one-empty-row"] = key_of(row_sections(inputs, empty, selected_row_lines(world.repo), limit_lines(1800), upstream)[0])
+    return keys
+
+
+def cell_key_independent_of_location(scratch: str) -> tuple[bool, str]:
+    """同一份假仓与假树（连上游导出）放在两处：一处在主树的位置，一处在另一处的副本目录底下、多套几层；各类单元的键逐个相同（路径、副本还是主树都不进键）。"""
+    here, there = location_keys(os.path.join(scratch, "main-tree")), location_keys(os.path.join(scratch, "copies", "nested", "copy-of-the-tree"))
+    differing = sorted(kind for kind in here if here[kind] != there[kind])
+    return not differing, (f"{len(here)} 类单元的键都相同" if not differing else f"键随所在目录变了：{', '.join(differing)}")
 
 
 LAYER_FILES = ("segment_one_units_revision_11.py", "rows_orchestrator_revision_11.py", "rows_orchestrator_segment_two_revision_11.py")
@@ -2125,7 +2463,8 @@ def cell_frozen_o3_reverse_moves(scratch: str) -> tuple[bool, str]:
 
 
 SELFTEST_CELLS = {
-    "rp1-two-passes": cell_rp1_two_passes, "rp1-layers-e2e": cell_rp1_layers_end_to_end,
+    "rp1-two-passes": cell_rp1_two_passes, "rp1-layers-e2e": cell_rp1_layers_end_to_end, "reuse-three-questions": cell_reuse_three_questions,
+    "reuse-sentinel": cell_reuse_sentinel, "key-independent-of-location": cell_key_independent_of_location,
     "rp3-kind": cell_rp3_kind, "rp3-build": cell_rp3_build, "rp3-closure": cell_rp3_closure, "rp3-closure-mutated-content": cell_rp3_closure_mutated_content,
     "rp3-env": cell_rp3_env, "rp3-mutation": cell_rp3_mutation, "rp3-args": cell_rp3_args, "rp3-limit": cell_rp3_limit, "rp3-upstream": cell_rp3_upstream,
     "rp3-research": cell_rp3_research, "rp3-python": cell_rp3_python,
@@ -2139,10 +2478,17 @@ SELFTEST_SWITCHES = {**{f"drop-{name}": f"rp3-{name}" for name in SECTION_ORDER}
                      "closure-check-skipped": "rp6-closure-extra-file", "manifest-unchecked": "rp8-corrupted-entry", "insert-in-place": "rp5-atomic-insert",
                      "fresh-always-ignored": "rp1-two-passes", "pin-moves-ignored": "pin-moves", "frozen-o3-moves-ignored": "frozen-o3-moves",
                      "pin-partial-accepted": "pin-moves-partial", "frozen-o3-partial-accepted": "frozen-o3-reverse-moves",
-                     "frozen-o3-whole-chain-only": "frozen-o3-reverse-moves"}
+                     "frozen-o3-whole-chain-only": "frozen-o3-reverse-moves", "sentinel-skipped": "reuse-sentinel",
+                     "forced-read-answered-found": "reuse-sentinel", "sentinel-problems-ignored": "reuse-sentinel",
+                     "location-in-key": "key-independent-of-location"}
 
 
 def selftest(argument_list: list[str]) -> int:
+    problem = prune_server_client.selftest_service_problem()
+    if problem:   # 库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「用法」--selftest）
+        print(f"✗ reuse_library.py 自证没跑：{problem}", file=sys.stderr)
+        print(f"     → 怎么办：{prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
+        return 2
     os.environ[SELFTEST_VARIABLE] = "1"
     return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
 

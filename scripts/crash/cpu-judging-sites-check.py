@@ -60,7 +60,7 @@ RefFS 判器名的接收者（receiver_kind）：allowed_set_for_a_crash_in、cr
       「✗ 自证 local-function-of-the-same-name：」
   CPU_JUDGING_SITES_CHECK_BREAK=judge-self-test-covers-whole-file  judge-self-test 登了一个函数，那份文件里每个函数里的调用点都算合规（函数级退成整份）
       「✗ 自证 self-test-other-function：」
-  CPU_JUDGING_SITES_CHECK_BREAK=receiver-unchecked  RefFS 判器名（allowed_set_for_a_crash_in、crash_and_recover）也只按名字认，不看接收者（改前的判法）
+  CPU_JUDGING_SITES_CHECK_BREAK=receiver-unchecked  RefFS 判器名（allowed_set_for_a_crash_in、crash_and_recover）也只按名字认，不看接收者
       「✗ 自证 same-name-local-method：」、「✗ 自证 reference-call-beside-local-method：」
 """
 import fnmatch

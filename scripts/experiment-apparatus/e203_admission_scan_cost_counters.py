@@ -6,7 +6,9 @@
 用法：
   python3 e203_admission_scan_cost_counters.py --build counts|timing --source <仓根> --into <工作目录> [--diff-out <文件>]
   python3 e203_admission_scan_cost_counters.py --check-anchors <树>      只核锚点、打每个锚点的行号，不写
-  python3 e203_admission_scan_cost_counters.py --selftest                用一棵小的假树证每个分支（不编实现）
+  python3 e203_admission_scan_cost_counters.py --selftest [--histories <历史用例>]   用一棵小的假树证每个分支（不编实现）；
+                                                                         另核历史用例里意图那次规模读数的取法（不给取本目录那一份）
+  python3 e203_admission_scan_cost_counters.py --mutation-check <变异表>   逐条改坏、跑自证，没红的报 missed
   python3 e203_admission_scan_cost_counters.py --write-fake-source <新目录>   写一棵小的假仓根（入口脚本的自证用）
 退出码：0 成；2 用法错或文件不在；3 有锚点命中不是恰好一次（一个字节不写，登记停机条款第 1 条）；4 自证有一格不对。
 
@@ -137,7 +139,12 @@ pub mod @MODULE@ {
         pub row: &'static str,
         pub calls: u64,
         pub steps: u64,
+        /// 站点自己另读的表长之和：整份拷那两行是要拷的元素数；第七节 ③2 调用处读表长的那十行是全表扫那一部分每次调用那一刻的表长。
         pub scale: u64,
+        /// `steps` 里属于走到命中为止那一部分（find、any、all、while 找第一个、contains）的步（修订 4）。
+        pub steps_to_the_hit: u64,
+        /// 走到命中为止那一部分每次调用那一刻要扫的表长之和（修订 4 的上界）。
+        pub scale_to_the_hit: u64,
         pub exclusive_nanos: u64,
         /// 按身份建的索引上这一行归口到的查询次数，与每次查询的 ⌈log₂(索引项数 + 1)⌉ 之和（登记第五节 s19、s23、s36 的“查询次数 × lg”）。
         pub queries: u64,
@@ -169,6 +176,8 @@ pub mod @MODULE@ {
         calls: Vec<u64>,
         steps: Vec<u64>,
         scale: Vec<u64>,
+        steps_to_the_hit: Vec<u64>,
+        scale_to_the_hit: Vec<u64>,
         nanos: Vec<u64>,
         queries: Vec<u64>,
         query_levels: Vec<u64>,
@@ -184,6 +193,8 @@ pub mod @MODULE@ {
                 calls: vec![0; cells],
                 steps: vec![0; cells],
                 scale: vec![0; cells],
+                steps_to_the_hit: vec![0; cells],
+                scale_to_the_hit: vec![0; cells],
                 nanos: vec![0; cells],
                 queries: vec![0; cells],
                 query_levels: vec![0; cells],
@@ -197,13 +208,15 @@ pub mod @MODULE@ {
             for (segment_index, segment) in ALL_SEGMENTS.iter().enumerate() {
                 for (row_index, row) in ALL_ROWS.iter().enumerate() {
                     let cell = segment_index * ROW_COUNT + row_index;
-                    if self.calls[cell] + self.steps[cell] + self.scale[cell] + self.nanos[cell] + self.queries[cell] > 0 {
+                    if self.calls[cell] + self.steps[cell] + self.scale[cell] + self.scale_to_the_hit[cell] + self.nanos[cell] + self.queries[cell] > 0 {
                         rows.push(RowReading {
                             segment: segment.tag(),
                             row: row.name(),
                             calls: self.calls[cell],
                             steps: self.steps[cell],
                             scale: self.scale[cell],
+                            steps_to_the_hit: self.steps_to_the_hit[cell],
+                            scale_to_the_hit: self.scale_to_the_hit[cell],
                             exclusive_nanos: self.nanos[cell],
                             queries: self.queries[cell],
                             query_levels: self.query_levels[cell],
@@ -290,6 +303,20 @@ pub mod @MODULE@ {
         THREAD.with(|cell| std::mem::take(&mut cell.borrow_mut().finished))
     }
 
+    thread_local! {
+        /// 不量的那一段（历史第 1–4 步）停掉逐步的读数：为真时计数构建的调用、步数、表长、差量与规模读数一样不记，计时构建的守卫不计时。
+        /// 段照旧换、记录照旧开与收（判了几次照数），只是记录里没有行。只读这一个线程局部的布尔，不借 `THREAD`。
+        static READINGS_PAUSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
+    /// 停（true）或恢复（false）这条线程上逐步的读数。
+    pub fn pause_readings(paused: bool) {
+        READINGS_PAUSED.with(|cell| cell.set(paused));
+    }
+    #[must_use]
+    pub fn readings_paused() -> bool {
+        READINGS_PAUSED.with(std::cell::Cell::get)
+    }
+
     /// 归口：在它活着的这一段里，不属于某一行函数的步（码 2 规划、按身份建索引）记到哪一行。
     pub struct AttributionGuard;
     #[must_use]
@@ -309,6 +336,9 @@ pub mod @MODULE@ {
 //C     }
 
 //C     fn with_open(change: impl FnOnce(&mut Open, usize, u32)) {
+//C         if readings_paused() {
+//C             return;
+//C         }
 //C         THREAD.with(|cell| {
 //C             let thread = &mut *cell.borrow_mut();
 //C             let segment = thread.segment as usize;
@@ -334,9 +364,15 @@ pub mod @MODULE@ {
 //C     }
 //C     /// 归口给当前挂着的行（没有挂着的记到清单外那一行）。
 //C     pub fn call_attributed() {
+//C         if readings_paused() {
+//C             return;
+//C         }
 //C         call(attributed_row());
 //C     }
 //C     pub fn steps_attributed(count: usize) {
+//C         if readings_paused() {
+//C             return;
+//C         }
 //C         steps(attributed_row(), count);
 //C     }
 //C     /// 站点自己另读的循环长度（与走过的步独立，供登记第七节 ③2 对账）。
@@ -345,8 +381,30 @@ pub mod @MODULE@ {
 //C             open.scale[segment * ROW_COUNT + row as usize] += u64::try_from(count).expect("长度装得进 u64");
 //C         });
 //C     }
+//C     /// 站点在调用那一刻另读的、走到命中为止那一部分要扫的表长（修订 4 的上界；与走过的步独立）。
+//C     pub fn scale_to_the_hit(row: Row, count: usize) {
+//C         with_open(|open, segment, _| {
+//C             open.scale_to_the_hit[segment * ROW_COUNT + row as usize] += u64::try_from(count).expect("长度装得进 u64");
+//C         });
+//C     }
+//C     /// 这一行在当前段里走了 `count` 步，都属于走到命中为止那一部分：步数与这一部分的步数各加 `count`。
+//C     pub fn steps_to_the_hit(row: Row, count: usize) {
+//C         let count = u64::try_from(count).expect("步数装得进 u64");
+//C         with_open(|open, segment, _| {
+//C             let cell = segment * ROW_COUNT + row as usize;
+//C             open.steps[cell] += count;
+//C             open.steps_to_the_hit[cell] += count;
+//C         });
+//C     }
+//C     /// 走到命中为止那一部分里走了一步。
+//C     pub fn step_to_the_hit(row: Row) {
+//C         steps_to_the_hit(row, 1);
+//C     }
 //C     /// 按身份建的索引上归口行的一次查询：索引有 `index_entries` 项，折半查至多 ⌈log₂(项数 + 1)⌉ 层。
 //C     pub fn query_attributed(index_entries: u64) {
+//C         if readings_paused() {
+//C             return;
+//C         }
 //C         let row = attributed_row();
 //C         with_open(|open, segment, _| {
 //C             let cell = segment * ROW_COUNT + row as usize;
@@ -354,20 +412,23 @@ pub mod @MODULE@ {
 //C             open.query_levels[cell] += u64::from(u64::BITS - index_entries.leading_zeros());
 //C         });
 //C     }
-//C     /// 线性 `contains` 走过的步：走到找到的那一个或走完（`Vec::contains` 同序），记在 `row` 上。
+//C     /// 线性 `contains` 走过的步：走到找到的那一个或走完（`Vec::contains` 同序），记在 `row` 走到命中为止的那一部分上。
 //C     pub fn contains_counted<Item: PartialEq>(row: Row, haystack: &[Item], needle: &Item) -> bool {
 //C         let walked = haystack.iter().position(|candidate| candidate == needle);
-//C         steps(row, walked.map_or(haystack.len(), |index| index + 1));
+//C         steps_to_the_hit(row, walked.map_or(haystack.len(), |index| index + 1));
 //C         walked.is_some()
 //C     }
 //C     /// 只在归口行正是 `row` 时记一条差量读数。
 //C     pub fn delta_if_attributed(row: Row, key: &'static str, value: usize) {
-//C         if attributed_row() == row {
+//C         if !readings_paused() && attributed_row() == row {
 //C             delta(key, value);
 //C         }
 //C     }
 //C     /// 一条差量读数（B8 的输入），记在当前段当前轮。
 //C     pub fn delta(key: &'static str, value: usize) {
+//C         if readings_paused() {
+//C             return;
+//C         }
 //C         let value = u64::try_from(value).expect("读数装得进 u64");
 //C         THREAD.with(|cell| {
 //C             let thread = &mut *cell.borrow_mut();
@@ -383,6 +444,9 @@ pub mod @MODULE@ {
 //T     pub fn call_attributed() {}
 //T     pub fn steps_attributed(_count: usize) {}
 //T     pub fn scale(_row: Row, _count: usize) {}
+//T     pub fn scale_to_the_hit(_row: Row, _count: usize) {}
+//T     pub fn steps_to_the_hit(_row: Row, _count: usize) {}
+//T     pub fn step_to_the_hit(_row: Row) {}
 //T     pub fn delta(_key: &'static str, _value: usize) {}
 //T     pub fn query_attributed(_index_entries: u64) {}
 //T     pub fn delta_if_attributed(_row: Row, _key: &'static str, _value: usize) {}
@@ -393,6 +457,9 @@ pub mod @MODULE@ {
 //T     }
 //T     #[must_use]
 //T     pub fn timer(row: Row) -> TimerGuard {
+//T         if readings_paused() {
+//T             return TimerGuard { active: false };
+//T         }
 //T         THREAD.with(|cell| {
 //T             let thread = &mut *cell.borrow_mut();
 //T             if thread.open.is_none() {
@@ -465,6 +532,7 @@ HEAD_AFTER_A_CHECK = "\nfn publish_version_of_trees_relocating_units_after_a_che
 HEAD_WRAPPER = "\npub fn prepare_the_version_publish<Device: BlockDevice>(\n"
 HEAD_JUDGE = "\nfn judge_the_publish_before_any_read_or_write<Device: BlockDevice>(\n"
 HEAD_SETTLE = "\nfn settle_the_allocation_record_tree(\n"
+HEAD_ZERO_ROOT = "\npub fn plan_the_tree_after_this_publish_down_to_a_zero_root(\n"
 T = CORE + "transaction.rs"
 A = CORE + "allocator.rs"
 
@@ -509,6 +577,79 @@ def span(name, file, head, end, begin_anchor, end_anchor, row_name, indent, coun
     ]
 
 
+# 登记第七节 ③2 的规模读数（修订 3 ②：式子只吃独立于被计数那一步的读数）：只在计数构建里插，计时构建不插。
+# 入口：判之前读上一版（被量的发布扫的就是它）与这次的计划；出口：发完、换回 Outside 之前读这一次发出来的那一版。
+# 读法只读字段长度与按号数记录，不调任何插了计数的函数（调了会把这一次的读数记进某一行的步数）。
+# 每组：(包着这一组的那一行或 None, ((差量名, 表达式), ...))；差量记在当时那一段、轮 0。
+SCALE_READINGS_AT_THE_ENTRY = (
+    ("    if let Some(e203_version) = previous {\n", (
+        ("entry_accounting_rows", "e203_version.accounting_entries.len()"),
+        ("entry_watermark_rows_before_its_txg",
+         "e203_version.accounting_entries.iter().filter(|entry| entry.statistic == STATISTIC_INODE_WATERMARK"
+         " && entry.generation < e203_version.root.checkpoint_txg).count()"),
+        ("entry_accounting_tree_keys", "e203_version.accounting_tree.shape.keys_in_order().len()"),
+        ("entry_accounting_tree_nodes", "e203_version.accounting_tree.shape.nodes().len()"),
+        ("entry_deadlist_tree_keys", "e203_version.deadlist_tree.shape.keys_in_order().len()"),
+        ("entry_deadlist_tree_nodes", "e203_version.deadlist_tree.shape.nodes().len()"),
+        ("entry_central_mapping_tree_keys", "e203_version.central_mapping_tree.shape.keys_in_order().len()"),
+        ("entry_central_mapping_tree_nodes", "e203_version.central_mapping_tree.shape.nodes().len()"),
+        ("entry_allocation_record_tree_nodes", "e203_version.allocation_record_tree.node_set().len()"),
+        ("entry_units", "e203_version.units.len()"),
+        ("entry_mapped_units", "e203_version.mapped_units.len()"),
+        ("entry_files_other_than_the_first", "e203_version.files_other_than_the_first.len()"),
+        ("entry_deadlist_entries", "e203_version.deadlist_entries.len()"),
+        ("entry_kept_mapping_entries", "e203_version.mapping_entries_kept_for_the_snapshots.len()"),
+        # 改 size 的那个 inode 的记录在叶容器摊平之后排第几（从 1 起；记录按号升序、叶之间不交叠，按「号更小的条数 + 1」数，不走 find）；
+        # 不在就是全部记录数（find 走完）；这一步不改 size 记 0
+        ("entry_position_of_the_inode_whose_size_changes",
+         "deletion_and_lineage.step.inode_whose_size_changes().map_or(0, |e203_inode| {"
+         " let e203_records = || e203_version.inode_leaf_containers.iter().flat_map(|container| container.contents.records.iter());"
+         " if e203_records().any(|record| record.inode == e203_inode.0) {"
+         " e203_records().filter(|record| record.inode < e203_inode.0).count() + 1 } else { e203_records().count() } })"),
+    )),
+    (None, (
+        ("entry_instance_table_chain_replaced",
+         "match &plan.instance_table { InstanceTablePlan::Rewrite(e203_rewrite) => e203_rewrite.replaced_chain.len(),"
+         " InstanceTablePlan::Carry(_) => 0 }"),
+        # s14 每块盘调一次、每次走完这一刻的聚簇段（修订 4）：落点判读的就是这个分配器，这一段里它不变
+        ("entry_cluster_segments", "allocator.cluster_segments().len()"),
+    )),
+)
+SCALE_READINGS_AT_THE_EXIT = (
+    ("    if let Ok((_, e203_output)) = &built {\n", (
+        ("exit_accounting_tree_keys", "e203_output.accounting_tree.shape.keys_in_order().len()"),
+        ("exit_accounting_tree_nodes", "e203_output.accounting_tree.shape.nodes().len()"),
+        ("exit_deadlist_tree_keys", "e203_output.deadlist_tree.shape.keys_in_order().len()"),
+        ("exit_deadlist_tree_nodes", "e203_output.deadlist_tree.shape.nodes().len()"),
+        ("exit_central_mapping_tree_keys", "e203_output.central_mapping_tree.shape.keys_in_order().len()"),
+        ("exit_central_mapping_tree_nodes", "e203_output.central_mapping_tree.shape.nodes().len()"),
+        ("exit_mapped_units", "e203_output.mapped_units.len()"),
+        ("exit_allocation_record_tree_nodes", "e203_output.allocation_record_tree.node_set().len()"),
+        ("exit_deadlist_entries", "e203_output.deadlist_entries.len()"),
+        ("exit_container_tree_units",
+         "e203_output.tombstone_containers.len() + e203_output.tombstone_tree_index_nodes.shape.positions_in_bump_order().len()"
+         " + e203_output.lineage_containers.len() + e203_output.lineage_tree_index_nodes.shape.positions_in_bump_order().len()"
+         " + e203_output.retirement_containers.len() + e203_output.retirement_tree_index_nodes.shape.positions_in_bump_order().len()"),
+        ("exit_extent_tree_nodes",
+         "e203_output.extent_tree.lower_nodes.len() + e203_output.extent_tree.upper_nodes.len()"
+         " + e203_output.files_other_than_the_first.iter().map(|file| file.extent_lower_nodes.len()).sum::<usize>()"),
+    )),
+)
+
+
+def readings_text(groups):
+    """一组组规模读数插成的文字：包着的那一行下缩进 8 格，没有包的 4 格。
+    整段包在「读数没停」里：不量的那一段（历史第 1–4 步）连读数的式子都不算（有的要走整张表），停没停见模块里的 `readings_paused`。"""
+    text = f"    if !{P}readings_paused() {{\n"
+    for opening, readings in groups:
+        indent = "        " if opening else "    "
+        text += opening or ""
+        for key, expression in readings:
+            text += f"{indent}{P}delta(\"{key}\", {expression});\n"
+        text += "    }\n" if opening else ""
+    return text + "    }\n"
+
+
 def edits():
     e = []
     add = e.append
@@ -516,6 +657,9 @@ def edits():
     add(Edit("segment_caller", T, HEAD_AFTER_A_CHECK, FN_END,
              "    refuse_while_a_publish_is_frozen(allocator)?;\n", "after",
              *BOTH(f"    {P}segment({seg('CallerBeforeTheJudgement')});\n")))
+    # 出口读数排在换回 Outside 之前（同一个锚点前插，先插的在前）：记录还开着，读数进这一次发布的记录
+    add(Edit("scale_readings_at_the_exit", T, HEAD_AFTER_A_CHECK, FN_END,
+             "    let (writes, output) = match built {\n", "before", readings_text(SCALE_READINGS_AT_THE_EXIT), None))
     add(Edit("segment_outside_after_prepare", T, HEAD_AFTER_A_CHECK, FN_END,
              "    let (writes, output) = match built {\n", "before",
              *BOTH(f"    {P}segment({seg('Outside')});\n")))
@@ -524,6 +668,10 @@ def edits():
     add(Edit("segment_landing_judgement", T, HEAD_JUDGE, FN_END,
              "    let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator\n", "before",
              *BOTH(f"    {P}segment({seg('BeforeTheLandingJudgement')});\n")))
+    # 入口读数排在换进落点判之前那一段之后（同一个锚点前插，后插的在后）：上一版在被量的发布动它之前的样子
+    add(Edit("scale_readings_at_the_entry", T, HEAD_JUDGE, FN_END,
+             "    let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator\n", "before",
+             readings_text(SCALE_READINGS_AT_THE_ENTRY), None))
     add(Edit("segment_between_the_judgements", T, HEAD_JUDGE, FN_END,
              "    let settled = settle_the_allocation_record_tree(\n", "before",
              *BOTH(f"    {P}segment({seg('BetweenTheTwoJudgements')});\n")))
@@ -531,10 +679,14 @@ def edits():
              "    Ok(PublishJudgedBeforeAnyReadOrWrite {\n", "before",
              *BOTH(f"    {P}segment({seg('AfterTheJudgements')});\n")))
     # ---- s1：调用方那一份整份拷
+    # 整份拷的一步是被拷分配器里一个集合元素（登记读法第 3 条、第三节 s1 行），所以步数就是这一份要拷的元素数；
+    # scale 另记同一个数，供第七节 ③1 拿它比 U 那一部分。只记 scale 不记步数时 Q1、Q2 与阳性对照读到的步数是 0。
     clone1 = "    let allocator_before_this_publish = allocator.clone();\n"
     add(Edit("s1_caller_copy", T, HEAD_AFTER_A_CHECK, FN_END, clone1, "replace",
              counted_call("WholeAllocatorCopyBeforeTheJudgement", "    ")
-             + f"    {P}scale({row('WholeAllocatorCopyBeforeTheJudgement')}, allocator.e203_whole_copy_elements());\n" + clone1,
+             + "    let e203_copied_elements = allocator.e203_whole_copy_elements();\n"
+             + f"    {P}steps({row('WholeAllocatorCopyBeforeTheJudgement')}, e203_copied_elements);\n"
+             + f"    {P}scale({row('WholeAllocatorCopyBeforeTheJudgement')}, e203_copied_elements);\n" + clone1,
              "    let allocator_before_this_publish = {\n"
              + f"        let _e203_timer = {P}timer({row('WholeAllocatorCopyBeforeTheJudgement')});\n"
              + "        allocator.clone()\n    };\n"))
@@ -545,7 +697,9 @@ def edits():
     clone2 = "        let mut rehearsal = allocator.clone();\n"
     add(Edit("s24_rehearsal_copy", T, HEAD_SETTLE, FN_END, clone2, "replace",
              counted_call("WholeAllocatorCopyInASettlingRound")
-             + f"        {P}scale({row('WholeAllocatorCopyInASettlingRound')}, allocator.e203_whole_copy_elements());\n" + clone2,
+             + "        let e203_copied_elements = allocator.e203_whole_copy_elements();\n"
+             + f"        {P}steps({row('WholeAllocatorCopyInASettlingRound')}, e203_copied_elements);\n"
+             + f"        {P}scale({row('WholeAllocatorCopyInASettlingRound')}, e203_copied_elements);\n" + clone2,
              "        let mut rehearsal = {\n"
              + f"            let _e203_timer = {P}timer({row('WholeAllocatorCopyInASettlingRound')});\n"
              + "            allocator.clone()\n        };\n"))
@@ -578,29 +732,44 @@ def edits():
     find_a = "        self.records\n            .iter()\n            .find(|record| record.device == device && record.slot == slot)\n"
     add(Edit("s25_record_for", A, "    pub fn record_for(\n", METHOD_END, find_a, "replace",
              counted_call("AllocatorReleaseLinearFind")
+             + f"        {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len());\n"
              + "        self.records\n            .iter()\n            .find(|record| {\n"
-             + f"                {P}step({row('AllocatorReleaseLinearFind')});\n"
+             + f"                {P}step_to_the_hit({row('AllocatorReleaseLinearFind')});\n"
              + "                record.device == device && record.slot == slot\n            })\n",
              guard("AllocatorReleaseLinearFind") + find_a))
     GUARD_SCOPE["s25_record_for"] = "body"
+    # 修订 4：每块盘找一次，找之前读这一刻的记录数（上界那一半）
+    add(Edit("s25_release_records_to_scan", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END,
+             "            let record = self\n                .records\n                .iter_mut()\n", "before",
+             f"            {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len());\n", None))
     add(Edit("s25_release_find", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END,
              "                .find(|record| record.device == device.device && record.slot == placement.slot)\n", "replace",
              "                .find(|record| {\n"
-             + f"                    {P}step({row('AllocatorReleaseLinearFind')});\n"
+             + f"                    {P}step_to_the_hit({row('AllocatorReleaseLinearFind')});\n"
              + "                    record.device == device.device && record.slot == placement.slot\n                })\n",
              None))
+    # 登记第三节 s25 一行的第二处查找（每块盘一次）：计数构建记一次调用，计时构建只罩这一句找（到 expect 为止）
+    add(Edit("s25_release_call", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END,
+             "            let record = self\n                .records\n                .iter_mut()\n", "before",
+             counted_call("AllocatorReleaseLinearFind", "            "), None))
+    e.extend(span("s25_release_timing", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END,
+                  "            let record = self\n                .records\n                .iter_mut()\n",
+                  "            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            "))
     add(Edit("s26_user_slot_scan", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END,
              "        while candidate + 1 < end {\n", "before",
-             counted_call("UserDataSlotLinearScan"), None))
+             counted_call("UserDataSlotLinearScan")
+             # 修订 4 的上界：这一刻单元区里的候选对数（每对一步）× (1 + 这一刻的聚簇段数，每个候选里 any 至多走完它们)
+             + f"        {P}scale_to_the_hit({row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate) / 2).expect(\"候选数装得进 usize\") * (1 + cluster_segments.len()));\n",
+             None))
     e.extend(span("s26_timing", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END,
                   "        while candidate + 1 < end {\n", "            candidate += 2;\n        }\n",
                   "UserDataSlotLinearScan", "        ", end_mode="after"))
     inside = ("            let inside_cluster_segment = cluster_segments.iter().any(|segment| {\n"
               "                candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS\n            });\n")
     add(Edit("s26_candidate_steps", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END, inside, "replace",
-             f"            {P}step({row('UserDataSlotLinearScan')});\n"
+             f"            {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n"
              "            let inside_cluster_segment = cluster_segments.iter().any(|segment| {\n"
-             f"                {P}step({row('UserDataSlotLinearScan')});\n"
+             f"                {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n"
              "                candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS\n            });\n",
              None))
     add(Edit("s28_empty_segment_scan", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END,
@@ -609,26 +778,35 @@ def edits():
     add(Edit("s28_empty_segment_timer", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END,
              "        (0..full_segments)\n", "before", None, guard("EmptySegmentLinearScan")))
     GUARD_SCOPE["s28_empty_segment_timer"] = "body"
+    # 修订 4 的上界：find 要扫的整段数，就是这一刻位图里的整段数（找之前读）
+    add(Edit("s28_segments_to_scan", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END,
+             "        (0..full_segments)\n", "before",
+             f"        {P}scale_to_the_hit({row('EmptySegmentLinearScan')}, self.allocated.len() / per_segment);\n", None))
     add(Edit("s28_segment_steps", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END,
              "            .find(|segment| {\n                self.used_per_segment[*segment] == 0\n", "replace",
-             "            .find(|segment| {\n" + f"                {P}step({row('EmptySegmentLinearScan')});\n"
+             "            .find(|segment| {\n" + f"                {P}step_to_the_hit({row('EmptySegmentLinearScan')});\n"
              + "                self.used_per_segment[*segment] == 0\n", None))
     add(Edit("s29_fallback_scan", A, "    pub fn lowest_commit_generated_fallback_slot_outside_the_region(\n", METHOD_END,
              "        while candidate + footprint.slots() <= unit_area_end {\n", "before",
-             counted_call("FallbackSlotLinearScan"), None))
+             counted_call("FallbackSlotLinearScan")
+             # 修订 4 的上界：这一刻单元区里按对齐步长排得下的候选数（每个一步）× (1 + 跨度槽数，每个候选里 all 至多走完跨度)
+             + f"        {P}scale_to_the_hit({row('FallbackSlotLinearScan')}, usize::try_from(unit_area_end.checked_sub(candidate + footprint.slots()).map_or(0, |e203_room| e203_room / footprint.alignment_in_slots() + 1) * (1 + footprint.slots())).expect(\"上界装得进 usize\"));\n",
+             None))
     e.extend(span("s29_timing", A, "    pub fn lowest_commit_generated_fallback_slot_outside_the_region(\n", METHOD_END,
                   "        while candidate + footprint.slots() <= unit_area_end {\n",
                   "            candidate += footprint.alignment_in_slots();\n        }\n",
                   "FallbackSlotLinearScan", "        ", end_mode="after"))
     add(Edit("s29_candidate_steps", A, "    pub fn lowest_commit_generated_fallback_slot_outside_the_region(\n", METHOD_END,
              "            let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {\n", "replace",
-             f"            {P}step({row('FallbackSlotLinearScan')});\n"
+             f"            {P}step_to_the_hit({row('FallbackSlotLinearScan')});\n"
              "            let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {\n"
-             f"                {P}step({row('FallbackSlotLinearScan')});\n", None))
+             f"                {P}step_to_the_hit({row('FallbackSlotLinearScan')});\n", None))
     add(Edit("s27_record_intersection", A, "\nfn make_room_for_record_on_device(\n", FN_END,
              "    let intersecting_record_slots: Vec<SlotNumber> = records\n        .iter()\n        .filter(|record| {\n",
              "replace",
              counted_call("RecordIntersectionFilter", "    ")
+             # 修订 4：filter 走完这一刻的记录（全表扫那一部分，逐格相等）
+             + f"    {P}scale({row('RecordIntersectionFilter')}, records.len());\n"
              + "    let intersecting_record_slots: Vec<SlotNumber> = records\n        .iter()\n        .filter(|record| {\n"
              + f"            {P}step({row('RecordIntersectionFilter')});\n",
              None))
@@ -641,14 +819,18 @@ def edits():
     add(Edit("s27_find_steps", A, HEAD_MAKE_ROOM, FN_END,
              "                .find(|record| record.device == device && record.slot == record_slot)\n", "replace",
              "                .find(|record| {\n"
-             + f"                    {P}step({row('RecordIntersectionFilter')});\n"
+             + f"                    {P}step_to_the_hit({row('RecordIntersectionFilter')});\n"
              + "                    record.device == device && record.slot == record_slot\n                })\n", None))
+    # 修订 4：find 之前读这一刻的记录数（走到命中为止那一部分的上界）
     e.extend(span("s27_find_timing", A, HEAD_MAKE_ROOM, FN_END,
                   "            let existing = records\n",
                   "            assert!(existing.is_released, \"回收过的落点的记录该是已释放\");\n",
-                  "RecordIntersectionFilter", "            "))
+                  "RecordIntersectionFilter", "            ",
+                  counts_begin=f"            {P}scale_to_the_hit({row('RecordIntersectionFilter')}, records.len());\n"))
     retain_line = "            records.retain(|record| !(record.device == device && record.slot == record_slot));\n"
+    # 修订 4：retain 走完这一刻的记录（全表扫那一部分），retain 之前读
     add(Edit("s27_retain", A, HEAD_MAKE_ROOM, FN_END, retain_line, "replace",
+             f"            {P}scale({row('RecordIntersectionFilter')}, records.len());\n"
              "            records.retain(|record| {\n"
              + f"                {P}step({row('RecordIntersectionFilter')});\n"
              + "                !(record.device == device && record.slot == record_slot)\n            });\n",
@@ -667,8 +849,10 @@ def edits():
     find_f = "        self.files_other_than_the_first\n            .iter()\n            .find(|file| file.inode == inode)\n"
     add(Edit("s6_file_find", T, "    pub fn file_other_than_the_first(\n", METHOD_END, find_f, "replace",
              counted_call("FileOtherThanTheFirstLinearFind")
+             # 修订 4 的上界：find 之前读这一版这一刻的别的文件数
+             + f"        {P}scale_to_the_hit({row('FileOtherThanTheFirstLinearFind')}, self.files_other_than_the_first.len());\n"
              + "        self.files_other_than_the_first\n            .iter()\n            .find(|file| {\n"
-             + f"                {P}step({row('FileOtherThanTheFirstLinearFind')});\n"
+             + f"                {P}step_to_the_hit({row('FileOtherThanTheFirstLinearFind')});\n"
              + "                file.inode == inode\n            })\n",
              guard("FileOtherThanTheFirstLinearFind") + find_f))
     add(Edit("s7_inodes_with_an_entry", T,
@@ -681,8 +865,10 @@ def edits():
     add(Edit("s12_root_header_find", T, "    pub fn unit(&self, identity: TransactionUnit) -> &PublishedUnit {\n", METHOD_END,
              unit_find, "replace",
              counted_call("RootHeaderLinearFind")
+             # 修订 4 的上界：find 之前读这一版这一刻的单元数
+             + f"        {P}scale_to_the_hit({row('RootHeaderLinearFind')}, self.units.len());\n"
              + "        self.units\n            .iter()\n            .find(|unit| {\n"
-             + f"                {P}step({row('RootHeaderLinearFind')});\n"
+             + f"                {P}step_to_the_hit({row('RootHeaderLinearFind')});\n"
              + "                unit.identity == identity\n            })\n",
              guard("RootHeaderLinearFind") + unit_find))
     sort_w = "        steps.sort_by_key(|entry| entry.generation);\n"
@@ -753,15 +939,31 @@ def edits():
              f"    {P}delta_if_attributed({row('MultiLevelTreePlanning')}, \"code_two_keys_changed\", previous_keys.symmetric_difference(&keys_after_this_publish).count());\n"
              f"    {P}delta(\"code_two_plan_keys_after\", keys_after_this_publish.len());\n"
              f"    {P}delta(\"code_two_plan_nodes_after\", nodes.len());\n", None))
+    # deadlist 树这一版一把 key 都不剩时走零根那一支，不进上面的规划函数：这一支也是一棵码 2 树的一次规划，
+    # 照记一次调用、走过的上一版节点（换下的每一个），与进出的 key 数（上一版的 key 全出、没有进的），每轮三棵树各一条。
+    zero_root_keys_changed = (f"    {P}delta_if_attributed({row('MultiLevelTreePlanning')}, \"code_two_keys_changed\", "
+                              "previous.keys_in_order().len());\n")
+    add(Edit("code_two_zero_root_plan_steps", CODE2, HEAD_ZERO_ROOT, FN_END,
+             "    if !keys_after_this_publish.is_empty() {\n"
+             "        return plan_the_tree_after_this_publish(previous, keys_after_this_publish, capacity);\n    }\n",
+             "after",
+             f"    {P}call_attributed();\n"
+             f"    {P}steps_attributed(previous.nodes().len());\n"
+             + zero_root_keys_changed,
+             None))
     add(Edit("s16_allocation_plan", ART, "\npub fn plan_the_tree_after_this_publish(\n", FN_END,
              "    let nodes = nodes_after\n        .iter()\n        .map(|node| {\n", "before",
              counted_call("AllocationRecordTreePlan", "    ")
+             # 修订 4：这一次的节点与上一版的节点各走一遍（全表扫，逐格相等），调用那一刻读两张表长
+             + f"    {P}scale({row('AllocationRecordTreePlan')}, nodes_after.len() + previous_nodes.len());\n"
              + f"    {P}steps({row('AllocationRecordTreePlan')}, nodes_after.len() + previous_nodes.len());\n"
              + f"    {P}delta(\"allocation_plan_nodes_after\", nodes_after.len());\n",
              guard("AllocationRecordTreePlan", "    ")))
     add(Edit("s30_records_of_each_leaf", ART, "\npub fn records_of_each_leaf(\n", FN_END,
              "    let mut by_leaf: BTreeMap<AllocationRecordTreeNode, Vec<AllocationRecord>> = BTreeMap::new();\n", "before",
              counted_call("RecordsOfEachLeaf", "    ")
+             # 修订 4：每条记录放进它的叶（全表扫，逐格相等），调用那一刻读记录数
+             + f"    {P}scale({row('RecordsOfEachLeaf')}, records.len());\n"
              + f"    {P}steps({row('RecordsOfEachLeaf')}, records.len());\n",
              guard("RecordsOfEachLeaf", "    ")))
     add_the_rest(e)
@@ -829,10 +1031,21 @@ def add_the_rest(e):
              "    let covers_a_changed_inode = |position: &ExtentUpperNodePosition| {\n", "before",
              f"    {P}steps({row('ExtentUpperSegmentPlan')}, inodes_with_an_entry_after_this_publish.len() * (1 + positions_after_this_publish.iter().map(|position| usize::from(position.level)).max().unwrap_or(0)));\n",
              None))
-    contains_line = "                if covers_a_changed_inode(position) || !previous_upper_nodes.contains(position) {\n"
-    add(Edit("s8_contains_steps", EXT, HEAD_S8, FN_END, contains_line, "replace",
-             f"                if covers_a_changed_inode(position) || !{P}contains_counted({row('ExtentUpperSegmentPlan')}, previous_upper_nodes, position) {{\n",
+    # 修订 4：路径那一部分是全表扫（每个有条目的号走一条到根的路），调用那一刻读有条目的号数与新形状的最高层，与记步数那一句分开读
+    add(Edit("s8_path_table", EXT, HEAD_S8, FN_END,
+             "    let covers_a_changed_inode = |position: &ExtentUpperNodePosition| {\n", "before",
+             f"    {P}scale({row('ExtentUpperSegmentPlan')}, inodes_with_an_entry_after_this_publish.len() * (1 + positions_after_this_publish.iter().map(|position| usize::from(position.level)).max().unwrap_or(0)));\n",
              None))
+    contains_line = "                if covers_a_changed_inode(position) || !previous_upper_nodes.contains(position) {\n"
+    # 修订 4 的上界：contains 只在没被短路时调，每调一次之前读上一版上段的节点数；走过的步记在走到命中为止那一部分（contains_counted）
+    add(Edit("s8_contains_steps", EXT, HEAD_S8, FN_END, contains_line, "replace",
+             f"                if covers_a_changed_inode(position) || !{{ {P}scale_to_the_hit({row('ExtentUpperSegmentPlan')}, previous_upper_nodes.len());"
+             f" {P}contains_counted({row('ExtentUpperSegmentPlan')}, previous_upper_nodes, position) }} {{\n",
+             None))
+    # 修订 4：换下的那一遍 filter 走完上一版上段的每个节点（全表扫），filter 之前读
+    add(Edit("s8_replaced_filter_table", EXT, HEAD_S8, FN_END,
+             "    let replaced_previous_positions = previous_upper_nodes\n", "before",
+             f"    {P}scale({row('ExtentUpperSegmentPlan')}, previous_upper_nodes.len());\n", None))
     replaced_filter = ("        .filter(|position| {\n"
                        "            !positions_after_this_publish.contains(position) || covers_a_changed_inode(position)\n")
     add(Edit("s8_replaced_filter_steps", EXT, HEAD_S8, FN_END, replaced_filter, "replace",
@@ -845,10 +1058,12 @@ def add_the_rest(e):
     add(Edit("s16_intersection_steps", T, HEAD_SETTLE, FN_END,
              "            rewritten.intersection(&nodes_after).copied().collect();\n", "after",
              f"        {P}steps({row('AllocationRecordTreePlan')}, rewritten.len() + nodes_after.len());\n", None))
+    # 修订 4：intersection 那两张表在这一轮开头的长度（全表扫，逐格相等），intersection 之前读
     e.extend(span("s16_intersection_timing", T, HEAD_SETTLE, FN_END,
                   "        let rewritten_among_the_nodes_after: BTreeSet<AllocationRecordTreeNode> =\n",
                   "        let allocation_plan = crate::allocation_record_tree::plan_the_tree_after_this_publish(\n",
-                  "AllocationRecordTreePlan", "        "))
+                  "AllocationRecordTreePlan", "        ",
+                  counts_begin=f"        {P}scale({row('AllocationRecordTreePlan')}, rewritten.len() + nodes_after.len());\n"))
     e.extend(span("s15_timing", T, HEAD_SETTLE, FN_END,
                   "    let (previous_nodes, previous_records): (\n",
                   "    for _round in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {\n",
@@ -861,6 +1076,8 @@ def add_the_rest(e):
              None, guard("RecordsOfEachLeaf", "    ")))
     add(Edit("s30_changed_steps", ART, HEAD_CHANGED, FN_END,
              "        before.keys().chain(after.keys()).copied().collect();\n", "after",
+             # 修订 4：两边叶的并每片比一次（全表扫，逐格相等），比之前读并集的片数
+             f"    {P}scale({row('RecordsOfEachLeaf')}, leaves.len());\n"
              f"    {P}steps({row('RecordsOfEachLeaf')}, leaves.len());\n"
              "    {\n"
              "        let no_records: Vec<AllocationRecord> = Vec::new();\n"
@@ -1088,7 +1305,8 @@ def unified(files, changed):
 def check_builds_are_not_mixed(build, diff_text):
     """作废条款第 7 条：计时构建的 diff 里不许有计数模块，计数构建里不许有计时。"""
     counting_calls = [f"{P}{name}(" for name in ("call", "step", "steps", "scale", "delta", "call_attributed", "steps_attributed", "round_begin",
-                                                 "contains_counted", "query_attributed", "delta_if_attributed")]
+                                                 "contains_counted", "query_attributed", "delta_if_attributed",
+                                                 "scale_to_the_hit", "steps_to_the_hit", "step_to_the_hit")]
     if build == "timing" and ("e203_scan_counts" in diff_text or any(call in diff_text for call in counting_calls)):
         return "计时构建的 diff 里出现了计数"
     if build == "counts" and ("e203_scan_timing" in diff_text or "Instant" in diff_text or f"{P}timer(" in diff_text
@@ -1338,7 +1556,31 @@ def write_fake_source(root):
         (root / relative).write_text(text, encoding="utf-8")
 
 
-def selftest():
+HISTORIES = pathlib.Path(__file__).with_name("e203_admission_scan_cost_histories.rs")
+
+
+def the_intent_scale_is_read_between_the_write_and_the_unlink(histories_text):
+    """历史用例里 `measure_an_unlink` 的体：先建 Y、写 Y，再取意图那次的规模读数，最后 unlink；`measure` 里不再另取意图那次的读数。"""
+    head = "\nfn measure_an_unlink("
+    if histories_text.count(head) != 1:
+        return False
+    start = histories_text.index(head)
+    body = histories_text[start:histories_text.index("\n}\n", start)]
+    measure_head = "\nfn measure(build: &str"
+    if histories_text.count(measure_head) != 1:
+        return False
+    measure_start = histories_text.index(measure_head)
+    measure_body = histories_text[measure_start:histories_text.index("\n}\n", measure_start)]
+    reading = 'state_text(build, point, state, "unlink_intent", round, pool)'
+    steps = ("create_inodes(pool, 1)[0];", "overwrite_inode(pool, inode);", reading, "unlink(pool, inode);")
+    if any(body.count(step) != 1 for step in steps):
+        return False
+    positions = [body.index(step) for step in steps]
+    return positions == sorted(positions) and '"unlink_intent", round, pool)' not in measure_body
+
+
+def selftest(histories_path=HISTORIES):
+    import re
     failures = []
 
     def expect(ok, what):
@@ -1414,6 +1656,202 @@ def selftest():
             ok = any((f"timer({P}Row::{camel})" in (edit.timing or "") or (f"Row::{camel}" in (edit.timing or "") and "timer(" in (edit.timing or "")))
                      for edit in edits())
         expect(ok, f"row_{camel}_has_a_timing_site")
+    # 计数站点要记步数：每一行（清单外归口那一行除外）在计数构建里有 step / steps / contains_counted 点名它，或经归口记步（attribute 它）。
+    # 只记 scale 或只记调用次数的那一行在这里红（第一段 s1、s24 只记了 scale，步数恒为 0）。
+    steps_forms = ("steps(", "step(", "contains_counted(", "step_to_the_hit(", "steps_to_the_hit(")
+    for camel in counted_rows:
+        explicit = any(f"{P}{form}{P}Row::{camel}" in (edit.counts or "") for edit in edits() for form in steps_forms)
+        attributed = any(f"attribute({P}Row::{camel})" in (edit.counts or "") for edit in edits())
+        expect(explicit or attributed, f"row_{camel}_has_a_steps_site")
+    # 整份拷那两行（s1、s24）：步数就是这一份要拷的元素数（登记读法第 3 条），插计数后的计数构建里各恰好一处（变异 c13、c14）
+    counts_joined = "".join(counts[path] for path in sorted(counts))
+    for camel in ("WholeAllocatorCopyBeforeTheJudgement", "WholeAllocatorCopyInASettlingRound"):
+        steps_of_the_copy = f"{P}steps({P}Row::{camel}, e203_copied_elements);"
+        expect(counts_joined.count(steps_of_the_copy) == 1
+               and "let e203_copied_elements = allocator.e203_whole_copy_elements();" in counts_joined,
+               f"row_{camel}_records_the_copied_elements_as_steps")
+    # 登记第七节 ③2 的规模读数（修订 3 ②）：每一条在计数构建里恰好一处、读的是这一版的那张表，入口那几条在落点判那一段换进之后、
+    # 出口那几条在换回 Outside 之前；计时构建一条都不插（变异 c17–c45）。期望的文字逐字写在这里，不从读数表里生成。
+    readings_expected = {
+        "entry": (HEAD_JUDGE, f"{P}segment({seg('BeforeTheLandingJudgement')});",
+                  "let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator", (
+            'delta("entry_accounting_rows", e203_version.accounting_entries.len());',
+            'delta("entry_watermark_rows_before_its_txg", e203_version.accounting_entries.iter().filter(|entry| entry.statistic == '
+            'STATISTIC_INODE_WATERMARK && entry.generation < e203_version.root.checkpoint_txg).count());',
+            'delta("entry_accounting_tree_keys", e203_version.accounting_tree.shape.keys_in_order().len());',
+            'delta("entry_accounting_tree_nodes", e203_version.accounting_tree.shape.nodes().len());',
+            'delta("entry_deadlist_tree_keys", e203_version.deadlist_tree.shape.keys_in_order().len());',
+            'delta("entry_deadlist_tree_nodes", e203_version.deadlist_tree.shape.nodes().len());',
+            'delta("entry_central_mapping_tree_keys", e203_version.central_mapping_tree.shape.keys_in_order().len());',
+            'delta("entry_central_mapping_tree_nodes", e203_version.central_mapping_tree.shape.nodes().len());',
+            'delta("entry_allocation_record_tree_nodes", e203_version.allocation_record_tree.node_set().len());',
+            'delta("entry_units", e203_version.units.len());',
+            'delta("entry_mapped_units", e203_version.mapped_units.len());',
+            'delta("entry_files_other_than_the_first", e203_version.files_other_than_the_first.len());',
+            'delta("entry_deadlist_entries", e203_version.deadlist_entries.len());',
+            'delta("entry_kept_mapping_entries", e203_version.mapping_entries_kept_for_the_snapshots.len());',
+            'delta("entry_position_of_the_inode_whose_size_changes", deletion_and_lineage.step.inode_whose_size_changes().map_or(0, |e203_inode| {'
+            ' let e203_records = || e203_version.inode_leaf_containers.iter().flat_map(|container| container.contents.records.iter());'
+            ' if e203_records().any(|record| record.inode == e203_inode.0) {'
+            ' e203_records().filter(|record| record.inode < e203_inode.0).count() + 1 } else { e203_records().count() } }));',
+            'delta("entry_instance_table_chain_replaced", match &plan.instance_table { InstanceTablePlan::Rewrite(e203_rewrite) => '
+            'e203_rewrite.replaced_chain.len(), InstanceTablePlan::Carry(_) => 0 });',
+            'delta("entry_cluster_segments", allocator.cluster_segments().len());',
+        )),
+        "exit": (HEAD_AFTER_A_CHECK, f"{P}segment({seg('CallerBeforeTheJudgement')});", f"{P}segment({seg('Outside')});", (
+            'delta("exit_accounting_tree_keys", e203_output.accounting_tree.shape.keys_in_order().len());',
+            'delta("exit_accounting_tree_nodes", e203_output.accounting_tree.shape.nodes().len());',
+            'delta("exit_deadlist_tree_keys", e203_output.deadlist_tree.shape.keys_in_order().len());',
+            'delta("exit_deadlist_tree_nodes", e203_output.deadlist_tree.shape.nodes().len());',
+            'delta("exit_central_mapping_tree_keys", e203_output.central_mapping_tree.shape.keys_in_order().len());',
+            'delta("exit_central_mapping_tree_nodes", e203_output.central_mapping_tree.shape.nodes().len());',
+            'delta("exit_mapped_units", e203_output.mapped_units.len());',
+            'delta("exit_allocation_record_tree_nodes", e203_output.allocation_record_tree.node_set().len());',
+            'delta("exit_deadlist_entries", e203_output.deadlist_entries.len());',
+            'delta("exit_container_tree_units", e203_output.tombstone_containers.len() + e203_output.tombstone_tree_index_nodes.shape.'
+            'positions_in_bump_order().len() + e203_output.lineage_containers.len() + e203_output.lineage_tree_index_nodes.shape.'
+            'positions_in_bump_order().len() + e203_output.retirement_containers.len() + e203_output.retirement_tree_index_nodes.shape.'
+            'positions_in_bump_order().len());',
+            'delta("exit_extent_tree_nodes", e203_output.extent_tree.lower_nodes.len() + e203_output.extent_tree.upper_nodes.len() + '
+            'e203_output.files_other_than_the_first.iter().map(|file| file.extent_lower_nodes.len()).sum::<usize>());',
+        )),
+    }
+    for where, (head, after_this, before_this, lines) in readings_expected.items():
+        start = counts[T].index(head)
+        body = counts[T][start:counts[T].index(FN_END, start + len(head))]
+        for line in lines:
+            key = line[len('delta("'):line.index('",')]
+            written = f"{P}{line}"
+            placed = (body.count(written) == 1 and body.count(after_this) == 1 and body.count(before_this) == 1
+                      and body.index(after_this) < body.index(written) < body.index(before_this))
+            expect(placed and f'"{key}"' not in timing[T], f"scale_reading_{key}_is_read_at_the_{where}_in_the_counts_build_only")
+        # 不量的那一段停掉读数：这一组规模读数整段包在「读数没停」里，包的那一句在第一条读数之前、只有一处，计时构建里没有（变异 c68）
+        wrap = f"    if !{P}readings_paused() {{\n"
+        first_reading = f"{P}{lines[0]}"
+        expect(body.count(wrap) == 1 and body.index(wrap) < body.index(first_reading) and wrap not in timing[T],
+               f"scale_readings_at_the_{where}_are_skipped_while_the_readings_are_paused")
+    # 停读数的开关（不量的那一段提速）：两种构建都有这一对函数、问的是同一个线程局部的布尔（变异 c67）；计数构建每个记读数的入口先问停没停，
+    # 计时构建的守卫停了不计时（变异 c69、c70）；换段那一个函数不问（记录照旧开与收，判了几次照数）。期望的文字逐字写在这里，不从模板里生成。
+    paused_return = "if readings_paused() {\n            return;\n        }\n"
+    for build_name, module in (("counts", module_text("counts")), ("timing", module_text("timing"))):
+        # 用正则写，免得本脚本源码里同一句出现两次（变异表按原文在本脚本里恰好命中一次找锚点）
+        expect(re.search(r"pub fn pause_readings\(paused: bool\) \{\s+READINGS_PAUSED\.with\(\|cell\| cell\.set\(paused\)\);\s+\}", module)
+               is not None
+               and re.search(r"pub fn readings_paused\(\) -> bool \{\s+READINGS_PAUSED\.with\(std::cell::Cell::get\)\s+\}", module) is not None,
+               f"{build_name}_module_has_the_switch_that_pauses_the_readings")
+        segment_body = module[module.index("    pub fn segment(next: Segment) {"):module.index("    pub fn round_begin() {")]
+        expect("readings_paused" not in segment_body, f"{build_name}_segment_switch_opens_and_closes_records_while_paused")
+    counts_module, timing_module = module_text("counts"), module_text("timing")
+    for function in ("fn with_open(change: impl FnOnce(&mut Open, usize, u32)) {\n        ", "pub fn call_attributed() {\n        ",
+                     "pub fn steps_attributed(count: usize) {\n        ", "pub fn query_attributed(index_entries: u64) {\n        ",
+                     "pub fn delta(key: &'static str, value: usize) {\n        "):
+        expect(counts_module.count(function + paused_return) == 1,
+               f"counts_{function.split('(')[0].split()[-1]}_records_nothing_while_the_readings_are_paused")
+    expect("    pub fn delta_if_attributed(row: Row, key: &'static str, value: usize) {\n        if !readings_paused() && attributed_row() == row {\n"
+           in counts_module, "counts_delta_if_attributed_records_nothing_while_the_readings_are_paused")
+    expect("    pub fn timer(row: Row) -> TimerGuard {\n        if readings_paused() {\n            return TimerGuard { active: false };\n        }\n"
+           in timing_module, "timing_guard_is_inactive_while_the_readings_are_paused")
+    # 修订 4：十行在每次调用那一刻读它要扫的那张表的长度。每条读数在计数构建里它那个函数体里恰好一处、在扫那一句之前（与它之后的那一句之前），
+    # 计时构建里没有；读的只是字段长度与本地的循环边界，不调插了计数的函数（变异 c46 起）。期望的文字逐字写在这里，不从改动表里生成。
+    ART, EXT, CHANGED = CORE + "allocation_record_tree.rs", CORE + "extent_tree.rs", "\npub fn nodes_whose_contents_changed(\n"
+    make_room, settle_round = "\nfn make_room_for_record_on_device(\n", f"{P}round_begin();"
+    call_site_readings = (
+        ("s6_find", T, "    pub fn file_other_than_the_first(\n", METHOD_END, None, ".find(|file| {",
+         f"{P}scale_to_the_hit({P}Row::FileOtherThanTheFirstLinearFind, self.files_other_than_the_first.len());"),
+        ("s8_path", EXT, "\npub fn plan_the_extent_upper_segment(\n", FN_END, "canonical_upper_segment_of_the_inodes_with_an_entry(",
+         "let covers_a_changed_inode",
+         f"{P}scale({P}Row::ExtentUpperSegmentPlan, inodes_with_an_entry_after_this_publish.len() * (1 + positions_after_this_publish.iter()"
+         ".map(|position| usize::from(position.level)).max().unwrap_or(0)));"),
+        ("s8_contains", EXT, "\npub fn plan_the_extent_upper_segment(\n", FN_END, "if covers_a_changed_inode(position) || !{",
+         f"{P}contains_counted({P}Row::ExtentUpperSegmentPlan, previous_upper_nodes, position) }}",
+         f"{P}scale_to_the_hit({P}Row::ExtentUpperSegmentPlan, previous_upper_nodes.len());"),
+        ("s8_replaced_filter", EXT, "\npub fn plan_the_extent_upper_segment(\n", FN_END, None, "let replaced_previous_positions = previous_upper_nodes",
+         f"{P}scale({P}Row::ExtentUpperSegmentPlan, previous_upper_nodes.len());"),
+        ("s12_find", T, "    pub fn unit(&self, identity: TransactionUnit) -> &PublishedUnit {\n", METHOD_END, None, ".find(|unit| {",
+         f"{P}scale_to_the_hit({P}Row::RootHeaderLinearFind, self.units.len());"),
+        ("s16_plan", ART, "\npub fn plan_the_tree_after_this_publish(\n", FN_END, None, "let nodes = nodes_after",
+         f"{P}scale({P}Row::AllocationRecordTreePlan, nodes_after.len() + previous_nodes.len());"),
+        ("s16_intersection", T, HEAD_SETTLE, FN_END, settle_round, "let rewritten_among_the_nodes_after",
+         f"{P}scale({P}Row::AllocationRecordTreePlan, rewritten.len() + nodes_after.len());"),
+        ("s25_record_for", A, "    pub fn record_for(\n", METHOD_END, None, ".find(|record| {",
+         f"{P}scale_to_the_hit({P}Row::AllocatorReleaseLinearFind, self.records.len());"),
+        ("s25_release", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END, None, "let record = self",
+         f"{P}scale_to_the_hit({P}Row::AllocatorReleaseLinearFind, self.records.len());"),
+        ("s26_candidates", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END, f"{P}call({P}Row::UserDataSlotLinearScan);",
+         "while candidate + 1 < end {",
+         f"{P}scale_to_the_hit({P}Row::UserDataSlotLinearScan, usize::try_from(end.saturating_sub(candidate) / 2)"
+         '.expect("候选数装得进 usize") * (1 + cluster_segments.len()));'),
+        ("s27_filter", A, make_room, FN_END, None, "let intersecting_record_slots",
+         f"{P}scale({P}Row::RecordIntersectionFilter, records.len());\n    let intersecting_record_slots"),
+        ("s27_find", A, make_room, FN_END, None, "let existing = records",
+         f"{P}scale_to_the_hit({P}Row::RecordIntersectionFilter, records.len());"),
+        ("s27_retain", A, make_room, FN_END, "let existing = records", "records.retain(|record| {",
+         f"{P}scale({P}Row::RecordIntersectionFilter, records.len());\n            records.retain"),
+        ("s28_segments", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END, "let per_segment =", "(0..full_segments)",
+         f"{P}scale_to_the_hit({P}Row::EmptySegmentLinearScan, self.allocated.len() / per_segment);"),
+        ("s29_candidates", A, "    pub fn lowest_commit_generated_fallback_slot_outside_the_region(\n", METHOD_END,
+         f"{P}call({P}Row::FallbackSlotLinearScan);", "while candidate + footprint.slots() <= unit_area_end {",
+         f"{P}scale_to_the_hit({P}Row::FallbackSlotLinearScan, usize::try_from(unit_area_end.checked_sub(candidate + footprint.slots())"
+         '.map_or(0, |e203_room| e203_room / footprint.alignment_in_slots() + 1) * (1 + footprint.slots())).expect("上界装得进 usize"));'),
+        ("s30_records", ART, "\npub fn records_of_each_leaf(\n", FN_END, None, "let mut by_leaf",
+         f"{P}scale({P}Row::RecordsOfEachLeaf, records.len());"),
+        ("s30_leaves", ART, CHANGED, FN_END, "before.keys().chain(after.keys()).copied().collect();", f"{P}steps({P}Row::RecordsOfEachLeaf, leaves.len());",
+         f"{P}scale({P}Row::RecordsOfEachLeaf, leaves.len());"),
+    )
+    for name, path, head, end, after_this, before_this, written in call_site_readings:
+        start = counts[path].index(head)
+        body = counts[path][start:counts[path].index(end, start + len(head)) + len(end)]
+        low = body.index(after_this) + len(after_this) if after_this and body.count(after_this) == 1 else (0 if not after_this else -1)
+        high = body.index(before_this) if body.count(before_this) == 1 else -1
+        at = body.find(written)
+        placed = body.count(written) == 1 and 0 <= low <= at and at < high
+        expect(placed and written not in timing[path], f"call_site_length_{name}_is_read_before_the_scan_in_the_counts_build_only")
+    # 走到命中为止的那一部分的步记进 steps_to_the_hit（全表扫的照旧记 step / steps）：每行两种记法各几处，逐行写死（变异 c46 起）
+    walks_to_the_hit = {"FileOtherThanTheFirstLinearFind": (1, 0), "RootHeaderLinearFind": (1, 0), "AllocatorReleaseLinearFind": (2, 0),
+                        "UserDataSlotLinearScan": (2, 0), "EmptySegmentLinearScan": (1, 0), "FallbackSlotLinearScan": (2, 0),
+                        "RecordIntersectionFilter": (1, 2), "ExtentUpperSegmentPlan": (0, 1), "AllocationRecordTreePlan": (0, 0),
+                        "RecordsOfEachLeaf": (0, 0)}
+    every_counts_file = "".join(counts[path] for path in sorted(counts))
+    for camel, (to_the_hit, plain) in walks_to_the_hit.items():
+        found = (every_counts_file.count(f"{P}step_to_the_hit({P}Row::{camel});"), every_counts_file.count(f"{P}step({P}Row::{camel});"))
+        expect(found == (to_the_hit, plain), f"row_{camel}_counts_the_walk_to_the_hit_apart")
+    # s25 两处查找（`record_for` 与 `release_leaving_the_record_allocated_on` 每块盘一次）各记一次调用、各有一个计时守卫：
+    # 调用数是 B8 那一行 c25 × lg(R_a) 的 c25，只记一处时少一半（变异 c71、c72）
+    counted_call_of_the_release_find = f"{P}call({P}Row::AllocatorReleaseLinearFind);"
+    timer_of_the_release_find = f"{P}timer({P}Row::AllocatorReleaseLinearFind);"
+    release_find_sites = (
+        ("    pub fn record_for(\n", ".find(", counts, counted_call_of_the_release_find,
+         "counts_release_find_in_record_for_is_marked_before_the_find"),
+        ("    pub fn record_for(\n", ".find(", timing, timer_of_the_release_find,
+         "timing_release_find_in_record_for_is_marked_before_the_find"),
+        ("    pub fn release_leaving_the_record_allocated_on(\n", "let record = self", counts, counted_call_of_the_release_find,
+         "counts_release_find_in_release_is_marked_before_the_find"),
+        ("    pub fn release_leaving_the_record_allocated_on(\n", "let record = self", timing, timer_of_the_release_find,
+         "timing_release_find_in_release_is_marked_before_the_find"),
+    )
+    for site_head, site_find, tree, needle, case_name in release_find_sites:
+        site_start = tree[A].index(site_head)
+        site_body = tree[A][site_start:tree[A].index(METHOD_END, site_start + len(site_head)) + len(METHOD_END)]
+        placed = (site_body.count(needle) == 1 and site_body.count(site_find) == 1
+                  and site_body.index(needle) < site_body.index(site_find))
+        expect(placed, case_name)
+    expect(every_counts_file.count(f"{P}call({P}Row::AllocatorReleaseLinearFind);") == 2,
+           "counts_build_records_a_call_at_both_release_finds")
+    expect("steps_to_the_hit(row, walked.map_or(haystack.len(), |index| index + 1));" in counts[T]
+           and "open.steps_to_the_hit[cell] += count;" in counts[T] and "open.steps[cell] += count;" in counts[T],
+           "a_step_to_the_hit_is_counted_in_both_the_steps_and_the_part_to_the_hit")
+    # deadlist 树走零根那一支时也记一条进出的 key 数（每轮三棵码 2 树各一条，模型按三条读；变异 c15）
+    zero_root_text = counts[CORE + "code_two_tree.rs"]
+    zero_root_start = zero_root_text.index(HEAD_ZERO_ROOT)
+    zero_root_body = zero_root_text[zero_root_start:zero_root_text.index(FN_END, zero_root_start + len(HEAD_ZERO_ROOT))]
+    expect('"code_two_keys_changed", previous.keys_in_order().len())' in zero_root_body
+           and "steps_attributed(previous.nodes().len())" in zero_root_body
+           and zero_root_body.index('"code_two_keys_changed"') > zero_root_body.index("return plan_the_tree_after_this_publish("),
+           "the_deadlist_zero_root_branch_records_the_keys_changed")
+    # 历史用例：意图那次的规模读数在 Y 建好、写好之后、unlink 之前取（第一段在建 Y 之前取，别的文件数与聚簇段数各少一，停机条款第 2 条打中 98 格；变异 c16）
+    histories_text = pathlib.Path(histories_path).read_text(encoding="utf-8")
+    expect(the_intent_scale_is_read_between_the_write_and_the_unlink(histories_text),
+           "the_unlink_intent_scale_is_read_after_the_file_to_unlink_is_written")
     # 副本要编得起来：缺哪一份就拒，拷出来的清单不许指到副本外（变异 c4）
     import tempfile
     with tempfile.TemporaryDirectory() as directory:
@@ -1547,24 +1985,38 @@ def selftest():
 
 
 def mutation_check(table):
-    """对本脚本自己的变异表逐条跑：把原文换成替换文写到临时文件，跑它的 --selftest，必须退非 0 才算抓到。"""
+    """对变异表逐条跑：把原文换成替换文写到临时文件，跑 --selftest，必须退非 0 才算抓到。
+
+    每行三段（名、原文、替换文）改的是本脚本；第四段写 `histories` 的改的是历史用例 `e203_admission_scan_cost_histories.rs`，
+    本脚本原样、自证经 --histories 读改过的那一份。自证一律经 --histories 指到历史用例（改过的或仓里那一份），
+    临时目录里的本脚本旁边没有历史用例。"""
     import subprocess
     import tempfile
-    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    sources = {"script": pathlib.Path(__file__).read_text(encoding="utf-8"),
+               "histories": HISTORIES.read_text(encoding="utf-8")}
     missed = 0
     for line in pathlib.Path(table).read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
-        name, original, replacement = line.split("\t")
-        # 原文与替换文逐字取自本脚本的源码（源码里的 \n 是反斜杠加 n 两个字符），不做转义还原
+        fields = line.split("\t")
+        name, original, replacement = fields[:3]
+        target = fields[3] if len(fields) == 4 else "script"
+        if target == "histories":
+            # 历史用例是 Rust：表里的 \n（反斜杠加 n）还原成换行，好写跨行的原文
+            original, replacement = original.replace("\\n", "\n"), replacement.replace("\\n", "\n")
+        # 改本脚本的那几行：原文与替换文逐字取自本脚本的源码（源码里的 \n 是反斜杠加 n 两个字符），不做转义还原
+        source = sources[target]
         if source.count(original) != 1:
             print(f"name=counters_mutation id={name} result=anchor_lost hits={source.count(original)}")
             missed += 1
             continue
         with tempfile.TemporaryDirectory() as directory:
             mutated = pathlib.Path(directory) / "mutated.py"
-            mutated.write_text(source.replace(original, replacement), encoding="utf-8")
-            outcome = subprocess.run([sys.executable, "-I", str(mutated), "--selftest"], capture_output=True, text=True, check=False)
+            histories = pathlib.Path(directory) / "histories.rs"
+            mutated.write_text(source.replace(original, replacement) if target == "script" else sources["script"], encoding="utf-8")
+            histories.write_text(source.replace(original, replacement) if target == "histories" else sources["histories"], encoding="utf-8")
+            outcome = subprocess.run([sys.executable, "-I", str(mutated), "--selftest", "--histories", str(histories)],
+                                     capture_output=True, text=True, check=False)
         caught = outcome.returncode != 0
         missed += 0 if caught else 1
         print(f"name=counters_mutation id={name} result={'caught' if caught else 'missed'} exit={outcome.returncode}")
@@ -1600,7 +2052,7 @@ def main(argv):
             print(__doc__, file=sys.stderr)
             return 2
     if "--selftest" in args:
-        return selftest()
+        return selftest(args.get("--histories", HISTORIES))
     if "--check-anchors" in args:
         return check_anchors(args["--check-anchors"])
     if "--write-fake-source" in args:

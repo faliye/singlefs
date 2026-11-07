@@ -12,8 +12,8 @@ rounds_cut_to_four	const ROUNDS: u64 = 5;	const ROUNDS: u64 = 4;
 overwrite_never_run	pool.overwrite(OVERWRITE_BYTES).expect("覆盖写发成");	();
 caller_flag_forced_false	record.had_caller_segment, record.rounds	false, record.rounds
 done_marker_dropped	println!("E203RESULT name=item_done build={build} point={point}");	();
-unlink_not_done	    unlink(pool, inode);\n    e203_scan::take_finished()	    e203_scan::take_finished()
-history_unlinks_one_short	for _ in 0..axes.unlinks {	for _ in 0..axes.unlinks.saturating_sub(1) {
+unlink_not_done	    unlink(pool, inode);\n    (scanned_by_the_intent, e203_scan::take_finished())	    (scanned_by_the_intent, e203_scan::take_finished())
+history_unlinks_one_short	        for _ in 0..axes.unlinks {\n            let judgements =	        for _ in 0..axes.unlinks.saturating_sub(1) {\n            let judgements =
 overwrite_state_line_dropped	println!("{scanned}");	let _ = &scanned;
 final_state_mislabeled	state_text(build, point, state, "unlink_final", round, pool)	state_text(build, point, state, "unlink_intent", round, pool)
 segment_slots_printed_wrong	segment_slots={CLUSTER_SEGMENT_SLOTS}	segment_slots={INODE_LEAF_RECORDS}

@@ -6,11 +6,14 @@ import json
 import os
 import re
 import random
+import stat
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import zlib
 from types import SimpleNamespace
@@ -439,7 +442,13 @@ assert text == '## topic\\nbody\\n'
         source = '\n'.join(line for line in source.splitlines()
                            if not line.startswith(('source ', 'preflight ')))
         source += "\nckn D1 refs-linux test 0 \"printf 0; : '%ROOT%'; false\"\n[[ $fail == 1 && $pass == 0 ]]\n"
-        result = subprocess.run(['bash', '-c', source], capture_output=True, text=True)
+        # bash -c 起的截段里 BASH_SOURCE 是空的，脚本按自己所在目录找 lib_work_root.py 取共享数据根那一步找不到；
+        # 两棵树的根照文件头「两棵树的根」用 FS_REFS、KERNEL_TREE 给定，这一条只判 ckn 的计数，不读树
+        with tempfile.TemporaryDirectory() as directory:
+            environment = dict(os.environ, FS_REFS=os.path.join(directory, 'refs'), KERNEL_TREE=os.path.join(directory, 'kern'))
+            for name in ('VERIFY_CITATIONS_BREAK', 'VERIFY_CITATIONS_ASSERTIONS', 'VERIFY_CITATIONS_SELFTEST_MARK'):
+                environment.pop(name, None)
+            result = subprocess.run(['bash', '-c', source], capture_output=True, text=True, env=environment)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_pdf_rejects_truncated_compressed_evidence(self):
@@ -654,6 +663,159 @@ assert text == '## topic\\nbody\\n'
         entry, _ = module.transform_entry(module.Entry('title', body), '2026-01-01', None,
                                          module.new_report(), 'sample', None)
         self.assertEqual(entry.body, body)
+
+    def test_batch_write_each_switch_is_refused_at_entry_and_dry_run_never_writes(self):
+        # 审核 A17 的三场景（records/2026-11-02-文档代码逐项审核-复现.py）：普通入口带 REPLACE_BATCH_WRITE_EACH=1 退 2、一个字节不写；
+        # 进程内（自证里能设它的地方）设着它时 --dry-run 也只核不写，后一处锚点不中时前一处同样不写
+        environment = {key: value for key, value in os.environ.items()
+                       if key not in ('REPLACE_BATCH_BREAK', 'REPLACE_BATCH_WRITE_EACH', 'ATOMIC_REPLACE_BREAK')}
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'target.txt'
+            for label, edits, write_each, wanted_code in (
+                    ('正常干跑', [{'file': str(target), 'old': 'original', 'new': 'replacement'}], False, 0),
+                    ('带开关干跑', [{'file': str(target), 'old': 'original', 'new': 'replacement'}], True, 2),
+                    ('带开关干跑、后一处锚点不中', [{'file': str(target), 'old': 'original', 'new': 'replacement'},
+                                       {'file': str(target), 'old': 'absent', 'new': 'other'}], True, 2)):
+                with self.subTest(case=label):
+                    target.write_text('original\n', encoding='utf-8')
+                    specification = Path(directory) / 'spec.json'
+                    specification.write_text(json.dumps(edits), encoding='utf-8')
+                    run_environment = dict(environment, REPLACE_BATCH_WRITE_EACH='1') if write_each else environment
+                    result = subprocess.run([sys.executable, '-B', str(KB / 'replace-batch.py'), '--dry-run', str(specification)],
+                                            cwd=directory, env=run_environment, capture_output=True, text=True, timeout=60)
+                    self.assertEqual(result.returncode, wanted_code, result.stdout + result.stderr)
+                    self.assertEqual(target.read_text(encoding='utf-8'), 'original\n')
+                    if write_each:
+                        self.assertIn('REPLACE_BATCH_WRITE_EACH', result.stderr)
+            module = load('replace-batch')
+            for label, edits, wanted_code in (
+                    ('进程内设着开关、全中的干跑', [{'file': str(target), 'old': 'original', 'new': 'replacement'}], 0),
+                    ('进程内设着开关、后一处锚点不中的干跑', [{'file': str(target), 'old': 'original', 'new': 'replacement'},
+                                             {'file': str(target), 'old': 'absent', 'new': 'other'}], 1)):
+                with self.subTest(case=label), mock.patch.dict(os.environ, {'REPLACE_BATCH_WRITE_EACH': '1'}), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    target.write_text('original\n', encoding='utf-8')
+                    self.assertEqual(module.run(edits, dry_run=True), wanted_code)
+                    self.assertEqual(target.read_text(encoding='utf-8'), 'original\n')
+
+    def test_append_validators_follow_the_markdown_fence_state(self):
+        # 审核 A44 的六种输入（records/2026-11-02-文档代码逐项审核-追加标题复现.py）：两个追加工具都按 lib_markdown.py 的围栏认、标题去 0–3 个前导空格
+        append = load('append-record')
+        ledger = load('ledger-append-section')
+        cases = [
+            ('paragraph', 'ordinary paragraph\n', False),
+            ('heading', '## real heading\n', True),
+            ('simple_fence', '```\n## code\n```\n', False),
+            ('shorter_inner_fence', '````\n```\n## still code\n````\n', False),
+            ('indented_heading', '  ## real heading\n', True),
+            ('indented_code_then_heading', '    ```\n## real heading\n', True),
+        ]
+        for tool, problem_of in (('append-record', append.text_problem),
+                                 ('ledger-append-section', lambda body: ledger.body_problem('title', body, (('status', 'open'),)))):
+            for label, body, refused in cases:
+                with self.subTest(tool=tool, case=label):
+                    self.assertEqual(problem_of(body) is not None, refused, problem_of(body))
+
+    def test_ledger_lock_keeps_both_appends_when_both_would_pass_the_digest_check(self):
+        # 审核 A45 的交错（records/2026-11-02-文档代码逐项审核-账本并发复现.py）：甲过了写前复核、停在改名之前，乙这时开跑。
+        # 有账本锁：乙卡在锁上，甲等不到乙过复核、照常换上，乙读新账本取下一个号，两份正文都在。
+        # 对照（弄坏开关 no-ledger-lock）：乙读到同一版、复核也过，两个都退 0 而只剩一份正文——证明这条测试判得出覆盖。
+        for broken, both_bodies_kept in (('', True), ('no-ledger-lock', False)):
+            with self.subTest(broken=broken or '（不设开关）'), tempfile.TemporaryDirectory() as scratch:
+                module = load('ledger-append-section')
+                real_replace = module.replace_file_contents_by_rename
+                first_checked, second_checked = threading.Event(), threading.Event()
+                worker = threading.local()
+
+                def controlled_replace(path, text, check_before_rename=None):
+                    def checked_then_wait():
+                        check_before_rename()
+                        if worker.label == '甲':
+                            first_checked.set()
+                            second_checked.wait(timeout=3)
+                        else:
+                            second_checked.set()
+                    return real_replace(path, text, check_before_rename=checked_then_wait)
+
+                root, ledger_path = module.make_root(scratch, 'repo', module.sample_ledger(['一'], ['一']))
+
+                def append(label):
+                    worker.label = label
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        return module.append_section(ledger_path, '来自' + label, '来自%s的正文\n' % label,
+                                                     [('判定', '新登'), ('历史', '—'), ('开着的', '整节')], notation_root=root)
+
+                with mock.patch.object(module, 'replace_file_contents_by_rename', controlled_replace), \
+                        mock.patch.object(module, 'BROKEN', broken):
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        first = pool.submit(append, '甲')
+                        self.assertTrue(first_checked.wait(timeout=30), '甲没走到写前复核之后')
+                        second = pool.submit(append, '乙')
+                        codes = [first.result(timeout=60), second.result(timeout=60)]
+                final = Path(ledger_path).read_text(encoding='utf-8')
+                headings, indexed, _, _ = module.scan(final.split('\n'))
+                self.assertEqual(codes, [0, 0])
+                if both_bodies_kept:
+                    self.assertIn('来自甲的正文', final)
+                    self.assertIn('来自乙的正文', final)
+                    self.assertEqual((headings, indexed), ([1, 2, 3], [1, 2, 3]))
+                else:
+                    self.assertEqual(('来自甲的正文' in final) + ('来自乙的正文' in final), 1)
+                    self.assertEqual((headings, indexed), ([1, 2], [1, 2]))
+
+    def test_interruption_after_rename_is_reported_as_already_replaced(self):
+        # 审核 A49（受控故障）与 A19：改名之后、目录 fsync 时到的 Ctrl-C 要让调用方分得出新内容已经换上；
+        # 改名之前 fsync 临时文件失败（EIO）照旧是 ReplaceRefused、原文不动
+        atomic = load('lib_atomic_replace')
+        replace_once = load('replace-once')
+        original_fsync = os.fsync
+
+        def interrupted_on_directory(descriptor):
+            if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                raise KeyboardInterrupt('注入：目录 fsync 时按了 Ctrl-C')
+            return original_fsync(descriptor)
+
+        def failing_fsync(descriptor):
+            raise OSError(5, '注入：fsync 失败')
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'target.md'
+            path.write_text('OLD\n', encoding='utf-8')
+            with mock.patch.object(os, 'fsync', interrupted_on_directory):
+                with self.assertRaises(atomic.ReplacedThenInterrupted) as raised:
+                    atomic.replace_file_contents_by_rename(str(path), 'NEW\n')
+            self.assertIsInstance(raised.exception, KeyboardInterrupt)
+            self.assertEqual(path.read_text(encoding='utf-8'), 'NEW\n')
+            self.assertEqual(atomic.leftover_temporary_files(directory), [])
+            path.write_text('OLD\n', encoding='utf-8')
+            with mock.patch.object(os, 'fsync', interrupted_on_directory):
+                code, message = replace_once.replace_once(str(path), 'OLD', 'NEW')
+            self.assertEqual(code, 5, message)
+            self.assertEqual(path.read_text(encoding='utf-8'), 'NEW\n')
+            path.write_text('OLD\n', encoding='utf-8')
+            with mock.patch.object(os, 'fsync', failing_fsync):
+                with self.assertRaises(atomic.ReplaceRefused):
+                    atomic.replace_file_contents_by_rename(str(path), 'NEW\n')
+            self.assertEqual(path.read_text(encoding='utf-8'), 'OLD\n')
+            self.assertEqual(atomic.leftover_temporary_files(directory), [])
+
+    def test_basis_line_reference_to_a_file_deleted_in_the_worktree_is_refused(self):
+        # 审核 A48：与 HEAD 不同的那一版缺了（工作区删掉）不跳过，写了行号的引用照样拒
+        module = load('lib_basis_paths')
+        with tempfile.TemporaryDirectory() as directory:
+            def git(*args):
+                return subprocess.run(['git', '-C', directory, *args], check=True, capture_output=True)
+            git('init')
+            path = Path(directory) / 'docs/a.md'
+            path.parent.mkdir()
+            path.write_text('first\nsecond\n')
+            git('add', '.')
+            git('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'base')
+            self.assertEqual(module.basis_check(directory, '`docs/a.md:1`')[0], [])
+            path.unlink()
+            problems, untracked = module.basis_check(directory, '`docs/a.md:1`')
+            self.assertTrue(problems)
+            self.assertEqual(untracked, [])
 
 
 if __name__ == '__main__':

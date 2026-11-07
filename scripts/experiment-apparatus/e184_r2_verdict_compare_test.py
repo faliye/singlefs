@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # admission: always 每一次调都跑，判的是同目录 e184_r2_verdict_compare.py 此刻的样子，上一次的结论不替这一次作保
-# run-condition: none 只在合成产物（内存里与临时目录）和改前产物（在工作区时）上读文本，除了 python3 之外没有环境要求，不起 cargo
+# run-condition: none 只在合成产物（内存里与临时目录）和改前产物（history-kept: 被比对的产物名；在工作区时）上读文本，除了 python3 之外没有环境要求，不起 cargo
 """e184_r2_verdict_compare.py 的单测（E184 重跑 r2 登记 5.2 节的对照，一条对照一个用例；登记第九节九行变异各有一项点名要红的用例）。
 
 用法：python3 scripts/experiment-apparatus/e184_r2_verdict_compare_test.py     每项一行 ✓ 绿 / ✗ 红，末行「自证 N 项，红 M 项」，有红退 1。
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from e184_r2_verdict_compare import *  # noqa: E402,F401,F403
 from e184_r2_verdict_compare import Unreadable, main  # noqa: E402
 
-# ── 合成产物：行形照改前产物（research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out）的各类行 ──────────
+# ── 合成产物：行形照改前产物（history-kept: 被比对的产物名；research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out）的各类行 ──────────
 
 SMOKE_STREAMS = ("new_pool_file_creation_stream", "overwrite_fixed_script_stream", "multi_record_publish_stream", "snapshot_creation_stream")
 STREAM_CHECKS = ("recorded_values_match_the_test_pins", "pins_still_in_the_test_file", "two_counting_routes_agree",

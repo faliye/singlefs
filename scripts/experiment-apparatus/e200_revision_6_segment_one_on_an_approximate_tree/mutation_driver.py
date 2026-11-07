@@ -1,10 +1,11 @@
 """E200（修订6近似树重跑） 研究一侧的变异驱动（登记第九节；表 scripts/mutation/tables/e200_revision_6_segment_one_on_an_approximate_tree.tsv）。
 
 出处：照抄 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/mutation_driver.py（提交 59ce5a865 那一版，sha256
-3399e5ddaeed24b24f96fb43535f08cece70dba3683e2e6fea2364af2f2a22f1），改了四处：这一段文件头、TEST_MODULES、单测环境不再带 E171 的仓根变量、argparse 的说明。
+3399e5ddaeed24b24f96fb43535f08cece70dba3683e2e6fea2364af2f2a22f1），改了五处：这一段文件头、TEST_MODULES、单测环境不再带 E171 的仓根变量、argparse 的说明、
+源文件连同本目录的 `.sh`（编译包装 compile_in_the_approximate_tree.sh 的拷贝判法也要能改坏，单测 CompileWrapper 整条起它）。
 scripts/mutation/mutate.sh 只跑 cargo，起不了 Python 的单测（登记第五节 5.4「经 E171 研究一侧的 mutation_driver.py 那种做法跑」）。
-派活之前逐条核锚点——原文（`\\n` 还原成换行）在本目录的源文件（本文件与 `test_*.py` 除外）里合起来恰好命中一次，不是就退 3、一条不跑；
-每条在草稿目录的一份副本上替换、先 `py_compile`（编不过记无效）、再跑本目录的单测，单测红记抓到、全绿记没红；每条在新副本上做；
+派活之前逐条核锚点——原文（`\\n` 还原成换行）在本目录的源文件（`.py` 与 `.sh`，本文件与 `test_*.py` 除外）里合起来恰好命中一次，不是就退 3、一条不跑；
+每条在草稿目录的一份副本上替换、先查语法（`.py` 用 `py_compile`、`.sh` 用 `bash -n`，过不了记无效）、再跑本目录的单测，单测红记抓到、全绿记没红；每条在新副本上做；
 收尾在一份新副本上重跑基线，核「已还原，基线仍全绿」，并核本目录在跑前跑后逐字节相同。结局符号照 .claude/rules/mutation-sampling.md：
 ✅ 抓到、⏭ 无效、❌ 没红、⏱ 超时。结果行不带耗时，两次跑逐字节相同。
 
@@ -46,7 +47,18 @@ def read_table(path: str) -> list[tuple[str, str, str]]:
 
 def source_files(directory: str) -> list[str]:
     return sorted(name for name in os.listdir(directory)
-                  if name.endswith(".py") and name != THIS_FILE and not name.startswith("test_"))
+                  if name.endswith((".py", ".sh")) and name != THIS_FILE and not name.startswith("test_"))
+
+
+def syntax_holds(path: str, directory: str) -> bool:
+    """改坏之后的那一份还过得了语法：.py 用 py_compile，.sh 用 bash -n。"""
+    if path.endswith(".sh"):
+        return subprocess.run(["bash", "-n", path], capture_output=True).returncode == 0
+    try:
+        py_compile.compile(path, doraise=True, cfile=os.path.join(directory, "compiled-check.pyc"))
+    except py_compile.PyCompileError:
+        return False
+    return True
 
 
 def directory_digest(directory: str) -> str:
@@ -124,10 +136,9 @@ def main(argument_list: list[str]) -> int:
             text = handle.read()
         with open(target, "w", encoding="utf-8") as handle:
             handle.write(text.replace(original, replacement, 1))
-        try:
-            py_compile.compile(target, doraise=True, cfile=os.path.join(directory, "compiled-check.pyc"))
+        if syntax_holds(target, directory):
             outcome, exit_code = run_unit_tests(directory, test_modules)
-        except py_compile.PyCompileError:
+        else:
             outcome, exit_code = INVALID, -1
         tally[outcome] += 1
         lines.result(f"name=mutation number={number} outcome={outcome} mutation={field(name)} unit_test_exit={exit_code}")

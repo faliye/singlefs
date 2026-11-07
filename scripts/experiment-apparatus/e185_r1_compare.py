@@ -29,7 +29,7 @@ from project_preflight import preflight  # noqa: E402
 
 TOKEN = re.compile(r'(\w+)=("[^"]*"|\S+)')
 
-# 登记第五节：上一趟（2026-10-20）两份产物的 sha256
+# 登记第五节：上一趟两份产物的 sha256
 BASELINE_WALL_CLOCK_SHA256 = "a6afc7bf2f380d86f3b51a070c91465c3206a2476c216af6ab59fbe700a7d87b"
 BASELINE_STAGE_SPLIT_SHA256 = "e087a1b6834a381322c87ebd0a53a242b66ce035812fab39d7628b79e3a9e125"
 # 登记第十一节「装置变了」：装置 sha256；输入清单里要有它、不许出现计数特性

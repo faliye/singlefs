@@ -58,7 +58,7 @@ stdout 要接给 `--target`：
       「✗ 自检：只在暂存区的新文件按块挑，提交对象里该是暂存区那一版加命中的那一块」、「✗ 自检：搬迁后的路径按块挑，提交对象里该是旧路径在 HEAD 里的那一版加命中的那一块」
   BATCH_TARGET_BREAK=keep-foreign-dropped   按块挑的组不认 --keep-foreign（当没写，命中 --foreign 的块照旧整组拒）
       「✗ 自检：--keep-foreign 的组应当退 0」
-  BATCH_TARGET_BREAK=head-only-base   按块挑只认 HEAD 里有的路径（不取真索引与搬迁前旧路径当底，改前的样子）
+  BATCH_TARGET_BREAK=head-only-base   按块挑只认 HEAD 里有的路径（不取真索引与搬迁前旧路径当底）
       「✗ 自检：只在暂存区的新文件按块挑应当退 0」、「✗ 自检：搬迁后的路径按块挑应当退 0」
   BATCH_TARGET_BREAK=merge-markers-accepted   --patch 合成出冲突标记也照收，不拒
       「✗ 自检：--patch 这一批与别人改在同一处应当退 2」

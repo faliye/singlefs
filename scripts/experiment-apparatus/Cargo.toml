@@ -250,6 +250,8 @@ path = "e59_message_recompute.rs"
 [dependencies]
 aes-gcm = "0.11.1"
 chacha20poly1305 = "0.11.0"
+# 实验装置读写判定库的口子（E174、E178 用）：转交的协议写在这个包的文件头
+singlefs-device-library = { path = "../../crates/singlefs-device-library" }
 
 [[bin]]
 name = "e31-aad-snapshot"

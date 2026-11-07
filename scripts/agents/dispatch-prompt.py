@@ -13,8 +13,8 @@
 不成立的一次列全（占位、定义要的输入、写范围、快照、批次一行、书记员规格……）；⑤ 与在跑的实现员撞文件、⑦ 并发
 要会话状态，写成「派的那一刻另判」。不知道类型、或派发闸跑不起来的，只查占位（<填 …>），并写明别几条没核。
 
-为什么：2026-09-20 起 8 天里派发闸拒了 187 次，前几种原因全是缺一行（岔路行、要改的文件、出口、还差）；主 agent 派完再给子 agent
-发了 573 条纠正或追加。缺项该在写的时候补，不该在派的时候拒：骨架把定义要的每一样都列成一行占位，占位没填完就不派。
+为什么：派发闸拒的原因多半是缺一行（岔路行、要改的文件、出口、还差）；主 agent 派完再给子 agent
+发的纠正或追加也多是补缺项。缺项该在写的时候补，不该在派的时候拒：骨架把定义要的每一样都列成一行占位，占位没填完就不派。
 骨架里的固定行与派发闸（.claude/hooks/runner-dispatch-guard.sh）判的是同一套：开工先读（没有定义的类型）、
 定义的 required-inputs 每组一行、实现员的「要动的 crates 文件」、写回员的「规格检查已判」、执行员的「这一段回答的岔路」、每种类型的「批次」一行。
 「批次：」一行派发闸 ⑱ 判形如 records/<文件>.md#<批号>、文件在本仓或登记的工作树里，十种类型缺这一行拒（判法只在派发闸文件头 ⑱ 条）。
@@ -81,7 +81,7 @@
   DISPATCH_PROMPT_BREAK=selftest-location-handback-hint-dropped  SELFTEST_LOCATION_LINE 的占位里不写这些命令由主 agent 起、子 agent 写进报告自己不起（SELFTEST_LOCATION_HANDBACK_HINT）
       「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（tooling-writer）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（implementation-writer）」
       「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（investigator）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当写明命令由主 agent 起、子 agent 自己不起（experiment-runner）」
-  DISPATCH_PROMPT_BREAK=selftest-location-hint-bare  SELFTEST_LOCATION_HANDBACK_HINT 退回改前：不分表内表外，一律写 `task-server/task submit -- <脚本> --selftest` 这一形（SELFTEST_LOCATION_REQUIRED_CLAUSE 交空；表里 required 的脚本裸写会被 project-code-guard.sh 拒）
+  DISPATCH_PROMPT_BREAK=selftest-location-hint-bare  SELFTEST_LOCATION_HANDBACK_HINT 不分表内表外，一律写 `task-server/task submit -- <脚本> --selftest` 这一形（SELFTEST_LOCATION_REQUIRED_CLAUSE 交空；表里 required 的脚本裸写会被 project-code-guard.sh 拒）
       「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（tooling-writer）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（implementation-writer）」
       「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（investigator）」；「✗ 自检：会跑自证的类型骨架的「自证在哪跑」占位应当点到「要临时服务的自证」那一行（表里 required 的脚本裸写会被拒）（experiment-runner）」
   DISPATCH_PROMPT_BREAK=temporary-service-line-dropped  skeleton() 不打「要临时服务的自证」一行
@@ -106,7 +106,7 @@
       点名了登记脚本、拼了整条包装写法的那一格（骨架里要临时服务的自证那一行填完过派发闸 --check）不红：点名时规则一句后面接着带
       写进报告、由主 agent 交的整条命令，整句因提到主 agent、有交回说法被派发闸 ㉒ 放过，又因带了直角引号括起的原文过借用写法闸，规则一句写错这一格看不出来；规则一句由上面不点名的几格盯
 
-  DISPATCH_PROMPT_BREAK=scratch-expanded-from-home  selftest_work_root() 退回改前：自检的草稿目录与报告路径写成 ~/ 起头、照家目录展开的样子（~/ 加工作根相对本机家目录的路径）
+  DISPATCH_PROMPT_BREAK=scratch-expanded-from-home  selftest_work_root()：自检的草稿目录与报告路径写成 ~/ 起头、照家目录展开的样子（~/ 加工作根相对本机家目录的路径）
       （本机家目录下展开回工作根；自证把 HOME 换成别的目录再判同一份提示，展开就落到工作根外面，--check 的结局跟着变，第二台的家目录是另一个，平常的趟里也一样靠工作根取）
       「✗ 自检：clerk 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
       「✗ 自检：experiment-designer 的骨架换了家目录（HOME 指到别的目录），--check 的结局应与本机家目录下相同，实际」
@@ -123,7 +123,7 @@
 
   DISPATCH_PROMPT_BREAK=report-default-dropped  skeleton() 的「报告：」一行退回 <填 报告|报告路径> 占位，不填 <草稿目录>/result.md
       骨架的「报告：」一行默认填草稿目录下的 result.md（「✗ 自检：骨架的「报告：」一行默认应当填 <草稿目录>/result.md」；有定义的类型骨架那一格「✗ 自检：有定义的类型：骨架缺 …」同样红）
-  DISPATCH_PROMPT_BREAK=three-way-report-default-dropped  三方腿的「报告：」一行退回改前：定义要了「报告」的填 <草稿目录>/result.md，没要的不打这一行
+  DISPATCH_PROMPT_BREAK=three-way-report-default-dropped  三方腿的「报告：」一行只按定义写：定义要了「报告」的填 <草稿目录>/result.md，没要的不打这一行
       三方腿的骨架只打一行占位（「✗ 自检：三方腿的骨架应当只打一行「报告：research/prompts/<填 轮>-<填 模型>-output.md」」，三种各一句）、
       只填别的占位时点名报告行（「✗ 自检：三方腿骨架只填别的占位、不动报告行」，三种各一句）、
       骨架读到的三方腿类型与 frontmatter 逐个相同（「✗ 自检：三方腿类型表：样本仓骨架按三方腿打报告占位的类型」「✗ 自检：三方腿类型表：本仓骨架按三方腿打报告占位的类型」）
@@ -134,9 +134,9 @@
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-attack），--check 应当退 0，实际」
       「✗ 自检：三方腿骨架报告填成 research/prompts/x-r1-opus-output.md（three-way-defense），--check 应当退 0，实际」
       「✗ 派 three-way-attack 的提示里没有行首「报告：」一行（句中写的「报告写进 …」不算这一行）。」
-  DISPATCH_PROMPT_BREAK=leg-types-hardcoded  three_way_report_types() 不读定义 frontmatter 的 leg: three-way，退回改前写死的 three-way-forward、three-way-attack、three-way-defense
+  DISPATCH_PROMPT_BREAK=leg-types-hardcoded  three_way_report_types() 不读定义 frontmatter 的 leg: three-way，改用写死的 three-way-forward、three-way-attack、three-way-defense
       骨架读到的三方腿类型与 frontmatter 逐个相同（「✗ 自检：三方腿类型表：样本仓骨架按三方腿打报告占位的类型应当与 frontmatter 逐个相同」）
-  DISPATCH_PROMPT_BREAK=draft-line-own-regex  claim_problems() 不调 lib_prompt_scratch_line.py，退回改前这里自己的 DRAFT_LINE（第 0 列、全角冒号，围栏代码块里的也认）
+  DISPATCH_PROMPT_BREAK=draft-line-own-regex  claim_problems() 不调 lib_prompt_scratch_line.py，改用这里自己的 DRAFT_LINE（第 0 列、全角冒号，围栏代码块里的也认）
       「✗ 自检：认领行 绿：闭合了的围栏代码块里的草稿目录一行不算，不要求认领：应当 0 个问题，实际」；「✗ 自检：认领行 红：半角冒号的草稿目录一行同样要认领：应当 1 个问题，实际」；「✗ 自检：认领行调共用库：「草稿目录：」一行应当经 lib_prompt_scratch_line.py 的 scratch_line_values 认，实际」
   DISPATCH_PROMPT_BREAK=untouched-line-dropped  skeleton() 不给实现员、工具员打「不碰：<填 …>」一行（常设要求 D3）
       「✗ 自检：实现员与工具员的骨架应当带一行「不碰：<填 …>」（implementation-writer）」；「✗ 自检：实现员与工具员的骨架应当带一行「不碰：<填 …>」（tooling-writer）」
@@ -249,12 +249,12 @@ BROKEN = os.environ.get("DISPATCH_PROMPT_BREAK", "")
 PLACEHOLDER = re.compile(r"<填[^>]*>")
 REPORT_LINE_NAME, REPORT_FILE_NAME = "报告", "result.md"   # 骨架的「报告：」一行默认填 <草稿目录>/result.md（派发闸 ⑰ 拒文件名里带 report 的）
 # 三方腿的报告就是 research/prompts/<轮>-<模型>-output.md（交回闸只认这种形态；派发闸 ⑰ 读同一处类型表）：骨架填这个占位，轮与模型两处主 agent 填
-THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY = ("three-way-forward", "three-way-attack", "three-way-defense")   # 改前写死的那一份：只有弄坏开关 leg-types-hardcoded 下还在用
+THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY = ("three-way-forward", "three-way-attack", "three-way-defense")   # 写死的那一份：只有弄坏开关 leg-types-hardcoded 下还在用
 
 
 def three_way_report_types(agents_dir):
     """骨架打三方腿报告占位的类型：agents_dir（<仓根>/.claude/agents）里定义 frontmatter 写了 leg: three-way 的（lib_three_way_legs.py 的 three_way_leg_types）。
-    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下退回改前写死的三种。"""
+    读不到那份库交空集、stderr 写一句；弄坏开关 leg-types-hardcoded 下用写死的三种。"""
     if BROKEN == "leg-types-hardcoded":
         return frozenset(THREE_WAY_REPORT_TYPES_BEFORE_REGISTRY)
     if three_way_legs is None:
@@ -284,13 +284,13 @@ EXTRA_LINES = {
     "experiment-runner": ["这一段回答的岔路：<填 岔路单里的哪几行>", "上一段岔路表里还差：<填 续做时写还差的行；第一段删掉这一行>",
                           *([] if BROKEN == "handover-line-dropped" else [HANDOVER_LINE])],
 }
-# 会跑自证的类型要的一行（用户 2026-10-11 定「派发提示写明自证在哪跑」）：按各定义「输入」一节判——
+# 会跑自证的类型要的一行（派发提示写明自证在哪跑）：按各定义「输入」一节判——
 # 工具员要给判红样本与弄坏开关，实现员与执行员会改脚本、装置或变异表锚点，调查员在仓副本里改坏、二分
 # 占位里另提一句这些命令谁起、怎么起：一切跑项目代码的命令只认经 task-server/task 起（records/2026-10-30-编译绕过内存总上限.md 批 3b），
-# 子 agent 一律不往统一任务服务交任务（用户 2026-11-01 定，records/2026-10-29-subagent拆分提案.md 第一百七十四节），所以这一行写的是主 agent 起交回命令的那棵树；
-# 主 agent 填这一行时写过「排不上带 ulimit -v 与 nice 直跑」，子 agent 照它把自证跑在 slice 外面；现在内存与排队归服务，提示里不写包装
+# 子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），所以这一行写的是主 agent 起交回命令的那棵树；
+# 内存与排队归服务，提示里不写包装（不写「排不上带 ulimit -v 与 nice 直跑」这类绕开服务的做法）
 # 表里 required 的自证裸写 --selftest 在执行前被 project-code-guard.sh 拒（一百九十七节 ②）：占位里表外的写这一形，required 的指到下面「要临时服务的自证」那一行的整条；
-# 弄坏开关 selftest-location-hint-bare 下退回改前：不分表内表外，一律写这一形
+# 弄坏开关 selftest-location-hint-bare 下不分表内表外，一律写这一形
 TEMPORARY_SERVICE_LABEL = "要临时服务的自证"
 SELFTEST_LOCATION_REQUIRED_CLAUSE = ("" if BROKEN == "selftest-location-hint-bare" else
                                      f"（表外的脚本写这一形，.claude/hooks/selftest-temporary-service.tsv 里 required 的脚本裸写会被 project-code-guard.sh 拒，照骨架「{TEMPORARY_SERVICE_LABEL}」那一行的整条写）")
@@ -335,7 +335,7 @@ def temporary_service_line(settings):
     """骨架里「要临时服务的自证」那一行：规则一句，加上 --set 的值里点名了的 required 脚本各拼出来的整条。一句话写完（句中不用句号与分号：派发闸 ㉒ 按句判，
     每一处点到 task-server/task submit 的句子都要有写进报告、由主 agent 交的说法；整条命令放在「」里当原文，借用写法闸与派发闸都不拒）。
     弄坏开关 temporary-service-named-dropped 下只写规则；temporary-service-line-unquoted 下规则一句退回会被两道闸拒的写法。"""
-    if BROKEN == "temporary-service-line-unquoted":   # 改前会被两道闸拒的写法：借别处做法不带原文，命令在反引号里、不写交回
+    if BROKEN == "temporary-service-line-unquoted":   # 会被两道闸拒的写法：借别处做法不带原文，命令在反引号里、不写交回
         text = (f"{TEMPORARY_SERVICE_LABEL}：这些脚本的自证照登记表那一份的写法拼成 "
                 f"`task-server/task submit -- {TEMPORARY_SERVICE_WRAPPER} <解释器> <脚本> --selftest` 交服务")
     else:
@@ -367,7 +367,7 @@ def frontmatter_fields(definition_path):
 
 
 CLAIM_COMMAND = "bash scripts/hosts/work-directory-ownership.sh claim"
-DRAFT_LINE = re.compile(r"^草稿目录：\s*(\S+)", re.M)   # 改前这里自己的认法：只有弄坏开关 draft-line-own-regex 下还在用
+DRAFT_LINE = re.compile(r"^草稿目录：\s*(\S+)", re.M)   # 这里自己的认法：只有弄坏开关 draft-line-own-regex 下还在用
 try:   # 「草稿目录：」一行的认法只在 .claude/hooks/lib_prompt_scratch_line.py（与派发闸 ⑯ ⑰、完工清理闸、交回闸 ⑥、看门狗共用；读不到时认领行不核，输出写一句）
     import lib_prompt_scratch_line as prompt_scratch_line  # noqa: E402
     prompt_scratch_line_error = None
@@ -390,7 +390,7 @@ def normalized_directory(value):
 
 def draft_line_value(text):
     """提示里「草稿目录：」一行点名的路径（照写的样子，没展开）→ (路径或 None, 读不到库的原因或 None)：认法是 lib_prompt_scratch_line.py 的 scratch_line_values
-    （行首只许空白、全角半角冒号都认、闭合了的围栏代码块里的不认、<填 …> 占位不认），几行的取第一行。弄坏开关 draft-line-own-regex 下退回改前的 DRAFT_LINE。"""
+    （行首只许空白、全角半角冒号都认、闭合了的围栏代码块里的不认、<填 …> 占位不认），几行的取第一行。弄坏开关 draft-line-own-regex 下用这里自己的 DRAFT_LINE。"""
     if BROKEN == "draft-line-own-regex":
         draft = DRAFT_LINE.search(text)
         return (draft.group(1) if draft else None), None
@@ -557,8 +557,8 @@ SELFTEST_SCRATCH_NAME = "dispatch-prompt-selftest"   # 自检填进草稿目录�
 
 def selftest_work_root():
     """自检造草稿目录、报告路径用的工作根：lib_work_root.py 的 configured_work_root（绝对路径，两台同一个，不经 ~ 与 $HOME）；读不到那份库、取不到工作根抛 RuntimeError 或 ValueError。
-    弄坏开关 scratch-expanded-from-home 下退回改前经家目录展开的写法：~/ 加工作根相对本机家目录的路径（本机家目录下展开回工作根，HOME 换成别的目录就落到工作根外面；
-    改前写死 ~/.local/share/singlefs/work，第二台上平常的趟也红，这里按各台家目录算，让这个开关在哪台跑红的格都一样）。"""
+    弄坏开关 scratch-expanded-from-home 下经家目录展开：~/ 加工作根相对本机家目录的路径（本机家目录下展开回工作根，HOME 换成别的目录就落到工作根外面；
+    按各台家目录算、不写死 ~/.local/share/singlefs/work，让这个开关在哪台跑红的格都一样）。"""
     if work_root_library is None:
         raise RuntimeError(f"读不到 .claude/hooks/lib_work_root.py（{work_root_library_error!r}）")
     work_root = work_root_library.configured_work_root()
@@ -800,7 +800,7 @@ def selftest():
                     failures.append(f"三方腿骨架{three_way_label}（{three_way_type}），--check 应当退 {three_way_want}"
                                     + (f"并点名「{three_way_needle}」" if three_way_needle else "") + f"，实际 {code_three_way}：{buffer.getvalue()[-600:]}")
         # 三方腿类型表（拆分提案第九十节 ⑯）：骨架读到的类型集合（按哪几种打报告占位）与登记处（定义 frontmatter 的 leg: three-way 一行）逐个相同。
-        # 样本仓里的登记故意与改前写死的三种不同：攻方没登记、辩方的值带行尾注释、另登记一种不以 three-way 起头的 sample-leg、材料员没登记、正文里写的不算；
+        # 样本仓里的登记故意与写死的三种不同：攻方没登记、辩方的值带行尾注释、另登记一种不以 three-way 起头的 sample-leg、材料员没登记、正文里写的不算；
         # 本仓按 frontmatter 现扫，至少要有一种（开关 leg-types-hardcoded 下样本仓那一格红）
         legs_agents = os.path.join(work, "legs-sample", ".claude", "agents")
         os.makedirs(legs_agents)

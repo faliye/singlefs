@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# admission: always 每一次调都照此刻各段输出齐不齐判还差什么，上一次跑完不替这一次作保
-# run-condition: command cargo git
+# admission: always 整个脚本每次都起：哪一片已有判定、键对不对得上由 prune-server 里的按片判定现答（scripts/experiment-apparatus/long_run_item_verdicts.py），上一次跑完不替这一次作保
+# run-condition: command cargo git python3
 # E181（落得下那一判与挂载下界）第一段（固定点与落得下段，跑前登记 research/prompts/e181-preregistration.md 5.5 节第一段）的长跑跑法：
 #   装置是入库装置 crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs；装置按「段」（命令行参数）一段一段跑，
-#   本脚本把它们切成八个互不依赖的片，每片一个进程、一份输出，全部做完再按固定次序拼成产物
+#   本脚本把它们切成八个互不依赖的片，每片一个进程、一份输出，全部判完再按固定次序拼成产物
 #   research/results/e181-landing-check-fixed-point-and-mount-lower-bound-landing.out（多段产物，每段有自己的 name=done 收尾行），
 #   第一片（常量回比、锚点、自证、小几何的阳性对照）另存一份给复跑登记用的产物 …-checks.out（逐字节可比，不含计时与线程数）。
 #
-# long-run-shards: 一片 = 装置的一段输出：checks、f11、f9、measure、controls、narrow、unequal、small 八片；每片一个进程，--only 点名哪几片，两台机器可以各跑一部分片
-# long-run-resume: 同一条命令重起就是续跑：每片做完把输出落成日志目录里的 seg-<片名>.out（片旁 seg-<片名>.out.binary-sha256 记着打它的装置 sha256），重起先看它末行是不是 name=done emitted=行数、片旁记的装置 sha256 是不是这一趟的，两样都齐的直接取、只补没做完的（记的不同或没有记录的片整份移到日志目录的 void-<日期>-<进程号>/ 再现跑，逐片报「作废：<片名>（装置 sha256 不同）」），成功那句报「现判 N、复用 M」
-# long-run-unshardable: 多机这一段缺：本脚本不自己读多机配置去分发，第二台上的片由主 agent 用 --only 点名起、再把 seg-*.out 取回本机后用 --assemble 并成产物
+# long-run-shards: 一片 = 装置的一段输出：checks、f11、f9、measure、controls、narrow、unequal、small 八片；每片一个进程，--only 点名哪几片，两台机器可以各判一部分片
+# long-run-resume: 每片一条判定，在 prune-server 的 apparatus-items 族、种类 e181_landing_check_fixed_point_and_mount_lower_bound（读写经 scripts/experiment-apparatus/long_run_item_verdicts.py，
+#   它文件头「判定库」）：键 = 装置入口 main 的单元闭包（release 档；admission.py 的 compute_unit_key 算）、工具链、闭包真引到的依赖版本、这一片点名的段；
+#   checks 那一片产物逐字节可比（compare=exact），别的片带计时与线程数（compare=timing，只比绿红与退出码）。键相同、库里判绿的片取库里的片产物、不起装置；
+#   判红的照同一把键记红撤绿、下一趟现判。同一条命令重起就是续跑，成功那句报「现判 N、复用 M、拒算 R」。本地不留片文件、不读旧片文件（旧产物不导入）。
+# long-run-hosts: 两台各判一部分片：主 agent 用 --only 点名交统一任务服务（派哪台由服务定），判完的片都写进 prune-server 那一份，不拷、不取回；
+#   之后在哪一台起一次不带参数的本脚本：判完的片复用、拼出产物。台数与每台线程不在这里读（并发数照下面的内存预算算）。
 #
 # 片与段、并发数（并发数显式给：一份试写的拷贝约占 5 GiB，一个走种子的线程约占 2 GiB 以上，装置里的默认是每台默认重活线程数，会撞顶；
-#   脚本里不套内存包装，整条命令交 task-server，内存额度由服务按记录给；下面的内存预算只用来算并发数）：
+#   脚本里不套内存包装，整条命令交 task-server，内存额度由服务按记录给；下面的内存预算只用来算并发数，并发数不进键）：
 #   checks   constants anchors selfcheck f10-controls-small
 #   f11      f11                                              （计时片：开跑前机器要闲，跑的时候不和别的片并行）
 #   f9       f9                                               预算 E181_CAP_F9（默认 16G），同时试写的拷贝数 (预算 − 4) ÷ 5 取整
@@ -22,33 +26,40 @@
 #   unequal  f10-unequal                                      同上
 #   small    f10-small                                        同上
 # measure 片和别的片一样一律跑完、不设外推停机（挂钟由统一任务服务管）；外推读数在 measure 片的输出里（name=f10_measure_extrapolation）。
-# 装置在一趟里不许换，每片记下打它的是哪一版装置（欠账 C862，共用段落在 long-run-lib/binary-identity.sh）：开跑时把装置二进制拷一份进 $E181_LOG_DIRECTORY/pinned-binary/<sha256>/（只读），
-#   八片都按这份拷贝起，不再 exec 仓根 target/release 下那一份（别的会话的 cargo 随时会把它换掉）；每片做完先在片旁写 seg-<片名>.out.binary-sha256（这份拷贝的 sha256）再换名成 seg-<片名>.out；
-#   续跑只沿用片旁记的 sha256 与这一趟相同的片；拼产物之前再核八片记的 sha256 都是这一趟的（--assemble 不起装置时核八片彼此相同），不同就拒、不出产物。
-#   第二台上用 --only 跑的那几片要用与本机同一份装置（把本机私有副本送过去、第二台 E181_BINARY 指到送到的文件），用自己编的另一份，取回后本机拼产物时会因 sha256 不同被拒。
-#   老的私有副本留着不删（一个 sha256 一个目录），确认不再续跑那一版之后手删。
+# 装置在一趟里不许换（共用段落在 long-run-lib/binary-identity.sh）：开跑时把装置二进制拷一份进 $E181_LOG_DIRECTORY/pinned-binary/<sha256>/（只读），
+#   八片都按这份拷贝起，不再 exec 开跑时给的那个路径（别的会话的 cargo 随时会把它换掉）；跑着的时候源码被改了，long_run_item_verdicts.py 的 finish 重算键、
+#   撤掉这一趟写进库的那几片、判红。老的私有副本留着不删（一个 sha256 一个目录），确认不再用那一版之后手删。
 #
 # 用法（在仓里任何目录起都行，脚本自己回到仓根）：
-#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh                      本机跑全部片并拼产物（做完的片直接取）
-#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --only <片名>[,<片名>…]   只做点名的片，不拼产物（分给第二台用）
-#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --assemble           不跑，只拼产物（八片都齐才拼）
-#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --list-segments      列八片和它们的段，不编译、不跑
-#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --selftest           假装置在临时树里走一遍续跑、换装置作废、跑着换二进制、拼产物前核 sha256（不起 cargo、不碰真装置）
-# 环境：E181_PRODUCT_DIRECTORY（产物目录，默认 research/results；自证用）、E181_BINARY（装置二进制；没给就先 cargo build --release 编仓根 target/ 下的那一份）、E181_LOG_DIRECTORY（片输出与进度日志目录，默认
-#   工作根下的 e181-long-run，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、E181_CAP_F9、E181_CAP_F10、E181_PROBE_COUNT（f9 同时试写的拷贝数）、E181_WALKERS（走种子的线程数）。
+#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh                      判全部片（判完的复用）并拼产物
+#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --only <片名>[,<片名>…]   只判点名的片，不拼产物（分给第二台用）
+#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --list-segments      列八片和它们的段，不编译、不跑、不连 prune-server
+#   bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --selftest           假装置在临时树里走一遍（不起 cargo、不碰真装置）；判定写进临时 prune-server：
+#     只在临时服务底下跑（long_run_item_verdicts.py selftest-service，即客户端 selftest_service_problem；不在就退 2、一格都不跑），起法：
+#     python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --selftest
+# 环境：E181_PRODUCT_DIRECTORY（产物目录，默认 research/results；自证用）、E181_BINARY（装置二进制；没给就在要起装置时先 cargo build --release 编，装置取 cargo 自己报的这一趟编出来的位置
+#   ——编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，仓根 target/ 下那一份可能是早先编的旧二进制，不取它；取法在 long-run-lib/binary-identity.sh 的 binary_identity_build）、
+#   E181_LOG_DIRECTORY（装置私有副本与这一趟的状态目录，默认工作根下的 e181-long-run，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、
+#   E181_CAP_F9、E181_CAP_F10、E181_PROBE_COUNT（f9 同时试写的拷贝数）、E181_WALKERS（走种子的线程数）。
 # 产物名：…-landing.out 已有时另存 …-landing-<日期>.out，同一天再跑加 -r2、-r3，已有的一个不动；…-checks.out 同样。
-# 退出码：0 做完；1 装置跑失败或产物不齐；2 用法错；3 装置报停机（日志里 name=stop 那一行）；
-#   78 装置没编好（--list-segments 不需要）。
+# 退出码：0 做完；1 有片判红、产物不齐、复用哨兵红或键在跑的中途变了；2 用法错；3 装置报停机（日志里 name=stop 那一行）；
+#   75 prune-server 不可用；78 装置没编好（--list-segments 不需要）。
 #
+# 复用三问（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：自证经 long_run_item_verdicts.py reuse-cells 跑那六格（reuse-three-questions、
+#   key-independent-of-directory、reuse-sentinel 与哨兵的三种红），假驱动是自证的假装置，checks、f11 两片的装置入口换成假树里两个 Python 函数（它文件头「复用格」）。
 # 弄坏开关 E181_LONG_RUN_BREAK=<项，逗号分隔>（只在 --selftest 起的那几趟里认：自证设 E181_LONG_RUN_SELFTEST_MARK 指到它建的标记文件，别处设了拒、退 2）：
 #   E181_LONG_RUN_BREAK=exec-root-binary  每片仍按开跑时给的那个路径起、不按私有副本
-#       「装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的八片自报的 sha256 与片旁记的都是开跑时那份」
-#   E181_LONG_RUN_BREAK=stale-binary-reused  沿用只看片末行、不看片旁记的装置 sha256
-#       「旧装置打的八片全作废：逐片报作废、八片全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的」「片旁记的 sha256 不同的、没有记录的片都作废重跑，另外六片沿用」
-#   E181_LONG_RUN_BREAK=merge-sha-unchecked  拼产物之前不核各片记的装置 sha256
-#       「拼产物之前各片记的装置 sha256 不同：拒、点名那一片、退 1、不另出产物」「--assemble 八片记的 sha256 彼此相同：不起装置、核过、另存带日期的产物」
+#       「装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的八片自报的 sha256 都是开跑时那份」
 #   E181_LONG_RUN_BREAK=done-marker-ignored  片输出末行不齐也当做完
-#       「末行不齐的片输出不算做完：退 1、没有 seg-*.out、不拼产物」
+#       「末行不齐的片判红：退 1、头一片记红、别的没跑到、不拼产物」
+#   E181_LONG_RUN_BREAK=binary-from-root-target  没给 E181_BINARY 时编完取仓根 target/release 下那一份，不取 cargo 报的这一趟编出来的位置
+#       「没给 E181_BINARY：装置取 cargo 报的这一趟编出来的那一份、不取仓根 target/release 下早先编的那一份」
+#   E181_LONG_RUN_BREAK=reuse-ignored  库里判绿的片也照起装置现判（不认 plan 答的 reuse）
+#       「原样重起：八片全复用、装置一次没起、产物另存带日期的」「--only 点名的片判完不拼产物；再不带参数起，那两片复用、其余现判、拼出产物」
+#       「reuse-three-questions」「key-independent-of-directory」「reuse-sentinel」「forced-still-reused-red」
+#   E181_LONG_RUN_BREAK=finish-ignored  不认 long_run_item_verdicts.py finish 的退出码（复用哨兵红、键中途变了照退 0）
+#       「sentinel-rejudged-red」「forced-verdict-differs-red」「forced-still-reused-red」
+# 复用那几格另认 long_run_item_verdicts.py 的弄坏开关 LONG_RUN_ITEMS_BREAK（它文件头；打开后本脚本的自证红在它点名的同名格）。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -56,10 +67,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：本脚本得留在仓里的 scripts/experiment-apparatus/ 下（它按自己的位置找仓根）；挪走了就放回去再起" >&2; exit 2; }
 
+SCRIPT_KEY="scripts/experiment-apparatus/e181-landing-check-long-run.sh"
+ITEM_VERDICTS="scripts/experiment-apparatus/long_run_item_verdicts.py"   # 按片判定的读写（文件头 long-run-resume）
 PRODUCT_DIRECTORY="${E181_PRODUCT_DIRECTORY:-research/results}"
 LANDING_STEM="$PRODUCT_DIRECTORY/e181-landing-check-fixed-point-and-mount-lower-bound-landing"
 CHECKS_STEM="$PRODUCT_DIRECTORY/e181-landing-check-fixed-point-and-mount-lower-bound-checks"
-BINARY="${E181_BINARY:-target/release/e181_landing_check_fixed_point_and_mount_lower_bound}"
+BINARY_NAME="e181_landing_check_fixed_point_and_mount_lower_bound"
+APPARATUS_ENTRY="crates/singlefs-verification/src/bin/$BINARY_NAME.rs::main"
+BINARY="${E181_BINARY:-}"   # 没给：build_the_binary 照 cargo 报的这一趟编出来的位置填
 LOG_DIRECTORY="${E181_LOG_DIRECTORY:-}"
 if [[ -z "$LOG_DIRECTORY" ]]; then   # 没设：工作根（.claude/hooks/lib_work_root.py，两台同一份）下的 e181-long-run；自证的临时树各格都给了目录，不走这里
   if ! LOG_DIRECTORY="$(python3 .claude/hooks/lib_work_root.py)" || [[ "$LOG_DIRECTORY" != /* ]]; then
@@ -164,18 +179,45 @@ next_free_product_path() { # <名的前段，不带 .out>
   echo "$stem-$today-r$revision.out"
 }
 
-# 编译与跑装置都直接起、不再套线程包装：整条命令交 task-server，线程照服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS
-build_the_binary() {
-  cargo build --release -p singlefs-verification --bin e181_landing_check_fixed_point_and_mount_lower_bound || {
-    echo "  ✗ 装置编不过" >&2
-    echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
-    exit 1
-  }
+# 一片的判定请求（long_run_item_verdicts.py 文件头「请求文件」）：装置入口、release 档、这一片点名的段；checks 逐字节可比，别的片带计时（timing）
+segment_request() { # <片名>
+  local compare=timing sections
+  [[ "$1" == checks ]] && compare=exact
+  sections=$(sections_of_segment "$1")
+  printf '%s\t%s\tprofile:release\tline:segment=%s\tline:sections=%s\tline:compare=%s\n' "$1" "$APPARATUS_ENTRY" "$1" "${sections// /,}" "$compare"
 }
 
-# 做一片：输出落 seg-<片名>.out（先写 .partial，退 0 且齐了才改名），进度写 seg-<片名>.err。退出码照装置的（被内存包装拦下的也照它的）。
+decision_of() { # <片名>：plan 答的 judge / reuse / refused
+  awk -F'\t' -v item="$1" '$1 == item {print $2}' "$PLAN_DIRECTORY/decisions.tsv"
+}
+
+# 判定库那一步没成：75（prune-server 不可用）照交，用法错交 2，别的按 1 交（3 是「装置报停机」，不混用）
+library_failure_exit() { # <哪一步> <退出码>：打原因，交该退的码
+  echo "  ✗ 按片判定的 $1 没成（long_run_item_verdicts.py 退 $2）" >&2
+  echo "     → 怎么办：退 75 是 prune-server 不可用：python3 prune-server/control check 看服务，修好之后重交同一条命令（报给主 agent）；别的照上面它打的出路改" >&2
+  if (($2 == 75 || $2 == 2)); then return "$2"; fi
+  return 1
+}
+
+# 编译与跑装置都直接起、不再套线程包装：整条命令交 task-server，线程照服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS。
+# 装置取 cargo 报的这一趟编出来的位置（binary_identity_build；编译目录由服务给，不是仓根 target/）。弄坏开关 binary-from-root-target 下取仓根 target/release 下那一份
+build_the_binary() {
+  local build_status
+  binary_identity_build "$BINARY_NAME" --release -p singlefs-verification --bin "$BINARY_NAME"; build_status=$?
+  if ((build_status == 1)); then
+    echo "  ✗ 装置编不过" >&2
+    echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本（判完的片在库里，复用）" >&2
+    exit 1
+  fi
+  ((build_status == 0)) || exit 78
+  BINARY="$BUILT_BINARY"
+  break_is binary-from-root-target && BINARY="target/release/$BINARY_NAME"
+  return 0
+}
+
+# 判一片：输出先写 seg-<片名>.partial，退 0 且齐了才改名成 seg-<片名>.out、记绿；不然记红。退出码照装置的；记库没成交 75 或 1。
 run_segment() { # <片名>
-  local segment="$1" sections cap environment=() code
+  local segment="$1" sections cap environment=() code record_code
   sections=$(sections_of_segment "$segment") || usage_error "没有这一片：$segment"
   cap=$(cap_of_segment "$segment")
   case "$segment" in
@@ -183,30 +225,35 @@ run_segment() { # <片名>
     narrow | unequal | small) environment+=("E181_THREADS=${E181_WALKERS:-$(walker_count_of_cap "$cap")}") ;;
     *) ;;
   esac
-  rm -f -- "$LOG_DIRECTORY/seg-$segment.partial"
   binary_identity_assert_unchanged || return 1
   # shellcheck disable=SC2086  # 段名按空格拆成装置的几个参数
   env ${environment[@]+"${environment[@]}"} \
     "$LAUNCH_BINARY" $sections \
-    > "$LOG_DIRECTORY/seg-$segment.partial" 2> "$LOG_DIRECTORY/seg-$segment.err"
+    > "$SEGMENT_DIRECTORY/seg-$segment.partial" 2> "$SEGMENT_DIRECTORY/seg-$segment.err"
   code=$?
-  if ((code == 0)) && is_complete_output "$LOG_DIRECTORY/seg-$segment.partial"; then
-    # 先在片旁记下打它的装置 sha256（这份私有副本的），再换名成 .out：有 .out 就一定有记录
-    binary_identity_stamp_write "$LOG_DIRECTORY/seg-$segment.out" || return 1
-    mv -f -- "$LOG_DIRECTORY/seg-$segment.partial" "$LOG_DIRECTORY/seg-$segment.out"
+  if ((code == 0)) && is_complete_output "$SEGMENT_DIRECTORY/seg-$segment.partial"; then
+    mv -f -- "$SEGMENT_DIRECTORY/seg-$segment.partial" "$SEGMENT_DIRECTORY/seg-$segment.out"
+    python3 "$ITEM_VERDICTS" record "$PLAN_DIRECTORY" "$segment" 0 "$SEGMENT_DIRECTORY/seg-$segment.out" || { library_failure_exit "record（片 $segment）" "$?"; return 75; }
     return 0
   fi
   ((code != 0)) || code=1
+  python3 "$ITEM_VERDICTS" record "$PLAN_DIRECTORY" "$segment" "$code" "$SEGMENT_DIRECTORY/seg-$segment.partial" --red \
+    || { library_failure_exit "record（片 $segment）" "$?"; return 75; }
   return "$code"
 }
 
 report_segment_failure() { # <片名> <退出码>
-  echo "  ✗ 片 $1 退 $2（日志 $LOG_DIRECTORY/seg-$1.err，输出 $LOG_DIRECTORY/seg-$1.partial）" >&2
+  if (($2 == 75)); then
+    echo "  ✗ 片 $1 判完了、判定记不进 prune-server（见上一行）" >&2
+    echo "     → 怎么办：python3 prune-server/control check 看服务，修好之后重交同一条命令" >&2
+    return 75
+  fi
+  echo "  ✗ 片 $1 退 $2，判红（错误输出末尾在下面）" >&2
   echo "     → 怎么办：先看下面日志末尾几行；装置报停机的另有提示，出路在后面" >&2
-  tail -n 5 -- "$LOG_DIRECTORY/seg-$1.err" >&2
-  if grep -q '^E7RESULT name=stop ' -- "$LOG_DIRECTORY/seg-$1.partial" 2>/dev/null; then
+  tail -n 5 -- "$SEGMENT_DIRECTORY/seg-$1.err" >&2
+  if grep -q '^E7RESULT name=stop ' -- "$SEGMENT_DIRECTORY/seg-$1.partial" 2>/dev/null; then
     echo "  ✗ 装置报停机，该停下交回主 agent：" >&2
-    grep -m3 '^E7RESULT name=stop ' -- "$LOG_DIRECTORY/seg-$1.partial" >&2
+    grep -m3 '^E7RESULT name=stop ' -- "$SEGMENT_DIRECTORY/seg-$1.partial" >&2
     echo "     → 怎么办：把上面的 name=stop 行交主 agent，不重跑" >&2
     return 3
   fi
@@ -215,37 +262,28 @@ report_segment_failure() { # <片名> <退出码>
 }
 
 assemble_the_products() {
-  local segment missing=0 landing checks_product checked_pairs=()
-  for segment in "${SEGMENT_ORDER[@]}"; do
-    [[ -f "$LOG_DIRECTORY/seg-$segment.out" ]] || { echo "  ✗ 片 $segment 还没做完：$LOG_DIRECTORY/seg-$segment.out 不在" >&2; missing=$((missing + 1)); }
-  done
-  ((missing == 0)) || { echo "     → 怎么办：不带 --assemble 再起一次本脚本（或在第二台上 --only 跑完点名的片、把 seg-*.out 取回本机）" >&2; return 1; }
-  # 拼产物之前再核一遍：八片片旁记的装置 sha256 都得是这一趟的（--assemble 不起装置时没有这一趟的，核八片彼此相同），不同或没有记录就拒、不出产物
-  if ! break_is merge-sha-unchecked; then
-    for segment in "${SEGMENT_ORDER[@]}"; do
-      checked_pairs+=("$segment" "$(binary_identity_stamp_read "$LOG_DIRECTORY/seg-$segment.out")")
-    done
-    binary_identity_check_same "${PINNED_BINARY_SHA256:-}" "${checked_pairs[@]}" || return 1
-  fi
+  local segment landing checks_product assembled="$SEGMENT_DIRECTORY/landing.assembled"
   landing=$(next_free_product_path "$LANDING_STEM")
   checks_product=$(next_free_product_path "$CHECKS_STEM")
-  local assembled="$LOG_DIRECTORY/landing.assembled"
   rm -f -- "$assembled"
-  for segment in "${SEGMENT_ORDER[@]}"; do cat -- "$LOG_DIRECTORY/seg-$segment.out" >> "$assembled"; done
-  is_complete_output "$assembled" || { echo "  ✗ 拼出来的产物不齐：$assembled" >&2; echo "     → 怎么办：看这份文件末尾缺哪一段的收尾行，把对应片的 $LOG_DIRECTORY/seg-<片名>.out 删掉，不带 --assemble 再起一次本脚本重做那一片" >&2; return 1; }
+  for segment in "${SEGMENT_ORDER[@]}"; do cat -- "$SEGMENT_DIRECTORY/seg-$segment.out" >> "$assembled" || return 1; done
+  is_complete_output "$assembled" || { echo "  ✗ 拼出来的产物不齐：$assembled" >&2; echo "     → 怎么办：看这份文件末尾缺哪一段的收尾行，交主 agent 查那一片的判定（库里那一条判绿而产物不齐，是装置或收尾判法的缺陷）" >&2; return 1; }
+  mkdir -p -- "$PRODUCT_DIRECTORY" || return 1
   mv -n -- "$assembled" "$landing" || return 1
-  [[ ! -e "$checks_product" ]] || { echo "  ✗ 复跑登记用的产物名被占了：$checks_product" >&2; echo "     → 怎么办：落地产物已经落在 $landing；把 $LOG_DIRECTORY/seg-checks.out 拷成一个没被占的 …-checks 名字（命名规则见文件头「产物名」）" >&2; return 1; }
-  cp -- "$LOG_DIRECTORY/seg-checks.out" "$checks_product" || return 1
-  echo "产物：$landing（$(wc -l < "$landing") 行）；复跑登记用：$checks_product（$(wc -l < "$checks_product") 行）；进度日志目录：$LOG_DIRECTORY"
+  [[ ! -e "$checks_product" ]] || { echo "  ✗ 复跑登记用的产物名被占了：$checks_product" >&2; echo "     → 怎么办：落地产物已经落在 $landing；照文件头「产物名」另起一个没被占的 …-checks 名字" >&2; return 1; }
+  cp -- "$SEGMENT_DIRECTORY/seg-checks.out" "$checks_product" || return 1
+  echo "产物：$landing（$(wc -l < "$landing") 行）；复跑登记用：$checks_product（$(wc -l < "$checks_product") 行）；按片判定 $counts"
 }
 
-# 自证：假装置在每一格自己的临时树里走一遍（本脚本与共用库拷进树里，树里 .claude 指向真仓的）；不起 cargo、不碰真装置。
+# 自证：假装置在每一格自己的临时树里走一遍（本脚本与共用库拷进树里，树里 .claude 与 long_run_item_verdicts.py 是指回真仓的符号链接）；不起 cargo、不碰真装置。
+# 判定写进临时 prune-server（客户端 selftest_service_problem 判在不在临时服务底下），每格一份命名空间；八片的装置入口都换成假树里的 measure_alpha（不然算不出键、全拒算）。
 # 树里没有 scripts/hosts/：常规路径要是又去套那一层线程包装，起不来，各格照红。
 # 换不掉的一处：产物名里的日期用 TZ=Asia/Tokyo date +%F 取，自证里同样取，跨零点的那一刻会误红，重跑即可。
 run_selftest() {
-  local work failures=0 cell_count=0 fakes real_root today cell exit_code first_exit old_sha original_sha swap_target stem_landing stem_checks
+  local work failures=0 cell_count=0 fakes real_root today cell exit_code first_exit old_sha original_sha swap_target stem_landing stem_checks segment reuse_output reuse_red
   unset E181_PRODUCT_DIRECTORY E181_BINARY E181_LOG_DIRECTORY E181_CAP_F9 E181_CAP_F10 E181_PROBE_COUNT E181_WALKERS
   real_root="$PWD"
+  python3 "$real_root/$ITEM_VERDICTS" selftest-service || return 2
   today=$(TZ=Asia/Tokyo date +%F)
   work=$(mktemp -d) || return 1
   fakes="$work/fakes"
@@ -283,23 +321,37 @@ for section in "$@"; do
 done
 FAKE
   chmod +x "$fakes/device"
-  # 一格的树：本脚本与共用库的拷贝、假装置、指向真仓 .claude 的符号链接、空的 git 仓。
+  # 样板树：本脚本与共用库的拷贝、树里的假装置（fake-bin/device）、指向真仓 .claude 与 long_run_item_verdicts.py 的符号链接、假装置入口、空的 git 仓。每格拷一份。
+  local tree="$work/template"
+  mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/research/results" "$tree/fake-bin"
+  cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/e181-landing-check-long-run.sh"
+  cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
+  cp -- "$fakes/device" "$tree/fake-bin/device"
+  ln -s -- "$real_root/$ITEM_VERDICTS" "$tree/$ITEM_VERDICTS"
+  ln -s -- "$real_root/.claude" "$tree/.claude"
+  python3 "$real_root/$ITEM_VERDICTS" plant-fake-entries "$tree" || { rm -rf -- "${work:?}"; return 1; }
+  git -C "$tree" init -q > /dev/null 2>&1
+  for segment in "${SEGMENT_ORDER[@]}"; do printf '%s\tscripts/experiment-apparatus/long_run_reuse_fake_entries.py::measure_alpha\n' "$segment"; done > "$work/all-segments.tsv"
   make_tree() {
-    local tree="$1/tree"
-    mkdir -p -- "$tree/scripts/experiment-apparatus/long-run-lib" "$tree/research/results" "$1/bin" "$1/logs"
-    cp -- "$SCRIPT_PATH" "$tree/scripts/experiment-apparatus/e181-landing-check-long-run.sh"
-    cp -- "$(dirname -- "$SCRIPT_PATH")/long-run-lib/binary-identity.sh" "$tree/scripts/experiment-apparatus/long-run-lib/"
-    cp -- "$fakes/device" "$1/bin/device"
-    ln -s -- "$real_root/.claude" "$tree/.claude"
-    git -C "$tree" init -q > /dev/null 2>&1
+    mkdir -p -- "$1/logs"
+    cp -R -- "$work/template" "$1/tree"
   }
-  # 在这一格的树里起脚本拷贝；这一格要设的环境变量写在 invoke 前面（INVOKE_BINARY 换装置路径）。
+  # 在这一格的树里起脚本拷贝；这一格要设的环境变量写在 invoke 前面（INVOKE_BINARY 换装置路径；INVOKE_BUILDS 设了就不给 E181_BINARY，PATH 最前面放这一格的假 cargo）。
   invoke() {
-    local cell="$1"
+    local cell="$1" binary_setting
     shift
-    ( cd -- "$cell/tree" && env GIT_CEILING_DIRECTORIES="$work" E181_SELFTEST_CALLS="$cell/calls" E181_BINARY="${INVOKE_BINARY:-$cell/bin/device}" \
-        E181_LOG_DIRECTORY="$cell/logs" E181_LONG_RUN_SELFTEST_MARK="$work/mark" \
+    binary_setting=("E181_BINARY=${INVOKE_BINARY:-$cell/tree/fake-bin/device}")
+    [[ -n "${INVOKE_BUILDS:-}" ]] && binary_setting=("PATH=$cell/fake-cargo:$PATH")
+    ( cd -- "$cell/tree" && env -u SINGLEFS_REUSE_SENTINEL_SEED "${binary_setting[@]}" GIT_CEILING_DIRECTORIES="$work" E181_SELFTEST_CALLS="$cell/calls" \
+        E181_LOG_DIRECTORY="$cell/logs" E181_LONG_RUN_SELFTEST_MARK="$work/mark" LONG_RUN_ITEMS_LIBRARY_DIRECTORY="$cell/library" \
+        LONG_RUN_ITEMS_SELFTEST_ENTRIES="$work/all-segments.tsv" SINGLEFS_REUSE_SENTINEL_COUNT=1000 \
         bash "$cell/tree/scripts/experiment-apparatus/e181-landing-check-long-run.sh" "$@" > "$cell/out" 2>&1 )
+  }
+  calls_of() { # <格> [<后缀>]：假装置被起了几次
+    if [[ -f "$1/calls${2:-}" ]]; then wc -l < "$1/calls${2:-}"; else echo 0; fi
+  }
+  products_of() { # <格>：产物目录里有几份
+    find "$1/tree/research/results" -type f | wc -l
   }
   expect() {
     local name="$1" condition="$2"
@@ -309,76 +361,81 @@ FAKE
     else
       echo "  ✗ $name：条件「$condition」不成立"
       [[ -f "$cell/out" ]] && tail -n 6 -- "$cell/out" | sed 's/^/      输出：/'
-      echo "     → 怎么办：照上面这一格点名的条件和输出改本脚本，再单独起 bash scripts/experiment-apparatus/e181-landing-check-long-run.sh --selftest 到它退 0"
+      echo "     → 怎么办：照上面这一格点名的条件和输出改本脚本，再在临时 prune-server 底下单独起本脚本的 --selftest（文件头「用法」那一条）到它退 0"
       failures=$((failures + 1))
     fi
   }
   cell="$work/fresh"; make_tree "$cell"
-  original_sha=$(sha256sum -- "$cell/bin/device" | cut -d' ' -f1)
+  original_sha=$(sha256sum -- "$cell/tree/fake-bin/device" | cut -d' ' -f1)
   invoke "$cell"; exit_code=$?
-  expect "全新：八片现判、拼出落地产物与复跑登记用的产物、每片片旁记着装置 sha256" '((exit_code == 0)) && grep -qF "现判 8、复用 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem_landing.out") == 23)) && (($(wc -l < "$cell/tree/$stem_checks.out") == 8)) && (($(wc -l < "$cell/calls") == 8)) && (($(ls "$cell"/logs/seg-*.out.binary-sha256 | wc -l) == 8)) && [[ "$(cat "$cell"/logs/seg-*.out.binary-sha256 | sort -u)" == "$original_sha" ]] && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out"'
+  expect "全新：八片现判、拼出落地产物与复跑登记用的产物、成功句报现判 8、复用 0、拒算 0" '((exit_code == 0)) && grep -qF "现判 8、复用 0、拒算 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem_landing.out") == 23)) && (($(wc -l < "$cell/tree/$stem_checks.out") == 8)) && (($(calls_of "$cell") == 8)) && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out"'
   invoke "$cell"; exit_code=$?
-  expect "原样重起：八片全沿用、装置一次没起、产物另存带日期的" '((exit_code == 0)) && grep -qF "现判 0、复用 8" "$cell/out" && (($(wc -l < "$cell/calls") == 8)) && [[ -f "$cell/tree/$stem_landing-$today.out" ]]'
-  cell="$work/old-binary"; make_tree "$cell"
-  invoke "$cell"; first_exit=$?
-  old_sha=$(sha256sum -- "$cell/bin/device" | cut -d' ' -f1)
-  echo "# a newer build of the device" >> "$cell/bin/device"
-  invoke "$cell"; exit_code=$?
-  expect "旧装置打的八片全作废：逐片报作废、八片全现跑、旧片连记录整份留在作废目录、片旁记的都是新装置的" '((first_exit == 0 && exit_code == 0)) && grep -qF "现判 8、复用 0" "$cell/out" && (($(grep -c "^作废：.*（装置 sha256 不同）" "$cell/out") == 8)) && grep -q "^作废：checks（装置 sha256 不同）" "$cell/out" && (($(find "$cell"/logs/void-* -name "seg-*.out" | wc -l) == 8)) && (($(find "$cell"/logs/void-* -name "*.binary-sha256" | wc -l) == 8)) && ! grep -q "$old_sha" "$cell"/logs/seg-*.out.binary-sha256 && (($(wc -l < "$cell/calls") == 16))'
-  cell="$work/stale-two"; make_tree "$cell"
-  invoke "$cell"; first_exit=$?
-  printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$cell/logs/seg-narrow.out.binary-sha256"
-  rm -f -- "$cell/logs/seg-small.out.binary-sha256"
-  invoke "$cell"; exit_code=$?
-  expect "片旁记的 sha256 不同的、没有记录的片都作废重跑，另外六片沿用" '((first_exit == 0 && exit_code == 0)) && grep -qF "现判 2、复用 6" "$cell/out" && grep -q "^作废：narrow（装置 sha256 不同）：记的是 f" "$cell/out" && grep -q "^作废：small（装置 sha256 不同）：记的是 没有记录" "$cell/out" && (($(wc -l < "$cell/calls") == 10))'
+  expect "原样重起：八片全复用、装置一次没起、产物另存带日期的" '((exit_code == 0)) && grep -qF "现判 0、复用 8、拒算 0" "$cell/out" && (($(calls_of "$cell") == 8)) && [[ -f "$cell/tree/$stem_landing-$today.out" ]]'
   cell="$work/swap"; make_tree "$cell"
-  swap_target="$cell/bin/device"
+  swap_target="$cell/tree/fake-bin/device"
   original_sha=$(sha256sum -- "$swap_target" | cut -d' ' -f1)
   E181_SELFTEST_SWAP_TARGET="$swap_target" invoke "$cell"; exit_code=$?
-  expect "装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的八片自报的 sha256 与片旁记的都是开跑时那份" '((exit_code == 0)) && [[ -e "$swap_target.swapped" ]] && [[ "$(sha256sum -- "$swap_target" | cut -d" " -f1)" != "$original_sha" ]] && (($(wc -l < "$cell/calls.self-sha") == 8)) && [[ "$(awk "{print \$NF}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]] && [[ "$(cat "$cell"/logs/seg-*.out.binary-sha256 | sort -u)" == "$original_sha" ]]'
-  cell="$work/assemble-mixed"; make_tree "$cell"
-  invoke "$cell"; first_exit=$?
-  printf '%s\n' "$(printf 'f%.0s' {1..64})" > "$cell/logs/seg-f9.out.binary-sha256"
-  invoke "$cell" --assemble; exit_code=$?
-  expect "拼产物之前各片记的装置 sha256 不同：拒、点名那一片、退 1、不另出产物" '((first_exit == 0 && exit_code == 1)) && grep -qF "片 f9 的装置 sha256 对不上" "$cell/out" && grep -qF "合并产物之前核全部片的装置 sha256" "$cell/out" && (($(ls "$cell/tree/research/results" | wc -l) == 2))'
-  cell="$work/assemble-same"; make_tree "$cell"
-  invoke "$cell"; first_exit=$?
-  invoke "$cell" --assemble; exit_code=$?
-  expect "--assemble 八片记的 sha256 彼此相同：不起装置、核过、另存带日期的产物" '((first_exit == 0 && exit_code == 0)) && grep -qF "核过：8 片的装置 sha256 相同" "$cell/out" && (($(wc -l < "$cell/calls") == 8)) && [[ -f "$cell/tree/$stem_landing-$today.out" ]]'
+  expect "装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的八片自报的 sha256 都是开跑时那份" '((exit_code == 0)) && [[ -e "$swap_target.swapped" ]] && [[ "$(sha256sum -- "$swap_target" | cut -d" " -f1)" != "$original_sha" ]] && (($(calls_of "$cell" .self-sha) == 8)) && [[ "$(awk "{print \$NF}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]]'
   cell="$work/only"; make_tree "$cell"
   invoke "$cell" --only checks,f11; first_exit=$?
   cp -- "$cell/out" "$cell/out.first"
-  invoke "$cell" --assemble; exit_code=$?
-  expect "--only 点名的片做完不拼产物；其余片没做完时 --assemble 退 1" '((first_exit == 0 && exit_code == 1)) && (($(wc -l < "$cell/calls") == 2)) && grep -qF "点名的片做完了" "$cell/out.first" && grep -qF "还没做完" "$cell/out" && (($(ls "$cell/tree/research/results" | wc -l) == 0))'
+  invoke "$cell"; exit_code=$?
+  expect "--only 点名的片判完不拼产物；再不带参数起，那两片复用、其余现判、拼出产物" '((first_exit == 0 && exit_code == 0)) && grep -qF "点名的片判完" "$cell/out.first" && grep -qF "现判 2、复用 0、拒算 0" "$cell/out.first" && grep -qF "现判 6、复用 2、拒算 0" "$cell/out" && (($(calls_of "$cell") == 8)) && (($(products_of "$cell") == 2))'
   cell="$work/device-stop"; make_tree "$cell"
   E181_SELFTEST_DEVICE=stop invoke "$cell"; exit_code=$?
-  expect "装置报停机：退 3、name=stop 行转出来、不拼产物" '((exit_code == 3)) && grep -qF "name=stop reason=selftest_stop" "$cell/out" && (($(ls "$cell/tree/research/results" | wc -l) == 0))'
+  expect "装置报停机：退 3、name=stop 行转出来、不拼产物" '((exit_code == 3)) && grep -qF "name=stop reason=selftest_stop" "$cell/out" && (($(products_of "$cell") == 0))'
   cell="$work/truncated"; make_tree "$cell"
   E181_SELFTEST_DEVICE=truncated invoke "$cell"; exit_code=$?
-  expect "末行不齐的片输出不算做完：退 1、没有 seg-*.out、不拼产物" '((exit_code == 1)) && (($(ls "$cell"/logs/seg-*.out 2> /dev/null | wc -l) == 0)) && (($(ls "$cell/tree/research/results" | wc -l) == 0))'
+  expect "末行不齐的片判红：退 1、头一片记红、别的没跑到、不拼产物" '((exit_code == 1)) && grep -qF "· checks：红，现判" "$cell/out" && (($(grep -c "：没跑到" "$cell/out") == 7)) && (($(products_of "$cell") == 0))'
   cell="$work/binary-missing"; make_tree "$cell"
-  INVOKE_BINARY="$cell/bin/not-built" invoke "$cell"; exit_code=$?
-  expect "装置二进制不在：退 78、装置一次没起" '((exit_code == 78)) && grep -qF "装置二进制不在或不可执行" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+  INVOKE_BINARY="$cell/tree/fake-bin/not-built" invoke "$cell"; exit_code=$?
+  expect "装置二进制不在：退 78、装置一次没起" '((exit_code == 78)) && grep -qF "装置二进制不在或不可执行" "$cell/out" && (($(calls_of "$cell") == 0))'
+  # 没给 E181_BINARY：编一次，装置取 cargo 报的这一趟编出来的位置（这一格的编译目录 build/release 下，演 task-server 给的那一份），
+  #   仓根 target/release 下另放一份早先编的旧装置（字节不同，像并包前编的那份）：八片自报的 sha256 都是编出来的那一份
+  cell="$work/built-here"; make_tree "$cell"
+  mkdir -p -- "$cell/build/release" "$cell/tree/target/release" "$cell/fake-cargo"
+  cp -- "$fakes/device" "$cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound"
+  { cat -- "$fakes/device"; echo "# an old build left in the root target directory"; } > "$cell/tree/target/release/e181_landing_check_fixed_point_and_mount_lower_bound"
+  chmod +x -- "$cell/tree/target/release/e181_landing_check_fixed_point_and_mount_lower_bound"
+  original_sha=$(sha256sum -- "$cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" | cut -d' ' -f1)
+  old_sha=$(sha256sum -- "$cell/tree/target/release/e181_landing_check_fixed_point_and_mount_lower_bound" | cut -d' ' -f1)
+  cat > "$cell/fake-cargo/cargo" <<'FAKE'
+#!/usr/bin/env bash
+# 假 cargo（built-here 那一格）：记参数；build 时照 cargo 的机读输出报一行 compiler-artifact，executable 指 E181_SELFTEST_BUILT（这一格编译目录里那一份）
+echo "$*" >> "$E181_SELFTEST_CALLS.cargo"
+[[ "${1:-}" == build ]] || exit 0
+printf '{"reason":"compiler-artifact","target":{"name":"%s"},"executable":"%s","fresh":false}\n' "${E181_SELFTEST_BUILT##*/}" "$E181_SELFTEST_BUILT"
+printf '{"reason":"build-finished","success":true}\n'
+FAKE
+  chmod +x -- "$cell/fake-cargo/cargo"
+  E181_SELFTEST_BUILT="$cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" INVOKE_BUILDS=1 invoke "$cell"; exit_code=$?
+  expect "没给 E181_BINARY：装置取 cargo 报的这一趟编出来的那一份、不取仓根 target/release 下早先编的那一份" '((exit_code == 0)) && grep -qF "build --release -p singlefs-verification --bin e181_landing_check_fixed_point_and_mount_lower_bound --message-format=json-render-diagnostics" "$cell/calls.cargo" && (($(calls_of "$cell" .self-sha) == 8)) && [[ "$(awk "{print \$NF}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]] && grep -qF "源 $cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" "$cell/out" && [[ "$old_sha" != "$original_sha" ]]'
   cell="$work/list"; make_tree "$cell"
   invoke "$cell" --list-segments; exit_code=$?
-  expect "--list-segments：列八片、不起装置" '((exit_code == 0)) && (($(grep -c "（上限 " "$cell/out") == 8)) && [[ ! -e "$cell/calls" ]]'
+  expect "--list-segments：列八片、不起装置" '((exit_code == 0)) && (($(grep -c "（上限 " "$cell/out") == 8)) && (($(calls_of "$cell") == 0))'
   cell="$work/bad-argument"; make_tree "$cell"
   invoke "$cell" --bogus; exit_code=$?
-  expect "认不得的参数退 2" '((exit_code == 2)) && grep -qF "认不得的参数「--bogus」" "$cell/out" && [[ ! -e "$cell/calls" ]]'
+  expect "认不得的参数退 2" '((exit_code == 2)) && grep -qF "认不得的参数「--bogus」" "$cell/out" && (($(calls_of "$cell") == 0))'
+  # 复用那六格（long_run_item_verdicts.py 文件头「复用格」）：checks、f11 两片，--only 跑完退 0
+  reuse_output=$(python3 "$real_root/$ITEM_VERDICTS" reuse-cells --script "$SCRIPT_KEY" --template "$work/template" --items checks,f11 --work "$work/reuse" --green-exit 0 -- \
+    env E181_BINARY="{tree}/fake-bin/device" GIT_CEILING_DIRECTORIES="$work" E181_SELFTEST_CALLS="{tree}/../calls" E181_LOG_DIRECTORY="{tree}/../logs" \
+    E181_LONG_RUN_SELFTEST_MARK="$work/mark" bash "{tree}/scripts/experiment-apparatus/e181-landing-check-long-run.sh" --only checks,f11 2>&1)
+  echo "$reuse_output"
+  reuse_red=$(sed -n 's/^long_run_item_verdicts 复用格.*：6 格，红 \([0-9]*\) 格$/\1/p' <<< "$reuse_output")
+  cell_count=$((cell_count + 6))
+  if [[ -z "$reuse_red" ]]; then failures=$((failures + 6)); echo "  ✗ 复用那六格没跑完（没有「long_run_item_verdicts 复用格」那一行），按六格红算"; echo "     → 怎么办：看上面 reuse-cells 打的输出里第一处 ✗ 或 Python 报错（复用格起不来多半是 prune-server 不可用或 long_run_item_verdicts.py 抛了异常），修好之后在临时 prune-server 底下单独起本脚本的 --selftest（文件头「用法」那一条）到它退 0"; else failures=$((failures + reuse_red)); fi
   rm -rf -- "${work:?}"
   if ((failures > 0)); then echo "e181-landing-check-long-run.sh 自证：$failures 格红（共 $cell_count 格）"; return 1; fi
   echo "e181-landing-check-long-run.sh 自证：$cell_count 格全绿"
   return 0
 }
 
-assemble_only=0
 list_segments=0
 selftest=0
 only_text=""
 while (($# > 0)); do
   case "$1" in
     --selftest) selftest=1; shift ;;
-    --assemble) assemble_only=1; shift ;;
     --list-segments) list_segments=1; shift ;;
     --only) (($# >= 2)) || usage_error "--only 后面要写片名"; only_text="$2"; shift 2 ;;
     *) usage_error "认不得的参数「$1」" ;;
@@ -402,32 +459,21 @@ if [[ -n "$only_text" ]]; then
 fi
 
 mkdir -p -- "$LOG_DIRECTORY" || exit 1
-if ((assemble_only)); then assemble_the_products; exit $?; fi
+# 这一趟的状态目录（long_run_item_verdicts.py 的计划、复用片取回的产物、这一趟判的片输出）：跑完、失败、被打断都删
+STATE_DIRECTORY=$(mktemp -d "$LOG_DIRECTORY/run-XXXXXX") || exit 1
+trap 'rm -rf -- "$STATE_DIRECTORY"' EXIT
+PLAN_DIRECTORY="$STATE_DIRECTORY/plan"
+SEGMENT_DIRECTORY="$STATE_DIRECTORY/segments"
+mkdir -p -- "$SEGMENT_DIRECTORY" || exit 1
+for segment in "${wanted[@]}"; do segment_request "$segment"; done > "$STATE_DIRECTORY/requests.tsv"
+python3 "$ITEM_VERDICTS" plan "$PLAN_DIRECTORY" --script "$SCRIPT_KEY" --kind "$BINARY_NAME" --root "$PWD" --requests "$STATE_DIRECTORY/requests.tsv" \
+  || { library_failure_exit plan "$?"; exit $?; }
 
-[[ -n "${E181_BINARY:-}" ]] || build_the_binary
-[[ -x "$BINARY" ]] || { echo "  ✗ 装置二进制不在或不可执行：$BINARY" >&2; echo "     → 怎么办：没给 E181_BINARY 就看上面 cargo build --release 的输出；给了就核对它指向的文件存在且可执行" >&2; exit 78; }
-# 开跑时拷一份私有副本：八片都按这份拷贝起，binary_stamp 是拷贝的 sha256
-binary_identity_pin "$BINARY" "$LOG_DIRECTORY/pinned-binary" || exit 1
-binary_stamp="$PINNED_BINARY_SHA256"
-LAUNCH_BINARY="$PINNED_BINARY"
-break_is exec-root-binary && LAUNCH_BINARY="$BINARY"
-
-load_one_minute=$(cut -d' ' -f1 /proc/loadavg)
-echo "开跑前负载 loadavg1=$load_one_minute（f11 的挂钟读数在机器忙时偏大；装置收尾行会再记一次）；装置 sha256 $binary_stamp（私有副本 $PINNED_BINARY，源 $BINARY）"
-
-reused=0
-judged=0
 pending=()
-void_directory="$LOG_DIRECTORY/void-$(TZ=Asia/Tokyo date +%F)-$$"
 for segment in "${wanted[@]}"; do
-  if is_complete_output "$LOG_DIRECTORY/seg-$segment.out"; then
-    # 做完了还要是这一趟的装置打的；记的不同或没有记录的整份移到作废目录，逐片报作废，现跑
-    if break_is stale-binary-reused || binary_identity_is_current "$LOG_DIRECTORY/seg-$segment.out"; then
-      reused=$((reused + 1))
-    else
-      binary_identity_void_shard "$segment" "$LOG_DIRECTORY/seg-$segment.out" "$void_directory" || exit 1
-      pending+=("$segment")
-    fi
+  if [[ "$(decision_of "$segment")" == reuse ]] && ! break_is reuse-ignored; then
+    cp -- "$PLAN_DIRECTORY/outputs/$segment.out" "$SEGMENT_DIRECTORY/seg-$segment.out" || exit 1
+    echo "片 $segment：复用（键相同、库里判绿）"
   else
     pending+=("$segment")
   fi
@@ -438,43 +484,60 @@ run_and_check() { # <片名>
   local segment="$1" code
   run_segment "$segment"; code=$?
   ((code == 0)) || { report_segment_failure "$segment" "$code"; return $?; }
-  judged=$((judged + 1))
 }
 
-# 计时片先跑，机器上没有别的片在跑
-for segment in checks f11; do
-  if contains_segment "$segment" "${pending[@]+"${pending[@]}"}"; then run_and_check "$segment" || exit $?; fi
-done
-
-# f9 与 F10 那一串并行：每片把退出码写进自己的文件，最后单独一个 wait 等齐
-f9_code_file="$LOG_DIRECTORY/f9.code"
-rm -f -- "$f9_code_file"
-f9_started=0
-if contains_segment f9 "${pending[@]+"${pending[@]}"}"; then
-  { run_segment f9; echo "$?" > "$f9_code_file"; } &
-  f9_started=1
-fi
 chain_status=0
-for segment in measure controls narrow unequal small; do
-  contains_segment "$segment" "${wanted[@]}" || continue
-  if contains_segment "$segment" "${pending[@]+"${pending[@]}"}"; then
-    run_and_check "$segment" || { chain_status=$?; break; }
-  fi
-done
-wait  # shell-lint:exit-collected f9 片的退出码写进 $f9_code_file，下面读它；文件不在就判红
 f9_status=0
-if ((f9_started)); then
-  [[ -f "$f9_code_file" ]] || { echo "  ✗ f9 片的退出码文件不在：$f9_code_file" >&2; echo "     → 怎么办：看 $LOG_DIRECTORY/seg-f9.err 和上面其他片的输出，再起同一条命令（做完的片直接取）" >&2; f9_status=1; }
-  if ((f9_status == 0)); then
-    f9_status=$(cat -- "$f9_code_file")
-    if ((f9_status == 0)); then judged=$((judged + 1)); else report_segment_failure f9 "$f9_status"; f9_status=$?; fi
+if ((${#pending[@]} > 0)); then
+  [[ -n "${E181_BINARY:-}" ]] || build_the_binary
+  [[ -x "$BINARY" ]] || { echo "  ✗ 装置二进制不在或不可执行：$BINARY" >&2; echo "     → 怎么办：没给 E181_BINARY 就看上面 cargo build --release 的输出；给了就核对它指向的文件存在且可执行" >&2; exit 78; }
+  # 开跑时拷一份私有副本：八片都按这份拷贝起
+  binary_identity_pin "$BINARY" "$LOG_DIRECTORY/pinned-binary" || exit 1
+  LAUNCH_BINARY="$PINNED_BINARY"
+  break_is exec-root-binary && LAUNCH_BINARY="$BINARY"
+  load_one_minute=$(cut -d' ' -f1 /proc/loadavg)
+  echo "开跑前负载 loadavg1=$load_one_minute（f11 的挂钟读数在机器忙时偏大；装置收尾行会再记一次）；装置 sha256 $PINNED_BINARY_SHA256（私有副本 $PINNED_BINARY，源 $BINARY）"
+
+  # 计时片先跑，机器上没有别的片在跑
+  for segment in checks f11; do
+    if contains_segment "$segment" "${pending[@]}"; then run_and_check "$segment" || { chain_status=$?; break; }; fi
+  done
+
+  # f9 与 F10 那一串并行：每片把退出码写进自己的文件，最后单独一个 wait 等齐
+  f9_code_file="$STATE_DIRECTORY/f9.code"
+  rm -f -- "$f9_code_file"
+  f9_started=0
+  if ((chain_status == 0)) && contains_segment f9 "${pending[@]}"; then
+    { run_segment f9; echo "$?" > "$f9_code_file"; } &
+    f9_started=1
+  fi
+  if ((chain_status == 0)); then
+    for segment in measure controls narrow unequal small; do
+      if contains_segment "$segment" "${pending[@]}"; then
+        run_and_check "$segment" || { chain_status=$?; break; }
+      fi
+    done
+  fi
+  wait  # shell-lint:exit-collected f9 片的退出码写进 $f9_code_file，下面读它；文件不在就判红
+  if ((f9_started)); then
+    [[ -f "$f9_code_file" ]] || { echo "  ✗ f9 片的退出码文件不在：$f9_code_file" >&2; echo "     → 怎么办：看上面其他片的输出，再起同一条命令（判完的片复用）" >&2; f9_status=1; }
+    if ((f9_status == 0)); then
+      f9_status=$(cat -- "$f9_code_file")
+      ((f9_status == 0)) || { report_segment_failure f9 "$f9_status"; f9_status=$?; }
+    fi
   fi
 fi
-echo "现判 $judged、复用 $reused"
+python3 "$ITEM_VERDICTS" finish "$PLAN_DIRECTORY" > "$STATE_DIRECTORY/finish.out"; finish_exit=$?
+cat -- "$STATE_DIRECTORY/finish.out"
+((finish_exit <= 1)) || { library_failure_exit finish "$finish_exit"; exit $?; }
+break_is finish-ignored && finish_exit=0
+counts=$(sed -n 's/^LONG_RUN_ITEMS .* \(现判 [0-9]*、复用 [0-9]*、拒算 [0-9]*\)$/\1/p' "$STATE_DIRECTORY/finish.out")
+echo "按片判定：$counts"
 ((chain_status == 0)) || exit "$chain_status"
 ((f9_status == 0)) || exit "$f9_status"
+((finish_exit == 0)) || { echo "  ✗ 按片判定收尾判红（复用哨兵或键在跑的中途变了，见上面 ✗ 那几行）" >&2; echo "     → 怎么办：照上面那几行的出路办，再起同一条命令" >&2; exit 1; }
 if [[ -n "$only_text" ]]; then
-  echo "点名的片做完了（不拼产物）：$only_text；片输出在 $LOG_DIRECTORY"
+  echo "点名的片判完了（不拼产物）：$only_text；判定在 prune-server，不带参数再起一次就复用它们、拼产物"
   exit 0
 fi
 assemble_the_products

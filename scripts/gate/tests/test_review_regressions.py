@@ -163,6 +163,7 @@ class ReviewRegressions(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0)
         with mock.patch.object(runner, 'build', return_value=(0, [])), \
                 mock.patch.object(runner, 'read_metadata', return_value=(({'demo-id': 'demo'}, {'demo': True}, ['demo'], None), None)), \
+                mock.patch.object(runner, 'memory_settings', return_value=(None, 'regression test: no memory cap', None, 'regression test: no peak records')), \
                 mock.patch.object(runner.subprocess, 'run', side_effect=run), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(runner.run(1, ['-p', 'demo@1.0']), 0)
@@ -191,6 +192,7 @@ class ReviewRegressions(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0)
         with mock.patch.object(runner, 'build', return_value=(0, [artifact])), \
                 mock.patch.object(runner, 'read_metadata', return_value=(({'demo-id': 'demo'}, {'demo': True}, ['demo'], None), None)), \
+                mock.patch.object(runner, 'memory_settings', return_value=(None, 'regression test: no memory cap', None, 'regression test: no peak records')), \
                 mock.patch.object(runner.subprocess, 'run', side_effect=run), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(runner.run(1, ['-p', 'demo', '--test', 'alpha']), 0)

@@ -5,7 +5,7 @@
 
 use e7_index_bench::Emitter;
 
-/// D22 2026-09-10 用户定案：槽宽 = 探测到的 physical_block_size，本机 512。
+/// D22槽宽 = 探测到的 physical_block_size，本机 512。
 const SLOT_BYTES: u64 = 512;
 /// E115 给主密钥槽取的最小可用假设值。
 const KEY_SLOT_INLINE_BYTES: u64 = 80;

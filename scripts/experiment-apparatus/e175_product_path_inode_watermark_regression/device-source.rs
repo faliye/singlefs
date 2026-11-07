@@ -1,6 +1,6 @@
-//! E175（产品路径上 inode 号水位退回与重发号）的装置。仓副本装置：只放在执行员草稿目录里那份仓副本的
-//! `crates/singlefs-harness/tests/` 下，主工作区的 `crates/` 不动（跑前登记 `research/prompts/e175-preregistration.md`
-//! 第五节「装置写在哪」）。产品路径 = 一次都不调 `PoolWriter::set_inode_number_watermark_source`、不加 `SharedFaultPlan` 注入。
+//! E175（产品路径上 inode 号水位退回与重发号）的装置。仓副本装置：只放在仓副本的 `crates/singlefs-verification/tests/` 下
+//! （跑前登记写的是并包之前的 `crates/singlefs-harness/tests/`，那个包已并进验证包），主工作区的 `crates/` 不动
+//! （跑前登记 `research/prompts/e175-preregistration.md` 第五节「装置写在哪」）。产品路径 = 一次都不调 `PoolWriter::set_inode_number_watermark_source`、不加 `SharedFaultPlan` 注入。
 //!
 //! 臂由跑的一方在副本里施加补丁之后用 `E175_ARM` 告诉装置（`P`、`V1`、`V2`、`V717`）；装置不读源码判臂，
 //! 施加前后的 `sha256sum` 由跑的一方记进产物。
@@ -47,17 +47,17 @@ use singlefs_core::recovery::{
     readable_roots, rebuild_version, scan_journal, RebuiltVersion,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_harness::history::{
+use singlefs_verification::history::{
     execute_history_with, AppliedEffect, ContentChoice, ContentLength, FloorTargetChoice,
     GeneratedHistory, GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
     HistoryOperation, HistoryOperationKind, HistorySeed, HistoryStartingPoint,
     NamedGenerationWeights, OverwriteContentDraw, PerStepChecker, RollbackTargetChoice,
     RollbackTargetDraw, StepObservation, StepOutcome, StepPosition,
 };
-use singlefs_harness::memory_pool::MemoryPool;
-use singlefs_harness::SharedStream;
+use singlefs_verification::memory_pool::MemoryPool;
+use singlefs_verification::SharedStream;
 
-/// 种子基，抄自 `crates/singlefs-harness/src/history.rs` 第 107 行（登记第五节「装置要读 crates/ 的常量」）；
+/// 种子基，抄自 `crates/singlefs-verification/src/history.rs` 第 130 行（登记第五节「装置要读 crates/ 的常量」）；
 /// `seed_base_and_first_inode_number_match_the_crates` 拿它与实现侧同名常量回比。
 const SEED_BASE_COPIED_FROM_THE_HISTORY_MODULE: u64 = 7_463_871_032_432_355_113;
 /// 第一个 inode 号，抄自 `crates/singlefs-core/src/transaction.rs` 第 138 行，同一条用例回比。
@@ -530,7 +530,7 @@ fn random_history_item(family: Family, index: u64, weights: &GenerationWeights) 
         family,
         index,
         label: format!("seed{}", seed.0),
-        history: singlefs_harness::history::generate_history_with_weights(seed, operation_count, weights),
+        history: singlefs_verification::history::generate_history_with_weights(seed, operation_count, weights),
     }
 }
 
@@ -578,7 +578,7 @@ fn history_item(family: Family, index: u64) -> HistoryItem {
                 family,
                 index,
                 label: format!("seed{}", seed.0),
-                history: singlefs_harness::history::generate_history_with_weights(
+                history: singlefs_verification::history::generate_history_with_weights(
                     seed,
                     F2_OPERATIONS_PER_HISTORY,
                     &F2_WEIGHTS,
@@ -1633,7 +1633,7 @@ fn run_families_from_the_environment_into_the_result_file() -> std::path::PathBu
     let path = std::env::var("E175_RESULT_FILE")
         .map_or_else(|_| default_scratch_file("e175-result.out"), std::path::PathBuf::from);
     let worker_threads = optional_positive_number_from_environment("E175_WORKER_THREADS").map_or_else(
-        || std::thread::available_parallelism().map_or(1, usize::from),
+        || singlefs_verification::heavy_threads::default_heavy_threads().get(),
         |threads| usize::try_from(threads).expect("线程数装得进 usize"),
     );
     let budget = optional_positive_number_from_environment("E175_TIME_BUDGET_SECONDS").map(Duration::from_secs);
@@ -1886,8 +1886,8 @@ fn result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_s
 fn seed_base_and_first_inode_number_match_the_crates() {
     assert_eq!(
         SEED_BASE_COPIED_FROM_THE_HISTORY_MODULE,
-        singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
-        "本地抄的种子基与 history.rs 第 107 行不同"
+        singlefs_verification::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+        "本地抄的种子基与 history.rs 第 130 行不同"
     );
     assert_eq!(
         FIRST_INODE_NUMBER_COPIED_FROM_THE_TRANSACTION_MODULE,

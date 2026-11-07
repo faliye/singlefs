@@ -120,7 +120,7 @@ fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, s
             let old_unit_index = next_random_word(&mut random_state) % units;
             file.read_exact_at(&mut unit_buffer.as_mut_slice()[..grain_bytes], old_unit_index * grain_bytes as u64).expect("RMW 读失败");
             let verify_start = Instant::now();
-            // 读回来的旧单元先验一遍：D4 的 Merkle 要求改之前先确认它没坏
+            // 读回来的旧单元先验一遍：D4 的 Merkle 要求改写之前先确认它没坏
             sink = sink.wrapping_add(
                 cipher.encrypt_inout_detached(nonce, b"", (&mut unit_buffer.as_mut_slice()[..grain_bytes]).into())
                     .expect("验旧单元失败")[0] as u64);

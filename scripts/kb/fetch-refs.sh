@@ -10,6 +10,8 @@
 # --check 只查在不在、hash 对不对，不下载。
 # 文献放哪：FS_REFS 设了照它（下面的 docs/），没设取共享数据根下的 fs-refs（.claude/hooks/lib_work_root.py shared fs-refs，两台同一个绝对路径；
 #   不经 ~ 与 $HOME 取：第二台的家目录是另一个；scripts/kb/verify-citations.sh 与 scripts/kb/pdf-text.py 从同一处读），取不到退 2。
+# 管的只有下面 LIST 里的七份 PDF（写进 docs/、每份旁边记 .sha256）。同一个根底下 verify-citations.sh 读的另几样不归它：
+#   linux-6.17/ 与 zfs/ 两棵源码树、docs/rfc8439.txt 都不是它取的，它也不核；它们各自的取得方式、版本与校验边界写在 verify-citations.sh 的树登记表 TREE_LIST。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -41,8 +43,8 @@ trap 'exit 143' TERM
 #
 # ⚠️ 不在这张表里的一份：**ZFS On-Disk Specification**。下得回来，但 pdf-text.py 抽出的是乱码
 # （CID 双字节字体，抽取器只支持单字节），按它自己的规矩这算**抽取失败**，不算「原文没这句」。
-# 引它的那几条（4 个 label × 128 KiB uberblock 环、槽号 = txg %% 槽数）改从已固定的 OpenZFS
-# 源码树核，断言在 verify-citations.sh 的 D20 三条。⇒ 那份 PDF 对本仓没有承重作用，不收。
+# 引它的那几条（4 个 label × 128 KiB uberblock 环、槽号 = txg %% 槽数）改从 OpenZFS 源码树（verify-citations.sh 的 refs-zfs，
+# 不是本脚本取的，取得方式与校验边界见那边的树登记表）核，断言在 verify-citations.sh 的 D20 三条。⇒ 那份 PDF 对本仓没有承重作用，不收。
 LIST=$(cat <<'TSV'
 ostep-45-file-integrity.pdf|https://pages.cs.wisc.edu/~remzi/OSTEP/file-integrity.pdf|D18
 naclcrypto.pdf|https://cr.yp.to/highspeed/naclcrypto-20090310.pdf|D9

@@ -30,7 +30,7 @@
 //!
 //! 纯算术几何模型：没有 btree、没有 write buffer、没有 I/O；只数叶、不数内部节点；
 //! 不答 inode 号水位的台阶行（它随根留着、不在「这一代的行」里，这里不建模）；
-//! 不答今天十二项统计量表下的数（统计量表照 2026-09-03 那张十一项表）；不答挂钟。
+//! 不答今天十二项统计量表下的数（统计量表照那张十一项表）；不答挂钟。
 //! **确定性模型**：同一个二进制跑 N 遍必然逐字节相同 ⇒ N 轮说明的是没有隐藏状态，
 //! 不是统计上稳定；证据强度来自钉绝对值的断言与变异。
 
@@ -42,7 +42,7 @@ const NODE_BYTES: u64 = 16384;
 const DIRTY_BYTES_THRESHOLD: u64 = 2 * 1024 * 1024 * 1024;
 /// 原判据 4 / 10 的门槛：`T_dirty` 的 1%（整除）。过界 = 严格大于。
 const ACCOUNTING_WRITE_BUDGET_BYTES: u64 = DIRTY_BYTES_THRESHOLD / 100;
-/// 2026-09-03 那天 D5 已定项 4 的统计量数（登记读法第 3 条：这一次不换表）。
+/// 当时 D5 已定项 4 的统计量数（登记读法第 3 条：这一次不换表）。
 const STATISTIC_COUNT: usize = 11;
 /// 记账 value：完整值 8 字节（原装置同一个数）。
 const ACCOUNTING_VALUE_BYTES: u64 = 8;
@@ -79,7 +79,7 @@ const IMPLEMENTATION_NODE_HEADER_WITH_KEY_RANGE_BYTES: u64 = 159;
 #[cfg(test)]
 const IMPLEMENTATION_LEAF_CAPACITY_IN_ENTRIES: u64 = 477;
 
-/// 行数口径：旧的（K 代、每次发布一写一删）与新的（D5 已定项 2 现行定案）。
+/// 行数口径：旧的（K 代、每次发布一写一删）与新的（D5 已定项 2 现行条文）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RowCountCaliber {
     TwentyFiveGenerationsWriteAndDelete,
@@ -134,7 +134,7 @@ impl Reading {
     }
 }
 
-/// 统计量表的一行。次序与 2026-09-03 那天 D5 已定项 4 那张表逐行对应（原装置 `STATISTICS_TABLE`）。
+/// 统计量表的一行。次序与当时 D5 已定项 4 那张表逐行对应（原装置 `STATISTICS_TABLE`）。
 struct Statistic {
     per_device: bool,
     per_tree_narrow: bool,

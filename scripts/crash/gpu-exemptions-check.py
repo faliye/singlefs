@@ -2,7 +2,7 @@
 # admission: always 判的是此刻 crates/ 的 Rust 源码与豁免表，几秒读完；两边有一边改了都要现判
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/gpu-exemptions.tsv，除了 python3 之外没有环境要求
 """不走 GPU 的计算登记成豁免：豁免表 .claude/gate.d/gpu-exemptions.tsv 与代码里的标记 `// gpu-exempt: <截名>` 逐项对上
-（欠账 C626（走 GPU 的计算类没有登记），用户定不得欠账；判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J5：
+（欠账 C626（走 GPU 的计算类没有登记）：不得欠账；
 选路只看本机开关与仓内豁免表，豁免表每一行登记时由用户点头）。门禁 code-source-discipline 的 gpu-exemptions 格调它。
 
 豁免表写法在它自己的表头：一行「截名<TAB>代码标记名<TAB>为什么上不了 GPU<TAB>用户点头日期」，代码标记名就是写在代码里的那一整句

@@ -203,7 +203,7 @@ struct InstanceRow {
     is_rollback: bool,
 }
 
-/// 2026-09-17（第二段跑之前）加了两个字段，专供 H6（管理员回退）用：回退要把
+/// 有两个字段专供 H6（管理员回退）用：回退要把
 /// `pool.current_fixpoint_slots` / `pool.current_instance_table_slots` 也载回 R_old 那一刻的值，
 /// 不能靠"槽状态快照里最低的几个 Allocated 槽"去猜——那是个只在"分配器总从最低空槽发"这条
 /// 不变量下才成立的假设，猜错了下一次发布释放的就不是 R_old 真正持有的那几个槽。
@@ -648,9 +648,7 @@ mod tests {
         assert_eq!((INSTANCE_SWITCH_LIMIT + 1) * switch_share(9), 116);
     }
 
-    /// A4：checkpoint 保留池 = c（D28（挂载期承诺量） 已定项 4）。此前这里写的是
-    /// `assert_eq!(fixpoint_cost, fixpoint_cost)`，对任何输入恒真、不会红，等于没有断言
-    /// （2026-09-17 产物之前发现并改写，见登记「十二、修订」）。现在真跑 `gate_snapshot`，
+    /// A4：checkpoint 保留池 = c（D28（挂载期承诺量） 已定项 4）。真跑 `gate_snapshot`，
     /// 锚点是与公式本身无关的字面量（不是再抄一遍 `fixpoint_cost` 变量），覆盖登记「五、5.5」
     /// 两个取样点 c = 4 与 c = 9。
     #[test]
@@ -714,7 +712,7 @@ mod tests {
 
     /// R8：根槽写失败也要推进一格 txg（D23（journal 的角色与格式） 已定项 14 逐字「不推进就是
     /// 反复重写同一个槽、把 R 个失败域用成一个」）。这条分支在 H1 里从没被走到过（H1 从不注入
-    /// 失败）；2026-09-17 实现 H5 之前发现它不碰 `pool.next_txg`，产物之前修好，见登记「十二、修订」。
+    /// 失败），只有 H5 走到它（见登记「十二、修订」）。
     #[test]
     fn failed_publish_still_advances_next_txg() {
         let geometry = baseline_geometry();
@@ -884,8 +882,8 @@ mod tests {
         assert!(wedged_any, "PC5：保留量全 0 时，至少要有一条臂在这一格上卡死");
     }
 
-    /// 阳性对照 PC5 对 H5 也要跑（2026-09-17 主 agent 指示「阳性对照对新历史也要跑」）：k=1、位=首
-    /// 在 `pc5_geometry` 上对每一条臂都退化（2026-09-17 实测：`zero_reserves` 把 `checkpoint_reserve`／
+    /// 阳性对照 PC5 对 H5 也要跑（阳性对照对新历史也要跑）：k=1、位=首
+    /// 在 `pc5_geometry` 上对每一条臂都退化（实测：`zero_reserves` 把 `checkpoint_reserve`／
     /// `switch_reserve` 都清零，gate1 的减项跟着少两项，3 次触动之后 Y 常常不用推空就批准——
     /// `FailureInjector` 的窗口一次都没被问到，`injected=0`，H4a／H5 的退化条款按字面触发，这不是 bug，
     /// 是「注入的故障没有机会发生」）；k=3、位=覆需要 pushing 推得更久，能撞见真卡死——同一份探针
@@ -980,7 +978,7 @@ mod tests {
         assert_eq!(summary.unsafe_candidate_reuse_count_field, 0, "真实基线（串-重判 × G7）不该发出候选根还引用的槽");
     }
 
-    // ===== H8（2026-09-17 第四段）：`LazyFailureInjector` =====
+    // ===== H8（第四段）：`LazyFailureInjector` =====
 
     /// 位=首：`window_start` 恒为 1，与 `next` 的参数无关——传任意 `last_txg` 都不改变这一点，
     /// 与 `FailureInjector::new(1, k)` 逐次读数相同。
@@ -1016,7 +1014,7 @@ mod tests {
         assert_eq!(injector.injected, 1);
     }
 
-    // ===== H4a／H4b（2026-09-17 第四段）：推空发布之中崩溃再重开 =====
+    // ===== H4a／H4b（第四段）：推空发布之中崩溃再重开 =====
 
     /// H4a 与 H4b 在本模型里产生同一个 `RunSummary`（除 `history` 标签外）——见
     /// `run_crash_mid_push_history` 头部 ⚠️：`attempt_publish` 是一次性完成分配 + 写根，
@@ -1050,7 +1048,7 @@ mod tests {
         assert_eq!(recovery_publishes_after_reopen, 0);
     }
 
-    // ===== H8（2026-09-17 第四段）：注入点改到填满阶段 =====
+    // ===== H8（第四段）：注入点改到填满阶段 =====
 
     /// 真实基线在这个几何点上，填满阶段自己确实自推了空发布——`run_fill_phase_injected_history` 的注入
     /// 打在填满阶段（`fill_phase_self_pushes` > 0），不是退回 H5 的注入点。数字是这个几何 + k=1
@@ -1177,7 +1175,7 @@ fn reclaim_after_publish(pool: &mut Pool, reclaim: ReclaimTiming) {
 
 /// F-扣／F-双扣：这次发布要带的 F 大于 F_顶 时，先把 g ≤ 新 F 的已释放槽扣住（登记「五、5.3」）。
 /// PC4（F-扣 一族）：改坏时跳过扣住，直接把这批槽变空闲——复现 `mount.rs` 注释里
-/// 「不扣住时抬 F 自己的空发布落在刚回收的槽上」那个曾经打中过的缺陷。
+/// 「不扣住时抬 F 自己的空发布落在刚回收的槽上」那个缺陷。
 fn maybe_hold_before_publish(pool: &mut Pool, reclaim: ReclaimTiming, new_floor: u64) {
     if !reclaim.holds_before_release() {
         return;
@@ -1320,9 +1318,8 @@ fn attempt_publish(
     // ③ 写根：注入失败时整份退回，不持久（R8：探针写写得进去，瞬时失败，走实例切换）。
     // txg 仍要推进一格：D23（journal 的角色与格式） 已定项 14 逐字「根槽写失败重发时 checkpoint_txg
     // 推进一格再发（根环区域 = txg mod R）……不推进就是反复重写同一个槽、把 R 个失败域用成一个」。
-    // 2026-09-17 产物之前发现并改（见登记「十二、修订」）：这一分支此前不碰 `pool.next_txg`，
-    // 下一次重试会拿同一个 txg 再写同一个槽——H1 从没注入过失败，这条分支此前零覆盖，H5 是第一个
-    // 会走到这里的历史。
+    // 不推进的话（见登记「十二、修订」），
+    // 下一次重试会拿同一个 txg 再写同一个槽——H1 从没注入过失败，只有 H5 的历史会走到这里。
     if fail {
         undo_publish_attempt(
             pool,
@@ -1504,7 +1501,7 @@ fn stop_policy_says_stop(pool: &Pool, stop: StopPolicy) -> bool {
 /// 只能把 `pool.allocation_failure_hit`（`attempt_publish` 已经置位）当卡死信号交回给调用方。
 ///
 /// `failures` 在这次推空自己的根槽写之前被问一次（参数是这次推空即将发生之前的 `last_persisted_txg`，
-/// 供 `LazyFailureInjector` 现算 `window_start` 用；`FailureInjector` 忽略它）；H5（2026-09-17 加）要求
+/// 供 `LazyFailureInjector` 现算 `window_start` 用；`FailureInjector` 忽略它）；H5 要求
 /// 「切换的写行发布的根也算在连续失败里」（登记「五、5.4」H5-k-位 定义），所以这个闭包要一路带进
 /// `perform_instance_switch`，覆盖写行与暖机自己的根槽写——不能只在这里问一次就把结果存成 `bool`
 /// 往下传，那样切换内部的每一次根槽写都会读到同一个决定。
@@ -1709,7 +1706,7 @@ enum RetryOutcome {
 /// `initial_non_empty_publish_count` 与 `initial_touches`：H4a／H5 的前缀在进这个循环之前已经先做了
 /// 若干次「触动（中间不尝试）」（登记「五、5.4」：H4a／H5 的前缀是「连续 3 次触动，中间不尝试」，
 /// 与 H1 从第一次就「尝试再触动」交替着走不同）——这两个参数把那几次已经发生的非空发布计进来，
-/// H1 传 0、0 与此前完全等价。
+/// H1 传 0、0 与不带前缀完全等价。
 fn retry_loop(
     pool: &mut Pool,
     arm: Arm,
@@ -1802,9 +1799,9 @@ fn retry_outcome_label(outcome: RetryOutcome) -> (String, i64) {
 
 /// 填满阶段：写对象 X（`geometry.object_units` 个单元），再一个接一个写 1 单元填充对象，
 /// 直到某次填充写报 ENOSPC。返回 X 的对象号与填充对象队列（先进先出即最先写、槽号最低）。
-/// `failures`（2026-09-17 第四段加，H8 用）：填满阶段每一次自推空发布之前被问一次，参数是
-/// `last_persisted_txg`——H1／H5／H6 一律传 `&mut |_last_txg| false`（不注入，行为与加这个参数
-/// 之前逐字节相同），只有 `run_fill_phase_injected_history` 传一个真的 `LazyFailureInjector`。内部两处
+/// `failures`（H8 用）：填满阶段每一次自推空发布之前被问一次，参数是
+/// `last_persisted_txg`——H1／H5／H6 一律传 `&mut |_last_txg| false`（不注入），
+/// 只有 `run_fill_phase_injected_history` 传一个真的 `LazyFailureInjector`。内部两处
 /// `admit_request` 调用都要 `&mut *failures` 重新借用——`failures` 是个 `&mut dyn FnMut(u64) -> bool`，
 /// 不能被 `admit_request` 按值吃掉之后还留着给下一轮循环用。
 fn fill_pool(pool: &mut Pool, arm: Arm, geometry: Geometry, failures: &mut dyn FnMut(u64) -> bool) -> (u64, Vec<u64>) {
@@ -1955,7 +1952,7 @@ impl FailurePosition {
 /// 覆盖两块盘所需的根槽写次数（与「四」I1 锚点同一个公式：`last_txg mod 3 = 1` 时 3 次，否则 2 次），
 /// 只是这里要的是"从哪次开始失败"的窗口起点，不是覆盖次数本身——两者数值相同（覆盖需要几次，
 /// 让 F_生效 真正变成新值的正是最后那一次，也就是第几次）。拆成一个只吃 `last_txg` 标量的版本
-/// （`cover_push_index_from_last_txg`），是因为 H8（2026-09-17 第四段）要在 `push_one_empty_publish`
+/// （`cover_push_index_from_last_txg`），是因为 H8 要在 `push_one_empty_publish`
 /// 内部、`pool` 已经借给函数参数的那一刻现算这个值——传一个 `&Pool` 进闭包会撞借用检查，传一个
 /// 提前读好的 `u64` 不会。
 fn cover_push_index_from_last_txg(last_txg: u64) -> u64 {
@@ -2004,7 +2001,7 @@ impl FailureInjector {
     }
 }
 
-/// H8 专用（2026-09-17 第四段，主 agent 定，依据「十二、修订」第三段第 7 条第 2 类诊断：
+/// H8 专用（依据「十二、修订」第三段第 7 条第 2 类诊断：
 /// P-止 在「填满」阶段自己把 F 抬到位，H5 的失败注入窗口从没落在这几次自推空发布上）：与
 /// `FailureInjector` 同一套「连续 k 次」语义，区别是 `window_start` 不在构造时算好，而是在
 /// 第一次被问到（也就是这次运行里第一次真的发生自推空发布，不管是在填满阶段还是在「删后写回」
@@ -2041,7 +2038,7 @@ impl LazyFailureInjector {
 }
 
 /// 「这一格该记『退化』还是『卡死』」：`.claude/rules/mutation-sampling.md`「同一条纪律的反面」——
-/// 2026-09-17 探针跑撞到过（PC5 在 H5 上 `pc5_root_write_failure_hit_any=false`）：`Damage::zero_reserves` 时
+/// 探针跑撞到过（PC5 在 H5 上 `pc5_root_write_failure_hit_any=false`）：`Damage::zero_reserves` 时
 /// `fill_pool` 自己就会先卡死（近满盘固定点分配失败，`pool.allocation_failure_hit` 已置位），
 /// 之后连续 3 次触动里第一次 `publish_delete` 撞上同一个卡死、`is_none()` 为真，H5 的退化分支
 /// 把它记成「退化」——这掩盖了 PC5 真正要证明的那件事：它不是「这次准入没走到该走的路径」，
@@ -2148,7 +2145,7 @@ fn run_root_write_failure_history(
 }
 
 // ===== H8：注入点改成填满阶段自推的空发布（登记「十二、修订」第三段第 7 条第 2 类诊断，
-// 主 agent 2026-09-17 第四段指定；不是登记「五」原文的一种历史，是原 H5 的一个变体） =====
+// 第四段；不是登记「五」原文的一种历史，是 H5 的一个变体） =====
 
 /// H8：与 H5 相同的 k ∈ {1,2,3} × 位 ∈ {首,覆}，区别只在注入点——不等「删后写回」那次准入里
 /// 的推空，而是打在**填满阶段为抬 F 自己推的那几次空发布**上（第三段诊断：P-止 在「填满」阶段
@@ -2248,14 +2245,14 @@ fn run_fill_phase_injected_history(
 // ===== H6：管理员回退之后隔离了一批槽再写（登记「五、5.4」） =====
 
 /// 管理员回退（D23（journal 的角色与格式） 已定项 14）：取新实例；`pool.slots`／`current_fixpoint_slots`／
-/// `current_instance_table_slots` 从 `rollback_target` 的快照载入；影子账按窄读法（2026-09-16 用户定案，
+/// `current_instance_table_slots` 从 `rollback_target` 的快照载入；影子账按窄读法（
 /// D23（journal 的角色与格式） 已定项 14 正文「按主语『被抛弃时间线的根』读，仍被有效根引用的槽不在其内」）
 /// 隔离「只被被抛弃根引用、不被候选根引用、且在 `rollback_target` 自己的快照里不是 Allocated」的槽；
 /// 回退行 `(rollback_target.instance, rollback_target.txg, 0, is_rollback=true)` 写进实例表；回退那次发布非空（R9：
 /// 它改了用户可见状态），带 F_生效（回退候选集已要求 `rollback_target.txg ≥ F_生效`，回退本身不改变 F）。
 /// 返回这次回退 + 暖机一共消耗的发布尝试数；回退那次发布自己真的分配不到固定点 + 实例表槽
 /// （近满盘，Q5a／Q5b 那类真卡死，不是 H6 故意注入的故障）时返回 `None`——回退不保证总能成功，
-/// 这不是登记要它测的故障历史，但模型不能假装它不会发生（2026-09-17 冒烟跑撞到过，见登记
+/// 这不是登记要它测的故障历史，但模型不能假装它不会发生（冒烟跑撞到过，见登记
 /// 「十二、修订」）。
 ///
 /// ⚠️ **简化，不是登记的全部**：`pool.object_slots`（对象号 → 槽号）不按 `rollback_target` 重新对齐——
@@ -2425,7 +2422,7 @@ fn run_rollback_history(arm: Arm, geometry: Geometry, damage: Damage) -> (RunSum
 }
 
 // ===== H4a／H4b：推空发布之中崩溃，第一条带新 F 的根只落了一块盘，再重开（登记「五、5.4」，
-// 2026-09-17 第四段） =====
+// 第四段） =====
 
 /// 两个崩溃点，登记原文：
 /// - H4a「这次准入里第一条带新 F 的推空根持久之后立刻崩溃（这条根只在一块盘上）」；
@@ -2606,7 +2603,7 @@ fn main() {
         }
     }
 
-    // H5-k-位（登记「五、5.4」，2026-09-17 第二段跑补）：k ∈ {1,2,3} × 位 ∈ {首,覆}，24 臂 × 48 格。
+    // H5-k-位（登记「五、5.4」，第二段）：k ∈ {1,2,3} × 位 ∈ {首,覆}，24 臂 × 48 格。
     for consecutive_root_write_failure_count in [1u64, 2, 3] {
         for position in [FailurePosition::First, FailurePosition::Cover] {
             for geometry in all_geometries() {
@@ -2639,7 +2636,7 @@ fn main() {
         }
     }
 
-    // H8（2026-09-17 第四段，主 agent 定）：同一套 k × 位，注入点改成填满阶段的自推空发布，
+    // H8（第四段）：同一套 k × 位，注入点改成填满阶段的自推空发布，
     // 填满阶段不自推时原样落回 H5 的注入点；24 臂 × 48 格。
     for consecutive_root_write_failure_count in [1u64, 2, 3] {
         for position in [FailurePosition::First, FailurePosition::Cover] {
@@ -2674,7 +2671,7 @@ fn main() {
         }
     }
 
-    // H6（登记「五、5.4」，2026-09-17 第二段跑补）：24 臂 × 48 格。
+    // H6（登记「五、5.4」，第二段）：24 臂 × 48 格。
     for geometry in all_geometries() {
         for arm in all_arms() {
             let (summary, isolated_slots_after_rollback) = run_rollback_history(arm, geometry, Damage::default());
@@ -2698,7 +2695,7 @@ fn main() {
         }
     }
 
-    // H4a／H4b（登记「五、5.4」，2026-09-17 第四段跑补）：推空发布之中崩溃再重开；24 臂 × 48 格。
+    // H4a／H4b（登记「五、5.4」，第四段）：推空发布之中崩溃再重开；24 臂 × 48 格。
     for crash_point in [CrashPoint::AfterFirstPush, CrashPoint::BeforeSecondPush] {
         for geometry in all_geometries() {
             for arm in all_arms() {
@@ -2838,7 +2835,7 @@ fn main() {
         run_count += 1;
     }
 
-    // 阳性对照对新历史也要跑（2026-09-17 主 agent 指示）：H5 用 k=1、位=首（最简单、最容易命中
+    // 阳性对照对新历史也要跑：H5 用 k=1、位=首（最简单、最容易命中
     // 的组合，与 H1 用同一组 PC 几何格）；H6 与 H1 完全共用 fill_pool／retry_loop／publish_delete，
     // 按同样的道理重跑一遍。
     let mut pc1_root_write_failure_hit_any = false;
@@ -2850,8 +2847,8 @@ fn main() {
     let mut pc4_rollback_hit_any = false;
     let mut pc5_rollback_hit_any = false;
     // H4（`CrashPoint::AfterFirstPush`）与 H8（k=1、位=首，与其它历史的阳性对照同一个理由：
-    // 最简单、最容易命中的组合）也要跑（2026-09-17 第四段，主 agent 指示「阳性对照对 H4、H8
-    // 也跑」）。H8 的 PC5 复用 H5 探针探出来的 k=3／位=覆——`pc5_geometry` 不落在诊断报的
+    // 最简单、最容易命中的组合）也要跑（阳性对照对 H4、H8
+    // 也跑）。H8 的 PC5 复用 H5 探针探出来的 k=3／位=覆——`pc5_geometry` 不落在诊断报的
     // 「n=16×S=4」自推区间里，`LazyFailureInjector` 大概率在填满阶段问零次、原样落回 H5 的
     // 注入点，理由与判定同 H5 的 PC5。
     let mut pc1_crash_mid_push_hit_any = false;

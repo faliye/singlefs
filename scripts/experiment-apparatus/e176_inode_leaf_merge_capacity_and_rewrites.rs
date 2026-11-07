@@ -1037,7 +1037,7 @@ fn accepted(outcome: &StepOutcome) -> bool {
     }
 }
 
-/// 窗口还开着时记一步：有一条臂没接受这一步的操作就关窗（这一步不算），记三条臂此前的操作流指纹；否则三条臂都删了就记重写片数。
+/// 窗口还开着时记一步：有一条臂没接受这一步的操作就关窗（这一步不算），记三条臂已有的操作流指纹；否则三条臂都删了就记重写片数。
 fn record_step_in_window(window: &mut ComparisonWindow, runs: &[ArmRun], outcomes: &[StepOutcome], step: u64) {
     let triple_outcomes = window.arm_indices.map(|arm_index| &outcomes[arm_index]);
     if let Some(slot) = triple_outcomes.iter().position(|outcome| !accepted(outcome)) {

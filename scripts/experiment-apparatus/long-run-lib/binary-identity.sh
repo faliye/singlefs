@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 长跑脚本共用的一段：装置二进制在一趟里不许换，每一片记下打它的是哪一版装置，续跑只沿用同一版装置打的片（欠账 C862）。
-# 被长跑脚本 source，不单独起（库，没有准入与运行条件）；里面只有函数定义与两个全局变量，source 的时候什么都不做。
+# 被长跑脚本 source（binary_identity_build 另给 e6-units.sh 与 scripts/devices/e152-run.sh 取编出来的装置），不单独起（库，没有准入与运行条件）；里面只有函数定义与四个全局变量（PINNED_BINARY、PINNED_BINARY_SHA256、BUILT_BINARY、BUILT_BINARIES），source 的时候什么都不做。
 #   binary_identity_pin <装置二进制> <私有目录>   开跑时拷一份进私有目录（按 sha256 分子目录、拷完只读），设 PINNED_BINARY（拷贝的路径）与 PINNED_BINARY_SHA256（拷贝的 sha256）；
 #                                                  之后每片每段只按 PINNED_BINARY 起，不再 exec 仓根 target/release 下那一份（别的编译随时会把它换掉）
 #   binary_identity_assert_unchanged [<路径> <sha>]  起每一片之前核私有副本的 sha256 还是开跑时那个（不给参数核最近拷的那份；一趟里拷了几份装置的，逐份带参数核）
@@ -11,10 +11,18 @@
 #   binary_identity_void_shard <片名> <片文件> <作废目录>        片与它的记录一起移进作废目录（留着不删），并报上面那一行
 #   binary_identity_check_same <期望 sha256 或空串> <片名> <片里记的 sha256> [<片名> <片里记的 sha256> …]
 #                                                合并产物之前再核一遍：期望值空串时要求彼此相同；任何一片没有记录或不同就拒、返回 1
+#   binary_identity_build <bin 名>[,<bin 名>…] <cargo build 的参数…>   起 cargo build <参数…> --message-format=json-render-diagnostics（编译的诊断照旧打到标准错误），
+#                                                从 cargo 报的 compiler-artifact 行里逐个取这几个 bin 的 executable，照给的次序放进 BUILT_BINARIES、头一个另放进 BUILT_BINARY：
+#                                                这一趟实际编出来的那几份（一条 cargo 编几个 bin 的，名字逗号隔开一起给）。
+#                                                编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，不往仓根 target/ 编（.claude/main-agent.md「一轮怎么开、怎么收」）；
+#                                                仓根 target/ 下那一份可能是早先编的旧二进制，不拼那条路径。cargo 退非 0 返回 1；编过了却有一个 bin 报不出 executable
+#                                                返回 2、打原因与出路（两种 BUILT_BINARY 都是空串、BUILT_BINARIES 是空数组）
 # gate-similar: scripts/hosts/compile-then-swap.py 它管「编译放在另一个目录、编完整份换上」，不管长跑脚本开跑后装置在不在变；scripts/hosts/source-stamp.py 它给源码树记指纹，不给二进制记；没有已有的库管长跑里装置是哪一版
 
 PINNED_BINARY=""
 PINNED_BINARY_SHA256=""
+BUILT_BINARY=""
+BUILT_BINARIES=()
 
 binary_identity_sha256_of() { # <文件>
   local digest
@@ -96,6 +104,55 @@ binary_identity_void_shard() { # <片名> <片文件> <作废目录>
   mv -- "$file" "$destination" || return 1
   if [[ -f "$file.binary-sha256" ]]; then mv -- "$file.binary-sha256" "$destination.binary-sha256" || return 1; fi
   binary_identity_void_line "$name" "$recorded" "$destination"
+}
+
+binary_identity_build() { # <bin 名>[,<bin 名>…] <cargo build 的参数…>
+  local names="$1" messages located index
+  local -a wanted=()
+  shift
+  BUILT_BINARY=""
+  BUILT_BINARIES=()
+  IFS=',' read -r -a wanted <<<"$names"
+  messages=$(mktemp "${TMPDIR:-/tmp}/binary-identity-build.XXXXXX") || {
+    echo "  ✗ 建不了收 cargo 机读输出的临时文件（${TMPDIR:-/tmp} 下）" >&2
+    echo "     → 怎么办：看 ${TMPDIR:-/tmp} 满没满、可不可写，腾出地方再起本脚本" >&2
+    return 1
+  }
+  if ! cargo build "$@" --message-format=json-render-diagnostics > "$messages"; then
+    rm -f -- "$messages"
+    return 1
+  fi
+  located=$(python3 - "$messages" "$names" <<'PYTHON'
+import json, sys
+path, names = sys.argv[1], sys.argv[2].split(",")
+found = {}
+with open(path, encoding="utf-8", errors="replace") as handle:
+    for line in handle:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            message = json.loads(line)
+        except ValueError:
+            continue
+        target_name = (message.get("target") or {}).get("name")
+        if message.get("reason") == "compiler-artifact" and target_name in names and message.get("executable"):
+            found[target_name] = message["executable"]
+for name in names:
+    print(found.get(name, ""))
+PYTHON
+  )
+  rm -f -- "$messages"
+  mapfile -t BUILT_BINARIES <<<"$located"
+  for index in "${!wanted[@]}"; do
+    if [[ -z "${BUILT_BINARIES[index]:-}" ]]; then
+      echo "  ✗ cargo build 退 0，机读输出里却没有 bin ${wanted[index]} 的 compiler-artifact 行（executable），不知道这一趟编出来的在哪" >&2
+      echo "     → 怎么办：单跑同一条 cargo build … --message-format=json-render-diagnostics 看它报的 executable；不拼仓根 target/ 下的路径（那一份可能是早先编的旧二进制）" >&2
+      BUILT_BINARIES=()
+      return 2
+    fi
+  done
+  BUILT_BINARY="${BUILT_BINARIES[0]}"
 }
 
 binary_identity_check_same() { # <期望 sha256 或空串> <片名> <记的 sha256> …

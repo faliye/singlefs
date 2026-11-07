@@ -1,10 +1,21 @@
 # E200（修订6近似树重跑） 第一段：造树与 Q1 判法的变异表（跑前登记第九节 M40–M47）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。
 # 经 scripts/experiment-apparatus/e200_revision_6_segment_one_on_an_approximate_tree/mutation_driver.py 跑（mutate.sh 只跑 cargo）；M48–M52 归第二段的对照脚本，那时再追加。
+# M45 登记写「只比文件长度」：Q1-逐份手里只有目标的 sha256、没有目标文件的长度，照字面改不出；这一行改成只比两份 sha256 串的长度，
+#   配套那一格照登记 P41 用同长不同内容的两份（原式不等，变异相等），能不能顶登记那一条由登记修订定。
+# 不带 M 号的几行不在登记第九节里：T3 的 blob 号（登记读法 4 T3「写 blob 号与出处提交」）与 Q2-编的拷贝核对（编译包装与 compile_lines）各自会红的那一处。
 M40 T3 的候选不收悬空 blob	        candidates.setdefault(blob, UNREACHABLE)	        pass
 M41 T5 取最晚改它的后代提交	    return min(changed, key=lambda version: (version.time, version.commit)) if changed else None	    return max(changed, key=lambda version: (version.time, version.commit)) if changed else None
 M42 T5 的新文件取最晚加它的提交	    return min(additions, key=lambda version: (version.time, version.commit)) if additions else None	    return max(additions, key=lambda version: (version.time, version.commit)) if additions else None
 M43 T2 取今天 HEAD 那一版	        t2_blob = repository.blob_at(BASE_COMMIT, path)	        t2_blob = repository.blob_at("HEAD", path)
-M44 singlefs-core 挪进别的验证包	PRODUCT_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-verification/", 	PRODUCT_PREFIXES = ("crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-verification/", 
-M45 Q1-逐份的相等只比长度	    return near_sha256 == target_sha256	    return len(near_sha256) == len(target_sha256)
+M44 singlefs-core 挪进别的验证包	PRODUCT_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-harness/", 	PRODUCT_PREFIXES = ("crates/singlefs-format/", "crates/singlefs-checker/", "crates/singlefs-replay-prefix/")\nOTHER_PREFIXES = ("crates/singlefs-core/", "crates/singlefs-harness/", 
+M45 Q1-逐份的相等只比两份 sha256 串的长度	    return near_sha256 == target_sha256	    return len(near_sha256) == len(target_sha256)
 M46 T4 删第 3477–3483 行（差一）	REMOVED_FIRST_LINE = 3478	REMOVED_FIRST_LINE = 3477
 M47 T4 不核枚举名	    if REMOVED_BLOCK_NAME.encode("utf-8") not in block:	    if False:
+T3 命中的 blob 号不进造树那一侧的 Choice	            return Choice(MARKER_EXACT_PINNED, found[1], found[0], repository.read_blob(found[0])), notes	            return Choice(MARKER_EXACT_PINNED, found[1], "-", repository.read_blob(found[0])), notes
+T3 命中的 blob 号不进研究一侧的 Choice	            return Choice(MARKER_EXACT_PINNED, found[1], found[0], repository.read_blob(found[0]))\n        if path in BAD_IMPLEMENTATION_TABLES	            return Choice(MARKER_EXACT_PINNED, found[1], "-", repository.read_blob(found[0]))\n        if path in BAD_IMPLEMENTATION_TABLES
+清单与 name=file 行的 blob 列不写 blob 号	               choice.blob, digest)	               "-", digest)
+Q2-编只看树里的二进制在不在	        copied[name] = same_bytes(in_tree, built)	        copied[name] = os.path.isfile(in_tree)
+Q2-编不看拷的退出码	    compiled = exit_code == 0 and copy_exit_code == 0 and all(copied.values())	    compiled = exit_code == 0 and all(copied.values())
+编译包装吞掉 e171 那一条 cp 的退出码	target/release/e171_three_oracle_collusion_after_the_oracle_fixes || COPY_EXIT=$?	target/release/e171_three_oracle_collusion_after_the_oracle_fixes
+编译包装吞掉 e170 那一条 cp 的退出码	target/release/e170_o3_spec_executor_export || COPY_EXIT=$?	target/release/e170_o3_spec_executor_export
+编译包装不把拷的退出码交给 compile-lines	--copy-exit-code "$COPY_EXIT"	--copy-exit-code 0

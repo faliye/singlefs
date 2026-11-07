@@ -14,7 +14,7 @@ children 里每个子任务的 attempts）里找那一次尝试，读 memory_pea
 用法：
   report.py --artifacts <产物.out…> --status <状态存档.json…>                 打到标准输出（读不动的格列出来、不当 0）
   report.py --artifacts … --status … --out <判决.out>                          同样的行写进一份新文件（排他新建，已在就拒），末行 `E7RESULT name=done emitted=N`
-  report.py --artifacts … --status … --unstable                                只列需要重跑一轮 5 次的格（第一轮散布 > 2% 而第二轮还没跑），一格一行 `arm devices fill named`
+  report.py --artifacts … --status … --unstable                                只列需要重跑一轮 5 次的格，一格一行 `arm devices fill named`
   report.py --selftest                 合成产物与合成状态存档上的自证（每一项标签就是下面「弄坏开关」点名要红的那一格）：各项过了之后接着逐个打开弄坏开关
                                        起自己，要求每个开关都红在点名的那一项（开关生效的那一趟只跑各项）
 退出码：0 判完；1 自证红；2 用法、产物或状态存档读不了、判决文件已在；3 产物里装置版本不一致（整份不判）。
@@ -333,7 +333,7 @@ def round_keys(arm, devices, fill, named, round_number):
 
 
 def chosen_round(artifact, arm, devices, fill, named):
-    """最近一轮完整的 5 次：第二轮（重复号 6–10）齐了用第二轮，否则第一轮（1–5）；都不齐交 (None, None)（本次未跑）。"""
+    """最近一轮完整的 5 次：复测轮（重复号 6–10）齐了用复测轮，否则初测轮（1–5）；都不齐交 (None, None)（本次未跑）。"""
     for round_number in (2, 1):
         keys = round_keys(arm, devices, fill, named, round_number)
         if all(run_is_complete(artifact, key) for key in keys):
@@ -430,7 +430,7 @@ def subtracted_peak(artifact, arm, devices, geometry):
 
 
 def cells_needing_a_rerun(artifact):
-    """第一轮 5 次散布 > 2% 而第二轮还没有的格（扫环格、空跑格与 measurement_pc），登记第十一节 V2。"""
+    """初测轮 5 次散布 > 2% 而复测轮还没有的格（扫环格、空跑格与 measurement_pc），登记第十一节 V2。"""
     found = []
     for geometry, (named, fill) in GEOMETRIES.items():
         arms = ("empty",) + arms_of(geometry) + (("measurement_pc",) if geometry == "k64_full" else ())
@@ -1226,7 +1226,7 @@ def case_digest_mismatch_is_caught():
 
 
 def second_round_lines(arm, devices, fill, named, extra):
-    """重复号 6–10 的 5 次（第二轮），memory_peak = 空跑格 + H + 20 MiB，再加 extra(repeat) 字节。"""
+    """重复号 6–10 的 5 次，memory_peak = 空跑格 + H + 20 MiB，再加 extra(repeat) 字节。"""
     filled = RING_SLOTS if fill == "full" else RING_SLOTS // 2
     resident = predicted_peak(arm, devices, filled, named)
     return [synthetic_line(arm, devices, fill, named, repeat, resident,
@@ -1244,7 +1244,7 @@ def case_unstable_cell_is_not_judged():
     assert row["judgment"] == "not_judged" and row["reason"] == "unstable_needs_rerun", row
     assert ("baseline", 2, "full", 64) in cells_needing_a_rerun(synthetic_artifact(lines))
     steady = one(lines + second_round_lines("baseline", 2, "full", 64, lambda repeat: 1000 * repeat), "jia_line3", geometry="k64_full")
-    assert steady["judgment"] == "on_line", steady     # 第二轮 5 次齐了且稳定，改用第二轮
+    assert steady["judgment"] == "on_line", steady     # 复测轮 5 次齐了且稳定，改用复测轮
     still = one(lines + second_round_lines("baseline", 2, "full", 64, lambda repeat: 100 * MEBIBYTE * (repeat == 10)), "jia_line3", geometry="k64_full")
     assert still["judgment"] == "not_judged" and still["reason"] == "unstable_after_rerun", still
 

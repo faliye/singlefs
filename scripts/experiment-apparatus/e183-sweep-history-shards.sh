@@ -38,11 +38,11 @@
 #   bash scripts/experiment-apparatus/e183-sweep-history-shards.sh --host-share <k>/<n>    只跑第 k 份（片号 mod n 等于 k 的片），写进片目录，不合并（服务片用的就是这一种）
 #   bash scripts/experiment-apparatus/e183-sweep-history-shards.sh --merge-only            不跑，片齐了合并出产物
 #   bash scripts/experiment-apparatus/e183-sweep-history-shards.sh --list-items            逐行列片名与做没做完（要装置已编好，不编译）
-#   bash scripts/experiment-apparatus/e183-sweep-history-shards.sh --selftest              假装置、假机器清单、假的 task-server（照分片协议逐步起这一份）走一遍续跑、分台与停机（不起 cargo）
+#   bash scripts/experiment-apparatus/e183-sweep-history-shards.sh --selftest              假装置、PATH 最前面的假 cargo、假机器清单、假的 task-server（照分片协议逐步起这一份）走一遍续跑、分台、停机与编装置（不起真 cargo）
 #   --shard-directory <目录> 可与前四种合用，换片目录（相对仓根或绝对路径）。
 #   --binary <程序文件> 可与前四种合用，装置用这一份、不编（命令行优先于 E183_BINARY）。接着上一趟续跑时用它钉住那一趟的程序文件：
 #     仓根 target/release 下那一份会被别的会话的 cargo 换成另一个编译单元的产物（同一份源码两个 sha256），不钉就可能与已做完的片对不上。
-# 环境：E183_BINARY（装置程序文件；没给就先 cargo build --release 编仓根 target/ 下的那一份）、E183_SHARD_DIRECTORY（片目录，默认
+# 环境：E183_BINARY（装置程序文件；没给就先 cargo build --release 编，取 cargo 报的这一趟编出来的位置，不取仓根 target/ 下那一份）、E183_SHARD_DIRECTORY（片目录，默认
 #   工作根下的 e183-h5-shards，工作根取 .claude/hooks/lib_work_root.py、两台同一份）、#   E183_THREADS（见「多机的读法」）、
 #   E183_LOG_DIRECTORY（每片的标准输出与错误输出，默认工作根下的 e183-h5-shards-logs）、E183_PRODUCT_DIRECTORY（产物目录，默认 research/results）。
 #   只给自证换假的：E183_HOSTS_EMITTER（默认 scripts/crash/crash-point-replay-shard-configuration-check.sh）。
@@ -66,6 +66,8 @@
 #       「装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的五片自报的 sha256 仍是开跑时那份」
 #   E183_SHARDS_BREAK=merge-sha-unchecked  合并之前脚本不核全部片的 sha256
 #       「合并之前核全部片的装置 sha256：有一片对不上，脚本先拒（退 1、点名那一片、装置 merge 不起、不另出产物）」
+#   E183_SHARDS_BREAK=build-jobs-from-device-threads  编装置时编译线程取本脚本自己的 THREADS（调用方自己定线程），不照服务交的 CARGO_BUILD_JOBS
+#       「不给装置就直接起 cargo build 编、编译线程照服务交的 CARGO_BUILD_JOBS：编不过退 1、点名编不过」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
@@ -74,7 +76,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：在仓里起这份脚本（它自己回到仓根；进不去多半是脚本被挪出了 scripts/experiment-apparatus/）" >&2; exit 2; }
 
-BINARY_DEFAULT="target/release/e183_capacity_read_cache_reserve_and_sweep_costs"
 PRODUCT_STEM_NAME="e183-capacity-read-cache-reserve-and-sweep-costs-h5"
 # 缺省的片目录与日志目录放工作根（.claude/hooks/lib_work_root.py，两台同一份）下：只在没给那个目录时取（自证的各格都给了），取不到就停，不退回 $HOME 下
 work_root_or_stop() {   # <没给的那个变量名>：成了把工作根放进 WORK_ROOT
@@ -189,20 +190,29 @@ host_count() {
   echo $((1 + count))
 }
 
-# 装置：E183_BINARY 给了用它（不编），没给就先编仓根 target/ 下那一份。BINARY_SHA256 是程序文件的 sha256，写进每一片、合并时比。
+# 装置：E183_BINARY 给了用它（不编），没给就先编，装置取 cargo 报的这一趟编出来的位置（long-run-lib/binary-identity.sh 的 binary_identity_build：
+#   编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，仓根 target/ 下那一份可能是早先编的旧二进制，不取它）。BINARY_SHA256 是程序文件的 sha256，写进每一片、合并时比。
 prepare_binary() {
   if [[ -n "$BINARY_OPTION" ]]; then
     BINARY="$BINARY_OPTION"
   elif [[ -n "${E183_BINARY:-}" ]]; then
     BINARY="$E183_BINARY"
   else
-    BINARY="$BINARY_DEFAULT"
-    bash scripts/hosts/capped.sh "$THREADS" cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs \
-      > "$LOG_DIRECTORY/build-$RUN_STAMP.log" 2>&1 || {
+    # 编译直接起、不再套线程包装：整条命令交 task-server，编译线程照服务交的 CARGO_BUILD_JOBS（弄坏开关 build-jobs-from-device-threads 下改成本脚本的 THREADS）
+    break_is build-jobs-from-device-threads && export CARGO_BUILD_JOBS="$THREADS"
+    local build_status
+    binary_identity_build e183_capacity_read_cache_reserve_and_sweep_costs --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs 2> "$LOG_DIRECTORY/build-$RUN_STAMP.log"; build_status=$?
+    if ((build_status == 1)); then
       echo "  ✗ 装置编不过（$LOG_DIRECTORY/build-$RUN_STAMP.log）" >&2
       echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
       exit 1
-    }
+    fi
+    if ((build_status != 0)); then
+      echo "  ✗ 装置编过了，cargo 却没报出它编在哪（$LOG_DIRECTORY/build-$RUN_STAMP.log 末尾那两行）" >&2
+      echo "     → 怎么办：照那份日志末尾的出路办；不拿仓根 target/ 下那一份顶（可能是早先编的旧二进制）" >&2
+      exit 1
+    fi
+    BINARY="$BUILT_BINARY"
   fi
   [[ -x "$BINARY" ]] || { echo "  ✗ 装置程序文件不在或不可执行（$BINARY）" >&2; echo "     → 怎么办：装置没编好就先 cargo build --release，或设 E183_BINARY 指到编好的一份" >&2; exit 1; }
   # 开跑时拷一份私有副本：之后列片、起每一片、合并都按这份拷贝，BINARY_SHA256 是拷贝的 sha256
@@ -323,7 +333,7 @@ merge_product() {
   echo "产物：$destination（$(wc -l < "$destination") 行，sha256 $(sha256sum -- "$destination" | cut -d' ' -f1)）"
 }
 
-# 自证：假装置（五片）、假机器清单、假的 task-server（run_phases：照分片协议起计划、各服务片、合并，片目录是同一个；
+# 自证：假装置（五片）、PATH 最前面的假 cargo（只记一笔与 CARGO_BUILD_JOBS、编不过）、假机器清单、假的 task-server（run_phases：照分片协议起计划、各服务片、合并，片目录是同一个；
 # 第 0 片当本机、别的当第二台，第二台那几片的环境里 E183_BINARY 是它自己编的另一份），每一格在自己的临时目录里从头搭，格与格不共用状态。
 run_selftest() {
   local work failures=0 fakes
@@ -370,6 +380,14 @@ FAKE
   # 第二台自己编的那一份：同一份源码、字节不同（编进去的树路径不同）
   { cat "$fakes/device"; echo '# built on the peer in another tree'; } > "$fakes/device-built-on-peer"
   chmod +x "$fakes"/*
+  mkdir -p -- "$fakes/bin"
+  cat > "$fakes/bin/cargo" <<'FAKE'
+#!/usr/bin/env bash
+echo "cargo $* | jobs=${CARGO_BUILD_JOBS:-unset}" >> "$E183_SELFTEST_CALLS.cargo"
+echo "error: selftest compile error" >&2
+exit 101
+FAKE
+  chmod +x "$fakes/bin/cargo"
   # 一格的环境：片目录、日志、产物都在这一格自己的目录里。
   invoke() {
     local cell="$1" hosts="$2"
@@ -491,9 +509,15 @@ print(len(plan["shards"]), "|".join(",".join(sorted(shard)) for shard in plan["s
   original_sha=$(sha256sum -- "$cell/bin/device" | cut -d' ' -f1)
   E183_SELFTEST_SWAP_TARGET="$cell/bin/device" INVOKE_BINARY="$cell/bin/device" invoke "$cell" 1; exit_code=$?
   expect "装置在一趟里不许换：跑着的时候仓根那份被换掉，之后起的五片自报的 sha256 仍是开跑时那份" '((exit_code == 0)) && [[ -e "$cell/bin/device.swapped" ]] && [[ "$(sha256sum -- "$cell/bin/device" | cut -d" " -f1)" != "$original_sha" ]] && (($(wc -l < "$cell/calls.self-sha") == 5)) && [[ "$(awk "{print \$2}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]] && grep -q "binary_sha256=$original_sha" "$cell/shards/h5-d"'
+  # 不给装置：编装置那一步直接起 cargo（假 cargo 在 PATH 最前面）；这一格的 CARGO_BUILD_JOBS 是 5、E183_THREADS 是 3，编译线程要照前一个
+  cell="$work/build"; mkdir -p -- "$cell"
+  INVOKE_ENVIRONMENT=("E183_BINARY=" "PATH=$fakes/bin:$PATH" "CARGO_BUILD_JOBS=5")
+  invoke "$cell" 1; exit_code=$?
+  INVOKE_ENVIRONMENT=()
+  expect "不给装置就直接起 cargo build 编、编译线程照服务交的 CARGO_BUILD_JOBS：编不过退 1、点名编不过" '((exit_code == 1)) && grep -q "装置编不过" "$cell/out" && [[ "$(cat -- "$cell/calls.cargo" 2> /dev/null)" == "cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs --message-format=json-render-diagnostics | jobs=5" ]]'
   rm -rf -- "$work"
   if ((failures > 0)); then echo "e183-sweep-history-shards.sh 自证：$failures 格红"; return 1; fi
-  echo "e183-sweep-history-shards.sh 自证：18 格全绿"
+  echo "e183-sweep-history-shards.sh 自证：19 格全绿"
   return 0
 }
 
@@ -526,7 +550,9 @@ THREADS=$(thread_count) || { echo "  ✗ 取不到这台的线程数（原因见
 mkdir -p -- "$LOG_DIRECTORY" "$SHARD_DIRECTORY" || exit 1
 
 if [[ "$mode" == list ]]; then
-  BINARY="${BINARY_OPTION:-${E183_BINARY:-$BINARY_DEFAULT}}"
+  BINARY="${BINARY_OPTION:-${E183_BINARY:-}}"
+  # --list-items 不编：没给装置就拒（仓根 target/ 下那一份可能是早先编的旧二进制，不拿它顶）
+  [[ -n "$BINARY" ]] || { echo "  ✗ --list-items 不编装置，也没给装置（E183_BINARY 或 --binary 都空着）" >&2; echo "     → 怎么办：E183_BINARY 或 --binary 指到这一趟编出来的那一份，或开跑时拷的私有副本（$LOG_DIRECTORY/pinned-binary/<sha256>/ 下）" >&2; exit 78; }
   [[ -x "$BINARY" ]] || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs" >&2; exit 78; }
   load_shard_list
   BINARY_SHA256=$(binary_identity_sha256_of "$BINARY") || { echo "  ✗ 算不出装置程序文件的 sha256（$BINARY）" >&2; echo "     → 怎么办：核这个文件在、当前用户读得了；装置没编好就先 cargo build --release，或设 E183_BINARY 指到编好的一份" >&2; exit 1; }

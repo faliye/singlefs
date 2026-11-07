@@ -30,12 +30,12 @@
 被 import 时照认（五份调用方的自证要用它，它们各自的入口守卫也拒平常跑时设着它）。
 
 弄坏开关（只给自证证红用；被 import 时五份调用方的自证同样红）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（失败行「✗ lib_session_directory 自证：<格名>：…」）：
-  SESSION_DIRECTORY_BREAK=home-from-environment  home_directory() 设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取环境里的 HOME（改前：~/.claude/projects 接脚本自己所在的仓路径）
+  SESSION_DIRECTORY_BREAK=home-from-environment  home_directory() 设了 TASK_SERVER_SOURCE_REPOSITORY 也仍取环境里的 HOME（~/.claude/projects 接脚本自己所在的仓路径）
       「✗ lib_session_directory 自证：设了来源仓根时家目录从它的路径取、不用 HOME」
       「✗ lib_session_directory 自证：会话目录还没建过时取最近一层带 .claude/projects 的上级」
       「✗ lib_session_directory 自证：来源仓根在 /home/<用户> 底下而哪层都没有 .claude/projects 时按 /home/<用户> 取」
       「✗ lib_session_directory 自证：另指了仓时会话目录名按那个仓拼、家目录仍从来源仓根取」
-  SESSION_DIRECTORY_BREAK=honor-break-outside-selftest  refuse_break_outside_selftest() 不拒：直接执行而不是 --selftest 时设了开关也照常往下走（改前的样子）
+  SESSION_DIRECTORY_BREAK=honor-break-outside-selftest  refuse_break_outside_selftest() 不拒：直接执行而不是 --selftest 时设了开关也照常往下走
       「✗ lib_session_directory 自证：平常跑设开关要被拒」
 """
 import os

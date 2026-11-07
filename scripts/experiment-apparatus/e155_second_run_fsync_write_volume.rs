@@ -344,7 +344,7 @@ fn class_dirty_nodes_this_layer(
         return 1.0;
     }
     let far_fraction: f64 = if let Some((total_units, touched_units)) = data_unit_totals {
-        // R3（2026-09-19 修订）：数据单元旧版远近只看总量 vs 这次持久化触达量，与 K8 策略无关。
+        // R3（修订）：数据单元旧版远近只看总量 vs 这次持久化触达量，与 K8 策略无关。
         if total_units > touched_units {
             1.0
         } else {
@@ -355,7 +355,7 @@ fn class_dirty_nodes_this_layer(
             (PositionPolicy::Near, _) => 0.0,
             (PositionPolicy::Far, _) => 1.0,
             (PositionPolicy::Balanced, Placement::Sequential) => (insert_count / layer_coverage).min(1.0),
-            // R2（2026-09-19 修订）：远的比例 = 1 − q，不是 q 本身（第三节 3.2 ②）。
+            // R2（修订）：远的比例 = 1 − q，不是 q 本身（第三节 3.2 ②）。
             (PositionPolicy::Balanced, Placement::Random) => (1.0 - previous_touch_fraction).clamp(0.0, 1.0),
         }
     };
@@ -1495,7 +1495,7 @@ mod jia_anchor_tests {
         }
     }
 
-    /// F2 第一半（登记第十节，主 agent 2026-09-19 追加要求）：P=10⁸、F1、rand、Lbalanced 一格
+    /// F2 第一半（登记第十节，追加要求）：P=10⁸、F1、rand、Lbalanced 一格
     /// 迭代到上限仍未收敛（`row6_grid` 里这一格 `fixed_point_iterations=1000`），`jia_convergence_and_saturation_status` 要把它
     /// 判成第一半触发；这一格第二半不该触发（extent/alloc/mapping 第 0 层脏节点占比都远低于 50%）。
     #[test]
@@ -3000,7 +3000,7 @@ fn main() {
     }
 
     // Q6.11：第三节 3.2 四处改动前后甲的差，覆盖第 6 行主表同一批格（这一次改成要跑）；
-    // 每格另判 F2 两半（改前 legacy、改后 fixed 分开判，F2 触发的格按登记「结论收窄」报，不当普通值用）。
+    // 每格另判 F2 两半（legacy、fixed 分开判，F2 触发的格按登记「结论收窄」报，不当普通值用）。
     for &file_count in &file_counts {
         for family in families {
             for placement in placements {

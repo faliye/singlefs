@@ -4,7 +4,7 @@
 """崩溃流覆盖：覆盖表、ignore 开着的节点、评估 0 次的（流，不变量）对。判法只在这一份里，
 门禁 crash-point-replay 的 crash-flow-coverage、crash-ignored-nodes、invariant-zero-evaluations 三格调它，
 入口 scripts/crash/crash-point-replay.sh 每趟跑完拿它把覆盖表落进这一趟的日志目录。出口与条款：.claude/kb/milestone/03-third-txn.md「出口」的出口 4、
-六·1、六·3；用户 2026-10-20 定的 K1–K7 原话在 records/2026-10-18-里程碑三收尾与近期欠账.md「用户 2026-10-19 弹窗定出口 4 七条」那一条。
+六·1、六·3；K1–K7 的条文在 records/2026-10-18-里程碑三收尾与近期欠账.md 讲出口 4 七条的那一节。
 
 读的两种行（crates 那一侧打，这里只读）：
   覆盖行  CRASH_FLOW_COVERAGE entry=<入口名> step=<StepKind 成员名> segment=<段序号> expansion=<expanded|ignored_point|registered_segment|not_expanded>
@@ -93,7 +93,7 @@
   CRASH_FLOW_COVERAGE_BREAK=empty-reason-accepted  zero-evaluations 不判基准里理由空着的行
       「✗ 自检 zero-evaluations-empty-reason：」
       「✗ 自检 …格里有…格判错」
-  CRASH_FLOW_COVERAGE_BREAK=reuse-without-recall  collect 照改前：复用的测试二进制不取回存着的行、也不报 unknown
+  CRASH_FLOW_COVERAGE_BREAK=reuse-without-recall  collect：复用的测试二进制不取回存着的行、也不报 unknown
       「✗ 自检 collect-recalls-reused-binary：」、「✗ 自检 collect-partial-reuse-is-unknown：」
       「✗ 自检 collect-unreachable-exits-75：」
       「✗ 自检 …格里有…格判错」

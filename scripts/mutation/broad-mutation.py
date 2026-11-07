@@ -3,8 +3,8 @@
 # run-condition: command git python3
 # task-server-gpu-arguments: *   每一趟都有带 gpu 特性的那一趟（没卡的机器由驱动记本次未跑），清场与分卡由服务在最外层办（task-server/task_server_lib.py 文件头「GPU」）
 # broad-mutation-driver-signature: singlefs 广谱变异逐条驱动（改名或拷走的一份靠这一行认，别删）
-"""广谱变异的逐条驱动（.claude/kb/checks-owed.md 的 C489；用户 2026-09-30 定：一直跑、中断要续接不从头来、一条一条可点名；
-2026-10-15 定：剪枝的单元是函数，广谱变异一条一条按内容算，不按 HEAD、不按提交算）。
+"""广谱变异的逐条驱动（.claude/kb/checks-owed.md 的 C489（singlefs-core 的广谱变异对今天的代码没有结论）：一直跑、中断要续接不从头来、一条一条可点名；
+剪枝的单元是函数，广谱变异一条一条按内容算，不按 HEAD、不按提交算）。
 
   broad-mutation.py [选哪些条] [怎么跑]             不带选条参数就是剪枝：把 --source 给的工作树（默认本仓的工作区）换进库目录的专用树，由 cargo-mutants
                                                    生成此刻的清单，每条变异现算单元键过沿用判据（scripts/mutation/mutation-prune.py），沿用得了沿用、沿用不了现判；
@@ -36,7 +36,7 @@
   --tools-from <文件>（工具版本换成这份文件，一行一个）：提交门禁的样本用，真跑与写行的用法不认。
 
 库目录（--home；一处，固定，不随趟、不随判法换目录、没有版本目录；判定不在这里，在下面「判定库」）：
-  runs/run-<进程号>-<随机>/   这一趟的运行目录（用户 2026-10-23 定案「自己用完自己删」：编译生成物每趟新建、跑完删，判定库照留、照旧按单元键复用）。
+  runs/run-<进程号>-<随机>/   这一趟的运行目录（自己用完自己删：编译生成物每趟新建、跑完删，判定库照留、按单元键复用）。
                    拿到库目录的锁之后建（Library.begin_run），正常结束、拒绝退出、被 TERM / INT 停都在 main 的收尾删掉（Library.end_run；
                    删之前经 scripts/hosts/run_build_directory.py 核本机没有进程开着里面的文件，有就不删、逐个报进程，这一趟别的都成了也退 9）。
                    被 KILL 的那一趟留下的，下一趟拿到锁之后先删（同样先核开着的文件；里面有在途记录的报一句被打断在哪一条）。里面四样：
@@ -48,7 +48,7 @@
   tree.synced      上一次换树拷了几个文件、什么时候（只当记录，不进任何键）
   logs/            没过的那一步的输出（每条每步一份，后一趟同名的盖掉前一趟）
   lock             库目录的排他锁（见下「中断续接」）
-判定库（用户 2026-11-01 定「现在就对接 不允许残留」；.claude/rules/verification.md「判定库只有一份」）：全在 prune-server 里那一份，读写只经
+判定库（.claude/rules/verification.md「判定库只有一份」，不留旧库的残留）：全在 prune-server 里那一份，读写只经
   scripts/prune-server/prune_server_client.py，本地一个文件都不建、不读。服务连不上、停了、忙到上限，客户端退 75（不当「库里没有」现判）；配置不对、回应解不开退 3。
   键 = broad-mutation[@命名空间]/broad-mutation-units/<表>/<条目>（客户端文件头「键空间」：库目录落在临时目录底下的另占一份命名空间，自证与门禁样本用；
   别处的不带，两台读写同一份）。各张表：
@@ -98,7 +98,7 @@
         出路是查清那几个条目是谁经客户端写进来的（驱动只写这五种结局），用客户端把点到的条目改写成成形的行（服务没有删键）。
   一条的状态不取最后一行：键相同、沿用判据认的那几行里有 caught / missed / unviable 的取其中最后一行；
   都没有而有 stage-one-only 行的是 stage-one-only；只有 driver-error 行的是 driver-error，续跑时重试；一行都没有是 none。
-  记红、撤绿、下趟现判（用户 2026-10-29 弹窗定案；「判红」照提交门禁 broad-mutation 的 gate-verdict 格与 --summary 的 BROAD_MUTATION_GATE 行：missed 没红 > 0 判红，
+  记红、撤绿、下趟现判（「判红」照提交门禁 broad-mutation 的 gate-verdict 格与 --summary 的 BROAD_MUTATION_GATE 行：missed 没红 > 0 判红，
     没结论（只过了第一段、驱动错、none）也判红但那是「没有定论」，不是一条定论；无效 unviable 与抓到都算有结论、不判红）：
     判红的定论是没红。同一把键的定论（caught / missed / unviable）里最后一个是 missed 的，红照键记着，前面同一把键的好结论（抓到、无效）撤掉，下一趟这一条现判、不沿用：
     不带选条参数的剪枝跑、点名的跑都现判一次，它也不进复用哨兵的候选；现判又出没红，下一趟还是现判（没红每趟现判，直到判出抓到或无效）。
@@ -109,13 +109,13 @@
     同键更早的抓到还会重新冒出来当状态。
     要 GPU 那一趟的条（CPU 没红、又有带 gpu 特性的测试够得着）红不红看合起来的状态：GPU 趟的真实状态是没红才算红，CPU 一趟的没红行才不沿用；GPU 趟抓到 / 无效 / 还没有结论 /
     没结论的，CPU 一趟的没红行照沿用（gpu_decided_keys 在选条之前交给 Judgement.state，GPU 趟没红的那一条两趟都现判）。
-    弄坏开关 missed-carried 下没红照旧按覆盖者键沿用（改前的样子）。
+    弄坏开关 missed-carried 下没红照旧按覆盖者键沿用。
 两段式：第一段每条只跑验证包之外三个包（singlefs-checker、singlefs-core、singlefs-format）的测试（eatmydata + cargo nextest，遇第一个失败即停）；第一段没红的先落一行 stage-one-only，再进第二段。
-  第二段只补第一段没跑到的（用户 2026-09-30 定）：被变异的两个包的文档测试（cargo test --doc）、验证包里的全部测试函数
+  第二段只补第一段没跑到的：被变异的两个包的文档测试（cargo test --doc）、验证包里的全部测试函数
   （cargo test --release -p singlefs-verification --lib --tests；登记成 crash-case: 的崩溃枚举用例与放量分项经 --skip 排掉，它们另走按块那一路，
   排除单与门禁按条那一趟的 --exclude-registered 是同一张：scripts/gate/admission.py 的 registered_test_functions，读法只在那里一份）；
   都没红才记 missed。标了 #[ignore] 的用例 cargo 不跑，驱动不算（只剩要显卡、量显存与量速度那几条）。第二段被打断的条，续跑时只补第二段。
-GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 验证包，出处 .claude/kb/checks-owed.md 的 C489、records/2026-09-30-里程碑三开工第一轮.md 的 GPU 普查）：
+GPU 那一趟（第二段补一趟带 gpu 特性的 验证包，出处 .claude/kb/checks-owed.md 的 C489（singlefs-core 的广谱变异对今天的代码没有结论）的 GPU 普查）：
   CPU 那一趟（上面的两段）全跑完之后，对「CPU 那一趟最后落的结论是没红、又有带 gpu 特性的测试够得着」的条另补一趟带 gpu 特性的 验证包（verification.md 里带特性那一趟）：
     cargo test --release -p singlefs-verification --features <tests/ 里 cfg 点到的特性> --lib / --test <挂特性的测试文件>… -- --nocapture --test-threads 1
     特性与挂特性的文件每趟从 验证包 tests/ 顶层每个 .rs 的 #[cfg(…)] / #![cfg(…)] 现读（gated_test_files，同门禁 crash-point-replay 的 feature-gated-tests 格），
@@ -175,8 +175,8 @@ GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 
   所以真跑测试的每一步（步表里种类是 test 的：两段的测试步、覆盖那一步、GPU 那一趟的测试步；编译步不算）的环境里设 SINGLEFS_MULTI_HOST_CONFIG=<多机配置的绝对路径>。
   多机配置在哪：调用方设了 SINGLEFS_MULTI_HOST_CONFIG 照它（取成绝对路径），没设取 --source 那棵树的 git common-dir 上一层下的 multi-host.env。
   那份文件不在（或 --source 不是 git 工作树、又没设那个变量）的，真跑起任何 cargo 之前就拒、退 2，一步都不起（配置错，不当本次未跑）。
-  弄坏开关 test-steps-configuration-unpassed 下不判、不设（改前的样子）。
-内存与限时（用户 2026-10-31 定 SC02）：每一步命令直接起，不经线程包装、内存包装与清场包装，不设内存上限、不限时，
+  弄坏开关 test-steps-configuration-unpassed 下不判、不设。
+内存与限时：每一步命令直接起，不经线程包装、内存包装与清场包装，不设内存上限、不限时，
   起在自己新开的进程组里（组号就是驱动起的那个子进程的进程号）。整条驱动是统一任务服务的一个任务：内存上限由服务按记录给、撞了放大重排，
   卡住由服务判（task-server/task_server_lib.py 文件头结局表的 stalled），驱动不另判、不另重跑。一条变异把整趟撞上限或卡住、被服务停，
   就是驱动整趟被停（照「中断续接」）：在途那一条不落行、没有结论，不算抓到；服务重排之后同一条命令照常判它。一步退了认不出的码一律记 driver-error。
@@ -257,14 +257,14 @@ GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 
       红：「✗ 自证：不认得的项没拒」
   BROAD_MUTATION_BREAK=exclude-re-dropped  换树时不把 .cargo/mutants.toml 拷进专用树（cargo-mutants 读不到 exclude_re，等于忽略它）
       红：「✗ 自证：exclude_re 没排掉那一条、清单没整版重判、或别的条没沿用」
-  BROAD_MUTATION_BREAK=item-counts-dropped  每条一行 BROAD_MUTATION_ITEM 不带 judged=、red=、reused=（改前的样子）
+  BROAD_MUTATION_BREAK=item-counts-dropped  每条一行 BROAD_MUTATION_ITEM 不带 judged=、red=、reused=
       红：「✗ 自证：BROAD_MUTATION_ITEM 每条一行没带判了、红了、复用了多少」
   BROAD_MUTATION_BREAK=test-variables-anywhere  只供自证的变量隔一层进程、库目录在自证工作目录之外也认
       红：「✗ 自证：只供自证的变量指着自证工作目录之外的库时没拒」、「✗ 自证：父进程不是 --selftest 的进程带着假一步的变量时没拒」、「✗ 自证：父进程不是 --selftest 的进程只带着弄坏开关时没拒」
       另红：「✗ 自证：平常跑设了弄坏开关、带认不得的选项时没在参数解析之前拒并点名」
-  BROAD_MUTATION_BREAK=break-guard-after-parsing  只供自证的变量（含这个弄坏开关）平常跑设了的拒排回参数解析之后（改前的样子：认不得的选项先被 argparse 当用法错拒，不点名变量）
+  BROAD_MUTATION_BREAK=break-guard-after-parsing  只供自证的变量（含这个弄坏开关）平常跑设了的拒排回参数解析之后：认不得的选项先被 argparse 当用法错拒，不点名变量
       红：「✗ 自证：平常跑设了弄坏开关、带认不得的选项时没在参数解析之前拒并点名」
-  BROAD_MUTATION_BREAK=missed-carried  没红（CPU 一趟、GPU 一趟）按覆盖者键相同照旧沿用、不现判（改前的样子）
+  BROAD_MUTATION_BREAK=missed-carried  没红（CPU 一趟、GPU 一趟）按覆盖者键相同照旧沿用、不现判
       红：「✗ 自证：单独一条没红（CPU 一趟）下一趟没现判、或抓到的、无效的没沿用」、「✗ 自证：同一条变异内容没变、判定库里有可沿用的行、所在文件在某提交之后改过别处，没照样沿用」、
       「✗ 自证：抓到它的那条测试改了之后那几条没现判」、「✗ 自证：先抓到、同一把键又判没红（CPU 一趟）下一趟没现判、或现判之后没红仍沿用」、「✗ 自证：现判又出没红的条（CPU 一趟）下一趟没接着现判」、
       「✗ 自证：GPU 趟没红的条下一趟没现判」、「✗ 自证：GPU 趟先抓到、同一把键又判没红的条下一趟没现判」
@@ -287,7 +287,7 @@ GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 
       红：「✗ 自证：按覆盖挑测试、第二段按二进制、文档测试每次跑」、「✗ 自证：只补第二段不对」、「✗ 自证：两段式的结局不对」、「✗ 自证：汇总不对」、「✗ 自证：第二段的步不对」、
       「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」
       另红：「✗ 提交门禁判红：…条沿用不了、也没有现判的结论」、「✗ 自证：重起之后沿用得了的条或基线被重跑了」
-  BROAD_MUTATION_BREAK=term-leaves-step-running  被 TERM 时只给驱动起的那一个进程发一次 TERM，不停它的进程组（改前的样子）
+  BROAD_MUTATION_BREAK=term-leaves-step-running  被 TERM 时只给驱动起的那一个进程发一次 TERM，不停它的进程组
       红：「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）」（分出来的那一个还握着这一趟树里的工作目录，运行目录删不掉）、「✗ 自证：被 TERM 停时在途那一步没有连同它的进程组一起停」（selftest_stop_cells：假的一步分出来的那一个照挂着）
   BROAD_MUTATION_BREAK=registered-not-skipped  第二段 验证包与 GPU 那一趟的测试步命令不接登记的崩溃枚举用例与放量分项的 --skip
       红：「✗ 自证：登记的崩溃枚举用例与放量分项没经 --skip 排掉」
@@ -312,12 +312,12 @@ GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 
       另红：「✗ 自证：两趟都没红：」、「✗ 自证：只有 CPU 红：」、「✗ 自证：没卡：」
   BROAD_MUTATION_BREAK=stage-two-baseline-red-generic  第二段基线红只报一句不给出路
       红：「✗ 自证：第二段基线红没报成带出路的拒绝」
-      另红：「✗ 基线 two-test-checker-tier 在没改过的树上退 101：基线不绿」
+      另红：「✗ 基线 two-test-verification 在没改过的树上退 101：基线不绿」
   BROAD_MUTATION_BREAK=baseline-any-threads  取基线不看线程数
       红：「✗ 自证：换了 --threads 之后基线没在新线程数下另记」
-  BROAD_MUTATION_BREAK=test-steps-configuration-unpassed  真跑测试的步不往环境里设 SINGLEFS_MULTI_HOST_CONFIG、起 cargo 之前也不判多机配置在不在（改前的样子）
+  BROAD_MUTATION_BREAK=test-steps-configuration-unpassed  真跑测试的步不往环境里设 SINGLEFS_MULTI_HOST_CONFIG、起 cargo 之前也不判多机配置在不在
       红：「✗ 自证：真跑测试的步没收到多机配置」、「✗ 自证：多机配置不在时没在起 cargo 之前拒」
-  BROAD_MUTATION_BREAK=rocksdb-entry-unchecked  真跑起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+  BROAD_MUTATION_BREAK=rocksdb-entry-unchecked  真跑起 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
       红：「✗ 自证：被判的树里 验证包依赖 rocksdb 而进程环境里没有预编库的取值，没在起 cargo 之前拒」
       （entry 的跳过办法：被判的树里没有依赖 rocksdb 的清单（自证的 SELFTEST_SOURCES 就是这样），或 PATH 上的 cargo 是带
       『# rocksdb-prebuilt-entry: selftest-fake-cargo』那一行的假 cargo；见 scripts/hosts/rocksdb-prebuilt.py 文件头『entry』）
@@ -334,25 +334,25 @@ GPU 那一趟（C489；用户 2026-10-22 定第二段补一趟带 gpu 特性的 
       另红：「✗ 自证：改了 GPU 趟的函数，CPU 那一趟的判法单元指纹跟着变了」、「✗ 自证：改了 GPU 趟沿用不沿用没红的那一句（GpuJudging.state 里）」
   BROAD_MUTATION_BREAK=refused-carried  拒算的条与抓到它的测试认不出的条照沿用
       红：「✗ 自证：拒算的条没有每趟现判、或别的条没沿用」
-  BROAD_MUTATION_BREAK=read-only-volatile-refused  只读的用法（--summary 这一类）也拒落在开机会清空的目录里的库（改前的写法：样本拷进 /tmp 再判时判不了）
+  BROAD_MUTATION_BREAK=read-only-volatile-refused  只读的用法（--summary 这一类）也拒落在开机会清空的目录里的库：样本拷进 /tmp 再判时判不了
       红：「✗ 自证：库目录落在 /dev/shm 里时只读的 --summary 也拒了」
   BROAD_MUTATION_BREAK=list-cache-unchecked  清单按单元记进判定库 lists/ 之后不复原核对
       红：「✗ 自证：清单里有被变异包之外的一条时 --refresh-list 没拒」
-  BROAD_MUTATION_BREAK=run-directory-kept  跑完（正常、拒绝、被 TERM / INT 停）不删这一趟的运行目录（改前的样子：编译目录与树跨趟留着）
+  BROAD_MUTATION_BREAK=run-directory-kept  跑完（正常、拒绝、被 TERM / INT 停）不删这一趟的运行目录：编译目录与树跨趟留着
       红：「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（正常结束）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（出错退出）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）」、
       「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」、「✗ 自证：重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录」、「✗ 自证：上一趟被 KILL 留下的运行目录」、
       「✗ 自证：恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完」
   BROAD_MUTATION_BREAK=run-directory-open-files-unchecked  删这一趟的运行目录之前不核有没有进程开着里面的文件
       红：「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」
-  BROAD_MUTATION_BREAK=build-directory-in-home  照改前把专用树、编译目录、每一步的 TMPDIR 与在途记录放在库目录里、跨趟留着（不建 runs/ 下的运行目录）
+  BROAD_MUTATION_BREAK=build-directory-in-home  把专用树、编译目录、每一步的 TMPDIR 与在途记录放在库目录里、跨趟留着（不建 runs/ 下的运行目录）
       红：「✗ 自证：第二趟的编译目录不是新建的」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（正常结束）」、「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（出错退出）」、
       「✗ 自证：跑完运行目录里不剩它建的编译目录与树副本（被 TERM 停）」、「✗ 自证：这一趟的运行目录里还有进程开着文件时应当不删、报出那个进程、退 9」、「✗ 自证：驱动被杀之后它那一趟的运行目录里没有留着改过的树与在途记录」、
       「✗ 自证：被打断的第 3 条没有重跑、或被当成已完成」、「✗ 自证：重起跑完之后库目录里还剩上一趟被 KILL 留下的、或这一趟的运行目录」、「✗ 自证：上一趟被 KILL 留下的运行目录」、
       「✗ 自证：恢复原件半途被杀之后树里多出了文件、临时件不在运行目录里、或重跑没照常判完」
-  BROAD_MUTATION_BREAK=baseline-by-packages  基线键照改前取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名
+  BROAD_MUTATION_BREAK=baseline-by-packages  基线键取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名
       红：「✗ 自证：基线键没按这一步跑到的判定的单元闭包取」、「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
       另红：「✗ 自证：第二趟的编译目录不是新建的」
-  BROAD_MUTATION_BREAK=baseline-refused-step-whole  不按条记基线：基线键拒算的测试步照改前整步照跑（一条拒算整步照跑）
+  BROAD_MUTATION_BREAK=baseline-refused-step-whole  不按条记基线：基线键拒算的测试步整步照跑（一条拒算整步照跑）
       红：「✗ 自证：基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑」
   BROAD_MUTATION_BREAK=gpu-red-not-caught  GPU 那一趟红了不算抓到（合起来仍记没红）
       红：「✗ 自证：只有 GPU 红：」
@@ -475,7 +475,7 @@ JUDGING_ENTRIES = (("scripts/mutation/broad-mutation.py", "select_items"), ("scr
 # 收判法单元闭包时扫哪几份（驱动、规则库、libtest 结果行的解析）；它们按字面路径载入的 lib_function_units.py 照样收进来
 JUDGING_SCAN_FILES = ("scripts/mutation/broad-mutation.py", "scripts/mutation/mutation-prune.py", "scripts/gate/lib_libtest_result_lines.py")
 # 按覆盖逐条（验证包逐个二进制）挑测试、基线键拒算时按条记基线的那三个测试步；文档测试那一步每条都整步跑，不在里面
-PER_ENTRY_TEST_STEPS = ("one-test", "two-test-checker-tier")
+PER_ENTRY_TEST_STEPS = ("one-test", "two-test-verification")
 EXIT_GATE_RED = 8
 DECISIVE_OUTCOMES = ("caught", "missed", "unviable")          # 这条变异自己的结局
 STAGE_ONE_ONLY = "stage-one-only"
@@ -626,7 +626,7 @@ def refuse_outside_selftest(present):
 
 def check_test_only_variables_before_parsing(argv):
     """只供自证的变量平常跑设了就拒，排在一切参数解析之前（认不得的选项也先看这个）；命令行带 --selftest 的是自证本身，放过。
-    弄坏开关 break-guard-after-parsing：不在这里拒，退回参数解析之后的 check_test_only_variables 去拒（改前的样子）。"""
+    弄坏开关 break-guard-after-parsing：不在这里拒，退回参数解析之后的 check_test_only_variables 去拒。"""
     present = [name for name in TEST_ONLY_VARIABLES if os.environ.get(name)]
     if present and "--selftest" not in argv and not raw_break("break-guard-after-parsing") and not test_mode():
         refuse_outside_selftest(present)
@@ -977,7 +977,7 @@ class Library:
     def begin_run(self):
         """这一趟的运行目录（文件头「库目录」runs/）：拿到锁之后先删上一趟被 KILL 留下的运行目录（树、编译目录、在途记录；删之前核没有进程开着里面的文件），
         再新建这一趟的 <库目录>/runs/run-<进程号>-<随机>/。交上一趟被打断在哪一条的在途记录（没有交 None）。
-        弄坏开关 interrupted-run-directory-kept：不删上一趟留下的、不认它的在途记录；build-directory-in-home：照改前把树、编译目录与在途记录放在库目录里、跨趟留着。"""
+        弄坏开关 interrupted-run-directory-kept：不删上一趟留下的、不认它的在途记录；build-directory-in-home：把树、编译目录与在途记录放在库目录里、跨趟留着。"""
         if break_is("build-directory-in-home"):
             os.makedirs(self.home, exist_ok=True)
             self.place_run_directory(self.home)
@@ -1436,27 +1436,27 @@ class Judgement:
             key, _forms = self.rules.test_key(self.tree, entry["unit"], entry["target"], self.globals)
             target = entry["target"].split(":", 2)
             label = "lib" if target[1] == "lib" else target[2]
-            by_binary.setdefault(f"checker:{label}", []).append(key)
+            by_binary.setdefault(f"verification:{label}", []).append(key)
         for binary, keys in by_binary.items():
-            jobs[(binary, "*")] = (hashlib.sha256(("coverage-v1\nchecker\n" + "".join(f"{key}\n" for key in sorted(keys))).encode()).hexdigest()
+            jobs[(binary, "*")] = (hashlib.sha256(("coverage-v1\nverification\n" + "".join(f"{key}\n" for key in sorted(keys))).encode()).hexdigest()
                                    if all(keys) else None)
         return jobs
 
     def selection(self, item, runner):
-        """C2 / E1 / E6：这条变异每一步跑哪些测试。{"one": None 全部 / [(二进制, 用例)], "checker": None / [目标], "reason": …}。"""
+        """C2 / E1 / E6：这条变异每一步跑哪些测试。{"one": None 全部 / [(二进制, 用例)], "verification": None / [目标], "reason": …}。"""
         current = self.key_of(item)
         everything = self.rules.run_everything_reason(self.tree, current)
         if everything or break_is("coverage-selection-dropped") or "one" not in runner.coverage_available:
-            return {"one": None, "checker": None, "reason": everything or "no-coverage"}
+            return {"one": None, "verification": None, "reason": everything or "no-coverage"}
         unit = current["unit"]
         fingerprint = f"{unit.kind}:{unit.fingerprint}"
         spawning = self.rules.spawning_binaries(self.tree, STAGE_ONE_PACKAGES, runner.profile_counts)
         chosen = {"one": self.rules.select_tests(runner.coverage["one"], fingerprint, spawning), "reason": "coverage"}
-        checker_spawning = {binary.split("::", 1)[1] if "::" in binary else "lib" for binary in self.rules.spawning_binaries(self.tree, (VERIFICATION_PACKAGE,))}
+        verification_spawning = {binary.split("::", 1)[1] if "::" in binary else "lib" for binary in self.rules.spawning_binaries(self.tree, (VERIFICATION_PACKAGE,))}
         if "two" not in runner.coverage_available or break_is("stage-two-not-by-binary"):
-            chosen["checker"] = None
+            chosen["verification"] = None
             return chosen
-        chosen["checker"] = sorted({job[0][len("checker:"):] for job, covered in runner.coverage["checker"].items() if fingerprint in covered} | checker_spawning)
+        chosen["verification"] = sorted({job[0][len("verification:"):] for job, covered in runner.coverage["verification"].items() if fingerprint in covered} | verification_spawning)
         return chosen
 
     def baseline_key(self, step, threads):
@@ -1464,7 +1464,7 @@ class Judgement:
         （闭包键里有闭包单元的种类与去注释指纹、闭包真引到的 cfg 原子、依赖版本行、工具链那几行）、去掉线程数的命令、全局那几行（判法单元指纹除外）；
         不带步名、手写的版本号、包级与文件级指纹。在这一步的 cfg 与特性下不编的判定（entry-cfg-inactive）不算这一步跑到的、不进键。
         拒算（照跑、不沿用、不退回包级）：编译步（编得过与否、用时随包里每一个单元变，按单元闭包切不开）、认不出跑哪些判定的步、有一条判定的闭包拒算。
-        弄坏开关 baseline-by-packages：照改前取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名。"""
+        弄坏开关 baseline-by-packages：取这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹（包级），带手写的 form 与步名。"""
         name, _stage, kind, command, _failed = step
         if break_is("baseline-by-packages"):
             return self.package_baseline_key(step, threads), ""
@@ -1557,7 +1557,7 @@ class Judgement:
             return self.runnable(STAGE_ONE_PACKAGES) + self.macro_entries(STAGE_ONE_PACKAGES), False
         if name == "two-test-doc":
             return self.rules.doctest_entries(self.tree, MUTATED_PACKAGES), False
-        if name == "two-test-checker-tier":
+        if name == "two-test-verification":
             return self.runnable((VERIFICATION_PACKAGE,)) + self.macro_entries((VERIFICATION_PACKAGE,)), True
         return None, False
 
@@ -1597,10 +1597,10 @@ class Judgement:
         return (None, forms) if forms else (key, [])
 
     def package_baseline_key(self, step, threads):
-        """改前的基线键（只给弄坏开关 baseline-by-packages）：这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹多重集、去掉线程数的命令、
+        """包级的基线键（只给弄坏开关 baseline-by-packages）：这一步编、跑的那几个包（连同路径依赖）里全部单元的指纹多重集、去掉线程数的命令、
         全局那几行（判法单元指纹除外），带手写的 form 与步名。"""
         name, _stage, _kind, command, _failed = step
-        packages = set(MUTATED_PACKAGES if name == "two-test-doc" else (VERIFICATION_PACKAGE,) if "checker-tier" in name else STAGE_ONE_PACKAGES)
+        packages = set(MUTATED_PACKAGES if name == "two-test-doc" else (VERIFICATION_PACKAGE,) if "verification" in name else STAGE_ONE_PACKAGES)
         crates = {crate.directory: crate for crate in self.tree.workspace.crates if crate.package in packages}
         pending = list(crates.values())
         while pending:
@@ -1764,28 +1764,28 @@ def step_table(arguments):
     """每一步：(步名, 哪一段, build / test, 命令, 测试没过的退出码)。
     第二段只补第一段没跑到的：文档测试（被变异的两个包）、验证包里的全部测试函数（登记的崩溃枚举用例与放量分项另走按块那一路，
     起命令时经 --skip 排掉：Runner.command_with_skips）。第一段跑过的那三个包的用例第二段不再跑。"""
-    harness = package_arguments(STAGE_ONE_PACKAGES)
+    stage_one_arguments = package_arguments(STAGE_ONE_PACKAGES)
     threads = str(arguments.threads)
     sync_free = ["eatmydata"]
     stage_two_prefix = sync_free if arguments.stage_two_eatmydata else []
-    checker_tier = ["--release", "-p", VERIFICATION_PACKAGE, "--lib", "--tests"]
-    harness_build = ["cargo", "nextest", "run", "--locked", *harness, "--no-run"]
-    harness_test = sync_free + ["cargo", "nextest", "run", "--locked", *harness, "-j", threads]
+    verification_arguments = ["--release", "-p", VERIFICATION_PACKAGE, "--lib", "--tests"]
+    stage_one_build = ["cargo", "nextest", "run", "--locked", *stage_one_arguments, "--no-run"]
+    stage_one_test = sync_free + ["cargo", "nextest", "run", "--locked", *stage_one_arguments, "-j", threads]
     stage_one = [
-        ("one-build", "one", "build", harness_build, None),
-        ("one-test", "one", "test", harness_test, NEXTEST_TEST_FAILED_EXIT),
+        ("one-build", "one", "build", stage_one_build, None),
+        ("one-test", "one", "test", stage_one_test, NEXTEST_TEST_FAILED_EXIT),
     ]
     if break_is("stage-two-full-cargo-test"):
         return stage_one + [
-            ("two-build-debug", "two", "build", ["cargo", "test", "--locked", *harness, "--no-run"], None),
-            ("two-test-debug", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *harness], CARGO_FAILED_EXIT),
-            ("two-build-checker-tier", "two", "build", ["cargo", "test", "--locked", *checker_tier, "--no-run"], None),
-            ("two-test-checker-tier", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *checker_tier], CARGO_FAILED_EXIT),
+            ("two-build-debug", "two", "build", ["cargo", "test", "--locked", *stage_one_arguments, "--no-run"], None),
+            ("two-test-debug", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *stage_one_arguments], CARGO_FAILED_EXIT),
+            ("two-build-verification", "two", "build", ["cargo", "test", "--locked", *verification_arguments, "--no-run"], None),
+            ("two-test-verification", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *verification_arguments], CARGO_FAILED_EXIT),
         ]
     return stage_one + [
         ("two-test-doc", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", "--doc", *package_arguments(MUTATED_PACKAGES)], CARGO_FAILED_EXIT),
-        ("two-build-checker-tier", "two", "build", ["cargo", "test", "--locked", *checker_tier, "--no-run"], None),
-        ("two-test-checker-tier", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *checker_tier], CARGO_FAILED_EXIT),
+        ("two-build-verification", "two", "build", ["cargo", "test", "--locked", *verification_arguments, "--no-run"], None),
+        ("two-test-verification", "two", "test", stage_two_prefix + ["cargo", "test", "--locked", *verification_arguments], CARGO_FAILED_EXIT),
     ]
 
 
@@ -1825,7 +1825,7 @@ class Runner:
         self.selftest_work = test_variable(SELFTEST_WORK_VARIABLE) or ""   # 假一步在它下面（文件头「只供测试」）
         self.stages_with_fresh_baseline = set()
         self.judgement = None
-        self.coverage = {"one": {}, "checker": {}}
+        self.coverage = {"one": {}, "verification": {}}
         self.coverage_available = set()
         self.profile_counts = {}
         self.baseline_keys = {}
@@ -1853,13 +1853,13 @@ class Runner:
                 return None, "none"
             filters = prune_rules().nextest_filters(selection["one"])
             return command + [word for text in filters for word in ("-E", text)], f"{len(selection['one'])} tests"
-        if name == "two-test-checker-tier" and selection.get("checker") is not None:
-            if not selection["checker"]:
+        if name == "two-test-verification" and selection.get("verification") is not None:
+            if not selection["verification"]:
                 return None, "none"
             command = [word for word in command if word not in ("--lib", "--tests")]
-            for target in selection["checker"]:
+            for target in selection["verification"]:
                 command += ["--lib"] if target == "lib" else ["--test", target]
-            return command, ",".join(selection["checker"])
+            return command, ",".join(selection["verification"])
         if name == "two-test-doc" and break_is("doc-tests-skipped"):
             return None, "none"
         return command, "all"
@@ -1923,7 +1923,7 @@ class Runner:
 
     @staticmethod
     def coverage_part(stage, binary):
-        return "one" if stage == "one" else "checker"
+        return "one" if stage == "one" else "verification"
 
     def step_named(self, step_name):
         return next(step for step in self.steps if step[0] == step_name)
@@ -1931,34 +1931,6 @@ class Runner:
     def log_path(self, sequence, step_name):
         prefix = "baseline" if sequence == BASELINE_SEQUENCE else str(sequence)
         return os.path.join(self.library.logs, f"{prefix}.{step_name}.log")
-
-    def stop_step(self, child):
-        """驱动被 TERM / INT 停：在途这一步连同它的进程组一起停，不留着它跑完（文件头「中断续接」）。
-        一步起在自己新开的进程组里（run_step 的 start_new_session），组号就是 child 的进程号：cargo 与它起的测试进程都在这一组里，
-        只给 child 发 TERM 的话 cargo 退了、测试进程照跑。发信号只点自己起的那一组：先 TERM，到 --stop-grace 秒还有没退的就 KILL。"""
-        grace = self.arguments.stop_grace
-        if break_is("term-leaves-step-running"):
-            child.terminate()   # 弄坏开关：只点自己起的这一个进程，组里别的进程照跑（改前的样子）
-            try:
-                child.wait(timeout=grace)
-            except subprocess.TimeoutExpired:
-                pass
-            return
-        self.signal_step_group(child, signal.SIGTERM)
-        try:
-            child.wait(timeout=grace)
-        except subprocess.TimeoutExpired:
-            pass
-        self.signal_step_group(child, signal.SIGKILL)    # 组里还活着的（child 退了而它起的进程没退的也算）一并停掉
-        child.wait()
-
-    @staticmethod
-    def signal_step_group(child, number):
-        """给自己起的这一步那一个进程组发信号（组号是 child 的进程号）；组里一个进程都不剩时不报错。"""
-        try:
-            os.killpg(child.pid, number)
-        except ProcessLookupError:
-            pass
 
     def progress_interval(self):
         fake = test_variable("BROAD_MUTATION_PROGRESS_INTERVAL")
@@ -1981,7 +1953,7 @@ class Runner:
                 next_report += interval
 
     def baseline_rows_of(self, step_name):
-        """基线表 baselines/ 里这把基线键、这个线程数下这一步的行：[(写入的次序号, {列名: 值})]。弄坏开关 baseline-any-threads 下不看线程数（改前的取法）。"""
+        """基线表 baselines/ 里这把基线键、这个线程数下这一步的行：[(写入的次序号, {列名: 值})]。弄坏开关 baseline-any-threads 下不看线程数。"""
         threads = str(self.arguments.threads)
         baseline_key = self.baseline_key_of(step_name)
         return [(number, row) for number, row in enumerate(self.library.baseline_rows(), start=1)
@@ -1990,14 +1962,14 @@ class Runner:
     def command_with_skips(self, step_name, command):
         """第二段 验证包那一步与 GPU 那一趟的测试步：登记的崩溃枚举用例与放量分项经 --skip 排掉（接在测试二进制的参数后面：命令里已有 `--` 的接在它后面，没有的补一个）；
         别的步原样。"""
-        if step_name not in ("two-test-checker-tier", GPU_TEST_STEP) or not self.skip_names:
+        if step_name not in ("two-test-verification", GPU_TEST_STEP) or not self.skip_names:
             return command
         tail = [word for name in self.skip_names for word in ("--skip", name)]
         return list(command) + (tail if "--" in command else ["--"] + tail)
 
     def run_step(self, step, sequence, command=None, selection_text="all", extra=None):
         """跑一步：交 (退出码, 秒数)。输出落进这一条这一步的日志。command 不给就用步表里的。
-        不经线程包装、内存包装与清场包装，不设内存上限、不限时（文件头「内存与限时」）：命令直接起，起在自己新开的进程组里（stop_step 照组停）。"""
+        不经线程包装、内存包装与清场包装，不设内存上限、不限时（文件头「内存与限时」）：命令直接起，起在自己新开的进程组里（被停时照组停，见下面 Stopped 那一支）。"""
         step_name, _stage, _kind, table_command, _test_failed_exit = step
         command = self.command_with_skips(step_name, table_command if command is None else command)
         remove_tree(self.library.scratch)
@@ -2022,7 +1994,30 @@ class Runner:
             try:
                 exit_code = self.wait_reporting_progress(child, step_name, sequence, started)
             except Stopped:
-                self.stop_step(child)
+                # 驱动被 TERM / INT 停：在途这一步连同它的进程组一起停，不留着它跑完（文件头「中断续接」）。这一步起在自己新开的进程组里
+                #   （上面 Popen 的 start_new_session），组号就是 child 的进程号：cargo 与它起的测试进程都在这一组里，只给 child 发 TERM 的话
+                #   cargo 退了、测试进程照跑。发信号只点自己起的那一组：先 TERM，到 --stop-grace 秒还有没退的就 KILL；组里一个进程都不剩时不报错
+                grace = self.arguments.stop_grace
+                if break_is("term-leaves-step-running"):
+                    child.terminate()   # 弄坏开关：只点自己起的这一个进程，组里别的进程照跑
+                    try:
+                        child.wait(timeout=grace)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    raise
+                try:
+                    os.killpg(child.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    child.wait(timeout=grace)
+                except subprocess.TimeoutExpired:
+                    pass
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)    # 组里还活着的（child 退了而它起的进程没退的也算）一并停掉
+                except ProcessLookupError:
+                    pass
+                child.wait()
                 raise
         return exit_code, time.monotonic() - started
 
@@ -2047,7 +2042,7 @@ class Runner:
                 say(f"  · 基线 {step_name}：基线键拒算（{self.baseline_refusals[step_name]}），在没改过的树上照跑、不沿用")
             else:
                 say(f"  · 基线 {step_name}：在没改过的树上跑（这把基线键下、这个线程数下还没有它的绿记录）")
-            command = list(step[3]) + (["--no-fail-fast"] if step_name == "two-test-checker-tier" else [])
+            command = list(step[3]) + (["--no-fail-fast"] if step_name == "two-test-verification" else [])
             exit_code, seconds = self.run_step(step, BASELINE_SEQUENCE, command=command)
             outcome = "ok" if exit_code == 0 else f"exit-{exit_code}"
             self.library.append_rows(BASELINES_TABLE, [[self.baseline_key_of(step_name), step_name, outcome, now_text(), self.arguments.threads]])
@@ -2204,7 +2199,7 @@ def libtest_outcome(line):
 
 
 def libtest_failed_name(line):
-    """libtest 结果行结局是 FAILED 的全名（` - should panic` 那一段不进名字），别的交 None。弄坏开关 own-libtest-failure-line 下回到改前那条正则（名字带上 ` - should panic`）。"""
+    """libtest 结果行结局是 FAILED 的全名（` - should panic` 那一段不进名字），别的交 None。弄坏开关 own-libtest-failure-line 下用另一条正则（名字带上 ` - should panic`）。"""
     if break_is("own-libtest-failure-line"):
         found = re.match(r"^test (\S.*?) \.\.\. FAILED\s*$", line)
         return found.group(1) if found else None
@@ -2410,7 +2405,7 @@ def process_item(library, runner, item, with_stage_one, with_stage_two):
                 return record(DRIVER_ERROR, stage, note_text=f"{step_name} 退 {exit_code} 而日志里没有带源码位置的编译错误：不算无效", step_name=step_name,
                               step_seconds=seconds, environment_doubt=f"第 {sequence} 条的 {step_name} 退 {exit_code} 而没有编译错误")
             if kind == "test" and exit_code == test_failed_exit:
-                package_of_step = VERIFICATION_PACKAGE if "checker-tier" in step_name else ""
+                package_of_step = VERIFICATION_PACKAGE if "verification" in step_name else ""
                 return record("caught", stage, first_failing_test(log_path, test_failed_exit, package_of_step), note_text=step_name,
                               step_name=step_name, step_seconds=seconds)
             if break_is("unknown-exit-stops"):
@@ -2445,7 +2440,7 @@ GPU_VERDICT_COLUMNS = ("key", "sequence", "package", "name", "outcome", "caught_
 GPU_ROW_OUTCOMES = (*DECISIVE_OUTCOMES, DRIVER_ERROR)
 GPU_FEATURE = "gpu"
 GPU_TESTS_DIRECTORY = "crates/singlefs-verification/tests"
-GPU_BUILD_STEP, GPU_TEST_STEP = "gpu-build-checker-tier", "gpu-test-checker-tier"
+GPU_BUILD_STEP, GPU_TEST_STEP = "gpu-build-verification", "gpu-test-verification"
 GPU_BASELINE_SEQUENCE = "gpu-baseline"
 GPU_NO_ADAPTER_MARK = "NOT_RUN_NO_GPU_ADAPTER"      # GPU 对拍找不到 GPU 适配器时测试打的那一行（门禁 crash-point-replay 的 feature-gated-tests 格读同一个词）
 GPU_NOT_RUN = "not-run"                              # 这一趟没跑成：不落行、不算没红
@@ -3321,7 +3316,7 @@ def multi_host_configuration_for_tests(source):
 
 def check_multi_host_configuration(source, arguments):
     """真跑起任何 cargo 之前判多机配置在不在（文件头「多机配置交给测试」），在就记进 arguments.multi_host_configuration；不在拒（退 2），一步都不起。
-    弄坏开关 test-steps-configuration-unpassed 下不判（改前的样子）。"""
+    弄坏开关 test-steps-configuration-unpassed 下不判。"""
     path, present = multi_host_configuration_for_tests(source)
     arguments.multi_host_configuration = path
     if present or break_is("test-steps-configuration-unpassed"):
@@ -3429,9 +3424,9 @@ def coverage_step(specification_path):
         shutil.rmtree(directory, ignore_errors=True)
         return {"binary": binary, "test": test, "covered": [list(entry) for entry in covered], "profiles": len(files), "exit": done.returncode}
 
-    tests, jobs, harness = [], [], package_arguments(STAGE_ONE_PACKAGES)
+    tests, jobs, stage_one_arguments = [], [], package_arguments(STAGE_ONE_PACKAGES)
     if spec["kind"] == "one":
-        for binary, _kind, _name, executable, cwd in build(harness):
+        for binary, _kind, _name, executable, cwd in build(stage_one_arguments):
             for test in listed(executable, cwd):
                 tests.append([binary, test])
                 if (binary, test) not in known:
@@ -3439,7 +3434,7 @@ def coverage_step(specification_path):
     else:
         skips = [word for name in spec.get("skips", []) for word in ("--skip", name)]   # 登记的崩溃枚举用例与放量分项不在这里跑（驱动交下来的名单）
         for _binary, kind, name, executable, cwd in build(["--release", "-p", VERIFICATION_PACKAGE, "--lib", "--tests"]):
-            job = ("checker:" + ("lib" if kind == "lib" else name), "*")
+            job = ("verification:" + ("lib" if kind == "lib" else name), "*")
             tests.append(list(job))
             if job not in known:
                 jobs.append((len(jobs), job[0], "*", executable, cwd, [executable, *skips], False))
@@ -3721,7 +3716,7 @@ if step.startswith("gpu-"):
     with open(os.path.join(work, "gpu-env.log"), "a") as log:
         log.write(f"{sequence}\t{step}\t{os.environ.get('BINDGEN_EXTRA_CLANG_ARGS', '-')}\t{os.environ.get('BROAD_MUTATION_STEP_COMMAND', '-')}\n")
     running = "     Running tests/gpu_pair.rs (target/release/deps/gpu_pair-0123456789abcdef)"
-    if step == "gpu-test-checker-tier":
+    if step == "gpu-test-verification":
         if action in ("ok", "gpu-pass"):
             print(running)
             print("test gpu_case ... ok")
@@ -3850,15 +3845,15 @@ SELFTEST_SOURCES = {
 }
 # 序号 → 假的一步怎么答（没写的步答 0）：各种结局，两段各有；第二段的两种测试步各答一次；退 104 是认不出的退出码（记驱动错，第 8 条在第二段，状态是只过了第一段）
 SELFTEST_PLAN = [("1", "one-test", "fail-nextest"), ("2", "one-build", "fail-compile"), ("3", "one-test", "exit:104"),
-                 ("5", "two-test-doc", "fail-cargo"), ("6", "one-test", "exit:104"), ("7", "two-test-checker-tier", "fail-cargo"),
-                 ("8", "two-test-checker-tier", "exit:104")]
+                 ("5", "two-test-doc", "fail-cargo"), ("6", "one-test", "exit:104"), ("7", "two-test-verification", "fail-cargo"),
+                 ("8", "two-test-verification", "exit:104")]
 SELFTEST_EXPECTED = {"1": ("caught", "one"), "2": ("unviable", "one"), "3": (DRIVER_ERROR, "one"), "4": ("missed", "two"),
                      "5": ("caught", "two"), "6": (DRIVER_ERROR, "one"), "7": ("caught", "two"), "8": (DRIVER_ERROR, "two")}
 # 第 5 条（文档测试那一步）与第 7 条（验证包那一步）都抓到了、但 libtest 的日志里没有 Running 行，抓到它的测试认不出，两条都算拒算
 SELFTEST_EXPECTED_SUMMARY = "total=8 caught=3 missed=1 unviable=1 stage_one_only=1 driver_error=2 not_run=0 refused=2 unlisted_units=0"
 SELFTEST_STAGE_TWO_CASE = "tests::the_stage_two_case"   # fail-cargo 那一步（假 cargo test）头一条红的用例名
-SELFTEST_STAGE_TWO_STEPS = ["two-test-doc", "two-build-checker-tier", "two-test-checker-tier"]
-SELFTEST_BUILD_STEPS = ("one-build", "two-build-checker-tier", "two-build-debug")   # 编译步：基线键拒算、每趟照跑
+SELFTEST_STAGE_TWO_STEPS = ["two-test-doc", "two-build-verification", "two-test-verification"]
+SELFTEST_BUILD_STEPS = ("one-build", "two-build-verification", "two-build-debug")   # 编译步：基线键拒算、每趟照跑
 SELFTEST_NEXTEST_CASE = "singlefs-format::catching the_case_that_catches_it"
 SELFTEST_CATCHING_CASE = "singlefs-format::catching_cases catching_one"
 SELFTEST_JUDGING_KEY = "selftest-judging-units"
@@ -4059,7 +4054,7 @@ class Selftest:
         return {sequence: entry["state"] for sequence, entry in self.listed(home, source).items()}
 
     def build_leftovers(self, home):
-        """跑完之后库目录里还剩的编译目录与树副本（相对库目录）：runs/ 下的每一个运行目录，与改前放在库目录里的那几样（tree、target、target-coverage、scratch）。"""
+        """跑完之后库目录里还剩的编译目录与树副本（相对库目录）：runs/ 下的每一个运行目录，与库目录里直接放着的那几样（tree、target、target-coverage、scratch；弄坏开关 build-directory-in-home 下才有）。"""
         home_path = os.path.join(self.work, home)
         runs = os.path.join(home_path, "runs")
         found = [os.path.join("runs", name) for name in sorted(os.listdir(runs))] if os.path.isdir(runs) else []
@@ -4257,7 +4252,7 @@ def selftest_basic_cells(selftest):
     table = {step[0]: step[3] for step in step_table(argparse.Namespace(threads=3, stage_two_eatmydata=False))}
     commands_are_right = (
         table.get("two-test-doc") == ["cargo", "test", "--locked", "--doc", "-p", "singlefs-core", "-p", "singlefs-checker"]
-        and table.get("two-test-checker-tier") == ["cargo", "test", "--locked", "--release", "-p", VERIFICATION_PACKAGE, "--lib", "--tests"]
+        and table.get("two-test-verification") == ["cargo", "test", "--locked", "--release", "-p", VERIFICATION_PACKAGE, "--lib", "--tests"]
         and table.get("one-test", [])[:3] == ["eatmydata", "cargo", "nextest"]
         and not any(name.startswith("two-test") and command[-len(table["one-test"]):] == table["one-test"] for name, command in table.items()))
     selftest.check(stage_two_of_four == SELFTEST_STAGE_TWO_STEPS and commands_are_right,
@@ -4531,9 +4526,9 @@ def selftest_prune_cells(selftest):
     coverage_one = {"tests": [["fake-package::fake_target", "covers_one"], ["fake-package::fake_target", "covers_two"]],
                     "jobs": [{"binary": "fake-package::fake_target", "test": "covers_one", "covered": [[core, "one"]], "profiles": 1, "exit": 0},
                              {"binary": "fake-package::fake_target", "test": "covers_two", "covered": [[core, "two"]], "profiles": 1, "exit": 0}], "failed": []}
-    coverage_two = {"tests": [["checker:tier_one", "*"], ["checker:lib", "*"]],
-                    "jobs": [{"binary": "checker:tier_one", "test": "*", "covered": [[core, "one"]], "profiles": 1, "exit": 0},
-                             {"binary": "checker:lib", "test": "*", "covered": [], "profiles": 1, "exit": 0}], "failed": []}
+    coverage_two = {"tests": [["verification:covering_target", "*"], ["verification:lib", "*"]],
+                    "jobs": [{"binary": "verification:covering_target", "test": "*", "covered": [[core, "one"]], "profiles": 1, "exit": 0},
+                             {"binary": "verification:lib", "test": "*", "covered": [], "profiles": 1, "exit": 0}], "failed": []}
     for name, content in (("coverage-one", coverage_one), ("coverage-two", coverage_two)):
         with open(os.path.join(work, name + ".json"), "w") as handle:
             json.dump(content, handle)
@@ -4545,10 +4540,10 @@ def selftest_prune_cells(selftest):
     picked = {(entry[0], entry[1]): list(entry[2:]) for entry in selftest_selections(selftest)}
     rows = {row["sequence"]: row for row in selftest.rows("prune")}
     expected = {("1", "one-test"): ["1 tests"],
-                ("1", "two-test-checker-tier"): ["tier_one"], ("1", "two-test-doc"): ["all"],
+                ("1", "two-test-verification"): ["covering_target"], ("1", "two-test-doc"): ["all"],
                 ("3", "two-test-doc"): ["all"], ("0", "one-test"): ["all"]}
     selftest.check(ran.returncode == 0 and all(picked.get(key) == value for key, value in expected.items())
-                   and not any(key in picked for key in (("3", "one-test"), ("3", "two-test-checker-tier")))
+                   and not any(key in picked for key in (("3", "one-test"), ("3", "two-test-verification")))
                    and ("3", "one-build") in picked and rows.get("3", {}).get("outcome") == "missed" and "零覆盖" in rows.get("3", {}).get("note", ""),
                    f"按覆盖挑测试、第二段按二进制、文档测试每次跑不对（退 {ran.returncode}；各步 {sorted(picked.items())}；第 3 条 {rows.get('3')}）：{ran.stderr[-400:]}",
                    "看 Judgement.selection（执行到容器单元的测试、第二段执行到它的二进制）、Runner.ensure_coverage、Runner.command_for（挑空的步不跑，文档测试一直跑）")
@@ -4628,7 +4623,7 @@ def selftest_prune_cells(selftest):
                    f"每条都抓到的提交门禁没判绿（退 {green.returncode}）：{green.stdout[-300:]}{green.stderr[-300:]}",
                    "看 summarise：抓到、没红、无效都算有结论，没红为零、没有单元缺清单才绿")
     # 第二段基线红：报拒绝、点名红的测试、给出路
-    selftest.write_plan([("0", "two-test-checker-tier", "fail-cargo")])
+    selftest.write_plan([("0", "two-test-verification", "fail-cargo")])
     red = selftest.run("stage-two-red", "--item", "4")
     selftest.write_plan(SELFTEST_PLAN)
     selftest.check(red.returncode == EXIT_BASELINE_RED and SELFTEST_STAGE_TWO_CASE in red.stderr and "修好之前这一道过不去" in red.stderr and "crash_identity" in red.stderr,
@@ -4815,7 +4810,7 @@ def selftest_baseline_threads_cells(selftest):
 
 def selftest_baseline_key_cells(selftest):
     """基线键（文件头「基线」）：编译步拒算、每趟照跑；测试步的键按它跑到的测试的单元闭包取——改一个不在任何测试闭包里的函数（core 的 six），
-    第一段测试那一步的基线照样沿用、不重跑；改抓到它的那条 harness 测试的函数体，那一步的基线重跑。弄坏开关 baseline-by-packages（包级）下这一格必须判错。"""
+    第一段测试那一步的基线照样沿用、不重跑；改抓到它的那条第一段测试的函数体，那一步的基线重跑。弄坏开关 baseline-by-packages（包级）下这一格必须判错。"""
     core, catching = "crates/singlefs-core/src/lib.rs", "crates/singlefs-format/tests/catching.rs"
     changed_core = SELFTEST_CORE.replace("pub fn six() -> u32 {\n", "pub fn six() -> u32 {\n    let _unused = 0;\n")
     source = selftest_source_copy(selftest, "baseline-key-source")
@@ -4839,7 +4834,7 @@ def selftest_baseline_key_cells(selftest):
     selftest.check((first.returncode, outside.returncode, inside.returncode) == (0, 0, 0) and first_baselines == ["one-build", "one-test"]
                    and outside_baselines == ["one-build"] and "基线 one-build：基线键拒算" in outside.stdout and inside_baselines == ["one-build", "one-test"],
                    f"基线键没按这一步跑到的判定的单元闭包取（头一趟退 {first.returncode}、基线 {first_baselines}；改了不在测试闭包里的 six 之后退 {outside.returncode}、"
-                   f"基线 {outside_baselines}；改了那条 harness 测试之后退 {inside.returncode}、基线 {inside_baselines}）：{outside.stdout[-400:]}{inside.stderr[-300:]}",
+                   f"基线 {outside_baselines}；改了那条第一段测试之后退 {inside.returncode}、基线 {inside_baselines}）：{outside.stdout[-400:]}{inside.stderr[-300:]}",
                    "看 Judgement.baseline_key 与 Runner.baseline_key_of：测试步的键只取它跑到的测试（连同条目级宏调用）各自的单元闭包键、命令与全局那几行，"
                    "不取包里全部单元的指纹、不带步名与 form；编译步拒算，这一趟用 run_token 算一把独有的键照跑")
 
@@ -4861,7 +4856,7 @@ def selftest_baseline_entry_cells(selftest):
             with open(path) as handle:
                 for line in handle:
                     fields = line.rstrip("\n").split("\t")
-                    if len(fields) >= 3 and fields[0] == str(BASELINE_SEQUENCE) and fields[1] in ("one-test", "two-test-checker-tier"):
+                    if len(fields) >= 3 and fields[0] == str(BASELINE_SEQUENCE) and fields[1] in ("one-test", "two-test-verification"):
                         text = fields[2]
                         found.setdefault(fields[1], []).append(json.loads(text[len("per-entry "):]) if text.startswith("per-entry ") else text)
         return found
@@ -4884,18 +4879,18 @@ def selftest_baseline_entry_cells(selftest):
         selftest.write_mutants(selftest.mutants)
         selftest.write_plan(SELFTEST_PLAN)
     stage_one_binary = "singlefs-format::per_entry"
-    checker_parts = [selection.get("part") if isinstance(selection, dict) else selection for selection in first_selections.get("two-test-checker-tier", [])]
+    verification_parts = [selection.get("part") if isinstance(selection, dict) else selection for selection in first_selections.get("two-test-verification", [])]
     inside_tests = inside_selections.get("one-test", [{}])
     selftest.check((first.returncode, outside.returncode, inside.returncode) == (0, 0, 0)
-                   and first_selections.get("one-test") == ["all"] and checker_parts == ["whole", "skip", "exact"]
+                   and first_selections.get("one-test") == ["all"] and verification_parts == ["whole", "skip", "exact"]
                    and outside_selections.get("one-test") == [{"tests": [[stage_one_binary, "refused_third"]], "binaries": []}]
-                   and outside_selections.get("two-test-checker-tier") == [{"binaries": ["singlefs-verification"], "part": "exact"}]
+                   and outside_selections.get("two-test-verification") == [{"binaries": ["singlefs-verification"], "part": "exact"}]
                    and "按条记基线" in outside.stdout
                    and len(inside_tests) == 1 and isinstance(inside_tests[0], dict)
                    and sorted(test for _binary, test in inside_tests[0].get("tests", [])) == ["kept_first", "refused_third"],
                    f"基线没按条记：一步里收得全的测试没各自沿用、或拒算的那几条没照跑（头一趟退 {first.returncode}、第一段测试步 {first_selections.get('one-test')}、"
-                   f"验证包 {checker_parts}；改了不在测试闭包里的 six 之后退 {outside.returncode}、第一段测试步 {outside_selections.get('one-test')}、"
-                   f"验证包 {outside_selections.get('two-test-checker-tier')}；改了 kept_first 之后退 {inside.returncode}、"
+                   f"验证包 {verification_parts}；改了不在测试闭包里的 six 之后退 {outside.returncode}、第一段测试步 {outside_selections.get('one-test')}、"
+                   f"验证包 {outside_selections.get('two-test-verification')}；改了 kept_first 之后退 {inside.returncode}、"
                    f"第一段测试步 {inside_selections.get('one-test')}）：{outside.stdout[-400:]}{outside.stderr[-300:]}{inside.stderr[-300:]}",
                    "看 Judgement.baseline_entry_plan 与 Runner.ensure_entry_baseline：基线键拒算的测试步按条记（一条测试、验证包一个二进制一份记录，键是各自的单元闭包键），"
                    "找得到记录的沿用、不再跑，只照跑找不到的与拒算的那几条，不整步照跑")
@@ -4940,7 +4935,7 @@ FRESH_BUILD_COMMIT_TIME_NS = 1_790_000_000 * 10 ** 9    # 自证里的「源码�
 
 def selftest_fresh_build_cells(selftest):
     """每一趟自己的编译目录（文件头「库目录」runs/）：同一份源码（mtime 早于产物）连跑两趟，第二趟的编译目录是新建的，两个包都从头编，
-    不照用上一趟编的产物；两趟跑完库目录里都不剩运行目录、也没有改前放在库目录里的树与编译目录（正常结束那一种结局）。"""
+    不照用上一趟编的产物；两趟跑完库目录里都不剩运行目录、也没有直接放在库目录里的树与编译目录（正常结束那一种结局）。"""
     work = selftest.work
     core_extra = "crates/singlefs-core/src/extra.rs"
 
@@ -5041,11 +5036,11 @@ stub = types.SimpleNamespace(rules=rules, tree=tree, exclusions=[])
 runnable = sorted(entry["test"] for entry in driver.Judgement.runnable(stub, ("singlefs-format",)))
 runner = types.SimpleNamespace(skip_names=["alpha_case", "tool_case"])
 base = ["cargo", "test", "--locked", "--release", "-p", driver.VERIFICATION_PACKAGE, "--lib", "--tests", "--no-fail-fast"]
-commands = {"plain": driver.Runner.command_with_skips(runner, "two-test-checker-tier", base),
-            "exact": driver.Runner.command_with_skips(runner, "two-test-checker-tier", base + ["--", "--exact", "a_case"]),
+commands = {"plain": driver.Runner.command_with_skips(runner, "two-test-verification", base),
+            "exact": driver.Runner.command_with_skips(runner, "two-test-verification", base + ["--", "--exact", "a_case"]),
             "other": driver.Runner.command_with_skips(runner, "one-test", ["cargo", "nextest"]),
             "gpu": driver.Runner.command_with_skips(runner, driver.GPU_TEST_STEP, driver.gpu_pass_command("test", ["gpu"], ["lib"])),
-            "none": driver.Runner.command_with_skips(types.SimpleNamespace(skip_names=[]), "two-test-checker-tier", base)}
+            "none": driver.Runner.command_with_skips(types.SimpleNamespace(skip_names=[]), "two-test-verification", base)}
 print(json.dumps({"quick": quick, "exclusions": exclusions, "nothing": nothing, "runnable": runnable, "commands": commands, "base": base}))
 '''
 
@@ -5068,7 +5063,7 @@ def selftest_registered_cells(selftest):
     selftest.check(commands["plain"] == base + ["--"] + skips and commands["exact"] == base + ["--", "--exact", "a_case"] + skips and commands["other"] == ["cargo", "nextest"]
                    and commands["gpu"][-len(skips):] == skips and "--nocapture" in commands["gpu"] and commands["none"] == base,
                    f"登记的崩溃枚举用例与放量分项没经 --skip 排掉：第二段 验证包与 GPU 那一趟的测试步命令不对（{commands}）",
-                   "看 Runner.command_with_skips：两个测试步（two-test-checker-tier、GPU 的测试步）接 --skip，命令里已有 `--` 的接在后面，没有的补一个，别的步和没有登记时原样")
+                   "看 Runner.command_with_skips：两个测试步（two-test-verification、GPU 的测试步）接 --skip，命令里已有 `--` 的接在后面，没有的补一个，别的步和没有登记时原样")
     expected = [[binary, test, driver_reason] for (binary, test), driver_reason in ((pair, REGISTERED_REASON) for pair in found["quick"])]
     selftest.check(found["quick"] and found["exclusions"] == expected and found["nothing"] == [],
                    f"登记的崩溃枚举用例没进排除单：验证包里对上的静态测试没被排掉（对上的 {found['quick']}；排除单 {found['exclusions']}；没对上的 {found['nothing']}）",
@@ -5166,7 +5161,7 @@ def selftest_stop_cells(selftest):
                    and rerun.returncode == 0 and rows_of_one == ["caught"],
                    f"被 TERM 停时在途那一步没有连同它的进程组一起停（那一步{'挂住了' if hanging else '没起来'}；驱动退 {driver.returncode}；那一步的进程 {step_processes}、"
                    f"{'都停了' if all_stopped else '还有活着的'}；紧接着重跑退 {rerun.returncode}、第 1 条各行 {rows_of_one}）：{errors[-600:]}{rerun.stderr[-300:]}",
-                   "看 Runner.run_step（start_new_session：一步起在自己新开的进程组里）与 Runner.stop_step（给那一组发 TERM，到 --stop-grace 秒还有活着的就 KILL）")
+                   "看 Runner.run_step（start_new_session：一步起在自己新开的进程组里）里 Stopped 那一支（给那一组发 TERM，到 --stop-grace 秒还有活着的就 KILL）")
 
 
 def gpu_item_lines(output, prefix="BROAD_MUTATION_GPU_ITEM"):
@@ -5225,7 +5220,7 @@ def selftest_gpu_cells(selftest):
                        "GPU 那一趟的结局没有单独存进 GPU 判定表（判定表 verdicts/ 里只该有 CPU 那一趟的三行）", "看 record_gpu_verdict：GPU 趟的判定行落 gpu-verdicts/，CPU 那一趟的 verdicts/ 一行不改")
 
         # ② 只有 GPU 红：CPU 那一趟都没红；第 1 条 GPU 的结果行被 --nocapture 打散（认名字靠 failures: 名单），第 2 条是整齐的结果行 ⇒ 合起来都是抓到
-        ran = gpu_run("gpu-gpu-red", [("1", "gpu-test-checker-tier", "gpu-fail-scrambled"), ("2", "gpu-test-checker-tier", "gpu-fail")], *two)
+        ran = gpu_run("gpu-gpu-red", [("1", "gpu-test-verification", "gpu-fail-scrambled"), ("2", "gpu-test-verification", "gpu-fail")], *two)
         gpu_rows = {row["sequence"]: row for row in selftest.gpu_rows("gpu-gpu-red")}
         items = gpu_item_lines(ran.stdout)
         summary = summary_of("gpu-gpu-red")

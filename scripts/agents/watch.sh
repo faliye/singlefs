@@ -24,19 +24,19 @@
 # 弄坏开关（只给 --selftest 证红用；自证不逐个打开，打开后跑 --selftest 核红在点名那一格）：平常跑设了就在一切之前退 2、点名变量只在自证里认，自证起的子进程由 WATCH_SELFTEST_MARK 认。
 #   WATCH_BREAK=rootfreekeydropped  root-free-gib-alert 这个键读了不转成选项（键表里新加的键自证不核的样子）
 #       自检⑩（「✗ 自检⑩：键表里这些键没转成同名的长选项」）
-#   WATCH_BREAK=ackcommajoined  --ack 的逗号连写不拆，整串原样当一条交过去（改前的样子：连写的几个进程照报）
+#   WATCH_BREAK=ackcommajoined  --ack 的逗号连写不拆，整串原样当一条交过去（连写的几个进程照报）
 #       自检⑨（「✗ 自检⑨：--ack 逗号连写没拆成一条一个 --ack」）、自检⑪（「✗ 自检⑪：--ack 类:<告警名> 没原样转过去」）
-#   WATCH_BREAK=ackscopeform  --ack 只认「进程:」与「<agent 号>:」两种头（改前的样子：类: 被当成形态不对拒绝）
+#   WATCH_BREAK=ackscopeform  --ack 只认「进程:」与「<agent 号>:」两种头（类: 被当成形态不对拒绝）
 #       自检⑪（「✗ 自检⑪：--ack 类:<告警名> 没原样转过去」）、
 #       自检⑬（「✗ 自检⑬：--ack 类:根分区余量过低 经 watch.sh 起的看门狗子进程应当确认那一类告警」、「✗ 自检⑬：--ack 类:交回之后后台还在跑 不该确认别的类的告警」）、
 #       自检⑭（「✗ 自检⑭：watch.conf 里推荐的 --ack 类:根分区余量过低 过不了 watch.sh」、「✗ 自检⑭：agent-watch.py 文件头里推荐的 --ack 类:根分区余量过低 过不了 watch.sh」、
 #       「✗ 自检⑭：看门狗打出的告警里推荐的 --ack 类:根分区余量过低 过不了 watch.sh」）
 #   WATCH_BREAK=ackclassfiltered  自检⑬里真起的看门狗子进程带 AGENT_WATCH_BREAK=ackclassfiltered：agent-watch.py 的 acknowledgements() 滤掉 类: 开头的键（--ack 类:<告警名> 经真起的看门狗不起作用，被确认的那一类告警照样叫醒）
 #       自检⑬（「✗ 自检⑬：--ack 类:根分区余量过低 经 watch.sh 起的看门狗子进程应当确认那一类告警」）
-#   WATCH_BREAK=ackrecommendedform  自检⑭把 watch.conf、agent-watch.py 文件头与看门狗告警里推荐的 --ack 写法里的「类:」换回「本机:」再喂 --dry-run（改前的推荐写法，watch.sh 不认）
+#   WATCH_BREAK=ackrecommendedform  自检⑭把 watch.conf、agent-watch.py 文件头与看门狗告警里推荐的 --ack 写法里的「类:」换回「本机:」再喂 --dry-run（「本机:」写法 watch.sh 不认）
 #       自检⑭（「✗ 自检⑭：watch.conf 里推荐的 --ack 本机:根分区余量过低 过不了 watch.sh」、「✗ 自检⑭：agent-watch.py 文件头里推荐的 --ack 本机:根分区余量过低 过不了 watch.sh」、
 #       「✗ 自检⑭：看门狗打出的告警里推荐的 --ack 本机:根分区余量过低 过不了 watch.sh」）
-#   WATCH_BREAK=session-directory-from-home  会话目录退回 $HOME 接本脚本所在的仓路径（改前的样子：设了 TASK_SERVER_SOURCE_REPOSITORY 也不用，HOME 指到别处就找错）
+#   WATCH_BREAK=session-directory-from-home  会话目录取 $HOME 接本脚本所在的仓路径（设了 TASK_SERVER_SOURCE_REPOSITORY 也不用，HOME 指到别处就找错）
 #       自检⑫（「✗ 自检⑫：设了 TASK_SERVER_SOURCE_REPOSITORY、HOME 指到别处时，--processes 没带来源仓的会话目录」、
 #       「✗ 自检⑫：设了 TASK_SERVER_SOURCE_REPOSITORY、HOME 指到别处时，不给 agent 号的 --discover 没带来源仓的会话目录」、
 #       「✗ 自检⑫：设了 TASK_SERVER_SOURCE_REPOSITORY、HOME 指到别处时，--report 没带来源仓的会话目录」、「✗ 自检⑫：来源仓根不是绝对路径时应当退 2 并写出路」）、
@@ -63,7 +63,7 @@ die() { echo "  ✗ $1" >&2; echo "     → 怎么办：$2" >&2; exit 2; }
 
 # 本仓的会话目录（<家目录>/.claude/projects/<仓路径把 / 换成 ->，各会话的 <会话号> 目录在它底下）：统一任务服务给任务的来源仓根 TASK_SERVER_SOURCE_REPOSITORY 定仓路径与家目录
 # （本机与第二台都给本机那份仓的绝对路径，会话记录在第二台挂在同一绝对路径，第二台的 $HOME 是另一个，不用它）；没有这个变量（服务外手跑）取本脚本所在的仓与本机家目录。
-# 取法只在 lib_session_directory.py 里；取不到它已把 ✗ 与出路写到标准错误，这里退 2。弄坏开关 WATCH_BREAK=session-directory-from-home 退回改前的 $HOME 接仓路径（自检⑫红）。
+# 取法只在 lib_session_directory.py 里；取不到它已把 ✗ 与出路写到标准错误，这里退 2。弄坏开关 WATCH_BREAK=session-directory-from-home 取 $HOME 接仓路径（自检⑫红）。
 repository_session_directory() {
   if [[ "${WATCH_BREAK:-}" == session-directory-from-home ]]; then
     printf '%s\n' "$HOME/.claude/projects/${root//\//-}"
@@ -204,7 +204,7 @@ selftest() {
   fi
   checked=$((checked + 1))
   # ⑬ --ack 类:<告警名> 经真起的看门狗子进程：watch.sh 不给 agent 号（走 --discover）起真的 agent-watch.py，三趟各用自己的状态目录：
-  # 不给 --ack 时报「根分区余量过低」退 3；--ack 类:根分区余量过低 时那一条只进报告（max-minutes=0，第一轮整查完就到点，退 4）、不再叫醒；
+  # 不给 --ack 时报「根分区余量过低」退 3；--ack 类:根分区余量过低 时那一条只进报告（max-minutes=0，整查完一次就到点，退 4）、不再叫醒；
   # --ack 的是别的类（类:交回之后后台还在跑）时「根分区余量过低」照报、退 3。告警靠环境变量把根分区可用量设成 40 GiB 造出来（阈值 128 GiB 下过线），
   # 状态目录、会话登记、草稿根都指到临时目录，会话目录是 ⑫ 造的空目录，不连真服务。
   # 弄坏开关 WATCH_BREAK=ackclassfiltered 给这几只子进程带 AGENT_WATCH_BREAK=ackclassfiltered（acknowledgements() 滤掉 类: 开头的键），第二趟的确认失效，这一格红
@@ -236,7 +236,7 @@ selftest() {
   fi
   checked=$((checked + 1))
   # ⑭ 文件与告警里推荐的 --ack 写法，原样喂 watch.sh --dry-run 看收不收：watch.conf 里根分区余量那一条、agent-watch.py 文件头的那一句、⑬ 里真起的看门狗打出的告警出路；
-  # 推荐写法过不了 watch.sh（改前推荐 --ack 本机:根分区余量过低，被拒「不是 --ack 认的形态」）就红，找不到推荐写法的也红（没有东西可判）。
+  # 推荐写法过不了 watch.sh（例如推荐 --ack 本机:根分区余量过低，被拒「不是 --ack 认的形态」）就红，找不到推荐写法的也红（没有东西可判）。
   # 弄坏开关 WATCH_BREAK=ackrecommendedform 把取到的写法里的「类:」换回「本机:」再喂，这一格红
   recommended_ack_accepted() {   # $1：推荐写法出在哪；$2：从那里取出来的写法，一行一个
     local label="$1" forms="$2" form dry_output
@@ -282,7 +282,7 @@ while (($#)); do
       (($#)) || die "--ack 后面没给要确认的告警" "写成 --ack <agent 号>:<告警名>，进程告警写 --ack 进程:<pid>，一类告警写 --ack 类:<告警名>"
       [[ "$1" =~ $ack_head ]] || die "「$1」不是 --ack 认的形态" "写成 <agent 号>:<告警名>（告警名照看门狗报出来的那个，例如 上下文过大），或 进程:<pid>、类:<告警名>；几条可逗号连写，头一条也要是这几种形态"
       if [[ "${WATCH_BREAK:-}" == ackcommajoined ]]; then
-        acks+=(--ack "$1")   # 弄坏开关：逗号连写不拆（改前的样子）
+        acks+=(--ack "$1")   # 弄坏开关：逗号连写不拆
       else
         # 逗号连写（文件头 --ack 那一行）：逗号后面接「进程:」「类:」或「<agent 号>:」的才是下一条，别的逗号留在前一条的告警名里
         ack_entries=()

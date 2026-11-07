@@ -9,7 +9,7 @@
     agent-cost.py dispatch [--root …] [--since …] [--until …]      # 派发按类型、派发闸与钩子的拒绝、重复派发、消息、看门狗退出码
     agent-cost.py outcome  [--root …] [--since …] [--until YYYY-MM-DD] [--repo 仓根] [--summary] [--jobs N] [--out 文件]
                                                                    # 每个子 agent 一行的结局账，再汇总；--until 只收那一天及之前开工的（含那一天，不给不设上界）；
-                                                                   # --summary 只打汇总；--jobs 读会话记录的进程数（默认 12 与每台默认重活线程数取小）；成功句报 --since、--until 的取值
+                                                                   # --summary 只打汇总；--jobs 读会话记录的进程数（默认取每台默认重活线程数）；成功句报 --since、--until 的取值
                                                                    # --out 把同一份输出（连同成功句）落进那个文件：排他新建，文件已在就拒（退 2，什么都不算、不写）、
                                                                    # 给出路；写完回读，与标准输出逐字相同才退 0，不同就删掉这次建的文件、退 1；窗口里没有子 agent（退 77）时不建文件。
                                                                    # 每批收尾落账的写法：outcome --since <批开工那天> --until <收尾那天> --summary --out <那一轮调度记录目录>/<轮>-outcome-<日期>.txt
@@ -37,11 +37,11 @@ outcome 的口径（桶名照 records/2026-10-22-子agent结果落地审计.md�
     循环拼出来的，把那一段当通配与目录名对；同一条命令里赋过的变量先展开）。交回里的路径取到空白、引号、括号、全角标点为止，扩展名后面直接粘着的汉字说明也去掉，
     去掉粘在后面的全角括号与说明文字。两个子 agent 共用同一个目录名时，按目录名点到的只算在下一个共用者开工之前（按完整路径、agent 号点到的不受此限）。
   草稿目录：子 agent 派发提示（首条记录）里行首「草稿目录：」那一行点名的路径，取第一个；认法只在 .claude/hooks/lib_prompt_scratch_line.py 的 scratch_line_values
-    （列表、引用记号、粗体起头的，句中转述的，闭合了的围栏代码块里的都不认；原来一行里哪都认，见弄坏开关 draft-anywhere-in-line）。
+    （列表、引用记号、粗体起头的，句中转述的，闭合了的围栏代码块里的都不认；一行里哪都认的是弄坏开关 draft-anywhere-in-line）。
   桶：三方腿类型（--repo 那棵树的 .claude/agents 里定义 frontmatter 写了 leg: three-way 的，经 .claude/hooks/lib_three_way_legs.py 读；
     派发闸、交回闸与骨架读同一处，拆分提案第九十节 ⑯；材料员这类以 three-way 起头而没登记的按别的类型分桶）交回了的分两桶：交回里点名的 research/prompts/<轮>-*-output.md 有一份在工作树（git worktree list 列出的每一棵）
     或 git 历史（所有分支加 HEAD，删过的也算）里、且同轮的 research/prompts/<轮>-main-verification.md 也在（轮名取 -output 前面最长的、有判决的那一段前缀）的
-    记 verdict-archived，其余记 three-way-report-or-verdict-missing（攻方 landing-audit-r2 K3-2：原来按类型名一律记有效）；
+    记 verdict-archived，其余记 three-way-report-or-verdict-missing；
     没交回的按最后一句分 cut-by-api-error、in-flight（最后一条记录距此刻不到
     30 分钟）、stopped-salvaged（中途停下，但后来有人点到）、stopped-abandoned（中途停下，没人点到；被停掉的与别的原因中途断掉的都在这里）；交回了的写了不少于 10 行的按落地率分 written-landed（不低于 70%）、
     written-partial（30% 到 70%）、written-overwritten（更低，主 agent 点到过）、written-unused（更低，没人点到）；其余按引用分 report-used-by-main、
@@ -71,21 +71,21 @@ outcome 的口径（桶名照 records/2026-10-22-子agent结果落地审计.md�
       连带红的格：「✗ 自检：花费：每个子 agent 折算 1000 + 5 × 100 = 1500，合计应当 31500、三方腿 1 个应当 1500」
   AGENT_COST_BREAK=leg-types-by-prefix  三方腿类型退回按类型名 three-way 开头认（three_way_leg_types_of、is_three_way_leg），不读定义 frontmatter 的 leg: three-way
       三方腿类型表（「✗ 自检：三方腿类型表：」）
-  AGENT_COST_BREAK=draft-anywhere-in-line  草稿目录退回改前的认法：派发提示里「草稿目录：」在一行里哪都认（句中转述、列表里的、闭合了的围栏代码块里的也认），取第一个
+  AGENT_COST_BREAK=draft-anywhere-in-line  草稿目录改成宽松的认法：派发提示里「草稿目录：」在一行里哪都认（句中转述、列表里的、闭合了的围栏代码块里的也认），取第一个
       草稿目录认法（「✗ 自检：草稿目录认法：」）
-  AGENT_COST_BREAK=main-session-by-mtime  records_between() 不看每条记录的时刻，主会话整份收（改前：会话文件修改时刻不早于 --since 就整份算进去）
+  AGENT_COST_BREAK=main-session-by-mtime  records_between() 不看每条记录的时刻，主会话整份收（会话文件修改时刻不早于 --since 就整份算进去）
       主会话按记录时刻切天（「✗ 自检：主会话按记录时刻切天：」）
   AGENT_COST_BREAK=outcome-out-clobber  outcome --out 不排他：文件已在也不拒，整份覆盖
       结局账落盘（「✗ 自检：结局账落盘：」）
 同目录 lib_session_directory.py 的开关（判法在那一份，开关表也在它的文件头），打开后这里红的项：
-  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也照改前取 HOME（家目录接脚本自己所在的仓路径）
+  SESSION_DIRECTORY_BREAK=home-from-environment  设了 TASK_SERVER_SOURCE_REPOSITORY 也仍取 HOME（家目录接脚本自己所在的仓路径）
       默认会话目录取来源仓根（「✗ 自检：默认会话目录取来源仓根：」）、不给 --root（「✗ 自检：不给 --root 时 run_command 应当按来源仓根取会话目录」）
 同目录 subagent_transcript.py 的两个开关（判法在那一份，开关表也在它的文件头），打开后这里红的项：
   SUBAGENT_TRANSCRIPT_BREAK=refused-counts-delivered  被交回闸拒的交回也算送达
       交回与起点（「✗ 自检：交回与起点：outcome 应当收…」「✗ 自检：交回与起点：timing 应当收 3 个…」）
   SUBAGENT_TRANSCRIPT_BREAK=start-by-mtime  起点取文件修改时刻，不读首条记录
       交回与起点（「✗ 自检：交回与起点：outcome 应当收…」）、结局账落盘（「✗ 自检：结局账落盘：」：样本的起点被当成此刻，窗口里没有子 agent）
-      连带红的格：「✗ 自检：东京日期切天：outcome --since 2026-10-21 --until 2026-10-21 应当收东京 2026-10-21 零点刚过与深夜开工的两个」
+      连带红的格：「✗ 自检：东京日期切天：outcome --since 2026-10-21 --until 2026-10-21 应当收东京 2026-10-21 零点刚过与深夜开工的两个」 history-kept: 引的是自证失败行原文，日期是自证输入的数据
 """
 import ast
 import bisect
@@ -138,7 +138,7 @@ AGENT_ID = re.compile(r"a[0-9a-f]{16}")
 
 def day_start(day):
     """--since / --until 写的 YYYY-MM-DD → 那一天零点（东京日期）；弄坏开关 day-cut-by-record-zone 下退回按会话记录时间戳的时区切。"""
-    zone = UTC if BROKEN == "day-cut-by-record-zone" else DATE_ZONE   # clock-times:allow 弄坏开关退回改前按会话记录时间戳的时区切天
+    zone = UTC if BROKEN == "day-cut-by-record-zone" else DATE_ZONE   # clock-times:allow 弄坏开关改成按会话记录时间戳的时区切天
     return datetime.datetime.fromisoformat(day).replace(tzinfo=zone)
 
 
@@ -192,7 +192,7 @@ def recent(path, since):
 
 def records_between(path, since, until=None):
     """主会话记录里时刻落在 [since, until) 的那些条（文件头「主会话 … 按每条记录自己的时刻筛」；窗口由 window_bounds 按东京日期给）。
-    不带时刻的元数据条不收；时间戳不带时区的按零时区补上。弄坏开关 main-session-by-mtime 下整份收（改前的样子）。"""
+    不带时刻的元数据条不收；时间戳不带时区的按零时区补上。弄坏开关 main-session-by-mtime 下整份收。"""
     for record in records(path):
         if BROKEN == "main-session-by-mtime":
             yield record
@@ -447,7 +447,7 @@ HISTORY_MARGIN_DAYS = 6            # git 历史往 --since 之前多取几天
 LANDED_AT, PARTIAL_AT, WRITTEN_MINIMUM = 0.7, 0.3, 10
 IN_FLIGHT_MINUTES = 30
 REWORK_WORDS_BEFORE_FIX = r"修(?!订)|重跑|重派|再派|重做|返工|续做|续派|接续|接手|接着做|（续）|补写|补做|改名|改号|改钉值|第\s*[2-9]\d*\s*次|redispatch|re-?run|renumber|retry|"
-# fix、fixes、fixed 后面要是词尾（连字符不算）：fixture、fixtures、fixed-script 不算（攻方 landing-audit-r2 K3-4）
+# fix、fixes、fixed 后面要是词尾（连字符不算）：fixture、fixtures、fixed-script 不算
 REWORK_WORDS = re.compile(REWORK_WORDS_BEFORE_FIX + r"\bfix(?:es|ed)?(?![\w-])", re.IGNORECASE)
 REWORK_WORDS_FIX_PREFIX_FOR_BREAK = re.compile(REWORK_WORDS_BEFORE_FIX + r"\bfix", re.IGNORECASE)
 NARROW_REWORK_WORDS_FOR_BREAK = re.compile("修|重跑|续做|改名|改号")
@@ -465,7 +465,7 @@ EVENT_TOOLS = ("Bash", "Read", "Edit", "Write", "MultiEdit", "Agent", "Task", "S
 EVENT_TEXT_LIMIT = 30000
 PATH_CHARS = r"[A-Za-z0-9_.\-/~@+=%$一-鿿]"   # ASCII 加汉字（目录名里有「甲」「乙」这类）；全角标点、括号、空白不在里面，路径到那里为止
 WORK_PATH = re.compile(r"(?:~|/home/[^/\s]+)/\.local/share/singlefs/work/" + PATH_CHARS + r"+|/tmp/claude-\d+/" + PATH_CHARS + r"+|research/prompts/" + PATH_CHARS + r"+")
-# 改前的路径写法：只在标点处截断，全角括号与说明文字会粘进路径（弄坏开关 no-path-normalize 退回它）
+# 只在标点处截断的路径写法：全角括号与说明文字会粘进路径（弄坏开关 no-path-normalize 用它）
 OLD_WORK_PATH = re.compile(r"(?:~|/home/[^/\s]+)/\.local/share/singlefs/work/[^\s'\"`)>\]，。；、：:,]+|/tmp/claude-\d+/[^\s'\"`)>\]，。；、：:,]+|research/prompts/[^\s'\"`)>\]，。；、：:,]+")
 PATH_TOKEN = re.compile(r"[^\s'\"`()<>|;&]*/[^\s'\"`()<>|;&]*")
 VARIABLE_ASSIGNMENT = re.compile(r"(?:^|[\s;&(])([A-Za-z_][A-Za-z0-9_]*)=(\"[^\"\n]*\"|'[^'\n]*'|[^\s;&|()]+)")
@@ -727,7 +727,7 @@ def raw_timestamp(line):
 
 def draft_directory_of(prompt):
     """派发提示点名的草稿目录（照写的样子，没展开）：行首「草稿目录：」那几行里的第一个，没有交 None。认法只在 .claude/hooks/lib_prompt_scratch_line.py 的 scratch_line_values。
-    弄坏开关 draft-anywhere-in-line 下退回改前：「草稿目录：」在一行里哪都认，取第一个。"""
+    弄坏开关 draft-anywhere-in-line 下：「草稿目录：」在一行里哪都认，取第一个。"""
     if BROKEN == "draft-anywhere-in-line":
         found = re.search(r"草稿目录[：:]\s*(" + PATH_CHARS + "+)", prompt or "")
         return found.group(1) if found else None
@@ -892,7 +892,7 @@ def wildcard_regex(component):
 def event_tokens(text):
     """一条工具调用文本里和引用有关的记号，各带一个字符的标签：i 是 agent 号，p 是工作目录一类的路径（连同各级上层目录），
     n 是目录名一类的路径段（带连字符、不像文件名），w 是带变量、星号、问号、花括号的这样一段。
-    弄坏开关 no-path-normalize 时只剩 agent 号与旧写法认出的路径，变量不展开、路径段不取。"""
+    弄坏开关 no-path-normalize 时只剩 agent 号与只在标点处截断的写法认出的路径，变量不展开、路径段不取。"""
     normalize = BROKEN != "no-path-normalize"
     tokens = set()
     if normalize and "$" in text:
@@ -1080,14 +1080,14 @@ def leg_output_verdicts(handback_text, known):
 
 def three_way_leg_types_of(repository):
     """outcome 两个三方腿桶收的类型：--repo 那棵树的 .claude/agents 里定义 frontmatter 写了 leg: three-way 的（lib_three_way_legs.py 的 three_way_leg_types）。
-    弄坏开关 leg-types-by-prefix 下退回改前：类型名以 three-way 开头的都算（这里交那棵树里以 three-way 开头的定义名，给自证比集合用）。"""
+    弄坏开关 leg-types-by-prefix 下：类型名以 three-way 开头的都算（这里交那棵树里以 three-way 开头的定义名，给自证比集合用）。"""
     if BROKEN == "leg-types-by-prefix":
         return frozenset(os.path.basename(path)[: -len(".md")] for path in glob.glob(os.path.join(repository, ".claude", "agents", "three-way*.md")))
     return three_way_legs.three_way_leg_types(repository)
 
 
 def is_three_way_leg(agent_type, leg_types):
-    """这个子 agent 的类型进不进三方腿的两个桶；弄坏开关 leg-types-by-prefix 下按类型名 three-way 开头认（改前的判法）。"""
+    """这个子 agent 的类型进不进三方腿的两个桶；弄坏开关 leg-types-by-prefix 下按类型名 three-way 开头认。"""
     return agent_type.startswith("three-way") if BROKEN == "leg-types-by-prefix" else agent_type in leg_types
 
 
@@ -1118,7 +1118,7 @@ def scan_job(kind, path):
     return scan_subagent(path) if kind == "sub" else scan_main_session(path)
 
 
-def collect_outcome(root, since, repository, now, workers=1, until=None):
+def collect_outcome(root, since, repository, now, workers, until=None):
     """起点（首条记录的时刻）落在 [since, until) 里的每个子 agent 一行（until 为 None 不设上界）：
     [{agent, type, description, start, handed_back, cut, bucket, cost, rework, ...}]，与 git 历史、各工作树比对过。
     会话记录按文件分给 workers 个工作进程读（workers 为 1 时在本进程里顺序读）。"""
@@ -1915,7 +1915,7 @@ def run_command(argv):
     if argv[0] == "outcome":
         if workers is None:
             try:
-                workers = min(12, heavy_threads.default_heavy_threads())
+                workers = heavy_threads.default_heavy_threads()
             except heavy_threads.HeavyThreadDefaultError as error:
                 print(f"  ✗ 取不了读会话记录的默认进程数：{error}\n  → 怎么办：{error.howto}；或写 --jobs N")
                 return 2

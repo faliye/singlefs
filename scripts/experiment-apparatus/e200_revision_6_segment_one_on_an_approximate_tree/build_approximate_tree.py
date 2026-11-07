@@ -3,11 +3,12 @@
 造出来的（都在 --output 给的新目录下）：
   tree/            Cargo.toml、Cargo.lock、crates/ 下名字以 .rs 结尾或以 Cargo. 起头的（T1，快照摘要只收这些），加 .cargo/ 下全部与 crates/mutations.tsv
   research-side/   修订 6 那一趟研究一侧十一份（E171（三oracle合谋测试） 研究一侧 JSON 的 files）与没记 sha256 的两份，按仓里的相对路径放
-  manifest.tsv     逐文件清单：place、path、class、status、pinned、marker、source、sha256
+  manifest.tsv     逐文件清单：place、path、class、status、pinned、marker、source、blob、sha256
+blob 列（产物 name=file 行的 blob=）：内容直接取自 git 的那一版的 blob 号（T2、T3 命中的那一个（悬空的也写）、T5）；T4 删行复原的、取今天主工作区的、missing 写 -。
 记号（manifest 的 marker 列，产物 name=file 行的 marker=）：
   exact_head                 T2：不在 94 行里，取 31e47115… 那一版
   exact_pinned               T3：在 94 行里、有钉值；全部提交（含 stash 与 reflog 点到的）里这条路径的某一版或某个悬空 blob，内容 sha256 等于钉值；
-                             source= 写那一版出处的提交号，悬空的写 unreachable
+                             source= 写那一版出处的提交号，悬空的写 unreachable；blob= 写命中的那个 blob 号（登记第一节读法 4 T3「写 blob 号与出处提交」）
   exact_reconstructed        T4：装置 T3 找不到，ab35105f…（提交 f8a9ddaab）删第 3478–3484 行之后等于 67e7a549…
   approximate_device         T4：删完不等于 67e7a549…，照用
   approximate_first_commit   T5：31e47115… 的后代里按提交时刻最早一个、这条路径与 31e47115… 那一版不同的提交；新文件取最早加它的那一个提交
@@ -144,9 +145,10 @@ class Pin:
 
 @dataclasses.dataclass(frozen=True)
 class Choice:
-    """一条路径取的那一版：记号、出处（提交号、unreachable、today、-）、内容（None 是 missing）。"""
+    """一条路径取的那一版：记号、出处（提交号、unreachable、today、-）、blob 号（内容直接取自 git 的那一个；复原的、今天的、missing 是 -）、内容（None 是 missing）。"""
     marker: str
     source: str
+    blob: str
     content: bytes | None
 
 
@@ -398,13 +400,13 @@ def choose_tree_version(repository: GitRepository, path: str, status: str | None
     notes: dict[str, str] = {}
     if status is None:
         t2_blob = repository.blob_at(BASE_COMMIT, path)
-        return Choice(MARKER_EXACT_HEAD, BASE_COMMIT, repository.read_blob(t2_blob)), notes
+        return Choice(MARKER_EXACT_HEAD, BASE_COMMIT, t2_blob, repository.read_blob(t2_blob)), notes
     if pin is not None:
         found = find_pinned(candidates_of(path), sha256_of_blob, pin.target_sha256)
         if path == DEVICE_PATH:
             notes["t3"] = "found" if found else "not_found"
         if found:
-            return Choice(MARKER_EXACT_PINNED, found[1], repository.read_blob(found[0])), notes
+            return Choice(MARKER_EXACT_PINNED, found[1], found[0], repository.read_blob(found[0])), notes
         if path == DEVICE_PATH:
             device_base = repository.read_blob(repository.blob_at(DEVICE_BASE_COMMIT, path))
             notes["device_base_sha256"] = sha256_hex(device_base)
@@ -414,17 +416,17 @@ def choose_tree_version(repository: GitRepository, path: str, status: str | None
                 notes["s44"] = str(problem)
             else:
                 exact = sha256_hex(rebuilt) == REVISION_6_DEVICE_SHA256
-                return Choice(MARKER_EXACT_RECONSTRUCTED if exact else MARKER_APPROXIMATE_DEVICE, DEVICE_BASE_COMMIT, rebuilt), notes
+                return Choice(MARKER_EXACT_RECONSTRUCTED if exact else MARKER_APPROXIMATE_DEVICE, DEVICE_BASE_COMMIT, "-", rebuilt), notes
     base_blob = repository.blob_at(BASE_COMMIT, path)
     if base_blob is None:
         added = first_addition_after_base(versions)
         if added is None:
-            return Choice(MARKER_MISSING, "-", None), notes
-        return Choice(MARKER_FIRST_COMMIT, added.commit, repository.read_blob(added.blob)), notes
+            return Choice(MARKER_MISSING, "-", "-", None), notes
+        return Choice(MARKER_FIRST_COMMIT, added.commit, added.blob, repository.read_blob(added.blob)), notes
     changed = first_change_after_base(versions, base_blob) if variant == VARIANT_FIRST_COMMIT else None
     if changed is None:
-        return Choice(MARKER_APPROXIMATE_HEAD, BASE_COMMIT, repository.read_blob(base_blob)), notes
-    return Choice(MARKER_FIRST_COMMIT, changed.commit, repository.read_blob(changed.blob)), notes
+        return Choice(MARKER_APPROXIMATE_HEAD, BASE_COMMIT, base_blob, repository.read_blob(base_blob)), notes
+    return Choice(MARKER_FIRST_COMMIT, changed.commit, changed.blob, repository.read_blob(changed.blob)), notes
 
 
 def choose_research_version(path: str, pinned: str | None, candidates: dict[str, str], sha256_of_blob: dict[str, str],
@@ -434,15 +436,15 @@ def choose_research_version(path: str, pinned: str | None, candidates: dict[str,
     if pinned is not None:
         found = find_pinned(candidates, sha256_of_blob, pinned)
         if found:
-            return Choice(MARKER_EXACT_PINNED, found[1], repository.read_blob(found[0]))
+            return Choice(MARKER_EXACT_PINNED, found[1], found[0], repository.read_blob(found[0]))
         if path in BAD_IMPLEMENTATION_TABLES or not os.path.isfile(today):
-            return Choice(MARKER_MISSING, "-", None)
+            return Choice(MARKER_MISSING, "-", "-", None)
         with open(today, "rb") as handle:
-            return Choice(MARKER_TODAY, "today", handle.read())
+            return Choice(MARKER_TODAY, "today", "-", handle.read())
     if not os.path.isfile(today):
-        return Choice(MARKER_MISSING, "-", None)
+        return Choice(MARKER_MISSING, "-", "-", None)
     with open(today, "rb") as handle:
-        return Choice(MARKER_UNRECORDED, "today", handle.read())
+        return Choice(MARKER_UNRECORDED, "today", "-", handle.read())
 
 
 @dataclasses.dataclass
@@ -498,10 +500,11 @@ def build(repository: GitRepository, inputs: BuildInputs, variant: str, output: 
             write_file(tree_root, path, choice.content)
         elif counted_in_digest(path):
             stops.append(("S40", f"new_file_missing_{path}"))
-        row = ("tree", path, classify(path), (status_of.get(path) or "none").replace(" ", "_"), str(path in pin_of).lower(), choice.marker, choice.source, digest)
+        row = ("tree", path, classify(path), (status_of.get(path) or "none").replace(" ", "_"), str(path in pin_of).lower(), choice.marker, choice.source,
+               choice.blob, digest)
         manifest_rows.append(row)
         lines.result("name=file place=tree " + " ".join(f"{key}={field(value)}" for key, value in
-                                                         zip(("path", "class", "status", "pinned", "marker", "source", "sha256"), row[1:])))
+                                                         zip(("path", "class", "status", "pinned", "marker", "source", "blob", "sha256"), row[1:])))
         if path == DEVICE_PATH:
             if "s44" in notes:
                 stops.append(("S44", notes["s44"]))
@@ -518,11 +521,12 @@ def build(repository: GitRepository, inputs: BuildInputs, variant: str, output: 
         digest = sha256_hex(choice.content) if choice.content is not None else "-"
         if choice.content is not None:
             write_file(research_root, path, choice.content)
-        manifest_rows.append(("research_side", path, classify(path), "none", str(pinned is not None).lower(), choice.marker, choice.source, digest))
+        manifest_rows.append(("research_side", path, classify(path), "none", str(pinned is not None).lower(), choice.marker, choice.source, choice.blob,
+                              digest))
         lines.result(f"name=file place=research_side path={field(path)} pinned_outside_the_repository={str(outside).lower()} "
-                     f"marker={choice.marker} source={field(choice.source)} sha256={digest}")
+                     f"marker={choice.marker} source={field(choice.source)} blob={choice.blob} sha256={digest}")
     with open(os.path.join(output, "manifest.tsv"), "x", encoding="utf-8") as handle:
-        handle.write("place\tpath\tclass\tstatus\tpinned\tmarker\tsource\tsha256\n")
+        handle.write("place\tpath\tclass\tstatus\tpinned\tmarker\tsource\tblob\tsha256\n")
         handle.writelines("\t".join(row) + "\n" for row in manifest_rows)
     digest, count = snapshot_digest(tree_root)
     markers: dict[str, int] = {}

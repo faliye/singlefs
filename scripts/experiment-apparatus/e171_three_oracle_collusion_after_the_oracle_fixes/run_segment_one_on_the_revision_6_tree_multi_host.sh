@@ -1,7 +1,7 @@
 #!/bin/bash
-# 多机跑法（2026-10-06，用户定案「分片 双机62核 给80g」「分片 断点重启 自适应多机跑」）：这一份由原跑法 run_segment_one_on_the_revision_6_tree.sh（869d2c0a…）
-# 生成，第 1 行到第 351 行（前提、续跑入口、第 0–10 步）只改了这几行注释，第 11–13 步换成多机编排 rows_orchestrator.py（文件头写分配、派发、合并、跨机对照、续跑）。
-# 起法（当时经脱离单元起，那一层已删；现在整条命令交 task-server/task submit --）：env RUN_SUFFIX=-r6-r3 RUN_DATE=2026-10-05 RESUME_TAG=<新的> bash <这一份>；同一条命令再起，第 11–13 步由编排器只补没做完的行。
+# 多机跑法：这一份由原跑法 run_segment_one_on_the_revision_6_tree.sh（869d2c0a…）
+# 生成，第 1 行到第 351 行（前提、续跑入口、第 0–10 步）只改了这几行注释与第 29 行仓里装置的路径（路径不在冻结范围内：`.claude/rules/path-moves.md` 文件头），第 11–13 步换成多机编排 rows_orchestrator.py（文件头写分配、派发、合并、跨机对照、续跑）。
+# 起法（当时经脱离单元起，那一层已删；现在整条命令交 task-server/task submit --）：env RUN_SUFFIX=-r6-r3 RUN_DATE=<YYYY-MM-DD> RESUME_TAG=<新的> bash <这一份>；同一条命令再起，第 11–13 步由编排器只补没做完的行。
 # long-run-shards: 第 11–13 步按行切：每行一个单线道逐行驱动，行从按推的用时最长先做的队列里派到各台空出来的槽（rows_orchestrator.py 文件头「行与派发」）
 # long-run-resume: 同一条命令再起就是续跑：第 11–13 步只补行目录里还没有 row-result.tsv 的行，别的台被停时取回的行先收进来、写到一半的重做
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
@@ -26,7 +26,7 @@ WORK_ROOT=$SCRATCH/rows-work$RESUME_TAG
 TREE=scripts/experiment-apparatus/target/e171-r1-frozen-tree-revision-6
 BIN=$TREE/target/release/e171_three_oracle_collusion_after_the_oracle_fixes
 E170_BIN=$TREE/target/release/e170_o3_spec_executor_export
-DEVICE_SOURCE=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
+DEVICE_SOURCE=crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
 RESEARCH=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes
 TIMING=$RESEARCH/device_timing.py
 # 编排器、check_product.py（与编排器同目录的 peer_side.py、 由编排器按它自己的目录取）用仓里入库的那一份（与草稿里的逐字节相同）；
@@ -40,7 +40,7 @@ E170_BAD_STATES=scripts/experiment-apparatus/target/e170-r2-today-dumps/e170-bad
 OLD_FIRST_SEGMENT_DUMPS=scripts/experiment-apparatus/target/e171-r1-dumps/newtree-2026-10-05
 OLD_Q5_RESULTS=research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-revision-5-q5
 OLD_Q5_DUMPS=scripts/experiment-apparatus/target/e171-r1-dumps
-# 修订 6 树（2026-10-05 拍）与它 release 编出的两个装置；仓里装置换进修订 7 那份之后应为 REPO_DEVICE_SHA256
+# 修订 6 树与它 release 编出的两个装置；仓里装置换进修订 7 那份之后应为 REPO_DEVICE_SHA256
 SNAPSHOT_DIGEST=7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4
 BIN_SHA256=6057769a543a629b0974ce759676df76cd9ad6e6a7e6c8941ec00641eb1d6036
 E170_BIN_SHA256=e67b8b012fab36cfa5a9ccbfa3efd5bbe321fa9179c9a6a864a637e1939ed46d
@@ -142,7 +142,7 @@ if begin 0 "冻结树产物（S15 ①②③）、stream-constants、S3/S11 流�
     must python3 -B "$CHECK" line "$(product_of stream-constants)" s1 check="${stream}_allocator_carries_the_root_ring_of_make_filesystem" holds=true
   done
   must python3 -B "$CHECK" line "$(product_of stream-constants)" s1 check=third_stream_split_publish local='Some(234)' holds=true
-  # stream-constants 只算常量、不跑流，计时产物里没有逐流时间，不核 device_timing（登记末尾主 agent 认定 2026-10-05 第 5 条）
+  # stream-constants 只算常量、不跑流，计时产物里没有逐流时间，不核 device_timing（登记末尾主 agent 认定第 5 条）
   device_step s3-s11-baseline-stream-1-with-probe "$BIN" baseline --streams 1 --writable-mount-probe --output-directory "$DUMPS/s3-s11-baseline-stream-1-with-probe"
   [ $? -eq 0 ] || stop "S3/S11 自检那一趟退出码不是 0"
   must python3 -B "$CHECK" verdict "$(product_of s3-s11-baseline-stream-1-with-probe)" s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 \

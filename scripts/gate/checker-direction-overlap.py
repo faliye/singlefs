@@ -5,8 +5,8 @@
 # gate-similar: lib_function_units.py 闭包由它收（Rust 八条闭包规则），这里不另写解析器，只在它收出的两份闭包上求交、按登记表分类
 """池级 checker 两个方向共享什么（C410（checker 两个方向共享什么没有检查））：扫描式方向调用的函数单元集合与遍历式方向调用的函数单元集合，
 交集只许落在格式解析、报告通道与常量里；越界、或取不到调用图即判红。门禁 checker-independence-and-sync 的 checker-direction-overlap 格调它。
-依据：D13（验证路线） 已定项 12「两者对同一条不变量独立判断，共享的只有格式解析」。扫描式方向的边界照用户 2026-10-26 定的
-「连 walk.rs 扫单元头那几个函数一起算，另建调用图」：扫描重建模块 crates/singlefs-checker/src/rebuild.rs，连同 walk.rs 里扫单元头、
+依据：D13（验证路线） 已定项 12「两者对同一条不变量独立判断，共享的只有格式解析」。扫描式方向的边界是
+连 walk.rs 扫单元头那几个函数一起算、另建调用图：扫描重建模块 crates/singlefs-checker/src/rebuild.rs，连同 walk.rs 里扫单元头、
 按已发布谓词滤、喂 I-1.8（归并后版本全序） 与扫描重建的那几个函数。
 
 做法：
@@ -25,7 +25,7 @@
                                              crates/singlefs-checker/src/lib.rs 单元，或登记表 reporting-channel 点名的
                                              crates/singlefs-checker/src/image.rs 里 Judgements 的方法；别的判越界
                                              （报告通道：两个方向往同一个判定累加器报判定，传的是判定结果，不是判定逻辑，不算判定共享；
-                                             用户 2026-10-26 定「Judgements::judge 条款写一句报告通道不算判定共享」）
+                                             Judgements::judge 的条款里写一句报告通道不算判定共享）
      没有函数体的 trait 方法声明               不判：只是签名，调到的是实现那一边（今天是读盘接口 ImageReader 那几个）
      常量（const、static）                    许
      别的（struct、enum、union、type、trait 头、impl 头、use、mod、mod_head、extern_crate、doctest、数据单元）  不判：不是被调用的函数，只报个数

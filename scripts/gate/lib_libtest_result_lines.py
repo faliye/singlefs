@@ -52,7 +52,7 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
       「marker<TAB><源文件><TAB><not-run|cpu-judging><TAB><complete：1|0><TAB><那一截><TAB><认作谁打的，一个一列>」，末行 RECORDABLE binaries=… green=… withheld=… markers=…
   lib_libtest_result_lines.py --selftest
 弄坏开关 LIBTEST_RESULT_LINES_BREAK（只给证红用，逗号分隔可给几个；--selftest 本身与它起的子进程、门禁样本根里由阶段转来的认，平常跑设了退 2、点名只在自证里认），下一行起写打开后自证红在哪几格：
-  LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  ` - should panic` 当成全名的一部分（mutate.sh 改前的取法）
+  LIBTEST_RESULT_LINES_BREAK=should-panic-in-name  ` - should panic` 当成全名的一部分（mutate.sh 的取法）
     本库「should panic 的失败行取得出全名」「rustdoc 的结果行整段算全名、should panic 照样摘掉」「点名省掉模块路径、should panic 的用例对得上」
     「取 FAILED 的全名按出现次序」「failed-names 从标准输入取名字、退 0」；连带 crates-mutation-rows.py「should panic 的用例红了判抓到、点名省掉模块路径只对上那一个」、
     prove-red.sh「#[should_panic] 的用例红了……应当判抓到」、rerun-failed-tests.py「should panic 的失败用例按全名重跑」、
@@ -64,12 +64,12 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
     「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」「binary-results 逐条打源文件、全名、结局、这一段对不对得上…」「recordable --cpu-judging-recordable：几条同时…」
   LIBTEST_RESULT_LINES_BREAK=per-binary-count-unchecked  binary_runs 不核「结果行条数 = 汇总行三个数之和」，一律当对得上
     本库「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」
-  LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary  一段里有记号就整段不记（改前门禁 excluded_binaries_of_log 的样子）
+  LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary  一段里有记号就整段不记（门禁 excluded_binaries_of_log 的做法）
     本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable 逐条打 green、withheld、marker…」；连带门禁 crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
-  LIBTEST_RESULT_LINES_BREAK=count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（改前 binary_runs 的 consistent 当门槛的样子）
+  LIBTEST_RESULT_LINES_BREAK=count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（binary_runs 的 consistent 当门槛）
     本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」
     「按条记库：这一段另有对不上号的单独一行结局，接出来的结局不认…」「recordable 逐条打 green、withheld、marker…」；连带同上那个门禁开关
-  LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也照改前把判段判在 CPU 的那一条不记
+  LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也把判段判在 CPU 的那一条不记
     本库「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable --cpu-judging-recordable…」
 """
 import collections
@@ -211,7 +211,7 @@ def marker_pieces(line):
 
 def account_binary(source, lines, serial, cpu_judging_recordable=False):
     """一个测试二进制那一段（Running 那一行之后、下一段之前的行）逐条认结局、认记号归谁：交 BinaryAccount（文件头「按条记库」）。
-    cpu_judging_recordable：判段判在 CPU 的记号照交、不让谁不记（弄坏开关 cpu-judging-always-withheld 下照改前不记）。"""
+    cpu_judging_recordable：判段判在 CPU 的记号照交、不让谁不记（弄坏开关 cpu-judging-always-withheld 下不记）。"""
     cpu_judging_withholds = not cpu_judging_recordable or break_is("cpu-judging-always-withheld")
     entries, lost, starts, raw_markers = [], [], [], []
     pending, summary, orphans = None, None, 0

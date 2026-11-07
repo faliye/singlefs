@@ -1,7 +1,7 @@
 """E171 第 1 次重跑 O3 一侧：冻结的执行器版本核对、起执行器、读执行器的判定行（第 1 次重跑登记第一节读法 9，原登记读法 7、8，
 作废条款 Z2、Z4）。
 
-冻结的那一版是 E170 第 2 次重跑 Q4 判甲交的 v2-487（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 22 批「22-4b 交回」那一条），
+冻结的那一版是 E170 第 2 次重跑 Q4 判甲交的 v2-487（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 22 批（history-kept: 批号是调度记录里的登记位）「22-4b 交回」那一条），
 执行器改成默认全跑之后重冻结的：执行器目录 `scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/`，冻结行取
 `research/results/e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out` 里全部冻结行（16 个文件行加种子行 `4c3bd32dd60a064f`；那份产物是用
 这个目录现跑出来的，里面只有这一组冻结行）。冻结范围照那一版执行器自己的 `executor_main.FILES_OUTSIDE_THE_FREEZE`：不含名字以 `comparator`、

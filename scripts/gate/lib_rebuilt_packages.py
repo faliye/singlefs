@@ -36,7 +36,7 @@ scripts/mutation/prove-red.sh（每条变异施加后那一趟编译核被改的
       本库「补丁里取出改过的路径（新旧两侧、去重、不认 /dev/null）」「补丁删了一个文件：那个包也算改过」
   REBUILT_PACKAGES_BREAK=ignore-dep-info  不看编译目录的 dep-info，包里改过 .rs 的都核
       本库「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「dep-info 里是绝对路径：照原样认」
-  REBUILT_PACKAGES_BREAK=absolute-dep-info-only  dep-info 里的词只拿绝对路径比，相对路径不以工作区根解（改前的样子，真 cargo 写的 dep-info 一个都对不上）
+  REBUILT_PACKAGES_BREAK=absolute-dep-info-only  dep-info 里的词只拿绝对路径比，相对路径不以工作区根解（真 cargo 写的 dep-info 一个都对不上）
       本库「dep-info 里是相对工作区根的路径（真 cargo 的写法）：照认、那个包照核」「改过的 .rs 不在编译目录的任何 dep-info 里（没开的 feature）：那个包不核」
       「没重编的文件在上一次留下的 dep-info 里：照核、判红」；连带 merge-and-verify.sh（它用 --write-selftest-cargo 那份假 cargo，写的也是相对路径）
       「头一次编、补丁改过的 demo 有 Compiling 行」「编过之后 --skip-apply 再验同一批补丁」「编译目录里的产物比源码新（共用编译目录）、补丁改过的 demo 没有 Compiling 行」三格（都报「重编核对本次未判」）

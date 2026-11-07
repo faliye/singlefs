@@ -40,7 +40,7 @@ const REGIONS: u64 = 2;
 const SLOTS_PER_REGION: u64 = 4;
 const SLOT_BYTES: u64 = 256;
 
-// ── 本机现查（2026-08-30，`/sys/block/nvme0n1/queue/`）──
+// ── 本机现查（`/sys/block/nvme0n1/queue/`）──
 const HOST_PHYSICAL_BLOCK_SIZE: u64 = 512;
 const HOST_IO_MIN: u64 = 512;
 
@@ -110,7 +110,7 @@ const ROOT_RATES: [(&str, u64, u64); 5] = [
 
 /// **撕裂的判定宽度只能取 `physical_block_size`**（D20 推论三：自证单元的原子宽度
 /// 等于运行时探测到的 `physical_block_size`）。
-/// ⚠️ **64 KiB 不在这一栏**：2026-08-30 逐行现查 `block/blk-settings.c:855-856`,
+/// ⚠️ **64 KiB 不在这一栏**：2026-08-30 逐行现查（history-kept: 外部源码的现查日期） `block/blk-settings.c:855-856`,
 /// 堆叠取的是成员盘 `physical_block_size` 的 max；而 `drivers/md/raid0.c:393` 与
 /// `raid5.c:7955` 都是 `lim.io_min = mddev->chunk_sectors << 9`——**chunk 落在 `io_min` 上**。
 /// ⇒ 阵列上 pbs 仍是 512 / 4096。把 chunk 喂进这一栏会造出一个不存在的结论。
@@ -344,7 +344,7 @@ mod tests {
     }
 
     /// **结论 4 的算术来源**：2048 字节的环装得进 4096 与 65536 的 `io_min`，装不进 512 的。
-    /// ⚠️ 这一段此前零测试零变异，而它正是「真正抹掉全环的机制是设备内部 RMW」那条结论的出处。
+    /// ⚠️ 这一段必须有测试与变异：它正是「真正抹掉全环的机制是设备内部 RMW」那条结论的出处。
     #[test]
     fn the_whole_ring_fits_inside_a_four_kibibyte_or_larger_io_min() {
         assert_eq!(total_bytes(), 2048);

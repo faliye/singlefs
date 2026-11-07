@@ -4,7 +4,7 @@
 # admission: always 每次调都在这一刻的树上跑全部项或点名的分项；哪些块要重判由库里的块键与判法单元指纹定，不在这里
 # run-condition: command bash cargo python3
 # run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
-# 崩溃放量（用户 2026-09-29 定：其他的崩溃放量放在一个脚本里做、作为分项；以后一起跑，分项用参数跑；不指定参数就跑全部项）：
+# 崩溃放量（其他的崩溃放量放在一个脚本里做、作为分项；一起跑，分项用参数跑；不指定参数就跑全部项）：
 #
 #   crash-amplification.sh                                  全部项：登记表里每个分项按次序跑一遍，展开深度只有一处（见「展开深度」）
 #   crash-amplification.sh --item <分项> [--item <分项>]…    只跑点名的分项，给几次取并集（分项名照 --list-items 列的）；展开深度同上，成功句不说全部项
@@ -37,7 +37,7 @@
 # 全部分项的判定都在 prune-server 里那一份判定库（scripts/crash/crash-amplification-lib.sh 文件头「判定库」：引擎经客户端直接读写，这里与分项驱动都不拼库目录、不送库的变量）：
 # 几条流共前缀，同一份库里前缀节点只判一次；重跑同一条命令就是续跑——同一把判法单元指纹下判过的块全部复用，判法改了旧行留作历史、这一把从头判。
 # 每项交 scripts/crash/crash-amplification-item.sh 在本机跑：配置开了 GPU 就由 GPU 判，做不到那一项报错
-# （用户 2026-09-29 定：「配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有gpu就一定要让GPU工作 如果不行就明确报错拒绝，不接受默认降级」）。
+# （配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有 gpu 就一定要让 GPU 工作，如果不行就明确报错拒绝，不接受默认降级）。
 # 运行条件：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上）由文件头 run-condition: check 在开跑之前判（同分项驱动，判法在
 #   crash-amplification-lib.sh 的 crash_amplification_run_condition_holds）；跑起来才知道的退 78：某一项的驱动退 78
 #   （显卡或第二台用不上）。出路都是「修好设备，或改配置」。
@@ -53,8 +53,8 @@
 #          判法、ITEM 行、汇总、成功句与退出码都同不分片的那一趟。有一项找不到产物（产物表里没有那一片、或缺 item.log / item.exit）退 1、一项都不重放。
 #   读完这几个变量就从环境里清掉（TASK_SERVER_SHARD_*），不传给分项驱动：别的入口在服务的分片里调到这里时，照不分片跑。
 #   TASK_SERVER_SHARD_PHASE 是别的值退 2。弄坏开关 shard-phase-ignored 下不认这几个变量，三步都照不分片跑。
-#   带 --no-shard 的不分（用户：「默认应该就是分片的 不分片才要加参数」）：计划写一片、不起驱动，那一片照不分片整趟跑、退出码照整趟，合并什么都不做。弄坏开关 no-shard-ignored 下照分片。
-# 编译目录（用户 2026-10-23 定案「自己用完自己删」，不跨趟复用）：建好 <放量家目录>/runs/entry-<时刻>-<进程号>/ 之后，调用方没设 CARGO_TARGET_DIR 时
+#   带 --no-shard 的不分（默认分片，不分片才要加参数）：计划写一片、不起驱动，那一片照不分片整趟跑、退出码照整趟，合并什么都不做。弄坏开关 no-shard-ignored 下照分片。
+# 编译目录（自己用完自己删，不跨趟复用）：建好 <放量家目录>/runs/entry-<时刻>-<进程号>/ 之后，调用方没设 CARGO_TARGET_DIR 时
 #   在里面建 target、export 给每一项的分项驱动（分项驱动看到设了就不另建）；正常结束、有项红、被 TERM / INT 停（等手里那一项的驱动退出）都在 EXIT 上删
 #   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程，整趟退非 0）。调用方设了的照它、不删。
 #
@@ -66,9 +66,9 @@
 #   有一行两样都不是（exhaustive=false 而 registered_segments= 是 -、没报或写得认不得，或 exhaustive= 没报）这一项判红、整趟退 1，
 #   理由里点名不穷举又没登段的流，出路是「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」；登了段的行另两种判红见「按段登记」。
 #   取值：登记分项里最长一段的写数。今天是 30 写：多记录流与删除流（multi-record-publish、unlink-after-the-multi-record-publish）共有的第 16 段，
-#   出处是第 32 批 Q 探针真跑出来的段形状 PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]
-#   （删除流 35 段，前 19 段与多记录流逐段相同；records/2026-10-01-删除与并发事务.md 2026-10-08「三·5 量数」那一条）。展开 28 时这两项驱动行报 exhaustive=false，
-#   2026-10-08 展开 30 跑这两项，驱动行都报 exhaustive=true expand_up_to=30。别的分项没有段形状的记录；一段不超过展开上限就展开全部真子集，
+#   出处是探针真跑出来的段形状 PROBE_SEGMENT_SIZES [2,2,1,2,2,1,2,24,2,1,2,28,4,1,2,30,6,1,2,26,2,1,2,24,2,1,2,22,2,1,2,20,2,1,2]
+#   （删除流 35 段，前 19 段与多记录流逐段相同；records/2026-10-01-删除与并发事务.md「三·5 量数」那一条）。展开 28 时这两项驱动行报 exhaustive=false，
+#   展开 30 跑这两项，驱动行都报 exhaustive=true expand_up_to=30。别的分项没有段形状的记录；一段不超过展开上限就展开全部真子集，
 #   所以从 28 抬到 30 只改写数是 29、30 的段，不超过 28 写的段展开不变。
 #   这里不现算：驱动行只报 exhaustive= 与 expand_up_to=、不报段的写数（crates/singlefs-verification/src/crash_amplification.rs 的
 #   reuse_and_scale_fields_of_the_line），段形状要编、跑 验证包的用例才拿得到。新加的流或改了写表而出现更长的段，这里不会自己跟上：
@@ -85,10 +85,10 @@
 #     是 <段号>:<写数>[,…]：判红，理由点名那条流与那几段（「流 <流> 段 <段号>:<写数>、…」），出路「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」；
 #     没报或写得认不得（旧引擎打的行）：照不穷举判红，理由点名那条流，出路「引擎没报 unregistered_segments_beyond_expansion=，重编引擎」。
 #   按行判，同一项别的行照判。
-#   分片枚举（用户 2026-10-13 定：登记段的域装不进 u64 时按固定次序分片枚举，判定进库；不指定范围那一趟判完全部片，片长只当分批）：
+#   分片枚举（登记段的域装不进 u64 时按固定次序分片枚举，判定进库；不指定范围那一趟判完全部片，片长只当分批）：
 #   引擎在 unregistered_segments_beyond_expansion= 之后报 registered_segment_domains=<段号>:<full|slice>[,…]（登记段的域是全展开还是分片；一段都没登写 -）
 #   与 registered_segment_progress=<段号>:<已判态数>/<域的总态数>[,…]（只列 slice 段，没有写 -；两个数都是精确的十进制数字串，引擎的态数是 768 位宽整数
-#   （用户 2026-10-13 定，6 个 u128 拼），可能到 140 位：这里只按 ^[0-9]+$ 认、不转成数、不做数值比较，成功句原样打这两个串）。登了段的行，不看展开深度：
+#   （6 个 u128 拼），可能到 140 位：这里只按 ^[0-9]+$ 认、不转成数、不做数值比较，成功句原样打这两个串）。登了段的行，不看展开深度：
 #     两个字段缺一个（旧引擎）、registered_segments= 列的段有一段不在 registered_segment_domains= 里、slice 段没在 registered_segment_progress= 里、
 #     进度里列了不是 slice 的段、或写法认不得：判红，理由点名那条流，出路「引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎」；
 #     slice 段已判态数字面全是 0、而这一行的现判（states_checked_here=）与复用（states_reused=，没报照 0 算）都不是正整数：判红，理由点名那条流与那一段（「流 <流> 段 <段号>:0/<总>」），
@@ -204,7 +204,7 @@
 #       第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」：这一项没记红、整趟退 0）、
 #       第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：ITEM 行记成 exit=0）、
 #       第 57 格（「按项分片的合并应当……」：重放那一项的退 1 被吞成 0、整趟退 0）、第 58 格（「带 --no-shard 应当计划写一片……」：那一片的退 1 被吞成 0）
-#   CRASH_AMPLIFICATION_BREAK=logs-single  每一项驱动的输出只写一份全量日志（改前的样子：tee，不经 two-logs.sh，没有 .problems.log）
+#   CRASH_AMPLIFICATION_BREAK=logs-single  每一项驱动的输出只写一份全量日志（tee，不经 two-logs.sh，没有 .problems.log）
 #       第 47 格（「每一项的输出应当出两份日志…」）
 #   CRASH_AMPLIFICATION_BREAK=skip-filter  调驱动时不带 --test-filter
 #       第 4 格（「全量没把每个分项各调一次驱动」）、第 6 格（「不该清场：各项应当带 --test-filter、不经清场包装重起」）
@@ -218,8 +218,9 @@
 #       第 59 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：TOTAL 行没有 expand_up_to=6、成功句没有缩过域那一句）
 #   CRASH_AMPLIFICATION_BREAK=expand-up-to-unchecked  --crash-expand-up-to 的值与环境里的变量不核是不是非负整数
 #       第 60 格（「--crash-expand-up-to 的值不是非负整数时应当退 2、一项都不跑」）
-#   CRASH_AMPLIFICATION_BREAK=scoped-domain-unbounded  带 --item、没缩域也不判指定范围的崩溃域上限（改前的样子）
-#       第 61 格（「估数超过 200000 态应当退 79、一项都不起」）、第 64 格（「估不出应当退 79」）、第 65 格（「只有缩过域的记录算不出全域态数，应当退 79」）
+#   CRASH_AMPLIFICATION_BREAK=scoped-domain-unbounded  带 --item、没缩域也不判指定范围的崩溃域上限
+#       第 61 格（「估数超过 200000 态应当退 79、一项都不起」）、第 62 格（「点名项全部可复用的放行，不论上一趟的态数多大」：不判就不打「全部复用，现判 0 态」那一句）、
+#       第 64 格（「估不出应当退 79」）、第 65 格（「只有缩过域的记录算不出全域态数，应当退 79」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-narrowed-refused  缩了域（--crash-expand-up-to 小于引擎常量）也照没缩判：缩域值不交给判法
 #       第 63 格（「缩过域的放行，不读库、不判上限」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-reusable-counted  库里录下的块键都对得上、全部可复用的分项也按上一趟全域真跑的态数算（上一趟有记录才算）
@@ -274,13 +275,13 @@
 #   CRASH_AMPLIFICATION_BREAK=driver-not-run-as-zero-lines  不认分项驱动的 CRASH_AMPLIFICATION_NOT_RUN 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
 #       第 29 格（「分项驱动退 77 没记进本次未跑」：原因里没有那一行的 reason=）、第 30 格（「几条流里有的没借到显存，这一项却记了通过」）、
 #       第 44 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
-#   CRASH_AMPLIFICATION_BREAK=driver-77-as-failure  分项驱动退 77 照别的非 0 退出码判红（改前的判法）
+#   CRASH_AMPLIFICATION_BREAK=driver-77-as-failure  分项驱动退 77 照别的非 0 退出码判红
 #       第 29 格（「分项驱动退 77 没记进本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：记成了红）
 #   CRASH_AMPLIFICATION_BREAK=judge-not-run-ignored  不认分项驱动转打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
 #       第 44 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
-#   CRASH_AMPLIFICATION_BREAK=not-run-cause-always-vram  分项驱动退 77 而打了 CRASH_AMPLIFICATION_NOT_RUN 行时，原因前半句不看 step= 一律写借不到显存（改前的写法）
+#   CRASH_AMPLIFICATION_BREAK=not-run-cause-always-vram  分项驱动退 77 而打了 CRASH_AMPLIFICATION_NOT_RUN 行时，原因前半句不看 step= 一律写借不到显存
 #       第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」）
-#   CRASH_AMPLIFICATION_BREAK=registered-segments-ignored  不认驱动行的 registered_segments=（改前的判法：exhaustive=false 一律算不穷举）
+#   CRASH_AMPLIFICATION_BREAK=registered-segments-ignored  不认驱动行的 registered_segments=（exhaustive=false 一律算不穷举）
 #       第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
 #       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
@@ -298,17 +299,16 @@
 #       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
 #       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
-#   CRASH_AMPLIFICATION_BREAK=segments-registry-not-sent  不往分项驱动送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY（改前的样子）
+#   CRASH_AMPLIFICATION_BREAK=segments-registry-not-sent  不往分项驱动送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY
 #       第 34 格（「分项驱动没收到按段登记文件的绝对路径」）
 #   CRASH_AMPLIFICATION_BREAK=segments-registry-unchecked  开跑前不核按段登记文件
 #       第 35 格（「按段登记文件写坏了却没整趟拒跑」）
-#   CRASH_AMPLIFICATION_BREAK=beyond-expansion-ignored  不按 unregistered_segments_beyond_expansion= 判（改前的判法：登了段的行一律不算不穷举）
+#   CRASH_AMPLIFICATION_BREAK=beyond-expansion-ignored  不按 unregistered_segments_beyond_expansion= 判（登了段的行一律不算不穷举）
 #       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-missing-as-dash  驱动行没报 unregistered_segments_beyond_expansion= 当成报了 -（ITEM 行写 - 不写 unknown，判法上当成没有展不开的段）
 #       第 22 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 26 格（「复用数没照各行之和取」）、
 #       第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）、第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
 #       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-unreported  ITEM 行的 unregistered_segments_beyond_expansion= 写 -、成功句不报展开上限盖不住又没登记的段
 #       第 22 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 26 格（「复用数没照各行之和取」）、
@@ -318,7 +318,7 @@
 #       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
 #   CRASH_AMPLIFICATION_BREAK=slice-progress-zero-accepted  分片段已判 0 态也不判红
 #       第 39 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）
-#   CRASH_AMPLIFICATION_BREAK=slice-zero-despite-reuse  分片段已判 0 态不看那一行的现判与复用（改前的判法：全部复用的一趟也红）
+#   CRASH_AMPLIFICATION_BREAK=slice-zero-despite-reuse  分片段已判 0 态不看那一行的现判与复用（全部复用的一趟也红）
 #       第 43 格（「全部复用的一趟…判了红」）
 #   CRASH_AMPLIFICATION_BREAK=domains-missing-accepted  登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，当成没有登记段的域（不判红，ITEM 行写 -）
 #       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
@@ -335,13 +335,13 @@
 #       第 41 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
 #   CRASH_AMPLIFICATION_BREAK=ignore-summed-per-row  按登记不判的 ignored_points= / states_skipped_by_ignore= 对每一行相加（同一条流叫停再续这类几行重复计），不按流分组只取一次、同组各行不同也不记 unknown
 #       第 42 格（「按登记不判的点数与态数没按流分组、每组只取一次」）
-#   CRASH_AMPLIFICATION_BREAK=rocksdb-entry-unchecked  清场与起分项之前不调 scripts/hosts/rocksdb-prebuilt.py entry（改前的样子）
+#   CRASH_AMPLIFICATION_BREAK=rocksdb-entry-unchecked  清场与起分项之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       第 48 格（「验证包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78…」）
 #   CRASH_AMPLIFICATION_BREAK=shard-phase-ignored  不认 TASK_SERVER_SHARD_PHASE 这几个变量，计划、一片、合并都照不分片跑（文件头「经 task-server 按项分片」）
 #       第 55 格（「按项分片的计划那一步应当……」）、第 56 格（「按项分片的一片应当……」）、第 57 格（「按项分片的合并应当……」）、第 58 格（「带 --no-shard 应当计划写一片……」：起了驱动）
 #   CRASH_AMPLIFICATION_BREAK=no-shard-ignored  不认 --no-shard，照按项分片
 #       第 58 格（「带 --no-shard 应当计划写一片……」）
-#   CRASH_AMPLIFICATION_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（改前的样子：分项在仓根照仓根的 target 编、跨趟留着）
+#   CRASH_AMPLIFICATION_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（分项在仓根照仓根的 target 编、跨趟留着）
 #       第 49 格（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」）、
 #       第 51 格（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就在参数解析之前退 2 拒跑、拒绝句逐个点名，只有 --selftest 本身不拒，--list-items 与认不得的选项也先看这个）：
@@ -2099,7 +2099,7 @@ for row in "${rows_to_run[@]}"; do
   item_started_at=$(date +%s)
   items_dispatched=$((items_dispatched + 1))
   # 驱动的输出边跑边转打，同时出两份日志（scripts/hosts/two-logs.sh：$item_output_file 是全量，同名的 .problems.log 只收错误与警告，行前带全量日志里的行号，一般只看它）；
-  #   退出码是驱动的。弄坏开关 logs-single：照改前只写一份全量日志（tee）
+  #   退出码是驱动的。弄坏开关 logs-single：只写一份全量日志（tee）
   #   按项分片的合并那一步（文件头「经 task-server 按项分片」）：不起驱动，照那一片存下的输出与退出码重放
   if [[ "$shard_phase" == merge ]]; then
     item_command=(bash -c 'cat -- "$1"; exit "$(cat -- "$2")"' shard-replay "${shard_replay_directories[row_index]}/item.log" "${shard_replay_directories[row_index]}/item.exit")

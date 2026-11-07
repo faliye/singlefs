@@ -11,10 +11,10 @@ m10_user_scale_forgets_the_start_slot	    USER_SCALE_DEVICE_SLOTS - UNIT_AREA_ST
 m11_bitmap_memory_one_word_per_segment	        segment_summaries: 3 * summary_words(memory_input.segments_per_disk) * 8 * DISKS,	        segment_summaries: 3 * memory_input.segments_per_disk * 8 * DISKS,
 m12_positive_control_keeps_the_settling_copy_cheap	    let retired_round_copy = today_whole_copy_in_a_round;	    let retired_round_copy = 0;
 m13_user_scale_forgets_the_base	    let mut total = base;	    let mut total = 0.0;
-m14_reconciliation_forgets_the_step_that_finds	"inodes_with_an_extent_entry_set" => Some(calls * (1 + number(state, "other_files")?)),	"inodes_with_an_extent_entry_set" => Some(calls * number(state, "other_files")?),
-m15_reconciliation_upper_bound_excludes_the_bound	Relation::AtMost => steps <= expected,	Relation::AtMost => steps < expected,
-m16_reconciliation_equals_accepts_more	Relation::Equals => steps == expected,	Relation::Equals => steps >= expected,
-m17_reconciliation_forgets_the_calls	"cluster_segment_sum" => Some(calls * number(state, "cluster_segments")?),	"cluster_segment_sum" => Some(number(state, "cluster_segments")?),
+m14_reconciliation_forgets_the_step_that_finds	Some(calls * (1 + entry("files_other_than_the_first")?))	Some(calls * entry("files_other_than_the_first")?)
+m15_reconciliation_upper_bound_excludes_the_bound	let over_the_bound = cell.steps_to_the_hit > cell.lengths_to_the_hit;	let over_the_bound = cell.steps_to_the_hit >= cell.lengths_to_the_hit;
+m16_reconciliation_equals_accepts_more	            steps == expected,\n            false,	            steps >= expected,\n            false,
+m17_reconciliation_forgets_the_calls	"cluster_segment_sum" => Some(calls * entry("cluster_segments")?),	"cluster_segment_sum" => Some(entry("cluster_segments")?),
 m18_void_8_needs_no_full_rounds	.filter(|(_, (taken, _))| *taken < ROUNDS)	.filter(|(_, (taken, _))| *taken < 1)
 m19_void_8_drops_nothing	        kind == "overwrite"	        kind == "no_such_kind"
 m20_f6_with_no_cells_is_called_checked	(!checks.is_empty()).then(|| checks.iter().any(|ok| !*ok))	Some(checks.iter().any(|ok| !*ok))
@@ -28,3 +28,46 @@ m27_the_narrow_arm_forgets_the_segment_before_the_landing	const SEGMENTS_BEFORE_
 m28_second_segment_nanos_drop_the_unimproved_rows	nanos += own;	nanos += 0.0;
 m29_user_scale_ignores_an_unread_point	Err(point_gaps) => gaps.push(format!("{point}:{}", point_gaps.join("|"))),	Err(_point_gaps) => {}
 m30_user_scale_nanos_accept_fewer_rounds	if usable.len() as u64 != ROUNDS {	if usable.len() as u64 > ROUNDS {
+m31_copy_elements_read_the_steps	        let per_copy = cell.scale / cell.calls;	        let per_copy = cell.steps / cell.calls;
+m32_two_code_two_trees_per_round_are_enough	keys_changed.len() as u64 != 3 * rounds	keys_changed.len() as u64 != 2 * rounds
+m33_code_two_tree_heights_shifted_by_one	.map(|(index, (_, value))| (*value, heights[index % 3]))	.map(|(index, (_, value))| (*value, heights[(index + 1) % 3]))
+m34_extrapolation_check_only_on_the_first_segment_axes	        for axis in AXES {\n            let points = axis_points_for_alpha(counts, axis);	        for axis in ["U", "u"] {\n            let points = axis_points_for_alpha(counts, axis);
+m35_diagonal_cell_measures_another_point	.find(|(_, point_axes)| **point_axes == DIAGONAL_POINT)	.find(|(_, point_axes)| **point_axes != DIAGONAL_POINT)
+m36_f1_judged_when_the_extrapolation_check_fails	if cells.len() == 4 && !reference_only && !extrapolation_not_trusted {	if cells.len() == 4 && !reference_only {
+m37_user_scale_ignores_the_measured_unit_area	                && (axis == "U" || position <= axis_highest_position(axis))	                && position <= axis_highest_position(axis)
+m38_inode_record_find_takes_one_step_more_per_call	Some(calls * entry("position_of_the_inode_whose_size_changes")?)	Some(calls * (entry("position_of_the_inode_whose_size_changes")? + 1))
+m39_extent_roles_scan_ignores_the_calls	"extent_roles_rewritten_scan" => Some(calls * exit("extent_tree_nodes")?),	"extent_roles_rewritten_scan" => Some(exit("extent_tree_nodes")?),
+m40_checkpoint_cost_plan_counts_a_judgement_per_call	Some(calls / 2 * per_judgement)	Some(calls * per_judgement)
+m41_checkpoint_cost_plan_takes_odd_calls	            if !calls.is_multiple_of(2) {\n                return None;\n            }\n	            // 奇数次调用照算（变异 m41）\n
+m42_allocation_node_set_takes_one_step_per_node	Some(calls * 2 * entry("allocation_record_tree_nodes")?)	Some(calls * entry("allocation_record_tree_nodes")?)
+m43_watermark_sort_compares_every_step_row	+ entry("watermark_rows_before_its_txg")?.saturating_sub(1)),	+ entry("watermark_rows_before_its_txg")?),
+m44_deadlist_changes_skip_the_file_index	Some(rounds * (every_round + entry("files_other_than_the_first")?))	Some(rounds * every_round)
+m45_multi_level_planning_zero_root_walks_no_previous_node	                + if deadlist_keys == 0 {\n                    entry("deadlist_tree_nodes")?\n	                + if deadlist_keys == 0 {\n                    0\n
+m46_container_trees_once_per_publish	Some(fixed_point_rounds_of(product, at)? * exit("container_tree_units")?)	Some(exit("container_tree_units")?)
+m47_moved_entries_filter_reads_the_keys	"moved_entries_path_tail_filter" => Some(calls * entry("central_mapping_tree_nodes")?),	"moved_entries_path_tail_filter" => Some(calls * entry("central_mapping_tree_keys")?),
+m48_release_judgement_drops_the_kept_index	extra if extra == 2 * rounds => Some(rounds * (kept + by_role)),	extra if extra == 2 * rounds => Some(rounds * by_role),
+m49_accounting_entries_five_rows_per_device	const PER_DEVICE_ACCOUNTING_ROWS: u64 = 6;	const PER_DEVICE_ACCOUNTING_ROWS: u64 = 5;
+m50_instance_table_chain_ignores_the_calls	"instance_table_chain" => Some(calls * entry("instance_table_chain_replaced")?),	"instance_table_chain" => Some(entry("instance_table_chain_replaced")?),
+m51_mapped_units_table_puts_out_the_previous_version	Some(rounds * (entry("mapped_units")? + exit("mapped_units")?))	Some(rounds * (entry("mapped_units")? + entry("mapped_units")?))
+m52_allocation_nodes_are_taken_to_stay_put	(every_round_once && per_round.iter().all(|(_, nodes)| *nodes == after)).then_some(())	Some(())
+m53_a_publish_reading_read_twice_is_taken	        [(0, value)] => Some(*value),	        [(0, value), ..] => Some(*value),
+m54_multi_level_planning_counts_the_mapping_keys_once	            let mapping = mapping_keys\n                + code_two_plan_steps(	            let mapping = code_two_plan_steps(
+m55_files_plan_takes_one_file_more_per_call	"files_other_than_the_first_plan" => Some(calls * entry("files_other_than_the_first")?),	"files_other_than_the_first_plan" => Some(calls * (entry("files_other_than_the_first")? + 1)),
+m56_file_find_takes_a_whole_table_part	"file_other_than_the_first_linear_find",\n        Relation::UpToTheHitAtTheCallSite,	"file_other_than_the_first_linear_find",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+m57_extent_upper_plan_loses_the_part_to_the_hit	"extent_upper_segment_plan",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,	"extent_upper_segment_plan",\n        Relation::WholeTableAtTheCallSite,
+m58_root_header_find_taken_as_a_whole_table	read_at_the_call_site("root_header_linear_find", Relation::UpToTheHitAtTheCallSite),	read_at_the_call_site("root_header_linear_find", Relation::WholeTableAtTheCallSite),
+m59_allocation_plan_takes_a_part_to_the_hit	"allocation_record_tree_plan",\n        Relation::WholeTableAtTheCallSite,	"allocation_record_tree_plan",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+m60_release_find_takes_a_whole_table_part	"allocator_release_linear_find",\n        Relation::UpToTheHitAtTheCallSite,	"allocator_release_linear_find",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+m61_user_data_slot_scan_taken_as_a_whole_table	"user_data_slot_linear_scan",\n        Relation::UpToTheHitAtTheCallSite,	"user_data_slot_linear_scan",\n        Relation::WholeTableAtTheCallSite,
+m62_record_intersection_loses_the_whole_table_part	"record_intersection_filter",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,	"record_intersection_filter",\n        Relation::UpToTheHitAtTheCallSite,
+m63_empty_segment_scan_takes_a_whole_table_part	"empty_segment_linear_scan",\n        Relation::UpToTheHitAtTheCallSite,	"empty_segment_linear_scan",\n        Relation::WholeTableAndUpToTheHitAtTheCallSite,
+m64_fallback_slot_scan_taken_as_a_whole_table	"fallback_slot_linear_scan",\n        Relation::UpToTheHitAtTheCallSite,	"fallback_slot_linear_scan",\n        Relation::WholeTableAtTheCallSite,
+m65_records_of_each_leaf_taken_as_walking_to_the_hit	read_at_the_call_site("records_of_each_leaf", Relation::WholeTableAtTheCallSite),	read_at_the_call_site("records_of_each_leaf", Relation::UpToTheHitAtTheCallSite),
+m66_whole_table_part_accepts_fewer_steps	let agrees = whole_table_steps == cell.whole_table_lengths	let agrees = whole_table_steps <= cell.whole_table_lengths
+m67_a_line_without_the_part_to_the_hit_is_read_as_zero	        if read.lines_without_the_part_to_the_hit > 0 {\n            return None;\n        }\n	        // 没带走到命中为止那两样的行照 0 读（变异 m67）\n
+m68_cells_over_the_bound_are_not_counted	row_over += u64::from(over_the_bound);	row_over += 0;
+m69_the_last_batch_is_left_out_again	const EVERY_KIND: &[&str] = &["overwrite", "unlink_intent", "unlink_final"];	const EVERY_KIND: &[&str] = &["overwrite", "unlink_intent"];
+m70_the_record_axes_extrapolate_past_the_registered_points	                && (axis == "U" || position <= axis_highest_position(axis))	                && (axis == "U" || position > 0)
+m71_the_by_delta_mapped_units_queries_are_the_whole_table	        mapped_units_queries_by_delta(mapped_units_changed_over_all_rounds, mapped_units);	        product.query_levels_of(&at, segments, "mapped_units_whole_table");
+m72_unread_point_axes_read_as_f3_not_fired	    } else if !judged_any_axis || !points_with_the_axes_unread.is_empty() {	    } else if false {
+m73_the_timing_points_take_no_axes_from_the_counts	                with_axes.points.insert(point, *axes);	                let _ = axes;
