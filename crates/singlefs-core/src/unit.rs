@@ -1,11 +1,11 @@
 //! 单元的头：共同前缀 42（D18（块里携带什么信息） 已定项 7），码 2 索引节点头（已定项 18），码 3 打包记录单元头（已定项 11）。
 //!
 //! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）。三类单元的写者各交出一份写法规格
-//! （[`spec_index_node_bytes`]、[`spec_packed_unit_bytes`]、[`spec_data_unit_bytes`]：先按字段表写成没封的那一份，再写载荷 CRC、
-//! 再封头校验和，[`spec_sealed_unit`]），读者各交出一份读法规格（[`spec_parse_index_node`]、[`spec_parse_packed_unit`]、
-//! [`spec_parse_data_unit`]），往返引理（[`lemma_index_node_round_trip`]、[`lemma_packed_unit_round_trip`]、
+//! （[`specification_index_node_bytes`]、[`specification_packed_unit_bytes`]、[`specification_data_unit_bytes`]：先按字段表写成没封的那一份，再写载荷 CRC、
+//! 再封头校验和，[`specification_sealed_unit`]），读者各交出一份读法规格（[`specification_parse_index_node`]、[`specification_parse_packed_unit`]、
+//! [`specification_parse_data_unit`]），往返引理（[`lemma_index_node_round_trip`]、[`lemma_packed_unit_round_trip`]、
 //! [`lemma_data_unit_round_trip`]）证写者写出来的单元读者读回同一份头与条目。CRC-32C 在 Verus 里是未解释函数
-//! （`checksum::spec_crc32_castagnoli`，D13（验证路线） 已定项 14），往返只用到「同一段字节同一个数」。
+//! （`checksum::specification_crc32_castagnoli`，D13（验证路线） 已定项 14），往返只用到「同一段字节同一个数」。
 
 use singlefs_format::{
     DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE,
@@ -59,12 +59,12 @@ impl WriteOrder {
     }
 
     /// 盘上 10 字节：实例代号 4 + 事务号低 6 字节，小端。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.instance.0 as nat, 4) + little_endian_bytes(self.transaction as nat, 6)
     }
 
     /// 从 `source` 的 `position` 起读 10 字节解成的写序。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         WriteOrder {
             instance: InstanceGeneration(little_endian_value(source.subrange(position, position + 4)) as u32),
             transaction: little_endian_value(source.subrange(position + 4, position + 10)) as u64,
@@ -77,9 +77,9 @@ impl WriteOrder {
             self.is_encodable(),
             0 <= position,
             position + 10 <= source.len(),
-            source.subrange(position, position + 10) == self.spec_bytes(),
+            source.subrange(position, position + 10) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
+            Self::specification_decode_at(source, position) == self,
     {
         broadcast use group_little_endian_round_trips;
         lemma_little_endian_capacities();
@@ -129,12 +129,12 @@ fn reserved_bytes() -> (reserved: usize)
 // ===== 三类单元共用的规格 =====
 
 /// 单元头里的 fsid（[`unit_filesystem_identifier`] 的规格）：系统配置 fsid 前 8 字节的小端值。
-pub open spec fn spec_unit_filesystem_identifier(filesystem_identifier: [u8; 16]) -> u64 {
+pub open spec fn specification_unit_filesystem_identifier(filesystem_identifier: [u8; 16]) -> u64 {
     little_endian_value(filesystem_identifier@.subrange(0, 8)) as u64
 }
 
 /// 共同前缀 42 字节（[`write_common_prefix`] 的规格）：magic 4、格式版本 2、类标签 1、flags 1、声明长度 2、头校验和 32（写的时候是 0）。
-pub open spec fn spec_common_prefix_bytes(unit_class: u8, declared_length: u16) -> Seq<u8> {
+pub open spec fn specification_common_prefix_bytes(unit_class: u8, declared_length: u16) -> Seq<u8> {
     UNIT_MAGIC@ + little_endian_bytes(UNIT_FORMAT_VERSION as nat, 2) + little_endian_bytes(unit_class as nat, 1)
         + little_endian_bytes(0, 1) + little_endian_bytes(declared_length as nat, 2) + zero_bytes(
         WIDE_CHECKSUM_BYTES as nat,
@@ -142,8 +142,8 @@ pub open spec fn spec_common_prefix_bytes(unit_class: u8, declared_length: u16) 
 }
 
 /// 封了头校验和的单元（[`seal_header_checksum`] 的规格）：偏移 10 那 32 字节换成罩 `[0, header_end)`、自身按 0 算出来的字段。
-pub open spec fn spec_header_checksum_sealed(bytes: Seq<u8>, header_end: int) -> Seq<u8> {
-    bytes.subrange(0, HEADER_CHECKSUM_OFFSET as int) + spec_wide_checksum_field(
+pub open spec fn specification_header_checksum_sealed(bytes: Seq<u8>, header_end: int) -> Seq<u8> {
+    bytes.subrange(0, HEADER_CHECKSUM_OFFSET as int) + specification_wide_checksum_field(
         bytes,
         header_end,
         HEADER_CHECKSUM_OFFSET as int,
@@ -151,21 +151,21 @@ pub open spec fn spec_header_checksum_sealed(bytes: Seq<u8>, header_end: int) ->
 }
 
 /// 写了载荷 CRC 的单元（[`seal_payload_checksum`] 的规格）：`payload_checksum_offset` 起 4 字节换成罩 `[header_end, 末尾)` 的 CRC-32C 小端。
-pub open spec fn spec_payload_checksum_written(bytes: Seq<u8>, header_end: int, payload_checksum_offset: int) -> Seq<u8> {
+pub open spec fn specification_payload_checksum_written(bytes: Seq<u8>, header_end: int, payload_checksum_offset: int) -> Seq<u8> {
     bytes.subrange(0, payload_checksum_offset) + little_endian_bytes(
-        spec_crc32_castagnoli(bytes.subrange(header_end, bytes.len() as int)) as nat,
+        specification_crc32_castagnoli(bytes.subrange(header_end, bytes.len() as int)) as nat,
         4,
     ) + bytes.subrange(payload_checksum_offset + 4, bytes.len() as int)
 }
 
 /// 三类单元的写者都是先写载荷 CRC、再封头校验和（头校验和罩住载荷 CRC 那 4 字节）。
-pub open spec fn spec_sealed_unit(unsealed: Seq<u8>, header_end: int, payload_checksum_offset: int) -> Seq<u8> {
-    spec_header_checksum_sealed(spec_payload_checksum_written(unsealed, header_end, payload_checksum_offset), header_end)
+pub open spec fn specification_sealed_unit(unsealed: Seq<u8>, header_end: int, payload_checksum_offset: int) -> Seq<u8> {
+    specification_header_checksum_sealed(specification_payload_checksum_written(unsealed, header_end, payload_checksum_offset), header_end)
 }
 
 /// 头校验和那一判（读者一侧）：偏移 10 那 32 字节等于罩 `[0, header_end)` 现算的字段。
-pub open spec fn spec_header_checksum_holds(bytes: Seq<u8>, header_end: int) -> bool {
-    bytes.subrange(HEADER_CHECKSUM_OFFSET as int, HEADER_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES) == spec_wide_checksum_field(
+pub open spec fn specification_header_checksum_holds(bytes: Seq<u8>, header_end: int) -> bool {
+    bytes.subrange(HEADER_CHECKSUM_OFFSET as int, HEADER_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES) == specification_wide_checksum_field(
         bytes,
         header_end,
         HEADER_CHECKSUM_OFFSET as int,
@@ -173,56 +173,56 @@ pub open spec fn spec_header_checksum_holds(bytes: Seq<u8>, header_end: int) -> 
 }
 
 /// 载荷 CRC 那一判（读者一侧，[`check_payload_checksum`] 的规格）。
-pub open spec fn spec_payload_checksum_holds(bytes: Seq<u8>, header_end: int, payload_checksum_offset: int) -> bool {
-    little_endian_value(bytes.subrange(payload_checksum_offset, payload_checksum_offset + 4)) == spec_crc32_castagnoli(
+pub open spec fn specification_payload_checksum_holds(bytes: Seq<u8>, header_end: int, payload_checksum_offset: int) -> bool {
+    little_endian_value(bytes.subrange(payload_checksum_offset, payload_checksum_offset + 4)) == specification_crc32_castagnoli(
         bytes.subrange(header_end, bytes.len() as int),
     ) as nat
 }
 
 /// 类身份段之后那 29 字节预留位全 0（[`check_encryption_reserved_bytes_are_zero`] 的规格）。
-pub open spec fn spec_encryption_reserved_bytes_are_zero(bytes: Seq<u8>, header_end: int) -> bool {
+pub open spec fn specification_encryption_reserved_bytes_are_zero(bytes: Seq<u8>, header_end: int) -> bool {
     bytes.subrange(header_end, header_end + NONCE_MAC_ALGORITHM_RESERVED_BYTES) == zero_bytes(
         NONCE_MAC_ALGORITHM_RESERVED_BYTES as nat,
     )
 }
 
 /// 定宽的几段依次接起来（记录区、条目区）：从末尾那一段往前剥，与写者逐段追加同一个次序。
-pub open spec fn spec_concatenation(pieces: Seq<Seq<u8>>) -> Seq<u8>
+pub open spec fn specification_concatenation(pieces: Seq<Seq<u8>>) -> Seq<u8>
     decreases pieces.len(),
 {
     if pieces.len() == 0 {
         Seq::empty()
     } else {
-        spec_concatenation(pieces.drop_last()) + pieces.last()
+        specification_concatenation(pieces.drop_last()) + pieces.last()
     }
 }
 
 /// 一串 `Vec<u8>` 各自的字节。
-pub open spec fn spec_byte_sequences_of_vectors(vectors: Seq<Vec<u8>>) -> Seq<Seq<u8>> {
+pub open spec fn specification_byte_sequences_of_vectors(vectors: Seq<Vec<u8>>) -> Seq<Seq<u8>> {
     vectors.map_values(|vector: Vec<u8>| vector@)
 }
 
 /// 每一段都恰好 `width` 字节。
-pub open spec fn spec_every_piece_has_width(pieces: Seq<Seq<u8>>, width: nat) -> bool {
+pub open spec fn specification_every_piece_has_width(pieces: Seq<Seq<u8>>, width: nat) -> bool {
     forall|piece_index: int| 0 <= piece_index < pieces.len() ==> (#[trigger] pieces[piece_index]).len() == width
 }
 
 /// 从 `start` 起切 `count` 段、各 `width` 字节（读者切记录区、条目区的读法）。
-pub open spec fn spec_pieces_at(bytes: Seq<u8>, start: int, count: nat, width: nat) -> Seq<Seq<u8>> {
+pub open spec fn specification_pieces_at(bytes: Seq<u8>, start: int, count: nat, width: nat) -> Seq<Seq<u8>> {
     Seq::new(count, |piece_index: int| bytes.subrange(start + piece_index * width, start + (piece_index + 1) * width))
 }
 
 /// 定宽的 `n` 段接起来是 `n × width` 字节。
 pub proof fn lemma_concatenation_of_pieces_of_one_width(pieces: Seq<Seq<u8>>, width: nat)
     requires
-        spec_every_piece_has_width(pieces, width),
+        specification_every_piece_has_width(pieces, width),
     ensures
-        spec_concatenation(pieces).len() == pieces.len() * width,
+        specification_concatenation(pieces).len() == pieces.len() * width,
     decreases pieces.len(),
 {
     if pieces.len() > 0 {
         let shorter = pieces.drop_last();
-        assert(spec_every_piece_has_width(shorter, width)) by {
+        assert(specification_every_piece_has_width(shorter, width)) by {
             assert forall|piece_index: int| 0 <= piece_index < shorter.len() implies (#[trigger] shorter[piece_index]).len()
                 == width by {
                 assert(shorter[piece_index] == pieces[piece_index]);
@@ -237,22 +237,22 @@ pub proof fn lemma_concatenation_of_pieces_of_one_width(pieces: Seq<Seq<u8>>, wi
 /// 定宽的 `n` 段接起来，第 `piece_index` 段落在 `[piece_index × width, (piece_index + 1) × width)`。
 pub proof fn lemma_piece_of_a_concatenation(pieces: Seq<Seq<u8>>, width: nat, piece_index: int)
     requires
-        spec_every_piece_has_width(pieces, width),
+        specification_every_piece_has_width(pieces, width),
         0 <= piece_index < pieces.len(),
     ensures
-        spec_concatenation(pieces).subrange(piece_index * width, (piece_index + 1) * width) == pieces[piece_index],
+        specification_concatenation(pieces).subrange(piece_index * width, (piece_index + 1) * width) == pieces[piece_index],
     decreases pieces.len(),
 {
     let shorter = pieces.drop_last();
-    assert(spec_every_piece_has_width(shorter, width)) by {
+    assert(specification_every_piece_has_width(shorter, width)) by {
         assert forall|shorter_index: int| 0 <= shorter_index < shorter.len() implies (#[trigger] shorter[shorter_index]).len()
             == width by {
             assert(shorter[shorter_index] == pieces[shorter_index]);
         }
     }
     lemma_concatenation_of_pieces_of_one_width(shorter, width);
-    let whole = spec_concatenation(pieces);
-    let front = spec_concatenation(shorter);
+    let whole = specification_concatenation(pieces);
+    let front = specification_concatenation(shorter);
     assert(whole == front + pieces.last());
     if piece_index == pieces.len() - 1 {
         assert(pieces.last() == pieces[piece_index]);
@@ -281,14 +281,14 @@ pub proof fn lemma_piece_of_a_concatenation(pieces: Seq<Seq<u8>>, width: nat, pi
 /// 读者切出来的定宽各段就是写者接起来的那几段：`[start, start + n × width)` 是那 `n` 段接起来的，就按段切回它们。
 pub proof fn lemma_pieces_at_a_concatenation(bytes: Seq<u8>, start: int, pieces: Seq<Seq<u8>>, width: nat)
     requires
-        spec_every_piece_has_width(pieces, width),
+        specification_every_piece_has_width(pieces, width),
         0 <= start,
         start + pieces.len() * width <= bytes.len(),
-        bytes.subrange(start, start + pieces.len() * width) == spec_concatenation(pieces),
+        bytes.subrange(start, start + pieces.len() * width) == specification_concatenation(pieces),
     ensures
-        spec_pieces_at(bytes, start, pieces.len(), width) == pieces,
+        specification_pieces_at(bytes, start, pieces.len(), width) == pieces,
 {
-    let cut = spec_pieces_at(bytes, start, pieces.len(), width);
+    let cut = specification_pieces_at(bytes, start, pieces.len(), width);
     assert forall|piece_index: int| 0 <= piece_index < pieces.len() implies #[trigger] cut[piece_index] == pieces[piece_index] by {
         lemma_piece_of_a_concatenation(pieces, width, piece_index);
         assert((piece_index + 1) * width <= pieces.len() * width) by (nonlinear_arith)
@@ -300,7 +300,7 @@ pub proof fn lemma_pieces_at_a_concatenation(bytes: Seq<u8>, start: int, pieces:
                 0 <= piece_index,
         ;
         assert((piece_index + 1) * width == piece_index * width + width) by (nonlinear_arith);
-        assert(cut[piece_index] =~= spec_concatenation(pieces).subrange(piece_index * width, (piece_index + 1) * width));
+        assert(cut[piece_index] =~= specification_concatenation(pieces).subrange(piece_index * width, (piece_index + 1) * width));
     }
     assert(cut =~= pieces);
 }
@@ -317,14 +317,14 @@ pub proof fn lemma_sealed_unit_keeps_everything_outside_the_two_checksums(
         header_end <= unsealed.len(),
     ensures
         ({
-            let sealed = spec_sealed_unit(unsealed, header_end, payload_checksum_offset);
+            let sealed = specification_sealed_unit(unsealed, header_end, payload_checksum_offset);
             &&& sealed.len() == unsealed.len()
             &&& forall|position: int|
                 0 <= position < unsealed.len() && !(HEADER_CHECKSUM_OFFSET <= position < UNIT_COMMON_PREFIX_BYTES) && !(
                 payload_checksum_offset <= position < payload_checksum_offset + 4) ==> #[trigger] sealed[position]
                     == unsealed[position]
-            &&& spec_header_checksum_holds(sealed, header_end)
-            &&& spec_payload_checksum_holds(sealed, header_end, payload_checksum_offset)
+            &&& specification_header_checksum_holds(sealed, header_end)
+            &&& specification_payload_checksum_holds(sealed, header_end, payload_checksum_offset)
             &&& sealed.subrange(header_end, sealed.len() as int) == unsealed.subrange(header_end, unsealed.len() as int)
             &&& forall|start: int, end: int|
                 0 <= start <= end <= unsealed.len() && (end <= HEADER_CHECKSUM_OFFSET || UNIT_COMMON_PREFIX_BYTES <= start)
@@ -335,12 +335,12 @@ pub proof fn lemma_sealed_unit_keeps_everything_outside_the_two_checksums(
         }),
 {
     lemma_little_endian_capacities();
-    let with_payload_checksum = spec_payload_checksum_written(unsealed, header_end, payload_checksum_offset);
-    let crc = spec_crc32_castagnoli(unsealed.subrange(header_end, unsealed.len() as int));
+    let with_payload_checksum = specification_payload_checksum_written(unsealed, header_end, payload_checksum_offset);
+    let crc = specification_crc32_castagnoli(unsealed.subrange(header_end, unsealed.len() as int));
     assert(with_payload_checksum.len() == unsealed.len());
-    let field = spec_wide_checksum_field(with_payload_checksum, header_end, 10);
+    let field = specification_wide_checksum_field(with_payload_checksum, header_end, 10);
     assert(field.len() == 32);
-    let sealed = spec_sealed_unit(unsealed, header_end, payload_checksum_offset);
+    let sealed = specification_sealed_unit(unsealed, header_end, payload_checksum_offset);
     assert(sealed == with_payload_checksum.subrange(0, 10) + field + with_payload_checksum.subrange(42, unsealed.len() as int));
     assert(sealed.len() == unsealed.len());
     assert forall|position: int|
@@ -371,7 +371,7 @@ pub proof fn lemma_sealed_unit_keeps_everything_outside_the_two_checksums(
         assert(with_payload_checksum[position] == unsealed[position]);
     }
     // 罩住的那一截（字段按 0）两份相同，所以封进去的字段就是读者现算的字段。
-    assert(spec_covered_with_the_field_zeroed(sealed, header_end, 10) =~= spec_covered_with_the_field_zeroed(
+    assert(specification_covered_with_the_field_zeroed(sealed, header_end, 10) =~= specification_covered_with_the_field_zeroed(
         with_payload_checksum,
         header_end,
         10,
@@ -404,7 +404,7 @@ pub proof fn lemma_sealed_unit_keeps_everything_outside_the_two_checksums(
 #[must_use]
 pub fn unit_filesystem_identifier(filesystem_identifier: &[u8; 16]) -> (identifier_in_unit_headers: u64)
     ensures
-        identifier_in_unit_headers == spec_unit_filesystem_identifier(*filesystem_identifier),
+        identifier_in_unit_headers == specification_unit_filesystem_identifier(*filesystem_identifier),
         little_endian_bytes(identifier_in_unit_headers as nat, 8) == filesystem_identifier@.subrange(0, 8),
 {
     // u64::from_le_bytes 与切片转数组没有 Verus 规格：经 ByteReader 读前 8 字节的小端，同一个值。
@@ -420,7 +420,7 @@ pub fn write_common_prefix(writer: &mut ByteWriter, unit_class: u8, declared_len
         old(writer).written() == Seq::<u8>::empty(),
     ensures
         final(writer).is_well_formed(),
-        final(writer).written() == spec_common_prefix_bytes(unit_class, declared_length),
+        final(writer).written() == specification_common_prefix_bytes(unit_class, declared_length),
         final(writer).total_bytes() == old(writer).total_bytes(),
 {
     writer.put(&UNIT_MAGIC);
@@ -429,7 +429,7 @@ pub fn write_common_prefix(writer: &mut ByteWriter, unit_class: u8, declared_len
     writer.put_u8(0);
     writer.put_u16(declared_length);
     writer.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
-    assert(writer.written() =~= spec_common_prefix_bytes(unit_class, declared_length));
+    assert(writer.written() =~= specification_common_prefix_bytes(unit_class, declared_length));
     writer.assert_position(UNIT_COMMON_PREFIX_BYTES, "共同前缀");
 }
 
@@ -439,13 +439,13 @@ pub fn write_common_prefix(writer: &mut ByteWriter, unit_class: u8, declared_len
 /// 头校验和字段不整个落在 `[0, header_end)` 里，或 `header_end` 过了 `bytes` 末尾（`requires` 排除的那一种）。
 pub fn seal_header_checksum(bytes: &mut [u8], header_end: usize)
     requires
-        spec_wide_checksum_field_fits(old(bytes)@, header_end as int, HEADER_CHECKSUM_OFFSET as int),
+        specification_wide_checksum_field_fits(old(bytes)@, header_end as int, HEADER_CHECKSUM_OFFSET as int),
     ensures
-        final(bytes)@ == spec_header_checksum_sealed(old(bytes)@, header_end as int),
+        final(bytes)@ == specification_header_checksum_sealed(old(bytes)@, header_end as int),
 {
     let digest = wide_checksum_with_field_zeroed(bytes, header_end, HEADER_CHECKSUM_OFFSET);
     bytes[HEADER_CHECKSUM_OFFSET..HEADER_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
-    assert(bytes@ =~= spec_header_checksum_sealed(old(bytes)@, header_end as int));
+    assert(bytes@ =~= specification_header_checksum_sealed(old(bytes)@, header_end as int));
 }
 
 /// 载荷 CRC 罩 `[header_end, 末尾)`，小端 4 字节写进 `payload_checksum_offset`：三类单元的写者共用这一步（原来各写一份
@@ -455,7 +455,7 @@ fn seal_payload_checksum(bytes: &mut [u8], header_end: usize, payload_checksum_o
         payload_checksum_offset + 4 <= header_end,
         header_end <= old(bytes)@.len(),
     ensures
-        final(bytes)@ == spec_payload_checksum_written(
+        final(bytes)@ == specification_payload_checksum_written(
             old(bytes)@,
             header_end as int,
             payload_checksum_offset as int,
@@ -469,7 +469,7 @@ fn seal_payload_checksum(bytes: &mut [u8], header_end: usize, payload_checksum_o
         assert(checksum_bytes@ =~= little_endian_bytes(payload_crc as nat, 4));
     }
     bytes[payload_checksum_offset..payload_checksum_offset + 4].copy_from_slice(checksum_bytes.as_slice());
-    assert(bytes@ =~= spec_payload_checksum_written(old(bytes)@, header_end as int, payload_checksum_offset as int));
+    assert(bytes@ =~= specification_payload_checksum_written(old(bytes)@, header_end as int, payload_checksum_offset as int));
 }
 
 // ===== 码 3 打包记录单元的身份 =====
@@ -485,13 +485,13 @@ pub struct PackedIdentity {
 
 impl PackedIdentity {
     /// 盘上 26 字节：出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8，小端（退役记录与 inode 内部条目里的身份引用同序同宽）。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.birth_tree.0 as nat, 8) + little_endian_bytes(self.record_type as nat, 2)
             + little_endian_bytes(self.container as nat, 8) + little_endian_bytes(self.container_birth.0 as nat, 8)
     }
 
     /// 从 `source` 的 `position` 起读 26 字节解成的身份。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         PackedIdentity {
             birth_tree: TreeIdentifier(little_endian_value(source.subrange(position, position + 8)) as u64),
             record_type: little_endian_value(source.subrange(position + 8, position + 10)) as u16,
@@ -505,9 +505,9 @@ impl PackedIdentity {
         requires
             0 <= position,
             position + 26 <= source.len(),
-            source.subrange(position, position + 26) == self.spec_bytes(),
+            source.subrange(position, position + 26) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
+            Self::specification_decode_at(source, position) == self,
     {
         broadcast use group_little_endian_round_trips;
         lemma_little_endian_capacities();
@@ -524,18 +524,18 @@ impl PackedIdentity {
 // ===== 码 2 节点的头宽与容量 =====
 
 /// 码 2 节点明文头末尾 `86 + 2 × key 宽`（[`index_node_plain_header_end`] 的式子）。
-pub open spec fn spec_index_node_plain_header_end(key_width: int) -> int {
+pub open spec fn specification_index_node_plain_header_end(key_width: int) -> int {
     INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE + INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT * key_width
 }
 
 /// 码 2 节点含预留位的头宽 `86 + 2 × key 宽 + 29`（[`index_node_header_bytes`] 的式子）。
-pub open spec fn spec_index_node_header_bytes(key_width: int) -> int {
-    spec_index_node_plain_header_end(key_width) + NONCE_MAC_ALGORITHM_RESERVED_BYTES
+pub open spec fn specification_index_node_header_bytes(key_width: int) -> int {
+    specification_index_node_plain_header_end(key_width) + NONCE_MAC_ALGORITHM_RESERVED_BYTES
 }
 
 /// 一个码 2 节点装得下的定宽条目数 `(16384 − 含预留位的头宽) ÷ 条目宽`（[`index_node_entry_capacity`] 的式子）。
-pub open spec fn spec_index_node_entry_capacity(key_width: int, entry_width: int) -> int {
-    (NODE_BYTES - spec_index_node_header_bytes(key_width)) / entry_width
+pub open spec fn specification_index_node_entry_capacity(key_width: int, entry_width: int) -> int {
+    (NODE_BYTES - specification_index_node_header_bytes(key_width)) / entry_width
 }
 
 /// 码 2 索引节点 16384（D18（块里携带什么信息） 已定项 18 的偏移表，key 宽住 51）：
@@ -549,7 +549,7 @@ fn index_node_plain_header_end(key_width: usize) -> (header_end: usize)
     requires
         key_width <= NODE_BYTES,
     ensures
-        header_end == spec_index_node_plain_header_end(key_width as int),
+        header_end == specification_index_node_plain_header_end(key_width as int),
 {
     let key_range_bytes = usize::try_from(INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT)
         .expect("key 区间两个 key")
@@ -570,7 +570,7 @@ pub fn index_node_header_bytes(key_width: usize) -> (header_bytes: usize)
     requires
         key_width <= NODE_BYTES,
     ensures
-        header_bytes == spec_index_node_header_bytes(key_width as int),
+        header_bytes == specification_index_node_header_bytes(key_width as int),
 {
     index_node_plain_header_end(key_width) + reserved_bytes()
 }
@@ -586,9 +586,9 @@ pub fn index_node_header_bytes(key_width: usize) -> (header_bytes: usize)
 pub fn index_node_entry_capacity(key_width: usize, entry_width: usize) -> (capacity: usize)
     requires
         entry_width > 0,
-        spec_index_node_header_bytes(key_width as int) <= NODE_BYTES,
+        specification_index_node_header_bytes(key_width as int) <= NODE_BYTES,
     ensures
-        capacity == spec_index_node_entry_capacity(key_width as int, entry_width as int),
+        capacity == specification_index_node_entry_capacity(key_width as int, entry_width as int),
 {
     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
     assert!(
@@ -608,7 +608,7 @@ pub fn index_node_entry_capacity(key_width: usize, entry_width: usize) -> (capac
 /// 码 3 单元没封的头连同预留位，`[0, 136)`，照写者的次序逐段接：共同前缀 42、类标签副本 1、身份 26（出生树 8 + 打包记录类型 2
 /// + 容器号 8 + 容器出生代 8）、记录数 2、记录宽 2、诞生代号 8、fsid 8、载荷 CRC 4（写的时候是 0）、写序 10（实例代号 4 + 事务号 6）、
 /// 出生序号 4、预留位 29。
-pub open spec fn spec_packed_unit_unsealed_header(
+pub open spec fn specification_packed_unit_unsealed_header(
     identity: PackedIdentity,
     record_count: nat,
     record_width: u16,
@@ -617,7 +617,7 @@ pub open spec fn spec_packed_unit_unsealed_header(
     write_order: WriteOrder,
     birth_sequence: BirthSequence,
 ) -> Seq<u8> {
-    spec_common_prefix_bytes(UNIT_CLASS_PACKED, (record_count * record_width) as u16) + little_endian_bytes(
+    specification_common_prefix_bytes(UNIT_CLASS_PACKED, (record_count * record_width) as u16) + little_endian_bytes(
         UNIT_CLASS_PACKED as nat,
         1,
     ) + little_endian_bytes(identity.birth_tree.0 as nat, 8) + little_endian_bytes(identity.record_type as nat, 2)
@@ -625,13 +625,13 @@ pub open spec fn spec_packed_unit_unsealed_header(
         + little_endian_bytes(record_count, 2) + little_endian_bytes(record_width as nat, 2) + little_endian_bytes(
         birth_txg.0 as nat,
         8,
-    ) + little_endian_bytes(spec_unit_filesystem_identifier(filesystem_identifier) as nat, 8) + zero_bytes(4)
+    ) + little_endian_bytes(specification_unit_filesystem_identifier(filesystem_identifier) as nat, 8) + zero_bytes(4)
         + little_endian_bytes(write_order.instance.0 as nat, 4) + little_endian_bytes(write_order.transaction as nat, 6)
         + little_endian_bytes(birth_sequence.0 as nat, 4) + zero_bytes(NONCE_MAC_ALGORITHM_RESERVED_BYTES as nat)
 }
 
 /// 码 3 单元没封的那一份：共同前缀、类身份段、记录依次接在 136 之后、补 0 到 32768。
-pub open spec fn spec_packed_unit_unsealed_bytes(
+pub open spec fn specification_packed_unit_unsealed_bytes(
     identity: PackedIdentity,
     record_width: u16,
     records: Seq<Seq<u8>>,
@@ -640,7 +640,7 @@ pub open spec fn spec_packed_unit_unsealed_bytes(
     write_order: WriteOrder,
     birth_sequence: BirthSequence,
 ) -> Seq<u8> {
-    let header = spec_packed_unit_unsealed_header(
+    let header = specification_packed_unit_unsealed_header(
         identity,
         records.len(),
         record_width,
@@ -649,12 +649,12 @@ pub open spec fn spec_packed_unit_unsealed_bytes(
         write_order,
         birth_sequence,
     );
-    let record_area = spec_concatenation(records);
+    let record_area = specification_concatenation(records);
     header + record_area + zero_bytes((DATA_UNIT_BYTES - header.len() - record_area.len()) as nat)
 }
 
 /// [`build_packed_unit`] 写出的整个码 3 单元：载荷 CRC 罩 [107, 32768)、写在 89；头校验和罩 [0, 107)。
-pub open spec fn spec_packed_unit_bytes(
+pub open spec fn specification_packed_unit_bytes(
     identity: PackedIdentity,
     record_width: u16,
     records: Seq<Seq<u8>>,
@@ -663,8 +663,8 @@ pub open spec fn spec_packed_unit_bytes(
     write_order: WriteOrder,
     birth_sequence: BirthSequence,
 ) -> Seq<u8> {
-    spec_sealed_unit(
-        spec_packed_unit_unsealed_bytes(
+    specification_sealed_unit(
+        specification_packed_unit_unsealed_bytes(
             identity,
             record_width,
             records,
@@ -679,19 +679,19 @@ pub open spec fn spec_packed_unit_bytes(
 }
 
 /// 一个码 3 单元的记录区装得下的字节：32768 − 头 107 − 预留位 29。
-pub open spec fn spec_packed_unit_record_area_bytes() -> int {
+pub open spec fn specification_packed_unit_record_area_bytes() -> int {
     DATA_UNIT_BYTES - PACKED_UNIT_HEADER_BYTES - NONCE_MAC_ALGORITHM_RESERVED_BYTES
 }
 
 /// [`build_packed_unit`] 的前提，也就是 [`lemma_packed_unit_round_trip`] 的前提（往返不另加）：写序的事务号装得进 6 字节、
 /// 记录宽不是 0、记录数装得进 2 字节、记录区装得进一个单元、每条记录都是记录宽。
 /// 记录宽不是 0 与读者那一判（记录宽 0 而记录数不为 0 就拒）对齐：I-1.7 要记录宽等于登记表为那个打包记录类型登记的宽，登记的宽都不是 0。
-pub open spec fn spec_packed_unit_writer_accepts(write_order: WriteOrder, record_width: u16, records: Seq<Seq<u8>>) -> bool {
+pub open spec fn specification_packed_unit_writer_accepts(write_order: WriteOrder, record_width: u16, records: Seq<Seq<u8>>) -> bool {
     &&& write_order.is_encodable()
     &&& record_width > 0
     &&& records.len() <= u16::MAX
-    &&& records.len() * record_width <= spec_packed_unit_record_area_bytes()
-    &&& spec_every_piece_has_width(records, record_width as nat)
+    &&& records.len() * record_width <= specification_packed_unit_record_area_bytes()
+    &&& specification_every_piece_has_width(records, record_width as nat)
 }
 
 /// 码 3 打包记录单元 32768：类身份段 107 + 预留位 29，记录区从 136 起；载荷 CRC 罩 [107, 32768)。
@@ -700,7 +700,7 @@ pub open spec fn spec_packed_unit_writer_accepts(write_order: WriteOrder, record
 /// 记录数装不进 2 字节、记录区装不进一个单元、或有一条记录的宽与 `record_width` 不同（`requires` 排除的三种：写者先按容量切好记录再调这里）；
 /// 写序的事务号装不进 6 字节（同上）。
 ///
-/// `requires` 另要记录宽不是 0（[`spec_packed_unit_writer_accepts`]）：只约束经 Verus 验过的调用方，函数体不判它、不为它 panic；
+/// `requires` 另要记录宽不是 0（[`specification_packed_unit_writer_accepts`]）：只约束经 Verus 验过的调用方，函数体不判它、不为它 panic；
 /// 今天的调用方都在 `verus!` 之外，传的都是登记表里非 0 的记录宽。
 #[must_use]
 pub fn build_packed_unit(
@@ -713,19 +713,19 @@ pub fn build_packed_unit(
     birth_sequence: BirthSequence,
 ) -> (unit: Vec<u8>)
     requires
-        spec_packed_unit_writer_accepts(write_order, record_width, spec_byte_sequences_of_vectors(records@)),
+        specification_packed_unit_writer_accepts(write_order, record_width, specification_byte_sequences_of_vectors(records@)),
     ensures
-        unit@ == spec_packed_unit_bytes(
+        unit@ == specification_packed_unit_bytes(
             identity,
             record_width,
-            spec_byte_sequences_of_vectors(records@),
+            specification_byte_sequences_of_vectors(records@),
             birth_txg,
             *filesystem_identifier,
             write_order,
             birth_sequence,
         ),
 {
-    let ghost record_pieces = spec_byte_sequences_of_vectors(records@);
+    let ghost record_pieces = specification_byte_sequences_of_vectors(records@);
     let header_end = usize::try_from(PACKED_UNIT_HEADER_BYTES).expect("107");
     let declared_length =
         u16::try_from(records.len() * usize::from(record_width)).expect("声明长度 2 字节");
@@ -753,7 +753,7 @@ pub fn build_packed_unit(
     writer.assert_position(PACKED_UNIT_HEADER_BYTES, "码 3 头");
     writer.skip(reserved_bytes());
     let ghost header = writer.written();
-    assert(header == spec_packed_unit_unsealed_header(
+    assert(header == specification_packed_unit_unsealed_header(
         identity,
         records@.len(),
         record_width,
@@ -769,11 +769,11 @@ pub fn build_packed_unit(
             writer.is_well_formed(),
             writer.total_bytes() == DATA_UNIT_BYTES,
             header.len() == 136,
-            record_pieces == spec_byte_sequences_of_vectors(records@),
+            record_pieces == specification_byte_sequences_of_vectors(records@),
             record_index <= records@.len(),
-            records@.len() * record_width <= spec_packed_unit_record_area_bytes(),
-            spec_every_piece_has_width(record_pieces, record_width as nat),
-            writer.written() == header + spec_concatenation(record_pieces.subrange(0, record_index as int)),
+            records@.len() * record_width <= specification_packed_unit_record_area_bytes(),
+            specification_every_piece_has_width(record_pieces, record_width as nat),
+            writer.written() == header + specification_concatenation(record_pieces.subrange(0, record_index as int)),
         decreases records@.len() - record_index,
     {
         let record = &records[record_index];
@@ -788,7 +788,7 @@ pub fn build_packed_unit(
         );
         proof {
             let written_pieces = record_pieces.subrange(0, record_index as int);
-            assert(spec_every_piece_has_width(written_pieces, record_width as nat));
+            assert(specification_every_piece_has_width(written_pieces, record_width as nat));
             lemma_concatenation_of_pieces_of_one_width(written_pieces, record_width as nat);
             assert(record_index * record_width + record_width <= records@.len() * record_width) by (nonlinear_arith)
                 requires
@@ -809,7 +809,7 @@ pub fn build_packed_unit(
         lemma_concatenation_of_pieces_of_one_width(record_pieces, record_width as nat);
     }
     let mut bytes = writer.into_bytes();
-    assert(bytes@ =~= spec_packed_unit_unsealed_bytes(
+    assert(bytes@ =~= specification_packed_unit_unsealed_bytes(
         identity,
         record_width,
         record_pieces,
@@ -827,7 +827,7 @@ pub fn build_packed_unit(
 
 /// 码 2 节点没封的头连同预留位，`[0, 115 + 2k)`，照写者的次序逐段接：共同前缀 42、树 ID 8、层级 1、key 宽 1、key 区间 2k、诞生代号 8、
 /// fsid 8、实例代号 4、出生序号 4、载荷 CRC 4（写的时候是 0）、预留 2、条目数 2、条目宽 2、预留位 29。
-pub open spec fn spec_index_node_unsealed_header(
+pub open spec fn specification_index_node_unsealed_header(
     tree: TreeIdentifier,
     level: u8,
     smallest_key: Seq<u8>,
@@ -839,12 +839,12 @@ pub open spec fn spec_index_node_unsealed_header(
     entry_count: nat,
     entry_width: u16,
 ) -> Seq<u8> {
-    spec_common_prefix_bytes(UNIT_CLASS_INDEX_NODE, (entry_count * entry_width) as u16) + little_endian_bytes(
+    specification_common_prefix_bytes(UNIT_CLASS_INDEX_NODE, (entry_count * entry_width) as u16) + little_endian_bytes(
         tree.0 as nat,
         8,
     ) + little_endian_bytes(level as nat, 1) + little_endian_bytes(smallest_key.len(), 1) + smallest_key + largest_key
         + little_endian_bytes(birth_txg.0 as nat, 8) + little_endian_bytes(
-        spec_unit_filesystem_identifier(filesystem_identifier) as nat,
+        specification_unit_filesystem_identifier(filesystem_identifier) as nat,
         8,
     ) + little_endian_bytes(instance.0 as nat, 4) + little_endian_bytes(birth_sequence.0 as nat, 4) + zero_bytes(4)
         + zero_bytes(2) + little_endian_bytes(entry_count, 2) + little_endian_bytes(entry_width as nat, 2) + zero_bytes(
@@ -853,7 +853,7 @@ pub open spec fn spec_index_node_unsealed_header(
 }
 
 /// 码 2 节点没封的那一份：共同前缀、类身份段、预留位 29、条目依次接起来、补 0 到 16384。
-pub open spec fn spec_index_node_unsealed_bytes(
+pub open spec fn specification_index_node_unsealed_bytes(
     tree: TreeIdentifier,
     level: u8,
     smallest_key: Seq<u8>,
@@ -865,7 +865,7 @@ pub open spec fn spec_index_node_unsealed_bytes(
     entry_width: u16,
     entries: Seq<Seq<u8>>,
 ) -> Seq<u8> {
-    let header = spec_index_node_unsealed_header(
+    let header = specification_index_node_unsealed_header(
         tree,
         level,
         smallest_key,
@@ -877,12 +877,12 @@ pub open spec fn spec_index_node_unsealed_bytes(
         entries.len(),
         entry_width,
     );
-    let entry_area = spec_concatenation(entries);
+    let entry_area = specification_concatenation(entries);
     header + entry_area + zero_bytes((NODE_BYTES - header.len() - entry_area.len()) as nat)
 }
 
 /// [`build_index_node`] 写出的整个码 2 节点：载荷 CRC 罩 [86 + 2k, 16384)、写在 76 + 2k；头校验和罩 [0, 86 + 2k)。
-pub open spec fn spec_index_node_bytes(
+pub open spec fn specification_index_node_bytes(
     tree: TreeIdentifier,
     level: u8,
     smallest_key: Seq<u8>,
@@ -894,9 +894,9 @@ pub open spec fn spec_index_node_bytes(
     entry_width: u16,
     entries: Seq<Seq<u8>>,
 ) -> Seq<u8> {
-    let header_end = spec_index_node_plain_header_end(smallest_key.len() as int);
-    spec_sealed_unit(
-        spec_index_node_unsealed_bytes(
+    let header_end = specification_index_node_plain_header_end(smallest_key.len() as int);
+    specification_sealed_unit(
+        specification_index_node_unsealed_bytes(
             tree,
             level,
             smallest_key,
@@ -917,7 +917,7 @@ pub open spec fn spec_index_node_bytes(
 /// 条目宽不是 0、条目宽不窄于 key 宽、条目不多于一个节点装得下的、每条条目都是条目宽。
 /// 条目宽不窄于 key 宽不论有没有条目都要，与读者那一判（空节点也判）对齐：D8（核心索引结构） 已定项 11 要条目里 key 一律是前 key 宽个字节，
 /// I-1.10 要条目宽等于那棵树登记的条目字段表宽度，登记的宽都不窄于那棵树的 key 宽。
-pub open spec fn spec_index_node_writer_accepts(
+pub open spec fn specification_index_node_writer_accepts(
     key_width: int,
     smallest_key: Seq<u8>,
     largest_key: Seq<u8>,
@@ -929,15 +929,15 @@ pub open spec fn spec_index_node_writer_accepts(
     &&& key_width <= u8::MAX
     &&& entry_width > 0
     &&& key_width <= entry_width
-    &&& entries.len() <= spec_index_node_entry_capacity(key_width, entry_width as int)
-    &&& spec_every_piece_has_width(entries, entry_width as nat)
+    &&& entries.len() <= specification_index_node_entry_capacity(key_width, entry_width as int)
+    &&& specification_every_piece_has_width(entries, entry_width as nat)
 }
 
 /// # Panics
 /// 两端 key 不是 `key_width` 宽、`key_width` 装不进一个字节、条目宽是 0、条目多于一个节点装得下的、或有一条条目的宽不是 `entry_width`
 /// 或窄于 key 宽（`requires` 排除的几种：写者先按 [`index_node_entry_capacity`] 判「装不下」并报错，不走到这里）。
 ///
-/// `requires` 另要空节点的条目宽也不窄于 key 宽（[`spec_index_node_writer_accepts`]）：只约束经 Verus 验过的调用方，函数体只在有条目时
+/// `requires` 另要空节点的条目宽也不窄于 key 宽（[`specification_index_node_writer_accepts`]）：只约束经 Verus 验过的调用方，函数体只在有条目时
 /// 判它（逐条的那一句断言），空节点不为它 panic；今天的调用方都在 `verus!` 之外，传的 key 宽与条目宽都是登记表里的格式常量。
 #[allow(
     clippy::too_many_arguments,
@@ -958,15 +958,15 @@ pub fn build_index_node(
     entries: &[Vec<u8>],
 ) -> (node: Vec<u8>)
     requires
-        spec_index_node_writer_accepts(
+        specification_index_node_writer_accepts(
             key_width as int,
             smallest_key@,
             largest_key@,
             entry_width,
-            spec_byte_sequences_of_vectors(entries@),
+            specification_byte_sequences_of_vectors(entries@),
         ),
     ensures
-        node@ == spec_index_node_bytes(
+        node@ == specification_index_node_bytes(
             tree,
             level,
             smallest_key@,
@@ -976,16 +976,16 @@ pub fn build_index_node(
             instance,
             birth_sequence,
             entry_width,
-            spec_byte_sequences_of_vectors(entries@),
+            specification_byte_sequences_of_vectors(entries@),
         ),
 {
-    let ghost entry_pieces = spec_byte_sequences_of_vectors(entries@);
+    let ghost entry_pieces = specification_byte_sequences_of_vectors(entries@);
     proof {
-        assert(entries@.len() * entry_width <= NODE_BYTES - spec_index_node_header_bytes(key_width as int)) by (nonlinear_arith)
+        assert(entries@.len() * entry_width <= NODE_BYTES - specification_index_node_header_bytes(key_width as int)) by (nonlinear_arith)
             requires
-                entries@.len() <= (NODE_BYTES - spec_index_node_header_bytes(key_width as int)) / (entry_width as int),
+                entries@.len() <= (NODE_BYTES - specification_index_node_header_bytes(key_width as int)) / (entry_width as int),
                 entry_width > 0,
-                spec_index_node_header_bytes(key_width as int) <= NODE_BYTES,
+                specification_index_node_header_bytes(key_width as int) <= NODE_BYTES,
         ;
     }
     // assert_eq! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert! 加同一句话。
@@ -1021,7 +1021,7 @@ pub fn build_index_node(
     writer.assert_position(u64::try_from(header_end).expect("头末尾"), "码 2 头");
     writer.skip(reserved_bytes());
     let ghost header = writer.written();
-    assert(header == spec_index_node_unsealed_header(
+    assert(header == specification_index_node_unsealed_header(
         tree,
         level,
         smallest_key@,
@@ -1039,13 +1039,13 @@ pub fn build_index_node(
         invariant
             writer.is_well_formed(),
             writer.total_bytes() == NODE_BYTES,
-            header.len() == spec_index_node_header_bytes(key_width as int),
-            entry_pieces == spec_byte_sequences_of_vectors(entries@),
+            header.len() == specification_index_node_header_bytes(key_width as int),
+            entry_pieces == specification_byte_sequences_of_vectors(entries@),
             entry_index <= entries@.len(),
-            entries@.len() * entry_width <= NODE_BYTES - spec_index_node_header_bytes(key_width as int),
+            entries@.len() * entry_width <= NODE_BYTES - specification_index_node_header_bytes(key_width as int),
             key_width <= entry_width,
-            spec_every_piece_has_width(entry_pieces, entry_width as nat),
-            writer.written() == header + spec_concatenation(entry_pieces.subrange(0, entry_index as int)),
+            specification_every_piece_has_width(entry_pieces, entry_width as nat),
+            writer.written() == header + specification_concatenation(entry_pieces.subrange(0, entry_index as int)),
         decreases entries@.len() - entry_index,
     {
         let entry = &entries[entry_index];
@@ -1064,7 +1064,7 @@ pub fn build_index_node(
         );
         proof {
             let written_pieces = entry_pieces.subrange(0, entry_index as int);
-            assert(spec_every_piece_has_width(written_pieces, entry_width as nat));
+            assert(specification_every_piece_has_width(written_pieces, entry_width as nat));
             lemma_concatenation_of_pieces_of_one_width(written_pieces, entry_width as nat);
             assert(entry_index * entry_width + entry_width <= entries@.len() * entry_width) by (nonlinear_arith)
                 requires
@@ -1085,7 +1085,7 @@ pub fn build_index_node(
         lemma_concatenation_of_pieces_of_one_width(entry_pieces, entry_width as nat);
     }
     let mut bytes = writer.into_bytes();
-    assert(bytes@ =~= spec_index_node_unsealed_bytes(
+    assert(bytes@ =~= specification_index_node_unsealed_bytes(
         tree,
         level,
         smallest_key@,
@@ -1126,45 +1126,45 @@ pub fn data_unit_payload_capacity() -> (capacity: usize)
 
 /// 码 1 单元没封的头连同预留位，`[0, 134)`，照写者的次序逐段接：共同前缀 42、类标签副本 1、树 ID 8、对象 ID 8、对象出生代 8、锚点 8、
 /// 诞生代号 8、fsid 8、写序 10（实例代号 4 + 事务号 6）、载荷 CRC 4（写的时候是 0）、预留位 29。
-pub open spec fn spec_data_unit_unsealed_header(
+pub open spec fn specification_data_unit_unsealed_header(
     identity: DataUnitIdentity,
     birth_txg: CheckpointTxg,
     filesystem_identifier: [u8; 16],
     write_order: WriteOrder,
     payload_length: nat,
 ) -> Seq<u8> {
-    spec_common_prefix_bytes(UNIT_CLASS_DATA, payload_length as u16) + little_endian_bytes(UNIT_CLASS_DATA as nat, 1)
+    specification_common_prefix_bytes(UNIT_CLASS_DATA, payload_length as u16) + little_endian_bytes(UNIT_CLASS_DATA as nat, 1)
         + little_endian_bytes(identity.tree.0 as nat, 8) + little_endian_bytes(identity.object as nat, 8)
         + little_endian_bytes(identity.object_birth.0 as nat, 8) + little_endian_bytes(identity.anchor_offset as nat, 8)
         + little_endian_bytes(birth_txg.0 as nat, 8) + little_endian_bytes(
-        spec_unit_filesystem_identifier(filesystem_identifier) as nat,
+        specification_unit_filesystem_identifier(filesystem_identifier) as nat,
         8,
     ) + little_endian_bytes(write_order.instance.0 as nat, 4) + little_endian_bytes(write_order.transaction as nat, 6)
         + zero_bytes(4) + zero_bytes(NONCE_MAC_ALGORITHM_RESERVED_BYTES as nat)
 }
 
 /// 码 1 单元没封的那一份：共同前缀、类身份段、载荷从 134 起、补 0 到 32768。
-pub open spec fn spec_data_unit_unsealed_bytes(
+pub open spec fn specification_data_unit_unsealed_bytes(
     identity: DataUnitIdentity,
     birth_txg: CheckpointTxg,
     filesystem_identifier: [u8; 16],
     write_order: WriteOrder,
     payload: Seq<u8>,
 ) -> Seq<u8> {
-    let header = spec_data_unit_unsealed_header(identity, birth_txg, filesystem_identifier, write_order, payload.len());
+    let header = specification_data_unit_unsealed_header(identity, birth_txg, filesystem_identifier, write_order, payload.len());
     header + payload + zero_bytes((DATA_UNIT_BYTES - header.len() - payload.len()) as nat)
 }
 
 /// [`build_data_unit`] 写出的整个码 1 单元：载荷 CRC 罩 [105, 32768)、写在 101；头校验和罩 [0, 105)。
-pub open spec fn spec_data_unit_bytes(
+pub open spec fn specification_data_unit_bytes(
     identity: DataUnitIdentity,
     birth_txg: CheckpointTxg,
     filesystem_identifier: [u8; 16],
     write_order: WriteOrder,
     payload: Seq<u8>,
 ) -> Seq<u8> {
-    spec_sealed_unit(
-        spec_data_unit_unsealed_bytes(identity, birth_txg, filesystem_identifier, write_order, payload),
+    specification_sealed_unit(
+        specification_data_unit_unsealed_bytes(identity, birth_txg, filesystem_identifier, write_order, payload),
         DATA_UNIT_HEADER_BYTES as int,
         101,
     )
@@ -1187,7 +1187,7 @@ pub fn build_data_unit(
         payload@.len() <= DATA_UNIT_BYTES - DATA_UNIT_HEADER_BYTES - NONCE_MAC_ALGORITHM_RESERVED_BYTES,
         write_order.is_encodable(),
     ensures
-        unit@ == spec_data_unit_bytes(identity, birth_txg, *filesystem_identifier, write_order, payload@),
+        unit@ == specification_data_unit_bytes(identity, birth_txg, *filesystem_identifier, write_order, payload@),
 {
     let header_end = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105");
     let unit_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
@@ -1219,7 +1219,7 @@ pub fn build_data_unit(
     writer.skip(reserved_bytes());
     writer.put(payload);
     let mut bytes = writer.into_bytes();
-    assert(bytes@ =~= spec_data_unit_unsealed_bytes(identity, birth_txg, *filesystem_identifier, write_order, payload@));
+    assert(bytes@ =~= specification_data_unit_unsealed_bytes(identity, birth_txg, *filesystem_identifier, write_order, payload@));
     seal_payload_checksum(bytes.as_mut_slice(), header_end, payload_crc_offset);
     seal_header_checksum(bytes.as_mut_slice(), header_end);
     bytes
@@ -1301,7 +1301,7 @@ fn check_encryption_reserved_bytes_are_zero(
     requires
         header_end + NONCE_MAC_ALGORITHM_RESERVED_BYTES <= bytes@.len(),
     ensures
-        checked is Ok <==> spec_encryption_reserved_bytes_are_zero(bytes@, header_end as int),
+        checked is Ok <==> specification_encryption_reserved_bytes_are_zero(bytes@, header_end as int),
         checked matches Err(error) ==> error == UnitError::EncryptionReservedBytesNotZero,
 {
     assert(bytes@.len() == bytes.len());
@@ -1313,7 +1313,7 @@ fn check_encryption_reserved_bytes_are_zero(
 }
 
 /// 共同前缀四关与头校验和那一判（[`check_common_prefix`] 的规格）：都过了交回声明长度。
-pub open spec fn spec_check_common_prefix(bytes: Seq<u8>, expected_class: u8, header_end: int) -> Result<u16, UnitError> {
+pub open spec fn specification_check_common_prefix(bytes: Seq<u8>, expected_class: u8, header_end: int) -> Result<u16, UnitError> {
     if bytes.len() < header_end {
         Err(UnitError::TooShort)
     } else if bytes.subrange(0, 4) != UNIT_MAGIC@ {
@@ -1324,7 +1324,7 @@ pub open spec fn spec_check_common_prefix(bytes: Seq<u8>, expected_class: u8, he
         Err(UnitError::WrongUnitClass { expected: expected_class, found: bytes[6] })
     } else if bytes[7] != 0 {
         Err(UnitError::NonZeroFlags)
-    } else if !spec_header_checksum_holds(bytes, header_end) {
+    } else if !specification_header_checksum_holds(bytes, header_end) {
         Err(UnitError::HeaderChecksumMismatch)
     } else {
         Ok(little_endian_value(bytes.subrange(8, 10)) as u16)
@@ -1340,7 +1340,7 @@ fn check_common_prefix(
     requires
         UNIT_COMMON_PREFIX_BYTES <= header_end,
     ensures
-        declared == spec_check_common_prefix(bytes@, expected_class, header_end as int),
+        declared == specification_check_common_prefix(bytes@, expected_class, header_end as int),
 {
     if bytes.len() < header_end {
         return Err(UnitError::TooShort);
@@ -1383,7 +1383,7 @@ fn check_payload_checksum(
         payload_crc_offset + 4 <= bytes@.len(),
         header_end <= bytes@.len(),
     ensures
-        checked is Ok <==> spec_payload_checksum_holds(bytes@, header_end as int, payload_crc_offset as int),
+        checked is Ok <==> specification_payload_checksum_holds(bytes@, header_end as int, payload_crc_offset as int),
         checked matches Err(error) ==> error == UnitError::PayloadChecksumMismatch,
 {
     let mut reader = ByteReader::at(bytes, payload_crc_offset);
@@ -1425,7 +1425,7 @@ pub struct IndexNodeHeaderModel {
 }
 
 impl IndexNodeHeader {
-    pub open spec fn spec_model(&self) -> IndexNodeHeaderModel {
+    pub open spec fn specification_model(&self) -> IndexNodeHeaderModel {
         IndexNodeHeaderModel {
             tree: self.tree,
             level: self.level,
@@ -1437,27 +1437,27 @@ impl IndexNodeHeader {
             instance: self.instance,
             birth_sequence: self.birth_sequence,
             entry_width: self.entry_width as nat,
-            entries: spec_byte_sequences_of_vectors(self.entries@),
+            entries: specification_byte_sequences_of_vectors(self.entries@),
         }
     }
 }
 
 /// [`parse_index_node`] 的判法（交回的是 [`IndexNodeHeaderModel`]）。
-pub open spec fn spec_parse_index_node(bytes: Seq<u8>) -> Result<IndexNodeHeaderModel, UnitError> {
+pub open spec fn specification_parse_index_node(bytes: Seq<u8>) -> Result<IndexNodeHeaderModel, UnitError> {
     if bytes.len() != NODE_BYTES {
         Err(UnitError::TooShort)
     } else {
         let key_width = bytes[51] as int;
-        let header_end = spec_index_node_plain_header_end(key_width);
-        match spec_check_common_prefix(bytes, UNIT_CLASS_INDEX_NODE, header_end) {
+        let header_end = specification_index_node_plain_header_end(key_width);
+        match specification_check_common_prefix(bytes, UNIT_CLASS_INDEX_NODE, header_end) {
             Err(error) => Err(error),
             Ok(declared_length) => {
                 let entry_count = little_endian_value(bytes.subrange(header_end - 4, header_end - 2));
                 let entry_width = little_endian_value(bytes.subrange(header_end - 2, header_end));
                 let entries_start = header_end + NONCE_MAC_ALGORITHM_RESERVED_BYTES;
-                if !spec_payload_checksum_holds(bytes, header_end, header_end - 10) {
+                if !specification_payload_checksum_holds(bytes, header_end, header_end - 10) {
                     Err(UnitError::PayloadChecksumMismatch)
-                } else if !spec_encryption_reserved_bytes_are_zero(bytes, header_end) {
+                } else if !specification_encryption_reserved_bytes_are_zero(bytes, header_end) {
                     Err(UnitError::EncryptionReservedBytesNotZero)
                 } else if entry_count * entry_width != declared_length {
                     Err(UnitError::Structure(UnitStructureDefect::IndexNodeDeclaredLengthIsNotEntryCountTimesEntryWidth))
@@ -1488,7 +1488,7 @@ pub open spec fn spec_parse_index_node(bytes: Seq<u8>) -> Result<IndexNodeHeader
                                 little_endian_value(bytes.subrange(72 + 2 * key_width, 76 + 2 * key_width)) as u32,
                             ),
                             entry_width,
-                            entries: spec_pieces_at(bytes, entries_start, entry_count, entry_width),
+                            entries: specification_pieces_at(bytes, entries_start, entry_count, entry_width),
                         },
                     )
                 }
@@ -1501,8 +1501,8 @@ pub open spec fn spec_parse_index_node(bytes: Seq<u8>) -> Result<IndexNodeHeader
 pub fn parse_index_node(bytes: &[u8]) -> (parsed: Result<IndexNodeHeader, UnitError>)
     ensures
         match parsed {
-            Ok(header) => spec_parse_index_node(bytes@) == Ok::<IndexNodeHeaderModel, UnitError>(header.spec_model()),
-            Err(error) => spec_parse_index_node(bytes@) == Err::<IndexNodeHeaderModel, UnitError>(error),
+            Ok(header) => specification_parse_index_node(bytes@) == Ok::<IndexNodeHeaderModel, UnitError>(header.specification_model()),
+            Err(error) => specification_parse_index_node(bytes@) == Err::<IndexNodeHeaderModel, UnitError>(error),
         },
 {
     if bytes.len() != usize::try_from(NODE_BYTES).expect("16384") {
@@ -1587,7 +1587,7 @@ fn pieces_of_one_width(bytes: &[u8], start: usize, count: usize, width: usize) -
     requires
         start + count * width <= bytes@.len(),
     ensures
-        spec_byte_sequences_of_vectors(pieces@) == spec_pieces_at(bytes@, start as int, count as nat, width as nat),
+        specification_byte_sequences_of_vectors(pieces@) == specification_pieces_at(bytes@, start as int, count as nat, width as nat),
 {
     assert(bytes@.len() == bytes.len());
     let mut pieces: Vec<Vec<u8>> = Vec::new();
@@ -1616,7 +1616,7 @@ fn pieces_of_one_width(bytes: &[u8], start: usize, count: usize, width: usize) -
         pieces.push(copied_into_a_vector(&bytes[piece_start..piece_start + width]));
         piece_index += 1;
     }
-    assert(spec_byte_sequences_of_vectors(pieces@) =~= spec_pieces_at(bytes@, start as int, count as nat, width as nat));
+    assert(specification_byte_sequences_of_vectors(pieces@) =~= specification_pieces_at(bytes@, start as int, count as nat, width as nat));
     pieces
 }
 
@@ -1644,7 +1644,7 @@ pub struct PackedUnitHeaderModel {
 }
 
 impl PackedUnitHeader {
-    pub open spec fn spec_model(&self) -> PackedUnitHeaderModel {
+    pub open spec fn specification_model(&self) -> PackedUnitHeaderModel {
         PackedUnitHeaderModel {
             identity: self.identity,
             birth_txg: self.birth_txg,
@@ -1652,25 +1652,25 @@ impl PackedUnitHeader {
             write_order: self.write_order,
             birth_sequence: self.birth_sequence,
             record_width: self.record_width as nat,
-            records: spec_byte_sequences_of_vectors(self.records@),
+            records: specification_byte_sequences_of_vectors(self.records@),
         }
     }
 }
 
 /// [`parse_packed_unit`] 的判法（交回的是 [`PackedUnitHeaderModel`]）。
-pub open spec fn spec_parse_packed_unit(bytes: Seq<u8>) -> Result<PackedUnitHeaderModel, UnitError> {
+pub open spec fn specification_parse_packed_unit(bytes: Seq<u8>) -> Result<PackedUnitHeaderModel, UnitError> {
     if bytes.len() != DATA_UNIT_BYTES {
         Err(UnitError::TooShort)
     } else {
-        match spec_check_common_prefix(bytes, UNIT_CLASS_PACKED, PACKED_UNIT_HEADER_BYTES as int) {
+        match specification_check_common_prefix(bytes, UNIT_CLASS_PACKED, PACKED_UNIT_HEADER_BYTES as int) {
             Err(error) => Err(error),
             Ok(declared_length) => {
                 let record_count = little_endian_value(bytes.subrange(69, 71));
                 let record_width = little_endian_value(bytes.subrange(71, 73));
                 let records_start = PACKED_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES;
-                if !spec_payload_checksum_holds(bytes, PACKED_UNIT_HEADER_BYTES as int, 89) {
+                if !specification_payload_checksum_holds(bytes, PACKED_UNIT_HEADER_BYTES as int, 89) {
                     Err(UnitError::PayloadChecksumMismatch)
-                } else if !spec_encryption_reserved_bytes_are_zero(bytes, PACKED_UNIT_HEADER_BYTES as int) {
+                } else if !specification_encryption_reserved_bytes_are_zero(bytes, PACKED_UNIT_HEADER_BYTES as int) {
                     Err(UnitError::EncryptionReservedBytesNotZero)
                 } else if little_endian_value(bytes.subrange(42, 43)) != UNIT_CLASS_PACKED {
                     Err(UnitError::Structure(UnitStructureDefect::PackedUnitClassTagCopyIsNotThePackedClass))
@@ -1683,13 +1683,13 @@ pub open spec fn spec_parse_packed_unit(bytes: Seq<u8>) -> Result<PackedUnitHead
                 } else {
                     Ok(
                         PackedUnitHeaderModel {
-                            identity: PackedIdentity::spec_decode_at(bytes, 43),
+                            identity: PackedIdentity::specification_decode_at(bytes, 43),
                             birth_txg: CheckpointTxg(little_endian_value(bytes.subrange(73, 81)) as u64),
                             filesystem_identifier: little_endian_value(bytes.subrange(81, 89)) as u64,
-                            write_order: WriteOrder::spec_decode_at(bytes, 93),
+                            write_order: WriteOrder::specification_decode_at(bytes, 93),
                             birth_sequence: BirthSequence(little_endian_value(bytes.subrange(103, 107)) as u32),
                             record_width,
-                            records: spec_pieces_at(bytes, records_start, record_count, record_width),
+                            records: specification_pieces_at(bytes, records_start, record_count, record_width),
                         },
                     )
                 }
@@ -1701,8 +1701,8 @@ pub open spec fn spec_parse_packed_unit(bytes: Seq<u8>) -> Result<PackedUnitHead
 pub fn parse_packed_unit(bytes: &[u8]) -> (parsed: Result<PackedUnitHeader, UnitError>)
     ensures
         match parsed {
-            Ok(header) => spec_parse_packed_unit(bytes@) == Ok::<PackedUnitHeaderModel, UnitError>(header.spec_model()),
-            Err(error) => spec_parse_packed_unit(bytes@) == Err::<PackedUnitHeaderModel, UnitError>(error),
+            Ok(header) => specification_parse_packed_unit(bytes@) == Ok::<PackedUnitHeaderModel, UnitError>(header.specification_model()),
+            Err(error) => specification_parse_packed_unit(bytes@) == Err::<PackedUnitHeaderModel, UnitError>(error),
         },
 {
     if bytes.len() != usize::try_from(DATA_UNIT_BYTES).expect("32768") {
@@ -1783,16 +1783,16 @@ pub struct DataUnitHeader {
 }
 
 /// [`parse_data_unit`] 的判法。
-pub open spec fn spec_parse_data_unit(bytes: Seq<u8>) -> Result<DataUnitHeader, UnitError> {
+pub open spec fn specification_parse_data_unit(bytes: Seq<u8>) -> Result<DataUnitHeader, UnitError> {
     if bytes.len() != DATA_UNIT_BYTES {
         Err(UnitError::TooShort)
     } else {
-        match spec_check_common_prefix(bytes, UNIT_CLASS_DATA, DATA_UNIT_HEADER_BYTES as int) {
+        match specification_check_common_prefix(bytes, UNIT_CLASS_DATA, DATA_UNIT_HEADER_BYTES as int) {
             Err(error) => Err(error),
             Ok(declared_length) => {
-                if !spec_payload_checksum_holds(bytes, DATA_UNIT_HEADER_BYTES as int, 101) {
+                if !specification_payload_checksum_holds(bytes, DATA_UNIT_HEADER_BYTES as int, 101) {
                     Err(UnitError::PayloadChecksumMismatch)
-                } else if !spec_encryption_reserved_bytes_are_zero(bytes, DATA_UNIT_HEADER_BYTES as int) {
+                } else if !specification_encryption_reserved_bytes_are_zero(bytes, DATA_UNIT_HEADER_BYTES as int) {
                     Err(UnitError::EncryptionReservedBytesNotZero)
                 } else if little_endian_value(bytes.subrange(42, 43)) != UNIT_CLASS_DATA {
                     Err(UnitError::Structure(UnitStructureDefect::DataUnitClassTagCopyIsNotTheDataClass))
@@ -1809,7 +1809,7 @@ pub open spec fn spec_parse_data_unit(bytes: Seq<u8>) -> Result<DataUnitHeader, 
                             },
                             birth_txg: CheckpointTxg(little_endian_value(bytes.subrange(75, 83)) as u64),
                             filesystem_identifier: little_endian_value(bytes.subrange(83, 91)) as u64,
-                            write_order: WriteOrder::spec_decode_at(bytes, 91),
+                            write_order: WriteOrder::specification_decode_at(bytes, 91),
                             declared_length,
                         },
                     )
@@ -1821,7 +1821,7 @@ pub open spec fn spec_parse_data_unit(bytes: Seq<u8>) -> Result<DataUnitHeader, 
 
 pub fn parse_data_unit(bytes: &[u8]) -> (parsed: Result<DataUnitHeader, UnitError>)
     ensures
-        parsed == spec_parse_data_unit(bytes@),
+        parsed == specification_parse_data_unit(bytes@),
 {
     if bytes.len() != usize::try_from(DATA_UNIT_BYTES).expect("32768") {
         return Err(UnitError::TooShort);
@@ -1864,7 +1864,7 @@ pub fn parse_data_unit(bytes: &[u8]) -> (parsed: Result<DataUnitHeader, UnitErro
 }
 
 /// [`data_unit_payload`] 的判法：载荷末尾越界、补齐有非 0 的报结构错，否则交回 `[134, 134 + 声明长度)`。
-pub open spec fn spec_data_unit_payload(bytes: Seq<u8>, declared_length: u16) -> Result<Seq<u8>, UnitError> {
+pub open spec fn specification_data_unit_payload(bytes: Seq<u8>, declared_length: u16) -> Result<Seq<u8>, UnitError> {
     let payload_start = DATA_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES;
     let payload_end = payload_start + declared_length;
     if payload_end > bytes.len() {
@@ -1886,10 +1886,10 @@ pub open spec fn spec_data_unit_payload(bytes: Seq<u8>, declared_length: u16) ->
 pub fn data_unit_payload(bytes: &[u8], declared_length: u16) -> (payload: Result<&[u8], UnitError>)
     ensures
         match payload {
-            Ok(payload_bytes) => spec_data_unit_payload(bytes@, declared_length) == Ok::<Seq<u8>, UnitError>(
+            Ok(payload_bytes) => specification_data_unit_payload(bytes@, declared_length) == Ok::<Seq<u8>, UnitError>(
                 payload_bytes@,
             ),
-            Err(error) => spec_data_unit_payload(bytes@, declared_length) == Err::<Seq<u8>, UnitError>(error),
+            Err(error) => specification_data_unit_payload(bytes@, declared_length) == Err::<Seq<u8>, UnitError>(error),
         },
 {
     let payload_start = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105") + reserved_bytes();
@@ -1923,7 +1923,7 @@ pub proof fn lemma_one_byte_little_endian(byte: u8)
 pub proof fn lemma_common_prefix_reads_back(source: Seq<u8>, unit_class: u8, declared_length: u16)
     requires
         source.len() >= 10,
-        source.subrange(0, 10) == spec_common_prefix_bytes(unit_class, declared_length).subrange(0, 10),
+        source.subrange(0, 10) == specification_common_prefix_bytes(unit_class, declared_length).subrange(0, 10),
     ensures
         source.subrange(0, 4) == UNIT_MAGIC@,
         little_endian_value(source.subrange(4, 6)) == UNIT_FORMAT_VERSION,
@@ -1937,7 +1937,7 @@ pub proof fn lemma_common_prefix_reads_back(source: Seq<u8>, unit_class: u8, dec
     let class = little_endian_bytes(unit_class as nat, 1);
     let flags = little_endian_bytes(0, 1);
     let declared = little_endian_bytes(declared_length as nat, 2);
-    assert(spec_common_prefix_bytes(unit_class, declared_length).subrange(0, 10) =~= magic + version + class + flags
+    assert(specification_common_prefix_bytes(unit_class, declared_length).subrange(0, 10) =~= magic + version + class + flags
         + declared);
     lemma_split_a_concatenated_range(source, 0, magic + version + class + flags, declared);
     lemma_split_a_concatenated_range(source, 0, magic + version + class, flags);
@@ -1962,40 +1962,40 @@ pub proof fn lemma_data_unit_round_trip(
         write_order.is_encodable(),
     ensures
         ({
-            let unit = spec_data_unit_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
-            &&& spec_parse_data_unit(unit) == Ok::<DataUnitHeader, UnitError>(
+            let unit = specification_data_unit_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
+            &&& specification_parse_data_unit(unit) == Ok::<DataUnitHeader, UnitError>(
                 DataUnitHeader {
                     identity,
                     birth_txg,
-                    filesystem_identifier: spec_unit_filesystem_identifier(filesystem_identifier),
+                    filesystem_identifier: specification_unit_filesystem_identifier(filesystem_identifier),
                     write_order,
                     declared_length: payload.len() as u16,
                 },
             )
-            &&& spec_data_unit_payload(unit, payload.len() as u16) == Ok::<Seq<u8>, UnitError>(payload)
+            &&& specification_data_unit_payload(unit, payload.len() as u16) == Ok::<Seq<u8>, UnitError>(payload)
         }),
 {
     lemma_little_endian_capacities();
     let declared_length = payload.len() as u16;
-    let header = spec_data_unit_unsealed_header(identity, birth_txg, filesystem_identifier, write_order, payload.len());
-    let unsealed = spec_data_unit_unsealed_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
+    let header = specification_data_unit_unsealed_header(identity, birth_txg, filesystem_identifier, write_order, payload.len());
+    let unsealed = specification_data_unit_unsealed_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
     let padding = zero_bytes((DATA_UNIT_BYTES - header.len() - payload.len()) as nat);
     assert(header.len() == 134);
     assert(unsealed.len() == 32768);
     lemma_sealed_unit_keeps_everything_outside_the_two_checksums(unsealed, 105, 101);
-    let unit = spec_data_unit_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
+    let unit = specification_data_unit_bytes(identity, birth_txg, filesystem_identifier, write_order, payload);
     // 没封的那一份逐段剥开：头、载荷、补齐，再把头照写者的次序从末尾往前剥。
     assert(unsealed.subrange(0, unsealed.len() as int) =~= unsealed);
     lemma_split_a_concatenated_range(unsealed, 0, header + payload, padding);
     lemma_split_a_concatenated_range(unsealed, 0, header, payload);
-    let prefix = spec_common_prefix_bytes(UNIT_CLASS_DATA, declared_length);
+    let prefix = specification_common_prefix_bytes(UNIT_CLASS_DATA, declared_length);
     let class = little_endian_bytes(UNIT_CLASS_DATA as nat, 1);
     let tree = little_endian_bytes(identity.tree.0 as nat, 8);
     let object = little_endian_bytes(identity.object as nat, 8);
     let object_birth = little_endian_bytes(identity.object_birth.0 as nat, 8);
     let anchor = little_endian_bytes(identity.anchor_offset as nat, 8);
     let birth = little_endian_bytes(birth_txg.0 as nat, 8);
-    let fsid = little_endian_bytes(spec_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
+    let fsid = little_endian_bytes(specification_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
     let instance = little_endian_bytes(write_order.instance.0 as nat, 4);
     let transaction = little_endian_bytes(write_order.transaction as nat, 6);
     let crc_field = zero_bytes(4);
@@ -2031,7 +2031,7 @@ pub proof fn lemma_data_unit_round_trip(
     assert(unit.subrange(83, 91) == unsealed.subrange(83, 91));
     assert(unit.subrange(91, 95) == unsealed.subrange(91, 95));
     assert(unit.subrange(95, 101) == unsealed.subrange(95, 101));
-    assert(spec_unit_filesystem_identifier(filesystem_identifier) < 0x1_0000_0000_0000_0000);
+    assert(specification_unit_filesystem_identifier(filesystem_identifier) < 0x1_0000_0000_0000_0000);
 }
 
 /// 码 3 打包记录单元往返：[`build_packed_unit`] 写出的单元，[`parse_packed_unit`] 读回同一份头与同样的记录。
@@ -2046,10 +2046,10 @@ pub proof fn lemma_packed_unit_round_trip(
     birth_sequence: BirthSequence,
 )
     requires
-        spec_packed_unit_writer_accepts(write_order, record_width, records),
+        specification_packed_unit_writer_accepts(write_order, record_width, records),
     ensures
-        spec_parse_packed_unit(
-            spec_packed_unit_bytes(
+        specification_parse_packed_unit(
+            specification_packed_unit_bytes(
                 identity,
                 record_width,
                 records,
@@ -2062,7 +2062,7 @@ pub proof fn lemma_packed_unit_round_trip(
             PackedUnitHeaderModel {
                 identity,
                 birth_txg,
-                filesystem_identifier: spec_unit_filesystem_identifier(filesystem_identifier),
+                filesystem_identifier: specification_unit_filesystem_identifier(filesystem_identifier),
                 write_order,
                 birth_sequence,
                 record_width: record_width as nat,
@@ -2074,7 +2074,7 @@ pub proof fn lemma_packed_unit_round_trip(
     lemma_concatenation_of_pieces_of_one_width(records, record_width as nat);
     let record_count = records.len();
     let declared_length = (record_count * record_width) as u16;
-    let header = spec_packed_unit_unsealed_header(
+    let header = specification_packed_unit_unsealed_header(
         identity,
         record_count,
         record_width,
@@ -2083,8 +2083,8 @@ pub proof fn lemma_packed_unit_round_trip(
         write_order,
         birth_sequence,
     );
-    let record_area = spec_concatenation(records);
-    let unsealed = spec_packed_unit_unsealed_bytes(
+    let record_area = specification_concatenation(records);
+    let unsealed = specification_packed_unit_unsealed_bytes(
         identity,
         record_width,
         records,
@@ -2097,7 +2097,7 @@ pub proof fn lemma_packed_unit_round_trip(
     assert(header.len() == 136);
     assert(unsealed.len() == 32768);
     lemma_sealed_unit_keeps_everything_outside_the_two_checksums(unsealed, 107, 89);
-    let unit = spec_packed_unit_bytes(
+    let unit = specification_packed_unit_bytes(
         identity,
         record_width,
         records,
@@ -2109,7 +2109,7 @@ pub proof fn lemma_packed_unit_round_trip(
     assert(unsealed.subrange(0, unsealed.len() as int) =~= unsealed);
     lemma_split_a_concatenated_range(unsealed, 0, header + record_area, padding);
     lemma_split_a_concatenated_range(unsealed, 0, header, record_area);
-    let prefix = spec_common_prefix_bytes(UNIT_CLASS_PACKED, declared_length);
+    let prefix = specification_common_prefix_bytes(UNIT_CLASS_PACKED, declared_length);
     let class = little_endian_bytes(UNIT_CLASS_PACKED as nat, 1);
     let birth_tree = little_endian_bytes(identity.birth_tree.0 as nat, 8);
     let record_type = little_endian_bytes(identity.record_type as nat, 2);
@@ -2118,7 +2118,7 @@ pub proof fn lemma_packed_unit_round_trip(
     let count = little_endian_bytes(record_count, 2);
     let width = little_endian_bytes(record_width as nat, 2);
     let birth = little_endian_bytes(birth_txg.0 as nat, 8);
-    let fsid = little_endian_bytes(spec_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
+    let fsid = little_endian_bytes(specification_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
     let crc_field = zero_bytes(4);
     let instance = little_endian_bytes(write_order.instance.0 as nat, 4);
     let transaction = little_endian_bytes(write_order.transaction as nat, 6);
@@ -2179,13 +2179,13 @@ pub proof fn lemma_index_node_unsealed_fields(
     requires
         largest_key.len() == smallest_key.len(),
         smallest_key.len() <= u8::MAX,
-        entries.len() * entry_width <= NODE_BYTES - spec_index_node_header_bytes(smallest_key.len() as int),
-        spec_every_piece_has_width(entries, entry_width as nat),
+        entries.len() * entry_width <= NODE_BYTES - specification_index_node_header_bytes(smallest_key.len() as int),
+        specification_every_piece_has_width(entries, entry_width as nat),
     ensures
         ({
             let key_width = smallest_key.len() as int;
             let header_end = 86 + 2 * key_width;
-            let unsealed = spec_index_node_unsealed_bytes(
+            let unsealed = specification_index_node_unsealed_bytes(
                 tree,
                 level,
                 smallest_key,
@@ -2198,7 +2198,7 @@ pub proof fn lemma_index_node_unsealed_fields(
                 entries,
             );
             &&& unsealed.len() == NODE_BYTES
-            &&& unsealed.subrange(0, 42) == spec_common_prefix_bytes(
+            &&& unsealed.subrange(0, 42) == specification_common_prefix_bytes(
                 UNIT_CLASS_INDEX_NODE,
                 (entries.len() * entry_width) as u16,
             )
@@ -2209,7 +2209,7 @@ pub proof fn lemma_index_node_unsealed_fields(
             &&& unsealed.subrange(52 + key_width, 52 + 2 * key_width) == largest_key
             &&& unsealed.subrange(52 + 2 * key_width, 60 + 2 * key_width) == little_endian_bytes(birth_txg.0 as nat, 8)
             &&& unsealed.subrange(60 + 2 * key_width, 68 + 2 * key_width) == little_endian_bytes(
-                spec_unit_filesystem_identifier(filesystem_identifier) as nat,
+                specification_unit_filesystem_identifier(filesystem_identifier) as nat,
                 8,
             )
             &&& unsealed.subrange(68 + 2 * key_width, 72 + 2 * key_width) == little_endian_bytes(instance.0 as nat, 4)
@@ -2220,7 +2220,7 @@ pub proof fn lemma_index_node_unsealed_fields(
             &&& unsealed.subrange(header_end - 4, header_end - 2) == little_endian_bytes(entries.len(), 2)
             &&& unsealed.subrange(header_end - 2, header_end) == little_endian_bytes(entry_width as nat, 2)
             &&& unsealed.subrange(header_end, header_end + 29) == zero_bytes(29)
-            &&& unsealed.subrange(header_end + 29, header_end + 29 + entries.len() * entry_width) == spec_concatenation(
+            &&& unsealed.subrange(header_end + 29, header_end + 29 + entries.len() * entry_width) == specification_concatenation(
                 entries,
             )
         }),
@@ -2229,7 +2229,7 @@ pub proof fn lemma_index_node_unsealed_fields(
     lemma_concatenation_of_pieces_of_one_width(entries, entry_width as nat);
     let entry_count = entries.len();
     let declared_length = (entry_count * entry_width) as u16;
-    let header = spec_index_node_unsealed_header(
+    let header = specification_index_node_unsealed_header(
         tree,
         level,
         smallest_key,
@@ -2241,8 +2241,8 @@ pub proof fn lemma_index_node_unsealed_fields(
         entry_count,
         entry_width,
     );
-    let entry_area = spec_concatenation(entries);
-    let unsealed = spec_index_node_unsealed_bytes(
+    let entry_area = specification_concatenation(entries);
+    let unsealed = specification_index_node_unsealed_bytes(
         tree,
         level,
         smallest_key,
@@ -2258,12 +2258,12 @@ pub proof fn lemma_index_node_unsealed_fields(
     assert(unsealed.subrange(0, unsealed.len() as int) =~= unsealed);
     lemma_split_a_concatenated_range(unsealed, 0, header + entry_area, padding);
     lemma_split_a_concatenated_range(unsealed, 0, header, entry_area);
-    let prefix = spec_common_prefix_bytes(UNIT_CLASS_INDEX_NODE, declared_length);
+    let prefix = specification_common_prefix_bytes(UNIT_CLASS_INDEX_NODE, declared_length);
     let tree_bytes = little_endian_bytes(tree.0 as nat, 8);
     let level_bytes = little_endian_bytes(level as nat, 1);
     let key_width_bytes = little_endian_bytes(smallest_key.len(), 1);
     let birth = little_endian_bytes(birth_txg.0 as nat, 8);
-    let fsid = little_endian_bytes(spec_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
+    let fsid = little_endian_bytes(specification_unit_filesystem_identifier(filesystem_identifier) as nat, 8);
     let instance_bytes = little_endian_bytes(instance.0 as nat, 4);
     let sequence = little_endian_bytes(birth_sequence.0 as nat, 4);
     let crc_field = zero_bytes(4);
@@ -2305,13 +2305,13 @@ pub proof fn lemma_index_node_sealed_fields(
     requires
         largest_key.len() == smallest_key.len(),
         smallest_key.len() <= u8::MAX,
-        entries.len() * entry_width <= NODE_BYTES - spec_index_node_header_bytes(smallest_key.len() as int),
-        spec_every_piece_has_width(entries, entry_width as nat),
+        entries.len() * entry_width <= NODE_BYTES - specification_index_node_header_bytes(smallest_key.len() as int),
+        specification_every_piece_has_width(entries, entry_width as nat),
     ensures
         ({
             let key_width = smallest_key.len() as int;
             let header_end = 86 + 2 * key_width;
-            let node = spec_index_node_bytes(
+            let node = specification_index_node_bytes(
                 tree,
                 level,
                 smallest_key,
@@ -2324,7 +2324,7 @@ pub proof fn lemma_index_node_sealed_fields(
                 entries,
             );
             &&& node.len() == NODE_BYTES
-            &&& node.subrange(0, 10) == spec_common_prefix_bytes(
+            &&& node.subrange(0, 10) == specification_common_prefix_bytes(
                 UNIT_CLASS_INDEX_NODE,
                 (entries.len() * entry_width) as u16,
             ).subrange(0, 10)
@@ -2335,23 +2335,23 @@ pub proof fn lemma_index_node_sealed_fields(
             &&& node.subrange(52 + key_width, 52 + 2 * key_width) == largest_key
             &&& node.subrange(52 + 2 * key_width, 60 + 2 * key_width) == little_endian_bytes(birth_txg.0 as nat, 8)
             &&& node.subrange(60 + 2 * key_width, 68 + 2 * key_width) == little_endian_bytes(
-                spec_unit_filesystem_identifier(filesystem_identifier) as nat,
+                specification_unit_filesystem_identifier(filesystem_identifier) as nat,
                 8,
             )
             &&& node.subrange(68 + 2 * key_width, 72 + 2 * key_width) == little_endian_bytes(instance.0 as nat, 4)
             &&& node.subrange(72 + 2 * key_width, 76 + 2 * key_width) == little_endian_bytes(birth_sequence.0 as nat, 4)
             &&& node.subrange(header_end - 4, header_end - 2) == little_endian_bytes(entries.len(), 2)
             &&& node.subrange(header_end - 2, header_end) == little_endian_bytes(entry_width as nat, 2)
-            &&& spec_header_checksum_holds(node, header_end)
-            &&& spec_payload_checksum_holds(node, header_end, header_end - 10)
+            &&& specification_header_checksum_holds(node, header_end)
+            &&& specification_payload_checksum_holds(node, header_end, header_end - 10)
             &&& node.subrange(header_end, header_end + 29) == zero_bytes(29)
-            &&& node.subrange(header_end + 29, header_end + 29 + entries.len() * entry_width) == spec_concatenation(entries)
+            &&& node.subrange(header_end + 29, header_end + 29 + entries.len() * entry_width) == specification_concatenation(entries)
         }),
 {
     let key_width = smallest_key.len() as int;
     let entry_count = entries.len();
     let header_end = 86 + 2 * key_width;
-    let unsealed = spec_index_node_unsealed_bytes(
+    let unsealed = specification_index_node_unsealed_bytes(
         tree,
         level,
         smallest_key,
@@ -2376,7 +2376,7 @@ pub proof fn lemma_index_node_sealed_fields(
         entries,
     );
     lemma_sealed_unit_keeps_everything_outside_the_two_checksums(unsealed, header_end, header_end - 10);
-    let node = spec_index_node_bytes(
+    let node = specification_index_node_bytes(
         tree,
         level,
         smallest_key,
@@ -2425,10 +2425,10 @@ pub proof fn lemma_index_node_round_trip(
     entries: Seq<Seq<u8>>,
 )
     requires
-        spec_index_node_writer_accepts(smallest_key.len() as int, smallest_key, largest_key, entry_width, entries),
+        specification_index_node_writer_accepts(smallest_key.len() as int, smallest_key, largest_key, entry_width, entries),
     ensures
-        spec_parse_index_node(
-            spec_index_node_bytes(
+        specification_parse_index_node(
+            specification_index_node_bytes(
                 tree,
                 level,
                 smallest_key,
@@ -2448,7 +2448,7 @@ pub proof fn lemma_index_node_round_trip(
                 smallest_key,
                 largest_key,
                 birth_txg,
-                filesystem_identifier: spec_unit_filesystem_identifier(filesystem_identifier),
+                filesystem_identifier: specification_unit_filesystem_identifier(filesystem_identifier),
                 instance,
                 birth_sequence,
                 entry_width: entry_width as nat,
@@ -2459,11 +2459,11 @@ pub proof fn lemma_index_node_round_trip(
     lemma_little_endian_capacities();
     let key_width = smallest_key.len() as int;
     let entry_count = entries.len();
-    assert(entry_count * entry_width <= NODE_BYTES - spec_index_node_header_bytes(key_width)) by (nonlinear_arith)
+    assert(entry_count * entry_width <= NODE_BYTES - specification_index_node_header_bytes(key_width)) by (nonlinear_arith)
         requires
-            entry_count <= (NODE_BYTES - spec_index_node_header_bytes(key_width)) / (entry_width as int),
+            entry_count <= (NODE_BYTES - specification_index_node_header_bytes(key_width)) / (entry_width as int),
             entry_width > 0,
-            spec_index_node_header_bytes(key_width) <= NODE_BYTES,
+            specification_index_node_header_bytes(key_width) <= NODE_BYTES,
     ;
     let declared_length = (entry_count * entry_width) as u16;
     let header_end = 86 + 2 * key_width;
@@ -2479,7 +2479,7 @@ pub proof fn lemma_index_node_round_trip(
         entry_width,
         entries,
     );
-    let node = spec_index_node_bytes(
+    let node = specification_index_node_bytes(
         tree,
         level,
         smallest_key,
@@ -2493,7 +2493,7 @@ pub proof fn lemma_index_node_round_trip(
     );
     lemma_common_prefix_reads_back(node, UNIT_CLASS_INDEX_NODE, declared_length);
     lemma_pieces_at_a_concatenation(node, header_end + 29, entries, entry_width as nat);
-    assert(spec_check_common_prefix(node, UNIT_CLASS_INDEX_NODE, header_end) == Ok::<u16, UnitError>(declared_length));
+    assert(specification_check_common_prefix(node, UNIT_CLASS_INDEX_NODE, header_end) == Ok::<u16, UnitError>(declared_length));
     assert(little_endian_value(node.subrange(header_end - 4, header_end - 2)) == entry_count);
     assert(little_endian_value(node.subrange(header_end - 2, header_end)) == entry_width);
 }

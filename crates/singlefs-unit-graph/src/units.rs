@@ -275,6 +275,10 @@ pub enum SourceRead {
         line: u32,
         digest: Sha256Digest,
     },
+    /// `current_exe()` 的路径原样交给 `Command::new`（`rust_items` 的 `own_program_path_is_handed_to_command_unchanged`），又不是
+    /// [`SourceRead::ChildTestProcess`] 那一形：起的就是在跑的这个程序。入口是一个 bin 的 `fn main`、不按测试编的时候它再进一次
+    /// 已在闭包里的 `main`，不算新代码；别的入口（在跑的是 libtest，参数选中哪条测试说不清）拒算 `current-exe`，`fragment` 是那一条的原样片段。
+    OwnProgramRestart { line: u32, fragment: String },
     /// `Command::new(current_exe())` 起本测试二进制的一个子进程，参数里 `--exact` 后面跟着的测试名：闭包里解到入口目标里那个
     /// `#[test] fn`，连一条边（`current-exe-child`）。解不出来时照旧拒算 `current-exe`，`fragment` 就是那一条的原样片段。
     ChildTestProcess {

@@ -129,11 +129,11 @@ pub(crate) enum ScanRebuildNotDecided {
     /// 码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出
     /// （码 1 的全序键与码 3 同形，C464（I-1.8 对码 1 的全序键写窄了））。
     /// 扫描方向交来的副本 fsid 都等于本池的，那样两组的归并键相同、合成一版，这一支只在交进来的副本 fsid 不同时走到。
-    DataUnitVersionsTiedOnTheTotalOrderKeyOfI18,
+    DataUnitVersionsTiedOnTheMergedVersionTotalOrderKey,
     /// 码 3 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8（归并后版本全序） ② 不成立，择新键择不出。
-    PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18,
+    PackedRecordVersionsTiedOnTheMergedVersionTotalOrderKey,
     /// 同一版（归并键相同）的副本头里的载荷校验和不同：I-1.8（归并后版本全序） ① 判损坏、不择。
-    CopiesOfOneVersionCarryDifferentPayloadsUnderI18,
+    CopiesOfOneVersionCarryDifferentPayloadsUnderTheMergedVersionTotalOrder,
     /// 当前版本那片码 3 容器（墓碑、inode、退役、谱系）没有一份副本解得开。
     CurrentPackedContainerDecodesFromNoCopy,
     /// 当前版本的谱系容器里的记录接不成一条父链（有一条 T_old ≥ T_rb，或同一个 T_rb 有两条）：「在谱系上」按 I-9.18（删除队列里的号有谱系上的墓碑）
@@ -154,13 +154,13 @@ pub(crate) enum ScanRebuildNotDecided {
 impl ScanRebuildNotDecided {
     pub(crate) fn reason(self) -> &'static str {
         match self {
-            ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18 => {
+            ScanRebuildNotDecided::DataUnitVersionsTiedOnTheMergedVersionTotalOrderKey => {
                 "扫描重建：码 1 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同，I-1.8 ② 不成立，择不出当前版本"
             }
-            ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18 => {
+            ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheMergedVersionTotalOrderKey => {
                 "扫描重建：码 3 同一对象身份上两组 (诞生代号, 实例代号, 事务号) 相同，I-1.8 ② 不成立，择不出当前版本"
             }
-            ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderI18 => {
+            ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderTheMergedVersionTotalOrder => {
                 "扫描重建：同一版的副本头里的载荷校验和不同，I-1.8 ① 判损坏、不择"
             }
             ScanRebuildNotDecided::CurrentPackedContainerDecodesFromNoCopy => {
@@ -268,10 +268,10 @@ fn latest_of_the_ordered_versions<Version: std::borrow::Borrow<VersionOfAnObject
     {
         return Err(match current.borrow().class {
             ContentUnitClass::Data => {
-                ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18
+                ScanRebuildNotDecided::DataUnitVersionsTiedOnTheMergedVersionTotalOrderKey
             }
             ContentUnitClass::PackedRecord => {
-                ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18
+                ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheMergedVersionTotalOrderKey
             }
         });
     }
@@ -471,7 +471,7 @@ pub(crate) fn choose_current_versions(
                 placements: BTreeSet::new(),
             });
         if version.payload_checksum != payload_checksum {
-            return Err(ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderI18);
+            return Err(ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderTheMergedVersionTotalOrder);
         }
         version.placements.insert(copy.placement);
     }
@@ -1150,8 +1150,7 @@ mod tests {
 
     /// W1：注释里带测试模块那一行属性的字样不是切点，切在恰是那一行的地方；它后面那条 `use` 算进非测试代码、判在白名单之外。
     #[test]
-    fn a_walk_import_behind_a_comment_naming_the_test_attribute_is_outside_the_use_list_whitelist()
-    {
+    fn walk_import_behind_a_comment_naming_the_test_attribute_is_outside_the_use_list_whitelist() {
         let source_before_the_test_module = source_before_the_test_module_of(
             SOURCE_WITH_A_WALK_IMPORT_BEHIND_A_COMMENT_NAMING_THE_TEST_ATTRIBUTE,
         );
@@ -1170,7 +1169,7 @@ mod tests {
 
     /// W1：同一份源码按路径找，`crate::walk`、`walk::` 与 `check_pool_image` 都判出来。
     #[test]
-    fn a_walk_import_behind_a_comment_naming_the_test_attribute_is_named_outside_the_whitelist() {
+    fn walk_import_behind_a_comment_naming_the_test_attribute_is_named_outside_the_whitelist() {
         let named_outside_the_whitelist =
             names_outside_the_whitelist_in(source_before_the_test_module_of(
                 SOURCE_WITH_A_WALK_IMPORT_BEHIND_A_COMMENT_NAMING_THE_TEST_ATTRIBUTE,
@@ -1210,7 +1209,7 @@ mod tests {
     /// 恰是测试模块那一行属性的行多于一行：第二行会把它之后的非测试代码也切进测试模块，判红。
     #[test]
     #[should_panic(expected = "要恰好一行")]
-    fn a_second_line_that_is_exactly_the_test_attribute_is_refused() {
+    fn second_line_that_is_exactly_the_test_attribute_is_refused() {
         source_before_the_test_module_of(
             "#[cfg(test)]\nuse crate::walk::check_pool_image;\nfn rebuild() {}\n#[cfg(test)]\nmod tests {}\n",
         );
@@ -1476,7 +1475,7 @@ mod tests {
         ];
         assert_eq!(
             rebuilt_from(&copies, &[]).err(),
-            Some(ScanRebuildNotDecided::DataUnitVersionsTiedOnTheTotalOrderKeyOfI18),
+            Some(ScanRebuildNotDecided::DataUnitVersionsTiedOnTheMergedVersionTotalOrderKey),
             "两组 (诞生代号, 实例代号, 事务号) 相同：I-1.8 ② 不成立，交回没定、不猜"
         );
     }
@@ -1492,7 +1491,7 @@ mod tests {
         ];
         assert_eq!(
             choose_current_versions(&copies).err(),
-            Some(ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderI18),
+            Some(ScanRebuildNotDecided::CopiesOfOneVersionCarryDifferentPayloadsUnderTheMergedVersionTotalOrder),
             "归并键相同而头里的载荷校验和不同：I-1.8 ① 判损坏、不择"
         );
     }
@@ -1519,7 +1518,7 @@ mod tests {
                 &[(first_placement, first), (second_placement, second)]
             )
             .err(),
-            Some(ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheTotalOrderKeyOfI18),
+            Some(ScanRebuildNotDecided::PackedRecordVersionsTiedOnTheMergedVersionTotalOrderKey),
             "同一片容器两版 (诞生代号, 实例代号, 事务号) 相同、记录数不同（归并键不同，是两组）：I-1.8 ② 不成立，择不出"
         );
     }
@@ -1563,7 +1562,7 @@ mod tests {
     }
 
     #[test]
-    fn a_whole_object_tombstone_kills_the_data_units_of_an_object_whose_record_is_gone() {
+    fn whole_object_tombstone_kills_the_data_units_of_an_object_whose_record_is_gone() {
         let tombstone_container = tombstone_container_holding(&[tombstone_record(
             FIRST_INODE,
             OBJECT_BIRTH_OF_THE_FIRST_INODE,
@@ -1590,7 +1589,7 @@ mod tests {
     /// 墓碑压着、记录还在的对象：它的记录与数据单元都不进重建出的表，记录原样放进 `records_of_the_tombstoned_objects`，扫描重建照常交回
     /// 算不算删除中这一侧不认，由比对那一侧两侧一起认。
     #[test]
-    fn a_tombstoned_object_that_still_has_its_record_is_set_aside_for_the_comparison_to_judge_with_both_sides(
+    fn tombstoned_object_that_still_has_its_record_is_set_aside_for_the_comparison_to_judge_with_both_sides(
     ) {
         let tombstone_container = tombstone_container_holding(&[tombstone_record(
             FIRST_INODE,
@@ -1707,7 +1706,7 @@ mod tests {
     }
 
     #[test]
-    fn a_data_unit_beyond_the_size_of_its_record_is_not_claimed() {
+    fn data_unit_beyond_the_size_of_its_record_is_not_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units(3000, [3, 3]),
             [0],
@@ -1716,7 +1715,7 @@ mod tests {
     }
 
     #[test]
-    fn a_data_unit_born_before_a_data_unit_at_a_smaller_offset_is_not_claimed() {
+    fn data_unit_born_before_a_data_unit_at_a_smaller_offset_is_not_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units(2 * SECOND_DATA_UNIT_OFFSET_IN_BYTES, [5, 3]),
             [0],
@@ -1725,7 +1724,7 @@ mod tests {
     }
 
     #[test]
-    fn a_data_unit_born_after_the_data_units_at_smaller_offsets_is_claimed() {
+    fn data_unit_born_after_the_data_units_at_smaller_offsets_is_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units(SECOND_DATA_UNIT_OFFSET_IN_BYTES + 100, [3, 5]),
             [0, SECOND_DATA_UNIT_OFFSET_IN_BYTES],
@@ -1736,7 +1735,7 @@ mod tests {
     /// 题面那一形：两个单元同在 txg 3 写下，txg 4 截在单元边界上（N_w = 一个净荷，不重写单元 0）、
     /// 放掉单元 1，再变长到两个净荷（洞）。单元 1 还在盘上、出生 txg 与单元 0 相同，写序那一条判不死它；第四条判死它，只认领单元 0。
     #[test]
-    fn a_data_unit_born_before_the_truncation_field_beyond_its_size_is_not_claimed() {
+    fn data_unit_born_before_the_truncation_field_beyond_its_size_is_not_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units_under_a_truncation_field(
                 2 * SECOND_DATA_UNIT_OFFSET_IN_BYTES,
@@ -1753,7 +1752,7 @@ mod tests {
 
     /// 截到 0（N_w = 0）再变长：⌈0 ÷ 净荷⌉.max(1) = 1，单元 0 不在第四条的射程里，出生 txg 早于 T 也照认领（去掉 .max(1) 会判死它）。
     #[test]
-    fn a_truncation_field_to_size_zero_still_keeps_the_first_data_unit_claimed() {
+    fn truncation_field_to_size_zero_still_keeps_the_first_data_unit_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units_under_a_truncation_field(
                 3000,
@@ -1770,7 +1769,7 @@ mod tests {
 
     /// 出生 txg 恰为 T：不早于 T，第四条不判死（`<` 写成 `<=` 会判死截断那一次及之后写下的单元）。
     #[test]
-    fn a_data_unit_born_at_the_truncation_field_txg_is_claimed() {
+    fn data_unit_born_at_the_truncation_field_txg_is_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units_under_a_truncation_field(
                 2 * SECOND_DATA_UNIT_OFFSET_IN_BYTES,
@@ -1788,7 +1787,7 @@ mod tests {
     /// 单元号恰比边界小一：N_w 比一个净荷多 1 字节，⌈N_w ÷ 净荷⌉ = 2，单元 1 是截断留下的单元，出生 txg 早于 T 也照认领
     /// （向下取整会判死它）。
     #[test]
-    fn a_data_unit_below_the_rounded_up_truncation_field_size_is_claimed() {
+    fn data_unit_below_the_rounded_up_truncation_field_size_is_claimed() {
         assert_eq!(
             offsets_claimed_with_two_data_units_under_a_truncation_field(
                 2 * SECOND_DATA_UNIT_OFFSET_IN_BYTES,
@@ -1870,7 +1869,7 @@ mod tests {
     /// 回退那一形：第一个文件那一版 txg 3（数据单元与 inode 叶容器诞生代号 3），覆盖写一版 txg 4（诞生代号 4，写序更大），
     /// 挂着回退到 txg 3、回退那次发布 txg 5 写一条谱系记录 (5, 3)。txg 4 不在最新那一版的谱系上：那一版的两个单元不是任何现行版本的成员。
     #[test]
-    fn a_lineage_record_leaves_out_the_versions_born_on_the_branch_the_rollback_abandoned() {
+    fn lineage_record_leaves_out_the_versions_born_on_the_branch_the_rollback_abandoned() {
         let kept_data_unit = placement_on_device_zero(50180);
         let abandoned_data_unit = placement_on_device_zero(50254);
         let kept_record = inode_record(FIRST_INODE, OBJECT_BIRTH_OF_THE_FIRST_INODE, 3000);
@@ -1932,8 +1931,8 @@ mod tests {
     /// 回退抛弃的那一段（txg 4）里删了第一个文件、写了墓碑（死亡 txg 4），回退到 txg 3 之后文件又活着：墓碑随现行那一版走、照样择得到，
     /// 但它的死亡 txg 不在谱系上，不压回退目标那一版里的对象。
     #[test]
-    fn a_tombstone_written_on_the_abandoned_branch_does_not_kill_the_object_the_rollback_brings_back(
-    ) {
+    fn tombstone_written_on_the_abandoned_branch_does_not_kill_the_object_the_rollback_brings_back()
+    {
         let record = inode_record(FIRST_INODE, OBJECT_BIRTH_OF_THE_FIRST_INODE, 3000);
         let inode_container = inode_container_version_born_at(1, std::slice::from_ref(&record), 3);
         let tombstone_container = sealed_packed_container(&PackedContainer {
@@ -1987,7 +1986,7 @@ mod tests {
     /// 叶容器 2 在 txg 6 退役（死亡 txg 6 在谱系上）：它最后那一版还在盘上扫得到，按退役树整个身份不认领——记录不进 inode 记录集合，
     /// 容器不进中央映射。
     #[test]
-    fn a_retirement_record_on_the_lineage_leaves_out_the_leaf_container_it_names() {
+    fn retirement_record_on_the_lineage_leaves_out_the_leaf_container_it_names() {
         let live_record = inode_record(FIRST_INODE, OBJECT_BIRTH_OF_THE_FIRST_INODE, 0);
         let live_container =
             inode_container_version_born_at(1, std::slice::from_ref(&live_record), 3);
@@ -2030,7 +2029,7 @@ mod tests {
     /// 叶容器 2 在 txg 5 退役，之后回退到 txg 4（谱系记录 (6, 4)）：死亡 txg 5 落在回退抛弃的那一段里，退役树随现行那一版走、照样择得到，
     /// 但那条退役记录不在谱系上，叶容器 2 在回退目标那一版里还活着、照认领。
     #[test]
-    fn a_retirement_record_off_the_lineage_leaves_the_leaf_container_it_names_claimed() {
+    fn retirement_record_off_the_lineage_leaves_the_leaf_container_it_names_claimed() {
         let revived_record = inode_record(FIRST_INODE + 1, 3, 0);
         let revived_container =
             inode_container_version_born_at(2, std::slice::from_ref(&revived_record), 3);
@@ -2075,7 +2074,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lineage_record_whose_target_is_not_older_than_its_rollback_is_not_decided() {
+    fn lineage_record_whose_target_is_not_older_than_its_rollback_is_not_decided() {
         let lineage_container = lineage_container_holding(&[lineage_record(5, 5)], 5);
         let placement = placement_on_device_zero(50310);
         let copies = [copy_of_the_container(placement, &lineage_container)];
@@ -2087,7 +2086,7 @@ mod tests {
     }
 
     #[test]
-    fn a_retired_leaf_container_with_a_version_born_after_its_death_is_not_decided() {
+    fn retired_leaf_container_with_a_version_born_after_its_death_is_not_decided() {
         let rewritten_container =
             inode_container_version_born_at(2, &[inode_record(FIRST_INODE + 1, 3, 0)], 7);
         let retirement_container =
@@ -2113,7 +2112,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tombstone_whose_range_is_not_the_whole_object_is_not_decided() {
+    fn tombstone_whose_range_is_not_the_whole_object_is_not_decided() {
         let tombstone_container = tombstone_container_holding(&[tombstone_record(
             FIRST_INODE,
             OBJECT_BIRTH_OF_THE_FIRST_INODE,
@@ -2129,7 +2128,7 @@ mod tests {
     }
 
     #[test]
-    fn a_current_container_without_a_decodable_copy_is_not_decided() {
+    fn current_container_without_a_decodable_copy_is_not_decided() {
         let inode_container = inode_container_holding(1, &[inode_record(FIRST_INODE, 3, 3000)]);
         let mut torn_copy = inode_container.clone();
         torn_copy[200] ^= 0xFF;

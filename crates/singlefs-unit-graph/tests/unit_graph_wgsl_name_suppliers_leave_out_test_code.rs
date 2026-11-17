@@ -75,7 +75,7 @@ fn key_text(tree: &FixtureTree, entry: &EntrySpecification) -> Result<String, St
 
 /// 场景：产品入口的内核缺 `LIMIT`，产品函数与测试函数的串里都有它。预期：并进来的是产品函数，测试函数不进闭包。
 #[test]
-fn a_test_function_naming_the_external_name_in_a_string_is_not_pulled_in_as_a_supplier() {
+fn test_function_naming_the_external_name_in_a_string_is_not_pulled_in_as_a_supplier() {
     let tree = supplied_tree("wgsl-supplier-not-test");
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);

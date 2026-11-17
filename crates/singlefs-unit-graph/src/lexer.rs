@@ -476,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    fn a_range_after_a_number_is_not_part_of_the_number() {
+    fn range_after_a_number_is_not_part_of_the_number() {
         assert_eq!(texts("0..10"), ["0", ".", ".", "10"]);
         assert_eq!(texts("tuple.0.1"), ["tuple", ".", "0.1"]);
     }

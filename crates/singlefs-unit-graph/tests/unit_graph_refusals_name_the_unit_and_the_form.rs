@@ -49,7 +49,7 @@ fn an_include_str_whose_argument_is_not_a_literal_is_refused() {
 }
 
 #[test]
-fn a_runtime_read_whose_path_is_joined_from_a_variable_is_refused() {
+fn runtime_read_whose_path_is_joined_from_a_variable_is_refused() {
     assert_refused_with(
         "runtime-read-path-not-literal",
         &[(
@@ -60,7 +60,7 @@ fn a_runtime_read_whose_path_is_joined_from_a_variable_is_refused() {
 }
 
 #[test]
-fn a_runtime_read_with_a_literal_path_becomes_a_data_unit_instead_of_a_refusal() {
+fn runtime_read_with_a_literal_path_becomes_a_data_unit_instead_of_a_refusal() {
     let files = [
         (
             "crates/refusing/src/lib.rs",
@@ -76,7 +76,7 @@ fn a_runtime_read_with_a_literal_path_becomes_a_data_unit_instead_of_a_refusal()
 }
 
 #[test]
-fn a_test_that_starts_its_own_executable_is_refused() {
+fn test_that_starts_its_own_executable_is_refused() {
     assert_refused_with(
         "current-exe",
         &[(
@@ -98,7 +98,7 @@ fn an_identifier_pasting_macro_is_refused() {
 }
 
 #[test]
-fn a_cfg_name_nobody_recognizes_is_refused_unless_the_command_line_gives_it() {
+fn conditional_compilation_name_nobody_recognizes_is_refused_unless_the_command_line_gives_it() {
     let files = [(
         "crates/refusing/src/lib.rs",
         "#[cfg(verus_keep_ghost)]\npub fn ghost_helper() -> u32 {\n    1\n}\npub fn entry_point() -> u32 {\n    ghost_helper()\n}\n",
@@ -123,7 +123,7 @@ fn a_cfg_name_nobody_recognizes_is_refused_unless_the_command_line_gives_it() {
 }
 
 #[test]
-fn a_call_into_an_extern_block_is_refused() {
+fn call_into_an_extern_block_is_refused() {
     assert_refused_with(
         "extern-function-interface",
         &[(
@@ -134,7 +134,7 @@ fn a_call_into_an_extern_block_is_refused() {
 }
 
 #[test]
-fn a_linked_file_with_unbalanced_brackets_is_refused() {
+fn linked_file_with_unbalanced_brackets_is_refused() {
     assert_refused_with(
         "unbalanced-brackets",
         &[
@@ -151,7 +151,7 @@ fn a_linked_file_with_unbalanced_brackets_is_refused() {
 }
 
 #[test]
-fn a_linked_file_with_an_unrecognized_item_start_is_refused() {
+fn linked_file_with_an_unrecognized_item_start_is_refused() {
     assert_refused_with(
         "unrecognized-item-start",
         &[
@@ -176,7 +176,7 @@ fn an_item_level_include_is_refused() {
 }
 
 #[test]
-fn a_declared_module_whose_file_is_missing_is_refused() {
+fn declared_module_whose_file_is_missing_is_refused() {
     assert_refused_with(
         "module-file-missing",
         &[(
@@ -198,7 +198,7 @@ fn an_included_file_that_does_not_exist_is_refused() {
 }
 
 #[test]
-fn a_procedure_macro_crate_in_the_link_is_refused() {
+fn procedure_macro_crate_in_the_link_is_refused() {
     let manifest = "[package]\nname = \"refusing\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[lib]\nproc-macro = true\n";
     let verdict = entry_verdict(
         manifest,
@@ -216,7 +216,7 @@ fn a_procedure_macro_crate_in_the_link_is_refused() {
 }
 
 #[test]
-fn a_manifest_directory_path_canonicalized_after_its_literal_joins_is_refused() {
+fn manifest_directory_path_canonicalized_after_its_literal_joins_is_refused() {
     let files = [
         (
             "crates/refusing/src/lib.rs",
@@ -233,7 +233,7 @@ fn a_manifest_directory_path_canonicalized_after_its_literal_joins_is_refused() 
 }
 
 #[test]
-fn a_path_buf_from_the_manifest_directory_with_a_literal_join_becomes_a_data_unit() {
+fn path_buffer_from_the_manifest_directory_with_a_literal_join_becomes_a_data_unit() {
     let files = [
         (
             "crates/refusing/src/lib.rs",
@@ -255,8 +255,8 @@ fn a_path_buf_from_the_manifest_directory_with_a_literal_join_becomes_a_data_uni
 /// 照清单目录拼出包外、仓根之内的字面路径（`RelativeToManifest`），收成数据单元、不拒算；那份文件改了，键跟着变。
 /// 判别力（`crates/mutations.tsv`）：`env!("CARGO_MANIFEST_DIR")` 起头的 `include_*!` 参数当成认不得的形态（拒算），这条红。
 #[test]
-fn a_manifest_relative_include_of_a_file_above_the_package_becomes_a_data_unit_instead_of_a_refusal(
-) {
+fn manifest_relative_include_of_a_file_above_the_package_becomes_a_data_unit_instead_of_a_refusal()
+{
     let source = "pub const REGISTRATION_FILE_TEXT: &str = include_str!(concat!(\n    env!(\"CARGO_MANIFEST_DIR\"),\n    \"/\",\n    \"../../registered-thread-default\"\n));\npub fn entry_point() -> usize {\n    REGISTRATION_FILE_TEXT.len()\n}\n";
     let files = [
         ("crates/refusing/src/lib.rs", source),

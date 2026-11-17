@@ -751,7 +751,7 @@ mod tests {
     /// 三个单元的文件改单元 1 中间 4 KiB，单元 1、2 一起重写、都读回旧单元；
     /// 整单元盖满单元 1 时单元 1 不读、单元 2 照读；单元数与 size 不变。
     #[test]
-    fn a_write_inside_existing_units_rewrites_every_unit_from_the_offset_and_reads_back_what_it_does_not_cover(
+    fn write_inside_existing_units_rewrites_every_unit_from_the_offset_and_reads_back_what_it_does_not_cover(
     ) {
         let size = 3 * payload() - 7;
         let inside = partial_write(3, size, payload() + 100, 4096);
@@ -778,7 +778,7 @@ mod tests {
 
     /// 0 个单元的 inode（新建、size 0）写 4 KiB：单元 0 读残留；起点在第三个单元里：前两个补零、不读，第三个读残留。
     #[test]
-    fn a_write_into_an_inode_without_units_reads_the_residue_of_the_units_it_writes_and_zeroes_the_gap(
+    fn write_into_an_inode_without_units_reads_the_residue_of_the_units_it_writes_and_zeroes_the_gap(
     ) {
         let first_write = partial_write(0, 0, 0, 4096);
         assert_eq!(first_write.first_rewritten_unit(), DataUnitIndexInFile(0));
@@ -811,7 +811,7 @@ mod tests {
 
     /// 写落在最后一个存在的单元之后：它满一个净荷就不重写（从写之前的单元数起），不满就从它起、按已有单元读回；洞里写换不了 size。
     #[test]
-    fn a_write_after_the_last_existing_unit_rewrites_that_unit_only_when_it_is_not_full() {
+    fn write_after_the_last_existing_unit_rewrites_that_unit_only_when_it_is_not_full() {
         let after_a_full_unit = partial_write(1, payload(), payload(), 10);
         assert_eq!(
             after_a_full_unit.first_rewritten_unit(),

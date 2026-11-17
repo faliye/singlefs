@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
 
 use crate::build_features::FeaturesEnabledByTheBuild;
 use crate::closure::{
-    compute_closure_of_entries_with_the_features_of_the_build, reuse_key, ClosureRequest,
+    compute_closure_of_entries_not_following_the_listed_units, reuse_key, ClosureRequest,
     EntryError,
 };
 use crate::closure::{ExternalKeyInputs, RequestedCondition};
@@ -114,6 +114,39 @@ pub fn entry_group_key_with_the_features_of_the_build(
     locked_packages: &[LockedPackage],
     switches: &RuleSwitches,
 ) -> Result<EntryGroupKey, EntryError> {
+    entry_group_key_not_following_the_listed_units(
+        workspace,
+        request,
+        &BTreeSet::new(),
+        features_enabled_by_the_build,
+        toolchain_lines,
+        locked_packages,
+        switches,
+    )
+    .map(|keyed| keyed.key)
+}
+
+/// 一组的结果，连同登记了不沿它收、这一趟真够到的单元（限定名，排好序）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EntryGroupKeyNotFollowingTheListedUnits {
+    pub key: EntryGroupKey,
+    pub units_reached_and_not_followed: Vec<String>,
+}
+
+/// 同 [`entry_group_key_with_the_features_of_the_build`]，另给这一组「不沿它收」的单元登记（限定名；
+/// [`crate::closure::compute_closure_of_entries_not_following_the_listed_units`]）。登记是空的，键与那一个函数逐字相同。
+///
+/// # Errors
+/// 同 [`entry_group_key`]；表里点名的包工作区里没有。
+pub fn entry_group_key_not_following_the_listed_units(
+    workspace: &Workspace,
+    request: &EntryGroupRequest,
+    units_not_followed: &BTreeSet<String>,
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    toolchain_lines: &[String],
+    locked_packages: &[LockedPackage],
+    switches: &RuleSwitches,
+) -> Result<EntryGroupKeyNotFollowingTheListedUnits, EntryError> {
     let workspace = workspace.view_for_judgment(JudgmentKind::ProductBehavior);
     if request.entry_paths.is_empty() {
         return Err(EntryError::MalformedEntryPath(format!(
@@ -130,17 +163,20 @@ pub fn entry_group_key_with_the_features_of_the_build(
     // 每一趟要么交出闭包，要么去掉一个不编进来的入口：至多入口数加一趟
     let mut outcome = loop {
         let Some((first_entry, additional_entries)) = compiled_entries.split_first() else {
-            return Ok(EntryGroupKey {
-                group_name: request.group_name.clone(),
-                verdict: EntryGroupVerdict::NotCompiled {
-                    reason: format!(
-                        "组里的入口在这组特性下都不编进来：{}",
-                        entries_not_compiled.join("、")
-                    ),
+            return Ok(EntryGroupKeyNotFollowingTheListedUnits {
+                key: EntryGroupKey {
+                    group_name: request.group_name.clone(),
+                    verdict: EntryGroupVerdict::NotCompiled {
+                        reason: format!(
+                            "组里的入口在这组特性下都不编进来：{}",
+                            entries_not_compiled.join("、")
+                        ),
+                    },
+                    entries_not_compiled,
+                    composition_lines: Vec::new(),
+                    watched_files: BTreeSet::new(),
                 },
-                entries_not_compiled,
-                composition_lines: Vec::new(),
-                watched_files: BTreeSet::new(),
+                units_reached_and_not_followed: Vec::new(),
             });
         };
         let closure_request = ClosureRequest {
@@ -154,12 +190,13 @@ pub fn entry_group_key_with_the_features_of_the_build(
             uses_default_features: false,
             target_triple: target_triple.clone(),
         };
-        match compute_closure_of_entries_with_the_features_of_the_build(
+        match compute_closure_of_entries_not_following_the_listed_units(
             workspace,
             &closure_request,
             additional_entries,
             features_enabled_by_the_build,
             switches,
+            units_not_followed,
         ) {
             Ok(outcome) => break outcome,
             Err(EntryError::EntryInactive(path)) => {
@@ -199,12 +236,15 @@ pub fn entry_group_key_with_the_features_of_the_build(
                 .collect(),
         },
     };
-    Ok(EntryGroupKey {
-        group_name: request.group_name.clone(),
-        verdict,
-        entries_not_compiled,
-        composition_lines,
-        watched_files: watched_files_of_the_closure(workspace, &outcome),
+    Ok(EntryGroupKeyNotFollowingTheListedUnits {
+        key: EntryGroupKey {
+            group_name: request.group_name.clone(),
+            verdict,
+            entries_not_compiled,
+            composition_lines,
+            watched_files: watched_files_of_the_closure(workspace, &outcome),
+        },
+        units_reached_and_not_followed: outcome.units_reached_and_not_followed,
     })
 }
 
@@ -597,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_line_before_its_group_and_a_malformed_key_are_refused() {
+    fn unit_line_before_its_group_and_a_malformed_key_are_refused() {
         assert!(parse_entry_group_table(&format!(
             "{ENTRY_GROUP_TABLE_HEADER}\nunit\tlost\tfn\ta::b\tf:1-2\t{}\n",
             "00".repeat(DIGEST_BYTES)

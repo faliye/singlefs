@@ -6,7 +6,8 @@
 //! 另有一趟整理到停：同一历史的两个池，一个选 `cpu`、一个选 `gpu` 递进这份实现（背后是 CPU 替身），发的每一版、录制流、停在哪逐项相同。
 //! 设置（D26 已定项 13 第 1–3 条）：核心层交来的每一组转到两份核那一层，挂载那一刻交一次、切换只在生效的那一批开头交，一批之内不交；
 //! 交新设置不清三段的连续不确定计数（第 8 条）。出错（第 4 条）：报给核心层的错带着卡与原因。
-//! 卡清单照本包开卡之后那一份答（`gpus_of_this_host::DiscreteGpusAfterTheOpening`）：挂载那一刻没开成而跳过的卡，挂着切换点到它照第 4 条拒。
+//! 卡清单照本包开卡之后那一份答（`gpus_of_this_host::DiscreteGpusAfterTheOpening`）；切换点到的卡重开到上限都没开成（替身照产品那一层答开不成）时，
+//! 核心层在交设置之后的两批之间当场停整理、报出那张卡与每一次的原因（D26（后台整理与放置回收） 已定项 13 第 4 条「重开 3 次都不成，GC 停下，报警」）。
 #[path = "../../singlefs-verification/tests/common_background_gpu_compute/mod.rs"]
 mod common_background_gpu_compute;
 mod common_pool_on_memory_devices;
@@ -19,8 +20,9 @@ use common_background_gpu_compute::{CpuBackedBackgroundGpuComputeForTests, EIGHT
 use common_pool_on_memory_devices::pool_after_a_sequential_write_in_an_earlier_mount;
 use singlefs_background_gpu::adapter_inventory::DiscreteGpuOnThisHost;
 use singlefs_background_gpu::background_gpu::{
-    BatchNotSplitOverTheGpus, ChecksumBatchFailed, GpuFailureCause, LiveSlotBatchFailed,
-    RegionRecordBatchFailed, SmallestPieceNotHeldOnTheGpu,
+    BatchNotSplitOverTheGpus, ChecksumBatchFailed, GpuFailureCause, GpuNotOpenedAfterTheReopenings,
+    LatestSettingsHandedIn, LiveSlotBatchFailed, RegionRecordBatchFailed,
+    SmallestPieceNotHeldOnTheGpu,
 };
 use singlefs_background_gpu::background_gpu_compute::{
     core_failure_of_the_gpu, BackgroundGpuComputeThroughBothKernels, BothKernelsOfTheThreeSegments,
@@ -28,9 +30,7 @@ use singlefs_background_gpu::background_gpu_compute::{
 use singlefs_background_gpu::checksum_kernels::{
     cpu_reference_outcome, ChecksumKernelOutcome, UnitChecksumToVerify,
 };
-use singlefs_background_gpu::gpus_of_this_host::{
-    DiscreteGpuNotOpenedAtTheMount, DiscreteGpusAfterTheOpening,
-};
+use singlefs_background_gpu::gpus_of_this_host::DiscreteGpusAfterTheOpening;
 use singlefs_background_gpu::live_slot_kernels::cpu_reference_live_slots;
 use singlefs_background_gpu::region_record_kernels::{
     cpu_reference_classification, RegionRecordToClassify,
@@ -46,10 +46,10 @@ use singlefs_core::background_compute::{
     BackgroundComputeSettings, BackgroundComputeSettingsRefused, BackgroundGpuCompute,
     BackgroundGpuComputeFailed, BackgroundGpuComputeHandle, BackgroundTask,
     BackgroundTaskAfterTheComputeError, BackgroundTaskStoppedAfterAComputeError,
-    ClusterSegmentEntryKey, GpuComputedSegment, GpuDeviceIdentifier, GpuDeviceNotOpenedAtTheMount,
-    GpuEntryCounts, GpuEntryDecision, GpuInventory, GpuLeftOutUnderItsMemoryLimit,
-    GpuMemoryInBytes, GpuSubmissionsOfOneSegment, GpuSubmissionsOfTheBatch,
-    InputNotSupportedOnTheGpu, RegionRecordEntryKey, RegionRecordToClassifyOnTheGpu,
+    ClusterSegmentEntryKey, GpuComputedSegment, GpuDeviceIdentifier, GpuEntryCounts,
+    GpuEntryDecision, GpuInventory, GpuLeftOutUnderItsMemoryLimit, GpuMemoryInBytes,
+    GpuSubmissionsOfOneSegment, GpuSubmissionsOfTheBatch, InputNotSupportedOnTheGpu,
+    PciStateOfTheGpuReadWhenJudgedUnusable, RegionRecordEntryKey, RegionRecordToClassifyOnTheGpu,
     SubmissionWaitedForPastTheLimit, UnitChecksumOutcome, UnitChecksumToVerifyOnTheGpu,
     BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
 };
@@ -74,8 +74,12 @@ const FILESYSTEM_IDENTIFIER_OF_THE_UNITS: [u8; 16] = [7; 16];
 const TREE_OF_THE_TEST_DATA: u64 = 11;
 /// CPU 替身答的那一张卡。
 const CARD_OF_THE_TEST_DOUBLE: &str = "card-of-the-cpu-test-double";
-/// 切换用例里挂载那一刻没开成而跳过的那一张卡。
-const CARD_NOT_OPENED_AT_THE_MOUNT: &str = "card-not-opened-at-the-mount";
+/// 切换用例里挂载时没开、切换点到它而重开到上限都没开成的那一张卡。
+const CARD_NOT_OPENED_AFTER_THE_REOPENINGS: &str = "card-not-opened-after-the-reopenings";
+
+fn card_not_opened_after_the_reopenings() -> GpuDeviceIdentifier {
+    GpuDeviceIdentifier::of_opaque_bytes(CARD_NOT_OPENED_AFTER_THE_REOPENINGS.as_bytes().to_vec())
+}
 
 fn card_of_the_test_double() -> GpuDeviceIdentifier {
     GpuDeviceIdentifier::of_opaque_bytes(CARD_OF_THE_TEST_DOUBLE.as_bytes().to_vec())
@@ -96,7 +100,7 @@ fn discrete_gpu_of_eight_gibibytes(name: &str) -> DiscreteGpuOnThisHost {
 fn only_the_card_of_the_test_double_opened() -> DiscreteGpusAfterTheOpening {
     DiscreteGpusAfterTheOpening {
         opened: vec![discrete_gpu_of_eight_gibibytes(CARD_OF_THE_TEST_DOUBLE)],
-        not_opened: Vec::new(),
+        not_opened_for_not_taking_part: Vec::new(),
     }
 }
 
@@ -121,6 +125,12 @@ struct InjectedIntoTheKernelsOnTheCpu {
     batch_not_split_over_the_gpus: Option<BatchNotSplitOverTheGpus>,
     /// 下一次收到核心层转来的设置时换成「此刻这组设置下一批分不到卡上」的那一种：模拟挂着切到一组一张卡都用不上的设置。
     batch_not_split_over_the_gpus_once_the_next_settings_arrive: Option<BatchNotSplitOverTheGpus>,
+    /// 下一次收到核心层转来的设置之后，那一组点到的这张卡在会话锁外重开到上限都没开成：替身照产品那一层，交设置之后两批之间那一问答它一次
+    /// （`BothKernelsOfTheThreeSegments::put_the_gpus_opened_since_the_switch_in_effect`），之后这组设置下每一批报成它的 GPU 出错。
+    not_opened_after_the_reopenings_once_the_next_settings_arrive:
+        Option<GpuNotOpenedAfterTheReopenings>,
+    /// 收到设置之后还没交回的那一张重开到上限都没开成的卡（两批之间那一问交回它就清掉）。
+    not_opened_after_the_reopenings_to_report: Option<GpuNotOpenedAfterTheReopenings>,
     /// 每一批算完之后核心层来取的「三段各自在卡上是怎么交的」：替身每次都交回这一份（用例照它核核心层记没记进那一批的记账）。
     submissions_reported_after_each_batch: GpuSubmissionsOfTheBatch,
 }
@@ -137,6 +147,8 @@ impl InjectedIntoTheKernelsOnTheCpu {
             live_slot_batch_failure: None,
             batch_not_split_over_the_gpus: None,
             batch_not_split_over_the_gpus_once_the_next_settings_arrive: None,
+            not_opened_after_the_reopenings_once_the_next_settings_arrive: None,
+            not_opened_after_the_reopenings_to_report: None,
             submissions_reported_after_each_batch: GpuSubmissionsOfTheBatch::default(),
         }
     }
@@ -155,11 +167,6 @@ impl GpuInventory for BothKernelsComputedOnTheCpu {
         self.discrete_gpus_after_the_opening
             .devices_with_total_memory()
     }
-
-    fn devices_not_opened_at_the_mount(&self) -> Vec<GpuDeviceNotOpenedAtTheMount> {
-        self.discrete_gpus_after_the_opening
-            .devices_not_opened_at_the_mount()
-    }
 }
 
 impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
@@ -170,10 +177,28 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
         match &injected.batch_not_split_over_the_gpus {
             None => {}
-            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+            Some(BatchNotSplitOverTheGpus::GpuNotOpenedAfterTheReopeningsAtTheSwitch(
+                not_opened,
+            )) => {
+                return Err(ChecksumBatchFailed::GpuFailed {
+                    device: not_opened.device.clone(),
+                    cause: GpuFailureCause::NotOpenedAfterTheReopenings {
+                        causes_of_each_opening: not_opened.causes_of_each_opening.clone(),
+                    },
+                    pci_state_when_judged_unusable: not_opened
+                        .pci_state_when_judged_unusable
+                        .clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
+                device,
+                cause,
+                pci_state_when_judged_unusable,
+            }) => {
                 return Err(ChecksumBatchFailed::GpuFailed {
                     device: device.clone(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_when_judged_unusable.clone(),
                 });
             }
             Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
@@ -219,10 +244,28 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
         match &injected.batch_not_split_over_the_gpus {
             None => {}
-            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+            Some(BatchNotSplitOverTheGpus::GpuNotOpenedAfterTheReopeningsAtTheSwitch(
+                not_opened,
+            )) => {
+                return Err(RegionRecordBatchFailed::GpuFailed {
+                    device: not_opened.device.clone(),
+                    cause: GpuFailureCause::NotOpenedAfterTheReopenings {
+                        causes_of_each_opening: not_opened.causes_of_each_opening.clone(),
+                    },
+                    pci_state_when_judged_unusable: not_opened
+                        .pci_state_when_judged_unusable
+                        .clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
+                device,
+                cause,
+                pci_state_when_judged_unusable,
+            }) => {
                 return Err(RegionRecordBatchFailed::GpuFailed {
                     device: device.clone(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_when_judged_unusable.clone(),
                 });
             }
             Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
@@ -279,10 +322,28 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
         let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
         match &injected.batch_not_split_over_the_gpus {
             None => {}
-            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause }) => {
+            Some(BatchNotSplitOverTheGpus::GpuNotOpenedAfterTheReopeningsAtTheSwitch(
+                not_opened,
+            )) => {
+                return Err(LiveSlotBatchFailed::GpuFailed {
+                    device: not_opened.device.clone(),
+                    cause: GpuFailureCause::NotOpenedAfterTheReopenings {
+                        causes_of_each_opening: not_opened.causes_of_each_opening.clone(),
+                    },
+                    pci_state_when_judged_unusable: not_opened
+                        .pci_state_when_judged_unusable
+                        .clone(),
+                });
+            }
+            Some(BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
+                device,
+                cause,
+                pci_state_when_judged_unusable,
+            }) => {
                 return Err(LiveSlotBatchFailed::GpuFailed {
                     device: device.clone(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_when_judged_unusable.clone(),
                 });
             }
             Some(BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out)) => {
@@ -325,6 +386,31 @@ impl BothKernelsOfTheThreeSegments for BothKernelsComputedOnTheCpu {
             .take()
         {
             injected.batch_not_split_over_the_gpus = Some(not_split);
+        }
+        if let Some(not_opened) = injected
+            .not_opened_after_the_reopenings_once_the_next_settings_arrive
+            .take()
+        {
+            injected.not_opened_after_the_reopenings_to_report = Some(not_opened);
+        }
+    }
+
+    /// 同产品那一层：交设置之后两批之间这一问答开不成的那张（交设置当场那一问就答），之后这组设置下每一批报成它的 GPU 出错；
+    /// 没有要报的就答换上了，连同此刻这组设置下一批分不分得到卡上。
+    fn put_the_gpus_opened_since_the_switch_in_effect(&mut self) -> LatestSettingsHandedIn {
+        let mut injected = self.injected.lock().expect("用例没在别处 panic 过");
+        match injected.not_opened_after_the_reopenings_to_report.take() {
+            Some(not_opened) => {
+                injected.batch_not_split_over_the_gpus = Some(
+                    BatchNotSplitOverTheGpus::GpuNotOpenedAfterTheReopeningsAtTheSwitch(
+                        not_opened.clone(),
+                    ),
+                );
+                LatestSettingsHandedIn::NotOpened(not_opened)
+            }
+            None => LatestSettingsHandedIn::PutInEffect {
+                not_split_over_the_gpus: injected.batch_not_split_over_the_gpus.clone(),
+            },
         }
     }
 
@@ -654,19 +740,29 @@ fn the_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_le
             injected.unit_checksum_batch_failure = Some(ChecksumBatchFailed::GpuFailed {
                 device: card.clone(),
                 cause: cause.clone(),
+                pci_state_when_judged_unusable:
+                    PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
             });
             injected.region_record_batch_failure = Some(RegionRecordBatchFailed::GpuFailed {
                 device: card.clone(),
                 cause: cause.clone(),
+                pci_state_when_judged_unusable:
+                    PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
             });
             injected.live_slot_batch_failure = Some(LiveSlotBatchFailed::GpuFailed {
                 device: card.clone(),
                 cause: cause.clone(),
+                pci_state_when_judged_unusable:
+                    PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
             });
         }
         let failed_round_of_the_implementation =
             one_round_of_the_three_segments(&mut implementation, &inputs);
-        let reported_with_the_card_and_the_cause = core_failure_of_the_gpu(&card, &cause);
+        let reported_with_the_card_and_the_cause = core_failure_of_the_gpu(
+            &card,
+            &cause,
+            &PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+        );
         assert_eq!(
             failed_round_of_the_implementation,
             DecisionsOfTheThreeSegments {
@@ -709,7 +805,7 @@ fn the_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_le
             device: card.clone(),
             entry_position: 0,
             memory_limit: Some(GpuMemoryInBytes(50)),
-            smallest_piece_bytes,
+            smallest_piece_bytes: GpuMemoryInBytes(smallest_piece_bytes),
         };
         injected.unit_checksum_batch_failure = Some(
             ChecksumBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held(64)),
@@ -722,12 +818,12 @@ fn the_batch_that_fails_on_the_gpu_or_times_out_is_reported_as_gpu_failed_and_le
             LiveSlotBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held(104)),
         );
     }
-    let entry_larger_than_a_chunk = |input_bytes: u64| {
+    let entry_larger_than_a_chunk = |smallest_piece_bytes: u64| {
         BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
             InputNotSupportedOnTheGpu::EntryLargerThanAChunkOnTheDevice {
                 device: card_of_the_test_double(),
                 entry_position: 0,
-                input_bytes,
+                smallest_piece_bytes: GpuMemoryInBytes(smallest_piece_bytes),
             },
         )
     };
@@ -777,92 +873,120 @@ fn the_core_admits_gpu_settings_against_the_inventory_the_implementation_answers
     );
 }
 
-/// 第 4 条「挂载或切换那一刻……点名的卡不存在，就拒绝挂载（或拒绝切换）」：
-/// 挂载时给了卡列表、没点名的那张卡没开成而被跳过；挂着切换点到它（点名它，或不给卡列表、本机全部独显都参与）照拒，校验同挂载那一刻，
-/// 生效的与待生效的都不动，实现只收到挂载那一组。经核心层的切换入口与产品那一份实现（两份核那一层是 CPU 替身）走。
+/// D26（后台整理与放置回收） 已定项 13 第 4 条「重开 3 次都不成，GC 停下，报警里报出哪张卡、每次开不成的原因，等人处理，不自动再试」，经核心层与产品那一份实现（两份核那一层是 CPU 替身）走：
+/// 挂载点替身那一张；头一批里请求切换只点挂载时没开的另一张，替身收到这一组之后照产品那一层报「它重开到上限都没开成」（4 次的原因）——切换照收；
+/// 切换生效的那一批开头整理当场停着，报的错带着这张卡与每一次开不成的出错（各照这张卡出错报），那一批不开，切换之前那一批照常走 GPU。
 #[test]
-fn the_switch_to_a_card_not_opened_at_the_mount_is_refused() {
+fn the_card_named_by_a_switch_not_opened_after_the_reopenings_stops_the_compaction_reporting_the_card_and_every_cause(
+) {
+    let mut pool = pool_after_a_sequential_write_in_an_earlier_mount();
     let injected = Arc::new(Mutex::new(InjectedIntoTheKernelsOnTheCpu::nothing()));
-    let cause_at_the_mount = GpuFailureCause::DeviceOrPipelineDidNotStart {
-        reason: "起不了设备：造出来的坏卡".to_string(),
-    };
     let implementation = BackgroundGpuComputeThroughBothKernels::with_no_entry_uncertain(
         BothKernelsComputedOnTheCpu {
             injected: Arc::clone(&injected),
             discrete_gpus_after_the_opening: DiscreteGpusAfterTheOpening {
                 opened: vec![discrete_gpu_of_eight_gibibytes(CARD_OF_THE_TEST_DOUBLE)],
-                not_opened: vec![DiscreteGpuNotOpenedAtTheMount {
-                    discrete_gpu: discrete_gpu_of_eight_gibibytes(CARD_NOT_OPENED_AT_THE_MOUNT),
-                    cause: cause_at_the_mount.clone(),
-                }],
+                not_opened_for_not_taking_part: vec![discrete_gpu_of_eight_gibibytes(
+                    CARD_NOT_OPENED_AFTER_THE_REOPENINGS,
+                )],
             },
         },
     );
-    let mount_settings = settings_on_the_card_of_the_test_double(None, Duration::from_secs(10));
-    let mut background_compute = BackgroundComputeOfThisMount::of_a_mount(
-        admit_background_compute_settings_with_the_gpu_compute(
-            mount_settings.clone(),
-            Some(BackgroundGpuComputeHandle::of_an_implementation(
-                implementation,
-            )),
+    let causes_of_each_opening: Vec<GpuFailureCause> = (1..=4)
+        .map(|opening| GpuFailureCause::DeviceOrPipelineDidNotStart {
+            reason: format!("起不了设备：造出来的坏卡，第 {opening} 次"),
+        })
+        .collect();
+    let not_opened = GpuNotOpenedAfterTheReopenings {
+        device: card_not_opened_after_the_reopenings(),
+        causes_of_each_opening: causes_of_each_opening.clone(),
+        pci_state_when_judged_unusable: PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+    };
+    let mut session = pool.remounted_with_compaction_forced_to_start(
+        settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
+        Some(BackgroundGpuComputeHandle::of_an_implementation(
+            implementation,
+        )),
+    );
+    let mut batches_begun = 0_usize;
+    let mut switch_in_the_middle_of_the_first_batch =
+        |background_compute: &mut BackgroundComputeOfThisMount| {
+            batches_begun += 1;
+            if batches_begun == 1 {
+                background_compute
+                    .request_switch_from_the_next_batch(
+                        BackgroundComputeSettings {
+                            background_compute: BackgroundComputeBackend::Gpu,
+                            background_gpu_devices: Some(vec![
+                                card_not_opened_after_the_reopenings(),
+                            ]),
+                            background_gpu_memory_limit: None,
+                            background_gpu_wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+                        },
+                        None,
+                    )
+                    .expect("卡清单列着挂载时没开的那张：切换照收，开不开得成不在校验里判");
+                injected
+                    .lock()
+                    .expect("用例没在别处 panic 过")
+                    .not_opened_after_the_reopenings_once_the_next_settings_arrive =
+                    Some(not_opened.clone());
+            }
+        };
+    let run = session
+        .run_compaction_calling_a_test_only_hook_in_the_middle_of_each_batch(
+            &mut pool.devices,
+            &mut switch_in_the_middle_of_the_first_batch,
         )
-        .expect("点名开成了的那张卡：挂载照收"),
+        .expect("整理一趟");
+    assert!(
+        matches!(
+            run.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError
+            )
+        ) && run.background_compute_of_each_batch.len() == 1
+            && matches!(
+                run.background_compute_of_each_batch[0].path_taken,
+                BackgroundComputePathTaken::Gpu(_)
+            ),
+        "切换之前那一批走 GPU；切换生效之后那一批开头停着、不开：{:?}，{:?}",
+        run.outcome,
+        run.background_compute_of_each_batch
     );
-    let card_not_opened =
-        GpuDeviceIdentifier::of_opaque_bytes(CARD_NOT_OPENED_AT_THE_MOUNT.as_bytes().to_vec());
-    let refused_as_not_opened_at_the_mount = Err(
-        BackgroundComputeSettingsRefused::ParticipatingGpuDeviceNotOpenedAtTheMount(
-            GpuDeviceNotOpenedAtTheMount {
-                device: card_not_opened.clone(),
-                failure_at_the_mount: core_failure_of_the_gpu(
-                    &card_not_opened,
-                    &cause_at_the_mount,
-                ),
-            },
+    let failure_reported = BackgroundGpuComputeFailed::GpuNotOpenedAfterTheReopenings {
+        device: card_not_opened_after_the_reopenings(),
+        failures_of_each_opening: causes_of_each_opening
+            .iter()
+            .map(|cause| {
+                core_failure_of_the_gpu(
+                    &card_not_opened_after_the_reopenings(),
+                    cause,
+                    &PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                )
+            })
+            .collect(),
+        pci_state_when_judged_unusable: Box::new(
+            PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
         ),
-    );
+    };
     assert_eq!(
-        background_compute.request_switch_from_the_next_batch(
-            BackgroundComputeSettings {
-                background_compute: BackgroundComputeBackend::Gpu,
-                background_gpu_devices: Some(vec![card_not_opened.clone()]),
-                background_gpu_memory_limit: None,
-                background_gpu_wait_limit: Duration::from_secs(10),
+        session.background_compute().stopped_after_a_compute_error(),
+        &[BackgroundTaskStoppedAfterAComputeError {
+            task: BackgroundTask::CompactionRelocation,
+            error: BackgroundComputeError::GpuUnusableUnderTheSettingsHandedIn {
+                failure: failure_reported,
             },
-            None,
-        ),
-        refused_as_not_opened_at_the_mount,
-        "点名挂载那一刻没开成的卡：拒绝切换，报出它与没开成的原因"
+            batches_compensated_on_the_cpu: 0,
+        }],
+        "重开到上限都没开成：整理停着，报出这张卡与每一次开不成的原因"
     );
     assert_eq!(
-        background_compute.request_switch_from_the_next_batch(
-            BackgroundComputeSettings {
-                background_compute: BackgroundComputeBackend::Gpu,
-                background_gpu_devices: None,
-                background_gpu_memory_limit: None,
-                background_gpu_wait_limit: Duration::from_secs(10),
-            },
-            None,
-        ),
-        refused_as_not_opened_at_the_mount,
-        "不给卡列表：本机全部独显都参与，里面有没开成的那张，拒绝切换"
-    );
-    assert_eq!(
-        background_compute.requested_from_the_next_batch(),
-        None,
-        "两次都被拒：没有记成待生效"
-    );
-    assert_eq!(
-        background_compute.in_effect().settings(),
-        &mount_settings,
-        "生效的仍是挂载那一组"
-    );
-    assert_eq!(
-        injected.lock().expect("用例没在别处 panic 过").events,
-        vec![EventOfTheKernelsOnTheCpu::SettingsReceived(
-            admitted_on_the_card_of_the_test_double(None, Duration::from_secs(10))
-        )],
-        "实现只收到挂载那一组"
+        session.background_compute().stopped_after_a_compute_error()[0]
+            .error
+            .gpu_devices_named(),
+        vec![card_not_opened_after_the_reopenings()],
+        "报警点名的是开不成的那张卡"
     );
 }
 
@@ -1162,6 +1286,7 @@ fn the_gpu_unusable_after_its_resubmissions_stops_the_compaction_reporting_the_c
                 wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
             }),
         },
+        pci_state_when_judged_unusable: PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
     });
     let mut session = pool.remounted_with_compaction_forced_to_start(
         settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),
@@ -1194,6 +1319,9 @@ fn the_gpu_unusable_after_its_resubmissions_stops_the_compaction_reporting_the_c
                     wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
                     last_submission_waited_for:
                         SubmissionWaitedForPastTheLimit::SubmissionOfThisBatch,
+                    pci_state_when_judged_unusable: Box::new(
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                    ),
                 },
             },
             batches_compensated_on_the_cpu: 0,
@@ -1213,8 +1341,8 @@ fn the_mount_whose_participating_gpus_are_all_left_out_under_their_memory_limit_
     let gpus_left_out = vec![GpuLeftOutUnderItsMemoryLimit {
         device: card_of_the_test_double(),
         memory_limit: GpuMemoryInBytes(64),
-        smallest_piece_bytes: 976,
-        bytes_already_held_on_the_device: 0,
+        smallest_piece_bytes: GpuMemoryInBytes(976),
+        bytes_already_held_on_the_device: GpuMemoryInBytes(0),
     }];
     injected
         .lock()
@@ -1278,8 +1406,8 @@ fn the_switch_to_settings_whose_participating_gpus_are_all_left_out_stops_the_co
     let gpus_left_out = vec![GpuLeftOutUnderItsMemoryLimit {
         device: card_of_the_test_double(),
         memory_limit: memory_limit_holding_no_piece,
-        smallest_piece_bytes: 976,
-        bytes_already_held_on_the_device: 0,
+        smallest_piece_bytes: GpuMemoryInBytes(976),
+        bytes_already_held_on_the_device: GpuMemoryInBytes(0),
     }];
     let mut session = pool.remounted_with_compaction_forced_to_start(
         settings_on_the_card_of_the_test_double(None, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT),

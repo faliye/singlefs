@@ -780,7 +780,7 @@ mod tests {
 
     /// 没有 `verus!` 的原样交回：别的宏名带花括号的调用（里面写得像 Verus）也不剥。
     #[test]
-    fn a_source_without_verus_blocks_comes_back_byte_for_byte() {
+    fn source_without_verus_blocks_comes_back_byte_for_byte() {
         let source = "fn plain(value: u64) -> u64 {\n    value + 1\n}\nlookalike! {\n    fn inside(width: usize) -> (named: usize) ensures named == width, { width }\n}\n";
         assert_eq!(
             source_with_verus_ghost_code_blanked(source).as_deref(),

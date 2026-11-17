@@ -10,11 +10,15 @@
 //! [`MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU`]；专门测小上限切片的那几条照用各自更小的值。
 //! 解析与对卡是纯函数（单测在 `tests/real_gpu_tests_open_only_the_gpus_the_task_server_handed_over.rs`，不挂特性、不要卡），读环境、起判法、起 `nvidia-smi`、
 //! 枚举适配器的那一层薄壳在 [`handed_over_gpus_or_report_not_run`]。
+//! 挂载之后这个进程只许在交来的那几张卡上有设备（D26（后台整理与放置回收） 已定项 13 第 2 条「挂载时只开参与的卡」）：[`assert_this_process_is_on_no_gpu_but_the_handed_over_or_report_not_run`]
+//! 照服务判跑错卡的同一个读法（`task-server/task_server.py` 的 `compute_processes_now`：`nvidia-smi --query-compute-apps` 列出的进程号与卡的 UUID，
+//! UUID 经 `--query-gpu=index,uuid` 对到序号）认这个进程在哪几张卡上，上了别的卡判红；读不成打 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、
+//! 交回 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`] 让调用方看得见（对拍用例照它交回没跑成、不入库），不当绿。
 //! 一条用例只建一个 Vulkan 实例：服务交了这一台的卡时 [`handed_over_gpus_or_report_not_run`] 建一份 [`VulkanInstanceOfThisProcess`]，连同交来的卡交回，
 //! 这条用例里对卡、开卡、再枚举都用它；服务没交卡时不建（不碰 GPU）。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Duration;
 
@@ -235,6 +239,90 @@ pub fn pci_buses_by_nvidia_smi_index(
         }
     }
     Ok(buses)
+}
+
+/// 读这个进程在哪几张卡上要的 `nvidia-smi` 参数：每个在卡上有计算上下文的进程一行「卡的 UUID, 进程号」（服务判跑错卡读的同一份）。
+pub const NVIDIA_SMI_COMPUTE_PROCESS_ARGUMENTS: [&str; 2] = [
+    "--query-compute-apps=gpu_uuid,pid",
+    "--format=csv,noheader,nounits",
+];
+
+/// 卡的 UUID 对到 `nvidia-smi` 序号要的参数：每张卡一行「序号, UUID」。
+pub const NVIDIA_SMI_INDEX_AND_UUID_ARGUMENTS: [&str; 2] =
+    ["--query-gpu=index,uuid", "--format=csv,noheader"];
+
+/// 进程号 `process_identifier` 在哪几张卡上有计算上下文（`nvidia-smi` 序号）：`compute_process_report` 是 [`NVIDIA_SMI_COMPUTE_PROCESS_ARGUMENTS`] 的输出，
+/// `index_and_uuid_report` 是 [`NVIDIA_SMI_INDEX_AND_UUID_ARGUMENTS`] 的输出。别的进程的行不看。
+///
+/// # Errors
+/// 一行切不出两段、序号或进程号不是数、同一个 UUID 报了两个序号、这个进程所在的卡的 UUID 对不上序号。
+pub fn nvidia_smi_indices_the_process_is_on(
+    compute_process_report: &str,
+    index_and_uuid_report: &str,
+    process_identifier: u32,
+) -> Result<BTreeSet<NvidiaSmiIndex>, String> {
+    let mut indices_by_uuid: BTreeMap<String, NvidiaSmiIndex> = BTreeMap::new();
+    for line in index_and_uuid_report
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+    {
+        let (index_text, uuid) = line
+            .split_once(',')
+            .ok_or_else(|| format!("nvidia-smi 的一行「{line}」切不出序号与 UUID"))?;
+        let nvidia_smi_index = NvidiaSmiIndex(
+            index_text
+                .trim()
+                .parse()
+                .map_err(|_| format!("nvidia-smi 的一行「{line}」序号不是数"))?,
+        );
+        if indices_by_uuid
+            .insert(uuid.trim().to_string(), nvidia_smi_index)
+            .is_some()
+        {
+            return Err(format!("nvidia-smi 把 UUID {} 报了两次", uuid.trim()));
+        }
+    }
+    let mut indices_the_process_is_on = BTreeSet::new();
+    for line in compute_process_report
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+    {
+        let (uuid, process_text) = line
+            .split_once(',')
+            .ok_or_else(|| format!("nvidia-smi 的一行「{line}」切不出 UUID 与进程号"))?;
+        let process_on_the_gpu: u32 = process_text
+            .trim()
+            .parse()
+            .map_err(|_| format!("nvidia-smi 的一行「{line}」进程号不是数"))?;
+        if process_on_the_gpu != process_identifier {
+            continue;
+        }
+        let nvidia_smi_index = indices_by_uuid.get(uuid.trim()).ok_or_else(|| {
+            format!(
+                "这个进程所在的卡 UUID {} 对不上 nvidia-smi 报的序号",
+                uuid.trim()
+            )
+        })?;
+        indices_the_process_is_on.insert(*nvidia_smi_index);
+    }
+    Ok(indices_the_process_is_on)
+}
+
+/// `indices_the_process_is_on` 里不是交来的卡的那几张，按序号排；都是交来的是空。
+#[must_use]
+pub fn nvidia_smi_indices_not_handed_over(
+    indices_the_process_is_on: &BTreeSet<NvidiaSmiIndex>,
+    handed_over_gpus: &[HandedOverGpu],
+) -> Vec<NvidiaSmiIndex> {
+    indices_the_process_is_on
+        .iter()
+        .filter(|nvidia_smi_index| {
+            !handed_over_gpus
+                .iter()
+                .any(|handed_over| handed_over.nvidia_smi_index == **nvidia_smi_index)
+        })
+        .copied()
+        .collect()
 }
 
 /// 交来的一张卡对上的本机 Vulkan 独显：`nvidia-smi` 序号与 wgpu 报的总线地址原样（挂载参数 `background_gpu_devices` 点的就是这个串）。
@@ -473,21 +561,117 @@ fn this_host_address_by_the_configuration_check() -> Result<String, String> {
     this_host_address_emitted_by_the_configuration_check(&printed)
 }
 
-/// 跑一次 `nvidia-smi`（[`NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS`]）读每张卡的序号与总线地址。
-fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>, String> {
+/// 跑一次 `nvidia-smi`，交回标准输出。
+fn output_of_nvidia_smi(arguments: &[&str]) -> Result<String, String> {
     let output = std::process::Command::new("nvidia-smi")
-        .args(NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS)
+        .args(arguments)
         .stdin(std::process::Stdio::null())
         .output()
         .map_err(|error| format!("nvidia-smi 起不来：{error}"))?;
     if !output.status.success() {
         return Err(format!(
-            "nvidia-smi {NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS:?} 退了 {}：{}",
+            "nvidia-smi {arguments:?} 退了 {}：{}",
             output.status,
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-    pci_buses_by_nvidia_smi_index(&String::from_utf8_lossy(&output.stdout))
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// 核这个进程此刻在哪几张卡上的结局（[`assert_this_process_is_on_no_gpu_but_the_handed_over_or_report_not_run`]）。上了交来的卡之外的卡不交回，判红。
+#[must_use]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GpusThisProcessIsOn {
+    /// 读成了，这个进程只在交来的卡上（打过 `GPUS_THIS_PROCESS_IS_ON` 那一行）。
+    OnlyTheHandedOver,
+    /// 读不成、或读到这个进程一张卡都不在（打过 `NOT_RUN_NO_GPU_ADAPTER` 那一行）：这一条整条记本次未跑，调用方不当绿、不把这一趟的结论入库。
+    NotReadSoThisRunIsNotRun,
+}
+
+/// 挂载之后、卸载之前调：这个进程此刻在哪几张卡上有设备（[`nvidia_smi_indices_the_process_is_on`]，读法同服务判跑错卡），判法在
+/// [`gpus_this_process_is_on_judged_against_the_handed_over`]。
+///
+/// # Panics
+/// 这个进程上了交来的卡之外的卡。
+pub fn assert_this_process_is_on_no_gpu_but_the_handed_over_or_report_not_run(
+    test_name: &str,
+    handed_over_gpus: &[HandedOverGpu],
+) -> GpusThisProcessIsOn {
+    let indices_the_process_is_on = output_of_nvidia_smi(&NVIDIA_SMI_COMPUTE_PROCESS_ARGUMENTS)
+        .and_then(|compute_processes| {
+            let index_and_uuid = output_of_nvidia_smi(&NVIDIA_SMI_INDEX_AND_UUID_ARGUMENTS)?;
+            nvidia_smi_indices_the_process_is_on(
+                &compute_processes,
+                &index_and_uuid,
+                std::process::id(),
+            )
+        });
+    gpus_this_process_is_on_judged_against_the_handed_over(
+        test_name,
+        indices_the_process_is_on,
+        handed_over_gpus,
+    )
+}
+
+/// 读到的这个进程所在的卡（`indices_the_process_is_on`，读不成是 `Err`）与交来的卡比：有一张不是交来的就判红；
+/// 读不成、或读到一张卡都不在（此刻交来的卡上开着设备，读到空就是这个读法看不见它的设备）打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`、
+/// 交回 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`]，不判红；读到了打一行 `GPUS_THIS_PROCESS_IS_ON test=<用例名> nvidia_smi_indices=<序号，逗号隔开>`。
+///
+/// # Panics
+/// 这个进程上了交来的卡之外的卡。
+pub fn gpus_this_process_is_on_judged_against_the_handed_over(
+    test_name: &str,
+    indices_the_process_is_on: Result<BTreeSet<NvidiaSmiIndex>, String>,
+    handed_over_gpus: &[HandedOverGpu],
+) -> GpusThisProcessIsOn {
+    let indices_the_process_is_on = match indices_the_process_is_on {
+        Ok(indices_the_process_is_on) if indices_the_process_is_on.is_empty() => {
+            println!(
+                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason=nvidia-smi 列的计算进程里没有这个进程（进程号 {}），而交来的卡上开着它的设备：读法看不见它",
+                std::process::id()
+            );
+            return GpusThisProcessIsOn::NotReadSoThisRunIsNotRun;
+        }
+        Ok(indices_the_process_is_on) => indices_the_process_is_on,
+        Err(reason) => {
+            println!(
+                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason=读不成这个进程在哪几张卡上：{reason}"
+            );
+            return GpusThisProcessIsOn::NotReadSoThisRunIsNotRun;
+        }
+    };
+    println!(
+        "GPUS_THIS_PROCESS_IS_ON test={test_name} nvidia_smi_indices={}",
+        indices_the_process_is_on
+            .iter()
+            .map(|nvidia_smi_index| nvidia_smi_index.0.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let not_handed_over =
+        nvidia_smi_indices_not_handed_over(&indices_the_process_is_on, handed_over_gpus);
+    assert!(
+        not_handed_over.is_empty(),
+        "这个进程上了服务没交给它的卡（nvidia-smi 序号 {not_handed_over:?}；交来的是 {handed_over_gpus:?}）"
+    );
+    GpusThisProcessIsOn::OnlyTheHandedOver
+}
+
+/// 这个进程按需领到的卡（与 `GPU_CARDS_BY_PRIORITY` 同格式）：服务起跑没交卡、给了领卡通道时，测试包到判段要开卡的那一刻才领
+/// （`common_pairing_input_through_the_library` 经验证包的领卡通道领，领到记在这里）；环境变量给了卡的照环境变量，不看这里。
+static CARDS_LEASED_ON_DEMAND_FOR_THIS_PROCESS: std::sync::OnceLock<String> =
+    std::sync::OnceLock::new();
+
+/// 记下这个进程按需领到的卡：[`handed_over_gpus_or_report_not_run`] 在环境变量没给卡时照它。进程里只记一回，之后再记的不改。
+pub fn note_the_cards_leased_on_demand_for_this_process(cards: &str) {
+    CARDS_LEASED_ON_DEMAND_FOR_THIS_PROCESS.get_or_init(|| cards.to_string());
+}
+
+/// 跑一次 `nvidia-smi`（[`NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS`]）读每张卡的序号与总线地址。
+fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>, String> {
+    pci_buses_by_nvidia_smi_index(&output_of_nvidia_smi(
+        &NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS,
+    )?)
 }
 
 /// 服务交给这个进程、属于这一台的卡，逐张对上本机的 Vulkan 独显，照交来的次序；连同对卡时建的那一份 Vulkan 实例交回（这条用例里开卡、再枚举都用它）。
@@ -501,7 +685,9 @@ pub fn handed_over_gpus_or_report_not_run(
     wait_limit: Duration,
 ) -> Option<HandedOverGpusSeenThroughTheInstance> {
     let handover_variable_value =
-        std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER).ok();
+        std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER)
+            .ok()
+            .or_else(|| CARDS_LEASED_ON_DEMAND_FOR_THIS_PROCESS.get().cloned());
     let handed_to_this_host = gpus_handed_to_this_host(
         handover_variable_value.as_deref(),
         this_host_address_by_the_configuration_check,

@@ -1,5 +1,5 @@
 //! 部分写的纯计划核：单元来源、重写起点和写后单元数由 core 直接调用。
-//! 这里只证明决策；单元端点换算、旧尾单元是否不满的判定及实际读写由调用方负责。
+//! 证明计划决策与固定长度覆盖写的抽象字节规律；实际读写到字节模型的精化仍由调用方负责。
 use crate::file_range_proofs::units_covering_size;
 use vstd::prelude::*;
 
@@ -42,27 +42,27 @@ pub open spec fn byte_in_range(byte: int, start: u64, end: u64) -> bool {
     start <= byte < end
 }
 
-pub open spec fn unit_is_touched(ws: u64, we: u64, us: u64, ue: u64) -> bool {
-    ws < ue && us < we
+pub open spec fn unit_is_touched(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64) -> bool {
+    write_start < unit_end && unit_start < write_end
 }
 
-pub open spec fn unit_is_covered(ws: u64, we: u64, us: u64, ue: u64) -> bool {
-    ws <= us && ue <= we
+pub open spec fn unit_is_covered(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64) -> bool {
+    write_start <= unit_start && unit_end <= write_end
 }
 
 /// 旧单元没盖满就读旧数据；新单元只在被部分覆盖时读残留；未写到的新单元补零。
-pub fn classify_partial_write_unit(has_old: bool, ws: u64, we: u64, us: u64, ue: u64)
+pub fn classify_partial_write_unit(has_old: bool, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
     -> (answer: PartialWriteUnitSource)
-    requires ws < we, us < ue,
+    requires write_start < write_end, unit_start < unit_end,
     ensures
-        answer is OldReadBack <==> has_old && !unit_is_covered(ws, we, us, ue),
-        answer is OldCoveredWhole <==> has_old && unit_is_covered(ws, we, us, ue),
-        answer is NewReadResidue <==> !has_old && unit_is_touched(ws, we, us, ue) && !unit_is_covered(ws, we, us, ue),
-        answer is NewCoveredWhole <==> !has_old && unit_is_covered(ws, we, us, ue),
-        answer is ZeroGap <==> !has_old && !unit_is_touched(ws, we, us, ue),
+        answer is OldReadBack <==> has_old && !unit_is_covered(write_start, write_end, unit_start, unit_end),
+        answer is OldCoveredWhole <==> has_old && unit_is_covered(write_start, write_end, unit_start, unit_end),
+        answer is NewReadResidue <==> !has_old && unit_is_touched(write_start, write_end, unit_start, unit_end) && !unit_is_covered(write_start, write_end, unit_start, unit_end),
+        answer is NewCoveredWhole <==> !has_old && unit_is_covered(write_start, write_end, unit_start, unit_end),
+        answer is ZeroGap <==> !has_old && !unit_is_touched(write_start, write_end, unit_start, unit_end),
 {
-    let touched = ws < ue && us < we;
-    let whole = ws <= us && ue <= we;
+    let touched = write_start < unit_end && unit_start < write_end;
+    let whole = write_start <= unit_start && unit_end <= write_end;
     if has_old {
         if whole { PartialWriteUnitSource::OldCoveredWhole } else { PartialWriteUnitSource::OldReadBack }
     } else if !touched {
@@ -75,34 +75,212 @@ pub fn classify_partial_write_unit(has_old: bool, ws: u64, we: u64, us: u64, ue:
 }
 
 /// 非空区间的端点判定等价于逐字节“全部覆盖”；部分覆盖不能被误判为免读旧数据。
-pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(ws: u64, we: u64, us: u64, ue: u64)
-    requires ws < we, us < ue,
+pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
+    requires write_start < write_end, unit_start < unit_end,
     ensures
-        unit_is_covered(ws, we, us, ue) <==>
-            (forall|byte: int| #[trigger] byte_in_range(byte, us, ue) ==> byte_in_range(byte, ws, we)),
+        unit_is_covered(write_start, write_end, unit_start, unit_end) <==>
+            (forall|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) ==> byte_in_range(byte, write_start, write_end)),
 {
-    if !unit_is_covered(ws, we, us, ue) {
-        if ws > us {
-            assert(byte_in_range(us as int, us, ue));
-            assert(!byte_in_range(us as int, ws, we));
+    if !unit_is_covered(write_start, write_end, unit_start, unit_end) {
+        if write_start > unit_start {
+            assert(byte_in_range(unit_start as int, unit_start, unit_end));
+            assert(!byte_in_range(unit_start as int, write_start, write_end));
         } else {
-            assert(byte_in_range(ue - 1, us, ue));
-            assert(!byte_in_range(ue - 1, ws, we));
+            assert(byte_in_range(unit_end - 1, unit_start, unit_end));
+            assert(!byte_in_range(unit_end - 1, write_start, write_end));
         }
     }
 }
 
 /// 相交判定恰好表示存在共同字节；相邻端点不算相交。
-pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(ws: u64, we: u64, us: u64, ue: u64)
-    requires ws < we, us < ue,
+pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
+    requires write_start < write_end, unit_start < unit_end,
     ensures
-        unit_is_touched(ws, we, us, ue) <==>
-            (exists|byte: int| #[trigger] byte_in_range(byte, us, ue) && byte_in_range(byte, ws, we)),
+        unit_is_touched(write_start, write_end, unit_start, unit_end) <==>
+            (exists|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) && byte_in_range(byte, write_start, write_end)),
 {
-    if unit_is_touched(ws, we, us, ue) {
-        let byte = if ws > us { ws as int } else { us as int };
-        assert(byte_in_range(byte, us, ue) && byte_in_range(byte, ws, we));
+    if unit_is_touched(write_start, write_end, unit_start, unit_end) {
+        let byte = if write_start > unit_start { write_start as int } else { unit_start as int };
+        assert(byte_in_range(byte, unit_start, unit_end) && byte_in_range(byte, write_start, write_end));
     }
+}
+
+/// 固定长度文件内的写入；扩展文件、补洞与 I/O 不在这个字节模型中。
+pub open spec fn overwrite_fits(old: Seq<u8>, start: int, data: Seq<u8>) -> bool {
+    0 <= start && start + data.len() <= old.len()
+}
+
+pub open spec fn overwritten_bytes(old: Seq<u8>, start: int, data: Seq<u8>) -> Seq<u8> {
+    Seq::new(old.len(), |byte: int|
+        if start <= byte < start + data.len() { data[byte - start] } else { old[byte] })
+}
+
+/// 写内每个字节来自请求，写外每个字节仍是原值；空写也包括在内。
+pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)
+    requires overwrite_fits(old, start, data),
+    ensures
+        overwritten_bytes(old, start, data).len() == old.len(),
+        forall|byte: int| 0 <= byte < old.len() ==>
+            #[trigger] overwritten_bytes(old, start, data)[byte] ==
+                if start <= byte < start + data.len() { data[byte - start] } else { old[byte] },
+        data.len() == 0 ==> overwritten_bytes(old, start, data) == old,
+{
+    if data.len() == 0 {
+        assert(overwritten_bytes(old, start, data) =~= old);
+    }
+}
+
+/// 同一段写两次，后一次完全取代前一次；不是只证明最后一个字节。
+pub proof fn lemma_overwriting_the_same_range_keeps_only_the_last_write(
+    old: Seq<u8>, start: int, first: Seq<u8>, last: Seq<u8>,
+)
+    requires
+        overwrite_fits(old, start, first),
+        first.len() == last.len(),
+    ensures
+        overwrite_fits(overwritten_bytes(old, start, first), start, last),
+        overwritten_bytes(overwritten_bytes(old, start, first), start, last)
+            == overwritten_bytes(old, start, last),
+{
+    assert(overwritten_bytes(overwritten_bytes(old, start, first), start, last)
+        =~= overwritten_bytes(old, start, last));
+}
+
+/// 不相交的写可以交换顺序，包括相邻区间与空写；重叠写没有这个性质。
+pub proof fn lemma_disjoint_overwrites_commute(
+    old: Seq<u8>, first_start: int, first: Seq<u8>, second_start: int, second: Seq<u8>,
+)
+    requires
+        overwrite_fits(old, first_start, first),
+        overwrite_fits(old, second_start, second),
+        first_start + first.len() <= second_start || second_start + second.len() <= first_start,
+    ensures
+        overwrite_fits(overwritten_bytes(old, first_start, first), second_start, second),
+        overwrite_fits(overwritten_bytes(old, second_start, second), first_start, first),
+        overwritten_bytes(overwritten_bytes(old, first_start, first), second_start, second)
+            == overwritten_bytes(overwritten_bytes(old, second_start, second), first_start, first),
+{
+    assert(overwritten_bytes(overwritten_bytes(old, first_start, first), second_start, second)
+        =~= overwritten_bytes(overwritten_bytes(old, second_start, second), first_start, first));
+}
+
+/// 分类核的“整单元覆盖”条件蕴涵该单元的结果不依赖旧内容。
+pub proof fn lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(
+    left: Seq<u8>, right: Seq<u8>, data: Seq<u8>, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64,
+)
+    requires
+        write_start < write_end, unit_start < unit_end,
+        left.len() == right.len(),
+        overwrite_fits(left, write_start as int, data),
+        data.len() == write_end - write_start,
+        unit_is_covered(write_start, write_end, unit_start, unit_end),
+    ensures
+        forall|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) ==>
+            0 <= byte < left.len()
+            && overwritten_bytes(left, write_start as int, data)[byte]
+                == overwritten_bytes(right, write_start as int, data)[byte],
+{
+    lemma_whole_coverage_means_every_unit_byte_is_written(write_start, write_end, unit_start, unit_end);
+}
+
+/// 非空见证与重叠写反例：以上前提可满足，交换律确实需要不相交条件。
+pub proof fn witness_overwrite_laws_and_overlapping_write_order()
+    ensures
+        overwrite_fits(seq![1u8, 2, 3, 4], 1, seq![8u8, 9]),
+        overwritten_bytes(seq![1u8, 2, 3, 4], 1, seq![8u8, 9]) == seq![1u8, 8, 9, 4],
+        overwritten_bytes(seq![1u8, 2, 3, 4], 4, Seq::<u8>::empty()) == seq![1u8, 2, 3, 4],
+        overwritten_bytes(overwritten_bytes(seq![0u8, 0], 0, seq![1u8, 1]), 1, seq![2u8])
+            != overwritten_bytes(overwritten_bytes(seq![0u8, 0], 1, seq![2u8]), 0, seq![1u8, 1]),
+{
+    let old = seq![1u8, 2, 3, 4];
+    lemma_overwrite_changes_exactly_the_requested_bytes(old, 1, seq![8u8, 9]);
+    lemma_overwrite_changes_exactly_the_requested_bytes(old, 4, Seq::<u8>::empty());
+    lemma_overwriting_the_same_range_keeps_only_the_last_write(old, 1, seq![5u8, 6], seq![8u8, 9]);
+    lemma_disjoint_overwrites_commute(old, 0, seq![7u8], 1, seq![8u8, 9]);
+    lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(old, seq![5u8, 6, 7, 8], seq![8u8, 9], 1, 3, 1, 3);
+    assert(overwritten_bytes(old, 1, seq![8u8, 9]) =~= seq![1u8, 8, 9, 4]);
+    assert(overwritten_bytes(overwritten_bytes(seq![0u8, 0], 0, seq![1u8, 1]), 1, seq![2u8])[1] == 2);
+    assert(overwritten_bytes(overwritten_bytes(seq![0u8, 0], 1, seq![2u8]), 0, seq![1u8, 1])[1] == 1);
+}
+
+/// 分界点允许落在请求两端；空前缀或空后缀不改变分段写入的结果。
+pub proof fn lemma_splitting_an_overwrite_preserves_the_result(
+    old: Seq<u8>, start: int, data: Seq<u8>, split: int,
+)
+    requires
+        overwrite_fits(old, start, data),
+        0 <= split <= data.len(),
+    ensures
+        overwrite_fits(old, start, data.subrange(0, split)),
+        overwrite_fits(overwritten_bytes(old, start, data.subrange(0, split)),
+            start + split, data.subrange(split, data.len() as int)),
+        overwritten_bytes(overwritten_bytes(old, start, data.subrange(0, split)),
+            start + split, data.subrange(split, data.len() as int))
+            == overwritten_bytes(old, start, data),
+{
+    let prefix = data.subrange(0, split);
+    let suffix = data.subrange(split, data.len() as int);
+    let split_result = overwritten_bytes(overwritten_bytes(old, start, prefix), start + split, suffix);
+    let whole_result = overwritten_bytes(old, start, data);
+    assert forall|byte: int| 0 <= byte < old.len() implies
+        #[trigger] split_result[byte] == whole_result[byte] by {
+        if start <= byte < start + data.len() {
+            if byte < start + split {
+                assert(prefix[byte - start] == data[byte - start]);
+            } else {
+                assert(suffix[byte - start - split] == data[byte - start]);
+            }
+        }
+    }
+    assert(split_result =~= whole_result);
+}
+
+/// 后写完全包含在请求中时，可以先改请求内容；未覆盖的文件前后缀仍保留。
+pub proof fn lemma_a_contained_overwrite_folds_into_the_payload(
+    old: Seq<u8>, start: int, data: Seq<u8>, offset: int, replacement: Seq<u8>,
+)
+    requires
+        overwrite_fits(old, start, data),
+        overwrite_fits(data, offset, replacement),
+    ensures
+        overwrite_fits(overwritten_bytes(old, start, data), start + offset, replacement),
+        overwrite_fits(old, start, overwritten_bytes(data, offset, replacement)),
+        overwritten_bytes(overwritten_bytes(old, start, data), start + offset, replacement)
+            == overwritten_bytes(old, start, overwritten_bytes(data, offset, replacement)),
+{
+    let sequential_result = overwritten_bytes(overwritten_bytes(old, start, data), start + offset, replacement);
+    let combined_result = overwritten_bytes(old, start, overwritten_bytes(data, offset, replacement));
+    assert forall|byte: int| 0 <= byte < old.len() implies
+        #[trigger] sequential_result[byte] == combined_result[byte] by {
+        if start + offset <= byte < start + offset + replacement.len() {
+            assert(start <= byte < start + data.len());
+        }
+    }
+    assert(sequential_result =~= combined_result);
+}
+
+/// 严格内部分界、两端分界和空后写都有见证，排除仅靠矛盾前提成立的契约。
+pub proof fn witness_split_and_contained_overwrites()
+    ensures
+        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![8u8, 9]), 3, seq![10u8, 11])
+            == seq![1u8, 8, 9, 10, 11, 6],
+        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![8u8, 9, 10, 11]), 2, seq![20u8, 21])
+            == seq![1u8, 8, 20, 21, 11, 6],
+{
+    let old = seq![1u8, 2, 3, 4, 5, 6];
+    let data = seq![8u8, 9, 10, 11];
+    let replacement = seq![20u8, 21];
+    lemma_splitting_an_overwrite_preserves_the_result(old, 1, data, 2);
+    lemma_splitting_an_overwrite_preserves_the_result(old, 1, data, 0);
+    lemma_splitting_an_overwrite_preserves_the_result(old, 1, data, 4);
+    lemma_a_contained_overwrite_folds_into_the_payload(old, 1, data, 1, replacement);
+    lemma_a_contained_overwrite_folds_into_the_payload(old, 1, data, 4, Seq::<u8>::empty());
+    assert(data.subrange(0, 2) =~= seq![8u8, 9]);
+    assert(data.subrange(2, 4) =~= seq![10u8, 11]);
+    assert(overwritten_bytes(old, 1, data) =~= seq![1u8, 8, 9, 10, 11, 6]);
+    assert(overwritten_bytes(data, 1, replacement) =~= seq![8u8, 20, 21, 11]);
+    assert(overwritten_bytes(old, 1, overwritten_bytes(data, 1, replacement))
+        =~= seq![1u8, 8, 20, 21, 11, 6]);
 }
 
 /// 重写从写入起点开始；跨过已有尾部时，未满的旧尾单元也必须重写。
@@ -170,15 +348,22 @@ mod tests {
     #[test]
     fn unit_sources_match_the_bytes_actually_overwritten() {
         let mut seen = [false; 5];
-        for ws in 0..7 {
-            for we in ws + 1..9 {
-                for us in 0..7 {
-                    for ue in us + 1..9 {
-                        let written =
-                            (us..ue).filter(|byte| (ws..we).contains(byte)).count() as u64;
+        for write_start in 0..7 {
+            for write_end in write_start + 1..9 {
+                for unit_start in 0..7 {
+                    for unit_end in unit_start + 1..9 {
+                        let written = (unit_start..unit_end)
+                            .filter(|byte| (write_start..write_end).contains(byte))
+                            .count() as u64;
                         for old in [false, true] {
                             let (index, reads_old, reads_residue, gap, whole) =
-                                match classify_partial_write_unit(old, ws, we, us, ue) {
+                                match classify_partial_write_unit(
+                                    old,
+                                    write_start,
+                                    write_end,
+                                    unit_start,
+                                    unit_end,
+                                ) {
                                     PartialWriteUnitSource::OldReadBack => {
                                         (0, true, false, false, false)
                                     }
@@ -196,10 +381,13 @@ mod tests {
                                     }
                                 };
                             seen[index] = true;
-                            assert_eq!(reads_old, old && written < ue - us);
-                            assert_eq!(reads_residue, !old && 0 < written && written < ue - us);
+                            assert_eq!(reads_old, old && written < unit_end - unit_start);
+                            assert_eq!(
+                                reads_residue,
+                                !old && 0 < written && written < unit_end - unit_start
+                            );
                             assert_eq!(gap, !old && written == 0);
-                            assert_eq!(whole, written == ue - us);
+                            assert_eq!(whole, written == unit_end - unit_start);
                         }
                     }
                 }

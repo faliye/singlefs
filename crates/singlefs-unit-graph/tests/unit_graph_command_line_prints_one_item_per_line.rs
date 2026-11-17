@@ -120,7 +120,7 @@ fn closure_lists_the_composition_and_ends_with_the_key_that_key_prints() {
 }
 
 #[test]
-fn a_refused_closure_exits_three_and_prints_no_key_line() {
+fn refused_closure_exits_three_and_prints_no_key_line() {
     let tree = FixtureTree::materialize(
         "command-line-refused",
         &[
@@ -177,7 +177,7 @@ fn an_unknown_entry_or_option_exits_two() {
 }
 
 #[test]
-fn a_closure_without_a_target_triple_line_exits_two() {
+fn closure_without_a_target_triple_line_exits_two() {
     let tree = FixtureTree::materialize("command-line-no-triple", &RULE_CELL_FIXTURE);
     let root = tree.root().to_string_lossy().into_owned();
     let closure = unit_graph(&[
@@ -248,7 +248,7 @@ fn an_entry_whose_file_is_only_compiled_under_a_feature_exits_two_without_that_f
 }
 
 #[test]
-fn a_lock_file_whose_packages_miss_a_named_external_crate_exits_three_and_lock_lines_with_a_lock_file_exit_two(
+fn lock_file_whose_packages_miss_a_named_external_crate_exits_three_and_lock_lines_with_a_lock_file_exit_two(
 ) {
     let tree = FixtureTree::materialize(
         "command-line-lock-file",
@@ -299,4 +299,137 @@ fn a_lock_file_whose_packages_miss_a_named_external_crate_exits_three_and_lock_l
         "delta\t1.0.0\t-\t-",
     ]);
     assert_eq!(both.status.code(), Some(2), "两种依赖行只能给一种");
+}
+
+#[test]
+fn why_prints_the_chain_of_first_edges_from_a_unit_back_to_the_entry() {
+    let tree = FixtureTree::materialize("command-line-why", &RULE_CELL_FIXTURE);
+    let root = tree.root().to_string_lossy().into_owned();
+    let why = unit_graph(&[
+        "why",
+        &root,
+        "ftier::judge_operator",
+        "--unit",
+        "ops::Add for Money>::add",
+        "--toolchain-line",
+        HOST_LINE,
+    ]);
+    assert_eq!(
+        why.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&why.stderr)
+    );
+    let lines = stdout_lines(&why);
+    let fields_of_each_line: Vec<Vec<&str>> = lines
+        .iter()
+        .map(|line| line.split('\t').collect())
+        .collect();
+    assert_eq!(
+        fields_of_each_line[0][..3],
+        ["why", "fn", "fcore::<impl std::ops::Add for Money>::add"],
+        "{lines:?}"
+    );
+    // add 是 Money 被点名时随它的 trait impl 进来的，Money 是入口写的裸名，入口没有来处
+    assert_eq!(
+        fields_of_each_line[1][..6],
+        [
+            "",
+            "via",
+            "R-隐式（类型被点名）",
+            "-",
+            "struct",
+            "fcore::Money"
+        ],
+        "{lines:?}"
+    );
+    assert_eq!(
+        fields_of_each_line[2][..6],
+        ["", "via", "R-裸名", "Money", "fn", "ftier::judge_operator"],
+        "{lines:?}"
+    );
+    assert_eq!(
+        fields_of_each_line[3],
+        ["", "via", "入口", "-", "-"],
+        "{lines:?}"
+    );
+    assert_eq!(lines.len(), 4, "只命中这一个单元，链到入口为止：{lines:?}");
+}
+
+#[test]
+fn why_with_an_empty_pattern_gives_every_rust_unit_of_the_closure_one_first_edge() {
+    let tree = FixtureTree::materialize("command-line-why-every-unit", &RULE_CELL_FIXTURE);
+    let root = tree.root().to_string_lossy().into_owned();
+    let closure = unit_graph(&[
+        "closure",
+        &root,
+        "ftier::judge_operator",
+        "--toolchain-line",
+        HOST_LINE,
+    ]);
+    assert_eq!(closure.status.code(), Some(0));
+    let rust_units_of_the_closure = stdout_lines(&closure)
+        .iter()
+        .filter(|line| {
+            !["key\t", "data\t", "data-directory\t", "wgsl-"]
+                .iter()
+                .any(|prefix| line.starts_with(prefix))
+        })
+        .count();
+    assert!(rust_units_of_the_closure >= 4);
+    let why = unit_graph(&[
+        "why",
+        &root,
+        "ftier::judge_operator",
+        "--unit",
+        "",
+        "--toolchain-line",
+        HOST_LINE,
+    ]);
+    assert_eq!(why.status.code(), Some(0));
+    let lines = stdout_lines(&why);
+    // 空子串命中全部单元：来处在命中集合里的各一行 inside，没有来处的（入口）各一行 why 加一行 via
+    let units_with_a_first_edge = lines
+        .iter()
+        .filter(|line| line.starts_with("why\t") || line.starts_with("inside\t"))
+        .count();
+    assert_eq!(
+        units_with_a_first_edge, rust_units_of_the_closure,
+        "{lines:?}"
+    );
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.starts_with("why\t"))
+            .collect::<Vec<_>>(),
+        lines
+            .iter()
+            .filter(|line| line.starts_with("why\tfn\tftier::judge_operator\t"))
+            .collect::<Vec<_>>(),
+        "没有来处的只有入口：{lines:?}"
+    );
+}
+
+#[test]
+fn the_unit_option_goes_with_why_and_only_with_why() {
+    let tree = FixtureTree::materialize("command-line-why-usage", &RULE_CELL_FIXTURE);
+    let root = tree.root().to_string_lossy().into_owned();
+    let why_without_a_unit = unit_graph(&[
+        "why",
+        &root,
+        "ftier::judge_operator",
+        "--toolchain-line",
+        HOST_LINE,
+    ]);
+    assert_eq!(why_without_a_unit.status.code(), Some(2));
+    let closure_with_a_unit = unit_graph(&[
+        "closure",
+        &root,
+        "ftier::judge_operator",
+        "--unit",
+        "Money",
+        "--toolchain-line",
+        HOST_LINE,
+    ]);
+    assert_eq!(closure_with_a_unit.status.code(), Some(2));
 }

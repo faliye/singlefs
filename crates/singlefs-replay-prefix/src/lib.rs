@@ -33,6 +33,9 @@ pub mod compaction_plan_proofs;
 pub mod file_range_proofs;
 pub mod gc_crash_proofs;
 pub mod gc_ring_interval_proofs;
+pub mod gpu_gc_capacity_proofs;
+pub mod gpu_gc_proofs;
+pub mod gpu_gc_scoring_proofs;
 pub mod partial_write_proofs;
 pub mod unlink_proofs;
 
@@ -272,7 +275,7 @@ pub open spec fn is_a_later_record_of_the_same_instance<RootSource>(
 
 // 已定项 4 读者规则第四格（C540）：同一 (实例代号, checkpoint_txg) 里这一条之后还有读得出的记录。
 // 「之后」按计数器、不要求紧接着；往后看到 txg 越过这一条的就不再看——同实例 txg 随计数器不降（K10）时与「之后任一条同 txg」逐态相同
-pub open spec fn a_later_record_of_the_same_publish_is_readable<RootSource>(
+pub open spec fn later_record_of_the_same_publish_is_readable<RootSource>(
     records: Seq<CoreRecord<RootSource>>,
     position: int,
 ) -> bool {
@@ -350,7 +353,7 @@ pub open spec fn passes_every_check_before_the_named_units<
     &&& back_chain_reported_holding(back_chain_broken, position)
     &&& obeys_the_reader_rules_and_the_commit_markers(records[position], previous)
     &&& !(is_last_record_of_its_publish(records[position])
-        && a_later_record_of_the_same_publish_is_readable(records, position))
+        && later_record_of_the_same_publish_is_readable(records, position))
 }
 
 #[verifier::opaque]
@@ -373,7 +376,7 @@ pub open spec fn fails_a_check_before_the_named_units<RootSource, BackChain: Fn(
     ||| back_chain_reported_broken(back_chain_broken, position)
     ||| !obeys_the_reader_rules_and_the_commit_markers(records[position], previous)
     ||| (is_last_record_of_its_publish(records[position])
-        && a_later_record_of_the_same_publish_is_readable(records, position))
+        && later_record_of_the_same_publish_is_readable(records, position))
 }
 
 pub open spec fn previous_in_the_chain<RootSource>(
@@ -1727,7 +1730,7 @@ proof fn lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg<R
         records_ascend_by_instance_and_counter(records),
         journal_txg_does_not_decrease_with_the_counter_within_an_instance(records),
         0 <= end_index < records.len(),
-        !a_later_record_of_the_same_publish_is_readable(records, end_index),
+        !later_record_of_the_same_publish_is_readable(records, end_index),
     ensures
         forall|record_index: int|
             end_index < record_index < records.len() && (#[trigger] records[record_index]).instance
@@ -2155,7 +2158,7 @@ proof fn lemma_the_landed_record_closes_its_txg<
     assert forall|position_in_chain: int|
         0 <= position_in_chain < admitted.len() && is_last_record_of_its_publish(
             records[#[trigger] admitted[position_in_chain]],
-        ) implies !a_later_record_of_the_same_publish_is_readable(
+        ) implies !later_record_of_the_same_publish_is_readable(
         records,
         admitted[position_in_chain],
     ) by {
@@ -3124,7 +3127,7 @@ fn readable_record_of_the_same_publish_follows<RootSource>(
         index < records.len(),
         records_ascend_by_instance_and_counter(records@),
     ensures
-        follows == a_later_record_of_the_same_publish_is_readable(records@, index as int),
+        follows == later_record_of_the_same_publish_is_readable(records@, index as int),
 {
     let record = &records[index];
     let mut later_index = index + 1;
@@ -4112,7 +4115,7 @@ pub fn witness_nonempty_replay_and_its_fixed_point() {
 }
 
 // ===== spec 自己的冒烟（防 spec 恒真或恒假）=====
-proof fn a_publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreRecord<u64>)
+proof fn publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreRecord<u64>)
     requires
         first.checkpoint_txg == second.checkpoint_txg,
         first.ordinal_within_publish.0 == 1,
@@ -4129,7 +4132,7 @@ proof fn a_publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreR
     assert(is_concatenation_of_whole_publishes(both.subrange(0, 0)));
 }
 
-proof fn a_record_without_the_last_flag_alone_is_not_a_concatenation(only: CoreRecord<u64>)
+proof fn record_without_the_last_flag_alone_is_not_a_concatenation(only: CoreRecord<u64>)
     requires
         !is_last_record_of_its_publish(only),
     ensures
@@ -4187,7 +4190,7 @@ mod tests {
 
     /// 所选根那次发布的末条（计数器 1）之后，txg 2 的发布两条都在、第二条带末条标志 ⇒ 整次施加，新根段取末条的。
     #[test]
-    fn a_two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record(
+    fn two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record(
     ) {
         let records = [
             record(
@@ -4238,7 +4241,7 @@ mod tests {
 
     /// 同样的锚点，txg 2 的发布只有第一条（不带末条标志）⇒ 末条没到，一条都不施加，新根段还是所选根的。
     #[test]
-    fn a_publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays() {
+    fn publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays() {
         let records = [
             record(
                 1,
@@ -4295,7 +4298,7 @@ mod tests {
 
     /// txg 大的赢，哪怕另一个槽的实例代号更高（D22 已定项 7 txg 为主、实例代号只破平局）。
     #[test]
-    fn a_later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg() {
+    fn later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg() {
         let root_slots = [root_choice_key(2, 2), root_choice_key(3, 1)];
         assert_eq!(
             choose_root_slot(&root_slots),
@@ -4317,7 +4320,7 @@ mod tests {
 
     /// 第一个自证过的槽不是最新的：往后看完全部槽再择（D22 已定项 24 先验全部候选再择新）。
     #[test]
-    fn a_newer_root_after_the_first_self_verified_slot_is_chosen_over_it() {
+    fn newer_root_after_the_first_self_verified_slot_is_chosen_over_it() {
         let root_slots = [None, root_choice_key(2, 1), None, root_choice_key(3, 1)];
         assert_eq!(
             choose_root_slot(&root_slots),

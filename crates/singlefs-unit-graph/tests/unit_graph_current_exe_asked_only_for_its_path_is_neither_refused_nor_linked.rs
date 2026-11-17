@@ -1,6 +1,7 @@
 //! `current_exe()` 拒不拒算看同一个单元里起没起子进程（`scripts/gate/lib_function_units.py` 文件头「测试二进制起自己」同一判法）：
 //! 单元里没有 `Command`、`spawn` 这类词、只问路径的，不拒算也不连边；起了子进程的照旧按起自己判——折得出 `--exact` 后面点名的测试就连边，
 //! 折不出（没有 `--exact`、路径先存进变量再交 `Command::new`、点名的测试不在）拒算 `current-exe`。
+//! 这里的入口都是测试；入口是 bin 的 `fn main` 时起自己的判法在 `tests/unit_graph_own_program_restart_is_keyed_only_from_the_main_of_a_bin.rs`。
 //! 夹具与那一份的 `CURRENT_EXE_PATH_ONLY_FIXTURE`、`CURRENT_EXE_SPAWN_FIXTURE` 逐字同形，每条断言与那边同名的格同一个结论；
 //! `use std::{env::current_exe, process::Command};` 那一条是两边共有的「后面不跟括号的 `current_exe` 不算」，夹具只在这一份。
 
@@ -59,7 +60,7 @@ const READS_THE_SIZE_BODY_CHANGED: &str = "expect(\"读得到\").len();\n       
 const SPAWN_MANIFEST: &str = "[package]\nname = \"fexs\"\n";
 const SPAWN_FILE: &str = "crates/fexs/src/lib.rs";
 
-/// 起子进程的四种写法与被起的那条测试。
+/// 起子进程的五种写法与被起的那条测试。
 const SPAWN_LIBRARY: &str = r#"#[cfg(test)]
 mod tests {
     use std::process::Command;
@@ -77,6 +78,12 @@ mod tests {
     fn it_takes_the_path_first_and_hands_it_to_command() {
         let program = std::env::current_exe().expect("路径");
         let output = Command::new(program).args(["--exact", "tests::the_child_runs_alone"]).output().expect("起得来");
+        assert!(output.status.success());
+    }
+    #[test]
+    fn it_starts_a_sibling_of_its_own_program_file() {
+        let program = std::env::current_exe().expect("路径").with_file_name("other");
+        let output = Command::new(program).output().expect("起得来");
         assert!(output.status.success());
     }
     #[test]
@@ -100,8 +107,8 @@ const NAMES_THE_CHILD_ENTRY: EntrySpecification = EntrySpecification {
     conditions: &["test"],
 };
 
-/// 起了子进程而折不出点名的那一条测试的三种写法。
-const SPAWNING_ENTRIES_WITHOUT_A_FOLDED_CHILD: [EntrySpecification; 3] = [
+/// 起了子进程而折不出点名的那一条测试的四种写法（路径改过的那一种由 `rust_items` 就地拒算，另三种在闭包的 `finish` 按入口拒算）。
+const SPAWNING_ENTRIES_WITHOUT_A_FOLDED_CHILD: [EntrySpecification; 4] = [
     EntrySpecification {
         entry_path: "fexs::tests::it_starts_itself_without_naming_a_test",
         target: "lib",
@@ -109,6 +116,11 @@ const SPAWNING_ENTRIES_WITHOUT_A_FOLDED_CHILD: [EntrySpecification; 3] = [
     },
     EntrySpecification {
         entry_path: "fexs::tests::it_takes_the_path_first_and_hands_it_to_command",
+        target: "lib",
+        conditions: &["test"],
+    },
+    EntrySpecification {
+        entry_path: "fexs::tests::it_starts_a_sibling_of_its_own_program_file",
         target: "lib",
         conditions: &["test"],
     },
@@ -193,7 +205,7 @@ fn assert_a_path_only_entry_is_keyed_and_follows_only_its_own_body(
 
 /// 场景：`assert!(std::env::current_exe().is_ok())`，单元里没有起子进程的词。预期：不拒算、键只跟它自己的函数体变。
 #[test]
-fn a_test_asking_only_whether_it_has_a_path_is_keyed_and_follows_only_its_own_body() {
+fn test_asking_only_whether_it_has_a_path_is_keyed_and_follows_only_its_own_body() {
     assert_a_path_only_entry_is_keyed_and_follows_only_its_own_body(
         "current-exe-asks-whether-it-has-a-path",
         &ASKS_WHETHER_IT_HAS_A_PATH_ENTRY,
@@ -204,7 +216,7 @@ fn a_test_asking_only_whether_it_has_a_path_is_keyed_and_follows_only_its_own_bo
 
 /// 场景：取 `current_exe()` 的路径读程序文件的大小，单元里没有起子进程的词。预期：不拒算、键只跟它自己的函数体变。
 #[test]
-fn a_test_reading_the_size_of_its_own_program_file_is_keyed_and_follows_only_its_own_body() {
+fn test_reading_the_size_of_its_own_program_file_is_keyed_and_follows_only_its_own_body() {
     assert_a_path_only_entry_is_keyed_and_follows_only_its_own_body(
         "current-exe-reads-the-size",
         &READS_THE_SIZE_ENTRY,
@@ -216,7 +228,7 @@ fn a_test_reading_the_size_of_its_own_program_file_is_keyed_and_follows_only_its
 /// 场景：同一单元里 `Command::new(current_exe())` 起子进程、`--exact` 后面点名同一目标里的那条测试。预期：不拒算，
 /// 被点名的测试连进闭包，改它的函数体，起它的入口的键变。
 #[test]
-fn a_test_starting_itself_and_naming_the_child_links_the_child_and_follows_its_body() {
+fn test_starting_itself_and_naming_the_child_links_the_child_and_follows_its_body() {
     let tree = tree_of(
         "current-exe-spawn-named",
         "crates/fexs/Cargo.toml",
@@ -253,7 +265,7 @@ fn a_test_starting_itself_and_naming_the_child_links_the_child_and_follows_its_b
 /// 场景：同一单元里起了子进程而折不出点名的那一条测试——没有 `--exact`、路径先存进变量再交 `Command::new`、点名的测试不在
 /// （同一棵夹具树上三个入口，各判一次，不改树）。预期：三个都拒算 `current-exe`，落在夹具文件里。
 #[test]
-fn a_test_starting_itself_without_a_folded_child_name_is_still_refused_as_current_exe() {
+fn test_starting_itself_without_a_folded_child_name_is_still_refused_as_current_exe() {
     let tree = tree_of(
         "current-exe-spawn-unfolded",
         "crates/fexs/Cargo.toml",
@@ -274,8 +286,8 @@ fn a_test_starting_itself_without_a_folded_child_name_is_still_refused_as_curren
 /// 场景：一条 `use` 同时引进 `current_exe` 与 `Command`，入口只问路径（`current_exe().is_ok()`）。那条 `use` 随用到的
 /// `current_exe` 进闭包，它里面有 `Command` 这个词，而 `current_exe` 后面跟的是逗号不是括号。预期：不拒算、键算得出。
 #[test]
-fn a_use_importing_current_exe_together_with_command_does_not_refuse_a_test_asking_only_for_its_path(
-) {
+fn use_importing_current_exe_together_with_command_does_not_refuse_a_test_asking_only_for_its_path()
+{
     let tree = tree_of(
         "current-exe-imported",
         "crates/fexu/Cargo.toml",

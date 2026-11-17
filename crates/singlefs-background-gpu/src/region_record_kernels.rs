@@ -30,14 +30,14 @@
 //! 映射条目、落点索引与按 key 排的序号一项都没有时，各缓冲照样放一项全 0 的（wgpu 不许长度为 0 的绑定），条数照参数里的数。
 //!
 //! 整份映射每段都交一份；它连同一条记录都装不下这张卡此刻剩下的地方时，按落点（盘、槽）的区间把映射切成几片逐片交
-//! （[`region_record_plan_on_a_gpu`]，用户 2026-10-28 定「装不下应该自适应的分片」），核不改：一片里是位置项指进这段区间的条目（按条目表的次序），
+//! （[`region_record_plan_on_a_gpu`]，D26（后台整理与放置回收） 已定项 13 第 3 条「按上限自适应切成几片」），核不改：一片里是位置项指进这段区间的条目（按条目表的次序），
 //! 一条条目的另一条位置项指到区间外时换成指区间里的这一条（两条位置项同一落点，核与核心层都只记一次）。这样一条记录的落点所在的那一片
 //! （它的「本片」）里有指着它的全部条目、次序同整份映射，本片的分类就是整份映射下的分类，只差一样：本片里没有条目指着它、也没有条目带它头里那把 key
 //! （已死）时，那把 key 可能在别的片里——别的片里没有条目指着它，分出来只会是已死或「key 与位置不符」，有一片是后者就改判后者。
 //! 合法两份、各写各的（第 8 条），逐条走映射那一份核的各片按 [`walking_classification_over_the_mapping_slices`]、按索引查的那一份按
 //! [`searching_classification_over_the_mapping_slices`]。
 //!
-//! 一个单元切成几片（用户 2026-10-28 定「这部分不能因为装不下就拒绝，装不下应该自适应的分片，缩小逐次进行」）：最大那条记录连同一个落点上的全部条目
+//! 一个单元切成几片（第 3 条「装不下不拒绝」「按上限自适应切成几片、缩小逐次交」）：最大那条记录连同一个落点上的全部条目
 //! 都装不下时，比 [`UNIT_HEAD_PIECE_INPUT_BYTES`] 长的单元都切成头一片与之后的几片（[`region_record_plan_on_a_gpu`]）。核解头、查结构、查映射只读头一片
 //! （最宽的头连同其后的预留位不过 625 字节），头一片之后的字节只进载荷 CRC。CRC-32C 的寄存器更新对「寄存器、字节」是线性的：
 //! 从寄存器 `r` 起喂一段字节 `T` 的结果，等于从 `r` 起喂 `|T|` 个 0 字节的结果异或从 0 起喂 `T` 的结果。所以先交头一片之后的几片：每一片两份核各自
@@ -52,6 +52,7 @@ use std::ops::Range;
 
 use singlefs_core::address::{CheckpointTxg, SlotNumber};
 use singlefs_core::allocator::AllocationRecord;
+use singlefs_core::background_compute::GpuMemoryInBytes;
 use singlefs_core::logged_operations::CompactionRegion;
 use singlefs_core::region_scan::{
     scan_region_over_the_identity_index, AllocationInRegion, CentralMappingEntry,
@@ -66,10 +67,14 @@ use crate::checksum_kernels::UnrecognizedVerdictWord;
 use crate::live_slot_kernels::low_and_high_words_of_the_slot;
 use crate::memory_limit_and_chunks::{
     chunks_that_fit_on_the_gpu, input_buffer_bytes, pieces_cut_to_fit_on_the_gpu,
-    ChunkBoundsOfAGpu, ChunkFootprint, PieceOfAnEntry, SmallestPieceLargerThanTheRoom,
+    ChunkBoundsOfAGpu, ChunkFootprint, EntryCountOfAChunk, InputLengthOnTheHostInBytes,
+    PieceOfAnEntry, SmallestPieceLargerThanTheRoom,
+    COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS,
+    COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION,
 };
 use crate::two_kernel_reconciliation::{
-    ConsecutiveUncertaintyCounts, ReconciledBatch, TwoKernelOutcomesOfAnEntry,
+    first_entry_key_repeated_among, ConsecutiveUncertaintyCounts, ReconciledBatch,
+    SameEntryKeyTwiceInOneBatch, TwoKernelOutcomesOfAnEntry,
 };
 
 /// 按条目表的次序逐条看映射、按字节查表算校验和的那一份核。
@@ -85,23 +90,22 @@ pub const SEARCHING_KERNEL_ENTRY_POINT: &str =
 /// 两份核的工作组都是 64 个调用（两份 WGSL 里的 `@workgroup_size(64)`），每条记录一个调用。
 pub const REGION_RECORD_INVOCATIONS_PER_WORKGROUP: u32 = 64;
 /// 参数缓冲：四个 `u32`。
-pub const REGION_RECORD_PARAMETER_BUFFER_BYTES: u64 = 16;
+pub const REGION_RECORD_PARAMETER_BUFFER_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(16);
 pub const RECORD_DESCRIPTOR_WORDS: usize = 11;
-pub const RECORD_DESCRIPTOR_BYTES: u64 = 44;
+pub const RECORD_DESCRIPTOR_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(44);
 /// 切开的单元头一片的输入字节数：两份核在头一片里读到的最远那个字节是码 2 索引节点最宽的头（86 + 2 × 255 字节，key 宽一个字节最大 255）
 /// 连同其后 29 字节预留位，共 625 字节，补到整字是 628。头一片之后的字节只进载荷 CRC，随便切。
-pub const UNIT_HEAD_PIECE_INPUT_BYTES: u64 = 628;
+pub const UNIT_HEAD_PIECE_INPUT_BYTES: InputLengthOnTheHostInBytes =
+    InputLengthOnTheHostInBytes(628);
 /// 映射 key 在核里占几个字：key 不超过这么多字的字节（[`KEY_BYTES_THE_KERNELS_HOLD`]），长了的这一批交不成。
 pub const KEY_WORDS: usize = 7;
 pub const KEY_BYTES_THE_KERNELS_HOLD: usize = 4 * KEY_WORDS;
 pub const MAPPING_ENTRY_WORDS: usize = 1 + KEY_WORDS + 6;
 pub const LOCATION_ITEM_WORDS: usize = 4;
 pub const REGION_RECORD_OUTCOME_WORDS: usize = 6 + KEY_WORDS;
-pub const REGION_RECORD_OUTCOME_BYTES: u64 = 52;
+pub const REGION_RECORD_OUTCOME_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(52);
 /// 结果缓冲开算之前的填充字：结果的类只会被核写成认得的那几个。
 pub const REGION_RECORD_OUTCOME_NOT_WRITTEN_FILL_WORD: u32 = 0xFFFF_FFFF;
-/// 两份核各一个结果缓冲与一个回读暂存缓冲。
-const REGION_RECORD_OUTCOME_AND_READBACK_BUFFERS: u64 = 4;
 
 /// 结果的类（两份 WGSL 里各写一份同值的常量）。
 const OUTCOME_KIND_MOVABLE: u32 = 0;
@@ -145,10 +149,14 @@ pub fn record_is_one_the_region_scan_reads(
     region: CompactionRegion,
     record: &AllocationRecord,
 ) -> bool {
-    record.device == region.device()
-        && !record.is_released
-        && region.contains_slot(record.slot)
-        && record.slot.0 + u64::from(record.span_slots) <= region.end_slot().0
+    singlefs_replay_prefix::gpu_gc_proofs::gpu_record_is_in_scan_region(
+        record.device == region.device(),
+        record.is_released,
+        record.slot.0,
+        u64::from(record.span_slots),
+        region.start_slot().0,
+        region.end_slot().0,
+    )
 }
 
 /// 两份核各自的 CRC-32C 寄存器（不取反、不带全 1 初值的那一个；见本模块文件头「一个单元切成几片」）：一片之前带进去的，或单元头一片之后那几字节
@@ -245,10 +253,11 @@ pub fn packed_region_record_chunk(
         .iter()
         .map(|piece| piece.bytes().map_or(0, <[u8]>::len))
         .sum();
-    let padded_bytes =
-        input_buffer_bytes(u64::try_from(total_unit_bytes).expect("usize 装得进 u64"));
+    let padded_bytes = input_buffer_bytes(InputLengthOnTheHostInBytes::of_this_many_bytes(
+        total_unit_bytes,
+    ));
     let mut input_bytes =
-        Vec::with_capacity(usize::try_from(padded_bytes).expect("一段的输入装得进内存"));
+        Vec::with_capacity(usize::try_from(padded_bytes.0).expect("一段的输入装得进内存"));
     let mut descriptor_words = Vec::with_capacity(pieces.len() * RECORD_DESCRIPTOR_WORDS);
     for piece in pieces {
         let byte_offset = u32::try_from(input_bytes.len())
@@ -289,7 +298,7 @@ pub fn packed_region_record_chunk(
         ]);
     }
     input_bytes.resize(
-        usize::try_from(padded_bytes).expect("一段的输入装得进内存"),
+        usize::try_from(padded_bytes.0).expect("一段的输入装得进内存"),
         0,
     );
     PackedRegionRecordChunk {
@@ -414,26 +423,27 @@ impl MappingTablesForTheKernels {
 
     /// 三个缓冲在卡上合占的字节数。
     #[must_use]
-    pub fn bytes_on_the_gpu(&self) -> u64 {
+    pub fn bytes_on_the_gpu(&self) -> GpuMemoryInBytes {
         let words = self.entry_words.len()
             + self.location_item_words.len()
             + self.key_sorted_entry_positions.len();
-        4 * u64::try_from(words).expect("装得进 u64")
+        GpuMemoryInBytes(4 * u64::try_from(words).expect("装得进 u64"))
     }
 
     /// 三个缓冲里最大的那一个的字节数：它也要装得进这张卡的绑定上限。
     #[must_use]
-    pub fn largest_buffer_bytes(&self) -> u64 {
+    pub fn largest_buffer_bytes(&self) -> GpuMemoryInBytes {
         let words = self
             .entry_words
             .len()
             .max(self.location_item_words.len())
             .max(self.key_sorted_entry_positions.len());
-        4 * u64::try_from(words).expect("装得进 u64")
+        GpuMemoryInBytes(4 * u64::try_from(words).expect("装得进 u64"))
     }
 }
 
 /// 区域扫描那一段一段在卡上占的：参数缓冲与整份映射（三个缓冲，每段都交一份）；每条一项描述、两份核各一项结果与一项回读暂存。
+/// 参数、映射的三个缓冲、输入、描述与两份结果缓冲都映射着建，各带一份同尺寸的暂存（[`COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION`]）。
 /// 按条排的最大缓冲是结果那一个。
 #[must_use]
 pub fn region_record_chunk_footprint(
@@ -445,16 +455,36 @@ pub fn region_record_chunk_footprint(
 /// 同 [`region_record_chunk_footprint`]，映射的三个缓冲按合占的字节数给。
 #[must_use]
 pub fn region_record_chunk_footprint_of_mapping_table_bytes(
-    mapping_table_bytes: u64,
+    mapping_table_bytes: GpuMemoryInBytes,
 ) -> ChunkFootprint {
     ChunkFootprint {
-        bytes_per_chunk_besides_the_entries: REGION_RECORD_PARAMETER_BUFFER_BYTES
-            + mapping_table_bytes,
-        bytes_per_entry_besides_its_input: RECORD_DESCRIPTOR_BYTES
-            + REGION_RECORD_OUTCOME_AND_READBACK_BUFFERS * REGION_RECORD_OUTCOME_BYTES,
+        bytes_per_chunk_besides_the_entries: COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+            .bytes_of_the_copies(REGION_RECORD_PARAMETER_BUFFER_BYTES)
+            .plus(mapping_table_bytes_held_with_their_staging(
+                mapping_table_bytes,
+            )),
+        bytes_per_entry_besides_its_input: COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+            .bytes_of_the_copies(RECORD_DESCRIPTOR_BYTES)
+            .plus(
+                COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS
+                    .bytes_of_the_copies(REGION_RECORD_OUTCOME_BYTES),
+            ),
         bytes_per_entry_in_the_largest_entry_buffer: REGION_RECORD_OUTCOME_BYTES
             .max(RECORD_DESCRIPTOR_BYTES),
     }
+}
+
+/// 映射的三个缓冲（合 `mapping_table_bytes` 字节）连同各自的暂存在卡上合占的字节数。
+///
+/// # Panics
+/// 乘出来超出 `u64`：映射的表照内存里的条目数算，字节数不过 `isize::MAX`，乘 2 装得进 `u64`。
+#[must_use]
+pub fn mapping_table_bytes_held_with_their_staging(
+    mapping_table_bytes: GpuMemoryInBytes,
+) -> GpuMemoryInBytes {
+    COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+        .checked_bytes_of_the_copies(mapping_table_bytes)
+        .expect("映射的表照内存里的条目数算，字节数不过 isize::MAX，乘 2 装得进 u64")
 }
 
 /// 映射的一个落点：盘与槽号，按（盘、槽号）排。
@@ -504,24 +534,37 @@ impl MappingSliceWithItsChunks {
     }
 }
 
+/// 一片映射里几条条目（条目表的项数）：条数，与落点项数（[`MappingLocationItemCount`]）、一段里几条记录（[`EntryCountOfAChunk`]）不是一回事。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct MappingEntryCount(u64);
+
+/// 一片映射里几项落点（落点表的项数）：条数，与条目数（[`MappingEntryCount`]）不是一回事。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct MappingLocationItemCount(u64);
+
 /// 一片映射交给核时三张表合占的字节数与最大那一张的字节数：`entry_count` 条条目、`location_item_count` 项落点（都按 [`MappingTablesForTheKernels`]
 /// 的建法：一项都没有时照样放一项全 0 的）。
-fn mapping_table_bytes_of(entry_count: u64, location_item_count: u64) -> (u64, u64) {
-    let entry_words = MAPPING_ENTRY_WORDS_AS_U64 * entry_count.max(1);
-    let location_item_words = LOCATION_ITEM_WORDS_AS_U64 * location_item_count.max(1);
-    let key_sorted_words = entry_count.max(1);
+fn mapping_table_bytes_of(
+    entry_count: MappingEntryCount,
+    location_item_count: MappingLocationItemCount,
+) -> (GpuMemoryInBytes, GpuMemoryInBytes) {
+    let (table_bytes, largest_table_bytes) =
+        singlefs_replay_prefix::gpu_gc_capacity_proofs::checked_gpu_mapping_table_bytes(
+            entry_count.0,
+            location_item_count.0,
+        )
+        .expect("映射表的总字节数与最大绑定量装得进 u64");
     (
-        4 * (entry_words + location_item_words + key_sorted_words),
-        4 * entry_words.max(location_item_words).max(key_sorted_words),
+        GpuMemoryInBytes(table_bytes),
+        GpuMemoryInBytes(largest_table_bytes),
     )
 }
 
-const MAPPING_ENTRY_WORDS_AS_U64: u64 = 14;
-const LOCATION_ITEM_WORDS_AS_U64: u64 = 4;
-
 /// 一条记录交给核的输入字节数（读不到的是 0）。
-fn input_bytes_of_the_record<EntryKey>(record: &RegionRecordToClassify<'_, EntryKey>) -> u64 {
-    u64::try_from(record.unit_bytes.map_or(0, <[u8]>::len)).expect("装得进 u64")
+fn input_bytes_of_the_record<EntryKey>(
+    record: &RegionRecordToClassify<'_, EntryKey>,
+) -> InputLengthOnTheHostInBytes {
+    InputLengthOnTheHostInBytes::of_this_many_bytes(record.unit_bytes.map_or(0, <[u8]>::len))
 }
 
 /// 一片映射：位置项指进 `[first_location, location_past_the_slice)` 的条目按条目表的次序，位置项指到段外的换成指段里的那一条。
@@ -560,7 +603,7 @@ fn entries_of_the_mapping_slice(
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegionRecordPlanOnAGpu {
     /// 每条记录从单元头起交给核的那一片的字节数，按记录的次序：没切开的是整个单元（读不到的是 0），切开的是 [`UNIT_HEAD_PIECE_INPUT_BYTES`]。
-    pub bytes_from_the_start_of_each_record: Vec<u64>,
+    pub bytes_from_the_start_of_each_record: Vec<InputLengthOnTheHostInBytes>,
     /// 切开的单元头一片之后的那几片，按交的次序切成的几段：片的 `entry_position` 是那条记录在这一批里的位置，`input_bytes` 从单元的头一个字节数起；
     /// 同一个单元的几片按字节的次序、各在前后不同的段里（后一片接着前一片算完的寄存器算）。没有切开的单元时是空。
     pub chunks_of_the_pieces_after_the_heads: Vec<Vec<PieceOfAnEntry>>,
@@ -568,7 +611,7 @@ pub struct RegionRecordPlanOnAGpu {
     pub mapping_slices: Vec<MappingSliceWithItsChunks>,
 }
 
-/// 一张卡上区域扫描这一批分到它的记录怎么切（交之前算完），先整、后切（用户 2026-10-28 定「装不下应该自适应的分片，缩小逐次进行」）：
+/// 一张卡上区域扫描这一批分到它的记录怎么切（交之前算完），先整、后切（第 3 条「按上限自适应切成几片、缩小逐次交」）：
 /// 每条记录交整个单元、映射整份或按落点切成几片（[`mapping_slices_under_the_input_lengths`]）装得下就这样交；装不下（最大那条记录连同一个落点上的
 /// 全部条目都装不下）就把比 [`UNIT_HEAD_PIECE_INPUT_BYTES`] 长的单元都切开：每条从单元头起只交头一片、映射照它再切，头一片之后的字节按
 /// `memory_limit_and_chunks::pieces_cut_to_fit_on_the_gpu` 切成单独成一段都装得下的几片（这几段只交一份空映射，核只接着算寄存器；见本模块文件头
@@ -586,7 +629,8 @@ pub fn region_record_plan_on_a_gpu<EntryKey>(
     mapping_tables: &MappingTablesForTheKernels,
     room: ChunkBoundsOfAGpu,
 ) -> Result<RegionRecordPlanOnAGpu, SmallestPieceLargerThanTheRoom> {
-    let input_lengths: Vec<u64> = records.iter().map(input_bytes_of_the_record).collect();
+    let input_lengths: Vec<InputLengthOnTheHostInBytes> =
+        records.iter().map(input_bytes_of_the_record).collect();
     let whole_units_not_held = match mapping_slices_under_the_input_lengths(
         &input_lengths,
         mapping_entries,
@@ -611,7 +655,7 @@ pub fn region_record_plan_on_a_gpu<EntryKey>(
     if positions_of_the_units_cut.is_empty() {
         return Err(whole_units_not_held);
     }
-    let bytes_from_the_start_of_each_record: Vec<u64> = input_lengths
+    let bytes_from_the_start_of_each_record: Vec<InputLengthOnTheHostInBytes> = input_lengths
         .iter()
         .map(|input_bytes| (*input_bytes).min(UNIT_HEAD_PIECE_INPUT_BYTES))
         .collect();
@@ -621,13 +665,15 @@ pub fn region_record_plan_on_a_gpu<EntryKey>(
         mapping_tables,
         room,
     )?;
-    let bytes_after_the_heads: Vec<u64> = positions_of_the_units_cut
+    let bytes_after_the_heads: Vec<InputLengthOnTheHostInBytes> = positions_of_the_units_cut
         .iter()
-        .map(|position| input_lengths[*position] - UNIT_HEAD_PIECE_INPUT_BYTES)
+        .map(|position| input_lengths[*position].minus(UNIT_HEAD_PIECE_INPUT_BYTES))
         .collect();
     let chunks_of_the_pieces_after_the_heads = pieces_cut_to_fit_on_the_gpu(
         &bytes_after_the_heads,
-        region_record_chunk_footprint_of_mapping_table_bytes(mapping_table_bytes_of(0, 0).0),
+        region_record_chunk_footprint_of_mapping_table_bytes(
+            mapping_table_bytes_of(MappingEntryCount(0), MappingLocationItemCount(0)).0,
+        ),
         room,
     )
     .map_err(|smallest_piece| SmallestPieceLargerThanTheRoom {
@@ -640,8 +686,8 @@ pub fn region_record_plan_on_a_gpu<EntryKey>(
             .into_iter()
             .map(|piece| PieceOfAnEntry {
                 entry_position: positions_of_the_units_cut[piece.entry_position],
-                input_bytes: UNIT_HEAD_PIECE_INPUT_BYTES + piece.input_bytes.start
-                    ..UNIT_HEAD_PIECE_INPUT_BYTES + piece.input_bytes.end,
+                input_bytes: UNIT_HEAD_PIECE_INPUT_BYTES.plus(piece.input_bytes.start)
+                    ..UNIT_HEAD_PIECE_INPUT_BYTES.plus(piece.input_bytes.end),
             })
             .collect()
     })
@@ -657,13 +703,15 @@ pub fn region_record_plan_on_a_gpu<EntryKey>(
 /// 取大的。一个落点上不止一条条目的那一片随这一批的映射变，挂着时逐批判（[`region_record_plan_on_a_gpu`]）：一张卡这一批切不出就这一批不分给它、
 /// 活照卡的顺序填给别的卡（`crate::gpus_of_this_host::plans_of_a_batch_filling_the_gpus_in_order`）。
 #[must_use]
-pub fn bytes_of_the_smallest_region_record_piece() -> u64 {
-    let head_piece_with_one_entry =
-        region_record_chunk_footprint_of_mapping_table_bytes(mapping_table_bytes_of(1, 1).0)
-            .bytes_held_by_a_chunk(UNIT_HEAD_PIECE_INPUT_BYTES, 1);
-    let piece_after_the_head_of_one_byte =
-        region_record_chunk_footprint_of_mapping_table_bytes(mapping_table_bytes_of(0, 0).0)
-            .bytes_held_by_a_chunk(1, 1);
+pub fn bytes_of_the_smallest_region_record_piece() -> GpuMemoryInBytes {
+    let head_piece_with_one_entry = region_record_chunk_footprint_of_mapping_table_bytes(
+        mapping_table_bytes_of(MappingEntryCount(1), MappingLocationItemCount(1)).0,
+    )
+    .bytes_held_by_a_chunk(UNIT_HEAD_PIECE_INPUT_BYTES, EntryCountOfAChunk(1));
+    let piece_after_the_head_of_one_byte = region_record_chunk_footprint_of_mapping_table_bytes(
+        mapping_table_bytes_of(MappingEntryCount(0), MappingLocationItemCount(0)).0,
+    )
+    .bytes_held_by_a_chunk(InputLengthOnTheHostInBytes(1), EntryCountOfAChunk(1));
     head_piece_with_one_entry.max(piece_after_the_head_of_one_byte)
 }
 
@@ -671,7 +719,7 @@ pub fn bytes_of_the_smallest_region_record_piece() -> u64 {
 /// 把映射切成几片，每片照它的三张表切记录（见本模块文件头）。片按落点的次序排，一个落点上的全部条目落在同一片里。`mapping_tables` 是整份映射的三张表。
 /// 没有记录交回空。
 ///
-/// 切法：每条条目的每个不同的落点记一项，按（落点、条目序号）排、按落点归组，从前往后贪心装：装进当前这一片之后三张表合占的不超过
+/// 切法：每条条目的每个不同的落点记一项，按（落点、条目序号）排、按落点归组，从前往后贪心装：装进当前这一片之后三张表连同各自的暂存合占的不超过
 /// 「这张卡剩下的地方扣掉参数缓冲与最大那条记录的一条」、最大那张表装得进绑定上限就装，装不下就在这个落点上另起一片。
 ///
 /// # Errors
@@ -680,7 +728,7 @@ pub fn bytes_of_the_smallest_region_record_piece() -> u64 {
 /// # Panics
 /// `mapping_tables` 不是 `mapping_entries` 建出来的。
 pub fn mapping_slices_under_the_input_lengths(
-    input_lengths: &[u64],
+    input_lengths: &[InputLengthOnTheHostInBytes],
     mapping_entries: &[CentralMappingEntry],
     mapping_tables: &MappingTablesForTheKernels,
     room: ChunkBoundsOfAGpu,
@@ -703,22 +751,28 @@ pub fn mapping_slices_under_the_input_lengths(
             }]);
         }
     }
-    let footprint_without_the_mapping = region_record_chunk_footprint_of_mapping_table_bytes(0);
+    let footprint_without_the_mapping =
+        region_record_chunk_footprint_of_mapping_table_bytes(GpuMemoryInBytes(0));
     let (largest_record_position, largest_record_input_bytes) = input_lengths
         .iter()
         .copied()
         .enumerate()
         .max_by_key(|(_position, input_bytes)| *input_bytes)
         .expect("上面判过有记录");
-    let largest_record_piece_bytes =
-        footprint_without_the_mapping.bytes_held_by_a_chunk(largest_record_input_bytes, 1);
-    let smallest_piece_with = |mapping_table_bytes: u64| SmallestPieceLargerThanTheRoom {
-        entry_position: largest_record_position,
-        smallest_piece_bytes: largest_record_piece_bytes + mapping_table_bytes,
-    };
-    let room_for_the_mapping_tables = room.memory_limit.map_or(u64::MAX, |memory_limit| {
-        memory_limit.0.saturating_sub(largest_record_piece_bytes)
-    });
+    let largest_record_piece_bytes = footprint_without_the_mapping
+        .bytes_held_by_a_chunk(largest_record_input_bytes, EntryCountOfAChunk(1));
+    let smallest_piece_with =
+        |mapping_table_bytes: GpuMemoryInBytes| SmallestPieceLargerThanTheRoom {
+            entry_position: largest_record_position,
+            smallest_piece_bytes: largest_record_piece_bytes.plus(
+                mapping_table_bytes_held_with_their_staging(mapping_table_bytes),
+            ),
+        };
+    let room_for_the_mapping_tables =
+        room.memory_limit
+            .map_or(GpuMemoryInBytes(u64::MAX), |memory_limit| {
+                GpuMemoryInBytes(memory_limit.0.saturating_sub(largest_record_piece_bytes.0))
+            });
     let record_fits_the_binding = input_buffer_bytes(largest_record_input_bytes)
         <= room.largest_storage_binding_in_bytes
         && footprint_without_the_mapping.bytes_per_entry_in_the_largest_entry_buffer
@@ -741,10 +795,13 @@ pub fn mapping_slices_under_the_input_lengths(
     let mut entries_in_the_slice: u64 = 0;
     let mut location_items_in_the_slice: u64 = 0;
     let fits = |entry_count: u64, location_item_count: u64| -> bool {
-        let (table_bytes, largest_table_bytes) =
-            mapping_table_bytes_of(entry_count, location_item_count);
+        let (table_bytes, largest_table_bytes) = mapping_table_bytes_of(
+            MappingEntryCount(entry_count),
+            MappingLocationItemCount(location_item_count),
+        );
         record_fits_the_binding
-            && table_bytes <= room_for_the_mapping_tables
+            && mapping_table_bytes_held_with_their_staging(table_bytes)
+                <= room_for_the_mapping_tables
             && largest_table_bytes <= room.largest_storage_binding_in_bytes
     };
     let mut group_start = 0;
@@ -773,7 +830,11 @@ pub fn mapping_slices_under_the_input_lengths(
         ) {
             if !fits(group_items, group_items) {
                 return Err(smallest_piece_with(
-                    mapping_table_bytes_of(group_items, group_items).0,
+                    mapping_table_bytes_of(
+                        MappingEntryCount(group_items),
+                        MappingLocationItemCount(group_items),
+                    )
+                    .0,
                 ));
             }
             if entries_in_the_slice != 0 {
@@ -793,7 +854,9 @@ pub fn mapping_slices_under_the_input_lengths(
         group_start = group_end;
     }
     if !fits(entries_in_the_slice, location_items_in_the_slice) {
-        return Err(smallest_piece_with(mapping_table_bytes_of(0, 0).0));
+        return Err(smallest_piece_with(
+            mapping_table_bytes_of(MappingEntryCount(0), MappingLocationItemCount(0)).0,
+        ));
     }
     let mut slices = Vec::with_capacity(slice_starts.len());
     for (slice_position, first_location) in slice_starts.iter().enumerate() {
@@ -924,9 +987,9 @@ pub fn region_record_classifications_of_the_plan<'unit, EntryKey, SubmissionFail
                     .unit_bytes
                     .expect("切开的单元读到了：读不到的那一条交 0 字节，不比头一片长、不切");
                 let piece_start =
-                    usize::try_from(piece.input_bytes.start).expect("片在单元里，装得进 usize");
+                    usize::try_from(piece.input_bytes.start.0).expect("片在单元里，装得进 usize");
                 let piece_end =
-                    usize::try_from(piece.input_bytes.end).expect("片在单元里，装得进 usize");
+                    usize::try_from(piece.input_bytes.end.0).expect("片在单元里，装得进 usize");
                 RegionRecordPieceForTheKernels::PieceAfterTheHead {
                     record: records[piece.entry_position].record,
                     bytes: &unit_bytes[piece_start..piece_end],
@@ -966,12 +1029,13 @@ pub fn region_record_classifications_of_the_plan<'unit, EntryKey, SubmissionFail
         .zip(&registers_of_the_bytes_after_the_head)
         .map(|((to_classify, bytes_from_the_start), registers)| {
             let bytes_after_this_piece = input_bytes_of_the_record(to_classify)
-                .checked_sub(*bytes_from_the_start)
+                .0
+                .checked_sub(bytes_from_the_start.0)
                 .expect("从单元头起的那一片不比单元长");
             RegionRecordPieceForTheKernels::UnitFromItsStart {
                 record: to_classify.record,
                 bytes: to_classify.unit_bytes.map(|unit_bytes| {
-                    &unit_bytes[..usize::try_from(*bytes_from_the_start)
+                    &unit_bytes[..usize::try_from(bytes_from_the_start.0)
                         .expect("不比单元长，装得进 usize")]
                 }),
                 bytes_of_the_unit_after_this_piece: u32::try_from(bytes_after_this_piece)
@@ -1305,16 +1369,17 @@ pub fn cpu_reference_classification(
 
 /// 区域扫描里一批记录的比对（第 8 条）：两份核的分类交进来（按 `records` 的次序，逐条走映射那一份在前），逐条比、更新计数；
 /// 连续不确定到 N 轮的记录交 CPU 参照（[`cpu_reference_classification`]）现判，按身份的索引只在头一次要它时建。
-/// 这一批出错就原样交回出错、计数不动、CPU 参照不调。
+/// 这一批出错、或同一个条目键在一批里出现两次，就交回出错、计数不动、CPU 参照不调。三段同一个次序：重复的键先于两份核的结局判
+/// （外壳在交卡之前就查，重复时一片都不交，卡出错与重复键不同时出现）。
 ///
 /// # Errors
-/// `both_kernel_classifications` 是 `Err` 时交回它。
+/// 同一个条目键在一批里出现两次时交回 [`SameEntryKeyTwiceInOneBatch`] 转成的那一种（两份核交成了还是出错了都先报它）；`both_kernel_classifications` 是 `Err` 时交回它。
 ///
 /// # Panics
-/// 两份核交回的条数与 `records` 不等；同一个条目键在一批里出现两次；交 CPU 判的那一条不是区域扫描会去读的那一种。
+/// 两份核交回的条数与 `records` 不等；交 CPU 判的那一条不是区域扫描会去读的那一种。
 pub fn reconciled_region_record_classifications<
     EntryKey: Eq + std::hash::Hash + Clone,
-    BatchFailure,
+    BatchFailure: From<SameEntryKeyTwiceInOneBatch>,
 >(
     region: CompactionRegion,
     records: &[RegionRecordToClassify<'_, EntryKey>],
@@ -1325,6 +1390,11 @@ pub fn reconciled_region_record_classifications<
     >,
     uncertainty: &mut ConsecutiveUncertaintyCounts<EntryKey>,
 ) -> Result<ReconciledBatch<AllocationInRegion>, BatchFailure> {
+    if let Some(repeated) =
+        first_entry_key_repeated_among(records.iter().map(|record| &record.entry_key))
+    {
+        return Err(BatchFailure::from(repeated));
+    }
     let both_kernel_classifications = both_kernel_classifications.map(|classifications| {
         assert_eq!(
             classifications.len(),
@@ -1723,7 +1793,9 @@ mod tests {
         assert_eq!((tables.entry_count, tables.location_item_count), (0, 0));
         assert_eq!(
             tables.bytes_on_the_gpu(),
-            4 * u64::try_from(MAPPING_ENTRY_WORDS + LOCATION_ITEM_WORDS + 1).expect("小数")
+            GpuMemoryInBytes(
+                4 * u64::try_from(MAPPING_ENTRY_WORDS + LOCATION_ITEM_WORDS + 1).expect("小数")
+            )
         );
     }
 
@@ -2077,7 +2149,7 @@ mod tests {
         );
     }
 
-    /// 用户 2026-10-28 定「装不下应该自适应的分片」：上限只装得下最大那条 32 KiB 的记录连同一条条目的映射，映射按落点切成一片一个落点
+    /// 第 3 条「按上限自适应切成几片」：上限只装得下最大那条 32 KiB 的记录连同一条条目的映射，映射按落点切成一片一个落点
     /// （两块盘上各六个），每条记录在每片之下各分一次类（两份核在 CPU 上的替身照核心层对这一片判），两份各按自己的合法合成，
     /// 与 CPU 参照对整份映射的分类逐条相同。槽 20 上那个单元头里的 key 只有一条条目带着、它指着槽 40（别的片）：本片判成已死，合成之后是
     /// 「key 与位置不符」。
@@ -2130,16 +2202,15 @@ mod tests {
             .collect();
         let mapping_tables = MappingTablesForTheKernels::of_the_mapping_entries(&mapping_entries)
             .expect("key 都是 27 字节");
-        let one_entry_with_one_location_bytes = mapping_table_bytes_of(1, 1).0;
+        let one_entry_with_one_location_bytes =
+            mapping_table_bytes_of(MappingEntryCount(1), MappingLocationItemCount(1)).0;
         let memory_limit =
             region_record_chunk_footprint_of_mapping_table_bytes(one_entry_with_one_location_bytes)
-                .bytes_held_by_a_chunk(32768, 1);
+                .bytes_held_by_a_chunk(InputLengthOnTheHostInBytes(32768), EntryCountOfAChunk(1));
         let room = ChunkBoundsOfAGpu {
-            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(
-                memory_limit,
-            )),
-            largest_storage_binding_in_bytes: 1 << 30,
-            largest_entry_count_per_dispatch: 1 << 20,
+            memory_limit: Some(memory_limit),
+            largest_storage_binding_in_bytes: GpuMemoryInBytes(1 << 30),
+            largest_entry_count_per_dispatch: EntryCountOfAChunk(1 << 20),
         };
         let plan = region_record_plan_on_a_gpu(&records, &mapping_entries, &mapping_tables, room)
             .expect("最大那条记录连同一个落点上的一条条目装得下");
@@ -2313,7 +2384,7 @@ mod tests {
         )
     }
 
-    /// 用户 2026-10-28 定「这部分不能因为装不下就拒绝，装不下应该自适应的分片，缩小逐次进行」：上限 2 KiB，连一个 16 KiB 的索引节点都装不下
+    /// 第 3 条「装不下不拒绝」「按上限自适应切成几片、缩小逐次交」：上限 2 KiB，连一个 16 KiB 的索引节点都装不下
     /// （数据单元的载荷两万字节、字节各不相同，头一片之后的寄存器不是 0）：
     /// 比头一片长的单元都切成头一片与之后的几片（之后的几片按上限切、同一个单元的各片在前后不同的段里），两份核在 CPU 上的替身先逐片接着算寄存器、
     /// 再照头一片分类（替身核对头一片、之后的字节数与两份各自带进来的寄存器，对不上就交「载荷校验和不对」）；每条记录两份的分类与 CPU 参照对整个单元、
@@ -2357,9 +2428,9 @@ mod tests {
         let mapping_tables = MappingTablesForTheKernels::of_the_mapping_entries(&mapping_entries)
             .expect("key 都是 27 字节");
         let room = ChunkBoundsOfAGpu {
-            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(2048)),
-            largest_storage_binding_in_bytes: 1 << 30,
-            largest_entry_count_per_dispatch: 1 << 20,
+            memory_limit: Some(GpuMemoryInBytes(2048)),
+            largest_storage_binding_in_bytes: GpuMemoryInBytes(1 << 30),
+            largest_entry_count_per_dispatch: EntryCountOfAChunk(1 << 20),
         };
         let plan = region_record_plan_on_a_gpu(&records, &mapping_entries, &mapping_tables, room)
             .expect("切开之后头一片连同一个落点上的条目、之后的每一片都装得下 2 KiB");
@@ -2370,13 +2441,13 @@ mod tests {
                 UNIT_HEAD_PIECE_INPUT_BYTES,
                 UNIT_HEAD_PIECE_INPUT_BYTES,
                 UNIT_HEAD_PIECE_INPUT_BYTES,
-                0,
-                0,
+                InputLengthOnTheHostInBytes(0),
+                InputLengthOnTheHostInBytes(0),
                 UNIT_HEAD_PIECE_INPUT_BYTES,
             ],
             "读到的单元都切成头一片，读不到的交 0 字节"
         );
-        let pieces_after_the_head_of_the_index_node: u64 = plan
+        let pieces_after_the_head_of_the_index_node: InputLengthOnTheHostInBytes = plan
             .chunks_of_the_pieces_after_the_heads
             .iter()
             .flatten()
@@ -2385,7 +2456,7 @@ mod tests {
             .sum();
         assert_eq!(
             pieces_after_the_head_of_the_index_node,
-            16384 - UNIT_HEAD_PIECE_INPUT_BYTES,
+            InputLengthOnTheHostInBytes(16384).minus(UNIT_HEAD_PIECE_INPUT_BYTES),
             "索引节点头一片之后的几片一个字节不漏"
         );
         assert!(
@@ -2486,8 +2557,8 @@ mod tests {
                 .expect("key 都是 27 字节");
             assert_eq!(
                 mapping_table_bytes_of(
-                    u64::try_from(entries.len()).expect("小数"),
-                    expected_location_items
+                    MappingEntryCount(u64::try_from(entries.len()).expect("小数")),
+                    MappingLocationItemCount(expected_location_items)
                 ),
                 (tables.bytes_on_the_gpu(), tables.largest_buffer_bytes()),
                 "{} 条条目",

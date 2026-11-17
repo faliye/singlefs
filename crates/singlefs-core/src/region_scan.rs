@@ -1132,7 +1132,7 @@ mod tests {
     /// 映射里这个 key 的位置挪到了 R 里另一个槽，原来那个槽上的单元头照旧：没有条目指着它，但头里的 key 在映射里，
     /// 两个来源对不上，判「不一致」，不判「已死」（G9「头里的 key 与映射里的位置对不上」）。
     #[test]
-    fn a_unit_whose_mapping_entry_points_at_another_slot_is_inconsistent_not_dead() {
+    fn unit_whose_mapping_entry_points_at_another_slot_is_inconsistent_not_dead() {
         let mut pool = PoolUnderTest::default();
         let (data, key) = data_unit(1);
         pool.place(slot_in_region(0), 2, Some(&data));
@@ -1147,7 +1147,7 @@ mod tests {
 
     /// 映射条目指着这个槽，而单元头里反查出的 key 是另一把（头的写序与映射 key 的不同）：判「不一致」，不判可搬。
     #[test]
-    fn a_unit_whose_header_key_differs_from_the_mapping_entry_pointing_at_it_is_inconsistent() {
+    fn unit_whose_header_key_differs_from_the_mapping_entry_pointing_at_it_is_inconsistent() {
         let mut pool = PoolUnderTest::default();
         let (_mapped_data, mapped_key) = data_unit(1);
         let (data_with_another_write_order, _its_own_key) = data_unit(2);
@@ -1225,7 +1225,7 @@ mod tests {
     /// 隔离槽上的单元头完好、映射条目照旧指着它、key 也对得上：照样判「隔离」，不判可搬（
     /// 隔离 = 释放前核出校验和对不上，搬它就是把坏副本搬走；隔离排在读头与核映射之前）。
     #[test]
-    fn a_quarantined_slot_the_mapping_still_points_at_is_quarantined_not_movable() {
+    fn quarantined_slot_the_mapping_still_points_at_is_quarantined_not_movable() {
         let mut pool = PoolUnderTest::default();
         let (data, key) = data_unit(1);
         pool.place(slot_in_region(0), 2, Some(&data));
@@ -1246,7 +1246,7 @@ mod tests {
     /// 两条映射条目指着同一个槽：一条是单元头里反查出的 key，另一条是别的 key（类标签相同）。要每一条都是头里那把 key 才可搬，
     /// 这里判「不一致」。
     #[test]
-    fn a_slot_two_mapping_entries_point_at_with_only_one_carrying_the_header_key_is_inconsistent() {
+    fn slot_two_mapping_entries_point_at_with_only_one_carrying_the_header_key_is_inconsistent() {
         let mut pool = PoolUnderTest::default();
         let (data, own_key) = data_unit(1);
         let (_other_data, other_key) = data_unit(2);
@@ -1268,8 +1268,8 @@ mod tests {
     /// 单元头里的 key 在映射里，映射的两条位置条目槽号与这个槽相同、却在另两块盘上（不是 R 那块盘）：没有条目指着 R 那块盘上的这个槽，
     /// 判「不一致」，不判可搬。
     #[test]
-    fn a_mapping_entry_at_the_same_slot_number_on_other_devices_does_not_point_at_the_region_device(
-    ) {
+    fn mapping_entry_at_the_same_slot_number_on_other_devices_does_not_point_at_the_region_device()
+    {
         let mut pool = PoolUnderTest::default();
         let (data, key) = data_unit(1);
         pool.place(slot_in_region(0), 2, Some(&data));
@@ -1295,7 +1295,7 @@ mod tests {
 
     /// 两槽单元的第二个槽钉住（起点槽没钉住）：整条记录判「钉住」，不判可搬。
     #[test]
-    fn a_two_slot_unit_whose_second_slot_is_pinned_is_pinned() {
+    fn two_slot_unit_whose_second_slot_is_pinned_is_pinned() {
         let mut pool = PoolUnderTest::default();
         let (data, key) = data_unit(1);
         pool.place(slot_in_region(0), 2, Some(&data));
@@ -1314,7 +1314,7 @@ mod tests {
 
     /// R 那块盘上一条未释放的记录跨着 R 的边界（从下面罩进来、从里面罩出去）：判决 G9 没定它归哪一类，整次拒、一条都不分类。
     #[test]
-    fn a_record_straddling_the_region_boundary_is_refused_before_any_classification() {
+    fn record_straddling_the_region_boundary_is_refused_before_any_classification() {
         let (inside, inside_key) = data_unit(1);
         let slot_below_the_region = SlotNumber(region_under_test().start_slot().0 - 1);
 

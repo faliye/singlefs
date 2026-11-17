@@ -104,7 +104,7 @@ verus! {
 /// CRC-32C 在 Verus 里是未解释函数（D13（验证路线） 已定项 14「哈希是 uninterpreted function」）：证明只用到「同一段字节同一个数」，
 /// 不展开多项式。它与真实现对不对得上不归 Verus 判，归差分测试 [`tests::crc32c_matches_the_published_check_value`]（公开校验值）
 /// 与 checker 那一份按位实现的交叉比（D13（验证路线） 已定项 5）；这一条与 [`crc32_castagnoli`] 的 `external_body` 各登记一行信任清单。
-pub uninterp spec fn spec_crc32_castagnoli(bytes: Seq<u8>) -> u32;
+pub uninterp spec fn specification_crc32_castagnoli(bytes: Seq<u8>) -> u32;
 
 /// 完整 32 位 CRC-32C，走 [`castagnoli_route_of_this_processor`] 选的那条路。
 ///
@@ -113,7 +113,7 @@ pub uninterp spec fn spec_crc32_castagnoli(bytes: Seq<u8>) -> u32;
 #[must_use]
 pub fn crc32_castagnoli(bytes: &[u8]) -> (crc: u32)
     ensures
-        crc == spec_crc32_castagnoli(bytes@),
+        crc == specification_crc32_castagnoli(bytes@),
 {
     crc32_castagnoli_on_route(castagnoli_route_of_this_processor(), bytes)
 }
@@ -301,7 +301,7 @@ pub assume_specification[ singlefs_format::WIDE_CHECKSUM_BYTES ] -> (wide_checks
 pub assume_specification[ singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES ] -> (crc_bytes: u64) returns 4u64;
 
 /// 求校验和时罩住的那一截：`[0, cover_end)`，其中校验和字段自己那 32 字节按 0 参与（I-2.4）。
-pub open spec fn spec_covered_with_the_field_zeroed(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
+pub open spec fn specification_covered_with_the_field_zeroed(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
     bytes.subrange(0, field_offset) + zero_bytes(WIDE_CHECKSUM_BYTES as nat) + bytes.subrange(
         field_offset + WIDE_CHECKSUM_BYTES,
         cover_end,
@@ -309,15 +309,15 @@ pub open spec fn spec_covered_with_the_field_zeroed(bytes: Seq<u8>, cover_end: i
 }
 
 /// 32 字节校验和字段该写的样子：罩住那一截的 CRC-32C 小端 4 字节，其余 28 字节 0（D18（块里携带什么信息） 已定项 17）。
-pub open spec fn spec_wide_checksum_field(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
+pub open spec fn specification_wide_checksum_field(bytes: Seq<u8>, cover_end: int, field_offset: int) -> Seq<u8> {
     little_endian_bytes(
-        spec_crc32_castagnoli(spec_covered_with_the_field_zeroed(bytes, cover_end, field_offset)) as nat,
+        specification_crc32_castagnoli(specification_covered_with_the_field_zeroed(bytes, cover_end, field_offset)) as nat,
         singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES as nat,
     ) + zero_bytes((WIDE_CHECKSUM_BYTES - singlefs_format::CHECKSUM_CRC32_CASTAGNOLI_BYTES) as nat)
 }
 
 /// 校验和字段的前提：字段整个落在罩住的那一截里，罩住的那一截不过 `bytes` 末尾。
-pub open spec fn spec_wide_checksum_field_fits(bytes: Seq<u8>, cover_end: int, field_offset: int) -> bool {
+pub open spec fn specification_wide_checksum_field_fits(bytes: Seq<u8>, cover_end: int, field_offset: int) -> bool {
     &&& 0 <= field_offset
     &&& field_offset + WIDE_CHECKSUM_BYTES <= cover_end
     &&& cover_end <= bytes.len()
@@ -354,9 +354,9 @@ pub fn wide_checksum_with_field_zeroed(
     field_offset: usize,
 ) -> (field: [u8; 32])
     requires
-        spec_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
+        specification_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
     ensures
-        field@ == spec_wide_checksum_field(bytes@, cover_end as int, field_offset as int),
+        field@ == specification_wide_checksum_field(bytes@, cover_end as int, field_offset as int),
 {
     let field_width = usize::try_from(WIDE_CHECKSUM_BYTES).expect("32");
     // 罩住的那一截：字段之前照抄、字段 32 字节按 0、字段之后照抄到 cover_end（写者 new 出来就是 0，跳过的那一段保持 0）。
@@ -366,7 +366,7 @@ pub fn wide_checksum_with_field_zeroed(
     covered_writer.put(&bytes[field_offset + field_width..cover_end]);
     let covered = covered_writer.into_bytes();
     proof {
-        assert(covered@ =~= spec_covered_with_the_field_zeroed(bytes@, cover_end as int, field_offset as int));
+        assert(covered@ =~= specification_covered_with_the_field_zeroed(bytes@, cover_end as int, field_offset as int));
     }
     wide_checksum_field_of_the_crc(crc32_castagnoli(&covered))
 }
@@ -378,10 +378,10 @@ pub fn wide_checksum_with_field_zeroed(
 #[must_use]
 pub fn wide_checksum_field_holds(bytes: &[u8], cover_end: usize, field_offset: usize) -> (holds: bool)
     requires
-        spec_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
+        specification_wide_checksum_field_fits(bytes@, cover_end as int, field_offset as int),
     ensures
         holds == (bytes@.subrange(field_offset as int, field_offset + WIDE_CHECKSUM_BYTES)
-            == spec_wide_checksum_field(bytes@, cover_end as int, field_offset as int)),
+            == specification_wide_checksum_field(bytes@, cover_end as int, field_offset as int)),
 {
     let field_width = usize::try_from(WIDE_CHECKSUM_BYTES).expect("32");
     let stored = &bytes[field_offset..field_offset + field_width];

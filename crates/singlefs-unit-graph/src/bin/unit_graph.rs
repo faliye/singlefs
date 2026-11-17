@@ -5,7 +5,10 @@
 //!                      [--toolchain-line <行>…] [--toolchain-of-the-build <profile>]
 //!                      [--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <种类>] [--threads <N>]
 //!   unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]
+//!   unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]
 //!
+//! `why` 只查不算键：闭包里「文件路径 + 空格 + 限定名」含 `--unit` 那个子串的单元，各是经哪条边头一回被排进闭包的
+//! （行格式见库的 `output::why_lines`）；目标三元组照 closure 一样从工具链行取，依赖行不用，有拒算照打链、退 0。
 //! 给几个入口时一起收一个闭包（`compute_closure_of_entries`：几个入口都在 `--target` 点名的那个目标里、同一个 crate）。
 //! `--toolchain-of-the-build <profile>` 照这台机器现拼一次构建的工具链行（`build_toolchain::toolchain_lines_of_the_build`，与
 //! `singlefs-verification` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
@@ -49,7 +52,7 @@ use singlefs_unit_graph::conditional_compilation::target_triple_of_toolchain_lin
 use singlefs_unit_graph::heavy_threads::default_heavy_threads;
 use singlefs_unit_graph::lock_file::{narrowed_lock_lines, parse_lock_file, LockedPackage};
 use singlefs_unit_graph::output::{
-    closure_lines, dump_lines, key_line, parse_time_refusals, refusal_lines,
+    closure_lines, dump_lines, key_line, parse_time_refusals, refusal_lines, why_lines,
 };
 use singlefs_unit_graph::rule_switches::RuleSwitches;
 use singlefs_unit_graph::verus_ghost_code::JudgmentKind;
@@ -60,7 +63,8 @@ const USAGE: &str = concat!(
     "      unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features] ",
     "[--toolchain-line <行>…（其中一行 host: <三元组> 或 target: <三元组>）] [--toolchain-of-the-build <profile>] ",
     "[--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
-    "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]"
+    "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]\n",
+    "      unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]"
 );
 
 /// 用法错、读不了、入口找不到。
@@ -73,6 +77,7 @@ enum Command {
     Dump,
     Closure,
     Key,
+    Why,
 }
 
 struct Arguments {
@@ -88,6 +93,8 @@ struct Arguments {
     build_profile: Option<String>,
     judgment_kind: JudgmentKind,
     threads: Option<NonZeroUsize>,
+    /// `why` 要查的单元：文件路径或限定名里的一段。
+    unit_pattern: Option<String>,
 }
 
 fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
@@ -98,6 +105,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
         "dump" => Command::Dump,
         "closure" => Command::Closure,
         "key" => Command::Key,
+        "why" => Command::Why,
         other => return Err(format!("认不得子命令「{other}」")),
     };
     let mut positional = Vec::new();
@@ -114,6 +122,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
         build_profile: None,
         judgment_kind: JudgmentKind::FormalVerification,
         threads: None,
+        unit_pattern: None,
     };
     let mut position = 1usize;
     while position < raw.len() {
@@ -127,6 +136,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
             | "--lock-line"
             | "--lock-file"
             | "--toolchain-of-the-build"
+            | "--unit"
             | "--judgment-kind" => {
                 let Some(value) = value else {
                     return Err(format!("{current} 后面缺值"));
@@ -149,6 +159,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
                         RequestedCondition::parse(value)
                             .map_err(|text| format!("--cfg 认不得「{text}」"))?,
                     ),
+                    "--unit" => arguments.unit_pattern = Some(value.clone()),
                     "--toolchain-line" => arguments.toolchain_lines.push(value.clone()),
                     "--lock-file" => arguments.lock_file = Some(PathBuf::from(value)),
                     "--toolchain-of-the-build" => arguments.build_profile = Some(value.clone()),
@@ -183,9 +194,12 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
     };
     if !positional_count_fits {
         return Err(format!(
-            "dump 要 1 个位置参数（根），closure 与 key 要根与至少一个入口；给了 {} 个",
+            "dump 要 1 个位置参数（根），closure、key 与 why 要根与至少一个入口；给了 {} 个",
             positional.len()
         ));
+    }
+    if (command == Command::Why) != arguments.unit_pattern.is_some() {
+        return Err("--unit <子串> 只给 why 用，why 必须给".to_string());
     }
     if arguments.lock_file.is_some() && !arguments.lock_lines.is_empty() {
         return Err("--lock-line 与 --lock-file 只能给一种".to_string());
@@ -274,7 +288,7 @@ fn lines_of(
             );
             (lines, summary, 0)
         }
-        Command::Closure | Command::Key => {
+        Command::Closure | Command::Key | Command::Why => {
             let mut toolchain_lines = arguments.toolchain_lines.clone();
             if let Some(profile) = &arguments.build_profile {
                 match toolchain_lines_of_this_machine(workspace, profile) {
@@ -323,6 +337,15 @@ fn lines_of(
                     Ok(outcome) => outcome,
                     Err(error) => return (Vec::new(), error.to_string(), EXIT_USAGE),
                 };
+            if let (Command::Why, Some(pattern)) = (arguments.command, &arguments.unit_pattern) {
+                let lines = why_lines(workspace, &outcome, pattern);
+                let summary = format!(
+                    "入口 {entry_path}：闭包 {} 个 Rust 单元，含「{pattern}」的单元打了 {} 行",
+                    outcome.units.len(),
+                    lines.len()
+                );
+                return (lines, summary, 0);
+            }
             let lock_lines = match &arguments.lock_file {
                 None => arguments.lock_lines.clone(),
                 Some(path) => {

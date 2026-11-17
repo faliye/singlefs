@@ -1,8 +1,8 @@
 //! checker：与实现只共享 `singlefs-format` 这一个常量模块（D13（验证路线） 已定项 5），
 //! CRC-32C、解析、校验各写一份，不从 `singlefs-core` 引任何东西。
-//! 步 1 能判的：系统配置槽（magic / 整槽校验和 / incompat 位 / 世代号）、根记录槽（magic / 整槽校验和 / fsid / flags）、
-//! 单元头（共同前缀 / 头校验和 / 载荷 CRC），以及「三个区域的槽 0 是不是同一份第 0 代根」。
-//! 步 3 / 步 4 / 步 5 加的：码 2 节点的头与条目（声明长度、key 宽、key 按字段序严格递增、区间贴紧）、码 3 容器的记录、
+//! 这一份判：系统配置槽（magic / 整槽校验和 / incompat 位 / 世代号）、根记录槽（magic / 整槽校验和 / fsid / flags）、
+//! 单元头（共同前缀 / 头校验和 / 载荷 CRC）、「三个区域的槽 0 是不是同一份第 0 代根」、
+//! 码 2 节点的头与条目（声明长度、key 宽、key 按字段序严格递增、区间贴紧）、码 3 容器的记录、
 //! journal 记录（`header_csum` 罩整条 4096、载荷 CRC、点名项、反向链口径）。
 #![forbid(unsafe_code)]
 
@@ -54,34 +54,158 @@ pub fn crc32_castagnoli_bitwise(bytes: &[u8]) -> u32 {
     !remainder
 }
 
+/// 每条线程记下的内容总字节数的上限（[`crc32_castagnoli_table`] 的按内容复用，每条线程各一份、互不相加）：
+/// 记下一段新内容会让总数超过它时，整份记录清空再记。取 8 MiB：池级 checker 判一个崩溃状态走到的单元是几十到几百个
+/// 16 KiB 的单元（几 MiB），8 MiB 装得下一个状态走到的全部单元加上相邻状态里换掉的那几个，相邻状态之间就能复用；
+/// 重活线程数取登记的每台默认值（`.claude/heavy-thread-default`）时，一台机器上全部线程的记录合计是这个数乘线程数，压在几百 MiB。
+const REMEMBERED_CONTENT_BYTES_LIMIT_PER_THREAD: usize = 8 * 1024 * 1024;
+
+/// 一个指纹之下最多记几段内容：再记一段时挤掉最早记下的那一段。指纹撞上而内容不同的每一段都要整段逐字节比一遍，
+/// 这个数压住一次查找最多比几段（几段 16 KiB 的比对比现算一遍 16 KiB 的查表快）。
+const REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT: usize = 4;
+
+/// 指纹从内容里取几个 8 字节的字：头一个字从偏移 0 起、末一个字止于内容末尾，其余在两者之间按偏移等分。
+const FINGERPRINT_SAMPLED_WORD_COUNT: usize = 16;
+
+/// 指纹：内容长度加从内容里固定位置取的几个字。只用来挑候选，复用之前候选还要与输入整段逐字节相同。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct ContentFingerprint {
+    length_in_bytes: usize,
+    sampled_words: [u64; FINGERPRINT_SAMPLED_WORD_COUNT],
+}
+
+/// 记下的一段内容与它的 CRC-32C（查表现算出来的那个值）。
+struct RememberedChecksum {
+    content: Box<[u8]>,
+    checksum: u32,
+}
+
+/// 一条线程的按内容复用记录：指纹到候选的表，加记下的内容总字节数（等于表里全部候选 `content` 长度之和）。
+struct RememberedChecksumsOfThisThread {
+    candidates_by_fingerprint:
+        std::collections::HashMap<ContentFingerprint, Vec<RememberedChecksum>>,
+    remembered_content_bytes: usize,
+}
+
+thread_local! {
+    /// [`crc32_castagnoli_table`] 的按内容复用记录：每条线程一份，不加锁、不跨线程共用。
+    static REMEMBERED_CHECKSUMS_OF_THIS_THREAD: std::cell::RefCell<RememberedChecksumsOfThisThread> =
+        std::cell::RefCell::new(RememberedChecksumsOfThisThread {
+            candidates_by_fingerprint: std::collections::HashMap::new(),
+            remembered_content_bytes: 0,
+        });
+}
+
+#[cfg(test)]
+thread_local! {
+    /// 单测把这条线程的记录上限缩小用；`None` 取 [`REMEMBERED_CONTENT_BYTES_LIMIT_PER_THREAD`]。
+    static REMEMBERED_CONTENT_BYTES_LIMIT_OVERRIDE_OF_THIS_THREAD: std::cell::Cell<Option<usize>> =
+        const { std::cell::Cell::new(None) };
+    /// 这条线程上查表现算了几次（复用那一支不加）。
+    static FRESH_COMPUTATIONS_OF_THIS_THREAD: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// 这条线程上指纹相同、逐字节比对不同的候选比了几次。
+    static SAME_FINGERPRINT_OTHER_CONTENT_COMPARISONS_OF_THIS_THREAD: std::cell::Cell<u64> =
+        const { std::cell::Cell::new(0) };
+}
+
 /// 查表的 CRC-32C（反射多项式 0x82F63B78，一次一个字节、一张 256 项的表）：与按位那一份逐字节同值
 /// （单测 `table_crc32c_agrees_with_the_bitwise_crc32c_on_every_prefix_length` 对拍），
-/// 与实现那份仍是不同写法（实现在 x86_64 上查到 SSE4.2 走硬件 `crc32` 指令，别处走 slicing-by-8）；池级 checker 在崩溃点重放的
-/// 每个崩溃状态上要算几十个单元，按位算太慢。
+/// 与实现那份是不同写法（实现在 x86_64 上查到 SSE4.2 走硬件 `crc32` 指令，别处走 slicing-by-8）。
+///
+/// 按内容复用：池级 checker 在崩溃点重放的每个崩溃状态上都要算走到的每个单元，相邻崩溃状态只差一次写，绝大多数单元逐字节相同。
+/// 每条线程记下算过的内容与结果（`REMEMBERED_CHECKSUMS_OF_THIS_THREAD`），按指纹（长度加固定位置的字）挑候选，
+/// 候选与输入**整段逐字节相同**才取记下的值，所以取到的值就是对同一串字节现算的值；没有逐字节相同的候选就现算、记下。
+/// 记下的内容总字节数到 `REMEMBERED_CONTENT_BYTES_LIMIT_PER_THREAD` 整份清空。
+/// 新调用点不用另写缓存：经这个函数算的都走这一份记录（`checksum_field_holds` 同）。
 #[must_use]
 pub fn crc32_castagnoli_table(bytes: &[u8]) -> u32 {
     static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
-    let table = TABLE.get_or_init(|| {
-        let mut entries = [0u32; 256];
-        for (index, entry) in entries.iter_mut().enumerate() {
-            let mut remainder = u32::try_from(index).expect("小于 256");
-            for _bit in 0..8 {
-                remainder = if remainder & 1 == 1 {
-                    (remainder >> 1) ^ 0x82F6_3B78
-                } else {
-                    remainder >> 1
-                };
+    const WORD_BYTES: usize = 8;
+    #[cfg(not(test))]
+    let remembered_content_bytes_limit = REMEMBERED_CONTENT_BYTES_LIMIT_PER_THREAD;
+    #[cfg(test)]
+    let remembered_content_bytes_limit = REMEMBERED_CONTENT_BYTES_LIMIT_OVERRIDE_OF_THIS_THREAD
+        .with(std::cell::Cell::get)
+        .unwrap_or(REMEMBERED_CONTENT_BYTES_LIMIT_PER_THREAD);
+    let fingerprint = ContentFingerprint {
+        length_in_bytes: bytes.len(),
+        sampled_words: std::array::from_fn(|word_index| {
+            let word_start = if bytes.len() <= WORD_BYTES {
+                0
+            } else {
+                (bytes.len() - WORD_BYTES) * word_index / (FINGERPRINT_SAMPLED_WORD_COUNT - 1)
+            };
+            let word_end = bytes.len().min(word_start + WORD_BYTES);
+            let mut word = [0u8; WORD_BYTES];
+            word[..word_end - word_start].copy_from_slice(&bytes[word_start..word_end]);
+            u64::from_le_bytes(word)
+        }),
+    };
+    REMEMBERED_CHECKSUMS_OF_THIS_THREAD.with(|remembered_record_of_this_thread| {
+        let mut remembered = remembered_record_of_this_thread.borrow_mut();
+        if let Some(candidates) = remembered.candidates_by_fingerprint.get(&fingerprint) {
+            let same_content_position = candidates
+                .iter()
+                .position(|candidate| *candidate.content == *bytes);
+            #[cfg(test)]
+            SAME_FINGERPRINT_OTHER_CONTENT_COMPARISONS_OF_THIS_THREAD.with(|comparisons| {
+                let compared = same_content_position.unwrap_or(candidates.len());
+                comparisons
+                    .set(comparisons.get() + u64::try_from(compared).expect("候选数装得进 u64"));
+            });
+            if let Some(position) = same_content_position {
+                return candidates[position].checksum;
             }
-            *entry = remainder;
         }
-        entries
-    });
-    let mut remainder = !0u32;
-    for byte in bytes {
-        remainder = table[usize::from(u8::try_from(remainder & 0xFF).expect("低 8 位") ^ *byte)]
-            ^ (remainder >> 8);
-    }
-    !remainder
+        let table = TABLE.get_or_init(|| {
+            let mut entries = [0u32; 256];
+            for (index, entry) in entries.iter_mut().enumerate() {
+                let mut remainder = u32::try_from(index).expect("小于 256");
+                for _bit in 0..8 {
+                    remainder = if remainder & 1 == 1 {
+                        (remainder >> 1) ^ 0x82F6_3B78
+                    } else {
+                        remainder >> 1
+                    };
+                }
+                *entry = remainder;
+            }
+            entries
+        });
+        let mut remainder = !0u32;
+        for byte in bytes {
+            remainder = table
+                [usize::from(u8::try_from(remainder & 0xFF).expect("低 8 位") ^ *byte)]
+                ^ (remainder >> 8);
+        }
+        let checksum = !remainder;
+        #[cfg(test)]
+        FRESH_COMPUTATIONS_OF_THIS_THREAD.with(|fresh| fresh.set(fresh.get() + 1));
+        if bytes.len() > remembered_content_bytes_limit {
+            return checksum;
+        }
+        if remembered.remembered_content_bytes + bytes.len() > remembered_content_bytes_limit {
+            remembered.candidates_by_fingerprint.clear();
+            remembered.remembered_content_bytes = 0;
+        }
+        let candidates = remembered
+            .candidates_by_fingerprint
+            .entry(fingerprint)
+            .or_default();
+        let evicted_content_bytes =
+            if candidates.len() >= REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT {
+                candidates.remove(0).content.len()
+            } else {
+                0
+            };
+        candidates.push(RememberedChecksum {
+            content: bytes.into(),
+            checksum,
+        });
+        remembered.remembered_content_bytes =
+            remembered.remembered_content_bytes - evicted_content_bytes + bytes.len();
+        checksum
+    })
 }
 
 pub(crate) fn checksum_field_holds(bytes: &[u8], cover_end: usize, field_offset: usize) -> bool {
@@ -1227,10 +1351,324 @@ mod tests {
         }
     }
 
+    /// 在一条新起的线程上跑 `body_on_the_fresh_thread`：按内容复用的记录与几个计数都是每条线程一份，新线程上从空的起，
+    /// 单测之间、单测与同一进程里别的单测之间都看不见对方记下的内容；`body_on_the_fresh_thread` 里的断言红了，原样的 panic 在调用方这一侧接着抛。
+    fn on_a_fresh_thread<Outcome: Send + 'static>(
+        body_on_the_fresh_thread: impl FnOnce() -> Outcome + Send + 'static,
+    ) -> Outcome {
+        std::thread::spawn(body_on_the_fresh_thread)
+            .join()
+            .unwrap_or_else(|panic_payload| std::panic::resume_unwind(panic_payload))
+    }
+
+    /// 这条线程上查表现算过几次。
+    fn fresh_computations_of_this_thread() -> u64 {
+        FRESH_COMPUTATIONS_OF_THIS_THREAD.with(std::cell::Cell::get)
+    }
+
+    /// 这条线程上指纹相同、逐字节比对不同的候选比过几次。
+    fn same_fingerprint_other_content_comparisons_of_this_thread() -> u64 {
+        SAME_FINGERPRINT_OTHER_CONTENT_COMPARISONS_OF_THIS_THREAD.with(std::cell::Cell::get)
+    }
+
+    /// 这条线程的记录此刻的样子：表里全部候选内容的长度之和、记录自己记着的总字节数、一个指纹之下最多几个候选。
+    struct RememberedChecksumsMeasured {
+        content_bytes_summed_over_the_table: usize,
+        remembered_content_bytes_recorded: usize,
+        most_candidates_under_a_single_fingerprint: usize,
+    }
+
+    fn remembered_checksums_of_this_thread_measured() -> RememberedChecksumsMeasured {
+        REMEMBERED_CHECKSUMS_OF_THIS_THREAD.with(|remembered_record_of_this_thread| {
+            let remembered = remembered_record_of_this_thread.borrow();
+            RememberedChecksumsMeasured {
+                content_bytes_summed_over_the_table: remembered
+                    .candidates_by_fingerprint
+                    .values()
+                    .flatten()
+                    .map(|candidate| candidate.content.len())
+                    .sum(),
+                remembered_content_bytes_recorded: remembered.remembered_content_bytes,
+                most_candidates_under_a_single_fingerprint: remembered
+                    .candidates_by_fingerprint
+                    .values()
+                    .map(Vec::len)
+                    .max()
+                    .unwrap_or(0),
+            }
+        })
+    }
+
+    /// 一个节点大小（16384 字节）的单元内容：按 `seed` 起头的字节序列，不与别的 `seed` 的内容相同。
+    fn node_sized_content_seeded_by(seed: u8) -> Vec<u8> {
+        let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+        (0..node_bytes)
+            .map(|offset| {
+                let low_byte = u8::try_from(offset % 251).expect("小于 251");
+                low_byte.wrapping_mul(7).wrapping_add(seed)
+            })
+            .collect()
+    }
+
+    /// 指纹取样不落在上面的字节：16384 字节的内容取 16 个 8 字节的字，起点是 16376 × 字的序号 ÷ 15（向下取整），
+    /// 紧挨 8192 的两个字是 7642..7650 与 8733..8741，8192 落在两者之间。只改这一字节的两段指纹相同、内容不同。
+    const UNSAMPLED_MIDDLE_OFFSET_OF_A_NODE_SIZED_CONTENT: usize = 8192;
+
+    /// 与 `node_sized_content_seeded_by(seed)` 只差中间那一个不取样的字节（异或上 `middle_byte_difference`）。
+    fn node_sized_content_differing_only_in_the_unsampled_middle_byte(
+        seed: u8,
+        middle_byte_difference: u8,
+    ) -> Vec<u8> {
+        let mut content = node_sized_content_seeded_by(seed);
+        content[UNSAMPLED_MIDDLE_OFFSET_OF_A_NODE_SIZED_CONTENT] ^= middle_byte_difference;
+        content
+    }
+
+    /// 按内容复用之后，查表那一份连着调几遍、每一遍都与按位那一份逐个同值：每个前缀长度（0 到 1024 字节）、全 0 与全 0xFF 的
+    /// 16384 字节、只在中间一个不取样的字节上不同而指纹相同的两段。那一对必须各得各的值（第二段查到第一段那个候选时逐字节比对不同、
+    /// 现算），且两段确实落在同一个指纹之下（指纹相同、内容不同的比对次数涨了）。
+    #[test]
+    fn table_crc32c_reusing_remembered_content_agrees_with_the_bitwise_crc32c_on_every_pass() {
+        on_a_fresh_thread(|| {
+            let prefix_source: Vec<u8> = (0..1024u32)
+                .map(|index| u8::try_from(index % 256).expect("小于 256"))
+                .collect();
+            let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+            let mut inputs: Vec<Vec<u8>> = (0..=prefix_source.len())
+                .map(|prefix_length| prefix_source[..prefix_length].to_vec())
+                .collect();
+            inputs.push(vec![0u8; node_bytes]);
+            inputs.push(vec![0xFFu8; node_bytes]);
+            let same_fingerprint_pair_start = inputs.len();
+            inputs.push(node_sized_content_seeded_by(3));
+            inputs.push(node_sized_content_differing_only_in_the_unsampled_middle_byte(3, 0x5A));
+            let bitwise_checksums: Vec<u32> = inputs
+                .iter()
+                .map(|input| crc32_castagnoli_bitwise(input))
+                .collect();
+            assert_ne!(
+                bitwise_checksums[same_fingerprint_pair_start],
+                bitwise_checksums[same_fingerprint_pair_start + 1],
+                "中间差一个字节的两段，按位算出的值不同"
+            );
+            let comparisons_before = same_fingerprint_other_content_comparisons_of_this_thread();
+            for pass in 0..3 {
+                for (input, bitwise_checksum) in inputs.iter().zip(&bitwise_checksums) {
+                    assert_eq!(
+                        crc32_castagnoli_table(input),
+                        *bitwise_checksum,
+                        "遍号 {pass}、{} 字节的输入：查表（按内容复用）与按位两份不同",
+                        input.len()
+                    );
+                }
+            }
+            assert!(
+                same_fingerprint_other_content_comparisons_of_this_thread() > comparisons_before,
+                "中间差一个字节的两段落在同一个指纹之下：查第二段时与第一段逐字节比过、比对不同"
+            );
+        });
+    }
+
+    /// 记录上限缩到 3 个单元（49152 字节）、8 段各不相同的 16384 字节内容轮着算两遍：记录到上限整份清空，
+    /// 清空前后每一次的值都与按位那一份相同；表里内容的总长度从不超过上限、与记录记着的总字节数相等；
+    /// 清空过的内容第二遍要现算（第二遍现算次数不为 0）。
+    #[test]
+    fn clearing_the_remembered_content_at_the_limit_keeps_every_checksum_equal_to_the_bitwise_crc32c(
+    ) {
+        on_a_fresh_thread(|| {
+            let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+            let shrunk_limit = 3 * node_bytes;
+            REMEMBERED_CONTENT_BYTES_LIMIT_OVERRIDE_OF_THIS_THREAD
+                .with(|limit_override| limit_override.set(Some(shrunk_limit)));
+            let inputs: Vec<Vec<u8>> = (0..8u8).map(node_sized_content_seeded_by).collect();
+            let bitwise_checksums: Vec<u32> = inputs
+                .iter()
+                .map(|input| crc32_castagnoli_bitwise(input))
+                .collect();
+            let mut fresh_computations_of_each_pass = Vec::new();
+            for pass in 0..2 {
+                let fresh_before = fresh_computations_of_this_thread();
+                for (input_index, (input, bitwise_checksum)) in
+                    inputs.iter().zip(&bitwise_checksums).enumerate()
+                {
+                    assert_eq!(
+                        crc32_castagnoli_table(input),
+                        *bitwise_checksum,
+                        "遍号 {pass}、段号 {input_index}：清空前后查表（按内容复用）与按位两份不同"
+                    );
+                    let measured = remembered_checksums_of_this_thread_measured();
+                    assert!(
+                        measured.content_bytes_summed_over_the_table <= shrunk_limit,
+                        "遍号 {pass}、段号 {input_index} 之后表里记着 {} 字节，超过上限 {shrunk_limit}",
+                        measured.content_bytes_summed_over_the_table
+                    );
+                    assert_eq!(
+                        measured.content_bytes_summed_over_the_table,
+                        measured.remembered_content_bytes_recorded,
+                        "遍号 {pass}、段号 {input_index} 之后：表里内容的总长度与记录记着的总字节数不同"
+                    );
+                }
+                fresh_computations_of_each_pass
+                    .push(fresh_computations_of_this_thread() - fresh_before);
+            }
+            assert_eq!(
+                fresh_computations_of_each_pass[0], 8,
+                "头一遍 8 段都没记过，都现算"
+            );
+            assert!(
+                fresh_computations_of_each_pass[1] > 0,
+                "记录到上限清空过，第二遍有被清掉的内容要现算（实际现算 {} 次）",
+                fresh_computations_of_each_pass[1]
+            );
+        });
+    }
+
+    /// 同一段 16384 字节的内容在同一条线程上第二次及以后调用走复用那一支（现算次数不涨），值与按位那一份相同；
+    /// 另一条线程算同一段内容时自己现算一次（各线程各一份记录），它的现算不记到这一条线程上，这一条线程之后照旧复用。
+    #[test]
+    fn the_same_content_computed_again_on_the_same_thread_is_reused_and_another_thread_computes_its_own(
+    ) {
+        on_a_fresh_thread(|| {
+            let content = node_sized_content_seeded_by(11);
+            let bitwise_checksum = crc32_castagnoli_bitwise(&content);
+            let fresh_before = fresh_computations_of_this_thread();
+            assert_eq!(crc32_castagnoli_table(&content), bitwise_checksum);
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before + 1,
+                "头一次调用现算一次"
+            );
+            for repeat in 0..5 {
+                assert_eq!(crc32_castagnoli_table(&content), bitwise_checksum);
+                assert_eq!(
+                    fresh_computations_of_this_thread(),
+                    fresh_before + 1,
+                    "重复调用号 {repeat}：同一段内容应走复用那一支，现算次数不涨"
+                );
+            }
+            let content_for_another_thread = content.clone();
+            let (checksum_on_another_thread, fresh_on_another_thread) =
+                on_a_fresh_thread(move || {
+                    let fresh_before_on_another_thread = fresh_computations_of_this_thread();
+                    let checksum = crc32_castagnoli_table(&content_for_another_thread);
+                    (
+                        checksum,
+                        fresh_computations_of_this_thread() - fresh_before_on_another_thread,
+                    )
+                });
+            assert_eq!(checksum_on_another_thread, bitwise_checksum);
+            assert_eq!(
+                fresh_on_another_thread, 1,
+                "另一条线程的记录是它自己的、从空的起：同一段内容在那里现算一次"
+            );
+            assert_eq!(crc32_castagnoli_table(&content), bitwise_checksum);
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before + 1,
+                "另一条线程的现算不记到这一条线程上，这一条线程照旧复用"
+            );
+        });
+    }
+
+    /// 同一个指纹之下的候选最多 `REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT` 个：只差中间那个不取样字节的 5 段各算一次，
+    /// 表里那个指纹之下留 4 个、记着的总字节数跟着减掉挤掉的那一段；挤掉的是最早记下的那一段（再算它要现算），
+    /// 最晚记下的那一段照旧复用；每一次的值都与按位那一份相同。
+    #[test]
+    fn a_fingerprint_keeps_at_most_the_candidate_limit_and_evicts_the_earliest_remembered_content()
+    {
+        on_a_fresh_thread(|| {
+            let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+            let inputs: Vec<Vec<u8>> = (1..=5u8)
+                .map(|middle_byte_difference| {
+                    node_sized_content_differing_only_in_the_unsampled_middle_byte(
+                        5,
+                        middle_byte_difference,
+                    )
+                })
+                .collect();
+            for input in &inputs {
+                assert_eq!(
+                    crc32_castagnoli_table(input),
+                    crc32_castagnoli_bitwise(input)
+                );
+            }
+            let measured = remembered_checksums_of_this_thread_measured();
+            assert_eq!(
+                measured.most_candidates_under_a_single_fingerprint,
+                REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT,
+                "5 段同一个指纹：留到上限 {REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT} 个"
+            );
+            assert_eq!(
+                measured.remembered_content_bytes_recorded,
+                REMEMBERED_CANDIDATES_PER_FINGERPRINT_LIMIT * node_bytes,
+                "挤掉的那一段的字节数从记着的总数里减掉"
+            );
+            assert_eq!(
+                measured.content_bytes_summed_over_the_table,
+                measured.remembered_content_bytes_recorded
+            );
+            let fresh_before = fresh_computations_of_this_thread();
+            let newest = inputs.last().expect("5 段");
+            assert_eq!(
+                crc32_castagnoli_table(newest),
+                crc32_castagnoli_bitwise(newest)
+            );
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before,
+                "最晚记下的那一段还在，复用"
+            );
+            let earliest = &inputs[0];
+            assert_eq!(
+                crc32_castagnoli_table(earliest),
+                crc32_castagnoli_bitwise(earliest)
+            );
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before + 1,
+                "最早记下的那一段被挤掉了，现算"
+            );
+        });
+    }
+
+    /// `checksum_field_holds` 把校验和字段清零的那份拷贝交给 `crc32_castagnoli_table`，走同一份按内容复用的记录：
+    /// 同一个系统配置槽连判两次，都判成立，第二次不现算。
+    #[test]
+    fn checksum_field_holds_on_the_same_slot_twice_reuses_the_remembered_checksum_the_second_time()
+    {
+        on_a_fresh_thread(|| {
+            let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+            let slot = system_configuration_slot_with_the_first_incompat_byte(
+                INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT,
+            );
+            let fresh_before = fresh_computations_of_this_thread();
+            assert!(checksum_field_holds(
+                &slot,
+                slot_bytes,
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET
+            ));
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before + 1,
+                "头一次判：清零校验和字段的那份拷贝现算一次"
+            );
+            assert!(checksum_field_holds(
+                &slot,
+                slot_bytes,
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET
+            ));
+            assert_eq!(
+                fresh_computations_of_this_thread(),
+                fresh_before + 1,
+                "第二次判同一个槽：清零后的拷贝逐字节相同，取记下的值，不现算"
+            );
+        });
+    }
+
     /// 偏移 301 的节点大小（几何段开头那 4 字节）改成 8192、整槽校验和照 checker 自己的算法重封：magic、校验和、格式版本、incompat 位
     /// 都过，拒它的只能是节点大小那一判（C840）；改回 16384 照收。
     #[test]
-    fn a_system_configuration_slot_whose_node_size_is_not_the_format_constant_is_refused_by_name() {
+    fn system_configuration_slot_whose_node_size_is_not_the_format_constant_is_refused_by_name() {
         let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
         let slot_declaring_node_bytes = |node_bytes: u32| {
             let mut slot = vec![0u8; slot_bytes];
@@ -1320,7 +1758,7 @@ mod tests {
 
     /// 只带位 1、不带位 2（0x02）：位 2 是这一版布局身份的一部分，拒。
     #[test]
-    fn a_first_incompat_byte_without_bit_two_is_an_unknown_incompat_bit() {
+    fn first_incompat_byte_without_bit_two_is_an_unknown_incompat_bit() {
         assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
             INCOMPAT_FIRST_SSD_LINE_WITH_ROLLBACK_FLOOR_AND_UNMOUNT_MARKER_BIT,
             "只带位 1",
@@ -1329,7 +1767,7 @@ mod tests {
 
     /// 只带位 2、不带布局身份位 1（0x04）：拒。
     #[test]
-    fn a_first_incompat_byte_without_bit_one_is_an_unknown_incompat_bit() {
+    fn first_incompat_byte_without_bit_one_is_an_unknown_incompat_bit() {
         assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
             INCOMPAT_INODE_RECORD_TRUNCATION_FIELD_BIT,
             "只带位 2",
@@ -1338,7 +1776,7 @@ mod tests {
 
     /// 这一版布局之外再带没分出去的位 3（0x0E）：拒。
     #[test]
-    fn a_first_incompat_byte_carrying_an_unassigned_bit_is_an_unknown_incompat_bit() {
+    fn first_incompat_byte_carrying_an_unassigned_bit_is_an_unknown_incompat_bit() {
         assert_the_first_incompat_byte_is_an_unknown_incompat_bit(
             INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT | 0x08,
             "再带位 3",

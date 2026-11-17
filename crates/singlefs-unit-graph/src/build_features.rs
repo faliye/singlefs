@@ -115,8 +115,8 @@ fn environment_name_of(name: &str) -> String {
     name.to_ascii_uppercase().replace('-', "_")
 }
 
-/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`features_with_their_cfg` 说开着的那几个，按清单里的名字排好）。
-/// `features_with_their_cfg` 是它构建脚本里逐个写的（特性名、`cfg!(feature = "<名>")`）：cargo 编构建脚本时带着本包这一次开了的特性的 cfg，
+/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`features_with_their_conditional_compilation_flags` 说开着的那几个，按清单里的名字排好）。
+/// `features_with_their_conditional_compilation_flags` 是它构建脚本里逐个写的（特性名、`cfg!(feature = "<名>")`）：cargo 编构建脚本时带着本包这一次开了的特性的 cfg，
 /// 并过之后的，别的包并上来的也在里面；不读进程环境里的 `CARGO_FEATURE_*`（外面带进来的同名变量分不出）。
 ///
 /// # Errors
@@ -124,11 +124,11 @@ fn environment_name_of(name: &str) -> String {
 pub fn features_of_the_crate_being_built(
     workspace: &Workspace,
     crate_being_built: CrateIndex,
-    features_with_their_cfg: &[(&str, bool)],
+    features_with_their_conditional_compilation_flags: &[(&str, bool)],
 ) -> Result<Vec<String>, BuildFeaturesError> {
     let workspace_crate = &workspace.crates[crate_being_built.0];
     let features_of_the_manifest = &workspace_crate.manifest.features;
-    let names_in_the_table: BTreeSet<&str> = features_with_their_cfg
+    let names_in_the_table: BTreeSet<&str> = features_with_their_conditional_compilation_flags
         .iter()
         .map(|(feature, _)| *feature)
         .collect();
@@ -152,7 +152,7 @@ pub fn features_of_the_crate_being_built(
     Ok(features_of_the_manifest
         .keys()
         .filter(|feature| {
-            features_with_their_cfg
+            features_with_their_conditional_compilation_flags
                 .iter()
                 .any(|(name, is_enabled_by_cargo)| {
                     *name == feature.as_str() && *is_enabled_by_cargo
@@ -267,6 +267,17 @@ pub fn features_enabled_on_the_dependencies(
 #[path = "../../singlefs-core/build.rs"]
 mod singlefs_core_build_script;
 
+/// `singlefs-background-gpu` 的构建脚本本身，只在单测里编进来读它的特性表（`tests::the_background_gpu_build_script_lists_every_feature_of_its_manifest`）。
+/// 本包没有 `tests-on-a-real-gpu`，表里那一格的 cfg 在这里恒为假；构建脚本的 `main` 在这里用不上。
+#[cfg(test)]
+#[allow(
+    dead_code,
+    unexpected_cfgs,
+    reason = "构建脚本的 main 在单测里不调；它写的 cfg!(feature = \"tests-on-a-real-gpu\") 是 singlefs-background-gpu 的特性，本包没有这个特性"
+)]
+#[path = "../../singlefs-background-gpu/build.rs"]
+mod singlefs_background_gpu_build_script;
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroUsize;
@@ -366,7 +377,7 @@ mod tests {
     /// 场景：建一棵小工作区，作用域照常走完。预期：走完之前根在，走完之后根不在。
     /// 判别力（`crates/mutations.tsv`）：小工作区的 Drop 不删，根还在，这条红。
     #[test]
-    fn a_fixture_workspace_is_gone_once_the_scope_ends_normally() {
+    fn fixture_workspace_is_gone_once_the_scope_ends_normally() {
         let root = {
             let workspace = FixtureWorkspace::new(&[("crates/judging/src/lib.rs", "")]);
             assert!(
@@ -385,7 +396,7 @@ mod tests {
     /// 预期：panic 接住之后，写了的那一半不在了（同一进程里别的用例的小工作区并行建着，按头一份夹具的内容认这一棵）。
     /// 判别力（`crates/mutations.tsv`）：小工作区的 Drop 不删，半棵还在，这条红。
     #[test]
-    fn a_fixture_workspace_half_written_when_a_panic_hits_is_gone() {
+    fn fixture_workspace_half_written_when_a_panic_hits_is_gone() {
         let panicked = std::panic::catch_unwind(|| {
             FixtureWorkspace::new(&[
                 ("crates/judging/src/lib.rs", HALF_WRITTEN_FIXTURE_TEXT),
@@ -466,7 +477,7 @@ mod tests {
     /// 只编判器的包（计数没开）与和脚手架一起编（脚手架的 dev 依赖把计数并上来）两种编法：判器闭包里计数那个原子的真值分别是
     /// 假与真，键各是那一种编法编出来的代码该有的那一把——开的那一把等于把计数特性写进判器对依赖的 `features` 之后算的键。
     #[test]
-    fn a_feature_another_package_unified_onto_the_dependency_flips_its_atom_and_the_key() {
+    fn feature_another_package_unified_onto_the_dependency_flips_its_atom_and_the_key() {
         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
         let workspace = fixture.load();
         let (alone, alone_key) =
@@ -568,7 +579,7 @@ mod tests {
 
     /// 带特性的直接依赖没交出那一行：交错误，不当成没开。
     #[test]
-    fn a_direct_dependency_with_features_that_reported_nothing_is_an_error() {
+    fn direct_dependency_with_features_that_reported_nothing_is_an_error() {
         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
         let workspace = fixture.load();
         assert_eq!(
@@ -586,7 +597,7 @@ mod tests {
 
     /// 交出的名字对不上清单里的特性：交错误。
     #[test]
-    fn a_reported_feature_missing_from_the_manifest_is_an_error() {
+    fn reported_feature_missing_from_the_manifest_is_an_error() {
         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
         let workspace = fixture.load();
         assert_eq!(
@@ -604,7 +615,7 @@ mod tests {
 
     /// 带特性的包只经别的包间接依赖：cargo 不把它的元数据交给这个构建脚本，交错误。
     #[test]
-    fn a_dependency_with_features_reached_only_through_another_package_is_an_error() {
+    fn dependency_with_features_reached_only_through_another_package_is_an_error() {
         let fixture = FixtureWorkspace::new(&[
             ("crates/counting-basis/Cargo.toml", COUNTING_MANIFEST),
             ("crates/counting-basis/src/lib.rs", COUNTING_LIBRARY),
@@ -632,7 +643,7 @@ mod tests {
 
     /// 带特性的直接依赖没写 links：交错误。
     #[test]
-    fn a_direct_dependency_with_features_but_without_links_is_an_error() {
+    fn direct_dependency_with_features_but_without_links_is_an_error() {
         let manifest_without_links = COUNTING_MANIFEST.replace("links = \"counting-basis\"\n", "");
         let fixture = FixtureWorkspace::new(&[
             (
@@ -684,7 +695,7 @@ mod tests {
 
     /// 特性表与清单 `[features]` 不是同一组名字：清单里有、表里漏写的，表里写了、清单里没有的，都交错误、逐个点名，不按「没开」算。
     #[test]
-    fn a_feature_table_that_disagrees_with_the_manifest_is_an_error() {
+    fn feature_table_that_disagrees_with_the_manifest_is_an_error() {
         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
         let workspace = fixture.load();
         let counting_crate = workspace
@@ -728,7 +739,7 @@ mod tests {
         );
     }
 
-    /// `singlefs-core` 清单 `[features]` 里的每个特性在它构建脚本的特性表（`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`）里恰好一行、
+    /// `singlefs-core` 清单 `[features]` 里的每个特性在它构建脚本的特性表（`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS`）里恰好一行、
     /// 表里没有清单之外的名字（`crates/singlefs-core/build.rs` 文件头点名的这一条）。构建脚本只读 cfg、构建时自己不比：清单加了特性而表没加，
     /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，`cargo build` 与验证包的构建都不报。
     /// 表编进来读（同一份源码），清单照原文解（`manifest::parse_crate_manifest`）。
@@ -739,7 +750,7 @@ mod tests {
         let names_in_the_manifest: Vec<&str> =
             manifest.features.keys().map(String::as_str).collect();
         let mut names_in_the_table: Vec<&str> =
-            super::singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG
+            super::singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
                 .iter()
                 .map(|(feature, _)| *feature)
                 .collect();
@@ -751,6 +762,55 @@ mod tests {
         assert_eq!(
             names_in_the_table, names_in_the_manifest,
             "核心层构建脚本的特性表与清单 [features] 逐个相同"
+        );
+    }
+
+    /// `singlefs-background-gpu` 的清单与构建脚本，取法同 [`CORE_MANIFEST_TEXT`]。
+    const BACKGROUND_GPU_MANIFEST_TEXT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../singlefs-background-gpu/Cargo.toml"
+    ));
+    const BACKGROUND_GPU_BUILD_SCRIPT_TEXT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../singlefs-background-gpu/build.rs"
+    ));
+
+    /// 产品 GPU 包那一侧的约定与这里读的对得上：清单写了 links、构建脚本照 [`ENABLED_FEATURES_METADATA_KEY`] 打元数据
+    /// （它的测试包的构建脚本经 [`features_enabled_on_the_dependencies`] 读，算对拍里参照一侧的判法单元键）。
+    #[test]
+    fn the_background_gpu_build_script_reports_under_the_key_read_here() {
+        let manifest = crate::manifest::parse_crate_manifest(BACKGROUND_GPU_MANIFEST_TEXT)
+            .expect("产品 GPU 包清单读得了");
+        assert_eq!(manifest.links.as_deref(), Some("singlefs-background-gpu"));
+        assert!(
+            BACKGROUND_GPU_BUILD_SCRIPT_TEXT.contains(&format!(
+                "\"cargo::metadata={ENABLED_FEATURES_METADATA_KEY}={{}}\""
+            )),
+            "产品 GPU 包构建脚本照 {ENABLED_FEATURES_METADATA_KEY} 交出特性"
+        );
+    }
+
+    /// 产品 GPU 包清单 `[features]` 里的每个特性在它构建脚本的特性表里恰好一行、表里没有清单之外的名字：清单加了特性而表没加，
+    /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，构建不报。
+    #[test]
+    fn the_background_gpu_build_script_lists_every_feature_of_its_manifest() {
+        let manifest = crate::manifest::parse_crate_manifest(BACKGROUND_GPU_MANIFEST_TEXT)
+            .expect("产品 GPU 包清单读得了");
+        let names_in_the_manifest: Vec<&str> =
+            manifest.features.keys().map(String::as_str).collect();
+        let mut names_in_the_table: Vec<&str> =
+            super::singlefs_background_gpu_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
+                .iter()
+                .map(|(feature, _)| *feature)
+                .collect();
+        names_in_the_table.sort_unstable();
+        assert!(
+            !names_in_the_manifest.is_empty(),
+            "产品 GPU 包清单 [features] 里至少有 tests-on-a-real-gpu：{names_in_the_manifest:?}"
+        );
+        assert_eq!(
+            names_in_the_table, names_in_the_manifest,
+            "产品 GPU 包构建脚本的特性表与清单 [features] 逐个相同"
         );
     }
 }

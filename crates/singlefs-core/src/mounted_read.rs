@@ -45,16 +45,17 @@ use crate::records::{
 };
 use crate::recovery::{
     choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
+    choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot,
     fall_back_judged_on_the_three_readers,
     inode_record_is_not_below_the_separator_key_and_the_container,
     inode_records_of_the_leaf_ascend_after_the_leaves_before,
     inode_tree_root_key_range_is_the_subtree_coverage,
     read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
     read_unit_via_locations, replay_journal, scan_journal,
-    tree_table_entries_each_kind_at_most_once, FailureKindForTheFallBack, JournalScanReport,
-    MappedTreeNodeClass, NamedUnitVerification, PoolReader,
-    PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition, RecoveryFailure,
-    TreeTableEntriesRefusal,
+    tree_table_entries_each_kind_at_most_once, ContainerNumberOfAnInodeLeaf,
+    FailureKindForTheFallBack, JournalScanReport, MappedTreeNodeClass, NamedUnitVerification,
+    PoolReader, PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition, RecoveryFailure,
+    SeparatorKeyOfAnInodeLeaf, TreeTableEntriesRefusal,
 };
 use crate::root_record::RootRecord;
 use crate::transaction::MultiLevelCodeTwoTree;
@@ -368,6 +369,8 @@ pub struct MountedPoolForRead {
 }
 
 /// 打开挂载态：把根记录到树表条目到两棵用户可见的树这一段读回内存，之后按偏移读不再碰它们。
+/// 这是只读语义的那一条路：读者读到只坏一份只计数（[`ReadPathObservation::data_unit_reads_with_one_copy_failing`]、报给读者）、不搬，不看同一个池上开没开着可写挂载；
+/// 可写挂载期间用户读文件经 `mounted_session::MountedSession::read_the_file`（D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」）。
 ///
 /// 读的次序：中央映射树（自举豁免，只按父指针里的位置条目读，D19（块指针的结构与宽度预算） 已定项 8；多层时整棵读进来）→ 树表（同样豁免）
 /// → 树表条目 → extent 树根兼叶 → inode 树根 → 每一片 inode 叶容器。
@@ -570,9 +573,9 @@ pub fn open_pool_for_read(
             // 记录号不小于分隔 key 与容器号（I-9.4 第一句，分隔 key 那一半是 I-9.12 第二句）：与冷走读、可写挂载重建、快照冷读同一个判法，
             // 少了这一判，只读挂载会收下另三个读者都拒的一版。
             inode_record_is_not_below_the_separator_key_and_the_container(
-                record.inode,
-                separator_key,
-                identity_in_the_entry.container,
+                InodeNumber(record.inode),
+                SeparatorKeyOfAnInodeLeaf(separator_key),
+                ContainerNumberOfAnInodeLeaf(identity_in_the_entry.container),
             )?;
             records_of_the_container.push(record);
         }
@@ -641,14 +644,43 @@ pub struct MountedReadOnly {
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
 /// 崩溃点重放的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
-/// 枚举那一半归验证包，由主 agent 经门禁 crash-point-replay 跑）。
+/// 枚举那一半归验证包，由主 agent 经门禁 crash-point-replay 跑）。系统配置不筛 fsid；管理员知道本池 fsid 的用 [`mount_read_only_of_the_pool`]。
 ///
 /// # Errors
 /// 见 [`MountReadOnlyFailure`]。
 pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, MountReadOnlyFailure> {
-    let system_configuration_choice =
+    mount_read_only_from_the_system_configuration_choice(
+        reader,
         choose_system_configuration_naming_devices_without_a_mountable_slot(reader)
-            .map_err(MountReadOnlyFailure::Recovery)?;
+            .map_err(MountReadOnlyFailure::Recovery)?,
+    )
+}
+
+/// 带本池 fsid 的只读挂载：与 [`mount_read_only`] 同一条路径，系统配置只从自述 fsid 是 `filesystem_identifier_of_the_pool` 的槽里择
+/// （`recovery::choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot`，与可写挂载同一个筛法）：
+/// 别的池的槽世代号再大也择不到，一块盘两槽都是别的池的就跳过这块盘。一个字节都不写。
+///
+/// # Errors
+/// 见 [`MountReadOnlyFailure`]；盘上没有一槽是这个 fsid 的池的报 `Recovery(RecoveryFailure::NoValidSystemConfiguration)`，不读别的池。
+pub fn mount_read_only_of_the_pool(
+    reader: &dyn PoolReader,
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> Result<MountedReadOnly, MountReadOnlyFailure> {
+    mount_read_only_from_the_system_configuration_choice(
+        reader,
+        choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot(
+            reader,
+            filesystem_identifier_of_the_pool,
+        )
+        .map_err(MountReadOnlyFailure::Recovery)?,
+    )
+}
+
+/// [`mount_read_only`] 与 [`mount_read_only_of_the_pool`] 共用的路径：系统配置已经择过。
+fn mount_read_only_from_the_system_configuration_choice(
+    reader: &dyn PoolReader,
+    system_configuration_choice: crate::recovery::SystemConfigurationChoice,
+) -> Result<MountedReadOnly, MountReadOnlyFailure> {
     let system_configuration = system_configuration_choice.system_configuration;
     let chosen_root = choose_root(reader, &system_configuration)
         .ok_or(MountReadOnlyFailure::Recovery(RecoveryFailure::NoValidRoot))?;
@@ -994,7 +1026,10 @@ impl OpenFileForRead<'_> {
             &mut observation,
         );
         // 读到一半报错（后面一个单元两份都坏、映射里没有、自描述对不上……）的那一次，报错之前已经发出的读、已经读到的只坏一份照样并进打开之后的累计：
-        // 与写入口「改动被拒时那几次读也算」同一种口径——读是真发到盘上的、坏的那一份是真读到的，计不计不看这一次调用成没成
+        // 读是真发到盘上的、坏的那一份是真读到的，计不计不看这一次调用成没成。这个累计不去重：一次调用里一个单元先按父指针的位置提示读，
+        // 提示不算数时再按中央映射读一遍（[`Self::dereference_data_unit`]），两遍发出的读都照计；只坏一份的计数不是两遍都照计：
+        // 按提示那一遍读到的只坏一份不在中央映射里这个单元的权威落点上（单元被整理搬走、提示还指旧槽）时，那一遍的这一项在并进来之前清零、不计，
+        // 映射那一遍读到的只坏一份照计。跨调用相加。
         // 这一次读自己的观测随报错丢掉，只留在累计里。
         self.mount.add_to_observation_since_open(observation);
         Ok(FileReadOutput {

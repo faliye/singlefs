@@ -329,7 +329,7 @@ mod tests {
 
     /// 同名同版本、来源不同的两个包：带来源的那一项挑得出，不带来源的挑不出（两个候选）。
     #[test]
-    fn a_dependency_item_with_a_source_picks_the_package_of_that_source_among_same_name_same_version_packages(
+    fn dependency_item_with_a_source_picks_the_package_of_that_source_among_same_name_same_version_packages(
     ) {
         let packages = parse_lock_file(
             "version = 4\n\n[[package]]\nname = \"gamma\"\nversion = \"1.0.0\"\n\
@@ -353,8 +353,8 @@ mod tests {
     }
 
     #[test]
-    fn a_dependency_item_with_a_version_picks_that_version_and_a_bare_name_needs_a_single_candidate(
-    ) {
+    fn dependency_item_with_a_version_picks_that_version_and_a_bare_name_needs_a_single_candidate()
+    {
         let packages = parse_lock_file(LOCK_TEXT).expect("夹具锁文件读得了");
         assert_eq!(
             resolve_dependency_item(&packages, "gamma 2.0.0").map(|package| &package.version[..]),
@@ -371,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn a_package_without_a_version_is_an_error() {
+    fn package_without_a_version_is_an_error() {
         assert_eq!(
             parse_lock_file("[[package]]\nname = \"alpha\"\n"),
             Err(LockFileError::PackageWithoutNameOrVersion {

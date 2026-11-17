@@ -109,7 +109,7 @@ const WRAPPED_WITH_AN_ENSURES: &str = "verus! {\nfn key_bytes_width() -> (width:
 
 const WRAPPED_WITH_AN_ENSURES_AND_A_PROOF_BLOCK: &str = "verus! {\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    proof { assert(true); }\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
 
-const WRAPPED_WITH_SPEC_AND_PROOF_FUNCTIONS_A_GHOST_LET_AND_AN_ASSERT: &str = "verus! {\nspec fn width_in_the_specification() -> int { 10 }\nproof fn lemma_width() ensures width_in_the_specification() == 10 { }\nfn key_bytes_width() -> (width: usize)\n    requires true,\n    ensures width == width_in_the_specification(),\n{\n    proof { lemma_width(); }\n    let ghost width_in_ghost_code = width_in_the_specification();\n    assert(width_in_ghost_code == 10);\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
+const WRAPPED_WITH_SPECIFICATION_AND_PROOF_FUNCTIONS_A_GHOST_LET_AND_AN_ASSERT: &str = "verus! {\nspec fn width_in_the_specification() -> int { 10 }\nproof fn lemma_width() ensures width_in_the_specification() == 10 { }\nfn key_bytes_width() -> (width: usize)\n    requires true,\n    ensures width == width_in_the_specification(),\n{\n    proof { lemma_width(); }\n    let ghost width_in_ghost_code = width_in_the_specification();\n    assert(width_in_ghost_code == 10);\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
 
 const EXECUTABLE_STRING_CHANGED: &str = "verus! {\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"11\")\n}\n}";
 
@@ -118,7 +118,7 @@ const EXECUTABLE_EXPRESSION_CHANGED: &str = "verus! {\nfn key_bytes_width() -> (
 const EXECUTABLE_ATTRIBUTE_ADDED: &str = "verus! {\n#[inline(never)]\nfn key_bytes_width() -> (width: usize)\n    ensures width == 10,\n{\n    usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect(\"10\")\n}\n}";
 
 #[test]
-fn a_comment_only_change_keeps_the_product_behavior_key() {
+fn comment_only_change_keeps_the_product_behavior_key() {
     assert!(
         !product_behavior_key_changes_under(COMMENT_ONLY),
         "只加注释：去注释之后逐字相同"
@@ -155,10 +155,11 @@ fn an_added_ensures_clause_and_proof_block_keep_the_product_behavior_key() {
 }
 
 #[test]
-fn added_spec_and_proof_functions_a_ghost_let_and_an_assert_keep_the_product_behavior_key() {
+fn added_specification_and_proof_functions_a_ghost_let_and_an_assert_keep_the_product_behavior_key()
+{
     assert!(
         !product_behavior_key_changes_under(
-            WRAPPED_WITH_SPEC_AND_PROOF_FUNCTIONS_A_GHOST_LET_AND_AN_ASSERT
+            WRAPPED_WITH_SPECIFICATION_AND_PROOF_FUNCTIONS_A_GHOST_LET_AND_AN_ASSERT
         ),
         "spec 函数、proof 函数、requires、ensures、proof 块里调引理、let ghost、assert 都剥掉，剥掉的部分点到的名字也不再是边"
     );
@@ -354,7 +355,7 @@ fn an_ordinary_parameter_added_in_the_same_place_changes_the_product_behavior_ke
 }
 
 #[test]
-fn a_ghost_parameter_and_its_ghost_argument_added_to_a_call_keep_the_product_behavior_key() {
+fn ghost_parameter_and_its_ghost_argument_added_to_a_call_keep_the_product_behavior_key() {
     assert!(
         !key_changes_between_rewrites_of_both_functions(
             JudgmentKind::ProductBehavior,
@@ -366,7 +367,7 @@ fn a_ghost_parameter_and_its_ghost_argument_added_to_a_call_keep_the_product_beh
 }
 
 #[test]
-fn a_ghost_parameter_and_its_ghost_argument_added_to_a_method_call_keep_the_product_behavior_key() {
+fn ghost_parameter_and_its_ghost_argument_added_to_a_method_call_keep_the_product_behavior_key() {
     assert!(
         !key_changes_between_rewrites_of_both_functions(
             JudgmentKind::ProductBehavior,
@@ -390,7 +391,7 @@ fn changing_an_executable_argument_changes_the_product_behavior_key() {
 }
 
 #[test]
-fn a_ghost_field_added_with_its_initialization_and_its_pattern_keeps_the_product_behavior_key() {
+fn ghost_field_added_with_its_initialization_and_its_pattern_keeps_the_product_behavior_key() {
     assert!(
         !key_changes_between_rewrites_of_both_functions(
             JudgmentKind::ProductBehavior,
@@ -458,7 +459,7 @@ fn fixture_judge_group_key(replacement: Option<&str>) -> String {
 }
 
 #[test]
-fn a_judge_group_key_is_taken_on_the_product_behavior_view() {
+fn judge_group_key_is_taken_on_the_product_behavior_view() {
     assert_eq!(
         fixture_judge_group_key(None),
         fixture_judge_group_key(Some(WRAPPED_WITH_AN_ENSURES_AND_A_PROOF_BLOCK)),

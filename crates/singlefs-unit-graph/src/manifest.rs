@@ -570,7 +570,7 @@ mod tests {
 
     /// `[lib] crate-type = ["proc-macro"]` 与 `proc-macro = true` 同义：都认成过程宏 crate。
     #[test]
-    fn a_library_declaring_the_proc_macro_crate_type_is_a_procedure_macro_crate() {
+    fn library_declaring_the_procedural_macro_crate_type_is_a_procedure_macro_crate() {
         let manifest = parse_crate_manifest(
             "[package]\nname = \"demo-macros\"\n\n[lib]\ncrate-type = [\"proc-macro\"]\n",
         )

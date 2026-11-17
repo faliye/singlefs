@@ -753,7 +753,7 @@ mod tests {
 
     /// 没有单元重写、单元数与尾部都没变（最后一批放 0 个）：整棵照抄、什么都不换下。
     #[test]
-    fn a_final_batch_releasing_nothing_carries_the_whole_extent_tree() {
+    fn final_batch_releasing_nothing_carries_the_whole_extent_tree() {
         let plan = plan_the_extent_tree_after_a_size_change(
             &extent_tree_of_a_file_without_holes(3),
             FIRST_INODE_NUMBER,
@@ -773,7 +773,7 @@ mod tests {
     /// 第 0 片叶罩的单元两版一样、照抄，第 1 片新叶与新的下段根重写，上一版那片叶（兼下段根）不被换下；从单元 100 起重写到 145 个——
     /// 第 0 片叶罩着重写的单元，叶与根都重写、上一版那一片换下。
     #[test]
-    fn a_partial_write_adding_units_carries_only_the_leaves_below_the_first_rewritten_unit() {
+    fn partial_write_adding_units_carries_only_the_leaves_below_the_first_rewritten_unit() {
         let past_a_full_leaf = plan_the_lower_segment_after_a_size_change(
             &[extent_lower_node_position(0, 0)],
             SizeChangeOfTheFile {

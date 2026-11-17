@@ -3,9 +3,9 @@
 //! 反向链 = CRC-32C(本实例内逻辑前一条记录的 496 字节头，`header_csum` 按 0 参与)，本实例第一条恒 0。
 //!
 //! 除 [`JournalBytesToWrite`] 之外整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：
-//! [`JournalRecord::to_bytes`] 交出的就是写法规格 [`JournalRecord::spec_bytes`]；[`JournalRecord::parse`] 收下一条记录当且仅当
-//! 读法规格 [`JournalRecord::spec_parse_accepts`] 成立，交回的记录逐字段等于那段字节按字段表读出来的样子
-//! （[`JournalRecord::spec_matches_the_bytes`]）；往返引理 [`JournalRecord::lemma_parse_round_trip`] 证写出来的记录读者收、读回同一条。
+//! [`JournalRecord::to_bytes`] 交出的就是写法规格 [`JournalRecord::specification_bytes`]；[`JournalRecord::parse`] 收下一条记录当且仅当
+//! 读法规格 [`JournalRecord::specification_parse_accepts`] 成立，交回的记录逐字段等于那段字节按字段表读出来的样子
+//! （[`JournalRecord::specification_matches_the_bytes`]）；往返引理 [`JournalRecord::lemma_parse_round_trip`] 证写出来的记录读者收、读回同一条。
 //! 点名项、反向链、环内偏移与环末尾的下一个槽各有自己的规格。
 
 use singlefs_format::{
@@ -26,7 +26,7 @@ use crate::checksum::*;
 use crate::pointer::*;
 // 规格与引理只在 Verus 编的时候有（平时的构建把它们擦掉），按名字引会编不过，所以整个模块引进来。
 use crate::root_record::*;
-// unit.rs 的规格与引理（spec_concatenation 一族）只在规格与证明里用，平时的构建把它们连同用处一起擦掉，所以按全路径写、不 use。
+// unit.rs 的规格与引理（specification_concatenation 一族）只在规格与证明里用，平时的构建把它们连同用处一起擦掉，所以按全路径写、不 use。
 
 verus! {
 
@@ -68,7 +68,7 @@ pub enum JournalRecordPlaceInPublish {
 
 impl JournalRecordPlaceInPublish {
     /// 写进记录标志那 1 字节的值（[`Self::record_flags_byte`] 的规格）。
-    pub open spec fn spec_record_flags_byte(self) -> u8 {
+    pub open spec fn specification_record_flags_byte(self) -> u8 {
         match self {
             JournalRecordPlaceInPublish::LastRecordOfThePublish => JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH,
             JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow => 0,
@@ -76,7 +76,7 @@ impl JournalRecordPlaceInPublish {
     }
 
     /// 盘上那 1 字节读回的位置（[`Self::from_record_flags_byte`] 的规格）：0 与 1 之外 ⇒ `None`。
-    pub open spec fn spec_of_record_flags_byte(record_flags_byte: u8) -> Option<Self> {
+    pub open spec fn specification_of_record_flags_byte(record_flags_byte: u8) -> Option<Self> {
         if record_flags_byte == 0 {
             Some(JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow)
         } else if record_flags_byte == JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH {
@@ -89,7 +89,7 @@ impl JournalRecordPlaceInPublish {
     /// 往返：写进记录标志的值读回同一个位置。
     pub proof fn lemma_record_flags_byte_round_trip(self)
         ensures
-            Self::spec_of_record_flags_byte(self.spec_record_flags_byte()) == Some(self),
+            Self::specification_of_record_flags_byte(self.specification_record_flags_byte()) == Some(self),
     {
     }
 
@@ -97,7 +97,7 @@ impl JournalRecordPlaceInPublish {
     #[must_use]
     pub const fn record_flags_byte(self) -> (record_flags_byte: u8)
         ensures
-            record_flags_byte == self.spec_record_flags_byte(),
+            record_flags_byte == self.specification_record_flags_byte(),
     {
         match self {
             JournalRecordPlaceInPublish::LastRecordOfThePublish => {
@@ -111,7 +111,7 @@ impl JournalRecordPlaceInPublish {
     #[must_use]
     pub const fn from_record_flags_byte(record_flags_byte: u8) -> (place: Option<Self>)
         ensures
-            place == Self::spec_of_record_flags_byte(record_flags_byte),
+            place == Self::specification_of_record_flags_byte(record_flags_byte),
     {
         // 按常量的 match 臂写成 if / else if：0 与位 0 两个取值收，其余照旧当损坏。
         if record_flags_byte == 0 {
@@ -167,17 +167,17 @@ pub struct NamedUnit {
 }
 
 /// 10 个字节拼成的定长数组（规格里从一段字节取回 key 尾段）：`bytes` 恰好 10 个字节时就是视图等于它的那一个数组。
-pub open spec fn spec_ten_byte_array_of(bytes: Seq<u8>) -> [u8; 10] {
+pub open spec fn specification_ten_byte_array_of(bytes: Seq<u8>) -> [u8; 10] {
     choose|array: [u8; 10]| array@ == bytes
 }
 
 /// 一个 10 字节数组的视图取回的就是它自己（数组按逐元素相等判相等）。
 pub proof fn lemma_ten_byte_array_of_a_view(array: [u8; 10])
     ensures
-        spec_ten_byte_array_of(array@) == array,
+        specification_ten_byte_array_of(array@) == array,
 {
     broadcast use vstd::array::group_array_axioms;
-    let chosen = spec_ten_byte_array_of(array@);
+    let chosen = specification_ten_byte_array_of(array@);
     assert(exists|candidate: [u8; 10]| candidate@ == array@);
     assert(chosen@ == array@);
     assert forall|position: int| 0 <= position < 10 implies chosen[position] == array[position] by {
@@ -194,31 +194,31 @@ impl NamedUnit {
     }
 
     /// 盘上 56 字节：两条位置条目 28、类标签 1、出生树 8、出生 txg 8、key 尾段 10、flags 1（写 0）。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        spec_location_entries_bytes(self.locations) + little_endian_bytes(self.unit_class as nat, 1) + little_endian_bytes(
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        specification_location_entries_bytes(self.locations) + little_endian_bytes(self.unit_class as nat, 1) + little_endian_bytes(
             self.birth_tree.0 as nat,
             8,
         ) + little_endian_bytes(self.birth_txg.0 as nat, 8) + self.key_tail@ + little_endian_bytes(0, 1)
     }
 
     /// 从 `source` 的 `position` 起读 56 字节解成的点名项（flags 那 1 字节读者不看）。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         NamedUnit {
             locations: [
-                LocationEntry::spec_decode_at(source, position),
-                LocationEntry::spec_decode_at(source, position + 14),
+                LocationEntry::specification_decode_at(source, position),
+                LocationEntry::specification_decode_at(source, position + 14),
             ],
             unit_class: little_endian_value(source.subrange(position + 28, position + 29)) as u8,
             birth_tree: TreeIdentifier(little_endian_value(source.subrange(position + 29, position + 37)) as u64),
             birth_txg: CheckpointTxg(little_endian_value(source.subrange(position + 37, position + 45)) as u64),
-            key_tail: spec_ten_byte_array_of(source.subrange(position + 45, position + 55)),
+            key_tail: specification_ten_byte_array_of(source.subrange(position + 45, position + 55)),
         }
     }
 
     /// 写成的点名项恰好 56 字节。
     pub proof fn lemma_bytes_have_the_entry_width(self)
         ensures
-            self.spec_bytes().len() == JOURNAL_NAMED_ENTRY_BYTES,
+            self.specification_bytes().len() == JOURNAL_NAMED_ENTRY_BYTES,
     {
     }
 
@@ -228,12 +228,12 @@ impl NamedUnit {
             self.is_encodable(),
             0 <= position,
             position + 56 <= source.len(),
-            source.subrange(position, position + 56) == self.spec_bytes(),
+            source.subrange(position, position + 56) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
+            Self::specification_decode_at(source, position) == self,
     {
         lemma_little_endian_capacities();
-        let locations = spec_location_entries_bytes(self.locations);
+        let locations = specification_location_entries_bytes(self.locations);
         let class = little_endian_bytes(self.unit_class as nat, 1);
         let birth_tree = little_endian_bytes(self.birth_tree.0 as nat, 8);
         let birth_txg = little_endian_bytes(self.birth_txg.0 as nat, 8);
@@ -244,15 +244,15 @@ impl NamedUnit {
         lemma_split_a_concatenated_range(source, position, locations + class + birth_tree, birth_txg);
         lemma_split_a_concatenated_range(source, position, locations + class, birth_tree);
         lemma_split_a_concatenated_range(source, position, locations, class);
-        lemma_split_a_concatenated_range(source, position, self.locations[0].spec_bytes(), self.locations[1].spec_bytes());
+        lemma_split_a_concatenated_range(source, position, self.locations[0].specification_bytes(), self.locations[1].specification_bytes());
         self.locations[0].lemma_decode_at_round_trip(source, position);
         self.locations[1].lemma_decode_at_round_trip(source, position + 14);
         lemma_ten_byte_array_of_a_view(self.key_tail);
-        assert(Self::spec_decode_at(source, position).locations =~= self.locations);
+        assert(Self::specification_decode_at(source, position).locations =~= self.locations);
     }
 
     /// 重放凑出的中央映射 key（[`Self::mapping_key`] 的规格）：类标签 1、出生树 8、出生 txg 8、key 尾段 10，共 27 字节。
-    pub open spec fn spec_mapping_key(self) -> Seq<u8> {
+    pub open spec fn specification_mapping_key(self) -> Seq<u8> {
         little_endian_bytes(self.unit_class as nat, 1) + little_endian_bytes(self.birth_tree.0 as nat, 8) + little_endian_bytes(
             self.birth_txg.0 as nat,
             8,
@@ -267,7 +267,7 @@ impl NamedUnit {
             self.is_encodable(),
         ensures
             final(writer).is_well_formed(),
-            final(writer).written() == old(writer).written() + self.spec_bytes(),
+            final(writer).written() == old(writer).written() + self.specification_bytes(),
             final(writer).total_bytes() == old(writer).total_bytes(),
     {
         let start = writer.position();
@@ -279,7 +279,7 @@ impl NamedUnit {
         writer.put_u64(self.birth_txg.0);
         writer.put(&self.key_tail);
         writer.put_u8(0);
-        assert(writer.written() =~= old(writer).written() + self.spec_bytes());
+        assert(writer.written() =~= old(writer).written() + self.specification_bytes());
         // assert_eq! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert! 加一句话。
         assert!(
             writer.position() - start == usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56"),
@@ -294,7 +294,7 @@ impl NamedUnit {
             old(reader).source().len() <= usize::MAX,
         ensures
             final(reader).advanced_by(old(reader), JOURNAL_NAMED_ENTRY_BYTES as nat),
-            named == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            named == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
             named.is_encodable(),
     {
         let locations = [
@@ -317,7 +317,7 @@ impl NamedUnit {
             birth_txg,
             key_tail,
         };
-        assert(named.locations =~= Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int).locations);
+        assert(named.locations =~= Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int).locations);
         named
     }
 
@@ -325,7 +325,7 @@ impl NamedUnit {
     #[must_use]
     pub fn mapping_key(&self) -> (key: Vec<u8>)
         ensures
-            key@ == self.spec_mapping_key(),
+            key@ == self.specification_mapping_key(),
     {
         let mut writer = ByteWriter::new(usize::try_from(MAPPING_KEY_BYTES).expect("27"));
         writer.put_u8(self.unit_class);
@@ -333,7 +333,7 @@ impl NamedUnit {
         writer.put_u64(self.birth_txg.0);
         writer.put(&self.key_tail);
         let key = writer.into_bytes();
-        assert(key@ =~= self.spec_mapping_key());
+        assert(key@ =~= self.specification_mapping_key());
         key
     }
 }
@@ -375,8 +375,8 @@ pub fn back_chain_of(previous_record_bytes: &[u8]) -> (back_chain: u32)
     requires
         previous_record_bytes@.len() >= JOURNAL_HEADER_BYTES,
     ensures
-        back_chain == spec_crc32_castagnoli(
-            spec_covered_with_the_field_zeroed(
+        back_chain == specification_crc32_castagnoli(
+            specification_covered_with_the_field_zeroed(
                 previous_record_bytes@,
                 JOURNAL_HEADER_BYTES as int,
                 JOURNAL_HEADER_CHECKSUM_OFFSET as int,
@@ -393,7 +393,7 @@ pub fn back_chain_of(previous_record_bytes: &[u8]) -> (back_chain: u32)
     header_writer.put(&previous_record_bytes[JOURNAL_HEADER_CHECKSUM_OFFSET + field_width..header_bytes]);
     let header = header_writer.into_bytes();
     proof {
-        assert(header@ =~= spec_covered_with_the_field_zeroed(
+        assert(header@ =~= specification_covered_with_the_field_zeroed(
             previous_record_bytes@,
             JOURNAL_HEADER_BYTES as int,
             JOURNAL_HEADER_CHECKSUM_OFFSET as int,
@@ -490,7 +490,7 @@ pub fn slot_after_the_journal_ring(journal_ring_bytes: u64) -> (slot: SlotNumber
 }
 
 /// 记录 n 在设备上的偏移（[`record_offset`] 的规格）：环起点之后 `(计数器 − 1) mod 槽数 × 4096`。
-pub open spec fn spec_record_offset(counter: u64, ring_bytes: u64) -> int {
+pub open spec fn specification_record_offset(counter: u64, ring_bytes: u64) -> int {
     JOURNAL_RING_START_SLOT * SLOT_BYTES + ((counter - FIRST_JOURNAL_COUNTER) as int % (ring_bytes / JOURNAL_RECORD_BYTES) as int)
         * JOURNAL_RECORD_BYTES
 }
@@ -510,9 +510,9 @@ pub fn record_offset(counter: u64, ring_bytes: u64) -> (offset: DeviceOffsetInBy
     requires
         counter >= FIRST_JOURNAL_COUNTER,
         ring_bytes >= JOURNAL_RECORD_BYTES,
-        spec_record_offset(counter, ring_bytes) <= u64::MAX,
+        specification_record_offset(counter, ring_bytes) <= u64::MAX,
     ensures
-        offset.0 == spec_record_offset(counter, ring_bytes),
+        offset.0 == specification_record_offset(counter, ring_bytes),
 {
     let ring_slots = ring_bytes / JOURNAL_RECORD_BYTES;
     let records_before_this_one = counter.checked_sub(FIRST_JOURNAL_COUNTER).expect(
@@ -527,23 +527,23 @@ pub fn record_offset(counter: u64, ring_bytes: u64) -> (offset: DeviceOffsetInBy
 // ===== journal 记录的写法与读法 =====
 
 /// 一条记录装得下的点名项数：(4096 − 496) ÷ 56 = 64。
-pub open spec fn spec_named_units_one_record_holds() -> int {
+pub open spec fn specification_named_units_one_record_holds() -> int {
     (JOURNAL_RECORD_BYTES as int - JOURNAL_HEADER_BYTES as int) / JOURNAL_NAMED_ENTRY_BYTES as int
 }
 
 /// 一串点名项各自写成的 56 字节。
-pub open spec fn spec_named_unit_bytes_of(named: Seq<NamedUnit>) -> Seq<Seq<u8>> {
-    named.map_values(|named_unit: NamedUnit| named_unit.spec_bytes())
+pub open spec fn specification_named_unit_bytes_of(named: Seq<NamedUnit>) -> Seq<Seq<u8>> {
+    named.map_values(|named_unit: NamedUnit| named_unit.specification_bytes())
 }
 
 /// 一串点名项写成的那几段都是 56 字节。
 pub proof fn lemma_named_unit_bytes_have_the_entry_width(named: Seq<NamedUnit>)
     ensures
-        crate::unit::spec_every_piece_has_width(spec_named_unit_bytes_of(named), JOURNAL_NAMED_ENTRY_BYTES as nat),
+        crate::unit::specification_every_piece_has_width(specification_named_unit_bytes_of(named), JOURNAL_NAMED_ENTRY_BYTES as nat),
 {
     // 点名项的写法规格在这里不展开：每一段的宽只取单项那条宽度引理交回的事实，少了那一步就当场报证明错。
-    hide(NamedUnit::spec_bytes);
-    assert forall|piece_index: int| 0 <= piece_index < named.len() implies (#[trigger] spec_named_unit_bytes_of(
+    hide(NamedUnit::specification_bytes);
+    assert forall|piece_index: int| 0 <= piece_index < named.len() implies (#[trigger] specification_named_unit_bytes_of(
         named,
     )[piece_index]).len() == JOURNAL_NAMED_ENTRY_BYTES by {
         named[piece_index].lemma_bytes_have_the_entry_width();
@@ -554,7 +554,7 @@ impl JournalRecord {
     /// 写者写得出它：计数器装得进 6 字节、点名项不多于一条记录装得下的、点名项与新根段四条指针的位置条目都写得出。
     pub open spec fn is_encodable(self) -> bool {
         &&& self.counter < 0x1_0000_0000_0000
-        &&& self.named@.len() <= spec_named_units_one_record_holds()
+        &&& self.named@.len() <= specification_named_units_one_record_holds()
         &&& forall|named_index: int| 0 <= named_index < self.named@.len() ==> (#[trigger] self.named@[named_index]).is_encodable()
         &&& self.new_tree_table.is_encodable() && self.new_tree_table.has_location_entries_the_writer_accepts()
         &&& self.new_mapping_root.is_encodable() && self.new_mapping_root.has_location_entries_the_writer_accepts()
@@ -564,7 +564,7 @@ impl JournalRecord {
     }
 
     /// 提交标记那 1 字节：带写 1、不带写 0（D23（journal 的角色与格式） 已定项 7）。
-    pub open spec fn spec_commit_marker(self) -> u8 {
+    pub open spec fn specification_commit_marker(self) -> u8 {
         if self.is_commit {
             1
         } else {
@@ -576,22 +576,22 @@ impl JournalRecord {
     /// 实例代号 4、计数器 6、checkpoint_txg 8、nonce 12、头部校验和 32、事务号 8、提交标记 1、本次发布内序号 4、反向链 4、载荷校验和 4、
     /// 新根段 373（树表指针 86、中央映射树根指针 86、树 ID 水位 8、回退下界 8、实例表指针 86、分配记录树根指针 86、卸载记号 4、
     /// 回收门槛 8、钉槽 1）、fsid 8、MAC 16。
-    pub open spec fn spec_unsealed_header(self) -> Seq<u8> {
+    pub open spec fn specification_unsealed_header(self) -> Seq<u8> {
         JOURNAL_MAGIC@ + little_endian_bytes(JOURNAL_RECORD_TYPE_ORDINARY as nat, 2) + little_endian_bytes(0, 1)
-            + little_endian_bytes(self.place_in_publish.spec_record_flags_byte() as nat, 1) + little_endian_bytes(
+            + little_endian_bytes(self.place_in_publish.specification_record_flags_byte() as nat, 1) + little_endian_bytes(
             JOURNAL_RECORD_BYTES as nat,
             4,
         ) + little_endian_bytes(self.named@.len(), 4) + little_endian_bytes(self.instance.0 as nat, 4)
             + little_endian_bytes(self.counter as nat, 6) + little_endian_bytes(self.checkpoint_txg.0 as nat, 8)
             + zero_bytes(12) + zero_bytes(WIDE_CHECKSUM_BYTES as nat) + little_endian_bytes(self.transaction as nat, 8)
-            + little_endian_bytes(self.spec_commit_marker() as nat, 1) + little_endian_bytes(
+            + little_endian_bytes(self.specification_commit_marker() as nat, 1) + little_endian_bytes(
             self.ordinal_within_publish.0 as nat,
             4,
-        ) + little_endian_bytes(self.back_chain as nat, 4) + zero_bytes(4) + self.new_tree_table.spec_bytes()
-            + self.new_mapping_root.spec_bytes() + little_endian_bytes(self.new_tree_identifier_watermark as nat, 8)
-            + little_endian_bytes(self.new_rollback_floor.0 as nat, 8) + self.new_instance_table.spec_bytes()
-            + self.new_allocation_record_tree_root.spec_bytes() + little_endian_bytes(
-            self.new_unmount_marker.spec_flags_bits() as nat,
+        ) + little_endian_bytes(self.back_chain as nat, 4) + zero_bytes(4) + self.new_tree_table.specification_bytes()
+            + self.new_mapping_root.specification_bytes() + little_endian_bytes(self.new_tree_identifier_watermark as nat, 8)
+            + little_endian_bytes(self.new_rollback_floor.0 as nat, 8) + self.new_instance_table.specification_bytes()
+            + self.new_allocation_record_tree_root.specification_bytes() + little_endian_bytes(
+            self.new_unmount_marker.specification_flags_bits() as nat,
             4,
         ) + little_endian_bytes(self.new_reclaim_threshold.0 as nat, 8) + little_endian_bytes(
             self.new_pinned_ring_slot.0 as nat,
@@ -600,28 +600,28 @@ impl JournalRecord {
     }
 
     /// 点名项那一截：各项的 56 字节依次接起来。
-    pub open spec fn spec_named_area(self) -> Seq<u8> {
-        crate::unit::spec_concatenation(spec_named_unit_bytes_of(self.named@))
+    pub open spec fn specification_named_area(self) -> Seq<u8> {
+        crate::unit::specification_concatenation(specification_named_unit_bytes_of(self.named@))
     }
 
     /// 没封的整条：记录头、点名项、补 0 到 4096。
-    pub open spec fn spec_unsealed_bytes(self) -> Seq<u8> {
-        let header = self.spec_unsealed_header();
-        let named_area = self.spec_named_area();
+    pub open spec fn specification_unsealed_bytes(self) -> Seq<u8> {
+        let header = self.specification_unsealed_header();
+        let named_area = self.specification_named_area();
         header + named_area + zero_bytes((JOURNAL_RECORD_BYTES - header.len() - named_area.len()) as nat)
     }
 
     /// 写了载荷校验和的整条：偏移 95 那 4 字节换成罩点名项那一截的 CRC-32C 小端。
-    pub open spec fn spec_bytes_with_the_payload_checksum(self) -> Seq<u8> {
-        let unsealed = self.spec_unsealed_bytes();
-        unsealed.subrange(0, 95) + little_endian_bytes(spec_crc32_castagnoli(self.spec_named_area()) as nat, 4)
+    pub open spec fn specification_bytes_with_the_payload_checksum(self) -> Seq<u8> {
+        let unsealed = self.specification_unsealed_bytes();
+        unsealed.subrange(0, 95) + little_endian_bytes(specification_crc32_castagnoli(self.specification_named_area()) as nat, 4)
             + unsealed.subrange(99, JOURNAL_RECORD_BYTES as int)
     }
 
     /// [`Self::to_bytes`] 写出的整条：再把偏移 46 那 32 字节换成罩整条 4096、自身按 0 算出来的头部校验和。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        let with_payload_checksum = self.spec_bytes_with_the_payload_checksum();
-        with_payload_checksum.subrange(0, JOURNAL_HEADER_CHECKSUM_OFFSET as int) + spec_wide_checksum_field(
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        let with_payload_checksum = self.specification_bytes_with_the_payload_checksum();
+        with_payload_checksum.subrange(0, JOURNAL_HEADER_CHECKSUM_OFFSET as int) + specification_wide_checksum_field(
             with_payload_checksum,
             JOURNAL_RECORD_BYTES as int,
             JOURNAL_HEADER_CHECKSUM_OFFSET as int,
@@ -632,31 +632,31 @@ impl JournalRecord {
     }
 
     /// 头里自述的点名项数（偏移 12 的 4 字节）。
-    pub open spec fn spec_named_count_of(bytes: Seq<u8>) -> nat {
+    pub open spec fn specification_named_count_of(bytes: Seq<u8>) -> nat {
         little_endian_value(bytes.subrange(12, 16))
     }
 
     /// [`Self::parse`] 收下这段字节的判法：magic、整条校验和、类型、记录标志、记录长度、提交标记、序号、新根段四条指针头部、
     /// 卸载记号、fsid、点名项区不越过记录末尾、载荷校验和。
-    pub open spec fn spec_parse_accepts(bytes: Seq<u8>, expected_filesystem_identifier: u64) -> bool {
-        let named_count = Self::spec_named_count_of(bytes);
+    pub open spec fn specification_parse_accepts(bytes: Seq<u8>, expected_filesystem_identifier: u64) -> bool {
+        let named_count = Self::specification_named_count_of(bytes);
         &&& bytes.len() >= JOURNAL_RECORD_BYTES
         &&& bytes.subrange(0, 4) == JOURNAL_MAGIC@
         &&& bytes.subrange(JOURNAL_HEADER_CHECKSUM_OFFSET as int, JOURNAL_HEADER_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES)
-            == spec_wide_checksum_field(bytes, JOURNAL_RECORD_BYTES as int, JOURNAL_HEADER_CHECKSUM_OFFSET as int)
+            == specification_wide_checksum_field(bytes, JOURNAL_RECORD_BYTES as int, JOURNAL_HEADER_CHECKSUM_OFFSET as int)
         &&& little_endian_value(bytes.subrange(4, 6)) == JOURNAL_RECORD_TYPE_ORDINARY
-        &&& JournalRecordPlaceInPublish::spec_of_record_flags_byte(little_endian_value(bytes.subrange(7, 8)) as u8) is Some
+        &&& JournalRecordPlaceInPublish::specification_of_record_flags_byte(little_endian_value(bytes.subrange(7, 8)) as u8) is Some
         &&& little_endian_value(bytes.subrange(8, 12)) == JOURNAL_RECORD_BYTES
         &&& little_endian_value(bytes.subrange(86, 87)) <= 1
         &&& little_endian_value(bytes.subrange(87, 91)) != 0
-        &&& NodePointer::spec_read_judging_at(bytes, 99) is Ok
-        &&& NodePointer::spec_read_judging_at(bytes, 185) is Ok
-        &&& NodePointer::spec_read_judging_at(bytes, 287) is Ok
-        &&& NodePointer::spec_read_judging_at(bytes, 373) is Ok
-        &&& UnmountMarker::spec_of_unmount_marker_field(little_endian_value(bytes.subrange(459, 463)) as u32) is Some
+        &&& NodePointer::specification_read_judging_at(bytes, 99) is Ok
+        &&& NodePointer::specification_read_judging_at(bytes, 185) is Ok
+        &&& NodePointer::specification_read_judging_at(bytes, 287) is Ok
+        &&& NodePointer::specification_read_judging_at(bytes, 373) is Ok
+        &&& UnmountMarker::specification_of_unmount_marker_field(little_endian_value(bytes.subrange(459, 463)) as u32) is Some
         &&& little_endian_value(bytes.subrange(472, 480)) == expected_filesystem_identifier
         &&& JOURNAL_HEADER_BYTES + named_count * JOURNAL_NAMED_ENTRY_BYTES <= JOURNAL_RECORD_BYTES
-        &&& little_endian_value(bytes.subrange(95, 99)) == spec_crc32_castagnoli(
+        &&& little_endian_value(bytes.subrange(95, 99)) == specification_crc32_castagnoli(
             bytes.subrange(
                 JOURNAL_HEADER_BYTES as int,
                 JOURNAL_HEADER_BYTES + named_count * JOURNAL_NAMED_ENTRY_BYTES,
@@ -665,9 +665,9 @@ impl JournalRecord {
     }
 
     /// 这条记录逐字段等于那段字节按字段表读出来的样子（[`Self::parse`] 交回的记录满足它）。
-    pub open spec fn spec_matches_the_bytes(self, bytes: Seq<u8>) -> bool {
-        let named_count = Self::spec_named_count_of(bytes);
-        &&& JournalRecordPlaceInPublish::spec_of_record_flags_byte(little_endian_value(bytes.subrange(7, 8)) as u8) == Some(
+    pub open spec fn specification_matches_the_bytes(self, bytes: Seq<u8>) -> bool {
+        let named_count = Self::specification_named_count_of(bytes);
+        &&& JournalRecordPlaceInPublish::specification_of_record_flags_byte(little_endian_value(bytes.subrange(7, 8)) as u8) == Some(
             self.place_in_publish,
         )
         &&& self.instance.0 == little_endian_value(bytes.subrange(16, 20))
@@ -677,13 +677,13 @@ impl JournalRecord {
         &&& self.is_commit == (little_endian_value(bytes.subrange(86, 87)) == 1)
         &&& self.ordinal_within_publish.0 == little_endian_value(bytes.subrange(87, 91))
         &&& self.back_chain == little_endian_value(bytes.subrange(91, 95))
-        &&& self.new_tree_table == NodePointer::spec_decode_at(bytes, 99)
-        &&& self.new_mapping_root == NodePointer::spec_decode_at(bytes, 185)
+        &&& self.new_tree_table == NodePointer::specification_decode_at(bytes, 99)
+        &&& self.new_mapping_root == NodePointer::specification_decode_at(bytes, 185)
         &&& self.new_tree_identifier_watermark == little_endian_value(bytes.subrange(271, 279))
         &&& self.new_rollback_floor.0 == little_endian_value(bytes.subrange(279, 287))
-        &&& self.new_instance_table == NodePointer::spec_decode_at(bytes, 287)
-        &&& self.new_allocation_record_tree_root == NodePointer::spec_decode_at(bytes, 373)
-        &&& UnmountMarker::spec_of_unmount_marker_field(little_endian_value(bytes.subrange(459, 463)) as u32) == Some(
+        &&& self.new_instance_table == NodePointer::specification_decode_at(bytes, 287)
+        &&& self.new_allocation_record_tree_root == NodePointer::specification_decode_at(bytes, 373)
+        &&& UnmountMarker::specification_of_unmount_marker_field(little_endian_value(bytes.subrange(459, 463)) as u32) == Some(
             self.new_unmount_marker,
         )
         &&& self.new_reclaim_threshold.0 == little_endian_value(bytes.subrange(463, 471))
@@ -691,7 +691,7 @@ impl JournalRecord {
         &&& self.filesystem_identifier == little_endian_value(bytes.subrange(472, 480))
         &&& self.named@ == Seq::new(
             named_count,
-            |named_index: int| NamedUnit::spec_decode_at(
+            |named_index: int| NamedUnit::specification_decode_at(
                 bytes,
                 JOURNAL_HEADER_BYTES + named_index * JOURNAL_NAMED_ENTRY_BYTES,
             ),
@@ -706,7 +706,7 @@ impl JournalRecord {
         requires
             self.is_encodable(),
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
     {
         proof {
             lemma_little_endian_capacities();
@@ -765,8 +765,8 @@ impl JournalRecord {
         writer.skip(16); // MAC：第一版留位全 0
         writer.assert_position(JOURNAL_HEADER_BYTES, "记录头");
         let ghost header = writer.written();
-        assert(header =~= self.spec_unsealed_header());
-        let ghost named_pieces = spec_named_unit_bytes_of(self.named@);
+        assert(header =~= self.specification_unsealed_header());
+        let ghost named_pieces = specification_named_unit_bytes_of(self.named@);
         proof {
             lemma_named_unit_bytes_have_the_entry_width(self.named@);
         }
@@ -777,17 +777,17 @@ impl JournalRecord {
                 writer.is_well_formed(),
                 writer.total_bytes() == JOURNAL_RECORD_BYTES,
                 header.len() == JOURNAL_HEADER_BYTES,
-                header == self.spec_unsealed_header(),
-                named_pieces == spec_named_unit_bytes_of(self.named@),
+                header == self.specification_unsealed_header(),
+                named_pieces == specification_named_unit_bytes_of(self.named@),
                 named_index <= self.named@.len(),
                 self.is_encodable(),
-                crate::unit::spec_every_piece_has_width(named_pieces, JOURNAL_NAMED_ENTRY_BYTES as nat),
-                writer.written() == header + crate::unit::spec_concatenation(named_pieces.subrange(0, named_index as int)),
+                crate::unit::specification_every_piece_has_width(named_pieces, JOURNAL_NAMED_ENTRY_BYTES as nat),
+                writer.written() == header + crate::unit::specification_concatenation(named_pieces.subrange(0, named_index as int)),
             decreases self.named@.len() - named_index,
         {
             proof {
                 let written_pieces = named_pieces.subrange(0, named_index as int);
-                assert(crate::unit::spec_every_piece_has_width(written_pieces, JOURNAL_NAMED_ENTRY_BYTES as nat));
+                assert(crate::unit::specification_every_piece_has_width(written_pieces, JOURNAL_NAMED_ENTRY_BYTES as nat));
                 crate::unit::lemma_concatenation_of_pieces_of_one_width(written_pieces, JOURNAL_NAMED_ENTRY_BYTES as nat);
                 assert(named_index * 56 + 56 <= self.named@.len() * 56) by (nonlinear_arith)
                     requires
@@ -799,7 +799,7 @@ impl JournalRecord {
             proof {
                 let longer = named_pieces.subrange(0, named_index + 1);
                 assert(longer.drop_last() =~= named_pieces.subrange(0, named_index as int));
-                assert(longer.last() == self.named@[named_index as int].spec_bytes());
+                assert(longer.last() == self.named@[named_index as int].specification_bytes());
             }
             named_index += 1;
         }
@@ -810,16 +810,16 @@ impl JournalRecord {
         let payload_end = writer.position();
         let mut bytes = writer.into_bytes();
         proof {
-            let unsealed = self.spec_unsealed_bytes();
+            let unsealed = self.specification_unsealed_bytes();
             assert(bytes@ =~= unsealed);
             assert(unsealed.subrange(0, unsealed.len() as int) =~= unsealed);
             lemma_split_a_concatenated_range(
                 unsealed,
                 0,
-                header + self.spec_named_area(),
-                zero_bytes((JOURNAL_RECORD_BYTES - header.len() - self.spec_named_area().len()) as nat),
+                header + self.specification_named_area(),
+                zero_bytes((JOURNAL_RECORD_BYTES - header.len() - self.specification_named_area().len()) as nat),
             );
-            lemma_split_a_concatenated_range(unsealed, 0, header, self.spec_named_area());
+            lemma_split_a_concatenated_range(unsealed, 0, header, self.specification_named_area());
         }
         let payload_checksum = crc32_castagnoli(
             &bytes[usize::try_from(JOURNAL_HEADER_BYTES).expect("496")..payload_end],
@@ -829,11 +829,11 @@ impl JournalRecord {
         checksum_writer.put_u32(payload_checksum);
         let checksum_bytes = checksum_writer.into_bytes();
         copy_bytes_into(&mut bytes, payload_checksum_offset, checksum_bytes.as_slice());
-        assert(bytes@ =~= self.spec_bytes_with_the_payload_checksum());
+        assert(bytes@ =~= self.specification_bytes_with_the_payload_checksum());
         let digest =
             wide_checksum_with_field_zeroed(&bytes, record_bytes, JOURNAL_HEADER_CHECKSUM_OFFSET);
         copy_bytes_into(&mut bytes, JOURNAL_HEADER_CHECKSUM_OFFSET, &digest);
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -847,9 +847,9 @@ impl JournalRecord {
     pub fn parse(bytes: &[u8], expected_filesystem_identifier: u64) -> (record: Option<Self>)
         ensures
             match record {
-                Some(parsed) => Self::spec_parse_accepts(bytes@, expected_filesystem_identifier)
-                    && parsed.spec_matches_the_bytes(bytes@),
-                None => !Self::spec_parse_accepts(bytes@, expected_filesystem_identifier),
+                Some(parsed) => Self::specification_parse_accepts(bytes@, expected_filesystem_identifier)
+                    && parsed.specification_matches_the_bytes(bytes@),
+                None => !Self::specification_parse_accepts(bytes@, expected_filesystem_identifier),
             },
     {
         let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
@@ -974,13 +974,13 @@ impl JournalRecord {
             invariant
                 reader.source() == bytes@,
                 bytes@.len() == bytes.len(),
-                reader.spec_position() == 496 + named_index * 56,
+                reader.specification_position() == 496 + named_index * 56,
                 496 + named_count * 56 <= 4096,
                 bytes@.len() >= 4096,
                 named_index <= named_count,
                 named@.len() == named_index,
                 forall|read_index: int|
-                    0 <= read_index < named_index ==> #[trigger] named@[read_index] == NamedUnit::spec_decode_at(
+                    0 <= read_index < named_index ==> #[trigger] named@[read_index] == NamedUnit::specification_decode_at(
                         bytes@,
                         496 + read_index * 56,
                     ),
@@ -1019,7 +1019,7 @@ impl JournalRecord {
         };
         assert(record.named@ =~= Seq::new(
             named_count as nat,
-            |named_index: int| NamedUnit::spec_decode_at(
+            |named_index: int| NamedUnit::specification_decode_at(
                 bytes@,
                 JOURNAL_HEADER_BYTES + named_index * JOURNAL_NAMED_ENTRY_BYTES,
             ),
@@ -1037,49 +1037,49 @@ impl JournalRecord {
             self.is_encodable(),
         ensures
             ({
-                let unsealed = self.spec_unsealed_bytes();
+                let unsealed = self.specification_unsealed_bytes();
                 let named_end = JOURNAL_HEADER_BYTES + self.named@.len() * JOURNAL_NAMED_ENTRY_BYTES;
                 &&& unsealed.len() == JOURNAL_RECORD_BYTES
-                &&& self.spec_named_area().len() == self.named@.len() * JOURNAL_NAMED_ENTRY_BYTES
+                &&& self.specification_named_area().len() == self.named@.len() * JOURNAL_NAMED_ENTRY_BYTES
                 &&& named_end <= JOURNAL_RECORD_BYTES
                 &&& unsealed.subrange(0, 4) == JOURNAL_MAGIC@
                 &&& unsealed.subrange(4, 6) == little_endian_bytes(JOURNAL_RECORD_TYPE_ORDINARY as nat, 2)
-                &&& unsealed.subrange(7, 8) == little_endian_bytes(self.place_in_publish.spec_record_flags_byte() as nat, 1)
+                &&& unsealed.subrange(7, 8) == little_endian_bytes(self.place_in_publish.specification_record_flags_byte() as nat, 1)
                 &&& unsealed.subrange(8, 12) == little_endian_bytes(JOURNAL_RECORD_BYTES as nat, 4)
                 &&& unsealed.subrange(12, 16) == little_endian_bytes(self.named@.len(), 4)
                 &&& unsealed.subrange(16, 20) == little_endian_bytes(self.instance.0 as nat, 4)
                 &&& unsealed.subrange(20, 26) == little_endian_bytes(self.counter as nat, 6)
                 &&& unsealed.subrange(26, 34) == little_endian_bytes(self.checkpoint_txg.0 as nat, 8)
                 &&& unsealed.subrange(78, 86) == little_endian_bytes(self.transaction as nat, 8)
-                &&& unsealed.subrange(86, 87) == little_endian_bytes(self.spec_commit_marker() as nat, 1)
+                &&& unsealed.subrange(86, 87) == little_endian_bytes(self.specification_commit_marker() as nat, 1)
                 &&& unsealed.subrange(87, 91) == little_endian_bytes(self.ordinal_within_publish.0 as nat, 4)
                 &&& unsealed.subrange(91, 95) == little_endian_bytes(self.back_chain as nat, 4)
-                &&& unsealed.subrange(99, 185) == self.new_tree_table.spec_bytes()
-                &&& unsealed.subrange(185, 271) == self.new_mapping_root.spec_bytes()
+                &&& unsealed.subrange(99, 185) == self.new_tree_table.specification_bytes()
+                &&& unsealed.subrange(185, 271) == self.new_mapping_root.specification_bytes()
                 &&& unsealed.subrange(271, 279) == little_endian_bytes(self.new_tree_identifier_watermark as nat, 8)
                 &&& unsealed.subrange(279, 287) == little_endian_bytes(self.new_rollback_floor.0 as nat, 8)
-                &&& unsealed.subrange(287, 373) == self.new_instance_table.spec_bytes()
-                &&& unsealed.subrange(373, 459) == self.new_allocation_record_tree_root.spec_bytes()
-                &&& unsealed.subrange(459, 463) == little_endian_bytes(self.new_unmount_marker.spec_flags_bits() as nat, 4)
+                &&& unsealed.subrange(287, 373) == self.new_instance_table.specification_bytes()
+                &&& unsealed.subrange(373, 459) == self.new_allocation_record_tree_root.specification_bytes()
+                &&& unsealed.subrange(459, 463) == little_endian_bytes(self.new_unmount_marker.specification_flags_bits() as nat, 4)
                 &&& unsealed.subrange(463, 471) == little_endian_bytes(self.new_reclaim_threshold.0 as nat, 8)
                 &&& unsealed.subrange(471, 472) == little_endian_bytes(self.new_pinned_ring_slot.0 as nat, 1)
                 &&& unsealed.subrange(472, 480) == little_endian_bytes(self.filesystem_identifier as nat, 8)
-                &&& unsealed.subrange(JOURNAL_HEADER_BYTES as int, named_end) == self.spec_named_area()
+                &&& unsealed.subrange(JOURNAL_HEADER_BYTES as int, named_end) == self.specification_named_area()
             }),
     {
         lemma_little_endian_capacities();
         lemma_named_unit_bytes_have_the_entry_width(self.named@);
         crate::unit::lemma_concatenation_of_pieces_of_one_width(
-            spec_named_unit_bytes_of(self.named@),
+            specification_named_unit_bytes_of(self.named@),
             JOURNAL_NAMED_ENTRY_BYTES as nat,
         );
         assert(self.named@.len() * 56 <= 64 * 56) by (nonlinear_arith)
             requires
                 self.named@.len() <= 64,
         ;
-        let header = self.spec_unsealed_header();
-        let named_area = self.spec_named_area();
-        let unsealed = self.spec_unsealed_bytes();
+        let header = self.specification_unsealed_header();
+        let named_area = self.specification_named_area();
+        let unsealed = self.specification_unsealed_bytes();
         let padding = zero_bytes((JOURNAL_RECORD_BYTES - header.len() - named_area.len()) as nat);
         assert(header.len() == 496);
         assert(unsealed.subrange(0, unsealed.len() as int) =~= unsealed);
@@ -1088,7 +1088,7 @@ impl JournalRecord {
         let magic = JOURNAL_MAGIC@;
         let record_type = little_endian_bytes(JOURNAL_RECORD_TYPE_ORDINARY as nat, 2);
         let algorithm = little_endian_bytes(0, 1);
-        let flags = little_endian_bytes(self.place_in_publish.spec_record_flags_byte() as nat, 1);
+        let flags = little_endian_bytes(self.place_in_publish.specification_record_flags_byte() as nat, 1);
         let length = little_endian_bytes(JOURNAL_RECORD_BYTES as nat, 4);
         let count = little_endian_bytes(self.named@.len(), 4);
         let instance = little_endian_bytes(self.instance.0 as nat, 4);
@@ -1097,17 +1097,17 @@ impl JournalRecord {
         let nonce = zero_bytes(12);
         let header_checksum = zero_bytes(WIDE_CHECKSUM_BYTES as nat);
         let transaction = little_endian_bytes(self.transaction as nat, 8);
-        let commit = little_endian_bytes(self.spec_commit_marker() as nat, 1);
+        let commit = little_endian_bytes(self.specification_commit_marker() as nat, 1);
         let ordinal = little_endian_bytes(self.ordinal_within_publish.0 as nat, 4);
         let back_chain = little_endian_bytes(self.back_chain as nat, 4);
         let payload_checksum = zero_bytes(4);
-        let tree_table = self.new_tree_table.spec_bytes();
-        let mapping_root = self.new_mapping_root.spec_bytes();
+        let tree_table = self.new_tree_table.specification_bytes();
+        let mapping_root = self.new_mapping_root.specification_bytes();
         let watermark = little_endian_bytes(self.new_tree_identifier_watermark as nat, 8);
         let floor = little_endian_bytes(self.new_rollback_floor.0 as nat, 8);
-        let instance_table = self.new_instance_table.spec_bytes();
-        let allocation_root = self.new_allocation_record_tree_root.spec_bytes();
-        let unmount = little_endian_bytes(self.new_unmount_marker.spec_flags_bits() as nat, 4);
+        let instance_table = self.new_instance_table.specification_bytes();
+        let allocation_root = self.new_allocation_record_tree_root.specification_bytes();
+        let unmount = little_endian_bytes(self.new_unmount_marker.specification_flags_bits() as nat, 4);
         let reclaim = little_endian_bytes(self.new_reclaim_threshold.0 as nat, 8);
         let pinned = little_endian_bytes(self.new_pinned_ring_slot.0 as nat, 1);
         let fsid = little_endian_bytes(self.filesystem_identifier as nat, 8);
@@ -1161,8 +1161,8 @@ impl JournalRecord {
             self.is_encodable(),
         ensures
             ({
-                let unsealed = self.spec_unsealed_bytes();
-                let sealed = self.spec_bytes();
+                let unsealed = self.specification_unsealed_bytes();
+                let sealed = self.specification_bytes();
                 let named_end = JOURNAL_HEADER_BYTES + self.named@.len() * JOURNAL_NAMED_ENTRY_BYTES;
                 &&& sealed.len() == JOURNAL_RECORD_BYTES
                 &&& forall|position: int|
@@ -1170,21 +1170,21 @@ impl JournalRecord {
                         < JOURNAL_HEADER_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES) && !(95 <= position < 99) ==> #[trigger] sealed[position]
                         == unsealed[position]
                 &&& sealed.subrange(JOURNAL_HEADER_CHECKSUM_OFFSET as int, JOURNAL_HEADER_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES)
-                    == spec_wide_checksum_field(sealed, JOURNAL_RECORD_BYTES as int, JOURNAL_HEADER_CHECKSUM_OFFSET as int)
+                    == specification_wide_checksum_field(sealed, JOURNAL_RECORD_BYTES as int, JOURNAL_HEADER_CHECKSUM_OFFSET as int)
                 &&& named_end <= JOURNAL_RECORD_BYTES
-                &&& sealed.subrange(JOURNAL_HEADER_BYTES as int, named_end) == self.spec_named_area()
-                &&& little_endian_value(sealed.subrange(95, 99)) == spec_crc32_castagnoli(
+                &&& sealed.subrange(JOURNAL_HEADER_BYTES as int, named_end) == self.specification_named_area()
+                &&& little_endian_value(sealed.subrange(95, 99)) == specification_crc32_castagnoli(
                     sealed.subrange(JOURNAL_HEADER_BYTES as int, named_end),
                 )
             }),
     {
         lemma_little_endian_capacities();
         self.lemma_unsealed_fields();
-        let unsealed = self.spec_unsealed_bytes();
-        let with_payload_checksum = self.spec_bytes_with_the_payload_checksum();
-        let crc = spec_crc32_castagnoli(self.spec_named_area());
-        let field = spec_wide_checksum_field(with_payload_checksum, 4096, 46);
-        let sealed = self.spec_bytes();
+        let unsealed = self.specification_unsealed_bytes();
+        let with_payload_checksum = self.specification_bytes_with_the_payload_checksum();
+        let crc = specification_crc32_castagnoli(self.specification_named_area());
+        let field = specification_wide_checksum_field(with_payload_checksum, 4096, 46);
+        let sealed = self.specification_bytes();
         let named_end = JOURNAL_HEADER_BYTES + self.named@.len() * JOURNAL_NAMED_ENTRY_BYTES;
         assert(with_payload_checksum.len() == 4096);
         assert(field.len() == 32);
@@ -1207,7 +1207,7 @@ impl JournalRecord {
             }
         }
         // 罩住的那一截（字段按 0）两份相同，所以封进去的字段就是读者现算的字段。
-        assert(spec_covered_with_the_field_zeroed(sealed, 4096, 46) =~= spec_covered_with_the_field_zeroed(
+        assert(specification_covered_with_the_field_zeroed(sealed, 4096, 46) =~= specification_covered_with_the_field_zeroed(
             with_payload_checksum,
             4096,
             46,
@@ -1235,25 +1235,25 @@ impl JournalRecord {
             self.is_encodable(),
         ensures
             ({
-                let sealed = self.spec_bytes();
+                let sealed = self.specification_bytes();
                 &&& sealed.subrange(0, 4) == JOURNAL_MAGIC@
                 &&& sealed.subrange(4, 6) == little_endian_bytes(JOURNAL_RECORD_TYPE_ORDINARY as nat, 2)
-                &&& sealed.subrange(7, 8) == little_endian_bytes(self.place_in_publish.spec_record_flags_byte() as nat, 1)
+                &&& sealed.subrange(7, 8) == little_endian_bytes(self.place_in_publish.specification_record_flags_byte() as nat, 1)
                 &&& sealed.subrange(8, 12) == little_endian_bytes(JOURNAL_RECORD_BYTES as nat, 4)
                 &&& sealed.subrange(12, 16) == little_endian_bytes(self.named@.len(), 4)
                 &&& sealed.subrange(16, 20) == little_endian_bytes(self.instance.0 as nat, 4)
                 &&& sealed.subrange(20, 26) == little_endian_bytes(self.counter as nat, 6)
                 &&& sealed.subrange(26, 34) == little_endian_bytes(self.checkpoint_txg.0 as nat, 8)
                 &&& sealed.subrange(78, 86) == little_endian_bytes(self.transaction as nat, 8)
-                &&& sealed.subrange(86, 87) == little_endian_bytes(self.spec_commit_marker() as nat, 1)
+                &&& sealed.subrange(86, 87) == little_endian_bytes(self.specification_commit_marker() as nat, 1)
                 &&& sealed.subrange(87, 91) == little_endian_bytes(self.ordinal_within_publish.0 as nat, 4)
                 &&& sealed.subrange(91, 95) == little_endian_bytes(self.back_chain as nat, 4)
             }),
     {
         self.lemma_unsealed_fields();
         self.lemma_sealed_keeps_everything_outside_the_two_checksums();
-        let unsealed = self.spec_unsealed_bytes();
-        let sealed = self.spec_bytes();
+        let unsealed = self.specification_unsealed_bytes();
+        let sealed = self.specification_bytes();
         assert(sealed.subrange(0, 4) =~= unsealed.subrange(0, 4));
         assert(sealed.subrange(4, 6) =~= unsealed.subrange(4, 6));
         assert(sealed.subrange(7, 8) =~= unsealed.subrange(7, 8));
@@ -1274,14 +1274,14 @@ impl JournalRecord {
             self.is_encodable(),
         ensures
             ({
-                let sealed = self.spec_bytes();
-                &&& sealed.subrange(99, 185) == self.new_tree_table.spec_bytes()
-                &&& sealed.subrange(185, 271) == self.new_mapping_root.spec_bytes()
+                let sealed = self.specification_bytes();
+                &&& sealed.subrange(99, 185) == self.new_tree_table.specification_bytes()
+                &&& sealed.subrange(185, 271) == self.new_mapping_root.specification_bytes()
                 &&& sealed.subrange(271, 279) == little_endian_bytes(self.new_tree_identifier_watermark as nat, 8)
                 &&& sealed.subrange(279, 287) == little_endian_bytes(self.new_rollback_floor.0 as nat, 8)
-                &&& sealed.subrange(287, 373) == self.new_instance_table.spec_bytes()
-                &&& sealed.subrange(373, 459) == self.new_allocation_record_tree_root.spec_bytes()
-                &&& sealed.subrange(459, 463) == little_endian_bytes(self.new_unmount_marker.spec_flags_bits() as nat, 4)
+                &&& sealed.subrange(287, 373) == self.new_instance_table.specification_bytes()
+                &&& sealed.subrange(373, 459) == self.new_allocation_record_tree_root.specification_bytes()
+                &&& sealed.subrange(459, 463) == little_endian_bytes(self.new_unmount_marker.specification_flags_bits() as nat, 4)
                 &&& sealed.subrange(463, 471) == little_endian_bytes(self.new_reclaim_threshold.0 as nat, 8)
                 &&& sealed.subrange(471, 472) == little_endian_bytes(self.new_pinned_ring_slot.0 as nat, 1)
                 &&& sealed.subrange(472, 480) == little_endian_bytes(self.filesystem_identifier as nat, 8)
@@ -1289,8 +1289,8 @@ impl JournalRecord {
     {
         self.lemma_unsealed_fields();
         self.lemma_sealed_keeps_everything_outside_the_two_checksums();
-        let unsealed = self.spec_unsealed_bytes();
-        let sealed = self.spec_bytes();
+        let unsealed = self.specification_unsealed_bytes();
+        let sealed = self.specification_bytes();
         assert(sealed.subrange(99, 185) =~= unsealed.subrange(99, 185));
         assert(sealed.subrange(185, 271) =~= unsealed.subrange(185, 271));
         assert(sealed.subrange(271, 279) =~= unsealed.subrange(271, 279));
@@ -1309,11 +1309,11 @@ impl JournalRecord {
         requires
             self.is_encodable(),
         ensures
-            Self::spec_named_count_of(self.spec_bytes()) == self.named@.len(),
+            Self::specification_named_count_of(self.specification_bytes()) == self.named@.len(),
             self.named@ == Seq::new(
-                Self::spec_named_count_of(self.spec_bytes()),
-                |named_index: int| NamedUnit::spec_decode_at(
-                    self.spec_bytes(),
+                Self::specification_named_count_of(self.specification_bytes()),
+                |named_index: int| NamedUnit::specification_decode_at(
+                    self.specification_bytes(),
                     JOURNAL_HEADER_BYTES + named_index * JOURNAL_NAMED_ENTRY_BYTES,
                 ),
             ),
@@ -1321,16 +1321,16 @@ impl JournalRecord {
         lemma_little_endian_capacities();
         self.lemma_sealed_keeps_everything_outside_the_two_checksums();
         self.lemma_sealed_header_fields_before_the_new_root_segment();
-        let sealed = self.spec_bytes();
+        let sealed = self.specification_bytes();
         let named_count = self.named@.len();
         let named_end = 496 + named_count as int * 56;
-        let pieces = spec_named_unit_bytes_of(self.named@);
+        let pieces = specification_named_unit_bytes_of(self.named@);
         lemma_named_unit_bytes_have_the_entry_width(self.named@);
         let decoded = Seq::new(
-            Self::spec_named_count_of(sealed),
-            |named_index: int| NamedUnit::spec_decode_at(sealed, JOURNAL_HEADER_BYTES + named_index * JOURNAL_NAMED_ENTRY_BYTES),
+            Self::specification_named_count_of(sealed),
+            |named_index: int| NamedUnit::specification_decode_at(sealed, JOURNAL_HEADER_BYTES + named_index * JOURNAL_NAMED_ENTRY_BYTES),
         );
-        assert(Self::spec_named_count_of(sealed) == named_count);
+        assert(Self::specification_named_count_of(sealed) == named_count);
         assert forall|named_index: int| 0 <= named_index < named_count implies #[trigger] decoded[named_index]
             == self.named@[named_index] by {
             crate::unit::lemma_piece_of_a_concatenation(pieces, 56, named_index);
@@ -1348,34 +1348,34 @@ impl JournalRecord {
                 named_index * 56,
                 (named_index + 1) * 56,
             ));
-            assert(pieces[named_index] == self.named@[named_index].spec_bytes());
+            assert(pieces[named_index] == self.named@[named_index].specification_bytes());
             assert(self.named@[named_index].is_encodable());
             self.named@[named_index].lemma_decode_at_round_trip(sealed, piece_start);
         }
         assert(decoded =~= self.named@);
     }
 
-    /// 往返：写者写出来的整条（[`Self::spec_bytes`]），读者按这条记录自己的 fsid 收下，读回的每个字段都是这条记录的
-    /// （[`Self::spec_matches_the_bytes`]）。读者拒「本次发布内序号为 0」，所以这里要序号不为 0；写者不判它。
+    /// 往返：写者写出来的整条（[`Self::specification_bytes`]），读者按这条记录自己的 fsid 收下，读回的每个字段都是这条记录的
+    /// （[`Self::specification_matches_the_bytes`]）。读者拒「本次发布内序号为 0」，所以这里要序号不为 0；写者不判它。
     pub proof fn lemma_parse_round_trip(self)
         requires
             self.is_encodable(),
             self.ordinal_within_publish.0 != 0,
         ensures
-            Self::spec_parse_accepts(self.spec_bytes(), self.filesystem_identifier),
-            self.spec_matches_the_bytes(self.spec_bytes()),
+            Self::specification_parse_accepts(self.specification_bytes(), self.filesystem_identifier),
+            self.specification_matches_the_bytes(self.specification_bytes()),
     {
         // 整条字节的两份写法规格与记录标志的读法规格在这里不展开：只用下面几段引理交回的事实，少了哪一段就在这里当场报证明错，
         // 不会去展开 4096 字节的写法、撞 rlimit。
-        hide(JournalRecord::spec_bytes);
-        hide(JournalRecord::spec_unsealed_bytes);
-        hide(JournalRecordPlaceInPublish::spec_of_record_flags_byte);
+        hide(JournalRecord::specification_bytes);
+        hide(JournalRecord::specification_unsealed_bytes);
+        hide(JournalRecordPlaceInPublish::specification_of_record_flags_byte);
         lemma_little_endian_capacities();
         self.lemma_sealed_keeps_everything_outside_the_two_checksums();
         self.lemma_sealed_header_fields_before_the_new_root_segment();
         self.lemma_sealed_new_root_segment_fields();
         self.lemma_named_units_read_back();
-        let sealed = self.spec_bytes();
+        let sealed = self.specification_bytes();
         self.place_in_publish.lemma_record_flags_byte_round_trip();
         self.new_unmount_marker.lemma_flags_bits_round_trip();
         self.new_tree_table.lemma_decode_at_round_trip(sealed, 99);
@@ -1705,7 +1705,7 @@ mod tests {
     /// 读者收下的点名项 Vec 按项数预分配：一项的记录读回来容量恰好 1，不是逐项 push 从空 Vec 起第一次开的 4。
     /// 扫环把每条读到的记录都留到交回为止，多开的那 3 项堆按记录条数累加（E197（扫环胶水内存随盘数）分配器峰值的预测按恰好项数算）。
     #[test]
-    fn a_parsed_record_holds_its_named_units_in_a_vector_of_exactly_the_named_count() {
+    fn parsed_record_holds_its_named_units_in_a_vector_of_exactly_the_named_count() {
         let named_unit = NamedUnit {
             locations: [
                 LocationEntry {

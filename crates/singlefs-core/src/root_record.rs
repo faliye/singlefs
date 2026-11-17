@@ -2,7 +2,7 @@
 //! 自证校验和罩整槽含补齐、自身按 0 参与。行序即盘上顺序，偏移按行累加。
 //!
 //! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：[`RootRecord::to_slot`] 交出的就是
-//! [`RootRecord::spec_slot_bytes`]，[`RootRecord::parse_slot`] 交出的就是 [`RootRecord::spec_parse_slot`]，往返引理
+//! [`RootRecord::specification_slot_bytes`]，[`RootRecord::parse_slot`] 交出的就是 [`RootRecord::specification_parse_slot`]，往返引理
 //! [`RootRecord::lemma_parse_slot_round_trip`] 证写出来的槽读回同一条根记录。
 
 use singlefs_format::{
@@ -53,7 +53,7 @@ pub enum UnmountMarker {
 
 impl UnmountMarker {
     /// 写进 flags 那 4 字节的值（[`Self::flags_bits`] 的规格）。
-    pub open spec fn spec_flags_bits(self) -> u32 {
+    pub open spec fn specification_flags_bits(self) -> u32 {
         match self {
             UnmountMarker::WrittenByTheUnmountSequence => ROOT_RECORD_FLAG_UNMOUNT_MARKER,
             UnmountMarker::NotWrittenByTheUnmountSequence => 0,
@@ -61,7 +61,7 @@ impl UnmountMarker {
     }
 
     /// 只带记号那一位的 flags 读回的记号（[`Self::of_flags_bits_carrying_only_the_marker`] 的规格）。
-    pub open spec fn spec_of_flags_bits_carrying_only_the_marker(flags: u32) -> Self {
+    pub open spec fn specification_of_flags_bits_carrying_only_the_marker(flags: u32) -> Self {
         if flags & ROOT_RECORD_FLAG_UNMOUNT_MARKER == 0 {
             UnmountMarker::NotWrittenByTheUnmountSequence
         } else {
@@ -70,18 +70,18 @@ impl UnmountMarker {
     }
 
     /// 记号那 4 字节读回的记号：位 0 之外有位为 1 ⇒ `None`（[`Self::of_unmount_marker_field_of_a_new_root_segment`] 的规格）。
-    pub open spec fn spec_of_unmount_marker_field(field: u32) -> Option<Self> {
+    pub open spec fn specification_of_unmount_marker_field(field: u32) -> Option<Self> {
         if field & !ROOT_RECORD_FLAG_UNMOUNT_MARKER != 0 {
             None
         } else {
-            Some(Self::spec_of_flags_bits_carrying_only_the_marker(field))
+            Some(Self::specification_of_flags_bits_carrying_only_the_marker(field))
         }
     }
 
     /// 往返：写进 flags 的值读回同一个记号。
     pub proof fn lemma_flags_bits_round_trip(self)
         ensures
-            Self::spec_of_unmount_marker_field(self.spec_flags_bits()) == Some(self),
+            Self::specification_of_unmount_marker_field(self.specification_flags_bits()) == Some(self),
     {
         assert(1u32 & !1u32 == 0u32 && 1u32 & 1u32 != 0u32 && 0u32 & !1u32 == 0u32 && 0u32 & 1u32 == 0u32)
             by (bit_vector);
@@ -91,7 +91,7 @@ impl UnmountMarker {
     #[must_use]
     pub const fn flags_bits(self) -> (bits: u32)
         ensures
-            bits == self.spec_flags_bits(),
+            bits == self.specification_flags_bits(),
     {
         match self {
             UnmountMarker::WrittenByTheUnmountSequence => ROOT_RECORD_FLAG_UNMOUNT_MARKER,
@@ -104,7 +104,7 @@ impl UnmountMarker {
     #[must_use]
     pub const fn of_unmount_marker_field_of_a_new_root_segment(field: u32) -> (marker: Option<Self>)
         ensures
-            marker == Self::spec_of_unmount_marker_field(field),
+            marker == Self::specification_of_unmount_marker_field(field),
     {
         if field & !ROOT_RECORD_FLAG_UNMOUNT_MARKER != 0 {
             return None;
@@ -116,7 +116,7 @@ impl UnmountMarker {
     #[must_use]
     const fn of_flags_bits_carrying_only_the_marker(flags: u32) -> (marker: Self)
         ensures
-            marker == Self::spec_of_flags_bits_carrying_only_the_marker(flags),
+            marker == Self::specification_of_flags_bits_carrying_only_the_marker(flags),
     {
         if flags & ROOT_RECORD_FLAG_UNMOUNT_MARKER == 0 {
             UnmountMarker::NotWrittenByTheUnmountSequence
@@ -215,30 +215,30 @@ impl RootRecord {
     }
 
     /// 自证校验和之前那 138 字节：magic、fsid、flags、实例代号、checkpoint_txg、树表指针、树 ID 水位、回退下界 F。
-    pub open spec fn spec_bytes_before_the_checksum(self) -> Seq<u8> {
-        ROOT_MAGIC@ + self.filesystem_identifier@ + little_endian_bytes(self.unmount_marker.spec_flags_bits() as nat, 4)
+    pub open spec fn specification_bytes_before_the_checksum(self) -> Seq<u8> {
+        ROOT_MAGIC@ + self.filesystem_identifier@ + little_endian_bytes(self.unmount_marker.specification_flags_bits() as nat, 4)
             + little_endian_bytes(self.instance.0 as nat, 4) + little_endian_bytes(self.checkpoint_txg.0 as nat, 8)
-            + self.tree_table.spec_bytes() + little_endian_bytes(self.tree_identifier_watermark as nat, 8)
+            + self.tree_table.specification_bytes() + little_endian_bytes(self.tree_identifier_watermark as nat, 8)
             + little_endian_bytes(self.rollback_floor.0 as nat, 8)
     }
 
     /// 自证校验和之后那 296 字节：实例表、中央映射树、分配记录树三条指针，回收门槛 t、钉槽 p、算法类型 0、nonce 与 MAC 28 字节 0。
-    pub open spec fn spec_bytes_after_the_checksum(self) -> Seq<u8> {
-        self.instance_table.spec_bytes() + self.mapping_root.spec_bytes() + self.allocation_record_tree_root.spec_bytes()
+    pub open spec fn specification_bytes_after_the_checksum(self) -> Seq<u8> {
+        self.instance_table.specification_bytes() + self.mapping_root.specification_bytes() + self.allocation_record_tree_root.specification_bytes()
             + little_endian_bytes(self.reclaim_threshold.0 as nat, 8) + little_endian_bytes(self.pinned_ring_slot.0 as nat, 1)
             + little_endian_bytes(0, 1) + zero_bytes(28)
     }
 
     /// 校验和字段还是 0 的整槽：记录 466 字节、之后补 0 到槽宽。
-    pub open spec fn spec_unsealed_slot_bytes(self, slot_bytes: nat) -> Seq<u8> {
-        self.spec_bytes_before_the_checksum() + zero_bytes(WIDE_CHECKSUM_BYTES as nat) + self.spec_bytes_after_the_checksum()
+    pub open spec fn specification_unsealed_slot_bytes(self, slot_bytes: nat) -> Seq<u8> {
+        self.specification_bytes_before_the_checksum() + zero_bytes(WIDE_CHECKSUM_BYTES as nat) + self.specification_bytes_after_the_checksum()
             + zero_bytes((slot_bytes - ROOT_RECORD_BYTES) as nat)
     }
 
     /// [`Self::to_slot`] 写出的整槽：校验和字段换成罩整槽、自身按 0 算出来的那 32 字节。
-    pub open spec fn spec_slot_bytes(self, slot_bytes: nat) -> Seq<u8> {
-        let unsealed = self.spec_unsealed_slot_bytes(slot_bytes);
-        unsealed.subrange(0, ROOT_CHECKSUM_OFFSET as int) + spec_wide_checksum_field(
+    pub open spec fn specification_slot_bytes(self, slot_bytes: nat) -> Seq<u8> {
+        let unsealed = self.specification_unsealed_slot_bytes(slot_bytes);
+        unsealed.subrange(0, ROOT_CHECKSUM_OFFSET as int) + specification_wide_checksum_field(
             unsealed,
             slot_bytes as int,
             ROOT_CHECKSUM_OFFSET as int,
@@ -246,34 +246,34 @@ impl RootRecord {
     }
 
     /// [`Self::parse_slot`] 的判法：magic、整槽校验和、fsid、flags、四条指针头部五关，过了才按字段表读出来。
-    pub open spec fn spec_parse_slot(bytes: Seq<u8>, expected_filesystem_identifier: [u8; 16]) -> Option<Self> {
+    pub open spec fn specification_parse_slot(bytes: Seq<u8>, expected_filesystem_identifier: [u8; 16]) -> Option<Self> {
         let flags = little_endian_value(bytes.subrange(20, 24)) as u32;
         if bytes.len() < ROOT_RECORD_BYTES || bytes.subrange(0, 4) != ROOT_MAGIC@ {
             None
         } else if bytes.subrange(ROOT_CHECKSUM_OFFSET as int, ROOT_CHECKSUM_OFFSET + WIDE_CHECKSUM_BYTES)
-            != spec_wide_checksum_field(bytes, bytes.len() as int, ROOT_CHECKSUM_OFFSET as int) {
+            != specification_wide_checksum_field(bytes, bytes.len() as int, ROOT_CHECKSUM_OFFSET as int) {
             None
         } else if bytes.subrange(4, 20) != expected_filesystem_identifier@ {
             None
         } else if flags & !ROOT_RECORD_FLAG_UNMOUNT_MARKER != 0 {
             None
-        } else if NodePointer::spec_read_judging_at(bytes, 36) is Err
-            || NodePointer::spec_read_judging_at(bytes, 170) is Err
-            || NodePointer::spec_read_judging_at(bytes, 256) is Err
-            || NodePointer::spec_read_judging_at(bytes, 342) is Err {
+        } else if NodePointer::specification_read_judging_at(bytes, 36) is Err
+            || NodePointer::specification_read_judging_at(bytes, 170) is Err
+            || NodePointer::specification_read_judging_at(bytes, 256) is Err
+            || NodePointer::specification_read_judging_at(bytes, 342) is Err {
             None
         } else {
             Some(RootRecord {
                 filesystem_identifier: expected_filesystem_identifier,
-                unmount_marker: UnmountMarker::spec_of_flags_bits_carrying_only_the_marker(flags),
+                unmount_marker: UnmountMarker::specification_of_flags_bits_carrying_only_the_marker(flags),
                 instance: InstanceGeneration(little_endian_value(bytes.subrange(24, 28)) as u32),
                 checkpoint_txg: CheckpointTxg(little_endian_value(bytes.subrange(28, 36)) as u64),
-                tree_table: NodePointer::spec_decode_at(bytes, 36),
+                tree_table: NodePointer::specification_decode_at(bytes, 36),
                 tree_identifier_watermark: little_endian_value(bytes.subrange(122, 130)) as u64,
                 rollback_floor: CheckpointTxg(little_endian_value(bytes.subrange(130, 138)) as u64),
-                instance_table: NodePointer::spec_decode_at(bytes, 170),
-                mapping_root: NodePointer::spec_decode_at(bytes, 256),
-                allocation_record_tree_root: NodePointer::spec_decode_at(bytes, 342),
+                instance_table: NodePointer::specification_decode_at(bytes, 170),
+                mapping_root: NodePointer::specification_decode_at(bytes, 256),
+                allocation_record_tree_root: NodePointer::specification_decode_at(bytes, 342),
                 reclaim_threshold: CheckpointTxg(little_endian_value(bytes.subrange(428, 436)) as u64),
                 pinned_ring_slot: PinnedRingSlot(little_endian_value(bytes.subrange(436, 437)) as u8),
             })
@@ -286,33 +286,33 @@ impl RootRecord {
             self.is_encodable(),
             slot_bytes >= ROOT_RECORD_BYTES,
         ensures
-            Self::spec_parse_slot(self.spec_slot_bytes(slot_bytes), self.filesystem_identifier) == Some(self),
+            Self::specification_parse_slot(self.specification_slot_bytes(slot_bytes), self.filesystem_identifier) == Some(self),
     {
         lemma_little_endian_capacities();
         self.unmount_marker.lemma_flags_bits_round_trip();
-        let unsealed = self.spec_unsealed_slot_bytes(slot_bytes);
-        let sealed = self.spec_slot_bytes(slot_bytes);
-        let before = self.spec_bytes_before_the_checksum();
-        let after = self.spec_bytes_after_the_checksum();
+        let unsealed = self.specification_unsealed_slot_bytes(slot_bytes);
+        let sealed = self.specification_slot_bytes(slot_bytes);
+        let before = self.specification_bytes_before_the_checksum();
+        let after = self.specification_bytes_after_the_checksum();
         assert(before.len() == 138);
         assert(after.len() == 296);
         assert(unsealed.len() == slot_bytes);
-        let digest = spec_wide_checksum_field(unsealed, slot_bytes as int, 138);
+        let digest = specification_wide_checksum_field(unsealed, slot_bytes as int, 138);
         assert(digest.len() == 32);
         assert(sealed.len() == slot_bytes);
         // 校验和字段之外两截与没封的那一份逐字节相同，所以罩住的那一截（字段按 0）两份相同、算出来的校验和相同。
         assert(sealed.subrange(0, 138) =~= before);
         assert(sealed.subrange(138, 170) =~= digest);
         assert(sealed.subrange(170, 466) =~= after);
-        assert(spec_covered_with_the_field_zeroed(sealed, slot_bytes as int, 138)
-            =~= spec_covered_with_the_field_zeroed(unsealed, slot_bytes as int, 138));
+        assert(specification_covered_with_the_field_zeroed(sealed, slot_bytes as int, 138)
+            =~= specification_covered_with_the_field_zeroed(unsealed, slot_bytes as int, 138));
         // 前 138 字节逐段剥开。
         let magic = ROOT_MAGIC@;
         let fsid = self.filesystem_identifier@;
-        let flags = little_endian_bytes(self.unmount_marker.spec_flags_bits() as nat, 4);
+        let flags = little_endian_bytes(self.unmount_marker.specification_flags_bits() as nat, 4);
         let instance = little_endian_bytes(self.instance.0 as nat, 4);
         let checkpoint = little_endian_bytes(self.checkpoint_txg.0 as nat, 8);
-        let tree_table = self.tree_table.spec_bytes();
+        let tree_table = self.tree_table.specification_bytes();
         let watermark = little_endian_bytes(self.tree_identifier_watermark as nat, 8);
         let rollback = little_endian_bytes(self.rollback_floor.0 as nat, 8);
         lemma_split_a_concatenated_range(sealed, 0, magic + fsid + flags + instance + checkpoint + tree_table + watermark, rollback);
@@ -323,9 +323,9 @@ impl RootRecord {
         lemma_split_a_concatenated_range(sealed, 0, magic + fsid, flags);
         lemma_split_a_concatenated_range(sealed, 0, magic, fsid);
         // 后 296 字节逐段剥开。
-        let instance_table = self.instance_table.spec_bytes();
-        let mapping_root = self.mapping_root.spec_bytes();
-        let allocation_root = self.allocation_record_tree_root.spec_bytes();
+        let instance_table = self.instance_table.specification_bytes();
+        let mapping_root = self.mapping_root.specification_bytes();
+        let allocation_root = self.allocation_record_tree_root.specification_bytes();
         let reclaim = little_endian_bytes(self.reclaim_threshold.0 as nat, 8);
         let pinned = little_endian_bytes(self.pinned_ring_slot.0 as nat, 1);
         let algorithm_type = little_endian_bytes(0, 1);
@@ -344,7 +344,7 @@ impl RootRecord {
         self.instance_table.lemma_decode_at_round_trip(sealed, 170);
         self.mapping_root.lemma_decode_at_round_trip(sealed, 256);
         self.allocation_record_tree_root.lemma_decode_at_round_trip(sealed, 342);
-        assert(Self::spec_parse_slot(sealed, self.filesystem_identifier).unwrap().filesystem_identifier
+        assert(Self::specification_parse_slot(sealed, self.filesystem_identifier).unwrap().filesystem_identifier
             == self.filesystem_identifier);
     }
 
@@ -358,7 +358,7 @@ impl RootRecord {
             slot_bytes >= ROOT_RECORD_BYTES,
             self.is_encodable(),
         ensures
-            bytes@ == self.spec_slot_bytes(slot_bytes as nat),
+            bytes@ == self.specification_slot_bytes(slot_bytes as nat),
     {
         assert!(
             slot_bytes >= usize::try_from(ROOT_RECORD_BYTES).expect("466"),
@@ -388,10 +388,10 @@ impl RootRecord {
         writer.skip(12 + 16); // nonce、MAC：第一版留位全 0
         writer.assert_position(ROOT_RECORD_BYTES, "根记录");
         let mut bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_unsealed_slot_bytes(slot_bytes as nat));
+        assert(bytes@ =~= self.specification_unsealed_slot_bytes(slot_bytes as nat));
         let digest = wide_checksum_with_field_zeroed(&bytes, slot_bytes, ROOT_CHECKSUM_OFFSET);
         copy_bytes_into(&mut bytes, ROOT_CHECKSUM_OFFSET, &digest);
-        assert(bytes@ =~= self.spec_slot_bytes(slot_bytes as nat));
+        assert(bytes@ =~= self.specification_slot_bytes(slot_bytes as nat));
         bytes
     }
 
@@ -405,7 +405,7 @@ impl RootRecord {
     #[must_use]
     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> (root: Option<Self>)
         ensures
-            root == Self::spec_parse_slot(bytes@, *expected_filesystem_identifier),
+            root == Self::specification_parse_slot(bytes@, *expected_filesystem_identifier),
     {
         if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("466")
             || bytes[..4] != ROOT_MAGIC

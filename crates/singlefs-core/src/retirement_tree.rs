@@ -338,7 +338,7 @@ mod tests {
 
     /// 没有新退役记录的发布整棵照抄：一片都不重写，根也不重写。
     #[test]
-    fn a_publish_without_retirement_records_carries_the_whole_tree() {
+    fn publish_without_retirement_records_carries_the_whole_tree() {
         let before = after_appending_one_per_publish(
             2,
             RetirementContainerCapacity::FromTheContainerFormat,
@@ -362,7 +362,7 @@ mod tests {
     /// 开放容器满了就关、开下一片（产品容量 959，这里压到 2）：容器号 = 最大号 + 1、出生代 = 这次的 txg；满了的那片一个字节都不动。
     /// 一次发布追加两条、开放容器只剩一格时：第一条装满它，第二条开新片，两片都重写。
     #[test]
-    fn a_full_open_container_is_closed_and_a_publish_with_two_records_can_span_two_containers() {
+    fn full_open_container_is_closed_and_a_publish_with_two_records_can_span_two_containers() {
         let two = after_appending_one_per_publish(
             2,
             retirement_container_capacity_capped_at(2),

@@ -180,7 +180,7 @@ mod tests {
 
     /// 一个根装 2031 个号；多一个就拒成类型化错误（不是空间不够），这一支只在构造函数这一层测得到。
     #[test]
-    fn a_queue_longer_than_one_root_holds_is_refused_as_a_typed_error() {
+    fn queue_longer_than_one_root_holds_is_refused_as_a_typed_error() {
         let capacity = deleted_inodes_one_root_node_holds();
         assert_eq!(capacity, 2031, "(16384 − 含预留位的头 131) ÷ 8 的整数部分");
         let full: Vec<InodeNumber> = (1..=u64::try_from(capacity).expect("容量"))

@@ -23,6 +23,10 @@
 //! R-裸名同一个目标里按模块筛（`crates/` 下的包与工作区外的 crate 一样，各一个弄坏开关）：只连单元所在模块看得见的那几份
 //! （`candidates_seen_from_the_module_of_the_unit`：本模块定义的、经 use 引进的、glob use 的模块里的、写成 `模块::名` 的），点不准的退回全连；
 //! 名字是 use 改名的原名、单元是 `macro_rules!`（体里的名字在调用处解）的不筛。跨目标的只认 `pub`、不按模块筛。
+//! use 引进的名字要 use 路径恰好点到候选所在的模块才算点准：路径点到的模块里没有这个名字的候选，名字是那个模块经 `pub use` 转出来的，落在哪一份看不出，退回全连。
+//! R-裸名局部绑定遮住同名函数（一个弄坏开关；跨目标的同样遮）：函数单元里，名字每一处都是局部绑定或落在绑定的作用域里的
+//! （`is_bare_name_only_a_local_binding_of_the_function`），不往外连同名的函数。只遮函数：`let` 写成常量、静态量、单元结构体的名字是拿它当模式，
+//! 不是新绑定（rustc 对静态量与元组结构体报 E0530），这几种照连。
 //! 拒算：单元自己带的（`rust_items` 切分时记下）、链接到的文件切不全的、数据文件读不了的、构建脚本或 bin 找不到的、
 //! proc-macro crate、cfg 谓词判不了的、工具链的目标三元组查不出的、WGSL 外名没有着落的，全部收进 `ClosureOutcome::refusals`；有一条拒算就不交键。
 //! WGSL 外名（`.wgsl` 里用到、模块里没定义的名字）的着落（`WgslExternalNameSources::supply`）：整名是闭包里某个 Rust 串字面量的一个词；
@@ -40,6 +44,10 @@
 //! `--exact` 后面跟着折得出的测试名（字面串、同一 crate 的 `const …: &str`、全由它们组成的 `format!` / `concat!`；或起子进程的函数的
 //! 一个参数，取闭包里每一处调用在那个位置上交的实参），就连到入口目标里那个 `#[test] fn`；折不出、解不到恰好一个的拒算 `current-exe`。
 //! 单元里不起子进程（没有 `Command`、`spawn` 这类词）、只问 `current_exe()` 路径的不拒算、不连边（`rust_items` 的 `SPAWNING_WORDS`）。
+//! 程序起自己（[`SourceRead::OwnProgramRestart`]，`finish` 判）：`current_exe()` 的路径原样交给 `Command::new`、没有折得出的 `--exact`。
+//! 入口恰好是一个 bin 目标的 `fn main`、这一趟不按测试编的（`entry_is_the_main_of_a_program`）不拒算、不连边：子进程跑的还是这个 `main`，
+//! 它闭包里的代码都已收齐，换参数只换走哪条路。入口是别的函数（`tests::…`、bin 里的辅助函数、模块里另一个叫 `main` 的）、是测试目标、
+//! 或一组入口里另有别的入口的，拒算 `current-exe`：按测试编的程序里 `main` 是 libtest 的，参数选中哪条测试说不清。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -50,10 +58,12 @@ use crate::conditional_compilation::{
     rendered_predicate, split_at_top_level_commas, target_platform_of_triple,
     CompilationConditions, ConditionalCompilationSet, Evaluation, Predicate, TargetPlatform,
 };
-use crate::lexer::{lex_source, token_text, DocumentationCommentTreatment, TokenKind};
+use crate::lexer::{
+    identifier_name, lex_source, token_text, DocumentationCommentTreatment, Token, TokenKind,
+};
 use crate::manifest::DependencySection;
 use crate::rule_switches::{BrokenRule, RuleSwitches};
-use crate::rust_items::{normalized_path, test_name_pieces_of_texts};
+use crate::rust_items::{normalized_path, references_of_tokens, test_name_pieces_of_texts};
 use crate::sha256::{sha256_of, Sha256Digest};
 use crate::shell_sources::ShellNormalizationFailure;
 use crate::units::{
@@ -204,6 +214,15 @@ pub struct DataUnit {
     pub kind: DataUnitKind,
 }
 
+/// 闭包里一个单元头一回被排进待收队列的那条边：正在收哪个单元（入口与收尾几步并进来的没有）、照哪条规则、经哪个名字（规则不按名字连的为空）。
+/// 只给人查「它是经哪条边进来的」用，不进键、不进组成清单；同一个单元可以经好几条边进来，记的只是头一条。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FirstEdgeIntoTheClosure {
+    pub from: Option<UnitIndex>,
+    pub rule: &'static str,
+    pub name: String,
+}
+
 /// 一次收闭包的结果。
 #[derive(Clone, Debug)]
 pub struct ClosureOutcome {
@@ -217,6 +236,10 @@ pub struct ClosureOutcome {
     pub wgsl_units: Vec<WgslUnitIndex>,
     pub data_units: Vec<DataUnit>,
     pub refusals: Vec<Refusal>,
+    /// 闭包里每个单元头一回被排进来的那条边（[`FirstEdgeIntoTheClosure`]）：只当索引，不进键。
+    pub first_edges: BTreeMap<UnitIndex, FirstEdgeIntoTheClosure>,
+    /// 调用方登记了「不沿它收」、这一趟又真够到了的单元（限定名，排好序）：它们不在 `units` 里，也没从它们往下收。
+    pub units_reached_and_not_followed: Vec<String>,
 }
 
 /// 调用方拼进键的外部输入：工具链（`rustc -vV` 与解析后的构建环境）与依赖解析结果，各是原文行。本 crate 不跑 rustc；
@@ -863,6 +886,14 @@ struct ClosureRun<'workspace> {
     condition_atoms: BTreeSet<String>,
     /// 头一份 bash 规范化跑不下去的 shell 脚本（`follow_shell_sources`）：有了它这一趟交 `EntryError::ShellNormalizationFailed`，不交闭包。
     shell_normalization_failure: Option<ShellNormalizationFailure>,
+    /// 每个被排进队列的单元头一回是经哪条边排进来的（`record_the_first_edge`）；不改收什么，只当索引。
+    first_edges: BTreeMap<UnitIndex, FirstEdgeIntoTheClosure>,
+    /// 此刻正在收的单元与正在走的规则：`push` 照它们记头一条边。
+    unit_being_visited: Option<UnitIndex>,
+    rule_being_followed: &'static str,
+    /// 调用方登记的不沿它收的单元（限定名）：够到了不进闭包、不往下收，记进 `units_reached_and_not_followed`。
+    units_not_followed: BTreeSet<String>,
+    units_reached_and_not_followed: BTreeSet<String>,
 }
 
 /// R-方法：基本类型与 `Self`、`Vec`、`Option`、`Result`、`Box`、`String` 恒被点名。
@@ -873,6 +904,362 @@ const ALWAYS_NAMED_TYPES: [&str; 23] = [
 
 /// R-裸名按模块筛候选时，路径根名是这几个的指标准库，不点本目标里的哪一份（另几个是看得见的别的 crate 的库名）。
 const PATH_ROOTS_OF_THE_STANDARD_CRATES: [&str; 3] = ["std", "core", "alloc"];
+
+/// 函数体里这几个词起头的可能是嵌套条目。嵌套条目看不见外层函数的局部绑定，里面的同名引用要往外解；哪一处在嵌套条目里不细分，
+/// 函数体里有这几个词的函数一律不算遮住（`fn` 指针类型、`*const` 这类不是条目的写法同样算，只多连）。
+const WORDS_STARTING_A_NESTED_ITEM: [&str; 13] = [
+    "fn",
+    "impl",
+    "trait",
+    "mod",
+    "const",
+    "static",
+    "struct",
+    "enum",
+    "union",
+    "type",
+    "use",
+    "macro_rules",
+    "extern",
+];
+
+/// use 语句里 `path_start` 那一段前面的路径，花括号展开：`use a::{b::{c, d}, e}` 里 `d` 前面是 `a`、`b`。顺着 `段::` 往前收，碰到不是 `段::` 的就跳到包着它的 `{` 接着收，
+/// 收到 `use` 为止；`use_keyword` 是 `use` 的位置。
+fn use_path_leading_to<'source>(
+    source: &'source str,
+    tokens: &[Token],
+    use_keyword: usize,
+    path_start: usize,
+) -> Vec<&'source str> {
+    let text_at = |position: usize| {
+        tokens
+            .get(position)
+            .map_or("", |token| token_text(source, token))
+    };
+    let mut path = Vec::new();
+    let mut position = path_start;
+    loop {
+        if position >= use_keyword + 4
+            && text_at(position - 1) == ":"
+            && text_at(position - 2) == ":"
+            && tokens[position - 3].kind == TokenKind::Identifier
+        {
+            path.push(text_at(position - 3));
+            position -= 3;
+            continue;
+        }
+        let mut nested_braces = 0usize;
+        let mut enclosing_brace = None;
+        for cursor in (use_keyword + 1..position).rev() {
+            match text_at(cursor) {
+                "}" => nested_braces += 1,
+                "{" if nested_braces == 0 => {
+                    enclosing_brace = Some(cursor);
+                    break;
+                }
+                "{" => nested_braces -= 1,
+                _ => {}
+            }
+        }
+        let Some(brace) = enclosing_brace else {
+            path.reverse();
+            return path;
+        };
+        position = brace;
+    }
+}
+
+/// 函数单元的签名在它词法单元里的位置（`function_signature_positions`）。
+struct FunctionSignaturePositions {
+    own_name: usize,
+    parameters_open: usize,
+    parameters_close: usize,
+    body_open: usize,
+}
+
+/// 找函数单元的签名：深度 0 上头一个 `fn`、后面的名字、跳过尖括号里的泛型参数之后的 `(` 与配对的 `)`、再往后深度 0 上头一个 `{`。
+/// 哪一步对不上（`verus!` 里的怪写法、没有函数体的声明）交 None。
+fn function_signature_positions(
+    source: &str,
+    tokens: &[Token],
+) -> Option<FunctionSignaturePositions> {
+    let text_at = |position: usize| {
+        tokens
+            .get(position)
+            .map_or("", |token| token_text(source, token))
+    };
+    let mut depth_before_the_keyword = 0usize;
+    let mut function_keyword = None;
+    for position in 0..tokens.len() {
+        match text_at(position) {
+            "(" | "[" | "{" => depth_before_the_keyword += 1,
+            ")" | "]" | "}" => {
+                depth_before_the_keyword = depth_before_the_keyword.saturating_sub(1)
+            }
+            "fn" if depth_before_the_keyword == 0 => {
+                function_keyword = Some(position);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let own_name = function_keyword? + 1;
+    let mut parameters_open = own_name + 1;
+    if text_at(parameters_open) == "<" {
+        let mut angle_depth = 0usize;
+        loop {
+            match text_at(parameters_open) {
+                "" => return None,
+                "<" => angle_depth += 1,
+                ">" if text_at(parameters_open - 1) != "-" => {
+                    angle_depth = angle_depth.saturating_sub(1);
+                }
+                _ => {}
+            }
+            parameters_open += 1;
+            if angle_depth == 0 {
+                break;
+            }
+        }
+    }
+    if text_at(parameters_open) != "(" {
+        return None;
+    }
+    let mut depth_from_the_parameters = 0usize;
+    let mut parameters_close = None;
+    let mut body_open = None;
+    for position in parameters_open..tokens.len() {
+        match text_at(position) {
+            "{" if parameters_close.is_some() && depth_from_the_parameters == 0 => {
+                body_open = Some(position);
+                break;
+            }
+            "(" | "[" | "{" => depth_from_the_parameters += 1,
+            ")" | "]" | "}" => {
+                depth_from_the_parameters = depth_from_the_parameters.saturating_sub(1);
+                if depth_from_the_parameters == 0 && parameters_close.is_none() {
+                    parameters_close = Some(position);
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(FunctionSignaturePositions {
+        own_name,
+        parameters_open,
+        parameters_close: parameters_close?,
+        body_open: body_open?,
+    })
+}
+
+/// 参数表里绑定 `name` 的那一处：括号深度 1 上紧跟 `(` 或 `,`、可带 `mut`、后面接单个 `:`。解构的参数（`(a, b): …`、`&a: …`）不认。
+fn parameter_binding_position(
+    source: &str,
+    tokens: &[Token],
+    signature: &FunctionSignaturePositions,
+    name: &str,
+) -> Option<usize> {
+    let text_at = |position: usize| {
+        tokens
+            .get(position)
+            .map_or("", |token| token_text(source, token))
+    };
+    let mut delimiter_depth = 0usize;
+    let mut is_at_parameter_start = true;
+    for position in signature.parameters_open + 1..signature.parameters_close {
+        let word = text_at(position);
+        match word {
+            "(" | "[" | "{" => delimiter_depth += 1,
+            ")" | "]" | "}" => delimiter_depth = delimiter_depth.saturating_sub(1),
+            "," if delimiter_depth == 0 => {
+                is_at_parameter_start = true;
+                continue;
+            }
+            _ => {}
+        }
+        if !is_at_parameter_start {
+            continue;
+        }
+        if word == "mut" {
+            continue;
+        }
+        is_at_parameter_start = false;
+        if tokens
+            .get(position)
+            .is_some_and(|token| token.kind == TokenKind::Identifier)
+            && identifier_name(word) == name
+            && text_at(position + 1) == ":"
+            && text_at(position + 2) != ":"
+        {
+            return Some(position);
+        }
+    }
+    None
+}
+
+/// `name_position` 上的名字是一条语句开头的 `let [mut] 名` 绑定：`let` 紧跟 `{`、`}` 或 `;`（`if let`、`while let`、`&& let` 不算），名字后面接 `=`、`;`
+/// 或单个 `:`。解构模式不认。
+fn is_statement_let_binding_at(source: &str, tokens: &[Token], name_position: usize) -> bool {
+    let text_at = |position: usize| {
+        tokens
+            .get(position)
+            .map_or("", |token| token_text(source, token))
+    };
+    let let_distance = if name_position >= 1 && text_at(name_position - 1) == "mut" {
+        2
+    } else {
+        1
+    };
+    let Some(let_position) = name_position.checked_sub(let_distance) else {
+        return false;
+    };
+    let Some(before_the_let) = let_position.checked_sub(1) else {
+        return false;
+    };
+    text_at(let_position) == "let"
+        && matches!(text_at(before_the_let), "{" | "}" | ";")
+        && match text_at(name_position + 1) {
+            "=" | ";" => true,
+            ":" => text_at(name_position + 2) != ":",
+            _ => false,
+        }
+}
+
+/// 还开着的一层括号，只记判局部绑定要的那几样。
+#[derive(Clone, Copy)]
+struct OpenDelimiterOfTheBindingScan {
+    is_brace: bool,
+    is_inside_a_macro_call: bool,
+    /// 这一层此刻看得见 `name` 的局部绑定（外层绑定了的算）。
+    is_name_bound: bool,
+    /// 这一层有一条 `let 名` 还没走到它的 `;`：初始值里的 `名` 指外面的，走到 `;` 才算绑定了。
+    is_let_waiting_for_its_semicolon: bool,
+}
+
+/// 函数单元 `tokens` 里 `name` 只是局部绑定：至少有一处绑定（语句开头的 `let [mut] 名`，或参数），别的每一处都落在绑定的作用域里。块级作用域按花括号认：
+/// `let` 从它的 `;` 起到外层花括号收尾，参数从参数表的 `)` 起到单元收尾。这几样不算遮住（宁可多连）：绑定之前或作用域之外出现的、`let` 初始值里的；
+/// 带路径的（前后挨 `::`）、宏名（后接 `!` 与开括号）；格式串捕获（`{名}`）在作用域外的；宏调用括号里的 `let`（展开成什么看不出，不当绑定；
+/// 作用域里写在宏调用实参里的名字照算局部的）；解构、`if let`、`match`、`for`、闭包参数绑定的不认（这几处的名字按「作用域外」算）；函数体里有嵌套条目的词
+/// （`WORDS_STARTING_A_NESTED_ITEM`）的。单个 `.` 后面的是字段或方法，不指函数，不看；函数自己的名字不看。
+fn is_bare_name_only_a_local_binding_of_the_function(
+    source: &str,
+    tokens: &[Token],
+    name: &str,
+) -> bool {
+    let Some(signature) = function_signature_positions(source, tokens) else {
+        return false;
+    };
+    let text_at = |position: usize| {
+        tokens
+            .get(position)
+            .map_or("", |token| token_text(source, token))
+    };
+    let parameter_position = parameter_binding_position(source, tokens, &signature, name);
+    let mut has_binding = parameter_position.is_some();
+    let mut open_delimiters = vec![OpenDelimiterOfTheBindingScan {
+        is_brace: false,
+        is_inside_a_macro_call: false,
+        is_name_bound: false,
+        is_let_waiting_for_its_semicolon: false,
+    }];
+    for (position, token) in tokens.iter().enumerate() {
+        let text = token_text(source, token);
+        let innermost = *open_delimiters
+            .last()
+            .expect("最外面那一层不出栈（下面的出栈判了长度），栈不空");
+        match token.kind {
+            TokenKind::Lifetime => {}
+            TokenKind::Literal => {
+                if !innermost.is_name_bound
+                    && text.contains(name)
+                    && references_of_tokens(source, std::slice::from_ref(token), None)
+                        .plain_names
+                        .iter()
+                        .any(|captured| captured == name)
+                {
+                    return false;
+                }
+            }
+            TokenKind::Punctuation => match text {
+                "(" | "[" | "{" => {
+                    let follows_a_macro_name = position >= 2
+                        && text_at(position - 1) == "!"
+                        && tokens[position - 2].kind == TokenKind::Identifier;
+                    open_delimiters.push(OpenDelimiterOfTheBindingScan {
+                        is_brace: text == "{",
+                        is_inside_a_macro_call: innermost.is_inside_a_macro_call
+                            || follows_a_macro_name,
+                        is_name_bound: innermost.is_name_bound,
+                        is_let_waiting_for_its_semicolon: false,
+                    });
+                }
+                ")" | "]" | "}" => {
+                    if open_delimiters.len() > 1 {
+                        open_delimiters.pop();
+                    }
+                    if position == signature.parameters_close && parameter_position.is_some() {
+                        open_delimiters
+                            .last_mut()
+                            .expect("上面只在长度大于 1 时出栈，栈不空")
+                            .is_name_bound = true;
+                    }
+                }
+                ";" => {
+                    let scope = open_delimiters
+                        .last_mut()
+                        .expect("最外面那一层不出栈（上面的出栈判了长度），栈不空");
+                    if scope.is_let_waiting_for_its_semicolon {
+                        scope.is_let_waiting_for_its_semicolon = false;
+                        scope.is_name_bound = true;
+                    }
+                }
+                _ => {}
+            },
+            TokenKind::Identifier => {
+                if identifier_name(text) != name
+                    || position == signature.own_name
+                    || Some(position) == parameter_position
+                {
+                    continue;
+                }
+                if innermost.is_brace
+                    && !innermost.is_inside_a_macro_call
+                    && is_statement_let_binding_at(source, tokens, position)
+                {
+                    let scope = open_delimiters
+                        .last_mut()
+                        .expect("最外面那一层不出栈（上面的出栈判了长度），栈不空");
+                    scope.is_let_waiting_for_its_semicolon = true;
+                    has_binding = true;
+                    continue;
+                }
+                let is_after_a_single_dot = position >= 1
+                    && text_at(position - 1) == "."
+                    && !(position >= 2 && text_at(position - 2) == ".");
+                if is_after_a_single_dot {
+                    continue;
+                }
+                let is_after_a_path_separator =
+                    position >= 2 && text_at(position - 1) == ":" && text_at(position - 2) == ":";
+                let is_before_a_path_separator =
+                    text_at(position + 1) == ":" && text_at(position + 2) == ":";
+                let is_a_macro_name = text_at(position + 1) == "!"
+                    && matches!(text_at(position + 2), "(" | "[" | "{");
+                if is_after_a_path_separator || is_before_a_path_separator || is_a_macro_name {
+                    return false;
+                }
+                if !innermost.is_name_bound {
+                    return false;
+                }
+            }
+        }
+    }
+    has_binding
+        && !tokens[signature.body_open..].iter().any(|token| {
+            token.kind == TokenKind::Identifier
+                && WORDS_STARTING_A_NESTED_ITEM.contains(&token_text(source, token))
+        })
+}
 
 impl<'workspace> ClosureRun<'workspace> {
     fn new(
@@ -902,10 +1289,30 @@ impl<'workspace> ClosureRun<'workspace> {
             wgsl_name_suppliers_tried: HashSet::new(),
             condition_atoms: BTreeSet::new(),
             shell_normalization_failure: None,
+            first_edges: BTreeMap::new(),
+            unit_being_visited: None,
+            rule_being_followed: "入口",
+            units_not_followed: BTreeSet::new(),
+            units_reached_and_not_followed: BTreeSet::new(),
+        }
+    }
+
+    /// 记下 `unit` 头一回被排进来的那条边；已经记过的不改。
+    fn record_the_first_edge(&mut self, unit: UnitIndex, name: &str) {
+        if !self.first_edges.contains_key(&unit) {
+            self.first_edges.insert(
+                unit,
+                FirstEdgeIntoTheClosure {
+                    from: self.unit_being_visited,
+                    rule: self.rule_being_followed,
+                    name: name.to_string(),
+                },
+            );
         }
     }
 
     fn push(&mut self, unit: UnitIndex, target: TargetIndex) {
+        self.record_the_first_edge(unit, "");
         if !self.seen_pairs.contains(&(unit, target)) {
             self.pending.push((unit, target));
         }
@@ -967,14 +1374,21 @@ impl<'workspace> ClosureRun<'workspace> {
             if !self.seen_pairs.insert((unit, target)) {
                 continue;
             }
+            self.unit_being_visited = Some(unit);
             self.visit_unit_for_target(unit, target);
         }
+        self.unit_being_visited = None;
     }
 
     fn visit_unit_for_target(&mut self, unit_index: UnitIndex, target: TargetIndex) {
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
         if !self.is_kind_kept(unit.kind) {
+            return;
+        }
+        if self.units_not_followed.contains(&unit.qualified_name) {
+            self.units_reached_and_not_followed
+                .insert(unit.qualified_name.clone());
             return;
         }
         match self.activity(unit_index, target) {
@@ -1000,6 +1414,7 @@ impl<'workspace> ClosureRun<'workspace> {
                 .switches
                 .is_intact(BrokenRule::DynTraitsOpenEveryImplementation)
             {
+                self.rule_being_followed = "R-开放";
                 for trait_name in &unit.references.dyn_trait_names {
                     self.open_trait(trait_name);
                 }
@@ -1009,6 +1424,7 @@ impl<'workspace> ClosureRun<'workspace> {
             return;
         }
         if unit.kind.is_type() {
+            self.rule_being_followed = "R-隐式（类型被点名）";
             self.name_type(&unit.name);
         }
         if unit.kind == UnitKind::ItemMacroInvocation
@@ -1020,12 +1436,14 @@ impl<'workspace> ClosureRun<'workspace> {
                 .types_declared_by_item_macro
                 .get(&unit_index)
             {
+                self.rule_being_followed = "R-隐式（条目级宏调用生成的类型被点名）";
                 for type_name in type_names {
                     self.name_type(type_name);
                 }
             }
         }
         if unit.kind == UnitKind::TraitHead {
+            self.rule_being_followed = "trait 头带它的 impl";
             // trait 头进闭包时它的 blanket impl 连同成员一起进
             if let Some(implementations) = workspace
                 .indexes
@@ -1105,6 +1523,7 @@ impl<'workspace> ClosureRun<'workspace> {
         {
             return alias_originals;
         }
+        self.rule_being_followed = "R-结构";
         if let Some(container) = unit.container {
             self.push(container, target);
         }
@@ -1155,6 +1574,7 @@ impl<'workspace> ClosureRun<'workspace> {
         if !self.switches.is_intact(BrokenRule::BareNames) {
             return;
         }
+        self.rule_being_followed = "R-裸名";
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
         let visible = self.link.visible_targets(target);
@@ -1170,6 +1590,9 @@ impl<'workspace> ClosureRun<'workspace> {
             .is_intact(BrokenRule::CratesDirectoryNamesByModule);
         // macro_rules! 体里的裸名在调用处解，定义所在模块看不出它落在哪一份：一律全连
         let is_resolved_at_the_call_site = unit.kind == UnitKind::MacroRulesDefinition;
+        let local_bindings_shadow_same_named_functions = self
+            .switches
+            .is_intact(BrokenRule::LocalBindingsShadowSameNamedFunctions);
         let unit_crate = workspace.targets[target.0].crate_index;
         let roots_naming_another_crate: BTreeSet<&str> = PATH_ROOTS_OF_THE_STANDARD_CRATES
             .iter()
@@ -1185,6 +1608,8 @@ impl<'workspace> ClosureRun<'workspace> {
             )
             .collect();
         for name in unit.references.plain_names.iter().chain(alias_originals) {
+            // 只在这个名字真有同名函数要连时算一次（文件头「R-裸名局部绑定遮住同名函数」）；use 改名的原名不是这个单元写的名字，不算遮住
+            let mut is_only_a_local_binding: Option<bool> = None;
             for visible_target in &visible {
                 let Some(found) = workspace
                     .indexes
@@ -1228,10 +1653,28 @@ impl<'workspace> ClosureRun<'workspace> {
                     candidates = &seen_from_the_module;
                 }
                 for found_unit in candidates {
+                    if local_bindings_shadow_same_named_functions
+                        && workspace.units[found_unit.0].kind == UnitKind::Function
+                        && unit.kind == UnitKind::Function
+                        && !alias_originals.contains(name)
+                        && *is_only_a_local_binding.get_or_insert_with(|| {
+                            unit.token_range.is_some_and(|(first_token, end_token)| {
+                                let file = &workspace.files[unit.file.0];
+                                is_bare_name_only_a_local_binding_of_the_function(
+                                    &file.source,
+                                    &file.tokens[first_token..end_token],
+                                    name,
+                                )
+                            })
+                        })
+                    {
+                        continue;
+                    }
                     if *visible_target == target
                         || workspace.units[found_unit.0].is_public
                         || ignores_visibility
                     {
+                        self.record_the_first_edge(*found_unit, name);
                         self.push(*found_unit, *visible_target);
                     }
                 }
@@ -1272,12 +1715,12 @@ impl<'workspace> ClosureRun<'workspace> {
     }
 
     /// 同一个目标里，单元按裸名 `name` 连得到 `candidates` 里的哪几份（与 `scripts/gate/lib_function_units.py` 的
-    /// `RustWorkspace.candidates_seen_from_module` 同一个判法）：与单元同一模块的；所在模块的 use 引进了 `name`（或是 glob）、use 路径里有
-    /// 候选所在模块末段的（`crate` 对根模块、`super` 对上一层、`super::super` 对上两层，`self` 起头对本模块）；单元里写成 `前缀::name`、
-    /// 前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
+    /// `RustWorkspace.candidates_seen_from_module` 同一个判法）：与单元同一模块的；所在模块的 use 引进了 `name`（或是 glob）、引进它的那一支路径
+    /// （花括号展开之后）恰好点到候选所在模块的（`crate`、`self`、`super` 起头的从根模块、本模块、往上那一层接着走，要整条相等；别的起头的相对路径要是候选模块路径的后缀）；
+    /// 单元里写成 `前缀::name`、前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
     /// use 路径或 `…::name` 整条路径的根名在 `roots_naming_another_crate` 里的（别的 crate 的库名、`std`、`core`、`alloc`）指的是别的 crate，
     /// 不点这个目标里的哪一份，跳过这一处。
-    /// 认不出落在哪一份的退回全连：use 或前缀一份都没点到（经 `pub use` 转出来的）、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
+    /// 认不出落在哪一份的退回全连：use 的某一支或前缀一份都没点到（经 `pub use` 转出来的）、这条 use 里找不到引进 `name` 的那一支、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
     /// 前缀是本目标的类型或 trait、或 `Self` 的是关联项（R-路径另管），跳过这一处。哪一样都不沾的（字段名、局部变量、impl 成员自己的名字）一份都不连。
     fn candidates_seen_from_the_module_of_the_unit(
         &self,
@@ -1335,6 +1778,39 @@ impl<'workspace> ClosureRun<'workspace> {
                 .collect();
             (!found.is_empty()).then_some(found)
         };
+        // use 的一支路径（不含名字本身）恰好点到的候选（下标）；一份都没点到交 None。
+        // 恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；模块里没有这个名字的候选，名字可能是它经 `pub use` 转出来的
+        let placed_by_the_use_path = |path: &[&str]| -> Option<BTreeSet<usize>> {
+            let leading_supers = path
+                .iter()
+                .take_while(|segment| **segment == "super")
+                .count();
+            let own_module_words = own_module.iter().map(String::as_str);
+            let exact_module: Option<Vec<&str>> = match path.first().copied() {
+                Some("crate") => Some(path[1..].to_vec()),
+                Some("self") => Some(own_module_words.chain(path[1..].iter().copied()).collect()),
+                Some("super") => Some(
+                    own_module_words
+                        .take(own_module.len().saturating_sub(leading_supers))
+                        .chain(path[leading_supers..].iter().copied())
+                        .collect(),
+                ),
+                Some(_) | None => None,
+            };
+            let found: BTreeSet<usize> = candidate_modules
+                .iter()
+                .enumerate()
+                .filter(|(_, module)| {
+                    let module_words: Vec<&str> = module.iter().map(String::as_str).collect();
+                    match &exact_module {
+                        Some(exact) => module_words == *exact,
+                        None => !path.is_empty() && module_words.ends_with(path),
+                    }
+                })
+                .map(|(candidate_position, _)| candidate_position)
+                .collect();
+            (!found.is_empty()).then_some(found)
+        };
         let mut is_placement_unknown = false;
         if let Some(uses) = workspace
             .indexes
@@ -1368,12 +1844,29 @@ impl<'workspace> ClosureRun<'workspace> {
                 if path_root.is_some_and(|root| roots_naming_another_crate.contains(root)) {
                     continue;
                 }
-                let segments: Vec<&str> = (first_token..end_token)
-                    .filter(|position| is_identifier_at(*position))
-                    .map(text_at)
-                    .filter(|word| !matches!(*word, "use" | "pub" | "as") && *word != name)
+                // 这条 use 里引进 name 的每一支（`*`、名字本身）的路径，花括号展开之后；`原名 as name` 那一支 `as` 前面不是 `段::`，路径只到外层花括号，多半点不到，退回全连
+                let use_keyword = (first_token..end_token)
+                    .find(|position| is_identifier_at(*position) && text_at(*position) == "use")
+                    .unwrap_or(first_token);
+                let paths_bringing_in_the_name: Vec<Vec<&str>> = (use_keyword + 1..end_token)
+                    .filter(|position| {
+                        text_at(*position) == "*"
+                            || (is_identifier_at(*position)
+                                && text_at(*position) == name
+                                && text_at(*position + 1) != ":")
+                    })
+                    .map(|leaf| use_path_leading_to(&file.source, &file.tokens, use_keyword, leaf))
                     .collect();
-                match placed(&segments) {
+                let placed_by_every_path = (!paths_bringing_in_the_name.is_empty())
+                    .then(|| {
+                        paths_bringing_in_the_name
+                            .iter()
+                            .map(|path| placed_by_the_use_path(path))
+                            .collect::<Option<Vec<BTreeSet<usize>>>>()
+                    })
+                    .flatten()
+                    .map(|hits| hits.into_iter().flatten().collect::<BTreeSet<usize>>());
+                match placed_by_every_path {
                     Some(hit) => seen.extend(hit),
                     None => is_placement_unknown = true,
                 }
@@ -1469,6 +1962,7 @@ impl<'workspace> ClosureRun<'workspace> {
         if !self.switches.is_intact(BrokenRule::MethodCalls) {
             return;
         }
+        self.rule_being_followed = "R-方法";
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
         let foreign_type_implementations = self.foreign_type_trait_implementations();
@@ -1499,6 +1993,7 @@ impl<'workspace> ClosureRun<'workspace> {
                     false
                 };
                 if is_eligible {
+                    self.record_the_first_edge(*member, method_name);
                     self.push_with_a_linked_target(*member);
                 }
             }
@@ -1509,6 +2004,7 @@ impl<'workspace> ClosureRun<'workspace> {
         if !self.switches.is_intact(BrokenRule::QualifiedPaths) {
             return;
         }
+        self.rule_being_followed = "R-路径";
         let workspace = self.workspace;
         let unit = &workspace.units[unit_index.0];
         let own_container = unit
@@ -1565,6 +2061,7 @@ impl<'workspace> ClosureRun<'workspace> {
                     false
                 };
                 if is_match {
+                    self.record_the_first_edge(*member, &format!("{qualifier}::{member_name}"));
                     self.push_with_a_linked_target(*member);
                 }
             }
@@ -1591,6 +2088,7 @@ impl<'workspace> ClosureRun<'workspace> {
         if !self.switches.is_intact(BrokenRule::GlobalAllocatorEdges) {
             return;
         }
+        self.rule_being_followed = "全局分配器";
         let workspace = self.workspace;
         for allocator in &workspace.indexes.global_allocators {
             for membership in &workspace.memberships[workspace.units[allocator.0].file.0] {
@@ -1823,6 +2321,8 @@ impl<'workspace> ClosureRun<'workspace> {
                 }
                 // 子进程测试边在闭包收完一趟之后连（`pull_in_child_process_tests`）：参数写法要看闭包里的调用处
                 SourceRead::ChildTestProcess { .. } => {}
+                // 拒不拒算要看入口，在 `finish` 判
+                SourceRead::OwnProgramRestart { .. } => {}
                 SourceRead::BinaryExecutable { binary_name, line } => {
                     match workspace.target_of_crate(
                         crate_index,
@@ -2004,6 +2504,7 @@ impl<'workspace> ClosureRun<'workspace> {
                 | SourceRead::BuildScriptEnvironmentValue { .. }
                 | SourceRead::BinaryExecutable { .. }
                 | SourceRead::Directory { .. }
+                | SourceRead::OwnProgramRestart { .. }
                 | SourceRead::ChildTestProcess { .. } => false,
             });
             if includes_a_defining_file {
@@ -2030,6 +2531,7 @@ impl<'workspace> ClosureRun<'workspace> {
             .collect();
         let includers =
             self.wgsl_includers_outside_the_closure(&names_the_wgsl_module_leaves_undefined);
+        self.rule_being_followed = "WGSL 外名的着落";
         if !includers.is_empty() {
             // 先只并读 `.wgsl` 的单元：下一趟在合起来的模块上重算外名，定义在那几份里的名字不再去找 Rust 侧的着落
             for (includer, linked_target) in &includers {
@@ -2237,6 +2739,7 @@ impl<'workspace> ClosureRun<'workspace> {
                 }
             }
         }
+        self.rule_being_followed = "子进程测试";
         let mut pushed = false;
         for child in children {
             if !self.seen_pairs.contains(&(child, self.entry_target)) {
@@ -2247,11 +2750,32 @@ impl<'workspace> ClosureRun<'workspace> {
         pushed
     }
 
-    fn finish(mut self, entry_target: TargetIndex, entry_units: Vec<UnitIndex>) -> ClosureOutcome {
+    fn finish(
+        mut self,
+        entry_target: TargetIndex,
+        entry_units: Vec<UnitIndex>,
+        is_entry_compiled_as_test: bool,
+    ) -> ClosureOutcome {
         let workspace = self.workspace;
+        let entry_is_the_main_of_a_program = entry_is_the_main_of_a_program(
+            workspace,
+            entry_target,
+            &entry_units,
+            is_entry_compiled_as_test,
+        );
         for unit_index in &self.in_closure {
             let unit = &workspace.units[unit_index.0];
             for read in &unit.reads {
+                if let SourceRead::OwnProgramRestart { line, fragment } = read {
+                    if !entry_is_the_main_of_a_program {
+                        self.refusals.insert(Refusal {
+                            file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
+                            line: *line,
+                            form: RefusalForm::CurrentExecutablePath,
+                            fragment: fragment.clone(),
+                        });
+                    }
+                }
                 if let SourceRead::ChildTestProcess {
                     line,
                     test_name,
@@ -2322,6 +2846,12 @@ impl<'workspace> ClosureRun<'workspace> {
             }
             wgsl_units = reached.into_iter().collect();
         }
+        let in_closure = &self.in_closure;
+        let first_edges = self
+            .first_edges
+            .into_iter()
+            .filter(|(unit, _)| in_closure.contains(unit))
+            .collect();
         ClosureOutcome {
             entry_target_kind: workspace.targets[entry_target.0].kind,
             entry_units,
@@ -2330,8 +2860,27 @@ impl<'workspace> ClosureRun<'workspace> {
             wgsl_units,
             data_units: self.data_units.into_iter().collect(),
             refusals: self.refusals.into_iter().collect(),
+            first_edges,
+            units_reached_and_not_followed: self
+                .units_reached_and_not_followed
+                .into_iter()
+                .collect(),
         }
     }
+}
+
+/// 这一趟的入口恰好是一个 bin 目标自己的 `fn main`（目标根文件顶层那一个，一组入口里没有别的）、不按测试编：跑起来的进程从这个 `main` 起。
+fn entry_is_the_main_of_a_program(
+    workspace: &Workspace,
+    entry_target: TargetIndex,
+    entry_units: &[UnitIndex],
+    is_entry_compiled_as_test: bool,
+) -> bool {
+    workspace.targets[entry_target.0].kind == TargetKind::Binary
+        && !is_entry_compiled_as_test
+        && workspace
+            .main_function_of(entry_target)
+            .is_some_and(|main| entry_units == [main])
 }
 
 fn entry_conditions_of(
@@ -2583,6 +3132,30 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
     features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
     switches: &RuleSwitches,
 ) -> Result<ClosureOutcome, EntryError> {
+    compute_closure_of_entries_not_following_the_listed_units(
+        workspace,
+        request,
+        additional_entry_paths,
+        features_enabled_by_the_build,
+        switches,
+        &BTreeSet::new(),
+    )
+}
+
+/// 同 [`compute_closure_of_entries_with_the_features_of_the_build`]，另给一张「不沿它收」的单元登记（限定名）：够到登记的单元时
+/// 它不进闭包、不从它往下收（经别的边够得到的单元照进），真够到的那几个交在 `ClosureOutcome::units_reached_and_not_followed`。
+/// 登记是空的，与那一个函数逐字相同。登记什么、为什么不改判定结局由调用方担（登记的表与它的自证在调用方那一侧）。
+///
+/// # Errors
+/// 同 [`compute_closure_of_entries_with_the_features_of_the_build`]。
+pub fn compute_closure_of_entries_not_following_the_listed_units(
+    workspace: &Workspace,
+    request: &ClosureRequest,
+    additional_entry_paths: &[String],
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    switches: &RuleSwitches,
+    units_not_followed: &BTreeSet<String>,
+) -> Result<ClosureOutcome, EntryError> {
     let mut features_enabled_on_the_dependencies_by_the_build = BTreeMap::new();
     for (package_name, features) in &features_enabled_by_the_build.features_of_each_package {
         let crate_index = workspace
@@ -2634,6 +3207,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
             )?);
         }
         let mut run = ClosureRun::new(workspace, link, switches, entry_target);
+        run.units_not_followed.clone_from(units_not_followed);
         for entry in &entries {
             run.push(*entry, entry_target);
             let signature_traits = workspace.units[entry.0]
@@ -2644,6 +3218,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
                 run.open_trait(trait_name);
             }
         }
+        run.rule_being_followed = "链进来的别的目标的 main";
         for root in &extra_roots {
             if let Some(main) = workspace.main_function_of(*root) {
                 run.push(main, *root);
@@ -2658,7 +3233,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
             return Err(EntryError::ShellNormalizationFailed(failure));
         }
         if run.requested_roots.is_subset(&extra_roots) {
-            let mut outcome = run.finish(entry_target, entries);
+            let mut outcome = run.finish(entry_target, entries, entry_conditions.is_test);
             if platform.is_none() {
                 let entry_unit = &workspace.units[outcome
                     .entry_units

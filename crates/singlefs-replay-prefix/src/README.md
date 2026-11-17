@@ -4,7 +4,7 @@
 
 本次 GC 扩展的审查记录在 [records](../../../records/2026-10-24-GC形式化与core改动复核.md)。原始验证记录在 [扩展报告](../../../records/2026-10-24-GC实现与旧读者及崩溃协议形式化扩展.md)。以下说明当前源码，而非冻结历史。
 
-## 七份源文件各负责什么
+## 八份源文件各负责什么
 
 | 文件 | 可执行产品入口 | 验证内容与主要边界 |
 | --- | --- | --- |
@@ -12,11 +12,12 @@
 | [compaction_plan_proofs.rs](compaction_plan_proofs.rs) | `choose_compaction_segment`、`plan_compaction_batch` | 选段资格、贪心和平局规则；计划顺序、数量、互异性和进展；另有按槽区间的搬迁保持引理（P4），前提含回退候选与读者的区间，它不是产品 I/O 代码 |
 | [gc_ring_interval_proofs.rs](gc_ring_interval_proofs.rs) | 无 | GC 搬迁协议的根环版：映射值是槽区间，F 分内存与持久两层，根按版本号点名；任意有限历史的读取保持、三个反例被拒、G7 |
 | [gc_crash_proofs.rs](gc_crash_proofs.rs) | **只有** `released_record_can_be_reclaimed` | 回收比较核，与「门槛蕴涵没被引用」那一条引理（两条前提显式写在 requires 里） |
+| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 新增 20 项核心性质与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
 | [file_range_proofs.rs](file_range_proofs.rs) | `next_tail_batch`、`bytes_in_unit`、`checked_write_end`、`payload_length_from_start`、`units_covering_size`、`units_for_sequential_write`、`rounded_size_fits`、`checked_unit_byte_range`、`checked_bytes_in_indexed_unit` | 截断/删除的批量释放边界、进展与尾区间分区；部分写交集的精确覆盖、两侧偏移与容量上界；相邻单元无重叠无遗漏；按单元号算单元端点的乘加与溢出拒绝 |
 | [unlink_proofs.rs](unlink_proofs.rs) | `next_unlink_batch`、`size_after_an_unlink_batch` | unlink 的分批计划：整串计划的形状与步数、每个数据单元恰好释放一次、从任一中间版续做的计划等于一路做下来的后半截；删除批的下段节点每层至多重写截口那一个（按跨度模型）；size 乘法不回绕 |
-| [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价 |
+| [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价；抽象字节模型的覆盖规律与整单元覆盖不依赖旧内容 |
 
-核的入口文件为 `lib.rs`，另六份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
+核的入口文件为 `lib.rs`，另七份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
 
 ## core 到 compaction 核的转换
 
@@ -145,6 +146,43 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 本模块新增 6 个被验函数（含一条 nonlinear_arith 子证明，共 7 条义务）与 11 个必红变异。证明依赖输入区间有效：构造后的计划字段须保持一致，单元端点的乘加不溢出；不宣称已经证明公开字段被任意改写后的计划、区间地址转换、五类来源对应的真实 I/O 或整个发布事务。核测试枚举实际覆盖字节并确认五类都出现，core 包装测试单独核对公开枚举的读旧数据/读残留/补零标记。
 
 `first_written_unit` 与 `last_written_unit` 另调用 `unit_containing_byte`，分别定位写入首字节与末字节（end - 1）。核要求正容量，证明 `index × capacity <= byte < (index + 1) × capacity`；区间端点是数学整数，因此也覆盖 byte = u64::MAX，并不保证实际构造下一个单元地址时不会溢出。core 包装测试通过枚举写到的字节集合核对首尾单元，核测试以 u128 端点检查极值。
+
+## 固定长度覆盖写的字节规律
+
+`partial_write_proofs` 的 `overwritten_bytes` 用 `Seq<u8>` 表示固定长度文件内的覆盖写，`overwrite_fits` 要求写入起点非负、整个请求位于文件内。证明义务包括：
+
+- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件。
+- `lemma_overwriting_the_same_range_keeps_only_the_last_write`：同起点、同长度的连续覆盖只保留最后一次的内容。
+- `lemma_disjoint_overwrites_commute`：不相交的两次覆盖可以交换顺序，两种顺序下第二次写仍满足范围前提；允许相邻区间和空请求。
+- `lemma_whole_unit_overwrite_does_not_depend_on_old_bytes`：利用现有整单元覆盖引理，证明分类核的覆盖条件足以使单元结果不依赖旧内容。
+- `witness_overwrite_laws_and_overlapping_write_order`：给出满足各引理前提的具体非空调用、EOF 处的空请求，以及重叠写交换后结果不同的反例。
+- `lemma_splitting_an_overwrite_preserves_the_result`：任意合法分界点把请求分成相邻的前缀与后缀，依序写入与整段一次写入相同，两段均满足范围前提；包含空前缀和空后缀。
+- `lemma_a_contained_overwrite_folds_into_the_payload`：后写完全位于前次请求内时，依序写入与先改请求内容、再整段写回相同，两条路径均满足范围前提。
+- `witness_split_and_contained_overwrites`：构造非空分段写入、严格包含的后写、两端分界与空后写，钉住组合后的具体字节。
+
+这些性质仅针对抽象字节模型，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不新增运行时代码或可信假设。必红表含各函数的契约反例及删除关键前提的反例（同长度、不相交、整单元覆盖、合法分界、后写包含于请求）。组合性质另有后缀偏移错位、后写偏移错位和见证字节错误的反例。
+
+复跑本模块（仓根执行；`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的 `verus`，任务服务按确认单确认后运行）：
+
+```sh
+task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
+  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
+  --verify-only-module partial_write_proofs crates/singlefs-replay-prefix/src/lib.rs
+task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
+  --item must-red:overwrite-last-needs-equal-lengths \
+  --item must-red:overwrite-commute-needs-disjoint-ranges \
+  --item must-red:overwrite-whole-needs-coverage \
+  --item must-red:overwrite-split-needs-suffix-offset \
+  --item must-red:overwrite-contained-needs-file-offset \
+  --item must-red:overwrite-split-needs-valid-boundary \
+  --item must-red:overwrite-contained-needs-payload-bounds
+task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
+  --offline --lib -- --exact \
+  partial_write_proofs::tests::located_unit_contains_the_byte_even_when_its_end_exceeds_u64 \
+  partial_write_proofs::tests::unit_sources_match_the_bytes_actually_overwritten \
+  partial_write_proofs::tests::rewrite_start_includes_the_gap_and_the_partial_old_tail \
+  partial_write_proofs::tests::after_count_preserves_old_units_and_covers_the_write_at_full_width
+```
 
 ## 按单元号计算部分写区间
 

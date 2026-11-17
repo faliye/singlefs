@@ -18,7 +18,7 @@ fn temporary_entries_named_after(prefix: &str) -> Vec<String> {
 /// 场景：写一棵两份文件的夹具树，用例照常走完。预期：走完之前根在、两份文件在，走完之后根不在。
 /// 判别力（`crates/mutations.tsv`）：夹具树的 Drop 不删，根还在，这条红。
 #[test]
-fn a_fixture_tree_is_gone_once_the_test_scope_ends_normally() {
+fn fixture_tree_is_gone_once_the_test_scope_ends_normally() {
     let root = {
         let tree = FixtureTree::materialize(
             "fixture-tree-normal-end",
@@ -40,7 +40,7 @@ fn a_fixture_tree_is_gone_once_the_test_scope_ends_normally() {
 /// 写夹具途中 panic。预期：panic 接住之后，这条用例标签下的临时目录一个都不在（写了的那一半跟着删了）。
 /// 判别力（`crates/mutations.tsv`）：夹具树的 Drop 不删，半棵树还在，这条红。
 #[test]
-fn a_fixture_tree_half_written_when_a_panic_hits_is_gone() {
+fn fixture_tree_half_written_when_a_panic_hits_is_gone() {
     let label = "fixture-tree-panic-while-writing";
     let prefix = format!("singlefs-unit-graph-{label}-{}-", std::process::id());
     let panicked = std::panic::catch_unwind(|| {

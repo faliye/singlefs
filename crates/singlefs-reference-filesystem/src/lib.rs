@@ -977,7 +977,7 @@ mod tests {
 
     /// 建快照捕获那一刻的文件，之后覆盖写不动它；读快照读出建它那一刻的内容；删掉之后读不到，活头的文件不变
     #[test]
-    fn a_snapshot_reads_the_file_at_its_creation_until_it_is_destroyed() {
+    fn snapshot_reads_the_file_at_its_creation_until_it_is_destroyed() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::CreateSnapshot(SnapshotName(65_549)));
@@ -1007,7 +1007,7 @@ mod tests {
 
     /// 建快照、删快照各是发布末尾（返回成功时抬起下界）：崩在建快照之后，允许集合的下界就是它；恢复读出那一刻的文件，快照接着活着。
     #[test]
-    fn a_crash_after_a_snapshot_returned_keeps_the_snapshot_and_starts_from_it() {
+    fn crash_after_a_snapshot_returned_keeps_the_snapshot_and_starts_from_it() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         let creation = succeed(&mut model, Operation::CreateSnapshot(SnapshotName(7)));
@@ -1031,7 +1031,7 @@ mod tests {
     /// 文件集合为空时建快照照收（
     /// 第三节 F5）：空池上建快照，之后写第一个文件，读快照读出「没有文件」，活头读出写的那份。
     #[test]
-    fn a_snapshot_created_while_there_is_no_file_reads_no_file_after_the_first_file_is_written() {
+    fn snapshot_created_while_there_is_no_file_reads_no_file_after_the_first_file_is_written() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateSnapshot(SnapshotName(3)));
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1051,7 +1051,7 @@ mod tests {
     /// 快照有与没有两种结局都收——之后删这个快照照收（落了盘），
     /// 回退也照收（没落盘：第一版有快照就拒回退，只有快照集合可以是空的才收）。
     #[test]
-    fn a_crash_after_a_snapshot_creation_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
+    fn crash_after_a_snapshot_creation_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1095,7 +1095,7 @@ mod tests {
     /// 读快照读出建它那一刻的 A 照收、读出别的内容判红且模型不动；读出 A 之后只剩快照还在的那个集合，回退照拒；
     /// 没读快照时回退照收（快照已删）。
     #[test]
-    fn a_crash_after_a_snapshot_destruction_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
+    fn crash_after_a_snapshot_destruction_that_failed_after_writing_allows_the_snapshot_to_be_there_or_not(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1239,7 +1239,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_inside_a_publish_that_carries_two_overwrites_does_not_allow_the_state_that_cuts_the_publish(
+    fn crash_inside_a_publish_that_carries_two_overwrites_does_not_allow_the_state_that_cuts_the_publish(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1289,7 +1289,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_fsync_keeps_the_lower_bound_at_the_previous_successful_fsync() {
+    fn failed_fsync_keeps_the_lower_bound_at_the_previous_successful_fsync() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::Fsync);
@@ -1314,7 +1314,7 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_that_failed_after_writing_may_be_seen_after_the_crash() {
+    fn publish_that_failed_after_writing_may_be_seen_after_the_crash() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::Fsync);
@@ -1339,7 +1339,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_inside_an_overwrite_does_not_allow_the_publish_that_comes_after_it() {
+    fn crash_inside_an_overwrite_does_not_allow_the_publish_that_comes_after_it() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::Fsync);
@@ -1361,7 +1361,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_inside_an_fsync_does_not_raise_the_lower_bound() {
+    fn crash_inside_an_fsync_does_not_raise_the_lower_bound() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1412,7 +1412,7 @@ mod tests {
     }
 
     #[test]
-    fn a_recovered_state_outside_the_allowed_set_is_refused_and_the_model_does_not_move() {
+    fn recovered_state_outside_the_allowed_set_is_refused_and_the_model_does_not_move() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::Fsync);
@@ -1456,7 +1456,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_inside_a_rollback_allows_the_rolled_back_content_even_below_the_fsynced_state() {
+    fn crash_inside_a_rollback_allows_the_rolled_back_content_even_below_the_fsynced_state() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1478,7 +1478,7 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_that_failed_after_writing_is_not_counted_as_a_confirmed_publish_for_rollback() {
+    fn publish_that_failed_after_writing_is_not_counted_as_a_confirmed_publish_for_rollback() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1503,7 +1503,7 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_the_crash_fell_inside_is_not_counted_as_a_confirmed_publish_for_rollback() {
+    fn publish_the_crash_fell_inside_is_not_counted_as_a_confirmed_publish_for_rollback() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1551,7 +1551,7 @@ mod tests {
     }
 
     #[test]
-    fn a_crash_number_beyond_the_crash_itself_or_zero_is_refused_and_the_model_does_not_move() {
+    fn crash_number_beyond_the_crash_itself_or_zero_is_refused_and_the_model_does_not_move() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         let before = model.clone();
@@ -1676,8 +1676,8 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_resent_verbatim_after_failing_while_writing_raises_the_lower_bound_and_is_a_version(
-    ) {
+    fn publish_resent_verbatim_after_failing_while_writing_raises_the_lower_bound_and_is_a_version()
+    {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1703,7 +1703,7 @@ mod tests {
     }
 
     #[test]
-    fn a_freshly_formatted_pool_is_version_one_and_the_first_confirmed_publish_is_version_two() {
+    fn freshly_formatted_pool_is_version_one_and_the_first_confirmed_publish_is_version_two() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         assert_eq!(model.newest_version(), VersionNumber(1), "起点是第 1 版");
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1751,7 +1751,7 @@ mod tests {
     }
 
     #[test]
-    fn a_recovery_that_abandoned_the_newest_root_is_not_judged_and_the_next_crash_is_judged_from_what_it_read(
+    fn recovery_that_abandoned_the_newest_root_is_not_judged_and_the_next_crash_is_judged_from_what_it_read(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1782,7 +1782,7 @@ mod tests {
     /// 覆盖写 B、发布，抛弃最新根（B 那次发布）的那次恢复读出 A。读出的 A 不在允许集合里也不判、照收；重新起头时的快照集合取被抛弃那一版
     /// 之前那一版（建快照那一版）的，快照 7 照在，读它读出 A 不判红。
     #[test]
-    fn a_recovery_that_abandoned_the_newest_root_keeps_a_snapshot_created_in_the_published_state_before_it(
+    fn recovery_that_abandoned_the_newest_root_keeps_a_snapshot_created_in_the_published_state_before_it(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1828,7 +1828,7 @@ mod tests {
     /// 读它读出 A 判红，同名再建照收（
     /// 调用方交「写出最新那一版的那一条」，取的是之前那一版的，不是这一版自己的）。
     #[test]
-    fn a_recovery_that_abandoned_the_newest_root_written_by_a_snapshot_creation_restarts_without_that_snapshot(
+    fn recovery_that_abandoned_the_newest_root_written_by_a_snapshot_creation_restarts_without_that_snapshot(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1875,7 +1875,7 @@ mod tests {
     /// 都映到建快照那一版；抛弃最新根（暖机那一条）的那次恢复落到它前一条根，仍在建快照那一版上，快照 7 在、读出 A。
     /// 调用方交「不是写出这一版的那一条」，快照集合取这一版自己那一刻的：快照 7 照在，读它读出 A 不判红。
     #[test]
-    fn a_recovery_that_abandoned_a_root_written_after_a_snapshot_creation_keeps_that_snapshot() {
+    fn recovery_that_abandoned_a_root_written_after_a_snapshot_creation_keeps_that_snapshot() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -1905,7 +1905,7 @@ mod tests {
     /// 销毁中记号、读照读，下一次用户改动先走空把它删完。调用方交「写出这一版的那一条」，快照集合前后两份都收：读快照 7 读出 A 照收、
     /// 只留快照在的那一份；走空之后同名再建也照收。
     #[test]
-    fn a_recovery_that_abandoned_the_last_batch_of_a_snapshot_destruction_allows_the_snapshot_there_or_gone(
+    fn recovery_that_abandoned_the_last_batch_of_a_snapshot_destruction_allows_the_snapshot_there_or_gone(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -1953,7 +1953,7 @@ mod tests {
     /// 调用方说被抛弃的根写出了最新那一版，而最新那一版是上一次恢复读出、重新起头的那一版（之后没有已确认的发布）：它之前那一版在
     /// 上一次恢复之前，RefFS 不记那时的快照集合， 没写取什么——返回第一版不支持，模型不动。
     #[test]
-    fn a_recovery_that_abandoned_the_root_that_wrote_the_state_at_the_last_recovery_is_not_in_the_first_version_and_the_model_does_not_move(
+    fn recovery_that_abandoned_the_root_that_wrote_the_state_at_the_last_recovery_is_not_in_the_first_version_and_the_model_does_not_move(
     ) {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("A")));
@@ -2000,7 +2000,7 @@ mod tests {
 
     /// 截断之后读快照：快照读出截之前的内容，活头是截之后的。
     #[test]
-    fn a_snapshot_created_before_a_truncation_reads_the_content_before_it() {
+    fn snapshot_created_before_a_truncation_reads_the_content_before_it() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
         succeed(&mut model, Operation::CreateSnapshot(SnapshotName(65_549)));
@@ -2017,7 +2017,7 @@ mod tests {
     /// 崩在截断里：截断交成内容改动加它那次发布，崩溃落在那次发布里，
     /// 允许集合恰好两样——截前与截后；截到一半（某一批的边界）的内容不在里面。
     #[test]
-    fn a_crash_inside_a_truncation_allows_exactly_the_content_before_and_after_it() {
+    fn crash_inside_a_truncation_allows_exactly_the_content_before_and_after_it() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
         succeed(&mut model, Operation::ExplicitPublish);
@@ -2077,7 +2077,7 @@ mod tests {
 
     /// 崩在按偏移写那次发布里：允许集合恰好写前、写后两样（一次发布做完，没有写到一半的内容）。
     #[test]
-    fn a_crash_inside_a_write_at_an_offset_allows_exactly_the_content_before_and_after_it() {
+    fn crash_inside_a_write_at_an_offset_allows_exactly_the_content_before_and_after_it() {
         let mut model = ReferenceFileSystem::on_a_freshly_formatted_pool();
         succeed(&mut model, Operation::CreateTheFirstFile(content("abcdef")));
         succeed(&mut model, Operation::ExplicitPublish);

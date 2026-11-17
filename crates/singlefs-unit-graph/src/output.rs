@@ -287,6 +287,90 @@ pub fn closure_lines(
     lines
 }
 
+fn unit_position_text(workspace: &Workspace, unit_index: UnitIndex) -> String {
+    let unit = &workspace.units[unit_index.0];
+    format!(
+        "{}\t{}\t{}:{}-{}",
+        unit.kind.output_name(),
+        unit.qualified_name,
+        workspace.files[unit.file.0].relative_path,
+        unit.start_line,
+        unit.end_line
+    )
+}
+
+/// `why` 的全部行：闭包里「文件路径 + 空格 + 限定名」含 `pattern` 的单元（命中的单元），各是经哪条边头一回被排进来的。
+/// 头一条边的来处不是命中单元的（从命中集合外面跨进来的那几个）打整条链，一直追到入口：
+///   `why\t<种类>\t<限定名>\t<文件>:<起>-<止>`，下面每一跳一行 `\tvia\t<规则>\t<经哪个名字，没有为 ->\t<来处的种类>\t<限定名>\t<文件>:<起>-<止>`，
+///   没有来处的那一跳（入口、收尾几步并进来的）写 `\tvia\t<规则>\t<名字>\t-`；
+/// 来处也是命中单元的只打一行 `inside\t<单元>\t<规则>\t<名字>\t<来处>`。同一个单元可以经好几条边进来，这里只有头一条：
+/// 切掉它之后重跑一遍，看别的边还带不带它进来。只当索引，不进键。
+#[must_use]
+pub fn why_lines(workspace: &Workspace, outcome: &ClosureOutcome, pattern: &str) -> Vec<String> {
+    let is_matched = |unit_index: UnitIndex| {
+        let unit = &workspace.units[unit_index.0];
+        format!(
+            "{} {}",
+            workspace.files[unit.file.0].relative_path, unit.qualified_name
+        )
+        .contains(pattern)
+    };
+    let name_text = |name: &str| if name.is_empty() { "-" } else { name }.to_string();
+    let mut crossing = Vec::new();
+    let mut inside = Vec::new();
+    for unit_index in &outcome.units {
+        if !is_matched(*unit_index) {
+            continue;
+        }
+        let Some(edge) = outcome.first_edges.get(unit_index) else {
+            continue;
+        };
+        match edge.from {
+            Some(from) if is_matched(from) => inside.push(format!(
+                "inside\t{}\t{}\t{}\t{}",
+                unit_position_text(workspace, *unit_index),
+                edge.rule,
+                name_text(&edge.name),
+                unit_position_text(workspace, from)
+            )),
+            Some(_) | None => {
+                crossing.push(format!(
+                    "why\t{}",
+                    unit_position_text(workspace, *unit_index)
+                ));
+                let mut current = *unit_index;
+                // 每一跳的来处都比这一跳更早被记下，链一定走到没有来处的那一跳；步数另按闭包大小封顶
+                for _ in 0..=outcome.units.len() {
+                    let Some(step) = outcome.first_edges.get(&current) else {
+                        break;
+                    };
+                    match step.from {
+                        Some(from) => {
+                            crossing.push(format!(
+                                "\tvia\t{}\t{}\t{}",
+                                step.rule,
+                                name_text(&step.name),
+                                unit_position_text(workspace, from)
+                            ));
+                            current = from;
+                        }
+                        None => {
+                            crossing.push(format!(
+                                "\tvia\t{}\t{}\t-",
+                                step.rule,
+                                name_text(&step.name)
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    crossing.extend(inside);
+    crossing
+}
+
 /// 拒算行（`key` 拒算时只打这几行）。
 #[must_use]
 pub fn refusal_lines(workspace: &Workspace, refusals: &[Refusal]) -> Vec<String> {

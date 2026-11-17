@@ -1,0 +1,14 @@
+[package]
+name = "singlefs-mount-runtime"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "挂载就起的后台运行库（D26（后台整理与放置回收） 已定项 13 第 5 条）：挂载入口起周期线程，前台接口与后台批经一把锁，每次发布之间放锁"
+
+# 只依赖核心层：GPU 经特质递进（OpensTheBackgroundGpu，实现在产品 GPU 包），不开 GPU 的调用方不拖上 wgpu。
+# 不设 [features]：验证包的构建脚本取直接依赖的特性要依赖带 links 与构建脚本，带特性而不带 links 的依赖让它当场停下。
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+
+[dev-dependencies]
+singlefs-format = { path = "../singlefs-format" }

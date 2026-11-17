@@ -92,14 +92,14 @@ pub proof fn lemma_unlink_plan_shape(remaining: nat, batch: nat)
         step_before(unlink_plan(remaining, batch)[0]) == remaining,
         unlink_plan(remaining, batch).last() is Final,
         step_before(unlink_plan(remaining, batch).last()) <= batch,
-        forall|i: int| 0 <= i < unlink_plan(remaining, batch).len() - 1 ==> {
-            &&& #[trigger] unlink_plan(remaining, batch)[i] is Batch
-            &&& step_before(unlink_plan(remaining, batch)[i]) == step_after(unlink_plan(remaining, batch)[i]) + batch
-            &&& step_after(unlink_plan(remaining, batch)[i]) >= 1
-            &&& step_before(unlink_plan(remaining, batch)[i + 1]) == step_after(unlink_plan(remaining, batch)[i])
+        forall|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len() - 1 ==> {
+            &&& #[trigger] unlink_plan(remaining, batch)[step_index] is Batch
+            &&& step_before(unlink_plan(remaining, batch)[step_index]) == step_after(unlink_plan(remaining, batch)[step_index]) + batch
+            &&& step_after(unlink_plan(remaining, batch)[step_index]) >= 1
+            &&& step_before(unlink_plan(remaining, batch)[step_index + 1]) == step_after(unlink_plan(remaining, batch)[step_index])
         },
-        forall|i: int| 0 <= i < unlink_plan(remaining, batch).len() ==>
-            step_before(#[trigger] unlink_plan(remaining, batch)[i]) <= remaining,
+        forall|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len() ==>
+            step_before(#[trigger] unlink_plan(remaining, batch)[step_index]) <= remaining,
     decreases remaining,
 {
     if remaining > batch {
@@ -110,22 +110,22 @@ pub proof fn lemma_unlink_plan_shape(remaining: nat, batch: nat)
         let plan = unlink_plan(remaining, batch);
         assert(plan == head + tail);
         assert(plan.last() == tail.last());
-        assert forall|i: int| 0 <= i < plan.len() - 1 implies {
-            &&& #[trigger] plan[i] is Batch
-            &&& step_before(plan[i]) == step_after(plan[i]) + batch
-            &&& step_after(plan[i]) >= 1
-            &&& step_before(plan[i + 1]) == step_after(plan[i])
+        assert forall|step_index: int| 0 <= step_index < plan.len() - 1 implies {
+            &&& #[trigger] plan[step_index] is Batch
+            &&& step_before(plan[step_index]) == step_after(plan[step_index]) + batch
+            &&& step_after(plan[step_index]) >= 1
+            &&& step_before(plan[step_index + 1]) == step_after(plan[step_index])
         } by {
-            if i > 0 {
-                assert(plan[i] == tail[i - 1]);
-                assert(plan[i + 1] == tail[i]);
+            if step_index > 0 {
+                assert(plan[step_index] == tail[step_index - 1]);
+                assert(plan[step_index + 1] == tail[step_index]);
             } else {
                 assert(plan[1] == tail[0]);
             }
         }
-        assert forall|i: int| 0 <= i < plan.len() implies step_before(#[trigger] plan[i]) <= remaining by {
-            if i > 0 {
-                assert(plan[i] == tail[i - 1]);
+        assert forall|step_index: int| 0 <= step_index < plan.len() implies step_before(#[trigger] plan[step_index]) <= remaining by {
+            if step_index > 0 {
+                assert(plan[step_index] == tail[step_index - 1]);
             }
         }
     }
@@ -159,14 +159,14 @@ pub proof fn lemma_unlink_plan_length(remaining: nat, batch: nat)
     }
 }
 
-/// 第 7 条 ①「计划相等」：做完第 i 批（不是最后一批）之后从它留下的单元数续做，算出的整串与不崩溃一路做下来的后半截逐步相同。
-pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, i: int)
+/// 第 7 条 ①「计划相等」：做完第 step_index 批（不是最后一批）之后从它留下的单元数续做，算出的整串与不崩溃一路做下来的后半截逐步相同。
+pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, step_index: int)
     requires
         batch > 0,
-        0 <= i < unlink_plan(remaining, batch).len() - 1,
+        0 <= step_index < unlink_plan(remaining, batch).len() - 1,
     ensures
-        unlink_plan(remaining, batch).subrange(i + 1, unlink_plan(remaining, batch).len() as int)
-            == unlink_plan(step_after(unlink_plan(remaining, batch)[i]), batch),
+        unlink_plan(remaining, batch).subrange(step_index + 1, unlink_plan(remaining, batch).len() as int)
+            == unlink_plan(step_after(unlink_plan(remaining, batch)[step_index]), batch),
     decreases remaining,
 {
     lemma_unlink_plan_shape(remaining, batch);
@@ -175,12 +175,12 @@ pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, i:
     let tail = unlink_plan(rest, batch);
     assert(remaining > batch);
     assert(plan == seq![UnlinkPlanStep::Batch { before: remaining, kept: rest }] + tail);
-    if i == 0 {
+    if step_index == 0 {
         assert(plan.subrange(1, plan.len() as int) =~= tail);
     } else {
-        lemma_continued_plan_equals_the_rest(rest, batch, i - 1);
-        assert(plan[i] == tail[i - 1]);
-        assert(plan.subrange(i + 1, plan.len() as int) =~= tail.subrange(i, tail.len() as int));
+        lemma_continued_plan_equals_the_rest(rest, batch, step_index - 1);
+        assert(plan[step_index] == tail[step_index - 1]);
+        assert(plan.subrange(step_index + 1, plan.len() as int) =~= tail.subrange(step_index, tail.len() as int));
     }
 }
 
@@ -189,12 +189,12 @@ pub proof fn lemma_each_data_unit_released_exactly_once(remaining: nat, batch: n
     requires
         batch > 0,
     ensures
-        (unit < remaining) <==> exists|i: int| 0 <= i < unlink_plan(remaining, batch).len()
-            && released_by(#[trigger] unlink_plan(remaining, batch)[i], unit),
-        forall|i: int, j: int|
-            0 <= i < unlink_plan(remaining, batch).len() && 0 <= j < unlink_plan(remaining, batch).len()
-            && released_by(#[trigger] unlink_plan(remaining, batch)[i], unit)
-            && released_by(#[trigger] unlink_plan(remaining, batch)[j], unit) ==> i == j,
+        (unit < remaining) <==> exists|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len()
+            && released_by(#[trigger] unlink_plan(remaining, batch)[step_index], unit),
+        forall|step_index: int, other_step_index: int|
+            0 <= step_index < unlink_plan(remaining, batch).len() && 0 <= other_step_index < unlink_plan(remaining, batch).len()
+            && released_by(#[trigger] unlink_plan(remaining, batch)[step_index], unit)
+            && released_by(#[trigger] unlink_plan(remaining, batch)[other_step_index], unit) ==> step_index == other_step_index,
     decreases remaining,
 {
     let plan = unlink_plan(remaining, batch);
@@ -209,35 +209,35 @@ pub proof fn lemma_each_data_unit_released_exactly_once(remaining: nat, batch: n
         lemma_each_data_unit_released_exactly_once(rest, batch, unit);
         lemma_unlink_plan_shape(rest, batch);
         assert(plan == seq![UnlinkPlanStep::Batch { before: remaining, kept: rest }] + tail);
-        assert forall|i: int| 1 <= i < plan.len() implies #[trigger] plan[i] == tail[i - 1] by {}
+        assert forall|step_index: int| 1 <= step_index < plan.len() implies #[trigger] plan[step_index] == tail[step_index - 1] by {}
         // 后半截释放的单元都在 rest 之下，与第一批 [rest, remaining) 不交。
-        assert forall|i: int| 0 <= i < tail.len() && released_by(#[trigger] tail[i], unit) implies unit < rest by {
-            assert(step_before(tail[i]) <= rest);
+        assert forall|step_index: int| 0 <= step_index < tail.len() && released_by(#[trigger] tail[step_index], unit) implies unit < rest by {
+            assert(step_before(tail[step_index]) <= rest);
         }
         if unit < remaining {
             if unit >= rest {
                 assert(released_by(plan[0], unit));
             } else {
-                let k = choose|k: int| 0 <= k < tail.len() && released_by(#[trigger] tail[k], unit);
-                assert(plan[k + 1] == tail[k]);
-                assert(released_by(plan[k + 1], unit));
+                let tail_step_index = choose|tail_step_index: int| 0 <= tail_step_index < tail.len() && released_by(#[trigger] tail[tail_step_index], unit);
+                assert(plan[tail_step_index + 1] == tail[tail_step_index]);
+                assert(released_by(plan[tail_step_index + 1], unit));
             }
         } else {
-            assert forall|i: int| 0 <= i < plan.len() implies !released_by(#[trigger] plan[i], unit) by {
-                if i > 0 {
-                    assert(plan[i] == tail[i - 1]);
+            assert forall|step_index: int| 0 <= step_index < plan.len() implies !released_by(#[trigger] plan[step_index], unit) by {
+                if step_index > 0 {
+                    assert(plan[step_index] == tail[step_index - 1]);
                 }
             }
         }
-        assert forall|i: int, j: int|
-            0 <= i < plan.len() && 0 <= j < plan.len()
-            && released_by(#[trigger] plan[i], unit)
-            && released_by(#[trigger] plan[j], unit) implies i == j by {
-            if i > 0 {
-                assert(plan[i] == tail[i - 1]);
+        assert forall|step_index: int, other_step_index: int|
+            0 <= step_index < plan.len() && 0 <= other_step_index < plan.len()
+            && released_by(#[trigger] plan[step_index], unit)
+            && released_by(#[trigger] plan[other_step_index], unit) implies step_index == other_step_index by {
+            if step_index > 0 {
+                assert(plan[step_index] == tail[step_index - 1]);
             }
-            if j > 0 {
-                assert(plan[j] == tail[j - 1]);
+            if other_step_index > 0 {
+                assert(plan[other_step_index] == tail[other_step_index - 1]);
             }
         }
     }
@@ -276,28 +276,28 @@ pub proof fn lemma_deletion_batch_rewrites_only_the_cut_path(index: nat, span: n
         lower_node_exists(index, span, kept) ==> lower_node_exists(index, span, before),
         lower_node_dropped(index, span, before, kept) <==> (kept <= index * span && index * span < before),
 {
-    let q = kept / span;
-    let r = kept % span;
-    assert(kept == q * span + r && 0 <= r < span) by {
+    let quotient = kept / span;
+    let remainder = kept % span;
+    assert(kept == quotient * span + remainder && 0 <= remainder < span) by {
         vstd::arithmetic::div_mod::lemma_fundamental_div_mod(kept as int, span as int);
         vstd::arithmetic::div_mod::lemma_mod_bound(kept as int, span as int);
-        vstd::arithmetic::mul::lemma_mul_is_commutative(span as int, q as int);
+        vstd::arithmetic::mul::lemma_mul_is_commutative(span as int, quotient as int);
     }
     if lower_node_rewritten(index, span, kept) {
-        // index × span < kept < index × span + span 且 q × span ≤ kept < q × span + span ⇒ index == q、r ≠ 0。
-        // index < q 时 (index + 1) × span ≤ q × span ≤ kept；index > q 时 (q + 1) × span ≤ index × span < kept：都矛盾。
+        // index × span < kept < index × span + span 且 quotient × span ≤ kept < quotient × span + span ⇒ index == quotient、remainder ≠ 0。
+        // index < quotient 时 (index + 1) × span ≤ quotient × span ≤ kept；index > quotient 时 (quotient + 1) × span ≤ index × span < kept：都矛盾。
         assert((index + 1) * span == index * span + span) by (nonlinear_arith);
-        assert((q + 1) * span == q * span + span) by (nonlinear_arith);
-        if index < q {
-            vstd::arithmetic::mul::lemma_mul_inequality((index + 1) as int, q as int, span as int);
+        assert((quotient + 1) * span == quotient * span + span) by (nonlinear_arith);
+        if index < quotient {
+            vstd::arithmetic::mul::lemma_mul_inequality((index + 1) as int, quotient as int, span as int);
         }
-        if index > q {
-            vstd::arithmetic::mul::lemma_mul_inequality((q + 1) as int, index as int, span as int);
+        if index > quotient {
+            vstd::arithmetic::mul::lemma_mul_inequality((quotient + 1) as int, index as int, span as int);
         }
-        assert(index == q);
-        assert(r != 0);
+        assert(index == quotient);
+        assert(remainder != 0);
     }
-    if index == q && r != 0 {
+    if index == quotient && remainder != 0 {
         assert(index * span < kept && kept < index * span + span);
     }
 }
@@ -361,8 +361,8 @@ mod tests {
                     .collect();
                 released.sort_unstable();
                 assert_eq!(released, (0..remaining).collect::<Vec<_>>());
-                for (i, &(_, kept)) in steps.iter().enumerate().take(steps.len() - 1) {
-                    assert_eq!(plan(kept, batch), steps[i + 1..].to_vec());
+                for (step_index, &(_, kept)) in steps.iter().enumerate().take(steps.len() - 1) {
+                    assert_eq!(plan(kept, batch), steps[step_index + 1..].to_vec());
                 }
             }
         }

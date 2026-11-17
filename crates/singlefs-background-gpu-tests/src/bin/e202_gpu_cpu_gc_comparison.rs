@@ -1,6 +1,7 @@
 // admission: always 每跑一次都在今天这份 crates 上现造池、现量挂钟与 CPU，计时每次都是新观测，上一次跑完不替这一次作保
 // task-server-gpu-arguments: lockstep concurrent sensitivity stage-three-cost
 // task-server-resumable: lockstep concurrent sensitivity
+// task-server-gpu-cards: all
 //! E202（GPU与CPU两种模式GC对照组）的装置：跑前登记 `research/prompts/e202-preregistration.md`。
 //!
 //! 同一负载、同一池，核心层后台入口 `MountedSession::run_compaction_in_the_background` 在 `background_compute=cpu` 与 `background_compute=gpu`
@@ -10,7 +11,8 @@
 //! 子命令（登记第十四节「起法」）：
 //! - `geometry-check --product <文件>`：三档各一条线程造起步镜像、核几何（登记第五节「负载」第 4 条），每档另在 CPU 臂上不计时地交替跑一次、
 //!   按第六节「前提 N」的阶梯数出每次跑的批数；不要卡。
-//! - `lockstep --reading occupancy --unit-area <2288MiB|4GiB|8GiB> [--user-changes <次数>] [--batch-units <个数>] --product <文件>`：交替跑六条臂。
+//! - `lockstep --reading occupancy --unit-area <2288MiB|4GiB|8GiB> [--user-changes <次数>] [--batch-units <个数>] [--cards <张数>] --product <文件>`：交替跑六条臂；
+//!   `--cards` 只管「全部卡」那两条臂开几张（见下面「全部卡」臂那一段），`--arms` 里没点这两条臂之一的给了算用法错。别的子命令都不认 `--cards`。
 //! - `concurrent --reading occupancy --unit-area <…> --foreground-interval-milliseconds <毫秒> --product <文件>`：并发跑三条臂。
 //! - `sensitivity --batch-units 16 --foreground-interval-milliseconds 500 --product <文件>`：中档几何敏感性两点（登记第八节）。
 //! - `judge-trend --product <文件> <三档 lockstep 产物…>`：量 T 的分类与停机条款第 2 条（三档的 crates 版本相同）。
@@ -24,18 +26,31 @@
 //! `--product` 那份文件只追加：同一条命令重起时读它里面已有的 `name=repeat_done` 行，跳过做完的重复（登记第十四节「续跑入口」）。
 //!
 //! 退出码：0 正常；2 命令行不对；3 停机条款触发（登记第十一节「停机」，产物照打）；4 阳性对照没过（产物照打）；
-//! 77 一条臂都没跑到（看不到独显）；78 准入或运行条件不满足（CPU 钟分辨率自检不过、读不到登记的线程数、写不了产物）。
+//! 77 一条臂都没跑到（服务交的卡里没有这一台的）；78 准入或运行条件不满足（CPU 钟分辨率自检不过、读不到登记的线程数、写不了产物、
+//! 服务既没交卡也没给领卡通道、领卡没成、交来的卡对不上本机的独显）。
 //!
-//! 换不掉的那几处：真卡（GPU 臂经产品 GPU 包开本进程看得到的独显）、真钟（单调钟与 CPU 钟）、`/proc`（机器负载与开卡线程）；
+//! 卡只用服务交的（[`cards_handed_to_the_apparatus`]）：环境变量 `GPU_CARDS_BY_PRIORITY` 有卡串就只开那几张；没有而有领卡通道时，
+//! 起步镜像造完、开设备之前那一刻才经验证包的按需领卡领（`singlefs_verification::gpu_card_configuration::cards_handed_over_or_leased_on_demand`）；
+//! 两样都没有报错退出，不自己枚举本机的卡。要卡的四个子命令都先做完只用 CPU 的活（读产物、开跑检查、造起步镜像、丙段代价的装置自数），再取卡。
+//! 「全部卡」臂开几张每次跑时由 `lockstep --cards <张数>` 设：给了 N 只开服务交来的卡里排在前头的 N 张（先后照服务交来的卡串），
+//! 不给开交来的全部；`background_gpu_devices` 点名开的那几张，本机没交的卡不开。N 小于 2（只开一张时全部卡臂与点名一张卡臂是同一条臂）、
+//! 不是数、多于交来的张数都退 2（命令行不对），不截成交来的张数；这一台一张都没交的照「服务交的卡里没有这一台的」退 77。
+//! 开了几张、照什么开的打在 `name=every_card_arm_cards` 一行；续跑时这两样与产物里已有的这一行有一处不同，或产物里有结果行而没有这一行，
+//! 打 `name=stopped clause=cards_option_differs_from_the_product_being_resumed` 退 2，两种张数的重复不混在同一份产物里。
+//! 这份源文件头的张数声明写 `all`：服务把那台此刻的空卡都交来，装置照 `--cards` 只开其中 N 张；没给 `--cards` 而只交来一张时这条臂与点名一张卡臂相同，报本次未跑。
+//! `lockstep`、`concurrent`、`sensitivity` 与 `stage-three-cost` 不拆成先录后判（理由写在各自入口旁）；
+//! 只比结果、不量挂钟的那一条内联真卡测试走先录后判：输入与装置自数的参照先在 CPU 上写进判定库，判段读回才取卡（测试包 `common_pairing_input_through_the_library`）。
+//!
+//! 换不掉的那几处：真卡（GPU 臂经产品 GPU 包开服务交的独显）、真钟（单调钟与 CPU 钟）、`/proc`（机器负载与开卡线程）；
 //! 判法与计数写成纯函数，同包测试里喂合成输入。
-//! 装置住产品 GPU 包（登记第五节「装置住哪」）：只读、只驱动与观测，不改 `crates/` 下别的文件。决定几何与判据门槛的常量写成本地常量、
-//! 开跑先与核心层公开的同一个量回比（[`local_constants_disagreeing_with_the_core`]），对不上走停机条款第 1 条。
+//! 装置住产品 GPU 的测试包（它同时依赖产品 GPU 包与验证包，按需领卡与判定库都经验证包那一份）：只读、只驱动与观测，不改 `crates/` 下别的文件。
+//! 决定几何与判据门槛的常量写成本地常量、开跑先与核心层公开的同一个量回比（[`local_constants_disagreeing_with_the_core`]），对不上走停机条款第 1 条。
 #![forbid(unsafe_code)]
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::{BufRead, Write};
-use std::num::NonZeroU64;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, Weak};
@@ -46,7 +61,8 @@ use singlefs_background_gpu::adapter_inventory::{
 };
 use singlefs_background_gpu::background_gpu::{
     host_cpu_time_of_this_thread, monotonic_raw_time_now,
-    open_background_gpu_with_the_memory_leaked_in_this_process, VulkanInstanceOfThisProcess,
+    open_background_gpu_with_the_memory_leaked_in_this_process, OpeningsNotReturnedInThisProcess,
+    VulkanInstanceOfThisProcess,
 };
 use singlefs_background_gpu::background_gpu_compute::{
     open_background_gpu_compute, BackgroundGpuComputeOnTheParticipatingGpus,
@@ -59,16 +75,17 @@ use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes, InodeNumber, SlotNumber,
     TreeIdentifier,
 };
-use singlefs_core::admission::LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW;
+use singlefs_core::admission::LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE;
 use singlefs_core::allocator::{
-    unit_area_slots_of_device, AllocationRecord, DeviceFreeMap, PoolAllocator, UnitAreaStart,
+    unit_area_slots_of_device, AllocationRecord, AllocationRecordQuarantineMark, DeviceFreeMap,
+    PoolAllocator, UnitAreaStart,
 };
 use singlefs_core::background_compute::{
     admit_gpu_settings_against_the_inventory, AdmittedGpuSettings, BackgroundComputeBackend,
     BackgroundComputeOfOneBatch, BackgroundComputePathTaken, BackgroundComputeSettings,
     BackgroundGpuCompute, BackgroundGpuComputeFailed, BackgroundGpuComputeHandle,
-    ClusterSegmentEntryKey, GpuDeviceIdentifier, GpuDeviceNotOpenedAtTheMount, GpuEntryDecision,
-    GpuInventory, GpuMemoryInBytes, GpuSubmissionsOfOneSegment, GpuSubmissionsOfTheBatch,
+    ClusterSegmentEntryKey, GpuDeviceIdentifier, GpuEntryDecision, GpuInventory, GpuMemoryInBytes,
+    GpuSubmissionsOfOneSegment, GpuSubmissionsOfTheBatch, LatestGpuSettingsHandedIn,
     ReasonTheBatchRanOnTheCpu, RegionRecordToClassifyOnTheGpu, UnitChecksumOutcome,
     UnitChecksumToVerifyOnTheGpu, BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
 };
@@ -79,11 +96,11 @@ use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::compaction_plan::{
     choose_region, cluster_segment_entry_keys_of_the_unit_area,
     live_slots_per_cluster_segment_by_the_records, publish_budget_of_a_compaction_run,
-    region_scans_of_the_segments_without_an_unreleased_record, CallerMonotonicClockReading,
-    CallerOfTheBackgroundCompaction, CompactionBatchSize, CompactionBatchUnits, CompactionPacing,
-    CompactionRunForcing, CompactionRunStop, CompactionSwitches, CompactionTimerFallback,
-    CompactionWriteBandwidthLimit, ForegroundFsync, RegionChoice, RegionChoiceCriterion,
-    SegmentsRefusedByTheRegionScan, UnitAreaOfOneDevice,
+    region_scans_of_the_segments_without_an_unreleased_record, AnswerOfTheCallerBeforeTheNextBatch,
+    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionBatchSize,
+    CompactionBatchUnits, CompactionPacing, CompactionRunForcing, CompactionRunStop,
+    CompactionSwitches, CompactionTimerFallback, CompactionWriteBandwidthLimit, RegionChoice,
+    RegionChoiceCriterion, SegmentsRefusedByTheRegionScan, UnitAreaOfOneDevice,
 };
 use singlefs_core::inode_tree::{
     leaf_containers_one_root_node_holds, write_records_into_leaf_containers,
@@ -119,10 +136,26 @@ use singlefs_core::transaction::{
     PoolWriter, TransactionOutput, TransactionUnit,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
+use singlefs_verification::crash_library::PairingJudged;
+use singlefs_verification::gpu_card_configuration::{
+    cards_handed_over_or_leased_on_demand, CardLeaseChannelOfTheCaller,
+};
 
-/// 产品 GPU 包测试共用模块里给每张参与的卡的显存上限（登记第五节常量表最后一行回比的对象）。
+use common_discrete_gpus_of_this_host::{
+    handed_over_gpus_or_report_not_run, note_the_cards_leased_on_demand_for_this_process,
+    VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER,
+};
+use common_pairing_input_through_the_library::{
+    append_count, append_number, judgement_of_the_assertions_on_the_cards, ComparisonOnTheCards,
+    PairingInputBeingRead,
+};
+
+/// 本包测试共用的取卡模块：给每张参与的卡的显存上限（登记第五节常量表最后一行回比的对象），服务交的卡对上本机的 Vulkan 独显。
 #[path = "../../tests/common_discrete_gpus_of_this_host/mod.rs"]
 mod common_discrete_gpus_of_this_host;
+/// 本包测试共用的对拍过库：内联真卡测试先录后判、对拍结论入库按键复用（键与存法都是验证包那一份）。
+#[path = "../../tests/common_pairing_input_through_the_library/mod.rs"]
+mod common_pairing_input_through_the_library;
 
 // ---- 本地常量（登记第五节「装置读 `crates/` 的这些常量」那张表；值抄自那张表，开跑回比） ----
 
@@ -144,7 +177,7 @@ const LOCAL_UNIT_AREA_START_SLOT: u64 = 50176;
 const LOCAL_PUBLISH_BUDGET_GIVEN_BY_A_USER_CHANGE: u64 = 20;
 /// 等 GPU 的上限默认（第 9 行，`BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT`）。
 const LOCAL_GPU_WAIT_LIMIT_BY_DEFAULT: Duration = Duration::from_secs(10);
-/// 每张参与的卡的显存上限 1 GiB（第 10 行；问题单「装置要求」第一条，用户 2026-11-01 定）。
+/// 每张参与的卡的显存上限 1 GiB（第 10 行；问题单「装置要求」第一条）。
 const LOCAL_MEMORY_LIMIT_OF_EACH_PARTICIPATING_GPU: u64 = 1 << 30;
 /// 每块盘字节 = 784 MiB + 单元区（登记第一节「盘容量的两种读法与各档取值」）；784 MiB 是默认环长下单元区的起点。
 const LOCAL_BYTES_BEFORE_THE_UNIT_AREA: u64 = 784 << 20;
@@ -312,7 +345,7 @@ struct ConstantMismatch {
 }
 
 /// 第五节常量表逐项回比（停机条款第 1 条）。`singlefs-format` 不是本包的直接依赖，格式常量经核心层公开的等价量取：
-/// 槽字节取槽 1 的设备偏移，数据单元字节取 `LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW`（= 数据单元字节 ÷ 槽字节）乘槽字节，
+/// 槽字节取槽 1 的设备偏移，数据单元字节取 `LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE`（= 数据单元字节 ÷ 槽字节）乘槽字节，
 /// 聚簇段槽数取核心层每段活槽数那一步给 640 槽单元区分出的段数，环长取单元区起点与环起点两个偏移之差。
 fn local_constants_disagreeing_with_the_core() -> Vec<ConstantMismatch> {
     let mut mismatches = Vec::new();
@@ -334,7 +367,7 @@ fn local_constants_disagreeing_with_the_core() -> Vec<ConstantMismatch> {
     compare(
         "data_unit_bytes".to_string(),
         LOCAL_DATA_UNIT_BYTES,
-        LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW * slot_bytes_of_the_core,
+        LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE * slot_bytes_of_the_core,
     );
     let probe_unit_area_slots = 10 * LOCAL_CLUSTER_SEGMENT_SLOTS;
     let probe_segments = live_slots_per_cluster_segment_by_the_records(
@@ -2658,9 +2691,9 @@ fn construct_a_starting_image_on_the_clock(
 enum ComputeOfTheArm {
     /// `background_compute=cpu`，卡与上限不给（产品默认）。
     Cpu,
-    /// `gpu`，只点本进程看得到的独显里 PCI 地址最小的那一张，上限 1 GiB。
+    /// `gpu`，只点服务交来的独显里 PCI 地址最小的那一张，上限 1 GiB。
     GpuOnTheCardWithTheLowestPciAddress,
-    /// `gpu`，不给 `background_gpu_devices`，每张卡上限 1 GiB。
+    /// `gpu`，`background_gpu_devices` 点名服务交来的全部独显（交几张开几张，本机没交的卡不开），每张卡上限 1 GiB。
     GpuOnEveryCard,
 }
 
@@ -2771,7 +2804,7 @@ fn discrete_gpus_seen_by_this_process(
     Ok(discrete_gpus)
 }
 
-/// 这条臂在看得到 `gpu_count` 张独显的任务上跑不跑得了；跑不了的交回 `name=not_run` 那一行的理由（登记第十一节作废第 8 条）。
+/// 这条臂在服务交来 `gpu_count` 张独显（本进程看得到、只用的就是这几张）的任务上跑不跑得了；跑不了的交回 `name=not_run` 那一行的理由（登记第十一节作废第 8 条）。
 fn reason_the_arm_is_not_run(compute: ComputeOfTheArm, gpu_count: usize) -> Option<&'static str> {
     match compute {
         ComputeOfTheArm::Cpu => None,
@@ -2812,7 +2845,12 @@ fn background_compute_settings_of_the_arm(
         },
         ComputeOfTheArm::GpuOnEveryCard => BackgroundComputeSettings {
             background_compute: BackgroundComputeBackend::Gpu,
-            background_gpu_devices: None,
+            background_gpu_devices: Some(
+                discrete_gpus
+                    .iter()
+                    .map(|gpu| gpu_device_identifier_of_the_pci_bus_address(&gpu.pci_bus_address))
+                    .collect(),
+            ),
             background_gpu_memory_limit: Some(vec![memory_limit; discrete_gpus.len()]),
             background_gpu_wait_limit: LOCAL_GPU_WAIT_LIMIT_BY_DEFAULT,
         },
@@ -2960,10 +2998,6 @@ impl<Inner: GpuInventory> GpuInventory for GpuComputeRejudgedOnTheCpu<Inner> {
     fn devices_with_total_memory(&self) -> Vec<(GpuDeviceIdentifier, GpuMemoryInBytes)> {
         self.inner.devices_with_total_memory()
     }
-
-    fn devices_not_opened_at_the_mount(&self) -> Vec<GpuDeviceNotOpenedAtTheMount> {
-        self.inner.devices_not_opened_at_the_mount()
-    }
 }
 
 impl<Inner: BackgroundGpuCompute> BackgroundGpuCompute for GpuComputeRejudgedOnTheCpu<Inner> {
@@ -3026,6 +3060,17 @@ impl<Inner: BackgroundGpuCompute> BackgroundGpuCompute for GpuComputeRejudgedOnT
 
     fn use_the_settings_from_the_next_batch(&mut self, settings: &AdmittedGpuSettings) {
         self.inner.use_the_settings_from_the_next_batch(settings);
+    }
+
+    fn use_no_gpu_from_the_next_batch(&mut self) {
+        self.inner.use_no_gpu_from_the_next_batch();
+    }
+
+    fn put_the_gpus_opened_since_the_settings_were_handed_in_in_effect(
+        &mut self,
+    ) -> LatestGpuSettingsHandedIn {
+        self.inner
+            .put_the_gpus_opened_since_the_settings_were_handed_in_in_effect()
     }
 
     fn failure_under_the_settings_handed_in(&self) -> Option<BackgroundGpuComputeFailed> {
@@ -3312,8 +3357,8 @@ impl CallerOfTheBackgroundCompaction for CallerOfTheLockstepRun {
         CallerMonotonicClockReading(self.reading.get())
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        ForegroundFsync::NoneWaiting
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
     }
 }
 
@@ -4226,12 +4271,25 @@ struct GpuOfTheRun {
     gpus_leaked_when_dropped: Option<GpusLeakedWhenTheBackgroundGpuIsDropped>,
 }
 
-/// GPU 臂开卡用的那一份进程级 Vulkan 实例（这条命令枚举独显时建的）；这条命令没建（不枚举独显）交回 `Err`。
+/// GPU 臂开卡用的那一份进程级 Vulkan 实例（取卡时建的，[`cards_seen_by_the_command`]，对卡与开卡都用它）；这条命令没有它（服务交的卡里没有这一台的）交回 `Err`。
 fn vulkan_instance_for_the_gpu_arm(
     vulkan_instance: Option<&VulkanInstanceOfThisProcess>,
 ) -> Result<&VulkanInstanceOfThisProcess, String> {
     vulkan_instance
         .ok_or_else(|| "GPU 臂要开卡，这条命令却没建进程级 Vulkan 实例（没枚举独显）".to_string())
+}
+
+/// 这个进程里各张卡上在开、到点没回来的开卡那一张表（D26（后台整理与放置回收） 已定项 13 第 4 条：表在进程级，各次开卡共用；
+/// 前一次挂住的卡，之后的开卡同样不再起，出路只有重启进程）。装置不经产品的进程开卡器开卡、手里没有开卡器持有的那一张，
+/// 所以在这里放一份：整个进程只建一次，装置里的每一处开卡都取这一份（[`openings_not_returned_in_this_process`]）。
+static OPENINGS_NOT_RETURNED_IN_THIS_PROCESS: std::sync::OnceLock<
+    OpeningsNotReturnedInThisProcess,
+> = std::sync::OnceLock::new();
+
+/// 装置每一处开卡交给产品开卡入口的那一张表：头一次问的时候建，之后每次交同一张（[`OPENINGS_NOT_RETURNED_IN_THIS_PROCESS`]）。
+fn openings_not_returned_in_this_process() -> &'static OpeningsNotReturnedInThisProcess {
+    OPENINGS_NOT_RETURNED_IN_THIS_PROCESS
+        .get_or_init(OpeningsNotReturnedInThisProcess::with_none_not_returned)
 }
 
 /// 照这条臂开卡（挂载与开卡都在第一次 GC 调用之前做完、在窗口外：登记第一节「不含挂载那一刻量代价」），在 `vulkan_instance` 上开。
@@ -4252,8 +4310,13 @@ fn open_the_gpu_of_the_arm(
     let selection = BackgroundGpuSelection::of_the_settings(settings);
     match arm.rejudging {
         RejudgingOfTheArm::NotRejudged => {
-            let opened = open_background_gpu_compute(&selection, memory_leaked, vulkan_instance)
-                .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
+            let opened = open_background_gpu_compute(
+                &selection,
+                memory_leaked,
+                openings_not_returned_in_this_process(),
+                vulkan_instance,
+            )
+            .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             Ok(GpuOfTheRun {
                 gpu_compute: Some(opened.gpu_compute),
                 rejudge_log: None,
@@ -4264,7 +4327,9 @@ fn open_the_gpu_of_the_arm(
             let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
                 &selection,
                 memory_leaked,
+                openings_not_returned_in_this_process(),
                 vulkan_instance,
+                |_gpus_to_open| {},
             )
             .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             let gpus_leaked_when_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -4948,11 +5013,27 @@ fn class_one_anchors_of_a_lockstep_run_hold(
 struct LockstepRunSetting<'run> {
     image: &'run StartingImage,
     discrete_gpus: &'run [DiscreteGpuSeenByThisProcess],
+    /// 全部卡臂开的那几张（`--cards` 挑过的，[`discrete_gpus_named_for_the_every_card_arm`]）。
+    discrete_gpus_of_the_every_card_arm: &'run [DiscreteGpuSeenByThisProcess],
     memory_leaked: &'run GpuMemoryLeakedInThisProcess,
     /// 开卡用的那一份进程级 Vulkan 实例；只跑 CPU 臂的没有。
     vulkan_instance: Option<&'run VulkanInstanceOfThisProcess>,
     user_changes: u64,
     batch_units: usize,
+}
+
+impl LockstepRunSetting<'_> {
+    /// 这条臂开的卡从哪一份里取（[`discrete_gpus_of_the_arm`]）。
+    fn discrete_gpus_of_the_arm(
+        &self,
+        compute: ComputeOfTheArm,
+    ) -> &[DiscreteGpuSeenByThisProcess] {
+        discrete_gpus_of_the_arm(
+            compute,
+            self.discrete_gpus,
+            self.discrete_gpus_of_the_every_card_arm,
+        )
+    }
 }
 
 /// 交替跑一次：拷池、开卡、挂载、两条线程交替、读摘要与内容、核锚点、记机器负载。开卡或挂载不成交回 `Err`（交主 agent，不当跑过）。
@@ -4962,7 +5043,10 @@ fn run_lockstep_once(
     repeat: u32,
 ) -> Result<LockstepRunSummary, String> {
     let host_at_the_start = host_load_reading()?;
-    let settings = background_compute_settings_of_the_arm(arm.compute, setting.discrete_gpus);
+    let settings = background_compute_settings_of_the_arm(
+        arm.compute,
+        setting.discrete_gpus_of_the_arm(arm.compute),
+    );
     let gpu = open_the_gpu_of_the_arm(
         arm,
         &settings,
@@ -5059,9 +5143,13 @@ fn run_lockstep_once(
         .filter(|window| calls_failing_the_inclusion_checks(std::slice::from_ref(*window)) > 0)
         .copied()
         .collect();
-    let lowest_card = setting.discrete_gpus.first().map(|lowest_discrete_gpu| {
-        gpu_device_identifier_of_the_pci_bus_address(&lowest_discrete_gpu.pci_bus_address)
-    });
+    let lowest_card =
+        setting
+            .discrete_gpus_of_the_arm(arm.compute)
+            .first()
+            .map(|lowest_discrete_gpu| {
+                gpu_device_identifier_of_the_pci_bus_address(&lowest_discrete_gpu.pci_bus_address)
+            });
     let gpu_work_anchors = lowest_card
         .as_ref()
         .map_or_else(GpuWorkAnchors::default, |lowest_card| {
@@ -5431,6 +5519,15 @@ fn arms_in_the_rotation_of_the_repeat(arms_run: &[LockstepArm], repeat: u32) -> 
         .collect()
 }
 
+/// `name=run` 行里 GPU 臂的型号串：这条臂取卡的那一份里每张卡的型号，以 `+` 连。
+fn gpu_models_in_the_run_line(discrete_gpus_of_the_arm: &[DiscreteGpuSeenByThisProcess]) -> String {
+    discrete_gpus_of_the_arm
+        .iter()
+        .map(|gpu| field_value(&gpu.model))
+        .collect::<Vec<String>>()
+        .join("+")
+}
+
 fn run_one_lockstep_repeat(
     setting: &LockstepRunSetting<'_>,
     arms_run: &[LockstepArm],
@@ -5439,18 +5536,12 @@ fn run_one_lockstep_repeat(
     product: &mut ProductWriter,
 ) -> RepeatOutcome {
     let tier = setting.image.tier;
-    let gpu_models: String = setting
-        .discrete_gpus
-        .iter()
-        .map(|gpu| field_value(&gpu.model))
-        .collect::<Vec<String>>()
-        .join("+");
     let mut runs: Vec<LockstepRunSummary> = Vec::new();
     for arm in arms_in_the_rotation_of_the_repeat(arms_run, repeat) {
         let models_of_the_arm = if arm.compute.uses_the_gpu() {
-            gpu_models.as_str()
+            gpu_models_in_the_run_line(setting.discrete_gpus_of_the_arm(arm.compute))
         } else {
-            "none"
+            "none".to_string()
         };
         let mut kept: Option<LockstepRunSummary> = None;
         for attempt in 0..2 {
@@ -5465,7 +5556,7 @@ fn run_one_lockstep_repeat(
             };
             product.emit(
                 "run",
-                &summary.fields(tier, session_number, models_of_the_arm),
+                &summary.fields(tier, session_number, &models_of_the_arm),
             );
             for window in &summary.windows_failing_the_inclusion_checks {
                 eprintln!(
@@ -5566,29 +5657,386 @@ fn run_one_lockstep_repeat(
 
 // ---- 子命令共用的开头：产物、开跑检查、crates 版本（停机条款第 2 条：与产物里已有的比）、卡 ----
 
-/// 子命令开头读到的：产物里已有的结果行、这是第几次起这条命令、合起来的 crates 摘要、本进程看得到的独显，
-/// 与枚举它们的那一份进程级 Vulkan 实例（这条命令里开卡都用它，不另建；不枚举独显的命令不建，是 `None`）。
+/// 子命令开头读到的：产物里已有的结果行、这是第几次起这条命令、登记的重活线程数。卡不在开头取（[`cards_seen_by_the_command`]）。
 struct OpeningOfTheCommand {
     lines_already_in_the_product: Vec<KindAndFieldsOfAResultLine>,
     session_number: u64,
     registered_heavy_threads: usize,
+}
+
+/// 这条命令要不要卡（几何核与造池计时不要）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CardsOfTheCommand {
+    /// 要卡：开头只核服务给了卡的来路（[`the_task_server_hands_over_cards`]），只用 CPU 的活做完、开设备之前才取（[`cards_seen_by_the_command`]）。
+    TakenBeforeOpeningTheDevices,
+    /// 不要卡：开头打一行 `name=gpus enumerated=false`，不碰 GPU。
+    NotNeeded,
+}
+
+/// 服务给这个进程卡的来路有没有：环境变量 `GPU_CARDS_BY_PRIORITY` 设了（`environment_value`），或有领卡通道（`channel`）。只看，不领。
+fn the_task_server_hands_over_cards(
+    environment_value: Option<&str>,
+    channel: Option<&CardLeaseChannelOfTheCaller>,
+) -> bool {
+    environment_value.is_some() || channel.is_some()
+}
+
+/// 此刻这个进程的环境里服务给没给卡的来路（[`the_task_server_hands_over_cards`] 照此刻的环境变量与领卡通道判）。
+fn the_task_server_hands_over_cards_to_this_process() -> bool {
+    the_task_server_hands_over_cards(
+        std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER)
+            .ok()
+            .as_deref(),
+        CardLeaseChannelOfTheCaller::read_from_the_environment_now().as_ref(),
+    )
+}
+
+/// 服务既没交卡也没给领卡通道时的那一句（产物 `name=stopped` 的理由与取卡的错）。
+const REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER: &str =
+    "服务既没经 GPU_CARDS_BY_PRIORITY 交卡、也没给领卡通道：这条命令要经 task-server/task submit 交，装置不自己枚举本机的卡";
+
+/// 装置用的卡串（与 `GPU_CARDS_BY_PRIORITY` 同格式）：环境变量给了照它、不领；没给而有领卡通道，经 `lease` 领（这一刻才领）；
+/// 两样都没有报错（验证包 `cards_handed_over_or_leased_on_demand` 交回 `None` 的那一支），不退回自己枚举。
+///
+/// # Errors
+/// 两样都没有；领卡没成。
+fn cards_handed_to_the_apparatus(
+    environment_value: Option<String>,
+    channel: Option<&CardLeaseChannelOfTheCaller>,
+    lease: &dyn Fn(&CardLeaseChannelOfTheCaller) -> Result<String, String>,
+) -> Result<String, String> {
+    cards_handed_over_or_leased_on_demand(environment_value, channel, lease)
+        .map_err(|refusal| format!("按需领卡没成：{refusal}"))?
+        .ok_or_else(|| REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER.to_string())
+}
+
+/// 服务交给这个进程、属于这一台的独显，连同枚举与开卡用的那一份进程级 Vulkan 实例（交的卡里没有这一台的：一张都没有、不建实例）。
+#[derive(Clone)]
+struct CardsSeenByThisProcess {
+    /// 交来的卡，按 PCI 地址次序（点名一张卡臂取头一张，全部卡臂照 `--cards` 从中挑，[`discrete_gpus_named_for_the_every_card_arm`]）。
     discrete_gpus: Vec<DiscreteGpuSeenByThisProcess>,
+    /// 同一批卡的 PCI 地址，照服务交来的卡串的先后（`--cards <张数>` 取排在前头的那几张）。
+    handed_over_pci_bus_addresses_in_the_handed_over_order: Vec<String>,
     vulkan_instance: Option<VulkanInstanceOfThisProcess>,
 }
 
-/// 这条命令要不要枚举本进程看得到的独显（几何核不要卡）：要的带着这个进程的那一份 Vulkan 实例（`main` 照要卡的子命令建，一个进程一份，
-/// 枚举与这条命令里开卡都用它）。封闭集合。
-#[derive(Clone, Copy, Debug)]
-enum GpusOfTheCommand<'process> {
-    EnumeratedOn(&'process VulkanInstanceOfThisProcess),
-    NotNeeded,
+/// 这个进程取到的卡：进程里只取一回（敏感度那一条的交替跑与并发跑共用，一个进程一份 Vulkan 实例），取不成的那一句之后每次交同一句。
+static CARDS_SEEN_BY_THIS_PROCESS: std::sync::OnceLock<Result<CardsSeenByThisProcess, String>> =
+    std::sync::OnceLock::new();
+
+/// 取卡模块打 `GPUS_HANDED_OVER_BY_THE_TASK_SERVER test=<名>`、`NOT_RUN_NO_GPU_ADAPTER test=<名>` 那几行时用的名字。
+const NAME_OF_THE_APPARATUS_IN_THE_CARD_LINES: &str = "e202_gpu_cpu_gc_comparison";
+
+/// panic 带出来的文字（`panic!` 与断言带的是 `String` 或 `&str`）。
+fn text_carried_by_the_panic(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| {
+            payload
+                .downcast_ref::<&'static str>()
+                .map(|text| (*text).to_string())
+        })
+        .unwrap_or_else(|| "panic 带的不是文字".to_string())
+}
+
+/// 本机看得到的独显（`seen_on_this_host`，PCI 地址次序）里服务交来的那几张（`handed_over_pci_bus_addresses`，wgpu 报的原样）：
+/// 不在交来的里的不留。交回留下的那几张。
+///
+/// # Errors
+/// 交来的有一张不在本机看得到的独显里。
+fn discrete_gpus_among_the_handed_over(
+    seen_on_this_host: Vec<DiscreteGpuSeenByThisProcess>,
+    handed_over_pci_bus_addresses: &[String],
+) -> Result<Vec<DiscreteGpuSeenByThisProcess>, String> {
+    let handed_over: Vec<DiscreteGpuSeenByThisProcess> = seen_on_this_host
+        .into_iter()
+        .filter(|gpu| handed_over_pci_bus_addresses.contains(&gpu.pci_bus_address))
+        .collect();
+    if handed_over.len() != handed_over_pci_bus_addresses.len() {
+        return Err(format!(
+            "服务交来的卡（{handed_over_pci_bus_addresses:?}）不全在本机看得到的独显里（对上的 {:?}）",
+            handed_over
+                .iter()
+                .map(|gpu| gpu.pci_bus_address.as_str())
+                .collect::<Vec<&str>>()
+        ));
+    }
+    Ok(handed_over)
+}
+
+/// 取卡：卡串照 [`cards_handed_to_the_apparatus`]（领到的记给取卡模块），再经取卡模块（`handed_over_gpus_or_report_not_run`）对上本机的 Vulkan 独显、
+/// 建这个进程的那一份实例，只留交来的那几张（[`discrete_gpus_among_the_handed_over`]）。
+///
+/// # Errors
+/// 没有卡的来路、领卡没成；交来的卡对不上本机的独显（取卡模块判红的那几种，panic 的文字原样带出）；枚举等超过上限。
+fn cards_taken_for_this_process() -> Result<CardsSeenByThisProcess, String> {
+    let cards = cards_handed_to_the_apparatus(
+        std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER).ok(),
+        CardLeaseChannelOfTheCaller::read_from_the_environment_now().as_ref(),
+        &|channel| channel.cards_leased_by_this_process().map(str::to_string),
+    )?;
+    note_the_cards_leased_on_demand_for_this_process(&cards);
+    let handed_over = std::panic::catch_unwind(|| {
+        handed_over_gpus_or_report_not_run(
+            NAME_OF_THE_APPARATUS_IN_THE_CARD_LINES,
+            LOCAL_GPU_WAIT_LIMIT_BY_DEFAULT,
+        )
+    })
+    .map_err(|payload| {
+        format!(
+            "服务交来的卡对不上本机的独显：{}",
+            text_carried_by_the_panic(&*payload)
+        )
+    })?;
+    let Some(handed_over) = handed_over else {
+        return Ok(CardsSeenByThisProcess {
+            discrete_gpus: Vec::new(),
+            handed_over_pci_bus_addresses_in_the_handed_over_order: Vec::new(),
+            vulkan_instance: None,
+        });
+    };
+    let handed_over_pci_bus_addresses_in_the_handed_over_order: Vec<String> = handed_over
+        .gpus
+        .iter()
+        .map(|gpu| gpu.pci_bus_address.clone())
+        .collect();
+    let discrete_gpus = discrete_gpus_among_the_handed_over(
+        discrete_gpus_seen_by_this_process(&handed_over.vulkan_instance)?,
+        &handed_over_pci_bus_addresses_in_the_handed_over_order,
+    )?;
+    Ok(CardsSeenByThisProcess {
+        discrete_gpus,
+        handed_over_pci_bus_addresses_in_the_handed_over_order,
+        vulkan_instance: Some(handed_over.vulkan_instance),
+    })
+}
+
+/// 这个进程取到的卡：头一次问的时候取（[`cards_taken_for_this_process`]），之后每次交同一份；取不成的那一句之后每次交同一句。
+fn cards_of_this_process() -> Result<&'static CardsSeenByThisProcess, &'static String> {
+    CARDS_SEEN_BY_THIS_PROCESS
+        .get_or_init(cards_taken_for_this_process)
+        .as_ref()
+}
+
+/// 要卡的子命令在只用 CPU 的活做完、开设备之前调：取这个进程的卡（[`cards_of_this_process`]），打 `name=gpus` 一行。
+/// 取不成打 `name=gpus enumerated=false reason=…` 与 `name=stopped clause=cards_not_taken`，交回退出码 78。
+fn cards_seen_by_the_command(product: &mut ProductWriter) -> Result<CardsSeenByThisProcess, i32> {
+    match cards_of_this_process() {
+        Ok(cards) => {
+            emit_the_gpus(
+                product,
+                cards.vulkan_instance.is_some(),
+                &cards.discrete_gpus,
+            );
+            Ok(cards.clone())
+        }
+        Err(reason) => {
+            product.emit(
+                "gpus",
+                &format!("enumerated=false reason={}", field_value(reason)),
+            );
+            product.emit(
+                "stopped",
+                &format!("clause=cards_not_taken reason={}", field_value(reason)),
+            );
+            Err(EXIT_RUN_CONDITION_NOT_MET)
+        }
+    }
+}
+
+/// 这条臂在交来的卡上跑不跑得了：照交来的张数判（[`reason_the_arm_is_not_run`]），本机另有没交的卡不影响。
+fn reason_the_arm_is_not_run_on_the_cards(
+    compute: ComputeOfTheArm,
+    cards: &CardsSeenByThisProcess,
+) -> Option<&'static str> {
+    reason_the_arm_is_not_run(compute, cards.discrete_gpus.len())
+}
+
+/// `--cards` 至少给几张：只开一张时全部卡臂与点名一张卡臂是同一条臂。
+const CARDS_THE_EVERY_CARD_ARM_OPENS_AT_LEAST: usize = 2;
+
+/// 全部卡臂开几张（`lockstep --cards <张数>`）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CardsOfTheEveryCardArm {
+    /// 没给 `--cards`：服务交来几张开几张。
+    EveryHandedOverCard,
+    /// `--cards <张数>`：只开服务交来的卡串里排在前头的这么多张（命令行只认不小于 [`CARDS_THE_EVERY_CARD_ARM_OPENS_AT_LEAST`] 的）。
+    FirstHandedOverCards(NonZeroUsize),
+}
+
+impl CardsOfTheEveryCardArm {
+    /// `name=every_card_arm_cards` 一行里 `named_by=` 的值。
+    const fn name(self) -> &'static str {
+        match self {
+            CardsOfTheEveryCardArm::EveryHandedOverCard => "every_handed_over_card",
+            CardsOfTheEveryCardArm::FirstHandedOverCards(_requested_card_count) => "cards_option",
+        }
+    }
+}
+
+/// 全部卡臂开的卡，按 PCI 地址次序（同 [`CardsSeenByThisProcess::discrete_gpus`]）：没给 `--cards` 是交来的全部；
+/// 给了 N 是服务交来的卡串里排在前头的 N 张。这一台一张都没交的交回空（照「服务交的卡里没有这一台的」办，不当命令行不对）。
+///
+/// # Errors
+/// N 多于这一台交来的张数：不截成交来的张数。
+fn discrete_gpus_named_for_the_every_card_arm(
+    cards: &CardsSeenByThisProcess,
+    cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
+) -> Result<Vec<DiscreteGpuSeenByThisProcess>, String> {
+    match cards_of_the_every_card_arm {
+        CardsOfTheEveryCardArm::EveryHandedOverCard => Ok(cards.discrete_gpus.clone()),
+        CardsOfTheEveryCardArm::FirstHandedOverCards(_requested_card_count)
+            if cards.discrete_gpus.is_empty() =>
+        {
+            Ok(Vec::new())
+        }
+        CardsOfTheEveryCardArm::FirstHandedOverCards(requested_card_count) => {
+            let handed_over_order = &cards.handed_over_pci_bus_addresses_in_the_handed_over_order;
+            if requested_card_count.get() > handed_over_order.len() {
+                return Err(format!(
+                    "--cards {requested_card_count} 多于服务交给这一台的 {} 张卡（{handed_over_order:?}）",
+                    handed_over_order.len()
+                ));
+            }
+            let first_handed_over: &[String] = &handed_over_order[..requested_card_count.get()];
+            Ok(cards
+                .discrete_gpus
+                .iter()
+                .filter(|gpu| first_handed_over.contains(&gpu.pci_bus_address))
+                .cloned()
+                .collect())
+        }
+    }
+}
+
+/// `name=every_card_arm_cards` 一行的字段：这一档全部卡臂开几张、照什么开的（`--cards` 给的还是交来的全部）、开的是哪几张。
+fn fields_of_the_every_card_arm_cards_line(
+    tier: UnitAreaTier,
+    cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
+    discrete_gpus_of_the_every_card_arm: &[DiscreteGpuSeenByThisProcess],
+) -> String {
+    format!(
+        "tier={} cards_named={} named_by={} pci_bus_addresses={}",
+        tier.name(),
+        discrete_gpus_of_the_every_card_arm.len(),
+        cards_of_the_every_card_arm.name(),
+        field_value(
+            &discrete_gpus_of_the_every_card_arm
+                .iter()
+                .map(|gpu| gpu.pci_bus_address.as_str())
+                .collect::<Vec<&str>>()
+                .join(",")
+        )
+    )
+}
+
+/// 这一趟打不打 `name=every_card_arm_cards` 一行、续跑时核不核它：点了全部卡臂（两条之一），而且这一台交来了卡。
+/// 这一台一张都没交的不打不核：哪条 GPU 臂都不跑（退 77），产物里不留一行零张，以后在交了卡的那一台续跑时不被它挡住。
+fn the_every_card_arm_cards_are_recorded(
+    arms_requested: &[LockstepArm],
+    cards: &CardsSeenByThisProcess,
+) -> bool {
+    arms_requested
+        .iter()
+        .any(|arm| arm.compute == ComputeOfTheArm::GpuOnEveryCard)
+        && !cards.discrete_gpus.is_empty()
+}
+
+/// 续跑时核产物里已有的 `name=every_card_arm_cards` 行（不分档）：每一行的 `cards_named` 与 `named_by` 都同这一趟算出的相同才接着跑，
+/// 两种张数的重复不混在同一份产物里。交回 `None` 是接着跑：产物是新的（一行结果都没有），或每一行都相同。
+/// 交回 `Some` 是停下：`name=stopped clause=cards_option_differs_from_the_product_being_resumed` 那一行在 clause 之后的字段，
+/// 带产物里的与这一趟的 `cards_named`、`named_by`；产物里有结果行而没有 `every_card_arm_cards` 行的，认不出那几次开了几张，
+/// 产物那一边写 `none`、出路是换一个 `--product`。
+fn every_card_arm_cards_differing_from_the_product_being_resumed(
+    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
+    cards_named_now: usize,
+    cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
+) -> Option<String> {
+    if lines_already_in_the_product.is_empty() {
+        return None;
+    }
+    let cards_named_now_text = cards_named_now.to_string();
+    let named_by_now = cards_of_the_every_card_arm.name();
+    let mut lines_recorded_in_the_product = lines_already_in_the_product
+        .iter()
+        .filter(|(name, _fields)| name == "every_card_arm_cards")
+        .map(|(_name, fields)| (fields.get("cards_named"), fields.get("named_by")))
+        .peekable();
+    let (cards_named_in_the_product, named_by_in_the_product, reason) =
+        if lines_recorded_in_the_product.peek().is_none() {
+            (
+                "none",
+                "none",
+                "产物里有结果行而没有every_card_arm_cards行，认不出那几次全部卡臂开了几张，换一个--product",
+            )
+        } else {
+            let (cards_named_recorded, named_by_recorded) = lines_recorded_in_the_product.find(
+                |(cards_named_of_the_line, named_by_of_the_line)| {
+                    cards_named_of_the_line.map(String::as_str)
+                        != Some(cards_named_now_text.as_str())
+                        || named_by_of_the_line.map(String::as_str) != Some(named_by_now)
+                },
+            )?;
+            (
+                cards_named_recorded.map_or("none", String::as_str),
+                named_by_recorded.map_or("none", String::as_str),
+                "产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product",
+            )
+        };
+    Some(format!(
+        "cards_named_in_the_product={} named_by_in_the_product={} cards_named_now={cards_named_now} named_by_now={named_by_now} reason={reason}",
+        field_value(cards_named_in_the_product),
+        field_value(named_by_in_the_product),
+    ))
+}
+
+/// 这条臂开的卡从哪一份里取：全部卡臂是 `--cards` 挑过的那一份，点名一张卡臂（取头一张）与 CPU 臂是交来的全部。
+fn discrete_gpus_of_the_arm<'cards>(
+    compute: ComputeOfTheArm,
+    handed_over: &'cards [DiscreteGpuSeenByThisProcess],
+    of_the_every_card_arm: &'cards [DiscreteGpuSeenByThisProcess],
+) -> &'cards [DiscreteGpuSeenByThisProcess] {
+    match compute {
+        ComputeOfTheArm::Cpu | ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress => handed_over,
+        ComputeOfTheArm::GpuOnEveryCard => of_the_every_card_arm,
+    }
+}
+
+/// 打 `name=gpus` 一行：枚举过没有、几张、各自的 PCI 地址与型号。
+fn emit_the_gpus(
+    product: &mut ProductWriter,
+    is_enumerated: bool,
+    discrete_gpus: &[DiscreteGpuSeenByThisProcess],
+) {
+    product.emit(
+        "gpus",
+        &format!(
+            "enumerated={is_enumerated} count={} pci_bus_addresses={} models={}",
+            discrete_gpus.len(),
+            field_value(
+                &discrete_gpus
+                    .iter()
+                    .map(|gpu| gpu.pci_bus_address.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(",")
+            ),
+            field_value(
+                &discrete_gpus
+                    .iter()
+                    .map(|gpu| gpu.model.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(",")
+            )
+        ),
+    );
 }
 
 fn opening_of_the_command(
     product: &mut ProductWriter,
     product_path: &Path,
     command_fields: &str,
-    gpus: GpusOfTheCommand<'_>,
+    cards: CardsOfTheCommand,
 ) -> Result<OpeningOfTheCommand, i32> {
     let lines_already_in_the_product =
         result_lines_already_in_the_product(product_path).map_err(|reason| {
@@ -5621,48 +6069,25 @@ fn opening_of_the_command(
         );
         return Err(EXIT_STOPPED);
     }
-    let (vulkan_instance, discrete_gpus) = match gpus {
-        GpusOfTheCommand::EnumeratedOn(vulkan_instance) => {
-            let discrete_gpus =
-                discrete_gpus_seen_by_this_process(vulkan_instance).map_err(|reason| {
-                    product.emit(
-                        "gpus",
-                        &format!("enumerated=false reason={}", field_value(&reason)),
-                    );
-                    EXIT_RUN_CONDITION_NOT_MET
-                })?;
-            (Some(vulkan_instance.clone()), discrete_gpus)
+    match cards {
+        CardsOfTheCommand::TakenBeforeOpeningTheDevices => {
+            if !the_task_server_hands_over_cards_to_this_process() {
+                product.emit(
+                    "stopped",
+                    &format!(
+                        "clause=no_cards_from_the_task_server reason={}",
+                        field_value(REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER)
+                    ),
+                );
+                return Err(EXIT_RUN_CONDITION_NOT_MET);
+            }
         }
-        GpusOfTheCommand::NotNeeded => (None, Vec::new()),
-    };
-    product.emit(
-        "gpus",
-        &format!(
-            "enumerated={} count={} pci_bus_addresses={} models={}",
-            vulkan_instance.is_some(),
-            discrete_gpus.len(),
-            field_value(
-                &discrete_gpus
-                    .iter()
-                    .map(|gpu| gpu.pci_bus_address.as_str())
-                    .collect::<Vec<&str>>()
-                    .join(",")
-            ),
-            field_value(
-                &discrete_gpus
-                    .iter()
-                    .map(|gpu| gpu.model.as_str())
-                    .collect::<Vec<&str>>()
-                    .join(",")
-            )
-        ),
-    );
+        CardsOfTheCommand::NotNeeded => emit_the_gpus(product, false, &[]),
+    }
     Ok(OpeningOfTheCommand {
         lines_already_in_the_product,
         session_number,
         registered_heavy_threads,
-        discrete_gpus,
-        vulkan_instance,
     })
 }
 
@@ -5769,6 +6194,8 @@ struct LockstepCommand {
     user_changes: u64,
     batch_units: usize,
     arms_requested: Vec<LockstepArm>,
+    /// 全部卡臂开几张（`--cards`）。
+    cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
     product: PathBuf,
 }
 
@@ -5812,10 +6239,10 @@ fn repeats_already_done(
     (done, numbers, next_repeat)
 }
 
-fn lockstep_command(
-    command: &LockstepCommand,
-    vulkan_instance: &VulkanInstanceOfThisProcess,
-) -> i32 {
+/// 交替跑不拆成先录后判：量 W、C、S、P 是同一个进程、同一次重复里 CPU 臂与 GPU 臂按轮换次序挨着跑的成对差（[`run_one_lockstep_repeat`]、
+/// [`judgement_of_a_lockstep_tier`]），H 按一次重复里最忙的那一次判整组作废；把 CPU 臂挪到另一段（另一个进程、另一个时刻、可能另一台）去跑，
+/// 成对差的两边就不再同时同机。只把造起步镜像挪到取卡之前（它不在任何计时窗口里）。
+fn lockstep_command(command: &LockstepCommand) -> i32 {
     let mut product = match ProductWriter::appending_to(&command.product) {
         Ok(product) => product,
         Err(reason) => {
@@ -5835,7 +6262,7 @@ fn lockstep_command(
         &mut product,
         &command.product,
         &command_fields,
-        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
+        CardsOfTheCommand::TakenBeforeOpeningTheDevices,
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -5847,9 +6274,77 @@ fn lockstep_command(
         product.finish();
         return EXIT_STOPPED;
     }
+    let image = construct_the_starting_image(command.tier);
+    if !emit_the_construction(&mut product, &image) {
+        product.emit(
+            "stopped",
+            "clause=geometry_not_formed reason=几何没造成，改负载重造交主agent",
+        );
+        product.finish();
+        return EXIT_STOPPED;
+    }
+    let cards = match cards_seen_by_the_command(&mut product) {
+        Ok(cards) => cards,
+        Err(exit_code) => {
+            product.finish();
+            return exit_code;
+        }
+    };
+    let discrete_gpus_of_the_every_card_arm = match discrete_gpus_named_for_the_every_card_arm(
+        &cards,
+        command.cards_of_the_every_card_arm,
+    ) {
+        Ok(discrete_gpus_of_the_every_card_arm) => discrete_gpus_of_the_every_card_arm,
+        Err(reason) => {
+            product.emit(
+                "stopped",
+                &format!(
+                    "clause=cards_option_exceeds_the_cards_handed_over reason={}",
+                    field_value(&reason)
+                ),
+            );
+            product.finish();
+            eprintln!("{reason}\n{USAGE}");
+            return EXIT_USAGE;
+        }
+    };
+    if the_every_card_arm_cards_are_recorded(&command.arms_requested, &cards) {
+        if let Some(fields) = every_card_arm_cards_differing_from_the_product_being_resumed(
+            &opening.lines_already_in_the_product,
+            discrete_gpus_of_the_every_card_arm.len(),
+            command.cards_of_the_every_card_arm,
+        ) {
+            product.emit(
+                "stopped",
+                &format!("clause=cards_option_differs_from_the_product_being_resumed {fields}"),
+            );
+            product.finish();
+            eprintln!(
+                "续跑的产物 {} 里全部卡臂开的卡与这一趟对不上：{fields}\n{USAGE}",
+                command.product.display()
+            );
+            return EXIT_USAGE;
+        }
+        product.emit(
+            "every_card_arm_cards",
+            &fields_of_the_every_card_arm_cards_line(
+                command.tier,
+                command.cards_of_the_every_card_arm,
+                &discrete_gpus_of_the_every_card_arm,
+            ),
+        );
+    }
     let mut arms_run: Vec<LockstepArm> = Vec::new();
     for arm in &command.arms_requested {
-        match reason_the_arm_is_not_run(arm.compute, opening.discrete_gpus.len()) {
+        match reason_the_arm_is_not_run(
+            arm.compute,
+            discrete_gpus_of_the_arm(
+                arm.compute,
+                &cards.discrete_gpus,
+                &discrete_gpus_of_the_every_card_arm,
+            )
+            .len(),
+        ) {
             Some(reason) => product.emit(
                 "not_run",
                 &format!(
@@ -5861,12 +6356,12 @@ fn lockstep_command(
             None => arms_run.push(*arm),
         }
     }
-    if opening.discrete_gpus.is_empty() {
+    if cards.discrete_gpus.is_empty() {
         for arm in &arms_run {
             product.emit(
                 "not_run",
                 &format!(
-                    "tier={} arm={} reason=本进程看得到的独立显卡一张都没有",
+                    "tier={} arm={} reason=服务交的卡里没有这一台的独立显卡",
                     command.tier.name(),
                     arm.name()
                 ),
@@ -5875,21 +6370,13 @@ fn lockstep_command(
         product.finish();
         return EXIT_NO_ARM_RAN;
     }
-    let image = construct_the_starting_image(command.tier);
-    if !emit_the_construction(&mut product, &image) {
-        product.emit(
-            "stopped",
-            "clause=geometry_not_formed reason=几何没造成，改负载重造交主agent",
-        );
-        product.finish();
-        return EXIT_STOPPED;
-    }
     let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
     let setting = LockstepRunSetting {
         image: &image,
-        discrete_gpus: &opening.discrete_gpus,
+        discrete_gpus: &cards.discrete_gpus,
+        discrete_gpus_of_the_every_card_arm: &discrete_gpus_of_the_every_card_arm,
         memory_leaked: &memory_leaked,
-        vulkan_instance: opening.vulkan_instance.as_ref(),
+        vulkan_instance: cards.vulkan_instance.as_ref(),
         user_changes: command.user_changes,
         batch_units: command.batch_units,
     };
@@ -6113,11 +6600,11 @@ fn distribution_fields(name: &str, distribution: Option<LatencyDistribution>) ->
     }
 }
 
-/// 并发跑里调用方的钟与前台：钟是真的单调钟（`CLOCK_MONOTONIC_RAW`，从开跑起算），`foreground_fsync` 读前台置的那个标志，每问一次记下问的时刻与答的（窗口外读）。
+/// 并发跑里调用方的钟与前台：钟是真的单调钟（`CLOCK_MONOTONIC_RAW`，从开跑起算），`answer_before_the_next_batch` 读前台置的那个标志，每问一次记下问的时刻与答的（窗口外读）。
 struct CallerOfTheConcurrentRun<'run> {
     started: StartOnTheMonotonicRawClock,
     fsync_is_waiting: &'run AtomicBool,
-    queries_of_the_call: RefCell<Vec<(Duration, ForegroundFsync)>>,
+    queries_of_the_call: RefCell<Vec<(Duration, AnswerOfTheCallerBeforeTheNextBatch)>>,
 }
 
 impl CallerOfTheBackgroundCompaction for CallerOfTheConcurrentRun<'_> {
@@ -6125,11 +6612,11 @@ impl CallerOfTheBackgroundCompaction for CallerOfTheConcurrentRun<'_> {
         CallerMonotonicClockReading(self.started.elapsed())
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
         let answer = if self.fsync_is_waiting.load(Ordering::SeqCst) {
-            ForegroundFsync::Waiting
+            AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
         } else {
-            ForegroundFsync::NoneWaiting
+            AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
         };
         self.queries_of_the_call
             .borrow_mut()
@@ -6143,7 +6630,7 @@ struct ConcurrentCallRecord {
     call: GcCallRecord,
     started_at: Duration,
     returned_at: Duration,
-    fsync_queries: Vec<(Duration, ForegroundFsync)>,
+    fsync_queries: Vec<(Duration, AnswerOfTheCallerBeforeTheNextBatch)>,
 }
 
 /// 第七节甲类第 5 行：答了「在等」的那次调用只答了这一次、它是这次调用问的最后一次（答了之后不再发批），停机原因是让路。
@@ -6151,15 +6638,16 @@ fn the_call_yielded_after_answering_waiting(call: &ConcurrentCallRecord) -> bool
     let waiting_answers = call
         .fsync_queries
         .iter()
-        .filter(|(_at, answer)| *answer == ForegroundFsync::Waiting)
+        .filter(|(_at, answer)| {
+            *answer == AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
+        })
         .count();
     match waiting_answers {
         0 => true,
         1 => {
-            call.fsync_queries
-                .last()
-                .is_some_and(|(_at, answer)| *answer == ForegroundFsync::Waiting)
-                && call.call.stop_name == CompactionRunStop::YieldedToAForegroundFsync.name()
+            call.fsync_queries.last().is_some_and(|(_at, answer)| {
+                *answer == AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
+            }) && call.call.stop_name == CompactionRunStop::YieldedToAForegroundFsync.name()
         }
         _more_than_one => false,
     }
@@ -6189,7 +6677,9 @@ fn waiting_answers_trajectory(calls: &[ConcurrentCallRecord]) -> WaitingAnswersT
             let waiting = call
                 .fsync_queries
                 .iter()
-                .filter(|(_at, answer)| *answer == ForegroundFsync::Waiting)
+                .filter(|(_at, answer)| {
+                    *answer == AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
+                })
                 .count();
             u64::try_from(waiting).expect("次数")
         })
@@ -7067,10 +7557,9 @@ fn command_fields_of_a_concurrent_command(command: &ConcurrentCommand) -> String
     )
 }
 
-fn concurrent_command(
-    command: &ConcurrentCommand,
-    vulkan_instance: &VulkanInstanceOfThisProcess,
-) -> i32 {
+/// 并发跑不拆成先录后判：量 F 与让路读数是同一个进程里 CPU 臂、GPU 臂与不跑 GC 臂按轮换次序挨着跑出来的（量 F 底就是不跑 GC 臂，
+/// [`run_one_concurrent_repeat`]），把 CPU 臂挪到另一段去跑，三条臂就不再同时同机。只把造起步镜像挪到取卡之前（它不在任何计时窗口里）。
+fn concurrent_command(command: &ConcurrentCommand) -> i32 {
     let mut product = match ProductWriter::appending_to(&command.product) {
         Ok(product) => product,
         Err(reason) => {
@@ -7083,7 +7572,7 @@ fn concurrent_command(
         &mut product,
         &command.product,
         &command_fields,
-        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
+        CardsOfTheCommand::TakenBeforeOpeningTheDevices,
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -7095,9 +7584,25 @@ fn concurrent_command(
         product.finish();
         return EXIT_STOPPED;
     }
+    let image = construct_the_starting_image(command.tier);
+    if !emit_the_construction(&mut product, &image) {
+        product.emit(
+            "stopped",
+            "clause=geometry_not_formed reason=几何没造成，改负载重造交主agent",
+        );
+        product.finish();
+        return EXIT_STOPPED;
+    }
+    let cards = match cards_seen_by_the_command(&mut product) {
+        Ok(cards) => cards,
+        Err(exit_code) => {
+            product.finish();
+            return exit_code;
+        }
+    };
     let mut arms_run: Vec<ConcurrentArm> = Vec::new();
     for arm in &command.arms_requested {
-        match reason_the_arm_is_not_run(arm.compute_of_the_arm(), opening.discrete_gpus.len()) {
+        match reason_the_arm_is_not_run_on_the_cards(arm.compute_of_the_arm(), &cards) {
             Some(reason) => product.emit(
                 "not_run",
                 &format!(
@@ -7109,12 +7614,12 @@ fn concurrent_command(
             None => arms_run.push(*arm),
         }
     }
-    if opening.discrete_gpus.is_empty() {
+    if cards.discrete_gpus.is_empty() {
         for arm in &arms_run {
             product.emit(
                 "not_run",
                 &format!(
-                    "tier={} arm={} reason=本进程看得到的独立显卡一张都没有",
+                    "tier={} arm={} reason=服务交的卡里没有这一台的独立显卡",
                     command.tier.name(),
                     arm.name()
                 ),
@@ -7123,21 +7628,12 @@ fn concurrent_command(
         product.finish();
         return EXIT_NO_ARM_RAN;
     }
-    let image = construct_the_starting_image(command.tier);
-    if !emit_the_construction(&mut product, &image) {
-        product.emit(
-            "stopped",
-            "clause=geometry_not_formed reason=几何没造成，改负载重造交主agent",
-        );
-        product.finish();
-        return EXIT_STOPPED;
-    }
     let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
     let setting = ConcurrentRunSetting {
         image: &image,
-        discrete_gpus: &opening.discrete_gpus,
+        discrete_gpus: &cards.discrete_gpus,
         memory_leaked: &memory_leaked,
-        vulkan_instance: opening.vulkan_instance.as_ref(),
+        vulkan_instance: cards.vulkan_instance.as_ref(),
         user_changes: CONCURRENT_USER_CHANGES,
         foreground_interval: command.foreground_interval,
     };
@@ -7241,6 +7737,7 @@ fn sensitivity_lockstep_command(product: &Path, user_changes: u64) -> LockstepCo
         user_changes,
         batch_units: BATCH_UNITS_AT_THE_SENSITIVITY_POINT,
         arms_requested: vec![LOCKSTEP_ARMS[0], LOCKSTEP_ARMS[1]],
+        cards_of_the_every_card_arm: CardsOfTheEveryCardArm::EveryHandedOverCard,
         product: product.to_path_buf(),
     }
 }
@@ -7257,20 +7754,14 @@ fn sensitivity_concurrent_command(product: &Path) -> ConcurrentCommand {
     }
 }
 
-/// 两点串着跑、写进同一份产物：交替跑那一点不是 0 就不跑并发那一点、交回它的退出码。
-fn sensitivity_command(
-    product: &Path,
-    user_changes: u64,
-    vulkan_instance: &VulkanInstanceOfThisProcess,
-) -> i32 {
-    let lockstep_exit = lockstep_command(
-        &sensitivity_lockstep_command(product, user_changes),
-        vulkan_instance,
-    );
+/// 两点串着跑、写进同一份产物：交替跑那一点不是 0 就不跑并发那一点、交回它的退出码。两点共用这个进程取到的那一份卡（[`CARDS_SEEN_BY_THIS_PROCESS`]）。
+/// 不拆成先录后判：两点各是交替跑、并发跑，量的都是同一个进程里各臂挨着跑的读数（理由在 [`lockstep_command`]、[`concurrent_command`]）。
+fn sensitivity_command(product: &Path, user_changes: u64) -> i32 {
+    let lockstep_exit = lockstep_command(&sensitivity_lockstep_command(product, user_changes));
     if lockstep_exit != EXIT_SUCCESS {
         return lockstep_exit;
     }
-    concurrent_command(&sensitivity_concurrent_command(product), vulkan_instance)
+    concurrent_command(&sensitivity_concurrent_command(product))
 }
 
 // ---- 子命令 geometry-check（登记第五节「分段」第一段：只造池、不计时、不要卡；第一节未定第 6 项：量每档造池耗时与每次跑的批数）----
@@ -7290,6 +7781,7 @@ fn geometry_check_of_a_tier(tier: UnitAreaTier) -> GeometryCheckOfATier {
             let setting = LockstepRunSetting {
                 image: &image,
                 discrete_gpus: &[],
+                discrete_gpus_of_the_every_card_arm: &[],
                 memory_leaked: &memory_leaked,
                 vulkan_instance: None,
                 user_changes,
@@ -7325,7 +7817,7 @@ fn geometry_check_command(product_path: &Path) -> i32 {
         &mut product,
         product_path,
         "command=geometry-check reading=occupancy",
-        GpusOfTheCommand::NotNeeded,
+        CardsOfTheCommand::NotNeeded,
     ) {
         Ok(opening) => opening,
         Err(exit_code) => {
@@ -7461,7 +7953,7 @@ fn construction_timing_command(command: &ConstructionTimingCommand) -> i32 {
             command.storage.name(),
             joined_live_data_units.join(",")
         ),
-        GpusOfTheCommand::NotNeeded,
+        CardsOfTheCommand::NotNeeded,
     ) {
         product.finish();
         return exit_code;
@@ -7736,10 +8228,6 @@ impl<Inner: GpuInventory> GpuInventory for GpuComputeTimingTheStageThree<Inner> 
     fn devices_with_total_memory(&self) -> Vec<(GpuDeviceIdentifier, GpuMemoryInBytes)> {
         self.inner.devices_with_total_memory()
     }
-
-    fn devices_not_opened_at_the_mount(&self) -> Vec<GpuDeviceNotOpenedAtTheMount> {
-        self.inner.devices_not_opened_at_the_mount()
-    }
 }
 
 impl<Inner: BackgroundGpuCompute> BackgroundGpuCompute for GpuComputeTimingTheStageThree<Inner> {
@@ -7784,6 +8272,17 @@ impl<Inner: BackgroundGpuCompute> BackgroundGpuCompute for GpuComputeTimingTheSt
 
     fn use_the_settings_from_the_next_batch(&mut self, settings: &AdmittedGpuSettings) {
         self.inner.use_the_settings_from_the_next_batch(settings);
+    }
+
+    fn use_no_gpu_from_the_next_batch(&mut self) {
+        self.inner.use_no_gpu_from_the_next_batch();
+    }
+
+    fn put_the_gpus_opened_since_the_settings_were_handed_in_in_effect(
+        &mut self,
+    ) -> LatestGpuSettingsHandedIn {
+        self.inner
+            .put_the_gpus_opened_since_the_settings_were_handed_in_in_effect()
     }
 
     fn failure_under_the_settings_handed_in(&self) -> Option<BackgroundGpuComputeFailed> {
@@ -7845,7 +8344,9 @@ fn stage_three_share_of_one_greedy_call(
         let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
             &BackgroundGpuSelection::of_the_settings(&settings),
             memory_leaked,
+            openings_not_returned_in_this_process(),
             vulkan_instance_for_the_gpu_arm(vulkan_instance)?,
+            |_gpus_to_open| {},
         )
         .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
         let gpus_leaked_when_the_gpu_is_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -7945,7 +8446,9 @@ fn stage_three_counts_on_the_arm(
             let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
                 &BackgroundGpuSelection::of_the_settings(&settings),
                 memory_leaked,
+                openings_not_returned_in_this_process(),
                 vulkan_instance_for_the_gpu_arm(vulkan_instance)?,
+                |_gpus_to_open| {},
             )
             .map_err(|refused| format!("开后台 GPU：{refused:?}"))?;
             let gpus_leaked_when_the_gpu_is_dropped = background_gpu.gpus_leaked_when_dropped();
@@ -7985,11 +8488,228 @@ fn allocation_records_and_unit_area_of_the_image(
     ))
 }
 
-fn stage_three_cost_command(
-    tier: UnitAreaTier,
-    product_path: &Path,
-    vulkan_instance: &VulkanInstanceOfThisProcess,
-) -> i32 {
+// ---- 内联真卡测试的先录后判：小池上 GPU 点名一张卡臂与装置自数的逐段活槽数对拍 ----
+// 只录那一段在 CPU 上造输入（起步镜像那一版的分配记录与盘 0 的单元区）、装置自数参照、写进判定库，不取卡；判段读回之后才取卡、只跑 GPU、比，
+// 对拍结论按键入库复用（测试包 `common_pairing_input_through_the_library::pairing_concluded_on_the_cards_through_the_pairing_library`，键与存法都是验证包那一份）。
+// 这几个 fn 不挂 `cfg(test)`：两侧的入口要编进 bin 本体，构建脚本经函数单元图收它们的闭包时 bin 不开 `cfg(test)`。
+
+/// 参照一侧那一组的组名（登记在 `src/reference_units_entries.rs`，入口是 [`reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment`]）。
+#[cfg_attr(
+    not(all(test, feature = "tests-on-a-real-gpu")),
+    allow(
+        dead_code,
+        reason = "只给真卡那一条内联测试用；要编进 bin 本体，构建脚本收参照一侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+const REFERENCE_UNITS_GROUP_OF_THE_APPARATUS_COUNT: &str =
+    "apparatus_count_of_the_live_slots_per_segment_in_the_gpu_cpu_gc_comparison";
+
+/// 分配记录与单元区编成对拍输入的字节：单元区的盘号、起点槽、槽数，记录条数，逐条记录是盘号、槽号、跨几个槽、代、释放没有、隔离没有
+/// （后两样写 0 或 1），都是 8 字节小端（`common_pairing_input_through_the_library` 的 `append_number`、`append_count`）。
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "只给内联测试用；要编进 bin 本体，构建脚本收参照一侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn pairing_input_bytes_of_the_allocation_records_and_the_unit_area(
+    allocation_records: &[AllocationRecord],
+    unit_area: UnitAreaOfOneDevice,
+) -> Vec<u8> {
+    let mut input_bytes = Vec::new();
+    append_number(&mut input_bytes, u64::from(unit_area.device.0));
+    append_number(&mut input_bytes, unit_area.start.slot().0);
+    append_number(&mut input_bytes, unit_area.slots);
+    append_count(&mut input_bytes, allocation_records.len());
+    for record in allocation_records {
+        append_number(&mut input_bytes, u64::from(record.device.0));
+        append_number(&mut input_bytes, record.slot.0);
+        append_number(&mut input_bytes, u64::from(record.span_slots));
+        append_number(&mut input_bytes, record.generation.0);
+        append_number(&mut input_bytes, u64::from(record.is_released));
+        append_number(
+            &mut input_bytes,
+            match record.quarantine_mark {
+                AllocationRecordQuarantineMark::NotQuarantined => 0,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck => 1,
+            },
+        );
+    }
+    input_bytes
+}
+
+/// 写下的 0 或 1 读回成「是不是」。
+///
+/// # Panics
+/// 读回的既不是 0 也不是 1：录的与读的布局对不上。
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "只给内联测试用；要编进 bin 本体，构建脚本收两侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn whether_of_the_number_written(number: u64, field_name: &str) -> bool {
+    match number {
+        0 => false,
+        1 => true,
+        other => panic!("{field_name}只写 0 或 1，读回 {other}：录的与读的布局对不上"),
+    }
+}
+
+/// [`pairing_input_bytes_of_the_allocation_records_and_the_unit_area`] 的反向：单元区起点照 journal 环长重算（起点在环末尾的下一个槽）。
+///
+/// # Panics
+/// 字节与这份布局对不上（短了、取完还有剩、数装不下）；起点不落在聚簇段边界上。
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "只给内联测试用；要编进 bin 本体，构建脚本收两侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn allocation_records_and_the_unit_area_of_the_pairing_input_bytes(
+    input_bytes: &[u8],
+) -> (Vec<AllocationRecord>, UnitAreaOfOneDevice) {
+    let mut input = PairingInputBeingRead::from_the_start_of(input_bytes);
+    let device = DeviceIdentity(u32::try_from(input.take_number()).expect("写下的盘号装得进 u32"));
+    let start_slot = SlotNumber(input.take_number());
+    let journal_ring_bytes = start_slot.to_device_offset().0
+        - JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION
+            .to_device_offset()
+            .0;
+    let start = UnitAreaStart::following_the_journal_ring(journal_ring_bytes)
+        .unwrap_or_else(|refused| panic!("读回的单元区起点不落在聚簇段边界上：{refused:?}"));
+    let unit_area = UnitAreaOfOneDevice {
+        device,
+        start,
+        slots: input.take_number(),
+    };
+    let record_count = input.take_count();
+    let allocation_records = (0..record_count)
+        .map(|_record| AllocationRecord {
+            device: DeviceIdentity(
+                u32::try_from(input.take_number()).expect("写下的盘号装得进 u32"),
+            ),
+            slot: SlotNumber(input.take_number()),
+            span_slots: u16::try_from(input.take_number()).expect("写下的跨槽数装得进 u16"),
+            generation: CheckpointTxg(input.take_number()),
+            is_released: whether_of_the_number_written(input.take_number(), "释放没有"),
+            quarantine_mark: if whether_of_the_number_written(input.take_number(), "隔离没有") {
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck
+            } else {
+                AllocationRecordQuarantineMark::NotQuarantined
+            },
+        })
+        .collect();
+    input.finish();
+    (allocation_records, unit_area)
+}
+
+/// 参照一侧的入口（登记在 `src/reference_units_entries.rs`）：对拍输入里那份分配记录与单元区上装置自数的每段活槽数
+/// （[`live_slots_of_each_segment_counted_by_the_apparatus`]），编成字节：段数，逐段的活槽数，都是 8 字节小端。只录那一段调它。
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "只给内联测试用；要编进 bin 本体，构建脚本收参照一侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment(
+    input_bytes: &[u8],
+) -> Vec<u8> {
+    let (allocation_records, unit_area) =
+        allocation_records_and_the_unit_area_of_the_pairing_input_bytes(input_bytes);
+    let by_the_apparatus =
+        live_slots_of_each_segment_counted_by_the_apparatus(&allocation_records, unit_area);
+    let mut reference_bytes = Vec::new();
+    append_count(&mut reference_bytes, by_the_apparatus.len());
+    for live_slots in by_the_apparatus {
+        append_number(&mut reference_bytes, live_slots);
+    }
+    reference_bytes
+}
+
+/// [`reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment`] 写下的参照读回成每段活槽数。
+///
+/// # Panics
+/// 字节与这份布局对不上。
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "只给内联测试用；要编进 bin 本体，构建脚本收 GPU 一侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn live_slots_per_segment_of_the_reference_bytes(reference_bytes: &[u8]) -> Vec<u64> {
+    let mut reference = PairingInputBeingRead::from_the_start_of(reference_bytes);
+    let segment_count = reference.take_count();
+    let live_slots = (0..segment_count)
+        .map(|_segment| reference.take_number())
+        .collect();
+    reference.finish();
+    live_slots
+}
+
+/// GPU 一侧的入口（登记在 `src/gpu_side_units_entries.rs`，组名是内联真卡测试的名字）：判段读回之后调。取这个进程的卡
+/// （[`cards_of_this_process`]：环境变量给了卡照它，没给有领卡通道这一刻领），GPU 点名一张卡臂照丙段代价那一套在读回的分配记录上数
+/// [`STAGE_THREE_COST_REPEATS`] 遍（[`stage_three_counts_on_the_arm`]），每一遍逐段与读回的参照比。服务没给卡的来路、或交的卡里没有这一台的，
+/// 打 `NOT_RUN_NO_GPU_ADAPTER` 交回没跑成，不入库；给了来路而取不成（交来的卡对不上本机的独显）判红。
+#[cfg_attr(
+    not(all(test, feature = "tests-on-a-real-gpu")),
+    allow(
+        dead_code,
+        reason = "只给真卡那一条内联测试用；要编进 bin 本体，构建脚本收 GPU 一侧的闭包时 bin 不开 cfg(test)"
+    )
+)]
+fn judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let (allocation_records, unit_area) =
+            allocation_records_and_the_unit_area_of_the_pairing_input_bytes(input_bytes);
+        let by_the_apparatus = live_slots_per_segment_of_the_reference_bytes(reference_bytes);
+        if !the_task_server_hands_over_cards_to_this_process() {
+            println!(
+                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER}"
+            );
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        }
+        let cards = cards_of_this_process()
+            .unwrap_or_else(|reason| panic!("判段要开卡，取卡没成：{reason}"));
+        if cards.vulkan_instance.is_none() {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        }
+        let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
+        let on_the_card = stage_three_counts_on_the_arm(
+            ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
+            &allocation_records,
+            unit_area,
+            &cards.discrete_gpus,
+            &memory_leaked,
+            cards.vulkan_instance.as_ref(),
+        )
+        .unwrap_or_else(|reason| panic!("GPU 点名一张卡臂数不成：{reason}"));
+        assert_eq!(
+            on_the_card.walls.len(),
+            STAGE_THREE_COST_REPEATS,
+            "修订第 9 条：各量 5 次"
+        );
+        if !every_pass_agrees_with_the_apparatus_count(&on_the_card, &by_the_apparatus) {
+            panic!("GPU 点名一张卡臂有一遍逐段与读回的装置自数不同：{on_the_card:?}，参照 {by_the_apparatus:?}");
+        }
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+/// 丙段代价不拆成先录后判：GPU 臂逐段比的每段活槽数就是计时的那几遍数出来的（[`StageThreeCounter::count_once`] 一次调用同时交回挂钟与每段的数），
+/// 比较入库按键复用的话，复用的那一趟就不跑这几遍、量代价那一半跟着没了；另跑几遍不计时的来比，跑在计时之前改了头一遍的冷热与开卡线程那一读数，
+/// 跑在之后是多占的卡时、而量代价那一半整趟照样持卡，复用省不下卡。装置自数的参照（[`live_slots_of_each_segment_counted_by_the_apparatus`]）
+/// 与造起步镜像都在取卡之前做完。
+fn stage_three_cost_command(tier: UnitAreaTier, product_path: &Path) -> i32 {
     let mut product = match ProductWriter::appending_to(product_path) {
         Ok(product) => product,
         Err(reason) => {
@@ -7997,21 +8717,18 @@ fn stage_three_cost_command(
             return EXIT_RUN_CONDITION_NOT_MET;
         }
     };
-    let opening = match opening_of_the_command(
+    if let Err(exit_code) = opening_of_the_command(
         &mut product,
         product_path,
         &format!(
             "command=stage-three-cost tier={} repeats={STAGE_THREE_COST_REPEATS}",
             tier.name()
         ),
-        GpusOfTheCommand::EnumeratedOn(vulkan_instance),
+        CardsOfTheCommand::TakenBeforeOpeningTheDevices,
     ) {
-        Ok(opening) => opening,
-        Err(exit_code) => {
-            product.finish();
-            return exit_code;
-        }
-    };
+        product.finish();
+        return exit_code;
+    }
     if !emit_whether_the_make_filesystem_accepts_the_tier(&mut product, tier) {
         product.finish();
         return EXIT_STOPPED;
@@ -8036,11 +8753,18 @@ fn stage_three_cost_command(
         };
     let counted_by_the_apparatus =
         live_slots_of_each_segment_counted_by_the_apparatus(&allocation_records, unit_area);
+    let cards = match cards_seen_by_the_command(&mut product) {
+        Ok(cards) => cards,
+        Err(exit_code) => {
+            product.finish();
+            return exit_code;
+        }
+    };
     let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
     let mut arms_run: Vec<&str> = Vec::new();
     let mut does_every_arm_agree = true;
     for arm in STAGE_THREE_COST_ARMS {
-        if let Some(reason) = reason_the_arm_is_not_run(arm, opening.discrete_gpus.len()) {
+        if let Some(reason) = reason_the_arm_is_not_run_on_the_cards(arm, &cards) {
             product.emit(
                 "not_run",
                 &format!("tier={} arm={} reason={reason}", tier.name(), arm.name()),
@@ -8052,17 +8776,17 @@ fn stage_three_cost_command(
             arm,
             &allocation_records,
             unit_area,
-            &opening.discrete_gpus,
+            &cards.discrete_gpus,
             &memory_leaked,
-            opening.vulkan_instance.as_ref(),
+            cards.vulkan_instance.as_ref(),
         )
         .and_then(|counts| {
             stage_three_share_of_one_greedy_call(
                 &image,
                 arm,
-                &opening.discrete_gpus,
+                &cards.discrete_gpus,
                 &memory_leaked,
-                opening.vulkan_instance.as_ref(),
+                cards.vulkan_instance.as_ref(),
             )
             .map(|share| (counts, share))
         });
@@ -8082,6 +8806,7 @@ fn stage_three_cost_command(
                 return EXIT_STOPPED;
             }
         };
+        // 这里的比较不拆出去入库复用：逐段比的活槽数就是上面计时那几遍数出来的，拆开就要么少了量代价那一半、要么另跑几遍多占卡时。
         does_every_arm_agree &=
             every_pass_agrees_with_the_apparatus_count(&counts, &counted_by_the_apparatus);
         product.emit(
@@ -8202,7 +8927,7 @@ fn judge_trend_command(product_path: &Path, lockstep_products: &[PathBuf]) -> i3
 
 const USAGE: &str = "用法：
   e202_gpu_cpu_gc_comparison geometry-check --product <文件>
-  e202_gpu_cpu_gc_comparison lockstep --reading occupancy --unit-area <2288MiB|4GiB|8GiB> [--user-changes <24|48|96>] [--batch-units <4|16>] [--arms <臂,…>] --product <文件>
+  e202_gpu_cpu_gc_comparison lockstep --reading occupancy --unit-area <2288MiB|4GiB|8GiB> [--user-changes <24|48|96>] [--batch-units <4|16>] [--arms <臂,…>] [--cards <全部卡臂开几张>] --product <文件>
   e202_gpu_cpu_gc_comparison concurrent --reading occupancy --unit-area <2288MiB|4GiB|8GiB> [--foreground-interval-milliseconds <50|500>] [--arms <臂,…>] --product <文件>
   e202_gpu_cpu_gc_comparison sensitivity [--user-changes <24|48|96>] [--batch-units 16] [--foreground-interval-milliseconds 500] --product <文件>
   e202_gpu_cpu_gc_comparison judge-trend --product <文件> <三档 lockstep 产物…>
@@ -8280,6 +9005,31 @@ fn user_changes_of_the_options(options: &mut BTreeMap<String, String>) -> Result
     }
 }
 
+/// `--cards` 只认不小于 [`CARDS_THE_EVERY_CARD_ARM_OPENS_AT_LEAST`] 的整数（0 与 1 同一句报错）；不给是开服务交来的全部。
+/// 多于交来的张数要等取了卡才判得出（[`discrete_gpus_named_for_the_every_card_arm`]）。
+fn cards_of_the_every_card_arm_of_the_options(
+    options: &mut BTreeMap<String, String>,
+) -> Result<CardsOfTheEveryCardArm, String> {
+    match options.remove("cards") {
+        None => Ok(CardsOfTheEveryCardArm::EveryHandedOverCard),
+        Some(text) => {
+            let requested_card_count = text
+                .parse::<usize>()
+                .map_err(|parse_failure| format!("--cards {text} 不是数（{parse_failure}）"))?;
+            NonZeroUsize::new(requested_card_count)
+                .filter(|named_card_count| {
+                    named_card_count.get() >= CARDS_THE_EVERY_CARD_ARM_OPENS_AT_LEAST
+                })
+                .map(CardsOfTheEveryCardArm::FirstHandedOverCards)
+                .ok_or_else(|| {
+                    format!(
+                        "--cards {text}：全部卡臂至少开 {CARDS_THE_EVERY_CARD_ARM_OPENS_AT_LEAST} 张（只开一张时它与点名一张卡臂是同一条臂）"
+                    )
+                })
+        }
+    }
+}
+
 fn command_of_the_arguments(arguments: &[String]) -> Result<CommandOfTheApparatus, String> {
     let (subcommand, rest) = arguments.split_first().ok_or("缺子命令")?;
     let (mut options, positionals) = options_and_positionals(rest)?;
@@ -8313,11 +9063,21 @@ fn command_of_the_arguments(arguments: &[String]) -> Result<CommandOfTheApparatu
                     .collect::<Result<Vec<LockstepArm>, String>>()?,
                 None => LOCKSTEP_ARMS.to_vec(),
             };
+            let cards_of_the_every_card_arm =
+                cards_of_the_every_card_arm_of_the_options(&mut options)?;
+            if cards_of_the_every_card_arm != CardsOfTheEveryCardArm::EveryHandedOverCard
+                && !arms_requested
+                    .iter()
+                    .any(|arm| arm.compute == ComputeOfTheArm::GpuOnEveryCard)
+            {
+                return Err("--cards 只管全部卡臂开几张，--arms 里没点全部卡臂".to_string());
+            }
             CommandOfTheApparatus::Lockstep(LockstepCommand {
                 tier,
                 user_changes,
                 batch_units,
                 arms_requested,
+                cards_of_the_every_card_arm,
                 product,
             })
         }
@@ -8446,36 +9206,25 @@ fn command_of_the_arguments(arguments: &[String]) -> Result<CommandOfTheApparatu
     Ok(command)
 }
 
-/// 一个进程只起一条子命令；要卡的子命令在这里建这个进程的那一份 Vulkan 实例交下去（敏感度那一条的交替跑与并发跑共用它），不要卡的不建。
+/// 一个进程只起一条子命令。要卡的子命令自己在只用 CPU 的活做完、开设备之前取卡、建这个进程的那一份 Vulkan 实例（[`cards_seen_by_the_command`]），
+/// 敏感度那一条的交替跑与并发跑共用它；不要卡的不取、不建。
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let exit_code = match command_of_the_arguments(&arguments) {
         Ok(CommandOfTheApparatus::GeometryCheck { product }) => geometry_check_command(&product),
-        Ok(CommandOfTheApparatus::Lockstep(command)) => lockstep_command(
-            &command,
-            &VulkanInstanceOfThisProcess::created_for_this_process(),
-        ),
-        Ok(CommandOfTheApparatus::Concurrent(command)) => concurrent_command(
-            &command,
-            &VulkanInstanceOfThisProcess::created_for_this_process(),
-        ),
+        Ok(CommandOfTheApparatus::Lockstep(command)) => lockstep_command(&command),
+        Ok(CommandOfTheApparatus::Concurrent(command)) => concurrent_command(&command),
         Ok(CommandOfTheApparatus::Sensitivity {
             product,
             user_changes,
-        }) => sensitivity_command(
-            &product,
-            user_changes,
-            &VulkanInstanceOfThisProcess::created_for_this_process(),
-        ),
+        }) => sensitivity_command(&product, user_changes),
         Ok(CommandOfTheApparatus::JudgeTrend {
             product,
             lockstep_products,
         }) => judge_trend_command(&product, &lockstep_products),
-        Ok(CommandOfTheApparatus::StageThreeCost { tier, product }) => stage_three_cost_command(
-            tier,
-            &product,
-            &VulkanInstanceOfThisProcess::created_for_this_process(),
-        ),
+        Ok(CommandOfTheApparatus::StageThreeCost { tier, product }) => {
+            stage_three_cost_command(tier, &product)
+        }
         Ok(CommandOfTheApparatus::ConstructionTiming(command)) => {
             construction_timing_command(&command)
         }
@@ -9256,13 +10005,19 @@ mod tests {
 
     /// 第九节变异「全部卡臂也只点一张」在这里红。
     #[test]
-    fn the_every_card_arm_names_no_card_and_gives_one_limit_per_card() {
+    fn the_every_card_arm_names_every_handed_over_card_and_gives_one_limit_per_card() {
         let settings = background_compute_settings_of_the_arm(
             ComputeOfTheArm::GpuOnEveryCard,
             &two_discrete_gpus(),
         );
         assert_eq!(settings.background_compute, BackgroundComputeBackend::Gpu);
-        assert_eq!(settings.background_gpu_devices, None);
+        assert_eq!(
+            settings.background_gpu_devices,
+            Some(vec![
+                gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0"),
+                gpu_device_identifier_of_the_pci_bus_address("0000:02:00.0"),
+            ])
+        );
         assert_eq!(
             settings.background_gpu_memory_limit,
             Some(vec![GpuMemoryInBytes(1 << 30); 2])
@@ -9319,7 +10074,10 @@ mod tests {
             caller.clock_reading(),
             CallerMonotonicClockReading(Duration::from_millis(2))
         );
-        assert_eq!(caller.foreground_fsync(), ForegroundFsync::NoneWaiting);
+        assert_eq!(
+            caller.answer_before_the_next_batch(),
+            AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
+        );
     }
 
     fn gpu_record_giving_work_to(cards: Vec<GpuDeviceIdentifier>) -> BackgroundComputeOfOneBatch {
@@ -9928,6 +10686,7 @@ mod tests {
         let setting = LockstepRunSetting {
             image: &image,
             discrete_gpus: &[],
+            discrete_gpus_of_the_every_card_arm: &[],
             memory_leaked: &memory_leaked,
             vulkan_instance: None,
             user_changes: LOCKSTEP_USER_CHANGES_LADDER[0],
@@ -10684,7 +11443,7 @@ mod tests {
     fn concurrent_call_with(
         stop_name: &str,
         started_at_milliseconds: u64,
-        queries: &[(u64, ForegroundFsync)],
+        queries: &[(u64, AnswerOfTheCallerBeforeTheNextBatch)],
         returned_at_milliseconds: u64,
     ) -> ConcurrentCallRecord {
         let mut call = call_record_with(1, Vec::new());
@@ -10709,13 +11468,26 @@ mod tests {
             yield_stop,
             0,
             &[
-                (1, ForegroundFsync::NoneWaiting),
-                (2, ForegroundFsync::Waiting),
+                (
+                    1,
+                    AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                ),
+                (
+                    2,
+                    AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                ),
             ],
             3,
         );
-        let never_asked_to_wait =
-            concurrent_call_with(budget_stop, 0, &[(1, ForegroundFsync::NoneWaiting)], 2);
+        let never_asked_to_wait = concurrent_call_with(
+            budget_stop,
+            0,
+            &[(
+                1,
+                AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+            )],
+            2,
+        );
         assert_eq!(
             calls_not_yielding_after_answering_waiting(&[yielded, never_asked_to_wait]),
             0
@@ -10724,17 +11496,39 @@ mod tests {
             budget_stop,
             0,
             &[
-                (1, ForegroundFsync::Waiting),
-                (2, ForegroundFsync::NoneWaiting),
+                (
+                    1,
+                    AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                ),
+                (
+                    2,
+                    AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                ),
             ],
             3,
         );
-        let waiting_but_another_stop =
-            concurrent_call_with(budget_stop, 0, &[(1, ForegroundFsync::Waiting)], 2);
+        let waiting_but_another_stop = concurrent_call_with(
+            budget_stop,
+            0,
+            &[(
+                1,
+                AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+            )],
+            2,
+        );
         let waiting_twice = concurrent_call_with(
             yield_stop,
             0,
-            &[(1, ForegroundFsync::Waiting), (2, ForegroundFsync::Waiting)],
+            &[
+                (
+                    1,
+                    AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                ),
+                (
+                    2,
+                    AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                ),
+            ],
             3,
         );
         let trajectory = waiting_answers_trajectory(&[
@@ -10755,16 +11549,39 @@ mod tests {
                 yield_stop,
                 0,
                 &[
-                    (1, ForegroundFsync::Waiting),
-                    (2, ForegroundFsync::NoneWaiting),
+                    (
+                        1,
+                        AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                    ),
+                    (
+                        2,
+                        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                    ),
                 ],
                 3,
             ),
-            concurrent_call_with(budget_stop, 0, &[(1, ForegroundFsync::Waiting)], 2),
+            concurrent_call_with(
+                budget_stop,
+                0,
+                &[(
+                    1,
+                    AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                )],
+                2,
+            ),
             concurrent_call_with(
                 yield_stop,
                 0,
-                &[(1, ForegroundFsync::Waiting), (2, ForegroundFsync::Waiting)],
+                &[
+                    (
+                        1,
+                        AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                    ),
+                    (
+                        2,
+                        AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+                    ),
+                ],
                 3,
             ),
         ] {
@@ -10780,9 +11597,18 @@ mod tests {
                 "compaction_stopped_publish_budget_spent",
                 0,
                 &[
-                    (1, ForegroundFsync::NoneWaiting),
-                    (4, ForegroundFsync::NoneWaiting),
-                    (10, ForegroundFsync::NoneWaiting),
+                    (
+                        1,
+                        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                    ),
+                    (
+                        4,
+                        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                    ),
+                    (
+                        10,
+                        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                    ),
                 ],
                 15,
             ),
@@ -11298,50 +12124,838 @@ mod tests {
         assert_eq!(share.stage_three, None);
     }
 
-    /// 同上一条，GPU 点名一张卡臂换成真卡上产品那一份：五遍每段的活槽数都等于装置自己数的；greedy 那一次 GC 调用里丙段至少调了一次、
-    /// 那一截不长于整次调用。要本进程看得到至少一张独显。
+    /// 同上一条，GPU 点名一张卡臂换成真卡上产品那一份：五遍每段的活槽数都等于装置自己数的。先录后判：只录那一段在 CPU 上造小池、
+    /// 取分配记录与单元区、装置自数参照、写进判定库，不取卡；判段读回之后才取卡、只跑 GPU、逐段比，对拍结论按键入库复用（库里有两边一致的不取卡）。
+    /// 持卡判入口 [`judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool`]。
     #[cfg(feature = "tests-on-a-real-gpu")]
     #[test]
     fn the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool(
     ) {
-        let vulkan_instance = VulkanInstanceOfThisProcess::created_for_this_process();
-        let discrete_gpus =
-            discrete_gpus_seen_by_this_process(&vulkan_instance).expect("枚举得到适配器");
-        assert!(
-            !discrete_gpus.is_empty(),
-            "带 tests-on-a-real-gpu 跑，本进程要看得到至少一张独显"
+        crate::common_pairing_input_through_the_library::pairing_concluded_on_the_cards_through_the_pairing_library(
+            "the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool",
+            REFERENCE_UNITS_GROUP_OF_THE_APPARATUS_COUNT,
+            || {
+                let (allocation_records, unit_area) =
+                    allocation_records_and_unit_area_of_the_image(&small_pool_image())
+                        .expect("量挂载成");
+                pairing_input_bytes_of_the_allocation_records_and_the_unit_area(
+                    &allocation_records,
+                    unit_area,
+                )
+            },
+            reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment,
+            judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool,
         );
+    }
+
+    /// 小池上 GPU 点名一张卡臂照产品 greedy 跑的那一次 GC 调用：丙段至少调了一次、那一截不长于整次调用。只在真卡上跑通、没有 CPU 一侧可比
+    /// （CPU 臂那一截从包外量不到），不入对拍结论；只录那一段（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）没有要录的，不造池、不取卡就返回。
+    #[cfg(feature = "tests-on-a-real-gpu")]
+    #[test]
+    fn a_greedy_call_on_a_real_card_runs_the_stage_three_on_the_gpu_within_the_call_on_the_small_pool(
+    ) {
+        let test_name =
+            "a_greedy_call_on_a_real_card_runs_the_stage_three_on_the_gpu_within_the_call_on_the_small_pool";
+        if !singlefs_verification::crash_library::RunStage::of_this_process().judges() {
+            println!("NO_CARD_TAKEN_IN_THE_RECORD_STAGE test={test_name}");
+            return;
+        }
+        if !the_task_server_hands_over_cards_to_this_process() {
+            println!(
+                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER}"
+            );
+            return;
+        }
         let image = small_pool_image();
-        let (allocation_records, unit_area) =
-            allocation_records_and_unit_area_of_the_image(&image).expect("量挂载成");
-        let by_the_apparatus =
-            live_slots_of_each_segment_counted_by_the_apparatus(&allocation_records, unit_area);
+        let cards = cards_of_this_process()
+            .unwrap_or_else(|reason| panic!("判段要开卡，取卡没成：{reason}"));
+        if cards.vulkan_instance.is_none() {
+            return;
+        }
         let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
-        let on_the_card = stage_three_counts_on_the_arm(
-            ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
-            &allocation_records,
-            unit_area,
-            &discrete_gpus,
-            &memory_leaked,
-            Some(&vulkan_instance),
-        )
-        .expect("GPU 点名一张卡臂数得成");
-        assert_eq!(on_the_card.walls.len(), 5);
-        assert!(
-            every_pass_agrees_with_the_apparatus_count(&on_the_card, &by_the_apparatus),
-            "{on_the_card:?}"
-        );
         let share = stage_three_share_of_one_greedy_call(
             &image,
             ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
-            &discrete_gpus,
+            &cards.discrete_gpus,
             &memory_leaked,
-            Some(&vulkan_instance),
+            cards.vulkan_instance.as_ref(),
         )
         .expect("GPU 点名一张卡臂挂载得成");
         let stage_three = share.stage_three.expect("GPU 臂外面套了丙段计时");
         assert!(stage_three.calls >= 1, "{share:?}");
         assert!(stage_three.wall <= share.gc_call_wall, "{share:?}");
+    }
+
+    /// 一份五个变量都给了的领卡通道（值是什么不看，只当有通道）。
+    fn lease_channel_given() -> CardLeaseChannelOfTheCaller {
+        CardLeaseChannelOfTheCaller::of_the_variable_values(&|_name| {
+            Some(std::ffi::OsString::from("given"))
+        })
+        .expect("五个变量都给了")
+    }
+
+    /// 环境变量里服务交的卡串与领卡通道领到的卡串（两串不同，看得出用的是哪一串；地址是文档用的保留地址）。
+    const CARDS_IN_THE_ENVIRONMENT_VARIABLE: &str = "192.0.2.1:0:32G";
+    const CARDS_LEASED_THROUGH_THE_CHANNEL: &str = "192.0.2.1:1:32G";
+
+    /// 场景：环境变量给了卡串，也有领卡通道。
+    /// 预期：照环境变量那一串，一次都不领；开头的来路核判有来路。
+    #[test]
+    fn the_cards_in_the_environment_variable_are_used_without_leasing() {
+        let leases = Cell::new(0_u32);
+        let cards = cards_handed_to_the_apparatus(
+            Some(CARDS_IN_THE_ENVIRONMENT_VARIABLE.to_string()),
+            Some(&lease_channel_given()),
+            &|_channel| {
+                leases.set(leases.get() + 1);
+                Ok(CARDS_LEASED_THROUGH_THE_CHANNEL.to_string())
+            },
+        );
+        assert_eq!(
+            (cards, leases.get()),
+            (Ok(CARDS_IN_THE_ENVIRONMENT_VARIABLE.to_string()), 0)
+        );
+        assert!(the_task_server_hands_over_cards(
+            Some(CARDS_IN_THE_ENVIRONMENT_VARIABLE),
+            None
+        ));
+    }
+
+    /// 场景：环境变量没给卡，有领卡通道。
+    /// 预期：经通道领一回，用领到的那一串；开头的来路核判有来路（只看、不领）。
+    #[test]
+    fn without_the_environment_variable_the_cards_are_leased_through_the_channel() {
+        let channel = lease_channel_given();
+        let leases = Cell::new(0_u32);
+        let cards = cards_handed_to_the_apparatus(None, Some(&channel), &|_channel| {
+            leases.set(leases.get() + 1);
+            Ok(CARDS_LEASED_THROUGH_THE_CHANNEL.to_string())
+        });
+        assert_eq!(
+            (cards, leases.get()),
+            (Ok(CARDS_LEASED_THROUGH_THE_CHANNEL.to_string()), 1)
+        );
+        assert!(the_task_server_hands_over_cards(None, Some(&channel)));
+    }
+
+    /// 场景：环境变量没给卡、也没有领卡通道（没经服务交）。
+    /// 预期：取卡报错（那一句点名经 task-server/task submit 交），一次都不领、不退回自己枚举；开头的来路核判没有来路。
+    #[test]
+    fn without_the_variable_and_the_channel_the_apparatus_refuses_instead_of_enumerating_the_cards()
+    {
+        let leases = Cell::new(0_u32);
+        let cards = cards_handed_to_the_apparatus(None, None, &|_channel| {
+            leases.set(leases.get() + 1);
+            Ok(CARDS_LEASED_THROUGH_THE_CHANNEL.to_string())
+        });
+        assert_eq!(
+            (cards, leases.get()),
+            (
+                Err(REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER.to_string()),
+                0
+            )
+        );
+        assert!(REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER.contains("task-server/task submit"));
+        assert!(!the_task_server_hands_over_cards(None, None));
+    }
+
+    /// 本机看得到的三张独显，按 PCI 地址次序。
+    fn three_discrete_gpus_seen_on_this_host() -> Vec<DiscreteGpuSeenByThisProcess> {
+        ["0000:01:00.0", "0000:02:00.0", "0000:03:00.0"]
+            .into_iter()
+            .map(|pci_bus_address| DiscreteGpuSeenByThisProcess {
+                pci_bus_address: pci_bus_address.to_string(),
+                model: format!("model at {pci_bus_address}"),
+            })
+            .collect()
+    }
+
+    /// 场景：本机看得到三张独显，服务只交了总线地址居中的那一张。
+    /// 预期：只留交来的那一张；点名一张卡臂点的就是交来的那一张。
+    #[test]
+    fn only_the_handed_over_card_among_those_seen_on_this_host_is_kept() {
+        let kept = discrete_gpus_among_the_handed_over(
+            three_discrete_gpus_seen_on_this_host(),
+            &["0000:02:00.0".to_string()],
+        )
+        .expect("交来的那一张在本机看得到的独显里");
+        assert_eq!(
+            kept.iter()
+                .map(|gpu| gpu.pci_bus_address.as_str())
+                .collect::<Vec<&str>>(),
+            vec!["0000:02:00.0"]
+        );
+        assert_eq!(
+            background_compute_settings_of_the_arm(
+                ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
+                &kept
+            )
+            .background_gpu_devices,
+            Some(vec![gpu_device_identifier_of_the_pci_bus_address(
+                "0000:02:00.0"
+            )])
+        );
+    }
+
+    /// 场景：服务交了一张本机看不到的卡。
+    /// 预期：取卡报错，不退回用本机看得到的那几张。
+    #[test]
+    fn a_handed_over_card_not_seen_on_this_host_is_refused() {
+        assert!(discrete_gpus_among_the_handed_over(
+            three_discrete_gpus_seen_on_this_host(),
+            &["0000:04:00.0".to_string()],
+        )
+        .is_err());
+    }
+
+    /// 场景：本机看得到三张独显，服务交了其中两张（总线地址在两头的那两张）；另一趟三张都交了。
+    /// 预期：全部卡臂照跑，点名的正是交来的那两张、上限两份，没交的那一张不点；三张都交了就点三张、上限三份。
+    #[test]
+    fn the_every_card_arm_opens_as_many_cards_as_are_handed_over() {
+        let handed_over_pci_bus_addresses =
+            ["0000:01:00.0".to_string(), "0000:03:00.0".to_string()];
+        let two_of_three = CardsSeenByThisProcess {
+            discrete_gpus: discrete_gpus_among_the_handed_over(
+                three_discrete_gpus_seen_on_this_host(),
+                &handed_over_pci_bus_addresses,
+            )
+            .expect("交来的两张都在本机看得到的独显里"),
+            handed_over_pci_bus_addresses_in_the_handed_over_order: handed_over_pci_bus_addresses
+                .to_vec(),
+            vulkan_instance: None,
+        };
+        assert_eq!(
+            reason_the_arm_is_not_run_on_the_cards(ComputeOfTheArm::GpuOnEveryCard, &two_of_three),
+            None
+        );
+        let settings = background_compute_settings_of_the_arm(
+            ComputeOfTheArm::GpuOnEveryCard,
+            &two_of_three.discrete_gpus,
+        );
+        assert_eq!(
+            (
+                settings.background_gpu_devices,
+                settings.background_gpu_memory_limit
+            ),
+            (
+                Some(vec![
+                    gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0"),
+                    gpu_device_identifier_of_the_pci_bus_address("0000:03:00.0"),
+                ]),
+                Some(vec![GpuMemoryInBytes(1 << 30); 2])
+            )
+        );
+        let every_one_of_three = background_compute_settings_of_the_arm(
+            ComputeOfTheArm::GpuOnEveryCard,
+            &three_discrete_gpus_seen_on_this_host(),
+        );
+        assert_eq!(
+            every_one_of_three
+                .background_gpu_devices
+                .map(|devices| devices.len()),
+            Some(3)
+        );
+    }
+
+    /// 服务交来本机全部三张独显，交来的卡串先后是总线地址 03、01、02（与 PCI 地址次序不同）。
+    fn three_cards_handed_over_out_of_the_pci_order() -> CardsSeenByThisProcess {
+        let handed_over_pci_bus_addresses_in_the_handed_over_order = vec![
+            "0000:03:00.0".to_string(),
+            "0000:01:00.0".to_string(),
+            "0000:02:00.0".to_string(),
+        ];
+        CardsSeenByThisProcess {
+            discrete_gpus: discrete_gpus_among_the_handed_over(
+                three_discrete_gpus_seen_on_this_host(),
+                &handed_over_pci_bus_addresses_in_the_handed_over_order,
+            )
+            .expect("交来的三张都在本机看得到的独显里"),
+            handed_over_pci_bus_addresses_in_the_handed_over_order,
+            vulkan_instance: None,
+        }
+    }
+
+    fn pci_bus_addresses_of(discrete_gpus: &[DiscreteGpuSeenByThisProcess]) -> Vec<&str> {
+        discrete_gpus
+            .iter()
+            .map(|gpu| gpu.pci_bus_address.as_str())
+            .collect()
+    }
+
+    /// 场景：服务交来三张（交来的先后 03、01、02），`--cards 2`。
+    /// 预期：全部卡臂只点交来的卡串里排在前头的那两张（03 与 01，按 PCI 地址次序交回），上限两份；交来的另一张不点。
+    #[test]
+    fn the_cards_option_names_the_first_handed_over_cards_in_the_handed_over_order() {
+        let cards = three_cards_handed_over_out_of_the_pci_order();
+        let named = discrete_gpus_named_for_the_every_card_arm(
+            &cards,
+            CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
+        )
+        .expect("要两张、交了三张");
+        assert_eq!(
+            pci_bus_addresses_of(&named),
+            ["0000:01:00.0", "0000:03:00.0"]
+        );
+        let settings =
+            background_compute_settings_of_the_arm(ComputeOfTheArm::GpuOnEveryCard, &named);
+        assert_eq!(
+            (
+                settings.background_gpu_devices,
+                settings.background_gpu_memory_limit
+            ),
+            (
+                Some(vec![
+                    gpu_device_identifier_of_the_pci_bus_address("0000:01:00.0"),
+                    gpu_device_identifier_of_the_pci_bus_address("0000:03:00.0"),
+                ]),
+                Some(vec![GpuMemoryInBytes(1 << 30); 2])
+            )
+        );
+    }
+
+    /// 场景：服务交来三张，没给 `--cards`。
+    /// 预期：全部卡臂点交来的三张全部（按 PCI 地址次序）。
+    #[test]
+    fn without_the_cards_option_the_every_card_arm_names_every_handed_over_card() {
+        let cards = three_cards_handed_over_out_of_the_pci_order();
+        let named = discrete_gpus_named_for_the_every_card_arm(
+            &cards,
+            CardsOfTheEveryCardArm::EveryHandedOverCard,
+        )
+        .expect("没给 --cards 不会多于交来的");
+        assert_eq!(
+            pci_bus_addresses_of(&named),
+            ["0000:01:00.0", "0000:02:00.0", "0000:03:00.0"]
+        );
+    }
+
+    /// 场景：服务交来三张，`--cards 4`。
+    /// 预期：报错，不截成交来的三张。
+    #[test]
+    fn the_cards_option_asking_for_more_than_are_handed_over_is_refused() {
+        let cards = three_cards_handed_over_out_of_the_pci_order();
+        assert_eq!(
+            discrete_gpus_named_for_the_every_card_arm(
+                &cards,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(4).expect("4 不是 0")),
+            )
+            .map(|named| pci_bus_addresses_of(&named).len()),
+            Err("--cards 4 多于服务交给这一台的 3 张卡（[\"0000:03:00.0\", \"0000:01:00.0\", \"0000:02:00.0\"]）".to_string())
+        );
+    }
+
+    /// 场景：这一台服务一张卡都没交，`--cards 2`。
+    /// 预期：交回空（照「服务交的卡里没有这一台的」退 77 那一路办），不当命令行不对。
+    #[test]
+    fn the_cards_option_on_a_host_handed_no_card_names_none_without_a_usage_error() {
+        let no_card = CardsSeenByThisProcess {
+            discrete_gpus: Vec::new(),
+            handed_over_pci_bus_addresses_in_the_handed_over_order: Vec::new(),
+            vulkan_instance: None,
+        };
+        assert_eq!(
+            discrete_gpus_named_for_the_every_card_arm(
+                &no_card,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(
+                    NonZeroUsize::new(2).expect("2 不是 0")
+                ),
+            ),
+            Ok(Vec::new())
+        );
+    }
+
+    /// `lockstep` 子命令的必填参数，后面接 `extra_words`。
+    fn lockstep_command_of_the_words(
+        extra_words: &[&str],
+    ) -> Result<CommandOfTheApparatus, String> {
+        let mut words = vec![
+            "lockstep",
+            "--reading",
+            "occupancy",
+            "--unit-area",
+            "4GiB",
+            "--product",
+            "lockstep.out",
+        ];
+        words.extend_from_slice(extra_words);
+        command_of_the_arguments(&arguments_of(&words))
+    }
+
+    /// 场景：`lockstep --cards 2`。
+    /// 预期：认成只开交来的卡里排在前头的两张。
+    #[test]
+    fn lockstep_with_the_cards_option_two_names_the_first_two_handed_over_cards() {
+        match lockstep_command_of_the_words(&["--cards", "2"]) {
+            Ok(CommandOfTheApparatus::Lockstep(command)) => assert_eq!(
+                command.cards_of_the_every_card_arm,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(
+                    NonZeroUsize::new(2).expect("2 不是 0")
+                )
+            ),
+            Ok(_) | Err(_) => panic!("lockstep --cards 2 认得出"),
+        }
+    }
+
+    /// 场景：`lockstep` 不给 `--cards`。
+    /// 预期：认成开服务交来的全部。
+    #[test]
+    fn lockstep_without_the_cards_option_opens_every_handed_over_card() {
+        match lockstep_command_of_the_words(&[]) {
+            Ok(CommandOfTheApparatus::Lockstep(command)) => assert_eq!(
+                command.cards_of_the_every_card_arm,
+                CardsOfTheEveryCardArm::EveryHandedOverCard
+            ),
+            Ok(_) | Err(_) => panic!("lockstep 不给 --cards 认得出"),
+        }
+    }
+
+    /// 场景：`lockstep --cards 0`。
+    /// 预期：命令行不对，与 `--cards 1` 同一句（全部卡臂至少开两张），不当成没给。
+    #[test]
+    fn lockstep_with_the_cards_option_zero_is_a_usage_error() {
+        assert_eq!(
+            lockstep_command_of_the_words(&["--cards", "0"]).err(),
+            Some(
+                "--cards 0：全部卡臂至少开 2 张（只开一张时它与点名一张卡臂是同一条臂）"
+                    .to_string()
+            )
+        );
+    }
+
+    /// 场景：`lockstep --cards 1`。
+    /// 预期：命令行不对（只开一张时全部卡臂与点名一张卡臂是同一条臂），不认成只开一张、报本次未跑。
+    #[test]
+    fn lockstep_with_the_cards_option_one_is_a_usage_error() {
+        assert_eq!(
+            lockstep_command_of_the_words(&["--cards", "1"]).err(),
+            Some(
+                "--cards 1：全部卡臂至少开 2 张（只开一张时它与点名一张卡臂是同一条臂）"
+                    .to_string()
+            )
+        );
+    }
+
+    /// 场景：`lockstep --cards 两张`。
+    /// 预期：命令行不对（不是数）。
+    #[test]
+    fn lockstep_with_the_cards_option_not_a_number_is_a_usage_error() {
+        assert!(lockstep_command_of_the_words(&["--cards", "两张"])
+            .err()
+            .is_some_and(|reason| reason.starts_with("--cards 两张 不是数")));
+    }
+
+    /// 场景：`lockstep --cards 2 --arms cpu,gpu_one_card`（没点全部卡臂）；另一趟 `--arms gpu_every_card_rejudged`。
+    /// 预期：没点全部卡臂的命令行不对；点了全部卡多判臂的认得出。
+    #[test]
+    fn lockstep_with_the_cards_option_but_without_an_every_card_arm_is_a_usage_error() {
+        assert_eq!(
+            lockstep_command_of_the_words(&["--cards", "2", "--arms", "cpu,gpu_one_card"]).err(),
+            Some("--cards 只管全部卡臂开几张，--arms 里没点全部卡臂".to_string())
+        );
+        assert!(lockstep_command_of_the_words(&[
+            "--cards",
+            "2",
+            "--arms",
+            "gpu_every_card_rejudged"
+        ])
+        .is_ok());
+    }
+
+    /// 场景：没有全部卡臂的子命令 `concurrent` 给 `--cards 2`。
+    /// 预期：命令行不对（`--cards` 认不得）。
+    #[test]
+    fn a_subcommand_without_the_every_card_arm_refuses_the_cards_option() {
+        assert_eq!(
+            command_of_the_arguments(&arguments_of(&[
+                "concurrent",
+                "--reading",
+                "occupancy",
+                "--unit-area",
+                "4GiB",
+                "--cards",
+                "2",
+                "--product",
+                "concurrent.out",
+            ]))
+            .err(),
+            Some("--cards 认不得".to_string())
+        );
+    }
+
+    /// 场景：全部卡臂照 `--cards 2` 点了两张、没给 `--cards` 点了三张。
+    /// 预期：`name=every_card_arm_cards` 一行写出开了几张、照什么开的（`cards_option` 或 `every_handed_over_card`）与哪几张。
+    #[test]
+    fn the_every_card_arm_cards_line_tells_how_many_cards_and_whether_the_cards_option_named_them()
+    {
+        let three = three_discrete_gpus_seen_on_this_host();
+        assert_eq!(
+            fields_of_the_every_card_arm_cards_line(
+                UnitAreaTier::FourGibibytes,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
+                &three[..2],
+            ),
+            "tier=4GiB cards_named=2 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0"
+        );
+        assert_eq!(
+            fields_of_the_every_card_arm_cards_line(
+                UnitAreaTier::FourGibibytes,
+                CardsOfTheEveryCardArm::EveryHandedOverCard,
+                &three,
+            ),
+            "tier=4GiB cards_named=3 named_by=every_handed_over_card pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0"
+        );
+    }
+
+    /// 场景：交来三张，全部卡臂照 `--cards` 只取了其中两张。
+    /// 预期：全部卡臂取卡、数张数、写型号都从挑过的两张里取；点名一张卡臂与 CPU 臂仍从交来的三张里取，`name=run` 行的型号串照旧是三张。
+    #[test]
+    fn only_the_every_card_arm_takes_its_cards_from_those_the_cards_option_named() {
+        let three = three_discrete_gpus_seen_on_this_host();
+        let two = &three[1..];
+        assert_eq!(
+            pci_bus_addresses_of(discrete_gpus_of_the_arm(
+                ComputeOfTheArm::GpuOnEveryCard,
+                &three,
+                two
+            )),
+            ["0000:02:00.0", "0000:03:00.0"]
+        );
+        for compute in [
+            ComputeOfTheArm::Cpu,
+            ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress,
+        ] {
+            assert_eq!(
+                discrete_gpus_of_the_arm(compute, &three, two).len(),
+                3,
+                "{compute:?}"
+            );
+        }
+        assert_eq!(
+            gpu_models_in_the_run_line(&three),
+            "model_at_0000:01:00.0+model_at_0000:02:00.0+model_at_0000:03:00.0"
+        );
+    }
+
+    /// 场景：点了全部卡臂、交来三张；点了全部卡多判臂、这一台一张没交；只点 CPU 臂与点名一张卡臂、交来三张。
+    /// 预期：只有头一种打 `name=every_card_arm_cards` 一行、续跑时核它；这一台没交卡的不打不核（照旧退 77），没点全部卡臂的不打不核。
+    #[test]
+    fn the_every_card_arm_cards_are_recorded_only_with_an_every_card_arm_on_a_host_handed_cards() {
+        let no_card = CardsSeenByThisProcess {
+            discrete_gpus: Vec::new(),
+            handed_over_pci_bus_addresses_in_the_handed_over_order: Vec::new(),
+            vulkan_instance: None,
+        };
+        assert_eq!(
+            (
+                the_every_card_arm_cards_are_recorded(
+                    &[LOCKSTEP_ARMS[2]],
+                    &three_cards_handed_over_out_of_the_pci_order()
+                ),
+                the_every_card_arm_cards_are_recorded(&[LOCKSTEP_ARMS[5]], &no_card),
+                the_every_card_arm_cards_are_recorded(
+                    &[LOCKSTEP_ARMS[0], LOCKSTEP_ARMS[1]],
+                    &three_cards_handed_over_out_of_the_pci_order()
+                ),
+            ),
+            (true, false, false)
+        );
+    }
+
+    /// 产物里已有的结果行，照装置写的那种行（`E202 name=<种类> 键=值 …`）读回来。
+    fn lines_already_in_a_product_of(
+        lines_without_the_prefix: &[&str],
+    ) -> Vec<KindAndFieldsOfAResultLine> {
+        lines_without_the_prefix
+            .iter()
+            .map(|line| {
+                fields_of_a_result_line(&format!("{RESULT_LINE_PREFIX} {line}"))
+                    .expect("测试里写的是装置的结果行")
+            })
+            .collect()
+    }
+
+    /// `--cards 2` 那一趟写下的 `name=every_card_arm_cards` 一行（不带前缀）。
+    fn every_card_arm_cards_line_of_the_cards_option_two() -> String {
+        let three = three_discrete_gpus_seen_on_this_host();
+        format!(
+            "name=every_card_arm_cards {}",
+            fields_of_the_every_card_arm_cards_line(
+                UnitAreaTier::FourGibibytes,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(
+                    NonZeroUsize::new(2).expect("2 不是 0")
+                ),
+                &three[..2],
+            )
+        )
+    }
+
+    /// 场景：新产物（一行结果都没有）；续跑的产物里有 `--cards 2` 那一趟写下的一行，这一趟同样 `--cards 2`、开到两张。
+    /// 预期：都接着跑。
+    #[test]
+    fn resuming_a_product_with_the_same_every_card_arm_cards_goes_on() {
+        let cards_option_two =
+            CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0"));
+        assert_eq!(
+            every_card_arm_cards_differing_from_the_product_being_resumed(&[], 2, cards_option_two),
+            None
+        );
+        let line_of_the_cards_option_two = every_card_arm_cards_line_of_the_cards_option_two();
+        assert_eq!(
+            every_card_arm_cards_differing_from_the_product_being_resumed(
+                &lines_already_in_a_product_of(&[
+                    "name=session_start session=1 command=lockstep",
+                    line_of_the_cards_option_two.as_str(),
+                    "name=repeat_done tier=4GiB repeat=0 session=1",
+                ]),
+                2,
+                cards_option_two,
+            ),
+            None
+        );
+    }
+
+    /// 场景：续跑的产物里那一行是 `--cards 3` 开的三张；这一趟 `--cards 2`。
+    /// 预期：照什么开的相同而张数不同，停下，带上产物里的（3 张、`cards_option`）与这一趟的（2 张、`cards_option`）。
+    #[test]
+    fn resuming_a_product_whose_every_card_arm_opened_another_count_stops() {
+        assert_eq!(
+            every_card_arm_cards_differing_from_the_product_being_resumed(
+                &lines_already_in_a_product_of(&[
+                    "name=session_start session=1 command=lockstep",
+                    "name=every_card_arm_cards tier=4GiB cards_named=3 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0",
+                ]),
+                2,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
+            ),
+            Some(
+                "cards_named_in_the_product=3 named_by_in_the_product=cards_option cards_named_now=2 named_by_now=cards_option reason=产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product"
+                    .to_string()
+            )
+        );
+    }
+
+    /// 场景：续跑的产物里有 `--cards 2` 那一趟写下的一行；这一趟没给 `--cards`、交来的正好两张。
+    /// 预期：张数相同而照什么开的不同，照样停下。
+    #[test]
+    fn resuming_a_product_with_the_same_count_named_another_way_stops() {
+        let line_of_the_cards_option_two = every_card_arm_cards_line_of_the_cards_option_two();
+        assert_eq!(
+            every_card_arm_cards_differing_from_the_product_being_resumed(
+                &lines_already_in_a_product_of(&[line_of_the_cards_option_two.as_str()]),
+                2,
+                CardsOfTheEveryCardArm::EveryHandedOverCard,
+            ),
+            Some(
+                "cards_named_in_the_product=2 named_by_in_the_product=cards_option cards_named_now=2 named_by_now=every_handed_over_card reason=产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product"
+                    .to_string()
+            )
+        );
+    }
+
+    /// 场景：续跑的产物里有结果行（起过、跑完过重复），而没有 `name=every_card_arm_cards` 行；这一趟 `--cards 2`。
+    /// 预期：当成对不上停下，产物那一边写 `none`，出路写换一个 `--product`。
+    #[test]
+    fn resuming_a_product_without_an_every_card_arm_cards_line_stops() {
+        assert_eq!(
+            every_card_arm_cards_differing_from_the_product_being_resumed(
+                &lines_already_in_a_product_of(&[
+                    "name=session_start session=1 command=lockstep",
+                    "name=repeat_done tier=4GiB repeat=0 session=1",
+                ]),
+                2,
+                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
+            ),
+            Some(
+                "cards_named_in_the_product=none named_by_in_the_product=none cards_named_now=2 named_by_now=cards_option reason=产物里有结果行而没有every_card_arm_cards行，认不出那几次全部卡臂开了几张，换一个--product"
+                    .to_string()
+            )
+        );
+    }
+
+    /// 一条分配记录（代照写 5）。
+    fn allocation_record_of_the_pairing(
+        device: u32,
+        slot: u64,
+        span_slots: u16,
+        is_released: bool,
+        quarantine_mark: AllocationRecordQuarantineMark,
+    ) -> AllocationRecord {
+        AllocationRecord {
+            device: DeviceIdentity(device),
+            slot: SlotNumber(slot),
+            span_slots,
+            generation: CheckpointTxg(5),
+            is_released,
+            quarantine_mark,
+        }
+    }
+
+    /// 场景：默认环长下单元区（三个整段加末尾 5 个槽）上的几条记录（段里的、跨两段的、释放了的、别的盘上的、隔离了的），不造池，
+    /// 在一次性的库上（验证包 `DisposableLibrary`，它自己起的临时 prune-server）先只录、再只判；持卡判换成只数自己被调了几次、解读回的参照。
+    /// 预期：只录那一趟交回只录、持卡判一次都没调（不取卡）；只判那一趟持卡判被调一次，读回的参照就是装置在只录那一段自数的每段活槽数
+    /// （隔离了的仍分配、照数，释放了的与别的盘上的不数）。
+    #[test]
+    fn the_record_stage_of_the_live_slot_pairing_takes_no_card_and_the_judge_stage_reads_back_the_apparatus_count(
+    ) {
+        use crate::common_pairing_input_through_the_library::{
+            pairing_concluded_on_the_cards_in_the_library, KeysOfAPairingOnTheCards,
+            PairingOnTheCardsOutcome,
+        };
+        use singlefs_verification::crash_identity::JudgingUnitsKey;
+        use singlefs_verification::crash_library::{
+            recording_key_of_the_pairing_input_and_the_reference_units, CrashLibrary,
+            CrashLibraryClass, DisposableLibrary, RunStage,
+        };
+        use singlefs_verification::sha256::DIGEST_BYTES;
+        use singlefs_verification::verdict_store::PairingAgreement;
+
+        let test_name = "the_record_stage_of_the_live_slot_pairing_takes_no_card_and_the_judge_stage_reads_back_the_apparatus_count";
+        let unit_area = UnitAreaOfOneDevice {
+            device: DeviceIdentity(0),
+            start: UnitAreaStart::of_the_default_journal_ring(),
+            slots: 3 * LOCAL_CLUSTER_SEGMENT_SLOTS + 5,
+        };
+        let start = unit_area.start.slot().0;
+        let allocation_records = vec![
+            allocation_record_of_the_pairing(
+                0,
+                start + 2,
+                4,
+                false,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            ),
+            allocation_record_of_the_pairing(
+                0,
+                start + 62,
+                4,
+                false,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            ),
+            allocation_record_of_the_pairing(
+                0,
+                start + 70,
+                2,
+                true,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            ),
+            allocation_record_of_the_pairing(
+                1,
+                start + 10,
+                8,
+                false,
+                AllocationRecordQuarantineMark::NotQuarantined,
+            ),
+            allocation_record_of_the_pairing(
+                0,
+                start + 130,
+                2,
+                false,
+                AllocationRecordQuarantineMark::QuarantinedAfterTheReleaseChecksumCheck,
+            ),
+        ];
+        let input_bytes = pairing_input_bytes_of_the_allocation_records_and_the_unit_area(
+            &allocation_records,
+            unit_area,
+        );
+        assert_eq!(
+            allocation_records_and_the_unit_area_of_the_pairing_input_bytes(&input_bytes),
+            (allocation_records.clone(), unit_area),
+            "对拍输入的字节读回原样"
+        );
+        let by_the_apparatus =
+            live_slots_of_each_segment_counted_by_the_apparatus(&allocation_records, unit_area);
+        assert_eq!(by_the_apparatus, vec![6, 2, 2]);
+        // 一次性库留着：要从空库数持卡判被调了几次
+        let disposable = DisposableLibrary::new("e202-live-slot-pairing-record-stage")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::InputPairing).expect("开得了一次性库");
+        let key_filled_with = |fingerprint_byte: u8| -> Result<JudgingUnitsKey, String> {
+            Ok(JudgingUnitsKey::of_the_parts(
+                [fingerprint_byte; DIGEST_BYTES],
+                Vec::new(),
+            ))
+        };
+        let reference_units = key_filled_with(0x31);
+        let keys = KeysOfAPairingOnTheCards {
+            recording: recording_key_of_the_pairing_input_and_the_reference_units(
+                &key_filled_with(0x5A),
+                &input_bytes,
+                &reference_units,
+            ),
+            reference_units,
+            gpu_side_units: key_filled_with(0x32),
+        };
+        let cards_taken = Cell::new(0_u32);
+        let reference_read_back: RefCell<Option<Vec<u64>>> = RefCell::new(None);
+        let judge_counting_the_cards_taken = |_input_read_back: &[u8], reference_bytes: &[u8]| {
+            cards_taken.set(cards_taken.get() + 1);
+            *reference_read_back.borrow_mut() = Some(
+                live_slots_per_segment_of_the_reference_bytes(reference_bytes),
+            );
+            PairingJudged {
+                conclusion: format!("{test_name}：假的持卡判").into_bytes(),
+                agreement: PairingAgreement::BothSidesAgree,
+            }
+        };
+        let recorded = pairing_concluded_on_the_cards_in_the_library(
+            &library,
+            RunStage::RecordOnly,
+            test_name,
+            &keys,
+            &input_bytes,
+            reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment,
+            judge_counting_the_cards_taken,
+        );
+        let cards_taken_in_the_record_stage = cards_taken.get();
+        let judged = pairing_concluded_on_the_cards_in_the_library(
+            &library,
+            RunStage::JudgeOnly,
+            test_name,
+            &keys,
+            &input_bytes,
+            |_input_bytes: &[u8]| -> Vec<u8> { panic!("只判那一段不算参照") },
+            judge_counting_the_cards_taken,
+        );
+        assert_eq!(
+            (recorded, cards_taken_in_the_record_stage),
+            (PairingOnTheCardsOutcome::RecordedOnly, 0),
+            "只录那一趟不调持卡判（不取卡）"
+        );
+        assert_eq!(
+            (judged, cards_taken.get()),
+            (PairingOnTheCardsOutcome::JudgedNowAndBothSidesAgree, 1),
+            "只判那一趟读回之后调一次持卡判"
+        );
+        assert_eq!(reference_read_back.into_inner(), Some(by_the_apparatus));
+    }
+
+    /// 场景：核这个进程在哪几张卡上时 `nvidia-smi` 读不成。
+    /// 预期：交回本次未跑（调用方看得见，对拍用例照它交回没跑成、不入库），不判红。
+    #[test]
+    fn a_process_whose_cards_cannot_be_read_is_reported_not_run_to_the_caller() {
+        assert_eq!(
+            common_discrete_gpus_of_this_host::gpus_this_process_is_on_judged_against_the_handed_over(
+                "a_process_whose_cards_cannot_be_read_is_reported_not_run_to_the_caller",
+                Err("nvidia-smi 起不来".to_string()),
+                &[],
+            ),
+            common_discrete_gpus_of_this_host::GpusThisProcessIsOn::NotReadSoThisRunIsNotRun
+        );
+    }
+
+    /// 场景：核这个进程在哪几张卡上时读成了，可这个进程一张卡都不在（读法看不见它开着的设备）。
+    /// 预期：交回本次未跑，不当成只在交来的卡上。
+    #[test]
+    fn a_process_seen_on_no_card_is_reported_not_run_to_the_caller() {
+        assert_eq!(
+            common_discrete_gpus_of_this_host::gpus_this_process_is_on_judged_against_the_handed_over(
+                "a_process_seen_on_no_card_is_reported_not_run_to_the_caller",
+                Ok(BTreeSet::new()),
+                &[],
+            ),
+            common_discrete_gpus_of_this_host::GpusThisProcessIsOn::NotReadSoThisRunIsNotRun
+        );
     }
 
     /// 两种产物行的形态：修订第 9 条写的四个键在前、次序照写，装置另报的在后；CPU 臂丙段那一截写量不到；结果行读回来认得出种类与键。
@@ -11566,5 +13180,28 @@ mod tests {
             }
             assert!(files.len() > 100, "{live_data_units}：{}", files.len());
         }
+    }
+
+    #[test]
+    fn every_opening_in_the_apparatus_is_handed_the_same_openings_table_of_this_process() {
+        let handed_to_one_opening = openings_not_returned_in_this_process();
+        let handed_to_another_opening = openings_not_returned_in_this_process();
+        assert!(handed_to_one_opening.is_the_same_table_as(handed_to_another_opening));
+    }
+
+    /// 这份源文件的原文，编进测试二进制：开卡的几处在没有真卡时走不到，「各处都取进程那一张、不现建」只能对着原文核。
+    const SOURCE_TEXT_OF_THE_APPARATUS: &str = include_str!("e202_gpu_cpu_gc_comparison.rs");
+
+    #[test]
+    fn the_apparatus_builds_an_empty_openings_table_only_for_the_one_kept_for_this_process() {
+        // 拼起来写：整串照原样写在这里，这一行自己就会被数进去。
+        let building_an_empty_openings_table = concat!("with_none", "_not_returned");
+        assert_eq!(
+            SOURCE_TEXT_OF_THE_APPARATUS
+                .matches(building_an_empty_openings_table)
+                .count(),
+            1,
+            "装置里现建一张空的开卡表的只该有进程那一张（openings_not_returned_in_this_process）：别处现建的开卡不与别的开卡共用表"
+        );
     }
 }

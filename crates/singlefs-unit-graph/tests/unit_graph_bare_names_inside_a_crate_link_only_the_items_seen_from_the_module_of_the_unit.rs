@@ -183,8 +183,8 @@ const OWN_MODULE_EDITS: [FixtureEdit; 2] = [
 /// 场景：`judges::judge_slots` 用自己模块里私有的 `SLOT_BYTES`，`cards` 模块里另有一个同名的私有常量。
 /// 预期：改 `cards` 那一个键不变，改 `judges` 那一个键变。
 #[test]
-fn a_unit_using_the_private_constant_of_its_own_module_does_not_link_the_same_name_in_another_module(
-) {
+fn unit_using_the_private_constant_of_its_own_module_does_not_link_the_same_name_in_another_module()
+{
     assert_eq!(
         key_expectations_after_successive_edits(
             &JUDGE_SLOTS_ENTRY,
@@ -213,7 +213,7 @@ fn with_crates_directory_names_by_module_broken_the_private_constant_in_another_
 /// 场景：`readers::page_count` 经 `use crate::layout::PAGE_BYTES` 用它，`spare` 里另有私有的同名常量。
 /// 预期：改 `spare` 那一个键不变，改 `layout` 那一个键变。
 #[test]
-fn a_name_imported_by_a_use_links_only_the_module_the_use_points_at() {
+fn name_imported_by_a_use_links_only_the_module_the_use_points_at() {
     assert_eq!(
         key_expectations_after_successive_edits(
             &library_entry("fmodules::readers::page_count"),
@@ -239,7 +239,7 @@ fn a_name_imported_by_a_use_links_only_the_module_the_use_points_at() {
 /// 场景：`globbed::line_count` 经 `use crate::layout::*` 用 `LINE_BYTES`，`spare` 里另有私有的同名常量。
 /// 预期：改 `spare` 那一个键不变，改 `layout` 那一个键变。
 #[test]
-fn a_name_brought_in_by_a_glob_use_links_only_the_globbed_module() {
+fn name_brought_in_by_a_glob_use_links_only_the_globbed_module() {
     assert_eq!(
         key_expectations_after_successive_edits(
             &library_entry("fmodules::globbed::line_count"),
@@ -279,7 +279,7 @@ const OTHER_CRATE_EDITS: [FixtureEdit; 2] = [
 /// 场景：`framed::frame_count` 经 `use fformat::FRAME_BYTES` 从别的 crate 引进它（真仓里 `use singlefs_format::{…SLOT_BYTES…}` 的形状），
 /// `fmodules` 的 `spare` 里另有私有的同名常量。预期：改 `spare` 那一个键不变，改 `fformat` 那一个键变。
 #[test]
-fn a_name_imported_from_another_crate_does_not_link_a_same_named_item_of_this_crate() {
+fn name_imported_from_another_crate_does_not_link_a_same_named_item_of_this_crate() {
     assert_eq!(
         key_expectations_after_successive_edits(
             &library_entry("fmodules::framed::frame_count"),
@@ -294,7 +294,7 @@ fn a_name_imported_from_another_crate_does_not_link_a_same_named_item_of_this_cr
 /// 场景：`pathed::frame_count_by_path` 写成 `fformat::FRAME_BYTES`，`spare` 里另有私有的同名常量。
 /// 预期：改 `spare` 那一个键不变，改 `fformat` 那一个键变。
 #[test]
-fn a_path_rooted_at_another_crate_does_not_link_a_same_named_item_of_this_crate() {
+fn path_rooted_at_another_crate_does_not_link_a_same_named_item_of_this_crate() {
     assert_eq!(
         key_expectations_after_successive_edits(
             &library_entry("fmodules::pathed::frame_count_by_path"),
@@ -309,7 +309,7 @@ fn a_path_rooted_at_another_crate_does_not_link_a_same_named_item_of_this_crate(
 /// 场景：`outer::middle::inner::depth` 写 `super::super::DEPTH`，`outer` 与 `outer::middle` 各有一个私有的 `DEPTH`。
 /// 预期：改 `middle` 那一个键不变，改 `outer` 那一个键变。
 #[test]
-fn a_path_with_two_supers_links_the_grandparent_module_and_not_the_parent() {
+fn path_with_two_supers_links_the_grandparent_module_and_not_the_parent() {
     assert_eq!(
         key_expectations_after_successive_edits(
             &library_entry("fmodules::outer::middle::inner::depth"),

@@ -1252,7 +1252,7 @@ mod tests {
     /// deadlist 树按节点格式算的容量：叶 376、内部 125（
     /// key 43、value 空，叶条目宽 = key 宽；内部条目 = key 43 + 子指针 86）。
     #[test]
-    fn a_deadlist_node_holds_three_hundred_seventy_six_leaf_entries_or_one_hundred_twenty_five_children(
+    fn deadlist_node_holds_three_hundred_seventy_six_leaf_entries_or_one_hundred_twenty_five_children(
     ) {
         let key_width = CodeTwoKeyFieldWidths::DEADLIST.key_width_in_bytes();
         assert_eq!(key_width, 43, "key 43：头 8 + 纪元 8 + 映射 key 27");
@@ -1267,7 +1267,7 @@ mod tests {
 
     /// 这一版一把 key 都不剩：零根，上一版的节点全部换下；上一版也是零根时一个节点都不写也不换。
     #[test]
-    fn a_tree_whose_last_key_is_deleted_plans_a_zero_root_and_replaces_every_previous_node() {
+    fn tree_whose_last_key_is_deleted_plans_a_zero_root_and_replaces_every_previous_node() {
         let previous = two_leaves_under_a_root(5);
         let plan = plan_the_tree_after_this_publish_down_to_a_zero_root(
             &previous,
@@ -1394,7 +1394,7 @@ mod tests {
     /// 预期：规划交回 `PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`；分隔 key 是 5 的同一棵树照常删得掉。
     /// 从盘上重建的上一版照冷走读判了分隔 key 之后，这样的形状从盘上进不来，这一道是规划自己的最后一道。
     #[test]
-    fn a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner() {
+    fn previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner() {
         assert!(
             plan_the_tree_after_this_publish(
                 &two_leaves_under_a_root(5),

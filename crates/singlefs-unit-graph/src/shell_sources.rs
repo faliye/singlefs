@@ -3265,8 +3265,11 @@ mod tests {
         assert_eq!(python_normpath("///a"), "/a");
         assert_eq!(python_normpath("../a/.."), "..");
         // 拼出来，不写成整段字面量：以两级上跳起头的字面量会被 crates 变异表的静态核当成逃出 crates/ 的路径
-        let two_levels_up_then_a = concat!("..", "/../a");
-        assert_eq!(python_normpath(two_levels_up_then_a), two_levels_up_then_a);
+        let path_climbing_two_levels_then_naming_one_file = concat!("..", "/../a");
+        assert_eq!(
+            python_normpath(path_climbing_two_levels_then_naming_one_file),
+            path_climbing_two_levels_then_naming_one_file
+        );
         assert_eq!(python_normpath("/.."), "/");
         assert_eq!(python_dirname("a"), "");
         assert_eq!(python_dirname("/a"), "/");

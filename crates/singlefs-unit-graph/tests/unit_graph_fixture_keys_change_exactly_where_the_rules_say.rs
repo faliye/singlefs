@@ -386,12 +386,12 @@ fn dyn_dispatch_reaches_the_implementation_of_a_type_named_and_converted_inside_
 }
 
 #[test]
-fn a_generic_bound_reaches_the_implementation_of_the_named_type() {
+fn generic_bound_reaches_the_implementation_of_the_named_type() {
     assert_cell_holds(&GENERIC_BOUND_DISPATCH);
 }
 
 #[test]
-fn a_trait_default_method_body_is_in_the_closure() {
+fn trait_default_method_body_is_in_the_closure() {
     assert_cell_holds(&TRAIT_DEFAULT_METHOD);
 }
 
@@ -406,7 +406,7 @@ fn an_implicit_drop_body_is_in_the_closure() {
 }
 
 #[test]
-fn a_function_generated_by_a_declarative_macro_is_in_the_closure() {
+fn function_generated_by_a_declarative_macro_is_in_the_closure() {
     assert_cell_holds(&FUNCTION_FROM_A_DECLARATIVE_MACRO);
 }
 
@@ -416,7 +416,7 @@ fn an_associated_constant_reached_through_a_generic_is_in_the_closure() {
 }
 
 #[test]
-fn a_function_behind_a_function_pointer_table_is_in_the_closure() {
+fn function_behind_a_function_pointer_table_is_in_the_closure() {
     assert_cell_holds(&FUNCTION_POINTER_TABLE);
 }
 
@@ -431,7 +431,7 @@ fn an_open_entry_with_a_generic_trait_bound_reaches_every_implementation() {
 }
 
 #[test]
-fn a_constant_used_as_an_array_length_is_in_the_closure() {
+fn constant_used_as_an_array_length_is_in_the_closure() {
     assert_cell_holds(&CONSTANT_IN_AN_ARRAY_LENGTH);
 }
 
@@ -441,7 +441,7 @@ fn an_unreachable_function_keeps_the_key() {
 }
 
 #[test]
-fn a_comment_only_change_keeps_the_key() {
+fn comment_only_change_keeps_the_key() {
     assert_cell_holds(&COMMENT_ONLY);
 }
 
@@ -451,22 +451,22 @@ fn an_enumeration_defined_by_a_path_qualified_item_macro_is_in_the_closure() {
 }
 
 #[test]
-fn a_verus_function_whose_ensures_clause_has_braces_is_one_unit() {
+fn verus_function_whose_ensures_clause_has_braces_is_one_unit() {
     assert_cell_holds(&VERUS_ENSURES_WITH_BRACES);
 }
 
 #[test]
-fn a_unit_under_a_feature_that_is_off_keeps_the_key() {
+fn unit_under_a_feature_that_is_off_keeps_the_key() {
     assert_cell_holds(&UNIT_UNDER_A_FEATURE_THAT_IS_OFF);
 }
 
 #[test]
-fn a_unit_under_a_feature_that_is_on_changes_the_key() {
+fn unit_under_a_feature_that_is_on_changes_the_key() {
     assert_cell_holds(&UNIT_UNDER_A_FEATURE_THAT_IS_ON);
 }
 
 #[test]
-fn a_documentation_comment_only_change_keeps_the_key() {
+fn documentation_comment_only_change_keeps_the_key() {
     assert_cell_holds(&DOCUMENTATION_COMMENT_ONLY);
 }
 
@@ -476,7 +476,7 @@ fn changing_documentation_test_code_only_changes_the_documentation_test_entry() 
 }
 
 #[test]
-fn a_file_read_through_a_manifest_directory_concatenation_changes_the_key() {
+fn file_read_through_a_manifest_directory_concatenation_changes_the_key() {
     assert_cell_holds(&FILE_READ_THROUGH_A_MANIFEST_DIRECTORY_CONCATENATION);
 }
 
@@ -491,7 +491,7 @@ fn an_inherent_method_called_with_a_dot_is_in_the_closure() {
 }
 
 #[test]
-fn a_function_called_through_a_renamed_import_is_in_the_closure() {
+fn function_called_through_a_renamed_import_is_in_the_closure() {
     assert_cell_holds(&CALL_THROUGH_A_RENAMED_IMPORT);
 }
 

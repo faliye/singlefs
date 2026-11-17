@@ -50,7 +50,8 @@ use crate::allocation_record_tree::{
     AllocationRecordTreeNodePosition, AllocationRecordTreePlan, AllocationRecordTreeVersion,
 };
 use crate::allocator::{
-    AllocationRecord, Placement, PlacementRefusal, PoolAllocator, UnitFootprint,
+    AllocationRecord, AllocationRecordTreeLeafIndex, Placement, PlacementRefusal, PoolAllocator,
+    RewriteSetLeaves, UnitFootprint,
 };
 use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::checksum::crc32_castagnoli;
@@ -59,7 +60,7 @@ use crate::code_two_tree::{
     plan_the_tree_after_this_publish, plan_the_tree_after_this_publish_down_to_a_zero_root,
     CodeTwoKeyFieldWidths, CodeTwoTreeKey, CodeTwoTreeNodeCapacity, CodeTwoTreeNodeContents,
     CodeTwoTreeNodeOrigin, CodeTwoTreeNodePosition, CodeTwoTreePlan, CodeTwoTreeReadExpectation,
-    CodeTwoTreeRefusal, CodeTwoTreeShape, CodeTwoTreeVersion,
+    CodeTwoTreeRefusal, CodeTwoTreeShape, CodeTwoTreeShapeNode, CodeTwoTreeVersion,
 };
 use crate::compaction_plan::{
     region_is_empty_by_the_records, PlannedRelocation, RelocationDestinationPolicy,
@@ -131,12 +132,12 @@ use crate::records::{
 };
 use crate::recovery::{
     effective_rollback_floor_rereading_unreadable_reads_once, highest_root_instance,
-    snapshot_tree_table_entries_paired_one_to_one,
+    instance_table_chain_of_root, snapshot_tree_table_entries_paired_one_to_one,
     system_configuration_slots_of_one_device_read_once,
     system_configuration_witness_is_undecidable, tree_table_entry_count,
-    verified_system_configuration_slots, PoolReader, PoolReaderOfOneReadPass,
-    PoolReaderStraightFromTheDisk, RecoveryFailure, SnapshotTreeTableEntries,
-    SystemConfigurationSlotsOfOneDevice,
+    verified_system_configuration_slots, PoolReader, PoolReaderCountingUnitReadsWithOneCopyFailing,
+    PoolReaderOfOneReadPass, PoolReaderStraightFromTheDisk, RecoveryFailure,
+    SnapshotTreeTableEntries, SystemConfigurationSlotsOfOneDevice,
 };
 use crate::retirement_tree::{
     append_retirement_records_to_the_open_container, retirement_records_of_this_publish,
@@ -374,6 +375,13 @@ pub struct PoolWriter<'pool, Device: BlockDevice> {
     /// 把这次发布之后仍被活快照钉着（换下来进 deadlist、映射条目留存）的那几个搬到新槽（用户 2026-11-04 定「另发一批搬迁修好」，
     /// [`relocations_of_old_data_units_kept_for_the_snapshots`]）。只在内存里；新开的写入口从空起。
     mapping_keys_of_old_data_units_read_back_with_one_copy_failing: RefCell<Vec<Vec<u8>>>,
+    /// 这个写入口上写系统配置槽之前算 F 生效值（[`Self::write_system_configuration_slot`]）读到只坏一份的那几组位置条目，按读的先后；
+    /// 每次发布都走这一读，读的是最新那条根的实例表（D4（校验和位置） 已定项 4「可写挂载期间别的读」）。写入口手里没有分配器：
+    /// 有分配器的调用方接着把它们记进这次挂载别的读那一份账（[`Self::count_the_reads_before_the_system_configuration_writes`]）。只在内存里；新开的写入口从空起。
+    locations_read_with_one_copy_failing_before_the_system_configuration_writes:
+        RefCell<Vec<[LocationEntry; 2]>>,
+    /// 这个写入口上最近一次分配记录树重写集的固定点走了几轮（[`PoolWriter::rounds_of_the_last_allocation_record_tree_settling`]）。只在内存里、不落盘；新开的写入口从 0 起。
+    rounds_of_the_last_allocation_record_tree_settling: Cell<usize>,
 }
 
 /// 一个写入口上读新槽残留的账（[`PoolWriter::residue_reads`]）：发了几次、读不出几次。
@@ -413,11 +421,22 @@ impl<'pool, Device: BlockDevice> PoolWriter<'pool, Device> {
             residue_reads: Cell::new(ResidueReadsOfTheWriter::NONE),
             old_data_unit_reads_back_with_one_copy_failing: Cell::new(0),
             mapping_keys_of_old_data_units_read_back_with_one_copy_failing: RefCell::new(Vec::new()),
+            locations_read_with_one_copy_failing_before_the_system_configuration_writes:
+                RefCell::new(Vec::new()),
+            rounds_of_the_last_allocation_record_tree_settling: Cell::new(0),
         }
     }
 }
 
 impl<Device: BlockDevice> PoolWriter<'_, Device> {
+    /// 这个写入口上最近一次定下来的分配记录树重写集固定点走了几轮（[`settle_the_allocation_record_tree`]、
+    /// [`settle_the_allocation_record_tree_of_a_row_publish_on_a_version_without_file`]）；还没有定下来过是 0，轮数用完的那一次走错误成员，不记在这里。
+    #[must_use]
+    pub fn rounds_of_the_last_allocation_record_tree_settling(&self) -> usize {
+        self.rounds_of_the_last_allocation_record_tree_settling
+            .get()
+    }
+
     /// 这个写入口上读新槽残留发了几次、读不出几次（判决 m4-partial-write-r1 第二节 R2「残留读出错记数、不拒写」）。
     #[must_use]
     pub fn residue_reads(&self) -> ResidueReadsOfTheWriter {
@@ -438,6 +457,18 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
     #[must_use]
     pub fn old_data_unit_reads_back_with_one_copy_failing(&self) -> u64 {
         self.old_data_unit_reads_back_with_one_copy_failing.get()
+    }
+
+    /// 把写系统配置槽之前算 F 生效值读到只坏一份的那几组位置条目记进这次挂载别的读那一份账（[`PoolAllocator::count_the_other_unit_reads_with_one_copy_failing`]），
+    /// 写入口上的清空。下一次用户改动发成之后另发的那一批按它们换落点，发布本身已发成的那次改动的那一批就算下一批。
+    pub(crate) fn count_the_reads_before_the_system_configuration_writes(
+        &self,
+        allocator: &PoolAllocator,
+    ) {
+        allocator.count_the_other_unit_reads_with_one_copy_failing(
+            self.locations_read_with_one_copy_failing_before_the_system_configuration_writes
+                .take(),
+        );
     }
 
     /// 同 [`Self::old_data_unit_reads_back_with_one_copy_failing`] 那几次读回的旧单元在上一版里的映射 key，按读的先后，一次一把。
@@ -665,12 +696,20 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
         // 要按它分两类），而这一写是发布末尾的轮换、取号或先写 F，报错的去处只有块设备错。退路不让 F 回落：生效值取系统配置里读得出的
         // F 与根上带的 F 的大者，要被覆写的那一槽在这里先读进来，根上的 F 不高于它那块盘系统配置里的（I-7.12（系统配置 F 不低于同盘根上的 F）），
         // 只剩「那块盘两槽系统配置与带最高 F 的根同时读不出」这一种叠加故障算得低（推的，没造过）。
+        let devices_counting_unit_reads_with_one_copy_failing =
+            PoolReaderCountingUnitReadsWithOneCopyFailing::counting_from_zero(&*self.devices);
         let pool_effective_floor = effective_rollback_floor_rereading_unreadable_reads_once(
-            &*self.devices,
+            &devices_counting_unit_reads_with_one_copy_failing,
             &self.parameters.region_devices,
             &self.parameters.geometry,
             &self.parameters.filesystem_identifier,
         );
+        self.locations_read_with_one_copy_failing_before_the_system_configuration_writes
+            .borrow_mut()
+            .extend(
+                devices_counting_unit_reads_with_one_copy_failing
+                    .locations_of_the_units_read_with_one_copy_failing(),
+            );
         let rollback_floor = match rollback_floor_to_write {
             RollbackFloorOfASystemConfigurationWrite::PoolEffectiveFloor => pool_effective_floor,
             RollbackFloorOfASystemConfigurationWrite::RaisedFloor(raised_floor) => {
@@ -1535,6 +1574,8 @@ fn persist_publish_writes<Device: BlockDevice>(
 #[derive(Clone, Debug)]
 pub struct FrozenPublish {
     writes: PublishWrites,
+    /// 这次发布是哪一种（[`KindOfTheFrozenPublish`]）：冻结在发布路径里定不了，由发起它的会话记上。重发成了，会话照它记账。
+    kind: KindOfTheFrozenPublish,
     /// 重发成功之后交出去的那一版；它的写账在重发那一刻现记（`writes` 字段），这里是空账。
     version: PoolVersion,
     /// 这次发布成立之后的分配器（释放、取落点、记根都做完的那一份）。冻结期间调用方手里的分配器回到发布之前的样子，
@@ -1558,6 +1599,28 @@ impl FrozenPublish {
     pub fn writes(&self) -> &PublishWrites {
         &self.writes
     }
+
+    #[must_use]
+    pub fn kind(&self) -> KindOfTheFrozenPublish {
+        self.kind
+    }
+
+    /// 同一次发布，种类换成发起它的会话说的那一种。
+    #[must_use]
+    pub(crate) fn of_the_kind(self, kind: KindOfTheFrozenPublish) -> Self {
+        Self { kind, ..self }
+    }
+}
+
+/// 冻结的那一次发布重发成了，会话要怎么记账（D26（后台整理与放置回收） 已定项 13 第 6 条）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KindOfTheFrozenPublish {
+    /// 用户改动的发布，或这次用户改动之后接着走的删除步：这次改动已经算发成，重给一份预算、清上一条完成的意图。
+    UserChange,
+    /// 整理的一次发布：扣预算、记一个根槽。
+    CompactionPublish,
+    /// 两样都不记：删除续做的一步、推抬 F 的一次发布，与发布路径刚冻结、还没有会话说种类的。
+    NeitherOfTheCountedKinds,
 }
 
 /// 发布路径的第一道：分配器上冻结着一次没重发的发布，就在任何读写之前拒绝（D23（journal 的角色与格式） 已定项 14
@@ -1591,12 +1654,16 @@ fn persist_the_publish_or_freeze_it<Device: BlockDevice>(
     version: PoolVersion,
 ) -> Result<PoolVersion, PublishError> {
     let writes_before_this_publish = pool.writes_by_structure_kind.clone();
-    if let Err(cause) = persist_publish_writes(pool, &writes) {
+    let persisted = persist_publish_writes(pool, &writes);
+    // 账各份分配器拷贝共用：落盘中途失败、分配器换回发布之前那一份，读到的照样在账上（读是真发到盘上的）。
+    pool.count_the_reads_before_the_system_configuration_writes(allocator);
+    if let Err(cause) = persisted {
         pool.count_failed_publish(&writes_before_this_publish);
         let allocator_after_the_publish =
             std::mem::replace(allocator, allocator_before_this_publish);
         allocator.freeze_publish(FrozenPublish {
             writes,
+            kind: KindOfTheFrozenPublish::NeitherOfTheCountedKinds,
             version,
             allocator_after_the_publish,
         });
@@ -1622,13 +1689,16 @@ pub fn resend_the_frozen_publish<Device: BlockDevice>(
         return Ok(None);
     };
     let writes_before_the_resend = pool.writes_by_structure_kind.clone();
-    if let Err(cause) = persist_publish_writes(pool, &frozen.writes) {
+    let persisted = persist_publish_writes(pool, &frozen.writes);
+    pool.count_the_reads_before_the_system_configuration_writes(allocator);
+    if let Err(cause) = persisted {
         pool.count_failed_publish(&writes_before_the_resend);
         allocator.freeze_publish(frozen);
         return Err(PublishError::BlockDevice(cause));
     }
     let FrozenPublish {
         writes: _,
+        kind: _,
         version,
         allocator_after_the_publish,
     } = frozen;
@@ -1887,6 +1957,8 @@ struct SettledRowPublishOnAVersionWithoutFile {
     allocation_record_tree: AllocationRecordTreePlan,
     rewritten_roles: Vec<TransactionUnit>,
     release: Vec<Placement>,
+    /// 固定点走了几轮（定下来的那一轮算在内）。
+    rounds_walked: usize,
 }
 
 /// 树表 0 条那一版写行时，分配记录树重写哪几个节点（固定点，同带文件那一路的 [`settle_the_allocation_record_tree`]）：上一版的树是分配器记着的
@@ -1928,10 +2000,11 @@ fn settle_the_allocation_record_tree_of_a_row_publish_on_a_version_without_file(
     let chain = instance_table_chain_to_release(&instance_table.replaced_chain, allocator)?;
     let instance_table_roles =
         instance_table_page_roles_in_bump_order(instance_table.pages_after_this_publish());
+    let previous_version_of_the_tree = previous_tree.map(|tree| &tree.version);
     let mut rewritten: BTreeSet<AllocationRecordTreeNode> = BTreeSet::new();
     let mut nodes_after: BTreeSet<AllocationRecordTreeNode> = previous_nodes.clone();
     // 迭代上界与跨轮携带的同 `settle_the_allocation_record_tree`。
-    for _round in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {
+    for round_index in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {
         let rewritten_among_the_nodes_after: BTreeSet<AllocationRecordTreeNode> =
             rewritten.intersection(&nodes_after).copied().collect();
         let allocation_plan = crate::allocation_record_tree::plan_the_tree_after_this_publish(
@@ -1970,12 +2043,18 @@ fn settle_the_allocation_record_tree_of_a_row_publish_on_a_version_without_file(
         let changed_by_the_release =
             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
         if !changed_by_the_release.is_subset(&rewritten_by_the_plan) {
-            rewritten.extend(changed_by_the_release);
+            merge_into_the_rewrite_set_walking_the_release_chain(
+                &mut rewritten,
+                changed_by_the_release,
+                previous_version_of_the_tree,
+                &geometry,
+            );
             nodes_after.extend(nodes_holding_records(&geometry, rehearsal.records()));
             continue;
         }
+        let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(&rewritten_roles, allocator);
         for identity in &rewritten_roles {
-            allocate_placement_for_role(&mut rehearsal, *identity, txg)?;
+            allocate_placement_for_role(&mut rehearsal, *identity, txg, &rewrite_set_leaves)?;
         }
         let changed =
             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
@@ -1985,9 +2064,15 @@ fn settle_the_allocation_record_tree_of_a_row_publish_on_a_version_without_file(
                 allocation_record_tree: allocation_plan,
                 rewritten_roles,
                 release,
+                rounds_walked: round_index + 1,
             });
         }
-        rewritten.extend(changed);
+        merge_into_the_rewrite_set_walking_the_release_chain(
+            &mut rewritten,
+            changed,
+            previous_version_of_the_tree,
+            &geometry,
+        );
         nodes_after = holding_records;
     }
     Err(PublishError::AllocationRecordTreeRewriteSetDidNotSettle {
@@ -2102,6 +2187,8 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
         txg,
         allocator,
     )?;
+    pool.rounds_of_the_last_allocation_record_tree_settling
+        .set(settled.rounds_walked);
     // 这次发布切出来的记录条数在动分配器之前判（代码审阅第 26 条）：点名的就是这次重写的角色（下面 `named_roles`）。
     refuse_a_publish_of_more_journal_records_than_the_limit(
         roles_named_by_each_record_of_the_publish(
@@ -2121,8 +2208,10 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
     // 实例表链的各片最前、尾片先（D3（空间分配） 已定项 10 ⑤），分配记录树的节点在它们之后按位置先叶后根取：
     // 这些节点自己的分配记录也要进这棵树，所以落点都取完才装节点。
     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
+    let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(&settled.rewritten_roles, allocator);
     for identity in &settled.rewritten_roles {
-        let placement = allocate_placement_for_role(allocator, *identity, txg)?;
+        let placement =
+            allocate_placement_for_role(allocator, *identity, txg, &rewrite_set_leaves)?;
         slots.insert(*identity, placement.slot);
     }
     // 落点取完、这次不再分配：记下这条根盖掉的根环槽（同 `publish_admitted` 那一处；失败时分配器由调用方整个换回去），
@@ -2397,7 +2486,8 @@ pub fn prepare_the_row_publish_on_a_version_without_file<Device: BlockDevice>(
     ))
 }
 
-/// 一个角色这次发布的落点：用户数据按政策函数，其余是提交内生块（码 3 容器按数据单元那一档，D3（空间分配） 已定项 10 ⑤）。
+/// 一个角色这次发布的落点：用户数据按政策函数，其余是提交内生块（码 3 容器按数据单元那一档，D3（空间分配） 已定项 10 ⑤）；
+/// 提交内生块回落时先取 `rewrite_set_leaves`（这次发布分配记录树重写集里的叶）里的空槽，再取空槽最多的叶（D3（空间分配） 已定项 8 第 2 条）。
 /// 取不到时带上是哪个角色、分配器给的原因。
 ///
 /// # Errors
@@ -2406,17 +2496,51 @@ fn allocate_placement_for_role(
     allocator: &mut PoolAllocator,
     identity: TransactionUnit,
     txg: CheckpointTxg,
+    rewrite_set_leaves: &RewriteSetLeaves,
 ) -> Result<Placement, PublishError> {
     let placement = match identity.placement() {
         PlacementRule::UserData => allocator.try_allocate_user_data(txg),
-        PlacementRule::CommitGenerated(footprint) => {
-            allocator.try_allocate_commit_generated(footprint, txg)
-        }
+        PlacementRule::CommitGenerated(footprint) => allocator
+            .try_allocate_commit_generated_preferring_the_rewrite_set(
+                footprint,
+                txg,
+                rewrite_set_leaves,
+            ),
     };
     placement.map_err(|refusal| PublishError::PlacementRefused {
         unit: identity,
         refusal,
     })
+}
+
+/// 这次发布重写的角色里分配记录树的叶（层级 0），池里每块盘上都重写的那几片的序号（[`RewriteSetLeaves::present_on_every_device`]）：
+/// 提交内生块回落先取这些叶里的空槽（[`PoolAllocator::try_allocate_commit_generated_preferring_the_rewrite_set`]）。
+/// 固定点的演练与真发读的是同一串重写角色（定下来那一轮的角色就是真发的角色），所以两边得同一个集合、取同一串落点。
+fn rewrite_set_leaves_of_the_roles(
+    rewritten_roles: &[TransactionUnit],
+    allocator: &PoolAllocator,
+) -> RewriteSetLeaves {
+    let leaf_indices_per_device: Vec<BTreeSet<AllocationRecordTreeLeafIndex>> = allocator
+        .devices
+        .iter()
+        .map(|device_map| {
+            rewritten_roles
+                .iter()
+                .filter_map(|role| match allocation_record_tree_node_of_role(*role) {
+                    Some(AllocationRecordTreeNode::BelowTheRoot(position))
+                        if position.level == 0 && position.device == device_map.device =>
+                    {
+                        Some(AllocationRecordTreeLeafIndex(position.index_in_device))
+                    }
+                    Some(
+                        AllocationRecordTreeNode::BelowTheRoot(_) | AllocationRecordTreeNode::Root,
+                    )
+                    | None => None,
+                })
+                .collect()
+        })
+        .collect();
+    RewriteSetLeaves::present_on_every_device(&leaf_indices_per_device)
 }
 
 /// 池里现行的那一版：还没发布过文件版本（树表 0 条，零单元发布或写行那次发布写出的根）、带文件的一版，
@@ -3676,7 +3800,9 @@ mod sorted_identity_index {
         }
 
         /// 按身份升序逐项走；走过一项算看过一项。
-        pub(super) fn iter(&self) -> WalkOfTheSortedIdentityIndex<'_, Identity, Value> {
+        pub(super) fn walk_in_ascending_identity(
+            &self,
+        ) -> WalkOfTheSortedIdentityIndex<'_, Identity, Value> {
             WalkOfTheSortedIdentityIndex {
                 remaining: self.sorted.iter(),
             }
@@ -3752,7 +3878,7 @@ impl<'table, Identity: Ord, Entry> FirstEntryOfEachIdentity<'table, Identity, En
     /// 索引里的每个身份与它在表里的最先那一项，按身份升序：表里每个不同的身份恰好一项。走一项记看过一项。
     pub fn first_entries(&self) -> impl DoubleEndedIterator<Item = (&Identity, &'table Entry)> {
         self.first_entry_of_each_identity
-            .iter()
+            .walk_in_ascending_identity()
             .map(|(identity, entry)| (identity, *entry))
     }
 }
@@ -5407,6 +5533,17 @@ pub(crate) fn copies_of_a_released_unit_failing_the_release_checksum_check<
     if !some_copy_failed {
         return Vec::new();
     }
+    // 一份没对上、另一份对得上（重读也没对上的不算读到）：这一读读到只坏一份（D4（校验和位置） 已定项 4「读到只坏一份时计数」）。
+    if reading_of_each_copy
+        .iter()
+        .any(|(_, reading)| match reading {
+            QuarantinedCopyReading::IntactButAnotherCopyFailed => true,
+            QuarantinedCopyReading::ChecksumMismatch
+            | QuarantinedCopyReading::UnreadableAfterOneReread => false,
+        })
+    {
+        reader.note_that_a_unit_was_read_with_one_copy_failing(locations);
+    }
     // 两条位置项各指池里一块不同的盘（调用方判过；第一版池里恰好两块盘，mkfs 断言过），两份都留：按位置项的次序（设备身份升序）各交一份。
     reading_of_each_copy
         .into_iter()
@@ -6521,8 +6658,8 @@ pub fn snapshot_inode_root_entry(
 }
 
 /// 删快照 `snapshot` 时能放掉的 deadlist 条目，按 key 升序（D5（快照 / 空间记账机制） 已定项 12 定案表「销毁 S」那一行，判决 S4）：
-/// 头是活头 inode 树、纪元落在 [lo, hi) 里、birth > P——lo = 它那条码 14 的诞生 txg，P = 它的前驱，hi 现取：下一侧是快照时取那条码 14 的
-/// 诞生 txg；下一侧是活头时条款取「写意图那次发布的 txg」，它不落盘（判决 S4「续做点不存」）——这里取 `hi_when_the_next_side_is_the_live_head`
+/// 头是活头 inode 树、纪元落在 [lower_epoch_bound, upper_epoch_bound) 里、birth > P——lower_epoch_bound = 它那条码 14 的诞生 txg，P = 它的前驱，upper_epoch_bound 现取：下一侧是快照时取那条码 14 的
+/// 诞生 txg；下一侧是活头时条款取「写意图那次发布的 txg」，它不落盘（判决 S4「续做点不存」）——这里取 `upper_epoch_bound_when_the_next_side_is_the_live_head`
 /// （调用方给这一批自己的 txg）：条目的纪元只取自上一版活头的前驱，活头前驱只在建快照与写销毁意图两处变，而意图挂着时这两样都被拒
 /// （判决 m4-c145-destruction-bound-r1 B1），所以纪元 ≥ 写意图那次 txg 的条目一条都不会有，两种取法放的是同一组。余下的条目键不动，它们按纪元落进下一侧的那一段
 /// （约定 B，已定项 16：下一侧的前驱在意图那次已经换成 P）。`snapshot` 不在树表里交回空表。
@@ -6530,17 +6667,19 @@ pub fn snapshot_inode_root_entry(
 pub fn deadlist_entries_the_destruction_of_a_snapshot_releases(
     version: &TransactionOutput,
     snapshot: TreeIdentifier,
-    hi_when_the_next_side_is_the_live_head: CheckpointTxg,
+    upper_epoch_bound_when_the_next_side_is_the_live_head: CheckpointTxg,
 ) -> Vec<DeadlistEntry> {
     let Some(snapshot_entry) = snapshot_inode_root_entry(&version.tree_table_entries, snapshot)
     else {
         return Vec::new();
     };
-    let lo = snapshot_entry.birth_txg;
+    let lower_epoch_bound = snapshot_entry.birth_txg;
     let predecessor = snapshot_entry.previous_snapshot_txg;
-    let hi = match next_side_of_the_snapshot(&version.tree_table_entries, snapshot) {
+    let upper_epoch_bound = match next_side_of_the_snapshot(&version.tree_table_entries, snapshot) {
         Some(NextSideOfASnapshot::Snapshot(next)) => next.birth_txg,
-        Some(NextSideOfASnapshot::LiveHead) | None => hi_when_the_next_side_is_the_live_head,
+        Some(NextSideOfASnapshot::LiveHead) | None => {
+            upper_epoch_bound_when_the_next_side_is_the_live_head
+        }
     };
     let head = TreeIdentifier(snapshot_entry.head_identifier);
     version
@@ -6548,7 +6687,7 @@ pub fn deadlist_entries_the_destruction_of_a_snapshot_releases(
         .iter()
         .filter(|entry| {
             entry.head == head
-                && (lo..hi).contains(&entry.epoch)
+                && (lower_epoch_bound..upper_epoch_bound).contains(&entry.epoch)
                 && birth_txg_of_a_mapping_key(&entry.mapping_key)
                     .is_some_and(|birth| birth > predecessor)
         })
@@ -10312,7 +10451,8 @@ pub fn publish_data_changes_published_together<Device: BlockDevice>(
 /// 一个盘都不读、一个写都不发；`pool` 只读它的参数与开关。过了交回这一次要写的 journal 字节（记录条数 × 4096）。
 ///
 /// 判的是「此刻接在 `previous` 后面」：会话里收下与排空之间不再有别的发布（收下与排空都拿着 `&mut` 会话，屏障类先排空），排空那一次与这里判的
-/// 是同一份上一版与分配器；被空间拒时这里不推抬 F（推是写），会话排空那一次照旧推抬 F 再判。
+/// 是同一份上一版与分配器，除非又一次 `accept` 为空间推了抬 F（那一次在推完之后把待发并上它重判过）；这里只判、不推抬 F（推是写）：被空间拒时
+/// `mounted_session::MountedSessionWithPendingChanges::accept` 推抬 F 再调这里，会话排空那一次照旧推抬 F 再判。
 ///
 /// # Errors
 /// `PublishFrozenAfterAWriteFailureIsNotResentYet`；计划那几种；`SpaceAdmissionRefused`、`PlacementRefused`、`JournalRecordsOfThePublishExceedTheLimit`、
@@ -10555,6 +10695,9 @@ pub enum RelocationBatchRefused {
         planned_source: Placement,
         mapping_locations: Option<[LocationEntry; 2]>,
     },
+    /// 另发的那一批（[`publish_the_relocations_and_the_repair_of_the_exempt_units`] 之前认位置）沿链读实例表读不出、解不开：认不出记下的那几组位置条目是不是实例表片。
+    /// 在这一批任何写之前。
+    InstanceTableOfTheVersionUnreadable(RecoveryFailure),
     /// 这个单元的字节不在手里：从盘上重建时提示与映射都读不出的数据单元（D19 已定项 5：照抄位置项、不读内容），
     /// 或留存条目指的单元两份都读不出、核不上位置项里的校验和。原样字节写目的地（判决 G3）做不到，不搬。
     UnitBytesNotAvailable {
@@ -10601,10 +10744,12 @@ impl From<PublishError> for RelocationBatchRefused {
 /// 用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：式子那一判照判，需求是这次重写的角色（这一个入口照抄 logged_ops，重写的只有记账树、
 /// 分配记录树、中央映射树与树表这几样固定点），批次最坏占用（计划里每一项在目的地各占它的跨度、每份副本各一份，
 /// `admission::worst_case_occupancy_of_a_compaction_batch`）加进这一次读数的已承诺预留；可用压到需求之下就拒成 `SpaceAdmissionRefused`，
-/// 在任何写之前，会话照暂停办（意图留在盘上，下次再试）。落点那一判只在重写的角色里有普通分配时判（`admission::publish_has_an_ordinary_allocation`），
-/// 搬迁副本的落点由取目的地那一步在任何写之前判（取不到交回 `PlacementRefused`）。合取 7 免（带搬迁的发布不是前台写入，
-/// `reach_of_the_empty_cluster_segments_conjunct`）。同一发布路径上签发、删意图、丢意图那几次重写 logged_ops 根（普通分配），两判照判
-/// （[`publish_compaction_step`]）。
+/// 在任何写之前，会话照暂停办（单发一次只删意图的发布丢掉意图，下一次整理从头签发）。落点那一判只在重写的角色里有普通分配时判
+/// （`admission::publish_has_an_ordinary_allocation`），搬迁副本的落点由取目的地那一步在任何写之前判（取不到交回 `PlacementRefused`）。
+/// 合取 7 免（带搬迁的发布不是前台写入，`reach_of_the_empty_cluster_segments_conjunct`）。同一发布路径上（[`publish_compaction_step`]）
+/// 签发那一次照判：logged_ops 根重写是普通分配，两判照判。只删意图、不搬单元的那几次（意图达成而 R 已按记录全空、丢意图、整理停下时删意图）
+/// 归删除类（D28（挂载期承诺量） 已定项 1 的不判名单）：式子那一判不判；落点那一判照判——logged_ops 删空时这一版没有 `LoggedOperationsRoot`、
+/// 重写的只有固定点，没有普通分配、落点那一判也不判，固定点照常取落点；logged_ops 里另有截断意图时它重写 logged_ops 根，落点那一判照判。
 ///
 /// # Errors
 /// 计划对不上上一版 ⇒ [`RelocationBatchRefused`] 那四种，在任何读写之前；其余同 `publish_version`（`Publish`）。
@@ -10670,6 +10815,8 @@ pub enum RegionCheckOfTheIntentDeletion {
 /// 整理的一次发布（[`publish_relocation_batch`] 的一般形）：搬 `planned` 里那几个单元（可以一个都没有），同一次发布对意图做 `intent_step`
 /// （判决 G1：意图条目写进 logged_ops 树，签发那次发布写、最后一批同发布删；D8（核心索引结构） 已定项 5 三态表：签发之前崩 = 没有意图，
 /// 签发之后、最后一批之前崩 = 意图还在、挂载续做，最后一批之后 = 意图没了且目标态达成）。别的同 [`publish_relocation_batch`]。
+/// 只删意图、不搬单元的那一次（删意图不带一批、丢意图）取落点时不排除活意图的 R（[`publish_compaction_step_in_the_session`]），
+/// 删意图那一核不数它自己在 R 里的新落点；带一批的照旧排除 R。
 ///
 /// 签发那次写下的 `segs0` 就是调用方交进来的那条意图里的：签发那次发布之前的全空聚簇段数（判决
 /// `research/prompts/m4-segment-code-r2-main-verification.md` 第三节 H3，用户 2026-10-16 定「取签发之前」；会话按上一版的分配记录数，
@@ -10845,6 +10992,11 @@ pub(crate) fn publish_compaction_step_in_the_session<Device: BlockDevice>(
             CompactionStepCheckBeforePersisting::RegionEmptyByTheRecords {
                 region: intent.region,
                 region_check: region_check_of_the_intent_deletion,
+                placements_of_this_publish: if planned.is_empty() {
+                    PlacementsOfThisPublishInTheRegion::NotCountedTheRegionIsOpenToThisPublish
+                } else {
+                    PlacementsOfThisPublishInTheRegion::CountedAsRecordsInTheRegion
+                },
             },
         ),
         (CompactionIntentStep::Drop, Some((issued_txg, _))) => (
@@ -10852,23 +11004,26 @@ pub(crate) fn publish_compaction_step_in_the_session<Device: BlockDevice>(
             CompactionStepCheckBeforePersisting::NothingToCheck,
         ),
     };
-    let mut relocations = Vec::with_capacity(planned.len());
-    {
-        let _inside_the_relocation_sources = lookup_work::entering(LookupSite::RelocationSources);
-        // 计划里每一项按映射 key 查一次上一版：按 key 的索引与批量读者在第一项要查时建一次（七·6，用户 2026-10-21 定并进），
-        // 不逐项在 `mapped_units` 上找、逐 key 重解叶。
-        let mut previous_read_by_key = None;
-        for planned_relocation in planned {
-            relocations.push(relocation_checked_against_the_version(
-                &*pool.devices,
-                previous_read_by_key.get_or_insert_with(|| {
-                    MappedUnitsOfAVersionReadByKey::of_the_version(previous)
-                }),
-                planned_relocation,
-            )?);
-        }
-    }
-    publish_compaction_step_after_its_check(
+    let relocations = relocations_checked_against_the_version(pool, allocator, previous, planned)?;
+    // 只删意图、不搬单元的那一次（删意图那一支不带一批、丢意图）取落点时放开 R：它落盘的那一版里已没有意图，排他只挡得住它自己，
+    // R 之外取不到落点时意图就删不掉、R 一直排他（D26（后台整理与放置回收） 已定项 2；D28（挂载期承诺量） 已定项 1 的结构判据「只删整理意图、不搬单元」）。
+    // 带一批的照旧排除 R：搬出 R 的单元不许落回 R。撤分配器侧的活意图照旧由会话在这一版落盘之后做；发成、被拒都在返回之前放回排他。
+    let deletes_only_the_intent = planned.is_empty()
+        && match intent_step {
+            CompactionIntentStep::DeleteOnceTheRegionIsEmptyByTheRecords
+            | CompactionIntentStep::Drop => true,
+            CompactionIntentStep::CarryTheIntent
+            | CompactionIntentStep::CarryTheIntentUnlessThisPublishEmptiesTheRegion
+            | CompactionIntentStep::Issue(_) => false,
+        };
+    let exclusion_before_the_publish = if deletes_only_the_intent {
+        allocator
+            .compaction_mut()
+            .open_the_region_to_the_publish_deleting_the_intent()
+    } else {
+        None
+    };
+    let published = publish_compaction_step_after_its_check(
         pool,
         allocator,
         previous,
@@ -10876,6 +11031,111 @@ pub(crate) fn publish_compaction_step_in_the_session<Device: BlockDevice>(
         logged_operations,
         check,
         instance,
+    );
+    allocator
+        .compaction_mut()
+        .put_back_the_region_exclusion(exclusion_before_the_publish);
+    published
+}
+
+/// 计划里每一项对着上一版核过、带上搬它要的东西（[`relocation_checked_against_the_version`]）。按留存条目读源读到只坏一份的进这次挂载别的读那一份账
+/// （D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」）：有一项核不过时前面几项读到的也进，读是真发到盘上的。
+///
+/// # Errors
+/// [`relocation_checked_against_the_version`] 的那几种，在任何写之前。
+fn relocations_checked_against_the_version<Device: BlockDevice>(
+    pool: &PoolWriter<'_, Device>,
+    allocator: &PoolAllocator,
+    previous: &TransactionOutput,
+    planned: &[PlannedRelocation],
+) -> Result<Vec<RelocationOfThePublish>, RelocationBatchRefused> {
+    let _inside_the_relocation_sources = lookup_work::entering(LookupSite::RelocationSources);
+    let devices_counting_unit_reads_with_one_copy_failing =
+        PoolReaderCountingUnitReadsWithOneCopyFailing::counting_from_zero(&*pool.devices);
+    // 计划里每一项按映射 key 查一次上一版：按 key 的索引与批量读者在第一项要查时建一次（七·6，用户 2026-10-21 定并进），
+    // 不逐项在 `mapped_units` 上找、逐 key 重解叶。
+    let mut previous_read_by_key = None;
+    let relocations: Result<Vec<RelocationOfThePublish>, RelocationBatchRefused> = planned
+        .iter()
+        .map(|planned_relocation| {
+            relocation_checked_against_the_version(
+                &devices_counting_unit_reads_with_one_copy_failing,
+                previous_read_by_key.get_or_insert_with(|| {
+                    MappedUnitsOfAVersionReadByKey::of_the_version(previous)
+                }),
+                planned_relocation,
+            )
+        })
+        .collect();
+    allocator.count_the_other_unit_reads_with_one_copy_failing(
+        devices_counting_unit_reads_with_one_copy_failing
+            .locations_of_the_units_read_with_one_copy_failing(),
+    );
+    relocations
+}
+
+/// 用户改动发成之后另发的那一批（`mounted_session` 的 `relocate_the_units_read_with_one_copy_failing_after_the_change`）：搬 `planned` 那几个单元（可以一个都没有）、
+/// 同一次发布换下 `repair` 点名的豁免映射的单元（[`RepairOfTheExemptUnits`]，可以一个都没有），两样不能都空。同一个事务层、同一条发布路径：
+/// 意图照抄（照 [`publish_relocation_batch`]，意图的签发与删不归这一批），计划核法、准入、落盘同 [`publish_compaction_step`]，实例表要换就照写行整条链重写。
+/// 不新加提交步骤、不改可写挂载的分段（这一批在用户改动之后，不在挂载那一串里）。
+///
+/// # Errors
+/// 同 [`publish_relocation_batch`]。
+///
+/// # Panics
+/// `planned` 与 `repair` 都是空的：调用方两样都空就不发。
+pub(crate) fn publish_the_relocations_and_the_repair_of_the_exempt_units<Device: BlockDevice>(
+    pool: &mut PoolWriter<'_, Device>,
+    allocator: &mut PoolAllocator,
+    previous: &TransactionOutput,
+    planned: &[PlannedRelocation],
+    repair: &RepairOfTheExemptUnits,
+    instance: InstanceGeneration,
+) -> Result<TransactionOutput, RelocationBatchRefused> {
+    assert!(
+        !(planned.is_empty() && repair.is_empty()),
+        "另发的那一批要么搬单元、要么换豁免映射的单元：调用方两样都空就不发"
+    );
+    let relocations = relocations_checked_against_the_version(pool, allocator, previous, planned)?;
+    let txg = checkpoint_txg_of_the_publish_after(previous.root.checkpoint_txg)?;
+    // 事务号接着这个实例（同整理的每一次发布，[`publish_compaction_step_after_its_check`]）。
+    let transaction_of_this_publish = previous.highest_transaction_number_in_this_instance + 1;
+    let deletion_and_lineage = DeletionAndLineageOfThePublish {
+        step: DeletionStepOfThePublish::NotADeletion,
+        container_tree_capacities: pool.container_tree_capacities(),
+        lineage: LineageStepOfThePublish::NoLineageRecord,
+        snapshot: SnapshotStepOfThePublish::NoNewSnapshot,
+        logged_operations: LoggedOperationsStepOfThePublish::CarryTheLoggedOperations,
+    };
+    publish_version_of_trees_relocating_units_after_a_check(
+        pool,
+        allocator,
+        PublishPlan {
+            txg,
+            counter: previous.record.counter + 1,
+            transaction: transaction_of_this_publish,
+            highest_transaction_number_before_this_publish: previous
+                .highest_transaction_number_in_this_instance,
+            instance,
+            back_chain: back_chain_of(&previous.record_bytes),
+            file: None,
+            new_inode_records: &[],
+            instance_table: match &repair.instance_table_rewrite {
+                Some(rewrite) => InstanceTablePlan::Rewrite(rewrite.clone()),
+                None => InstanceTablePlan::Carry(previous.root.instance_table),
+            },
+            tree_birth_txg: previous.tree_birth_txg(),
+            tree_identifier_watermark: previous.root.tree_identifier_watermark,
+            rollback_floor: previous.root.rollback_floor,
+        },
+        Some(previous),
+        previous.tree_identifiers,
+        UnmountMarker::NotWrittenByTheUnmountSequence,
+        &deletion_and_lineage,
+        &relocations,
+        &repair.mapping_keys_routed_through_the_nodes,
+        &[],
+        |_version_after_this_publish| Ok::<(), RelocationBatchRefused>(()),
     )
 }
 
@@ -10883,10 +11143,11 @@ pub(crate) fn publish_compaction_step_in_the_session<Device: BlockDevice>(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CompactionStepCheckBeforePersisting {
     NothingToCheck,
-    /// 删意图：R 按记录全空（停机谓词，判决 G4），照 `region_check` 判（产品路径恒照记录）。
+    /// 删意图：R 按记录全空（停机谓词，判决 G4），照 `region_check` 判（产品路径恒照记录）；这次发布自己在 R 里的新落点算不算照 `placements_of_this_publish`。
     RegionEmptyByTheRecords {
         region: CompactionRegion,
         region_check: RegionCheckOfTheIntentDeletion,
+        placements_of_this_publish: PlacementsOfThisPublishInTheRegion,
     },
     /// 照抄意图，依次核：R 还有一条未释放的记录（判决 m4-segment-code-r1 第三节 F2：这一批腾空了 R 就同一次发布删意图）；
     /// 再照 `planned_units_rewritten_anyway` 核计划里每个单元都真搬了（判决 m4-segment-code-r2 第三节 H4）。
@@ -10951,6 +11212,16 @@ fn publish_compaction_step_after_its_check<Device: BlockDevice>(
     )
 }
 
+/// 删意图那一核（[`CompactionStepCheckBeforePersisting::RegionEmptyByTheRecords`]）数不数这次发布自己在 R 里的新落点。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlacementsOfThisPublishInTheRegion {
+    /// 带一批的删意图：取落点照旧排除 R，这次发布在 R 里有一条分配代是它的记录也是 R 不空（只供测试的开关关掉排他时走得到）。
+    CountedAsRecordsInTheRegion,
+    /// 不带一批的删意图：取落点放开了 R（[`publish_compaction_step_in_the_session`]），分配代是这次发布的记录是它落盘那一版自己的节点，
+    /// 那一版里已没有意图，不算 R 不空；上一版就在 R 里的记录照算。
+    NotCountedTheRegionIsOpenToThisPublish,
+}
+
 /// 整理的一次发布落盘之前那一核（[`CompactionStepCheckBeforePersisting`]）：在这次发布算好的这一版上判，过了交 `Ok`，不过交给调用方的拒绝。
 /// 只读这一版与计划，不读盘：判定与随后落盘的读的是同一份算好的账。
 fn compaction_step_check_on_the_version_after_this_publish(
@@ -10963,13 +11234,35 @@ fn compaction_step_check_on_the_version_after_this_publish(
         CompactionStepCheckBeforePersisting::RegionEmptyByTheRecords {
             region,
             region_check,
+            placements_of_this_publish,
         } => {
             let is_the_region_empty_by_the_records = match region_check {
                 RegionCheckOfTheIntentDeletion::JudgedByTheRecords => {
-                    region_is_empty_by_the_records(
-                        &version_after_this_publish.allocation_records,
-                        region,
-                    )
+                    match placements_of_this_publish {
+                        PlacementsOfThisPublishInTheRegion::CountedAsRecordsInTheRegion => {
+                            region_is_empty_by_the_records(
+                                &version_after_this_publish.allocation_records,
+                                region,
+                            )
+                        }
+                        PlacementsOfThisPublishInTheRegion::NotCountedTheRegionIsOpenToThisPublish => {
+                            let txg_of_this_publish = version_after_this_publish.root.checkpoint_txg;
+                            let records_from_before_this_publish: Vec<AllocationRecord> =
+                                version_after_this_publish
+                                    .allocation_records
+                                    .iter()
+                                    .filter(|record| {
+                                        record.is_released
+                                            || record.generation != txg_of_this_publish
+                                    })
+                                    .copied()
+                                    .collect();
+                            region_is_empty_by_the_records(
+                                &records_from_before_this_publish,
+                                region,
+                            )
+                        }
+                    }
                 }
                 RegionCheckOfTheIntentDeletion::RefusedAsIfTheRegionKeptAnUnreleasedRecordForTests => {
                     false
@@ -11177,16 +11470,24 @@ fn relocation_checked_against_the_version<Reader: PoolReader + ?Sized>(
         RelocatedUnitHolder::KeptForTheSnapshots => {
             let unit_bytes = usize::try_from(planned.source.span * SLOT_BYTES)
                 .expect("一个单元两槽以内，字节数装得进 usize");
+            let mut some_copy_before_this_one_failed = false;
             source_locations
                 .iter()
                 .find_map(|location| {
-                    reader
+                    let copy = reader
                         .read(
                             location.device,
                             location.slot.to_device_offset(),
                             unit_bytes,
                         )
-                        .filter(|copy| crc32_castagnoli(copy) == location.unit_checksum)
+                        .filter(|copy| crc32_castagnoli(copy) == location.unit_checksum);
+                    match (&copy, some_copy_before_this_one_failed) {
+                        (Some(_), true) => reader
+                            .note_that_a_unit_was_read_with_one_copy_failing(&source_locations),
+                        (Some(_), false) => {}
+                        (None, _) => some_copy_before_this_one_failed = true,
+                    }
+                    copy
                 })
                 .unwrap_or_default()
         }
@@ -11731,23 +12032,36 @@ pub fn relocations_of_old_data_units_kept_for_the_snapshots(
     planned
 }
 
-/// 一版里此刻住在 `locations` 这几组位置条目上的那几个单元的映射 key：进中央映射的单元按映射里那两条位置条目认，留存的映射条目
-/// （`version.mapping_entries_kept_for_the_snapshots`）按它记的那两条认；一把 key 只出一次，按 `mapped_units` 的次序、留存的排在后面。
-/// 可写挂载读盘建上一版时读到只坏一份的那几个单元（`recovery::PoolReaderCountingUnitReadsWithOneCopyFailing::locations_of_the_units_read_with_one_copy_failing`）
-/// 在挂载交回之前经它认成 key，交给会话下一次用户改动之后另发的那一批（用户 2026-11-05 定「可写挂载时搬」）。
-/// 豁免映射的三类（映射树自己的节点、树表、实例表）不在映射里、认不出；挂载这一串的发布里已经换了落点的单元（树表、记账树这类每次发布都换下的）
-/// 也认不出——它们的旧落点照释放之前读盘核那一路走。
+/// 一版里 `locations` 这几组位置条目认出来的结果（[`units_at_these_locations`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitsAtTheseLocations {
+    /// 住在这几组位置条目上的、进中央映射或留存着映射条目的那几个单元的映射 key。一把 key 只出一次，按 `mapped_units` 的次序、留存的排在后面。
+    pub mapping_keys: Vec<Vec<u8>>,
+    /// 认不出映射 key 的那几组，按交进来的次序：豁免映射的三类（映射树自己的节点、树表、实例表片）的，与这一版里已经没有单元住着的。
+    pub locations_without_a_mapping_key: Vec<[LocationEntry; 2]>,
+}
+
+/// 按一版认 `locations` 这几组位置条目（[`UnitsAtTheseLocations`]）：进中央映射的单元按映射里那两条位置条目认，留存的映射条目
+/// （`version.mapping_entries_kept_for_the_snapshots`）按它记的那两条认。可写挂载交回之前按挂载之后那一版认建上一版读到只坏一份的那几组
+/// （`recovery::PoolReaderCountingUnitReadsWithOneCopyFailing::locations_of_the_units_read_with_one_copy_failing`），会话下一次用户改动发成之后
+/// 按那一版认别的读记下的那几组，认出的 key 进另发的那一批（用户 2026-11-05 定「可写挂载时搬」）。
+/// 挂载这一串的发布、或这次改动已经换了落点的单元认不出：它们的旧落点只在读到只坏一份之后记着那组位置条目时走释放之前读盘核
+/// （[`copies_of_the_exempt_units_read_with_one_copy_failing`] 管豁免映射的三类）。
 #[must_use]
-pub fn mapping_keys_of_the_units_at_these_locations(
+pub fn units_at_these_locations(
     version: &TransactionOutput,
     locations: &[[LocationEntry; 2]],
-) -> Vec<Vec<u8>> {
+) -> UnitsAtTheseLocations {
     let mut mapping_keys: Vec<Vec<u8>> = Vec::new();
     if locations.is_empty() {
-        return mapping_keys;
+        return UnitsAtTheseLocations {
+            mapping_keys,
+            locations_without_a_mapping_key: Vec::new(),
+        };
     }
+    let mut locations_with_a_mapping_key: Vec<[LocationEntry; 2]> = Vec::new();
     let mut central_mapping = CentralMappingOfAVersionReadLeafByLeaf::of_the_version(version);
-    // 迭代上界是这一版进映射的单元数加留存条目数；跨轮携带的只有已认出的那几把 key。
+    // 迭代上界是这一版进映射的单元数加留存条目数；跨轮携带的只有已认出的那几把 key 与那几组位置条目。
     for (_, mapping_key) in &version.mapped_units {
         if mapping_keys.contains(mapping_key) {
             continue;
@@ -11755,6 +12069,7 @@ pub fn mapping_keys_of_the_units_at_these_locations(
         match central_mapping.locations_of_key(mapping_key) {
             MappingLookup::Found(mapped_locations) if locations.contains(&mapped_locations) => {
                 mapping_keys.push(mapping_key.clone());
+                locations_with_a_mapping_key.push(mapped_locations);
             }
             MappingLookup::Found(_)
             | MappingLookup::NodeMalformedOrNoEntryWithThisKey
@@ -11764,18 +12079,262 @@ pub fn mapping_keys_of_the_units_at_these_locations(
     for (kept_key, kept_locations) in &version.mapping_entries_kept_for_the_snapshots {
         if !mapping_keys.contains(kept_key) && locations.contains(kept_locations) {
             mapping_keys.push(kept_key.clone());
+            locations_with_a_mapping_key.push(*kept_locations);
         }
     }
-    mapping_keys
+    UnitsAtTheseLocations {
+        mapping_keys,
+        locations_without_a_mapping_key: locations
+            .iter()
+            .filter(|read_locations| !locations_with_a_mapping_key.contains(read_locations))
+            .copied()
+            .collect(),
+    }
 }
 
-/// 可写挂载读盘建上一版时读到只坏一份的那几个单元（`mapping_keys`，[`mapping_keys_of_the_units_at_these_locations`] 认出来的）里，到 `version`
-/// 这一版仍在中央映射里或留存条目里的那几个，照已有的搬迁路径另发一批时的计划（用户 2026-11-05 定「可写挂载时搬」；与
+/// 另发的那一批要换落点的豁免映射的单元（D4（校验和位置） 已定项 4 的三类：映射树自己的节点、树表、实例表片；[`repair_of_the_exempt_units_at_these_locations`]）：
+/// 它们认不出映射 key、搬迁入口不收（[`RelocationBatchRefused::PinnedUnitInThePlan`]），换落点照它们自己的重写路子走：树表与映射树根每次发布都换，走不到这里；
+/// 映射树根之下的节点经 `mapping_keys_routed_through_the_nodes` 把从根到叶那条路整条重写（[`plan_rewriting_the_paths_to_the_moved_entries`]，条目的位置不变）；
+/// 实例表整条链 COW 重写、行不变（D18（块里携带什么信息） 已定项 11「每次写行 COW 重写整条链」，没有不被改写的片）。
+#[derive(Clone, Debug)]
+pub struct RepairOfTheExemptUnits {
+    /// 这一批换下的那几个豁免映射的角色，按映射树节点、实例表片的次序。
+    pub units: Vec<TransactionUnit>,
+    mapping_keys_routed_through_the_nodes: Vec<Vec<u8>>,
+    instance_table_rewrite: Option<InstanceTableRewrite>,
+    /// 认这几组时沿链读实例表读到只坏一份的那几片的位置条目（一片一组）：读到的片同一批接着换，调用方记进别的读那份账。
+    pub locations_read_with_one_copy_failing_while_reading_the_chain: Vec<[LocationEntry; 2]>,
+    /// 认这几组时实例表链读不出、解不开的那个失败：实例表那一半跳过（读不出也写不了行不变的重写），映射树节点与要搬的单元照发，结局报明实例表没换。
+    pub instance_table_chain_unreadable: Option<RecoveryFailure>,
+}
+
+impl RepairOfTheExemptUnits {
+    /// 这一批要不要为豁免映射的单元发。
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.units.is_empty()
+    }
+}
+
+/// `locations_without_a_mapping_key`（[`UnitsAtTheseLocations`]）里此刻是 `version` 那一版豁免映射的单元的那几组要怎么换落点。
+/// 映射树节点只比内存里这一版的指针；余下的有一组才沿链读实例表（只坏一份的读才有这几组，没有坏副本的发布不多读）。这一读经数只坏一份的那一层：
+/// 读到只坏一份的片与账上记着的片一样，整条链同一批重写（D4（校验和位置） 已定项 4「可写挂载期间别的读」）。链读不出、解不开时认不出余下那几组是不是实例表片，
+/// 实例表那一半跳过，失败交在 [`RepairOfTheExemptUnits::instance_table_chain_unreadable`] 里。
+/// 没有单元住着的那几组（这次改动已经换下的，树表与映射树根每次发布都换，在这里头）不进结果。
+#[must_use]
+pub fn repair_of_the_exempt_units_at_these_locations<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    version: &TransactionOutput,
+    locations_without_a_mapping_key: &[[LocationEntry; 2]],
+) -> RepairOfTheExemptUnits {
+    let mut units: Vec<TransactionUnit> = Vec::new();
+    let mut mapping_keys_routed_through_the_nodes: Vec<Vec<u8>> = Vec::new();
+    let mut locations_left: Vec<[LocationEntry; 2]> = Vec::new();
+    let mapping_tree = &version.central_mapping_tree;
+    // 迭代上界是交进来的组数乘映射树的节点数；跨轮携带的只有认出的那几样。
+    for locations in locations_without_a_mapping_key {
+        let mapping_tree_node = mapping_tree
+            .shape
+            .nodes()
+            .iter()
+            .zip(&mapping_tree.pointers)
+            .find(|(_, pointer)| pointer.locations == *locations)
+            .map(|(node, _)| node);
+        if let Some(node) = mapping_tree_node {
+            units.push(
+                MultiLevelCodeTwoTree::CentralMapping
+                    .role_of_node(node.position, &mapping_tree.shape),
+            );
+            mapping_keys_routed_through_the_nodes
+                .push(mapping_key_below_the_node(mapping_tree, node));
+        } else {
+            locations_left.push(*locations);
+        }
+    }
+    if locations_left.is_empty() {
+        return RepairOfTheExemptUnits {
+            units,
+            mapping_keys_routed_through_the_nodes,
+            instance_table_rewrite: None,
+            locations_read_with_one_copy_failing_while_reading_the_chain: Vec::new(),
+            instance_table_chain_unreadable: None,
+        };
+    }
+    let counting_reader = PoolReaderCountingUnitReadsWithOneCopyFailing::counting_from_zero(reader);
+    let chain_read = instance_table_chain_of_root(&counting_reader, &version.root);
+    let locations_read_with_one_copy_failing_while_reading_the_chain =
+        counting_reader.locations_of_the_units_read_with_one_copy_failing();
+    let chain = match chain_read {
+        Ok(chain) => chain,
+        Err(failure) => {
+            return RepairOfTheExemptUnits {
+                units,
+                mapping_keys_routed_through_the_nodes,
+                instance_table_rewrite: None,
+                locations_read_with_one_copy_failing_while_reading_the_chain,
+                instance_table_chain_unreadable: Some(failure),
+            }
+        }
+    };
+    let any_page_read_with_one_copy_failing = chain.page_pointers.iter().any(|page_pointer| {
+        locations_left.contains(&page_pointer.locations)
+            || locations_read_with_one_copy_failing_while_reading_the_chain
+                .contains(&page_pointer.locations)
+    });
+    let instance_table_rewrite = if any_page_read_with_one_copy_failing {
+        units.extend((0..chain.page_pointers.len()).map(|position| {
+            TransactionUnit::of_instance_table_page(InstanceTablePageIndex(
+                u64::try_from(position).expect("片序号"),
+            ))
+        }));
+        Some(InstanceTableRewrite {
+            rows: chain.records.rows,
+            replaced_chain: chain.page_pointers,
+        })
+    } else {
+        None
+    };
+    RepairOfTheExemptUnits {
+        units,
+        mapping_keys_routed_through_the_nodes,
+        instance_table_rewrite,
+        locations_read_with_one_copy_failing_while_reading_the_chain,
+        instance_table_chain_unreadable: None,
+    }
+}
+
+/// `node` 下面的一把映射 key（沿头一个孩子走到叶、取叶里头一把）：把它当「条目换了位置」交给发布，从根到它那片叶的路整条重写，`node` 在路上。
+///
+/// # Panics
+/// 节点的孩子不在同一份形状里、或叶或内部节点是空的：形状由规划或读树造出来，节点都不空、孩子都在（`code_two_tree` 读树那一步判过）。
+fn mapping_key_below_the_node(
+    mapping_tree: &CodeTwoTreeVersion,
+    node: &CodeTwoTreeShapeNode,
+) -> Vec<u8> {
+    let mut contents = &node.contents;
+    // 迭代上界：每一轮下降一层，至多树高那么多轮；走到叶就停。
+    loop {
+        match contents {
+            CodeTwoTreeNodeContents::Leaf { keys } => {
+                return keys
+                    .first()
+                    .expect("映射树的叶不空：规划与读树都不留空叶")
+                    .bytes()
+                    .to_vec();
+            }
+            CodeTwoTreeNodeContents::Internal { children } => {
+                let child = children
+                    .first()
+                    .expect("映射树的内部节点至少一个孩子：规划与读树都不留空节点")
+                    .child;
+                contents = &mapping_tree
+                    .shape
+                    .node(child)
+                    .expect("孩子的位置取自同一份形状")
+                    .contents;
+            }
+        }
+    }
+}
+
+/// 这次发布换下的豁免映射的单元里，读到只坏一份之后记着位置条目的那几个（`locations_read_with_one_copy_failing`，
+/// [`PoolAllocator::locations_read_with_one_copy_failing_waiting_for_the_next_user_change`]）照释放之前读盘核那一路读：一份没对上就两份都隔离
+/// （D4（校验和位置） 已定项 4「旧落点照释放前核隔离」，读法同 [`copies_of_a_released_unit_failing_the_release_checksum_check`]）。
+/// 没有记着的不读：豁免映射的单元不在硬规则 1 的射程里（D19（块指针的结构与宽度预算） 已定项 5），这一读只跟着读到只坏一份的那几组。
+fn copies_of_the_exempt_units_read_with_one_copy_failing<Reader: PoolReader + ?Sized>(
+    previous: &TransactionOutput,
+    previous_roles_replaced: &[TransactionUnit],
+    instance_table: &InstanceTablePlan,
+    locations_read_with_one_copy_failing: &[[LocationEntry; 2]],
+    reader: &Reader,
+) -> Vec<CopyQuarantinedAfterReleaseChecksumMismatch> {
+    let mut quarantined = Vec::new();
+    if locations_read_with_one_copy_failing.is_empty() {
+        return quarantined;
+    }
+    let mut check_when_it_was_read_with_one_copy_failing =
+        |identity: TransactionUnit, locations: &[LocationEntry; 2]| {
+            if locations_read_with_one_copy_failing.contains(locations) {
+                quarantined.extend(
+                    copies_of_a_released_unit_failing_the_release_checksum_check(
+                        identity, locations, reader,
+                    ),
+                );
+            }
+        };
+    // 迭代上界是这次换下的角色数；不是豁免映射的那几个走 `copies_failing_the_release_checksum_check`。
+    for identity in previous_roles_replaced {
+        match identity {
+            TransactionUnit::MappingTreeNodeBelowTheRoot(position) => {
+                check_when_it_was_read_with_one_copy_failing(
+                    *identity,
+                    &previous
+                        .central_mapping_tree
+                        .pointer_of(*position)
+                        .locations,
+                );
+            }
+            TransactionUnit::MappingTree => check_when_it_was_read_with_one_copy_failing(
+                *identity,
+                &previous.root.mapping_root.locations,
+            ),
+            TransactionUnit::TreeTable => check_when_it_was_read_with_one_copy_failing(
+                *identity,
+                &previous.root.tree_table.locations,
+            ),
+            TransactionUnit::InstanceTable
+            | TransactionUnit::InstanceTablePageAfterTheFirst(_)
+            | TransactionUnit::DataOfAFileOtherThanTheFirst { .. }
+            | TransactionUnit::ExtentLowerNodeOfAFileOtherThanTheFirst { .. }
+            | TransactionUnit::Data(_)
+            | TransactionUnit::ExtentLowerNode(_)
+            | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
+            | TransactionUnit::ExtentRoot
+            | TransactionUnit::InodeLeafContainer(_)
+            | TransactionUnit::InodeRoot
+            | TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
+            | TransactionUnit::AllocationTree
+            | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
+            | TransactionUnit::AccountingTree
+            | TransactionUnit::DeadlistTreeNodeBelowTheRoot(_)
+            | TransactionUnit::DeadlistTree
+            | TransactionUnit::DeletedInodesRoot
+            | TransactionUnit::LoggedOperationsRoot
+            | TransactionUnit::TombstoneLeafContainer(_)
+            | TransactionUnit::TombstoneRoot
+            | TransactionUnit::TombstoneNodeBelowTheRoot(_)
+            | TransactionUnit::LineageLeafContainer(_)
+            | TransactionUnit::LineageRoot
+            | TransactionUnit::LineageNodeBelowTheRoot(_)
+            | TransactionUnit::RetirementLeafContainer(_)
+            | TransactionUnit::RetirementRoot
+            | TransactionUnit::RetirementNodeBelowTheRoot(_) => {}
+        }
+    }
+    // 整条实例表旧链由计划带着（第 1 片起的指针不在上一版的内存态里）。
+    match instance_table {
+        InstanceTablePlan::Rewrite(rewrite) => {
+            for (position, page_pointer) in rewrite.replaced_chain.iter().enumerate() {
+                check_when_it_was_read_with_one_copy_failing(
+                    TransactionUnit::of_instance_table_page(InstanceTablePageIndex(
+                        u64::try_from(position).expect("片序号"),
+                    )),
+                    &page_pointer.locations,
+                );
+            }
+        }
+        InstanceTablePlan::Carry(_) => {}
+    }
+    quarantined
+}
+
+/// 读到只坏一份的那几个单元（`mapping_keys`：可写挂载读盘建上一版读到的，与可写挂载期间别的读读到的，都是 [`units_at_these_locations`] 认出来的）里，到 `version`
+/// 这一版仍在中央映射里或留存条目里的那几个，照已有的搬迁路径另发一批时的计划（D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」；与
 /// [`relocations_of_old_data_units_kept_for_the_snapshots`] 同一批发，`planned_before` 是那一份、已在里面的 key 不重复）：源落点取映射里那两条
 /// 位置条目（或留存条目记的那两条）的槽，跨度按 key 的类标签归到的用户可见角色取（[`user_visible_role_standing_for_a_unit_class`]）。
 /// 到 `version` 这一版已经不在的（这次改动或挂载之后的发布把它整个重写了、旧落点照释放之前读盘核那一路走）不进计划。
 #[must_use]
-pub fn relocations_of_the_units_read_with_one_copy_failing_while_mounting(
+pub fn relocations_of_the_units_read_with_one_copy_failing(
     version: &TransactionOutput,
     mapping_keys: &[Vec<u8>],
     planned_before: &[PlannedRelocation],
@@ -11824,7 +12383,7 @@ pub fn relocations_of_the_units_read_with_one_copy_failing_while_mounting(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CopiesOfAUnitRead {
     /// 头一条就对上，或两条位置提示都没对上、映射那一组头一条对上（提示过期与两份都坏分不开，不算只坏一份），
-    /// 或按提示读到只坏一份而提示不是这个单元此刻在映射里的落点（提示过期：旧槽上坏的那一份不归这个单元计）。
+    /// 或按提示读到只坏一份而映射里查到这个单元此刻的落点不是提示（提示过期：旧槽上坏的那一份不归这个单元计）。
     WithoutAFailingCopy,
     /// 同一组里前一条读不回字节或整单元 CRC-32C 对不上，后一条对上：只坏一份。
     FromTheOtherCopyAfterOneFailed,
@@ -11903,8 +12462,9 @@ pub fn read_back_the_old_data_unit_telling_whether_a_copy_failed<Reader: PoolRea
                         MappingLookup::Found(mapped_locations) => {
                             mapped_locations == pointer.locations
                         }
+                        // 查不出落点就判不出提示过期：这一份是真读到的坏副本，照计（查不到的判红留给照映射释放那一步）。
                         MappingLookup::NodeMalformedOrNoEntryWithThisKey
-                        | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => false,
+                        | MappingLookup::EntryNarrowerThanItsFieldTable { .. } => true,
                     };
                 if !hints_are_the_mapping_position {
                     copies_read.set(CopiesOfAUnitRead::WithoutAFailingCopy);
@@ -12279,6 +12839,34 @@ pub struct DeletionQueueWalk {
     pub stopped_by: Result<(), PublishError>,
 }
 
+/// 选删除队列的下一步、发它：次序只在这里：`deleted_inodes` 先走空，再走销毁中的快照（树号升序），再走截断；整理是提示类，不在这里走。
+/// 下一步只由 `current` 这一版定：走空一趟（[`walk_the_deletion_queue_until_it_is_empty`]）与放锁的后台入口一次只走一步都调它，步与步之间插进别的发布，走到的还是同一串步。
+/// 队列空着交回 `None`，一个写都不发。
+pub fn publish_the_next_step_of_the_deletion_queue<Device: BlockDevice>(
+    pool: &mut PoolWriter<'_, Device>,
+    allocator: &mut PoolAllocator,
+    current: &TransactionOutput,
+    batch_size: UnlinkBatchSize,
+    instance: InstanceGeneration,
+) -> Option<Result<TransactionOutput, PublishError>> {
+    match (
+        current.deleted_inodes.first().copied(),
+        current.snapshots_being_destroyed.first().copied(),
+        live_truncation_intent_of_the_entries(&current.logged_operations),
+    ) {
+        (Some(inode), _, _) => Some(publish_unlink_step(
+            pool, allocator, current, inode, batch_size, instance,
+        )),
+        (None, Some(snapshot), _) => Some(publish_snapshot_destruction_step(
+            pool, allocator, current, snapshot, batch_size, instance,
+        )),
+        (None, None, Some(_truncation)) => Some(publish_truncation_step(
+            pool, allocator, current, batch_size, instance,
+        )),
+        (None, None, None) => None,
+    }
+}
+
 /// 同 [`publish_unlink_steps_until_the_queue_is_empty`]，连同发成的每一步交回（会话与挂载续做要把它们交给调用方，
 /// 模型对拍逐次比它们）。每发成一步，`current` 与交回的那一步指着同一份（不拷一整版）。
 pub fn walk_the_deletion_queue_until_it_is_empty<Device: BlockDevice>(
@@ -12291,28 +12879,14 @@ pub fn walk_the_deletion_queue_until_it_is_empty<Device: BlockDevice>(
     let mut steps_published = Vec::new();
     // 迭代上界：每一步要么让队首那个文件少至少一个单元、要么删掉队首那个号（最后一批），要么放掉销毁中那个快照至少一条 deadlist 条目、
     // 要么删掉它那一对条目（最后一批），要么让截断的文件少至少一个单元、要么删掉截断条目（最后一批）：队列、单元数与条目数都有限。
-    // 次序（判决 m4-trunc-r1 K1）：`deleted_inodes` 先走空，再走销毁中的快照（树号升序），再走截断；整理是提示类，不在这里走。
     loop {
-        let next_step = match (
-            current.deleted_inodes.first().copied(),
-            current.snapshots_being_destroyed.first().copied(),
-            live_truncation_intent_of_the_entries(&current.logged_operations),
-        ) {
-            (Some(inode), _, _) => {
-                publish_unlink_step(pool, allocator, current, inode, batch_size, instance)
-            }
-            (None, Some(snapshot), _) => publish_snapshot_destruction_step(
-                pool, allocator, current, snapshot, batch_size, instance,
-            ),
-            (None, None, Some(_truncation)) => {
-                publish_truncation_step(pool, allocator, current, batch_size, instance)
-            }
-            (None, None, None) => {
-                return DeletionQueueWalk {
-                    steps_published,
-                    stopped_by: Ok(()),
-                }
-            }
+        let Some(next_step) = publish_the_next_step_of_the_deletion_queue(
+            pool, allocator, current, batch_size, instance,
+        ) else {
+            return DeletionQueueWalk {
+                steps_published,
+                stopped_by: Ok(()),
+            };
         };
         match next_step {
             Ok(next) => {
@@ -12870,6 +13444,8 @@ fn judge_the_publish_before_any_read_or_write<Device: BlockDevice>(
         mapping_keys_whose_entries_change_without_a_relocation,
         pool.snapshot_lifetime_judgement(),
     )?;
+    pool.rounds_of_the_last_allocation_record_tree_settling
+        .set(settled.rounds_walked);
     // 这次发布切出来的记录条数（代码审阅第 26 条）：角色定下来就数得出，在准入、读盘核与动分配器之前判。
     let journal_records_of_the_publish = records_of_a_publish_naming_the_relocated_copies(
         &settled.resolved.rewritten_roles,
@@ -12920,15 +13496,18 @@ fn judge_the_publish_before_any_read_or_write<Device: BlockDevice>(
     );
     // 删除类发布（意图、各批、最后一批）不判式子那一判、落点那一判照判（D28（挂载期承诺量） 已定项 1：它们的空间罩在环窗口里）。
     // 删快照的三种发布与 unlink 同准入（判决第七节岔路 4「删快照照 unlink 的过程做、同等准入」）：式子那一判同样不判。
-    // 整理的各次发布（`publish_compaction_step`）不是删除类，走 `NotADeletion` 那一臂。整理不是释放路径、走常规准入（D26（后台整理与放置回收）
-    // 已定项 3 第 2 句；用户 2026-10-26 定 C906「照条款：整理批走常规准入」）：搬了单元的一批照判式子那一判，哪怕重写的角色只有固定点，
-    // 批次最坏占用（计划里每一项都真搬，[`worst_case_occupancy_of_a_compaction_batch`]）加进这一次读数的已承诺预留；签发、删意图、丢意图
-    // 重写 logged_ops 根（普通分配），照判。可用压到需求之下就拒（`SpaceAdmissionRefused`），会话照暂停办：意图留在盘上，下次再试。
+    // 整理的各次发布（`publish_compaction_step`）走 `NotADeletion` 那一臂。整理不是释放路径、走常规准入（D26（后台整理与放置回收）
+    // 已定项 3 第 2 句；C906「照条款：整理批走常规准入」）：搬了单元的一批照判式子那一判，哪怕重写的角色只有固定点，
+    // 批次最坏占用（计划里每一项都真搬，[`worst_case_occupancy_of_a_compaction_batch`]）加进这一次读数的已承诺预留；签发重写 logged_ops 根
+    // （普通分配），照判。可用压到需求之下就拒（`SpaceAdmissionRefused`），会话照暂停办：单发一次只删意图的发布丢掉意图。
+    // 只删整理意图、不搬单元的发布（意图达成而 R 已空、丢意图、暂停与出错停下时删意图）归删除类（D28（挂载期承诺量） 已定项 1 的不判名单）：
+    // 式子那一判不判，落点那一判在上面照判（logged_ops 里另有截断意图、重写 logged_ops 根时）。
     // 截断的意图、各批、最后一批同样当删除类（判决 m4-trunc-r1 K10）；变长与只改记录当普通写，照判。
     let demand_is_judged = match (allocator.space_admission(), deletion_and_lineage.step) {
         (SpaceAdmission::JudgedByTheFormula, step) => {
             !step.is_a_deletion_class_publish()
                 && !deletion_and_lineage.snapshot.is_a_snapshot_destruction()
+                && !deletes_only_the_compaction_intent(deletion_and_lineage, relocations)
                 && (publish_has_an_ordinary_allocation(&settled.resolved.rewritten_roles)
                     || !relocations.is_empty())
         }
@@ -12966,11 +13545,149 @@ fn judge_the_publish_before_any_read_or_write<Device: BlockDevice>(
     })
 }
 
+/// 这次发布只删整理意图、不搬单元（[`CompactionIntentStep::DeleteOnceTheRegionIsEmptyByTheRecords`] 不带一批、[`CompactionIntentStep::Drop`]）：
+/// 归删除类，式子那一判不判（D28（挂载期承诺量） 已定项 1 的不判名单，[`judge_the_publish_before_any_read_or_write`]）。
+/// logged_ops 那一步之外别的都照抄（整理的发布不写文件、不建 inode、不建也不删快照），只看 logged_ops 那一步与搬不搬单元。
+fn deletes_only_the_compaction_intent(
+    deletion_and_lineage: &DeletionAndLineageOfThePublish,
+    relocations: &[RelocationOfThePublish],
+) -> bool {
+    let deletes_the_compaction_intent = match deletion_and_lineage.logged_operations {
+        LoggedOperationsStepOfThePublish::DeleteTheCompactionIntent { .. } => true,
+        LoggedOperationsStepOfThePublish::CarryTheLoggedOperations
+        | LoggedOperationsStepOfThePublish::IssueTheCompactionIntent(_)
+        | LoggedOperationsStepOfThePublish::IssueTheTruncationIntent(_)
+        | LoggedOperationsStepOfThePublish::DeleteTheTruncationIntent { .. }
+        | LoggedOperationsStepOfThePublish::TakeTheTruncationEntryOfTheRollbackTarget(_) => false,
+    };
+    deletes_the_compaction_intent && relocations.is_empty()
+}
+
 /// [`judge_the_publish_before_any_read_or_write`] 判过的：走到固定点的这一次发布、记账行的盘、这次切成几条 journal 记录。
 struct PublishJudgedBeforeAnyReadOrWrite {
     settled: SettledPublish,
     device_identities_of_the_accounting_rows: Vec<DeviceIdentity>,
     journal_records_of_the_publish: usize,
+}
+
+/// 这次发布释放之前读盘核的全部读（[`prepare_the_version_publish_relocating_units`]）：换下的角色、记着只坏一份的豁免映射的单元、删快照这一批放的条目、搬走的源落点，
+/// 交回要隔离的那几份。经 `reader` 读，调用方在它返回之后（`Err` 也是）取数到的只坏一份。
+///
+/// # Errors
+/// 映射条目的位置项指池外的盘、两条指同一块盘；删快照这一批放的条目认不出角色；[`copies_failing_the_release_checksum_check`] 那几种。都在动分配器的账与任何写之前。
+fn copies_quarantined_by_the_release_checks<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    allocator: &mut PoolAllocator,
+    plan: &PublishPlan<'_>,
+    previous: Option<&TransactionOutput>,
+    settled: &SettledPublish,
+    device_identities_of_the_accounting_rows: &[DeviceIdentity],
+    release_checksum_check: ReleaseChecksumCheck,
+) -> Result<Vec<CopyQuarantinedAfterReleaseChecksumMismatch>, PublishError> {
+    let kept_for_the_snapshots = &settled
+        .resolved
+        .deadlist
+        .user_visible_roles_kept_for_the_snapshots;
+    let mut quarantine = match (previous, release_checksum_check) {
+        (Some(previous_version), ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt) => {
+            let mut copies_failing = copies_failing_the_release_checksum_check(
+                previous_version,
+                &settled.previous_roles_replaced,
+                kept_for_the_snapshots,
+                reader,
+                FileContentOfThePublish::of_the_plan(plan),
+            )?;
+            copies_failing.extend(copies_of_the_exempt_units_read_with_one_copy_failing(
+                previous_version,
+                &settled.previous_roles_replaced,
+                &plan.instance_table,
+                &allocator.locations_read_with_one_copy_failing_waiting_for_the_next_user_change(),
+                reader,
+            ));
+            copies_failing
+        }
+        (Some(previous_version), ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition) => {
+            // 预演不读盘，但映射条目的位置项指池外的盘、两条指同一块盘那一判不读盘，照样判（发布路径在读盘核之前判的同一件事）。
+            refuse_mapping_entries_that_do_not_name_two_pool_devices(
+                previous_version,
+                &settled.previous_roles_replaced,
+                kept_for_the_snapshots,
+                device_identities_of_the_accounting_rows,
+                FileContentOfThePublish::of_the_plan(plan),
+            )?;
+            Vec::new()
+        }
+        (None, _) => Vec::new(),
+    };
+    // 删快照这一批放的条目同样先按留存的映射条目读盘核（判决 S4「每条先核还在、读盘核校验和」；条目还在由 `resolve` 从上一版的 deadlist 取保证）。
+    for (entry, locations) in &settled
+        .resolved
+        .deadlist
+        .entries_released_by_the_destruction
+    {
+        let role = role_standing_for_the_unit_of_a_deadlist_entry(entry)?;
+        let not_releasable = |cause: PublishError| PublishError::DeadlistEntryNotReleasable {
+            mapping_key: entry.mapping_key.clone(),
+            refusal: DeadlistEntryReleaseRefusal::PlacementNotReleasable(Box::new(cause)),
+        };
+        refuse_locations_that_do_not_name_two_pool_devices(
+            role,
+            locations,
+            device_identities_of_the_accounting_rows,
+        )
+        .map_err(not_releasable)?;
+        match release_checksum_check {
+            ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt => {
+                quarantine.extend(
+                    copies_of_a_released_unit_failing_the_release_checksum_check(
+                        role, locations, reader,
+                    ),
+                );
+            }
+            ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition => {}
+        }
+    }
+    // 搬走的源落点释放之前同样按映射位置项读盘核（判决 G3「源落点写释放代进 defer」走的是同一条释放判定路径）。签发之后强制一次
+    // 「释放前核出对不上」那个只供测试的开关（判决 G6）落在这一批第一个源落点上：两份都当核出对不上，隔离（D19 已定项 5）。
+    for (position, relocation) in settled.relocations_in_effect.iter().enumerate() {
+        refuse_locations_that_do_not_name_two_pool_devices(
+            relocation.role_for_the_checks,
+            &relocation.source_locations,
+            device_identities_of_the_accounting_rows,
+        )?;
+        match release_checksum_check {
+            ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt => {
+                let is_forced_to_mismatch = position == 0
+                    && allocator
+                        .compaction_mut()
+                        .take_the_forced_release_checksum_mismatch();
+                if is_forced_to_mismatch {
+                    quarantine.extend(relocation.source_locations.iter().enumerate().map(
+                        |(copy_position, location)| CopyQuarantinedAfterReleaseChecksumMismatch {
+                            unit: relocation.role_for_the_checks,
+                            device: location.device,
+                            placement: relocation.source,
+                            reading: if copy_position == 0 {
+                                QuarantinedCopyReading::ChecksumMismatch
+                            } else {
+                                QuarantinedCopyReading::IntactButAnotherCopyFailed
+                            },
+                        },
+                    ));
+                } else {
+                    quarantine.extend(
+                        copies_of_a_released_unit_failing_the_release_checksum_check(
+                            relocation.role_for_the_checks,
+                            &relocation.source_locations,
+                            reader,
+                        ),
+                    );
+                }
+            }
+            ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition => {}
+        }
+    }
+    Ok(quarantine)
 }
 
 /// 同 [`prepare_the_version_publish`]，另带这次要搬的单元（整理的一批，[`publish_relocation_batch`]；别的发布给空的）：
@@ -13010,103 +13727,24 @@ fn prepare_the_version_publish_relocating_units<Device: BlockDevice>(
     )?;
     // 经映射核到的那几个单元，释放之前再按位置项读盘核一次校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）：只读，
     // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。
-    let kept_for_the_snapshots = &settled
-        .resolved
-        .deadlist
-        .user_visible_roles_kept_for_the_snapshots;
-    let mut quarantine = match (previous, release_checksum_check) {
-        (Some(previous_version), ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt) => {
-            copies_failing_the_release_checksum_check(
-                previous_version,
-                &settled.previous_roles_replaced,
-                kept_for_the_snapshots,
-                &*pool.devices,
-                FileContentOfThePublish::of_the_plan(plan),
-            )?
-        }
-        (Some(previous_version), ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition) => {
-            // 预演不读盘，但映射条目的位置项指池外的盘、两条指同一块盘那一判不读盘，照样判（发布路径在读盘核之前判的同一件事）。
-            refuse_mapping_entries_that_do_not_name_two_pool_devices(
-                previous_version,
-                &settled.previous_roles_replaced,
-                kept_for_the_snapshots,
-                &device_identities_of_the_accounting_rows,
-                FileContentOfThePublish::of_the_plan(plan),
-            )?;
-            Vec::new()
-        }
-        (None, _) => Vec::new(),
-    };
-    // 删快照这一批放的条目同样先按留存的映射条目读盘核（判决 S4「每条先核还在、读盘核校验和」；条目还在由 `resolve` 从上一版的 deadlist 取保证）。
-    for (entry, locations) in &settled
-        .resolved
-        .deadlist
-        .entries_released_by_the_destruction
-    {
-        let role = role_standing_for_the_unit_of_a_deadlist_entry(entry)?;
-        let not_releasable = |cause: PublishError| PublishError::DeadlistEntryNotReleasable {
-            mapping_key: entry.mapping_key.clone(),
-            refusal: DeadlistEntryReleaseRefusal::PlacementNotReleasable(Box::new(cause)),
-        };
-        refuse_locations_that_do_not_name_two_pool_devices(
-            role,
-            locations,
-            &device_identities_of_the_accounting_rows,
-        )
-        .map_err(not_releasable)?;
-        match release_checksum_check {
-            ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt => {
-                quarantine.extend(
-                    copies_of_a_released_unit_failing_the_release_checksum_check(
-                        role,
-                        locations,
-                        &*pool.devices,
-                    ),
-                );
-            }
-            ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition => {}
-        }
-    }
-    // 搬走的源落点释放之前同样按映射位置项读盘核（判决 G3「源落点写释放代进 defer」走的是同一条释放判定路径）。签发之后强制一次
-    // 「释放前核出对不上」那个只供测试的开关（判决 G6）落在这一批第一个源落点上：两份都当核出对不上，隔离（D19 已定项 5）。
-    for (position, relocation) in settled.relocations_in_effect.iter().enumerate() {
-        refuse_locations_that_do_not_name_two_pool_devices(
-            relocation.role_for_the_checks,
-            &relocation.source_locations,
-            &device_identities_of_the_accounting_rows,
-        )?;
-        match release_checksum_check {
-            ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt => {
-                let is_forced_to_mismatch = position == 0
-                    && allocator
-                        .compaction_mut()
-                        .take_the_forced_release_checksum_mismatch();
-                if is_forced_to_mismatch {
-                    quarantine.extend(relocation.source_locations.iter().enumerate().map(
-                        |(copy_position, location)| CopyQuarantinedAfterReleaseChecksumMismatch {
-                            unit: relocation.role_for_the_checks,
-                            device: location.device,
-                            placement: relocation.source,
-                            reading: if copy_position == 0 {
-                                QuarantinedCopyReading::ChecksumMismatch
-                            } else {
-                                QuarantinedCopyReading::IntactButAnotherCopyFailed
-                            },
-                        },
-                    ));
-                } else {
-                    quarantine.extend(
-                        copies_of_a_released_unit_failing_the_release_checksum_check(
-                            relocation.role_for_the_checks,
-                            &relocation.source_locations,
-                            &*pool.devices,
-                        ),
-                    );
-                }
-            }
-            ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition => {}
-        }
-    }
+    // 释放之前读盘核读到只坏一份的进这次挂载别的读那一份账（D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」）。
+    let devices_counting_unit_reads_with_one_copy_failing =
+        PoolReaderCountingUnitReadsWithOneCopyFailing::counting_from_zero(&*pool.devices);
+    let quarantine_read = copies_quarantined_by_the_release_checks(
+        &devices_counting_unit_reads_with_one_copy_failing,
+        allocator,
+        plan,
+        previous,
+        &settled,
+        &device_identities_of_the_accounting_rows,
+        release_checksum_check,
+    );
+    // 核不过提前返回的那一次，返回之前读到的只坏一份同样进账（D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」）。
+    allocator.count_the_other_unit_reads_with_one_copy_failing(
+        devices_counting_unit_reads_with_one_copy_failing
+            .locations_of_the_units_read_with_one_copy_failing(),
+    );
+    let quarantine = quarantine_read?;
     publish_admitted(
         pool,
         allocator,
@@ -13154,10 +13792,11 @@ struct RelocationOfThePublish {
 /// （D26（后台整理与放置回收） 已定项 5 第 2 条、D3（空间分配） 已定项 7「分配代」口径），活 R 由分配器排除。
 ///
 /// # Errors
-/// 取不到 ⇒ `PlacementRefused`，带着释放判定用的那个角色。
+/// 取不到 ⇒ `PlacementRefused`，带着释放判定用的那个角色。提交内生块的搬迁回落时同 [`allocate_placement_for_role`]，先取 `rewrite_set_leaves` 里的空槽。
 fn allocate_relocation_destination(
     allocator: &mut PoolAllocator,
     relocation: &RelocationOfThePublish,
+    rewrite_set_leaves: &RewriteSetLeaves,
 ) -> Result<Placement, PublishError> {
     let rule = relocation.role_for_the_checks.placement();
     let placement = match (allocator.compaction().switches.destination_policy, rule) {
@@ -13168,7 +13807,11 @@ fn allocate_relocation_destination(
         (
             RelocationDestinationPolicy::UserDataPlacementForDataAndOpenSegmentForTheRest,
             PlacementRule::CommitGenerated(footprint),
-        ) => allocator.try_allocate_commit_generated(footprint, relocation.birth_txg),
+        ) => allocator.try_allocate_commit_generated_preferring_the_rewrite_set(
+            footprint,
+            relocation.birth_txg,
+            rewrite_set_leaves,
+        ),
         (
             RelocationDestinationPolicy::LowestUnblockedSlotForEveryUnitForTests,
             PlacementRule::UserData,
@@ -13195,6 +13838,8 @@ struct SettledPublish {
     release: Vec<Placement>,
     /// 这次真搬的那几个（要搬的里面去掉这次重写本来就换下的角色），按计划的次序。
     relocations_in_effect: Vec<RelocationOfThePublish>,
+    /// 固定点走了几轮（定下来的那一轮算在内）。
+    rounds_walked: usize,
 }
 
 /// 这次发布换下的上一版角色与要释放的落点（释放判定路径，只查不改，D19（块指针的结构与宽度预算） 已定项 5 第 1 条）：
@@ -13323,14 +13968,21 @@ fn role_standing_for_the_unit_of_a_deadlist_entry(
 /// 这次写的每个单元、连分配记录树自己的节点，每盘各记一条；换下的每一份把它那条改成已释放（D3（空间分配） 已定项 7；这就是释放链）。
 /// 所以走一个固定点：从「重写集空、节点照上一版」起，按它算这次发布的全部角色，在分配器的**拷贝**上把释放与取落点照发布路径的次序
 /// 走一遍，按走出来的记录算有记录的节点与内容变了的节点（[`nodes_whose_contents_changed`]）；节点对得上、变了的都在重写集里（或本来就是新节点）
-/// 就定下，否则节点换成走出来的那一批、变了的并进重写集再走一遍。多罩的节点内容没变、照样重写一份（合法的 COW）。
+/// 就定下，否则节点换成走出来的那一批、变了的并进重写集、顺着释放链走到闭包（[`merge_into_the_rewrite_set_walking_the_release_chain`]）再走一遍。
+/// 多罩的节点内容没变、照样重写一份（合法的 COW）。
 /// 真发时走的是同一串释放与取落点，得出同一份记录（释放之前读盘核出对不上的那几份记录留在已分配，只会让变了的节点更少）。
 /// 没有上一版（第一个文件版本）时这棵树的树号换成这次发出来的（树表 0 条那一版的分配记录树是树 0），节点全部重写、不照抄。
 ///
-/// **走得完**：产品路径上释放只改写记录、不在这次发布里空出槽（回收要等根记下之后），取落点时分配记录树的节点之后只剩单槽的提交内生块、
-/// 按同一串槽位往后取——多一个角色只把这一串拉长，有记录的节点只多不少，重写集也只增不减，都以池里的节点数为上界。
-/// 只供测试的复用窗口置 0 开关（`ReuseWindow::ForcedToZero`）让释放当场空出槽、回落可能取回它们，那一格的单调性推不出来：
-/// 给 [`ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT`] 轮，走不完交回 `AllocationRecordTreeRewriteSetDidNotSettle`（条款没写这一格怎么办）。
+/// **走不走得完，推出来的只有一半**：重写集只增不减（只经 [`merge_into_the_rewrite_set_walking_the_release_chain`] 并节点），以池里的节点数为上界；
+/// 一轮没定下来，要么并进了新节点（重写集严格变大），要么重写集没变、只是这一版的节点换成走出来的那一批。后一种轮的个数推不出上界：
+/// 提交内生块回落时先取这一轮重写集里的叶（[`rewrite_set_leaves_of_the_roles`]），取光了再取空槽最多的叶（D3（空间分配） 已定项 8 第 2 条），
+/// 计划里的节点一变、先取的叶跟着变，这一轮的落点不是上一轮那一串的延长——装着记录的节点可以变少，这一版的节点不单调，同一个重写集下可以来回换。
+/// 推的、没证：回落的落点只进两种叶，重写集里的叶与空槽最多的那片叶；后者装进这次的落点就变了内容、下一轮并进重写集、之后先取它，
+/// 所以每进一片新叶都是重写集里的叶取光之后的那一次、重写集跟着变大。这一句只说回落那一支；开段与 bump 的落点按段走，与重写集无关。
+/// 节点数可以比 [`ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT`] 大，节点数这个上界也不保证轮数够：释放链沿活跃叶连成一长串时，一轮只走一跳就要走满轮数，
+/// 所以每次并进重写集都一次走到闭包，释放链不占轮数，轮数只剩取落点碰到新叶与这一版的节点来回换那两样。E206（发布固定点轮数的代价）第一段 16 个取样点量到至多 5 轮，这几个点都有全空段、走不到回落。
+/// 只供测试的复用窗口置 0 开关（`ReuseWindow::ForcedToZero`）让释放当场空出槽、回落可能取回它们，那一格的单调性也推不出来。
+/// 走满 [`ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT`] 轮走不完，交回 `AllocationRecordTreeRewriteSetDidNotSettle`（条款没写这一格怎么办）。
 ///
 /// # Errors
 /// 同 [`PublishPlan::resolve`]、[`placements_released_by_this_publish`]，与拷贝上取不到落点（`PlacementRefused`）——
@@ -13372,10 +14024,11 @@ fn settle_the_allocation_record_tree(
         ),
         None => (BTreeSet::new(), &[]),
     };
+    let previous_tree = previous.map(|previous_version| &previous_version.allocation_record_tree);
     let mut rewritten: BTreeSet<AllocationRecordTreeNode> = BTreeSet::new();
     let mut nodes_after: BTreeSet<AllocationRecordTreeNode> = previous_nodes.clone();
-    // 迭代上界是 ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT 轮；跨轮携带的是重写集（只增不减）与这一版的节点（换成上一轮走出来的那一批）。
-    for _round in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {
+    // 迭代上界是 ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT 轮；跨轮携带的是重写集（只增不减，每轮结束时对释放链是闭的）与这一版的节点（换成上一轮走出来的那一批）。
+    for round_index in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {
         let rewritten_among_the_nodes_after: BTreeSet<AllocationRecordTreeNode> =
             rewritten.intersection(&nodes_after).copied().collect();
         let allocation_plan = crate::allocation_record_tree::plan_the_tree_after_this_publish(
@@ -13431,15 +14084,22 @@ fn settle_the_allocation_record_tree(
         let changed_by_the_release =
             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
         if !changed_by_the_release.is_subset(&rewritten_by_the_plan) {
-            rewritten.extend(changed_by_the_release);
+            merge_into_the_rewrite_set_walking_the_release_chain(
+                &mut rewritten,
+                changed_by_the_release,
+                previous_tree,
+                &geometry,
+            );
             nodes_after.extend(nodes_holding_records(&geometry, rehearsal.records()));
             continue;
         }
+        let rewrite_set_leaves =
+            rewrite_set_leaves_of_the_roles(&resolved.rewritten_roles, allocator);
         for relocation in &relocations_in_effect {
-            allocate_relocation_destination(&mut rehearsal, relocation)?;
+            allocate_relocation_destination(&mut rehearsal, relocation, &rewrite_set_leaves)?;
         }
         for identity in &resolved.rewritten_roles {
-            allocate_placement_for_role(&mut rehearsal, *identity, plan.txg)?;
+            allocate_placement_for_role(&mut rehearsal, *identity, plan.txg, &rewrite_set_leaves)?;
         }
         let changed =
             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
@@ -13450,9 +14110,15 @@ fn settle_the_allocation_record_tree(
                 previous_roles_replaced,
                 release,
                 relocations_in_effect,
+                rounds_walked: round_index + 1,
             });
         }
-        rewritten.extend(changed);
+        merge_into_the_rewrite_set_walking_the_release_chain(
+            &mut rewritten,
+            changed,
+            previous_tree,
+            &geometry,
+        );
         nodes_after = holding_records;
     }
     Err(PublishError::AllocationRecordTreeRewriteSetDidNotSettle {
@@ -13460,9 +14126,43 @@ fn settle_the_allocation_record_tree(
     })
 }
 
-/// 分配记录树重写集的固定点最多走几轮（[`settle_the_allocation_record_tree`]）。产品路径上三四轮就定（第一轮重写集是空的、
-/// 释放弄脏的叶在取落点之前先并进来；下一轮罩住这次写的那几片叶与它们的祖先、再一轮罩住释放链弄脏的叶）；
-/// 只供测试的复用窗口置 0 开关下单调性推不出来，这个数给它一个边。
+/// 把一轮弄脏的节点并进分配记录树的重写集，再顺着释放链走到闭包：重写集里的节点这一版要重写，重写就释放它在上一版的两份落点，
+/// 释放改写落点那条记录，记录所在的叶（由槽号定）与叶的祖先内容就变了、也要重写；新并进来的节点接着走同一步，直到不再多。
+/// 走到的节点固定点下一轮的释放一定弄脏，它们本来就在不动点里：提前并进来只省轮数，写的角色与字节不变。
+/// 重写集从空集起、只经这里并节点，进来时对这一步是闭的，所以只从新并进来的节点走。上一版没有的节点没有旧落点，走到它为止；没有上一版的不走。
+fn merge_into_the_rewrite_set_walking_the_release_chain(
+    rewritten: &mut BTreeSet<AllocationRecordTreeNode>,
+    dirty_nodes: BTreeSet<AllocationRecordTreeNode>,
+    previous_tree: Option<&AllocationRecordTreeVersion>,
+    geometry: &AllocationRecordTreeGeometry,
+) {
+    let mut nodes_whose_old_locations_are_not_walked: Vec<AllocationRecordTreeNode> = dirty_nodes
+        .into_iter()
+        .filter(|node| rewritten.insert(*node))
+        .collect();
+    let Some(previous_tree) = previous_tree else {
+        return;
+    };
+    // 迭代上界是树的节点数：一个节点只在头一次并进重写集时进待走的那一叠；祖先那一层循环的上界是树高。没有提前出口。
+    while let Some(node) = nodes_whose_old_locations_are_not_walked.pop() {
+        let Some(pointer) = previous_tree.pointer_of(node) else {
+            continue;
+        };
+        for location in pointer.locations {
+            let mut leaf_or_ancestor = Some(geometry.leaf_of_slot(location.device, location.slot));
+            while let Some(node_on_the_way_to_the_root) = leaf_or_ancestor {
+                if rewritten.insert(node_on_the_way_to_the_root) {
+                    nodes_whose_old_locations_are_not_walked.push(node_on_the_way_to_the_root);
+                }
+                leaf_or_ancestor = geometry.parent_of(node_on_the_way_to_the_root);
+            }
+        }
+    }
+}
+
+/// 分配记录树重写集的固定点最多走几轮（[`settle_the_allocation_record_tree`]）。释放链每次并进重写集都走到闭包，产品路径上轮数只剩取落点碰到新叶
+/// 与回落先取重写集的叶让这一版的节点来回换那两样，E206（发布固定点轮数的代价）全部取样点量到至多 5 轮；这两样与只供测试的复用窗口置 0 开关下的单调性
+/// 都推不出上界，这个数给它们一个边。
 pub const ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT: usize = 64;
 
 /// 一次发布切成几条 journal 记录、每条点名哪几个角色（D23（journal 的角色与格式） 已定项 17，C491（多条记录时共享内生块在哪条点名没定）
@@ -15056,10 +15756,12 @@ fn publish_admitted<Device: BlockDevice>(
     // 整理的一批：源落点上面已经随释放进了 defer；目的落点在这次重写的角色之前取（固定点里走的是同一串，`settle_the_allocation_record_tree`），
     // 分配代写单元的诞生代。目的地定下之后，上一版拷一份、把搬走的单元的映射位置换到目的地（`take_the_mapping_positions_over_the_location_hints`）：
     // 照抄这些单元的角色、装映射条目、重写它们的父节点与树表时，读的都是这一份。
+    let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(rewritten, allocator);
     let mut relocated_copies: Vec<(PublishedUnit, NamedUnit, UnitRelocatedByThisPublish)> =
         Vec::with_capacity(relocations.len());
     for relocation in relocations {
-        let destination = allocate_relocation_destination(allocator, relocation)?;
+        let destination =
+            allocate_relocation_destination(allocator, relocation, &rewrite_set_leaves)?;
         let destination_locations = pool.location_entries(destination.slot, &relocation.bytes);
         let mut key_tail = [0u8; 10];
         key_tail.copy_from_slice(&relocation.mapping_key[17..27]);
@@ -15141,7 +15843,8 @@ fn publish_admitted<Device: BlockDevice>(
     // 落点先于内容：分配记录树要装自己那条（D3（空间分配） 已定项 5），所以这次重写的落点在装任何单元之前全部取定。
     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
     for identity in rewritten {
-        let placement = allocate_placement_for_role(allocator, *identity, txg)?;
+        let placement =
+            allocate_placement_for_role(allocator, *identity, txg, &rewrite_set_leaves)?;
         slots.insert(*identity, placement.slot);
     }
     // 这次的根要盖掉根环里的一个槽：落点都取完了、这次不再分配，在装记账行之前记下它——盖掉的是被抛弃的根就清它的隔离位，
@@ -17225,7 +17928,7 @@ mod tests {
     /// 层级 1 有 20000 个节点的三层形状（根之下 20200 个节点），指针表按 bump 次序、每项的出生序号就是它的下标；表头那一项故意记成要问的
     /// 那个位置、带另一个指针——逐项找的写法先碰到它、交回那个错的，按下标取的写法只看「这一层之前各层的节点数之和 + 同层序号」那一格。
     #[test]
-    fn a_node_pointer_below_the_root_is_taken_at_its_position_in_bump_order() {
+    fn node_pointer_below_the_root_is_taken_at_its_position_in_bump_order() {
         const LEVEL_ONE_NODES: usize = 20_000;
         const LEVEL_TWO_NODES: usize = 200;
         let shape = ContainerTreeShape::from_children_of_each_node_at_each_level(vec![
@@ -17284,7 +17987,7 @@ mod tests {
     /// D5（快照 / 空间记账机制） 已定项 14 的左边界：birth == S.txg 时快照引用它（进 deadlist），birth == S.txg + 1 时不引用（释放）；
     /// 映射 key 不是 27 字节（birth 取不到）默认进 deadlist（「判据的输入取不到时默认进 deadlist」）。没打过快照（p = 0）时一律释放。
     #[test]
-    fn a_unit_born_at_the_snapshot_txg_is_kept_and_one_born_after_it_is_released() {
+    fn unit_born_at_the_snapshot_txg_is_kept_and_one_born_after_it_is_released() {
         let key_born_at = |birth: u64| {
             crate::records::mapping_key_for_node(
                 UNIT_CLASS_INDEX_NODE,
@@ -17798,8 +18501,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "要小于它才是压回一个已发过的号")]
-    fn a_pressed_back_inode_number_watermark_not_below_the_previous_watermark_is_a_misused_switch()
-    {
+    fn pressed_back_inode_number_watermark_not_below_the_previous_watermark_is_a_misused_switch() {
         let not_pressed_back = InodeNumberWatermarkSource::PressedBackForTests(
             InodeNumberWatermarkPressedBackForTests::new(5).expect("5 不小于第一个 inode 号"),
         );
@@ -17807,7 +18509,7 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_without_a_previous_version_starts_the_inode_number_watermark_at_two_on_the_product_path(
+    fn publish_without_a_previous_version_starts_the_inode_number_watermark_at_two_on_the_product_path(
     ) {
         assert_eq!(
             InodeNumberWatermarkSource::FromThePreviousVersionsAccounting
@@ -17819,7 +18521,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "开关只给有上一版的发布，装着它走到这里是开关给错了")]
-    fn a_pressed_back_inode_number_watermark_on_a_publish_without_a_previous_version_is_a_misused_switch(
+    fn pressed_back_inode_number_watermark_on_a_publish_without_a_previous_version_is_a_misused_switch(
     ) {
         let pressed_back = InodeNumberWatermarkSource::PressedBackForTests(
             InodeNumberWatermarkPressedBackForTests::new(FIRST_INODE_NUMBER)

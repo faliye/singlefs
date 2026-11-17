@@ -50,8 +50,8 @@ const BUILD_SCRIPT_OUTPUT_DIRECTORY_VARIABLE: &str = "OUT_DIR";
 /// 清单目录拼出的目录绑到名字、名字的用法再绑到名字，最多跟这么多层（再深的拒算）。
 const DEEPEST_DIRECTORY_BINDING_CHAIN: usize = 4;
 
-/// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试就拒算 `current-exe`；一个都没有的只是在问路径，
-/// 不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
+/// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试、路径又不是一个字不改地交给 `Command::new`（那一形看入口，
+/// [`SourceRead::OwnProgramRestart`]）就拒算 `current-exe`；一个都没有的只是在问路径，不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
 const SPAWNING_WORDS: [&str; 7] = [
     "Command",
     "spawn",
@@ -61,6 +61,11 @@ const SPAWNING_WORDS: [&str; 7] = [
     "execve",
     "execvp",
 ];
+
+/// 不带 `#[link]` 的 `extern "C"` 块里只声明这几个符号时不拒算（`extern_block_declares_only_listed_system_library_calls`）：C 库的系统调用封装，
+/// 标准库的文件读写走的是同一层，换 C 库影响它们的程度与 `std::fs` 相同。名单只收仓里真在用的。
+/// 与 `scripts/gate/lib_function_units.py` 同一份。
+const SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS: [&str; 2] = ["pwrite", "fdatasync"];
 
 const RUST_KEYWORDS: [&str; 39] = [
     "as",
@@ -1638,6 +1643,241 @@ impl<'scan> RustScanner<'scan> {
         }
     }
 
+    /// `last_token` 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 `panic!(…)`、`…process::exit(…)`，或以它们收尾的块。
+    fn expression_ending_at_diverges(&self, last_token: usize, first_allowed: usize) -> bool {
+        match self.text_of(last_token) {
+            "}" => {
+                let before_the_brace = last_token.saturating_sub(1);
+                let last_inside = if self.text_of(before_the_brace) == ";" {
+                    before_the_brace.saturating_sub(1)
+                } else {
+                    before_the_brace
+                };
+                self.expression_ending_at_diverges(last_inside, first_allowed)
+            }
+            ")" => {
+                let Some(open) = (first_allowed..last_token).rev().find(|position| {
+                    self.text_of(*position) == "(" && self.closes[*position] == Some(last_token)
+                }) else {
+                    return false;
+                };
+                let is_panic =
+                    open >= 2 && self.text_of(open - 1) == "!" && self.text_of(open - 2) == "panic";
+                let is_process_exit = open >= 4
+                    && self.text_of(open - 1) == "exit"
+                    && self.text_of(open - 2) == ":"
+                    && self.text_of(open - 3) == ":"
+                    && self.text_of(open - 4) == "process";
+                is_panic || is_process_exit
+            }
+            _ => false,
+        }
+    }
+
+    /// `current_exe()` 调用（闭括号之后是 `after_call`）连同把路径取出来的写法整个是什么表达式：交 `[起, 止)`。认的写法：
+    /// 后接 `?`、`.unwrap()`、`.expect("字面串")`、闭包一定不交值的 `.unwrap_or_else(…)`；或
+    /// `match current_exe() { Ok(名字) => 名字, Err(…) => <return … 或一定不交值的表达式> }`。别的写法（失败时换一个路径、取到路径又接方法）交 `None`。
+    fn own_path_expression_range(
+        &self,
+        call_start: usize,
+        after_call: usize,
+        unit_end: usize,
+    ) -> Option<(usize, usize)> {
+        if self.text_of(after_call) == "?" {
+            return Some((call_start, after_call + 1));
+        }
+        if self.text_of(after_call) == "." && self.text_of(after_call + 2) == "(" {
+            let open = after_call + 2;
+            let close = self.close_of(open);
+            let is_taken = match self.text_of(after_call + 1) {
+                "unwrap" => close == open + 1,
+                "expect" => {
+                    close == open + 2 && plain_string_content(self.text_of(open + 1)).is_some()
+                }
+                "unwrap_or_else" => {
+                    self.text_of(open + 1) == "|"
+                        && close > open + 1
+                        && self.expression_ending_at_diverges(close - 1, open + 1)
+                }
+                _ => false,
+            };
+            return is_taken.then_some((call_start, close + 1));
+        }
+        if self.text_of(after_call) != "{" || self.text_before(call_start) != "match" {
+            return None;
+        }
+        let close = self.close_of(after_call);
+        if close > unit_end
+            || self.text_of(after_call + 1) != "Ok"
+            || self.text_of(after_call + 2) != "("
+            || !self.is_identifier(after_call + 3)
+            || self.text_of(after_call + 4) != ")"
+            || self.text_of(after_call + 5) != "="
+            || self.text_of(after_call + 6) != ">"
+            || self.text_of(after_call + 7) != self.text_of(after_call + 3)
+            || self.text_of(after_call + 8) != ","
+            || self.text_of(after_call + 9) != "Err"
+            || self.text_of(after_call + 10) != "("
+        {
+            return None;
+        }
+        let error_pattern_close = self.close_of(after_call + 10);
+        if self.text_of(error_pattern_close + 1) != "="
+            || self.text_of(error_pattern_close + 2) != ">"
+        {
+            return None;
+        }
+        let arm_start = error_pattern_close + 3;
+        let arm_end = if self.text_of(close - 1) == "," {
+            close - 1
+        } else {
+            close
+        };
+        if arm_start >= arm_end {
+            return None;
+        }
+        let arm_texts: Vec<&str> = (arm_start..arm_end)
+            .map(|index| self.text_of(index))
+            .collect();
+        let is_one_arm = split_at_top_level_commas(&arm_texts).len() == 1;
+        let arm_does_not_hand_a_value = self.text_of(arm_start) == "return"
+            || self.expression_ending_at_diverges(arm_end - 1, arm_start);
+        (is_one_arm && arm_does_not_hand_a_value).then_some((call_start - 1, close + 1))
+    }
+
+    /// `open_paren` 是 `Command::new(` 的开括号。
+    fn is_command_new_open(&self, open_paren: usize) -> bool {
+        open_paren >= 4
+            && self.text_of(open_paren) == "("
+            && self.text_of(open_paren - 1) == "new"
+            && self.text_of(open_paren - 2) == ":"
+            && self.text_of(open_paren - 3) == ":"
+            && self.text_of(open_paren - 4) == "Command"
+    }
+
+    /// `current_exe()` 的路径是不是一个字不改地交给了 `Command::new`：起的就是这个程序文件本身。两种写法：就地写在 `Command::new(…)` 的括号里；
+    /// 或绑给 `let` 名字（同一个单元里这个名字不再 `let`），名字的每一处用法只是 `Command::new(名字)`、`Command::new(&名字)` 与 `名字.display()`，至少起一次。
+    /// 拿路径拼别的路径（`.parent()`、`.with_file_name(…)`、`.join(…)`）、交给别的函数、当参数交给别的程序（`Command::new("sh").arg(名字)`）的不算：
+    /// 那样起的可能是别的程序。
+    fn own_program_path_is_handed_to_command_unchanged(
+        &self,
+        current_exe_index: usize,
+        unit_end: usize,
+    ) -> bool {
+        let call_start = self.path_expression_start(current_exe_index);
+        if self.text_of(current_exe_index + 2) != ")" {
+            return false;
+        }
+        let Some((expression_start, expression_end)) =
+            self.own_path_expression_range(call_start, current_exe_index + 3, unit_end)
+        else {
+            return false;
+        };
+        if expression_start > 0
+            && self.is_command_new_open(expression_start - 1)
+            && self.close_of(expression_start - 1) == expression_end
+        {
+            return true;
+        }
+        let Some(name) = self.let_binding_name(expression_start, expression_end) else {
+            return false;
+        };
+        let is_bound_again = (expression_end..unit_end).any(|index| {
+            self.text_of(index) == "let"
+                && (self.name_at(index + 1) == name
+                    || (self.text_of(index + 1) == "mut" && self.name_at(index + 2) == name))
+        });
+        if is_bound_again {
+            return false;
+        }
+        let uses = self.uses_of_the_binding(&name, expression_end, unit_end);
+        let is_handed_to_command = |use_index: usize| {
+            let open = if self.text_before(use_index) == "&" {
+                use_index - 2
+            } else {
+                use_index - 1
+            };
+            self.is_command_new_open(open) && self.close_of(open) == use_index + 1
+        };
+        let is_only_displayed = |use_index: usize| {
+            self.text_of(use_index + 1) == "."
+                && self.text_of(use_index + 2) == "display"
+                && self.text_of(use_index + 3) == "("
+                && self.text_of(use_index + 4) == ")"
+        };
+        uses.iter()
+            .any(|use_index| is_handed_to_command(*use_index))
+            && uses
+                .iter()
+                .all(|use_index| is_handed_to_command(*use_index) || is_only_displayed(*use_index))
+    }
+
+    /// `extern` 块（`keyword_index` 是 `extern`，块在 `open..close`）不用拒算：ABI 是 `"C"`，条目前面没有 `#[link…]`，块里只有 `fn` 声明，
+    /// 每条的前面最多一个 `#[link_name = "…"]`、符号（`link_name` 或函数名）都在 [`SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS`] 里，至少声明一条。
+    /// 有 `static`、别的属性、`safe fn` 这类写法的一律不算。
+    fn extern_block_declares_only_listed_system_library_calls(
+        &self,
+        item_start: usize,
+        keyword_index: usize,
+        open: usize,
+        close: usize,
+    ) -> bool {
+        if plain_string_content(self.text_of(keyword_index + 1)) != Some("C")
+            || keyword_index + 2 != open
+        {
+            return false;
+        }
+        let has_link_attribute = (item_start..keyword_index).any(|index| {
+            self.text_of(index) == "#"
+                && self.text_of(index + 1) == "["
+                && self.text_of(index + 2) == "link"
+        });
+        if has_link_attribute {
+            return false;
+        }
+        let mut position = open + 1;
+        let mut declared_any = false;
+        while position < close {
+            let mut link_name = None;
+            if self.text_of(position) == "#" {
+                let is_link_name = self.text_of(position + 1) == "["
+                    && self.text_of(position + 2) == "link_name"
+                    && self.text_of(position + 3) == "="
+                    && self.text_of(position + 5) == "]";
+                if !is_link_name {
+                    return false;
+                }
+                link_name = plain_string_content(self.text_of(position + 4));
+                if link_name.is_none() {
+                    return false;
+                }
+                position += 6;
+            }
+            if self.text_of(position) == "pub" {
+                position += 1;
+            }
+            if self.text_of(position) != "fn"
+                || !self.is_identifier(position + 1)
+                || self.text_of(position + 2) != "("
+            {
+                return false;
+            }
+            let declared_name = self.name_at(position + 1);
+            let symbol = link_name.unwrap_or(&declared_name);
+            if !SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS.contains(&symbol) {
+                return false;
+            }
+            declared_any = true;
+            let Some(semicolon) =
+                (self.close_of(position + 2)..close).find(|index| self.text_of(*index) == ";")
+            else {
+                return false;
+            };
+            position = semicolon + 1;
+        }
+        declared_any
+    }
+
     /// 单元的词法单元 `[first, end)` 里有没有起子进程的词（[`SPAWNING_WORDS`]，标识符逐字比）。
     fn starts_a_process(&self, first: usize, end: usize) -> bool {
         (first..end)
@@ -1748,6 +1988,15 @@ impl<'scan> RustScanner<'scan> {
                             test_name,
                             fragment,
                         }),
+                        // 路径一个字不改地交给 `Command::new`：起的是这个程序自己，拒不拒算看入口（闭包的 `finish`）
+                        None if self
+                            .own_program_path_is_handed_to_command_unchanged(index, end) =>
+                        {
+                            reads.push(SourceRead::OwnProgramRestart {
+                                line: self.line_of(index),
+                                fragment,
+                            })
+                        }
                         // 同一个单元里起了子进程、又折不出点名的那一条测试：子进程跑什么说不清，拒算
                         None if self.starts_a_process(first, end) => refusals.push(self.refusal(
                             RefusalForm::CurrentExecutablePath,
@@ -2249,9 +2498,16 @@ impl<'scan> RustScanner<'scan> {
                         true,
                     );
                     new_unit.declared_names = Some(self.extern_block_declared_names(open, close));
-                    new_unit
-                        .extra_refusals
-                        .push(RefusalForm::ExternalFunctionInterface);
+                    if !self.extern_block_declares_only_listed_system_library_calls(
+                        item_start,
+                        keyword_index,
+                        open,
+                        close,
+                    ) {
+                        new_unit
+                            .extra_refusals
+                            .push(RefusalForm::ExternalFunctionInterface);
+                    }
                     self.push_unit(new_unit, scan_context);
                     return close + 1;
                 }
@@ -2852,7 +3108,7 @@ mod tests {
 
     /// `use a::b as c;`：进当前模块可用名字集的只有别名 `c`，原名 `b` 不进（早先 `b` 也被记进去，别处同名的条目会被误认成命中了这条 use）。
     #[test]
-    fn a_use_with_an_alias_brings_only_the_alias_into_the_module_names() {
+    fn use_with_an_alias_brings_only_the_alias_into_the_module_names() {
         let parsed = parse("use a::b as c;\n");
         let imports = parsed.units[0]
             .imports
@@ -2911,7 +3167,7 @@ mod tests {
     }
 
     #[test]
-    fn a_path_qualified_item_macro_invocation_is_one_unit_that_declares_its_names() {
+    fn path_qualified_item_macro_invocation_is_one_unit_that_declares_its_names() {
         let parsed = parse("singlefs_verification::enum_listing_every_member! {\n    #[derive(Debug)]\n    pub enum Color { Red, Green }\n}\n");
         assert!(
             parsed.file_level_refusals.is_empty(),
@@ -2968,7 +3224,7 @@ mod tests {
     }
 
     #[test]
-    fn a_verus_ensures_clause_with_braces_stays_inside_its_function_unit() {
+    fn verus_ensures_clause_with_braces_stays_inside_its_function_unit() {
         let parsed = parse(
             "verus! {\npub fn chosen(value: u64) -> (result: u64)\n    ensures if value > 0 { result == value } else { result == 0 },\n{\n    value\n}\n\
              pub open spec fn never_called() -> bool { true }\n}\n",
@@ -3042,7 +3298,7 @@ mod tests {
     }
 
     #[test]
-    fn a_capture_right_after_an_escaped_brace_still_counts_as_a_bare_name() {
+    fn capture_right_after_an_escaped_brace_still_counts_as_a_bare_name() {
         let parsed = parse("fn show() -> String { format!(\"{{{WRAPPED_WIDTH}}}\") }\n");
         assert!(
             parsed.units[0]

@@ -396,7 +396,7 @@ mod tests {
 
     /// 槽号与跨槽数是盘上读来的：槽号顶满 u64 时末槽算不出来，判不落在叶里，不 panic、不回绕成落得进。
     #[test]
-    fn a_record_whose_last_slot_overflows_does_not_fit_in_any_leaf() {
+    fn record_whose_last_slot_overflows_does_not_fit_in_any_leaf() {
         let leaf = AllocationRecordTreeCell::BelowTheRoot {
             level: 0,
             device: 0,
@@ -413,7 +413,7 @@ mod tests {
 
     /// key 短于这棵树的 key 宽（坏盘上条目被截）：三个按 key 取孩子的函数交回 `None`，不切片越界。
     #[test]
-    fn a_key_shorter_than_the_tree_key_width_names_no_child() {
+    fn key_shorter_than_the_tree_key_width_names_no_child() {
         assert_eq!(
             allocation_record_tree_child_of_entry_key(
                 AllocationRecordTreeCell::Root,

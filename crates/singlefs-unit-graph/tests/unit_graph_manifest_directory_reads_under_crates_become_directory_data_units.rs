@@ -115,7 +115,8 @@ fn assert_refused_as_runtime_path(entry_path: &'static str, line: u32) {
 /// 场景：`let package_root = Path::new(env!(…)); read_dir(package_root.join("tables"))`。预期：不拒算，闭包里有一行
 /// `data-directory\tcrates/fscan/tables\t<读它的那一行>\t<摘要>`，摘要照规则逐字算（两份文件按相对路径排好、每行换行收尾）。
 #[test]
-fn a_directory_under_crates_handed_to_read_dir_becomes_a_directory_data_unit_instead_of_refused() {
+fn directory_under_crates_handed_to_read_directory_becomes_a_directory_data_unit_instead_of_refused(
+) {
     let tree = scanning_tree("directory-unit");
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);
@@ -164,7 +165,7 @@ fn changing_a_package_file_outside_the_read_directory_keeps_the_key() {
 /// 场景：私有常量 `MANIFEST_DIRECTORY = env!(…)`，`Path::new(常量)` 绑到名字上再 `.join("../fother/src")` 交给 `read_dir`。
 /// 预期：不拒算；兄弟包源码目录里的文件改了，键变。
 #[test]
-fn a_private_manifest_directory_constant_wrapped_in_a_path_reads_the_sibling_directory_it_joins() {
+fn private_manifest_directory_constant_wrapped_in_a_path_reads_the_sibling_directory_it_joins() {
     let tree = scanning_tree("directory-constant");
     let before =
         key_text(&tree, &SIBLING_ENTRY).expect("私有常量按 Path::new 的用法折得出，不拒算");
@@ -175,7 +176,7 @@ fn a_private_manifest_directory_constant_wrapped_in_a_path_reads_the_sibling_dir
 
 /// 场景：`pub const` 的清单目录常量（别的文件里的用法看不见）。预期：照旧拒算，落在常量那一行。
 #[test]
-fn a_public_manifest_directory_constant_is_still_refused() {
+fn public_manifest_directory_constant_is_still_refused() {
     assert_refused_as_runtime_path("fscan::public_constant_count", 4);
 }
 
@@ -193,12 +194,12 @@ fn the_whole_crates_directory_is_still_refused() {
 
 /// 场景：拼出仓根下 `crates/` 之外的 `litmus/`。预期：照旧拒算。
 #[test]
-fn a_directory_outside_crates_is_still_refused() {
+fn directory_outside_crates_is_still_refused() {
     assert_refused_as_runtime_path("fscan::litmus_count", 29);
 }
 
 /// 场景：包目录绑到 `package_root`，之后 `package_root.parent()`（读整棵仓的写法）。预期：照旧拒算，落在 `env!` 那一行。
 #[test]
-fn a_bound_package_root_that_goes_to_its_parent_is_still_refused() {
+fn bound_package_root_that_goes_to_its_parent_is_still_refused() {
     assert_refused_as_runtime_path("fscan::repository_root_through_parent", 33);
 }

@@ -148,7 +148,7 @@ fn raising_the_version_of_a_transitive_dependency_of_the_named_crate_changes_the
 }
 
 #[test]
-fn a_path_qualified_call_names_its_external_crate_too() {
+fn path_qualified_call_names_its_external_crate_too() {
     let (lines, _) = narrowed_lines_and_key("fconsumer::uses_beta", None).expect("不拒算");
     assert_eq!(
         lines,
@@ -158,7 +158,7 @@ fn a_path_qualified_call_names_its_external_crate_too() {
 }
 
 #[test]
-fn a_named_external_crate_missing_from_the_lock_file_is_refused() {
+fn named_external_crate_missing_from_the_lock_file_is_refused() {
     let reason = narrowed_lines_and_key("fconsumer::uses_delta", None)
         .expect_err("delta 在清单里、不在锁文件里，落不到包");
     assert!(
@@ -193,7 +193,7 @@ const RENAMED_DEPENDENCY_FIXTURE: [(&str, &str); 3] = [
 ];
 
 #[test]
-fn a_renamed_dependency_is_found_in_the_lock_file_under_its_package_name() {
+fn renamed_dependency_is_found_in_the_lock_file_under_its_package_name() {
     let tree = FixtureTree::materialize("renamed-dependency", &RENAMED_DEPENDENCY_FIXTURE);
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);

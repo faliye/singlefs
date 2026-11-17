@@ -98,10 +98,11 @@ const GROUP_SIZE: u8 = 4;
 /// [200 ms, 5 s] 下端在「秒」里写不出），默认 5 s 写 5000。
 const TIME_THRESHOLD_MILLISECONDS: u32 = 5000;
 const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
-/// 整理低水位 / 高水位 / 停止线三条（D26（后台整理与放置回收） 已定项 1）。
-const COMPACTION_WATERMARK_COUNT: usize = 3;
-/// 三条水位第一版恒 0，0 的含义是「用内置默认」（D22（单元原子性怎么合成） 已定项 15 ④）。
-const COMPACTION_WATERMARK_BUILT_IN_DEFAULT: u64 = 0;
+/// 字段表里那 3 个 8 字节的预留位（盘上恒全 0）：整理的三条水位是挂载参数、不存盘（D26（后台整理与放置回收） 已定项 1，
+/// `compaction_plan::CompactionWatermarks`）。
+const RESERVED_RUNTIME_WORD_COUNT: usize = 3;
+/// 预留位盘上的值。
+const RESERVED_RUNTIME_WORD_VALUE: u64 = 0;
 
 /// 在飞记录数上限 = 环槽数 ÷ F，语义是一次恢复重放的前缀最多这么多条（D23（journal 的角色与格式） 已定项 18）。
 /// 环槽数 = 环长 ÷ [`JOURNAL_RECORD_BYTES`]，F = [`JOURNAL_SAFETY_FACTOR`]（I-8.1（环几何够大）），两次都取整数部分。
@@ -339,11 +340,11 @@ impl SystemMutableConfiguration {
 
 /// 系统运行配置：36 字节，改它无代价、每次挂载可重设并回写（D22（单元原子性怎么合成） 已定项 26 第三档）。
 ///
-/// 字段表里归这一档的 3 行：可调值段的「T_time 4」「T_dirty 8」「整理低 / 高 / 停三水位 8 × 3」。
+/// 字段表里归这一档的 3 行：可调值段的「T_time 4」「T_dirty 8」「整理水位预留 8 × 3」。
 /// **没有字段**：挂载选项通道不存在（C422（挂载选项通道不存在）），这三行今天没有可设的入口，只有内置默认值。
 /// T_time 与 T_dirty 的发布触发已经接上：挂载时 [`PublishTriggerThresholds::of_the_mount`] 从这里取两个内置默认值求值一次
 /// （脏量那一支按环长夹），会话里 `mounted_session::publish_trigger_cause` 拿它们比时间与待发的 journal 字节；
-/// 整理三水位恒 0 = 内置默认（D22（单元原子性怎么合成） 已定项 15 ④）。所以这一档拿内置默认值写盘，不带状态。
+/// 整理的三条水位不在这一档：挂载参数、不存盘，这 24 字节是全 0 的预留位。所以这一档拿内置默认值与全 0 写盘，不带状态。
 /// 真有了挂载选项通道，值落在这里，下面三个方法退回去当默认值。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemRuntimeConfiguration;
@@ -364,10 +365,10 @@ impl SystemRuntimeConfiguration {
         DIRTY_THRESHOLD_BYTES
     }
 
-    /// 整理低水位 / 高水位 / 停止线，按字段表的次序（D26（后台整理与放置回收） 已定项 1）。
+    /// 字段表里那 3 个预留位，按字段表的次序。
     #[must_use]
-    pub fn compaction_watermarks(self) -> [u64; COMPACTION_WATERMARK_COUNT] {
-        [COMPACTION_WATERMARK_BUILT_IN_DEFAULT; COMPACTION_WATERMARK_COUNT]
+    pub fn reserved_runtime_words(self) -> [u64; RESERVED_RUNTIME_WORD_COUNT] {
+        [RESERVED_RUNTIME_WORD_VALUE; RESERVED_RUNTIME_WORD_COUNT]
     }
 }
 
@@ -678,8 +679,8 @@ impl SystemConfiguration {
         slot.write(SlotFieldMutability::RuntimeConfiguration, |writer| {
             writer.put_u32(self.runtime.time_threshold_milliseconds());
             writer.put_u64(self.runtime.dirty_threshold_bytes());
-            for watermark in self.runtime.compaction_watermarks() {
-                writer.put_u64(watermark);
+            for reserved_word in self.runtime.reserved_runtime_words() {
+                writer.put_u64(reserved_word);
             }
         });
         slot.write(SlotFieldMutability::RuntimeQuantity, |writer| {
@@ -1148,7 +1149,7 @@ mod tests {
         assert_eq!(
             SystemRuntimeConfiguration::FIELD_TABLE_BYTES,
             36,
-            "系统运行配置：T_time 4 + T_dirty 8 + 整理三水位 24"
+            "系统运行配置：T_time 4 + T_dirty 8 + 预留 24"
         );
         assert_eq!(
             SystemRuntimeQuantities::FIELD_TABLE_BYTES,

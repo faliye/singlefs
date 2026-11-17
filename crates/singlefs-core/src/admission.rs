@@ -44,7 +44,7 @@ use singlefs_format::{
 
 use crate::address::{CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InodeNumber};
 use crate::allocation_record_tree::{span_in_slots_at_level, AllocationRecordTreeGeometry};
-use crate::allocator::PoolAllocator;
+use crate::allocator::{PoolAllocator, SlotPairCount};
 use crate::code_two_tree::{
     plan_the_tree_after_this_publish, CodeTwoKeyFieldWidths, CodeTwoTreeKey,
     CodeTwoTreeNodeCapacity, CodeTwoTreeShape,
@@ -171,9 +171,9 @@ impl MetadataBlocks {
 
 /// ckpt_cost 里谱系容器那一项的固定部分（D28（挂载期承诺量） 已定项 4「谱系容器单列一项，按一次谱系容器 COW 算」）：
 /// 一个谱系容器（32 KiB 码 3，2 块）加谱系树根（1 块）；谱系树的内部层数另加
-/// （[`checkpoint_cost_of_one_lineage_container_cow`]）。
-pub const LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
-pub const LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW: u64 = 1;
+/// （[`checkpoint_cost_of_one_lineage_container_copy_on_write`]）。
+pub const LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
+pub const LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE: u64 = 1;
 
 /// ckpt_cost 里谱系容器那一项：一次谱系容器 COW 连路径 = 容器 2 + 谱系树根 1 + 谱系树内部层数（根节点码 2 头里现读的层级减一，
 /// 零根与只有根时 0）。零根时也是这么多：回退那次在零根上开第一片容器、写第一个根。
@@ -181,11 +181,12 @@ pub const LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW: u64 = 1;
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
 #[must_use]
-pub fn checkpoint_cost_of_one_lineage_container_cow(
+pub fn checkpoint_cost_of_one_lineage_container_copy_on_write(
     lineage_tree_internal_levels: u64,
 ) -> MetadataBlocks {
     MetadataBlocks(
-        (LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW + LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW)
+        (LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE
+            + LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE)
             .checked_add(lineage_tree_internal_levels)
             .expect("谱系那一项装得进 u64"),
     )
@@ -198,7 +199,7 @@ pub fn checkpoint_cost_of_one_lineage_container_cow(
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
 #[must_use]
-pub fn central_mapping_entries_of_one_lineage_container_cow(
+pub fn central_mapping_entries_of_one_lineage_container_copy_on_write(
     lineage_tree_internal_levels: u64,
 ) -> u64 {
     const MAPPED_UNITS_OF_THE_LINEAGE_CONTAINER: u64 = 1;
@@ -210,21 +211,22 @@ pub fn central_mapping_entries_of_one_lineage_container_cow(
 
 /// ckpt_cost 里退役容器那一项的固定部分（「两样都做」：
 /// 照谱系在 ckpt_cost 里单列一项）：一个退役容器（32 KiB 码 3，2 块）加退役树根（1 块）；退役树的内部层数另加
-/// （[`checkpoint_cost_of_one_retirement_container_cow`]）。
-pub const RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
-pub const RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW: u64 = 1;
+/// （[`checkpoint_cost_of_one_retirement_container_copy_on_write`]）。
+pub const RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
+pub const RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE: u64 = 1;
 
 /// ckpt_cost 里退役容器那一项：一次退役容器 COW 连路径 = 容器 2 + 退役树根 1 + 退役树内部层数（根节点码 2 头里现读的层级减一，
-/// 零根与只有根时 0），同谱系那一项（[`checkpoint_cost_of_one_lineage_container_cow`]）的算法。
+/// 零根与只有根时 0），同谱系那一项（[`checkpoint_cost_of_one_lineage_container_copy_on_write`]）的算法。
 ///
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
 #[must_use]
-pub fn checkpoint_cost_of_one_retirement_container_cow(
+pub fn checkpoint_cost_of_one_retirement_container_copy_on_write(
     retirement_tree_internal_levels: u64,
 ) -> MetadataBlocks {
     MetadataBlocks(
-        (RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW + RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW)
+        (RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE
+            + RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE)
             .checked_add(retirement_tree_internal_levels)
             .expect("退役那一项装得进 u64"),
     )
@@ -235,7 +237,7 @@ pub fn checkpoint_cost_of_one_retirement_container_cow(
 /// # Panics
 /// 加出来装不进 u64：内部层数至多十来层。
 #[must_use]
-pub fn central_mapping_entries_of_one_retirement_container_cow(
+pub fn central_mapping_entries_of_one_retirement_container_copy_on_write(
     retirement_tree_internal_levels: u64,
 ) -> u64 {
     const MAPPED_UNITS_OF_THE_RETIREMENT_CONTAINER: u64 = 1;
@@ -975,8 +977,8 @@ pub struct PlacementRoomOnOneDevice {
     pub device: DeviceIdentity,
     /// 数据单元落得下的槽对：两槽都没挡（已分配、影子账隔离、抬 F 扣住三种位都没置）、起点偶数、不在这次挂载开过的任何一个聚簇段里
     /// （已定项 8 第 1、2 条，已定项 10 ②③；`DeviceFreeMap::unblocked_slot_pairs_outside_the_cluster_segments`）。
-    pub slot_pairs_for_data_units: u64,
-    /// 提交内生块落得下的槽：三种位都没置，聚簇段内外都算——开放段 bump、开全空段、回落到最低空槽挡的都只是这三种位
+    pub slot_pairs_for_data_units: SlotPairCount,
+    /// 提交内生块落得下的槽：三种位都没置，聚簇段内外都算——开放段 bump、开全空段、回落（先取这次发布重写集的叶、再取每块盘都空的槽最多的叶）挡的都只是这三种位
     /// （已定项 8 第 2 条、已定项 10 ①⑤；`DeviceFreeMap::unblocked_slots`）。
     pub slots_for_commit_generated_units: u64,
 }
@@ -1072,9 +1074,10 @@ pub fn admit_the_units_landing_on_every_device(
     let devices_where_the_units_cannot_land: Vec<DeviceShortOfDemand> = room
         .iter()
         .filter_map(|room_on_the_device| {
-            if room_on_the_device.slot_pairs_for_data_units < units.data_units {
+            if room_on_the_device.slot_pairs_for_data_units < SlotPairCount(units.data_units) {
                 let slots_of_the_pairs = room_on_the_device
                     .slot_pairs_for_data_units
+                    .0
                     .checked_mul(slots_of_a_data_unit)
                     .expect("槽对的槽数装得进 u64");
                 return Some(DeviceShortOfDemand {
@@ -1168,9 +1171,9 @@ impl SpaceAdmission {
 /// - 记账树：这次发布写完之后那棵记账树的节点数（[`accounting_tree_nodes_after_the_publish_built_on`]：行数至多是这一版的行数加
 ///   这次新留的 1 级 inode 号水位台阶，按写路径同一个规划器、按 `node_capacities` 的记账树容量现算）；
 /// - 树表 1（每次发布重写一个单元，D16（发布语义） 已定项 9）；实例表链不进（它的开销归已定项 3 的切换预留）；
-/// - 谱系容器单列一项，按一次谱系容器 COW 连路径算（[`checkpoint_cost_of_one_lineage_container_cow`]，只算带文件的一版：
+/// - 谱系容器单列一项，按一次谱系容器 COW 连路径算（[`checkpoint_cost_of_one_lineage_container_copy_on_write`]，只算带文件的一版：
 ///   树表 0 条的一版没有谱系树，也走不到管理员回退）；
-/// - 退役容器照谱系单列一项（[`checkpoint_cost_of_one_retirement_container_cow`]
+/// - 退役容器照谱系单列一项（[`checkpoint_cost_of_one_retirement_container_copy_on_write`]
 ///   第六节 R2「两样都做」，只算带文件的一版），它在中央映射树里的删插同样算上。
 ///
 /// 「当前」= 这次发布要接在后面的那一版：
@@ -1183,8 +1186,8 @@ impl SpaceAdmission {
 /// 中央映射树的节点容量按节点格式算（产品路径）；只供测试的压小容量下量同一个数用
 /// [`checkpoint_cost_of_the_version_to_build_on_with_node_capacities`]。
 ///
-/// 分配记录树那一项不读这一版有哪些节点：按「每块盘两条叶路径」算，在开放段装不下开新段、没有全空段回落到最低空槽、
-/// 换下很久之前落在别处的节点这三种情形下少扣（量到一块盘改 3–4 片叶），
+/// 分配记录树那一项不读这一版有哪些节点：按「每块盘两条叶路径」算，在开放段装不下开新段、没有全空段回落（先取这次发布重写集的叶，
+/// 那些叶里没有每块盘都空的落点再取每块盘都空的槽最多的叶，落点可以在单元区的任何一片叶里）、换下很久之前落在别处的节点这三种情形下少扣，
 /// 一次发布改几片叶的不动点收不了口，拿得准的上界只有几何上整棵树。代价随单元区线性涨（两块 4 GiB 盘 529 个节点）。
 ///
 /// 同一个数也是挂载期承诺量里暖机那一半的 c_max（已定项 4 末条「按同一个现算的 c_max 取」）。
@@ -1240,14 +1243,18 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                 allocation_record_tree_nodes
                     .checked_add(accounting_nodes)
                     .and_then(|nodes| {
-                        nodes.checked_add(central_mapping_entries_of_one_lineage_container_cow(
-                            lineage_tree_internal_levels,
-                        ))
+                        nodes.checked_add(
+                            central_mapping_entries_of_one_lineage_container_copy_on_write(
+                                lineage_tree_internal_levels,
+                            ),
+                        )
                     })
                     .and_then(|nodes| {
-                        nodes.checked_add(central_mapping_entries_of_one_retirement_container_cow(
-                            retirement_tree_internal_levels,
-                        ))
+                        nodes.checked_add(
+                            central_mapping_entries_of_one_retirement_container_copy_on_write(
+                                retirement_tree_internal_levels,
+                            ),
+                        )
                     })
                     .expect("两棵树重写的节点数与谱系、退役那几把装得进 u64")
             };
@@ -1275,16 +1282,22 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                     },
                     node_capacities.of_tree(MultiLevelCodeTwoTree::CentralMapping),
                 );
-            let lineage_container_cow =
-                checkpoint_cost_of_one_lineage_container_cow(lineage_tree_internal_levels).0;
-            let retirement_container_cow =
-                checkpoint_cost_of_one_retirement_container_cow(retirement_tree_internal_levels).0;
+            let lineage_container_copy_on_write =
+                checkpoint_cost_of_one_lineage_container_copy_on_write(
+                    lineage_tree_internal_levels,
+                )
+                .0;
+            let retirement_container_copy_on_write =
+                checkpoint_cost_of_one_retirement_container_copy_on_write(
+                    retirement_tree_internal_levels,
+                )
+                .0;
             [
                 allocation_record_tree_nodes,
                 central_mapping_tree_nodes,
                 accounting_tree_nodes,
-                lineage_container_cow,
-                retirement_container_cow,
+                lineage_container_copy_on_write,
+                retirement_container_copy_on_write,
             ]
             .into_iter()
             .try_fold(0u64, u64::checked_add)
@@ -1602,7 +1615,7 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
             SpaceBudgetOfARole::OrdinaryAllocation
         }
         // 谱系容器与谱系树根归固定点、进 ckpt_cost 的 Σ 名单（D28（挂载期承诺量） 已定项 1 接线），只在管理员回退那次重写：
-        // 回退不判式子，空间从 checkpoint 保留池里出（[`checkpoint_cost_of_one_lineage_container_cow`]）。
+        // 回退不判式子，空间从 checkpoint 保留池里出（[`checkpoint_cost_of_one_lineage_container_copy_on_write`]）。
         TransactionUnit::LineageLeafContainer(_)
         | TransactionUnit::LineageRoot
         | TransactionUnit::LineageNodeBelowTheRoot(_)
@@ -2201,7 +2214,7 @@ mod tests {
     #[test]
     fn the_lineage_term_of_the_checkpoint_cost_is_a_container_a_root_and_every_internal_level() {
         assert_eq!(
-            [0, 1, 2].map(checkpoint_cost_of_one_lineage_container_cow),
+            [0, 1, 2].map(checkpoint_cost_of_one_lineage_container_copy_on_write),
             [MetadataBlocks(3), MetadataBlocks(4), MetadataBlocks(5)]
         );
     }
@@ -2211,11 +2224,11 @@ mod tests {
     #[test]
     fn the_retirement_term_of_the_checkpoint_cost_is_a_container_a_root_and_every_internal_level() {
         assert_eq!(
-            [0, 1, 2].map(checkpoint_cost_of_one_retirement_container_cow),
+            [0, 1, 2].map(checkpoint_cost_of_one_retirement_container_copy_on_write),
             [MetadataBlocks(3), MetadataBlocks(4), MetadataBlocks(5)]
         );
         assert_eq!(
-            [0, 1, 2].map(central_mapping_entries_of_one_retirement_container_cow),
+            [0, 1, 2].map(central_mapping_entries_of_one_retirement_container_copy_on_write),
             [2, 3, 4]
         );
     }
@@ -2482,7 +2495,7 @@ mod tests {
 
     fn room(
         device: u32,
-        slot_pairs_for_data_units: u64,
+        slot_pairs_for_data_units: SlotPairCount,
         slots_for_commit_generated_units: u64,
     ) -> PlacementRoomOnOneDevice {
         PlacementRoomOnOneDevice {
@@ -2507,7 +2520,7 @@ mod tests {
         };
         assert_eq!(
             admit_the_units_landing_on_every_device(
-                &[room(0, 3, 20), room(1, 3, 20)],
+                &[room(0, SlotPairCount(3), 20), room(1, SlotPairCount(3), 20)],
                 three_data_units_and_fourteen_slots
             ),
             Ok(()),
@@ -2515,7 +2528,7 @@ mod tests {
         );
         assert_eq!(
             admit_the_units_landing_on_every_device(
-                &[room(0, 3, 20), room(1, 2, 20)],
+                &[room(0, SlotPairCount(3), 20), room(1, SlotPairCount(2), 20)],
                 three_data_units_and_fourteen_slots
             ),
             Err(AdmissionRefusedOnSomeDevices {
@@ -2530,7 +2543,7 @@ mod tests {
         );
         assert_eq!(
             admit_the_units_landing_on_every_device(
-                &[room(0, 3, 19), room(1, 3, 19)],
+                &[room(0, SlotPairCount(3), 19), room(1, SlotPairCount(3), 19)],
                 UnitsOfAPublishToLand {
                     data_units: 3,
                     commit_generated_slots: 15,

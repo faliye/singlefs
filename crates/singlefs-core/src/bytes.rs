@@ -3,7 +3,7 @@
 //! 读写两侧连同小端编码的规格都在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇，被验区域登记在
 //! `.claude/gate.d/verus-pins.tsv`，必红世界在 `crates/singlefs-core/verus-must-red-worlds.tsv`）。写的一侧的契约是「写到的那一截
 //! 接上这一段」：[`ByteWriter`] 只往游标处写、游标只往前走，`new` 写的是 0，所以游标之后恒是 0，写完交出的整份就是写到的那一截
-//! 接上还没写到的零（[`ByteWriter::spec_finished_bytes`]）。读的一侧的契约是「读出来的值是那几个字节的小端值」。两侧用同一对规格
+//! 接上还没写到的零（[`ByteWriter::specification_finished_bytes`]）。读的一侧的契约是「读出来的值是那几个字节的小端值」。两侧用同一对规格
 //! [`little_endian_bytes`] 与 [`little_endian_value`]，两条引理（[`lemma_little_endian_value_of_bytes`]、
 //! [`lemma_little_endian_bytes_of_value`]）证它们互逆：各记录的往返契约都落在这两条上。
 //!
@@ -312,7 +312,7 @@ impl ByteWriter {
     }
 
     /// [`Self::into_bytes`] 交出的整份：写到的那一截接上还没写到的零。
-    pub open spec fn spec_finished_bytes(&self) -> Seq<u8> {
+    pub open spec fn specification_finished_bytes(&self) -> Seq<u8> {
         self.written() + zero_bytes((self.total_bytes() - self.written().len()) as nat)
     }
 
@@ -564,12 +564,12 @@ impl ByteWriter {
         requires
             self.is_well_formed(),
         ensures
-            bytes@ == self.spec_finished_bytes(),
+            bytes@ == self.specification_finished_bytes(),
             bytes@.len() == self.total_bytes(),
     {
         proof {
             self.lemma_written_is_within_the_buffer();
-            assert(self.bytes@ =~= self.spec_finished_bytes());
+            assert(self.bytes@ =~= self.specification_finished_bytes());
         }
         self.bytes
     }
@@ -588,31 +588,31 @@ impl<'bytes> ByteReader<'bytes> {
     }
 
     /// 游标：下一次读从这里起。
-    pub closed spec fn spec_position(&self) -> nat {
+    pub closed spec fn specification_position(&self) -> nat {
         self.cursor as nat
     }
 
     /// 从游标起还读得出 `byte_count` 个字节：各个读的方法的前提。
     pub open spec fn has_left(&self, byte_count: nat) -> bool {
-        self.spec_position() + byte_count <= self.source().len()
+        self.specification_position() + byte_count <= self.source().len()
     }
 
     /// 从游标起 `byte_count` 个字节（读的方法交出或读成值的那一截）。
     pub open spec fn next_bytes(&self, byte_count: nat) -> Seq<u8> {
-        self.source().subrange(self.spec_position() as int, (self.spec_position() + byte_count) as int)
+        self.source().subrange(self.specification_position() as int, (self.specification_position() + byte_count) as int)
     }
 
     /// 读了 `byte_count` 个字节之后：同一段字节、游标前移 `byte_count`。
     pub open spec fn advanced_by(&self, earlier: &Self, byte_count: nat) -> bool {
         &&& self.source() == earlier.source()
-        &&& self.spec_position() == earlier.spec_position() + byte_count
+        &&& self.specification_position() == earlier.specification_position() + byte_count
     }
 
     #[must_use]
     pub fn at(bytes: &'bytes [u8], offset: usize) -> (reader: Self)
         ensures
             reader.source() == bytes@,
-            reader.spec_position() == offset,
+            reader.specification_position() == offset,
     {
         Self { bytes, cursor: offset }
     }
@@ -768,7 +768,7 @@ impl<'bytes> ByteReader<'bytes> {
     /// 不 panic；游标可以停在切片末尾之后，之后的读在它们自己的 `requires` 上被拦下。
     pub fn skip(&mut self, byte_count: usize)
         requires
-            old(self).spec_position() + byte_count <= usize::MAX,
+            old(self).specification_position() + byte_count <= usize::MAX,
         ensures
             final(self).advanced_by(old(self), byte_count as nat),
     {
@@ -778,7 +778,7 @@ impl<'bytes> ByteReader<'bytes> {
     #[must_use]
     pub fn position(&self) -> (position: usize)
         ensures
-            position == self.spec_position(),
+            position == self.specification_position(),
     {
         self.cursor
     }

@@ -13,17 +13,24 @@ use singlefs_format::{
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::block_device::{BlockDevice, BlockDeviceError};
 use crate::journal::JournalRecordPlaceInPublish;
-use crate::make_filesystem::MakeFilesystemParameters;
+use crate::make_filesystem::{
+    MakeFilesystemParameters, GENESIS_CHECKPOINT_TXG, MKFS_INSTANCE_GENERATION,
+};
 use crate::recovery::{
     choose_system_configuration_of_the_pool, every_root_ring_slot, highest_root_instance,
-    read_root_ring_slot, scan_journal, unit_area_start_of_the_chosen_system_configuration,
-    verified_system_configuration_slots, PoolReader, RecoveryFailure, RootRingSlotReading,
+    highest_root_txg, read_root_ring_slot, scan_journal,
+    unit_area_start_of_the_chosen_system_configuration, verified_system_configuration_slots,
+    PoolReader, RecoveryFailure, RootRingSlotReading,
 };
 use crate::system_configuration::SystemConfiguration;
 use crate::transaction::{CommitStep, PoolWriter};
 use crate::unit::{
     parse_data_unit, parse_index_node, parse_packed_unit, unit_filesystem_identifier,
 };
+
+/// 第 0 代那一版的 journal tail：mkfs 不写 journal 记录，写进系统配置的 tail 就是这个值（`make_filesystem` 写系统配置槽那一处）。
+/// 断言第 0 代时离线出路写它：第 0 代没有末条记录，这个值不靠记录得来，写出来与 mkfs 同值。
+const JOURNAL_TAIL_OF_THE_GENESIS_VERSION: u64 = 0;
 
 /// 一块盘单元区里解得开头、fsid 是本池的单元，写序实例代号与 `birth_txg` 各自的最大值（[`write_order_and_birth_in_the_unit_area_of_the_device`]）。
 /// 一个都没有时两项都是 `None`。
@@ -141,8 +148,9 @@ pub enum SystemConfigurationRepairRefused {
     /// 断言那一版的根在根环里读不出、它那次发布带末条标志的记录在 journal 环里也读不出（或读出的不是它）：查不到就一个字节不写
     /// （「查断言那一版的根或记录读得出、且是它」）。
     AssertedVersionReadableNeitherInTheRootRingNorInTheJournalRing { asserted: AssertedVersion },
-    /// 断言那一版的根读得出、带末条标志的记录读不出：写进系统配置的 tail 该取什么，条款没写（α' 取那一版末条记录的计数器，
-    /// 末条读不出时没有这个数），第一版不支持，一个字节不写。
+    /// 根读得出、带末条标志的记录读不出：写进系统配置的 tail 该取什么，条款没写（α' 取那一版末条记录的计数器，末条读不出时没有这个数），
+    /// 第一版不支持，一个字节不写。两形走这一支：断言那一版不是第 0 代；断言第 0 代而根环或 journal 环里读得到比第 0 代新的东西
+    /// （写行与暖机的根、它们的记录，而它们写下的单元都读不出、birth_txg 闸数不到）。第 0 代之后什么都读不到的不走这一支：mkfs 不写记录，tail 取 mkfs 写的值。
     TailOfTheAssertedVersionUndecidedWithoutItsLastRecordUnsupportedInTheFirstVersion {
         asserted: AssertedVersion,
     },
@@ -213,8 +221,10 @@ fn slots_of_one_device_for_the_rewrite<Reader: PoolReader + ?Sized>(
 ///
 /// 1. 按调用方的本池 fsid 择系统配置（拿几何）。
 /// 2. 断言那一版的根在根环里读得出且是它，或它那次发布带末条标志的记录在 journal 环里读得出且是它；两样都没有一个字节不写。
-///    tail 取那条末条记录的计数器：根读得出而末条读不出时条款没写取什么，一个字节不写。
+///    tail 取那条末条记录的计数器；断言第 0 代（实例代号 [`MKFS_INSTANCE_GENERATION`]、txg [`GENESIS_CHECKPOINT_TXG`]）时根读得出就取 mkfs 写的值
+///    （[`JOURNAL_TAIL_OF_THE_GENESIS_VERSION`]）；别的版本根读得出而末条读不出时条款没写取什么，一个字节不写。
 /// 3. 扫每块盘整个单元区（[`write_order_and_birth_in_the_unit_area_of_the_device`]）：`birth_txg` 最大值大于断言那一版就一个字节不写。
+///    断言第 0 代还要根环与 journal 环里都读不到比第 0 代新的东西，读得到就一个字节不写：`birth_txg` 闸数不到读不出的单元，闸拦不住那一形。
 /// 4. 写的实例代号取各盘自证槽、根环、journal 环与单元写序里的最大值（不加一）。
 /// 5. 只重写不自证的槽（读不出、自证不过、别的池的）：逐盘按世代号写（`transaction::PoolWriter` 的系统配置槽写，世代号逐盘 +1、F 带整池生效值），
 ///    写完一道池屏障。每个槽都自证时一个字节不写，交回空表。
@@ -261,11 +271,16 @@ pub fn rewrite_system_configuration_slots_for_the_asserted_version<Device: Block
                 && record.place_in_publish == JournalRecordPlaceInPublish::LastRecordOfThePublish
         })
         .max_by_key(|record| record.counter);
+    let asserted_version_is_the_genesis_version = asserted.instance == MKFS_INSTANCE_GENERATION
+        && asserted.checkpoint_txg == GENESIS_CHECKPOINT_TXG;
     let journal_tail_written = match (
         root_of_the_asserted_version_is_readable,
         last_record_of_the_asserted_version,
     ) {
         (_, Some(last_record)) => last_record.counter,
+        (true, None) if asserted_version_is_the_genesis_version => {
+            JOURNAL_TAIL_OF_THE_GENESIS_VERSION
+        }
         (true, None) => {
             return Err(
                 SystemConfigurationRepairRefused::TailOfTheAssertedVersionUndecidedWithoutItsLastRecordUnsupportedInTheFirstVersion {
@@ -306,6 +321,23 @@ pub fn rewrite_system_configuration_slots_for_the_asserted_version<Device: Block
         highest_write_order_instance_in_the_unit_areas =
             highest_write_order_instance_in_the_unit_areas
                 .max(unit_area.highest_write_order_instance);
+    }
+    // birth_txg 闸数不到读不出的单元：写行与暖机的单元都读不出时闸放行，而环里的根与记录说第 0 代之后写过东西，tail 取 mkfs 的值就不是这个盘面的真话。
+    let something_newer_than_the_genesis_is_readable_in_the_rings = !records.is_empty()
+        || highest_root_txg(
+            &*devices,
+            &immutable.region_devices,
+            &immutable.sizes,
+            &immutable.filesystem_identifier,
+        ) != Some(GENESIS_CHECKPOINT_TXG);
+    if asserted_version_is_the_genesis_version
+        && something_newer_than_the_genesis_is_readable_in_the_rings
+    {
+        return Err(
+            SystemConfigurationRepairRefused::TailOfTheAssertedVersionUndecidedWithoutItsLastRecordUnsupportedInTheFirstVersion {
+                asserted,
+            },
+        );
     }
     let spacing = u64::from(immutable.sizes.fixed_structure_slot_spacing);
     let highest_instance_in_the_self_verified_slots = devices

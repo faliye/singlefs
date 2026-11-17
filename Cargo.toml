@@ -12,14 +12,17 @@ members = [
     "crates/singlefs-reference-filesystem",
     "crates/singlefs-unit-graph",
     "crates/singlefs-background-gpu",
+    "crates/singlefs-background-gpu-tests",
     "crates/singlefs-device-library",
+    "crates/singlefs-mount-runtime",
+    "gpu-verification-server",
 ]
 exclude = ["scripts/experiment-apparatus", "prune-server"]
 
 # 与 scripts/experiment-apparatus/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
 [profile.release]
 opt-level = 3
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 # debug_assert! 在 release 下也开（.claude/singlefs-ai-sop/rules/test-script-discipline.md「编译与算法都要快」）
 debug-assertions = true

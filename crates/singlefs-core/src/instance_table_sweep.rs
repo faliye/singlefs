@@ -280,11 +280,11 @@ pub enum NoRowDeletedThisRound {
         devices_of_the_pool: u32,
     },
     /// 根环一个槽读不出、或读成功而全零：按「可能有该实例的根」算，这一次不删。
-    ARootRingSlotIsUnreadableOrAllZero { ring_slot: RootRingSlot },
+    RootRingSlotIsUnreadableOrAllZero { ring_slot: RootRingSlot },
     /// 根环一个槽读得出而自证不过，重读一次仍不过（自证得过、却不住在它的 txg 按落点公式该住的那一槽的错位读也算自证不过，
     /// 与 `recovery::read_root_ring_slot` 同一个核 `root_ring::root_sits_in_the_ring_slot_the_formula_gives`；
     /// 一个槽 0 读出第 0 代根、而同一遍读出的环里最大的 txg 已到发布路径写进这一槽的 txg，也算这一槽自证不过）。
-    ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot: RootRingSlot },
+    RootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot: RootRingSlot },
     /// 择不到系统配置：判不了池有几块盘、根环在哪。
     SystemConfigurationNotChosen { failure: RecoveryFailure },
     /// 现行那一版的实例表读不出：判不了哪几行是候选。
@@ -295,9 +295,9 @@ pub enum NoRowDeletedThisRound {
         failure: RecoveryFailure,
     },
     /// 读池中一个落点的头读失败（扇区维：读不到不等于不存在）。
-    AReadOfAPlacementFailed { placement: PlacementOfAUnitHead },
+    ReadOfAPlacementFailed { placement: PlacementOfAUnitHead },
     /// 池里有一个本池的单元，写序实例大于挂载根的实例（已发布谓词判损坏）：这一轮任何行都不删（判决第二节 Q3 正推给的保守读法）。
-    AUnitWrittenByAnInstanceAboveTheMountedOne {
+    UnitWrittenByAnInstanceAboveTheMountedOne {
         placement: PlacementOfAUnitHead,
         writer_instance: InstanceGeneration,
     },
@@ -305,13 +305,13 @@ pub enum NoRowDeletedThisRound {
     SweepOnAVersionWithoutFileNotSupportedInTheFirstVersion,
     /// 抹之前那一遍重读，一个要抹的头报设备错或读回的不是判的那个头（用户 2026-10-04 定 C）：这一轮不删，一个头都不抹
     /// （先把要抹的头全部重读一遍、都还是判的那个头才开始抹，[`erase_the_heads_and_publish_the_sweep`]）。
-    AHeadRereadBeforeErasingIsNotTheJudgedUnit {
+    HeadRereadBeforeErasingIsNotTheJudgedUnit {
         placement: PlacementOfAUnitHead,
         reread: HeadRereadBeforeErasing,
     },
 }
 
-/// 抹之前那一遍重读一个要抹的头读到了什么（[`NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit`]）。
+/// 抹之前那一遍重读一个要抹的头读到了什么（[`NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit`]）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeadRereadBeforeErasing {
     /// 读失败（设备报错）。
@@ -426,7 +426,7 @@ pub fn judge_the_instance_table_sweep(
             };
             let Some(bytes) = reader.read(device, SlotNumber(slot).to_device_offset(), head_bytes)
             else {
-                return Err(NoRowDeletedThisRound::AReadOfAPlacementFailed { placement });
+                return Err(NoRowDeletedThisRound::ReadOfAPlacementFailed { placement });
             };
             let Some(head) = unit_head_read_by_sweep(&bytes) else {
                 slot += 1;
@@ -439,7 +439,7 @@ pub fn judge_the_instance_table_sweep(
             }
             if head.writer_instance > current_root.instance {
                 return Err(
-                    NoRowDeletedThisRound::AUnitWrittenByAnInstanceAboveTheMountedOne {
+                    NoRowDeletedThisRound::UnitWrittenByAnInstanceAboveTheMountedOne {
                         placement,
                         writer_instance: head.writer_instance,
                     },
@@ -495,7 +495,7 @@ fn every_root_of_the_ring_self_verified(
         }
         let Some(root) = root_read else {
             return Err(
-                NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot },
+                NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot },
             );
         };
         roots_read.push(RootOfARingSlotReadBySweep {
@@ -526,7 +526,7 @@ fn every_root_of_the_ring_self_verified(
         }
         if !read.self_verified_on_the_first_read {
             return Err(
-                NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread {
                     ring_slot: read.ring_slot,
                 },
             );
@@ -541,7 +541,7 @@ fn every_root_of_the_ring_self_verified(
         .filter(|root| !genesis_root_reached_by_the_publishes_of_the_pass(root, read.ring_slot));
         let Some(root) = reread else {
             return Err(
-                NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+                NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread {
                     ring_slot: read.ring_slot,
                 },
             );
@@ -571,10 +571,10 @@ fn root_read_once_from_the_ring_slot(
     let device = region_devices[usize::try_from(ring_slot.region).expect("区域号")];
     let offset = slot_offset(ring_slot, immutable_sizes.fixed_structure_slot_spacing);
     let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
-        return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot });
+        return Err(NoRowDeletedThisRound::RootRingSlotIsUnreadableOrAllZero { ring_slot });
     };
     if bytes.iter().all(|byte| *byte == 0) {
-        return Err(NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot });
+        return Err(NoRowDeletedThisRound::RootRingSlotIsUnreadableOrAllZero { ring_slot });
     }
     // 核落点公式（D16（发布语义） 已定项 6 骑手条款 1「恢复与挂载读根环时都调」，C973（实例表清扫读根环不核落点））：自证得过、却不住在它的 txg 该住的那一槽的根
     // 是错位读（第 0 代根照 mkfs 种根的槽另认），照这一槽这一次自证不过记——不核的话，错位读把一个实例在环里唯一的根换成别槽的根，
@@ -619,7 +619,7 @@ pub enum InstanceTableSweepOutcome {
     /// 判的那一半就停了，一个头都没抹。
     NoRowDeleted(NoRowDeletedThisRound),
     /// 抹完头、清扫发布落盘：删了这几行。`heads_erased` 是抹了的头，就是判的那一半要抹的全部（抹之前那一遍重读有一个不是判的那个头时
-    /// 这一轮不删，走 [`NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit`]）。
+    /// 这一轮不删，走 [`NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit`]）。
     RowsDeleted {
         rows_deleted: Vec<InstanceRow>,
         heads_erased: Vec<PlacementOfAUnitHead>,
@@ -685,7 +685,7 @@ pub fn erase_the_heads_and_publish_the_sweep<Device: BlockDevice>(
             PoolReader::read(&*devices, to_erase.placement.device, offset, head_bytes)
         else {
             return InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit {
+                NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit {
                     placement: to_erase.placement,
                     reread: HeadRereadBeforeErasing::ReadFailed,
                 },
@@ -700,7 +700,7 @@ pub fn erase_the_heads_and_publish_the_sweep<Device: BlockDevice>(
             });
         if !still_the_unpublished_unit_judged {
             return InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit {
+                NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit {
                     placement: to_erase.placement,
                     reread: HeadRereadBeforeErasing::NotTheJudgedUnit,
                 },
@@ -738,7 +738,12 @@ pub fn erase_the_heads_and_publish_the_sweep<Device: BlockDevice>(
             };
         }
     }
-    let chain = match instance_table_chain_of_root(&*devices, &current_file_version.root) {
+    // 这一读与下面判的那一读（[`judge_the_instance_table_sweep`] 的调用方）读到只坏一份都进别的读那份账（D4（校验和位置） 已定项 4「可写挂载期间别的读」）。
+    let chain_read = allocator
+        .reading_and_counting_the_other_unit_reads_with_one_copy_failing(&*devices, |reader| {
+            instance_table_chain_of_root(reader, &current_file_version.root)
+        });
+    let chain = match chain_read {
         Ok(chain) => chain,
         Err(failure) => {
             return InstanceTableSweepOutcome::NoRowDeleted(
@@ -912,7 +917,11 @@ pub fn sweep_the_instance_table_at_the_end_of_the_mount<Device: BlockDevice>(
         }
         InstanceTableSweepSwitch::SweptAtTheEndOfTheMountAboveTheThreshold => {}
     }
-    let rows = match instance_table_chain_of_root(&*devices, current.root()) {
+    let chain_read = allocator
+        .reading_and_counting_the_other_unit_reads_with_one_copy_failing(&*devices, |reader| {
+            instance_table_chain_of_root(reader, current.root())
+        });
+    let rows = match chain_read {
         Ok(chain) => u64::try_from(chain.records.rows.len()).expect("行数装得进 u64"),
         Err(failure) => {
             return InstanceTableSweepAtTheEndOfTheMount::Swept(
@@ -954,7 +963,11 @@ pub fn sweep_the_instance_table_while_mounted<Device: BlockDevice>(
             )
         }
     }
-    let judgement = match judge_the_instance_table_sweep(&*devices, current.root()) {
+    let judgement_read = allocator
+        .reading_and_counting_the_other_unit_reads_with_one_copy_failing(&*devices, |reader| {
+            judge_the_instance_table_sweep(reader, current.root())
+        });
+    let judgement = match judgement_read {
         Ok(judgement) => judgement,
         Err(no_row_deleted) => return InstanceTableSweepOutcome::NoRowDeleted(no_row_deleted),
     };
@@ -1023,7 +1036,7 @@ mod tests {
 
     /// 认领规则按整单元跳：码 1、码 3 两槽，码 2 一槽（S2-2）。
     #[test]
-    fn a_claimed_unit_spans_two_slots_for_data_and_packed_units_and_one_slot_for_nodes() {
+    fn claimed_unit_spans_two_slots_for_data_and_packed_units_and_one_slot_for_nodes() {
         assert_eq!(data_unit_head(1, 1, 1).span_in_slots(), 2);
         assert_eq!(
             UnitHeadReadBySweep {
@@ -1442,11 +1455,11 @@ mod misplaced_ring_reads_tests {
     /// （D16（发布语义） 已定项 6 骑手条款 1「恢复与挂载读根环时都调」）。
     /// 判别力：`crates/mutations.tsv`「C973 清扫读根环不核落点公式」那一行，这一条红在 `Ok` 那一支（实例 1 那一行判成要删）。
     #[test]
-    fn a_misplaced_read_replacing_the_only_ring_root_of_an_instance_on_both_reads_deletes_no_row() {
+    fn misplaced_read_replacing_the_only_ring_root_of_an_instance_on_both_reads_deletes_no_row() {
         let pool = pool_with_an_instance_down_to_one_ring_root();
         let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 2);
         match judge_the_instance_table_sweep(&reader, &pool.current_root) {
-            Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+            Err(NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread {
                 ring_slot,
             }) => {
                 assert_eq!(
@@ -1472,7 +1485,7 @@ mod misplaced_ring_reads_tests {
     /// 判别力：`crates/mutations.tsv`「C973 清扫读根环自证不过不重读」那一行，这一条红（第一次错位就停，不重读）；
     /// 「C973 清扫读根环不核落点公式」那一行同样红（错位那一读当自证过，实例 1 那一行判成要删）。
     #[test]
-    fn a_misplaced_read_of_the_only_ring_root_of_an_instance_reread_right_keeps_its_row() {
+    fn misplaced_read_of_the_only_ring_root_of_an_instance_reread_right_keeps_its_row() {
         let pool = pool_with_an_instance_down_to_one_ring_root();
         let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 1);
         let instance_rotated_out = pool.instance_rotated_out;
@@ -1543,8 +1556,8 @@ mod misplaced_ring_reads_tests {
         }
     }
 
-    /// mkfs → 实例 1 可写挂载，写行 txg 1 那次发布写区域 1 槽 0 的根槽落盘之后就断电（系统配置轮换与暖机 txg 2 都丢；同
-    /// E205（多处读坏倒挂三条改法的代价） 起点镜像「根槽 FUA 持久、系统配置轮换没持久」那一形）→ 实例 2 可写挂载、新池新建文件、覆盖写到根环每一槽都住着自证过的根为止
+    /// mkfs → 实例 1 可写挂载，写行 txg 1 那次发布写区域 1 槽 0 的根槽落盘之后就断电（系统配置轮换与暖机 txg 2 都丢，
+    /// 即根槽 FUA 持久、系统配置轮换没持久那一形）→ 实例 2 可写挂载、新池新建文件、覆盖写到根环每一槽都住着自证过的根为止
     /// （S = 4：区域 0 槽 0 要到 txg 12 才轮到）。
     /// 盘面：区域 0 槽 0 仍是 mkfs 种的第 0 代根；实例 1 在环里只剩写行那条根（txg 1，区域 1 槽 0，也是 mkfs 种过第 0 代根的槽）；
     /// 实例表里实例 1 那一行还在。`ring_slot_of_a_root_of_the_rotating_instance` 这里放区域 0 槽 0（错位读回第 0 代根）。
@@ -1706,7 +1719,7 @@ mod misplaced_ring_reads_tests {
             pool_with_the_only_root_of_an_instance_in_a_ring_slot_seeded_by_make_filesystem();
         let reader = PoolReadingOneRingSlotMisplaced::over(&pool, 2);
         match judge_the_instance_table_sweep(&reader, &pool.current_root) {
-            Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread {
+            Err(NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread {
                 ring_slot,
             }) => {
                 assert_eq!(
@@ -1770,7 +1783,7 @@ mod misplaced_ring_reads_tests {
         assert!(
             matches!(
                 judged,
-                Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
+                Err(NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
                     if ring_slot == RootRingSlot { region: 1, slot: 0 }
             ),
             "错位读回非第 0 代根：这一轮不删、停在区域 1 槽 0：{judged:?}"
@@ -1948,7 +1961,7 @@ mod misplaced_ring_reads_tests {
         assert!(
             matches!(
                 judged,
-                Err(NoRowDeletedThisRound::ARootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
+                Err(NoRowDeletedThisRound::RootRingSlotIsNotSelfVerifiedAfterOneReread { ring_slot })
                     if ring_slot == pool.ring_slot_of_the_only_root_of_the_instance
             ),
             "已重读过的那一槽读出第 0 代根：这一轮不删、停在区域 1 槽 0：{judged:?}"

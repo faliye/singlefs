@@ -100,7 +100,7 @@ fn kernel_refusals_after_renaming_the_prelude_constant(
 }
 
 #[test]
-fn a_wgsl_name_that_no_rust_string_supplies_is_refused() {
+fn wgsl_name_that_no_rust_string_supplies_is_refused() {
     let verdict =
         kernel_refusals_after_renaming_the_prelude_constant(&RuleSwitches::every_rule_intact());
     let reason = verdict.expect_err("Rust 串里没有 PRELUDE_OFFSET 了，应当拒算");

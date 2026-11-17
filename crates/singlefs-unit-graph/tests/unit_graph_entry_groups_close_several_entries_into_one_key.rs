@@ -97,7 +97,7 @@ const OTHER_BODY_CHANGE: (&str, &str) = (
 );
 
 #[test]
-fn a_unit_only_the_second_entry_reaches_changes_the_group_key_but_not_the_key_of_the_first_entry_alone(
+fn unit_only_the_second_entry_reaches_changes_the_group_key_but_not_the_key_of_the_first_entry_alone(
 ) {
     let group_before =
         keyed(&group_key_with(&["fgroup::alpha", "fgroup::beta"], &[], None).expect("入口找得到"));
@@ -183,7 +183,7 @@ fn an_entry_not_compiled_under_the_features_is_left_out_and_the_rest_are_keyed()
 }
 
 #[test]
-fn a_group_whose_closure_has_a_refusal_hands_back_the_refusal_lines() {
+fn group_whose_closure_has_a_refusal_hands_back_the_refusal_lines() {
     let group_key =
         group_key_with(&["fgroup::alpha", "fgroup::starts_itself"], &[], None).expect("入口找得到");
     match &group_key.verdict {

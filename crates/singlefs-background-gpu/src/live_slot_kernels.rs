@@ -18,7 +18,7 @@
 //! 记录一条都没有时绑定 2、3 照样各放一项全 0 的（wgpu 不许长度为 0 的绑定），条数照参数里的数。
 //! 整份记录表每段都交一份（同区域扫描那一段的整份映射）：一批按段切。整份记录表连同一个段都装不下这张卡此刻剩下的地方时，
 //! 记录表按记录的次序切成相连的几片，每片单独建两张表、照它切段逐段交，各片数出的活槽数逐段相加（[`live_slot_plan_on_a_gpu`]、
-//! [`live_slots_summed_over_the_record_slices`]；用户 2026-10-28 定「装不下应该自适应的分片」）：一段的活槽数是每条记录罩住它的槽数之和，
+//! [`live_slots_summed_over_the_record_slices`]；D26（后台整理与放置回收） 已定项 13 第 3 条「按上限自适应切成几片」）：一段的活槽数是每条记录罩住它的槽数之和，
 //! 按记录切开再加不改它；核不改。两份核数出的各自加各自的。
 
 use singlefs_core::address::SlotNumber;
@@ -33,11 +33,17 @@ use singlefs_core::logged_operations::CompactionRegion;
 use std::ops::Range;
 
 use crate::checksum_kernels::UnrecognizedVerdictWord;
+use singlefs_core::background_compute::GpuMemoryInBytes;
+
 use crate::memory_limit_and_chunks::{
-    chunks_that_fit_on_the_gpu, ChunkBoundsOfAGpu, ChunkFootprint, SmallestPieceLargerThanTheRoom,
+    chunks_that_fit_on_the_gpu, ChunkBoundsOfAGpu, ChunkFootprint, EntryCountOfAChunk,
+    InputLengthOnTheHostInBytes, SmallestPieceLargerThanTheRoom,
+    COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS,
+    COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION,
 };
 use crate::two_kernel_reconciliation::{
-    ConsecutiveUncertaintyCounts, ReconciledBatch, TwoKernelOutcomesOfAnEntry,
+    first_entry_key_repeated_among, ConsecutiveUncertaintyCounts, ReconciledBatch,
+    SameEntryKeyTwiceInOneBatch, TwoKernelOutcomesOfAnEntry,
 };
 
 /// 逐条走遍记录、按区间相交算长度的那一份核。
@@ -53,21 +59,18 @@ pub const SEARCHING_SORTED_RECORDS_KERNEL_ENTRY_POINT: &str =
 /// 两份核的工作组都是 64 个调用（两份 WGSL 里的 `@workgroup_size(64)`），每个段一个调用。
 pub const LIVE_SLOT_INVOCATIONS_PER_WORKGROUP: u32 = 64;
 /// 参数缓冲：四个 `u32`。
-pub const LIVE_SLOT_PARAMETER_BUFFER_BYTES: u64 = 16;
+pub const LIVE_SLOT_PARAMETER_BUFFER_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(16);
 pub const SEGMENT_BOUND_WORDS: usize = 4;
-pub const SEGMENT_BOUND_BYTES: u64 = 16;
+/// 每个段一项上下界在主机上打包的字节数（[`SEGMENT_BOUND_WORDS`] 个 `u32`）：选段打分把它当这一段的「输入」交给切批。
+pub const SEGMENT_BOUND_BYTES: InputLengthOnTheHostInBytes = InputLengthOnTheHostInBytes(16);
 pub const ALLOCATION_RECORD_WORDS: usize = 5;
 pub const LIVE_SLOT_OUTCOME_WORDS: usize = 3;
-pub const LIVE_SLOT_OUTCOME_BYTES: u64 = 12;
-/// 结果缓冲开算之前的填充字：判定字只会被核写成 [`VERDICT_WORD_COUNTED`]。
+pub const LIVE_SLOT_OUTCOME_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(12);
+/// 结果缓冲开算之前的填充字：有效判定字见 [`singlefs_replay_prefix::gpu_gc_proofs::GPU_LIVE_SLOTS_COUNTED`]。
 pub const LIVE_SLOT_OUTCOME_NOT_WRITTEN_FILL_WORD: u32 = 0xFFFF_FFFF;
-/// 判定字：这一段数完了（两份 WGSL 里各写一份同值的常量）。
-const VERDICT_WORD_COUNTED: u32 = 1;
 /// 释放了没有那一个字（两份 WGSL 里各写一份同值的常量）。
 const RELEASED_WORD_OF_A_RELEASED_RECORD: u32 = 1;
 const RELEASED_WORD_OF_A_LIVE_RECORD: u32 = 0;
-/// 两份核各一个结果缓冲与一个回读暂存缓冲。
-const LIVE_SLOT_OUTCOME_AND_READBACK_BUFFERS: u64 = 4;
 
 /// 区域扫描那一段（[`crate::region_record_kernels`]）打包槽号也用这一份：两段交给核的槽号字是同一种拆法。
 pub(crate) fn low_and_high_words_of_the_slot(slot: SlotNumber) -> [u32; 2] {
@@ -131,24 +134,25 @@ impl AllocationRecordTablesForTheKernels {
 
     /// 两个缓冲在卡上合占的字节数。
     #[must_use]
-    pub fn bytes_on_the_gpu(&self) -> u64 {
+    pub fn bytes_on_the_gpu(&self) -> GpuMemoryInBytes {
         let words = self.record_words.len() + self.record_positions_by_device_and_slot.len();
-        4 * u64::try_from(words).expect("装得进 u64")
+        GpuMemoryInBytes(4 * u64::try_from(words).expect("装得进 u64"))
     }
 
     /// 两个缓冲里大的那一个的字节数：它也要装得进这张卡的绑定上限。
     #[must_use]
-    pub fn largest_buffer_bytes(&self) -> u64 {
+    pub fn largest_buffer_bytes(&self) -> GpuMemoryInBytes {
         let words = self
             .record_words
             .len()
             .max(self.record_positions_by_device_and_slot.len());
-        4 * u64::try_from(words).expect("装得进 u64")
+        GpuMemoryInBytes(4 * u64::try_from(words).expect("装得进 u64"))
     }
 }
 
 /// 选段打分一段在卡上占的：参数缓冲与整份记录表（两个缓冲，每段都交一份）；每个段一项上下界（当这一段的「输入」算）、
-/// 两份核各一项结果与一项回读暂存。按条排的最大缓冲（输入之外）是结果那一个。
+/// 两份核各一项结果与一项回读暂存。参数、记录表的两个缓冲、段的上下界与两份结果缓冲都映射着建，各带一份同尺寸的暂存
+/// （[`COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION`]）。按条排的最大缓冲（输入之外）是结果那一个。
 #[must_use]
 pub fn live_slot_chunk_footprint(
     record_tables: &AllocationRecordTablesForTheKernels,
@@ -158,24 +162,60 @@ pub fn live_slot_chunk_footprint(
 
 /// 同 [`live_slot_chunk_footprint`]，记录表的两个缓冲按合占的字节数给。
 #[must_use]
-pub fn live_slot_chunk_footprint_of_record_table_bytes(record_table_bytes: u64) -> ChunkFootprint {
+pub fn live_slot_chunk_footprint_of_record_table_bytes(
+    record_table_bytes: GpuMemoryInBytes,
+) -> ChunkFootprint {
     ChunkFootprint {
-        bytes_per_chunk_besides_the_entries: LIVE_SLOT_PARAMETER_BUFFER_BYTES + record_table_bytes,
-        bytes_per_entry_besides_its_input: LIVE_SLOT_OUTCOME_AND_READBACK_BUFFERS
-            * LIVE_SLOT_OUTCOME_BYTES,
+        bytes_per_chunk_besides_the_entries: COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+            .bytes_of_the_copies(LIVE_SLOT_PARAMETER_BUFFER_BYTES.plus(record_table_bytes)),
+        bytes_per_entry_besides_its_input: COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS
+            .bytes_of_the_copies(LIVE_SLOT_OUTCOME_BYTES),
         bytes_per_entry_in_the_largest_entry_buffer: LIVE_SLOT_OUTCOME_BYTES,
+    }
+}
+
+/// 记录表（整份或一片）里几条分配记录：条数，与一段里几个段（[`EntryCountOfAChunk`]）、一张卡分到几个段（[`ClusterSegmentCountOfAGpu`]）不是一回事。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AllocationRecordCountOfATable(pub u64);
+
+impl AllocationRecordCountOfATable {
+    /// 记录表里 `record_count` 条（调用方手里是切片长度、`usize`）。
+    ///
+    /// # Panics
+    /// `record_count` 装不进 `u64`（`usize` 不比 `u64` 宽的平台上走不到）。
+    #[must_use]
+    pub fn of_this_many_records(record_count: usize) -> Self {
+        Self(u64::try_from(record_count).expect("记录表的条数装得进 u64"))
+    }
+}
+
+/// 这一批分到一张卡的聚簇段有几个：段数，与一段里几条（[`EntryCountOfAChunk`]）、记录表里几条分配记录（[`AllocationRecordCountOfATable`]）
+/// 不是一回事。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ClusterSegmentCountOfAGpu(pub u64);
+
+impl ClusterSegmentCountOfAGpu {
+    /// 一张卡分到 `segment_count` 个段（调用方手里是切片长度、`usize`）。
+    ///
+    /// # Panics
+    /// `segment_count` 装不进 `u64`（`usize` 不比 `u64` 宽的平台上走不到）。
+    #[must_use]
+    pub fn of_this_many_segments(segment_count: usize) -> Self {
+        Self(u64::try_from(segment_count).expect("一张卡分到的段数装得进 u64"))
     }
 }
 
 /// `record_count` 条记录的记录表交给核时两个缓冲合占的字节数与大的那一个的字节数（按 [`AllocationRecordTablesForTheKernels`] 的建法：
 /// 没有记录时各放一项）。
 #[must_use]
-pub fn record_table_bytes_of(record_count: u64) -> (u64, u64) {
-    let record_words = ALLOCATION_RECORD_WORDS_AS_U64 * record_count.max(1);
-    let sorted_position_words = record_count.max(1);
+pub fn record_table_bytes_of(
+    record_count: AllocationRecordCountOfATable,
+) -> (GpuMemoryInBytes, GpuMemoryInBytes) {
+    let record_words = ALLOCATION_RECORD_WORDS_AS_U64 * record_count.0.max(1);
+    let sorted_position_words = record_count.0.max(1);
     (
-        4 * (record_words + sorted_position_words),
-        4 * record_words.max(sorted_position_words),
+        GpuMemoryInBytes(4 * (record_words + sorted_position_words)),
+        GpuMemoryInBytes(4 * record_words.max(sorted_position_words)),
     )
 }
 
@@ -183,9 +223,11 @@ const ALLOCATION_RECORD_WORDS_AS_U64: u64 = 5;
 
 /// 选段打分一段里最小的一片在卡上合占的字节数：一个段连同只有一条记录的记录表。
 #[must_use]
-pub fn bytes_of_the_smallest_live_slot_piece() -> u64 {
-    live_slot_chunk_footprint_of_record_table_bytes(record_table_bytes_of(1).0)
-        .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, 1)
+pub fn bytes_of_the_smallest_live_slot_piece() -> GpuMemoryInBytes {
+    live_slot_chunk_footprint_of_record_table_bytes(
+        record_table_bytes_of(AllocationRecordCountOfATable(1)).0,
+    )
+    .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, EntryCountOfAChunk(1))
 }
 
 /// 记录表的一片（按记录的次序相连的几条）与这张卡上这一片之下段切成的几段（按这张卡分到的段里的位置）。
@@ -202,15 +244,14 @@ pub struct RecordSliceWithItsChunks {
 /// # Errors
 /// 连只有一条记录的那一片连同一个段都装不下（[`SmallestPieceLargerThanTheRoom`]，`entry_position` 是 0）。
 pub fn live_slot_plan_on_a_gpu(
-    record_count: usize,
-    segment_count: usize,
+    record_count: AllocationRecordCountOfATable,
+    segment_count: ClusterSegmentCountOfAGpu,
     room: ChunkBoundsOfAGpu,
 ) -> Result<Vec<RecordSliceWithItsChunks>, SmallestPieceLargerThanTheRoom> {
-    if segment_count == 0 {
+    if segment_count.0 == 0 {
         return Ok(Vec::new());
     }
-    let record_count_wide = u64::try_from(record_count).expect("装得进 u64");
-    let fits = |records_in_the_slice: u64| -> bool {
+    let fits = |records_in_the_slice: AllocationRecordCountOfATable| -> bool {
         let (table_bytes, largest_table_bytes) = record_table_bytes_of(records_in_the_slice);
         largest_table_bytes <= room.largest_storage_binding_in_bytes
             && chunks_that_fit_on_the_gpu(
@@ -220,21 +261,27 @@ pub fn live_slot_plan_on_a_gpu(
             )
             .is_ok()
     };
-    let records_per_slice = if fits(record_count_wide) {
-        record_count_wide.max(1)
+    let records_per_slice = if fits(record_count) {
+        record_count.0.max(1)
     } else {
-        // 记录表每多一条，两个缓冲合占多 24 字节、大的那一个多 20 字节：按显存上限与绑定上限各自的余量现算最多几条，再核一遍。
+        // 记录表每多一条，两个缓冲合占多 24 字节（连同暂存多 48 字节）、大的那一个多 20 字节：按显存上限与绑定上限各自的余量现算最多几条，再核一遍。
         let (table_bytes_of_one_record, largest_table_bytes_of_one_record) =
-            record_table_bytes_of(1);
-        let one_segment_without_the_table = live_slot_chunk_footprint_of_record_table_bytes(0)
-            .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, 1);
+            record_table_bytes_of(AllocationRecordCountOfATable(1));
+        let one_segment_without_the_table =
+            live_slot_chunk_footprint_of_record_table_bytes(GpuMemoryInBytes(0))
+                .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, EntryCountOfAChunk(1));
         let records_under_the_memory_limit = room.memory_limit.map_or(u64::MAX, |memory_limit| {
-            memory_limit.0.saturating_sub(one_segment_without_the_table) / table_bytes_of_one_record
+            memory_limit
+                .0
+                .saturating_sub(one_segment_without_the_table.0)
+                / COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+                    .bytes_of_the_copies(table_bytes_of_one_record)
+                    .0
         });
         let records_under_the_binding =
-            room.largest_storage_binding_in_bytes / largest_table_bytes_of_one_record;
+            room.largest_storage_binding_in_bytes.0 / largest_table_bytes_of_one_record.0;
         let records_per_slice = records_under_the_memory_limit.min(records_under_the_binding);
-        if records_per_slice == 0 || !fits(records_per_slice) {
+        if records_per_slice == 0 || !fits(AllocationRecordCountOfATable(records_per_slice)) {
             return Err(SmallestPieceLargerThanTheRoom {
                 entry_position: 0,
                 smallest_piece_bytes: bytes_of_the_smallest_live_slot_piece(),
@@ -244,13 +291,26 @@ pub fn live_slot_plan_on_a_gpu(
     };
     let records_per_slice =
         usize::try_from(records_per_slice).expect("一片的条数不超过记录数，装得进 usize");
-    let segment_bound_lengths = vec![SEGMENT_BOUND_BYTES; segment_count];
+    let segment_bound_lengths = vec![
+        SEGMENT_BOUND_BYTES;
+        usize::try_from(segment_count.0)
+            .expect("一张卡分到的段数是切片长度，装得进 usize")
+    ];
     let mut slices = Vec::new();
     let mut slice_start = 0;
     loop {
-        let slice_end = record_count.min(slice_start + records_per_slice);
+        let slice_end = usize::try_from(
+            singlefs_replay_prefix::gpu_gc_proofs::next_gpu_record_slice_end(
+                u64::try_from(slice_start).expect("记录位置装得进 u64"),
+                record_count.0,
+                u64::try_from(records_per_slice).expect("片容量装得进 u64"),
+            ),
+        )
+        .expect("片终点不超过记录数，装得进 usize");
         let (table_bytes, _largest_table_bytes) =
-            record_table_bytes_of(u64::try_from(slice_end - slice_start).expect("装得进 u64"));
+            record_table_bytes_of(AllocationRecordCountOfATable(
+                u64::try_from(slice_end - slice_start).expect("装得进 u64"),
+            ));
         let segment_chunks = chunks_that_fit_on_the_gpu(
             &segment_bound_lengths,
             live_slot_chunk_footprint_of_record_table_bytes(table_bytes),
@@ -262,7 +322,7 @@ pub fn live_slot_plan_on_a_gpu(
             segment_chunks,
         });
         slice_start = slice_end;
-        if slice_start >= record_count {
+        if u64::try_from(slice_start).expect("记录位置装得进 u64") >= record_count.0 {
             break;
         }
     }
@@ -313,14 +373,10 @@ pub fn live_slots_summed_over_the_record_slices<SubmissionFailure>(
                 .iter_mut()
                 .zip(chunk_live_slots)
             {
-                summed.0 = summed
-                    .0
-                    .checked_add(walking)
-                    .expect("活槽数之和不超过记录数乘 65535，装得进 u64");
-                summed.1 = summed
-                    .1
-                    .checked_add(searching)
-                    .expect("活槽数之和不超过记录数乘 65535，装得进 u64");
+                *summed = singlefs_replay_prefix::gpu_gc_proofs::checked_live_slot_totals(
+                    summed.0, summed.1, walking, searching,
+                )
+                .expect("活槽数之和不超过记录数乘 65535，装得进 u64");
             }
             segments_counted = segment_chunk.end;
         }
@@ -384,7 +440,7 @@ pub fn live_slot_outcome_buffer_before_the_kernel_writes(segment_count: usize) -
 /// 把读回的结果字节解成每个段一个活槽数。
 ///
 /// # Errors
-/// 某一段的判定字不是 [`VERDICT_WORD_COUNTED`]（核没写到它，还是填充字，或写坏了）。
+/// 某一段的判定字不是 [`singlefs_replay_prefix::gpu_gc_proofs::GPU_LIVE_SLOTS_COUNTED`]（核没写到它，还是填充字，或写坏了）。
 ///
 /// # Panics
 /// 字节数不是每段 [`LIVE_SLOT_OUTCOME_BYTES`] 的整数倍：回读缓冲按段数建，长度对不上是外壳的 bug。
@@ -404,13 +460,15 @@ pub fn decoded_live_slot_outcomes(
             let (word_bytes, _no_leftover) = outcome_record.as_chunks::<4>();
             let [live_slots_low, live_slots_high, verdict_word] =
                 std::array::from_fn(|word_position| u32::from_le_bytes(word_bytes[word_position]));
-            if verdict_word != VERDICT_WORD_COUNTED {
-                return Err(UnrecognizedVerdictWord {
-                    entry_position,
-                    verdict_word,
-                });
-            }
-            Ok(u64::from(live_slots_low) | (u64::from(live_slots_high) << 32))
+            singlefs_replay_prefix::gpu_gc_proofs::decoded_gpu_live_slots(
+                live_slots_low,
+                live_slots_high,
+                verdict_word,
+            )
+            .ok_or(UnrecognizedVerdictWord {
+                entry_position,
+                verdict_word,
+            })
         })
         .collect()
 }
@@ -426,21 +484,25 @@ pub fn cpu_reference_live_slots(
 }
 
 /// 选段打分一批的比对（第 8 条）：两份核数出的活槽数交进来，逐段比、更新计数；连续不确定到 N 轮的段交 CPU 参照现判
-/// （整块单元区的 CPU 参照只在头一次要它时数一遍）。这一批出错就原样交回出错、计数不动、CPU 参照不调。
+/// （整块单元区的 CPU 参照只在头一次要它时数一遍）。同一个段在一批里出现两次（先于整段清单那一判查；外壳在交卡之前就查、重复时一片都不交），
+/// 或这一批出错，就交回出错、计数不动、CPU 参照不调。
 ///
 /// # Errors
-/// `both_kernel_live_slots` 是 `Err` 时交回它。
+/// 同一个段在一批里出现两次时交回 [`SameEntryKeyTwiceInOneBatch`] 转成的那一种（两份核交成了还是出错了都先报它）；`both_kernel_live_slots` 是 `Err` 时交回它。
 ///
 /// # Panics
-/// `segments` 不是 `unit_area` 的整段按起点升序一个不漏（核心层 `BackgroundGpuCompute::count_live_slots_per_cluster_segment` 的约定）；
+/// `segments` 不重复而不是 `unit_area` 的整段按起点升序一个不漏（核心层 `BackgroundGpuCompute::count_live_slots_per_cluster_segment` 的约定）；
 /// 两份核交回的段数与 `segments` 不等。
-pub fn reconciled_live_slots_of_the_segments<BatchFailure>(
+pub fn reconciled_live_slots_of_the_segments<BatchFailure: From<SameEntryKeyTwiceInOneBatch>>(
     allocation_records: &[AllocationRecord],
     unit_area: UnitAreaOfOneDevice,
     segments: &[ClusterSegmentEntryKey],
     both_kernel_live_slots: Result<Vec<(u64, u64)>, BatchFailure>,
     uncertainty: &mut ConsecutiveUncertaintyCounts<ClusterSegmentEntryKey>,
 ) -> Result<ReconciledBatch<u64>, BatchFailure> {
+    if let Some(repeated) = first_entry_key_repeated_among(segments.iter()) {
+        return Err(BatchFailure::from(repeated));
+    }
     assert_eq!(
         segments,
         cluster_segment_entry_keys_of_the_unit_area(unit_area).as_slice(),
@@ -470,6 +532,7 @@ pub fn reconciled_live_slots_of_the_segments<BatchFailure>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use singlefs_replay_prefix::gpu_gc_proofs::GPU_LIVE_SLOTS_COUNTED as VERDICT_WORD_COUNTED;
 
     use singlefs_core::address::{CheckpointTxg, DeviceIdentity};
     use singlefs_core::allocator::{AllocationRecordQuarantineMark, UnitAreaStart};
@@ -558,7 +621,7 @@ mod tests {
         assert_eq!(tables.record_count, 0);
         assert_eq!(
             tables.bytes_on_the_gpu(),
-            4 * u64::try_from(ALLOCATION_RECORD_WORDS + 1).expect("小数")
+            GpuMemoryInBytes(4 * u64::try_from(ALLOCATION_RECORD_WORDS + 1).expect("小数"))
         );
     }
 
@@ -656,7 +719,8 @@ mod tests {
         let reference = cpu_reference_live_slots(&records, unit_area);
         assert_eq!(reference, vec![0, 3, 0], "核心层数的：中间那一段 3 个活槽");
         let mut uncertainty = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
-        let disagreeing_on_the_middle_segment = || Ok::<_, ()>(vec![(0, 0), (3, 4), (0, 0)]);
+        let disagreeing_on_the_middle_segment =
+            || Ok::<_, SameEntryKeyTwiceInOneBatch>(vec![(0, 0), (3, 4), (0, 0)]);
         let first_round = reconciled_live_slots_of_the_segments(
             &records,
             unit_area,
@@ -699,7 +763,7 @@ mod tests {
             &[],
             unit_area,
             &segments,
-            Ok::<_, ()>(vec![(0, 0), (0, 0)]),
+            Ok::<_, SameEntryKeyTwiceInOneBatch>(vec![(0, 0), (0, 0)]),
             &mut ConsecutiveUncertaintyCounts::with_no_entry_uncertain(),
         );
     }
@@ -778,14 +842,32 @@ mod tests {
                 .collect();
             let tables = AllocationRecordTablesForTheKernels::of_the_allocation_records(&records);
             assert_eq!(
-                record_table_bytes_of(u64::try_from(record_count).expect("小数")),
+                record_table_bytes_of(AllocationRecordCountOfATable(
+                    u64::try_from(record_count).expect("小数")
+                )),
                 (tables.bytes_on_the_gpu(), tables.largest_buffer_bytes()),
                 "{record_count} 条"
             );
         }
     }
 
-    /// 用户 2026-10-28 定「装不下应该自适应的分片」：上限 128 字节（一个段 80 字节加两条记录 48 字节）装不下整份记录表加一个段，
+    #[test]
+    fn allocation_record_count_of_this_many_records_is_the_slice_length() {
+        assert_eq!(
+            AllocationRecordCountOfATable::of_this_many_records(7),
+            AllocationRecordCountOfATable(7)
+        );
+    }
+
+    #[test]
+    fn cluster_segment_count_of_this_many_segments_is_the_slice_length() {
+        assert_eq!(
+            ClusterSegmentCountOfAGpu::of_this_many_segments(3),
+            ClusterSegmentCountOfAGpu(3)
+        );
+    }
+
+    /// 第 3 条「按上限自适应切成几片」：上限 232 字节（一个段连同暂存 136 字节加两条记录连同暂存 96 字节）装不下整份记录表加一个段，
     /// 记录表按记录切成每片两条、各片逐段数（两份核在 CPU 上的替身照核心层数这一片记录）再相加，与 CPU 参照对整份记录逐段相同。
     #[test]
     fn the_record_table_cut_into_slices_under_a_small_memory_limit_sums_to_the_cpu_reference() {
@@ -803,12 +885,16 @@ mod tests {
             record(UNIT_AREA_DEVICE, start + 2 * segment_slots + 1, 200, false),
         ];
         let room = ChunkBoundsOfAGpu {
-            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(128)),
-            largest_storage_binding_in_bytes: 1 << 30,
-            largest_entry_count_per_dispatch: 1 << 20,
+            memory_limit: Some(GpuMemoryInBytes(232)),
+            largest_storage_binding_in_bytes: GpuMemoryInBytes(1 << 30),
+            largest_entry_count_per_dispatch: EntryCountOfAChunk(1 << 20),
         };
-        let plan = live_slot_plan_on_a_gpu(records.len(), segments.len(), room)
-            .expect("128 字节装得下最小的一片");
+        let plan = live_slot_plan_on_a_gpu(
+            AllocationRecordCountOfATable::of_this_many_records(records.len()),
+            ClusterSegmentCountOfAGpu::of_this_many_segments(segments.len()),
+            room,
+        )
+        .expect("232 字节装得下最小的一片");
         assert_eq!(
             plan.iter()
                 .map(|slice| slice.records.clone())
@@ -864,18 +950,124 @@ mod tests {
     #[test]
     fn the_memory_limit_below_the_smallest_live_slot_piece_reports_how_much_it_needs() {
         let room = ChunkBoundsOfAGpu {
-            memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(
-                bytes_of_the_smallest_live_slot_piece() - 1,
+            memory_limit: Some(GpuMemoryInBytes(
+                bytes_of_the_smallest_live_slot_piece().0 - 1,
             )),
-            largest_storage_binding_in_bytes: 1 << 30,
-            largest_entry_count_per_dispatch: 1 << 20,
+            largest_storage_binding_in_bytes: GpuMemoryInBytes(1 << 30),
+            largest_entry_count_per_dispatch: EntryCountOfAChunk(1 << 20),
         };
         assert_eq!(
-            live_slot_plan_on_a_gpu(7, 3, room),
+            live_slot_plan_on_a_gpu(
+                AllocationRecordCountOfATable(7),
+                ClusterSegmentCountOfAGpu(3),
+                room
+            ),
             Err(SmallestPieceLargerThanTheRoom {
                 entry_position: 0,
                 smallest_piece_bytes: bytes_of_the_smallest_live_slot_piece(),
             })
         );
+    }
+
+    /// 选段打分一批里同一个段出现两次（`segments_of_the_batch` 照整段清单的位置摆），两份核交成了（`kernels_failed` 为假）或出错了都一样：
+    /// 交回同一个段两次出现的位置，不走到整段清单那一判，计数一条不动。
+    fn live_slots_of_a_batch_with_a_segment_repeated(
+        positions_in_the_full_list: &[usize],
+        kernels_failed: bool,
+    ) -> (
+        Result<ReconciledBatch<u64>, SameEntryKeyTwiceInOneBatch>,
+        u32,
+    ) {
+        let unit_area = unit_area_of_three_segments();
+        let full_list = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+        let segments_of_the_batch: Vec<ClusterSegmentEntryKey> = positions_in_the_full_list
+            .iter()
+            .map(|position| full_list[*position])
+            .collect();
+        let both_kernel_live_slots = if kernels_failed {
+            Err(SameEntryKeyTwiceInOneBatch {
+                position_of_the_first_occurrence: usize::MAX,
+                position_of_the_second_occurrence: usize::MAX,
+            })
+        } else {
+            Ok(vec![(0, 1); segments_of_the_batch.len()])
+        };
+        let mut uncertainty = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
+        let reconciled = reconciled_live_slots_of_the_segments(
+            &[],
+            unit_area,
+            &segments_of_the_batch,
+            both_kernel_live_slots,
+            &mut uncertainty,
+        );
+        let rounds_of_the_first_segment =
+            uncertainty.consecutive_uncertain_rounds_of(&full_list[0]);
+        (reconciled, rounds_of_the_first_segment)
+    }
+
+    fn repeated_at(first: usize, second: usize) -> SameEntryKeyTwiceInOneBatch {
+        SameEntryKeyTwiceInOneBatch {
+            position_of_the_first_occurrence: first,
+            position_of_the_second_occurrence: second,
+        }
+    }
+
+    #[test]
+    fn the_middle_segment_twice_in_place_of_the_last_is_returned_as_a_repeated_entry_key() {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 1], false),
+            (Err(repeated_at(1, 2)), 0)
+        );
+    }
+
+    #[test]
+    fn the_middle_segment_twice_with_the_kernels_failed_is_returned_as_a_repeated_entry_key() {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 1], true),
+            (Err(repeated_at(1, 2)), 0)
+        );
+    }
+
+    #[test]
+    fn the_last_segment_appended_again_is_returned_as_a_repeated_entry_key() {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 2, 2], false),
+            (Err(repeated_at(2, 3)), 0)
+        );
+    }
+
+    #[test]
+    fn the_last_segment_appended_again_with_the_kernels_failed_is_returned_as_a_repeated_entry_key()
+    {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 2, 2], true),
+            (Err(repeated_at(2, 3)), 0)
+        );
+    }
+
+    #[test]
+    fn the_first_segment_appended_again_is_returned_as_a_repeated_entry_key() {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 2, 0], false),
+            (Err(repeated_at(0, 3)), 0)
+        );
+    }
+
+    #[test]
+    fn the_first_segment_appended_again_with_the_kernels_failed_is_returned_as_a_repeated_entry_key(
+    ) {
+        assert_eq!(
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 2, 0], true),
+            (Err(repeated_at(0, 3)), 0)
+        );
+    }
+
+    /// 对照：整段清单一个不漏、两份核数得不一样——照常比，头一个段这一轮不确定（计数到 1）。
+    #[test]
+    fn the_full_list_of_segments_without_a_repeat_is_reconciled() {
+        let (reconciled, rounds_of_the_first_segment) =
+            live_slots_of_a_batch_with_a_segment_repeated(&[0, 1, 2], false);
+        assert!(reconciled.is_ok(), "{reconciled:?}");
+        assert_eq!(rounds_of_the_first_segment, 1);
     }
 }

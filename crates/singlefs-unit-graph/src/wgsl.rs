@@ -584,7 +584,7 @@ mod tests {
 
     /// `switch x { case LIMIT: … }`：冒号前的 `LIMIT` 是被比的常量、是引用，不是局部声明（早先被当成参数名吞掉，常量改了内核的闭包不变）。
     #[test]
-    fn a_constant_named_in_a_switch_case_selector_is_a_reference_not_a_local_declaration() {
+    fn constant_named_in_a_switch_case_selector_is_a_reference_not_a_local_declaration() {
         let parsed = parse_wgsl_file(
             "const LIMIT: u32 = 3u;\nconst OTHER: u32 = 5u;\n\
              fn pick(x: u32) -> u32 { switch x { case LIMIT, OTHER: { return 1u; } case 7u: { return 2u; } default: { return 0u; } } }\n",

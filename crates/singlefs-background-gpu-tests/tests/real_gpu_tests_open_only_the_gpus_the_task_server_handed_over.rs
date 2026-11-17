@@ -1,15 +1,16 @@
 //! 真卡测试只开服务交来的卡（`common_discrete_gpus_of_this_host`）那几个纯函数的单测：读 `GPU_CARDS_BY_PRIORITY`、挑这一台的、
 //! `nvidia-smi` 序号按 PCI 总线地址对上 wgpu 的独显、交来的比源头声明的少判红、开卡只点名交来的卡；另核两张、三张卡那两个测试目标源头声明的张数
-//! 与它们的用例要的张数相同（服务照源头的声明分卡）。不要卡、不挂特性，`cargo test -p singlefs-background-gpu --test <本目标>` 就能跑。
+//! 与它们的用例要的张数相同（服务照源头的声明分卡）；挂载之后这个进程在哪几张卡上（读 `nvidia-smi` 的计算进程）、上了交来的卡之外的哪几张。不要卡、不挂特性，`cargo test -p singlefs-background-gpu-tests --test <本目标>` 就能跑。
 mod common_discrete_gpus_of_this_host;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
 use common_discrete_gpus_of_this_host::{
     gpu_card_count_declared_in_the_source_header, gpus_handed_over_by_the_task_server,
     gpus_handed_to_this_host, handed_over_gpus_matched_to_the_adapters,
     handed_over_gpus_of_the_declared_count, identifiers_of_the_handed_over_gpus,
+    nvidia_smi_indices_not_handed_over, nvidia_smi_indices_the_process_is_on,
     pci_bus_identifier_without_the_domain, pci_buses_by_nvidia_smi_index,
     selection_over_the_handed_over_gpus, this_host_address_emitted_by_the_configuration_check,
     GpuHandedOverByTheTaskServer, GpuHandoverUnreadable, GpusHandedToThisHost, HandedOverGpu,
@@ -327,5 +328,51 @@ fn the_three_gpu_target_declares_in_its_header_the_gpu_count_its_tests_ask_for()
         ),
         (Some(3), Some(3)),
         "三张卡那个目标：源头声明三张（服务照它分），用例也要三张"
+    );
+}
+
+/// 两张卡的「序号, UUID」（`nvidia-smi --query-gpu=index,uuid --format=csv,noheader`）。
+const INDEX_AND_UUID_OF_TWO_GPUS: &str = "0, GPU-aaaa\n1, GPU-bbbb\n";
+
+/// 欠账 C996：这个进程（进程号 4242）只在卡 1 上，别的进程（进程号 7）在卡 0 上——只认这个进程那一行，读出卡 1。
+#[test]
+fn the_gpus_the_process_is_on_are_read_from_its_own_compute_process_lines_only() {
+    assert_eq!(
+        nvidia_smi_indices_the_process_is_on(
+            "GPU-aaaa, 7\nGPU-bbbb, 4242\n",
+            INDEX_AND_UUID_OF_TWO_GPUS,
+            4242
+        ),
+        Ok(BTreeSet::from([NvidiaSmiIndex(1)])),
+        "别的进程在卡 0 上不算这个进程的"
+    );
+}
+
+/// 这个进程所在的卡的 UUID 对不上序号：报出来，不当它不在卡上。
+#[test]
+fn a_compute_process_line_on_an_unknown_gpu_is_reported_rather_than_skipped() {
+    assert!(
+        nvidia_smi_indices_the_process_is_on("GPU-cccc, 4242\n", INDEX_AND_UUID_OF_TWO_GPUS, 4242)
+            .is_err(),
+        "UUID 对不上序号：读不成"
+    );
+}
+
+/// 欠账 C996：交来的是卡 1，这个进程却也在卡 0 上——报出卡 0；只在卡 1 上时报空。
+#[test]
+fn a_gpu_the_process_is_on_outside_the_handed_over_ones_is_reported() {
+    let handed_over = [handed_over_gpu(1, "0000:41:00.0")];
+    assert_eq!(
+        nvidia_smi_indices_not_handed_over(
+            &BTreeSet::from([NvidiaSmiIndex(0), NvidiaSmiIndex(1)]),
+            &handed_over
+        ),
+        vec![NvidiaSmiIndex(0)],
+        "上了没交的卡 0"
+    );
+    assert!(
+        nvidia_smi_indices_not_handed_over(&BTreeSet::from([NvidiaSmiIndex(1)]), &handed_over)
+            .is_empty(),
+        "只在交来的卡 1 上"
     );
 }

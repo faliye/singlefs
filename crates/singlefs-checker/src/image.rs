@@ -955,10 +955,13 @@ fn physical_block_size_fits_a_root_slot(physical_block_size: u32, slot_spacing: 
     u64::from(physical_block_size) >= ROOT_RECORD_BYTES && physical_block_size <= slot_spacing
 }
 
-/// journal 环长装得下 F 条记录（在飞记录数上限 = 环槽数 ÷ F 不是 0，D23（journal 的角色与格式） 已定项 18；F 取格式常量
-/// `JOURNAL_SAFETY_FACTOR`，不读槽里那 4 字节，那一格没有上下界可判），且环的末端（同一槽「journal 环起点」字段 × 16384 + 环长）
+/// journal 环长装得下 F 条记录（在飞记录数上限 = ⌊环长 ÷ 4096 ÷ F⌋ 不是 0，D23（journal 的角色与格式） 已定项 18；F 取格式常量
+/// `JOURNAL_SAFETY_FACTOR`，不读槽里那 4 字节，那一格没有上下界可判），在飞上限装得进系统配置里它那 4 字节一格（`u32`，
+/// `.claude/kb/layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」；装不进时 I-8.1 那一格在飞上限的等式必不成立，
+/// 这一格先拒，归 I-7.13、与实现收同一张表），且环的末端（同一槽「journal 环起点」字段 × 16384 + 环长）
 /// 不越过同一槽的「单元区起始槽号」字段 × 16384（已定项 19 ③：单元区起始槽号随环长走；checker 扫单元区也按这个字段）。
 /// 两个槽号字段都是盘上读来的 8 字节：环末端乘加溢出算越界；单元区起点乘出来超过 u64 时它在任何设备偏移之外。
+/// 算式 checker 自己写，不引实现（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判 checker 不引实现）。
 fn journal_ring_bytes_lie_in_the_supported_range(
     journal_ring_start_slot: u64,
     journal_ring_bytes: u64,
@@ -969,6 +972,7 @@ fn journal_ring_bytes_lie_in_the_supported_range(
         .checked_mul(SLOT_BYTES)
         .and_then(|journal_ring_start| journal_ring_start.checked_add(journal_ring_bytes));
     in_flight_record_limit >= 1
+        && u32::try_from(in_flight_record_limit).is_ok()
         && journal_ring_end.is_some_and(|journal_ring_end| {
             unit_area_start_slot
                 .checked_mul(SLOT_BYTES)
@@ -2307,7 +2311,7 @@ mod tests {
 
     /// 阳性对照：四槽都是第一版的值、尾部全 0，第 0 代根的槽尾全 0——四槽都可择，I-7.13 成立，I-2.4 不红。
     #[test]
-    fn a_pool_holding_only_first_version_values_reads_every_slot_as_usable_and_keeps_header_checksum_coverage(
+    fn pool_holding_only_first_version_values_reads_every_slot_as_usable_and_keeps_header_checksum_coverage(
     ) {
         let pool = pool_holding_only_first_version_values();
         for (device, slots) in system_configuration_slot_readings(&pool) {
@@ -2340,7 +2344,7 @@ mod tests {
     /// C663 S：盘 1 槽 0 的每区槽数写 17（区间 [4, 16] 之外）、重封——D22（单元原子性怎么合成） 已定项 2「越界整池拒绝挂载」，
     /// 不再是「这一槽不可择」、别的槽照择。
     #[test]
-    fn a_slot_declaring_seventeen_slots_per_region_refuses_the_whole_pool() {
+    fn slot_declaring_seventeen_slots_per_region_refuses_the_whole_pool() {
         let mut pool = pool_holding_only_first_version_values();
         rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| {
             slot[SLOTS_PER_REGION_OFFSET] = 17
@@ -2353,7 +2357,7 @@ mod tests {
 
     /// C663 R：盘 1 槽 0 的区域数写 2（与第一版常量 3 不等）、重封。
     #[test]
-    fn a_slot_declaring_two_regions_refuses_the_whole_pool() {
+    fn slot_declaring_two_regions_refuses_the_whole_pool() {
         let mut pool = pool_holding_only_first_version_values();
         rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| slot[REGIONS_OFFSET] = 2);
         assert_device_one_slot_zero_refuses_the_whole_pool_naming(
@@ -2364,7 +2368,7 @@ mod tests {
 
     /// C663 R：区域数写 0，报 0 那一头自己的成员，同一个处置（整池拒）。
     #[test]
-    fn a_slot_declaring_zero_regions_refuses_the_whole_pool() {
+    fn slot_declaring_zero_regions_refuses_the_whole_pool() {
         let mut pool = pool_holding_only_first_version_values();
         rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| slot[REGIONS_OFFSET] = 0);
         assert_device_one_slot_zero_refuses_the_whole_pool_naming(
@@ -2375,7 +2379,7 @@ mod tests {
 
     /// C663 R：区域数写 4（比字段表留的三个逐区域设备字段多一个），报大于 3 那一头自己的成员，同一个处置（整池拒）。
     #[test]
-    fn a_slot_declaring_four_regions_refuses_the_whole_pool() {
+    fn slot_declaring_four_regions_refuses_the_whole_pool() {
         let mut pool = pool_holding_only_first_version_values();
         rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| slot[REGIONS_OFFSET] = 4);
         assert_device_one_slot_zero_refuses_the_whole_pool_naming(
@@ -2387,7 +2391,7 @@ mod tests {
     /// C663 次序：盘 1 槽 0 格式版本写 2、incompat 第一个字节写 0x03（不是这一版布局的 0x06，不认识）、重封——两样同在一槽时先判格式版本
     /// 读成带不收之值、整池拒，不是 incompat 不认得那一支的「这一槽不可择」。
     #[test]
-    fn a_slot_with_an_unrecognized_format_version_and_an_unknown_incompat_bit_refuses_the_whole_pool_by_its_format_version(
+    fn slot_with_an_unrecognized_format_version_and_an_unknown_incompat_bit_refuses_the_whole_pool_by_its_format_version(
     ) {
         let mut pool = pool_holding_only_first_version_values();
         rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| {
@@ -2403,7 +2407,7 @@ mod tests {
     /// C728 系统配置槽尾：盘 1 槽 0 字段表之后的头一个字节（偏移 489）写 1、重封——整槽校验和罩着它、core 不读它，
     /// 池级 checker 判 I-2.4 红、点名那个偏移；它不是读者不收之值，I-7.13 照旧成立。
     #[test]
-    fn a_non_zero_byte_right_past_the_system_configuration_field_table_reddens_header_checksum_coverage(
+    fn non_zero_byte_right_past_the_system_configuration_field_table_reddens_header_checksum_coverage(
     ) {
         let mut pool = pool_holding_only_first_version_values();
         let field_table_end = usize::try_from(SYSTEM_CONFIGURATION_BYTES).expect("489");
@@ -2433,7 +2437,7 @@ mod tests {
 
     /// C728 根槽尾：第 0 代根的根记录之后头一个字节（偏移 466）写 1、重封自证校验和——池级 checker 判 I-2.4 红、点名那个偏移。
     #[test]
-    fn a_non_zero_byte_right_past_the_root_record_reddens_header_checksum_coverage() {
+    fn non_zero_byte_right_past_the_root_record_reddens_header_checksum_coverage() {
         let mut pool = pool_holding_only_first_version_values();
         let record_end = usize::try_from(ROOT_RECORD_BYTES).expect("466");
         let mut root_slot = genesis_root_slot();
@@ -2453,5 +2457,43 @@ mod tests {
             detail.contains("根槽偏移 466 "),
             "违例点名根槽偏移 466：{detail}"
         );
+    }
+
+    /// 在飞上限那 4 字节一格（`.claude/kb/layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）：环长 `3 << 44` 字节时
+    /// 在飞上限 = 2³²，装不进 `u32`，环长判据判假；小一个 12288 字节（F 条记录）时在飞上限 = 2³² − 1，这一格不拒。
+    /// 两个环长的单元区起点都照环长现算（同一个槽号 1024 + 3 × 2³⁰），环末端都不越过它——这一对取样点上只有装不装得进 4 字节那一格分得开。
+    #[test]
+    fn journal_ring_whose_in_flight_record_limit_overflows_its_four_byte_field_lies_outside_the_supported_range(
+    ) {
+        let overflowing_journal_ring_bytes: u64 = 3 << 44;
+        let largest_fitting_journal_ring_bytes =
+            overflowing_journal_ring_bytes - JOURNAL_SAFETY_FACTOR * JOURNAL_RECORD_BYTES;
+        assert_eq!(
+            overflowing_journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR,
+            u64::from(u32::MAX) + 1,
+            "取样点在 4 字节一格的边界上：大的那个环长的在飞上限恰好比 u32::MAX 多 1"
+        );
+        for journal_ring_bytes in [
+            overflowing_journal_ring_bytes,
+            largest_fitting_journal_ring_bytes,
+        ] {
+            let unit_area_start_slot =
+                JOURNAL_RING_START_SLOT + journal_ring_bytes.div_ceil(SLOT_BYTES);
+            assert_eq!(
+                unit_area_start_slot,
+                JOURNAL_RING_START_SLOT + (3 << 30),
+                "环长 {journal_ring_bytes} 现算的单元区起点"
+            );
+            assert_eq!(
+                journal_ring_bytes_lie_in_the_supported_range(
+                    JOURNAL_RING_START_SLOT,
+                    journal_ring_bytes,
+                    unit_area_start_slot,
+                ),
+                journal_ring_bytes == largest_fitting_journal_ring_bytes,
+                "环长 {journal_ring_bytes}：在飞上限 {} 装得进 4 字节才过环长判据",
+                journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
+            );
+        }
     }
 }

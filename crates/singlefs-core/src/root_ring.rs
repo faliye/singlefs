@@ -297,8 +297,8 @@ mod tests {
     /// 第 0 代根（txg 0）住三个区域各自的槽 0 都认（mkfs 种根的槽），住槽 1 判错位。
     /// 判别力：`crates/mutations.tsv`「根环一簇 R1：落点公式核恒认」那一行（谓词恒真）与「第 0 代根照公式只认区域 0」那一行，各让这一条红。
     #[test]
-    fn a_root_sits_only_in_the_ring_slot_its_txg_targets_and_a_genesis_root_in_any_region_slot_zero(
-    ) {
+    fn root_sits_only_in_the_ring_slot_its_txg_targets_and_a_genesis_root_in_any_region_slot_zero()
+    {
         let slots = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
         let formula_slot_of_txg_four = target_for_publish(CheckpointTxg(4), slots);
         assert_eq!(

@@ -16,13 +16,14 @@
 //! 自己的 cfg 是假），所以那里点名打开、这里的 cfg 却说没开的特性，构建当场停下、说出是哪一个，不交一份与编出来的库不符的元数据。
 //!
 //! 只做交出与这一判：不生成代码，值是开着的特性名写进 cargo 环境变量名的样子（大写、`-` 换成 `_`），按清单里的名字排好、逗号隔开。
-//! 清单 `[features]` 里的每个特性都要在 [`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`] 里有一行：`singlefs-unit-graph` 的
+//! 清单 `[features]` 里的每个特性都要在 [`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS`] 里有一行：`singlefs-unit-graph` 的
 //! `build_features` 单测把两边逐个比（`the_core_build_script_lists_every_feature_of_its_manifest`）。
 
 /// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。
 /// `pub(crate)`：验证包的 `publish_lookup_by_identity` 与 `singlefs-unit-graph` 的单测经 `#[path]` 把这份构建脚本编成一个模块，
 /// 要读它与下面两个函数。
-pub(crate) const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 2] = [
+pub(crate) const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS: [(&str, bool);
+    2] = [
     (
         "lookup-work-counters",
         cfg!(feature = "lookup-work-counters"),
@@ -43,10 +44,12 @@ const ENCODED_RUSTFLAGS_SEPARATOR: char = '\u{1f}';
 const ENABLED_FEATURES_RUSTC_ENVIRONMENT_VARIABLE: &str =
     "SINGLEFS_CORE_ENABLED_FEATURES_REPORTED_BY_THE_BUILD_SCRIPT";
 
-/// 交出去的那一行的值：`features_with_their_cfg` 里开着的那几个，写成 cargo 环境变量名的样子（大写、`-` 换成 `_`），逗号隔开。
-/// 只看 `features_with_their_cfg`，不读进程环境：外面带进来的 `CARGO_FEATURE_*` 不算开着。
-pub(crate) fn enabled_features_metadata_value(features_with_their_cfg: &[(&str, bool)]) -> String {
-    features_with_their_cfg
+/// 交出去的那一行的值：`features_with_their_conditional_compilation_flags` 里开着的那几个，写成 cargo 环境变量名的样子（大写、`-` 换成 `_`），逗号隔开。
+/// 只看 `features_with_their_conditional_compilation_flags`，不读进程环境：外面带进来的 `CARGO_FEATURE_*` 不算开着。
+pub(crate) fn enabled_features_metadata_value(
+    features_with_their_conditional_compilation_flags: &[(&str, bool)],
+) -> String {
+    features_with_their_conditional_compilation_flags
         .iter()
         .filter(|(_, is_enabled_by_cargo)| *is_enabled_by_cargo)
         .map(|(feature, _)| feature.to_ascii_uppercase().replace('-', "_"))
@@ -55,11 +58,11 @@ pub(crate) fn enabled_features_metadata_value(features_with_their_cfg: &[(&str, 
 }
 
 /// `encoded_rustflags`（[`ENCODED_RUSTFLAGS_VARIABLE`] 的值）里经 `--cfg feature="<名>"`（`--cfg` 与它的值分两项，或写成
-/// `--cfg=feature="<名>"` 一项；等号两边与引号里外的空白不算）点名打开、而 `features_with_their_cfg` 说这一次没开的那几个特性，
+/// `--cfg=feature="<名>"` 一项；等号两边与引号里外的空白不算）点名打开、而 `features_with_their_conditional_compilation_flags` 说这一次没开的那几个特性，
 /// 按表的次序。表里没有的名字不管（`RUSTFLAGS` 给每个包都带，别的包的特性也在里面）。
 pub(crate) fn features_opened_by_the_rustflags_but_off_in_this_build_script<'table>(
     encoded_rustflags: &str,
-    features_with_their_cfg: &[(&'table str, bool)],
+    features_with_their_conditional_compilation_flags: &[(&'table str, bool)],
 ) -> Vec<&'table str> {
     let arguments: Vec<&str> = encoded_rustflags
         .split(ENCODED_RUSTFLAGS_SEPARATOR)
@@ -67,28 +70,28 @@ pub(crate) fn features_opened_by_the_rustflags_but_off_in_this_build_script<'tab
         .collect();
     let mut feature_names_opened_by_the_rustflags: Vec<String> = Vec::new();
     // 迭代上界是参数个数；跨轮携带的是下一项是不是 `--cfg` 的值（只看紧跟在 `--cfg` 后面的那一项）。
-    let mut is_the_value_of_a_cfg_flag = false;
+    let mut is_the_value_of_a_conditional_compilation_flag = false;
     for argument in arguments {
-        let cfg_value = if is_the_value_of_a_cfg_flag {
-            is_the_value_of_a_cfg_flag = false;
+        let conditional_compilation_value = if is_the_value_of_a_conditional_compilation_flag {
+            is_the_value_of_a_conditional_compilation_flag = false;
             Some(argument)
         } else if argument == "--cfg" {
-            is_the_value_of_a_cfg_flag = true;
+            is_the_value_of_a_conditional_compilation_flag = true;
             None
         } else {
             argument.strip_prefix("--cfg=")
         };
-        let Some(cfg_value) = cfg_value else {
+        let Some(conditional_compilation_value) = conditional_compilation_value else {
             continue;
         };
-        let Some((name, value)) = cfg_value.split_once('=') else {
+        let Some((name, value)) = conditional_compilation_value.split_once('=') else {
             continue;
         };
         if name.trim() == "feature" {
             feature_names_opened_by_the_rustflags.push(value.trim().trim_matches('"').to_string());
         }
     }
-    features_with_their_cfg
+    features_with_their_conditional_compilation_flags
         .iter()
         .filter(|(feature, is_enabled_by_cargo)| {
             !*is_enabled_by_cargo
@@ -111,7 +114,7 @@ fn main() {
     };
     let disagreeing = features_opened_by_the_rustflags_but_off_in_this_build_script(
         &encoded_rustflags,
-        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
+        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS,
     );
     assert!(
         disagreeing.is_empty(),
@@ -121,11 +124,15 @@ fn main() {
     );
     println!(
         "cargo::metadata=enabled_features={}",
-        enabled_features_metadata_value(&FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG)
+        enabled_features_metadata_value(
+            &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
+        )
     );
     println!(
         "cargo::rustc-env={ENABLED_FEATURES_RUSTC_ENVIRONMENT_VARIABLE}={}",
-        enabled_features_metadata_value(&FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG)
+        enabled_features_metadata_value(
+            &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
+        )
     );
     println!("cargo::rerun-if-changed=build.rs");
 }

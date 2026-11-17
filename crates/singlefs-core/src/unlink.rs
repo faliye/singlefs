@@ -469,7 +469,7 @@ mod tests {
     /// 剩下的不多于一批就是最后一批：产品批大小下 144 个单元的文件只有最后一批，145 个的先截掉尾部 144 个；
     /// 没有数据单元的文件只有一个释放 0 个的最后一批（不设一次做完的快路，形状同一个）。
     #[test]
-    fn a_file_of_at_most_one_batch_goes_straight_to_the_final_batch() {
+    fn file_of_at_most_one_batch_goes_straight_to_the_final_batch() {
         let product = UnlinkBatchSize::OneExtentLowerLeaf;
         assert_eq!(
             next_unlink_step(144, product),
@@ -518,7 +518,7 @@ mod tests {
     /// 第 1 片叶罩 144..=287、被截掉一半 ⇒ 重写；根罩着被截掉那一段 ⇒ 重写；第 2 片叶整片被截 ⇒ 换下、不再出现。
     /// 上段这个文件那一串（这里只有根兼叶）重写。
     #[test]
-    fn a_deletion_batch_rewrites_only_the_cut_lower_leaf_and_its_ancestors() {
+    fn deletion_batch_rewrites_only_the_cut_lower_leaf_and_its_ancestors() {
         let previous = extent_tree_of_a_file_without_holes(300);
         let plan = plan_the_extent_tree_after_a_deletion_batch(
             &previous,
@@ -567,7 +567,7 @@ mod tests {
     /// 截在叶边界上（300 截到 144）：留下的第 0 片叶一个字节都不变 ⇒ 照抄，它成了下段根（下段矮一层）；
     /// 下段一个节点都不重写，上段那一串照样重写（上段叶条目里下段根的指针换成第 0 片叶的）。
     #[test]
-    fn a_deletion_batch_cut_on_a_leaf_boundary_carries_the_kept_leaf_as_the_new_lower_root() {
+    fn deletion_batch_cut_on_a_leaf_boundary_carries_the_kept_leaf_as_the_new_lower_root() {
         let previous = extent_tree_of_a_file_without_holes(300);
         let plan = plan_the_extent_tree_after_a_deletion_batch(
             &previous,
@@ -597,7 +597,7 @@ mod tests {
 
     /// 截到只剩一个单元：不建下段（内联，同写路径），上一版下段每个节点都换下。
     #[test]
-    fn a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment() {
+    fn deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment() {
         let previous = extent_tree_of_a_file_without_holes(3);
         let plan = plan_the_extent_tree_after_a_deletion_batch(
             &previous,
@@ -620,7 +620,7 @@ mod tests {
     /// 删第一个文件之外的 inode 500 的一批（判决 m3-multi-file-unlink-r1 第三节 M1）：第一个文件的下段整段照抄、一个都不换下，
     /// 上段只重写罩着 500 的那一串（它那片叶 (0, 3) 与根 (1, 0)），第一个文件那片叶 (0, 0) 照抄；有条目的号集合不变、根层级不变。
     #[test]
-    fn a_deletion_batch_of_another_inode_carries_the_first_file_and_rewrites_only_the_upper_path_of_that_inode(
+    fn deletion_batch_of_another_inode_carries_the_first_file_and_rewrites_only_the_upper_path_of_that_inode(
     ) {
         let previous = extent_tree_with_the_upper_nodes(
             &[

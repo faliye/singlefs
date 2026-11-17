@@ -69,7 +69,7 @@ fn function_start_lines(workspace: &Workspace, outcome: &ClosureOutcome) -> BTre
 }
 
 #[test]
-fn the_same_source_under_two_triples_closes_over_the_two_target_os_branches() {
+fn the_same_source_under_two_triples_closes_over_the_two_target_operating_system_branches() {
     let tree = FixtureTree::materialize("platform-branch", &PLATFORM_BRANCH_FIXTURE);
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);
@@ -101,7 +101,7 @@ fn the_same_source_under_two_triples_closes_over_the_two_target_os_branches() {
 }
 
 #[test]
-fn a_triple_missing_from_the_table_is_refused() {
+fn triple_missing_from_the_table_is_refused() {
     let tree = FixtureTree::materialize("platform-unknown", &PLATFORM_BRANCH_FIXTURE);
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);

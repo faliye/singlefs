@@ -13,36 +13,27 @@ use std::collections::BTreeMap;
 
 use crate::manifest::{parse_toml_entries, TomlValue};
 
-/// 进键的 profile 设置：会改编出来的代码怎么跑的那几样（按 cargo 文档 Profiles 一节的键名）。
-pub const PROFILE_SETTING_KEYS: [&str; 8] = [
+/// 进键的 profile 设置：会改编出来的代码跑出的结果的那几样（按 cargo 文档 Profiles 一节的键名）。
+/// `debug`（调试信息）与 `incremental`（增量编译）不改编出来的代码跑出的结果，不进键：根清单与 `CARGO_PROFILE_<名>_<键>`
+/// 里写了也不读。`codegen-units` 进键：它改代码分区与栈深。依据是 D13（验证路线） 已定项 17
+/// 「工具链（含 cargo 解析后的生效构建环境与外部工具版本）」那一句。
+pub const PROFILE_SETTING_KEYS: [&str; 6] = [
     "opt-level",
-    "debug",
     "debug-assertions",
     "overflow-checks",
     "lto",
     "panic",
-    "incremental",
     "codegen-units",
 ];
 
 /// 内置 profile 的默认值与它继承谁（cargo 文档 Profiles 一节「Default profiles」）。
-fn builtin_profile(profile_name: &str) -> Option<(Option<&'static str>, [&'static str; 8])> {
+fn builtin_profile(profile_name: &str) -> Option<(Option<&'static str>, [&'static str; 6])> {
     // 次序照 [`PROFILE_SETTING_KEYS`]
     match profile_name {
-        "dev" => Some((
-            None,
-            [
-                "0", "true", "true", "true", "false", "unwind", "true", "256",
-            ],
-        )),
-        "release" => Some((
-            None,
-            [
-                "3", "false", "false", "false", "false", "unwind", "false", "16",
-            ],
-        )),
-        "test" => Some((Some("dev"), [""; 8])),
-        "bench" => Some((Some("release"), [""; 8])),
+        "dev" => Some((None, ["0", "true", "true", "false", "unwind", "256"])),
+        "release" => Some((None, ["3", "false", "false", "false", "unwind", "16"])),
+        "test" => Some((Some("dev"), [""; 6])),
+        "bench" => Some((Some("release"), [""; 6])),
         _ => None,
     }
 }
@@ -216,18 +207,78 @@ mod tests {
     fn the_release_profile_takes_the_root_manifest_over_the_builtin_defaults() {
         let lines =
             effective_profile_lines(ROOT_MANIFEST, "release", &no_environment).expect("算得出");
-        assert!(
-            lines.contains(&"profile.overflow-checks: true".to_string()),
-            "{lines:?}"
+        // 根清单里的 `debug = true` 不出行；`codegen-units` 取内置默认
+        assert_eq!(
+            lines,
+            [
+                "profile: release",
+                "profile.opt-level: 3",
+                "profile.debug-assertions: true",
+                "profile.overflow-checks: true",
+                "profile.lto: false",
+                "profile.panic: unwind",
+                "profile.codegen-units: 16",
+            ]
         );
-        assert!(
-            lines.contains(&"profile.debug-assertions: true".to_string()),
-            "{lines:?}"
+    }
+
+    /// 根清单只在 `[profile.release]` 里多写这几行的一份（其余照 [`ROOT_MANIFEST`] 那样起头）。
+    fn release_manifest_with(release_settings: &str) -> String {
+        format!(
+            "[workspace]\nmembers = [\"crates/alpha\"]\n\n[profile.release]\n{release_settings}"
+        )
+    }
+
+    fn release_lines_of(release_settings: &str) -> Vec<String> {
+        effective_profile_lines(
+            &release_manifest_with(release_settings),
+            "release",
+            &no_environment,
+        )
+        .expect("算得出")
+    }
+
+    #[test]
+    fn debug_and_incremental_leave_the_profile_lines_byte_for_byte_unchanged() {
+        assert_eq!(
+            release_lines_of("debug = true\n"),
+            release_lines_of("debug = false\n"),
+            "只差 debug"
         );
-        assert!(
-            lines.contains(&"profile.codegen-units: 16".to_string()),
-            "内置默认：{lines:?}"
+        assert_eq!(
+            release_lines_of("debug = 2\nincremental = true\n"),
+            release_lines_of("debug = 2\nincremental = false\n"),
+            "只差 incremental"
         );
+        let without_environment = release_lines_of("debug = 2\n");
+        let with_environment =
+            effective_profile_lines(&release_manifest_with("debug = 2\n"), "release", &|name| {
+                matches!(
+                    name,
+                    "CARGO_PROFILE_RELEASE_DEBUG" | "CARGO_PROFILE_RELEASE_INCREMENTAL"
+                )
+                .then(|| "true".to_string())
+            })
+            .expect("算得出");
+        assert_eq!(
+            without_environment, with_environment,
+            "只差 CARGO_PROFILE_RELEASE_DEBUG 与 CARGO_PROFILE_RELEASE_INCREMENTAL"
+        );
+    }
+
+    #[test]
+    fn debug_assertions_opt_level_and_codegen_units_each_change_the_profile_lines() {
+        for (settings, changed_settings) in [
+            ("debug-assertions = false\n", "debug-assertions = true\n"),
+            ("opt-level = 3\n", "opt-level = 2\n"),
+            ("codegen-units = 16\n", "codegen-units = 1\n"),
+        ] {
+            assert_ne!(
+                release_lines_of(settings),
+                release_lines_of(changed_settings),
+                "{settings:?} 与 {changed_settings:?}"
+            );
+        }
     }
 
     #[test]
@@ -259,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn the_dev_profile_without_a_table_keeps_the_builtin_overflow_checks() {
+    fn the_development_profile_without_a_table_keeps_the_builtin_overflow_checks() {
         let lines = effective_profile_lines(ROOT_MANIFEST, "dev", &no_environment).expect("算得出");
         assert!(
             lines.contains(&"profile.overflow-checks: true".to_string()),

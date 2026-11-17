@@ -3772,7 +3772,7 @@ mod tests {
     /// 第 5 片两层都满、再长一层：层级 1 的 (1, 1) 满了开 (1, 2)；它的父亲是根 (2, 0)，也满了，旧根留在 (2, 0)、右半 (2, 1) 一个孩子 (1, 2)、
     /// 新根 (3, 0) 两个孩子 (2, 0) 与 (2, 1)。
     #[test]
-    fn a_full_root_grows_a_level_with_the_old_root_kept_in_place_and_a_new_right_half() {
+    fn full_root_grows_a_level_with_the_old_root_kept_in_place_and_a_new_right_half() {
         assert_eq!(shape_after_opening(0, 2).root_level(), 0);
         assert_eq!(
             shape_after_opening(2, 2).positions_in_bump_order(),

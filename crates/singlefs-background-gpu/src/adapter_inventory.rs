@@ -222,7 +222,7 @@ pub fn identifiers_of_the_discrete_gpus_in_the_enumeration(
 }
 
 /// 此刻本机在的独显各自的标识（挂着切换那一刻现查）：产品经 wgpu 现枚举一次（外壳 `background_gpu` 里那一份），测试换成假的。
-/// 枚举不成（等 wgpu 超过上限）时交回空：一张都不在，切换照「GPU 不在」拒。
+/// 枚举不成（等 wgpu 超过上限）时交回空：一张都不在，切换没点名时照「GPU 不在」拒，点了名的拒成 `NamedGpuDeviceNotInTheInventory`。
 pub trait DiscreteGpusPresentNow {
     fn identifiers_of_the_discrete_gpus_present_now(&self) -> Vec<GpuDeviceIdentifier>;
 }
@@ -246,7 +246,7 @@ impl GpuInventory for DiscreteGpuInventorySnapshot<'_> {
 pub struct BackgroundGpuSelection {
     pub background_gpu_devices: Option<Vec<GpuDeviceIdentifier>>,
     pub background_gpu_memory_limit: Option<Vec<GpuMemoryInBytes>>,
-    /// 每一处阻塞等 GPU 的上限（挂载参数 `background_gpu_wait_limit`；用户 2026-10-26 定等 GPU 结果「设超时，超时算出错」）：
+    /// 每一处阻塞等 GPU 的上限（挂载参数 `background_gpu_wait_limit`；D26（后台整理与放置回收） 已定项 13 第 4 条）：
     /// 挂载那一刻等 wgpu 的 future、挂着的时候等一次提交做完与回读映射好，各次都在它之内，超过就按 GPU 出错办（`crate::waiting_for_the_gpu`）。
     pub background_gpu_wait_limit: std::time::Duration,
 }

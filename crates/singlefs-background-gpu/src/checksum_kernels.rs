@@ -9,14 +9,21 @@
 //!   开算之前整块填 [`OUTCOME_NOT_WRITTEN_FILL_WORD`]：核没写到的那一条读回来判定字不是 0 也不是 1，按 GPU 出错交回。
 //!
 //! 一个单元单独成一段都装不下这张卡此刻剩下的地方时切成几片（`memory_limit_and_chunks::pieces_cut_to_fit_on_the_gpu`），每片当一条交两份核，
-//! 核照常算这一片的 CRC-32C；再把各片的值合成整单元的值、与期望值比（[`checksum_outcomes_of_the_units_cut_into_pieces`]，用户 2026-10-28 定
-//! 「装不下应该自适应的分片」）。合法也是两份、各写各的（第 8 条：两份核不共用核函数）：查表那一份核的各片按「补零字节的算子矩阵」合
+//! 核照常算这一片的 CRC-32C；再把各片的值合成整单元的值、与期望值比（[`checksum_outcomes_of_the_units_cut_into_pieces`]，D26（后台整理与放置回收）
+//! 已定项 13 第 3 条「按上限自适应切成几片」）。合法也是两份、各写各的（第 8 条：两份核不共用核函数）：查表那一份核的各片按「补零字节的算子矩阵」合
 //! （[`crc32c_of_two_pieces_by_the_zero_operator_matrices`]），逐位移那一份核的各片按「乘 x 的 8n 次方再取模」合
 //! （[`crc32c_of_two_pieces_by_multiplying_a_power_of_the_polynomial_variable`]）；CPU 参照照旧对整单元一次算（核心层的 CRC-32C），与两种合法都不共用代码。
 
-use crate::memory_limit_and_chunks::{ChunkFootprint, PieceOfAnEntry};
+use singlefs_core::background_compute::GpuMemoryInBytes;
+
+use crate::memory_limit_and_chunks::{
+    ChunkFootprint, EntryCountOfAChunk, InputLengthOnTheHostInBytes, PieceOfAnEntry,
+    COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS,
+    COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION,
+};
 use crate::two_kernel_reconciliation::{
-    ConsecutiveUncertaintyCounts, ReconciledBatch, TwoKernelOutcomesOfAnEntry,
+    first_entry_key_repeated_among, ConsecutiveUncertaintyCounts, ReconciledBatch,
+    SameEntryKeyTwiceInOneBatch, TwoKernelOutcomesOfAnEntry,
 };
 
 /// 按字节查表的那一份核（`crc32c_by_byte_remainder_table`）。
@@ -29,32 +36,38 @@ pub const BITWISE_KERNEL_ENTRY_POINT: &str = "crc32c_by_shifting_whole_words";
 /// 两份核的工作组都是 64 个调用（两份 WGSL 里的 `@workgroup_size(64)`），每条一个调用。
 pub const INVOCATIONS_PER_WORKGROUP: u32 = 64;
 /// 参数缓冲占的字节数：着色器只读开头一个 `u32`，缓冲按 16 字节建（uniform 缓冲的常见最小对齐）。
-pub const PARAMETER_BUFFER_BYTES: u64 = 16;
+pub const PARAMETER_BUFFER_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(16);
 /// 每条描述三个 `u32`。
 pub const DESCRIPTOR_WORDS_PER_ENTRY: usize = 3;
-pub const DESCRIPTOR_BYTES_PER_ENTRY: u64 = 12;
+pub const DESCRIPTOR_BYTES_PER_ENTRY: GpuMemoryInBytes = GpuMemoryInBytes(12);
 /// 每条结果两个 `u32`。
 pub const OUTCOME_WORDS_PER_ENTRY: usize = 2;
-pub const OUTCOME_BYTES_PER_ENTRY: u64 = 8;
+pub const OUTCOME_BYTES_PER_ENTRY: GpuMemoryInBytes = GpuMemoryInBytes(8);
 /// 结果缓冲开算之前的填充字：判定字只会被核写成 0 或 1。
 pub const OUTCOME_NOT_WRITTEN_FILL_WORD: u32 = 0xFFFF_FFFF;
 const VERDICT_WORD_MATCHES: u32 = 1;
 const VERDICT_WORD_DOES_NOT_MATCH: u32 = 0;
-/// 两份核各一个结果缓冲与一个回读暂存缓冲。
-const OUTCOME_AND_READBACK_BUFFERS: u64 = 4;
 
-/// 校验和核对一段在卡上占的：参数缓冲；每条一项描述、两份核各一项结果与一项回读暂存。按条排的最大缓冲是描述那一个。
+/// 校验和核对一段在卡上占的：参数缓冲；每条一项描述、两份核各一项结果与一项回读暂存。参数、输入、描述与两份结果缓冲都映射着建，
+/// 各带一份同尺寸的暂存（[`COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION`]；输入那一份由 [`ChunkFootprint::bytes_held_by_a_chunk`] 算）。
+/// 按条排的最大缓冲是描述那一个。
 pub const CHECKSUM_CHUNK_FOOTPRINT: ChunkFootprint = ChunkFootprint {
-    bytes_per_chunk_besides_the_entries: PARAMETER_BUFFER_BYTES,
-    bytes_per_entry_besides_its_input: DESCRIPTOR_BYTES_PER_ENTRY
-        + OUTCOME_AND_READBACK_BUFFERS * OUTCOME_BYTES_PER_ENTRY,
+    bytes_per_chunk_besides_the_entries: COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+        .bytes_of_the_copies(PARAMETER_BUFFER_BYTES),
+    bytes_per_entry_besides_its_input: COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION
+        .bytes_of_the_copies(DESCRIPTOR_BYTES_PER_ENTRY)
+        .plus(
+            COPIES_ON_THE_GPU_OF_AN_OUTCOME_OF_BOTH_KERNELS
+                .bytes_of_the_copies(OUTCOME_BYTES_PER_ENTRY),
+        ),
     bytes_per_entry_in_the_largest_entry_buffer: DESCRIPTOR_BYTES_PER_ENTRY,
 };
 
 /// 校验和核对一段里最小的一片在卡上合占的字节数：一个字节的单元（补到一个整字）连同一段的固定占用。
 #[must_use]
-pub fn bytes_of_the_smallest_checksum_piece() -> u64 {
-    CHECKSUM_CHUNK_FOOTPRINT.bytes_held_by_a_chunk(1, 1)
+pub fn bytes_of_the_smallest_checksum_piece() -> GpuMemoryInBytes {
+    CHECKSUM_CHUNK_FOOTPRINT
+        .bytes_held_by_a_chunk(InputLengthOnTheHostInBytes(1), EntryCountOfAChunk(1))
 }
 
 /// 要核的一个单元：调用方给的条目键（同一单元在下一轮还用同一个键，连续不确定按它数）、单元字节、期望的 CRC-32C。
@@ -105,10 +118,10 @@ pub fn packed_checksum_chunk<EntryKey>(
 ) -> PackedChecksumChunk {
     let total_unit_bytes: usize = units.iter().map(|unit| unit.unit_bytes.len()).sum();
     let padded_bytes = crate::memory_limit_and_chunks::input_buffer_bytes(
-        u64::try_from(total_unit_bytes).expect("usize 装得进 u64"),
+        InputLengthOnTheHostInBytes::of_this_many_bytes(total_unit_bytes),
     );
     let mut input_bytes =
-        Vec::with_capacity(usize::try_from(padded_bytes).expect("一段的输入装得进内存"));
+        Vec::with_capacity(usize::try_from(padded_bytes.0).expect("一段的输入装得进内存"));
     let mut descriptor_words = Vec::with_capacity(units.len() * DESCRIPTOR_WORDS_PER_ENTRY);
     for unit in units {
         let byte_offset = u32::try_from(input_bytes.len())
@@ -119,7 +132,7 @@ pub fn packed_checksum_chunk<EntryKey>(
         descriptor_words.extend_from_slice(&[byte_offset, byte_length, unit.expected_crc32c]);
     }
     input_bytes.resize(
-        usize::try_from(padded_bytes).expect("一段的输入装得进内存"),
+        usize::try_from(padded_bytes.0).expect("一段的输入装得进内存"),
         0,
     );
     PackedChecksumChunk {
@@ -206,18 +219,26 @@ pub fn cpu_reference_outcome(unit_bytes: &[u8], expected_crc32c: u32) -> Checksu
 }
 
 /// 扫描里的校验和核对一批的比对（第 8 条）：两份核的结果交进来（按 `units` 的次序，查表那一份在前），逐条比、更新计数；
-/// 连续不确定到 N 轮的条目交 CPU 参照（[`cpu_reference_outcome`]）现判。这一批出错就原样交回出错、计数不动、CPU 参照不调。
+/// 连续不确定到 N 轮的条目交 CPU 参照（[`cpu_reference_outcome`]）现判。这一批出错、或同一个条目键在一批里出现两次，就交回出错、计数不动、CPU 参照不调。
+/// 三段同一个次序：重复的键先于两份核的结局判（外壳在交卡之前就查，重复时一片都不交，卡出错与重复键不同时出现）。
 ///
 /// # Errors
-/// `both_kernel_outcomes` 是 `Err` 时交回它。
+/// 同一个条目键在一批里出现两次时交回 [`SameEntryKeyTwiceInOneBatch`] 转成的那一种（两份核交成了还是出错了都先报它）；`both_kernel_outcomes` 是 `Err` 时交回它。
 ///
 /// # Panics
-/// 两份核交回的条数与 `units` 不等；同一个条目键在一批里出现两次。
-pub fn reconciled_unit_checksums<EntryKey: Eq + std::hash::Hash + Clone, BatchFailure>(
+/// 两份核交回的条数与 `units` 不等。
+pub fn reconciled_unit_checksums<
+    EntryKey: Eq + std::hash::Hash + Clone,
+    BatchFailure: From<SameEntryKeyTwiceInOneBatch>,
+>(
     units: &[UnitChecksumToVerify<'_, EntryKey>],
     both_kernel_outcomes: Result<Vec<(ChecksumKernelOutcome, ChecksumKernelOutcome)>, BatchFailure>,
     uncertainty: &mut ConsecutiveUncertaintyCounts<EntryKey>,
 ) -> Result<ReconciledBatch<ChecksumKernelOutcome>, BatchFailure> {
+    if let Some(repeated) = first_entry_key_repeated_among(units.iter().map(|unit| &unit.entry_key))
+    {
+        return Err(BatchFailure::from(repeated));
+    }
     let both_kernel_outcomes = both_kernel_outcomes.map(|outcomes| {
         assert_eq!(outcomes.len(), units.len(), "两份核每条各交一个结果");
         units
@@ -372,9 +393,9 @@ pub fn units_of_the_pieces<'unit, EntryKey>(
         .map(|piece| {
             let unit = &units[piece.entry_position];
             let piece_start =
-                usize::try_from(piece.input_bytes.start).expect("片的起点在单元里，装得进 usize");
+                usize::try_from(piece.input_bytes.start.0).expect("片的起点在单元里，装得进 usize");
             let piece_end =
-                usize::try_from(piece.input_bytes.end).expect("片的终点在单元里，装得进 usize");
+                usize::try_from(piece.input_bytes.end.0).expect("片的终点在单元里，装得进 usize");
             UnitChecksumToVerify {
                 entry_key: (),
                 unit_bytes: &unit.unit_bytes[piece_start..piece_end],
@@ -416,9 +437,9 @@ pub fn checksum_outcomes_of_the_units_cut_into_pieces<EntryKey, SubmissionFailur
     let mut unit_outcomes = Vec::with_capacity(units.len());
     let mut next_piece = 0;
     for (entry_position, unit) in units.iter().enumerate() {
-        let unit_length = u64::try_from(unit.unit_bytes.len()).expect("装得进 u64");
+        let unit_length = InputLengthOnTheHostInBytes::of_this_many_bytes(unit.unit_bytes.len());
         let first_piece = next_piece;
-        let mut covered_up_to = 0;
+        let mut covered_up_to = InputLengthOnTheHostInBytes(0);
         while next_piece < piece_outcomes.len()
             && piece_outcomes[next_piece].0.entry_position == entry_position
         {
@@ -444,12 +465,12 @@ pub fn checksum_outcomes_of_the_units_cut_into_pieces<EntryKey, SubmissionFailur
             table_driven_crc32c = crc32c_of_two_pieces_by_the_zero_operator_matrices(
                 table_driven_crc32c,
                 table_driven.computed_crc32c,
-                piece.input_byte_count(),
+                piece.input_byte_count().0,
             );
             bitwise_crc32c = crc32c_of_two_pieces_by_multiplying_a_power_of_the_polynomial_variable(
                 bitwise_crc32c,
                 bitwise.computed_crc32c,
-                piece.input_byte_count(),
+                piece.input_byte_count().0,
             );
         }
         unit_outcomes.push((
@@ -647,7 +668,7 @@ mod tests {
             .collect())
     }
 
-    /// 用户 2026-10-28 定「装不下应该自适应的分片」：上限 1 KiB 时 4095、4096、32771 字节的单元切成几片交（两份核在 CPU 上的替身），
+    /// 第 3 条「按上限自适应切成几片」：上限 1 KiB 时 4095、4096、32771 字节的单元切成几片交（两份核在 CPU 上的替身），
     /// 各片的值两份各按自己的合法合成，与 CPU 参照对整单元的判定逐条相同；期望值一对一错，判定两边都走到。
     #[test]
     fn units_cut_into_pieces_under_a_small_memory_limit_match_the_cpu_reference_on_every_unit() {
@@ -672,17 +693,17 @@ mod tests {
                 }
             })
             .collect();
-        let lengths: Vec<u64> = unit_bytes
+        let lengths: Vec<InputLengthOnTheHostInBytes> = unit_bytes
             .iter()
-            .map(|bytes| u64::try_from(bytes.len()).expect("装得进 u64"))
+            .map(|bytes| InputLengthOnTheHostInBytes::of_this_many_bytes(bytes.len()))
             .collect();
         let chunks_of_pieces = crate::memory_limit_and_chunks::pieces_cut_to_fit_on_the_gpu(
             &lengths,
             CHECKSUM_CHUNK_FOOTPRINT,
             crate::memory_limit_and_chunks::ChunkBoundsOfAGpu {
-                memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(1024)),
-                largest_storage_binding_in_bytes: 1 << 30,
-                largest_entry_count_per_dispatch: 1 << 20,
+                memory_limit: Some(GpuMemoryInBytes(1024)),
+                largest_storage_binding_in_bytes: GpuMemoryInBytes(1 << 30),
+                largest_entry_count_per_dispatch: EntryCountOfAChunk(1 << 20),
             },
         )
         .expect("1 KiB 装得下最小的一片");

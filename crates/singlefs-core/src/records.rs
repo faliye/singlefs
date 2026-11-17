@@ -2,7 +2,7 @@
 //! key 的全序按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11）——小端存储不构成 memcmp 序，所以各给 sort key。
 //!
 //! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：每一种记录有一份写法的规格
-//! （`spec_bytes`）、一份读法的规格（`spec_parse`）与一条往返引理（`lemma_parse_round_trip`：写出来的字节读回同一条记录）；
+//! （`specification_bytes`）、一份读法的规格（`specification_parse`）与一条往返引理（`lemma_parse_round_trip`：写出来的字节读回同一条记录）；
 //! 写的函数交出的就是写法的规格，读的函数交出的就是读法的规格。
 
 use singlefs_format::{
@@ -92,22 +92,22 @@ impl InodeRecordTruncationField {
     }
 
     /// T。
-    pub closed spec fn spec_truncation_txg(self) -> CheckpointTxg {
+    pub closed spec fn specification_truncation_txg(self) -> CheckpointTxg {
         self.truncation_txg
     }
 
     /// N_w。
-    pub closed spec fn spec_truncated_size_in_bytes(self) -> u64 {
+    pub closed spec fn specification_truncated_size_in_bytes(self) -> u64 {
         self.truncated_size_in_bytes
     }
 
     /// 类型不变量的公开说法：每一个造得出来的值都满足它，两个读字段的方法在 `ensures` 里交出来。
-    pub open spec fn spec_is_consistent(self) -> bool {
-        self.spec_truncation_txg().0 == 0 ==> self.spec_truncated_size_in_bytes() == 0
+    pub open spec fn specification_is_consistent(self) -> bool {
+        self.specification_truncation_txg().0 == 0 ==> self.specification_truncated_size_in_bytes() == 0
     }
 
     /// 盘上读来的两段 8 字节解成的字段（[`Self::from_the_two_fields_on_disk`] 的判法）。
-    pub closed spec fn spec_from_the_two_fields_on_disk(truncation_txg: u64, truncated_size_in_bytes: u64) -> Option<Self> {
+    pub closed spec fn specification_from_the_two_fields_on_disk(truncation_txg: u64, truncated_size_in_bytes: u64) -> Option<Self> {
         if truncation_txg == 0 && truncated_size_in_bytes != 0 {
             None
         } else {
@@ -118,13 +118,13 @@ impl InodeRecordTruncationField {
     /// 往返：合法的字段把它的两段再解一次就是它自己；解出来的两段就是给的那两段。
     pub proof fn lemma_from_the_two_fields_on_disk(self, truncation_txg: u64, truncated_size_in_bytes: u64)
         ensures
-            self.spec_is_consistent() ==> Self::spec_from_the_two_fields_on_disk(
-                self.spec_truncation_txg().0,
-                self.spec_truncated_size_in_bytes(),
+            self.specification_is_consistent() ==> Self::specification_from_the_two_fields_on_disk(
+                self.specification_truncation_txg().0,
+                self.specification_truncated_size_in_bytes(),
             ) == Some(self),
-            Self::spec_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes) matches Some(field)
-                ==> field.spec_truncation_txg().0 == truncation_txg && field.spec_truncated_size_in_bytes()
-                == truncated_size_in_bytes && field.spec_is_consistent(),
+            Self::specification_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes) matches Some(field)
+                ==> field.specification_truncation_txg().0 == truncation_txg && field.specification_truncated_size_in_bytes()
+                == truncated_size_in_bytes && field.specification_is_consistent(),
     {
     }
 
@@ -141,8 +141,8 @@ impl InodeRecordTruncationField {
         requires
             truncation_txg.0 != 0,
         ensures
-            field.spec_truncation_txg() == truncation_txg,
-            field.spec_truncated_size_in_bytes() == truncated_size_in_bytes,
+            field.specification_truncation_txg() == truncation_txg,
+            field.specification_truncated_size_in_bytes() == truncated_size_in_bytes,
     {
         // assert_ne! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert! 加同一句话。
         assert!(
@@ -162,7 +162,7 @@ impl InodeRecordTruncationField {
         truncated_size_in_bytes: u64,
     ) -> (field: Option<Self>)
         ensures
-            field == Self::spec_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes),
+            field == Self::specification_from_the_two_fields_on_disk(truncation_txg, truncated_size_in_bytes),
     {
         if truncation_txg == 0 && truncated_size_in_bytes != 0 {
             return None;
@@ -177,8 +177,8 @@ impl InodeRecordTruncationField {
     #[must_use]
     pub const fn truncation_txg(self) -> (truncation_txg: CheckpointTxg)
         ensures
-            truncation_txg == self.spec_truncation_txg(),
-            self.spec_is_consistent(),
+            truncation_txg == self.specification_truncation_txg(),
+            self.specification_is_consistent(),
     {
         proof {
             use_type_invariant(self);
@@ -190,8 +190,8 @@ impl InodeRecordTruncationField {
     #[must_use]
     pub const fn truncated_size_in_bytes(self) -> (truncated_size_in_bytes: u64)
         ensures
-            truncated_size_in_bytes == self.spec_truncated_size_in_bytes(),
-            self.spec_is_consistent(),
+            truncated_size_in_bytes == self.specification_truncated_size_in_bytes(),
+            self.specification_is_consistent(),
     {
         proof {
             use_type_invariant(self);
@@ -203,7 +203,7 @@ impl InodeRecordTruncationField {
     #[must_use]
     pub const fn is_written(self) -> (is_written: bool)
         ensures
-            is_written == (self.spec_truncation_txg().0 != 0),
+            is_written == (self.specification_truncation_txg().0 != 0),
     {
         self.truncation_txg.0 != 0
     }
@@ -243,7 +243,7 @@ impl InodeRecordTruncationField {
 verus! {
 
 /// `blocks` = ⌈`size` ÷ 512⌉（[`InodeRecord::to_bytes`] 写的那 8 字节）。
-pub open spec fn spec_blocks_of_the_size(size: u64) -> u64 {
+pub open spec fn specification_blocks_of_the_size(size: u64) -> u64 {
     if size % 512 == 0 {
         (size / 512) as u64
     } else {
@@ -254,17 +254,17 @@ pub open spec fn spec_blocks_of_the_size(size: u64) -> u64 {
 impl InodeRecord {
     /// 截断字段满足类型不变量（每一个造得出来的字段都满足）：[`Self::lemma_parse_round_trip`] 的前提。
     pub open spec fn is_well_formed(self) -> bool {
-        self.truncation_field.spec_is_consistent()
+        self.truncation_field.specification_is_consistent()
     }
 
     /// 盘上 140 字节（[`Self::to_bytes`] 交出的）。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.inode as nat, 8) + little_endian_bytes(self.object_birth.0 as nat, 8)
             + little_endian_bytes(0, 8) + little_endian_bytes(0o100_644, 4) + little_endian_bytes(0, 4)
             + little_endian_bytes(0, 4) + little_endian_bytes(self.nlink as nat, 4) + little_endian_bytes(
             self.size as nat,
             8,
-        ) + little_endian_bytes(spec_blocks_of_the_size(self.size) as nat, 8) + little_endian_bytes(0, 8)
+        ) + little_endian_bytes(specification_blocks_of_the_size(self.size) as nat, 8) + little_endian_bytes(0, 8)
             + little_endian_bytes(self.write_time_seconds as nat, 8) + little_endian_bytes(
             self.write_time_seconds as nat,
             8,
@@ -272,18 +272,18 @@ impl InodeRecord {
             self.change_count as nat,
             8,
         ) + zero_bytes(12) + zero_bytes(12) + little_endian_bytes(
-            self.truncation_field.spec_truncation_txg().0 as nat,
+            self.truncation_field.specification_truncation_txg().0 as nat,
             8,
-        ) + little_endian_bytes(self.truncation_field.spec_truncated_size_in_bytes() as nat, 8) + zero_bytes(4)
+        ) + little_endian_bytes(self.truncation_field.specification_truncated_size_in_bytes() as nat, 8) + zero_bytes(4)
     }
 
     /// [`Self::parse`] 的判法。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Option<Self> {
         if bytes.len() != INODE_RECORD_BYTES || bytes.subrange(108, 120) != zero_bytes(12) || bytes.subrange(136, 140)
             != zero_bytes(4) {
             None
         } else {
-            match InodeRecordTruncationField::spec_from_the_two_fields_on_disk(
+            match InodeRecordTruncationField::specification_from_the_two_fields_on_disk(
                 little_endian_value(bytes.subrange(120, 128)) as u64,
                 little_endian_value(bytes.subrange(128, 136)) as u64,
             ) {
@@ -306,10 +306,10 @@ impl InodeRecord {
         requires
             self.is_well_formed(),
         ensures
-            Self::spec_parse(self.spec_bytes()) == Some(self),
+            Self::specification_parse(self.specification_bytes()) == Some(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let inode = little_endian_bytes(self.inode as nat, 8);
         let birth = little_endian_bytes(self.object_birth.0 as nat, 8);
@@ -319,7 +319,7 @@ impl InodeRecord {
         let gid = little_endian_bytes(0, 4);
         let nlink = little_endian_bytes(self.nlink as nat, 4);
         let size = little_endian_bytes(self.size as nat, 8);
-        let blocks = little_endian_bytes(spec_blocks_of_the_size(self.size) as nat, 8);
+        let blocks = little_endian_bytes(specification_blocks_of_the_size(self.size) as nat, 8);
         let rdev = little_endian_bytes(0, 8);
         let access_time = little_endian_bytes(self.write_time_seconds as nat, 8);
         let modify_time = little_endian_bytes(self.write_time_seconds as nat, 8);
@@ -327,8 +327,8 @@ impl InodeRecord {
         let change_count = little_endian_bytes(self.change_count as nat, 8);
         let nanoseconds = zero_bytes(12);
         let reserved = zero_bytes(12);
-        let truncation_txg = little_endian_bytes(self.truncation_field.spec_truncation_txg().0 as nat, 8);
-        let truncated_size = little_endian_bytes(self.truncation_field.spec_truncated_size_in_bytes() as nat, 8);
+        let truncation_txg = little_endian_bytes(self.truncation_field.specification_truncation_txg().0 as nat, 8);
+        let truncated_size = little_endian_bytes(self.truncation_field.specification_truncated_size_in_bytes() as nat, 8);
         let tail_reserved = zero_bytes(4);
         lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds + reserved + truncation_txg + truncated_size, tail_reserved);
         lemma_split_a_concatenated_range(bytes, 0, inode + birth + locality + mode + uid + gid + nlink + size + blocks + rdev + access_time + modify_time + change_time + change_count + nanoseconds + reserved + truncation_txg, truncated_size);
@@ -356,7 +356,7 @@ impl InodeRecord {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
             self.is_well_formed(),
     {
         let mut writer = ByteWriter::new(usize::try_from(INODE_RECORD_BYTES).expect("140"));
@@ -395,7 +395,7 @@ impl InodeRecord {
         writer.skip(4);
         writer.assert_position(INODE_RECORD_BYTES, "inode 记录");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -403,7 +403,7 @@ impl InodeRecord {
     #[must_use]
     pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
         ensures
-            record == Self::spec_parse(bytes@),
+            record == Self::specification_parse(bytes@),
     {
         let truncation_field_offset =
             usize::try_from(INODE_RECORD_TRUNCATION_FIELD_OFFSET).expect("120");
@@ -489,7 +489,7 @@ impl TombstoneRecord {
     }
 
     /// 盘上 40 字节：对象 ID 8 + 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.object.0 as nat, 8) + little_endian_bytes(self.object_birth.0 as nat, 8)
             + little_endian_bytes(self.range_start_in_bytes as nat, 8) + little_endian_bytes(
             self.range_end_in_bytes as nat,
@@ -498,7 +498,7 @@ impl TombstoneRecord {
     }
 
     /// [`Self::parse`] 的判法：长度不是 40 交回 `None`。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Option<Self> {
         if bytes.len() != TOMBSTONE_RECORD_BYTES {
             None
         } else {
@@ -515,10 +515,10 @@ impl TombstoneRecord {
     /// 往返：写出的 40 字节读回同一条墓碑。
     pub proof fn lemma_parse_round_trip(self)
         ensures
-            Self::spec_parse(self.spec_bytes()) == Some(self),
+            Self::specification_parse(self.specification_bytes()) == Some(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let object = little_endian_bytes(self.object.0 as nat, 8);
         let birth = little_endian_bytes(self.object_birth.0 as nat, 8);
@@ -534,7 +534,7 @@ impl TombstoneRecord {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
     {
         let mut writer = ByteWriter::new(usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40"));
         writer.put_u64(self.object.0);
@@ -544,7 +544,7 @@ impl TombstoneRecord {
         writer.put_u64(self.death_txg.0);
         writer.assert_position(TOMBSTONE_RECORD_BYTES, "墓碑记录");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -552,7 +552,7 @@ impl TombstoneRecord {
     #[must_use]
     pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
         ensures
-            record == Self::spec_parse(bytes@),
+            record == Self::specification_parse(bytes@),
     {
         if bytes.len() != usize::try_from(TOMBSTONE_RECORD_BYTES).expect("40") {
             return None;
@@ -581,13 +581,13 @@ pub struct LineageRecord {
 
 impl LineageRecord {
     /// 盘上 24 字节：T_rb 8 + T_old 8 + H_cur 8。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.rollback_txg.0 as nat, 8) + little_endian_bytes(self.rollback_target_txg.0 as nat, 8)
             + little_endian_bytes(self.inode_number_watermark_of_the_version_rolled_back_from as nat, 8)
     }
 
     /// [`Self::parse`] 的判法：长度不是 24 交回 `None`。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Option<Self> {
         if bytes.len() != LINEAGE_RECORD_BYTES {
             None
         } else {
@@ -602,10 +602,10 @@ impl LineageRecord {
     /// 往返：写出的 24 字节读回同一条谱系记录。
     pub proof fn lemma_parse_round_trip(self)
         ensures
-            Self::spec_parse(self.spec_bytes()) == Some(self),
+            Self::specification_parse(self.specification_bytes()) == Some(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let rollback = little_endian_bytes(self.rollback_txg.0 as nat, 8);
         let target = little_endian_bytes(self.rollback_target_txg.0 as nat, 8);
@@ -617,7 +617,7 @@ impl LineageRecord {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
     {
         let mut writer = ByteWriter::new(usize::try_from(LINEAGE_RECORD_BYTES).expect("24"));
         writer.put_u64(self.rollback_txg.0);
@@ -625,7 +625,7 @@ impl LineageRecord {
         writer.put_u64(self.inode_number_watermark_of_the_version_rolled_back_from);
         writer.assert_position(LINEAGE_RECORD_BYTES, "谱系记录");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -633,7 +633,7 @@ impl LineageRecord {
     #[must_use]
     pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
         ensures
-            record == Self::spec_parse(bytes@),
+            record == Self::specification_parse(bytes@),
     {
         if bytes.len() != usize::try_from(LINEAGE_RECORD_BYTES).expect("24") {
             return None;
@@ -658,17 +658,17 @@ pub struct RetirementRecord {
 
 impl RetirementRecord {
     /// 盘上 34 字节：被退役的身份 26 + 死亡 txg 8。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        self.retired.spec_bytes() + little_endian_bytes(self.death_txg.0 as nat, 8)
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        self.retired.specification_bytes() + little_endian_bytes(self.death_txg.0 as nat, 8)
     }
 
     /// [`Self::parse`] 的判法：长度不是 34 交回 `None`。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Option<Self> {
         if bytes.len() != RETIREMENT_RECORD_BYTES {
             None
         } else {
             Some(RetirementRecord {
-                retired: PackedIdentity::spec_decode_at(bytes, 0),
+                retired: PackedIdentity::specification_decode_at(bytes, 0),
                 death_txg: CheckpointTxg(little_endian_value(bytes.subrange(26, 34)) as u64),
             })
         }
@@ -677,15 +677,15 @@ impl RetirementRecord {
     /// 往返：写出的 34 字节读回同一条退役记录。
     pub proof fn lemma_parse_round_trip(self)
         ensures
-            Self::spec_parse(self.spec_bytes()) == Some(self),
+            Self::specification_parse(self.specification_bytes()) == Some(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         lemma_split_a_concatenated_range(
             bytes,
             0,
-            self.retired.spec_bytes(),
+            self.retired.specification_bytes(),
             little_endian_bytes(self.death_txg.0 as nat, 8),
         );
         self.retired.lemma_decode_at_round_trip(bytes, 0);
@@ -694,7 +694,7 @@ impl RetirementRecord {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
     {
         let mut writer = ByteWriter::new(usize::try_from(RETIREMENT_RECORD_BYTES).expect("34"));
         writer.put_u64(self.retired.birth_tree.0);
@@ -704,7 +704,7 @@ impl RetirementRecord {
         writer.put_u64(self.death_txg.0);
         writer.assert_position(RETIREMENT_RECORD_BYTES, "退役记录");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -712,7 +712,7 @@ impl RetirementRecord {
     #[must_use]
     pub fn parse(bytes: &[u8]) -> (record: Option<Self>)
         ensures
-            record == Self::spec_parse(bytes@),
+            record == Self::specification_parse(bytes@),
     {
         if bytes.len() != usize::try_from(RETIREMENT_RECORD_BYTES).expect("34") {
             return None;
@@ -731,12 +731,12 @@ impl RetirementRecord {
 }
 
 /// inode 内部条目 120 的写法：分隔 key 8 + 身份引用 26 + 子指针 86。
-pub open spec fn spec_inode_internal_entry_bytes(
+pub open spec fn specification_inode_internal_entry_bytes(
     separator_key: u64,
     child_identity: PackedIdentity,
     child: NodePointer,
 ) -> Seq<u8> {
-    little_endian_bytes(separator_key as nat, 8) + child_identity.spec_bytes() + child.spec_bytes()
+    little_endian_bytes(separator_key as nat, 8) + child_identity.specification_bytes() + child.specification_bytes()
 }
 
 /// inode 树内部节点条目 120：分隔 key 8 + 身份引用 26（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）+ 子指针 86。
@@ -753,7 +753,7 @@ pub fn build_inode_internal_entry(
         child.is_encodable(),
         child.has_location_entries_the_writer_accepts(),
     ensures
-        entry@ == spec_inode_internal_entry_bytes(separator_key, child_identity, child),
+        entry@ == specification_inode_internal_entry_bytes(separator_key, child_identity, child),
 {
     let mut writer = ByteWriter::new(usize::try_from(INODE_INTERNAL_ENTRY).expect("120"));
     writer.put_u64(separator_key);
@@ -764,14 +764,14 @@ pub fn build_inode_internal_entry(
     child.write_to(&mut writer);
     writer.assert_position(INODE_INTERNAL_ENTRY, "inode 内部条目");
     let entry = writer.into_bytes();
-    assert(entry@ =~= spec_inode_internal_entry_bytes(separator_key, child_identity, child));
+    assert(entry@ =~= specification_inode_internal_entry_bytes(separator_key, child_identity, child));
     entry
 }
 
 /// extent 叶记录 112 的写法：key (locality_id 0, inode 8, offset 8) + 数据指针 88。
-pub open spec fn spec_extent_record_bytes(inode: u64, offset: u64, pointer: DataPointer) -> Seq<u8> {
+pub open spec fn specification_extent_record_bytes(inode: u64, offset: u64, pointer: DataPointer) -> Seq<u8> {
     little_endian_bytes(0, 8) + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8)
-        + pointer.spec_bytes()
+        + pointer.specification_bytes()
 }
 
 /// extent 叶记录 112：key (locality_id 8, inode 8, offset 8) + 数据指针 88。
@@ -782,9 +782,9 @@ pub open spec fn spec_extent_record_bytes(inode: u64, offset: u64, pointer: Data
 pub fn build_extent_record(inode: u64, offset: u64, pointer: DataPointer) -> (record: Vec<u8>)
     requires
         pointer.is_encodable(),
-        spec_location_entries_ascend_by_device(pointer.locations),
+        specification_location_entries_ascend_by_device(pointer.locations),
     ensures
-        record@ == spec_extent_record_bytes(inode, offset, pointer),
+        record@ == specification_extent_record_bytes(inode, offset, pointer),
 {
     let mut writer = ByteWriter::new(usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112"));
     writer.put_u64(0);
@@ -793,7 +793,7 @@ pub fn build_extent_record(inode: u64, offset: u64, pointer: DataPointer) -> (re
     pointer.write_to(&mut writer);
     writer.assert_position(EXTENT_LEAF_RECORD_BYTES, "extent 叶记录");
     let record = writer.into_bytes();
-    assert(record@ =~= spec_extent_record_bytes(inode, offset, pointer));
+    assert(record@ =~= specification_extent_record_bytes(inode, offset, pointer));
     record
 }
 
@@ -810,14 +810,14 @@ pub struct AccountingEntry {
 
 impl AccountingEntry {
     /// 盘上 34 字节。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.statistic as nat, 2) + little_endian_bytes(self.tree.0 as nat, 8)
             + little_endian_bytes(self.device.0 as nat, 4) + little_endian_bytes(self.generation.0 as nat, 8)
             + little_endian_bytes(self.value as nat, 8) + little_endian_bytes(self.sequence as nat, 4)
     }
 
     /// [`Self::parse`] 的判法：宽不等于 34 交回 `None`。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Option<Self> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Option<Self> {
         if bytes.len() != ACCOUNTING_ENTRY_BYTES {
             None
         } else {
@@ -835,10 +835,10 @@ impl AccountingEntry {
     /// 往返：写出的 34 字节读回同一条记账条目。
     pub proof fn lemma_parse_round_trip(self)
         ensures
-            Self::spec_parse(self.spec_bytes()) == Some(self),
+            Self::specification_parse(self.specification_bytes()) == Some(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let statistic = little_endian_bytes(self.statistic as nat, 2);
         let tree = little_endian_bytes(self.tree.0 as nat, 8);
@@ -856,7 +856,7 @@ impl AccountingEntry {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
     {
         let mut writer = ByteWriter::new(usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34"));
         writer.put_u16(self.statistic);
@@ -867,7 +867,7 @@ impl AccountingEntry {
         writer.put_u32(self.sequence);
         writer.assert_position(ACCOUNTING_ENTRY_BYTES, "记账条目");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -875,7 +875,7 @@ impl AccountingEntry {
     #[must_use]
     pub fn key_bytes(&self) -> (key: Vec<u8>)
         ensures
-            key@ == self.spec_bytes().subrange(0, 22),
+            key@ == self.specification_bytes().subrange(0, 22),
     {
         // `to_vec` 没有 Verus 规格，经 copied_into_a_vector 拷，同一个结果。
         copied_into_a_vector(&self.to_bytes()[..22])
@@ -900,7 +900,7 @@ impl AccountingEntry {
     #[must_use]
     pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
         ensures
-            entry == Self::spec_parse(bytes@),
+            entry == Self::specification_parse(bytes@),
     {
         if bytes.len() != usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34") {
             return None;
@@ -918,9 +918,9 @@ impl AccountingEntry {
 }
 
 /// 码 1 映射 key 的写法：类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10。
-pub open spec fn spec_mapping_key_for_data_bytes(head: PointerHead, write_order: WriteOrder) -> Seq<u8> {
+pub open spec fn specification_mapping_key_for_data_bytes(head: PointerHead, write_order: WriteOrder) -> Seq<u8> {
     little_endian_bytes(UNIT_CLASS_DATA as nat, 1) + little_endian_bytes(head.birth_tree.0 as nat, 8)
-        + little_endian_bytes(head.birth_txg.0 as nat, 8) + write_order.spec_bytes()
+        + little_endian_bytes(head.birth_txg.0 as nat, 8) + write_order.specification_bytes()
 }
 
 /// 中央映射 key 一律 27（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10）：码 1 = 类标签 + 出生树 + 出生 txg + 写序 10；
@@ -933,7 +933,7 @@ pub fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> (key:
     requires
         write_order.is_encodable(),
     ensures
-        key@ == spec_mapping_key_for_data_bytes(head, write_order),
+        key@ == specification_mapping_key_for_data_bytes(head, write_order),
 {
     let mut writer = ByteWriter::new(usize::try_from(MAPPING_KEY_BYTES).expect("27"));
     writer.put_u8(UNIT_CLASS_DATA);
@@ -943,12 +943,12 @@ pub fn mapping_key_for_data(head: PointerHead, write_order: WriteOrder) -> (key:
     writer.put_six_byte_unsigned(write_order.transaction);
     writer.assert_position(MAPPING_KEY_BYTES, "码 1 映射 key");
     let key = writer.into_bytes();
-    assert(key@ =~= spec_mapping_key_for_data_bytes(head, write_order));
+    assert(key@ =~= specification_mapping_key_for_data_bytes(head, write_order));
     key
 }
 
 /// 码 2 / 码 3 映射 key 的写法：类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 出生序号 4 + 补零 2。
-pub open spec fn spec_mapping_key_for_node_bytes(unit_class: u8, pointer: NodePointer) -> Seq<u8> {
+pub open spec fn specification_mapping_key_for_node_bytes(unit_class: u8, pointer: NodePointer) -> Seq<u8> {
     little_endian_bytes(unit_class as nat, 1) + little_endian_bytes(pointer.head.birth_tree.0 as nat, 8)
         + little_endian_bytes(pointer.head.birth_txg.0 as nat, 8) + little_endian_bytes(pointer.instance.0 as nat, 4)
         + little_endian_bytes(pointer.birth_sequence.0 as nat, 4) + zero_bytes(2)
@@ -957,7 +957,7 @@ pub open spec fn spec_mapping_key_for_node_bytes(unit_class: u8, pointer: NodePo
 #[must_use]
 pub fn mapping_key_for_node(unit_class: u8, pointer: NodePointer) -> (key: Vec<u8>)
     ensures
-        key@ == spec_mapping_key_for_node_bytes(unit_class, pointer),
+        key@ == specification_mapping_key_for_node_bytes(unit_class, pointer),
 {
     let mut writer = ByteWriter::new(usize::try_from(MAPPING_KEY_BYTES).expect("27"));
     writer.put_u8(unit_class);
@@ -968,7 +968,7 @@ pub fn mapping_key_for_node(unit_class: u8, pointer: NodePointer) -> (key: Vec<u
     writer.assert_position(25, "码 2 / 码 3 映射 key 里有含义的那一段");
     writer.skip(2);
     let key = writer.into_bytes();
-    assert(key@ =~= spec_mapping_key_for_node_bytes(unit_class, pointer));
+    assert(key@ =~= specification_mapping_key_for_node_bytes(unit_class, pointer));
     key
 }
 
@@ -1005,8 +1005,8 @@ pub fn mapping_key_sort_key(key: &[u8]) -> (sort_key: (u8, u64, u64, u32, u64))
 }
 
 /// 映射条目 55 的写法：key 27 + 两条位置条目 28。
-pub open spec fn spec_mapping_entry_bytes(key: Seq<u8>, locations: [LocationEntry; 2]) -> Seq<u8> {
-    key + spec_location_entries_bytes(locations)
+pub open spec fn specification_mapping_entry_bytes(key: Seq<u8>, locations: [LocationEntry; 2]) -> Seq<u8> {
+    key + specification_location_entries_bytes(locations)
 }
 
 /// 映射条目 55：key 27 + 位置条目 14 × 2。
@@ -1020,7 +1020,7 @@ pub fn build_mapping_entry(key: &[u8], locations: [LocationEntry; 2]) -> (entry:
         locations[0].is_encodable(),
         locations[1].is_encodable(),
     ensures
-        entry@ == spec_mapping_entry_bytes(key@, locations),
+        entry@ == specification_mapping_entry_bytes(key@, locations),
 {
     // assert_eq! 展开成的 core::panicking::assert_failed 没有 Verus 规格，写成 assert!。
     assert!(
@@ -1034,7 +1034,7 @@ pub fn build_mapping_entry(key: &[u8], locations: [LocationEntry; 2]) -> (entry:
     locations[1].write_to(&mut writer);
     writer.assert_position(MAPPING_ENTRY_BYTES, "映射条目");
     let entry = writer.into_bytes();
-    assert(entry@ =~= spec_mapping_entry_bytes(key@, locations));
+    assert(entry@ =~= specification_mapping_entry_bytes(key@, locations));
     entry
 }
 
@@ -1118,7 +1118,7 @@ pub enum SnapshotDestructionMark {
 
 impl SnapshotDestructionMark {
     /// 这个记号在 flags 那 2 字节里的值（[`Self::flags`] 的规格）。
-    pub open spec fn spec_flags(self) -> u16 {
+    pub open spec fn specification_flags(self) -> u16 {
         match self {
             SnapshotDestructionMark::NotBeingDestroyed => 0,
             SnapshotDestructionMark::BeingDestroyed => TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED,
@@ -1129,7 +1129,7 @@ impl SnapshotDestructionMark {
     #[must_use]
     pub const fn flags(self) -> (flags: u16)
         ensures
-            flags == self.spec_flags(),
+            flags == self.specification_flags(),
     {
         match self {
             SnapshotDestructionMark::NotBeingDestroyed => 0,
@@ -1177,12 +1177,12 @@ pub struct DeadlistEntry {
 
 impl DeadlistEntry {
     /// 盘上 43 字节：头的树 ID 8 + 纪元 8 + 映射 key 27。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.head.0 as nat, 8) + little_endian_bytes(self.epoch.0 as nat, 8) + self.mapping_key@
     }
 
     /// [`Self::parse`] 的判法：宽不等于 43 交回 `None`。
-    pub open spec fn spec_parse_fields(bytes: Seq<u8>) -> Option<(TreeIdentifier, CheckpointTxg, Seq<u8>)> {
+    pub open spec fn specification_parse_fields(bytes: Seq<u8>) -> Option<(TreeIdentifier, CheckpointTxg, Seq<u8>)> {
         if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
             None
         } else {
@@ -1201,10 +1201,10 @@ impl DeadlistEntry {
         requires
             self.mapping_key@.len() == MAPPING_KEY_BYTES,
         ensures
-            Self::spec_parse_fields(self.spec_bytes()) == Some((self.head, self.epoch, self.mapping_key@)),
+            Self::specification_parse_fields(self.specification_bytes()) == Some((self.head, self.epoch, self.mapping_key@)),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
+        let bytes = self.specification_bytes();
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let head = little_endian_bytes(self.head.0 as nat, 8);
         let epoch = little_endian_bytes(self.epoch.0 as nat, 8);
@@ -1222,7 +1222,7 @@ impl DeadlistEntry {
         requires
             self.mapping_key@.len() == MAPPING_KEY_BYTES,
         ensures
-            key@ == self.spec_bytes(),
+            key@ == self.specification_bytes(),
     {
         let mut writer = ByteWriter::new(DEADLIST_ENTRY_KEY_BYTES);
         writer.put_u64(self.head.0);
@@ -1238,7 +1238,7 @@ impl DeadlistEntry {
             "deadlist 条目",
         );
         let key = writer.into_bytes();
-        assert(key@ =~= self.spec_bytes());
+        assert(key@ =~= self.specification_bytes());
         key
     }
 
@@ -1248,10 +1248,10 @@ impl DeadlistEntry {
     pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
         ensures
             match entry {
-                Some(parsed) => Self::spec_parse_fields(bytes@) == Some(
+                Some(parsed) => Self::specification_parse_fields(bytes@) == Some(
                     (parsed.head, parsed.epoch, parsed.mapping_key@),
                 ),
-                None => Self::spec_parse_fields(bytes@) is None,
+                None => Self::specification_parse_fields(bytes@) is None,
             },
     {
         if bytes.len() != DEADLIST_ENTRY_KEY_BYTES {
@@ -1313,9 +1313,9 @@ impl TreeTableEntry {
     }
 
     /// 盘上 200 字节，flags 写 `mark` 的值。
-    pub open spec fn spec_bytes_with_destruction_mark(self, mark: SnapshotDestructionMark) -> Seq<u8> {
+    pub open spec fn specification_bytes_with_destruction_mark(self, mark: SnapshotDestructionMark) -> Seq<u8> {
         little_endian_bytes(self.tree.0 as nat, 8) + little_endian_bytes(200, 2) + little_endian_bytes(self.kind as nat, 2)
-            + little_endian_bytes(mark.spec_flags() as nat, 2) + self.root.spec_bytes() + little_endian_bytes(
+            + little_endian_bytes(mark.specification_flags() as nat, 2) + self.root.specification_bytes() + little_endian_bytes(
             self.previous_snapshot_txg.0 as nat,
             8,
         ) + little_endian_bytes(self.birth_txg.0 as nat, 8) + little_endian_bytes(self.head_identifier as nat, 8)
@@ -1323,7 +1323,7 @@ impl TreeTableEntry {
     }
 
     /// [`Self::parse_with_destruction_mark`] 的判法。
-    pub open spec fn spec_parse_with_destruction_mark(bytes: Seq<u8>) -> Option<(Self, SnapshotDestructionMark)> {
+    pub open spec fn specification_parse_with_destruction_mark(bytes: Seq<u8>) -> Option<(Self, SnapshotDestructionMark)> {
         let kind = little_endian_value(bytes.subrange(10, 12)) as u16;
         let flags = little_endian_value(bytes.subrange(12, 14)) as u16;
         if bytes.len() != TREE_TABLE_ENTRY_BYTES || bytes.subrange(124, 200) != zero_bytes(76) {
@@ -1334,7 +1334,7 @@ impl TreeTableEntry {
             == TREE_KIND_SNAPSHOT_INODE_ROOT)) {
             None
         } else {
-            match NodePointer::spec_read_judging_at(bytes, 14) {
+            match NodePointer::specification_read_judging_at(bytes, 14) {
                 Err(_refusal) => None,
                 Ok(root) => Some(
                     (
@@ -1362,16 +1362,16 @@ impl TreeTableEntry {
         requires
             self.is_writable_with(mark),
         ensures
-            Self::spec_parse_with_destruction_mark(self.spec_bytes_with_destruction_mark(mark)) == Some((self, mark)),
+            Self::specification_parse_with_destruction_mark(self.specification_bytes_with_destruction_mark(mark)) == Some((self, mark)),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes_with_destruction_mark(mark);
+        let bytes = self.specification_bytes_with_destruction_mark(mark);
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
         let tree = little_endian_bytes(self.tree.0 as nat, 8);
         let length = little_endian_bytes(200, 2);
         let kind = little_endian_bytes(self.kind as nat, 2);
-        let flags = little_endian_bytes(mark.spec_flags() as nat, 2);
-        let root = self.root.spec_bytes();
+        let flags = little_endian_bytes(mark.specification_flags() as nat, 2);
+        let root = self.root.specification_bytes();
         let previous = little_endian_bytes(self.previous_snapshot_txg.0 as nat, 8);
         let birth = little_endian_bytes(self.birth_txg.0 as nat, 8);
         let head = little_endian_bytes(self.head_identifier as nat, 8);
@@ -1393,7 +1393,7 @@ impl TreeTableEntry {
         requires
             self.is_writable_with(SnapshotDestructionMark::NotBeingDestroyed),
         ensures
-            bytes@ == self.spec_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed),
+            bytes@ == self.specification_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed),
     {
         self.to_bytes_with_destruction_mark(SnapshotDestructionMark::NotBeingDestroyed)
     }
@@ -1408,7 +1408,7 @@ impl TreeTableEntry {
         requires
             self.is_writable_with(mark),
         ensures
-            bytes@ == self.spec_bytes_with_destruction_mark(mark),
+            bytes@ == self.specification_bytes_with_destruction_mark(mark),
     {
         // 记号的 == 没有 Verus 规格，比 flags 的值：两种记号的值不同，同一个判法。
         assert!(
@@ -1432,7 +1432,7 @@ impl TreeTableEntry {
         writer.skip(76);
         writer.assert_position(TREE_TABLE_ENTRY_BYTES, "树表条目");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes_with_destruction_mark(mark));
+        assert(bytes@ =~= self.specification_bytes_with_destruction_mark(mark));
         bytes
     }
 
@@ -1464,7 +1464,7 @@ impl TreeTableEntry {
     )]
     pub fn parse(bytes: &[u8]) -> (entry: Option<Self>)
         ensures
-            entry == match Self::spec_parse_with_destruction_mark(bytes@) {
+            entry == match Self::specification_parse_with_destruction_mark(bytes@) {
                 Some((parsed, _mark)) => Some(parsed),
                 None => None,
             },
@@ -1481,7 +1481,7 @@ impl TreeTableEntry {
     #[must_use]
     pub fn parse_with_destruction_mark(bytes: &[u8]) -> (entry: Option<(Self, SnapshotDestructionMark)>)
         ensures
-            entry == Self::spec_parse_with_destruction_mark(bytes@),
+            entry == Self::specification_parse_with_destruction_mark(bytes@),
     {
         if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
             || !every_byte_is_zero(&bytes[bytes.len() - 76..])
@@ -1542,18 +1542,18 @@ pub enum PointerCarryingEntryRefusal {
 }
 
 /// [`parse_inode_internal_entry_or_refusal`] 的判法。
-pub open spec fn spec_parse_inode_internal_entry(
+pub open spec fn specification_parse_inode_internal_entry(
     bytes: Seq<u8>,
 ) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
     if bytes.len() != INODE_INTERNAL_ENTRY {
         Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable)
     } else {
-        match NodePointer::spec_read_judging_at(bytes, 34) {
+        match NodePointer::specification_read_judging_at(bytes, 34) {
             Err(refusal) => Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal)),
             Ok(child) => Ok(
                 (
                     little_endian_value(bytes.subrange(0, 8)) as u64,
-                    PackedIdentity::spec_decode_at(bytes, 8),
+                    PackedIdentity::specification_decode_at(bytes, 8),
                     child,
                 ),
             ),
@@ -1566,17 +1566,17 @@ pub proof fn lemma_inode_internal_entry_round_trip(separator_key: u64, child_ide
     requires
         child.is_encodable(),
     ensures
-        spec_parse_inode_internal_entry(spec_inode_internal_entry_bytes(separator_key, child_identity, child)) == Ok::<
+        specification_parse_inode_internal_entry(specification_inode_internal_entry_bytes(separator_key, child_identity, child)) == Ok::<
             (u64, PackedIdentity, NodePointer),
             PointerCarryingEntryRefusal,
         >((separator_key, child_identity, child)),
 {
     lemma_little_endian_capacities();
-    let bytes = spec_inode_internal_entry_bytes(separator_key, child_identity, child);
+    let bytes = specification_inode_internal_entry_bytes(separator_key, child_identity, child);
     assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
     let separator = little_endian_bytes(separator_key as nat, 8);
-    lemma_split_a_concatenated_range(bytes, 0, separator + child_identity.spec_bytes(), child.spec_bytes());
-    lemma_split_a_concatenated_range(bytes, 0, separator, child_identity.spec_bytes());
+    lemma_split_a_concatenated_range(bytes, 0, separator + child_identity.specification_bytes(), child.specification_bytes());
+    lemma_split_a_concatenated_range(bytes, 0, separator, child_identity.specification_bytes());
     child_identity.lemma_decode_at_round_trip(bytes, 8);
     child.lemma_decode_at_round_trip(bytes, 34);
 }
@@ -1587,7 +1587,7 @@ pub proof fn lemma_inode_internal_entry_round_trip(separator_key: u64, child_ide
 #[must_use]
 pub fn parse_inode_internal_entry(bytes: &[u8]) -> (entry: Option<(u64, PackedIdentity, NodePointer)>)
     ensures
-        entry == match spec_parse_inode_internal_entry(bytes@) {
+        entry == match specification_parse_inode_internal_entry(bytes@) {
             Ok(parsed) => Some(parsed),
             Err(_refusal) => None,
         },
@@ -1603,7 +1603,7 @@ pub fn parse_inode_internal_entry_or_refusal(
     bytes: &[u8],
 ) -> (entry: Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal>)
     ensures
-        entry == spec_parse_inode_internal_entry(bytes@),
+        entry == specification_parse_inode_internal_entry(bytes@),
 {
     if bytes.len() != usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
         return Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable);
@@ -1633,17 +1633,17 @@ pub proof fn lemma_extent_record_round_trip(inode: u64, offset: u64, pointer: Da
     requires
         pointer.is_encodable(),
     ensures
-        spec_extent_record_bytes(inode, offset, pointer).subrange(0, 24) == little_endian_bytes(0, 8)
+        specification_extent_record_bytes(inode, offset, pointer).subrange(0, 24) == little_endian_bytes(0, 8)
             + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8),
-        DataPointer::spec_read_judging_at(spec_extent_record_bytes(inode, offset, pointer), 24) == Ok::<
+        DataPointer::specification_read_judging_at(specification_extent_record_bytes(inode, offset, pointer), 24) == Ok::<
             DataPointer,
             PointerHeadFieldOutsideTheFirstVersion,
         >(pointer),
 {
-    let bytes = spec_extent_record_bytes(inode, offset, pointer);
+    let bytes = specification_extent_record_bytes(inode, offset, pointer);
     assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
     let key = little_endian_bytes(0, 8) + little_endian_bytes(inode as nat, 8) + little_endian_bytes(offset as nat, 8);
-    lemma_split_a_concatenated_range(bytes, 0, key, pointer.spec_bytes());
+    lemma_split_a_concatenated_range(bytes, 0, key, pointer.specification_bytes());
     pointer.lemma_decode_at_round_trip(bytes, 24);
 }
 
@@ -1660,12 +1660,12 @@ pub fn parse_extent_record(
             Ok((key, pointer)) => {
                 &&& bytes@.len() == EXTENT_LEAF_RECORD_BYTES
                 &&& key@ == bytes@.subrange(0, 24)
-                &&& DataPointer::spec_read_judging_at(bytes@, 24) == Ok::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(pointer)
+                &&& DataPointer::specification_read_judging_at(bytes@, 24) == Ok::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(pointer)
             },
             Err(PointerCarryingEntryRefusal::WidthOtherThanItsFieldTable) => bytes@.len() != EXTENT_LEAF_RECORD_BYTES,
             Err(PointerCarryingEntryRefusal::PointerHeadFieldOutsideTheFirstVersion(refusal)) => {
                 &&& bytes@.len() == EXTENT_LEAF_RECORD_BYTES
-                &&& DataPointer::spec_read_judging_at(bytes@, 24) == Err::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(refusal)
+                &&& DataPointer::specification_read_judging_at(bytes@, 24) == Err::<DataPointer, PointerHeadFieldOutsideTheFirstVersion>(refusal)
             },
         },
 {
@@ -1694,14 +1694,14 @@ pub proof fn lemma_mapping_entry_round_trip(key: Seq<u8>, locations: [LocationEn
         locations[0].is_encodable(),
         locations[1].is_encodable(),
     ensures
-        spec_mapping_entry_bytes(key, locations).subrange(0, 27) == key,
-        LocationEntry::spec_decode_at(spec_mapping_entry_bytes(key, locations), 27) == locations[0],
-        LocationEntry::spec_decode_at(spec_mapping_entry_bytes(key, locations), 41) == locations[1],
+        specification_mapping_entry_bytes(key, locations).subrange(0, 27) == key,
+        LocationEntry::specification_decode_at(specification_mapping_entry_bytes(key, locations), 27) == locations[0],
+        LocationEntry::specification_decode_at(specification_mapping_entry_bytes(key, locations), 41) == locations[1],
 {
-    let bytes = spec_mapping_entry_bytes(key, locations);
+    let bytes = specification_mapping_entry_bytes(key, locations);
     assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
-    lemma_split_a_concatenated_range(bytes, 0, key, spec_location_entries_bytes(locations));
-    lemma_split_a_concatenated_range(bytes, 27, locations[0].spec_bytes(), locations[1].spec_bytes());
+    lemma_split_a_concatenated_range(bytes, 0, key, specification_location_entries_bytes(locations));
+    lemma_split_a_concatenated_range(bytes, 27, locations[0].specification_bytes(), locations[1].specification_bytes());
     locations[0].lemma_decode_at_round_trip(bytes, 27);
     locations[1].lemma_decode_at_round_trip(bytes, 41);
 }
@@ -1720,8 +1720,8 @@ pub fn parse_mapping_entry(bytes: &[u8]) -> (entry: Option<(Vec<u8>, [LocationEn
             Some((key, locations)) => {
                 &&& bytes@.len() >= MAPPING_ENTRY_BYTES
                 &&& key@ == bytes@.subrange(0, 27)
-                &&& locations[0] == LocationEntry::spec_decode_at(bytes@, 27)
-                &&& locations[1] == LocationEntry::spec_decode_at(bytes@, 41)
+                &&& locations[0] == LocationEntry::specification_decode_at(bytes@, 27)
+                &&& locations[1] == LocationEntry::specification_decode_at(bytes@, 41)
             },
             None => bytes@.len() < MAPPING_ENTRY_BYTES,
         },
@@ -2007,7 +2007,7 @@ mod tests {
     /// deadlist 条目 43 字节：头的树 ID 8 + 纪元 8 + 中央映射 key 27（D5（快照 / 空间记账机制） 已定项 12），读回来逐字段相等；
     /// 出生 txg 取映射 key 偏移 9 那 8 字节，不取纪元。
     #[test]
-    fn a_deadlist_entry_is_the_head_the_epoch_and_the_mapping_key_and_reads_back() {
+    fn deadlist_entry_is_the_head_the_epoch_and_the_mapping_key_and_reads_back() {
         let mapping_key = mapping_key_for_node(
             2,
             NodePointer {
@@ -2084,7 +2084,7 @@ mod tests {
     /// 退役记录 34 字节：出生树 0、打包记录类型 8、容器号 10、容器出生代 18、死亡 txg 26，小端、无填充；读回逐字段相等，
     /// 长度不是 34 读不出（短一字节、长一字节都不收）。身份四段与 inode 内部条目里身份引用那 26 字节逐字节相同。
     #[test]
-    fn a_retirement_record_is_thirty_four_bytes_identity_in_entry_order_then_the_death_txg() {
+    fn retirement_record_is_thirty_four_bytes_identity_in_entry_order_then_the_death_txg() {
         let record = RetirementRecord {
             retired: PackedIdentity {
                 birth_tree: TreeIdentifier(0x0102),

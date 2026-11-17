@@ -87,7 +87,7 @@ fn closure_contents(tree: &FixtureTree, entry: &EntrySpecification) -> (Vec<Stri
 }
 
 #[test]
-fn a_constant_assertion_naming_a_constant_of_another_included_wgsl_file_is_not_refused() {
+fn constant_assertion_naming_a_constant_of_another_included_wgsl_file_is_not_refused() {
     let switches = RuleSwitches::every_rule_intact();
     let tree = FixtureTree::materialize("wgsl-split-kernel", &SPLIT_KERNEL_FIXTURE);
     let verdict = key_of(
@@ -195,7 +195,7 @@ fn changing_the_constant_in_the_pulled_in_file_changes_the_key_of_the_entry_read
 }
 
 #[test]
-fn a_file_defining_the_constant_in_a_crate_outside_the_link_does_not_supply_it_and_the_name_is_refused(
+fn file_defining_the_constant_in_a_crate_outside_the_link_does_not_supply_it_and_the_name_is_refused(
 ) {
     let switches = RuleSwitches::every_rule_intact();
     let tree = FixtureTree::materialize("wgsl-split-kernel-unlinked", &SPLIT_KERNEL_FIXTURE);

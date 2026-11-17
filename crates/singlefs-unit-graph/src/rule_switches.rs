@@ -8,6 +8,8 @@
 //!   crates-directory-names-by-module      R-裸名：`crates/` 下的包同一个目标里的裸名照旧连到每一份同名条目（不按单元所在模块筛）
 //!                                         → `tests/unit_graph_bare_names_inside_a_crate_link_only_the_items_seen_from_the_module_of_the_unit.rs`
 //!                                         里「别的模块里同名的私有常量」那一格
+//!   local-bindings-shadow-same-named-functions  R-裸名：函数里的局部绑定不遮同名函数（名字只是 `let` 或参数绑定的，照旧连到同名函数）
+//!                                         → `tests/unit_graph_local_bindings_shadow_same_named_functions.rs` 里「let 遮住同名函数」那一格
 //!   qualified-paths                       R-路径：不解 `Q::x` → 「经类型路径调关联函数」
 //!   method-calls                          R-方法：不解 `.x(` → 「trait 默认方法」「经点调固有方法」
 //!   trait-implementation-edges            R-隐式：类型被点名不带它的 trait impl → 「运算符重载」「Drop 隐式调用」「关联常量（经泛型）」
@@ -59,6 +61,7 @@ pub enum BrokenRule {
     TargetScope,
     BareNames,
     CratesDirectoryNamesByModule,
+    LocalBindingsShadowSameNamedFunctions,
     QualifiedPaths,
     MethodCalls,
     TraitImplementationEdges,
@@ -88,10 +91,11 @@ pub enum BrokenRule {
 
 impl BrokenRule {
     /// 全部开关，按文件头那张表的次序。
-    pub const EVERY_RULE: [BrokenRule; 28] = [
+    pub const EVERY_RULE: [BrokenRule; 29] = [
         BrokenRule::TargetScope,
         BrokenRule::BareNames,
         BrokenRule::CratesDirectoryNamesByModule,
+        BrokenRule::LocalBindingsShadowSameNamedFunctions,
         BrokenRule::QualifiedPaths,
         BrokenRule::MethodCalls,
         BrokenRule::TraitImplementationEdges,
@@ -126,6 +130,9 @@ impl BrokenRule {
             BrokenRule::TargetScope => "target-scope",
             BrokenRule::BareNames => "bare-names",
             BrokenRule::CratesDirectoryNamesByModule => "crates-directory-names-by-module",
+            BrokenRule::LocalBindingsShadowSameNamedFunctions => {
+                "local-bindings-shadow-same-named-functions"
+            }
             BrokenRule::QualifiedPaths => "qualified-paths",
             BrokenRule::MethodCalls => "method-calls",
             BrokenRule::TraitImplementationEdges => "trait-implementation-edges",

@@ -61,7 +61,7 @@ fn closure_units(workspace: &Workspace, entry: &EntrySpecification) -> Vec<(Unit
 
 /// R1：闭包里没有一个单元引到 `gpu`（`plain_entry` 与它调的 `helper`），带不带 `gpu` 特性两种目标下键相同。
 #[test]
-fn a_closure_that_never_mentions_gpu_keeps_its_key_with_and_without_the_gpu_feature() {
+fn closure_that_never_mentions_gpu_keeps_its_key_with_and_without_the_gpu_feature() {
     let tree =
         FixtureTree::materialize("condition-atoms", &CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE);
     let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
@@ -80,7 +80,7 @@ fn a_closure_that_never_mentions_gpu_keeps_its_key_with_and_without_the_gpu_feat
 
 /// R1：闭包里的单元经函数体里的 `cfg!`、语句上的 `#[cfg]`、入口自己的 `#[cfg_attr]` 引到 `gpu`，带不带 `gpu` 特性两把键不同。
 #[test]
-fn a_closure_mentioning_gpu_through_a_cfg_macro_a_statement_cfg_or_a_cfg_attr_changes_its_key_with_the_gpu_feature(
+fn closure_mentioning_gpu_through_a_conditional_compilation_macro_a_statement_conditional_compilation_or_a_conditional_compilation_attribute_changes_its_key_with_the_gpu_feature(
 ) {
     let tree =
         FixtureTree::materialize("condition-atoms", &CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE);
@@ -103,7 +103,7 @@ fn a_closure_mentioning_gpu_through_a_cfg_macro_a_statement_cfg_or_a_cfg_attr_ch
 
 /// R2：`use crate::store::{self}` 引进名字 `store`：只写 `store::open()` 的 `reader` 连上这条 use，改这条 use 键变。
 #[test]
-fn a_use_with_self_in_braces_imports_the_module_name_and_editing_it_changes_the_key() {
+fn use_with_self_in_braces_imports_the_module_name_and_editing_it_changes_the_key() {
     let entry = library_entry("fuse::user::reader", WITHOUT_THE_GPU_FEATURE);
     let base = FixtureTree::materialize("use-self", &CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE);
     let base_workspace = workspace_of(base.root(), &RuleSwitches::every_rule_intact());
@@ -129,7 +129,7 @@ fn a_use_with_self_in_braces_imports_the_module_name_and_editing_it_changes_the_
 
 /// R3：blanket impl（`impl<T: Copy> Shout for T`）够得到的方法算边：`yell` 调 `value.shout()`，闭包里有 blanket impl 的 `shout`，改它键变。
 #[test]
-fn a_blanket_implementation_method_is_in_the_closure_and_editing_it_changes_the_key() {
+fn blanket_implementation_method_is_in_the_closure_and_editing_it_changes_the_key() {
     let entry = library_entry("fblanket::yell", WITHOUT_THE_GPU_FEATURE);
     let base = FixtureTree::materialize("blanket", &CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE);
     let base_workspace = workspace_of(base.root(), &RuleSwitches::every_rule_intact());
@@ -151,7 +151,7 @@ fn a_blanket_implementation_method_is_in_the_closure_and_editing_it_changes_the_
 /// R4：`dyn Sink` 只带 `Sink` 自己的 impl（`impl Sink for Meter`，改它键变），不带只在 trait 参数里写了 `Sink` 的
 /// `impl Wrap<dyn Sink> for Holder`（改它键不变）。
 #[test]
-fn a_dyn_trait_reaches_only_implementations_of_that_trait_and_not_ones_naming_it_in_their_trait_arguments(
+fn dyn_trait_reaches_only_implementations_of_that_trait_and_not_ones_naming_it_in_their_trait_arguments(
 ) {
     let entry = library_entry("fopen::feed", WITHOUT_THE_GPU_FEATURE);
     let base = FixtureTree::materialize("open-trait", &CLOSURE_RULES_SHARED_WITH_PYTHON_FIXTURE);

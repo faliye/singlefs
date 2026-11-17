@@ -1437,7 +1437,7 @@ proof fn one_movable_allocation_is_planned_and_not_reported_emptied(
 }
 
 // 选段：唯一一段装着钉住的槽，「选中它」不合 P1。
-proof fn a_segment_holding_a_pinned_slot_is_not_a_sound_choice(only: CompactionKernelSegment)
+proof fn segment_holding_a_pinned_slot_is_not_a_sound_choice(only: CompactionKernelSegment)
     requires
         only.holds_a_pinned_slot,
     ensures
@@ -1548,7 +1548,7 @@ mod tests {
 
     /// 能搬、钉住、能搬、已死、能搬，K = 2 ⇒ 搬下标 0 与 2，跳过钉住与已死、不取第三个能搬的。
     #[test]
-    fn a_batch_takes_the_first_movable_units_up_to_the_batch_size() {
+    fn batch_takes_the_first_movable_units_up_to_the_batch_size() {
         let allocations = [
             allocation(64, movable(10)),
             allocation(65, CompactionKernelAllocationClass::Pinned),

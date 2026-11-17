@@ -129,7 +129,7 @@ fn key_text(tree: &FixtureTree, entry: &EntrySpecification) -> Result<String, St
 
 /// 场景：入口用 `--exact 常量` 起子进程。预期：不拒算，闭包里有被点名的那条测试与它调的产品函数，没有别的测试。
 #[test]
-fn a_child_named_by_a_constant_after_exact_is_linked_into_the_closure_instead_of_refused() {
+fn child_named_by_a_constant_after_exact_is_linked_into_the_closure_instead_of_refused() {
     let tree = child_tree("current-exe-constant");
     let switches = RuleSwitches::every_rule_intact();
     let workspace = workspace_of(tree.root(), &switches);
@@ -188,7 +188,7 @@ fn changing_a_test_outside_the_closure_keeps_the_key_of_the_test_that_spawns_the
 /// 场景：测试名写成 `format!("{}::{CHILD_FUNCTION}", "tests")`（字面串与常量拼的），经 `.arg` 一个一个交。
 /// 预期：不拒算；改被起的测试，键变。
 #[test]
-fn a_child_named_by_a_format_of_literals_and_constants_is_linked_and_keys_follow_its_body() {
+fn child_named_by_a_format_of_literals_and_constants_is_linked_and_keys_follow_its_body() {
     let tree = child_tree("current-exe-format");
     let before = key_text(&tree, &BY_A_FORMAT_ENTRY).expect("format! 拼的测试名折得出，不拒算");
     tree.replace_exactly_once(LIBRARY_FILE, CHILD_BODY, CHILD_BODY_CHANGED);
@@ -198,7 +198,7 @@ fn a_child_named_by_a_format_of_literals_and_constants_is_linked_and_keys_follow
 
 /// 场景：起子进程的是一个辅助函数，测试名是它的参数，入口交一个常量。预期：不拒算；改被起的测试，键变。
 #[test]
-fn a_child_named_by_the_argument_a_caller_passes_to_the_spawning_helper_is_linked() {
+fn child_named_by_the_argument_a_caller_passes_to_the_spawning_helper_is_linked() {
     let tree = child_tree("current-exe-helper");
     let before = key_text(&tree, &THROUGH_A_HELPER_ENTRY).expect("调用处交的实参折得出，不拒算");
     tree.replace_exactly_once(LIBRARY_FILE, CHILD_BODY, CHILD_BODY_CHANGED);
@@ -211,7 +211,7 @@ fn a_child_named_by_the_argument_a_caller_passes_to_the_spawning_helper_is_linke
 
 /// 场景：`--exact` 后面的名字在这个目标里没有对得上的 `#[test] fn`。预期：照旧拒算 `current-exe`，落在 `current_exe` 那一行。
 #[test]
-fn a_child_name_that_matches_no_test_function_is_still_refused_as_current_exe() {
+fn child_name_that_matches_no_test_function_is_still_refused_as_current_exe() {
     let tree = child_tree("current-exe-unmatched");
     let reason = key_text(&tree, &NONEXISTENT_TEST_ENTRY).expect_err("解不到 #[test] fn：照旧拒算");
     assert!(

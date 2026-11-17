@@ -715,6 +715,8 @@ struct Walk<'reader> {
     user_visible_tree_being_walked: Option<UserVisibleTreeOfTheWalk>,
     /// 正在走的这一版树表里每棵根指针非全零的用户可见树，带根指针的出生 txg（I-3.5 (b) 拿它比 R⁻.txg）。
     user_visible_tree_roots_of_this_version: Vec<UserVisibleTreeRootOfAVersion>,
+    /// 这一版树表里第一条「走到没有条款的形状」的条目的种类（[`tree_table_entry_is_a_shape_without_a_clause`]）：这一版走完记进 I-3.5 的输入。
+    kind_of_a_tree_table_entry_without_a_clause_in_this_version: Option<u16>,
     /// 走过的树表单元 (设备, 槽) → 它每一条条目里 I-9.25 与 I-3.5 读的几样：别的版本共享这片树表时照这份判，不重读盘。
     tree_table_entries_of_a_walked_tree_table: BTreeMap<(u32, u64), Vec<TreeTableEntryOfTheWalk>>,
     /// 走过的实例表各片（按读回那一份的落点）→ 头里的诞生代号：I-3.5 要它。不进 `birth_txg_of_walked_units`——
@@ -778,6 +780,8 @@ struct TreeTableEntryOfTheWalk {
     birth_txg: u64,
     /// 种类是用户可见树、根指针非全零时是那棵树的根；别的条目 `None`。
     user_visible_root: Option<UserVisibleTreeRootOfAVersion>,
+    /// 根指针整条全零：[`tree_table_entry_is_a_shape_without_a_clause`] 读它。
+    root_pointer_is_all_zero: bool,
     /// 码 14 条目 flags 位 0 是不是「销毁中」：I-9.25 的前驱链跳过它。
     /// 别的种类恒 false。
     is_a_snapshot_being_destroyed: bool,
@@ -802,11 +806,24 @@ fn tree_table_entry_of_the_walk(entry: &[u8]) -> Option<TreeTableEntryOfTheWalk>
         previous_snapshot_txg: read_u64(entry, TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET),
         birth_txg: read_u64(entry, TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET),
         user_visible_root,
+        root_pointer_is_all_zero: root_pointer.all_zero,
         is_a_snapshot_being_destroyed: kind == TREE_KIND_SNAPSHOT_INODE_ROOT
             && read_u16(entry, TREE_TABLE_ENTRY_FLAGS_OFFSET)
                 & TREE_TABLE_ENTRY_FLAG_SNAPSHOT_BEING_DESTROYED
                 != 0,
     })
+}
+
+/// 树表的一条条目是不是 I-3.5 条款说的「走到没有条款的形状」（`crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 那一行）：
+/// 主走读走不下去，这一版的引用集合数不全。种类没登记的条目一律算（根指针全零的也算：它占的是另一种树的位置，条款没说它是什么）；
+/// livelist、稀疏旁表登记了、条目格式没有条款：根指针全零是第一版的合法形状，非全零才算（它们真有了根节点，走读不往下走）。
+/// 只读快照的两种条目没有自己的 key 形态，走读照活头那两种树往下走，不算。
+fn tree_table_entry_is_a_shape_without_a_clause(kind: u16, root_pointer_is_all_zero: bool) -> bool {
+    match kind {
+        TREE_KIND_SNAPSHOT_INODE_ROOT | TREE_KIND_SNAPSHOT_EXTENT_ROOT => false,
+        TREE_KIND_LIVELIST | TREE_KIND_SPARSE_SIDE_TABLE => !root_pointer_is_all_zero,
+        other_kind => key_schema_for_tree_kind(other_kind).is_none(),
+    }
 }
 
 /// 走完的一版留给 I-3.5 的东西：它是哪一版、引用过哪些落点（还没折成单元）、这些落点在这一版里各落在哪棵用户可见树里、
@@ -823,6 +840,8 @@ struct VersionPlacementsForTheAppearanceRule {
     user_visible_tree_of_each_placement: BTreeMap<(u32, u64), UserVisibleTreeOfTheWalk>,
     user_visible_tree_roots: Vec<UserVisibleTreeRootOfAVersion>,
     references_are_complete: bool,
+    /// 这一版树表里第一条「走到没有条款的形状」的条目的种类（[`tree_table_entry_is_a_shape_without_a_clause`]）；没有是 `None`。
+    kind_of_a_tree_table_entry_without_a_clause: Option<u16>,
     /// 这一版的实例表指针头里的出生 txg（[`instance_table_pointer_birth_txg_of`]）：取号跳过的第四条件读它。
     instance_table_pointer_birth_txg: Option<u64>,
     /// 这一版树表里谱系树的全部谱系记录（[`lineage_records_of_a_version_for_the_appearance_rule`]），读不全交回判不了的是哪一样：
@@ -849,6 +868,8 @@ struct VersionReferencesForTheAppearanceRule {
     user_visible_tree_roots: Vec<UserVisibleTreeRootOfAVersion>,
     /// 这一版走读一条走读失败都没记：记了就是引用集合数不全，它参与的每一对报不适用。
     references_are_complete: bool,
+    /// 这一版树表里第一条「走到没有条款的形状」的条目的种类：有就是引用集合数不全，它参与的每一对报不适用（[`VersionPlacementsForTheAppearanceRule`] 的同名字段）。
+    kind_of_a_tree_table_entry_without_a_clause: Option<u16>,
     /// 这一版的实例表指针头里的出生 txg（[`instance_table_pointer_birth_txg_of`]）：取号跳过的第四条件读它。
     instance_table_pointer_birth_txg: Option<u64>,
     /// 这一版谱系树里的全部谱系记录，读不全交回判不了的是哪一样（[`VersionPlacementsForTheAppearanceRule`] 的同名字段）。
@@ -1062,6 +1083,19 @@ fn judge_the_appearance_rule_of_adjacent_candidate_versions(
             if !previous_references_are_complete || !version.references_are_complete {
                 unjudged_because_something_does_not_read_back.push(format!(
                     "相邻两版 (实例 {previous_instances:?}、txg {previous_txg}) → (实例 {}、txg {})：有一版走读记过失败、引用没收全，这一对不判",
+                    version.instance, version.checkpoint_txg
+                ));
+                continue;
+            }
+            if let Some(kind) = previous_versions
+                .iter()
+                .chain(std::iter::once(version))
+                .find_map(|walked_version| {
+                    walked_version.kind_of_a_tree_table_entry_without_a_clause
+                })
+            {
+                unjudged_because_something_does_not_read_back.push(format!(
+                    "相邻两版 (实例 {previous_instances:?}、txg {previous_txg}) → (实例 {}、txg {})：有一版树表里有种类 {kind} 的条目，走读走到没有条款的形状、引用没收全，这一对不判",
                     version.instance, version.checkpoint_txg
                 ));
                 continue;
@@ -1849,6 +1883,7 @@ impl<'reader> Walk<'reader> {
             user_visible_tree_of_each_placement_below_a_walked_tree_table: BTreeMap::new(),
             user_visible_tree_being_walked: None,
             user_visible_tree_roots_of_this_version: Vec::new(),
+            kind_of_a_tree_table_entry_without_a_clause_in_this_version: None,
             tree_table_entries_of_a_walked_tree_table: BTreeMap::new(),
             birth_txg_of_walked_instance_table_pages: BTreeMap::new(),
             versions_walked_for_the_appearance_rule: Vec::new(),
@@ -2145,6 +2180,7 @@ impl<'reader> Walk<'reader> {
         self.user_visible_tree_of_each_placement_in_this_version
             .clear();
         self.user_visible_tree_roots_of_this_version.clear();
+        self.kind_of_a_tree_table_entry_without_a_clause_in_this_version = None;
         self.central_mapping_of_this_version = CentralMappingLocationsOfAVersion::default();
         self.tree_sharing_in_the_walk = TreeSharingInTheWalk::OwnTreesOfTheVersion;
         self.snapshot_trees_being_destroyed_in_this_version.clear();
@@ -2182,6 +2218,8 @@ impl<'reader> Walk<'reader> {
                 ),
                 user_visible_tree_roots: self.user_visible_tree_roots_of_this_version.clone(),
                 references_are_complete: self.walk_failures.len() == walk_failures_before,
+                kind_of_a_tree_table_entry_without_a_clause: self
+                    .kind_of_a_tree_table_entry_without_a_clause_in_this_version,
                 instance_table_pointer_birth_txg,
                 lineage_records,
             });
@@ -2229,6 +2267,8 @@ impl<'reader> Walk<'reader> {
                     .collect(),
                 user_visible_tree_roots: version.user_visible_tree_roots.clone(),
                 references_are_complete: version.references_are_complete,
+                kind_of_a_tree_table_entry_without_a_clause: version
+                    .kind_of_a_tree_table_entry_without_a_clause,
                 instance_table_pointer_birth_txg: version.instance_table_pointer_birth_txg,
                 lineage_records: version.lineage_records.clone(),
             })
@@ -2896,6 +2936,7 @@ impl<'reader> Walk<'reader> {
         self.tree_table_entries_of_a_walked_tree_table
             .insert(tree_table_placement, entries_of_the_walk.clone());
         self.judge_previous_snapshot_txg_of_the_tree_table_entries(&entries_of_the_walk);
+        self.note_the_first_tree_table_entry_without_a_clause(&entries_of_the_walk);
         self.user_visible_tree_roots_of_this_version = entries_of_the_walk
             .iter()
             .filter_map(|entry| entry.user_visible_root)
@@ -3313,6 +3354,8 @@ impl<'reader> Walk<'reader> {
             self.walk_the_tree_of_a_snapshot_entry(entry, tree, kind, &what);
             return;
         }
+        // 没有 key 形态的条目走读走不下去：这一版的引用没收全由 `note_the_first_tree_table_entry_without_a_clause` 记下，
+        // 走到树表这一层时就记了（共享这片树表的版本不走到这里）。
         let Some(schema) = key_schema_for_tree_kind(kind) else {
             return;
         };
@@ -3700,6 +3743,22 @@ impl<'reader> Walk<'reader> {
         }
     }
 
+    /// 这一版树表里第一条「走到没有条款的形状」的条目的种类记下（I-3.5）：先走这片树表的那一版与共享它的版本都经这里，
+    /// 共享的版本不重走条目，引用同样没收全。不进 `walk_failures`：I-7.2、I-4.8、I-7.4 判的是走读断没断，这一条由 I-9.16 ④ 判红。
+    fn note_the_first_tree_table_entry_without_a_clause(
+        &mut self,
+        entries: &[TreeTableEntryOfTheWalk],
+    ) {
+        self.kind_of_a_tree_table_entry_without_a_clause_in_this_version =
+            entries.iter().find_map(|entry| {
+                tree_table_entry_is_a_shape_without_a_clause(
+                    entry.kind,
+                    entry.root_pointer_is_all_zero,
+                )
+                .then_some(entry.kind)
+            });
+    }
+
     /// 这一版的树表单元别的版本先走过（`visited_units`）：不重读盘，照先走那一版记下的条目判这一版的 I-9.25，
     /// 这一版树表里几棵用户可见树的根也照它取（I-3.5）。先走那一版头用不了、没记下条目的，这里没有对象。
     fn judge_the_tree_table_entries_an_earlier_version_walked(
@@ -3714,6 +3773,7 @@ impl<'reader> Walk<'reader> {
             return;
         };
         self.judge_previous_snapshot_txg_of_the_tree_table_entries(&entries);
+        self.note_the_first_tree_table_entry_without_a_clause(&entries);
         self.user_visible_tree_roots_of_this_version = entries
             .iter()
             .filter_map(|entry| entry.user_visible_root)
@@ -4270,7 +4330,7 @@ impl<'reader> Walk<'reader> {
                 ) {
                     None => None,
                     Some(child_class) => {
-                        let a_copy_of_the_class_the_entry_type_names_verifies =
+                        let some_copy_of_the_class_the_entry_type_names_verifies =
                             class_the_entry_type_names.is_some_and(|class| {
                                 some_copy_of_the_child_verifies_as_the_class_the_entry_type_names(
                                     self.reader,
@@ -4278,7 +4338,7 @@ impl<'reader> Walk<'reader> {
                                     class,
                                 )
                             });
-                        if a_copy_of_the_class_the_entry_type_names_verifies {
+                        if some_copy_of_the_class_the_entry_type_names_verifies {
                             self.judgements.judge("I-9.2", false, || {
                                 format!(
                                     "inode 内部条目类型段 {record_type} 说孩子是 {class_the_entry_type_names:?}，孩子头里的类标签是 {child_class:?}（按那一类的长度读回、整单元校验和对得上）；另一份头里就是类型段那一类、按那一类的长度自证得过，照类型段那一支往下走那一份"
@@ -7210,7 +7270,7 @@ fn extent_tree_with_the_inode_of_each_data_pointer_without_judging(
     central_mapping: &CentralMappingLocationsOfAVersion,
     cache: &mut IndexNodeCache,
 ) -> Option<ExtentTreeReadWithoutJudging> {
-    /// 待读的一个节点：上段 (层级, 序号)，或某个 inode 下段 (层级, 序号)；根那一个层级取它自己头里的。
+    // 待读的一个节点：上段 (层级, 序号)，或某个 inode 下段 (层级, 序号)；根那一个层级取它自己头里的。
     enum Pending {
         Upper(PointerView, Option<(u8, u64)>),
         Lower(PointerView, u64, Option<(u8, u64)>),
@@ -7793,10 +7853,10 @@ fn judge_release_generations(
             // 盘上那条记录仍写着已释放，D16（发布语义） 已定项 1 / D3（空间分配） 已定项 7）。这个镜像上找不到那条根，这一条判不了。
             continue;
         };
-        let a_later_root_is_incomplete = scanned
+        let some_later_root_is_incomplete = scanned
             .iter()
             .any(|root| root.checkpoint_txg > last_referencing_txg && !root.references.is_complete);
-        if a_later_root_is_incomplete {
+        if some_later_root_is_incomplete {
             skipped_behind_an_incomplete_later_root += 1;
             continue;
         }
@@ -12777,15 +12837,15 @@ fn judge_publish_ordinals_and_last_record_flags(
                 }
             }
             // 前一个计数器上坐着的记录（哪个实例的都算）不在这一组里：这一组计数器最小的就是 first_counter，同实例同 txg 的那一条会在组里。
-            let a_record_sits_before_the_first_member =
-                first_counter
-                    .checked_sub(1)
-                    .is_some_and(|previous_counter| {
-                        records_at_counter(records, previous_counter)
-                            .next()
-                            .is_some()
-                    });
-            if a_record_sits_before_the_first_member && first_member.ordinal_within_publish != 1 {
+            let some_record_sits_before_the_first_member = first_counter
+                .checked_sub(1)
+                .is_some_and(|previous_counter| {
+                    records_at_counter(records, previous_counter)
+                        .next()
+                        .is_some()
+                });
+            if some_record_sits_before_the_first_member && first_member.ordinal_within_publish != 1
+            {
                 note_violation(
                     "不从 1 起",
                     format!(
@@ -15018,7 +15078,7 @@ fn data_units_the_size_asks_for(size_in_bytes: u64) -> u64 {
 }
 
 /// 这一版的截断条目里有没有一条对得上这条记录：inode 号、对象出生代相同，目标 = 记录的 size。
-fn a_truncation_intent_names_the_record(
+fn truncation_intent_names_the_record(
     inode: u64,
     record: &InodeRecordOfTheDeletionScan,
     truncation_intents: &[TruncationIntentOfTheScan],
@@ -15074,7 +15134,7 @@ fn judge_data_unit_counts_of_the_inodes_against_their_size(
         let data_units_existing = data_units.data_unit_count();
         let asked_for = data_units_the_size_asks_for(record.size_in_bytes);
         let names_a_truncation_intent =
-            a_truncation_intent_names_the_record(*inode, record, truncation_intents);
+            truncation_intent_names_the_record(*inode, record, truncation_intents);
         let (count_matches_the_tag, what_the_tag_allows) = match (
             data_units.declared_by_the_upper_leaf_entry,
             names_a_truncation_intent,
@@ -15148,7 +15208,7 @@ fn judge_data_units_beyond_the_size_against_the_truncation_intents(
         judgements.judge(
             DATA_UNITS_BEYOND_THE_SIZE_ARE_NAMED_BY_A_TRUNCATION_INTENT,
             data_units_existing <= asked_for
-                || a_truncation_intent_names_the_record(*inode, record, truncation_intents),
+                || truncation_intent_names_the_record(*inode, record, truncation_intents),
             || {
                 format!(
                     "{version_name}：inode {inode} 的记录 size {} 要 {asked_for} 个数据单元，extent 树里挂着 {data_units_existing} 个（size 之外 {} 个），同一版 logged_ops 里没有一条截断条目对得上它（inode 号、对象出生代 {}、目标 = size）",
@@ -23840,8 +23900,7 @@ mod tests {
     ///  与第三节第 4 句：「有记录、没有条目、size > 0」I-4.6 红，
     /// 没有条目而 size 0（`publish_new_inodes` 建出来、没改过 size 的）与标签 0 配 size > 0（粘住的标签 0：整个文件是洞）都不红。
     #[test]
-    fn a_record_without_an_upper_leaf_entry_reddens_the_unit_count_only_when_its_size_is_not_zero()
-    {
+    fn record_without_an_upper_leaf_entry_reddens_the_unit_count_only_when_its_size_is_not_zero() {
         assert_eq!(
             violations_of_the_unit_count_of_a_record_without_data_units(5000, None),
             1,
@@ -24375,7 +24434,7 @@ mod tests {
     /// txg 3–11 是同一个带文件的状态 A。抬 F 那一刻区域 0 槽 0 住着第 0 代根：有效根 0–11，非空的只有 3，不足 4 个，上限取最旧有效根 txg 0，
     /// F 抬到 1 越过它，判红。
     #[test]
-    fn a_floor_raised_over_the_slot_of_the_genesis_root_past_the_oldest_valid_root_reddens_the_rollback_floor_invariant(
+    fn floor_raised_over_the_slot_of_the_genesis_root_past_the_oldest_valid_root_reddens_the_rollback_floor_invariant(
     ) {
         let verdict = rollback_floor_raised_over_the_slot_of_the_genesis_root_at_txg_twelve(
             |checkpoint_txg| if checkpoint_txg <= 2 { 0 } else { b'A' },
@@ -24394,7 +24453,7 @@ mod tests {
     /// 8–11 是 D。抬 F 那一刻区域 0 槽 0 住着第 0 代根（两棵用户可见树都没有）：非空有效根 1、6、7、8，第 4 新的是 1；盘 1 上最新的 10，
     /// 上限 1，F 抬到 1 成立。
     #[test]
-    fn a_floor_raised_over_the_slot_of_the_genesis_root_to_the_fourth_newest_non_empty_root_holds_the_rollback_floor_invariant(
+    fn floor_raised_over_the_slot_of_the_genesis_root_to_the_fourth_newest_non_empty_root_holds_the_rollback_floor_invariant(
     ) {
         assert_eq!(
             rollback_floor_raised_over_the_slot_of_the_genesis_root_at_txg_twelve(
@@ -24598,7 +24657,7 @@ mod tests {
     /// 区域 2 槽 3 比 9 小的正 txg 没有、不定上限。抬之前的 F 已是 4 时 3 低于它（写者只并不低于今天的 F 的槽），一槽都不定上限；
     /// 那个实例在环里最旧的根是 3 时 3 不比它小，同样不定。读不出、自证过的槽不在这里。
     #[test]
-    fn a_ring_slot_reading_back_all_zero_holds_the_floor_raise_at_the_largest_txg_it_can_hold() {
+    fn ring_slot_reading_back_all_zero_holds_the_floor_raise_at_the_largest_txg_it_can_hold() {
         let geometry = geometry_of_a_ring_of_twelve();
         let readings: BTreeMap<(u64, u64), RootRingSlotReading> = (0..3u64)
             .flat_map(|region| (0..4u64).map(move |slot| (region, slot)))
@@ -24985,7 +25044,7 @@ mod tests {
 
     /// I-9.40 必红世界：根层级高一层（只剩 inode 1 时根留在层级 1，第 0 片叶挂在它下面）。
     #[test]
-    fn a_root_one_level_higher_than_needed_departs_from_the_canonical_upper_shape() {
+    fn root_one_level_higher_than_needed_departs_from_the_canonical_upper_shape() {
         assert!(
             departure_of_the_extent_upper_segment_from_its_canonical_shape(
                 &ExtentUpperSegmentShapeRead {
@@ -25000,7 +25059,7 @@ mod tests {
 
     /// I-9.40 必红世界：少一个祖先（S = {1, 30000} 要层级 2，30000 那片叶 (0, 209) 与根 (2, 0) 都在，它们之间那一层的 (1, 1) 缺了）。
     #[test]
-    fn a_missing_ancestor_departs_from_the_canonical_upper_shape() {
+    fn missing_ancestor_departs_from_the_canonical_upper_shape() {
         assert!(
             departure_of_the_extent_upper_segment_from_its_canonical_shape(
                 &ExtentUpperSegmentShapeRead {
@@ -25035,7 +25094,7 @@ mod tests {
     /// 次级读法的缓存（[`read_through_a_cache_keyed_by_the_located_placement`]）：一条提示已刷新的指针（提示就是映射位置，不试提示）读不出、
     /// 记下「读不出」；另一版里同一个单元的指针提示还在源槽、认到同一个映射落点，要试提示——缓存里那一格「读不出」不拿来用，照读一遍。
     #[test]
-    fn a_cached_unreadable_placement_is_read_again_by_a_pointer_that_tries_its_hint() {
+    fn cached_unreadable_placement_is_read_again_by_a_pointer_that_tries_its_hint() {
         let mut cache: BTreeMap<(u32, u64, u32), Option<u64>> = BTreeMap::new();
         let pointer_whose_hint_is_the_mapping_position = node_pointer_at_the_slot(
             DESTINATION_SLOT_OF_THE_RELOCATED_UNIT,
@@ -25340,7 +25399,7 @@ mod tests {
     /// C01 树 ID 那一格（审计局部对照树 ID 7 / 8 那一形）：树 7 的节点先被一版按树 7 走过，下一版按树 8 引用它——命中走过的单元、不往下展开，
     /// 这一条引用要的树照判，I-1.3 红。
     #[test]
-    fn a_node_an_earlier_version_walked_reddens_the_tree_identifier_invariant_when_referenced_from_another_tree(
+    fn node_an_earlier_version_walked_reddens_the_tree_identifier_invariant_when_referenced_from_another_tree(
     ) {
         let image = ImageHoldingOneUnitAtSlotOne::of(&index_node_of_tree(7));
         let pointer = pointer_to_slot_one(&image, node_pointer_bytes(), node_bytes(), 0);
@@ -25369,7 +25428,7 @@ mod tests {
     /// C01 出生身份那一格：节点先被一版按出生 txg 0 的指针走过，下一版的指针记出生 txg 9——命中走过的单元，I-1.2 照判红；
     /// 「判过几个被引用单元」只在第一次走时加（它数的是单元），命中不翻倍。
     #[test]
-    fn a_node_an_earlier_version_walked_reddens_the_birth_identity_invariant_when_this_pointer_names_another_birth_txg(
+    fn node_an_earlier_version_walked_reddens_the_birth_identity_invariant_when_this_pointer_names_another_birth_txg(
     ) {
         let image = ImageHoldingOneUnitAtSlotOne::of(&index_node_of_tree(7));
         let pointer_of_the_earlier_version =
@@ -25402,7 +25461,7 @@ mod tests {
     /// C01 类标签那一格：槽 1 上的码 2 节点先被一版按节点走过，下一版的 extent 记录拿一条数据指针指着它（整单元校验和按数据单元宽对得上）——
     /// 命中走过的单元，这一条引用要码 1、头里是码 2，I-1.6 红。
     #[test]
-    fn a_node_an_earlier_version_walked_reddens_the_class_label_invariant_when_an_extent_record_points_at_it(
+    fn node_an_earlier_version_walked_reddens_the_class_label_invariant_when_an_extent_record_points_at_it(
     ) {
         let image = ImageHoldingOneUnitAtSlotOne::of(&index_node_of_tree(7));
         let node_pointer = pointer_to_slot_one(&image, node_pointer_bytes(), node_bytes(), 0);
@@ -25598,7 +25657,7 @@ mod tests {
     /// C896：墓碑树一个层级 1 的内部节点先被一版层级 2 的父节点走过，下一版层级 3 的父节点又指着它——命中，层级 = 父层级 − 1 照判，
     /// I-1.1 多红一格。
     #[test]
-    fn a_container_tree_internal_node_an_earlier_version_walked_reddens_the_logical_address_invariant_under_a_parent_of_another_level(
+    fn container_tree_internal_node_an_earlier_version_walked_reddens_the_logical_address_invariant_under_a_parent_of_another_level(
     ) {
         let (smallest_key, largest_key) = (1u64.to_le_bytes(), 4u64.to_le_bytes());
         let image =
@@ -27265,7 +27324,7 @@ mod tests {
     /// 那一份盘面上：按记录自述 (P) 在槽 1 不成立；改记之后三判与逐槽两判都成立（槽 2 隔离豁免、槽 3 在 U 里）；
     /// 改记之后 A 的 [2, 4) 与 B 在槽 3 相交——X 的尾槽压在 B 那一次释放留下、还在 defer 里的槽上——取宽那一支判红。
     #[test]
-    fn quarantined_unit_tail_over_a_record_released_between_t_and_theta_high_reddens_the_unit_class_reading(
+    fn quarantined_unit_tail_over_a_record_released_between_the_root_recorded_reclaim_threshold_and_theta_high_reddens_the_unit_class_reading(
     ) {
         let records = records_of_the_world_with_a_quarantined_unit_tail_over_a_released_record();
         let allocated = Some(4 * SLOT_BYTES);
@@ -27425,7 +27484,7 @@ mod tests {
     /// 已释放的记录一律当占着（回收门槛复算不出的那个近似）：U、U + 1 与 U + 2 两条记录是这一版自己释放的（释放代等于这一版的 txg），
     /// 落点不取 U，取 U + 4。
     #[test]
-    fn a_released_allocation_record_keeps_its_slots_out_of_the_first_data_unit_slot() {
+    fn released_allocation_record_keeps_its_slots_out_of_the_first_data_unit_slot() {
         let unit_area_start = UNIT_AREA_START_SLOT_OF_THE_DEFAULT_JOURNAL_RING;
         let version_checkpoint_txg = 29;
         let allocation_records = [
@@ -27765,21 +27824,21 @@ mod tests {
     }
 
     #[test]
-    fn a_full_first_tombstone_container_and_one_more_hold_on_the_product_branch() {
+    fn full_first_tombstone_container_and_one_more_hold_on_the_product_branch() {
         assert_a_full_first_container_and_one_more_hold_on_the_product_branch(
             ContainerTreeOfTheCapacityJudges::Tombstone,
         );
     }
 
     #[test]
-    fn a_full_first_lineage_container_and_one_more_hold_on_the_product_branch() {
+    fn full_first_lineage_container_and_one_more_hold_on_the_product_branch() {
         assert_a_full_first_container_and_one_more_hold_on_the_product_branch(
             ContainerTreeOfTheCapacityJudges::Lineage,
         );
     }
 
     #[test]
-    fn a_full_first_retirement_container_and_one_more_hold_on_the_product_branch() {
+    fn full_first_retirement_container_and_one_more_hold_on_the_product_branch() {
         assert_a_full_first_container_and_one_more_hold_on_the_product_branch(
             ContainerTreeOfTheCapacityJudges::Retirement,
         );
@@ -28144,8 +28203,7 @@ mod tests {
 
     /// 两个活快照的合法 deadlist：I-3.5（③ ④ 与逆向）与 I-3.6 都判到且成立。
     #[test]
-    fn a_legal_deadlist_under_two_live_snapshots_holds_the_reference_intervals_and_the_tight_bound()
-    {
+    fn legal_deadlist_under_two_live_snapshots_holds_the_reference_intervals_and_the_tight_bound() {
         let units = units_of_the_synthetic_world();
         let world = world_with_two_live_snapshots(&units);
         assert_eq!(
@@ -28165,8 +28223,7 @@ mod tests {
 
     /// 必红世界（I-3.5 ④）：把一个活头还引用的块放进 deadlist。
     #[test]
-    fn a_deadlist_entry_pinning_a_unit_the_head_still_references_violates_the_reference_intervals()
-    {
+    fn deadlist_entry_pinning_a_unit_the_head_still_references_violates_the_reference_intervals() {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
         world.deadlist_entries.push(deadlist_entry_of_the_head(
@@ -28182,8 +28239,7 @@ mod tests {
 
     /// 必红世界（I-3.5 逆向）：deadlist 里一条钉着谁都不引用、也不在待放集里的单元（不加逆向时这一类三条全绿）。
     #[test]
-    fn a_deadlist_entry_pinning_a_unit_no_live_snapshot_references_violates_the_reverse_direction()
-    {
+    fn deadlist_entry_pinning_a_unit_no_live_snapshot_references_violates_the_reverse_direction() {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
         world.deadlist_entries.push(deadlist_entry_of_the_head(
@@ -28199,7 +28255,7 @@ mod tests {
 
     /// 必红世界（I-3.5 ③）：只有活快照引用的单元，deadlist 里一条钉它的都没有（被直接释放了）。
     #[test]
-    fn a_unit_only_a_live_snapshot_references_without_a_deadlist_entry_violates_the_reference_intervals(
+    fn unit_only_a_live_snapshot_references_without_a_deadlist_entry_violates_the_reference_intervals(
     ) {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
@@ -28215,7 +28271,7 @@ mod tests {
 
     /// 必红世界（I-3.5 ③ 归属）：只有 S2 引用的单元挂在纪元 4（S2 自己那一份 [4, 6)），而它该在 S2 之后那一侧 [6, ∞)。
     #[test]
-    fn a_unit_only_a_live_snapshot_references_pinned_under_an_epoch_of_another_side_violates_the_reference_intervals(
+    fn unit_only_a_live_snapshot_references_pinned_under_an_epoch_of_another_side_violates_the_reference_intervals(
     ) {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
@@ -28233,7 +28289,7 @@ mod tests {
 
     /// 必红世界（I-3.6）：把该直接释放的块放进 deadlist——birth 7 晚于活头那一侧的前驱 6（最后一个快照之后才生的块，被杀时该直接释放）。
     #[test]
-    fn a_deadlist_entry_born_after_the_previous_snapshot_of_its_side_violates_the_tight_bound() {
+    fn deadlist_entry_born_after_the_previous_snapshot_of_its_side_violates_the_tight_bound() {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
         let born_after_the_previous_snapshot = data_unit_mapping_key(SECOND_SNAPSHOT_TXG + 1, 5);
@@ -28284,7 +28340,7 @@ mod tests {
     /// 待放的那一条纪元抬到被判这一版的 txg：下一侧是活头时上界取这一版的 txg，它不再算待放，birth 5 大于活头那一侧的前驱 4。上界取 ∞ 时它照算待放、
     /// 两条都成立（空真那一形）。
     #[test]
-    fn a_pending_entry_whose_epoch_is_raised_to_the_txg_of_the_version_violates_the_tight_bound() {
+    fn pending_entry_whose_epoch_is_raised_to_the_txg_of_the_version_violates_the_tight_bound() {
         let units = units_of_the_synthetic_world();
         let mut world =
             world_between_the_destroy_intent_of_the_second_snapshot_and_its_last_batch(&units);
@@ -28311,7 +28367,7 @@ mod tests {
     /// 合法态：先删掉的快照留下纪元 6 的条目（birth 3 不大于它的前驱 4，那一次没放），之后删 S1（lo = 4、P = 0），
     /// 意图与最后一批之间这一条纪元 6 大于 lo、小于这一版的 txg、birth 3 > 0，在待放集里。上界收成 lo + 1 的写法这里红。
     #[test]
-    fn a_pending_entry_whose_epoch_is_above_the_lower_bound_of_the_intent_holds_the_tight_bound_and_the_reverse_direction(
+    fn pending_entry_whose_epoch_is_above_the_lower_bound_of_the_intent_holds_the_tight_bound_and_the_reverse_direction(
     ) {
         let units = units_of_the_synthetic_world();
         let world = DeadlistAndSnapshotReachOfAVersion {
@@ -28356,7 +28412,7 @@ mod tests {
     /// 必红世界（I-3.6 每个纪元恰好落进一份区间，C145 第一条）：S1 的前驱改成 2，前驱链照样首尾相接（S2 的前驱 4 = S1.txg、活头的前驱 6 = S2.txg），
     /// 一条纪元 1 的条目比最早那一侧的前驱小，落不进任何一侧。
     #[test]
-    fn a_deadlist_entry_whose_epoch_falls_below_every_side_of_a_contiguous_chain_violates_the_tight_bound(
+    fn deadlist_entry_whose_epoch_falls_below_every_side_of_a_contiguous_chain_violates_the_tight_bound(
     ) {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
@@ -28378,7 +28434,7 @@ mod tests {
 
     /// 前驱链不首尾相接（活头的前驱 7 ≠ S2.txg 6）时落不进恰好一侧的条目报部分没判（归 I-9.25 判红；C701），不判红、不报不适用。
     #[test]
-    fn a_deadlist_entry_outside_every_side_of_a_broken_chain_is_left_unjudged_by_the_tight_bound() {
+    fn deadlist_entry_outside_every_side_of_a_broken_chain_is_left_unjudged_by_the_tight_bound() {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
         world.head_previous_snapshot_txg = SECOND_SNAPSHOT_TXG + 1;
@@ -28396,7 +28452,7 @@ mod tests {
 
     /// 必红世界（I-3.6 deadlist key 在同一版中央映射里查得到，C300 的 checker 一半）：只有 S2 引用的那个单元的映射条目从这一版的映射里没了。
     #[test]
-    fn a_deadlist_entry_whose_mapping_key_is_missing_from_the_central_mapping_violates_the_tight_bound(
+    fn deadlist_entry_whose_mapping_key_is_missing_from_the_central_mapping_violates_the_tight_bound(
     ) {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
@@ -28421,7 +28477,7 @@ mod tests {
     /// 这一版的中央映射读不全：deadlist key 查不查得到判不了，I-3.6 报部分没判、点名映射读不全、不判红（另两样都成立；C701（别的判法静默跳过
     /// 读不出的部分））。
     #[test]
-    fn a_central_mapping_not_read_in_full_leaves_the_mapping_lookup_of_the_deadlist_unjudged() {
+    fn central_mapping_not_read_in_full_leaves_the_mapping_lookup_of_the_deadlist_unjudged() {
         let units = units_of_the_synthetic_world();
         let mut world = world_with_two_live_snapshots(&units);
         world.keys_of_the_central_mapping = CentralMappingKeysOfAVersion::NotReadInFull;
@@ -28529,7 +28585,7 @@ mod tests {
 
     /// 必红世界（I-3.7 少一条）：S2 在相接的后一版里没带销毁中记号就没了。
     #[test]
-    fn a_live_snapshot_vanishing_between_consecutive_versions_violates_the_enumerable_invariant() {
+    fn live_snapshot_vanishing_between_consecutive_versions_violates_the_enumerable_invariant() {
         let live = SnapshotStanding::Live;
         let versions = [
             snapshots_of_a_synthetic_version(
@@ -28550,7 +28606,7 @@ mod tests {
 
     /// 必红世界（I-3.7 多一条）：后一版多出一个活快照，诞生 txg 2 不是后一版的 txg 6。
     #[test]
-    fn a_live_snapshot_appearing_with_another_txg_violates_the_enumerable_invariant() {
+    fn live_snapshot_appearing_with_another_txg_violates_the_enumerable_invariant() {
         let live = SnapshotStanding::Live;
         let versions = [
             snapshots_of_a_synthetic_version(5, &[(FIRST_SNAPSHOT_TREE, 4, live)]),
@@ -28687,7 +28743,7 @@ mod tests {
 
     /// I-3.7 每一版那一格：S.txg 4、6 的两个活快照在 txg 6 那一版成立；同一张表在 txg 5 那一版红（S2 的诞生 txg 6 晚于这一版）。
     #[test]
-    fn a_live_snapshot_whose_txg_is_after_its_version_violates_the_enumerable_invariant() {
+    fn live_snapshot_whose_txg_is_after_its_version_violates_the_enumerable_invariant() {
         let entries = synthetic_tree_table_with_snapshots(&[
             (FIRST_SNAPSHOT_TREE, FIRST_SNAPSHOT_TXG, 0, 0),
             (
@@ -28730,7 +28786,7 @@ mod tests {
     /// D16（发布语义） 已定项 1 的「非空」与去重：两棵用户树的根不变、只多出一对快照条目的那一版，
     /// 与前一版是两个不同的状态，数「第 N 新的非空有效根」时各计一个；只比两棵树的读法把它们并成一个（`crates/mutations.tsv` 里这一条的那一行）。
     #[test]
-    fn a_root_that_only_created_a_snapshot_counts_as_one_more_distinct_state() {
+    fn root_that_only_created_a_snapshot_counts_as_one_more_distinct_state() {
         let before = synthetic_tree_table_with_snapshots(&[]);
         let after_creating_a_snapshot =
             synthetic_tree_table_with_snapshots(&[(FIRST_SNAPSHOT_TREE, FIRST_SNAPSHOT_TXG, 0, 0)]);
@@ -28790,7 +28846,7 @@ mod tests {
     /// 同一份行，R 的指针出生 txg 改成 12（R 就是新建实例表的那一版）接得上——两个分类只差第四条件。
     /// 第四条件比成 R.txg − 1（变异「C699 甲：取号跳过第四条件比成 R 的前一个 txg」）这一条红。
     #[test]
-    fn a_hole_whose_rows_bridge_is_not_a_number_acquisition_skip_unless_the_later_version_created_its_instance_table(
+    fn hole_whose_rows_bridge_is_not_a_number_acquisition_skip_unless_the_later_version_created_its_instance_table(
     ) {
         let rows = rows_bridging_instance_one_at(10, &[]);
         assert_eq!(
@@ -28809,7 +28865,7 @@ mod tests {
     /// R 的实例表指针出生 txg 8（R 是实例 3 写行那一版）。四个条件都成立：接得上。第四条件比成 R⁻ 的 txg
     /// （变异「C699 甲：取号跳过第四条件比成 R⁻ 的 txg」）这一条红。
     #[test]
-    fn a_number_acquisition_skip_whose_later_version_created_its_instance_table_is_bridged() {
+    fn number_acquisition_skip_whose_later_version_created_its_instance_table_is_bridged() {
         let rows = rows_bridging_instance_one_at(6, &[2]);
         assert_eq!(
             hole_in_the_candidate_set_between(6, &BTreeSet::from([1]), 8, 3, Some(8), &rows),
@@ -28821,7 +28877,7 @@ mod tests {
     /// R 的实例表指针整条全零（`instance_table_pointer_birth_txg_of` 交 `None`）：行接得上也按「R 不是新建实例表的那一版」认，接不上
     /// （E198 装置的甲同一个读法）。第四条件写成「指针出生 txg 不大于 R.txg」（变异「C699 甲：取号跳过第四条件写成不大于」，全零读成最小）这一条红。
     #[test]
-    fn a_hole_whose_later_version_has_an_all_zero_instance_table_pointer_is_not_a_number_acquisition_skip(
+    fn hole_whose_later_version_has_an_all_zero_instance_table_pointer_is_not_a_number_acquisition_skip(
     ) {
         let rows = rows_bridging_instance_one_at(6, &[2]);
         assert_eq!(
@@ -28870,6 +28926,7 @@ mod tests {
                 root_pointer_birth_txg,
             }],
             references_are_complete: true,
+            kind_of_a_tree_table_entry_without_a_clause: None,
             instance_table_pointer_birth_txg: None,
             lineage_records,
         }
@@ -28879,7 +28936,20 @@ mod tests {
     fn reference_interval_verdict_of_the_appearance_rule_pair(
         lineage_records_of_the_later_version: Result<Vec<LineageRecordOfTheScan>, DeletionScanGap>,
     ) -> InvariantVerdict {
-        let versions = [
+        reference_interval_verdict_of_the_appearance_rule_pair_given_the_tree_table_entries_without_a_clause(
+            lineage_records_of_the_later_version,
+            None,
+            None,
+        )
+    }
+
+    /// 同 [`reference_interval_verdict_of_the_appearance_rule_pair`]，两版各带树表里「走到没有条款的形状」的条目的种类。
+    fn reference_interval_verdict_of_the_appearance_rule_pair_given_the_tree_table_entries_without_a_clause(
+        lineage_records_of_the_later_version: Result<Vec<LineageRecordOfTheScan>, DeletionScanGap>,
+        kind_without_a_clause_in_the_previous_version: Option<u16>,
+        kind_without_a_clause_in_the_later_version: Option<u16>,
+    ) -> InvariantVerdict {
+        let mut versions = [
             version_of_the_appearance_rule_pair(
                 TXG_OF_THE_VERSION_BEFORE_THE_ROLLBACK,
                 TXG_OF_THE_VERSION_BEFORE_THE_ROLLBACK,
@@ -28893,6 +28963,10 @@ mod tests {
                 lineage_records_of_the_later_version,
             ),
         ];
+        versions[0].kind_of_a_tree_table_entry_without_a_clause =
+            kind_without_a_clause_in_the_previous_version;
+        versions[1].kind_of_a_tree_table_entry_without_a_clause =
+            kind_without_a_clause_in_the_later_version;
         let birth_txg_of_walked_units = BTreeMap::from([
             ((0u32, 100u64), TXG_OF_THE_VERSION_BEFORE_THE_ROLLBACK),
             (
@@ -28918,6 +28992,126 @@ mod tests {
             .find(|(invariant, _)| *invariant == REFERENCE_INTERVALS_ARE_EXACT)
             .expect("I-3.5 在清单里")
             .1
+    }
+
+    /// 一个没登记的种类码：种类码登记表（D8（核心索引结构） 已定项 9）到 15 为止。
+    const TREE_KIND_NOT_REGISTERED: u16 = 16;
+
+    fn assert_the_pair_reports_the_tree_table_entry_without_a_clause(verdict: InvariantVerdict) {
+        match verdict {
+            InvariantVerdict::PartiallyJudged(unjudged) => assert!(
+                unjudged.contains(&format!(
+                    "有一版树表里有种类 {TREE_KIND_NOT_REGISTERED} 的条目，走读走到没有条款的形状、引用没收全，这一对不判"
+                )),
+                "说明点名那一条条目的种类：{unjudged}"
+            ),
+            other @ (InvariantVerdict::Holds
+            | InvariantVerdict::Violated(_)
+            | InvariantVerdict::NotApplicable(_)) => {
+                panic!("R 或 R⁻ 的树表里有没有条款的条目：这一对报部分没判，实际 {other:?}")
+            }
+        }
+    }
+
+    /// 后一版树表里有种类没登记的条目：这一对不判。谱系树里一条担保都没有，判了就红，所以这一条分得出判没判。
+    #[test]
+    fn later_version_with_a_tree_table_entry_of_an_unregistered_kind_leaves_the_pair_not_judged() {
+        assert_the_pair_reports_the_tree_table_entry_without_a_clause(
+            reference_interval_verdict_of_the_appearance_rule_pair_given_the_tree_table_entries_without_a_clause(
+                Ok(Vec::new()),
+                None,
+                Some(TREE_KIND_NOT_REGISTERED),
+            ),
+        );
+    }
+
+    /// 前一版树表里有种类没登记的条目：同样不判（同一理由）。
+    #[test]
+    fn previous_version_with_a_tree_table_entry_of_an_unregistered_kind_leaves_the_pair_not_judged()
+    {
+        assert_the_pair_reports_the_tree_table_entry_without_a_clause(
+            reference_interval_verdict_of_the_appearance_rule_pair_given_the_tree_table_entries_without_a_clause(
+                Ok(Vec::new()),
+                Some(TREE_KIND_NOT_REGISTERED),
+                None,
+            ),
+        );
+    }
+
+    /// 哪些树表条目算「走到没有条款的形状」：种类没登记的不管根指针、livelist 与稀疏旁表只在根指针非全零时、
+    /// 走读走得下去的那几种（只读快照两种连同有 key 形态的）都不算。
+    #[test]
+    fn only_unregistered_kinds_and_rooted_livelist_or_sparse_side_table_entries_are_shapes_without_a_clause(
+    ) {
+        for root_pointer_is_all_zero in [true, false] {
+            for kind in [0, TREE_KIND_NOT_REGISTERED, u16::MAX] {
+                assert!(
+                    tree_table_entry_is_a_shape_without_a_clause(kind, root_pointer_is_all_zero),
+                    "种类 {kind} 没登记，根指针全零 {root_pointer_is_all_zero}"
+                );
+            }
+            for kind in [
+                TREE_KIND_EXTENT,
+                TREE_KIND_INODE,
+                TREE_KIND_ALLOCATION,
+                TREE_KIND_ACCOUNTING,
+                TREE_KIND_DEADLIST,
+                TREE_KIND_DELETED_INODES,
+                TREE_KIND_TOMBSTONE,
+                TREE_KIND_LINEAGE,
+                TREE_KIND_LOGGED_OPERATIONS,
+                TREE_KIND_RETIREMENT,
+                TREE_KIND_SNAPSHOT_INODE_ROOT,
+                TREE_KIND_SNAPSHOT_EXTENT_ROOT,
+            ] {
+                assert!(
+                    !tree_table_entry_is_a_shape_without_a_clause(kind, root_pointer_is_all_zero),
+                    "种类 {kind} 走读走得下去，根指针全零 {root_pointer_is_all_zero}"
+                );
+            }
+        }
+        for kind in [TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE] {
+            assert!(
+                !tree_table_entry_is_a_shape_without_a_clause(kind, true),
+                "种类 {kind} 根指针全零是第一版的合法形状"
+            );
+            assert!(
+                tree_table_entry_is_a_shape_without_a_clause(kind, false),
+                "种类 {kind} 真有了根节点：走读不往下走，引用没收全"
+            );
+        }
+    }
+
+    /// 这一版的树表别的版本先走过：条目不重走，「走到没有条款的形状」照先走那一版记下的条目认；开始走下一版时清掉。
+    #[test]
+    fn version_sharing_a_tree_table_walked_earlier_takes_its_entry_without_a_clause_until_the_next_version(
+    ) {
+        let image = ImageHoldingOneUnitAtSlotOne::of(&index_node_of_tree(7));
+        let mut walk = Walk::starting_with(&image, Judgements::default(), 0, 0, 10);
+        let tree_table_placement = (0u32, 1u64);
+        walk.tree_table_entries_of_a_walked_tree_table.insert(
+            tree_table_placement,
+            vec![TreeTableEntryOfTheWalk {
+                tree: 65_541,
+                kind: TREE_KIND_NOT_REGISTERED,
+                previous_snapshot_txg: 0,
+                birth_txg: 3,
+                user_visible_root: None,
+                root_pointer_is_all_zero: true,
+                is_a_snapshot_being_destroyed: false,
+            }],
+        );
+        walk.judge_the_tree_table_entries_an_earlier_version_walked(tree_table_placement);
+        assert_eq!(
+            walk.kind_of_a_tree_table_entry_without_a_clause_in_this_version,
+            Some(TREE_KIND_NOT_REGISTERED),
+            "共享这片树表的版本同样引用没收全"
+        );
+        walk.begin_walking_a_version();
+        assert_eq!(
+            walk.kind_of_a_tree_table_entry_without_a_clause_in_this_version, None,
+            "下一版从没有记起"
+        );
     }
 
     fn lineage_record(rollback_txg: u64, parent_txg: u64) -> LineageRecordOfTheScan {

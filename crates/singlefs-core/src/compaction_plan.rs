@@ -16,11 +16,14 @@ use singlefs_replay_prefix::compaction_plan_proofs::{
     CompactionKernelSegment, CompactionKernelSegmentScan,
 };
 
-use crate::address::{DeviceIdentity, SlotNumber};
-use crate::allocator::{AllocationRecord, Placement, UnitAreaStart};
+use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
+use crate::admission::{BytesOnOneDevice, UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED};
+use crate::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator, UnitAreaStart};
 use crate::background_compute::{BackgroundTaskAfterTheComputeError, ClusterSegmentEntryKey};
 use crate::logged_operations::{CompactionIntent, CompactionRegion};
+use crate::mounted_session::{BackgroundCompactionTrigger, CompactionRunReach};
 use crate::region_scan::{AllocationInRegion, RegionScan, RegionScanRefusal, ScannedAllocation};
+use crate::root_ring::RootRingSlotsPerRegion;
 
 /// 选段判据。封闭集合：加一种判据就加一个成员。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -425,12 +428,18 @@ pub fn plan_batch_skipping_the_units_this_publish_rewrites_anyway(
     }
 }
 
-/// 一批至多搬几个单元从哪来。封闭集合。产品路径的批大小条款没写（判决 G2 的 K 归 E10（老化：结构抗老化 vs 事后整理））：
-/// 产品路径照 [`CompactionBatchSize::NotDecidedByTheClauses`]，整理一次运行在签任何意图、发任何一个写之前停下，停机原因
-/// [`CompactionRunStop::BatchSizeNotDecidedByTheClauses`]；只供测试的开关给出一个数才走得进去。
+/// 批大小的产品默认：一批至多搬 16 个单元（D26（后台整理与放置回收） 已定项 1；数是拍的，下界由一份 `B_gc` 做得完一条意图算出：
+/// 默认几何下一条 64 单元的意图要 1 + ⌈64/16⌉ = 5 次发布）。挂载参数，不存盘（[`CompactionBatchSize::OfTheMount`]）。
+pub const COMPACTION_BATCH_UNITS_BY_DEFAULT: CompactionBatchUnits = match NonZeroUsize::new(16) {
+    Some(units) => CompactionBatchUnits(units),
+    None => panic!("16 不是 0"),
+};
+
+/// 一批至多搬几个单元从哪来。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionBatchSize {
-    NotDecidedByTheClauses,
+    /// 这次挂载给的（挂载参数，默认 [`COMPACTION_BATCH_UNITS_BY_DEFAULT`]）。
+    OfTheMount(CompactionBatchUnits),
     /// 只供测试。
     ForcedForTests(CompactionBatchUnits),
 }
@@ -438,12 +447,13 @@ pub enum CompactionBatchSize {
 /// 整理什么时候起跑。封闭集合。产品路径照水位（[`CompactionRunForcing::FollowTheWatermarks`]）；另两种只供测试。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRunForcing {
-    /// 定时兜底那一次与用户改动发成之后那一次按水位判起不起跑（D26（后台整理与放置回收） 已定项 13 第 5 条）。第一版三条水位恒 0、
-    /// 0 = 关，所以这一支在产品路径上不起跑；显式入口（`mounted_session::MountedSession::run_compaction`）
-    /// 不看水位、照常跑。
+    /// 定时兜底那一次与用户改动发成之后那一次按水位判起不起跑（D26（后台整理与放置回收） 已定项 13 第 5 条，[`CompactionWatermarks`]）；
+    /// 后台入口连同不发布的停做的备忘、挂载那一份预算从根环读、破例与回退门都只在这一支判。显式入口
+    /// （`mounted_session::MountedSession::run_compaction`）不看水位、不过回退门，照常跑。
     FollowTheWatermarks,
     /// 只供测试：起跑判据不看水位、恒为真——定时兜底查到的是「该跑」，用户改动发成之后记下的也是「该跑了」，由后台入口
-    /// （`mounted_session::MountedSession::run_compaction_in_the_background`）去跑。
+    /// （`mounted_session::MountedSession::run_compaction_in_the_background`）去跑。备忘、挂载那一份预算从根环读、破例与回退门这一支都不判：
+    /// 用它的用例钉的是一趟怎么推，发布数由用例自己摆。
     ForcedToStartForTests,
     /// 只供测试：两个入口都不起跑，停机原因 [`CompactionRunStop::ForcedToStopForTests`]。
     ForcedToStopForTests,
@@ -510,12 +520,12 @@ pub enum RelocationPublishOrder {
     SourceReleasedWhileTheMappingStillNamesItForTests,
 }
 
-/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）：会话为读回时只坏一份、又被活快照钉着的旧单元另发的那一批搬迁
-/// （`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots`），在发之前当作被空间准入拒。产品路径恒 [`Self::NotForced`]。
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支能被测试强制进入）：一次用户改动发成之后，会话为读到只坏一份的单元另发的那一批搬迁
+/// （`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing`），在发之前当作被空间准入拒。产品路径恒 [`Self::NotForced`]。
 /// 被拒推抬 F 再试那一支在小盘之外的池上造不出「改动放得下、紧接着那一批放不下」，靠它进；
 /// 开关造的拒绝在这一批的写入口建起之前交回，一个写都没发。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RelocationKeptForTheSnapshotsRefusedForSpace {
+pub enum RelocationBatchAfterTheChangeRefusedForSpace {
     NotForced,
     /// 接下来这几次发这一批都当作被拒，用完之后照常发。
     ForcedForTheNextAttemptsForTests {
@@ -525,13 +535,13 @@ pub enum RelocationKeptForTheSnapshotsRefusedForSpace {
     ForcedOnEveryAttemptForTests,
 }
 
-/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：会话另发的那一批搬迁（同 [`RelocationKeptForTheSnapshotsRefusedForSpace`]）在发之前
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：会话另发的那一批搬迁（同 [`RelocationBatchAfterTheChangeRefusedForSpace`]）在发之前
 /// 当作被拒、而不是空间不够（计划对不上那一版那一种：`transaction::RelocationBatchRefused::PlannedUnitNotInTheVersion`，点名计划里头一把 key）。
-/// 产品路径恒 [`Self::NotForced`]。被拒不是空间不够那一支（不推抬 F、不再试，`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace`）
+/// 产品路径恒 [`Self::NotForced`]。被拒不是空间不够那一支（不推抬 F、不再试，`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace`）
 /// 在产品路径上要计划在算出来与发之间失效、或发布路径报空间之外的错才进得去，靠它进；开关造的拒绝在这一批的写入口建起之前交回，一个写都没发。
 /// 被空间拒的那个开关同时开着时先照那一个拒（它在前面判）。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RelocationKeptForTheSnapshotsRefusedNotForSpace {
+pub enum RelocationBatchAfterTheChangeRefusedNotForSpace {
     NotForced,
     /// 每一次发这一批都当作被拒（不是空间不够：不再试，一批只发这一次）。
     ForcedOnEveryAttemptForTests,
@@ -539,10 +549,10 @@ pub enum RelocationKeptForTheSnapshotsRefusedNotForSpace {
 
 /// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：会话为另发的那一批搬迁被空间拒而推抬 F 时，那一串抬 F 当作自己报了错
 /// （`mount::MountError::InstanceTableUnreadable`：`mount::push_one_floor_raise_within_the_admission_budget` 在任何写之前交得出的那一种），一个写都不发。
-/// 产品路径恒 [`Self::NotForced`]。抬 F 自己报错那一支（`mounted_session::RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace`）
-/// 在产品路径上要推抬 F 时读盘或落盘出错才进得去，靠它进；要先被空间拒才推抬 F，与 [`RelocationKeptForTheSnapshotsRefusedForSpace`] 合着开。封闭集合。
+/// 产品路径恒 [`Self::NotForced`]。抬 F 自己报错那一支（`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace`）
+/// 在产品路径上要推抬 F 时读盘或落盘出错才进得去，靠它进；要先被空间拒才推抬 F，与 [`RelocationBatchAfterTheChangeRefusedForSpace`] 合着开。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FloorRaiseForTheRelocationKeptForTheSnapshotsFails {
+pub enum FloorRaiseForTheRelocationBatchAfterTheChangeFails {
     NotForced,
     /// 每一次为这一批推抬 F 都当作抬 F 自己报了错。
     ForcedOnEveryRaiseForTests,
@@ -567,7 +577,7 @@ pub struct CompactionSwitches {
 
 impl CompactionSwitches {
     pub const PRODUCT: CompactionSwitches = CompactionSwitches {
-        batch_size: CompactionBatchSize::NotDecidedByTheClauses,
+        batch_size: CompactionBatchSize::OfTheMount(COMPACTION_BATCH_UNITS_BY_DEFAULT),
         forced_region: None,
         run_forcing: CompactionRunForcing::FollowTheWatermarks,
         region_exclusion: CompactionRegionExclusion::ExcludedWhileTheIntentIsLive,
@@ -583,8 +593,6 @@ impl CompactionSwitches {
 /// 一次整理运行停在哪。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompactionRunStop {
-    /// 产品路径的批大小条款没写（[`CompactionBatchSize::NotDecidedByTheClauses`]）：一个意图都没签、一个写都没发。
-    BatchSizeNotDecidedByTheClauses,
     /// 只供测试的开关叫停（[`CompactionRunForcing::ForcedToStopForTests`]）。
     ForcedToStopForTests,
     /// 一段都没资格（[`RegionChoice::NoEligibleSegment`]），或强制选的那一段不合格。
@@ -598,7 +606,8 @@ pub enum CompactionRunStop {
     },
     /// 这次运行的发布预算用完了。
     PublishBudgetSpent { budget: u64 },
-    /// 一批被空间拒（准入或落点）：暂停——撤掉 R 排他、意图留着，不推抬 F。
+    /// 一批被空间拒（准入或落点）：暂停——单独发一次只删意图的发布丢掉意图（R 排他跟着撤），不推抬 F；下一次整理从头签发、重扫。
+    /// 只删意图的那一次归删除类，不判式子、落点照判（`transaction::judge_the_publish_before_any_read_or_write`）。
     PausedShortOfSpace,
     /// 签发那次发布被空间拒（准入或落点）：意图没签成、盘上没有它，R 排他跟着撤；不推抬 F。
     IssueRefusedShortOfSpace,
@@ -610,21 +619,29 @@ pub enum CompactionRunStop {
     /// 用户改动之后起跑的那一趟只跑至多一批，跑完了。
     OneBatchAfterTheUserChangeDone,
     /// 后台入口：前台有 fsync 在等，不发下一批（D26（后台整理与放置回收） 已定项 13 第 6 条）。
+    /// 全空段低于底额、前台写不进时这一趟的第一次发布不为前台 fsync 让路（前台已写不进，让路换不来什么）。
     YieldedToAForegroundFsync,
+    /// 后台入口：调用方在停这条驱动后台入口的线程，不发下一批，低于底额的破例也不发（线程很快 join 得上）。
+    YieldedToTheCallerStoppingItsThread,
     /// 后台入口：这一个写带宽窗口里整理写的字节已到写带宽上限，不发下一批（D26 已定项 13 第 6 条，[`CompactionWriteBandwidthLimit`]）。
     WriteBandwidthLimitReached {
         bytes_written_in_the_window: u64,
         limit_in_bytes_per_second: u64,
     },
-    /// 这一批算着出了错（D26 已定项 13 第 4 条）：这一批放弃、一个写都没发，意图留在盘上；整理这个后台任务停下或当场解除停下见
-    /// `task_after_the_error`。
+    /// 这一批算着出了错（D26 已定项 13 第 4 条）：这一批放弃、一个单元都没搬；现行那一版里有活意图就单发一次只删意图的发布丢掉它
+    /// （R 排他跟着撤，同 [`Self::PausedShortOfSpace`]），没有就一个写都没发。整理这个后台任务怎样了见 `task_after_the_error`：
+    /// 一批里同一个条目键出现两次（`background_compute::BackgroundGpuComputeFailed::SameEntryKeyTwiceInOneBatch`）只作废这一批、任务不停
+    /// （[`BackgroundTaskAfterTheComputeError::NotStoppedForOnlyTheBatchIsAbandoned`]）；别的错停下，或当场解除停下。下一次整理从头签发。
     BatchAbandonedAfterABackgroundComputeError {
         task_after_the_error: BackgroundTaskAfterTheComputeError,
     },
-    /// 整理这个后台任务先前因一批出错停着（D26 已定项 13 第 4 条；挂载那一刻或切换生效的那一批开头，实现照交给它的那一组一张卡都用不上而当场停着的同算），
+    /// 整理这个后台任务先前因一批出错停着（D26 已定项 13 第 4 条；挂载那一刻或两批之间实现答交给它的那一组换上了而一张卡都用不上、答开不成而当场停着的同算），
     /// 而这一刻池子每块盘的已分配占它的容量都不超过补跑阈值：
-    /// 停在这一刻，从这一刻起一个写都不发、撤掉活意图的 R 排他。一趟开头就判出的，这一趟一个写都没发；一趟之中在 CPU 上补跑过几批之后、
-    /// 或一趟之中切换生效的那一批开头才判出的，前面那几批照常发过。等占用超过阈值（下一趟照常补跑），或一次通过校验的切换请求解除停下。
+    /// 停在这一刻：现行那一版里有活意图就单发一次只删意图的发布丢掉它（R 排他跟着撤，同 [`Self::PausedShortOfSpace`]），之后一个写都不发；
+    /// 没有活意图就从这一刻起一个写都不发（删除续做也不走）。显式入口每一趟开头判这一条；后台入口判出停着而有活意图时起跑一趟只为删它
+    /// （`mounted_session::BackgroundCompactionTrigger::LiveIntentWhileStoppedAfterAComputeError`），没有活意图就不起跑。挂着切换之后实现答那一组一张卡都用不上或开不成、
+    /// 手里没有活意图时，两个入口都在任何写之前停在这一条。一趟之中在 CPU 上补跑过几批之后、或一趟之中两批之间实现答出那一组的结局才判出的，
+    /// 前面那几批照常发过。等占用超过阈值（下一趟照常补跑、从头签发），或一次通过校验的切换请求解除停下；开卡期间出错停着的，实现答那一组换上了也解除。
     BackgroundTaskStoppedAfterAnEarlierComputeError,
     /// GPU 路径上 R 里除了这一轮两份核判得不一样的记录，再没有判定了可搬的（D26 已定项 13 第 8 条「这一批不回收、不搬，留到下一轮重算」）：
     /// 这一批不发，意图照留（不删也不丢），下一批重扫照判。
@@ -632,16 +649,58 @@ pub enum CompactionRunStop {
     /// GPU 路径上选中要签的那一段里有这一轮两份核判得不一样的记录（D26 已定项 13 第 8 条）：R 里要搬几个数不准，签发前那一判判不了，
     /// 这一批不签，下一批重扫照判。
     IssueHeldBackByRecordsUncertainThisRound { records_uncertain_this_round: u64 },
+    /// 后台入口：这次整理发布要写的根槽与它之后余量（[`root_ring_slots_left_by_a_compaction_publish`]）那几槽里的根一走，根环里不同用户状态就少于 4 个
+    /// （D16（发布语义） 已定项 1 的回退候选集；D26 已定项 13 第 5 条的加门）：不发，一个写都没发。全空段低于底额、前台写不进时每趟第一次发布破例不判。
+    CompactionPublishWouldLeaveFewerThanFourRollbackStates {
+        states_now: u64,
+        states_after_the_publish_and_the_margin: u64,
+    },
+    /// 后台入口：回退门读根环或树表没读通（读不清有几个状态就不发）：一个写都没发，下一次叫起重判。
+    RollbackStatesOfTheRingUnreadable,
+    /// 后台入口放锁的那一种（`mounted_session::MountedSessionWithPendingChanges::run_compaction_in_the_background_for_at_most_one_publish`）：
+    /// 这一趟这一次调用发成了一次，调用方放锁之后接着调。不是停机，这一趟记在会话上没完。
+    OnePublishOfTheTripDone,
+    /// 后台入口因删除队列不空起跑的那一趟（D26（后台整理与放置回收） 已定项 13）：队列走空了，这一趟只走队列、一次整理发布都不发。整理下一次调用照常判起跑。
+    DeletionQueueWalkedWithoutACompactionPublish,
 }
 
 impl CompactionRunStop {
+    /// 这一种停在现行那一版不变、开关不变时重判还是同一个结论，又不发布：记进备忘，定时兜底下一次不重判
+    /// （[`CompactionOfThisMount::note_the_stop_of_a_run`]）。选段、签发前判、无产出与回退门读的（分配记录、映射、快照钉住的槽、根环）都随发布变，
+    /// 内存里的隔离集与不合格段表也只在发布里变。GPU 两份核不一致、被节奏或空间截住、出错的那几种下一次可能翻面，不进备忘。
+    #[must_use]
+    pub const fn publishes_nothing_until_the_next_publish(self) -> bool {
+        match self {
+            CompactionRunStop::NoEligibleSegment
+            | CompactionRunStop::HolesOutsideTheRegionFewerThanItsUnitsToMove { .. }
+            | CompactionRunStop::NoYieldFromTheLastIntent { .. }
+            | CompactionRunStop::CompactionPublishWouldLeaveFewerThanFourRollbackStates {
+                ..
+            } => true,
+            CompactionRunStop::ForcedToStopForTests
+            | CompactionRunStop::PublishBudgetSpent { .. }
+            | CompactionRunStop::PausedShortOfSpace
+            | CompactionRunStop::IssueRefusedShortOfSpace
+            | CompactionRunStop::NoLiveIntentLeftToContinue
+            | CompactionRunStop::NothingMovableButTheRegionIsNotEmpty
+            | CompactionRunStop::OneBatchAfterTheUserChangeDone
+            | CompactionRunStop::YieldedToAForegroundFsync
+            | CompactionRunStop::YieldedToTheCallerStoppingItsThread
+            | CompactionRunStop::WriteBandwidthLimitReached { .. }
+            | CompactionRunStop::BatchAbandonedAfterABackgroundComputeError { .. }
+            | CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError
+            | CompactionRunStop::OnlyRecordsUncertainThisRoundLeftToMove { .. }
+            | CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound { .. }
+            | CompactionRunStop::RollbackStatesOfTheRingUnreadable
+            | CompactionRunStop::OnePublishOfTheTripDone
+            | CompactionRunStop::DeletionQueueWalkedWithoutACompactionPublish => false,
+        }
+    }
+
     /// 运行时报出停在哪一条（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
-            CompactionRunStop::BatchSizeNotDecidedByTheClauses => {
-                "compaction_stopped_batch_size_not_decided_by_the_clauses"
-            }
             CompactionRunStop::ForcedToStopForTests => "compaction_stopped_by_the_test_only_switch",
             CompactionRunStop::NoEligibleSegment => "compaction_stopped_no_eligible_segment",
             CompactionRunStop::HolesOutsideTheRegionFewerThanItsUnitsToMove { .. } => {
@@ -669,6 +728,9 @@ impl CompactionRunStop {
             CompactionRunStop::YieldedToAForegroundFsync => {
                 "compaction_yielded_to_a_foreground_fsync"
             }
+            CompactionRunStop::YieldedToTheCallerStoppingItsThread => {
+                "compaction_yielded_to_the_caller_stopping_its_thread"
+            }
             CompactionRunStop::WriteBandwidthLimitReached { .. } => {
                 "compaction_paced_by_the_write_bandwidth_limit"
             }
@@ -684,11 +746,23 @@ impl CompactionRunStop {
             CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound { .. } => {
                 "compaction_issue_held_back_by_records_uncertain_on_the_gpu"
             }
+            CompactionRunStop::CompactionPublishWouldLeaveFewerThanFourRollbackStates {
+                ..
+            } => "compaction_stopped_the_publish_would_leave_fewer_than_four_rollback_states",
+            CompactionRunStop::RollbackStatesOfTheRingUnreadable => {
+                "compaction_stopped_the_rollback_states_of_the_ring_are_unreadable"
+            }
+            CompactionRunStop::OnePublishOfTheTripDone => "compaction_one_publish_of_the_trip_done",
+            CompactionRunStop::DeletionQueueWalkedWithoutACompactionPublish => {
+                "compaction_deletion_queue_walked_without_a_compaction_publish"
+            }
         }
     }
 }
 
-/// 一条活意图在这次挂载里的样子：意图本身与它的 R 排没排他（暂停 = 撤掉 R 排他、意图留着）。
+/// 一条活意图在这次挂载里的样子：意图本身与它的 R 排没排他（产品值排他；只供测试的开关 [`CompactionRegionExclusion::SwitchedOffForTests`] 不排）。
+/// 整理停下（暂停、一批出错停下）删掉意图连同排他，盘上每一版不留「意图在、R 不排他」那一态；只删意图的那一次发布自己取落点时放开 R
+/// （[`CompactionSwitchesAndTheExcludedRegion::open_the_region_to_the_publish_deleting_the_intent`]），那一次发布落盘的那一版里已没有意图。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LiveCompactionIntent {
     pub intent: CompactionIntent,
@@ -721,6 +795,10 @@ pub struct CompactionObservations {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompactionSwitchesAndTheExcludedRegion {
     pub switches: CompactionSwitches,
+    /// 三条水位线（D26（后台整理与放置回收） 已定项 1，挂载参数，不存盘）。
+    pub watermarks: CompactionWatermarks,
+    /// 只供测试：不看读数，判起跑判据时当这个量越了线（[`CompactionWatermarkCrossingForcing`]）。
+    pub watermark_crossing_forcing: CompactionWatermarkCrossingForcing,
     live_intent: Option<LiveCompactionIntent>,
     has_the_forced_release_checksum_mismatch_been_used: bool,
     quarantines_noted_by_the_publishes: Vec<(SlotNumber, u64)>,
@@ -732,6 +810,8 @@ impl CompactionSwitchesAndTheExcludedRegion {
     pub fn of_a_new_mount() -> Self {
         Self {
             switches: CompactionSwitches::PRODUCT,
+            watermarks: CompactionWatermarks::BY_DEFAULT,
+            watermark_crossing_forcing: CompactionWatermarkCrossingForcing::NotForced,
             live_intent: None,
             has_the_forced_release_checksum_mismatch_been_used: false,
             quarantines_noted_by_the_publishes: Vec::new(),
@@ -767,21 +847,25 @@ impl CompactionSwitchesAndTheExcludedRegion {
         self.live_intent.take().map(|live| live.intent)
     }
 
-    /// 暂停：撤掉 R 排他、意图留着。下一次运行接着推它时重新排他。
-    pub fn pause_the_live_intent(&mut self) {
-        if let Some(live) = self.live_intent.as_mut() {
-            live.is_the_region_excluded_from_placement = false;
-        }
+    /// 只删意图、不搬单元的那一次发布（暂停、出错停下、停着时的删意图，R 已按记录全空的删意图；`transaction::publish_compaction_step_in_the_session`）
+    /// 取落点之前放开 R：那一次发布落盘之后盘上就没有这条意图，它自己的新落点落进 R 不违 I-5.6（「活意图的 R 内没有分配代 > `c0` 的记录」只管意图活着的那几版）。
+    /// 活意图本身不撤（撤的时机照旧在删意图那一版落盘之后，会话撤）；交回放开之前排不排他，没有活意图交回 `None`。发布返回之后（发成或被拒）
+    /// 照交回的那一个经 [`Self::put_back_the_region_exclusion`] 放回，别的发布照旧排除 R。
+    pub(crate) fn open_the_region_to_the_publish_deleting_the_intent(&mut self) -> Option<bool> {
+        self.live_intent
+            .as_mut()
+            .map(|live| std::mem::replace(&mut live.is_the_region_excluded_from_placement, false))
     }
 
-    /// 接着推一条暂停过的意图：照开关重新排他。
-    pub fn resume_the_live_intent(&mut self) {
-        let is_excluded = match self.switches.region_exclusion {
-            CompactionRegionExclusion::ExcludedWhileTheIntentIsLive => true,
-            CompactionRegionExclusion::SwitchedOffForTests => false,
-        };
-        if let Some(live) = self.live_intent.as_mut() {
-            live.is_the_region_excluded_from_placement = is_excluded;
+    /// 放回 [`Self::open_the_region_to_the_publish_deleting_the_intent`] 放开之前的排他。活意图已撤（或从来没有）就什么都不做。
+    pub(crate) fn put_back_the_region_exclusion(
+        &mut self,
+        was_excluded_before_the_publish: Option<bool>,
+    ) {
+        if let (Some(live), Some(was_excluded)) =
+            (self.live_intent.as_mut(), was_excluded_before_the_publish)
+        {
+            live.is_the_region_excluded_from_placement = was_excluded;
         }
     }
 
@@ -836,6 +920,9 @@ pub struct CompactionOfThisMount {
     /// 上一次用户改动之后整理发了几次布：会话发成一次用户改动就归零。
     pub publishes_since_the_last_user_change: u64,
     pub observations: CompactionObservations,
+    /// 最近一次判起跑判据的结论：哪块盘哪个量越了线、读数与线各是多少（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。还没判过是 `None`。
+    /// 判了没起跑（[`WatermarkVerdict::NoLineCrossed`]）也记：它答的就是这一次为什么没起跑，所以不进只记起跑之后那几样的 [`CompactionObservations`]。
+    pub last_watermark_verdict: Option<WatermarkVerdict>,
     /// 用户改动发成之后起跑判据查出来的结果，后台入口取走（[`CompactionStartJudgement`]）。
     pub start_judgement: CompactionStartJudgement,
     /// 这次挂载里上一条完成的意图（「上一条无产出就不签」读它的 `segs0`）：跨趟留着，不随一趟结束丢掉，
@@ -856,15 +943,43 @@ pub struct CompactionOfThisMount {
     /// 会话下一次用户改动发成之后照快照下另发那批同一条路径把它们搬到新槽、两份新写（
     /// `mounted_session::MountedSession::publish_user_change`），交给那一批就清空。只在内存里，新挂载是空的。
     mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting: Vec<Vec<u8>>,
-    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationKeptForTheSnapshotsRefusedForSpace`]）。新挂载是产品值。
-    relocation_kept_for_the_snapshots_refused_for_space:
-        RelocationKeptForTheSnapshotsRefusedForSpace,
-    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationKeptForTheSnapshotsRefusedNotForSpace`]）。新挂载是产品值。
-    relocation_kept_for_the_snapshots_refused_not_for_space:
-        RelocationKeptForTheSnapshotsRefusedNotForSpace,
-    /// 只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationKeptForTheSnapshotsFails`]）。新挂载是产品值。
-    floor_raise_for_the_relocation_kept_for_the_snapshots_fails:
-        FloorRaiseForTheRelocationKeptForTheSnapshotsFails,
+    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationBatchAfterTheChangeRefusedForSpace`]）。新挂载是产品值。
+    relocation_batch_after_the_change_refused_for_space:
+        RelocationBatchAfterTheChangeRefusedForSpace,
+    /// 只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationBatchAfterTheChangeRefusedNotForSpace`]）。新挂载是产品值。
+    relocation_batch_after_the_change_refused_not_for_space:
+        RelocationBatchAfterTheChangeRefusedNotForSpace,
+    /// 只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationBatchAfterTheChangeFails`]）。新挂载是产品值。
+    floor_raise_for_the_relocation_batch_after_the_change_fails:
+        FloorRaiseForTheRelocationBatchAfterTheChangeFails,
+    /// 上一次不发布的停（[`CompactionRunStop::publishes_nothing_until_the_next_publish`]）记在哪一版、哪一组开关上：这两样都没变，定时兜底不重判。
+    stop_that_publishes_nothing_until_the_next_publish:
+        Option<StopThatPublishesNothingUntilTheNextPublish>,
+    /// 这次挂载那一份预算还没从根环读：挂载不给新预算（D26 已定项 13 第 5 条的加门），头一次判后台起跑时
+    /// 把已经过去的发布数取成根环里最新那个用户状态之后的根数；这之前发成用户改动就不用读了。
+    publishes_of_the_mount_are_still_to_be_read_from_the_ring: bool,
+    /// 放锁的后台入口上一次调用之后还没完的那一趟（[`BackgroundTripUnderWay`]）。
+    background_trip_under_way: Option<BackgroundTripUnderWay>,
+}
+
+/// 上一次不发布的停记下的那几样（[`CompactionOfThisMount::note_the_stop_of_a_run`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StopThatPublishesNothingUntilTheNextPublish {
+    checkpoint_txg: CheckpointTxg,
+    switches: CompactionSwitches,
+    stop: CompactionRunStop,
+}
+
+/// 放锁的后台入口跨几次调用推的那一趟：一趟只判一次起跑，每次调用至多一次发布。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct BackgroundTripUnderWay {
+    pub(crate) trigger: BackgroundCompactionTrigger,
+    pub(crate) reach: CompactionRunReach,
+    /// 这一趟前几次调用已发的批数（用户改动之后那一趟至多一批，跨调用数）。
+    pub(crate) batches_published: u64,
+    /// 这一趟是全空段低于底额、前台写不进时起跑的，前几次调用还没发过一次整理发布（只走了删除续做、被写带宽截住或排空被拒）：
+    /// 下一次调用接着推时，整理的第一次发布照样破例。
+    pub(crate) is_the_exception_of_the_trip_still_open: bool,
 }
 
 impl CompactionOfThisMount {
@@ -876,6 +991,7 @@ impl CompactionOfThisMount {
             quarantined_slots: BTreeSet::new(),
             publishes_since_the_last_user_change: 0,
             observations: CompactionObservations::default(),
+            last_watermark_verdict: None,
             start_judgement: CompactionStartJudgement::NotDue,
             last_completed_intent: None,
             timer_fallback_last_check: None,
@@ -883,13 +999,74 @@ impl CompactionOfThisMount {
             old_data_unit_reads_back_with_one_copy_failing: 0,
             unit_reads_with_one_copy_failing_while_mounting: 0,
             mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting: Vec::new(),
-            relocation_kept_for_the_snapshots_refused_for_space:
-                RelocationKeptForTheSnapshotsRefusedForSpace::NotForced,
-            relocation_kept_for_the_snapshots_refused_not_for_space:
-                RelocationKeptForTheSnapshotsRefusedNotForSpace::NotForced,
-            floor_raise_for_the_relocation_kept_for_the_snapshots_fails:
-                FloorRaiseForTheRelocationKeptForTheSnapshotsFails::NotForced,
+            relocation_batch_after_the_change_refused_for_space:
+                RelocationBatchAfterTheChangeRefusedForSpace::NotForced,
+            relocation_batch_after_the_change_refused_not_for_space:
+                RelocationBatchAfterTheChangeRefusedNotForSpace::NotForced,
+            floor_raise_for_the_relocation_batch_after_the_change_fails:
+                FloorRaiseForTheRelocationBatchAfterTheChangeFails::NotForced,
+            stop_that_publishes_nothing_until_the_next_publish: None,
+            publishes_of_the_mount_are_still_to_be_read_from_the_ring: true,
+            background_trip_under_way: None,
         }
+    }
+
+    /// 一趟停下时记下不发布的停：`current_txg` 是现行那一版，`switches` 是这一趟用的开关。别的结局清掉备忘（下一次照常判）。
+    pub(crate) fn note_the_stop_of_a_run(
+        &mut self,
+        stop: CompactionRunStop,
+        current_txg: CheckpointTxg,
+        switches: CompactionSwitches,
+    ) {
+        self.stop_that_publishes_nothing_until_the_next_publish = stop
+            .publishes_nothing_until_the_next_publish()
+            .then_some(StopThatPublishesNothingUntilTheNextPublish {
+                checkpoint_txg: current_txg,
+                switches,
+                stop,
+            });
+    }
+
+    /// 备忘记着的停这一刻还算不算数：现行那一版与开关都没变才算，交回那一次的停。
+    #[must_use]
+    pub(crate) fn stop_still_holding_at(
+        &self,
+        current_txg: CheckpointTxg,
+        switches: CompactionSwitches,
+    ) -> Option<CompactionRunStop> {
+        self.stop_that_publishes_nothing_until_the_next_publish
+            .filter(|noted| noted.checkpoint_txg == current_txg && noted.switches == switches)
+            .map(|noted| noted.stop)
+    }
+
+    /// 这次挂载那一份预算还要不要从根环读，并记下读过了（读没读通都只读这一次）。
+    pub(crate) fn take_the_reading_of_the_publishes_of_the_mount_from_the_ring(&mut self) -> bool {
+        std::mem::replace(
+            &mut self.publishes_of_the_mount_are_still_to_be_read_from_the_ring,
+            false,
+        )
+    }
+
+    /// 发成一次用户改动：已经过去的发布数从 0 数，根环里最新的用户状态就是这一次，挂载那一份不用再读。
+    pub(crate) fn note_a_user_change_published(&mut self) {
+        self.publishes_since_the_last_user_change = 0;
+        self.publishes_of_the_mount_are_still_to_be_read_from_the_ring = false;
+    }
+
+    /// 取走还没完的那一趟（放锁的后台入口接着推它时）。
+    pub(crate) fn take_the_background_trip_under_way(&mut self) -> Option<BackgroundTripUnderWay> {
+        self.background_trip_under_way.take()
+    }
+
+    /// 记下这一趟这次调用之后还没完。
+    pub(crate) fn keep_the_background_trip_under_way(&mut self, trip: BackgroundTripUnderWay) {
+        self.background_trip_under_way = Some(trip);
+    }
+
+    /// 放锁的后台入口有没有一趟没完（运行库按它决定多久之后再醒）。
+    #[must_use]
+    pub fn has_a_background_trip_under_way(&self) -> bool {
+        self.background_trip_under_way.is_some()
     }
 
     /// 可写挂载读盘建上一版时只坏一份的次数（[`Self::count_unit_reads_with_one_copy_failing_while_mounting`] 记的）。
@@ -921,7 +1098,7 @@ impl CompactionOfThisMount {
         &self.mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting
     }
 
-    /// 记下可写挂载读盘建上一版时读到只坏一份的那几个单元的映射 key（挂载交回之前调一次，接在已记的后面、同一把只记一次）。
+    /// 记下读到只坏一份的那几个单元的映射 key（挂载交回之前调一次，接在已记的后面、同一把只记一次）。
     pub(crate) fn keep_the_mapping_keys_of_the_units_read_with_one_copy_failing_while_mounting(
         &mut self,
         mapping_keys: Vec<Vec<u8>>,
@@ -946,74 +1123,74 @@ impl CompactionOfThisMount {
         )
     }
 
-    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationKeptForTheSnapshotsRefusedForSpace`]）。产品路径一处都不调它。
-    pub fn force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
+    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被空间准入拒（[`RelocationBatchAfterTheChangeRefusedForSpace`]）。产品路径一处都不调它。
+    pub fn force_the_relocation_batch_after_the_change_refused_for_space_for_tests(
         &mut self,
-        forcing: RelocationKeptForTheSnapshotsRefusedForSpace,
+        forcing: RelocationBatchAfterTheChangeRefusedForSpace,
     ) {
-        self.relocation_kept_for_the_snapshots_refused_for_space = forcing;
+        self.relocation_batch_after_the_change_refused_for_space = forcing;
     }
 
     /// 会话另发那一批的这一次该不该当作被空间准入拒（开关用掉一次就记下：「接下来这几次」少一次，用完回到产品值）。
-    pub(crate) fn take_a_forced_space_refusal_of_the_relocation_kept_for_the_snapshots(
+    pub(crate) fn take_a_forced_space_refusal_of_the_relocation_batch_after_the_change(
         &mut self,
     ) -> bool {
-        match self.relocation_kept_for_the_snapshots_refused_for_space {
-            RelocationKeptForTheSnapshotsRefusedForSpace::NotForced => false,
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedOnEveryAttemptForTests => true,
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+        match self.relocation_batch_after_the_change_refused_for_space {
+            RelocationBatchAfterTheChangeRefusedForSpace::NotForced => false,
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedOnEveryAttemptForTests => true,
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedForTheNextAttemptsForTests {
                 attempts,
             } => {
-                self.relocation_kept_for_the_snapshots_refused_for_space =
+                self.relocation_batch_after_the_change_refused_for_space =
                     match NonZeroU64::new(attempts.get() - 1) {
                         Some(attempts_left) => {
-                            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+                            RelocationBatchAfterTheChangeRefusedForSpace::ForcedForTheNextAttemptsForTests {
                                 attempts: attempts_left,
                             }
                         }
-                        None => RelocationKeptForTheSnapshotsRefusedForSpace::NotForced,
+                        None => RelocationBatchAfterTheChangeRefusedForSpace::NotForced,
                     };
                 true
             }
         }
     }
 
-    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationKeptForTheSnapshotsRefusedNotForSpace`]）。
+    /// 装上只供测试的开关：会话另发的那一批搬迁发之前当作被拒、不是空间不够（[`RelocationBatchAfterTheChangeRefusedNotForSpace`]）。
     /// 产品路径一处都不调它。
-    pub fn force_the_relocation_kept_for_the_snapshots_refused_not_for_space_for_tests(
+    pub fn force_the_relocation_batch_after_the_change_refused_not_for_space_for_tests(
         &mut self,
-        forcing: RelocationKeptForTheSnapshotsRefusedNotForSpace,
+        forcing: RelocationBatchAfterTheChangeRefusedNotForSpace,
     ) {
-        self.relocation_kept_for_the_snapshots_refused_not_for_space = forcing;
+        self.relocation_batch_after_the_change_refused_not_for_space = forcing;
     }
 
     /// 会话另发那一批的这一次该不该当作被拒、不是空间不够。
     #[must_use]
-    pub(crate) fn is_the_relocation_kept_for_the_snapshots_forced_refused_not_for_space(
+    pub(crate) fn is_the_relocation_batch_after_the_change_forced_refused_not_for_space(
         &self,
     ) -> bool {
-        match self.relocation_kept_for_the_snapshots_refused_not_for_space {
-            RelocationKeptForTheSnapshotsRefusedNotForSpace::NotForced => false,
-            RelocationKeptForTheSnapshotsRefusedNotForSpace::ForcedOnEveryAttemptForTests => true,
+        match self.relocation_batch_after_the_change_refused_not_for_space {
+            RelocationBatchAfterTheChangeRefusedNotForSpace::NotForced => false,
+            RelocationBatchAfterTheChangeRefusedNotForSpace::ForcedOnEveryAttemptForTests => true,
         }
     }
 
-    /// 装上只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationKeptForTheSnapshotsFails`]）。产品路径一处都不调它。
-    pub fn force_the_floor_raise_for_the_relocation_kept_for_the_snapshots_to_fail_for_tests(
+    /// 装上只供测试的开关：为另发的那一批推的抬 F 当作自己报错（[`FloorRaiseForTheRelocationBatchAfterTheChangeFails`]）。产品路径一处都不调它。
+    pub fn force_the_floor_raise_for_the_relocation_batch_after_the_change_to_fail_for_tests(
         &mut self,
-        forcing: FloorRaiseForTheRelocationKeptForTheSnapshotsFails,
+        forcing: FloorRaiseForTheRelocationBatchAfterTheChangeFails,
     ) {
-        self.floor_raise_for_the_relocation_kept_for_the_snapshots_fails = forcing;
+        self.floor_raise_for_the_relocation_batch_after_the_change_fails = forcing;
     }
 
     /// 为另发那一批推的这一串抬 F 该不该当作自己报了错。
     #[must_use]
-    pub(crate) fn is_the_floor_raise_for_the_relocation_kept_for_the_snapshots_forced_to_fail(
+    pub(crate) fn is_the_floor_raise_for_the_relocation_batch_after_the_change_forced_to_fail(
         &self,
     ) -> bool {
-        match self.floor_raise_for_the_relocation_kept_for_the_snapshots_fails {
-            FloorRaiseForTheRelocationKeptForTheSnapshotsFails::NotForced => false,
-            FloorRaiseForTheRelocationKeptForTheSnapshotsFails::ForcedOnEveryRaiseForTests => true,
+        match self.floor_raise_for_the_relocation_batch_after_the_change_fails {
+            FloorRaiseForTheRelocationBatchAfterTheChangeFails::NotForced => false,
+            FloorRaiseForTheRelocationBatchAfterTheChangeFails::ForcedOnEveryRaiseForTests => true,
         }
     }
 
@@ -1308,8 +1485,8 @@ pub enum CompactionTimerFallback {
     EveryMilliseconds(NonZeroU64),
 }
 
-/// 定时兜底间隔的默认：关（兜底间隔默认 0（关），
-/// 与水位恒 0 同一个读法）。默认值待 C412（整理的挂钟代价没量过） 与 E10（老化：结构抗老化 vs 事后整理）。
+/// 定时兜底间隔的默认：关。核心层不起线程，调用方不给间隔就没有定时兜底；挂载就起的周期线程那一层给它的间隔是周期的一半
+/// （`singlefs_mount_runtime`，周期默认 30 秒）。
 pub const COMPACTION_TIMER_FALLBACK_BY_DEFAULT: CompactionTimerFallback =
     CompactionTimerFallback::Off;
 
@@ -1359,18 +1536,33 @@ impl CompactionPacing {
     };
 }
 
-/// 前台此刻有没有 fsync 在等（D26（后台整理与放置回收） 已定项 13 第 6 条「前台有 fsync 在等时不发下一批」）。封闭集合。
+/// 这一批之前调用方的回答（D26（后台整理与放置回收） 已定项 13 第 6 条「前台有 fsync 在等时不发下一批」）：发不发下一批，要不要让路。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ForegroundFsync {
-    NoneWaiting,
-    Waiting,
+pub enum AnswerOfTheCallerBeforeTheNextBatch {
+    NoForegroundFsyncWaiting,
+    ForegroundFsyncIsWaiting,
+    /// 前台不一定有 fsync 在等，是调用方在停这条驱动后台入口的线程：照样不发下一批，低于底额的破例也不发（线程很快 join 得上）。
+    CallerIsStoppingItsThread,
 }
 
-/// 后台入口每推一批之前问调用方的两样：此刻的钟、前台有没有 fsync 在等。核心层不起线程，调用方在自己的线程上驱动后台入口，
+/// 后台入口每推一批之前问调用方的两样：此刻的钟、这一批之前它的回答。核心层不起线程，调用方在自己的线程上驱动后台入口，
 /// 钟与前台的 fsync 队列都在调用方手里；测试里由一份假的实现。
 pub trait CallerOfTheBackgroundCompaction {
     fn clock_reading(&self) -> CallerMonotonicClockReading;
-    fn foreground_fsync(&self) -> ForegroundFsync;
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch;
+}
+
+/// 回退门给根环留的余量（D26（后台整理与放置回收） 已定项 13 第 5 条的加门）：一次整理发布之后，再发这么多次发布，根环里仍有 4 个不同用户状态。
+/// 取每区根槽数 S（根环 3S 槽的三分之一）：最新的 4 个状态之后门放 `3S − 4 − S = 2S − 4` 次发布，S = 5 时是 6 次，
+/// 产品批大小 16 下一条整段意图（至多 `1 + ⌈64 ÷ 16⌉ = 5` 次发布）走得完；S = 4 时是 4 次，走不完就停在门上报出来。
+/// 下一次可写挂载自己的发布不经门：写行加暖机至多 3 次，续做一条意图至多 5 次，合起来至多 8 次。S = 8 时一次挂载落在余量里；S 更小时一次挂载就可能用完余量。
+/// 连崩几次用完这几槽之后，挂载自己的发布照样挤掉用户状态。
+/// 这笔算术不算 `accept` 被空间拒时当场推的抬 F 那几串（`mounted_session::MountedSessionWithPendingChanges::accept`）：它们不经门，推一串也用掉这几槽。
+#[must_use]
+pub fn root_ring_slots_left_by_a_compaction_publish(
+    root_ring_slots_per_region: RootRingSlotsPerRegion,
+) -> u64 {
+    root_ring_slots_per_region.count()
 }
 
 /// 一次整理运行的发布预算：
@@ -1399,16 +1591,332 @@ pub fn publishes_left_of_the_budget_given_by_the_last_user_change(
         .saturating_sub(publishes_since_the_last_user_change)
 }
 
-/// 起跑判据（水位越线再跑；D26（后台整理与放置回收） 已定项 13 第 5 条：定时兜底每隔一段时间查一次，每次用户改动发成之后也查一次，
-/// 两处查的都是它）。第一版三条水位恒 0（关），产品路径恒不起跑；只供测试的开关强制。
-#[must_use]
-pub const fn compaction_starts_by_the_watermarks(forcing: CompactionRunForcing) -> bool {
-    match forcing {
-        CompactionRunForcing::FollowTheWatermarks | CompactionRunForcing::ForcedToStopForTests => {
-            false
+/// 整理的两样挂载参数（都不存盘）：批大小与三条水位线（[`crate::mount::mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_parameters`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CompactionMountParameters {
+    pub batch_units: CompactionBatchUnits,
+    pub watermarks: CompactionWatermarks,
+}
+
+impl CompactionMountParameters {
+    /// 两样都取产品默认。
+    pub const BY_DEFAULT: CompactionMountParameters = CompactionMountParameters {
+        batch_units: COMPACTION_BATCH_UNITS_BY_DEFAULT,
+        watermarks: CompactionWatermarks::BY_DEFAULT,
+    };
+}
+
+/// 全空聚簇段线的产品默认：整段数的 5%（D26（后台整理与放置回收） 已定项 1，数是拍的）。
+pub const EMPTY_CLUSTER_SEGMENTS_LINE_PERCENT_BY_DEFAULT: u64 = 5;
+/// 全空聚簇段线的下限：2 段（前台写入类发布在全空段低于 `N₀` = 1 时被合取 7 拒，线至少 `N₀ + 1`，不然前台先被拒、整理才起跑）。
+pub const EMPTY_CLUSTER_SEGMENTS_LINE_LOWEST_IN_SEGMENTS_BY_DEFAULT: u64 = 2;
+
+/// 全空聚簇段这条水位（越线：全空聚簇段数 < 线）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EmptyClusterSegmentsWatermark {
+    Off,
+    /// 线 = max(⌈整段数 × 百分比 ÷ 100⌉, 下限)，再不超过整段数（只有一两个整段的小盘刚 mkfs 时不越线）。
+    PercentOfTheClusterSegments {
+        percent: u64,
+        lowest_line_in_segments: u64,
+    },
+}
+
+impl EmptyClusterSegmentsWatermark {
+    /// 这块盘的线（段数）；关着是 `None`。
+    #[must_use]
+    pub fn line_in_segments(self, cluster_segments_in_the_unit_area: u64) -> Option<u64> {
+        match self {
+            EmptyClusterSegmentsWatermark::Off => None,
+            EmptyClusterSegmentsWatermark::PercentOfTheClusterSegments {
+                percent,
+                lowest_line_in_segments,
+            } => {
+                let percent_of_the_segments = (u128::from(cluster_segments_in_the_unit_area)
+                    * u128::from(percent))
+                .div_ceil(100);
+                let lowest = u128::from(lowest_line_in_segments);
+                let line = percent_of_the_segments
+                    .max(lowest)
+                    .min(u128::from(cluster_segments_in_the_unit_area));
+                Some(u64::try_from(line).expect("线不超过整段数"))
+            }
         }
-        CompactionRunForcing::ForcedToStartForTests => true,
     }
+}
+
+/// 碎片度这条水位（越线：`空闲段数 ÷ 已分配槽数 > 线`，且空闲段数不少于绝对下限；D26 已定项 1 的 `F = runs / L`，`L` 取已分配槽数，
+/// 条款没定义它，归 C326（`runs` 口径换了之后的 L 没定义））。默认关。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FragmentationWatermark {
+    Off,
+    /// 线是 `free_runs_above ÷ per_allocated_slots`；`at_least_free_runs` 是这一支开了必带的绝对下限：
+    /// 用得很少的盘上已分配槽数很小而空闲段数至少 1，只看比值近乎空盘就越线。
+    FreeRunsPerAllocatedSlotAbove {
+        free_runs_above: NonZeroU64,
+        per_allocated_slots: NonZeroU64,
+        at_least_free_runs: NonZeroU64,
+    },
+}
+
+/// 不可回收字节这条水位（越线：不可回收字节 ≥ 线）。读数第一版恒 0（[`UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED`]），开了也不越线；默认关。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnreclaimableBytesWatermark {
+    Off,
+    AtLeast(NonZeroU64),
+}
+
+/// 三条水位线（D26 已定项 1：三水位任一越线起跑，带设备维）。挂载参数，不存盘：盘上系统配置那 24 字节是全 0 的预留。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CompactionWatermarks {
+    pub empty_cluster_segments: EmptyClusterSegmentsWatermark,
+    pub fragmentation: FragmentationWatermark,
+    pub unreclaimable_bytes: UnreclaimableBytesWatermark,
+}
+
+impl CompactionWatermarks {
+    /// 产品默认：全空聚簇段线 5%、下限 2；碎片度与不可回收字节关。
+    pub const BY_DEFAULT: CompactionWatermarks = CompactionWatermarks {
+        empty_cluster_segments: EmptyClusterSegmentsWatermark::PercentOfTheClusterSegments {
+            percent: EMPTY_CLUSTER_SEGMENTS_LINE_PERCENT_BY_DEFAULT,
+            lowest_line_in_segments: EMPTY_CLUSTER_SEGMENTS_LINE_LOWEST_IN_SEGMENTS_BY_DEFAULT,
+        },
+        fragmentation: FragmentationWatermark::Off,
+        unreclaimable_bytes: UnreclaimableBytesWatermark::Off,
+    };
+}
+
+/// 一块盘此刻的三个量（分配器增量维护的计数，读一次 O(1)，与记账树写出去的是同一份）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WatermarkReadingOfADevice {
+    pub device: DeviceIdentity,
+    pub empty_cluster_segments: u64,
+    pub cluster_segments_in_the_unit_area: u64,
+    pub free_runs: u64,
+    pub allocated_slots: u64,
+    pub unreclaimable_bytes: u64,
+}
+
+impl WatermarkReadingOfADevice {
+    /// 从分配器上这块盘的空闲图读。全空聚簇段数是记录口径：一段里只剩 defer 槽也算全空
+    /// （`allocator::DeviceFreeMap::empty_segments`，开段看的是另一个量，`allocator::DeviceFreeMap::lowest_empty_segment`）。
+    #[must_use]
+    pub fn of_the_device_map(device_map: &DeviceFreeMap) -> Self {
+        WatermarkReadingOfADevice {
+            device: device_map.device,
+            empty_cluster_segments: device_map.empty_segments(),
+            cluster_segments_in_the_unit_area: device_map.unit_area_slots() / CLUSTER_SEGMENT_SLOTS,
+            free_runs: device_map.free_runs(),
+            allocated_slots: device_map.allocated_slots(),
+            unreclaimable_bytes: UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED.0,
+        }
+    }
+}
+
+/// 三个量。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WatermarkQuantity {
+    EmptyClusterSegments,
+    Fragmentation,
+    UnreclaimableBytes,
+}
+
+/// 只供测试（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：不看读数，判起跑判据时当这个量越了线。产品路径恒 [`Self::NotForced`]。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompactionWatermarkCrossingForcing {
+    NotForced,
+    ForcedForTests(WatermarkQuantity),
+}
+
+/// 一块盘上全空聚簇段的段数：全空聚簇段那条水位的读数与线。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EmptyClusterSegmentCount(pub u64);
+
+/// 一块盘上空闲段（连续空闲槽的一段）的段数：碎片度那条水位的读数，线换算到这块盘此刻的已分配槽数上也是它。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct FreeRunCount(pub u64);
+
+/// 头一个越线的量，连同它的读数与线。三个量的单位各不相同，各带各的类型。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WatermarkCrossing {
+    EmptyClusterSegments {
+        reading: EmptyClusterSegmentCount,
+        line: EmptyClusterSegmentCount,
+    },
+    /// `line` 是把线换算到这块盘的已分配槽数上的空闲段数。
+    Fragmentation {
+        reading: FreeRunCount,
+        line: FreeRunCount,
+    },
+    UnreclaimableBytes {
+        reading: BytesOnOneDevice,
+        line: BytesOnOneDevice,
+    },
+}
+
+/// 起跑判据的结论，连同走了哪一支（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WatermarkVerdict {
+    /// 只供测试的开关强制起跑（[`CompactionRunForcing::ForcedToStartForTests`]）。
+    ForcedToStartByTheTestOnlySwitch,
+    /// 只供测试的开关强制不起跑（[`CompactionRunForcing::ForcedToStopForTests`]）。
+    ForcedToStopByTheTestOnlySwitch,
+    /// 只供测试的开关当这个量越了线（[`CompactionWatermarkCrossingForcing::ForcedForTests`]）。
+    CrossingForcedByTheTestOnlySwitch(WatermarkQuantity),
+    /// 每块盘的三个量都没越线。
+    NoLineCrossed,
+    /// 按盘的次序、每块盘按全空聚簇段、碎片度、不可回收字节的次序头一个越线的。
+    Crossed {
+        device: DeviceIdentity,
+        crossing: WatermarkCrossing,
+    },
+}
+
+impl WatermarkVerdict {
+    /// 这一结论起不起跑。
+    #[must_use]
+    pub const fn starts(self) -> bool {
+        match self {
+            WatermarkVerdict::ForcedToStartByTheTestOnlySwitch
+            | WatermarkVerdict::CrossingForcedByTheTestOnlySwitch(_)
+            | WatermarkVerdict::Crossed { .. } => true,
+            WatermarkVerdict::ForcedToStopByTheTestOnlySwitch | WatermarkVerdict::NoLineCrossed => {
+                false
+            }
+        }
+    }
+}
+
+/// 一块盘头一个越线的量（全空聚簇段、碎片度、不可回收字节的次序），连同读数与线。
+fn watermark_crossed_on_the_device(
+    watermarks: &CompactionWatermarks,
+    reading: &WatermarkReadingOfADevice,
+) -> Option<WatermarkCrossing> {
+    if let Some(line) = watermarks
+        .empty_cluster_segments
+        .line_in_segments(reading.cluster_segments_in_the_unit_area)
+    {
+        if reading.empty_cluster_segments < line {
+            return Some(WatermarkCrossing::EmptyClusterSegments {
+                reading: EmptyClusterSegmentCount(reading.empty_cluster_segments),
+                line: EmptyClusterSegmentCount(line),
+            });
+        }
+    }
+    match watermarks.fragmentation {
+        FragmentationWatermark::Off => {}
+        FragmentationWatermark::FreeRunsPerAllocatedSlotAbove {
+            free_runs_above,
+            per_allocated_slots,
+            at_least_free_runs,
+        } => {
+            let line_on_this_device = u128::from(free_runs_above.get())
+                * u128::from(reading.allocated_slots)
+                / u128::from(per_allocated_slots.get());
+            let is_above_the_line = u128::from(reading.free_runs)
+                * u128::from(per_allocated_slots.get())
+                > u128::from(free_runs_above.get()) * u128::from(reading.allocated_slots);
+            if reading.allocated_slots > 0
+                && is_above_the_line
+                && reading.free_runs >= at_least_free_runs.get()
+            {
+                return Some(WatermarkCrossing::Fragmentation {
+                    reading: FreeRunCount(reading.free_runs),
+                    line: FreeRunCount(
+                        u64::try_from(line_on_this_device).expect("低于空闲段数读数，装得进 u64"),
+                    ),
+                });
+            }
+        }
+    }
+    match watermarks.unreclaimable_bytes {
+        UnreclaimableBytesWatermark::Off => None,
+        UnreclaimableBytesWatermark::AtLeast(line) => (reading.unreclaimable_bytes >= line.get())
+            .then_some(WatermarkCrossing::UnreclaimableBytes {
+                reading: BytesOnOneDevice(reading.unreclaimable_bytes),
+                line: BytesOnOneDevice(line.get()),
+            }),
+    }
+}
+
+/// 起跑判据（水位越线再跑；D26（后台整理与放置回收） 已定项 1、已定项 13 第 5 条：定时兜底每隔一段时间查一次，每次用户改动发成之后也查一次，
+/// 两处查的都是它）：任一块盘的任一个量越线就起跑。只读交进来的读数，代价随盘数、不随盘容量（`.claude/rules/fs-design.md`「记账是事务的副产品」第一格）。
+/// 水位只在起跑时查，停机不靠水位（D26 已定项 1 第 2 条），所以没有回滞。
+#[must_use]
+pub fn compaction_starts_by_the_watermarks(
+    forcing: CompactionRunForcing,
+    watermarks: &CompactionWatermarks,
+    readings: &[WatermarkReadingOfADevice],
+) -> WatermarkVerdict {
+    match forcing {
+        CompactionRunForcing::ForcedToStartForTests => {
+            return WatermarkVerdict::ForcedToStartByTheTestOnlySwitch
+        }
+        CompactionRunForcing::ForcedToStopForTests => {
+            return WatermarkVerdict::ForcedToStopByTheTestOnlySwitch
+        }
+        CompactionRunForcing::FollowTheWatermarks => {}
+    }
+    for reading in readings {
+        if let Some(crossing) = watermark_crossed_on_the_device(watermarks, reading) {
+            return WatermarkVerdict::Crossed {
+                device: reading.device,
+                crossing,
+            };
+        }
+    }
+    WatermarkVerdict::NoLineCrossed
+}
+
+/// 这个分配器此刻的起跑判据结论：开关、线与每块盘的读数都从它取（[`compaction_starts_by_the_watermarks`]）。
+#[must_use]
+pub fn compaction_watermark_verdict_of_the_allocator(
+    allocator: &PoolAllocator,
+) -> WatermarkVerdict {
+    let compaction = allocator.compaction();
+    match (
+        compaction.switches.run_forcing,
+        compaction.watermark_crossing_forcing,
+    ) {
+        (
+            CompactionRunForcing::FollowTheWatermarks,
+            CompactionWatermarkCrossingForcing::ForcedForTests(quantity),
+        ) => WatermarkVerdict::CrossingForcedByTheTestOnlySwitch(quantity),
+        (
+            CompactionRunForcing::FollowTheWatermarks
+            | CompactionRunForcing::ForcedToStartForTests
+            | CompactionRunForcing::ForcedToStopForTests,
+            CompactionWatermarkCrossingForcing::NotForced
+            | CompactionWatermarkCrossingForcing::ForcedForTests(_),
+        ) => {
+            let readings: Vec<WatermarkReadingOfADevice> = allocator
+                .devices
+                .iter()
+                .map(WatermarkReadingOfADevice::of_the_device_map)
+                .collect();
+            compaction_starts_by_the_watermarks(
+                compaction.switches.run_forcing,
+                &compaction.watermarks,
+                &readings,
+            )
+        }
+    }
+}
+
+/// 全空段低于底额、前台写入类发布已写不进（合取 7，`N₀` 是开关给的那一档）：任一块盘低于就算。后台入口的破例（每趟至少发 1 次）判它，代价随盘数。
+#[must_use]
+pub fn foreground_writes_are_below_the_empty_cluster_segments_floor(
+    allocator: &PoolAllocator,
+) -> bool {
+    let floor = allocator
+        .compaction()
+        .switches
+        .empty_cluster_segments_floor
+        .segments();
+    allocator
+        .devices
+        .iter()
+        .any(|device_map| device_map.empty_segments() < floor)
 }
 
 /// 与 Verus 证过的选段核、计划核逐项对拍（`.claude/kb/milestone/04-fourth-txn.md` 二·4；
@@ -2292,19 +2800,22 @@ mod tests {
         };
         let converted = compaction_kernel_allocations(&scan);
         assert_eq!(converted.len(), scan.allocations.len());
-        for (i, allocation) in converted.iter().enumerate() {
-            assert_eq!(allocation.source_slot, scan.allocations[i].placement.slot.0);
+        for (allocation_index, allocation) in converted.iter().enumerate() {
+            assert_eq!(
+                allocation.source_slot,
+                scan.allocations[allocation_index].placement.slot.0
+            );
             let singlefs_replay_prefix::compaction_plan_proofs::CompactionKernelAllocationClass::Movable {
                 mapping_key_identity: identity,
             } = allocation.class else { panic!("所有输入均为可搬项"); };
-            for (j, other) in converted.iter().enumerate() {
+            for (other_allocation_index, other) in converted.iter().enumerate() {
                 let singlefs_replay_prefix::compaction_plan_proofs::CompactionKernelAllocationClass::Movable {
                     mapping_key_identity: other_identity,
                 } = other.class else { panic!("所有输入均为可搬项"); };
                 assert_eq!(
                     identity == other_identity,
-                    keys[i] == keys[j],
-                    "输入 {i}、{j} 的字节相等关系必须保留"
+                    keys[allocation_index] == keys[other_allocation_index],
+                    "输入 {allocation_index}、{other_allocation_index} 的字节相等关系必须保留"
                 );
             }
         }
@@ -2609,7 +3120,7 @@ mod tests {
     /// GPU 路径上一段的活槽数这一轮不确定（D26（后台整理与放置回收） 已定项 13 第 8 条）：它这一批不进候选，选的是其余各段里活槽最少的；
     /// 同样的输入把它记成数出来的，它活槽最少、选的就是它。
     #[test]
-    fn a_segment_whose_live_slots_are_uncertain_this_round_is_left_out_of_the_candidates() {
+    fn segment_whose_live_slots_are_uncertain_this_round_is_left_out_of_the_candidates() {
         let unit_area = UnitAreaOfOneDevice {
             device: DEVICE_OF_THE_UNIT_AREA,
             start: UnitAreaStart::of_the_default_journal_ring(),

@@ -9,8 +9,8 @@
 //!
 //! 和 `crate::lineage_tree`、`crate::tombstone_tree` 一样只算、不发一个写：这里只有字段表的读写，签发、推进、删意图归发布入口。
 //!
-//! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：条目的写法 [`LoggedOperationEntry::spec_bytes`]、
-//! 读法 [`LoggedOperationEntry::spec_parse`] 与往返引理 [`LoggedOperationEntry::lemma_parse_round_trip`]；整理区域 R 带类型不变量。
+//! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）：条目的写法 [`LoggedOperationEntry::specification_bytes`]、
+//! 读法 [`LoggedOperationEntry::specification_parse`] 与往返引理 [`LoggedOperationEntry::lemma_parse_round_trip`]；整理区域 R 带类型不变量。
 
 use singlefs_format::{
     CLUSTER_SEGMENT_SLOTS, LOGGED_OPERATIONS_ENTRY_BYTES, LOGGED_OPERATIONS_KEY_BYTES,
@@ -20,7 +20,7 @@ use vstd::prelude::*;
 use crate::address::{CheckpointTxg, DeviceIdentity, InodeNumber, SlotNumber};
 // 规格与引理只在 Verus 编的时候有（平时的构建把它们擦掉），按名字引会编不过，所以整个模块引进来。
 use crate::bytes::*;
-// 同上：spec_index_node_entry_capacity 平时的构建里没有。
+// 同上：specification_index_node_entry_capacity 平时的构建里没有。
 use crate::unit::*;
 
 verus! {
@@ -64,7 +64,7 @@ pub enum LoggedOperationKind {
 
 impl LoggedOperationKind {
     /// 写进 key 前 2 字节的种类码（[`Self::code`] 的规格）。
-    pub open spec fn spec_code(self) -> u16 {
+    pub open spec fn specification_code(self) -> u16 {
         match self {
             LoggedOperationKind::Compaction => LOGGED_OPERATION_KIND_COMPACTION,
             LoggedOperationKind::Truncation => LOGGED_OPERATION_KIND_TRUNCATION,
@@ -72,7 +72,7 @@ impl LoggedOperationKind {
     }
 
     /// 盘上读到的种类码认的那一种（[`Self::of_code`] 的规格）。
-    pub open spec fn spec_of_code(kind_code: u16) -> Option<Self> {
+    pub open spec fn specification_of_code(kind_code: u16) -> Option<Self> {
         if kind_code == LOGGED_OPERATION_KIND_COMPACTION {
             Some(LoggedOperationKind::Compaction)
         } else if kind_code == LOGGED_OPERATION_KIND_TRUNCATION {
@@ -86,7 +86,7 @@ impl LoggedOperationKind {
     #[must_use]
     pub const fn code(self) -> (kind_code: u16)
         ensures
-            kind_code == self.spec_code(),
+            kind_code == self.specification_code(),
     {
         match self {
             LoggedOperationKind::Compaction => LOGGED_OPERATION_KIND_COMPACTION,
@@ -98,7 +98,7 @@ impl LoggedOperationKind {
     #[must_use]
     pub const fn of_code(kind_code: u16) -> (kind: Option<Self>)
         ensures
-            kind == Self::spec_of_code(kind_code),
+            kind == Self::specification_of_code(kind_code),
     {
         // 常量模式的 match 写成 if：Verus 不认按常量匹配，两种码之外的保留码照旧交回 None。
         if kind_code == LOGGED_OPERATION_KIND_COMPACTION {
@@ -140,28 +140,28 @@ impl CompactionRegion {
     }
 
     /// R 所在的盘。
-    pub closed spec fn spec_device(self) -> DeviceIdentity {
+    pub closed spec fn specification_device(self) -> DeviceIdentity {
         self.device
     }
 
     /// R 的起始槽。
-    pub closed spec fn spec_start_slot(self) -> SlotNumber {
+    pub closed spec fn specification_start_slot(self) -> SlotNumber {
         self.start_slot
     }
 
     /// 起始槽是 64 的倍数、装得进 6 字节（类型不变量的公开说法：每一个值都满足它，各个读它的方法在 `ensures` 里交出来）。
-    pub open spec fn spec_start_is_aligned_and_fits(self) -> bool {
-        &&& self.spec_start_slot().0 % 64 == 0
-        &&& self.spec_start_slot().0 < 0x1_0000_0000_0000
+    pub open spec fn specification_start_is_aligned_and_fits(self) -> bool {
+        &&& self.specification_start_slot().0 % 64 == 0
+        &&& self.specification_start_slot().0 < 0x1_0000_0000_0000
     }
 
     /// 这个槽号在不在 R 里（[`Self::contains_slot`] 的规格）。
-    pub open spec fn spec_contains_slot(self, slot: SlotNumber) -> bool {
-        self.spec_start_slot().0 <= slot.0 && slot.0 < self.spec_start_slot().0 + 64
+    pub open spec fn specification_contains_slot(self, slot: SlotNumber) -> bool {
+        self.specification_start_slot().0 <= slot.0 && slot.0 < self.specification_start_slot().0 + 64
     }
 
     /// [`Self::of_one_cluster_segment`] 的判法：先判对齐，再判装不装得进 6 字节。
-    pub closed spec fn spec_of_one_cluster_segment(
+    pub closed spec fn specification_of_one_cluster_segment(
         device: DeviceIdentity,
         start_slot: SlotNumber,
     ) -> Result<Self, CompactionRegionRefusal> {
@@ -177,19 +177,19 @@ impl CompactionRegion {
     /// 判过的区域交回的盘与起始槽就是给的那两样；判法的结论（对齐、装得进）就是不变量。
     pub proof fn lemma_of_one_cluster_segment(device: DeviceIdentity, start_slot: SlotNumber)
         ensures
-            Self::spec_of_one_cluster_segment(device, start_slot) is Ok <==> (start_slot.0 % 64 == 0
+            Self::specification_of_one_cluster_segment(device, start_slot) is Ok <==> (start_slot.0 % 64 == 0
                 && start_slot.0 < 0x1_0000_0000_0000),
-            Self::spec_of_one_cluster_segment(device, start_slot) matches Ok(region) ==> region.spec_device()
-                == device && region.spec_start_slot() == start_slot,
+            Self::specification_of_one_cluster_segment(device, start_slot) matches Ok(region) ==> region.specification_device()
+                == device && region.specification_start_slot() == start_slot,
     {
     }
 
     /// 一个区域由它的盘与起始槽定：两样相同的区域相同；它自己的盘与起始槽再判一次就是它自己。
     pub proof fn lemma_region_is_its_device_and_start(self)
         requires
-            self.spec_start_is_aligned_and_fits(),
+            self.specification_start_is_aligned_and_fits(),
         ensures
-            Self::spec_of_one_cluster_segment(self.spec_device(), self.spec_start_slot()) == Ok::<
+            Self::specification_of_one_cluster_segment(self.specification_device(), self.specification_start_slot()) == Ok::<
                 Self,
                 CompactionRegionRefusal,
             >(self),
@@ -205,8 +205,8 @@ impl CompactionRegion {
         start_slot: SlotNumber,
     ) -> (region: Result<Self, CompactionRegionRefusal>)
         ensures
-            region == Self::spec_of_one_cluster_segment(device, start_slot),
-            region matches Ok(made) ==> made.spec_start_is_aligned_and_fits(),
+            region == Self::specification_of_one_cluster_segment(device, start_slot),
+            region matches Ok(made) ==> made.specification_start_is_aligned_and_fits(),
     {
         if !start_slot.0.is_multiple_of(CLUSTER_SEGMENT_SLOTS) {
             return Err(CompactionRegionRefusal::StartOffAClusterSegmentBoundary { start_slot });
@@ -220,8 +220,8 @@ impl CompactionRegion {
     #[must_use]
     pub const fn device(self) -> (device: DeviceIdentity)
         ensures
-            device == self.spec_device(),
-            self.spec_start_is_aligned_and_fits(),
+            device == self.specification_device(),
+            self.specification_start_is_aligned_and_fits(),
     {
         proof {
             use_type_invariant(self);
@@ -232,8 +232,8 @@ impl CompactionRegion {
     #[must_use]
     pub const fn start_slot(self) -> (start_slot: SlotNumber)
         ensures
-            start_slot == self.spec_start_slot(),
-            self.spec_start_is_aligned_and_fits(),
+            start_slot == self.specification_start_slot(),
+            self.specification_start_is_aligned_and_fits(),
     {
         proof {
             use_type_invariant(self);
@@ -254,7 +254,7 @@ impl CompactionRegion {
     #[must_use]
     pub const fn end_slot(self) -> (end_slot: SlotNumber)
         ensures
-            end_slot.0 == self.spec_start_slot().0 + 64,
+            end_slot.0 == self.specification_start_slot().0 + 64,
     {
         proof {
             use_type_invariant(self);
@@ -266,7 +266,7 @@ impl CompactionRegion {
     #[must_use]
     pub const fn contains_slot(self, slot: SlotNumber) -> (inside: bool)
         ensures
-            inside == self.spec_contains_slot(slot),
+            inside == self.specification_contains_slot(slot),
     {
         proof {
             use_type_invariant(self);
@@ -347,7 +347,7 @@ pub enum LoggedOperationsRootRefusal {
 
 impl LoggedOperation {
     /// 这一条意图的种类（[`Self::kind`] 的规格）。
-    pub open spec fn spec_kind(self) -> LoggedOperationKind {
+    pub open spec fn specification_kind(self) -> LoggedOperationKind {
         match self {
             LoggedOperation::Compaction(_intent) => LoggedOperationKind::Compaction,
             LoggedOperation::Truncation(_intent) => LoggedOperationKind::Truncation,
@@ -357,7 +357,7 @@ impl LoggedOperation {
     #[must_use]
     pub const fn kind(&self) -> (kind: LoggedOperationKind)
         ensures
-            kind == self.spec_kind(),
+            kind == self.specification_kind(),
     {
         match self {
             LoggedOperation::Compaction(_intent) => LoggedOperationKind::Compaction,
@@ -368,15 +368,15 @@ impl LoggedOperation {
 
 impl LoggedOperationKey {
     /// 全序上严格在前：先比种类码、再比签发 txg（[`Self::sort_key`] 那一对按元组比的序）。
-    pub open spec fn spec_precedes(self, other: Self) -> bool {
-        ||| self.kind.spec_code() < other.kind.spec_code()
-        ||| (self.kind.spec_code() == other.kind.spec_code() && self.issued_txg.0 < other.issued_txg.0)
+    pub open spec fn specification_precedes(self, other: Self) -> bool {
+        ||| self.kind.specification_code() < other.kind.specification_code()
+        ||| (self.kind.specification_code() == other.kind.specification_code() && self.issued_txg.0 < other.issued_txg.0)
     }
 
     #[must_use]
     pub fn sort_key(&self) -> (sort_key: (u16, u64))
         ensures
-            sort_key == (self.kind.spec_code(), self.issued_txg.0),
+            sort_key == (self.kind.specification_code(), self.issued_txg.0),
     {
         (self.kind.code(), self.issued_txg.0)
     }
@@ -385,7 +385,7 @@ impl LoggedOperationKey {
     #[must_use]
     pub fn precedes(&self, other: &Self) -> (precedes: bool)
         ensures
-            precedes == self.spec_precedes(*other),
+            precedes == self.specification_precedes(*other),
     {
         let (this_kind_code, this_issued_txg) = self.sort_key();
         let (other_kind_code, other_issued_txg) = other.sort_key();
@@ -395,23 +395,23 @@ impl LoggedOperationKey {
 }
 
 /// 一串条目里 `position` 那一条的 key 严格在下一条之前。
-pub open spec fn spec_pair_ascends(entries: Seq<LoggedOperationEntry>, position: int) -> bool {
-    entries[position].spec_key().spec_precedes(entries[position + 1].spec_key())
+pub open spec fn specification_pair_ascends(entries: Seq<LoggedOperationEntry>, position: int) -> bool {
+    entries[position].specification_key().specification_precedes(entries[position + 1].specification_key())
 }
 
 /// 一串条目按 key 严格升序（相邻两条前一条严格在前）。
-pub open spec fn spec_keys_strictly_ascend(entries: Seq<LoggedOperationEntry>) -> bool {
-    forall|position: int| 0 <= position && position + 1 < entries.len() ==> #[trigger] spec_pair_ascends(entries, position)
+pub open spec fn specification_keys_strictly_ascend(entries: Seq<LoggedOperationEntry>) -> bool {
+    forall|position: int| 0 <= position && position + 1 < entries.len() ==> #[trigger] specification_pair_ascends(entries, position)
 }
 
 /// 一串条目里某一种意图有几条。
-pub open spec fn spec_number_of_kind(entries: Seq<LoggedOperationEntry>, kind: LoggedOperationKind) -> nat
+pub open spec fn specification_number_of_kind(entries: Seq<LoggedOperationEntry>, kind: LoggedOperationKind) -> nat
     decreases entries.len(),
 {
     if entries.len() == 0 {
         0
     } else {
-        spec_number_of_kind(entries.drop_last(), kind) + if entries.last().operation.spec_kind() == kind {
+        specification_number_of_kind(entries.drop_last(), kind) + if entries.last().operation.specification_kind() == kind {
             1nat
         } else {
             0nat
@@ -419,10 +419,10 @@ pub open spec fn spec_number_of_kind(entries: Seq<LoggedOperationEntry>, kind: L
     }
 }
 
-/// 一串条目按 key 严格升序（[`spec_keys_strictly_ascend`]）：两处读写根条目的断言与拒收共用这一判。
+/// 一串条目按 key 严格升序（[`specification_keys_strictly_ascend`]）：两处读写根条目的断言与拒收共用这一判。
 fn keys_strictly_ascend(entries: &[LoggedOperationEntry]) -> (ascending: bool)
     ensures
-        ascending == spec_keys_strictly_ascend(entries@),
+        ascending == specification_keys_strictly_ascend(entries@),
 {
     let mut later_position: usize = 1;
     while later_position < entries.len()
@@ -430,11 +430,11 @@ fn keys_strictly_ascend(entries: &[LoggedOperationEntry]) -> (ascending: bool)
             1 <= later_position,
             forall|position: int|
                 0 <= position && position + 1 < later_position && position + 1 < entries@.len()
-                    ==> #[trigger] spec_pair_ascends(entries@, position),
+                    ==> #[trigger] specification_pair_ascends(entries@, position),
         decreases entries@.len() - later_position,
     {
         if !entries[later_position - 1].key().precedes(&entries[later_position].key()) {
-            assert(!spec_pair_ascends(entries@, later_position - 1));
+            assert(!specification_pair_ascends(entries@, later_position - 1));
             return false;
         }
         later_position += 1;
@@ -442,17 +442,17 @@ fn keys_strictly_ascend(entries: &[LoggedOperationEntry]) -> (ascending: bool)
     true
 }
 
-/// 一串条目里 `kind` 那一种意图有几条（[`spec_number_of_kind`]）。
+/// 一串条目里 `kind` 那一种意图有几条（[`specification_number_of_kind`]）。
 fn number_of_entries_of_kind(entries: &[LoggedOperationEntry], kind: LoggedOperationKind) -> (count: usize)
     ensures
-        count == spec_number_of_kind(entries@, kind),
+        count == specification_number_of_kind(entries@, kind),
 {
     let mut count: usize = 0;
     let mut checked_count: usize = 0;
     while checked_count < entries.len()
         invariant
             checked_count <= entries@.len(),
-            count == spec_number_of_kind(entries@.take(checked_count as int), kind),
+            count == specification_number_of_kind(entries@.take(checked_count as int), kind),
             count <= checked_count,
         decreases entries@.len() - checked_count,
     {
@@ -478,20 +478,20 @@ fn entry_bytes() -> (entry_bytes: usize)
 
 impl LoggedOperationEntry {
     /// 这一条的 key（[`Self::key`] 的规格）。
-    pub open spec fn spec_key(self) -> LoggedOperationKey {
-        LoggedOperationKey { kind: self.operation.spec_kind(), issued_txg: self.issued_txg }
+    pub open spec fn specification_key(self) -> LoggedOperationKey {
+        LoggedOperationKey { kind: self.operation.specification_kind(), issued_txg: self.issued_txg }
     }
 
     /// 写得出、读得回的一条：整理意图的 R 满足类型不变量（每一个造得出来的 R 都满足，见 [`CompactionRegion::start_slot`]）。
     pub open spec fn is_well_formed(self) -> bool {
-        self.operation matches LoggedOperation::Compaction(intent) ==> intent.region.spec_start_is_aligned_and_fits()
+        self.operation matches LoggedOperation::Compaction(intent) ==> intent.region.specification_start_is_aligned_and_fits()
     }
 
     /// 条目 44 的 value 那 34 字节。
-    pub open spec fn spec_value_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_value_bytes(self) -> Seq<u8> {
         match self.operation {
-            LoggedOperation::Compaction(intent) => little_endian_bytes(intent.region.spec_device().0 as nat, 4)
-                + little_endian_bytes(intent.region.spec_start_slot().0 as nat, 6) + little_endian_bytes(64, 2)
+            LoggedOperation::Compaction(intent) => little_endian_bytes(intent.region.specification_device().0 as nat, 4)
+                + little_endian_bytes(intent.region.specification_start_slot().0 as nat, 6) + little_endian_bytes(64, 2)
                 + little_endian_bytes(intent.allocation_generation_at_issue.0 as nat, 8) + little_endian_bytes(
                 intent.empty_cluster_segments_at_issue as nat,
                 8,
@@ -504,27 +504,27 @@ impl LoggedOperationEntry {
     }
 
     /// 盘上 44 字节（[`Self::to_bytes`] 交出的）：种类 2 + 签发 txg 8 + value 34。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        little_endian_bytes(self.operation.spec_kind().spec_code() as nat, 2) + little_endian_bytes(
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        little_endian_bytes(self.operation.specification_kind().specification_code() as nat, 2) + little_endian_bytes(
             self.issued_txg.0 as nat,
             8,
-        ) + self.spec_value_bytes()
+        ) + self.specification_value_bytes()
     }
 
     /// [`Self::parse`] 的判法。
-    pub open spec fn spec_parse(bytes: Seq<u8>) -> Result<Self, LoggedOperationEntryRefusal> {
+    pub open spec fn specification_parse(bytes: Seq<u8>) -> Result<Self, LoggedOperationEntryRefusal> {
         let kind_code = little_endian_value(bytes.subrange(0, 2)) as u16;
         let issued_txg = CheckpointTxg(little_endian_value(bytes.subrange(2, 10)) as u64);
         if bytes.len() != LOGGED_OPERATIONS_ENTRY_BYTES {
             Err(LoggedOperationEntryRefusal::WidthIsNotTheFieldTable { entry_bytes: bytes.len() as usize })
         } else {
-            match LoggedOperationKind::spec_of_code(kind_code) {
+            match LoggedOperationKind::specification_of_code(kind_code) {
                 None => Err(LoggedOperationEntryRefusal::UnknownKind { kind_code }),
-                Some(LoggedOperationKind::Compaction) => match spec_parse_compaction_intent_at(bytes, 10) {
+                Some(LoggedOperationKind::Compaction) => match specification_parse_compaction_intent_at(bytes, 10) {
                     Ok(intent) => Ok(LoggedOperationEntry { issued_txg, operation: LoggedOperation::Compaction(intent) }),
                     Err(refusal) => Err(refusal),
                 },
-                Some(LoggedOperationKind::Truncation) => match spec_parse_truncation_intent_at(bytes, 10) {
+                Some(LoggedOperationKind::Truncation) => match specification_parse_truncation_intent_at(bytes, 10) {
                     Ok(intent) => Ok(LoggedOperationEntry { issued_txg, operation: LoggedOperation::Truncation(intent) }),
                     Err(refusal) => Err(refusal),
                 },
@@ -537,19 +537,19 @@ impl LoggedOperationEntry {
         requires
             self.is_well_formed(),
         ensures
-            Self::spec_parse(self.spec_bytes()) == Ok::<Self, LoggedOperationEntryRefusal>(self),
+            Self::specification_parse(self.specification_bytes()) == Ok::<Self, LoggedOperationEntryRefusal>(self),
     {
         lemma_little_endian_capacities();
-        let bytes = self.spec_bytes();
-        let kind_bytes = little_endian_bytes(self.operation.spec_kind().spec_code() as nat, 2);
+        let bytes = self.specification_bytes();
+        let kind_bytes = little_endian_bytes(self.operation.specification_kind().specification_code() as nat, 2);
         let issued_bytes = little_endian_bytes(self.issued_txg.0 as nat, 8);
         assert(bytes.subrange(0, bytes.len() as int) =~= bytes);
-        lemma_split_a_concatenated_range(bytes, 0, kind_bytes + issued_bytes, self.spec_value_bytes());
+        lemma_split_a_concatenated_range(bytes, 0, kind_bytes + issued_bytes, self.specification_value_bytes());
         lemma_split_a_concatenated_range(bytes, 0, kind_bytes, issued_bytes);
         match self.operation {
             LoggedOperation::Compaction(intent) => {
-                let device = little_endian_bytes(intent.region.spec_device().0 as nat, 4);
-                let start = little_endian_bytes(intent.region.spec_start_slot().0 as nat, 6);
+                let device = little_endian_bytes(intent.region.specification_device().0 as nat, 4);
+                let start = little_endian_bytes(intent.region.specification_start_slot().0 as nat, 6);
                 let count = little_endian_bytes(64, 2);
                 let generation = little_endian_bytes(intent.allocation_generation_at_issue.0 as nat, 8);
                 let segments = little_endian_bytes(intent.empty_cluster_segments_at_issue as nat, 8);
@@ -574,7 +574,7 @@ impl LoggedOperationEntry {
     #[must_use]
     pub const fn key(&self) -> (key: LoggedOperationKey)
         ensures
-            key == self.spec_key(),
+            key == self.specification_key(),
     {
         LoggedOperationKey {
             kind: self.operation.kind(),
@@ -587,7 +587,7 @@ impl LoggedOperationEntry {
     #[must_use]
     pub fn to_bytes(&self) -> (bytes: Vec<u8>)
         ensures
-            bytes@ == self.spec_bytes(),
+            bytes@ == self.specification_bytes(),
             self.is_well_formed(),
     {
         let mut writer = ByteWriter::new(entry_bytes());
@@ -622,10 +622,10 @@ impl LoggedOperationEntry {
                 writer.skip(TRUNCATION_INTENT_PADDING_BYTES);
             }
         }
-        assert(writer.written() =~= after_the_key + self.spec_value_bytes());
+        assert(writer.written() =~= after_the_key + self.specification_value_bytes());
         writer.assert_position(LOGGED_OPERATIONS_ENTRY_BYTES, "logged_ops 条目");
         let bytes = writer.into_bytes();
-        assert(bytes@ =~= self.spec_bytes());
+        assert(bytes@ =~= self.specification_bytes());
         bytes
     }
 
@@ -637,7 +637,7 @@ impl LoggedOperationEntry {
     /// 截断意图的补零非零 ⇒ `TruncationPaddingNotZero`。
     pub fn parse(bytes: &[u8]) -> (entry: Result<Self, LoggedOperationEntryRefusal>)
         ensures
-            entry == Self::spec_parse(bytes@),
+            entry == Self::specification_parse(bytes@),
             entry matches Ok(parsed) ==> parsed.is_well_formed(),
     {
         if bytes.len() != entry_bytes() {
@@ -669,7 +669,7 @@ impl LoggedOperationEntry {
 }
 
 /// 整理意图那 34 字节 value 从 `source` 的 `position` 起读出来的样子（[`parse_compaction_intent`] 的判法）：先判槽数、再判补零、最后判 R。
-pub open spec fn spec_parse_compaction_intent_at(
+pub open spec fn specification_parse_compaction_intent_at(
     source: Seq<u8>,
     position: int,
 ) -> Result<CompactionIntent, LoggedOperationEntryRefusal> {
@@ -685,7 +685,7 @@ pub open spec fn spec_parse_compaction_intent_at(
     } else if source.subrange(position + 28, position + 34) != zero_bytes(6) {
         Err(LoggedOperationEntryRefusal::CompactionPaddingNotZero)
     } else {
-        match CompactionRegion::spec_of_one_cluster_segment(device, start_slot) {
+        match CompactionRegion::specification_of_one_cluster_segment(device, start_slot) {
             Ok(region) => Ok(CompactionIntent { region, allocation_generation_at_issue, empty_cluster_segments_at_issue }),
             Err(refusal) => Err(LoggedOperationEntryRefusal::CompactionRegionRefused(refusal)),
         }
@@ -693,7 +693,7 @@ pub open spec fn spec_parse_compaction_intent_at(
 }
 
 /// 截断意图那 34 字节 value 从 `source` 的 `position` 起读出来的样子（[`parse_truncation_intent`] 的判法）。
-pub open spec fn spec_parse_truncation_intent_at(
+pub open spec fn specification_parse_truncation_intent_at(
     source: Seq<u8>,
     position: int,
 ) -> Result<TruncationIntent, LoggedOperationEntryRefusal> {
@@ -715,8 +715,8 @@ fn parse_compaction_intent(
     requires
         old(reader).has_left(34),
     ensures
-        intent == spec_parse_compaction_intent_at(old(reader).source(), old(reader).spec_position() as int),
-        intent matches Ok(parsed) ==> parsed.region.spec_start_is_aligned_and_fits(),
+        intent == specification_parse_compaction_intent_at(old(reader).source(), old(reader).specification_position() as int),
+        intent matches Ok(parsed) ==> parsed.region.specification_start_is_aligned_and_fits(),
 {
     let device = DeviceIdentity(reader.get_u32());
     let start_slot = SlotNumber(reader.get_six_byte_unsigned());
@@ -753,7 +753,7 @@ fn parse_truncation_intent(
     requires
         old(reader).has_left(34),
     ensures
-        intent == spec_parse_truncation_intent_at(old(reader).source(), old(reader).spec_position() as int),
+        intent == specification_parse_truncation_intent_at(old(reader).source(), old(reader).specification_position() as int),
 {
     let inode = InodeNumber(reader.get_u64());
     let object_birth = CheckpointTxg(reader.get_u64());
@@ -773,7 +773,7 @@ fn parse_truncation_intent(
 #[must_use]
 pub fn logged_operations_one_root_node_holds() -> (holds: usize)
     ensures
-        holds == spec_index_node_entry_capacity(10, 44),
+        holds == specification_index_node_entry_capacity(10, 44),
         holds == 369,
 {
     index_node_entry_capacity(LOGGED_OPERATIONS_KEY_WIDTH_IN_BYTES, entry_bytes())
@@ -789,12 +789,12 @@ pub fn logged_operations_one_root_node_holds() -> (holds: usize)
 #[must_use]
 pub fn logged_operations_root_entries(entries: &[LoggedOperationEntry]) -> (root_entries: Vec<Vec<u8>>)
     requires
-        spec_keys_strictly_ascend(entries@),
+        specification_keys_strictly_ascend(entries@),
         entries@.len() <= 369,
     ensures
         root_entries@.len() == entries@.len(),
         forall|position: int|
-            0 <= position < entries@.len() ==> (#[trigger] root_entries@[position])@ == entries@[position].spec_bytes(),
+            0 <= position < entries@.len() ==> (#[trigger] root_entries@[position])@ == entries@[position].specification_bytes(),
 {
     assert!(
         keys_strictly_ascend(entries),
@@ -811,7 +811,7 @@ pub fn logged_operations_root_entries(entries: &[LoggedOperationEntry]) -> (root
             written_count <= entries@.len(),
             root_entries@.len() == written_count,
             forall|position: int|
-                0 <= position < written_count ==> (#[trigger] root_entries@[position])@ == entries@[position].spec_bytes(),
+                0 <= position < written_count ==> (#[trigger] root_entries@[position])@ == entries@[position].specification_bytes(),
         decreases entries@.len() - written_count,
     {
         root_entries.push(entries[written_count].to_bytes());
@@ -834,18 +834,18 @@ pub fn logged_operation_entries_of_the_root_entries(
             Ok(parsed_entries) => {
                 &&& parsed_entries@.len() == entries@.len()
                 &&& forall|position: int|
-                    0 <= position < entries@.len() ==> LoggedOperationEntry::spec_parse(
+                    0 <= position < entries@.len() ==> LoggedOperationEntry::specification_parse(
                         (#[trigger] entries@[position])@,
                     ) == Ok::<LoggedOperationEntry, LoggedOperationEntryRefusal>(parsed_entries@[position])
-                &&& spec_keys_strictly_ascend(parsed_entries@)
-                &&& spec_number_of_kind(parsed_entries@, LoggedOperationKind::Compaction) <= 1
-                &&& spec_number_of_kind(parsed_entries@, LoggedOperationKind::Truncation) <= 1
+                &&& specification_keys_strictly_ascend(parsed_entries@)
+                &&& specification_number_of_kind(parsed_entries@, LoggedOperationKind::Compaction) <= 1
+                &&& specification_number_of_kind(parsed_entries@, LoggedOperationKind::Truncation) <= 1
             },
             Err(LoggedOperationsRootRefusal::EntryRefused(refusal)) => exists|position: int|
-                0 <= position < entries@.len() && LoggedOperationEntry::spec_parse((#[trigger] entries@[position])@)
+                0 <= position < entries@.len() && LoggedOperationEntry::specification_parse((#[trigger] entries@[position])@)
                     == Err::<LoggedOperationEntry, LoggedOperationEntryRefusal>(refusal),
             Err(LoggedOperationsRootRefusal::EntriesNotInStrictlyAscendingKeyOrder) => forall|position: int|
-                0 <= position < entries@.len() ==> LoggedOperationEntry::spec_parse(
+                0 <= position < entries@.len() ==> LoggedOperationEntry::specification_parse(
                     (#[trigger] entries@[position])@,
                 ) is Ok,
             Err(LoggedOperationsRootRefusal::MoreThanOneCompactionIntent { compaction_intents }) => compaction_intents
@@ -862,7 +862,7 @@ pub fn logged_operation_entries_of_the_root_entries(
             parsed_count <= entries@.len(),
             parsed@.len() == parsed_count,
             forall|position: int|
-                0 <= position < parsed_count ==> LoggedOperationEntry::spec_parse((#[trigger] entries@[position])@)
+                0 <= position < parsed_count ==> LoggedOperationEntry::specification_parse((#[trigger] entries@[position])@)
                     == Ok::<LoggedOperationEntry, LoggedOperationEntryRefusal>(parsed@[position]),
         decreases entries@.len() - parsed_count,
     {
@@ -890,7 +890,7 @@ pub fn logged_operation_entries_of_the_root_entries(
     Ok(parsed)
 }
 
-/// 每多看一条，计数的增量就是那一条是不是这一种（[`spec_number_of_kind`] 从末尾往前数，这里把它接到前缀上）。
+/// 每多看一条，计数的增量就是那一条是不是这一种（[`specification_number_of_kind`] 从末尾往前数，这里把它接到前缀上）。
 proof fn lemma_number_of_kind_of_a_longer_prefix(
     entries: Seq<LoggedOperationEntry>,
     prefix_length: int,
@@ -899,10 +899,10 @@ proof fn lemma_number_of_kind_of_a_longer_prefix(
     requires
         0 <= prefix_length < entries.len(),
     ensures
-        spec_number_of_kind(entries.take(prefix_length + 1), kind) == spec_number_of_kind(
+        specification_number_of_kind(entries.take(prefix_length + 1), kind) == specification_number_of_kind(
             entries.take(prefix_length),
             kind,
-        ) + if entries[prefix_length].operation.spec_kind() == kind {
+        ) + if entries[prefix_length].operation.specification_kind() == kind {
             1nat
         } else {
             0nat
@@ -921,7 +921,7 @@ pub fn live_compaction_intent_of_the_entries(
     entries: &[LoggedOperationEntry],
 ) -> (live: Option<(CheckpointTxg, CompactionIntent)>)
     requires
-        spec_number_of_kind(entries@, LoggedOperationKind::Compaction) <= 1,
+        specification_number_of_kind(entries@, LoggedOperationKind::Compaction) <= 1,
     ensures
         match live {
             Some((issued_txg, intent)) => exists|position: int|
@@ -929,7 +929,7 @@ pub fn live_compaction_intent_of_the_entries(
                     issued_txg,
                     operation: LoggedOperation::Compaction(intent),
                 }),
-            None => spec_number_of_kind(entries@, LoggedOperationKind::Compaction) == 0,
+            None => specification_number_of_kind(entries@, LoggedOperationKind::Compaction) == 0,
         },
 {
     let mut live: Option<(CheckpointTxg, CompactionIntent)> = None;
@@ -938,7 +938,7 @@ pub fn live_compaction_intent_of_the_entries(
     while checked_count < entries.len()
         invariant
             checked_count <= entries@.len(),
-            spec_number_of_kind(entries@, LoggedOperationKind::Compaction) <= 1,
+            specification_number_of_kind(entries@, LoggedOperationKind::Compaction) <= 1,
             match live {
                 Some((issued_txg, intent)) => {
                     &&& exists|position: int|
@@ -946,10 +946,10 @@ pub fn live_compaction_intent_of_the_entries(
                             issued_txg,
                             operation: LoggedOperation::Compaction(intent),
                         })
-                    &&& spec_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Compaction)
+                    &&& specification_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Compaction)
                         == 1
                 },
-                None => spec_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Compaction)
+                None => specification_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Compaction)
                     == 0,
             },
         decreases entries@.len() - checked_count,
@@ -989,7 +989,7 @@ pub fn live_truncation_intent_of_the_entries(
     entries: &[LoggedOperationEntry],
 ) -> (live: Option<(CheckpointTxg, TruncationIntent)>)
     requires
-        spec_number_of_kind(entries@, LoggedOperationKind::Truncation) <= 1,
+        specification_number_of_kind(entries@, LoggedOperationKind::Truncation) <= 1,
     ensures
         match live {
             Some((issued_txg, intent)) => exists|position: int|
@@ -997,7 +997,7 @@ pub fn live_truncation_intent_of_the_entries(
                     issued_txg,
                     operation: LoggedOperation::Truncation(intent),
                 }),
-            None => spec_number_of_kind(entries@, LoggedOperationKind::Truncation) == 0,
+            None => specification_number_of_kind(entries@, LoggedOperationKind::Truncation) == 0,
         },
 {
     let mut live: Option<(CheckpointTxg, TruncationIntent)> = None;
@@ -1006,7 +1006,7 @@ pub fn live_truncation_intent_of_the_entries(
     while checked_count < entries.len()
         invariant
             checked_count <= entries@.len(),
-            spec_number_of_kind(entries@, LoggedOperationKind::Truncation) <= 1,
+            specification_number_of_kind(entries@, LoggedOperationKind::Truncation) <= 1,
             match live {
                 Some((issued_txg, intent)) => {
                     &&& exists|position: int|
@@ -1014,10 +1014,10 @@ pub fn live_truncation_intent_of_the_entries(
                             issued_txg,
                             operation: LoggedOperation::Truncation(intent),
                         })
-                    &&& spec_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Truncation)
+                    &&& specification_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Truncation)
                         == 1
                 },
-                None => spec_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Truncation)
+                None => specification_number_of_kind(entries@.take(checked_count as int), LoggedOperationKind::Truncation)
                     == 0,
             },
         decreases entries@.len() - checked_count,
@@ -1055,7 +1055,7 @@ proof fn lemma_number_of_kind_of_a_prefix_is_at_most_the_whole(
     requires
         0 <= prefix_length <= entries.len(),
     ensures
-        spec_number_of_kind(entries.take(prefix_length), kind) <= spec_number_of_kind(entries, kind),
+        specification_number_of_kind(entries.take(prefix_length), kind) <= specification_number_of_kind(entries, kind),
     decreases entries.len() - prefix_length,
 {
     if prefix_length < entries.len() {
@@ -1074,7 +1074,7 @@ mod tests {
 
     /// 截断条目 44 字节逐字节钉住：key = 种类 2 + 签发 txg；value = inode 号、对象出生代、目标 size、补零 10。
     #[test]
-    fn a_truncation_entry_is_kind_two_then_the_issue_txg_inode_object_birth_target_size_and_ten_zero_bytes(
+    fn truncation_entry_is_kind_two_then_the_issue_txg_inode_object_birth_target_size_and_ten_zero_bytes(
     ) {
         let entry = LoggedOperationEntry {
             issued_txg: CheckpointTxg(0x0102_0304_0506_0708),
@@ -1097,7 +1097,7 @@ mod tests {
 
     /// 截断意图的补零有一个字节非零就拒收；一个根里两条截断意图拒收（全池至多一条）。
     #[test]
-    fn a_truncation_entry_with_a_non_zero_padding_byte_or_a_second_truncation_entry_is_refused() {
+    fn truncation_entry_with_a_non_zero_padding_byte_or_a_second_truncation_entry_is_refused() {
         let entry = |issued_txg: u64| LoggedOperationEntry {
             issued_txg: CheckpointTxg(issued_txg),
             operation: LoggedOperation::Truncation(TruncationIntent {

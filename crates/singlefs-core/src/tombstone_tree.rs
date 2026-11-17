@@ -283,7 +283,7 @@ mod tests {
 
     /// 开放容器还装得下：追加进最右那一片、身份不变、只重写它。
     #[test]
-    fn a_tombstone_is_appended_to_the_open_container_while_it_has_room() {
+    fn tombstone_is_appended_to_the_open_container_while_it_has_room() {
         let first = after_appending(
             1,
             tombstone_container_capacity_capped_at(2),
@@ -314,7 +314,7 @@ mod tests {
 
     /// 开放容器满了就关、开下一片：容器号 = 最大号 + 1、出生代 = 这次的 txg；满了的那片一个字节都不动、不进重写清单。
     #[test]
-    fn a_full_open_container_is_closed_and_the_next_one_takes_the_largest_number_plus_one() {
+    fn full_open_container_is_closed_and_the_next_one_takes_the_largest_number_plus_one() {
         let two = after_appending(
             2,
             tombstone_container_capacity_capped_at(2),

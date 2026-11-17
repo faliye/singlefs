@@ -4,26 +4,29 @@
 //! （`two_kernel_reconciliation`）。连续不确定的计数三段各一份，只住在这份实现里：重挂换一份实现就清零。
 //! 出错照第 4 条：这一批的判定一条都不交、计数不动，映射成核心层的三种之一，带上出在哪张卡、什么原因（[`core_failure_of_the_checksum_batch`]、
 //! [`core_failure_of_the_region_record_batch`]、[`core_failure_of_the_live_slot_batch`]），不换 CPU 接着算。
-//! 等 GPU 超过上限（用户 2026-10-26 定「设超时，超时算出错」）在同一张卡上重交 3 次都等超过上限之后（用户 2026-10-28 定）映射成
+//! 等 GPU 超过上限（第 4 条：超时算出错）在同一张卡上重交 3 次都等超过上限之后（第 4 条「至多 3 次，都超时才报警」）映射成
 //! `GpuUnusableAfterResubmissions`，带卡、重交了几次、等的上限，分得清最后那一次是这一批的那一次提交、还是前一次超时的那一次没做完：这是「这张卡用不了」那一声报警。
-//! 参与的卡的显存上限连最小的一片都装不下、一张都不剩（用户 2026-10-28 定「连一片都装不下就不用这张卡」）映射成 `EveryParticipatingGpuLeftOutUnderItsMemoryLimit`，
-//! 带每张被晾下的卡、上限与至少要多少；挂载那一刻与切换生效的那一批开头核心层就经 [`BackgroundGpuCompute::failure_under_the_settings_handed_in`] 读到，
-//! 当场报警停着、不拒挂载也不拒切换。
+//! 参与的卡的显存上限连最小的一片都装不下、一张都不剩（第 3 条「连最小的一片都装不下，这张卡就不用」）映射成 `EveryParticipatingGpuLeftOutUnderItsMemoryLimit`，
+//! 带每张被晾下的卡、上限与至少要多少；挂载那一刻与切换的那一组换上那一刻核心层就从两批之间那一问的答案里读到
+//! （[`BackgroundGpuCompute::put_the_gpus_opened_since_the_settings_were_handed_in_in_effect`] 答换上了时带着），当场报警停着、不拒挂载也不拒切换。
 //! 一张参与的卡连这一批最小的一片都装不下映射成 `InputNotSupportedOnTheGpu` 的「一条装不进一段」，带卡、位置与最小的一片的字节数。
 //! 核心层交来的设置（挂载那一刻与每次切换生效的那一批开头）转给两份核那一层，从下一批起照它分活、切段、等；三段的连续不确定计数不动。
 //!
 //! 两份核各算一次的那一层抽成 [`BothKernelsOfTheThreeSegments`]：产品是 `background_gpu::BackgroundGpu`（参与的卡上两份 WGSL 核）；
 //! 测试里换上在 CPU 上算的替身，比对、计数、映射这几样不起卡就钉得住。
-//! 挂载那一刻的入口 [`open_background_gpu_compute`]：开卡（卡清单、显存上限、等 GPU 的上限，校验同核心层 `admit_background_compute_settings`），
-//! 交回核心层挂载与切换收的把手，连同没开成而跳过的卡。
+//! 挂载那一刻的入口 [`open_background_gpu_compute`]：只在参与的卡上开卡（卡清单、显存上限、等 GPU 的上限，校验同核心层 `admit_background_compute_settings`），
+//! 交回核心层挂载与切换收的把手；切换点到没开的卡，在会话锁外开、开完了在两批之间换上（`background_gpu::BackgroundGpuOverTheCards::use_the_settings_from_the_next_batch`），
+//! 两批之间那一问照最近交来的那一组答还在开卡、换上了（连同用不用得上）、开不成三种（[`LatestGpuSettingsHandedIn`]），核心层开卡期间把切换记成还没生效；
+//! 重开到上限都没开成映射成 `GpuNotOpenedAfterTheReopenings`，带卡与每一次的原因，核心层当场停 GC、报警。新开的卡并进这一份实现：连续不确定的计数不因切换清零。
+//! 切到 `cpu` 时核心层告知一张卡都不参与，开着的卡全部关掉（`background_gpu::BackgroundGpuOverTheCards::use_no_gpu_from_the_next_batch`）。
 
 use singlefs_core::allocator::AllocationRecord;
 use singlefs_core::background_compute::{
     AdmittedGpuSettings, BackgroundGpuCompute, BackgroundGpuComputeFailed,
-    BackgroundGpuComputeHandle, ClusterSegmentEntryKey, GpuDeviceIdentifier,
-    GpuDeviceNotOpenedAtTheMount, GpuEntryDecision, GpuFailureOnTheDevice, GpuInventory,
-    GpuMemoryInBytes, GpuShortOfFreeMemoryForTheSmallestPiece, GpuSubmissionsOfTheBatch,
-    InputNotSupportedOnTheGpu, RegionRecordEntryKey, RegionRecordToClassifyOnTheGpu,
+    BackgroundGpuComputeHandle, ClusterSegmentEntryKey, GpuDeviceIdentifier, GpuEntryDecision,
+    GpuFailureOnTheDevice, GpuInventory, GpuMemoryInBytes, GpuShortOfFreeMemoryForTheSmallestPiece,
+    GpuSubmissionsOfTheBatch, InputNotSupportedOnTheGpu, LatestGpuSettingsHandedIn,
+    PciStateOfTheGpuReadWhenJudgedUnusable, RegionRecordEntryKey, RegionRecordToClassifyOnTheGpu,
     SubmissionWaitedForPastTheLimit, UnitChecksumOutcome, UnitChecksumToVerifyOnTheGpu,
 };
 use singlefs_core::compaction_plan::UnitAreaOfOneDevice;
@@ -34,21 +37,25 @@ use crate::adapter_inventory::{BackgroundGpuSelection, DiscreteGpuListRefused};
 use crate::background_gpu::{
     open_background_gpu_with_the_memory_leaked_in_this_process, BackgroundGpu,
     BackgroundGpuOpenRefused, BackgroundGpuOverTheCards, BatchNotSplitOverTheGpus,
-    CardOfTheBackgroundGpu, ChecksumBatchFailed, GpuFailureCause, LiveSlotBatchFailed,
+    CardOfTheBackgroundGpu, ChecksumBatchFailed, GpuFailureCause, GpuNotOpenedAfterTheReopenings,
+    LatestSettingsHandedIn, LiveSlotBatchFailed, OpeningsNotReturnedInThisProcess,
     RegionRecordBatchFailed, SmallestPieceNotHeldOnTheGpu, VulkanInstanceOfThisProcess,
+    WaitForTheOpeningAtASwitch,
 };
 use crate::checksum_kernels::{
     reconciled_unit_checksums, ChecksumKernelOutcome, UnitChecksumToVerify,
 };
 use crate::gpus_of_this_host::{
-    DiscreteGpuNotOpenedAtTheMount, GpuLeftOutUnderItsMemoryLimit, GpuMemoryLeakedInThisProcess,
+    GpuLeftOutUnderItsMemoryLimit, GpuMemoryLeakedInThisProcess, GpusLeakedWhenClosedAtASwitch,
     GpusLeakedWhenTheBackgroundGpuIsDropped,
 };
 use crate::live_slot_kernels::reconciled_live_slots_of_the_segments;
 use crate::region_record_kernels::{
     reconciled_region_record_classifications, RegionRecordToClassify,
 };
-use crate::two_kernel_reconciliation::{ConsecutiveUncertaintyCounts, EntryDecision};
+use crate::two_kernel_reconciliation::{
+    ConsecutiveUncertaintyCounts, EntryDecision, SameEntryKeyTwiceInOneBatch,
+};
 
 /// 三段各两份核算一次、交回每条两份的结果（不比对、不动计数）的那一层，连同本机的卡清单。产品是 [`BackgroundGpu`]；测试换上在 CPU 上算的替身。
 /// 三个方法的约定同 [`BackgroundGpu`] 上对应的那三个：交回的条数与交进去的相同、按交进去的次序；出错时一条都不交。
@@ -85,9 +92,22 @@ pub trait BothKernelsOfTheThreeSegments: GpuInventory {
     ) -> Result<Vec<(u64, u64)>, LiveSlotBatchFailed>;
 
     /// 从下一批起照核心层交来的这一组跑：只在它点的卡上、按卡的顺序填满（前面的卡填到它照显存上限一次放得下的量，装不下的才给后面的卡；
-    /// 挂载时量出的代价不用来分活），照它给的显存上限切段、照它给的等的上限等；不重开设备
+    /// 挂载时量出的代价不用来分活），照它给的显存上限切段、照它给的等的上限等；开着的卡不重开，点到没开的卡在会话锁外开、开完了才换上
     /// （`singlefs_core::background_compute::BackgroundGpuCompute::use_the_settings_from_the_next_batch` 转来的，只在两批之间）。
     fn use_the_settings_from_the_next_batch(&mut self, settings: &AdmittedGpuSettings);
+
+    /// 从下一批起一张卡都不参与（`singlefs_core::background_compute::BackgroundGpuCompute::use_no_gpu_from_the_next_batch` 转来的，切到 `cpu` 时）：
+    /// 开着的卡全部关掉（[`BackgroundGpuOverTheCards::use_no_gpu_from_the_next_batch`]）。不开卡的替身没有这一样，什么都不做。
+    fn use_no_gpu_from_the_next_batch(&mut self) {}
+
+    /// 两批之间：会话锁外为切换开卡的那一次开完了就换上（[`BackgroundGpuOverTheCards::put_the_gpus_opened_since_the_switch_in_effect`]，不等它开完），
+    /// 交回最近交来的那一组此刻怎样了（[`LatestSettingsHandedIn`]）。不开卡的替身交来那一刻就换上：答换上了，连同
+    /// [`Self::batch_not_split_over_the_gpus_under_the_settings_in_use`]。
+    fn put_the_gpus_opened_since_the_switch_in_effect(&mut self) -> LatestSettingsHandedIn {
+        LatestSettingsHandedIn::PutInEffect {
+            not_split_over_the_gpus: self.batch_not_split_over_the_gpus_under_the_settings_in_use(),
+        }
+    }
 
     /// 此刻这组设置下一批分不分得到卡上（与这一批有几条无关）：分不到交回是哪一种（换设置时量代价出错、参与的卡因显存上限一张都不剩），
     /// 分得到交回 `None`。只读，不交活。
@@ -135,6 +155,17 @@ impl<Card: CardOfTheBackgroundGpu> BothKernelsOfTheThreeSegments
         BackgroundGpuOverTheCards::use_the_settings_from_the_next_batch(self, settings);
     }
 
+    fn use_no_gpu_from_the_next_batch(&mut self) {
+        BackgroundGpuOverTheCards::use_no_gpu_from_the_next_batch(self);
+    }
+
+    fn put_the_gpus_opened_since_the_switch_in_effect(&mut self) -> LatestSettingsHandedIn {
+        BackgroundGpuOverTheCards::put_the_gpus_opened_since_the_switch_in_effect(
+            self,
+            WaitForTheOpeningAtASwitch::NotAtAll,
+        )
+    }
+
     fn batch_not_split_over_the_gpus_under_the_settings_in_use(
         &self,
     ) -> Option<BatchNotSplitOverTheGpus> {
@@ -171,28 +202,30 @@ impl<Kernels> BackgroundGpuComputeThroughBothKernels<Kernels> {
     }
 }
 
-/// 挂载那一刻开后台 GPU 的结局：核心层挂载与切换收的把手，没开成而跳过的卡（给了 `background_gpu_devices` 而没点名的，按总线地址排、各带原因；
-/// 没跳过一张是空），与开卡那一组点了而因显存上限连最小的一片都装不下、不用的卡（按参与的次序，各带上限与至少要多少；用户 2026-10-28 定
-/// 「连一片都装不下就不用这张卡」）。参与的卡因此一张都不剩时挂载不拒：核心层挂载那一刻把校验过的那一组交给实现、读
-/// [`BackgroundGpuCompute::failure_under_the_settings_handed_in`]，读到 `EveryParticipatingGpuLeftOutUnderItsMemoryLimit` 就当场报警停着。
+/// 挂载那一刻开后台 GPU 的结局：核心层挂载与切换收的把手，挂载那一刻开着的卡（只有参与的卡，按总线地址排），与开卡那一组点了而因显存上限连最小的一片都装不下、不用的卡（按参与的次序，各带上限与至少要多少；第 3 条
+/// 「连最小的一片都装不下，这张卡就不用」）。参与的卡因此一张都不剩时挂载不拒：核心层挂载那一刻把校验过的那一组交给实现、问两批之间那一问
+/// （[`BackgroundGpuCompute::put_the_gpus_opened_since_the_settings_were_handed_in_in_effect`]），答换上了而带着 `EveryParticipatingGpuLeftOutUnderItsMemoryLimit`
+/// 就当场报警停着。
 /// 给了 `background_gpu_devices` 时没点名而交不成一张卡、没收进卡清单的独显各带原因（`unnamed_discrete_gpus_left_off_the_list`）；
-/// 卸载（丢掉核心层收的把手）之后泄漏了哪几张卡，读 `gpus_leaked_when_dropped`。
+/// 卸载（丢掉核心层收的把手）之后泄漏了哪几张卡，读 `gpus_leaked_when_dropped`；挂着切换关卡时泄漏了哪几张卡，随时读 `gpus_leaked_when_closed_at_a_switch`。
 #[derive(Debug)]
 pub struct OpenedBackgroundGpuCompute {
     pub gpu_compute: BackgroundGpuComputeHandle,
-    pub gpus_not_opened_at_the_mount: Vec<DiscreteGpuNotOpenedAtTheMount>,
+    pub gpus_opened_at_the_mount: Vec<GpuDeviceIdentifier>,
     pub gpus_left_out_under_their_memory_limit: Vec<GpuLeftOutUnderItsMemoryLimit>,
     pub unnamed_discrete_gpus_left_off_the_list: Vec<DiscreteGpuListRefused>,
     pub gpus_leaked_when_dropped: GpusLeakedWhenTheBackgroundGpuIsDropped,
+    pub gpus_leaked_when_closed_at_a_switch: GpusLeakedWhenClosedAtASwitch,
 }
 
 /// 挂载那一刻开后台 GPU、交回核心层挂载与切换收的把手（D26（后台整理与放置回收） 已定项 13「挂载时由调用方把它的实现递进去」）：
-/// 开本机全部独显、逐张量代价，`selection` 定开卡时参与的卡（`BackgroundGpuSelection::of_the_settings` 照挂载那一组取；本包开卡时照它校验一次，
-/// 同核心层 `admit_background_compute_settings`）。给了列表而没点名的卡没开成就跳过、在交回的结局里报出来，参与的卡没开成就拒。
-/// 核心层挂载时照这份实现答的卡清单（此刻本机在的独显，连同没开成的那几张）再校验一次，并把校验过的那一组交过来
+/// 只开参与的卡、逐张量代价，`selection` 定开卡时参与的卡（`BackgroundGpuSelection::of_the_settings` 照挂载那一组取；本包开卡时照它校验一次，
+/// 同核心层 `admit_background_compute_settings`）。没点名的卡不开，参与的卡没开成就拒。
+/// 核心层挂载时照这份实现答的卡清单（此刻本机在的独显，开着的与没开的）再校验一次，并把校验过的那一组交过来
 /// （`use_the_settings_from_the_next_batch`），之后每次切换生效时另交，参与的卡、显存上限、等的上限都照核心层交来的那一组。
-/// `memory_leaked_in_this_process` 是调用方在进程里留着的那一份：此前几次挂载泄漏在一张卡上的字节先从它的余量里扣掉，这一次卸载泄漏的记进去。
+/// `memory_leaked_in_this_process` 是调用方在进程里留着的那一份：之前几次挂载泄漏在一张卡上的字节先从它的余量里扣掉，这一次卸载泄漏的记进去。
 /// `vulkan_instance` 同样是调用方在进程里留着的那一份（[`VulkanInstanceOfThisProcess`]）：开卡的枚举与之后现查本机在的独显都用它，不另建。
+/// `openings_not_returned_in_this_process` 也是调用方在进程里留着的那一份：一张卡上前一次开卡到点之后还没回来，这一次挂载与之后的切换都不在它上面再起。
 ///
 /// # Errors
 /// [`BackgroundGpuOpenRefused`] 的五种：设置被拒（GPU 不在、上限个数不对、上限超过显存总量……）、点名的卡不在这一次枚举的清单里
@@ -201,14 +234,27 @@ pub struct OpenedBackgroundGpuCompute {
 pub fn open_background_gpu_compute(
     selection: &BackgroundGpuSelection,
     memory_leaked_in_this_process: &GpuMemoryLeakedInThisProcess,
+    openings_not_returned_in_this_process: &OpeningsNotReturnedInThisProcess,
     vulkan_instance: &VulkanInstanceOfThisProcess,
 ) -> Result<OpenedBackgroundGpuCompute, BackgroundGpuOpenRefused> {
     let background_gpu = open_background_gpu_with_the_memory_leaked_in_this_process(
         selection,
         memory_leaked_in_this_process,
+        openings_not_returned_in_this_process,
         vulkan_instance,
+        |_gpus_to_open| {},
     )?;
-    let gpus_not_opened_at_the_mount = background_gpu.gpus_not_opened_at_the_mount().to_vec();
+    Ok(background_gpu_compute_of_the_opened_gpu(background_gpu))
+}
+
+/// 开成的后台 GPU 交成核心层挂载与切换收的把手，连同开着的卡、因显存上限不用、没收进清单的卡与丢掉之后泄漏了哪几张的那一份
+/// （[`OpenedBackgroundGpuCompute`]）。进程开卡器（`crate::gpu_opener_of_this_process`）自己开卡（要枚举完报回要开几张卡）之后也走这一步。
+/// 对任何一种卡都一样（产品是 [`BackgroundGpu`]，测试换上在 CPU 上算的替身卡）。
+#[must_use]
+pub fn background_gpu_compute_of_the_opened_gpu<Card: CardOfTheBackgroundGpu>(
+    background_gpu: BackgroundGpuOverTheCards<Card>,
+) -> OpenedBackgroundGpuCompute {
+    let gpus_opened_at_the_mount = background_gpu.gpus_opened();
     let gpus_left_out_under_their_memory_limit = background_gpu
         .gpus_left_out_under_their_memory_limit()
         .to_vec();
@@ -216,15 +262,17 @@ pub fn open_background_gpu_compute(
         .unnamed_discrete_gpus_left_off_the_list()
         .to_vec();
     let gpus_leaked_when_dropped = background_gpu.gpus_leaked_when_dropped();
-    Ok(OpenedBackgroundGpuCompute {
+    let gpus_leaked_when_closed_at_a_switch = background_gpu.gpus_leaked_when_closed_at_a_switch();
+    OpenedBackgroundGpuCompute {
         gpu_compute: BackgroundGpuComputeHandle::of_an_implementation(
-            BackgroundGpuComputeOnTheParticipatingGpus::with_no_entry_uncertain(background_gpu),
+            BackgroundGpuComputeThroughBothKernels::with_no_entry_uncertain(background_gpu),
         ),
-        gpus_not_opened_at_the_mount,
+        gpus_opened_at_the_mount,
         gpus_left_out_under_their_memory_limit,
         unnamed_discrete_gpus_left_off_the_list,
         gpus_leaked_when_dropped,
-    })
+        gpus_leaked_when_closed_at_a_switch,
+    }
 }
 
 /// 本包一条的判定换成核心层的：三种一一对应，结局照 `outcome_for_the_core` 换。
@@ -244,18 +292,22 @@ pub fn core_decision_of_the_entry<KernelOutcome, CoreOutcome>(
     }
 }
 
-/// 一张卡上的 GPU 出错报给核心层：等超过上限的两种（这一批的那一次、前一次超时的那一次没做完）是 `WaitForTheGpuExceededTheLimit`，
-/// 带上限本身；重交 3 次都等超过上限的（这张卡用不了，用户 2026-10-28 定「都超时才报警」）是 `GpuUnusableAfterResubmissions`，带重交了几次、
-/// 最后那一次等的上限与是哪一次提交；别的是 `GpuFailed`，原因一一对过去、原话照带。卡照带。
+/// 一张卡上的 GPU 出错报给核心层：等超过上限的三种（这一批的那一次、前一次超时的那一次没做完、冲掉待写的那一次空提交没做完）是
+/// `WaitForTheGpuExceededTheLimit`，带上限本身与是哪一次提交；重交 3 次都等超过上限的（这张卡用不了，第 4 条「都超时才报警」）是
+/// `GpuUnusableAfterResubmissions`，带重交了几次、最后那一次等的上限与是哪一次提交；别的是 `GpuFailed`，原因一一对过去（开卡那几种各对各的成员）、原话照带。卡照带。
+/// `pci_state_when_judged_unusable`（判这张卡用不了那一刻外壳读的 PCI 状态，没读的是没读）照带进带读数的那三种（`GpuFailed`、`GpuUnusableAfterResubmissions`、
+/// `GpuNotOpenedAfterTheReopenings`）；重开到上限都没开成的，每一次开不成报成的那一个带的是没读（每一次没开成而还要重开时不读）。这里不读。
 #[must_use]
 pub fn core_failure_of_the_gpu(
     device: &GpuDeviceIdentifier,
     cause: &GpuFailureCause,
+    pci_state_when_judged_unusable: &PciStateOfTheGpuReadWhenJudgedUnusable,
 ) -> BackgroundGpuComputeFailed {
     let failed_on_the_device =
         |cause_on_the_device: GpuFailureOnTheDevice| BackgroundGpuComputeFailed::GpuFailed {
             device: device.clone(),
             cause: cause_on_the_device,
+            pci_state_when_judged_unusable: Box::new(pci_state_when_judged_unusable.clone()),
         };
     match cause {
         GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit } => {
@@ -273,9 +325,38 @@ pub fn core_failure_of_the_gpu(
                     SubmissionWaitedForPastTheLimit::EarlierTimedOutSubmissionStillRunning,
             }
         }
+        GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { wait_limit } => {
+            BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
+                device: device.clone(),
+                wait_limit: *wait_limit,
+                submission_waited_for:
+                    SubmissionWaitedForPastTheLimit::EmptySubmissionFlushingThePendingWrites,
+            }
+        }
         GpuFailureCause::DeviceOrPipelineDidNotStart { reason } => {
             failed_on_the_device(GpuFailureOnTheDevice::DeviceOrPipelineDidNotStart {
                 reason: reason.clone(),
+            })
+        }
+        GpuFailureCause::OpeningThreadNotStarted { reason } => {
+            failed_on_the_device(GpuFailureOnTheDevice::OpeningThreadNotStarted {
+                reason: reason.clone(),
+            })
+        }
+        GpuFailureCause::OpeningPanicked { said_by_the_panic } => {
+            failed_on_the_device(GpuFailureOnTheDevice::OpeningPanicked {
+                said_by_the_panic: said_by_the_panic.clone(),
+            })
+        }
+        GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned => {
+            failed_on_the_device(GpuFailureOnTheDevice::EarlierOpeningOfTheDeviceNotReturned)
+        }
+        GpuFailureCause::OpeningCalledOff => {
+            failed_on_the_device(GpuFailureOnTheDevice::OpeningCalledOff)
+        }
+        GpuFailureCause::OpeningsInThisMountUsedUp { failed_openings } => {
+            failed_on_the_device(GpuFailureOnTheDevice::OpeningsInThisMountUsedUp {
+                failed_openings: *failed_openings,
             })
         }
         GpuFailureCause::UncapturedErrorOrDeviceLost { reason } => {
@@ -317,6 +398,7 @@ pub fn core_failure_of_the_gpu(
                     wait_limit: *wait_limit,
                     last_submission_waited_for:
                         SubmissionWaitedForPastTheLimit::SubmissionOfThisBatch,
+                    pci_state_when_judged_unusable: Box::new(pci_state_when_judged_unusable.clone()),
                 }
             }
             GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit {
@@ -327,20 +409,57 @@ pub fn core_failure_of_the_gpu(
                 wait_limit: *wait_limit,
                 last_submission_waited_for:
                     SubmissionWaitedForPastTheLimit::EarlierTimedOutSubmissionStillRunning,
+                pci_state_when_judged_unusable: Box::new(pci_state_when_judged_unusable.clone()),
             },
-            // 只有等超过上限的两种才重交（`crate::waiting_for_the_gpu::outcome_resubmitted_after_timeouts`），别的原因当场交回、不包进这一种；
+            GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { wait_limit } => {
+                BackgroundGpuComputeFailed::GpuUnusableAfterResubmissions {
+                    device: device.clone(),
+                    resubmissions: *resubmissions,
+                    wait_limit: *wait_limit,
+                    last_submission_waited_for:
+                        SubmissionWaitedForPastTheLimit::EmptySubmissionFlushingThePendingWrites,
+                    pci_state_when_judged_unusable: Box::new(pci_state_when_judged_unusable.clone()),
+                }
+            }
+            // 只有等超过上限的三种才重交（`crate::waiting_for_the_gpu::outcome_resubmitted_after_timeouts`），别的原因当场交回、不包进这一种；
             // 包进来了也照最后那一次的原因如实报。
             last_cause_other_than_a_wait_past_the_limit @ (GpuFailureCause::DeviceOrPipelineDidNotStart {
                 ..
             }
+            | GpuFailureCause::OpeningThreadNotStarted { .. }
+            | GpuFailureCause::OpeningPanicked { .. }
+            | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
+            | GpuFailureCause::OpeningCalledOff
+            | GpuFailureCause::OpeningsInThisMountUsedUp { .. }
             | GpuFailureCause::UncapturedErrorOrDeviceLost { .. }
             | GpuFailureCause::WaitForTheSubmissionFailed { .. }
             | GpuFailureCause::ReadbackMappingFailed { .. }
             | GpuFailureCause::KernelLeftAnUnrecognizedVerdictWord(..)
             | GpuFailureCause::OutOfMemoryCreatingTheBuffers { .. }
-            | GpuFailureCause::UnusableAfterResubmissions { .. }) => {
-                core_failure_of_the_gpu(device, last_cause_other_than_a_wait_past_the_limit)
+            | GpuFailureCause::UnusableAfterResubmissions { .. }
+            | GpuFailureCause::NotOpenedAfterTheReopenings { .. }) => {
+                core_failure_of_the_gpu(
+                    device,
+                    last_cause_other_than_a_wait_past_the_limit,
+                    pci_state_when_judged_unusable,
+                )
             }
+        },
+        GpuFailureCause::NotOpenedAfterTheReopenings {
+            causes_of_each_opening,
+        } => BackgroundGpuComputeFailed::GpuNotOpenedAfterTheReopenings {
+            device: device.clone(),
+            failures_of_each_opening: causes_of_each_opening
+                .iter()
+                .map(|cause_of_the_opening| {
+                    core_failure_of_the_gpu(
+                        device,
+                        cause_of_the_opening,
+                        &PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                    )
+                })
+                .collect(),
+            pci_state_when_judged_unusable: Box::new(pci_state_when_judged_unusable.clone()),
         },
     }
 }
@@ -368,23 +487,43 @@ pub fn core_failure_of_every_participating_gpu_short_of_free_memory(
     }
 }
 
-/// 此刻这组设置下一批分不到卡上，报给核心层：换设置时量代价出错照 [`core_failure_of_the_gpu`]，参与的卡一张都不剩照
-/// [`core_failure_of_every_participating_gpu_left_out`]。三段交回的与挂载那一刻核心层读到的都照它报。
+/// 此刻这组设置下一批分不到卡上，报给核心层：切换点到的卡重开到上限都没开成照 [`core_failure_of_the_gpu_not_opened_after_the_reopenings`]，
+/// 换设置时量代价出错照 [`core_failure_of_the_gpu`]（带量代价出错那一刻读的 PCI 状态），参与的卡一张都不剩照 [`core_failure_of_every_participating_gpu_left_out`]。
+/// 三段交回的与挂载那一刻核心层读到的都照它报。
 #[must_use]
 pub fn core_failure_of_the_batch_not_split_over_the_gpus(
     not_split: &BatchNotSplitOverTheGpus,
 ) -> BackgroundGpuComputeFailed {
     match not_split {
-        BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch { device, cause } => {
-            core_failure_of_the_gpu(device, cause)
+        BatchNotSplitOverTheGpus::GpuNotOpenedAfterTheReopeningsAtTheSwitch(not_opened) => {
+            core_failure_of_the_gpu_not_opened_after_the_reopenings(not_opened)
         }
+        BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
+            device,
+            cause,
+            pci_state_when_judged_unusable,
+        } => core_failure_of_the_gpu(device, cause, pci_state_when_judged_unusable),
         BatchNotSplitOverTheGpus::EveryParticipatingGpuLeftOut(gpus_left_out) => {
             core_failure_of_every_participating_gpu_left_out(gpus_left_out)
         }
     }
 }
 
-/// 一张参与的卡连这一批最小的一片都装不下报给核心层：`InputNotSupportedOnTheGpu` 的「一条装不进一段」，`input_bytes` 是最小的一片合占的字节数
+/// 切换点到的一张卡重开到上限都没开成报给核心层：`GpuNotOpenedAfterTheReopenings`，带这张卡与每一次开不成照 [`core_failure_of_the_gpu`] 报成的出错，按开的次序。
+#[must_use]
+pub fn core_failure_of_the_gpu_not_opened_after_the_reopenings(
+    not_opened: &GpuNotOpenedAfterTheReopenings,
+) -> BackgroundGpuComputeFailed {
+    core_failure_of_the_gpu(
+        &not_opened.device,
+        &GpuFailureCause::NotOpenedAfterTheReopenings {
+            causes_of_each_opening: not_opened.causes_of_each_opening.clone(),
+        },
+        &not_opened.pci_state_when_judged_unusable,
+    )
+}
+
+/// 一张参与的卡连这一批最小的一片都装不下报给核心层：`InputNotSupportedOnTheGpu` 的「一条装不进一段」，`smallest_piece_bytes` 是最小的一片合占的字节数
 /// （这张卡至少要剩这么多）。
 #[must_use]
 pub fn core_failure_of_the_smallest_piece_not_held(
@@ -394,9 +533,19 @@ pub fn core_failure_of_the_smallest_piece_not_held(
         InputNotSupportedOnTheGpu::EntryLargerThanAChunkOnTheDevice {
             device: smallest_piece_not_held.device.clone(),
             entry_position: smallest_piece_not_held.entry_position,
-            input_bytes: smallest_piece_not_held.smallest_piece_bytes,
+            smallest_piece_bytes: smallest_piece_not_held.smallest_piece_bytes,
         },
     )
+}
+
+/// 一批里同一个条目键出现了两次（两份核比对之前查出、计数没动）：照原样报给核心层，这一批按出错放弃，不归哪张卡。
+fn core_failure_of_a_repeated_entry_key(
+    repeated: &SameEntryKeyTwiceInOneBatch,
+) -> BackgroundGpuComputeFailed {
+    BackgroundGpuComputeFailed::SameEntryKeyTwiceInOneBatch {
+        position_of_the_first_occurrence: repeated.position_of_the_first_occurrence,
+        position_of_the_second_occurrence: repeated.position_of_the_second_occurrence,
+    }
 }
 
 /// 甲段一批交不成，报给核心层：GPU 出错照 [`core_failure_of_the_gpu`]；连最小的一片都装不下照 [`core_failure_of_the_smallest_piece_not_held`]。
@@ -405,7 +554,11 @@ pub fn core_failure_of_the_checksum_batch(
     failed: &ChecksumBatchFailed,
 ) -> BackgroundGpuComputeFailed {
     match failed {
-        ChecksumBatchFailed::GpuFailed { device, cause } => core_failure_of_the_gpu(device, cause),
+        ChecksumBatchFailed::GpuFailed {
+            device,
+            cause,
+            pci_state_when_judged_unusable,
+        } => core_failure_of_the_gpu(device, cause, pci_state_when_judged_unusable),
         ChecksumBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held) => {
             core_failure_of_the_smallest_piece_not_held(smallest_piece_not_held)
         }
@@ -419,6 +572,9 @@ pub fn core_failure_of_the_checksum_batch(
             gpus_short_of_free_memory,
             gpus_left_out_under_their_memory_limit,
         ),
+        ChecksumBatchFailed::SameEntryKeyTwiceInOneBatch(repeated) => {
+            core_failure_of_a_repeated_entry_key(repeated)
+        }
     }
 }
 
@@ -429,9 +585,11 @@ pub fn core_failure_of_the_region_record_batch(
     failed: &RegionRecordBatchFailed,
 ) -> BackgroundGpuComputeFailed {
     match failed {
-        RegionRecordBatchFailed::GpuFailed { device, cause } => {
-            core_failure_of_the_gpu(device, cause)
-        }
+        RegionRecordBatchFailed::GpuFailed {
+            device,
+            cause,
+            pci_state_when_judged_unusable,
+        } => core_failure_of_the_gpu(device, cause, pci_state_when_judged_unusable),
         RegionRecordBatchFailed::MappingKeyLongerThanTheKernelsHold(longer) => {
             BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
                 InputNotSupportedOnTheGpu::MappingKeyLongerThanTheKernelsHold {
@@ -453,6 +611,9 @@ pub fn core_failure_of_the_region_record_batch(
             gpus_short_of_free_memory,
             gpus_left_out_under_their_memory_limit,
         ),
+        RegionRecordBatchFailed::SameEntryKeyTwiceInOneBatch(repeated) => {
+            core_failure_of_a_repeated_entry_key(repeated)
+        }
     }
 }
 
@@ -462,7 +623,11 @@ pub fn core_failure_of_the_live_slot_batch(
     failed: &LiveSlotBatchFailed,
 ) -> BackgroundGpuComputeFailed {
     match failed {
-        LiveSlotBatchFailed::GpuFailed { device, cause } => core_failure_of_the_gpu(device, cause),
+        LiveSlotBatchFailed::GpuFailed {
+            device,
+            cause,
+            pci_state_when_judged_unusable,
+        } => core_failure_of_the_gpu(device, cause, pci_state_when_judged_unusable),
         LiveSlotBatchFailed::GpuCannotHoldTheSmallestPiece(smallest_piece_not_held) => {
             core_failure_of_the_smallest_piece_not_held(smallest_piece_not_held)
         }
@@ -476,6 +641,9 @@ pub fn core_failure_of_the_live_slot_batch(
             gpus_short_of_free_memory,
             gpus_left_out_under_their_memory_limit,
         ),
+        LiveSlotBatchFailed::SameEntryKeyTwiceInOneBatch(repeated) => {
+            core_failure_of_a_repeated_entry_key(repeated)
+        }
     }
 }
 
@@ -489,10 +657,6 @@ fn unit_checksum_outcome_for_the_core(outcome: ChecksumKernelOutcome) -> UnitChe
 impl<Kernels: GpuInventory> GpuInventory for BackgroundGpuComputeThroughBothKernels<Kernels> {
     fn devices_with_total_memory(&self) -> Vec<(GpuDeviceIdentifier, GpuMemoryInBytes)> {
         self.kernels.devices_with_total_memory()
-    }
-
-    fn devices_not_opened_at_the_mount(&self) -> Vec<GpuDeviceNotOpenedAtTheMount> {
-        self.kernels.devices_not_opened_at_the_mount()
     }
 }
 
@@ -588,7 +752,38 @@ impl<Kernels: BothKernelsOfTheThreeSegments> BackgroundGpuCompute
         self.kernels.use_the_settings_from_the_next_batch(settings);
     }
 
-    /// 问两份核那一层此刻这组设置下一批分不分得到卡上，分不到照 [`core_failure_of_the_batch_not_split_over_the_gpus`] 报。
+    /// 转给两份核那一层；三段的连续不确定计数不动（第 8 条）。
+    fn use_no_gpu_from_the_next_batch(&mut self) {
+        self.kernels.use_no_gpu_from_the_next_batch();
+    }
+
+    /// 转给两份核那一层（[`BothKernelsOfTheThreeSegments::put_the_gpus_opened_since_the_switch_in_effect`]），三种答案一一对过去：
+    /// 换上了而这组设置下一批分不到卡上的照 [`core_failure_of_the_batch_not_split_over_the_gpus`] 报，重开到上限都没开成的那张照
+    /// [`core_failure_of_the_gpu_not_opened_after_the_reopenings`] 报；三段的连续不确定计数不动（新开的卡并进这一份实现，不整份换掉）。
+    fn put_the_gpus_opened_since_the_settings_were_handed_in_in_effect(
+        &mut self,
+    ) -> LatestGpuSettingsHandedIn {
+        match self
+            .kernels
+            .put_the_gpus_opened_since_the_switch_in_effect()
+        {
+            LatestSettingsHandedIn::StillOpeningItsCards => {
+                LatestGpuSettingsHandedIn::StillOpeningTheirCards
+            }
+            LatestSettingsHandedIn::PutInEffect {
+                not_split_over_the_gpus,
+            } => LatestGpuSettingsHandedIn::PutInEffect {
+                failure_under_the_settings: not_split_over_the_gpus
+                    .map(|not_split| core_failure_of_the_batch_not_split_over_the_gpus(&not_split)),
+            },
+            LatestSettingsHandedIn::NotOpened(not_opened) => LatestGpuSettingsHandedIn::NotOpened {
+                failure: core_failure_of_the_gpu_not_opened_after_the_reopenings(&not_opened),
+            },
+        }
+    }
+
+    /// 问两份核那一层此刻这组设置下一批分不分得到卡上，分不到照 [`core_failure_of_the_batch_not_split_over_the_gpus`] 报
+    /// （核心层不直接读它，读的是两批之间那一问答换上了时带着的那一个；e202 的包装照转）。
     fn failure_under_the_settings_handed_in(&self) -> Option<BackgroundGpuComputeFailed> {
         self.kernels
             .batch_not_split_over_the_gpus_under_the_settings_in_use()
@@ -622,6 +817,9 @@ mod tests {
             |cause: GpuFailureOnTheDevice| BackgroundGpuComputeFailed::GpuFailed {
                 device: card_named_in_the_failures(),
                 cause,
+                pci_state_when_judged_unusable: Box::new(
+                    PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                ),
             };
         vec![
             (
@@ -687,18 +885,87 @@ mod tests {
             ),
             (
                 GpuFailureCause::OutOfMemoryCreatingTheBuffers {
-                    bytes_held_by_the_chunk: 4096,
+                    bytes_held_by_the_chunk: GpuMemoryInBytes(4096),
                     reason: "假的：显存不足".to_string(),
                 },
                 failed_on_the_card(GpuFailureOnTheDevice::OutOfMemoryCreatingTheBuffers {
-                    bytes_held_by_the_chunk: 4096,
+                    bytes_held_by_the_chunk: GpuMemoryInBytes(4096),
                     reason: "假的：显存不足".to_string(),
                 }),
+            ),
+            (
+                GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit {
+                    wait_limit,
+                },
+                BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
+                    device: card_named_in_the_failures(),
+                    wait_limit,
+                    submission_waited_for:
+                        SubmissionWaitedForPastTheLimit::EmptySubmissionFlushingThePendingWrites,
+                },
+            ),
+            (
+                GpuFailureCause::OpeningThreadNotStarted {
+                    reason: "假的：起不了开卡线程".to_string(),
+                },
+                failed_on_the_card(GpuFailureOnTheDevice::OpeningThreadNotStarted {
+                    reason: "假的：起不了开卡线程".to_string(),
+                }),
+            ),
+            (
+                GpuFailureCause::OpeningPanicked {
+                    said_by_the_panic: "假的：开卡 panic".to_string(),
+                },
+                failed_on_the_card(GpuFailureOnTheDevice::OpeningPanicked {
+                    said_by_the_panic: "假的：开卡 panic".to_string(),
+                }),
+            ),
+            (
+                GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned,
+                failed_on_the_card(GpuFailureOnTheDevice::EarlierOpeningOfTheDeviceNotReturned),
+            ),
+            (
+                GpuFailureCause::OpeningCalledOff,
+                failed_on_the_card(GpuFailureOnTheDevice::OpeningCalledOff),
+            ),
+            (
+                GpuFailureCause::OpeningsInThisMountUsedUp { failed_openings: 4 },
+                failed_on_the_card(GpuFailureOnTheDevice::OpeningsInThisMountUsedUp {
+                    failed_openings: 4,
+                }),
+            ),
+            (
+                GpuFailureCause::NotOpenedAfterTheReopenings {
+                    causes_of_each_opening: vec![
+                        GpuFailureCause::DeviceOrPipelineDidNotStart {
+                            reason: "假的：头一次起不了设备".to_string(),
+                        },
+                        GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit },
+                    ],
+                },
+                BackgroundGpuComputeFailed::GpuNotOpenedAfterTheReopenings {
+                    device: card_named_in_the_failures(),
+                    failures_of_each_opening: vec![
+                        failed_on_the_card(GpuFailureOnTheDevice::DeviceOrPipelineDidNotStart {
+                            reason: "假的：头一次起不了设备".to_string(),
+                        }),
+                        BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
+                            device: card_named_in_the_failures(),
+                            wait_limit,
+                            submission_waited_for:
+                                SubmissionWaitedForPastTheLimit::SubmissionOfThisBatch,
+                        },
+                    ],
+                    pci_state_when_judged_unusable: Box::new(
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                    ),
+                },
             ),
         ]
     }
 
-    /// 第 4 条「停下并报错」：三段的每一种 GPU 出错报给核心层时都带着出在哪张卡、什么原因，等超过上限的两种报成等超过上限、分得清是哪一次提交。
+    /// 第 4 条「停下并报错」：三段的每一种 GPU 出错报给核心层时都带着出在哪张卡、什么原因，等超过上限的三种报成等超过上限、分得清是哪一次提交；
+    /// 开卡那几种（起不了线程、panic、前一次没回来、叫停、连着试满）各报各的成员。
     #[test]
     fn every_gpu_failure_is_reported_to_the_core_with_its_card_and_cause() {
         for (cause, expected) in every_gpu_failure_cause_and_its_core_failure() {
@@ -706,6 +973,8 @@ mod tests {
                 core_failure_of_the_checksum_batch(&ChecksumBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "甲段：{cause:?}"
@@ -714,6 +983,8 @@ mod tests {
                 core_failure_of_the_region_record_batch(&RegionRecordBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "乙段：{cause:?}"
@@ -722,6 +993,8 @@ mod tests {
                 core_failure_of_the_live_slot_batch(&LiveSlotBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: cause.clone(),
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "丙段：{cause:?}"
@@ -736,13 +1009,13 @@ mod tests {
             device: card_named_in_the_failures(),
             entry_position: 3,
             memory_limit: Some(GpuMemoryInBytes(50)),
-            smallest_piece_bytes: 104,
+            smallest_piece_bytes: GpuMemoryInBytes(104),
         };
         let reported = BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
             InputNotSupportedOnTheGpu::EntryLargerThanAChunkOnTheDevice {
                 device: card_named_in_the_failures(),
                 entry_position: 3,
-                input_bytes: 104,
+                smallest_piece_bytes: GpuMemoryInBytes(104),
             },
         );
         assert_eq!(
@@ -789,7 +1062,7 @@ mod tests {
         );
     }
 
-    /// 用户 2026-10-28 定「都超时才报警」：重交 3 次都等超过上限的那一次报给核心层是「这张卡用不了」那一个成员，带卡、重交了几次、
+    /// 第 4 条「都超时才报警」：重交 3 次都等超过上限的那一次报给核心层是「这张卡用不了」那一个成员，带卡、重交了几次、
     /// 最后那一次等的上限与是哪一次提交（这一批的那一次，或重交之前等的前一次）；三段都这样报。
     #[test]
     fn the_gpu_unusable_after_its_resubmissions_is_reported_with_its_resubmissions_and_wait_limit()
@@ -806,6 +1079,12 @@ mod tests {
                 },
                 SubmissionWaitedForPastTheLimit::EarlierTimedOutSubmissionStillRunning,
             ),
+            (
+                GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit {
+                    wait_limit,
+                },
+                SubmissionWaitedForPastTheLimit::EmptySubmissionFlushingThePendingWrites,
+            ),
         ] {
             let unusable = GpuFailureCause::UnusableAfterResubmissions {
                 resubmissions: 3,
@@ -816,11 +1095,16 @@ mod tests {
                 resubmissions: 3,
                 wait_limit,
                 last_submission_waited_for,
+                pci_state_when_judged_unusable: Box::new(
+                    PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                ),
             };
             assert_eq!(
                 core_failure_of_the_checksum_batch(&ChecksumBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: unusable.clone(),
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "甲段"
@@ -829,6 +1113,8 @@ mod tests {
                 core_failure_of_the_region_record_batch(&RegionRecordBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: unusable.clone(),
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "乙段"
@@ -837,6 +1123,8 @@ mod tests {
                 core_failure_of_the_live_slot_batch(&LiveSlotBatchFailed::GpuFailed {
                     device: card_named_in_the_failures(),
                     cause: unusable,
+                    pci_state_when_judged_unusable:
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
                 }),
                 expected,
                 "丙段"
@@ -844,7 +1132,7 @@ mod tests {
         }
     }
 
-    /// 用户 2026-10-28 定「连一片都装不下就不用这张卡」「不能因为装不下就拒绝」：参与的卡一张都不剩时，三段交回的与挂载那一刻实现答的
+    /// 第 3 条「连最小的一片都装不下，这张卡就不用」「装不下不拒绝」：参与的卡一张都不剩时，三段交回的与挂载那一刻实现答的
     /// （`failure_under_the_settings_handed_in` 照它报）都报成核心层「参与的卡一张都不剩」那一个成员，按参与的次序带每张卡、上限与至少要多少；
     /// 换设置时量代价出错照那张卡的 GPU 出错报。
     #[test]
@@ -854,14 +1142,14 @@ mod tests {
             GpuLeftOutUnderItsMemoryLimit {
                 device: card_named_in_the_failures(),
                 memory_limit: GpuMemoryInBytes(50),
-                smallest_piece_bytes: 976,
-                bytes_already_held_on_the_device: 0,
+                smallest_piece_bytes: GpuMemoryInBytes(976),
+                bytes_already_held_on_the_device: GpuMemoryInBytes(0),
             },
             GpuLeftOutUnderItsMemoryLimit {
                 device: GpuDeviceIdentifier::of_opaque_bytes(b"0000:02:00.0".to_vec()),
                 memory_limit: GpuMemoryInBytes(900),
-                smallest_piece_bytes: 976,
-                bytes_already_held_on_the_device: 600,
+                smallest_piece_bytes: GpuMemoryInBytes(976),
+                bytes_already_held_on_the_device: GpuMemoryInBytes(600),
             },
         ];
         let expected =
@@ -902,22 +1190,33 @@ mod tests {
             expected,
             "挂载那一刻实现答的"
         );
-        let cause = GpuFailureCause::DeviceOrPipelineDidNotStart {
-            reason: "假的：量代价出错".to_string(),
+        let cause = GpuFailureCause::UncapturedErrorOrDeviceLost {
+            reason: "假的：量代价时设备丢了".to_string(),
         };
+        let pci_state_read =
+            crate::pci_state_of_the_gpu::pci_state_read_under_the_root_not_present_for_tests(
+                "0000:01:00.0",
+            );
+        let cost_not_measured = core_failure_of_the_batch_not_split_over_the_gpus(
+            &BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
+                device: card_named_in_the_failures(),
+                cause: cause.clone(),
+                pci_state_when_judged_unusable: pci_state_read.clone(),
+            },
+        );
         assert_eq!(
-            core_failure_of_the_batch_not_split_over_the_gpus(
-                &BatchNotSplitOverTheGpus::CostNotMeasuredAtTheSwitch {
-                    device: card_named_in_the_failures(),
-                    cause: cause.clone(),
-                }
-            ),
-            core_failure_of_the_gpu(&card_named_in_the_failures(), &cause),
+            cost_not_measured,
+            core_failure_of_the_gpu(&card_named_in_the_failures(), &cause, &pci_state_read),
             "换设置时量代价出错照那张卡的 GPU 出错报"
+        );
+        assert_eq!(
+            cost_not_measured.pci_state_when_judged_unusable(),
+            pci_state_read,
+            "量代价出错那一刻读的那一份带进核心层"
         );
     }
 
-    /// 用户 2026-10-28「连一片都装不下就不用这张卡」用于空闲显存：三段报的「这一批参与的卡一张都不剩、其中有因空闲显存不用的」报给核心层是
+    /// 第 4 条「卡上此刻空闲的显存连这一批最小的一片都装不下：这一批不给这张卡分活」：三段报的「这一批参与的卡一张都不剩、其中有因空闲显存不用的」报给核心层是
     /// `EveryParticipatingGpuShortOfFreeMemoryForTheSmallestPiece`，因空闲显存不用的（按先后）与因显存上限不用的原样带过去；核心层读得出点名的卡
     /// （因空闲显存不用的在前）。
     #[test]
@@ -925,14 +1224,14 @@ mod tests {
     ) {
         let gpus_short_of_free_memory = vec![GpuShortOfFreeMemoryForTheSmallestPiece {
             device: card_named_in_the_failures(),
-            bytes_of_the_last_chunk_not_created: 64,
-            smallest_piece_bytes: 64,
+            bytes_of_the_last_chunk_not_created: GpuMemoryInBytes(64),
+            smallest_piece_bytes: GpuMemoryInBytes(64),
         }];
         let gpus_left_out_under_their_memory_limit = vec![GpuLeftOutUnderItsMemoryLimit {
             device: GpuDeviceIdentifier::of_opaque_bytes(b"0000:02:00.0".to_vec()),
             memory_limit: GpuMemoryInBytes(50),
-            smallest_piece_bytes: 64,
-            bytes_already_held_on_the_device: 0,
+            smallest_piece_bytes: GpuMemoryInBytes(64),
+            bytes_already_held_on_the_device: GpuMemoryInBytes(0),
         }];
         let expected =
             BackgroundGpuComputeFailed::EveryParticipatingGpuShortOfFreeMemoryForTheSmallestPiece {
@@ -996,5 +1295,101 @@ mod tests {
             core_decision_of_the_entry(EntryDecision::JudgedByTheCpuReference(9_u32), u64::from),
             GpuEntryDecision::JudgedByTheCpuReference(9_u64)
         );
+    }
+
+    /// 第 4 条「读数随那一次出错进核心层」：外壳判卡用不了那一刻读的一份，报给核心层时照带进那三种（卡当场报出错的 `GpuFailed`、重交用完的
+    /// `GpuUnusableAfterResubmissions`、切换开不成的 `GpuNotOpenedAfterTheReopenings`），重开到上限都没开成的每一次开不成报成的那一个带的是没读；这里不读。
+    #[test]
+    fn the_pci_state_read_by_the_shell_is_carried_into_the_core_failure_of_the_three_moments() {
+        let pci_state_read =
+            crate::pci_state_of_the_gpu::pci_state_read_under_the_root_not_present_for_tests(
+                "0000:01:00.0",
+            );
+        let wait_limit = Duration::from_secs(10);
+        let causes_judging_the_card_unusable = [
+            GpuFailureCause::UncapturedErrorOrDeviceLost {
+                reason: "假的：设备丢了".to_string(),
+            },
+            GpuFailureCause::UnusableAfterResubmissions {
+                resubmissions: 3,
+                last_cause: Box::new(GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit }),
+            },
+        ];
+        for cause in causes_judging_the_card_unusable {
+            assert_eq!(
+                core_failure_of_the_checksum_batch(&ChecksumBatchFailed::GpuFailed {
+                    device: card_named_in_the_failures(),
+                    cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_read.clone(),
+                })
+                .pci_state_when_judged_unusable(),
+                pci_state_read,
+                "甲段 {cause:?}"
+            );
+            assert_eq!(
+                core_failure_of_the_region_record_batch(&RegionRecordBatchFailed::GpuFailed {
+                    device: card_named_in_the_failures(),
+                    cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_read.clone(),
+                })
+                .pci_state_when_judged_unusable(),
+                pci_state_read,
+                "乙段 {cause:?}"
+            );
+            assert_eq!(
+                core_failure_of_the_live_slot_batch(&LiveSlotBatchFailed::GpuFailed {
+                    device: card_named_in_the_failures(),
+                    cause: cause.clone(),
+                    pci_state_when_judged_unusable: pci_state_read.clone(),
+                })
+                .pci_state_when_judged_unusable(),
+                pci_state_read,
+                "丙段 {cause:?}"
+            );
+        }
+        let not_opened = core_failure_of_the_gpu_not_opened_after_the_reopenings(
+            &GpuNotOpenedAfterTheReopenings {
+                device: card_named_in_the_failures(),
+                causes_of_each_opening: vec![GpuFailureCause::UncapturedErrorOrDeviceLost {
+                    reason: "假的：开卡时设备丢了".to_string(),
+                }],
+                pci_state_when_judged_unusable: pci_state_read.clone(),
+            },
+        );
+        assert_eq!(
+            not_opened,
+            BackgroundGpuComputeFailed::GpuNotOpenedAfterTheReopenings {
+                device: card_named_in_the_failures(),
+                failures_of_each_opening: vec![BackgroundGpuComputeFailed::GpuFailed {
+                    device: card_named_in_the_failures(),
+                    cause: GpuFailureOnTheDevice::UncapturedErrorOrDeviceLost {
+                        reason: "假的：开卡时设备丢了".to_string(),
+                    },
+                    pci_state_when_judged_unusable: Box::new(
+                        PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+                    ),
+                }],
+                pci_state_when_judged_unusable: Box::new(pci_state_read),
+            }
+        );
+    }
+
+    /// 一批里同一个条目键出现两次：报给核心层的是不归哪张卡的那一种，两次出现的位置照带，不 panic。
+    #[test]
+    fn repeated_entry_key_is_reported_to_the_core_with_both_positions_and_no_card() {
+        let failure = core_failure_of_the_checksum_batch(
+            &ChecksumBatchFailed::SameEntryKeyTwiceInOneBatch(SameEntryKeyTwiceInOneBatch {
+                position_of_the_first_occurrence: 2,
+                position_of_the_second_occurrence: 5,
+            }),
+        );
+        assert_eq!(
+            failure,
+            BackgroundGpuComputeFailed::SameEntryKeyTwiceInOneBatch {
+                position_of_the_first_occurrence: 2,
+                position_of_the_second_occurrence: 5,
+            }
+        );
+        assert!(failure.gpu_devices_named().is_empty(), "重复键不归哪张卡");
     }
 }

@@ -272,8 +272,8 @@ pub fn witness_file_range_boundaries() {
     proof { lemma_rounded_size_bounds_written_unit_addresses(1, 1, 0); }
     let _empty_units = units_for_sequential_write(0, 32_634);
     assert(_empty_units == 1);
-    let _max_units = units_covering_size(u64::MAX, 1);
-    assert(_max_units == u64::MAX);
+    let _maximum_units = units_covering_size(u64::MAX, 1);
+    assert(_maximum_units == u64::MAX);
     let _rounded_overflow = rounded_size_fits(u64::MAX, 2);
     assert(!_rounded_overflow);
     let _end = checked_write_end(u64::MAX - 3, 3);
@@ -292,8 +292,8 @@ pub fn witness_file_range_boundaries() {
     assert(_high.0 == u64::MAX - 1 && _high.1);
     let _adjacent = bytes_in_unit(0, 10, 10, 20);
     assert(_adjacent is None) by {
-        if let Some((a, b, n)) = _adjacent {
-            assert(in_both_ranges(10 + a as int, 0, 10, 10, 20));
+        if let Some((offset_in_unit, offset_in_write, length)) = _adjacent {
+            assert(in_both_ranges(10 + offset_in_unit as int, 0, 10, 10, 20));
         }
     }
 }
@@ -530,7 +530,9 @@ mod tests {
                             Some((in_unit, in_write, length)) => {
                                 assert!(length > 0);
                                 let actual = (0..length)
-                                    .map(|i| unit_start + in_unit + i)
+                                    .map(|offset_in_overlap| {
+                                        unit_start + in_unit + offset_in_overlap
+                                    })
                                     .collect::<Vec<_>>();
                                 assert_eq!(actual, expected);
                                 assert_eq!(write_start + in_write, expected[0]);

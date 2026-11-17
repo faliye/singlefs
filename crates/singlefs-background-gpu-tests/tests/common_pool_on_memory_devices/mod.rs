@@ -1,8 +1,7 @@
 //! 本包端到端用例共用的搭建：两块内存里的稀疏盘上 mkfs → 取号 → 暖机 → 新池新建文件（同 `crates/singlefs-verification/tests/common/mod.rs` 的
 //! `build_pool` 那一串，参数也照它的 `parameters`），另一次挂载里顺序写第一个文件 [`DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT`] 个数据单元、
 //! 会话丢掉（「进程退出」）。这份字节拷成几个池，各自重挂、装上整理只供测试的开关，推一趟整理到停，用例逐项比。
-//! 本包不依赖验证包（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条判产品 GPU 包与验证包两边闭包的交集），
-//! 所以盘与搭建在这里另写一份，只用核心层。
+//! 盘与搭建在这里另写一份，只用核心层：验证包那一份住在它自己的 `tests/` 下，别的包引不到。
 //! 盘按 512 字节扇区存（没写过的读回 0），改盘的每个动作（写、写零、discard、屏障）按先后记进这个池两块盘共用的录制流；重挂之前换一条空的流，
 //! 用例比的是重挂之后的那一段。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
@@ -43,7 +42,7 @@ pub const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const FIRST_FILE_BYTES: usize = 3000;
 /// 另一次挂载里顺序写第一个文件的数据单元数（同验证包 `compaction_batches_on_the_gpu_path_through_the_background_gpu_compute.rs`）。
 pub const DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT: usize = 40;
-/// 整理一批至多搬几个（只供测试的开关；产品路径批大小条款没写）。
+/// 整理一批至多搬几个（只供测试的开关）。
 pub const UNITS_PER_BATCH: usize = 2;
 
 /// 改盘的一个动作，按先后记。
@@ -239,6 +238,28 @@ impl PoolOnMemoryDevices {
                     RecordedMemoryDevice {
                         identity: *identity,
                         sectors: device.sectors.clone(),
+                        stream: Arc::clone(&stream),
+                    },
+                )
+            })
+            .collect();
+        PoolOnMemoryDevices { devices, stream }
+    }
+
+    /// 照写过的扇区（[`PoolOnMemoryDevices::written_sectors_of_every_device`] 交回的那种）搭一个池，录制流是空的：
+    /// 从判定库里读回的那份历史用它搭回来。
+    pub fn of_the_written_sectors(
+        written_sectors: Vec<(DeviceIdentity, BTreeMap<u64, Vec<u8>>)>,
+    ) -> PoolOnMemoryDevices {
+        let stream: RecordedStream = Arc::new(Mutex::new(Vec::new()));
+        let devices = written_sectors
+            .into_iter()
+            .map(|(identity, sectors)| {
+                (
+                    identity,
+                    RecordedMemoryDevice {
+                        identity,
+                        sectors,
                         stream: Arc::clone(&stream),
                     },
                 )

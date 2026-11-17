@@ -1,5 +1,8 @@
 [package]
 name = "singlefs-background-gpu"
+# 构建脚本（build.rs）把这一次编译里 cargo 给本包打开的特性交给直接依赖本包的构建脚本（`DEP_SINGLEFS_BACKGROUND_GPU_ENABLED_FEATURES`，做法同 singlefs-core）：
+# 本包的测试包照它算对拍里参照一侧的判法单元键。
+links = "singlefs-background-gpu"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -7,6 +10,9 @@ description = "产品的后台 GPU 路径（D26（后台整理与放置回收）
 
 [dependencies]
 singlefs-core = { path = "../singlefs-core" }
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+# 开卡器实现运行库的特质（src/gpu_opener_of_this_process.rs）。依赖方向只许本包 → 运行库：运行库只依赖核心层，不开 GPU 的调用方不拖上 wgpu。
+singlefs-mount-runtime = { path = "../singlefs-mount-runtime" }
 # 版本与特性照验证包那一份写死（crates/singlefs-verification/Cargo.toml 的 wgpu 一行）：两个包在同一个工作区里解析成同一份 wgpu。
 wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"] }
 # 显存总量：wgpu 的适配器信息不报显存，经 wgpu 的 hal 层拿到 Vulkan 实例，读物理设备的内存堆（src/background_gpu.rs 的 largest_device_local_memory_heap）。
@@ -22,23 +28,7 @@ libc = "0.2"
 wgpu = { version = "=30.0.1", default-features = false, features = ["noop"] }
 
 [features]
-# 要真显卡的对拍（tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs、tests/region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs、
-# tests/live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs）与真卡上的端到端整理（tests/compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu.rs）只在开了这个特性时编：
-# 不开时 `cargo test` 整包与整工作区都不碰 GPU（.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」：用 GPU 的跑法要经清场脚本起）。
+# 本包的源码里没有按这个特性编的代码：要真显卡的集成测试目标（对拍与端到端）与实验装置 E202（GPU与CPU两种模式GC对照组）都在测试包
+# crates/singlefs-background-gpu-tests 里，那个包有同名的特性。这里留着它，是因为构建脚本（build.rs）照清单里的特性逐个交给测试包的构建脚本，
+# 单元图那一侧的单测（singlefs-unit-graph 的 build_features）要求这张清单里至少有它；不开时 `cargo test` 整包与整工作区都不碰 GPU。
 tests-on-a-real-gpu = []
-
-[[test]]
-name = "checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu"
-required-features = ["tests-on-a-real-gpu"]

@@ -262,7 +262,7 @@ mod tests {
 
     /// 谱系记录 24 字节：T_rb、T_old、H_cur 依次各 8 字节，小端；读回逐字段相等，长度不是 24 读不出（短一字节、长一字节都不收）。
     #[test]
-    fn a_lineage_record_is_twenty_four_bytes_rollback_txg_then_target_txg_then_the_watermark_rolled_back_from(
+    fn lineage_record_is_twenty_four_bytes_rollback_txg_then_target_txg_then_the_watermark_rolled_back_from(
     ) {
         let record = LineageRecord {
             rollback_txg: CheckpointTxg(0x0102),

@@ -188,7 +188,7 @@ pub trait PoolReader {
     /// 按一组位置条目读一个单元时只坏一份（D4（校验和位置） 已定项 4「读到只坏一份时计数」）：同一组里前一条读不回字节或整单元校验和
     /// 对不上，后一条对上、交回了它那一份。`locations` 是那一组两条位置条目（哪个单元由它们认）。默认什么都不做；要取数的读者
     /// 套 [`PoolReaderCountingUnitReadsWithOneCopyFailing`]。两条位置提示都没对上、转去查中央映射的那一回不算（提示过期与两份都坏分不开），
-    /// 映射那一组里只坏一份的照算；按提示读到只坏一份而提示不是这个单元此刻在映射里的落点也不报
+    /// 映射那一组里只坏一份的照算；按提示读到只坏一份而映射里查到的落点不是提示也不报
     /// （`PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition`）。
     fn note_that_a_unit_was_read_with_one_copy_failing(&self, _locations: &[LocationEntry; 2]) {}
 }
@@ -318,7 +318,8 @@ impl<Reader: PoolReader + ?Sized> PoolReader
 /// 只在读的那一组位置条目就是这个单元此刻的权威落点——中央映射里它那两条位置条目（D19（块指针的结构与宽度预算） 已定项 8）——时往里转；
 /// 别的读与报告原样交给里面那一份。提示是盘上 extent 叶、父条目里记的，单元被整理搬走之后提示还指旧槽，旧槽上一份被盖掉、另一份还是旧字节，
 /// 按提示读就是「只坏一份」，而映射里的权威落点两份都好：旧槽上坏的那一份不归这个单元计（判决 `research/prompts/m4-close-code-r3-main-verification.md`
-/// 第二节 T2 ②、第三节第 4 条）。映射里查不出（没有这把 key、查映射本身判红）同样不转：这一读已经读成，判红留给走到映射那一步的读者照报。
+/// 第二节 T2 ②、第三节第 4 条）。只有查到了、落点不是这一组才判得出提示过期；映射里查不出（没有这把 key、查映射本身判红）判不出，这一份是真读到的坏副本，
+/// 照转（D4（校验和位置） 已定项 4「读到只坏一份时计数」，只有造坏的镜像走得到，判红留给走到映射那一步的读者照报）。
 /// 经映射回退的那一读读的就是映射里那两条，照转。没转的那一报记下（[`Self::dropped_a_one_copy_failing_note_off_the_mapping_position`]）。
 pub(crate) struct PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition<'reader> {
     reader: &'reader dyn PoolReader,
@@ -411,10 +412,12 @@ impl PoolReader for PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition<'_> {
     }
     fn note_that_a_unit_was_read_with_one_copy_failing(&self, locations: &[LocationEntry; 2]) {
         match (self.central_mapping_locations_of_key)(self.mapping_key) {
-            Ok(Some(mapped_locations)) if mapped_locations == *locations => self
+            Ok(Some(mapped_locations)) if mapped_locations != *locations => {
+                self.one_copy_failing_note_dropped.set(true);
+            }
+            Ok(Some(_) | None) | Err(_) => self
                 .reader
                 .note_that_a_unit_was_read_with_one_copy_failing(locations),
-            Ok(Some(_) | None) | Err(_) => self.one_copy_failing_note_dropped.set(true),
         }
     }
 }
@@ -1805,11 +1808,26 @@ pub fn choose_system_configuration_of_the_pool(
     reader: &dyn PoolReader,
     filesystem_identifier_of_the_pool: &[u8; 16],
 ) -> Result<SystemConfiguration, RecoveryFailure> {
+    choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot(
+        reader,
+        filesystem_identifier_of_the_pool,
+    )
+    .map(|choice| choice.system_configuration)
+}
+
+/// 与 [`choose_system_configuration_of_the_pool`] 同一个筛法，另交回两个槽都不可择而被跳过的盘（别的池的槽筛掉之后两槽都不可择的盘也在内）：
+/// 带本池 fsid 的只读挂载与恢复（`mounted_read::mount_read_only_of_the_pool`、[`recover_of_the_pool`]）用。
+///
+/// # Errors
+/// 同 [`choose_system_configuration_of_the_pool`]；盘上没有一槽是这个 fsid 的池的报 [`RecoveryFailure::NoValidSystemConfiguration`]。
+pub fn choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot(
+    reader: &dyn PoolReader,
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> Result<SystemConfigurationChoice, RecoveryFailure> {
     choose_system_configuration_among_the_slots_of(
         reader,
         SlotsOfWhichPool::OnlyThePool(*filesystem_identifier_of_the_pool),
     )
-    .map(|choice| choice.system_configuration)
 }
 
 /// [`choose_system_configuration_naming_devices_without_a_mountable_slot`] 与 [`choose_system_configuration_of_the_pool`] 共用的择法，
@@ -2025,13 +2043,31 @@ pub fn read_root_ring_slot<Reader: PoolReader + ?Sized>(
 
 /// 三个区域全部槽逐个验自证校验和，取 `(checkpoint_txg, 实例代号)` 最大的（D22（单元原子性怎么合成） 已定项 7 择新；
 /// 已定项 24 先逐个验证全部候选、再在有效者中择新）；最大的不止一个槽时取读根环次序里最前的那个。
-/// 取最大那一截在 `singlefs_replay_prefix::choose_root_slot` 里（Verus 验的是那一份）；这里只读槽、验自证校验和与 fsid，
-/// 把每个槽摊成核的入参（自证过的给择新键，读不出、自证不过的给 None），再照核交回的下标取回那条根。
+/// 读法与择法同 [`choose_root_keeping_every_self_verified_root_read`]，只交回择到的那条根。
 #[must_use]
 pub fn choose_root(
     reader: &dyn PoolReader,
     system_configuration: &SystemConfiguration,
 ) -> Option<RootRecord> {
+    choose_root_keeping_every_self_verified_root_read(reader, system_configuration).chosen_root
+}
+
+/// 择根那一遍读出来的：择到的根（一条自证过的都没有时 `None`），与这一遍每个槽读出、自证过的根（根环次序，同一条根住两槽就出现两次）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RootChosenWithEverySelfVerifiedRootRead {
+    pub chosen_root: Option<RootRecord>,
+    pub self_verified_roots_in_ring_order: Vec<RootRecord>,
+}
+
+/// 择根（[`choose_root`] 那一份择法），连同这一遍读出、自证过的全部根一起交回：每个槽只读一次，择到的根与交回的全部根出自同一遍读数。
+/// 可写挂载的读阶段拿它择根，读到的全部根留给读阶段之后的几遍（`mount` 的 `rebuilt_allocator` 里 C 并的较新可读根），之后那几遍读坏的根不因此漏掉。
+/// 取最大那一截在 `singlefs_replay_prefix::choose_root_slot` 里（Verus 验的是那一份）；这里只读槽、验自证校验和与 fsid，
+/// 把每个槽摊成核的入参（自证过的给择新键，读不出、自证不过的给 None），再照核交回的下标取回那条根。
+#[must_use]
+pub fn choose_root_keeping_every_self_verified_root_read(
+    reader: &dyn PoolReader,
+    system_configuration: &SystemConfiguration,
+) -> RootChosenWithEverySelfVerifiedRootRead {
     let immutable = &system_configuration.immutable;
     let self_verified_roots_in_ring_order: Vec<Option<RootRecord>> =
         every_root_ring_slot(&immutable.sizes)
@@ -2061,10 +2097,17 @@ pub fn choose_root(
             })
         })
         .collect();
-    choose_root_slot(&choice_keys_in_ring_order).map(|chosen_slot| {
+    let chosen_root = choose_root_slot(&choice_keys_in_ring_order).map(|chosen_slot| {
         self_verified_roots_in_ring_order[chosen_slot]
             .expect("择根核只交回自证过的槽（它的 ensures：所选槽在入参里是 Some），这里是 None 说明核或摊入参错了")
-    })
+    });
+    RootChosenWithEverySelfVerifiedRootRead {
+        chosen_root,
+        self_verified_roots_in_ring_order: self_verified_roots_in_ring_order
+            .into_iter()
+            .flatten()
+            .collect(),
+    }
 }
 
 /// 根环全部自证过的根里最大的 checkpoint_txg：新实例的第一次发布取 max(它, 环里全部自证通过的记录的 checkpoint_txg) + 1
@@ -3631,6 +3674,10 @@ pub fn rebuild_version_with_its_snapshot_entries_in_the_unit_area_starting_at(
         mapping_tree,
     };
     let mapped_units = mapped_units_of_the_version(&trees_read);
+    central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots(
+        &mapping_entries,
+        &mapped_units,
+    )?;
     let allocation_record_tree = trees_read.allocation_tree_read.version();
     let files_other_than_the_first = files_other_than_the_first_of_the_version(&trees_read);
     let data_pointers = trees_read.first_file_extents.data_pointers.clone();
@@ -4117,13 +4164,13 @@ fn data_units_judged_against_the_inode_records(
         .iter()
         .map(|file| file.inode.0)
         .collect();
-    let a_record_without_an_entry_has_a_size =
+    let some_record_without_an_entry_has_a_size =
         inode_records_in_container_order.iter().any(|record| {
             record.inode != FIRST_INODE_NUMBER
                 && !inodes_with_an_entry.contains(&record.inode)
                 && record.size != 0
         });
-    if a_record_without_an_entry_has_a_size {
+    if some_record_without_an_entry_has_a_size {
         return Err(RecoveryFailure::InvariantViolated {
             invariant: "E142 走读同款",
             detail: RECORD_WITHOUT_AN_EXTENT_ENTRY_HAS_A_SIZE,
@@ -5115,12 +5162,18 @@ pub fn verified_system_configuration_slots<Reader: PoolReader + ?Sized>(
 }
 
 /// 一块盘两个系统配置槽各读一次的结局（D22（单元原子性怎么合成） 已定项 8 射程「可写挂载读系统配置的见证按盘读」，S-辨：
-/// 一槽撕裂、另一槽自证过，与设备读不出分开）：自证过、fsid 与本池相同的那几份，与设备报读错（`PoolReader::read` 交空）的槽数。
+/// 一槽撕裂、另一槽自证过，与设备读不出分开）：自证过、fsid 与本池相同的那几份，设备报读错（`PoolReader::read` 交空）的槽数，
+/// 与整槽校验和过而 fsid 不是本池的槽数。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SystemConfigurationSlotsOfOneDevice {
     pub device: DeviceIdentity,
     pub self_verified: Vec<SystemConfiguration>,
     pub slots_reporting_a_read_error: u64,
+    /// 别的池的槽：magic、整槽校验和、布局位、每区槽数都过，自述的 fsid 不是本池的。「自证过」要 fsid 与本池相同
+    /// （`research/prompts/e205-preregistration.md`「乙入判不出」下一行「两种读法共用」，C707（系统配置判不出里 fsid 不符落哪一边没写）
+    /// 定「fsid 不是本池的槽按自证不过处置」），这几槽不进 `self_verified`；读的一方不报读坏（不进读坏账）。
+    /// R2 本身不看它；可写挂载读阶段见证读的乙入判不出（`mount::newer_publish_witness`）把它算读得出而自证不过的槽。
+    pub slots_of_another_pool_whose_checksum_verifies: u64,
 }
 
 impl SystemConfigurationSlotsOfOneDevice {
@@ -5133,7 +5186,8 @@ impl SystemConfigurationSlotsOfOneDevice {
 }
 
 /// 一块盘两槽各读一次：读得出的按整槽校验和与 fsid 判（每区槽数 S 越界的槽与自证不过的槽一样丢掉：走到这一步之前
-/// `choose_system_configuration` 已经在同一个池上判过区间、越界的池根本挂不上，这里再报一次越界也没有第二种处置），读不出的计数。
+/// `choose_system_configuration` 已经在同一个池上判过区间、越界的池根本挂不上，这里再报一次越界也没有第二种处置），读不出的计数，
+/// 解得开而 fsid 不是本池的计数。
 #[must_use]
 pub fn system_configuration_slots_of_one_device_read_once<Reader: PoolReader + ?Sized>(
     reader: &Reader,
@@ -5144,6 +5198,7 @@ pub fn system_configuration_slots_of_one_device_read_once<Reader: PoolReader + ?
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     let mut self_verified = Vec::new();
     let mut slots_reporting_a_read_error = 0;
+    let mut slots_of_another_pool_whose_checksum_verifies = 0;
     for offset in [0, slot_spacing_in_bytes] {
         match reader.read(device, DeviceOffsetInBytes(offset), slot_bytes) {
             None => slots_reporting_a_read_error += 1,
@@ -5153,6 +5208,8 @@ pub fn system_configuration_slots_of_one_device_read_once<Reader: PoolReader + ?
                         == *filesystem_identifier
                     {
                         self_verified.push(system_configuration);
+                    } else {
+                        slots_of_another_pool_whose_checksum_verifies += 1;
                     }
                 }
                 // 读成而自证不过（magic 与整槽校验和、节点大小，C840 当自证不过）：报给读者（可写挂载这次挂载共用的那一份记进读坏账、
@@ -5177,6 +5234,7 @@ pub fn system_configuration_slots_of_one_device_read_once<Reader: PoolReader + ?
         device,
         self_verified,
         slots_reporting_a_read_error,
+        slots_of_another_pool_whose_checksum_verifies,
     }
 }
 
@@ -6152,6 +6210,14 @@ pub const INODE_SEPARATOR_KEY_NOT_ABOVE_THE_LEAVES_BEFORE_IT: &str =
 pub const INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER: &str =
     "inode 记录号小于分隔 key 或容器号";
 
+/// 指着一片 inode 叶的那条内部条目的分隔 key（I-9.12）：与记录号、容器号底下都是 u64，各是一个量。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SeparatorKeyOfAnInodeLeaf(pub(crate) u64);
+
+/// 一片 inode 叶容器头里的容器号（I-9.4）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ContainerNumberOfAnInodeLeaf(pub(crate) u64);
+
 /// 一片 inode 叶容器里的一条记录号不小于指着这片叶的那条内部条目的分隔 key、也不小于这片叶的容器号（I-9.4 第一句；分隔 key 那一半是
 /// I-9.12 第二句「第 i 条的分隔 key ≤ 第 i 个孩子的 key 区间下界」，逐条记录判就判到了下界）。读 inode 树的四个读者——可写挂载重建、冷走读、
 /// 快照第一个文件的冷读与只读挂载打开池——逐条记录调这一个，同一张镜像一个结局（判决 `research/prompts/m4-close-code-r3-main-verification.md`
@@ -6160,11 +6226,11 @@ pub const INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER: &str =
 /// # Errors
 /// 记录号小于分隔 key 或容器号 ⇒ [`RecoveryFailure::InvariantViolated`]（I-9.4，[`INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER`]）。
 pub(crate) fn inode_record_is_not_below_the_separator_key_and_the_container(
-    record_inode: u64,
-    separator_key: u64,
-    container: u64,
+    record_inode: InodeNumber,
+    separator_key: SeparatorKeyOfAnInodeLeaf,
+    container: ContainerNumberOfAnInodeLeaf,
 ) -> Result<(), RecoveryFailure> {
-    if record_inode < separator_key || record_inode < container {
+    if record_inode.0 < separator_key.0 || record_inode.0 < container.0 {
         return Err(RecoveryFailure::InvariantViolated {
             invariant: "I-9.4",
             detail: INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER,
@@ -6792,6 +6858,11 @@ fn accounting_entry_count_is_three_plus_six_per_device(
     Ok(())
 }
 
+/// [`central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots`] 报的那一拒的不变量号与说明。
+pub const CENTRAL_MAPPING_KEY_SET_INVARIANT: &str = "I-1.11";
+pub const CENTRAL_MAPPING_KEY_SET_DISAGREES_WITH_THE_MAPPED_UNITS: &str =
+    "中央映射里的 key 集合不等于这一版进映射的单元的 key 加留存条目的 key（一条映射 key 被换了）";
+
 /// 进映射的单元各有几个（[`mapping_entry_count_is_one_per_mapped_unit`] 的输入）。
 struct MappedUnitCounts {
     extent_tree_nodes: usize,
@@ -6828,6 +6899,41 @@ fn mapping_entry_count_is_one_per_mapped_unit(
         return Err(RecoveryFailure::InvariantViolated {
             invariant: "E142 走读同款",
             detail: "映射条目数不是 1 + extent 树、分配记录树、记账树、deadlist 树的节点数 + deadlist 条目数 + inode 叶容器数 + 数据单元数",
+        });
+    }
+    Ok(())
+}
+
+/// 建上一版那一判（I-1.11（映射 key 与单元头相符） 产品一侧；D4（校验和位置） 已定项 4 那一格「映射 key 被换的盘挂载时拒」）：中央映射里的 key 集合
+/// 等于这一版进映射的单元的 key 加留存条目的 key。[`mapping_entry_count_is_one_per_mapped_unit`] 只数条数，一条 key 换了、封得对的盘数得过；
+/// 不拒的话这一版照「查不到就留提示」收下，提示在单元搬走之后还指隔离的旧落点，下一次发布把这把 key 盖回那里，搬到的新槽没人引用。只比内存里读过的，不多读盘。
+/// 只读路径（冷走读、`read_at`）不判：换 key 不动位置条目与单元字节，查不到报 [`RecoveryFailure::MappingMiss`]，读不出别的单元的字节。
+///
+/// # Errors
+/// 两个集合不等 ⇒ [`RecoveryFailure::InvariantViolated`]。
+fn central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots(
+    mapping_entries: &MappingEntriesOfTheVersion,
+    mapped_units: &[(TransactionUnit, Vec<u8>)],
+) -> Result<(), RecoveryFailure> {
+    let keys_expected: BTreeSet<&[u8]> = mapped_units
+        .iter()
+        .map(|(_, key)| key.as_slice())
+        .chain(
+            mapping_entries
+                .mapping_entries_kept_for_the_snapshots
+                .iter()
+                .map(|(key, _)| key.as_slice()),
+        )
+        .collect();
+    let keys_in_the_mapping: BTreeSet<&[u8]> = mapping_entries
+        .mapping_position_of_key
+        .keys()
+        .map(Vec::as_slice)
+        .collect();
+    if keys_expected != keys_in_the_mapping {
+        return Err(RecoveryFailure::InvariantViolated {
+            invariant: CENTRAL_MAPPING_KEY_SET_INVARIANT,
+            detail: CENTRAL_MAPPING_KEY_SET_DISAGREES_WITH_THE_MAPPED_UNITS,
         });
     }
     Ok(())
@@ -6997,9 +7103,9 @@ fn inode_leaf_container_judged_against_its_entry(
             what: "inode 记录",
         })?;
         inode_record_is_not_below_the_separator_key_and_the_container(
-            record.inode,
-            separator_key,
-            identity.container,
+            InodeNumber(record.inode),
+            SeparatorKeyOfAnInodeLeaf(separator_key),
+            ContainerNumberOfAnInodeLeaf(identity.container),
         )?;
         records.push(record);
     }
@@ -8254,14 +8360,46 @@ pub fn newest_root_from_the_version_the_system_configuration_witnessed_up_to_the
 /// 整条恢复路径。报出去的 `root` 恒是所选的那条根；施加记录之后走的是重建出来的根。所选那一版三样读者的并集里有字节丢了、没有内容拒收，
 /// 系统配置又没见证它时退到 [见证到的那一版, 所选根) 里读得出、不被抛弃的最新一条根（[`fall_back_judged_on_the_three_readers`]）：
 /// 那一版走得通，`root` 与 `effective_root` 都报退到的那一条，`journal` 仍是对所选根扫环、施加那一趟的报告；走不通留在所选那一版、
-/// 照它自己的走读报。不看 journal 的那一臂（`JournalPolicy::Ignore`）不退。
+/// 照它自己的走读报。不看 journal 的那一臂（`JournalPolicy::Ignore`）不退。系统配置不筛 fsid；调用方知道本池 fsid 的用 [`recover_of_the_pool`]。
 #[must_use]
 pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport {
+    recover_from_the_system_configuration_choice(
+        reader,
+        policy,
+        choose_system_configuration_naming_devices_without_a_mountable_slot(reader),
+    )
+}
+
+/// 与 [`recover`] 同一条恢复路径，系统配置只从自述 fsid 是 `filesystem_identifier_of_the_pool` 的槽里择
+/// （[`choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot`]）：别的池的槽世代号再大也择不到。
+/// 盘上没有一槽是这个 fsid 的池的，报告的失败是 [`RecoveryFailure::NoValidSystemConfiguration`]，不读别的池。
+#[must_use]
+pub fn recover_of_the_pool(
+    reader: &dyn PoolReader,
+    policy: JournalPolicy,
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> RecoveryReport {
+    recover_from_the_system_configuration_choice(
+        reader,
+        policy,
+        choose_system_configuration_of_the_pool_naming_devices_without_a_mountable_slot(
+            reader,
+            filesystem_identifier_of_the_pool,
+        ),
+    )
+}
+
+/// [`recover`] 与 [`recover_of_the_pool`] 共用的恢复路径：系统配置已经择过，择不到的把失败报成报告。
+fn recover_from_the_system_configuration_choice(
+    reader: &dyn PoolReader,
+    policy: JournalPolicy,
+    system_configuration_choice: Result<SystemConfigurationChoice, RecoveryFailure>,
+) -> RecoveryReport {
     let mut mapping_fallbacks = 0;
     let SystemConfigurationChoice {
         system_configuration,
         devices_without_a_mountable_system_configuration_slot,
-    } = match choose_system_configuration_naming_devices_without_a_mountable_slot(reader) {
+    } = match system_configuration_choice {
         Ok(choice) => choice,
         Err(failure) => {
             return RecoveryReport {
@@ -9037,13 +9175,13 @@ mod back_chain_judgement_tests {
 mod inode_leaf_records_ascending_across_the_leaves_tests {
     use super::{
         inode_record_is_not_below_the_separator_key_and_the_container,
-        inode_records_of_the_leaf_ascend_after_the_leaves_before, RecoveryFailure,
-        INODE_LEAVES_OVERLAP_THE_LEAVES_BEFORE_THEM,
+        inode_records_of_the_leaf_ascend_after_the_leaves_before, ContainerNumberOfAnInodeLeaf,
+        RecoveryFailure, SeparatorKeyOfAnInodeLeaf, INODE_LEAVES_OVERLAP_THE_LEAVES_BEFORE_THEM,
         INODE_RECORDS_OF_A_LEAF_DO_NOT_STRICTLY_ASCEND,
         INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER,
         INODE_SEPARATOR_KEY_NOT_ABOVE_THE_LEAVES_BEFORE_IT,
     };
-    use crate::address::CheckpointTxg;
+    use crate::address::{CheckpointTxg, InodeNumber};
     use crate::records::{
         InodeRecord, InodeRecordTruncationField, NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
     };
@@ -9090,7 +9228,7 @@ mod inode_leaf_records_ascending_across_the_leaves_tests {
     /// 攻方 `separator_200` 那一形缩小：两片叶 [1, 2, 3] 与 [5, 7]，右片的分隔 key 改成 3（不大于左片最大号 3，仍不大于右片最小号 5）：
     /// 记录照叶序严格升序，拒在 I-9.12 第三句。分隔 key 4 落在 (3, 5] 里照收，交回最大号 7。
     #[test]
-    fn a_separator_key_not_above_the_largest_record_of_the_leaves_before_is_refused() {
+    fn separator_key_not_above_the_largest_record_of_the_leaves_before_is_refused() {
         assert_eq!(
             judged_leaf_by_leaf_with_their_separators(&[(1, &[1, 2, 3]), (3, &[5, 7])]),
             Err(RecoveryFailure::InvariantViolated {
@@ -9106,22 +9244,34 @@ mod inode_leaf_records_ascending_across_the_leaves_tests {
 
     /// 记录号小于分隔 key（攻方 `separator_235` 那一形：分隔 key 235、头一条 234）或小于容器号：拒在 I-9.4；等于两者照收。
     #[test]
-    fn a_record_below_the_separator_key_or_the_container_is_refused_on_the_container_number_invariant(
+    fn record_below_the_separator_key_or_the_container_is_refused_on_the_container_number_invariant(
     ) {
         let below = Err(RecoveryFailure::InvariantViolated {
             invariant: "I-9.4",
             detail: INODE_RECORD_BELOW_THE_SEPARATOR_KEY_OR_THE_CONTAINER,
         });
         assert_eq!(
-            inode_record_is_not_below_the_separator_key_and_the_container(234, 235, 234),
+            inode_record_is_not_below_the_separator_key_and_the_container(
+                InodeNumber(234),
+                SeparatorKeyOfAnInodeLeaf(235),
+                ContainerNumberOfAnInodeLeaf(234)
+            ),
             below
         );
         assert_eq!(
-            inode_record_is_not_below_the_separator_key_and_the_container(234, 234, 235),
+            inode_record_is_not_below_the_separator_key_and_the_container(
+                InodeNumber(234),
+                SeparatorKeyOfAnInodeLeaf(234),
+                ContainerNumberOfAnInodeLeaf(235)
+            ),
             below
         );
         assert_eq!(
-            inode_record_is_not_below_the_separator_key_and_the_container(234, 234, 234),
+            inode_record_is_not_below_the_separator_key_and_the_container(
+                InodeNumber(234),
+                SeparatorKeyOfAnInodeLeaf(234),
+                ContainerNumberOfAnInodeLeaf(234)
+            ),
             Ok(())
         );
     }
@@ -9135,7 +9285,7 @@ mod inode_leaf_records_ascending_across_the_leaves_tests {
     /// 攻方第二次抽样那一形缩小：左片末条改成比右片头一条大（[1, 2, 9] 与 [4, 7]），每片自己升序，两片交叠：拒在 I-9.12。
     /// 右片头一条恰等于左片末条（[1, 2, 4] 与 [4, 7]）同样拒：严格升序，等号不放过。
     #[test]
-    fn a_left_leaf_reaching_past_the_first_record_of_the_right_leaf_is_refused_as_overlapping() {
+    fn left_leaf_reaching_past_the_first_record_of_the_right_leaf_is_refused_as_overlapping() {
         let overlapping = Err(RecoveryFailure::InvariantViolated {
             invariant: "I-9.12",
             detail: INODE_LEAVES_OVERLAP_THE_LEAVES_BEFORE_THEM,
@@ -9158,7 +9308,10 @@ mod inode_leaf_records_ascending_across_the_leaves_tests {
 
 #[cfg(test)]
 mod counting_unit_reads_with_one_copy_failing_tests {
-    use super::{PoolReader, PoolReaderCountingUnitReadsWithOneCopyFailing};
+    use super::{
+        PoolReader, PoolReaderCountingUnitReadsWithOneCopyFailing,
+        PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition, RecoveryFailure,
+    };
     use crate::address::{DeviceIdentity, DeviceOffsetInBytes, SlotNumber};
     use crate::pointer::LocationEntry;
 
@@ -9197,6 +9350,49 @@ mod counting_unit_reads_with_one_copy_failing_tests {
             slot: SlotNumber(slot),
             unit_checksum: 7,
         })
+    }
+
+    /// 按提示读到只坏一份：映射里查不到这把 key、查映射本身判红时判不出提示过期，照转、照计（只有造坏的镜像走得到）；
+    /// 查到了而落点不是这一组是提示过期，不转、记下没转。
+    #[test]
+    fn note_is_dropped_only_when_the_mapping_names_another_position() {
+        let key = [1u8; 27];
+        let noted_when_the_mapping_answers =
+            |answer: Result<Option<[LocationEntry; 2]>, RecoveryFailure>| {
+                let counting = PoolReaderCountingUnitReadsWithOneCopyFailing::counting_from_zero(
+                    &PoolReaderWithoutDevices,
+                );
+                let lookup = |_key: &[u8]| answer.clone();
+                let noting = PoolReaderNotingOneCopyFailingOnlyAtTheMappingPosition::over(
+                    &counting, &key, &lookup,
+                );
+                noting
+                    .note_that_a_unit_was_read_with_one_copy_failing(&locations_of_a_unit_at(100));
+                (
+                    counting.unit_reads_with_one_copy_failing(),
+                    noting.dropped_a_one_copy_failing_note_off_the_mapping_position(),
+                )
+            };
+        assert_eq!(
+            noted_when_the_mapping_answers(Ok(None)),
+            (1, false),
+            "映射里没有这把 key：照计"
+        );
+        assert_eq!(
+            noted_when_the_mapping_answers(Err(RecoveryFailure::NoValidRoot)),
+            (1, false),
+            "查映射本身判红：照计"
+        );
+        assert_eq!(
+            noted_when_the_mapping_answers(Ok(Some(locations_of_a_unit_at(100)))),
+            (1, false),
+            "提示就是映射里的落点：照计"
+        );
+        assert_eq!(
+            noted_when_the_mapping_answers(Ok(Some(locations_of_a_unit_at(102)))),
+            (0, true),
+            "映射里的落点是别处：提示过期，不计"
+        );
     }
 
     /// 同一个单元的同一份坏副本报两次（实例表链经两处读两遍那一形，判决 m4-close-code-r3 第二节 T2 ①）只计一次；另一个单元再报一次计第二次；

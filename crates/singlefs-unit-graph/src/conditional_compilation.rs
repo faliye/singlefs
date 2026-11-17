@@ -84,7 +84,7 @@ pub struct TargetPlatform {
 macro_rules! target_platform_table {
     ($(
         $triple:literal: names [$($name:literal),*],
-        arch $arch:literal, os $os:literal, family $family:literal, env $environment:literal,
+        arch $arch:literal, os $operating_system:literal, family $family:literal, env $environment:literal,
         endian $endian:literal, pointer_width $pointer_width:literal, vendor $vendor:literal,
         atomics [$($atomic:literal),*];
     )*) => {
@@ -94,7 +94,7 @@ macro_rules! target_platform_table {
             names: &[$($name),*],
             key_values: &[
                 ("target_arch", $arch),
-                ("target_os", $os), // naming-lint:external rustc 定的 cfg 名
+                ("target_os", $operating_system), // naming-lint:external rustc 定的 cfg 名
                 ("target_family", $family),
                 ("target_env", $environment), // naming-lint:external rustc 定的 cfg 名
                 ("target_endian", $endian),
@@ -608,12 +608,18 @@ mod tests {
         let macos = platform_of("aarch64-apple-darwin");
         let windows = platform_of("x86_64-pc-windows-msvc");
         let thirty_two_bit = platform_of("i686-unknown-linux-gnu");
-        let os_is_linux = &conditions("cfg ( target_os = \"linux\" )")[0];
-        let os_is_macos = &conditions("cfg ( target_os = \"macos\" )")[0];
-        assert_eq!(linux.evaluate(os_is_linux), Evaluation::Holds);
-        assert_eq!(linux.evaluate(os_is_macos), Evaluation::DoesNotHold);
-        assert_eq!(macos.evaluate(os_is_macos), Evaluation::Holds);
-        assert_eq!(macos.evaluate(os_is_linux), Evaluation::DoesNotHold);
+        let operating_system_is_linux = &conditions("cfg ( target_os = \"linux\" )")[0];
+        let operating_system_is_macos = &conditions("cfg ( target_os = \"macos\" )")[0];
+        assert_eq!(linux.evaluate(operating_system_is_linux), Evaluation::Holds);
+        assert_eq!(
+            linux.evaluate(operating_system_is_macos),
+            Evaluation::DoesNotHold
+        );
+        assert_eq!(macos.evaluate(operating_system_is_macos), Evaluation::Holds);
+        assert_eq!(
+            macos.evaluate(operating_system_is_linux),
+            Evaluation::DoesNotHold
+        );
         let unix = &conditions("cfg ( unix )")[0];
         assert_eq!(linux.evaluate(unix), Evaluation::Holds);
         assert_eq!(windows.evaluate(unix), Evaluation::DoesNotHold);
@@ -723,7 +729,8 @@ mod tests {
     }
 
     #[test]
-    fn a_cfg_inside_cfg_attr_only_applies_when_the_condition_holds() {
+    fn conditional_compilation_inside_conditional_compilation_attribute_only_applies_when_the_condition_holds(
+    ) {
         let attribute = conditions("cfg_attr ( feature = \"gpu\" , cfg ( test ) )");
         assert_eq!(attribute.len(), 1);
         assert_eq!(

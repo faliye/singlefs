@@ -148,7 +148,7 @@ impl InodeLeafContainer {
     /// 盘上读来的（可写挂载重建上一版，`recovery::rebuild_version`）由读者判过记录宽 140
     /// （`recovery::inode_leaf_container_judged_against_its_entry`）、记录区不越过单元末尾（`unit::parse_packed_unit`），
     /// 一片至多 ⌊(32768 − 107 − 29) ÷ 140⌋ = 233 条（C476 普查「缺口」表 `inode_tree.rs:88` 那一行；这条算术由单测
-    /// `a_packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit` 盯着）。装到了说明这两道之一被绕过了，
+    /// `packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit` 盯着）。装到了说明这两道之一被绕过了，
     /// 不许当成「还能装 0 条」往下走。
     #[must_use]
     pub fn free_record_slots(&self) -> (free_record_slots: u64)
@@ -2609,7 +2609,7 @@ mod tests {
     /// 靠的就是这条算术（读者判记录宽 = `INODE_RECORD_BYTES`、记录区不越过单元末尾）。改了记录宽、单元头宽或预留位而不重算
     /// `INODE_LEAF_RECORDS`，盘上一片就可能装得下第 234 条（C476 普查「缺口」表 `inode_tree.rs:88` 那一行）。
     #[test]
-    fn a_packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit() {
+    fn packed_unit_holds_no_more_inode_records_than_the_leaf_record_limit() {
         use singlefs_format::{
             DATA_UNIT_BYTES, INODE_RECORD_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
             PACKED_UNIT_HEADER_BYTES,
@@ -3100,7 +3100,7 @@ mod tests {
     /// 左从右借（M3 均分借）：第一片删完一条剩 99 条、第二片 233 条，之和 > 233 不并；99 < 117 ⇒ 从第二片借最小的 ⌊(233 − 99) ÷ 2⌋ = 67 条，
     /// 借完两片 166 / 166（相差不超过 1）；两片都保留身份，第二片的分隔 key 改成它这一版的最小 key 301（N1）；没有身份消失，第三片照抄。
     #[test]
-    fn a_container_below_the_floor_borrows_half_the_difference_from_its_right_neighbour() {
+    fn container_below_the_floor_borrows_half_the_difference_from_its_right_neighbour() {
         let mut before = full_containers(3);
         keep_the_first_records(&mut before, 0, 100);
         let after = remove_record_from_leaf_containers(&before, InodeNumber(5)).expect("删 5");

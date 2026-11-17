@@ -3,7 +3,7 @@
 //! + 位置条目 14 × 2（按设备身份升序，I-2.5）+ key 尾段：指向码 2 / 码 3 的带实例代号 4 + 出生序号 4（86）。
 //!
 //! 整份在 `verus!` 里，由 Verus 直接验（里程碑四出口 5「core 直验」编解码与记录格式这一簇）。每一种指针与位置条目各有
-//! 一份写法的规格（`spec_bytes`）、一份读法的规格（`spec_decode_at`：从一段字节的某个位置起读出来的样子）与一条往返引理
+//! 一份写法的规格（`specification_bytes`）、一份读法的规格（`specification_decode_at`：从一段字节的某个位置起读出来的样子）与一条往返引理
 //! （`lemma_decode_at_round_trip`：那几个字节是它写成的，就读回它）；写的方法交出的正是写法的规格，读的方法交出的正是读法的规格。
 
 use singlefs_format::{DATA_POINTER_BYTES, LOC_ENTRY, NODE_POINTER_BYTES, POINTER_HEAD_BYTES};
@@ -45,13 +45,13 @@ impl LocationEntry {
     }
 
     /// 盘上 14 字节。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         little_endian_bytes(self.device.0 as nat, 4) + little_endian_bytes(self.slot.0 as nat, 6)
             + little_endian_bytes(self.unit_checksum as nat, 4)
     }
 
     /// 从 `source` 的 `position` 起读 14 字节解成的位置条目。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         LocationEntry {
             device: DeviceIdentity(little_endian_value(source.subrange(position, position + 4)) as u32),
             slot: SlotNumber(little_endian_value(source.subrange(position + 4, position + 10)) as u64),
@@ -65,9 +65,9 @@ impl LocationEntry {
             self.is_encodable(),
             0 <= position,
             position + 14 <= source.len(),
-            source.subrange(position, position + 14) == self.spec_bytes(),
+            source.subrange(position, position + 14) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
+            Self::specification_decode_at(source, position) == self,
     {
         lemma_little_endian_capacities();
         let device_bytes = little_endian_bytes(self.device.0 as nat, 4);
@@ -85,14 +85,14 @@ impl LocationEntry {
             self.is_encodable(),
         ensures
             final(writer).is_well_formed(),
-            final(writer).written() == old(writer).written() + self.spec_bytes(),
+            final(writer).written() == old(writer).written() + self.specification_bytes(),
             final(writer).total_bytes() == old(writer).total_bytes(),
     {
         let start = writer.position();
         writer.put_u32(self.device.0);
         writer.put_six_byte_unsigned(self.slot.0);
         writer.put_u32(self.unit_checksum);
-        assert(writer.written() =~= old(writer).written() + self.spec_bytes());
+        assert(writer.written() =~= old(writer).written() + self.specification_bytes());
         assert!(
             writer.position() - start == usize::try_from(LOC_ENTRY).expect("14"),
             "位置条目写了 14 字节"
@@ -104,7 +104,7 @@ impl LocationEntry {
             old(reader).has_left(LOC_ENTRY as nat),
         ensures
             final(reader).advanced_by(old(reader), LOC_ENTRY as nat),
-            entry == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            entry == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
             entry.is_encodable(),
     {
         Self {
@@ -116,8 +116,8 @@ impl LocationEntry {
 }
 
 /// 两条位置条目的写法：照数组次序接起来，28 字节。
-pub open spec fn spec_location_entries_bytes(locations: [LocationEntry; 2]) -> Seq<u8> {
-    locations[0].spec_bytes() + locations[1].spec_bytes()
+pub open spec fn specification_location_entries_bytes(locations: [LocationEntry; 2]) -> Seq<u8> {
+    locations[0].specification_bytes() + locations[1].specification_bytes()
 }
 
 /// 两条位置条目的槽号都装得进 6 字节。
@@ -126,7 +126,7 @@ pub open spec fn location_entries_are_encodable(locations: [LocationEntry; 2]) -
 }
 
 /// 两条位置条目按设备身份严格升序（I-2.5）。
-pub open spec fn spec_location_entries_ascend_by_device(locations: [LocationEntry; 2]) -> bool {
+pub open spec fn specification_location_entries_ascend_by_device(locations: [LocationEntry; 2]) -> bool {
     locations[0].device.0 < locations[1].device.0
 }
 
@@ -180,7 +180,7 @@ pub fn location_entries_ascend_by_device(
     locations: &[LocationEntry; 2],
 ) -> (ascending: Result<(), LocationEntriesNotAscendingByDevice>)
     ensures
-        ascending is Ok <==> spec_location_entries_ascend_by_device(*locations),
+        ascending is Ok <==> specification_location_entries_ascend_by_device(*locations),
 {
     if locations[0].device.0 < locations[1].device.0 {
         Ok(())
@@ -289,7 +289,7 @@ struct PointerHeadAsRead {
 
 impl PointerHeadAsRead {
     /// 从 `source` 的 `position` 起读 50 字节、按字段表切出来的样子。
-    spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         PointerHeadAsRead {
             is_every_mac_and_nonce_byte_zero: source.subrange(position, position + 28) == zero_bytes(28),
             algorithm_type: little_endian_value(source.subrange(position + 28, position + 29)) as u8,
@@ -304,7 +304,7 @@ impl PointerHeadAsRead {
     }
 
     /// [`Self::judged`] 的判法：按 MAC / nonce、算法类型、压缩算法码、压后长度、extent 偏移的次序，第一处不是第一版取值的那一段报出来。
-    spec fn spec_judged(self) -> Result<PointerHead, PointerHeadFieldOutsideTheFirstVersion> {
+    spec fn specification_judged(self) -> Result<PointerHead, PointerHeadFieldOutsideTheFirstVersion> {
         if !self.is_every_mac_and_nonce_byte_zero {
             Err(PointerHeadFieldOutsideTheFirstVersion::MacOrNonceNotZero)
         } else if self.algorithm_type != 0 {
@@ -333,7 +333,7 @@ impl PointerHeadAsRead {
             old(reader).has_left(POINTER_HEAD_BYTES as nat),
         ensures
             final(reader).advanced_by(old(reader), POINTER_HEAD_BYTES as nat),
-            head_as_read == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            head_as_read == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
     {
         let is_every_mac_and_nonce_byte_zero = every_byte_is_zero(reader.take(16 + 12));
         let algorithm_type = reader.get_u8();
@@ -356,7 +356,7 @@ impl PointerHeadAsRead {
     /// 加密与压缩那几段按第一版的取值判，再判 extent 偏移（[`PointerHeadFieldOutsideTheFirstVersion`] 各成员的出处）。
     fn judged(self) -> (judged: Result<PointerHead, PointerHeadFieldOutsideTheFirstVersion>)
         ensures
-            judged == self.spec_judged(),
+            judged == self.specification_judged(),
     {
         if !self.is_every_mac_and_nonce_byte_zero {
             return Err(PointerHeadFieldOutsideTheFirstVersion::MacOrNonceNotZero);
@@ -395,23 +395,23 @@ impl PointerHeadAsRead {
 
 impl PointerHead {
     /// 盘上 50 字节：MAC 与 nonce 28 字节 0、算法类型 0、压缩算法码 0、压后长度 0、extent 偏移 0，再接出生树与出生 txg。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
         zero_bytes(28) + little_endian_bytes(0, 1) + little_endian_bytes(0, 1) + little_endian_bytes(0, 2)
             + little_endian_bytes(0, 2) + little_endian_bytes(self.birth_tree.0 as nat, 8)
             + little_endian_bytes(self.birth_txg.0 as nat, 8)
     }
 
     /// 从 `source` 的 `position` 起读 50 字节解成的头部（加密与压缩那几段不判）。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         PointerHead {
             birth_tree: TreeIdentifier(little_endian_value(source.subrange(position + 34, position + 42)) as u64),
             birth_txg: CheckpointTxg(little_endian_value(source.subrange(position + 42, position + 50)) as u64),
         }
     }
 
-    /// 同 [`Self::spec_decode_at`]，加密、压缩与 extent 偏移那几段按第一版的取值判：按 MAC / nonce、算法类型、压缩算法码、
+    /// 同 [`Self::specification_decode_at`]，加密、压缩与 extent 偏移那几段按第一版的取值判：按 MAC / nonce、算法类型、压缩算法码、
     /// 压后长度、extent 偏移的次序，第一处不是第一版取值的那一段报出来。
-    pub open spec fn spec_read_judging_at(
+    pub open spec fn specification_read_judging_at(
         source: Seq<u8>,
         position: int,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
@@ -436,7 +436,7 @@ impl PointerHead {
                 PointerHeadExtentOffsetNotZero { extent_offset },
             ))
         } else {
-            Ok(Self::spec_decode_at(source, position))
+            Ok(Self::specification_decode_at(source, position))
         }
     }
 
@@ -445,10 +445,10 @@ impl PointerHead {
         requires
             0 <= position,
             position + 50 <= source.len(),
-            source.subrange(position, position + 50) == self.spec_bytes(),
+            source.subrange(position, position + 50) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
-            Self::spec_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
+            Self::specification_decode_at(source, position) == self,
+            Self::specification_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
     {
         lemma_little_endian_capacities();
         let mac_and_nonce = zero_bytes(28);
@@ -485,7 +485,7 @@ impl PointerHead {
             old(writer).has_room_for(POINTER_HEAD_BYTES as nat),
         ensures
             final(writer).is_well_formed(),
-            final(writer).written() == old(writer).written() + self.spec_bytes(),
+            final(writer).written() == old(writer).written() + self.specification_bytes(),
             final(writer).total_bytes() == old(writer).total_bytes(),
     {
         let start = writer.position();
@@ -497,7 +497,7 @@ impl PointerHead {
         assert!(writer.position() - start == 34, "出生树落在指针头部偏移 34");
         writer.put_u64(self.birth_tree.0);
         writer.put_u64(self.birth_txg.0);
-        assert(writer.written() =~= old(writer).written() + self.spec_bytes());
+        assert(writer.written() =~= old(writer).written() + self.specification_bytes());
         assert!(
             writer.position() - start == usize::try_from(POINTER_HEAD_BYTES).expect("50"),
             "指针头部写了 50 字节"
@@ -512,7 +512,7 @@ impl PointerHead {
             old(reader).has_left(POINTER_HEAD_BYTES as nat),
         ensures
             final(reader).advanced_by(old(reader), POINTER_HEAD_BYTES as nat),
-            head == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            head == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
     {
         PointerHeadAsRead::read_from(reader).head
     }
@@ -528,7 +528,7 @@ impl PointerHead {
             old(reader).has_left(POINTER_HEAD_BYTES as nat),
         ensures
             final(reader).advanced_by(old(reader), POINTER_HEAD_BYTES as nat),
-            head == Self::spec_read_judging_at(old(reader).source(), old(reader).spec_position() as int),
+            head == Self::specification_read_judging_at(old(reader).source(), old(reader).specification_position() as int),
     {
         PointerHeadAsRead::read_from(reader).judged()
     }
@@ -545,7 +545,7 @@ pub struct NodePointer {
 
 impl NodePointer {
     /// 整条全 0 的指针（[`Self::empty_root`] 交回的那一条）。
-    pub open spec fn spec_empty_root() -> Self {
+    pub open spec fn specification_empty_root() -> Self {
         let zero = LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(0), unit_checksum: 0 };
         NodePointer {
             head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) },
@@ -562,37 +562,37 @@ impl NodePointer {
 
     /// 写者肯写的位置条目次序：按设备身份严格升序，或整条全零（I-2.5 对全零指针整体豁免）。
     pub open spec fn has_location_entries_the_writer_accepts(self) -> bool {
-        self == Self::spec_empty_root() || spec_location_entries_ascend_by_device(self.locations)
+        self == Self::specification_empty_root() || specification_location_entries_ascend_by_device(self.locations)
     }
 
     /// 盘上 86 字节：头部 50 + 两条位置条目 28 + 实例代号 4 + 出生序号 4。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        self.head.spec_bytes() + spec_location_entries_bytes(self.locations) + little_endian_bytes(
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        self.head.specification_bytes() + specification_location_entries_bytes(self.locations) + little_endian_bytes(
             self.instance.0 as nat,
             4,
         ) + little_endian_bytes(self.birth_sequence.0 as nat, 4)
     }
 
     /// 从 `source` 的 `position` 起读 86 字节解成的指针（头部加密与压缩那几段不判）。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         NodePointer {
-            head: PointerHead::spec_decode_at(source, position),
+            head: PointerHead::specification_decode_at(source, position),
             locations: [
-                LocationEntry::spec_decode_at(source, position + 50),
-                LocationEntry::spec_decode_at(source, position + 64),
+                LocationEntry::specification_decode_at(source, position + 50),
+                LocationEntry::specification_decode_at(source, position + 64),
             ],
             instance: InstanceGeneration(little_endian_value(source.subrange(position + 78, position + 82)) as u32),
             birth_sequence: BirthSequence(little_endian_value(source.subrange(position + 82, position + 86)) as u32),
         }
     }
 
-    /// 同 [`Self::spec_decode_at`]，头部加密、压缩与 extent 偏移那几段按第一版的取值判。
-    pub open spec fn spec_read_judging_at(
+    /// 同 [`Self::specification_decode_at`]，头部加密、压缩与 extent 偏移那几段按第一版的取值判。
+    pub open spec fn specification_read_judging_at(
         source: Seq<u8>,
         position: int,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
-        match PointerHead::spec_read_judging_at(source, position) {
-            Ok(_head) => Ok(Self::spec_decode_at(source, position)),
+        match PointerHead::specification_read_judging_at(source, position) {
+            Ok(_head) => Ok(Self::specification_decode_at(source, position)),
             Err(refusal) => Err(refusal),
         }
     }
@@ -603,14 +603,14 @@ impl NodePointer {
             self.is_encodable(),
             0 <= position,
             position + 86 <= source.len(),
-            source.subrange(position, position + 86) == self.spec_bytes(),
+            source.subrange(position, position + 86) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
-            Self::spec_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
+            Self::specification_decode_at(source, position) == self,
+            Self::specification_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
     {
         lemma_little_endian_capacities();
-        let head_bytes = self.head.spec_bytes();
-        let locations_bytes = spec_location_entries_bytes(self.locations);
+        let head_bytes = self.head.specification_bytes();
+        let locations_bytes = specification_location_entries_bytes(self.locations);
         let instance_bytes = little_endian_bytes(self.instance.0 as nat, 4);
         let birth_sequence_bytes = little_endian_bytes(self.birth_sequence.0 as nat, 4);
         lemma_split_a_concatenated_range(
@@ -624,20 +624,20 @@ impl NodePointer {
         lemma_split_a_concatenated_range(
             source,
             position + 50,
-            self.locations[0].spec_bytes(),
-            self.locations[1].spec_bytes(),
+            self.locations[0].specification_bytes(),
+            self.locations[1].specification_bytes(),
         );
         self.head.lemma_decode_at_round_trip(source, position);
         self.locations[0].lemma_decode_at_round_trip(source, position + 50);
         self.locations[1].lemma_decode_at_round_trip(source, position + 64);
-        assert(Self::spec_decode_at(source, position).locations =~= self.locations);
+        assert(Self::specification_decode_at(source, position).locations =~= self.locations);
     }
 
     /// 没有根的树：整条指针全 0（I-2.5 对全零指针整体豁免升序判定）。
     #[must_use]
     pub const fn empty_root() -> (root: Self)
         ensures
-            root == Self::spec_empty_root(),
+            root == Self::specification_empty_root(),
     {
         let zero = LocationEntry {
             device: DeviceIdentity(0),
@@ -658,7 +658,7 @@ impl NodePointer {
     /// 这条指针是不是整条全 0（逐字段比，与 `*self == Self::empty_root()` 同一个判法）。
     fn is_the_empty_root(&self) -> (is_empty: bool)
         ensures
-            is_empty == (*self == Self::spec_empty_root()),
+            is_empty == (*self == Self::specification_empty_root()),
     {
         let is_empty = self.head.birth_tree.0 == 0 && self.head.birth_txg.0 == 0
             && self.locations[0].device.0 == 0 && self.locations[0].slot.0 == 0
@@ -667,7 +667,7 @@ impl NodePointer {
             && self.instance.0 == 0 && self.birth_sequence.0 == 0;
         proof {
             if is_empty {
-                assert(self.locations =~= Self::spec_empty_root().locations);
+                assert(self.locations =~= Self::specification_empty_root().locations);
             }
         }
         is_empty
@@ -698,7 +698,7 @@ impl NodePointer {
             self.has_location_entries_the_writer_accepts(),
         ensures
             final(writer).is_well_formed(),
-            final(writer).written() == old(writer).written() + self.spec_bytes(),
+            final(writer).written() == old(writer).written() + self.specification_bytes(),
             final(writer).total_bytes() == old(writer).total_bytes(),
     {
         let start = writer.position();
@@ -711,7 +711,7 @@ impl NodePointer {
         self.locations[1].write_to(writer);
         writer.put_u32(self.instance.0);
         writer.put_u32(self.birth_sequence.0);
-        assert(writer.written() =~= old(writer).written() + self.spec_bytes());
+        assert(writer.written() =~= old(writer).written() + self.specification_bytes());
         assert!(
             writer.position() - start == usize::try_from(NODE_POINTER_BYTES).expect("86"),
             "码 2 / 码 3 指针写了 86 字节"
@@ -723,14 +723,14 @@ impl NodePointer {
             old(reader).has_left(NODE_POINTER_BYTES as nat),
         ensures
             final(reader).advanced_by(old(reader), NODE_POINTER_BYTES as nat),
-            pointer == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            pointer == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
             pointer.is_encodable(),
     {
         let head = PointerHead::read_from(reader);
         let pointer = Self::read_after_the_head(head, reader);
-        assert(pointer.locations =~= Self::spec_decode_at(
+        assert(pointer.locations =~= Self::specification_decode_at(
             old(reader).source(),
-            old(reader).spec_position() as int,
+            old(reader).specification_position() as int,
         ).locations);
         pointer
     }
@@ -745,7 +745,7 @@ impl NodePointer {
         requires
             old(reader).has_left(NODE_POINTER_BYTES as nat),
         ensures
-            pointer == Self::spec_read_judging_at(old(reader).source(), old(reader).spec_position() as int),
+            pointer == Self::specification_read_judging_at(old(reader).source(), old(reader).specification_position() as int),
             pointer is Ok ==> final(reader).advanced_by(old(reader), NODE_POINTER_BYTES as nat),
             pointer matches Ok(read_pointer) ==> read_pointer.is_encodable(),
     {
@@ -754,9 +754,9 @@ impl NodePointer {
                 reader,
             )?;
         let pointer = Self::read_after_the_head(head, reader);
-        assert(pointer.locations =~= Self::spec_decode_at(
+        assert(pointer.locations =~= Self::specification_decode_at(
             old(reader).source(),
-            old(reader).spec_position() as int,
+            old(reader).specification_position() as int,
         ).locations);
         Ok(pointer)
     }
@@ -773,12 +773,12 @@ impl NodePointer {
             old(reader).has_left(NODE_POINTER_BYTES as nat),
         ensures
             pointer == match judgement {
-                PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion => Self::spec_read_judging_at(
+                PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion => Self::specification_read_judging_at(
                     old(reader).source(),
-                    old(reader).spec_position() as int,
+                    old(reader).specification_position() as int,
                 ),
                 PointerHeadFieldsJudgement::NotJudgedByTheShadowLedger => Ok(
-                    Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+                    Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
                 ),
             },
             pointer is Ok ==> final(reader).advanced_by(old(reader), NODE_POINTER_BYTES as nat),
@@ -798,15 +798,15 @@ impl NodePointer {
         ensures
             final(reader).advanced_by(old(reader), (NODE_POINTER_BYTES - POINTER_HEAD_BYTES) as nat),
             pointer.head == head,
-            pointer.locations[0] == LocationEntry::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
-            pointer.locations[1] == LocationEntry::spec_decode_at(old(reader).source(), (old(reader).spec_position() + 14) as int),
+            pointer.locations[0] == LocationEntry::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
+            pointer.locations[1] == LocationEntry::specification_decode_at(old(reader).source(), (old(reader).specification_position() + 14) as int),
             pointer.instance.0 == little_endian_value(old(reader).source().subrange(
-                (old(reader).spec_position() + 28) as int,
-                (old(reader).spec_position() + 32) as int,
+                (old(reader).specification_position() + 28) as int,
+                (old(reader).specification_position() + 32) as int,
             )),
             pointer.birth_sequence.0 == little_endian_value(old(reader).source().subrange(
-                (old(reader).spec_position() + 32) as int,
-                (old(reader).spec_position() + 36) as int,
+                (old(reader).specification_position() + 32) as int,
+                (old(reader).specification_position() + 36) as int,
             )),
             pointer.is_encodable(),
     {
@@ -838,29 +838,29 @@ impl DataPointer {
     }
 
     /// 盘上 88 字节：头部 50 + 两条位置条目 28 + 写序 10。
-    pub open spec fn spec_bytes(self) -> Seq<u8> {
-        self.head.spec_bytes() + spec_location_entries_bytes(self.locations) + self.write_order.spec_bytes()
+    pub open spec fn specification_bytes(self) -> Seq<u8> {
+        self.head.specification_bytes() + specification_location_entries_bytes(self.locations) + self.write_order.specification_bytes()
     }
 
     /// 从 `source` 的 `position` 起读 88 字节解成的指针（头部加密与压缩那几段不判）。
-    pub open spec fn spec_decode_at(source: Seq<u8>, position: int) -> Self {
+    pub open spec fn specification_decode_at(source: Seq<u8>, position: int) -> Self {
         DataPointer {
-            head: PointerHead::spec_decode_at(source, position),
+            head: PointerHead::specification_decode_at(source, position),
             locations: [
-                LocationEntry::spec_decode_at(source, position + 50),
-                LocationEntry::spec_decode_at(source, position + 64),
+                LocationEntry::specification_decode_at(source, position + 50),
+                LocationEntry::specification_decode_at(source, position + 64),
             ],
-            write_order: WriteOrder::spec_decode_at(source, position + 78),
+            write_order: WriteOrder::specification_decode_at(source, position + 78),
         }
     }
 
-    /// 同 [`Self::spec_decode_at`]，头部加密、压缩与 extent 偏移那几段按第一版的取值判。
-    pub open spec fn spec_read_judging_at(
+    /// 同 [`Self::specification_decode_at`]，头部加密、压缩与 extent 偏移那几段按第一版的取值判。
+    pub open spec fn specification_read_judging_at(
         source: Seq<u8>,
         position: int,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
-        match PointerHead::spec_read_judging_at(source, position) {
-            Ok(_head) => Ok(Self::spec_decode_at(source, position)),
+        match PointerHead::specification_read_judging_at(source, position) {
+            Ok(_head) => Ok(Self::specification_decode_at(source, position)),
             Err(refusal) => Err(refusal),
         }
     }
@@ -871,26 +871,26 @@ impl DataPointer {
             self.is_encodable(),
             0 <= position,
             position + 88 <= source.len(),
-            source.subrange(position, position + 88) == self.spec_bytes(),
+            source.subrange(position, position + 88) == self.specification_bytes(),
         ensures
-            Self::spec_decode_at(source, position) == self,
-            Self::spec_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
+            Self::specification_decode_at(source, position) == self,
+            Self::specification_read_judging_at(source, position) == Ok::<Self, PointerHeadFieldOutsideTheFirstVersion>(self),
     {
-        let head_bytes = self.head.spec_bytes();
-        let locations_bytes = spec_location_entries_bytes(self.locations);
-        lemma_split_a_concatenated_range(source, position, head_bytes + locations_bytes, self.write_order.spec_bytes());
+        let head_bytes = self.head.specification_bytes();
+        let locations_bytes = specification_location_entries_bytes(self.locations);
+        lemma_split_a_concatenated_range(source, position, head_bytes + locations_bytes, self.write_order.specification_bytes());
         lemma_split_a_concatenated_range(source, position, head_bytes, locations_bytes);
         lemma_split_a_concatenated_range(
             source,
             position + 50,
-            self.locations[0].spec_bytes(),
-            self.locations[1].spec_bytes(),
+            self.locations[0].specification_bytes(),
+            self.locations[1].specification_bytes(),
         );
         self.head.lemma_decode_at_round_trip(source, position);
         self.locations[0].lemma_decode_at_round_trip(source, position + 50);
         self.locations[1].lemma_decode_at_round_trip(source, position + 64);
         self.write_order.lemma_decode_at_round_trip(source, position + 78);
-        assert(Self::spec_decode_at(source, position).locations =~= self.locations);
+        assert(Self::specification_decode_at(source, position).locations =~= self.locations);
     }
 
     /// # Panics
@@ -899,10 +899,10 @@ impl DataPointer {
         requires
             old(writer).has_room_for(DATA_POINTER_BYTES as nat),
             self.is_encodable(),
-            spec_location_entries_ascend_by_device(self.locations),
+            specification_location_entries_ascend_by_device(self.locations),
         ensures
             final(writer).is_well_formed(),
-            final(writer).written() == old(writer).written() + self.spec_bytes(),
+            final(writer).written() == old(writer).written() + self.specification_bytes(),
             final(writer).total_bytes() == old(writer).total_bytes(),
     {
         let start = writer.position();
@@ -915,7 +915,7 @@ impl DataPointer {
         self.locations[1].write_to(writer);
         writer.put_u32(self.write_order.instance.0);
         writer.put_six_byte_unsigned(self.write_order.transaction);
-        assert(writer.written() =~= old(writer).written() + self.spec_bytes());
+        assert(writer.written() =~= old(writer).written() + self.specification_bytes());
         assert!(
             writer.position() - start == usize::try_from(DATA_POINTER_BYTES).expect("88"),
             "数据指针写了 88 字节"
@@ -927,14 +927,14 @@ impl DataPointer {
             old(reader).has_left(DATA_POINTER_BYTES as nat),
         ensures
             final(reader).advanced_by(old(reader), DATA_POINTER_BYTES as nat),
-            pointer == Self::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
+            pointer == Self::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
             pointer.is_encodable(),
     {
         let head = PointerHead::read_from(reader);
         let pointer = Self::read_after_the_head(head, reader);
-        assert(pointer.locations =~= Self::spec_decode_at(
+        assert(pointer.locations =~= Self::specification_decode_at(
             old(reader).source(),
-            old(reader).spec_position() as int,
+            old(reader).specification_position() as int,
         ).locations);
         pointer
     }
@@ -949,7 +949,7 @@ impl DataPointer {
         requires
             old(reader).has_left(DATA_POINTER_BYTES as nat),
         ensures
-            pointer == Self::spec_read_judging_at(old(reader).source(), old(reader).spec_position() as int),
+            pointer == Self::specification_read_judging_at(old(reader).source(), old(reader).specification_position() as int),
             pointer is Ok ==> final(reader).advanced_by(old(reader), DATA_POINTER_BYTES as nat),
             pointer matches Ok(read_pointer) ==> read_pointer.is_encodable(),
     {
@@ -958,9 +958,9 @@ impl DataPointer {
                 reader,
             )?;
         let pointer = Self::read_after_the_head(head, reader);
-        assert(pointer.locations =~= Self::spec_decode_at(
+        assert(pointer.locations =~= Self::specification_decode_at(
             old(reader).source(),
-            old(reader).spec_position() as int,
+            old(reader).specification_position() as int,
         ).locations);
         Ok(pointer)
     }
@@ -971,9 +971,9 @@ impl DataPointer {
         ensures
             final(reader).advanced_by(old(reader), (DATA_POINTER_BYTES - POINTER_HEAD_BYTES) as nat),
             pointer.head == head,
-            pointer.locations[0] == LocationEntry::spec_decode_at(old(reader).source(), old(reader).spec_position() as int),
-            pointer.locations[1] == LocationEntry::spec_decode_at(old(reader).source(), (old(reader).spec_position() + 14) as int),
-            pointer.write_order == WriteOrder::spec_decode_at(old(reader).source(), (old(reader).spec_position() + 28) as int),
+            pointer.locations[0] == LocationEntry::specification_decode_at(old(reader).source(), old(reader).specification_position() as int),
+            pointer.locations[1] == LocationEntry::specification_decode_at(old(reader).source(), (old(reader).specification_position() + 14) as int),
+            pointer.write_order == WriteOrder::specification_decode_at(old(reader).source(), (old(reader).specification_position() + 28) as int),
             pointer.is_encodable(),
     {
         let locations = [
@@ -1047,8 +1047,7 @@ mod tests {
     #[should_panic(
         expected = "位置条目按设备身份严格升序（I-2.5），整条全零的空指针（empty_root）豁免"
     )]
-    fn a_non_empty_node_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer()
-    {
+    fn non_empty_node_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer() {
         let on_device_one = LocationEntry {
             device: DeviceIdentity(1),
             slot: SlotNumber(50178),
@@ -1081,7 +1080,7 @@ mod tests {
     /// 两条位置条目都在盘 0 的数据指针：数据指针没有全零豁免，写出时断言。
     #[test]
     #[should_panic(expected = "数据指针的位置条目按设备身份严格升序（I-2.5），没有全零豁免")]
-    fn a_data_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer() {
+    fn data_pointer_with_both_location_entries_on_one_device_is_refused_by_the_writer() {
         let on_device_zero = LocationEntry {
             device: DeviceIdentity(0),
             slot: SlotNumber(50200),

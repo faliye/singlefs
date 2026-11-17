@@ -8,6 +8,9 @@
 //! 这一批在这张卡上第 1 + [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 次超时就交回 [`GpuFailureCause::UnusableAfterResubmissions`]（这张卡用不了，带最后一次的原因），这一批放弃、不换 CPU，
 //! 连续不确定的计数不动（`two_kernel_reconciliation::ConsecutiveUncertaintyCounts::reconcile_unless_the_batch_failed`）。别的出错不重交。
 //!
+//! 开卡（起设备、编管线、量代价）每一次至多等 [`WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT`]（[`outcome_of_opening_a_gpu_within_the_limit`]）；
+//! 一张卡开不成就隔 1 分钟重开、至多重开 3 次，都不成才算它开不成（第 4 条，挂载那一刻点名的卡与挂着切换点到的新卡同一种：[`gpu_opened_with_the_reopenings`]）。
+//!
 //! 等法与钟、完成信号拆开：钟是 [`MonotonicClock`]（产品用这个进程的单调钟 [`SteadyClockOfThisProcess`]），完成信号是调用方给的
 //! 「看一次做没做完、最多等这么久」的闭包。不要 GPU 的用例换上假钟与假完成信号，钉住「上限内完成照常、超过上限交回超时出错」。
 
@@ -116,23 +119,31 @@ pub fn wait_for_completion_before_the_deadline<Output>(
 /// 1 + [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 次等超过上限就报这张卡用不了。
 pub const RESUBMISSIONS_AFTER_A_TIMEOUT: u32 = 3;
 
-/// 是不是等超过上限的那两种：这一次提交自己等超过上限，或交活之前、重交之前等前一次那一次又等满了上限。只有这两种重交、算进一批的超时次数。
+/// 是不是等超过上限的那三种：这一次提交自己等超过上限，交活之前、重交之前等前一次那一次又等满了上限，或建缓冲出错之后冲掉待写的那一次空提交等满了上限。
+/// 只有这三种重交、算进一批的超时次数。
 fn waited_past_the_limit(cause: &GpuFailureCause) -> bool {
     match cause {
         GpuFailureCause::WaitForTheGpuExceededTheLimit { .. }
-        | GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { .. } => true,
+        | GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { .. }
+        | GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { .. } => true,
         GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+        | GpuFailureCause::OpeningThreadNotStarted { .. }
+        | GpuFailureCause::OpeningPanicked { .. }
+        | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
+        | GpuFailureCause::OpeningCalledOff
+        | GpuFailureCause::OpeningsInThisMountUsedUp { .. }
         | GpuFailureCause::UncapturedErrorOrDeviceLost { .. }
         | GpuFailureCause::WaitForTheSubmissionFailed { .. }
         | GpuFailureCause::ReadbackMappingFailed { .. }
         | GpuFailureCause::KernelLeftAnUnrecognizedVerdictWord(..)
         | GpuFailureCause::OutOfMemoryCreatingTheBuffers { .. }
-        | GpuFailureCause::UnusableAfterResubmissions { .. } => false,
+        | GpuFailureCause::UnusableAfterResubmissions { .. }
+        | GpuFailureCause::NotOpenedAfterTheReopenings { .. } => false,
     }
 }
 
 /// 一批里一张卡上到此刻等超过上限了几次、重交了几次（重交只数真交出去的：重交之前那一等又等满了上限、没交的那一回只算超时，
-/// 重交那一次建缓冲显存不足、没交出去的那一回不算）（第 4 条「放弃的那一批在同一张卡上重交，至多 3 次，都超时才报警」按批、按卡数：
+/// 重交那一次建缓冲显存不足、或之后冲掉待写的那一次空提交等满了上限而没交出去的那一回不算）（第 4 条「放弃的那一批在同一张卡上重交，至多 3 次，都超时才报警」按批、按卡数：
 /// 一批切成几片、几段时各片的超时合起来算，交活之前等前一次超时的那次提交那一等也算）。一批开头每张卡各一份，从 0 起。
 /// 外壳的「一批」是三段各自交给 GPU 的那一次（`BackgroundGpu` 的三段方法各调一次是一批）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -182,21 +193,31 @@ impl TimeoutsOfTheBatchOnOneGpu {
     }
 }
 
-/// 一次交的结局说不说明那一次真交到了卡上：建缓冲显存不足（[`GpuFailureCause::OutOfMemoryCreatingTheBuffers`]）是在交之前判出的、那一段没交；
+/// 一次交的结局说不说明那一次真交到了卡上：建缓冲出错（显存不足 [`GpuFailureCause::OutOfMemoryCreatingTheBuffers`]，或之后冲掉待写的那一次空提交等满了上限
+/// [`GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit`]）是在交之前判出的、那一段没交；
 /// 别的出错都是交了之后才判出的（等提交、回读、读回的判定字），做完了的当然交了。只给交一段那一次的结局用（`submit_once` 交回的）。
 fn the_attempt_reached_the_gpu<Outcome>(attempt: &Result<Outcome, GpuFailureCause>) -> bool {
     match attempt {
         Ok(_outcome) => true,
-        Err(GpuFailureCause::OutOfMemoryCreatingTheBuffers { .. }) => false,
+        Err(
+            GpuFailureCause::OutOfMemoryCreatingTheBuffers { .. }
+            | GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { .. },
+        ) => false,
         Err(
             GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+            | GpuFailureCause::OpeningThreadNotStarted { .. }
+            | GpuFailureCause::OpeningPanicked { .. }
+            | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
+            | GpuFailureCause::OpeningCalledOff
+            | GpuFailureCause::OpeningsInThisMountUsedUp { .. }
             | GpuFailureCause::UncapturedErrorOrDeviceLost { .. }
             | GpuFailureCause::WaitForTheSubmissionFailed { .. }
             | GpuFailureCause::WaitForTheGpuExceededTheLimit { .. }
             | GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { .. }
             | GpuFailureCause::ReadbackMappingFailed { .. }
             | GpuFailureCause::KernelLeftAnUnrecognizedVerdictWord(..)
-            | GpuFailureCause::UnusableAfterResubmissions { .. },
+            | GpuFailureCause::UnusableAfterResubmissions { .. }
+            | GpuFailureCause::NotOpenedAfterTheReopenings { .. },
         ) => true,
     }
 }
@@ -273,14 +294,33 @@ pub const WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT: Duration = Duration::from_se
 /// 在另一条线程上开一张卡（`open`），这条线程至多等 `opening_limit`：开成或开不成照原样交回；到点还没交回就交回
 /// [`GpuFailureCause::WaitForTheGpuExceededTheLimit`]（带 `opening_limit`），不再等它（挂载等开卡成功或到点才往下走，不做回调）。
 /// 到点之后那条线程照旧跑着、不停它（编管线是驱动里的同步调用，停不下来）：它开出来的东西没人收，它跑完时就地丢掉。
+/// 产品开卡（`background_gpu::started_gpu_with_its_cost_measured`）交回的东西丢掉时不等 GPU：开成的那张卡量代价的提交都已做完，照常析构；
+/// 量代价出错而账上还记着在跑的提交的那张卡，在 `open` 里已经泄漏、这一次占着的字节已记进这个进程的泄漏账，交回的只是那个错。
 ///
 /// # Errors
-/// `open` 交回的出错；到点 ⇒ `WaitForTheGpuExceededTheLimit`；起不了那条线程 ⇒ [`GpuFailureCause::DeviceOrPipelineDidNotStart`]。
+/// `open` 交回的出错；到点 ⇒ `WaitForTheGpuExceededTheLimit`；起不了那条线程 ⇒ [`GpuFailureCause::OpeningThreadNotStarted`]。
 ///
 /// # Panics
-/// `open` panic 了：在这条线程上照原样再 panic（与不隔一条线程时相同）。
+/// `open` panic 了：在这条线程上照原样再 panic（与不隔一条线程时相同；挂载与切换共用的开一张卡那一步接住它，
+/// `gpus_of_this_host::gpu_opened_under_its_memory_limit`）。
 pub fn outcome_of_opening_a_gpu_within_the_limit<Opened: Send + 'static>(
     opening_limit: Duration,
+    open: impl FnOnce() -> Result<Opened, GpuFailureCause> + Send + 'static,
+) -> Result<Opened, GpuFailureCause> {
+    outcome_of_opening_a_gpu_within_what_is_left_of_the_limit(opening_limit, opening_limit, open)
+}
+
+/// 同 [`outcome_of_opening_a_gpu_within_the_limit`]，这一次开卡的期限 `opening_limit` 已经用掉了一段（同一张卡上排队等别的挂载那一次开完，
+/// `background_gpu::opening_of_a_card_within_the_limit`）：这条线程只再等剩下的 `time_left_of_the_limit`，到点报的仍是整个期限 `opening_limit`。
+///
+/// # Errors
+/// 同 [`outcome_of_opening_a_gpu_within_the_limit`]。
+///
+/// # Panics
+/// 同 [`outcome_of_opening_a_gpu_within_the_limit`]。
+pub fn outcome_of_opening_a_gpu_within_what_is_left_of_the_limit<Opened: Send + 'static>(
+    opening_limit: Duration,
+    time_left_of_the_limit: Duration,
     open: impl FnOnce() -> Result<Opened, GpuFailureCause> + Send + 'static,
 ) -> Result<Opened, GpuFailureCause> {
     let (outcome_sender, outcome_receiver) = std::sync::mpsc::channel();
@@ -290,10 +330,10 @@ pub fn outcome_of_opening_a_gpu_within_the_limit<Opened: Send + 'static>(
             // 送不出去只有一种：等它的那一头到点不等了、已经丢了，这次开卡的结局没人要。
             let _nobody_waits_for_this_opening_any_more = outcome_sender.send(open());
         })
-        .map_err(|error| GpuFailureCause::DeviceOrPipelineDidNotStart {
+        .map_err(|error| GpuFailureCause::OpeningThreadNotStarted {
             reason: format!("起不了开卡的那条线程：{error}"),
         })?;
-    match outcome_receiver.recv_timeout(opening_limit) {
+    match outcome_receiver.recv_timeout(time_left_of_the_limit) {
         Ok(outcome_of_the_opening) => outcome_of_the_opening,
         Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
             Err(GpuFailureCause::WaitForTheGpuExceededTheLimit {
@@ -308,6 +348,66 @@ pub fn outcome_of_opening_a_gpu_within_the_limit<Opened: Send + 'static>(
     }
 }
 
+/// 一张卡开不成之后隔多久重开（第 4 条「间隔 1 分钟重开」，挂载那一刻点名的卡与挂着切换点到的新卡同一个数）。
+pub const INTERVAL_BEFORE_REOPENING_A_GPU_NOT_OPENED: Duration = Duration::from_secs(60);
+
+/// 一张卡开不成之后至多重开几次（第 4 条「最多重开 3 次」）：头一次开不成之后再开这么多次，都不成才算这张卡开不成。
+pub const REOPENINGS_OF_A_GPU_NOT_OPENED_AT_MOST: u32 = 3;
+
+/// 一张卡开不成时怎么重开：头一次开不成就等 `interval` 再开，至多再开 `reopenings_at_most` 次，都不成才算这张卡开不成
+/// （[`gpu_opened_with_the_reopenings`]）。产品是 [`Self::OF_THE_PRODUCT`]；用例换上间隔为 0 的，不真等 1 分钟。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReopeningsOfAGpuNotOpened {
+    pub interval: Duration,
+    pub reopenings_at_most: u32,
+}
+
+impl ReopeningsOfAGpuNotOpened {
+    /// 产品的：间隔 [`INTERVAL_BEFORE_REOPENING_A_GPU_NOT_OPENED`]，至多重开 [`REOPENINGS_OF_A_GPU_NOT_OPENED_AT_MOST`] 次。
+    pub const OF_THE_PRODUCT: Self = Self {
+        interval: INTERVAL_BEFORE_REOPENING_A_GPU_NOT_OPENED,
+        reopenings_at_most: REOPENINGS_OF_A_GPU_NOT_OPENED_AT_MOST,
+    };
+
+    /// 一张卡至多开几次：头一次加至多重开的次数（第 4 条「头一次开卡不算重开，一张卡至多开 4 次」）。挂着切换时一张卡在一次挂载里连着开不成到这个数（开成一次清零），
+    /// 再被点到就不再开（`background_gpu::BackgroundGpuOverTheCards::use_the_settings_from_the_next_batch`）。
+    #[must_use]
+    pub const fn openings_at_most(self) -> u32 {
+        self.reopenings_at_most.saturating_add(1)
+    }
+
+    /// 连同重开，一张卡至多要等多久才有结局：每一次开卡至多 `each_opening`，开 1 + 重开次数 次，中间隔重开次数个间隔；超出 `Duration` 取它的最大值。
+    #[must_use]
+    pub const fn longest_wait_of_one_gpu(self, each_opening: Duration) -> Duration {
+        each_opening
+            .saturating_mul(self.reopenings_at_most.saturating_add(1))
+            .saturating_add(self.interval.saturating_mul(self.reopenings_at_most))
+    }
+}
+
+/// 开一张卡（`open_once` 开一次，交回开出来的或这一次开不成的原因），开不成就照 `reopenings` 重开：每次重开之前把间隔交给
+/// `wait_before_a_reopening` 等（产品是 `std::thread::sleep`），开成了就交回、不再开。
+///
+/// # Errors
+/// 开了 1 + `reopenings.reopenings_at_most` 次都没开成：每一次的原因，按开的次序（头一次的在前）。
+pub fn gpu_opened_with_the_reopenings<Opened>(
+    reopenings: ReopeningsOfAGpuNotOpened,
+    mut wait_before_a_reopening: impl FnMut(Duration),
+    mut open_once: impl FnMut() -> Result<Opened, GpuFailureCause>,
+) -> Result<Opened, Vec<GpuFailureCause>> {
+    let mut causes_of_each_opening = Vec::new();
+    for reopenings_so_far in 0..=reopenings.reopenings_at_most {
+        if reopenings_so_far > 0 {
+            wait_before_a_reopening(reopenings.interval);
+        }
+        match open_once() {
+            Ok(opened) => return Ok(opened),
+            Err(cause) => causes_of_each_opening.push(cause),
+        }
+    }
+    Err(causes_of_each_opening)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,10 +416,23 @@ mod tests {
     use crate::checksum_kernels::{
         checksum_outcomes_of_the_units_cut_into_pieces, ChecksumKernelOutcome, UnitChecksumToVerify,
     };
-    use crate::memory_limit_and_chunks::PieceOfAnEntry;
+    use crate::memory_limit_and_chunks::{InputLengthOnTheHostInBytes, PieceOfAnEntry};
     use crate::two_kernel_reconciliation::{
-        ConsecutiveUncertaintyCounts, TwoKernelOutcomesOfAnEntry,
+        ConsecutiveUncertaintyCounts, SameEntryKeyTwiceInOneBatch, TwoKernelOutcomesOfAnEntry,
     };
+
+    /// 用例里一批交不成的样子：等 GPU 那一样报的错原样，或同一个条目键出现两次。
+    #[derive(Debug, PartialEq, Eq)]
+    enum BatchFailureInTheTest {
+        WaitingForTheGpu(GpuFailureCause),
+        SameEntryKeyTwiceInOneBatch(SameEntryKeyTwiceInOneBatch),
+    }
+
+    impl From<SameEntryKeyTwiceInOneBatch> for BatchFailureInTheTest {
+        fn from(repeated: SameEntryKeyTwiceInOneBatch) -> Self {
+            Self::SameEntryKeyTwiceInOneBatch(repeated)
+        }
+    }
 
     /// 假钟：只在完成信号让它走时才走。
     struct ClockMovedByTheTest {
@@ -441,7 +554,7 @@ mod tests {
         let mut uncertainty: ConsecutiveUncertaintyCounts<u32> =
             ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
         let disagreeing_round = uncertainty.reconcile_unless_the_batch_failed(
-            Ok::<_, GpuFailureCause>(vec![TwoKernelOutcomesOfAnEntry {
+            Ok::<_, BatchFailureInTheTest>(vec![TwoKernelOutcomesOfAnEntry {
                 entry_key: 1,
                 outcome_by_one_kernel: 7_u32,
                 outcome_by_the_independently_written_kernel: 8,
@@ -467,16 +580,19 @@ mod tests {
                 outcome_by_one_kernel: 7_u32,
                 outcome_by_the_independently_written_kernel: 8,
             }]
-        });
+        })
+        .map_err(BatchFailureInTheTest::WaitingForTheGpu);
         let timed_out_round = uncertainty
             .reconcile_unless_the_batch_failed(timed_out_outcomes, |_entry_position| {
                 panic!("超时那一批不交 CPU 判")
             });
         assert_eq!(
             timed_out_round,
-            Err(GpuFailureCause::WaitForTheGpuExceededTheLimit {
-                wait_limit: Duration::from_secs(2)
-            }),
+            Err(BatchFailureInTheTest::WaitingForTheGpu(
+                GpuFailureCause::WaitForTheGpuExceededTheLimit {
+                    wait_limit: Duration::from_secs(2)
+                }
+            )),
             "超时算出错"
         );
         assert_eq!(
@@ -565,7 +681,7 @@ mod tests {
             .map(|entry_position| {
                 vec![PieceOfAnEntry {
                     entry_position,
-                    input_bytes: 0..8,
+                    input_bytes: InputLengthOnTheHostInBytes(0)..InputLengthOnTheHostInBytes(8),
                 }]
             })
             .collect();
@@ -864,7 +980,7 @@ mod tests {
     #[test]
     fn the_resubmission_short_of_memory_for_its_buffers_is_not_counted_as_a_resubmission() {
         let short_of_memory = GpuFailureCause::OutOfMemoryCreatingTheBuffers {
-            bytes_held_by_the_chunk: 2000,
+            bytes_held_by_the_chunk: singlefs_core::background_compute::GpuMemoryInBytes(2000),
             reason: "用例造的：重交那一次卡上空闲的不够".to_string(),
         };
         let mut gpu = GpuWithScriptedSubmissions::scripted(
@@ -885,6 +1001,39 @@ mod tests {
             ),
             (2, 1, 1, 0),
             "交了两回、等了一回、超时 1 次，重交那一回没交到卡上：重交记 0"
+        );
+    }
+
+    /// 头一次交等超过上限，重交之前那一等等到了，重交那一次建缓冲出错、冲掉待写的那一次空提交等满了上限（这一段没交到卡上），
+    /// 再一回等到、重交做完——超时 2 次（冲掉待写那一回算一次），「重交了几次」只记真交到卡上的那 1 次。
+    #[test]
+    fn the_flush_of_the_pending_writes_timing_out_counts_as_a_timeout_and_not_as_a_resubmission() {
+        let flush_timed_out =
+            GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit {
+                wait_limit: WAIT_LIMIT_OF_THE_RESUBMISSIONS,
+            };
+        let mut gpu = GpuWithScriptedSubmissions::scripted(
+            vec![
+                Err(this_submission_timed_out()),
+                Err(flush_timed_out),
+                Ok(9),
+            ],
+            vec![Ok(()), Ok(())],
+        );
+        let (outcome, timeouts_of_the_batch) = outcome_and_timeouts_of_one_submission(&mut gpu);
+        assert_eq!(
+            outcome,
+            Ok(9),
+            "冲掉待写等不到照重交的规矩往下走，第三回做完"
+        );
+        assert_eq!(
+            (
+                gpu.submissions_made,
+                timeouts_of_the_batch.timeouts(),
+                timeouts_of_the_batch.resubmissions()
+            ),
+            (3, 2, 1),
+            "交了 3 回，超时 2 次，冲掉待写等不到的那一回没交到卡上：重交记 1"
         );
     }
 
@@ -957,5 +1106,82 @@ mod tests {
             GpuWithScriptedSubmissions::scripted(vec![Err(device_lost.clone())], Vec::new());
         assert_eq!(gpu.outcome_with_resubmissions(), Err(device_lost));
         assert_eq!((gpu.submissions_made, gpu.waits_made), (1, 0));
+    }
+
+    /// 用例里第 `opening` 次开卡（从 1 数）开不成的原因。
+    fn cause_of_the_opening_in_the_test(opening: u32) -> GpuFailureCause {
+        GpuFailureCause::DeviceOrPipelineDidNotStart {
+            reason: format!("用例造的：第 {opening} 次起不了设备"),
+        }
+    }
+
+    /// 照脚本开卡（`outcomes_in_order` 按次序交回，脚本用完就开不成），重开的规矩是间隔 7 秒、至多重开 3 次；交回结局、开了几次与每次重开之前交去等的间隔。
+    fn opening_with_the_reopenings_in_the_test(
+        outcomes_in_order: Vec<Result<u32, GpuFailureCause>>,
+    ) -> (Result<u32, Vec<GpuFailureCause>>, u32, Vec<Duration>) {
+        let mut outcomes = outcomes_in_order.into_iter();
+        let mut openings = 0_u32;
+        let mut waits = Vec::new();
+        let outcome = gpu_opened_with_the_reopenings(
+            ReopeningsOfAGpuNotOpened {
+                interval: Duration::from_secs(7),
+                reopenings_at_most: 3,
+            },
+            |interval| waits.push(interval),
+            || {
+                openings += 1;
+                outcomes
+                    .next()
+                    .unwrap_or_else(|| Err(cause_of_the_opening_in_the_test(openings)))
+            },
+        );
+        (outcome, openings, waits)
+    }
+
+    /// 开不成两次、第三次开成：交回第三次开出来的，开了 3 次，两次重开之前各等一个间隔。
+    #[test]
+    fn the_gpu_not_opened_twice_and_opened_the_third_time_is_handed_back_after_two_intervals() {
+        let (outcome, openings, waits) = opening_with_the_reopenings_in_the_test(vec![
+            Err(cause_of_the_opening_in_the_test(1)),
+            Err(cause_of_the_opening_in_the_test(2)),
+            Ok(42),
+        ]);
+        assert_eq!(outcome, Ok(42), "第三次开成：照常交回");
+        assert_eq!(openings, 3, "开成了就不再开");
+        assert_eq!(
+            waits,
+            vec![Duration::from_secs(7); 2],
+            "两次重开之前各等一个间隔"
+        );
+    }
+
+    /// 头一次与 3 次重开都开不成：交回每一次的原因（按开的次序），一共开 4 次、等 3 个间隔，之后不再开。
+    #[test]
+    fn the_gpu_never_opened_is_reopened_three_times_and_every_cause_is_handed_back_in_order() {
+        let (outcome, openings, waits) = opening_with_the_reopenings_in_the_test(Vec::new());
+        assert_eq!(
+            outcome,
+            Err((1..=4).map(cause_of_the_opening_in_the_test).collect()),
+            "每一次开不成的原因都交回，头一次的在前"
+        );
+        assert_eq!(openings, 4, "头一次加 3 次重开");
+        assert_eq!(waits, vec![Duration::from_secs(7); 3]);
+    }
+
+    /// 产品的重开：间隔 1 分钟、至多重开 3 次；连同重开一张卡至多等 4 次开卡上限加 3 个间隔（5 分钟的上限下是 23 分钟）。
+    #[test]
+    fn the_product_reopens_a_gpu_not_opened_three_times_one_minute_apart() {
+        assert_eq!(
+            ReopeningsOfAGpuNotOpened::OF_THE_PRODUCT,
+            ReopeningsOfAGpuNotOpened {
+                interval: Duration::from_secs(60),
+                reopenings_at_most: 3,
+            }
+        );
+        assert_eq!(
+            ReopeningsOfAGpuNotOpened::OF_THE_PRODUCT
+                .longest_wait_of_one_gpu(WAIT_LIMIT_OF_OPENING_A_GPU_AT_THE_MOUNT),
+            Duration::from_secs(60) * 23
+        );
     }
 }

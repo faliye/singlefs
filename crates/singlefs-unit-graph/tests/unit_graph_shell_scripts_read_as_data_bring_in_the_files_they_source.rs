@@ -160,7 +160,7 @@ fn sourced_data_line(sourced_file: &str, read_line: u32) -> String {
 /// 场景：脚本里 `source scripts/lib/plain-library.sh`（相对路径，按根找到）。预期：不拒算，闭包里有一行被 source 的那份文件的数据单元，
 /// 落在读脚本的那一行、指纹是它的字节。
 #[test]
-fn a_literal_source_path_brings_the_sourced_file_into_the_closure_as_a_data_unit_at_the_site_reading_the_script(
+fn literal_source_path_brings_the_sourced_file_into_the_closure_as_a_data_unit_at_the_site_reading_the_script(
 ) {
     let tree = shell_data_tree("shell-literal");
     let lines = closure_text_lines(&tree, &LITERAL_ENTRY);
@@ -195,8 +195,8 @@ fn changing_a_file_sourced_through_the_directory_of_bash_source_changes_the_key(
 /// 场景：脚本 source 的 first.sh 再经 `$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)` 赋的变量 source second.sh；改 second.sh。
 /// 预期：闭包里两层的文件都在，改里层 second.sh 键变。
 #[test]
-fn a_library_sourced_by_a_sourced_library_is_followed_layer_by_layer_and_changing_it_changes_the_key(
-) {
+fn library_sourced_by_a_sourced_library_is_followed_layer_by_layer_and_changing_it_changes_the_key()
+{
     let tree = shell_data_tree("shell-nested");
     let lines = closure_text_lines(&tree, &DIRECTORY_ENTRY);
     for sourced_file in ["scripts/lib/first.sh", "scripts/lib/second.sh"] {
@@ -218,7 +218,7 @@ fn a_library_sourced_by_a_sourced_library_is_followed_layer_by_layer_and_changin
 
 /// 场景：`. "$SCRIPT_DIRECTORY/lib/dot-only.sh"`（变量由 `$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)` 赋）。预期：`.` 照 source 收。
 #[test]
-fn a_dot_source_through_a_variable_assigned_from_cd_and_pwd_is_followed() {
+fn dot_source_through_a_variable_assigned_from_cd_and_print_working_directory_is_followed() {
     let tree = shell_data_tree("shell-dotted");
     let lines = closure_text_lines(&tree, &DOTTED_ENTRY);
     let expected = sourced_data_line("scripts/lib/dot-only.sh", DOTTED_SCRIPT_READ_LINE);
@@ -230,7 +230,7 @@ fn a_dot_source_through_a_variable_assigned_from_cd_and_pwd_is_followed() {
 
 /// 场景：`library="$1"; source "$library"`。预期：拒算 `shell-path-unfolded`，落在样本脚本 source 的那一行。
 #[test]
-fn a_source_path_that_does_not_fold_refuses_the_key_as_shell_path_unfolded() {
+fn source_path_that_does_not_fold_refuses_the_key_as_shell_path_unfolded() {
     let tree = shell_data_tree("shell-unfolded");
     let reason = key_text(&tree, &UNFOLDED_ENTRY).expect_err("source 的路径折不出要拒算");
     assert!(

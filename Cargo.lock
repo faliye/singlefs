@@ -285,6 +285,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpu-verification-server"
+version = "0.1.0"
+dependencies = [
+ "prune-server",
+ "singlefs-core",
+ "singlefs-verification",
+]
+
+[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,6 +812,22 @@ dependencies = [
  "ash",
  "libc",
  "singlefs-core",
+ "singlefs-mount-runtime",
+ "singlefs-replay-prefix",
+ "wgpu",
+]
+
+[[package]]
+name = "singlefs-background-gpu-tests"
+version = "0.1.0"
+dependencies = [
+ "ash",
+ "singlefs-background-gpu",
+ "singlefs-core",
+ "singlefs-mount-runtime",
+ "singlefs-replay-prefix",
+ "singlefs-unit-graph",
+ "singlefs-verification",
  "wgpu",
 ]
 
@@ -830,6 +855,14 @@ version = "0.1.0"
 [[package]]
 name = "singlefs-format"
 version = "0.1.0"
+
+[[package]]
+name = "singlefs-mount-runtime"
+version = "0.1.0"
+dependencies = [
+ "singlefs-core",
+ "singlefs-format",
+]
 
 [[package]]
 name = "singlefs-reference-filesystem"

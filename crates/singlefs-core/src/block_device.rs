@@ -56,7 +56,7 @@ pub struct ExternalTypeSpecificationOfInputOutputError(io::Error);
 #[verifier::external_type_specification]
 #[verifier::external_body]
 #[allow(dead_code, reason = "只给 Verus 看的类型规格：产品构建里没有人读它包着的字段")]
-pub struct ExternalTypeSpecificationOfPathBuf(PathBuf);
+pub struct ExternalTypeSpecificationOfPathBuffer(PathBuf);
 
 #[verifier::external_type_specification]
 #[verifier::external_body]
@@ -1538,7 +1538,7 @@ mod tests {
     /// 场景：守卫认领一份镜像与一个带文件的目录，作用域照常走完。预期：两条路径都不在了。
     /// 判别力（`crates/mutations.tsv`）：守卫的 Drop 不删，两条都还在，这条红。
     #[test]
-    fn a_temporary_image_and_directory_are_gone_once_the_scope_ends_normally() {
+    fn temporary_image_and_directory_are_gone_once_the_scope_ends_normally() {
         let image_path;
         let directory_path;
         {
@@ -1578,7 +1578,7 @@ mod tests {
     /// 场景：守卫认领的镜像建好之后作用域里 panic。预期：panic 接住之后镜像不在了。
     /// 判别力（`crates/mutations.tsv`）：守卫的 Drop 不删，镜像还在，这条红。
     #[test]
-    fn a_temporary_image_is_gone_after_a_panic_inside_the_scope() {
+    fn temporary_image_is_gone_after_a_panic_inside_the_scope() {
         let image = temporary_image_path("guard-panic");
         let image_path = image.to_path_buf();
         let panicked = std::panic::catch_unwind(move || {
@@ -1858,7 +1858,7 @@ mod tests {
     /// 打洞报别的错（测试开关当作 `fallocate` 报了 `EIO`）：照常交回 `InputOutput`、原 errno 带着，
     /// 一个 0 都不写——段里还是旧字节，经 write 系统调用一个字节都没交出去，两个落地计数都不动。
     #[test]
-    fn a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes() {
+    fn hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes() {
         const IMAGE_BYTES: u64 = 65536;
         const DIRT: u8 = 0xC3;
         let path = temporary_image_path("failing-punch");
@@ -2016,7 +2016,7 @@ mod tests {
 
     /// 打洞被信号打断一次：原样重打一次、真打成洞（[`assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error`]）。
     #[test]
-    fn a_hole_punch_interrupted_by_a_signal_is_punched_again_without_falling_back_or_reporting_an_error(
+    fn hole_punch_interrupted_by_a_signal_is_punched_again_without_falling_back_or_reporting_an_error(
     ) {
         assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error(1);
     }
@@ -2024,7 +2024,7 @@ mod tests {
     /// 打洞连着被信号打断两次：第二次被打断也照样原样重打、第三次真打成洞，不报错、不退回逐块写 0。
     /// 「被打断第二次就报错」（重打只给一次）时这里交回 `InputOutput`。
     #[test]
-    fn a_hole_punch_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time_without_falling_back_or_reporting_an_error(
+    fn hole_punch_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time_without_falling_back_or_reporting_an_error(
     ) {
         assert_punched_again_after_interruptions_without_falling_back_or_reporting_an_error(2);
     }
@@ -2084,8 +2084,8 @@ mod tests {
     /// 内存稀疏盘（`singlefs_verification::memory_pool::SparseBlockDevice`）在验证包，核心层的单测拿不到它，不在这里比
     /// （它与文件后端对这两处长度 0 的请求逐个对拍在 `sparse_devices_refuse_requests_outside_the_device_like_the_file_backend`）。
     #[test]
-    fn a_zero_length_zero_fill_ends_the_same_on_the_file_backend_and_both_arms_of_the_direct_backend(
-    ) {
+    fn zero_length_zero_fill_ends_the_same_on_the_file_backend_and_both_arms_of_the_direct_backend()
+    {
         const IMAGE_BYTES: u64 = 65536;
         const DIRT: u8 = 0x5A;
         let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
@@ -2438,7 +2438,7 @@ mod tests {
 
     /// 文件后端的 discard 复用打洞：段内读回全 0、段外一个字节不动、文件长度不变，交回「交给了底层」并记一次。
     #[test]
-    fn a_discard_on_the_file_backend_punches_the_range_back_to_zero_and_leaves_the_neighbours() {
+    fn discard_on_the_file_backend_punches_the_range_back_to_zero_and_leaves_the_neighbours() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-punched",
             DiscardLanding::PunchHoleOrAnswerUnsupported,
@@ -2482,7 +2482,7 @@ mod tests {
 
     /// 文件系统不支持打洞：交回「不支持」、一个 0 都不写（段里还是旧字节），记一次「不支持」。
     #[test]
-    fn a_discard_where_hole_punching_is_unsupported_answers_unsupported_and_leaves_the_old_bytes() {
+    fn discard_where_hole_punching_is_unsupported_answers_unsupported_and_leaves_the_old_bytes() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-unsupported",
             DiscardLanding::ActAsIfPunchingWereUnsupported,
@@ -2508,8 +2508,7 @@ mod tests {
 
     /// 打洞报 `EIO`：照常交回块设备 I/O 错，不吞成「不支持」，段里还是旧字节，两种结局都不记。
     #[test]
-    fn a_discard_whose_hole_punch_fails_with_an_input_output_error_is_reported_and_changes_nothing()
-    {
+    fn discard_whose_hole_punch_fails_with_an_input_output_error_is_reported_and_changes_nothing() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-input-output-error",
             DiscardLanding::ActAsIfPunchingFailedWithAnInputOutputError,
@@ -2527,7 +2526,7 @@ mod tests {
 
     /// 打洞连着被信号打断两次：原样重打到第三次，打成洞、交回「交给了底层」，被打断的次数记 2。
     #[test]
-    fn a_discard_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time() {
+    fn discard_interrupted_by_a_signal_twice_in_a_row_is_punched_a_third_time() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-interrupted",
             DiscardLanding::ActAsIfTheFirstPunchesWereInterruptedBySignal {
@@ -2545,7 +2544,7 @@ mod tests {
 
     /// 没对齐、越过末尾的 discard 在动文件之前就拒，与读写同一条判据；段里还是旧字节。
     #[test]
-    fn a_discard_off_the_block_boundaries_or_past_the_end_is_refused_before_touching_the_file() {
+    fn discard_off_the_block_boundaries_or_past_the_end_is_refused_before_touching_the_file() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-refused",
             DiscardLanding::PunchHoleOrAnswerUnsupported,
@@ -2566,7 +2565,7 @@ mod tests {
 
     /// 文件后端上长度 0 的 discard 没有动作：交回「交给了底层」、不调 `fallocate`、两种结局都不记，段里还是旧字节
     #[test]
-    fn a_zero_length_discard_on_the_file_backend_is_applied_without_being_counted() {
+    fn zero_length_discard_on_the_file_backend_is_applied_without_being_counted() {
         let (mut device, _removed) = dirty_image_for_discards(
             "discard-zero-length",
             DiscardLanding::PunchHoleOrAnswerUnsupported,
@@ -2587,7 +2586,7 @@ mod tests {
 
     /// `O_DIRECT` 后端上长度 0 的 discard 没有动作：两臂都交回「交给了底层」、不记「不支持」。
     #[test]
-    fn a_zero_length_discard_on_the_direct_backend_is_applied_without_being_counted_on_both_arms() {
+    fn zero_length_discard_on_the_direct_backend_is_applied_without_being_counted_on_both_arms() {
         for policy in [
             PageCachePolicy::BypassWithDirectInputOutput,
             PageCachePolicy::GoThroughPageCache,
