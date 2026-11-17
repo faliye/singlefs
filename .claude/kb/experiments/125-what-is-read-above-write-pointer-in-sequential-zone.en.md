@@ -154,7 +154,7 @@ cross-apparatus reconciliation turns red immediately), `neg_control_cond_not_emp
 
 ⚠️ **One of them was a true defect forced out by mutation testing, recorded faithfully**: positive control originally had only
 the mutual comparison assertion `WPB == M × SLOT`, where `M` drove both write and expected value ⇒ changing `M` from 8 to 7
-**remained completely silent**. Per `.claude/singlefs-ai-sop/rules/test-discipline.md` "For every mutual comparison assertion written,
+**remained completely silent**. Per `.claude/rules/test-discipline.md` "For every mutual comparison assertion written,
 there must be an assertion beside it pinning absolute values", supplemented two absolute value assertions `WPB == 32768` and `ZBYTES − WPB == 67076096`,
 and the mutation was caught on the spot. **This is precisely the failure pattern that rule guards against, and it truly happened once in E125 (What is Read Above Write Pointer in Sequential Zone) 2026-09-09 run.**
 
@@ -162,9 +162,9 @@ and the mutation was caught on the spot. **This is precisely the failure pattern
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D22 (Synthesizing Unit Atomicity) settled item 10 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D22 (Synthesizing Unit Atomicity) unsettled item 6 | Raw material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D22 (Synthesizing Unit Atomicity) settled item 10 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D22 (Synthesizing Unit Atomicity) unsettled item 6 | Raw material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 
@@ -176,7 +176,7 @@ and the mutation was caught on the spot. **This is precisely the failure pattern
 
 ### 2026-09-09 (Design)
 - Design registered, criteria and failure clauses hardcoded before run. **Zero cells of data existed at this point** —— exactly
-  the order demanded by `.claude/singlefs-ai-sop/rules/test-discipline.md` "Answers must not exist before the experiment begins".
+  the order demanded by `.claude/rules/test-discipline.md` "Answers must not exist before the experiment begins".
   Basis: D22 (Synthesizing Unit Atomicity) unsettled item 6 round had zero observations, while checking
   `modinfo null_blk` and `which blkzone` on 2026-09-09 demonstrated observations were obtainable.
   **Reason for unexecuted was inability to obtain root in this round** (host sudo blocked by sandbox), not observation feasibility.

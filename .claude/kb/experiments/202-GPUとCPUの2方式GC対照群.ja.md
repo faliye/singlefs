@@ -4,19 +4,21 @@
 
 事前登録 `research/prompts/e202-preregistration.md`。問題票 `research/prompts/m4-gpugc-compare-questions.md` に回答：同一負荷・同一プール下で `background_compute=cpu` と `background_compute=gpu` の2方式の間で GC 壁時計時間、消費・節減ホスト CPU 時間、フォアグラウンド fsync 遅延分布、容量による変化を比較。
 
-組み込み装置 `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`（background-gpu パッケージ所属）。**本ページは事前登録と装置骨格の作成のみを記録し、成果物は未実行。**
+組み込み装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs`（製品 GPU パッケージのテストパッケージ background-gpu-tests 所属）。**本ページは事前登録と装置骨格の作成のみを記録し、成果物は未実行。**
 
 ### 現状
 
 - 事前登録作成済み（2026-11-03）、装置骨格作成済み、成果物未実行。
+- 第一段の幾何確認は一度起動したが、完走せず成果物も残していない：開始プールの構築が遅すぎ、計測した速度ではタスクサービスの四時間上限に収まらない。計測値：2288MiB 段では逐次書き込みの半分が約 34 分、交互書き込みの半分は約 60 秒で 95 ステップ（全 18304 ステップ）；8GiB 段では 2100 秒で逐次書き込み 18292 ステップ（全 65536 ステップ）；三段を同時に構築し、常駐メモリは 2100 秒時点で 9.4 GiB。ユーザーは今回は実行せず、プール構築の高速化が済んでから実行すると決めた。
 - ディスク容量は固定占有率の読み方を採用（容量増大時、有効データがユニット領域に占める割合を固定で 50% とする）。
 - 装置の制約：GPU モードは1カード上限 1 GiB、カード順に充填；単一カードおよび複数カードで各実行；判定が項目ごとに CPU 参照と一致して初めて1組の数値として計上。
+- 複数カードの臂で使うカード枚数は `lockstep --cards <枚数>` で決める（0 または 1、あるいはタスクサーバーが渡した枚数より多いと終了コード 2；指定しなければタスクサーバーが渡した全カードを使う）。成果物の `name=every_card_arm_cards` 行に `cards_named` と決め方（`named_by=cards_option` または `every_handed_over_card`）を記録する。再開時に枚数が再開対象の成果物と異なれば `name=stopped clause=cards_option_differs_from_the_product_being_resumed` を出して終了コード 2。
 
 ### 再実行
 
 ```bash
 # リポジトリ内装置のコンパイルと実行はメイン agent の担当；task-server 経由でスケジューリング
-task-server/task submit -- cargo run --release -p singlefs-background-gpu --features gpu --bin e202_gpu_cpu_gc_comparison
+task-server/task submit -- cargo run --release -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --bin e202_gpu_cpu_gc_comparison
 ```
 
 ### 計測条件
@@ -37,9 +39,14 @@ task-server/task submit -- cargo run --release -p singlefs-background-gpu --feat
 
 | 決定項目 | 関係 | 振り返り |
 |---|---|---|
-| D26 (バックグラウンド整理と配置回収) 確定項目 13 | 準備 | 2026-11-03 影響なし：未実行、事前登録作成済み |
+| D26 (バックグラウンド整理と配置回収) 確定項目 13 | 準備 | 2026-11-14 影響なし：今回の変更は装置をテストパッケージへ移したこと、起動方法、複数カードの腕のカード枚数の決め方であり、判定基準・腕・条件は変わらず、成果物は一度も実行していないため、事前登録作成済み・装置未実行のまま |
 
 ## 履歴バージョン
+
+### 2026-11-13
+
+- 第一段の幾何確認を一度起動した（タスク 16507）が、開始プールの構築が遅く、メモリ上限に三度当たって最初からやり直しになり、メインエージェントが取り消した；ユーザーは今回は実行せず、プール構築の高速化を待つと決めた。成果物なし。
+- 装置を製品 GPU パッケージからそのテストパッケージ `crates/singlefs-background-gpu-tests/src/bin/` へ丸ごと移し、起動方法を `-p singlefs-background-gpu-tests --features tests-on-a-real-gpu` に変えた；複数カードの臂の枚数は `lockstep --cards <枚数>` で決めるようにし、成果物に `name=every_card_arm_cards` 行が増えた（ユーザー決定の原文は `records/2026-11-11-GPU两段与按需领卡核查.md`）。判定基準・臂・口径は変えておらず、成果物は一度も実行していない。
 
 ### 2026-11-03
 

@@ -123,6 +123,7 @@
 | 本次未跑 | not run this time | 今回未実行 | |
 | 清场 | quiesce | 静止化 | 起 GPU 之前停掉占卡的服务<br>stop the services holding the GPUs before a GPU run<br>GPU を使う前に GPU を占有しているサービスを止める |
 | 显卡 | GPU card | GPU カード | |
+| 开卡器 | opener | オープナー | |
 | 内核 | kernel | カーネル | |
 | 派活 | dispatch | ディスパッチ | |
 | 零轮 | zero round | ゼロラウンド | |
@@ -132,7 +133,6 @@
 | 合表 | merged table | 統合表 | |
 | 登记表 | registry | 登録表 | |
 | 岔路单 | fork sheet | 分岐表 | |
-| 积压登记表 | backlog registry | 積み残し登録表 | |
 | 收口表 | closeout table | 収束表 | |
 | 钉表 | pin table | 固定表 | |
 | 产物 | artifact | 成果物 | |

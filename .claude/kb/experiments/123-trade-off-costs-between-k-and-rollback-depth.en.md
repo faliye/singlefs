@@ -29,10 +29,10 @@ Swept dimension: **S ∈ {1, 2, 4, 8, 16}** (R = 3 settled, D22 (Synthesizing Un
 | # | Criterion |
 |---|---|
 | 1 | All four metrics must be given for both arms under **the identical measurement basis** —— one arm reporting block counts while the other reports byte counts is forbidden |
-| 2 | Each metric must be **given per S**, taking values at only a single S is forbidden (`.claude/singlefs-ai-sop/rules/evidence-discipline.md` "Did I only sample at one point?") |
+| 2 | Each metric must be **given per S**, taking values at only a single S is forbidden (`.claude/rules/evidence-discipline.md` "Did I only sample at one point?") |
 | 3 | **Positive control**: at S=1 (N=3) "rollbackable generations" of both arms must differ (3 vs 2). Identical ⇒ model fails to distinguish both arms, **entire round invalidated** |
 | 4 | **Negative control**: set Arm ② K to N (both arms converge) ⇒ all four metrics must be **equal cell by cell**. Not equal ⇒ **entire round invalidated** |
-| 5 | **Each metric must have assertions pinning absolute values**, mutual comparisons between arms alone forbidden (`.claude/singlefs-ai-sop/rules/test-discipline.md` "Comparing multiple arms only against each other cannot detect when all arms are wrong together") |
+| 5 | **Each metric must have assertions pinning absolute values**, mutual comparisons between arms alone forbidden (`.claude/rules/test-discipline.md` "Comparing multiple arms only against each other cannot detect when all arms are wrong together") |
 
 ### Failure Clauses (Hardcoded Before Run)
 
@@ -109,10 +109,10 @@ corrected on the spot to pass through price difference function; only after corr
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D22 (Synthesizing Unit Atomicity) settled item 25 | Raw material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D23 (Journal Role & Format) settled item 14 | Raw material | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D25 (Target Workload Priority) settled item 1 | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D22 (Synthesizing Unit Atomicity) settled item 25 | Raw material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 14 | Raw material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) settled item 1 | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

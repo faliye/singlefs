@@ -239,23 +239,29 @@ Assertions link path 1 to 2 in `anchors_from_independent_calculations` (line 173
 - Model-level counts only, no timing or throughput. Q4 reversal's second half “conflict rate lowers throughput below serial” is decidable only to “no more than serial” (Q-9); “below” requires recomputation and validation times, i.e. Q1 local-device throughput.
 - Only 2/3 transactions, one initial value, two shapes, six arms; no duplicate counts for more transactions, more complex shapes, merging tree contents (Q3), crash prefix (Q2/Q7), admission oversell (Q5).
 - 「A字面」 X/T duplicates show the four things named literally in candidate do not cover transaction number and tree watermark touched on each `crates/` publish; not proof whole exclusive is infeasible: A proponents' form locks from read to write-back and is all 0. Which reading defines whole exclusive belongs to main agent.
-- 「P设」 at D = 2 can disagree on lowest free pair and fail to converge within retry cap 2: weakest reading of failure 6, not proof device partitioning is impossible. A different form requires the three steps in `.claude/singlefs-ai-sop/rules/evidence-discipline.md` on pre-fixed arm definitions and is a new experiment.
+- 「P设」 at D = 2 can disagree on lowest free pair and fail to converge within retry cap 2: weakest reading of failure 6, not proof device partitioning is impossible. A different form requires the three steps in `.claude/rules/evidence-discipline.md` on pre-fixed arm definitions and is a new experiment.
 - 「O读」 uses fewer than n rounds in Q1乙 only for disjoint read sets; same shape (each transaction creates inode) equals n as 「O整」.
 - Default geometry where number of regions = number of transactions and sufficient reserve: FALLBACK and deadlock paths for 「P区」 are never reached under the default geometry (in the artifact `region_fallbacks=0`, `region_deadlocks=0`); the model path is verified only by unit tests, and the artifact contains no readings (sampling points of the second segment).
 - ACC accounting lost updates and BASE lost updates (Q-10) unmodeled; FRZ, SC, BC (frozen publishes, system configuration slot generation, reverse chain) listed as unmeasured.
 - 「O读」 no-guard and 「O整」 no-guard controls use the same code (12.2.3); no separate control for 「O读」's “issue transaction number at commit” guard. V6 mutation catches it.
 
+### 2026-11-14 re-run artifacts
+
+The re-run now judges byte-identical; the new artifacts are in the repository and the replay-table rows point to the new names (the E129 device probe has no replay-table row):
+
+- `research/results/e166-parallel-commit-shared-state-partition-r2-main-2026-11-14.out` (byte-identical to `e166-parallel-commit-shared-state-partition-r2-main-2026-10-02.out`)
+
 ### Affected decisions
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D13 (Verification Route) settled item 2 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D13 (Verification Route) settled item 10 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D3 (Space Allocation) settled item 6 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D28 (Mount-Time Commitments) settled item 2 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D16 (Publish Semantics) settled item 4 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D8 (Core Index Structure) settled item 11 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
-| D8 (Core Index Structure) settled item 8 | Background | 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D13 (Verification Route) settled item 2 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D13 (Verification Route) settled item 10 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D3 (Space Allocation) settled item 6 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D28 (Mount-Time Commitments) settled item 2 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D16 (Publish Semantics) settled item 4 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D8 (Core Index Structure) settled item 11 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
+| D8 (Core Index Structure) settled item 8 | Background | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-18 unaffected: prior artifacts archived in version control (recoverable from git history), body references reduced to filenames; conclusions and numbers unchanged |
 
 ## Historical Versions
 

@@ -147,18 +147,24 @@ grep -o 'name=[a-z_0-9]*' research/results/e83-tombstone-grain-2026-10-04-r2.out
   M8 (reserved bytes 29 → 28) capacity-insensitive (header 135 still in 815 validity interval [129, 168], 16 rows of `cost` unchanged), caught solely by structural assertion `constants_match_the_clause_arithmetic`, not recorded as equivalent mutation.
 - Command counting unit tests: `grep -c '#\[test\]' scripts/experiment-apparatus/e83_tombstone_grain.rs` outputs `21`.
 
+### 2026-11-14 re-run artifacts
+
+The re-run now judges byte-identical; the new artifacts are in the repository and the replay-table rows point to the new names (the E129 device probe has no replay-table row):
+
+- `research/results/e83-tombstone-grain-2026-11-14.out` (byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`)
+
 ### Impacted Decisions
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D18 (Information Carried in a Block) settled item 10 | Support | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D18 (Information Carried in a Block) settled item 8 | Does not affect | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D18 (Information Carried in a Block) settled item 11 | Material prep | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D18 (Information Carried in a Block) settled item 24 | Support | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D18 (Information Carried in a Block) settled item 16 | Material prep | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D3 (Space Allocation) settled item 2 | Material prep | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D2 (RAID Stripe Policy) settled item 9 | Does not affect | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
-| D4 (Checksum Location) settled item 5 | Does not affect | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D18 (Information Carried in a Block) settled item 10 | Support | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D18 (Information Carried in a Block) settled item 8 | Does not affect | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D18 (Information Carried in a Block) settled item 11 | Material prep | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D18 (Information Carried in a Block) settled item 24 | Support | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D18 (Information Carried in a Block) settled item 16 | Material prep | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D3 (Space Allocation) settled item 2 | Material prep | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D2 (RAID Stripe Policy) settled item 9 | Does not affect | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D4 (Checksum Location) settled item 5 | Does not affect | 2026-11-15 unaffected: the rerun artifact is now `e83-tombstone-grain-2026-11-14.out`, byte-identical to `e83-tombstone-grain-2026-10-04-r2.out`; conclusions and numbers unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
 
 ## Historical Versions
 

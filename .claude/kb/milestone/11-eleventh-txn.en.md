@@ -23,6 +23,7 @@ Exits and to what layer the POSIX surface is implemented are left to user decisi
 | 1 | Decisions regarding directory structure established and settled (which tree directory entries live in, keys, hard link counts, rename atomicity), on-disk format registered in `.claude/kb/layout/` with the same milestone number (filename starting with `11-`) | I |
 | 2 | Settled POSIX operation set lands in implementation, RefFS expanded to identical set, differential testing against model matches item by item | II |
 | 3 | One crash stream per new transaction type, achieving zero red across the board | III |
+| 4 | Interaction with features landed earlier each has one test case and one must-red world: snapshots, GC, truncation, packing, parallel commit, multiple files, and the transactions added by each milestone ordered before this file (settled by the user on 2026-11-16; the shape follows Milestone 5 Exit 5) | III |
 
 ## Grouping and Ordering
 
@@ -32,6 +33,8 @@ Exits and to what layer the POSIX surface is implemented are left to user decisi
 | 1 Establish decisions | I·1 → I·2 | Establish decisions before writing code | Not started |
 | 2 Implementation | II·1 ∥ II·2, then II·3 | RefFS and implementation are mutually independent (RefFS does not import implementation); differential testing after both sides exist | Not started |
 | 3 Coverage | III·1 | Depends on 2 | Not started |
+
+**Addendum (settled by the user on 2026-11-16)**: the design rounds of I·1 and I·2 move up to run alongside Milestone 5 X·1, by three-way argument only and without code; the implementation stays in this file.
 
 **Estimate**: Not estimated. Record `records/2026-10-11-里程碑五打包与决策进度列.md` Section 3 inferred 3–4 weeks (inferred, unmeasured).
 
@@ -50,7 +53,7 @@ Exits and to what layer the POSIX surface is implemented are left to user decisi
 
 ## II. Implementation and Differential Testing
 
-- **Existing in repo**: Operation enum of RefFS contains only five types: creating first file, overwrite, explicit publish, fsync, rollback (`enum Operation` in `crates/singlefs-reference-filesystem/src/lib.rs`); ideal model in `crates/singlefs-verification/src/model.rs`.
+- **Existing in repo**: Operation enum of RefFS contains nine types: creating first file, overwrite, explicit publish, fsync, rollback, create snapshot, destroy snapshot, truncate, write at offset (checked 2026-11-16; multiple files are added by Milestone 5 X·3) (`enum Operation` in `crates/singlefs-reference-filesystem/src/lib.rs`); ideal model in `crates/singlefs-verification/src/model.rs`.
 - **Work items**:
 
 | # | Description | Backing clauses and owed checks | Acceptance | Dependencies |
@@ -64,5 +67,23 @@ Exits and to what layer the POSIX surface is implemented are left to user decisi
 | # | Description | Backing clauses and owed checks | Acceptance | Dependencies |
 |---|---|---|---|---|
 | III·1 | One crash stream per new transaction type (create, delete, rename, hard link), registered in `crash-case:` rows of `.claude/gate.d/stage-inputs.tsv` and `.claude/gate.d/crash-point-replay-items.tsv` | Settled items 9 and 15 of D13 (Verification Route) | Zero red across the board; mutation causing both or neither side to be visible upon mid-rename crash turns red | II |
+
+## IV. Multi-Tenant Isolation (moved from milestone ten; decided by the user on 2026-11-11)
+
+
+- **Verbatim**: "5 also has permission issues, because using O_DIRECT requires designing permissions" "in other words calling it multi-tenant isolation might be more appropriate" confirming "Yes, we want Linux permission model to judge permissions ourselves in o_direct mode" (User 2026-10-12).
+- **Existing in repo**: On-disk format of inode records reserves 4 bytes each for mode / uid / gid / nlink at offset 24 (field table in settled item 6 of D8 (Core Index Structure)); `InodeRecord` in `crates/singlefs-core/src/records.rs` only carries inode, object birth generation, nlink, size, change count, write timestamp; writing to disk hardcodes mode to `0o100644`, uid and gid to 0, reading skips these three slots (writing and parsing of `InodeRecord`, checked in `crates/singlefs-core/src/records.rs`). How attributes are extended is linked to C115 (overflow path of inode attributes lacks placement), originally ordered in Milestone 11 I·2 (placement of attributes and extended attributes). Space accounting follows `.claude/rules/fs-design.md` "accounting is a byproduct of transactions, not post-hoc traversal" falling in first slot; per-tenant quotas must likewise be maintained incrementally upon commit. Checked 2026-11-16: `InodeRecord` also carries the truncation field; writing and parsing the record are inside the Verus-verified region (the lemmas in `crates/singlefs-core/src/records.rs`, `.claude/gate.d/verus-pins.tsv`), so IV·2 changes these three fields together with the proofs.
+- **Work items**:
+
+| # | Description | Backing clauses and owed checks | Acceptance | Dependencies |
+|---|---|---|---|---|
+| IV·1 | Design round (same round as I·1): how identity is obtained (inferred: disk-holding process obtains uid, gid, and supplementary groups of peer process via Unix socket); mode, uid, gid fall in slots reserved at offset 24 of inode records; how far alignment goes with Linux kernel judgments for regular files (beyond owner / group / others rwx tiers and root, whether setuid / setgid / sticky bits, POSIX ACLs, capabilities like `CAP_DAC_OVERRIDE` are recognized); whether listing (enumeration by inode number) filters by permission; raw disk itself governed by Linux device node permissions (which user disk-holding process runs as, which group disk belongs to); per-uid quotas maintained incrementally upon commit | Settled item 6 of D8 (Core Index Structure); C115 (overflow path of inode attributes lacks placement); metric table in D5 (Snapshot / Space Accounting Mechanism); settled item 1 of D16 (Publish Semantics) "acceptance"; C71 (Unrecognized statistics tag silently ignored) (quota per uid is the first new statistical dimension planned, attribution inferred, verify before starting work) | Three-party verdict filed in `research/prompts/`, settlements written back to kb; decisions require experiments | Stage 0; if the per-tenant-key path is chosen, also Milestone 15 I·2 and II |
+| IV·2 | Implementation: inode records read and write mode, uid, gid (no longer hardcoding `0o100644` and 0); owner takes caller upon file creation; chmod, chown, quota modification are separate transactions traversing same transaction layer (`.claude/rules/fs-design.md` "start from transactions, not from features"); session entry judges read, write, truncate, delete, listing per caller uid, gid, supplementary groups and file mode; per-uid space quotas maintained incrementally upon commit, acceptance rejects accordingly | Settlement of IV·1 | Each new test proven to turn red first; differential testing against model matches item by item across interleaved multi-uid history | IV·1; I·2 |
+| IV·3 | Unauthorized access test cases and differential testing: one test case per permission tier in Linux (writing without write bit, reading without read bit, modifying another file's mode, non-root changing owner, writing after exhausting own quota), all rejected; identical tuple (uid, gid, supplementary groups, mode, operation) judged via kernel on ext4 matches singlefs judgment item by item; streams crashing mid-chmod or chown connect to crash amplification; per-uid quota ledger in crash streams equals per-uid calculated by checker traversal | `.claude/rules/fs-design.md` "accounting is a byproduct of transactions, not post-hoc traversal" (runtime and checker use different algorithms) | Unauthorized access cases all rejected, differential testing matches item by item; removing entry check causes unauthorized test cases to turn red | IV·2 |
+
+- **Must be settled before starting work**:
+  1. Processes capable of directly opening raw disks bypass any file-level judgment (able to read every byte on disk); hence isolation based solely on permission bits requires tenants not to touch disks directly: multiple sessions can only take the form of "single disk-holding process serving multiple client sessions". To allow tenants to open disks directly, encryption partitioning keys by tenant is required, with encryption in Milestone 15 ([15-fifteenth-txn.md](15-fifteenth-txn.md)). Choosing between the two determines multi-session form in I·1 (inferred, unmeasured); if the latter is chosen, IV comes after Milestone 15.
+  2. How far alignment with Linux goes: implementing rwx and root only, or including setuid / setgid / sticky bits, POSIX ACLs, and capabilities together.
+- **To change after the move**: IV·1 originally says "in the same round as I·1", which means milestone ten I·1 (sessions and the multi-session form); the settlement of that round is an input here; where mode, uid and gid live is settled in the same round as I·2 (where attributes and extended attributes live); the execute bit of directories, path traversal and the sticky bit enter the scope of the judgment in IV·1; the per-uid quota keeps the approach IV·2 originally describes.
 
 **Not in exits**: FUSE mount (Milestone 12 [12-twelfth-txn.md](12-twelfth-txn.md)), encryption AAD on directory entries (Milestone 15), cross-file packing and inlining on write path (settled item 3 of D14 (Dual-Track: Large/Small Files & Persistent/Transient) judged negative).

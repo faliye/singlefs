@@ -18,7 +18,7 @@
 > | **③ Two arms form a false dichotomy** | Derived state can maintain a **lossy digest** of "which units have sharing" (false positives permitted, false negatives forbidden): losing it falls back to full-disk scan = "merely slow", which is the exact definition of D21 (Boundary Between Authoritative and Derived States) derived state; corruption only scans a few extra units, corruption detectable. ⇒ It remains purely derived state, **does not expand authoritative state catalog**, while rebuild cost is O(shared units) rather than O(disk). **"Arm B billed by disk capacity" is a property of the `Derived` implementation in E69 (Incremental Maintenance Cost of Reverse Index Taking Authoritative State), not a property of derived state** |
 > | **④ Density formula is an identity** | `entries_written` is identically equal to sum of `extra_referrers` across disk = `closed_form` (`referrer` monotonically increments ⇒ insertion guaranteed non-duplicate) ⇒ those 101 `matches=true` across "scanning full domain 0..=100" **proved arithmetic, not the tested object** |
 >
-> ⚠️ **Root cause was a skipped verbatim verification**: `.claude/singlefs-ai-sop/rules/verify-before-claiming.md` explicitly states
+> ⚠️ **Root cause was a skipped verbatim verification**: `.claude/rules/evidence-discipline.md` explicitly states
 > "Whether it is settled and how it is actually defined are two separate questions". Prior to modeling, read D21 (Boundary Between Authoritative and Derived States) settled item 1 verbatim,
 > **yet failed to read the first cell of `fs-design.md` used as criterion verbatim** — used it merely on impression.
 >
@@ -151,9 +151,9 @@ Fixed 100k units, 8 units per transaction:
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D21 (Boundary Between Authoritative and Derived States) settled item 1 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D1 (Data Mobility / Reverse Index) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D6 (Snapshot Implementation Model) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D21 (Boundary Between Authoritative and Derived States) settled item 1 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D1 (Data Mobility / Reverse Index) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D6 (Snapshot Implementation Model) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

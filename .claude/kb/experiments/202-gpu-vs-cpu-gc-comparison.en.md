@@ -4,19 +4,21 @@
 
 Pre-run registration `research/prompts/e202-preregistration.md`. Answers question list `research/prompts/m4-gpugc-compare-questions.md`: compares GC wall-clock, host CPU time used and saved, foreground fsync latency distribution, and saved CPU time scaling with disk capacity between `background_compute=cpu` and `background_compute=gpu`.
 
-In-tree apparatus `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs` (lives in background-gpu crate). **This page records that the pre-run registration and apparatus skeleton are written; no artifacts have been run.**
+In-tree apparatus `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs` (lives in the background-gpu-tests crate, the test crate of the product GPU crate). **This page records that the pre-run registration and apparatus skeleton are written; no artifacts have been run.**
 
 ### Current Status
 
 - Pre-run registration written (2026-11-03), apparatus skeleton created, no artifacts run yet.
+- The geometry check of segment one was started once, did not finish and left no artifact: building the starting pools is too slow to fit under the four-hour cap of the task service at the measured speed. Measured: on the 2288MiB tier the sequential half took about 34 minutes and the interleaved half did 95 steps in about 60 seconds out of 18304; on the 8GiB tier the sequential half reached 18292 steps out of 65536 at 2100 seconds; with three tiers built at once the resident memory was 9.4 GiB at 2100 seconds. The user settled not to run it this time and to run it after the pool-building speed-up is done.
 - Capacity reading uses fixed-occupancy reading (50% live data in unit area).
 - Apparatus constraints: GPU mode per-card cap 1 GiB, filling cards in order; runs with single card and multiple cards; a data set counts only when judging clauses match CPU reference item by item.
+- How many cards the multi-card arm uses is set by `lockstep --cards <count>` (0 or 1, or more than the task server handed over, exits 2; without it the arm uses every card the task server handed over); the product line `name=every_card_arm_cards` records `cards_named` and how it was set (`named_by=cards_option` or `every_handed_over_card`); when resuming with a count different from the product being resumed, it prints `name=stopped clause=cards_option_differs_from_the_product_being_resumed` and exits 2.
 
 ### Repro
 
 ```bash
 # In-repo apparatus compilation and execution belongs to the main agent; scheduled via task-server
-task-server/task submit -- cargo run --release -p singlefs-background-gpu --features gpu --bin e202_gpu_cpu_gc_comparison
+task-server/task submit -- cargo run --release -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --bin e202_gpu_cpu_gc_comparison
 ```
 
 ### Measurement Basis
@@ -37,9 +39,14 @@ task-server/task submit -- cargo run --release -p singlefs-background-gpu --feat
 
 | Decision item | Relationship | Look-back |
 |---|---|---|
-| D26 (Background Compaction and Placement Reclamation) settled item 13 | Preparation | 2026-11-03 Unaffected: not run, pre-run registration written |
+| D26 (Background Compaction and Placement Reclamation) settled item 13 | Preparation | 2026-11-14 Unaffected: this round moved the apparatus into its test package, changed how it is started, and changed how the number of cards for the multi-card arm is set; the criteria, arms and scope are unchanged and no artifact has been run, so it is still pre-run registration written, apparatus not run |
 
 ## Historical Versions
+
+### 2026-11-13
+
+- The geometry check of segment one was started once (task 16507); building the starting pools was too slow and the memory cap was hit three times with a restart from scratch each time, so the main agent cancelled it; the user settled not to run it this time and to wait for the pool-building speed-up. No artifact.
+- The apparatus moved whole from the product GPU crate into its test crate `crates/singlefs-background-gpu-tests/src/bin/`, and is now started with `-p singlefs-background-gpu-tests --features tests-on-a-real-gpu`; the card count of the multi-card arm is now set by `lockstep --cards <count>`, and the product gains a `name=every_card_arm_cards` line (the user settlement, verbatim, is in `records/2026-11-11-GPU两段与按需领卡核查.md`). Criteria, arms and measurement definitions are unchanged; the product has never been run.
 
 ### 2026-11-03
 

@@ -636,11 +636,18 @@ Catching all 16 only shows the asserted locations were mutation-tested, not ever
 
 Path 1 vs 2 is asserted in `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` `compare_one_sequence`, stopping at first difference. Path 1 vs 3 is pinned by `every_registered_anchor_matches_the_independent_reference` (source line 2154, 26 registered answers compared verbatim); segment-two test `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` compares 29. Shared-input limitations: if 233/135 are wrong, all three paths can be wrong together; if their common positional interpretation is not what `crates/` intends, all three are wrong; generator exists only in path 1, so comparison cannot prove it follows registration (first steps of four generators are pinned by tests).
 
+### 2026-11-14 re-run artifacts
+
+The re-run now judges byte-identical; the new artifacts are in the repository and the replay-table rows point to the new names (the E129 device probe has no replay-table row):
+
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out` (byte-identical to `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`)
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out` (byte-identical to `e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out`)
+
 ### Decisions affected
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D8 (Core Index Structure), settled item 6 | Support | 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-17 unaffected: this round synchronizes wording, artifact references, paths and numbers only, leaving conclusion, values and artifacts unchanged. 2026-10-11 also unaffected: wording only (time, positional references, self-reference), with conclusion, values and artifacts unchanged. |
+| D8 (Core Index Structure), settled item 6 | Support | 2026-11-15 unaffected: the rerun artifacts are now `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`, `e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`, byte-identical to `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`, `e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out`; conclusions and numbers unchanged; previously, 2026-11-03 unaffected: only the way the rerun commands are written was changed, conclusions, numbers and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-17 unaffected: this round synchronizes wording, artifact references, paths and numbers only, leaving conclusion, values and artifacts unchanged. 2026-10-11 also unaffected: wording only (time, positional references, self-reference), with conclusion, values and artifacts unchanged. |
 
 ## Historical Versions
 

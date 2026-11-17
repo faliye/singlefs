@@ -56,7 +56,7 @@ It represents the upper bound on traversal locality. ⚠️ However, D8 (Core In
 
 ⚠️ **The positive control fails at the `cache_leaves ≥ 128` tiers** (all four arms 122)—
 that is not "hashing is also great", but **the entire tree fits in cache, so the metric lacks discriminative power at that tier**.
-Per `.claude/singlefs-ai-sop/rules/test-discipline.md` "Negative results must be separable from 'code was not reached'",
+Per `.claude/rules/test-discipline.md` "Negative results must be separable from 'code was not reached'",
 those two tiers can only be read as "unmeasurable", not "no difference".
 
 ### Measurement Basis
@@ -90,7 +90,7 @@ The seven unit tests pinned only **structural properties** (tree shape, key enco
 **none pinning the measured quantity itself**. ⇒ If leaf assignment or geometry were wrong across the board, **all four arms would be wrong together**,
 while the ratio `Inode/Locality = 1.46×` would still "hold"—
 **and that ratio is precisely the figure cited by D8 (Core Index Structure) when adopting locality prefix.**
-This is exactly the pattern called out by `.claude/singlefs-ai-sop/rules/test-discipline.md`
+This is exactly the pattern called out by `.claude/rules/test-discipline.md`
 "Only comparing multiple arms against each other cannot detect all arms being wrong together".
 
 Four absolute assertions were added, **each forced out by mutation testing**:
@@ -125,7 +125,7 @@ not distance between adjacent keys. Rewriting symmetrically to full-path test ca
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D8 (Core Index Structure) Settled Item 3 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D8 (Core Index Structure) Settled Item 3 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

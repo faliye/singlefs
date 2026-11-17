@@ -62,6 +62,8 @@ Two mutually independent reasons:
 
 #### Settled Item 4: Atomic Width Specified Separately by Unit Class; Combining into One Statement Is Erroneous
 
+**Implementation boundary**: The judgement resolution takes the value recorded in the system configuration, not the value probed at run time (C1040 (Mount does not compare the probed physical block size or the capacities of the two disks)).
+
 **Settlement**: The answers to the two questions must be given separately by unit class.
 
 | Unit Class | Question 1: What the atomic width is | Question 2: Who guarantees it |
@@ -152,7 +154,7 @@ Two exceptions, both pointing toward the same conclusion: the only explicit clai
 
 **Scope**: ⚠️ **"Newer devices" does not equal "larger atomic write width".** NVMe atomic write units depend on what the device itself declares for `AWUN` / `NAWUPF`; absence of declaration means absence of capability. Abandoning compatibility with legacy devices buys "can assume 4 KiB physical sectors", "can assume FLUSH/FUA synthesized by block layer", "can assume concurrent commits"—**it does not buy atomic write width**. The quote from ZFS `vdev_label.c` was recorded earlier in D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment); no OpenZFS source on local host, cannot be independently verified.
 
-**Basis**: No experiments: five facts are observations obtained from line-by-line inspection of kernel source and sysfs, not numbers produced in this project; the table of production implementations serves strictly as counter-evidence and mechanisms per `.claude/singlefs-ai-sop/rules/evidence-discipline.md` "how other projects do things is a clue, not evidence"—it shifts the burden of proof to the "rely on device" side, without constituting affirmative evidence. Main agent settlement, two independent paths plus self-check, process in changelog.
+**Basis**: No experiments: five facts are observations obtained from line-by-line inspection of kernel source and sysfs, not numbers produced in this project; the table of production implementations serves strictly as counter-evidence and mechanisms per `.claude/rules/evidence-discipline.md` "how other projects do things is a clue, not evidence"—it shifts the burden of proof to the "rely on device" side, without constituting affirmative evidence. Main agent settlement, two independent paths plus self-check, process in changelog.
 
 **Owed**: C16 (pipeline declares failure model exception).
 

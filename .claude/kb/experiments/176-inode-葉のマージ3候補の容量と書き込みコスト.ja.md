@@ -636,11 +636,18 @@ Q2p、Q2c、Q3 は「借用量」に対して不安定である（M3 に関わ�
 
 経路間の比較アサーション：経路 1 対経路 2 は、突き合わせ bin `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` の `compare_one_sequence` に固定されている（一歩ずつ比較し、最初の差で停止する）。経路 1 対経路 3 は単体テスト `every_registered_anchor_matches_the_independent_reference` に固定されている（同じソースの第 2154 行、26 セルの登録された答えを一字一句比較する。第 2 段には別に `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` があり、29 セルを比較する）。共通項についての問い：233 と 135 が誤っていれば三つの経路が一緒に誤り、「kb と実装がともに誤った値を選ぶ」ことは防げない。位置記法の三経路は同じ読み方に由来するため、その読み方自体が `crates/` の意図と違えば三経路とも誤る。負荷生成器は経路 1 に一つだけ存在するため、突き合わせでは生成器が登録どおりに生成したとは証明できない。その半分は単体テストで四種の負荷の最初の数ステップを固定することで確認する。
 
+### 2026-11-14 再実行の成果物
+
+再実行は現在バイト一致と判定された。新しい成果物はリポジトリに入り、再実行表の登録行は新しい名前を指す（E129 のデバイスプローブには再実行表の行がない）：
+
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`（`e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` とバイト単位で一致）
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`（`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` とバイト単位で一致）
+
 ### 影響する決定
 
 | 決定項目 | 関係 | 再確認 |
 |---|---|---|
-| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-11-03 影響なし：再実行コマンドの書き方だけを変更した。結論・数・成果物は不変。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
+| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-11-15 影響なし：再実行の成果物を `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out` に差し替え、`e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` とバイト単位で一致、結論・数値は不変。それ以前の 2026-11-03 影響なし：再実行コマンドの書き方だけを変更した。結論・数・成果物は不変。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
 
 ## 履歴バージョン
 

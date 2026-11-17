@@ -75,7 +75,7 @@ and **erroneous freeing lies in the direction of data loss**.
 
 The first version of the `deadlist` arm **modeled death rules without reading the definition sentence of D5 (Snapshot / Space Accounting Mechanism)**,
 yielding `wrong_free > 0`—directly contradicting the already-proven "data loss direction is structurally zero" of E26 (Lookup Cost and Accuracy of Three Accounting Models).
-`rules/verify-before-claiming.md` records the exact same failure
+`rules/evidence-discipline.md` records the exact same failure
 ("checked status column, did not read definition"), repeated here once again.
 Fix: paste the definition sentence of D5 (Snapshot / Space Accounting Mechanism) **verbatim into code comments**, then model according to it.
 
@@ -88,10 +88,10 @@ were charged as side branches—whereas under linear history everything is compa
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D6 (Snapshot Implementation Model) Settled Item 5 | Support | 2026-09-20 unaffected: reverse index lookups to delete a snapshot across three accounting models measured across tiers; log-log slope of the lookup arm shows cost is not "slightly more expensive", but falling from constant into O(N) |
-| D6 (Snapshot Implementation Model) Settled Item 8 | Support | 2026-09-20 unaffected: predicate "attributed to original creator" under multi-writable head + 70% sharing erroneously frees all writable heads, where erroneous freeing lies in data loss direction—quantifies Condition 1 of 9 criteria "asymmetric consequences of divergence directions" |
-| D6 (Snapshot Implementation Model) Settled Item 10 | Support | 2026-09-20 unaffected: the O(N) baseline of paying lookups is measured by it; nested interval labeling is designed to pull back this exact curve |
-| D5 (Snapshot / Space Accounting Mechanism) | Material | 2026-09-20 unaffected: unidirectional linear arm is its exact form; constant 0 lookups quantifies its O(1) property; closure of invalidation recorded in D6 (Snapshot Implementation Model) Settled Item 6 |
+| D6 (Snapshot Implementation Model) Settled Item 5 | Support | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: reverse index lookups to delete a snapshot across three accounting models measured across tiers; log-log slope of the lookup arm shows cost is not "slightly more expensive", but falling from constant into O(N) |
+| D6 (Snapshot Implementation Model) Settled Item 8 | Support | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: predicate "attributed to original creator" under multi-writable head + 70% sharing erroneously frees all writable heads, where erroneous freeing lies in data loss direction—quantifies Condition 1 of 9 criteria "asymmetric consequences of divergence directions" |
+| D6 (Snapshot Implementation Model) Settled Item 10 | Support | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: the O(N) baseline of paying lookups is measured by it; nested interval labeling is designed to pull back this exact curve |
+| D5 (Snapshot / Space Accounting Mechanism) | Material | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 unaffected: unidirectional linear arm is its exact form; constant 0 lookups quantifies its O(1) property; closure of invalidation recorded in D6 (Snapshot Implementation Model) Settled Item 6 |
 
 ## Historical Versions
 

@@ -23,6 +23,7 @@ Exit criteria are left to user decision in Phase 0. Main agent's inferred candid
 | 1 | Scrub: both full run and generational incremental, governed by clauses on post-detection action; executable without keys on encrypted volumes | I |
 | 2 | Rescue writeback: built atop Milestone 4 read-only scan rebuild, writing reconstruction results back, mountable, checker all green | II |
 | 3 | Single-disk ditto: metadata multi-replica distributed placement, surviving single-disk corruption at one site | III |
+| 4 | Interaction with features landed earlier each has one test case and one must-red world: snapshots, GC, truncation, packing, parallel commit, multiple files, and the transactions added by each milestone ordered before this file (settled by the user on 2026-11-16; the shape follows Milestone 5 Exit 5) | I, II, III |
 
 ## Grouping and Ordering
 
@@ -32,6 +33,8 @@ Exit criteria are left to user decision in Phase 0. Main agent's inferred candid
 | 1 Scrub | I·1 → I·2 | Incremental builds on full run | Unstarted |
 | 2 Rescue | II·1 | Depends on Phase 0 | Unstarted |
 | 3 Ditto | III·1 | Modifies format, scheduled before freeze | Unstarted |
+
+**Addendum (settled by the user on 2026-11-16)**: once the single-disk line (III·1) opens, the real-disk power cut of Milestone 9 IV·2 and IV·3 and of Milestone 10 II·3 follows it: the pool on the disk under test waits for the single-disk line.
 
 **Estimation**: Not estimated. Record `records/2026-10-11-里程碑五打包与决策进度列.md` Section 3 inferred 3 weeks combining these items with format freeze (inferred, unmeasured); not re-estimated after splitting.
 
@@ -70,3 +73,10 @@ Exit criteria are left to user decision in Phase 0. Main agent's inferred candid
 - **To be settled before starting**: Whether to reopen "do not open single-device layout line initially" (whether single-disk volume is a supported configuration in this version, settled by user).
 
 **Not in exit criteria**: Format freeze (Milestone 17 [17-seventeenth-txn.md](17-seventeenth-txn.md)), multi-disk reconstruction and resynchronization (Milestone 13).
+
+## Debts assigned to this file by the re-check of owed checks on 2026-11-11
+
+After the row-by-row re-check against the code (`records/2026-11-11-欠账表按代码重核逐行结论.md`), these debts have their destination written to this file although this file did not name them before; do each as its registered row says under "how to block it", and see each registered row for what is still owed; the assignment was inferred by topic during the re-check and is to be verified before work starts.
+
+- I·1: C7 (no check for stale blocks), C902 (The region scan and the resident isolation set are not seeded from isolation marks), C903 (Rollback on a pool where only one disk carries the isolation mark clears and proceeds anyway), C904 ("Released yet carrying an isolation mark" can be written in memory and is stopped only by an assertion), C983 (the retry reports a recorded leaf as replaced after the empty publish of a floor raise already replaced it), C984 (no clause says who owns the case where the instance table cannot be read and nothing else can be issued), C986 (no case replaces a multi-piece instance table chain as a whole), C987 (a disk whose mapping key set is equal but whose positions are swapped is accepted), C989 (a read that is bad in the second position entry is neither counted nor relocated)
+- II·1: C73 (Allocation record state classification unsettled), C75 (The Degraded-Mount Gate Cannot Go Red Itself), C104 (No Self-Contained Evidence for Payload Integrity of Codes 1 / 2 on the Scan Path), C302 (Code-2 Historical Versions at the Moment of a Snapshot Cannot Be Retrieved), C343 (level 1 rebuild mixes in abandoned units when the instance table is unreadable), C991 (the offline way out writes tail without checking this disk's units)

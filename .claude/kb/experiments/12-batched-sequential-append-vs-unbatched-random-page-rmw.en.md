@@ -44,7 +44,7 @@ N≥5 rounds per tier.
 | In "fits in cache" tier, Arm B and Arm A show no distinguishable difference | **Valid result, record faithfully** | It demonstrates that "refcounting is nearly free when counters fit", which is one of the questions E12 (Batched Sequential Append vs Unbatched Random Page RMW) aims to answer, **not a bug** |
 | Arm A shows distinguishable differences across the three tiers | **Implementation defect, entire round voided** | Arm A contains no counters and should not vary with counter table size |
 
-⚠️ Retaining positive controls is a hard requirement (`.claude/singlefs-ai-sop/rules/test-discipline.md`: failure clauses of an experiment must not make conclusions unfalsifiable)—**without them, "no difference" cannot be distinguished between expected finding or broken implementation.**
+⚠️ Retaining positive controls is a hard requirement (`.claude/rules/test-discipline.md`: failure clauses of an experiment must not make conclusions unfalsifiable)—**without them, "no difference" cannot be distinguished between expected finding or broken implementation.**
 
 ### What E12 (Batched Sequential Append vs Unbatched Random Page RMW) Does Not Answer
 
@@ -112,7 +112,7 @@ Put real competitors (D6 (Snapshot Implementation Model) "snapshot ID into key" 
 
 Each arm reads `/sys/block/vda/stat` before and after (**counted by kernel block layer itself**,
 sharing no code, sampling, or tools with this program's counters, satisfying
-verification requirements of `.claude/singlefs-ai-sop/rules/evidence-discipline.md`).
+verification requirements of `.claude/rules/evidence-discipline.md`).
 **All nine cells show ratio 1.00.**
 
 This independent path proves three things that were merely assumptions prior to E12 (Batched Sequential Append vs Unbatched Random Page RMW):
@@ -223,7 +223,7 @@ If publish semantics revert to "new root per transaction", Arm A results of E12 
 ### Fault Injection on Measurement Apparatus: Proving Discriminative Power
 
 **"Ratio 1.00" can mean "all correct", or "verification path is cosmetic"—without fault injection, one cannot tell.**
-`.claude/singlefs-ai-sop/rules/test-discipline.md`: after writing a check, ask "if the subject truly broke, would it turn red".
+`.claude/rules/test-discipline.md`: after writing a check, ask "if the subject truly broke, would it turn red".
 
 Four test cases (seed 77777, inspecting only refcount 8× tier):
 
@@ -274,13 +274,13 @@ host 32 cores / 60 GiB; QEMU 8.2.2 + KVM. Block layer readings taken from `/sys/
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D6 (Snapshot Implementation Model) settled item 1 | Support | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 13 | Support | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 19 | Support | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 17 | Support | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 6 | Support | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D16 (Publish Semantics) | No Effect | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
-| D8 (Core Index Structure) | No Effect | 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D6 (Snapshot Implementation Model) settled item 1 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 13 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 19 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 17 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 6 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) | No Effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
+| D8 (Core Index Structure) | No Effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only phrasing revised (temporal words, positional references, and self-references); conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

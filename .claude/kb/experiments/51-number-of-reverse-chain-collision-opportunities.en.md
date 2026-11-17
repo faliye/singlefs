@@ -7,7 +7,7 @@ E49 (Reverse Chain Width: 32 vs 64) counted every time the record checker compar
 judging on this basis that 32-bit is sufficient in only 4 out of 12 tiers. **That measurement basis may have been overcounted**, and it was the sole basis for "whether 32-bit is sufficient".
 
 ⚠️ **Separate number established instead of modifying E49 (Reverse Chain Width: 32 vs 64)**: what changed is the model, not parameters; per
-`.claude/singlefs-ai-sop/rules/test-discipline.md`, this is a new experiment. Artifacts and conclusions of E49 (Reverse Chain Width: 32 vs 64) remain untouched.
+`.claude/rules/test-discipline.md`, this is a new experiment. Artifacts and conclusions of E49 (Reverse Chain Width: 32 vs 64) remain untouched.
 
 ### What to Measure
 
@@ -130,8 +130,8 @@ Verdict for 32-bit under 12 tiers (ring 3 × record disk footprint 2 × frequenc
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D23 (Journal Role & Format) settled item 8 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D23 (Journal Role & Format) settled item 11 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 8 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 11 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

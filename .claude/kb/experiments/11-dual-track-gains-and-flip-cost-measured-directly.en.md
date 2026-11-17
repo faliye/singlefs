@@ -16,7 +16,7 @@ The deduction half (exhaustively enumerating flip entry points, re-evaluating ea
 
 **What counts as failure**:
 - Measuring all six together without isolating individual contributions → **entire round voided**.
-- Wallclock saved after turning off an omission is **smaller than measurement noise** → that omission **is not worth entering format**, record faithfully; this is a valid result, not an implementation bug (`.claude/singlefs-ai-sop/rules/test-discipline.md`: failure clauses of an experiment must not make conclusions unfalsifiable).
+- Wallclock saved after turning off an omission is **smaller than measurement noise** → that omission **is not worth entering format**, record faithfully; this is a valid result, not an implementation bug (`.claude/rules/test-discipline.md`: failure clauses of an experiment must not make conclusions unfalsifiable).
 
 ### Group 2: Cost Side — Slope of Flip Migration
 
@@ -30,7 +30,7 @@ The deduction half (exhaustively enumerating flip entry points, re-evaluating ea
 
 **What counts as failure**:
 - Unable to measure slope differences across all tiers → likely the maximum tier was not large enough, or migration was performed asynchronously in background without being accounted for. **Entire round voided**; expand scale and ensure timing covers until migration truly completes.
-- If an entry point **never triggers migration at all** during test, verify first whether it was silently bypassed by implementation—"no cost measured" and "code never ran" must be distinguished (`.claude/singlefs-ai-sop/rules/evidence-discipline.md`).
+- If an entry point **never triggers migration at all** during test, verify first whether it was silently bypassed by implementation—"no cost measured" and "code never ran" must be distinguished (`.claude/rules/evidence-discipline.md`).
 
 ### Switch to Force Entering Both Tracks (Hard Requirement 2)
 
@@ -44,9 +44,9 @@ The switch form shares ancestry with the mkfs "force layout specification" switc
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D14 (Dual-Track: Large/Small Files & Persistent/Transient) settled item 6 | Preparation | 2026-09-19 unaffected: verification half of deduction D-2 (Deduce Six Omissions Item by Item), unrun; after D14 (Dual-Track: Large/Small Files & Persistent/Transient) rejected format-level second track, two tracks will not be implemented, running only if v2 proposes format-level second track; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
-| D8 (Core Index Structure) | No Effect | 2026-09-19 unaffected: only borrows its "operations of unbounded scale must never be made into a single transaction" as criterion source for Group 2; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
-| D12 (Target Media) | No Effect | 2026-09-19 unaffected: only borrows its mkfs switch of "force layout specification" as switch form for forcing both tracks; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
+| D14 (Dual-Track: Large/Small Files & Persistent/Transient) settled item 6 | Preparation | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 unaffected: verification half of deduction D-2 (Deduce Six Omissions Item by Item), unrun; after D14 (Dual-Track: Large/Small Files & Persistent/Transient) rejected format-level second track, two tracks will not be implemented, running only if v2 proposes format-level second track; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
+| D8 (Core Index Structure) | No Effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 unaffected: only borrows its "operations of unbounded scale must never be made into a single transaction" as criterion source for Group 2; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
+| D12 (Target Media) | No Effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 unaffected: only borrows its mkfs switch of "force layout specification" as switch form for forcing both tracks; 2026-10-11 unaffected: knowledge rot governance only revised obsolete status sentences; conclusions and artifacts remain unchanged |
 
 ## Historical Versions
 

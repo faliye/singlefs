@@ -40,7 +40,7 @@ Reports three numbers: `survivors` (count of passing slots), `chosen_gen` (selec
 | **Positive control**: When no injection occurs, `rollback` must be **0** and `survivors` must be **8** | Otherwise ⇒ read or write path flawed, **entire round aborted** |
 | **Negative control**: **Wipe all four disks** ⇒ `survivors` must be **0** | Non-zero ⇒ not reading disk (likely reading cache), **entire round aborted** |
 | `rollback > 1` | **Faithfully record**—means E48 (Feasible Points for Root Ring Geometry) model failed on real devices, far more valuable than "expected" |
-| Cannot read `E7RESULT` closing line in VM | Per `.claude/singlefs-ai-sop/rules/command-safety.md` integrity gate, **entire round aborted**, forbidden to treat as 0 |
+| Cannot read `E7RESULT` closing line in VM | Per `.claude/rules/command-safety-by-review.md` "result capture needs an integrity gate", **entire round aborted**, forbidden to treat as 0 |
 
 ### Prerequisites
 
@@ -120,9 +120,9 @@ can easily carry a self-consistent checksum; **judgment then relies entirely on 
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Prepares | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D16 (Publish Semantics) settled item 6 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Prepares | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) settled item 6 | Supports | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

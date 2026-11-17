@@ -47,7 +47,7 @@ disks lost and regained belongs to C88 (Timeline discrimination for root ring un
 
 - Code `scripts/experiment-apparatus/e87_fixed_placement.rs`
   (`cargo run --release --bin e87-fixed-placement`),
-  raw output `e87-fixed-placement-2026-09-02.out` (10 lines, closing line `emitted=10`).
+  raw output `e87-fixed-placement-2026-11-08.out` (10 lines, closing line `emitted=10`) (swapped in on 2026-11-08: differs from `e87-fixed-placement-2026-09-02.out` only by a label rename, current name `system_configuration=`, 8 lines; byte-identical apart from the rename).
 - Pure arithmetic exhaustion, identical md5 across 5 rounds. **8 unit tests, all 5 mutations caught one by one, 0 blind spots**,
   mutation table `scripts/mutation/tables/e87_fixed_placement.tsv`
   (`bash scripts/mutation/mutate.sh e87-fixed-placement scripts/experiment-apparatus/e87_fixed_placement.rs scripts/mutation/tables/e87_fixed_placement.tsv`).
@@ -56,11 +56,11 @@ disks lost and regained belongs to C88 (Timeline discrimination for root ring un
 
 | Decision Branch | Relationship | Review |
 |---|---|---|
-| D22 (Synthesizing Unit Atomicity) settled item 8 | Supports | 2026-09-19 Unaffected: single copy of system configuration losing Disk 0 makes entire pool unmountable, one copy per disk plus journal mirroring leaves all 8 cells mountable with zero window loss, discovering mkfs must seed Generation 0 root into all regions |
-| D22 (Synthesizing Unit Atomicity) settled item 14 | Supports | 2026-09-19 Unaffected: on 2 disks R = 3 losing Disk 1 worst-case 1 generation, Disk 0 worst-case 2 generations, which are the two figures for disk count degradation when devs < R |
-| D22 (Synthesizing Unit Atomicity) settled item 16 | Supports | 2026-09-19 Unaffected: on two disks R = 3 one disk inevitably carries two regions, making ownership 0 / 1 / 0 the sole normative specification |
-| D2 (RAID Stripe Policy) settled item 7 | Supports | 2026-09-20 Unaffected: on two disks R = 3 one disk inevitably carries two regions, combined with pigeonhole lower bound yielding ownership 0 / 1 / 0 as sole normative specification, serving as rationale for hardcoding three regions 0 / 1 / 0 in first version; journal mirroring writing each record twice is precisely settled item 6 w >= 2 lower bound, E87 (Placement of Fixed Structures) merely directs it at journal |
-| D23 (Journal Role & Format) | Does not affect | 2026-09-19 Unaffected: only cites >=2 slot alternation isomorphic to settled item 3 |
+| D22 (Synthesizing Unit Atomicity) settled item 8 | Supports | 2026-11-08 unaffected: the replay registration switched to a new retained artifact that differs only by a label rename; conclusions and numbers unchanged; previously, 2026-09-19 Unaffected: single copy of system configuration losing Disk 0 makes entire pool unmountable, one copy per disk plus journal mirroring leaves all 8 cells mountable with zero window loss, discovering mkfs must seed Generation 0 root into all regions |
+| D22 (Synthesizing Unit Atomicity) settled item 14 | Supports | 2026-11-08 unaffected: the replay registration switched to a new retained artifact that differs only by a label rename; conclusions and numbers unchanged; previously, 2026-09-19 Unaffected: on 2 disks R = 3 losing Disk 1 worst-case 1 generation, Disk 0 worst-case 2 generations, which are the two figures for disk count degradation when devs < R |
+| D22 (Synthesizing Unit Atomicity) settled item 16 | Supports | 2026-11-08 unaffected: the replay registration switched to a new retained artifact that differs only by a label rename; conclusions and numbers unchanged; previously, 2026-09-19 Unaffected: on two disks R = 3 one disk inevitably carries two regions, making ownership 0 / 1 / 0 the sole normative specification |
+| D2 (RAID Stripe Policy) settled item 7 | Supports | 2026-11-08 unaffected: the replay registration switched to a new retained artifact that differs only by a label rename; conclusions and numbers unchanged; previously, 2026-09-20 Unaffected: on two disks R = 3 one disk inevitably carries two regions, combined with pigeonhole lower bound yielding ownership 0 / 1 / 0 as sole normative specification, serving as rationale for hardcoding three regions 0 / 1 / 0 in first version; journal mirroring writing each record twice is precisely settled item 6 w >= 2 lower bound, E87 (Placement of Fixed Structures) merely directs it at journal |
+| D23 (Journal Role & Format) | Does not affect | 2026-11-08 unaffected: the replay registration switched to a new retained artifact that differs only by a label rename; conclusions and numbers unchanged; previously, 2026-09-19 Unaffected: only cites >=2 slot alternation isomorphic to settled item 3 |
 
 ## Historical Versions
 

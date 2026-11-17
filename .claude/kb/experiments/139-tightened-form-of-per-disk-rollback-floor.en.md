@@ -165,7 +165,7 @@ Caught 26, invalid 0, unred 0 (by symbol counts at start of each result line: `�
 
 **Detector positive controls** (Registration Section 6 row 4, original three `name=verdict` rows in old artifact verbatim unchanged): `crit2_a_drain_false_enospc=3424`, `crit2_a_broken_false_or_stall=64`, `crit2_g_near_full_wad_cost5=48`, `crit2_g2r_mount_growth_false_or_stall=32`, `crit2_d_activation_fakes=584`, `crit2_gtxgcap_skip_retention=12576`, all six cells > 0 ⇒ false ENOSPC, stalls, fake candidates, minimum retention detectors distinguish differences.
 
-**Four questions to ask first when struck** (`.claude/singlefs-ai-sop/rules/evidence-discipline.md` "Criteria can be written wrong: determine which kind first upon hit"):
+**Four questions to ask first when struck** (`.claude/rules/evidence-discipline.md` "Criteria can be written wrong: determine which kind first upon hit"):
 
 | Question | Answer |
 |---|---|
@@ -736,13 +736,19 @@ D16 (Publish Semantics) settled item 1 Round 4 three-way argument (`research/pro
 10. All four minimum values of reservation sweep fall on bottom edge of sweep (formula - 6), true requirements of both arms unmeasured.
 11. Relationship between ring depth and state count (cell of 3 failures on S = 4) has only one observation, no formula.
 
+### 2026-11-14 re-run artifacts
+
+The re-run now judges byte-identical; the new artifacts are in the repository and the replay-table rows point to the new names (the E129 device probe has no replay-table row):
+
+- `research/results/e139-tightened-floor-2026-11-14.out` (byte-identical to `e139-tightened-floor-2026-10-29.out`)
+
 ### Affected Decisions
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D16 (Publish Semantics) settled item 1 | Supports | 2026-10-30 changed: Rerun 3 is read as no flip (0 of 611 class-A pairs flip), and the settlement sentence "the effective value after recovery is still taken the apparatus's old way …" drops the owed-check wording (C660 (Sentence in per-disk rollback floor settlement does not match apparatus)) and now says the CG arm follows how `crates/` takes it today; prior review 2026-10-29 unaffected: under today's `crates/` reclamation threshold Rerun 3 flips 0 of 611 class-A pairs, the arm the settlement takes is unchanged; the sentence in the settlement "the effective value after recovery is still taken the apparatus's old way" now stands differently to the apparatus, whether to change it is up to the main agent; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
-| D3 (Space Allocation) settled item 9 | Supports | 2026-10-29 unaffected: the 8 rows of write-after-delete failure in Rerun 3 were already in the Rerun 2 artifact and keep the same values under the new threshold; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
-| D23 (Journal Role & Format) | Does not affect | 2026-10-29 unaffected: Rerun 3 only swaps the reclamation threshold and does not touch the journal; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D16 (Publish Semantics) settled item 1 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-30 changed: Rerun 3 is read as no flip (0 of 611 class-A pairs flip), and the settlement sentence "the effective value after recovery is still taken the apparatus's old way …" drops the owed-check wording (C660 (Sentence in per-disk rollback floor settlement does not match apparatus)) and now says the CG arm follows how `crates/` takes it today; prior review 2026-10-29 unaffected: under today's `crates/` reclamation threshold Rerun 3 flips 0 of 611 class-A pairs, the arm the settlement takes is unchanged; the sentence in the settlement "the effective value after recovery is still taken the apparatus's old way" now stands differently to the apparatus, whether to change it is up to the main agent; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D3 (Space Allocation) settled item 9 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-29 unaffected: the 8 rows of write-after-delete failure in Rerun 3 were already in the Rerun 2 artifact and keep the same values under the new threshold; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-29 unaffected: Rerun 3 only swaps the reclamation threshold and does not touch the journal; prior review 2026-10-17 unaffected: wording, artifact pointers, paths, and numbers synchronized only; conclusions, numbers, and artifacts unchanged; prior review 2026-10-11 unaffected: wording only (temporal terms, positional references, self-references); conclusions, numbers, and artifacts unchanged |
 
 ## Historical Versions
 

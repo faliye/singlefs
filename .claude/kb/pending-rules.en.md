@@ -59,7 +59,7 @@ The gate does not judge "Search for existing before creating verification appara
 **判据：修完之后，说得出全库里还有哪几处和它是同一个模式，每一处是改了，还是查过确认没有这个缺陷。**
 
 1. 把缺陷拆成两种形态：**代码形态**（同样的写法、同一个函数或正则、抄过的同一段）和**逻辑形态**（同样的假设、同样的边界、同一个口径，写法不同也算）。
-2. 两种形态都全库搜。代码形态按写法 grep；逻辑形态按「谁在做同一件事」找：同一个概念的别的实现、同一类输入的别的处理、判同一条判据的别的检查，含测试、示例、各语言版本。输出不截断，先数再看（`verify-before-claiming.md`「截断过的输出也是窄的那一句」）。
+2. 两种形态都全库搜。代码形态按写法 grep；逻辑形态按「谁在做同一件事」找：同一个概念的别的实现、同一类输入的别的处理、判同一条判据的别的检查，含测试、示例、各语言版本。输出不截断，先数再看（`evidence-discipline.md`「截断过的输出也是窄的那一句」）。
 3. 每个命中逐个判。有同一缺陷的，在同一次改动里一起改；没有的，写明为什么不受影响。
 4. 每个顺带修掉的相似处，各配一条先证明会红的测试（`show-me-test.md`）。
 5. 提交信息写：搜了什么（关键字或命令）、命中几处、改了几处、没改的几处各自的原因。搜不到别的相似处，写「搜了 <什么>，0 处」，不写「没有」。
@@ -75,7 +75,7 @@ Scope: every fix of a defect, whether in code, scripts, gates or documents, and 
 **Criterion: after the fix, you can say which other places in the whole codebase follow the same pattern, and for each one whether it was changed, or checked and confirmed free of this defect.**
 
 1. Split the defect into two forms: the **code form** (the same way of writing, the same function or regex, the same copied passage) and the **logic form** (the same assumption, the same boundary, the same measurement basis, even when written differently).
-2. Search the whole codebase for both forms. Grep the code form by how it is written; find the logic form by asking "who else does the same thing": other implementations of the same concept, other handling of the same kind of input, other checks of the same criterion, including tests, examples and every language version. Do not truncate output; count first, then look (`verify-before-claiming.md` "Truncated output is the narrow claim too").
+2. Search the whole codebase for both forms. Grep the code form by how it is written; find the logic form by asking "who else does the same thing": other implementations of the same concept, other handling of the same kind of input, other checks of the same criterion, including tests, examples and every language version. Do not truncate output; count first, then look (`evidence-discipline.md` "Truncated output is the narrow claim too").
 3. Judge each hit one by one. Fix those with the same defect in the same change; for those without it, write down why they are not affected.
 4. Each similar place fixed along the way gets its own test that is first shown to go red (`show-me-test.md`).
 5. The commit message states what was searched (keywords or commands), how many hits, how many places were changed, and the reason for each place left unchanged. If no other similar place is found, write "searched <what>, 0 places", not "none".

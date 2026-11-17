@@ -5,7 +5,7 @@
 D23 (Journal Role & Format) settled item 13 adopted Candidate B — `header_csum` still covers only record header,
 adding a checksum covering named item array separately. **That field must first prove it will turn red**,
 otherwise one cannot distinguish whether it is checking or merely echoing the header copy
-(`.claude/singlefs-ai-sop/rules/evidence-discipline.md` "validation path itself must also prove it turns red").
+(`.claude/rules/evidence-discipline.md` "validation path itself must also prove it turns red").
 
 ### Criteria (Hardcoded Before Run, Unchanged After Run)
 
@@ -100,8 +100,8 @@ None. Pure codec model.
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D18 (Information Carried in a Block) settled item 17 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D23 (Journal Role & Format) settled item 13 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D18 (Information Carried in a Block) settled item 17 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 13 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

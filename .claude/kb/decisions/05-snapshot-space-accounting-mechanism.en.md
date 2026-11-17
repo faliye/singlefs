@@ -20,10 +20,10 @@ D5 (Snapshot / Space Accounting Mechanism) governs two matters: block lifecycle 
 | 10 | **Statistics tag registry and two reserved values** | Tag code = row number in settled item 4 table; device segment without device dimension writes 0xFFFF_FFFF, tree ID segment without tree dimension writes 0 **Status: Settled.** **Progress: Implemented.** |
 | 11 | **Whether to build deadlist carrier day-1** | Built: forms independent tree registered into tree table day-1, kind code 8, tree ID 65543, root pointer zero **Status: Settled.** **Progress: Implemented.** |
 | 12 | **Form of deadlist entries** | key = head tree ID 8 + epoch 8 + central mapping key 27 = 43 bytes, value empty; entries bucketed by epoch, handover does not move entries **Status: Settled.** **Progress: Implemented.** |
-| 13 | **Which mechanism to adopt for lifecycle determination** | Takes birth generation + deadlist: compares `previous_snapshot_txg` on deletion, hands over completely on snapshot creation, merges to newer side without full scan on snapshot destruction **Status: Settled.** **Progress: Unimplemented.** |
-| 14 | **Necessary and sufficient condition of reference interval** | `birth(b) ≤ S.txg < death(b)`, left-closed right-open; three quantities each defined; default to deadlist when judgment inputs unavailable **Status: Settled.** **Progress: Unimplemented.** |
+| 13 | **Which mechanism to adopt for lifecycle determination** | Takes birth generation + deadlist: compares `previous_snapshot_txg` on deletion, hands over completely on snapshot creation, merges to newer side without full scan on snapshot destruction **Status: Settled.** **Progress: Implemented.** |
+| 14 | **Necessary and sufficient condition of reference interval** | `birth(b) ≤ S.txg < death(b)`, left-closed right-open; three quantities each defined; default to deadlist when judgment inputs unavailable **Status: Settled.** **Progress: Implemented.** |
 | 15 | **Whether background relocation modifies `birth`** | Does not modify: relocation is not a publication, `birth` travels with unit as-is **Status: Settled.** **Progress: Implemented.** |
-| 16 | **Which side deadlist merges to upon snapshot destruction** | Takes Convention B (merges to next newer side); not "snapshot deadlist never rewritten", just exceptions one order of magnitude fewer **Status: Settled.** **Progress: Unimplemented.** |
+| 16 | **Which side deadlist merges to upon snapshot destruction** | Takes Convention B (merges to next newer side); not "snapshot deadlist never rewritten", just exceptions one order of magnitude fewer **Status: Settled.** **Progress: Implemented.** |
 | 17 | **Four premises; crossing any one invalidates it** | Four premises written strictly item-by-item; introducing second live reference to same block must reopen D5 (Snapshot / Space Accounting Mechanism); triggered once, converged form is D5 (Snapshot / Space Accounting Mechanism) primary + sparse side table auxiliary **Status: Settled.** **Progress: No code object.** |
 | 18 | **Three clauses to add for clones / writable snapshots** | Each head holds own predecessor snapshot number and deadlist, initialized from origin; branch point snapshots and heads with live snapshots of their own forbidden from destruction; destroying a head requires livelist **Status: Settled.** **Progress: Unimplemented.** |
 | 19 | **Runtime form of liveness judgment and cost of snapshot destruction** | Query side table first, decrement count if count > 1, otherwise `birth > previous_snapshot_txg` releases immediately, remainder enters deadlist; snapshot destruction O(deadlist entry count + bucket count) **Status: Settled.** **Progress: Unimplemented.** |
@@ -57,7 +57,7 @@ D5 (Snapshot / Space Accounting Mechanism) governs two matters: block lifecycle 
 **Basis**:
 
 - E54 (How Many Generations to Retain in Accounting): "What generation takes" and "how many generations kept" are orthogonal issues—no-discard arm plus incremental discard rule matches keep-last-K-generations cell-for-cell across 60 cells; when not discarding, slope of key count over checkpoint count equals statistic count, whereas keeping K generations slope is 0.
-- Main agent inspection on 2026-09-23: No reader requires accounting across multiple generations simultaneously—checker reads accounting rows taking values by (statistic, device), ignoring generation segment (`crates/singlefs-checker/src/walk.rs` accounting tree branch); recovery reads only accounting tree of selected root (`crates/singlefs-core/src/recovery.rs` accounting tree root section); write path writes 15 rows of current generation per publish, never point-deleting (`crates/singlefs-core/src/transaction.rs` `accounting_entry_count(2)`).
+- Main agent inspection on 2026-09-23: No reader requires accounting across multiple generations simultaneously—checker reads accounting rows taking values by (statistic, device), ignoring generation segment (`crates/singlefs-checker/src/walk.rs` accounting tree branch); recovery reads only accounting tree of selected root (`crates/singlefs-core/src/recovery.rs` accounting tree root section); write path writes 15 rows of current generation per publish, never point-deleting (`crates/singlefs-core/src/transaction.rs` `accounting_entries_of_this_publish`).
 - User settlement 2026-09-23: Each root carries only its own generation (milestone "overwrite, release, rollback and reuse" closeout table row 56), original wording in history.
 - User settlement, original wording in history.
 - Step rows for inode number watermark: W3 verdict `research/prompts/m3-w3-r2-main-verification.md` Section 2 attacker clauses (C2aL strongest form leaves step rows on every publish where watermark changes, granting exception to I-3.13 (the generation segment of accounting rows equals this version's txg) and D5 (Snapshot / Space Accounting Mechanism) settled item 2), `research/prompts/m3-w3-r3-main-verification.md` Section 2 clone head C2aL row (leaves row on clone creation) and Section 3 cost table; verbatim definition of C2aL in second round attacker report `m3-w3-r2-opus-output.md` "**C2aL strongest form** (proposed by me)" row; user settlement 2026-10-08 Y2 "C2aL: accounting leaves step rows (recommended)", original wording in history. No experiment: numbers measured on three-party leg models and repository copies, no experiment number established.
@@ -319,7 +319,7 @@ First version destruction intention written on destroyed snapshot's own Code 14 
 - E94 (Touch Surface of Moving Shared Placement Points): Without `prev` propagation entries pinned permanently, mutation M5b verified red at model layer.
 - External implementations (clues, unverified in this project): btrfs qgroup traverses extent refcount + reverse index, paying +76% commit time, +1347% transaction wait, −25% write throughput (measurement basis is "qgroup traversing reverse index", not "pure refcount"); bcachefs accounting maintained by triggers on key commit, `check_allocations` rebuilding via full run traversal, validating "incremental maintenance + traversal audit" pattern rather than this mechanism (bcachefs lacks deadlist), and its traversal audit shares same add/subtract code with runtime, failing to catch semantic errors ([prior-art.md](../prior-art.md) 7.11); copying that shape forbidden in this project.
 
-**Owed**: C195 (prev propagation during destroy cascade is written only in the experiment's model revision log).
+**Owed**: None.
 
 #### Settled Item 14: Necessary and Sufficient Condition of Reference Interval
 
@@ -417,6 +417,8 @@ Three boundaries and consequences of misconfiguration:
 **Owed**: C265 (release boundary of destroying a writable head written as a fixed clone moment)—clause supplemented, red-turning check remains owed; C270 (whether the fork-point gate's child count counts clones)—likewise.
 
 #### Settled Item 19: Runtime Form of Liveness Judgment and Cost of Snapshot Destruction
+
+**Implementation boundary**: The step that compares birth with the previous snapshot txg exists; the sparse side table step does not (the side table stays empty and counts as 1).
 
 **Settlement**:
 

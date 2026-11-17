@@ -145,4 +145,4 @@ inode 记录 140 字节的其余字段照 [layout/01-first-txn.md](01-first-txn.
 | 搬迁批的 journal 点名项点名搬迁副本 | 格式级空白：点名项的字段表在 D23（journal 的角色与格式） 已定项 17，点名搬迁副本这一条决策正文没写 | 判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G3；`crates/singlefs-core/src/transaction.rs:9660` |
 | 活整理意图、活截断意图全池各至多一条 | 格式级空白：决策正文没写 | 判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1、`research/prompts/m4-trunc-r1-main-verification.md` 第三节 K1；`crates/singlefs-core/src/logged_operations.rs:363` |
 | 快照条目的树 ID 取值（第一个文件版本之后第一次建快照取 65549、65550） | 推的，没有用例钉 | `crates/singlefs-core/src/transaction.rs:9436` 的 `publish_create_snapshot` |
-| GPU 垃圾回收（七·x）新写出的盘上字节 | 没找到：工作区 `crates/` 下没有 `singlefs-background-gpu` 包；未跟踪的 `crates/singlefs-core/src/background_compute.rs` 里没有写盘调用；`crates/singlefs-core/src/` 未暂存的改动里新增的行没有一行带 `put_u`、`write_at`、`to_slot` | 2026-10-26 现查 |
+| GPU 垃圾回收（七·x）新写出的盘上字节 | 没有新写出的字节：产品 GPU 包 `crates/singlefs-background-gpu/src/` 与 `crates/singlefs-core/src/background_compute.rs` 里没有一处 `put_u`、`write_at`、`to_slot`、`BlockDevice`；GPU 一侧不写盘 | `grep -rn` 这四个词，两处零命中 |

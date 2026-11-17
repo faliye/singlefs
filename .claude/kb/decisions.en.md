@@ -37,32 +37,32 @@ kb-shape section 7 **independently counts the body text** to compare—if the ge
 
 | Decision | Status | Conclusion (Brief) | Document | Progress |
 |---|---|---|---|---|
-| D1 (Data Mobility / Reverse Index) | Settled 8 / Unsettled 0 | Reverse index required, designed into format day-1, post-hoc patch forbidden | [01-Data Mobility / Reverse Index.en.md](decisions/01-data-mobility-reverse-index.en.md) | Implemented 6 / Unimplemented 0 / No code object 2 |
-| D2 (RAID Stripe Policy) | Settled 21 / Unsettled 1 | Variable stripe width, full-stripe write never RMW; partial stripes pinned + lazy reallocation; membership table in Code 3 packed record, container index, container mirrored | [02-RAID Stripe Policy.en.md](decisions/02-raid-stripe-policy.en.md) | Implemented 12 / Unimplemented 9 / No code object 1 |
-| D3 (Space Allocation) | Settled 17 / Unsettled 0 | Globally unified allocator; per-placement allocation records; admission with in-flight overlay; commit endogenous block clustering; user data bypasses clustered segments, lowest free slot | [03-Space Allocation.en.md](decisions/03-space-allocation.en.md) | Implemented 14 / Unimplemented 3 |
-| D4 (Checksum Location) | Settled 8 / Unsettled 0 | Checksum inlined into pointers forming Merkle tree; units strictly 32 KiB with header, one extent per unit | [04-Checksum Location.en.md](decisions/04-checksum-location.en.md) | Implemented 6 / Unimplemented 2 |
-| D5 (Snapshot / Space Accounting Mechanism) | Settled 21 / Unsettled 0 | Adopts ZFS birth txg + deadlist; accounting lives in btree, key is (metric, tree ID, dev, gen); sparse side table registered day-1 as independent tree | [05-Snapshot / Space Accounting Mechanism.en.md](decisions/05-snapshot-space-accounting-mechanism.en.md) | Implemented 14 / Unimplemented 6 / No code object 1 |
+| D1 (Data Mobility / Reverse Index) | Settled 8 / Unsettled 0 | Reverse index required, designed into format day-1, post-hoc patch forbidden | [01-Data Mobility / Reverse Index.en.md](decisions/01-data-mobility-reverse-index.en.md) | Implemented 5 / Unimplemented 1 / No code object 2 |
+| D2 (RAID Stripe Policy) | Settled 21 / Unsettled 1 | Variable stripe width, full-stripe write never RMW; partial stripes pinned + lazy reallocation; membership table in Code 3 packed record, container index, container mirrored | [02-RAID Stripe Policy.en.md](decisions/02-raid-stripe-policy.en.md) | Implemented 10 / Unimplemented 11 / No code object 1 |
+| D3 (Space Allocation) | Settled 17 / Unsettled 0 | Globally unified allocator; per-placement allocation records; admission with in-flight overlay; commit endogenous block clustering; user data bypasses clustered segments, lowest free slot | [03-Space Allocation.en.md](decisions/03-space-allocation.en.md) | Implemented 15 / Unimplemented 2 |
+| D4 (Checksum Location) | Settled 8 / Unsettled 0 | Checksum inlined into pointers forming Merkle tree; units strictly 32 KiB with header, one extent per unit | [04-Checksum Location.en.md](decisions/04-checksum-location.en.md) | Implemented 8 / Unimplemented 0 |
+| D5 (Snapshot / Space Accounting Mechanism) | Settled 21 / Unsettled 0 | Adopts ZFS birth txg + deadlist; accounting lives in btree, key is (metric, tree ID, dev, gen); sparse side table registered day-1 as independent tree | [05-Snapshot / Space Accounting Mechanism.en.md](decisions/05-snapshot-space-accounting-mechanism.en.md) | Implemented 17 / Unimplemented 3 / No code object 1 |
 | D6 (Snapshot Implementation Model) | Settled 10 / Unsettled 0 | Adopts multiple writable heads, mechanism takes "each head has its own tree", cost paid on lookup | [06-Snapshot Implementation Model.en.md](decisions/06-snapshot-implementation-model.en.md) | Implemented 2 / Unimplemented 4 / No code object 4 |
 | D7 (Merging into Linux Mainline) | Settled 1 / Unsettled 0 | Out-of-tree for initial years, single-maintainer project, gate serves as acceptance criterion | [07-Merging into Linux Mainline.en.md](decisions/07-merging-into-linux-mainline.en.md) | Implemented 0 / Unimplemented 0 / No code object 1 |
 | D8 (Core Index Structure) | Settled 16 / Unsettled 0 | Multiple keyspaces + log-structured nodes + write buffer; accounting uses idempotent full values; 16 KiB nodes; inode tree leaves are Code 3 packed records, record length 140, published (id, birth gen) unreusable | [08-Core Index Structure.en.md](decisions/08-core-index-structure.en.md) | Implemented 13 / Unimplemented 3 |
 | D9 (Encryption) | Settled 17 / Unsettled 0 | AEAD; full 128-bit MAC; nonce per extent; AAD binds logical identity | [09-Encryption.en.md](decisions/09-encryption.en.md) | Implemented 3 / Unimplemented 11 / No code object 3 |
 | D10 (True Answer to Random Writes / Fragmentation) | Settled 3 / Unsettled 0 | Answer lies in D26 two legs; Candidate C (FDP / ZNS) demoted to acceleration | [10-True Answer to Random Writes / Fragmentation.en.md](decisions/10-true-answer-to-random-writes-fragmentation.en.md) | Implemented 0 / Unimplemented 0 / No code object 3 |
 | D11 (Message Buffers in Index Nodes) | Settled 7 / Unsettled 0 | Retain message buffers; ε = 0.65 (fanout 119, buffer 665 entries); trees whose pending flushes cannot be recalculated solely from authoritative state (inode tree only) have ε = 0; buffer remains purely derived | [11-Message Buffers in Index Nodes.en.md](decisions/11-message-buffers-in-index-nodes.en.md) | Implemented 1 / Unimplemented 4 / No code object 2 |
-| D12 (Target Media) | Settled 7 / Unsettled 0 | Layout branches per media class, each occupying one incompat bit, uncapped; supports heterogeneous pools; first branch is pure SSD | [12-Target Media.en.md](decisions/12-target-media.en.md) | Implemented 4 / Unimplemented 0 / No code object 3 |
-| D13 (Verification Route) | Settled 18 / Unsettled 0 | Implement all three verification classes; RefFS taken to extreme, self-contained persistence and crash semantics; crash refinement tests "one publish + one crash + one recovery" first | [13-Verification Route.en.md](decisions/13-verification-route.en.md) | Implemented 9 / Unimplemented 6 / No code object 3 |
+| D12 (Target Media) | Settled 7 / Unsettled 0 | Layout branches per media class, each occupying one incompat bit, uncapped; supports heterogeneous pools; first branch is pure SSD | [12-Target Media.en.md](decisions/12-target-media.en.md) | Implemented 3 / Unimplemented 1 / No code object 3 |
+| D13 (Verification Route) | Settled 18 / Unsettled 0 | Implement all three verification classes; RefFS taken to extreme, self-contained persistence and crash semantics; crash refinement tests "one publish + one crash + one recovery" first | [13-Verification Route.en.md](decisions/13-verification-route.en.md) | Implemented 11 / Unimplemented 4 / No code object 3 |
 | D14 (Dual-Track: Large/Small Files & Persistent/Transient) | Settled 6 / Unsettled 0 | Adopts allocator hints + inlining, no format-level second track | [14-Dual-Track: Large/Small Files & Persistent/Transient.en.md](decisions/14-dual-track-large-small-files-persistent-transient.en.md) | Implemented 3 / Unimplemented 0 / No code object 3 |
-| D15 (Format Freeze Policy) | Settled 11 / Unsettled 0 | Freeze is gate-arbitrated commit, freezing 4 layers sequentially; pre-freeze checklist uses each unsettled item's "format modifying" statement, not decision names; default padding width 0; `spec_hash` always computed over the full projection of the kb field tables, never switched to Rust structs | [15-Format Freeze Policy.en.md](decisions/15-format-freeze-policy.en.md) | Implemented 3 / Unimplemented 3 / No code object 5 |
-| D16 (Publish Semantics) | Settled 17 / Unsettled 0 | Batched root publication; each publish increments checkpoint_txg; persistence ordering uses two barriers + pre-replay validation; journal format is independent freeze component | [16-Publish Semantics.en.md](decisions/16-publish-semantics.en.md) | Implemented 12 / Unimplemented 4 / No code object 1 |
+| D15 (Format Freeze Policy) | Settled 11 / Unsettled 0 | Freeze is gate-arbitrated commit, freezing 4 layers sequentially; pre-freeze checklist uses each unsettled item's "format modifying" statement, not decision names; default padding width 0; `spec_hash` always computed over the full projection of the kb field tables, never switched to Rust structs | [15-Format Freeze Policy.en.md](decisions/15-format-freeze-policy.en.md) | Implemented 2 / Unimplemented 4 / No code object 5 |
+| D16 (Publish Semantics) | Settled 17 / Unsettled 0 | Batched root publication; each publish increments checkpoint_txg; persistence ordering uses two barriers + pre-replay validation; journal format is independent freeze component | [16-Publish Semantics.en.md](decisions/16-publish-semantics.en.md) | Implemented 15 / Unimplemented 1 / No code object 1 |
 | D17 (Implementation Layering & Third-Party Pipeline) | Settled 8 / Unsettled 0 | Waistline below commit protocol; conformance suite ships source + validator | [17-Implementation Layering & Third-Party Pipeline.en.md](decisions/17-implementation-layering-third-party-pipeline.en.md) | Implemented 4 / Unimplemented 3 / No code object 1 |
 | D18 (Information Carried in a Block) | Settled 24 / Unsettled 0 | Three criteria; data blocks carry plaintext self-describing headers; unit header field tables classified; unit registry (packed record is Code 3); tombstones use range-packed shared units | [18-Information Carried in a Block.en.md](decisions/18-information-carried-in-a-block.en.md) | Implemented 16 / Unimplemented 4 / No code object 4 |
-| D19 (Block Pointer Structure & Width Budget) | Settled 15 / Unsettled 0 | Pointers split into two sections; carries dev; fixed width; position entry 14 bytes; position authority hybrid; mapping key reuses write sequence key by class; all pointers enter mapping; header carries birth (tree, txg) | [19-Block Pointer Structure & Width Budget.en.md](decisions/19-block-pointer-structure-width-budget.en.md) | Implemented 14 / Unimplemented 1 |
+| D19 (Block Pointer Structure & Width Budget) | Settled 15 / Unsettled 0 | Pointers split into two sections; carries dev; fixed width; position entry 14 bytes; position authority hybrid; mapping key reuses write sequence key by class; all pointers enter mapping; header carries birth (tree, txg) | [19-Block Pointer Structure & Width Budget.en.md](decisions/19-block-pointer-structure-width-budget.en.md) | Implemented 15 / Unimplemented 0 |
 | D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) | Settled 8 / Unsettled 0 | Load-bearing surface is unit; atomic width takes runtime probed physical_block_size | [20-Load-Bearing Surface: Unit Atomicity & Self-Containment.en.md](decisions/20-load-bearing-surface-unit-atomicity-self-containment.en.md) | Implemented 4 / Unimplemented 0 / No code object 4 |
-| D21 (Boundary Between Authoritative and Derived States) | Settled 19 / Unsettled 0 | Authoritative state = units + accounting + root; index is derived state, rebuildable | [21-Boundary Between Authoritative and Derived States.en.md](decisions/21-boundary-between-authoritative-and-derived-states.en.md) | Implemented 6 / Unimplemented 8 / No code object 5 |
-| D22 (Synthesizing Unit Atomicity) | Settled 25 / Unsettled 1 | Boundary determined by parent pointers; accounting uses COW; root ring R=3; root record routes through tree table indirection | [22-Synthesizing Unit Atomicity.en.md](decisions/22-synthesizing-unit-atomicity.en.md) | Implemented 17 / Unimplemented 1 / No code object 8 |
+| D21 (Boundary Between Authoritative and Derived States) | Settled 19 / Unsettled 0 | Authoritative state = units + accounting + root; index is derived state, rebuildable | [21-Boundary Between Authoritative and Derived States.en.md](decisions/21-boundary-between-authoritative-and-derived-states.en.md) | Implemented 4 / Unimplemented 10 / No code object 5 |
+| D22 (Synthesizing Unit Atomicity) | Settled 25 / Unsettled 1 | Boundary determined by parent pointers; accounting uses COW; root ring R=3; root record routes through tree table indirection | [22-Synthesizing Unit Atomicity.en.md](decisions/22-synthesizing-unit-atomicity.en.md) | Implemented 16 / Unimplemented 2 / No code object 8 |
 | D23 (Journal Role & Format) | Settled 26 / Unsettled 0 | Records target states for pointer layer; fixed-length ring, 4 KiB records; reverse chain CRC32C; replay lower bound = root high-water mark | [23-Journal Role & Format.en.md](decisions/23-journal-role-format.en.md) | Implemented 23 / Unimplemented 1 / No code object 2 |
-| D24 (Offloading Heavy Background Work to GPU) | Settled 5 / Unsettled 0 | Deferred, non-essential; load-bearing only user settlements | [24-Offloading Heavy Background Work to GPU.en.md](decisions/24-offloading-heavy-background-work-to-gpu.en.md) | Implemented 0 / Unimplemented 1 / No code object 4 |
+| D24 (Offloading Heavy Background Work to GPU) | Settled 5 / Unsettled 0 | Deferred, non-essential; load-bearing only user settlements | [24-Offloading Heavy Background Work to GPU.en.md](decisions/24-offloading-heavy-background-work-to-gpu.en.md) | Implemented 1 / Unimplemented 1 / No code object 3 |
 | D25 (Target Workload Priority) | Settled 7 / Unsettled 0 | Coarse granularity: one fsync carries 8 leaves on 1 shared spine | [25-Target Workload Priority.en.md](decisions/25-target-workload-priority.en.md) | Implemented 0 / Unimplemented 1 / No code object 6 |
-| D26 (Background Compaction and Placement Reclamation) | Settled 10 / Unsettled 3 | Resolves fragmentation independently: resident compaction + structural anti-aging, device interface demoted to acceleration; compaction adds no commit steps, intent written as monotonic predicate; reclamation split into two lines: handed to the disk when the disk FTL is good enough, no code-level FTL | [26-Background Compaction and Placement Reclamation.en.md](decisions/26-background-compaction-and-placement-reclamation.en.md) | Implemented 0 / Unimplemented 11 / No code object 2 |
+| D26 (Background Compaction and Placement Reclamation) | Settled 10 / Unsettled 5 | Resolves fragmentation independently: resident compaction + structural anti-aging, device interface demoted to acceleration; compaction adds no commit steps, intent written as monotonic predicate; reclamation split into two lines: handed to the disk when the disk FTL is good enough, no code-level FTL | [26-Background Compaction and Placement Reclamation.en.md](decisions/26-background-compaction-and-placement-reclamation.en.md) | Implemented 7 / Unimplemented 7 / No code object 1 |
 | D27 (Small-Data Packing Container) | Settled 13 / Unsettled 0 | Background compaction moves <= 4 KiB objects into shared containers; write path unmodified; slots remain COW, abandoned on violation; scope captures consecutive small-packet waste; size class table omitted from format, version 1 takes 36 classes at ratio 1.125; packing tours continuously in mapping key order; one MAC per whole container, AAD binds container identity | [27-Small-Data Packing Container.en.md](decisions/27-small-data-packing-containers.en.md) | Implemented 0 / Unimplemented 13 |
 | D28 (Mount-Time Commitments) | Settled 4 / Unsettled 0 | Admission conjunction per device: each disk satisfied independently; pending-deletion usage, committed reservations and the checkpoint reserve pool counted as the sum over all replicas, each disk deducting that sum ÷ replica count; the admission inequality gains two terms, "mount-time commitments" (per device) and "checkpoint reserve pool" (computed live, uncapped); admission reading = published statistics − in-flight approved; instance switch reserve = (N_switch + 1) × one instance table chain rewrite, fixed-point redo needs no extra space | [28-Mount-Time Commitments.en.md](decisions/28-mount-time-commitments.en.md) | Implemented 4 / Unimplemented 0 |
 ---
@@ -95,7 +95,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
 - **D1 (Data Mobility / Reverse Index)** —— Settled (8 items, 0 unsettled)
   - 1. What can enter the unit's self-contained section —— Settled · Implemented
   - 2. Whether reverse indices count as self-contained data —— Settled · Implemented
-  - 3. Whether to reserve custom extension points —— Settled · Implemented
+  - 3. Whether to reserve custom extension points —— Settled · Unimplemented
   - 4. What enters self-contained section vs extension points —— Settled · Implemented
   - 5. How many pointers exist for self-contained immutable data, and how legacy versions disconnect —— Settled · Implemented
   - 6. Withdrawn · This number no longer used —— Settled · No code object
@@ -117,10 +117,10 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 13. Writable vs read-only during degraded mode —— Settled · Unimplemented
   - 14. Key definition for stripe table logical tree —— Settled · Unimplemented
   - 15. General criterion for objects with differing lifecycles —— Settled · No code object
-  - 16. Never emit writes smaller than io_min —— Settled · Implemented
+  - 16. Never emit writes smaller than io_min —— Settled · Unimplemented
   - 17. Forbid two objects with different lifecycles from sharing physical mapping unit —— Settled · Implemented
   - 18. Whether w_max and g in system configuration default to 4 or 2 in version 1 —— Settled · Implemented
-  - 19. Slot stride between root slots and system config slots —— Settled · Implemented
+  - 19. Slot stride between root slots and system config slots —— Settled · Unimplemented
   - 20. Whether stripe table and container index register in tree table on day-1 —— Settled · Implemented
   - 21. Parity layout variants —— **Unsettled** · Unimplemented
   - 22. Full-stripe writes, never read-modify-write —— Settled · Implemented
@@ -138,15 +138,15 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 11. Span field attribution in 20-byte allocation record: key vs value —— Settled · Implemented
   - 12. Sole registry location for allocation admission conjunction, and relation to dual admission formulas —— Settled · Implemented
   - 13. Whether to separate data vs metadata spaces —— Settled · Implemented
-  - 14. Collateral commitments entailed by non-classification —— Settled · Unimplemented
+  - 14. Collateral commitments entailed by non-classification —— Settled · Implemented
   - 15. Morphology of space reservations —— Settled · Implemented
   - 16. Capabilities of unkeyed side when encryption is enabled —— Settled · Unimplemented
   - 17. The operation of freeing space requires no allocation —— Settled · Implemented
 - **D4 (Checksum Location)** —— Settled (8 items, 0 unsettled)
   - 1. Tension between checksum granularity and small random reads —— Settled · Implemented
   - 2. Handling extents smaller than a unit —— Settled · Implemented
-  - 3. How writes that do not fill a unit are executed —— Settled · Unimplemented
-  - 4. Handling read-modify-write failures when legacy unit cannot be read —— Settled · Unimplemented
+  - 3. How writes that do not fill a unit are executed —— Settled · Implemented
+  - 4. Handling read-modify-write failures when legacy unit cannot be read —— Settled · Implemented
   - 5. Whether 32 KiB refers to total unit with header or payload only —— Settled · Implemented
   - 6. Location and width of declared extent length —— Settled · Implemented
   - 7. Relationship between logical extent and unit —— Settled · Implemented
@@ -164,10 +164,10 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 10. Registry of metric tags and two reserved values —— Settled · Implemented
   - 11. Whether deadlist carrier is built day-1 —— Settled · Implemented
   - 12. Morphology of deadlist entries —— Settled · Implemented
-  - 13. Lifecycle determination mechanism adopted —— Settled · Unimplemented
-  - 14. Necessary and sufficient conditions for reference intervals —— Settled · Unimplemented
+  - 13. Lifecycle determination mechanism adopted —— Settled · Implemented
+  - 14. Necessary and sufficient conditions for reference intervals —— Settled · Implemented
   - 15. Whether background relocation alters birth —— Settled · Implemented
-  - 16. Direction deadlist merges when destroying snapshots —— Settled · Unimplemented
+  - 16. Direction deadlist merges when destroying snapshots —— Settled · Implemented
   - 17. Four premises beyond which mechanism fails —— Settled · No code object
   - 18. Three additions required for clones / writable snapshots —— Settled · Unimplemented
   - 19. Runtime form of liveness judgment and cost of snapshot destruction —— Settled · Unimplemented
@@ -237,16 +237,16 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 1. How many layout branches are created —— Settled · Implemented
   - 2. How much is shared between branches —— Settled · No code object
   - 3. Where device-level geometric quantities reside —— Settled · Implemented
-  - 4. Verification rules for device-level geometric quantities —— Settled · Implemented
+  - 4. Verification rules for device-level geometric quantities —— Settled · Unimplemented
   - 5. Which layout branch is implemented in version 1 —— Settled · Implemented
   - 6. Media branching vs single layout with parameters —— Settled · No code object
   - 7. Debts to repay when opening a new layout branch —— Settled · No code object
 - **D13 (Verification Route)** —— Settled (18 items, 0 unsettled)
-  - 1. Which area crash refinement verifies first —— Settled · Unimplemented
+  - 1. Which area crash refinement verifies first —— Settled · Implemented
   - 2. Whether transaction layer commits serializability —— Settled · Implemented
   - 3. Degree of fidelity for custom reference implementation (RefFS) —— Settled · Implemented
   - 4. Definition of crash state sets for crash-point replay —— Settled · Implemented
-  - 5. What checker and tested implementation are permitted to share —— Settled · Implemented
+  - 5. What checker and tested implementation are permitted to share —— Settled · Unimplemented
   - 6. Three mutually independent oracles —— Settled · Unimplemented
   - 7. Verification scope of O2 (independent parser + checker) —— Settled · Implemented
   - 8. Two custom-developed verification components —— Settled · Unimplemented
@@ -257,8 +257,8 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 13. Conflict 2: Refinement specification vs differential model —— Settled · No code object
   - 14. Linkage with other decisions —— Settled · No code object
   - 15. One verification crate, one gate, two ways to run —— Settled · Implemented
-  - 16. Slicing and state width for segment-registered state tracking —— Settled · Unimplemented
-  - 17. Unit of reallocation judgment —— Settled · Unimplemented
+  - 16. Slicing and state width for segment-registered state tracking —— Settled · Implemented
+  - 17. Unit of reallocation judgment —— Settled · Implemented
   - 18. How the GC identity property is proven, and down to which layer —— Settled · Unimplemented
 - **D14 (Dual-Track Architecture: Large vs Small Files and Persistent vs Transient Data)** —— Settled (6 sub-items, including 0 unsettled)
   - 1. Settled · Question invalid · Number retired —— Settled · No code object
@@ -269,7 +269,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 6. Layer placement of dual-track allocation —— Settled · Implemented
 - **D15 (Format Freeze Policy)** —— Settled (11 items, 0 unsettled)
   - 1. Disposition of Item 7 in pre-freeze checklist —— Settled · No code object
-  - 2. Whether tree table is an open extensible list —— Settled · Implemented
+  - 2. Whether tree table is an open extensible list —— Settled · Unimplemented
   - 3. Provenance of spec_hash —— Settled · Unimplemented
   - 4. Bit allocation registry for feature bits —— Settled · Implemented
   - 5. Operational definition of format freeze —— Settled · Unimplemented
@@ -280,11 +280,11 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 10. Width, accounting, and allocation authority of feature bits —— Settled · Implemented
   - 11. Two failure checks required for freeze validation —— Settled · Unimplemented
 - **D16 (Publish Semantics)** —— Settled (17 items, 0 unsettled)
-  - 1. Dimension of defer window —— Settled · Unimplemented
+  - 1. Dimension of defer window —— Settled · Implemented
   - 2. Checkpoint trigger criteria —— Settled · Implemented
   - 3. Freeze layer assignment for journal in D15 (Format Freeze Policy) —— Settled · Unimplemented
   - 4. Second replay implementation for the record checker —— Settled · Implemented
-  - 5. Calibration of T_time and T_dirty, and measurement basis of the loss window —— Settled · Unimplemented
+  - 5. Calibration of T_time and T_dirty, and measurement basis of the loss window —— Settled · Implemented
   - 6. Publication counter —— Settled · Implemented
   - 7. Persistence ordering of publication —— Settled · Implemented
   - 8. Whether new instance must write current instance root to two disks first —— Settled · Implemented
@@ -293,7 +293,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 11. Whether root publication can bypass journal —— Settled · Implemented
   - 12. Validity semantics of intermediate states —— Settled · Implemented
   - 13. Ownership of this journal replay implementation —— Settled · Implemented
-  - 14. Placement of snapshot publication point —— Settled · Unimplemented
+  - 14. Placement of snapshot publication point —— Settled · Implemented
   - 15. When releases generated in checkpoint C enter allocatable set —— Settled · Implemented
   - 16. Window boundary for amortizing checkpoints vs message buffers —— Settled · No code object
   - 17. Assumptions caller can make after fsync errors —— Settled · Implemented
@@ -336,7 +336,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 2. Bit width of ciphertext checksum —— Settled · Implemented
   - 3. Fixed width vs variable length —— Settled · Implemented
   - 4. Widths of location entry components —— Settled · Implemented
-  - 5. Authoritative location of placement data —— Settled · Unimplemented
+  - 5. Authoritative location of placement data —— Settled · Implemented
   - 6. Field table of central mapping entries —— Settled · Implemented
   - 7. Sections included in pointer header —— Settled · Implemented
   - 8. Birth identity carried on referencing side; categories stored in mapping —— Settled · Implemented
@@ -371,8 +371,8 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 12. Whether derived state alters format —— Settled · No code object
   - 13. Recovery, tree replacement, and migration paths —— Settled · Unimplemented
   - 14. Morphology of extension points —— Settled · Unimplemented
-  - 15. Basis for declaring extension point size —— Settled · Implemented
-  - 16. Evaluation timing of unit geometry —— Settled · Implemented
+  - 15. Basis for declaring extension point size —— Settled · Unimplemented
+  - 16. Evaluation timing of unit geometry —— Settled · Unimplemented
   - 17. Hard constraints on extension points —— Settled · Unimplemented
   - 18. Utilization of byte-by-byte comparison table —— Settled · No code object
   - 19. Which half of reverse mapping self-containment purchases —— Settled · No code object
@@ -384,7 +384,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 5. Widening the measurement basis of D2 (RAID Stripe Policy) —— Settled · No code object
   - 6. Zoned write pointers as witnesses outside filesystem checksum jurisdiction —— **Unsettled** · No code object
   - 7. Field table of root records —— Settled · Implemented
-  - 8. Placement of fixed structures —— Settled · Implemented
+  - 8. Placement of fixed structures —— Settled · Unimplemented
   - 9. Field table of system configuration —— Settled · Implemented
   - 10. Whether zone write pointer can serve as authoritative recovery ceiling —— Settled · No code object
   - 11. Whether zone write pointer enters O2 judgment inputs —— Settled · No code object
@@ -432,7 +432,7 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 26. Dual parsing disciplines for record headers —— Settled · Implemented
 - **D24 (Offloading Heavy Background Work to GPU)** —— Settled (5 items, 0 unsettled)
   - 1. Whether to implement —— Settled · Unimplemented
-  - 2. Three hard constraints —— Settled · No code object
+  - 2. Three hard constraints —— Settled · Implemented
   - 3. Criterion formulation —— Settled · No code object
   - 4. Reopening criteria —— Settled · No code object
   - 5. Source of legitimacy —— Settled · No code object
@@ -444,20 +444,22 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 5. How the measurement basis is computed when these figures set other parameters —— Settled · No code object
   - 6. Whether capacity benchmarking can substitute for D25 answer —— Settled · No code object
   - 7. Concurrency level for concurrent fsync —— Settled · Unimplemented
-- **D26 (Background Compaction and Placement Reclamation)** —— Semi-settled (13 items, 3 unsettled)
-  - 1. Trigger criteria for compaction —— Settled · Unimplemented
-  - 2. Transactional form of compaction —— Settled · Unimplemented
-  - 3. Whether compaction itself requests space —— Settled · Unimplemented
+- **D26 (Background Compaction and Placement Reclamation)** —— Semi-settled (15 items, 5 unsettled)
+  - 1. Trigger criteria for compaction —— Settled · Implemented
+  - 2. Transactional form of compaction —— Settled · Implemented
+  - 3. Whether compaction itself requests space —— Settled · Implemented
   - 4. Form of structural anti-aging —— Settled · Unimplemented
-  - 5. Interaction between compaction and accounting —— Settled · Unimplemented
-  - 6. Runtime observability points for compaction invocation —— Settled · Unimplemented
+  - 5. Interaction between compaction and accounting —— Settled · Implemented
+  - 6. Runtime observability points for compaction invocation —— Settled · Implemented
   - 7. Branching of reclamation lines —— Settled · Unimplemented
   - 8. Switching criteria between the two reclamation lines —— **Unsettled** · Unimplemented
   - 9. Scopes of the two reclamation lines —— **Unsettled** · Unimplemented
   - 10. Feature bit tiers and device commands for reclamation lines —— **Unsettled** · Unimplemented
   - 11. Where the answer to fragmentation rests —— Settled · No code object
-  - 12. Form of Leg 1 —— Settled · No code object
-  - 13. Where background task computation sits, how it is enabled, and its cadence —— Settled · Unimplemented
+  - 12. Form of Leg 1 —— Settled · Implemented
+  - 13. Where background task computation sits, how it is enabled, and its cadence —— Settled · Implemented
+  - 14. Whole-disk compaction —— **Unsettled** · Unimplemented
+  - 15. Deletion Queue Not Walked While the Background Is Stopped —— **Unsettled** · Unimplemented
 - **D27 (Small-Data Packing Container)** —— Settled (13 items, 0 unsettled)
   - 1. Whether the operational form adopts online packing or background compaction, and how damaged containers are repaired —— Settled · Unimplemented
   - 2. Demarcation boundaries —— Settled · Unimplemented

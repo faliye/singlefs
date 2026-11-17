@@ -80,7 +80,7 @@ raw output `e20-fanout-2026-08-28.out` (two-tier initial version) and
 ### ⚠️ Positive control ran only one point before revision, while the group producing conclusions never passed the gate (2026-08-29 adversarial verification revision)
 
 **This is the second repetition of the lesson from E18 (Whether D5 Scraps Under Multiple Forks / Multiple Writable Heads) in this repository.**
-`.claude/singlefs-ai-sop/rules/test-discipline.md` verbatim:
+`.claude/rules/test-discipline.md` verbatim:
 "Running positive control on only one arm is equivalent to the other arm never passing the gate, **and it happens to be the very arm producing the conclusion**".
 
 The positive control for E20 (CPU Cache Cost of Widening Pointers) was previously hard-coded on **`entry_bytes=16` / `node_bytes=4096`**, passing after a single run,
@@ -136,9 +136,9 @@ binary search hit position (inverted comparison direction originally did not go 
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D19 (Block Pointer Structure & Width Budget) settled item 1 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D8 (Core Index Structure) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D4 (Checksum Location) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D19 (Block Pointer Structure & Width Budget) settled item 1 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D8 (Core Index Structure) settled item 2 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

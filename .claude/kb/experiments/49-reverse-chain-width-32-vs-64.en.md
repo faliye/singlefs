@@ -158,7 +158,7 @@ with its denominator exceeding the incident denominator by **3 to 6 orders of ma
   Mutation table `scripts/mutation/tables/e49_chain_width.tsv` (14 entries; 12 caught in header 311 run, 7 original plus 5 new M8–M12 in section "2026-09-25", M13/M14 added in header 487 run).
 - **Both denominators are scenario points, not measurements**: D-Incident reuses the "crashed 10 times daily × 10 years" adopted by D23 (Journal Role & Format) settled item 9;
   D-Traversal ring sizes take XFS lower / upper bounds and a middle value, with traversal frequency weekly / daily.
-  **This repository has neither crash frequency telemetry nor a record checker.**
+  **When this experiment ran, this repository had neither crash frequency telemetry nor a record checker (a record checker exists now; see `check_records` in `crates/singlefs-verification/src/crash.rs`).**
 - **"False acceptance = 2⁻ⁿ" is conditional on uniform chain values**. Hash algorithm unsettled; E40 (Ciphertext Checksum Bit Width) demonstrated that **truncated CRC is not a shorter CRC**;
   if chain values take truncated CRC, this curve does not apply.
 - Record checker **comparisons per pass** takes "how many records in ring", assuming a full ring pass;
@@ -314,8 +314,8 @@ Byte-identical `e49-chain-width-2026-10-04-h487.out`.
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D23 (Journal Role & Format) settled item 8 | Material | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 Unaffected: only adds unit test names then and now in question 5; numbers, conclusions, and artifacts remain unchanged |
-| D13 (Verification Route) | No effect | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 Unaffected: only adds unit test names then and now in question 5; numbers, conclusions, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 8 | Material | 2026-11-17 unaffected: only outdated sentences about the current state and artifact pointers were changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 Unaffected: only adds unit test names then and now in question 5; numbers, conclusions, and artifacts remain unchanged |
+| D13 (Verification Route) | No effect | 2026-11-17 unaffected: only outdated sentences about the current state and artifact pointers were changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-17 Unaffected: only adds unit test names then and now in question 5; numbers, conclusions, and artifacts remain unchanged |
 
 ## Historical Versions
 

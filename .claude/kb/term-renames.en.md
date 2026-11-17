@@ -86,14 +86,14 @@ One row per pair, `scripts/kb/sweep-term.py` replaces and checks according to th
 | GATE_FORMAL_VERDICT_STORE | GATE_FORMAL_VERDICT_LIBRARY | Full string | Formal verification gate environment variable |
 | store-in-tmpdir | library-in-tmpdir | Full string | Item of `FORMAL_VERIFICATION_BREAK` |
 | 快速档 | 快档 | Full string | Tier in E165 (Bounded Exhaustive Recovery Replay and Mutation Kill Bound); part of the quick / slow tier naming, like "harness slow-tier case" |
-| `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?0(?![0-9.])(?! ?冒烟)` | 崩溃点重放 | Regex | Chinese term; does not match tree levels like "Layer 1 0" or D13 "Layer 0 smoke" |
+| `(?<![第每各叶外内里深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?0(?![0-9.])(?! ?冒烟)` | 崩溃点重放 | Regex | Chinese term; does not match tree levels like "Layer 1 0" or D13 "Layer 0 smoke" |
 | 第一条流 | 新池新建文件流 | Full string | Chinese term: first workload of crash-point replay |
 | 第二条流 | 覆盖写固定脚本流 | Full string | Chinese term: second workload of crash-point replay (fixed script to E) |
 | 层 0 冒烟 | 冒烟层 | Full string | Label for tier 1 in three-tier table of settled item 9 of D13 |
 | 层 1 常规 | 常规层 | Full string | Label for tier 2 in same table |
 | 层 2 全量 | 大负载层 | Full string | Label for tier 3 in same table |
-| `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?1(?![0-9.])(?! ?常规)` | 常规层 | Regex | Chinese term: when tier 2 of three-tier table written alone; does not match tree levels |
-| `(?<![第每各叶外内深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?2(?![0-9.])(?! ?全量)` | 大负载层 | Regex | Chinese term: when tier 3 of three-tier table written alone; does not match tree levels; those followed by "全量" (full run) are replaced by the preceding row |
+| `(?<![第每各叶外内里深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?1(?![0-9.])(?! ?常规)` | 常规层 | Regex | Chinese term: when tier 2 of three-tier table written alone; does not match tree levels |
+| `(?<![第每各叶外内里深一两三几多0-9])(?<!第 [0-9] )(?<!第 [0-9][0-9] )层 ?2(?![0-9.])(?! ?全量)` | 大负载层 | Regex | Chinese term: when tier 3 of three-tier table written alone; does not match tree levels; those followed by "全量" (full run) are replaced by the preceding row |
 | `checker-tier-layer0-replay(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]checker-tier-layer0-replay)` | crash-point-replay | Regex | Gate name, stage file name, fixture directory name |
 | `layer0-shard-configuration-check(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-configuration-check)` | crash-point-replay-shard-configuration-check | Regex | Script name for two-host shard configuration judgment |
 | `layer0-shard-run(?![A-Za-z0-9_-])(?<![A-Za-z0-9_-]layer0-shard-run)` | crash-point-replay-shard-run | Regex | Script name for the two-host sharding wrapper of crash-point replay (do not match the deleted `layer0-shard-run-selftest.sh`; it has no new name) |

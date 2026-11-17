@@ -27,7 +27,7 @@ ditto arm pulls metadata recovery count from 4659 to 5242 (all) under non-resona
 | D18 (Information Carried in a Block) settled item 23 | "Child block recording current parent physical address" judged "chronologically impossible" ⇒ version chain eliminated, chain arm can only take same-batch chain |
 
 ⚠️ **ZFS mechanism is an external implementation, only usable to propose shapes and indicate which path to test**
-(`.claude/singlefs-ai-sop/rules/evidence-discipline.md` "How other projects do it is a lead, not evidence").
+(`.claude/rules/evidence-discipline.md` "How other projects do it is a lead, not evidence").
 One known difference from this project: ZFS indirect blocks are pure pointer arrays, whereas this project's index nodes carry key intervals
 (D18 (Information Carried in a Block) settled item 2) ⇒ metadata ratio is not necessarily identical, hence ratio is swept as a parameter.
 
@@ -105,10 +105,10 @@ bash scripts/experiment-apparatus/replay.sh E118     # Byte-for-byte comparison 
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D18 (Information Carried in a Block) settled item 4 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D18 (Information Carried in a Block) settled item 23 | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D3 (Space Allocation) settled item 3 | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D4 (Checksum Location) settled item 1 | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D18 (Information Carried in a Block) settled item 4 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D18 (Information Carried in a Block) settled item 23 | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D3 (Space Allocation) settled item 3 | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D4 (Checksum Location) settled item 1 | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

@@ -28,7 +28,7 @@ Code: `scripts/experiment-apparatus/e130_livelist_bounded_destroy.rs`, raw outpu
 
 No file I/O, no concurrency, no random source ⇒ running the same binary N times is necessarily identical byte-for-byte.
 **"Consistent across N rounds" demonstrates the absence of hidden state, not statistical stability**
-(`.claude/singlefs-ai-sop/rules/test-discipline.md`).
+(`.claude/rules/test-discipline.md`).
 Evidence strength derives from **22 unit tests + 15 mutations all caught**, not from round counts.
 
 **What it does not answer**: real I/O counts, wall-clock cost of condense itself, crash consistency;
@@ -46,8 +46,8 @@ which this apparatus does not verify by even a single word.
 ⚠️ **The trigger predicate for `condense` was modified once, before any measurement was run**: Version 1 wrote "FREE entry ratio ≥ 1/2",
 whereas in this workload family `free_event_count / (allocation_event_count + free_event_count) = c / (1 + 2c)`, which is strictly less than 1/2 for any finite `c`
 ⇒ antecedent is vacuously false, the arm never triggers once, acting as an exact replica of `naive` —
-the **strawman control arm** explicitly called out in `.claude/singlefs-ai-sop/rules/evidence-discipline.md`,
-as well as the form in `.claude/singlefs-ai-sop/rules/test-discipline.md` where "antecedents of failure clauses can be written inverted".
+the **strawman control arm** explicitly called out in `.claude/rules/evidence-discipline.md`,
+as well as the form in `.claude/rules/test-discipline.md` where "if the observation that would trigger it cannot be written down, the clause either has its antecedent written inverted or is empty".
 It was exposed by this apparatus's unit tests, not artifacts. The inverted version is archived by unit test `the_first_condense_predicate_never_fires`.
 
 ### Conclusion: Arm A Passes Criterion 5, with Two Costs
@@ -124,11 +124,11 @@ Artifacts were re-run and replaced, passing byte-for-byte verification under `re
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D6 (Snapshot Implementation Model) settled item 3 | Supports | 2026-09-20 unaffected: whether Candidate A (per-head livelist) passes settled item 8 Criterion 5 "bounded destruction" is judged by it, concluding it passes only with condense — that is acceptance evidence for "requiring a second structure, adopting ZFS event stream form". ⚠️ E130 (Does Per-Head Livelist Pass Bounded Destruction) body text wrote "D6 (Snapshot Implementation Model) settled item 2", which was the numbering on 2026-09-10; destruction structure resides in settled item 3 after 2026-09-13 |
-| D3 (Space Allocation) settled item 17 | Supports | 2026-09-20 unaffected: the extra bytes prepaid per block released on the release path collide verbatim with the principle that "releasing space does not require allocating space" |
-| D3 (Space Allocation) settled item 2 | Supports | 2026-09-20 unaffected: for livelist entries to take the tombstone path, they must enter the quantity of "how much is needed to untie itself" — the basis for settled item 2 supplementing the livelist half |
-| D5 (Snapshot / Space Accounting Mechanism) settled item 5 | Does not affect | 2026-09-20 unaffected: only borrows accounting entry width as a cross-harness measurement basis control, does not judge accounting key |
-| D8 (Core Index Structure) settled item 5 | Does not affect | 2026-09-20 unaffected: only notes that the "resumable" half relies on intent mechanism, unmodeled by apparatus |
+| D6 (Snapshot Implementation Model) settled item 3 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: whether Candidate A (per-head livelist) passes settled item 8 Criterion 5 "bounded destruction" is judged by it, concluding it passes only with condense — that is acceptance evidence for "requiring a second structure, adopting ZFS event stream form". ⚠️ E130 (Does Per-Head Livelist Pass Bounded Destruction) body text wrote "D6 (Snapshot Implementation Model) settled item 2", which was the numbering on 2026-09-10; destruction structure resides in settled item 3 after 2026-09-13 |
+| D3 (Space Allocation) settled item 17 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: the extra bytes prepaid per block released on the release path collide verbatim with the principle that "releasing space does not require allocating space" |
+| D3 (Space Allocation) settled item 2 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: for livelist entries to take the tombstone path, they must enter the quantity of "how much is needed to untie itself" — the basis for settled item 2 supplementing the livelist half |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 5 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: only borrows accounting entry width as a cross-harness measurement basis control, does not judge accounting key |
+| D8 (Core Index Structure) settled item 5 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: only notes that the "resumable" half relies on intent mechanism, unmodeled by apparatus |
 
 ## Historical Versions
 

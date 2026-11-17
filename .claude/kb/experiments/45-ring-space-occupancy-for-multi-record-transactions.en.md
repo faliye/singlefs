@@ -7,7 +7,7 @@ and **the direction of overturning was a mutual transposition**: previously writ
 
 ⚠️ **A mutual transposition of this magnitude requires three independent verifications.** A single arithmetic recheck is insufficient——
 if the step overturning conclusion from side A to side B was itself mistaken, flipping it back merely errs in a different direction.
-E45 (Ring Space Occupancy for Multi-Record Transactions) assigns an **isolated path sharing no code** to each of the three steps under `.claude/singlefs-ai-sop/rules/evidence-discipline.md`.
+E45 (Ring Space Occupancy for Multi-Record Transactions) assigns an **isolated path sharing no code** to each of the three steps under `.claude/rules/evidence-discipline.md`.
 
 ### Verified Premises (Investigated 2026-08-30)
 
@@ -88,7 +88,7 @@ I-8.2 (Record Header Does Not Cross Atomic Unit) verbatim requires only "record 
 | 3 Matching published table of E23 (Journal Geometry) | **Not cross-binary reproduction**: 140 / 644 / 5684 are **not** in `e23-journal-geom-2026-08-29.out` (the sole 140 in that artifact is `forced=140`), they were **hand-calculated tables in the text** of E23 (Journal Geometry), copied into E45 (Ring Space Occupancy for Multi-Record Transactions) as three literals. Furthermore, it only anchors the two constants `BASE_RECORD_HEADER_BYTES` and `NAMED_ITEM_BYTES`, offering **zero discriminative power over the multiple under test** |
 
 ⇒ **The three paths agreed because all three shared the same false premise.**
-`.claude/singlefs-ai-sop/rules/evidence-discipline.md`: Such agreement is not evidence.
+`.claude/rules/evidence-discipline.md`: Such agreement is not evidence.
 **The discipline that "mutual transposition requires three verifications" was sound; the flaw was that the three verifications were not genuinely independent.**
 
 ### ⚠️ Four Other Points Identified in Attack Round
@@ -224,9 +224,9 @@ which is the cost of "one record per fsync", not the cost of this choice.
 
 | Decision Branch | Relationship | Review |
 |---|---|---|
-| D23 (Journal Role & Format) settled item 7 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D23 (Journal Role & Format) settled item 4 | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D25 (Target Workload Priority) | Does not affect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 7 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 4 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D25 (Target Workload Priority) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

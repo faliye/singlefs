@@ -97,7 +97,7 @@ Three independent lines of evidence, any one of which suffices alone:
 Previous measurements in E21 (Net Benefit of GPU Offloading) each kept the GPU busy for only 2.06 ms (compute segment) to 21.3 ms (including transfer), 5 rounds each,
 totaling under 0.2 seconds; whereas `nvidia-smi` samples per second and power draw exhibits latency
 ⇒ **glancing at any moment almost inevitably reveals idle**.
-This collides directly with `.claude/singlefs-ai-sop/rules/test-discipline.md`
+This collides directly with `.claude/rules/test-discipline.md`
 "negative results must be distinguishable from 'code was never reached'"—**to claim "this path was run", one must have readings proving it actually executed**,
 which millisecond-level benchmarks cannot provide on their own.
 ⇒ **Approach**: GPU benchmarks must either sample utilization/power concurrently, or run a sufficiently long sustained workload as proof of existence.
@@ -138,7 +138,7 @@ and scripts directly refuse to run when free VRAM < 3 GiB—disrupting other ser
 1. Initial version took **the measured arm itself** as control, demanding "16 threads 2× faster". But XOR fold is **bandwidth-bound**;
    single thread already reached 54.12 GB/s, hitting the wall at 2 threads; **it was never supposed to scale linearly**.
    Measured 1.16× ⇒ a valid result was misjudged as harness failure.
-   **`.claude/singlefs-ai-sop/rules/test-discipline.md` explicitly mandates positive controls use "the baseline where effect conclusively exists"**,
+   **`.claude/rules/test-discipline.md` explicitly mandates positive controls use "the baseline where effect conclusively exists"**,
    rather than the measured arm itself.
 2. Second version established a separate compute-bound arm, but had **each** thread execute identical iteration counts ⇒ total work scaled with thread count,
    representing weak scaling where wall-clock is flat and ratio ≈ 1 under perfect parallelism; measured 0.96 was misjudged as non-parallel.
@@ -217,9 +217,9 @@ so introducing GPU does not violate settled discipline; however, **not a single 
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D24 (Offloading Heavy Background Work to GPU) settled item 3 | Supports | 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
-| D24 (Offloading Heavy Background Work to GPU) settled item 4 | Supports | 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
-| D24 (Offloading Heavy Background Work to GPU) settled item 1 | Does not affect | 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D24 (Offloading Heavy Background Work to GPU) settled item 3 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D24 (Offloading Heavy Background Work to GPU) settled item 4 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
+| D24 (Offloading Heavy Background Work to GPU) settled item 1 | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording adjustments only (temporal words, location references, self-references); conclusions, numbers, and artifacts unchanged |
 
 ## Historical Versions
 

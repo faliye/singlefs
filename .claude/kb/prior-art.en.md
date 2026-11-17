@@ -61,7 +61,7 @@ Sources: [bcachefs Snapshots Design Document](https://bcachefs.org/Snapshots/),
 | [Dicklesworthstone/frankenfs](https://github.com/Dicklesworthstone/frankenfs) | Rust | Claims ext4+btrfs rewrite, 22 crates, zero unsafe | 21 stars / **8213 commits** / 0 issues. **Ratio strongly suggests agent batch generation**—inferred, code unread |
 
 **Significance to this project**: btrfsutils proves that "building a Rust implementation following btrfs format" can produce a prototype in 3 months, but only because **the format was ready-made and `btrfs inspect-internal dump-tree` served as a free referee**.
-Building from scratch, this project has neither—**the lack of an oracle is the largest hidden cost of building from zero**, and must be accounted for in budget; see `.claude/singlefs-ai-sop/rules/test-discipline.md` "Model Differential Testing".
+Building from scratch, this project has neither—**the lack of an oracle is the largest hidden cost of building from zero**, and must be accounted for in budget; see `.claude/rules/verification.md` "Functional correctness relies on model differential testing".
 
 ## 4. Kernel Rust Filesystem Abstraction Layer
 
@@ -422,7 +422,7 @@ The last decade has produced at least five categories of ready-made methods, eac
 **Two most direct takeaways for this project**:
 
 1. **RefFS in Metis demonstrates that a "reference implementation" need not be someone else's mature filesystem; it can be a small implementation written specifically for differential testing.**
-   This matches the model differential testing in `.claude/singlefs-ai-sop/rules/test-discipline.md`, but Metis connects it with state-space enumeration rather than solely feeding random operation sequences.
+   This matches the model differential testing in `.claude/rules/test-discipline.md`, but Metis connects it with state-space enumeration rather than solely feeding random operation sequences.
 2. **DaisyNFS layering is isomorphic to `.claude/rules/fs-design.md` "one transaction layer shared by all structures"**:
    The transaction layer resolves concurrency and crashes once, leaving upper layers to verify only sequential correctness.
    This provides an independent justification outside this project for that discipline.
@@ -513,7 +513,7 @@ Comments in `btree_gc.c` admit the reconstruction side "is not idempotent; we'll
 |---|---|
 | Incremental application divergence: dropped update, concurrency loss, un-replayed crash | **Flawed addition/subtraction semantics**: sign reversed on a branch causes runtime and reconstruction to err to the exact same value, passing memcmp completely green |
 
-**Significance to this project**: `.claude/singlefs-ai-sop/rules/evidence-discipline.md` mandates that "verification paths do not share the same code, sampling, or tools". This section records a concrete real-world instance where violating that rule produced blind spots. Remediation see [checks-owed.md](checks-owed.md) C12.
+**Significance to this project**: `.claude/rules/evidence-discipline.md` mandates that "verification paths do not share the same code, sampling, or tools". This section records a concrete real-world instance where violating that rule produced blind spots. Remediation see [checks-owed.md](checks-owed.md) C12.
 
 **Incidental accounting format facts** (verified concurrently): Accounting tree is bound at the **format level** to `BTREE_IS_write_buffer` in `bcachefs_format.h` `BCH_BTREE_IDS()`; `disk_accounting_format.h` verbatim: "Unlike with other key types, **updates are _deltas_**"; merge function is `dst->v.d[i] += src.v->d[i]`; write buffer explicitly forks accounting vs regular keys across insertion, flush deduplication, and btree writeback; because Δ is non-idempotent, it invents a **total bversion ordering** to determine whether a Δ has been applied, and strictly forbids accounting key flushes until journal replay completes.
 **These items form the checklist of costs incurred by placing increments in buffers.**
@@ -553,7 +553,7 @@ Source: `zfs/include/sys/vdev_impl.h` macros from `VDEV_UBERBLOCK_RING` to `VDEV
 ⚠️ **The metric used is ashift (alignment / minimum allocation unit), not Linux io_min (stripe chunk size on arrays).**
 These two metrics diverge drastically on md arrays—E34 (Root Ring Slot Geometry) measured a 128x difference on real md/raid5.
 
-⚠️ **Known difference with this project** (`.claude/singlefs-ai-sop/rules/evidence-discipline.md` requires noting):
+⚠️ **Known difference with this project** (`.claude/rules/evidence-discipline.md` requires noting):
 ZFS labels occupy 4 **fixed areas** per disk at 256 KiB each, with uberblock ring permanently taking 128 KiB;
 in this project, the root ring distributes R regions across the disk with prime stride; **region size is not a format constant**—slots per region S resides in system configuration, and only the two edges of its interval (lower bound 4, upper bound 16) are format constants (D22 (Synthesizing Unit Atomicity) settled item 2).
 => "Widening slot width = reducing slot count" holds in this project only if "fixed region size" is established, which does not exist in the repository.
@@ -604,7 +604,7 @@ D21 Item 3 ③ verbatim states: "User-requested external survey (how others impl
 
 ## 10. Deadlist accounting, relocating shared blocks, and discard timing under snapshots
 
-Retrieved on 2026-10-12. None of these items has been verified in this project; each is a clue, not evidence (`.claude/singlefs-ai-sop/rules/evidence-discipline.md`, "What other projects do is a clue, not evidence").
+Retrieved on 2026-10-12. None of these items has been verified in this project; each is a clue, not evidence (`.claude/rules/evidence-discipline.md`, "What other projects do is a clue, not evidence").
 
 **Versions Checked and Retrieval Method**
 

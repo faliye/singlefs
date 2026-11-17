@@ -111,7 +111,7 @@ None. Pure counting model.
   raw output `e67-device-subset-2026-08-31.out` (52 lines, ending with line `emitted=52`).
 - Mutation table `scripts/mutation/tables/e67_device_subset.tsv` (4 entries: M2 / M3 / M4 caught, M1 invalid).
   ⚠️ **M1 (Arm E does not fix and reselects every time) replacement failed compilation**, re-run on 2026-09-16 recorded it as compilation failure invalid mutation —
-  per `.claude/singlefs-ai-sop/rules/test-discipline.md`, compilation failure counts as neither caught nor blind spot;
+  per `.claude/rules/test-discipline.md`, compilation failure counts as neither caught nor blind spot;
   **it owes a replacement mutation that genuinely alters behavior**: no mutation proves that "Arm E reselecting every time" turns red.
   ⚠️ M2 (hit only considers one disk) original text hit two locations before 2026-09-16 (`mutate.sh` exited with code 3, subsequent entries not run),
   re-run after adding one line of context on 2026-09-16 to make unique hit, M2 / M3 / M4 all turned red (C327 (Mutation Table Anchor Rot Lacks Failing Check) repaid that day).
@@ -122,7 +122,7 @@ None. Pure counting model.
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D2 (RAID Stripe Policy) settled item 8 | Support | 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
+| D2 (RAID Stripe Policy) settled item 8 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: wording only (temporal terms, positional references, self-referential terms), conclusions, figures, and artifact unchanged |
 
 ## Historical Versions
 

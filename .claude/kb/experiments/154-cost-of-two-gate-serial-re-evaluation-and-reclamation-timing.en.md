@@ -131,7 +131,7 @@ Code `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_tim
 
 ### This is a Counting Model, Not an Implementation; Differences Between Measurement Basis and Preregistration
 
-Pure arithmetic, no I/O, no concurrency, no random sources; running identical input N times is necessarily identical (rerun of stage 4 artifact is byte-for-byte identical, `diff` has no output); strength of evidence comes from 30 unit tests and 14 caught mutations, not from round counts (`.claude/singlefs-ai-sop/rules/test-discipline.md` premise that "single observation does not count" applies to observations with variation; this harness has none).
+Pure arithmetic, no I/O, no concurrency, no random sources; running identical input N times is necessarily identical (rerun of stage 4 artifact is byte-for-byte identical, `diff` has no output); strength of evidence comes from 30 unit tests and 14 caught mutations, not from round counts (`.claude/rules/test-discipline.md` premise that "single observation does not count" applies to observations with variation; this harness has none).
 
 **What was done in this stage** (items 1–6 are stage 2 records, detailed in preregistration section 12 revisions items 3–6; items 7–11 are stage 4 additions, detailed in preregistration section 12 stage 4):
 
@@ -190,11 +190,11 @@ PC1 (F carried by empty push constantly takes F_top, not raised), PC2 (`df` inva
 
 | Decision Item | Relation | Review |
 |---|---|---|
-| D3 (Space Allocation) settled item 12 | Prepare material | 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
-| D16 (Publish Semantics) | Prepare material | 2026-10-21 unaffected: only the trilingual language-switch line was added; previously, 2026-10-11 was unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
-| D3 (Space Allocation) settled item 9 | No impact | 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
-| D28 (Mount-Time Commitments) | No impact | 2026-10-21 unaffected: only the trilingual language-switch line was added; previously, 2026-10-11 was unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
-| D23 (Journal Role & Format) settled item 14 | No impact | 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
+| D3 (Space Allocation) settled item 12 | Prepare material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
+| D16 (Publish Semantics) | Prepare material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch line was added; previously, 2026-10-11 was unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
+| D3 (Space Allocation) settled item 9 | No impact | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
+| D28 (Mount-Time Commitments) | No impact | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch line was added; previously, 2026-10-11 was unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
+| D23 (Journal Role & Format) settled item 14 | No impact | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-11 Unaffected: wording changes only (time words, positional references, self-references); conclusion, numbers, and artifact unchanged |
 
 ## Historical Versions
 

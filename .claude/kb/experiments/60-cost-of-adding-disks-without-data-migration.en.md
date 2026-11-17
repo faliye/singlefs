@@ -78,7 +78,7 @@ The fuller the existing disks, the worse this ratio: 80% stranded at 95% fill, 9
 | Arm A w=3 | **−2.0%** | Judged "cost not significant" ⇒ maintain no migration |
 
 ⚠️ **Criteria 1–3 focused solely on the parity overhead dimension, whereas the decisive dimension is stranded capacity** (Criterion 5 only required reporting, setting no threshold).
-Per `.claude/singlefs-ai-sop/rules/test-discipline.md` "never retroactively modify criteria—modifications constitute a new experiment",
+Per `.claude/rules/test-discipline.md` "never retroactively modify criteria—modifications constitute a new experiment",
 here both are **faithfully juxtaposed**: the criteria deliver a split verdict, while the unconstrained dimension reveals a 2× disparity.
 **To establish stranded capacity as a decision criterion, a separate experiment must be founded.**
 
@@ -129,8 +129,8 @@ None. Pure allocation-layer count model.
 
 | Decision Item | Relationship | Retrospective |
 |---|---|---|
-| D2 (RAID Stripe Policy) settled item 4 | Supports | 2026-09-20 unaffected: without migration new disk absorbs only the sum of remaining free space on other disks; under 4 disks at 90% fill, 60% of new disk is stranded, and at 95% fill 80% is stranded, supporting the background rebalancing direction of settled item 4 c |
-| D3 (Space Allocation) | Does not affect | 2026-09-20 unaffected: E60 (Cost of Adding Disks Without Data Migration) explicitly states it does not model fragmentation and resident compaction, leaving all clauses of D3 (Space Allocation) unjudged |
+| D2 (RAID Stripe Policy) settled item 4 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: without migration new disk absorbs only the sum of remaining free space on other disks; under 4 disks at 90% fill, 60% of new disk is stranded, and at 95% fill 80% is stranded, supporting the background rebalancing direction of settled item 4 c |
+| D3 (Space Allocation) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 unaffected: E60 (Cost of Adding Disks Without Data Migration) explicitly states it does not model fragmentation and resident compaction, leaving all clauses of D3 (Space Allocation) unjudged |
 
 ## Historical Versions
 

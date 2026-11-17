@@ -4,7 +4,7 @@
 
 **It answers two questions**, with criteria, thresholds, and invalidation clauses set down in `e129-preregistration.md` prior to any harness code:
 
-1. At the end of D2 (RAID Stripe Policy) section "Write Granularity", verbatim: "⚠️ Local machine cannot falsify via fault injection (`dm-flakey` cannot construct tears); per `.claude/singlefs-ai-sop/rules/evidence-discipline.md` recorded as **mechanism derivation**, falsification awaits crash-point replay harness." —— **whether this sentence still holds**.
+1. At the end of D2 (RAID Stripe Policy) section "Write Granularity", verbatim: "⚠️ Local machine cannot falsify via fault injection (`dm-flakey` cannot construct tears); per `.claude/rules/evidence-discipline.md` recorded as **mechanism derivation**, falsification awaits crash-point replay harness." —— **whether this sentence still holds**.
 2. The specific justification owed by Candidate ② of C212 (fixed-structure writes smaller than io_min): "that requires showing why fixed structures do not fear intra-device RMW, whereas the real device round of E34 (Root Ring Slot Geometry) **only proved the single mechanism of RAID5 write hole**" —— **whether a second mechanism exists beyond write hole**.
 
 ### Conclusion 1: Position-Deterministic Tear Injector Can Be Constructed, 5/5 Rounds
@@ -122,14 +122,20 @@ Replaced with "building snapshot on exclusive cell as well" per `.claude/rules/m
 ⚠️ **Process of supplementing this assertion stepped on category three**: threshold 128 of `shared_not_amplified` was hardcoded,
 **insensitive to upward modifications of block size**, hence requiring an additional pin that "measured `io_min` must equal block width declared in this section".
 
+### 2026-11-14 re-run artifacts
+
+The re-run now judges byte-identical; the new artifacts are in the repository and the replay-table rows point to the new names (the E129 device probe has no replay-table row):
+
+- `research/results/e129-thin-rmw-2026-11-14.out` (byte-identical to `e129-thin-rmw-2026-09-10.out`)
+
 ### Influenced Decisions
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D2 (RAID Stripe Policy) settled item 16 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D2 (RAID Stripe Policy) settled item 17 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D2 (RAID Stripe Policy) settled item 19 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D17 (Implementation Layering & Third-Party Pipeline) settled item 1 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D2 (RAID Stripe Policy) settled item 16 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D2 (RAID Stripe Policy) settled item 17 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D2 (RAID Stripe Policy) settled item 19 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D17 (Implementation Layering & Third-Party Pipeline) settled item 1 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

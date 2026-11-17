@@ -64,7 +64,7 @@ Two additional structural self-proofs (failing invalidates entire round as imple
 - Criteria 1 or 3 missed: **faithfully record candidate invalid**, altering ground truth, world generation, or swapping cells forbidden.
 - Criterion 2 positive control missed, or structural self-proof missed: **implementation flawed, entire round invalidated.**
 - Deterministic model: 5 rounds of byte-identical md5 proves absence of hidden state, not claiming statistical stability
-  (`.claude/singlefs-ai-sop/rules/test-discipline.md`).
+  (`.claude/rules/test-discipline.md`).
 
 ### Measurement Basis and Known Limitations
 
@@ -131,9 +131,9 @@ Label maintenance (order-maintenance during tree growth) is outside scope, requi
 
 | Decision Branch | Relationship | Review |
 |---|---|---|
-| D6 (Snapshot Implementation Model) settled item 10 | Supports | 2026-09-20 Unaffected: all three criteria met——candidate arm erroneous release and leaked free constantly 0 across all cells, reverse lookups constantly 0 while paid-lookup baseline scales with size, Linear topology degenerates to D5 (Snapshot / Space Accounting Mechanism) constant form; frontier upper bound tracks branch count, finest deletion tier never exceeds antichain upper bound |
-| D6 (Snapshot Implementation Model) settled item 1 | Prepares material | 2026-09-20 Unaffected: "tree or DAG" resolved by each head having own tree, E89 (Nested Interval Labeling and Deletion Frontier) models only trees without touching DAG complexity |
-| D5 (Snapshot / Space Accounting Mechanism) | Prepares material | 2026-09-20 Unaffected: "comparing txg with previous snapshot" is interval labeling on chains, E89 (Nested Interval Labeling and Deletion Frontier) establishes its generalization onto trees |
+| D6 (Snapshot Implementation Model) settled item 10 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 Unaffected: all three criteria met——candidate arm erroneous release and leaked free constantly 0 across all cells, reverse lookups constantly 0 while paid-lookup baseline scales with size, Linear topology degenerates to D5 (Snapshot / Space Accounting Mechanism) constant form; frontier upper bound tracks branch count, finest deletion tier never exceeds antichain upper bound |
+| D6 (Snapshot Implementation Model) settled item 1 | Prepares material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 Unaffected: "tree or DAG" resolved by each head having own tree, E89 (Nested Interval Labeling and Deletion Frontier) models only trees without touching DAG complexity |
+| D5 (Snapshot / Space Accounting Mechanism) | Prepares material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 Unaffected: "comparing txg with previous snapshot" is interval labeling on chains, E89 (Nested Interval Labeling and Deletion Frontier) establishes its generalization onto trees |
 
 ## Historical Versions
 

@@ -636,11 +636,18 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 跨路径的比对断言：路径 1 对路径 2 钉在对拍 bin `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` 的 `compare_one_sequence`（逐步比，第一处不同就停）；路径 1 对路径 3 钉在单测 `every_registered_anchor_matches_the_independent_reference`（同一份源码第 2154 行，26 格登记答案逐字比；第二段另有 `segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest` 比 29 格）。共用项问句：233、135 若错，三条路径一起错，挡不住「kb 与实现一起取错」；位置记法三条路径同出一处读法，若那读法本身不是 `crates/` 想要的，三条一起错；负载生成器只在路径 1 里有一份，对拍证明不了生成器照登记生成（那一半靠单测里四种负载的前几步钉住）。
 
+### 2026-11-14 复跑产物
+
+复跑现判字节一致；新产物落进仓里，复跑表登记行改指新名（E129 设备探针没有复跑表的行）：
+
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`（与 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 逐字节一致）
+- `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`（与 `e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 逐字节一致）
+
 ### 影响的决策
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 支撑 | 2026-11-03 不受影响：只改复跑写法，结论、数与产物都不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D8（核心索引结构） 已定项 6 | 支撑 | 2026-11-15 不受影响：复跑产物换成 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`，与 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 逐字节一致，结论与数不变；此前 2026-11-03 不受影响：只改复跑写法，结论、数与产物都不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 

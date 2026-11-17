@@ -8,7 +8,7 @@ E48 (Feasible Points for Root Ring Geometry) treats those two dimensions as inde
 
 ⚠️ **This is a new experiment, not a rerun of E47 (Root Ring Failure Domain Losses)**: The question asked has changed
 (E47 (Root Ring Failure Domain Losses) asked "how large is the loss", whereas E48 (Feasible Points for Root Ring Geometry) asks "whether there exists a point without this loss"),
-and per `.claude/singlefs-ai-sop/rules/test-discipline.md` "changing criteria makes a new experiment", a new ID is assigned.
+and per `.claude/rules/test-discipline.md` "do not go back and change the criteria — changing them makes a new experiment, rerun", a new ID is assigned.
 The artifacts and conclusions of E47 (Root Ring Failure Domain Losses) remain untouched.
 
 ### Independent Variables
@@ -144,10 +144,10 @@ both represent "conclusions without gates".
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-09-19 Unaffected: All 9 feasible points are "prime stride + cross-region rotation", serving as basis for region placement and slot ordering lines |
-| D16 (Publish Semantics) settled item 6 | Supports | 2026-09-20 Unaffected: Rotation key in the mechanism is called txg and increments per publish; all 9 feasible points rest on this reading—invalidated retrospectively if "checkpoint_txg increments by 1 per publish" fails |
-| D22 (Synthesizing Unit Atomicity) unsettled item 6 | Material | 2026-09-19 Unaffected: P is odd prime, region spacing not divisible by power-of-two zone_size, serving as arithmetic input striking down option B "alternating zone pairs plus zone reset" |
-| D2 (RAID Stripe Policy) | No effect | 2026-09-19 Unaffected: Settled item 5 settled root ring no re-placement, E48 (Feasible Points for Root Ring Geometry) guarantee holds strictly at mkfs time |
+| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 Unaffected: All 9 feasible points are "prime stride + cross-region rotation", serving as basis for region placement and slot ordering lines |
+| D16 (Publish Semantics) settled item 6 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-20 Unaffected: Rotation key in the mechanism is called txg and increments per publish; all 9 feasible points rest on this reading—invalidated retrospectively if "checkpoint_txg increments by 1 per publish" fails |
+| D22 (Synthesizing Unit Atomicity) unsettled item 6 | Material | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 Unaffected: P is odd prime, region spacing not divisible by power-of-two zone_size, serving as arithmetic input striking down option B "alternating zone pairs plus zone reset" |
+| D2 (RAID Stripe Policy) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-09-19 Unaffected: Settled item 5 settled root ring no re-placement, E48 (Feasible Points for Root Ring Geometry) guarantee holds strictly at mkfs time |
 
 ## Historical Versions
 

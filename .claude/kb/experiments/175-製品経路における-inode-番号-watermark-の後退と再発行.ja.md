@@ -10,7 +10,7 @@
 
 事前登録 `e175-preregistration.md`（2区間を実行したときの sha256 `d68c9d2229bcf3800c5efd36c9194e6af9684b193a172258b58846474afae805`）。問いは読み B に固定し、「再発行」は同一時間線上のみを数える。第12節「修訂」は2回：修訂1は実行員による8つの読みの固定と装置の書き方、修訂2は設計員による「2区間を同一凍結コピーで実行」と4ジオメトリ点。判定基準、閾値、方式、測定量の取捨は変えていない。`m3-3-5-forks.md` の分岐 W は C479 (既発行inode番号の再利用が現状再現不能)に残る「活記録がその場で置換される」形態を問う。反転観測は「製品経路上で、テスト専用 watermark スイッチを付けずに inode 番号 watermark を後退させて再発行を作る履歴があるか」。判断十分条件はランダム履歴とロールバックを伴う履歴を登録数だけ実行し、再発行と I-9.29 (同番号に単一の出生世代のみ許可)の不合格回数を数えること。1回あれば判断に十分。
 
-**本ページの数値はすべてリポジトリコピー装置を1つの凍結コピーで実行した結果**：装置は登録第5節の配置に従い、凍結コピー `~/.local/share/singlefs/work/e175-frozen-crates-2/repo/` の `crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs` に配置。主作業領域の `crates/` は変更しない（形式化ラインの凍結期間）。装置ソースは `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs` にそのまま保存（成果物ディレクトリ外）。凍結コピー `code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb` は2026-10-08、ルートリング ライン第10zバッチの第10・第11ブロック統合と統合後検証の全成功後にコピー。HEAD `31e47115471ba5502a4531d25dffcc921be36899`（`baseline-frozen-crates.out` 先頭行）。kb の他箇所でこの数値を引用する際は「リポジトリコピー装置、凍結コピー」と明記する。装置を `crates/` に入れるか、入庫装置で再実行するかはメイン agent が決める。
+**本ページの数値はすべてリポジトリコピー装置を1つの凍結コピーで実行した結果**：装置は登録第5節の配置に従い、凍結コピー `~/.local/share/singlefs/work/e175-frozen-crates-2/repo/` の `crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs` に配置。主作業領域の `crates/` は変更しない（形式化ラインの凍結期間）。装置ソースは当時 `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs` にそのまま保存（成果物ディレクトリ外）されていたが、その後検証クレートの bin `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs` に変わり、旧ファイルとディレクトリは削除済み。凍結コピー `code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb` は2026-10-08、ルートリング ライン第10zバッチの第10・第11ブロック統合と統合後検証の全成功後にコピー。HEAD `31e47115471ba5502a4531d25dffcc921be36899`（`baseline-frozen-crates.out` 先頭行）。kb の他箇所でこの数値を引用する際は「リポジトリコピー装置、凍結コピー」と明記する。装置は検証クレートの bin に変わり、D 族 P 方式はこの bin で再実行済みで結果行は残存成果物とバイト単位で一致する（タスク11045）。入庫した bin でそれ以外の族をやり直すかはメイン agent が決める。
 
 **現状**：両区間をこの凍結コピーで完了。第1区間は D 族の値固定、F3a の対象を絞った網羅、F2 のロールバック付きランダム履歴。第2区間は既存 F1 ランダム履歴4群と第8節ジオメトリ4点 G-long/G-small/G-draw/G-long-F1。P/V1/V2 を登録どおりそれぞれの規模で実行。第3区間 F3b/F4 は付随項目で W の判断が十分となった後は未実行。
 
@@ -30,22 +30,20 @@
 
 ### 再実行
 
+装置は現在、検証クレートの bin `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs` である。`driver_e175`（`scripts/experiment-apparatus/replay.sh`）はコピーを作らず、装置を別のソースに置いてビルドし直すこともせず、`cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` を直接実行する。環境変数は変わらない（`E175_ARM`、`E175_FAMILY`、`E175_RESULT_FILE`、`E175_WORKER_THREADS`）。エントリ引数 `summarize` が集計を書き、`E175_RESULT_FILE` と `E175_SUMMARY_FILE` は必須（bin ターゲットには `CARGO_TARGET_TMPDIR` がない）。再実行登録行の行キーは関数ユニットのクロージャで構成される。この行のユニット数は5831で、この bin の `main` を変えるとキーが変わり、別の実験の bin の `main` や無関係なテストファイルを変えても変わらない（タスク11055）。残存成果物 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` はこの bin の結果行とバイト単位で一致する（タスク11045、再実行の現判定「バイト一致1」）。
+
 ```
-# 冻结副本（拷 Cargo.toml、Cargo.lock、.cargo、crates 四样；主工作区 crates/ 不动），核清单再放装置
-F=~/.local/share/singlefs/work/e175-frozen-crates-2/repo; R=$PWD/research/results/e175-product-path-inode-watermark-regression-2026-10-08
-(cd $F && sha256sum -c --quiet $R/baseline-frozen-crates.sha)
-cp $PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs $F/crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs
-# 每一臂：施加补丁（P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff）、编、拷出二进制、还原，再核一次清单
-ROOT=$PWD; (cd $F && CARGO_TARGET_DIR=<ビルドディレクトリ> $ROOT/task-server/task submit -- cargo test --release -p singlefs-verification --test e175_product_path_inode_watermark_regression --no-run)
-task-server/task submit -- env E175_ARM=P <测试二进制> --test-threads 5
+# 臂由跑的一方在一份仓副本里施加补丁之后用 E175_ARM 告诉装置：P 不施加；V1、V2 照 $R/patch-V1.diff、$R/patch-V2.diff，跑完还原
+R=$PWD/research/results/e175-product-path-inode-watermark-regression-2026-10-08
+task-server/task submit -- env E175_ARM=P cargo test --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression -- --test-threads 5
 task-server/task submit -- env E175_ARM=P E175_FAMILY=F2 E175_RESULT_FILE=$R/f2-P.out E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb E175_WORKER_THREADS=5 \
-  <测试二进制> --exact run_one_family_on_one_arm_into_the_result_file
+  cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression
 # E175_TIME_BUDGET_SECONDS、E175_INDICES、E175_INDEX_LIMIT を設定しなければ登録した全区間；いずれか一つでも設定すれば領域縮小で、その回は family_complete 行を書かず、集計ではそのファミリーを complete=no と書き、ファミリー全体の成果物とはしない（二段階の成果物の回は E175_TIME_BUDGET_SECONDS=170 を設定していた）
 # 族名：D、F3a、F2、F1-broad、F1-reuse-after-raising-the-floor、F1-deleting-files-of-several-lower-leaves、
 #       F1-newest-system-configuration-slot-reading-zeros、G-long、G-small、G-draw、G-long-F1
-# 汇总（两段各一份）
-E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb <测试二进制> --exact summarize_the_result_files
-# 登记的复跑（scripts/experiment-apparatus/replay.sh 一行 E175|@driver_e175：拷今天的 crates/ 进副本、放进 device-source.rs、跑 D 族 P 臂）
+# 汇总（两段各一份）：入口参数 summarize，E175_SUMMARY_FILE 必给，已有就拒
+task-server/task submit -- env E175_SUMMARY_INPUTS=<逗号分隔的结果文件> E175_SUMMARY_FILE=<新文件> E175_CODE_BASELINE=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression -- summarize
+# 登记的复跑（scripts/experiment-apparatus/replay.sh 一行 E175|@driver_e175：直接 cargo run 这个 bin，跑 D 族 P 臂）
 bash scripts/experiment-apparatus/replay.sh E175
 ```
 
@@ -55,7 +53,7 @@ bash scripts/experiment-apparatus/replay.sh E175
 
 | ファイル | 内容 |
 |---|---|
-| `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs` | 装置ソース。成果物ディレクトリ外の `scripts/experiment-apparatus/` に移動済み。両区間実行時の sha256 は `310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca` で同一。コミット `6aa74a765`、`f778192d3` と 2026-10-23 のディレクトリ名変更がスクリプトパスを変更し、現在の sha256 は `99f4433c0bfb1d009081bf78c0607df31fb91912edeb5a622a7c2d1e02923735`。 |
+| `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs` | 装置ソース（検証クレートの bin。成果物ディレクトリ外）。両区間実行時のソースは `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`（sha256 `310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca`、両区間で同一）で、そのファイルとディレクトリは削除済み。bin の現在の sha256 は `edfcd3336107a2b306f5912f97da1845119c9faf0b732afa918f3218164a6eea`。エントリ引数 `summarize` を追加し、`E175_RESULT_FILE` と `E175_SUMMARY_FILE` は必須。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.sha` | 装置配置前の凍結コピー一覧。340行、パスはコピーのルート相対。sha256 `48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb` が `code_baseline`。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.out` | `name=frozen_copy`（コピー日、バッチ、HEAD、diff/status 2行の sha256、ファイル数、コピー前後の主作業領域一覧とコピーの一致）、`name=mutation_anchor` 3行、`name=arm_check` 9行、`name=arm_binary` 3行、`name=main_drift_after_copy` 1行。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/patch-V1.diff`、`e175-product-path-inode-watermark-regression-2026-10-08/patch-V2.diff` | V1、V2 方式に適用するパッチ。 |
@@ -69,7 +67,7 @@ bash scripts/experiment-apparatus/replay.sh E175
 | `e175-product-path-inode-watermark-regression-2026-10-08/f1-broad-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-broad-V1.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-broad-V2.out` | F1 `BROAD`、3方式。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/f1-reuse-after-raising-the-floor-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-reuse-after-raising-the-floor-V1.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-reuse-after-raising-the-floor-V2.out` | F1 `REUSE_AFTER_RAISING_THE_FLOOR`、3方式。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/f1-deleting-files-of-several-lower-leaves-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-deleting-files-of-several-lower-leaves-V1.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-deleting-files-of-several-lower-leaves-V2.out` | F1 `DELETING_FILES_OF_SEVERAL_LOWER_LEAVES`、3方式。 |
-| `e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-V1.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-V2.out` | F1 `NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`、3方式。 |
+| `e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-V1.out`、`e175-product-path-inode-watermark-regression-2026-10-08/f1-newest-system-configuration-slot-reading-zeros-V2.out` | F1 `NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`（当時この群には全ディスクで隠す手順だけがあった）、3方式。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/g-long-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/g-long-V1.out` | ジオメトリ点 G-long（F2 の重み、150ステップ）、P と V1。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/g-small-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/g-draw-P.out`、`e175-product-path-inode-watermark-regression-2026-10-08/g-long-f1-P.out` | ジオメトリ点 G-small（`UnitAreaOf384Slots`）、G-draw（`RecentUniformOrBeyond`）、G-long-F1（`BROAD`、150ステップ）、P。 |
 | `e175-product-path-inode-watermark-regression-2026-10-08/summary-segment-two.out` | 第2区間集計：17件の族 × 方式結果ファイル。 |
@@ -132,7 +130,7 @@ for s in one two; do diff <(grep -v '^#' superseded-b000407a/summary-segment-$s.
 
 ### 判定基準の個別確認（登録第6節、測定量ごとに報告）
 
-F1 4群は `BROAD` / `REUSE_AFTER_RAISING_THE_FLOOR` / `DELETING_FILES_OF_SEVERAL_LOWER_LEAVES` / `NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS` の順、ジオメトリ4点は G-long / G-small / G-draw / G-long-F1 の順。数値は上記2集計による。
+F1 4群は `BROAD` / `REUSE_AFTER_RAISING_THE_FLOOR` / `DELETING_FILES_OF_SEVERAL_LOWER_LEAVES` / `NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`（当時この群には全ディスクで隠す手順だけがあった）の順、ジオメトリ4点は G-long / G-small / G-draw / G-long-F1 の順。数値は上記2集計による。
 
 | 測定量 | F3a | F2 | F1 4群 | ジオメトリ4点 | 判定 |
 |---|---|---|---|---|---|
@@ -173,9 +171,9 @@ V1/V2 の全 Q1 イベントを Q9 分類とそのステップの I-9.29 判定�
 
 ### 単体テストと mutation
 
-単体テスト28件：`grep -c '^#\[test\]' device-source.rs` は28、うち2件は `#[ignore]`（大規模入口と集計）。`quick-tests.out` の3方式それぞれ `test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out`。第1区間版より11件追加：第2区間規模・重み2件、新族の各番号0を実行する8件、2コード基線混在またはヘッダーなしの結果ファイルを集計で拒否する1件（`result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary`）。
+両区間実行時の装置（旧ファイル `device-source.rs`）の単体テストは28件：`grep -c '^#\[test\]' device-source.rs` は28、うち2件は `#[ignore]`（大規模入口と集計）。`quick-tests.out` の3方式それぞれ `test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out`。第1区間版より11件追加：第2区間規模・重み2件、新族の各番号0を実行する8件、2コード基線混在またはヘッダーなしの結果ファイルを集計で拒否する1件（`result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary`）。入庫した bin の単体テストは現在36件（bin のソースに対する `grep -c '#\[test\]'` は36、`#[ignore]` なし。大規模入口と集計はエントリ引数になりテストではなくなった。コピー上で36件成功、タスク10984）。ページが引くテスト名のうち数件は両区間実行時の名前で、bin では改名されている。
 
-登録第9節の mutation は6件：V1/V2 は陽性対照方式で実行した全族を区別できる（R-V1/R-V2 合格）。V3/V4/V5 は装置内の破壊スイッチで、`quick-tests.out` では各指定テストが失敗（3回とも `--skip first_history_of` で各族番号0の8サンプルを除外し `17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out`）。V3（台帳を番号で重複除去）と V4（発行イベント分類時に全 root を破棄と判定）は V1 の `rollback_one_step_then_create_matches_the_arm` の「a5：Q1 はちょうど1」で失敗（`left: 0`、`right: 1`。V4 は `q1=0 q3b=1` も出力）。V5（Q9 を常に「まだある」と判定）は P の `q9_classification_says_gone_when_no_holder_is_readable` で失敗。V717 は登録上条件付きで Q6 = 0 のため未実行。検出5、無効0、失敗せず0、未実行1。装置は `research/` 下でも `crates/mutations.tsv` 内でもなく、ミューテーション表がないため `mutate.sh` は適用外。装置ヘッダーの破壊スイッチ表にある V3 テスト名 `rollback_one_step_then_create_on_v1_reissues_three_on_the_same_timeline` は実際に失敗する `rollback_one_step_then_create_matches_the_arm` と異なる（テスト改名時にヘッダーを更新していない）。後者が失敗したテスト。
+登録第9節の mutation は6件：V1/V2 は陽性対照方式で実行した全族を区別できる（R-V1/R-V2 合格）。V3/V4/V5 は装置内の破壊スイッチで、`quick-tests.out` では各指定テストが失敗（3回とも `--skip first_history_of` で各族番号0の8サンプルを除外し `17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out`）。V3（台帳を番号で重複除去）と V4（発行イベント分類時に全 root を破棄と判定）は V1 の `rollback_one_step_then_create_matches_the_arm` の「a5：Q1 はちょうど1」で失敗（`left: 0`、`right: 1`。V4 は `q1=0 q3b=1` も出力）。V5（Q9 を常に「まだある」と判定）は P の `q9_classification_says_gone_when_no_holder_is_readable` で失敗。V717 は登録上条件付きで Q6 = 0 のため未実行。検出5、無効0、失敗せず0、未実行1。両区間実行時、装置は `research/` 下でも `crates/mutations.tsv` 内でもなく、ミューテーション表がなかった。装置が `crates/` の bin になってからは `crates/mutations.tsv` に12行（M1–M12：入口の腕と環境変数の読み取り、族の選択、再開、結果行のフィールド、`summarize` と集計ファイルの書き方。`grep -c e175_product_path_inode_watermark_regression crates/mutations.tsv` の出力は12）が登録され、うち11行は赤の証明で全て検出（タスク11015）、M3 は crates-mutation-replay に委ねている（ディスパッチ記録 `records/2026-11-06-门禁判定全部入库.md` のバッチ13）。両区間実行時の装置ヘッダーの破壊スイッチ表にある V3 テスト名 `rollback_one_step_then_create_on_v1_reissues_three_on_the_same_timeline` は実際に失敗する `rollback_one_step_then_create_matches_the_arm` と異なっていた（テスト改名時にヘッダーを更新していなかった）。後者が失敗したテスト。bin のヘッダーは後者に直してある。
 
 ### 分岐表
 
@@ -189,26 +187,26 @@ V1/V2 の全 Q1 イベントを Q9 分類とそのステップの I-9.29 判定�
 - クラッシュ復旧による root 破棄（二重故障形、F3b）と書込み／フラッシュ故障注入後の inode 作成（F4）は登録第3区間の付属で、判定十分後は未実行。履歴中に選ばれた `CrashRecoveryAbandoningTheNewestRoot` は C554 (クラッシュリカバリで放棄されたルートが一時的に読めない時にシャドウ会計が計算不能)の乙以降、マウントが拒否され破棄 root を作らないため、Q3b の0は破棄タイムラインをまたぐ再発行が存在しないことを示さない。装置は「破棄と判定された root」の回数を数えておらず、2区間で S3 が破棄 root を判定したかは結論しない。
 - Q6 の読み方には制約がある：現行版はそのステップの可読 root のうち最新から取り、rollback 前にはそれ自体が環内で読める。Q6 > 0 は現行版自体を再構築できない場合にしか起きない。読み故障のない履歴で Q6 = 0 はこの読み方から導かれ、独立した観測ではない。そのため V717 は全族で未実行であり、「rollback で max を取る」ガードがこれらの履歴で通ったかは答えられない。
 - 「生きたレコードのその場での置換」は I-9.29 (同番号に単一の出生世代のみ許可)では見えない。陽性対照 V1 方式 G-long 番号24の2回の再発行（`g-long-V1.out` の `index=24 kind=q1_same_timeline` の `position=op92`、`position=op95`）ではその2ステップで I-9.29 は成立した。製品方式ではこの形を作れなかったため、「製品経路で起きたら I-9.29 が捕捉できるか」には答えず、P 方式で0回だったとだけ言う。
-- 「リポジトリコピー装置、凍結コピー」：数値は2026-10-08にコピーした2つ目の凍結コピー（`baseline-frozen-crates.out`）から得ており、リポジトリに収めた装置では再実行していない。コピー後に主作業領域の `crates/` はさらに6ファイル変化（`baseline-frozen-crates.out` の `name=main_drift_after_copy`）、うち `crates/singlefs-core/src/mount.rs` と `crates/singlefs-verification/src/gpu_memory_ledger.rs` は装置に組み込まれる。F3a、F2、F1、幾何点は変化後のコードで再実行せず、`scripts/experiment-apparatus/replay.sh` の `driver_e175` だけを変化後の主作業領域でビルドし D 族 P 方式を1回実行、`elapsed_ns` を除いた出力は `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` と一致した。
+- 「リポジトリコピー装置、凍結コピー」：数値は2026-10-08にコピーした2つ目の凍結コピー（`baseline-frozen-crates.out`）から得ており、リポジトリに収めた装置では D 族 P 方式を除き再実行していない。コピー後に主作業領域の `crates/` はさらに6ファイル変化（`baseline-frozen-crates.out` の `name=main_drift_after_copy`）、うち `crates/singlefs-core/src/mount.rs` と `crates/singlefs-verification/src/gpu_memory_ledger.rs` は装置に組み込まれる。F3a、F2、F1、幾何点は変化後のコードで再実行せず、`scripts/experiment-apparatus/replay.sh` の `driver_e175` だけを変化後の主作業領域でビルドし D 族 P 方式を1回実行、`elapsed_ns` を除いた出力は `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` と一致した。入庫した装置は現在検証クレートの bin で、`driver_e175` は `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` を直接実行し、D 族 P 方式の結果行はこの残存成果物とバイト単位で一致する（タスク11045、再実行の現判定「バイト一致1」）。
 - このページの読数を覆す現象：同じ凍結コピー・同じ装置で再実行し、いずれかの P 方式区間の結果行が成果物と異なる（再開実行とマルチスレッド統合は quick で突合済み）；または第3区間 F3b / F4 か登録外の履歴で同一タイムラインの Q1 ≥ 1、I-9.29 が赤になる。
 
 ### 経路と結論の登録
 
 | # | 経路 | 算出方法 | ソース位置 | 共用する項目 |
 |---|---|---|---|---|
-| 1 | S3 経路1（インスタンステーブル） | 最新の可読 root のインスタンステーブルで (インスタンス, txg) ごとに各 root を破棄するか判定。2区間の各ステップの全可読 root を走査 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:713 abandoned_by_the_table`、判定 `crates/singlefs-core/src/recovery.rs:1553 publish_is_abandoned_by_the_instance_table` | `readable_roots` の root、ディスク上のインスタンステーブル、`crates/` の破棄判定 |
-| 2 | S3 経路2（ステップ台帳） | マウント成功ごとにモデル ルートリングのそのステップ直前の最新 root を選択 root とし、同じ旧インスタンスで txg が大きい root を破棄と判定 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:723 abandoned_by_the_step_ledger`、選択 root は `crates/singlefs-verification/src/model.rs:2235 answer_mount_writable` の選択法 | `readable_roots` の root、理想モデルの ルートリング、実行器が返すマウント結果 |
-| 3 | S1 台帳の再発行（Q1） | 番号ごとに出生世代と保持 root を記録し、発行時に同番号の別出生世代に衝突するとイベントを記録 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:1028 HistoryAccount::observe`、再構築 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、経路1の破棄判定 |
-| 4 | S2 checker の I-9.29 (同番号に単一の出生世代のみ許可) | プールレベル checker が各ステップのイメージを判定 | `scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs:1158 HistoryAccount::judge_with_the_checker`、`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | イメージ本体のみ。1–3とパースコードを共用しない |
+| 1 | S3 経路1（インスタンステーブル） | 最新の可読 root のインスタンステーブルで (インスタンス, txg) ごとに各 root を破棄するか判定。2区間の各ステップの全可読 root を走査 | `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs:824 abandoned_by_the_table`、判定 `crates/singlefs-core/src/recovery.rs:1553 publish_is_abandoned_by_the_instance_table` | `readable_roots` の root、ディスク上のインスタンステーブル、`crates/` の破棄判定 |
+| 2 | S3 経路2（ステップ台帳） | マウント成功ごとにモデル ルートリングのそのステップ直前の最新 root を選択 root とし、同じ旧インスタンスで txg が大きい root を破棄と判定 | `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs:834 abandoned_by_the_step_ledger`、選択 root は `crates/singlefs-verification/src/model.rs:2235 answer_mount_writable` の選択法 | `readable_roots` の root、理想モデルの ルートリング、実行器が返すマウント結果 |
+| 3 | S1 台帳の再発行（Q1） | 番号ごとに出生世代と保持 root を記録し、発行時に同番号の別出生世代に衝突するとイベントを記録 | `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs:1149 HistoryAccount::observe`、再構築 `crates/singlefs-core/src/recovery.rs:5405 rebuild_version` | `readable_roots`、`rebuild_version`、経路1の破棄判定 |
+| 4 | S2 checker の I-9.29 (同番号に単一の出生世代のみ許可) | プールレベル checker が各ステップのイメージを判定 | `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs:1300 HistoryAccount::judge_with_the_checker`、`crates/singlefs-checker/src/walk.rs:10947 check_pool_image` | イメージ本体のみ。1–3とパースコードを共用しない |
 
-経路1と2は同じ量を判定し root ごとに比較して不一致を計数する（`device-source.rs` の `s3_path_disagreements`）。2区間の26結果ファイルは全て0回。ただし両経路は `readable_roots` の root 集合を共用し、列挙が誤れば両方とも誤る。経路3と4は同じ量ではなく、登録第10節 F3 で照合し（1188、1199行）、両区間とも0回。経路間比較はカウントであり `assert_eq!` ではなく、両経路をつなぐ assertion が1つ不足する。
+経路1と2は同じ量を判定し root ごとに比較して不一致を計数する（bin の `abandonment_path_disagreements`）。2区間の26結果ファイルは全て0回。ただし両経路は `readable_roots` の root 集合を共用し、列挙が誤れば両方とも誤る。経路3と4は同じ量ではなく、登録第10節 F3 で照合し（bin の1332、1346行）、両区間とも0回。経路間比較はカウントであり `assert_eq!` ではなく、両経路をつなぐ assertion が1つ不足する。
 
 ### 影響を受ける意思決定
 
 | 意思決定の項目 | 関係 | 再確認 |
 |---|---|---|
-| D8 (コアインデックス構造)決定済み項目6 | 参考資料 | 2026-11-05 影響なし：使い方と再実行の説明だけを変更した（ゲートは一つ、走らせ方は二通り；検証クレートの改名）。結論、数値、成果物は変わらない。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-21 影響なし：冒頭の装置ソース位置を scripts/experiment-apparatus/ 移転後の現状に変更。結論・数値・成果物は不変。以前の2026-10-18も影響なし：前回成果物をリポジトリへアーカイブ（git 履歴から取得可）、本文の参照はファイル名のみとし、装置ソースを成果物ディレクトリから scripts/experiment-apparatus/ へ移動したが内容・結論・数値は不変 |
-| D23 (ジャーナルの役割と形式)決定済み項目14 | 参考資料 | 2026-11-05 影響なし：使い方と再実行の説明だけを変更した（ゲートは一つ、走らせ方は二通り；検証クレートの改名）。結論、数値、成果物は変わらない。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-21 影響なし：冒頭の装置ソース位置を scripts/experiment-apparatus/ 移転後の現状に変更。結論・数値・成果物は不変。以前の2026-10-18も影響なし：前回成果物をリポジトリへアーカイブ（git 履歴から取得可）、本文の参照はファイル名のみとし、装置ソースを成果物ディレクトリから scripts/experiment-apparatus/ へ移動したが内容・結論・数値は不変 |
+| D8 (コアインデックス構造)決定済み項目6 | 参考資料 | 2026-11-09 影響なし：装置を検証クレートの bin に変え、再実行の説明・ソース位置・単体テストとミューテーションの現状を合わせて書き換えた。結論、数値、成果物は変わらない。それ以前の 2026-11-05 影響なし：使い方と再実行の説明だけを変更した（ゲートは一つ、走らせ方は二通り；検証クレートの改名）。結論、数値、成果物は変わらない。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-21 影響なし：冒頭の装置ソース位置を scripts/experiment-apparatus/ 移転後の現状に変更。結論・数値・成果物は不変。以前の2026-10-18も影響なし：前回成果物をリポジトリへアーカイブ（git 履歴から取得可）、本文の参照はファイル名のみとし、装置ソースを成果物ディレクトリから scripts/experiment-apparatus/ へ移動したが内容・結論・数値は不変 |
+| D23 (ジャーナルの役割と形式)決定済み項目14 | 参考資料 | 2026-11-09 影響なし：装置を検証クレートの bin に変え、再実行の説明・ソース位置・単体テストとミューテーションの現状を合わせて書き換えた。結論、数値、成果物は変わらない。それ以前の 2026-11-05 影響なし：使い方と再実行の説明だけを変更した（ゲートは一つ、走らせ方は二通り；検証クレートの改名）。結論、数値、成果物は変わらない。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-21 影響なし：冒頭の装置ソース位置を scripts/experiment-apparatus/ 移転後の現状に変更。結論・数値・成果物は不変。以前の2026-10-18も影響なし：前回成果物をリポジトリへアーカイブ（git 履歴から取得可）、本文の参照はファイル名のみとし、装置ソースを成果物ディレクトリから scripts/experiment-apparatus/ へ移動したが内容・結論・数値は不変 |
 
 ## 履歴バージョン
 

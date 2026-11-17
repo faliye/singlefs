@@ -53,7 +53,7 @@ Inherits slot, defer, fragmentation, and equal-budget measurement basis of E93 (
 1. **Manual calculation anchor**: 8 keys, node capacity 2, group width 2: inserting one key triggers one split, group partitions of both grouping arms **hardcoded by manual calculation**, and must be **mutually distinct** after split —— if both arms are identical on anchor, the model lacks discriminative power, entire round invalidated.
 2. **Conservation**: incremental runs == audit runs (per sampling point); total keys in nodes == live keys; free slots + occupied slots == total slots; deferred slots cannot be reused in current round.
 3. **Positive control passes gate on every arm**: under forced placement, fully isolated layout reports `runs == node_count`, contiguous layout reports `runs == 1`.
-4. **Splits and merges truly occurred**: each arm reports split count and merge count for this round, **both must be > 0**, otherwise entire round invalidated (`.claude/singlefs-ai-sop/rules/test-discipline.md` "Negative results must be distinguishable from 'code was never reached'").
+4. **Splits and merges truly occurred**: each arm reports split count and merge count for this round, **both must be > 0**, otherwise entire round invalidated (`.claude/rules/test-discipline.md` "Negative results must be distinguishable from 'code was never reached'").
 5. **Cross-apparatus gate**: disabling inserts/deletes and setting node capacity to 1, the three arms must reproduce verbatim the `runs_median` of corresponding cells in E95 (Aging Node Layout Arm) committed artifact; mismatch judged red.
 6. **Question to answer**: on **any** equal-budget cell, can "grouping by node count" suppress runs below **0.8x** of "grouping by key interval" (threshold hardcoded before run)? Yes ⇒ group identity **must** be stored in node header, format portion of D26 (Background Compaction and Placement Reclamation) settled item 4 must settle concrete shape and width; No ⇒ **model layer supports 'group identity does not need to enter format'**, that arm retreats to policy tier, and byte judgment of D26 (Background Compaction and Placement Reclamation) settled item 4 requires re-adjudication.
 7. Does not substitute for E10 (Aging: Structural Resistance vs Post-hoc Compaction); time axis and degradation criteria remain under it.
@@ -67,7 +67,7 @@ Inherits slot, defer, fragmentation, and equal-budget measurement basis of E93 (
 | "Grouping by node count" sweeps all | **Valid result, record faithfully** —— evidence that format shape must be truly settled |
 | "Grouping by key interval" sweeps all | **Valid result, record faithfully**, with a separate note: storing group identity is not only unnecessary, but harmful |
 
-⚠️ **Both grouping arms must be given their most favorable implementation** (`.claude/singlefs-ai-sop/rules/evidence-discipline.md` strawman clause):
+⚠️ **Both grouping arms must be given their most favorable implementation** (`.claude/rules/evidence-discipline.md` strawman clause):
 group width `W` and group size `G` each sweep a set of values, taking the best on each cell; swept ranges must be written into artifact.
 
 ### Verdict (Per Criteria Hardcoded Before Run, Transcribed Line by Line from Artifact)
@@ -122,10 +122,10 @@ None. Pure arithmetic, can modify model layer directly on source code of E95 (Ag
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D26 (Background Compaction and Placement Reclamation) settled item 4 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D10 (True Answer to Random Writes / Fragmentation) settled item 2 | Support | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D8 (Core Index Structure) | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D11 (Message Buffers in Index Nodes) | No effect | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D26 (Background Compaction and Placement Reclamation) settled item 4 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D10 (True Answer to Random Writes / Fragmentation) settled item 2 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D8 (Core Index Structure) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D11 (Message Buffers in Index Nodes) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

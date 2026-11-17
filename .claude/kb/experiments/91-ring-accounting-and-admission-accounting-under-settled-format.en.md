@@ -13,7 +13,7 @@ D16 (Publish Semantics) settled item 5 derived "occupancy per checkpoint = T_dir
 whereas D23 (Journal Role & Format) settled item 12, settled later, specifies a record format of fixed 4 KiB length,
 78 B header, and 56 B per entry. Whether the two actually yield different ring lower bounds is judged by the model.
 
-### Verbatim Cited Clauses (verify-before-claiming)
+### Verbatim Cited Clauses (evidence-discipline)
 
 - D23 (Journal Role & Format) settled item 12: Record fixed 4 KiB length written into system configuration;
   "A 4096-byte record fits (4096 − 99) / 56 = 71 entries" (E75 (Record Size and Ring Geometry) actually measured that all four header readings 78/91/95/99 yield 71 entries).
@@ -117,8 +117,8 @@ this is the quantitative realization of the account in backward leg 1.1, recorde
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D16 (Publish Semantics) settled item 5 | Supports | 2026-09-20 Unaffected: hypothesis entered at outset judged true—derived number in settled item 5 undercounted by 1.80× under old entry measurement basis (4096 vs 7388 KiB); those two derived numbers in the scope of settled item 5 (1847 records, 7388 KiB, ring lower bounds 14776 / 22164 KiB) originate from here; settlements of `T_dirty` and `T_time` themselves not modified; repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
-| D23 (Journal Role & Format) settled item 14 | Does not affect | 2026-09-20 Unaffected: served only as input—watermark semantics "recovery only applies records strictly greater than selected root" and admission / acceptance formula taken from it; E91 (Ring and Admission Accounting Under Settled Format) produces constrained value of I-8.1 (Ring Geometry Sufficiently Large) and respective scopes of three old lower bounds, without modifying any item of D23 (Journal Role & Format); repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
+| D16 (Publish Semantics) settled item 5 | Supports | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 Unaffected: hypothesis entered at outset judged true—derived number in settled item 5 undercounted by 1.80× under old entry measurement basis (4096 vs 7388 KiB); those two derived numbers in the scope of settled item 5 (1847 records, 7388 KiB, ring lower bounds 14776 / 22164 KiB) originate from here; settlements of `T_dirty` and `T_time` themselves not modified; repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 14 | Does not affect | 2026-11-18 unaffected: only the cited rule file name was changed to its current name, conclusions, numbers and artifacts are unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-09-20 Unaffected: served only as input—watermark semantics "recovery only applies records strictly greater than selected root" and admission / acceptance formula taken from it; E91 (Ring and Admission Accounting Under Settled Format) produces constrained value of I-8.1 (Ring Geometry Sufficiently Large) and respective scopes of three old lower bounds, without modifying any item of D23 (Journal Role & Format); repository-wide renaming on same date "系统配置" → "系统配置" only touched wording, conclusions, numbers, and artifacts unchanged |
 
 ## Historical Versions
 

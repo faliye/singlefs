@@ -28,7 +28,7 @@ Original document `e128-preregistration.md`, unchanged by a single word after ru
 ④ Run 5 rounds; asserting "A is slower" requires it to be slower across all 5 rounds, asserting "not slower" requires not slower across all 5 rounds; if neither holds, record "unstable".
 
 ⚠️ **Explicitly did not establish an 'acceptable slowdown' threshold before run**: that number belongs to judgment, not experiment
-(`.claude/singlefs-ai-sop/rules/test-discipline.md` "Failure clauses must not make conclusions unfalsifiable").
+(`.claude/rules/test-discipline.md` "Failure clauses must not make conclusions unfalsifiable").
 ⚠️ **Explicitly stated acceptance of opposite outcome before run**: original verbatim states "If `inode_jia` is **faster** than `inode_bing`, or difference is **< 2%**:
 I will record that '**this cache cost of A does not hold on 16 KiB nodes**'... **this is an outcome I accept, not an outcome to avoid**".
 **The actual run landed precisely in this cell.**
@@ -61,7 +61,7 @@ Ran **four full rounds**: first three judged "A is never slower", fourth judged 
 | 3 | `e128-pointer-birth-cost-2026-09-10.out` | 0.9764 | `0/5 jia_never_slower` |
 | **4** | `e128-pointer-birth-cost-2026-09-10-rerun4.out` | **1.0885** | **`5/5 jia_slower_every_round`** |
 
-⇒ Per `.claude/singlefs-ai-sop/rules/test-discipline.md` "To claim 'pass' it must pass every round, to claim 'fail' it must fail every round... if neither is satisfied, record 'unstable' faithfully without drawing a conclusion" —— **this cell records 'unstable', drawing no conclusion.**
+⇒ Per `.claude/rules/test-discipline.md` "To claim 'pass' it must pass every round, to claim 'fail' it must fail every round... if neither is satisfied, record 'unstable' faithfully without drawing a conclusion" —— **this cell records 'unstable', drawing no conclusion.**
 
 Artifacts verbatim for Round 3 and Round 4:
 
@@ -181,10 +181,10 @@ Among them M6 (reverting `inode_jia` arm back to 93) was supplemented: without u
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D19 (Block Pointer Structure & Width Budget) settled item 7 | Support | 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
-| D19 (Block Pointer Structure & Width Budget) settled item 8 | Support | 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
-| D8 (Core Index Structure) | No effect | 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
-| D22 (Synthesizing Unit Atomicity) | No effect | 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
+| D19 (Block Pointer Structure & Width Budget) settled item 7 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
+| D19 (Block Pointer Structure & Width Budget) settled item 8 | Support | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
+| D8 (Core Index Structure) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
+| D22 (Synthesizing Unit Atomicity) | No effect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-17 unaffected: only synchronized phrasing, artifact pointers, paths, and numbers; conclusions, numbers, and artifacts unchanged; previously 2026-10-11 unaffected: only phrasing modified (time words, position designations, self-reference); conclusions, numbers, and artifacts unchanged |
 
 ## Historical Versions
 

@@ -124,7 +124,7 @@ E40 (Ciphertext Checksum Bit Width) thus provided a **testable reopening criteri
   it proves "code with written assertions was tested by mutations", **not "every piece of code covered by conclusion was tested"**.
 - ⚠️ **Only one positive control pair was made** (8-bit sum check vs CRC32C):
   CRC64 and truncated SHA-256 **were not individually proven to have discriminative power**.
-  `.claude/singlefs-ai-sop/rules/test-discipline.md` "positive control must run for every tested arm" was not fully satisfied.
+  `.claude/rules/test-discipline.md` "positive control must run for every tested arm" was not fully satisfied.
 - **Three algorithm implementations pinned with public test vectors**: `crc32c("123456789") = 0xE3069283`,
   `cyclic_redundancy_check_64("123456789") = 0x995DC9BBDF1939FA`, SHA-256 empty string and first 8 bytes of `"abc"`.
   ⚠️ **Cannot be omitted**: if algorithm implementation is wrong, undetected rate shifts systematically, and four arms **shift together**, undetectable by mutual comparison.
@@ -139,9 +139,9 @@ E40 (Ciphertext Checksum Bit Width) thus provided a **testable reopening criteri
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D19 (Block Pointer Structure & Width Budget) settled item 2 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D23 (Journal Role & Format) settled item 11 | Supports | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D9 (Encryption) | No impact | 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D19 (Block Pointer Structure & Width Budget) settled item 2 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D23 (Journal Role & Format) settled item 11 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D9 (Encryption) | No impact | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

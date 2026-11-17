@@ -1,4 +1,4 @@
-## E152 Per-Milestone File Performance Against Six File Systems — run (seven formal runs, seventh 2026-09-29: two-disk mirror seven systems + singlefs 5 rounds each, 40-for-40 on first pass; see “Runs (newest first)” for each run; 26 unit tests / 26 mutations all caught)
+## E152 Per-Milestone File Performance Against Six File Systems — run (seven formal runs, seventh 2026-09-29: two-disk mirror seven systems + singlefs 5 rounds each, 40-for-40 on first pass; the same set was run again on 2026-11-17, 40-for-40 on first pass, the entry script marked its artifact header as reduced and the user ruled it usable as is; see “Runs (newest first)” for each run; 26 unit tests / 26 mutations all caught)
 
 [中文](152-按里程碑对比六家文件系统的文件性能.md) · **English** · [日本語](152-マイルストーン別に-6-ファイルシステムのファイル性能を比較.ja.md)
 
@@ -21,7 +21,7 @@ E152_CONFIGURATIONS=singlefs bash scripts/devices/e152-run.sh research/results/e
 ```
 
 
-`E152_CONFIGURATIONS` makes it a scoped run and `E152_ROUNDS` is a domain reduction; a run whose rounds or configurations differ from the registered ones gets `reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes` appended to the artifact header `E152RUN_HEADER`. A formal run of eight configurations over five rounds takes about 45 minutes. During that time do not compile or run gates on the host: crash-point-replay, qemu-device-streams, and research-build-and-replay consume CPU or start VMs and would contaminate timings.
+`E152_CONFIGURATIONS` makes it a scoped run and `E152_ROUNDS` is a domain reduction; a run whose rounds or configurations differ from the registered ones gets `reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes` appended to the artifact header `E152RUN_HEADER`; the entry script's registered value is the eight single-disk configuration names, so the configuration names of the two-disk mirror command above differ from it and the 2026-11-17 artifact header carries this part as well (earlier ones have none, because the entry script had no `reduced_note` when they ran). A formal run of eight configurations over five rounds takes about 45 minutes. During that time do not compile or run gates on the host: crash-point-replay, qemu-device-streams, and research-build-and-replay consume CPU or start VMs and would contaminate timings.
 
 Code: `scripts/experiment-apparatus/e152_file_system_benchmark.rs` (26 unit tests; guest single-round workload and host summary modes); mutation table `scripts/mutation/tables/e152_file_system_benchmark.tsv` (all 26 caught); additional root `scripts/devices/e152-stage-root.sh`; driver `scripts/devices/e152-run.sh`; tables `scripts/experiment-apparatus/e152-tables.py` (`--selftest`). Original outputs: `e152-file-system-benchmark-2026-09-15.out` (single disk, 890 lines, final line `emitted=174`) and `e152-file-system-benchmark-mirror-2026-09-15.out` (two-disk mirror, 941 lines, final line `emitted=174`). Preregistration `e152-preregistration.md` has six revisions and four smoke tests before the formal run in section 10.
 
@@ -29,6 +29,7 @@ Code: `scripts/experiment-apparatus/e152_file_system_benchmark.rs` (26 unit test
 
 | Date | Scope | Rounds / VM runs | Artifact (`research/results/`) | Results |
 |---|---|---|---|---|
+| 2026-11-17 | On top of working-tree changes, seven two-disk mirrors + singlefs (artifact header carries `reduced=yes … not_e152_product=yes`; user ruled it usable) | 5 / 40, all `vm_exit=0` | `e152-file-system-benchmark-mirror-2026-11-17.out` | “2026-11-17: seven two-disk mirrors + singlefs”; cell-by-cell comparison with 2026-09-29 in `scripts/experiment-apparatus/perf-by-milestone.md` III.5 |
 | 2026-09-29 | After the crash amplification full run and the quiesce, seven two-disk mirrors + singlefs | 5 / 40, all `vm_exit=0` | `e152-file-system-benchmark-mirror-2026-09-29.out` | “2026-09-29: seven two-disk mirrors + singlefs”; cell-by-cell comparison with 2026-09-28 in `scripts/experiment-apparatus/perf-by-milestone.md` III.4 |
 | 2026-09-28 | Milestone two wrap-up step 8, seven two-disk mirrors + singlefs | 5 / 40, all `vm_exit=0` | `e152-file-system-benchmark-mirror-2026-09-28.out` | “2026-09-28: seven two-disk mirrors + singlefs”; singlefs compared row by row with 2026-09-17 in `scripts/experiment-apparatus/perf-by-milestone.md` III.3 |
 | 2026-09-19 | Singlefs arm only, after apparatus changed to finish reading before forwarding; separate P1 recalculation and G1 single-vCPU, 3 rounds | 5 + 3 | `e152-file-system-benchmark-second-transaction-relay-timing-2026-09-19.out`, etc. | “2026-09-19: singlefs arm after reading before forwarding” |
@@ -36,6 +37,108 @@ Code: `scripts/experiment-apparatus/e152_file_system_benchmark.rs` (26 unit test
 | 2026-09-17 step 7 | Singlefs arm only (`file-overwrite` mode) | 5 | `e152-file-system-benchmark-second-transaction-2026-09-17.out` | “Step 7” within “2026-09-17 wrap-up” |
 | 2026-09-15 mirrors | Seven mirrored configurations + singlefs | 5 / 41 (one retry) | `e152-file-system-benchmark-mirror-2026-09-15.out` (archived) | “2026-09-15 two-disk mirrors”; `scripts/experiment-apparatus/perf-by-milestone.md` II.2 |
 | 2026-09-15 single disk | Eight configurations, one disk each | 5 / 40 | `e152-file-system-benchmark-2026-09-15.out` (archived) | “Single disk” within “2026-09-15 two-disk mirrors”; `scripts/experiment-apparatus/perf-by-milestone.md` II |
+
+### 2026-11-17: seven two-disk mirrors + singlefs
+
+The code is the working tree with uncommitted changes on top of commit `8ed2ea4845ef0023fcf9a41e3ac09fece4423c0d` (checked now with `git rev-parse HEAD`; `git diff HEAD --shortstat -- crates/singlefs-core` counts 35 changed files), not the same code as the 2026-09-29 run (dbcc0d2f, no working-tree changes to the core code). Command (run on this host, 2 410 seconds):
+`env 'E152_CONFIGURATIONS=raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs' bash scripts/devices/e152-run.sh research/results/e152-file-system-benchmark-mirror-2026-11-17.out`.
+The artifact has 1026 lines, last line `E7RESULT name=summary_done emitted=180`; all 40 VM runs had `vm_exit=0` with no retries (`grep -c '^E152RUN .*vm_exit=0' <artifact>` counts 40, `grep -c 'attempt=2' <artifact>` counts 0).
+
+Host one-minute load was 1.61–27.19 (2026-09-29: 0.50–9.61); the four high runs, whole lines (taken with `grep -n '^E152RUN ' <artifact>`):
+
+```
+101:E152RUN configuration=bcachefs-replicas2 round=1 attempt=1 host_load1=10.10 vm_exit=0
+121:E152RUN configuration=zfs-mirror round=1 attempt=1 host_load1=27.19 vm_exit=0
+140:E152RUN configuration=singlefs round=1 attempt=1 host_load1=10.02 vm_exit=0
+171:E152RUN configuration=raw-md round=2 attempt=1 host_load1=6.29 vm_exit=0
+```
+
+The other 36 runs were below 6. During those three round-1 runs another task was compiling on this host; after the user saw these lines the artifact was ruled usable as is, and cells affected by high load are reported by the dispersion marks in the tables, not deleted.
+Header line 1 carries `reduced=yes registered_rounds=5 registered_configurations=raw,ext4,xfs,f2fs,btrfs,bcachefs,zfs,singlefs not_e152_product=yes` (whole line `E152RUN_HEADER kernel=6.17.0-1028-oem rounds=5 configurations=raw-md,ext4-md,xfs-md,f2fs-md,btrfs-raid1,bcachefs-replicas2,zfs-mirror,singlefs …`; the `started_jst=` part is the start clock time and is not copied): the entry script `scripts/devices/e152-run.sh` takes only the eight single-disk configuration names as its registered value in `reduced_note`, so the two-disk mirror set, whose names differ, is marked as reduced although its rounds and configurations are the registered ones (the 2026-09-29 artifact header has no such part; `reduced_note` came after that run).
+
+Cell-by-cell comparison with 2026-09-29 (`scripts/experiment-apparatus/perf-by-milestone.md` III.5): of 207 cells, 25 changed by more than 15% (22 of the six systems, 3 of singlefs), and every one of them carried ⚠ on at least one of the two days; cells with ⚠ went from 34 to 69, up for every system except raw md, which stayed level (1 cell). The singlefs arm: the write requests, bytes, barriers and FUA of publication B are identical to 2026-09-29 (29 / 475 648 / 6 / 1), and the binary's own median went 19.1 → 15.4 ms; the work in the first stage and cold recovery changed (per-disk bytes written 805 959 680 → 807 012 352, disk 1 write requests 1 596 → 832, cold recovery read 114 688 and 40 960 more bytes per disk), cold-recovery median 9 914 → 13 918 ms (round 1 35 696 ms, rounds 2–5 13 367–14 561 ms), first-stage median 348 → 363 ms; the cause of the slower cold recovery was not investigated.
+
+The six dimension tables and the singlefs table (`python3 scripts/experiment-apparatus/e152-tables.py research/results/e152-file-system-benchmark-mirror-2026-11-17.out`, whole output, first seven tables; the block-layer amplification and control tables are in the same output, copied in `perf-by-milestone.md` III.5):
+
+#### Large-file sequential writes and reads (MiB/s; higher is better)
+
+| Configuration | Sequential write | Sequential read |
+|---|---|---|
+| Raw md raid1 (mirror ceiling) | 2 677 | 5 126 |
+| ext4 (md raid1) | 2 504 ⚠19% | 4 935 |
+| XFS (md raid1) | 2 251 ⚠24% | 4 870 |
+| F2FS (md raid1) | 2 579 | 5 107 ⚠16% |
+| Btrfs raid1 | 1 363 | 4 746 |
+| Bcachefs two replicas | 2 299 ⚠47% | 4 713 ⚠53% |
+| OpenZFS mirror (vdev is a partition) | 519 ⚠19% | 1 852 |
+| singlefs (two disks) | — | — |
+
+#### 4K random reads and writes (operations/s: higher is better; p99 completion latency in µs: lower is better)
+
+| Configuration | Random read ops/s | Random read p99 | Random write ops/s | Random write p99 |
+|---|---|---|---|---|
+| Raw md raid1 (mirror ceiling) | 64 940 | 700 ⚠27% | 37 533 | 905 |
+| ext4 (md raid1) | 59 966 ⚠18% | 823 ⚠136% | 34 803 | 1 089 |
+| XFS (md raid1) | 59 277 ⚠28% | 741 ⚠161% | 34 465 | 1 089 ⚠42% |
+| F2FS (md raid1) | 60 514 | 626 ⚠45% | 35 367 | 1 056 |
+| Btrfs raid1 | 50 236 | 667 ⚠36% | 10 791 ⚠45% | 3 489 ⚠575% |
+| Bcachefs two replicas | 28 177 ⚠71% | 1 564 ⚠416% | 34 945 ⚠72% | 1 679 ⚠742% |
+| OpenZFS mirror (vdev is a partition) | 2 881 | 11 993 ⚠28% | 3 114 ⚠23% | 49 020 ⚠52% |
+| singlefs (two disks) | — | — | — | — |
+
+#### Metadata / small files (operations/s; higher is better)
+
+| Configuration | Create empty file | stat | Delete file | 4 KiB write + fsync |
+|---|---|---|---|---|
+| ext4 (md raid1) | 232 558 ⚠29% | 909 090 ⚠46% | 294 117 ⚠20% | 881 |
+| XFS (md raid1) | 178 571 ⚠55% | 909 090 ⚠22% | 196 078 | 981 |
+| F2FS (md raid1) | 166 666 ⚠54% | 909 090 | 232 558 ⚠21% | 1 228 |
+| Btrfs raid1 | 227 272 ⚠39% | 909 090 | 126 582 | 747 ⚠70% |
+| Bcachefs two replicas | 135 135 ⚠76% | 833 333 ⚠131% | 128 205 ⚠68% | 750 ⚠70% |
+| OpenZFS mirror (vdev is a partition) | 51 020 ⚠167% | 666 666 ⚠21% | 30 674 ⚠57% | 1 086 ⚠57% |
+| singlefs (two disks) | — | — | — | — |
+
+#### Small-file persistence: create + write 3000 bytes + fsync file + fsync directory (100 times on a freshly formatted empty file system)
+
+| Configuration | Median latency µs | p99 latency µs | Write requests/op | Bytes written/op | FLUSH/op | First operation bytes | First operation write requests | First operation FLUSH |
+|---|---|---|---|---|---|---|---|---|
+| ext4 (md raid1) | 1 050 | 1 354 ⚠48% | 8.00 | 72 581 | 4.00 | 73 728 | 8.00 | 4.00 |
+| XFS (md raid1) | 986 | 1 330 ⚠32% | 6.00 | 19 927 | 4.00 | 13 312 | 6.00 | 4.00 |
+| F2FS (md raid1) | 1 013 | 1 108 ⚠37% | 12.0 | 41 123 | 6.00 | 40 960 | 12.0 | 6.00 |
+| Btrfs raid1 | 2 409 | 3 355 ⚠961% | 14.0 | 201 195 | 8.00 | 155 648 | 14.0 | 8.00 |
+| Bcachefs two replicas | 1 642 | 2 675 ⚠180% | 6.30 | 14 673 | 4.00 | 36 864 | 14.0 | 4.00 |
+| OpenZFS mirror (vdev is a partition) | 909 ⚠63% | 1 005 ⚠197% | 4.00 | 8 192 ⚠16% | 2.00 | 8 192 ⚠288% | 4.00 ⚠350% | 2.00 |
+| singlefs (two disks) | 15 368 ⚠19% | — | 36.0 | 475 648 | 7.00 | — | — | — |
+
+#### Cold mount (unmount, clear caches, remount)
+
+| Configuration | Wall time ms | Bytes read | Read requests |
+|---|---|---|---|
+| ext4 (md raid1) | 1.60 ⚠26% | 21 504 | 6.00 |
+| XFS (md raid1) | 7.59 ⚠79% | 4 235 776 | 45.0 |
+| F2FS (md raid1) | 3.28 ⚠19% | 692 224 | 14.0 |
+| Btrfs raid1 | 4.32 ⚠323% | 331 776 | 24.0 |
+| Bcachefs two replicas | 41.0 ⚠96% | 8 243 200 ⚠22% | 59.0 |
+| OpenZFS mirror (vdev is a partition) | 6 113 | 10 785 280 ⚠23% | 241 |
+| singlefs (two disks) | 13 918 ⚠160% | 1 612 242 944 | 393 694 |
+
+#### Formatting and usable capacity (16 GiB disks)
+
+| Configuration | Format ms | Format bytes written | Format FLUSH | Total capacity % | Available % |
+|---|---|---|---|---|---|
+| ext4 (md raid1) | 78.3 ⚠30% | 143 197 184 | 14.0 | 48.8 | 46.3 |
+| XFS (md raid1) | 90.3 ⚠55% | 135 160 832 | 10.0 | 49.8 | 48.7 |
+| F2FS (md raid1) | 107 ⚠184% | 79 815 680 | 8.00 | 49.9 | 49.0 |
+| Btrfs raid1 | 36.0 ⚠529% | 9 216 000 | 23.0 | 50.0 | 49.2 |
+| Bcachefs two replicas | 27.4 ⚠53% | 32 768 | 2.00 | 92.0 | 90.6 |
+| OpenZFS mirror (vdev is a partition) | 543 ⚠40% | 3 580 928 | 26.0 | 46.9 | 46.9 |
+| singlefs (two disks) | — | — | — | — | — |
+
+#### singlefs (two 16 GiB disks, qemu-device-streams real-device binary)
+
+| Configuration | mkfs + number acquisition + warm-up + new-pool file creation ms | Overwrite, release, rollback and reuse (overwrite B) ms | Publication B (binary's own timing) ms | Cold recovery ms | Bytes read across both disks | Read requests across both disks | B write requests across both disks | B bytes written across both disks | B barriers across both disks | B FUA writes across both disks |
+|---|---|---|---|---|---|---|---|---|---|---|
+| singlefs (two disks) | 363 ⚠107% | 16.4 ⚠39% | 15.4 ⚠19% | 13 918 ⚠160% | 1 612 242 944 | 393 694 | 29.0 | 475 648 | 6.00 | 1.00 |
 
 ### 2026-09-29: seven two-disk mirrors + singlefs
 
@@ -639,17 +742,22 @@ Artifact line: git show 0ec0be214cdc:research/results/e142-first-txn-dry-run-202
 8. Every singlefs tree had one node in the two 2026-09-17 runs; write volume after trees grow and files multiply was not measured.
 9. Whether the six systems' 8–200 KiB per operation writes journal, intent log or trees was not measured; use requires current research, marked unverified by this project.
 10. How to narrow the gaps (data-unit granularity, seven trees each rewriting a unit on overwrite, reading the whole ring at cold recovery) is a design inference requiring three-way argument.
+11. The 2026-11-17 run: singlefs cold-recovery median is 40% longer than 2026-09-29 (9 914 → 13 918 ms) and the per-disk bytes and requests read and written also changed; the code is not the same, and which change caused it was not investigated; the three round-1 runs had host load 10.02–27.19, and the relation between load and dispersion was read only from the ⚠ marks in the tables, with no control round.
 
 ### Decisions affected
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D23 (Journal Role & Format) | Background material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by artifact pointers; numbers, conclusions and artifacts unchanged. |
-| D17 (Implementation Layering & Third-Party Pipeline), settled item 5 | Background material | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
-| D2 (RAID Stripe Policy), settled item 9 | No effect | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
-| D4 (Checksum Location), settled item 5 | No effect | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D23 (Journal Role & Format) | Background material | 2026-11-17 unaffected: the new 2026-11-17 section; the cold-recovery read volume of 1 612 242 944 bytes in 393 694 requests is still of the whole-ring-scan magnitude, cold-recovery median 13 918 ms, the background use is unchanged, and no item's basis cites this page; previously, 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by artifact pointers; numbers, conclusions and artifacts unchanged. |
+| D17 (Implementation Layering & Third-Party Pipeline), settled item 5 | Background material | 2026-11-17 unaffected: the new 2026-11-17 section; singlefs can still be compared with the six systems on only three tables and has no POSIX interface, the background use is unchanged; previously, 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D2 (RAID Stripe Policy), settled item 9 | No effect | 2026-11-17 unaffected: the new 2026-11-17 section; singlefs still ran on two disks and the stripe policy was not measured; previously, 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
+| D4 (Checksum Location), settled item 5 | No effect | 2026-11-17 unaffected: the new 2026-11-17 section; checksum location was not measured; previously, 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-10-15 unaffected: whole copied artifact lines were replaced by pointers to artifacts; numbers, conclusions, and artifacts unchanged. |
 
 ## Historical Versions
+
+### 2026-11-17
+
+- The 2026-11-17 run: seven two-disk mirrors + singlefs, five rounds each, on top of working-tree changes (`e152-file-system-benchmark-mirror-2026-11-17.out`, all 40 VM runs `vm_exit=0`, host load 1.61–27.19, 10.02–27.19 in three round-1 runs, ruled usable by the user after seeing them). Tables and the cell-by-cell comparison with the 2026-09-29 run are in `scripts/experiment-apparatus/perf-by-milestone.md` III.5: of 207 cells 25 changed by more than 15%; singlefs publication B got faster (19.1 → 15.4 ms), cold-recovery median 9 914 → 13 918 ms, and the per-disk bytes and requests read and written changed. The artifact header carries `reduced=yes … not_e152_product=yes` (the entry script's registered value recognises only the eight single-disk configuration names); the rerun-command paragraph and item 11 of “What it cannot answer” were written accordingly. All four affected-decision rows were reviewed to that date.
 
 ### 2026-09-29
 

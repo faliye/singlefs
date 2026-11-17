@@ -19,6 +19,7 @@
   - 三份表：`cell_classes.tsv`（读法 7 的分类表，sha256 `4c053fa2…`）、`device_function_map.tsv`（G5，`95b93eb4…`）、`research_function_map.tsv`（G7，`9761c84f…`），sha256 钉在代码里，对不上不比、不归因（登记修订 2）。
 - 单测六份（`test_contrast_against_r1.py`、`test_q2_misses.py`、`test_attribution.py`、`test_whole_table_matrix.py`、`test_current_tree_row_driver.py`、`test_full_table_run.py`）合计 107 条，任务 6325 跑过 `Ran 107 tests`、`OK`；自证 `full_table_run.py --selftest` 四格（复用三问、哨兵、复用账、存进库的行与完整导出逐字相同），任务 6326 `FULL_TABLE_SELFTEST cells=4 passed=4 failed=0 failed_cells=-`；弄坏开关六条（任务 5540–5545）各红在点名的那一项；变异表 `scripts/mutation/tables/e201_three_oracle_collusion_full_table_on_the_current_tree.tsv` 45 条（V1–V14、24 条落地行与 7 条拷树行），产物 `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-04-r2-s1-mutations.out` 末行 `E7RESULT name=verdict mutations=45 caught=45 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`。
 - 过程与前期产物：变异初版 14 条（`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-s1-mutations.out`，末行 `E7RESULT name=verdict mutations=14 caught=14 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`）、变异二版 38 条（`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-r2-s1-mutations.out`，末行 `E7RESULT name=verdict mutations=38 caught=38 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`）；分片计划阶段产物 `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-s1-plan.out`、`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-r2-s1-plan.out`、`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-r3-s1-plan.out`、`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-03-r4-s1-plan.out`。
+- O3 一侧（登记修订 8，2026-11-11）：执行器目录 `scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496/`（journal 记录头 496 字节），冻结参照 `research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out`，与 E171 第 3 次重跑同版；不再是 487 目录与 r2 冻结参照，所以 O3 列与 r1 的比对要记 O3 版本不同。装置只在 `e171_research_side.py` 里换了本进程的三个常量，E171 两个目录没动；单测加 `FrozenO3Is496Tests` 两条、变异表加两行，这两格还没跑。
 - 两段产物都还没跑；`research/results/` 下还没有 E201 的两段产物。
 
 ### 复跑
@@ -36,6 +37,8 @@ python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_t
 产物名：`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-<计划那一天>-<段>-<件>.out`，段 `s1`（流一、流二整表）或 `s2`（流三），件是 plan、t1、t2、t3、contrast、attribution、q2、matrix、controls、verdict。`replay.sh` 的复跑登记等产物出来再写（登记 5.6「提交时」）。
 
 ### 口径
+
+- O3 用哪一版：496 目录与 E171 第 3 次重跑的冻结参照（登记修订 8），每片开头与收尾 `frozen_o3.freeze_differences` 各核一次（作废 Z2）；与 r1 的 O3 列不同版，O3 一侧差出来的格不算 E201 实现的差。换版之后单测任务 13144 `Ran 115 tests`、`OK`，变异表产物 `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-11-mutations.out` 末行 `E7RESULT name=verdict mutations=50 caught=50 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`。
 
 - 「今天的树」：计划那一步拷进计划目录的主工作区 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`、`prune-server/`，与 crates 编、跑时读的六份仓根文件 `.claude/heavy-thread-default`、`scripts/crash/crash-point-replay-shard-configuration-check.sh`、`scripts/hosts/peer-host-lib.sh`、`.claude/scripts/preflight.sh`、`.claude/singlefs-ai-sop/scripts/preflight.sh`、`.claude/singlefs-ai-sop/scripts/preflight.py`（不带 `target`，含别的会话没提交的改动；`prune-server/` 是 crates 经 path 依赖到的仓根目录，登记修订 5 加，缘由是第一段整趟在任务 5503 停在 S6；六份文件是编译期 `include_str!` 读的那一份与装置运行期从编它的那棵树起的多机配置判法连同它 source、起的四份，登记修订 6 加，缘由是第一段整趟在任务 5606 又停在 S6）；各片从这一份同步线道树，开头与收尾核快照摘要与各文件 sha256（作废 Z3）。这几样不写死，由 `scripts/hosts/lib_repository_copy.py` 的 `copy_closure` 现算（登记修订 7）。`multi-host.env` 不拷：副本里起的命令显式带主工作区那一份的路径。
 - r1 一边只读 git 里的三份产物：P1 第二段比对器、P2 第二段逐行驱动合成产物、P3 第一段比对器（sha256 与行数核过才读，作废 Z5）；P0 只取它记的 git status 那几行的路径，给归因用。
@@ -60,7 +63,7 @@ python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_t
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D13（验证路线） 已定项 6 | 备料 | 2026-11-05 不受影响：只改用法与复跑说明（一个门禁、两种跑法；验证包改名），结论、数与产物不变；此前 2026-11-03 不受影响：装置已写、产物未跑，没有读数；E201（三oracle合谋今树整表） 答的是 E171（三oracle合谋测试） 的判定在今天的实现上变没变，依据段没有引它，只写备料 |
+| D13（验证路线） 已定项 6 | 备料 | 2026-11-11 不受影响：O3 一侧换到 496 目录与 E171（三oracle合谋测试） 第 3 次重跑的冻结参照、核对应表时照搬迁登记倒换，只动装置与登记修订 8，产物仍没跑、没有读数，依据段仍没有引 E201（三oracle合谋今树整表），关系仍是备料；此前 2026-11-05 不受影响：只改用法与复跑说明（一个门禁、两种跑法；验证包改名），结论、数与产物不变；此前 2026-11-03 不受影响：装置已写、产物未跑，没有读数；E201（三oracle合谋今树整表） 答的是 E171（三oracle合谋测试） 的判定在今天的实现上变没变，依据段没有引它，只写备料 |
 
 ## 历史版本
 

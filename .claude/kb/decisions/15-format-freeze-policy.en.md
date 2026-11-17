@@ -11,7 +11,7 @@ Items in D15 (Format Freeze Policy) have only a single set of numbers without re
 | # | Item | Settlement |
 |---|---|---|
 | 1 | **Specific handling of item 7 in pre-freeze checklist** | Item 7 does not write a list of decisions, but is written as a single predicate — each unsettled item across the repository declares whether it "touches the format"; if a freeze request intersects with it, judge red; default padding width is 0 **Status: Settled.** **Progress: No code object.** |
-| 2 | **Whether the tree table is an open list** | Yes, made an open list from day-1 **Status: Settled.** **Progress: Implemented.** |
+| 2 | **Whether the tree table is an open list** | Yes, made an open list from day-1 **Status: Settled.** **Progress: Unimplemented.** |
 | 3 | **Source of `spec_hash`** | No switching. Invariably computed against `format-spec/<component>.toml`; that toml file is a complete projection of the kb field table, including row ordering and non-scalar on-disk semantic rules **Status: Settled.** **Progress: Unimplemented.** |
 | 4 | **Bit allocation registry for feature bits** | incompat bit 1 = first pure-SSD layout line (the version with F and unmount mark) and bit 2 = inode record truncation fields, both set upon mkfs, bit 0 left free; before the format is frozen, bit numbers may be reclaimed and renumbered **Status: Settled.** **Progress: Implemented.** |
 | 5 | **What the action of freezing constitutes** | Freezing = committing a file `.claude/kb/format-frozen/<component>.toml`; humans only decide whether to initiate it, while the machine decides whether the request holds **Status: Settled.** **Progress: Unimplemented.** |
@@ -39,6 +39,8 @@ Framing determines interpretation (`.claude/singlefs-ai-sop/skills/decide/SKILL.
 **Owed checks**: C62 (Item Ruling Values Diverge in the kb); C102 (no reserved area in index node headers; adding fields is not compat).
 
 #### Settled Item 2: Tree Table Made an Open List from Day-1
+
+**Implementation boundary**: Tree-table entries carry their own length and the table length is variable; the reader judges an unregistered tree kind as a malformed unit (`crates/singlefs-core/src/recovery.rs:5050`) instead of "not seeing the new tree".
 
 **Settlement**: The tree table is made an open list from day-1. Evidence lies in the judgment table of settled item 9: under an open list, "adding a keyspace" means old readers merely **do not see the new tree** (compat grade, graceful degradation); hardcoding tree counts means old readers **cannot read the tree table** (incompat, immediate breakage). **Open lists strictly dominate**, with the only cost being an extra table length field plus a variable-length table section in the tree table unit — identical to the rationale in settled item 10 "reserves should lean generous". => Adding keyspaces is an explicitly stated expansion objective of this project, not an accident, so that row in the judgment table is pinned as **compat**.
 

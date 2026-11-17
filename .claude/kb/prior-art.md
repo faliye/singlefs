@@ -77,7 +77,7 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 **对本工程的意义**：btrfsutils 证明了「照着 btrfs 格式做 Rust 实现」三个月能出雏形，
 但那是因为**格式现成、且 `btrfs inspect-internal dump-tree` 是免费的裁判**。
 本工程从零设计，这两样都没有——**没有 oracle 是从头做的最大隐性成本**，
-必须在预算里，见 `.claude/singlefs-ai-sop/rules/test-discipline.md`「模型对拍」。
+必须在预算里，见 `.claude/rules/verification.md`「功能正确性靠模型对拍」。
 
 ## 四、内核 Rust 文件系统抽象层
 
@@ -502,7 +502,7 @@ Bε 缓冲比例、size-tiering、key-value 分离、过滤器类型——
 **对本工程最直接的两条**：
 
 1. **Metis 的 RefFS 说明「参照实现」不必是别人的成熟文件系统，可以是为对拍专门写的小实现。**
-   这正是 `.claude/singlefs-ai-sop/rules/test-discipline.md` 说的模型对拍，
+   这正是 `.claude/rules/test-discipline.md` 说的模型对拍，
    但 Metis 多给了一件事：把它和状态空间穷举接起来，而不是只喂随机操作序列。
 2. **DaisyNFS 的分层与 `.claude/rules/fs-design.md`「一个事务层，所有结构共用」同构**：
    事务层一次把并发与崩溃解决掉，上层就只剩顺序正确性要验。
@@ -601,7 +601,7 @@ if we run it multiple times」——**重建侧本身就是一串 `+=`**。
 |---|---|
 | 增量**应用过程**出偏差：漏一次更新、并发丢失、崩溃后未重放 | **加减语义本身写错**：某分支符号搞反，运行时与重建一起错到同一个值，`memcmp` 全绿 |
 
-**对本工程**：`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 写着「校验的两条路径不共享
+**对本工程**：`.claude/rules/evidence-discipline.md` 写着「校验的两条路径不共享
 同一段代码、同一次采样、同一个工具」。这一节是那条规则在真实系统里**已经被违反并产生盲区**的实例。
 处置见 [checks-owed.md](checks-owed.md) C12（增量语义共用）。
 
@@ -652,7 +652,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ⚠️ **它用的量是 `ashift`（对齐 / 最小分配单元），不是 Linux 的 `io_min`（阵列上是条带块大小）。**
 两个量在 md 阵列上差很远——E34（根环槽几何） 在真 md/raid5 上量到 128 倍。
 
-⚠️ **与本工程的一处已知差异（`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 要求写下来）**：
+⚠️ **与本工程的一处已知差异（`.claude/rules/evidence-discipline.md` 要求写下来）**：
 ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock 环恒占其中 128 KiB；
 而本工程的根环是 R 个区域按素数步长撒在盘上，**区域多大不是格式常量**——
 每区槽数 S 住系统配置，只有区间两条边（下界 4、上界 16）是格式常量（D22（单元原子性怎么合成） 已定项 2）。⇒ 「抬槽宽 = 减槽数」这个等式在本工程
@@ -699,7 +699,7 @@ ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock �
 
 ## 九、每对象扩展槽：五家现役实现怎么放「属于这个对象、但不在主字段里」的数据（D21（权威态与派生态的分界） 已定项 3 ③ 的外部调研，2026-09-13 现查）
 
-D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的外部调研（别家怎么做每对象扩展槽）还没做」。五家全部现查原文（URL 在表里），**未在本项目验证**；按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`，它们只能提假设、指该测的路径，不进正推 / 反推 / 校验。每家都写一处与本工程的已知差异。
+D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的外部调研（别家怎么做每对象扩展槽）还没做」。五家全部现查原文（URL 在表里），**未在本项目验证**；按 `.claude/rules/evidence-discipline.md`，它们只能提假设、指该测的路径，不进正推 / 反推 / 校验。每家都写一处与本工程的已知差异。
 
 | 实现 | 扩展槽住哪 | 形态与宽度 | 装不下时 | 来源（现查） | 与本工程的一处差异 |
 |---|---|---|---|---|---|
@@ -709,12 +709,12 @@ D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的
 | ZFS | dnode（`DNODE_SHIFT 9`，512 字节）核心 64 字节之后的 bonus 缓冲：`DN_BONUS_SIZE(dnsize) = dnsize − DNODE_CORE_SIZE − (1 << SPA_BLKPTRSHIFT)`（512 字节 dnode 时 320），`dn_bonustype u8`、`dn_bonuslen u16` | bonus 装系统属性（SA）；类型由 `dn_bonustype` 声明 | 「Spill blocks are used to store system attribute data (i.e. file metadata) that does not fit in the dnode's bonus buffer」，`DNODE_FLAG_SPILL_BLKPTR (1 << 2)`，spill 指针占掉 bonus 末尾的一个 blkptr | https://raw.githubusercontent.com/openzfs/zfs/master/include/sys/dnode.h | 每对象槽宽是 dnode 大小减核心（可到 1 KiB 以上的 dnode）；本工程扩展点配额 N 由每条线在系统配置声明、第一版为 0 |
 | APFS | inode 记录值 `j_inode_val` 末尾的可变长扩展字段：`apfs_xf_blob { xf_num_exts u16, xf_used_data u16, xf_data[] }`，每个字段 `apfs_x_field { x_type u8, x_flags u8, x_size u16 }`；类型如 `DSTREAM = 8`、`NAME = 4`、`FINDER_INFO = 7`、`SPARSE_BYTES = 13` | 每字段 4 字节元数据 + 值；xattr 值 `apfs_xattr_val { flags u16, xdata_len u16, xdata[] }` | 嵌入上限 `APFS_XATTR_MAX_EMBEDDED_SIZE = 3804`（`XATTR_DATA_EMBEDDED = 2`），更大的走数据流（`XATTR_DATA_STREAM = 1`） | https://raw.githubusercontent.com/linux-apfs/linux-apfs-rw/master/apfs_raw.h （Apple 的 APFS Reference PDF 用 CID 字体，本机 `pdf-text.py` 抽不出文字，改核 Linux 驱动头文件） | 类型 + 长度的自描述字段列表，可装数据；本工程的扩展点只装一个指向 |
 
-**五家共有的形态**：都是「对象记录内一段有上限的空间 + 装不下时指向外部」，上限 320 字节（ZFS 512 字节 dnode）到约 3.9 KiB（btrfs 一叶、APFS 3804）。**没有一家把扩展槽做成「只许一个指向、不许内联」**——这是本工程 D1（数据可移动性 / 反向索引） 已定项 3 独有的形态，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「没有任何现役实现走 X 这条路」是最值钱的一类外部信号：举证责任在本工程这边（理由记在 D1（数据可移动性 / 反向索引） 已定项 3 与 D21（权威态与派生态的分界） 硬约束 5）。
+**五家共有的形态**：都是「对象记录内一段有上限的空间 + 装不下时指向外部」，上限 320 字节（ZFS 512 字节 dnode）到约 3.9 KiB（btrfs 一叶、APFS 3804）。**没有一家把扩展槽做成「只许一个指向、不许内联」**——这是本工程 D1（数据可移动性 / 反向索引） 已定项 3 独有的形态，按 `.claude/rules/evidence-discipline.md`「没有任何现役实现走某条路」是最值钱的一类外部信号：举证责任在本工程这边（理由记在 D1（数据可移动性 / 反向索引） 已定项 3 与 D21（权威态与派生态的分界） 硬约束 5）。
 **「为空」怎么编码，五家各自的做法**：ext4 靠 `e_value_size = 0` 与条目计数；XFS 靠 `count = 0`；btrfs 靠条目不存在；ZFS 靠 `dn_bonuslen = 0`；APFS 靠 `xf_num_exts = 0`——**都是「计数为 0」而不是「某个全零指针」**，与 D21（权威态与派生态的分界） 已定项 3 ②「全零不能直接当空用」那句同向。
 
 ## 十、快照下的死块记账、搬被共享的块与 discard 时机
 
-取得日期 2026-10-12；每条未在本项目验证，是线索不是证据（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」）。
+取得日期 2026-10-12；每条未在本项目验证，是线索不是证据（`.claude/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」）。
 
 **查的版本与取法**
 

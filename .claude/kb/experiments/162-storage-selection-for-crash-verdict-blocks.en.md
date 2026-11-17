@@ -185,6 +185,8 @@ E162  @driver_e162_anchors     字节一致 e162-crash-verdict-block-store-2026-
 
 ### What it cannot answer
 
+The apparatus `e162_verdict_store_power_cut.rs` was changed on 2026-11-09 (in the self-check, the paths of the apparatus source, `preflight.py` and `vm-bench.sh` are now written as `concat!(env!("CARGO_MANIFEST_DIR"), …)`, and the path of `vm-bench.sh` now points to `scripts/devices/vm-bench.sh`; the arithmetic of the readings was not touched). The apparatus has not been formally run since; when the numbers are needed, wait for the user to ask for a run.
+
 - **S1 is sufficient for judgment (2026-09-27 second segment supplemental run), S2 remains unjudged**: all four S1 arms each completed the originally registered 200 main-cell kills, all Q1a–Q1f verdict rows returned 0, meeting the sufficiency condition, and the positive controls as well as the V6 threshold passed across all four arms. S2 only ran 20 kills per arm in the feasibility tier, and its 200 kills as well as Q2a–Q2b have not been judged.
 - **S3 was not run at all**: sustained throughput of sending blocks over the network, consistency after network disconnection and reconnection, and cross-machine cells were explicitly specified by revision six of registration section 12 as not run in the feasibility tier, so S3 currently has zero data.
 - **S1-large and geometry samples G-bs10, G-batch16, G-sparse, G-random unrun**: whether occupancy ratio, random reads and write rate reverse relative to main point is unknown.
@@ -198,7 +200,7 @@ E162  @driver_e162_anchors     字节一致 e162-crash-verdict-block-store-2026-
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D13 (Verification Route) settled item 4 | Background | 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-24 unaffected: apparatus verified by replay.sh, output byte-for-byte identical with retained artifact, conclusions and numbers unchanged; prior 2026-10-18 unaffected: rerun section identifies the artifact registered in replay.sh; conclusions and numbers unchanged |
+| D13 (Verification Route) settled item 4 | Background | 2026-11-14 unaffected: the way the apparatus self-test locates the apparatus source, `preflight.py` and `vm-bench.sh` was rewritten; the arithmetic of the readings unchanged, not formally run since; conclusions, numbers and artifacts unchanged; this item is only background, and the item's text does not mention what was changed; previously, 2026-11-05 unaffected: only the usage and rerun notes were changed (one gate, two ways to run; the verification crate was renamed); conclusions, numbers, and artifacts unchanged; previously, 2026-11-01 unaffected: only the rerun launch commands were changed; previously, 2026-10-24 unaffected: apparatus verified by replay.sh, output byte-for-byte identical with retained artifact, conclusions and numbers unchanged; prior 2026-10-18 unaffected: rerun section identifies the artifact registered in replay.sh; conclusions and numbers unchanged |
 
 ## Historical Versions
 

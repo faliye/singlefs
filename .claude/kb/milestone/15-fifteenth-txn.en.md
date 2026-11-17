@@ -1,4 +1,4 @@
-# Milestone "Encryption": Tasks, Acceptance, and Ordering
+# Milestone "Compression and Encryption": Tasks, Acceptance, and Ordering
 
 [中文](15-fifteenth-txn.md) · **English** · [日本語](15-fifteenth-txn.ja.md)
 
@@ -24,17 +24,33 @@ Exit criteria and whether post-encryption key rotation is enabled are left to us
 | 2 | KDF and master key slot, system configuration authentication | I |
 | 3 | Expected value of each AAD field originates solely from lookup path or already authenticated ciphertext-side fields, including directory entries | II |
 | 4 | Keyless side is strictly read-only check-only; crash streams of encrypted volumes whole-domain 0 red | III |
+| 5 | Interaction with features landed earlier each has one test case and one must-red world: snapshots, GC, truncation, packing, parallel commit, multiple files, and the transactions added by each milestone ordered before this file (settled by the user on 2026-11-16; the shape follows Milestone 5 Exit 5) | III |
 
 ## Grouping and Ordering
 
 | Phase | What to Do | Why Sequenced Here | Status |
 |---|---|---|---|
-| 0 Handover | Check current state of reserved fields in implementation (`grep -rl nonce crates/singlefs-core/src` hits ten files; verify whether all are merely reserved slots before starting); settle exit criteria | Four kinds of reservations in D9 (Encryption) settled item 12 already implemented; inspect their current state first | Unstarted |
+| 0 Handover | Check current state of reserved fields in implementation (`grep -rl nonce crates/singlefs-core/src` hits eleven files (checked 2026-11-16); verify whether all are merely reserved slots before starting); settle exit criteria | Four kinds of reservations in D9 (Encryption) settled item 12 already implemented; inspect their current state first | Unstarted |
+| 0 Compression | 0·1 → 0·2 | Encryption works on the extent after compression, so this comes before I·1 | Not started |
 | 1 Computation and Keys | I·1 ∥ I·2 | Mutually independent (inferred) | Unstarted |
 | 2 AAD | II·1 → II·2 | Depends on I·1 | Unstarted |
 | 3 Keyless and Coverage | III·1 ∥ III·2 | Depend on I, II | Unstarted |
 
+**Addendum (settled by the user on 2026-11-16)**: the design round of 0·1 moves up to run alongside Milestone 5 X·1, by three-way argument only and without code; the implementation of 0·2 stays in this file.
+
 **Estimation**: Not estimated. Record `records/2026-10-11-里程碑五打包与决策进度列.md` Section 3 inferred 3–4 weeks (inferred, unmeasured).
+
+## 0. Compression (the user decided on 2026-11-11 to merge it into this file instead of a separate milestone)
+
+- **Already in the repository**: no decision governs the algorithm or the switch of compression; D9 (Encryption) settled item 14 only registers the algorithm code (0 = not compressed), and D9 (Encryption) settled item 13 fixes the order compression → encryption → MAC. Compression changes the on-disk format, so it has to be finished before the freeze of milestone seventeen; the ciphertext checksum and the nonce of encryption are computed over the extent after compression, so it is placed before I·1.
+- **Tasks**:
+
+| # | What to do | Clauses and debts it rests on | Acceptance | Depends on |
+|---|---|---|---|---|
+| 0·1 | Establish the decision (three-way): whether to compress, which algorithms, at which granularity (extent or unit), how to store data that does not compress, where the logical length and the on-disk length are recorded, and the relation to the small-data container (milestone five) and to truncation | D9 (Encryption) settled items 13 and 14; `.claude/rules/fs-design.md`, "the criterion for format branches" | The verdict lands in `research/prompts/` and the settlement is written back to the kb; a decision needs an experiment, at least one counting experiment | stage 0 |
+| 0·2 | Implementation: compress on the write path and decompress on the read path, with the algorithm code in the cell the pointer already reserves; the new invariants go into the pool-level checker and the GPU judge | The settlement of 0·1 | One bad image and one mutation row per invariant; differential testing against the model on a compressed volume is identical item by item; the crash streams of a compressed volume are 0 red over the whole domain | 0·1 |
+
+- **Must be settled before starting work**: whether compression enters the first version (if 0·1 rules it out, this section keeps only the decision and the algorithm code stays reserved).
 
 ## I. Encryption Computation and Keys
 
@@ -43,7 +59,7 @@ Exit criteria and whether post-encryption key rotation is enabled are left to us
 
 | # | What to Do | Borne Clauses and Owed Checks | Acceptance | Dependencies |
 |---|---|---|---|---|
-| I·1 | Unit encryption and decryption: two algorithms, nonce generation and storage, MAC, ciphertext checksum, Code 1 identity segment converted to ciphertext | D9 (Encryption) settled items 1, 2, 3, 4, 11, 13; D18 (Information Carried in a Block) settled item 13; C185 (unsettled whether payload CRC covers ciphertext or plaintext), C193 (size of unit header when encryption is enabled never calculated across repo), C399 (prerequisite for note on nonce non-reuse never reviewed) | Mutation colliding nonces across two writes turns red; corrupting one ciphertext byte turns red on read; round-trip test of both algorithms on identical plaintext | Phase 0 |
+| I·1 | Unit encryption and decryption: two algorithms, nonce generation and storage, MAC, ciphertext checksum, Code 1 identity segment converted to ciphertext | D9 (Encryption) settled items 1, 2, 3, 4, 11, 13; D18 (Information Carried in a Block) settled item 13; C185 (unsettled whether payload CRC covers ciphertext or plaintext), C193 (size of unit header when encryption is enabled never calculated across repo), C399 (prerequisite for note on nonce non-reuse never reviewed); the two places C406 (the read side does not check the algorithm type and the three compression bytes) still owes: the root record and the journal record still skip their own algorithm type (`RootRecord::parse_slot` in `crates/singlefs-core/src/root_record.rs`, `JournalRecord::parse` in `crates/singlefs-core/src/journal.rs`), to be checked before encryption is turned on | Mutation colliding nonces across two writes turns red; corrupting one ciphertext byte turns red on read; round-trip test of both algorithms on identical plaintext | Phase 0 |
 | I·2 | KDF, master key slots, system configuration authentication | D9 (Encryption) settled item 8; C74 (No Defense Against Cross-Volume Misdirected Writes in the Period Without Encryption) | Mounting with key from different volume fails; corrupting one byte of system configuration turns red | Phase 0 |
 
 - **To be settled before starting**: Whether C240 (uncomputed cost of re-encryption during relocation) (whether to re-encrypt during GC, packing, rebalance relocation) is calculated here or established separately; whether key rotation is implemented.
@@ -68,4 +84,12 @@ Exit criteria and whether post-encryption key rotation is enabled are left to us
 | III·1 | Keyless mount: read-only check-only, write path writes zero bytes | D9 (Encryption) settled item 5; D3 (Space Allocation) settled item 16; C32 (no gate on whether the keyless side can write bytes), C136 (nobody has marked which invariants can be verified without a key), C166 (Whether Format Reservations Retained After Plaintext Side Cancellation) | Mutation issuing write request from keyless side turns red | I |
 | III·2 | Crash streams and differential against model for encrypted volumes; pool-level checker judges with keys | D13 (Verification Route) settled items 9, 15 | Whole-domain 0 red | I, II |
 
-**Not in exit criteria**: Full form of keyless scrub and handling upon detection (Milestone 16 [16-sixteenth-txn.md](16-sixteenth-txn.md)), compression (compression → encryption → MAC order settled, compression itself has no decision).
+**Not in exit criteria**: Full form of keyless scrub and handling upon detection (Milestone 16 [16-sixteenth-txn.md](16-sixteenth-txn.md)).
+
+## Debts assigned to this file by the re-check of owed checks on 2026-11-11
+
+After the row-by-row re-check against the code (`records/2026-11-11-欠账表按代码重核逐行结论.md`), these debts have their destination written to this file although this file did not name them before; do each as its registered row says under "how to block it", and see each registered row for what is still owed; the assignment was inferred by topic during the re-check and is to be verified before work starts.
+
+- I·1: C68 (Invariant Allowlist Conflicts with Settled Clauses), C111 (class tag lacks replica on ciphertext side), C173 (plaintext header leakage surface left undefended after the plaintext side was cancelled), C400 (whether the MAC in the unit header and the one in the pointer are two copies), C405 (nobody reconciled encryption's need for parallelism with serial-first commit)
+- III·1: C303 (the basis of D2 boundary ③ lapsed with the withdrawal of D9 settled item 7)
+- III·2: C189 (Whether I-2.3 Judges Plaintext or On-Disk Bytes When Encryption Is On Is Unsettled)

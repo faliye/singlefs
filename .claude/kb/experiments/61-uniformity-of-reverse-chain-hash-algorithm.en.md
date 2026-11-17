@@ -17,10 +17,10 @@
 > | **③ Metric 1 was algebraically impossible to fail for Arm A** | Full rank of CRC-32 on differences constrained to ≤32-bit windows is an **algebraic tautology** (`gcd(x, g) = 1` and `deg d < 32 ⇒ xᵏd mod g ≠ 0`), independent of base, header length, or field layout. 1379 windows represent 1379 instances of the identical theorem, not 1379 independent empirical facts |
 > | **④ Metric 3 lacked statistical power** | λ=128, Poisson sd=11.3 ⇒ band [64, 256] in Criterion 4 corresponds to **±5.7σ**, capable only of ruling out "effective bit width loss ≥ 1 full bit". **"Arm B truncation is uniform" was an overstatement**; evidence only supports "Arm B loses less than 1 bit" |
 >
-> ⚠️ **This is precisely the pattern targeted by `.claude/singlefs-ai-sop/rules/evidence-discipline.md` "forbidding constructing models after deciding conclusion"**,
+> ⚠️ **This is precisely the pattern targeted by `.claude/rules/evidence-discipline.md` "forbidding constructing models after deciding conclusion"**,
 > and indeed its primary archetype: every step seems reasonable, yet those steps were selected to fit the conclusion.
 > Defect ② had all three arms sharing `make_header` ⇒ **inter-arm comparisons appeared completely normal**, exactly
-> what `.claude/singlefs-ai-sop/rules/test-discipline.md` "comparing multiple arms mutually fails to detect when all arms err together" was designed to stop.
+> what `.claude/rules/test-discipline.md` "comparing multiple arms mutually fails to detect when all arms err together" was designed to stop.
 
 D23 (Journal Role & Format) settled item 8 settled width at 32 bits, and settled item 10 settled coverage (entire header of prior record,
 where 32-byte `header_csum` is excluded from hash input). **Missing was solely which function to compress those bytes into 32 bits.**
@@ -145,8 +145,8 @@ Full rank is equivalent to enumerating all 2³² differences in that window.
 
 | Decision Item | Relationship | Retrospective |
 |---|---|---|
-| D23 (Journal Role & Format) settled item 11 | Supports | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-04 unaffected: updated header width, new root segment, and named items to current values only, conclusions and artifacts unchanged |
-| D19 (Block Pointer Structure & Width Budget) | Does not affect | 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-04 unaffected: updated header width, new root segment, and named items to current values only, conclusions and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 11 | Supports | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-04 unaffected: updated header width, new root segment, and named items to current values only, conclusions and artifacts unchanged |
+| D19 (Block Pointer Structure & Width Budget) | Does not affect | 2026-11-11 unaffected: a rename changed wording only (rule file paths); conclusions, numbers and artifacts unchanged; previously, 2026-10-22 unaffected: only the format widths in sentences describing the current state were changed; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-04 unaffected: updated header width, new root segment, and named items to current values only, conclusions and artifacts unchanged |
 
 ## Historical Versions
 
