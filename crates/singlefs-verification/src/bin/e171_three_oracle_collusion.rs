@@ -1,6 +1,7 @@
 // task-server-gpu-arguments: baseline row known-bad-images
-// 三个模式都经 `given_states_engine_of_this_experiment`（`crash_amplification::GivenStatesEngine`）判盘：baseline 与 row 判取样态的 O2，
+// 三个模式的判段都经 `given_states_engine_of_this_experiment`（`crash_amplification::GivenStatesEngine`）判盘：baseline 与 row 判取样态的 O2，
 // known-bad-images 判已知坏镜像与 E170（O3规约执行器第一版）的坏状态；带 gpu 编好的二进制直接交统一任务服务时，由服务按这一行清场、分卡。
+// 录入段（`--stage record`）不起引擎、不碰卡，判段（`--stage judge`）才在卡上判；这一行按模式词认，分不出段。
 //! E171（三oracle合谋测试） 第一段：入库装置。
 //!
 //! 登记：`research/prompts/e171-preregistration.md` 5.3（装置写在哪）、5.5（坏镜像表）、5.6（阳性与阴性对照）、5.8「第一段」、
@@ -10,7 +11,7 @@
 //! 中性格式，不在这个文件里。
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness、format 与 replay-prefix。
-//! 两条流的驱动、取样、中性格式的写出与读回照抄 `e170_o3_spec_executor_export.rs`（不 `#[path]` 引它），改三处（登记 5.3）：
+//! 两条流的驱动、取样、中性格式的写出与读回照抄 `e170_specification_executor_export.rs`（不 `#[path]` 引它），改三处（登记 5.3）：
 //! ① 驱动里的 API 调用不 `.expect`：结局（成功 / 错误成员 / panic）记进 `calls.tsv` 的 `ok` / `err` 列与 `call-outcomes.tsv`，
 //! 出错之后这条流不再往下驱动；② 跟着每次调用推理想模型，记 O1-对拍；③ 每个取样的状态算 O1-崩溃判官与 O2，写 `oracle-verdicts.tsv`。
 //!
@@ -18,12 +19,25 @@
 //!   e171_three_oracle_collusion row --output-directory <目录>
 //!   e171_three_oracle_collusion known-bad-images --dump-directory <基线导出目录> --output-directory <目录> [--e170-bad-rows]
 //!   以上三种之后都可以加 `--positive-control <O1-对拍|O1-崩溃判官|O2>` 或 `--disable-oracle <O1|O2>`（只对 baseline 与 row）
+//!   以及 `--sampling-threads <正整数>`：baseline 与 row 判取样态、known-bad-images 判已知坏镜像与 E170 坏状态的线程数，不给取每台默认重活线程数，都再按内存上限收（`sampling_threads_of_this_run`）；
+//!   写 1 是一条线程按序号走完的那一趟，产物（`E7RESULT` 行与去掉耗时之后的文件）与几条线程的逐字相同
+//!   以及 `--stage record|judge`（三种模式都认，取值照 `crash_library::RunStage` 的写法）：`record` 只跑录入段，`judge` 只跑判段，不给就两段先后跑。
+//!
+//! 两段（D13（验证路线） 已定项 15「判器上 GPU」；`.claude/rules/verification.md`「一个门禁：两种跑法」按需领卡那一句）：
+//! 录入段只在 CPU 上跑：驱动、取样、O1、导出文件都在这一段，O2 要判的盘一张一张作给定状态表录进判定库（prune-server 里那一份，
+//! 给定状态表那一类、按表的摘要），不起给定状态引擎、不碰卡；这一段的观测与结果行要的东西写成一份交接，放在输出目录里
+//! （[`HAND_OFF_TO_THE_JUDGE_STAGE_FILE`]）。判段不再驱动、不再取样：读回交接，凭摘要从库里读回每张盘、交引擎判，写判完才有的产物
+//! （`oracle-verdicts.tsv`、`known-bad-o2.tsv`、`e170-bad-rows-o2.tsv`，坏镜像模式的另两个产物也在这一段写），打全部 `E7RESULT` 行，删掉交接。
+//! 不给 `--stage` 时两段先后跑，交接在内存里交，产物与结果行与分两趟跑的逐字节相同（去掉耗时之后）。
+//! 判器的结论只进产物与结果行，不回头定取样与驱动：三种模式都分得开。
+//! 段不用 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 点：取样那一步（`sample_crash_states_on_the_cpu`）照那个变量选段，设了它取样就只录不判。
 //!
 //! `baseline`：回比本地常量（S1）、三批取样、写十个导出文件加 `oracle-verdicts.tsv` 与 `call-outcomes.tsv`；`row`：同上，只是
 //! 不回比常量（坏实现那一趟本来就会让写流与段表变）、只取批 1 与批 2；S5 在这一趟也判：返回了错误的调用（卸载除外）都记成 O1-对拍的红
-//! （取号、暖机出错也是），不适用只来自卸载与对拍判出不同之后（`s5_checks_of_a_bad_implementation_row`）。目录已存在就拒绝。
+//! （取号、暖机出错也是），不适用只来自卸载与对拍判出不同之后（`not_applicable_source_checks_of_a_bad_implementation_row`）。目录已存在就拒绝。
 //! 标准输出：`E7RESULT` 行（与跑几次无关）与 `E7TIMING` 行（耗时）；收尾 `name=done emitted=N`。
-//! 退出码：0 正常；2 命令行不对或输出目录已存在；3 停机条款 S1、S3、S4、S5 没过（产物照打，交主 agent）。
+//! 退出码：0 正常（只跑录入段的那一趟录完就是 0，停机条款归判段）；2 命令行不对、要录的输出目录已存在、只跑判段而录入段没跑过
+//! （或交接与这一趟的参数对不上）；3 停机条款 S1、S3、S4、S5 没过（产物照打，交主 agent）。
 
 /// 崩溃点重放取样过崩溃判定库的项（`crash_state_enumeration::sample_crash_states_on_the_cpu`）：项名与设点文件（这份装置自己）。
 const CRASH_POINT_REPLAY_SAMPLING_ITEM: CrashPointReplayItem<'static> = CrashPointReplayItem {
@@ -32,7 +46,8 @@ const CRASH_POINT_REPLAY_SAMPLING_ITEM: CrashPointReplayItem<'static> = CrashPoi
 };
 
 /// 这一次取样的项名：装置一趟按不同的段、不同的序号区间取样几十次，每次是一条不同的流，项名各给一个（库里同一个项名下只登一份清单，
-/// 几次共用会撞；块键按内容算，下一趟照样复用判过的块）。
+/// 几次共用会撞；块键按内容算，下一趟照样复用判过的块）。号按调用的次序发：`observe_sampled_states` 在起线程之前按连续段的次序取好，
+/// 几条线程与一条线程的那一趟每个连续段拿到同一个项名、录入键相同。
 fn sampling_item_name_of_this_call() -> String {
     static NEXT_SAMPLING_NUMBER: std::sync::atomic::AtomicU64 =
         std::sync::atomic::AtomicU64::new(0);
@@ -47,8 +62,11 @@ fn sampling_item_name_of_this_call() -> String {
 mod common;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::time::Instant;
 
 use singlefs_checker::image::InvariantVerdict;
@@ -74,10 +92,13 @@ use singlefs_verification::crash::{
     in_place_subsets_with_copy_on_write_none_or_all_expansion, CrashStateEnumerationTables,
     CrashStateJudgement,
 };
+use singlefs_verification::crash_amplification::RecordedGivenStatesTableWithItsColumns;
 use singlefs_verification::crash_facts::{extract_flow_facts, FlowFacts};
+use singlefs_verification::crash_library::{LibraryOpenInThisProcess, RunStage};
 use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
+use singlefs_verification::known_bad_images::known_bad_images;
 use singlefs_verification::memory_pool::{
     newest_persisted_root, writes_and_segments_with_stream_indexes_and_entries, CrashImage,
     MemoryPool, PublishedVersion, RetainedWrite, WrittenContents,
@@ -102,7 +123,7 @@ use singlefs_verification::{
 
 // ───────────────────────────── 本地常量（登记 5.3、S1） ─────────────────────────────
 //
-// 下面这一批与 `e170_o3_spec_executor_export.rs`「本地常量（登记 5.7、S1）」那一节同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
+// 下面这一批与 `e170_specification_executor_export.rs`「本地常量（登记 5.7、S1）」那一节同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
 // 不直接引（决定几何与工作量的数写成本地常量：引了就等于装置与实现共用一个数，两边一起错而逐格相等）。
 // 这些常量只在基线那一趟回比：坏实现改了写流，这些数在坏实现那一趟本来就会变，照数记进产物。
 
@@ -125,24 +146,24 @@ const LOCAL_FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const LOCAL_FIRST_FILE_BYTES: usize = 3000;
 const LOCAL_FIRST_FILE_CONTENT_MODULUS: usize = 251;
 
-/// 流一的段长：`tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `prepare` 里的段长断言。
-const LOCAL_FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
-/// 流一的写数：同一份文件 `prepare` 里的写数断言（取号 2 + 暖机两次各 5 + A 29）。
-const LOCAL_FIRST_STREAM_WRITES: usize = 41;
+/// 流一的段长（12 段）：取号两轮各一段（2、2；D22（单元原子性怎么合成） 已定项 8「取号写两轮」），暖机两次各是记录段 2、根槽段 1、轮换段 2，
+/// A 是 24 个单元写一段、记录 2、根槽 1、轮换 2。`tests/crash_enumeration_new_pool_file_creation_stream.rs` 的段长断言是同一张表。
+const LOCAL_FIRST_STREAM_SEGMENT_LENGTHS: [usize; 12] = [2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
+/// 流一的写数：取号两轮各 2 + 暖机两次各 5 + A 29。
+const LOCAL_FIRST_STREAM_WRITES: usize = 43;
 /// 流一的根槽写数：暖机两次各一条 + A 一条。
 const LOCAL_FIRST_STREAM_ROOT_WRITES: usize = 3;
-/// 流一全量与甲二（每段按甲二展开）的状态数：同一份测试文件里全量与甲二那两个态数常量。
-const LOCAL_FIRST_STREAM_FULL_STATES: u64 = 16_777_260;
-const LOCAL_FIRST_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 46;
+/// 流一全量与甲二（每段按甲二展开）的状态数：同一份测试文件的 `FULL_STATES` 与 `IN_PLACE_SUBSETS_STATES`。
+const LOCAL_FIRST_STREAM_FULL_STATES: u64 = 16_777_268;
+const LOCAL_FIRST_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 54;
 /// 流一每次写只取两态时的全量闭式：同一份文件的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
-const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_240;
+const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_243;
 
-/// 流二的段长（78 段）：取今天 crates 现算的那一份，即这个装置 `baseline` 的 S1 `fixed_script_through_e_then_unmount_segment_lengths`
-/// 的 `crates=`（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 里 `step=z5`、`check=fixed_script_through_e_then_unmount_segment_lengths` 那一行）。与
-/// `tests/crash_enumeration_fixed_script_stream.rs` 的 `prepare` 里「固定脚本到 E 再正常卸载的段序列」那条断言只差第 33 段（回退 D 那次向前发布）：20 → 24，
-/// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
-const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
-    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
+/// 流二的段长（80 段）：每次发布是单元段（暖机 txg 1、2 没有）、记录段 2、根槽段 1、轮换段 2；取号（流开头与 B 之后重开可写挂载各一次）两轮各一段 2；
+/// 抬 F 与卸载开头先写新 F 一段 2。单元段的写数：A、B、C、回退 D 各 24（回退 D 含谱系容器与谱系树根，D18（块里携带什么信息） 已定项 24 第 5 条），
+/// 写行 18，写行之后的两次暖机与抬 F、卸载推的空发布各 16，五次覆盖写与 E 各 28。
+const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 80] = [
+    2, 2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
     16, // 取号到写行之后的暖机
     2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
     28, // C、回退 D、覆盖写
@@ -150,24 +171,20 @@ const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, // 抬 F、E、卸载
     16, 2, 1, 2, // 卸载第二次空发布与 txg 19 的轮换
 ];
-/// 流二的写数：S1 `fixed_script_through_e_then_unmount_writes` 的 `crates=481`（同一份产物第 439 行）；测试文件第 448 行
-/// `191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21)` = 477 不含回退 D 那次的 4 次谱系记录写。
-const LOCAL_SECOND_STREAM_WRITES: usize = 481;
-/// 流二的根槽写数：同一份文件第 482 行（`=> 19`）。
+/// 流二的写数：段长之和，到 D 199 + 五次覆盖写 5 × 33 + 抬 F 2 + 2 × 21 + E 33 + 卸载 2 + 2 × 21 = 485。
+const LOCAL_SECOND_STREAM_WRITES: usize = 485;
+/// 流二的根槽写数：`tests/crash_enumeration_fixed_script_stream.rs` 里这条流的根槽写数断言（`=> 19`），19 次发布各一条。
 const LOCAL_SECOND_STREAM_ROOT_WRITES: usize = 19;
-/// 流二全量的状态数：S1 `fixed_script_through_e_then_unmount_full_states` 的 `crates=1678377204`（同一份产物第 443 行；
-/// 测试文件第 100 行 `FULL_STATES_THROUGH_THE_UNMOUNT` 还是 1_662_648_564，差 2^24 − 2^20）。甲二：测试文件里
-/// 甲二到卸载的那个态数常量，与 S1 `crates=278` 相同。
-const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_678_377_204;
-const LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 278;
-/// 流二每次写只取两态时的全量闭式：S1 `fixed_script_through_e_then_unmount_two_state_closed_form` 的 `crates=1678377089`
-/// （同一份产物第 445 行；测试文件第 96 行还是 1_662_648_449）。单测拿段长表回算它。
-const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_089;
-/// E 的数据单元落点：同一份文件第 318 行（`50176`）。
-const LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT: u64 = 50_176;
-/// 抬 F 推的空发布数：同一份文件第 306 行（`raised.publishes.len(), 2`）。
+/// 流二全量与甲二的状态数：同一份测试文件的 `FULL_STATES_THROUGH_THE_UNMOUNT` 与 `IN_PLACE_SUBSETS_STATES_THROUGH_THE_UNMOUNT`。
+const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_678_377_220;
+const LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 294;
+/// 流二每次写只取两态时的全量闭式：同一份文件的 `FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT`（单测拿段长表回算它）。
+const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_095;
+/// E 的数据单元落点：同一份测试文件里 E 那一步的断言（`50176`）。
+const LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT: u64 = 50_176;
+/// 抬 F 推的空发布数：同一份测试文件里抬 F 那一步的断言（`raised.publishes.len(), 2`）。
 const LOCAL_SECOND_STREAM_RAISE_FLOOR_PUBLISHES: usize = 2;
-/// 卸载推的两次空发布的 txg：同一份文件第 336 行（`vec![CheckpointTxg(18), CheckpointTxg(19)]`）。
+/// 卸载推的两次空发布的 txg：同一份测试文件里卸载那一步的断言（`vec![CheckpointTxg(18), CheckpointTxg(19)]`）。
 const LOCAL_SECOND_STREAM_UNMOUNT_TXGS: [u64; 2] = [18, 19];
 
 /// 取样：批 1 每段内点的分母、批 2 的分母、批 3 的分母（登记 5.4）。
@@ -185,21 +202,23 @@ const UNMOUNT_CALL_LABEL: &str = "unmount";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StreamName {
     NewPoolFileCreation,
-    FixedScriptThroughEThenUnmount,
+    FixedScriptReuseAfterRaisingFloorThenUnmount,
 }
 
 impl StreamName {
     fn directory_name(self) -> &'static str {
         match self {
             Self::NewPoolFileCreation => "new_pool_file_creation",
-            Self::FixedScriptThroughEThenUnmount => "fixed_script_through_e_then_unmount",
+            Self::FixedScriptReuseAfterRaisingFloorThenUnmount => {
+                "fixed_script_through_e_then_unmount"
+            }
         }
     }
 }
 
 const STREAM_NAMES: [StreamName; 2] = [
     StreamName::NewPoolFileCreation,
-    StreamName::FixedScriptThroughEThenUnmount,
+    StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
 ];
 
 // ───────────────────────────── 流二的内容生成式（照抄测试文件） ─────────────────────────────
@@ -274,7 +293,7 @@ enum ModelVerdictOfCall {
     Agrees,
     /// 对不上的第一格；模型停在这里，此后的调用不比（读法 6）。
     Disagrees {
-        aspect: &'static str,
+        aspect: String,
         model_answer: String,
         implementation_answer: String,
     },
@@ -296,7 +315,7 @@ impl ModelVerdictOfCall {
 /// 驱动方调的一次 API：标签、它发出的第一条操作的流序下标、返回点（返回时录制流的长度，都从 mkfs 之后数）、结局、模型的判定。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RecordedCall {
-    label: &'static str,
+    label: String,
     first_operation: usize,
     return_point: usize,
     outcome: CallOutcome,
@@ -353,11 +372,12 @@ enum DisabledOracle {
     PoolChecker,
 }
 
-/// 一次跑的开关：阳性对照、关一条。
+/// 一次跑的开关：阳性对照、关一条、判取样态与坏镜像的线程数（不进产物，`None` 取每台默认重活线程数）。
 #[derive(Clone, Copy, Debug, Default)]
 struct RunSwitches {
     positive_control: Option<PositiveControl>,
     disabled_oracle: Option<DisabledOracle>,
+    sampling_threads: Option<NonZeroUsize>,
 }
 
 /// 实现 panic 的消息：`String` 或 `&str`，别的写 `non_text_panic`。
@@ -482,7 +502,7 @@ impl StreamDriver {
             self.stop_the_model_at(call_index);
         }
         self.calls.push(RecordedCall {
-            label,
+            label: label.to_string(),
             first_operation,
             return_point,
             outcome,
@@ -524,7 +544,8 @@ impl StreamDriver {
         self.calls[call_index].model = ModelVerdictOfCall::Disagrees {
             aspect:
                 singlefs_verification::model::ModelDisagreementAspect::RefusedWhenModelRequiresSuccess
-                    .name(),
+                    .name()
+                    .to_string(),
             model_answer: "往前走".to_string(),
             implementation_answer: format!("拒了:{}", error_member_of(&failure)),
         };
@@ -557,7 +578,7 @@ impl StreamDriver {
             return;
         }
         if self.switches.positive_control == Some(PositiveControl::ComparisonOfTheCalls)
-            && self.name == StreamName::FixedScriptThroughEThenUnmount
+            && self.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
             && self.calls[call_index].label == "publish"
             && !self.comparison_control_applied
         {
@@ -583,7 +604,7 @@ impl StreamDriver {
             }
             Err(disagreement) => {
                 self.calls[call_index].model = ModelVerdictOfCall::Disagrees {
-                    aspect: disagreement.aspect.name(),
+                    aspect: disagreement.aspect.name().to_string(),
                     model_answer: disagreement.model_answer,
                     implementation_answer: disagreement.implementation_answer,
                 };
@@ -1120,7 +1141,7 @@ impl LiveStream {
             .map(|location| location.slot.0);
         self.checks.push(StopCheck::new(
             "second_stream_e_data_unit_slot",
-            Some(LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT),
+            Some(LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT),
             reuse_slot,
         ));
         self.versions.push(version(2, 17, later_content(31)));
@@ -1146,7 +1167,8 @@ struct PreparedStream {
     calls: Vec<RecordedCall>,
     judged_root_index: usize,
     versions: Vec<PublishedVersion>,
-    committed_versions: BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
+    /// 模型的版本目录的内容：取样态分几条线程判，这份不用 `Rc`，每条线程照它造自己那一份（[`committed_versions_for_this_thread`]）。
+    committed_version_contents: BTreeMap<ModelRootKey, Option<Vec<u8>>>,
     /// 模型不再往前走的那次调用（`None`：整条流的每次调用都比过了）。
     model_stopped_at_call: Option<usize>,
     checks: Vec<StopCheck>,
@@ -1241,7 +1263,10 @@ fn prepare_stream(
         calls: live.driver.calls.clone(),
         judged_root_index,
         versions,
-        committed_versions: std::mem::take(&mut live.driver.committed_versions),
+        committed_version_contents: std::mem::take(&mut live.driver.committed_versions)
+            .into_iter()
+            .map(|(key, file)| (key, file.map(|content| content.to_vec())))
+            .collect(),
         model_stopped_at_call: live.driver.model_stopped_at_call,
         checks,
         ending,
@@ -1249,7 +1274,7 @@ fn prepare_stream(
 }
 
 /// S1 里跟流有关的几条（只在基线那一趟）：段长表、写数、根槽写数、盘数与盘字节数对本地常量；流一整条流逐条与 `build_pool` 比。
-/// 与 `e170_o3_spec_executor_export.rs` 的 `prepare_stream` 里那一批 S1 回比同一批。
+/// 与 `e170_specification_executor_export.rs` 的 `prepare_stream` 里那一批 S1 回比同一批。
 #[allow(
     clippy::too_many_arguments,
     reason = "这几样是 prepare_stream 驱动完之后手里同时有的，拆成结构体只会多一层搬运"
@@ -1279,7 +1304,7 @@ fn stream_checks_against_the_crates(
                 LOCAL_FIRST_STREAM_WRITES,
                 LOCAL_FIRST_STREAM_ROOT_WRITES,
             ),
-            StreamName::FixedScriptThroughEThenUnmount => (
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
                 &LOCAL_SECOND_STREAM_SEGMENT_LENGTHS,
                 LOCAL_SECOND_STREAM_WRITES,
                 LOCAL_SECOND_STREAM_ROOT_WRITES,
@@ -1842,10 +1867,139 @@ impl RecoverySummary {
     }
 }
 
-/// 池级 checker 判红的不变量名（`Violated` 才算；`NotApplicable` 不算红）。
-/// 这份装置判已知坏镜像与 E170 坏状态的池级 checker 的给定状态引擎（进程里一份，第一次用时起；能走两段的都走两段）：
-/// 每张要判的盘作一张给定状态表，录入段写进家目录下给定状态表那一类的判定库，判段从库里读回判（配了 GPU 且编进了 `gpu` 特性在卡上判，
-/// 否则由 CPU 判器判），判过的复用。产物只收这份装置自己打的行：引擎不调 `finish`，不打收尾行。
+// ───────────────────────────── O2 的盘两段：录入段只录、判段只判录下的 ─────────────────────────────
+
+/// 录入段录下的一张要判的盘：表名与这张表录下的那一份的摘要（判段凭摘要读回）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RecordedTableReference {
+    table_name: String,
+    digest: [u8; DIGEST_BYTES],
+}
+
+/// O2 要判的盘交给谁：录入段只录（只在 CPU 上，不碰给定状态引擎与卡），判段只判录下的。
+/// 产品是 [`GivenStatesTablesInTheLibrary`]；单测换成内存里的替身，数录与判各几次。
+trait PoolCheckerTablesOfTheTwoStages: Sync {
+    /// 录入段：这张盘作一张给定状态表录下，交回判段读回它要的引用。
+    fn record_a_table(&self, table_name: &str, pool: &MemoryPool) -> RecordedTableReference;
+
+    /// 判段：读回录下的那张盘判，交回池级 checker 判红的不变量名（按 `IMPLEMENTED_INVARIANTS` 的次序，与 `check_pool_image` 交回的次序相同）。
+    ///
+    /// # Errors
+    /// 交接与录下的对不上：照交接里的摘要读不回那张盘（没录过、读回的字节摘要不是它、解不出），一句话点名那张表与出路（重跑录入段）。
+    ///
+    /// # Panics
+    /// 引擎判不了这张盘（起不了、判的时候失败、库读写不了；不退回别处判）。
+    fn judge_a_recorded_table(&self, table: &RecordedTableReference)
+        -> Result<Vec<String>, String>;
+}
+
+/// O2 两段的产品那一种。录入段：这张盘作一张给定状态表（基线就是那张盘、写表空、一个空持久集合），照给定状态引擎录入段写进库的那一种字节
+/// （`RecordedGivenStatesTableWithItsColumns`，两栏不填）按摘要写进这个进程的判定库（prune-server 里那一份；库里已有逐字节相同的那一份就不再写），
+/// 不起引擎。判段：照摘要从库里读回，交 [`given_states_engine_of_this_experiment`] 判（引擎在判段第一次判时才起：配了 GPU 且编进了 `gpu` 特性在卡上判，
+/// 否则由 CPU 判器判；同一份字节引擎照录入键命中、不再写，判过的复用）。
+struct GivenStatesTablesInTheLibrary;
+
+impl GivenStatesTablesInTheLibrary {
+    /// 这个进程的判定库（第一次用时开；与引擎开的是同一份，`LibraryOpenInThisProcess::open_or_share`）。
+    ///
+    /// # Panics
+    /// 库开不了（连不上 prune-server 时 `open_or_share` 照它的退出码退出进程）。
+    fn library() -> &'static LibraryOpenInThisProcess {
+        static LIBRARY: std::sync::OnceLock<LibraryOpenInThisProcess> = std::sync::OnceLock::new();
+        LIBRARY.get_or_init(|| {
+            LibraryOpenInThisProcess::open_or_share()
+                .unwrap_or_else(|refusal| panic!("开不了判定库：{refusal}"))
+        })
+    }
+}
+
+impl PoolCheckerTablesOfTheTwoStages for GivenStatesTablesInTheLibrary {
+    fn record_a_table(&self, table_name: &str, pool: &MemoryPool) -> RecordedTableReference {
+        use singlefs_verification::crash_given_states::GivenStatesOfATable;
+        let table = GivenStatesOfATable {
+            table_name: table_name.to_string(),
+            base: pool,
+            writes: &[],
+            segments: &[],
+            seams: &[],
+            persisted_sets: vec![Vec::new()],
+        };
+        let recorded_bytes = RecordedGivenStatesTableWithItsColumns::of((&table).into()).to_bytes();
+        let digest = sha256_digest(&recorded_bytes);
+        let stored = Self::library()
+            .lock()
+            .read_given_states_table(&digest)
+            .unwrap_or_else(|error| panic!("给定状态表 {table_name} 读不了库：{error:?}"));
+        if stored.as_deref() != Some(recorded_bytes.as_slice()) {
+            Self::library()
+                .lock()
+                .store_given_states_table(&digest, &recorded_bytes)
+                .unwrap_or_else(|error| panic!("给定状态表 {table_name} 写不进库：{error:?}"));
+        }
+        RecordedTableReference {
+            table_name: table_name.to_string(),
+            digest,
+        }
+    }
+
+    fn judge_a_recorded_table(
+        &self,
+        table: &RecordedTableReference,
+    ) -> Result<Vec<String>, String> {
+        use singlefs_verification::crash_given_states::{
+            GivenStatesConclusionsSource, GivenStatesJudge,
+        };
+        let table_name = &table.table_name;
+        let recorded_bytes = Self::library()
+            .lock()
+            .read_given_states_table(&table.digest)
+            .unwrap_or_else(|error| panic!("给定状态表 {table_name} 读不了库：{error:?}"))
+            .ok_or_else(|| {
+                format!(
+                    "交接里的给定状态表 {table_name} 不在库里：先跑录入段（{STAGE_ARGUMENT} record，或不给 {STAGE_ARGUMENT}、两段先后跑）"
+                )
+            })?;
+        if sha256_digest(&recorded_bytes) != table.digest {
+            return Err(format!(
+                "交接里的给定状态表 {table_name} 从库里读回的字节摘要不是交接里录的那一个：重跑录入段（{STAGE_ARGUMENT} record）"
+            ));
+        }
+        let recorded = RecordedGivenStatesTableWithItsColumns::from_bytes(&recorded_bytes)
+            .ok_or_else(|| {
+                format!(
+                    "交接里的给定状态表 {table_name} 从库里读回的字节解不出：重跑录入段（{STAGE_ARGUMENT} record）"
+                )
+            })?;
+        let judged = recorded
+            .with_the_table(|table_read_back| {
+                given_states_engine_of_this_experiment()
+                    .judge_the_given_states_with_its_columns(table_read_back)
+            })
+            .unwrap_or_else(|reason| {
+                panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
+            });
+        match judged.source {
+            GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
+            GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
+            | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => panic!(
+                "装置的判段不分片、引擎不分段：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 SINGLEFS_CRASH_AMPLIFICATION_SHARE（{table_name}）"
+            ),
+        }
+        let [conclusion] = judged.states.as_slice() else {
+            panic!(
+                "{table_name}：一个状态一份结论，交回 {} 份",
+                judged.states.len()
+            );
+        };
+        Ok(conclusion
+            .pool_checker_violations()
+            .into_iter()
+            .map(|(invariant, _)| invariant.to_string())
+            .collect())
+    }
+}
+
+/// 这份装置判段判盘的给定状态引擎（进程里一份，判段第一次判时起；录入段不起它）。产物只收这份装置自己打的行：引擎不调 `finish`，不打收尾行。
 ///
 /// # Panics
 /// 引擎起不了（配了 GPU 卡用不上、结论版本与编译时对不上……都不退回 CPU）。
@@ -1865,53 +2019,8 @@ fn given_states_engine_of_this_experiment(
     })
 }
 
-/// 池级 checker 在这张盘上判违例的不变量名（按 `IMPLEMENTED_INVARIANTS` 的次序，与 `check_pool_image` 交回的次序相同）：那张盘作一张
-/// 给定状态表（基线就是那张盘、写表空、一个空持久集合）交 [`given_states_engine_of_this_experiment`] 两段判。
-///
-/// # Panics
-/// 引擎判不了这张表（不退回别处判）；这一趟只录、或这张表归别的机器判（实验装置不分两趟跑、不分片）。
-fn pool_checker_red_names_through_the_given_states_engine(
-    table_name: &str,
-    pool: &MemoryPool,
-) -> Vec<String> {
-    use singlefs_verification::crash_given_states::{
-        GivenStatesConclusionsSource, GivenStatesJudge, GivenStatesOfATable,
-    };
-    let judged = given_states_engine_of_this_experiment()
-        .judge_the_given_states(&GivenStatesOfATable {
-            table_name: table_name.to_string(),
-            base: pool,
-            writes: &[],
-            segments: &[],
-            seams: &[],
-            persisted_sets: vec![Vec::new()],
-        })
-        .unwrap_or_else(|reason| {
-            panic!("给定状态表 {table_name} 判不了（不退回别处判）：{reason}")
-        });
-    match judged.source {
-        GivenStatesConclusionsSource::JudgedOrReadBackOnThisHost => {}
-        GivenStatesConclusionsSource::PlaceholderOfATableLeftToAnotherHost
-        | GivenStatesConclusionsSource::PlaceholderOfATableRecordedOnly => panic!(
-            "实验装置不分只录、只判两趟跑，也不分片：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE 与 SINGLEFS_CRASH_AMPLIFICATION_SHARE（{table_name}）"
-        ),
-    }
-    let [conclusion] = judged.states.as_slice() else {
-        panic!(
-            "{table_name}：一个状态一份结论，交回 {} 份",
-            judged.states.len()
-        );
-    };
-    conclusion
-        .pool_checker_violations()
-        .into_iter()
-        .map(|(invariant, _)| invariant.to_string())
-        .collect()
-}
-
-/// 只有 `Violated` 算判红的那几条的名字。O2 的名单换成两段（[`pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine`]）之后
-/// 产品路径不再用它，只剩登记第九节 X6 那条单测（`only_a_violated_invariant_counts_as_a_red_pool_checker_verdict`）守着；留不留归主 agent
-/// （报告「停下交主 agent」）。
+/// 只有 `Violated` 算判红的那几条的名字。O2 的名单走两段（[`PoolCheckerTablesOfTheTwoStages`]），
+/// 这个函数只给单测用：登记第九节 X6 那条（`only_a_violated_invariant_counts_as_a_red_pool_checker_verdict`）与不上卡的判法（`pool_checker_red_names_of_a_given_image_on_the_cpu`）。
 #[cfg(test)]
 fn violated_invariant_names(verdicts: &[(&'static str, InvariantVerdict)]) -> Vec<String> {
     verdicts
@@ -1940,21 +2049,68 @@ struct StateObservation {
     /// 这一态里持久或撕裂的写属于的最后一次调用（一个写都没落的态是 None）。
     touched_call: Option<usize>,
     crash_judge: CrashJudgeVerdict,
-    /// O2 直接调 `check_pool_image` 判红的不变量（关掉 O2 时 None）。
-    pool_checker_red: Option<Vec<String>>,
-    /// S3：直接调的结果与 `judge_crash_image(...).pool_checker` 判红的不变量集合相同。
-    pool_checker_matches_the_judgement: bool,
+    /// O2：关掉、录入段录下了这一态要判的盘、判段判完。
+    pool_checker: PoolCheckerOfAState,
     consulted: RecoverySummary,
     ignored: RecoverySummary,
-    o1_nanoseconds: u128,
-    o2_nanoseconds: u128,
+    crash_judge_nanoseconds: u128,
+    pool_checker_nanoseconds: u128,
     recovery_nanoseconds: u128,
 }
 
-/// 一次观测的状态：阳性对照里「批 1 第一个读回了文件的态」只翻一次。
+/// 一个取样态上 O2 走到哪一步。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PoolCheckerOfAState {
+    /// 关一条（Q3-核）关掉了 O2：这一列写 `off`，S3 不比。
+    Off,
+    /// 录入段把这一态要判的盘录下了，判段还没判。
+    RecordedForTheJudgeStage(RecordedTableReference),
+    /// 判段判完：判红的不变量名，与 S3（判出的名单与 `judge_crash_image(...).pool_checker` 判红的不变量集合相同；O2 阳性对照那一趟不比，记相同）。
+    Judged {
+        red: Vec<String>,
+        matches_the_judgement: bool,
+    },
+}
+
+impl StateObservation {
+    /// O2 判红的不变量（关掉 O2 时 None）。
+    ///
+    /// # Panics
+    /// 这一态录下的盘判段还没判（`oracle-verdicts.tsv` 与结果行都在判段判完之后才写）。
+    fn pool_checker_red(&self) -> Option<&[String]> {
+        match &self.pool_checker {
+            PoolCheckerOfAState::Off => None,
+            PoolCheckerOfAState::Judged { red, .. } => Some(red.as_slice()),
+            PoolCheckerOfAState::RecordedForTheJudgeStage(table) => panic!(
+                "{} 判段还没判：O2 的名单在判段判完之后才读",
+                table.table_name
+            ),
+        }
+    }
+
+    /// S3：O2 判出的名单与 `judge_crash_image(...).pool_checker` 判红的不变量集合相同（关掉 O2 时不比，记相同）。
+    ///
+    /// # Panics
+    /// 同 [`StateObservation::pool_checker_red`]。
+    fn pool_checker_matches_the_judgement(&self) -> bool {
+        match &self.pool_checker {
+            PoolCheckerOfAState::Off => true,
+            PoolCheckerOfAState::Judged {
+                matches_the_judgement,
+                ..
+            } => *matches_the_judgement,
+            PoolCheckerOfAState::RecordedForTheJudgeStage(table) => {
+                panic!("{} 判段还没判：S3 在判段判完之后才比", table.table_name)
+            }
+        }
+    }
+}
+
+/// 一次观测的状态：阳性对照里「批 1 第一个读回了文件的态」只翻一次。「第一个」要一条线程按序号走才说得清，
+/// 这个阳性对照那一趟只开一条线程（[`sampling_threads_given_the_positive_control`]）。
 struct ObservationControls {
     switches: RunSwitches,
-    crash_judge_control_pending: bool,
+    crash_judge_control_pending: AtomicBool,
 }
 
 /// 把写表每一项落在哪一次调用里算出来：写在录制流里的下标落在 `first_operation` 不超过它的最后一次调用里。
@@ -1976,28 +2132,38 @@ fn call_index_of_each_write(stream: &PreparedStream) -> Vec<Option<usize>> {
 /// 模型那一侧给每一步之后并起来的版本目录，交给 `crash_recovery_disagreement`（S8：三处调用都在这个函数里）。
 fn crash_judge_of_the_state(
     stream: &PreparedStream,
+    committed_versions: &BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
     image: &CrashImage<'_>,
     consulted: &RecoveryReport,
     batch: u8,
-    controls: &mut ObservationControls,
+    controls: &ObservationControls,
 ) -> CrashJudgeVerdict {
     let newest_persisted_root_key =
         newest_persisted_root(&stream.writes, &image.persisted[..stream.writes.len()])
             .map(|(checkpoint_txg, instance)| model_root_key(instance, checkpoint_txg));
     let mut read_back = observed_read_back_after_a_crash(consulted);
-    if controls.crash_judge_control_pending && batch == 1 {
+    if controls.crash_judge_control_pending.load(Ordering::SeqCst) && batch == 1 {
         if let ObservedReadBack::FileRead { content, .. } = &mut read_back {
             if let Some(last_byte) = content.last_mut() {
                 *last_byte ^= 1;
-                controls.crash_judge_control_pending = false;
+                controls
+                    .crash_judge_control_pending
+                    .store(false, Ordering::SeqCst);
             }
         }
     }
-    crash_judge_verdict(
-        &stream.committed_versions,
-        newest_persisted_root_key,
-        &read_back,
-    )
+    crash_judge_verdict(committed_versions, newest_persisted_root_key, &read_back)
+}
+
+/// 这条线程自己的一份模型版本目录：`crash_recovery_disagreement` 收 `Rc`，`Rc` 不跨线程，照流里存的内容造。
+fn committed_versions_for_this_thread(
+    stream: &PreparedStream,
+) -> BTreeMap<ModelRootKey, Option<Rc<[u8]>>> {
+    stream
+        .committed_version_contents
+        .iter()
+        .map(|(key, content)| (*key, content.as_deref().map(Rc::<[u8]>::from)))
+        .collect()
 }
 
 /// 模型的 `crash_recovery_disagreement` 判一态读回的版本：有不同记红（带实现那一侧说的话），没有不同记绿。
@@ -2026,9 +2192,194 @@ fn crash_judge_is_applicable(
     !touched_call.is_some_and(|call| model_stopped_at_call.is_some_and(|stopped| call >= stopped))
 }
 
+/// 服务交给这一趟的内存上限（字节）所在的环境变量；没设（不经服务起）就不按内存收线程。
+const MEMORY_CAP_ENVIRONMENT_VARIABLE: &str = "TASK_SERVER_MEMORY_CAP_BYTES";
+
+/// 内存上限里留给取样线程之外的（两条流的驱动、枚举表、事实表、写文件、引擎与库的连接）：只开一条线程的 E171 取样段，
+/// 整个进程的峰值不到 1.5 GiB（`REPLAY_ROW` 的在跑行），这里按它留出余量。
+const MEBIBYTES_OUTSIDE_THE_SAMPLING_THREADS: u64 = 2048;
+
+/// 一条取样线程要留的内存：录入段的流字节、读回的流与它的计划、撕裂表、物化的盘、表的字节与读回的那一份、判表与打包判表各一份，
+/// 固定脚本流的写流载荷约 7.2 MiB、撕裂载荷约 0.2 MiB（`ops-payload.bin`、`torn-payload.bin`），每样几份，这个数按它们估。
+/// 判已知坏镜像与 E170 坏状态的线程同一份数：手里是一张盘的两三份拷贝（已知坏镜像只在新池新建文件流上，载荷约 0.5 MiB；E170 坏状态重建的盘不大于固定脚本流的载荷）、
+/// 算摘要的消息、给定状态表的录入字节与读回的那一份、判表与打包判表，没有比取样线程多出来的一样。
+const MEBIBYTES_OF_A_SAMPLING_THREAD: u64 = 256;
+
+/// 取样线程的栈：与判定在主线程上跑时同样大（`std::thread::spawn` 缺省的栈比主线程小，恢复与 checker 不该因为换了线程换一种栈）。
+const STACK_BYTES_OF_A_SAMPLING_THREAD: usize = 8 * 1024 * 1024;
+
+/// 这一趟判取样态、判坏镜像开几条线程：`--sampling-threads` 给了照它，没给取每台默认重活线程数；再按内存上限与阳性对照收。
+///
+/// # Panics
+/// 同 [`singlefs_verification::heavy_threads::default_heavy_threads`]；服务交的内存上限不是数。
+fn sampling_threads_of_this_run(switches: RunSwitches) -> NonZeroUsize {
+    let requested = switches
+        .sampling_threads
+        .unwrap_or_else(singlefs_verification::heavy_threads::default_heavy_threads);
+    let memory_cap_bytes =
+        singlefs_verification::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable::<u64>(
+            MEMORY_CAP_ENVIRONMENT_VARIABLE,
+            singlefs_verification::numeric_environment_variable::process_environment_variable(
+                MEMORY_CAP_ENVIRONMENT_VARIABLE,
+            )
+            .as_deref(),
+        );
+    sampling_threads_given_the_positive_control(
+        sampling_threads_within_the_memory_cap(requested, memory_cap_bytes),
+        switches,
+    )
+}
+
+/// 按内存上限收线程数：上限扣掉 [`MEBIBYTES_OUTSIDE_THE_SAMPLING_THREADS`]，余下的放得下几条 [`MEBIBYTES_OF_A_SAMPLING_THREAD`] 就开几条，
+/// 不多于要的、至少一条。线程数只定快慢，不进产物。
+fn sampling_threads_within_the_memory_cap(
+    requested: NonZeroUsize,
+    memory_cap_bytes: Option<u64>,
+) -> NonZeroUsize {
+    let Some(memory_cap_bytes) = memory_cap_bytes else {
+        return requested;
+    };
+    let mebibytes_for_the_threads =
+        (memory_cap_bytes / (1024 * 1024)).saturating_sub(MEBIBYTES_OUTSIDE_THE_SAMPLING_THREADS);
+    let threads_that_fit =
+        usize::try_from(mebibytes_for_the_threads / MEBIBYTES_OF_A_SAMPLING_THREAD)
+            .unwrap_or(usize::MAX);
+    NonZeroUsize::new(requested.get().min(threads_that_fit)).unwrap_or(NonZeroUsize::MIN)
+}
+
+/// O1-崩溃判官的阳性对照要翻「批 1 第一个读回了文件的态」，先后由序号定：这一趟只开一条线程，别的趟照给的线程数。
+fn sampling_threads_given_the_positive_control(
+    threads: NonZeroUsize,
+    switches: RunSwitches,
+) -> NonZeroUsize {
+    if switches.positive_control == Some(PositiveControl::CrashJudge) {
+        NonZeroUsize::MIN
+    } else {
+        threads
+    }
+}
+
+/// 把 `run_count` 个连续段（坏镜像模式里一条算一段）分给至多 `threads` 条线程判，交回的结局按连续段的次序排，与哪条线程先判完无关：线程按次序领下一个连续段，
+/// 判完放回它自己的位置。某个连续段的结局叫停（`stops_the_later_runs`）之后不再领新的，交回的到次序上第一个叫停的连续段为止（含它）：
+/// 领的次序就是连续段的次序，比它靠前的都领过、都判完了，所以这一份与一条线程按次序走到那里停下的那一份相同；领了而排在它后面的丢掉。
+///
+/// # Panics
+/// `outcome_of_the_run` panic（它自己要接住连续段里的 panic）；起不了线程。
+fn outcomes_of_the_runs_in_their_order<Outcome: Send>(
+    run_count: usize,
+    threads: NonZeroUsize,
+    stops_the_later_runs: &(dyn Fn(&Outcome) -> bool + Sync),
+    outcome_of_the_run: &(dyn Fn(usize) -> Outcome + Sync),
+) -> Vec<Outcome> {
+    let next_run = AtomicUsize::new(0);
+    let later_runs_are_stopped = AtomicBool::new(false);
+    let outcomes: Vec<Mutex<Option<Outcome>>> =
+        (0..run_count).map(|_run| Mutex::new(None)).collect();
+    std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..threads.get().min(run_count))
+            .map(|_worker| {
+                let next_run = &next_run;
+                let later_runs_are_stopped = &later_runs_are_stopped;
+                let outcomes = &outcomes;
+                std::thread::Builder::new()
+                    .name("e171-judging".to_string())
+                    .stack_size(STACK_BYTES_OF_A_SAMPLING_THREAD)
+                    .spawn_scoped(scope, move || loop {
+                        if later_runs_are_stopped.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        let run = next_run.fetch_add(1, Ordering::SeqCst);
+                        if run >= run_count {
+                            break;
+                        }
+                        let outcome = outcome_of_the_run(run);
+                        if stops_the_later_runs(&outcome) {
+                            later_runs_are_stopped.store(true, Ordering::SeqCst);
+                        }
+                        *outcomes[run].lock().unwrap_or_else(PoisonError::into_inner) =
+                            Some(outcome);
+                    })
+                    .expect("起得了判取样态的线程")
+            })
+            .collect();
+        for worker in workers {
+            worker
+                .join()
+                .expect("连续段里的 panic 都在 outcome_of_the_run 里接住了");
+        }
+    });
+    let mut outcomes_in_their_order = Vec::with_capacity(run_count);
+    for outcome_of_a_run in outcomes {
+        let outcome = outcome_of_a_run
+            .into_inner()
+            .unwrap_or_else(PoisonError::into_inner)
+            .expect("次序上第一个叫停的连续段之前的都领过、判完了：领的次序就是连续段的次序");
+        let stops = stops_the_later_runs(&outcome);
+        outcomes_in_their_order.push(outcome);
+        if stops {
+            break;
+        }
+    }
+    outcomes_in_their_order
+}
+
+/// 一件里 panic 时接住的载荷：交回主线程，排到它的次序上再原样抛出。
+type CaughtPanicPayload = Box<dyn std::any::Any + Send>;
+
+/// [`outcomes_of_the_runs_in_their_order`] 按一件一件判、接住每件里的 panic：次序上第一个 panic 的件之后不再领新的，它之前的都判完了。
+/// 交回的 `Err` 只可能是最后一个，主线程把它之前的结局照次序收完再 [`std::panic::resume_unwind`]：打出的行与一条线程走到那里 panic 时相同。
+///
+/// # Panics
+/// 起不了线程。
+fn outcomes_up_to_the_earliest_panic<Outcome: Send>(
+    item_count: usize,
+    threads: NonZeroUsize,
+    outcome_of_the_item: &(dyn Fn(usize) -> Outcome + Sync),
+) -> Vec<Result<Outcome, CaughtPanicPayload>> {
+    outcomes_of_the_runs_in_their_order(
+        item_count,
+        threads,
+        &|outcome: &Result<Outcome, CaughtPanicPayload>| outcome.is_err(),
+        &|item| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| outcome_of_the_item(item)))
+        },
+    )
+}
+
+/// 一张给定的盘上池级 checker 判红的不变量名：表名、那张盘。单测的 O2 两段替身（`PoolCheckerTablesKeptInMemory`）照它判读回的盘；
+/// 产品的判段是 [`GivenStatesTablesInTheLibrary`]。
+#[cfg(test)]
+type PoolCheckerRedNamesOfAGivenImage<'judge> =
+    dyn Fn(&str, &MemoryPool) -> Vec<String> + Sync + 'judge;
+
+/// 录入段录下一个取样态上 O2 要判的盘：流名、序号、镜像摘要、这一态的镜像、这一态是不是 O2 阳性对照改坏的那一张。
+/// 产品路径是 [`pool_checker_table_of_a_sampled_state`]；由参数给，线程对拍能在单测里换别的录法。
+type PoolCheckerTableOfASampledState<'record> =
+    dyn Fn(StreamName, u64, &str, &CrashImage<'_>, bool) -> RecordedTableReference + Sync + 'record;
+
+/// 取样中途某个状态上实现 panic（实现自崩）：那一句（`<panic 的消息>:after_ordinal_<崩之前最后判完的序号>`），与崩之前判完的那几态（按序号升序）。
+/// 那几态录下的盘判段照样判：引擎在其中一态上失败时，两段之前在取样回调里先撞上的是引擎那一次（[`judge_the_recorded_pool_checker_tables`]）。
+struct ObservationsUpToACrashInAState {
+    crash: String,
+    observations: Vec<StateObservation>,
+}
+
+/// 一个连续段判完的结局：判完的那几态（连续段中途 panic 时是 panic 之前判完的），与 `sample_crash_states_on_the_cpu` 交回的整条流状态数或 panic 的消息。
+struct ObservationsOfARun {
+    observations: Vec<StateObservation>,
+    ending: Result<u64, String>,
+}
+
 /// 按序号升序把取样的状态切成连续的几段，每段调一次 `judge_crash_state_range`：回调里给的那个 `CrashImage` 折回落地向量、算摘要，
-/// 再算 O1-崩溃判官与 O2（直接调 `check_pool_image`），并单独计恢复的耗时。回调的持久集合另与 `crash_facts` 按序号现算的掩码比。
-/// 某个状态上实现 panic（实现自崩）：交回 `Err`，带最后一个判完的序号。
+/// 再算 O1-崩溃判官，O2 只在 CPU 上计时、要判的盘交 `pool_checker_table` 录下（录入段：判归判段，[`judge_the_recorded_pool_checker_tables`]），
+/// 并单独计恢复的耗时。回调的持久集合另与 `crash_facts` 按序号现算的掩码比。
+/// 这几段分给 `threads` 条线程（[`outcomes_of_the_runs_in_their_order`]），每态各交各的表（表名、表的内容与一条线程时相同，判定库的键不变），
+/// 结果按（批号、序号）排好：除了耗时几列，与 `threads` 是几无关。
+/// 某个状态上实现 panic（实现自崩）：交回 `Err`，那一句带次序上第一个 panic 的态之前最后一个判完的序号，另带 panic 之前判完的那几态。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "前五个是这条流的几样输入，其余是开关、线程数与录 O2 要判的盘的办法"
+)]
 // gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn observe_sampled_states(
     stream: &PreparedStream,
@@ -2037,7 +2388,9 @@ fn observe_sampled_states(
     torn_image_index_by_write: &BTreeMap<usize, usize>,
     sampled: &SampledOrdinals,
     switches: RunSwitches,
-) -> Result<Vec<StateObservation>, String> {
+    threads: NonZeroUsize,
+    pool_checker_table: &PoolCheckerTableOfASampledState<'_>,
+) -> Result<Vec<StateObservation>, ObservationsUpToACrashInAState> {
     let mut batch_of_ordinal: BTreeMap<u64, u8> = BTreeMap::new();
     for (batch_offset, batch) in sampled.batches.iter().enumerate() {
         for ordinal in batch {
@@ -2061,16 +2414,23 @@ fn observe_sampled_states(
     let model_is_enabled =
         switches.disabled_oracle != Some(DisabledOracle::ComparisonAndCrashJudge);
     let pool_checker_is_enabled = switches.disabled_oracle != Some(DisabledOracle::PoolChecker);
-    let mut controls = ObservationControls {
+    let controls = ObservationControls {
         switches,
-        crash_judge_control_pending: switches.positive_control == Some(PositiveControl::CrashJudge),
+        crash_judge_control_pending: AtomicBool::new(
+            switches.positive_control == Some(PositiveControl::CrashJudge),
+        ),
     };
-    let mut observations: Vec<StateObservation> = Vec::new();
-    for run in runs {
+    let sampling_item_names: Vec<String> = runs
+        .iter()
+        .map(|_run| sampling_item_name_of_this_call())
+        .collect();
+    let observe_a_run = |run_position: usize| -> ObservationsOfARun {
+        let committed_versions = committed_versions_for_this_thread(stream);
+        let mut observations_of_the_run: Vec<StateObservation> = Vec::new();
         let judged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             sample_crash_states_on_the_cpu(
                 CrashPointReplayItem {
-                    name: &sampling_item_name_of_this_call(),
+                    name: &sampling_item_names[run_position],
                     setting_file: CRASH_POINT_REPLAY_SAMPLING_ITEM.setting_file,
                 },
                 &stream.base,
@@ -2079,7 +2439,7 @@ fn observe_sampled_states(
                 stream.judged_root_index,
                 &stream.versions,
                 &full_expansion,
-                run,
+                runs[run_position].clone(),
                 &mut |ordinal, image, judgement| {
                     let batch = batch_of_ordinal[&ordinal];
                     let landing_vector = landing_vector_of(
@@ -2103,19 +2463,20 @@ fn observe_sampled_states(
                     } else {
                         crash_judge_of_the_state(
                             stream,
+                            &committed_versions,
                             image,
                             &judgement.consulted,
                             batch,
-                            &mut controls,
+                            &controls,
                         )
                     };
-                    let o1_nanoseconds = crash_judge_started.elapsed().as_nanos();
+                    let crash_judge_nanoseconds = crash_judge_started.elapsed().as_nanos();
                     let pool_checker_control = controls.switches.positive_control
                         == Some(PositiveControl::PoolChecker)
                         && stream.name == StreamName::NewPoolFileCreation
                         && ordinal == tables.state_count - 1;
                     // O2 逐状态计时量的是 CPU 池级 checker 本身（豁免截名 experiment-measures-the-cpu-judge-itself）：CPU 这一遍只计时；
-                    // 判红的名单走两段（同一张盘作一张给定状态表交引擎，阳性对照那一态是改坏的那一张），不在计时里
+                    // 判红的名单走两段（同一张盘作一张给定状态表录下、判段交引擎判，阳性对照那一态是改坏的那一张），不在计时里
                     let pool_checker_started = Instant::now();
                     let pool_checker_timed_on_the_cpu = pool_checker_is_enabled.then(|| {
                         if pool_checker_control {
@@ -2124,28 +2485,26 @@ fn observe_sampled_states(
                             check_pool_image(image)
                         }
                     });
-                    let o2_nanoseconds = pool_checker_started.elapsed().as_nanos();
+                    let pool_checker_nanoseconds = pool_checker_started.elapsed().as_nanos();
                     let image_digest = sha256_text(&crash_image_digest(image));
-                    let pool_checker_red = pool_checker_timed_on_the_cpu.map(|_| {
-                        pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine(
+                    let pool_checker = if pool_checker_timed_on_the_cpu.is_some() {
+                        PoolCheckerOfAState::RecordedForTheJudgeStage(pool_checker_table(
                             stream.name,
                             ordinal,
                             &image_digest,
                             image,
                             pool_checker_control,
-                        )
-                    });
-                    let pool_checker_matches_the_judgement = pool_checker_red
-                        .as_ref()
-                        .is_none_or(|direct| *direct == verdict.pool_checker_red)
-                        || controls.switches.positive_control == Some(PositiveControl::PoolChecker);
+                        ))
+                    } else {
+                        PoolCheckerOfAState::Off
+                    };
                     let recovery_started = Instant::now();
                     let _ = singlefs_core::recovery::recover(
                         image,
                         singlefs_core::recovery::JournalPolicy::Consult,
                     );
                     let recovery_nanoseconds = recovery_started.elapsed().as_nanos();
-                    observations.push(StateObservation {
+                    observations_of_the_run.push(StateObservation {
                         batch,
                         ordinal,
                         segment_index: tables
@@ -2154,17 +2513,18 @@ fn observe_sampled_states(
                         landing_vector,
                         image_digest,
                         verdict,
-                        judge_nanoseconds: o1_nanoseconds + o2_nanoseconds + recovery_nanoseconds,
+                        judge_nanoseconds: crash_judge_nanoseconds
+                            + pool_checker_nanoseconds
+                            + recovery_nanoseconds,
                         mask_matches_the_facts: facts.persisted_writes_of_state(ordinal)
                             == image.persisted,
                         touched_call,
                         crash_judge,
-                        pool_checker_red,
-                        pool_checker_matches_the_judgement,
+                        pool_checker,
                         consulted: RecoverySummary::of(&judgement.consulted),
                         ignored: RecoverySummary::of(&judgement.ignored),
-                        o1_nanoseconds,
-                        o2_nanoseconds,
+                        crash_judge_nanoseconds,
+                        pool_checker_nanoseconds,
                         recovery_nanoseconds,
                     });
                 },
@@ -2172,19 +2532,40 @@ fn observe_sampled_states(
             .judged()
             .expect("实验装置不分只录、只判两趟跑：起它时不设 SINGLEFS_CRASH_AMPLIFICATION_STAGE")
         }));
-        match judged {
+        ObservationsOfARun {
+            observations: observations_of_the_run,
+            ending: judged.map_err(|payload| panic_text(&*payload)),
+        }
+    };
+    eprintln!(
+        "E171_SAMPLED_STATES stream={} runs={} threads={threads}",
+        stream.name.directory_name(),
+        runs.len()
+    );
+    let mut observations: Vec<StateObservation> = Vec::new();
+    for observed in outcomes_of_the_runs_in_their_order(
+        runs.len(),
+        threads,
+        &|observed: &ObservationsOfARun| observed.ending.is_err(),
+        &observe_a_run,
+    ) {
+        observations.extend(observed.observations);
+        match observed.ending {
             Ok(state_count_of_the_stream) => assert_eq!(
                 state_count_of_the_stream, tables.state_count,
                 "judge_crash_state_range 交回的整条流状态数与枚举表的相同"
             ),
-            Err(payload) => {
-                return Err(format!(
-                    "{}:after_ordinal_{}",
-                    panic_text(&*payload),
+            Err(what) => {
+                let crash = format!(
+                    "{what}:after_ordinal_{}",
                     observations
                         .last()
                         .map_or_else(|| "none".to_string(), |last| last.ordinal.to_string())
-                ));
+                );
+                return Err(ObservationsUpToACrashInAState {
+                    crash,
+                    observations,
+                });
             }
         }
     }
@@ -2192,11 +2573,75 @@ fn observe_sampled_states(
     Ok(observations)
 }
 
+/// 判段判完一条流录下的盘。
+enum JudgedTablesOfAStream {
+    /// 录下的盘都判完了（这条流没有录下的盘也算）。
+    AllJudged,
+    /// 引擎判某一态的盘时失败（panic）：`what` 与两段之前取样回调里接住它时的那一句相同（`<panic 的消息>:after_ordinal_<按序号它前面那一态>`），
+    /// 这条流照两段之前记成某个状态上实现自崩（[`StreamExport::record_an_engine_failure_in_a_state`]）。
+    EngineFailedInAState { what: String },
+}
+
+/// 判段：录入段录下了盘的每个取样态按序号升序（两段之前取样回调判它们的次序）交 `tables` 判，分给 `threads` 条线程
+/// （[`outcomes_up_to_the_earliest_panic`]），换成判完的名单；S3 照判出的名单与 `judge_crash_image` 那一遍判红的不变量比
+/// （O2 阳性对照那一趟不比，记相同）。关掉 O2 的态不动。引擎在序号上第一个失败的态停下，交回
+/// [`JudgedTablesOfAStream::EngineFailedInAState`]（它之前的态判完了，它与之后的不再往下走）。
+///
+/// # Errors
+/// 交接与录下的对不上（[`PoolCheckerTablesOfTheTwoStages::judge_a_recorded_table`] 的 `Err`）：那一句原样交回。
+fn judge_the_recorded_pool_checker_tables(
+    observations: &mut [StateObservation],
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    threads: NonZeroUsize,
+    switches: RunSwitches,
+) -> Result<JudgedTablesOfAStream, String> {
+    let mut positions_in_the_ordinal_order: Vec<usize> = (0..observations.len()).collect();
+    positions_in_the_ordinal_order.sort_by_key(|position| observations[*position].ordinal);
+    let recorded_tables: Vec<(usize, RecordedTableReference)> = positions_in_the_ordinal_order
+        .into_iter()
+        .filter_map(|position| match &observations[position].pool_checker {
+            PoolCheckerOfAState::RecordedForTheJudgeStage(table) => Some((position, table.clone())),
+            PoolCheckerOfAState::Off | PoolCheckerOfAState::Judged { .. } => None,
+        })
+        .collect();
+    let judged_in_the_ordinal_order =
+        outcomes_up_to_the_earliest_panic(recorded_tables.len(), threads, &|item| {
+            tables.judge_a_recorded_table(&recorded_tables[item].1)
+        });
+    let pool_checker_control_is_on =
+        switches.positive_control == Some(PositiveControl::PoolChecker);
+    let mut ordinal_judged_last: Option<u64> = None;
+    for ((position, _table), judged) in recorded_tables.iter().zip(judged_in_the_ordinal_order) {
+        let red = match judged {
+            Ok(red_or_refusal) => red_or_refusal?,
+            Err(payload) => {
+                return Ok(JudgedTablesOfAStream::EngineFailedInAState {
+                    what: format!(
+                        "{}:after_ordinal_{}",
+                        panic_text(&*payload),
+                        ordinal_judged_last
+                            .map_or_else(|| "none".to_string(), |ordinal| ordinal.to_string())
+                    ),
+                });
+            }
+        };
+        let observation = &mut observations[*position];
+        let matches_the_judgement =
+            red == observation.verdict.pool_checker_red || pool_checker_control_is_on;
+        observation.pool_checker = PoolCheckerOfAState::Judged {
+            red,
+            matches_the_judgement,
+        };
+        ordinal_judged_last = Some(observation.ordinal);
+    }
+    Ok(JudgedTablesOfAStream::AllJudged)
+}
+
 // ───────────────────────────── 一条流导出（登记 5.3 的十个文件，照抄 E170 的写出） ─────────────────────────────
 
 /// 写出的一个文件：名字、字节数、sha256；带耗时的两个文件另算一份去掉耗时之后的 sha256（登记第十二节修订 V2b）。
 struct WrittenFile {
-    name: &'static str,
+    name: String,
     bytes: usize,
     sha256: String,
     sha256_without_timing: Option<String>,
@@ -2232,7 +2677,7 @@ fn write_export_file(directory: &Path, name: &'static str, contents: &[u8]) -> W
     std::fs::write(directory.join(name), contents)
         .unwrap_or_else(|error| panic!("写 {}：{error}", directory.join(name).display()));
     WrittenFile {
-        name,
+        name: name.to_string(),
         bytes: contents.len(),
         sha256: sha256_hexadecimal(contents),
         sha256_without_timing: contents_without_timing(name, contents)
@@ -2384,19 +2829,19 @@ fn oracle_verdicts_file_text(observations: &[StateObservation]) -> String {
         .iter()
         .enumerate()
         .map(|(state_number, observation)| {
-            let (o2_word, o2_items) = match &observation.pool_checker_red {
+            let (pool_checker_word, pool_checker_items) = match observation.pool_checker_red() {
                 None => ("off", "-".to_string()),
-                Some(items) if items.is_empty() => ("green", "-".to_string()),
+                Some([]) => ("green", "-".to_string()),
                 Some(items) => ("red", items.join(",")),
             };
-            let o1_detail = match &observation.crash_judge {
+            let crash_judge_detail = match &observation.crash_judge {
                 CrashJudgeVerdict::Red { what } => cell_text(what),
                 CrashJudgeVerdict::Green
                 | CrashJudgeVerdict::NotApplicable
                 | CrashJudgeVerdict::Off => "-".to_string(),
             };
             format!(
-                "{state_number}\t{}\t{}\t{}\t{}\t{}\t{o1_detail}\t{o2_word}\t{o2_items}\t{}\t{}\t{}\t{}\n",
+                "{state_number}\t{}\t{}\t{}\t{}\t{}\t{crash_judge_detail}\t{pool_checker_word}\t{pool_checker_items}\t{}\t{}\t{}\t{}\n",
                 observation.batch,
                 observation.ordinal,
                 observation.segment_index,
@@ -2404,7 +2849,7 @@ fn oracle_verdicts_file_text(observations: &[StateObservation]) -> String {
                     .touched_call
                     .map_or_else(|| "-".to_string(), |call| call.to_string()),
                 observation.crash_judge.word(),
-                observation.pool_checker_matches_the_judgement,
+                observation.pool_checker_matches_the_judgement(),
                 observation.consulted.text(),
                 observation.ignored.text(),
                 field_text(&list_text(&observation.verdict.red_items)),
@@ -2419,7 +2864,52 @@ const STREAM_STATUS_FILE: &str = "stream-status.tsv";
 
 /// 按 E170 登记 5.3 写一条流的十个文件，manifest 最后写（它记前九个的 sha256）；之后再写本实验自己的三个：
 /// `oracle-verdicts.tsv`、`call-outcomes.tsv`、`stream-status.tsv`（不进 manifest：manifest 与 E170 导出装置写的同一份逐字节可比，停机 S2）。
+/// 装置分两段写（[`write_stream_files_before_the_judge_stage`]、[`write_the_oracle_verdicts_file`]）；这一份一趟写完，给单测比两段写的。
+#[cfg(test)]
 fn write_stream_files(
+    directory: &Path,
+    stream: &PreparedStream,
+    tables: &CrashStateEnumerationTables,
+    observations: &[StateObservation],
+    full_states: u64,
+    in_place_subsets_states: u64,
+) -> Vec<WrittenFile> {
+    let mut files = write_stream_files_before_the_judge_stage(
+        directory,
+        stream,
+        tables,
+        observations,
+        full_states,
+        in_place_subsets_states,
+    );
+    write_the_oracle_verdicts_file(directory, observations, &mut files);
+    files
+}
+
+/// 判段：写这条流的 `oracle-verdicts.tsv`（O2 那几列判完才有），排进写出的文件里 manifest 之后那一位（与一趟写完时的次序相同）。
+///
+/// # Panics
+/// `files` 里没有 manifest（这条流没导出：没导出的流不写 `oracle-verdicts.tsv`）；O2 录下的盘还没判（[`StateObservation::pool_checker_red`]）。
+fn write_the_oracle_verdicts_file(
+    directory: &Path,
+    observations: &[StateObservation],
+    files: &mut Vec<WrittenFile>,
+) {
+    let written = write_export_file(
+        directory,
+        ORACLE_VERDICTS_FILE,
+        oracle_verdicts_file_text(observations).as_bytes(),
+    );
+    let position_after_the_manifest = files
+        .iter()
+        .position(|file| file.name == MANIFEST_FILE)
+        .expect("导出了的流写过 manifest")
+        + 1;
+    files.insert(position_after_the_manifest, written);
+}
+
+/// 录入段写得了的那几个导出文件：[`write_stream_files`] 里除 `oracle-verdicts.tsv` 之外的，次序相同（O2 那几列要等判段）。
+fn write_stream_files_before_the_judge_stage(
     directory: &Path,
     stream: &PreparedStream,
     tables: &CrashStateEnumerationTables,
@@ -2513,7 +3003,11 @@ fn write_stream_files(
         observations.len(),
     );
     for (listed_name, file) in FILES_LISTED_IN_THE_MANIFEST.iter().zip(&files) {
-        assert_eq!(*listed_name, file.name, "manifest 的次序与写出的次序相同");
+        assert_eq!(
+            *listed_name,
+            file.name.as_str(),
+            "manifest 的次序与写出的次序相同"
+        );
         manifest_text.push_str(&format!("sha256:{}\t{}\n", file.name, file.sha256));
     }
     files.push(write_export_file(
@@ -2521,15 +3015,14 @@ fn write_stream_files(
         MANIFEST_FILE,
         manifest_text.as_bytes(),
     ));
-    files.push(write_export_file(
-        directory,
-        ORACLE_VERDICTS_FILE,
-        oracle_verdicts_file_text(observations).as_bytes(),
-    ));
     files
         .extend(write_the_files_that_exist_even_when_the_stream_is_not_exported(directory, stream));
     files
 }
+
+/// [`write_the_files_that_exist_even_when_the_stream_is_not_exported`] 写的两个文件，按它写的次序。
+const FILES_WRITTEN_EVEN_WHEN_THE_STREAM_IS_NOT_EXPORTED: [&str; 2] =
+    [CALL_OUTCOMES_FILE, STREAM_STATUS_FILE];
 
 /// 驱动里实现自崩、或没有根槽写可判的流不导出状态；这两个文件照写（比对器靠它们认出「实现自崩」与「出错截断」）。
 fn write_the_files_that_exist_even_when_the_stream_is_not_exported(
@@ -2604,6 +3097,35 @@ impl StreamExport {
             write_nanoseconds: 0,
         }
     }
+
+    /// 判段里引擎判这条流某一态的盘时失败（`what` 见 [`JudgedTablesOfAStream::EngineFailedInAState`]）：照两段之前取样回调里接住它时那样，
+    /// 这条流记成某个状态上实现自崩（`implementation_crashed_in_a_state:<what>`），盖过录入段记的那一句；`directory`（这条流的导出目录）里只留
+    /// 照写的两个文件（[`FILES_WRITTEN_EVEN_WHEN_THE_STREAM_IS_NOT_EXPORTED`]，录入段写的别的导出文件删掉），取样之后才有的几样清零。
+    ///
+    /// # Panics
+    /// 录入段写的导出文件删不掉。
+    fn record_an_engine_failure_in_a_state(&mut self, directory: &Path, what: &str) {
+        for file in &self.files {
+            if !FILES_WRITTEN_EVEN_WHEN_THE_STREAM_IS_NOT_EXPORTED.contains(&file.name.as_str()) {
+                let path = directory.join(&file.name);
+                std::fs::remove_file(&path)
+                    .unwrap_or_else(|error| panic!("删 {}：{error}", path.display()));
+            }
+        }
+        self.files.retain(|file| {
+            FILES_WRITTEN_EVEN_WHEN_THE_STREAM_IS_NOT_EXPORTED.contains(&file.name.as_str())
+        });
+        self.not_exported = Some(format!("implementation_crashed_in_a_state:{what}"));
+        self.tearable_write_count = 0;
+        self.full_states = 0;
+        self.in_place_subsets_states = 0;
+        self.torn_scans = Vec::new();
+        self.observations = Vec::new();
+        self.rebuilt_digest_mismatches = 0;
+        self.rebuilt_states = 0;
+        self.observe_nanoseconds = 0;
+        self.write_nanoseconds = 0;
+    }
 }
 
 /// 基线与坏实现那一趟的差别：基线回比本地常量、取三批；坏实现那一趟不回比（写流与段表本来就会变）、只取批 1 与批 2。
@@ -2613,11 +3135,14 @@ enum RunKind {
     BadImplementationRow,
 }
 
+/// 录入段导出一条流：驱动、取样、写录入段写得了的导出文件（[`write_stream_files_before_the_judge_stage`]）、S4 回读；O2 要判的盘录进 `pool_checker_tables`，不判。
+/// 某个状态上实现自崩的流只写两个照写的文件，崩之前判完的那几态留在 `observations` 里交判段（[`judge_the_dump`] 判完清掉）。
 fn export_stream(
     name: StreamName,
     output_root: &Path,
     run_kind: RunKind,
     switches: RunSwitches,
+    pool_checker_tables: &dyn PoolCheckerTablesOfTheTwoStages,
 ) -> StreamExport {
     let started = Instant::now();
     let is_baseline = run_kind == RunKind::Baseline;
@@ -2734,21 +3259,37 @@ fn export_stream(
         &torn_image_index_by_write,
         &sampled,
         switches,
+        sampling_threads_of_this_run(switches),
+        &|stream_name, ordinal, image_digest, image, pool_checker_control| {
+            pool_checker_table_of_a_sampled_state(
+                pool_checker_tables,
+                stream_name,
+                ordinal,
+                image_digest,
+                image,
+                pool_checker_control,
+            )
+        },
     ) {
         Ok(observations) => observations,
-        Err(what) => {
+        Err(ObservationsUpToACrashInAState {
+            crash,
+            observations,
+        }) => {
             export.files = write_the_files_that_exist_even_when_the_stream_is_not_exported(
                 &directory, &stream,
             );
             export.checks = checks;
-            export.not_exported = Some(format!("implementation_crashed_in_a_state:{what}"));
+            export.not_exported = Some(format!("implementation_crashed_in_a_state:{crash}"));
+            // 崩之前判完的那几态录下的盘留给判段判（引擎在其中一态上失败时那一句盖过这一句），判完清掉
+            export.observations = observations;
             export.elapsed_nanoseconds = started.elapsed().as_nanos();
             return export;
         }
     };
     let observe_nanoseconds = observe_started.elapsed().as_nanos();
     let write_started = Instant::now();
-    let files = write_stream_files(
+    let files = write_stream_files_before_the_judge_stage(
         &directory,
         &stream,
         &tables,
@@ -2784,7 +3325,7 @@ fn export_stream(
 }
 
 /// S1 里跟状态数有关的几条（只在基线那一趟）：全量与甲二状态数、每次写只取两态时的闭式、枚举表与 `crash_facts` 数的总数，
-/// 对本地常量。与 `e170_o3_spec_executor_export.rs` 的 `export_stream` 里那一批 S1 回比同一批。
+/// 对本地常量。与 `e170_specification_executor_export.rs` 的 `export_stream` 里那一批 S1 回比同一批。
 fn state_count_checks_against_the_crates(
     name: StreamName,
     stream: &PreparedStream,
@@ -2800,7 +3341,7 @@ fn state_count_checks_against_the_crates(
             LOCAL_FIRST_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM,
         ),
-        StreamName::FixedScriptThroughEThenUnmount => (
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
             LOCAL_SECOND_STREAM_FULL_STATES,
             LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM,
@@ -2836,21 +3377,22 @@ fn state_count_checks_against_the_crates(
 // ───────────────────────────── 结果行、V2 与 main ─────────────────────────────
 
 /// `E7RESULT` 行计数（收尾 `name=done emitted=N`，N 把 done 自己也算进去）；`E7TIMING` 行不计数、不进入库产物。
-struct ResultLines {
+struct ResultLines<'output> {
     emitted: u64,
+    output: &'output mut dyn std::io::Write,
 }
 
-impl ResultLines {
+impl ResultLines<'_> {
     fn emit_result_line(&mut self, body: &str) {
         self.emitted += 1;
-        println!("E7RESULT {body}");
+        writeln!(self.output, "E7RESULT {body}").expect("写得了结果行");
     }
     fn timing(body: &str) {
         println!("E7TIMING {body}");
     }
     fn finish(&mut self) {
         self.emitted += 1;
-        println!("E7RESULT name=done emitted={}", self.emitted);
+        writeln!(self.output, "E7RESULT name=done emitted={}", self.emitted).expect("写得了结果行");
     }
 }
 
@@ -2912,1515 +3454,13 @@ fn timing_summary(mut nanoseconds: Vec<u128>) -> (u128, u128, u128, u128) {
     nanoseconds.sort_unstable();
     let count = nanoseconds.len();
     let total: u128 = nanoseconds.iter().sum();
-    let p95_index = (count * 95).div_ceil(100) - 1;
+    let ninety_fifth_percentile_index = (count * 95).div_ceil(100) - 1;
     (
         total,
         nanoseconds[(count - 1) / 2],
-        nanoseconds[p95_index],
+        nanoseconds[ninety_fifth_percentile_index],
         nanoseconds[count - 1],
     )
-}
-
-// ───────────────────────────── 已知坏镜像族（登记 5.5 第三族）：照抄 `checker_known_bad_images.rs` ─────────────────────────────
-//
-// 那份用例是 O2 自己的回归语料：每一份都照 O2 的判据造来让 O2 红。`known_bad_images` 与它新用到的辅助函数
-// `move_the_data_unit_of_the_first_file_two_slots_further` 照抄 sha256 e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736
-// 那一份（第 755–1326 行、第 1328–1375 行；E170 第 2 次重跑登记修订 2 读法 18）。其余导入、常量与辅助函数照抄自更早的
-// sha256 e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820 那一份，与 e426cdff… 里同名条目去空白、去收尾逗号之后逐个相同
-// （`use` 两行不比）；散在 `known_bad_images` 之后的那几个在 e426cdff… 里的行号写在模块末尾的注释里。它的 `#[test]` 没有抄。照抄、不 `#[path]` 引：
-// 那个文件有自己的 `mod common;` 与全部测试，私有的 `known_bad_images` 也引不到。条目名与条数在 `known-bad-images` 模式里与原文件逐条比（停机 S4、断言 A8）。
-#[allow(
-    dead_code,
-    unused_imports,
-    clippy::all,
-    clippy::pedantic,
-    reason = "照抄 checker_known_bad_images.rs 的辅助函数与坏镜像表，删了没人调的 verdict：那份文件里别的族用的辅助函数在这里没人调，抄来的写法也不照本文件的 lint 改"
-)]
-mod known_bad_images_copied_from_the_harness_test {
-    use super::common::{
-        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool,
-        copy_each_root_into_the_new_root_segment_of_its_journal_records, crash_state_devices,
-        format_pool, geometry, memory_pool_of_sparse_devices, parameters,
-        publish_overwrite_in_process, rewrite_journal_record_and_rechain_the_records_after_it,
-        BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
-    };
-    use singlefs_checker::image::{
-        InvariantVerdict, ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
-        DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
-        FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
-        INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
-        INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
-        JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
-        LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
-        NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
-        PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, REFERENCE_INTERVALS_ARE_EXACT,
-        ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES, ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
-        SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
-        SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
-        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
-        SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
-        TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
-        UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
-    };
-    use singlefs_checker::walk::check_pool_image;
-    use singlefs_core::address::{
-        CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
-    };
-    use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
-    use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
-    use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
-    use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
-    use singlefs_core::journal::{
-        back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
-        JournalRecordPlaceInPublish,
-    };
-    use singlefs_core::make_filesystem::{
-        allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
-        INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
-    };
-    use singlefs_core::mount::{
-        mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, InstanceRow,
-        MountError, RollbackTarget, ShadowLedger, Unmounted,
-    };
-    use singlefs_core::recovery::{
-        instance_table_chain_of_root, recover, JournalPolicy, PoolReader, RecoveryFailure,
-        RecoveryOutcome,
-    };
-    use singlefs_core::system_configuration::SystemImmutableSizes;
-    use singlefs_core::transaction::{
-        acquire_instance, publish_first_file, publish_instance_table_on_version_without_file,
-        publish_overwrite, publish_sequential_write, publish_without_units, warm_up, FirstFile,
-        InstanceTableOnlyPublishPlan, InstanceTableRewrite, PoolVersion, PoolWriter,
-        TransactionOutput, TransactionUnit, ZeroUnitPublishPlan,
-    };
-    use singlefs_format::{
-        ALLOCATION_RECORD_TREE_LEAF_SLOTS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES,
-        JOURNAL_SAFETY_FACTOR, NODE_BYTES, TREE_IDENTIFIER_EXTENT,
-    };
-    use singlefs_verification::history::{
-        allocation_statistic_mechanism, AllocationStatisticMechanism,
-    };
-    use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
-    use singlefs_verification::segments::StepKind;
-    use singlefs_verification::{RetainedOperation, SharedStream};
-
-    const SLOT: u64 = 16384;
-    const DEVICES: [u32; 2] = [0, 1];
-    /// 写完新池新建文件之后单元区里的单元：(起点槽, 字节数)。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，
-    /// A 写出它的五个节点——两块盘各自的叶 61（50245、50246）、两块盘各自的第 1 层节点 0（50247、50248）与根（50249），先叶后根。
-    const UNITS: [(u64, usize); 14] = [
-        (50176, 32768),
-        (50178, 16384),
-        (50180, 32768),
-        (50240, 16384),
-        (50242, 32768),
-        (50244, 16384),
-        (50245, 16384),
-        (50246, 16384),
-        (50247, 16384),
-        (50248, 16384),
-        (50249, 16384),
-        (50250, 16384),
-        (50251, 16384),
-        (50252, 16384),
-    ];
-    /// 再覆盖写一次（发布 B，txg 4）之后单元区里的单元：A 的十四个槽仍在盘上（根环里 A 的根还引用着它们），加上 B 写出的十二个单元
-    /// （落点由 `overwrite_in_one_instance.rs` 的验收钉住）。
-    const UNITS_AFTER_OVERWRITE: [(u64, usize); 26] = [
-        (50176, 32768),
-        (50178, 16384),
-        (50180, 32768),
-        (50182, 32768),
-        (50240, 16384),
-        (50242, 32768),
-        (50244, 16384),
-        (50245, 16384),
-        (50246, 16384),
-        (50247, 16384),
-        (50248, 16384),
-        (50249, 16384),
-        (50250, 16384),
-        (50251, 16384),
-        (50252, 16384),
-        (50253, 16384),
-        (50254, 32768),
-        (50256, 16384),
-        (50257, 16384),
-        (50258, 16384),
-        (50259, 16384),
-        (50260, 16384),
-        (50261, 16384),
-        (50262, 16384),
-        (50263, 16384),
-        (50264, 16384),
-    ];
-    /// 发布 B 写出的分配记录树两片叶（盘 0 的叶 61、盘 1 的叶 61；I-3.9、I-3.10、I-5.4 那几份坏镜像改的就是它们）与树表（I-9.14 那一份改它）。
-    /// 每片叶只装它那块盘上的记录：一个单元两盘各一份落点，两条记录分在两片叶里。
-    const ALLOCATION_LEAVES_AFTER_OVERWRITE: [u64; 2] = [50257, 50258];
-    const TREE_TABLE_AFTER_OVERWRITE: u64 = 50264;
-    const INSTANCE_TABLE: u64 = 50176;
-    /// mkfs 种下的第 0 版树表单元：第一个文件版本换下它之后只有第 0 代根还引用。
-    const GENESIS_TREE_TABLE: u64 = 50178;
-    const DATA_UNIT: u64 = 50180;
-    const EXTENT_ROOT: u64 = 50240;
-    const INODE_LEAF: u64 = 50242;
-    const INODE_ROOT: u64 = 50244;
-    /// 新池新建文件（A）写出的分配记录树两片叶（盘 0、盘 1 各自的叶 61）：发布 B 之后只有 A 的根还（经 A 的第 1 层节点）指着它们。
-    const ALLOCATION_LEAVES: [u64; 2] = [50245, 50246];
-    const ACCOUNTING_ROOT: u64 = 50250;
-    const TREE_TABLE: u64 = 50252;
-
-    fn read(pool: &MemoryPool, device: u32, offset: u64, length: usize) -> Vec<u8> {
-        PoolReader::read(
-            pool,
-            DeviceIdentity(device),
-            DeviceOffsetInBytes(offset),
-            length,
-        )
-        .expect("读")
-    }
-
-    fn write(pool: &mut MemoryPool, device: u32, offset: u64, bytes: &[u8]) {
-        pool.devices
-            .get_mut(&DeviceIdentity(device))
-            .expect("盘")
-            .write(DeviceOffsetInBytes(offset), bytes);
-    }
-
-    /// 按类重封：先算载荷 CRC，再算头校验和（码 1：头 105、CRC 在 101；码 3：头 107、CRC 在 89；码 2：头 86 + 2k、CRC 在 76 + 2k）。
-    fn reseal_unit(bytes: &mut [u8]) {
-        let (header_end, payload_crc_offset) = match bytes[6] {
-            1 => (105usize, 101usize),
-            3 => (107, 89),
-            _ => (
-                86 + 2 * usize::from(bytes[51]),
-                76 + 2 * usize::from(bytes[51]),
-            ),
-        };
-        let payload_crc = crc32_castagnoli(&bytes[header_end..]);
-        bytes[payload_crc_offset..payload_crc_offset + 4]
-            .copy_from_slice(&payload_crc.to_le_bytes());
-        singlefs_core::unit::seal_header_checksum(bytes, header_end);
-    }
-
-    /// 根环全部槽：(盘, 偏移)。区域 r 在盘 [0, 1, 0][r] 上，起点 64 × 16384 + r × 3 MiB，槽距 4096。
-    fn root_slots() -> Vec<(u32, u64)> {
-        (0..3u64)
-            .flat_map(|region| {
-                (0..8u64).map(move |slot| {
-                    (
-                        [0u32, 1, 0][usize::try_from(region).expect("区域")],
-                        64 * SLOT + region * 3 * (1 << 20) + slot * 4096,
-                    )
-                })
-            })
-            .collect()
-    }
-
-    fn location_pattern(device: u32, slot: u64, checksum: u32) -> Vec<u8> {
-        [
-            device.to_le_bytes().to_vec(),
-            slot.to_le_bytes()[..6].to_vec(),
-            checksum.to_le_bytes().to_vec(),
-        ]
-        .concat()
-    }
-
-    fn replace_all(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
-        let mut changed = false;
-        let mut index = 0;
-        while index + needle.len() <= haystack.len() {
-            if haystack[index..index + needle.len()] == *needle {
-                haystack[index..index + needle.len()].copy_from_slice(replacement);
-                changed = true;
-                index += needle.len();
-            } else {
-                index += 1;
-            }
-        }
-        changed
-    }
-
-    /// 一个单元（两盘同槽）的整单元校验和从 old 变成 new：把引用它的位置条目逐个补上，被补的单元重封、再往上补，直到根槽。
-    /// `units` 是这份镜像单元区里的单元表：写完新池新建文件的是 `UNITS`，再覆盖写一次的是 `UNITS_AFTER_OVERWRITE`。
-    fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u64, u32, u32)>) {
-        while let Some((slot, old, new)) = changes.pop() {
-            if old == new {
-                continue;
-            }
-            for (container, length) in units.iter().copied() {
-                if container == slot {
-                    continue;
-                }
-                let mut bytes = read(pool, 0, container * SLOT, length);
-                let mut touched = false;
-                for device in DEVICES {
-                    touched |= replace_all(
-                        &mut bytes,
-                        &location_pattern(device, slot, old),
-                        &location_pattern(device, slot, new),
-                    );
-                }
-                if touched {
-                    let before = crc32_castagnoli(&read(pool, 0, container * SLOT, length));
-                    reseal_unit(&mut bytes);
-                    for device in DEVICES {
-                        write(pool, device, container * SLOT, &bytes);
-                    }
-                    changes.push((container, before, crc32_castagnoli(&bytes)));
-                }
-            }
-            for (device, offset) in root_slots() {
-                let mut bytes = read(pool, device, offset, 512);
-                let mut touched = false;
-                for location_device in DEVICES {
-                    touched |= replace_all(
-                        &mut bytes,
-                        &location_pattern(location_device, slot, old),
-                        &location_pattern(location_device, slot, new),
-                    );
-                }
-                if touched {
-                    let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
-                    bytes[138..170].copy_from_slice(&digest);
-                    write(pool, device, offset, &bytes);
-                }
-            }
-        }
-        copy_each_root_into_the_new_root_segment_of_its_journal_records(pool);
-    }
-
-    /// journal 记录头里 `checkpoint_txg`（8 字节）的偏移（D23（journal 的角色与格式） 已定项 4 / 已定项 17 的字段表）。
-    const JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET: usize = 26;
-
-    /// 只改一块盘上的那一份单元（另一块盘留着原样）：重封被改那一份的两道校验和，再把它的新整单元校验和补进引用它的
-    /// **那一块盘那一条**位置条目——位置条目逐盘各带一个整单元校验和（D4（校验和位置），指针 86 / 88 里位置条目 14 × 2），
-    /// 所以补完两份各自仍与自己那条位置条目对得上，I-2.1（校验和与内容匹配） 不跟着红；父单元两盘同内容，它自己的整单元校验和
-    /// 往上补那一段照旧走 `propagate`。
-    fn mutate_one_device_copy_of_unit(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        device: u32,
-        slot: u64,
-        change: impl Fn(&mut Vec<u8>),
-    ) {
-        let length = units
-            .iter()
-            .find(|(start, _)| *start == slot)
-            .expect("登记过的单元")
-            .1;
-        let before = read(pool, device, slot * SLOT, length);
-        let mut bytes = before.clone();
-        change(&mut bytes);
-        reseal_unit(&mut bytes);
-        write(pool, device, slot * SLOT, &bytes);
-        let (old, new) = (crc32_castagnoli(&before), crc32_castagnoli(&bytes));
-        let mut parents_changed = Vec::new();
-        for (container, container_length) in units.iter().copied() {
-            if container == slot {
-                continue;
-            }
-            let container_before = read(pool, 0, container * SLOT, container_length);
-            let mut container_bytes = container_before.clone();
-            if replace_all(
-                &mut container_bytes,
-                &location_pattern(device, slot, old),
-                &location_pattern(device, slot, new),
-            ) {
-                reseal_unit(&mut container_bytes);
-                for each_device in DEVICES {
-                    write(pool, each_device, container * SLOT, &container_bytes);
-                }
-                parents_changed.push((
-                    container,
-                    crc32_castagnoli(&container_before),
-                    crc32_castagnoli(&container_bytes),
-                ));
-            }
-        }
-        for (root_device, offset) in root_slots() {
-            let mut root_bytes = read(pool, root_device, offset, 512);
-            if replace_all(
-                &mut root_bytes,
-                &location_pattern(device, slot, old),
-                &location_pattern(device, slot, new),
-            ) {
-                let digest = wide_checksum_with_field_zeroed(&root_bytes, 512, 138);
-                root_bytes[138..170].copy_from_slice(&digest);
-                write(pool, root_device, offset, &root_bytes);
-            }
-        }
-        propagate(pool, units, parents_changed);
-    }
-
-    /// 改一个单元（两盘一起改）：`reseal` 为真时重封它的两道校验和；新的整单元校验和沿引用链补上去。
-    fn mutate_unit_of(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        slot: u64,
-        change: impl Fn(&mut Vec<u8>),
-        reseal: bool,
-    ) {
-        let length = units
-            .iter()
-            .find(|(start, _)| *start == slot)
-            .expect("登记过的单元")
-            .1;
-        let before = read(pool, 0, slot * SLOT, length);
-        let mut bytes = before.clone();
-        change(&mut bytes);
-        if reseal {
-            reseal_unit(&mut bytes);
-        }
-        for device in DEVICES {
-            write(pool, device, slot * SLOT, &bytes);
-        }
-        propagate(
-            pool,
-            units,
-            vec![(slot, crc32_castagnoli(&before), crc32_castagnoli(&bytes))],
-        );
-    }
-
-    /// 写完新池新建文件那份镜像上改一个单元。
-    fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), reseal: bool) {
-        mutate_unit_of(pool, &UNITS, slot, change, reseal);
-    }
-
-    /// 分配记录树的两片叶（两块盘各一片）逐片改、各自重封，新的整单元校验和沿引用链补上去（叶 → 那块盘的第 1 层节点 → 根 → 树表 → 根槽）；
-    /// `change` 返回它在那一片叶里改了几条记录，这里交回两片合起来的条数。
-    fn mutate_allocation_leaves(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        leaves: [u64; 2],
-        change: impl Fn(&mut Vec<u8>) -> usize,
-    ) -> usize {
-        let changed_records = std::cell::Cell::new(0usize);
-        for leaf in leaves {
-            mutate_unit_of(
-                pool,
-                units,
-                leaf,
-                |bytes| changed_records.set(changed_records.get() + change(bytes)),
-                true,
-            );
-        }
-        changed_records.get()
-    }
-
-    /// journal 记录头里这三个字段的偏移（D23（journal 的角色与格式） 已定项 17 的字段表；记录头自证校验和在 46、罩整条 4096）。
-    const JOURNAL_RECORD_INSTANCE_OFFSET: usize = 16;
-    const JOURNAL_RECORD_TRANSACTION_OFFSET: usize = 78;
-
-    /// 这几份镜像上环里的记录条数上界：读到这个计数器还没读完就说明镜像变了，断言会响（别让列表被悄悄截断）。
-    const RECORDS_READ_BACK_AT_MOST: u64 = 64;
-
-    /// 一块盘的 journal 环里从计数器 1 起连着的记录，读成 (计数器, 实例代号, 事务号)；读到没有 magic 的那一格就停。
-    /// 计数器与环槽一一对应（`record_offset`），所以这里按计数器取偏移，不整条环扫。
-    fn journal_records_on_device(pool: &MemoryPool, device: u32) -> Vec<(u64, u32, u64)> {
-        let mut records = Vec::new();
-        for counter in 1..=RECORDS_READ_BACK_AT_MOST {
-            let offset = singlefs_core::journal::record_offset(
-                counter,
-                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-            )
-            .0;
-            let bytes = read(pool, device, offset, 4096);
-            if bytes[..4] != singlefs_core::journal::JOURNAL_MAGIC {
-                break;
-            }
-            records.push((
-                counter,
-                u32::from_le_bytes(
-                    bytes[JOURNAL_RECORD_INSTANCE_OFFSET..JOURNAL_RECORD_INSTANCE_OFFSET + 4]
-                        .try_into()
-                        .expect("4 字节"),
-                ),
-                get_u64(&bytes, JOURNAL_RECORD_TRANSACTION_OFFSET),
-            ));
-        }
-        assert!(
-            u64::try_from(records.len()).expect("条数") < RECORDS_READ_BACK_AT_MOST,
-            "环里的记录多到读满了上界 {RECORDS_READ_BACK_AT_MOST}：这几份镜像上不该有这么多"
-        );
-        records
-    }
-
-    /// 一条 journal 记录的事务号改成 `transaction`，头校验和重封（罩整条 4096，字段在 46）；两盘各一份都改——
-    /// 事务号重号是写者算错号，不是一块盘的字节坏了，两盘会写出同一条记录。
-    fn set_transaction_number_of_journal_record(
-        pool: &mut MemoryPool,
-        counter: u64,
-        expected_transaction: u64,
-        transaction: u64,
-    ) {
-        let offset = singlefs_core::journal::record_offset(
-            counter,
-            singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-        )
-        .0;
-        for device in DEVICES {
-            let mut record = read(pool, device, offset, 4096);
-            assert_eq!(
-                get_u64(&record, JOURNAL_RECORD_TRANSACTION_OFFSET),
-                expected_transaction,
-                "盘 {device} 计数器 {counter} 那条记录的事务号"
-            );
-            set_u64(&mut record, JOURNAL_RECORD_TRANSACTION_OFFSET, transaction);
-            let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-            record[46..78].copy_from_slice(&digest);
-            write(pool, device, offset, &record);
-        }
-    }
-
-    /// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）：加密类型在整槽校验和（155，宽 32）、自身 MAC（16）、nonce 水位（12）、
-    /// KDF 标识（4）之后，偏移 219；第一版只读 0（不加密）。
-    const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 219;
-    /// 登记过的加密算法，第一版读者不读加密的卷：带它的系统配置槽自证过也整池拒绝挂载。
-    const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
-    /// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
-    const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
-    const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
-    /// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）几何段里几个 16 KiB 槽号与环长的偏移：journal 环起点 325、环长 333、
-    /// 根环起点 371、单元区起始槽号 417。checker 与实现今天各自按这几个偏移读；这里照字段表各写一份。
-    const SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
-    const SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET: usize = 333;
-    const SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
-    const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
-    /// 系统配置自举头里的本盘设备号（4 字节）：fsid（偏移 102，宽 16）之后 20 字节、再 1 字节之后，偏移 139。
-    const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET: usize = 139;
-    /// 第一版 mkfs 写进这几格的值（字段表那一列）：journal 环从槽 1024 起、默认环长 768 MiB、根环从槽 64 起、单元区从槽 50176 起。
-    const JOURNAL_RING_START_SLOT_OF_THE_POOL: u64 = 1024;
-    const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
-    const ROOT_RING_BASE_SLOT_OF_THE_POOL: u64 = 64;
-    const UNIT_AREA_START_SLOT_OF_THE_POOL: u64 = 50176;
-    /// 聚簇段 64 槽（D3（空间分配） 已定项 10 ①）：单元区起始槽号要落在它的整数倍上。
-    const CLUSTER_SEGMENT_SLOTS_OF_THE_POOL: u64 = 64;
-
-    /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
-    fn mutate_system_configuration_slot(
-        pool: &mut MemoryPool,
-        device: u32,
-        slot_offset: u64,
-        change: impl Fn(&mut Vec<u8>),
-    ) {
-        let mut bytes = read(pool, device, slot_offset, 4096);
-        change(&mut bytes);
-        let digest = wide_checksum_with_field_zeroed(&bytes, 4096, 155);
-        bytes[155..187].copy_from_slice(&digest);
-        write(pool, device, slot_offset, &bytes);
-    }
-
-    fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
-        bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
-    }
-    fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
-        bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
-    }
-    fn get_u32(bytes: &[u8], offset: usize) -> u32 {
-        u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
-    }
-
-    fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
-        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-    }
-
-    /// 两块盘对调盘体：每块盘两个系统配置槽里的本盘设备号改成另一块盘的身份（盘 0 的两槽写 1、盘 1 的两槽写 0），整槽重封，
-    /// 别的字节不动。与盘体真对调不同的只有这一格：根环区域、单元都还在原来的盘上，所以别的不变量照判成立。
-    fn swap_the_own_device_numbers_of_the_two_devices(image: &mut MemoryPool) {
-        let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-        for (device, own_device_number_written) in [(0u32, 1u32), (1, 0)] {
-            for slot_offset in [0, spacing] {
-                mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
-                    set_u32(
-                        bytes,
-                        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET,
-                        own_device_number_written,
-                    );
-                });
-            }
-        }
-    }
-
-    /// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（实审 Y4 的 A、B、C、D、E「读字段，不等于常量就整池拒」）：
-    /// 盘 1 槽 0 的一个几何字段改掉、整槽重封，别的三槽照原样。每项带 checker 该报的那个 `Verdict` 成员名（违例说明里带着它）。
-    fn known_bad_images_of_the_system_configuration_geometry() -> Vec<(&'static str, Mutation)> {
-        let on_the_refused_slot = |change: fn(&mut Vec<u8>)| -> Mutation {
-            Box::new(move |image: &mut MemoryPool| {
-                mutate_system_configuration_slot(
-                    image,
-                    DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                    OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                    change,
-                );
-            })
-        };
-        vec![
-            // A：单元区起始槽号往后挪一段（50176 → 50240），环长不动：不是环长现算的那个槽。
-            (
-                "UnitAreaStartNotTheSlotAfterTheJournalRing",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
-                        UNIT_AREA_START_SLOT_OF_THE_POOL + CLUSTER_SEGMENT_SLOTS_OF_THE_POOL,
-                    );
-                }),
-            ),
-            // D：环长少一槽（768 MiB − 16 KiB），单元区起始槽号跟着改成它现算的 50175（两者自洽）：不在聚簇段边界上。
-            (
-                "UnitAreaStartOffTheClusterSegmentBoundary",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET,
-                        JOURNAL_RING_BYTES_OF_THE_POOL - SLOT,
-                    );
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
-                        UNIT_AREA_START_SLOT_OF_THE_POOL - 1,
-                    );
-                }),
-            ),
-            // B：journal 环起点写 1023：实现按常量 1024 写记录、扫环，按字段扫的读者判的是错位 16 KiB 的另一个环。
-            (
-                "JournalRingStartSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET,
-                        JOURNAL_RING_START_SLOT_OF_THE_POOL - 1,
-                    );
-                }),
-            ),
-            // C：根环起点写 65：实现按常量 64 写根，按字段读的读者读的是另一个根环。
-            (
-                "RootRingBaseSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET,
-                        ROOT_RING_BASE_SLOT_OF_THE_POOL + 1,
-                    );
-                }),
-            ),
-            // E：根环起点写 0：先于槽距判，报起点、不报「槽 1 不在根环起点之前」。
-            (
-                "RootRingBaseSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(bytes, SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET, 0);
-                }),
-            ),
-        ]
-    }
-
-    /// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
-    fn tree_table_entry_offset(index: usize) -> usize {
-        131 + 200 * index
-    }
-
-    /// 一个码 2 节点的自描述三段（D18（块里携带什么信息） 已定项 7：key 宽 1 字节在 51、条目数 2 字节在 82 + 2k、
-    /// 条目宽 2 字节在 84 + 2k；声明长度 2 字节在 8，条目区从 86 + 2k + 29 起）改成「条目宽 = key 宽、只装一条条目」：
-    /// 条目数改 1、声明长度改 k、largest_key 贴到那一条条目的 key 上、条目区之后的字节清零。
-    ///
-    /// 这么改是为了让**除 I-1.10（码 2 条目宽等于字段表宽） 之外的每一道都还成立**：声明长度 = 条目数 × 条目宽、
-    /// 条目宽 ≥ key 宽（`index_node_view` 判的那两道）、key 区间贴紧首末条目（I-1.1（块头自述逻辑地址））、
-    /// 声明长度之后的补齐为零且在载荷 CRC 内（I-2.3（补齐字节为零且参与校验和））。
-    /// 盘上留下的就是一个处处自洽、唯独条目宽与那棵树的字段表不符的节点——
-    /// I-1.10（码 2 条目宽等于字段表宽） 判的正是这一格，判不出来它，走读下一步就按字段表的固定偏移切这条 k 字节的条目、当场越界
-    /// （panic 面普查 R13）。
-    fn narrow_the_entry_width_to_the_key_width(bytes: &mut [u8]) {
-        let key_width = usize::from(bytes[51]);
-        let key_width_field = u16::try_from(key_width).expect("key 宽装得进 u16");
-        let entries_start = 86 + 2 * key_width + 29;
-        let first_key: Vec<u8> = bytes[entries_start..entries_start + key_width].to_vec();
-        set_u16(bytes, 8, key_width_field);
-        set_u16(bytes, 82 + 2 * key_width, 1);
-        set_u16(bytes, 84 + 2 * key_width, key_width_field);
-        bytes[52 + key_width..52 + 2 * key_width].copy_from_slice(&first_key);
-        for byte in &mut bytes[entries_start + key_width..] {
-            *byte = 0;
-        }
-    }
-
-    /// 码 2 节点头里出生序号那 4 字节的偏移**扣掉 2k**（D18（块里携带什么信息） 已定项 7 的字段表：
-    /// 诞生代号 52 + 2k、fsid 60 + 2k、写序 68 + 2k、出生序号 72 + 2k；k 是节点自述的 key 宽，在偏移 51）。
-    const INDEX_NODE_BIRTH_SEQUENCE_OFFSET_BEFORE_THE_KEYS: usize = 72;
-    /// 码 1 数据单元头里诞生代号那 8 字节的偏移（D18（块里携带什么信息） 已定项 7 的字段表）。
-    const DATA_UNIT_BIRTH_TXG_OFFSET: usize = 75;
-    /// extent 树上段叶（key 宽 24）里第一条条目内联的那条数据指针中诞生代号那 8 字节的偏移：
-    /// 条目区从 115 + 2 × 24 = 163 起，条目 = key (0, inode 8, 0) 24 + 标签 1（2 = 单单元内联）+ 数据指针 88
-    /// （D8（核心索引结构） 已定项 14），指针里诞生代号在 42。
-    const EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET: usize = 163 + 24 + 1 + 42;
-    /// 一条树表条目里诞生 txg 那 8 字节的偏移：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8
-    /// （D8（核心索引结构） 已定项 8 的字段表）。
-    const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
-    /// 分配记录树叶（key 宽 10）：条目数在 82 + 2 × 10、条目区从 115 + 2 × 10 起，每条 20 = key (设备 4, 槽号 6) +
-    /// value (跨度段 2，最高位是已释放标志, 分配代或释放代 8)。
-    const ALLOCATION_NODE_ENTRY_COUNT_OFFSET: usize = 102;
-    const ALLOCATION_NODE_ENTRY_START: usize = 135;
-    const ALLOCATION_RECORD_BYTES: usize = 20;
-    const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
-
-    fn get_u64(bytes: &[u8], offset: usize) -> u64 {
-        u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
-    }
-
-    /// 中央映射树（根兼叶，key 宽 27、条目 55）里唯一那条码 1 条目：key 的出生 txg（key 偏移 9）从 `from` 改成 `to`。
-    /// 码 1 排在最前（类标签 1 最小），头里的最小 key 就是它的 key，跟着改；改完仍按 key 升序。
-    fn rewrite_the_data_unit_mapping_key_birth_txg(bytes: &mut [u8], from: u64, to: u64) {
-        const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 9;
-        const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
-        let key_width = usize::from(bytes[51]);
-        assert_eq!(key_width, 27, "映射 key 宽 27");
-        let entries_start = 115 + 2 * key_width;
-        assert_eq!(bytes[entries_start], 1, "第一条是码 1 那一条");
-        assert_eq!(
-            bytes[entries_start..entries_start + key_width],
-            bytes[HEADER_SMALLEST_KEY_OFFSET..HEADER_SMALLEST_KEY_OFFSET + key_width],
-            "头里的最小 key 就是第一条的 key"
-        );
-        for key_start in [entries_start, HEADER_SMALLEST_KEY_OFFSET] {
-            assert_eq!(
-                get_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET),
-                from,
-                "码 1 映射 key 的出生 txg 本来是 {from}"
-            );
-            set_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET, to);
-        }
-    }
-
-    /// 实审 B2 新立的「中央映射条目的 key 与它指的单元头相符」：I-1.11（映射 key 与单元头相符）。
-    const MAPPING_KEY_INVARIANT: &str =
-        singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER;
-
-    /// 中央映射树（根兼叶，key 宽 27、条目 55）里指着 `slot` 那个码 2 节点的那条条目：key 尾段的出生序号（key 偏移 21，4 字节）+1。
-    /// 头里的最小 / 最大 key 是它时跟着改；改完仍按 key 严格升序（码 2 的 key 按出生树分开，这一条与左右邻不同出生树）。
-    fn raise_the_mapping_key_tail_of_the_node_at(bytes: &mut [u8], slot: u64) {
-        const MAPPING_KEY_TAIL_OFFSET: usize = 21;
-        const MAPPING_ENTRY_BYTES: usize = 55;
-        const MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET: usize = 27 + 4;
-        const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
-        let key_width = usize::from(bytes[51]);
-        assert_eq!(key_width, 27, "映射 key 宽 27");
-        let header_largest_key_offset = HEADER_SMALLEST_KEY_OFFSET + key_width;
-        let entry_count = usize::from(u16::from_le_bytes([
-            bytes[82 + 2 * key_width],
-            bytes[83 + 2 * key_width],
-        ]));
-        let entries_start = 115 + 2 * key_width;
-        let entry_start = (0..entry_count)
-            .map(|index| entries_start + index * MAPPING_ENTRY_BYTES)
-            .find(|start| {
-                bytes[*start] == 2
-                    && get_u64(bytes, start + MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET)
-                        & 0xFFFF_FFFF_FFFF
-                        == slot
-            })
-            .expect("映射里有指着这个码 2 节点的那一条");
-        let old_key = bytes[entry_start..entry_start + key_width].to_vec();
-        let tail = entry_start + MAPPING_KEY_TAIL_OFFSET;
-        let birth_sequence = u32::from_le_bytes(bytes[tail..tail + 4].try_into().expect("4 字节"));
-        bytes[tail..tail + 4].copy_from_slice(&(birth_sequence + 1).to_le_bytes());
-        let new_key = bytes[entry_start..entry_start + key_width].to_vec();
-        for header_key in [HEADER_SMALLEST_KEY_OFFSET, header_largest_key_offset] {
-            if bytes[header_key..header_key + key_width] == old_key[..] {
-                bytes[header_key..header_key + key_width].copy_from_slice(&new_key);
-            }
-        }
-    }
-
-    /// 分配记录树叶里，把代字段等于 `from` 的已释放记录改成 `to`；返回改了几条。
-    fn rewrite_released_generations(bytes: &mut [u8], from: u64, to: u64) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-            if span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0
-                && get_u64(bytes, record + 12) == from
-            {
-                set_u64(bytes, record + 12, to);
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 分配记录树叶里槽号是 `slot` 的记录（两盘各一条）跨度改成 `span_slots`，已释放标志照留；返回改了几条。
-    fn set_allocation_record_span(bytes: &mut [u8], slot: u64, span_slots: u16) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let mut slot_bytes = [0u8; 8];
-            slot_bytes[..6].copy_from_slice(&bytes[record + 4..record + 10]);
-            if u64::from_le_bytes(slot_bytes) == slot {
-                let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-                set_u16(
-                    bytes,
-                    record + 10,
-                    (span_field & ALLOCATION_RECORD_RELEASED_FLAG) | span_slots,
-                );
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 一份坏镜像：它要让哪一条判违例，以及怎么从干净镜像改出来。
-    type Mutation = Box<dyn Fn(&mut MemoryPool)>;
-
-    fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
-        let leaf_head_checksum = crc32_castagnoli(&read(clean, 0, INODE_LEAF * SLOT, 16384));
-        let stray_node = {
-            let mut stray = read(clean, 0, EXTENT_ROOT * SLOT, 16384);
-            set_u64(&mut stray, 42, 65624);
-            reseal_unit(&mut stray);
-            stray
-        };
-        let orphan_with_instance_two = {
-            let mut orphan = read(clean, 0, DATA_UNIT * SLOT, 32768);
-            orphan[91..95].copy_from_slice(&2u32.to_le_bytes());
-            reseal_unit(&mut orphan);
-            orphan
-        };
-        let orphan_for_second_sentence = orphan_with_instance_two.clone();
-        let record_with_instance_two = {
-            let offset = singlefs_core::journal::record_offset(
-                3,
-                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-            )
-            .0;
-            let mut record = read(clean, 0, offset, 4096);
-            record[16..20].copy_from_slice(&2u32.to_le_bytes());
-            let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-            record[46..78].copy_from_slice(&digest);
-            record
-        };
-        vec![
-            // 第 0 代根（暖机 txg 1、2）引用的 mkfs 树表单元（50178，A 换下之后只有它们引用）内容改掉再重封：那条候选根指着的块被复用。
-            (
-                "I-7.4",
-                Box::new(|image: &mut MemoryPool| {
-                    let mut unit = read(image, 0, GENESIS_TREE_TABLE * SLOT, 16384);
-                    set_u64(&mut unit, 42, 77);
-                    reseal_unit(&mut unit);
-                    for device in DEVICES {
-                        write(image, device, GENESIS_TREE_TABLE * SLOT, &unit);
-                    }
-                }),
-            ),
-            // 同一个单元的头抹成零、不重封：从第 0 代根出发的遍历读不到它。
-            (
-                "I-4.8",
-                Box::new(|image: &mut MemoryPool| {
-                    let erased = vec![0u8; 16384];
-                    for device in DEVICES {
-                        write(image, device, GENESIS_TREE_TABLE * SLOT, &erased);
-                    }
-                }),
-            ),
-            // 数据单元五元组里的锚点偏移改成 32768（extent key 的偏移是 0）。
-            (
-                "I-1.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| set_u64(bytes, 67, 32768), true)
-                }),
-            ),
-            // extent 树根头里的树 ID 改成 99。
-            (
-                "I-1.3",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, EXTENT_ROOT, |bytes| set_u64(bytes, 42, 99), true)
-                }),
-            ),
-            // inode 叶容器头里的 fsid 改掉。
-            (
-                "I-1.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 81, 0xDEAD), true)
-                }),
-            ),
-            // 盘 1 被择的那个系统配置槽里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
-            (
-                "I-1.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 1, 4096, |bytes| bytes[102] ^= 0xFF)
-                }),
-            ),
-            // 码 3 容器类身份段的首字节改成 1。
-            (
-                "I-1.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| bytes[42] = 1, true)
-                }),
-            ),
-            // 类型 2 容器的记录宽改成 139（登记的是 140）。
-            (
-                "I-1.7",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u16(bytes, 71, 139), true)
-                }),
-            ),
-            // 记账树根自述的条目宽缩到 key 宽 22（登记的字段表宽 34），别的自描述字段跟着调成自洽的一份。
-            (
-                "I-1.10",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| narrow_the_entry_width_to_the_key_width(bytes),
-                        true,
-                    )
-                }),
-            ),
-            // 数据单元盘 0 那一份翻一个载荷字节，不补任何校验和。
-            (
-                "I-2.1",
-                Box::new(|image: &mut MemoryPool| {
-                    let mut bytes = read(image, 0, DATA_UNIT * SLOT, 32768);
-                    bytes[200] ^= 1;
-                    write(image, 0, DATA_UNIT * SLOT, &bytes);
-                }),
-            ),
-            // 数据单元补齐区写一个非零字节，载荷 CRC 跟着重算（校验和对、补齐不为 0）。
-            (
-                "I-2.3",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| bytes[32000] = 1, true)
-                }),
-            ),
-            // 数据单元头里翻一个字节，不重封头校验和（整单元校验和照样补上去，I-2.1 不先挡）。
-            (
-                "I-2.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| bytes[60] ^= 1, false)
-                }),
-            ),
-            // 树表里 extent 树那条的根指针，两条位置条目对调（盘 1 在前）。
-            (
-                "I-2.5",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let pointer = tree_table_entry_offset(0) + 14;
-                            let first: Vec<u8> = bytes[pointer + 50..pointer + 64].to_vec();
-                            let second: Vec<u8> = bytes[pointer + 64..pointer + 78].to_vec();
-                            bytes[pointer + 50..pointer + 64].copy_from_slice(&second);
-                            bytes[pointer + 64..pointer + 78].copy_from_slice(&first);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 记账树里盘 0 的「已分配」多记 16384。
-            (
-                "I-3.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| adjust_accounting(bytes, 1, 0, 16384),
-                        true,
-                    )
-                }),
-            ),
-            // 树表里分配记录树那条的根指针，盘 0 那条位置条目改指槽 50243（压在 inode 叶容器的第二个槽上）。
-            (
-                "I-5.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let location = tree_table_entry_offset(2) + 14 + 50 + 4;
-                            bytes[location..location + 6]
-                                .copy_from_slice(&50243u64.to_le_bytes()[..6]);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 记账树里盘 0 的「空闲」多记 16384。
-            (
-                "I-5.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| adjust_accounting(bytes, 2, 0, 16384),
-                        true,
-                    )
-                }),
-            ),
-            // 根环全部槽抹成 0。
-            (
-                "I-7.1",
-                Box::new(|image: &mut MemoryPool| {
-                    for (device, offset) in root_slots() {
-                        write(image, device, offset, &[0u8; 512]);
-                    }
-                }),
-            ),
-            // inode 叶容器两份都改坏一个字节（不补校验和）：最新的根走不完。
-            (
-                "I-7.2",
-                Box::new(|image: &mut MemoryPool| {
-                    for device in DEVICES {
-                        let mut bytes = read(image, device, INODE_LEAF * SLOT, 32768);
-                        bytes[5000] ^= 1;
-                        write(image, device, INODE_LEAF * SLOT, &bytes);
-                    }
-                }),
-            ),
-            // 盘 0 被择的那个系统配置槽（槽 1，世代 5）里逐区域设备改成 [0, 0, 0]。
-            (
-                "I-7.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 0, 4096, |bytes| {
-                        bytes[379..391].copy_from_slice(&[0u8; 12])
-                    })
-                }),
-            ),
-            // 盘 1 槽 0 的加密类型改成 1、重算整槽校验和：这一槽自证过而带这一版读者不收的值，实现整池拒绝挂载
-            // （A3-checker-2 第四节第 1 条，别的三槽照原样）。
-            (
-                SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(
-                        image,
-                        DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                        OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                        |bytes| {
-                            bytes[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET] =
-                                ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ
-                        },
-                    )
-                }),
-            ),
-            // 两块盘四个系统配置槽里的本盘设备号互换、整槽重封（实审 Y2-b 越格线索：盘体对调之后的池可写挂载因本盘设备号拒）。
-            (
-                SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
-                Box::new(swap_the_own_device_numbers_of_the_two_devices),
-            ),
-            // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
-            // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    write(image, 0, 50302 * SLOT, &orphan_with_instance_two)
-                }),
-            ),
-            // journal 环里一个空槽放一条实例代号 2 的记录（头校验和重封）⇒ ① 红：扫描方向要读 journal 环。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    write(
-                        image,
-                        0,
-                        singlefs_core::journal::record_offset(
-                            9,
-                            singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-                        )
-                        .0,
-                        &record_with_instance_two,
-                    )
-                }),
-            ),
-            // 盘 0 较新那一槽的实例代号改成 2，再放那份实例代号 2 的孤儿 ⇒ 各盘最大号 [2, 1] 不等而较大者有东西带着，② 红（① 成立）。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 0, 4096, |bytes| {
-                        bytes[477..481].copy_from_slice(&2u32.to_le_bytes())
-                    });
-                    write(image, 0, 50302 * SLOT, &orphan_for_second_sentence);
-                }),
-            ),
-            // 在没人引用的槽 50300 上放一个树 ID 65624（高于水位 65548）的码 2 节点（头校验和过、诞生代号 3）。
-            (
-                "I-7.8",
-                Box::new(move |image: &mut MemoryPool| write(image, 0, 50300 * SLOT, &stray_node)),
-            ),
-            // 树表里 inode 树那条的根指针改指 inode 叶容器（码 3），校验和取那个容器前 16 KiB 的 CRC。
-            (
-                "I-9.1",
-                Box::new(move |image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let pointer = tree_table_entry_offset(1) + 14;
-                            for location in [pointer + 50, pointer + 64] {
-                                bytes[location + 4..location + 10]
-                                    .copy_from_slice(&INODE_LEAF.to_le_bytes()[..6]);
-                                bytes[location + 10..location + 14]
-                                    .copy_from_slice(&leaf_head_checksum.to_le_bytes());
-                            }
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // inode 树根那条内部条目的身份引用里容器号改成 2（子头里是 1）。
-            (
-                "I-9.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_ROOT, |bytes| set_u64(bytes, 131 + 18, 2), true)
-                }),
-            ),
-            // 容器号改成 5，而容器里那条记录的 inode 是 1。
-            (
-                "I-9.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 53, 5), true)
-                }),
-            ),
-            // inode 记录的预留段（记录偏移 139）写一个非零字节。
-            (
-                "I-9.7",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| bytes[136 + 139] = 1, true)
-                }),
-            ),
-            // inode 记录的对象出生代改成 2（数据单元五元组里是 3）。
-            (
-                "I-9.10",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 136 + 8, 2), true)
-                }),
-            ),
-            // inode 记录的 blocks（记录偏移 48）写回按分到一个 32 KiB 单元算的 64，而 size 3000 ⇒ ⌈3000 ÷ 512⌉ = 6。
-            (
-                "I-9.15",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_LEAF,
-                        |bytes| set_u64(bytes, 136 + INODE_RECORD_BLOCKS_OFFSET, 64),
-                        true,
-                    )
-                }),
-            ),
-            // 树表里 livelist 与稀疏旁表两条互换种类：盘上仍按树 ID 升序（I-1.1 不红），按发号次序 livelist 的号 65542 大过稀疏旁表的号 65541。
-            (
-                "I-9.16",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(bytes),
-                        true,
-                    )
-                }),
-            ),
-            // 实例表里多一行 (1, 3, 0)：行的实例代号等于挂载根的实例 1，不「低于」；链指针记录仍在末尾、行仍唯一，红的只有那一半。
-            (
-                "I-3.8",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INSTANCE_TABLE,
-                        |bytes| {
-                            let chain_record: Vec<u8> = bytes[136..224].to_vec();
-                            let mut row = vec![0u8; 88];
-                            row[1..5].copy_from_slice(&1u32.to_le_bytes());
-                            row[5..13].copy_from_slice(&3u64.to_le_bytes());
-                            bytes[136..224].copy_from_slice(&row);
-                            bytes[224..312].copy_from_slice(&chain_record);
-                            set_u16(bytes, 69, 2);
-                            set_u16(bytes, 8, 176);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 盘 0 环内偏移 4096 那条记录（w4，暖机第二条空发布）的反向链字段改成 0，头校验和重封：
-            // 它不是本实例第一条（本实例第一条是 w1、计数器 1），链值必须等于 CRC32C(w1 的 487 字节头)。
-            (
-                "I-8.6",
-                Box::new(|image: &mut MemoryPool| {
-                    let offset = singlefs_core::journal::record_offset(
-                        2,
-                        singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-                    )
-                    .0;
-                    let mut record = read(image, 0, offset, 4096);
-                    let back_chain_field =
-                        JOURNAL_RECORD_BACK_CHAIN_OFFSET..JOURNAL_RECORD_BACK_CHAIN_OFFSET + 4;
-                    assert_ne!(
-                        u32::from_le_bytes(
-                            record[back_chain_field.clone()].try_into().expect("4 字节")
-                        ),
-                        0,
-                        "w4 的反向链本来是 CRC32C(w1 的头)，非 0"
-                    );
-                    record[back_chain_field].copy_from_slice(&0u32.to_le_bytes());
-                    let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-                    record[46..78].copy_from_slice(&digest);
-                    write(image, 0, offset, &record);
-                }),
-            ),
-            // inode 叶容器**盘 1 那一份**的载荷改一个字节、重封载荷校验和与头校验和，类身份段与写序一个字节不动：
-            // 两份归并成同一组（归并键逐字节相同）而载荷不同。盘 1 那条位置条目跟着补上 ⇒ I-2.1 不先挡。
-            (
-                "I-1.8",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_one_device_copy_of_unit(image, &UNITS, 1, INODE_LEAF, |bytes| {
-                        assert_eq!(bytes[20000], 0, "记录区之后的补齐本来是 0");
-                        bytes[20000] = 1;
-                    });
-                }),
-            ),
-            // extent 树根（码 2，key 宽 24）头里的出生序号 +1，引用它的树表条目里那条指针一个字节不动：
-            // 头里的出生身份与引用它的指针记的不符 ⇒ I-1.2（块头写序已发布） 红。
-            // 出生序号不是已发布谓词的输入（谓词只读诞生代号与写序），所以 I-4.2（无被引用未提交块） 不跟着红。
-            // 中央映射里 extent 根那条 key 的尾段就是它的出生序号（D19（块指针的结构与宽度预算） 已定项 6）：跟着 +1，
-            // 不跟着改就是映射 key 与单元头不符、映射 key 那一条（I-1.11（映射 key 与单元头相符）） 一起红。
-            (
-                "I-1.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        EXTENT_ROOT,
-                        |bytes| {
-                            let offset = INDEX_NODE_BIRTH_SEQUENCE_OFFSET_BEFORE_THE_KEYS
-                                + 2 * usize::from(bytes[51]);
-                            let birth_sequence = u32::from_le_bytes(
-                                bytes[offset..offset + 4].try_into().expect("4 字节"),
-                            );
-                            bytes[offset..offset + 4]
-                                .copy_from_slice(&(birth_sequence + 1).to_le_bytes());
-                        },
-                        true,
-                    );
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| raise_the_mapping_key_tail_of_the_node_at(bytes, EXTENT_ROOT),
-                        true,
-                    );
-                }),
-            ),
-            // 中央映射里数据单元那条 key 的出生 txg 从 3 改成 4，数据单元一个字节不动：映射 key 与它指的单元头里的诞生代号不符
-            // ⇒ 映射 key 那一条（I-1.11（映射 key 与单元头相符）） 红。
-            (
-                MAPPING_KEY_INVARIANT,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
-                        true,
-                    );
-                }),
-            ),
-            // 数据单元头里的诞生代号从 3 改成 4（最新的根就是 txg 3、实例 1），引用它的 extent 记录里那条数据指针的
-            // 诞生代号跟着改成 4：指针与头仍然一致（I-1.2（块头写序已发布） 不跟着红），而这个**被引用**的块按
-            // C113（扫描重建时多版单元的现行版本判定无输入） P2 的已发布谓词判不成已发布（i == 挂载根实例 ⇒ 要 b ≤ 挂载根的 txg）
-            // ⇒ I-4.2（无被引用未提交块） 红：盘上留下的正是「提交了的根指着一个还没提交的块」。
-            // 分配记录树里那个落点的分配代也跟着改成 4（两盘各一条）：记录与单元同源，不跟着改就是 I-3.10（已分配记录的分配代等于
-            // 它罩住的单元的诞生代号） 一起红，判别力算不到 I-4.2 头上。
-            (
-                "I-4.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        DATA_UNIT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
-                                3,
-                                "数据单元的诞生代号本来是 3"
-                            );
-                            set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 4);
-                        },
-                        true,
-                    );
-                    mutate_unit(
-                        image,
-                        EXTENT_ROOT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET),
-                                3,
-                                "extent 记录里那条数据指针的诞生代号本来是 3"
-                            );
-                            set_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET, 4);
-                        },
-                        true,
-                    );
-                    // 中央映射里那个数据单元的 key 带着它的诞生代号（D19（块指针的结构与宽度预算） 已定项 6）：跟着改成 4，
-                    // 不跟着改就是映射 key 与单元头的出生身份不符、I-1.2 一起红（实审 B1 起 checker 拿映射 key 比单元头）。
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
-                        true,
-                    );
-                    assert_eq!(
-                        mutate_allocation_leaves(image, &UNITS, ALLOCATION_LEAVES, |bytes| {
-                            rewrite_unreleased_allocation_generation(bytes, DATA_UNIT, 3, 4)
-                        }),
-                        2,
-                        "数据单元两盘各一条未释放记录（两片叶各一条），分配代本来是 3"
-                    );
-                }),
-            ),
-            // 记账里的 inode 号水位从 2 改成 1：树里最大的 key 就是 1，水位不再严格大于它（I-9.6）。
-            // 别的行一个字节都不动 ⇒ I-3.1 / I-5.2 那两条照旧绿。
-            (
-                "I-9.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| set_accounting(bytes, 12, 0xFFFF_FFFF, 1),
-                        true,
-                    );
-                }),
-            ),
-            // inode 根那条条目的分隔 key 从 1 改成 2（连着把节点头的 key 区间也改成 [2, 2]，
-            // 不然 I-1.1（key 区间罩住条目） 先红、这一格就成了搭车）：分隔 key 2 大于这个孩子的最小 key 1 ⇒ I-9.12 红。
-            (
-                "I-9.12",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_ROOT,
-                        |bytes| {
-                            set_u64(bytes, 131, 2);
-                            set_u64(bytes, 52, 2);
-                            set_u64(bytes, 60, 2);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 类型 2 容器的记录数与声明长度都改成 0。
-            (
-                "I-9.13",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_LEAF,
-                        |bytes| {
-                            set_u16(bytes, 69, 0);
-                            set_u16(bytes, 8, 0);
-                            bytes[136..276].fill(0);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // I-3.5：A 的数据单元（50180）头里的诞生代号 3 → 2，重封、补到根：A 引用、暖机那一版（txg 2）不引用的单元诞生代号不大于 2，
-            // 也不在整棵继承下来的用户可见树里（extent 树根指针出生 txg 3）。指针、映射 key 与分配代还记 3，I-1.2、I-1.11、I-3.10 跟着红，
-            // 所以放在这一张表里（只判「它红」，不判「只红它」）；按各个组成部分的几份在
-            // `checker_judges_reference_intervals_and_every_new_root_segment_field.rs`。
-            (
-                REFERENCE_INTERVALS_ARE_EXACT,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        DATA_UNIT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
-                                3,
-                                "A 的数据单元生在 txg 3"
-                            );
-                            set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 2);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // I-5.5（判决 `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K2）：A 那一版是从 mkfs 水位第一次建树的那一版，
-            // 它唯一的数据单元（50180 = 单元区起始槽号 50176 + 4）搬到再往后两槽，每块盘上落点最小的数据单元就不在 U + 4。
-            // 分配记录与记账照旧记着 50180，这份镜像上不只红 I-5.5；这一格只要它判违例。
-            (
-                FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
-                Box::new(move_the_data_unit_of_the_first_file_two_slots_further),
-            ),
-        ]
-    }
-
-    /// 新池新建文件写出的那个数据单元（`DATA_UNIT`，32 KiB）原样搬到往后两槽（写完新池新建文件那份镜像上空着，下一个 32 KiB 对齐的槽对）：
-    /// 两盘各写一份；`UNITS` 里引用它的单元（extent 树根里的数据指针、中央映射叶）把位置条目的槽号改成新的、重封，
-    /// 新的整单元校验和沿引用链补到根槽。50180 那两份原样留着：journal 记录的点名项仍指着它。
-    fn move_the_data_unit_of_the_first_file_two_slots_further(image: &mut MemoryPool) {
-        const DATA_UNIT_BYTES: usize = 32768;
-        let moved_to = DATA_UNIT + 2;
-        assert!(
-            UNITS.iter().all(|(start, _)| *start != moved_to),
-            "槽 {moved_to} 在写完新池新建文件的镜像上空着"
-        );
-        let data_unit = read(image, 0, DATA_UNIT * SLOT, DATA_UNIT_BYTES);
-        for device in DEVICES {
-            write(image, device, moved_to * SLOT, &data_unit);
-        }
-        let checksum = crc32_castagnoli(&data_unit);
-        let mut parents_changed = Vec::new();
-        for (container, length) in UNITS.iter().copied() {
-            if container == DATA_UNIT {
-                continue;
-            }
-            let before = read(image, 0, container * SLOT, length);
-            let mut bytes = before.clone();
-            let mut touched = false;
-            for device in DEVICES {
-                touched |= replace_all(
-                    &mut bytes,
-                    &location_pattern(device, DATA_UNIT, checksum),
-                    &location_pattern(device, moved_to, checksum),
-                );
-            }
-            if touched {
-                reseal_unit(&mut bytes);
-                for device in DEVICES {
-                    write(image, device, container * SLOT, &bytes);
-                }
-                parents_changed.push((
-                    container,
-                    crc32_castagnoli(&before),
-                    crc32_castagnoli(&bytes),
-                ));
-            }
-        }
-        assert!(
-            !parents_changed.is_empty(),
-            "写完新池新建文件的镜像上有单元指着那个数据单元"
-        );
-        propagate(image, &UNITS, parents_changed);
-    }
-
-    /// 发布 B（txg 4）之后的干净镜像：A 的十二个单元（十四个槽）在这次发布里改写成已释放、释放代 4，树表是 B 写的那一版，
-    /// A 那一版仍被根环里 A 的根指着。I-3.9（释放代落在停止引用它的那一格区间里）与 I-9.14（树表条目的诞生 txg 跨根不变）
-    /// 要的跨根比较到这里才有内容：写完新池新建文件的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
-    /// 两次暖机空发布不写树表），I-9.14 在那份镜像上报「不适用」。
-
-    // 以下是散在原文件 `known_bad_images` 之后、被上面用到的常量与辅助函数，在 e426cdff… 那一份里的行号：3191 1629 3299 3381 3366 3239 3736 3233 3235 3236 3234 3231
-
-    /// inode 记录里 `blocks` 的偏移（D8（核心索引结构） 已定项 6 的偏移表：size 在 40，blocks 在 48）。
-    const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
-
-    /// 记录头里反向链那 4 字节的偏移：事务段 78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4（D23（journal 的角色与格式） 已定项 4 / 已定项 8）。
-    const JOURNAL_RECORD_BACK_CHAIN_OFFSET: usize = 91;
-
-    /// 新池新建文件写出的中央映射树根（bump 次序：分配记录树五个节点、记账树、映射树、树表）。
-    const MAPPING_ROOT: u64 = 50251;
-
-    /// 记账树叶里 (统计量, 设备) 那一行的值加 delta（条目区从 115 + 2 × 22 = 159 起，每条 34：统计量 2、树 8、设备 4、代 8、值 8、seq 4）。
-    fn adjust_accounting(bytes: &mut [u8], statistic: u16, device: u32, delta: u64) {
-        let count = usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
-        for index in 0..count {
-            let row = 159 + 34 * index;
-            if u16::from_le_bytes([bytes[row], bytes[row + 1]]) == statistic
-                && u32::from_le_bytes(bytes[row + 10..row + 14].try_into().expect("4")) == device
-            {
-                let value = u64::from_le_bytes(bytes[row + 22..row + 30].try_into().expect("8"));
-                bytes[row + 22..row + 30].copy_from_slice(&(value + delta).to_le_bytes());
-                return;
-            }
-        }
-        panic!("记账树里没有 ({statistic}, {device}) 这一行");
-    }
-
-    /// 记账树叶里 (统计量, 设备) 那一行的值改成 value（偏移口径同 `adjust_accounting`）。
-    fn set_accounting(bytes: &mut [u8], statistic: u16, device: u32, value: u64) {
-        let count = usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
-        for index in 0..count {
-            let row = 159 + 34 * index;
-            if u16::from_le_bytes([bytes[row], bytes[row + 1]]) == statistic
-                && u32::from_le_bytes(bytes[row + 10..row + 14].try_into().expect("4")) == device
-            {
-                bytes[row + 22..row + 30].copy_from_slice(&value.to_le_bytes());
-                return;
-            }
-        }
-        panic!("记账树里没有 ({statistic}, {device}) 这一行");
-    }
-
-    /// 树表单元里 livelist 与稀疏旁表两条互换种类（条目偏移 10 的 2 字节）；树 ID、根指针不动。
-    fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut [u8]) {
-        for (index, kind_before, kind_after) in [
-            (
-                LIVELIST_TREE_TABLE_ENTRY_INDEX,
-                TREE_KIND_LIVELIST,
-                TREE_KIND_SPARSE_SIDE_TABLE,
-            ),
-            (
-                SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX,
-                TREE_KIND_SPARSE_SIDE_TABLE,
-                TREE_KIND_LIVELIST,
-            ),
-        ] {
-            let kind_offset = tree_table_entry_offset(index) + TREE_TABLE_ENTRY_KIND_OFFSET;
-            assert_eq!(
-                u16::from_le_bytes([tree_table[kind_offset], tree_table[kind_offset + 1]]),
-                kind_before,
-                "树表第 {index} 条的种类"
-            );
-            set_u16(tree_table, kind_offset, kind_after);
-        }
-    }
-
-    /// 分配记录树叶里槽号是 `slot`、**未带**已释放标志、分配代等于 `from` 的记录（两盘各一条）改成 `to`；返回改了几条。
-    fn rewrite_unreleased_allocation_generation(
-        bytes: &mut [u8],
-        slot: u64,
-        from: u64,
-        to: u64,
-    ) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let mut slot_bytes = [0u8; 8];
-            slot_bytes[..6].copy_from_slice(&bytes[record + 4..record + 10]);
-            let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-            if u64::from_le_bytes(slot_bytes) == slot
-                && span_field & ALLOCATION_RECORD_RELEASED_FLAG == 0
-                && get_u64(bytes, record + 12) == from
-            {
-                set_u64(bytes, record + 12, to);
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 新池新建文件那一版树表里十一条按发号次序排：livelist 是第 4 条（从 0 数，号 65541）、稀疏旁表第 5 条（号 65542）。
-    const LIVELIST_TREE_TABLE_ENTRY_INDEX: usize = 4;
-
-    const TREE_KIND_LIVELIST: u16 = 6;
-
-    const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
-
-    const SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX: usize = 5;
-
-    /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
-    const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
-
-    /// 对外的口子：第 755 行的 `known_bad_images` 是私有的，这里转一手（类型就是第 753 行的 `Mutation`）。
-    pub(super) fn entries_of_the_known_bad_images(
-        clean: &MemoryPool,
-    ) -> Vec<(&'static str, Box<dyn Fn(&mut MemoryPool)>)> {
-        known_bad_images(clean)
-    }
 }
 
 // ───────────────────────────── 坏镜像：镜像物化、补丁与摘要（登记 5.5） ─────────────────────────────
@@ -4458,28 +3498,26 @@ fn pool_checker_on_the_first_known_bad_image(
 /// 这一态的物化镜像上施加已知坏镜像族的第一条改法之后的那张盘（阳性对照 O2 判的那一张）。
 fn first_known_bad_image_of(image: &CrashImage<'_>) -> MemoryPool {
     let clean = materialized_memory_pool(image);
-    let entries =
-        known_bad_images_copied_from_the_harness_test::entries_of_the_known_bad_images(&clean);
-    let (_, apply_the_first_entry) = entries
-        .first()
-        .expect("已知坏镜像族至少一条（S4：装置数出的条数要是 43）");
+    let entries = known_bad_images(&clean);
+    let (_, apply_the_first_entry) = entries.first().expect("已知坏镜像表至少一条");
     let mut bad = clean.clone();
     apply_the_first_entry(&mut bad);
     bad
 }
 
-/// 取样的一态上 O2 判红的不变量名，走两段（O2 的名单按判到位与违例位能两段，计时与按件 panic 留 CPU）：
-/// 这一态的物化镜像（阳性对照那一态是改坏的那一张，[`first_known_bad_image_of`]）作一张给定状态表交
-/// [`pool_checker_red_names_through_the_given_states_engine`]。表名带流、序号与镜像摘要（同名的表内容就相同，判过的复用）。
-fn pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine(
+/// 录入段录下取样的一态上 O2 要判的盘（O2 的名单按判到位与违例位能两段，计时与按件 panic 留 CPU）：
+/// 这一态的物化镜像（阳性对照那一态是改坏的那一张，[`first_known_bad_image_of`]）作一张给定状态表交 `tables` 录下。
+/// 表名带流、序号与镜像摘要（同名的表内容就相同，判过的复用）。
+fn pool_checker_table_of_a_sampled_state(
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
     stream_name: StreamName,
     ordinal: u64,
     image_digest: &str,
     image: &CrashImage<'_>,
     pool_checker_control: bool,
-) -> Vec<String> {
+) -> RecordedTableReference {
     if pool_checker_control {
-        pool_checker_red_names_through_the_given_states_engine(
+        tables.record_a_table(
             &format!(
                 "sampled-state/{}/ordinal={ordinal}/image={image_digest}/first-known-bad-entry",
                 stream_name.directory_name()
@@ -4487,7 +3525,7 @@ fn pool_checker_red_names_of_a_sampled_state_through_the_given_states_engine(
             &first_known_bad_image_of(image),
         )
     } else {
-        pool_checker_red_names_through_the_given_states_engine(
+        tables.record_a_table(
             &format!(
                 "sampled-state/{}/ordinal={ordinal}/image={image_digest}",
                 stream_name.directory_name()
@@ -4635,68 +3673,7 @@ fn sector_difference_as_patches(clean: &MemoryPool, bad: &MemoryPool) -> Vec<Byt
     patches
 }
 
-// ───────────────────────────── `known-bad-images` 模式：43 条已知坏镜像与 E170 的 P 行、盲测族上的 O2（登记 5.5） ─────────────────────────────
-
-/// 原用例文件的 sha256（登记第三节、A8）：变了先重数条目再比，不照抄的那一份当作没变。
-const KNOWN_BAD_TEST_FILE_SHA256: &str =
-    "e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736";
-/// `known_bad_images(clean)` 的条目数（登记第七节 A8；E170 第 2 次重跑登记修订 2 读法 18 照今天那份重数：
-/// 第 755–1326 行里 `Box::new(` 43 处，字面名 38 条、常量名 5 条）。
-const KNOWN_BAD_ENTRY_COUNT: usize = 43;
-
-/// 原用例文件里 `known_bad_images` 一函数里每条的目标不变量名，按文件次序：十二格缩进的一行写字面名（`"I-x.y",`）或常量名。
-fn entry_names_in_the_original_test_file(text: &str) -> Vec<String> {
-    let mut inside = false;
-    let mut names = Vec::new();
-    for line in text.lines() {
-        if line.starts_with("fn known_bad_images(clean: &MemoryPool)") {
-            inside = true;
-            continue;
-        }
-        if inside && line == "}" {
-            break;
-        }
-        if !inside || !line.starts_with("            ") || line.starts_with("             ") {
-            continue;
-        }
-        let token = line.trim().trim_end_matches(',');
-        if let Some(literal) = token
-            .strip_prefix('"')
-            .and_then(|rest| rest.strip_suffix('"'))
-        {
-            if literal.starts_with("I-") {
-                names.push(literal.to_string());
-            }
-        } else if !token.is_empty()
-            && token
-                .chars()
-                .all(|character| character.is_ascii_uppercase() || character == '_')
-        {
-            names.push(match token {
-                "SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS" => {
-                    singlefs_checker::image::SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS
-                        .to_string()
-                }
-                "SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY" => {
-                    singlefs_checker::image::SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY
-                        .to_string()
-                }
-                "MAPPING_KEY_INVARIANT" => {
-                    singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER.to_string()
-                }
-                // 下面两支写本地字面量，值抄自 `crates/singlefs-checker/src/image.rs` 的 `REFERENCE_INTERVALS_ARE_EXACT`、
-                // `FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK` 两条常量（E170 第 2 次重跑登记 12.15）：
-                // 照抄的条目带的是 crates 常量的值，`known_bad_entry_names_equal_the_original_file_in_order` 那一格两边不等就不过。
-                "REFERENCE_INTERVALS_ARE_EXACT" => "I-3.5".to_string(),
-                "FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK" => {
-                    "I-5.5".to_string()
-                }
-                unresolved => format!("unresolved_constant:{unresolved}"),
-            });
-        }
-    }
-    names
-}
+// ───────────────────────────── `known-bad-images` 模式：已知坏镜像与 E170 的 P 行、盲测族上的 O2（登记 5.5） ─────────────────────────────
 
 /// 补丁文本：`设备:偏移:在补丁文件里的起点:长度`，逗号隔开（E170 的 `bad-states.tsv` 同一种写法）；没有补丁写 `-`。
 fn patch_list_text(patches: &[BytePatch], patches_file: &mut Vec<u8>) -> String {
@@ -4739,15 +3716,247 @@ fn patches_of_a_patch_list_text(list: &str, patches_file: &[u8]) -> Vec<BytePatc
         .collect()
 }
 
-/// 43 条已知坏镜像在流一全持久态上的 O2：每一条施加在干净镜像的拷贝上，一边直接判（`MemoryPool`），一边取补丁（逐扇区的差）再叠回干净镜像判，
-/// 两边判红的不变量集合要相等（S4）、目标不变量要在里面（S4）。交回（停机条款没过的条数）。
-fn known_bad_images_on_the_first_stream(
-    dump_directory: &Path,
-    output_directory: &Path,
-    lines: &mut ResultLines,
-) -> usize {
-    let mut failed = 0usize;
-    let stream_directory = dump_directory.join(StreamName::NewPoolFileCreation.directory_name());
+/// 录入段录下的已知坏镜像表一条：判段写 `known-bad-o2.tsv` 那一行与结果行要的（目标不变量、补丁几处、补丁叠回之后的摘要与直接改坏的相同不相同、
+/// 两张要判的盘）。补丁与摘要进 `known-bad-states.tsv`、`known-bad-patches.bin`，录入段就拼好。
+struct RecordedKnownBadEntry {
+    target: String,
+    patch_count: usize,
+    digest_equals_the_direct_one: bool,
+    direct: RecordedTableReference,
+    patched: RecordedTableReference,
+}
+
+/// 录入段录完已知坏镜像表一条交回主线程的：交给判段的那一份，与按条目的次序拼 `known-bad-states.tsv`、`known-bad-patches.bin` 要的补丁与摘要。
+struct KnownBadEntryOfTheRecordStage {
+    hand_off: RecordedKnownBadEntry,
+    patches: Vec<BytePatch>,
+    patched_digest: String,
+}
+
+/// 录入段录已知坏镜像表的一条：施加在干净镜像的拷贝上，直接改坏的那张录下，再取补丁（逐扇区的差）叠回干净镜像、叠完的那张录下。
+/// 表的改法（`Box<dyn Fn>`）不跨线程，这条线程照干净镜像现取一份表；干净镜像定了，表的条数、次序与改法就定了。
+fn record_a_known_bad_entry(
+    clean: &MemoryPool,
+    entry_index: usize,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+) -> KnownBadEntryOfTheRecordStage {
+    let entries = known_bad_images(clean);
+    let (target, apply) = &entries[entry_index];
+    let mut bad = clean.clone();
+    apply(&mut bad);
+    let direct = tables.record_a_table(&format!("known-bad/entry-{entry_index}/direct"), &bad);
+    let patches = sector_difference_as_patches(clean, &bad);
+    let mut patched = clean.clone();
+    apply_patches(&mut patched, &patches);
+    let patched_table =
+        tables.record_a_table(&format!("known-bad/entry-{entry_index}/patched"), &patched);
+    let patched_digest = sha256_text(&memory_pool_digest(&patched));
+    let digest_equals_the_direct_one = patched_digest == sha256_text(&memory_pool_digest(&bad));
+    KnownBadEntryOfTheRecordStage {
+        hand_off: RecordedKnownBadEntry {
+            target: (*target).to_string(),
+            patch_count: patches.len(),
+            digest_equals_the_direct_one,
+            direct,
+            patched: patched_table,
+        },
+        patches,
+        patched_digest,
+    }
+}
+
+/// 录入段录下的 E170 坏状态一行：判段写 `e170-bad-rows-o2.tsv` 那一行与结果行要的（流、行号、底态摘要、两个摘要与 E170 写的相同不相同、
+/// E170 池级 checker 那一列、底态与叠完补丁的两张要判的盘）。
+struct RecordedE170BadRow {
+    label: String,
+    row_identifier: String,
+    base_digest: String,
+    digests_equal: bool,
+    e170_pool_checker_column: String,
+    base: RecordedTableReference,
+    patched: RecordedTableReference,
+}
+
+/// 录入段录 E170 坏状态的一行：从中性格式重建底态、录下底态，叠补丁、录下叠完的那张，两个摘要与 E170 写的两个摘要比。
+fn record_an_e170_bad_row(
+    label: &str,
+    neutral: &NeutralStream,
+    patches_file: &[u8],
+    state_row: &str,
+    verdict_row: &str,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+) -> RecordedE170BadRow {
+    let state_fields: Vec<&str> = state_row.split('\t').collect();
+    assert_eq!(
+        state_fields.len(),
+        5,
+        "bad-states.tsv 一行五列：{state_row:?}"
+    );
+    let verdict_fields: Vec<&str> = verdict_row.split('\t').collect();
+    assert_eq!(
+        verdict_fields.len(),
+        10,
+        "bad-impl-verdicts.tsv 一行十列：{verdict_row:?}"
+    );
+    let row_identifier = state_fields[0];
+    let mut pool = rebuilt_memory_pool(neutral, state_fields[1]);
+    let base_digest = sha256_text(&memory_pool_digest(&pool));
+    // 不打补丁的底态上的 O2（登记 5.6 坏镜像行的阴性：F、Mk、Mk⁺、Mk⁻ 各一张，必须不红）。
+    let base = tables.record_a_table(
+        &format!("e170-bad-row/{label}/{row_identifier}/base"),
+        &pool,
+    );
+    apply_patches(
+        &mut pool,
+        &patches_of_a_patch_list_text(state_fields[4], patches_file),
+    );
+    let patched_digest = sha256_text(&memory_pool_digest(&pool));
+    let patched = tables.record_a_table(
+        &format!("e170-bad-row/{label}/{row_identifier}/patched"),
+        &pool,
+    );
+    let digests_equal = base_digest == state_fields[2] && patched_digest == state_fields[3];
+    RecordedE170BadRow {
+        label: label.to_string(),
+        row_identifier: row_identifier.to_string(),
+        base_digest,
+        digests_equal,
+        e170_pool_checker_column: verdict_fields[6].to_string(),
+        base,
+        patched,
+    }
+}
+
+/// E170 坏状态一行判完的结局：`e170-bad-rows-o2.tsv` 的那一行与结果行，按行的次序在主线程上收。
+struct JudgedE170BadRow {
+    row_failed: bool,
+    pool_checker_file_row: String,
+    result_line: String,
+}
+
+/// 判段：E170 坏状态一行的底态与叠完补丁的那张判完之后，判红的不变量与 E170 池级 checker 那一列比（S3），拼产物那一行与结果行。
+fn judged_e170_bad_row(
+    row: &RecordedE170BadRow,
+    base_red: &[String],
+    red_by_the_pool_checker: &[String],
+) -> JudgedE170BadRow {
+    let RecordedE170BadRow {
+        label,
+        row_identifier,
+        base_digest,
+        digests_equal,
+        e170_pool_checker_column,
+        ..
+    } = row;
+    let pool_checker_text_of_the_row = list_text(red_by_the_pool_checker);
+    let pool_checker_equals_e170 = pool_checker_text_of_the_row == *e170_pool_checker_column;
+    JudgedE170BadRow {
+        row_failed: !(*digests_equal && pool_checker_equals_e170),
+        pool_checker_file_row: format!(
+            "{label}\t{row_identifier}\t{}\t{pool_checker_text_of_the_row}\t{e170_pool_checker_column}\t{pool_checker_equals_e170}\t{digests_equal}\t{}\t{base_digest}\n",
+            if red_by_the_pool_checker.is_empty() { "green" } else { "red" },
+            list_text(base_red)
+        ),
+        result_line: format!(
+            "name=e170_bad_row stream={label} row={row_identifier} o2={} o2_red={} e170_pool_checker={} o2_equals_e170={pool_checker_equals_e170} digests_equal={digests_equal} base_o2_red={}",
+            if red_by_the_pool_checker.is_empty() { "green" } else { "red" },
+            field_text(&pool_checker_text_of_the_row),
+            field_text(e170_pool_checker_column),
+            field_text(&list_text(base_red))
+        ),
+    }
+}
+
+/// `known-bad-images` 模式录入段构造要判的盘的三步，按两段之前打结果行的次序。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum KnownBadImagesStep {
+    /// 从导出目录重建干净镜像、两条 S4 回比、数表的条数、录下干净镜像那张盘。
+    CleanImage,
+    /// 已知坏镜像表逐条构造、录下。
+    KnownBadEntries,
+    /// E170 坏状态逐流、逐行构造、录下（只在带 `--e170-bad-rows` 时）。
+    E170BadRows,
+}
+
+/// 录入段构造要判的盘时 panic 了：在哪一步、panic 的消息。判段照两段之前的次序打到那一步之前，再以同一句 panic。
+struct PanicOfTheRecordStage {
+    step: KnownBadImagesStep,
+    message: String,
+}
+
+/// 录下了的干净镜像：已知坏镜像表的条数与干净镜像那张盘。
+struct RecordedCleanImage {
+    entry_count: usize,
+    table: RecordedTableReference,
+}
+
+/// 录入段交给判段的 `known-bad-images` 那一趟：已知坏镜像表在流一全持久态上（干净镜像的两条 S4 回比、表的条数与干净镜像那张盘、每一条录下的，
+/// 与按条目的次序拼好的 `known-bad-states.tsv`、`known-bad-patches.bin`），与带 `--e170-bad-rows` 时 E170 坏状态两条流按行的次序录下的每一行（不带是空的）。
+/// 构造时 panic 了的，各样录到 panic 之前为止（`clean` 没录下是 `None`），`panic_of_the_record_stage` 记着在哪一步、那一句。
+struct RecordedKnownBadImages {
+    clean_image_checks: Vec<StopCheck>,
+    clean: Option<RecordedCleanImage>,
+    entries: Vec<RecordedKnownBadEntry>,
+    states_text: String,
+    patches_file: Vec<u8>,
+    e170_bad_rows: Vec<RecordedE170BadRow>,
+    panic_of_the_record_stage: Option<PanicOfTheRecordStage>,
+}
+
+/// 录入段在 `step` 这一步 panic 过（`panic_of_the_record_stage`）：判段以同一句 panic（与两段之前构造到那里 panic 时一样，之后的结果行与产物都没有）。
+fn panic_again_if_the_record_stage_panicked_at(
+    panic_of_the_record_stage: Option<&PanicOfTheRecordStage>,
+    step: KnownBadImagesStep,
+) {
+    if let Some(panic) =
+        panic_of_the_record_stage.filter(|recorded_panic| recorded_panic.step == step)
+    {
+        std::panic::panic_any(panic.message.clone());
+    }
+}
+
+/// `known-bad-images` 模式的录入段：从导出目录重建流一全持久态（干净镜像），回比两个摘要（S4），已知坏镜像表每一条（一条怎么录见
+/// [`record_a_known_bad_entry`]）与带 `--e170-bad-rows` 时 E170 坏状态每一行（[`record_an_e170_bad_row`]）要判的盘录进 `tables`，不判。
+/// 条目与行分给 [`sampling_threads_of_this_run`] 条线程录（每条各录各的表，表名、内容与一条线程时相同，判定库的键不变）；补丁文件的起点与
+/// 录下的次序都按条目、按行的次序在主线程上收，与线程数无关。构造时 panic 了（次序上第一个 panic 的条目或行）：接住，录到它之前为止，
+/// 记下在哪一步、那一句（[`PanicOfTheRecordStage`]），交给判段照两段之前的次序打到那里再 panic。
+fn record_the_known_bad_images(
+    command_line: &KnownBadImagesCommandLine,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+) -> RecordedKnownBadImages {
+    let mut recorded = RecordedKnownBadImages {
+        clean_image_checks: Vec::new(),
+        clean: None,
+        entries: Vec::new(),
+        states_text: String::new(),
+        patches_file: Vec::new(),
+        e170_bad_rows: Vec::new(),
+        panic_of_the_record_stage: None,
+    };
+    let mut step = KnownBadImagesStep::CleanImage;
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        record_the_known_bad_images_step_by_step(command_line, tables, &mut recorded, &mut step);
+    }));
+    if let Err(payload) = caught {
+        recorded.panic_of_the_record_stage = Some(PanicOfTheRecordStage {
+            step,
+            message: panic_text(&*payload),
+        });
+    }
+    recorded
+}
+
+/// [`record_the_known_bad_images`] 的三步，录下的随录随放进 `recorded`，走到哪一步记在 `step`（panic 时那两样留到 panic 之前）。
+fn record_the_known_bad_images_step_by_step(
+    command_line: &KnownBadImagesCommandLine,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    recorded: &mut RecordedKnownBadImages,
+    step: &mut KnownBadImagesStep,
+) {
+    let threads = sampling_threads_of_this_run(command_line.switches);
+    let stream_directory = command_line
+        .dump_directory
+        .join(StreamName::NewPoolFileCreation.directory_name());
     let neutral = read_neutral_stream(&stream_directory);
     let write_count = neutral
         .operations
@@ -4769,7 +3978,7 @@ fn known_bad_images_on_the_first_stream(
         })
         .find(|fields| fields[4] == all_persisted)
         .map(|fields| fields[5].clone());
-    for check in [
+    recorded.clean_image_checks = vec![
         StopCheck::new(
             "known_bad_clean_image_digest_equals_build_pool",
             &reference_digest,
@@ -4780,127 +3989,55 @@ fn known_bad_images_on_the_first_stream(
             Some(&clean_digest),
             states_digest_of_the_full_state.as_ref(),
         ),
-    ] {
-        failed += usize::from(!check.holds());
-        lines.emit_result_line(&format!(
-            "name=s4 check={} local={} crates={} holds={}",
-            check.name,
-            field_text(&check.local),
-            field_text(&check.crates),
-            check.holds()
-        ));
-    }
-    let test_file_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/checker_known_bad_images.rs");
-    let test_file_text = std::fs::read_to_string(&test_file_path)
-        .unwrap_or_else(|error| panic!("读 {}：{error}", test_file_path.display()));
-    let test_file_sha256 = sha256_hexadecimal(test_file_text.as_bytes());
-    let entries =
-        known_bad_images_copied_from_the_harness_test::entries_of_the_known_bad_images(&clean);
-    let names_here: Vec<&str> = entries.iter().map(|(name, _)| *name).collect();
-    let names_in_the_file = entry_names_in_the_original_test_file(&test_file_text);
-    for check in [
-        StopCheck::new(
-            "known_bad_test_file_sha256_is_the_copied_one",
-            KNOWN_BAD_TEST_FILE_SHA256,
-            &test_file_sha256,
-        ),
-        StopCheck::new(
-            "known_bad_entry_count_here",
-            KNOWN_BAD_ENTRY_COUNT,
-            entries.len(),
-        ),
-        StopCheck::new(
-            "known_bad_entry_count_in_the_original_file",
-            KNOWN_BAD_ENTRY_COUNT,
-            names_in_the_file.len(),
-        ),
-        StopCheck::new(
-            "known_bad_entry_names_equal_the_original_file_in_order",
-            &names_in_the_file,
-            &names_here,
-        ),
-    ] {
-        failed += usize::from(!check.holds());
-        lines.emit_result_line(&format!(
-            "name=s4 check={} local={} crates={} holds={}",
-            check.name,
-            field_text(&check.local),
-            field_text(&check.crates),
-            check.holds()
-        ));
-    }
-    let clean_red =
-        pool_checker_red_names_through_the_given_states_engine("known-bad/clean", &clean);
-    lines.emit_result_line(&format!(
-        "name=known_bad_clean_image invariants_red={}",
-        field_text(&list_text(&clean_red))
-    ));
-    let mut states_text = String::new();
-    let mut patches_file: Vec<u8> = Vec::new();
-    let mut o2_text = String::new();
-    for (entry_index, (target, apply)) in entries.iter().enumerate() {
-        let mut bad = clean.clone();
-        apply(&mut bad);
-        let direct_red = pool_checker_red_names_through_the_given_states_engine(
-            &format!("known-bad/entry-{entry_index}/direct"),
-            &bad,
-        );
-        let patches = sector_difference_as_patches(&clean, &bad);
-        let mut patched = clean.clone();
-        apply_patches(&mut patched, &patches);
-        let patched_red = pool_checker_red_names_through_the_given_states_engine(
-            &format!("known-bad/entry-{entry_index}/patched"),
-            &patched,
-        );
-        let patched_digest = sha256_text(&memory_pool_digest(&patched));
-        let digest_equals_the_direct_one = patched_digest == sha256_text(&memory_pool_digest(&bad));
-        let sets_equal = direct_red == patched_red;
-        let target_is_red = patched_red.iter().any(|name| name == target);
-        failed += usize::from(!(sets_equal && digest_equals_the_direct_one && target_is_red));
-        states_text.push_str(&format!(
+    ];
+    let entry_count = known_bad_images(&clean).len();
+    recorded.clean = Some(RecordedCleanImage {
+        entry_count,
+        table: tables.record_a_table("known-bad/clean", &clean),
+    });
+    *step = KnownBadImagesStep::KnownBadEntries;
+    eprintln!("E171_KNOWN_BAD_IMAGES entries={entry_count} threads={threads}");
+    for (entry_index, recorded_entry) in
+        outcomes_up_to_the_earliest_panic(entry_count, threads, &|entry_index| {
+            record_a_known_bad_entry(&clean, entry_index, tables)
+        })
+        .into_iter()
+        .enumerate()
+    {
+        let KnownBadEntryOfTheRecordStage {
+            hand_off,
+            patches,
+            patched_digest,
+        } = match recorded_entry {
+            Ok(entry_of_the_record_stage) => entry_of_the_record_stage,
+            Err(payload) => std::panic::resume_unwind(payload),
+        };
+        recorded.states_text.push_str(&format!(
             "{entry_index}\t{all_persisted}\t{clean_digest}\t{patched_digest}\t{}\n",
-            patch_list_text(&patches, &mut patches_file)
+            patch_list_text(&patches, &mut recorded.patches_file)
         ));
-        o2_text.push_str(&format!(
-            "{entry_index}\t{target}\t{}\t{}\t{sets_equal}\t{target_is_red}\n",
-            list_text(&patched_red),
-            list_text(&direct_red)
-        ));
-        lines.emit_result_line(&format!(
-            "name=known_bad_entry index={entry_index} target={target} o2={} patched_red={} direct_red={} sets_equal={sets_equal} digest_equals_the_direct_one={digest_equals_the_direct_one} target_is_red={target_is_red} patches={}",
-            if patched_red.is_empty() { "green" } else { "red" },
-            field_text(&list_text(&patched_red)),
-            field_text(&list_text(&direct_red)),
-            patches.len()
-        ));
+        recorded.entries.push(hand_off);
     }
-    std::fs::create_dir_all(output_directory)
-        .unwrap_or_else(|error| panic!("建 {}：{error}", output_directory.display()));
-    for (file_name, contents) in [
-        ("known-bad-states.tsv", states_text.into_bytes()),
-        ("known-bad-patches.bin", patches_file),
-        ("known-bad-o2.tsv", o2_text.into_bytes()),
-    ] {
-        let written = write_export_file(output_directory, file_name, &contents);
-        lines.emit_result_line(&format!(
-            "name=file file={file_name} bytes={} sha256={}",
-            written.bytes, written.sha256
-        ));
+    *step = KnownBadImagesStep::E170BadRows;
+    if command_line.with_e170_bad_rows {
+        record_the_e170_bad_rows_of_both_streams(
+            &command_line.dump_directory,
+            threads,
+            tables,
+            &mut recorded.e170_bad_rows,
+        );
     }
-    failed
 }
 
-/// E170 的 `bad-states` 模式造的坏状态（P 行、N 行、盲测族）上的 O2：每一行读 `bad-states.tsv` 的落地向量与补丁，从中性格式重建底态、叠补丁，
-/// 底态与补丁之后的镜像摘要与 E170 写的两个摘要逐行比，再调 `check_pool_image`，判红的不变量与 E170 `bad-impl-verdicts.tsv` 里池级 checker 那一列逐行比（S3）。
-/// 交回（对不上的行数）。只读 `bad-states.tsv`、`bad-patches.bin`、`bad-impl-verdicts.tsv`，不读期望文件。
-fn e170_bad_rows_on_both_streams(
+/// E170 的 `bad-states` 模式造的坏状态（P 行、N 行、盲测族）：每一行读 `bad-states.tsv` 的落地向量与补丁、`bad-impl-verdicts.tsv` 里池级 checker
+/// 那一列，录下要判的两张盘（一行怎么录见 [`record_an_e170_bad_row`]），按流、按行的次序放进 `rows`，与线程数无关。一条流的行分给 `threads` 条线程录；
+/// 次序上第一个 panic 的行原样抛出，它之前的行都放进去了。只读 `bad-states.tsv`、`bad-patches.bin`、`bad-impl-verdicts.tsv`，不读期望文件。
+fn record_the_e170_bad_rows_of_both_streams(
     dump_directory: &Path,
-    output_directory: &Path,
-    lines: &mut ResultLines,
-) -> usize {
-    let mut failed = 0usize;
-    let mut o2_text = String::new();
+    threads: NonZeroUsize,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    rows: &mut Vec<RecordedE170BadRow>,
+) {
     for name in STREAM_NAMES {
         let label = name.directory_name();
         let stream_directory = dump_directory.join(label);
@@ -4913,68 +4050,198 @@ fn e170_bad_rows_on_both_streams(
             verdict_rows.len(),
             "bad-states.tsv 与 bad-impl-verdicts.tsv 同行数"
         );
-        for (state_row, verdict_row) in state_rows.iter().zip(&verdict_rows) {
-            let state_fields: Vec<&str> = state_row.split('\t').collect();
-            assert_eq!(
-                state_fields.len(),
-                5,
-                "bad-states.tsv 一行五列：{state_row:?}"
-            );
-            let verdict_fields: Vec<&str> = verdict_row.split('\t').collect();
-            assert_eq!(
-                verdict_fields.len(),
-                10,
-                "bad-impl-verdicts.tsv 一行十列：{verdict_row:?}"
-            );
-            let row_id = state_fields[0];
-            let mut pool = rebuilt_memory_pool(&neutral, state_fields[1]);
-            let base_digest = sha256_text(&memory_pool_digest(&pool));
-            // 不打补丁的底态上的 O2（登记 5.6 坏镜像行的阴性：F、Mk、Mk⁺、Mk⁻ 各一张，必须不红）。
-            let base_red = pool_checker_red_names_through_the_given_states_engine(
-                &format!("e170-bad-row/{label}/{row_id}/base"),
-                &pool,
-            );
-            apply_patches(
-                &mut pool,
-                &patches_of_a_patch_list_text(state_fields[4], &patches_file),
-            );
-            let patched_digest = sha256_text(&memory_pool_digest(&pool));
-            let o2_red = pool_checker_red_names_through_the_given_states_engine(
-                &format!("e170-bad-row/{label}/{row_id}/patched"),
-                &pool,
-            );
-            let o2_text_of_the_row = list_text(&o2_red);
-            let e170_pool_checker_column = verdict_fields[6];
-            let digests_equal = base_digest == state_fields[2] && patched_digest == state_fields[3];
-            let o2_equals_e170 = o2_text_of_the_row == e170_pool_checker_column;
-            failed += usize::from(!(digests_equal && o2_equals_e170));
-            o2_text.push_str(&format!(
-                "{label}\t{row_id}\t{}\t{o2_text_of_the_row}\t{e170_pool_checker_column}\t{o2_equals_e170}\t{digests_equal}\t{}\t{base_digest}\n",
-                if o2_red.is_empty() { "green" } else { "red" },
-                list_text(&base_red)
-            ));
-            lines.emit_result_line(&format!(
-                "name=e170_bad_row stream={label} row={row_id} o2={} o2_red={} e170_pool_checker={} o2_equals_e170={o2_equals_e170} digests_equal={digests_equal} base_o2_red={}",
-                if o2_red.is_empty() { "green" } else { "red" },
-                field_text(&o2_text_of_the_row),
-                field_text(e170_pool_checker_column),
-                field_text(&list_text(&base_red))
-            ));
+        eprintln!(
+            "E171_E170_BAD_ROWS stream={label} rows={} threads={threads}",
+            state_rows.len()
+        );
+        for recorded in
+            outcomes_up_to_the_earliest_panic(state_rows.len(), threads, &|row_position| {
+                record_an_e170_bad_row(
+                    label,
+                    &neutral,
+                    &patches_file,
+                    &state_rows[row_position],
+                    &verdict_rows[row_position],
+                    tables,
+                )
+            })
+        {
+            match recorded {
+                Ok(row) => rows.push(row),
+                Err(payload) => std::panic::resume_unwind(payload),
+            }
         }
     }
-    std::fs::create_dir_all(output_directory)
-        .unwrap_or_else(|error| panic!("建 {}：{error}", output_directory.display()));
-    let written = write_export_file(output_directory, "e170-bad-rows-o2.tsv", o2_text.as_bytes());
+}
+
+/// `known-bad-images` 模式的判段：录下的盘按录下的次序（干净镜像、每一条的直接改坏与叠完补丁、每一行 E170 坏状态的底态与叠完补丁）
+/// 分给 [`sampling_threads_of_this_run`] 条线程判，结果行与产物照一趟写完时的次序拼：两边判红的不变量集合要相等（S4）、目标不变量要在里面（S4）；
+/// E170 坏状态每一行判红的不变量与 E170 池级 checker 那一列比（S3）。判器在次序上第一个 panic 的那张盘照原样抛出，抛出之前的结果行与产物照写
+/// （与一条线程判到那里 panic 时相同）。录入段构造时 panic 过的，打到那一步之前，再以同一句 panic（[`panic_again_if_the_record_stage_panicked_at`]）：
+/// 录下的盘都在 panic 之前，判器在其中一张上 panic 的先抛。结果行写进 `result_lines_output`，产物写进命令行给的输出目录。交回退出码。
+///
+/// # Errors
+/// 交接与录下的对不上（[`PoolCheckerTablesOfTheTwoStages::judge_a_recorded_table`] 的 `Err`）：一个文件都不写、一行结果行都不打就交回那一句。
+fn judge_the_known_bad_images(
+    command_line: &KnownBadImagesCommandLine,
+    recorded: RecordedKnownBadImages,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    result_lines_output: &mut dyn std::io::Write,
+) -> Result<i32, String> {
+    let RecordedKnownBadImages {
+        clean_image_checks,
+        clean,
+        entries,
+        states_text,
+        patches_file,
+        e170_bad_rows,
+        panic_of_the_record_stage,
+    } = recorded;
+    let recorded_tables: Vec<&RecordedTableReference> = clean
+        .iter()
+        .map(|recorded_clean_image| &recorded_clean_image.table)
+        .chain(
+            entries
+                .iter()
+                .flat_map(|entry| [&entry.direct, &entry.patched]),
+        )
+        .chain(
+            e170_bad_rows
+                .iter()
+                .flat_map(|row| [&row.base, &row.patched]),
+        )
+        .collect();
+    let mut judged_in_the_recorded_order = Vec::with_capacity(recorded_tables.len());
+    for judged in outcomes_up_to_the_earliest_panic(
+        recorded_tables.len(),
+        sampling_threads_of_this_run(command_line.switches),
+        &|position| tables.judge_a_recorded_table(recorded_tables[position]),
+    ) {
+        judged_in_the_recorded_order.push(match judged {
+            Ok(red_or_refusal) => Ok(red_or_refusal?),
+            Err(payload) => Err(payload),
+        });
+    }
+    let mut judged_in_the_recorded_order = judged_in_the_recorded_order.into_iter();
+    let mut lines = ResultLines {
+        emitted: 0,
+        output: result_lines_output,
+    };
     lines.emit_result_line(&format!(
-        "name=file file=e170-bad-rows-o2.tsv bytes={} sha256={}",
-        written.bytes, written.sha256
+        "name=config segment=s1 mode=known-bad-images e170_bad_rows={}",
+        command_line.with_e170_bad_rows
     ));
-    failed
+    let mut known_bad_failed = 0usize;
+    for check in &clean_image_checks {
+        known_bad_failed += usize::from(!check.holds());
+        lines.emit_result_line(&format!(
+            "name=s4 check={} local={} crates={} holds={}",
+            check.name,
+            field_text(&check.local),
+            field_text(&check.crates),
+            check.holds()
+        ));
+    }
+    let Some(RecordedCleanImage { entry_count, .. }) = clean else {
+        let panic = panic_of_the_record_stage
+            .expect("录入段没录下干净镜像，只可能是构造干净镜像那一步 panic 了");
+        std::panic::panic_any(panic.message);
+    };
+    lines.emit_result_line(&format!("name=known_bad_entry_count count={entry_count}"));
+    let mut red_names_of_the_next_table = || match judged_in_the_recorded_order
+        .next()
+        .expect("录下的每张盘都判过一次：判的次序就是录下的次序，panic 的那张之后不再往下走")
+    {
+        Ok(red) => red,
+        Err(payload) => std::panic::resume_unwind(payload),
+    };
+    let clean_red = red_names_of_the_next_table();
+    lines.emit_result_line(&format!(
+        "name=known_bad_clean_image invariants_red={}",
+        field_text(&list_text(&clean_red))
+    ));
+    let mut pool_checker_text = String::new();
+    for (entry_index, entry) in entries.iter().enumerate() {
+        let direct_red = red_names_of_the_next_table();
+        let patched_red = red_names_of_the_next_table();
+        let target = &entry.target;
+        let digest_equals_the_direct_one = entry.digest_equals_the_direct_one;
+        let sets_equal = direct_red == patched_red;
+        let target_is_red = patched_red.iter().any(|name| name == target);
+        known_bad_failed +=
+            usize::from(!(sets_equal && digest_equals_the_direct_one && target_is_red));
+        pool_checker_text.push_str(&format!(
+            "{entry_index}\t{target}\t{}\t{}\t{sets_equal}\t{target_is_red}\n",
+            list_text(&patched_red),
+            list_text(&direct_red)
+        ));
+        lines.emit_result_line(&format!(
+            "name=known_bad_entry index={entry_index} target={target} o2={} patched_red={} direct_red={} sets_equal={sets_equal} digest_equals_the_direct_one={digest_equals_the_direct_one} target_is_red={target_is_red} patches={}",
+            if patched_red.is_empty() { "green" } else { "red" },
+            field_text(&list_text(&patched_red)),
+            field_text(&list_text(&direct_red)),
+            entry.patch_count
+        ));
+    }
+    panic_again_if_the_record_stage_panicked_at(
+        panic_of_the_record_stage.as_ref(),
+        KnownBadImagesStep::KnownBadEntries,
+    );
+    std::fs::create_dir_all(&command_line.output_directory)
+        .unwrap_or_else(|error| panic!("建 {}：{error}", command_line.output_directory.display()));
+    for (file_name, contents) in [
+        ("known-bad-states.tsv", states_text.into_bytes()),
+        ("known-bad-patches.bin", patches_file),
+        ("known-bad-o2.tsv", pool_checker_text.into_bytes()),
+    ] {
+        let written = write_export_file(&command_line.output_directory, file_name, &contents);
+        lines.emit_result_line(&format!(
+            "name=file file={file_name} bytes={} sha256={}",
+            written.bytes, written.sha256
+        ));
+    }
+    let e170_rows_failed = if command_line.with_e170_bad_rows {
+        let mut failed = 0usize;
+        let mut e170_pool_checker_text = String::new();
+        for row in &e170_bad_rows {
+            let base_red = red_names_of_the_next_table();
+            let red_by_the_pool_checker = red_names_of_the_next_table();
+            let judged = judged_e170_bad_row(row, &base_red, &red_by_the_pool_checker);
+            failed += usize::from(judged.row_failed);
+            e170_pool_checker_text.push_str(&judged.pool_checker_file_row);
+            lines.emit_result_line(&judged.result_line);
+        }
+        panic_again_if_the_record_stage_panicked_at(
+            panic_of_the_record_stage.as_ref(),
+            KnownBadImagesStep::E170BadRows,
+        );
+        let written = write_export_file(
+            &command_line.output_directory,
+            "e170-bad-rows-o2.tsv",
+            e170_pool_checker_text.as_bytes(),
+        );
+        lines.emit_result_line(&format!(
+            "name=file file=e170-bad-rows-o2.tsv bytes={} sha256={}",
+            written.bytes, written.sha256
+        ));
+        failed
+    } else {
+        0
+    };
+    lines.emit_result_line(&format!(
+        "name=verdict known_bad_entries_failing_s4={known_bad_failed} e170_bad_rows_failing_s3_or_s4={e170_rows_failed}"
+    ));
+    lines.finish();
+    if known_bad_failed > 0 || e170_rows_failed > 0 {
+        Ok(3)
+    } else {
+        Ok(0)
+    }
 }
 
 /// 一条流的结果行（`E7RESULT` 与 `E7TIMING`）；交回 (S1 没过的条数, S4 对不上的态数, 掩码对不上的态数, S3 对不上的态数,
 /// O1-对拍判红的调用数, O1-崩溃判官判红的态数, O2 判红的态数)。
-fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
+fn report_stream(lines: &mut ResultLines<'_>, export: &StreamExport) -> [usize; 7] {
     let label = export.name.directory_name();
     let mut failed_checks = 0usize;
     for check in &export.checks {
@@ -5053,20 +4320,19 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         };
         let crash_judge_is =
             |word: &'static str| count_where(&|observation| observation.crash_judge.word() == word);
-        let o2_red = count_where(&|observation| {
+        let red_by_the_pool_checker = count_where(&|observation| {
             observation
-                .pool_checker_red
-                .as_ref()
+                .pool_checker_red()
                 .is_some_and(|items| !items.is_empty())
         });
         crash_judge_red += crash_judge_is("red");
-        pool_checker_red += o2_red;
+        pool_checker_red += red_by_the_pool_checker;
         let segments: BTreeSet<usize> = in_batch
             .iter()
             .map(|observation| observation.segment_index)
             .collect();
         lines.emit_result_line(&format!(
-            "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o2_red={o2_red} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={}",
+            "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o2_red={red_by_the_pool_checker} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={}",
             in_batch.len(),
             segments.len(),
             count_where(&|observation| observation.landing_vector.contains('1')),
@@ -5074,7 +4340,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
             crash_judge_is("green"),
             crash_judge_is("na"),
             crash_judge_is("off"),
-            count_where(&|observation| !observation.pool_checker_matches_the_judgement),
+            count_where(&|observation| !observation.pool_checker_matches_the_judgement()),
             count_where(&|observation| !observation.verdict.pool_checker_red.is_empty()),
             count_where(&|observation| observation
                 .verdict
@@ -5097,20 +4363,20 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         for (stage, pick) in [
             (
                 "o1",
-                (|observation: &StateObservation| observation.o1_nanoseconds)
+                (|observation: &StateObservation| observation.crash_judge_nanoseconds)
                     as fn(&StateObservation) -> u128,
             ),
-            ("o2", |observation| observation.o2_nanoseconds),
+            ("o2", |observation| observation.pool_checker_nanoseconds),
             ("recovery", |observation| observation.recovery_nanoseconds),
         ] {
-            let (total, median, p95, maximum) = timing_summary(
+            let (total, median, ninety_fifth_percentile, maximum) = timing_summary(
                 in_batch
                     .iter()
                     .map(|observation| pick(observation))
                     .collect(),
             );
             ResultLines::timing(&format!(
-                "name=stage_time stream={label} batch={batch} stage={stage} states={} total_ns={total} median_ns={median} p95_ns={p95} max_ns={maximum}",
+                "name=stage_time stream={label} batch={batch} stage={stage} states={} total_ns={total} median_ns={median} p95_ns={ninety_fifth_percentile} max_ns={maximum}",
                 in_batch.len()
             ));
         }
@@ -5120,10 +4386,10 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         .iter()
         .filter(|observation| !observation.mask_matches_the_facts)
         .count();
-    let s3_mismatches = export
+    let pool_checker_direct_mismatches = export
         .observations
         .iter()
-        .filter(|observation| !observation.pool_checker_matches_the_judgement)
+        .filter(|observation| !observation.pool_checker_matches_the_judgement())
         .count();
     lines.emit_result_line(&format!(
         "name=s4 stream={label} rebuilt_states={} digest_mismatches={}",
@@ -5134,7 +4400,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         export.observations.len()
     ));
     lines.emit_result_line(&format!(
-        "name=s3 stream={label} states={} o2_direct_differs_from_judge_crash_image={s3_mismatches}",
+        "name=s3 stream={label} states={} o2_direct_differs_from_judge_crash_image={pool_checker_direct_mismatches}",
         export.observations.len()
     ));
     for file in &export.files {
@@ -5166,7 +4432,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
         failed_checks,
         export.rebuilt_digest_mismatches,
         mask_mismatches,
-        s3_mismatches,
+        pool_checker_direct_mismatches,
         red_calls,
         crash_judge_red,
         pool_checker_red,
@@ -5175,11 +4441,11 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 7] {
 
 /// 基线上 O1 不适用的来源只有两种（登记第十一节 S5）：模型没有答的 `unmount`，与对拍判出不同之后。基线上不许有对拍判出不同，
 /// 所以模型只许停在流二的 `unmount` 那一次调用（流一一次都不停）。这两条按 `StopCheck` 的形式回比：期望（本地）与实际（这一趟）。
-fn s5_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
+fn not_applicable_source_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
     let label = export.name.directory_name();
     let expected_stop = match export.name {
         StreamName::NewPoolFileCreation => None,
-        StreamName::FixedScriptThroughEThenUnmount => export
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => export
             .calls
             .iter()
             .rposition(|call| call.label == UNMOUNT_CALL_LABEL),
@@ -5203,13 +4469,13 @@ fn s5_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
     ]
 }
 
-/// 逐行那一趟（坏实现、阳性对照；不关 oracle）的 S5：与基线那一趟（[`s5_checks_of_the_baseline`]）同一条停机条款（登记第十一节 S5：
+/// 逐行那一趟（坏实现、阳性对照；不关 oracle）的 S5：与基线那一趟（[`not_applicable_source_checks_of_the_baseline`]）同一条停机条款（登记第十一节 S5：
 /// 「不适用只许来自 `unmount` 与对拍判出不同之后」）。坏实现可以让对拍判出不同、让模型停在那里（那是 O1-对拍的红），所以这一趟不要求模型
 /// 只停在 `unmount`；要求两样（登记第一节读法 5、6），都按「不合的个数」回比 0：
 /// ① 返回了错误的调用（卸载除外：模型没有卸载的答）没有一次留在「没问模型」（`not_modelled`）——取号、暖机出错那一形；
 /// 模型因对拍判出不同停下之后的调用（`skipped_after_the_model_stopped`）不数：读法 6 原文「一次对拍判出不同之后模型不再往前走」，
 /// 那是合规来源（登记修订 4）；② O1-崩溃判官的不适用只来自模型停在卸载、或停在对拍判出不同的那次调用。
-fn s5_checks_of_a_bad_implementation_row(
+fn not_applicable_source_checks_of_a_bad_implementation_row(
     label: &str,
     calls: &[RecordedCall],
     model_stopped_at_call: Option<usize>,
@@ -5248,11 +4514,11 @@ fn s5_checks_of_a_bad_implementation_row(
     ]
 }
 
-/// 这一趟、这一条流要判的 S5（登记第十一节 S5）。基线那一趟判 [`s5_checks_of_the_baseline`]：只判不带对照、不关 oracle、流导出了的基线
-/// （阳性对照会让模型在翻过的那次调用停下，关掉 O1 时每次调用都不比）。逐行那一趟判 [`s5_checks_of_a_bad_implementation_row`]：阳性对照照判
+/// 这一趟、这一条流要判的 S5（登记第十一节 S5）。基线那一趟判 [`not_applicable_source_checks_of_the_baseline`]：只判不带对照、不关 oracle、流导出了的基线
+/// （阳性对照会让模型在翻过的那次调用停下，关掉 O1 时每次调用都不比）。逐行那一趟判 [`not_applicable_source_checks_of_a_bad_implementation_row`]：阳性对照照判
 /// （它让模型停在翻过的那次调用，是对拍的红）；关掉 O1 不判；驱动没走完整（实现 panic、流水线 panic）的流走自崩那一类，不判；
 /// 状态上实现 panic 的流驱动是走完了的，照判（那时没有观测，不适用的态数是 0）。
-fn s5_checks_to_judge(
+fn not_applicable_source_checks_to_judge(
     export: &StreamExport,
     run_kind: RunKind,
     switches: RunSwitches,
@@ -5263,7 +4529,7 @@ fn s5_checks_to_judge(
                 && switches.positive_control.is_none()
                 && switches.disabled_oracle.is_none()
             {
-                s5_checks_of_the_baseline(export)
+                not_applicable_source_checks_of_the_baseline(export)
             } else {
                 Vec::new()
             }
@@ -5281,7 +4547,7 @@ fn s5_checks_to_judge(
                         observation.crash_judge == CrashJudgeVerdict::NotApplicable
                     })
                     .count();
-                s5_checks_of_a_bad_implementation_row(
+                not_applicable_source_checks_of_a_bad_implementation_row(
                     export.name.directory_name(),
                     &export.calls,
                     export.model_stopped_at_call,
@@ -5304,6 +4570,7 @@ struct KnownBadImagesCommandLine {
     dump_directory: PathBuf,
     output_directory: PathBuf,
     with_e170_bad_rows: bool,
+    switches: RunSwitches,
 }
 
 enum ParsedCommand {
@@ -5333,6 +4600,9 @@ fn parse_command_line(arguments: &[String]) -> Option<ParsedCommand> {
                     _ => return None,
                 });
             }
+            "--sampling-threads" => {
+                switches.sampling_threads = Some(words.next()?.parse::<NonZeroUsize>().ok()?);
+            }
             _ => return None,
         }
     }
@@ -5350,46 +4620,687 @@ fn parse_command_line(arguments: &[String]) -> Option<ParsedCommand> {
             dump_directory: dump_directory?,
             output_directory: output_directory?,
             with_e170_bad_rows,
+            switches,
         })),
         _ => None,
     }
 }
 
-fn run_known_bad_images(command_line: &KnownBadImagesCommandLine) -> i32 {
-    let mut lines = ResultLines { emitted: 0 };
-    lines.emit_result_line(&format!(
-        "name=config segment=s1 mode=known-bad-images e170_bad_rows={}",
-        command_line.with_e170_bad_rows
-    ));
-    let known_bad_failed = known_bad_images_on_the_first_stream(
-        &command_line.dump_directory,
-        &command_line.output_directory,
-        &mut lines,
-    );
-    let e170_rows_failed = if command_line.with_e170_bad_rows {
-        e170_bad_rows_on_both_streams(
-            &command_line.dump_directory,
-            &command_line.output_directory,
-            &mut lines,
-        )
-    } else {
-        0
-    };
-    lines.emit_result_line(&format!(
-        "name=verdict known_bad_entries_failing_s4={known_bad_failed} e170_bad_rows_failing_s3_or_s4={e170_rows_failed}"
-    ));
-    lines.finish();
-    if known_bad_failed > 0 || e170_rows_failed > 0 {
-        3
-    } else {
-        0
+// ───────────────────────────── 两段的交接与选段 ─────────────────────────────
+
+/// 点段的参数（取值照 `crash_library::RunStage` 的写法：`record` 只跑录入段、`judge` 只跑判段，不给就两段先后跑）。
+const STAGE_ARGUMENT: &str = "--stage";
+
+/// 只跑录入段那一趟留给判段的交接，放在输出目录里：判段读完、写完产物之后删掉；两段先后跑的那一趟在内存里交、不落这个文件。
+/// 里面没有判定（O2 录下的只是盘的摘要，盘在判定库里）：是录入段的观测与结果行要的东西。
+const HAND_OFF_TO_THE_JUDGE_STAGE_FILE: &str = "hand-off-to-the-judge-stage.bin";
+
+/// 交接字节的头：换了布局就换头，判段只认这一版。
+const HAND_OFF_MAGIC: &[u8; 8] = b"E171HO01";
+
+/// 只跑录入段那一趟录完的退出码（停机条款归判段）。
+const EXIT_CODE_OF_A_RECORD_ONLY_RUN: i32 = 0;
+
+/// 交接里的一样东西怎么写成字节、怎么读回：整数小端定长，串与列表先写长度，枚举先写一个字节的成员号。
+trait HandOffField: Sized {
+    fn put_into(&self, bytes: &mut Vec<u8>);
+    /// 字节不够、成员号认不得、串不是 UTF-8 交回 `None`。
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self>;
+}
+
+/// 从交接字节里按次序往下读。
+struct HandOffReader<'bytes> {
+    bytes: &'bytes [u8],
+    position: usize,
+}
+
+impl<'bytes> HandOffReader<'bytes> {
+    fn take_bytes(&mut self, count: usize) -> Option<&'bytes [u8]> {
+        let end = self.position.checked_add(count)?;
+        let taken = self.bytes.get(self.position..end)?;
+        self.position = end;
+        Some(taken)
+    }
+
+    fn is_at_the_end(&self) -> bool {
+        self.position == self.bytes.len()
     }
 }
 
-fn run_dump(command_line: &CommandLine) -> i32 {
+impl HandOffField for u8 {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.push(*self);
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        reader.take_bytes(1).map(|taken| taken[0])
+    }
+}
+
+impl HandOffField for bool {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.push(u8::from(*self));
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(false),
+            1 => Some(true),
+            2..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for u64 {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.extend_from_slice(&self.to_le_bytes());
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        Some(u64::from_le_bytes(reader.take_bytes(8)?.try_into().ok()?))
+    }
+}
+
+impl HandOffField for u128 {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.extend_from_slice(&self.to_le_bytes());
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        Some(u128::from_le_bytes(reader.take_bytes(16)?.try_into().ok()?))
+    }
+}
+
+impl HandOffField for usize {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        u64::try_from(*self)
+            .expect("usize 装得进 u64")
+            .put_into(bytes);
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        usize::try_from(u64::take_from(reader)?).ok()
+    }
+}
+
+impl HandOffField for String {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        self.len().put_into(bytes);
+        bytes.extend_from_slice(self.as_bytes());
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        let length = usize::take_from(reader)?;
+        String::from_utf8(reader.take_bytes(length)?.to_vec()).ok()
+    }
+}
+
+impl HandOffField for [u8; DIGEST_BYTES] {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.extend_from_slice(self);
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        reader.take_bytes(DIGEST_BYTES)?.try_into().ok()
+    }
+}
+
+impl<Element: HandOffField> HandOffField for Option<Element> {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            None => bytes.push(0),
+            Some(value) => {
+                bytes.push(1);
+                value.put_into(bytes);
+            }
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(None),
+            1 => Element::take_from(reader).map(Some),
+            2..=u8::MAX => None,
+        }
+    }
+}
+
+impl<Element: HandOffField> HandOffField for Vec<Element> {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        self.len().put_into(bytes);
+        for element in self {
+            element.put_into(bytes);
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        let count = usize::take_from(reader)?;
+        (0..count)
+            .map(|_element_position| Element::take_from(reader))
+            .collect()
+    }
+}
+
+/// 结构体的交接：字段按写出的次序逐个写、逐个读（构造时每个字段都要写出来，漏了一个编不过）。
+macro_rules! hand_off_fields_of_a_struct {
+    ($structure:ident { $($field:ident),+ $(,)? }) => {
+        impl HandOffField for $structure {
+            fn put_into(&self, bytes: &mut Vec<u8>) {
+                $( self.$field.put_into(bytes); )+
+            }
+            fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+                Some(Self {
+                    $( $field: HandOffField::take_from(reader)?, )+
+                })
+            }
+        }
+    };
+}
+
+hand_off_fields_of_a_struct!(StopCheck {
+    name,
+    local,
+    crates
+});
+hand_off_fields_of_a_struct!(RecordedCall {
+    label,
+    first_operation,
+    return_point,
+    outcome,
+    model
+});
+hand_off_fields_of_a_struct!(TornScan {
+    segment_index,
+    scanned,
+    found
+});
+hand_off_fields_of_a_struct!(ImplementationVerdict {
+    consulted_root,
+    consulted_outcome,
+    ignored_root,
+    ignored_outcome,
+    red_items,
+    pool_checker_red,
+    root_without_record,
+    claimed_state_missing_unit
+});
+hand_off_fields_of_a_struct!(RecoverySummary {
+    root,
+    outcome,
+    read_back_sha256,
+    records_applied
+});
+hand_off_fields_of_a_struct!(StateObservation {
+    batch,
+    ordinal,
+    segment_index,
+    landing_vector,
+    image_digest,
+    verdict,
+    judge_nanoseconds,
+    mask_matches_the_facts,
+    touched_call,
+    crash_judge,
+    pool_checker,
+    consulted,
+    ignored,
+    crash_judge_nanoseconds,
+    pool_checker_nanoseconds,
+    recovery_nanoseconds
+});
+hand_off_fields_of_a_struct!(WrittenFile {
+    name,
+    bytes,
+    sha256,
+    sha256_without_timing
+});
+hand_off_fields_of_a_struct!(StreamExport {
+    name,
+    checks,
+    calls,
+    ending,
+    model_stopped_at_call,
+    not_exported,
+    operation_count,
+    write_count,
+    segment_count,
+    tearable_write_count,
+    full_states,
+    in_place_subsets_states,
+    torn_scans,
+    observations,
+    files,
+    rebuilt_digest_mismatches,
+    rebuilt_states,
+    elapsed_nanoseconds,
+    drive_nanoseconds,
+    observe_nanoseconds,
+    write_nanoseconds
+});
+hand_off_fields_of_a_struct!(RecordedTableReference { table_name, digest });
+hand_off_fields_of_a_struct!(RecordedDump {
+    stream_independent_checks,
+    exports
+});
+hand_off_fields_of_a_struct!(RecordedKnownBadEntry {
+    target,
+    patch_count,
+    digest_equals_the_direct_one,
+    direct,
+    patched
+});
+hand_off_fields_of_a_struct!(RecordedE170BadRow {
+    label,
+    row_identifier,
+    base_digest,
+    digests_equal,
+    e170_pool_checker_column,
+    base,
+    patched
+});
+hand_off_fields_of_a_struct!(RecordedCleanImage { entry_count, table });
+hand_off_fields_of_a_struct!(PanicOfTheRecordStage { step, message });
+hand_off_fields_of_a_struct!(RecordedKnownBadImages {
+    clean_image_checks,
+    clean,
+    entries,
+    states_text,
+    patches_file,
+    e170_bad_rows,
+    panic_of_the_record_stage
+});
+
+impl HandOffField for KnownBadImagesStep {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.push(match self {
+            Self::CleanImage => 0,
+            Self::KnownBadEntries => 1,
+            Self::E170BadRows => 2,
+        });
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::CleanImage),
+            1 => Some(Self::KnownBadEntries),
+            2 => Some(Self::E170BadRows),
+            3..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for StreamName {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        bytes.push(match self {
+            Self::NewPoolFileCreation => 0,
+            Self::FixedScriptReuseAfterRaisingFloorThenUnmount => 1,
+        });
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::NewPoolFileCreation),
+            1 => Some(Self::FixedScriptReuseAfterRaisingFloorThenUnmount),
+            2..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for CallOutcome {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            Self::Succeeded => bytes.push(0),
+            Self::ReturnedError(member) => {
+                bytes.push(1);
+                member.put_into(bytes);
+            }
+            Self::Panicked(text) => {
+                bytes.push(2);
+                text.put_into(bytes);
+            }
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::Succeeded),
+            1 => Some(Self::ReturnedError(String::take_from(reader)?)),
+            2 => Some(Self::Panicked(String::take_from(reader)?)),
+            3..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for ModelVerdictOfCall {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            Self::NotModelled => bytes.push(0),
+            Self::Agrees => bytes.push(1),
+            Self::Disagrees {
+                aspect,
+                model_answer,
+                implementation_answer,
+            } => {
+                bytes.push(2);
+                aspect.put_into(bytes);
+                model_answer.put_into(bytes);
+                implementation_answer.put_into(bytes);
+            }
+            Self::SkippedAfterTheModelStopped => bytes.push(3),
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::NotModelled),
+            1 => Some(Self::Agrees),
+            2 => Some(Self::Disagrees {
+                aspect: String::take_from(reader)?,
+                model_answer: String::take_from(reader)?,
+                implementation_answer: String::take_from(reader)?,
+            }),
+            3 => Some(Self::SkippedAfterTheModelStopped),
+            4..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for StreamEnding {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            Self::Completed => bytes.push(0),
+            Self::StoppedByAnError { call_index, member } => {
+                bytes.push(1);
+                call_index.put_into(bytes);
+                member.put_into(bytes);
+            }
+            Self::ImplementationCrashed { what } => {
+                bytes.push(2);
+                what.put_into(bytes);
+            }
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::Completed),
+            1 => Some(Self::StoppedByAnError {
+                call_index: usize::take_from(reader)?,
+                member: String::take_from(reader)?,
+            }),
+            2 => Some(Self::ImplementationCrashed {
+                what: String::take_from(reader)?,
+            }),
+            3..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for CrashJudgeVerdict {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            Self::NotApplicable => bytes.push(0),
+            Self::Green => bytes.push(1),
+            Self::Red { what } => {
+                bytes.push(2);
+                what.put_into(bytes);
+            }
+            Self::Off => bytes.push(3),
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::NotApplicable),
+            1 => Some(Self::Green),
+            2 => Some(Self::Red {
+                what: String::take_from(reader)?,
+            }),
+            3 => Some(Self::Off),
+            4..=u8::MAX => None,
+        }
+    }
+}
+
+impl HandOffField for PoolCheckerOfAState {
+    fn put_into(&self, bytes: &mut Vec<u8>) {
+        match self {
+            Self::Off => bytes.push(0),
+            Self::RecordedForTheJudgeStage(table) => {
+                bytes.push(1);
+                table.put_into(bytes);
+            }
+            Self::Judged {
+                red,
+                matches_the_judgement,
+            } => {
+                bytes.push(2);
+                red.put_into(bytes);
+                matches_the_judgement.put_into(bytes);
+            }
+        }
+    }
+    fn take_from(reader: &mut HandOffReader<'_>) -> Option<Self> {
+        match u8::take_from(reader)? {
+            0 => Some(Self::Off),
+            1 => Some(Self::RecordedForTheJudgeStage(
+                RecordedTableReference::take_from(reader)?,
+            )),
+            2 => Some(Self::Judged {
+                red: Vec::take_from(reader)?,
+                matches_the_judgement: bool::take_from(reader)?,
+            }),
+            3..=u8::MAX => None,
+        }
+    }
+}
+
+/// 交接的全部字节：头、这一趟的参数（判段照它核两段是不是同一条命令）、录入段交出的那一份。
+fn hand_off_bytes<HandOff: HandOffField>(run_arguments: &[String], hand_off: &HandOff) -> Vec<u8> {
+    let mut bytes = HAND_OFF_MAGIC.to_vec();
+    run_arguments.to_vec().put_into(&mut bytes);
+    hand_off.put_into(&mut bytes);
+    bytes
+}
+
+/// 读回交接：头对得上、参数与这一趟的相同、录入段交出的那一份解得出、末尾没有多出的字节。
+///
+/// # Errors
+/// 上面四样有一样不成，一句话说哪一样、出路是什么。
+fn hand_off_of_the_bytes<HandOff: HandOffField>(
+    bytes: &[u8],
+    run_arguments: &[String],
+) -> Result<HandOff, String> {
+    let mut reader = HandOffReader { bytes, position: 0 };
+    if reader.take_bytes(HAND_OFF_MAGIC.len()) != Some(HAND_OFF_MAGIC.as_slice()) {
+        return Err(format!(
+            "交接的头不是 {}：不是这一版装置的录入段写的，重跑录入段（{STAGE_ARGUMENT} record）",
+            String::from_utf8_lossy(HAND_OFF_MAGIC)
+        ));
+    }
+    let recorded_arguments = Vec::<String>::take_from(&mut reader)
+        .ok_or_else(|| "交接里的参数解不出：重跑录入段".to_string())?;
+    if recorded_arguments != run_arguments {
+        return Err(format!(
+            "录入段那一趟的参数是 {recorded_arguments:?}，这一趟是 {run_arguments:?}：判段照录入段那一趟的参数起（只换 {STAGE_ARGUMENT}）"
+        ));
+    }
+    let hand_off = HandOff::take_from(&mut reader)
+        .ok_or_else(|| "交接里录入段交出的那一份解不出：重跑录入段".to_string())?;
+    if !reader.is_at_the_end() {
+        return Err("交接末尾多出字节：重跑录入段".to_string());
+    }
+    Ok(hand_off)
+}
+
+/// 照 `stage` 跑两段，交回退出码：
+/// - 只跑录入段：`record` 交出交接，写进输出目录里的 [`HAND_OFF_TO_THE_JUDGE_STAGE_FILE`]，不判，交回 [`EXIT_CODE_OF_A_RECORD_ONLY_RUN`]；
+/// - 只跑判段：不跑 `record`，从那个文件读回交接交 `judge`，判完删掉那个文件（`judge` 拒了或 panic 了就留着，可以只重跑判段）；
+/// - 两段先后跑：`record` 交出的交接在内存里写成字节、读回，交 `judge`（与分两趟同一种交法，不落文件）。
+///
+/// # Errors
+/// 只跑判段而读不到交接（录入段没跑过：报错句点名先跑录入段）、交接读回不成（[`hand_off_of_the_bytes`]）、`judge` 拒了
+/// （交接里录的盘与库里的对不上）；交接写不进、删不掉。
+fn run_in_stages<HandOff: HandOffField>(
+    stage: RunStage,
+    run_arguments: &[String],
+    output_directory: &Path,
+    record: impl FnOnce() -> HandOff,
+    judge: impl FnOnce(HandOff) -> Result<i32, String>,
+) -> Result<i32, String> {
+    let hand_off_path = output_directory.join(HAND_OFF_TO_THE_JUDGE_STAGE_FILE);
+    match stage {
+        RunStage::RecordOnly => {
+            let bytes = hand_off_bytes(run_arguments, &record());
+            std::fs::create_dir_all(output_directory)
+                .map_err(|error| format!("建 {}：{error}", output_directory.display()))?;
+            std::fs::write(&hand_off_path, bytes.as_slice())
+                .map_err(|error| format!("交接写不进 {}：{error}", hand_off_path.display()))?;
+            Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN)
+        }
+        RunStage::JudgeOnly => {
+            let bytes = std::fs::read(&hand_off_path).map_err(|error| {
+                format!(
+                    "读不到录入段留下的交接 {}（{error}）：先跑录入段（{STAGE_ARGUMENT} record，或不给 {STAGE_ARGUMENT}、两段先后跑）",
+                    hand_off_path.display()
+                )
+            })?;
+            let hand_off = hand_off_of_the_bytes(&bytes, run_arguments)?;
+            let exit_code = judge(hand_off)?;
+            std::fs::remove_file(&hand_off_path)
+                .map_err(|error| format!("交接删不掉 {}：{error}", hand_off_path.display()))?;
+            Ok(exit_code)
+        }
+        RunStage::RecordThenJudge => {
+            let bytes_handed_over_in_memory = hand_off_bytes(run_arguments, &record());
+            judge(hand_off_of_the_bytes(
+                &bytes_handed_over_in_memory,
+                run_arguments,
+            )?)
+        }
+    }
+}
+
+/// 从命令行里取出 `--stage <段>`（至多一次，取值照 `RunStage::of_the_variable_value`：`record`、`judge`），交回段与其余的参数
+/// （进交接、两段核是不是同一条命令的那一份）。写错、给了两次交回 `None`。
+fn stage_and_the_run_arguments(arguments: &[String]) -> Option<(RunStage, Vec<String>)> {
+    let mut stage_word: Option<&str> = None;
+    let mut run_arguments = Vec::new();
+    let mut words = arguments.iter();
+    while let Some(word) = words.next() {
+        if word == STAGE_ARGUMENT {
+            if stage_word.is_some() {
+                return None;
+            }
+            stage_word = Some(words.next()?.as_str());
+        } else {
+            run_arguments.push(word.clone());
+        }
+    }
+    let stage = RunStage::of_the_variable_value(stage_word).ok()?;
+    Some((stage, run_arguments))
+}
+
+/// `known-bad-images` 模式照 `stage` 跑（[`run_in_stages`]：录入段 [`record_the_known_bad_images`]，判段 [`judge_the_known_bad_images`]）。
+///
+/// # Errors
+/// 同 [`run_in_stages`]。
+fn run_known_bad_images(
+    command_line: &KnownBadImagesCommandLine,
+    stage: RunStage,
+    run_arguments: &[String],
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    result_lines_output: &mut dyn std::io::Write,
+) -> Result<i32, String> {
+    run_in_stages(
+        stage,
+        run_arguments,
+        &command_line.output_directory,
+        || record_the_known_bad_images(command_line, tables),
+        |recorded| judge_the_known_bad_images(command_line, recorded, tables, result_lines_output),
+    )
+}
+
+/// 录入段交给判段的 `baseline`、`row` 那一趟：与流无关的 S1 回比（只在基线那一趟有）与两条流各自导出之后的样子（O2 录下了、没判）。
+struct RecordedDump {
+    stream_independent_checks: Vec<StopCheck>,
+    exports: Vec<StreamExport>,
+}
+
+/// `baseline`、`row` 的录入段：与流无关的 S1 回比（只在基线那一趟），两条流各导出一遍（[`export_stream`]：驱动、取样、写录入段写得了的导出文件，
+/// O2 要判的盘录进 `tables`）；流水线里 panic 的那条流记成没导出。
+fn record_the_dump(
+    command_line: &CommandLine,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+) -> RecordedDump {
+    let stream_independent_checks = if command_line.run_kind == RunKind::Baseline {
+        stream_independent_checks()
+    } else {
+        Vec::new()
+    };
+    let exports = STREAM_NAMES
+        .iter()
+        .map(|name| {
+            let started = Instant::now();
+            let exported = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                export_stream(
+                    *name,
+                    &command_line.output_directory,
+                    command_line.run_kind,
+                    command_line.switches,
+                    tables,
+                )
+            }));
+            exported.unwrap_or_else(|payload| {
+                StreamExport::not_exported(
+                    *name,
+                    format!("pipeline_panicked:{}", panic_text(&*payload)),
+                    started,
+                )
+            })
+        })
+        .collect();
+    RecordedDump {
+        stream_independent_checks,
+        exports,
+    }
+}
+
+/// `baseline`、`row` 的判段：每条流录下的盘交 `tables` 判（[`judge_the_recorded_pool_checker_tables`]）；引擎在某一态上失败的流照两段之前记成
+/// 某个状态上实现自崩（[`StreamExport::record_an_engine_failure_in_a_state`]），导出了的流写 `oracle-verdicts.tsv`，没导出的流清掉留给判段判的观测；
+/// 再照一趟写完时的次序打全部结果行（S5 在这里判），交回退出码。结果行写进 `result_lines_output`。
+///
+/// # Errors
+/// 交接与录下的对不上（[`PoolCheckerTablesOfTheTwoStages::judge_a_recorded_table`] 的 `Err`）：判段一个文件都不写、一行结果行都不打就交回那一句。
+fn judge_the_dump(
+    command_line: &CommandLine,
+    recorded: RecordedDump,
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    result_lines_output: &mut dyn std::io::Write,
+) -> Result<i32, String> {
     let run_kind = command_line.run_kind;
     let switches = command_line.switches;
-    let mut lines = ResultLines { emitted: 0 };
+    let RecordedDump {
+        stream_independent_checks,
+        mut exports,
+    } = recorded;
+    let threads = sampling_threads_of_this_run(switches);
+    let judged_streams = exports
+        .iter_mut()
+        .map(|export| {
+            judge_the_recorded_pool_checker_tables(
+                &mut export.observations,
+                tables,
+                threads,
+                switches,
+            )
+        })
+        .collect::<Result<Vec<JudgedTablesOfAStream>, String>>()?;
+    for (export, judged) in exports.iter_mut().zip(judged_streams) {
+        let directory = command_line
+            .output_directory
+            .join(export.name.directory_name());
+        match judged {
+            JudgedTablesOfAStream::AllJudged => {}
+            JudgedTablesOfAStream::EngineFailedInAState { what } => {
+                export.record_an_engine_failure_in_a_state(&directory, &what);
+            }
+        }
+        if export.not_exported.is_none() {
+            write_the_oracle_verdicts_file(&directory, &export.observations, &mut export.files);
+        } else {
+            export.observations = Vec::new();
+        }
+    }
+    let mut lines = ResultLines {
+        emitted: 0,
+        output: result_lines_output,
+    };
     lines.emit_result_line(&format!(
         "name=config segment=s1 mode={} streams={} sector_bytes={LOCAL_SECTOR_BYTES} first_batch_divisor={FIRST_BATCH_DIVISOR} second_batch_divisor={SECOND_BATCH_DIVISOR} third_batch_divisor={THIRD_BATCH_DIVISOR} torn_states_per_segment={TORN_STATES_PER_SEGMENT} torn_scan_ordinals_per_segment={TORN_SCAN_ORDINALS_PER_SEGMENT} third_batch_sampled={} positive_control={} disabled_oracle={}",
         if run_kind == RunKind::Baseline { "baseline" } else { "row" },
@@ -5403,66 +5314,81 @@ fn run_dump(command_line: &CommandLine) -> i32 {
             .map_or_else(|| "none".to_string(), |oracle| format!("{oracle:?}")),
     ));
     let mut failed_checks = 0usize;
-    if run_kind == RunKind::Baseline {
-        for check in stream_independent_checks() {
-            failed_checks += usize::from(!check.holds());
-            lines.emit_result_line(&format!(
-                "name=s1 stream=both check={} local={} crates={} holds={}",
-                check.name,
-                field_text(&check.local),
-                field_text(&check.crates),
-                check.holds()
-            ));
-        }
+    for check in &stream_independent_checks {
+        failed_checks += usize::from(!check.holds());
+        lines.emit_result_line(&format!(
+            "name=s1 stream=both check={} local={} crates={} holds={}",
+            check.name,
+            field_text(&check.local),
+            field_text(&check.crates),
+            check.holds()
+        ));
     }
     let mut totals = [0usize; 7];
     let mut streams_not_exported = 0usize;
-    let mut s5_failed = 0usize;
-    for name in STREAM_NAMES {
-        let started = Instant::now();
-        let output_root = command_line.output_directory.clone();
-        let exported = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            export_stream(name, &output_root, run_kind, switches)
-        }));
-        let mut export = exported.unwrap_or_else(|payload| {
-            StreamExport::not_exported(
-                name,
-                format!("pipeline_panicked:{}", panic_text(&*payload)),
-                started,
-            )
-        });
+    let mut not_applicable_source_checks_failed = 0usize;
+    for mut export in exports {
         streams_not_exported += usize::from(export.not_exported.is_some());
-        let s5 = s5_checks_to_judge(&export, run_kind, switches);
-        s5_failed += s5.iter().filter(|check| !check.holds()).count();
-        export.checks.extend(s5);
+        let not_applicable_source_checks =
+            not_applicable_source_checks_to_judge(&export, run_kind, switches);
+        not_applicable_source_checks_failed += not_applicable_source_checks
+            .iter()
+            .filter(|check| !check.holds())
+            .count();
+        export.checks.extend(not_applicable_source_checks);
         let stream_totals = report_stream(&mut lines, &export);
         for (total, value) in totals.iter_mut().zip(stream_totals) {
             *total += value;
         }
     }
     failed_checks += totals[0];
-    let [_, rebuilt_digest_mismatches, mask_mismatches, s3_mismatches, red_calls, crash_judge_red, pool_checker_red] =
+    let [_, rebuilt_digest_mismatches, mask_mismatches, pool_checker_direct_mismatches, red_calls, crash_judge_red, pool_checker_red] =
         totals;
     lines.emit_result_line(&format!(
-        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} s3_o2_judgement_mismatches={s3_mismatches} streams_not_exported={streams_not_exported} o1_comparison_red_calls={red_calls} o1_crash_judge_red_states={crash_judge_red} o2_red_states={pool_checker_red}"
+        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} s3_o2_judgement_mismatches={pool_checker_direct_mismatches} streams_not_exported={streams_not_exported} o1_comparison_red_calls={red_calls} o1_crash_judge_red_states={crash_judge_red} o2_red_states={pool_checker_red}"
     ));
     lines.finish();
     let stop_clause_hit = failed_checks > 0
         || rebuilt_digest_mismatches > 0
-        || s3_mismatches > 0
-        || (run_kind == RunKind::Baseline && (s5_failed > 0 || streams_not_exported > 0));
+        || pool_checker_direct_mismatches > 0
+        || (run_kind == RunKind::Baseline
+            && (not_applicable_source_checks_failed > 0 || streams_not_exported > 0));
     if stop_clause_hit {
-        3
+        Ok(3)
     } else {
-        0
+        Ok(0)
     }
+}
+
+/// `baseline`、`row` 照 `stage` 跑（[`run_in_stages`]：录入段 [`record_the_dump`]，判段 [`judge_the_dump`]）。
+///
+/// # Errors
+/// 同 [`run_in_stages`]。
+fn run_dump(
+    command_line: &CommandLine,
+    stage: RunStage,
+    run_arguments: &[String],
+    tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    result_lines_output: &mut dyn std::io::Write,
+) -> Result<i32, String> {
+    run_in_stages(
+        stage,
+        run_arguments,
+        &command_line.output_directory,
+        || record_the_dump(command_line, tables),
+        |recorded| judge_the_dump(command_line, recorded, tables, result_lines_output),
+    )
 }
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let Some(parsed) = parse_command_line(&arguments) else {
+    let Some((stage, parsed, run_arguments)) =
+        stage_and_the_run_arguments(&arguments).and_then(|(stage, run_arguments)| {
+            parse_command_line(&run_arguments).map(|parsed| (stage, parsed, run_arguments))
+        })
+    else {
         eprintln!(
-            "用法：e171_three_oracle_collusion baseline|row --output-directory <目录> [--positive-control O1-对拍|O1-崩溃判官|O2 | --disable-oracle O1|O2]，或 known-bad-images --dump-directory <基线导出目录> --output-directory <目录> [--e170-bad-rows]；收到 {arguments:?}"
+            "用法：e171_three_oracle_collusion baseline|row --output-directory <目录> [--positive-control O1-对拍|O1-崩溃判官|O2 | --disable-oracle O1|O2] [--sampling-threads <正整数>]，或 known-bad-images --dump-directory <基线导出目录> --output-directory <目录> [--e170-bad-rows] [--sampling-threads <正整数>]；都可以加 {STAGE_ARGUMENT} record|judge；收到 {arguments:?}"
         );
         std::process::exit(2);
     };
@@ -5470,19 +5396,37 @@ fn main() {
         ParsedCommand::Dump(command_line) => &command_line.output_directory,
         ParsedCommand::KnownBadImages(command_line) => &command_line.output_directory,
     };
-    if output_directory.exists() {
+    if stage.records() && output_directory.exists() {
         eprintln!(
-            "输出目录 {} 已存在：装置不覆盖已有的文件，换一个目录",
+            "输出目录 {} 已存在：装置不覆盖已有的文件，换一个目录（只跑判段的那一趟才接着录入段那一趟的目录：{STAGE_ARGUMENT} judge）",
             output_directory.display()
         );
         std::process::exit(2);
     }
-    let exit_code = match &parsed {
-        ParsedCommand::Dump(command_line) => run_dump(command_line),
-        ParsedCommand::KnownBadImages(command_line) => run_known_bad_images(command_line),
+    let tables = GivenStatesTablesInTheLibrary;
+    let ran = match &parsed {
+        ParsedCommand::Dump(command_line) => run_dump(
+            command_line,
+            stage,
+            &run_arguments,
+            &tables,
+            &mut std::io::stdout(),
+        ),
+        ParsedCommand::KnownBadImages(command_line) => run_known_bad_images(
+            command_line,
+            stage,
+            &run_arguments,
+            &tables,
+            &mut std::io::stdout(),
+        ),
     };
-    if exit_code != 0 {
-        std::process::exit(exit_code);
+    match ran {
+        Ok(0) => {}
+        Ok(exit_code) => std::process::exit(exit_code),
+        Err(refusal) => {
+            eprintln!("{refusal}");
+            std::process::exit(2);
+        }
     }
 }
 
@@ -5498,7 +5442,7 @@ mod tests {
         "c71cae1b3fc678e4cabfa21d575c728edd44a4b372b3389ce763856273abecbf";
 
     #[test]
-    fn a_torn_landing_folds_to_one_and_a_persisted_write_to_two() {
+    fn torn_landing_folds_to_one_and_a_persisted_write_to_two() {
         // 写表：0 持久、1 没持久、2 原写没持久而撕裂镜像（枚举写表下标 3）持久。
         let persisted = vec![true, false, false, true];
         let torn_image_index_by_write = BTreeMap::from([(2usize, 3usize)]);
@@ -5641,8 +5585,39 @@ mod tests {
             LOCAL_SECOND_STREAM_SEGMENT_LENGTHS.iter().sum::<usize>(),
             LOCAL_SECOND_STREAM_WRITES
         );
-        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_678_377_089);
-        assert_eq!(LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM, 16_777_240);
+        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_678_377_095);
+        assert_eq!(LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM, 16_777_243);
+    }
+
+    /// 两条流驱动完，`baseline` 回比的段长表、写数、根槽写数、盘数与盘字节数（`prepare_stream` 那一批 S1）逐条成立：
+    /// 本地表与现在录到的流分叉时这里红，用不着跑一趟 `baseline`。闭式与写数都对而段的次序不对的表只有这条抓得到。
+    #[test]
+    fn stop_checks_of_both_streams_hold_against_the_streams_recorded_now() {
+        for name in STREAM_NAMES {
+            let stream = prepare_stream(name, RunSwitches::default(), true);
+            assert_eq!(
+                stream.ending,
+                StreamEnding::Completed,
+                "{} 没有驱动到头",
+                name.directory_name()
+            );
+            let broken: Vec<String> = stream
+                .checks
+                .iter()
+                .filter(|check| !check.holds())
+                .map(|check| {
+                    format!(
+                        "{} local={} crates={}",
+                        check.name, check.local, check.crates
+                    )
+                })
+                .collect();
+            assert!(
+                broken.is_empty(),
+                "{} 的 S1 没过：{broken:?}",
+                name.directory_name()
+            );
+        }
     }
 
     fn bytes_write(device: u32, offset: u64, bytes: Vec<u8>) -> RetainedWrite {
@@ -5816,7 +5791,7 @@ mod tests {
 
     /// E170 的 P 行只翻一个字节：补丁不按扇区对齐，施加时读出罩住它的整扇区、只换那一个字节、再整扇区写回。
     #[test]
-    fn a_one_byte_patch_inside_a_sector_changes_only_that_byte() {
+    fn one_byte_patch_inside_a_sector_changes_only_that_byte() {
         let devices = [DeviceIdentity(0), DeviceIdentity(1)];
         let mut pool = MemoryPool::with_devices(&devices, 1 << 20);
         pool.apply_writes(&[bytes_write(1, 512, vec![0x11; 1024])]);
@@ -5852,7 +5827,7 @@ mod tests {
 
     /// 模型不认的版本读回来记红、认的记绿（X4：崩溃判官的结果丢掉，这里红）。
     #[test]
-    fn a_read_back_of_a_version_the_model_never_committed_is_red_and_a_committed_one_is_green() {
+    fn read_back_of_a_version_the_model_never_committed_is_red_and_a_committed_one_is_green() {
         let committed_key = model_root_key(InstanceGeneration(1), CheckpointTxg(3));
         let committed = BTreeMap::from([(committed_key, Some(Rc::<[u8]>::from(vec![7u8, 8, 9])))]);
         let green = ObservedReadBack::FileRead {
@@ -5894,7 +5869,7 @@ mod tests {
     /// 模型没有会话时问发布第一个文件：答案本身就是一格对不上，驱动把它记成 `Disagrees`、模型停在这次调用，下一次调用不比
     /// （X5：`judge_and_advance` 的不同丢掉，这里红）。
     #[test]
-    fn a_comparison_the_model_cannot_answer_is_recorded_as_a_disagreement_and_stops_the_model() {
+    fn comparison_the_model_cannot_answer_is_recorded_as_a_disagreement_and_stops_the_model() {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
             SharedStream::retaining_contents(),
@@ -5969,7 +5944,7 @@ mod tests {
     /// 取号交回错误：这条流不带故障，模型对取号只有「往前走」一种走法，驱动把它记成「模型说该成、实现拒了」，模型停在这次调用
     /// （登记第一节读法 5 末句；装置一侧变异：记红丢掉，这里红）。
     #[test]
-    fn a_refused_acquire_on_a_stream_without_faults_is_recorded_as_a_comparison_red_and_stops_the_model(
+    fn refused_acquire_on_a_stream_without_faults_is_recorded_as_a_comparison_red_and_stops_the_model(
     ) {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
@@ -5987,7 +5962,7 @@ mod tests {
         assert_eq!(
             driver.calls[0].model,
             ModelVerdictOfCall::Disagrees {
-                aspect: "模型说该成、实现拒了",
+                aspect: "模型说该成、实现拒了".to_string(),
                 model_answer: "往前走".to_string(),
                 implementation_answer: "拒了:DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness".to_string(),
             }
@@ -6026,7 +6001,7 @@ mod tests {
 
     /// 取号 panic 是实现自崩（读法 5），不是对拍的红：这一栏留在 `not_modelled`，这条流走自崩那一类、不导出。
     #[test]
-    fn a_panic_in_the_acquire_is_an_implementation_crash_and_not_a_comparison_red() {
+    fn panic_in_the_acquire_is_an_implementation_crash_and_not_a_comparison_red() {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
             SharedStream::retaining_contents(),
@@ -6054,6 +6029,7 @@ mod tests {
             RunSwitches {
                 positive_control: None,
                 disabled_oracle: Some(DisabledOracle::ComparisonAndCrashJudge),
+                sampling_threads: None,
             },
         );
         let refused: Result<(), RefusedForTheTest> = Err(
@@ -6075,12 +6051,12 @@ mod tests {
             RunSwitches::default(),
         );
         let _ = live.step_acquire_and_warm_up();
-        let calls_red_in_the_comparison: Vec<&'static str> = live
+        let calls_red_in_the_comparison: Vec<&str> = live
             .driver
             .calls
             .iter()
             .filter(|call| matches!(call.model, ModelVerdictOfCall::Disagrees { .. }))
-            .map(|call| call.label)
+            .map(|call| call.label.as_str())
             .collect();
         assert!(
             calls_red_in_the_comparison.is_empty(),
@@ -6097,7 +6073,12 @@ mod tests {
             RunSwitches::default(),
         );
         assert!(live.step_acquire_and_warm_up());
-        let labels: Vec<&'static str> = live.driver.calls.iter().map(|call| call.label).collect();
+        let labels: Vec<&str> = live
+            .driver
+            .calls
+            .iter()
+            .map(|call| call.label.as_str())
+            .collect();
         assert_eq!(labels, vec!["acquire", "warm_up"]);
         assert!(live
             .driver
@@ -6115,7 +6096,7 @@ mod tests {
         model: ModelVerdictOfCall,
     ) -> RecordedCall {
         RecordedCall {
-            label,
+            label: label.to_string(),
             first_operation: 0,
             return_point: 0,
             outcome,
@@ -6125,7 +6106,7 @@ mod tests {
 
     fn disagreement_for_the_test() -> ModelVerdictOfCall {
         ModelVerdictOfCall::Disagrees {
-            aspect: "模型说该成、实现拒了",
+            aspect: "模型说该成、实现拒了".to_string(),
             model_answer: "往前走".to_string(),
             implementation_answer: "拒了:X".to_string(),
         }
@@ -6134,7 +6115,7 @@ mod tests {
     /// 逐行那一趟的 S5：返回了错误而 O1-对拍没问模型（`not_modelled`）的调用、与不适用来自卸载和对拍不同之外的来源，各自回比 0，
     /// 不是 0 就是停机。绝对值：期望写 `0`，实际写不合的个数。
     #[test]
-    fn the_row_s5_counts_the_errored_calls_left_unjudged_and_the_not_applicable_states_from_another_source(
+    fn the_row_not_applicable_source_checks_count_the_errored_calls_left_unjudged_and_the_not_applicable_states_from_another_source(
     ) {
         let errored = |text: &str| CallOutcome::ReturnedError(text.to_string());
         // 取号出错、O1-对拍没记红（修之前的样子）：第一样 1 处不合；模型停在这次调用、来源不是卸载也不是对拍不同，但没有不适用的态，第二样 0。
@@ -6143,7 +6124,8 @@ mod tests {
             errored("X"),
             ModelVerdictOfCall::NotModelled,
         )];
-        let silent_acquire_checks = s5_checks_of_a_bad_implementation_row("s", &silent, Some(0), 0);
+        let silent_acquire_checks =
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &silent, Some(0), 0);
         assert_eq!(
             silent_acquire_checks
                 .iter()
@@ -6167,7 +6149,8 @@ mod tests {
             errored("X"),
             disagreement_for_the_test(),
         )];
-        let recorded_red_checks = s5_checks_of_a_bad_implementation_row("s", &red, Some(0), 9);
+        let recorded_red_checks =
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &red, Some(0), 9);
         assert!(recorded_red_checks.iter().all(StopCheck::holds));
         // 对拍在发布上判出不同、模型停在那里，之后的可写挂载出错（`skipped_after_the_model_stopped`，第 108 行那一形）：登记读法 6 的合规来源，
         // 两样都 0（登记修订 4）。
@@ -6183,8 +6166,12 @@ mod tests {
                 ModelVerdictOfCall::SkippedAfterTheModelStopped,
             ),
         ];
-        let error_after_the_stop_checks =
-            s5_checks_of_a_bad_implementation_row("s", &error_after_the_stop, Some(0), 6);
+        let error_after_the_stop_checks = not_applicable_source_checks_of_a_bad_implementation_row(
+            "s",
+            &error_after_the_stop,
+            Some(0),
+            6,
+        );
         assert_eq!(
             error_after_the_stop_checks
                 .iter()
@@ -6206,8 +6193,12 @@ mod tests {
             ),
             recorded_call_for_the_test("publish", errored("Y"), ModelVerdictOfCall::Agrees),
         ];
-        let allowed_refusal_checks =
-            s5_checks_of_a_bad_implementation_row("s", &allowed_refusal, Some(2), 5);
+        let allowed_refusal_checks = not_applicable_source_checks_of_a_bad_implementation_row(
+            "s",
+            &allowed_refusal,
+            Some(2),
+            5,
+        );
         assert_eq!(
             allowed_refusal_checks
                 .iter()
@@ -6228,8 +6219,12 @@ mod tests {
                 ModelVerdictOfCall::NotModelled,
             ),
         ];
-        let unmount_stop_checks =
-            s5_checks_of_a_bad_implementation_row("s", &unmount_stop, Some(1), 7);
+        let unmount_stop_checks = not_applicable_source_checks_of_a_bad_implementation_row(
+            "s",
+            &unmount_stop,
+            Some(1),
+            7,
+        );
         assert!(unmount_stop_checks.iter().all(StopCheck::holds));
         // 模型没停：没有不适用的态，合规。
         let no_stop = [recorded_call_for_the_test(
@@ -6237,14 +6232,16 @@ mod tests {
             CallOutcome::Succeeded,
             ModelVerdictOfCall::Agrees,
         )];
-        let no_stop_checks = s5_checks_of_a_bad_implementation_row("s", &no_stop, None, 0);
+        let no_stop_checks =
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &no_stop, None, 0);
         assert!(no_stop_checks.iter().all(StopCheck::holds));
     }
 
     /// 哪一趟判哪一份 S5：逐行那一趟判「返回了错误的调用都记了对拍的红」那一份，基线那一趟判原来那一份；
     /// 关掉 O1、驱动没走完整的流不判；基线带阳性对照、流没导出也不判。
     #[test]
-    fn the_row_run_judges_the_row_s5_and_the_baseline_run_judges_the_baseline_s5() {
+    fn the_row_run_judges_the_row_not_applicable_source_checks_and_the_baseline_run_judges_the_baseline_ones(
+    ) {
         let started = Instant::now();
         let silent_acquire_stopped_by_the_error = || {
             let mut export =
@@ -6263,7 +6260,7 @@ mod tests {
             export
         };
         let export = silent_acquire_stopped_by_the_error();
-        let row_checks = s5_checks_to_judge(
+        let row_checks = not_applicable_source_checks_to_judge(
             &export,
             RunKind::BadImplementationRow,
             RunSwitches::default(),
@@ -6288,9 +6285,10 @@ mod tests {
         let with_the_comparison_control = RunSwitches {
             positive_control: Some(PositiveControl::ComparisonOfTheCalls),
             disabled_oracle: None,
+            sampling_threads: None,
         };
         assert_eq!(
-            s5_checks_to_judge(
+            not_applicable_source_checks_to_judge(
                 &export,
                 RunKind::BadImplementationRow,
                 with_the_comparison_control
@@ -6301,24 +6299,27 @@ mod tests {
         let with_the_model_off = RunSwitches {
             positive_control: None,
             disabled_oracle: Some(DisabledOracle::ComparisonAndCrashJudge),
+            sampling_threads: None,
         };
-        assert!(
-            s5_checks_to_judge(&export, RunKind::BadImplementationRow, with_the_model_off)
-                .is_empty()
-        );
+        assert!(not_applicable_source_checks_to_judge(
+            &export,
+            RunKind::BadImplementationRow,
+            with_the_model_off
+        )
+        .is_empty());
         // 驱动没走完整（实现 panic）与流水线 panic（`ending` 是 `None`）的流不判，走自崩那一类。
         let mut crashed = silent_acquire_stopped_by_the_error();
         crashed.ending = Some(StreamEnding::ImplementationCrashed {
             what: "x".to_string(),
         });
-        assert!(s5_checks_to_judge(
+        assert!(not_applicable_source_checks_to_judge(
             &crashed,
             RunKind::BadImplementationRow,
             RunSwitches::default()
         )
         .is_empty());
         crashed.ending = None;
-        assert!(s5_checks_to_judge(
+        assert!(not_applicable_source_checks_to_judge(
             &crashed,
             RunKind::BadImplementationRow,
             RunSwitches::default()
@@ -6346,7 +6347,11 @@ mod tests {
                 ModelVerdictOfCall::Agrees,
             ),
         ];
-        let baseline_checks = s5_checks_to_judge(&clean, RunKind::Baseline, RunSwitches::default());
+        let baseline_checks = not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            RunSwitches::default(),
+        );
         assert_eq!(
             baseline_checks
                 .iter()
@@ -6366,27 +6371,21 @@ mod tests {
         let with_the_pool_checker_control = RunSwitches {
             positive_control: Some(PositiveControl::PoolChecker),
             disabled_oracle: None,
+            sampling_threads: None,
         };
-        assert!(
-            s5_checks_to_judge(&clean, RunKind::Baseline, with_the_pool_checker_control).is_empty()
-        );
+        assert!(not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            with_the_pool_checker_control
+        )
+        .is_empty());
         clean.not_exported = Some("x".to_string());
-        assert!(s5_checks_to_judge(&clean, RunKind::Baseline, RunSwitches::default()).is_empty());
-    }
-
-    /// 原用例文件里一个函数的条目名按文件次序取：字面名与常量名都认，更深缩进的行不认。
-    #[test]
-    fn entry_names_are_read_in_file_order_from_the_twelve_space_indented_lines_of_the_function() {
-        let text = "fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {\n    vec![\n        (\n            \"I-7.4\",\n            Box::new(|image| {\n                let x = 1;\n                \"I-9.9\";\n            }),\n        ),\n        (\n            MAPPING_KEY_INVARIANT,\n            Box::new(|image| {}),\n        ),\n        (\n            REFERENCE_INTERVALS_ARE_EXACT,\n            Box::new(|image| {}),\n        ),\n        (\n            FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,\n            Box::new(move_the_data_unit_of_the_first_file_two_slots_further),\n        ),\n    ]\n}\nfn other() {\n            \"I-0.0\",\n}\n";
-        assert_eq!(
-            entry_names_in_the_original_test_file(text),
-            vec![
-                "I-7.4".to_string(),
-                singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER.to_string(),
-                "I-3.5".to_string(),
-                "I-5.5".to_string()
-            ]
-        );
+        assert!(not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            RunSwitches::default()
+        )
+        .is_empty());
     }
 
     #[test]
@@ -6410,7 +6409,7 @@ mod tests {
     }
 
     #[test]
-    fn a_patch_list_text_round_trips_through_the_patches_file() {
+    fn patch_list_text_round_trips_through_the_patches_file() {
         let patches = vec![
             BytePatch {
                 device: 1,
@@ -6431,7 +6430,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_outcome_writes_ok_or_err_into_the_calls_file_and_a_word_into_the_outcomes_file() {
+    fn call_outcome_writes_ok_or_error_into_the_calls_file_and_a_word_into_the_outcomes_file() {
         assert_eq!(CallOutcome::Succeeded.calls_file_word(), "ok");
         assert_eq!(
             CallOutcome::ReturnedError("NoSpace".to_string()).calls_file_word(),
@@ -6444,6 +6443,1758 @@ mod tests {
         assert_eq!(
             CallOutcome::Panicked("炸".to_string()).outcome_word(),
             "panic"
+        );
+    }
+
+    /// 同时判的线程数：对拍里「几条线程」那一趟与连续段的单测用的，不是产品路径的线程数（产品路径 [`sampling_threads_of_this_run`]）。
+    const SEVERAL_THREADS: NonZeroUsize = NonZeroUsize::new(4).expect("4 不是 0");
+
+    /// 线程对拍每批取几个取样态：够几条线程同时领到不同的连续段，一趟不跑太久。
+    const SAMPLED_STATES_OF_EACH_BATCH_IN_THE_PAIRING: usize = 12;
+
+    /// 让几个连续段按 `finishing_order` 的次序判完：轮到谁谁才交回，还没轮到的等着。要这几个连续段同时在跑（线程数不少于连续段数）。
+    struct RunsFinishingInAGivenOrder {
+        finishing_order: Vec<usize>,
+        finished: std::sync::Mutex<usize>,
+        one_finished: std::sync::Condvar,
+    }
+
+    impl RunsFinishingInAGivenOrder {
+        fn new(finishing_order: &[usize]) -> Self {
+            Self {
+                finishing_order: finishing_order.to_vec(),
+                finished: std::sync::Mutex::new(0),
+                one_finished: std::sync::Condvar::new(),
+            }
+        }
+
+        fn wait_for_the_turn_of(&self, run: usize) {
+            let mut finished = self.finished.lock().expect("这把锁里不 panic");
+            while self.finishing_order[*finished] != run {
+                finished = self.one_finished.wait(finished).expect("这把锁里不 panic");
+            }
+            *finished += 1;
+            self.one_finished.notify_all();
+        }
+    }
+
+    #[test]
+    fn outcomes_come_back_in_run_order_when_the_later_runs_finish_earlier() {
+        let turns = RunsFinishingInAGivenOrder::new(&[3, 2, 1, 0]);
+        let outcomes = outcomes_of_the_runs_in_their_order(
+            4,
+            SEVERAL_THREADS,
+            &|_outcome: &usize| false,
+            &|run| {
+                turns.wait_for_the_turn_of(run);
+                run
+            },
+        );
+        assert_eq!(outcomes, vec![0, 1, 2, 3], "按连续段的次序，不按判完的次序");
+    }
+
+    #[test]
+    fn on_one_thread_no_run_after_a_stopping_run_is_taken() {
+        let taken = std::sync::Mutex::new(Vec::new());
+        let outcomes = outcomes_of_the_runs_in_their_order(
+            5,
+            NonZeroUsize::MIN,
+            &|outcome: &usize| *outcome == 2,
+            &|run| {
+                taken.lock().expect("这把锁里不 panic").push(run);
+                run
+            },
+        );
+        assert_eq!(outcomes, vec![0, 1, 2], "到叫停的连续段为止，含它");
+        assert_eq!(
+            *taken.lock().expect("这把锁里不 panic"),
+            vec![0, 1, 2],
+            "叫停之后不再领新的"
+        );
+    }
+
+    #[test]
+    fn the_earliest_stopping_run_ends_the_outcomes_when_a_later_one_stopped_earlier() {
+        let turns = RunsFinishingInAGivenOrder::new(&[3, 0, 2, 1]);
+        let outcomes = outcomes_of_the_runs_in_their_order(
+            4,
+            SEVERAL_THREADS,
+            &|outcome: &usize| *outcome == 1 || *outcome == 3,
+            &|run| {
+                turns.wait_for_the_turn_of(run);
+                run
+            },
+        );
+        assert_eq!(
+            outcomes,
+            vec![0, 1],
+            "次序上第一个叫停的是连续段 1，判完得早的连续段 3 与排在后面的都丢掉"
+        );
+    }
+
+    #[test]
+    fn the_memory_cap_limits_the_sampling_threads_and_at_least_one_is_left() {
+        const MEBIBYTE: u64 = 1024 * 1024;
+        let requested = NonZeroUsize::new(31).expect("31 不是 0");
+        let threads_under = |memory_cap_mebibytes: u64| {
+            sampling_threads_within_the_memory_cap(requested, Some(memory_cap_mebibytes * MEBIBYTE))
+                .get()
+        };
+        assert_eq!(
+            sampling_threads_within_the_memory_cap(requested, None).get(),
+            31,
+            "没有上限照要的开"
+        );
+        assert_eq!(threads_under(1024 * 1024), 31, "上限放得下时不多于要的");
+        assert_eq!(threads_under(9216), 28, "(9216 - 2048) / 256");
+        assert_eq!(threads_under(4096), 8, "(4096 - 2048) / 256");
+        assert_eq!(threads_under(1024), 1, "连留给线程之外的都不够时仍开一条");
+    }
+
+    #[test]
+    fn only_the_positive_control_of_the_crash_judge_takes_one_thread() {
+        let switches_of = |positive_control| RunSwitches {
+            positive_control,
+            ..RunSwitches::default()
+        };
+        assert_eq!(
+            sampling_threads_given_the_positive_control(
+                SEVERAL_THREADS,
+                switches_of(Some(PositiveControl::CrashJudge))
+            ),
+            NonZeroUsize::MIN,
+            "批 1 第一个读回了文件的态要一条线程按序号走才说得清"
+        );
+        for positive_control in [
+            None,
+            Some(PositiveControl::ComparisonOfTheCalls),
+            Some(PositiveControl::PoolChecker),
+        ] {
+            assert_eq!(
+                sampling_threads_given_the_positive_control(
+                    SEVERAL_THREADS,
+                    switches_of(positive_control)
+                ),
+                SEVERAL_THREADS,
+                "{positive_control:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_sampling_threads_argument_is_parsed_and_zero_is_refused() {
+        let arguments_with = |threads: &str| {
+            [
+                "baseline",
+                "--output-directory",
+                "目录",
+                "--sampling-threads",
+                threads,
+            ]
+            .map(str::to_string)
+        };
+        let Some(ParsedCommand::Dump(command_line)) = parse_command_line(&arguments_with("1"))
+        else {
+            panic!("baseline 带 --sampling-threads 1 要认");
+        };
+        assert_eq!(
+            command_line.switches.sampling_threads,
+            Some(NonZeroUsize::MIN)
+        );
+        assert!(
+            parse_command_line(&arguments_with("0")).is_none(),
+            "0 条线程不认"
+        );
+    }
+
+    /// O2 两段的单测替身：录下的盘按引用存在内存里（判段从这里读回），判交给 `judge`；数录与判各几次。
+    struct PoolCheckerTablesKeptInMemory<'judge> {
+        pools: Mutex<BTreeMap<[u8; DIGEST_BYTES], MemoryPool>>,
+        judge: &'judge PoolCheckerRedNamesOfAGivenImage<'judge>,
+        tables_recorded: AtomicUsize,
+        tables_judged: AtomicUsize,
+    }
+
+    impl<'judge> PoolCheckerTablesKeptInMemory<'judge> {
+        fn judging_with(judge: &'judge PoolCheckerRedNamesOfAGivenImage<'judge>) -> Self {
+            Self {
+                pools: Mutex::new(BTreeMap::new()),
+                judge,
+                tables_recorded: AtomicUsize::new(0),
+                tables_judged: AtomicUsize::new(0),
+            }
+        }
+
+        fn tables_recorded(&self) -> usize {
+            self.tables_recorded.load(Ordering::SeqCst)
+        }
+
+        fn tables_judged(&self) -> usize {
+            self.tables_judged.load(Ordering::SeqCst)
+        }
+    }
+
+    impl PoolCheckerTablesOfTheTwoStages for PoolCheckerTablesKeptInMemory<'_> {
+        fn record_a_table(&self, table_name: &str, pool: &MemoryPool) -> RecordedTableReference {
+            self.tables_recorded.fetch_add(1, Ordering::SeqCst);
+            let mut message = table_name.as_bytes().to_vec();
+            message.extend_from_slice(&memory_pool_digest(pool));
+            let table = RecordedTableReference {
+                table_name: table_name.to_string(),
+                digest: sha256_digest(&message),
+            };
+            self.pools
+                .lock()
+                .expect("这把锁里不 panic")
+                .insert(table.digest, pool.clone());
+            table
+        }
+
+        fn judge_a_recorded_table(
+            &self,
+            table: &RecordedTableReference,
+        ) -> Result<Vec<String>, String> {
+            self.tables_judged.fetch_add(1, Ordering::SeqCst);
+            let pool = self
+                .pools
+                .lock()
+                .expect("这把锁里不 panic")
+                .get(&table.digest)
+                .cloned()
+                .ok_or_else(|| format!("{} 没录过：先跑录入段", table.table_name))?;
+            Ok((self.judge)(&table.table_name, &pool))
+        }
+    }
+
+    /// 新池新建文件流的几样输入（写法同 `export_stream`），取样每批只留序号最大的 [`SAMPLED_STATES_OF_EACH_BATCH_IN_THE_PAIRING`] 个：
+    /// 批 1 留着全持久态（整条流最大的序号），按序号排与按（批号、序号）排的次序不同，对拍看得出结果排没排好。
+    struct StreamToSampleInThePairing {
+        stream: PreparedStream,
+        tables: CrashStateEnumerationTables,
+        facts: FlowFacts,
+        torn_image_index_by_write: BTreeMap<usize, usize>,
+        sampled: SampledOrdinals,
+    }
+
+    impl StreamToSampleInThePairing {
+        fn new_pool_file_creation() -> Self {
+            let stream = prepare_stream(
+                StreamName::NewPoolFileCreation,
+                RunSwitches::default(),
+                true,
+            );
+            let tables = crash_state_enumeration_tables(
+                &stream.base,
+                &stream.writes,
+                &stream.segments,
+                &full_expansion,
+            );
+            let facts = extract_flow_facts(
+                &stream.base,
+                &stream.writes,
+                &stream.segments,
+                &full_expansion,
+            );
+            let torn_image_index_by_write: BTreeMap<usize, usize> = tables
+                .torn_images
+                .iter()
+                .map(|row| (row.write_index, row.torn_image_index))
+                .collect();
+            let segment_has_a_torn_write: Vec<bool> = stream
+                .segments
+                .iter()
+                .map(|segment| {
+                    segment
+                        .iter()
+                        .any(|write_index| tables.is_tearable_by_write[*write_index])
+                })
+                .collect();
+            let mut sampled = sample_ordinals(
+                &tables.state_ranges_by_segment,
+                tables.state_count,
+                &segment_has_a_torn_write,
+                &|ordinal| {
+                    landing_vector_of(
+                        &facts.persisted_writes_of_state(ordinal),
+                        stream.writes.len(),
+                        &torn_image_index_by_write,
+                    )
+                },
+            );
+            for batch in &mut sampled.batches {
+                *batch = batch
+                    .iter()
+                    .rev()
+                    .copied()
+                    .take(SAMPLED_STATES_OF_EACH_BATCH_IN_THE_PAIRING)
+                    .collect();
+            }
+            Self {
+                stream,
+                tables,
+                facts,
+                torn_image_index_by_write,
+                sampled,
+            }
+        }
+
+        fn observations_on(
+            &self,
+            threads: NonZeroUsize,
+            pool_checker_table: &PoolCheckerTableOfASampledState<'_>,
+        ) -> Result<Vec<StateObservation>, ObservationsUpToACrashInAState> {
+            observe_sampled_states(
+                &self.stream,
+                &self.tables,
+                &self.facts,
+                &self.torn_image_index_by_write,
+                &self.sampled,
+                RunSwitches::default(),
+                threads,
+                pool_checker_table,
+            )
+        }
+
+        /// 录入段：取样、O2 要判的盘录进 `tables`（产品的录法 [`pool_checker_table_of_a_sampled_state`]）；实现自崩交回那一句。
+        fn observations_recorded_in(
+            &self,
+            threads: NonZeroUsize,
+            tables: &dyn PoolCheckerTablesOfTheTwoStages,
+        ) -> Result<Vec<StateObservation>, String> {
+            self.observations_on(
+                threads,
+                &|stream_name, ordinal, image_digest, image, pool_checker_control| {
+                    pool_checker_table_of_a_sampled_state(
+                        tables,
+                        stream_name,
+                        ordinal,
+                        image_digest,
+                        image,
+                        pool_checker_control,
+                    )
+                },
+            )
+            .map_err(|crashed| crashed.crash)
+        }
+
+        /// 录入段录完、判段判完的观测（判段与录入段同样开 `threads` 条线程）。
+        fn observations_recorded_and_judged_in(
+            &self,
+            threads: NonZeroUsize,
+            tables: &dyn PoolCheckerTablesOfTheTwoStages,
+        ) -> Vec<StateObservation> {
+            let mut observations = self
+                .observations_recorded_in(threads, tables)
+                .expect("这条流上实现不 panic");
+            match judge_the_recorded_pool_checker_tables(
+                &mut observations,
+                tables,
+                threads,
+                RunSwitches::default(),
+            ) {
+                Ok(JudgedTablesOfAStream::AllJudged) => observations,
+                Ok(JudgedTablesOfAStream::EngineFailedInAState { what }) => {
+                    panic!("这条流上判器不失败：{what}")
+                }
+                Err(refusal) => panic!("录下的盘都读得回：{refusal}"),
+            }
+        }
+
+        /// 这一份观测写出的每个文件：名字与去掉耗时之后的摘要（`E7RESULT name=file` 行报的那一个，`states.tsv`、`oracle-verdicts.tsv` 的行序进摘要）。
+        fn files_written_from(
+            &self,
+            observations: &[StateObservation],
+            threads: NonZeroUsize,
+        ) -> Vec<(String, String)> {
+            let directory = std::env::temp_dir().join(format!(
+                "e171-sampled-states-pairing-{}-{threads}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            std::fs::create_dir_all(&directory)
+                .unwrap_or_else(|error| panic!("建 {}：{error}", directory.display()));
+            let files = write_stream_files(
+                &directory,
+                &self.stream,
+                &self.tables,
+                observations,
+                self.tables.state_count,
+                0,
+            );
+            std::fs::remove_dir_all(&directory)
+                .unwrap_or_else(|error| panic!("删 {}：{error}", directory.display()));
+            files
+                .into_iter()
+                .map(|file| (file.name, file.sha256_without_timing.unwrap_or(file.sha256)))
+                .collect()
+        }
+
+        /// 一条线程与几条线程各录、各判一遍：观测按（批号、序号）排好，写出的文件逐个相同。
+        fn assert_several_threads_write_the_same_files_as_one_thread(
+            &self,
+            tables: &dyn PoolCheckerTablesOfTheTwoStages,
+        ) {
+            let on_one_thread = self.observations_recorded_and_judged_in(NonZeroUsize::MIN, tables);
+            let on_several_threads =
+                self.observations_recorded_and_judged_in(SEVERAL_THREADS, tables);
+            for observations in [&on_one_thread, &on_several_threads] {
+                assert!(
+                    observations
+                        .windows(2)
+                        .all(|pair| (pair[0].batch, pair[0].ordinal)
+                            < (pair[1].batch, pair[1].ordinal)),
+                    "观测按（批号、序号）严格升序"
+                );
+            }
+            assert_eq!(
+                self.files_written_from(&on_several_threads, SEVERAL_THREADS),
+                self.files_written_from(&on_one_thread, NonZeroUsize::MIN),
+                "几条线程与一条线程写出的文件（去掉耗时之后）逐个相同"
+            );
+        }
+    }
+
+    #[test]
+    fn sampled_states_on_several_threads_write_the_same_files_as_on_one_thread() {
+        StreamToSampleInThePairing::new_pool_file_creation()
+            .assert_several_threads_write_the_same_files_as_one_thread(
+                &PoolCheckerTablesKeptInMemory::judging_with(
+                    &pool_checker_red_names_of_a_given_image_on_the_cpu,
+                ),
+            );
+    }
+
+    /// 同一条对拍走产品路径：每态一张给定状态表录进判定库、判段交引擎，表名与表的内容与产品路径相同。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn sampled_states_through_the_given_states_engine_on_several_threads_write_the_same_files_as_on_one_thread(
+    ) {
+        StreamToSampleInThePairing::new_pool_file_creation()
+            .assert_several_threads_write_the_same_files_as_one_thread(
+                &GivenStatesTablesInTheLibrary,
+            );
+    }
+
+    /// 录入段取样：O2 开着时每个取样态录下一张盘、一张都不判（判归判段）。
+    #[test]
+    fn recording_the_sampled_states_records_a_table_for_every_state_and_judges_none() {
+        let stream_to_sample = StreamToSampleInThePairing::new_pool_file_creation();
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let observations = stream_to_sample
+            .observations_recorded_in(SEVERAL_THREADS, &tables)
+            .expect("这条流上实现不 panic");
+        assert!(!observations.is_empty(), "取样取到了态");
+        assert_eq!(tables.tables_judged(), 0, "录入段一张盘都不判");
+        assert_eq!(
+            tables.tables_recorded(),
+            observations.len(),
+            "每个取样态录下一张盘"
+        );
+        assert!(
+            observations.iter().all(|observation| matches!(
+                observation.pool_checker,
+                PoolCheckerOfAState::RecordedForTheJudgeStage(_)
+            )),
+            "录入段交出的观测里 O2 都是录下了、没判"
+        );
+    }
+
+    #[test]
+    fn panic_in_a_state_reports_the_same_text_on_several_threads_as_on_one_thread() {
+        const PANIC_MESSAGE: &str = "线程对拍里造的实现自崩";
+        let stream_to_sample = StreamToSampleInThePairing::new_pool_file_creation();
+        let sampled_in_order: Vec<u64> = stream_to_sample
+            .sampled
+            .batches
+            .iter()
+            .flatten()
+            .copied()
+            .collect::<BTreeSet<u64>>()
+            .into_iter()
+            .collect();
+        let position_of_the_panic = sampled_in_order.len() / 2;
+        let ordinal_of_the_panic = sampled_in_order[position_of_the_panic];
+        let panicking_at_that_state: &PoolCheckerTableOfASampledState<'_> =
+            &move |_stream_name, ordinal, _image_digest, _image, _pool_checker_control| {
+                assert_ne!(ordinal, ordinal_of_the_panic, "{PANIC_MESSAGE}");
+                RecordedTableReference {
+                    table_name: String::new(),
+                    digest: [0; DIGEST_BYTES],
+                }
+            };
+        let expected_ending = format!(
+            ":after_ordinal_{}",
+            sampled_in_order[position_of_the_panic - 1]
+        );
+        for threads in [NonZeroUsize::MIN, SEVERAL_THREADS] {
+            let refusal = stream_to_sample
+                .observations_on(threads, panicking_at_that_state)
+                .err()
+                .expect("那一态上 panic，这一趟要交回 Err")
+                .crash;
+            assert!(
+                refusal.contains(PANIC_MESSAGE) && refusal.ends_with(&expected_ending),
+                "{threads} 条线程：{refusal}，要以 {expected_ending} 收尾"
+            );
+        }
+    }
+
+    #[test]
+    fn the_sampling_threads_argument_reaches_the_known_bad_images_mode() {
+        let arguments = [
+            "known-bad-images",
+            "--dump-directory",
+            "导出目录",
+            "--output-directory",
+            "目录",
+            "--sampling-threads",
+            "3",
+        ]
+        .map(str::to_string);
+        let Some(ParsedCommand::KnownBadImages(command_line)) = parse_command_line(&arguments)
+        else {
+            panic!("known-bad-images 带 --sampling-threads 3 要认");
+        };
+        assert_eq!(
+            command_line.switches.sampling_threads,
+            NonZeroUsize::new(3),
+            "坏镜像模式的线程数取同一个参数"
+        );
+    }
+
+    /// 不上卡的给定盘 O2 名单：同一张盘直接判（线程对拍比的是分线程，不是两段；两段的那一条在带 gpu 特性的对拍里）。
+    // gpu-exempt: experiment-measures-the-cpu-judge-itself
+    fn pool_checker_red_names_of_a_given_image_on_the_cpu(
+        _table_name: &str,
+        pool: &MemoryPool,
+    ) -> Vec<String> {
+        violated_invariant_names(&check_pool_image(pool))
+    }
+
+    /// 造出来的 E170 坏状态每条流各几行带补丁（取已知坏镜像表开头几条的改法）。
+    const PATCHED_E170_BAD_ROWS_OF_EACH_STREAM: usize = 4;
+
+    /// 造出来的 E170 坏状态每条流各几行不带补丁、落在同一张没落任何写的底态上（几条线程同时判到同一张底态）。
+    const UNPATCHED_E170_BAD_ROWS_OF_EACH_STREAM: usize = 2;
+
+    /// 第 `row_position` 行造出来的 E170 坏状态的行号。
+    fn e170_bad_row_identifier(row_position: usize) -> String {
+        format!("row-{row_position}")
+    }
+
+    /// `known-bad-images` 模式走一趟留下的：退出码或 panic 的消息、结果行的全部字节、输出目录里每个文件的全部字节。
+    #[derive(Debug, PartialEq, Eq)]
+    struct KnownBadImagesModeOutcome {
+        ending: Result<i32, String>,
+        result_lines: String,
+        files: BTreeMap<String, Vec<u8>>,
+    }
+
+    /// 临时目录里一份 `known-bad-images` 模式要读的导出：两条流的目录都放新池新建文件流的中性格式（模式只按落地向量重建，不看它是哪条流），
+    /// `states.tsv` 一行全持久态，E170 坏状态由已知坏镜像表开头几条的补丁与不带补丁的几行组成，每行的两个摘要与 E170 池级 checker 那一列由这里现算。
+    struct DumpDirectoryForKnownBadImages {
+        directory: PathBuf,
+        known_bad_entry_count: usize,
+    }
+
+    impl DumpDirectoryForKnownBadImages {
+        fn new(scenario: &str) -> Self {
+            let directory = std::env::temp_dir().join(format!(
+                "e171-known-bad-images-{scenario}-{}",
+                std::process::id()
+            ));
+            let stream = prepare_stream(
+                StreamName::NewPoolFileCreation,
+                RunSwitches::default(),
+                true,
+            );
+            let tables = crash_state_enumeration_tables(
+                &stream.base,
+                &stream.writes,
+                &stream.segments,
+                &full_expansion,
+            );
+            let mut known_bad_entry_count = 0;
+            for name in STREAM_NAMES {
+                let stream_directory = directory.join(name.directory_name());
+                std::fs::create_dir_all(&stream_directory)
+                    .unwrap_or_else(|error| panic!("建 {}：{error}", stream_directory.display()));
+                write_stream_files(
+                    &stream_directory,
+                    &stream,
+                    &tables,
+                    &[],
+                    tables.state_count,
+                    0,
+                );
+                known_bad_entry_count =
+                    Self::write_the_full_state_and_the_e170_bad_rows(&stream_directory);
+            }
+            Self {
+                directory,
+                known_bad_entry_count,
+            }
+        }
+
+        /// 交回已知坏镜像表的条数。
+        fn write_the_full_state_and_the_e170_bad_rows(stream_directory: &Path) -> usize {
+            let neutral = read_neutral_stream(stream_directory);
+            let write_count = neutral
+                .operations
+                .iter()
+                .filter(|operation| operation.kind != RecordedOperationKind::Barrier)
+                .count();
+            let all_persisted = "2".repeat(write_count);
+            let none_landed = "0".repeat(write_count);
+            let clean = rebuilt_memory_pool(&neutral, &all_persisted);
+            std::fs::write(
+                stream_directory.join(STATES_FILE),
+                format!(
+                    "0\t0\t0\t1\t{all_persisted}\t{}\n",
+                    sha256_text(&memory_pool_digest(&clean))
+                ),
+            )
+            .unwrap_or_else(|error| panic!("写 {STATES_FILE}：{error}"));
+            let entries = known_bad_images(&clean);
+            let patches_of_the_entry = |entry_index: usize| {
+                let mut bad = clean.clone();
+                (entries[entry_index].1)(&mut bad);
+                sector_difference_as_patches(&clean, &bad)
+            };
+            let rows: Vec<(&str, Vec<BytePatch>)> = (0..PATCHED_E170_BAD_ROWS_OF_EACH_STREAM)
+                .map(|entry_index| (all_persisted.as_str(), patches_of_the_entry(entry_index)))
+                .chain(
+                    (0..UNPATCHED_E170_BAD_ROWS_OF_EACH_STREAM)
+                        .map(|_row| (none_landed.as_str(), Vec::new())),
+                )
+                .collect();
+            let mut states_text = String::new();
+            let mut verdicts_text = String::new();
+            let mut patches_file = Vec::new();
+            for (row_position, (landing_vector, patches)) in rows.iter().enumerate() {
+                let mut pool = rebuilt_memory_pool(&neutral, landing_vector);
+                let base_digest = sha256_text(&memory_pool_digest(&pool));
+                apply_patches(&mut pool, patches);
+                let row_identifier = e170_bad_row_identifier(row_position);
+                states_text.push_str(&format!(
+                    "{row_identifier}\t{landing_vector}\t{base_digest}\t{}\t{}\n",
+                    sha256_text(&memory_pool_digest(&pool)),
+                    patch_list_text(patches, &mut patches_file)
+                ));
+                let mut verdict_fields = vec!["-".to_string(); 10];
+                verdict_fields[6] = list_text(&pool_checker_red_names_of_a_given_image_on_the_cpu(
+                    &row_identifier,
+                    &pool,
+                ));
+                verdicts_text.push_str(&verdict_fields.join("\t"));
+                verdicts_text.push('\n');
+            }
+            for (file_name, contents) in [
+                ("bad-states.tsv", states_text.into_bytes()),
+                ("bad-patches.bin", patches_file),
+                ("bad-impl-verdicts.tsv", verdicts_text.into_bytes()),
+            ] {
+                std::fs::write(stream_directory.join(file_name), contents)
+                    .unwrap_or_else(|error| panic!("写 {file_name}：{error}"));
+            }
+            entries.len()
+        }
+
+        fn command_line_on(
+            &self,
+            threads: NonZeroUsize,
+            output_directory: PathBuf,
+        ) -> KnownBadImagesCommandLine {
+            KnownBadImagesCommandLine {
+                dump_directory: self.directory.clone(),
+                output_directory,
+                with_e170_bad_rows: true,
+                switches: RunSwitches {
+                    sampling_threads: Some(threads),
+                    ..RunSwitches::default()
+                },
+            }
+        }
+
+        /// 两段先后跑一趟，O2 两段交内存里的替身（判交给 `pool_checker_red_names`）。
+        fn run_on(
+            &self,
+            threads: NonZeroUsize,
+            pool_checker_red_names: &PoolCheckerRedNamesOfAGivenImage<'_>,
+        ) -> KnownBadImagesModeOutcome {
+            self.run_on_with_the_tables(
+                threads,
+                &PoolCheckerTablesKeptInMemory::judging_with(pool_checker_red_names),
+            )
+        }
+
+        fn run_on_with_the_tables(
+            &self,
+            threads: NonZeroUsize,
+            tables: &dyn PoolCheckerTablesOfTheTwoStages,
+        ) -> KnownBadImagesModeOutcome {
+            let output_directory = self.directory.join(format!("output-on-{threads}-threads"));
+            let KnownBadImagesModeOutcome {
+                ending,
+                result_lines,
+                ..
+            } = self.run_stage_on(
+                RunStage::RecordThenJudge,
+                threads,
+                &output_directory,
+                tables,
+            );
+            KnownBadImagesModeOutcome {
+                ending,
+                result_lines,
+                files: Self::read_and_remove(&output_directory),
+            }
+        }
+
+        /// 照 `stage` 跑一趟，交回退出码（或 panic 的消息、拒绝的那一句）与结果行；输出目录留着（[`Self::read_and_remove`] 读）。
+        fn run_stage_on(
+            &self,
+            stage: RunStage,
+            threads: NonZeroUsize,
+            output_directory: &Path,
+            tables: &dyn PoolCheckerTablesOfTheTwoStages,
+        ) -> KnownBadImagesModeOutcome {
+            let command_line = self.command_line_on(threads, output_directory.to_path_buf());
+            let mut result_lines = Vec::new();
+            let ending = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                run_known_bad_images(
+                    &command_line,
+                    stage,
+                    &KNOWN_BAD_IMAGES_RUN_ARGUMENTS.map(str::to_string),
+                    tables,
+                    &mut result_lines,
+                )
+            }))
+            .map_err(|payload| panic_text(&*payload))
+            .and_then(|ran| ran);
+            KnownBadImagesModeOutcome {
+                ending,
+                result_lines: String::from_utf8(result_lines).expect("结果行是 UTF-8"),
+                files: BTreeMap::new(),
+            }
+        }
+
+        /// 输出目录里每个文件的全部字节（没有这个目录是空的），读完删掉这个目录。
+        fn read_and_remove(output_directory: &Path) -> BTreeMap<String, Vec<u8>> {
+            let mut files = BTreeMap::new();
+            if output_directory.exists() {
+                for entry in std::fs::read_dir(output_directory)
+                    .unwrap_or_else(|error| panic!("读 {}：{error}", output_directory.display()))
+                {
+                    let path = entry.expect("读得了输出目录的一项").path();
+                    let contents = std::fs::read(&path)
+                        .unwrap_or_else(|error| panic!("读 {}：{error}", path.display()));
+                    files.insert(
+                        path.file_name()
+                            .expect("输出目录里的文件有名字")
+                            .to_string_lossy()
+                            .into_owned(),
+                        contents,
+                    );
+                }
+                std::fs::remove_dir_all(output_directory)
+                    .unwrap_or_else(|error| panic!("删 {}：{error}", output_directory.display()));
+            }
+            files
+        }
+    }
+
+    impl Drop for DumpDirectoryForKnownBadImages {
+        fn drop(&mut self) {
+            if let Err(error) = std::fs::remove_dir_all(&self.directory) {
+                eprintln!("删 {}：{error}", self.directory.display());
+            }
+        }
+    }
+
+    /// 一条线程与几条线程各走一趟模式：停机条款都过，结果行的字节与产物文件的字节逐个相同。
+    fn assert_the_known_bad_images_mode_leaves_the_same_on_several_threads_as_on_one_thread(
+        scenario: &str,
+        tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    ) {
+        let dump = DumpDirectoryForKnownBadImages::new(scenario);
+        let on_one_thread = dump.run_on_with_the_tables(NonZeroUsize::MIN, tables);
+        let on_several_threads = dump.run_on_with_the_tables(SEVERAL_THREADS, tables);
+        assert_eq!(
+            on_one_thread.ending,
+            Ok(0),
+            "停机条款都过：{}",
+            on_one_thread.result_lines
+        );
+        assert_eq!(
+            on_one_thread
+                .result_lines
+                .lines()
+                .filter(|line| line.contains("name=known_bad_entry "))
+                .count(),
+            dump.known_bad_entry_count,
+            "每条已知坏镜像一行结果行：{}",
+            on_one_thread.result_lines
+        );
+        assert_eq!(
+            on_one_thread
+                .result_lines
+                .lines()
+                .filter(|line| line.contains("name=e170_bad_row "))
+                .count(),
+            (PATCHED_E170_BAD_ROWS_OF_EACH_STREAM + UNPATCHED_E170_BAD_ROWS_OF_EACH_STREAM)
+                * STREAM_NAMES.len(),
+            "每行 E170 坏状态一行结果行：{}",
+            on_one_thread.result_lines
+        );
+        assert_eq!(
+            on_one_thread.files.keys().collect::<Vec<&String>>(),
+            [
+                "e170-bad-rows-o2.tsv",
+                "known-bad-o2.tsv",
+                "known-bad-patches.bin",
+                "known-bad-states.tsv"
+            ]
+            .map(str::to_string)
+            .iter()
+            .collect::<Vec<&String>>(),
+            "这个模式写的四个产物文件"
+        );
+        assert!(
+            on_one_thread.result_lines.ends_with(&format!(
+                "E7RESULT name=done emitted={}\n",
+                on_one_thread.result_lines.lines().count()
+            )),
+            "收尾行写进同一份输出、数得对：{}",
+            on_one_thread.result_lines
+        );
+        assert_eq!(
+            on_several_threads, on_one_thread,
+            "几条线程与一条线程的退出码、结果行、产物文件逐字相同"
+        );
+    }
+
+    #[test]
+    fn known_bad_images_mode_on_several_threads_prints_and_writes_the_same_as_on_one_thread() {
+        assert_the_known_bad_images_mode_leaves_the_same_on_several_threads_as_on_one_thread(
+            "cpu-pairing",
+            &PoolCheckerTablesKeptInMemory::judging_with(
+                &pool_checker_red_names_of_a_given_image_on_the_cpu,
+            ),
+        );
+    }
+
+    /// 同一条对拍走产品路径：每张盘一张给定状态表录进判定库、判段交引擎，表名与表的内容与产品路径相同。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn known_bad_images_mode_through_the_given_states_engine_on_several_threads_prints_and_writes_the_same_as_on_one_thread(
+    ) {
+        assert_the_known_bad_images_mode_leaves_the_same_on_several_threads_as_on_one_thread(
+            "engine-pairing",
+            &GivenStatesTablesInTheLibrary,
+        );
+    }
+
+    #[test]
+    fn judged_tables_keep_their_names_on_several_threads() {
+        let dump = DumpDirectoryForKnownBadImages::new("table-names");
+        let judged_table_names = Mutex::new(Vec::new());
+        let outcome = dump.run_on(SEVERAL_THREADS, &|table_name, pool| {
+            judged_table_names
+                .lock()
+                .expect("这把锁里不 panic")
+                .push(table_name.to_string());
+            pool_checker_red_names_of_a_given_image_on_the_cpu(table_name, pool)
+        });
+        assert_eq!(outcome.ending, Ok(0));
+        let mut expected_table_names = vec!["known-bad/clean".to_string()];
+        for entry_index in 0..dump.known_bad_entry_count {
+            expected_table_names.push(format!("known-bad/entry-{entry_index}/direct"));
+            expected_table_names.push(format!("known-bad/entry-{entry_index}/patched"));
+        }
+        for name in STREAM_NAMES {
+            for row_position in
+                0..PATCHED_E170_BAD_ROWS_OF_EACH_STREAM + UNPATCHED_E170_BAD_ROWS_OF_EACH_STREAM
+            {
+                let row_identifier = e170_bad_row_identifier(row_position);
+                let label = name.directory_name();
+                expected_table_names.push(format!("e170-bad-row/{label}/{row_identifier}/base"));
+                expected_table_names.push(format!("e170-bad-row/{label}/{row_identifier}/patched"));
+            }
+        }
+        expected_table_names.sort_unstable();
+        let mut judged_table_names = judged_table_names.into_inner().expect("这把锁里不 panic");
+        judged_table_names.sort_unstable();
+        assert_eq!(
+            judged_table_names, expected_table_names,
+            "每张表判一次、表名不随线程变（表名进录入摘要，判定库的键不变）"
+        );
+    }
+
+    /// 同时在判的调用要等到几次才算「同时」。
+    const SIMULTANEOUS_JUDGE_CALLS_LOOKED_FOR: usize = 2;
+
+    /// 表名以这个前缀起头的判定，等多久等不到另一次同时的调用就不再等（一条线程走完那一趟只等这一回）。
+    const SECONDS_A_JUDGE_CALL_WAITS_FOR_ANOTHER: u64 = 30;
+
+    /// 同时在判的调用数：`in_flight` 是此刻几次，`most_in_flight` 是到此刻最多几次，`gave_up` 是等过一回没等到。
+    #[derive(Default)]
+    struct JudgeCallsInFlight {
+        in_flight: usize,
+        most_in_flight: usize,
+        gave_up: bool,
+    }
+
+    /// 让表名带某个前缀的判定互相等到有 [`SIMULTANEOUS_JUDGE_CALLS_LOOKED_FOR`] 次同时在判：几条线程时必等得到，一条线程时等够时限一回就不再等。
+    struct RendezvousOfJudgeCalls {
+        table_name_prefix: &'static str,
+        calls: Mutex<JudgeCallsInFlight>,
+        one_arrived: std::sync::Condvar,
+    }
+
+    impl RendezvousOfJudgeCalls {
+        fn new(table_name_prefix: &'static str) -> Self {
+            Self {
+                table_name_prefix,
+                calls: Mutex::new(JudgeCallsInFlight::default()),
+                one_arrived: std::sync::Condvar::new(),
+            }
+        }
+
+        fn judge(&self, table_name: &str, pool: &MemoryPool) -> Vec<String> {
+            if table_name.starts_with(self.table_name_prefix) {
+                let deadline = Instant::now()
+                    + std::time::Duration::from_secs(SECONDS_A_JUDGE_CALL_WAITS_FOR_ANOTHER);
+                let mut calls = self.calls.lock().expect("这把锁里不 panic");
+                calls.in_flight += 1;
+                calls.most_in_flight = calls.most_in_flight.max(calls.in_flight);
+                self.one_arrived.notify_all();
+                while calls.most_in_flight < SIMULTANEOUS_JUDGE_CALLS_LOOKED_FOR && !calls.gave_up {
+                    let Some(time_left) = deadline.checked_duration_since(Instant::now()) else {
+                        calls.gave_up = true;
+                        break;
+                    };
+                    calls = self
+                        .one_arrived
+                        .wait_timeout(calls, time_left)
+                        .expect("这把锁里不 panic")
+                        .0;
+                }
+                calls.in_flight -= 1;
+            }
+            pool_checker_red_names_of_a_given_image_on_the_cpu(table_name, pool)
+        }
+
+        fn most_in_flight(&self) -> usize {
+            self.calls.lock().expect("这把锁里不 panic").most_in_flight
+        }
+    }
+
+    /// 带 `--sampling-threads` 走一趟模式（线程数照产品路径 `sampling_threads_of_this_run` 取），表名带这个前缀的判定要有几次同时在判。
+    fn assert_the_tables_with_this_prefix_are_judged_at_once(
+        scenario: &str,
+        table_name_prefix: &'static str,
+    ) {
+        let dump = DumpDirectoryForKnownBadImages::new(scenario);
+        let rendezvous = RendezvousOfJudgeCalls::new(table_name_prefix);
+        let outcome = dump.run_on(SEVERAL_THREADS, &|table_name, pool| {
+            rendezvous.judge(table_name, pool)
+        });
+        assert_eq!(outcome.ending, Ok(0));
+        let threads_of_this_run = sampling_threads_of_this_run(RunSwitches {
+            sampling_threads: Some(SEVERAL_THREADS),
+            ..RunSwitches::default()
+        });
+        let expected_at_once = SIMULTANEOUS_JUDGE_CALLS_LOOKED_FOR.min(threads_of_this_run.get());
+        assert!(
+            rendezvous.most_in_flight() >= expected_at_once,
+            "{table_name_prefix} 的表最多 {} 次同时在判，这一趟开 {threads_of_this_run} 条线程，至少要 {expected_at_once} 次",
+            rendezvous.most_in_flight()
+        );
+    }
+
+    #[test]
+    fn known_bad_entries_are_judged_on_several_threads_at_once() {
+        assert_the_tables_with_this_prefix_are_judged_at_once(
+            "entries-at-once",
+            "known-bad/entry-",
+        );
+    }
+
+    #[test]
+    fn e170_bad_rows_are_judged_on_several_threads_at_once() {
+        assert_the_tables_with_this_prefix_are_judged_at_once("rows-at-once", "e170-bad-row/");
+    }
+
+    const PANIC_MESSAGE_OF_THE_JUDGE: &str = "坏镜像线程对拍里造的判器崩";
+
+    /// 走到这张表就 panic 的判器，别的表照判。
+    fn judge_panicking_at<'table>(
+        panicking_table_name: &'table str,
+    ) -> impl Fn(&str, &MemoryPool) -> Vec<String> + Sync + 'table {
+        move |table_name, pool| {
+            assert_ne!(
+                table_name, panicking_table_name,
+                "{PANIC_MESSAGE_OF_THE_JUDGE}"
+            );
+            pool_checker_red_names_of_a_given_image_on_the_cpu(table_name, pool)
+        }
+    }
+
+    #[test]
+    fn panic_on_a_known_bad_entry_prints_the_same_lines_on_several_threads_as_on_one_thread() {
+        const ENTRY_OF_THE_PANIC: usize = 3;
+        let dump = DumpDirectoryForKnownBadImages::new("known-bad-entry-panic");
+        let panicking_table_name = format!("known-bad/entry-{ENTRY_OF_THE_PANIC}/patched");
+        let judge = judge_panicking_at(&panicking_table_name);
+        let on_one_thread = dump.run_on(NonZeroUsize::MIN, &judge);
+        let on_several_threads = dump.run_on(SEVERAL_THREADS, &judge);
+        assert!(
+            on_one_thread
+                .ending
+                .as_ref()
+                .is_err_and(|text| text.contains(PANIC_MESSAGE_OF_THE_JUDGE)),
+            "判器的 panic 原样抛出来：{:?}",
+            on_one_thread.ending
+        );
+        assert!(
+            on_one_thread.result_lines.contains(&format!(
+                "name=known_bad_entry index={} ",
+                ENTRY_OF_THE_PANIC - 1
+            )) && !on_one_thread
+                .result_lines
+                .contains(&format!("name=known_bad_entry index={ENTRY_OF_THE_PANIC} ")),
+            "结果行打到 panic 的前一条为止：{}",
+            on_one_thread.result_lines
+        );
+        assert!(on_one_thread.files.is_empty(), "产物在判完之后才写");
+        assert_eq!(
+            on_several_threads, on_one_thread,
+            "几条线程与一条线程的 panic 消息、结果行、产物文件逐字相同"
+        );
+    }
+
+    #[test]
+    fn panic_on_an_e170_bad_row_prints_and_writes_the_same_on_several_threads_as_on_one_thread() {
+        const ROW_OF_THE_PANIC: usize = 2;
+        let dump = DumpDirectoryForKnownBadImages::new("e170-bad-row-panic");
+        let label = StreamName::NewPoolFileCreation.directory_name();
+        let row_identifier = e170_bad_row_identifier(ROW_OF_THE_PANIC);
+        let panicking_table_name = format!("e170-bad-row/{label}/{row_identifier}/base");
+        let judge = judge_panicking_at(&panicking_table_name);
+        let on_one_thread = dump.run_on(NonZeroUsize::MIN, &judge);
+        let on_several_threads = dump.run_on(SEVERAL_THREADS, &judge);
+        assert!(
+            on_one_thread
+                .ending
+                .as_ref()
+                .is_err_and(|text| text.contains(PANIC_MESSAGE_OF_THE_JUDGE)),
+            "判器的 panic 原样抛出来：{:?}",
+            on_one_thread.ending
+        );
+        let row_line_start = |row_position: usize| {
+            format!(
+                "name=e170_bad_row stream={label} row={} ",
+                e170_bad_row_identifier(row_position)
+            )
+        };
+        assert!(
+            on_one_thread
+                .result_lines
+                .contains(&row_line_start(ROW_OF_THE_PANIC - 1))
+                && !on_one_thread
+                    .result_lines
+                    .contains(&row_line_start(ROW_OF_THE_PANIC)),
+            "结果行打到 panic 的前一行为止：{}",
+            on_one_thread.result_lines
+        );
+        assert_eq!(
+            on_one_thread.files.keys().collect::<Vec<&String>>(),
+            [
+                "known-bad-o2.tsv",
+                "known-bad-patches.bin",
+                "known-bad-states.tsv"
+            ]
+            .map(str::to_string)
+            .iter()
+            .collect::<Vec<&String>>(),
+            "已知坏镜像的产物已经写了，E170 坏状态那一份在判完之后才写"
+        );
+        assert_eq!(
+            on_several_threads, on_one_thread,
+            "几条线程与一条线程的 panic 消息、结果行、产物文件逐字相同"
+        );
+    }
+
+    #[test]
+    fn no_known_bad_entry_after_a_panicking_one_is_judged_on_one_thread() {
+        const ENTRY_OF_THE_PANIC: usize = 3;
+        let dump = DumpDirectoryForKnownBadImages::new("no-entry-after-the-panic");
+        let panicking_table_name = format!("known-bad/entry-{ENTRY_OF_THE_PANIC}/direct");
+        let judge = judge_panicking_at(&panicking_table_name);
+        let judged_table_names = Mutex::new(Vec::new());
+        let outcome = dump.run_on(NonZeroUsize::MIN, &|table_name, pool| {
+            judged_table_names
+                .lock()
+                .expect("这把锁里不 panic")
+                .push(table_name.to_string());
+            judge(table_name, pool)
+        });
+        assert!(outcome.ending.is_err(), "判器 panic 了这一趟要 panic");
+        assert_eq!(
+            judged_table_names
+                .into_inner()
+                .expect("这把锁里不 panic")
+                .last(),
+            Some(&panicking_table_name),
+            "panic 的那张表之后一张都不再判"
+        );
+    }
+
+    /// 坏镜像模式这几条单测的参数（进交接；两段核是不是同一条命令）。
+    const KNOWN_BAD_IMAGES_RUN_ARGUMENTS: [&str; 1] = ["known-bad-images"];
+
+    /// 只跑录入段：每张要判的盘都录下、一张都不判，不打结果行，输出目录里只留交接。
+    #[test]
+    fn the_record_stage_of_the_known_bad_images_mode_judges_no_table_and_leaves_only_the_hand_off()
+    {
+        let dump = DumpDirectoryForKnownBadImages::new("record-stage-only");
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let output_directory = dump.directory.join("output-of-the-record-stage");
+        let recorded = dump.run_stage_on(
+            RunStage::RecordOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        let files = DumpDirectoryForKnownBadImages::read_and_remove(&output_directory);
+        assert_eq!(recorded.ending, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        assert_eq!(tables.tables_judged(), 0, "录入段一张盘都不判");
+        let e170_bad_rows = (PATCHED_E170_BAD_ROWS_OF_EACH_STREAM
+            + UNPATCHED_E170_BAD_ROWS_OF_EACH_STREAM)
+            * STREAM_NAMES.len();
+        assert_eq!(
+            tables.tables_recorded(),
+            1 + 2 * dump.known_bad_entry_count + 2 * e170_bad_rows,
+            "干净镜像一张、已知坏镜像每条两张、E170 坏状态每行两张都录下"
+        );
+        assert!(
+            recorded.result_lines.is_empty(),
+            "录入段不打结果行：{}",
+            recorded.result_lines
+        );
+        assert_eq!(
+            files.keys().collect::<Vec<&String>>(),
+            vec![&HAND_OFF_TO_THE_JUDGE_STAGE_FILE.to_string()],
+            "录入段在输出目录里只留交接"
+        );
+    }
+
+    /// 分两趟跑（录入段一趟、判段一趟）与两段先后跑一趟：退出码、结果行、产物文件逐字节相同（判完删掉交接）；
+    /// 判段一张盘都不再录（不再重建、不再驱动），录下的每张盘判段判一次。
+    #[test]
+    fn the_known_bad_images_mode_in_two_runs_prints_and_writes_the_same_as_in_one_run() {
+        let dump = DumpDirectoryForKnownBadImages::new("two-runs");
+        let in_one_run = dump.run_on(
+            SEVERAL_THREADS,
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let output_directory = dump.directory.join("output-in-two-runs");
+        let recorded = dump.run_stage_on(
+            RunStage::RecordOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        assert_eq!(recorded.ending, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        let tables_recorded_by_the_record_stage = tables.tables_recorded();
+        let judged = dump.run_stage_on(
+            RunStage::JudgeOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        let in_two_runs = KnownBadImagesModeOutcome {
+            ending: judged.ending,
+            result_lines: judged.result_lines,
+            files: DumpDirectoryForKnownBadImages::read_and_remove(&output_directory),
+        };
+        assert_eq!(
+            tables.tables_recorded(),
+            tables_recorded_by_the_record_stage,
+            "判段一张盘都不再录：不重跑流程"
+        );
+        assert_eq!(
+            tables.tables_judged(),
+            tables_recorded_by_the_record_stage,
+            "录下的每张盘判段判一次"
+        );
+        assert_eq!(
+            in_one_run.ending,
+            Ok(0),
+            "停机条款都过：{}",
+            in_one_run.result_lines
+        );
+        assert_eq!(
+            in_two_runs, in_one_run,
+            "分两趟跑与两段先后跑一趟的退出码、结果行、产物文件逐字节相同"
+        );
+    }
+
+    /// 只跑判段而录入段没跑过：拒，报错句点名先跑录入段，一张盘都不录、不判，不打结果行。
+    #[test]
+    fn the_judge_stage_without_a_record_stage_refuses_and_names_the_record_stage() {
+        let dump = DumpDirectoryForKnownBadImages::new("judge-without-record");
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let output_directory = dump.directory.join("output-never-recorded");
+        let judged = dump.run_stage_on(
+            RunStage::JudgeOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        let refusal = judged.ending.expect_err("录入段没跑过就只跑判段，要拒");
+        assert!(
+            refusal.contains("先跑录入段") && refusal.contains(&format!("{STAGE_ARGUMENT} record")),
+            "报错句点名先跑录入段：{refusal}"
+        );
+        assert_eq!(tables.tables_recorded(), 0, "判段不补录");
+        assert_eq!(tables.tables_judged(), 0, "没有交接就一张都不判");
+        assert!(
+            judged.result_lines.is_empty(),
+            "拒了就不打结果行：{}",
+            judged.result_lines
+        );
+    }
+
+    /// 判段的参数与录入段那一趟的不同（两趟只许换 `--stage`）：拒，点名两趟的参数，不判。
+    #[test]
+    fn the_judge_stage_refuses_a_hand_off_recorded_under_other_arguments() {
+        let output_directory = std::env::temp_dir().join(format!(
+            "e171-hand-off-under-other-arguments-{}",
+            std::process::id()
+        ));
+        let recorded = run_in_stages(
+            RunStage::RecordOnly,
+            &["row".to_string()],
+            &output_directory,
+            || "录入段交出的".to_string(),
+            |_hand_off: String| -> Result<i32, String> { panic!("只跑录入段不判") },
+        );
+        let hand_offs_judged = AtomicUsize::new(0);
+        let judged = run_in_stages(
+            RunStage::JudgeOnly,
+            &["baseline".to_string()],
+            &output_directory,
+            || -> String { panic!("只跑判段不录") },
+            |_hand_off: String| {
+                hand_offs_judged.fetch_add(1, Ordering::SeqCst);
+                Ok(0)
+            },
+        );
+        std::fs::remove_dir_all(&output_directory)
+            .unwrap_or_else(|error| panic!("删 {}：{error}", output_directory.display()));
+        assert_eq!(recorded, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        let refusal = judged.expect_err("参数不同要拒");
+        assert!(
+            refusal.contains("[\"row\"]") && refusal.contains("[\"baseline\"]"),
+            "点名两趟的参数：{refusal}"
+        );
+        assert_eq!(hand_offs_judged.load(Ordering::SeqCst), 0, "拒了就不判");
+    }
+
+    /// 新池新建文件流的录入段（取样照 [`StreamToSampleInThePairing`] 收小，与 `export_stream` 同一种填法）：导出文件写进 `output_root`
+    /// 下这条流的目录，O2 要判的盘录进 `tables`，交回 `baseline` 那一趟的交接。
+    fn recorded_dump_of_the_pairing_stream(
+        stream_to_sample: &StreamToSampleInThePairing,
+        output_root: &Path,
+        tables: &dyn PoolCheckerTablesOfTheTwoStages,
+    ) -> RecordedDump {
+        let started = Instant::now();
+        let name = StreamName::NewPoolFileCreation;
+        let directory = output_root.join(name.directory_name());
+        std::fs::create_dir_all(&directory)
+            .unwrap_or_else(|error| panic!("建 {}：{error}", directory.display()));
+        let observations = stream_to_sample
+            .observations_recorded_in(SEVERAL_THREADS, tables)
+            .expect("这条流上实现不 panic");
+        let stream = &stream_to_sample.stream;
+        let mut export = StreamExport::not_exported(name, String::new(), started);
+        export.not_exported = None;
+        export.checks = stream.checks.clone();
+        export.calls = stream.calls.clone();
+        export.ending = Some(stream.ending.clone());
+        export.model_stopped_at_call = stream.model_stopped_at_call;
+        export.operation_count = stream.operations.len();
+        export.write_count = stream.writes.len();
+        export.segment_count = stream.segments.len();
+        export.tearable_write_count = stream_to_sample.torn_image_index_by_write.len();
+        export.full_states = stream_to_sample.tables.state_count;
+        export.torn_scans = stream_to_sample.sampled.torn_scans.clone();
+        export.files = write_stream_files_before_the_judge_stage(
+            &directory,
+            stream,
+            &stream_to_sample.tables,
+            &observations,
+            stream_to_sample.tables.state_count,
+            0,
+        );
+        export.observations = observations;
+        RecordedDump {
+            stream_independent_checks: stream_independent_checks(),
+            exports: vec![export],
+        }
+    }
+
+    /// 一个目录里每个文件（名字 → 去掉耗时之后的字节，[`contents_without_timing`]；不带耗时的原样）。
+    fn files_without_timing_under(directory: &Path) -> BTreeMap<String, Vec<u8>> {
+        std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("读 {}：{error}", directory.display()))
+            .map(|entry| {
+                let path = entry.expect("读得了目录的一项").path();
+                let name = path
+                    .file_name()
+                    .expect("目录里的文件有名字")
+                    .to_string_lossy()
+                    .into_owned();
+                let contents = std::fs::read(&path)
+                    .unwrap_or_else(|error| panic!("读 {}：{error}", path.display()));
+                let kept = contents_without_timing(&name, &contents).unwrap_or(contents);
+                (name, kept)
+            })
+            .collect()
+    }
+
+    /// `baseline` 的交接：新池新建文件流（取样收小）录入段一趟、判段一趟，与两段先后跑一趟，退出码与结果行逐字节相同、判完删掉交接；
+    /// 两趟写出的文件（去掉耗时之后）都与不经交接、一趟写完（`write_stream_files`）的逐个相同。
+    #[test]
+    fn a_dump_handed_off_to_the_judge_stage_prints_the_same_as_in_one_run_and_writes_the_same_as_without_a_hand_off(
+    ) {
+        let stream_to_sample = StreamToSampleInThePairing::new_pool_file_creation();
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let label = StreamName::NewPoolFileCreation.directory_name();
+        let root = std::env::temp_dir().join(format!("e171-dump-hand-off-{}", std::process::id()));
+        let run_arguments = ["baseline".to_string()];
+        let command_line_on = |output_directory: PathBuf| CommandLine {
+            run_kind: RunKind::Baseline,
+            output_directory,
+            switches: RunSwitches::default(),
+        };
+        let in_one_run_directory = root.join("in-one-run");
+        let mut in_one_run_lines = Vec::new();
+        let in_one_run = run_in_stages(
+            RunStage::RecordThenJudge,
+            &run_arguments,
+            &in_one_run_directory,
+            || {
+                recorded_dump_of_the_pairing_stream(
+                    &stream_to_sample,
+                    &in_one_run_directory,
+                    &tables,
+                )
+            },
+            |recorded_dump| {
+                judge_the_dump(
+                    &command_line_on(in_one_run_directory.clone()),
+                    recorded_dump,
+                    &tables,
+                    &mut in_one_run_lines,
+                )
+            },
+        );
+        let in_two_runs_directory = root.join("in-two-runs");
+        let recorded = run_in_stages(
+            RunStage::RecordOnly,
+            &run_arguments,
+            &in_two_runs_directory,
+            || {
+                recorded_dump_of_the_pairing_stream(
+                    &stream_to_sample,
+                    &in_two_runs_directory,
+                    &tables,
+                )
+            },
+            |_recorded: RecordedDump| -> Result<i32, String> { panic!("只跑录入段不判") },
+        );
+        let mut in_two_runs_lines = Vec::new();
+        let in_two_runs = run_in_stages(
+            RunStage::JudgeOnly,
+            &run_arguments,
+            &in_two_runs_directory,
+            || -> RecordedDump { panic!("只跑判段不再取样") },
+            |recorded_dump| {
+                judge_the_dump(
+                    &command_line_on(in_two_runs_directory.clone()),
+                    recorded_dump,
+                    &tables,
+                    &mut in_two_runs_lines,
+                )
+            },
+        );
+        let hand_off_is_left = in_two_runs_directory
+            .join(HAND_OFF_TO_THE_JUDGE_STAGE_FILE)
+            .exists();
+        let without_a_hand_off_directory = root.join("without-a-hand-off");
+        std::fs::create_dir_all(&without_a_hand_off_directory).unwrap_or_else(|error| {
+            panic!("建 {}：{error}", without_a_hand_off_directory.display())
+        });
+        let observations =
+            stream_to_sample.observations_recorded_and_judged_in(NonZeroUsize::MIN, &tables);
+        write_stream_files(
+            &without_a_hand_off_directory,
+            &stream_to_sample.stream,
+            &stream_to_sample.tables,
+            &observations,
+            stream_to_sample.tables.state_count,
+            0,
+        );
+        let files_in_one_run = files_without_timing_under(&in_one_run_directory.join(label));
+        let files_in_two_runs = files_without_timing_under(&in_two_runs_directory.join(label));
+        let files_without_a_hand_off = files_without_timing_under(&without_a_hand_off_directory);
+        std::fs::remove_dir_all(&root)
+            .unwrap_or_else(|error| panic!("删 {}：{error}", root.display()));
+        assert_eq!(recorded, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        assert!(in_one_run.is_ok(), "两段先后跑那一趟没拒：{in_one_run:?}");
+        assert_eq!(in_two_runs, in_one_run, "两趟的退出码相同");
+        assert_eq!(
+            String::from_utf8(in_two_runs_lines).expect("结果行是 UTF-8"),
+            String::from_utf8(in_one_run_lines).expect("结果行是 UTF-8"),
+            "分两趟跑与两段先后跑一趟的结果行逐字节相同"
+        );
+        assert!(!hand_off_is_left, "判段判完删掉交接");
+        assert_eq!(
+            files_in_two_runs, files_without_a_hand_off,
+            "经交接分两趟写出的文件与不经交接一趟写完的逐个相同"
+        );
+        assert_eq!(
+            files_in_one_run, files_without_a_hand_off,
+            "两段先后跑写出的文件与不经交接一趟写完的逐个相同"
+        );
+    }
+
+    /// 判段里引擎判一态的盘时失败的那句消息（不带空白：结果行里的 `field_text` 去掉空白）。
+    const ENGINE_FAILURE_MESSAGE: &str = "两段对拍里造的引擎失败";
+
+    /// 判段里引擎判新池新建文件流（取样照 [`StreamToSampleInThePairing`] 收小）某一态的盘时失败：分两趟跑（录入段一趟、判段一趟）、两段先后跑一趟，
+    /// 与两段之前的退出码、结果行逐字节相同，这条流的目录里都只留照写的两个文件（去掉耗时之后逐字节相同）。两段之前的那一份照不分两段的 `export_stream`
+    /// 在取样回调里接住实现自崩那一支的填法造：`not_exported` 是 `implementation_crashed_in_a_state:<消息>:after_ordinal_<按序号它前面那一态>`、
+    /// 只写照写的两个文件、取样之后才有的几样是零；打结果行的是两段之前与之后同一份 `report_stream`。
+    #[test]
+    fn an_engine_failure_in_a_state_prints_the_same_in_two_runs_in_one_run_and_as_before_the_two_stages(
+    ) {
+        let stream_to_sample = StreamToSampleInThePairing::new_pool_file_creation();
+        let sampled_in_order: Vec<u64> = stream_to_sample
+            .sampled
+            .batches
+            .iter()
+            .flatten()
+            .copied()
+            .collect::<BTreeSet<u64>>()
+            .into_iter()
+            .collect();
+        let position_of_the_failure = sampled_in_order.len() / 2;
+        let table_name_part_of_the_failure =
+            format!("/ordinal={}/", sampled_in_order[position_of_the_failure]);
+        let judge_failing_at_that_state = |table_name: &str, pool: &MemoryPool| -> Vec<String> {
+            if table_name.contains(&table_name_part_of_the_failure) {
+                panic!("{ENGINE_FAILURE_MESSAGE}");
+            }
+            pool_checker_red_names_of_a_given_image_on_the_cpu(table_name, pool)
+        };
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(&judge_failing_at_that_state);
+        let name = StreamName::NewPoolFileCreation;
+        let label = name.directory_name();
+        let root = std::env::temp_dir().join(format!("e171-engine-failure-{}", std::process::id()));
+        let run_arguments = ["baseline".to_string()];
+        let command_line_on = |output_directory: PathBuf| CommandLine {
+            run_kind: RunKind::Baseline,
+            output_directory,
+            switches: RunSwitches::default(),
+        };
+        let in_one_run_directory = root.join("in-one-run");
+        let mut in_one_run_lines = Vec::new();
+        let in_one_run = run_in_stages(
+            RunStage::RecordThenJudge,
+            &run_arguments,
+            &in_one_run_directory,
+            || {
+                recorded_dump_of_the_pairing_stream(
+                    &stream_to_sample,
+                    &in_one_run_directory,
+                    &tables,
+                )
+            },
+            |recorded_dump| {
+                judge_the_dump(
+                    &command_line_on(in_one_run_directory.clone()),
+                    recorded_dump,
+                    &tables,
+                    &mut in_one_run_lines,
+                )
+            },
+        );
+        let in_two_runs_directory = root.join("in-two-runs");
+        let recorded = run_in_stages(
+            RunStage::RecordOnly,
+            &run_arguments,
+            &in_two_runs_directory,
+            || {
+                recorded_dump_of_the_pairing_stream(
+                    &stream_to_sample,
+                    &in_two_runs_directory,
+                    &tables,
+                )
+            },
+            |_recorded: RecordedDump| -> Result<i32, String> { panic!("只跑录入段不判") },
+        );
+        let mut in_two_runs_lines = Vec::new();
+        let in_two_runs = run_in_stages(
+            RunStage::JudgeOnly,
+            &run_arguments,
+            &in_two_runs_directory,
+            || -> RecordedDump { panic!("只跑判段不再取样") },
+            |recorded_dump| {
+                judge_the_dump(
+                    &command_line_on(in_two_runs_directory.clone()),
+                    recorded_dump,
+                    &tables,
+                    &mut in_two_runs_lines,
+                )
+            },
+        );
+        let before_directory = root.join("before-the-two-stages");
+        let before_stream_directory = before_directory.join(label);
+        std::fs::create_dir_all(&before_stream_directory)
+            .unwrap_or_else(|error| panic!("建 {}：{error}", before_stream_directory.display()));
+        let stream = &stream_to_sample.stream;
+        let mut crashed_before_the_two_stages = StreamExport::not_exported(
+            name,
+            format!(
+                "implementation_crashed_in_a_state:{ENGINE_FAILURE_MESSAGE}:after_ordinal_{}",
+                sampled_in_order[position_of_the_failure - 1]
+            ),
+            Instant::now(),
+        );
+        crashed_before_the_two_stages.checks = stream.checks.clone();
+        crashed_before_the_two_stages.calls = stream.calls.clone();
+        crashed_before_the_two_stages.ending = Some(stream.ending.clone());
+        crashed_before_the_two_stages.model_stopped_at_call = stream.model_stopped_at_call;
+        crashed_before_the_two_stages.operation_count = stream.operations.len();
+        crashed_before_the_two_stages.write_count = stream.writes.len();
+        crashed_before_the_two_stages.segment_count = stream.segments.len();
+        crashed_before_the_two_stages.files =
+            write_the_files_that_exist_even_when_the_stream_is_not_exported(
+                &before_stream_directory,
+                stream,
+            );
+        let mut before_lines = Vec::new();
+        let before = judge_the_dump(
+            &command_line_on(before_directory.clone()),
+            RecordedDump {
+                stream_independent_checks: stream_independent_checks(),
+                exports: vec![crashed_before_the_two_stages],
+            },
+            &PoolCheckerTablesKeptInMemory::judging_with(
+                &pool_checker_red_names_of_a_given_image_on_the_cpu,
+            ),
+            &mut before_lines,
+        );
+        let hand_off_is_left = in_two_runs_directory
+            .join(HAND_OFF_TO_THE_JUDGE_STAGE_FILE)
+            .exists();
+        let files_in_one_run = files_without_timing_under(&in_one_run_directory.join(label));
+        let files_in_two_runs = files_without_timing_under(&in_two_runs_directory.join(label));
+        let files_before = files_without_timing_under(&before_stream_directory);
+        std::fs::remove_dir_all(&root)
+            .unwrap_or_else(|error| panic!("删 {}：{error}", root.display()));
+        let before_lines = String::from_utf8(before_lines).expect("结果行是 UTF-8");
+        assert_eq!(recorded, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        assert_eq!(before, Ok(3), "基线那一趟有流没导出，停机：{before_lines}");
+        assert_eq!(in_one_run, before, "两段先后跑与两段之前的退出码相同");
+        assert_eq!(in_two_runs, before, "分两趟跑与两段之前的退出码相同");
+        assert_eq!(
+            String::from_utf8(in_one_run_lines).expect("结果行是 UTF-8"),
+            before_lines,
+            "两段先后跑与两段之前的结果行逐字节相同"
+        );
+        assert_eq!(
+            String::from_utf8(in_two_runs_lines).expect("结果行是 UTF-8"),
+            before_lines,
+            "分两趟跑与两段之前的结果行逐字节相同"
+        );
+        assert!(!hand_off_is_left, "判段判完删掉交接");
+        assert_eq!(
+            files_before.keys().collect::<Vec<&String>>(),
+            FILES_WRITTEN_EVEN_WHEN_THE_STREAM_IS_NOT_EXPORTED
+                .map(str::to_string)
+                .iter()
+                .collect::<Vec<&String>>(),
+            "两段之前这条流的目录里只有照写的两个文件"
+        );
+        assert_eq!(
+            files_in_one_run, files_before,
+            "两段先后跑这条流的目录与两段之前的逐个相同"
+        );
+        assert_eq!(
+            files_in_two_runs, files_before,
+            "分两趟跑这条流的目录与两段之前的逐个相同"
+        );
+    }
+
+    /// 坏镜像模式里录入段构造某一行 E170 坏状态时 panic（`bad-states.tsv` 那一行少一列）：两段先后跑一趟、分两趟跑，与两段之前的 panic 消息、
+    /// 结果行、产物文件逐字节相同（分两趟跑的输出目录另留着交接）。两段之前（`e170_bad_rows_on_both_streams` 逐行构造、判，panic 的那一行原样抛出）
+    /// 结果行打到 panic 的前一行为止，已知坏镜像的三个产物照写，E170 那一份不写：期望照同一份导出没改坏时那一趟的结果行截到 panic 那一行之前、
+    /// 产物去掉 E170 那一份。
+    #[test]
+    fn a_panic_building_an_e170_bad_row_prints_the_same_in_two_runs_in_one_run_and_as_before_the_two_stages(
+    ) {
+        const ROW_OF_THE_PANIC: usize = 2;
+        let dump = DumpDirectoryForKnownBadImages::new("e170-bad-row-building-panic");
+        let unbroken = dump.run_on(
+            SEVERAL_THREADS,
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        assert_eq!(
+            unbroken.ending,
+            Ok(0),
+            "没改坏的导出停机条款都过：{}",
+            unbroken.result_lines
+        );
+        let label = StreamName::NewPoolFileCreation.directory_name();
+        let stream_directory = dump.directory.join(label);
+        let mut state_rows = read_text_lines(&stream_directory, "bad-states.tsv");
+        let (without_the_patches, _patches) = state_rows[ROW_OF_THE_PANIC]
+            .rsplit_once('\t')
+            .expect("bad-states.tsv 一行五列");
+        state_rows[ROW_OF_THE_PANIC] = without_the_patches.to_string();
+        std::fs::write(
+            stream_directory.join("bad-states.tsv"),
+            state_rows
+                .iter()
+                .map(|row| format!("{row}\n"))
+                .collect::<String>(),
+        )
+        .unwrap_or_else(|error| panic!("写 bad-states.tsv：{error}"));
+        let first_line_not_printed_before = format!(
+            "E7RESULT name=e170_bad_row stream={label} row={} ",
+            e170_bad_row_identifier(ROW_OF_THE_PANIC)
+        );
+        let lines_before = unbroken.result_lines[..unbroken
+            .result_lines
+            .find(&first_line_not_printed_before)
+            .expect("没改坏的那一趟打了 panic 那一行")]
+            .to_string();
+        let mut files_before = unbroken.files;
+        assert!(
+            files_before.remove("e170-bad-rows-o2.tsv").is_some(),
+            "没改坏的那一趟写了 E170 那一份产物"
+        );
+        let in_one_run = dump.run_on(
+            SEVERAL_THREADS,
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let tables = PoolCheckerTablesKeptInMemory::judging_with(
+            &pool_checker_red_names_of_a_given_image_on_the_cpu,
+        );
+        let output_directory = dump.directory.join("output-in-two-runs");
+        let recorded = dump.run_stage_on(
+            RunStage::RecordOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        let judged = dump.run_stage_on(
+            RunStage::JudgeOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &tables,
+        );
+        let mut files_in_two_runs =
+            DumpDirectoryForKnownBadImages::read_and_remove(&output_directory);
+        let hand_off_is_left = files_in_two_runs
+            .remove(HAND_OFF_TO_THE_JUDGE_STAGE_FILE)
+            .is_some();
+        assert!(
+            in_one_run
+                .ending
+                .as_ref()
+                .is_err_and(|text| text.contains("bad-states.tsv 一行五列")),
+            "构造那一行时的 panic 原样抛出来：{:?}",
+            in_one_run.ending
+        );
+        assert_eq!(
+            in_one_run.result_lines, lines_before,
+            "两段先后跑与两段之前的结果行逐字节相同（打到 panic 的前一行为止）"
+        );
+        assert_eq!(
+            in_one_run.files, files_before,
+            "两段先后跑与两段之前的产物逐字节相同（E170 那一份不写）"
+        );
+        assert_eq!(recorded.ending, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        assert_eq!(
+            judged.ending, in_one_run.ending,
+            "分两趟跑与两段先后跑 panic 的消息相同"
+        );
+        assert_eq!(
+            judged.result_lines, lines_before,
+            "分两趟跑与两段之前的结果行逐字节相同"
+        );
+        assert_eq!(
+            files_in_two_runs, files_before,
+            "分两趟跑与两段之前的产物逐字节相同"
+        );
+        assert!(hand_off_is_left, "判段 panic 了，交接留着");
+    }
+
+    /// 判段读到的交接里录的盘在判段这一边读不回（判段换了一份没录过它们的库）：拒（退非 0），报错句点名那张表与出路，
+    /// 一行结果行都不打、一个产物都不写，交接留着。
+    #[test]
+    fn the_judge_stage_refuses_a_hand_off_whose_tables_cannot_be_read_back() {
+        let dump = DumpDirectoryForKnownBadImages::new("tables-not-read-back");
+        let output_directory = dump.directory.join("output-judged-on-another-library");
+        let recorded = dump.run_stage_on(
+            RunStage::RecordOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &PoolCheckerTablesKeptInMemory::judging_with(
+                &pool_checker_red_names_of_a_given_image_on_the_cpu,
+            ),
+        );
+        let judged = dump.run_stage_on(
+            RunStage::JudgeOnly,
+            SEVERAL_THREADS,
+            &output_directory,
+            &PoolCheckerTablesKeptInMemory::judging_with(
+                &pool_checker_red_names_of_a_given_image_on_the_cpu,
+            ),
+        );
+        let files = DumpDirectoryForKnownBadImages::read_and_remove(&output_directory);
+        assert_eq!(recorded.ending, Ok(EXIT_CODE_OF_A_RECORD_ONLY_RUN));
+        let refusal = judged.ending.expect_err("交接里录的盘读不回，要拒");
+        assert!(
+            refusal.contains("known-bad/clean") && refusal.contains("先跑录入段"),
+            "报错句点名录入次序上第一张读不回的表与出路：{refusal}"
+        );
+        assert!(
+            judged.result_lines.is_empty(),
+            "拒了就不打结果行：{}",
+            judged.result_lines
+        );
+        assert_eq!(
+            files.keys().collect::<Vec<&String>>(),
+            vec![&HAND_OFF_TO_THE_JUDGE_STAGE_FILE.to_string()],
+            "一个产物都不写，交接留着"
         );
     }
 }

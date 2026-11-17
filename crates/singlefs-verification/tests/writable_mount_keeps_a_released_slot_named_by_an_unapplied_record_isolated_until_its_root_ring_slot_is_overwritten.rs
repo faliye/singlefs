@@ -136,10 +136,11 @@ fn a_slot_of_the_current_account_named_by_an_unapplied_record_stays_isolated_aft
         "C 的记录与账点名的落点里有 B 的现行账里仍分配着、写行那次发布（txg {row_publish_txg:?}）释放了的"
     );
     let slots_per_region = parameters().geometry.root_ring_slots_per_region;
-    let ring_slot_of_c = target_for_publish(abandoned.root.checkpoint_txg, slots_per_region);
+    let ring_slot_of_the_abandoned_publish =
+        target_for_publish(abandoned.root.checkpoint_txg, slots_per_region);
     let overwrites_limit = 4 * slots_per_region.count();
     let mut overwrites: u64 = 0;
-    let mut reclaimed_before_the_ring_slot_of_c_was_overwritten = false;
+    let mut reclaimed_before_the_ring_slot_of_the_abandoned_publish_was_overwritten = false;
     // 迭代上界 overwrites_limit（根环三区、每区 S 槽，一圈 3S 次发布之内必写到 C 那一槽）；跨轮携带「回收过」一个布尔；
     // 出口是写掉 C 那一槽的那一次发布。
     loop {
@@ -163,12 +164,12 @@ fn a_slot_of_the_current_account_named_by_an_unapplied_record_stays_isolated_aft
                 "第 {overwrites} 次覆盖写（txg {current_txg:?}）：C 的根环槽写掉之前（含写掉它的那一次发布）{placement:?} 没被重新分配"
             );
         }
-        if target_for_publish(current_txg, slots_per_region) == ring_slot_of_c {
+        if target_for_publish(current_txg, slots_per_region) == ring_slot_of_the_abandoned_publish {
             break;
         }
         for placement in &released_by_the_row_publish {
             if every_slot_of_the_placement_is_reclaimed(&pool.allocator, placement) {
-                reclaimed_before_the_ring_slot_of_c_was_overwritten = true;
+                reclaimed_before_the_ring_slot_of_the_abandoned_publish_was_overwritten = true;
             }
             assert!(
                 every_slot_of_the_placement_is_held(&pool.allocator, placement),
@@ -181,7 +182,7 @@ fn a_slot_of_the_current_account_named_by_an_unapplied_record_stays_isolated_aft
         );
     }
     assert!(
-        reclaimed_before_the_ring_slot_of_c_was_overwritten,
+        reclaimed_before_the_ring_slot_of_the_abandoned_publish_was_overwritten,
         "C 的根环槽写掉之前写行那次发布释放的槽过了回收门槛、被回收过（这一形才走到回收之后补隔离那一步）"
     );
 }

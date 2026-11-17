@@ -11,10 +11,11 @@
 //! CPU 路线判一块（`crash_judge_cpu_blocks`：崩溃放量判段没配 GPU 时一条核对线程判一段，入口登在判镜像的定义那一组）；
 //! 判法单元的入口登记表（`judging_units_entries`：构建脚本按它逐组算判器键写进 `OUT_DIR`，`crash_identity` 读回）。
 //! 随机历史两项的给定状态表、它的判器 trait 与 CPU 判法（`crash_given_states`，不引随机历史：流水线引它，崩溃枚举用例的判法闭包里因此没有崩溃注入；崩溃注入照旧转出）。
+//! 已知坏镜像表（`known_bad_images`：池级 checker 的回归语料与 E171 装置共用的那一份）。
 //! 池级 checker 判决器在 `singlefs_checker`。
 //!
 //! 每条记：设备身份、偏移、长度、内容哈希、种类（普通写 / FUA 写 / 整段清零 / 屏障，[`RecordedOperationKind`]）。读不记——崩溃状态只由写与屏障切段（D13（验证路线） 已定项 4）。
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 use std::cell::RefCell;
 use std::fmt::Write as _;
@@ -56,6 +57,7 @@ pub mod heavy_threads;
 pub mod hexadecimal;
 pub mod history;
 pub mod judging_units_entries;
+pub mod known_bad_images;
 pub mod memory_pool;
 pub mod model;
 pub mod model_comparison;
@@ -742,7 +744,7 @@ mod tests {
 
     /// 开了记读的流记每一次读与每一次 journal 记录槽提示问到的段（按发出次序）；没开的流一段都不记。
     #[test]
-    fn a_stream_retaining_reads_records_every_read_and_every_slot_hint_range_in_issue_order() {
+    fn stream_retaining_reads_records_every_read_and_every_slot_hint_range_in_issue_order() {
         let stream = SharedStream::retaining_contents_and_reads();
         let recorder = RecordingBlockDevice::with_shared_stream(
             DeviceIdentity(3),

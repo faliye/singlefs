@@ -13,7 +13,8 @@ mod common;
 
 use common::{
     build_pool, format_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
-    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B, FIXED_WRITE_TIME_SECONDS,
+    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
+    FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::{mount_writable, unmount, ShadowLedger, Unmounted};
@@ -119,7 +120,7 @@ fn a_root_rebuilt_from_the_second_unmount_publish_record_takes_the_unmount_marke
     for fill_byte in FILL_BYTES_OF_THE_THREE_OVERWRITES {
         overwrite_in_process_as_instance_one_and_advance_the_pool(
             &mut pool,
-            &vec![fill_byte; CONTENT_BYTES_OF_PUBLISH_B],
+            &vec![fill_byte; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
         );
     }
     assert_eq!(

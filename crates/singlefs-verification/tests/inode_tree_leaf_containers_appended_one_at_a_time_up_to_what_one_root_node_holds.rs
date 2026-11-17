@@ -37,7 +37,7 @@ fn size_zero_inode_record_appended_as(records_before: u64) -> InodeRecord {
 /// 再追加一条，交回 `MoreLeafContainersThanOneRootNodeHolds { containers: 136, capacity: 135 }`。
 /// 判别力：容器数的上限放宽一片（第 31 456 条照收），或分裂点提前（一片不装满 233 条就分裂，第 k 条落的片不是 ⌊k ÷ 233⌋）。
 #[test]
-fn appending_inode_records_one_at_a_time_rewrites_container_floor_k_over_233_and_refuses_the_136th_container(
+fn appending_inode_records_one_at_a_time_rewrites_container_floor_of_the_record_number_over_233_and_refuses_the_136th_container(
 ) {
     assert_eq!(
         leaf_containers_one_root_node_holds(),

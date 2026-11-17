@@ -254,9 +254,12 @@ enum ModelPublishKind {
     /// 搬走的是用户可见树的根（inode 树根、extent 树根，活头的或快照条目抄的）时，树表里那条根指针换成映射位置、盘上字节变了，
     /// 这一版算一个新状态（「照字节比，搬根算非空」，[`ModelRoot::user_visible_root_relocations`]）。
     /// `intent_after_the_batch` 说这一批之后意图照抄还是同一次发布删掉（这一批搬空了 R）。
+    /// 用户改动发成之后修只坏一份的那一批（`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing`，D4（校验和位置） 已定项 4）走同一条搬迁路径，也是这一种：
+    /// 意图照抄，读到实例表片只坏一份时同一次发布重写整条实例表链（`instance_table`）；整理的批恒照抄实例表。
     CompactionBatch {
         units_at_most: u64,
         intent_after_the_batch: ModelCompactionIntentAfterTheBatch,
+        instance_table: ModelInstanceTableOfTheBatch,
     },
     /// 签发一条整理意图（判决 G1；丁 3 交回的读法第 1 条：签发单独一次发布，不搬单元）：logged_ops 新写一个根装这一条
     /// （[`ModelUnitRole::LoggedOperationsRoot`]，分配代 = 这次的 txg），只重写固定点单元，文件内容、extent 树、inode 树、快照与 deadlist 都不动；
@@ -540,6 +543,15 @@ pub enum ModelCompactionIntentAfterTheBatch {
     DeletedWithTheLastBatch,
 }
 
+/// 搬迁的一批里实例表怎样（`transaction::publish_the_relocations_and_the_repair_of_the_exempt_units`）。封闭集合。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelInstanceTableOfTheBatch {
+    /// 照抄上一版那条链。
+    Carried,
+    /// 读到实例表片只坏一份：行不变，整条链重写到新落点（D4（校验和位置） 已定项 4「豁免映射的三类」）。
+    RewrittenWithTheSameRows,
+}
+
 /// 一条整理意图不随一批、单独一次发布离开 logged_ops 的两种。封闭集合。模型不记分配记录，分不出是哪一种：执行器按实现交回的这一版
 /// R 按记录全空没有交给模型（[`ModelCompactionPublishSeen`]），两种的根一样，只计数分开。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -650,9 +662,12 @@ impl ModelPublishKind {
     /// 这次发布重写不重写实例表：写行那两种重写整条链，别的照抄。
     fn rewrites_the_instance_table(self) -> bool {
         match self {
-            ModelPublishKind::RowsOnFileVersion | ModelPublishKind::RowsOnVersionWithoutFile => {
-                true
-            }
+            ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::CompactionBatch {
+                instance_table: ModelInstanceTableOfTheBatch::RewrittenWithTheSameRows,
+                ..
+            } => true,
             ModelPublishKind::FirstFileVersion
             | ModelPublishKind::OverwriteFileVersion
             | ModelPublishKind::EmptyOnFileVersion
@@ -666,7 +681,10 @@ impl ModelPublishKind {
             | ModelPublishKind::SnapshotDestructionIntent { .. }
             | ModelPublishKind::SnapshotDestructionBatch { .. }
             | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
-            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionBatch {
+                instance_table: ModelInstanceTableOfTheBatch::Carried,
+                ..
+            }
             | ModelPublishKind::CompactionIntentIssue
             | ModelPublishKind::CompactionIntentDeletion { .. }
             | ModelPublishKind::TruncationIntent { .. }
@@ -841,6 +859,11 @@ impl ModelPublishKind {
                 inode_leaf_container,
                 ..
             } => roles.push(inode_leaf_container),
+            // 修只坏一份的那一批重写实例表（`rewrites_the_instance_table`）：种类定死的那几个是搬迁共用的固定点单元，实例表在这里另加。
+            ModelPublishKind::CompactionBatch {
+                instance_table: ModelInstanceTableOfTheBatch::RewrittenWithTheSameRows,
+                ..
+            } => roles.push(ModelUnitRole::InstanceTable),
             ModelPublishKind::FirstFileVersion
             | ModelPublishKind::OverwriteFileVersion
             | ModelPublishKind::RowsOnFileVersion
@@ -855,7 +878,10 @@ impl ModelPublishKind {
             | ModelPublishKind::SnapshotDestructionIntent { .. }
             | ModelPublishKind::SnapshotDestructionBatch { .. }
             | ModelPublishKind::SnapshotDestructionFinalBatch { .. }
-            | ModelPublishKind::CompactionBatch { .. }
+            | ModelPublishKind::CompactionBatch {
+                instance_table: ModelInstanceTableOfTheBatch::Carried,
+                ..
+            }
             | ModelPublishKind::CompactionIntentIssue
             | ModelPublishKind::CompactionIntentDeletion { .. }
             | ModelPublishKind::TruncationIntent { .. }
@@ -2811,6 +2837,9 @@ pub enum ModelOperationKind {
     /// 整理的一批（`mounted_session::MountedSession::run_compaction`，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7、G8），
     /// 照抄意图的与同一次发布删意图的最后一批。
     PublishCompactionBatch,
+    /// 用户改动发成之后另发的那一批：修只坏一份的单元（`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated`，
+    /// D4（校验和位置） 已定项 4「读到只坏一份时计数；可写挂载里读到的，再经已有的搬迁路径把这个单元整个搬到新槽」）。
+    PublishRelocationBatchAfterAUserChange,
     /// 签发一条整理意图（判决 G1）。
     PublishCompactionIntentIssue,
     /// 不搬单元、R 已按记录全空，单独删意图（意图达成，判决 G4）。
@@ -2845,6 +2874,17 @@ pub struct ModelCompactionPublishSeen {
     pub is_the_region_of_the_live_intent_empty_by_the_records_after_the_publish: bool,
     /// 执行器强制选的那一段（`CompactionSwitches::forced_region`）：签发的 R 就是它。
     pub region_forced_for_the_issue: ModelCompactionRegion,
+}
+
+/// 执行器交给模型的、用户改动发成之后另发的那一批看得见的几样（[`IdealModel::answer_relocation_batch_after_a_user_change`]）。
+/// 搬哪几个、换不换实例表由这次挂载读到哪一份坏了定，模型不记盘上的读，答不了，只判这一版除这几样之外逐项是上一版的内容。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelRelocationBatchAfterAUserChangeSeen {
+    /// 这一批搬了几个单元：占槽上界按它取。
+    pub units_relocated: u64,
+    /// 搬的里头用户可见树的根单元（同 [`ModelCompactionPublishSeen::user_visible_root_units_relocated`]）。
+    pub user_visible_root_units_relocated: Vec<ModelUserVisibleRootUnit>,
+    pub instance_table: ModelInstanceTableOfTheBatch,
 }
 
 fn describe_compaction_publish_seen(seen: &ModelCompactionPublishSeen) -> String {
@@ -3274,6 +3314,9 @@ impl ModelDisagreement {
 /// 一步判完之后的计数：模型怎么答的、比了多少格。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ModelJudgementCounts {
+    /// 覆盖写掉电之后，盘上系统配置里的 F 正好是模型算的上限、比掉电之前的 F_生效高的次数（抬 F 那一串写完系统配置、第一条根还没落：
+    /// [`IdealModel::settle_floor_left_in_the_system_configurations_by_a_lost_power`] 的 [`ModelFloorLeftByALostPower::RaisedToTheCeiling`] 那一格跑到了）。
+    pub lost_powers_leaving_the_floor_at_the_ceiling: u64,
     pub required_refusals_matched: u64,
     pub permitted_refusals_taken: u64,
     pub successes_matched: u64,
@@ -3313,6 +3356,8 @@ pub struct ModelJudgementCounts {
     pub snapshot_destruction_batches_keeping_the_snapshot_matched: u64,
     /// 比过、对得上的整理的批（判决 G7「只比成功操作的内容」：每一批写出的那一版逐项与搬之前那一版的内容相同）。
     pub compaction_batches_matched: u64,
+    /// 比过、对得上的用户改动发成之后另发的那一批（[`ModelOperationKind::PublishRelocationBatchAfterAUserChange`]）。
+    pub relocation_batches_after_a_user_change_matched: u64,
     /// 比过、对得上的签发（判决 G1）。
     pub compaction_intents_issued_matched: u64,
     /// 比过、对得上的同一次发布删意图的最后一批（D8（核心索引结构） 已定项 5）。
@@ -3386,6 +3431,7 @@ impl ModelJudgementCounts {
     /// 把另一份逐项加进来：按字段拆开写全，新加一个字段而这里没加，编译不过。
     pub fn add(&mut self, other: &ModelJudgementCounts) {
         let ModelJudgementCounts {
+            lost_powers_leaving_the_floor_at_the_ceiling,
             required_refusals_matched,
             permitted_refusals_taken,
             successes_matched,
@@ -3408,6 +3454,7 @@ impl ModelJudgementCounts {
             snapshot_read_backs_compared,
             snapshot_destruction_batches_keeping_the_snapshot_matched,
             compaction_batches_matched,
+            relocation_batches_after_a_user_change_matched,
             compaction_intents_issued_matched,
             compaction_intents_deleted_with_the_last_batch_matched,
             compaction_intents_deleted_without_a_batch_matched,
@@ -3454,6 +3501,8 @@ impl ModelJudgementCounts {
         self.cold_start_contents_compared += cold_start_contents_compared;
         self.ceilings_compared += ceilings_compared;
         self.rollbacks_accepted_at_the_effective_floor += rollbacks_accepted_at_the_effective_floor;
+        self.lost_powers_leaving_the_floor_at_the_ceiling +=
+            lost_powers_leaving_the_floor_at_the_ceiling;
         self.unit_area_wall_refusals_in_the_interval += unit_area_wall_refusals_in_the_interval;
         self.deletion_batches_keeping_data_units_matched +=
             deletion_batches_keeping_data_units_matched;
@@ -3468,6 +3517,8 @@ impl ModelJudgementCounts {
         self.snapshot_destruction_batches_keeping_the_snapshot_matched +=
             snapshot_destruction_batches_keeping_the_snapshot_matched;
         self.compaction_batches_matched += compaction_batches_matched;
+        self.relocation_batches_after_a_user_change_matched +=
+            relocation_batches_after_a_user_change_matched;
         self.compaction_intents_issued_matched += compaction_intents_issued_matched;
         self.compaction_intents_deleted_with_the_last_batch_matched +=
             compaction_intents_deleted_with_the_last_batch_matched;
@@ -3534,9 +3585,22 @@ struct ModelSession {
     current: ModelRoot,
 }
 
+/// 掉电之后盘上系统配置里的 F 落在模型答的两个值里的哪一个
+/// （[`IdealModel::settle_floor_left_in_the_system_configurations_by_a_lost_power`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelFloorLeftByALostPower {
+    /// 还是掉电之前的 F_生效：这次改动没有走到抬 F 那一串写系统配置那一步。
+    KeptAtTheEffectiveFloor,
+    /// 是模型算的上限：抬 F 那一串把新 F 写进了系统配置，掉电截在它的第一条根之前。
+    RaisedToTheCeiling,
+}
+
 /// 理想模型的状态。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct IdealModel {
+    /// 掉电留在系统配置里、根环里还没有根带着的那一份 F（[`Self::settle_floor_left_in_the_system_configurations_by_a_lost_power`]）；
+    /// 没有这样的掉电时 0。只进 F_生效（[`Self::effective_rollback_floor`]）。
+    floor_left_in_the_system_configurations_by_a_lost_power: ModelCheckpointTxg,
     geometry: ModelPoolGeometry,
     /// 单元区起始槽号：journal 环末尾的下一个槽（D3（空间分配） 已定项 10 ④，随环长走；D23（journal 的角色与格式） 已定项 19 ③）。
     /// 模型自己按环长算（[`model_unit_area_start_slot`]），不调实现的那一份（D13（验证路线） 已定项 5）。
@@ -3797,6 +3861,7 @@ impl IdealModel {
             genesis,
         );
         Self {
+            floor_left_in_the_system_configurations_by_a_lost_power: ModelCheckpointTxg(0),
             geometry,
             unit_area_start_slot: model_unit_area_start_slot(journal_ring_bytes),
             slots_per_region,
@@ -3915,8 +3980,9 @@ impl IdealModel {
 
     /// F_生效 = 各幸存盘最新持久有效根所带 F 的最大值（D16（发布语义） 已定项 1「生效」根那一半）：有效 = 按最新那条根指着的实例表
     /// 不被抛弃；每块盘取落在它上面的有效根里 (txg, 实例) 最大的那一条。一条根都没有时 0。
-    /// 系统配置里的那一份 F（SysPre）模型不建：不建故障时抬 F 那一串要么在任何写之前被拒、要么推到每块盘，系统配置里的 F 与
-    /// 那一串的根带的相同，两半取大不改答案。被抛弃时间线上的根带的 F 算不算，D16 写着仍开着；这里照「有效根」的字面，不算。
+    /// 系统配置那一半（SysPre）只记掉电留下的那一份：抬 F 那一串要么在任何写之前被拒、要么推到每块盘，系统配置里的 F 与那一串的根带的相同，
+    /// 只有掉电截在写完系统配置之后、第一条根之前时高出根这一半（[`Self::settle_floor_left_in_the_system_configurations_by_a_lost_power`]）。
+    /// 被抛弃时间线上的根带的 F 算不算，D16 写着仍开着；这里照「有效根」的字面，不算。
     #[must_use]
     pub fn effective_rollback_floor(&self) -> ModelCheckpointTxg {
         let newest_table = Rc::clone(&self.newest_root().instance_table_rows);
@@ -3938,6 +4004,41 @@ impl IdealModel {
             .map(|root| root.rollback_floor)
             .max()
             .unwrap_or(ModelCheckpointTxg(0))
+            .max(self.floor_left_in_the_system_configurations_by_a_lost_power)
+    }
+
+    /// 一次发布掉电在它的第一个 journal 记录写上之后，判盘上系统配置里读得出的 F 的最大值（D16（发布语义） 已定项 1「生效」「抬 F 那一串」）并记下。
+    /// 掉电之前抬 F 那一串最多走到把新 F 写进每块盘的系统配置（它的第一条根就要写 journal），所以这个值只能是掉电之前的 F_生效，或这一刻模型算的上限
+    /// （[`Self::rollback_floor_ceiling`]）；两个值都由模型自己算，胶水只报盘上读到的是哪一个。
+    ///
+    /// # Errors
+    /// 读到的值不是这两个（抬过了上限、抬到一半、低于 F_生效）：交回 [`ModelDisagreementAspect::RollbackFloor`] 那一格，模型不动。
+    pub fn settle_floor_left_in_the_system_configurations_by_a_lost_power(
+        &mut self,
+        floor_read_from_the_system_configurations: ModelCheckpointTxg,
+    ) -> Result<ModelFloorLeftByALostPower, ModelDisagreement> {
+        let effective_floor_before_the_lost_power = self.effective_rollback_floor();
+        if floor_read_from_the_system_configurations == effective_floor_before_the_lost_power {
+            return Ok(ModelFloorLeftByALostPower::KeptAtTheEffectiveFloor);
+        }
+        let ceiling = self.rollback_floor_ceiling();
+        if ceiling == Some(floor_read_from_the_system_configurations) {
+            self.floor_left_in_the_system_configurations_by_a_lost_power =
+                floor_read_from_the_system_configurations;
+            return Ok(ModelFloorLeftByALostPower::RaisedToTheCeiling);
+        }
+        Err(ModelDisagreement::new(
+            ModelDisagreementAspect::RollbackFloor,
+            format!(
+                "掉电之后系统配置里的 F 只能是原值 {} 或这一刻的上限 {:?}（D16（发布语义） 已定项 1）",
+                effective_floor_before_the_lost_power.0,
+                ceiling.map(|ceiling_txg| ceiling_txg.0)
+            ),
+            format!(
+                "盘上系统配置里读得出的 F 最大是 {}",
+                floor_read_from_the_system_configurations.0
+            ),
+        ))
     }
 
     /// 按实例表判是不是被抛弃的：表里有它那个实例的行 (i, Ti, Wi) 且 txg > Ti（D23（journal 的角色与格式） 已定项 14）。
@@ -4106,8 +4207,17 @@ impl IdealModel {
     /// 根按盘分路，根的层号取「每块盘按下一层的宽度切出来的段数之和装得进一个根」的最低一层（实现员的取法，交回里写明）。
     ///
     /// 重写的是根，与这次之后还装着记录、内容变了的节点。模型不记哪几片变了，取「这次之后可能装着记录的节点」的全数：
-    /// 记录只住在落点上；落点按 D3（空间分配） 已定项 10 从最低处取（开新段取最低的全空段，回落取最低的空槽），每个落点至多多开一个
-    /// 64 槽的段 ⇒ 沿来路写过 P 个槽之后，落点都在单元区起点往后 `64 × P` 个槽里（单元区墙那一格同一个读法）。
+    /// 记录只住在落点上；用户数据与开新段按 D3（空间分配） 已定项 8 第 1 条、已定项 10 从最低处取（用户数据取最低的空槽对，开新段取最低的全空段），
+    /// 每个落点至多多开一个 64 槽的段；提交内生块回落（已定项 8 第 2 条：先取重写集的叶、再取每块盘都空的槽最多的叶）不取最低处，可它只在
+    /// 每块盘上一个全空段都没有时才走，那时单元区里每个整段（活 `R` 那一段除外，见下面推不出的几角）至少有一槽被挡 ⇒ 挡住各段的槽都是沿来路写过的槽时，
+    /// 单元区不过 `64 × P` 槽，回落落在哪一片叶都仍在单元区起点往后 `64 × P` 个槽里 ⇒ 沿来路写过 P 个槽之后，落点都在这一截里（单元区墙那一格同一个读法）。
+    /// 推不出的几角，每一角都让「单元区不过 `64 × P` 槽」这一步推不出来，回落可以落到那一截之外，这个上界在那里罩不罩得住没有推出来：
+    /// - 有的段只靠影子账隔离或抬 F 扣住的槽撑成非空（那几槽不是这条来路写的，不在 P 里），没有全空段时单元区可以长过 `64 × P`；
+    /// - 活 `R` 那一段可以整段空而回落照走：分配器找全空段时排除活 `R` 那一段（`DeviceFreeMap::lowest_empty_segment_outside_the_region`），
+    ///   那一段一槽都不必被挡，单元区可以多出这 64 槽；
+    /// - 单元区尾巴不满 64 槽的那一截不算段：同一处找全空段只走整段（单元区槽数整除 64 的那几段），没有全空段时那一截可以一槽都不被挡。
+    ///
+    /// 这几角欠在 D3（空间分配） 已定项 8 的「欠」（理想模型重写节点上界在隔离撑起的非空段一角）。
     /// 这次重写的节点自己也占槽，P 里含着要求的那个数：设重写数为 A，A ≤ g(A)（g 是「写过 P₀ + A 个槽之后可能装着记录的节点数」，
     /// 对 A 单调不减），从 g(∞)（单元区里的全部节点）起往下迭代，每一步都仍是 A 的上界，停在不动点。
     fn allocation_record_tree_nodes_rewritten_upper_bound(
@@ -7349,6 +7459,7 @@ impl IdealModel {
                         ModelPublishKind::CompactionBatch {
                             units_at_most: seen.units_at_most,
                             intent_after_the_batch: ModelCompactionIntentAfterTheBatch::CarriedOn,
+                            instance_table: ModelInstanceTableOfTheBatch::Carried,
                         },
                         ModelOperationKind::PublishCompactionBatch,
                         None,
@@ -7364,6 +7475,7 @@ impl IdealModel {
                             units_at_most: seen.units_at_most,
                             intent_after_the_batch:
                                 ModelCompactionIntentAfterTheBatch::DeletedWithTheLastBatch,
+                            instance_table: ModelInstanceTableOfTheBatch::Carried,
                         },
                         ModelOperationKind::PublishCompactionBatch,
                         None,
@@ -7397,10 +7509,53 @@ impl IdealModel {
                 }
             }
         };
+        self.answer_of_a_publish_relocating_units(
+            kind,
+            operation,
+            issued,
+            &seen.user_visible_root_units_relocated,
+        )
+    }
+
+    /// 用户改动发成之后另发的那一批（`mounted_session::RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated`，
+    /// D4（校验和位置） 已定项 4「可写挂载里读到的，再经已有的搬迁路径把这个单元整个搬到新槽、两份新写」）：接在现行那一版后面的一次搬迁发布，
+    /// 意图照抄（`transaction::publish_the_relocations_and_the_repair_of_the_exempt_units`：意图的签发与删不归这一批），所以不问活意图、也不问还有没有要走空的，
+    /// 与 [`Self::answer_compaction_publish`] 分开答。这一批不是整理：现行那一版没有活意图时一样发。只重写固定点单元，文件内容逐项照抄；
+    /// 换实例表时行不变。模型不答这一批发不发（模型不记盘上读到哪一份坏了），执行器按实现交回的那一版问。
+    ///
+    /// # Errors
+    /// 模型里没有可写会话：会话状态对不上；搬的根单元模型这一版不引用：[`ModelDisagreementAspect::NotModeled`]。
+    pub fn answer_relocation_batch_after_a_user_change(
+        &self,
+        seen: &ModelRelocationBatchAfterAUserChangeSeen,
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        self.answer_of_a_publish_relocating_units(
+            ModelPublishKind::CompactionBatch {
+                units_at_most: seen.units_relocated,
+                intent_after_the_batch: ModelCompactionIntentAfterTheBatch::CarriedOn,
+                instance_table: seen.instance_table,
+            },
+            ModelOperationKind::PublishRelocationBatchAfterAUserChange,
+            None,
+            &seen.user_visible_root_units_relocated,
+        )
+    }
+
+    /// 接在现行那一版后面的一次搬迁发布（整理的那几种与另发的那一批）：搬的根单元要是这一版引用着的；照 `kind` 算下一版，`issued` 是这次签发的意图，
+    /// 搬的根单元记进搬迁 txg（[`ModelRoot::user_visible_root_relocations`]）。
+    fn answer_of_a_publish_relocating_units(
+        &self,
+        kind: ModelPublishKind,
+        operation: ModelOperationKind,
+        issued: Option<ModelCompactionIntent>,
+        user_visible_root_units_relocated: &[ModelUserVisibleRootUnit],
+    ) -> Result<ModelAnswer, ModelDisagreement> {
+        let session = self.open_session()?;
+        let current = &session.current;
+        let checkpoint_txg = ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1);
         let referenced: BTreeSet<ModelUserVisibleRootUnit> =
             current.user_visible_root_units().into_iter().collect();
-        if let Some(unreferenced) = seen
-            .user_visible_root_units_relocated
+        if let Some(unreferenced) = user_visible_root_units_relocated
             .iter()
             .find(|unit| !referenced.contains(unit))
         {
@@ -7423,9 +7578,9 @@ impl IdealModel {
         if let Some(intent) = issued {
             root.logged_compaction_intent = Some(intent);
         }
-        if !seen.user_visible_root_units_relocated.is_empty() {
+        if !user_visible_root_units_relocated.is_empty() {
             let mut relocations = root.user_visible_root_relocations.as_ref().clone();
-            for unit in &seen.user_visible_root_units_relocated {
+            for unit in user_visible_root_units_relocated {
                 relocations.insert(*unit, checkpoint_txg);
             }
             root.user_visible_root_relocations = Rc::new(relocations);
@@ -8042,6 +8197,29 @@ impl IdealModel {
         Ok(answer)
     }
 
+    /// 可写挂载，而每块盘自证过、世代号最大的那一槽系统配置整次挂载读回全 0（执行器的
+    /// `HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`）：读回全 0 的槽读得出而自证不过、
+    /// 设备不报读错，每块盘只剩一槽自证过、没有一块盘两槽都自证过。乙入判不出（C971（多处读坏时可写挂载写出倒挂的新实例根），
+    /// `research/prompts/e205-preregistration.md`「乙入判不出」那一行）把这几槽并进 R2「有槽设备报读错」那一半当读错计，判据 N-配置 按真处置；
+    /// 重读一次仍读回全 0，取号之前拒可写（`NewerStateStillUnreadableAfterOneReread`）：一个字节都不写，模型状态不变（会话照旧关着，
+    /// 根环、F、取过的号都不动）。拒不看根环里有没有比所选那一版新的发布，所以不比环。调之前先 `close_session`。
+    #[must_use]
+    pub fn answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots(
+        &self,
+    ) -> ModelAnswer {
+        let required_refusals = BTreeSet::from([
+            ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread,
+        ]);
+        let mut answer = self.answer_for_publishes(
+            ModelOperationKind::MountWritable,
+            required_refusals,
+            Vec::new(),
+        );
+        // 读阶段判完、取号之前就拒：拒之前一个写都不发（实现的契约：`NewerStateStillUnreadableAfterOneReread` 取号之前交回）。
+        answer.walls_are_judged_before_the_first_write = true;
+        answer
+    }
+
     /// 可写挂载，而 `roots_whose_root_slot_is_missing` 那几条根的根槽写没落盘（说谎的设备吞了；它们的记录与单元都落了）：
     /// 择根落到除它们之外 (txg, 实例) 最大的那一条（所选根），恢复再施加 (实例代号, checkpoint_txg) 严格大于所选根、与所选根同实例的
     /// 那几次发布的记录（前缀不跨实例边界，D23（journal 的角色与格式） 已定项 14 注 1），由记录重建出它们；上一个实例那一行的 T 取
@@ -8642,6 +8820,9 @@ impl IdealModel {
                             counts.compaction_intents_deleted_with_the_last_batch_matched += 1;
                         }
                     }
+                    ModelOperationKind::PublishRelocationBatchAfterAUserChange => {
+                        counts.relocation_batches_after_a_user_change_matched += 1;
+                    }
                     ModelOperationKind::PublishCompactionIntentIssue => {
                         counts.compaction_intents_issued_matched += 1;
                     }
@@ -8833,6 +9014,7 @@ impl IdealModel {
             | ModelOperationKind::PublishSnapshotDestructionIntent
             | ModelOperationKind::PublishSnapshotDestructionStep
             | ModelOperationKind::PublishCompactionBatch
+            | ModelOperationKind::PublishRelocationBatchAfterAUserChange
             | ModelOperationKind::PublishCompactionIntentIssue
             | ModelOperationKind::PublishCompactionIntentCompletion
             | ModelOperationKind::PublishCompactionIntentDrop
@@ -8943,6 +9125,7 @@ impl IdealModel {
                 | ModelOperationKind::PublishSnapshotDestructionIntent
                 | ModelOperationKind::PublishSnapshotDestructionStep
                 | ModelOperationKind::PublishCompactionBatch
+                | ModelOperationKind::PublishRelocationBatchAfterAUserChange
                 | ModelOperationKind::PublishCompactionIntentIssue
                 | ModelOperationKind::PublishCompactionIntentCompletion
                 | ModelOperationKind::PublishCompactionIntentDrop
@@ -8967,6 +9150,7 @@ impl IdealModel {
                 | ModelOperationKind::PublishSnapshotDestructionIntent
                 | ModelOperationKind::PublishSnapshotDestructionStep
                 | ModelOperationKind::PublishCompactionBatch
+                | ModelOperationKind::PublishRelocationBatchAfterAUserChange
                 | ModelOperationKind::PublishCompactionIntentIssue
                 | ModelOperationKind::PublishCompactionIntentCompletion
                 | ModelOperationKind::PublishCompactionIntentDrop
@@ -10429,6 +10613,84 @@ mod tests {
     }
 
     /// 抬 F 到 6 之后 F_生效 = 6：回退到 txg 6 的根是候选（txg ≥ F_生效，D16（发布语义） 已定项 1「回退候选集」），txg 5 的必须拒。
+    /// 掉电留下的 F 还是原值：模型逐字段不动，这次掉电对 F 没有影响。判别力：只认上限时这里 F 0 不等于上限 6，判成对不上。
+    #[test]
+    fn lost_power_leaving_the_effective_floor_in_the_system_configurations_changes_nothing() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let model_before = model.clone();
+        assert_eq!(
+            model.settle_floor_left_in_the_system_configurations_by_a_lost_power(
+                ModelCheckpointTxg(0)
+            ),
+            Ok(ModelFloorLeftByALostPower::KeptAtTheEffectiveFloor)
+        );
+        assert_eq!(model, model_before);
+    }
+
+    /// 掉电留下的 F 是上限 6（根环里没有一条根带着它）：它成为 F_生效，下一个实例的第一条根带着它。
+    /// 判别力：不记下，或 F_生效 不取这一半，F_生效 还是 0，两条断言都红。
+    #[test]
+    fn lost_power_leaving_the_ceiling_in_the_system_configurations_carries_it_into_the_next_instance(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(0));
+        assert_eq!(model.rollback_floor_ceiling(), Some(ModelCheckpointTxg(6)));
+        assert_eq!(
+            model.settle_floor_left_in_the_system_configurations_by_a_lost_power(
+                ModelCheckpointTxg(6)
+            ),
+            Ok(ModelFloorLeftByALostPower::RaisedToTheCeiling)
+        );
+        assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(6));
+        model.close_session();
+        let mount = model.answer_mount_writable();
+        assert_eq!(
+            mount
+                .expected_roots
+                .first()
+                .expect("可写挂载至少写行那一条根")
+                .rollback_floor,
+            ModelCheckpointTxg(6)
+        );
+    }
+
+    /// 系统配置里的 F 超过模型算的上限（实现抬过了上限）：判成对不上，模型不动。判别力：判据放宽成不低于上限时这一条红。
+    #[test]
+    fn lost_power_leaving_a_floor_above_the_ceiling_disagrees_and_leaves_the_model_as_it_was() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let model_before = model.clone();
+        let disagreement = model
+            .settle_floor_left_in_the_system_configurations_by_a_lost_power(ModelCheckpointTxg(7))
+            .expect_err("上限是 6，7 抬过了上限");
+        assert_eq!(disagreement.aspect, ModelDisagreementAspect::RollbackFloor);
+        assert_eq!(model, model_before);
+    }
+
+    /// 系统配置里的 F 在原值与上限之间（抬 F 那一串只抬到上限，不抬到一半）：判成对不上。判别力：判据放宽成不超过上限时这一条红。
+    #[test]
+    fn lost_power_leaving_a_floor_between_the_effective_floor_and_the_ceiling_disagrees() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let disagreement = model
+            .settle_floor_left_in_the_system_configurations_by_a_lost_power(ModelCheckpointTxg(3))
+            .expect_err("原值 0、上限 6，3 两个都不是");
+        assert_eq!(disagreement.aspect, ModelDisagreementAspect::RollbackFloor);
+    }
+
+    /// 系统配置里的 F 低于 F_生效（根上的 F 先写进系统配置，同盘根上的 F 不高于它）：判成对不上。判别力：判据放宽成不超过原值时这一条红。
+    #[test]
+    fn lost_power_leaving_a_floor_below_the_effective_floor_disagrees() {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        let raise = model
+            .answer_raise_rollback_floor(ModelCheckpointTxg(6))
+            .expect("会话开着");
+        succeed(&mut model, &raise);
+        assert_eq!(model.effective_rollback_floor(), ModelCheckpointTxg(6));
+        let disagreement = model
+            .settle_floor_left_in_the_system_configurations_by_a_lost_power(ModelCheckpointTxg(5))
+            .expect_err("原值 6，5 低于它");
+        assert_eq!(disagreement.aspect, ModelDisagreementAspect::RollbackFloor);
+    }
+
     /// 回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14）：写一条根 (12, 2)，实例、F 照现行那一版，文件是 txg 6 写的那一版、
     /// 数据单元的分配代写回 6；实例 2 的 7–11 不被抛弃，之后再回退到 (9, 2) 照样是候选。冷启动读回最新那条根——回退写的那一版。
     #[test]
@@ -10704,7 +10966,7 @@ mod tests {
     /// 分配代对拍两个方向都比（代码审阅第 12 条）：模型这一版有、实现没交回的角色也报——只遍历实现交回的角色会漏判，
     /// 写行那一版九个角色只交两个也判对得上。
     #[test]
-    fn a_role_of_the_version_that_the_implementation_did_not_hand_in_is_reported() {
+    fn role_of_the_version_that_the_implementation_did_not_hand_in_is_reported() {
         let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
         let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
         let mut counts = ModelJudgementCounts::default();
@@ -10745,7 +11007,7 @@ mod tests {
     /// 数据单元按单元号逐个比（判决 `research/prompts/m4-trunc-r1-main-verification.md` 第三节 K4）：漏交一个单元、单元号重了，都报单元的分配代
     /// 对不上，点名交回的单元号。
     #[test]
-    fn a_data_unit_the_implementation_did_not_hand_in_or_handed_in_twice_is_reported() {
+    fn data_unit_the_implementation_did_not_hand_in_or_handed_in_twice_is_reported() {
         let (model, row_publish) = row_publish_of_a_mount_after_the_first_file();
         let mut observed = observed_exactly_as_the_model_wrote(&row_publish);
         let ObservedUnitAllocationRecords::EveryRoleOfTheVersion(records) =
@@ -11065,13 +11327,60 @@ mod tests {
         );
     }
 
+    /// 每块盘最新那一槽系统配置读回全 0 的可写挂载：没有一块盘两槽都自证过，乙入判不出（C971）⇒ 模型答拒可写，理由是「重读一次仍读不出」
+    /// 那一条，一次发布都不做。实现照这样拒（取号之前、录制流一步不多）对得上、模型状态逐项不变；实现做成了在「模型要拒、实现做成」那一格对不上。
+    #[test]
+    fn writable_mount_with_no_device_holding_two_self_verified_system_configuration_slots_is_refused_before_any_write(
+    ) {
+        let mut model = model_after_four_overwrites_in_a_second_instance();
+        model.close_session();
+        let answer = model
+            .answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots();
+        assert_eq!(
+            answer.required_refusals,
+            BTreeSet::from([
+                ModelRefusalReason::NewerPublishWitnessedBySystemConfigurationStillUnreadableAfterOneReread
+            ]),
+            "每块盘最新那一槽读回全 0、重读仍全 0：乙入判不出拒可写"
+        );
+        assert_eq!(
+            (
+                answer.expected_roots.len(),
+                &answer.expected_mount,
+                answer.walls_are_judged_before_the_first_write
+            ),
+            (0, &None, true),
+            "拒了就一条根都不写、不取号，拒在第一个写之前"
+        );
+        let model_before = model.clone();
+        let counts = model
+            .judge_and_advance(&answer, &refusal_of_the_one_reread(false))
+            .expect("照答案拒：取号之前、一个字节都没写");
+        assert_eq!(counts.required_refusals_matched, 1);
+        assert_eq!(model, model_before, "拒了之后模型状态逐项不变");
+        let succeeded = model
+            .clone()
+            .judge_and_advance(
+                &answer,
+                &ObservedOutcome::Succeeded(ObservedEffect::Mount {
+                    instance: ModelInstanceGeneration(3),
+                    rows_written: Vec::new(),
+                    roots: Vec::new(),
+                }),
+            )
+            .expect_err("实现不认读回全 0 的槽、挂载做成");
+        assert_eq!(
+            succeeded.aspect,
+            ModelDisagreementAspect::SucceededWhenModelRequiresRefusal
+        );
+    }
+
     /// 单元区墙的区间按单元区起点随环长走算（C475（非默认环长下单元区起点取编译期常量），实审 A3b 第 15 条）：6 MiB 的环，单元区从槽 1408 起；
     /// 盘只比默认环长那一档的单元区起点（编译期常量那个 50176）多 1000 槽。第一个文件之后一次覆盖写的上界乘 64 落在两道墙之间：
     /// 按随环长走的起点，单元区有四万九千多槽，离墙还远，实现报单元区墙就是对不上；按编译期常量取起点，单元区只剩 1000 槽，同一个拒绝落在区间里放行。
     /// 随机历史的单元区墙取样点（两块单元区 256 槽的小盘、准入关掉的那一段）一次单元区墙的拒绝都没有，两个起点在它上面判得一样（取样点不敏感）。
     #[test]
-    fn a_unit_area_wall_refusal_far_below_the_wall_that_follows_the_ring_is_judged_a_disagreement()
-    {
+    fn unit_area_wall_refusal_far_below_the_wall_that_follows_the_ring_is_judged_a_disagreement() {
         let journal_ring_bytes = 6 << 20;
         let slots_past_the_unit_area_start_of_the_default_ring = 1000;
         let device_slots = model_unit_area_start_slot(JOURNAL_RING_DEFAULT_BYTES)
@@ -11174,7 +11483,7 @@ mod tests {
     /// 叶至多切 2 次 ⇒ 映射树至多 1 + 2 × 2 = 5 个节点，根之下 4 个各占一槽：这次占槽上界 595 + 4 + 123 = 722。
     /// 条目里 302 = 数据 292 + 下段 4 + extent 根、inode 叶、inode 根、记账树各 1 + 谱系树按 txg 4 至多一片容器加根 2。
     #[test]
-    fn a_sequential_write_of_three_lower_leaves_counts_the_central_mapping_tree_nodes_below_the_root_in_the_occupied_slots(
+    fn sequential_write_of_three_lower_leaves_counts_the_central_mapping_tree_nodes_below_the_root_in_the_occupied_slots(
     ) {
         let mut model = two_device_model();
         model.acquire_and_warm_up_in_the_make_filesystem_process();
@@ -11389,7 +11698,7 @@ mod tests {
     /// `research/prompts/m3-formal-code-b34-r1-main-verification.md` 第二节 P5「B4」那一行），30 落进前两个窗口、120 落进第三个。
     /// 按取样点逐片往外加历史用例追不完（回退只取回或只丢某几片，只有建到那几片之外的历史抓得到），这一条不跑历史。
     #[test]
-    fn a_rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_for_every_pair_of_container_counts(
+    fn rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_for_every_pair_of_container_counts(
     ) {
         const CONTAINER_COUNTS: [u64; 9] = [1, 2, 3, 4, 5, 30, 100, 120, 135];
         let model = model_after_four_overwrites_in_a_second_instance();
@@ -11695,7 +12004,7 @@ mod tests {
     /// 快照删到一半（意图之后）的那一版与删完的那一版比「非空」（`mount::user_visible_trees_changed` 连同快照条目的根指针）：建快照那次换了状态，
     /// 意图那次只改记号与前驱、状态不变，最后一批删掉那一对条目又换了状态。
     #[test]
-    fn a_snapshot_creation_and_the_final_destruction_batch_change_the_user_visible_state_and_the_intent_does_not(
+    fn snapshot_creation_and_the_final_destruction_batch_change_the_user_visible_state_and_the_intent_does_not(
     ) {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         let before = model
@@ -11776,7 +12085,7 @@ mod tests {
     /// 是上一版的 txg、logged_ops 根的分配代 = 签发那次），签发之后再签发、搬空 R 而不删意图、删意图而 R 不空、不搬也不删都对不上；
     /// 照抄意图的一批、随最后一批删意图、单独删意图（R 已空：达成）、丢意图（R 不空）四种各认一次，删了之后这一版没有 logged_ops 根。
     #[test]
-    fn the_model_takes_the_issue_first_and_lets_the_intent_leave_logged_ops_only_in_the_ways_the_clauses_allow(
+    fn the_model_takes_the_issue_first_and_lets_the_intent_leave_logged_operations_only_in_the_ways_the_clauses_allow(
     ) {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         assert_eq!(
@@ -11912,7 +12221,7 @@ mod tests {
     /// 搬根算非空（「照字节比，搬根算非空」）：签发与只搬别的单元的一批不换状态，搬了活头 inode 树根的那一批换了状态，
     /// 抬 F 的上限跟着从第 4 新的非空根 6 挪到 7（不算它时还是 6）；搬一个这一版不引用的根单元模型答不了。
     #[test]
-    fn a_compaction_publish_relocating_a_user_visible_root_is_a_new_state_for_the_ceiling() {
+    fn compaction_publish_relocating_a_user_visible_root_is_a_new_state_for_the_ceiling() {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         let state_of = |judged_model: &IdealModel| {
             judged_model
@@ -11975,7 +12284,7 @@ mod tests {
     /// 一个没搬、意图照抄、R 不空的那一次（计划里只有这次发布本来就重写的节点）对不上、模型不动；搬了一个的照抄意图的一批认；R 里只剩这次发布
     /// 本来就重写的节点时那一次不搬单元、同一次发布删意图、发布之后 R 按记录全空，认成意图达成：这一版没有 logged_ops 根，用户可见状态不变。
     #[test]
-    fn a_compaction_publish_carrying_the_intent_relocates_at_least_one_unit_and_one_relocating_none_while_the_region_empties_deletes_the_intent(
+    fn compaction_publish_carrying_the_intent_relocates_at_least_one_unit_and_one_relocating_none_while_the_region_empties_deletes_the_intent(
     ) {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         let before = model
@@ -12029,7 +12338,7 @@ mod tests {
     /// 新根与 (10, 2) 同一个状态、与它前一条 (13, 2) 不同：(14, 2) 不带「最后一次搬它」的记录，算非空；从新到旧数 14、13、12、11（9 与 14 同一个状态不计），
     /// 第 4 新的是 11，两块盘上最新的取小是 13 ⇒ 上限 11。把现行那一版的记录并进来时 14 与 13 同一个状态、不算非空，数成 13、12、11、9，上限 9。
     #[test]
-    fn a_rollback_after_batches_relocated_a_root_the_target_references_carries_only_the_relocations_of_the_target(
+    fn rollback_after_batches_relocated_a_root_the_target_references_carries_only_the_relocations_of_the_target(
     ) {
         let mut model = model_after_four_overwrites_in_a_second_instance();
         succeed_with_the_compaction_publish(
@@ -12161,7 +12470,7 @@ mod tests {
     /// 第一个文件（txg 3）、unlink 意图与最后一批之后那一版有树而文件集合为空，建快照不要求拒、记的内容是「没有文件」；之后建一个 inode，
     /// 读快照读出「没有文件」，读出一个文件对不上。
     #[test]
-    fn a_snapshot_created_on_a_version_with_trees_and_no_file_reads_no_file_after_an_inode_is_created(
+    fn snapshot_created_on_a_version_with_trees_and_no_file_reads_no_file_after_an_inode_is_created(
     ) {
         let mut model = two_device_model();
         model.acquire_and_warm_up_in_the_make_filesystem_process();
@@ -12971,7 +13280,7 @@ mod tests {
     /// 这次起写粘住的标签 0（extent 上段根重写、上段有条目的号是 {2}）、读回 N 个 0；再变长只改记录、上段整棵照抄；截短发截断意图（logged_ops 根
     /// 重写、这一版在截断途中），走空的下一步是放 0 个单元的最后一批（删掉截断条目），标签 0 那一条照旧留着。
     #[test]
-    fn a_size_change_of_an_inode_created_after_the_first_file_was_deleted_keeps_a_tag_zero_entry_and_truncates_through_an_intent(
+    fn size_change_of_an_inode_created_after_the_first_file_was_deleted_keeps_a_tag_zero_entry_and_truncates_through_an_intent(
     ) {
         let mut model = model_with_a_file_of(100);
         let unlink = model
@@ -13064,7 +13373,7 @@ mod tests {
 
     /// N 按整单元向上取整溢出 u64：在任何写之前必须拒，一条根都不写。
     #[test]
-    fn a_truncation_size_whose_whole_data_units_overflow_is_refused_before_any_write() {
+    fn truncation_size_whose_whole_data_units_overflow_is_refused_before_any_write() {
         let model = model_with_a_file_of(100);
         let answer = model.answer_truncation(u64::MAX).expect("会话开着");
         assert_eq!(
@@ -13077,7 +13386,7 @@ mod tests {
     /// 回退到截断意图之后、最后一批之前的那一版（logged_ops 里截断条目取回退目标那一版的）：现行那一版截断已做完、logged_ops 删空，
     /// 回退那次把目标的截断条目带回来、logged_ops 根这次重写；之后走空接着做截断的最后一批，再删空。
     #[test]
-    fn a_rollback_to_a_version_in_the_middle_of_a_truncation_takes_its_truncation_entry_and_resumes_the_walk(
+    fn rollback_to_a_version_in_the_middle_of_a_truncation_takes_its_truncation_entry_and_resumes_the_walk(
     ) {
         let mut model = model_with_a_file_of(2 * payload() + 9);
         let intent = truncate_to(&mut model, payload() + 1);
@@ -13169,7 +13478,7 @@ mod tests {
     /// 三个单元的文件（顺序写 txg 10，字段没写过）截到 1 个净荷 + 5 字节，这次放单元之前存在 3 个、多于截后 size 罩的 2 个，意图那次（txg 11）
     /// 写成（11, P + 5）；之后再截到 7 字节（存在 2 个、多于罩的 1 个），整个替换成（13, 7），不取 min、不留上一次的。
     #[test]
-    fn a_truncation_intent_releasing_data_units_writes_its_txg_and_the_new_size_replacing_the_previous_field(
+    fn truncation_intent_releasing_data_units_writes_its_txg_and_the_new_size_replacing_the_previous_field(
     ) {
         let mut model = model_with_a_file_of(3 * payload());
         assert_eq!(
@@ -13205,7 +13514,7 @@ mod tests {
     /// （txg 11 意图写（11, P），txg 12 最后一批放单元 1–4）→ 变长到 5 个净荷（txg 13，照抄）→ 截到 3 个净荷（txg 14：存在 1 个、不多于罩的 3 个，
     /// 一个不放，照抄（11, P），不换成「最近一次」的（14, 3P））→ 最后一批不放单元（照抄）→ 再变长（照抄）。
     #[test]
-    fn a_truncation_intent_into_the_hole_releasing_no_data_unit_copies_the_field_of_the_earlier_truncation(
+    fn truncation_intent_into_the_hole_releasing_no_data_unit_copies_the_field_of_the_earlier_truncation(
     ) {
         let mut model = model_with_a_file_of(5 * payload());
         truncate_to(&mut model, payload());
@@ -13241,7 +13550,7 @@ mod tests {
     /// 截到 0 而文件只有一个单元（攻方「打中三」那条历史的前三步）：半个净荷的文件截到 0，存在 1 个、不多于 ⌈0 ÷ 净荷⌉.max(1) = 1 个，一个不放，
     /// 照抄（没写过）；之后变长到 1 个净荷 + 1 字节、截到 1 个净荷，都照抄，字段始终没写过。
     #[test]
-    fn a_truncation_to_zero_of_a_one_unit_file_releases_nothing_and_copies_the_field() {
+    fn truncation_to_zero_of_a_one_unit_file_releases_nothing_and_copies_the_field() {
         let mut model = model_with_a_file_of(payload() / 2);
         let intent = truncate_to(&mut model, 0);
         assert_eq!(
@@ -13414,7 +13723,7 @@ mod tests {
     /// → 回退到写字段之前那一版（txg 10，txg 13 那次回退）：字段没写过，不把现行那一版的（11, 7）并回去；之后变长（txg 14）照抄，仍没写过。
     /// 再回退到意图那一版（txg 11）取回（11, 7）。
     #[test]
-    fn a_rollback_takes_the_field_of_its_target_and_the_growth_after_it_copies_that() {
+    fn rollback_takes_the_field_of_its_target_and_the_growth_after_it_copies_that() {
         let mut model = model_with_a_file_of(3 * payload());
         let before_the_truncation = current_version(&model);
         let intent = truncate_to(&mut model, 7);
@@ -13450,7 +13759,7 @@ mod tests {
     /// 对拍比字段（判决 m4-trunc-r2 第三节 R6「理想模型记字段并在对拍里比」）：截断意图那一版实现交回的记录里两段全零（没写字段）时报
     /// 截断字段对不上；照模型写的交回对得上、计数加一；模型这一版有那条记录而实现交回没有，也报。
     #[test]
-    fn a_truncation_field_the_implementation_did_not_write_is_reported() {
+    fn truncation_field_the_implementation_did_not_write_is_reported() {
         let model = model_with_a_file_of(3 * payload());
         let answer = model
             .answer_truncation(u64::try_from(payload() + 5).expect("长度"))
@@ -13661,5 +13970,25 @@ mod tests {
             (1, None, Some(&after.key.checkpoint_txg)),
             "最后一批放掉单元 1、2（剩一个，内联）、删掉截断条目、上段它那一串重写"
         );
+    }
+
+    /// 搬迁的一批只有换实例表那一种才重写实例表：角色记这次写，第 1 片起的占槽也算（`rewrites_the_instance_table`）；照抄实例表的整理的批两样都不沾。
+    #[test]
+    fn only_a_batch_repairing_the_instance_table_rewrites_the_instance_table() {
+        let batch_with = |instance_table| ModelPublishKind::CompactionBatch {
+            units_at_most: 1,
+            intent_after_the_batch: ModelCompactionIntentAfterTheBatch::CarriedOn,
+            instance_table,
+        };
+        let repairing = batch_with(ModelInstanceTableOfTheBatch::RewrittenWithTheSameRows);
+        assert!(repairing.rewrites_the_instance_table());
+        assert!(repairing
+            .rewritten_roles()
+            .contains(&ModelUnitRole::InstanceTable));
+        let carrying = batch_with(ModelInstanceTableOfTheBatch::Carried);
+        assert!(!carrying.rewrites_the_instance_table());
+        assert!(!carrying
+            .rewritten_roles()
+            .contains(&ModelUnitRole::InstanceTable));
     }
 }

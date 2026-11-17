@@ -51,6 +51,10 @@ use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes_and_entries, CrashImage, MemoryPool, PublishedVersion,
     RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness, WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
@@ -176,7 +180,10 @@ fn one_unit_of_the_second_file_still_fits_after_filling(
         .and_then(|_filled| write_one_unit_of_the_second_file(&mut copy, second_file));
     match outcome {
         Ok(_written) => true,
-        Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)) => false,
+        Err(
+            UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+            | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_),
+        ) => false,
         Err(refusal) => panic!("填池探测只能因空间不够被拒：{refusal:?}"),
     }
 }
@@ -541,6 +548,7 @@ pub fn observe_the_read_only_mount_reading_back_the_recovered_content(
 /// 断言被空间拒；落到拒写那一次推的抬 F 空发布那几版、卸载抬 F 中途那几版时，写进与被拒按这两类各自照实计数、不断言哪一种
 /// （[`landed_version_for_one_more_unit`]）。
 /// 之后会话丢掉，经只读挂载读回第一个文件不变。交回的盘由判段跑池级 checker。
+/// 可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），再写一个单元跳过。
 // gpu-exempt: writable-mount
 pub fn observe_the_writable_mount_writing_one_more_unit(
     inputs: &InputsOfTheObservers,
@@ -580,8 +588,24 @@ pub fn observe_the_writable_mount_writing_one_more_unit(
         content_of_each_root: Default::default(),
     };
     {
-        let mounted = mount_writable(&mount_parameters, &mut pool.devices)
-            .unwrap_or_else(|error| panic!("崩溃状态上可写挂载接管成功：{error:?}"));
+        let mounted = match mount_writable(&mount_parameters, &mut pool.devices) {
+            Ok(mounted) => mounted,
+            Err(refusal) => {
+                return image_after_the_refusal_into_the_undecidable_witness(
+                    &WritableMountRefusedOnTheCrashDisks {
+                        refusal,
+                        devices: pool.devices,
+                        stream,
+                    },
+                    &materialized,
+                    report,
+                    &mount_parameters.filesystem_identifier,
+                    &fixed_geometry_of_the_384_slot_small_devices(),
+                    WRITABLE_MOUNT_WRITING_ONE_MORE_UNIT_CHECKER_CLEAN,
+                    counts,
+                );
+            }
+        };
         let (_output, session) = MountedSession::of_the_mount(mounted);
         pool.session = Some(session);
     }
@@ -751,9 +775,12 @@ fn assert_clean(tally: &CrashPointReplayTally) {
             + written_on_a_floor_raise_of_the_refused_write
             + refused_on_a_floor_raise_of_the_refused_write
             + written_in_the_middle_of_the_unmount
-            + refused_in_the_middle_of_the_unmount,
+            + refused_in_the_middle_of_the_unmount
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态上都可写接管、再写了一个单元：断言被拒的那几版 {refused_where_asserted}，拒写那一次推的抬 F 空发布上写进 {written_on_a_floor_raise_of_the_refused_write}、被拒 {refused_on_a_floor_raise_of_the_refused_write}，卸载中途写进 {written_in_the_middle_of_the_unmount}、被拒 {refused_in_the_middle_of_the_unmount}"
+        "每个没被乙入判不出拒的状态上都可写接管、再写了一个单元：断言被拒的那几版 {refused_where_asserted}，拒写那一次推的抬 F 空发布上写进 {written_on_a_floor_raise_of_the_refused_write}、被拒 {refused_on_a_floor_raise_of_the_refused_write}，卸载中途写进 {written_in_the_middle_of_the_unmount}、被拒 {refused_in_the_middle_of_the_unmount}"
     );
     singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
         refused_where_asserted,

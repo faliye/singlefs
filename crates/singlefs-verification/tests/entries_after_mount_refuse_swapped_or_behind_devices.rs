@@ -737,11 +737,11 @@ fn a_session_publish_onto_device_zero_holding_the_publish_root_in_region_two_tak
 /// 缺根那一半第一次读 P 的根槽，在会话发布里是那一槽被读的第几次（从 1 数）：会话发布读根环之前只核这一判。
 const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_SESSION_PUBLISH: u64 = 1;
 
-/// 缺根那一半第一次读 P 的根槽，在可写挂载里是那一槽被读的第几次（从 1 数）：读阶段（择根、见证读、重建）先读过它 7 次，
-/// 不出错时第 8 次就是取号之前逐盘核那一判的读，也是这一槽在取号之前的最后一次读（攻方原型扫出来的；
+/// 缺根那一半第一次读 P 的根槽，在可写挂载里是那一槽被读的第几次（从 1 数）：读阶段（择根、见证读、重建）先读过它 6 次，
+/// 不出错时第 7 次就是取号之前逐盘核那一判的读，也是这一槽在取号之前的最后一次读（攻方原型扫出来的；
 /// [`a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write`]
-/// 从第 8 次起读坏、恰好坏两次就拒成缺根，钉住它是那一判的第一次读）。
-const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT: u64 = 8;
+/// 从第 7 次起读坏、恰好坏两次就拒成缺根，钉住它是那一判的第一次读）。
+const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT: u64 = 7;
 
 /// H1 的一格：P 的根住的那块盘切在 P 的根槽 FUA 之后（落后、单元都在、根槽里是 P），会话发布时缺根那一半第一次读那一槽读坏
 /// （按 `fault`：读不出，或读回的字节坏一位、自证不过）、重读读得出 P：照常发布，那一次注入真发生了。
@@ -871,7 +871,7 @@ fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write
 }
 
 /// H3：同一组盘（P 的根住的那块切在根槽 FUA 之后）上可写挂载，所选那一版就是择到的 P，取号之前逐盘核时缺根那一半读那一槽
-/// 连着两次读坏（从第 8 次起每一次都坏，真发生的恰好是两次：读一次、重读一次）：拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`，
+/// 连着两次读坏（从第 7 次起每一次都坏，真发生的恰好是两次：读一次、重读一次）：拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`，
 /// 点名 P 的根住的那块盘、缺的是根（两次都读不出），拒在任何写之前（整池一次写都没发）、两块盘逐扇区不变。
 /// 可写挂载一律不核缺根那一半（所选那一版一律当成没写进根环）时，这一形挂得上或拒成别的。
 #[test]

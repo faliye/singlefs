@@ -166,6 +166,7 @@ fn is_a_step_of_the_compaction_or_the_deadlist(kind: CompactionFlowStepKind) -> 
         CompactionFlowStepKind::CompactionIssue
         | CompactionFlowStepKind::CompactionBatch
         | CompactionFlowStepKind::CompactionFinalBatch
+        | CompactionFlowStepKind::CompactionIntentDroppedOnAStop
         | CompactionFlowStepKind::Snapshot(SnapshotFlowStepKind::OverwriteUnderTheSnapshot)
         | CompactionFlowStepKind::DestroySnapshotThroughTheSession => true,
         CompactionFlowStepKind::SequentialWrite
@@ -180,7 +181,8 @@ fn is_a_step_of_the_compaction_or_the_deadlist(kind: CompactionFlowStepKind) -> 
         )
         | CompactionFlowStepKind::MountWritable
         | CompactionFlowStepKind::RaiseFloorToTheAdmissionCeiling
-        | CompactionFlowStepKind::NewInodesThroughTheSession => false,
+        | CompactionFlowStepKind::NewInodesThroughTheSession
+        | CompactionFlowStepKind::OverwriteWhileTheIntentIsLive => false,
     }
 }
 

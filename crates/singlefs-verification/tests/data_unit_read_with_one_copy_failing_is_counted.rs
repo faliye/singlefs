@@ -12,9 +12,9 @@
 //! 会话照已有的搬迁路径另发一批，把快照里的这个单元搬到新槽、两份新写，旧落点照释放之前读盘核隔离。
 //! 只读挂载只计数、不修：盘上逐字节不变。
 //! 另发的那一批被空间拒时推一串抬 F、回收之后再发同一批，推满仍放不下交回那一种结局、这一批一个字节都不写，
-//! 用户改动在每一种结局下都已发成；被拒那一支靠只供测试的开关（`compaction_plan::RelocationKeptForTheSnapshotsRefusedForSpace`）强制进入。
+//! 用户改动在每一种结局下都已发成；被拒那一支靠只供测试的开关（`compaction_plan::RelocationBatchAfterTheChangeRefusedForSpace`）强制进入。
 //! 被拒不是空间不够（不推抬 F、不再试）与为空间推的抬 F 自己报错那两支各靠一个只供测试的开关强制进入
-//! （`compaction_plan::RelocationKeptForTheSnapshotsRefusedNotForSpace`、`compaction_plan::FloorRaiseForTheRelocationKeptForTheSnapshotsFails`；
+//! （`compaction_plan::RelocationBatchAfterTheChangeRefusedNotForSpace`、`compaction_plan::FloorRaiseForTheRelocationBatchAfterTheChangeFails`；
 //! `.claude/rules/fs-design.md`「五条硬要求」第 2 条）；被拒不是空间不够的块设备错那一形另由故障注入设备在那一批的头一次写上报错造出来，照发布路径冻结。
 //! 截断到弄坏的那个单元中间与部分写同一套断言。可写挂载建上一版时读到的只坏一份另记一个数
 //! （`mounted_session::MountedSession::unit_reads_with_one_copy_failing_while_mounting`，与会话里读—改—写那一份按读的地方分开报）。
@@ -32,8 +32,8 @@ use std::num::NonZeroU64;
 
 use common::{file_content, geometry, parameters, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES};
 use common_unwitnessed_publish::{
-    devices_reading_back_all_zero_on, record_one_publish_after_overwrites, PublishRecordedAsR,
-    RangesReadingBackAllZero,
+    devices_reading_back_all_zero_on, record_one_publish_after_overwrites,
+    RangesReadingBackAllZero, RecordedPublishKind,
 };
 use singlefs_core::address::{
     DataUnitIndexInFile, DeviceIdentity, FileOffsetInBytes, InodeNumber, InstanceGeneration,
@@ -44,15 +44,15 @@ use singlefs_core::allocator::{Placement, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
 use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::compaction_plan::{
-    FloorRaiseForTheRelocationKeptForTheSnapshotsFails, PlannedRelocation,
-    RelocationKeptForTheSnapshotsRefusedForSpace, RelocationKeptForTheSnapshotsRefusedNotForSpace,
+    FloorRaiseForTheRelocationBatchAfterTheChangeFails, PlannedRelocation,
+    RelocationBatchAfterTheChangeRefusedForSpace, RelocationBatchAfterTheChangeRefusedNotForSpace,
 };
 use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem};
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::mounted_read::{mount_read_only, open_pool_for_read};
 use singlefs_core::mounted_session::{
     FloorRaisesPushedForTheRelocation, MountedSession,
-    RelocationOfTheOldDataUnitsKeptForTheSnapshots, UserChange, UserChangePublished,
+    RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing, UserChange, UserChangePublished,
 };
 use singlefs_core::pointer::{DataPointer, LocationEntry};
 use singlefs_core::records::TREE_KIND_SNAPSHOT_INODE_ROOT;
@@ -663,11 +663,11 @@ fn a_partial_write_without_a_snapshot_through_the_session_relocates_nothing_more
     );
     assert!(
         matches!(
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots,
-            RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing,
+            RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
         ),
         "没有活快照钉着：不另发搬迁，{:?}",
-        published.relocation_of_the_old_data_units_kept_for_the_snapshots
+        published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
     );
     assert_eq!(
         published.versions_published.len(),
@@ -783,19 +783,20 @@ fn the_unit_kept_for_the_snapshot_moved_to_new_slots_and_its_old_copies_are_quar
 fn relocated_keys_and_floor_raises(
     published: &UserChangePublished,
 ) -> (&[Vec<u8>], &FloorRaisesPushedForTheRelocation) {
-    match &published.relocation_of_the_old_data_units_kept_for_the_snapshots {
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::Relocated {
+    match &published.relocation_after_the_change_of_the_units_read_with_one_copy_failing {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated {
             mapping_keys,
             floor_raises,
+            ..
         } => (mapping_keys.as_slice(), floor_raises),
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
             ..
         } => panic!(
             "有活快照钉着只坏一份的旧单元：应另发一批搬迁、搬成，交回的是 {:?}",
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
         ),
     }
 }
@@ -890,8 +891,8 @@ fn a_relocation_under_a_live_snapshot_refused_once_for_space_relocates_after_rai
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+        .force_the_relocation_batch_after_the_change_refused_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedForTheNextAttemptsForTests {
                 attempts: NonZeroU64::new(1).expect("拒一次：1 不是 0"),
             },
         );
@@ -941,27 +942,27 @@ fn a_relocation_under_a_live_snapshot_refused_for_space_every_time_writes_nothin
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedOnEveryAttemptForTests,
+        .force_the_relocation_batch_after_the_change_refused_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedOnEveryAttemptForTests,
         );
     let published = write_into_the_damaged_unit_through_the_session(
         &mut under_the_snapshot.session,
         &mut pool,
         FIXED_WRITE_TIME_SECONDS + 3,
     );
-    let floor_raises = match &published.relocation_of_the_old_data_units_kept_for_the_snapshots {
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor {
+    let floor_raises = match &published.relocation_after_the_change_of_the_units_read_with_one_copy_failing {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor {
             floor_raises,
             ..
         } => floor_raises,
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::Relocated { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
             ..
         } => panic!(
             "那一批每一次都被空间拒：应推满仍放不下，交回的是 {:?}",
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
         ),
     };
     let last_empty_publish = floor_raises
@@ -1037,8 +1038,8 @@ fn a_partial_write_under_a_live_snapshot_is_published_while_its_relocation_stays
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedOnEveryAttemptForTests,
+        .force_the_relocation_batch_after_the_change_refused_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedOnEveryAttemptForTests,
         );
     let published = write_into_the_damaged_unit_through_the_session(
         &mut under_the_snapshot.session,
@@ -1047,11 +1048,11 @@ fn a_partial_write_under_a_live_snapshot_is_published_while_its_relocation_stays
     );
     assert!(
         matches!(
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots,
-            RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor { .. }
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing,
+            RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor { .. }
         ),
         "前提：那一批推满仍放不下，{:?}",
-        published.relocation_of_the_old_data_units_kept_for_the_snapshots
+        published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
     );
     assert_eq!(
         published.versions_published.len(),
@@ -1128,8 +1129,8 @@ fn a_relocation_under_a_live_snapshot_refused_not_for_space_is_not_retried_while
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_not_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedNotForSpace::ForcedOnEveryAttemptForTests,
+        .force_the_relocation_batch_after_the_change_refused_not_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedNotForSpace::ForcedOnEveryAttemptForTests,
         );
     let published = write_into_the_damaged_unit_through_the_session(
         &mut under_the_snapshot.session,
@@ -1137,20 +1138,20 @@ fn a_relocation_under_a_live_snapshot_refused_not_for_space_is_not_retried_while
         FIXED_WRITE_TIME_SECONDS + 3,
     );
     let (refusal, floor_raises) = match &published
-        .relocation_of_the_old_data_units_kept_for_the_snapshots
+        .relocation_after_the_change_of_the_units_read_with_one_copy_failing
     {
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace {
             refusal,
             floor_raises,
         } => (refusal, floor_raises),
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::Relocated { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
             ..
         } => panic!(
             "那一批被拒、不是空间不够：应交回 RefusedNotForSpace，交回的是 {:?}",
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
         ),
     };
     assert!(
@@ -1221,16 +1222,16 @@ fn a_floor_raise_failing_while_pushing_for_the_relocation_under_a_live_snapshot_
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedForSpace::ForcedForTheNextAttemptsForTests {
+        .force_the_relocation_batch_after_the_change_refused_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedForSpace::ForcedForTheNextAttemptsForTests {
                 attempts: NonZeroU64::new(1).expect("拒一次：1 不是 0"),
             },
         );
     under_the_snapshot
         .session
         .compaction
-        .force_the_floor_raise_for_the_relocation_kept_for_the_snapshots_to_fail_for_tests(
-            FloorRaiseForTheRelocationKeptForTheSnapshotsFails::ForcedOnEveryRaiseForTests,
+        .force_the_floor_raise_for_the_relocation_batch_after_the_change_to_fail_for_tests(
+            FloorRaiseForTheRelocationBatchAfterTheChangeFails::ForcedOnEveryRaiseForTests,
         );
     let published = write_into_the_damaged_unit_through_the_session(
         &mut under_the_snapshot.session,
@@ -1238,19 +1239,19 @@ fn a_floor_raise_failing_while_pushing_for_the_relocation_under_a_live_snapshot_
         FIXED_WRITE_TIME_SECONDS + 3,
     );
     let (cause, refusal_that_pushed_the_failed_raise, floor_raises) = match &published
-        .relocation_of_the_old_data_units_kept_for_the_snapshots
+        .relocation_after_the_change_of_the_units_read_with_one_copy_failing
     {
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
             cause,
             refusal_that_pushed_the_failed_raise,
             floor_raises,
         } => (cause, refusal_that_pushed_the_failed_raise, floor_raises),
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::Relocated { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace { .. } => panic!(
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace { .. } => panic!(
             "为那一批推的抬 F 自己报错：应交回 FloorRaiseFailedWhilePushingForSpace，交回的是 {:?}",
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
         ),
     };
     assert!(
@@ -1334,8 +1335,8 @@ fn writes_of_the_partial_write_before_the_relocation_under_a_live_snapshot() -> 
     under_the_snapshot
         .session
         .compaction
-        .force_the_relocation_kept_for_the_snapshots_refused_not_for_space_for_tests(
-            RelocationKeptForTheSnapshotsRefusedNotForSpace::ForcedOnEveryAttemptForTests,
+        .force_the_relocation_batch_after_the_change_refused_not_for_space_for_tests(
+            RelocationBatchAfterTheChangeRefusedNotForSpace::ForcedOnEveryAttemptForTests,
         );
     let writes_before_the_call = plan.calls().writes;
     let published = write_into_the_damaged_unit_through_the_session_on_the_devices(
@@ -1346,11 +1347,11 @@ fn writes_of_the_partial_write_before_the_relocation_under_a_live_snapshot() -> 
     let writes_in_the_call = plan.calls().writes - writes_before_the_call;
     assert!(
         matches!(
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots,
-            RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace { .. }
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing,
+            RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace { .. }
         ),
         "数的那一遍：那一批被开关拒成不是空间不够、一个写都没发，{:?}",
-        published.relocation_of_the_old_data_units_kept_for_the_snapshots
+        published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
     );
     let discards = &published.discards_after_the_change;
     let discard_writes =
@@ -1387,20 +1388,20 @@ fn a_block_device_error_on_the_first_write_of_the_relocation_under_a_live_snapsh
         "前提：注入真的发生了一次（改动那几次写之后的下一次写）"
     );
     let (refusal, floor_raises) = match &published
-        .relocation_of_the_old_data_units_kept_for_the_snapshots
+        .relocation_after_the_change_of_the_units_read_with_one_copy_failing
     {
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::RefusedNotForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace {
             refusal,
             floor_raises,
         } => (refusal, floor_raises),
-        RelocationOfTheOldDataUnitsKeptForTheSnapshots::NotNeeded
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::Relocated { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::NoSpaceAfterRaisingTheFloor { .. }
-        | RelocationOfTheOldDataUnitsKeptForTheSnapshots::FloorRaiseFailedWhilePushingForSpace {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
             ..
         } => panic!(
             "那一批落盘时块设备错：应交回 RefusedNotForSpace，交回的是 {:?}",
-            published.relocation_of_the_old_data_units_kept_for_the_snapshots
+            published.relocation_after_the_change_of_the_units_read_with_one_copy_failing
         ),
     };
     assert!(
@@ -1952,23 +1953,28 @@ fn a_writable_mount_falling_back_to_a_version_it_cannot_build_counts_the_damaged
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_UNWITNESSED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
-    let root_of_r = recorded.root();
-    let root_of_p = mount_read_only(&recorded.base)
+    let root_of_the_recorded_publish = recorded.root();
+    let root_of_the_previous_version = mount_read_only(&recorded.base)
         .expect("R 之前那一刻的盘面只读挂得上")
         .effective_root;
     assert_eq!(
-        (root_of_p.instance, root_of_p.checkpoint_txg),
+        (
+            root_of_the_previous_version.instance,
+            root_of_the_previous_version.checkpoint_txg
+        ),
         recorded.previous_key,
         "前提：R 之前那一刻择到的是 P"
     );
     assert_eq!(
-        root_of_p.instance_table.locations, root_of_r.instance_table.locations,
+        root_of_the_previous_version.instance_table.locations,
+        root_of_the_recorded_publish.instance_table.locations,
         "前提：P 与 R 共用实例表（同一次挂载里的覆盖写不重写它）"
     );
     assert_ne!(
-        root_of_p.tree_table.locations, root_of_r.tree_table.locations,
+        root_of_the_previous_version.tree_table.locations,
+        root_of_the_recorded_publish.tree_table.locations,
         "前提：R 重写了树表，P 的树表只归 P"
     );
     let data_unit_groups: Vec<_> = recorded
@@ -1982,14 +1988,15 @@ fn a_writable_mount_falling_back_to_a_version_it_cannot_build_counts_the_damaged
         "前提：覆盖写 R 只写了一个数据单元"
     );
     let mut ranges = RangesReadingBackAllZero::default().with_the_writes(&data_unit_groups[0]);
-    for location in &root_of_p.tree_table.locations {
+    for location in &root_of_the_previous_version.tree_table.locations {
         ranges.0.push((
             location.device,
             location.slot.to_device_offset().0,
             SLOT_BYTES,
         ));
     }
-    let damaged_copy_of_the_instance_table = root_of_r.instance_table.locations[0];
+    let damaged_copy_of_the_instance_table =
+        root_of_the_recorded_publish.instance_table.locations[0];
     ranges.0.push((
         damaged_copy_of_the_instance_table.device,
         damaged_copy_of_the_instance_table.slot.to_device_offset().0,

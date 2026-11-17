@@ -14,8 +14,8 @@ use common::PoolImageGeometry;
 use common_pointer_head_corruption::replace_the_unit_and_propagate_its_checksum_on;
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::mount::mount_writable;
@@ -27,7 +27,7 @@ use singlefs_core::unit::{build_index_node, parse_data_unit, parse_index_node, U
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::mount_transparency::{read_recovery_fields, ComparedVersion};
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 /// 树表条目里 flags 那两字节的起点（树 ID 8 + 条目长度 2 + 树的种类 2，D22（单元原子性怎么合成） 已定项 7「树表单元」）。
 const TREE_TABLE_ENTRY_FLAGS_OFFSET: usize = 12;
 /// flags 里任何种类上都没登记的一位（位 0 只在快照 inode 根条目上登记为「销毁中」）。
@@ -89,8 +89,10 @@ fn landing_of_the_three_places(
 #[test]
 fn a_data_unit_of_the_unwitnessed_version_reading_back_zero_lands_the_three_places_on_the_same_previous_version(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let data_unit_groups: Vec<_> = recorded
         .unit_writes_grouped_by_unit()
         .into_iter()
@@ -163,8 +165,10 @@ fn image_whose_unwitnessed_version_carries_a_tree_table_entry_with_an_unknown_fl
 /// 判别力：「根环一簇 R4：解不开的单元算成字节丢了」那一行（三处退回 P），这一条红。
 #[test]
 fn an_unwitnessed_version_whose_tree_table_entry_carries_an_unknown_flag_is_not_fallen_back_from() {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let image =
         image_whose_unwitnessed_version_carries_a_tree_table_entry_with_an_unknown_flag(&recorded);
     let no_range = RangesReadingBackAllZero::default();

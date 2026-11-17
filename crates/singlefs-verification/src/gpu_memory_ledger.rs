@@ -41,7 +41,8 @@
 //!   （丢了那一刻活着的借据没等成时这一段出不来；按「那一刻活着的借据都还了」判，
 //!   旧设备另有不在账上的句柄时会多给它占着的那一份）。
 //!   不走这份账的设备在起之前就记下它在哪张卡上（[`BusesWithDevicesStartedOutsideTheBooks::start_a_device_marked_first`]
-//!   攻方乙形：起好了才记，起设备到记下之间那一段读数里已经有那个设备的占用，被当成借据建上的）。
+//!   攻方乙形：起好了才记，起设备到记下之间那一段读数里已经有那个设备的占用，被当成借据建上的）；每条总线记几台，
+//!   那一台的句柄都丢了就减一台（[`DeviceOutsideTheBooksMarkedOnTheBus`]），减到 0 这张卡回到按账拆，不再照分不出算。
 //!
 //! 借的要比这张卡空着时能借的（同一个算法拿空卡上能用的当 M、B 当 0；空卡上能用的是 `nvidia-smi` 报的总量减驱动保留的那一份，
 //! 本机两张空卡上逐 MiB 等于报的空闲：5090 是 32607 − 497 = 32110，5060 Ti 是 16311 − 462 = 15849
@@ -68,8 +69,8 @@
 //! 崩溃放量产品路径在起过卡池的进程里也走这份账：第 ① 段每张装了状态的卡按装的状态数借草稿区（[`scratch_states_to_book_on_each_card`]，
 //! 只记在那张卡上），几张卡当场各试一次（[`GpuMemoryLedger::book_states_on_the_cards_with_room`]），每张在锁里照此刻能借的压状态数，
 //! 借不到的卡不装状态、它那一份留给后面的卡（[`place_states_on_the_cards_that_book_now`]）；第 ② 段核对与单元校验和在卡上建的缓冲
-//! 照 [`mebibytes_of_buffers_held_at_once`] 算，借第一张放得下的。没起过卡池的进程照旧不进账，是哪几种调用方写在
-//! `singlefs_verification::crash_amplification` 的文件头。
+//! 照 [`mebibytes_of_buffers_held_at_once`] 算，借第一张放得下的。崩溃放量取卡在带 `gpu` 特性的每个进程里都经这个进程的卡池
+//! （`singlefs_verification::crash_amplification` 的文件头第 5 条）。
 
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -512,19 +513,19 @@ pub fn mebibytes_of_buffers_held_at_once(
 pub enum GpuCardsSource {
     /// 这一趟没有一类计算走 GPU，不要卡。
     NoCardNeeded,
-    /// 这个进程起过 GPU 用例共用的卡池（`singlefs_verification::gpu_unit_checks::gpu_test_start::GpuCardPool`）：照池里的卡用，
+    /// 这个进程里 GPU 用例共用的卡池（`singlefs_verification::gpu_unit_checks::gpu_test_start::GpuCardPool`）：照池里的卡用，
     /// 每张卡这个进程只有一个设备、只在借到的那张卡上起；第 ① 段判器开的草稿区按装到这张卡上的状态数借
-    /// （主 agent 定照 state_count 记）。
+    /// （主 agent 定照 state_count 记）。崩溃放量取卡（`crash_amplification::gpu_cards_in_use`）交的就是这一种。
     TheCardPoolOfThisProcess,
-    /// 这个进程没起过卡池：这一趟自己在点名的卡上起设备（`gpu_unit_checks::gpu_cards_by_priority` 或 `usable_gpu_cards`），不进显存账；
-    /// 给定状态表与观察者交回的盘那两路在这些卡上建判器之前经 [`CardMemoryQueue`] 按显存排队。
+    /// 卡由调用方自己起好交进来（直接调 `crash_amplification::judge_my_blocks_on_gpu_cards` 的对拍用例），不进显存账；
+    /// 给定状态表与观察者交回的盘那两路在这一种卡上建判器之前经 [`CardMemoryQueue`] 按显存排队。
     DevicesStartedForThisRun,
 }
 
 /// 崩溃放量产品路径第 ① 段每张卡的草稿区在显存账上记几个状态。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScratchStatesToBook {
-    /// 不进账：这一趟不要卡，或这个进程没起过卡池、自己起的设备（[`GpuCardsSource::DevicesStartedForThisRun`]）。
+    /// 不进账：这一趟不要卡，或卡由调用方自己起好交进来（[`GpuCardsSource::DevicesStartedForThisRun`]）。
     NotBooked,
     /// 起过卡池：按卡的次序每张卡借几个状态的草稿区（0 是这张卡没装状态、不借）。
     OnEachCard(Vec<usize>),
@@ -532,7 +533,7 @@ pub enum ScratchStatesToBook {
 
 /// 产品路径第 ① 段的草稿区记几个状态的账：起过卡池的进程，每张装了状态的卡记它装的状态数，与这条流的状态数取小
 /// （[`states_in_one_dispatch_capped_by_the_state_count`]，与 GPU 对拍用例借卡那一路同一个封顶：判器的草稿区不为这条流没有的状态开）；
-/// 没起过卡池的照旧不进账。调用方照这里的状态数按 `crash_judge_dispatch::mebibytes_a_judge_needs` 算显存去借。
+/// 卡由调用方自己起好交进来的不进账。调用方照这里的状态数按 `crash_judge_dispatch::mebibytes_a_judge_needs` 算显存去借。
 #[must_use]
 pub fn scratch_states_to_book_on_each_card(
     cards_taken_from: GpuCardsSource,
@@ -563,9 +564,9 @@ pub fn scratch_states_to_book_on_each_card(
     }
 }
 
-/// 这一趟自己起的卡（[`GpuCardsSource::DevicesStartedForThisRun`]）上同时活着的判器按显存排队：每张卡一个容量（MiB），
+/// 调用方自己起好交进来的卡（[`GpuCardsSource::DevicesStartedForThisRun`]）上同时活着的判器按显存排队：每张卡一个容量（MiB），
 /// 一把锁护着每张卡上此刻排进去的占位合起来多少，占位还回来时叫醒等着的。容量由调用方给：那张卡给崩溃放量的额度扣掉驱动那一份
-/// （驱动那一份这个进程在每张卡上只付一次，起设备时付过）。自己起的卡不进上面那份显存账（[`GpuMemoryLedger`] 只在起过卡池的进程里走），
+/// （驱动那一份这个进程在每张卡上只付一次，起设备时付过）。这种卡不进上面那份显存账（[`GpuMemoryLedger`] 只管卡池里的卡），
 /// 几条线程同时往同一张卡上建判器、各自照整张卡的额度开草稿区，叠起来会撞顶（wgpu 报 Out of Memory、在建缓冲的线程上 panic）。
 /// 这份只算经它排进去的，不读卡上此刻的显存：别的进程、不经它建的缓冲不在它的账上（与卡池那份账的口径不同，那份每借一次现读一次）。
 pub struct CardMemoryQueue {
@@ -697,6 +698,42 @@ pub const GPU_NOT_RUN_MARKER: &str = "NOT_RUN_NO_GPU_ADAPTER";
 #[must_use]
 pub fn gpu_not_run_line(test_name: &str, reason: &str) -> String {
     format!("{GPU_NOT_RUN_MARKER} test={test_name} reason={reason}")
+}
+
+/// 卡超时、设备丢失那一行的记号：变异判「抓到」照它把这种红与断言红分开。
+const GPU_DEVICE_LOST_MARKER: &str = "GPU_DEVICE_LOST";
+
+/// 那一行的 `test=` 取当前线程的名字（libtest 多线程跑时是测试名）；线程没有名字时写这个。
+const THREAD_WITHOUT_A_NAME: &str = "unnamed-thread";
+
+/// 读日志的一头按行切时当换行的字符：控制字符（`\n`、`\r`、`\x0b`、`\x0c`、`\x1c` 到 `\x1e`、`\u{85}`）与 Unicode 的行、段分隔符
+/// （Python 的 `str.splitlines` 全都切）。
+fn is_a_line_break(character: char) -> bool {
+    character.is_control() || matches!(character, '\u{2028}' | '\u{2029}')
+}
+
+/// 去掉换行、接成一行：连着的几个换行算一处，换成一个空格（wgpu 的错误文字常带 `\n\nCaused by:` 这样的几行）。
+fn text_on_one_line(text: &str) -> String {
+    text.split(is_a_line_break)
+        .filter(|piece| !piece.is_empty())
+        .collect::<Vec<&str>>()
+        .join(" ")
+}
+
+/// 卡超时、设备丢失那一行：`GPU_DEVICE_LOST test=<当前线程名> card=<卡名> reason=<一句>`，一定是一行。
+/// 卡名里可以有空格（`NVIDIA GeForce RTX 3090`），`reason=` 排最后、到行尾。
+fn gpu_device_lost_line(test_name: &str, card_name: &str, reason: &str) -> String {
+    format!(
+        "{GPU_DEVICE_LOST_MARKER} test={} card={} reason={}",
+        text_on_one_line(test_name),
+        text_on_one_line(card_name),
+        text_on_one_line(reason)
+    )
+}
+
+/// 打到标准输出：用 `println!`，与 [`GPU_NOT_RUN_MARKER`] 那一行同样进 libtest 捕获的这条用例的输出，用例红了 libtest 把它交出来。
+fn print_the_device_lost_marker_line(marker_line: &str) {
+    println!("{marker_line}");
 }
 
 /// 显存不够而报「本次未跑」时原因的开头（借不到、卡上报 Out of Memory 都是它）：分项驱动与门禁按 [`GPU_NOT_RUN_MARKER`] 认这一行，
@@ -1941,11 +1978,14 @@ impl<Device: Clone> DeviceStartedOnDemand<Device> {
     }
 }
 
-/// 这个进程在哪几张卡（PCI 总线号，[`pci_bus_identifier_without_the_domain`] 写法）上起过不走这份账的设备（崩溃放量没起卡池时自己起的、
-/// 经入口直接起的）：卡池读这张卡时这个进程占着的那一份分不出哪些是借据建的（[`OccupiedByThisProcess::AlsoOutsideTheBooks`]）。
-/// 只增不减：那几个设备什么时候丢掉、卡上什么时候还，这里不知道，记着就照「分不出」算（只会少借）。
+/// 这个进程在哪几张卡（PCI 总线号，[`pci_bus_identifier_without_the_domain`] 写法）上有不走这份账的设备（经入口直接起的：
+/// `gpu_unit_checks::gpu_cards_by_priority`、`usable_gpu_cards` 这一类），每条总线记几台：卡池读这张卡时，记着的总线上这个进程占着的那一份
+/// 分不出哪些是借据建的（[`OccupiedByThisProcess::AlsoOutsideTheBooks`]，只会少借）。
+/// 起好的每台各拿一个 [`DeviceOutsideTheBooksMarkedOnTheBus`]，调用方把它放进那台设备的每一个克隆：最后一个克隆丢掉（这个进程里那台设备的句柄
+/// 都没了）时这条总线上减一台，减到 0 的总线摘掉，卡池读那张卡回到按账拆（`OnlyThroughTheBooks`）。
+/// 起不来的那一台照样记着、不减（起设备的半路这个进程在卡上占了什么、驱动什么时候还，这里不知道：分不出，只会少借）。
 pub struct BusesWithDevicesStartedOutsideTheBooks {
-    buses: Mutex<BTreeSet<String>>,
+    devices_marked_by_bus: Mutex<BTreeMap<String, usize>>,
 }
 
 /// 空着（一个不走账的设备都没起过）就是起点，没有别的不变量。
@@ -1955,16 +1995,63 @@ impl Default for BusesWithDevicesStartedOutsideTheBooks {
     }
 }
 
+/// 不走账的一台起好的设备在它那条总线上的那一记（[`BusesWithDevicesStartedOutsideTheBooks::start_a_device_marked_first`] 交的）：
+/// 丢掉时那条总线上减一台。调用方把它放进那台设备的每一个克隆、放在最后一个字段（字段照声明的次序丢：同一个克隆里的设备、队列与管线先丢）。
+pub struct DeviceOutsideTheBooksMarkedOnTheBus<'table> {
+    table: &'table BusesWithDevicesStartedOutsideTheBooks,
+    bus: String,
+}
+
+impl Drop for DeviceOutsideTheBooksMarkedOnTheBus<'_> {
+    fn drop(&mut self) {
+        self.table.take_one_device_off_the_bus(&self.bus);
+    }
+}
+
 impl BusesWithDevicesStartedOutsideTheBooks {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            buses: Mutex::new(BTreeSet::new()),
+            devices_marked_by_bus: Mutex::new(BTreeMap::new()),
         }
     }
 
-    /// 先把 `bus` 记成起过不走账的设备，再调 `start` 起，交 `start` 的结果：起设备到记下之间那一段，卡池读到的这个进程占着的已经有
-    /// 那个设备的那一份，后记就被当成借据建上的（攻方乙形）。起不来的照样记着（分不出，只会少借）。
+    /// 持锁只为改一格计数，没有会 panic 到一半的写：别的线程 panic 留下的毒照用。
+    fn devices_marked_by_bus_locked(&self) -> MutexGuard<'_, BTreeMap<String, usize>> {
+        self.devices_marked_by_bus
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// `bus` 上多记一台。
+    fn mark_one_more_device_on_the_bus(&self, bus: &str) {
+        let mut devices_marked_by_bus = self.devices_marked_by_bus_locked();
+        let devices_on_the_bus = devices_marked_by_bus.entry(bus.to_string()).or_insert(0);
+        *devices_on_the_bus = devices_on_the_bus
+            .checked_add(1)
+            .expect("一条总线上记着的设备数装得进 usize：每台都是这个进程起的");
+    }
+
+    /// `bus` 上减一台，减到 0 摘掉这条总线。
+    ///
+    /// # Panics
+    /// `bus` 上一台都没记着：每一记（[`DeviceOutsideTheBooksMarkedOnTheBus`]）都是先在它那条总线上加过一台才交出的，丢一记只减一台，
+    /// 没记着就是账被别处改坏了。
+    fn take_one_device_off_the_bus(&self, bus: &str) {
+        let mut devices_marked_by_bus = self.devices_marked_by_bus_locked();
+        let devices_on_the_bus = devices_marked_by_bus
+            .get_mut(bus)
+            .expect("丢掉的这一记在它那条总线上加过一台，那条总线还记着");
+        *devices_on_the_bus = devices_on_the_bus
+            .checked_sub(1)
+            .expect("丢掉的这一记在它那条总线上加过一台，这条总线上至少还记着它那一台");
+        if *devices_on_the_bus == 0 {
+            devices_marked_by_bus.remove(bus);
+        }
+    }
+
+    /// 先在 `bus` 上多记一台，再调 `start` 起，交 `start` 起好的设备连同这一台的那一记：起设备到记下之间那一段，卡池读到的这个进程占着的
+    /// 已经有那个设备的那一份，后记就被当成借据建上的（攻方乙形）。起不来的那一台照样记着、不交那一记（分不出，只会少借）。
     ///
     /// # Errors
     /// `start` 的错。
@@ -1972,22 +2059,28 @@ impl BusesWithDevicesStartedOutsideTheBooks {
         &self,
         bus: &str,
         start: impl FnOnce() -> Result<Device, Failure>,
-    ) -> Result<Device, Failure> {
-        // 持锁只为插一个总线号，没有会 panic 到一半的写：别的线程 panic 留下的毒照用
-        self.buses
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(bus.to_string());
-        start()
+    ) -> Result<(Device, DeviceOutsideTheBooksMarkedOnTheBus<'_>), Failure> {
+        self.mark_one_more_device_on_the_bus(bus);
+        let started_device = start()?;
+        Ok((
+            started_device,
+            DeviceOutsideTheBooksMarkedOnTheBus {
+                table: self,
+                bus: bus.to_string(),
+            },
+        ))
     }
 
-    /// 这个进程在 `bus` 那张卡上起过（或正在起）不走账的设备没有。
+    /// 这个进程在 `bus` 那张卡上有（或正在起、起不来过）不走账的设备没有。
     #[must_use]
     pub fn has_devices_on_the_bus(&self, bus: &str) -> bool {
-        self.buses
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .contains(bus)
+        self.devices_marked_by_bus_locked().contains_key(bus)
+    }
+
+    /// 每条总线上记着的设备加起来几台（还活着的，加起不来过的）。
+    #[must_use]
+    pub fn devices_marked_on_every_bus(&self) -> usize {
+        self.devices_marked_by_bus_locked().values().sum()
     }
 }
 
@@ -2050,6 +2143,7 @@ struct OutOfMemoryReport {
 /// （wgpu 的错误范围按线程分，判器内核在另起的线程上编，那里的 Out of Memory 范围接不住）。
 /// 每一次按记的那条线程认是哪段活的（攻方：别的线程上一次 Out of Memory 不把这段活真正的 panic 说成显存不够）：
 /// 那条线程上正在做一段活就是那一段；没有（活另起的编内核的线程）就是那一刻这个设备上在编内核的那几段（[`Self::compile_for_the_work_of_this_thread`]）。
+/// `Default` 是不在哪张真卡上的一份（测试里假的设备情况）；真卡上起的设备用 [`Self::on_the_card`]。
 #[derive(Default)]
 pub struct DeviceConditionOfACard {
     out_of_memory_reports: Mutex<Vec<OutOfMemoryReport>>,
@@ -2057,6 +2151,11 @@ pub struct DeviceConditionOfACard {
     works_compiling: Mutex<BTreeMap<WorkOnTheCardIdentifier, usize>>,
     /// 设备丢了的话：记了就不抹（重起的是新设备、新的一份）。
     lost: Mutex<Option<LossOfTheDevice>>,
+    /// 真卡的名字。`None` 的一份不打 [`GPU_DEVICE_LOST_MARKER`] 那一行：假的设备情况上记丢失的用例，因断言红时输出里不许有这一行，
+    /// 否则变异判「抓到」把断言红认成卡出了事。
+    card_name_of_the_device: Option<String>,
+    /// [`GPU_DEVICE_LOST_MARKER`] 那一行打过没有。
+    is_the_device_lost_marker_line_told: AtomicBool,
 }
 
 /// 设备为什么丢的，按接 Out of Memory 的那一层要做的决定分（设备丢失的回调里认：wgpu 给的那一句是不是它的「显存不够」）。
@@ -2106,6 +2205,18 @@ impl Drop for CompilingForAWork<'_> {
 }
 
 impl DeviceConditionOfACard {
+    /// 真卡 `card_name` 上起的一台设备的情况，一样都还没记。
+    #[must_use]
+    pub fn on_the_card(card_name: String) -> Self {
+        Self {
+            out_of_memory_reports: Mutex::new(Vec::new()),
+            works_compiling: Mutex::new(BTreeMap::new()),
+            lost: Mutex::new(None),
+            card_name_of_the_device: Some(card_name),
+            is_the_device_lost_marker_line_told: AtomicBool::new(false),
+        }
+    }
+
     /// 记一次 Out of Memory（`what` 说是在哪、wgpu 报的那一句），算在记的这条线程上正在做的那段活上；这条线程上没有活，
     /// 算在此刻这个设备上在编内核的那几段活上（都没有就哪段活都说不成）。
     pub fn record_an_out_of_memory(&self, what: String) {
@@ -2160,10 +2271,57 @@ impl DeviceConditionOfACard {
         compile()
     }
 
-    /// 记设备丢了（wgpu 的设备丢失回调调它）：`why` 是 wgpu 给的原因与那一句，`cause` 是回调认出来的缘由。
+    /// 记设备丢了（wgpu 的设备丢失回调与等卡没等成的那几处调它）：`why` 是丢失的原因与那一句，`cause` 是认出来的缘由。
+    /// 这个设备头一次出事时往标准输出打 [`GPU_DEVICE_LOST_MARKER`] 那一行。
     pub fn record_the_device_lost(&self, why: String, cause: CauseOfTheDeviceLoss) {
+        self.record_the_device_lost_telling_the_marker_line(
+            why,
+            cause,
+            print_the_device_lost_marker_line,
+        );
+    }
+
+    /// 等卡没等成、用例因此要红，而那一处不把设备记成丢了（记了会改卡池与显存不够的认法）：只打 [`GPU_DEVICE_LOST_MARKER`] 那一行，
+    /// 与 [`Self::record_the_device_lost`] 合起来这个设备只打一次。
+    pub fn print_the_device_lost_marker_line_the_first_time(&self, reason: &str) {
+        self.tell_the_device_lost_marker_line_the_first_time(
+            reason,
+            print_the_device_lost_marker_line,
+        );
+    }
+
+    fn record_the_device_lost_telling_the_marker_line(
+        &self,
+        why: String,
+        cause: CauseOfTheDeviceLoss,
+        tell_the_marker_line: impl FnOnce(&str),
+    ) {
+        let reason_for_the_marker_line = why.clone();
         *self.lost.lock().unwrap_or_else(PoisonError::into_inner) =
             Some(LossOfTheDevice { why, cause });
+        self.tell_the_device_lost_marker_line_the_first_time(
+            &reason_for_the_marker_line,
+            tell_the_marker_line,
+        );
+    }
+
+    fn tell_the_device_lost_marker_line_the_first_time(
+        &self,
+        reason: &str,
+        tell_the_marker_line: impl FnOnce(&str),
+    ) {
+        let Some(card_name) = self.card_name_of_the_device.as_deref() else {
+            return;
+        };
+        if self
+            .is_the_device_lost_marker_line_told
+            .swap(true, Ordering::Relaxed)
+        {
+            return;
+        }
+        let current_thread = std::thread::current();
+        let test_name = current_thread.name().unwrap_or(THREAD_WITHOUT_A_NAME);
+        tell_the_marker_line(&gpu_device_lost_line(test_name, card_name, reason));
     }
 
     fn loss_of_the_device(&self) -> Option<LossOfTheDevice> {
@@ -2917,7 +3075,7 @@ mod tests {
     use super::{
         attempt_on_a_card_without_room_for_one_state, card_memory_reader_of_one_report_per_reading,
         card_memory_readings_of_one_nvidia_smi_report, decide_scratch_before_booking,
-        gpu_not_run_line, pci_bus_identifier_without_the_domain,
+        gpu_device_lost_line, gpu_not_run_line, pci_bus_identifier_without_the_domain,
         reason_for_running_out_of_gpu_memory, BusesWithDevicesStartedOutsideTheBooks,
         DeviceConditionOfACard, WorkOnTheCardOfThisThread, GPU_MEMORY_SHORT_REASON_PREFIX,
     };
@@ -3022,7 +3180,7 @@ mod tests {
     /// （G1 二）：这个进程借了 1 000 之后，一个不经这份账的 GPU 用户占了 20 000（卡上空闲从 30 000 掉到 9 000）。
     /// 下一笔照这一刻现读的借：9 000 减这个进程借了还没占的 1 000、减还没起设备的驱动那一份，正好 5 440，多 1 MiB 就借不到。
     #[test]
-    fn a_booking_after_an_outsider_took_memory_follows_the_free_memory_read_at_that_booking() {
+    fn booking_after_an_outsider_took_memory_follows_the_free_memory_read_at_that_booking() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(30_000)]);
         let ledger = ledger_reading(&readings);
         assert_eq!(
@@ -3049,7 +3207,7 @@ mod tests {
     /// （G1 二）：外人占着卡（空 5 000）时借 10 000 借不到，不判红（卡空着时借得出 29 550）；
     /// 外人走了（空 30 000），下一笔照现读的借到。
     #[test]
-    fn a_booking_after_an_outsider_left_gets_the_memory_it_returned() {
+    fn booking_after_an_outsider_left_gets_the_memory_it_returned() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(5_000)]);
         let ledger = ledger_reading(&readings);
         assert_eq!(
@@ -3228,7 +3386,7 @@ mod tests {
 
     /// （正推探针 G 那一形）：卡上只空 1 000，不到一份驱动开销：借 1 MiB 也借不到，这个进程不登记（调用方不起设备）。
     #[test]
-    fn a_card_with_less_free_memory_than_one_driver_share_lends_nothing_and_registers_nothing() {
+    fn card_with_less_free_memory_than_one_driver_share_lends_nothing_and_registers_nothing() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(1_000)]);
         let ledger = ledger_reading(&readings);
         assert_eq!(
@@ -3246,7 +3404,7 @@ mod tests {
 
     /// K4-1 用的核账：一笔借据丢掉之前一直在账上，丢掉就不在了。
     #[test]
-    fn a_lease_is_on_the_books_until_it_is_dropped() {
+    fn lease_is_on_the_books_until_it_is_dropped() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(30_000)]);
         let ledger = ledger_reading(&readings);
         let booking = ledger.book_on_the_card(0, 1_000).expect("空着的卡借得到");
@@ -3267,7 +3425,7 @@ mod tests {
     /// （正推探针 C、攻方 S3 那一形）：卡上空 20 000，这个进程已经借着 12 000（没建）。按状态数借 30 个、
     /// 每个 1 000 MiB：照此刻能借的 5 440 压成 5 个，当场借到，不按卡的整份容量压成 17 个再判放不下。
     #[test]
-    fn a_scratch_booking_compresses_its_states_to_the_room_now_and_books_them() {
+    fn scratch_booking_compresses_its_states_to_the_room_now_and_books_them() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(20_000)]);
         let ledger = ledger_reading(&readings);
         assert_eq!(booking_kept_on_the_books(&ledger, 12_000), Ok(12_000));
@@ -3305,7 +3463,7 @@ mod tests {
     /// 要的比卡空着时能借的（空卡上能用的减驱动那一份，29 550）还大，判成比每张卡都大（调用方判红）；不超过它、只是此刻
     /// 放不下的是借不到（调用方报本次未跑）。按状态数借时一个状态都放不下同理。
     #[test]
-    fn a_need_larger_than_the_card_when_empty_never_fits_and_a_smaller_one_has_no_room_now() {
+    fn need_larger_than_the_card_when_empty_never_fits_and_a_smaller_one_has_no_room_now() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(5_000)]);
         let ledger = ledger_reading(&readings);
         let ceiling = AN_EMPTY_RTX_5090_HAS - DRIVER;
@@ -3394,7 +3552,7 @@ mod tests {
     /// 点名一张卡借，只记在那张卡上：第一张空着也不挪过去；要的比点名的那张空着时能借的大、比第一张小的，
     /// 判成比卡大（判红），不记到第一张上。
     #[test]
-    fn a_booking_on_a_named_card_stays_on_that_card_even_when_an_earlier_card_has_room() {
+    fn booking_on_a_named_card_stays_on_that_card_even_when_an_earlier_card_has_room() {
         let ledger = GpuMemoryLedger::new(
             2,
             Box::new(|| {
@@ -3429,7 +3587,7 @@ mod tests {
 
     /// 产品路径此刻借不到照 GPU 对拍用例那一路报「本次未跑」，同一个记号、原因写显存不够；比卡大、读不出卡判红。
     #[test]
-    fn a_booking_without_room_now_is_reported_not_run_with_the_gpu_not_run_marker() {
+    fn booking_without_room_now_is_reported_not_run_with_the_gpu_not_run_marker() {
         let no_room = BookingRefusal::NoCardHasRoomNow {
             need_mebibytes: 4_000,
             card_rooms_mebibytes: vec![1_000],
@@ -3514,7 +3672,7 @@ mod tests {
     /// 一张空着的 5090 照 3/4 额度装得下 17 867 个状态（日志里那一行）：45 个状态的流只开 45 个，
     /// 131 195 个状态的大流照旧按显存开，调用方要得更少就照它的，一点显存都不给、流是空的也带一个。
     #[test]
-    fn a_small_flow_opens_scratch_for_its_own_states_and_a_large_flow_still_follows_the_memory() {
+    fn small_flow_opens_scratch_for_its_own_states_and_a_large_flow_still_follows_the_memory() {
         const STATES_A_WHOLE_RTX_5090_HOLDS: usize = 17_867;
         assert_eq!(
             states_in_one_dispatch_capped_by_the_state_count(
@@ -3553,7 +3711,7 @@ mod tests {
     /// 设了卡的额度变量：容量取额度与「这个进程能占的 − 驱动那一份」里小的那个（额度小取额度，额度大取能占的那一边）；
     /// 没设：照旧是这张卡给崩溃放量的额度减驱动那一份。数照一张 5090（空 30 000 MiB，3/4 是 22 500）。
     #[test]
-    fn a_card_quota_from_the_environment_caps_each_card_ledger_and_without_it_the_capacity_is_unchanged(
+    fn card_quota_from_the_environment_caps_each_card_ledger_and_without_it_the_capacity_is_unchanged(
     ) {
         assert_eq!(
             card_ledger_capacity_mebibytes(Some(4096), None, 22_500, 30_000, DRIVER),
@@ -3598,9 +3756,9 @@ mod tests {
     }
 
     /// 起过卡池的进程，产品路径第 ① 段每张装了状态的卡按装的状态数借草稿区（45 个状态的小流只借 45 个，
-    /// 一张 5090 装满 17 867 个、余下 3 000 个给下一张的大流各借各的），没装状态的卡不借；没起过卡池、不要卡的照旧不进账。
+    /// 一张 5090 装满 17 867 个、余下 3 000 个给下一张的大流各借各的），没装状态的卡不借；卡由调用方交进来的、不要卡的照旧不进账。
     #[test]
-    fn a_process_that_started_the_card_pool_books_the_scratch_of_each_card_for_the_states_placed_on_it(
+    fn process_that_started_the_card_pool_books_the_scratch_of_each_card_for_the_states_placed_on_it(
     ) {
         assert_eq!(
             scratch_states_to_book_on_each_card(
@@ -3627,7 +3785,7 @@ mod tests {
                 45
             ),
             ScratchStatesToBook::NotBooked,
-            "没起过卡池的进程自己起设备，照旧不进账"
+            "卡由调用方自己起好交进来，照旧不进账"
         );
         assert_eq!(
             scratch_states_to_book_on_each_card(GpuCardsSource::NoCardNeeded, &[], 45),
@@ -3670,7 +3828,7 @@ mod tests {
     /// 「几张卡一张借不到时不拿着别的卡干等」：100 个状态、两张卡各带得了 60 个；第一张当场借到 60 个，第二张此刻借不到。
     /// 第二张只试一次、要装的是剩下的 40 个，借不到就不装它，判成就在第一张上判（剩下的 40 个排队等第一张）。
     #[test]
-    fn a_second_card_without_room_leaves_every_state_to_the_first_card() {
+    fn second_card_without_room_leaves_every_state_to_the_first_card() {
         let mut attempts_made = Vec::new();
         let attempts = place_states_on_the_cards_that_book_now(
             100,
@@ -4128,7 +4286,7 @@ mod tests {
     /// （缓冲交回驱动，读数里这个进程只剩驱动那一份）再销账：之后能借的是卡上空着的减第二笔还要建的、减驱动那一份，
     /// 销了账的 4 000 不再从空闲里扣（甲在这里多扣驱动那一份 2 560）。
     #[test]
-    fn a_lease_returned_after_the_device_finished_is_no_longer_taken_off_the_free_memory() {
+    fn lease_returned_after_the_device_finished_is_no_longer_taken_off_the_free_memory() {
         const EMPTY: u64 = 30_000;
         const FIRST_LEASE: u64 = 4_000;
         const SECOND_LEASE: u64 = 3_000;
@@ -4187,7 +4345,7 @@ mod tests {
     /// （攻方丙形）：报告里一张空着的 5090 空 32 110（总量 32 607 减保留 497）。要的比空卡上能用的减驱动那一份
     /// （29 550）大 1 MiB：判成比每张卡都大（判红），不是永远借不到的本次未跑。
     #[test]
-    fn a_need_beyond_what_an_empty_card_has_never_fits_even_below_the_total_memory() {
+    fn need_beyond_what_an_empty_card_has_never_fits_even_below_the_total_memory() {
         let report = nvidia_smi_report(&[an_rtx_5090_in_the_report(5_000, &[])]);
         let ledger = GpuMemoryLedger::new(
             1,
@@ -4217,7 +4375,7 @@ mod tests {
     /// 调用方照此刻能借的算出这张卡一个状态都带不了（带得了 0 个），而空着时放得下：
     /// 判成此刻借不到（调用方报本次未跑），不当成前面的卡装完了、一张都没借到就判红。
     #[test]
-    fn a_card_the_caller_found_holding_no_state_now_is_no_room_now_not_nothing_left_to_place() {
+    fn card_the_caller_found_holding_no_state_now_is_no_room_now_not_nothing_left_to_place() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(DRIVER + 1_000)]);
         let ledger = ledger_reading(&readings);
         assert_eq!(
@@ -4316,7 +4474,7 @@ mod tests {
 
     /// 读到的卡比池里多（一张卡的池读到两张）也判读不出，什么都不记。
     #[test]
-    fn a_reading_of_more_cards_than_the_pool_is_refused_and_nothing_is_booked() {
+    fn reading_of_more_cards_than_the_pool_is_refused_and_nothing_is_booked() {
         let too_many = GpuMemoryLedger::new(
             1,
             Box::new(|| {
@@ -4337,7 +4495,7 @@ mod tests {
 
     /// 卡池每张卡的设备第一次起不来不留着，下一次要时再起；起好了留着给后面要的；留着的那个丢了就重起一个。
     #[test]
-    fn a_device_that_failed_to_start_is_started_again_and_a_lost_one_is_replaced() {
+    fn device_that_failed_to_start_is_started_again_and_a_lost_one_is_replaced() {
         let slot: DeviceStartedOnDemand<u32> = DeviceStartedOnDemand::new();
         let starts = AtomicUsize::new(0);
         let start_as = |device: u32| {
@@ -4421,7 +4579,7 @@ mod tests {
 
     /// （K4-2 拆了锁之后）：同一张卡上一条线程在重起，另一条也要这张卡的设备：等这一次起完、拿它起好的那一台，不另起一台。
     #[test]
-    fn a_second_start_on_the_same_card_waits_for_the_restart_in_progress_and_takes_its_device() {
+    fn second_start_on_the_same_card_waits_for_the_restart_in_progress_and_takes_its_device() {
         let slot: DeviceStartedOnDemand<u32> = DeviceStartedOnDemand::new();
         assert_eq!(
             slot.started_or_start(|_device: &u32| false, || Ok::<u32, String>(1)),
@@ -4481,29 +4639,110 @@ mod tests {
     /// （攻方乙形）：不走账的设备起之前就记下它在哪张卡上：起的那一段里卡池读这张卡已经认得出
     /// 这个进程另有不走账的设备；没起过的卡不记。
     #[test]
-    fn a_device_outside_the_books_is_marked_on_its_bus_before_it_starts() {
+    fn device_outside_the_books_is_marked_on_its_bus_before_it_starts() {
         let buses = BusesWithDevicesStartedOutsideTheBooks::new();
-        assert_eq!(
-            buses.start_a_device_marked_first("01:00.0", || {
+        let (marked_while_starting, _marked_on_the_bus) = buses
+            .start_a_device_marked_first("01:00.0", || {
                 Ok::<bool, String>(buses.has_devices_on_the_bus("01:00.0"))
-            }),
-            Ok(true),
-            "起的那一段里已经记着"
+            })
+            .expect("造的设备起得来");
+        assert!(marked_while_starting, "起的那一段里已经记着");
+        assert!(
+            buses.has_devices_on_the_bus("01:00.0"),
+            "起好的那一台还在：记着"
         );
-        assert!(buses.has_devices_on_the_bus("01:00.0"));
         assert!(!buses.has_devices_on_the_bus("10:00.0"), "没起过的卡不记");
     }
 
     /// 不走账的设备起不来照样记着（分不出它占没占，只会少借）。
     #[test]
-    fn a_device_outside_the_books_that_failed_to_start_stays_marked_on_its_bus() {
+    fn device_outside_the_books_that_failed_to_start_stays_marked_on_its_bus() {
         let buses = BusesWithDevicesStartedOutsideTheBooks::new();
         assert_eq!(
             buses
-                .start_a_device_marked_first("10:00.0", || Err::<(), String>("起不来".to_string())),
+                .start_a_device_marked_first("10:00.0", || Err::<(), String>("起不来".to_string()))
+                .map(|(device, _marked_on_the_bus)| device),
             Err("起不来".to_string())
         );
         assert!(buses.has_devices_on_the_bus("10:00.0"));
+    }
+
+    /// 一条总线上起了两台不走账的设备：丢一台照样记着（还有一台），两台都丢了才摘掉这条总线，计数回到 0。
+    /// 判别力（`crates/mutations.tsv`「显存账 不走账的设备丢一台就摘掉整条总线」）：丢一台就摘，「丢了一台、还有一台」那条断言红。
+    /// 第二记包在 `ManuallyDrop` 里、两条中间断言过了才丢：丢一台就摘的账在断言 panic 展开时若再丢第二记，
+    /// 第二记的 `Drop` 找不到那条总线、在展开中又 panic，进程中止，测试红不在断言上。
+    #[test]
+    fn bus_stays_marked_until_the_last_device_outside_the_books_on_it_is_dropped() {
+        let buses = BusesWithDevicesStartedOutsideTheBooks::new();
+        let (_first_device, first_marked_on_the_bus) = buses
+            .start_a_device_marked_first("20:00.0", || Ok::<(), String>(()))
+            .expect("造的设备起得来");
+        let (_second_device, second_marked_on_the_bus) = buses
+            .start_a_device_marked_first("20:00.0", || Ok::<(), String>(()))
+            .expect("造的设备起得来");
+        let second_marked_on_the_bus = std::mem::ManuallyDrop::new(second_marked_on_the_bus);
+        assert_eq!(buses.devices_marked_on_every_bus(), 2);
+        drop(first_marked_on_the_bus);
+        assert!(
+            buses.has_devices_on_the_bus("20:00.0"),
+            "丢了一台、还有一台：照样记着"
+        );
+        assert_eq!(buses.devices_marked_on_every_bus(), 1);
+        drop(std::mem::ManuallyDrop::into_inner(second_marked_on_the_bus));
+        assert!(
+            !buses.has_devices_on_the_bus("20:00.0"),
+            "两台都丢了：摘掉这条总线"
+        );
+        assert_eq!(buses.devices_marked_on_every_bus(), 0);
+    }
+
+    /// （不走账的设备丢了之后借据不再扣两遍）：这个进程在 5090 上起了一台不走账的设备，又经账借了 3 000、起了账上的设备、
+    /// 建满（报告里这个进程占着驱动那一份加 3 000）。不走账的那一台还在时分不出，能借的是空闲再减驱动那一份、再减借着的（扣两遍，只会少借）；
+    /// 那一台丢了之后回到按账拆：能借的就是空闲（借着的与驱动那一份已经不在空闲里，不再扣第二遍）。
+    /// 判别力（`crates/mutations.tsv`「显存账 不走账的设备丢掉时不减」）：丢掉时不减，丢了之后照样扣两遍，这条红。
+    #[test]
+    fn once_the_device_outside_the_books_is_dropped_the_card_room_counts_the_leases_once() {
+        const LEASED: u64 = 3_000;
+        const FREE: u64 = 30_000 - DRIVER - LEASED;
+        let report = nvidia_smi_report(&[an_rtx_5090_in_the_report(
+            FREE,
+            &[(THIS_PROCESS, DRIVER + LEASED)],
+        )]);
+        let buses = Arc::new(BusesWithDevicesStartedOutsideTheBooks::new());
+        let buses_read_by_the_ledger = Arc::clone(&buses);
+        let ledger = GpuMemoryLedger::new(
+            1,
+            card_memory_reader_of_one_report_per_reading(
+                Box::new(move || Ok(report.clone())),
+                THIS_PROCESS,
+                vec![pci_bus_identifier_without_the_domain(BUS_OF_THE_RTX_5090)],
+                Box::new(move |bus: &str| buses_read_by_the_ledger.has_devices_on_the_bus(bus)),
+            ),
+            Box::new(|_position, may_hold_mebibytes| may_hold_mebibytes.saturating_sub(DRIVER)),
+            DRIVER,
+        );
+        let (_device_outside_the_books, marked_on_the_bus) = buses
+            .start_a_device_marked_first(
+                &pci_bus_identifier_without_the_domain(BUS_OF_THE_RTX_5090),
+                || Ok::<(), String>(()),
+            )
+            .expect("造的设备起得来");
+        let lease = ledger
+            .book_on_the_card(0, LEASED)
+            .expect("空闲 24 440 放得下 3 000 连驱动那一份");
+        let _device_on_the_books = ledger.record_the_device_started_on_the_card(0);
+        assert_eq!(
+            ledger.card_rooms_mebibytes_now(&[0]),
+            Ok(vec![FREE - DRIVER - LEASED]),
+            "不走账的那一台还在：分不出，借着的与驱动那一份再扣一遍"
+        );
+        drop(marked_on_the_bus);
+        assert_eq!(
+            ledger.card_rooms_mebibytes_now(&[0]),
+            Ok(vec![FREE]),
+            "那一台丢了：按账拆，借着的与驱动那一份只从空闲里扣一次"
+        );
+        drop(lease);
     }
 
     /// （攻方乙附，数照攻方模型那一行：空 21 010，借着 8 000 还没建，驱动实占 600）：
@@ -4534,7 +4773,7 @@ mod tests {
     /// 驱动实占 600）：那 4 000 丢掉之前等完设备、交回驱动再销账，读数里这个进程只剩驱动实占的 600；下一笔能借的是卡上此刻真能再给的
     /// 19 550（空 21 510 减驱动还要长的 1 960），不把驱动还没长到的那一截当成能借的（多给 D − x）。
     #[test]
-    fn a_lease_returned_after_the_device_finished_leaves_room_only_for_what_the_driver_still_grows_to(
+    fn lease_returned_after_the_device_finished_leaves_room_only_for_what_the_driver_still_grows_to(
     ) {
         const EMPTY: u64 = 32_110;
         const OUTSIDER: u64 = 10_000;
@@ -4708,7 +4947,7 @@ mod tests {
     /// 起过的设备丢了要重起，驱动那一份重新登记：卡上空 17 440（丢了的设备还占着），
     /// 第二笔 17 440 还没建，再起一个设备连它的驱动那一份要 20 000，放不下：交借不到，这个进程照旧登记着（驱动那一份许出去而没占上卡）。
     #[test]
-    fn a_lost_device_started_again_is_refused_when_its_driver_share_no_longer_fits_now() {
+    fn lost_device_started_again_is_refused_when_its_driver_share_no_longer_fits_now() {
         let (ledger, _readings) =
             ledger_whose_started_device_holds_a_built_lease_and_another_unbuilt(
                 30_000 - DRIVER - 10_000,
@@ -4728,7 +4967,7 @@ mod tests {
     /// 这个进程占着的分不出算（乙：17 440 减驱动那一份、减借着的 12 000，建上了的 10 000 也照没建扣），
     /// 不照丢了的那一份当已在卡上。
     #[test]
-    fn a_lost_device_started_again_books_its_driver_share_as_not_yet_on_the_card() {
+    fn lost_device_started_again_books_its_driver_share_as_not_yet_on_the_card() {
         let (ledger, _readings) =
             ledger_whose_started_device_holds_a_built_lease_and_another_unbuilt(2_000);
         assert_eq!(
@@ -4829,7 +5068,7 @@ mod tests {
     /// 设备为别的原因丢了，而这段活开始之后没记过 Out of Memory（早先一段活上处理过的一次不算），
     /// 说不成显存不够；这段活开始之后记过（别的活上的也算：丢了设备谁都做不成），说成设备因它丢了。
     #[test]
-    fn a_lost_device_explains_a_failure_only_with_an_out_of_memory_since_the_work_began() {
+    fn lost_device_explains_a_failure_only_with_an_out_of_memory_since_the_work_began() {
         let condition = DeviceConditionOfACard::default();
         condition.record_an_out_of_memory("早先处理过的一次".to_string());
         let work = WorkOnTheCardOfThisThread::begin();
@@ -4932,7 +5171,7 @@ mod tests {
     /// （正推 X19）：报告里点名的卡没有 Reserved 那一行（老驱动的样子），报错（判红），不悄悄当成保留 0
     /// （那样空卡上能用的就成了总量）。
     #[test]
-    fn a_missing_reserved_memory_in_the_report_is_an_error_not_zero() {
+    fn missing_reserved_memory_in_the_report_is_an_error_not_zero() {
         let report = nvidia_smi_report(&[an_rtx_5090_in_the_report(20_000, &[])])
             .lines()
             .filter(|line| !line.trim_start().starts_with("Reserved"))
@@ -4955,7 +5194,7 @@ mod tests {
     /// （正推 X4）：一个状态要的恰好等于空着时能借的，是此刻借不到（报本次未跑），不是放不下；
     /// 多 1 MiB 才是空着时也放不下。
     #[test]
-    fn a_state_needing_exactly_what_an_empty_card_lends_is_no_room_now() {
+    fn state_needing_exactly_what_an_empty_card_lends_is_no_room_now() {
         let room = CardRoomForThisProcess {
             room_now_mebibytes: 0,
             ceiling_mebibytes: 1_000,
@@ -4979,8 +5218,7 @@ mod tests {
     /// C 照旧记在账上：能借的是配给卡的额度 32 000 减驱动那一份、减三笔借据的 8 440，不超过卡上此刻真能再给的 8 550（空 13 510 减驱动还要长的
     /// 1 960、减 V 还要长回的 3 000）；C 照常销了账是 13 510，照账借满卡上就超了。这张卡的设备丢了、账照重起记，C 才销账。
     #[test]
-    fn a_lease_whose_wait_failed_stays_booked_until_the_device_is_taken_as_lost_and_gives_no_more()
-    {
+    fn lease_whose_wait_failed_stays_booked_until_the_device_is_taken_as_lost_and_gives_no_more() {
         const EMPTY: u64 = 32_110;
         const DRIVER_HOLDS_NOW: u64 = 600;
         const LONG_LEASE: u64 = 10_000;
@@ -5067,7 +5305,7 @@ mod tests {
     /// 丢了的设备重起被拒过一次（卡上空 17 440，第二笔 17 440 还没建），被拒之前已借到的
     /// 并发用例再来起设备，照此刻再判、照样拒，不直接放行；旧设备与它上面的缓冲都还给驱动之后（卡上空 30 000、这个进程不在报告里）再来，放得下，起。
     #[test]
-    fn a_lost_device_refused_a_restart_is_judged_again_on_every_later_attempt() {
+    fn lost_device_refused_a_restart_is_judged_again_on_every_later_attempt() {
         let (ledger, readings) =
             ledger_whose_started_device_holds_a_built_lease_and_another_unbuilt(
                 30_000 - DRIVER - 10_000,
@@ -5104,7 +5342,7 @@ mod tests {
     /// （正推 N10、攻方第三节第 1310 行 乙改数）：重起时借着的连新设备的驱动那一份照此刻的空闲
     /// 恰好放得下（空 17 440 = 驱动那一份 2 560 + 借着的 10 000 + 4 880，建上了的那 10 000 照没建算），起，不拒；多 1 MiB 就拒。
     #[test]
-    fn a_lost_device_started_again_fits_when_its_driver_share_fits_exactly() {
+    fn lost_device_started_again_fits_when_its_driver_share_fits_exactly() {
         let (ledger, _readings) =
             ledger_whose_started_device_holds_a_built_lease_and_another_unbuilt(4_880);
         assert_eq!(DRIVER + 10_000 + 4_880, 30_000 - DRIVER - 10_000);
@@ -5130,7 +5368,7 @@ mod tests {
     /// 12 440，多给 600。A 等完设备、它的卡丢掉，旧设备的句柄都没了（wgpu 收掉、卡上还给驱动），这一台放掉：照读数分得出算，能借的加 B 与驱动那一份
     /// 是空卡（B 是设备丢了那一刻就借着的，照「那一刻活着的借据都还了」判时要等 B 也还了，少给 600）。之后借 C 3 000、B 也还了，照旧。
     #[test]
-    fn a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement() {
+    fn lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement() {
         const EMPTY: u64 = 30_000;
         const DRIVER_HOLDS_NOW: u64 = 600;
         const LEASE_ON_THE_LOST_DEVICE: u64 = 10_000;
@@ -5242,7 +5480,7 @@ mod tests {
     }
 
     /// 借一笔建满 `mebibytes`、等设备超时（设备上还排着别的活）、丢掉：交回它的借据号；缓冲还在卡上，由调用方后来还给驱动。
-    fn a_lease_built_and_dropped_after_a_timed_out_wait(
+    fn lease_built_and_dropped_after_a_timed_out_wait(
         card: &Mutex<CardUnderTheLedger>,
         ledger: &GpuMemoryLedger,
         device: &DeviceStartedOnTheBooks<'_>,
@@ -5263,7 +5501,7 @@ mod tests {
     /// 一笔笔借 4 000、建满、等设备超时、丢掉；活后来做完、缓冲还给驱动，卡池借下一笔之前对这张卡 poll 一次交回队列空了：没等成的那一笔销账，
     /// 能借的回到卡上真能再给的（空卡减驱动那一份）。八笔笔笔借得到，中间没有别的等成。
     #[test]
-    fn a_lease_whose_wait_timed_out_leaves_the_books_when_a_poll_finds_its_device_idle() {
+    fn lease_whose_wait_timed_out_leaves_the_books_when_a_poll_finds_its_device_idle() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 1).expect("空卡借得到");
         let device = ledger.record_the_device_started_on_the_card(0);
@@ -5279,7 +5517,7 @@ mod tests {
         drop(first);
         for timed_out_lease_number in 1..=8 {
             let timed_out_lease =
-                a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 4_000);
+                lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 4_000);
             assert!(
                 ledger.is_the_lease_on_the_books(0, timed_out_lease),
                 "第 {timed_out_lease_number} 笔没等成：缓冲可能还在卡上，照旧记着"
@@ -5322,7 +5560,7 @@ mod tests {
     /// 卡池列卡（列出 X）、poll 交回队列空了（X 的缓冲还给驱动）；A 借 8 000、建满、没等成；卡池照列出来的销：X 销账，A 照旧记着，不多给。
     /// 下一次列卡列出 A，A 的缓冲还给驱动之后再 poll 交回队列空了，A 才销账。
     #[test]
-    fn a_lease_kept_after_the_listing_stays_on_the_books_when_the_poll_after_the_listing_finds_the_device_idle(
+    fn lease_kept_after_the_listing_stays_on_the_books_when_the_poll_after_the_listing_finds_the_device_idle(
     ) {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 1).expect("空卡借得到");
@@ -5337,28 +5575,28 @@ mod tests {
             DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished,
         );
         drop(first);
-        let lease_x =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 10_000);
+        let lease_listed_after_its_failed_wait =
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 10_000);
         let listed = ledger.leases_kept_after_a_failed_wait_on_each_card();
         assert_eq!(
             listed
                 .iter()
                 .map(LeasesKeptAfterAFailedWaitWhenListed::lease_identifiers)
                 .collect::<Vec<Vec<u64>>>(),
-            vec![vec![lease_x]],
+            vec![vec![lease_listed_after_its_failed_wait]],
             "列卡那一刻照旧记着的只有 X"
         );
         // poll 交回队列空了：X 的活做完、缓冲还给驱动
         card.lock().expect("假卡不 panic").built_mebibytes = 0;
-        let lease_a =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 8_000);
+        let lease_booked_after_the_listing =
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 8_000);
         device.take_in_that_the_work_of_the_listed_leases_finished(&listed[0]);
         assert!(
-            !ledger.is_the_lease_on_the_books(0, lease_x),
+            !ledger.is_the_lease_on_the_books(0, lease_listed_after_its_failed_wait),
             "X 列出来了、poll 那一刻之前提交的活都做完了：销账"
         );
         assert!(
-            ledger.is_the_lease_on_the_books(0, lease_a),
+            ledger.is_the_lease_on_the_books(0, lease_booked_after_the_listing),
             "A 是列卡之后才记成没等成的：它的活可以是 poll 之后才提交的，照旧记着"
         );
         assert!(
@@ -5371,7 +5609,7 @@ mod tests {
         card.lock().expect("假卡不 panic").built_mebibytes = 0;
         device.take_in_that_the_work_of_the_listed_leases_finished(&listed_again[0]);
         assert!(
-            !ledger.is_the_lease_on_the_books(0, lease_a),
+            !ledger.is_the_lease_on_the_books(0, lease_booked_after_the_listing),
             "下一次列卡列出 A、poll 交回队列空了：A 销账"
         );
         assert_eq!(room_now(&ledger), room_truly_left(&card, 0));
@@ -5397,7 +5635,7 @@ mod tests {
         );
         drop(first);
         let kept_lease =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 4_000);
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 4_000);
         {
             // 放掉：wgpu 收掉设备，它上面的缓冲与驱动那一份交回驱动
             let mut card = card.lock().expect("假卡不 panic");
@@ -5427,7 +5665,7 @@ mod tests {
 
     /// 正推账层探针那一形的起头：设备起好（驱动实占 600）、头一笔等完设备还了；再借此刻能借的减 1 000、建满、等设备超时、丢掉（照旧记着）。
     /// 交回账上的那一台、照旧记着的那一笔的借据号与它借的量（MiB）。
-    fn a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait<'ledger>(
+    fn started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait<'ledger>(
         card: &Mutex<CardUnderTheLedger>,
         ledger: &'ledger GpuMemoryLedger,
     ) -> (DeviceStartedOnTheBooks<'ledger>, u64, u64) {
@@ -5445,7 +5683,7 @@ mod tests {
         drop(first);
         let kept_mebibytes = room_now(ledger) - 1_000;
         let kept_lease =
-            a_lease_built_and_dropped_after_a_timed_out_wait(card, ledger, &device, kept_mebibytes);
+            lease_built_and_dropped_after_a_timed_out_wait(card, ledger, &device, kept_mebibytes);
         (device, kept_lease, kept_mebibytes)
     }
 
@@ -5454,11 +5692,11 @@ mod tests {
     /// 它上面的缓冲与驱动那一份交回了驱动（卡上空着）；卡池借之前列卡、看到留着的设备丢了：不 poll 它、告诉账，那一笔销账，借 4 000 借得到，
     /// 能借的不超过卡上真能再给的；之后的重起照常（驱动那一份照此刻判、新的一台记得上）。
     #[test]
-    fn a_lease_kept_on_a_device_found_lost_before_booking_leaves_the_books_and_four_thousand_fit_again(
+    fn lease_kept_on_a_device_found_lost_before_booking_leaves_the_books_and_four_thousand_fit_again(
     ) {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (device, kept_lease, _kept_mebibytes) =
-            a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
+            started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
         {
             let mut card = card.lock().expect("假卡不 panic");
             card.device_started = false;
@@ -5510,11 +5748,10 @@ mod tests {
     /// （K4-2 那一改不多给）：同上，设备丢了而它上面那一笔的缓冲与驱动那一份还占着卡（旧设备还没收拾）；卡池借之前告诉账之后，
     /// 那一笔出了账、这张卡照分不出算：能借的不超过卡上真能再给的，借 4 000 照旧借不到。
     #[test]
-    fn a_device_found_lost_with_its_buffers_still_on_the_card_lends_no_more_than_the_card_has_left()
-    {
+    fn device_found_lost_with_its_buffers_still_on_the_card_lends_no_more_than_the_card_has_left() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (device, kept_lease, kept_mebibytes) =
-            a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
+            started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
         {
             let mut card = card.lock().expect("假卡不 panic");
             card.device_started = false;
@@ -5548,7 +5785,7 @@ mod tests {
     /// （K4-2 那一改，卡池看到的是重起之前留着的那一份）：丢了的那一台重起过了（重起那一步已经把它记成丢了），
     /// 新的一台上有一笔没等成而照旧记着；卡池借之前取到的还是丢了的那一台、告诉账它丢了：账不动，新的一台没丢，它上面那一笔照旧记着。
     #[test]
-    fn a_device_found_lost_after_its_restart_leaves_the_replacement_and_its_kept_lease_alone() {
+    fn device_found_lost_after_its_restart_leaves_the_replacement_and_its_kept_lease_alone() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 1).expect("空卡借得到");
         let lost_device = ledger.record_the_device_started_on_the_card(0);
@@ -5567,7 +5804,7 @@ mod tests {
             .expect("重起：驱动那一份放得下");
         let replacement = ledger.record_the_device_started_on_the_card(0);
         let kept_on_the_replacement =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &replacement, 4_000);
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &replacement, 4_000);
         let room_before = room_now(&ledger);
         ledger.take_in_the_devices_kept_before_booking(
             |card_position| (card_position == 0).then_some(&lost_device),
@@ -5596,10 +5833,10 @@ mod tests {
     /// （卡池借之前 poll 的结局改成恒真照绿）：留着的设备没丢，poll 交回还有在飞的提交：
     /// poll 了一次，那一笔照旧记着（它的缓冲可能还在卡上），账不动。
     #[test]
-    fn a_device_still_busy_at_the_poll_before_booking_keeps_its_kept_lease_on_the_books() {
+    fn device_still_busy_at_the_poll_before_booking_keeps_its_kept_lease_on_the_books() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (device, kept_lease, _kept_mebibytes) =
-            a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
+            started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
         let room_before = room_now(&ledger);
         let polls = AtomicUsize::new(0);
         ledger.take_in_the_devices_kept_before_booking(
@@ -5674,8 +5911,8 @@ mod tests {
     /// （K5，正推 G1：去掉销列出来的借据时「等的是 poll 的那一台」那一条照绿）：丢了的那一台重起过、还没放掉，新的一台上
     /// 有一笔没等成而照旧记着；拿丢了的那一台交「列出来的那几笔的活做完了」：列出来的那一笔等的是新的一台，不销。
     #[test]
-    fn a_finished_poll_of_a_lost_device_left_alive_does_not_return_the_lease_kept_on_its_replacement(
-    ) {
+    fn finished_poll_of_a_lost_device_left_alive_does_not_return_the_lease_kept_on_its_replacement()
+    {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 1).expect("空卡借得到");
         let lost_device = ledger.record_the_device_started_on_the_card(0);
@@ -5694,7 +5931,7 @@ mod tests {
             .expect("重起：驱动那一份放得下");
         let replacement = ledger.record_the_device_started_on_the_card(0);
         let kept_on_the_replacement =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &replacement, 4_000);
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &replacement, 4_000);
         let listed = ledger.leases_kept_after_a_failed_wait_on_each_card();
         lost_device.take_in_that_the_work_of_the_listed_leases_finished(&listed[0]);
         assert!(
@@ -5742,7 +5979,7 @@ mod tests {
     /// （K4-2 那一改的接线）：卡池那一格交的设备在账上记在别的卡上（列的是第 1 张卡，取到的是第 0 张卡上的设备）：
     /// 断言拦下。
     #[test]
-    fn a_kept_device_on_the_books_of_another_card_is_refused_by_an_assertion() {
+    fn kept_device_on_the_books_of_another_card_is_refused_by_an_assertion() {
         let readings = replaceable_readings(vec![
             reading_of_an_rtx_5090(AN_EMPTY_RTX_5090_HAS),
             reading_of_an_rtx_5090(AN_EMPTY_RTX_5090_HAS),
@@ -5780,10 +6017,10 @@ mod tests {
     /// 不只列出来的，照绿）：poll 的当口（不在账的锁里）又有一笔借据记成没等成；poll 交回队列空了：列出来的那一笔销账，
     /// 列卡之后才记成没等成的那一笔照旧记着（它的活可以是 poll 之后才提交的）。
     #[test]
-    fn a_lease_kept_after_the_listing_survives_the_poll_before_booking() {
+    fn lease_kept_after_the_listing_survives_the_poll_before_booking() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (device, listed_lease, _kept_mebibytes) =
-            a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
+            started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
         let lease_kept_during_the_poll = std::cell::Cell::new(None);
         ledger.take_in_the_devices_kept_before_booking(
             |card_position| (card_position == 0).then_some(&device),
@@ -5824,7 +6061,7 @@ mod tests {
     fn the_lost_device_still_on_the_card_after_the_early_loss_and_the_restart_is_not_lent_again() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (device, _kept_lease, kept_mebibytes) =
-            a_started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
+            started_device_with_all_but_one_thousand_kept_after_a_timed_out_wait(&card, &ledger);
         {
             let mut card = card.lock().expect("假卡不 panic");
             card.device_started = false;
@@ -5860,7 +6097,7 @@ mod tests {
     /// （K4，正推 T3 拦 Z1：取留着的设备缺了的那张卡就停、不看后面的卡，照绿）：第 0 张卡那一格没有留着的设备
     /// （正在起），第 1 张卡的设备队列空了：第 1 张卡上那一笔照样销账，第 0 张卡上那一笔照旧记着。
     #[test]
-    fn a_card_whose_device_is_still_starting_does_not_keep_the_next_card_from_returning_its_kept_lease(
+    fn card_whose_device_is_still_starting_does_not_keep_the_next_card_from_returning_its_kept_lease(
     ) {
         let readings = replaceable_readings(vec![
             reading_of_an_rtx_5090(AN_EMPTY_RTX_5090_HAS),
@@ -5903,7 +6140,7 @@ mod tests {
     /// 能借的 29 550、卡上真能再给的 28 950，借走之后重起被拒。借之前那一步看池里每张卡：丢了的照重起记，能借的就是卡上真能再给的，
     /// 借走它之后重起放得下。
     #[test]
-    fn a_device_lost_without_a_kept_lease_is_taken_in_before_booking_so_the_room_lent_leaves_space_for_the_restart(
+    fn device_lost_without_a_kept_lease_is_taken_in_before_booking_so_the_room_lent_leaves_space_for_the_restart(
     ) {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 1).expect("空卡借得到");
@@ -5972,7 +6209,7 @@ mod tests {
     /// （K3-3 那一改：借之前看池里每张卡，只 poll 列出来的）：第 0 张卡的设备起着、没丢、没有没等成的借据，
     /// 第 1 张卡上一笔没等成：只 poll 第 1 张卡，那一笔销账，第 0 张卡的账不动。
     #[test]
-    fn a_card_without_a_kept_lease_is_not_polled_before_booking() {
+    fn card_without_a_kept_lease_is_not_polled_before_booking() {
         let readings = replaceable_readings(vec![
             reading_of_an_rtx_5090(AN_EMPTY_RTX_5090_HAS),
             reading_of_an_rtx_5090(AN_EMPTY_RTX_5090_HAS),
@@ -6385,7 +6622,7 @@ mod tests {
     /// （攻方改法 F-K1）：没等成的那一笔记着，同一台设备上后来另一笔借据等成了（等的是到那一刻为止的全部提交）：
     /// 没等成的那一笔一起销账。
     #[test]
-    fn a_lease_whose_wait_timed_out_leaves_the_books_when_another_lease_on_its_device_finishes_its_wait(
+    fn lease_whose_wait_timed_out_leaves_the_books_when_another_lease_on_its_device_finishes_its_wait(
     ) {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut finishing_later = ledger.book_on_the_card(0, 2_000).expect("空卡借得到");
@@ -6397,7 +6634,7 @@ mod tests {
             card.built_mebibytes = 2_000;
         }
         let timed_out_lease =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 6_000);
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &device, 6_000);
         card.lock().expect("假卡不 panic").built_mebibytes = 0;
         finishing_later.take_in_the_wait_before_returning(
             &device,
@@ -6415,7 +6652,7 @@ mod tests {
     /// 新设备起好、B 建满，B 等新设备超时、丢掉（缓冲还在卡上）。A 在旧设备上等成了：不销 B（B 等的是新设备）。旧设备放掉之后照读数分，
     /// B 照旧记着，不多给；新设备后来 poll 交队列空了、B 的缓冲还给驱动，B 才销账。
     #[test]
-    fn a_finished_wait_on_a_lost_device_leaves_a_lease_kept_on_its_replacement_on_the_books() {
+    fn finished_wait_on_a_lost_device_leaves_a_lease_kept_on_its_replacement_on_the_books() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (mut lease_on_the_lost_device, lost_device) =
             ten_thousand_built_with_the_device_held(&card, &ledger);
@@ -6504,18 +6741,18 @@ mod tests {
     /// （照「那一刻活着的借据都还了」判，这时回到照读数分，旧设备的那一份被当成新借据建上的）。那个克隆也丢了、旧设备放掉，照读数分：
     /// 长借据 Q 15 000 建满之后再借 10 000，借得到，能借的就是卡上真能再给的（攻方 `k1_3` 那六段的形状）。
     #[test]
-    fn a_lost_device_still_held_outside_the_leases_keeps_the_card_unsplittable_until_it_is_released(
-    ) {
+    fn lost_device_still_held_outside_the_leases_keeps_the_card_unsplittable_until_it_is_released()
+    {
         const DRIVER_HOLDS_NOW: u64 = 600;
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
-        let mut lease_a = ledger.book_on_the_card(0, 10_000).expect("空卡借得到");
-        let lease_a_identifier = lease_a.lease_identifier();
+        let mut lease_on_the_lost_device = ledger.book_on_the_card(0, 10_000).expect("空卡借得到");
+        let lease_on_the_lost_device_identifier = lease_on_the_lost_device.lease_identifier();
         assert_eq!(
             ledger.prepare_the_driver_share_before_starting_the_device(0),
             Ok(())
         );
         let held_by_the_pool = Arc::new(ledger.record_the_device_started_on_the_card(0));
-        let held_by_lease_a = Arc::clone(&held_by_the_pool);
+        let held_by_the_lease_on_the_lost_device = Arc::clone(&held_by_the_pool);
         let held_by_the_caller = Arc::clone(&held_by_the_pool);
         {
             let mut card = card.lock().expect("假卡不 panic");
@@ -6529,7 +6766,8 @@ mod tests {
             card.built_mebibytes = 0;
             card.left_by_a_lost_device_mebibytes = DRIVER_HOLDS_NOW + 10_000;
         }
-        let mut lease_l = ledger.book_on_the_card(0, 5_000).expect("借得到 5 000");
+        let mut lease_on_the_restarted_device =
+            ledger.book_on_the_card(0, 5_000).expect("借得到 5 000");
         assert_eq!(
             ledger.prepare_the_driver_share_before_starting_the_device(0),
             Ok(()),
@@ -6543,14 +6781,14 @@ mod tests {
             card.built_mebibytes = 5_000;
         }
         drop(held_by_the_pool);
-        lease_a.take_in_the_wait_before_returning(
-            &held_by_lease_a,
+        lease_on_the_lost_device.take_in_the_wait_before_returning(
+            &held_by_the_lease_on_the_lost_device,
             DeviceWaitBeforeReturningTheLease::TheWaitFailed,
         );
-        drop(held_by_lease_a);
-        drop(lease_a);
+        drop(held_by_the_lease_on_the_lost_device);
+        drop(lease_on_the_lost_device);
         assert!(
-            !ledger.is_the_lease_on_the_books(0, lease_a_identifier),
+            !ledger.is_the_lease_on_the_books(0, lease_on_the_lost_device_identifier),
             "A 等的是丢了还没放掉的那一台：没等成也照常销账，不卡在账上"
         );
         assert!(
@@ -6560,11 +6798,11 @@ mod tests {
             room_truly_left(&card, 0)
         );
         card.lock().expect("假卡不 panic").built_mebibytes = 0;
-        lease_l.take_in_the_wait_before_returning(
+        lease_on_the_restarted_device.take_in_the_wait_before_returning(
             &replacement,
             DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished,
         );
-        drop(lease_l);
+        drop(lease_on_the_restarted_device);
         assert!(
             room_now(&ledger) <= room_truly_left(&card, 0),
             "L 也还了、旧设备还在：照旧照分不出算，不多给（{} 对 {}）",
@@ -6593,7 +6831,7 @@ mod tests {
     /// 第二台起好、L 在它上面建满之后也丢了，M 借到、照重起记、第三台起好。第一台放掉了，第二台还被 L 的卡与调用方拿着、连 L 的缓冲占着卡：
     /// 照旧照分不出算，不多给；L 还了、第二台也放掉，照读数分。
     #[test]
-    fn a_second_loss_while_the_first_lost_device_remains_keeps_the_card_unsplittable_until_both_are_released(
+    fn second_loss_while_the_first_lost_device_remains_keeps_the_card_unsplittable_until_both_are_released(
     ) {
         const DRIVER_HOLDS_NOW: u64 = 600;
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
@@ -6618,14 +6856,15 @@ mod tests {
             card.device_started = false;
             card.left_by_a_lost_device_mebibytes = DRIVER_HOLDS_NOW;
         }
-        let mut lease_l = ledger.book_on_the_card(0, 5_000).expect("借得到 5 000");
+        let mut lease_on_the_restarted_device =
+            ledger.book_on_the_card(0, 5_000).expect("借得到 5 000");
         assert_eq!(
             ledger.prepare_the_driver_share_before_starting_the_device(0),
             Ok(()),
             "第一次重起"
         );
         let second_device = Arc::new(ledger.record_the_device_started_on_the_card(0));
-        let second_held_by_lease_l = Arc::clone(&second_device);
+        let restarted_device_held_by_its_lease = Arc::clone(&second_device);
         {
             let mut card = card.lock().expect("假卡不 panic");
             card.device_started = true;
@@ -6638,7 +6877,7 @@ mod tests {
             card.built_mebibytes = 0;
             card.left_by_a_lost_device_mebibytes = DRIVER_HOLDS_NOW + DRIVER_HOLDS_NOW + 5_000;
         }
-        let _lease_m = ledger.book_on_the_card(0, 1_000).expect("借得到 1 000");
+        let _lease_after_the_second_loss = ledger.book_on_the_card(0, 1_000).expect("借得到 1 000");
         assert_eq!(
             ledger.prepare_the_driver_share_before_starting_the_device(0),
             Ok(()),
@@ -6652,24 +6891,26 @@ mod tests {
             card.left_by_a_lost_device_mebibytes = DRIVER_HOLDS_NOW + 5_000;
         }
         drop(first_device);
-        let unbuilt_lease_m = 1_000;
+        let unbuilt_mebibytes_of_the_lease_after_the_second_loss = 1_000;
         assert!(
-            room_now(&ledger) <= room_truly_left(&card, unbuilt_lease_m),
+            room_now(&ledger)
+                <= room_truly_left(&card, unbuilt_mebibytes_of_the_lease_after_the_second_loss),
             "第一台放掉了、第二台连 L 的缓冲还在卡上：照分不出算，不多给（{} 对 {}）",
             room_now(&ledger),
-            room_truly_left(&card, unbuilt_lease_m)
+            room_truly_left(&card, unbuilt_mebibytes_of_the_lease_after_the_second_loss)
         );
         card.lock()
             .expect("假卡不 panic")
             .left_by_a_lost_device_mebibytes = DRIVER_HOLDS_NOW;
-        lease_l.take_in_the_wait_before_returning(
-            &second_held_by_lease_l,
+        lease_on_the_restarted_device.take_in_the_wait_before_returning(
+            &restarted_device_held_by_its_lease,
             DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished,
         );
-        drop(second_held_by_lease_l);
-        drop(lease_l);
+        drop(restarted_device_held_by_its_lease);
+        drop(lease_on_the_restarted_device);
         assert!(
-            room_now(&ledger) <= room_truly_left(&card, unbuilt_lease_m),
+            room_now(&ledger)
+                <= room_truly_left(&card, unbuilt_mebibytes_of_the_lease_after_the_second_loss),
             "L 还了、第二台还被调用方拿着：不多给"
         );
         card.lock()
@@ -6678,7 +6919,7 @@ mod tests {
         drop(second_device);
         assert_eq!(
             room_now(&ledger),
-            room_truly_left(&card, unbuilt_lease_m),
+            room_truly_left(&card, unbuilt_mebibytes_of_the_lease_after_the_second_loss),
             "丢了的两台都放掉了：照读数分，能借的是卡上真能再给的"
         );
     }
@@ -6686,12 +6927,12 @@ mod tests {
     /// （正推探针 P3、攻方 H5 的 X1 那一形：重起时没等成的借据要一起出账，不然这张卡到下一次丢设备都少给）：
     /// C 在设备上没等成、照旧记着（缓冲还在卡上）；设备丢了、重起：C 这时销账；旧设备连 C 的缓冲放掉之后，能借的就是卡上真能再给的。
     #[test]
-    fn a_lease_kept_after_a_failed_wait_leaves_the_books_at_the_restart_and_the_card_is_not_left_short(
+    fn lease_kept_after_a_failed_wait_leaves_the_books_at_the_restart_and_the_card_is_not_left_short(
     ) {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let (lease, lost_device) = ten_thousand_built_with_the_device_held(&card, &ledger);
         let kept_lease =
-            a_lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &lost_device, 4_000);
+            lease_built_and_dropped_after_a_timed_out_wait(&card, &ledger, &lost_device, 4_000);
         {
             let mut card = card.lock().expect("假卡不 panic");
             card.device_started = false;
@@ -6783,7 +7024,7 @@ mod tests {
     /// （`catch_unwind` 拿掉照绿）：不在展开中，等的时候 wgpu panic 了，
     /// 这一笔记成没等成（丢掉之后照旧记着），那个 panic 照样往外抛。
     #[test]
-    fn a_panic_while_waiting_before_returning_a_lease_is_taken_as_a_failed_wait_and_goes_on() {
+    fn panic_while_waiting_before_returning_a_lease_is_taken_as_a_failed_wait_and_goes_on() {
         let readings = replaceable_readings(vec![reading_of_an_rtx_5090(30_000)]);
         let ledger = ledger_reading(&readings);
         let mut lease = ledger.book_on_the_card(0, 1_000).expect("空卡借得到");
@@ -6811,22 +7052,21 @@ mod tests {
         );
     }
 
-    /// 子进程跑 [`a_lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again`] 那一形时设的变量。
+    /// 子进程跑 [`lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again`] 那一形时设的变量。
     const LEASE_DROPPED_WHILE_UNWINDING_CHILD_VARIABLE: &str =
         "SINGLEFS_HARNESS_LEASE_DROPPED_WHILE_UNWINDING_CHILD";
 
     /// 子进程里 `--exact` 点名跑的那条用例的 libtest 全名。写成字面串，算复用键的工具（D13（验证路线） 已定项 17）才折得出它、
     /// 把起子进程的用例连到被点名的那条；与模块路径拼出的逐字相同由用例里那条 `assert_eq!` 钉住。
-    const LEASE_DROPPED_WHILE_UNWINDING_CHILD_TEST_NAME: &str = "gpu_memory_ledger::tests::a_lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again";
+    const LEASE_DROPPED_WHILE_UNWINDING_CHILD_TEST_NAME: &str = "gpu_memory_ledger::tests::lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again";
 
     /// （攻方 H3，改法 F-H3，照攻方 `unwind_in_drop.rs` 写，不要卡）：用例本身 panic 了，
     /// 借据在展开中丢掉，等的时候 wgpu 又 panic：只记没等成、不再抛（展开中再抛整个进程中止）。在子进程里跑那一形（中止的是子进程，
     /// 这条用例照常判红），子进程要正常退出、这一笔记成没等成。
     #[test]
-    fn a_lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again()
-    {
+    fn lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again() {
         const TEST_FUNCTION: &str =
-            "a_lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again";
+            "lease_dropped_while_its_thread_unwinds_takes_in_a_panicking_wait_without_panicking_again";
         if std::env::var_os(LEASE_DROPPED_WHILE_UNWINDING_CHILD_VARIABLE).is_some() {
             struct LeaseReturnedWhenDropped<'ledger, 'device> {
                 lease: Option<GpuMemoryBooking<'ledger>>,
@@ -6899,9 +7139,190 @@ mod tests {
         );
     }
 
+    /// 在这条线程名的线程上记两次丢失、再报一次没等成，交回打出的每一行（告诉一个收集的闭包，不真打：
+    /// 这些用例因断言红时输出里没有 `GPU_DEVICE_LOST`，变异判「抓到」照常算）。
+    fn marker_lines_told_on_a_thread(
+        thread_builder: std::thread::Builder,
+        condition: DeviceConditionOfACard,
+        first_why: &'static str,
+    ) -> (Vec<String>, DeviceConditionOfACard) {
+        thread_builder
+            .spawn(move || {
+                let mut marker_lines = Vec::new();
+                condition.record_the_device_lost_telling_the_marker_line(
+                    first_why.to_string(),
+                    CauseOfTheDeviceLoss::Other,
+                    |marker_line| marker_lines.push(marker_line.to_string()),
+                );
+                condition.record_the_device_lost_telling_the_marker_line(
+                    "Unknown：回调记的缘由更准".to_string(),
+                    CauseOfTheDeviceLoss::GpuMemoryShort,
+                    |marker_line| marker_lines.push(marker_line.to_string()),
+                );
+                condition.tell_the_device_lost_marker_line_the_first_time(
+                    "等卡又没等成",
+                    |marker_line| marker_lines.push(marker_line.to_string()),
+                );
+                (marker_lines, condition)
+            })
+            .expect("起得了线程")
+            .join()
+            .expect("这条线程上只记丢失、不 panic")
+    }
+
+    #[test]
+    fn the_device_lost_marker_line_is_told_for_the_first_loss_and_never_again_on_that_device() {
+        let (marker_lines, condition) = marker_lines_told_on_a_thread(
+            std::thread::Builder::new().name("some_test_name".to_string()),
+            DeviceConditionOfACard::on_the_card("假的 GeForce 卡".to_string()),
+            "等卡没等成：超时",
+        );
+        assert_eq!(
+            marker_lines,
+            vec![
+                "GPU_DEVICE_LOST test=some_test_name card=假的 GeForce 卡 reason=等卡没等成：超时"
+                    .to_string()
+            ],
+            "同一个设备记两次丢失、再报一次没等成，只打头一次那一行"
+        );
+        assert_eq!(
+            condition.lost_reason(),
+            Some("Unknown：回调记的缘由更准".to_string()),
+            "打不打那一行不改记丢失的行为：后记的照旧盖掉先记的"
+        );
+    }
+
+    /// 头一次是只打行、不记丢失的那一处（等卡没等成而不记丢失）：打这一次；之后真记丢失不再打，设备照样记成丢了。
+    #[test]
+    fn failed_wait_that_told_the_marker_line_keeps_a_later_loss_from_telling_it_again() {
+        let condition = DeviceConditionOfACard::on_the_card("假的卡".to_string());
+        let mut marker_lines = Vec::new();
+        condition.tell_the_device_lost_marker_line_the_first_time(
+            "等卡没等成",
+            |marker_line| {
+                marker_lines.push(marker_line.to_string());
+            },
+        );
+        assert!(!condition.is_lost(), "只打行不把设备记成丢了");
+        condition.record_the_device_lost_telling_the_marker_line(
+            "Unknown：驱动重置".to_string(),
+            CauseOfTheDeviceLoss::Other,
+            |marker_line| marker_lines.push(marker_line.to_string()),
+        );
+        assert!(condition.is_lost(), "之后记丢失照样记成丢了");
+        assert_eq!(marker_lines.len(), 1, "只打一行：{marker_lines:?}");
+        assert!(
+            marker_lines[0].ends_with(" reason=等卡没等成"),
+            "打的是头一次那一句：{marker_lines:?}"
+        );
+    }
+
+    #[test]
+    fn the_device_lost_marker_line_takes_the_line_breaks_out_of_its_fields() {
+        assert_eq!(
+            gpu_device_lost_line(
+                "some_test",
+                "假的\n卡",
+                "Validation Error\n\nCaused by:\r\n  第三行\u{b}第四行\u{2028}第五行\n"
+            ),
+            "GPU_DEVICE_LOST test=some_test card=假的 卡 reason=Validation Error Caused by:   第三行 第四行 第五行",
+            "几行的错误文字接成一行，连着的几个换行算一处"
+        );
+    }
+
+    #[test]
+    fn condition_that_is_not_on_a_card_tells_no_marker_line_and_still_records_the_loss() {
+        let (marker_lines, condition) = marker_lines_told_on_a_thread(
+            std::thread::Builder::new().name("some_test_name".to_string()),
+            DeviceConditionOfACard::default(),
+            "等卡没等成：超时",
+        );
+        assert_eq!(
+            marker_lines,
+            Vec::<String>::new(),
+            "假的设备情况上记丢失不打那一行：用例因断言红时不许被认成卡出了事"
+        );
+        assert!(condition.is_lost(), "丢失照样记");
+    }
+
+    #[test]
+    fn thread_without_a_name_is_written_as_unnamed_in_the_marker_line() {
+        let (marker_lines, _condition) = marker_lines_told_on_a_thread(
+            std::thread::Builder::new(),
+            DeviceConditionOfACard::on_the_card("假的卡".to_string()),
+            "等卡没等成",
+        );
+        assert_eq!(
+            marker_lines,
+            vec!["GPU_DEVICE_LOST test=unnamed-thread card=假的卡 reason=等卡没等成".to_string()]
+        );
+    }
+
+    fn source_without_whitespace(source: &str) -> String {
+        source
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect()
+    }
+
+    /// 真打到标准输出的那一步：libtest 的捕获没有稳定的接口接到用例里，这里扫源码钉住两个入口都交 `println!` 那一个函数。
+    #[test]
+    fn both_entries_of_the_device_lost_marker_line_print_it_on_standard_output() {
+        let (code_before_the_tests, _tests) = include_str!("gpu_memory_ledger.rs")
+            .split_once("#[cfg(test)]\nmod tests {")
+            .expect("这份文件有测试模块");
+        let code = source_without_whitespace(code_before_the_tests);
+        for expected in [
+            "fnprint_the_device_lost_marker_line(marker_line:&str){println!(\"{marker_line}\");}",
+            "pubfnrecord_the_device_lost(&self,why:String,cause:CauseOfTheDeviceLoss){self.record_the_device_lost_telling_the_marker_line(why,cause,print_the_device_lost_marker_line,);}",
+            "pubfnprint_the_device_lost_marker_line_the_first_time(&self,reason:&str){self.tell_the_device_lost_marker_line_the_first_time(reason,print_the_device_lost_marker_line,);}",
+        ] {
+            assert_eq!(
+                code.matches(expected).count(),
+                1,
+                "源码里恰好一处 {expected}"
+            );
+        }
+    }
+
+    /// 真卡上起的设备带卡名（不带就一行都不打），等卡没等成而不记丢失的那几处都打那一行。这几处要真卡、真超时才走得到，这里扫源码钉住。
+    #[test]
+    fn started_card_has_its_name_and_the_failed_waits_that_record_no_loss_tell_the_marker_line() {
+        for (file_name, source, expected) in [
+            (
+                "gpu_unit_checks.rs 起设备",
+                include_str!("gpu_unit_checks.rs"),
+                "std::sync::Arc::new(DeviceConditionOfACard::on_the_card(discovered.name.clone()))",
+            ),
+            (
+                "gpu_unit_checks.rs 借据丢掉时那一次等",
+                include_str!("gpu_unit_checks.rs"),
+                "self.card.device_condition().print_the_device_lost_marker_line_the_first_time(",
+            ),
+            (
+                "crash_amplification.rs 还占位之前那一次等",
+                include_str!("crash_amplification.rs"),
+                "card_with_the_admitted_quota.device_condition().print_the_device_lost_marker_line_the_first_time(",
+            ),
+            (
+                "标定空转内核那一次等",
+                include_str!(
+                    "../tests/gpu_unit_checks_a_returned_card_lease_leaves_no_buffer_on_the_card.rs"
+                ),
+                "condition.print_the_device_lost_marker_line_the_first_time(",
+            ),
+        ] {
+            assert_eq!(
+                source_without_whitespace(source).matches(expected).count(),
+                1,
+                "{file_name} 里恰好一处 {expected}"
+            );
+        }
+    }
+
     /// （正推 N1）：同一条线程上活里又起一段活，里面那段丢掉之后，这条线程上记的 Out of Memory 算回外面那段。
     #[test]
-    fn a_work_begun_inside_another_hands_the_thread_back_to_the_outer_work_when_it_ends() {
+    fn work_begun_inside_another_hands_the_thread_back_to_the_outer_work_when_it_ends() {
         let condition = DeviceConditionOfACard::default();
         let outer_work = WorkOnTheCardOfThisThread::begin();
         let reports_before = condition.out_of_memory_reports();
@@ -6920,7 +7341,7 @@ mod tests {
     /// （正推 N2、N3）：同一段活在这个设备上同时两处编内核，里面那一处编完、外面那一处还在编时，
     /// 没有活的线程上记的 Out of Memory 照样算这段活的。
     #[test]
-    fn a_work_compiling_in_two_places_at_once_stays_compiling_until_both_end() {
+    fn work_compiling_in_two_places_at_once_stays_compiling_until_both_end() {
         let condition = DeviceConditionOfACard::default();
         let compiling_work = WorkOnTheCardOfThisThread::begin();
         let reports_before = condition.out_of_memory_reports();
@@ -6942,10 +7363,114 @@ mod tests {
         );
     }
 
+    /// 编内核的闭包造出来交出去的那一份：堆上的一块。交回的是不是闭包造的那一块按地址认（复制、重造的地址不同），值另比。
+    struct OutputOfTheCompileClosure {
+        heap_block: Box<[u64; 2]>,
+    }
+
+    /// 编内核的闭包造的那一块里的值。
+    const VALUE_MADE_IN_THE_COMPILE_CLOSURE: [u64; 2] = [0x5EED_C0DE, 7];
+
+    /// 经 `condition` 的 [`DeviceConditionOfACard::compile_for_the_work_of_this_thread`] 编一次：闭包里先做 `while_compiling`，
+    /// 再造一份 [`OutputOfTheCompileClosure`] 交出去。断言闭包恰好调了一次、交回的是闭包造的那一块（同一个地址、同一个值）。
+    /// 编内核那一步 panic 了也先数闭包调了几次再报。
+    /// 它靠的前提（登记了不沿它收的这个单元原样交回调用方闭包的结果、不改编出的内核，C1033（两个显存记账单元没有会红的检查））分三条路各一条用例钉。
+    fn assert_the_compile_closure_is_called_once_and_its_output_handed_back(
+        condition: &DeviceConditionOfACard,
+        while_compiling: impl Fn(),
+    ) {
+        let calls = AtomicUsize::new(0);
+        let block_made_in_the_closure = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+        let handed_back = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            condition.compile_for_the_work_of_this_thread(|| {
+                calls.fetch_add(1, Ordering::SeqCst);
+                while_compiling();
+                let output = OutputOfTheCompileClosure {
+                    heap_block: Box::new(VALUE_MADE_IN_THE_COMPILE_CLOSURE),
+                };
+                block_made_in_the_closure.store(
+                    std::ptr::from_ref::<[u64; 2]>(&*output.heap_block).cast_mut(),
+                    Ordering::SeqCst,
+                );
+                output
+            })
+        }));
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "编内核的闭包恰好调一次");
+        let handed_back = handed_back.expect("闭包调了一次，编内核那一步却 panic 了");
+        assert_eq!(
+            *handed_back.heap_block, VALUE_MADE_IN_THE_COMPILE_CLOSURE,
+            "交回的值是闭包造的那一份"
+        );
+        assert!(
+            std::ptr::eq(
+                &*handed_back.heap_block,
+                block_made_in_the_closure.load(Ordering::SeqCst)
+            ),
+            "交回的是闭包造的那一块，不是复制或重造的"
+        );
+    }
+
+    /// 这条线程上没有活（新起的一条线程，上面从没起过活）：编内核只是调闭包，原样交回它的结果。
+    #[test]
+    fn the_compile_closure_is_called_once_and_its_output_handed_back_on_a_thread_without_work() {
+        let condition = DeviceConditionOfACard::default();
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    assert_the_compile_closure_is_called_once_and_its_output_handed_back(
+                        &condition,
+                        || {},
+                    );
+                })
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+        });
+    }
+
+    /// 这条线程上有活、编内核正常编完：设备上记着「在给这段活编」，闭包照样只调一次、原样交回它的结果。
+    #[test]
+    fn the_compile_closure_is_called_once_and_its_output_handed_back_for_the_work_of_this_thread() {
+        let condition = DeviceConditionOfACard::default();
+        let _work = WorkOnTheCardOfThisThread::begin();
+        assert_the_compile_closure_is_called_once_and_its_output_handed_back(&condition, || {});
+        assert!(!condition.is_lost(), "正常编完的那一条路上设备没丢");
+    }
+
+    /// 这条线程上有活，编内核的时候另起的线程上记了 Out of Memory、又因显存不够把设备记成丢了（记账那一侧走到设备丢失与显存不够那一支）：
+    /// 闭包照样只调一次、原样交回它的结果。之后核这一支真走到了：设备记成丢了，那次 Out of Memory 说得成这段活的。
+    #[test]
+    fn the_compile_closure_is_called_once_and_its_output_handed_back_while_the_device_is_lost_short_of_gpu_memory(
+    ) {
+        let condition = DeviceConditionOfACard::default();
+        let work = WorkOnTheCardOfThisThread::begin();
+        let reports_before = condition.out_of_memory_reports();
+        assert_the_compile_closure_is_called_once_and_its_output_handed_back(&condition, || {
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    condition.record_an_out_of_memory("另起的线程上编内核时显存不够".to_string());
+                    condition.record_the_device_lost(
+                        "编内核时显存不够，设备丢了".to_string(),
+                        CauseOfTheDeviceLoss::GpuMemoryShort,
+                    );
+                });
+            });
+        });
+        assert!(condition.is_lost(), "编内核的时候设备记成丢了");
+        assert_eq!(
+            condition.out_of_memory_explaining_a_failure_of_the_work(
+                work.identifier(),
+                reports_before,
+                DeviceWhenTheWorkReturned::NotLost,
+            ),
+            Some("另起的线程上编内核时显存不够".to_string()),
+            "编内核的时候另起的线程上记的 Out of Memory 算在这段活上（不靠设备丢了那一支也说得成）"
+        );
+    }
+
     /// 记了丢失的设备是丢了的，没记的不是（卡池照它判留着的设备要不要重起）；
     /// 一段活交回那一刻照它记设备丢没丢。
     #[test]
-    fn a_device_recorded_lost_is_lost_and_another_is_not() {
+    fn device_recorded_lost_is_lost_and_another_is_not() {
         let condition = DeviceConditionOfACard::default();
         assert!(!condition.is_lost(), "没记丢失");
         assert_eq!(
@@ -6965,7 +7490,7 @@ mod tests {
     /// 先失败、先来认；另一段范围里接到的 Out of Memory 要等那一段先收完才记进设备。先失败的那一段等两段都报到再认：认得出设备丢之前报过
     /// Out of Memory，不判红。
     #[test]
-    fn a_piece_failing_on_a_lost_device_is_told_after_another_piece_records_its_out_of_memory() {
+    fn piece_failing_on_a_lost_device_is_told_after_another_piece_records_its_out_of_memory() {
         let condition = &DeviceConditionOfACard::default();
         let together = &WorksEndingTogetherOnADevice::new();
         let failed_piece_ending = together.join();
@@ -7023,24 +7548,24 @@ mod tests {
     /// （同一测试进程里两条用例共用卡池的设备）：X 的范围里接到 Out of Memory、wgpu 因它丢了设备，X 还没收完；Y 因设备丢了先失败、先收完，
     /// 等的只是它自己。设备是因显存不够丢的，Y 认成显存不够、不判红；X 收完认它自己那一句。同组对照照旧认得出。
     #[test]
-    fn a_work_failing_on_a_device_another_group_lost_for_lack_of_memory_is_told_out_of_memory() {
+    fn work_failing_on_a_device_another_group_lost_for_lack_of_memory_is_told_out_of_memory() {
         for same_group in [false, true] {
             let condition = &DeviceConditionOfACard::default();
             let shared = &WorksEndingTogetherOnADevice::new();
-            let alone_x = &WorksEndingTogetherOnADevice::new();
-            let alone_y = &WorksEndingTogetherOnADevice::new();
-            let (ending_x, ending_y) = if same_group {
+            let alone_out_of_memory_work = &WorksEndingTogetherOnADevice::new();
+            let alone_bystander_work = &WorksEndingTogetherOnADevice::new();
+            let (ending_of_the_out_of_memory_work, ending_of_the_bystander_work) = if same_group {
                 (shared.join(), shared.join())
             } else {
-                (alone_x.join(), alone_y.join())
+                (alone_out_of_memory_work.join(), alone_bystander_work.join())
             };
-            let (y_began_sender, y_began) = std::sync::mpsc::channel::<()>();
-            let (y_ended_sender, y_ended) = std::sync::mpsc::channel::<()>();
-            let (x_told, y_told) = std::thread::scope(|scope| {
-                let x = scope.spawn(move || {
+            let (bystander_began_sender, bystander_began) = std::sync::mpsc::channel::<()>();
+            let (bystander_ended_sender, bystander_ended) = std::sync::mpsc::channel::<()>();
+            let (out_of_memory_work_told, bystander_told) = std::thread::scope(|scope| {
+                let out_of_memory_work_thread = scope.spawn(move || {
                     let work = WorkOnTheCardOfThisThread::begin();
                     let reports_before = condition.out_of_memory_reports();
-                    y_began
+                    bystander_began
                         .recv_timeout(std::time::Duration::from_secs(60))
                         .expect("Y 一分钟之内开了活");
                     condition.record_the_device_lost(
@@ -7050,7 +7575,7 @@ mod tests {
                     let device_when_the_work_returned = condition.device_when_the_work_returns();
                     if !same_group {
                         // 不在同一组：Y 先收完，X 收得比 Y 晚
-                        y_ended
+                        bystander_ended
                             .recv_timeout(std::time::Duration::from_secs(60))
                             .expect("Y 一分钟之内收完");
                     }
@@ -7059,13 +7584,13 @@ mod tests {
                         reports_before,
                         device_when_the_work_returned,
                         Some("序号 0 的卡判一块时报了 Out of Memory".to_string()),
-                        ending_x,
+                        ending_of_the_out_of_memory_work,
                     )
                 });
-                let y = scope.spawn(move || {
+                let bystander_work_thread = scope.spawn(move || {
                     let work = WorkOnTheCardOfThisThread::begin();
                     let reports_before = condition.out_of_memory_reports();
-                    y_began_sender.send(()).expect("X 在等 Y 开活");
+                    bystander_began_sender.send(()).expect("X 在等 Y 开活");
                     let waiting_since = std::time::Instant::now();
                     while !condition.is_lost() {
                         assert!(
@@ -7079,21 +7604,24 @@ mod tests {
                         reports_before,
                         condition.device_when_the_work_returns(),
                         None,
-                        ending_y,
+                        ending_of_the_bystander_work,
                     );
                     // 同组时 X 不等这一句，发不出去也无妨
-                    let _ = y_ended_sender.send(());
+                    let _ = bystander_ended_sender.send(());
                     explained
                 });
-                (x.join().expect("X 不 panic"), y.join().expect("Y 不 panic"))
+                (
+                    out_of_memory_work_thread.join().expect("X 不 panic"),
+                    bystander_work_thread.join().expect("Y 不 panic"),
+                )
             });
             assert_eq!(
-                x_told,
+                out_of_memory_work_told,
                 Some("序号 0 的卡判一块时报了 Out of Memory".to_string()),
                 "同组 {same_group}：X 认它自己那一句"
             );
             assert!(
-                y_told.is_some(),
+                bystander_told.is_some(),
                 "同组 {same_group}：设备因显存不够丢了，Y 认成显存不够、不判红"
             );
         }
@@ -7103,15 +7631,15 @@ mod tests {
     /// A 的活自己真 panic 了，交回那一刻设备没丢、设备上一条 Out of Memory 都没有；A 报到之后 B 的范围里接到 Out of Memory（设备丢没丢两样都试），
     /// B 收完把它记进设备。A 等齐再认：只认算在它自己头上的，说不成显存不够（照样往外抛、判红）；B 认得出它自己那一句。
     #[test]
-    fn a_genuine_panic_while_the_device_was_there_is_not_told_out_of_memory_after_another_piece_runs_out(
+    fn genuine_panic_while_the_device_was_there_is_not_told_out_of_memory_after_another_piece_runs_out(
     ) {
-        for b_loses_the_device in [false, true] {
+        for later_piece_loses_the_device in [false, true] {
             let condition = &DeviceConditionOfACard::default();
             let together = &WorksEndingTogetherOnADevice::new();
-            let ending_a = together.join();
-            let ending_b = together.join();
-            let (a_told, b_told) = std::thread::scope(|scope| {
-                let a = scope.spawn(move || {
+            let ending_of_the_panicking_piece = together.join();
+            let ending_of_the_later_piece = together.join();
+            let (panicking_piece_told, later_piece_told) = std::thread::scope(|scope| {
+                let panicking_piece_thread = scope.spawn(move || {
                     let work = WorkOnTheCardOfThisThread::begin();
                     let reports_before = condition.out_of_memory_reports();
                     // A 的活 panic 了（真毛病）：交回这一刻设备没丢
@@ -7121,10 +7649,10 @@ mod tests {
                         reports_before,
                         device_when_the_work_returned,
                         None,
-                        ending_a,
+                        ending_of_the_panicking_piece,
                     )
                 });
-                let b = scope.spawn(move || {
+                let later_piece_thread = scope.spawn(move || {
                     let work = WorkOnTheCardOfThisThread::begin();
                     let reports_before = condition.out_of_memory_reports();
                     let waiting_since = std::time::Instant::now();
@@ -7135,7 +7663,7 @@ mod tests {
                         );
                         std::thread::yield_now();
                     }
-                    if b_loses_the_device {
+                    if later_piece_loses_the_device {
                         condition.record_the_device_lost(
                             LOST_FOR_LACK_OF_MEMORY.to_string(),
                             CauseOfTheDeviceLoss::GpuMemoryShort,
@@ -7146,19 +7674,22 @@ mod tests {
                         reports_before,
                         condition.device_when_the_work_returns(),
                         Some("序号 0 的卡单元校验和对拍时报了 Out of Memory".to_string()),
-                        ending_b,
+                        ending_of_the_later_piece,
                     )
                 });
-                (a.join().expect("A 不 panic"), b.join().expect("B 不 panic"))
+                (
+                    panicking_piece_thread.join().expect("A 不 panic"),
+                    later_piece_thread.join().expect("B 不 panic"),
+                )
             });
             assert_eq!(
-                a_told, None,
-                "B 丢设备 {b_loses_the_device}：A 交回那一刻设备没丢，它的 panic 说不成显存不够"
+                panicking_piece_told, None,
+                "B 丢设备 {later_piece_loses_the_device}：A 交回那一刻设备没丢，它的 panic 说不成显存不够"
             );
             assert_eq!(
-                b_told,
+                later_piece_told,
                 Some("序号 0 的卡单元校验和对拍时报了 Out of Memory".to_string()),
-                "B 丢设备 {b_loses_the_device}：B 认它自己那一句"
+                "B 丢设备 {later_piece_loses_the_device}：B 认它自己那一句"
             );
         }
     }
@@ -7166,7 +7697,7 @@ mod tests {
     /// （攻方 `record-the-caught-after-waiting`）：一段范围里接到的 Out of Memory 先记进设备再报到：
     /// 它报到的那一刻（还在等同组别的段）设备上已经记着，先收完的别的段这时来认就认得出。改成等完之后再记，报到的那一刻设备上一条都没有。
     #[test]
-    fn a_piece_records_what_its_scope_caught_before_it_reports_its_ending() {
+    fn piece_records_what_its_scope_caught_before_it_reports_its_ending() {
         let condition: &'static DeviceConditionOfACard =
             Box::leak(Box::new(DeviceConditionOfACard::default()));
         let together: &'static WorksEndingTogetherOnADevice =
@@ -7244,7 +7775,7 @@ mod tests {
 
     /// 一段领了报到、没报到就丢掉（那一段 panic 了），算它报到了，别的段不等它。
     #[test]
-    fn a_piece_dropping_its_ending_without_ending_does_not_keep_the_others_waiting() {
+    fn piece_dropping_its_ending_without_ending_does_not_keep_the_others_waiting() {
         let together: &'static WorksEndingTogetherOnADevice =
             Box::leak(Box::new(WorksEndingTogetherOnADevice::new()));
         let dropped_ending = together.join();
@@ -7266,7 +7797,7 @@ mod tests {
     /// （P2）：几张卡一起领的那一队块，报了 Out of Memory 的卡交回的那一块先给下一张来领的卡；
     /// 交回的都领走、队里也领完才算没有剩下的。
     #[test]
-    fn a_block_given_back_by_a_card_out_of_memory_goes_to_the_next_card_that_takes_one() {
+    fn block_given_back_by_a_card_out_of_memory_goes_to_the_next_card_that_takes_one() {
         let go_on = StopOfTheCards::NotRequested;
         let blocks = BlocksForTheCards::new(0..3);
         assert_eq!(blocks.take_a_block(go_on), Some(0));
@@ -7288,7 +7819,7 @@ mod tests {
     /// 在等的那几块（比判完的块号小、交回队里的），别的留在队里给下一趟；一块都没判完时一块都不领、队里原样；判红了连判完的块在等的也不领；
     /// 下一轮的那一队记着判完的块号，叫停了照样领判完的块在等的。
     #[test]
-    fn a_card_asked_to_stop_takes_only_the_blocks_judged_blocks_wait_for_and_leaves_the_rest() {
+    fn card_asked_to_stop_takes_only_the_blocks_judged_blocks_wait_for_and_leaves_the_rest() {
         let blocks = BlocksForTheCards::new(0..5);
         let mut judged_while_stopped = Vec::new();
         let left_while_stopped = judge_blocks_on_one_card(
@@ -7366,7 +7897,7 @@ mod tests {
     /// 判不了一块的卡收工、那一块不交回，不再领；判完的一块交不到写库那一头，
     /// 这张卡收工、不再领。
     #[test]
-    fn a_card_stops_taking_blocks_after_a_refusal_and_after_the_store_is_gone() {
+    fn card_stops_taking_blocks_after_a_refusal_and_after_the_store_is_gone() {
         let blocks_of_the_refusing_card = BlocksForTheCards::new(0..5);
         let mut taken = Vec::new();
         let left_by_the_refusing_card = judge_blocks_on_one_card(
@@ -7628,7 +8159,7 @@ mod tests {
     /// （`probes/killers.rs` 乙改数）：长借据建满、等完设备还了
     /// （卡上还给驱动），新借一笔建满：能借的照读数算，新借的建上的只扣一次，还了的那一笔不再扣（甲在这里多扣驱动那一份，21 990）。
     #[test]
-    fn a_lease_booked_after_another_was_returned_counts_its_built_buffers_once() {
+    fn lease_booked_after_another_was_returned_counts_its_built_buffers_once() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let mut first = ledger.book_on_the_card(0, 10_000).expect("空卡借得到");
         {
@@ -7657,7 +8188,7 @@ mod tests {
     /// 设备丢了、重起被拒一次之后，再被问三次而卡上读数没变，能借的不变
     /// （被拒之后记成「丢了、还没重起」，不记回「起着」而每问一次多扣一份）。
     #[test]
-    fn a_refused_restart_asked_again_takes_no_further_driver_share_off_the_room() {
+    fn refused_restart_asked_again_takes_no_further_driver_share_off_the_room() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let _lease = ten_thousand_built_on_a_started_device(&card, &ledger);
         // 新设备放不下：卡上 32 110 − 19 000 − 2 560 − 10 000 = 550，驱动那一份要 2 560
@@ -7684,7 +8215,7 @@ mod tests {
     /// 设备丢了、重起被拒之后又借了一笔，之后卡上又被占：再来起设备照此刻判、放不下就拒
     /// （借一笔不把驱动那一份记回「登记了、没起」而直接放行）。
     #[test]
-    fn a_lease_booked_after_a_refused_restart_keeps_the_restart_judged_again() {
+    fn lease_booked_after_a_refused_restart_keeps_the_restart_judged_again() {
         let (card, ledger) = ledger_on_a_card_under_the_ledger();
         let _lease = ten_thousand_built_on_a_started_device(&card, &ledger);
         the_device_is_lost_with_others_taking(&card, 19_000);
@@ -7707,7 +8238,7 @@ mod tests {
     /// （乙改数）：设备丢了要重起，借着的 10 000 连新设备的驱动那一份
     /// 照此刻的空闲恰好放得下就起，差 1 MiB 就拒（丢了的设备与建上的 10 000 留在卡上、不从读数里分出来：空 32 110 − 6 990 − 12 560 = 12 560）。
     #[test]
-    fn a_restart_is_allowed_when_it_fits_exactly_and_refused_one_mebibyte_short() {
+    fn restart_is_allowed_when_it_fits_exactly_and_refused_one_mebibyte_short() {
         assert_eq!(
             AN_EMPTY_RTX_5090_HAS - 6_990 - (DRIVER + 10_000),
             DRIVER + 10_000
@@ -7767,7 +8298,7 @@ mod tests {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
         }
 
-        fn a_card_joins(&self) {
+        fn card_joins(&self) {
             self.locked().running += 1;
         }
 
@@ -7870,7 +8401,7 @@ mod tests {
             let cards_left: Vec<(usize, CardLeftTheBlocks)> = std::thread::scope(|scope| {
                 let mut card_threads = Vec::new();
                 for card in cards_of_the_round.iter().copied() {
-                    clock.a_card_joins();
+                    clock.card_joins();
                     let (blocks, clock, stored_in_order, stored, judged_times) =
                         (&blocks, &clock, &stored_in_order, &stored, &judged_times);
                     let (blocks_taken_by_card_0, blocks_judged, stop_is_requested) =
@@ -7996,8 +8527,8 @@ mod tests {
     /// 第 1 到 20 块中任一块末尾报 Out of Memory、交回那一块，别的卡都已收工时也由收尾那一步再起的一轮判掉；每一格 20 块都照块序写进库、
     /// 没有一块判两遍。判别力：交回的那一块没人判、它后面判完的 2 块也不入库时红。
     #[test]
-    fn a_block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards(
-    ) {
+    fn block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards()
+    {
         const PENDING_BLOCKS: usize = 20;
         for ticks_of_each_card in [[1u64, 1], [2, 1], [3, 1]] {
             for out_of_memory_at_block_of_card_0 in 1..=PENDING_BLOCKS {
@@ -8060,7 +8591,7 @@ mod tests {
     /// 没有一块判两遍，第 1 张卡两轮各收工一次只算一张。判别力：「收尾那一轮起卡之前」那一格在轮末的断言上 panic（等着的 4 块）、
     /// 「头一轮最后一块」那一格报本次未跑、4 块判完不入库时红。
     #[test]
-    fn a_stop_around_the_closing_round_stores_every_block_judged_before_it() {
+    fn stop_around_the_closing_round_stores_every_block_judged_before_it() {
         for caller_stop in [
             CallerStopOfTheFakeRun::Never,
             CallerStopOfTheFakeRun::WhenTheBlocksJudgedReach(4),
@@ -8090,7 +8621,7 @@ mod tests {
     /// （正推 `rounds_sim4.rs` 的 `STOPSIM stop_from_round=Some(2)`）：两张卡、10 块，第 0 张很慢、
     /// 判第一块时报 Out of Memory，第 1 张把别的 9 块都判完先收工；收尾再起的那一轮起卡之前叫停：那一轮照样判交回的块 0，10 块都入库、不 panic。
     #[test]
-    fn a_stop_before_the_closing_round_still_judges_the_block_nine_judged_blocks_wait_for() {
+    fn stop_before_the_closing_round_still_judges_the_block_nine_judged_blocks_wait_for() {
         let judged = blocks_judged_on_fake_cards(
             10,
             &[300, 1],
@@ -8109,7 +8640,7 @@ mod tests {
     /// （「没判的留给下一趟」）：20 块，第 1 张卡判完块 1–3 时被叫停，第 0 张在块 0 上报了交回：
     /// 收尾那一轮只判块 0，块 0–3 照块序入库，块 4–19 一块都不判、留给下一趟，这一趟照叫停收尾。
     #[test]
-    fn a_stop_leaves_the_blocks_not_judged_to_the_next_run_after_storing_the_judged_ones() {
+    fn stop_leaves_the_blocks_not_judged_to_the_next_run_after_storing_the_judged_ones() {
         let judged = blocks_judged_on_fake_cards(
             20,
             &[10, 1],
@@ -8136,7 +8667,7 @@ mod tests {
     /// 同一轮里第 0 张卡在块 0 上报了 Out of Memory、交回，那一刻叫停；第 1 张还在判块 1：
     /// 判完块 1 之后照样领交回的块 0（块 1 在等它），块 0、1 入库，这一趟照叫停收尾、不报本次未跑（与交回的块落到收尾那一轮时同一个结局）。
     #[test]
-    fn a_stop_with_a_block_given_back_in_the_same_round_stores_the_judged_block_and_stops() {
+    fn stop_with_a_block_given_back_in_the_same_round_stores_the_judged_block_and_stops() {
         let judged = blocks_judged_on_fake_cards(
             4,
             &[1, 2],
@@ -8156,7 +8687,7 @@ mod tests {
     /// 一趟里见过一次叫停就记住：叫停文件头一次读到之后被删，之后每一处问都答叫停，
     /// 也不再读文件；没见过叫停时每问一次现读一次。
     #[test]
-    fn a_stop_request_seen_once_stays_requested_after_the_request_is_gone() {
+    fn stop_request_seen_once_stays_requested_after_the_request_is_gone() {
         let reads = AtomicUsize::new(0);
         let request_is_there_on_the_second_read = || reads.fetch_add(1, Ordering::SeqCst) == 1;
         let stop = StopRequestRememberedInThisRun::new(&request_is_there_on_the_second_read);
@@ -8174,7 +8705,7 @@ mod tests {
     /// 叫停、这一轮有卡报了 Out of Memory、判完的块都入了库而照叫停收尾：头一句 Out of Memory
     /// 照「本次未跑」那一行的形态打得出来；这一趟没有卡报过的，照叫停收尾不打这一行。
     #[test]
-    fn a_stop_after_an_out_of_memory_prints_the_first_out_of_memory_in_the_not_run_line() {
+    fn stop_after_an_out_of_memory_prints_the_first_out_of_memory_in_the_not_run_line() {
         let mut rounds: RoundsOfTheCards<usize> = RoundsOfTheCards::new(3);
         let blocks = rounds.take_the_blocks_of_the_round();
         assert_eq!(blocks.take_a_block(StopOfTheCards::NotRequested), Some(0));
@@ -8224,7 +8755,7 @@ mod tests {
     /// 一段活交回的那一刻记设备丢没丢：活里设备丢了，交回那一刻记成丢了；
     /// 活 panic 时设备没丢、之后才丢，交回那一刻记成没丢（之后丢的不把这段活真正的 panic 说成显存不够）。
     #[test]
-    fn a_work_notes_the_device_at_the_moment_it_returns_not_before_and_not_after() {
+    fn work_notes_the_device_at_the_moment_it_returns_not_before_and_not_after() {
         let lost_during_the_work = DeviceConditionOfACard::default();
         let (outcome, device_when_the_work_returned) =
             work_caught_noting_the_device_when_it_returned(&lost_during_the_work, || {
@@ -8438,7 +8969,7 @@ mod tests {
     /// （正推 `probes/killers_new.rs` M10）：叫停、一张卡报了 Out of Memory、判完的块只有 1 块在等：还有别的卡就再起一轮，
     /// 没有别的卡是本次未跑，都不是照叫停收尾；一块都不在等才照叫停收尾。
     #[test]
-    fn a_stop_with_one_judged_block_waiting_needs_another_round_or_is_not_run() {
+    fn stop_with_one_judged_block_waiting_needs_another_round_or_is_not_run() {
         assert_eq!(
             after_a_round_of_the_cards(3, 1, 1, StopOfTheRun::Requested, 1),
             AfterARoundOfTheCards::AnotherRoundOnlyForTheBlocksTheJudgedBlocksWaitFor
@@ -8455,7 +8986,7 @@ mod tests {
 
     /// （正推 `probes/killers_new.rs` M13）：没有卡报 Out of Memory 而判完的块还有在等前面那一块的：轮末断言 panic（叫停了也一样）。
     #[test]
-    fn a_round_without_out_of_memory_leaving_a_judged_block_waiting_panics() {
+    fn round_without_out_of_memory_leaving_a_judged_block_waiting_panics() {
         let mut rounds: RoundsOfTheCards<usize> = RoundsOfTheCards::new(3);
         let blocks = rounds.take_the_blocks_of_the_round();
         assert_eq!(blocks.take_a_block(StopOfTheCards::NotRequested), Some(0));
@@ -8469,7 +9000,7 @@ mod tests {
 
     /// （正推 `probes/killers_new.rs` M14）：没人叫停、没有卡报 Out of Memory，队里却还有没领走的块：轮末断言 panic；叫停了就可以留。
     #[test]
-    fn a_round_without_a_stop_leaving_a_block_untaken_panics() {
+    fn round_without_a_stop_leaving_a_block_untaken_panics() {
         let mut rounds: RoundsOfTheCards<usize> = RoundsOfTheCards::new(3);
         let blocks = rounds.take_the_blocks_of_the_round();
         assert!(panics_when_run(|| {
@@ -8596,7 +9127,7 @@ mod tests {
 
     /// 要 11 MiB 而每张卡容量 10 MiB：当场交「比每张卡都大」（等多久都放不下：不等、不挂住）。
     #[test]
-    fn a_need_larger_than_every_card_in_the_memory_queue_is_refused_at_once_instead_of_waiting() {
+    fn need_larger_than_every_card_in_the_memory_queue_is_refused_at_once_instead_of_waiting() {
         let queue = Arc::new(CardMemoryQueue::new(vec![10, 10]));
         let (outcome_sender, outcome) = std::sync::mpsc::channel();
         let queue_of_the_thread = Arc::clone(&queue);
@@ -8619,7 +9150,7 @@ mod tests {
 
     /// 两张卡各 10 MiB，前一张已排进 6 MiB，再要 6 MiB：排进后一张，不等前一张还。
     #[test]
-    fn a_judge_that_does_not_fit_beside_the_one_on_the_first_card_goes_to_the_next_card_without_waiting(
+    fn judge_that_does_not_fit_beside_the_one_on_the_first_card_goes_to_the_next_card_without_waiting(
     ) {
         let queue = Arc::new(CardMemoryQueue::new(vec![10, 10]));
         let on_the_first_card = queue

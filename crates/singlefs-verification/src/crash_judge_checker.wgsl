@@ -143,9 +143,10 @@ fn checker_read_system_configuration_slot(device: u32, offset: u32) -> CheckerSl
     if (spacing > ROOT_RING_REGION_STRIDE / slots_per_region) {
         return empty_checker_slot(SLOT_CARRIES_A_REFUSED_VALUE);
     }
-    // 环长：在飞上限 ≥ 1，环末端（起点 × 16384 + 环长，溢出算越界）≤ 单元区起点 × 16384（溢出算成立）
+    // 环长（image::journal_ring_bytes_lie_in_the_supported_range）：在飞上限 ⌊环长 ÷ 4096 ÷ 3⌋ ≥ 1 且装得进系统配置里它那 4 字节一格
+    // （高 32 位为 0），环末端（起点 × 16384 + 环长，溢出算越界）≤ 单元区起点 × 16384（溢出算成立）
     let in_flight = divmod64(shr64(ring_bytes, 12u), u64_of(3u)).quotient;
-    var ring_holds = !is_zero64(in_flight);
+    var ring_holds = !is_zero64(in_flight) && in_flight.y == 0u;
     let ring_start_bytes = slot_to_bytes(ring_start_slot);
     if (add64_overflows(ring_start_bytes, ring_bytes)) {
         ring_holds = false;
@@ -1000,11 +1001,35 @@ fn w_mark_part_of_the_range_not_judged(invariant: u32) {
 
 // I-9.7（walk.rs judge_reserved_bytes_and_the_truncation_field_of_an_inode_record，判决 `research/prompts/m4-trunc-r2-main-verification.md`
 // 第三节 R1）：一条记录各判三次——偏移 108–119 恒 0、136–139 恒 0，截断字段判「T = 0 ⇒ N_w = 0」
+// 打包表 base 起 [o, o + byte_count) 那几个字节全是 0：与逐字节 all_zero 判的同一件事，按字读、每个字只读一次（首尾两个字只看落在这一段里的字节），
+// 走读内核里每条 inode 记录的两段保留字节都过它
+fn w_bytes_are_all_zero_reading_each_word_once(base: u32, o: u32, byte_count: u32) -> bool {
+    if (byte_count == 0u) {
+        return true;
+    }
+    let first_word = o >> 2u;
+    let last_word = (o + byte_count - 1u) >> 2u;
+    // 迭代上界：这一段跨的字数 ⌈byte_count ÷ 4⌉ + 1
+    for (var word = first_word; word <= last_word; word = word + 1u) {
+        var mask_of_the_bytes_in_the_range = 0xFFFFFFFFu;
+        if (word == first_word) {
+            mask_of_the_bytes_in_the_range = mask_of_the_bytes_in_the_range << ((o & 3u) << 3u);
+        }
+        if (word == last_word) {
+            mask_of_the_bytes_in_the_range = mask_of_the_bytes_in_the_range & (0xFFFFFFFFu >> ((3u - ((o + byte_count - 1u) & 3u)) << 3u));
+        }
+        if ((tables[base + word] & mask_of_the_bytes_in_the_range) != 0u) {
+            return false;
+        }
+    }
+    return true;
+}
+
 fn w_judge_reserved_bytes_and_the_truncation_field_of_an_inode_record(base: u32, record_offset: u32) {
-    w_judge(INVARIANT_I_9_7, all_zero(base, record_offset + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_OFFSET,
-        INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_LENGTH));
-    w_judge(INVARIANT_I_9_7, all_zero(base, record_offset + INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_OFFSET,
-        INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_LENGTH));
+    w_judge(INVARIANT_I_9_7, w_bytes_are_all_zero_reading_each_word_once(base,
+        record_offset + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_OFFSET, INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD_LENGTH));
+    w_judge(INVARIANT_I_9_7, w_bytes_are_all_zero_reading_each_word_once(base,
+        record_offset + INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_OFFSET, INODE_RECORD_RESERVED_BYTES_AFTER_THE_TRUNCATION_FIELD_LENGTH));
     let truncation_field_txg = rd64(base, record_offset + INODE_RECORD_TRUNCATION_FIELD_TXG_OFFSET);
     let truncation_field_size = rd64(base, record_offset + INODE_RECORD_TRUNCATION_FIELD_SIZE_OFFSET);
     w_judge(INVARIANT_I_9_7, !is_zero64(truncation_field_txg) || is_zero64(truncation_field_size));
@@ -1157,8 +1182,17 @@ fn appearance_note_a_user_visible_root_of_this_version(kind: u32, tree: vec2<u32
     appearance_root_count_of_this_version = appearance_root_count_of_this_version + 1u;
 }
 
+// walk.rs tree_table_entry_is_a_shape_without_a_clause：树表的一条条目是不是 I-3.5 条款说的「走到没有条款的形状」（主走读走不下去、这一版的引用集合数不全）。
+// 种类码登记到 TREE_KIND_SNAPSHOT_EXTENT_ROOT 为止，没登记的（0 与更大的码）一律算；livelist、稀疏旁表根指针全零是第一版的合法形状，非全零才算；别的走读走得下去
+fn appearance_tree_table_entry_is_a_shape_without_a_clause(kind: u32, root_pointer_is_all_zero: bool) -> bool {
+    if (kind == TREE_KIND_LIVELIST || kind == TREE_KIND_SPARSE_SIDE_TABLE) {
+        return !root_pointer_is_all_zero;
+    }
+    return kind == 0u || kind > TREE_KIND_SNAPSHOT_EXTENT_ROOT;
+}
+
 // 这一版第一个读得出的树表（walk_the_entries_of_a_tree_table_walked_first_by_this_version）：树表里每棵根指针非全零的用户可见树
-// （条目窄于 200 字节的不算，tree_table_entry_of_the_walk 交 None）记成这一版的根，连同树表落点与这一版在 ② 里的下标记进走过的树表那张表
+// （条目窄于 200 字节的不算，tree_table_entry_of_the_walk 交 None）记成这一版的根，连同树表落点、这一版在 ② 里的下标与有没有「走到没有条款的形状」的条目记进走过的树表那张表
 fn appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt: Node, tree_table_device: u32, tree_table_slot: vec2<u32>) {
     if (appearance_walked_tree_table_count >= C_APPEARANCE_MAX_WALKED_TREE_TABLES) {
         undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (42u << 8u);
@@ -1174,6 +1208,9 @@ fn appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt: Node,
             let o = entry_offset(tt, e);
             let kind = rd16(tt.base, o + 10u);
             let root_pointer = parse_node_pointer(tt.base, o + 14u);
+            if (appearance_tree_table_entry_is_a_shape_without_a_clause(kind, root_pointer.all_zero)) {
+                appearance_tree_table_of_this_version_has_an_entry_without_a_clause = true;
+            }
             if (!appearance_tree_kind_is_user_visible(kind) || root_pointer.all_zero) {
                 continue;
             }
@@ -1192,11 +1229,12 @@ fn appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt: Node,
             appearance_note_a_user_visible_root_of_this_version(kind, tree, root_pointer.birth_txg);
         }
     }
-    sws(table_row + 3u, roots | (appearance_version_count << APPEARANCE_FIRST_WALKER_SHIFT));
+    sws(table_row + 3u, roots | (appearance_version_count << APPEARANCE_FIRST_WALKER_SHIFT)
+        | select(0u, APPEARANCE_WALKED_TREE_TABLE_HAS_AN_ENTRY_WITHOUT_A_CLAUSE, appearance_tree_table_of_this_version_has_an_entry_without_a_clause));
     appearance_walked_tree_table_count = appearance_walked_tree_table_count + 1u;
 }
 
-// 这一版的树表别的版本先走过（judge_the_tree_table_entries_an_earlier_version_walked）：这一版的用户可见树的根照先走那一版记下的取，
+// 这一版的树表别的版本先走过（judge_the_tree_table_entries_an_earlier_version_walked）：这一版的用户可见树的根与有没有「走到没有条款的形状」的条目照先走那一版记下的取，
 // 标签照先走那一版冻进 ③ 的接上（take_the_user_visible_tree_labels_below_a_tree_table_walked_earlier）；先走那一版头用不了、没记下的，这里没有对象
 fn appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(tree_table_device: u32, tree_table_slot: vec2<u32>) {
     for (var t = 0u; t < appearance_walked_tree_table_count; t = t + 1u) {
@@ -1204,12 +1242,14 @@ fn appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(tree_ta
         if (sw(table_row) != tree_table_device || sw(table_row + 1u) != tree_table_slot.x || sw(table_row + 2u) != tree_table_slot.y) {
             continue;
         }
-        let roots = sw(table_row + 3u) & ((1u << APPEARANCE_FIRST_WALKER_SHIFT) - 1u);
+        let walked_tree_table_word = sw(table_row + 3u);
+        appearance_tree_table_of_this_version_has_an_entry_without_a_clause = (walked_tree_table_word & APPEARANCE_WALKED_TREE_TABLE_HAS_AN_ENTRY_WITHOUT_A_CLAUSE) != 0u;
+        let roots = walked_tree_table_word & ((1u << APPEARANCE_FIRST_WALKER_SHIFT) - 1u);
         for (var r = 0u; r < roots; r = r + 1u) {
             let root_row = table_row + C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET + r * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
             appearance_note_a_user_visible_root_of_this_version(sw(root_row), vec2<u32>(sw(root_row + 1u), sw(root_row + 2u)), vec2<u32>(sw(root_row + 3u), sw(root_row + 4u)));
         }
-        appearance_take_the_labels_of_the_version_that_walked_the_tree_table_first(sw(table_row + 3u) >> APPEARANCE_FIRST_WALKER_SHIFT);
+        appearance_take_the_labels_of_the_version_that_walked_the_tree_table_first((walked_tree_table_word & ~APPEARANCE_WALKED_TREE_TABLE_HAS_AN_ENTRY_WITHOUT_A_CLAUSE) >> APPEARANCE_FIRST_WALKER_SHIFT);
         return;
     }
 }
@@ -1277,7 +1317,7 @@ fn appearance_label_code_in_this_version(version_row: u32, placement: u32) -> u3
 //    版本表 ② 第 v 行那一版占一行——第 0 字读得全是 1、判不了是 0（树表指针全零、树表读不出、条目比字段表窄、谱系树条目不是恰好一条、谱系树读不全），
 //    第 1 字谱系容器几片，之后每片 3 个字：容器在打包表里的字节基、记录数、第一条记录的偏移。记录不抄，判的时候从容器字节里读
 //    （同扫描内核的 D_LINEAGE_CONTAINERS）。一版的容器多于 C_APPEARANCE_MAX_LINEAGE_CONTAINERS 片判不了（站点 120）。
-//    放在版本表 ② 之后空着的那一段（crash_judge_checker_common.wgsl 里 C_APPEARANCE_VERSION_PLACEMENTS 上面那一句说的 8192 个字）
+//    放在版本表 ② 之后那一段（crash_judge_checker_common.wgsl 里 C_APPEARANCE_VERSION_PLACEMENTS 上面那一句说的前 7808 个字）
 const C_APPEARANCE_MAX_LINEAGE_CONTAINERS: u32 = 40u;
 
 const C_APPEARANCE_LINEAGE_CONTAINER_WORDS: u32 = 3u;
@@ -1299,6 +1339,15 @@ const APPEARANCE_LINEAGE_RECORD_PARENT_TXG_OFFSET: u32 = 8u;
 const UNDECIDABLE_APPEARANCE_LINEAGE_CONTAINERS_PAST_THE_TABLE: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (120u << 8u);
 
 const UNDECIDABLE_APPEARANCE_LINEAGE_TREE_PAST_THE_STACK: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (121u << 8u);
+
+// 正在走的这一版的树表里有没有「走到没有条款的形状」的条目（appearance_tree_table_entry_is_a_shape_without_a_clause）：这一版走完记进 ②
+var<private> appearance_tree_table_of_this_version_has_an_entry_without_a_clause: bool;
+
+// ④ 第 3 字的最高位：这片树表里有「走到没有条款的形状」的条目（第一个走到它的那一版的下标不到 C_APPEARANCE_MAX_VERSIONS，碰不到这一位）。
+// 共享这片树表的版本不重走条目，照这一位认
+const APPEARANCE_WALKED_TREE_TABLE_HAS_AN_ENTRY_WITHOUT_A_CLAUSE: u32 = 1u << 31u;
+
+const_assert C_APPEARANCE_MAX_VERSIONS < (1u << (31u - APPEARANCE_FIRST_WALKER_SHIFT));
 
 // 正在走的这一版的树表指针（w_walk_one 读指针时置，这一版走完读它的谱系）
 var<private> appearance_tree_table_pointer_of_the_version: Ptr;
@@ -1475,7 +1524,7 @@ fn appearance_lineage_names_a_rollback_between_the_two_versions_to_a_target_not_
 }
 
 // note_the_version_just_walked_for_the_appearance_rule：一版走完，把它此刻引用过的落点（这一版的集合，w_judge_placement_in_version 记的）
-// 换成落点表的下标、连同这一版打的标签码记进 ③（标签当场冻下，后走的版本不改它），连同实例、txg、走读这一版有没有记失败、实例表指针是不是这一版新建的，
+// 换成落点表的下标、连同这一版打的标签码记进 ③（标签当场冻下，后走的版本不改它），连同实例、txg、这一版的引用收全没有（走读没记失败、树表里没有「走到没有条款的形状」的条目）、实例表指针是不是这一版新建的，
 // 再读这一版的谱系记进 ⑤
 fn appearance_note_the_version_just_walked(instance: u32, txg: vec2<u32>, references_are_complete: bool, instance_table_pointer_is_born_with_the_version: bool) {
     if (appearance_version_count >= C_APPEARANCE_MAX_VERSIONS) {
@@ -1718,6 +1767,7 @@ fn w_begin_version() {
     appearance_user_visible_tree_is_being_walked = false;
     if (w_context == 0u) {
         appearance_root_count_of_this_version = 0u;
+        appearance_tree_table_of_this_version_has_an_entry_without_a_clause = false;
         appearance_label_stamp = appearance_label_stamp + 1u;
     }
 }
@@ -3969,14 +4019,17 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
             var have_range = false;
             var smallest = vec2<u32>(0u, 0u);
             var largest = vec2<u32>(0u, 0u);
+            // 前一条记录的号（跨轮带着，不回头再读前一条记录）：r 为 0 时不读它
+            var inode_of_the_previous_record = vec2<u32>(0u, 0u);
             for (var r = 0u; r < p.record_count; r = r + 1u) {
                 let ro = packed_record_offset(p, r);
                 let inode = rd64(p.base, ro);
                 // I-9.4 第四句：同一片打包记录类型 2 容器里记录号沿记录序严格递增（判决 `research/prompts/m3-delete-checker-r2-main-verification.md`
                 // 第二节 T11 取甲；walk.rs walk_inode_leaf_container 逐对判）
                 if (r > 0u) {
-                    w_judge(INVARIANT_I_9_4, lt64(rd64(p.base, packed_record_offset(p, r - 1u)), inode));
+                    w_judge(INVARIANT_I_9_4, lt64(inode_of_the_previous_record, inode));
                 }
+                inode_of_the_previous_record = inode;
                 w_judge_reserved_bytes_and_the_truncation_field_of_an_inode_record(p.base, ro);
                 w_judge(INVARIANT_I_9_4, le64(p.container, inode));
                 let size = rd64(p.base, ro + INODE_RECORD_SIZE_OFFSET);
@@ -3985,11 +4038,11 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
                 w_judge(INVARIANT_I_9_15, eq64(blocks, logical_blocks));
                 // I-9.26：对象出生代（记录偏移 INODE_RECORD_OBJECT_BIRTH_OFFSET）≤ 改动计数（偏移 88）≤ 这片容器头的诞生代号（偏移 73）
                 let change_count = rd64(p.base, ro + 88u);
-                w_judge(INVARIANT_I_9_26, le64(rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET), change_count) && le64(change_count, p.birth_txg));
+                let birth = rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET);
+                w_judge(INVARIANT_I_9_26, le64(birth, change_count) && le64(change_count, p.birth_txg));
                 // inode → 对象出生代（I-9.10）与 inode 树内最大号（I-9.6）只记活头的树：快照里的记录是建快照那一刻的样子，同号可以已是别的对象
                 if (w_context == 0u && !w_walking_the_trees_of_a_snapshot) {
                     // inode → 对象出生代（后写的覆盖先写的）
-                    let birth = rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET);
                     let birth_row_index = w_inode_birth_row_of(inode);
                     if (birth_row_index != NONE) {
                         sws(C_INODE_BIRTHS + birth_row_index * 4u + 2u, birth.x);
@@ -4203,6 +4256,7 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
     // logged_ops 树（第四棵多层码 2 树，walk.rs walk_tree_table_entry 的 logged_ops 那一支，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G1）：
     // 叶 44、内部节点 key 10 + 子指针 86 按 I-1.10 判，走到的节点记进引用；条目（意图）在引用与快照那一截每一版各判
     else if (kind == TREE_KIND_LOGGED_OPERATIONS) { schema = KEY_SCHEMA_LOGGED_OPERATIONS; }
+    // 没有 key 形态的条目走读走不下去：这一版的引用没收全在走到树表这一层时就记了（appearance_note_the_user_visible_roots_of_a_tree_table_walked_first）
     if (schema == NONE) {
         return;
     }
@@ -4889,7 +4943,7 @@ fn appearance_tree_is_inherited_whole(version_index: u32, root_index: u32, place
 // 每个落点 b 满足 (a) birth(b) > R⁻.txg，或 (b) b 打着一棵整棵继承下来的用户可见树的标签、且 R 的谱系记录里有一条 (T_rb, T_old) 满足
 // R⁻.txg < T_rb ≤ R.txg、那棵树的根指针出生 txg ≤ T_old（谱系那一半，⑤ 那一行；同一棵树在树表里有几条根时取最后一条的根指针出生 txg，
 // 同 walk.rs 按树收的那张表）。有洞而实例表行接不上时打着用户可见树标签的不判（N3）；
-// R 或 R⁻ 那一组有一版走读记过失败的那一对、诞生代号读不出的落点、(a) 不成立而落在整棵继承下来的树里、R 的谱系读不全的落点不判，
+// R 或 R⁻ 那一组有一版走读记过失败或树表里有「走到没有条款的形状」的条目（两样都记进 ② 第 3 字）的那一对、诞生代号读不出的落点、(a) 不成立而落在整棵继承下来的树里、R 的谱系读不全的落点不判，
 // 记射程里判不了（C701：CPU 报部分没判，几样都不置判到位；谱系读不全只让要靠谱系那一半判的落点不判，同一对里别的落点照判）。
 // 一个落点都没判到时 CPU 报不适用，违例位上与成立一样是 0
 fn judge_the_appearance_rule_of_adjacent_candidate_versions() {
@@ -6008,7 +6062,7 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             if (walk_kind == WALK_KIND_VERSION) {
                 walked_instance = rd32(walk_base, 16u);
             }
-            appearance_note_the_version_just_walked(walked_instance, w_version_txg, w_failures == failures_before, appearance_instance_table_pointer_is_born_with_the_version);
+            appearance_note_the_version_just_walked(walked_instance, w_version_txg, w_failures == failures_before && !appearance_tree_table_of_this_version_has_an_entry_without_a_clause, appearance_instance_table_pointer_is_born_with_the_version);
         }
         // ③ 走完之后这一阶段要做的
         if (phase == WALK_PHASE_NEWEST_ROOT) {

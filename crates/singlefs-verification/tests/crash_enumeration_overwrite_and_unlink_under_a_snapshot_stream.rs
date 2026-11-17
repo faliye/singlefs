@@ -48,6 +48,10 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, CrashImage,
 };
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 
 /// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
 const PATH_OF_THIS_TEST_FILE: &str =
@@ -150,14 +154,16 @@ fn assert_every_state_was_observed(tally: &CrashPointReplayTally) {
     );
     assert_eq!(
         counts.count_named("mount_continuation_steps_0")
-            + counts.count_named("mount_continuation_steps_1"),
+            + counts.count_named("mount_continuation_steps_1")
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次，续做至多一步"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的续做至多一步"
     );
     assert_eq!(
-        counts.count_named("mount_continuation_steps_1"),
+        counts.count_named("mount_continuation_steps_1")
+            + counts.count_named(&continuation_skipped_on_the_refusal_counter(1)),
         counts.count_named("landed_on_unlink_intent"),
-        "落到意图那一版的续做一步（最后一批），别的不续做"
+        "落到意图那一版的续做一步（最后一批；被乙入判不出拒的态按本来还差的步数算），别的不续做"
     );
     assert_eq!(
         counts.count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),

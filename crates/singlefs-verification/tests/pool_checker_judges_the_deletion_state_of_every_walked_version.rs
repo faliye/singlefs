@@ -45,7 +45,7 @@ use common_deletion_in_progress::{
     set_tombstone_field, tombstone_field, tree_table_slot_of_the_newest_root, unlink_to_the_end,
     zero_both_copies_of_the_unit_at, TOMBSTONE_RECORD_DEATH_TXG_OFFSET,
     TOMBSTONE_RECORD_OBJECT_BIRTH_OFFSET, TOMBSTONE_RECORD_RANGE_END_OFFSET,
-    UNIT_DECLARED_LENGTH_OFFSET,
+    TREE_KIND_NOT_REGISTERED, UNIT_DECLARED_LENGTH_OFFSET,
 };
 use common_pointer_head_corruption::{data_unit_bytes, node_bytes, unit_bytes_at};
 use singlefs_checker::image::{
@@ -652,10 +652,9 @@ fn an_inode_tree_without_a_deleted_inodes_entry_in_the_tree_table_leaves_the_del
 
 /// L1c：三个单元的文件删到「意图、留 2、留 1」，只把中间那一版（留 2）树表里 `deleted_inodes` 那一条的种类码改成 13，最新的根写对。
 /// 中间那一版 1 号 nlink 0、还有两个单元、不在任何队列里；改法 A 之前 I-9.5、I-4.7、I-4.6 都由别的版本判成立（攻方量过）。
-/// I-3.5（引用区间的精确性）跟着红：中间那一版树表里没有 `deleted_inodes` 那一条（种类 13 没有 key 形态，主走读不往下走、不记走读失败），
-/// 它不引用那棵树；最新的根照旧指着意图那一版写下的 `deleted_inodes` 树，那棵树里的落点是后一版引用、前一版不引用的，诞生代号不大于
-/// 中间那一版的 txg，整棵继承下来，(b) 前两半成立；谱系那一半不成立——这一段历史里没有回退，最新根的谱系树里没有回退记录
-/// （`crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 那一行：(b) 三半都要）。
+/// I-3.5（引用区间的精确性）不判红：中间那一版树表里种类没登记的那一条是「走到没有条款的形状」，主走读不往下走、这一版的引用集合数不全，
+/// 它参与的那两对报部分没判（`crates/singlefs-checker/invariants/05-空间记账.md` I-3.5 那一行）。照判的话，它不引用 `deleted_inodes` 树，
+/// 最新的根照旧指着意图那一版写下的那棵树，那棵树里的落点是后一版引用、前一版不引用的，(a) 与谱系那一半都不成立，就红了。
 #[test]
 fn an_intermediate_version_without_a_deleted_inodes_entry_leaves_the_deletion_queue_invariants_not_judged_while_the_newest_root_is_clean(
 ) {
@@ -679,16 +678,26 @@ fn an_intermediate_version_without_a_deleted_inodes_entry_leaves_the_deletion_qu
     );
     assert_eq!(
         violated_invariants(&image),
-        vec!["I-9.16", "I-3.5"],
-        "判红的是树表种类那一条，与中间那一版不引用、最新根整棵继承下来的 deleted_inodes 树那一条"
+        vec!["I-9.16"],
+        "判红的只有树表种类那一条"
     );
-    let appearance_rule_violation = first_violation_of(&image, "I-3.5");
-    assert!(
-        appearance_rule_violation.contains(&format!(
-            "用户可见树 Some(UserVisibleTreeOfTheWalk {{ kind: {TREE_KIND_DELETED_INODES},"
-        )) && appearance_rule_violation.contains("整棵继承：true"),
-        "I-3.5 红在最新根整棵继承下来的 deleted_inodes 树里的落点上：{appearance_rule_violation}"
-    );
+    let appearance_rule_unjudged = unjudged_parts_of_the_range(&image, "I-3.5");
+    let intermediate_txg = intermediate.root.checkpoint_txg.0;
+    let newest_txg = newest.root.checkpoint_txg.0;
+    for adjacent_pair_with_the_intermediate_version in [
+        format!("、txg {intermediate_txg})："),
+        format!(
+            "、txg {intermediate_txg}) → (实例 {}、txg {newest_txg})：",
+            newest.root.instance.0
+        ),
+    ] {
+        assert!(
+            appearance_rule_unjudged.contains(&format!(
+                "{adjacent_pair_with_the_intermediate_version}有一版树表里有种类 {TREE_KIND_NOT_REGISTERED} 的条目，走读走到没有条款的形状、引用没收全，这一对不判"
+            )),
+            "I-3.5 的部分没判点名中间那一版参与的那一对（{adjacent_pair_with_the_intermediate_version}）：{appearance_rule_unjudged}"
+        );
+    }
     for invariant in DELETION_QUEUE_SCAN_INVARIANTS {
         let reason = unjudged_parts_of_the_range(&image, invariant);
         assert!(

@@ -64,8 +64,7 @@ mod tests {
     /// 数值变量设成认不出的字样：panic，消息带变量名与原值，不当成没设（C606 那一类：写错的规模悄悄退回默认）。
     #[test]
     #[should_panic(expected = "SINGLEFS_EXAMPLE_LIMIT=\"eight\" 认不出")]
-    fn a_number_variable_set_to_text_that_is_not_a_number_panics_naming_the_variable_and_the_value()
-    {
+    fn number_variable_set_to_text_that_is_not_a_number_panics_naming_the_variable_and_the_value() {
         let _limit = number_from_the_variable_value_panicking_when_unreadable::<usize>(
             "SINGLEFS_EXAMPLE_LIMIT",
             Some("eight"),
@@ -75,7 +74,7 @@ mod tests {
     /// 不许为 0 的数（线程数）设成 0：同样 panic、带变量名与原值，不悄悄换成至少 1 或本机并行度。
     #[test]
     #[should_panic(expected = "SINGLEFS_EXAMPLE_THREADS=\"0\" 认不出")]
-    fn a_nonzero_number_variable_set_to_zero_panics_naming_the_variable_and_the_value() {
+    fn nonzero_number_variable_set_to_zero_panics_naming_the_variable_and_the_value() {
         let _threads = number_from_the_variable_value_panicking_when_unreadable::<
             std::num::NonZeroUsize,
         >("SINGLEFS_EXAMPLE_THREADS", Some("0"));
@@ -97,7 +96,7 @@ mod tests {
     /// 变量的值不是 UTF-8：panic，消息带变量名与原值，不当成没设（没设时调用方会悄悄取它那一档）。
     #[test]
     #[should_panic(expected = "SINGLEFS_EXAMPLE_LIMIT 的值不是 UTF-8")]
-    fn a_variable_whose_value_is_not_unicode_panics_naming_the_variable() {
+    fn variable_whose_value_is_not_unicode_panics_naming_the_variable() {
         use std::os::unix::ffi::OsStringExt as _;
         let _text = variable_text_panicking_when_not_unicode(
             "SINGLEFS_EXAMPLE_LIMIT",
@@ -122,7 +121,7 @@ mod tests {
 
     /// 设了的变量原文照读（空白不去：数值解析那一步才去）。
     #[test]
-    fn a_set_variable_reads_back_verbatim() {
+    fn set_variable_reads_back_verbatim() {
         assert_eq!(
             variable_text_panicking_when_not_unicode(
                 "SINGLEFS_EXAMPLE_LIMIT",
@@ -135,7 +134,7 @@ mod tests {
 
     /// 设了的数值变量去掉前后空白读回。
     #[test]
-    fn a_set_number_variable_reads_back_without_surrounding_blanks() {
+    fn set_number_variable_reads_back_without_surrounding_blanks() {
         assert_eq!(
             number_from_the_variable_value_panicking_when_unreadable::<u64>(
                 "SINGLEFS_EXAMPLE_LIMIT",

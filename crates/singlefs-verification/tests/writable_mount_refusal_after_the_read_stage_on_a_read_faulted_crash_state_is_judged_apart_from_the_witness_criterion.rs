@@ -24,10 +24,10 @@ use singlefs_verification::history::{
 };
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount,
-    read_recovery_fields, ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, read_recovery_fields,
+    ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
     ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
-    RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 use singlefs_verification::SharedStream;
 
@@ -87,8 +87,9 @@ fn verdict_on(
         .report
         .effective_root
         .expect("健康盘面上只读恢复落到第一个文件那一版");
-    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
         crash_image,
+        &SMALL.parameters().filesystem_identifier,
         fields.report.effective_root,
         &refusal_on(read_stage_settled_on(selected_version)),
         DiskAfterTheRefusal::ByteForByteUnchanged,
@@ -145,7 +146,7 @@ fn a_refusal_after_the_read_stage_on_a_read_faulted_crash_state_is_legal_where_t
             ReadFaultsUnderTheRefusedMount::TheRefusedMountReadThroughInjectedFaults
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage
         ),
         "被拒的那次挂载在读故障下跑：读阶段之后系统配置又读不出那一拒合法（瞬时读错在崩溃镜像上复算不出）"
     );
@@ -157,7 +158,7 @@ fn a_refusal_after_the_read_stage_on_a_read_faulted_crash_state_is_legal_where_t
             ReadFaultsUnderTheRefusedMount::TheRefusedMountReadThroughInjectedFaults
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
@@ -172,7 +173,7 @@ fn a_refusal_after_the_read_stage_on_a_read_faulted_crash_state_is_legal_where_t
             ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            reason: RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],

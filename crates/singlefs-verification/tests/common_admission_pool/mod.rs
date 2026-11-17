@@ -317,6 +317,9 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
             Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space)) => {
                 self.note_floor_raises(&no_space.floor_raises);
             }
+            Err(UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(no_space)) => {
+                self.note_floor_raises(&no_space.floor_raises);
+            }
             Err(UserChangeRefused::Publish { floor_raises, .. }) => {
                 self.note_floor_raises(floor_raises);
             }

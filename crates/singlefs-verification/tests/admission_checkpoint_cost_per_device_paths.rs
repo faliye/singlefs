@@ -1047,6 +1047,9 @@ fn replay_the_history(
             Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space)) => {
                 no_space.floor_raises.clone()
             }
+            Err(UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(no_space)) => {
+                no_space.floor_raises.clone()
+            }
             Err(other) => {
                 refusals.push(format!("{label} 用户改动：{other:?}"));
                 Vec::new()
@@ -1090,7 +1093,8 @@ fn empty_publish_plan_after(current: &TransactionOutput) -> PublishPlan<'static>
 }
 
 /// 实审 A4c 量到每块盘两条叶路径（K0）少扣的两段历史（报告第二节「三种情形各一段历史」），在分配记录树那一项取 K1 整棵树之后重放：
-/// - 单元区 2600 槽、逼满、种子 13、200 步：情形 ②（没有全空段，回落到最低空槽、一个单元一处）。A4c 量的那一段单元区从 50176 起，
+/// - 单元区 2600 槽、逼满、种子 13、200 步：情形 ②（没有全空段，每块盘都答回落，落点由池里统一取：先取这次发布重写集里每块盘都重写的叶中每块盘都空的最低落点，
+///   取不到再取每块盘都空的单槽最多那片叶里的最低落点（D3（空间分配） 已定项 8 第 2 条）；一个单元一处）。A4c 量的那一段单元区从 50176 起，
 ///   K0 下第 22 步崩了再挂之后的暖机一块盘改叶 61–64、实写 12 / ckpt_cost 8（少扣 4），200 步里少扣 4 次。单元区起点随环长走之后
 ///   （实审 A3b）小盘那一档的 6 MiB 环把单元区挪到 [1408, 4008)、罩叶 1–4；K0 下重放照样在第 22 步崩了再挂之后的暖机一块盘改 4 片叶、
 ///   实写 12 / ckpt_cost 8，200 步里少扣 4 次（第 22、58、137、154 步，实测）。K1 下 144 次空发布里一块盘改的叶多于两片的有 4 次（实测）；

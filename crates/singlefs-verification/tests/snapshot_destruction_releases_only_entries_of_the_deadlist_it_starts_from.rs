@@ -1,5 +1,5 @@
 //! C145 第三条「放块时要删的那条 deadlist 条目必须还在」的等价性留档
-//! （`.claude/singlefs-ai-sop/rules/test-discipline.md`「等价变异不算盲区，但要分开记」）：删快照每一批放掉的条目由
+//! （`.claude/rules/test-discipline.md`「等价变异不算盲区，但要分开记」）：删快照每一批放掉的条目由
 //! `transaction::deadlist_entries_the_destruction_of_a_snapshot_releases` 从上一版的 deadlist 里挑，放块那一处的 `entries_after` 也从同一份 deadlist 建，
 //! 所以那条断言在所有走得到的输入上都成立，删掉它的变异是等价变异、没有用例抓得到。这里把「挑出来的每一条都在它挑的那一份 deadlist 里、
 //! 一条不重」钉成一条用例，并核这一条真的走到了（挑出来的不空、删快照照常做完、deadlist 一条不剩）。改变行为的那一条变异

@@ -28,10 +28,16 @@
 //! 选段照 [`RUN_STAGE_ENVIRONMENT_VARIABLE`]：`record` 只录、`judge` 只判、不设两段先后跑（中间照样经库）。
 //!
 //! 同一个进程里几处开库共用一份连接（[`LibraryOpenInThisProcess`]：按键空间各一份，库里一把锁一次一个读写）；不同进程各连各的，谁都不等谁。
+//! 这把锁只包与 prune-server 的往返：排计划、序列化、算摘要、打包、解码都在锁外（[`assert_this_thread_holds_no_library_lock`] 在这几步的路上判），
+//! 累计持锁时长按连接打一行（[`LIBRARY_LOCK_TIME_LINE_PREFIX`]）、按取锁的调用点各打一行（[`LIBRARY_LOCK_TIME_OF_A_SITE_LINE_PREFIX`]）；
+//! 判段与录入段经 [`LibraryTakenAtEachReadOrWrite`] 每次读写现取现放，判、看、排计划时手里不握锁。同一条连接上同一摘要的流只读回一次（[`ValuesReadBackOnceInThisProcess`]）：
+//! 留的是从库里读回、核过摘要的那一份，不落盘、不存结论，随连接放手。
 
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc;
 use std::sync::{
     Arc, Mutex, MutexGuard, OnceLock, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak,
 };
@@ -110,6 +116,8 @@ pub enum CrashLibraryClass {
     JudgeTablesPairing,
     /// 第 ② 段核对的 GPU 与 CPU 参照对拍用例：事实表先入库、再读库核。
     FactsPairing,
+    /// 输入是调用方给的字节的对拍用例（判的不是崩溃状态）：输入先入库、再读库交给两边。
+    InputPairing,
 }
 
 impl CrashLibraryClass {
@@ -122,6 +130,7 @@ impl CrashLibraryClass {
             Self::GivenStates => "given_states",
             Self::JudgeTablesPairing => "judge_tables_pairing",
             Self::FactsPairing => "facts_pairing",
+            Self::InputPairing => "input_pairing",
         }
     }
 }
@@ -132,7 +141,45 @@ static EXCLUSIVE_TEMPORARY_DIRECTORIES_CREATED_IN_THIS_PROCESS: AtomicU64 = Atom
 /// 建一份独占的一次性临时目录最多试几个名字：名字撞上已有的目录（同进程号的旧进程被杀时留下的）就换下一个号，试满还建不出就报错。
 const MOST_EXCLUSIVE_TEMPORARY_DIRECTORY_NAMES_TRIED: u32 = 64;
 
-/// 调用方独占的一份一次性临时目录：`${TMPDIR:-/tmp}` 下 `singlefs-<标签>-<进程号>-<进程内序号>`（标签里的 `/` 换成 `-`，目录只占一层），`create_dir` 排他新建；
+/// 一段路径名（一级目录的名字）最多几个字节：Linux 的 `NAME_MAX`，再长 `mkdir` 报 `File name too long (os error 36)`。
+const MOST_BYTES_OF_ONE_PATH_COMPONENT: usize = 255;
+
+/// 标签放不下、截短之后接在后面的标签摘要取几位十六进制：标签整串 sha256 的前 16 位（64 比特），
+/// 只在截掉的那一段不同的两个标签靠它分开，同一台机器上同时在的一次性临时目录撞上的机会不计。
+const LABEL_DIGEST_HEXADECIMAL_DIGITS_OF_A_SHORTENED_NAME: usize = 16;
+
+/// 一次性临时目录的单段名字 `singlefs-<标签>-<进程号>-<进程内序号>`，标签里的 `/` 换成 `-`。
+/// 整段超 [`MOST_BYTES_OF_ONE_PATH_COMPONENT`] 字节的，标签截到放得下（按 UTF-8 字符边界截，不截半个字符），
+/// 截短的标签后面接 `-` 与标签整串 sha256 十六进制的前 [`LABEL_DIGEST_HEXADECIMAL_DIGITS_OF_A_SHORTENED_NAME`] 位，
+/// 再接 `-<进程号>-<进程内序号>`：只在截掉的那一段不同的两个标签照样得出不同的名字。放得下的照整串拼。
+fn exclusive_temporary_directory_name(
+    label: &str,
+    process_identifier: u32,
+    serial_in_this_process: u64,
+) -> String {
+    let label_without_slashes = label.replace('/', "-");
+    let suffix = format!("-{process_identifier}-{serial_in_this_process}");
+    let name_in_full = format!("singlefs-{label_without_slashes}{suffix}");
+    if name_in_full.len() <= MOST_BYTES_OF_ONE_PATH_COMPONENT {
+        return name_in_full;
+    }
+    let label_digest = hexadecimal_text(&sha256_digest(label.as_bytes()));
+    let digest_prefix = &label_digest[..LABEL_DIGEST_HEXADECIMAL_DIGITS_OF_A_SHORTENED_NAME];
+    let label_bytes_that_fit = MOST_BYTES_OF_ONE_PATH_COMPONENT
+        .saturating_sub("singlefs-".len() + "-".len() + digest_prefix.len() + suffix.len());
+    let mut label_bytes_kept = label_bytes_that_fit;
+    // 迭代上界：3 次（UTF-8 一个字符最多 4 个字节，退到字符边界最多退 3 个字节；0 总是字符边界）
+    while !label_without_slashes.is_char_boundary(label_bytes_kept) {
+        label_bytes_kept -= 1;
+    }
+    format!(
+        "singlefs-{}-{digest_prefix}{suffix}",
+        &label_without_slashes[..label_bytes_kept]
+    )
+}
+
+/// 调用方独占的一份一次性临时目录：`${TMPDIR:-/tmp}` 下 `singlefs-<标签>-<进程号>-<进程内序号>`（标签里的 `/` 换成 `-`，目录只占一层；
+/// 整段超一段路径名的上限时标签截短、接标签摘要，[`exclusive_temporary_directory_name`]），`create_dir` 排他新建；
 /// 丢掉时只删这一份（连同里面的东西）。同一个进程里两次用同一个标签各拿一份、互不删对方；两个进程同跑一个测试二进制，进程号不同。
 /// 标签只为在临时目录里认得出是谁建的，不靠它区分：验证包的单测与集成测试要一份自己的临时目录都经它建
 /// （照崩溃注入镜像目录的写法，`crate::crash_injection` 的 `create_the_image_directory_of_a_campaign_call`）。
@@ -161,10 +208,10 @@ impl ExclusiveTemporaryDirectory {
         for _name_tried in 0..MOST_EXCLUSIVE_TEMPORARY_DIRECTORY_NAMES_TRIED {
             let serial_in_this_process = EXCLUSIVE_TEMPORARY_DIRECTORIES_CREATED_IN_THIS_PROCESS
                 .fetch_add(1, Ordering::SeqCst);
-            let path = root.join(format!(
-                "singlefs-{}-{}-{serial_in_this_process}",
-                label.replace('/', "-"),
-                std::process::id()
+            let path = root.join(exclusive_temporary_directory_name(
+                label,
+                std::process::id(),
+                serial_in_this_process,
             ));
             match directory_builder.create(&path) {
                 Ok(()) => return Ok(Self { path }),
@@ -484,6 +531,205 @@ pub struct DisposableLibrary {
     key_space: LibraryKeySpace,
     scratch_directory: ExclusiveTemporaryDirectory,
     temporary_service: TemporaryPruneServer,
+    /// 单测构建里这份临时服务占的那一个名额（[`TemporaryServerPlaceInTheTestProcess`]）：排在最后，服务停了、目录删了才还
+    #[cfg(test)]
+    _place_in_the_test_process: TemporaryServerPlaceInTheTestProcess,
+}
+
+/// 单测进程里用例自己开的线程共用的那一份额度分成的两份（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）。
+/// libtest 已经照每台默认重活线程数一起跑那么多条用例，用例里再开的线程不再各照这个数开：一次性库的临时服务同时至多
+/// `temporary_servers` 份（每份照 [`THREADS_OF_A_TEMPORARY_SERVER`] 条记，至多占一半），余下的 `inner_threads` 条给里层的核对线程
+/// （[`InnerThreadsTaken`]）。两份合起来不超过每台默认重活线程数（它大过 [`THREADS_OF_A_TEMPORARY_SERVER`] 时）。
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SharesOfTheTestProcess {
+    pub(crate) temporary_servers: usize,
+    pub(crate) inner_threads: usize,
+}
+
+/// 一份临时服务常驻的线程（接 socket、接 TCP、提交各一条，加工作线程）与一条连接的两条（读帧、写回），
+/// 照 `prune_server::server` 在这个进程里起服务的那几处数。
+#[cfg(test)]
+pub(crate) const THREADS_OF_A_TEMPORARY_SERVER: usize =
+    3 + prune_server::server::WORKER_THREADS_OF_A_SERVICE_IN_THIS_PROCESS + 2;
+
+/// 每台默认重活线程数 `heavy_threads` 分成的两份（[`SharesOfTheTestProcess`]）：临时服务至少一份（不然一次性库永远起不来），
+/// 里层至少一条。
+#[cfg(test)]
+pub(crate) fn shares_of_the_test_process(heavy_threads: usize) -> SharesOfTheTestProcess {
+    let temporary_servers = (heavy_threads / 2 / THREADS_OF_A_TEMPORARY_SERVER).max(1);
+    SharesOfTheTestProcess {
+        temporary_servers,
+        inner_threads: heavy_threads
+            .saturating_sub(temporary_servers * THREADS_OF_A_TEMPORARY_SERVER)
+            .max(1),
+    }
+}
+
+/// 一处里层并行要 `wanted` 条线程时拿到几条：不过里层那一份 `inner_threads_of_the_share`，至少一条。要么整份拿到、要么等，不拆开拿：
+/// 同一处每次拿到的条数一样，切段的界不随别的用例此刻占了多少变。
+#[cfg(test)]
+pub(crate) fn inner_threads_granted(wanted: usize, inner_threads_of_the_share: usize) -> usize {
+    wanted.min(inner_threads_of_the_share).max(1)
+}
+
+/// 此刻里层已占 `in_use` 条时，再拿 `granted` 条放不放得下里层那一份 `inner_threads_of_the_share`。
+#[cfg(test)]
+pub(crate) fn inner_threads_fit(
+    in_use: usize,
+    granted: usize,
+    inner_threads_of_the_share: usize,
+) -> bool {
+    in_use + granted <= inner_threads_of_the_share
+}
+
+/// 单测进程此刻占着的：里层几条线程、几份临时服务，与哪条线程起着几份临时服务（同一条线程再起一份不再等：
+/// 它手里那一份要等它自己往下走才还，等就是自己等自己）。
+#[cfg(test)]
+struct ThreadsInUseInTheTestProcess {
+    inner_threads: usize,
+    temporary_servers: usize,
+    temporary_servers_started_by_each_thread: Vec<(std::thread::ThreadId, usize)>,
+}
+
+#[cfg(test)]
+static THREADS_IN_USE_IN_THE_TEST_PROCESS: Mutex<ThreadsInUseInTheTestProcess> =
+    Mutex::new(ThreadsInUseInTheTestProcess {
+        inner_threads: 0,
+        temporary_servers: 0,
+        temporary_servers_started_by_each_thread: Vec::new(),
+    });
+
+/// 还了线程或名额就叫醒等着的。
+#[cfg(test)]
+static THREADS_RETURNED_IN_THE_TEST_PROCESS: std::sync::Condvar = std::sync::Condvar::new();
+
+#[cfg(test)]
+fn shares_of_this_test_process() -> SharesOfTheTestProcess {
+    shares_of_the_test_process(crate::heavy_threads::default_heavy_threads().get())
+}
+
+/// 里层一处并行拿到的核对线程：产品构建里就是要的那么多条；单测构建里从单测进程的那一份额度拿（`SharesOfTheTestProcess`），
+/// 拿不到就等，丢掉时还回去。
+pub(crate) struct InnerThreadsTaken {
+    threads: usize,
+}
+
+impl InnerThreadsTaken {
+    /// 要 `wanted` 条（至少一条）：产品构建里照给。
+    #[cfg(not(test))]
+    pub(crate) fn take(wanted: usize) -> Self {
+        Self { threads: wanted }
+    }
+
+    /// 要 `wanted` 条：单测构建里照 [`inner_threads_granted`] 定拿几条，里层那一份放不下就等别的用例还。
+    #[cfg(test)]
+    pub(crate) fn take(wanted: usize) -> Self {
+        let inner_threads_of_the_share = shares_of_this_test_process().inner_threads;
+        let threads = inner_threads_granted(wanted, inner_threads_of_the_share);
+        let mut in_use = THREADS_IN_USE_IN_THE_TEST_PROCESS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        // 迭代上界是别的用例还线程的次数：每醒一次重判一次
+        while !inner_threads_fit(in_use.inner_threads, threads, inner_threads_of_the_share) {
+            in_use = THREADS_RETURNED_IN_THE_TEST_PROCESS
+                .wait(in_use)
+                .unwrap_or_else(PoisonError::into_inner);
+        }
+        in_use.inner_threads += threads;
+        Self { threads }
+    }
+
+    pub(crate) fn threads(&self) -> usize {
+        self.threads
+    }
+}
+
+#[cfg(test)]
+impl Drop for InnerThreadsTaken {
+    fn drop(&mut self) {
+        THREADS_IN_USE_IN_THE_TEST_PROCESS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .inner_threads -= self.threads;
+        THREADS_RETURNED_IN_THE_TEST_PROCESS.notify_all();
+    }
+}
+
+/// 单测构建里一份一次性库的临时服务占的名额（[`SharesOfTheTestProcess`] 的 `temporary_servers`）：起之前拿，满了就等；
+/// 同一条线程已经起着一份的不再等、不另占。丢掉时那条线程起的都丢了才还。
+/// 次序：先取名额（开一次性库）、后拿改环境的锁（`crate::crash_amplification::EnvironmentLockOfThisTestBinary`）。
+#[cfg(test)]
+struct TemporaryServerPlaceInTheTestProcess {
+    started_by: std::thread::ThreadId,
+}
+
+/// 拿着改环境的锁去新占一次性库名额时 panic 的那句话。
+#[cfg(test)]
+const PLACE_TAKEN_WHILE_HOLDING_THE_ENVIRONMENT_LOCK: &str =
+    "这条线程拿着改环境的锁去新占一次性库名额：次序要先开一次性库（取名额）、后拿改环境的锁（CrashAmplificationEnvironment、\
+     one_test_changes_the_environment_at_a_time）；反过来拿，名额满着时拿着名额等锁的用例与拿着锁等名额的用例互相等、整个测试进程挂住。\
+     把开库挪到拿锁之前";
+
+#[cfg(test)]
+impl TemporaryServerPlaceInTheTestProcess {
+    /// # Panics
+    /// 要新占名额（这条线程还没起着一份）而这条线程拿着改环境的锁（[`PLACE_TAKEN_WHILE_HOLDING_THE_ENVIRONMENT_LOCK`]）：
+    /// 在等名额之前当场 panic，不挂住。这条线程已经起着一份的不等名额、不查（拿着锁再开一份不会互等）。
+    fn take() -> Self {
+        let started_by = std::thread::current().id();
+        let temporary_servers_of_the_share = shares_of_this_test_process().temporary_servers;
+        let mut in_use = THREADS_IN_USE_IN_THE_TEST_PROCESS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some((_thread, started)) = in_use
+            .temporary_servers_started_by_each_thread
+            .iter_mut()
+            .find(|(thread, _started)| *thread == started_by)
+        {
+            *started += 1;
+            return Self { started_by };
+        }
+        if crate::crash_amplification::this_thread_holds_the_environment_lock() {
+            // 先放占用计数的锁再 panic：不让它中毒，别的用例照常取还
+            drop(in_use);
+            panic!("{PLACE_TAKEN_WHILE_HOLDING_THE_ENVIRONMENT_LOCK}");
+        }
+        // 迭代上界是别的用例还名额的次数：每醒一次重判一次
+        while in_use.temporary_servers >= temporary_servers_of_the_share {
+            in_use = THREADS_RETURNED_IN_THE_TEST_PROCESS
+                .wait(in_use)
+                .unwrap_or_else(PoisonError::into_inner);
+        }
+        in_use.temporary_servers += 1;
+        in_use
+            .temporary_servers_started_by_each_thread
+            .push((started_by, 1));
+        Self { started_by }
+    }
+}
+
+#[cfg(test)]
+impl Drop for TemporaryServerPlaceInTheTestProcess {
+    fn drop(&mut self) {
+        let mut in_use = THREADS_IN_USE_IN_THE_TEST_PROCESS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let position = in_use
+            .temporary_servers_started_by_each_thread
+            .iter()
+            .position(|(thread, _started)| *thread == self.started_by)
+            .expect("名额拿到时记下了起它的那条线程，那条线程起的都丢了才删这一项");
+        in_use.temporary_servers_started_by_each_thread[position].1 -= 1;
+        if in_use.temporary_servers_started_by_each_thread[position].1 == 0 {
+            in_use
+                .temporary_servers_started_by_each_thread
+                .swap_remove(position);
+            in_use.temporary_servers -= 1;
+        }
+        drop(in_use);
+        THREADS_RETURNED_IN_THE_TEST_PROCESS.notify_all();
+    }
 }
 
 impl DisposableLibrary {
@@ -499,6 +745,8 @@ impl DisposableLibrary {
     /// # Errors
     /// 同 [`Self::new`]。
     fn new_under(label: &str, temporary_root: &Path) -> Result<Self, String> {
+        #[cfg(test)]
+        let place_in_the_test_process = TemporaryServerPlaceInTheTestProcess::take();
         let temporary_service = TemporaryPruneServer::start_under(temporary_root)?;
         let socket_path = temporary_service.service().socket_path().to_path_buf();
         let scratch_directory = ExclusiveTemporaryDirectory::create_in(
@@ -524,6 +772,8 @@ impl DisposableLibrary {
             key_space: LibraryKeySpace::DisposableLibrary(namespace),
             scratch_directory,
             temporary_service,
+            #[cfg(test)]
+            _place_in_the_test_process: place_in_the_test_process,
         })
     }
 
@@ -681,9 +931,362 @@ impl Drop for DisposableLibraryOfThisProcess<'_> {
 /// 这个进程里开着的库在登记表里的键：连哪一处（`RouteAddress` 的写法）与键空间的前缀字节（全仓那一份是空的）。
 type KeyOfALibraryOpenInThisProcess = (String, Vec<u8>);
 
-/// 开着的一份：库，一把锁一次一个读写（容错客户端追加日志的一次性目录在它连着的那一端里，随最后一个放手的删掉）。
+/// 开着的一份：库，一把锁一次一个读写（容错客户端追加日志的一次性目录在它连着的那一端里，随最后一个放手的删掉）；这把锁的累计时长；
+/// 这条连接读回过的流与它们的计划；持锁时长行里报的连接名（[`connection_name_of_an_opening`]）。
 struct OpenLibrary {
+    connection_name: String,
     store: Mutex<VerdictStore>,
+    lock_times: LibraryLockTimes,
+    flows_read_back:
+        ValuesReadBackOnceInThisProcess<crate::crash_amplification::RecordedFlowAndItsPlan>,
+}
+
+/// 这个进程里开过几次连接：连接名带上开的是第几次，同一个进程里关了再开同一份库，两次的行不同名（各自的 `seconds_open` 各从零数）。
+static OPENINGS_OF_A_LIBRARY_IN_THIS_PROCESS: AtomicU64 = AtomicU64::new(0);
+
+/// 持锁时长行里的连接名：连哪一处、键空间前缀（十六进制，全仓那一份是空的）、这个进程里开的第几次，三段用 `#` 接起来，空白换成 `_`
+/// （行按空格切字段）。
+fn connection_name_of_an_opening(key: &KeyOfALibraryOpenInThisProcess) -> String {
+    let opening = OPENINGS_OF_A_LIBRARY_IN_THIS_PROCESS.fetch_add(1, Ordering::Relaxed);
+    format!("{}#{}#{opening}", key.0, hexadecimal_text(&key.1))
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join("_")
+}
+
+fn seconds_of_nanoseconds(nanoseconds: u64) -> f64 {
+    std::time::Duration::from_nanos(nanoseconds).as_secs_f64()
+}
+
+impl OpenLibrary {
+    /// `CRASH_LIBRARY_LOCK_TIME connection= pid= seconds_open= seconds_held= seconds_held_in_round_trips= seconds_held_outside_round_trips=
+    /// seconds_waited= most_askers_at_once= acquisitions= held_share_of_the_wall_clock= flows_read_over_the_connection=`，
+    /// 字段都是从连接开着起累计的：一趟的读数按 `connection=` 与 `pid=` 各取这一趟日志里那条连接的最后一行。
+    /// `seconds_held_in_round_trips` 是锁里花在与 prune-server 往返上的秒数（[`VerdictStore::nanoseconds_in_round_trips_so_far`]），
+    /// `most_askers_at_once` 是同时在等这把锁的最多线程数。
+    fn lock_time_line(&self, time_open: std::time::Duration) -> String {
+        let times = &self.lock_times;
+        let seconds_open = time_open.as_secs_f64();
+        let held_nanoseconds = times.nanoseconds_held.load(Ordering::Relaxed);
+        let held_in_round_trips_nanoseconds = times
+            .nanoseconds_held_in_round_trips
+            .load(Ordering::Relaxed);
+        let held = seconds_of_nanoseconds(held_nanoseconds);
+        let waited = seconds_of_nanoseconds(times.nanoseconds_waited.load(Ordering::Relaxed));
+        let held_share = if seconds_open > 0.0 {
+            held / seconds_open
+        } else {
+            0.0
+        };
+        format!(
+            "{LIBRARY_LOCK_TIME_LINE_PREFIX} connection={} pid={} seconds_open={seconds_open:.3} seconds_held={held:.3} seconds_held_in_round_trips={:.3} seconds_held_outside_round_trips={:.3} seconds_waited={waited:.3} most_askers_at_once={} acquisitions={} held_share_of_the_wall_clock={held_share:.3} flows_read_over_the_connection={}",
+            self.connection_name,
+            std::process::id(),
+            seconds_of_nanoseconds(held_in_round_trips_nanoseconds),
+            seconds_of_nanoseconds(held_nanoseconds.saturating_sub(held_in_round_trips_nanoseconds)),
+            times.most_askers_at_once.load(Ordering::Relaxed),
+            times.acquisitions.load(Ordering::Relaxed),
+            self.flows_read_back
+                .values_read_over_the_connection
+                .load(Ordering::Relaxed)
+        )
+    }
+
+    /// 按取锁的调用点各一行（[`LIBRARY_LOCK_TIME_OF_A_SITE_LINE_PREFIX`]），持锁秒数大的在前：`connection= pid= site=<文件>:<行>
+    /// seconds_held= seconds_held_in_round_trips= seconds_held_outside_round_trips= acquisitions= longest_hold_seconds=`，从连接开着起累计。
+    fn lock_time_lines_of_the_sites(&self) -> Vec<String> {
+        let sites = self
+            .lock_times
+            .of_each_site
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut ordered: Vec<(&(&'static str, u32), &LockTimesOfASite)> = sites.iter().collect();
+        ordered.sort_by_key(|site| std::cmp::Reverse(site.1.nanoseconds_held));
+        ordered
+            .into_iter()
+            .map(|((file, line), of_the_site)| {
+                format!(
+                    "{LIBRARY_LOCK_TIME_OF_A_SITE_LINE_PREFIX} connection={} pid={} site={file}:{line} seconds_held={:.3} seconds_held_in_round_trips={:.3} seconds_held_outside_round_trips={:.3} acquisitions={} longest_hold_seconds={:.3}",
+                    self.connection_name,
+                    std::process::id(),
+                    seconds_of_nanoseconds(of_the_site.nanoseconds_held),
+                    seconds_of_nanoseconds(of_the_site.nanoseconds_held_in_round_trips),
+                    seconds_of_nanoseconds(
+                        of_the_site
+                            .nanoseconds_held
+                            .saturating_sub(of_the_site.nanoseconds_held_in_round_trips)
+                    ),
+                    of_the_site.acquisitions,
+                    seconds_of_nanoseconds(of_the_site.longest_hold_nanoseconds),
+                )
+            })
+            .collect()
+    }
+
+    /// 连接那一行连同各调用点那几行打进标准错误。
+    fn print_the_lock_time_lines(&self, time_open: std::time::Duration) {
+        eprintln!("{}", self.lock_time_line(time_open));
+        for line in self.lock_time_lines_of_the_sites() {
+            eprintln!("{line}");
+        }
+    }
+}
+
+impl Drop for OpenLibrary {
+    fn drop(&mut self) {
+        self.print_the_lock_time_lines(self.lock_times.opened_at.elapsed());
+    }
+}
+
+/// 持锁时长行的头（[`OpenLibrary::lock_time_line`]）：只打进日志，不进任何键。
+pub const LIBRARY_LOCK_TIME_LINE_PREFIX: &str = "CRASH_LIBRARY_LOCK_TIME";
+
+/// 按调用点的持锁时长行的头（[`OpenLibrary::lock_time_lines_of_the_sites`]）：只打进日志，不进任何键。
+pub const LIBRARY_LOCK_TIME_OF_A_SITE_LINE_PREFIX: &str = "CRASH_LIBRARY_LOCK_TIME_OF_A_SITE";
+
+/// 连接开着时隔多久打一行持锁时长：实验装置把引擎放在 `static` 里，连接开到进程退出、放手那一行打不出来，读数靠这一行。
+const SECONDS_BETWEEN_LIBRARY_LOCK_TIME_LINES: u64 = 60;
+
+/// 一条连接上那把锁的累计时长。线程数越多等锁的秒数加起来越大，可以超过连接开着的秒数；判收窄成不成看持锁占比。
+struct LibraryLockTimes {
+    opened_at: std::time::Instant,
+    nanoseconds_held: AtomicU64,
+    /// 持锁的纳秒里花在与 prune-server 往返上的那一部分。
+    nanoseconds_held_in_round_trips: AtomicU64,
+    nanoseconds_waited: AtomicU64,
+    /// 此刻在等这把锁的线程数，与它到过的最大值。
+    askers_now: AtomicU64,
+    most_askers_at_once: AtomicU64,
+    acquisitions: AtomicU64,
+    next_line_at_second: AtomicU64,
+    /// 按取锁的调用点（文件，行）各记一份。
+    of_each_site: Mutex<BTreeMap<(&'static str, u32), LockTimesOfASite>>,
+}
+
+/// 一个取锁调用点的累计：持锁纳秒、其中往返的纳秒、取锁次数、最长一次持锁的纳秒。
+#[derive(Default)]
+struct LockTimesOfASite {
+    nanoseconds_held: u64,
+    nanoseconds_held_in_round_trips: u64,
+    acquisitions: u64,
+    longest_hold_nanoseconds: u64,
+}
+
+impl LibraryLockTimes {
+    fn starting_at_this_opening() -> Self {
+        Self {
+            opened_at: std::time::Instant::now(),
+            nanoseconds_held: AtomicU64::new(0),
+            nanoseconds_held_in_round_trips: AtomicU64::new(0),
+            nanoseconds_waited: AtomicU64::new(0),
+            askers_now: AtomicU64::new(0),
+            most_askers_at_once: AtomicU64::new(0),
+            acquisitions: AtomicU64::new(0),
+            next_line_at_second: AtomicU64::new(SECONDS_BETWEEN_LIBRARY_LOCK_TIME_LINES),
+            of_each_site: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    /// 一次持锁放手时记进这一次的调用点：持了多久、其中往返多久。
+    fn note_a_hold_at_the_site(
+        &self,
+        site: &'static std::panic::Location<'static>,
+        nanoseconds_held: u64,
+        nanoseconds_held_in_round_trips: u64,
+    ) {
+        self.nanoseconds_held_in_round_trips
+            .fetch_add(nanoseconds_held_in_round_trips, Ordering::Relaxed);
+        let mut sites = self
+            .of_each_site
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let of_the_site = sites.entry((site.file(), site.line())).or_default();
+        of_the_site.nanoseconds_held += nanoseconds_held;
+        of_the_site.nanoseconds_held_in_round_trips += nanoseconds_held_in_round_trips;
+        of_the_site.acquisitions += 1;
+        of_the_site.longest_hold_nanoseconds =
+            of_the_site.longest_hold_nanoseconds.max(nanoseconds_held);
+    }
+
+    /// 到了下一行该打的时候交回连接开了多久；几条线程同时到点只有抢到的那一条拿到。在取锁之前调，打这一行不算进持锁时长。
+    fn time_open_when_a_lock_time_line_is_due(
+        &self,
+        now: std::time::Instant,
+    ) -> Option<std::time::Duration> {
+        let time_open = now.duration_since(self.opened_at);
+        let next_line_at_second = self.next_line_at_second.load(Ordering::Relaxed);
+        if time_open.as_secs() < next_line_at_second {
+            return None;
+        }
+        self.next_line_at_second
+            .compare_exchange(
+                next_line_at_second,
+                time_open.as_secs() + SECONDS_BETWEEN_LIBRARY_LOCK_TIME_LINES,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            )
+            .ok()
+            .map(|_line_due_before| time_open)
+    }
+}
+
+fn nanoseconds_of_a_library_lock_duration(duration: std::time::Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).expect("一次取锁或持锁的纳秒数装得进 u64：五百多年")
+}
+
+thread_local! {
+    /// 这条线程此刻握着几把库锁（[`LibraryLockHeld`] 造出来加一、丢掉减一；它不能跨线程）。
+    static LIBRARY_LOCKS_HELD_BY_THIS_THREAD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// 纯计算（排计划、序列化、算摘要、打包、解码）的路上判：这条线程没握着库锁。别的线程握着不算，它们本来就该能同时算。
+/// 这几步挪回锁里时当场 panic，不等到量出并行上不去。
+///
+/// # Panics
+/// 这条线程握着库锁。
+pub(crate) fn assert_this_thread_holds_no_library_lock(pure_work: &str) {
+    let locks_held = LIBRARY_LOCKS_HELD_BY_THIS_THREAD.with(std::cell::Cell::get);
+    assert_eq!(
+        locks_held, 0,
+        "{pure_work}是纯计算，要挪到判定库的锁外：握着锁算，这个进程里别的线程读写判定库都得等它"
+    );
+}
+
+/// 手里握着的库锁：照 [`VerdictStore`] 用，丢掉时放锁、把握了多久（其中往返多久）记进 [`LibraryLockTimes`]，按取锁的调用点各记一份。
+pub struct LibraryLockHeld<'library> {
+    store: MutexGuard<'library, VerdictStore>,
+    times: &'library LibraryLockTimes,
+    acquired_at: std::time::Instant,
+    site: &'static std::panic::Location<'static>,
+    nanoseconds_in_round_trips_at_acquisition: u64,
+}
+
+impl std::ops::Deref for LibraryLockHeld<'_> {
+    type Target = VerdictStore;
+
+    fn deref(&self) -> &VerdictStore {
+        &self.store
+    }
+}
+
+impl std::ops::DerefMut for LibraryLockHeld<'_> {
+    fn deref_mut(&mut self) -> &mut VerdictStore {
+        &mut self.store
+    }
+}
+
+impl Drop for LibraryLockHeld<'_> {
+    fn drop(&mut self) {
+        self.times.nanoseconds_held.fetch_add(
+            nanoseconds_of_a_library_lock_duration(self.acquired_at.elapsed()),
+            Ordering::Relaxed,
+        );
+        self.times.note_a_hold_at_the_site(
+            self.site,
+            nanoseconds_of_a_library_lock_duration(self.acquired_at.elapsed()),
+            self.store
+                .nanoseconds_in_round_trips_so_far()
+                .saturating_sub(self.nanoseconds_in_round_trips_at_acquisition),
+        );
+        LIBRARY_LOCKS_HELD_BY_THIS_THREAD.with(|locks_held| locks_held.set(locks_held.get() - 1));
+    }
+}
+
+/// 一条连接最多留多少字节读回的值（按读回前的载荷算；解码之后的 Rust 结构大一点，粗估在载荷的两倍以内，推的）：超了从最早读回的放起。
+/// E171（三oracle合谋测试）两条流，载荷大的那条约 7.2 MiB，用不到这个数；比这个数还大的流不留，下一次照读。
+const MOST_BYTES_OF_FLOWS_HELD_OF_A_LIBRARY: u64 = 512 * 1024 * 1024;
+
+/// 一个摘要一个格子：几条线程同时要同一个摘要时，头一条握着格子去读，其余等它、拿它读回的那一份，不各读一遍。
+type SlotOfAValueReadBack<Value> = Arc<Mutex<Option<Arc<Value>>>>;
+
+struct SlotsOfTheValuesReadBack<Value> {
+    slot_of_digest: BTreeMap<[u8; DIGEST_BYTES], SlotOfAValueReadBack<Value>>,
+    /// 读回过的（摘要，载荷字节数），最早读回的在前。
+    held_in_the_order_read: VecDeque<([u8; DIGEST_BYTES], u64)>,
+    bytes_held: u64,
+}
+
+/// 同一摘要的值只从库里读回一次、留在内存里给这条连接上后面要它的人：内容由摘要定，读回时核过摘要，再读一遍读到的是同样的字节。
+/// 只留读回的，不留录入段内存里的那一份（录入与判两段中间只经库），不写结论，不是第二份判定库。
+struct ValuesReadBackOnceInThisProcess<Value> {
+    most_bytes_held: u64,
+    slots: Mutex<SlotsOfTheValuesReadBack<Value>>,
+    values_read_over_the_connection: AtomicU64,
+}
+
+impl<Value> ValuesReadBackOnceInThisProcess<Value> {
+    fn holding_at_most(most_bytes_held: u64) -> Self {
+        Self {
+            most_bytes_held,
+            slots: Mutex::new(SlotsOfTheValuesReadBack {
+                slot_of_digest: BTreeMap::new(),
+                held_in_the_order_read: VecDeque::new(),
+                bytes_held: 0,
+            }),
+            values_read_over_the_connection: AtomicU64::new(0),
+        }
+    }
+
+    /// 这个摘要留着就交回留着的；没留着调 `read` 读（交回值与它的载荷字节数）、留下。`read` 没读回值（只录、只判了这台机器的一份、出错）什么都不留，
+    /// 下一次照调。同一摘要同时只有一条线程在 `read` 里，它不握着 `slots`，别的摘要不等它。
+    ///
+    /// # Errors
+    /// `read` 的错。
+    fn held_or_read_once(
+        &self,
+        digest: &[u8; DIGEST_BYTES],
+        read: impl FnOnce() -> Result<StageOutcome<(Value, u64)>, String>,
+    ) -> Result<StageOutcome<Arc<Value>>, String> {
+        let slot: SlotOfAValueReadBack<Value> = Arc::clone(
+            self.slots
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .slot_of_digest
+                .entry(*digest)
+                .or_default(),
+        );
+        let mut value_in_the_slot = slot.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(value) = &*value_in_the_slot {
+            return Ok(StageOutcome::Judged(Arc::clone(value)));
+        }
+        let (value, payload_bytes) = match read()? {
+            StageOutcome::RecordedOnly => return Ok(StageOutcome::RecordedOnly),
+            StageOutcome::JudgedMyShareOnly {
+                blocks_judged_here,
+                blocks_left_to_other_hosts,
+            } => {
+                return Ok(StageOutcome::JudgedMyShareOnly {
+                    blocks_judged_here,
+                    blocks_left_to_other_hosts,
+                })
+            }
+            StageOutcome::Judged((value, payload_bytes)) => (Arc::new(value), payload_bytes),
+        };
+        self.values_read_over_the_connection
+            .fetch_add(1, Ordering::Relaxed);
+        *value_in_the_slot = Some(Arc::clone(&value));
+        drop(value_in_the_slot);
+        self.hold_within_the_limit(digest, payload_bytes);
+        Ok(StageOutcome::Judged(value))
+    }
+
+    /// 记下刚读回的这一份，超了额度从最早读回的放起（它自己比额度还大就连它一起放）。已经拿到手的 [`Arc`] 不受影响，放的只是这里留的那一份。
+    fn hold_within_the_limit(&self, digest: &[u8; DIGEST_BYTES], payload_bytes: u64) {
+        let mut slots = self.slots.lock().unwrap_or_else(PoisonError::into_inner);
+        slots
+            .held_in_the_order_read
+            .push_back((*digest, payload_bytes));
+        slots.bytes_held += payload_bytes;
+        // 迭代上界：留着的份数，每一轮放一份
+        while slots.bytes_held > self.most_bytes_held {
+            let Some((digest_let_go, bytes_let_go)) = slots.held_in_the_order_read.pop_front()
+            else {
+                break;
+            };
+            slots.bytes_held -= bytes_let_go;
+            slots.slot_of_digest.remove(&digest_let_go);
+        }
+    }
 }
 
 /// 这个进程里开着的判定库：按（连哪一处，键空间）各记一份。同一个进程里几处开同一份（并行跑的几条用例、几类测试）共用这一份连接，
@@ -746,7 +1349,12 @@ impl LibraryOpenInThisProcess {
         let store = VerdictStore::open_the_prune_server(storage)
             .map_err(|error| format!("开不了 prune-server 里那一份崩溃判定库：{error:?}"))?;
         let open = Arc::new(OpenLibrary {
+            connection_name: connection_name_of_an_opening(&key),
             store: Mutex::new(store),
+            lock_times: LibraryLockTimes::starting_at_this_opening(),
+            flows_read_back: ValuesReadBackOnceInThisProcess::holding_at_most(
+                MOST_BYTES_OF_FLOWS_HELD_OF_A_LIBRARY,
+            ),
         });
         open_libraries.insert(key.clone(), Arc::downgrade(&open));
         Ok(Self {
@@ -755,14 +1363,103 @@ impl LibraryOpenInThisProcess {
         })
     }
 
-    /// 库里那一把锁：一次一个读写。
-    pub fn lock(&self) -> MutexGuard<'_, VerdictStore> {
+    fn open_library(&self) -> &OpenLibrary {
         self.open
             .as_ref()
             .expect("库在放手之前一直在：只有 Drop 取走它")
-            .store
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// 库里那一把锁：一次一个读写。握着它只做与 prune-server 的往返。持锁时长按调用这一处的文件与行记（`#[track_caller]`）。
+    #[track_caller]
+    pub fn lock(&self) -> LibraryLockHeld<'_> {
+        let site = std::panic::Location::caller();
+        let open = self.open_library();
+        let asked_at = std::time::Instant::now();
+        if let Some(time_open) = open
+            .lock_times
+            .time_open_when_a_lock_time_line_is_due(asked_at)
+        {
+            open.print_the_lock_time_lines(time_open);
+        }
+        let askers_with_this_one = open.lock_times.askers_now.fetch_add(1, Ordering::Relaxed) + 1;
+        open.lock_times
+            .most_askers_at_once
+            .fetch_max(askers_with_this_one, Ordering::Relaxed);
+        let store = open.store.lock().unwrap_or_else(PoisonError::into_inner);
+        open.lock_times.askers_now.fetch_sub(1, Ordering::Relaxed);
+        let nanoseconds_in_round_trips_at_acquisition = store.nanoseconds_in_round_trips_so_far();
+        let acquired_at = std::time::Instant::now();
+        open.lock_times.nanoseconds_waited.fetch_add(
+            nanoseconds_of_a_library_lock_duration(acquired_at.duration_since(asked_at)),
+            Ordering::Relaxed,
+        );
+        open.lock_times.acquisitions.fetch_add(1, Ordering::Relaxed);
+        LIBRARY_LOCKS_HELD_BY_THIS_THREAD.with(|locks_held| locks_held.set(locks_held.get() + 1));
+        LibraryLockHeld {
+            store,
+            times: &open.lock_times,
+            acquired_at,
+            site,
+            nanoseconds_in_round_trips_at_acquisition,
+        }
+    }
+}
+
+/// 判段与录入段读写判定库经它：每一次读写现取现放（[`Self::take`]），手里不留整段握着的 [`VerdictStore`]，判、看、排计划都在锁外，
+/// 同一条连接上别的线程（同一个进程里并行跑的用例、给定状态表的引擎）在这期间照样读写。
+pub enum LibraryTakenAtEachReadOrWrite<'library> {
+    /// 这个进程里开着的那一份：每次取的是它那一把锁，持锁时长按取锁的调用点记。
+    SharedInThisProcess(&'library LibraryOpenInThisProcess),
+    /// 调用方独占的一份（单测与实验装置自己开的、不经这个进程登记表的那一份库）：同样一次一取，没有别的连接上的线程等它。
+    HeldByThisCallerAlone(Mutex<&'library mut VerdictStore>),
+}
+
+impl<'library> LibraryTakenAtEachReadOrWrite<'library> {
+    /// 调用方独占的那一份库照每次读写一取的办法交下去。
+    #[must_use]
+    pub fn held_by_this_caller_alone(store: &'library mut VerdictStore) -> Self {
+        Self::HeldByThisCallerAlone(Mutex::new(store))
+    }
+
+    /// 为这一次读写取库：取到的丢掉就放。同一条线程上手里握着一份还没丢又来取，等的是自己，死锁。
+    #[track_caller]
+    pub fn take(&self) -> StoreTakenForOneReadOrWrite<'_, 'library> {
+        match self {
+            Self::SharedInThisProcess(library) => {
+                StoreTakenForOneReadOrWrite::UnderTheLockOfTheConnection(library.lock())
+            }
+            Self::HeldByThisCallerAlone(store) => {
+                StoreTakenForOneReadOrWrite::HeldByThisCallerAlone(
+                    store.lock().unwrap_or_else(PoisonError::into_inner),
+                )
+            }
+        }
+    }
+}
+
+/// 为一次读写取到的库（[`LibraryTakenAtEachReadOrWrite::take`]）：照 [`VerdictStore`] 用，丢掉就放。
+pub enum StoreTakenForOneReadOrWrite<'taken, 'library> {
+    UnderTheLockOfTheConnection(LibraryLockHeld<'taken>),
+    HeldByThisCallerAlone(MutexGuard<'taken, &'library mut VerdictStore>),
+}
+
+impl std::ops::Deref for StoreTakenForOneReadOrWrite<'_, '_> {
+    type Target = VerdictStore;
+
+    fn deref(&self) -> &VerdictStore {
+        match self {
+            Self::UnderTheLockOfTheConnection(held) => held,
+            Self::HeldByThisCallerAlone(store) => store,
+        }
+    }
+}
+
+impl std::ops::DerefMut for StoreTakenForOneReadOrWrite<'_, '_> {
+    fn deref_mut(&mut self) -> &mut VerdictStore {
+        match self {
+            Self::UnderTheLockOfTheConnection(held) => held,
+            Self::HeldByThisCallerAlone(store) => store,
+        }
     }
 }
 
@@ -814,9 +1511,45 @@ impl CrashLibrary {
         &self.library_name
     }
 
-    /// 库里那一把锁：一次一个读写。
-    pub fn lock(&self) -> MutexGuard<'_, VerdictStore> {
+    /// 库里那一把锁：一次一个读写。握着它只做与 prune-server 的往返。持锁时长按调用这一处的文件与行记。
+    #[track_caller]
+    pub fn lock(&self) -> LibraryLockHeld<'_> {
         self.library.lock()
+    }
+
+    /// 这一类测试的判段、录入段读写库的那一份：每一次读写现取现放（[`LibraryTakenAtEachReadOrWrite::SharedInThisProcess`]）。
+    #[must_use]
+    pub fn taken_at_each_read_or_write(&self) -> LibraryTakenAtEachReadOrWrite<'_> {
+        LibraryTakenAtEachReadOrWrite::SharedInThisProcess(&self.library)
+    }
+
+    /// 这个摘要的流留着就交回留着的（读回过、排过计划的那一份）；没留着调 `read`（交回从库里读回的流连计划与载荷字节数）、留下。
+    /// 同一条连接上同一摘要只读回一次。
+    ///
+    /// # Errors
+    /// `read` 的错。
+    pub(crate) fn recorded_flow_and_its_plan_read_back_once(
+        &self,
+        flow_digest: &[u8; DIGEST_BYTES],
+        read: impl FnOnce() -> Result<
+            StageOutcome<(crate::crash_amplification::RecordedFlowAndItsPlan, u64)>,
+            String,
+        >,
+    ) -> Result<StageOutcome<Arc<crate::crash_amplification::RecordedFlowAndItsPlan>>, String> {
+        self.library
+            .open_library()
+            .flows_read_back
+            .held_or_read_once(flow_digest, read)
+    }
+
+    /// 这条连接从库里读回过几次流（留着的不算）：单测用。
+    #[cfg(test)]
+    pub(crate) fn recorded_flows_read_over_the_connection(&self) -> u64 {
+        self.library
+            .open_library()
+            .flows_read_back
+            .values_read_over_the_connection
+            .load(Ordering::Relaxed)
     }
 
     /// 这个进程里开着的那一份（给定状态表的引擎按它共用）。
@@ -1301,6 +2034,23 @@ pub fn read_flow_facts_back(
     FlowFactsReadBack::from_the_library_bytes(&bytes, digest)
 }
 
+/// 同 [`read_flow_facts_back`]，库只在读字节那一次往返里取：解码、核摘要在锁外。
+///
+/// # Errors
+/// 同 [`read_flow_facts_back`]。
+pub fn read_flow_facts_back_outside_the_lock(
+    library: &LibraryTakenAtEachReadOrWrite<'_>,
+    digest: &[u8; DIGEST_BYTES],
+) -> Result<FlowFactsReadBack, String> {
+    let bytes = library
+        .take()
+        .read_flow_facts(digest)
+        .map_err(|error| format!("读事实表失败：{error:?}"))?
+        .ok_or_else(|| "事实表不在库里：先跑录入段".to_string())?;
+    assert_this_thread_holds_no_library_lock("核事实表的摘要、解事实表");
+    FlowFactsReadBack::from_the_library_bytes(&bytes, digest)
+}
+
 /// 把事实表按摘要写进 `store`，再从 `store` 读回：核对只拿读回的那一份。
 ///
 /// # Errors
@@ -1333,6 +2083,24 @@ pub fn read_packed_judge_tables_back(
 }
 
 #[cfg(feature = "gpu")]
+/// 同 [`read_packed_judge_tables_back`]，库只在读字节那一次往返里取：核摘要、解码在锁外（判表可到几百 MiB，别的线程不等它解）。
+///
+/// # Errors
+/// 同 [`read_packed_judge_tables_back`]。
+pub fn read_packed_judge_tables_back_outside_the_lock(
+    library: &LibraryTakenAtEachReadOrWrite<'_>,
+    digest: &[u8; DIGEST_BYTES],
+) -> Result<PackedJudgeTablesReadBack, String> {
+    let bytes = library
+        .take()
+        .read_packed_judge_tables(digest)
+        .map_err(|error| format!("读 GPU 判表失败：{error:?}"))?
+        .ok_or_else(|| "GPU 判表不在库里：先跑录入段".to_string())?;
+    assert_this_thread_holds_no_library_lock("核判表的摘要、解读回的判表");
+    PackedJudgeTablesReadBack::from_the_library_bytes(&bytes, digest)
+}
+
+#[cfg(feature = "gpu")]
 /// 把打包判表按摘要写进 `store`，再从 `store` 读回：GPU 判器只拿读回的那一份。录入段、给定状态表的引擎与对拍用例都经它。
 ///
 /// # Errors
@@ -1348,6 +2116,53 @@ pub fn record_the_judge_tables_and_read_them_back(
         .map_err(|error| format!("GPU 判表写不进库：{error:?}"))?;
     drop(bytes);
     read_packed_judge_tables_back(store, &digest)
+}
+
+#[cfg(feature = "gpu")]
+/// 同 [`record_the_judge_tables_and_read_them_back`]，锁只包写与读那两次往返：序列化、算摘要、核摘要与解码都在锁外（几条线程同时判给定状态表时互不等）。
+///
+/// # Errors
+/// 同 [`record_the_judge_tables_and_read_them_back`]。
+pub(crate) fn record_the_judge_tables_and_read_them_back_outside_the_lock(
+    library: &LibraryOpenInThisProcess,
+    tables: &PackedJudgeTables,
+) -> Result<PackedJudgeTablesReadBack, String> {
+    assert_this_thread_holds_no_library_lock("序列化判表");
+    let bytes = tables.to_bytes();
+    let digest = sha256_digest(&bytes);
+    library
+        .lock()
+        .store_packed_judge_tables(&digest, &bytes)
+        .map_err(|error| format!("GPU 判表写不进库：{error:?}"))?;
+    drop(bytes);
+    let bytes_read_back = library
+        .lock()
+        .read_packed_judge_tables(&digest)
+        .map_err(|error| format!("读 GPU 判表失败：{error:?}"))?
+        .ok_or_else(|| "GPU 判表不在库里：先跑录入段".to_string())?;
+    assert_this_thread_holds_no_library_lock("核摘要、解判表");
+    PackedJudgeTablesReadBack::from_the_library_bytes(&bytes_read_back, &digest)
+}
+
+#[cfg(feature = "gpu")]
+/// 同 [`record_the_judge_tables_and_read_them_back`]，库每一次读写现取现放（[`LibraryTakenAtEachReadOrWrite`]）：序列化、算摘要、
+/// 核摘要与解码都在锁外。判段在观察者交回的盘上判池级 checker 时经它。
+///
+/// # Errors
+/// 同 [`record_the_judge_tables_and_read_them_back`]。
+pub(crate) fn record_the_judge_tables_and_read_them_back_at_each_read_or_write(
+    library: &LibraryTakenAtEachReadOrWrite<'_>,
+    tables: &PackedJudgeTables,
+) -> Result<PackedJudgeTablesReadBack, String> {
+    assert_this_thread_holds_no_library_lock("序列化判段要入库的判表");
+    let bytes = tables.to_bytes();
+    let digest = sha256_digest(&bytes);
+    library
+        .take()
+        .store_packed_judge_tables(&digest, &bytes)
+        .map_err(|error| format!("GPU 判表写不进库：{error:?}"))?;
+    drop(bytes);
+    read_packed_judge_tables_back_outside_the_lock(library, &digest)
 }
 
 // ============================== 对拍用例的两段与对拍结论 ==============================
@@ -1389,6 +2204,264 @@ pub fn facts_through_the_pairing_library(
         },
     )
     .unwrap_or_else(|refusal| panic!("对拍用例「{item_name}」的事实表过库失败：{refusal}"))
+}
+
+/// 对拍用例的输入清单里输入那一样的名字。
+const PAIRING_MANIFEST_INPUT: &str = "input";
+
+/// 从判定库里读回、核过摘要的一份对拍输入：对拍的两边只收它。字段私有，只有 [`PairingInputReadBack::from_the_library_bytes`] 造得出。
+#[derive(Debug)]
+pub struct PairingInputReadBack {
+    bytes: Vec<u8>,
+    digest: [u8; DIGEST_BYTES],
+}
+
+impl PairingInputReadBack {
+    /// 库里按 `digest` 存的那份字节：核摘要。
+    ///
+    /// # Errors
+    /// 字节的摘要对不上（库里那份被改过）。
+    pub fn from_the_library_bytes(
+        bytes: Vec<u8>,
+        digest: &[u8; DIGEST_BYTES],
+    ) -> Result<Self, String> {
+        if sha256_digest(&bytes) != *digest {
+            return Err("对拍输入摘要对不上：库里那份坏了，重跑录入段".to_string());
+        }
+        Ok(Self {
+            bytes,
+            digest: *digest,
+        })
+    }
+
+    /// 读回的字节。
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// 这份输入的摘要（对拍结论的键里输入那一半，[`pairing_conclusion_reused_or_judged`]）。
+    #[must_use]
+    pub fn digest(&self) -> &[u8; DIGEST_BYTES] {
+        &self.digest
+    }
+}
+
+/// 按摘要从库里读对拍输入：读字节、核摘要。
+///
+/// # Errors
+/// 库读失败；库里没有这个摘要；字节的摘要对不上。
+pub fn read_pairing_input_back(
+    store: &VerdictStore,
+    digest: &[u8; DIGEST_BYTES],
+) -> Result<PairingInputReadBack, String> {
+    let bytes = store
+        .read_pairing_input(digest)
+        .map_err(|error| format!("读对拍输入失败：{error:?}"))?
+        .ok_or_else(|| "对拍输入不在库里：先跑录入段".to_string())?;
+    PairingInputReadBack::from_the_library_bytes(bytes, digest)
+}
+
+/// 输入是调用方给的字节的对拍用例用：录入段把输入按摘要写进库、按录入键（输入摘要）登清单；判段照同一份输入现算录入键、读清单、
+/// 按摘要读回，对拍的两边只拿读回的那一份。只录那一趟交回 [`StageOutcome::RecordedOnly`]，用例拿到它就收工。
+/// 与 [`facts_through_the_pairing_library`] 同一个走法，输入不限是事实表。
+///
+/// # Panics
+/// 项名不合规矩；库开不了、写不进、读不回。
+pub fn pairing_input_through_the_pairing_library(
+    item_name: &str,
+    input_bytes: &[u8],
+) -> StageOutcome<PairingInputReadBack> {
+    let item =
+        ItemName::new(item_name).unwrap_or_else(|refusal| panic!("对拍用例的项名：{refusal}"));
+    let library = CrashLibrary::open(CrashLibraryClass::InputPairing)
+        .unwrap_or_else(|refusal| panic!("对拍用例「{item_name}」开不了库：{refusal}"));
+    let recording = recording_key_of_the_inputs(&RecordingInputsDigest(sha256_digest(input_bytes)));
+    pairing_input_through_the_library_under_the_recording_key(
+        &library,
+        RunStage::of_this_process(),
+        &item,
+        &recording,
+        input_bytes,
+    )
+    .unwrap_or_else(|refusal| panic!("对拍用例「{item_name}」的输入过库失败：{refusal}"))
+}
+
+/// [`pairing_input_through_the_pairing_library`] 的本体：库、选段与录入键由调用方给（单测在一次性的库上跑）。
+///
+/// # Errors
+/// 写不进库；登清单、读清单不成；库里没有清单指到的那一份；读回的字节摘要对不上。
+pub fn pairing_input_through_the_library_under_the_recording_key(
+    library: &CrashLibrary,
+    stage: RunStage,
+    item: &ItemName,
+    recording: &RecordingKeyOfThisRun,
+    input_bytes: &[u8],
+) -> Result<StageOutcome<PairingInputReadBack>, String> {
+    let digest = sha256_digest(input_bytes);
+    two_stages_under_the_recording_key(
+        library,
+        stage,
+        item,
+        recording,
+        |library_recorded_into| {
+            library_recorded_into
+                .lock()
+                .store_pairing_input(&digest, input_bytes)
+                .map_err(|error| format!("对拍输入写不进库：{error:?}"))?;
+            Ok(ItemManifest {
+                kind: "input_pairing".to_string(),
+                digests: vec![(PAIRING_MANIFEST_INPUT.to_string(), digest)],
+            })
+        },
+        |library_read_from, manifest| {
+            Ok(StageOutcome::Judged(read_pairing_input_back(
+                &library_read_from.lock(),
+                &manifest.digest_named(PAIRING_MANIFEST_INPUT)?,
+            )?))
+        },
+    )
+}
+
+/// 对拍用例的清单里参照那一样的名字。
+const PAIRING_MANIFEST_REFERENCE: &str = "reference";
+
+/// 从库里读回的对拍输入与参照一侧的结果（[`pairing_input_and_reference_through_the_pairing_library`] 判段交回的）。
+#[derive(Debug)]
+pub struct PairingInputAndReferenceReadBack {
+    pub input: PairingInputReadBack,
+    /// 参照一侧在录入段算出、写进库的结果。
+    pub reference: PairingInputReadBack,
+}
+
+/// 对拍输入连同参照一侧的录入输入摘要：输入的摘要与参照一侧判法单元指纹拼起来取 SHA-256。参照的代码变了、或输入变了，录入键都变，
+/// 库里旧的那一份参照不再被读到。
+#[must_use]
+pub fn recording_inputs_digest_of_the_pairing_input_and_the_reference_units(
+    input_bytes: &[u8],
+    reference_units: &JudgingUnitsKey,
+) -> RecordingInputsDigest {
+    RecordingInputsDigest(sha256_digest(
+        format!(
+            "singlefs pairing input with the reference\nreference_units={}\ninput={}\n",
+            hexadecimal_text(reference_units.fingerprint()),
+            hexadecimal_text(&sha256_digest(input_bytes))
+        )
+        .as_bytes(),
+    ))
+}
+
+/// 一边是参照（在 CPU 上算）、一边要上卡的对拍用例用：录入段把输入写进库，调 `reference_of_the_input` 在 CPU 上算参照一侧的结果、也写进库，
+/// 按录入键登清单；判段照同一份输入与参照一侧的判法单元现算录入键、读清单，输入与参照都从库里读回，持卡的那一段不再算参照。
+/// 录入键照 [`recording_key_of_the_inputs`] 同一个算法，输入摘要取 [`recording_inputs_digest_of_the_pairing_input_and_the_reference_units`]；
+/// `reference_units` 拒算时照录入函数单元拒算同样处置：键只拼输入的摘要、照录、不凭命中跳过。
+/// 只录那一趟交回 [`StageOutcome::RecordedOnly`]，用例拿到它就收工。
+///
+/// # Panics
+/// 项名不合规矩；库开不了、写不进、读不回。
+pub fn pairing_input_and_reference_through_the_pairing_library(
+    item_name: &str,
+    input_bytes: &[u8],
+    reference_units: &Result<JudgingUnitsKey, String>,
+    reference_of_the_input: impl FnOnce(&[u8]) -> Vec<u8>,
+) -> StageOutcome<PairingInputAndReferenceReadBack> {
+    let item =
+        ItemName::new(item_name).unwrap_or_else(|refusal| panic!("对拍用例的项名：{refusal}"));
+    let library = CrashLibrary::open(CrashLibraryClass::InputPairing)
+        .unwrap_or_else(|refusal| panic!("对拍用例「{item_name}」开不了库：{refusal}"));
+    let recording = recording_key_of_the_pairing_input_and_the_reference_units(
+        &judging_units_key(&JudgingUnits::Recording, toolchain_of_this_process())
+            .map_err(|refused| refused.sentence()),
+        input_bytes,
+        reference_units,
+    );
+    pairing_input_and_reference_through_the_library_under_the_recording_key(
+        &library,
+        RunStage::of_this_process(),
+        &item,
+        &recording,
+        input_bytes,
+        reference_of_the_input,
+    )
+    .unwrap_or_else(|refusal| panic!("对拍用例「{item_name}」的输入与参照过库失败：{refusal}"))
+}
+
+/// [`pairing_input_and_reference_through_the_pairing_library`] 的录入键：`recording_units` 是录入函数单元那一把（单测造拒算用）。
+#[must_use]
+pub fn recording_key_of_the_pairing_input_and_the_reference_units(
+    recording_units: &Result<JudgingUnitsKey, String>,
+    input_bytes: &[u8],
+    reference_units: &Result<JudgingUnitsKey, String>,
+) -> RecordingKeyOfThisRun {
+    match reference_units {
+        Ok(reference_units) => recording_key_of_the_inputs_under(
+            recording_units,
+            &recording_inputs_digest_of_the_pairing_input_and_the_reference_units(
+                input_bytes,
+                reference_units,
+            ),
+        ),
+        Err(sentence) => RecordingKeyOfThisRun {
+            skips_the_recording_on_a_hit: false,
+            refusal: Some(format!("参照一侧的判法单元拒算：{sentence}")),
+            ..recording_key_of_the_inputs_under(
+                recording_units,
+                &RecordingInputsDigest(sha256_digest(input_bytes)),
+            )
+        },
+    }
+}
+
+/// [`pairing_input_and_reference_through_the_pairing_library`] 的本体：库、选段与录入键由调用方给（单测在一次性的库上跑）。
+///
+/// # Errors
+/// 写不进库；登清单、读清单不成；库里没有清单指到的那一份；读回的字节摘要对不上。
+pub fn pairing_input_and_reference_through_the_library_under_the_recording_key(
+    library: &CrashLibrary,
+    stage: RunStage,
+    item: &ItemName,
+    recording: &RecordingKeyOfThisRun,
+    input_bytes: &[u8],
+    reference_of_the_input: impl FnOnce(&[u8]) -> Vec<u8>,
+) -> Result<StageOutcome<PairingInputAndReferenceReadBack>, String> {
+    let input_digest = sha256_digest(input_bytes);
+    two_stages_under_the_recording_key(
+        library,
+        stage,
+        item,
+        recording,
+        |library_recorded_into| {
+            let reference_bytes = reference_of_the_input(input_bytes);
+            let reference_digest = sha256_digest(&reference_bytes);
+            let mut store = library_recorded_into.lock();
+            store
+                .store_pairing_input(&input_digest, input_bytes)
+                .map_err(|error| format!("对拍输入写不进库：{error:?}"))?;
+            store
+                .store_pairing_input(&reference_digest, &reference_bytes)
+                .map_err(|error| format!("对拍参照写不进库：{error:?}"))?;
+            Ok(ItemManifest {
+                kind: "input_pairing_with_the_reference".to_string(),
+                digests: vec![
+                    (PAIRING_MANIFEST_INPUT.to_string(), input_digest),
+                    (PAIRING_MANIFEST_REFERENCE.to_string(), reference_digest),
+                ],
+            })
+        },
+        |library_read_from, manifest| {
+            let store = library_read_from.lock();
+            Ok(StageOutcome::Judged(PairingInputAndReferenceReadBack {
+                input: read_pairing_input_back(
+                    &store,
+                    &manifest.digest_named(PAIRING_MANIFEST_INPUT)?,
+                )?,
+                reference: read_pairing_input_back(
+                    &store,
+                    &manifest.digest_named(PAIRING_MANIFEST_REFERENCE)?,
+                )?,
+            }))
+        },
+    )
 }
 
 #[cfg(feature = "gpu")]
@@ -1543,42 +2616,595 @@ pub fn pairing_block_inputs_digest(
     sha256_digest(&bytes)
 }
 
-/// 一条流按块对拍下来几块复用、几块现判，与同一时刻手里最多压着几块的结论（宿主内存只随它涨，不随整条流的块数涨）。
+/// 一条流按块对拍下来几块复用、几块现判、几块归别的份，与同一时刻手里最多压着几块的结论（宿主内存只随它涨，不随整条流的块数涨）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PairingBlocksOfTheFlow {
     pub blocks_reused: u64,
     pub blocks_judged_now: u64,
+    /// 归别的份的块（[`PairingBlocksShare`]）：这一份不读库、不判、不折进总账；不是 0 时总账不是整条流的。
+    pub blocks_left_to_other_shares: u64,
+    /// 落在这一趟走的组之外的块（[`PairingBlocksShare::only_the_groups_of_pairing_blocks_in`]）：同样不读库、不判、不折进总账；
+    /// 不是 0 时总账只是那几组的状态，不是整条流的。
+    pub blocks_outside_the_groups_of_this_run: u64,
     pub most_block_conclusions_held_at_once: usize,
 }
 
 /// 判一段连着的块：交这一段里每块的序号段，按同一次序交回每块的结论字节与两边一致不一致；交 `None` 是判那一侧报「本次未跑」。
+/// 几段在各自的线程上同时判（[`pairing_conclusions_of_the_blocks_reused_or_judged`]）。
 pub type JudgeOfAStretchOfPairingBlocks<'closure> =
-    dyn FnMut(&[std::ops::Range<u64>]) -> Option<Vec<PairingJudged>> + 'closure;
+    dyn Fn(&[std::ops::Range<u64>]) -> Option<Vec<PairingJudged>> + Sync + 'closure;
 
-/// 攒着的那一段块交出去判之后怎样了。
-enum PendingPairingBlocks {
-    /// 判完、逐块存进库（拒算的不存）、逐块折进了总账；没攒着块也算这一种。
-    JudgedAndTaken,
-    /// 判那一侧报「本次未跑」：一块都没存。
-    NotRun,
+/// 这一趟领一条流的哪些块（几台机器分着判同一条流）：块按每段 `most_blocks_judged_together` 块分成组，一组归一份（判一段要连着的块，
+/// 一块一块轮着分，CPU 那一侧每块都要重建一次撕裂表）；哪组归哪一份只由权重表、流的输入摘要与组的序号定，几份各算各的、不用商量，
+/// 每一块恰好归一份。块键（[`pairing_block_inputs_digest`]）不带份额：哪一份判的，判出的块照同一把键进同一份库，合并那一趟按整份（`0/1`）全部复用。
+/// 流的输入摘要只错开各条流从哪一份轮起：一块的小流不会全落在同一份上。
+/// 另可只走一段组（[`Self::only_the_groups_of_pairing_blocks_in`]：一条流按状态序号区间拆成几条用例，每条只领自己那一段序号的组），
+/// 与几台分份叠用：组落在这一段里、又归这一份，才算领。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PairingBlocksShare {
+    share_of_this_run: crate::crash_amplification::HostShare,
+    weights_of_the_shares: crate::crash_amplification::WeightedShares,
+    groups_of_this_run: GroupsOfPairingBlocksOfThisRun,
 }
 
-/// 按块对拍（「必须要剪枝和复用」）：`[0, state_count)` 按 `states_per_block` 切块，按序号次序一块块走——库里有这一块
-/// 两边一致的结论（键是 [`pairing_block_inputs_digest`] 与两边判法单元指纹）就复用、不判；记着不一致（红）的与没有的一样现判、照同一把键
+/// 一趟走一条流的哪几组块。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum GroupsOfPairingBlocksOfThisRun {
+    EveryGroup,
+    /// 组的序号落在这个半开区间里的。
+    OnlyTheGroupsIn(std::ops::Range<u64>),
+}
+
+/// 状态序号区间 `ordinals` 落在一条流的哪几组块上（块宽 `states_per_block`、一组 `blocks_per_group` 块，组从序号 0 起排，同
+/// [`pairing_conclusions_of_the_blocks_reused_or_judged`] 的分组）：交回组的半开区间。区间两头要落在组的边界上，终点另可以是整条流的状态数
+/// `state_count`（最后一组不满）；不然领整组时会判到区间外的状态、或漏判区间里的，交 `Err`。
+///
+/// # Errors
+/// 区间是空的、终点越过 `state_count`、起点不在组的边界上、终点既不在组的边界上也不是 `state_count`，或一组的状态数装不进 u64。
+pub fn groups_of_pairing_blocks_holding_the_states(
+    ordinals: &std::ops::Range<u64>,
+    state_count: u64,
+    states_per_block: std::num::NonZeroU64,
+    blocks_per_group: std::num::NonZeroUsize,
+) -> Result<std::ops::Range<u64>, String> {
+    let states_per_group = u64::try_from(blocks_per_group.get())
+        .ok()
+        .and_then(|blocks| blocks.checked_mul(states_per_block.get()))
+        .ok_or_else(|| {
+            format!(
+                "一组 {blocks_per_group} 块、一块 {states_per_block} 个状态：一组的状态数装不进 u64"
+            )
+        })?;
+    if ordinals.start >= ordinals.end || ordinals.end > state_count {
+        return Err(format!(
+            "状态序号区间 {ordinals:?} 是空的或越过了整条流的 {state_count} 个状态"
+        ));
+    }
+    if !ordinals.start.is_multiple_of(states_per_group) {
+        return Err(format!(
+            "状态序号区间 {ordinals:?} 的起点不在组的边界上（一组 {states_per_group} 个状态）"
+        ));
+    }
+    if !ordinals.end.is_multiple_of(states_per_group) && ordinals.end != state_count {
+        return Err(format!(
+            "状态序号区间 {ordinals:?} 的终点既不在组的边界上（一组 {states_per_group} 个状态）、也不是整条流的状态数 {state_count}"
+        ));
+    }
+    Ok(ordinals.start / states_per_group..ordinals.end.div_ceil(states_per_group))
+}
+
+impl PairingBlocksShare {
+    /// 整条流都归这一趟（`0/1`）。
+    #[must_use]
+    pub fn whole_flow_in_one_share() -> Self {
+        Self::with_this_share_of_these_weights(
+            crate::crash_amplification::HostShare { index: 0, count: 1 },
+            vec![1],
+        )
+    }
+
+    /// 同 `self` 那一份，另只走组的序号落在 `groups` 里的组（替掉之前给过的组区间）；组区间由
+    /// [`groups_of_pairing_blocks_holding_the_states`] 从状态序号区间算。
+    #[must_use]
+    pub fn only_the_groups_of_pairing_blocks_in(self, groups: std::ops::Range<u64>) -> Self {
+        Self {
+            share_of_this_run: self.share_of_this_run,
+            weights_of_the_shares: self.weights_of_the_shares,
+            groups_of_this_run: GroupsOfPairingBlocksOfThisRun::OnlyTheGroupsIn(groups),
+        }
+    }
+
+    /// 第 `group_of_blocks` 组落不落在这一趟走的组里（没给组区间的一趟每一组都落在里面）。
+    #[must_use]
+    pub fn groups_of_this_run_hold(&self, group_of_blocks: u64) -> bool {
+        match &self.groups_of_this_run {
+            GroupsOfPairingBlocksOfThisRun::EveryGroup => true,
+            GroupsOfPairingBlocksOfThisRun::OnlyTheGroupsIn(groups) => {
+                groups.contains(&group_of_blocks)
+            }
+        }
+    }
+
+    /// 领 `share_of_this_run` 这一份，几份的权重是 `weights_of_the_shares`。
+    ///
+    /// # Panics
+    /// 权重的个数与份数不同；权重全是 0。
+    #[must_use]
+    pub fn with_this_share_of_these_weights(
+        share_of_this_run: crate::crash_amplification::HostShare,
+        weights_of_the_shares: Vec<u64>,
+    ) -> Self {
+        assert_eq!(
+            weights_of_the_shares.len(),
+            share_of_this_run.count,
+            "每一份一个权重"
+        );
+        Self {
+            share_of_this_run,
+            weights_of_the_shares: crate::crash_amplification::WeightedShares::new(
+                weights_of_the_shares,
+            ),
+            groups_of_this_run: GroupsOfPairingBlocksOfThisRun::EveryGroup,
+        }
+    }
+
+    /// 这个进程领哪一份：与崩溃放量同一对变量（`crate::crash_amplification::host_share_and_weights_from_the_environment`），没设是整份。
+    ///
+    /// # Errors
+    /// 份额或权重写错。
+    pub fn of_this_process() -> Result<Self, String> {
+        let (share_of_this_run, weights_of_the_shares) =
+            crate::crash_amplification::host_share_and_weights_from_the_environment()?;
+        Ok(Self::with_this_share_of_these_weights(
+            share_of_this_run,
+            weights_of_the_shares,
+        ))
+    }
+
+    /// 输入摘要是 `flow_inputs_digest` 的流第 `group_of_blocks` 组块归不归这一趟：落在这一趟走的组里（[`Self::groups_of_this_run_hold`]）、
+    /// 又归这一份。
+    #[must_use]
+    pub fn claims_this_group_of_pairing_blocks(
+        &self,
+        flow_inputs_digest: &[u8; DIGEST_BYTES],
+        group_of_blocks: u64,
+    ) -> bool {
+        let where_the_flow_starts_in_the_rotation = u64::from(u32::from_le_bytes(
+            flow_inputs_digest[..4]
+                .try_into()
+                .expect("摘要不止 4 个字节"),
+        ));
+        self.groups_of_this_run_hold(group_of_blocks)
+            && self
+                .weights_of_the_shares
+                .owner_of_block(where_the_flow_starts_in_the_rotation + group_of_blocks)
+                == self.share_of_this_run.index
+    }
+}
+
+/// 判一段块的那条线程收尾时交回的。
+struct FinishedPairingStretch {
+    started_as: u64,
+    /// 判那一段 panic 了是 `Err`（收的那一头等在飞的都收尾之后接着往外抛）。
+    judged: std::thread::Result<Option<Vec<PairingJudged>>>,
+}
+
+/// 等着按序号次序折进总账的一项。
+enum PairingBlocksAwaitingTheLedger {
+    Reused {
+        ordinals: std::ops::Range<u64>,
+        conclusion: Vec<u8>,
+    },
+    /// `conclusions` 是 `None`：这一段还在判，或判那一侧报了「本次未跑」。
+    Stretch {
+        started_as: u64,
+        blocks: Vec<std::ops::Range<u64>>,
+        conclusions: Option<Vec<PairingJudged>>,
+    },
+}
+
+/// 判那一侧为什么不再往下判了。
+enum PairingJudgingStopped {
+    /// 有一段交了 `None`（判那一侧报「本次未跑」）：那一段一块都不存。
+    NotRun,
+    /// 有一段 panic 了：照原样接着往外抛。
+    Panicked(Box<dyn std::any::Any + Send>),
+}
+
+/// 一条流这一趟正在判的那几段与等着折进总账的块：只在起 [`pairing_conclusions_of_the_blocks_reused_or_judged`] 的那条线程上动。
+struct PairingStretchesOfTheRun<'run> {
+    library: &'run CrashLibrary,
+    key_of_the_block: &'run dyn Fn(&std::ops::Range<u64>) -> Option<PairingConclusionKey>,
+    take_a_block_conclusion: &'run mut dyn FnMut(&std::ops::Range<u64>, &[u8]),
+    blocks_of_the_flow: PairingBlocksOfTheFlow,
+    stretches_judged_at_once: usize,
+    /// 等着折进总账的块（在判的算上）至多这么多：头上那一段迟迟判不完时，走块那一头停下来等，身后复用的、判完的结论不无限堆。
+    most_blocks_awaiting_the_ledger: usize,
+    awaiting_the_ledger: VecDeque<PairingBlocksAwaitingTheLedger>,
+    stretches_started: u64,
+    stretches_finished: u64,
+    stretches_in_flight: usize,
+    judging_stopped: Option<PairingJudgingStopped>,
+    finished_stretches: mpsc::Receiver<FinishedPairingStretch>,
+}
+
+impl PairingStretchesOfTheRun<'_> {
+    /// 此刻至多几段一起判：头一段判完之前只有它一段（录入段在它里面走完、判表在它里面过库，后面几段读的是录好的），之后 `stretches_judged_at_once` 段。
+    fn stretches_allowed_in_flight_now(&self) -> usize {
+        if self.stretches_finished == 0 {
+            1
+        } else {
+            self.stretches_judged_at_once
+        }
+    }
+
+    /// 等一段判完：判出来的逐块存进库（后面的段先判完也当场存，存进库的不等总账），记进等着折进总账的那一项，能折的折掉。
+    ///
+    /// # Errors
+    /// 库写失败。
+    ///
+    /// # Panics
+    /// 交回的结论块数与交出去的块数不同。
+    fn wait_for_a_pairing_stretch_to_finish(&mut self) -> Result<(), String> {
+        let FinishedPairingStretch {
+            started_as: finished_stretch,
+            judged,
+        } = self
+            .finished_stretches
+            .recv()
+            .expect("判一段的线程收尾都交一回（panic 也接住交），在飞的段不是 0 才等");
+        self.stretches_in_flight -= 1;
+        self.stretches_finished += 1;
+        let conclusions = match judged {
+            Ok(Some(conclusions)) => conclusions,
+            Ok(None) => {
+                if self.judging_stopped.is_none() {
+                    self.judging_stopped = Some(PairingJudgingStopped::NotRun);
+                }
+                return Ok(());
+            }
+            Err(panicked) => {
+                self.judging_stopped = Some(PairingJudgingStopped::Panicked(panicked));
+                return Ok(());
+            }
+        };
+        let awaiting_it = self
+            .awaiting_the_ledger
+            .iter_mut()
+            .find_map(|awaiting| match awaiting {
+                PairingBlocksAwaitingTheLedger::Stretch {
+                    started_as,
+                    blocks,
+                    conclusions: conclusions_of_the_stretch,
+                } if *started_as == finished_stretch => Some((blocks, conclusions_of_the_stretch)),
+                PairingBlocksAwaitingTheLedger::Stretch { .. }
+                | PairingBlocksAwaitingTheLedger::Reused { .. } => None,
+            })
+            .expect("起一段时把它排进了等着折进总账的那一队，折掉之前它已判完");
+        let (blocks, conclusions_awaiting) = awaiting_it;
+        assert_eq!(
+            conclusions.len(),
+            blocks.len(),
+            "判一段块交回的结论块数与交出去的块数相同"
+        );
+        store_the_judged_pairing_blocks(self.library, self.key_of_the_block, blocks, &conclusions)?;
+        *conclusions_awaiting = Some(conclusions);
+        self.note_the_block_conclusions_held();
+        self.take_the_blocks_at_the_head_of_the_queue();
+        Ok(())
+    }
+
+    /// 手里此刻压着几块的结论（判完、复用的还没轮到折进总账的），记下最多的一次。
+    fn note_the_block_conclusions_held(&mut self) {
+        let held: usize = self
+            .awaiting_the_ledger
+            .iter()
+            .map(|awaiting| match awaiting {
+                PairingBlocksAwaitingTheLedger::Reused { .. } => 1,
+                PairingBlocksAwaitingTheLedger::Stretch { conclusions, .. } => {
+                    conclusions.as_ref().map_or(0, Vec::len)
+                }
+            })
+            .sum();
+        self.blocks_of_the_flow.most_block_conclusions_held_at_once = self
+            .blocks_of_the_flow
+            .most_block_conclusions_held_at_once
+            .max(held);
+    }
+
+    /// 队头有结论的逐块按序号次序折进总账，折完就丢；队头那一段还在判（或报了本次未跑）就停。
+    fn take_the_blocks_at_the_head_of_the_queue(&mut self) {
+        // 迭代上界是队长；跨轮只有队在变短
+        while let Some(head) = self.awaiting_the_ledger.front() {
+            match head {
+                PairingBlocksAwaitingTheLedger::Stretch {
+                    conclusions: None, ..
+                } => return,
+                PairingBlocksAwaitingTheLedger::Stretch {
+                    conclusions: Some(_),
+                    ..
+                }
+                | PairingBlocksAwaitingTheLedger::Reused { .. } => {}
+            }
+            match self
+                .awaiting_the_ledger
+                .pop_front()
+                .expect("队头刚看过，还在")
+            {
+                PairingBlocksAwaitingTheLedger::Reused {
+                    ordinals,
+                    conclusion,
+                } => {
+                    (self.take_a_block_conclusion)(&ordinals, &conclusion);
+                    self.blocks_of_the_flow.blocks_reused += 1;
+                }
+                PairingBlocksAwaitingTheLedger::Stretch {
+                    blocks,
+                    conclusions,
+                    ..
+                } => {
+                    for (ordinals, judged) in blocks.iter().zip(conclusions.iter().flatten()) {
+                        (self.take_a_block_conclusion)(ordinals, &judged.conclusion);
+                        self.blocks_of_the_flow.blocks_judged_now += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /// 等到队里放得下 `blocks` 块（在飞的段判完腾地方）。不再往下判了就不等。
+    ///
+    /// # Errors
+    /// 库写失败。
+    fn wait_for_room_for_blocks_awaiting_the_ledger(
+        &mut self,
+        blocks: usize,
+    ) -> Result<(), String> {
+        // 迭代上界是在飞的段数：每一轮等完一段；在飞的是 0 时队已折空（队头只可能是在判的段）
+        while self.judging_stopped.is_none()
+            && self.stretches_in_flight > 0
+            && self.blocks_awaiting_the_ledger() + blocks > self.most_blocks_awaiting_the_ledger
+        {
+            self.wait_for_a_pairing_stretch_to_finish()?;
+        }
+        Ok(())
+    }
+
+    fn blocks_awaiting_the_ledger(&self) -> usize {
+        self.awaiting_the_ledger
+            .iter()
+            .map(|awaiting| match awaiting {
+                PairingBlocksAwaitingTheLedger::Reused { .. } => 1,
+                PairingBlocksAwaitingTheLedger::Stretch { blocks, .. } => blocks.len(),
+            })
+            .sum()
+    }
+
+    /// 等到在飞的段少于此刻许的段数。不再往下判了就不等。
+    ///
+    /// # Errors
+    /// 库写失败。
+    fn wait_for_a_free_place_among_the_stretches_in_flight(&mut self) -> Result<(), String> {
+        // 迭代上界是在飞的段数：每一轮等完一段
+        while self.judging_stopped.is_none()
+            && self.stretches_in_flight >= self.stretches_allowed_in_flight_now()
+        {
+            self.wait_for_a_pairing_stretch_to_finish()?;
+        }
+        Ok(())
+    }
+
+    /// 等在飞的段都收尾（不再往下判了也等：它们判完的照样存进库）。
+    ///
+    /// # Errors
+    /// 库写失败。
+    fn wait_for_every_stretch_in_flight(&mut self) -> Result<(), String> {
+        // 迭代上界是在飞的段数：每一轮等完一段
+        while self.stretches_in_flight > 0 {
+            self.wait_for_a_pairing_stretch_to_finish()?;
+        }
+        Ok(())
+    }
+}
+
+/// 把攒着的那一段连着的块排进队、在一条线程上判（没攒着块、已经不再往下判了就只清空攒着的）；此刻在飞的段满了先等，起完再满了也等：
+/// 一次只许一段时，走下一块之前这一段已经判完、存进库、折进总账。
+///
+/// # Errors
+/// 库写失败。
+fn start_judging_the_pending_pairing_blocks<'scope, 'environment: 'scope>(
+    scope: &'scope std::thread::Scope<'scope, 'environment>,
+    stretches: &mut PairingStretchesOfTheRun<'_>,
+    pending_blocks: &mut Vec<std::ops::Range<u64>>,
+    judge_the_blocks: &'environment JudgeOfAStretchOfPairingBlocks<'environment>,
+    finished_stretches: &mpsc::Sender<FinishedPairingStretch>,
+) -> Result<(), String> {
+    if pending_blocks.is_empty() {
+        return Ok(());
+    }
+    stretches.wait_for_a_free_place_among_the_stretches_in_flight()?;
+    stretches.wait_for_room_for_blocks_awaiting_the_ledger(pending_blocks.len())?;
+    if stretches.judging_stopped.is_some() {
+        pending_blocks.clear();
+        return Ok(());
+    }
+    let blocks = std::mem::take(pending_blocks);
+    let blocks_of_the_thread = blocks.clone();
+    let started_as = stretches.stretches_started;
+    stretches.stretches_started += 1;
+    stretches.stretches_in_flight += 1;
+    stretches
+        .awaiting_the_ledger
+        .push_back(PairingBlocksAwaitingTheLedger::Stretch {
+            started_as,
+            blocks,
+            conclusions: None,
+        });
+    let finished_stretches = finished_stretches.clone();
+    scope.spawn(move || {
+        // 接住 panic 交回去：收的那一头等在飞的都收尾之后照原样接着抛，判红的消息不变
+        let judged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            judge_the_blocks(&blocks_of_the_thread)
+        }));
+        finished_stretches
+            .send(FinishedPairingStretch { started_as, judged })
+            .expect("收的那一头活到这个作用域收尾之后");
+    });
+    stretches.wait_for_a_free_place_among_the_stretches_in_flight()
+}
+
+/// 判完的一段逐块存进库（键算不出的，即两边哪一边拒算，不存）。
+///
+/// # Errors
+/// 库写失败。
+fn store_the_judged_pairing_blocks(
+    library: &CrashLibrary,
+    key_of_the_block: &dyn Fn(&std::ops::Range<u64>) -> Option<PairingConclusionKey>,
+    blocks: &[std::ops::Range<u64>],
+    conclusions: &[PairingJudged],
+) -> Result<(), String> {
+    for (ordinals, judged) in blocks.iter().zip(conclusions) {
+        if let Some(key) = key_of_the_block(ordinals) {
+            library
+                .lock()
+                .store_pairing_conclusion(
+                    &key,
+                    &StoredPairingConclusion {
+                        conclusion: judged.conclusion.clone(),
+                        agreement: judged.agreement,
+                        circumstances: JudgementCircumstances::of_this_process_now(),
+                    },
+                )
+                .map_err(|error| format!("对拍块结论写不进库：{error:?}"))?;
+        }
+    }
+    Ok(())
+}
+
+/// 按序号次序把 `[0, state_count)` 按 `states_per_block` 切块走一遍：落在这一趟走的组之外的、归别的份的各数各的、不碰（前面攒着的先交出去判，一段块要连着）；
+/// 库里有两边一致的结论就复用，没有的攒成一段连着的块交出去判。判那一侧不再往下判了就收手。
+///
+/// # Errors
+/// 库读写失败。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "走一遍块的输入就是这几样：作用域、这一趟的账、流的输入摘要、状态数、块宽、一次判几块、这一趟领哪些块、判一段块、交回判完的那一头；收成一个类型只为让签名变短"
+)]
+fn walk_the_pairing_blocks_of_the_flow<'scope, 'environment: 'scope>(
+    scope: &'scope std::thread::Scope<'scope, 'environment>,
+    stretches: &mut PairingStretchesOfTheRun<'_>,
+    flow_inputs_digest: &[u8; DIGEST_BYTES],
+    state_count: u64,
+    states_per_block: std::num::NonZeroU64,
+    most_blocks_judged_together: std::num::NonZeroUsize,
+    share: &PairingBlocksShare,
+    judge_the_blocks: &'environment JudgeOfAStretchOfPairingBlocks<'environment>,
+    finished_stretches: &mpsc::Sender<FinishedPairingStretch>,
+) -> Result<(), String> {
+    let blocks_of_a_group =
+        u64::try_from(most_blocks_judged_together.get()).expect("一次判的块数装得进 u64");
+    let mut pending_blocks: Vec<std::ops::Range<u64>> =
+        Vec::with_capacity(most_blocks_judged_together.get());
+    let mut block_sequence = 0u64;
+    let mut block_start = 0u64;
+    while block_start < state_count && stretches.judging_stopped.is_none() {
+        let ordinals = block_start
+            ..block_start
+                .saturating_add(states_per_block.get())
+                .min(state_count);
+        block_start = ordinals.end;
+        let group_of_blocks = block_sequence / blocks_of_a_group;
+        block_sequence += 1;
+        if !share.groups_of_this_run_hold(group_of_blocks) {
+            start_judging_the_pending_pairing_blocks(
+                scope,
+                stretches,
+                &mut pending_blocks,
+                judge_the_blocks,
+                finished_stretches,
+            )?;
+            stretches
+                .blocks_of_the_flow
+                .blocks_outside_the_groups_of_this_run += 1;
+            continue;
+        }
+        if !share.claims_this_group_of_pairing_blocks(flow_inputs_digest, group_of_blocks) {
+            start_judging_the_pending_pairing_blocks(
+                scope,
+                stretches,
+                &mut pending_blocks,
+                judge_the_blocks,
+                finished_stretches,
+            )?;
+            stretches.blocks_of_the_flow.blocks_left_to_other_shares += 1;
+            continue;
+        }
+        let stored_conclusion = match (stretches.key_of_the_block)(&ordinals) {
+            Some(key) => stretches
+                .library
+                .lock()
+                .read_pairing_conclusion(&key)
+                .map_err(|error| format!("读对拍块结论失败：{error:?}"))?
+                .filter(stored_pairing_conclusion_is_reused),
+            None => None,
+        };
+        if let Some(stored) = stored_conclusion {
+            // 复用的这一块排在攒着的那一段后面：总账按序号次序收
+            start_judging_the_pending_pairing_blocks(
+                scope,
+                stretches,
+                &mut pending_blocks,
+                judge_the_blocks,
+                finished_stretches,
+            )?;
+            stretches.wait_for_room_for_blocks_awaiting_the_ledger(1)?;
+            stretches
+                .awaiting_the_ledger
+                .push_back(PairingBlocksAwaitingTheLedger::Reused {
+                    ordinals,
+                    conclusion: stored.conclusion,
+                });
+            stretches.take_the_blocks_at_the_head_of_the_queue();
+            stretches.note_the_block_conclusions_held();
+            continue;
+        }
+        pending_blocks.push(ordinals);
+        if pending_blocks.len() >= most_blocks_judged_together.get() {
+            start_judging_the_pending_pairing_blocks(
+                scope,
+                stretches,
+                &mut pending_blocks,
+                judge_the_blocks,
+                finished_stretches,
+            )?;
+        }
+    }
+    start_judging_the_pending_pairing_blocks(
+        scope,
+        stretches,
+        &mut pending_blocks,
+        judge_the_blocks,
+        finished_stretches,
+    )
+}
+
+/// 按块对拍（「必须要剪枝和复用」）：`[0, state_count)` 按 `states_per_block` 切块，按序号次序一块块走——不归 `share` 这一份的只数、不碰；
+/// 库里有这一块两边一致的结论（键是 [`pairing_block_inputs_digest`] 与两边判法单元指纹）就复用、不判；记着不一致（红）的与没有的一样现判、照同一把键
 /// 存回（红的照样存：记红、换掉原有的那一行）。没有的攒成一段连着的块（至多 `most_blocks_judged_together` 块），
-/// 交 `judge_the_blocks` 一次判完、逐块交回结论字节，逐块存进库。每一块的结论（复用的与现判的）按序号次序交 `take_a_block_conclusion`
-/// 折进调用方的总账，交完就丢：手里同一时刻至多压着 `most_blocks_judged_together` 块的结论，与整条流有几块无关。
-/// 两边哪一边的判法单元拒算：照判、不入库（不退回整文件指纹、不跳过）。`judge_the_blocks` 交 `None`（判那一侧报「本次未跑」）：当场收手、
-/// 交 `Ok(None)`，那一段一块都不存。
+/// 在一条线程上交 `judge_the_blocks` 一次判完，至多 `stretches_judged_at_once` 段一起判（头一段判完之前只有它一段，
+/// [`PairingStretchesOfTheRun::stretches_allowed_in_flight_now`]）；判完逐块存进库。每一块的结论（复用的与现判的）按序号次序交
+/// `take_a_block_conclusion` 折进调用方的总账，交完就丢：手里同一时刻至多压着 `stretches_judged_at_once` × `most_blocks_judged_together` 块的结论，
+/// 与整条流有几块无关。两边哪一边的判法单元拒算：照判、不入库（不退回整文件指纹、不跳过）。有一段交 `None`（判那一侧报「本次未跑」）：不再起新的段，
+/// 在飞的等它们收尾、判完的照存，交 `Ok(None)`，交 `None` 的那一段一块都不存。有一段 panic：同样等在飞的收尾，再照原样往外抛。
 ///
 /// # Errors
 /// 库读写失败。
 ///
 /// # Panics
-/// `judge_the_blocks` 交回的结论块数与交给它的块数不同。
+/// `judge_the_blocks` 交回的结论块数与交给它的块数不同；`judge_the_blocks` panic。
 #[allow(
     clippy::too_many_arguments,
-    reason = "按块对拍的输入就是这几样：库、流的输入摘要、状态数、块宽、一次判几块、两边判法单元、判一段块、收一块结论；收成一个类型只为让签名变短"
+    reason = "按块对拍的输入就是这几样：库、流的输入摘要、状态数、块宽、一次判几块、几段一起判、这一趟领哪些块、两边判法单元、判一段块、收一块结论；收成一个类型只为让签名变短"
 )]
 pub fn pairing_conclusions_of_the_blocks_reused_or_judged(
     library: &CrashLibrary,
@@ -1586,9 +3212,11 @@ pub fn pairing_conclusions_of_the_blocks_reused_or_judged(
     state_count: u64,
     states_per_block: std::num::NonZeroU64,
     most_blocks_judged_together: std::num::NonZeroUsize,
+    stretches_judged_at_once: std::num::NonZeroUsize,
+    share: &PairingBlocksShare,
     one_side: &Result<JudgingUnitsKey, String>,
     other_side: &Result<JudgingUnitsKey, String>,
-    judge_the_blocks: &mut JudgeOfAStretchOfPairingBlocks<'_>,
+    judge_the_blocks: &JudgeOfAStretchOfPairingBlocks<'_>,
     take_a_block_conclusion: &mut dyn FnMut(&std::ops::Range<u64>, &[u8]),
 ) -> Result<Option<PairingBlocksOfTheFlow>, String> {
     let both_sides = match (one_side, other_side) {
@@ -1617,121 +3245,47 @@ pub fn pairing_conclusions_of_the_blocks_reused_or_judged(
             other_side_judging_units: *other_side_key.fingerprint(),
         })
     };
-    let mut blocks_of_the_flow = PairingBlocksOfTheFlow {
-        blocks_reused: 0,
-        blocks_judged_now: 0,
-        most_block_conclusions_held_at_once: 0,
-    };
-    let mut pending_blocks: Vec<std::ops::Range<u64>> =
-        Vec::with_capacity(most_blocks_judged_together.get());
-    let mut block_start = 0u64;
-    while block_start < state_count {
-        let ordinals = block_start
-            ..block_start
-                .saturating_add(states_per_block.get())
-                .min(state_count);
-        block_start = ordinals.end;
-        let stored_conclusion = match key_of_the_block(&ordinals) {
-            Some(key) => library
-                .lock()
-                .read_pairing_conclusion(&key)
-                .map_err(|error| format!("读对拍块结论失败：{error:?}"))?
-                .filter(stored_pairing_conclusion_is_reused),
-            None => None,
-        };
-        if let Some(stored) = stored_conclusion {
-            // 复用的这一块之前攒着的先判完、折进总账：总账按序号次序收
-            match judge_and_take_the_pending_pairing_blocks(
-                library,
-                &mut pending_blocks,
-                &key_of_the_block,
-                judge_the_blocks,
-                take_a_block_conclusion,
-                &mut blocks_of_the_flow,
-            )? {
-                PendingPairingBlocks::JudgedAndTaken => {}
-                PendingPairingBlocks::NotRun => return Ok(None),
-            }
-            take_a_block_conclusion(&ordinals, &stored.conclusion);
-            blocks_of_the_flow.blocks_reused += 1;
-            continue;
-        }
-        pending_blocks.push(ordinals);
-        if pending_blocks.len() >= most_blocks_judged_together.get() {
-            match judge_and_take_the_pending_pairing_blocks(
-                library,
-                &mut pending_blocks,
-                &key_of_the_block,
-                judge_the_blocks,
-                take_a_block_conclusion,
-                &mut blocks_of_the_flow,
-            )? {
-                PendingPairingBlocks::JudgedAndTaken => {}
-                PendingPairingBlocks::NotRun => return Ok(None),
-            }
-        }
-    }
-    match judge_and_take_the_pending_pairing_blocks(
+    let (finished_stretches_sender, finished_stretches) = mpsc::channel();
+    let mut stretches = PairingStretchesOfTheRun {
         library,
-        &mut pending_blocks,
-        &key_of_the_block,
-        judge_the_blocks,
+        key_of_the_block: &key_of_the_block,
         take_a_block_conclusion,
-        &mut blocks_of_the_flow,
-    )? {
-        PendingPairingBlocks::JudgedAndTaken => Ok(Some(blocks_of_the_flow)),
-        PendingPairingBlocks::NotRun => Ok(None),
-    }
-}
-
-/// 把攒着的那一段连着的块交出去一次判完：逐块存进库（键算不出的，即两边哪一边拒算，不存），逐块按序号次序折进总账，清空攒着的那一段。
-///
-/// # Errors
-/// 库写失败。
-///
-/// # Panics
-/// 交回的结论块数与交出去的块数不同。
-fn judge_and_take_the_pending_pairing_blocks(
-    library: &CrashLibrary,
-    pending_blocks: &mut Vec<std::ops::Range<u64>>,
-    key_of_the_block: &dyn Fn(&std::ops::Range<u64>) -> Option<PairingConclusionKey>,
-    judge_the_blocks: &mut JudgeOfAStretchOfPairingBlocks<'_>,
-    take_a_block_conclusion: &mut dyn FnMut(&std::ops::Range<u64>, &[u8]),
-    blocks_of_the_flow: &mut PairingBlocksOfTheFlow,
-) -> Result<PendingPairingBlocks, String> {
-    if pending_blocks.is_empty() {
-        return Ok(PendingPairingBlocks::JudgedAndTaken);
-    }
-    let Some(conclusions) = judge_the_blocks(pending_blocks) else {
-        return Ok(PendingPairingBlocks::NotRun);
+        blocks_of_the_flow: PairingBlocksOfTheFlow {
+            blocks_reused: 0,
+            blocks_judged_now: 0,
+            blocks_left_to_other_shares: 0,
+            blocks_outside_the_groups_of_this_run: 0,
+            most_block_conclusions_held_at_once: 0,
+        },
+        stretches_judged_at_once: stretches_judged_at_once.get(),
+        most_blocks_awaiting_the_ledger: stretches_judged_at_once.get()
+            * most_blocks_judged_together.get(),
+        awaiting_the_ledger: VecDeque::new(),
+        stretches_started: 0,
+        stretches_finished: 0,
+        stretches_in_flight: 0,
+        judging_stopped: None,
+        finished_stretches,
     };
-    assert_eq!(
-        conclusions.len(),
-        pending_blocks.len(),
-        "判一段块交回的结论块数与交出去的块数相同"
-    );
-    blocks_of_the_flow.most_block_conclusions_held_at_once = blocks_of_the_flow
-        .most_block_conclusions_held_at_once
-        .max(conclusions.len());
-    for (ordinals, judged) in pending_blocks.iter().zip(&conclusions) {
-        if let Some(key) = key_of_the_block(ordinals) {
-            library
-                .lock()
-                .store_pairing_conclusion(
-                    &key,
-                    &StoredPairingConclusion {
-                        conclusion: judged.conclusion.clone(),
-                        agreement: judged.agreement,
-                        circumstances: JudgementCircumstances::of_this_process_now(),
-                    },
-                )
-                .map_err(|error| format!("对拍块结论写不进库：{error:?}"))?;
-        }
-        take_a_block_conclusion(ordinals, &judged.conclusion);
-        blocks_of_the_flow.blocks_judged_now += 1;
+    std::thread::scope(|scope| {
+        let walked = walk_the_pairing_blocks_of_the_flow(
+            scope,
+            &mut stretches,
+            flow_inputs_digest,
+            state_count,
+            states_per_block,
+            most_blocks_judged_together,
+            share,
+            judge_the_blocks,
+            &finished_stretches_sender,
+        );
+        walked.and(stretches.wait_for_every_stretch_in_flight())
+    })?;
+    match stretches.judging_stopped {
+        Some(PairingJudgingStopped::Panicked(panicked)) => std::panic::resume_unwind(panicked),
+        Some(PairingJudgingStopped::NotRun) => Ok(None),
+        None => Ok(Some(stretches.blocks_of_the_flow)),
     }
-    pending_blocks.clear();
-    Ok(PendingPairingBlocks::JudgedAndTaken)
 }
 
 #[cfg(test)]
@@ -1764,6 +3318,78 @@ mod tests {
             "标签里的 / 换成 -：{}",
             directory.path().display()
         );
+    }
+
+    /// 标签长到整串拼出的单段名超一段路径名的上限（带三个字节一个的中文）：照样建在临时目录下一层、单段名不超上限；
+    /// 只在截掉的那一段不同的两个标签，名字去掉 `-<进程号>-<进程内序号>` 之后仍不同；截短点落在中文字符中间时退到字符边界。
+    /// 判别力（`crates/mutations.tsv`）：不截短、整串照拼，建不出（ENAMETOOLONG）这条红；截短后不接标签摘要，两个名字相同这条红；
+    /// 截短点不退到字符边界，切片切在字符中间 panic，这条红。
+    #[test]
+    fn overlong_multibyte_label_is_cut_to_the_path_component_limit_and_labels_differing_only_beyond_the_cut_get_distinct_directories(
+    ) {
+        let shared_head = "崩溃判定库一次性目录".repeat(30);
+        let label_ending_in_east = format!("{shared_head}东");
+        let label_ending_in_west = format!("{shared_head}西");
+        assert!(
+            format!("singlefs-{label_ending_in_east}").len() > MOST_BYTES_OF_ONE_PATH_COMPONENT,
+            "标签整串拼出的名字超一段路径名的上限"
+        );
+        let east =
+            ExclusiveTemporaryDirectory::create(&label_ending_in_east).expect("超长的标签也建得出");
+        let west = ExclusiveTemporaryDirectory::create(&label_ending_in_west)
+            .expect("另一个超长的标签也建得出");
+        let name_of = |directory: &ExclusiveTemporaryDirectory| -> String {
+            directory
+                .path()
+                .file_name()
+                .expect("目录有名字")
+                .to_str()
+                .expect("名字是 UTF-8")
+                .to_owned()
+        };
+        for directory in [&east, &west] {
+            assert_eq!(
+                directory.path().parent(),
+                Some(std::env::temp_dir().as_path()),
+                "建在临时目录下一层：{}",
+                directory.path().display()
+            );
+            assert!(
+                name_of(directory).len() <= MOST_BYTES_OF_ONE_PATH_COMPONENT,
+                "单段名不超一段路径名的上限：{} 字节",
+                name_of(directory).len()
+            );
+            assert!(
+                name_of(directory).starts_with("singlefs-崩溃判定库"),
+                "截短的名字留着标签开头：{}",
+                name_of(directory)
+            );
+        }
+        let without_process_and_serial = |name: &str| -> String {
+            name.rsplitn(3, '-')
+                .nth(2)
+                .expect("名字以 -<进程号>-<进程内序号> 收尾")
+                .to_owned()
+        };
+        assert_ne!(
+            without_process_and_serial(&name_of(&east)),
+            without_process_and_serial(&name_of(&west)),
+            "只在截掉的那一段不同的两个标签，名字不同"
+        );
+        // 进程号各差一位，后缀各差一个字节：截短点落在三个字节一个的中文的三个位置上（字符边界与字符中间两处）
+        for process_identifier in [7, 70, 700] {
+            let name =
+                exclusive_temporary_directory_name(&label_ending_in_east, process_identifier, 1);
+            assert!(
+                name.len() <= MOST_BYTES_OF_ONE_PATH_COMPONENT,
+                "进程号 {process_identifier}：单段名不超上限，{} 字节",
+                name.len()
+            );
+            assert!(
+                name.ends_with(&format!("-{process_identifier}-1")),
+                "进程号 {process_identifier}：名字以 -<进程号>-<进程内序号> 收尾：{name}"
+            );
+        }
     }
 
     /// 同一个进程里两次用同一个标签建一次性临时目录：各拿一份不同的、新建的空目录；丢掉一份只删那一份，另一份连同里面的文件还在。
@@ -1899,6 +3525,7 @@ mod tests {
             CrashLibraryClass::GivenStates,
             CrashLibraryClass::JudgeTablesPairing,
             CrashLibraryClass::FactsPairing,
+            CrashLibraryClass::InputPairing,
         ] {
             assert!(
                 !amplification.library_name().contains(class.name()),
@@ -1941,6 +3568,174 @@ mod tests {
                 (key.clone(), ConclusionKind::ImageJudgement, cpu_version),
             ],
             "同一批状态只存一处：一块两种结论两条记录"
+        );
+    }
+
+    /// 对拍输入两段过库：只录那一趟写进库、不交回输入；只判那一趟照同一份输入现算录入键、从库里读回同样的字节与摘要；
+    /// 没录过的另一份输入只判时报库里没有清单。
+    /// 判别力：只判那一趟不读库、直接交回调用方手里的字节，没录过的那一份就不报错，红在最后一条断言。
+    #[test]
+    fn a_pairing_input_is_recorded_in_one_run_and_read_back_from_the_library_in_another() {
+        // 一次性库留着：自证对拍输入只录、只判两趟：要一份空的临时服务
+        let disposable =
+            DisposableLibrary::new("input-pairing").unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::InputPairing).expect("开得了库");
+        let units = Ok(JudgingUnitsKey::of_the_parts(
+            [9; DIGEST_BYTES],
+            vec![JudgingUnitFingerprint {
+                unit: "record_into".to_string(),
+                fingerprint: [10; DIGEST_BYTES],
+            }],
+        ));
+        let item = ItemName::new("input-pairing").expect("项名合规矩");
+        let recorded_input = b"units to verify and their expected checksums".to_vec();
+        let recording_key_of = |input: &[u8]| {
+            recording_key_of_the_inputs_under(&units, &RecordingInputsDigest(sha256_digest(input)))
+        };
+        let recorded = pairing_input_through_the_library_under_the_recording_key(
+            &library,
+            RunStage::RecordOnly,
+            &item,
+            &recording_key_of(&recorded_input),
+            &recorded_input,
+        )
+        .expect("只录那一趟写得进库");
+        assert!(
+            matches!(recorded, StageOutcome::RecordedOnly),
+            "只录那一趟不交回输入：{recorded:?}"
+        );
+        let judged = pairing_input_through_the_library_under_the_recording_key(
+            &library,
+            RunStage::JudgeOnly,
+            &item,
+            &recording_key_of(&recorded_input),
+            &recorded_input,
+        )
+        .expect("只判那一趟读得回");
+        let StageOutcome::Judged(read_back) = judged else {
+            panic!("只判那一趟交回读回的输入：{judged:?}")
+        };
+        assert_eq!(read_back.bytes(), recorded_input.as_slice());
+        assert_eq!(read_back.digest(), &sha256_digest(&recorded_input));
+        let never_recorded = b"another input nobody recorded".to_vec();
+        assert!(
+            pairing_input_through_the_library_under_the_recording_key(
+                &library,
+                RunStage::JudgeOnly,
+                &item,
+                &recording_key_of(&never_recorded),
+                &never_recorded,
+            )
+            .is_err(),
+            "没录过的输入只判：库里没有它的清单，报错、不现录"
+        );
+    }
+
+    /// 对拍输入连同参照两段过库：只录那一趟算一次参照、写进库；只判那一趟不算参照，输入与参照都从库里读回；同一把键再录一趟命中、不再算参照；
+    /// 参照一侧的判法单元换了一把，录入键变，只判读不到旧的那一份。
+    /// 判别力：录入键不拼参照一侧的单元指纹，换了一把之后只判照样读到旧参照，红在最后一条断言；判段现算参照，「只判那一趟不算参照」那一条红。
+    #[test]
+    fn a_pairing_reference_is_computed_once_at_the_recording_and_keyed_by_the_reference_units() {
+        // 一次性库留着：自证对拍参照只录、只判两趟：要一份空的临时服务
+        let disposable = DisposableLibrary::new("input-pairing-reference")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::InputPairing).expect("开得了库");
+        let units_fingerprinted = |fingerprint: u8| {
+            Ok(JudgingUnitsKey::of_the_parts(
+                [fingerprint; DIGEST_BYTES],
+                vec![JudgingUnitFingerprint {
+                    unit: "unit".to_string(),
+                    fingerprint: [fingerprint; DIGEST_BYTES],
+                }],
+            ))
+        };
+        let recording_units = units_fingerprinted(9);
+        let item = ItemName::new("input-pairing-reference").expect("项名合规矩");
+        let input = b"units to verify".to_vec();
+        let times_the_reference_was_computed = std::cell::Cell::new(0_u32);
+        let through_the_library =
+            |stage: RunStage, reference_units: &Result<JudgingUnitsKey, String>| {
+                pairing_input_and_reference_through_the_library_under_the_recording_key(
+                    &library,
+                    stage,
+                    &item,
+                    &recording_key_of_the_pairing_input_and_the_reference_units(
+                        &recording_units,
+                        &input,
+                        reference_units,
+                    ),
+                    &input,
+                    |input_bytes| {
+                        times_the_reference_was_computed
+                            .set(times_the_reference_was_computed.get() + 1);
+                        input_bytes.iter().rev().copied().collect()
+                    },
+                )
+            };
+        let reference_units = units_fingerprinted(11);
+        let recorded = through_the_library(RunStage::RecordOnly, &reference_units)
+            .expect("只录那一趟写得进库");
+        assert!(matches!(recorded, StageOutcome::RecordedOnly));
+        assert_eq!(
+            times_the_reference_was_computed.get(),
+            1,
+            "录入段算一次参照"
+        );
+        let StageOutcome::Judged(read_back) =
+            through_the_library(RunStage::JudgeOnly, &reference_units).expect("只判那一趟读得回")
+        else {
+            panic!("只判那一趟交回读回的输入与参照")
+        };
+        assert_eq!(
+            times_the_reference_was_computed.get(),
+            1,
+            "只判那一趟不算参照"
+        );
+        assert_eq!(read_back.input.bytes(), input.as_slice());
+        assert_eq!(
+            read_back.reference.bytes(),
+            input.iter().rev().copied().collect::<Vec<u8>>().as_slice()
+        );
+        assert!(matches!(
+            through_the_library(RunStage::RecordOnly, &reference_units).expect("同一把键再录一趟"),
+            StageOutcome::RecordedOnly
+        ));
+        assert_eq!(
+            times_the_reference_was_computed.get(),
+            1,
+            "录入键命中：不再算参照"
+        );
+        let refused: Result<JudgingUnitsKey, String> = Err("样本：拒算".to_string());
+        for _run in 0..2 {
+            assert!(matches!(
+                through_the_library(RunStage::RecordOnly, &refused).expect("参照一侧拒算照录"),
+                StageOutcome::RecordedOnly
+            ));
+        }
+        assert_eq!(
+            times_the_reference_was_computed.get(),
+            3,
+            "参照一侧拒算：每一趟都照录、不凭命中跳过"
+        );
+        assert!(
+            through_the_library(RunStage::JudgeOnly, &units_fingerprinted(12)).is_err(),
+            "参照一侧的判法单元换了一把：录入键变，库里没有这把键的清单"
+        );
+    }
+
+    /// 读回的对拍输入核摘要：字节与摘要对得上才造得出，差一个字节就拒。
+    #[test]
+    fn a_pairing_input_read_back_is_refused_when_its_bytes_do_not_match_the_digest() {
+        let input = b"pairing input".to_vec();
+        let digest = sha256_digest(&input);
+        assert!(PairingInputReadBack::from_the_library_bytes(input.clone(), &digest).is_ok());
+        let mut one_byte_changed = input;
+        one_byte_changed[0] ^= 1;
+        assert!(
+            PairingInputReadBack::from_the_library_bytes(one_byte_changed, &digest).is_err(),
+            "库里那份被改过一个字节：摘要对不上，拒"
         );
     }
 
@@ -1998,6 +3793,258 @@ mod tests {
         run_with_the_inputs(inputs, &refused);
         run_with_the_inputs(inputs, &refused);
         assert_eq!(recordings.get(), 4, "录入函数单元拒算时每趟照录、不复用");
+    }
+
+    /// 几条线程同时要同一个摘要：只读一次，都拿到读回的那一份；之后再要也不再读。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁收窄 同一摘要每次各开一个格子」这一行让这一条红（各读各的）。
+    #[test]
+    fn several_threads_asking_for_one_digest_read_it_once_and_share_the_value() {
+        let values = ValuesReadBackOnceInThisProcess::<u32>::holding_at_most(1024);
+        let reads = AtomicU64::new(0);
+        let threads_asking = 4;
+        let start_together = std::sync::Barrier::new(threads_asking);
+        let ask = || {
+            values
+                .held_or_read_once(&[1; DIGEST_BYTES], || {
+                    reads.fetch_add(1, Ordering::SeqCst);
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    Ok(StageOutcome::Judged((7u32, 8u64)))
+                })
+                .expect("读得回")
+                .judged()
+                .map(|value| *value)
+                .expect("读回了值")
+        };
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..threads_asking)
+                .map(|_thread| {
+                    scope.spawn(|| {
+                        start_together.wait();
+                        ask()
+                    })
+                })
+                .collect();
+            for handle in handles {
+                assert_eq!(handle.join().expect("线程不 panic"), 7);
+            }
+        });
+        assert_eq!(ask(), 7);
+        assert_eq!(reads.load(Ordering::SeqCst), 1, "同一个摘要只读一次");
+    }
+
+    /// 留的字节超了额度，从最早读回的放起；比额度还大的不留。放掉的下一次照读，留着的不再读。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁收窄 读回的流超额也不放」这一行让这一条红（放掉的那一份还留着，不再读）。
+    #[test]
+    fn values_read_back_beyond_the_limit_are_let_go_from_the_earliest() {
+        let values = ValuesReadBackOnceInThisProcess::<u32>::holding_at_most(10);
+        let reads = AtomicU64::new(0);
+        let ask = |digest_byte: u8, payload_bytes: u64| {
+            let value_read_or_held = values
+                .held_or_read_once(&[digest_byte; DIGEST_BYTES], || {
+                    reads.fetch_add(1, Ordering::SeqCst);
+                    Ok(StageOutcome::Judged((
+                        u32::from(digest_byte),
+                        payload_bytes,
+                    )))
+                })
+                .expect("读得回")
+                .judged()
+                .expect("读回了值");
+            assert_eq!(*value_read_or_held, u32::from(digest_byte));
+            reads.load(Ordering::SeqCst)
+        };
+        assert_eq!(ask(1, 6), 1, "头一份现读");
+        assert_eq!(ask(1, 6), 1, "还留着");
+        assert_eq!(ask(2, 6), 2, "第二份现读，超了额度放掉头一份");
+        assert_eq!(ask(2, 6), 2, "第二份还留着");
+        assert_eq!(ask(1, 6), 3, "头一份放掉了，照读");
+        assert_eq!(ask(3, 11), 4, "比额度还大的现读");
+        assert_eq!(ask(3, 11), 5, "比额度还大的不留，照读");
+    }
+
+    /// 握着库锁的线程走到纯计算当场 panic；别的线程握着不算，放了锁也不算。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁收窄 纯计算的断言不判」这一行让这一条红。
+    #[test]
+    fn the_pure_work_assertion_fires_only_on_the_thread_holding_the_library_lock() {
+        // 一次性库留着：要一把真的库锁
+        let disposable = DisposableLibrary::new("pure-work-assertion")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = LibraryOpenInThisProcess::open_or_share().expect("开得了库");
+        let held = library.lock();
+        assert!(
+            std::panic::catch_unwind(|| assert_this_thread_holds_no_library_lock("单测的纯计算"))
+                .is_err(),
+            "握着锁的这条线程上要 panic"
+        );
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| assert_this_thread_holds_no_library_lock("单测的纯计算"))
+                .join()
+                .expect("别的线程没握着锁，不 panic");
+        });
+        drop(held);
+        assert_this_thread_holds_no_library_lock("单测的纯计算");
+    }
+
+    /// 从持锁时长行里取一个字段的数。
+    fn field_of_the_lock_time_line(line: &str, field: &str) -> f64 {
+        line.split(' ')
+            .find_map(|word| word.strip_prefix(field)?.strip_prefix('='))
+            .unwrap_or_else(|| panic!("持锁时长行里没有 {field}：{line}"))
+            .parse()
+            .expect("字段是数")
+    }
+
+    /// 一条线程握着锁 30 毫秒以上，另一条等它：行里持锁秒数、等锁秒数、取锁次数都记上，持锁占比是持锁秒数除以连接开着的秒数。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁收窄 放锁时不记持锁时长」这一行让这一条红。
+    #[test]
+    fn the_lock_time_line_adds_up_what_the_lock_was_held_and_waited() {
+        // 一次性库留着：要一把真的库锁，从这条连接开着起数
+        let disposable =
+            DisposableLibrary::new("lock-time-line").unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = LibraryOpenInThisProcess::open_or_share().expect("开得了库");
+        let time_held = std::time::Duration::from_millis(30);
+        let the_other_thread_is_about_to_ask = std::sync::atomic::AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            let held = library.lock();
+            let other_thread = scope.spawn(|| {
+                the_other_thread_is_about_to_ask.store(true, Ordering::SeqCst);
+                drop(library.lock());
+            });
+            // 迭代上界：另一条线程起来就设它，起不来 join 那里也会报
+            while !the_other_thread_is_about_to_ask.load(Ordering::SeqCst) {
+                std::thread::yield_now();
+            }
+            std::thread::sleep(time_held);
+            drop(held);
+            other_thread.join().expect("另一条线程不 panic");
+        });
+        let line = library
+            .open_library()
+            .lock_time_line(std::time::Duration::from_millis(100));
+        assert!(line.starts_with(LIBRARY_LOCK_TIME_LINE_PREFIX), "{line}");
+        let held = field_of_the_lock_time_line(&line, "seconds_held");
+        assert!(held >= time_held.as_secs_f64(), "持锁秒数没记全：{line}");
+        assert!(
+            field_of_the_lock_time_line(&line, "seconds_waited") >= time_held.as_secs_f64() / 2.0,
+            "另一条线程等的没记上：{line}"
+        );
+        assert!(
+            field_of_the_lock_time_line(&line, "acquisitions") >= 2.0,
+            "两次取锁都数：{line}"
+        );
+        assert!(
+            (field_of_the_lock_time_line(&line, "held_share_of_the_wall_clock") - held / 0.1).abs()
+                < 0.02,
+            "持锁占比是持锁秒数除以连接开着的秒数：{line}"
+        );
+    }
+
+    /// 持锁时长行隔 60 秒一行：不到点不打，到点打一次，同一个点不打第二次，下一行从这一次到点起再隔 60 秒。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁收窄 持锁时长行不看到没到点」这一行让这一条红。
+    #[test]
+    fn the_lock_time_line_comes_once_per_interval() {
+        let times = LibraryLockTimes::starting_at_this_opening();
+        let at_second = |second: u64| times.opened_at + std::time::Duration::from_secs(second);
+        assert_eq!(
+            times.time_open_when_a_lock_time_line_is_due(at_second(59)),
+            None
+        );
+        assert_eq!(
+            times.time_open_when_a_lock_time_line_is_due(at_second(60)),
+            Some(std::time::Duration::from_secs(60))
+        );
+        assert_eq!(
+            times.time_open_when_a_lock_time_line_is_due(at_second(60)),
+            None
+        );
+        assert_eq!(
+            times.time_open_when_a_lock_time_line_is_due(at_second(119)),
+            None
+        );
+        assert_eq!(
+            times.time_open_when_a_lock_time_line_is_due(at_second(120)),
+            Some(std::time::Duration::from_secs(120))
+        );
+    }
+
+    /// 一条线程取锁、在锁里读一次库（与 prune-server 往返一次）再放：这一次持锁记在取锁的那一处（文件与行）名下，锁里往返的纳秒数大于零、
+    /// 不超过持锁的纳秒数；连接那一行与各调用点那几行都带连接名（`connection=`）与进程号（`pid=`），调用点那一行点名这一处。
+    /// 同一个进程里关了再开同一份库，两次的连接名不同（各自的 `seconds_open` 各从零数，按连接名取最后一行不混）。
+    /// 判别力（`crates/mutations.tsv`）：「判定库锁时长 锁里的往返不记」这一行让这一条红。
+    #[test]
+    fn the_lock_time_lines_name_the_connection_and_the_site_with_the_round_trips_in_the_lock() {
+        // 一次性库留着：要一把真的库锁与真的往返，从这条连接开着起数
+        let disposable = DisposableLibrary::new("lock-time-lines-of-the-sites")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = LibraryOpenInThisProcess::open_or_share().expect("开得了库");
+        let (held, line_of_the_lock) = (library.lock(), line!());
+        assert!(
+            held.read_flow_facts(&[0; DIGEST_BYTES])
+                .expect("读得了库")
+                .is_none(),
+            "空库里没有这一份事实表"
+        );
+        drop(held);
+        let open = library.open_library();
+        let held_in_round_trips = open
+            .lock_times
+            .nanoseconds_held_in_round_trips
+            .load(Ordering::Relaxed);
+        assert!(
+            held_in_round_trips > 0
+                && held_in_round_trips <= open.lock_times.nanoseconds_held.load(Ordering::Relaxed),
+            "锁里往返的纳秒数大于零、不超过持锁的纳秒数：{held_in_round_trips}"
+        );
+        {
+            let sites = open
+                .lock_times
+                .of_each_site
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let of_the_site = sites
+                .get(&(file!(), line_of_the_lock))
+                .expect("这一次持锁记在取锁的那一处名下");
+            assert!(
+                of_the_site.acquisitions == 1
+                    && of_the_site.nanoseconds_held_in_round_trips > 0
+                    && of_the_site.nanoseconds_held_in_round_trips <= of_the_site.nanoseconds_held,
+                "那一处取了一次锁、锁里往返的纳秒数大于零而不超过持锁的纳秒数"
+            );
+        }
+        let connection_and_process = format!(
+            "connection={} pid={}",
+            open.connection_name,
+            std::process::id()
+        );
+        let line = open.lock_time_line(std::time::Duration::from_millis(100));
+        assert!(
+            line.starts_with(&format!(
+                "{LIBRARY_LOCK_TIME_LINE_PREFIX} {connection_and_process} "
+            )),
+            "{line}"
+        );
+        let site = format!("site={}:{line_of_the_lock} ", file!());
+        assert!(
+            open.lock_time_lines_of_the_sites().iter().any(|site_line| {
+                site_line.starts_with(&format!(
+                    "{LIBRARY_LOCK_TIME_OF_A_SITE_LINE_PREFIX} {connection_and_process} "
+                )) && site_line.contains(&site)
+            }),
+            "调用点那几行里有点名 {site} 的一行：{:#?}",
+            open.lock_time_lines_of_the_sites()
+        );
+        let connection_name_of_the_first_opening = open.connection_name.clone();
+        drop(library);
+        let reopened = LibraryOpenInThisProcess::open_or_share().expect("再开得了库");
+        assert_ne!(
+            reopened.open_library().connection_name,
+            connection_name_of_the_first_opening,
+            "关了再开，连接名换一个"
+        );
     }
 
     /// 对拍结论入库（L10）：同一份输入、同两边判法单元第二趟复用、不再判；换了一边的判法单元照判；哪一边拒算照判、不入库。
@@ -2266,9 +4313,9 @@ mod tests {
         most_blocks_judged_together: usize,
         one_side: &Result<JudgingUnitsKey, String>,
         other_side: &Result<JudgingUnitsKey, String>,
-        agreement_of_the_block: &dyn Fn(&std::ops::Range<u64>) -> PairingAgreement,
+        agreement_of_the_block: &(dyn Fn(&std::ops::Range<u64>) -> PairingAgreement + Sync),
     ) -> PairingBlocksRun {
-        let mut blocks_asked_of_the_judge_each_time = Vec::new();
+        let blocks_asked_of_the_judge_each_time = Mutex::new(Vec::new());
         let mut conclusions_in_order = Vec::new();
         let blocks_of_the_flow = pairing_conclusions_of_the_blocks_reused_or_judged(
             library,
@@ -2276,16 +4323,20 @@ mod tests {
             state_count,
             std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
             std::num::NonZeroUsize::new(most_blocks_judged_together).expect("一次判的块数不是 0"),
+            std::num::NonZeroUsize::new(1).expect("一段一段判"),
+            &PairingBlocksShare::whole_flow_in_one_share(),
             one_side,
             other_side,
-            &mut |blocks| {
-                blocks_asked_of_the_judge_each_time.push(blocks.len());
+            &|blocks| {
+                blocks_asked_of_the_judge_each_time
+                    .lock()
+                    .expect("判段不 panic")
+                    .push(blocks.len());
                 Some(
                     blocks
                         .iter()
                         .map(|ordinals| PairingJudged {
-                            conclusion: format!("判{}-{}", ordinals.start, ordinals.end)
-                                .into_bytes(),
+                            conclusion: conclusion_bytes_of_the_pairing_block(ordinals),
                             agreement: agreement_of_the_block(ordinals),
                         })
                         .collect(),
@@ -2299,9 +4350,16 @@ mod tests {
         .expect("判段没报本次未跑");
         PairingBlocksRun {
             blocks_of_the_flow,
-            blocks_asked_of_the_judge_each_time,
+            blocks_asked_of_the_judge_each_time: blocks_asked_of_the_judge_each_time
+                .into_inner()
+                .expect("判段不 panic"),
             conclusions_in_order,
         }
+    }
+
+    /// 单测的判段给一块的结论字节：只由块的序号段定。
+    fn conclusion_bytes_of_the_pairing_block(ordinals: &std::ops::Range<u64>) -> Vec<u8> {
+        format!("判{}-{}", ordinals.start, ordinals.end).into_bytes()
     }
 
     /// 宿主内存随块数不涨：同一个一次判几块，5 块的流与 50 块的流手里同一时刻压着的块结论一样多（都是一次判的块数），
@@ -2348,6 +4406,718 @@ mod tests {
                 "{blocks} 块的流：每块的结论按序号次序各收一次，末块只到状态数"
             );
         }
+    }
+
+    /// 几段块同时判：头一段判完之前只有它一段；之后三段一起在各自的线程上判、后起的先判完，结论照样按序号次序折进总账、逐块都存进库，
+    /// 手里压着的块结论到 3 段 × 2 块为止。后起的两段先交回、队头那一段后交回，由队头那一段等到它们的块存进库再交回钉住，不看线程时序。
+    /// 判别力（`crates/mutations.tsv`）：头一段也不单独判，头一段判的时候别的段已经起了，这条红；一次只许一段（几段一起判的数不认），
+    /// 后面三段凑不齐、等到点，这条红；判完一段不排队、谁先判完谁先折进总账，这条红。
+    #[test]
+    fn stretches_judged_together_on_their_own_threads_come_back_in_block_order_and_all_stored() {
+        const STRETCHES_AT_ONCE: usize = 3;
+        const LONGEST_WAIT_FOR_THE_OTHER_STRETCHES: std::time::Duration =
+            std::time::Duration::from_secs(60);
+        // 一起判的三段里排在队头的那一段从哪个序号起：头一段之后的那一段
+        const FIRST_STATE_OF_THE_QUEUE_HEAD_AMONG_THE_STRETCHES_TOGETHER: u64 = 4 * 2;
+        // 一次性库留着：要从空库起数现判的块
+        let disposable = DisposableLibrary::new("pairing-blocks-together")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("开得了库");
+        let units = judging_units_key_of_these_units(&[("gpu_judge_unit", 1)]);
+        let other_units = judging_units_key_of_these_units(&[("cpu_judge_unit", 2)]);
+        let flow_inputs_digest = [41u8; DIGEST_BYTES];
+        // 一段 2 块、一块 4 个状态，头一段加后面一起判的三段，一共 8 块
+        let state_count = 4 * 2 * (1 + u64::try_from(STRETCHES_AT_ONCE).expect("装得进 u64"));
+        // 在飞的几段各从哪个序号起；后面三段是不是都在飞过了
+        let in_flight: Mutex<(Vec<u64>, bool)> = Mutex::new((Vec::new(), false));
+        let in_flight_changed = std::sync::Condvar::new();
+        let threads_of_the_stretches: Mutex<Vec<std::thread::ThreadId>> = Mutex::new(Vec::new());
+        let is_stored_in_the_library = |ordinals: std::ops::Range<u64>| {
+            library
+                .lock()
+                .read_pairing_conclusion(&PairingConclusionKey {
+                    inputs_digest: pairing_block_inputs_digest(&flow_inputs_digest, &ordinals),
+                    one_side_judging_units: *units.as_ref().expect("判法单元算得出").fingerprint(),
+                    other_side_judging_units: *other_units
+                        .as_ref()
+                        .expect("判法单元算得出")
+                        .fingerprint(),
+                })
+                .expect("读得了库")
+                .is_some()
+        };
+        let mut conclusions_in_order = Vec::new();
+        let blocks_of_the_flow = pairing_conclusions_of_the_blocks_reused_or_judged(
+            &library,
+            &flow_inputs_digest,
+            state_count,
+            std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
+            std::num::NonZeroUsize::new(2).expect("一次判 2 块"),
+            std::num::NonZeroUsize::new(STRETCHES_AT_ONCE).expect("三段一起判"),
+            &PairingBlocksShare::whole_flow_in_one_share(),
+            &units,
+            &other_units,
+            &|blocks| {
+                let start = blocks[0].start;
+                threads_of_the_stretches
+                    .lock()
+                    .expect("判段不留毒")
+                    .push(std::thread::current().id());
+                let mut guarded = in_flight.lock().expect("判段不留毒");
+                guarded.0.push(start);
+                if guarded.0.len() == STRETCHES_AT_ONCE {
+                    guarded.1 = true;
+                }
+                in_flight_changed.notify_all();
+                if start == 0 {
+                    // 放开锁等一会儿：别的段要是起了，醒来时在飞的就不止它一段
+                    let (still_guarded, _timed_out) = in_flight_changed
+                        .wait_timeout(guarded, std::time::Duration::from_millis(500))
+                        .expect("判段不留毒");
+                    guarded = still_guarded;
+                    assert_eq!(guarded.0, vec![0], "头一段判完之前只有它一段");
+                } else {
+                    // 三段都在飞过了才往下走；序号比它大的都走了它才走：后起的先判完
+                    let (still_guarded, wait_outcome) = in_flight_changed
+                        .wait_timeout_while(
+                            guarded,
+                            LONGEST_WAIT_FOR_THE_OTHER_STRETCHES,
+                            |(starts, all_were_in_flight)| {
+                                !*all_were_in_flight || starts.iter().any(|other| *other > start)
+                            },
+                        )
+                        .expect("判段不留毒");
+                    guarded = still_guarded;
+                    assert!(
+                        !wait_outcome.timed_out(),
+                        "序号从 {start} 起的这一段等不到别的段：三段没有一起判（在飞的 {:?}）",
+                        guarded.0
+                    );
+                }
+                guarded.0.retain(|other| *other != start);
+                in_flight_changed.notify_all();
+                drop(guarded);
+                if start == FIRST_STATE_OF_THE_QUEUE_HEAD_AMONG_THE_STRETCHES_TOGETHER {
+                    // 后起的两段离开判段之后、交回结论之前还隔着一步：等到它们的块都存进了库（收的那一头收到一段先存再记），
+                    // 这一段才交回，收的次序就是后起的先到，不看那一步的时序
+                    let deadline = std::time::Instant::now() + LONGEST_WAIT_FOR_THE_OTHER_STRETCHES;
+                    // 迭代上界是到点：每一轮问一次库，到点就判红
+                    while !(start + 4 * 2..state_count)
+                        .step_by(4)
+                        .all(|block_start| is_stored_in_the_library(block_start..block_start + 4))
+                    {
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "序号从 {start} 起的这一段等不到后起的两段存进库"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(2));
+                    }
+                }
+                Some(
+                    blocks
+                        .iter()
+                        .map(|ordinals| PairingJudged {
+                            conclusion: conclusion_bytes_of_the_pairing_block(ordinals),
+                            agreement: PairingAgreement::BothSidesAgree,
+                        })
+                        .collect(),
+                )
+            },
+            &mut |ordinals, conclusion| {
+                conclusions_in_order.push((ordinals.clone(), conclusion.to_vec()));
+            },
+        )
+        .expect("库读写得了")
+        .expect("判段没报本次未跑");
+        assert_eq!(
+            conclusions_in_order,
+            (0..8)
+                .map(|block: u64| {
+                    let ordinals = 4 * block..4 * block + 4;
+                    let conclusion = conclusion_bytes_of_the_pairing_block(&ordinals);
+                    (ordinals, conclusion)
+                })
+                .collect::<Vec<_>>(),
+            "每块的结论按序号次序各收一次"
+        );
+        assert_eq!(
+            (
+                blocks_of_the_flow.blocks_judged_now,
+                blocks_of_the_flow.blocks_reused,
+                blocks_of_the_flow.most_block_conclusions_held_at_once
+            ),
+            (8, 0, STRETCHES_AT_ONCE * 2),
+            "8 块都现判；三段后起的先判完，头上那一段判完时手里压着 3 段 × 2 块"
+        );
+        let threads = threads_of_the_stretches.into_inner().expect("判段不留毒");
+        assert_eq!(
+            threads
+                .iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            threads.len(),
+            "每段在自己的线程上判"
+        );
+        let second_run = pairing_blocks_run(
+            &library,
+            &flow_inputs_digest,
+            state_count,
+            2,
+            &units,
+            &other_units,
+        );
+        assert_eq!(
+            (
+                second_run.blocks_of_the_flow.blocks_judged_now,
+                second_run.blocks_of_the_flow.blocks_reused
+            ),
+            (0, 8),
+            "一起判的几段逐块都存进了库：第二趟一段一段走，8 块都复用"
+        );
+    }
+
+    /// 后面一段报「本次未跑」：交 `Ok(None)`，别的段判完的照存进库（下一趟复用）、报本次未跑的那一段一块都不存。
+    /// 判别力（`crates/mutations.tsv`）：判那一侧交 `None` 当没事，整条流照往下走、交 `Some`，这条红。
+    #[test]
+    fn a_stretch_reported_not_run_stops_the_flow_and_keeps_what_the_others_judged() {
+        // 一次性库留着：要从空库起数现判的块
+        let disposable = DisposableLibrary::new("pairing-blocks-not-run")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("开得了库");
+        let units = judging_units_key_of_these_units(&[("gpu_judge_unit", 1)]);
+        let other_units = judging_units_key_of_these_units(&[("cpu_judge_unit", 2)]);
+        let flow_inputs_digest = [42u8; DIGEST_BYTES];
+        let run_once = |block_reported_not_run: Option<u64>| {
+            pairing_conclusions_of_the_blocks_reused_or_judged(
+                &library,
+                &flow_inputs_digest,
+                4 * 4,
+                std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
+                std::num::NonZeroUsize::new(1).expect("一次判 1 块"),
+                std::num::NonZeroUsize::new(1).expect("一段一段判"),
+                &PairingBlocksShare::whole_flow_in_one_share(),
+                &units,
+                &other_units,
+                &|blocks| {
+                    if block_reported_not_run == Some(blocks[0].start) {
+                        return None;
+                    }
+                    Some(
+                        blocks
+                            .iter()
+                            .map(|ordinals| PairingJudged {
+                                conclusion: conclusion_bytes_of_the_pairing_block(ordinals),
+                                agreement: PairingAgreement::BothSidesAgree,
+                            })
+                            .collect(),
+                    )
+                },
+                &mut |_ordinals, _conclusion| {},
+            )
+            .expect("库读写得了")
+        };
+        assert_eq!(run_once(Some(8)), None, "第三块报本次未跑：整条流交 None");
+        let second_run = run_once(None).expect("这一趟没有报本次未跑的");
+        assert_eq!(
+            (second_run.blocks_reused, second_run.blocks_judged_now),
+            (2, 2),
+            "报本次未跑之前判完的两块存进了库；它自己与它后面的现判"
+        );
+    }
+
+    /// 判一段块的线程上 panic：照原样往外抛（判红的消息不变），不当本次未跑。
+    /// 判别力（`crates/mutations.tsv`）：panic 了只记成本次未跑、不往外抛，这条红（没 panic）。
+    #[test]
+    #[should_panic(expected = "两边对不上：这一段判红")]
+    fn a_panic_on_the_thread_of_a_stretch_is_thrown_again_with_its_message() {
+        let disposable = DisposableLibrary::new("pairing-blocks-panic")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("开得了库");
+        let units = judging_units_key_of_these_units(&[("gpu_judge_unit", 1)]);
+        let other_units = judging_units_key_of_these_units(&[("cpu_judge_unit", 2)]);
+        let _not_reached = pairing_conclusions_of_the_blocks_reused_or_judged(
+            &library,
+            &[43u8; DIGEST_BYTES],
+            4,
+            std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
+            std::num::NonZeroUsize::new(1).expect("一次判 1 块"),
+            std::num::NonZeroUsize::new(2).expect("两段一起判"),
+            &PairingBlocksShare::whole_flow_in_one_share(),
+            &units,
+            &other_units,
+            &|_blocks| panic!("两边对不上：这一段判红"),
+            &mut |_ordinals, _conclusion| {},
+        );
+    }
+
+    /// 两份领的块不重不漏：几条流、几种权重上，每一组块恰好归一份，两份领的块数与权重成比例（偏差不超过一组）；整份（`0/1`）领全部。
+    /// 判别力（`crates/mutations.tsv`）：归不归这一份的判断反过来，或一律算归这一份，这条红。
+    #[test]
+    fn the_shares_of_a_flow_claim_every_group_of_blocks_exactly_once() {
+        const GROUPS: u64 = 1000;
+        for flow_inputs_digest in [
+            [0u8; DIGEST_BYTES],
+            [7u8; DIGEST_BYTES],
+            [200u8; DIGEST_BYTES],
+        ] {
+            for weights in [vec![1u64, 1], vec![2, 3], vec![1, 1, 1]] {
+                let shares: Vec<PairingBlocksShare> = (0..weights.len())
+                    .map(|index| {
+                        PairingBlocksShare::with_this_share_of_these_weights(
+                            crate::crash_amplification::HostShare {
+                                index,
+                                count: weights.len(),
+                            },
+                            weights.clone(),
+                        )
+                    })
+                    .collect();
+                let total_weight: u64 = weights.iter().sum();
+                let mut groups_of_each_share = vec![0u64; weights.len()];
+                for group in 0..GROUPS {
+                    let claiming: Vec<usize> = shares
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, share)| {
+                            share.claims_this_group_of_pairing_blocks(&flow_inputs_digest, group)
+                        })
+                        .map(|(index, _)| index)
+                        .collect();
+                    assert_eq!(
+                        claiming.len(),
+                        1,
+                        "权重 {weights:?}：第 {group} 组恰好归一份，实际归 {claiming:?}"
+                    );
+                    groups_of_each_share[claiming[0]] += 1;
+                }
+                for (groups, weight) in groups_of_each_share.iter().zip(&weights) {
+                    assert!(
+                        groups.abs_diff(GROUPS * weight / total_weight) <= total_weight,
+                        "权重 {weights:?}：各份领的组数 {groups_of_each_share:?} 与权重成比例"
+                    );
+                }
+            }
+            for group in 0..GROUPS {
+                assert!(
+                    PairingBlocksShare::whole_flow_in_one_share()
+                        .claims_this_group_of_pairing_blocks(&flow_inputs_digest, group),
+                    "整份领全部"
+                );
+            }
+        }
+    }
+
+    /// 只走一段组的一趟：组区间外的组不领（两头外侧紧挨着的那一组在内），组区间里的每一组都领。
+    /// 判别力（`crates/mutations.tsv`）：组区间的判断一律算落在里面，这条红（区间外的组被领）。
+    #[test]
+    fn a_run_over_a_range_of_groups_claims_every_group_in_it_and_none_outside() {
+        const GROUPS_TRIED: u64 = 20;
+        let groups_of_the_run = 5..9;
+        for flow_inputs_digest in [[0u8; DIGEST_BYTES], [7u8; DIGEST_BYTES]] {
+            let share = PairingBlocksShare::whole_flow_in_one_share()
+                .only_the_groups_of_pairing_blocks_in(groups_of_the_run.clone());
+            let claimed: Vec<u64> = (0..GROUPS_TRIED)
+                .filter(|group| {
+                    share.claims_this_group_of_pairing_blocks(&flow_inputs_digest, *group)
+                })
+                .collect();
+            assert_eq!(
+                claimed,
+                groups_of_the_run.clone().collect::<Vec<u64>>(),
+                "组区间 {groups_of_the_run:?}：领的恰好是区间里的每一组"
+            );
+            for group_just_outside in [groups_of_the_run.start - 1, groups_of_the_run.end] {
+                assert!(
+                    !share.groups_of_this_run_hold(group_just_outside),
+                    "组区间 {groups_of_the_run:?}：紧挨着两头外侧的第 {group_just_outside} 组不落在里面"
+                );
+            }
+        }
+    }
+
+    /// 组区间与几台分份叠用：一组要落在组区间里、又归这一份才领；两份各叠同一段组区间时，组区间里的每一组恰好一份领，区间外的哪一份都不领。
+    /// 判别力（`crates/mutations.tsv`）：两样只要一样领就算领，这条红。
+    #[test]
+    fn a_range_of_groups_stacked_on_the_shares_of_several_hosts_claims_a_group_only_when_both_do() {
+        const GROUPS_TRIED: u64 = 200;
+        let groups_of_the_run = 40..120;
+        let flow_inputs_digest = [7u8; DIGEST_BYTES];
+        let shares_of_the_hosts: Vec<PairingBlocksShare> = (0..2)
+            .map(|index| {
+                PairingBlocksShare::with_this_share_of_these_weights(
+                    crate::crash_amplification::HostShare { index, count: 2 },
+                    vec![1, 1],
+                )
+            })
+            .collect();
+        let stacked_shares: Vec<PairingBlocksShare> = shares_of_the_hosts
+            .iter()
+            .map(|share_of_the_host| {
+                share_of_the_host
+                    .clone()
+                    .only_the_groups_of_pairing_blocks_in(groups_of_the_run.clone())
+            })
+            .collect();
+        for (share_of_the_host, stacked) in shares_of_the_hosts.iter().zip(&stacked_shares) {
+            let mut groups_of_the_host_outside_the_range = 0u64;
+            let mut groups_in_the_range_left_to_the_other_host = 0u64;
+            for group in 0..GROUPS_TRIED {
+                let claimed_by_the_host = share_of_the_host
+                    .claims_this_group_of_pairing_blocks(&flow_inputs_digest, group);
+                let in_the_range = groups_of_the_run.contains(&group);
+                assert_eq!(
+                    stacked.claims_this_group_of_pairing_blocks(&flow_inputs_digest, group),
+                    claimed_by_the_host && in_the_range,
+                    "第 {group} 组：归这一份 {claimed_by_the_host}、落在组区间 {groups_of_the_run:?} 里 {in_the_range}"
+                );
+                if claimed_by_the_host && !in_the_range {
+                    groups_of_the_host_outside_the_range += 1;
+                }
+                if !claimed_by_the_host && in_the_range {
+                    groups_in_the_range_left_to_the_other_host += 1;
+                }
+            }
+            assert!(
+                groups_of_the_host_outside_the_range > 0
+                    && groups_in_the_range_left_to_the_other_host > 0,
+                "取样的组里有归这一份而落在区间外的（{groups_of_the_host_outside_the_range} 组），也有落在区间里而归另一份的（{groups_in_the_range_left_to_the_other_host} 组）"
+            );
+        }
+        for group in 0..GROUPS_TRIED {
+            let claiming = stacked_shares
+                .iter()
+                .filter(|stacked| {
+                    stacked.claims_this_group_of_pairing_blocks(&flow_inputs_digest, group)
+                })
+                .count();
+            assert_eq!(
+                claiming,
+                usize::from(groups_of_the_run.contains(&group)),
+                "第 {group} 组：组区间 {groups_of_the_run:?} 里的恰好一份领，区间外的哪一份都不领"
+            );
+        }
+    }
+
+    /// 一条流按状态序号区间拆开（区间两头落在组的边界上，最后一段到整条流的状态数为止、最后一组不满）：各段算出的组区间拼起来恰好盖满
+    /// 整条流的每一组、两两不交，各段只走自己那段组的几趟，每一组恰好一趟领、整条流之外的组哪一趟都不领；起点对不齐、终点对不齐又不是整条流的状态数、
+    /// 空的、越过整条流的区间算不出组区间。
+    /// 判别力（`crates/mutations.tsv`）：组区间的上界当闭区间判（相邻两段交界上那一组两趟都领），这条红；终点按整除取组、不往上取整（最后那一组不满的哪一趟都不领），这条红。
+    #[test]
+    fn ranges_of_states_that_tile_a_flow_give_ranges_of_groups_that_tile_its_groups_without_overlap(
+    ) {
+        const STATES_PER_BLOCK: u64 = 4;
+        const BLOCKS_PER_GROUP: usize = 3;
+        const STATES_PER_GROUP: u64 = 12;
+        const STATE_COUNT: u64 = 13 * STATES_PER_GROUP + 2;
+        let states_per_block = std::num::NonZeroU64::new(STATES_PER_BLOCK).expect("块宽 4 不是 0");
+        let blocks_per_group =
+            std::num::NonZeroUsize::new(BLOCKS_PER_GROUP).expect("一组 3 块不是 0");
+        let ranges_of_states = [
+            0..2 * STATES_PER_GROUP,
+            2 * STATES_PER_GROUP..4 * STATES_PER_GROUP,
+            4 * STATES_PER_GROUP..8 * STATES_PER_GROUP,
+            8 * STATES_PER_GROUP..STATE_COUNT,
+        ];
+        let ranges_of_groups: Vec<std::ops::Range<u64>> = ranges_of_states
+            .iter()
+            .map(|ordinals| {
+                groups_of_pairing_blocks_holding_the_states(
+                    ordinals,
+                    STATE_COUNT,
+                    states_per_block,
+                    blocks_per_group,
+                )
+                .unwrap_or_else(|refusal| panic!("{refusal}"))
+            })
+            .collect();
+        let groups_of_the_flow = STATE_COUNT.div_ceil(STATES_PER_GROUP);
+        assert_eq!(
+            ranges_of_groups,
+            vec![0..2, 2..4, 4..8, 8..groups_of_the_flow],
+            "各段的组区间：最后一段罩到不满的最后一组"
+        );
+        let flow_inputs_digest = [9u8; DIGEST_BYTES];
+        let runs_over_the_ranges: Vec<PairingBlocksShare> = ranges_of_groups
+            .iter()
+            .map(|groups| {
+                PairingBlocksShare::whole_flow_in_one_share()
+                    .only_the_groups_of_pairing_blocks_in(groups.clone())
+            })
+            .collect();
+        for group in 0..groups_of_the_flow + 2 {
+            let claiming = runs_over_the_ranges
+                .iter()
+                .filter(|run| run.claims_this_group_of_pairing_blocks(&flow_inputs_digest, group))
+                .count();
+            assert_eq!(
+                claiming,
+                usize::from(group < groups_of_the_flow),
+                "第 {group} 组：整条流的 {groups_of_the_flow} 组里的恰好一趟领，之外的哪一趟都不领"
+            );
+        }
+        for refused in [
+            STATES_PER_BLOCK..2 * STATES_PER_GROUP,
+            0..2 * STATES_PER_GROUP + STATES_PER_BLOCK,
+            STATES_PER_GROUP..STATES_PER_GROUP,
+            8 * STATES_PER_GROUP..STATE_COUNT + 1,
+        ] {
+            assert!(
+                groups_of_pairing_blocks_holding_the_states(
+                    &refused,
+                    STATE_COUNT,
+                    states_per_block,
+                    blocks_per_group
+                )
+                .is_err(),
+                "状态序号区间 {refused:?} 算不出组区间"
+            );
+        }
+    }
+
+    /// 一条流按组区间拆成几趟：每一趟只判、只折进总账自己组区间里的块，别的数进 `blocks_outside_the_groups_of_this_run`（不算归别的份）；
+    /// 几趟判的块拼起来不重不漏；之后整条流一趟（`0/1`）一块都不现判、每块复用：块键不带组区间。
+    /// 判别力（`crates/mutations.tsv`）：组区间外的块也判，这条红。
+    #[test]
+    fn runs_over_ranges_of_groups_judge_every_block_once_and_a_run_over_the_whole_flow_reuses_all_of_them(
+    ) {
+        const BLOCKS: u64 = 40;
+        const BLOCKS_OF_A_GROUP: usize = 3;
+        let disposable = DisposableLibrary::new("pairing-blocks-ranges-of-groups")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("开得了库");
+        let units = judging_units_key_of_these_units(&[("gpu_judge_unit", 1)]);
+        let other_units = judging_units_key_of_these_units(&[("cpu_judge_unit", 2)]);
+        let flow_inputs_digest = [45u8; DIGEST_BYTES];
+        let state_count = 4 * BLOCKS;
+        let run_the_share = |share: &PairingBlocksShare| {
+            let blocks_asked_of_the_judge: Mutex<Vec<std::ops::Range<u64>>> =
+                Mutex::new(Vec::new());
+            let mut taken: Vec<std::ops::Range<u64>> = Vec::new();
+            let blocks_of_the_flow = pairing_conclusions_of_the_blocks_reused_or_judged(
+                &library,
+                &flow_inputs_digest,
+                state_count,
+                std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
+                std::num::NonZeroUsize::new(BLOCKS_OF_A_GROUP).expect("一次判的块数不是 0"),
+                std::num::NonZeroUsize::new(2).expect("两段一起判"),
+                share,
+                &units,
+                &other_units,
+                &|blocks| {
+                    blocks_asked_of_the_judge
+                        .lock()
+                        .expect("判段不 panic")
+                        .extend_from_slice(blocks);
+                    Some(
+                        blocks
+                            .iter()
+                            .map(|ordinals| PairingJudged {
+                                conclusion: conclusion_bytes_of_the_pairing_block(ordinals),
+                                agreement: PairingAgreement::BothSidesAgree,
+                            })
+                            .collect(),
+                    )
+                },
+                &mut |ordinals, _conclusion| taken.push(ordinals.clone()),
+            )
+            .expect("库读写得了")
+            .expect("判段没报本次未跑");
+            let mut judged = blocks_asked_of_the_judge
+                .into_inner()
+                .expect("判段不 panic");
+            judged.sort_by_key(|ordinals| ordinals.start);
+            (blocks_of_the_flow, judged, taken)
+        };
+        let blocks_of_a_group = u64::try_from(BLOCKS_OF_A_GROUP).expect("装得进 u64");
+        let blocks_of_the_groups = |groups: &std::ops::Range<u64>| -> Vec<std::ops::Range<u64>> {
+            (groups.start * blocks_of_a_group..(groups.end * blocks_of_a_group).min(BLOCKS))
+                .map(|block| 4 * block..4 * block + 4)
+                .collect()
+        };
+        let mut judged_by_the_runs: Vec<std::ops::Range<u64>> = Vec::new();
+        for groups in [0..5, 5..BLOCKS.div_ceil(blocks_of_a_group)] {
+            let (blocks_of_the_flow, judged, taken) = run_the_share(
+                &PairingBlocksShare::whole_flow_in_one_share()
+                    .only_the_groups_of_pairing_blocks_in(groups.clone()),
+            );
+            let blocks_of_the_run = blocks_of_the_groups(&groups);
+            let block_count_of_the_run =
+                u64::try_from(blocks_of_the_run.len()).expect("装得进 u64");
+            assert_eq!(
+                judged, blocks_of_the_run,
+                "组区间 {groups:?} 的一趟判的恰好是那几组的块"
+            );
+            assert_eq!(
+                taken, blocks_of_the_run,
+                "组区间 {groups:?} 的一趟按序号次序只把那几组的块折进总账"
+            );
+            assert_eq!(
+                (
+                    blocks_of_the_flow.blocks_judged_now,
+                    blocks_of_the_flow.blocks_outside_the_groups_of_this_run,
+                    blocks_of_the_flow.blocks_left_to_other_shares
+                ),
+                (block_count_of_the_run, BLOCKS - block_count_of_the_run, 0),
+                "组区间 {groups:?}：区间外的块数进区间外那一项，不算归别的份"
+            );
+            judged_by_the_runs.extend(judged);
+        }
+        judged_by_the_runs.sort_by_key(|ordinals| ordinals.start);
+        assert_eq!(
+            judged_by_the_runs,
+            (0..BLOCKS)
+                .map(|block| 4 * block..4 * block + 4)
+                .collect::<Vec<_>>(),
+            "几趟判的块拼起来不重不漏"
+        );
+        let (whole_run, judged_by_the_whole_run, _taken) =
+            run_the_share(&PairingBlocksShare::whole_flow_in_one_share());
+        assert_eq!(
+            (
+                whole_run.blocks_reused,
+                whole_run.blocks_judged_now,
+                whole_run.blocks_outside_the_groups_of_this_run
+            ),
+            (BLOCKS, 0, 0),
+            "整条流那一趟每块复用：块键不带组区间"
+        );
+        assert!(
+            judged_by_the_whole_run.is_empty(),
+            "整条流那一趟判段一次都不叫"
+        );
+    }
+
+    /// 两份各判自己的块、块键不带份额：两份都跑完之后，合并那一趟（`0/1`）一块都不现判，结论与从头整份判的逐块相同；
+    /// 每一份只把自己领的块折进总账、别的数进 `blocks_left_to_other_shares`；两份交给判段的每一段都是连着的整组。
+    /// 判别力（`crates/mutations.tsv`）：不归这一份的块也判，两份现判的块相加超过整条流，这条红；块一块一块轮着分、不按组分，判段拿不到整组连着的一段，这条红。
+    #[test]
+    fn two_shares_judge_every_block_once_and_the_merging_run_reuses_all_of_them() {
+        const BLOCKS: u64 = 40;
+        const BLOCKS_OF_A_GROUP: usize = 3;
+        let disposable = DisposableLibrary::new("pairing-blocks-shares")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
+        let library = CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("开得了库");
+        let units = judging_units_key_of_these_units(&[("gpu_judge_unit", 1)]);
+        let other_units = judging_units_key_of_these_units(&[("cpu_judge_unit", 2)]);
+        let flow_inputs_digest = [44u8; DIGEST_BYTES];
+        let state_count = 4 * BLOCKS;
+        let run_the_share = |share: &PairingBlocksShare| {
+            let stretches_asked: Mutex<Vec<Vec<std::ops::Range<u64>>>> = Mutex::new(Vec::new());
+            let mut taken: Vec<std::ops::Range<u64>> = Vec::new();
+            let blocks_of_the_flow = pairing_conclusions_of_the_blocks_reused_or_judged(
+                &library,
+                &flow_inputs_digest,
+                state_count,
+                std::num::NonZeroU64::new(4).expect("块宽 4 不是 0"),
+                std::num::NonZeroUsize::new(BLOCKS_OF_A_GROUP).expect("一次判的块数不是 0"),
+                std::num::NonZeroUsize::new(2).expect("两段一起判"),
+                share,
+                &units,
+                &other_units,
+                &|blocks| {
+                    stretches_asked
+                        .lock()
+                        .expect("判段不 panic")
+                        .push(blocks.to_vec());
+                    Some(
+                        blocks
+                            .iter()
+                            .map(|ordinals| PairingJudged {
+                                conclusion: conclusion_bytes_of_the_pairing_block(ordinals),
+                                agreement: PairingAgreement::BothSidesAgree,
+                            })
+                            .collect(),
+                    )
+                },
+                &mut |ordinals, conclusion| {
+                    assert_eq!(
+                        conclusion,
+                        conclusion_bytes_of_the_pairing_block(ordinals),
+                        "折进总账的是这一块的结论"
+                    );
+                    taken.push(ordinals.clone());
+                },
+            )
+            .expect("库读写得了")
+            .expect("判段没报本次未跑");
+            (
+                blocks_of_the_flow,
+                stretches_asked.into_inner().expect("判段不 panic"),
+                taken,
+            )
+        };
+        let mut judged_by_the_shares: Vec<std::ops::Range<u64>> = Vec::new();
+        for index in 0..2 {
+            let (blocks_of_the_flow, stretches_asked, taken) =
+                run_the_share(&PairingBlocksShare::with_this_share_of_these_weights(
+                    crate::crash_amplification::HostShare { index, count: 2 },
+                    vec![1, 1],
+                ));
+            assert_eq!(
+                blocks_of_the_flow.blocks_judged_now
+                    + blocks_of_the_flow.blocks_left_to_other_shares,
+                BLOCKS,
+                "第 {index} 份：判的加留给别的份的是整条流"
+            );
+            assert!(
+                blocks_of_the_flow.blocks_left_to_other_shares > 0,
+                "第 {index} 份：两份等权，有留给别的份的"
+            );
+            assert_eq!(
+                u64::try_from(taken.len()).expect("装得进 u64"),
+                blocks_of_the_flow.blocks_judged_now,
+                "第 {index} 份只把自己领的块折进总账"
+            );
+            for stretch in &stretches_asked {
+                assert!(
+                    stretch.windows(2).all(|pair| pair[0].end == pair[1].start)
+                        && stretch.len() <= BLOCKS_OF_A_GROUP,
+                    "第 {index} 份交给判段的一段是连着的块：{stretch:?}"
+                );
+            }
+            assert!(
+                stretches_asked
+                    .iter()
+                    .any(|stretch| stretch.len() == BLOCKS_OF_A_GROUP),
+                "第 {index} 份领的是整组的块，判段拿到过整组连着的一段：{stretches_asked:?}"
+            );
+            judged_by_the_shares.extend(stretches_asked.into_iter().flatten());
+        }
+        judged_by_the_shares.sort_by_key(|ordinals| ordinals.start);
+        assert_eq!(
+            judged_by_the_shares,
+            (0..BLOCKS)
+                .map(|block| 4 * block..4 * block + 4)
+                .collect::<Vec<_>>(),
+            "两份判的块不重不漏"
+        );
+        let (merging_run, stretches_asked_of_the_merging_run, taken_by_the_merging_run) =
+            run_the_share(&PairingBlocksShare::whole_flow_in_one_share());
+        assert_eq!(
+            (
+                merging_run.blocks_reused,
+                merging_run.blocks_judged_now,
+                merging_run.blocks_left_to_other_shares
+            ),
+            (BLOCKS, 0, 0),
+            "合并那一趟每块复用：块键不带份额"
+        );
+        assert!(
+            stretches_asked_of_the_merging_run.is_empty(),
+            "合并那一趟判段一次都不叫"
+        );
+        assert_eq!(
+            taken_by_the_merging_run,
+            (0..BLOCKS)
+                .map(|block| 4 * block..4 * block + 4)
+                .collect::<Vec<_>>(),
+            "合并那一趟每块的结论按序号次序各收一次"
+        );
     }
 
     /// 第二趟同一条流复用、现判 0：头一趟每块现判、一块都不复用（块键带序号段，别的块的结论不顶替这一块）；同一份输入、同两边判法单元的
@@ -2946,6 +5716,74 @@ mod tests {
         );
     }
 
+    /// 场景：一条新线程先拿改环境的锁（`CrashAmplificationEnvironment::cleared_then_set`）、再开一次性库（反着的次序）。
+    /// 预期：开库取名额那一步在等名额之前当场 panic（名额满着也不挂住），消息写明先开一次性库、后拿改环境的锁；
+    /// 那条线程 panic 之后锁已放，这条线程接着拿得到。
+    /// 判别力（`crates/mutations.tsv`）：取名额不问这条线程拿没拿着改环境的锁（那条线程取到名额、起了临时服务，不 panic），这条红。
+    #[test]
+    fn taking_a_disposable_library_place_while_holding_the_environment_lock_panics_at_once_naming_the_order(
+    ) {
+        let reversed_order = std::thread::spawn(|| {
+            let _environment =
+                crate::crash_amplification::CrashAmplificationEnvironment::cleared_then_set(&[]);
+            // 一次性库留着：自证反着的次序当场 panic（次序对了这一步取名额、起临时服务）
+            DisposableLibrary::new("place-taken-while-holding-the-environment-lock")
+                .map(|_library| ())
+        })
+        .join();
+        let panic_payload =
+            reversed_order.expect_err("拿着改环境的锁去开一次性库，取名额那一步当场 panic");
+        let panic_message = panic_payload
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| {
+                panic_payload
+                    .downcast_ref::<&str>()
+                    .map(|message| (*message).to_string())
+            })
+            .expect("assert! 带格式串的 panic 交回 String");
+        assert_eq!(
+            panic_message, PLACE_TAKEN_WHILE_HOLDING_THE_ENVIRONMENT_LOCK,
+            "panic 的就是取名额那一步，消息写明先开库、后拿锁"
+        );
+        assert!(
+            !crate::crash_amplification::this_thread_holds_the_environment_lock(),
+            "前提：这条线程没拿改环境的锁"
+        );
+        let _environment_after_the_panic =
+            crate::crash_amplification::CrashAmplificationEnvironment::cleared_then_set(&[]);
+    }
+
+    /// 场景：这条线程先开一份一次性库（新占一个名额），再拿改环境的锁，拿着锁再开第二份。
+    /// 预期：第二份不等名额、不查次序（同一条线程已经起着一份，拿着锁再开不会互等），开得成、不 panic；两份是两段名字空间。
+    /// 判别力（`crates/mutations.tsv`）：取名额那一步把「拿着改环境的锁」的检查挪回开头（这条线程已经起着一份的也查），这条红。
+    #[test]
+    fn a_thread_already_holding_a_disposable_library_place_opens_another_while_holding_the_environment_lock(
+    ) {
+        // 一次性库留着：自证这条线程起着一份之后拿着改环境的锁再开一份不查次序
+        let library_opened_before_the_lock =
+            DisposableLibrary::new("place-held-before-the-environment-lock")
+                .unwrap_or_else(|refusal| panic!("{refusal}"));
+        let environment =
+            crate::crash_amplification::CrashAmplificationEnvironment::cleared_then_set(&[]);
+        assert!(
+            crate::crash_amplification::this_thread_holds_the_environment_lock(),
+            "前提：开第二份时这条线程拿着改环境的锁"
+        );
+        // 一次性库留着：拿着改环境的锁开的第二份，自证不等名额、不 panic
+        let library_opened_under_the_lock =
+            DisposableLibrary::new("second-place-under-the-environment-lock")
+                .unwrap_or_else(|refusal| panic!("{refusal}"));
+        assert_ne!(
+            library_opened_before_the_lock.key_space(),
+            library_opened_under_the_lock.key_space(),
+            "两份一次性库两段名字空间"
+        );
+        drop(environment);
+        drop(library_opened_under_the_lock);
+        drop(library_opened_before_the_lock);
+    }
+
     /// 场景：另一条线程持着全仓那一份的守卫（[`TheOneLibraryKeptForThisProcess`]），持到这条线程已经去设一次性库之后再放；这条线程在它持着时去设。
     /// 预期：设一次性库等到守卫放手才设得上（设上那一刻守卫已经放手）；守卫持着的整段里这个进程一直没设一次性库。
     /// 判别力：`crates/mutations.tsv` 里以「全仓那一份的守卫不拿设一次性库那把锁」开头的那一行（守卫拿的是它自己新建的一把锁）让这一条红。
@@ -2993,6 +5831,91 @@ mod tests {
         assert!(
             guard_was_dropped_when_the_library_was_set,
             "设一次性库等到全仓那一份的守卫放手才设得上"
+        );
+    }
+
+    /// 场景：每台默认重活线程数从比一份临时服务多一条起到 124，外层 1 条到那么多条用例同时跑，每条里层要的条数取 1、2、
+    /// 每台默认重活线程数与它的两倍（核对线程变量设得比它大）几样，照拿线程的算术（[`shares_of_the_test_process`]、[`inner_threads_granted`]、
+    /// [`inner_threads_fit`]）一条接一条拿、放得下才拿。
+    /// 预期：每条拿到的不过里层那一份、至少一条；一起拿到的合起来不过里层那一份；里层那一份加临时服务那一份不过每台默认重活线程数。
+    /// 判别力（`crates/mutations.tsv`）：里层拿的不照那一份封顶，这条红；放不放得下不看已占的，这条红。
+    #[test]
+    fn inner_threads_of_the_cases_running_together_stay_within_the_heavy_thread_default() {
+        for heavy_threads in THREADS_OF_A_TEMPORARY_SERVER + 1..=124 {
+            let shares = shares_of_the_test_process(heavy_threads);
+            assert!(
+                shares.temporary_servers >= 1
+                    && shares.temporary_servers * THREADS_OF_A_TEMPORARY_SERVER
+                        + shares.inner_threads
+                        <= heavy_threads,
+                "每台默认 {heavy_threads} 条：临时服务至少一份，两份合起来不过它：{shares:?}"
+            );
+            for wanted in [1, 2, heavy_threads, 2 * heavy_threads] {
+                let granted = inner_threads_granted(wanted, shares.inner_threads);
+                assert!(
+                    (1..=shares.inner_threads).contains(&granted),
+                    "每台默认 {heavy_threads} 条、要 {wanted} 条：拿到的 {granted} 条在 1 到里层那一份 {} 条之间",
+                    shares.inner_threads
+                );
+                for cases_running_together in 1..=heavy_threads {
+                    let mut in_use = 0;
+                    for _case in 0..cases_running_together {
+                        if inner_threads_fit(in_use, granted, shares.inner_threads) {
+                            in_use += granted;
+                        }
+                    }
+                    assert!(
+                        in_use <= shares.inner_threads && in_use <= heavy_threads,
+                        "每台默认 {heavy_threads} 条、外层 {cases_running_together} 条各要 {wanted} 条：一起拿到的 {in_use} 条不过里层那一份 {} 条",
+                        shares.inner_threads
+                    );
+                }
+            }
+        }
+    }
+
+    /// 场景：外层 8 条线程同时各要每台默认重活线程数那么多条里层线程（[`InnerThreadsTaken::take`]，这个单测进程用的那一份额度），拿到后各持 20 毫秒。
+    /// 预期：每条拿到的都是里层那一份封顶后的条数；这 8 条同一时刻持着的合起来不过里层那一份；8 条都拿到过（还了的叫得醒等着的）。
+    /// 别的用例同时也在拿：它们占的只让这 8 条多等，这 8 条合起来的条数照样不过那一份。
+    /// 判别力（`crates/mutations.tsv`）：放不放得下不看已占的，这条红。
+    #[test]
+    fn threads_taken_by_cases_running_together_never_add_up_past_the_inner_share() {
+        const CASES_RUNNING_TOGETHER: usize = 8;
+        let heavy_threads = crate::heavy_threads::default_heavy_threads().get();
+        let inner_threads_of_the_share = shares_of_the_test_process(heavy_threads).inner_threads;
+        let held_now = std::sync::atomic::AtomicUsize::new(0);
+        let most_held_at_once = std::sync::atomic::AtomicUsize::new(0);
+        let granted_of_each_case: Vec<usize> = std::thread::scope(|scope| {
+            let cases: Vec<_> = (0..CASES_RUNNING_TOGETHER)
+                .map(|_case| {
+                    scope.spawn(|| {
+                        let taken = InnerThreadsTaken::take(heavy_threads);
+                        let held =
+                            held_now.fetch_add(taken.threads(), Ordering::SeqCst) + taken.threads();
+                        most_held_at_once.fetch_max(held, Ordering::SeqCst);
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        held_now.fetch_sub(taken.threads(), Ordering::SeqCst);
+                        taken.threads()
+                    })
+                })
+                .collect();
+            cases
+                .into_iter()
+                .map(|case| case.join().expect("拿线程的那条不 panic"))
+                .collect()
+        });
+        assert_eq!(
+            granted_of_each_case,
+            vec![
+                inner_threads_granted(heavy_threads, inner_threads_of_the_share);
+                CASES_RUNNING_TOGETHER
+            ],
+            "每条拿到的都是里层那一份封顶后的条数"
+        );
+        assert!(
+            most_held_at_once.load(Ordering::SeqCst) <= inner_threads_of_the_share,
+            "同一时刻持着的 {} 条不过里层那一份 {inner_threads_of_the_share} 条",
+            most_held_at_once.load(Ordering::SeqCst)
         );
     }
 }

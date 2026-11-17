@@ -52,7 +52,9 @@ pub enum Unreadability {
 }
 
 /// A、B（实例 1）、重开取号 2、C (2, 8)；崩溃恢复抛弃 C（落到 (2, 7)，实例 3 写行 9、暖机 10）、C 写回。
-pub fn pool_after_a_recovery_abandoned_c(tag: &str) -> (BuiltPool, TransactionOutput) {
+pub fn pool_after_a_recovery_abandoned_the_newest_publish(
+    tag: &str,
+) -> (BuiltPool, TransactionOutput) {
     let mut pool = build_pool(tag);
     let first = pool.output.clone();
     pool.output = publish_overwrite_in_process(
@@ -102,11 +104,11 @@ pub struct Remount {
     pub hook_calls: u32,
     pub current_txg: Option<CheckpointTxg>,
     /// C 那次发布写出的单元里，重开之后在盘 0 的分配器里是空闲的那几个（起点槽）。
-    pub free_units_of_c_after_remount: Vec<u64>,
+    pub free_units_of_the_abandoned_publish_after_remount: Vec<u64>,
 }
 
 pub fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Remount {
-    let (mut pool, abandoned) = pool_after_a_recovery_abandoned_c(tag);
+    let (mut pool, abandoned) = pool_after_a_recovery_abandoned_the_newest_publish(tag);
     let account_unit = abandoned.unit(account.unit());
     let failing = match unreadability {
         Unreadability::Readable => FailingReadsOfARange::Never,
@@ -157,7 +159,7 @@ pub fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Rem
         failed_reads,
         hook_calls: hook_calls.get(),
         current_txg: None,
-        free_units_of_c_after_remount: Vec::new(),
+        free_units_of_the_abandoned_publish_after_remount: Vec::new(),
     };
     match mounted {
         Ok(mounted) => {
@@ -166,7 +168,7 @@ pub fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Rem
             remount.abandoned_roots_unreadable = mounted.output.abandoned_roots_unreadable;
             remount.rereads = format!("{:?}", mounted.output.rereads);
             remount.space_admission = format!("{:?}", mounted.output.space_admission);
-            remount.free_units_of_c_after_remount = abandoned
+            remount.free_units_of_the_abandoned_publish_after_remount = abandoned
                 .units
                 .iter()
                 .filter(|unit| mounted.allocator.devices[0].is_free(unit.slot))
@@ -203,7 +205,7 @@ pub fn overwritten_units_of(
 
 /// 实例 4 里接着覆盖写，直到 C 的某个单元在盘上被改写或 txg 到 31（txg 32 的根盖掉 C 的根槽）。
 /// 交回一行：第一次改写时的 txg 与被改写的单元；没有改写就是写到了哪个 txg，那一刻的镜像交给池级 checker（I-7.4 判成立、一条不红）。
-pub fn continue_until_a_unit_of_c_is_reused(
+pub fn continue_until_a_unit_of_the_abandoned_publish_is_reused(
     remount: &mut Remount,
     images: &mut PoolCheckerImages,
 ) -> String {
@@ -254,7 +256,7 @@ pub fn run_arm(
         remount.account_slot,
         remount.result,
         remount.current_txg.map(|txg| txg.0),
-        remount.free_units_of_c_after_remount,
+        remount.free_units_of_the_abandoned_publish_after_remount,
         remount.isolated,
         remount.abandoned_roots_unreadable,
         remount.reads_of_each_copy,
@@ -264,7 +266,7 @@ pub fn run_arm(
         remount.space_admission,
     );
     let reuse = if remount.result.is_ok() {
-        continue_until_a_unit_of_c_is_reused(&mut remount, images)
+        continue_until_a_unit_of_the_abandoned_publish_is_reused(&mut remount, images)
     } else {
         "mount_refused".to_string()
     };
@@ -296,14 +298,14 @@ pub fn assert_recomputed_from_the_mapping_isolated_and_not_reused(
         "现算出的落点与读得出那一臂隔离的一样多"
     );
     assert_eq!(
-        remount.free_units_of_c_after_remount,
+        remount.free_units_of_the_abandoned_publish_after_remount,
         Vec::<u64>::new(),
         "C 的单元一个都没回到空闲"
     );
     assert!(line.contains("no_reuse_through_txg=31"), "{line}");
 }
 
-pub fn readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+pub fn readable_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(
     account: Account,
     images: &mut PoolCheckerImages,
 ) {
@@ -317,23 +319,26 @@ pub fn readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
         remount.reads_of_each_copy.0 >= 1,
         "影子账那一读真的读到了这一段"
     );
-    assert_eq!(remount.free_units_of_c_after_remount, Vec::<u64>::new());
+    assert_eq!(
+        remount.free_units_of_the_abandoned_publish_after_remount,
+        Vec::<u64>::new()
+    );
     assert!(line.contains("no_reuse_through_txg=31"), "{line}");
 }
 
-pub fn c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+pub fn c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(
     images: &mut PoolCheckerImages,
 ) {
-    readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+    readable_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(
         Account::AllocationRecordTreeRoot,
         images,
     );
 }
 
-pub fn c393_readable_tree_table_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+pub fn c393_readable_tree_table_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(
     images: &mut PoolCheckerImages,
 ) {
-    readable_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(
+    readable_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(
         Account::TreeTable,
         images,
     );

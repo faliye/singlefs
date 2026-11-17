@@ -1,7 +1,7 @@
 //! 可写挂载退回见证到的那一版之后、按它当水位再判缺记录（`F1_AFTER_F2`）之前先重扫一遍 journal 环，用新扫出的记录判
 //! （C754（退回之后再判缺记录不重扫环）；两处「重读一次」都是环与点名单元一起重读）。
 //!
-//! 盘面与 `writable_mount_rejudges_f1_after_falling_back_and_accepts_when_the_reread_clears_the_fault.rs` 同一个（`tests/common_unwitnessed_publish/mod.rs`）：
+//! 盘面与 `writable_mount_rejudges_missing_records_with_unverifiable_units_after_falling_back_and_accepts_when_the_reread_clears_the_fault.rs` 同一个（`tests/common_unwitnessed_publish/mod.rs`）：
 //! 384 槽小盘、第一个文件之后覆盖写 5 次，再录一次三条记录的顺序写 R，崩在 R 的根槽落盘之后、系统配置轮换之前；R 的树表两份一直读回全零，
 //! R 被择、走读失败，F2 退回 P。不同的是 R 的第 1 条记录只在每块盘上头一次读回全零（读阶段扫环那一次），之后读得出。
 mod common;
@@ -12,7 +12,7 @@ use common::{
     UnreadableRangeReadBack,
 };
 use common_unwitnessed_publish::{
-    plain_devices_on, record_one_publish_after_overwrites, PublishRecordedAsR,
+    plain_devices_on, record_one_publish_after_overwrites, RecordedPublishKind,
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::mount::{
@@ -21,7 +21,7 @@ use singlefs_core::mount::{
 };
 use singlefs_verification::memory_pool::RetainedWrite;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 fn unreadable_ranges_of(
     writes: &[&RetainedWrite],
@@ -46,8 +46,8 @@ fn unreadable_ranges_of(
 fn a_record_read_back_as_zero_once_while_scanning_the_ring_is_read_again_before_rejudging_and_leaves_no_gap(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let tree_table_writes = recorded.unit_writes_at(&recorded.root().tree_table);

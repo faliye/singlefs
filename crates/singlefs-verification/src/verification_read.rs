@@ -61,13 +61,13 @@ fn number(bytes: &[u8], offset: usize, width: usize) -> u64 {
 }
 
 /// 这里只接设备字节，不经 core 的任何内容解析或扫描候选生成。
-struct Reader<'a>(&'a dyn PoolReader);
+struct Reader<'pool>(&'pool dyn PoolReader);
 impl ImageReader for Reader<'_> {
     fn devices(&self) -> Vec<u32> {
         self.0
             .device_identities()
             .into_iter()
-            .map(|d| d.0)
+            .map(|device_identity| device_identity.0)
             .collect()
     }
     fn device_bytes(&self, device: u32) -> Option<u64> {
@@ -130,13 +130,129 @@ fn configuration_from_view(
     })
 }
 
+/// 系统配置槽里 fsid 的偏移（系统配置字段表）；这里另写一份，与 checker、核心层各自的常量不共用。
+const FILESYSTEM_IDENTIFIER_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 102;
+
+/// 一槽读出的字节是别的池的：magic 与整槽校验和都过（checker 先判这两关，交回别的判决的槽都过了这两关），而自述的 fsid 不是本池的。
+/// 不看 incompat 位与别的字段：带这一版读者不收的值的别的池的槽同样算。
+fn system_configuration_slot_bytes_belong_to_another_pool(
+    bytes: &[u8],
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> bool {
+    if matches!(
+        singlefs_checker::check_system_configuration_slot(bytes),
+        Err(singlefs_checker::Verdict::TooShort
+            | singlefs_checker::Verdict::BadMagic
+            | singlefs_checker::Verdict::ChecksumMismatch)
+    ) {
+        return false;
+    }
+    let filesystem_identifier_end = FILESYSTEM_IDENTIFIER_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+        + filesystem_identifier_of_the_pool.len();
+    bytes[FILESYSTEM_IDENTIFIER_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT..filesystem_identifier_end]
+        != filesystem_identifier_of_the_pool[..]
+}
+
+/// 系统配置槽里 incompat 位图的偏移与长度、节点大小的偏移、每区槽数的偏移（系统配置字段表）；这里另写一份，与 checker、核心层各自的常量不共用。
+const INCOMPAT_BITMAP_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 6;
+const BYTES_OF_THE_INCOMPATIBLE_FEATURE_BITMAP_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 32;
+const NODE_BYTES_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 301;
+const ROOT_RING_SLOTS_PER_REGION_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: usize = 362;
+/// 这一版布局的 incompat 位图第一个字节：位 1 与位 2 都带（系统配置字段表）；其余 31 字节都是 0。这里另写一份。
+const INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT_IN_THE_SYSTEM_CONFIGURATION_SLOT: u8 = 0x06;
+
+/// 可写挂载按盘读系统配置槽时把这一槽算成「别的池的槽」（乙入判不出的一半）：magic、整槽校验和、布局位、节点大小、每区槽数都过，自述的 fsid 不是本池的。
+/// 判的是核心层 `SystemConfiguration::parse_slot` 那几关，这里不调核心层：格式版本、加密类型、区域数、根环起点与槽距这几样 checker 判、产品这一读不判，
+/// 带这一版读者不收的值的别的池的槽同样算；布局位不认识、每区槽数越界的不算。
+pub(crate) fn system_configuration_slot_bytes_count_as_a_slot_of_another_pool(
+    bytes: &[u8],
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> bool {
+    if !system_configuration_slot_bytes_belong_to_another_pool(
+        bytes,
+        filesystem_identifier_of_the_pool,
+    ) {
+        return false;
+    }
+    let incompat_bitmap = &bytes[INCOMPAT_BITMAP_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+        ..INCOMPAT_BITMAP_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+            + BYTES_OF_THE_INCOMPATIBLE_FEATURE_BITMAP_IN_THE_SYSTEM_CONFIGURATION_SLOT];
+    let incompat_bitmap_is_this_layout = incompat_bitmap[0]
+        == INCOMPAT_FIRST_BYTE_OF_THIS_LAYOUT_IN_THE_SYSTEM_CONFIGURATION_SLOT
+        && incompat_bitmap[1..].iter().all(|byte| *byte == 0);
+    let recorded_node_bytes = u32::from_le_bytes(
+        bytes[NODE_BYTES_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+            ..NODE_BYTES_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT + 4]
+            .try_into()
+            .expect("切了 4 字节"),
+    );
+    let root_ring_slots_per_region_is_in_range =
+        RootRingSlotsPerRegion::from_system_configuration_field(u64::from(
+            bytes[ROOT_RING_SLOTS_PER_REGION_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT],
+        ))
+        .is_ok();
+    incompat_bitmap_is_this_layout
+        && u64::from(recorded_node_bytes) == NODE_BYTES
+        && root_ring_slots_per_region_is_in_range
+}
+
+/// 只给 checker 读系统配置槽用的口子：别的池的槽读成读不到，checker 按「不自证」处置它，也不从它身上取槽距。
+struct ReaderOfTheSystemConfigurationSlotsOfThePool<'reader> {
+    reader: Reader<'reader>,
+    filesystem_identifier_of_the_pool: &'reader [u8; 16],
+}
+impl ImageReader for ReaderOfTheSystemConfigurationSlotsOfThePool<'_> {
+    fn devices(&self) -> Vec<u32> {
+        self.reader.devices()
+    }
+    fn device_bytes(&self, device: u32) -> Option<u64> {
+        self.reader.device_bytes(device)
+    }
+    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
+        self.reader.read(device, offset, length).filter(|bytes| {
+            !system_configuration_slot_bytes_belong_to_another_pool(
+                bytes,
+                self.filesystem_identifier_of_the_pool,
+            )
+        })
+    }
+    fn candidate_unit_slots(&self, device: u32) -> Option<Vec<u64>> {
+        self.reader.candidate_unit_slots(device)
+    }
+    fn candidate_journal_slots(&self, device: u32) -> Option<Vec<u64>> {
+        self.reader.candidate_journal_slots(device)
+    }
+}
+
 pub(crate) fn choose_system_configuration(
     reader: &dyn PoolReader,
 ) -> Result<SystemConfiguration, ()> {
+    choose_system_configuration_among_the_slot_readings(
+        singlefs_checker::image::system_configuration_slot_readings(&Reader(reader)),
+    )
+}
+
+/// 与 [`choose_system_configuration`] 同一个择法，只从自述 fsid 是 `filesystem_identifier_of_the_pool` 的槽里择：
+/// 别的池的槽当自证不过，某块盘两槽都不算数就跳过这块盘。
+pub(crate) fn choose_system_configuration_of_the_pool(
+    reader: &dyn PoolReader,
+    filesystem_identifier_of_the_pool: &[u8; 16],
+) -> Result<SystemConfiguration, ()> {
+    choose_system_configuration_among_the_slot_readings(
+        singlefs_checker::image::system_configuration_slot_readings(
+            &ReaderOfTheSystemConfigurationSlotsOfThePool {
+                reader: Reader(reader),
+                filesystem_identifier_of_the_pool,
+            },
+        ),
+    )
+}
+
+fn choose_system_configuration_among_the_slot_readings(
+    readings_of_every_device: Vec<(u32, [SystemConfigurationSlotReading; 2])>,
+) -> Result<SystemConfiguration, ()> {
     let mut chosen: Option<SystemConfiguration> = None;
-    for (_, readings) in
-        singlefs_checker::image::system_configuration_slot_readings(&Reader(reader))
-    {
+    for (_, readings) in readings_of_every_device {
         let mut best: Option<SystemConfiguration> = None;
         for reading in readings {
             match reading {
@@ -223,7 +339,7 @@ fn locations(bytes: &[u8]) -> [LocationEntry; 2] {
 }
 
 pub(crate) fn node_pointer(bytes: &[u8]) -> Option<NodePointer> {
-    if bytes.len() < 86 || bytes[..34].iter().any(|b| *b != 0) {
+    if bytes.len() < 86 || bytes[..34].iter().any(|byte| *byte != 0) {
         return None;
     }
     Some(NodePointer {
@@ -411,8 +527,8 @@ pub(crate) fn instance_table_page(bytes: &[u8], page_index: u64) -> Option<Insta
         return None;
     }
     let next = match chain[1] {
-        0 if chain[2..].iter().all(|b| *b == 0) => None,
-        1 if chain[2..].iter().any(|b| *b != 0) => Some(node_pointer(&chain[2..])?),
+        0 if chain[2..].iter().all(|byte| *byte == 0) => None,
+        1 if chain[2..].iter().any(|byte| *byte != 0) => Some(node_pointer(&chain[2..])?),
         _ => return None,
     };
     Some(InstancePage { rows, next })
@@ -902,8 +1018,8 @@ mod tests {
         .expect("配置槽");
         let invalid_start = expected.iter().max().unwrap() + 64;
         put(&mut slot, 417, invalid_start, 8);
-        let slot_len = slot.len();
-        seal(&mut slot, 155, slot_len);
+        let slot_length_in_bytes = slot.len();
+        seal(&mut slot, 155, slot_length_in_bytes);
         assert!(
             singlefs_checker::check_system_configuration_slot(&slot).is_ok(),
             "这是一份校验和正确但几何自述错误的槽"

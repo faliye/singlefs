@@ -495,7 +495,7 @@ pub fn run_the_scenario_where_the_background_sweep_rereads_every_head_before_era
         matches!(
             outcome,
             InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit {
+                NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit {
                     placement,
                     reread: HeadRereadBeforeErasing::NotTheJudgedUnit,
                 }
@@ -600,7 +600,7 @@ pub fn the_reread_read_bad_deletes_no_row_and_the_next_sweep_leaves_no_orphan(
         matches!(
             sweep,
             InstanceTableSweepAtTheEndOfTheMount::Swept(InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::AHeadRereadBeforeErasingIsNotTheJudgedUnit {
+                NoRowDeletedThisRound::HeadRereadBeforeErasingIsNotTheJudgedUnit {
                     placement,
                     reread,
                 }

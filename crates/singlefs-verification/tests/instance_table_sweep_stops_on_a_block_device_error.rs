@@ -240,7 +240,7 @@ fn the_next_sweep_deletes_the_row_of_instance_one(
 /// 预期：结局 `StoppedByABlockDeviceErrorWhileErasing`，已抹的是第一个头（留着、读不出单元头），第二个起的头都还在；这一轮不删行（实例 1 那一行还在）；
 /// 挂载交回可写（覆盖写一次做成）；之后一次不注入错的清扫删掉实例 1 那一行、孤儿一个不剩。
 #[test]
-fn a_write_error_while_erasing_a_head_deletes_no_row_keeps_the_heads_erased_before_it_and_the_next_sweep_deletes_the_row(
+fn write_error_while_erasing_a_head_deletes_no_row_keeps_the_heads_erased_before_it_and_the_next_sweep_deletes_the_row(
 ) {
     let pool = pool_with_a_dead_instance(None);
     let dry = sweep_without_a_fault(&pool);
@@ -299,7 +299,7 @@ fn a_write_error_while_erasing_a_head_deletes_no_row_keeps_the_heads_erased_befo
 /// 场景：清扫挂载抹完全部孤儿头之后，那一块盘的那道屏障报块设备错。
 /// 预期：结局 `StoppedByABlockDeviceErrorWhileErasing`，已抹的是全部头（留着）；这一轮不删行；挂载交回可写；之后一次不注入错的清扫删掉实例 1 那一行。
 #[test]
-fn a_barrier_error_after_erasing_the_heads_deletes_no_row_keeps_the_heads_erased_and_the_next_sweep_deletes_the_row(
+fn barrier_error_after_erasing_the_heads_deletes_no_row_keeps_the_heads_erased_and_the_next_sweep_deletes_the_row(
 ) {
     let pool = pool_with_a_dead_instance(None);
     let dry = sweep_without_a_fault(&pool);
@@ -368,7 +368,7 @@ fn a_barrier_error_after_erasing_the_heads_deletes_no_row_keeps_the_heads_erased
 /// 落盘途中报错的那次清扫发布照发布路径冻结在交回的分配器上：冻结着时覆盖写被拒，原样重发做成之后覆盖写做成（挂载交回可写）；
 /// 在清扫挂载刚交回时的盘面上起一次不注入错的清扫，删掉实例 1 那一行、孤儿一个不剩。
 #[test]
-fn a_write_error_while_landing_the_sweep_publish_deletes_no_row_freezes_the_publish_and_the_next_sweep_deletes_the_row(
+fn write_error_while_landing_the_sweep_publish_deletes_no_row_freezes_the_publish_and_the_next_sweep_deletes_the_row(
 ) {
     let pool = pool_with_a_dead_instance(None);
     let dry = sweep_without_a_fault(&pool);

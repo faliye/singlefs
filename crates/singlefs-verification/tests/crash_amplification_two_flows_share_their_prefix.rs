@@ -223,77 +223,95 @@ fn fresh_judging_units_fingerprint() -> JudgingUnitsFingerprint {
 
 #[test]
 fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail() {
-    let flow_a = record_flow("prefix-share-a", &content_of(3, 4100), true);
-    let flow_b = record_flow("prefix-share-b", &content_of(11, 4100), false);
+    let filling_flow = record_flow("prefix-share-a", &content_of(3, 4100), true);
+    let reusing_flow = record_flow("prefix-share-b", &content_of(11, 4100), false);
     let version = fresh_judging_units_fingerprint();
-    let plan_a = plan_crash_points(&flow_a.flow());
-    let plan_b = plan_crash_points(&flow_b.flow());
+    let filling_plan = plan_crash_points(&filling_flow.flow());
+    let reusing_plan = plan_crash_points(&reusing_flow.flow());
 
     // 一、前缀逐点相同：身份、路径、块键
-    let prefix = prefix_length(&plan_a);
+    let prefix = prefix_length(&filling_plan);
     assert!(prefix >= 2, "取号加暖机与新池新建文件至少两段：{prefix}");
-    assert_eq!(prefix, prefix_length(&plan_b));
+    assert_eq!(prefix, prefix_length(&reusing_plan));
     for index in 0..prefix {
-        let (a, b) = (&plan_a.points[index], &plan_b.points[index]);
-        assert_eq!(a.identity, b.identity, "前缀第 {index} 个点身份相同");
-        assert_eq!(a.path_number, b.path_number, "前缀第 {index} 个点路径相同");
-        assert_eq!(a.reuse_key, b.reuse_key);
+        let (filling_point, reusing_point) =
+            (&filling_plan.points[index], &reusing_plan.points[index]);
+        assert_eq!(
+            filling_point.identity, reusing_point.identity,
+            "前缀第 {index} 个点身份相同"
+        );
+        assert_eq!(
+            filling_point.path_number, reusing_point.path_number,
+            "前缀第 {index} 个点路径相同"
+        );
+        assert_eq!(filling_point.reuse_key, reusing_point.reuse_key);
         assert!(
-            a.identity
+            filling_point
+                .identity
                 .starts_with(&format!("{}::", common_crash_points::THIS_FILE)),
             "前缀的点由公共模块设：{}",
-            a.identity
+            filling_point.identity
         );
     }
     assert!(
-        plan_a.points[0]
+        filling_plan.points[0]
             .path_number
             .starts_with("acquire_instance_and_warm_up."),
         "{}",
-        plan_a.points[0].path_number
+        filling_plan.points[0].path_number
     );
     assert_eq!(
-        plan_a.points[prefix].path_number,
+        filling_plan.points[prefix].path_number,
         format!(
             "{}/{}",
-            plan_a.points[prefix - 1].path_number,
-            plan_a.points[prefix].name
+            filling_plan.points[prefix - 1].path_number,
+            filling_plan.points[prefix].name
         ),
         "路径 = 父路径 / 自己的名字"
     );
 
     // 二、尾巴：同名（同一入口、同一种写、同一步）、不同数据 ⇒ 路径这一级并成一段，身份不同；文件各是设它的那一份
-    let tail_a = &plan_a.points[prefix];
-    let tail_b = &plan_b.points[prefix];
-    assert_eq!(tail_a.name, tail_b.name);
+    let filling_tail = &filling_plan.points[prefix];
+    let reusing_tail = &reusing_plan.points[prefix];
+    assert_eq!(filling_tail.name, reusing_tail.name);
     assert_eq!(
-        tail_a.path_number, tail_b.path_number,
+        filling_tail.path_number, reusing_tail.path_number,
         "同名分叉在路径这一级并成一段"
     );
-    assert_ne!(tail_a.identity, tail_b.identity, "数据不同，身份不同");
+    assert_ne!(
+        filling_tail.identity, reusing_tail.identity,
+        "数据不同，身份不同"
+    );
     assert!(
-        tail_a.identity.starts_with(&format!(
+        filling_tail.identity.starts_with(&format!(
             "{}::publish_overwrite.",
             common_crash_points::THIS_FILE
         )),
         "{}",
-        tail_a.identity
+        filling_tail.identity
     );
     assert!(
-        tail_b
+        reusing_tail
             .identity
             .starts_with(&format!("{PATH_OF_THIS_TEST_FILE}::publish_overwrite.")),
         "{}",
-        tail_b.identity
+        reusing_tail.identity
     );
     assert_eq!(repository_relative_file(file!()), PATH_OF_THIS_TEST_FILE);
 
     // 三、判法改了：计划不看判法，树与每个点的复用键都不动；判法单元指纹只在判定行上分（第四段末尾核）
     let changed_version = fresh_judging_units_fingerprint();
     assert_ne!(changed_version, version);
-    let plan_b_changed = plan_crash_points(&flow_b.flow());
-    assert_eq!(plan_b_changed.points.len(), plan_b.points.len());
-    for (changed, unchanged) in plan_b_changed.points.iter().zip(&plan_b.points) {
+    let reusing_plan_after_the_change = plan_crash_points(&reusing_flow.flow());
+    assert_eq!(
+        reusing_plan_after_the_change.points.len(),
+        reusing_plan.points.len()
+    );
+    for (changed, unchanged) in reusing_plan_after_the_change
+        .points
+        .iter()
+        .zip(&reusing_plan.points)
+    {
         assert_eq!(
             changed.path_number, unchanged.path_number,
             "判法改了树不动：{}",
@@ -310,31 +328,40 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     // 整份库里没判的块、路径索引的行数都从空库数起
     let library = UnitTestLibrary::new("two-flows-prefix-share");
     let mut store = library.store();
-    let mut report_a = CoverageReport::default();
-    let recording_a =
-        record_crash_points(&mut store, &plan_a, &version, &mut report_a).expect("录得进");
-    assert_eq!(recording_a.blocks_already_judged, 0);
+    let mut filling_report = CoverageReport::default();
+    let filling_recording =
+        record_crash_points(&mut store, &filling_plan, &version, &mut filling_report)
+            .expect("录得进");
+    assert_eq!(filling_recording.blocks_already_judged, 0);
     // 判法只吃库里读回的那一份：流先写进库再读回。
-    let read_back_of_line_295 =
-        record_the_flow_and_read_it_back(&mut store, &flow_a.flow()).expect("流写得进库、读得回");
-    let checking_a = check_recorded_blocks(
+    let read_back_of_line_295 = record_the_flow_and_read_it_back(&mut store, &filling_flow.flow())
+        .expect("流写得进库、读得回");
+    let filling_checking = check_recorded_blocks(
         &mut store,
         &read_back_of_line_295.flow(),
-        &plan_a,
+        &filling_plan,
         &WeightedShares::new(vec![1]),
         0,
         &version,
     )
     .expect("核得完");
-    assert_eq!(checking_a.red_states, 0, "{:?}", checking_a.red_texts);
+    assert_eq!(
+        filling_checking.red_states, 0,
+        "{:?}",
+        filling_checking.red_texts
+    );
     assert!(unjudged_blocks(&store, &version)
         .expect("对得了账")
         .is_empty());
     // 判法单元指纹换了：A 的每一块在新版本下都算没判，旧版本的行留着
     let mut report_changed = CoverageReport::default();
-    let recording_changed =
-        record_crash_points(&mut store, &plan_a, &changed_version, &mut report_changed)
-            .expect("录得进");
+    let recording_changed = record_crash_points(
+        &mut store,
+        &filling_plan,
+        &changed_version,
+        &mut report_changed,
+    )
+    .expect("录得进");
     assert_eq!(
         recording_changed.blocks_already_judged, 0,
         "换了判法单元指纹一块都不复用"
@@ -352,64 +379,72 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
         "旧版本的判定还在"
     );
 
-    let mut report_b = CoverageReport::default();
-    let recording_b =
-        record_crash_points(&mut store, &plan_b, &version, &mut report_b).expect("录得进");
-    let prefix_blocks: u64 = plan_a.points[..prefix]
+    let mut reusing_report = CoverageReport::default();
+    let reusing_recording =
+        record_crash_points(&mut store, &reusing_plan, &version, &mut reusing_report)
+            .expect("录得进");
+    let prefix_blocks: u64 = filling_plan.points[..prefix]
         .iter()
         .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
         .sum();
     assert_eq!(
-        recording_b.blocks_already_judged,
+        reusing_recording.blocks_already_judged,
         prefix_blocks,
         "前缀的块全部复用：{:?}",
-        report_b.lines()
+        reusing_report.lines()
     );
-    let tail_blocks: u64 = plan_b.points[prefix..]
+    let tail_blocks: u64 = reusing_plan.points[prefix..]
         .iter()
         .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
         .sum();
-    assert_eq!(recording_b.blocks_recorded, tail_blocks, "只有尾巴要核");
-    for line in &report_b.lines()[..prefix] {
+    assert_eq!(
+        reusing_recording.blocks_recorded, tail_blocks,
+        "只有尾巴要核"
+    );
+    for line in &reusing_report.lines()[..prefix] {
         assert!(
             line.ends_with(" reused") || line.ends_with(" not_expanded"),
             "前缀的点要么复用，要么段大过展开上限没有状态可复用：{line}"
         );
     }
     assert!(
-        report_b.lines()[..prefix]
+        reusing_report.lines()[..prefix]
             .iter()
             .any(|line| line.ends_with(" reused")),
         "{:?}",
-        report_b.lines()
+        reusing_report.lines()
     );
-    for line in &report_b.lines()[prefix..] {
+    for line in &reusing_report.lines()[prefix..] {
         assert!(
             line.ends_with(" checked") || line.ends_with(" not_expanded"),
             "尾巴的点要么核了，要么段大过展开上限没有状态：{line}"
         );
     }
     assert!(
-        report_b.lines()[prefix..]
+        reusing_report.lines()[prefix..]
             .iter()
             .any(|line| line.ends_with(" checked")),
         "{:?}",
-        report_b.lines()
+        reusing_report.lines()
     );
     // 判法只吃库里读回的那一份：流先写进库再读回。
-    let read_back_of_line_374 =
-        record_the_flow_and_read_it_back(&mut store, &flow_b.flow()).expect("流写得进库、读得回");
-    let checking_b = check_recorded_blocks(
+    let read_back_of_line_374 = record_the_flow_and_read_it_back(&mut store, &reusing_flow.flow())
+        .expect("流写得进库、读得回");
+    let reusing_checking = check_recorded_blocks(
         &mut store,
         &read_back_of_line_374.flow(),
-        &plan_b,
+        &reusing_plan,
         &WeightedShares::new(vec![1]),
         0,
         &version,
     )
     .expect("核得完");
-    assert_eq!(checking_b.blocks_checked, tail_blocks);
-    assert_eq!(checking_b.red_states, 0, "{:?}", checking_b.red_texts);
+    assert_eq!(reusing_checking.blocks_checked, tail_blocks);
+    assert_eq!(
+        reusing_checking.red_states, 0,
+        "{:?}",
+        reusing_checking.red_texts
+    );
     assert!(unjudged_blocks(&store, &version)
         .expect("对得了账")
         .is_empty());
@@ -417,39 +452,42 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     let paths = store.paths_with_prefix("").expect("读得了路径索引");
     assert_eq!(
         paths.len(),
-        plan_a.points.len(),
+        filling_plan.points.len(),
         "两条流同名，路径索引里一条路径一行：{paths:?}"
     );
     assert_eq!(
         store
-            .identity_of_path(&tail_b.path_number)
+            .identity_of_path(&reusing_tail.path_number)
             .expect("读得了")
             .as_deref(),
-        Some(tail_b.identity.as_str()),
+        Some(reusing_tail.identity.as_str()),
         "同一路径最后写的身份留在索引里"
     );
     let subtree = store
-        .paths_with_prefix(&format!("{}/", plan_a.points[0].path_number))
+        .paths_with_prefix(&format!("{}/", filling_plan.points[0].path_number))
         .expect("读得了");
     assert_eq!(
         subtree.len(),
-        plan_a.points.len() - 1,
+        filling_plan.points.len() - 1,
         "按前缀扫就是列子树：根之下的每个节点各一行"
     );
 
     // 五、改名只动路径索引：把流 B 的第一个点改名（祖先改名），它自己的身份变（名字在身份里），后代的身份不变、路径变；
     // 块键只由内容定（名字、身份都不进块键，D13 已定项 17），改了名的那个点连同后代的块全部照样复用，一块都不重核
-    let mut renamed_flow = flow_b.flow();
+    let mut renamed_flow = reusing_flow.flow();
     renamed_flow.crash_points[0].name = format!("renamed_{}", renamed_flow.crash_points[0].name);
     let plan_renamed = plan_crash_points(&renamed_flow);
-    assert_ne!(plan_renamed.points[0].identity, plan_b.points[0].identity);
-    for index in 1..plan_b.points.len() {
+    assert_ne!(
+        plan_renamed.points[0].identity,
+        reusing_plan.points[0].identity
+    );
+    for index in 1..reusing_plan.points.len() {
         assert_eq!(
-            plan_renamed.points[index].identity, plan_b.points[index].identity,
+            plan_renamed.points[index].identity, reusing_plan.points[index].identity,
             "祖先改名，后代身份不变"
         );
         assert_ne!(
-            plan_renamed.points[index].path_number, plan_b.points[index].path_number,
+            plan_renamed.points[index].path_number, reusing_plan.points[index].path_number,
             "祖先改名，后代路径变"
         );
     }
@@ -471,7 +509,7 @@ fn two_flows_sharing_their_prefix_reuse_its_verdicts_and_fork_only_at_the_tail()
     };
     assert_eq!(
         block_keys_of_the_first_point(&plan_renamed),
-        block_keys_of_the_first_point(&plan_b),
+        block_keys_of_the_first_point(&reusing_plan),
         "改名的那个点身份变了，块键逐块不变：名字与身份都不进块键"
     );
     assert_eq!(
@@ -533,60 +571,65 @@ fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_
     let version = fresh_judging_units_fingerprint();
     let older_version = fresh_judging_units_fingerprint();
     // 尾巴都由公共模块设点：A 与 B 的尾巴同名、同父镜像，只差写下的内容
-    let flow_a = with_the_overwritten_version_miswritten(record_flow(
+    let filling_flow = with_the_overwritten_version_miswritten(record_flow(
         "reuse-control-a",
         &content_of(3, 4100),
         true,
     ));
-    let flow_b_judged_by_an_older_version = with_the_overwritten_version_miswritten(record_flow(
-        "reuse-control-b-older",
-        &content_of(11, 4100),
-        true,
-    ));
-    let flow_b = record_flow("reuse-control-b", &content_of(11, 4100), true);
-    let plan_a = plan_crash_points(&flow_a.flow());
-    let plan_b = plan_crash_points(&flow_b.flow());
+    let reusing_flow_judged_by_an_older_version = with_the_overwritten_version_miswritten(
+        record_flow("reuse-control-b-older", &content_of(11, 4100), true),
+    );
+    let reusing_flow = record_flow("reuse-control-b", &content_of(11, 4100), true);
+    let filling_plan = plan_crash_points(&filling_flow.flow());
+    let reusing_plan = plan_crash_points(&reusing_flow.flow());
     let state_count = crash_point_replay_plan_state_count(
-        &flow_b.base,
-        &flow_b.writes,
-        &flow_b.segments,
+        &reusing_flow.base,
+        &reusing_flow.writes,
+        &reusing_flow.segments,
         &expansion,
     );
 
     // 开着复用与前缀共享：A（尾巴红）→ 旧判法单元指纹下的 B（尾巴红）→ B
     let shared = UnitTestLibrary::new("two-flows-reuse-control-shared");
     let mut shared_store = shared.store();
-    let checking_a = record_and_check(&mut shared_store, &flow_a, &plan_a, &version);
+    let filling_checking =
+        record_and_check(&mut shared_store, &filling_flow, &filling_plan, &version);
     let checking_older = record_and_check(
         &mut shared_store,
-        &flow_b_judged_by_an_older_version,
-        &plan_crash_points(&flow_b_judged_by_an_older_version.flow()),
+        &reusing_flow_judged_by_an_older_version,
+        &plan_crash_points(&reusing_flow_judged_by_an_older_version.flow()),
         &older_version,
     );
-    let mut report_b = CoverageReport::default();
-    let recording_b =
-        record_crash_points(&mut shared_store, &plan_b, &version, &mut report_b).expect("录得进");
+    let mut reusing_report = CoverageReport::default();
+    let reusing_recording = record_crash_points(
+        &mut shared_store,
+        &reusing_plan,
+        &version,
+        &mut reusing_report,
+    )
+    .expect("录得进");
     // 判法只吃库里读回的那一份：流先写进库再读回。
-    let read_back_of_line_535 = record_the_flow_and_read_it_back(&mut shared_store, &flow_b.flow())
-        .expect("流写得进库、读得回");
+    let read_back_of_line_535 =
+        record_the_flow_and_read_it_back(&mut shared_store, &reusing_flow.flow())
+            .expect("流写得进库、读得回");
     check_recorded_blocks(
         &mut shared_store,
         &read_back_of_line_535.flow(),
-        &plan_b,
+        &reusing_plan,
         &WeightedShares::new(vec![1]),
         0,
         &version,
     )
     .expect("核得完");
-    let with_reuse =
-        read_verdict_items_of_every_state(&shared_store, &plan_b, &version).expect("读得了判定");
+    let with_reuse = read_verdict_items_of_every_state(&shared_store, &reusing_plan, &version)
+        .expect("读得了判定");
 
     // 关掉复用：B 独自进一份空库
     let alone = UnitTestLibrary::new("two-flows-reuse-control-alone");
     let mut alone_store = alone.store();
-    record_and_check(&mut alone_store, &flow_b, &plan_b, &version);
-    let without_reuse =
-        read_verdict_items_of_every_state(&alone_store, &plan_b, &version).expect("读得了判定");
+    record_and_check(&mut alone_store, &reusing_flow, &reusing_plan, &version);
+    let without_reuse = read_verdict_items_of_every_state(&alone_store, &reusing_plan, &version)
+        .expect("读得了判定");
 
     // 关掉前缀共享：不分崩溃点、不进库，整条流的状态按序号逐个现判
     let mut without_prefix_split: Vec<Option<Vec<String>>> = Vec::new();
@@ -595,11 +638,11 @@ fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_
             name: "two_flows_share_their_prefix::flow_b_without_the_prefix_split",
             setting_file: PATH_OF_THIS_TEST_FILE,
         },
-        &flow_b.base,
-        &flow_b.writes,
-        &flow_b.segments,
-        flow_b.judged_root_index,
-        &flow_b.versions,
+        &reusing_flow.base,
+        &reusing_flow.writes,
+        &reusing_flow.segments,
+        reusing_flow.judged_root_index,
+        &reusing_flow.versions,
         &expansion,
         0..state_count,
         &mut |_ordinal, _image, judgement| without_prefix_split.push(Some(judgement.red_items())),
@@ -639,20 +682,20 @@ fn reused_verdicts_equal_state_by_state_the_verdicts_judged_without_the_library_
     }
 
     // 这份对照不是空的：B 的前缀确实复用了 A 的判定，库里先放的两样确实是红的
-    let prefix = prefix_length(&plan_b);
-    let prefix_blocks: u64 = plan_b.points[..prefix]
+    let prefix = prefix_length(&reusing_plan);
+    let prefix_blocks: u64 = reusing_plan.points[..prefix]
         .iter()
         .map(|point| u64::try_from(point.blocks().len()).expect("块数"))
         .sum();
     assert!(prefix_blocks > 0, "前缀至少一块");
     assert_eq!(
-        recording_b.blocks_already_judged,
+        reusing_recording.blocks_already_judged,
         prefix_blocks,
         "开着复用时 B 的前缀全部复用、尾巴一块都不复用：{:?}",
-        report_b.lines()
+        reusing_report.lines()
     );
     assert!(
-        checking_a.red_states > 0,
+        filling_checking.red_states > 0,
         "A 的版本表写错，尾巴必须红：库里要有一份不该被 B 复用的红判定"
     );
     assert!(

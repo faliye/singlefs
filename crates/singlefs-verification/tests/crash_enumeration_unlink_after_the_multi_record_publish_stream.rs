@@ -77,6 +77,10 @@ use singlefs_verification::memory_pool::{
     publishes_in, writes_and_segments, CrashImage, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RecordStreamContinuity, RetainedWrite,
 };
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 
 fn version_of(output: &TransactionOutput) -> (InstanceGeneration, CheckpointTxg) {
@@ -858,16 +862,20 @@ fn assert_the_functional_step_is_exhaustive_and_clean(step: FunctionalStepOfTheU
         &format!("{step:?}：意图、两批、最后一批各自停在中间的状态数"),
     );
     singlefs_verification::crash_state_enumeration::assert_the_count_equals_its_full_domain_pin_unless_narrowed(
-        [1, 2, 3].map(|steps| counts.count_named(&format!("mount_continuation_steps_{steps}"))),
+        [1, 2, 3].map(|steps| {
+            counts.count_named(&format!("mount_continuation_steps_{steps}"))
+                + counts.count_named(&continuation_skipped_on_the_refusal_counter(steps))
+        }),
         step.states_landing_with_continuation_steps_one_to_three(),
-        &format!("{step:?}：续做还差 1、2、3 步的状态数"),
+        &format!("{step:?}：续做还差 1、2、3 步的状态数（被乙入判不出拒的态按本来还差的步数算）"),
     );
     assert_eq!(
         (0..=3)
             .map(|steps| counts.count_named(&format!("mount_continuation_steps_{steps}")))
-            .sum::<u64>(),
+            .sum::<u64>()
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "{step:?}：每个状态都可写挂载过一次"
+        "{step:?}：每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
     );
     assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_every_state(
         counts,
@@ -1473,6 +1481,86 @@ fn unlink_stream_with_the_segments_shorter_than_ten_expanded_judged_on_the_cpu_j
     );
 }
 
+/// 只展开写数小于 10 的段那一趟的展开交崩溃放量的 CPU 逐块判器判（测试直接调 `crash_amplification::check_blocks_where`，
+/// 经 `check_blocks_where_until` 到 `check_blocks_where_until_with_threads`，不经选路：多机配置开不开 GPU、编没编进 gpu 特性都在 CPU 上逐块判），
+/// 库是这条用例自己的一次性库（`crash_library::DisposableLibrary`），每块现判。每一块都判了，判过的状态数等于这一趟展开下的闭式，一个红状态都没有。
+/// 这一趟展开里有恢复落到意图、两批、最后一批的根、报没有文件的状态（[`unlink_stream_with_the_segments_shorter_than_ten_expanded_judged_on_the_cpu_judge_reads_no_file_past_the_intent_without_an_oracle_violation`]
+/// 钉它们真跑到了）：逐块判器交给 CPU 判一段的版本表要带「没有文件的那几版」，那几个状态照比它旧的最新那一项判、不是违例。
+/// 判别力（`crates/mutations.tsv`「崩溃放量 CPU 判器不带「没有文件的那几版」」）：`check_blocks_where_until_with_threads` 交给判一段的版本表只认带文件的那几版时，
+/// 落到意图与各批的根的状态照 C 判成「有文件却报没有」，这一条的零红断言红。
+// gpu-exempt: cpu-judge-mutation-rows
+#[test]
+fn unlink_stream_with_the_segments_shorter_than_ten_expanded_checked_block_by_block_on_the_cpu_has_no_red_state(
+) {
+    use singlefs_verification::crash_amplification::{
+        check_blocks_where, plan_crash_points, record_the_flow_and_read_it_back, CrashFlow,
+    };
+    use singlefs_verification::crash_library::DisposableLibrary;
+    use singlefs_verification::crash_state_enumeration::crash_points_of_the_steps;
+    use singlefs_verification::verdict_store::{
+        JudgingUnitsFingerprint, PruneServerFailureHandling, SHA256_DIGEST_BYTES,
+    };
+    let prepared = prepare("unlink-after-multi-record-checked-block-by-block-on-the-cpu");
+    let flow = CrashFlow {
+        base: &prepared.base,
+        writes: &prepared.writes,
+        segments: &prepared.segments,
+        judged_root_index: prepared.judged_root_index,
+        versions: &prepared.versions,
+        versions_without_a_file: &prepared.versions_without_a_file,
+        expansion: &expansion_of_the_segments_shorter_than_ten,
+        crash_points: crash_points_of_the_steps(
+            CrashPointReplayItem {
+                name: "unlink_after_multi_record::segments_shorter_than_ten_checked_block_by_block_on_the_cpu",
+                setting_file: PATH_OF_THIS_TEST_FILE,
+            },
+            &prepared.writes,
+            &prepared.segments,
+        ),
+    };
+    let plan = plan_crash_points(&flow);
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &expansion_of_the_segments_shorter_than_ten,
+    );
+    let library =
+        DisposableLibrary::new("unlink-after-multi-record-checked-block-by-block-on-the-cpu")
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+    let mut store = library
+        .open_store(PruneServerFailureHandling::ReturnTheError)
+        .unwrap_or_else(|refusal| panic!("开不了用例的一次性库：{refusal}"));
+    // 判法只吃库里读回的那一份：流先写进库再读回
+    let read_back =
+        record_the_flow_and_read_it_back(&mut store, &flow).expect("流写得进一次性库、读得回");
+    // 一次性库是空的名字空间：这一把指纹下一块都没判过，每块现判
+    let judging_units = JudgingUnitsFingerprint([0; SHA256_DIGEST_BYTES]);
+    let checking = check_blocks_where(
+        &mut store,
+        &read_back.flow(),
+        &plan,
+        &|_block_sequence| true,
+        &judging_units,
+    )
+    .expect("一次性库读写得了");
+    let blocks_of_the_plan: usize = plan.points.iter().map(|point| point.blocks().len()).sum();
+    assert_eq!(
+        checking.blocks_checked,
+        u64::try_from(blocks_of_the_plan).expect("块数装得进 u64"),
+        "计划里的每一块都判了"
+    );
+    assert_eq!(
+        checking.states_checked, closed_form,
+        "判过的状态数等于只展开写数小于 10 的段那一趟展开下的闭式"
+    );
+    assert_eq!(
+        checking.red_states, 0,
+        "逐块判器照带「没有文件的那几版」的版本表判，一个红状态都没有：{:?}",
+        checking.red_texts
+    );
+}
+
 /// 两份造法写表摘要相等（J3、K2-2）：崩溃点重放那一份（[`prepare`]，不录崩溃点）与录制器那一份
 /// （B、C 两次顺序写挪进公共模块之后）录下的起点镜像与整张带屏障的写表逐字节相同、段一样切、被判的根槽写与版本表相同。
 /// 两份都调公共模块里同一个 `sequential_write`；崩溃点重放那一份的写法与挪之前逐字相同。摘要打一行 `CRASH_POINT_REPLAY_WRITE_TABLE`。
@@ -1537,7 +1625,7 @@ fn the_unlink_stream_writes_the_same_table_through_the_crash_point_recorder_as_w
 /// 不归 C，各自另立成流自己的末节点 `end_of_flow`（`crash_amplification::plan_crash_points`）：多记录流在 C 之后只剩它，删除流在 C 之后
 /// 还有意图、各批与它自己的末节点；两条流的末节点身份与计划哈希各不相同。
 #[test]
-fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_stream_and_each_stream_ends_in_its_own_node(
+fn the_unlink_stream_shares_the_nodes_through_the_newest_prefix_version_with_the_multi_record_publish_stream_and_each_stream_ends_in_its_own_node(
 ) {
     use singlefs_verification::crash_amplification::{
         plan_crash_points, CrashFlow, PlannedCrashPoint, END_OF_FLOW_NODE_NAME,
@@ -1617,21 +1705,21 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
         multi_record_nodes,
         "删除流经过同样四个节点、每个节点同样几个点"
     );
-    let points_through_c = 1 + *multi_record_nodes
+    let points_through_the_newest_prefix_version = 1 + *multi_record_nodes
         .last()
         .and_then(|(_entry, indexes)| indexes.last())
         .expect("C 至少一个点");
     assert_eq!(
         multi_record_plan.points.len(),
-        points_through_c + 1,
+        points_through_the_newest_prefix_version + 1,
         "多记录流在 C 之后只剩它自己的末节点"
     );
     assert!(
-        unlink_plan.points.len() > points_through_c + 1,
+        unlink_plan.points.len() > points_through_the_newest_prefix_version + 1,
         "删除流在 C 之后还有意图、各批与它自己的末节点"
     );
-    let tail_of_c = points_through_c - 1;
-    for index in 0..points_through_c {
+    let tail_of_the_newest_prefix_version = points_through_the_newest_prefix_version - 1;
+    for index in 0..points_through_the_newest_prefix_version {
         let (unlink_point, multi_record_point) =
             (&unlink_plan.points[index], &multi_record_plan.points[index]);
         let name = &multi_record_point.name;
@@ -1643,7 +1731,7 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
             unlink_point.judge_inputs, multi_record_point.judge_inputs,
             "第 {index} 个点（{name}）判器另读的输入相同"
         );
-        if index == tail_of_c {
+        if index == tail_of_the_newest_prefix_version {
             assert_ne!(
                 unlink_point.plan_hash, multi_record_point.plan_hash,
                 "C 尾（第 {index} 个点 {name}）计划哈希不同：它按发布分的态数要往下游找，多记录流后面没有根槽写、删除流归意图那次发布，\
@@ -1665,9 +1753,11 @@ fn the_unlink_stream_shares_the_nodes_through_c_with_the_multi_record_publish_st
         );
     }
     assert!(
-        !multi_record_plan.points[tail_of_c].blocks().is_empty(),
+        !multi_record_plan.points[tail_of_the_newest_prefix_version]
+            .blocks()
+            .is_empty(),
         "C 尾（{}）有状态",
-        multi_record_plan.points[tail_of_c].name
+        multi_record_plan.points[tail_of_the_newest_prefix_version].name
     );
     let unlink_end = unlink_plan.points.last().expect("计划至少一个点");
     let multi_record_end = multi_record_plan.points.last().expect("计划至少一个点");
@@ -1805,7 +1895,7 @@ fn crash_point_replay_tally_under_the_expansion_of_the_plan(
 /// `CrashPointReplayTally::states_by_publish` 逐项相同（同一种展开）。
 // crash-case-check:not-a-crash-case 两条合成流只展开写数不超过 6 的段，一两百个状态，只比按发布分的计数，单跑几秒
 #[test]
-fn the_tail_of_c_is_keyed_apart_in_the_two_streams_and_every_block_counts_its_states_by_publish_as_the_crash_point_replay_tally(
+fn the_tail_of_the_newest_prefix_version_is_keyed_apart_in_the_two_streams_and_every_block_counts_its_states_by_publish_as_the_crash_point_replay_tally(
 ) {
     use singlefs_verification::crash::CrashPointReplayPublishOfState;
     use singlefs_verification::crash_amplification::{
@@ -1893,22 +1983,29 @@ fn the_tail_of_c_is_keyed_apart_in_the_two_streams_and_every_block_counts_its_st
     }
 
     // 二、C 尾：两条流同一个树节点、同样几块，块键不同，各自归各自下游的那次发布
-    let tail_of_c = multi_record_plan.points.len() - 2;
+    let tail_of_the_newest_prefix_version = multi_record_plan.points.len() - 2;
     assert_eq!(
-        multi_record_plan.points[tail_of_c + 1].name,
+        multi_record_plan.points[tail_of_the_newest_prefix_version + 1].name,
         END_OF_FLOW_NODE_NAME,
         "多记录流 C 尾之后只剩末节点"
     );
     assert_eq!(
-        unlink_plan.points[tail_of_c].identity, multi_record_plan.points[tail_of_c].identity,
+        unlink_plan.points[tail_of_the_newest_prefix_version].identity,
+        multi_record_plan.points[tail_of_the_newest_prefix_version].identity,
         "C 尾在两条流里是树上同一个节点：设点文件、名字、复用键相同"
     );
     let intent = unlink
         .versions_without_a_file
         .first()
         .expect("删除流的版本表带意图那一版");
-    let unlink_tail = blocks_of_the_points(&unlink_blocks, tail_of_c..tail_of_c + 1);
-    let multi_record_tail = blocks_of_the_points(&multi_record_blocks, tail_of_c..tail_of_c + 1);
+    let unlink_tail = blocks_of_the_points(
+        &unlink_blocks,
+        tail_of_the_newest_prefix_version..tail_of_the_newest_prefix_version + 1,
+    );
+    let multi_record_tail = blocks_of_the_points(
+        &multi_record_blocks,
+        tail_of_the_newest_prefix_version..tail_of_the_newest_prefix_version + 1,
+    );
     assert!(!multi_record_tail.is_empty(), "C 尾至少一块");
     assert_eq!(
         unlink_tail.len(),
@@ -1951,8 +2048,10 @@ fn the_tail_of_c_is_keyed_apart_in_the_two_streams_and_every_block_counts_its_st
     }
 
     // 三、C 尾之前：两条流逐块块键相同，逐状态数归哪次发布也相同
-    let unlink_before_the_tail = blocks_of_the_points(&unlink_blocks, 0..tail_of_c);
-    let multi_record_before_the_tail = blocks_of_the_points(&multi_record_blocks, 0..tail_of_c);
+    let unlink_before_the_tail =
+        blocks_of_the_points(&unlink_blocks, 0..tail_of_the_newest_prefix_version);
+    let multi_record_before_the_tail =
+        blocks_of_the_points(&multi_record_blocks, 0..tail_of_the_newest_prefix_version);
     assert!(!multi_record_before_the_tail.is_empty(), "C 尾之前至少一块");
     assert_eq!(
         unlink_before_the_tail.len(),

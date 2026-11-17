@@ -328,6 +328,7 @@ fn outcome_class(outcome: &StepOutcome) -> String {
 fn is_a_refusal_for_space(outcome_class: &str) -> bool {
     outcome_class.starts_with("Refused(")
         && (outcome_class.contains("NoSpaceAfterRaisingTheFloor")
+            || outcome_class.contains("NoSpaceEvenWithEverythingAFloorRaiseCouldRelease")
             || outcome_class.contains("SpaceAdmissionRefused")
             || outcome_class.contains("PlacementRefused"))
 }

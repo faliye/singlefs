@@ -366,7 +366,7 @@ pub fn member_name_of(version: &PoolVersion) -> &'static str {
 
 /// 续做走到空、F 一次都没抬、可删的单元都还在 defer 里的盘面上卸载（攻方 `m3-unmount-after-short-continuation-r1` 表 A 那 9 格的形：
 /// 卸载被拒不绑队列）：单元区 292 槽、不先覆盖写、16 个单元，崩在意图与两批之后。重开、准入判着、删除批大小 1：取号之前那一判放行、
-/// 没推抬 F，续做 14 步走到空。挂载之后每块盘只剩 10 个没挡的空槽，卸载那一串两次空发布要 14 个——扣着回收出来的槽就在预演里取不到落点；
+/// 没推抬 F，续做 14 步走到空。挂载之后每块盘只剩 10 个没挡的空槽，卸载那一串两次空发布要 12 个——扣着回收出来的槽就在预演里取不到落点；
 /// 甲 GA 之下预演算上新 F 回收出来、当场放开的那一截，卸载做成、F 抬到现行那一版，池级 checker 全绿，再挂可写做成。
 /// 判别力：卸载回收的槽照旧扣到生效时卸载在预演里被拒，卸载那一步红。
 pub fn run_the_scenario_where_a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims(
@@ -442,8 +442,8 @@ pub fn run_the_scenario_where_a_mount_whose_continuation_walks_to_empty_without_
             slots_taken_by_the_unmount_sequence.len(),
             raised.rollback_floor,
         ),
-        (vec![10, 10], 14, current_txg),
-        "卸载之前每块盘 10 个空槽，那一串要 14 个；F 抬到现行那一版"
+        (vec![10, 10], 12, current_txg),
+        "卸载之前每块盘 10 个空槽，那一串要 12 个；F 抬到现行那一版"
     );
     assert!(
         slots_taken_by_the_unmount_sequence

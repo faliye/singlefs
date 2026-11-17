@@ -24,7 +24,7 @@ use singlefs_verification::crash_state_enumeration::{
 
 /// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
 const THIS_FILE: &str =
-    "crates/singlefs-verification/tests/crash_enumeration_writable_mount_of_an_io_min_8192_pool.rs";
+    "crates/singlefs-verification/tests/crash_enumeration_writable_mount_of_a_minimum_input_output_8192_pool.rs";
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
@@ -182,7 +182,7 @@ fn assert_recovery_checker_and_record_checker_clean(tally: &CrashPointReplayTall
 /// 不要 `gpu` 特性。
 // crash-case-check:not-a-crash-case 整域展开只为建 GPU 判表（核判表建得出、表里状态数等于全量），不上卡、一个状态都不判；判状态的在同文件登记的 crash-case:writable-mount-of-an-io-min-8192-pool
 #[test]
-fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build_with_every_crash_state_of_the_full_enumeration(
+fn the_gpu_judge_tables_of_the_first_writable_mount_of_a_minimum_input_output_8192_pool_build_with_every_crash_state_of_the_full_enumeration(
 ) {
     use singlefs_verification::crash_judge_tables::{build_judge_tables, JudgeFlow};
     let prepared = prepare();
@@ -205,8 +205,8 @@ fn the_gpu_judge_tables_of_the_first_writable_mount_of_an_io_min_8192_pool_build
 
 /// 段序列与全量的状态数钉住（八段、[`FULL_STATES`] 态），每段按甲二展开跑一遍恢复与 checker。
 #[test]
-fn the_first_writable_mount_of_an_io_min_8192_pool_keeps_its_segment_sequence_and_full_state_count()
-{
+fn the_first_writable_mount_of_a_minimum_input_output_8192_pool_keeps_its_segment_sequence_and_full_state_count(
+) {
     let prepared = prepare();
     assert_eq!(
         closed_form_state_count_of_write_index_segments(&prepared.segments),
@@ -291,7 +291,7 @@ fn observe_slot_one_at_8192(
 /// 写行发布那次轮换那一段写世代号 4，都落槽 0，各一个两盘同撕；取号写一轮时是取号那一段与暖机那次轮换那一段），
 /// 每一个上 checker 两块盘的槽 1 都在 8192 处读成可用，checker 与恢复择到的世代号相同。
 #[test]
-fn every_crash_state_of_the_first_writable_mount_of_an_io_min_8192_pool_recovers_and_the_checker_reads_slot_one_at_8192(
+fn every_crash_state_of_the_first_writable_mount_of_a_minimum_input_output_8192_pool_recovers_and_the_checker_reads_slot_one_at_8192(
 ) {
     let prepared = prepare();
     // 观察者经崩溃判定库那一路按块看：要记的数全经观察者计数；槽 1 读得不对的状态当场 panic（判段把那一句带出来、用例红）

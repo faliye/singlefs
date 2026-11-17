@@ -27,8 +27,9 @@ use singlefs_core::address::{DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::admission::{
     instance_switch_reserve_on_one_device, BytesOnOneDevice, MetadataBlocks, SpaceAdmission,
 };
-use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
 use singlefs_core::instance_table_sweep::{
+    erase_the_heads_and_publish_the_sweep, judge_the_instance_table_sweep,
     sweep_the_instance_table_while_mounted, unit_head_read_by_sweep,
     InstanceTableRowCountThreshold, InstanceTableSweepAtTheEndOfTheMount,
     InstanceTableSweepConfiguration, InstanceTableSweepOutcome, InstanceTableSweepSwitch,
@@ -47,6 +48,9 @@ use singlefs_verification::memory_pool::{writes_and_segments, MemoryPool, Sparse
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::SharedStream;
 
+/// 实例表一片的字节数（一个打包单元）。
+const BYTES_OF_AN_INSTANCE_TABLE_PAGE: usize = 32768;
+
 /// 场景与它交给池级 checker 的镜像见 `scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_the_row_of_a_dead_instance_is_deleted_after_its_roots_left_the_ring_and_its_unpublished_heads_are_erased`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn the_row_of_a_dead_instance_is_deleted_after_its_roots_left_the_ring_and_its_unpublished_heads_are_erased(
@@ -58,7 +62,7 @@ fn the_row_of_a_dead_instance_is_deleted_after_its_roots_left_the_ring_and_its_u
 /// 那一版到清扫时已经出了根环、那个数据单元已释放、没被别的根的账引用，第一个槽里它自己的头还在。
 /// 预期：认领规则按整单元跳——第一个槽认出码 1 单元，第二个槽被认领、不当探针：伪头不被抹（字节不变，不在抹了的落点里）。
 #[test]
-fn a_forged_head_inside_the_content_of_a_data_unit_is_claimed_by_the_unit_and_not_erased() {
+fn forged_head_inside_the_content_of_a_data_unit_is_claimed_by_the_unit_and_not_erased() {
     let pool = pool_with_a_dead_instance(Some(8));
     let forged = pool.forged.clone().expect("带伪头那一版写了");
     assert!(
@@ -99,7 +103,7 @@ fn a_forged_head_inside_the_content_of_a_data_unit_is_claimed_by_the_unit_and_no
 /// 再把那个数据单元第一个槽里的头翻坏一个字节（认领规则在那一槽认不出单元，第二个槽成了探针）。
 /// 预期：跳过根环里可读根的账里仍分配的槽——伪头所在的槽在那条根的账里，不被抹（字节不变，不在抹了的落点里）。
 #[test]
-fn a_head_inside_a_unit_still_allocated_in_the_account_of_a_ring_root_is_skipped_and_not_erased() {
+fn head_inside_a_unit_still_allocated_in_the_account_of_a_ring_root_is_skipped_and_not_erased() {
     let mut pool = pool_with_a_dead_instance(Some(14));
     let forged = pool.forged.clone().expect("带伪头那一版写了");
     pool.image.flip_byte(
@@ -139,7 +143,7 @@ fn a_head_inside_a_unit_still_allocated_in_the_account_of_a_ring_root_is_skipped
 /// 场景：清扫那次挂载里，第一个孤儿所在的槽每次读都报设备错（挂载自己不读它）。
 /// 预期：这一次清扫有一次读失败：一行都不删、一个头都不抹（结局报那个落点）；挂载照样做成，实例 1 那一行还在，孤儿头都还在。
 #[test]
-fn a_read_failure_on_one_placement_deletes_no_row_and_erases_no_head() {
+fn read_failure_on_one_placement_deletes_no_row_and_erases_no_head() {
     let pool = pool_with_a_dead_instance(None);
     let (first_orphan, _) = *pool
         .orphans_left_on_disk
@@ -168,7 +172,7 @@ fn a_read_failure_on_one_placement_deletes_no_row_and_erases_no_head() {
         matches!(
             mounted.output.instance_table_sweep,
             InstanceTableSweepAtTheEndOfTheMount::Swept(InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::AReadOfAPlacementFailed { placement }
+                NoRowDeletedThisRound::ReadOfAPlacementFailed { placement }
             )) if placement == first_orphan
         ),
         "读失败这一轮不删：{:?}",
@@ -231,6 +235,61 @@ fn the_background_sweep_with_a_device_missing_deletes_no_row() {
     );
 }
 
+/// 清扫抹完头、发清扫发布之前沿链读实例表（`instance_table_sweep::erase_the_heads_and_publish_the_sweep`）：判的时候盘还好，判完才弄坏现行实例表一份，判那一读读不到；
+/// 清扫发布换下整条链，写系统配置槽之前读的是新表。这一读是唯一读到坏的那一份的读，进别的读那个数（D4（校验和位置） 已定项 4「可写挂载期间别的读」）。
+/// 判别力：`crates/mutations.tsv`「可写挂载别的读：清扫发布之前读实例表不进账」那一行。
+#[test]
+fn the_chain_read_before_the_sweep_publish_counts_the_page_damaged_after_the_judgement() {
+    let pool = pool_with_a_dead_instance(None);
+    let (mut mounted, mut devices, _stream) = sweeping_mount_on(
+        &pool.image,
+        InstanceTableSweepConfiguration {
+            switch: InstanceTableSweepSwitch::HandedToTheBackgroundSweepWhileMounted,
+            row_count_threshold: InstanceTableRowCountThreshold::ANY_ROW,
+            sweep_publish_placements: SweepPublishPlacements::TakenFromTheAllocatorOfTheMount,
+        },
+    );
+    let judgement = judge_the_instance_table_sweep(&devices, mounted.current.root())
+        .expect("实例 1 那一行判得删");
+    let location = mounted.current.root().instance_table.locations[0];
+    let (_, device) = devices
+        .iter_mut()
+        .find(|(identity, _)| *identity == location.device)
+        .expect("池里有这块盘");
+    let mut page = vec![0u8; BYTES_OF_AN_INSTANCE_TABLE_PAGE];
+    device
+        .read_at(location.slot.to_device_offset(), &mut page)
+        .expect("读得出那一份");
+    page[BYTES_OF_AN_INSTANCE_TABLE_PAGE / 2] ^= 0xFF;
+    device
+        .write_at(
+            location.slot.to_device_offset(),
+            &page,
+            WriteDurability::Plain,
+        )
+        .expect("写回改过的那一份");
+    assert_eq!(
+        mounted.allocator.other_unit_reads_with_one_copy_failing(),
+        0
+    );
+    let outcome = erase_the_heads_and_publish_the_sweep(
+        &parameters_of_the_ring_hole_pools(),
+        &mut devices,
+        &mut mounted.allocator,
+        &mut mounted.current,
+        &judgement,
+        SweepPublishPlacements::TakenFromTheAllocatorOfTheMount,
+    );
+    assert!(
+        matches!(outcome, InstanceTableSweepOutcome::RowsDeleted { .. }),
+        "这一轮删了行：{outcome:?}"
+    );
+    assert_eq!(
+        mounted.allocator.other_unit_reads_with_one_copy_failing(),
+        1
+    );
+}
+
 /// 场景与它交给池级 checker 的镜像见 `scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_the_background_sweep_rereads_every_head_before_erasing_and_deletes_no_row_when_a_slot_was_allocated_after_the_judgement`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn the_background_sweep_rereads_every_head_before_erasing_and_deletes_no_row_when_a_slot_was_allocated_after_the_judgement(
@@ -238,9 +297,9 @@ fn the_background_sweep_rereads_every_head_before_erasing_and_deletes_no_row_whe
     scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_the_background_sweep_rereads_every_head_before_erasing_and_deletes_no_row_when_a_slot_was_allocated_after_the_judgement(&mut PoolCheckerImages::left_to_the_given_states_engine());
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_a_device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_a_device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance`；池级 checker 那一遍在交同一个场景的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn a_device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance(
+fn device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance(
 ) {
     scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::run_the_scenario_where_a_device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance(&mut PoolCheckerImages::left_to_the_given_states_engine());
 }
@@ -261,7 +320,7 @@ fn sweeping_a_periodic_schedule_of_unmounted_and_crashed_mounts_keeps_the_instan
 /// 场景：清扫那次挂载用只供测试的落点开关：清扫发布在一份每个空闲槽都被占掉的分配器拷贝上取落点（真的取落点那一段，被拒）。
 /// 预期：清扫发布被落点拒，这一轮不删行（实例 1 那一行还在）；挂载照样交回可写——接着在交回的分配器上覆盖写一次做成。
 #[test]
-fn a_sweep_publish_refused_for_its_placement_deletes_no_row_and_the_mount_stays_writable() {
+fn sweep_publish_refused_for_its_placement_deletes_no_row_and_the_mount_stays_writable() {
     let pool = pool_with_a_dead_instance(None);
     let (mut mounted, mut devices, stream) = sweeping_mount_on(
         &pool.image,
@@ -332,7 +391,7 @@ fn the_product_configuration_does_not_sweep_a_table_at_or_below_the_threshold() 
 /// 场景：mkfs 之后一直不写文件、接连可写挂载七次（实例 1 的根轮出了 12 槽的环），第八次挂载开关关着、有一行就扫。
 /// 预期：现行那一版树表 0 条，第一版不清扫：结局报这个成员；这次挂载写下的盘面与不扫的同一次挂载逐字节相同（清扫一个字节都没写）。
 #[test]
-fn a_sweep_on_a_version_without_file_is_not_supported_and_writes_nothing() {
+fn sweep_on_a_version_without_file_is_not_supported_and_writes_nothing() {
     let parameters = parameters_of_the_ring_hole_pools();
     let mut devices: RingHoleDevices = (0..2u32)
         .map(|number| {
@@ -725,11 +784,11 @@ fn unreadable_root_ring_slot(failing_reads: FailingReadsOfARange) -> SharedUnrea
 /// 场景：根环 (区域 2, 槽 3) 每次读都报设备错（`research/prompts/rot-decisions-r1-opus-output.md`「要主 agent 跑的命令」一节；D18（块里携带什么信息）
 /// 已定项 11「回收」一条：根环每个槽都读成功才算「没有」，读不出的槽按「可能有该实例的根」算）。mkfs 之后接连 8 次「可写挂载（有一行就扫）→ 写一个文件
 /// → 正常卸载」；那一槽在这次挂载里写过根时正常卸载被拒（`RootRingSlotKnownToHoldARoot`），那一次照崩在写文件之后往下挂。
-/// 预期：每次清扫都停在那一槽：结局报 `NoRowDeleted(ARootRingSlotIsUnreadableOrAllZero)`、点名那一槽；清扫之后的实例表行数一次都不降
+/// 预期：每次清扫都停在那一槽：结局报 `NoRowDeleted(RootRingSlotIsUnreadableOrAllZero)`、点名那一槽；清扫之后的实例表行数一次都不降
 /// （每次可写挂载写一行，行只增不删——C597（实例表行只增不删，删行的条件没有条款） 盯着的那笔代价）。对照见
 /// [`without_the_unreadable_root_ring_slot_the_same_mounts_delete_rows`]。
 #[test]
-fn a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row() {
+fn root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row() {
     let ranges = unreadable_root_ring_slot(FailingReadsOfARange::Every);
     let seen = mounts_with_a_write_and_an_unmount_each(&ranges);
     assert!(ranges.failed_reads() > 0, "前提：那一槽真被读过、读坏过");
@@ -754,7 +813,7 @@ fn a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_r
                     mount.sweep,
                     InstanceTableSweepAtTheEndOfTheMount::Swept(
                         InstanceTableSweepOutcome::NoRowDeleted(
-                            NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { .. }
+                            NoRowDeletedThisRound::RootRingSlotIsUnreadableOrAllZero { .. }
                         )
                     )
                 ),
@@ -773,7 +832,7 @@ fn a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_r
         matches!(
             seen.last().expect("挂了 8 次").sweep,
             InstanceTableSweepAtTheEndOfTheMount::Swept(InstanceTableSweepOutcome::NoRowDeleted(
-                NoRowDeletedThisRound::ARootRingSlotIsUnreadableOrAllZero { ring_slot }
+                NoRowDeletedThisRound::RootRingSlotIsUnreadableOrAllZero { ring_slot }
             )) if ring_slot == UNREADABLE_ROOT_RING_SLOT
         ),
         "根环早已写满，最后一次清扫点名的是读坏的那一槽：{:?}",
@@ -786,7 +845,7 @@ fn a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_r
     );
 }
 
-/// 场景：同 [`a_root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row`] 那 8 次挂载，那一槽一次都不读坏（只数读了几次）。
+/// 场景：同 [`root_ring_slot_unreadable_on_every_read_keeps_every_sweep_from_deleting_a_row`] 那 8 次挂载，那一槽一次都不读坏（只数读了几次）。
 /// 预期：至少一次清扫删了行，最后一次清扫之后的行数比 8 次挂载写下的 7 行少。
 #[test]
 fn without_the_unreadable_root_ring_slot_the_same_mounts_delete_rows() {

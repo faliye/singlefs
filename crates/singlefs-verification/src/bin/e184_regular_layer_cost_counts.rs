@@ -5,7 +5,7 @@
 //!
 //! 入库装置（登记「装置写在哪」）：读主工作区现状的 `crates/`，块键一律调 crates 的函数算（`crash_points_of_the_steps` 切节点、
 //! `plan_crash_points` 排计划、`PlannedCrashPoint::block_key` 取块键），不另写一份。
-//! 转储的写法与读法只有 `e184_regular_layer_cost_counts_dump/mod.rs` 那一份（转储 bin `e184_regular_layer_cost_counts_write_dump.rs` 也引它），这里经 `#[path]` 当模块引进来。
+//! 转储的写法与读法只有 `e184_regular_layer_cost_counts_write_dump/mod.rs` 那一份（转储 bin `e184_regular_layer_cost_counts_write_dump.rs` 也引它），这里经 `#[path]` 当模块引进来。
 //!
 //! 子命令：
 //!   selfcheck                                     停机 T1–T4 与第七节锚点逐条核（`name=stop_check`、`name=anchor`）
@@ -21,7 +21,7 @@
 //! 态数照报（登记第十二节修订 10）；转储往返对照比块键的上限再小一档，2^24。
 //! 产物是 `E7RESULT` 行。退出码：0 正常；2 命令行不对；3 停机条款没过（产物照打、交主 agent）；4 阳性对照没过（作废）；
 //! 78 准入与运行条件没满足（`preflight` 拒绝，带 `--force` 才照跑；强制跑的那一次，标准输出第一行多一行 `name=preflight forced=…`，`emitted=` 不数它）。
-//! `preflight` 的实现只有转储模块里那一份（`write_dump::preflight`），这里传自己的文件名。
+//! `preflight` 的实现只有转储模块里那一份（`write_dump::preflight`），这里传自己的源文件路径。
 //!
 //! 照抄的段与停机 T2（登记第十一节）：冒烟层三条流的建法照抄各测试文件里私有的建流函数（`prepare_the_fixed_script_stream`、`prepare_the_multi_record_publish_stream`、`prepare`）和它调到的私有函数，装置里用 `COPIED-BEGIN` / `COPIED-END`
 //! 两行标记框出每一段；`selfcheck` 的 `copied_text_verbatim` 把每一段去掉缩进之后在对应的测试文件原文里逐字查一次（原文经 `include_str!` 编进来），
@@ -45,11 +45,11 @@ mod common_crash_point_observers;
 mod common_crash_points;
 #[path = "../../tests/common_snapshot_prefix/mod.rs"]
 mod common_snapshot_prefix;
-#[path = "e184_regular_layer_cost_counts_dump/mod.rs"]
 #[allow(
     dead_code,
     reason = "转储模块是两份 bin 共用的：转储 bin 的子命令与随机历史的并行录制这个装置不调，只用转储格式、读回、录一条历史和线程数取法"
 )]
+#[path = "e184_regular_layer_cost_counts_write_dump/mod.rs"]
 mod write_dump;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -4409,7 +4409,14 @@ fn run_record_fixed_chains_command(arguments: &[String]) -> i32 {
 /// 这份源文件自己的文本：`COPIED-BEGIN` / `COPIED-END` 之间的行就是照抄的段。
 const OWN_SOURCE_TEXT: &str = include_str!("e184_regular_layer_cost_counts.rs");
 
-/// 这个 bin 在 `src/bin/` 下的文件名（`write_dump::preflight` 判它头上的准入与运行条件）。
+/// 这个 bin 的源文件路径（`write_dump::preflight` 判它头上的准入与运行条件）；写成 `concat!` 字面量，单元键收得到这份文件。
+const OWN_SOURCE_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/bin/e184_regular_layer_cost_counts.rs"
+);
+
+/// 这个 bin 在 `src/bin/` 下的文件名：单测拿它核 [`OWN_SOURCE_PATH`] 指的是这一份。
+#[cfg(test)]
 const OWN_SOURCE_FILE_NAME: &str = "e184_regular_layer_cost_counts.rs";
 
 const FIXED_SCRIPT_TEST_TEXT: &str = include_str!(concat!(
@@ -4907,7 +4914,7 @@ fn run_selfcheck_command(arguments: &[String]) -> i32 {
 }
 
 fn main() {
-    let forced_summary = write_dump::preflight(OWN_SOURCE_FILE_NAME);
+    let forced_summary = write_dump::preflight(OWN_SOURCE_PATH);
     if let Some(summary) = forced_summary {
         println!("E7RESULT name=preflight forced={summary}");
     }
@@ -6850,7 +6857,7 @@ mod tests {
     }
 
     #[test]
-    fn a_flow_whose_blocks_would_not_fit_in_memory_is_counted_but_not_planned() {
+    fn flow_whose_blocks_would_not_fit_in_memory_is_counted_but_not_planned() {
         let dump = dump_with_one_long_segment("fifty-six", 56);
         let base = dump.base_pool();
         let counted = state_count_of_the_flow(&base, &dump, Expansion::Full);
@@ -6932,7 +6939,7 @@ mod tests {
     }
 
     #[test]
-    fn a_small_limit_refuses_the_full_plan_of_a_real_flow_and_leaves_the_in_place_subsets_plan() {
+    fn small_limit_refuses_the_full_plan_of_a_real_flow_and_leaves_the_in_place_subsets_plan() {
         let prepared = prepared_new_pool_stream();
         let dump = prepared.dump();
         let refusal =
@@ -7242,15 +7249,13 @@ mod tests {
     #[test]
     fn the_own_source_file_name_points_at_this_very_source_in_the_source_directory_of_the_binaries()
     {
-        // 路径写成一串字面量，变异判法的单元键才认得出读的是哪份文件；文件名常量另由下一条断言钉住。
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/bin/e184_regular_layer_cost_counts.rs");
+        let path = std::path::Path::new(OWN_SOURCE_PATH);
         assert!(
             path.ends_with(OWN_SOURCE_FILE_NAME),
             "交给 preflight 的文件名 {OWN_SOURCE_FILE_NAME} 不是 src/bin 下的这一份 {}",
             path.display()
         );
-        let text = std::fs::read_to_string(&path).expect("preflight 要判的源文件读得到");
+        let text = std::fs::read_to_string(path).expect("preflight 要判的源文件读得到");
         assert_eq!(
             text,
             OWN_SOURCE_TEXT,

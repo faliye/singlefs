@@ -9,8 +9,8 @@ mod common_shared_by_harness_scenarios;
 mod scenarios_of_overwrite_in_one_instance;
 
 use common::{
-    build_pool, file_content, geometry, parameters, BuiltPool, CONTENT_BYTES_OF_PUBLISH_B,
-    FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    build_pool, file_content, geometry, parameters, BuiltPool,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
 use common_images_for_the_given_states_engine::PoolCheckerImages;
 use common_shared_by_harness_scenarios::second_content;
@@ -171,7 +171,7 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
             .inode_record
             .expect("覆盖写那一版有第一个文件那条记录")
             .size,
-        u64::try_from(CONTENT_BYTES_OF_PUBLISH_B).expect("长度")
+        u64::try_from(CONTENT_BYTES_OF_THE_OLDER_OVERWRITE).expect("长度")
     );
     assert_eq!(
         second

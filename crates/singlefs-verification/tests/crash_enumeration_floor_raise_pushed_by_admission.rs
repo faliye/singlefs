@@ -41,6 +41,11 @@ use singlefs_core::transaction::{FirstFile, PoolVersion, PoolWriter, PublishErro
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
@@ -167,8 +172,8 @@ fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     }
 }
 
-/// 观察者「崩溃之后可写挂载」（`writable_mount_after_the_crash`）：把这个状态持久的写落到基线上、可写挂载一次，挂不上当场 panic；
-/// 挂完的盘交回，池级 checker 在判段判。观察者的身份是这个 fn 的闭包键（入口登记在
+/// 观察者「崩溃之后可写挂载」（`writable_mount_after_the_crash`）：把这个状态持久的写落到基线上、可写挂载一次，可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），别的拒当场 panic；
+/// 挂完的盘（被拒的是没改过的盘）交回，池级 checker 在判段判。观察者的身份是这个 fn 的闭包键（入口登记在
 /// `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES`）。
 // gpu-exempt: writable-mount
 fn mount_writable_after_the_crash_of_the_floor_raise(
@@ -176,6 +181,8 @@ fn mount_writable_after_the_crash_of_the_floor_raise(
     base: &MemoryPool,
     parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters,
     image: &CrashImage<'_>,
+    report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     assert!(
         image.writes.len() > writes_of_the_raise.len(),
@@ -234,7 +241,19 @@ fn mount_writable_after_the_crash_of_the_floor_raise(
                 counter_when_the_pool_checker_is_clean: "mounted_and_checker_clean".to_string(),
             }
         }
-        Err(error) => panic!("挂载失败：{error:?}"),
+        Err(refusal) => image_after_the_refusal_into_the_undecidable_witness(
+            &WritableMountRefusedOnTheCrashDisks {
+                refusal,
+                devices,
+                stream,
+            },
+            &materialized,
+            report,
+            &parameters.filesystem_identifier,
+            &fixed_geometry_of_the_384_slot_small_devices(),
+            "mounted_and_checker_clean",
+            counts,
+        ),
     }
 }
 
@@ -272,19 +291,21 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
         "推的那一串的崩溃状态数 {states} 在 10⁶ 以内"
     );
     // 每个崩溃状态可写挂载一次、挂载之后的镜像跑池级 checker：当交回镜像的观察者挂进崩溃判定库那一路（两段）：
-    // 录入段在 CPU 上挂（挂载真跑实现，豁免表的 writable-mount 那一行；按恢复镜像去重），挂不上当场 panic（记成红项、用例红）；
+    // 录入段在 CPU 上挂（挂载真跑实现，豁免表的 writable-mount 那一行；按恢复镜像去重），可写挂载被拒时只认乙入判不出那一拒，别的拒当场 panic（记成红项、用例红）；
     // 判段在挂完的盘上判池级 checker（配了 GPU 上卡），判干净时 `mounted_and_checker_clean` 加一。观察者交来的 `image.writes` 是枚举用的写表
     // （录制流里的写在前、原地覆写的撕裂镜像与重放接在后面），`image.persisted` 与它逐条对应。
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
-                   _counts: &mut CrashPointReplayObserverCounts|
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
         mount_writable_after_the_crash_of_the_floor_raise(
             &writes_of_the_raise,
             &base,
             &pool.parameters,
             image,
+            report,
+            counts,
         )
     };
     let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
@@ -314,6 +335,10 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
     };
     // 计数行（C564 ①）：门禁 crash-point-replay 只认行首 `CRASH_POINT_REPLAY_FLOOR_RAISE_PUSHED_BY_THE_SESSION ` 与 `exhaustive=true`
     // （枚举到的状态数等于每一段都展开时按崩溃点重放口径另算的闭式），线程按 states= 找 CRASH_POINT_REPLAY_PARALLEL_FINISHED 那一行判；整行原样报出来。
+    print_the_writable_mount_refusals_into_the_undecidable_witness(
+        "floor_raise_pushed_by_the_session::full",
+        &tally,
+    );
     println!(
         "CRASH_POINT_REPLAY_FLOOR_RAISE_PUSHED_BY_THE_SESSION states={} closed_form={states} exhaustive={} violations={} failed={} checker_violations={} mounted_and_checker_clean={} checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
@@ -347,7 +372,7 @@ fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount
             .observer_counts
             .count_named("mounted_and_checker_clean"),
         states,
-        "每个崩溃状态都挂得上、挂载之后池级 checker 0 违例",
+        "每个崩溃状态都判过：挂得上的挂载之后、被乙入判不出拒的原样，池级 checker 0 违例",
     );
 }
 

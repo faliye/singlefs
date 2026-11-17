@@ -638,12 +638,17 @@ fn shared_prefix_is_identical(first: &PreparedStream, second: &PreparedStream) -
 /// 准入与运行条件（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`「开头先判」Rust 那一行）：起 `preflight.py check`，
 /// 退出码不是 0 就原样退出；交回 `forced` 时的摘要（强制跑的要写进产物）。
 fn preflight() -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e161_crash_state_dedup_and_time_split.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bin/e161_crash_state_dedup_and_time_split.rs"
+    );
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../.claude/singlefs-ai-sop/scripts/preflight.py"
+    );
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }
@@ -774,7 +779,7 @@ fn run_probe(output: &mut ResultLines, _states: Option<&str>) -> i32 {
                 plan: &plan,
                 ordinals: &taken,
                 control_ordinals: &control,
-                busy_zone: None,
+                timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
                 threads: threads_from_environment(),
                 depth: EvaluationDepth::FourSteps,
             });
@@ -856,7 +861,7 @@ fn run_segment_one(output: &mut ResultLines) -> i32 {
         plan: &first_full,
         ordinals: &first_stride,
         control_ordinals: &first_control,
-        busy_zone: None,
+        timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
         threads: 1,
         depth: EvaluationDepth::FourSteps,
     });
@@ -1781,17 +1786,85 @@ impl TimingZone {
     }
 }
 
-fn busy_wait_if(zone: TimingZone, busy_zone: Option<TimingZone>) {
-    if busy_zone == Some(zone) {
-        let started = Instant::now();
-        while started.elapsed() < TIMING_CONTROL_BUSY_WAIT {
-            black_box(started);
-        }
-    }
+/// 计时读哪一种钟。挂钟量真实耗时，产物与 PC3 用它；计数钟不读机器时间，只在忙等那一处往前拨 `TIMING_CONTROL_BUSY_WAIT`，
+/// 量出来的只是忙等记到了哪一区，与机器负载无关（单测拿它判「计时记到哪一区」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ZoneClock {
+    Wall,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "计数钟只给单测判计时记到哪一区，产物那几格读挂钟")
+    )]
+    Counted,
 }
 
-fn nanoseconds_since(started: Instant) -> u128 {
-    started.elapsed().as_nanos()
+/// 一趟的计时控制：忙等加在哪一区（不加是 `None`）与读哪一种钟。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TimingControl {
+    busy_zone: Option<TimingZone>,
+    clock: ZoneClock,
+}
+
+impl TimingControl {
+    /// 产物那几格：读挂钟、不加忙等。
+    const WALL_CLOCK_WITHOUT_BUSY_WAIT: Self = Self {
+        busy_zone: None,
+        clock: ZoneClock::Wall,
+    };
+}
+
+/// 一次读钟：挂钟那一刻与计数钟此刻的纳秒数都记下，量一段时按钟的种类取其中一样。
+#[derive(Clone, Copy, Debug)]
+struct ClockReading {
+    wall: Instant,
+    counted_nanoseconds: u128,
+}
+
+/// 一个函数里量各区用的钟：每个量时的函数各起一份，量的都是同一个函数里的一段；计数钟的读数是这一份钟上忙等拨过的纳秒。
+struct StateClock {
+    clock: ZoneClock,
+    counted_nanoseconds: u128,
+}
+
+impl StateClock {
+    fn new(clock: ZoneClock) -> Self {
+        Self {
+            clock,
+            counted_nanoseconds: 0,
+        }
+    }
+
+    fn now(&self) -> ClockReading {
+        ClockReading {
+            wall: Instant::now(),
+            counted_nanoseconds: self.counted_nanoseconds,
+        }
+    }
+
+    fn nanoseconds_since(&self, started: ClockReading) -> u128 {
+        match self.clock {
+            ZoneClock::Wall => started.wall.elapsed().as_nanos(),
+            ZoneClock::Counted => self.counted_nanoseconds - started.counted_nanoseconds,
+        }
+    }
+
+    /// 忙等区是 `zone` 时加一段忙等：挂钟真等 `TIMING_CONTROL_BUSY_WAIT`；计数钟往前拨这么多纳秒，不等。
+    fn busy_wait_if(&mut self, zone: TimingZone, busy_zone: Option<TimingZone>) {
+        if busy_zone != Some(zone) {
+            return;
+        }
+        match self.clock {
+            ZoneClock::Wall => {
+                let started = Instant::now();
+                while started.elapsed() < TIMING_CONTROL_BUSY_WAIT {
+                    black_box(started);
+                }
+            }
+            ZoneClock::Counted => {
+                self.counted_nanoseconds += TIMING_CONTROL_BUSY_WAIT.as_nanos();
+            }
+        }
+    }
 }
 
 /// 一个状态的计时（纳秒）。
@@ -2041,12 +2114,12 @@ impl EvaluationContext<'_> {
 }
 
 /// 照跑一个状态（5.1 第 1 步，真实基线）：次序与 `crash.rs` 的 `evaluate_state_for_versions` 逐步相同，每一步各用一对
-/// `Instant` 包住，外面再包一对量整个状态；计数照它记进 `tally`。交回两遍恢复的报告与判定表。
+/// 读钟（`StateClock::now`，钟的种类照 `timing`）包住，外面再包一对量整个状态；计数照它记进 `tally`。交回两遍恢复的报告与判定表。
 // gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn evaluate_baseline(
     context: &EvaluationContext<'_>,
     image: &CrashImage<'_>,
-    busy_zone: Option<TimingZone>,
+    timing: TimingControl,
     timings: &mut StateTimings,
     tally: &mut CrashPointReplayTally,
 ) -> (
@@ -2054,20 +2127,21 @@ fn evaluate_baseline(
     RecoveryReport,
     Vec<(&'static str, InvariantVerdict)>,
 ) {
-    let state_started = Instant::now();
-    let oracle_prefix_started = Instant::now();
+    let mut clock = StateClock::new(timing.clock);
+    let state_started = clock.now();
+    let oracle_prefix_started = clock.now();
     let newest = newest_persisted_root(image.writes, &image.persisted);
-    let oracle_prefix_nanoseconds = nanoseconds_since(oracle_prefix_started);
-    let consult_started = Instant::now();
-    busy_wait_if(TimingZone::RecoveryConsult, busy_zone);
+    let oracle_prefix_nanoseconds = clock.nanoseconds_since(oracle_prefix_started);
+    let consult_started = clock.now();
+    clock.busy_wait_if(TimingZone::RecoveryConsult, timing.busy_zone);
     let consulted = recover(image, JournalPolicy::Consult);
-    timings.recovery_consult_nanoseconds += nanoseconds_since(consult_started);
-    let ignore_started = Instant::now();
-    busy_wait_if(TimingZone::RecoveryIgnore, busy_zone);
+    timings.recovery_consult_nanoseconds += clock.nanoseconds_since(consult_started);
+    let ignore_started = clock.now();
+    clock.busy_wait_if(TimingZone::RecoveryIgnore, timing.busy_zone);
     let ignored = recover(image, JournalPolicy::Ignore);
-    timings.recovery_ignore_nanoseconds += nanoseconds_since(ignore_started);
-    let oracle_started = Instant::now();
-    busy_wait_if(TimingZone::Oracle, busy_zone);
+    timings.recovery_ignore_nanoseconds += clock.nanoseconds_since(ignore_started);
+    let oracle_started = clock.now();
+    clock.busy_wait_if(TimingZone::Oracle, timing.busy_zone);
     let consulted_violation = singlefs_verification::crash::oracle_violation_for_versions(
         &consulted.outcome,
         consulted.effective_root,
@@ -2080,16 +2154,17 @@ fn evaluate_baseline(
         newest,
         &context.stream.versions,
     );
-    timings.oracle_nanoseconds += nanoseconds_since(oracle_started) + oracle_prefix_nanoseconds;
-    let checker_started = Instant::now();
-    busy_wait_if(TimingZone::PoolChecker, busy_zone);
+    timings.oracle_nanoseconds +=
+        clock.nanoseconds_since(oracle_started) + oracle_prefix_nanoseconds;
+    let checker_started = clock.now();
+    clock.busy_wait_if(TimingZone::PoolChecker, timing.busy_zone);
     let verdicts = check_pool_image(image);
-    timings.pool_checker_nanoseconds += nanoseconds_since(checker_started);
-    let records_started = Instant::now();
-    busy_wait_if(TimingZone::RecordChecker, busy_zone);
+    timings.pool_checker_nanoseconds += clock.nanoseconds_since(checker_started);
+    let records_started = clock.now();
+    clock.busy_wait_if(TimingZone::RecordChecker, timing.busy_zone);
     let records = check_records(image, consulted.effective_root);
-    timings.record_checker_nanoseconds += nanoseconds_since(records_started);
-    timings.state_nanoseconds += nanoseconds_since(state_started);
+    timings.record_checker_nanoseconds += clock.nanoseconds_since(records_started);
+    timings.state_nanoseconds += clock.nanoseconds_since(state_started);
     tally.states += 1;
     if image.persisted[context.stream.judged_root_index] {
         tally.root_persisted_states += 1;
@@ -2187,11 +2262,12 @@ fn count_checker_reads(reads: &[LoggedRead]) -> CheckerReadCounts {
 fn replay_checker_reads(
     reads: &[LoggedRead],
     filesystem_identifier_low: u64,
-    busy_zone: Option<TimingZone>,
+    timing: TimingControl,
     timings: &mut StateTimings,
 ) {
-    let positions_started = Instant::now();
-    busy_wait_if(TimingZone::UnitCheckReplay, busy_zone);
+    let mut clock = StateClock::new(timing.clock);
+    let positions_started = clock.now();
+    clock.busy_wait_if(TimingZone::UnitCheckReplay, timing.busy_zone);
     let mut replayed_positions = BTreeSet::new();
     for read in reads {
         if let (ReadCategory::WholeUnit, Some((_digest, bytes))) =
@@ -2202,8 +2278,8 @@ fn replay_checker_reads(
             }
         }
     }
-    timings.unit_positions_replay_nanoseconds += nanoseconds_since(positions_started);
-    let events_started = Instant::now();
+    timings.unit_positions_replay_nanoseconds += clock.nanoseconds_since(positions_started);
+    let events_started = clock.now();
     for read in reads {
         let Some((_digest, bytes)) = &read.content else {
             continue;
@@ -2224,13 +2300,13 @@ fn replay_checker_reads(
             ReadCategory::FixedStructure => {}
         }
     }
-    timings.unit_events_replay_nanoseconds += nanoseconds_since(events_started);
+    timings.unit_events_replay_nanoseconds += clock.nanoseconds_since(events_started);
 }
 
 /// 一个状态上的四件事（5.1）：照跑计时、记录跑、单元级检查重放、出键。
 #[allow(
     clippy::too_many_arguments,
-    reason = "每个参数各是一样东西：输入、序号、段、持久集合、忙等区、要不要留对照数据、内容表、计数"
+    reason = "每个参数各是一样东西：输入、序号、段、持久集合、计时控制（忙等区与钟）、要不要留对照数据、内容表、计数"
 )]
 // gpu-exempt: experiment-measures-the-cpu-judge-itself
 fn evaluate_state(
@@ -2238,7 +2314,7 @@ fn evaluate_state(
     ordinal: u64,
     segment: usize,
     persisted: Vec<bool>,
-    busy_zone: Option<TimingZone>,
+    timing: TimingControl,
     keep_control_data: bool,
     tables: &RefCell<ContentTables>,
     tally: &mut CrashPointReplayTally,
@@ -2250,7 +2326,7 @@ fn evaluate_state(
     };
     let mut timings = StateTimings::default();
     let (consulted, ignored, verdicts) =
-        evaluate_baseline(context, &image, busy_zone, &mut timings, tally);
+        evaluate_baseline(context, &image, timing, &mut timings, tally);
     let consult_reader = RecordingReader::new(&image, RecordedPass::Recovery, ordinal, tables);
     let recorded_consult = recover(&consult_reader, JournalPolicy::Consult);
     let ignore_reader = RecordingReader::new(&image, RecordedPass::Recovery, ordinal, tables);
@@ -2258,14 +2334,15 @@ fn evaluate_state(
     let normal_reader = RecordingReader::new(&image, RecordedPass::CheckerNormal, ordinal, tables);
     let recorded_verdicts = check_pool_image(&normal_reader);
     let walk_reader = RecordingReader::new(&image, RecordedPass::CheckerWalk, ordinal, tables);
-    let walk_started = Instant::now();
+    let walk_clock = StateClock::new(timing.clock);
+    let walk_started = walk_clock.now();
     black_box(check_pool_image(&walk_reader));
-    timings.walk_checker_nanoseconds += nanoseconds_since(walk_started);
+    timings.walk_checker_nanoseconds += walk_clock.nanoseconds_since(walk_started);
     let normal_reads = normal_reader.reads.into_inner();
     replay_checker_reads(
         &normal_reads,
         context.filesystem_identifier_low,
-        busy_zone,
+        timing,
         &mut timings,
     );
     let counts = count_checker_reads(&normal_reads);
@@ -2701,7 +2778,7 @@ struct StreamDomainRun<'run> {
     plan: &'run LocalPlan<'run>,
     ordinals: &'run [u64],
     control_ordinals: &'run BTreeSet<u64>,
-    busy_zone: Option<TimingZone>,
+    timing: TimingControl,
     threads: usize,
     depth: EvaluationDepth,
 }
@@ -2741,7 +2818,7 @@ fn evaluate_stream_domain(run: &StreamDomainRun<'_>) -> StreamDomainTotals {
                             let _reports = evaluate_baseline(
                                 run.context,
                                 &image,
-                                None,
+                                TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
                                 &mut timings,
                                 &mut totals.tally,
                             );
@@ -2752,7 +2829,7 @@ fn evaluate_stream_domain(run: &StreamDomainRun<'_>) -> StreamDomainTotals {
                             *ordinal,
                             run.plan.segment_of(*ordinal),
                             run.plan.persisted_of(*ordinal),
-                            run.busy_zone,
+                            run.timing,
                             run.control_ordinals.contains(ordinal),
                             &tables,
                             &mut totals.tally,
@@ -3212,7 +3289,13 @@ fn tally_with_every_write_persisted(
             persisted: every_write.persisted_of(0),
         };
         let mut timings = StateTimings::default();
-        let _reports = evaluate_baseline(context, &image, None, &mut timings, &mut combined);
+        let _reports = evaluate_baseline(
+            context,
+            &image,
+            TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
+            &mut timings,
+            &mut combined,
+        );
     }
     combined
 }
@@ -4340,7 +4423,7 @@ fn report_crates_comparison(
         plan,
         ordinals,
         control_ordinals: &BTreeSet::new(),
-        busy_zone: None,
+        timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
         threads,
         depth: EvaluationDepth::BaselineOnly,
     });
@@ -4394,7 +4477,7 @@ fn report_control_double_run(
             plan,
             ordinals: &ordinals,
             control_ordinals: control,
-            busy_zone: None,
+            timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
             threads,
             depth: EvaluationDepth::FourSteps,
         })
@@ -4852,7 +4935,7 @@ fn process_stream(
                 plan,
                 ordinals,
                 control_ordinals,
-                busy_zone: None,
+                timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
                 threads,
                 depth: EvaluationDepth::FourSteps,
             })
@@ -5004,7 +5087,7 @@ fn refeed_every_write_persisted(
         refed_ordinal,
         context.stream.segments.len(),
         plan.persisted_of(plan.expanded_state_count),
-        None,
+        TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
         false,
         &tables,
         &mut tally,
@@ -5154,7 +5237,10 @@ fn report_timing_control(
             plan: &full,
             ordinals: &ordinals,
             control_ordinals: &BTreeSet::new(),
-            busy_zone,
+            timing: TimingControl {
+                busy_zone,
+                clock: ZoneClock::Wall,
+            },
             threads,
             depth: EvaluationDepth::FourSteps,
         });
@@ -5548,7 +5634,7 @@ fn report_per_state_crates_comparison(
         plan,
         ordinals,
         control_ordinals: &BTreeSet::new(),
-        busy_zone: None,
+        timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
         threads,
         depth: EvaluationDepth::BaselineOnly,
     });
@@ -5760,7 +5846,7 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
                 plan,
                 ordinals,
                 control_ordinals: &control_ordinals,
-                busy_zone: None,
+                timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
                 threads,
                 depth: EvaluationDepth::FourSteps,
             });
@@ -5893,7 +5979,7 @@ mod tests {
     /// 不先核就一路评到撞内存上限。
     fn evaluate_the_first_stream_small_domain(
         threads: usize,
-        busy_zone: Option<TimingZone>,
+        timing: TimingControl,
     ) -> (PreparedStream, StreamDomainTotals, Vec<u64>) {
         let stream = prepare_first_stream();
         let (totals, small) = {
@@ -5917,7 +6003,7 @@ mod tests {
                 plan: &plan,
                 ordinals: &small,
                 control_ordinals: &control,
-                busy_zone,
+                timing,
                 threads,
                 depth: EvaluationDepth::FourSteps,
             });
@@ -6112,7 +6198,8 @@ mod tests {
 
     #[test]
     fn recorded_recovery_answers_exactly_like_the_baseline_on_the_first_stream() {
-        let (_stream, totals, _small) = evaluate_the_first_stream_small_domain(2, None);
+        let (_stream, totals, _small) =
+            evaluate_the_first_stream_small_domain(2, TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT);
         assert_eq!(totals.states(), 53, "D1-small 新池新建文件流 53 个状态");
         assert_eq!(
             totals.consult_report_differs, 0,
@@ -6128,7 +6215,8 @@ mod tests {
 
     #[test]
     fn constant_keys_separate_recovery_outcomes_and_verdicts_on_the_first_stream() {
-        let (_stream, mut totals, small) = evaluate_the_first_stream_small_domain(2, None);
+        let (_stream, mut totals, small) =
+            evaluate_the_first_stream_small_domain(2, TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT);
         let stream = prepare_first_stream();
         let table = TornWriteTable::of(&stream);
         let plan = LocalPlan::new(
@@ -6164,7 +6252,8 @@ mod tests {
 
     #[test]
     fn refeeding_the_every_write_persisted_state_keeps_distinct_unit_contents() {
-        let (stream, totals, _small) = evaluate_the_first_stream_small_domain(2, None);
+        let (stream, totals, _small) =
+            evaluate_the_first_stream_small_domain(2, TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT);
         let table = TornWriteTable::of(&stream);
         let context = EvaluationContext::new(&stream, &table);
         let plan = LocalPlan::new(
@@ -6186,28 +6275,39 @@ mod tests {
         assert!(positions > 0, "全部持久那个状态读到了单元");
     }
 
+    /// PC3 的缩小版，读计数钟（不读机器时间，判定与负载无关）：D1-small 每个状态在看 journal 那一区忙等一次，
+    /// 六个计时区里只有看 journal 那一区记到 53 × 2 ms，别的区都是 0，整个状态的计时同样记到 53 × 2 ms。
     #[test]
     fn busy_wait_in_the_consult_zone_lands_in_the_consult_zone() {
-        let (_stream, quiet, _small) = evaluate_the_first_stream_small_domain(1, None);
-        let (_busy_stream, busy, _busy_small) =
-            evaluate_the_first_stream_small_domain(1, Some(TimingZone::RecoveryConsult));
-        let zone_total = |totals: &StreamDomainTotals, zone: usize| -> u128 {
-            totals
-                .timing_by_segment
-                .values()
-                .map(|sums| sums.zone_nanoseconds[zone])
-                .sum()
-        };
-        let added = zone_total(&busy, 0).saturating_sub(zone_total(&quiet, 0));
-        assert!(
-            added >= 53 * TIMING_CONTROL_BUSY_WAIT.as_nanos() * 9 / 10,
-            "PC3 的缩小版：看 journal 那一区多出 53 × 2 ms 的九成以上，实际 {added} ns"
+        let (_stream, busy, small) = evaluate_the_first_stream_small_domain(
+            1,
+            TimingControl {
+                busy_zone: Some(TimingZone::RecoveryConsult),
+                clock: ZoneClock::Counted,
+            },
+        );
+        let mut sums = TimingSums::default();
+        for segment_sums in busy.timing_by_segment.values() {
+            sums.absorb(segment_sums);
+        }
+        let busy_wait_of_the_domain = u128::try_from(small.len()).expect("状态数装得进 u128")
+            * TIMING_CONTROL_BUSY_WAIT.as_nanos();
+        assert_eq!(
+            sums.zone_nanoseconds,
+            [busy_wait_of_the_domain, 0, 0, 0, 0, 0],
+            "六个区依次是 {:?}：忙等只记到看 journal 那一区",
+            TIMING_ZONES.map(TimingZone::label)
+        );
+        assert_eq!(
+            sums.state_nanoseconds, busy_wait_of_the_domain,
+            "整个状态的计时包住看 journal 那一区"
         );
     }
 
     #[test]
     fn device_memory_parts_grow_by_the_synthetic_amounts() {
-        let (stream, mut totals, small) = evaluate_the_first_stream_small_domain(2, None);
+        let (stream, mut totals, small) =
+            evaluate_the_first_stream_small_domain(2, TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT);
         let table = TornWriteTable::of(&stream);
         let plan = LocalPlan::new(
             &stream,
@@ -6314,7 +6414,7 @@ mod tests {
                 plan: &plan,
                 ordinals: &stride,
                 control_ordinals: &BTreeSet::new(),
-                busy_zone: None,
+                timing: TimingControl::WALL_CLOCK_WITHOUT_BUSY_WAIT,
                 threads,
                 depth: EvaluationDepth::FourSteps,
             });

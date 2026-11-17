@@ -21,7 +21,7 @@ use singlefs_core::mount::{
     mount_writable, raise_rollback_floor_to_the_admission_ceiling, MountError, ShadowLedger,
 };
 use singlefs_core::recovery::{every_root_ring_slot, RecoveryFailure};
-use singlefs_core::root_ring::slot_offset;
+use singlefs_core::root_ring::{slot_offset, target_for_publish};
 
 /// 可写挂载之前实例 1 覆盖写到的 txg：环洞池（S = 4 的 12 槽环）上根环转过一圈。
 const LAST_TXG_OF_THE_FIRST_INSTANCE: u64 = 17;
@@ -83,6 +83,65 @@ fn the_admission_ceiling_refuses_with_the_reread_refusal_when_every_root_ring_sl
     );
     assert!(
         pool_of(&without_unreadable_ranges(devices_reading_the_ring_bad)) == image_before_the_raise,
+        "拒在任何写之前：两块盘逐字节不变"
+    );
+}
+
+/// 可写挂载做完之后，现行那条根住的槽（这个进程知道住着根）只有最前面两次读报设备错，再往后读得出；走公开入口准入抬 F。
+/// 公开入口的盘没有预演与真做共用的那一份，读根环一次就是一次读盘。算上限那一遍读它（第一次）、当场重读（第二次）都坏：
+/// 重读一次仍坏就拒（D16（发布语义） 已定项 1「根槽这一次读坏」那一行），在任何写之前，这一段恰读坏两次。
+/// 判别力：算上限之前多读一遍根环（`crates/mutations.tsv`「第10l批 读序：算上限之前多读一遍根环」那一行）时多读的那一遍吃掉第一次，当场重读读得出，这一条不拒、红。  history-kept: 引的是变异表里那一行的名字，照名字原样写
+#[test]
+fn a_known_ring_slot_bad_on_the_ceilings_read_and_on_its_reread_alone_refuses_the_raise_though_the_next_read_is_good(
+) {
+    let parameters = parameters_of_the_ring_hole_pools();
+    let mut devices = devices_of(&pool_overwritten_through(LAST_TXG_OF_THE_FIRST_INSTANCE));
+    let mounted = mount_writable(&parameters, &mut devices)
+        .expect("可写挂载：读阶段与重建分配器两遍都没有读故障");
+    let mut allocator = mounted.allocator.clone();
+    let mut current = mounted
+        .current
+        .into_file_version()
+        .expect("覆盖写过的池，这一版带文件");
+    let image_before_the_raise = pool_of(&devices);
+    let ring_slot_of_the_current_root = target_for_publish(
+        current.root.checkpoint_txg,
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    let slot_read_bad_twice = SharedUnreadableRanges::new(
+        vec![UnreadableRange {
+            device: parameters.region_devices
+                [usize::try_from(ring_slot_of_the_current_root.region).expect("区域号")],
+            offset_in_bytes: slot_offset(
+                ring_slot_of_the_current_root,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )
+            .0,
+            length_in_bytes: u64::from(parameters.geometry.physical_block_size),
+            failing_reads: FailingReadsOfARange::OnlyTheFirstTwo,
+        }],
+        UnreadableRangeReadBack::DeviceError,
+    );
+    let mut devices_reading_the_slot_bad = with_unreadable_ranges(devices, &slot_read_bad_twice);
+    let refused = raise_rollback_floor_to_the_admission_ceiling(
+        &parameters,
+        &mut devices_reading_the_slot_bad,
+        &mut allocator,
+        &mut current,
+        ShadowLedger::On,
+    )
+    .expect_err("第一次读与当场重读都坏：重读一次仍坏就拒");
+    assert!(
+        matches!(
+            refused,
+            MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot, .. }
+                if ring_slot == ring_slot_of_the_current_root
+        ),
+        "知道住着根的槽读坏、重读仍坏：{refused:?}"
+    );
+    assert_eq!(slot_read_bad_twice.failed_reads(), 2, "这一段恰读坏两次");
+    assert!(
+        pool_of(&without_unreadable_ranges(devices_reading_the_slot_bad)) == image_before_the_raise,
         "拒在任何写之前：两块盘逐字节不变"
     );
 }

@@ -750,7 +750,8 @@ fn rebuilding_the_previous_version_reads_every_relocated_mapped_unit_through_the
 /// （盘 1，盘 0），提示原样、读得出 ⇒ 重建拒成 I-2.5、不交出一版位置项逆序的指针（下一次发布重写父节点时写者在升序断言上 panic）。
 /// 判别力：`recovery::rebuild_version` 盖映射位置之后那一道 I-2.5 拿掉时这一条红（盖之前那一道只看盘上提示，提示是升序的）。
 #[test]
-fn rebuilding_a_version_whose_central_mapping_entry_has_descending_locations_is_refused_by_i_2_5() {
+fn rebuilding_a_version_whose_central_mapping_entry_has_descending_locations_is_refused_by_the_ascending_device_order_invariant(
+) {
     let mut built = new_pool_file_creation_image("rebuild-mapping-entry-descending");
     let moved = mapped_unit(&built, MappedUnitToRelocate::ExtentTreeRoot);
     let original_entries = parse_index_node(&central_mapping_root_bytes(&built))

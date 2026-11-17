@@ -12,7 +12,7 @@
 //!
 //! 改法丙（V1、V2；
 //! `research/prompts/m3-close-b19-code-r3-opus-output.md` V1「能写成的会红用例」三形）：补写盘之外的成员盘一个系统配置槽在逐盘核那一刻已读坏
-//! （整槽写 0）或已报读错（每次读都报块设备错），只进内存那一趟取号照样读到它、记进账；预演判两本账时剔掉落在这类槽上的那几条，
+//! （整槽写 0，或读阶段之后读回坏字节）或已报读错（每次读都报块设备错），只进内存那一趟取号照样读到它、记进账；预演判两本账时剔掉落在这类槽上的那几条，
 //! 拒因照旧点名真出故障的那份树表。
 
 #![allow(dead_code, reason = "几份 common 模块各只用到一部分")]
@@ -280,6 +280,8 @@ const DEVICE_NOT_REWRITTEN_BY_THE_ACQUISITION: DeviceIdentity = DeviceIdentity(0
 const INDEX_OF_THE_ZEROED_SLOT_OF_THE_MEMBER_DEVICE: u64 = 0;
 /// 成员盘上每次读都报块设备错的那个系统配置槽（槽 1，偏移一个固定结构槽距）。
 const INDEX_OF_THE_SLOT_REPORTING_A_READ_ERROR_ON_THE_MEMBER_DEVICE: u64 = 1;
+/// 成员盘上读阶段之后才读坏的那个系统配置槽（槽 0，偏移 0）。
+const INDEX_OF_THE_SLOT_TURNING_BAD_AFTER_THE_READ_STAGE_ON_THE_MEMBER_DEVICE: u64 = 0;
 
 fn system_configuration_slot_offset(
     geometry: &PoolImageGeometry,
@@ -359,14 +361,17 @@ fn read_named_by_the_refusal_on_a_read_failing_self_verification(
     read_named_by_the_refusal
 }
 
-/// 场景：窄盘镜像上盘 1 两个系统配置槽整槽写 0（补写盘），另把盘 0 槽 0 整槽写 0（盘 0 槽 1 自证得过，逐盘核放行、不补写盘 0）；
-/// 树表每一次读都读坏（同 U2 用例）。
+/// 场景：窄盘镜像上盘 1 两个系统配置槽整槽写 0（补写盘），盘 0 两槽在读阶段都读得出、自证得过（有一块盘两槽都自证过，乙入判不出不拒）；
+/// 盘 0 槽 0 从读阶段之后读到它的第一次读起每一次读都读回坏字节，逐盘核那一刻已读坏（盘 0 槽 1 自证得过，逐盘核放行、不补写盘 0）；
+/// 树表每一次读都读坏（同 U2 用例，窗口取自只带槽读坏那一遍）。
+/// 盘 0 槽 0 在读阶段就读坏的盘面（三槽坏、没有一块盘两槽都自证过）走不到预演：乙入判不出在取号之前拒，前提里钉住。
+/// 读阶段之后第一次读到这一槽是哪一读不写死：不带故障那一遍里这一槽的每一读按次序试，头一个让这次挂载做成的就是（更早的读坏落在读阶段，乙入判不出拒）。
 /// 预期：逐盘核那一刻盘 0 槽 0 已读坏，只进内存那一趟取号再读它记进读坏账，预演判两本账时剔掉；拒因交的那一次读坏是那份树表，
 /// 不是盘 0 槽 0；取号之前拒，一个写都没发到盘上。
-/// 判别力：只剔补写盘的系统配置槽、不剔成员盘的（`crates/mutations.tsv`「改法丙 预演判两本账只剔补写盘的系统配置槽、成员盘逐盘核那一刻已坏的槽照旧进读坏账」那一行，
-/// 的判法）时，读坏账最先那一条是盘 0 槽 0（偏移 0、长 4096），这一条红在拒因那一条断言。
+/// 判别力：逐盘核把读坏的槽记成读得出（`crates/mutations.tsv`「改法丙 逐盘核把读坏的系统配置槽记成读得出、没报自证不过」那一行）时剔不掉，
+/// 读坏账最先那一条是盘 0 槽 0（偏移 0、长 4096），这一条红在拒因那一条断言。
 #[test]
-fn tree_table_reading_back_garbage_every_time_is_named_by_the_rehearsal_refusal_instead_of_a_zeroed_slot_of_the_member_device_beside_a_device_rewritten_by_the_acquisition(
+fn tree_table_reading_back_garbage_every_time_is_named_by_the_rehearsal_refusal_instead_of_a_slot_of_the_member_device_turning_bad_after_the_read_stage_beside_a_device_rewritten_by_the_acquisition(
 ) {
     let (image, geometry, _) = narrow_image();
     let rewritten = with_both_system_configuration_slots_zeroed(
@@ -374,25 +379,88 @@ fn tree_table_reading_back_garbage_every_time_is_named_by_the_rehearsal_refusal_
         &geometry,
         DEVICE_WITH_BOTH_SYSTEM_CONFIGURATION_SLOTS_ZEROED,
     );
-    let torn = with_one_system_configuration_slot_zeroed(
+    let fault_free = mount_writable_with_read_faults_on_ranges(&rewritten, &geometry, Vec::new());
+    assert!(
+        fault_free.result.is_ok(),
+        "前提：盘 1 两槽写 0、不带读故障的可写挂载做成，实际 {:?}",
+        fault_free.result.as_ref().err()
+    );
+    let offset_of_the_slot = system_configuration_slot_offset(
+        &geometry,
+        INDEX_OF_THE_SLOT_TURNING_BAD_AFTER_THE_READ_STAGE_ON_THE_MEMBER_DEVICE,
+    );
+    let slot_reading_bad_from = |from_ordinal: u64| ReadFaultOnARange {
+        device: Some(DEVICE_NOT_REWRITTEN_BY_THE_ACQUISITION),
+        offset: offset_of_the_slot,
+        length_in_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES,
+        from_ordinal,
+        fault: ReadFault::ReadsBackCorruptedBytes,
+    };
+    let ordinals_of_the_reads_of_the_slot: Vec<u64> = fault_free
+        .reads_reaching_the_disk
+        .iter()
+        .filter(|read| {
+            read.device == DEVICE_NOT_REWRITTEN_BY_THE_ACQUISITION
+                && read.offset == offset_of_the_slot
+                && read.length_in_bytes == SYSTEM_CONFIGURATION_SLOT_BYTES
+        })
+        .map(|read| read.ordinal_across_the_pool)
+        .collect();
+    let first_read_of_the_slot = *ordinals_of_the_reads_of_the_slot
+        .first()
+        .expect("这次挂载读到盘 0 槽 0");
+    let bad_from_the_read_stage = mount_writable_with_read_faults_on_ranges(
         &rewritten,
         &geometry,
-        DEVICE_NOT_REWRITTEN_BY_THE_ACQUISITION,
-        INDEX_OF_THE_ZEROED_SLOT_OF_THE_MEMBER_DEVICE,
+        vec![slot_reading_bad_from(first_read_of_the_slot)],
     );
-    let (fault_free, faulted, offset_of_the_tree_table_copies) =
-        mount_without_faults_then_with_the_tree_table_reading_back_garbage_every_time(
-            &torn, &geometry,
-        );
-    let fault_free_mounted = fault_free.result.as_ref().unwrap_or_else(|error| {
-        panic!("前提：盘 1 两槽写 0、盘 0 槽 0 写 0、不带读故障的可写挂载做成，实际 {error:?}")
-    });
+    assert!(
+        matches!(
+            &bad_from_the_read_stage.result,
+            Err(MountError::NewerStateStillUnreadableAfterOneReread(_))
+        ),
+        "前提：盘 0 槽 0 在读阶段就读坏（三槽坏）：乙入判不出在取号之前拒，走不到预演，实际 {:?}",
+        bad_from_the_read_stage.result.as_ref().err()
+    );
+    let (slot_reading_bad, with_the_slot_reading_bad) = ordinals_of_the_reads_of_the_slot
+        .iter()
+        .map(|ordinal| {
+            let fault = slot_reading_bad_from(*ordinal);
+            (
+                fault,
+                mount_writable_with_read_faults_on_ranges(&rewritten, &geometry, vec![fault]),
+            )
+        })
+        .find(|(_, mounted)| mounted.result.is_ok())
+        .expect("盘 0 槽 0 从读阶段之后读到它的第一次读起读坏：逐盘核放行盘 0，挂载做成");
+    let mounted_with_the_slot_reading_bad = with_the_slot_reading_bad
+        .result
+        .as_ref()
+        .expect("上面按做成挑的");
     assert_eq!(
-        fault_free_mounted
+        mounted_with_the_slot_reading_bad
             .output
             .devices_rewritten_by_the_acquisition,
         vec![DEVICE_WITH_BOTH_SYSTEM_CONFIGURATION_SLOTS_ZEROED],
-        "前提：逐盘核只把盘 1 交给取号补写，盘 0 槽 1 自证得过、走落后支放行"
+        "前提：逐盘核只把盘 1 交给取号补写，盘 0 槽 1 自证得过、不补写盘 0"
+    );
+    let (window, offset_of_the_tree_table_copies) =
+        ordinals_of_a_tree_table_read_first_by_the_in_memory_rehearsal_and_of_its_other_copy(
+            &with_the_slot_reading_bad.reads_reaching_the_disk,
+        );
+    let tree_table_reading_back_garbage_every_time = ReadFaultOnARange {
+        device: None,
+        offset: offset_of_the_tree_table_copies,
+        length_in_bytes: BYTES_OF_A_TREE_TABLE,
+        from_ordinal: *window
+            .first()
+            .expect("窗口是只进内存那一趟头一次读的树表两份那两次读"),
+        fault: ReadFault::ReadsBackCorruptedBytes,
+    };
+    let faulted = mount_writable_with_read_faults_on_ranges(
+        &rewritten,
+        &geometry,
+        vec![slot_reading_bad, tree_table_reading_back_garbage_every_time],
     );
     let read_named_by_the_refusal =
         read_named_by_the_refusal_on_a_read_failing_self_verification(&faulted.result);
@@ -407,10 +475,9 @@ fn tree_table_reading_back_garbage_every_time_is_named_by_the_rehearsal_refusal_
         read_named_by_the_refusal.offset,
         read_named_by_the_refusal.length_in_bytes
     );
-    assert!(
-        faulted.writes_reaching_the_disk.is_empty(),
-        "取号之前拒，一个写都没发到盘上：{} 个",
-        faulted.writes_reaching_the_disk.len()
+    assert_eq!(
+        faulted.writes_reaching_the_disk, 0,
+        "取号之前拒，一个写都没发到盘上"
     );
 }
 

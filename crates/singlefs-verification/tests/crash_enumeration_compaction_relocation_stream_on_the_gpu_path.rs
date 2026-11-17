@@ -52,7 +52,10 @@ use singlefs_core::background_compute::{
     BackgroundComputePathTaken, BACKGROUND_GC_CPU_COMPENSATION_THRESHOLD_BY_DEFAULT,
 };
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
-use singlefs_core::mount::mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_switches;
+use singlefs_core::mount::{
+    mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_switches,
+    WritableMountWithBackgroundComputeRefused,
+};
 use singlefs_core::recovery::RecoveryReport;
 use singlefs_verification::crash::{
     crash_state_count_with_torn_in_place_overwrites, full_expansion,
@@ -69,6 +72,9 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, writes_and_segments, CrashImage, MemoryPool,
     SparseBlockDevice,
+};
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness, WritableMountRefusedOnTheCrashDisks,
 };
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
@@ -100,11 +106,15 @@ fn prepare(tag: &str) -> PreparedOnTheBackgroundCompute {
 /// 挂载发的写录在一条新的录制流上，连同挂完的盘交回。同 `common_compaction_prefix::mount_writable_with_the_compaction_switches_on_the_crash_disks`，
 /// 只是挂载参数选 `gpu`（那一份在共用模块里、只挂 `cpu`）。
 ///
+/// # Errors
+/// 可写挂载被拒：交回拒因与挂载用过的录制设备，由观察者判这一拒认不认（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`）。
+///
 /// # Panics
-/// 可写挂载做不成：这条流的每个崩溃状态按条款都挂得上。
+/// 后台计算设置被拒：这里的设置全合法、替身的两张卡都在。
 fn mount_writable_on_the_gpu_path_on_the_crash_disks(
     disks: &MemoryPool,
-) -> MountedWithTheCompactionSwitchesAfterTheCrash {
+) -> Result<MountedWithTheCompactionSwitchesAfterTheCrash, Box<WritableMountRefusedOnTheCrashDisks>>
+{
     let mount_parameters = parameters();
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices: Vec<_> = disks
@@ -124,17 +134,26 @@ fn mount_writable_on_the_gpu_path_on_the_crash_disks(
         .collect();
     let (_gpu_compute_kept_by_the_handle, gpu_compute_handle) = shared_cpu_backed_gpu_compute();
     let mounted =
-        mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_switches(
+        match mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_switches(
             &mount_parameters,
             &mut devices,
             admissible_gpu_settings_naming_both_cards(),
             Some(gpu_compute_handle),
             BACKGROUND_GC_CPU_COMPENSATION_THRESHOLD_BY_DEFAULT,
             compaction_switches_of_the_crash_flows(),
-        )
-        .unwrap_or_else(|refused| {
-            panic!("每个崩溃状态上选 gpu 的可写挂载都做得成：{refused:?}")
-        });
+        ) {
+            Ok(mounted) => mounted,
+            Err(WritableMountWithBackgroundComputeRefused::Mount(refusal)) => {
+                return Err(Box::new(WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                }));
+            }
+            Err(WritableMountWithBackgroundComputeRefused::BackgroundComputeSettings(refused)) => {
+                panic!("选 gpu 的挂载设置全合法、替身的两张卡都在：{refused:?}")
+            }
+        };
     let disks_after_the_mount = MemoryPool {
         devices: devices
             .iter()
@@ -144,12 +163,12 @@ fn mount_writable_on_the_gpu_path_on_the_crash_disks(
     };
     let (writes_of_the_mount, _segments_of_the_mount) =
         writes_and_segments(&stream.retained_operations(), &geometry());
-    MountedWithTheCompactionSwitchesAfterTheCrash {
+    Ok(MountedWithTheCompactionSwitchesAfterTheCrash {
         mounted,
         writes_of_the_mount,
         disks_after_the_mount,
         read_ranges_of_the_mount: stream.read_ranges(),
-    }
+    })
 }
 
 /// 挂载续做那一趟的每一批都走了 GPU 路径、没有一批算着出错：交回几批（落到的那一版没有活的整理意图、一趟都没续做的是 0）。
@@ -186,8 +205,21 @@ fn observe_the_mount_continuing_the_compaction_on_the_gpu_path(
         .effective_root
         .expect("每个状态都择到根（oracle 另判）");
     let landed = version_of_the_compaction_flow_landed_on(versions_of_the_flow, effective_root);
-    let mounted =
-        mount_writable_on_the_gpu_path_on_the_crash_disks(&materialized_crash_image(image));
+    let crash_disks = materialized_crash_image(image);
+    let mounted = match mount_writable_on_the_gpu_path_on_the_crash_disks(&crash_disks) {
+        Ok(mounted) => mounted,
+        Err(refused) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &refused,
+                &crash_disks,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     let compaction_publishes =
         assert_the_mount_continued_the_compaction_and_the_deletions(landed, &mounted);
     let continuation_batches_on_the_gpu_path = continuation_batches_all_on_the_gpu_path(&mounted);

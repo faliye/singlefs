@@ -32,10 +32,10 @@ use singlefs_core::background_compute::{
     BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
 };
 use singlefs_core::compaction_plan::{
-    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionBatchSize,
-    CompactionBatchUnits, CompactionPacing, CompactionRunForcing, CompactionRunStop,
-    CompactionStartJudgement, CompactionSwitches, CompactionTimerFallback,
-    CompactionWriteBandwidthLimit, ForegroundFsync, UnitAreaOfOneDevice,
+    AnswerOfTheCallerBeforeTheNextBatch, CallerMonotonicClockReading,
+    CallerOfTheBackgroundCompaction, CompactionBatchSize, CompactionBatchUnits, CompactionPacing,
+    CompactionRunForcing, CompactionRunStop, CompactionStartJudgement, CompactionSwitches,
+    CompactionTimerFallback, CompactionWriteBandwidthLimit, UnitAreaOfOneDevice,
 };
 use singlefs_core::logged_operations::CompactionRegion;
 use singlefs_core::mount::{
@@ -52,11 +52,11 @@ use singlefs_core::unit::data_unit_payload_capacity;
 
 /// 另一次挂载里顺序写第一个文件的数据单元数。
 const DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT: usize = 8;
-/// 整理一批至多搬几个（只供测试的开关；产品路径批大小条款没写）。
+/// 整理一批至多搬几个（只供测试的开关）。
 const UNITS_PER_BATCH: usize = 2;
 /// 「card-eight」答的那一张被晾下的卡：给它的上限与最小的一片（数是用例自己定的）。
 const MEMORY_LIMIT_HOLDING_NO_PIECE: GpuMemoryInBytes = GpuMemoryInBytes(64);
-const SMALLEST_PIECE_BYTES: u64 = 972;
+const SMALLEST_PIECE_BYTES: GpuMemoryInBytes = GpuMemoryInBytes(972);
 
 /// 只点名「card-eight」的那一组交进来之后答「参与的卡因显存上限一张都不剩」的那一个出错。
 fn every_participating_gpu_left_out() -> BackgroundGpuComputeFailed {
@@ -65,7 +65,7 @@ fn every_participating_gpu_left_out() -> BackgroundGpuComputeFailed {
             device: card_named("card-eight"),
             memory_limit: MEMORY_LIMIT_HOLDING_NO_PIECE,
             smallest_piece_bytes: SMALLEST_PIECE_BYTES,
-            bytes_already_held_on_the_device: 0,
+            bytes_already_held_on_the_device: GpuMemoryInBytes(0),
         }],
     }
 }
@@ -151,8 +151,8 @@ impl CallerOfTheBackgroundCompaction for CallerWithNoForegroundFsync {
         CallerMonotonicClockReading(Duration::ZERO)
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        ForegroundFsync::NoneWaiting
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
     }
 }
 

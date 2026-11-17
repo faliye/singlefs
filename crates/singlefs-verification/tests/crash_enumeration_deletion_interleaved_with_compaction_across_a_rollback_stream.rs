@@ -39,8 +39,8 @@ use common_compaction_deletion_prefix::{
     INODE_OF_THE_OTHER_FILE,
 };
 use common_compaction_prefix::{
-    image_with_the_relocation_sources_zeroed,
-    mount_writable_with_the_compaction_switches_on_the_crash_disks, region_of_the_crash_flows,
+    attempt_the_writable_mount_with_the_compaction_switches_on_the_crash_disks,
+    image_with_the_relocation_sources_zeroed, region_of_the_crash_flows,
     COMPACTION_BATCH_UNITS_OF_THE_CRASH_FLOWS,
 };
 use singlefs_core::compaction_plan::region_is_empty_by_the_records;
@@ -61,6 +61,10 @@ use singlefs_verification::crash_state_enumeration::{
 };
 use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, CrashImage,
+};
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
 };
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 
@@ -223,9 +227,23 @@ fn observe_the_mount_continuing_the_deletion_and_the_compaction(
         .expect("每个状态都择到根（oracle 另判）");
     let landed =
         version_of_the_deletion_compaction_flow_landed_on(versions_of_the_flow, effective_root);
-    let mounted = mount_writable_with_the_compaction_switches_on_the_crash_disks(
-        &materialized_crash_image(image),
-    );
+    let crash_disks = materialized_crash_image(image);
+    let mounted = match attempt_the_writable_mount_with_the_compaction_switches_on_the_crash_disks(
+        &crash_disks,
+    ) {
+        Ok(mounted) => mounted,
+        Err(refused) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &refused,
+                &crash_disks,
+                report,
+                &common::parameters().filesystem_identifier,
+                &common::geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     let compaction_publishes =
         assert_the_mount_continued_the_deletion_then_the_compaction(landed, &mounted);
     counts.add(
@@ -414,9 +432,10 @@ fn assert_every_state_was_observed(
         (0..=COMPACTION_CONTINUATION_PUBLISHES_AT_MOST)
             .map(|publishes| counts
                 .count_named(&format!("compaction_continuation_publishes_{publishes}")))
-            .sum::<u64>(),
+            .sum::<u64>()
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
     );
     singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
         (1..=COMPACTION_CONTINUATION_PUBLISHES_AT_MOST)

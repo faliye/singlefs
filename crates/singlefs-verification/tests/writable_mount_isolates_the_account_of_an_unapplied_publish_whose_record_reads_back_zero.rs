@@ -13,10 +13,10 @@ mod common_unwitnessed_publish;
 mod scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero;
 
 use common_images_for_the_given_states_engine::PoolCheckerImages;
-use scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::{OVERWRITES_BEFORE_R};
+use scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::{OVERWRITES_BEFORE_THE_RECORDED_PUBLISH};
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on,
-    record_one_publish_after_overwrites, PublishRecordedAsR,
+    record_one_publish_after_overwrites, RecordedPublishKind,
     RangesReadingBackAllZero,
 };
 use singlefs_core::journal::JournalRecord;
@@ -60,8 +60,8 @@ fn a_publish_whose_root_slot_and_first_record_read_back_zero_keeps_its_units_thr
 fn the_units_named_by_the_first_two_records_of_a_publish_whose_root_slot_and_tree_table_read_back_zero_are_isolated(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let tree_table_writes = recorded.unit_writes_at(&recorded.root().tree_table);

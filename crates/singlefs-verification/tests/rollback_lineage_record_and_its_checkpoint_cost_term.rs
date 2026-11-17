@@ -14,8 +14,9 @@ use scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::{
 };
 use singlefs_core::address::InstanceGeneration;
 use singlefs_core::admission::{
-    central_mapping_entries_of_one_lineage_container_cow,
-    checkpoint_cost_of_one_lineage_container_cow, checkpoint_cost_of_the_version_to_build_on,
+    central_mapping_entries_of_one_lineage_container_copy_on_write,
+    checkpoint_cost_of_one_lineage_container_copy_on_write,
+    checkpoint_cost_of_the_version_to_build_on,
     checkpoint_cost_of_the_version_to_build_on_with_node_capacities, MetadataBlocks,
 };
 use singlefs_core::code_two_tree::CodeTwoTreeNodeCapacity;
@@ -47,7 +48,7 @@ fn a_rollback_records_the_inode_number_watermark_of_the_version_it_rolls_back_fr
 }
 
 /// ckpt_cost 谱系那一项：谱系树零根（回退之前）与只有根（回退之后）都是 3 块（容器 2 + 根 1，内部 0 层），长高之后多一层多一块
-/// （第一版的谱系树还不长高，长高那一格只在 `checkpoint_cost_of_one_lineage_container_cow` 的参数上取）。
+/// （第一版的谱系树还不长高，长高那一格只在 `checkpoint_cost_of_one_lineage_container_copy_on_write` 的参数上取）。
 /// 第一个文件那一版整个 ckpt_cost 的绝对值 = 分配记录树 529 + 中央映射树那一项 + 记账树节点 + 树表 1 + 谱系 3 + 退役 3
 /// （退役那一项是判决 `research/prompts/m3-retire-r1-main-verification.md` 第六节 R2「两样都做」加的）。
 #[test]
@@ -55,17 +56,18 @@ fn the_lineage_term_of_the_checkpoint_cost_is_three_blocks_on_a_zero_root_and_on
 {
     let (mut pool, first_file_version) =
         pool_with_one_overwrite_after_the_first_file("lineage-term-of-the-checkpoint-cost");
-    let lineage_term_before = checkpoint_cost_of_one_lineage_container_cow(
+    let lineage_term_before = checkpoint_cost_of_one_lineage_container_copy_on_write(
         first_file_version.lineage_tree_internal_levels(),
     );
     roll_back_by_a_forward_publish_to(&mut pool, &first_file_version);
-    let lineage_term_after =
-        checkpoint_cost_of_one_lineage_container_cow(pool.output.lineage_tree_internal_levels());
+    let lineage_term_after = checkpoint_cost_of_one_lineage_container_copy_on_write(
+        pool.output.lineage_tree_internal_levels(),
+    );
     assert_eq!(
         (
             lineage_term_before,
             lineage_term_after,
-            checkpoint_cost_of_one_lineage_container_cow(1),
+            checkpoint_cost_of_one_lineage_container_copy_on_write(1),
         ),
         (MetadataBlocks(3), MetadataBlocks(3), MetadataBlocks(4)),
         "零根 3、只有根 3、长高一层 4"
@@ -86,13 +88,13 @@ fn the_lineage_term_of_the_checkpoint_cost_is_three_blocks_on_a_zero_root_and_on
 }
 
 /// ckpt_cost 中央映射树那一项的删插数连回退那次谱系容器与谱系树根进映射的删插一起算（Q-U「乙 一并算上」）：
-/// 谱系零根（回退之前）与只有根（回退之后）两版都多算容器 1 把、根 1 把（[`central_mapping_entries_of_one_lineage_container_cow`]）。
+/// 谱系零根（回退之前）与只有根（回退之后）两版都多算容器 1 把、根 1 把（[`central_mapping_entries_of_one_lineage_container_copy_on_write`]）。
 /// 产品容量（叶 294、内部 143）下这两版那一项的切分次数不随删插数多 2 把而变（529 + 1 + 2 把插进一片叶，切 4 次都装得下），量不出这几把；
 /// 中央映射树节点容量按只供测试的开关压到叶 4、内部节点 4（每切一次至少再插 2 把），两版的 ckpt_cost 绝对值钉在草稿探针现跑的数上。
 /// 记账树照产品容量（ckpt_cost 记账树那一项按传进去的容量规划这次发布之后的树，W3）：压到叶 4 时两版各 15 行的记账树
 /// 那一项跟着变成多片叶，量的就不只是谱系那几把了。
 #[test]
-fn the_central_mapping_term_counts_the_lineage_entries_of_one_cow_on_a_zero_root_and_on_a_root_only_tree(
+fn the_central_mapping_term_counts_the_lineage_entries_of_one_copy_on_write_on_a_zero_root_and_on_a_root_only_tree(
 ) {
     let (mut pool, first_file_version) = pool_with_one_overwrite_after_the_first_file(
         "central-mapping-term-counts-the-lineage-entries",
@@ -117,10 +119,10 @@ fn the_central_mapping_term_counts_the_lineage_entries_of_one_cow_on_a_zero_root
     );
     assert_eq!(
         (
-            central_mapping_entries_of_one_lineage_container_cow(
+            central_mapping_entries_of_one_lineage_container_copy_on_write(
                 first_file_version.lineage_tree_internal_levels()
             ),
-            central_mapping_entries_of_one_lineage_container_cow(
+            central_mapping_entries_of_one_lineage_container_copy_on_write(
                 pool.output.lineage_tree_internal_levels()
             ),
         ),

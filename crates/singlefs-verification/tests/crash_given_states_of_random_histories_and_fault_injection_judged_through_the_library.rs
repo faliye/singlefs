@@ -151,11 +151,11 @@ const RANDOM_HISTORY_SAMPLINGS_OF_THE_HARNESS: [RandomHistorySampling; 7] = [
         ),
     },
     RandomHistorySampling {
-        name: "newest-system-configuration-slot-of-each-device-reading-zeros",
+        name: "newest-system-configuration-slot-reading-zeros",
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: 48,
         operations_per_history: 24,
-        weights: GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+        weights: GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS,
         execution: without_the_pool_checker(
             HistoryDeviceWidth::UnitAreaOf384Slots,
             SpaceAdmission::JudgedByTheFormula,
@@ -1398,15 +1398,17 @@ fn every_step_image_and_every_image_after_a_fault_of_the_harness_samplings_judge
     );
 }
 
-/// 开 GPU 的多机配置，只写开关：显卡先后照调用方给这个进程的那一份、经环境变量交给引擎（清场之下要清场之后那一份显卡先后；
-/// [`two_eight_step_histories_and_their_fault_injection_judged_under`] 设，`common_gpu_cards_of_the_caller` 文件头写了为什么不抄进配置）。
+/// 开 GPU 的多机配置，只写开关：卡是调用方给这个进程的那一份、在环境守卫里交给引擎
+/// （[`two_eight_step_histories_and_their_fault_injection_judged_under`] 交，`common_gpu_cards_of_the_caller` 文件头写了为什么不抄进配置）。
 #[cfg(feature = "gpu")]
 fn write_a_configuration_with_the_gpu_enabled(configuration: &std::path::Path) {
     std::fs::write(configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
 }
 
-/// 这一趟在环境守卫里判：多机配置指到 `configuration`、库是 `library` 那一份一次性库（设成这个进程开的那一份），开 GPU 时显卡先后照调用方给这个进程的那一份
-/// （守卫把一趟读的变量清掉；显卡先后经环境变量交，配置只写开关；这一台是 HOSTS 里哪一项照调用方那份多机配置上判法认出的，不经环境交）。
+/// 这一趟在环境守卫里判：多机配置指到 `configuration`、库是 `library` 那一份一次性库（设成这个进程开的那一份），开 GPU 时卡是调用方给这个进程的那一份
+/// （守卫把一趟读的变量清掉之后，`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run` 交给引擎：服务交了卡串的设卡串，
+/// 清场之下是清场之后那一份；交领卡通道的把通道设回环境、不在这里领，引擎第一次上卡时才领；配置只写开关；
+/// 这一台是 HOSTS 里哪一项照调用方那份多机配置上判法认出的，不经环境交）。
 #[cfg(feature = "gpu")]
 fn two_eight_step_histories_and_their_fault_injection_judged_under(
     configuration: &std::path::Path,
@@ -1415,19 +1417,14 @@ fn two_eight_step_histories_and_their_fault_injection_judged_under(
     fault: FaultPutOnTheGpuSide,
 ) -> (JudgedThroughTheLibrary, GivenStatesRun) {
     use singlefs_verification::crash_amplification::CrashAmplificationEnvironment;
-    use singlefs_verification::gpu_card_configuration::{
-        CARDS_BY_PRIORITY_KEY, MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
-    };
-    let cards = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
-    let mut settings: Vec<(&str, &std::ffi::OsStr)> = vec![(
+    use singlefs_verification::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
+    let _the_library_of_this_process = library.make_it_the_library_of_this_process();
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
         MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
         configuration.as_os_str(),
-    )];
-    if gpu_enabled {
-        settings.push((CARDS_BY_PRIORITY_KEY, std::ffi::OsStr::new(&cards)));
-    }
-    let _the_library_of_this_process = library.make_it_the_library_of_this_process();
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
+    )]);
+    let cards_of_the_caller =
+        gpu_enabled.then(common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run);
     let (judged, _histories_judged, _spawned_worker_threads, run) =
         judge_through_the_given_states_engine(
             &RANDOM_HISTORY_SAMPLINGS_OF_TWO_EIGHT_STEP_HISTORIES_FROM_THE_SEED_BASE,
@@ -1435,6 +1432,7 @@ fn two_eight_step_histories_and_their_fault_injection_judged_under(
             fault,
             2,
         );
+    drop(cards_of_the_caller);
     drop(environment);
     (judged, run)
 }

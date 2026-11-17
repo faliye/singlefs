@@ -13,8 +13,8 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero, plain_devices_on,
-    pool_after_the_mount, record_one_publish_after_overwrites, PublishRecordedAsR,
-    RangesReadingBackAllZero, RecordedPublish, OVERWRITE_BYTES,
+    pool_after_the_mount, record_one_publish_after_overwrites, RangesReadingBackAllZero,
+    RecordedPublish, RecordedPublishKind, OVERWRITE_BYTES,
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::AllocationRecord;
@@ -28,12 +28,12 @@ use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{PoolVersion, TransactionOutput};
 use singlefs_format::SLOT_BYTES;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// 已被占那一形里，M1 之后最多再覆盖写几次去等 R 的树表槽与映射根槽都被重新分配（384 槽小盘一圈根环 24 次发布之内）。
 const OVERWRITES_AFTER_THE_MOUNT_AT_MOST: u64 = 24;
 
-fn root_of_r(recorded: &RecordedPublish) -> RootRecord {
+fn root_of_the_recorded_publish(recorded: &RecordedPublish) -> RootRecord {
     RootRecord::parse_slot(
         recorded.root_slot_write().bytes().expect("根槽写带字节"),
         &recorded.pool.parameters.filesystem_identifier,
@@ -83,9 +83,11 @@ fn is_the_refusal_on_the_account_of(error: &MountError, root: &RootRecord) -> bo
 #[test]
 fn an_abandoned_root_whose_account_slots_were_taken_by_later_units_no_longer_refuses_unmount_floor_raise_or_remount(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root = root_of_r(&recorded);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root = root_of_the_recorded_publish(&recorded);
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])
@@ -173,9 +175,11 @@ fn an_abandoned_root_whose_account_slots_were_taken_by_later_units_no_longer_ref
 #[test]
 fn an_abandoned_root_whose_account_slots_only_read_back_zero_still_refuses_the_unmount_before_any_write(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root = root_of_r(&recorded);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root = root_of_the_recorded_publish(&recorded);
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])

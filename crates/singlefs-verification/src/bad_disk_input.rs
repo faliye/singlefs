@@ -2970,7 +2970,7 @@ mod tests {
     /// 池级 checker 判出来的只有不适用与部分没判：算「一条都没判」（读者拒收整份镜像那一格），部分没判不算判过；
     /// 有一条成立或违例就不算。
     #[test]
-    fn a_checker_report_of_only_not_applicable_and_partially_judged_verdicts_counts_as_judging_nothing(
+    fn checker_report_of_only_not_applicable_and_partially_judged_verdicts_counts_as_judging_nothing(
     ) {
         let not_applicable_and_partially_judged = [
             ("I-1.1", InvariantVerdict::NotApplicable("读不出几何")),

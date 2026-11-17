@@ -1557,7 +1557,7 @@ mod tests {
     /// 恢复自称的那一版那一栏：没写的照看 journal 那一遍落到的判、恒不判红；写了的照写的判，与落到的根实例代号或 checkpoint_txg 有一样不同、
     /// 一边落到根一边没有都判红，相同不判红。红了出一项记录核对器的红项，从库里读回的红项还原出同一位。
     #[test]
-    fn a_claimed_version_other_than_the_one_landed_on_takes_the_record_checker_and_reddens_its_own_bit(
+    fn claimed_version_other_than_the_one_landed_on_takes_the_record_checker_and_reddens_its_own_bit(
     ) {
         let newest = Some((InstanceGeneration(1), CheckpointTxg(7)));
         let older = Some((InstanceGeneration(1), CheckpointTxg(6)));
@@ -1614,7 +1614,7 @@ mod tests {
     /// 给定状态那一路的红项从对拍字换出、存进库，读回来还原出同样的红位、违例位与恢复字（判到位不存，读回是 0）；
     /// oracle 那十四位在对拍之前去掉（两侧都不判不比）。
     #[test]
-    fn a_given_state_read_back_from_its_red_items_and_recovery_words_keeps_its_red_bits() {
+    fn given_state_read_back_from_its_red_items_and_recovery_words_keeps_its_red_bits() {
         let words = CrossCheckWords {
             red_bits: (1 << verdict_bits::CLAIMED_STATE_MISSING_UNIT)
                 | (1 << verdict_bits::CONSULTED_ORACLE_FIRST)
@@ -2492,7 +2492,7 @@ mod tests {
     /// 判定累加器 `impl` 块里转交 `invariant` 的方法（形如 `Judgements::judge_naming_the_slots`）不算点名 I-1.13：
     /// 包住调用的是那个方法，不是它前面那个遍历 `IMPLEMENTED_INVARIANTS` 的顶格函数；往前没有顶格函数时也不 panic。
     #[test]
-    fn a_method_in_an_impl_block_forwarding_invariant_does_not_name_the_scan_rebuild_invariant() {
+    fn method_in_an_impl_block_forwarding_invariant_does_not_name_the_scan_rebuild_invariant() {
         let forwarding_method = concat!(
             "impl Judgements {\n",
             "    pub fn judge_naming_the_slots(&mut self, invariant: &'static str, holds: bool) {\n",
@@ -2837,7 +2837,7 @@ mod tests {
     /// 场景：两块盘的池，崩溃镜像上盘 0 一个自证过的系统配置槽都没有、盘 1 两槽都在；基镜像上两块盘都有。
     /// 预期：判段那一判记盘 0 是新出现的死盘。
     #[test]
-    fn a_device_dead_on_the_crash_image_and_alive_on_the_base_image_is_reported_new() {
+    fn device_dead_on_the_crash_image_and_alive_on_the_base_image_is_reported_new() {
         assert_eq!(
             devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
                 &[(0, 0), (1, 2)],
@@ -2851,7 +2851,7 @@ mod tests {
     /// 场景：基镜像上盘 1 已经两槽全废（补写流的起点），崩溃镜像上它照旧全废、盘 0 只剩一槽。
     /// 预期：盘 1 不是新出现的，盘 0 还有一槽，判段那一判不记。
     #[test]
-    fn a_device_already_dead_on_the_base_image_is_not_reported_again() {
+    fn device_already_dead_on_the_base_image_is_not_reported_again() {
         assert_eq!(
             devices_without_a_self_verified_system_configuration_slot_against_the_base_image_from_the_slot_counts(
                 &[(0, 1), (1, 0)],

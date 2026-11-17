@@ -39,6 +39,9 @@ pub const UNIT_AREA_START_SLOT_OFFSET: usize = 417;
 pub const UNIT_AREA_START_SLOT_OF_THE_DEFAULT_RING: u64 =
     JOURNAL_RING_START_SLOT + JOURNAL_RING_DEFAULT_BYTES / SLOT_BYTES;
 
+/// 在飞上限 ⌊环长 ÷ 4096 ÷ F⌋ 恰好是 2³²（比系统配置里那 4 字节一格装得下的最大值多 1）的环长：`3 << 44` 字节，是 16 KiB 的整数倍。
+pub const JOURNAL_RING_BYTES_WHOSE_IN_FLIGHT_RECORD_LIMIT_OVERFLOWS_FOUR_BYTES: u64 = 3 << 44;
+
 /// 两块盘四个系统配置槽里，`fields_written` 的每个 (偏移, 值) 都写进去，整槽校验和重封。
 pub fn rewrite_every_system_configuration_slot(
     image: &mut MemoryPool,
@@ -216,5 +219,30 @@ pub fn run_the_scenario_where_a_root_ring_base_of_zero_is_refused_by_core_for_th
             fixed_structure_slot_spacing: 4096,
         },
         "RootRingBaseSlotNotTheFirstVersionConstant",
+    );
+}
+
+/// 在飞上限装不进 4 字节那一格：环长改成 [`JOURNAL_RING_BYTES_WHOSE_IN_FLIGHT_RECORD_LIMIT_OVERFLOWS_FOUR_BYTES`]（在飞上限
+/// ⌊环长 ÷ 4096 ÷ F⌋ = 2³²，装不进系统配置里它那 4 字节一格，`.claude/kb/layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」），
+/// 单元区起始槽号跟着改成它现算的 1024 + 3 × 2³⁰（在 64 槽段边界上、环末端恰好到它），其余字段（含在飞上限、最坏占用两格）不动。
+/// 两边都拒成环长那个成员：core 把这一格与在飞上限为 0、环末端越过单元区起点并成一个成员，checker 的环长判据有同一格；
+/// I-8.1 报不适用（`crates/singlefs-checker/invariants/03-journal.md` I-8.1 那一行「I-7.13 与这一条同时不成立时走 I-7.13 那一支」）。
+pub fn run_the_scenario_where_a_journal_ring_whose_in_flight_record_limit_overflows_its_four_byte_field_is_refused_by_core_and_reddens_the_checker_table(
+    images: &mut PoolCheckerImages,
+) {
+    core_and_checker_refuse_the_cell(images,
+        "system-configuration-table-in-flight-record-limit-past-four-bytes",
+        &[
+            (JOURNAL_RING_BYTES_OFFSET, JOURNAL_RING_BYTES_WHOSE_IN_FLIGHT_RECORD_LIMIT_OVERFLOWS_FOUR_BYTES),
+            (
+                UNIT_AREA_START_SLOT_OFFSET,
+                JOURNAL_RING_START_SLOT
+                    + JOURNAL_RING_BYTES_WHOSE_IN_FLIGHT_RECORD_LIMIT_OVERFLOWS_FOUR_BYTES / SLOT_BYTES,
+            ),
+        ],
+        SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingBytesOutsideTheSupportedRange {
+            journal_ring_bytes: JOURNAL_RING_BYTES_WHOSE_IN_FLIGHT_RECORD_LIMIT_OVERFLOWS_FOUR_BYTES,
+        },
+        "JournalRingBytesOutsideTheSupportedRange",
     );
 }

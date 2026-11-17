@@ -11,8 +11,8 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::journal::JournalRecord;
 use singlefs_core::mount::{
@@ -22,12 +22,12 @@ use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_verification::memory_pool::{MemoryPool, RetainedWrite};
 use singlefs_verification::segments::StepKind;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 fn recorded_publish_of_three_records() -> RecordedPublish {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     recorded

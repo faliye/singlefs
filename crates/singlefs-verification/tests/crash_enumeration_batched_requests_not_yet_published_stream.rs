@@ -48,6 +48,11 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
@@ -171,12 +176,14 @@ fn record_the_drain_of_three_batched_requests() -> RecordedDrain {
     }
 }
 
-/// 观察者「崩溃之后可写挂载」：把这个状态持久的写落到基线上、可写挂载一次（空间准入判着），挂不上当场 panic；挂完的盘交回，池级 checker 在判段判。
+/// 观察者「崩溃之后可写挂载」：把这个状态持久的写落到基线上、可写挂载一次（空间准入判着），可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），别的拒当场 panic；挂完的盘（被拒的是没改过的盘）交回，池级 checker 在判段判。
 // gpu-exempt: writable-mount
 fn mount_writable_after_a_crash_in_the_drain(
     base: &MemoryPool,
     parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters,
     image: &CrashImage<'_>,
+    report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     let mut materialized = base.clone();
     for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
@@ -228,7 +235,19 @@ fn mount_writable_after_a_crash_in_the_drain(
                     .to_string(),
             }
         }
-        Err(error) => panic!("排空途中崩溃之后可写挂载失败：{error:?}"),
+        Err(refusal) => image_after_the_refusal_into_the_undecidable_witness(
+            &WritableMountRefusedOnTheCrashDisks {
+                refusal,
+                devices,
+                stream,
+            },
+            &materialized,
+            report,
+            &parameters.filesystem_identifier,
+            &fixed_geometry_of_the_384_slot_small_devices(),
+            MOUNTED_AND_CHECKER_CLEAN_COUNTER,
+            counts,
+        ),
     }
 }
 
@@ -243,10 +262,10 @@ fn enumerate_the_drain(
     let parameters = &recorded.pool.parameters;
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
-                   _counts: &mut CrashPointReplayObserverCounts|
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
-        mount_writable_after_a_crash_in_the_drain(base, parameters, image)
+        mount_writable_after_a_crash_in_the_drain(base, parameters, image, report, counts)
     };
     let item_name = format!("{FLOW_NAME}::{item_label}");
     enumerate_crash_states_with_every_kind_of_observer(
@@ -274,11 +293,12 @@ fn enumerate_the_drain(
     .judged()
 }
 
-/// 判器先判、计数后核：恢复之后 oracle 与池级 checker 0 违例、每个状态都挂得上且挂完干净。
+/// 判器先判、计数后核：恢复之后 oracle 与池级 checker 0 违例、每个状态都判过：挂得上的挂完干净、被乙入判不出拒的原样干净。
 fn assert_every_state_recovers_a_published_version_and_remounts_clean(
     tally: &CrashPointReplayTally,
     states: u64,
 ) {
+    print_the_writable_mount_refusals_into_the_undecidable_witness(FLOW_NAME, tally);
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
         (0, None),
@@ -295,7 +315,7 @@ fn assert_every_state_recovers_a_published_version_and_remounts_clean(
             .observer_counts
             .count_named(MOUNTED_AND_CHECKER_CLEAN_COUNTER),
         states,
-        "每个崩溃状态都挂得上、挂载之后池级 checker 0 违例",
+        "每个崩溃状态都判过：挂得上的挂载之后、被乙入判不出拒的原样，池级 checker 0 违例",
     );
 }
 

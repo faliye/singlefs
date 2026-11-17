@@ -10,6 +10,7 @@
 //! `scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-addresses` 认（这一台网卡上的地址与 `HOSTS` 求交、恰好一项；全仓只这一份判法，
 //! 这里起它、读它打的 `THIS_HOST_ADDRESS`，不另判，[`MultiHostAddresses::emitted_by_the_configuration_check`]）。
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 /// 主机数组 `HOSTS` 里的一项：多机配置判法认过的一台机器的有线直连段地址（IPv4 点分或 IPv6，照判法打的原样）。
@@ -327,7 +328,7 @@ impl GpuQuiesce {
     #[must_use]
     pub fn of_this_process() -> Self {
         if std::env::var_os(QUIESCE_ORIGIN_READ_BACK_ENVIRONMENT_VARIABLE)
-            .is_some_and(|val| val == "1")
+            .is_some_and(|value| value == "1")
         {
             return Self::QuiescedByTheWrapper;
         }
@@ -345,19 +346,269 @@ pub const QUIESCE_HOLDER_ENVIRONMENT_VARIABLE: &str = "GPU_QUIESCE_HOLDER";
 /// 发起端已清场并回读后透传的环境变量（[`GpuQuiesce::of_this_process`]）。
 pub const QUIESCE_ORIGIN_READ_BACK_ENVIRONMENT_VARIABLE: &str = "GPU_QUIESCE_ORIGIN_READ_BACK";
 
-/// 配置的显卡优先级：环境变量 `GPU_CARDS_BY_PRIORITY` 设了就照它（服务分给这一条的卡经环境交下来），
-/// 没设时清没清场（[`GpuQuiesce::of_this_process`]）都不读多机配置（[`multi_host_configuration_file`]）里的卡（清场与分卡由服务做）：
+/// 服务交给按需领卡那一次尝试的领卡通道目录那个环境变量（`task-server/task_server_lib.py` 的 `CARD_LEASE_DIRECTORY_VARIABLE`）。
+pub const CARD_LEASE_DIRECTORY_ENVIRONMENT_VARIABLE: &str = "TASK_SERVER_CARD_LEASE_DIRECTORY";
+/// 服务交给按需领卡那一次尝试的领卡凭据那个环境变量（`task-server/task_server_lib.py` 的 `CARD_LEASE_TOKEN_VARIABLE`）。
+pub const CARD_LEASE_TOKEN_ENVIRONMENT_VARIABLE: &str = "TASK_SERVER_CARD_LEASE_TOKEN";
+/// 领卡客户端（`task-server/task` 的 `lease`）除通道目录与凭据之外另读的三个环境变量：尝试标签、任务号、第几次尝试。
+pub const CARD_LEASE_ATTEMPT_ENVIRONMENT_VARIABLES: [&str; 3] = [
+    "TASK_SERVER_ATTEMPT_LABEL",
+    "TASK_SERVER_TASK",
+    "TASK_SERVER_ATTEMPT",
+];
+/// 服务每次尝试交给命令的「提交方那一份仓的根」那个环境变量（`task-server/task_server_lib.py`）：领卡客户端取它下面的
+/// [`CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY`]（[`card_lease_client_from`]）。
+pub const TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE: &str =
+    "TASK_SERVER_SOURCE_REPOSITORY";
+/// 领卡客户端在仓里的路径（从仓根起）。
+pub const CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY: &str = "task-server/task";
+
+/// 调用方给这个进程的领卡通道：服务照按需领卡起的那一次尝试交下来的五个环境变量（通道目录、凭据、尝试标签、任务号、第几次尝试），
+/// 五个都在才算有通道（客户端少一个就拒）。有通道而环境里没有 `GPU_CARDS_BY_PRIORITY` 时，这个进程第一次真要卡的那一刻才领
+/// （[`CardLeaseChannelOfTheCaller::cards_leased_by_this_process`]），编译、录入这些不上卡的段不持卡。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CardLeaseChannelOfTheCaller {
+    /// 交给领卡客户端的那五个变量：名字与调用方给的值原样。
+    variables_for_the_client: Vec<(&'static str, OsString)>,
+}
+
+impl CardLeaseChannelOfTheCaller {
+    /// 照 `value_of`（按名字取一个环境变量的值）认通道：五个变量都给了、都不空才是 `Some`。
+    #[must_use]
+    pub fn of_the_variable_values(value_of: &dyn Fn(&str) -> Option<OsString>) -> Option<Self> {
+        let names = [
+            CARD_LEASE_DIRECTORY_ENVIRONMENT_VARIABLE,
+            CARD_LEASE_TOKEN_ENVIRONMENT_VARIABLE,
+        ]
+        .into_iter()
+        .chain(CARD_LEASE_ATTEMPT_ENVIRONMENT_VARIABLES);
+        let mut variables_for_the_client = Vec::new();
+        for name in names {
+            let value = value_of(name).filter(|value| !value.is_empty())?;
+            variables_for_the_client.push((name, value));
+        }
+        Some(Self {
+            variables_for_the_client,
+        })
+    }
+
+    /// 此刻进程环境里的那五个变量认出的通道。
+    #[must_use]
+    pub fn read_from_the_environment_now() -> Option<Self> {
+        Self::of_the_variable_values(&|name| std::env::var_os(name))
+    }
+
+    /// 交给领卡客户端的那五个变量（环境守卫清掉之后照它设回去）。
+    #[must_use]
+    pub fn variables_for_the_client(&self) -> &[(&'static str, OsString)] {
+        &self.variables_for_the_client
+    }
+
+    /// 这个进程按需领到的卡（与 `GPU_CARDS_BY_PRIORITY` 同格式）：进程里只领一回，第一次问的时候才领（客户端在等卡时这里照等），
+    /// 之后每次交同一份；这个进程退出时还（[`CardsLeasedUntilThisProcessExits`]）。被拒的那一回记下来，之后每次交同一句，不重试。
+    ///
+    /// # Errors
+    /// 找不到领卡客户端（[`card_lease_client_from`]）；领卡没成（[`lease_cards_through_the_client`]）。
+    pub fn cards_leased_by_this_process(&self) -> Result<&'static str, String> {
+        CARDS_LEASED_BY_THIS_PROCESS
+            .get_or_init(|| {
+                let current_directory = std::env::current_dir().map_err(|error| {
+                    format!("取不到这个进程的当前目录（领卡客户端从这里往上找）：{error}")
+                })?;
+                let client = card_lease_client_from(
+                    std::env::var_os(TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE)
+                        .map(PathBuf::from),
+                    &current_directory,
+                )?;
+                let leased = lease_cards_through_the_client(&client, self)?;
+                eprintln!("GPU_CARDS_LEASED_ON_DEMAND cards={}", leased.cards());
+                Ok(leased)
+            })
+            .as_ref()
+            .map(CardsLeasedUntilThisProcessExits::cards)
+            .map_err(Clone::clone)
+    }
+}
+
+/// 这个进程按需领卡那一回的结局：进程里只领一回（[`CardLeaseChannelOfTheCaller::cards_leased_by_this_process`]）。
+static CARDS_LEASED_BY_THIS_PROCESS: std::sync::OnceLock<
+    Result<CardsLeasedUntilThisProcessExits, String>,
+> = std::sync::OnceLock::new();
+
+/// 领到的卡，连同等着这个进程退出就还卡的那个子进程：子进程读自己的标准输入读到收尾才起客户端还卡，标准输入的写端只在这个进程手里，
+/// 这个进程退出（正常结束、panic、被杀都算）写端就关。不靠析构、不靠退出钩子：测试二进制经 `std::process::exit` 退，静态量不析构。
+#[derive(Debug)]
+pub struct CardsLeasedUntilThisProcessExits {
+    cards: String,
+    return_waiting_for_the_exit: std::process::Child,
+}
+
+impl CardsLeasedUntilThisProcessExits {
+    /// 领到的卡串（与 `GPU_CARDS_BY_PRIORITY` 同格式）。
+    #[must_use]
+    pub fn cards(&self) -> &str {
+        &self.cards
+    }
+
+    /// 不等进程退出，当场还：关掉还卡子进程的标准输入、等它起的客户端退出。交回客户端退没退 0。
+    ///
+    /// # Errors
+    /// 等不到还卡子进程。
+    pub fn return_the_cards_now(mut self) -> Result<bool, String> {
+        drop(self.return_waiting_for_the_exit.stdin.take());
+        self.return_waiting_for_the_exit
+            .wait()
+            .map(|status| status.success())
+            .map_err(|error| format!("等不到还卡的子进程：{error}"))
+    }
+}
+
+/// 领卡客户端在哪：`source_repository`（[`TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE`] 的值，服务交的仓根）给了就是它下面的
+/// [`CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY`]；没给（手起的、有通道而没交仓根）从 `start_directory` 起往上逐层找
+/// （cargo 把测试进程的当前目录设成包目录，仓根在它上面）。
+///
+/// # Errors
+/// 服务交的仓根下那一份不是文件；往上找到根都没有。
+pub fn card_lease_client_from(
+    source_repository: Option<PathBuf>,
+    start_directory: &Path,
+) -> Result<PathBuf, String> {
+    if let Some(repository) = source_repository {
+        let client = repository.join(CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY);
+        return if client.is_file() {
+            Ok(client)
+        } else {
+            Err(format!(
+                "{TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE} 点的仓根下没有领卡客户端：{} 不是文件。出路：整条经 task-server/task submit 交（服务交提交方那一份仓的根）",
+                client.display()
+            ))
+        };
+    }
+    start_directory
+        .ancestors()
+        .map(|directory| directory.join(CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY))
+        .find(|client| client.is_file())
+        .ok_or_else(|| {
+            format!(
+                "从 {} 往上找不到领卡客户端 {CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY}。出路：整条经 task-server/task submit 交（服务经 {TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE} 交仓根），或在仓里起这条命令",
+                start_directory.display()
+            )
+        })
+}
+
+/// 还卡子进程跑的 shell：标准输入读到收尾（领卡的进程退出），再起客户端 `lease return <卡串>`（`$0` 是客户端、`$1` 是卡串）。
+const RETURN_THE_CARDS_WHEN_THE_STANDARD_INPUT_ENDS: &str =
+    r#"while read -r line_never_written; do :; done; exec "$0" lease return "$1""#;
+
+/// 经 `client`（`task-server/task`）领一回卡：`lease take` 的标准输出是卡串，客户端在等卡时往标准错误打的行照进这个进程的标准错误
+/// （日志照涨）；领到之后起还卡的子进程（[`CardsLeasedUntilThisProcessExits`]）。通道的五个变量照 `channel` 交给客户端，不靠此刻的进程环境。
+///
+/// # Errors
+/// 起不了客户端；客户端退非 0（服务拒了、通道没了：不重试、不退回 CPU）；退 0 而没交卡串；起不了还卡的子进程（领到的那一张当场还掉）。
+pub fn lease_cards_through_the_client(
+    client: &Path,
+    channel: &CardLeaseChannelOfTheCaller,
+) -> Result<CardsLeasedUntilThisProcessExits, String> {
+    let variables = || {
+        channel
+            .variables_for_the_client
+            .iter()
+            .map(|(name, value)| (*name, value.as_os_str()))
+    };
+    let taken = std::process::Command::new(client)
+        .args(["lease", "take"])
+        .envs(variables())
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .map_err(|error| format!("起不了领卡客户端 {}：{error}", client.display()))?;
+    if !taken.status.success() {
+        return Err(format!(
+            "按需领卡没成：{} lease take 退 {}（原因在它往标准错误打的那一行）；不重试、不退回 CPU（运行条件不满足，退 78）。出路：整条经 task-server/task submit 重交",
+            client.display(),
+            taken
+                .status
+                .code()
+                .map_or_else(|| "（被信号停了）".to_string(), |code| code.to_string())
+        ));
+    }
+    let cards = String::from_utf8_lossy(&taken.stdout).trim().to_string();
+    let return_the_cards_at_once = || {
+        // 领到了而往下走不通：这一张当场还，结局不改这一句错（尝试结束时服务照样收回）
+        let _returned = std::process::Command::new(client)
+            .args(["lease", "return"])
+            .envs(variables())
+            .stdin(std::process::Stdio::null())
+            .status();
+    };
+    if cards.is_empty() {
+        return_the_cards_at_once();
+        return Err(format!(
+            "按需领卡没成：{} lease take 退 0 而没交卡串。出路：看服务的领卡回执，整条经 task-server/task submit 重交",
+            client.display()
+        ));
+    }
+    match std::process::Command::new("sh")
+        .arg("-c")
+        .arg(RETURN_THE_CARDS_WHEN_THE_STANDARD_INPUT_ENDS)
+        .arg(client)
+        .arg(&cards)
+        .envs(variables())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()
+    {
+        Ok(return_waiting_for_the_exit) => Ok(CardsLeasedUntilThisProcessExits {
+            cards,
+            return_waiting_for_the_exit,
+        }),
+        Err(error) => {
+            return_the_cards_at_once();
+            Err(format!(
+                "按需领卡领到了 {cards}，起不了等这个进程退出就还卡的子进程（sh）：{error}；领到的已当场还掉"
+            ))
+        }
+    }
+}
+
+/// 服务给这个进程的卡串从哪来：环境变量 `GPU_CARDS_BY_PRIORITY` 给了照它（起跑就交卡的尝试、外层已经领好交下来的），不领；
+/// 没给而有领卡通道，照 `lease` 领（真要卡的这一刻才领）；两样都没有是 `None`（没经服务给卡）。
+///
+/// # Errors
+/// `lease` 的错。
+pub fn cards_handed_over_or_leased_on_demand(
+    environment_value: Option<String>,
+    channel: Option<&CardLeaseChannelOfTheCaller>,
+    lease: &dyn Fn(&CardLeaseChannelOfTheCaller) -> Result<String, String>,
+) -> Result<Option<String>, String> {
+    match (environment_value, channel) {
+        (Some(text), Some(_) | None) => Ok(Some(text)),
+        (None, Some(channel)) => lease(channel).map(Some),
+        (None, None) => Ok(None),
+    }
+}
+
+/// 配置的显卡优先级：环境变量 `GPU_CARDS_BY_PRIORITY` 设了就照它（服务分给这一条的卡经环境交下来）；没设而此刻环境里有领卡通道
+/// （[`CardLeaseChannelOfTheCaller::read_from_the_environment_now`]）就在这一刻领（[`cards_handed_over_or_leased_on_demand`]）；
+/// 两样都没有时清没清场（[`GpuQuiesce::of_this_process`]）都不读多机配置（[`multi_host_configuration_file`]）里的卡（清场与分卡由服务做）：
 /// GPU 没开、两份显卡先后都没写是 `None`（本机能用的卡按空闲显存从大到小用，不设额度），开了或写了报错。
 /// 写了卡的，`HOSTS` 与这一台取调用方那份多机配置上判法认出的（[`multi_host_addresses_of_the_caller`]）。
 ///
 /// # Errors
 /// 写了而写法不对或地址不在 `HOSTS` 里（[`parse_cards_by_priority`]）；写了卡而判法认不出这一台；
-/// 没经服务给卡而多机配置开了 GPU 或写了两份显卡先后里的一份（[`cards_by_priority_from`]）。
+/// 没经服务给卡而多机配置开了 GPU 或写了两份显卡先后里的一份（[`cards_by_priority_from`]）；按需领卡没成。
 pub fn cards_by_priority_from_configuration_or_environment(
     configuration_file: Option<&Path>,
 ) -> Result<Option<ConfiguredCards>, String> {
+    let channel_in_the_environment_now =
+        CardLeaseChannelOfTheCaller::read_from_the_environment_now();
     cards_by_priority_from(
-        std::env::var(CARDS_BY_PRIORITY_KEY).ok(),
+        cards_handed_over_or_leased_on_demand(
+            std::env::var(CARDS_BY_PRIORITY_KEY).ok(),
+            channel_in_the_environment_now.as_ref(),
+            &|channel| channel.cards_leased_by_this_process().map(str::to_string),
+        )?,
         configuration_file,
         GpuQuiesce::of_this_process(),
         &multi_host_addresses_of_the_caller,
@@ -427,6 +678,7 @@ pub fn cards_by_priority_from(
 pub struct GpuConfigurationOfTheCaller {
     multi_host_configuration: Option<PathBuf>,
     cards_by_priority: Option<String>,
+    card_lease_channel: Option<CardLeaseChannelOfTheCaller>,
     quiesce: GpuQuiesce,
 }
 
@@ -452,8 +704,16 @@ impl GpuConfigurationOfTheCaller {
             )
             .map(PathBuf::from),
             cards_by_priority: std::env::var(CARDS_BY_PRIORITY_KEY).ok(),
+            card_lease_channel: CardLeaseChannelOfTheCaller::read_from_the_environment_now(),
             quiesce: GpuQuiesce::of_this_process(),
         }
+    }
+
+    /// 调用方给这个进程的领卡通道（服务照按需领卡起的那一次尝试才有）。环境守卫清掉了那五个变量、要上卡的用例照它设回去
+    /// （`crate::crash_amplification::CrashAmplificationEnvironment::set_the_multi_host_configuration_and_the_cards_of_the_caller`）。
+    #[must_use]
+    pub fn card_lease_channel(&self) -> Option<&CardLeaseChannelOfTheCaller> {
+        self.card_lease_channel.as_ref()
     }
 
     /// 多机配置在哪（同 [`multi_host_configuration_file`]，读的是这一份）。
@@ -489,14 +749,21 @@ impl GpuConfigurationOfTheCaller {
     /// 配置的显卡优先级（同 [`cards_by_priority_from_configuration_or_environment`]，环境那一层读的是这一份；`HOSTS` 与这一台同样取
     /// [`multi_host_addresses_of_the_caller`]）。
     ///
+    /// 这一份没有 `GPU_CARDS_BY_PRIORITY` 而有领卡通道的，在这一刻领（进程里只领一回，
+    /// [`CardLeaseChannelOfTheCaller::cards_leased_by_this_process`]）。
+    ///
     /// # Errors
-    /// 同 [`cards_by_priority_from`]。
+    /// 同 [`cards_by_priority_from`]；按需领卡没成。
     pub fn cards_by_priority(
         &self,
         configuration_file: Option<&Path>,
     ) -> Result<Option<ConfiguredCards>, String> {
         cards_by_priority_from(
-            self.cards_by_priority.clone(),
+            cards_handed_over_or_leased_on_demand(
+                self.cards_by_priority.clone(),
+                self.card_lease_channel.as_ref(),
+                &|channel| channel.cards_leased_by_this_process().map(str::to_string),
+            )?,
             configuration_file,
             self.quiesce,
             &multi_host_addresses_of_the_caller,
@@ -1050,6 +1317,281 @@ mod tests {
             refusal.starts_with("多机配置判法认不出这一台")
                 && refusal.contains("这一台网卡上的地址"),
             "报错是判法认不出这一台、带判法的原话：{refusal}"
+        );
+        drop(directory);
+    }
+
+    /// 单测用的领卡通道：五个变量都给，凭据与任务号取认得出的字面。
+    fn card_lease_channel_for_the_unit_tests(directory: &Path) -> CardLeaseChannelOfTheCaller {
+        let values = card_lease_variable_values_for_the_unit_tests(directory);
+        CardLeaseChannelOfTheCaller::of_the_variable_values(&|name| {
+            values
+                .iter()
+                .find(|(known, _)| *known == name)
+                .map(|(_, value)| value.clone())
+        })
+        .expect("五个变量都给了")
+    }
+
+    fn card_lease_variable_values_for_the_unit_tests(
+        directory: &Path,
+    ) -> Vec<(&'static str, OsString)> {
+        vec![
+            (
+                CARD_LEASE_DIRECTORY_ENVIRONMENT_VARIABLE,
+                directory.as_os_str().to_os_string(),
+            ),
+            (
+                CARD_LEASE_TOKEN_ENVIRONMENT_VARIABLE,
+                OsString::from("token-of-the-unit-test"),
+            ),
+            (
+                CARD_LEASE_ATTEMPT_ENVIRONMENT_VARIABLES[0],
+                OsString::from("label-of-the-unit-test"),
+            ),
+            (
+                CARD_LEASE_ATTEMPT_ENVIRONMENT_VARIABLES[1],
+                OsString::from("4093"),
+            ),
+            (
+                CARD_LEASE_ATTEMPT_ENVIRONMENT_VARIABLES[2],
+                OsString::from("1"),
+            ),
+        ]
+    }
+
+    /// 假的领卡客户端：每次调往同目录的 `calls.log` 记一行「参数|凭据|任务号」（凭据与任务号从它自己的环境读：核通道是照参数交的），
+    /// `lease take` 再照 `take_behaviour`（一段 shell）办，别的调用退 0。交回（客户端，调用记录）。
+    fn fake_card_lease_client(directory: &Path, take_behaviour: &str) -> (PathBuf, PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+        let client = directory.join("fake-card-lease-client");
+        let calls = directory.join("calls.log");
+        std::fs::write(
+            &client,
+            format!(
+                "#!/bin/sh\nprintf '%s|%s|%s\\n' \"$*\" \"${CARD_LEASE_TOKEN_ENVIRONMENT_VARIABLE}\" \"$TASK_SERVER_TASK\" >> '{}'\n[ \"$1 $2\" = 'lease take' ] || exit 0\n{take_behaviour}\n",
+                calls.display()
+            ),
+        )
+        .expect("写得了假客户端");
+        std::fs::set_permissions(&client, std::fs::Permissions::from_mode(0o755))
+            .expect("假客户端设得了可执行");
+        (client, calls)
+    }
+
+    /// 领卡通道要五个变量都在、都不空：少一个、有一个是空串，都不算有通道（客户端少一个就拒，不如当没有通道、照「没经服务给卡」报）。
+    /// 判别力（`crates/mutations.tsv`「按需领卡 通道缺变量也算有」）：缺的当空串收，少一个变量也认成有通道。
+    #[test]
+    fn a_card_lease_channel_needs_all_five_variables_present_and_not_empty() {
+        let directory = temporary_directory("card-lease-channel-variables");
+        let values = card_lease_variable_values_for_the_unit_tests(directory.path());
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        assert_eq!(
+            channel.variables_for_the_client(),
+            values.as_slice(),
+            "五个都给：通道记下的就是这五个、值原样"
+        );
+        for (missing, _) in &values {
+            let without_one = CardLeaseChannelOfTheCaller::of_the_variable_values(&|name| {
+                values
+                    .iter()
+                    .find(|(known, _)| *known == name && known != missing)
+                    .map(|(_, value)| value.clone())
+            });
+            assert_eq!(without_one, None, "少了 {missing}：不算有通道");
+            let with_one_empty = CardLeaseChannelOfTheCaller::of_the_variable_values(&|name| {
+                values
+                    .iter()
+                    .find(|(known, _)| *known == name)
+                    .map(|(known, value)| {
+                        if known == missing {
+                            OsString::new()
+                        } else {
+                            value.clone()
+                        }
+                    })
+            });
+            assert_eq!(with_one_empty, None, "{missing} 是空串：不算有通道");
+        }
+        drop(directory);
+    }
+
+    /// 环境里已经有服务交的卡（起跑就交卡的尝试、外层领好交下来的）：照它，有没有领卡通道都不领；两样都没有是没经服务给卡。
+    /// 判别力（`crates/mutations.tsv`「按需领卡 环境里有卡也去领」）：有通道时不管环境里有没有卡都领，领的次数是 1、交的是领来的那一张。
+    #[test]
+    fn cards_already_in_the_environment_are_used_without_leasing() {
+        let directory = temporary_directory("cards-in-the-environment-not-leased");
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &CardLeaseChannelOfTheCaller| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("192.0.2.93:7:1M".to_string())
+        };
+        assert_eq!(
+            cards_handed_over_or_leased_on_demand(
+                Some("192.0.2.93:4:2M".to_string()),
+                Some(&channel),
+                &lease
+            ),
+            Ok(Some("192.0.2.93:4:2M".to_string())),
+            "环境里有卡、也有通道：照环境里的"
+        );
+        assert_eq!(
+            cards_handed_over_or_leased_on_demand(
+                Some("192.0.2.93:4:2M".to_string()),
+                None,
+                &lease
+            ),
+            Ok(Some("192.0.2.93:4:2M".to_string())),
+            "环境里有卡、没有通道：照环境里的"
+        );
+        assert_eq!(
+            cards_handed_over_or_leased_on_demand(None, None, &lease),
+            Ok(None),
+            "两样都没有：没经服务给卡"
+        );
+        assert_eq!(leases.get(), 0, "三种都不领");
+        drop(directory);
+    }
+
+    /// 环境里没有卡而有领卡通道：这一刻领，交领来的那一张；领卡的错原样交回。
+    #[test]
+    fn without_cards_in_the_environment_the_cards_are_leased_through_the_channel() {
+        let directory = temporary_directory("cards-leased-through-the-channel");
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        assert_eq!(
+            cards_handed_over_or_leased_on_demand(None, Some(&channel), &|_channel| Ok(
+                "192.0.2.93:7:1M".to_string()
+            )),
+            Ok(Some("192.0.2.93:7:1M".to_string())),
+            "交领来的那一张"
+        );
+        assert_eq!(
+            cards_handed_over_or_leased_on_demand(None, Some(&channel), &|_channel| Err(
+                "领卡没成".to_string()
+            )),
+            Err("领卡没成".to_string()),
+            "领卡的错原样交回"
+        );
+        drop(directory);
+    }
+
+    /// 经客户端领一回：`lease take` 的标准输出就是卡串，通道的变量照参数交给客户端（不靠这个进程的环境）；领到之后不还，
+    /// 还卡子进程的标准输入一收尾（领卡的进程退出时写端关掉，这里用当场还代它）才起 `lease return <卡串>`。
+    /// 判别力（`crates/mutations.tsv`「按需领卡 进程退出不还卡」）：还卡子进程读到收尾直接退 0，调用记录里没有 `lease return` 那一行。
+    #[test]
+    fn a_lease_through_the_client_takes_the_cards_and_returns_them_only_when_the_standard_input_of_the_return_ends(
+    ) {
+        let directory = temporary_directory("lease-take-then-return");
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        let (client, calls) =
+            fake_card_lease_client(directory.path(), "echo '192.0.2.93:7:1M'; exit 0");
+        let leased = lease_cards_through_the_client(&client, &channel).expect("假客户端交了卡");
+        assert_eq!(
+            leased.cards(),
+            "192.0.2.93:7:1M",
+            "卡串是客户端标准输出那一行"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&calls).expect("读得了调用记录"),
+            "lease take|token-of-the-unit-test|4093\n",
+            "领到之后只调过一回 lease take、通道的变量到了客户端，还没还"
+        );
+        assert_eq!(leased.return_the_cards_now(), Ok(true), "还卡的客户端退 0");
+        assert_eq!(
+            std::fs::read_to_string(&calls).expect("读得了调用记录"),
+            "lease take|token-of-the-unit-test|4093\nlease return 192.0.2.93:7:1M|token-of-the-unit-test|4093\n",
+            "标准输入收尾之后还的就是领到的那一张"
+        );
+        drop(directory);
+    }
+
+    /// 客户端退非 0（服务拒了、通道没了）：报错点名退出码、写明不重试不退回 CPU，不起还卡（没领到）。
+    /// 判别力（`crates/mutations.tsv`「按需领卡 被拒当成领到」）：不看退出码，报的是「没交卡串」那一句、没有退出码。
+    #[test]
+    fn a_refused_lease_is_an_error_naming_the_exit_code_of_the_client_and_returns_nothing() {
+        let directory = temporary_directory("lease-refused");
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        let (client, calls) = fake_card_lease_client(directory.path(), "exit 3");
+        let refusal =
+            lease_cards_through_the_client(&client, &channel).expect_err("客户端退 3：领卡没成");
+        assert!(
+            refusal.contains("lease take 退 3") && refusal.contains("不重试、不退回 CPU"),
+            "报错点名退出码与不重试：{refusal}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&calls).expect("读得了调用记录"),
+            "lease take|token-of-the-unit-test|4093\n",
+            "没领到：不调 lease return"
+        );
+        drop(directory);
+    }
+
+    /// 客户端退 0 而没交卡串：报错，那一回当场还掉（服务那一侧可能已经记成持着）。
+    #[test]
+    fn a_lease_granting_no_card_is_an_error_and_is_returned_at_once() {
+        let directory = temporary_directory("lease-granting-no-card");
+        let channel = card_lease_channel_for_the_unit_tests(directory.path());
+        let (client, calls) = fake_card_lease_client(directory.path(), "exit 0");
+        let refusal = lease_cards_through_the_client(&client, &channel)
+            .expect_err("退 0 而没交卡串：领卡没成");
+        assert!(
+            refusal.contains("退 0 而没交卡串"),
+            "报错写明没交卡串：{refusal}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(&calls).expect("读得了调用记录"),
+            "lease take|token-of-the-unit-test|4093\nlease return|token-of-the-unit-test|4093\n",
+            "当场还了一回（不带卡串：还这一次尝试持着的）"
+        );
+        drop(directory);
+    }
+
+    /// 领卡客户端：服务交了仓根就是它下面那一份（不是文件就拒）；没交从起点往上逐层找仓里那个路径，找到根都没有就拒、出路写经服务交。
+    /// 判别力（`crates/mutations.tsv`「按需领卡 客户端只在起点那一层找」）：只看起点那一层，从包目录起找不到仓根下的客户端。
+    #[test]
+    fn the_card_lease_client_is_the_named_file_or_the_first_one_found_going_up_from_the_start() {
+        let directory = temporary_directory("card-lease-client-lookup");
+        let repository = directory.path().join("repository");
+        let package = repository.join("crates").join("some-package");
+        std::fs::create_dir_all(&package).expect("建得了包目录");
+        let client_in_the_repository = repository.join(CARD_LEASE_CLIENT_PATH_IN_THE_REPOSITORY);
+        std::fs::create_dir_all(
+            client_in_the_repository
+                .parent()
+                .expect("客户端在仓里的一个目录下"),
+        )
+        .expect("建得了客户端的目录");
+        std::fs::write(&client_in_the_repository, "#!/bin/sh\n").expect("写得了客户端");
+        assert_eq!(
+            card_lease_client_from(None, &package),
+            Ok(client_in_the_repository.clone()),
+            "没点名：从包目录往上找到仓根下那一份"
+        );
+        let elsewhere = directory.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).expect("建得了仓外的目录");
+        assert_eq!(
+            card_lease_client_from(Some(repository.clone()), &elsewhere),
+            Ok(client_in_the_repository.clone()),
+            "服务交了仓根：取它下面那一份，不看起点"
+        );
+        let refusal_of_the_source_repository =
+            card_lease_client_from(Some(elsewhere.clone()), &package)
+                .expect_err("服务交的仓根下没有客户端：拒，不改从起点往上找");
+        assert!(
+            refusal_of_the_source_repository
+                .contains(TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE)
+                && refusal_of_the_source_repository.contains("不是文件"),
+            "仓根下没有客户端：{refusal_of_the_source_repository}"
+        );
+        std::fs::remove_file(&client_in_the_repository).expect("删得了客户端");
+        let refusal_of_the_search =
+            card_lease_client_from(None, &package).expect_err("往上找不到：拒");
+        assert!(
+            refusal_of_the_search.contains("往上找不到领卡客户端")
+                && refusal_of_the_search
+                    .contains(TASK_SERVER_SOURCE_REPOSITORY_ENVIRONMENT_VARIABLE),
+            "找不到的出路写怎么点名：{refusal_of_the_search}"
         );
         drop(directory);
     }

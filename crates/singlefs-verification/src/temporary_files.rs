@@ -137,7 +137,7 @@ mod tests {
     /// 场景：守卫认领一个文件与一个带子目录的目录，作用域照常走完。预期：两条路径都不在了。
     /// 判别力（`crates/mutations.tsv`）：删法里不删，两条都还在，这条红。
     #[test]
-    fn a_claimed_file_and_a_claimed_directory_are_gone_once_the_scope_ends_normally() {
+    fn claimed_file_and_a_claimed_directory_are_gone_once_the_scope_ends_normally() {
         let file_path = fresh_temporary_path("file");
         let directory_path = fresh_temporary_path("directory");
         {
@@ -164,7 +164,7 @@ mod tests {
     /// 场景：守卫认领一个目录、写进文件之后作用域里 panic。预期：panic 接住之后那个目录不在了。
     /// 判别力（`crates/mutations.tsv`）：删法里不删，目录还在，这条红。
     #[test]
-    fn a_claimed_directory_is_gone_after_a_panic_inside_the_scope() {
+    fn claimed_directory_is_gone_after_a_panic_inside_the_scope() {
         let directory_path = fresh_temporary_path("panic");
         let panicked = std::panic::catch_unwind(|| {
             let directory = TemporaryPathRemovedOnDrop::claiming(directory_path.clone());
@@ -206,7 +206,7 @@ mod tests {
 
     /// 场景：守卫把路径交给别的主人之后丢掉。预期：路径还在（归接手的主人删），接手的主人收尾之后不在了。
     #[test]
-    fn a_path_handed_to_another_owner_is_left_for_that_owner_to_remove() {
+    fn path_handed_to_another_owner_is_left_for_that_owner_to_remove() {
         let image_path = fresh_temporary_path("handed-over");
         let image = TemporaryPathRemovedOnDrop::claiming(image_path.clone());
         std::fs::write(&*image, b"image bytes").expect("临时目录写得进文件");

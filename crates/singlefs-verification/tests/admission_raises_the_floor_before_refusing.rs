@@ -1148,7 +1148,10 @@ fn at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a
     for overwrite_index in 1..=200 {
         match pool.overwrite(OVERWRITE_BYTES) {
             Ok(_) => admitted_overwrites += 1,
-            Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)) => break,
+            Err(
+                UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+                | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_),
+            ) => break,
             Err(refusal) => {
                 panic!("第 {overwrite_index} 次覆盖写只会因为空间不够被拒：{refusal:?}")
             }

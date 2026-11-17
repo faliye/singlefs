@@ -4,7 +4,8 @@
 //! 用户改动返回之前一批整理都不发，起跑判据只记下「该跑了」，后台入口 `MountedSession::run_compaction_in_the_background` 被调时才发；
 //! 三样保证——一趟发布预算有上限（定时兜底与用户改动共用上一次用户改动给的那一份 `B_gc`，扣完等下一次用户改动；岔路单第 18 行甲）、
 //! 签下一条意图那一判跨趟读会话上的上一条完成的意图、为一次用户改动推的抬 F 与再判之间插不进整理批；
-//! 整理批走常规准入（批次最坏占用计入已承诺预留）；一批出错之后整理停下、通过校验的切换当场解除；定时兜底、写带宽上限、前台 fsync 让路。
+//! 整理批走常规准入（批次最坏占用计入已承诺预留），被空间拒就暂停：单发一次只删意图的发布，意图连同 R 排他一起撤，下一趟从头签发
+//! （I-5.6「活意图的 R 内没有分配代 > `c0` 的记录」）；一批出错之后整理停下、通过校验的切换当场解除；定时兜底、写带宽上限、前台 fsync 让路。
 //! 池照 `background_compute_settings_and_switch.rs` 的做法：`common::build_pool` 起，可写挂载，强制选第一个文件那次发布的提交内生块所在的段 50240、
 //! 一批一个。要压准入余量的用例在每块盘单元区最高处隔离槽（只动分配器的隔离位，不写盘），把可用(d) 压进一个槽宽之内；需求与批次占用先在
 //! 同样建、同样推的另一个池上量出来（两个池走同一串操作，字节相同）。
@@ -22,6 +23,8 @@ use common::{
 use common_background_gpu_compute::{
     admissible_gpu_settings_naming_both_cards, shared_cpu_backed_gpu_compute,
 };
+use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{DeviceIdentity, InodeNumber, SlotNumber};
 use singlefs_core::admission::admission_reading_before_a_publish;
 use singlefs_core::allocator::UnitFootprint;
@@ -30,18 +33,27 @@ use singlefs_core::background_compute::{
     BackgroundComputeOfThisMount, BackgroundTask, BackgroundTaskAfterTheComputeError,
 };
 use singlefs_core::compaction_plan::{
-    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionBatchSize,
-    CompactionBatchUnits, CompactionObservations, CompactionPacing, CompactionRunForcing,
-    CompactionRunStop, CompactionStartJudgement, CompactionSwitches, CompactionTimerFallback,
-    CompactionWriteBandwidthLimit, ForegroundFsync,
+    AnswerOfTheCallerBeforeTheNextBatch, CallerMonotonicClockReading,
+    CallerOfTheBackgroundCompaction, CompactionBatchSize, CompactionBatchUnits,
+    CompactionObservations, CompactionPacing, CompactionRunForcing, CompactionRunStop,
+    CompactionStartJudgement, CompactionSwitches, CompactionTimerFallback,
+    CompactionWriteBandwidthLimit,
 };
-use singlefs_core::logged_operations::{live_compaction_intent_of_the_entries, CompactionRegion};
-use singlefs_core::mount::{mount_writable, mount_writable_with_background_compute_settings};
+use singlefs_core::logged_operations::{
+    live_compaction_intent_of_the_entries, live_truncation_intent_of_the_entries, CompactionRegion,
+};
+use singlefs_core::mount::{
+    mount_writable, mount_writable_with_background_compute_settings,
+    roll_back_by_a_forward_publish, RollbackTarget,
+};
 use singlefs_core::mounted_session::{
     BackgroundCompactionCall, BackgroundCompactionNotStarted, BackgroundCompactionTrigger,
     CompactionRun, CompactionRunOutcome, MountedSession, UserChange, UserChangePublished,
 };
-use singlefs_core::transaction::{TransactionOutput, FIRST_INODE_NUMBER};
+use singlefs_core::transaction::{
+    publish_compaction_step, CompactionIntentStep, PoolVersion, PoolWriter, TransactionOutput,
+    TransactionUnit, FIRST_INODE_NUMBER,
+};
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::SLOT_BYTES;
 
@@ -64,15 +76,17 @@ const DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT: usize = 40;
 /// 后台入口的调用方：钟读数与前台有没有 fsync 在等都由用例摆。
 struct CallerForTests {
     clock_in_milliseconds: Cell<u64>,
-    foreground_fsync: Cell<ForegroundFsync>,
+    answer_before_the_next_batch: Cell<AnswerOfTheCallerBeforeTheNextBatch>,
 }
 
 impl CallerForTests {
     /// 钟在起点。
-    fn at_the_start_with(foreground_fsync: ForegroundFsync) -> Self {
+    fn at_the_start_with(
+        answer_before_the_next_batch: AnswerOfTheCallerBeforeTheNextBatch,
+    ) -> Self {
         CallerForTests {
             clock_in_milliseconds: Cell::new(0),
-            foreground_fsync: Cell::new(foreground_fsync),
+            answer_before_the_next_batch: Cell::new(answer_before_the_next_batch),
         }
     }
 
@@ -86,8 +100,8 @@ impl CallerOfTheBackgroundCompaction for CallerForTests {
         CallerMonotonicClockReading(Duration::from_millis(self.clock_in_milliseconds.get()))
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        self.foreground_fsync.get()
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        self.answer_before_the_next_batch.get()
     }
 }
 
@@ -308,7 +322,9 @@ fn a_user_change_under_cpu_settings_publishes_no_compaction_batch_before_returni
         .run_compaction_in_the_background(
             &mut devices,
             CompactionPacing::BY_DEFAULT,
-            &CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting),
+            &CallerForTests::at_the_start_with(
+                AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+            ),
         )
         .expect("盘表是挂载的那一份、现行那一版有树");
     pool.devices = Some(devices);
@@ -346,7 +362,9 @@ fn a_user_change_under_gpu_settings_publishes_no_compaction_batch_before_returni
         .run_compaction_in_the_background(
             &mut devices,
             CompactionPacing::BY_DEFAULT,
-            &CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting),
+            &CallerForTests::at_the_start_with(
+                AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+            ),
         )
         .expect("盘表是挂载的那一份、现行那一版有树");
     pool.devices = Some(devices);
@@ -437,7 +455,9 @@ fn an_idle_pool_under_the_timer_fallback_publishes_no_more_than_the_budget_of_it
         )),
         CompactionWriteBandwidthLimit::Unlimited,
     );
-    let caller = CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting);
+    let caller = CallerForTests::at_the_start_with(
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+    );
     let after_the_change = run_started_by(
         session
             .run_compaction_in_the_background(&mut devices, pacing, &caller)
@@ -514,7 +534,9 @@ fn the_timer_fallback_checks_the_start_judgement_again_only_once_an_interval_has
         )),
         CompactionWriteBandwidthLimit::Unlimited,
     );
-    let caller = CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting);
+    let caller = CallerForTests::at_the_start_with(
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+    );
     let at_the_start = session
         .run_compaction_in_the_background(&mut devices, pacing, &caller)
         .expect("盘表是挂载的那一份");
@@ -574,7 +596,9 @@ fn the_background_entry_under_the_default_pacing_with_nothing_due_starts_no_run_
         .run_compaction_in_the_background(
             &mut devices,
             CompactionPacing::BY_DEFAULT,
-            &CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting),
+            &CallerForTests::at_the_start_with(
+                AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+            ),
         )
         .expect("盘表是挂载的那一份");
     pool.devices = Some(devices);
@@ -835,7 +859,9 @@ fn a_user_change_refused_for_space_raises_the_floor_and_rejudges_without_a_compa
             .run_compaction_in_the_background(
                 &mut devices,
                 CompactionPacing::BY_DEFAULT,
-                &CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting),
+                &CallerForTests::at_the_start_with(
+                    AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+                ),
             )
             .expect("盘表是挂载的那一份"),
         BackgroundCompactionTrigger::DueAfterAUserChange,
@@ -916,10 +942,10 @@ fn demand_and_occupancy_in_slots_of_the_batch_after_the_issue(tag: &str) -> (u64
 }
 
 /// C906（D26 已定项 3 第 2 句「整理不是释放路径，它走常规准入，批次最坏占用计入『已承诺预留』」）：签发之后把每块盘的可用(d) 压到
-/// 「需求 + 批次最坏占用」之下一个槽以内（仍不少于需求本身：不算批次占用就放得下）。那一批被式子那一判拒：暂停（撤 R 排他），意图留在 logged_ops 里，
-/// 盘上逐字节不变（系统配置槽、根环里自证过的根、录制流的步数都与这一趟之前相同）。
+/// 「需求 + 批次最坏占用」之下一个槽以内（仍不少于需求本身：不算批次占用就放得下）。那一批被式子那一判拒、一个单元都没搬：暂停，
+/// 那一趟单发一次只删意图的发布（不搬单元），意图连同 R 排他一起撤，盘上与分配器这一侧都没有活意图。
 #[test]
-fn a_compaction_batch_that_would_push_the_available_below_the_demand_is_refused_by_the_admission_and_writes_nothing(
+fn a_compaction_batch_that_would_push_the_available_below_the_demand_is_refused_and_the_pause_drops_the_intent_in_one_publish(
 ) {
     let (demand_in_slots, occupancy_in_slots) =
         demand_and_occupancy_in_slots_of_the_batch_after_the_issue(
@@ -939,9 +965,7 @@ fn a_compaction_batch_that_would_push_the_available_below_the_demand_is_refused_
             "{device:?}：可用 {available} 不少于需求本身，压到需求之下的是批次最坏占用"
         );
     }
-    let intent_before =
-        live_compaction_intent_of_the_entries(&current_of(&session).logged_operations);
-    let before_the_batch = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let txg_before = txg_of(current_of(&session));
     let refused = run_one_compaction_publish(&mut session, &mut devices);
     pool.devices = Some(devices);
     assert!(
@@ -952,24 +976,379 @@ fn a_compaction_batch_that_would_push_the_available_below_the_demand_is_refused_
         "准入拒：暂停，实际 {:?}",
         refused.outcome
     );
-    assert!(refused.versions_published.is_empty(), "那一批没发");
+    let [dropped] = refused.versions_published.as_slice() else {
+        panic!(
+            "暂停那一趟恰好发一次只删意图的发布，实际发了 {} 次",
+            refused.versions_published.len()
+        );
+    };
     assert_eq!(
-        disk_snapshot(&pool.memory_pool(), &pool.stream),
-        before_the_batch,
-        "盘上逐字节不变"
+        txg_of(dropped),
+        txg_before + 1,
+        "那一批没发：紧接着的就是删意图那一版"
+    );
+    assert!(
+        dropped.units_relocated_by_this_publish.is_empty(),
+        "那一批没发：删意图那一版一个单元都没搬"
+    );
+    assert!(
+        live_compaction_intent_of_the_entries(&dropped.logged_operations).is_none(),
+        "删意图那一版 logged_ops 里没有整理意图"
     );
     assert_eq!(
-        live_compaction_intent_of_the_entries(&current_of(&session).logged_operations),
-        intent_before,
-        "意图留在盘上，下次再试"
+        Some(current_of(&session)),
+        Some(dropped),
+        "会话的现行那一版就是删意图那一版"
     );
+    assert!(
+        session.allocator.compaction().live_intent().is_none(),
+        "分配器这一侧意图连同 R 排他一起撤了"
+    );
+    assert_eq!(
+        (
+            refused.batches_published,
+            session.compaction.observations.intents_dropped
+        ),
+        (0, 1),
+        "一批都没发、丢了一条意图"
+    );
+}
+
+/// 只删意图、不搬单元的整理发布归删除类（D28（挂载期承诺量） 已定项 1 的不判名单）：式子那一判不判，落点那一判照判。
+/// 现行那一版 logged_ops 里除了整理意图还有一条截断意图——签发整理意图之后会话把第一个文件截到 1000 字节（意图 + 最后一批），
+/// 再挂着回退到截断意图那一版（整理条目照抄现行那一版、截断条目取回退目标的）——删整理意图那一次要重写 logged_ops 根（普通分配）。
+/// 把每块盘的可用(d) 压进 [0, 16384)，低于这一次的需求（至少一槽）：式子那一判要是判就拒成 `SpaceAdmissionRefused`；
+/// 只删意图那一次照样发成（落点那一判照判、取得到），那一版 logged_ops 里只剩那条截断意图、一个单元都没搬。
+/// 会话推整理时删除续做排在整理之前，整理的发布见不到截断意图，这一形直接经发布路径（`transaction::publish_compaction_step`）造。
+#[test]
+fn an_intent_drop_beside_a_truncation_intent_is_published_with_the_available_below_its_demand() {
+    let mut pool = build_pool("compaction-intent-drop-beside-a-truncation-intent");
+    let (mut session, mut devices) =
+        session_with_the_intent_issued_on_the_segment_of_the_first_publish(&mut pool);
+    let truncated = session
+        .publish_user_change(
+            &mut devices,
+            UserChange::Truncate {
+                inode: InodeNumber(FIRST_INODE_NUMBER),
+                new_size: 1000,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 1000,
+            },
+        )
+        .expect("截断第一个文件：意图 + 最后一批");
+    let truncation_intent_root = truncated
+        .versions_published
+        .first()
+        .expect("截断先发意图那一版")
+        .root;
+    let mut current = current_of(&session).clone();
+    roll_back_by_a_forward_publish(
+        &parameters(),
+        &mut devices,
+        &mut session.allocator,
+        &mut current,
+        RollbackTarget {
+            instance: truncation_intent_root.instance,
+            checkpoint_txg: truncation_intent_root.checkpoint_txg,
+        },
+    )
+    .expect("挂着回退到截断意图那一版");
+    session.current = PoolVersion::of_a_version_of_trees(current);
+    let before_the_drop = current_of(&session).clone();
+    let truncation_intent_issued_txg =
+        live_truncation_intent_of_the_entries(&before_the_drop.logged_operations)
+            .map(|(issued_txg, _)| issued_txg);
+    assert!(
+        live_compaction_intent_of_the_entries(&before_the_drop.logged_operations).is_some()
+            && truncation_intent_issued_txg.is_some(),
+        "回退之后 logged_ops 里整理意图与截断意图都在：{:?}",
+        before_the_drop.logged_operations
+    );
+    isolate_the_highest_slots_until_the_available_is_within_one_slot_above(&mut session, 0);
+    let available_before_the_drop = available_bytes_on_each_device(&session);
+    let publish_parameters = parameters();
+    let dropped = {
+        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+        publish_compaction_step(
+            &mut writer,
+            &mut session.allocator,
+            &before_the_drop,
+            &[],
+            CompactionIntentStep::Drop,
+            session.instance,
+        )
+        .expect("只删意图那一次归删除类、式子那一判不判：可用低于需求也照样发成")
+    };
+    pool.devices = Some(devices);
+    assert!(
+        dropped
+            .rewritten
+            .iter()
+            .any(|role| matches!(role, TransactionUnit::LoggedOperationsRoot)),
+        "logged_ops 里还剩截断意图：删整理意图那一次重写 logged_ops 根（普通分配），需求至少一槽：{:?}",
+        dropped.rewritten
+    );
+    for (device, available) in available_before_the_drop {
+        assert!(
+            available < i128::from(SLOT_BYTES),
+            "{device:?}：删意图之前可用 {available} 低于一槽，式子那一判要是判就拒"
+        );
+    }
+    assert!(
+        live_compaction_intent_of_the_entries(&dropped.logged_operations).is_none()
+            && live_truncation_intent_of_the_entries(&dropped.logged_operations)
+                .map(|(issued_txg, _)| issued_txg)
+                == truncation_intent_issued_txg,
+        "删意图那一版只删了整理意图、截断意图照留：{:?}",
+        dropped.logged_operations
+    );
+    assert!(
+        dropped.units_relocated_by_this_publish.is_empty(),
+        "只删意图：一个单元都没搬"
+    );
+}
+
+/// 会话现行那一版里罩进 R（槽 [50240, 50304)，两盘同槽）的未释放记录中分配代大于 `c0` 的那几条：(盘, 槽, 跨度, 分配代)。
+fn unreleased_records_in_the_region_allocated_after(
+    session: &MountedSession,
+    allocation_generation_at_issue: u64,
+) -> Vec<(u32, u64, u16, u64)> {
+    let start = SEGMENT_OF_THE_FIRST_PUBLISH;
+    let end = start + SLOTS_OF_A_CLUSTER_SEGMENT;
+    current_of(session)
+        .allocation_records
+        .iter()
+        .filter(|record| {
+            !record.is_released
+                && record.slot.0 < end
+                && record.slot.0 + u64::from(record.span_slots) > start
+                && record.generation.0 > allocation_generation_at_issue
+        })
+        .map(|record| {
+            (
+                record.device.0,
+                record.slot.0,
+                record.span_slots,
+                record.generation.0,
+            )
+        })
+        .collect()
+}
+
+/// 录制流施加出来的镜像上池级 checker 对 I-5.6 的判词。
+fn verdict_of_the_compaction_intent_region_invariant_on_the_recorded_image(
+    pool: &BuiltPool,
+) -> InvariantVerdict {
+    check_pool_image(&pool.memory_pool())
+        .into_iter()
+        .find_map(|(invariant, verdict)| (invariant == "I-5.6").then_some(verdict))
+        .expect("池级 checker 判 I-5.6")
+}
+
+/// 前台顺序写第一个文件 8 个单元。
+fn sequential_write_of_eight_units_to_the_first_file(
+    session: &mut MountedSession,
+    devices: &mut Vec<(DeviceIdentity, Recorded)>,
+) -> UserChangePublished {
+    let content: Vec<u8> = (0..8 * data_unit_payload_capacity())
+        .map(|index| u8::try_from(index % 241).expect("小于 256"))
+        .collect();
+    session
+        .publish_user_change(
+            devices,
+            UserChange::SequentialWriteOfAnInode {
+                inode: InodeNumber(FIRST_INODE_NUMBER),
+                content: &content,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 1000,
+            },
+        )
+        .expect("前台写发成")
+}
+
+/// 签发之后在单元区最高处隔离，把那一批压到被准入拒、暂停（暂停那一趟删了意图）；交回签发那一刻的分配代 `c0` 与每块盘这一次多隔离的槽数。
+fn session_paused_short_of_space_after_the_issue(
+    pool: &mut BuiltPool,
+    tag_measuring: &str,
+) -> (
+    MountedSession,
+    Vec<(DeviceIdentity, Recorded)>,
+    u64,
+    Vec<u64>,
+) {
+    let (demand_in_slots, occupancy_in_slots) =
+        demand_and_occupancy_in_slots_of_the_batch_after_the_issue(tag_measuring);
+    let (mut session, mut devices) =
+        session_with_the_intent_issued_on_the_segment_of_the_first_publish(pool);
+    let allocation_generation_at_issue = session
+        .allocator
+        .compaction()
+        .live_intent()
+        .expect("签发过")
+        .intent
+        .allocation_generation_at_issue
+        .0;
+    let isolated_before: Vec<u64> = session
+        .allocator
+        .devices
+        .iter()
+        .map(|device_map| device_map.isolated_slots())
+        .collect();
+    let slot_bytes = i128::from(SLOT_BYTES);
+    isolate_the_highest_slots_until_the_available_is_within_one_slot_above(
+        &mut session,
+        i128::from(demand_in_slots + occupancy_in_slots) * slot_bytes - slot_bytes,
+    );
+    let paused = run_one_compaction_publish(&mut session, &mut devices);
+    assert!(
+        matches!(
+            paused.outcome,
+            CompactionRunOutcome::Stopped(CompactionRunStop::PausedShortOfSpace)
+        ),
+        "要先暂停：{:?}",
+        paused.outcome
+    );
+    let isolated_by_the_squeeze: Vec<u64> = session
+        .allocator
+        .devices
+        .iter()
+        .zip(isolated_before)
+        .map(|(device_map, before)| device_map.isolated_slots() - before)
+        .collect();
+    (
+        session,
+        devices,
+        allocation_generation_at_issue,
+        isolated_by_the_squeeze,
+    )
+}
+
+/// 解开压余量时在每块盘单元区最高处隔离的那几槽（`isolated_by_the_squeeze` 按分配器里盘的次序）。
+fn clear_the_isolation_of_the_squeeze(
+    session: &mut MountedSession,
+    isolated_by_the_squeeze: &[u64],
+) {
+    for (device_map, isolated) in session
+        .allocator
+        .devices
+        .iter_mut()
+        .zip(isolated_by_the_squeeze)
+    {
+        let unit_area_end = device_map.unit_area_start().slot().0 + device_map.unit_area_slots();
+        for slot in unit_area_end - isolated..unit_area_end {
+            device_map.clear_isolation_of_slot(SlotNumber(slot));
+        }
+    }
+}
+
+/// I-5.6 与暂停：签发（R = 50240）→ 压准入余量让那一批被拒、暂停（删了意图）→ 解开压余量的隔离 → 前台写一次。之后盘上没有活意图，
+/// 录制流施加出来的镜像上池级 checker 判 I-5.6 不红（前台写落不落进原来的 R 都一样：落进去的那一版已经没有意图罩着 R）。
+#[test]
+fn a_foreground_write_after_the_pause_dropped_the_intent_finds_no_live_intent_and_keeps_the_compaction_intent_region_invariant(
+) {
+    let mut pool = build_pool("compaction-pause-then-foreground-write");
+    let (mut session, mut devices, allocation_generation_at_issue, isolated_by_the_squeeze) =
+        session_paused_short_of_space_after_the_issue(
+            &mut pool,
+            "compaction-pause-then-foreground-write-measuring",
+        );
+    clear_the_isolation_of_the_squeeze(&mut session, &isolated_by_the_squeeze);
+    let written = sequential_write_of_eight_units_to_the_first_file(&mut session, &mut devices);
+    pool.devices = Some(devices);
+    let records_in_the_region_after_c0 =
+        unreleased_records_in_the_region_allocated_after(&session, allocation_generation_at_issue);
+    let verdict = verdict_of_the_compaction_intent_region_invariant_on_the_recorded_image(&pool);
+    println!(
+        "compaction-pause: paused_then_written versions={} txg={} records_in_the_region_after_c0={records_in_the_region_after_c0:?} i_5_6={verdict:?}",
+        written.versions_published.len(),
+        txg_of(current_of(&session))
+    );
+    assert!(
+        live_compaction_intent_of_the_entries(&current_of(&session).logged_operations).is_none()
+            && session.allocator.compaction().live_intent().is_none(),
+        "暂停删了意图：前台写之后盘上与分配器这一侧都没有活意图"
+    );
+    assert!(
+        !matches!(verdict, InvariantVerdict::Violated(_)),
+        "I-5.6 不红：{verdict:?}"
+    );
+}
+
+/// 对照：同样签发、不压余量、不暂停，R 排他着，同一次前台写：意图仍活、仍排他，R 里没有分配代大于 `c0` 的记录，I-5.6 不红。
+#[test]
+fn the_same_foreground_write_while_the_region_stays_excluded_lands_nothing_in_the_region_after_c0()
+{
+    let mut pool = build_pool("compaction-excluded-then-foreground-write");
+    let (mut session, mut devices) =
+        session_with_the_intent_issued_on_the_segment_of_the_first_publish(&mut pool);
+    let allocation_generation_at_issue = session
+        .allocator
+        .compaction()
+        .live_intent()
+        .expect("签发过")
+        .intent
+        .allocation_generation_at_issue
+        .0;
+    sequential_write_of_eight_units_to_the_first_file(&mut session, &mut devices);
+    pool.devices = Some(devices);
+    let records_in_the_region_after_c0 =
+        unreleased_records_in_the_region_allocated_after(&session, allocation_generation_at_issue);
+    let verdict = verdict_of_the_compaction_intent_region_invariant_on_the_recorded_image(&pool);
     assert!(
         session
             .allocator
             .compaction()
             .live_intent()
-            .is_some_and(|live| !live.is_the_region_excluded_from_placement),
-        "暂停：撤了 R 排他、意图留着"
+            .is_some_and(|live| live.is_the_region_excluded_from_placement),
+        "没暂停：意图活着、排他"
+    );
+    assert!(
+        records_in_the_region_after_c0.is_empty(),
+        "排他着却落进了 R：{records_in_the_region_after_c0:?}"
+    );
+    assert!(
+        !matches!(verdict, InvariantVerdict::Violated(_)),
+        "排他着 I-5.6 不红：{verdict:?}"
+    );
+}
+
+/// 暂停删了意图之后重来：解开压余量的隔离、预算放满再整理一趟，在同一个 R 上重新签发（`c0` 比第一条大）、一路搬到最后一批同一次发布删意图。
+#[test]
+fn a_run_after_the_pause_issues_the_intent_again_and_completes_it() {
+    let mut pool = build_pool("compaction-pause-then-run-again");
+    let (mut session, mut devices, allocation_generation_at_issue, isolated_by_the_squeeze) =
+        session_paused_short_of_space_after_the_issue(
+            &mut pool,
+            "compaction-pause-then-run-again-measuring",
+        );
+    clear_the_isolation_of_the_squeeze(&mut session, &isolated_by_the_squeeze);
+    let observations_before = session.compaction.observations;
+    session.compaction.publishes_since_the_last_user_change = 0;
+    let again = session.run_compaction(&mut devices).expect("整理一趟");
+    pool.devices = Some(devices);
+    let observations_after = session.compaction.observations;
+    assert_eq!(
+        observations_after.intents_issued,
+        observations_before.intents_issued + 1,
+        "重新签发了一条（这一趟停在 {:?}）",
+        again.outcome
+    );
+    assert_eq!(
+        observations_after.intents_completed,
+        observations_before.intents_completed + 1,
+        "那一条做完了（这一趟停在 {:?}）",
+        again.outcome
+    );
+    let completed = session
+        .compaction
+        .last_completed_intent
+        .expect("做完的那一条记在会话上");
+    assert_eq!(completed.region, region_of_the_first_publish(), "同一个 R");
+    assert!(
+        completed.allocation_generation_at_issue.0 > allocation_generation_at_issue,
+        "从头签发：c0 取重新签发那一刻，比第一条大"
+    );
+    assert!(
+        live_compaction_intent_of_the_entries(&current_of(&session).logged_operations).is_none(),
+        "最后一批同一次发布删了意图"
     );
 }
 
@@ -1195,7 +1574,9 @@ fn the_background_entry_sends_no_batch_while_a_foreground_fsync_is_waiting() {
         CompactionRunForcing::ForcedToStartForTests,
     );
     create_one_inode(&mut session, &mut devices);
-    let caller = CallerForTests::at_the_start_with(ForegroundFsync::Waiting);
+    let caller = CallerForTests::at_the_start_with(
+        AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting,
+    );
     let before_the_call = disk_snapshot(&pool.memory_pool(), &pool.stream);
     let yielded = run_started_by(
         session
@@ -1221,7 +1602,9 @@ fn the_background_entry_sends_no_batch_while_a_foreground_fsync_is_waiting() {
         CompactionStartJudgement::DueAfterAUserChange,
         "让路是缓发：「该跑了」放回去"
     );
-    caller.foreground_fsync.set(ForegroundFsync::NoneWaiting);
+    caller
+        .answer_before_the_next_batch
+        .set(AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting);
     let resumed = run_started_by(
         session
             .run_compaction_in_the_background(&mut devices, CompactionPacing::BY_DEFAULT, &caller)
@@ -1248,7 +1631,9 @@ fn the_background_entry_sends_no_next_batch_once_the_write_bandwidth_limit_of_th
         CompactionTimerFallback::Off,
         CompactionWriteBandwidthLimit::BytesPerSecond(non_zero(1)),
     );
-    let caller = CallerForTests::at_the_start_with(ForegroundFsync::NoneWaiting);
+    let caller = CallerForTests::at_the_start_with(
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting,
+    );
     let issuing = run_started_by(
         session
             .run_compaction_in_the_background(&mut devices, pacing, &caller)

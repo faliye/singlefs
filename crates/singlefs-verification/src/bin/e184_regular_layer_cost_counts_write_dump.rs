@@ -6,7 +6,7 @@
 //! 只录写流、写转储：只引 `singlefs-verification` 的录制器与内存池、`singlefs-core`，不引崩溃那一侧的模块，好让它在第二段的旧提交副本里也编得过。
 //! 转储是二进制文件，装一条流从 mkfs 做完那一刻起的全部东西：基镜像 = 空盘叠上 mkfs 的全部写（连同清零写）、mkfs 之后的写表与段、
 //! 版本表、历史怎么收的尾。块键不在这里算（算块键要引崩溃那一侧的模块），由 `e184_regular_layer_cost_counts` 的 `keys` 读转储去算。
-//! 转储的写法与读法住 `e184_regular_layer_cost_counts_dump/mod.rs`，这个 bin 与主装置各经 `#[path]` 把它当模块引进去，只有这一份；这个文件只放命令行入口。
+//! 转储的写法与读法住 `e184_regular_layer_cost_counts_write_dump/mod.rs`，这个 bin 与主装置各经 `#[path]` 把它当模块引进去，只有这一份；这个文件只放命令行入口。
 //!
 //!   e184_regular_layer_cost_counts_write_dump dump-random-histories --steps <步数> --weights <BROAD|BROAD_WITH_COMPACTION_WHILE_MOUNTED>
 //!       --width <FourGibibytes|UnitAreaOf240Slots> --seeds <条数> --out <目录> [--check-determinism]
@@ -20,20 +20,27 @@
 //! 退出码：0 正常；2 命令行不对；3 有历史没录成（panic 或 mkfs 之后没有操作）；4 阳性对照没过（确定性核或基镜像往返核，登记 X1、X2）；
 //! 78 准入与运行条件没满足（`preflight` 拒绝，带 `--force` 才照跑；强制跑的那一次，标准输出第一行多一行 `name=preflight forced=…`，`emitted=` 不数它）。
 
-#[path = "e184_regular_layer_cost_counts_dump/mod.rs"]
 #[allow(
     dead_code,
     reason = "转储模块是两份 bin 共用的：主装置用的读回、录一条历史与转储往返对照这个 bin 不调"
 )]
+#[path = "e184_regular_layer_cost_counts_write_dump/mod.rs"]
 mod write_dump;
 
 use write_dump::{arguments_without_the_force_flag, preflight, run_dump_command, EXIT_CODE_USAGE};
 
-/// 这个 bin 在 `src/bin/` 下的文件名（`preflight` 判它头上的准入与运行条件）。
+/// 这个 bin 的源文件路径（`preflight` 判它头上的准入与运行条件）；写成 `concat!` 字面量，单元键收得到这份文件。
+const OWN_SOURCE_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/src/bin/e184_regular_layer_cost_counts_write_dump.rs"
+);
+
+/// 这个 bin 在 `src/bin/` 下的文件名：单测拿它核 [`OWN_SOURCE_PATH`] 指的是这一份。
+#[cfg(test)]
 const OWN_SOURCE_FILE_NAME: &str = "e184_regular_layer_cost_counts_write_dump.rs";
 
 fn main() {
-    let forced_summary = preflight(OWN_SOURCE_FILE_NAME);
+    let forced_summary = preflight(OWN_SOURCE_PATH);
     if let Some(summary) = forced_summary {
         println!("E7RESULT name=preflight forced={summary}");
     }
@@ -57,19 +64,22 @@ mod tests {
 
     #[test]
     fn the_own_source_file_name_points_at_a_file_in_the_source_directory_of_the_binaries() {
-        // 路径写成一串字面量，变异判法的单元键才认得出读的是哪份文件；文件名常量另由下一条断言钉住。
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/bin/e184_regular_layer_cost_counts_write_dump.rs");
+        let path = std::path::Path::new(OWN_SOURCE_PATH);
         assert!(
             path.ends_with(OWN_SOURCE_FILE_NAME),
             "交给 preflight 的文件名 {OWN_SOURCE_FILE_NAME} 不是 src/bin 下的这一份 {}",
             path.display()
         );
-        let text = std::fs::read_to_string(&path).expect("preflight 要判的源文件读得到");
+        let text = std::fs::read_to_string(path).expect("preflight 要判的源文件读得到");
         assert!(
             text.contains("// admission:") && text.contains("// run-condition:"),
             "{} 的文件头要有准入与运行条件",
             path.display()
         );
+    }
+
+    #[test]
+    fn the_dump_command_without_arguments_exits_with_usage_code() {
+        assert_eq!(run_dump_command(&[]), 2);
     }
 }

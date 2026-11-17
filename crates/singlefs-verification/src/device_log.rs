@@ -665,10 +665,10 @@ fn judge_discards_against_discardable_ranges(
             judged_discards += 1;
             continue;
         }
-        let a_later_publish_makes_it_discardable = publishes[publishes_returned_before_it..]
+        let later_publish_makes_it_discardable = publishes[publishes_returned_before_it..]
             .iter()
             .any(|later| is_covered_by_the_union_of(&later.discardable_ranges, start, end));
-        return Err(if a_later_publish_makes_it_discardable {
+        return Err(if later_publish_makes_it_discardable {
             MisplacedDiscard::BeforeTheLastBarrierOfThePublishThatMakesItDiscardable {
                 event_index,
                 offset: *offset,
@@ -1128,7 +1128,7 @@ mod tests {
     /// `fold_declared_zero_fills` 原地不动、一直往结果里推（`k4/mut_noguard` 在 1G 的内存包装里被杀）；
     /// 先判铺满那一步，这一条红在第一句断言上，不跑到不终止的那一步。
     #[test]
-    fn a_declared_zero_fill_of_length_zero_tiles_no_entry_and_leaves_the_log_unchanged() {
+    fn declared_zero_fill_of_length_zero_tiles_no_entry_and_leaves_the_log_unchanged() {
         let fill_start = 4 * ZERO_FILL_CHUNK_BYTES;
         let declared = vec![(DeviceOffsetInBytes(fill_start), 0)];
         let observed = vec![zero_write(fill_start, ZERO_FILL_CHUNK_BYTES)];
@@ -1168,7 +1168,7 @@ mod tests {
     /// 录制流里一次 discard 投成盘上同一段、同一个次序的一条 Discard：一次写、一次 discard、一道屏障的流，
     /// 盘上日志照收判绿；日志里缺那条 discard、段不同、与写换了次序，都在第一处不同的下标判红。
     #[test]
-    fn a_discard_in_the_recorded_stream_must_reach_the_device_log_as_the_same_range_in_the_same_order(
+    fn discard_in_the_recorded_stream_must_reach_the_device_log_as_the_same_range_in_the_same_order(
     ) {
         let data = vec![7u8; 512];
         let retained = |kind, offset, length, content_hash, contents| RetainedOperation {
@@ -1345,7 +1345,7 @@ mod tests {
 
     /// 第二次发布返回之后对它释放的那一段发 discard：落在可发区间里、在那次发布最后一道屏障之后，判绿、判过一条。
     #[test]
-    fn a_discard_of_a_released_segment_after_the_publish_returned_is_green() {
+    fn discard_of_a_released_segment_after_the_publish_returned_is_green() {
         let (stream, publishes) =
             two_publishes_with_one_discard(10, SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH);
         let events = expected_device_events(&stream, DeviceIdentity(0));
@@ -1363,7 +1363,7 @@ mod tests {
     /// 必红世界（判决 m4-gc-r1 G5）：同一次 discard 提前到第二次发布的根 FUA 写之前——那时最近返回的是第一次发布，那一段还不可发，
     /// 要到第二次发布返回才可发，判红在那条 Discard 上。
     #[test]
-    fn a_discard_moved_before_the_root_record_write_of_the_publish_that_releases_it_is_red() {
+    fn discard_moved_before_the_root_record_write_of_the_publish_that_releases_it_is_red() {
         let (stream, publishes) =
             two_publishes_with_one_discard(7, SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH);
         let events = expected_device_events(&stream, DeviceIdentity(0));
@@ -1394,7 +1394,7 @@ mod tests {
 
     /// 必红世界（判决 m4-gc-r1 G5）：第二次发布返回之后对它刚写了单元的那一段发 discard——那一段不在任何一次发布的可发区间里，判红。
     #[test]
-    fn a_discard_on_a_segment_that_is_not_discardable_is_red() {
+    fn discard_on_a_segment_that_is_not_discardable_is_red() {
         let (stream, publishes) =
             two_publishes_with_one_discard(10, SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH);
         let events = expected_device_events(&stream, DeviceIdentity(0));
@@ -1415,8 +1415,7 @@ mod tests {
 
     /// 可发区间按并判：一次 discard 跨两段相邻的可发区间算罩住，跨出去一个字节不算。
     #[test]
-    fn a_discard_spanning_two_adjacent_discardable_ranges_is_covered_and_one_byte_past_them_is_not()
-    {
+    fn discard_spanning_two_adjacent_discardable_ranges_is_covered_and_one_byte_past_them_is_not() {
         let ranges = vec![2048..4096, 0..2048];
         assert!(is_covered_by_the_union_of(&ranges, 0, 4096));
         assert!(!is_covered_by_the_union_of(&ranges, 0, 4097));
@@ -1459,7 +1458,7 @@ mod tests {
 
     /// 判器自己算可发区间的那一半在没有 discard 的流上不判池级 checker：每次发布交回一项、区间都空（候选只取流里真发过的段）。
     #[test]
-    fn a_stream_without_any_discard_has_no_discardable_range_after_any_publish() {
+    fn stream_without_any_discard_has_no_discardable_range_after_any_publish() {
         let mut stream = publish_on_device_zero(SEGMENT_RELEASED_BY_THE_SECOND_PUBLISH, 1 << 20);
         stream.extend(publish_on_device_zero(
             SEGMENT_WRITTEN_BY_THE_SECOND_PUBLISH,

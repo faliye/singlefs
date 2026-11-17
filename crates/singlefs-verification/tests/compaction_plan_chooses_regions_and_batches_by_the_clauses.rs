@@ -29,10 +29,9 @@ use singlefs_core::compaction_plan::{
     choose_region, empty_cluster_segments_by_the_records, greedy_score, holes_admit_the_issue,
     holes_outside_the_region_in_segments_holding_user_data, plan_batch,
     publish_budget_of_a_compaction_run, region_holds_a_quarantined_slot,
-    region_is_empty_by_the_records, the_completed_intent_yielded, CompactionBatchSize,
-    CompactionBatchUnits, CompactionRegionExclusion, CompactionSwitches, PlannedBatch,
-    PlannedRelocation, RegionChoice, RegionChoiceCriterion, SegmentsRefusedByTheRegionScan,
-    UnitAreaOfOneDevice,
+    region_is_empty_by_the_records, the_completed_intent_yielded, CompactionBatchUnits,
+    CompactionRegionExclusion, CompactionSwitches, PlannedBatch, PlannedRelocation, RegionChoice,
+    RegionChoiceCriterion, SegmentsRefusedByTheRegionScan, UnitAreaOfOneDevice,
 };
 use singlefs_core::logged_operations::{CompactionIntent, CompactionRegion};
 use singlefs_core::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
@@ -811,7 +810,8 @@ fn no_next_intent_is_issued_after_one_that_did_not_add_an_empty_segment() {
 
 /// 一次整理运行的发布预算（判决 G8 `B_gc`）：`3S − 4 − 已经过去的发布数`，至少 1。
 #[test]
-fn the_publish_budget_of_a_run_is_three_s_minus_four_minus_the_publishes_passed_and_at_least_one() {
+fn the_publish_budget_of_a_run_is_three_times_the_slots_per_region_minus_four_minus_the_publishes_passed_and_at_least_one(
+) {
     assert_eq!(publish_budget_of_a_compaction_run(8, 0), 20);
     assert_eq!(publish_budget_of_a_compaction_run(8, 5), 15);
     assert_eq!(
@@ -833,7 +833,7 @@ fn allocator_with_a_live_intent_on(
     ]);
     let product = CompactionSwitches::PRODUCT;
     allocator.set_compaction_switches(CompactionSwitches {
-        batch_size: CompactionBatchSize::NotDecidedByTheClauses,
+        batch_size: product.batch_size,
         forced_region: product.forced_region,
         run_forcing: product.run_forcing,
         region_exclusion: exclusion,

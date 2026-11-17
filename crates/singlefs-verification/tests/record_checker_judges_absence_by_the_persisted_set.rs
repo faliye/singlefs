@@ -356,9 +356,9 @@ fn copy_on_the_other_device(writes: &[RetainedWrite], index: usize) -> usize {
 struct MisalignedReuseChain {
     sigma: usize,
     /// u：B 在 l 头一槽的节点。
-    first_node_of_b: usize,
+    node_under_the_head_of_the_data_unit: usize,
     /// u2：B 在 l 第二槽的节点。
-    second_node_of_b: usize,
+    node_under_the_tail_of_the_data_unit: usize,
     /// l：txg 17 的 32K 数据单元，复用 u、u2 两槽。
     data_unit: usize,
     /// y：txg 25 在 l 头一槽的节点。
@@ -410,22 +410,33 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
                 NODE_SLOT_BYTES,
             )
         };
-        if let ([.., first_node_of_b], [.., second_node_of_b], [over_head, ..], [over_tail, ..]) = (
+        if let (
+            [.., node_under_the_head_of_the_data_unit],
+            [.., node_under_the_tail_of_the_data_unit],
+            [over_head, ..],
+            [over_tail, ..],
+        ) = (
             nodes_before(head).as_slice(),
             nodes_before(tail).as_slice(),
             nodes_after(head).as_slice(),
             nodes_after(tail).as_slice(),
         ) {
             chains.push((
-                *first_node_of_b,
-                *second_node_of_b,
+                *node_under_the_head_of_the_data_unit,
+                *node_under_the_tail_of_the_data_unit,
                 data_unit,
                 *over_head,
                 *over_tail,
             ));
         }
     }
-    let [(first_node_of_b, second_node_of_b, data_unit, over_head, over_tail)] = chains.as_slice()
+    let [(
+        node_under_the_head_of_the_data_unit,
+        node_under_the_tail_of_the_data_unit,
+        data_unit,
+        over_head,
+        over_tail,
+    )] = chains.as_slice()
     else {
         panic!("UOOUOMSU 的写表里「两节点 → 数据单元 → 两节点」要恰好一串，找到 {chains:?}");
     };
@@ -438,8 +449,8 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
     };
     assert_eq!(
         (
-            publish_txg_of(writes, *first_node_of_b),
-            publish_txg_of(writes, *second_node_of_b),
+            publish_txg_of(writes, *node_under_the_head_of_the_data_unit),
+            publish_txg_of(writes, *node_under_the_tail_of_the_data_unit),
             publish_txg_of(writes, *data_unit),
             publish_txg_of(writes, *over_head),
             publish_txg_of(writes, *over_tail),
@@ -469,8 +480,8 @@ fn misaligned_reuse_chain(recorded: &RecordedHistory) -> MisalignedReuseChain {
     );
     MisalignedReuseChain {
         sigma,
-        first_node_of_b: *first_node_of_b,
-        second_node_of_b: *second_node_of_b,
+        node_under_the_head_of_the_data_unit: *node_under_the_head_of_the_data_unit,
+        node_under_the_tail_of_the_data_unit: *node_under_the_tail_of_the_data_unit,
         data_unit: *data_unit,
         node_over_the_head_of_the_data_unit: *over_head,
         node_over_the_tail_of_the_data_unit: *over_tail,
@@ -642,7 +653,7 @@ fn misaligned_hole_state(recorded: &RecordedHistory, chain: &MisalignedReuseChai
     set_both_copies(
         &mut misaligned_hole,
         &recorded.writes,
-        chain.second_node_of_b,
+        chain.node_under_the_tail_of_the_data_unit,
         false,
     );
     set_both_copies(
@@ -828,7 +839,12 @@ fn a_node_whose_every_later_write_to_the_same_offset_never_landed_is_missing() {
     let chain = misaligned_reuse_chain(&recorded);
     let writes = &recorded.writes;
     let mut same_offset_hole = persisted_before_the_units_of_sigma(&recorded, chain.sigma);
-    set_both_copies(&mut same_offset_hole, writes, chain.first_node_of_b, false);
+    set_both_copies(
+        &mut same_offset_hole,
+        writes,
+        chain.node_under_the_head_of_the_data_unit,
+        false,
+    );
     set_both_copies(&mut same_offset_hole, writes, chain.data_unit, false);
     let engine = given_states_engine_of_this_test("same_offset_hole");
     let Some((effective_root, check)) =

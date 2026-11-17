@@ -1,8 +1,11 @@
 //! GPU 判器的派活：把一条流打包好的表与草稿区放上一张卡、编内核、把一段状态分成几次派活交给卡算、回读结论。
 //! 判法（内核原文、表怎么打包、派活参数与结论各是哪几个字、草稿区每个状态多大）在 `crate::crash_judge_gpu`；这一份只管怎么上卡
-//! （「派活和判法拆出来最好」）。GPU 判器那一组判法单元从 [`GpuCrashJudge::judge_states`] 这些入口按函数单元收闭包
-//! （`crate::judging_units_entries`）：上卡、派活与回读归位（决定一个状态的结论落到哪里的那几个函数）改了，那一把键跟着变；
-//! 这一份里够不着的函数改了不换键。
+//! （「派活和判法拆出来最好」）。GPU 判器那一组判法单元从 [`GpuCrashJudge::on_card_with_the_given_dispatch_width`]、
+//! `GpuCrashJudge::judge_one_dispatch` 这些入口按函数单元收闭包（`crate::judging_units_entries`）：上卡、派活与回读归位
+//! （决定一个状态的结论落到哪里的那几个函数）改了，那一把键跟着变；这一份里够不着的函数改了不换键。
+//! 一次派活多宽、草稿区开几条由调用方定好交给判器（[`DispatchWidthGivenToTheJudge`]）：定宽度、量显存额度的函数与常量
+//! （[`states_in_flight_within`]、[`states_per_dispatch_within_the_scratch_memory`]、[`MAXIMUM_SCRATCH_LANES`]、
+//! [`MEBIBYTES_LEFT_FOR_THE_DRIVER`]）与派活宽度调度的起步（`DispatchWidthSchedule::starting_narrow`）不在那一组的闭包里。
 //!
 //! 一张卡上同时在算的就是一次派活里的状态。草稿区一条缓冲受这张卡的存储绑定上限管（wgpu 压到 2 GiB − 4，装几个状态照 `SCRATCH_WORDS` 算，`states_per_scratch_lane`）；
 //! 一次派活要带更多状态，就每条缓冲各派一次活、同一个内核的几次派活排在同一趟里（它们碰的草稿与结论缓冲互不相同），卡一起算。
@@ -10,6 +13,7 @@
 //! 每秒 9 405 / 75 360 / 139 970 / 241 726 / 310 100 态，每次派活 27 / 28 / 30 / 34 / 38 毫秒。
 use std::ops::Range;
 
+use crate::crash_amplification::STUCK_AT_THE_INDIVISIBLE_FLOOR_LINE_PREFIX;
 use crate::crash_judge_gpu::{
     dispatch_words, pack_tables, persisted_mask_probe_kernel_source,
     verdict_was_written_by_both_kernels, JudgeKernelSources,
@@ -19,9 +23,9 @@ use crate::crash_judge_gpu::{
     VERDICT_WORD_NOT_WRITTEN,
 };
 use crate::crash_judge_tables::JudgeTables;
-use crate::gpu_memory_ledger::{
-    states_in_one_dispatch_capped_by_the_state_count, CauseOfTheDeviceLoss,
-};
+// 两样分两条 use：GPU 判器那一组的闭包只用得到设备丢失的记账，一条 use 一起引进的话封顶派活宽度的函数会跟着那条 use 进闭包
+use crate::gpu_memory_ledger::states_in_one_dispatch_capped_by_the_state_count;
+use crate::gpu_memory_ledger::CauseOfTheDeviceLoss;
 use crate::gpu_unit_checks::{
     gpu_lifecycle_trace, gpu_work_trace, readback_mapping_callback,
     take_the_readback_after_the_wait_or_record_the_device_lost, words_to_bytes, GpuCard,
@@ -33,15 +37,29 @@ pub const MAXIMUM_SCRATCH_LANES: usize = 32;
 /// 表与草稿区之外这个进程在卡上还要占的显存（MiB）：驱动的上下文、三个编好的内核、结论与回读缓冲。
 /// 判器的草稿区按「这张卡的显存额度 − 表 − 这个数」定。5090 上量到的是 2326 MiB（草稿区从 241 MiB 到 12283 MiB 五档都是这个数），留到 2560。
 pub const MEBIBYTES_LEFT_FOR_THE_DRIVER: u64 = 2560;
-/// 一次派活卡上最多算多久（秒）。派活在卡上跑的时候卡让不出来，跑得太久驱动会报上下文切换超时、把这条通道掐掉
-/// （内核日志 Xid 109；固定脚本到 E 那条流一次派约三万个状态时撞过，程序从此等不到结果）。一次派活带几个状态按它调。
+/// 还没量过拆不开的下限时，一次提交卡上最多算多久（秒）。提交在卡上跑的时候卡让不出来，跑得太久驱动会报上下文切换超时、把这条通道掐掉
+/// （内核日志 Xid 109），程序从此等不到结果。状态的轻重事先不知道，所以一次派活从 [`FIRST_DISPATCH_STATES`] 个状态起步，
+/// 每次派活按最久那一次提交的用时加宽或减半（[`dispatch_width_after_a_dispatch`]），涨满一条草稿缓冲才量宽度（[`calibration_goes_on`]）。
+/// 宽度 1 那一次提交是拆不开的下限（[`indivisible_floor_after_a_dispatch`]；单个状态的一趟，恢复、走读这几趟不分片）。量过它之后，
+/// 最久那一次提交许到驱动会掐的那条线 [`SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT`]，不看下限多长（[`longest_tolerated_submission_seconds`]）：
+/// 状态在卡上并行，加宽多半不加时，宽度涨上去卡才用得满。
 pub const LONGEST_DISPATCH_SECONDS: f64 = 0.5;
+/// 驱动会掐的那条线（秒）：一次提交在卡上算过它，就有被驱动报上下文切换超时（内核日志 Xid 109）掐掉通道的危险。
+/// 这条线不是定值，掐不掐看那一刻有没有别的上下文要这张卡。量到的：同一个状态单次提交约 5.78 秒，在第二台的 5060 Ti 上算完，
+/// 在本机同型卡上被掐（`records/2026-11-10-Xid109复盘.md`「经过」）；取 2 秒，不到被掐过的那一次的一半（推的：被掐的那一次本身多长没量过，
+/// 5.78 秒是第二台上同一个状态的用时）。
+pub const SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT: f64 = 2.0;
+/// 宽度停在拆不开的下限上、加不了宽，最久那一次提交又超过 [`LONGEST_DISPATCH_SECONDS`]，连着这么多次派活就报错、不再派
+/// （[`dispatches_stuck_at_the_floor_after_a_dispatch`]）：一条流里零星几个重状态（连着两三个）不报；连着 8 个都这样是这一段状态单个就重到
+/// 加宽要冒驱动掐通道的险，照这样一个一个派，每秒判不到一个状态，大的流要跑上几天。
+pub const DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING: u64 = 8;
 /// 等卡算完最多等多久（秒）：到点还没算完就报错，不干等（通道被驱动掐掉之后结果永远不回来）。
-/// 几条 GPU 对拍同卡并行时一次派活要排在别的用例后面：删除线三条同卡并行时一条等过了 120 秒（单跑那条整条 254 秒跑完），
-/// 从 120 抬到 300。
+/// 几条 GPU 对拍同卡并行时一次派活要排在别的用例后面：删除线三条同卡并行时一条等过了 120 秒（单跑那条整条 254 秒跑完）。
 pub const LONGEST_WAIT_FOR_THE_CARD_SECONDS: u64 = 300;
+/// 一个判器第一次派活带几个状态：这时还不知道状态有多重，带得多的那一次可能就撞驱动的超时，撞了就没有下一次可调。
+const FIRST_DISPATCH_STATES: usize = 1;
 /// 一次派活带的状态数最少几个（算得太久减半时的下限）。
-const NARROWEST_DISPATCH: usize = 256;
+const NARROWEST_DISPATCH: usize = 1;
 /// 量宽度时，这一档每个状态的用时比前面最好那一档多出这么多倍就不再加宽。
 pub const CALIBRATION_WORSE_THAN_THE_BEST: f64 = 1.25;
 /// 每派多少次活重量一次宽度：状态变重变轻，拐点跟着挪。
@@ -80,16 +98,27 @@ pub const MOST_ACCOUNTING_SLICES_OF_A_ROUND: u32 =
     ACCOUNTING_SLICE_POSITIONS / NARROWEST_ACCOUNTING_SLICE;
 
 /// 量宽度：同一段状态从一条草稿缓冲那么宽起，一档加一条缓冲地派，`samples` 是量过的各档（带几个状态、卡算了几秒）。
-/// 下一档还量不量：最新一档已经到这张卡带得了的上限、单次超过 [`LONGEST_DISPATCH_SECONDS`] 的一半、
+/// 下一档还量不量：最新一档已经到这张卡带得了的上限、它最久的那一次提交超过 `seconds_the_longest_submission_may_take` 的一半
+/// （`seconds_of_the_longest_submission_of_the_latest`：驱动掐的是卡上一段不可抢占的活，一次派活拆成几趟、几片提交，比的是最久的那一次提交，
+/// 不是整次派活的用时；上限照 [`longest_tolerated_submission_seconds`]：量过拆不开的下限是 [`SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT`]，
+/// 量宽度停在它的一半，与加宽的门槛 [`widening_keeps_the_longest_submission_tolerable`] 同一条线）、
 /// 或每个状态的用时比前面最好那一档多出 [`CALIBRATION_WORSE_THAN_THE_BEST`] 倍，就不量了。
 /// 一次派活带的状态多到一定程度，每个状态的用时猛涨（5090 过了 21 700 个、5060 Ti 过了 6 510 个，那时显存远没用满；
 /// 拐点随状态轻重挪），所以宽度在卡上现量，不按显存算。
 #[must_use]
-pub fn calibration_goes_on(samples: &[(usize, f64)], widest_possible: usize) -> bool {
+pub fn calibration_goes_on(
+    samples: &[(usize, f64)],
+    seconds_of_the_longest_submission_of_the_latest: f64,
+    widest_possible: usize,
+    seconds_the_longest_submission_may_take: f64,
+) -> bool {
     let Some((&(width, seconds), earlier)) = samples.split_last() else {
         return true;
     };
-    if width >= widest_possible || seconds > LONGEST_DISPATCH_SECONDS / 2.0 {
+    if width >= widest_possible
+        || seconds_of_the_longest_submission_of_the_latest
+            > seconds_the_longest_submission_may_take / 2.0
+    {
         return false;
     }
     let best_earlier = earlier
@@ -126,11 +155,154 @@ pub fn knee_after_calibration(samples: &[(usize, f64)], knee: usize) -> usize {
     }
 }
 
-/// 一次派活算得超过 [`LONGEST_DISPATCH_SECONDS`]（驱动会掐掉跑得太久的派活，内核日志 Xid 109）：下一次减半，
-/// 不少于 [`NARROWEST_DISPATCH`]（容量比它还小时取容量）。
+/// 一次派活最久那一次提交超过许的上限（[`longest_tolerated_submission_seconds`]；驱动会掐掉跑得太久的派活，内核日志 Xid 109）：下一次减半，
+/// 不少于 [`NARROWEST_DISPATCH`]、不超过容量。
 #[must_use]
 pub fn width_after_a_slow_dispatch(width: usize, capacity: usize) -> usize {
     (width / 2).clamp(NARROWEST_DISPATCH.min(capacity).max(1), capacity.max(1))
+}
+
+/// 拆不开的下限（宽度到 [`NARROWEST_DISPATCH`] 时那一次派活最久那一次提交几秒）在一次派活（实际带了 `states_carried` 个状态，
+/// 最久那一次提交 `seconds_of_the_longest_submission` 秒）之后记成多少：
+/// - 只带了 [`NARROWEST_DISPATCH`] 个状态：就是这一次的（状态变重变轻，下限跟着挪）。
+/// - 带得更多、前面的派活量过下限：取两者小的那个。少带几个状态算得不会更久，这一次比下限还快说明状态变轻了，下限至多是这一次的。
+/// - 带得更多、前面的派活没量过：还是没量过。
+#[must_use]
+pub fn indivisible_floor_after_a_dispatch(
+    seconds_of_the_indivisible_floor: Option<f64>,
+    states_carried: usize,
+    seconds_of_the_longest_submission: f64,
+) -> Option<f64> {
+    if states_carried <= NARROWEST_DISPATCH {
+        Some(seconds_of_the_longest_submission)
+    } else {
+        seconds_of_the_indivisible_floor
+            .map(|floor_seconds| floor_seconds.min(seconds_of_the_longest_submission))
+    }
+}
+
+/// 一次派活最久那一次提交许算多久（秒）：量过拆不开的下限（`is_the_indivisible_floor_measured`）的，是驱动会掐的那条线
+/// [`SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT`]，不看下限多长、过没过 [`LONGEST_DISPATCH_SECONDS`]（下限本身过了那条线时宽度停在下限，
+/// 见 [`dispatches_stuck_at_the_floor_after_a_dispatch`]）；没量过的是 [`LONGEST_DISPATCH_SECONDS`]。
+#[must_use]
+pub fn longest_tolerated_submission_seconds(is_the_indivisible_floor_measured: bool) -> f64 {
+    if is_the_indivisible_floor_measured {
+        SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT
+    } else {
+        LONGEST_DISPATCH_SECONDS
+    }
+}
+
+/// 最久那一次提交 `seconds_of_the_longest_submission` 秒的一次派活之后加一倍宽，最久那一次提交会不会越过许的上限
+/// （[`longest_tolerated_submission_seconds`]）：用时照状态数翻倍也不越过的才加宽。两条满足一条就加宽：
+/// - 不到 [`LONGEST_DISPATCH_SECONDS`] 的四分之一：加倍之后还不到它的一半。
+/// - 量过拆不开的下限（`is_the_indivisible_floor_measured`），又不超过 [`SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT`] 的一半：加倍之后不过那条线。
+///   不拿下限的倍数比：状态在卡上并行时加宽几乎不加时，宽度要一路涨上去；状态互相拖慢、用时随宽度成正比时，
+///   宽度停在最久那一次提交过了那条线一半的那一档，加宽那一步不会把它推过那条线，也不在两档之间来回跳。
+#[must_use]
+pub fn widening_keeps_the_longest_submission_tolerable(
+    seconds_of_the_longest_submission: f64,
+    is_the_indivisible_floor_measured: bool,
+) -> bool {
+    seconds_of_the_longest_submission < LONGEST_DISPATCH_SECONDS / 4.0
+        || (is_the_indivisible_floor_measured
+            && seconds_of_the_longest_submission <= SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT / 2.0)
+}
+
+/// 一次派活（此刻的宽度 `width`，实际带了 `states_carried` 个状态，最久那一次提交 `seconds_of_the_longest_submission` 秒，
+/// 照这一次记过之后量没量过拆不开的下限是 `is_the_indivisible_floor_measured`）之后的宽度：
+/// - 超过 [`longest_tolerated_submission_seconds`]：照实际带的状态数减半（[`width_after_a_slow_dispatch`]）。这一段剩的状态比宽度少时，按宽度减半还是太宽。
+/// - 加一倍宽不越过它（[`widening_keeps_the_longest_submission_tolerable`]），这一次又带满了宽度，宽度还没到一条草稿缓冲：加倍，不超过一条草稿缓冲、不超过容量；
+///   没带满的那一次说不出带满了多久，不加宽。
+/// - 其余不动。到了一条草稿缓冲往上由量宽度定（[`calibration_goes_on`]），这里不加宽。
+#[must_use]
+pub fn dispatch_width_after_a_dispatch(
+    width: usize,
+    states_carried: usize,
+    seconds_of_the_longest_submission: f64,
+    states_per_lane: usize,
+    capacity: usize,
+    is_the_indivisible_floor_measured: bool,
+) -> usize {
+    let widening_keeps_the_longest_submission_under_the_tolerated_line =
+        widening_keeps_the_longest_submission_tolerable(
+            seconds_of_the_longest_submission,
+            is_the_indivisible_floor_measured,
+        );
+    if seconds_of_the_longest_submission
+        > longest_tolerated_submission_seconds(is_the_indivisible_floor_measured)
+    {
+        width_after_a_slow_dispatch(states_carried, capacity)
+    } else if widening_keeps_the_longest_submission_under_the_tolerated_line
+        && states_carried == width
+        && width < states_per_lane
+    {
+        width
+            .saturating_mul(2)
+            .min(states_per_lane)
+            .min(capacity.max(1))
+    } else {
+        width
+    }
+}
+
+/// 宽度停在拆不开的下限上连着几次派活：这一次只带了 [`NARROWEST_DISPATCH`] 个状态、之后的宽度 `next_width` 还是它（加不了宽），
+/// 最久那一次提交又超过 [`LONGEST_DISPATCH_SECONDS`]，就在 `stuck_before`（前面连着几次）上加一；别的一律从 0 重数。
+/// 到 [`DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING`] 次判器报错（[`StuckAtTheIndivisibleFloor`]），不再一个一个派下去。
+/// 只带 1 个状态的那一次就量了下限，之后的宽度照量过下限的判法定（[`dispatch_width_after_a_dispatch`]）：不过驱动那条线的一半就加宽，
+/// 过了那条线减半还是 1，过了一半、没过那条线的不动。所以数得上的是两种：单个状态就过了那条线的一半（再加宽，状态互相拖慢时就过线），
+/// 与一条草稿缓冲或容量只装得下 1 个状态、加不了宽而单个状态过了 [`LONGEST_DISPATCH_SECONDS`] 的。
+#[must_use]
+pub fn dispatches_stuck_at_the_floor_after_a_dispatch(
+    stuck_before: u64,
+    states_carried: usize,
+    seconds_of_the_longest_submission: f64,
+    next_width: usize,
+) -> u64 {
+    if states_carried <= NARROWEST_DISPATCH
+        && next_width <= NARROWEST_DISPATCH
+        && seconds_of_the_longest_submission > LONGEST_DISPATCH_SECONDS
+    {
+        stuck_before + 1
+    } else {
+        0
+    }
+}
+
+/// 判器停在拆不开的下限上：宽度到了 [`NARROWEST_DISPATCH`]、加不了宽，最久那一次提交连着 [`DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING`] 次
+/// 超过 [`LONGEST_DISPATCH_SECONDS`]。这一段序号判到 `next_ordinal` 之前为止（之后的没判），这个判器一共判了 `states_judged_by_the_judge` 个状态。
+#[derive(Clone, Debug, PartialEq)]
+pub struct StuckAtTheIndivisibleFloor {
+    pub card_name: String,
+    /// 最后那一次（宽度在下限上）最久那一次提交几秒。
+    pub seconds_of_the_floor: f64,
+    pub dispatches_in_a_row: u64,
+    pub next_ordinal: u64,
+    pub states_judged_by_the_judge: u64,
+    /// 这条流一共几个状态。
+    pub state_count: u64,
+}
+
+impl StuckAtTheIndivisibleFloor {
+    /// 可 grep 的一行：[`STUCK_AT_THE_INDIVISIBLE_FLOOR_LINE_PREFIX`] 起头，`flow=` 只在调用方知道流名时有（判器不知道判的是哪条流；
+    /// 崩溃放量判段照 `crate::crash_amplification::gpu_judging_refusal_naming_the_flow` 补上）。
+    #[must_use]
+    pub fn line(&self, flow_name: Option<&str>) -> String {
+        let flow = flow_name.map_or_else(String::new, |name| format!(" flow={name}"));
+        format!(
+            "{STUCK_AT_THE_INDIVISIBLE_FLOOR_LINE_PREFIX}{flow} card={:?} seconds_of_the_floor={:.3} dispatches_in_a_row={} \
+             longest_dispatch_seconds={LONGEST_DISPATCH_SECONDS} driver_line_seconds={SUBMISSION_SECONDS_THE_DRIVER_MAY_CUT} \
+             next_ordinal={} states_judged_by_the_judge={} state_count={} \
+             说明=宽度到了 1 个状态还拆不开，单个状态的提交就过了驱动会掐的那条线的一半（或这张卡一次只带得了 1 个状态），加宽要冒被驱动掐通道（Xid 109）的险，一个一个派每秒判不到一个状态；\
+             这一趟报错退出，不再派下去。出路：从内核这一侧缩短单个状态那一趟（看 GPU_LIFECYCLE 行里哪一趟最久）",
+            self.card_name,
+            self.seconds_of_the_floor,
+            self.dispatches_in_a_row,
+            self.next_ordinal,
+            self.states_judged_by_the_judge,
+            self.state_count
+        )
+    }
 }
 
 /// 记账分片交完、等完一片（卡算了 `seconds` 秒）之后下一片的片宽（几个位置）：多于 [`LONGEST_DISPATCH_SECONDS`] 的四分之一（0.125 秒）减半，
@@ -305,14 +477,69 @@ use crate::crash_library::{judge_tables_through_the_pairing_library, StageOutcom
 /// 本机的卡传它的 [`GpuCard::memory_budget_mebibytes`]；别的机器上的卡按配置的额度算（绑定上限按本机的卡估）。
 #[must_use]
 pub fn states_in_flight_within(
-    max_storage_buffer_binding_size: u64,
+    maximum_storage_buffer_binding_size: u64,
     memory_mebibytes: u64,
     tables: &PackedJudgeTables,
 ) -> usize {
     let scratch_memory_mebibytes = memory_mebibytes
         .saturating_sub(tables.mebibytes())
         .saturating_sub(MEBIBYTES_LEFT_FOR_THE_DRIVER);
-    states_per_dispatch(max_storage_buffer_binding_size, scratch_memory_mebibytes)
+    states_per_dispatch_within_the_scratch_memory(
+        maximum_storage_buffer_binding_size,
+        scratch_memory_mebibytes,
+    )
+}
+
+/// 调用方定好交给判器的派活宽度（[`GpuCrashJudge::on_card_with_the_given_dispatch_width`]）：一条草稿缓冲装几个状态、
+/// 一次派活最多几个状态（草稿区开后者除以前者向上取整那么多条缓冲），连同从窄处起步的派活宽度调度。
+/// 判器照它开草稿区、切派活，自己不读卡的显存额度、不定宽度。
+pub struct DispatchWidthGivenToTheJudge {
+    states_per_lane: usize,
+    states_per_dispatch: usize,
+    dispatch_width_schedule: DispatchWidthSchedule,
+}
+
+impl DispatchWidthGivenToTheJudge {
+    /// 照给的两个数：一条草稿缓冲装 `states_per_lane` 个状态，一次派活最多 `states_per_dispatch` 个状态。
+    /// 一条缓冲的字节数要在判器那张卡的存储绑定上限以内（[`states_per_scratch_lane`] 照上限算的就在）。
+    ///
+    /// # Panics
+    /// 两个数有一个是 0。
+    #[must_use]
+    pub fn of_lanes_holding(states_per_lane: usize, states_per_dispatch: usize) -> Self {
+        assert!(
+            states_per_lane >= 1 && states_per_dispatch >= 1,
+            "一条草稿缓冲装 {states_per_lane} 个、一次派活带 {states_per_dispatch} 个：两个都至少 1"
+        );
+        Self {
+            states_per_lane,
+            states_per_dispatch,
+            dispatch_width_schedule: DispatchWidthSchedule::starting_narrow(
+                states_per_lane,
+                states_per_dispatch,
+            ),
+        }
+    }
+
+    /// 照这张卡的显存额度定：一条草稿缓冲照这张卡的存储绑定上限装（[`states_per_scratch_lane`]）；一次派活的状态数被
+    /// 这张卡的显存额度（[`GpuCard::memory_budget_mebibytes`] 扣掉表与 [`MEBIBYTES_LEFT_FOR_THE_DRIVER`]，[`states_in_flight_within`]）、
+    /// 调用方要的 `requested_states_per_dispatch` 与这条流的状态数压住，至少 1（[`states_in_one_dispatch_capped_by_the_state_count`]）。
+    #[must_use]
+    pub fn within_the_memory_budget_of_the_card(
+        card: &GpuCard,
+        tables: &PackedJudgeTables,
+        requested_states_per_dispatch: usize,
+    ) -> Self {
+        let limit = card.device().limits().max_storage_buffer_binding_size;
+        Self::of_lanes_holding(
+            states_per_scratch_lane(limit),
+            states_in_one_dispatch_capped_by_the_state_count(
+                states_in_flight_within(limit, card.memory_budget_mebibytes(), tables),
+                requested_states_per_dispatch,
+                tables.state_count,
+            ),
+        )
+    }
 }
 
 /// 一个判器在卡上要占多少显存（MiB，向上取整），不算 [`MEBIBYTES_LEFT_FOR_THE_DRIVER`] 那一份（那一份每张卡只付一次，归卡池的账）：
@@ -372,15 +599,10 @@ pub struct GpuCrashJudge<'card> {
     state_count: u64,
     /// 一条草稿缓冲装几个状态（[`states_per_scratch_lane`]）。
     states_per_lane: usize,
-    /// 一次派活最多几个状态（[`states_per_dispatch`]：草稿区按它开）。
+    /// 一次派活最多几个状态（调用方给的 [`DispatchWidthGivenToTheJudge`]：草稿区按它开）。
     states_per_dispatch: usize,
-    /// 此刻一次派活带几个状态：从一条草稿缓冲那么多起步，在卡上现量（[`calibration_goes_on`]），算得太久减半。
-    dispatch_width: std::sync::atomic::AtomicUsize,
-    /// 量过宽度没有；上次量宽度之后派了几次活（到 [`DISPATCHES_BETWEEN_CALIBRATIONS`] 重量）。
-    calibrated: std::sync::atomic::AtomicBool,
-    dispatches_since_calibration: std::sync::atomic::AtomicU64,
-    /// 量宽度时试到过、过了拐点的最窄那一档（[`knee_after_calibration`]）：以后量宽度只试比它窄的；没撞过是 `usize::MAX`。
-    knee: std::sync::atomic::AtomicUsize,
+    /// 此刻一次派活带几个状态、什么时候量宽度。
+    dispatch_width_schedule: DispatchWidthSchedule,
     /// 到此刻为止带得最多的一次派活几个状态、卡算得最久的一次多久（纳秒）。
     widest_dispatch: std::sync::atomic::AtomicUsize,
     nanoseconds_of_the_longest_dispatch: std::sync::atomic::AtomicU64,
@@ -389,6 +611,8 @@ pub struct GpuCrashJudge<'card> {
     nanoseconds_waiting_for_the_card: std::sync::atomic::AtomicU64,
     nanoseconds_reading_back: std::sync::atomic::AtomicU64,
     dispatches: std::sync::atomic::AtomicU64,
+    /// 各趟的提交账：每次派活收尾并一次（派活进门拿着 `one_dispatch_at_a_time`，这把锁上没有争抢）。
+    submission_waits_of_the_passes: std::sync::Mutex<SubmissionWaitsOfThePasses>,
     /// 记账分片两轮各自此刻的片宽（几个位置，[`AccountingRound::index`] 为下标）：从 [`FIRST_ACCOUNTING_SLICE_WIDTH`] 起，每片等完按
     /// [`accounting_slice_width_after_a_slice`] 调，下一次派活接着用。两轮各一份：按单元那一类那一轮在多数状态上什么都不数、片片都快，
     /// 与按记录自述那一轮共用一份时会把片宽涨回一轮一片，下一次派活按记录自述那一轮头一片就整轮一次交。
@@ -410,25 +634,341 @@ pub struct GpuJudgeTimeSpent {
     pub seconds_reading_back: f64,
 }
 
+/// GPU 判器一次派活里依次交的各趟（[`GpuCrashJudge`] 一次派活一趟一次提交、等它算完再交下一次），
+/// 按派活的次序；记账分片那一趟一次派活交几片就是几次提交，`Readback` 是把结论拷回的那一次提交。
+/// 名字（[`Self::name`]）与 `GPU_LIFECYCLE` 行里的 `pass=` 相同。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GpuJudgePass {
+    Recovery,
+    CheckerWalk,
+    CheckerScan,
+    CheckerScanAllocationRecordsDisjoint,
+    CheckerScanAllocationGenerationsThroughTheRollbackFloorRaises,
+    CheckerAccountingHead,
+    CheckerAccountingSlice,
+    CheckerAccountingDecide,
+    CheckerAccountingFinal,
+    CheckerReferencesAndSnapshots,
+    CheckerScanRebuild,
+    Readback,
+}
+
+/// GPU 判器一次派活有几趟（[`GpuJudgePass`] 的成员数）。
+pub const GPU_JUDGE_PASSES: usize = 12;
+
+impl GpuJudgePass {
+    pub const IN_THE_ORDER_OF_THE_DISPATCH: [Self; GPU_JUDGE_PASSES] = [
+        Self::Recovery,
+        Self::CheckerWalk,
+        Self::CheckerScan,
+        Self::CheckerScanAllocationRecordsDisjoint,
+        Self::CheckerScanAllocationGenerationsThroughTheRollbackFloorRaises,
+        Self::CheckerAccountingHead,
+        Self::CheckerAccountingSlice,
+        Self::CheckerAccountingDecide,
+        Self::CheckerAccountingFinal,
+        Self::CheckerReferencesAndSnapshots,
+        Self::CheckerScanRebuild,
+        Self::Readback,
+    ];
+
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Recovery => "recovery",
+            Self::CheckerWalk => "checker_walk",
+            Self::CheckerScan => "checker_scan",
+            Self::CheckerScanAllocationRecordsDisjoint => {
+                "checker_scan_allocation_records_disjoint"
+            }
+            Self::CheckerScanAllocationGenerationsThroughTheRollbackFloorRaises => {
+                "checker_scan_allocation_generations_through_the_rollback_floor_raises"
+            }
+            Self::CheckerAccountingHead => "checker_accounting_head",
+            Self::CheckerAccountingSlice => "checker_accounting_slice",
+            Self::CheckerAccountingDecide => "checker_accounting_decide",
+            Self::CheckerAccountingFinal => "checker_accounting_final",
+            Self::CheckerReferencesAndSnapshots => "checker_references_and_snapshots",
+            Self::CheckerScanRebuild => "checker_scan_rebuild",
+            Self::Readback => "readback",
+        }
+    }
+
+    /// 在 [`Self::IN_THE_ORDER_OF_THE_DISPATCH`] 里的下标。
+    #[must_use]
+    pub const fn index_in_the_dispatch(self) -> usize {
+        match self {
+            Self::Recovery => 0,
+            Self::CheckerWalk => 1,
+            Self::CheckerScan => 2,
+            Self::CheckerScanAllocationRecordsDisjoint => 3,
+            Self::CheckerScanAllocationGenerationsThroughTheRollbackFloorRaises => 4,
+            Self::CheckerAccountingHead => 5,
+            Self::CheckerAccountingSlice => 6,
+            Self::CheckerAccountingDecide => 7,
+            Self::CheckerAccountingFinal => 8,
+            Self::CheckerReferencesAndSnapshots => 9,
+            Self::CheckerScanRebuild => 10,
+            Self::Readback => 11,
+        }
+    }
+}
+
+/// 一次派活里各趟的提交：每趟几次、等卡纳秒之和、最久那一次几纳秒（[`GpuJudgePass::index_in_the_dispatch`] 为下标）。
+/// 定长、不分配：派活里每次提交等完记一次（[`Self::note_a_submission`]）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SubmissionWaitsOfOneDispatch {
+    submissions_of_each_pass: [u64; GPU_JUDGE_PASSES],
+    nanoseconds_waiting_of_each_pass: [u64; GPU_JUDGE_PASSES],
+    nanoseconds_of_the_longest_submission_of_each_pass: [u64; GPU_JUDGE_PASSES],
+}
+
+impl SubmissionWaitsOfOneDispatch {
+    /// `pass` 那一趟又交了一次提交，等卡等了 `nanoseconds`。
+    pub fn note_a_submission(&mut self, pass: GpuJudgePass, nanoseconds: u64) {
+        let index = pass.index_in_the_dispatch();
+        self.submissions_of_each_pass[index] += 1;
+        self.nanoseconds_waiting_of_each_pass[index] += nanoseconds;
+        self.nanoseconds_of_the_longest_submission_of_each_pass[index] =
+            self.nanoseconds_of_the_longest_submission_of_each_pass[index].max(nanoseconds);
+    }
+
+    /// 这一次派活全部提交的等卡纳秒之和：判器把它加进自己等卡的总账（[`GpuJudgeTimeSpent::seconds_waiting_for_the_card`] 那一笔）。
+    #[must_use]
+    pub fn nanoseconds_waiting_for_the_card(&self) -> u64 {
+        self.nanoseconds_waiting_of_each_pass.iter().sum()
+    }
+
+    /// 这一次派活里最久的那一次提交（不分哪一趟）。
+    #[must_use]
+    pub fn nanoseconds_of_the_longest_submission(&self) -> u64 {
+        self.nanoseconds_of_the_longest_submission_of_each_pass
+            .iter()
+            .copied()
+            .max()
+            .unwrap_or(0)
+    }
+}
+
+/// 一趟在一个判器上到此刻为止的提交账：几次、等卡纳秒之和、最久那一次。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SubmissionWaitsOfAPass {
+    pub submissions: u64,
+    pub nanoseconds_waiting_for_the_card: u64,
+    pub nanoseconds_of_the_longest_submission: u64,
+}
+
+/// 一个判器（一张卡）上各趟到此刻为止的提交账，与每次提交带几个状态的分布（求中位数用）。
+/// 一次派活的每次提交带的状态数相同（这次派活的状态数），所以分布按派活的状态数记：状态数 → 各趟在这样宽的派活里交了几次提交。
+/// 一次派活并一次账（[`Self::add_a_dispatch`]）；分布只在出现没见过的派活宽度时多一个节点。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SubmissionWaitsOfThePasses {
+    passes: [SubmissionWaitsOfAPass; GPU_JUDGE_PASSES],
+    submissions_of_each_pass_by_states_per_submission:
+        std::collections::BTreeMap<u64, [u64; GPU_JUDGE_PASSES]>,
+}
+
+impl SubmissionWaitsOfThePasses {
+    /// 并进一次带 `states_per_submission` 个状态的派活。
+    pub fn add_a_dispatch(
+        &mut self,
+        states_per_submission: u64,
+        waits_of_the_dispatch: &SubmissionWaitsOfOneDispatch,
+    ) {
+        let submissions_by_pass = self
+            .submissions_of_each_pass_by_states_per_submission
+            .entry(states_per_submission)
+            .or_insert([0; GPU_JUDGE_PASSES]);
+        for (index, pass) in self.passes.iter_mut().enumerate() {
+            let submissions = waits_of_the_dispatch.submissions_of_each_pass[index];
+            pass.submissions += submissions;
+            pass.nanoseconds_waiting_for_the_card +=
+                waits_of_the_dispatch.nanoseconds_waiting_of_each_pass[index];
+            pass.nanoseconds_of_the_longest_submission =
+                pass.nanoseconds_of_the_longest_submission.max(
+                    waits_of_the_dispatch.nanoseconds_of_the_longest_submission_of_each_pass[index],
+                );
+            submissions_by_pass[index] += submissions;
+        }
+    }
+
+    /// 并进另一个判器的账（同一张卡在收尾再起的那一轮里又建了一个判器）。
+    pub fn merge(&mut self, other: &Self) {
+        for (pass, other_pass) in self.passes.iter_mut().zip(&other.passes) {
+            pass.submissions += other_pass.submissions;
+            pass.nanoseconds_waiting_for_the_card += other_pass.nanoseconds_waiting_for_the_card;
+            pass.nanoseconds_of_the_longest_submission = pass
+                .nanoseconds_of_the_longest_submission
+                .max(other_pass.nanoseconds_of_the_longest_submission);
+        }
+        for (states_per_submission, other_submissions) in
+            &other.submissions_of_each_pass_by_states_per_submission
+        {
+            let submissions = self
+                .submissions_of_each_pass_by_states_per_submission
+                .entry(*states_per_submission)
+                .or_insert([0; GPU_JUDGE_PASSES]);
+            for (submissions_of_the_pass, other_of_the_pass) in
+                submissions.iter_mut().zip(other_submissions)
+            {
+                *submissions_of_the_pass += other_of_the_pass;
+            }
+        }
+    }
+
+    #[must_use]
+    pub fn of_the_pass(&self, pass: GpuJudgePass) -> SubmissionWaitsOfAPass {
+        self.passes[pass.index_in_the_dispatch()]
+    }
+
+    /// 各趟等卡纳秒之和（与判器等卡的总账是同一笔：两边都由每次派活的 [`SubmissionWaitsOfOneDispatch::nanoseconds_waiting_for_the_card`] 加成）。
+    #[must_use]
+    pub fn nanoseconds_waiting_for_the_card(&self) -> u64 {
+        self.passes
+            .iter()
+            .map(|pass| pass.nanoseconds_waiting_for_the_card)
+            .sum()
+    }
+
+    /// `pass` 那一趟每次提交带几个状态的中位数：全部提交按状态数从小到大排，取第 ⌊(次数 − 1) / 2⌋ 个（偶数次取中间两个里小的那个）；一次都没交是 0。
+    #[must_use]
+    pub fn median_states_per_submission(&self, pass: GpuJudgePass) -> u64 {
+        let index = pass.index_in_the_dispatch();
+        let submissions = self.passes[index].submissions;
+        if submissions == 0 {
+            return 0;
+        }
+        let position_of_the_median = (submissions - 1) / 2;
+        let mut submissions_so_far = 0u64;
+        self.submissions_of_each_pass_by_states_per_submission
+            .iter()
+            .find(|(_, submissions_by_pass)| {
+                submissions_so_far += submissions_by_pass[index];
+                submissions_so_far > position_of_the_median
+            })
+            .map(|(states_per_submission, _)| *states_per_submission)
+            .expect("分布里这一趟的提交次数之和等于这一趟的提交次数（两边在 add_a_dispatch 与 merge 里一起加）")
+    }
+}
+
+/// 每趟用时汇总行的行首（[`gpu_pass_summaries`]、[`GpuPassSummary::line`]）。
+pub const GPU_PASS_LINE_PREFIX: &str = "CRASH_AMPLIFICATION_GPU_PASS";
+
+/// 一条流（或一趟里的一段块区间）判完之后一张卡一趟的汇总；没有卡判过（整段复用，一次提交都没有）时只有一份、`card` 是 `None`。
+#[derive(Clone, Debug, PartialEq)]
+pub struct GpuPassSummary {
+    /// 卡名与序号；`None` 是这条流一张卡都没派活。
+    pub card: Option<(String, u32)>,
+    /// `None` 与 `card` 同。
+    pub pass: Option<GpuJudgePass>,
+    pub submissions: u64,
+    pub seconds_waiting_for_the_card: f64,
+    pub seconds_of_the_longest_submission: f64,
+    pub median_states_per_submission: u64,
+    /// 这张卡这一趟的等卡秒数占这条流全部卡、全部趟等卡秒数之和的比例；全部之和是 0 时是 0。
+    pub share_of_the_waits_of_the_flow: f64,
+}
+
+impl GpuPassSummary {
+    /// 汇总那一行：`CRASH_AMPLIFICATION_GPU_PASS flow=<流> card=<卡名> index=<序号> pass=<趟名> submissions=… seconds_waiting_for_the_card=…
+    /// seconds_of_the_longest_submission=… median_states_per_submission=… share_of_the_waits_of_the_flow=…`；没有卡的那一份卡、序号、趟名写 `none`。
+    #[must_use]
+    pub fn line(&self, flow_name: &str) -> String {
+        let (card, index) = match &self.card {
+            Some((name, index)) => (format!("{name:?}"), index.to_string()),
+            None => ("none".to_string(), "none".to_string()),
+        };
+        format!(
+            "{GPU_PASS_LINE_PREFIX} flow={flow_name} card={card} index={index} pass={} submissions={} seconds_waiting_for_the_card={:.3} \
+             seconds_of_the_longest_submission={:.3} median_states_per_submission={} share_of_the_waits_of_the_flow={:.4}",
+            self.pass.map_or("none", GpuJudgePass::name),
+            self.submissions,
+            self.seconds_waiting_for_the_card,
+            self.seconds_of_the_longest_submission,
+            self.median_states_per_submission,
+            self.share_of_the_waits_of_the_flow
+        )
+    }
+}
+
+/// 一条流判完时每张卡每一趟的汇总，卡按 `cards`（卡名、序号、那张卡的判器的提交账）里头一次出现的先后、趟按派活的次序：
+/// 同一张卡（序号相同）收工几次的账并成一份；`cards` 空着（整段复用、一次提交都没有）交一份提交次数 0 的。
+/// 比例的分母是这条流全部卡、全部趟的等卡纳秒之和。
+#[must_use]
+pub fn gpu_pass_summaries<'cards>(
+    cards: impl IntoIterator<Item = (&'cards str, u32, &'cards SubmissionWaitsOfThePasses)>,
+) -> Vec<GpuPassSummary> {
+    let mut merged_by_card: Vec<(&'cards str, u32, SubmissionWaitsOfThePasses)> = Vec::new();
+    for (name, card_index, waits_of_the_card) in cards {
+        match merged_by_card
+            .iter_mut()
+            .find(|(_, merged_index, _)| *merged_index == card_index)
+        {
+            Some((_, _, merged_waits)) => merged_waits.merge(waits_of_the_card),
+            None => merged_by_card.push((name, card_index, waits_of_the_card.clone())),
+        }
+    }
+    if merged_by_card.is_empty() {
+        return vec![GpuPassSummary {
+            card: None,
+            pass: None,
+            submissions: 0,
+            seconds_waiting_for_the_card: 0.0,
+            seconds_of_the_longest_submission: 0.0,
+            median_states_per_submission: 0,
+            share_of_the_waits_of_the_flow: 0.0,
+        }];
+    }
+    let nanoseconds_waiting_of_the_flow: u64 = merged_by_card
+        .iter()
+        .map(|(_, _, merged_waits)| merged_waits.nanoseconds_waiting_for_the_card())
+        .sum();
+    let mut summaries = Vec::with_capacity(merged_by_card.len() * GPU_JUDGE_PASSES);
+    for (name, card_index, merged_waits) in &merged_by_card {
+        for pass in GpuJudgePass::IN_THE_ORDER_OF_THE_DISPATCH {
+            let of_the_pass = merged_waits.of_the_pass(pass);
+            summaries.push(GpuPassSummary {
+                card: Some(((*name).to_string(), *card_index)),
+                pass: Some(pass),
+                submissions: of_the_pass.submissions,
+                seconds_waiting_for_the_card: of_the_pass.nanoseconds_waiting_for_the_card as f64
+                    / 1e9,
+                seconds_of_the_longest_submission: of_the_pass.nanoseconds_of_the_longest_submission
+                    as f64
+                    / 1e9,
+                median_states_per_submission: merged_waits.median_states_per_submission(pass),
+                share_of_the_waits_of_the_flow: if nanoseconds_waiting_of_the_flow == 0 {
+                    0.0
+                } else {
+                    of_the_pass.nanoseconds_waiting_for_the_card as f64
+                        / nanoseconds_waiting_of_the_flow as f64
+                },
+            });
+        }
+    }
+    summaries
+}
+
 /// 一条草稿缓冲装几个状态：每个状态 `SCRATCH_WORDS × 4` 字节，一条不超过这张卡的存储绑定上限；至少 1。
 #[must_use]
-pub fn states_per_scratch_lane(max_storage_buffer_binding_size: u64) -> usize {
+pub fn states_per_scratch_lane(maximum_storage_buffer_binding_size: u64) -> usize {
     let per_state = u64::try_from(SCRATCH_WORDS * 4).expect("装得进 u64");
-    usize::try_from(max_storage_buffer_binding_size / per_state)
+    usize::try_from(maximum_storage_buffer_binding_size / per_state)
         .unwrap_or(usize::MAX)
         .max(1)
 }
 
 /// 一张卡一次派活带几个状态：草稿区不超过给它的显存（MiB），也不超过 [`MAXIMUM_SCRATCH_LANES`] 条缓冲装得下的；至少 1。
 #[must_use]
-pub fn states_per_dispatch(
-    max_storage_buffer_binding_size: u64,
+pub fn states_per_dispatch_within_the_scratch_memory(
+    maximum_storage_buffer_binding_size: u64,
     scratch_memory_mebibytes: u64,
 ) -> usize {
     let per_state = u64::try_from(SCRATCH_WORDS * 4).expect("装得进 u64");
     let by_memory =
         usize::try_from(scratch_memory_mebibytes * 1024 * 1024 / per_state).unwrap_or(usize::MAX);
-    let by_lanes = states_per_scratch_lane(max_storage_buffer_binding_size) * MAXIMUM_SCRATCH_LANES;
+    let by_lanes =
+        states_per_scratch_lane(maximum_storage_buffer_binding_size) * MAXIMUM_SCRATCH_LANES;
     by_memory.min(by_lanes).max(1)
 }
 
@@ -805,8 +1345,8 @@ impl<'card> GpuCrashJudge<'card> {
         )
     }
 
-    /// 同 [`Self::on_card_with_packed_tables`]，编的是调用方给的三份内核源码。判器的结论按 GPU 判器那一组判法单元的键入库
-    /// （这个函数与 [`JudgeKernelSources::of_the_judge`] 都是那一组的入口）。
+    /// 同 [`Self::on_card_with_packed_tables`]，编的是调用方给的三份内核源码；一次派活的宽度照这张卡的显存额度算好
+    /// （[`DispatchWidthGivenToTheJudge::within_the_memory_budget_of_the_card`]）交给 [`Self::on_card_with_the_given_dispatch_width`]。
     /// 判定入库的路径只编一种别的源码：给定状态表那一栏旋钮值编进扫描内核（[`JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`]，
     /// `crate::crash_amplification::GivenStatesEngine` 照表上那一栏编；旋钮值进那张表的块键「给定状态表加旋钮栏」）。
     /// 对拍用例另拿它在内核里种假违例位、判旋钮压小写出的镜像，那几份结论不入库。
@@ -818,6 +1358,31 @@ impl<'card> GpuCrashJudge<'card> {
         card: &'card GpuCard,
         tables: &PackedJudgeTablesReadBack,
         requested_states_per_dispatch: usize,
+        kernel_sources: &JudgeKernelSources,
+    ) -> Self {
+        Self::on_card_with_the_given_dispatch_width(
+            card,
+            tables,
+            DispatchWidthGivenToTheJudge::within_the_memory_budget_of_the_card(
+                card,
+                tables,
+                requested_states_per_dispatch,
+            ),
+            kernel_sources,
+        )
+    }
+
+    /// 把打包判表上卡、编调用方给的三份内核源码，草稿区与派活宽度照调用方给的 `width_given_by_the_caller` 开：判器不读卡的显存额度、不定宽度。
+    /// 判器的结论按 GPU 判器那一组判法单元的键入库（这个函数与 [`JudgeKernelSources::of_the_judge`] 都是那一组的入口）；
+    /// 宽度只管一段序号切成几次派活，不进结论，定宽度的函数与常量不在那一组的闭包里。
+    ///
+    /// # Panics
+    /// 同 [`Self::on_card_with_packed_tables`]。
+    #[must_use]
+    pub fn on_card_with_the_given_dispatch_width(
+        card: &'card GpuCard,
+        tables: &PackedJudgeTablesReadBack,
+        width_given_by_the_caller: DispatchWidthGivenToTheJudge,
         kernel_sources: &JudgeKernelSources,
     ) -> Self {
         let packed = &tables.words;
@@ -833,12 +1398,11 @@ impl<'card> GpuCrashJudge<'card> {
             table_bytes <= limit,
             "判器的表 {table_bytes} 字节超过这张卡的绑定上限 {limit}：这条流 GPU 判不了"
         );
-        let states_per_lane = states_per_scratch_lane(limit);
-        let states_per_dispatch = states_in_one_dispatch_capped_by_the_state_count(
-            states_in_flight_within(limit, card.memory_budget_mebibytes(), tables),
-            requested_states_per_dispatch,
-            tables.state_count,
-        );
+        let DispatchWidthGivenToTheJudge {
+            states_per_lane,
+            states_per_dispatch,
+            dispatch_width_schedule,
+        } = width_given_by_the_caller;
         let tables_buffer = wgpu::util::DeviceExt::create_buffer_init(
             device,
             &wgpu::util::BufferInitDescriptor {
@@ -891,18 +1455,16 @@ impl<'card> GpuCrashJudge<'card> {
             state_count: tables.state_count,
             states_per_lane,
             states_per_dispatch,
-            dispatch_width: std::sync::atomic::AtomicUsize::new(
-                states_per_dispatch.min(states_per_lane),
-            ),
-            calibrated: std::sync::atomic::AtomicBool::new(false),
-            dispatches_since_calibration: std::sync::atomic::AtomicU64::new(0),
-            knee: std::sync::atomic::AtomicUsize::new(usize::MAX),
+            dispatch_width_schedule,
             widest_dispatch: std::sync::atomic::AtomicUsize::new(0),
             nanoseconds_of_the_longest_dispatch: std::sync::atomic::AtomicU64::new(0),
             nanoseconds_preparing: std::sync::atomic::AtomicU64::new(0),
             nanoseconds_waiting_for_the_card: std::sync::atomic::AtomicU64::new(0),
             nanoseconds_reading_back: std::sync::atomic::AtomicU64::new(0),
             dispatches: std::sync::atomic::AtomicU64::new(0),
+            submission_waits_of_the_passes: std::sync::Mutex::new(
+                SubmissionWaitsOfThePasses::default(),
+            ),
             accounting_slice_width_of_each_round: [
                 std::sync::atomic::AtomicU32::new(FIRST_ACCOUNTING_SLICE_WIDTH),
                 std::sync::atomic::AtomicU32::new(FIRST_ACCOUNTING_SLICE_WIDTH),
@@ -931,17 +1493,25 @@ impl<'card> GpuCrashJudge<'card> {
         }
     }
 
+    /// 到此刻为止各趟的提交账（各趟等卡之和与 [`Self::time_spent`] 的 `seconds_waiting_for_the_card` 是同一笔）。
+    #[must_use]
+    pub fn submission_waits_of_the_passes(&self) -> SubmissionWaitsOfThePasses {
+        self.submission_waits_of_the_passes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     /// 一次派活最多带几个状态（草稿区开了这么多；实际带几个在卡上现量，见 [`calibration_goes_on`]）。
     #[must_use]
     pub fn states_per_dispatch(&self) -> usize {
         self.states_per_dispatch
     }
 
-    /// 此刻一次派活带几个状态（量过宽度之后就是量出来的那个）。
+    /// 此刻一次派活带几个状态（从 [`FIRST_DISPATCH_STATES`] 个起步，按用时调；量过宽度之后是量出来的那个）。
     #[must_use]
     pub fn dispatch_width(&self) -> usize {
-        self.dispatch_width
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.dispatch_width_schedule.width()
     }
 
     /// 这条流一共几个状态（序号从 0 起）。
@@ -959,84 +1529,36 @@ impl<'card> GpuCrashJudge<'card> {
     /// 判一段序号的状态，每个状态 [`VERDICT_WORDS`] 个字，按序号次序。
     ///
     /// # Panics
-    /// 序号越过整条流的状态数；GPU 没写到某个状态（内核与派发对不上）。
+    /// 序号越过整条流的状态数；GPU 没写到某个状态（内核与派发对不上）；宽度停在拆不开的下限上
+    /// （[`Self::judge_states_unless_stuck_at_the_indivisible_floor`] 报的错，消息是 [`StuckAtTheIndivisibleFloor::line`] 那一行）。
     #[must_use]
     pub fn judge_states(&self, ordinals: Range<u64>) -> Vec<[u32; VERDICT_WORDS]> {
+        self.judge_states_unless_stuck_at_the_indivisible_floor(ordinals)
+            .unwrap_or_else(|stuck| panic!("{}", stuck.line(None)))
+    }
+
+    /// 同 [`Self::judge_states`]，宽度停在拆不开的下限上时报错、不 panic（崩溃放量判段照它拒判、整趟报错）。
+    ///
+    /// # Errors
+    /// 宽度停在拆不开的下限上连着 [`DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING`] 次（[`StuckAtTheIndivisibleFloor`]）：之后的序号不再派。
+    ///
+    /// # Panics
+    /// 序号越过整条流的状态数；GPU 没写到某个状态（内核与派发对不上）。
+    pub fn judge_states_unless_stuck_at_the_indivisible_floor(
+        &self,
+        ordinals: Range<u64>,
+    ) -> Result<Vec<[u32; VERDICT_WORDS]>, StuckAtTheIndivisibleFloor> {
         assert!(
             ordinals.end <= self.state_count,
             "序号段 {ordinals:?} 越过状态数 {}",
             self.state_count
         );
-        let mut out = Vec::with_capacity(
-            usize::try_from(ordinals.end - ordinals.start).expect("装得进 usize"),
-        );
-        let relaxed = std::sync::atomic::Ordering::Relaxed;
-        let lane = self.states_per_lane.min(self.states_per_dispatch);
-        let mut start = ordinals.start;
-        while start < ordinals.end {
-            let left = usize::try_from(ordinals.end - start).expect("装得进 usize");
-            let calibration_is_due = !self.calibrated.load(relaxed)
-                || self.dispatches_since_calibration.load(relaxed)
-                    >= DISPATCHES_BETWEEN_CALIBRATIONS;
-            let widest_to_try = self
-                .states_per_dispatch
-                .min(self.knee.load(relaxed).saturating_sub(1))
-                .max(lane);
-            if calibration_is_due && left >= 2 * lane && widest_to_try >= 2 * lane {
-                // 量宽度：同一段起点一档加一条缓冲地派；最宽那一档判的状态包住了前面几档，它的结论照用
-                let mut samples: Vec<(usize, f64)> = Vec::new();
-                let widest_verdicts = loop {
-                    let width = ((samples.len() + 1) * lane).min(widest_to_try).min(left);
-                    let timed = self
-                        .timed_dispatch(start..start + u64::try_from(width).expect("装得进 u64"));
-                    samples.push((width, timed.seconds));
-                    if width == left || !calibration_goes_on(&samples, widest_to_try) {
-                        break timed.verdicts;
-                    }
-                };
-                let chosen = calibrated_width(&samples);
-                eprintln!(
-                    "CRASH_JUDGE_DISPATCH_CALIBRATED card={:?} first_state={start} samples={} chosen_states={chosen} capacity={}",
-                    self.card.name,
-                    samples
-                        .iter()
-                        .map(|(width, seconds)| format!("{width}:{seconds:.3}"))
-                        .collect::<Vec<_>>()
-                        .join(","),
-                    self.states_per_dispatch
-                );
-                self.dispatch_width.store(chosen, relaxed);
-                self.knee.store(
-                    knee_after_calibration(&samples, self.knee.load(relaxed)),
-                    relaxed,
-                );
-                self.calibrated.store(true, relaxed);
-                self.dispatches_since_calibration.store(0, relaxed);
-                start += u64::try_from(widest_verdicts.len()).expect("装得进 u64");
-                out.extend(widest_verdicts);
-                continue;
-            }
-            let width = self.dispatch_width.load(relaxed);
-            let end = (start + u64::try_from(width).expect("装得进")).min(ordinals.end);
-            let timed = self.timed_dispatch(start..end);
-            out.extend(timed.verdicts);
-            self.dispatches_since_calibration.fetch_add(1, relaxed);
-            // 驱动掐的是卡上一段不可抢占的活：一次派活拆成几次提交之后比的是最久的那一次提交（整次的用时随片数变长，不说明哪一段跑得太久）
-            if timed.seconds_of_the_longest_submission > LONGEST_DISPATCH_SECONDS {
-                let next = width_after_a_slow_dispatch(width, self.states_per_dispatch);
-                eprintln!(
-                    "CRASH_JUDGE_DISPATCH_WIDTH card={:?} states={} seconds={:.3} seconds_of_the_dispatch={:.3} next_states={next} capacity={}",
-                    self.card.name,
-                    end - start,
-                    timed.seconds_of_the_longest_submission,
-                    timed.seconds,
-                    self.states_per_dispatch
-                );
-                self.dispatch_width.store(next, relaxed);
-            }
-            start = end;
-        }
-        out
+        self.dispatch_width_schedule.judge_ordinals(
+            ordinals,
+            &self.card.name,
+            self.state_count,
+            |one_dispatch| self.timed_dispatch(one_dispatch),
+        )
     }
 
     /// 一次派活，交回结论与卡算了几秒（这一次里全部提交的等卡之和、最久的那一次提交）；记下带得最多的一次、算得最久的一次。
@@ -1179,33 +1701,30 @@ impl<'card> GpuCrashJudge<'card> {
             parts: &parts,
             dispatch_and_verdict_buffers: &dispatch_and_verdict_buffers,
         };
-        let mut nanoseconds_waited = 0u64;
-        let mut nanoseconds_of_the_longest_submission = 0u64;
-        let mut note_a_submission = |nanoseconds: u64| {
-            nanoseconds_waited += nanoseconds;
-            nanoseconds_of_the_longest_submission =
-                nanoseconds_of_the_longest_submission.max(nanoseconds);
-        };
+        let mut waits = SubmissionWaitsOfOneDispatch::default();
         // 几趟按次序：扫描内核源码里的几趟读走读内核留在草稿区交接段里的东西，后一趟接着前一趟的违例位与判到位记（扫描重建那一截要读另几截写下的违例位）
-        for (pass_name, pipeline) in [
-            ("recovery", &self.recovery_pipeline),
-            ("checker_walk", &self.checker_walk_pipeline),
-            ("checker_scan", &self.checker_scan_pipeline),
+        for (pass, pipeline) in [
+            (GpuJudgePass::Recovery, &self.recovery_pipeline),
+            (GpuJudgePass::CheckerWalk, &self.checker_walk_pipeline),
+            (GpuJudgePass::CheckerScan, &self.checker_scan_pipeline),
             (
-                "checker_scan_allocation_records_disjoint",
+                GpuJudgePass::CheckerScanAllocationRecordsDisjoint,
                 &self.checker_scan_allocation_records_disjoint_pipeline,
             ),
             (
-                "checker_scan_allocation_generations_through_the_rollback_floor_raises",
+                GpuJudgePass::CheckerScanAllocationGenerationsThroughTheRollbackFloorRaises,
                 &self
                     .checker_scan_allocation_generations_through_the_rollback_floor_raises_pipeline,
             ),
             (
-                "checker_accounting_head",
+                GpuJudgePass::CheckerAccountingHead,
                 &self.checker_accounting_head_pipeline,
             ),
         ] {
-            note_a_submission(self.submit_one_pass_and_wait(&passes, pass_name, pipeline, None));
+            waits.note_a_submission(
+                pass,
+                self.submit_one_pass_and_wait(&passes, pass.name(), pipeline, None),
+            );
         }
         let relaxed = std::sync::atomic::Ordering::Relaxed;
         let mut slices_of_each_round = [0u32; 2];
@@ -1236,11 +1755,11 @@ impl<'card> GpuCrashJudge<'card> {
                 );
                 let nanoseconds = self.submit_one_pass_and_wait(
                     &passes,
-                    "checker_accounting_slice",
+                    GpuJudgePass::CheckerAccountingSlice.name(),
                     &self.checker_accounting_slice_pipeline,
                     Some(&parameters),
                 );
-                note_a_submission(nanoseconds);
+                waits.note_a_submission(GpuJudgePass::CheckerAccountingSlice, nanoseconds);
                 nanoseconds_of_the_longest_slice =
                     nanoseconds_of_the_longest_slice.max(nanoseconds);
                 let seconds = nanoseconds as f64 / 1e9;
@@ -1262,26 +1781,35 @@ impl<'card> GpuCrashJudge<'card> {
             }
             // 决断那一趟在按记录自述那一轮罩满之后、按单元那一类那一轮之前
             if round == AccountingRound::CountingAsRecorded {
-                note_a_submission(self.submit_one_pass_and_wait(
-                    &passes,
-                    "checker_accounting_decide",
-                    &self.checker_accounting_decide_pipeline,
-                    None,
-                ));
+                waits.note_a_submission(
+                    GpuJudgePass::CheckerAccountingDecide,
+                    self.submit_one_pass_and_wait(
+                        &passes,
+                        GpuJudgePass::CheckerAccountingDecide.name(),
+                        &self.checker_accounting_decide_pipeline,
+                        None,
+                    ),
+                );
             }
         }
-        for (pass_name, pipeline) in [
+        for (pass, pipeline) in [
             (
-                "checker_accounting_final",
+                GpuJudgePass::CheckerAccountingFinal,
                 &self.checker_accounting_final_pipeline,
             ),
             (
-                "checker_references_and_snapshots",
+                GpuJudgePass::CheckerReferencesAndSnapshots,
                 &self.checker_references_and_snapshots_pipeline,
             ),
-            ("checker_scan_rebuild", &self.checker_scan_rebuild_pipeline),
+            (
+                GpuJudgePass::CheckerScanRebuild,
+                &self.checker_scan_rebuild_pipeline,
+            ),
         ] {
-            note_a_submission(self.submit_one_pass_and_wait(&passes, pass_name, pipeline, None));
+            waits.note_a_submission(
+                pass,
+                self.submit_one_pass_and_wait(&passes, pass.name(), pipeline, None),
+            );
         }
         let result_bytes = u64::try_from(count * VERDICT_WORDS * 4).expect("装得进 u64");
         let staging = device.create_buffer(&wgpu::BufferDescriptor {
@@ -1347,7 +1875,10 @@ impl<'card> GpuCrashJudge<'card> {
             },
         );
         let reading_started = std::time::Instant::now();
-        note_a_submission(nanoseconds_of(reading_started - waiting_started));
+        waits.note_a_submission(
+            GpuJudgePass::Readback,
+            nanoseconds_of(reading_started - waiting_started),
+        );
         let mapped = slice.get_mapped_range().expect("读得到回读缓冲区");
         let (entries, remainder) = mapped.as_chunks::<4>();
         assert!(remainder.is_empty(), "回读缓冲区的长度是 4 的整数倍");
@@ -1371,6 +1902,7 @@ impl<'card> GpuCrashJudge<'card> {
         drop(mapped);
         staging.unmap();
         let nanoseconds_before_the_readback = nanoseconds_of(reading_started - dispatch_started);
+        let nanoseconds_waited = waits.nanoseconds_waiting_for_the_card();
         self.nanoseconds_preparing.fetch_add(
             nanoseconds_before_the_readback.saturating_sub(nanoseconds_waited),
             relaxed,
@@ -1380,7 +1912,15 @@ impl<'card> GpuCrashJudge<'card> {
         self.nanoseconds_reading_back
             .fetch_add(nanoseconds_of(reading_started.elapsed()), relaxed);
         self.dispatches.fetch_add(1, relaxed);
-        let seconds_of_the_longest_submission = nanoseconds_of_the_longest_submission as f64 / 1e9;
+        self.submission_waits_of_the_passes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .add_a_dispatch(
+                u64::try_from(count).expect("一次派活的状态数装得进 u64"),
+                &waits,
+            );
+        let seconds_of_the_longest_submission =
+            waits.nanoseconds_of_the_longest_submission() as f64 / 1e9;
         eprintln!(
             "CRASH_JUDGE_ACCOUNTING_SLICES card={:?} first_state={} states={count} slices_counting_as_recorded={} slices_counting_as_the_unit_classes={} \
              longest_slice_seconds={:.3} longest_submission_seconds={seconds_of_the_longest_submission:.3} slice_width_counting_as_recorded={} \
@@ -1509,7 +2049,7 @@ impl<'card> GpuCrashJudge<'card> {
         if let Err(error) = polled {
             let failure = format!(
                 "等了 {LONGEST_WAIT_FOR_THE_CARD_SECONDS} 秒，卡 {:?} 没把这次派活的 {pass_name} 那一趟（{} 个状态，序号 {} 起）算完：{error:?}。\
-                 多半是单次派活跑得太久被驱动掐了通道（看内核日志里的 Xid 109）；记账分片的片宽按每片的用时调，一次派活带的状态数按 LONGEST_DISPATCH_SECONDS 调",
+                 多半是单次派活跑得太久被驱动掐了通道（看内核日志里的 Xid 109）；记账分片的片宽按每片的用时调，一次派活带的状态数按 longest_tolerated_submission_seconds 调",
                 self.card.name,
                 ordinals.end - ordinals.start,
                 ordinals.start
@@ -1524,6 +2064,209 @@ impl<'card> GpuCrashJudge<'card> {
             panic!("{failure}");
         }
         nanoseconds
+    }
+}
+
+/// 一次派活带几个状态的调度：怎么把一段序号切成一次次派活。只管切，不碰卡：派活交给调用方，结论按序号次序接回，切法不进结论。
+/// 从 [`FIRST_DISPATCH_STATES`] 个起步，每次派活之后按 [`dispatch_width_after_a_dispatch`] 调；宽度到了一条草稿缓冲才量宽度。
+struct DispatchWidthSchedule {
+    /// 一条草稿缓冲装几个状态（[`states_per_scratch_lane`]）。
+    states_per_lane: usize,
+    /// 一次派活最多几个状态（调用方给的 [`DispatchWidthGivenToTheJudge`]：草稿区按它开）。
+    capacity: usize,
+    /// 此刻一次派活带几个状态。
+    width: std::sync::atomic::AtomicUsize,
+    /// 量过宽度没有；上次量宽度之后派了几次活（到 [`DISPATCHES_BETWEEN_CALIBRATIONS`] 重量）。
+    calibrated: std::sync::atomic::AtomicBool,
+    dispatches_since_calibration: std::sync::atomic::AtomicU64,
+    /// 量宽度时试到过、过了拐点的最窄那一档（[`knee_after_calibration`]）：以后量宽度只试比它窄的；没撞过是 `usize::MAX`。
+    knee: std::sync::atomic::AtomicUsize,
+    /// 拆不开的下限与宽度停在下限上连着几次：两样一起读、一起改。
+    floor_watch: std::sync::Mutex<IndivisibleFloorWatch>,
+    /// 经这个调度判过几个状态（停在下限上报错时报）。
+    states_judged: std::sync::atomic::AtomicU64,
+}
+
+/// [`DispatchWidthSchedule`] 记着的拆不开的下限（[`indivisible_floor_after_a_dispatch`]）与宽度停在下限上连着几次
+/// （[`dispatches_stuck_at_the_floor_after_a_dispatch`]）。
+struct IndivisibleFloorWatch {
+    /// 调宽度只看量没量过（[`longest_tolerated_submission_seconds`]）；秒数进 `CRASH_JUDGE_DISPATCH_WIDTH` 行。
+    seconds_of_the_indivisible_floor: Option<f64>,
+    dispatches_stuck_in_a_row: u64,
+}
+
+impl DispatchWidthSchedule {
+    fn starting_narrow(states_per_lane: usize, capacity: usize) -> Self {
+        Self {
+            states_per_lane,
+            capacity,
+            width: std::sync::atomic::AtomicUsize::new(FIRST_DISPATCH_STATES),
+            calibrated: std::sync::atomic::AtomicBool::new(false),
+            dispatches_since_calibration: std::sync::atomic::AtomicU64::new(0),
+            knee: std::sync::atomic::AtomicUsize::new(usize::MAX),
+            floor_watch: std::sync::Mutex::new(IndivisibleFloorWatch {
+                seconds_of_the_indivisible_floor: None,
+                dispatches_stuck_in_a_row: 0,
+            }),
+            states_judged: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    fn width(&self) -> usize {
+        self.width.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// 把 `ordinals` 切成一次次派活交给 `timed_dispatch`，结论按序号次序接起来。每个序号恰好判一次。
+    /// `card_name`、`state_count`（这条流一共几个状态）只进打的行与报的错。
+    ///
+    /// # Errors
+    /// 宽度停在拆不开的下限上连着 [`DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING`] 次（[`dispatches_stuck_at_the_floor_after_a_dispatch`]）：
+    /// 停在那一次派活之后，之后的序号不再派。
+    fn judge_ordinals(
+        &self,
+        ordinals: Range<u64>,
+        card_name: &str,
+        state_count: u64,
+        mut timed_dispatch: impl FnMut(Range<u64>) -> TimedDispatch,
+    ) -> Result<Vec<[u32; VERDICT_WORDS]>, StuckAtTheIndivisibleFloor> {
+        let mut out = Vec::with_capacity(
+            usize::try_from(ordinals.end - ordinals.start).expect("装得进 usize"),
+        );
+        let relaxed = std::sync::atomic::Ordering::Relaxed;
+        let lane = self.states_per_lane.min(self.capacity);
+        let mut start = ordinals.start;
+        while start < ordinals.end {
+            let left = usize::try_from(ordinals.end - start).expect("装得进 usize");
+            let width_now = self.width.load(relaxed);
+            let calibration_is_due = !self.calibrated.load(relaxed)
+                || self.dispatches_since_calibration.load(relaxed)
+                    >= DISPATCHES_BETWEEN_CALIBRATIONS;
+            let widest_to_try = self
+                .capacity
+                .min(self.knee.load(relaxed).saturating_sub(1))
+                .max(lane);
+            // 量宽度头一档就带一条缓冲：宽度还没涨到一条缓冲时（更窄的宽度上已经算得不快）不量
+            if calibration_is_due
+                && width_now >= lane
+                && left >= 2 * lane
+                && widest_to_try >= 2 * lane
+            {
+                // 量宽度：同一段起点一档加一条缓冲地派；最宽那一档判的状态包住了前面几档，它的结论照用
+                let seconds_the_longest_submission_may_take = longest_tolerated_submission_seconds(
+                    self.floor_watch
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .seconds_of_the_indivisible_floor
+                        .is_some(),
+                );
+                let mut samples: Vec<(usize, f64)> = Vec::new();
+                let widest_verdicts = loop {
+                    let width = ((samples.len() + 1) * lane).min(widest_to_try).min(left);
+                    let timed =
+                        timed_dispatch(start..start + u64::try_from(width).expect("装得进 u64"));
+                    samples.push((width, timed.seconds));
+                    if width == left
+                        || !calibration_goes_on(
+                            &samples,
+                            timed.seconds_of_the_longest_submission,
+                            widest_to_try,
+                            seconds_the_longest_submission_may_take,
+                        )
+                    {
+                        break timed.verdicts;
+                    }
+                };
+                let chosen = calibrated_width(&samples);
+                eprintln!(
+                    "CRASH_JUDGE_DISPATCH_CALIBRATED card={card_name:?} first_state={start} samples={} chosen_states={chosen} capacity={}",
+                    samples
+                        .iter()
+                        .map(|(width, seconds)| format!("{width}:{seconds:.3}"))
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    self.capacity
+                );
+                self.width.store(chosen, relaxed);
+                self.knee.store(
+                    knee_after_calibration(&samples, self.knee.load(relaxed)),
+                    relaxed,
+                );
+                self.calibrated.store(true, relaxed);
+                self.dispatches_since_calibration.store(0, relaxed);
+                self.states_judged.fetch_add(
+                    u64::try_from(widest_verdicts.len()).expect("装得进 u64"),
+                    relaxed,
+                );
+                start += u64::try_from(widest_verdicts.len()).expect("装得进 u64");
+                out.extend(widest_verdicts);
+                continue;
+            }
+            let end = (start + u64::try_from(width_now).expect("装得进")).min(ordinals.end);
+            let timed = timed_dispatch(start..end);
+            out.extend(timed.verdicts);
+            self.dispatches_since_calibration.fetch_add(1, relaxed);
+            // 驱动掐的是卡上一段不可抢占的活：一次派活拆成几次提交之后比的是最久的那一次提交（整次的用时随片数变长，不说明哪一段跑得太久）
+            let states_carried = usize::try_from(end - start).expect("装得进 usize");
+            let mut floor_watch = self
+                .floor_watch
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let seconds_of_the_indivisible_floor = indivisible_floor_after_a_dispatch(
+                floor_watch.seconds_of_the_indivisible_floor,
+                states_carried,
+                timed.seconds_of_the_longest_submission,
+            );
+            let next = dispatch_width_after_a_dispatch(
+                width_now,
+                states_carried,
+                timed.seconds_of_the_longest_submission,
+                self.states_per_lane,
+                self.capacity,
+                seconds_of_the_indivisible_floor.is_some(),
+            );
+            let dispatches_stuck_in_a_row = dispatches_stuck_at_the_floor_after_a_dispatch(
+                floor_watch.dispatches_stuck_in_a_row,
+                states_carried,
+                timed.seconds_of_the_longest_submission,
+                next,
+            );
+            floor_watch.seconds_of_the_indivisible_floor = seconds_of_the_indivisible_floor;
+            floor_watch.dispatches_stuck_in_a_row = dispatches_stuck_in_a_row;
+            drop(floor_watch);
+            if next != width_now
+                || timed.seconds_of_the_longest_submission
+                    > longest_tolerated_submission_seconds(
+                        seconds_of_the_indivisible_floor.is_some(),
+                    )
+            {
+                eprintln!(
+                    "CRASH_JUDGE_DISPATCH_WIDTH card={card_name:?} states={states_carried} seconds={:.3} seconds_of_the_dispatch={:.3} next_states={next} capacity={} \
+                     seconds_of_the_indivisible_floor={} dispatches_stuck_at_the_floor={dispatches_stuck_in_a_row}",
+                    timed.seconds_of_the_longest_submission,
+                    timed.seconds,
+                    self.capacity,
+                    seconds_of_the_indivisible_floor
+                        .map_or_else(|| "-".to_string(), |floor_seconds| format!("{floor_seconds:.3}"))
+                );
+            }
+            self.width.store(next, relaxed);
+            let states_judged = self
+                .states_judged
+                .fetch_add(u64::try_from(states_carried).expect("装得进 u64"), relaxed)
+                + u64::try_from(states_carried).expect("装得进 u64");
+            start = end;
+            if dispatches_stuck_in_a_row >= DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING {
+                return Err(StuckAtTheIndivisibleFloor {
+                    card_name: card_name.to_string(),
+                    seconds_of_the_floor: timed.seconds_of_the_longest_submission,
+                    dispatches_in_a_row: dispatches_stuck_in_a_row,
+                    next_ordinal: start,
+                    states_judged_by_the_judge: states_judged,
+                    state_count,
+                });
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -1693,7 +2436,7 @@ pub fn persisted_masks_on_the_card(
 /// 同 [`crate::gpu_unit_checks::gpu_test_start::GpuCardPool::lease_card_or_report_not_run`]、[`judge_tables_through_the_pairing_library`] 与 [`GpuCrashJudge::on_card_with_packed_tables`]。
 #[must_use]
 pub fn judge_every_state_on_a_card_leased_from_the_pool(
-    cards: &'static crate::gpu_unit_checks::gpu_test_start::GpuCardPool,
+    cards: crate::gpu_unit_checks::gpu_test_start::GpuCardPoolStartedAtTheFirstLease,
     test_name: &str,
     tables: &JudgeTables,
 ) -> Option<Vec<[u32; VERDICT_WORDS]>> {
@@ -1710,7 +2453,7 @@ pub fn judge_every_state_on_a_card_leased_from_the_pool(
         };
     gpu_work_trace("library_end", format_args!("test={test_name:?}"));
     let states_per_dispatch =
-        states_per_scratch_lane(cards.smallest_max_storage_buffer_binding_size());
+        states_per_scratch_lane(cards.smallest_maximum_storage_buffer_binding_size());
     let lease = cards.lease_card_or_report_not_run(
         test_name,
         mebibytes_a_judge_needs(&packed, states_per_dispatch),
@@ -1741,9 +2484,9 @@ pub fn judge_every_state_on_a_card_leased_from_the_pool(
 #[cfg(test)]
 mod tests {
     use super::{
-        states_per_dispatch, states_per_scratch_lane, CHECKER_ACCOUNTING_DECIDE_ENTRY_POINT,
-        CHECKER_ACCOUNTING_FINAL_ENTRY_POINT, CHECKER_ACCOUNTING_HEAD_ENTRY_POINT,
-        CHECKER_ACCOUNTING_SLICE_ENTRY_POINT,
+        states_per_dispatch_within_the_scratch_memory, states_per_scratch_lane,
+        CHECKER_ACCOUNTING_DECIDE_ENTRY_POINT, CHECKER_ACCOUNTING_FINAL_ENTRY_POINT,
+        CHECKER_ACCOUNTING_HEAD_ENTRY_POINT, CHECKER_ACCOUNTING_SLICE_ENTRY_POINT,
         CHECKER_SCAN_ALLOCATION_GENERATIONS_THROUGH_THE_ROLLBACK_FLOOR_RAISES_ENTRY_POINT,
         CHECKER_SCAN_ALLOCATION_RECORDS_DISJOINT_ENTRY_POINT, MAXIMUM_SCRATCH_LANES,
     };
@@ -1799,17 +2542,20 @@ mod tests {
             "12 GiB 装的状态少于条数上限：这一格判的是显存那一边"
         );
         assert_eq!(
-            states_per_dispatch(BINDING_LIMIT, twelve_gibibytes_in_mebibytes),
+            states_per_dispatch_within_the_scratch_memory(
+                BINDING_LIMIT,
+                twelve_gibibytes_in_mebibytes
+            ),
             states_in_twelve_gibibytes,
             "12 GiB 的草稿区装 12 GiB ÷ 每个状态 {bytes_per_state} 字节个状态（向下取整）"
         );
         assert_eq!(
-            states_per_dispatch(BINDING_LIMIT, 0),
+            states_per_dispatch_within_the_scratch_memory(BINDING_LIMIT, 0),
             1,
             "一点显存都不给也带一个"
         );
         assert_eq!(
-            states_per_dispatch(BINDING_LIMIT, 1024 * 1024),
+            states_per_dispatch_within_the_scratch_memory(BINDING_LIMIT, 1024 * 1024),
             states_per_lane * MAXIMUM_SCRATCH_LANES,
             "显存再多也只到条数上限"
         );
@@ -1820,7 +2566,7 @@ mod tests {
     /// 表取 1 MiB：45 个状态要 1 + ⌈45 × (每个状态的草稿区 + 两份结论字 2 × 25 × 4) ÷ 1 048 576⌉ MiB；
     /// 此刻 1 + ⌈45 × 8 038 596 ÷ 1 048 576⌉ = 1 + ⌈361 736 820 ÷ 1 048 576⌉ = 1 + 345 = 346 MiB。
     #[test]
-    fn a_card_lent_what_a_judge_needs_opens_scratch_for_every_state_it_was_lent_for() {
+    fn card_lent_what_a_judge_needs_opens_scratch_for_every_state_it_was_lent_for() {
         use super::{mebibytes_a_judge_needs, states_in_flight_within, PackedJudgeTables};
         let tables_mebibytes = 1;
         let tables_of = |state_count: u64| PackedJudgeTables {
@@ -1884,32 +2630,65 @@ mod tests {
         ];
         for measured in 1..rtx_5090.len() {
             assert!(
-                calibration_goes_on(&rtx_5090[..measured], 31_291),
+                calibration_goes_on(
+                    &rtx_5090[..measured],
+                    rtx_5090[measured - 1].1,
+                    31_291,
+                    super::LONGEST_DISPATCH_SECONDS
+                ),
                 "5090 前 {measured} 档每个状态越来越快：接着加宽"
             );
         }
         assert!(
-            !calibration_goes_on(&rtx_5090, 31_291),
+            !calibration_goes_on(&rtx_5090, 0.071, 31_291, super::LONGEST_DISPATCH_SECONDS),
             "5090 到 23870 个每个状态慢了一倍：停"
         );
         assert_eq!(calibrated_width(&rtx_5090), 21_700);
         let rtx_5060_ti = [(2170, 0.029), (4340, 0.032), (6510, 0.039), (8680, 0.324)];
-        assert!(calibration_goes_on(&rtx_5060_ti[..3], 14_072));
-        assert!(!calibration_goes_on(&rtx_5060_ti, 14_072));
+        assert!(calibration_goes_on(
+            &rtx_5060_ti[..3],
+            0.039,
+            14_072,
+            super::LONGEST_DISPATCH_SECONDS
+        ));
+        assert!(!calibration_goes_on(
+            &rtx_5060_ti,
+            0.324,
+            14_072,
+            super::LONGEST_DISPATCH_SECONDS
+        ));
         assert_eq!(calibrated_width(&rtx_5060_ti), 6510);
         assert!(
-            !calibration_goes_on(&[(2170, 0.2), (4340, 0.26)], 31_291),
-            "每个状态还在变快，可单次超过 0.25 秒：停"
+            !calibration_goes_on(
+                &[(2170, 0.2), (4340, 0.26)],
+                0.26,
+                31_291,
+                super::LONGEST_DISPATCH_SECONDS
+            ),
+            "每个状态还在变快，可最久那一次提交超过 0.25 秒：停"
         );
         assert!(
-            !calibration_goes_on(&[(2170, 0.02)], 2170),
+            calibration_goes_on(&[(267, 0.300)], 0.091, 1727, super::LONGEST_DISPATCH_SECONDS),
+            "整次派活 0.300 秒是几趟、几片提交加起来的，最久那一次提交只有 0.091 秒：接着加宽（5080 上截断流量到的那一档）"
+        );
+        assert!(
+            calibration_goes_on(
+                &[(267, 0.300), (534, 0.310)],
+                0.095,
+                1727,
+                super::LONGEST_DISPATCH_SECONDS
+            ),
+            "整次派活过了 0.25 秒、每个状态在变快、最久那一次提交没过 0.25 秒：接着加宽"
+        );
+        assert!(
+            !calibration_goes_on(&[(2170, 0.02)], 0.02, 2170, super::LONGEST_DISPATCH_SECONDS),
             "到了这张卡带得了的上限：停"
         );
     }
 
     /// 量完一次，最宽那一档不是选中的（过了拐点）就记下它，以后不再试到它；最宽那一档就是选中的（没撞到拐点）不记。
     #[test]
-    fn a_width_past_the_knee_is_not_tried_again() {
+    fn width_past_the_knee_is_not_tried_again() {
         use super::knee_after_calibration;
         let past_the_knee = [(2170, 0.076), (4340, 0.110), (6510, 0.180), (8680, 3.6)];
         assert_eq!(knee_after_calibration(&past_the_knee, usize::MAX), 8680);
@@ -1925,13 +2704,564 @@ mod tests {
         );
     }
 
-    /// 一次派活算得太久：下一次减半，不少于 256（容量比它小取容量）。
+    /// 一次派活算得太久：下一次减半，减到 1 个状态为止（宽度到 1 再慢也不到 0）。
     #[test]
-    fn a_dispatch_that_took_too_long_halves_the_next_one() {
+    fn dispatch_that_took_too_long_halves_the_next_one() {
         use super::width_after_a_slow_dispatch;
         assert_eq!(width_after_a_slow_dispatch(21_700, 31_291), 10_850);
-        assert_eq!(width_after_a_slow_dispatch(300, 31_291), 256);
-        assert_eq!(width_after_a_slow_dispatch(100, 100), 100);
+        assert_eq!(
+            width_after_a_slow_dispatch(300, 31_291),
+            150,
+            "几百个状态还接着减半"
+        );
+        assert_eq!(width_after_a_slow_dispatch(100, 100), 50);
+        assert_eq!(width_after_a_slow_dispatch(3, 31_291), 1);
+        assert_eq!(
+            width_after_a_slow_dispatch(1, 31_291),
+            1,
+            "1 个状态：不再减半"
+        );
+    }
+
+    /// 没量过拆不开的下限，用时不到 [`super::LONGEST_DISPATCH_SECONDS`] 的四分之一（0.125 秒）又带满了宽度：下一次加倍；
+    /// 0.125 秒到 0.5 秒之间不动，0.5 秒本身也不动。
+    #[test]
+    fn quick_dispatch_doubles_the_next_and_one_near_the_limit_keeps_it() {
+        use super::dispatch_width_after_a_dispatch;
+        for (seconds, width_after, what) in [
+            (0.001, 128, "0.001 秒：加倍"),
+            (0.124, 128, "0.124 秒：加倍"),
+            (0.126, 64, "0.126 秒：不动"),
+            (0.3, 64, "0.3 秒：不动"),
+            (0.5, 64, "0.5 秒：还没超过上限，不动"),
+        ] {
+            assert_eq!(
+                dispatch_width_after_a_dispatch(64, 64, seconds, 2170, 31_291, false),
+                width_after,
+                "宽度 64、{what}"
+            );
+        }
+    }
+
+    /// 没量过拆不开的下限，用时超过 [`super::LONGEST_DISPATCH_SECONDS`]：照实际带的状态数减半，不许到驱动会掐的那条线。
+    /// 这一段只剩 3 个状态时宽度 1000 还算了 0.6 秒，下一次带 1 个，不是 500 个。
+    #[test]
+    fn slow_dispatch_halves_what_it_carried_down_to_one_state() {
+        use super::dispatch_width_after_a_dispatch;
+        assert_eq!(
+            dispatch_width_after_a_dispatch(64, 64, 0.51, 2170, 31_291, false),
+            32,
+            "0.51 秒：过了 0.5 秒，减半"
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(64, 64, 0.6, 2170, 31_291, false),
+            32
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(1000, 3, 0.6, 2170, 31_291, false),
+            1,
+            "只带了 3 个状态就超了"
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(1, 1, 5.9, 2170, 31_291, false),
+            1,
+            "1 个状态还超：下限 1"
+        );
+    }
+
+    /// 加宽不超过一条草稿缓冲、不超过容量；到了一条草稿缓冲往上归量宽度管，用时再短也不动。
+    #[test]
+    fn widening_stops_at_one_scratch_lane_and_at_the_capacity() {
+        use super::dispatch_width_after_a_dispatch;
+        assert_eq!(
+            dispatch_width_after_a_dispatch(2048, 2048, 0.01, 2170, 31_291, false),
+            2170,
+            "加倍会过一条草稿缓冲：停在 2170"
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(8, 8, 0.01, 2170, 10, false),
+            10,
+            "加倍会过容量：停在 10"
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(2170, 2170, 0.01, 2170, 31_291, false),
+            2170,
+            "已经一条草稿缓冲"
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(21_700, 21_700, 0.01, 2170, 31_291, false),
+            21_700,
+            "量出来的宽度不在这里涨"
+        );
+    }
+
+    /// 这一段剩的状态比宽度少：算得再快也说不出带满了多久，不加宽。
+    #[test]
+    fn dispatch_that_did_not_fill_its_width_does_not_widen_it() {
+        use super::dispatch_width_after_a_dispatch;
+        assert_eq!(
+            dispatch_width_after_a_dispatch(64, 3, 0.001, 2170, 31_291, false),
+            64
+        );
+    }
+
+    /// 宽度 1 那一次 0.565 秒（崩溃放量那条重的流在 5090 上量到的）是拆不开的下限：下一次加宽，不因为过了 0.5 秒停在 1；
+    /// 量过下限之后最久那一次提交不过驱动那条线的一半（1 秒）接着加宽、到一条草稿缓冲为止，在 1 秒到 2 秒之间不动，过了 2 秒才减半。
+    #[test]
+    fn a_dispatch_of_one_state_over_the_target_is_the_indivisible_floor_and_the_width_grows_from_it(
+    ) {
+        use super::dispatch_width_after_a_dispatch;
+        for (width, seconds, width_after, what) in [
+            (1, 0.565, 2, "宽度 1、恰好是下限：加宽"),
+            (2, 0.6, 4, "宽度 2、0.6 秒：加宽"),
+            (
+                1024,
+                0.84,
+                1923,
+                "宽度 1024、0.84 秒：加宽，不过一条草稿缓冲",
+            ),
+            (64, 0.9, 128, "宽度 64、0.9 秒，没过那条线的一半：加宽"),
+            (64, 1.69, 64, "宽度 64、1.69 秒，过了一半、没过那条线：不动"),
+            (64, 1.7, 64, "宽度 64、1.7 秒：不动，不拿下限的倍数比"),
+        ] {
+            assert_eq!(
+                dispatch_width_after_a_dispatch(width, width, seconds, 1923, 3846, true),
+                width_after,
+                "下限 0.565 秒、{what}"
+            );
+        }
+    }
+
+    /// 量过拆不开的下限：下限多短都一样，最久那一次提交不过驱动会掐的那条线的一半（1 秒）就加宽，过了那条线（2 秒）才减半。
+    /// 下限 0.27 秒、带满 128 个状态最久一次 0.42 秒（本机 32G 卡上 unlink-merging-inode-leaf-containers 头 300 块量到的那一档）照样加宽。
+    #[test]
+    fn a_measured_floor_widens_up_to_half_the_driver_line_and_halves_only_past_the_line() {
+        use super::dispatch_width_after_a_dispatch;
+        for (seconds, width_after, what) in [
+            (0.42, 256, "0.42 秒：加宽"),
+            (0.99, 256, "0.99 秒：没过那条线的一半，加宽"),
+            (1.01, 128, "1.01 秒：过了那条线的一半，不动"),
+            (1.99, 128, "1.99 秒：没过那条线，不减半"),
+            (2.01, 64, "2.01 秒：过了那条线，减半"),
+        ] {
+            assert_eq!(
+                dispatch_width_after_a_dispatch(128, 128, seconds, 2170, 31_291, true),
+                width_after,
+                "量过下限、宽度 128 带满、{what}"
+            );
+        }
+        assert_eq!(
+            dispatch_width_after_a_dispatch(128, 100, 0.42, 2170, 31_291, true),
+            128,
+            "没带满宽度：不加宽"
+        );
+    }
+
+    /// 下限过了驱动会掐的那条线的一半（1.5 秒）或那条线本身（2.5 秒）：宽度 1 也不加宽（再加一倍，状态互相拖慢时就过线），停在下限上。
+    #[test]
+    fn a_floor_over_half_the_driver_line_keeps_the_width_at_one_state() {
+        use super::dispatch_width_after_a_dispatch;
+        assert_eq!(
+            dispatch_width_after_a_dispatch(1, 1, 1.5, 1923, 3846, true),
+            1
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(1, 1, 2.5, 1923, 3846, true),
+            1
+        );
+        assert_eq!(
+            dispatch_width_after_a_dispatch(1, 1, 0.9, 1923, 3846, true),
+            2,
+            "0.9 秒不过那条线的一半：加宽"
+        );
+    }
+
+    /// 许的上限：量过拆不开的下限就是驱动会掐的那条线 2 秒，不看下限多长；没量过是 0.5 秒。
+    #[test]
+    fn the_tolerated_submission_is_the_driver_line_once_the_floor_is_measured_and_half_a_second_before(
+    ) {
+        use super::longest_tolerated_submission_seconds;
+        assert_eq!(longest_tolerated_submission_seconds(true), 2.0);
+        assert_eq!(longest_tolerated_submission_seconds(false), 0.5);
+    }
+
+    /// 拆不开的下限怎么记：带 1 个状态的那一次就是下限（变重变轻都跟着）；带得更多的那一次比下限快就把下限压到它，慢不动；没量过的还是没量过。
+    #[test]
+    fn the_indivisible_floor_is_the_dispatch_of_one_state_and_falls_with_a_quicker_wider_one() {
+        use super::indivisible_floor_after_a_dispatch;
+        assert_eq!(
+            indivisible_floor_after_a_dispatch(None, 1, 0.565),
+            Some(0.565)
+        );
+        assert_eq!(
+            indivisible_floor_after_a_dispatch(Some(0.2), 1, 0.9),
+            Some(0.9)
+        );
+        assert_eq!(
+            indivisible_floor_after_a_dispatch(Some(0.565), 4, 0.9),
+            Some(0.565)
+        );
+        assert_eq!(
+            indivisible_floor_after_a_dispatch(Some(0.565), 4, 0.3),
+            Some(0.3)
+        );
+        assert_eq!(indivisible_floor_after_a_dispatch(None, 4, 0.3), None);
+    }
+
+    /// 停在下限上的数法：只带 1 个状态、之后还是 1 个、又过了 0.5 秒，才在前面的次数上加一；三样缺一样从 0 重数。
+    #[test]
+    fn a_dispatch_counts_as_stuck_only_at_one_state_staying_at_one_state_over_the_target() {
+        use super::dispatches_stuck_at_the_floor_after_a_dispatch;
+        assert_eq!(
+            dispatches_stuck_at_the_floor_after_a_dispatch(3, 1, 1.5, 1),
+            4
+        );
+        assert_eq!(
+            dispatches_stuck_at_the_floor_after_a_dispatch(3, 1, 1.5, 2),
+            0,
+            "加了宽"
+        );
+        assert_eq!(
+            dispatches_stuck_at_the_floor_after_a_dispatch(3, 1, 0.4, 1),
+            0,
+            "没过 0.5 秒"
+        );
+        assert_eq!(
+            dispatches_stuck_at_the_floor_after_a_dispatch(3, 2, 1.5, 1),
+            0,
+            "带了 2 个状态"
+        );
+    }
+
+    /// 量宽度照许的上限的一半停：量过下限时许 2 秒，一条缓冲那一档最久一次提交 0.99 秒接着加宽、1.01 秒停；照 0.5 秒的一半，0.6 秒就停了。
+    #[test]
+    fn calibration_over_an_indivisible_floor_goes_on_under_half_the_tolerated_submission() {
+        use super::{calibration_goes_on, longest_tolerated_submission_seconds};
+        assert!(calibration_goes_on(
+            &[(1923, 0.6)],
+            0.6,
+            3846,
+            longest_tolerated_submission_seconds(true)
+        ));
+        assert!(calibration_goes_on(
+            &[(1923, 0.99)],
+            0.99,
+            3846,
+            longest_tolerated_submission_seconds(true)
+        ));
+        assert!(!calibration_goes_on(
+            &[(1923, 1.01)],
+            1.01,
+            3846,
+            longest_tolerated_submission_seconds(true)
+        ));
+    }
+
+    /// 卡上一次派活要多久：整次的用时与最久那一次提交，只由这次派活带的序号段定。
+    struct SecondsOnAFakeCard {
+        of_the_dispatch: f64,
+        of_the_longest_submission: f64,
+    }
+
+    /// 假卡上判完一条流交回的两样：逐次派的序号段，与判器交回的结局（逐个状态的结论，或停在拆不开的下限上的错）。
+    type DispatchesAndOutcomeOnAFakeCard = (
+        Vec<std::ops::Range<u64>>,
+        Result<Vec<[u32; VERDICT_WORDS]>, super::StuckAtTheIndivisibleFloor>,
+    );
+
+    /// 经 `schedule` 判 `ordinals`（流一共 `ordinals.end` 个状态），派活交给假的卡（第一个结论字写序号），交回逐次派的序号段与判器交回的结局。
+    fn judge_on_a_fake_card_until_it_stops(
+        schedule: &super::DispatchWidthSchedule,
+        ordinals: std::ops::Range<u64>,
+        seconds_on_the_card: &dyn Fn(&std::ops::Range<u64>) -> SecondsOnAFakeCard,
+    ) -> DispatchesAndOutcomeOnAFakeCard {
+        let mut dispatched = Vec::new();
+        let state_count = ordinals.end;
+        let outcome = schedule.judge_ordinals(ordinals, "fake card", state_count, |one_dispatch| {
+            let seconds = seconds_on_the_card(&one_dispatch);
+            dispatched.push(one_dispatch.clone());
+            super::TimedDispatch {
+                verdicts: one_dispatch
+                    .map(|ordinal| {
+                        let mut words = [0u32; VERDICT_WORDS];
+                        words[0] = u32::try_from(ordinal).expect("假的流只有几千个状态");
+                        words
+                    })
+                    .collect(),
+                seconds: seconds.of_the_dispatch,
+                seconds_of_the_longest_submission: seconds.of_the_longest_submission,
+            }
+        });
+        (dispatched, outcome)
+    }
+
+    /// 同 [`judge_on_a_fake_card_until_it_stops`]，判器不许停在下限上；只交回逐次派的序号段，核每个序号恰好判一次、结论按序号次序。
+    fn judge_on_a_fake_card(
+        schedule: &super::DispatchWidthSchedule,
+        ordinals: std::ops::Range<u64>,
+        seconds_on_the_card: &dyn Fn(&std::ops::Range<u64>) -> SecondsOnAFakeCard,
+    ) -> Vec<std::ops::Range<u64>> {
+        let (dispatched, outcome) =
+            judge_on_a_fake_card_until_it_stops(schedule, ordinals.clone(), seconds_on_the_card);
+        let verdicts = outcome.expect("这条假流上判器不停在拆不开的下限上");
+        let judged: Vec<u64> = verdicts.iter().map(|words| u64::from(words[0])).collect();
+        let expected: Vec<u64> = ordinals.collect();
+        assert!(judged == expected, "每个序号恰好判一次、按序号次序");
+        dispatched
+    }
+
+    /// 不管带几个状态，每次派活都是 `seconds` 秒、只有一次提交的假卡：状态在卡上并行，加宽不加时。
+    fn the_same_seconds_whatever_the_width(
+        seconds: f64,
+    ) -> impl Fn(&std::ops::Range<u64>) -> SecondsOnAFakeCard {
+        move |_one_dispatch| SecondsOnAFakeCard {
+            of_the_dispatch: seconds,
+            of_the_longest_submission: seconds,
+        }
+    }
+
+    /// 每个状态 `seconds_per_state` 秒、一次派活只有一次提交的假卡。
+    fn seconds_in_proportion_to_the_states(
+        seconds_per_state: f64,
+    ) -> impl Fn(&std::ops::Range<u64>) -> SecondsOnAFakeCard {
+        move |one_dispatch| {
+            let seconds = (one_dispatch.end - one_dispatch.start) as f64 * seconds_per_state;
+            SecondsOnAFakeCard {
+                of_the_dispatch: seconds,
+                of_the_longest_submission: seconds,
+            }
+        }
+    }
+
+    fn states_of_each_dispatch(dispatched: &[std::ops::Range<u64>]) -> Vec<u64> {
+        dispatched
+            .iter()
+            .map(|one_dispatch| one_dispatch.end - one_dispatch.start)
+            .collect()
+    }
+
+    /// 轻的流：判器第一次派活带 1 个状态，用时短就一路加倍，涨满一条草稿缓冲才量宽度，量宽度从一条缓冲一档一档加，取量出来的那一档。
+    /// 每个状态的用时是 2 的负整数次幂，几档每个状态的用时逐字相同，取最窄的一档。
+    #[test]
+    fn light_flow_starts_at_one_state_doubles_up_to_one_lane_and_then_calibrates() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(100, 400);
+        assert_eq!(schedule.width(), 1, "第一次派活之前就是 1 个状态");
+        let dispatched = judge_on_a_fake_card(
+            &schedule,
+            0..2000,
+            &seconds_in_proportion_to_the_states(1.0 / 65_536.0),
+        );
+        let states = states_of_each_dispatch(&dispatched);
+        assert_eq!(
+            states[..11],
+            [1, 2, 4, 8, 16, 32, 64, 100, 200, 300, 400],
+            "起步加倍，64 个之后宽度到了一条缓冲（100 个）才量，量的时候逐档 100、200、300、400"
+        );
+        assert_eq!(schedule.width(), 100, "量出来的那一档");
+        assert!(
+            states[11..]
+                .iter()
+                .all(|states_carried| *states_carried <= 100),
+            "量完之后照量出来的宽度派（末尾那一次剩多少带多少）"
+        );
+    }
+
+    /// 重的流（每个状态 0.6 秒，过了 0.5 秒，用时随状态数成正比：状态互相拖慢）：宽度 1 那一次 0.6 秒是拆不开的下限，没过驱动那条线的一半，加宽到 2；
+    /// 2 个状态 1.2 秒，过了那条线的一半、没过那条线，停在 2，不去量宽度（量宽度头一档就是一条缓冲）。末尾只剩 1 个状态，照带 1 个、宽度不动。
+    #[test]
+    fn heavy_flow_whose_time_grows_with_the_states_settles_at_two_states_without_calibrating() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(4, 16);
+        let dispatched =
+            judge_on_a_fake_card(&schedule, 0..40, &seconds_in_proportion_to_the_states(0.6));
+        let mut expected = vec![1u64];
+        expected.extend([2u64; 19]);
+        expected.push(1);
+        assert_eq!(states_of_each_dispatch(&dispatched), expected);
+        assert_eq!(schedule.width(), 2);
+    }
+
+    /// 崩溃放量那条重的流在 5090 上的样子：一个状态单次提交 0.565 秒，状态在卡上并行、加宽不加时。宽度 1 那一次是拆不开的下限，
+    /// 不拿它跟 0.5 秒比：一路加倍，到一条草稿缓冲（64 个）就量宽度（64、128 两档），取每个状态最快的那一档。不停在 1 个状态上，也不报错。
+    #[test]
+    fn heavy_flow_whose_states_run_side_by_side_on_the_card_widens_from_the_indivisible_floor_up_to_the_capacity(
+    ) {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(64, 128);
+        let dispatched = judge_on_a_fake_card(
+            &schedule,
+            0..2000,
+            &the_same_seconds_whatever_the_width(0.565),
+        );
+        let states = states_of_each_dispatch(&dispatched);
+        assert_eq!(
+            states[..8],
+            [1, 2, 4, 8, 16, 32, 64, 128],
+            "加倍到一条缓冲（64 个）就量宽度，逐档 64、128"
+        );
+        assert_eq!(schedule.width(), 128, "量出来的那一档：容量");
+    }
+
+    /// 单个状态的提交就过了驱动会掐的那条线（2.5 秒）：宽度停在 1 个状态，连着 [`super::DISPATCHES_STUCK_AT_THE_FLOOR_BEFORE_REFUSING`] 次
+    /// 就报错、不再派；错里带卡、下限用时、判到哪、判了几个、一共几个，打成一行可 grep 的行。
+    #[test]
+    fn a_judge_stuck_at_the_indivisible_floor_over_the_driver_line_reports_it_after_eight_dispatches_in_a_row(
+    ) {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(4, 16);
+        let (dispatched, outcome) = judge_on_a_fake_card_until_it_stops(
+            &schedule,
+            0..40,
+            &the_same_seconds_whatever_the_width(2.5),
+        );
+        assert_eq!(
+            states_of_each_dispatch(&dispatched),
+            vec![1; 8],
+            "一个一个派，派到第 8 个就停"
+        );
+        let stuck = outcome.expect_err("停在下限上连着 8 次：报错");
+        assert_eq!(
+            stuck,
+            super::StuckAtTheIndivisibleFloor {
+                card_name: "fake card".to_string(),
+                seconds_of_the_floor: 2.5,
+                dispatches_in_a_row: 8,
+                next_ordinal: 8,
+                states_judged_by_the_judge: 8,
+                state_count: 40,
+            }
+        );
+        let line = stuck.line(Some("一条流"));
+        assert!(
+            line.starts_with(
+                "CRASH_JUDGE_STUCK_AT_THE_INDIVISIBLE_FLOOR flow=一条流 card=\"fake card\" seconds_of_the_floor=2.500 dispatches_in_a_row=8 "
+            ) && line.contains(" next_ordinal=8 states_judged_by_the_judge=8 state_count=40 "),
+            "{line}"
+        );
+    }
+
+    /// 单个状态 1.5 秒：没过驱动那条线（2 秒），可过了它的一半，加一倍宽、状态互相拖慢时就过线，宽度不敢加，停在 1 个状态；
+    /// 照样连着 8 次就报错，不默默一个一个派下去。
+    #[test]
+    fn a_judge_stuck_at_the_indivisible_floor_over_half_the_driver_line_reports_it_too() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(4, 16);
+        let (dispatched, outcome) = judge_on_a_fake_card_until_it_stops(
+            &schedule,
+            0..40,
+            &the_same_seconds_whatever_the_width(1.5),
+        );
+        assert_eq!(states_of_each_dispatch(&dispatched), vec![1; 8]);
+        assert_eq!(
+            outcome
+                .expect_err("停在下限上连着 8 次：报错")
+                .dispatches_in_a_row,
+            8
+        );
+    }
+
+    /// 零星几个重状态（连着 7 个单个就过驱动那条线）之后状态变轻：连着的次数没到 8，不报错，变轻之后宽度照样涨回去。
+    #[test]
+    fn seven_heavy_states_in_a_row_at_the_indivisible_floor_are_not_reported() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(4, 16);
+        let dispatched = judge_on_a_fake_card(&schedule, 0..40, &|one_dispatch| {
+            let seconds = if one_dispatch.start < 7 { 2.5 } else { 0.001 };
+            SecondsOnAFakeCard {
+                of_the_dispatch: seconds,
+                of_the_longest_submission: seconds,
+            }
+        });
+        assert_eq!(
+            states_of_each_dispatch(&dispatched)[..9],
+            [1, 1, 1, 1, 1, 1, 1, 1, 2],
+            "重的那 7 个一个一个派，变轻之后加倍"
+        );
+    }
+
+    /// 每个状态 0.1 秒、用时随状态数成正比：宽度 1 那一次量了下限，之后最久一次提交不过驱动那条线的一半（1 秒）就加倍，1、2、4、8 个；
+    /// 16 个 1.6 秒，过了那条线的一半、没过那条线，停在 16，一直不过那条线。
+    #[test]
+    fn the_width_of_a_flow_slowing_in_proportion_settles_past_half_the_driver_line() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(2170, 31_291);
+        let dispatched =
+            judge_on_a_fake_card(&schedule, 0..79, &seconds_in_proportion_to_the_states(0.1));
+        assert_eq!(
+            states_of_each_dispatch(&dispatched),
+            [1, 2, 4, 8, 16, 16, 16, 16]
+        );
+        assert_eq!(schedule.width(), 16);
+    }
+
+    /// 流半路变重再变轻：变重那一段（单个状态就过驱动那条线，2.5 秒）每次减半到 1 个状态，变回轻的又从 1 个涨回去。
+    /// 变重那一段到序号 385 为止，宽度到 1 之后只派 4 次，连着停在下限上的次数到不了报错那一档。
+    #[test]
+    fn the_width_falls_to_one_state_when_the_flow_turns_heavy_and_grows_back_when_it_turns_light() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(2170, 31_291);
+        let heavy_span = 127u64..385u64;
+        let dispatched = judge_on_a_fake_card(&schedule, 0..600, &|one_dispatch| {
+            let touches_the_heavy_span =
+                one_dispatch.start < heavy_span.end && one_dispatch.end > heavy_span.start;
+            let seconds = if touches_the_heavy_span { 2.5 } else { 0.001 };
+            SecondsOnAFakeCard {
+                of_the_dispatch: seconds,
+                of_the_longest_submission: seconds,
+            }
+        });
+        assert_eq!(
+            states_of_each_dispatch(&dispatched)[..15],
+            [1, 2, 4, 8, 16, 32, 64, 128, 64, 32, 16, 8, 4, 2, 1],
+            "加倍到 128 个撞上重的那一段（序号 127 起），之后减半到 1"
+        );
+        assert!(schedule.width() > 1, "变回轻的之后又涨回去");
+    }
+
+    /// 比的是最久那一次提交，不是整次：一次派活拆成很多次提交，整次 5 秒、最久一次 0.01 秒，照样算快。
+    #[test]
+    fn dispatch_of_many_quick_submissions_counts_as_quick() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(2170, 31_291);
+        let dispatched =
+            judge_on_a_fake_card(&schedule, 0..7, &|_one_dispatch| SecondsOnAFakeCard {
+                of_the_dispatch: 5.0,
+                of_the_longest_submission: 0.01,
+            });
+        assert_eq!(states_of_each_dispatch(&dispatched), [1, 2, 4]);
+    }
+
+    /// 一段序号判完时剩的状态比宽度少，下一段接着用原来的宽度，不算带满。
+    #[test]
+    fn range_shorter_than_the_width_leaves_the_width_alone() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(2170, 31_291);
+        let quick = seconds_in_proportion_to_the_states(0.001);
+        assert_eq!(judge_on_a_fake_card(&schedule, 0..1, &quick).len(), 1);
+        assert_eq!(schedule.width(), 2, "带满了 1 个状态：加倍");
+        assert_eq!(judge_on_a_fake_card(&schedule, 1..2, &quick).len(), 1);
+        assert_eq!(schedule.width(), 2, "宽度 2 只带了 1 个状态：不动");
+    }
+
+    /// 量过一次之后，派满 [`super::DISPATCHES_BETWEEN_CALIBRATIONS`] 次活再量一次：又出现比量出来的宽度宽的一次派活。
+    #[test]
+    fn the_width_is_calibrated_again_after_the_dispatches_between_calibrations() {
+        let schedule = super::DispatchWidthSchedule::starting_narrow(4, 16);
+        let dispatched = judge_on_a_fake_card(
+            &schedule,
+            0..4000,
+            &seconds_in_proportion_to_the_states(1.0 / 65_536.0),
+        );
+        let states = states_of_each_dispatch(&dispatched);
+        assert_eq!(
+            states[..6],
+            [1, 2, 4, 8, 12, 16],
+            "起步涨到一条缓冲（4 个），接着头一次量宽度，逐档 4、8、12、16"
+        );
+        let dispatches_between =
+            usize::try_from(super::DISPATCHES_BETWEEN_CALIBRATIONS).expect("装得进 usize");
+        assert!(
+            states[6..6 + dispatches_between]
+                .iter()
+                .all(|states_carried| *states_carried == 4),
+            "两次量宽度之间照量出来的 4 个派"
+        );
+        assert_eq!(
+            states[6 + dispatches_between..6 + dispatches_between + 4],
+            [4, 8, 12, 15],
+            "派满了再量一次；头一次最宽那一档 16 不是选中的，这一次只试到它之前的 15（knee_after_calibration）"
+        );
     }
 
     /// 记账分片一片算得多于 0.125 秒（[`super::LONGEST_DISPATCH_SECONDS`] 的四分之一）下一片减半、不窄过 16 个位置；少于 0.03125 秒（十六分之一）
@@ -2379,8 +3709,8 @@ mod tests {
                 "recovery",
                 recovery_kernel_source(),
                 KERNEL_ENTRY_POINT,
-                249_396,
-                150_604,
+                288_999,
+                111_001,
             ),
             (
                 "checker-scan",
@@ -2393,29 +3723,29 @@ mod tests {
                 "checker-scan-allocation-records-disjoint",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_SCAN_ALLOCATION_RECORDS_DISJOINT_ENTRY_POINT,
-                27_912,
-                372_088,
+                27_914,
+                372_086,
             ),
             (
                 "checker-scan-allocation-generations-through-the-rollback-floor-raises",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_SCAN_ALLOCATION_GENERATIONS_THROUGH_THE_ROLLBACK_FLOOR_RAISES_ENTRY_POINT,
-                277_387,
-                122_613,
+                278_009,
+                121_991,
             ),
             (
                 "checker-accounting-head",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_ACCOUNTING_HEAD_ENTRY_POINT,
-                34_463,
-                365_537,
+                34_467,
+                365_533,
             ),
             (
                 "checker-accounting-slice",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_ACCOUNTING_SLICE_ENTRY_POINT,
-                6_955,
-                393_045,
+                7_350,
+                392_650,
             ),
             (
                 "checker-accounting-decide",
@@ -2428,29 +3758,29 @@ mod tests {
                 "checker-accounting-final",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_ACCOUNTING_FINAL_ENTRY_POINT,
-                51_003,
-                348_997,
+                51_158,
+                348_842,
             ),
             (
                 "checker-references-and-snapshots",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_REFERENCES_AND_SNAPSHOTS_ENTRY_POINT,
-                191_118,
-                208_882,
+                191_277,
+                208_723,
             ),
             (
                 "checker-scan-rebuild",
                 crate::crash_judge_gpu::checker_scan_kernel_source(),
                 CHECKER_SCAN_REBUILD_ENTRY_POINT,
-                69_417,
-                330_583,
+                69_419,
+                330_581,
             ),
             (
                 "checker-walk",
                 crate::crash_judge_gpu::checker_walk_kernel_source(),
                 KERNEL_ENTRY_POINT,
-                357_405,
-                42_595,
+                370_376,
+                29_624,
             ),
         ] {
             let size = super::kernel_inlined_size_of_the_entry_point(&source, entry_point);
@@ -2528,6 +3858,318 @@ mod tests {
         println!(
             "GPU_KERNEL_COMPILE kernel=recovery seconds={:.1}",
             started.elapsed().as_secs_f64()
+        );
+    }
+
+    /// 秒数写成纳秒（测试里给的都是整的毫秒数）。
+    fn nanoseconds_of_milliseconds(milliseconds: u64) -> u64 {
+        milliseconds * 1_000_000
+    }
+
+    /// 两次派活的提交账：一次带 4 个状态（恢复 3 秒；记账分片三片 0.5、1.5、0.25 秒，最久的那一片在中间；拷回 0.75 秒），
+    /// 一次带 8 个状态（恢复 1 秒；分片两片 0.25、0.5 秒；拷回 0.25 秒）。别的趟一次都没交。
+    fn two_dispatches_of_a_judge() -> (
+        super::SubmissionWaitsOfOneDispatch,
+        super::SubmissionWaitsOfOneDispatch,
+        super::SubmissionWaitsOfThePasses,
+    ) {
+        use super::GpuJudgePass;
+        let mut four_states = super::SubmissionWaitsOfOneDispatch::default();
+        four_states.note_a_submission(GpuJudgePass::Recovery, nanoseconds_of_milliseconds(3000));
+        for milliseconds in [500, 1500, 250] {
+            four_states.note_a_submission(
+                GpuJudgePass::CheckerAccountingSlice,
+                nanoseconds_of_milliseconds(milliseconds),
+            );
+        }
+        four_states.note_a_submission(GpuJudgePass::Readback, nanoseconds_of_milliseconds(750));
+        let mut eight_states = super::SubmissionWaitsOfOneDispatch::default();
+        eight_states.note_a_submission(GpuJudgePass::Recovery, nanoseconds_of_milliseconds(1000));
+        for milliseconds in [250, 500] {
+            eight_states.note_a_submission(
+                GpuJudgePass::CheckerAccountingSlice,
+                nanoseconds_of_milliseconds(milliseconds),
+            );
+        }
+        eight_states.note_a_submission(GpuJudgePass::Readback, nanoseconds_of_milliseconds(250));
+        let mut passes = super::SubmissionWaitsOfThePasses::default();
+        passes.add_a_dispatch(4, &four_states);
+        passes.add_a_dispatch(8, &eight_states);
+        (four_states, eight_states, passes)
+    }
+
+    /// 各趟的提交账：次数与等卡之和是加起来的，最久的是最久的那一次（不是最后一次），中位数是全部提交按态数排开取下中位；
+    /// 各趟等卡之和等于每次派活交给判器等卡总账的那一笔之和（`GpuJudgeTimeSpent::seconds_waiting_for_the_card` 加的就是它），值钉成绝对数。
+    #[test]
+    fn submission_waits_of_the_passes_add_up_keep_the_longest_submission_and_take_the_lower_median()
+    {
+        use super::GpuJudgePass;
+        let (four_states, eight_states, passes) = two_dispatches_of_a_judge();
+        assert_eq!(
+            four_states.nanoseconds_waiting_for_the_card(),
+            nanoseconds_of_milliseconds(3000 + 500 + 1500 + 250 + 750),
+            "带 4 个状态那一次派活等卡之和"
+        );
+        assert_eq!(
+            four_states.nanoseconds_of_the_longest_submission(),
+            nanoseconds_of_milliseconds(3000),
+            "带 4 个状态那一次派活最久的那一次提交是恢复那一趟"
+        );
+        assert_eq!(
+            eight_states.nanoseconds_of_the_longest_submission(),
+            nanoseconds_of_milliseconds(1000),
+            "带 8 个状态那一次派活最久的那一次提交是恢复那一趟"
+        );
+        assert_eq!(
+            passes.of_the_pass(GpuJudgePass::Recovery),
+            super::SubmissionWaitsOfAPass {
+                submissions: 2,
+                nanoseconds_waiting_for_the_card: nanoseconds_of_milliseconds(4000),
+                nanoseconds_of_the_longest_submission: nanoseconds_of_milliseconds(3000),
+            },
+            "恢复那一趟：两次、共 4 秒、最久 3 秒（先派的那一次）"
+        );
+        assert_eq!(
+            passes.of_the_pass(GpuJudgePass::CheckerAccountingSlice),
+            super::SubmissionWaitsOfAPass {
+                submissions: 5,
+                nanoseconds_waiting_for_the_card: nanoseconds_of_milliseconds(3000),
+                nanoseconds_of_the_longest_submission: nanoseconds_of_milliseconds(1500),
+            },
+            "记账分片那一趟：五片、共 3 秒、最久 1.5 秒（头一次派活的中间那一片）"
+        );
+        assert_eq!(
+            passes.of_the_pass(GpuJudgePass::Readback),
+            super::SubmissionWaitsOfAPass {
+                submissions: 2,
+                nanoseconds_waiting_for_the_card: nanoseconds_of_milliseconds(1000),
+                nanoseconds_of_the_longest_submission: nanoseconds_of_milliseconds(750),
+            },
+            "拷回那一趟：两次、共 1 秒、最久 0.75 秒"
+        );
+        assert_eq!(
+            passes.of_the_pass(GpuJudgePass::CheckerWalk),
+            super::SubmissionWaitsOfAPass::default(),
+            "一次都没交的趟是零"
+        );
+        assert_eq!(
+            passes.median_states_per_submission(GpuJudgePass::CheckerAccountingSlice),
+            4,
+            "分片那一趟的五次提交按态数排开是 4、4、4、8、8，中位是 4"
+        );
+        assert_eq!(
+            passes.median_states_per_submission(GpuJudgePass::Recovery),
+            4,
+            "恢复那一趟两次是 4、8，偶数次取中间两个里小的那个"
+        );
+        assert_eq!(
+            passes.median_states_per_submission(GpuJudgePass::CheckerWalk),
+            0,
+            "一次都没交的趟中位数是 0"
+        );
+        assert_eq!(
+            passes.nanoseconds_waiting_for_the_card(),
+            four_states.nanoseconds_waiting_for_the_card()
+                + eight_states.nanoseconds_waiting_for_the_card(),
+            "各趟等卡之和等于两次派活交给判器等卡总账的两笔之和"
+        );
+        assert_eq!(
+            passes.nanoseconds_waiting_for_the_card(),
+            nanoseconds_of_milliseconds(8000),
+            "各趟等卡之和是 8 秒"
+        );
+    }
+
+    /// 汇总行：同一张卡收工两次的账并成一份，卡按头一次出现的先后、趟按派活的次序各一行；比例的分母是全部卡全部趟，
+    /// 各行比例之和等于 1；那一行原样钉住。
+    #[test]
+    fn pass_summaries_merge_a_card_that_finished_twice_and_share_the_waits_of_the_whole_flow() {
+        use super::{gpu_pass_summaries, GpuJudgePass, GPU_JUDGE_PASSES};
+        let (_, _, passes_of_the_card_at_index_one) = two_dispatches_of_a_judge();
+        let mut recovery_only = super::SubmissionWaitsOfOneDispatch::default();
+        recovery_only.note_a_submission(GpuJudgePass::Recovery, nanoseconds_of_milliseconds(4000));
+        let mut first_round_of_the_card_at_index_zero =
+            super::SubmissionWaitsOfThePasses::default();
+        first_round_of_the_card_at_index_zero.add_a_dispatch(16, &recovery_only);
+        let mut second_round_of_the_card_at_index_zero =
+            super::SubmissionWaitsOfThePasses::default();
+        second_round_of_the_card_at_index_zero.add_a_dispatch(2, &recovery_only);
+        let summaries = gpu_pass_summaries([
+            (
+                "card at index zero",
+                0,
+                &first_round_of_the_card_at_index_zero,
+            ),
+            ("card at index one", 1, &passes_of_the_card_at_index_one),
+            (
+                "card at index zero",
+                0,
+                &second_round_of_the_card_at_index_zero,
+            ),
+        ]);
+        assert_eq!(
+            summaries.len(),
+            2 * GPU_JUDGE_PASSES,
+            "两张卡各一份、每份每趟一行"
+        );
+        let recovery_of_the_card_at_index_zero = &summaries[0];
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.card,
+            Some(("card at index zero".to_string(), 0))
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.pass,
+            Some(GpuJudgePass::Recovery)
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.submissions, 2,
+            "收工两次的账并成一份"
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.seconds_waiting_for_the_card,
+            8.0
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.seconds_of_the_longest_submission,
+            4.0
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.median_states_per_submission, 2,
+            "两轮的分布并在一起：2、16 取下中位"
+        );
+        assert_eq!(
+            recovery_of_the_card_at_index_zero.share_of_the_waits_of_the_flow, 0.5,
+            "这条流等卡共 16 秒（这张卡 8 秒、另一张 8 秒），这一行 8 秒"
+        );
+        assert_eq!(
+            summaries[GPU_JUDGE_PASSES].card,
+            Some(("card at index one".to_string(), 1)),
+            "另一张卡在头一张的十二行之后"
+        );
+        let slice_of_the_card_at_index_one = summaries
+            .iter()
+            .find(|summary| {
+                summary.card == Some(("card at index one".to_string(), 1))
+                    && summary.pass == Some(GpuJudgePass::CheckerAccountingSlice)
+            })
+            .expect("另一张卡有记账分片那一行");
+        assert_eq!(
+            slice_of_the_card_at_index_one.share_of_the_waits_of_the_flow, 0.1875,
+            "3 秒占 16 秒"
+        );
+        assert_eq!(
+            slice_of_the_card_at_index_one.line("new-pool-file-creation"),
+            "CRASH_AMPLIFICATION_GPU_PASS flow=new-pool-file-creation card=\"card at index one\" index=1 pass=checker_accounting_slice submissions=5 \
+             seconds_waiting_for_the_card=3.000 seconds_of_the_longest_submission=1.500 median_states_per_submission=4 share_of_the_waits_of_the_flow=0.1875"
+        );
+        assert_eq!(
+            summaries
+                .iter()
+                .map(|summary| summary.share_of_the_waits_of_the_flow)
+                .sum::<f64>(),
+            1.0,
+            "各行比例之和是 1"
+        );
+    }
+
+    /// 一张卡都没派活（整段复用）：一行提交次数 0 的，卡、序号、趟名写 none，不省略。
+    #[test]
+    fn pass_summaries_of_a_flow_without_a_dispatch_are_one_line_with_no_submission() {
+        let summaries = super::gpu_pass_summaries(std::iter::empty());
+        assert_eq!(summaries.len(), 1, "整段复用的流也有一行");
+        assert_eq!(
+            summaries[0].line("flow-reused-in-full"),
+            "CRASH_AMPLIFICATION_GPU_PASS flow=flow-reused-in-full card=none index=none pass=none submissions=0 seconds_waiting_for_the_card=0.000 \
+             seconds_of_the_longest_submission=0.000 median_states_per_submission=0 share_of_the_waits_of_the_flow=0.0000"
+        );
+    }
+
+    /// 趟的次序表与下标对得上（账按下标记，次序表错位就把一趟的数记到另一趟名下），名字两两不同。
+    #[test]
+    fn every_pass_in_the_order_of_the_dispatch_sits_at_its_own_index_under_its_own_name() {
+        let passes = super::GpuJudgePass::IN_THE_ORDER_OF_THE_DISPATCH;
+        for (position, pass) in passes.iter().enumerate() {
+            assert_eq!(pass.index_in_the_dispatch(), position, "{pass:?}");
+        }
+        let names: std::collections::BTreeSet<&str> =
+            passes.iter().map(|pass| pass.name()).collect();
+        assert_eq!(names.len(), passes.len(), "趟名两两不同：{names:?}");
+    }
+
+    /// 场景：在卡池借的一张卡上，照调用方给的宽度（一条草稿缓冲装 1 个状态、一次派活 2 个状态）建判器（`on_card_with_the_given_dispatch_width`）；
+    /// 表是现造的 256 个零字、3 个状态，经入库那一种字节编码与摘要读回（`PackedJudgeTablesReadBack::from_the_library_bytes`），不判状态、只看判器开了什么。
+    /// 预期：判器一条缓冲装 1 个、开 2 条缓冲、一次派活最多 2 个，照给的开，不照这张卡的绑定上限与显存额度另算；
+    /// 对照：照这张卡的显存额度算的那一份（`DispatchWidthGivenToTheJudge::within_the_memory_budget_of_the_card`）一条缓冲装的不是 1 个
+    /// （不是的话下面那几句分不出判器用的是哪一份）。不读仓里的文件。
+    /// 判别力（`crates/mutations.tsv`）：上卡的入口不收给的宽度、照这张卡的显存额度重算，一条缓冲装的个数那一句红。
+    #[test]
+    fn the_judge_opens_its_scratch_lanes_at_the_width_the_caller_gives_not_at_the_memory_budget_of_the_card(
+    ) {
+        use super::{
+            mebibytes_a_judge_needs, DispatchWidthGivenToTheJudge, GpuCrashJudge,
+            PackedJudgeTables, PackedJudgeTablesReadBack,
+        };
+        use crate::crash_judge_gpu::JudgeKernelSources;
+        use crate::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+        const TEST_NAME: &str = "the_judge_opens_its_scratch_lanes_at_the_width_the_caller_gives_not_at_the_memory_budget_of_the_card";
+        const STATES_PER_LANE_GIVEN: usize = 1;
+        const STATES_PER_DISPATCH_GIVEN: usize = 2;
+        let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+            return;
+        };
+        let bytes = PackedJudgeTables {
+            words: vec![0; 256],
+            state_count: 3,
+        }
+        .to_bytes();
+        let packed = PackedJudgeTablesReadBack::from_the_library_bytes(
+            &bytes,
+            &crate::sha256::sha256_digest(&bytes),
+        )
+        .expect("摘要是照这份字节现算的、字节是 to_bytes 编的：读得回");
+        let Some(lease) = cards.lease_card_or_report_not_run(
+            TEST_NAME,
+            mebibytes_a_judge_needs(&packed, STATES_PER_DISPATCH_GIVEN),
+        ) else {
+            return;
+        };
+        let width_of_the_memory_budget =
+            DispatchWidthGivenToTheJudge::within_the_memory_budget_of_the_card(
+                lease.card(),
+                &packed,
+                STATES_PER_DISPATCH_GIVEN,
+            );
+        assert_ne!(
+            width_of_the_memory_budget.states_per_lane, STATES_PER_LANE_GIVEN,
+            "对照：照这张卡的绑定上限一条缓冲装的个数与给的不同"
+        );
+        let judge = GpuCrashJudge::on_card_with_the_given_dispatch_width(
+            lease.card(),
+            &packed,
+            DispatchWidthGivenToTheJudge::of_lanes_holding(
+                STATES_PER_LANE_GIVEN,
+                STATES_PER_DISPATCH_GIVEN,
+            ),
+            &JudgeKernelSources::of_the_judge(),
+        );
+        let opened = (
+            judge.states_per_lane,
+            judge.scratch_lanes.len(),
+            judge.states_per_dispatch(),
+        );
+        drop(judge);
+        drop(lease);
+        assert_eq!(
+            opened.0, STATES_PER_LANE_GIVEN,
+            "一条草稿缓冲装的个数照调用方给的，不照这张卡的绑定上限另算"
+        );
+        assert_eq!(
+            (opened.1, opened.2),
+            (
+                STATES_PER_DISPATCH_GIVEN.div_ceil(STATES_PER_LANE_GIVEN),
+                STATES_PER_DISPATCH_GIVEN
+            ),
+            "草稿缓冲的条数与一次派活最多几个照调用方给的开"
         );
     }
 }

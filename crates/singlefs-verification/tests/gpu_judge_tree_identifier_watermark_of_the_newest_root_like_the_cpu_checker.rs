@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 
 use common::{
     build_pool, file_content, geometry, overwrite_in_process_as_instance_one_and_advance_the_pool,
-    parameters, CONTENT_BYTES_OF_PUBLISH_B,
+    parameters, CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use singlefs_checker::image::{InvariantVerdict, IMPLEMENTED_INVARIANTS};
 use singlefs_checker::walk::check_pool_image;
@@ -87,8 +87,8 @@ fn root_record_of_the_write(write: &RetainedWrite) -> RootRecord {
 }
 
 /// 覆盖写 B 那一版的内容：与 A 的不同。
-fn content_of_publish_b() -> Vec<u8> {
-    (0..CONTENT_BYTES_OF_PUBLISH_B)
+fn content_of_the_older_overwrite() -> Vec<u8> {
+    (0..CONTENT_BYTES_OF_THE_OLDER_OVERWRITE)
         .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
         .collect()
 }
@@ -97,7 +97,10 @@ fn content_of_publish_b() -> Vec<u8> {
 /// [`LOWERED_TREE_IDENTIFIER_WATERMARK`]、重封，流里 B 那次（同 (实例, txg)）的每条 journal 记录的新根段水位跟着换、重封。
 fn overwrite_flow(tag: &str, newest_root_watermark: NewestRootWatermark) -> RecordedFlow {
     let mut pool = build_pool(tag);
-    overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &content_of_publish_b());
+    overwrite_in_process_as_instance_one_and_advance_the_pool(
+        &mut pool,
+        &content_of_the_older_overwrite(),
+    );
     let operations = pool.retained_operations();
     let (mut writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
         &operations[pool.mkfs_operation_count..],
@@ -202,7 +205,7 @@ fn overwrite_flow(tag: &str, newest_root_watermark: NewestRootWatermark) -> Reco
             PublishedVersion {
                 instance: InstanceGeneration(1),
                 checkpoint_txg: CheckpointTxg(4),
-                content: content_of_publish_b(),
+                content: content_of_the_older_overwrite(),
             },
         ],
     }

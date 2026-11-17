@@ -63,6 +63,10 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness, WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
@@ -475,8 +479,10 @@ fn observe_where_the_new_instance_records_are_applied(
 /// 可写挂载之后先建一棵树那个观察者看一个状态（文件头那一段，C274 那一格）：在崩溃镜像落成的盘的副本上可写挂载（实例 3），接着建快照；
 /// 两个新树号不在落到的那一版的树表里、新树表的树号严格升序。挂载与建快照的写录在一条新的录制流上，连同盘交回：判段在盘上跑池级 checker。
 ///
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），建快照跳过。
+///
 /// # Panics
-/// 可写挂载或建快照做不成，或新树号撞上落到的那一版里的树号。
+/// 可写挂载被拒而不是认下的那一拒，建快照做不成，或新树号撞上落到的那一版里的树号。
 // gpu-exempt: writable-mount
 fn observe_a_new_tree_after_the_writable_mount(
     inputs: &InputsOfTheObservers,
@@ -502,8 +508,24 @@ fn observe_a_new_tree_after_the_writable_mount(
             )
         })
         .collect();
-    let mut mounted = mount_writable(&mount_parameters, &mut devices)
-        .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
+    let mut mounted = match mount_writable(&mount_parameters, &mut devices) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &mount_parameters.filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_AND_THE_NEW_SNAPSHOT,
+                counts,
+            );
+        }
+    };
     let landed = mounted
         .current
         .file_version()
@@ -708,9 +730,10 @@ fn assert_the_judges_and_the_observers_are_clean(tally: &CrashPointReplayTally) 
         "实例 2 有根落盘的每个状态都再读一遍带读故障的恢复：{counts:?}"
     );
     assert_eq!(
-        counts.count_named(NEW_SNAPSHOT_TREES_DIFFER_FROM_EVERY_TREE_OF_THE_LANDED_VERSION),
+        counts.count_named(NEW_SNAPSHOT_TREES_DIFFER_FROM_EVERY_TREE_OF_THE_LANDED_VERSION)
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载、建快照，新树号都不撞：{counts:?}"
+        "每个没被乙入判不出拒的状态都可写挂载、建快照，新树号都不撞：{counts:?}"
     );
     assert_eq!(
         counts.count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_AND_THE_NEW_SNAPSHOT),

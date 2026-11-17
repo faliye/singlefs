@@ -86,7 +86,7 @@ fn assert_nothing_was_written(
 /// pbs 4096 + io_min 3072（槽距 6144），4096 宽的盘：判定宽度 4096，按排布次序第一个不对齐的是系统配置槽 1（偏移 6144）。
 /// 不在前拒的话，清完根环与 journal 环、写完两个单元与三条第 0 代根，写到系统配置槽 1 才被块设备报 `Unaligned`，盘上留下半份格式。
 #[test]
-fn physical_block_size_4096_with_io_min_3072_is_refused_at_system_configuration_slot_one_before_any_write(
+fn physical_block_size_4096_with_minimum_input_output_3072_is_refused_at_system_configuration_slot_one_before_any_write(
 ) {
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices(4096, &stream);
@@ -114,7 +114,8 @@ fn physical_block_size_4096_with_io_min_3072_is_refused_at_system_configuration_
 /// pbs 512 + io_min 3072（槽距 6144），512 宽的盘：判定宽度 3072；系统配置两槽（0、6144）都对齐，
 /// 按排布次序第一个不对齐的是根环区域 0 的槽 0（区域起点 1 MiB，1048576 ÷ 3072 不整除）。不拒则 mkfs 整个收下。
 #[test]
-fn physical_block_size_512_with_io_min_3072_is_refused_at_the_first_root_slot_before_any_write() {
+fn physical_block_size_512_with_minimum_input_output_3072_is_refused_at_the_first_root_slot_before_any_write(
+) {
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices(512, &stream);
     let result = make_filesystem(
@@ -141,7 +142,7 @@ fn physical_block_size_512_with_io_min_3072_is_refused_at_the_first_root_slot_be
 /// 对照：pbs 512 + io_min 4096（槽距 4096）判定宽度 4096，两个系统配置槽与 24 个根槽都对齐，mkfs 照收。
 /// 钉住「拒」只落在不对齐的几何上，不是新判定把常规几何也挡了。
 #[test]
-fn physical_block_size_512_with_io_min_4096_still_makes_a_filesystem() {
+fn physical_block_size_512_with_minimum_input_output_4096_still_makes_a_filesystem() {
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices(512, &stream);
     let result = make_filesystem(&parameters_declaring(512, 4096), &mut devices);

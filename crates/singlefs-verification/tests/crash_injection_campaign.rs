@@ -2468,38 +2468,27 @@ fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_findi
     );
 }
 
-/// 写一份开 GPU 的多机配置，只写开关：显卡先后照调用方给这个进程的那一份、经环境变量交给引擎（[`settings_of_an_engine_on_the_gpu`] 的
-/// `cards`，`common_gpu_cards_of_the_caller` 文件头写了为什么不抄进配置）。
+/// 写一份开 GPU 的多机配置，只写开关：卡是调用方给这个进程的那一份、在环境守卫里交给引擎
+/// （`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`，那份文件头写了为什么不抄进配置）。
 #[cfg(feature = "gpu")]
 fn write_a_configuration_with_the_gpu_enabled(configuration: &std::path::Path) {
     std::fs::write(configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
 }
 
-/// 调用方给这个进程的显卡先后（清场之下是清场之后那一份；不读此刻的环境），交 [`settings_of_an_engine_on_the_gpu`] 设成环境变量。
-#[cfg(feature = "gpu")]
-fn cards_of_the_caller() -> String {
-    common_gpu_cards_of_the_caller::card_priority_value_of_the_caller()
-}
-
-/// 用例在环境守卫里起开 GPU 的引擎时设的变量：多机配置指到用例写的那一份（[`write_a_configuration_with_the_gpu_enabled`]），
-/// 显卡先后写 `cards`（用例传 [`cards_of_the_caller`]）：配置只写开关，清场之下引擎要清场之后那一份显卡先后，环境变量设了（空串也算）就照它。
+/// 用例在环境守卫里起开 GPU 的引擎时设的变量：多机配置指到用例写的那一份（[`write_a_configuration_with_the_gpu_enabled`]）。
+/// 卡不经这里交：用例在环境守卫里接着调 `common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`（服务交了卡串的设卡串，
+/// 清场之下是清场之后那一份；交领卡通道的把通道设回环境、不在这里领，引擎第一次上卡时才领），先于守卫丢。
 /// 这一台是 HOSTS 里哪一项不经环境交：引擎与卡池都照调用方那份多机配置上判法认出的那一项
 /// （`gpu_card_configuration::multi_host_addresses_of_the_caller`），派到哪一台都认得出自己。
 #[cfg(feature = "gpu")]
-fn settings_of_an_engine_on_the_gpu<'settings>(
-    configuration: &'settings std::path::Path,
-    cards: &'settings str,
-) -> [(&'static str, &'settings std::ffi::OsStr); 2] {
-    use singlefs_verification::gpu_card_configuration::{
-        CARDS_BY_PRIORITY_KEY, MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
-    };
-    [
-        (
-            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
-            configuration.as_os_str(),
-        ),
-        (CARDS_BY_PRIORITY_KEY, std::ffi::OsStr::new(cards)),
-    ]
+fn settings_of_an_engine_on_the_gpu(
+    configuration: &std::path::Path,
+) -> [(&'static str, &std::ffi::OsStr); 1] {
+    use singlefs_verification::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
+    [(
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+        configuration.as_os_str(),
+    )]
 }
 
 /// 开 GPU 的小规模一批（两段、每段 8 步、每段 2 个崩溃状态）：这一趟自己写一份开 GPU 的多机配置、在环境守卫里跑（清掉、跑完还原一趟读的变量）。
@@ -2514,10 +2503,11 @@ fn small_campaign_judged_on_the_gpu(
     let directory = disposable_library_of_the_campaign(&format!("on-the-gpu-{tag}"));
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
-    let cards = cards_of_the_caller();
-    let settings = settings_of_an_engine_on_the_gpu(&configuration, &cards).to_vec();
+    let settings = settings_of_an_engine_on_the_gpu(&configuration).to_vec();
     let _the_library_of_this_process = directory.make_it_the_library_of_this_process();
     let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
+    let cards_of_the_caller =
+        common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let judged = campaign_through_the_given_states_engine(
         &CrashInjectionCampaign {
             first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
@@ -2534,6 +2524,7 @@ fn small_campaign_judged_on_the_gpu(
         },
         fault,
     );
+    drop(cards_of_the_caller);
     drop(environment);
     judged
 }
@@ -2869,11 +2860,12 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
     let directory = disposable_library_of_the_campaign("genesis-publish-on-the-gpu");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
-    let cards = cards_of_the_caller();
     let the_library_of_this_process = directory.make_it_the_library_of_this_process();
     let environment = CrashAmplificationEnvironment::cleared_then_set(
-        &settings_of_an_engine_on_the_gpu(&configuration, &cards),
+        &settings_of_an_engine_on_the_gpu(&configuration),
     );
+    let cards_of_the_caller =
+        common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
             item_name: format!(
@@ -2888,6 +2880,7 @@ fn a_genesis_unit_overwritten_by_an_illegal_reuse_is_red_on_the_gpu_record_check
         .judge_the_given_states(&table)
         .expect("配了 GPU 的引擎判得了这张表");
     let engine_run = engine.finish();
+    drop(cards_of_the_caller);
     drop(environment);
     drop(the_library_of_this_process);
     drop(directory);
@@ -3332,11 +3325,12 @@ fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_cr
     let directory = disposable_library_of_the_campaign("record-checker-after-the-mount-on-the-gpu");
     let configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&configuration);
-    let cards = cards_of_the_caller();
     let the_library_of_this_process = directory.make_it_the_library_of_this_process();
     let environment = CrashAmplificationEnvironment::cleared_then_set(
-        &settings_of_an_engine_on_the_gpu(&configuration, &cards),
+        &settings_of_an_engine_on_the_gpu(&configuration),
     );
+    let cards_of_the_caller =
+        common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let engine = GivenStatesEngine::start_from_environment(
         GivenStatesItem {
             item_name: format!("{}::history_of_a_first_file_and_two_overwrites record-checker-after-the-writable-mount", CRASH_POINT_REPLAY_ITEM),
@@ -3394,6 +3388,7 @@ fn the_gpu_record_checker_after_the_writable_mount_agrees_with_the_cpu_on_the_cr
         compared.push((first_crash.name, cpu.0));
     }
     let engine_run = engine.finish();
+    drop(cards_of_the_caller);
     drop(environment);
     drop(the_library_of_this_process);
     drop(directory);
@@ -3693,16 +3688,17 @@ fn the_gpu_judges_the_claimed_version_of_the_pool_after_the_mount_like_the_cpu_w
         disposable_library_with_a_configuration_on_the_cpu("claimed-version-paired");
     let gpu_configuration = directory.join("multi-host-with-gpu.env");
     write_a_configuration_with_the_gpu_enabled(&gpu_configuration);
-    let cards = cards_of_the_caller();
     let judged_in_a_run = |run: &str, gpu_enabled: bool| {
         let library = disposable_library_of_the_campaign(&format!("claimed-version-paired-{run}"));
         let settings: Vec<(&str, &std::ffi::OsStr)> = if gpu_enabled {
-            settings_of_an_engine_on_the_gpu(&gpu_configuration, &cards).to_vec()
+            settings_of_an_engine_on_the_gpu(&gpu_configuration).to_vec()
         } else {
             vec![("SINGLEFS_MULTI_HOST_CONFIG", cpu_configuration.as_os_str())]
         };
         let _the_library_of_this_process = library.make_it_the_library_of_this_process();
         let environment = CrashAmplificationEnvironment::cleared_then_set(&settings);
+        let cards_of_the_caller =
+            gpu_enabled.then(common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run);
         let engine = given_states_engine_under_the_callers_environment_guard(&format!(
             "claimed_version_of_the_pool_after_the_mount_paired {run}"
         ));
@@ -3712,6 +3708,7 @@ fn the_gpu_judges_the_claimed_version_of_the_pool_after_the_mount_like_the_cpu_w
             })
             .unwrap_or_else(|reason| panic!("{run} 那一趟判不了（不退回别处判）：{reason}"));
         let engine_run = engine.finish();
+        drop(cards_of_the_caller);
         drop(environment);
         (judged, engine_run)
     };

@@ -15,7 +15,8 @@ mod common;
 
 use common::{
     build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool,
-    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B, CONTENT_BYTES_OF_PUBLISH_C,
+    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_THE_NEWER_OVERWRITE,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::journal::record_offset;
@@ -37,8 +38,8 @@ const THREE_RECORD_RING_BYTES: u64 = 3 * JOURNAL_RECORD_BYTES;
 const CONTENT_BYTE_STRIDE: usize = 7;
 const CONTENT_BYTE_MODULUS_BELOW_256: usize = 253;
 /// B、C 两版文件的内容种子（字节数在 `common`）：两版长度与种子各不相同，读回哪一版看得出。
-const CONTENT_SEED_OF_PUBLISH_B: usize = 3;
-const CONTENT_SEED_OF_PUBLISH_C: usize = 11;
+const CONTENT_SEED_OF_THE_OLDER_OVERWRITE: usize = 3;
+const CONTENT_SEED_OF_THE_NEWER_OVERWRITE: usize = 11;
 
 fn content_of(length: usize, seed: usize) -> Vec<u8> {
     (0..length)
@@ -90,9 +91,15 @@ fn with_an_in_flight_limit_of_one_only_the_first_of_two_single_record_publishes_
     let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
     let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &content_of(CONTENT_BYTES_OF_PUBLISH_B, CONTENT_SEED_OF_PUBLISH_B),
+        &content_of(
+            CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
+            CONTENT_SEED_OF_THE_OLDER_OVERWRITE,
+        ),
     );
-    let third_content = content_of(CONTENT_BYTES_OF_PUBLISH_C, CONTENT_SEED_OF_PUBLISH_C);
+    let third_content = content_of(
+        CONTENT_BYTES_OF_THE_NEWER_OVERWRITE,
+        CONTENT_SEED_OF_THE_NEWER_OVERWRITE,
+    );
     let third =
         overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &third_content);
     assert_eq!(

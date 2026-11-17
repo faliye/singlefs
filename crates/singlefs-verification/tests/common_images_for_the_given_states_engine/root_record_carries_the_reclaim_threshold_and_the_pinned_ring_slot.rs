@@ -13,7 +13,8 @@ use crate::common::{
     build_pool, crash_state_devices, format_pool,
     overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
     tear_the_root_slot_written_for_txg, with_unreadable_ranges, FailingReadsOfARange,
-    SharedUnreadableRanges, UnreadableRange, UnreadableRangeReadBack, CONTENT_BYTES_OF_PUBLISH_B,
+    SharedUnreadableRanges, UnreadableRange, UnreadableRangeReadBack,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use crate::common_images_for_the_given_states_engine::{PoolCheckerExpectation, PoolCheckerImages};
 use crate::common_root_ring_holes::{
@@ -886,7 +887,7 @@ pub fn run_the_scenario_where_a_root_rebuilt_from_records_takes_the_reclaim_thre
     for fill_byte in FILL_BYTES_OF_THE_THREE_OVERWRITES {
         overwrite_in_process_as_instance_one_and_advance_the_pool(
             &mut pool,
-            &vec![fill_byte; CONTENT_BYTES_OF_PUBLISH_B],
+            &vec![fill_byte; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
         );
     }
     let root_of_txg_six = pool.output.root;

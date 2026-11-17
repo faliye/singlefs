@@ -5,8 +5,10 @@
 //! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，80 段、485 次写、19 条根槽写；取号写两轮，两次取号各两段）。
 //! 入口都由 `common_crash_points` 设点，前 38 个点与到 D 那条测试共享。展开上限取引擎的那一个（`EXPAND_UP_TO_WRITES_PER_SEGMENT_OF_THE_AMPLIFICATION`，
 //! 设了缩域变量 `EXPAND_UP_TO_ENVIRONMENT_VARIABLE` 就往小缩），28 及以上就是全域（`exhaustive=true`）。
+//! 设了块区间（`BLOCK_RANGE_ENVIRONMENT_VARIABLE`）的那一趟，对账、第二趟全部复用照这一片判（`common_blocks_judged_and_reused_by_the_run`）。
 
 mod common;
+mod common_blocks_judged_and_reused_by_the_run;
 mod common_crash_points;
 
 use std::time::Instant;
@@ -369,44 +371,12 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         "健康的固定脚本一个红状态都不该有：{:?}",
         run.checking.red_texts
     );
-    if run.share.count == 1 {
-        assert_eq!(
-            run.unjudged_blocks, 0,
-            "整份自己跑（两台各判一份时，两份都判进服务那一份之后不分片的那一趟就是整份），对账为空"
-        );
-        assert!(run.violations.is_empty());
-    }
-    if run.share.count == 1 {
-        // 库里这一判法单元指纹已经判过的块复用、不重核（续跑）：这一趟核的是它录下来还没判的那些
-        assert_eq!(
-            run.checking.states_checked, run.recording.states_recorded,
-            "这一趟录下来要判的状态都核了"
-        );
-        let second_run =
-            run_from_environment(&flow, ITEM_NAME, &toolchain, limit).expect("第二趟跑得完");
-        assert_eq!(
-            second_run.recording.blocks_already_judged,
-            run.recording.blocks_recorded + run.recording.blocks_already_judged,
-            "第二趟全部复用"
-        );
-        assert_eq!(second_run.checking.blocks_checked, 0, "复用的块不再核");
-    }
-    // 第 ②③ 段跑了就要：核对红 ⇒ 判器红，一条不一致都不许
-    if let Some(comparison) = &run.comparison {
-        assert_eq!(
-            comparison.disagreements, 0,
-            "核对红而判器绿：{:?}",
-            comparison.disagreement_samples
-        );
-        // 两台各判一份的那一趟：服务那一份里有对方判过、第 ② 段归对方核而对方还没核到的块，这一份不判；
-        // 两份都判进服务那一份之后不分片再跑的那一趟（share.count == 1）罩整条流，判过的块都要核过
-        if run.share.count == 1 {
-            assert_eq!(
-                comparison.blocks_without_verifier, 0,
-                "判过的块第 ② 段都核过"
-            );
-        }
-    }
+    // 对账、第二趟全部复用、判过的块都核过：设了块区间的那一趟照这一片判（录入段那一句数整条流，设了块区间也照判）
+    common_blocks_judged_and_reused_by_the_run::assert_the_run_judged_verified_and_reused_its_blocks(
+        &run,
+        &plan,
+        || run_from_environment(&flow, ITEM_NAME, &toolchain, limit).expect("第二趟跑得完"),
+    );
     let verifier_line = match (&run.verification, &run.comparison) {
         (Some(outcome), Some(comparison)) => format!(
             " verifier={} verified_states={} verifier_red={} compared={} both_red={} judge_red_only={} disagreements={}",

@@ -9,9 +9,9 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::journal::JournalRecord;
 use singlefs_core::mount::{
@@ -21,10 +21,10 @@ use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_verification::memory_pool::RetainedWrite;
 use singlefs_verification::segments::StepKind;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// 这一拒是 F1 乙、点名 R 那次发布。
-fn is_the_refusal_for_missing_records_of_r(
+fn is_the_refusal_for_missing_records_of_the_recorded_publish(
     refusal: &MountError,
     recorded: &RecordedPublish,
 ) -> bool {
@@ -48,8 +48,8 @@ fn is_the_refusal_for_missing_records_of_r(
 fn a_root_falling_back_to_the_witnessed_version_with_its_first_record_and_tree_table_reading_back_zero_refuses_the_writable_mount_before_any_write(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let tree_table_writes = recorded.unit_writes_at(&recorded.root().tree_table);
@@ -62,7 +62,7 @@ fn a_root_falling_back_to_the_witnessed_version_with_its_first_record_and_tree_t
     let refusal = mount_writable(&recorded.pool.parameters, &mut devices)
         .expect_err("退回 P 之后 R 缺第 1 条、末条点名的树表两份都验不过：拒可写");
     assert!(
-        is_the_refusal_for_missing_records_of_r(&refusal, &recorded),
+        is_the_refusal_for_missing_records_of_the_recorded_publish(&refusal, &recorded),
         "拒因是 F1 乙、点名 R：{refusal:?}"
     );
     assert!(
@@ -81,8 +81,8 @@ fn a_root_falling_back_to_the_witnessed_version_with_its_first_record_and_tree_t
 fn every_unit_of_a_root_falling_back_with_a_gap_in_its_records_refuses_the_writable_mount_exactly_when_a_readable_record_names_it(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let mut outcomes: Vec<String> = Vec::new();
@@ -101,7 +101,7 @@ fn every_unit_of_a_root_falling_back_with_a_gap_in_its_records_refuses_the_writa
                 unit_copies,
                 &hidden_records,
             );
-            match mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+            match mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
                 &recorded,
                 &crash_image,
                 &ranges,
@@ -122,7 +122,7 @@ fn every_unit_of_a_root_falling_back_with_a_gap_in_its_records_refuses_the_writa
                 }
                 Err(refusal) => {
                     assert!(
-                        is_the_refusal_for_missing_records_of_r(&refusal, &recorded),
+                        is_the_refusal_for_missing_records_of_the_recorded_publish(&refusal, &recorded),
                         "{cell}：拒因是 F1 乙、点名 R：{refusal:?}"
                     );
                     assert!(
@@ -187,8 +187,8 @@ fn unit_is_named_by_a_record_not_reading_back_zero(
 #[test]
 fn a_power_loss_after_the_first_record_of_a_three_record_publish_still_mounts_writable() {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     let first_record_offset = recorded.record_writes_of_the_record(1)[0].offset;
     let last_write_of_the_first_record = recorded

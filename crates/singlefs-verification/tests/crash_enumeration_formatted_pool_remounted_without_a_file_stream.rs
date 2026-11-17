@@ -3,7 +3,7 @@
 //! mkfs → 可写挂载（取号 1、不写行、零单元发布 txg 1 与暖机 txg 2）
 //! → 不写文件 → 正常卸载（树表 0 条的一版上一个字节都不写）→ 进程重开、再可写挂载（取号 2、在树表 0 条的一版上写实例 1 那一行 txg 3、暖机 txg 4）。
 //! 把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4 取崩溃状态，每个状态跑恢复 + 多版本 oracle（这条流上没有带文件的版本，只许报没有文件）、
-//! 池级 checker、记录核对器；每个状态再当交回镜像的观察者重开可写挂载一次、接着发第一个文件版本，挂不上或发不出都当场 panic（C492 的验收：
+//! 池级 checker、记录核对器；每个状态再当交回镜像的观察者重开可写挂载一次、接着发第一个文件版本，乙入判不出之外挂不上或发不出都当场 panic（C492 的验收：
 //! 重开之后发得出布），挂完发完的盘交判段跑池级 checker。
 //!
 //! **比已有的流多罩了什么**：`crash_enumeration_writable_mount_of_a_formatted_pool.rs` 只罩「只做过 mkfs 的池重开一次可写挂载、同一个进程里发第一个
@@ -44,6 +44,12 @@ use singlefs_core::transaction::{publish_first_file, FirstFile, PoolVersion, Poo
 use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, writes_and_segments, CrashImage, MemoryPool,
     RetainedWrite,
+};
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
 };
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::SharedStream;
@@ -149,20 +155,38 @@ fn record_the_formatted_pool_remounted_without_a_file(
 }
 
 /// 观察者「重开之后发第一个文件版本」（`remount_and_publish_the_first_file`）：把这个状态持久的写落到基线上，可写挂载一次、接着发第一个文件版本；
-/// 挂不上、发不出都当场 panic（C492：树表 0 条的一版上必须有可写的出路，重开之后发得出布）。挂完发完的盘交回，池级 checker 在判段判。
+/// 可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），发第一个文件版本跳过；别的拒、发不出都当场 panic
+/// （C492：这一拒的可写出路是离线断言第 0 代再挂，这个观察者不走它、认下这一拒就跳过发布）。挂完发完的盘交回，池级 checker 在判段判。
 /// 这条流上每个崩溃状态恢复都落在树表 0 条的一版上（没有带文件的版本），所以接着发的就是第一个文件版本。
 /// 观察者的身份是这个 fn 的闭包键（入口要登记在 `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES`；没登记时取键拒算、照判不入库）。
 // gpu-exempt: writable-mount
 fn remount_and_publish_the_first_file_after_the_crash(
     base: &MemoryPool,
     image: &CrashImage<'_>,
+    report: &RecoveryReport,
     counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices = crash_state_devices(base, image.writes, &image.persisted, &stream);
-    let mounted = mount_writable(&parameters(), &mut devices).unwrap_or_else(|error| {
-        panic!("C492：崩溃之后重开可写挂载被拒（树表 0 条的一版上没有可写的出路）：{error:?}")
-    });
+    let crash_disks = memory_pool_of_sparse_devices(&devices);
+    let mounted = match mount_writable(&parameters(), &mut devices) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &crash_disks,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                CHECKER_CLEAN_AFTER_THE_REMOUNT_AND_THE_FIRST_FILE,
+                counts,
+            );
+        }
+    };
     let mut allocator = mounted.allocator;
     let content = file_content();
     let published = {
@@ -210,10 +234,10 @@ fn enumerate_remounting_and_publishing_the_first_file(
 ) -> Option<CrashPointReplayTally> {
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
+                   report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
-        remount_and_publish_the_first_file_after_the_crash(&recorded.base, image, counts)
+        remount_and_publish_the_first_file_after_the_crash(&recorded.base, image, report, counts)
     };
     let item_name = format!("formatted_pool_remounted_without_a_file::{item_label}");
     enumerate_crash_states_with_every_kind_of_observer(
@@ -248,6 +272,10 @@ fn enumerate_remounting_and_publishing_the_first_file(
 }
 
 fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointReplayTally) {
+    print_the_writable_mount_refusals_into_the_undecidable_witness(
+        "formatted_pool_remounted_without_a_file",
+        tally,
+    );
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
         (0, None),
@@ -279,9 +307,12 @@ fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointR
     assert_eq!(
         tally
             .observer_counts
-            .count_named(REMOUNTED_AND_PUBLISHED_THE_FIRST_FILE),
+            .count_named(REMOUNTED_AND_PUBLISHED_THE_FIRST_FILE)
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "C492：每个崩溃状态之后都重开得了可写挂载、发得出第一个文件版本"
+        "C492：每个没被乙入判不出拒的崩溃状态之后都重开得了可写挂载、发得出第一个文件版本"
     );
     assert_eq!(
         tally

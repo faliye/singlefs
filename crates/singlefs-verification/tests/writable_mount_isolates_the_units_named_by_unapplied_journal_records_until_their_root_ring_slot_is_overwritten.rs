@@ -12,8 +12,8 @@ use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, fixed_geometry_of_the_384_slot_small_devices,
     image_of_devices_reading_back_all_zero, pool_after_the_mount,
     record_one_publish_after_overwrites, recorded_devices_reading_back_all_zero_on,
-    units_of_r_overwritten_on, PublishRecordedAsR, RangesReadingBackAllZero, RecordedPublish,
-    OVERWRITE_BYTES,
+    units_of_the_recorded_publish_overwritten_on, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind, OVERWRITE_BYTES,
 };
 use singlefs_core::address::{DeviceIdentity, SlotNumber};
 use singlefs_core::admission::{admission_reading_before_a_publish, BytesOnOneDevice};
@@ -30,10 +30,12 @@ use singlefs_verification::SharedStream;
 
 /// 覆盖写几次之后录 R：K1-2 与第一、二节都取 k = 5（384 槽这一档里 R 那次发布新开了一段，P 的账里那一段是空的，
 /// 取新实例那次挂载的提交内生块开到同一段上）。
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// M1 里读回全零的：R 的根槽与 R 写出的每个单元（`ur`）。
-fn root_slot_and_units_of_r(recorded: &RecordedPublish) -> RangesReadingBackAllZero {
+fn root_slot_and_units_of_the_recorded_publish(
+    recorded: &RecordedPublish,
+) -> RangesReadingBackAllZero {
     RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])
         .with_the_writes(&recorded.unit_writes())
@@ -45,13 +47,15 @@ fn root_slot_and_units_of_r(recorded: &RecordedPublish) -> RangesReadingBackAllZ
 #[test]
 fn a_power_loss_before_the_row_root_of_the_mount_that_took_a_new_instance_still_reads_back_the_root_whose_units_read_back_zero_at_that_mount(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices_reading_back_all_zero_on(
         &crash_image,
-        &root_slot_and_units_of_r(&recorded),
+        &root_slot_and_units_of_the_recorded_publish(&recorded),
         &stream,
     );
     let mounted = mount_writable(&recorded.pool.parameters, &mut devices)
@@ -75,7 +79,7 @@ fn a_power_loss_before_the_row_root_of_the_mount_that_took_a_new_instance_still_
     let mut image_before_the_row_root = crash_image.clone();
     image_before_the_row_root.apply_writes(&mount_writes[..row_root]);
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image_before_the_row_root),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image_before_the_row_root),
         Vec::<(DeviceIdentity, u64)>::new(),
         "写行那次发布的根落盘之前，那次挂载写下的一切都没碰 R 的单元（C 隔离了 R 的记录点名的落点）"
     );
@@ -104,24 +108,31 @@ fn a_power_loss_before_the_row_root_of_the_mount_that_took_a_new_instance_still_
 #[test]
 fn a_power_loss_before_the_row_root_of_the_mount_still_reads_back_a_candidate_root_whose_mapping_root_read_back_zero_at_that_mount(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root_of_r = RootRecord::parse_slot(
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root_of_the_recorded_publish = RootRecord::parse_slot(
         recorded.root_slot_write().bytes().expect("根槽写带字节"),
         &recorded.pool.parameters.filesystem_identifier,
     )
     .expect("R 的根自证");
-    let mapping_root_writes_of_r: Vec<&RetainedWrite> = recorded
+    let mapping_root_writes_of_the_recorded_publish: Vec<&RetainedWrite> = recorded
         .unit_writes()
         .into_iter()
         .filter(|write| {
-            root_of_r.mapping_root.locations.iter().any(|location| {
-                location.device == write.device && location.slot.to_device_offset() == write.offset
-            })
+            root_of_the_recorded_publish
+                .mapping_root
+                .locations
+                .iter()
+                .any(|location| {
+                    location.device == write.device
+                        && location.slot.to_device_offset() == write.offset
+                })
         })
         .collect();
     assert_eq!(
-        mapping_root_writes_of_r.len(),
+        mapping_root_writes_of_the_recorded_publish.len(),
         2,
         "R 写了自己的中央映射树根，两块盘各一份"
     );
@@ -129,7 +140,8 @@ fn a_power_loss_before_the_row_root_of_the_mount_still_reads_back_a_candidate_ro
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices_reading_back_all_zero_on(
         &crash_image,
-        &RangesReadingBackAllZero::default().with_the_writes(&mapping_root_writes_of_r),
+        &RangesReadingBackAllZero::default()
+            .with_the_writes(&mapping_root_writes_of_the_recorded_publish),
         &stream,
     );
     let mounted = mount_writable(&recorded.pool.parameters, &mut devices)
@@ -153,7 +165,7 @@ fn a_power_loss_before_the_row_root_of_the_mount_still_reads_back_a_candidate_ro
     let mut image_before_the_row_root = crash_image.clone();
     image_before_the_row_root.apply_writes(&mount_writes[..row_root]);
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image_before_the_row_root),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image_before_the_row_root),
         Vec::<(DeviceIdentity, u64)>::new(),
         "写行那次发布的根落盘之前，那次挂载写下的一切都没碰 R 的单元（C 不豁免候选根 R 自己引用的槽）"
     );
@@ -174,17 +186,21 @@ fn a_power_loss_before_the_row_root_of_the_mount_still_reads_back_a_candidate_ro
 #[test]
 fn the_ninth_admission_term_equals_the_slots_isolated_for_the_records_above_the_water_mark_on_every_device(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
-    let mut devices =
-        devices_reading_back_all_zero_on(&crash_image, &root_slot_and_units_of_r(&recorded));
+    let mut devices = devices_reading_back_all_zero_on(
+        &crash_image,
+        &root_slot_and_units_of_the_recorded_publish(&recorded),
+    );
     let mounted = mount_writable(&recorded.pool.parameters, &mut devices)
         .expect("系统配置没见证 R：可写挂载做得成");
     let reading =
         admission_reading_before_a_publish(&mounted.allocator, mounted.current.file_version());
     for device_map in &mounted.allocator.devices {
-        let slots_of_r_on_this_device: u64 = recorded
+        let slots_of_the_recorded_publish_on_this_device: u64 = recorded
             .unit_writes()
             .into_iter()
             .filter(|write| write.device == device_map.device)
@@ -192,7 +208,7 @@ fn the_ninth_admission_term_equals_the_slots_isolated_for_the_records_above_the_
             .sum();
         assert_eq!(
             device_map.isolated_slots(),
-            slots_of_r_on_this_device,
+            slots_of_the_recorded_publish_on_this_device,
             "盘 {:?}：分配器隔离的槽数 = R 写出的单元在这块盘上占的槽数（C 那一部分）",
             device_map.device
         );
@@ -218,18 +234,22 @@ fn the_ninth_admission_term_equals_the_slots_isolated_for_the_records_above_the_
 #[test]
 fn the_units_named_by_the_record_of_a_root_reread_as_abandoned_stay_isolated_until_this_process_overwrites_its_root_ring_slot(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
-    let mut devices =
-        devices_reading_back_all_zero_on(&crash_image, &root_slot_and_units_of_r(&recorded));
+    let mut devices = devices_reading_back_all_zero_on(
+        &crash_image,
+        &root_slot_and_units_of_the_recorded_publish(&recorded),
+    );
     let mounted = mount_writable(&recorded.pool.parameters, &mut devices)
         .expect("系统配置没见证 R：可写挂载做得成");
     let image_after_the_mount =
         image_of_devices_reading_back_all_zero(&devices, recorded.pool.device_bytes);
     let mut pool = pool_after_the_mount(&recorded, &image_after_the_mount, mounted);
     let slots_per_region = recorded.pool.parameters.geometry.root_ring_slots_per_region;
-    let ring_slot_of_r = target_for_publish(recorded.key.1, slots_per_region);
+    let last_ring_slot_the_push_reaches = target_for_publish(recorded.key.1, slots_per_region);
     let overwrites_limit = 4 * slots_per_region.count();
     let mut overwrites = 0;
     // 迭代上界 overwrites_limit（根环三区、每区 S 槽，一圈 3S 次发布之内必写到 R 那一槽）；每一轮发一次覆盖写、核一次。
@@ -239,12 +259,12 @@ fn the_units_named_by_the_record_of_a_root_reread_as_abandoned_stay_isolated_unt
         overwrites += 1;
         let current_txg = pool.session().current.root().checkpoint_txg;
         assert_eq!(
-            units_of_r_overwritten_on(&recorded, &pool.image()),
+            units_of_the_recorded_publish_overwritten_on(&recorded, &pool.image()),
             Vec::<(DeviceIdentity, u64)>::new(),
             "第 {overwrites} 次覆盖写（txg {current_txg:?}）之后，R 的根槽还没被这个进程盖掉或刚被盖掉：R 的单元一个都没被取到"
         );
         if current_txg > recorded.key.1
-            && target_for_publish(current_txg, slots_per_region) == ring_slot_of_r
+            && target_for_publish(current_txg, slots_per_region) == last_ring_slot_the_push_reaches
         {
             break;
         }
@@ -282,8 +302,8 @@ fn the_units_named_by_the_record_of_a_root_reread_as_abandoned_stay_isolated_unt
 fn the_units_named_by_the_readable_records_of_a_publish_whose_last_record_reads_back_zero_are_isolated(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();

@@ -1,5 +1,5 @@
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收进来的 C369（提交内生块段耗尽时没有回落）：D3（空间分配） 已定项 8 ②
-//! 「提交内生块的段耗尽时回落到该设备内槽号最小的空槽，同样排除 `R`」。
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收进来的 C369（提交内生块段耗尽时没有回落）：D3（空间分配） 已定项 8 第 2 条的回落——
+//! 先取这次发布分配记录树重写集里的叶（每块盘都重写的那几片）里的空槽，不够再取空槽最多的那片叶，同样排除 `R`。
 //! 池里没有全空的 64 槽聚簇段、开放段也用满，每块盘上却还有大片空槽：一次发布要成功，提交内生块落在回落政策函数给的槽上。
 //! 回落与 bump 游标绕开同一套位（已分配、影子账隔离、抬 F 扣住），不是绕开影子账或回收扣住的第二条路。
 //! 另钉增补 2 第 ② 行里「抬 F 的空发布分配不到固定点（开放段满、唯一全空段正是扣住的那一段）」补了回落之后的行为：
@@ -23,7 +23,9 @@ use singlefs_core::admission::{
     DeviceWithEmptyClusterSegmentsBelowTheFloor, EmptyClusterSegmentsBelowTheFloorOnSomeDevices,
 };
 use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
-use singlefs_core::allocator::{PlacementRefusal, PoolAllocator, UnitFootprint};
+use singlefs_core::allocator::{
+    AllocationRecordTreeLeafIndex, PlacementRefusal, PoolAllocator, RewriteSetLeaves, UnitFootprint,
+};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::compaction_plan::{CompactionSwitches, EmptyClusterSegmentsFloor};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
@@ -38,7 +40,9 @@ use singlefs_core::transaction::{
     PublishError, TransactionOutput, TransactionUnit,
 };
 use singlefs_core::write_accounting::WriteCallsAndBytes;
-use singlefs_format::{CLUSTER_SEGMENT_SLOTS, UNIT_AREA_START_SLOT};
+use singlefs_format::{
+    ALLOCATION_RECORD_TREE_LEAF_SLOTS, CLUSTER_SEGMENT_SLOTS, UNIT_AREA_START_SLOT,
+};
 use singlefs_verification::fault_injection::{
     FaultInjectingBlockDevice, FaultSchedule, InjectedFault, SharedFaultPlan,
 };
@@ -157,13 +161,16 @@ fn an_overwrite_on_a_pool_without_an_empty_cluster_segment_is_refused_by_the_emp
 
 /// C369 的验收：新池新建文件 A 之后开放段 [50240, 50304) 用满、别的段都不全空，覆盖写 B 要成功。
 /// 合取 7 的 `N₀` 压成 0，只测回落那一支（[`compaction_switches_with_the_empty_cluster_segments_floor_at_zero`]）。
-/// 回落政策函数在这张空闲图上给的落点（手算，不调分配器）：B 先释放 A 的十二个落点（进 defer、槽仍占着），数据单元不受段约束、
-/// 取 A 的 50180 之后最低的偶数空槽对 50182；extent 树根是第一个提交内生块，开放段装不下、没有全空段 ⇒ 回落到槽号最小的空槽 50179
-/// （mkfs 的 50176–50178 与 A 的数据单元之间那个从没分配过的洞）；inode 树叶容器两槽、起点 32768 对齐，50182–50183 刚给了数据单元 ⇒ 50184；
-/// 之后的一槽节点按 bump 次序接着取最低空槽 50186–50194（分配记录树按位置寻址，D8（核心索引结构） 已定项 14：B 改的记录都在两块盘各自的
-/// 叶 61 里，两片叶、两个第 1 层节点、根，先叶后根，再是记账树、映射树、树表）。两块盘上的分配记录同槽、分配代 4；冷启动读回 B。
+/// 回落政策函数在这张空闲图上给的落点（手算，不调分配器）：B 先释放 A 的十二个落点（进 defer、槽仍占着），释放改的记录都在两块盘各自的
+/// 叶 61（[49532, 50344)）里 ⇒ 固定点第 2 遍的重写集是两块盘的叶 61、两个第 1 层节点与根（分配记录树按位置寻址，D8（核心索引结构） 已定项 14），
+/// 回落先取叶 61 里两块盘都空的最低槽。数据单元不受段约束、取 A 的 50180 之后最低的偶数空槽对 50182；extent 树根是第一个提交内生块，
+/// 开放段装不下、没有全空段 ⇒ 回落到叶 61 里最低的空槽 50179（mkfs 的 50176–50178 与 A 的数据单元之间那个从没分配过的洞）；
+/// inode 树叶容器两槽、起点 32768 对齐，50182–50183 刚给了数据单元 ⇒ 50184；之后的一槽节点按 bump 次序接着取叶 61 里的 50186–50194
+/// （两片叶、两个第 1 层节点、根，先叶后根，再是记账树、映射树、树表）。落点都在叶 61 里，内容变了的节点就是重写集，第 2 遍定下。
+/// 两块盘上的分配记录同槽、分配代 4；冷启动读回 B。
 #[test]
-fn publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_on_every_device() {
+fn publish_on_pool_without_empty_cluster_segment_falls_back_into_the_rewrite_set_leaf_on_every_device(
+) {
     let mut pool = build_pool("supplement-two-fallback-publish");
     leave_no_empty_cluster_segment(&mut pool.allocator);
     pool.allocator.set_compaction_switches(
@@ -241,8 +248,8 @@ fn publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_
     );
 }
 
-/// 回落绕开影子账隔离的槽（与 bump 游标同一套位）：没有全空段时把 50179 在两块盘上都隔离，下一个一槽的提交内生块越过它、落到
-/// 50182（50180–50181 是 A 的数据单元）。
+/// 回落绕开影子账隔离的槽（与 bump 游标同一套位）：没有全空段时把 50179 在两块盘上都隔离，重写集是两块盘的叶 61，
+/// 下一个一槽的提交内生块越过它、落到叶 61 里下一个不被挡的空槽 50182（50180–50181 是 A 的数据单元）。
 #[test]
 fn fallback_skips_a_slot_isolated_by_the_shadow_ledger() {
     let mut pool = build_pool("supplement-two-fallback-isolated");
@@ -251,9 +258,17 @@ fn fallback_skips_a_slot_isolated_by_the_shadow_ledger() {
         pool.allocator
             .isolate_abandoned(device, SlotNumber(50179), 1);
     }
+    let leaf_61_on_both_devices = RewriteSetLeaves::present_on_every_device(&[
+        BTreeSet::from([AllocationRecordTreeLeafIndex(61)]),
+        BTreeSet::from([AllocationRecordTreeLeafIndex(61)]),
+    ]);
     let placement = pool
         .allocator
-        .try_allocate_commit_generated(UnitFootprint::OneSlot, CheckpointTxg(4))
+        .try_allocate_commit_generated_preferring_the_rewrite_set(
+            UnitFootprint::OneSlot,
+            CheckpointTxg(4),
+            &leaf_61_on_both_devices,
+        )
         .expect("隔离之外还有空槽");
     assert_eq!(
         placement.slot,
@@ -569,12 +584,29 @@ fn raise_floor(pool: &mut BuiltPool, new_floor: CheckpointTxg) -> Result<RaisedF
 }
 
 /// 增补 2 第 ② 行那一格，扣住的段外面还有不被挡的空槽：抬 F 之前开放段占满、每个全空段占掉段首一槽；抬 F 到 8 回收 A、B 与
-/// 重开之后前几版释放的落点，[50240, 50304) 里只剩回收的槽 ⇒ 它是唯一的全空段、又整段扣住。补回落之前这里报 `NoSpaceFor`；
-/// 今天抬 F 成功，空发布的固定点全部回落，一个都不在这次回收（扣住）的槽上；生效放开之后那一段是全池唯一的全空段。
+/// 重开之后前几版释放的落点，[50240, 50304) 里只剩回收的槽 ⇒ 它是唯一的全空段、又整段扣住。没有回落时这里报 `NoSpaceFor`；
+/// 抬 F 成功，空发布的固定点全部回落，一个都不在这次回收（扣住）的槽上；生效放开之后那一段是全池唯一的全空段。
 #[test]
 fn raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold() {
     let mut pool = build_six_overwrites_after_a_writable_remount("supplement-two-raise-falls-back");
     leave_no_empty_cluster_segment(&mut pool.allocator);
+    // 叶 62（[50344, 51156)）里两块盘都空的槽，抬 F 之前数：抬 F 回收的槽扣到生效、在这之前本来就占着，数出来的就是三次空发布回落时
+    // 叶 62 里不被挡的槽。
+    let first_slot_of_leaf_62 = 62 * ALLOCATION_RECORD_TREE_LEAF_SLOTS;
+    let free_slots_of_leaf_62_on_both_devices: Vec<u64> = (first_slot_of_leaf_62
+        ..first_slot_of_leaf_62 + ALLOCATION_RECORD_TREE_LEAF_SLOTS)
+        .filter(|slot| {
+            pool.allocator
+                .devices
+                .iter()
+                .all(|device_map| device_map.is_free(SlotNumber(*slot)))
+        })
+        .collect();
+    assert!(
+        free_slots_of_leaf_62_on_both_devices.len() >= 24,
+        "叶 62 里两块盘都空的槽够三次空发布各八个：{}",
+        free_slots_of_leaf_62_on_both_devices.len()
+    );
     let raised = raise_floor(&mut pool, CheckpointTxg(8))
         .expect("扣住的段外面还有不被挡的空槽：回落之后抬 F 的空发布拿得到固定点");
     let reclaimed_slots: BTreeSet<u64> = raised
@@ -602,11 +634,11 @@ fn raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_out
             "txg {txg} 的固定点落在这次回收的槽 {slot} 上：F 还没在两块盘上生效"
         );
     }
-    // 回落落点手算：扣住的是 50176–50178（mkfs 两个单元）、50180–50183（A、B 的数据单元）与 [50240, 50304) 里 A、B 的提交内生块；
-    // 50184–50193 是 txg 8–12 的数据单元（释放代 9–13 > 8，仍在 defer）、50194 是现行数据单元 ⇒ 不被挡的最低空槽依次是 50179、50196 起。
-    // 每次空发布重写的固定点按 bump 次序：分配记录树根之下那几个节点（按位置寻址，D8（核心索引结构） 已定项 14，先叶后根）、根、
-    // 记账树、映射树、树表。txg 14 换下的上一版固定点在 50344 之后（叶 62）、新取的落点在叶 61 ⇒ 两块盘各两片叶、两个第 1 层节点，
-    // 共十个单元；txg 15、16 换下的与新取的都在叶 61 ⇒ 各八个。
+    // 回落落点手算：每次空发布重写的固定点按 bump 次序：分配记录树根之下那几个节点（按位置寻址，D8（核心索引结构） 已定项 14，先叶后根）、根、
+    // 记账树、映射树、树表。txg 14 换下的上一版固定点在 50344 之后（叶 62）⇒ 释放弄脏两块盘的叶 62，固定点第 2 遍的重写集里有它，
+    // 回落先取叶 62 里两块盘都空的最低槽；新落点也在叶 62 ⇒ 两块盘各一片叶、两个第 1 层节点、根，加记账树、映射树、树表共八个单元，
+    // 依次取叶 62 里两块盘都空的头八个槽。txg 15、16 换下的与新取的都在叶 62 ⇒ 各八个，接着往后取。
+    // 槽号最小的空槽在叶 61（50179，50196 起），回落不取它们：叶 61 不在这三次的重写集里。
     let fixed_point_slots: Vec<(u64, Vec<u64>)> = raised
         .publishes
         .iter()
@@ -624,16 +656,11 @@ fn raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_out
     assert_eq!(
         fixed_point_slots,
         vec![
-            (
-                14,
-                std::iter::once(50179)
-                    .chain(50196..=50204)
-                    .collect::<Vec<u64>>()
-            ),
-            (15, (50205..=50212).collect()),
-            (16, (50213..=50220).collect()),
+            (14, free_slots_of_leaf_62_on_both_devices[0..8].to_vec()),
+            (15, free_slots_of_leaf_62_on_both_devices[8..16].to_vec()),
+            (16, free_slots_of_leaf_62_on_both_devices[16..24].to_vec()),
         ],
-        "三次空发布的固定点都落在回落政策函数给的槽上"
+        "三次空发布的固定点都落在回落政策函数给的槽上：叶 62 里两块盘都空的头二十四个槽"
     );
     assert_eq!(
         pool.allocator.open_segment(),
@@ -752,9 +779,9 @@ fn a_raise_whose_second_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_
     );
 }
 
-/// 同一格推到第三次：只留十八个两盘共同的空槽——预演里第一次（txg 14）拿走十个、第二次（txg 15）八个
-/// （[`raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold`] 钉着三次各拿几个），
-/// 第三次（txg 16，落盘 1）一个都拿不到，报它按 bump 次序的第一个单元（它换下的第二次那几个落点也在叶 61：盘 0 那片叶 61）。
+/// 同一格推到第三次：只留十八个两盘共同的空槽（都在叶 61）——预演里第一次（txg 14）换下的上一版固定点在叶 62、叶 62 里一个空槽都不剩，
+/// 回落取空槽最多的叶 61，叶 61 跟着进重写集，两块盘各两片叶、两个第 1 层节点与根、加记账树、映射树、树表拿走十个；第二次（txg 15）换下的与新取的
+/// 都在叶 61，拿走八个；第三次（txg 16，落盘 1）一个都拿不到，报它按 bump 次序的第一个单元（它换下的第二次那几个落点也在叶 61：盘 0 那片叶 61）。
 /// 前两次若已经落盘、第三次才被拒，已落盘 2 份。
 #[test]
 fn a_raise_whose_third_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write() {

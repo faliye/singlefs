@@ -9,7 +9,7 @@
 //! `mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount`：
 //! 两块单元区 240 槽的小盘，第一个文件之后连着崩了再挂，第 10 次取号之前不够、写行与暖机之后推抬 F；那次挂载的会话里覆盖写一次，
 //! 被空间准入拒、推抬 F。注入的是抬 F 那一串先写系统配置那一步里盘 0 的那次系统配置槽写（块设备错）。
-//! 同一个池上攒批的会话那一条：空间不够的改动在 `accept` 里就拒、进不了待发，所以排空待发时不会为空间推抬 F。
+//! 同一个池上攒批的会话那一条：空间不够的改动在 `accept` 里推抬 F 再判，推到不再推了还放不下就拒、进不了待发。
 
 mod common_admission;
 
@@ -20,7 +20,8 @@ use singlefs_core::address::DeviceIdentity;
 use singlefs_core::compaction_plan::CallerMonotonicClockReading;
 use singlefs_core::mount::{MountError, MountSpaceAdmission};
 use singlefs_core::mounted_session::{
-    AcceptRefused, MountedSessionWithPendingChanges, UserChange, UserChangeRefused,
+    AcceptRefused, BatchJudgedAtTheAccept, MountedSessionWithPendingChanges, UserChange,
+    UserChangeRefused,
 };
 use singlefs_core::transaction::{FirstFile, PublishError};
 use singlefs_verification::fault_injection::{
@@ -170,12 +171,10 @@ fn a_block_device_error_in_the_floor_raise_pushed_by_the_session_is_not_reported
     );
 }
 
-/// 攒批的会话排空待发时不为空间推抬 F：`accept` 进门那一判（这一次单独、并进待发合起来，含空间准入与落点）与之后排空那一次接在同一份上一版、
-/// 同一份分配器上（收下与排空之间没有别的发布，屏障类先排空），空间不够的改动在 `accept` 里就在任何读写之前拒、进不了待发；
-/// 于是「排空时为空间推的抬 F 写失败冻结、待发既没进冻结的那一次也没放回」那一形走不到（代码轮 m4-close-code-r1 判决 T4.4）。
-/// 第 10 次挂载做成（推满仍不够）之后，会话接上待发、交一次覆盖写：拒成「这一次单独发布过不了」、拒因是空间准入，两块盘逐字节不变（一串抬 F 都没推）、待发空。
+/// 第 10 次挂载做成（推满仍不够）之后，会话接上待发、交一次覆盖写：`accept` 为空间推抬 F 再判，还是放不下：拒成「推抬 F 之后报空间不够」，
+/// 判的是这一次单独那一批，拒绝里带推成的那几串（一串都没推成时两块盘逐字节不变），待发空。待发里已有改动、抬 F 写失败冻结的那几格在 `accept_raises_the_floor_for_space.rs`。
 #[test]
-fn a_change_short_of_space_is_refused_by_the_accept_before_any_write_so_no_publish_of_the_pending_changes_raises_the_floor(
+fn a_change_short_of_space_is_refused_by_the_accept_after_the_floor_raises_and_kept_out_of_the_pending_changes(
 ) {
     let (mut pool, _plan) = pool_after_nine_crash_remounts();
     let output = pool
@@ -202,16 +201,30 @@ fn a_change_short_of_space_is_refused_by_the_accept_before_any_write_so_no_publi
         }),
         CallerMonotonicClockReading(Duration::ZERO),
     );
-    match &refused {
-        Err(AcceptRefused::ChangeRefusedByThePublishJudgement(cause)) => assert!(
-            matches!(**cause, PublishError::SpaceAdmissionRefused(_)),
-            "拒因是空间准入：{cause:?}"
-        ),
-        other => panic!("空间不够的改动在 accept 里就拒、不收进待发：{other:?}"),
-    }
+    let refused = refused.expect_err("空间不够的改动在 accept 里就拒、不收进待发");
+    let AcceptRefused::RefusedAfterRaisingTheFloorForSpace {
+        judgement: BatchJudgedAtTheAccept::ThisChangeAlone,
+        refusal,
+    } = &refused
+    else {
+        panic!("判的是这一次单独那一批，推过抬 F 还放不下：{refused:?}");
+    };
+    let UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space) = &**refusal else {
+        panic!("推到不再推了还放不下，报空间不够：{refusal:?}");
+    };
     assert!(
-        pool.image() == image_before_the_accept,
-        "在任何写之前拒：一串抬 F 都没推，两块盘逐字节不变"
+        matches!(
+            no_space.last_refusal,
+            PublishError::SpaceAdmissionRefused(_)
+        ),
+        "拒因是空间准入：{:?}",
+        no_space.last_refusal
     );
+    if refused.floor_raises_pushed_by_this_accept().is_empty() {
+        assert!(
+            pool.image() == image_before_the_accept,
+            "一串抬 F 都没推：两块盘逐字节不变"
+        );
+    }
     assert_eq!(session.pending_changes_accepted(), 0, "待发空");
 }

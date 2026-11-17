@@ -20,7 +20,7 @@ use singlefs_verification::crash_library::{
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_of_the_manifest, cpu_reference_table_read_back_from_the_pairing_library,
-    gpu_card_pool_or_report_not_run, GpuCardLease, GpuCardPool,
+    gpu_card_pool_or_report_not_run, GpuCardLease, GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::gpu_unit_checks::{
     check_unit_checksums_on_gpu, check_unit_checksums_on_the_cpu, mebibytes_crc32c_of_ranges_needs,
@@ -35,7 +35,7 @@ use singlefs_verification::sha256::sha256_digest;
 /// 在卡池里借一张卡，够 `checks_at_once` 批各核 `units_per_check` 个单元的两道校验和同时在卡上（每个单元两段字节）；
 /// 借到打一行借的是哪张卡，等满了借不到时借卡那一层打「本次未跑」那一行、这里交 `None`（用例当场返回）。
 fn lease_for_unit_checks_or_report_not_run(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     test_name: &str,
     units_per_check: usize,
     checks_at_once: u64,

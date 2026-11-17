@@ -5,6 +5,15 @@
 //!
 // admission: always 每跑一次都在今天这份 crates 上现造池、现量挂钟，计时每次都是新观测，上一次跑完不替这一次作保
 // run-condition: command python3
+// task-server-gpu-arguments: gpu-submission host-cpu-per-submission recompute-disagreement host-cpu-drift-control
+//!
+//! 要卡的四个子命令（`gpu-submission`、`host-cpu-per-submission`、`recompute-disagreement`、`host-cpu-drift-control`）只用服务交给这个进程的卡
+//! （`cards_and_pairing_of_the_gpu_segments::card_text_handed_over_or_leased_now`）：环境变量 `GPU_CARDS_BY_PRIORITY` 给了卡串就照它；没给而服务交了领卡通道，到开设备前一刻才经验证包的按需领卡领
+//! （进程里只领一回，进程退出时还）；两样都没有报验证包没经服务给卡那一句、退 78，不枚举本机的卡。`--cards` 只在这一台交来的卡里按给的次序挑
+//! （`nvidia-smi` 序号），点到交来的卡之外当场报错、退 78（`cards_and_pairing_of_the_gpu_segments::cards_picked_among_those_handed_over`）。
+//! `gpu-submission` 与带卡单测 `resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units` 只比结果，走先录后判
+//! （段由 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 定：`record` 只录、`judge` 只判、不设是同一个进程里先录后判）：只录那一段在 CPU 上造输入、算 CPU 参照，
+//! 经验证包 `pairing_input_and_reference_through_the_pairing_library` 写进判定库，不取卡；判段读回之后才取卡、只跑 GPU、比读回的参照。
 //!
 //! 子命令：
 //!   wall-clock --image-directory <目录> [--point <活槽占比>:<池的数据量>]…
@@ -17,6 +26,7 @@
 //!   gpu-submission --wall-clock-product <文件> --stage-split-product <文件> --cards <nvidia-smi 序号,…>
 //!       第三段（编了 `gpu` 特性才有）：每张卡一次提交的 a、b、物理下限与 CRC 对拍，用第一段的 B_批 算 φ 与 n*，用第二段的饱和吞吐算 Q9。
 //!       没编 `gpu` 特性时退 78，报「本次未跑：没编 gpu 特性」。整条命令经 `task-server/task submit` 交，卡与清场由服务定。
+//!       只录那一段（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）造一个数据单元、算两种段长的 CPU 参照 CRC、写进判定库，打 `name=recorded_only`、退 0，不取卡。
 //!   foreground-fsync --image-directory <目录> --point <活槽占比>:<池的数据量> --batch-units <K> [--seconds <秒>]
 //!       第四段（附带，只在 Q16 > 10% 时跑）：前台「4 KiB 直接写 + fdatasync」循环的延迟，GC 并发与不跑 GC 各 5 轮。
 //!   geometry-check [--point <活槽占比>:<池的数据量>]… [--overwrite-order slot-order]
@@ -438,6 +448,428 @@ fn field_token(text: &str) -> String {
             other => other,
         })
         .collect()
+}
+
+// ───────────────────────────── 要卡的子命令取卡、只比结果的那几处先录后判（不编 gpu 特性也有单测） ─────────────────────────────
+
+/// 参照一侧判法单元那一组的组名：验证包 `judging_units_entries::JUDGING_UNITS_ENTRY_GROUPS` 登记，入口是
+/// [`cpu_reference_of_the_submission_unit`] 与 [`cpu_reference_of_the_slots`]。参照的代码改了，录入键跟着变，库里旧的那一份参照不再被读到。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "过库的产品路（gpu 特性）才用；没编 gpu 特性时不过库"
+    )
+)]
+const CPU_REFERENCE_UNITS_GROUP: &str = "e185_cpu_reference_crcs";
+
+/// gpu-submission 每次提交里一段的字节：一个整数据单元，与码 2 节点大小那一组（`crc32c_of_ranges` 按 32 KiB 一槽上传，两组的 t 应相同，报出来、不判）。
+#[cfg_attr(
+    not(any(feature = "gpu", test)),
+    allow(dead_code, reason = "gpu-submission（gpu 特性）与单测才用")
+)]
+const SUBMISSION_RANGE_LENGTHS: [u64; 2] = [32_768, 16_384];
+
+/// gpu-submission 的 CPU 参照（只录那一段算、写进库）：一个数据单元按 [`SUBMISSION_RANGE_LENGTHS`] 每种段长取开头那一截的 CRC-32C，依次 4 字节小端。
+///
+/// # Panics
+/// 数据单元短过最长的段长（交进来的是 `one_data_unit_of_the_workload` 读回的一整个数据单元）。
+#[cfg_attr(
+    not(any(feature = "gpu", test)),
+    allow(dead_code, reason = "gpu-submission（gpu 特性）录入段与单测才用")
+)]
+fn cpu_reference_of_the_submission_unit(unit: &[u8]) -> Vec<u8> {
+    SUBMISSION_RANGE_LENGTHS
+        .iter()
+        .flat_map(|range_length| {
+            let prefix = unit
+                .get(..usize::try_from(*range_length).expect("段长装得进 usize"))
+                .expect("数据单元不短于最长的段长（交进来的是一整个数据单元）");
+            crc32_castagnoli(prefix).to_le_bytes()
+        })
+        .collect()
+}
+
+/// 带卡单测的 CPU 参照（只录那一段算、写进库）：[`cards_and_pairing_of_the_gpu_segments::pairing_input_of_the_slots`] 写的对拍输入里，
+/// 每个单元在自己的 32 KiB 槽里取长度那一截的 CRC-32C，依次 4 字节小端。
+///
+/// # Panics
+/// 输入不是 [`cards_and_pairing_of_the_gpu_segments::pairing_input_of_the_slots`] 写的样子。
+#[cfg_attr(
+    not(test),
+    allow(dead_code, reason = "带卡单测的录入段与单测才用，装置的子命令不用")
+)]
+fn cpu_reference_of_the_slots(input: &[u8]) -> Vec<u8> {
+    let (slots, lengths) = cards_and_pairing_of_the_gpu_segments::slots_of_the_pairing_input(input);
+    let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+    slots
+        .chunks(slot_bytes)
+        .zip(&lengths)
+        .flat_map(|(slot, length)| {
+            crc32_castagnoli(&slot[..usize::try_from(*length).expect("长度装得进 usize")])
+                .to_le_bytes()
+        })
+        .collect()
+}
+
+/// 要卡的子命令取卡与先录后判过库：纯判法在这里（不编 gpu 特性也有单测），起真领卡、开真库的那一层只在编了 gpu 特性时有。
+mod cards_and_pairing_of_the_gpu_segments {
+    #![cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "不编 gpu 特性时只有单测用；编了 gpu 特性时带卡单测那几个（槽的编解码与过库）只有单测用"
+        )
+    )]
+    use super::{
+        cpu_reference_of_the_slots, cpu_reference_of_the_submission_unit, LOCAL_GPU_SLOT_BYTES,
+        SUBMISSION_RANGE_LENGTHS,
+    };
+    use singlefs_verification::crash_library::{PairingInputAndReferenceReadBack, StageOutcome};
+    use singlefs_verification::gpu_card_configuration::{
+        cards_by_priority_from, cards_handed_over_or_leased_on_demand, CardLeaseChannelOfTheCaller,
+        GpuQuiesce,
+    };
+    use std::path::Path;
+
+    /// 环境里没有卡串、也没有领卡通道，多机配置又没开 GPU、没写显卡先后时报的那一句（多机配置开了或写了时报验证包 `cards_by_priority_from` 那一句）。
+    pub(super) const NO_CARDS_HANDED_OVER_SENTENCE: &str = "没经服务给卡（环境里没有 GPU_CARDS_BY_PRIORITY，也没有领卡通道）：不枚举本机的卡（运行条件不满足，退 78）。出路：整条经 task-server/task submit 交，服务交卡或交领卡通道；要卡的入库装置二进制在 src/bin/<名字>.rs 文件头写 `// task-server-gpu-arguments: …`";
+
+    /// gpu-submission 过库的项名（对拍那一类库里的索引，不进键）。
+    pub(super) const SUBMISSION_PAIRING_ITEM: &str =
+        "e185_gc_batch_wall_clock_split/gpu_submission/one_data_unit_of_the_workload";
+
+    /// 这个进程此刻有的卡串（与 `GPU_CARDS_BY_PRIORITY` 同格式）：`environment_value`（环境变量 `GPU_CARDS_BY_PRIORITY` 的值）给了照它，不领；
+    /// 没给而有领卡通道，这一刻经 `lease` 领（验证包 `cards_handed_over_or_leased_on_demand`）；两样都没有交验证包没经服务给卡那一句
+    /// （`configuration_file` 那份多机配置开了 GPU 或写了显卡先后时 `cards_by_priority_from` 报的那一句，没有时 [`NO_CARDS_HANDED_OVER_SENTENCE`]），
+    /// 不枚举本机的卡。
+    ///
+    /// # Errors
+    /// 领卡没成（`lease` 的错原样）；两样都没有。
+    pub(super) fn card_text_handed_over_or_leased_now(
+        environment_value: Option<String>,
+        channel: Option<&CardLeaseChannelOfTheCaller>,
+        lease: &dyn Fn(&CardLeaseChannelOfTheCaller) -> Result<String, String>,
+        configuration_file: Option<&Path>,
+        quiesce: GpuQuiesce,
+    ) -> Result<String, String> {
+        match cards_handed_over_or_leased_on_demand(environment_value, channel, lease)? {
+            Some(text) => Ok(text),
+            None => {
+                // 多机配置开了 GPU 或写了显卡先后：照验证包那一句报（环境值给的是 None，卡项一项都不读）
+                cards_by_priority_from(None, configuration_file, quiesce, &|| {
+                    Err("没经服务给卡：不读卡项".to_string())
+                })?;
+                Err(NO_CARDS_HANDED_OVER_SENTENCE.to_string())
+            }
+        }
+    }
+
+    /// `--cards` 点名的 `nvidia-smi` 序号（按给的次序）都要在这一台交来的卡（`handed_over`）里：交回照给的次序的序号表。
+    ///
+    /// # Errors
+    /// 点名了交来的卡之外的序号：逐个列出，连同这一台交来的那几张。
+    pub(super) fn cards_picked_among_those_handed_over(
+        requested: &[u32],
+        handed_over: &[u32],
+    ) -> Result<Vec<u32>, String> {
+        let outside: Vec<u32> = requested
+            .iter()
+            .copied()
+            .filter(|index| !handed_over.contains(index))
+            .collect();
+        if outside.is_empty() {
+            Ok(requested.to_vec())
+        } else {
+            Err(format!(
+                "--cards 点了服务交来的卡之外的序号 {outside:?}（这一台交来的是 {handed_over:?}）：只许在交来的卡里挑（运行条件不满足，退 78）。出路：--cards 只写交来的卡，或整条重交、让服务交够这几张"
+            ))
+        }
+    }
+
+    /// 一处先录后判：过库那一步交回的结局定取不取卡。只录那一趟交回 `None`、`take_the_cards` 一次都不调；判段读回输入与参照之后才调它，
+    /// 交回读回的那一份与取卡的结局。
+    ///
+    /// # Panics
+    /// 过库交回只判了这一台那一份：对拍输入过库不分片，验证包 `pairing_input_and_reference_through_the_pairing_library` 只交只录与判全两种。
+    pub(super) fn read_back_before_the_cards<Cards>(
+        outcome: StageOutcome<PairingInputAndReferenceReadBack>,
+        take_the_cards: impl FnOnce() -> Cards,
+    ) -> Option<(PairingInputAndReferenceReadBack, Cards)> {
+        match outcome {
+            StageOutcome::RecordedOnly => None,
+            StageOutcome::Judged(read_back) => Some((read_back, take_the_cards())),
+            StageOutcome::JudgedMyShareOnly {
+                blocks_judged_here,
+                blocks_left_to_other_hosts,
+            } => panic!(
+                "对拍输入过库不分片，不该交回只判了这一台那一份（这台 {blocks_judged_here} 块、别的台 {blocks_left_to_other_hosts} 块）"
+            ),
+        }
+    }
+
+    /// 参照字节里依次 4 字节小端的 CRC-32C（[`cpu_reference_of_the_submission_unit`]、[`cpu_reference_of_the_slots`] 写的）。
+    ///
+    /// # Panics
+    /// 字节数不是 4 的倍数。
+    pub(super) fn crcs_of_the_reference_bytes(bytes: &[u8]) -> Vec<u32> {
+        assert!(
+            bytes.len().is_multiple_of(4),
+            "参照字节是一串 4 字节小端的 CRC-32C，长度 {} 不是 4 的倍数",
+            bytes.len()
+        );
+        bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|crc| u32::from_le_bytes(*crc))
+            .collect()
+    }
+
+    /// gpu-submission 从库里读回的：数据单元的字节，与每种段长（[`SUBMISSION_RANGE_LENGTHS`] 的次序）的 CPU 参照 CRC。
+    pub(super) struct SubmissionUnitReadBack {
+        pub(super) unit: Vec<u8>,
+        pub(super) cpu_crcs_by_range_length: Vec<u32>,
+    }
+
+    /// gpu-submission 过库那一步（[`read_back_before_the_cards`]）：项名 [`SUBMISSION_PAIRING_ITEM`]，输入是那一个数据单元，
+    /// 参照是 [`cpu_reference_of_the_submission_unit`]。`through_the_library` 的产品路是 [`input_and_reference_through_the_pairing_library`]。
+    ///
+    /// # Panics
+    /// 读回的参照不是每种段长一个 CRC。
+    #[allow(
+        clippy::type_complexity,
+        reason = "过库那一步写成闭包参数：产品路交验证包的过库函数，单测交假的"
+    )]
+    pub(super) fn submission_unit_read_back_before_the_cards<Cards>(
+        unit: &[u8],
+        through_the_library: impl FnOnce(
+            &str,
+            &[u8],
+            fn(&[u8]) -> Vec<u8>,
+        ) -> StageOutcome<PairingInputAndReferenceReadBack>,
+        take_the_cards: impl FnOnce() -> Cards,
+    ) -> Option<(SubmissionUnitReadBack, Cards)> {
+        read_back_before_the_cards(
+            through_the_library(
+                SUBMISSION_PAIRING_ITEM,
+                unit,
+                cpu_reference_of_the_submission_unit,
+            ),
+            take_the_cards,
+        )
+        .map(|(read_back, cards)| {
+            let cpu_crcs_by_range_length = crcs_of_the_reference_bytes(read_back.reference.bytes());
+            assert_eq!(
+                cpu_crcs_by_range_length.len(),
+                SUBMISSION_RANGE_LENGTHS.len(),
+                "gpu-submission 读回的参照每种段长一个 CRC"
+            );
+            (
+                SubmissionUnitReadBack {
+                    unit: read_back.input.bytes().to_vec(),
+                    cpu_crcs_by_range_length,
+                },
+                cards,
+            )
+        })
+    }
+
+    /// 带卡单测的对拍输入：槽数（8 字节小端）、每个单元的长度（各 4 字节小端）、全部 32 KiB 槽连放的字节。
+    ///
+    /// # Panics
+    /// 槽的字节数不是槽数乘 32 KiB。
+    pub(super) fn pairing_input_of_the_slots(slots: &[u8], lengths: &[u32]) -> Vec<u8> {
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        assert_eq!(
+            slots.len(),
+            lengths.len() * slot_bytes,
+            "每个单元一个 32 KiB 槽"
+        );
+        let mut input = u64::try_from(lengths.len())
+            .expect("槽数装得进 u64")
+            .to_le_bytes()
+            .to_vec();
+        for length in lengths {
+            input.extend_from_slice(&length.to_le_bytes());
+        }
+        input.extend_from_slice(slots);
+        input
+    }
+
+    /// [`pairing_input_of_the_slots`] 写的字节解回（槽连放的字节，长度表）。
+    ///
+    /// # Panics
+    /// 字节不是它写的样子（短了、长了、长度比槽长）。
+    pub(super) fn slots_of_the_pairing_input(input: &[u8]) -> (Vec<u8>, Vec<u32>) {
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let (count_bytes, rest) = input
+            .split_at_checked(8)
+            .expect("对拍输入开头是 8 字节的槽数");
+        let slot_count = usize::try_from(u64::from_le_bytes(
+            count_bytes
+                .try_into()
+                .expect("split_at_checked(8) 前一半 8 字节"),
+        ))
+        .expect("槽数装得进 usize");
+        let (length_bytes, slots) = rest
+            .split_at_checked(slot_count * 4)
+            .expect("槽数之后是每个单元 4 字节的长度");
+        assert_eq!(
+            slots.len(),
+            slot_count * slot_bytes,
+            "长度表之后是每个单元一个 32 KiB 槽"
+        );
+        let lengths: Vec<u32> = length_bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|length| u32::from_le_bytes(*length))
+            .collect();
+        assert!(
+            lengths.iter().all(|length| usize::try_from(*length)
+                .is_ok_and(|length_in_bytes| length_in_bytes <= slot_bytes)),
+            "每个单元的长度不超过一个槽"
+        );
+        (slots.to_vec(), lengths)
+    }
+
+    /// 带卡单测从库里读回的：槽连放的字节、长度表、每个单元的 CPU 参照 CRC。
+    pub(super) struct SlotsReadBack {
+        pub(super) slots: Vec<u8>,
+        pub(super) lengths: Vec<u32>,
+        pub(super) cpu_crcs: Vec<u32>,
+    }
+
+    /// 带卡单测过库那一步（[`read_back_before_the_cards`]）：项名 `item_name`，输入是 [`pairing_input_of_the_slots`] 写的那一份，
+    /// 参照是 [`cpu_reference_of_the_slots`]。`through_the_library` 的产品路是 [`input_and_reference_through_the_pairing_library`]。
+    ///
+    /// # Panics
+    /// 读回的参照不是每个单元一个 CRC。
+    #[allow(
+        clippy::type_complexity,
+        reason = "过库那一步写成闭包参数：产品路交验证包的过库函数，单测交假的"
+    )]
+    pub(super) fn slots_read_back_before_the_card<Card>(
+        item_name: &str,
+        slots: &[u8],
+        lengths: &[u32],
+        through_the_library: impl FnOnce(
+            &str,
+            &[u8],
+            fn(&[u8]) -> Vec<u8>,
+        ) -> StageOutcome<PairingInputAndReferenceReadBack>,
+        take_the_card: impl FnOnce() -> Card,
+    ) -> Option<(SlotsReadBack, Card)> {
+        read_back_before_the_cards(
+            through_the_library(
+                item_name,
+                &pairing_input_of_the_slots(slots, lengths),
+                cpu_reference_of_the_slots,
+            ),
+            take_the_card,
+        )
+        .map(|(read_back, card)| {
+            let (slots_read_back, lengths_read_back) =
+                slots_of_the_pairing_input(read_back.input.bytes());
+            let cpu_crcs = crcs_of_the_reference_bytes(read_back.reference.bytes());
+            assert_eq!(
+                cpu_crcs.len(),
+                lengths_read_back.len(),
+                "带卡单测读回的参照每个单元一个 CRC"
+            );
+            (
+                SlotsReadBack {
+                    slots: slots_read_back,
+                    lengths: lengths_read_back,
+                    cpu_crcs,
+                },
+                card,
+            )
+        })
+    }
+
+    /// 过库的产品路：验证包 `pairing_input_and_reference_through_the_pairing_library`（段由 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 定，
+    /// 键是验证包那一套），参照一侧的判法单元取编进来的 [`super::CPU_REFERENCE_UNITS_GROUP`] 那一组（拒算时照验证包的处置：照录、不凭命中跳过）。
+    ///
+    /// # Panics
+    /// 同验证包 `pairing_input_and_reference_through_the_pairing_library`：项名不合规矩；库开不了、写不进、读不回。
+    #[cfg(feature = "gpu")]
+    pub(super) fn input_and_reference_through_the_pairing_library(
+        item_name: &str,
+        input_bytes: &[u8],
+        reference_of_the_input: fn(&[u8]) -> Vec<u8>,
+    ) -> StageOutcome<PairingInputAndReferenceReadBack> {
+        use singlefs_verification::crash_identity::{judging_units_key, JudgingUnits};
+        use singlefs_verification::crash_library::{
+            pairing_input_and_reference_through_the_pairing_library, toolchain_of_this_process,
+        };
+        pairing_input_and_reference_through_the_pairing_library(
+            item_name,
+            input_bytes,
+            &judging_units_key(
+                &JudgingUnits::PairingComparison {
+                    group_name: super::CPU_REFERENCE_UNITS_GROUP,
+                },
+                toolchain_of_this_process(),
+            )
+            .map_err(|refused| refused.sentence()),
+            reference_of_the_input,
+        )
+    }
+
+    /// 编这份二进制的那棵树的仓根（包目录往上两层）：多机配置照它找（同验证包 `GpuConfigurationOfTheCaller::multi_host_configuration_file`）。
+    #[cfg(feature = "gpu")]
+    const REPOSITORY_ROOT_OF_THE_BUILD: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+
+    /// 开设备前一刻取卡：服务交给这个进程的卡串（[`card_text_handed_over_or_leased_now`]；环境变量与领卡通道取调用方给这个进程的那一份，
+    /// 验证包 `GpuConfigurationOfTheCaller::of_this_process`）里这一台的那几张，`--cards` 点名的照 [`cards_picked_among_those_handed_over`] 挑。
+    ///
+    /// # Errors
+    /// 多机配置找不到；领卡没成；两样都没有；卡串读不成（写法不对、地址不在 `HOSTS` 里、判法认不出这一台）；`--cards` 点到交来的卡之外。
+    #[cfg(feature = "gpu")]
+    pub(super) fn card_indices_handed_over_to_the_segment(
+        requested: &[u32],
+    ) -> Result<Vec<u32>, String> {
+        use singlefs_verification::gpu_card_configuration::{
+            multi_host_addresses_of_the_caller, parse_cards_by_priority,
+            GpuConfigurationOfTheCaller,
+        };
+        let caller = GpuConfigurationOfTheCaller::of_this_process();
+        let configuration_file =
+            caller.multi_host_configuration_file(Path::new(REPOSITORY_ROOT_OF_THE_BUILD))?;
+        let text = card_text_handed_over_or_leased_now(
+            caller.cards_handed_out_by_the_service().map(str::to_string),
+            caller.card_lease_channel(),
+            &|channel| channel.cards_leased_by_this_process().map(str::to_string),
+            configuration_file.as_deref(),
+            GpuQuiesce::of_this_process(),
+        )?;
+        let handed_over: Vec<u32> =
+            parse_cards_by_priority(&text, &multi_host_addresses_of_the_caller()?)?
+                .cards_of_this_host()
+                .into_iter()
+                .map(|(index, _memory_quota_mebibytes)| index)
+                .collect();
+        cards_picked_among_those_handed_over(requested, &handed_over)
+    }
+
+    /// 取卡没成（[`card_indices_handed_over_to_the_segment`] 的错）：原话打到标准错误，产物打一行 `name=verdict … status=not_run reason=cards_not_handed_over`、
+    /// 收尾，交回退出码 78（运行条件不满足）。
+    #[cfg(feature = "gpu")]
+    pub(super) fn stop_without_the_cards_handed_over(
+        segment: &str,
+        refusal: &str,
+        emitter: &mut super::Emitter,
+    ) -> i32 {
+        eprintln!("{segment}：取卡没成：{refusal}");
+        emitter.line(&format!(
+            "name=verdict segment={segment} status=not_run reason=cards_not_handed_over detail={}",
+            super::field_token(refusal)
+        ));
+        emitter.finish();
+        super::EXIT_CODE_NOT_RUN
+    }
 }
 
 const THREADS_ENVIRONMENT_VARIABLE: &str = "E185_THREADS";
@@ -10348,8 +10780,8 @@ mod gpu_submission {
 
     /// 段数 n 的取值（登记第五节）。
     const RANGE_COUNTS: [u64; 8] = [1, 4, 16, 64, 256, 1024, 4096, 16_384];
-    /// 每段的字节：一个整数据单元，与码 2 节点大小那一组（`crc32c_of_ranges` 按 32 KiB 一槽上传，两组的 t 应相同，报出来、不判）。
-    const RANGE_LENGTHS: [u64; 2] = [32_768, 16_384];
+    /// 每段的字节：只录那一段算 CPU 参照用的同一份（[`SUBMISSION_RANGE_LENGTHS`]）。
+    const RANGE_LENGTHS: [u64; 2] = SUBMISSION_RANGE_LENGTHS;
     /// 每档计时几次取中位（先丢一次编管线、建上下文）。
     const TIMED_SUBMISSIONS: usize = 5;
 
@@ -10424,15 +10856,16 @@ mod gpu_submission {
         crcs_agree: bool,
     }
 
+    /// 一张卡一组（段长）一个 n：`segment` 与它的 CPU 参照 CRC `cpu_crc` 都是判段从库里读回的（只录那一段算的参照，持卡时不算）。
     fn time_the_submissions(
         card: &GpuCard,
         segment: &[u8],
+        cpu_crc: u32,
         range_count: u64,
         link_peak: f64,
     ) -> SubmissionReading {
         let count = usize::try_from(range_count).expect("段数装得进 usize");
         let ranges: Vec<&[u8]> = vec![segment; count];
-        let cpu_crc = crc32_castagnoli(segment);
         let expected = vec![cpu_crc; count];
         let _warm_up = card.crc32c_of_ranges(&ranges);
         let mut seconds = Vec::new();
@@ -10585,12 +11018,45 @@ mod gpu_submission {
         let batch_bytes = batch_bytes_of_the_wall_clock_product(&result_lines_of(&wall_clock_text));
         let (throughput, stage_bytes) =
             readings_of_the_stage_split_product(&result_lines_of(&stage_split_text));
-        let unit = one_data_unit_of_the_workload();
+        // 先录后判：只录那一段造数据单元、算两种段长的 CPU 参照、写进库，到此收尾、不取卡；判段读回之后才取卡（计时窗口只包 GPU 提交，参照本来就在窗口外）
+        let Some((read_back, cards_handed_over)) =
+            cards_and_pairing_of_the_gpu_segments::submission_unit_read_back_before_the_cards(
+                &one_data_unit_of_the_workload(),
+                cards_and_pairing_of_the_gpu_segments::input_and_reference_through_the_pairing_library,
+                || {
+                    cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment(
+                        card_indices,
+                    )
+                },
+            )
+        else {
+            emitter.line(&format!(
+                "name=recorded_only segment=gpu_submission item={} constant_or_anchor_mismatches={mismatches}",
+                cards_and_pairing_of_the_gpu_segments::SUBMISSION_PAIRING_ITEM,
+            ));
+            emitter.finish();
+            return if mismatches > 0 {
+                EXIT_CODE_STOP_CLAUSE
+            } else {
+                EXIT_CODE_OK
+            };
+        };
+        let picked_card_indices = match cards_handed_over {
+            Ok(picked) => picked,
+            Err(refusal) => {
+                return cards_and_pairing_of_the_gpu_segments::stop_without_the_cards_handed_over(
+                    "gpu_submission",
+                    &refusal,
+                    &mut emitter,
+                )
+            }
+        };
+        let unit = read_back.unit;
         let links = pcie_links_reported_by_nvidia_smi();
         let mut card_failures: Vec<String> = Vec::new();
         let mut cards_measured = 0_usize;
         let mut fixed_share_values = Vec::new();
-        for card_index in card_indices {
+        for card_index in &picked_card_indices {
             let Some(card) = gpu_cards_by_priority(&[(*card_index, CARD_QUOTA_MEBIBYTES)])
                 .into_iter()
                 .next()
@@ -10623,14 +11089,18 @@ mod gpu_submission {
             let mut is_the_card_valid = check_string_holds;
             let mut fit_points = Vec::new();
             let mut median_of_one_range = None;
-            for range_length in RANGE_LENGTHS {
+            for (range_length, cpu_crc) in RANGE_LENGTHS
+                .into_iter()
+                .zip(read_back.cpu_crcs_by_range_length.iter().copied())
+            {
                 let segment = &unit[..usize::try_from(range_length).expect("段长")];
                 for range_count in RANGE_COUNTS
                     .iter()
                     .copied()
                     .filter(|count| count * LOCAL_GPU_SLOT_BYTES <= binding_limit)
                 {
-                    let reading = time_the_submissions(&card, segment, range_count, link_peak);
+                    let reading =
+                        time_the_submissions(&card, segment, cpu_crc, range_count, link_peak);
                     is_the_card_valid &= reading.respects_the_floor && reading.crcs_agree;
                     emitter.line(&format!(
                         "name=gpu_submission index={card_index} range_length={range_length} range_count={} input_bytes={} buffer_bytes={} median_seconds={:.9} respects_the_physical_floor={} crcs_agree={}",
@@ -16165,6 +16635,9 @@ mod host_cpu_per_submission_segment {
 
     /// 第一段（登记第五节「第一段怎么量」）：段开头自检、两份输入与门槛、校准与 P8、ρ_机器、本机 CPU 参照；每张卡起卡、P2、停机 J-S1、P3、
     /// P1、80 格 5 轮；两张卡量完算 R1–R5、旋钮翻面与 J10，收尾。
+    /// 取卡在开设备前一刻（`cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment`），之前的自检、校准基线、造单元、本机 CPU 参照都不持卡。
+    // 不走先录后判：被测的是同一个进程、同一台机器上 CPU 校准与 GPU 提交交替时主机线程花的 CPU 与挂钟（每格前后读校准比、
+    // 段开头与段末的校准基线、本机 CPU 参照 `cpu_crc_of_the_same_bytes` 都是这一台这一次的读数），存进库再由另一次、可能另一台读回就不是被测的那个量
     pub(super) fn measure_host_cpu_per_submission_segment(
         stage_split_product: &Path,
         attack_ledger: &Path,
@@ -16260,7 +16733,20 @@ mod host_cpu_per_submission_segment {
         let mut process_clock_cells: BTreeSet<(u32, SubmissionCell)> = BTreeSet::new();
         let mut cards_measured = Vec::new();
         let mut card_failures: Vec<String> = Vec::new();
-        for card_index in card_indices {
+        let picked_card_indices =
+            match cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment(
+                card_indices,
+            ) {
+                Ok(picked) => picked,
+                Err(refusal) => {
+                    return cards_and_pairing_of_the_gpu_segments::stop_without_the_cards_handed_over(
+                        "host_cpu_per_submission",
+                        &refusal,
+                        &mut emitter,
+                    )
+                }
+            };
+        for card_index in &picked_card_indices {
             let Some(card) = gpu_cards_by_priority(&[(*card_index, CARD_QUOTA_MEBIBYTES)])
                 .into_iter()
                 .next()
@@ -16723,6 +17209,8 @@ mod recompute_disagreement_segment {
 
     /// 第二段（登记第五节「第二段怎么量」）：段开头核装置 sha256、常量回比（停机 J-S2）、内容锚点（停机 J-S8）；每张卡起卡、P2、两种输入各
     /// 64 批，再算「两张卡同一输入」那一批；两张卡都算完逐条比（第十条 J11）。这一段不计时，只报每批挂钟。
+    /// 取卡在开设备前一刻（`cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment`），「两张卡同一输入」那一批在取卡之前造好；
+    /// 每张卡每种输入的 64 批（一批 16384 个 32 KiB 槽）在持卡时逐批现造、现算 CPU 参照。
     pub(super) fn measure_recompute_disagreement_segment(card_indices: &[u32]) -> i32 {
         let threads = worker_threads_from_the_environment();
         let mut emitter = Emitter::new();
@@ -16770,7 +17258,20 @@ mod recompute_disagreement_segment {
         let mut both_cards_results: Vec<(u32, Vec<KernelResultsOfAUnit>)> = Vec::new();
         let mut cards_measured = 0_usize;
         let mut control_failures: Vec<String> = Vec::new();
-        for card_index in card_indices {
+        let picked_card_indices =
+            match cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment(
+                card_indices,
+            ) {
+                Ok(picked) => picked,
+                Err(refusal) => {
+                    return cards_and_pairing_of_the_gpu_segments::stop_without_the_cards_handed_over(
+                        "recompute_disagreement",
+                        &refusal,
+                        &mut emitter,
+                    )
+                }
+            };
+        for card_index in &picked_card_indices {
             let Some(card) = gpu_cards_by_priority(&[(*card_index, CARD_QUOTA_MEBIBYTES)])
                 .into_iter()
                 .next()
@@ -17761,6 +18262,10 @@ mod host_cpu_drift_control_segment {
 
     /// 控漂移段（登记第五节「控漂移段怎么量」）：段开头照第 3 次重跑第一段；复现臂只量 `card_indices` 的头一张卡；受控臂绑核、起第二张卡、
     /// 两张卡各一遍 P1、暖到稳、5 轮卡交替；两条臂各自算点与判定，再算 D1–D7。
+    /// 取卡在两条臂起头一张卡之前一刻（`cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment`），之前的自检、校准基线、造单元、
+    /// 本机 CPU 参照都不持卡。
+    // 不走先录后判：被测的是同一个进程、同一台机器上主机 CPU 时间与它的漂移（绑核、读频率、暖到稳、每格前后读校准比、两张卡逐轮交替、漂移探针），
+    // CPU 一侧的读数存进库再由另一次、可能另一台读回就不是被测的那个量
     pub(super) fn measure_host_cpu_drift_control_segment(
         stage_split_product: &Path,
         attack_ledger: &Path,
@@ -17856,6 +18361,19 @@ mod host_cpu_drift_control_segment {
                 .unwrap_or(0.0),
         );
         let links = super::gpu_submission::pcie_links_reported_by_nvidia_smi();
+        let picked_card_indices =
+            match cards_and_pairing_of_the_gpu_segments::card_indices_handed_over_to_the_segment(
+                card_indices,
+            ) {
+                Ok(picked) => picked,
+                Err(refusal) => {
+                    return cards_and_pairing_of_the_gpu_segments::stop_without_the_cards_handed_over(
+                        "host_cpu_drift_control",
+                        &refusal,
+                        emitter,
+                    )
+                }
+            };
         let mut context = SegmentContext {
             threshold_edges,
             calibration: &mut calibration,
@@ -17869,8 +18387,8 @@ mod host_cpu_drift_control_segment {
         let mut probe_failures: BTreeSet<(DriftArm, u32)> = BTreeSet::new();
         for arm in DriftArm::ALL {
             let wanted: Vec<u32> = match arm {
-                DriftArm::Reproduction => card_indices.iter().copied().take(1).collect(),
-                DriftArm::Controlled => card_indices.to_vec(),
+                DriftArm::Reproduction => picked_card_indices.iter().copied().take(1).collect(),
+                DriftArm::Controlled => picked_card_indices.clone(),
             };
             let placement = place_the_thread_of_the_arm(arm);
             emitter.line(&format!(
@@ -18452,16 +18970,16 @@ fn run_the_foreground_fsync_segment(
 ) -> i32 {
     let mut emitter = Emitter::new();
     emitter.line(&format!(
-        "name=configuration segment=foreground_fsync {} batch_units={batch_units} seconds_per_round={seconds} rounds={ROUNDS} foreground_write_bytes={FOREGROUND_WRITE_BYTES}",
+        "name=configuration segment=answer_before_the_next_batch {} batch_units={batch_units} seconds_per_round={seconds} rounds={ROUNDS} foreground_write_bytes={FOREGROUND_WRITE_BYTES}",
         point.label()
     ));
     if !check_the_thread_cpu_clock_resolution(&mut emitter) {
-        return stop_for_the_clock_resolution(&mut emitter, "foreground_fsync");
+        return stop_for_the_clock_resolution(&mut emitter, "answer_before_the_next_batch");
     }
     let mismatches = check_the_constants_and_the_anchors(&mut emitter);
     if mismatches > 0 {
         emitter.line(&format!(
-            "name=verdict segment=foreground_fsync constant_or_anchor_mismatches={mismatches}"
+            "name=verdict segment=answer_before_the_next_batch constant_or_anchor_mismatches={mismatches}"
         ));
         emitter.finish();
         return EXIT_CODE_STOP_CLAUSE;
@@ -18476,7 +18994,7 @@ fn run_the_foreground_fsync_segment(
         Ok(images) => images,
         Err(error) => {
             emitter.line(&format!(
-                "name=verdict segment=foreground_fsync status=not_run reason={}",
+                "name=verdict segment=answer_before_the_next_batch status=not_run reason={}",
                 field_token(&error.to_string())
             ));
             emitter.finish();
@@ -18490,7 +19008,7 @@ fn run_the_foreground_fsync_segment(
     }
     if let Err(error) = create_a_zero_filled_image(&foreground_path, FOREGROUND_IMAGE_BYTES) {
         emitter.line(&format!(
-            "name=verdict segment=foreground_fsync status=not_run reason={}",
+            "name=verdict segment=answer_before_the_next_batch status=not_run reason={}",
             field_token(&error.to_string())
         ));
         emitter.finish();
@@ -18557,7 +19075,7 @@ fn run_the_foreground_fsync_segment(
     let removal = images.remove();
     let foreground_fsync_latency_judgement = judgement_of_the_rounds(&judgements);
     emitter.line(&format!(
-        "name=verdict segment=foreground_fsync constant_or_anchor_mismatches=0 valid_rounds={} foreground_fsync_latency_judgement_per_round={} foreground_fsync_latency_judgement={foreground_fsync_latency_judgement} images_removed={}",
+        "name=verdict segment=answer_before_the_next_batch constant_or_anchor_mismatches=0 valid_rounds={} foreground_fsync_latency_judgement_per_round={} foreground_fsync_latency_judgement={foreground_fsync_latency_judgement} images_removed={}",
         judgements.len(),
         judgements.join(","),
         removal.is_ok()
@@ -24222,33 +24740,315 @@ mod tests {
 
     // ───────────── 第 3 次重跑：带卡的单测（gpu 特性，整条经 task-server/task submit 交；没有卡报 NOT_RUN_NO_GPU_ADAPTER） ─────────────
 
-    /// 64 个按种子造的单元（偶数号 32 KiB、奇数号 16 KiB），各放一个 32 KiB 槽：（槽连放的字节、长度表、CPU 算的 CRC）。
-    #[cfg(feature = "gpu")]
-    fn seeded_slots(units: u64) -> (Vec<u8>, Vec<u32>, Vec<u32>) {
+    /// `units` 个按种子造的单元（偶数号 32 KiB、奇数号 16 KiB），各放一个 32 KiB 槽：（槽连放的字节、长度表）。CPU 参照 CRC 不在这里算，
+    /// 由只录那一段的 `cpu_reference_of_the_slots` 算、写进库。
+    fn seeded_slots(units: u64) -> (Vec<u8>, Vec<u32>) {
         let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
         let mut slots = vec![0_u8; usize::try_from(units).expect("单元数") * slot_bytes];
         let mut lengths = Vec::new();
-        let mut crcs = Vec::new();
         for (unit, slot) in (0_u64..).zip(slots.chunks_mut(slot_bytes)) {
             let length = disagreement_unit_length(unit);
             disagreement_unit_content(3, InputForm::Split, 5, unit, &mut slot[..length]);
             lengths.push(u32::try_from(length).expect("长度"));
-            crcs.push(crc32_castagnoli(&slot[..length]));
         }
-        (slots, lengths, crcs)
+        (slots, lengths)
     }
 
+    /// 带卡单测的名字：取卡时报「本次未跑」用它，过库的项名在它前面接装置名。
+    const SEEDED_UNITS_TEST_NAME: &str =
+        "resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units";
+
+    // ───────────── 要卡的子命令取卡、先录后判过库（不要真卡、不开真库：领卡与过库都是用例给的假的） ─────────────
+
+    /// 五个变量都给了的领卡通道（值只当凭据原样交给领卡那一步，用例里不起客户端）。
+    fn card_lease_channel_of_the_unit_tests(
+    ) -> singlefs_verification::gpu_card_configuration::CardLeaseChannelOfTheCaller {
+        singlefs_verification::gpu_card_configuration::CardLeaseChannelOfTheCaller::of_the_variable_values(
+            &|name| Some(std::ffi::OsString::from(format!("value-of-{name}"))),
+        )
+        .expect("五个变量都给了、都不空：算有通道")
+    }
+
+    /// 过库那一步判段交回的样子：输入与参照照原样当成从库里读回的（摘要照它们现算）。
+    fn judged_with_the_input_and_reference_read_back(
+        input: &[u8],
+        reference: &[u8],
+    ) -> singlefs_verification::crash_library::StageOutcome<
+        singlefs_verification::crash_library::PairingInputAndReferenceReadBack,
+    > {
+        use singlefs_verification::crash_library::{
+            PairingInputAndReferenceReadBack, PairingInputReadBack, StageOutcome,
+        };
+        StageOutcome::Judged(PairingInputAndReferenceReadBack {
+            input: PairingInputReadBack::from_the_library_bytes(
+                input.to_vec(),
+                &sha256_digest(input),
+            )
+            .expect("摘要照字节现算，对得上"),
+            reference: PairingInputReadBack::from_the_library_bytes(
+                reference.to_vec(),
+                &sha256_digest(reference),
+            )
+            .expect("摘要照字节现算，对得上"),
+        })
+    }
+
+    /// 一个 32 KiB 的数据单元（字节按下标取模，两种段长的开头那一截 CRC 不同）。
+    fn submission_unit_of_the_unit_tests() -> Vec<u8> {
+        (0..u32::try_from(LOCAL_DATA_UNIT_BYTES).expect("32768"))
+            .map(|offset| u8::try_from(offset % 251).expect("取模 251 装得进 u8"))
+            .collect()
+    }
+
+    /// 环境里已经有服务交的卡串：照它，有领卡通道也不领。
+    /// 判别力（`crates/mutations.tsv`「E185 V241 有领卡通道时不看环境里的卡串去领」）：领的次数是 1、交的是领来的那一张。
+    #[test]
+    fn the_card_text_in_the_environment_is_used_without_leasing_even_with_a_channel() {
+        let channel = card_lease_channel_of_the_unit_tests();
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &singlefs_verification::gpu_card_configuration::CardLeaseChannelOfTheCaller| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("192.0.2.93:7:1M".to_string())
+        };
+        assert_eq!(
+            cards_and_pairing_of_the_gpu_segments::card_text_handed_over_or_leased_now(
+                Some("192.0.2.93:4:2M".to_string()),
+                Some(&channel),
+                &lease,
+                None,
+                singlefs_verification::gpu_card_configuration::GpuQuiesce::NotQuiesced,
+            ),
+            Ok("192.0.2.93:4:2M".to_string()),
+            "环境里有卡串、也有通道：照环境里的"
+        );
+        assert_eq!(leases.get(), 0, "环境里有卡串：不领");
+    }
+
+    /// 环境里没有卡串而有领卡通道：这一刻领一回，交领来的那一张。
+    #[test]
+    fn without_a_card_text_in_the_environment_the_cards_are_leased_through_the_channel_now() {
+        let channel = card_lease_channel_of_the_unit_tests();
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &singlefs_verification::gpu_card_configuration::CardLeaseChannelOfTheCaller| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("192.0.2.93:7:1M".to_string())
+        };
+        assert_eq!(
+            cards_and_pairing_of_the_gpu_segments::card_text_handed_over_or_leased_now(
+                None,
+                Some(&channel),
+                &lease,
+                None,
+                singlefs_verification::gpu_card_configuration::GpuQuiesce::NotQuiesced,
+            ),
+            Ok("192.0.2.93:7:1M".to_string()),
+            "交领来的那一张"
+        );
+        assert_eq!(leases.get(), 1, "领一回");
+    }
+
+    /// 环境里没有卡串、也没有领卡通道：报没经服务给卡那一句（多机配置没给），不领、不交任何卡串（不退回本机枚举）。
+    /// 判别力（`crates/mutations.tsv`「E185 V240 没经服务给卡也交一个空卡串往下走」）：交回 `Ok` 的空串。
+    #[test]
+    fn without_a_card_text_or_a_channel_the_refusal_is_the_no_cards_handed_over_sentence() {
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &singlefs_verification::gpu_card_configuration::CardLeaseChannelOfTheCaller| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("192.0.2.93:7:1M".to_string())
+        };
+        assert_eq!(
+            cards_and_pairing_of_the_gpu_segments::card_text_handed_over_or_leased_now(
+                None,
+                None,
+                &lease,
+                None,
+                singlefs_verification::gpu_card_configuration::GpuQuiesce::NotQuiesced,
+            ),
+            Err(cards_and_pairing_of_the_gpu_segments::NO_CARDS_HANDED_OVER_SENTENCE.to_string()),
+        );
+        assert_eq!(leases.get(), 0, "没有通道：不领");
+    }
+
+    /// `--cards` 只在交来的卡里按给的次序挑：都在交来的卡里的照给的次序交回；点到交来的卡之外的报错，点名那几个序号与交来的那几张。
+    /// 判别力（`crates/mutations.tsv`「E185 V242 --cards 点到交来的卡之外也照收」）：点了 0 而交来的是 3、1 照样交回。
+    #[test]
+    fn cards_outside_those_handed_over_are_refused_and_those_inside_are_picked_in_the_given_order()
+    {
+        assert_eq!(
+            cards_and_pairing_of_the_gpu_segments::cards_picked_among_those_handed_over(
+                &[1, 3],
+                &[3, 1]
+            ),
+            Ok(vec![1, 3]),
+            "都在交来的卡里：照 --cards 给的次序"
+        );
+        let refusal = cards_and_pairing_of_the_gpu_segments::cards_picked_among_those_handed_over(
+            &[1, 0],
+            &[3, 1],
+        )
+        .expect_err("点了 0、交来的是 3 与 1：报错");
+        assert!(
+            refusal.contains("[0]") && refusal.contains("[3, 1]"),
+            "报错点名交来的卡之外的序号与交来的那几张：{refusal}"
+        );
+    }
+
+    /// gpu-submission 只录那一趟：数据单元与参照交给过库那一步，项名是 gpu-submission 那一项；过库交回只录，不取卡、交回 `None`。
+    /// 判别力（`crates/mutations.tsv`「E185 V243 只录那一趟也取卡」）：只录那一趟取卡的次数是 1。
+    #[test]
+    fn the_submission_unit_is_recorded_without_taking_a_card_when_the_stage_records_only() {
+        use singlefs_verification::crash_library::StageOutcome;
+        let unit = submission_unit_of_the_unit_tests();
+        let items_through_the_library = std::cell::RefCell::new(Vec::new());
+        let cards_taken = std::cell::Cell::new(0_u32);
+        let read_back =
+            cards_and_pairing_of_the_gpu_segments::submission_unit_read_back_before_the_cards(
+                &unit,
+                |item_name, input_bytes, reference_of_the_input| {
+                    items_through_the_library.borrow_mut().push((
+                        item_name.to_string(),
+                        input_bytes.to_vec(),
+                        reference_of_the_input(input_bytes),
+                    ));
+                    StageOutcome::RecordedOnly
+                },
+                || cards_taken.set(cards_taken.get() + 1),
+            );
+        assert!(read_back.is_none(), "只录那一趟交回 None");
+        assert_eq!(cards_taken.get(), 0, "只录那一趟不取卡");
+        assert_eq!(
+            items_through_the_library.into_inner(),
+            vec![(
+                cards_and_pairing_of_the_gpu_segments::SUBMISSION_PAIRING_ITEM.to_string(),
+                unit.clone(),
+                cpu_reference_of_the_submission_unit(&unit),
+            )],
+            "过库一回：gpu-submission 那一项、数据单元原样、参照是两种段长的 CRC"
+        );
+    }
+
+    /// gpu-submission 判段：读回之后才取卡（取一回），交回读回的数据单元与每种段长的 CPU 参照 CRC（32 KiB 整段、16 KiB 开头那一截）。
+    /// 判别力（`crates/mutations.tsv`「E185 V245 gpu-submission 的参照两种段长都按整个数据单元算」）：16 KiB 那一种的参照不等于开头那一截的 CRC。
+    #[test]
+    fn the_submission_unit_and_its_cpu_reference_are_read_back_before_the_card_is_taken() {
+        let unit = submission_unit_of_the_unit_tests();
+        let cards_taken = std::cell::Cell::new(0_u32);
+        let (read_back, ()) =
+            cards_and_pairing_of_the_gpu_segments::submission_unit_read_back_before_the_cards(
+                &unit,
+                |_item_name, input_bytes, reference_of_the_input| {
+                    judged_with_the_input_and_reference_read_back(
+                        input_bytes,
+                        &reference_of_the_input(input_bytes),
+                    )
+                },
+                || cards_taken.set(cards_taken.get() + 1),
+            )
+            .expect("判段交回读回的那一份");
+        assert_eq!(cards_taken.get(), 1, "判段读回之后取一回卡");
+        assert_eq!(read_back.unit, unit, "读回的数据单元原样");
+        assert_eq!(
+            read_back.cpu_crcs_by_range_length,
+            vec![crc32_castagnoli(&unit), crc32_castagnoli(&unit[..16_384])],
+            "每种段长一个参照：32 KiB 整段、16 KiB 开头那一截"
+        );
+    }
+
+    /// 带卡单测只录那一趟：槽与长度表编成对拍输入交给过库那一步，过库交回只录，不取卡、交回 `None`。
+    /// 判别力（`crates/mutations.tsv`「E185 V244 带卡单测只录那一趟也取卡」）：只录那一趟取卡的次数是 1。
+    #[test]
+    fn the_seeded_slots_are_recorded_without_taking_a_card_when_the_stage_records_only() {
+        use singlefs_verification::crash_library::StageOutcome;
+        let (slots, lengths) = seeded_slots(4);
+        let cards_taken = std::cell::Cell::new(0_u32);
+        let inputs_through_the_library = std::cell::RefCell::new(Vec::new());
+        let read_back = cards_and_pairing_of_the_gpu_segments::slots_read_back_before_the_card(
+            &format!("e185_gc_batch_wall_clock_split/{SEEDED_UNITS_TEST_NAME}"),
+            &slots,
+            &lengths,
+            |_item_name, input_bytes, _reference_of_the_input| {
+                inputs_through_the_library
+                    .borrow_mut()
+                    .push(input_bytes.to_vec());
+                StageOutcome::RecordedOnly
+            },
+            || cards_taken.set(cards_taken.get() + 1),
+        );
+        assert!(read_back.is_none(), "只录那一趟交回 None");
+        assert_eq!(cards_taken.get(), 0, "只录那一趟不取卡");
+        assert_eq!(
+            inputs_through_the_library.into_inner(),
+            vec![
+                cards_and_pairing_of_the_gpu_segments::pairing_input_of_the_slots(&slots, &lengths)
+            ],
+            "过库一回，输入是槽与长度表编成的那一份"
+        );
+    }
+
+    /// 带卡单测判段：读回之后才取卡（取一回），交回读回的槽、长度表与每个单元在自己长度那一截上的 CPU 参照 CRC。
+    /// 判别力（`crates/mutations.tsv`「E185 V246 带卡单测的参照按整个槽算」）：奇数号单元（16 KiB）的参照不等于它那一截的 CRC。
+    #[test]
+    fn the_seeded_slots_and_their_cpu_reference_are_read_back_before_the_card_is_taken() {
+        let (slots, lengths) = seeded_slots(4);
+        let cards_taken = std::cell::Cell::new(0_u32);
+        let (read_back, ()) =
+            cards_and_pairing_of_the_gpu_segments::slots_read_back_before_the_card(
+                &format!("e185_gc_batch_wall_clock_split/{SEEDED_UNITS_TEST_NAME}"),
+                &slots,
+                &lengths,
+                |_item_name, input_bytes, reference_of_the_input| {
+                    judged_with_the_input_and_reference_read_back(
+                        input_bytes,
+                        &reference_of_the_input(input_bytes),
+                    )
+                },
+                || cards_taken.set(cards_taken.get() + 1),
+            )
+            .expect("判段交回读回的那一份");
+        assert_eq!(cards_taken.get(), 1, "判段读回之后取一回卡");
+        assert_eq!(read_back.slots, slots, "读回的槽原样");
+        assert_eq!(read_back.lengths, lengths, "读回的长度表原样");
+        let slot_bytes = usize::try_from(LOCAL_GPU_SLOT_BYTES).expect("32768");
+        let expected: Vec<u32> = slots
+            .chunks(slot_bytes)
+            .zip(&lengths)
+            .map(|(slot, length)| {
+                crc32_castagnoli(&slot[..usize::try_from(*length).expect("长度装得进 usize")])
+            })
+            .collect();
+        assert_eq!(
+            read_back.cpu_crcs, expected,
+            "每个单元在自己长度那一截上的 CRC"
+        );
+    }
+
+    /// 先录后判：只录那一段造 64 个槽、算 CPU 参照、写进库，不取卡（打 `RECORDED_ONLY` 收工）；判段读回之后才取卡，两核逐条比读回的参照，核一与 crates 的 GPU CRC 比。
     #[cfg(feature = "gpu")]
     #[test]
     fn resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units() {
         use singlefs_verification::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
-        let Some(card) = first_usable_card_or_report_not_run(
-            "resident_kernels_agree_with_the_cpu_and_kernel_one_agrees_with_the_crates_on_seeded_units",
-        ) else {
+        let (seeded_slot_bytes, seeded_lengths) = seeded_slots(64);
+        let Some((read_back, card_or_not_run)) =
+            cards_and_pairing_of_the_gpu_segments::slots_read_back_before_the_card(
+                &format!("e185_gc_batch_wall_clock_split/{SEEDED_UNITS_TEST_NAME}"),
+                &seeded_slot_bytes,
+                &seeded_lengths,
+                cards_and_pairing_of_the_gpu_segments::input_and_reference_through_the_pairing_library,
+                || first_usable_card_or_report_not_run(SEEDED_UNITS_TEST_NAME),
+            )
+        else {
+            println!("RECORDED_ONLY test={SEEDED_UNITS_TEST_NAME}");
+            return;
+        };
+        let Some(card) = card_or_not_run else {
             return;
         };
         let kernels = resident_gpu_kernels::ResidentKernels::start(&card, 64);
-        let (slots, lengths, crcs) = seeded_slots(64);
+        let cards_and_pairing_of_the_gpu_segments::SlotsReadBack {
+            slots,
+            lengths,
+            cpu_crcs: crcs,
+        } = read_back;
         for form in InputForm::ALL {
             let (results, are_the_sequence_numbers_holding) = resident_gpu_kernels::untimed_results(
                 &kernels,

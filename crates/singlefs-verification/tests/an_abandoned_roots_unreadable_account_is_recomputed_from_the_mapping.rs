@@ -19,7 +19,7 @@ use common::{
 use common_images_for_the_given_states_engine::PoolCheckerImages;
 use common_shared_by_harness_scenarios::content_seeded_by;
 use scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::{
-    pool_after_a_recovery_abandoned_c, ISOLATED_14,
+    pool_after_a_recovery_abandoned_the_newest_publish, ISOLATED_14,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -34,17 +34,17 @@ use singlefs_format::SLOT_BYTES;
 use std::cell::Cell;
 use std::sync::Arc;
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn abandoned_root_whose_allocation_record_tree_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31(
 ) {
-    scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(&mut PoolCheckerImages::left_to_the_given_states_engine());
+    scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(&mut PoolCheckerImages::left_to_the_given_states_engine());
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
 fn abandoned_root_whose_tree_table_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31() {
-    scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31(&mut PoolCheckerImages::left_to_the_given_states_engine());
+    scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31(&mut PoolCheckerImages::left_to_the_given_states_engine());
 }
 
 /// 场景与它交给池级 checker 的镜像见 `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_on_every_read`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
@@ -94,7 +94,8 @@ fn abandoned_root_whose_tree_table_fails_only_the_first_read_of_each_copy_is_rec
 #[test]
 fn the_reread_hook_is_called_once_when_the_newest_instance_table_is_unreadable_and_the_reread_isolates_14(
 ) {
-    let (mut pool, _) = pool_after_a_recovery_abandoned_c("c393-hook-positive-control");
+    let (mut pool, _) =
+        pool_after_a_recovery_abandoned_the_newest_publish("c393-hook-positive-control");
     let devices_for_the_page = pool.reopen_recorded();
     let newest = singlefs_core::recovery::choose_root(
         &devices_for_the_page,
@@ -342,36 +343,54 @@ fn restore_the_root_slot(pool: &mut BuiltPool, hidden: &HiddenRootSlot) {
 #[test]
 fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator(
 ) {
-    let (mut pool, abandoned_c) =
-        pool_after_a_recovery_abandoned_c("lr3-raise-refused-on-the-shadow-ledger");
-    let before_d = pool.output.clone();
+    let (mut pool, abandoned_publish) = pool_after_a_recovery_abandoned_the_newest_publish(
+        "lr3-raise-refused-on-the-shadow-ledger",
+    );
+    let before_the_overwrite_in_the_recovering_instance = pool.output.clone();
     pool.output = publish_overwrite_in_process(
         &mut pool,
-        &before_d,
+        &before_the_overwrite_in_the_recovering_instance,
         &content_seeded_by(3000, 21),
         FIXED_WRITE_TIME_SECONDS + 120,
         InstanceGeneration(3),
     )
     .expect("D");
-    let before_e = pool.output.clone();
-    let abandoned_e = publish_overwrite_in_process(
+    let before_the_abandoned_overwrite_of_the_recovering_instance = pool.output.clone();
+    let abandoned_overwrite_of_the_recovering_instance = publish_overwrite_in_process(
         &mut pool,
-        &before_e,
+        &before_the_abandoned_overwrite_of_the_recovering_instance,
         &content_seeded_by(2200, 23),
         FIXED_WRITE_TIME_SECONDS + 120,
         InstanceGeneration(3),
     )
     .expect("E");
-    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &abandoned_e);
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
+        &mut pool,
+        &abandoned_overwrite_of_the_recovering_instance,
+    );
     let keys = [
-        (abandoned_c.root.instance, abandoned_c.root.checkpoint_txg),
-        (abandoned_e.root.instance, abandoned_e.root.checkpoint_txg),
+        (
+            abandoned_publish.root.instance,
+            abandoned_publish.root.checkpoint_txg,
+        ),
+        (
+            abandoned_overwrite_of_the_recovering_instance.root.instance,
+            abandoned_overwrite_of_the_recovering_instance
+                .root
+                .checkpoint_txg,
+        ),
     ];
     let positions = positions_in_the_ring_order(&mut pool, &keys);
     let (earlier, later) = if positions[0] > positions[1] {
-        (&abandoned_e, &abandoned_c)
+        (
+            &abandoned_overwrite_of_the_recovering_instance,
+            &abandoned_publish,
+        )
     } else {
-        (&abandoned_c, &abandoned_e)
+        (
+            &abandoned_publish,
+            &abandoned_overwrite_of_the_recovering_instance,
+        )
     };
     let hidden_root_slot_of_the_earlier = hide_the_root_slot_of(&mut pool, &earlier.root);
     let hidden_root_slot_of_the_later = hide_the_root_slot_of(&mut pool, &later.root);
@@ -498,46 +517,50 @@ fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_is
     let mounted_after_the_acquisitions =
         singlefs_core::mount::mount_writable(&parameters(), &mut devices_after_the_acquisitions)
             .expect("连取 370 次号之后可写挂载");
-    let instance_of_c = mounted_after_the_acquisitions.output.instance;
+    let instance_of_the_abandoned_publish = mounted_after_the_acquisitions.output.instance;
     pool.devices = Some(devices_after_the_acquisitions);
     pool.allocator = mounted_after_the_acquisitions.allocator;
     pool.output = mounted_after_the_acquisitions
         .current
         .into_file_version()
         .expect("带文件");
-    let before_c = pool.output.clone();
-    let abandoned_c = publish_overwrite_in_process(
+    let before_the_abandoned_publish = pool.output.clone();
+    let abandoned_publish = publish_overwrite_in_process(
         &mut pool,
-        &before_c,
+        &before_the_abandoned_publish,
         &content_seeded_by(2500, 11),
         FIXED_WRITE_TIME_SECONDS + 60,
-        instance_of_c,
+        instance_of_the_abandoned_publish,
     )
     .expect("C");
-    let pages_of_c: Vec<singlefs_core::pointer::NodePointer> = {
+    let instance_table_pages_of_the_abandoned_publish: Vec<singlefs_core::pointer::NodePointer> = {
         let devices_for_the_page_pointers = pool.reopen_recorded();
         let pages = singlefs_core::recovery::instance_table_page_pointers_as_far_as_readable(
             &devices_for_the_page_pointers,
-            &abandoned_c.root,
+            &abandoned_publish.root,
         );
         pool.devices = Some(devices_for_the_page_pointers);
         pages
     };
     assert_eq!(
-        pages_of_c.len(),
+        instance_table_pages_of_the_abandoned_publish.len(),
         2,
         "C 的实例表两片（371 行，一片装 369 行）"
     );
-    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &abandoned_c);
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
+        &mut pool,
+        &abandoned_publish,
+    );
     {
         use singlefs_core::block_device::{BlockDevice, WriteDurability};
         let mut devices_to_zero_the_tree_table = pool.reopen_recorded();
-        let tree_table_of_c = abandoned_c.unit(TransactionUnit::TreeTable);
+        let tree_table_of_the_abandoned_publish =
+            abandoned_publish.unit(TransactionUnit::TreeTable);
         for (_, device) in &mut devices_to_zero_the_tree_table {
             device
                 .write_at(
-                    DeviceOffsetInBytes(tree_table_of_c.slot.0 * SLOT_BYTES),
-                    &vec![0u8; tree_table_of_c.bytes.len()],
+                    DeviceOffsetInBytes(tree_table_of_the_abandoned_publish.slot.0 * SLOT_BYTES),
+                    &vec![0u8; tree_table_of_the_abandoned_publish.bytes.len()],
                     WriteDurability::Plain,
                 )
                 .expect("C 的树表两份抹零");
@@ -581,11 +604,11 @@ fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_is
         matches!(
             &raised,
             singlefs_core::mount::RaiseToTheAdmissionCeiling::Raised(raised)
-                if raised.publishes.first().is_some_and(|publish| publish.root.rollback_floor >= abandoned_c.root.checkpoint_txg)
+                if raised.publishes.first().is_some_and(|publish| publish.root.rollback_floor >= abandoned_publish.root.checkpoint_txg)
         ),
         "新 F 越过 C 的前一版：{raised:?}"
     );
-    let free_page_slots: Vec<(u32, u64)> = pages_of_c
+    let free_page_slots: Vec<(u32, u64)> = instance_table_pages_of_the_abandoned_publish
         .iter()
         .flat_map(|page| page.locations)
         .filter(|location| {
@@ -615,9 +638,10 @@ fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_is
 #[test]
 fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account_is_unreadable_recomputes_it_from_the_mapping(
 ) {
-    let (mut pool, abandoned_c) =
-        pool_after_a_recovery_abandoned_c("m11-unmount-recomputes-from-the-mapping");
-    let hidden_root_slot = hide_the_root_slot_of(&mut pool, &abandoned_c.root);
+    let (mut pool, abandoned_publish) = pool_after_a_recovery_abandoned_the_newest_publish(
+        "m11-unmount-recomputes-from-the-mapping",
+    );
+    let hidden_root_slot = hide_the_root_slot_of(&mut pool, &abandoned_publish.root);
     let mut devices_of_the_mount = pool.reopen_recorded();
     let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_mount)
         .expect("C 的根槽读回全零：照常可写挂载");
@@ -631,8 +655,8 @@ fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account
         .expect("挂载建的分配器装着根环表");
     assert_eq!(
         root_ring_table.placements_recorded_for_the_abandoned_root(
-            abandoned_c.root.instance,
-            abandoned_c.root.checkpoint_txg
+            abandoned_publish.root.instance,
+            abandoned_publish.root.checkpoint_txg
         ),
         None,
         "挂载那一刻 C 的根槽读回全零：根环表里没记着 C 的落点"
@@ -640,8 +664,8 @@ fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account
     assert_eq!(
         root_ring_table
             .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-                abandoned_c.root.instance,
-                abandoned_c.root.checkpoint_txg
+                abandoned_publish.root.instance,
+                abandoned_publish.root.checkpoint_txg
             ),
         None,
         "C 那一槽记的不是有效根：不借 C 那一圈的落点"
@@ -649,12 +673,13 @@ fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account
     {
         use singlefs_core::block_device::{BlockDevice, WriteDurability};
         let mut devices_to_zero_the_tree_table = pool.reopen_recorded();
-        let tree_table_of_c = abandoned_c.unit(TransactionUnit::TreeTable);
+        let tree_table_of_the_abandoned_publish =
+            abandoned_publish.unit(TransactionUnit::TreeTable);
         for (_, device) in &mut devices_to_zero_the_tree_table {
             device
                 .write_at(
-                    DeviceOffsetInBytes(tree_table_of_c.slot.0 * SLOT_BYTES),
-                    &vec![0u8; tree_table_of_c.bytes.len()],
+                    DeviceOffsetInBytes(tree_table_of_the_abandoned_publish.slot.0 * SLOT_BYTES),
+                    &vec![0u8; tree_table_of_the_abandoned_publish.bytes.len()],
                     WriteDurability::Plain,
                 )
                 .expect("C 的树表两份抹零");
@@ -686,7 +711,7 @@ fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account
             panic!("C 的账读不出、映射读得出：卸载从映射现算做成，而被拒：{refusal:?}")
         }
     }
-    let free_units_of_c: Vec<(u32, u64)> = abandoned_c
+    let free_units_of_the_abandoned_publish: Vec<(u32, u64)> = abandoned_publish
         .units
         .iter()
         .flat_map(|unit| {
@@ -699,7 +724,7 @@ fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account
         })
         .collect();
     assert_eq!(
-        free_units_of_c,
+        free_units_of_the_abandoned_publish,
         Vec::<(u32, u64)>::new(),
         "卸载之后 C 写出的单元一个都不空闲（从映射现算的落点都隔离着）"
     );

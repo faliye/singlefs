@@ -312,11 +312,12 @@ const THREADS_ENVIRONMENT_VARIABLE: &str = "E168_THREADS";
 const MEMORY_CAP_ENVIRONMENT_VARIABLE: &str = "E168_MEMORY_CAP";
 /// 两处都没给内存上限时取 40 GiB。
 const DEFAULT_MEMORY_CAP_BYTES: u64 = 40 << 30;
-/// 大片（P4）一片的峰值：4 GiB，按 P4 的盘大小估的，没量过；
-/// 一片可能比这个大：量出来的数以 `.claude/memory-bounded-parallelism.tsv` 里这个装置那一行（服务照它给内存上限）为准，两处同改。
+/// 大片（P4）一片的峰值：4 GiB，按 P4 的盘大小估的，没量过；一片可能比这个大，量出来的峰值只改这个常量。
+/// `.claude/memory-bounded-parallelism.tsv` 里这个装置那一行只登记它准许按内存上限定并发与理由，不记峰值；任务服务给的内存上限
+/// 只照服务自己库里按命令键的记录定，不读那张表。
 const PEAK_BYTES_OF_ONE_LARGE_SLICE: u64 = 4 << 30;
 /// 大片之外那一份常驻（主线程、P4 以外的片、进度线程）：4 GiB，推的、没量过（不跑 P4 的删除时整趟峰值约 2.3 GB）；
-/// 量出来的数同样以登记表那一行的底座为准，两处同改。
+/// 量出来的数同样只改这个常量。
 const RESIDENT_BYTES_BESIDES_THE_LARGE_SLICES: u64 = 4 << 30;
 
 /// 一片的进度：开没开跑、跑完没有、判完的格数与删除发布数（只给进度行读，不进产物）。
@@ -3144,7 +3145,7 @@ fn smallest_usable_line(
 }
 
 /// 第七节 B1、B2、B3：独立算术（B1、B2）与 mkfs 的边（B3）；不成立就作废（V3）。交回核过的条数。
-fn anchors_of_class_b() -> usize {
+fn anchors_of_the_independent_arithmetic_and_make_filesystem_edge() -> usize {
     let device_slots = |bytes: u64| bytes / SLOT_BYTES;
     let two_devices = |start_slot: u64, end_slot_exclusive: u64| {
         vec![
@@ -3270,8 +3271,8 @@ struct GroupTally {
     cells_apex_over_ring_window: u64,
     cells_not_fillable: u64,
     is_saturated: bool,
-    is_w_growing_with_file_size: bool,
-    publishes_whose_w_exceeds_landing: u64,
+    are_the_largest_new_slots_growing_with_file_size: bool,
+    publishes_whose_new_slots_exceed_the_landing_demand: u64,
     largest_new_slots: u64,
 }
 
@@ -3388,7 +3389,7 @@ fn run_the_ladder_group(
             summary.reserve_at_the_apex,
         ));
         tally.cells_refused += u64::from(summary.refusal.is_some());
-        tally.publishes_whose_w_exceeds_landing +=
+        tally.publishes_whose_new_slots_exceed_the_landing_demand +=
             summary.publishes_whose_new_slots_exceed_the_landing_demand;
     }
     let apex_series: Vec<(u64, i128)> = deleted
@@ -3402,7 +3403,8 @@ fn run_the_ladder_group(
     let saturation = apex_saturation(&apex_series, slots_per_region);
     tally.cells_deleted = u64::try_from(deleted.len()).expect("格数");
     tally.is_saturated = saturation == ApexSaturation::Saturated;
-    tally.is_w_growing_with_file_size = largest_new_slots_grow_with_file_size(&largest_by_point);
+    tally.are_the_largest_new_slots_growing_with_file_size =
+        largest_new_slots_grow_with_file_size(&largest_by_point);
     tally.largest_new_slots = largest_new_slots;
     emit_product_line!(
         "E name=group point={} S={slots_per_region} K={batch_data_units} arm={} cells_deleted={} cells_not_fillable={} cells_refused={} cells_apex_over_reserve={} cells_apex_over_ring_window={} w_max={largest_new_slots} w_max_intent={} w_max_batches={} ring_window_bound={bound} m3_saturation={saturation:?} m5_w_grows_with_file_size={} w_exceeds_landing_publishes={} ladder_extensions={extensions} ladder_ceiling={ceiling} apex_series={apex_series:?} w_max_series={largest_by_point:?}",
@@ -3415,8 +3417,8 @@ fn run_the_ladder_group(
         tally.cells_apex_over_ring_window,
         deleted.iter().map(|(_, summary)| summary.intent_new_slots).max().unwrap_or(0),
         deleted.iter().map(|(_, summary)| summary.largest_batch_new_slots).max().unwrap_or(0),
-        tally.is_w_growing_with_file_size,
-        tally.publishes_whose_w_exceeds_landing,
+        tally.are_the_largest_new_slots_growing_with_file_size,
+        tally.publishes_whose_new_slots_exceed_the_landing_demand,
     );
     if point == DeviceSizePoint::SmallestUsable {
         emit_product_line!(
@@ -3656,7 +3658,7 @@ fn run_one_positive_control(
         setting.label(),
         verdict.is_refused,
         refusal.map_or("none", DeleteRefusal::label),
-        verdict.u12_label(),
+        verdict.refused_after_raising_the_floor_label(),
         verdict.holds()
     );
     verdict
@@ -3686,7 +3688,7 @@ impl PositiveControlCellVerdict {
         }
     }
 
-    fn u12_label(self) -> &'static str {
+    fn refused_after_raising_the_floor_label(self) -> &'static str {
         match self.is_refused_with_no_space_after_raising_the_floor {
             None => "not_applicable",
             Some(true) => "true",
@@ -3890,7 +3892,10 @@ fn run_segment_one(filter: Option<&str>, scheduling: SliceScheduling) {
         "E name=constants compared={}",
         local_constants_against_the_implementation()
     );
-    emit_product_line!("E name=anchors_b checked={}", anchors_of_class_b());
+    emit_product_line!(
+        "E name=anchors_b checked={}",
+        anchors_of_the_independent_arithmetic_and_make_filesystem_edge()
+    );
     for slots_per_region in SEGMENT_ONE_SLOTS_PER_REGION {
         let geometry = make_filesystem_smallest_geometry(slots_per_region);
         if filter.is_some_and(|wanted| wanted != geometry.label()) {
@@ -3937,8 +3942,8 @@ fn run_segment_one(filter: Option<&str>, scheduling: SliceScheduling) {
         sum_of(Some(SMALLEST_BATCH_DATA_UNITS), |tally| tally.cells_apex_over_reserve),
         sum_of(None, |tally| u64::from(!tally.is_saturated)),
         sum_of(None, |tally| tally.cells_apex_over_ring_window),
-        sum_of(None, |tally| u64::from(tally.is_w_growing_with_file_size)),
-        sum_of(None, |tally| tally.publishes_whose_w_exceeds_landing),
+        sum_of(None, |tally| u64::from(tally.are_the_largest_new_slots_growing_with_file_size)),
+        sum_of(None, |tally| tally.publishes_whose_new_slots_exceed_the_landing_demand),
         positive_controls.verdict_fields(),
     );
     stop_when_a_positive_control_does_not_hold(positive_controls);
@@ -3952,7 +3957,10 @@ fn run_the_positive_controls_only(filter: Option<&str>, scheduling: SliceSchedul
         "E name=constants compared={}",
         local_constants_against_the_implementation()
     );
-    emit_product_line!("E name=anchors_b checked={}", anchors_of_class_b());
+    emit_product_line!(
+        "E name=anchors_b checked={}",
+        anchors_of_the_independent_arithmetic_and_make_filesystem_edge()
+    );
     let group_slices: Vec<LadderGroupSlice> = POSITIVE_CONTROL_GEOMETRIES
         .into_iter()
         .filter(|(point, slots_per_region)| {
@@ -3984,7 +3992,7 @@ fn run_the_positive_controls_only(filter: Option<&str>, scheduling: SliceSchedul
 
 /// 停机条款 S1 的那一段不删的历史（不调删除入口，主工作区与副本两份二进制都跑）：mkfs → 可写挂载 → 写一个文件（P2 上 32 个单元、
 /// P4 上 300 个单元）→ 重挂载（[`pool_with_a_file`] 的第 2 步）→ 覆盖写成 1 个单元 → 重挂载；打盘镜像的 sha256 与分配器三个计数。
-fn run_the_s1_history() {
+fn run_the_history_without_deletes() {
     for (geometry, data_units) in [
         (
             narrow_geometry(ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM),
@@ -4062,7 +4070,7 @@ fn main() {
     match arguments.as_slice() {
         ["s1-history"] => {
             emit_product_line!("E name=config mode=s1-history");
-            run_the_s1_history();
+            run_the_history_without_deletes();
         }
         ["segment1"] => {
             emit_product_line!("E name=config mode=segment1 geometry=all");
@@ -4400,10 +4408,10 @@ mod tests {
     }
 
     #[test]
-    fn a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds() {
+    fn publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds() {
         // 池级 checker 那一判经给定状态表两段判：配置开了 GPU 而这份二进制没编进 gpu 特性时判段不跑，照本次未跑交回
         if singlefs_verification::crash_amplification::judging_test_not_run_without_the_gpu_feature(
-            "e168_delete_ring_window_borrow::a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds",
+            "e168_delete_ring_window_borrow::publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds",
         ) {
             return;
         }
@@ -4533,7 +4541,7 @@ mod tests {
     }
 
     #[test]
-    fn the_s7_ledger_rewrite_is_published_with_the_formula_judgement_skipped_like_every_delete_publish(
+    fn the_ledger_rewrite_before_the_final_checker_is_published_with_the_formula_judgement_skipped_like_every_delete_publish(
     ) {
         let PoolWithAFile::Written(mut pool) = pool_with_a_file(
             narrow_geometry_with_the_ring_window_reserved(ROOT_RING_SLOTS_PER_REGION_MINIMUM),
@@ -4805,7 +4813,7 @@ mod tests {
     };
 
     #[test]
-    fn smallest_usable_disk_under_reading_c_fills_while_the_steps_one_and_two_disk_and_the_disk_two_slots_smaller_do_not(
+    fn smallest_usable_disk_of_the_steps_one_to_three_reading_fills_while_the_steps_one_and_two_disk_and_the_disk_two_slots_smaller_do_not(
     ) {
         for slots_per_region in [
             ROOT_RING_SLOTS_PER_REGION_MINIMUM,
@@ -4841,7 +4849,7 @@ mod tests {
     }
 
     #[test]
-    fn p1_journal_ring_for_a_file_of_88_data_units_is_two_mebibytes_and_one_mebibyte_refuses_the_write(
+    fn smallest_disk_journal_ring_for_a_file_of_88_data_units_is_two_mebibytes_and_one_mebibyte_refuses_the_write(
     ) {
         for (records_of_the_publish, expected_ring_bytes) in [
             (0, 1_048_576),
@@ -4940,7 +4948,7 @@ mod tests {
     }
 
     #[test]
-    fn positive_control_reads_free_0_on_the_disk_it_fills_with_the_n_unit_file() {
+    fn positive_control_reads_free_0_on_the_disk_it_fills_with_the_converged_file_size() {
         let geometry_for = |data_units: u64| {
             Some(smallest_usable_candidate(
                 ROOT_RING_SLOTS_PER_REGION_MAXIMUM,
@@ -4978,7 +4986,8 @@ mod tests {
 
     #[test]
     #[ignore = "要补丁表副本：主工作区那份的 delete_path_hooks 是桩，一调就打停机行退 3；在套过补丁表的副本里 `-- --ignored` 跑"]
-    fn segment_one_on_p2_s4_prints_the_same_lines_on_one_thread_and_on_eight_threads() {
+    fn segment_one_on_the_narrow_disk_with_four_slots_per_region_prints_the_same_lines_on_one_thread_and_on_eight_threads(
+    ) {
         let lines_and_stop_line_on = |thread_count: usize| {
             lines_and_stop_line_of(|| {
                 run_segment_one(
@@ -5161,23 +5170,25 @@ mod tests {
     }
 
     #[test]
-    fn positive_control_u12_holds_for_a_session_refusal_whose_floor_raise_was_refused_in_the_rehearsal_and_not_for_a_landing_refusal(
+    fn positive_control_refusal_after_raising_the_floor_holds_for_a_session_refusal_whose_floor_raise_was_refused_in_the_rehearsal_and_not_for_a_landing_refusal(
     ) {
-        let like_the_r7_session_cell_with_no_chain_landed = PositiveControlCellVerdict::of_the_cell(
-            RefusalHandling::ThroughTheSession,
-            Some(DeleteRefusal::NoSpaceAfterRaisingTheFloor),
-        );
+        let like_the_seventh_rerun_session_cell_with_no_chain_landed =
+            PositiveControlCellVerdict::of_the_cell(
+                RefusalHandling::ThroughTheSession,
+                Some(DeleteRefusal::NoSpaceAfterRaisingTheFloor),
+            );
         assert_eq!(
-            like_the_r7_session_cell_with_no_chain_landed,
+            like_the_seventh_rerun_session_cell_with_no_chain_landed,
             PositiveControlCellVerdict {
                 is_refused: true,
                 is_refused_with_no_space_after_raising_the_floor: Some(true),
             },
             "r7 冒烟 P1-S16 N-B 那一格：会话推了抬 F、那一串在预演第 2 次被拒、零落盘（floor_raise_publishes=0），拒绝种类 no_space_after_raising_the_floor；读法乙下 U12 成立"
         );
-        assert!(like_the_r7_session_cell_with_no_chain_landed.holds());
+        assert!(like_the_seventh_rerun_session_cell_with_no_chain_landed.holds());
         assert_eq!(
-            like_the_r7_session_cell_with_no_chain_landed.u12_label(),
+            like_the_seventh_rerun_session_cell_with_no_chain_landed
+                .refused_after_raising_the_floor_label(),
             "true"
         );
         for refusal_without_the_session in [DeleteRefusal::Landing, DeleteRefusal::Placement] {
@@ -5195,7 +5206,10 @@ mod tests {
                 refusal_without_the_session.label()
             );
             assert!(!session_arm_refused_without_the_session.holds());
-            assert_eq!(session_arm_refused_without_the_session.u12_label(), "false");
+            assert_eq!(
+                session_arm_refused_without_the_session.refused_after_raising_the_floor_label(),
+                "false"
+            );
         }
         let session_arm_not_refused =
             PositiveControlCellVerdict::of_the_cell(RefusalHandling::ThroughTheSession, None);
@@ -5219,11 +5233,17 @@ mod tests {
             }
         );
         assert!(direct_refused.holds());
-        assert_eq!(direct_refused.u12_label(), "not_applicable");
+        assert_eq!(
+            direct_refused.refused_after_raising_the_floor_label(),
+            "not_applicable"
+        );
         let direct_not_refused =
             PositiveControlCellVerdict::of_the_cell(RefusalHandling::Direct, None);
         assert!(!direct_not_refused.holds());
-        assert_eq!(direct_not_refused.u12_label(), "not_applicable");
+        assert_eq!(
+            direct_not_refused.refused_after_raising_the_floor_label(),
+            "not_applicable"
+        );
     }
 
     #[test]
@@ -5245,14 +5265,14 @@ mod tests {
         );
         let session_not_refused =
             PositiveControlCellVerdict::of_the_cell(RefusalHandling::ThroughTheSession, None);
-        let like_the_r7_smoke = PositiveControlTally::of_the_cells(&[
+        let like_the_seventh_rerun_smoke = PositiveControlTally::of_the_cells(&[
             direct_refused,
             session_refused_after_raising_the_floor,
             direct_refused,
             session_refused_after_raising_the_floor,
         ]);
         assert_eq!(
-            like_the_r7_smoke,
+            like_the_seventh_rerun_smoke,
             PositiveControlTally {
                 cells: 4,
                 cells_without_refusal: 0,
@@ -5261,10 +5281,10 @@ mod tests {
             },
             "r7 冒烟那四格（N-A、N-B、W-A、W-B）：四格都出了拒绝，两条 B 臂的拒绝都是 no_space_after_raising_the_floor（N-B 零落盘），读法乙下都成立"
         );
-        assert_eq!(like_the_r7_smoke.stop_reason(), None);
+        assert_eq!(like_the_seventh_rerun_smoke.stop_reason(), None);
         assert_eq!(
             lines_and_stop_line_of(|| stop_when_a_positive_control_does_not_hold(
-                like_the_r7_smoke
+                like_the_seventh_rerun_smoke
             )),
             (Vec::new(), None),
             "四格都合：不停"

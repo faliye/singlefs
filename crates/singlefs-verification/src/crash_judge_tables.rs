@@ -1053,7 +1053,7 @@ fn enumerate_locations(
 
 /// 一次写会不会写下自己的非零字节（[`enumerate_locations`] 按它算碰过的范围）：清零写（连同它的撕裂镜像，种类照抄被撕的那次写）不会，
 /// 别的种类会。discard 写的也是 0，照旧算碰过：它罩住的每个单元槽各建一个落点（discard 进判表那一批的写法，
-/// `tests::a_discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states` 钉着），这里不动它。
+/// `tests::discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states` 钉着），这里不动它。
 fn write_puts_bytes_of_its_own(kind: StepKind) -> bool {
     match kind {
         StepKind::ZeroFill => false,
@@ -1993,9 +1993,9 @@ impl JudgeTables {
                 expansion.digit_writes_and_the_copy_on_write_group(segment);
             segments.push(index(segment_writes.len()));
             segments.push(index(digit_writes.len()));
-            let (start_lo, start_hi) = split(segment.states.start);
-            let (end_lo, end_hi) = split(segment.states.end);
-            segments.extend([start_lo, start_hi, end_lo, end_hi]);
+            let (start_low, start_high) = split(segment.states.start);
+            let (end_low, end_high) = split(segment.states.end);
+            segments.extend([start_low, start_high, end_low, end_high]);
             segment_writes.extend(digit_writes.iter().copied());
             segments.push(expansion.code());
             segments.push(index(segment_writes.len()));
@@ -2047,11 +2047,11 @@ impl JudgeTables {
         let mut root_bytes = Vec::new();
         let mut laters = Vec::new();
         for write in &self.writes {
-            let (offset_lo, offset_hi) = split(write.offset);
-            let (instance, txg_lo, txg_hi) = match write.root_identity {
+            let (offset_low, offset_high) = split(write.offset);
+            let (instance, txg_low, txg_high) = match write.root_identity {
                 Some((instance, txg)) => {
-                    let (lo, hi) = split(txg);
-                    (instance, lo, hi)
+                    let (low, high) = split(txg);
+                    (instance, low, high)
                 }
                 None => (
                     JUDGE_TABLE_ENTRY_ABSENT,
@@ -2068,25 +2068,25 @@ impl JudgeTables {
             };
             writes.extend([
                 write.device,
-                offset_lo,
-                offset_hi,
+                offset_low,
+                offset_high,
                 write.length,
                 step_kind_code(write.kind),
                 write.location.unwrap_or(JUDGE_TABLE_ENTRY_ABSENT),
                 instance,
-                txg_lo,
-                txg_hi,
+                txg_low,
+                txg_high,
                 root_bytes_offset,
                 index(laters.len() / LATER_WORDS),
                 index(write.later_overlapping_writes.len()),
             ]);
             for later in &write.later_overlapping_writes {
-                let (covered_lo, covered_hi) = split(later.covered_sectors);
+                let (covered_low, covered_high) = split(later.covered_sectors);
                 laters.extend([
                     later.write_index,
                     u32::from(later.reuse_is_not_proven_illegal),
-                    covered_lo,
-                    covered_hi,
+                    covered_low,
+                    covered_high,
                 ]);
             }
         }
@@ -2119,11 +2119,11 @@ impl JudgeTables {
         version_bytes.extend(bytes_to_words(&zero_unit));
         let gaps = self.unit_slots_nothing_wrote_after_each_location();
         for (location_index, location) in self.locations.iter().enumerate() {
-            let (offset_lo, offset_hi) = split(location.offset);
+            let (offset_low, offset_high) = split(location.offset);
             locations.extend([
                 location.device,
-                offset_lo,
-                offset_hi,
+                offset_low,
+                offset_high,
                 location.length,
                 location.kind.code(),
                 index(location_writes.len()),
@@ -2145,8 +2145,8 @@ impl JudgeTables {
                 ));
                 version_bytes.extend(bytes_to_words(&version.bytes));
                 for mask in &version.sector_equals {
-                    let (lo, hi) = split(*mask);
-                    equal_masks.extend([lo, hi]);
+                    let (low, high) = split(*mask);
+                    equal_masks.extend([low, high]);
                 }
             }
         }
@@ -2156,12 +2156,12 @@ impl JudgeTables {
         let mut copy_groups = Vec::new();
         let mut copies = Vec::new();
         for publish in &self.publishes {
-            let (txg_lo, txg_hi) = split(publish.checkpoint_txg);
+            let (txg_low, txg_high) = split(publish.checkpoint_txg);
             publishes.extend([
                 publish.root_write,
                 publish.instance,
-                txg_lo,
-                txg_hi,
+                txg_low,
+                txg_high,
                 index(publish_records.len()),
                 index(publish.records.len()),
                 index(copy_groups.len() / 2),
@@ -2177,11 +2177,11 @@ impl JudgeTables {
         let mut expected = Vec::new();
         let mut chunks = Vec::new();
         for version in &self.expected_versions {
-            let (txg_lo, txg_hi) = split(version.checkpoint_txg);
+            let (txg_low, txg_high) = split(version.checkpoint_txg);
             expected.extend([
                 version.instance,
-                txg_lo,
-                txg_hi,
+                txg_low,
+                txg_high,
                 index(chunks.len() / 2),
                 index(version.chunks.len()),
                 match version.file {
@@ -2193,21 +2193,21 @@ impl JudgeTables {
                 chunks.extend([*crc, *length]);
             }
         }
-        let (device_bytes_lo, device_bytes_hi) = split(self.device_bytes);
-        let (state_count_lo, state_count_hi) = split(self.state_count);
+        let (device_bytes_low, device_bytes_high) = split(self.device_bytes);
+        let (state_count_low, state_count_high) = split(self.state_count);
         let mut header = vec![
             self.recorded_write_count,
             self.enumerated_write_count,
             index(self.segments.len()),
             index(self.devices.len()),
-            device_bytes_lo,
-            device_bytes_hi,
+            device_bytes_low,
+            device_bytes_high,
             index(self.locations.len()),
             index(self.publishes.len()),
             index(self.expected_versions.len()),
             self.judged_root_index,
-            state_count_lo,
-            state_count_hi,
+            state_count_low,
+            state_count_high,
         ];
         header.extend(self.devices.iter().copied());
         header.resize(HEADER_WORDS, 0);
@@ -2568,8 +2568,7 @@ mod tests {
 
     /// 段表一条 SEGMENT_WORDS 个字：甲二段先摊原地写那一组（数位）、再摊单元写那一组（整组落），两组合起来是段里全部的写，展开方式码在第 6 字。
     #[test]
-    fn a_segment_in_place_subsets_with_copy_on_write_none_or_all_lays_out_its_two_groups_of_writes()
-    {
+    fn segment_in_place_subsets_with_copy_on_write_none_or_all_lays_out_its_two_groups_of_writes() {
         let tables = tables_of_one_segment(
             SegmentFact {
                 writes: vec![2, 3, 4, 0, 1],
@@ -2616,7 +2615,7 @@ mod tests {
     /// 分片的段（C790）：段表第 9、10 字是片起点各位在段写表里的起点与位数，各位接在两组写之后（单元写那一组那一位在前）；
     /// 判表按片起点加片内序号拆，与不分片时同一个段内编号拆出的相同。
     #[test]
-    fn a_sliced_segment_lays_out_the_digits_of_its_slice_start_after_its_two_groups_of_writes() {
+    fn sliced_segment_lays_out_the_digits_of_its_slice_start_after_its_two_groups_of_writes() {
         let expansion = SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
             in_place_writes: vec![0, 1],
             copy_on_write_writes: vec![2, 3, 4],
@@ -2704,7 +2703,7 @@ mod tests {
 
     /// 枚举写表多于内核持久掩码的宽（[`MAXIMUM_ENUMERATED_WRITES`] 次）：建表交「掩码表满了」，不 panic、不往下建。
     #[test]
-    fn a_flow_with_more_enumerated_writes_than_the_mask_holds_is_refused_naming_the_mask() {
+    fn flow_with_more_enumerated_writes_than_the_mask_holds_is_refused_naming_the_mask() {
         let base = MemoryPool::with_devices(&[DeviceIdentity(0)], 1 << 26);
         let one_past_the_mask =
             u64::try_from(MAXIMUM_ENUMERATED_WRITES + 1).expect("掩码宽装得进 u64");
@@ -2755,7 +2754,7 @@ mod tests {
     /// 判别力（`crates/mutations.tsv` 两行）：枚举写表的上限改回 2048，建表交「掩码表满了」，这条红；一个落点的写数上限改回 64，
     /// 建表交「一个落点写太多」，这条红。
     #[test]
-    fn a_given_states_table_of_five_thousand_seven_hundred_and_nine_writes_with_one_hundred_and_eleven_on_one_location_is_built(
+    fn given_states_table_of_five_thousand_seven_hundred_and_nine_writes_with_one_hundred_and_eleven_on_one_location_is_built(
     ) {
         let base = formatted_pool_of_two_devices();
         let system_configuration_slot_writes = (0
@@ -3055,12 +3054,14 @@ mod tests {
 
     /// 两块盘 mkfs 一次的池（io_min 512、槽距 4096；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上），没有文件。
     fn formatted_pool_of_two_devices() -> MemoryPool {
-        formatted_pool_of_two_devices_with_io_min(512)
+        formatted_pool_of_two_devices_with_minimum_input_output_bytes(512)
     }
 
     /// 两块盘 mkfs 一次的池，mkfs 探测到的 io_min 是 `minimum_input_output_bytes`（槽距 = 4096 向上取整到它的整数倍；
     /// 物理块 512；根环区域 0 / 1 / 2 在盘 0 / 1 / 0 上），没有文件。
-    fn formatted_pool_of_two_devices_with_io_min(minimum_input_output_bytes: u32) -> MemoryPool {
+    fn formatted_pool_of_two_devices_with_minimum_input_output_bytes(
+        minimum_input_output_bytes: u32,
+    ) -> MemoryPool {
         let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> =
             [DeviceIdentity(0), DeviceIdentity(1)]
                 .into_iter()
@@ -3233,7 +3234,7 @@ mod tests {
     /// 盘 0 上一个落点都不建（CPU 读那块盘交 None，GPU 在那块盘上找不到落点、读到没有版本的切片），盘 1 上的根环区域 1 照建。
     /// 给区域盘一律建落点的取法从基线读盘 0 的字节读不出，在「落点在盘内、按扇区对齐」那一处 panic，这条红。
     #[test]
-    fn a_pool_without_a_device_that_holds_root_ring_regions_builds_its_tables_with_no_location_on_that_device(
+    fn pool_without_a_device_that_holds_root_ring_regions_builds_its_tables_with_no_location_on_that_device(
     ) {
         let mut image = formatted_pool_of_two_devices();
         image
@@ -3268,8 +3269,7 @@ mod tests {
     /// 撕裂那一版是撕裂镜像（`crash::torn_image_of_in_place_overwrite` 按「这次写之前的写全落了」时的旧字节算的）在这一槽上的那一截。
     /// 照旧在建表时拒 discard，或把 discard 当成落在它起点那一个落点上（长过那个落点就拒），这条在建表那一步就红。
     #[test]
-    fn a_discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states()
-    {
+    fn discard_over_a_data_unit_lands_in_every_unit_slot_location_it_covers_in_its_three_states() {
         let base = formatted_pool_of_two_devices();
         let unit_area_start_slot = slot_after_the_journal_ring(JOURNAL_RING_DEFAULT_BYTES).0;
         let discard_slots: u64 = 64;
@@ -3394,7 +3394,7 @@ mod tests {
     /// 判表在偏移 0 与几何槽距 4096 之外，给每块盘的 8192 建一个系统配置落点；4096 与 8192 那两槽之间各档（4608 … 7680、8704 … 11776）
     /// 碰过而哪一版都不自证，建完版本就去掉。只建偏移 0 与几何槽距两处的取法少了 8192，这条红；碰过的都留着的取法多出那几档，这条也红。
     #[test]
-    fn a_slot_one_carrying_a_refused_value_found_while_reading_every_spacing_gets_a_system_configuration_location(
+    fn slot_one_carrying_a_refused_value_found_while_reading_every_spacing_gets_a_system_configuration_location(
     ) {
         let mut image = formatted_pool_of_two_devices();
         let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(512));
@@ -3433,9 +3433,9 @@ mod tests {
     /// 判别力（`crates/mutations.tsv`「E 崩溃点重放 J14 判表的系统配置槽 1 照旧摆在 4096」那一行）：槽 1 照旧摆在 4096，盘 1 的 8192 没有落点、
     /// 4096 那一处一版都不自证被去掉，这条红。盘上两槽都写过的池上逐档那一圈补出 8192，那一处改法看不出来。
     #[test]
-    fn an_io_min_8192_pool_whose_slot_one_on_one_device_was_never_written_keeps_a_system_configuration_location_at_the_slot_spacing(
+    fn pool_with_minimum_input_output_bytes_8192_whose_slot_one_on_one_device_was_never_written_keeps_a_system_configuration_location_at_the_slot_spacing(
     ) {
-        let mut image = formatted_pool_of_two_devices_with_io_min(8192);
+        let mut image = formatted_pool_of_two_devices_with_minimum_input_output_bytes(8192);
         let spacing = u64::from(SystemImmutableSizes::slot_spacing_for(8192));
         assert_eq!(spacing, 8192, "io_min 8192 的池槽距 8192");
         let device_one = image

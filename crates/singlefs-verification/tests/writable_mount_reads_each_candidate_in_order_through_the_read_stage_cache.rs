@@ -24,8 +24,8 @@ use common::{
     rewrite_journal_record_and_rechain_the_records_after_it,
     sequential_write_in_process_as_instance_one_and_advance_the_pool,
     system_configuration_slots_of_every_device, tear_the_root_slot_written_for_txg,
-    write_back_system_configuration_slots, BlockLayerRead, CONTENT_BYTES_OF_PUBLISH_B,
-    CONTENT_BYTES_OF_PUBLISH_C, FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD,
+    write_back_system_configuration_slots, BlockLayerRead, CONTENT_BYTES_OF_THE_NEWER_OVERWRITE,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE, FIRST_DEVICE_TRIED_BY_THE_BACK_CHAIN_REREAD,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -44,8 +44,8 @@ use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::SharedStream;
 
 /// B、C 两版文件的填充字节。
-const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
-const CONTENT_FILL_BYTE_OF_PUBLISH_C: u8 = 0xC0;
+const CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE: u8 = 0xB0;
+const CONTENT_FILL_BYTE_OF_THE_NEWER_OVERWRITE: u8 = 0xC0;
 /// 两条记录那段历史里 B 的填充字节。
 const CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH: u8 = 0xD0;
 /// 池里两块盘：扫环每块盘各扫一遍整环。
@@ -266,11 +266,11 @@ fn writable_mount_reads_each_named_unit_once_per_candidate_in_journal_order_and_
         system_configuration_slots_of_every_device(&pool);
     let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
+        &vec![CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
     );
     let third = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_C; CONTENT_BYTES_OF_PUBLISH_C],
+        &vec![CONTENT_FILL_BYTE_OF_THE_NEWER_OVERWRITE; CONTENT_BYTES_OF_THE_NEWER_OVERWRITE],
     );
     assert_eq!(
         (
@@ -381,13 +381,13 @@ fn writable_mount_cuts_a_last_record_without_its_commit_marker_before_reading_it
         record.is_commit = false;
     });
     let (ring_bytes, candidates) = ring_bytes_and_records(&image, &[4, 5]);
-    let [first_record_of_b, last_record_of_b] =
+    let [first_record_of_the_two_record_publish, last_record_of_the_two_record_publish] =
         <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
     assert_eq!(
         (
-            first_record_of_b.named.len(),
-            last_record_of_b.place_in_publish,
-            last_record_of_b.is_commit
+            first_record_of_the_two_record_publish.named.len(),
+            last_record_of_the_two_record_publish.place_in_publish,
+            last_record_of_the_two_record_publish.is_commit
         ),
         (
             NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH,
@@ -416,7 +416,8 @@ fn writable_mount_cuts_a_last_record_without_its_commit_marker_before_reading_it
         "jsn 4 过了点名验证；jsn 5 断在提交标记上，B 整次不施加，挂载在 A"
     );
 
-    let mut expected_events_after_the_scan = named_unit_events_of(&first_record_of_b);
+    let mut expected_events_after_the_scan =
+        named_unit_events_of(&first_record_of_the_two_record_publish);
     assert_eq!(
         expected_events_after_the_scan.len(),
         NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH * READS_PER_NAMED_UNIT,
@@ -444,11 +445,11 @@ fn writable_mount_rereads_a_previous_record_whose_first_copy_reads_back_as_zeros
         system_configuration_slots_of_every_device(&pool);
     let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
+        &vec![CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
     );
     let third = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_C; CONTENT_BYTES_OF_PUBLISH_C],
+        &vec![CONTENT_FILL_BYTE_OF_THE_NEWER_OVERWRITE; CONTENT_BYTES_OF_THE_NEWER_OVERWRITE],
     );
     assert_eq!(
         (
@@ -480,7 +481,8 @@ fn writable_mount_rereads_a_previous_record_whose_first_copy_reads_back_as_zeros
         zero_the_copy_the_back_chain_reread_tries_first(&mut image, counter, ring_bytes);
     }
     let (_, candidates) = ring_bytes_and_records(&image, &[4, 5]);
-    let [candidate_b, candidate_c] = <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
+    let [older_overwrite_candidate, newer_overwrite_candidate] =
+        <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
 
     let (mounted, events) = mount_writable_logging_every_block_layer_event(&image, ring_bytes);
     assert_eq!(
@@ -507,11 +509,16 @@ fn writable_mount_rereads_a_previous_record_whose_first_copy_reads_back_as_zeros
         "所选根是 A 的；jsn 3、4 的 1 号盘那一份在，反向链对得上，B、C 都过了点名验证、都施加"
     );
 
-    let mut expected_events_after_the_scan =
-        vec![back_chain_reread_event_of(&candidate_b, ring_bytes)];
-    expected_events_after_the_scan.extend(named_unit_events_of(&candidate_b));
-    expected_events_after_the_scan.push(back_chain_reread_event_of(&candidate_c, ring_bytes));
-    expected_events_after_the_scan.extend(named_unit_events_of(&candidate_c));
+    let mut expected_events_after_the_scan = vec![back_chain_reread_event_of(
+        &older_overwrite_candidate,
+        ring_bytes,
+    )];
+    expected_events_after_the_scan.extend(named_unit_events_of(&older_overwrite_candidate));
+    expected_events_after_the_scan.push(back_chain_reread_event_of(
+        &newer_overwrite_candidate,
+        ring_bytes,
+    ));
+    expected_events_after_the_scan.extend(named_unit_events_of(&newer_overwrite_candidate));
     assert_eq!(
         expected_events_after_the_scan.len(),
         CANDIDATES_OF_THE_SINGLE_RECORD_PUBLISHES
@@ -579,13 +586,13 @@ fn writable_mount_rereads_the_zeroed_first_copy_of_the_previous_record_once_befo
         .journal_ring_bytes;
     zero_the_copy_the_back_chain_reread_tries_first(&mut image, 4, ring_bytes);
     let (_, candidates) = ring_bytes_and_records(&image, &[4, 5]);
-    let [first_record_of_b, last_record_of_b] =
+    let [first_record_of_the_two_record_publish, last_record_of_the_two_record_publish] =
         <[_; 2]>::try_from(candidates).expect("jsn 4、5 两条");
     assert_eq!(
         (
-            first_record_of_b.named.len(),
-            last_record_of_b.place_in_publish,
-            last_record_of_b.is_commit
+            first_record_of_the_two_record_publish.named.len(),
+            last_record_of_the_two_record_publish.place_in_publish,
+            last_record_of_the_two_record_publish.is_commit
         ),
         (
             NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH,
@@ -614,8 +621,12 @@ fn writable_mount_rereads_the_zeroed_first_copy_of_the_previous_record_once_befo
         "jsn 4 过了点名验证；jsn 5 断在提交标记上，B 整次不施加，挂载在 A"
     );
 
-    let mut expected_events_after_the_scan = named_unit_events_of(&first_record_of_b);
-    expected_events_after_the_scan.push(back_chain_reread_event_of(&last_record_of_b, ring_bytes));
+    let mut expected_events_after_the_scan =
+        named_unit_events_of(&first_record_of_the_two_record_publish);
+    expected_events_after_the_scan.push(back_chain_reread_event_of(
+        &last_record_of_the_two_record_publish,
+        ring_bytes,
+    ));
     assert_eq!(
         expected_events_after_the_scan.len(),
         NAMED_UNITS_OF_THE_FIRST_RECORD_OF_THE_TWO_RECORD_PUBLISH * READS_PER_NAMED_UNIT

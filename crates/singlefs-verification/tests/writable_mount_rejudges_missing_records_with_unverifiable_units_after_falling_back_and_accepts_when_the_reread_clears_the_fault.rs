@@ -9,7 +9,7 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on_until_lifted, record_one_publish_after_overwrites,
-    PublishRecordedAsR, RangesReadingBackAllZero, ReadBackAllZeroLift,
+    RangesReadingBackAllZero, ReadBackAllZeroLift, RecordedPublishKind,
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::mount::{
@@ -17,7 +17,7 @@ use singlefs_core::mount::{
     ReadStageSettled, ShadowLedger,
 };
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// R 被择、走读失败（树表读回全零），系统配置没见证 R，F2 退回 P；按 P 当水位，R 读得出的是第 2、3 条（序号不从 1 起），第 3 条点名的树表
 /// 两份都验不过 ⇒ 重读一次。重读之前的钩子撤掉读故障，重读时树表验得过：不拒，可写挂载建在 P 上做成；钩子只调了一次，读阶段没有重读
@@ -27,8 +27,8 @@ const OVERWRITES_BEFORE_R: u64 = 5;
 fn a_root_falling_back_with_its_first_record_and_tree_table_reading_back_zero_mounts_writable_when_the_reread_clears_the_fault(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let tree_table_writes = recorded.unit_writes_at(&recorded.root().tree_table);

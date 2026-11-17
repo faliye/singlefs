@@ -26,7 +26,7 @@ use steps::{
     LANDED_ON_THE_MULTI_RECORD_PREFIX_COUNTER, MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER,
 };
 
-use super::common::geometry;
+use super::common::{geometry, parameters};
 use super::common_crash_point_observers::POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER;
 use singlefs_core::recovery::RecoveryReport;
 use singlefs_verification::crash::{
@@ -37,6 +37,11 @@ use singlefs_verification::crash_amplification::{
     ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, ReadRangeOnTheCrashImage,
 };
 use singlefs_verification::memory_pool::{writes_and_segments, CrashImage};
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    writable_mount_refusals_into_the_undecidable_witness_of_each_observer,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 
 /// 这一份的仓内路径（与 `file!()` 归一之后相同）：C 之后每一步的设点文件，也是崩溃放量那一路两个观察者的代码文件。
@@ -114,6 +119,8 @@ pub fn observe_the_landed_version(
 /// 它要加一的计数照加，交回挂载发的写、挂完的盘与读过的段：判段在挂完的盘上判池级 checker（判干净时 [`POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER`]
 /// 加一；配了 GPU 上卡）。可写挂载与续做真跑实现，只能在 CPU 上（豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。
 ///
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），续做与读回跳过。
+///
 /// # Panics
 /// 恢复没择到根（oracle 另判），或 `steps::mount_continue_and_read_back_every_file` 判出不对。
 // gpu-exempt: writable-mount
@@ -129,12 +136,25 @@ pub fn observe_the_mount_continuation_and_the_files_read_back(
         .effective_root
         .expect("每个状态都择到根（oracle 另判）");
     let materialized = materialized_crash_image(image);
-    let mounted = mount_continue_and_read_back_every_file(
+    let mounted = match mount_continue_and_read_back_every_file(
         versions,
         inodes_read_back,
         landed_root,
         &materialized,
-    );
+    ) {
+        Ok(mounted) => mounted,
+        Err(refused) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &refused,
+                &materialized,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     for counter in &mounted.counters {
         counts.add(counter, 1);
     }
@@ -255,15 +275,17 @@ pub fn assert_every_state_was_observed(
     assert_eq!(
         (0..=DELETION_CONTINUATION_PUBLISHES_AT_MOST)
             .map(|publishes| counts.count_named(&steps::deletion_continuation_counter(publishes)))
-            .sum::<u64>(),
+            .sum::<u64>()
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "{stream:?}：每个状态都可写挂载过一次"
+        "{stream:?}：每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
     );
     assert_eq!(
         counts.count_named(FILES_READ_BACK_AFTER_THE_CONTINUATION_COUNTER)
-            + counts.count_named(MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER),
+            + counts.count_named(MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER)
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "{stream:?}：落到 A 起的每个状态都读回了每个文件"
+        "{stream:?}：落到 A 起的每个状态都读回了每个文件（被乙入判不出拒的态不读）"
     );
     assert_eq!(
         counts.count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),
@@ -595,14 +617,15 @@ pub fn amplify_a_multiple_copy_on_write_flow(
         return run;
     };
     println!(
-        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?} writable_mount_refusals_into_the_undecidable_witness={:?}",
         observing.images_judged_here,
         observing.images_judged_on_the_gpu_here,
         observing.image_judgements_reused,
         observing.blocks_observed_here,
         observing.states_observed_here,
         observing.states_of_each_observer,
-        observing.red_states_of_each_observer
+        observing.red_states_of_each_observer,
+ writable_mount_refusals_into_the_undecidable_witness_of_each_observer(observing)
     );
     let observer_names = [
         standard_prefix_observer.name(),
@@ -610,15 +633,20 @@ pub fn amplify_a_multiple_copy_on_write_flow(
         MOUNT_CONTINUATION_OBSERVER_NAME,
     ];
     for name in observer_names {
-        let states = observing
-            .states_of_each_observer
-            .get(name)
-            .copied()
-            .unwrap_or(0);
-        assert!(
-            states > 0,
-            "流 {flow_name} 经过标准前缀与 C 之后那几步，观察者 {name} 一个状态都没看"
-        );
+        let states =
+            common_crash_point_observers::states_seen_by_the_observer_as_the_block_range_requires(
+                &run,
+                observing,
+                flow_name,
+                name,
+                observers
+                    .iter()
+                    .find(|attached| attached.observer_name.as_str() == name)
+                    .map(|attached| attached.nodes.as_slice()),
+                &format!(
+                    "流 {flow_name} 经过标准前缀与 C 之后那几步，观察者 {name} 一个状态都没看"
+                ),
+            );
         assert_eq!(
             observing
                 .red_states_of_each_observer
@@ -639,7 +667,8 @@ pub fn amplify_a_multiple_copy_on_write_flow(
             assert_eq!(
                 (0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH + 1)
                     .map(|steps| count_named(&format!("mount_continuation_steps_{steps}")))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
                 "流 {flow_name}：标准前缀上的每个状态都可写挂载过一次"
             );
@@ -662,13 +691,15 @@ pub fn amplify_a_multiple_copy_on_write_flow(
             assert_eq!(
                 (0..=DELETION_CONTINUATION_PUBLISHES_AT_MOST)
                     .map(|publishes| count_named(&steps::deletion_continuation_counter(publishes)))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
-                "流 {flow_name}：C 之后那几步上的每个状态都可写挂载过一次"
+                "流 {flow_name}：C 之后那几步上的每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
             );
             assert_eq!(
                 count_named(FILES_READ_BACK_AFTER_THE_CONTINUATION_COUNTER)
-                    + count_named(MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER),
+                    + count_named(MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER)
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
                 "流 {flow_name}：C 之后那几步上落到 A 起的每个状态都读回了每个文件"
             );

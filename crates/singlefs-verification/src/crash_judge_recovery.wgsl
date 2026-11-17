@@ -571,6 +571,7 @@ fn rebuild_reader_kind_with_the_pointers_judged(root: RootFields, cfg: SysConfig
     rebuild_judges_the_pointers_of_the_version = true;
     some_pointer_of_the_version_does_not_ascend_by_device = false;
     some_mapping_position_of_the_version_does_not_ascend_by_device = false;
+    some_mapped_unit_key_is_missing_from_the_central_mapping = false;
     for (var entry_index = 0u; entry_index < tree_table.entry_count; entry_index = entry_index + 1u) {
         let root_pointer = parse_node_pointer(tree_table.base, entry_offset(tree_table, entry_index) + 14u);
         // 重建之后树表条目的根指针也换成映射位置（码 2 key）再判：读者不往下读的那几棵树，映射里有它们的根也在这里查
@@ -841,6 +842,11 @@ fn rebuild_reader_kind_with_the_pointers_judged(root: RootFields, cfg: SysConfig
         + data_units_of_every_file + deletion_tree_nodes) {
         return READER_REFUSED_CONTENT;
     }
+    // central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots：条数相等（上一判）、读到的每个进映射的单元的 key 都查得到（这一判）、
+    // 每条 deadlist 条目的 key 查得到（下面那一圈）。一版里两个单元同一把 key 而映射多出一条别的 key 的那一形这里判不出（CPU 判集合不等），只有造坏的盘走得到
+    if (some_mapped_unit_key_is_missing_from_the_central_mapping) {
+        return READER_REFUSED_CONTENT;
+    }
     // 映射条目逐条解（parse_mapping_entry 窄于 55，EntryWidthDiffersFromItsFieldTable）；每条 deadlist 条目的映射 key（条目偏移 16 起 27 字节）在映射里有、
     // 两条 deadlist 条目不同一把映射 key（映射 key 在映射树里严格升序、不重）
     for (var leaf_index = 0u; leaf_index < mapping_leaf_count; leaf_index = leaf_index + 1u) {
@@ -904,17 +910,10 @@ fn logged_operation_entries_parse(logged_operations_root: Node) -> bool {
     }
     return compaction_intents <= 1u && truncation_intents <= 1u;
 }
-// 中央映射里有没有一条条目的 key 与 (key_base, key_offset) 起的 27 字节逐字节相等（映射叶表 R_MAPPING_LEAVES，条目宽调用方判过不窄于 55）
+// 中央映射里有没有一条条目的 key 与 (key_base, key_offset) 起的 27 字节逐字节相等（映射叶表 R_MAPPING_LEAVES，条目宽调用方判过不窄于 55）：
+// 27 字节逐字节相等就是五段逐段相等，按 key 二分（调用方判过映射树读通，前提同 mapping_entry_holding_the_key）
 fn mapping_carries_the_key(key_base: u32, key_offset: u32) -> bool {
-    for (var leaf_index = 0u; leaf_index < mapping_leaf_count; leaf_index = leaf_index + 1u) {
-        let leaf = mapping_leaf_at(leaf_index);
-        for (var entry_index = 0u; entry_index < leaf.entries.entry_count; entry_index = entry_index + 1u) {
-            if (bytes_equal(leaf.base, leaf.entries.entries_start + entry_index * leaf.entries.entry_width, key_base, key_offset, 27u)) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return mapping_entry_holding_the_key(mapping_key_fields_at(key_base, key_offset)).found;
 }
 // deadlist 叶表里排在 (这片叶, 这一条) 之前的条目有没有同一把映射 key（条目偏移 16 起 27 字节）
 fn an_earlier_deadlist_entry_carries_the_mapping_key(key_base: u32, key_offset: u32, this_leaf: u32, this_entry: u32) -> bool {

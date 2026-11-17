@@ -299,7 +299,8 @@ mod tests {
     }
 
     #[test]
-    fn no_arguments_dump_h1_then_h2_and_leave_h3_out() {
+    fn no_arguments_dump_the_in_process_history_then_the_unmount_continuation_history_and_leave_the_size_zero_inode_history_out(
+    ) {
         let dumped_histories = parse_dumped_histories(&[]).expect("不带参数是认得的命令行");
         assert_eq!(
             dumped_histories.histories_in_dump_order(),
@@ -312,7 +313,7 @@ mod tests {
     }
 
     #[test]
-    fn the_history_option_with_h3_dumps_only_h3() {
+    fn the_history_option_naming_the_size_zero_inode_history_dumps_only_that_history() {
         let dumped_histories = parse_dumped_histories(&command_line(&["--history", "h3"]))
             .expect("`--history h3` 是认得的命令行");
         assert_eq!(
@@ -360,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn a_history_name_that_is_not_h1_h2_or_h3_is_refused() {
+    fn history_name_that_is_not_one_of_the_three_deletion_histories_is_refused() {
         assert_eq!(
             parse_dumped_histories(&command_line(&["--history", "h4"])),
             Err(CommandLineRefusal::UnknownHistoryName("h4".to_string())),

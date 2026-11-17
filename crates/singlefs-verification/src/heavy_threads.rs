@@ -237,7 +237,7 @@ mod tests {
 
     /// 登记写坏的几种形状都 panic（编进来的登记写坏是 bug），与 `scripts/hosts/heavy_threads.py` 拒的那几格相同。
     #[test]
-    fn a_malformed_registration_panics() {
+    fn malformed_registration_panics() {
         for registration in [
             "",
             "# 只有注释\n",

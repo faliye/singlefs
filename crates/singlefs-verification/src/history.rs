@@ -37,7 +37,7 @@ use singlefs_core::allocator::{
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::compaction_plan::{
     region_is_empty_by_the_records, CompactionBatchSize, CompactionBatchUnits,
-    CompactionOfThisMount, CompactionSwitches,
+    CompactionOfThisMount, CompactionRunForcing, CompactionSwitches,
 };
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::logged_operations::CompactionRegion;
@@ -45,14 +45,15 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
-    mount_writable_with_space_admission, raise_rollback_floor,
+    mount_writable_with_space_admission_and_compaction_switches, raise_rollback_floor,
     roll_back_by_a_forward_publish_in_the_session, FloorOfThePushedPublishes, MountError,
     ParametersAndDeviceTableOfTheMount, ResurrectedCopy, RollbackError, RollbackTarget,
     ShadowLedger, StillUnreadableAfterOneReread, SystemConfigurationUnreadableWhen,
 };
 use singlefs_core::mounted_session::{
     CompactionRun, CompactionRunFailure, CompactionRunOutcome, CompactionRunRefused,
-    MountedSession, UserChange, UserChangePublished, UserChangeRefused,
+    MountedSession, RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing, UserChange,
+    UserChangePublished, UserChangeRefused,
 };
 use singlefs_core::records::{
     birth_txg_of_a_mapping_key, NLINK_OF_AN_INODE_BEING_DELETED, STATISTIC_FREE_BYTES,
@@ -81,9 +82,10 @@ use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelCompactionPublishSeen, ModelDeviceIdentity,
-    ModelDisagreement, ModelDisagreementAspect, ModelJudgementCounts, ModelPoolGeometry,
-    ModelRefusalReason, ModelRingPosition, ModelRootKey, ObservedEffect, ObservedOutcome,
-    ObservedRefusalReason, ObservedSnapshotReadBack, MODEL_ROOT_RING_SLOTS,
+    ModelDisagreement, ModelDisagreementAspect, ModelFloorLeftByALostPower,
+    ModelInstanceTableOfTheBatch, ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason,
+    ModelRelocationBatchAfterAUserChangeSeen, ModelRingPosition, ModelRootKey, ObservedEffect,
+    ObservedOutcome, ObservedRefusalReason, ObservedSnapshotReadBack, MODEL_ROOT_RING_SLOTS,
 };
 use crate::model_comparison::{
     compaction_region_of_the_model, model_compaction_region, model_root_key,
@@ -544,12 +546,19 @@ pub enum HistoryOperation {
     /// 再发清扫发布删那一行（D18（块里携带什么信息） 已定项 11「回收」一条：抹头那一段只有这样的孤儿走得到）。
     /// 掉电截在第一条 journal 记录之前，那次改动没有任何一样能让恢复读到它的内容：交给模型与 RefFS 时与可写挂载相同。
     OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(ContentChoice),
-    /// 关掉这个进程的可写会话，可写挂载期间每块盘自证过、世代号最大的那一槽系统配置读回全 0（单故障：D22（单元原子性怎么合成）
-    /// 已定项 8「容错承诺是单故障：每盘一槽系统配置坏在承诺里」；`DeviceReadingZerosOverHiddenRanges`，挂载自己写到那一槽之后照常读得出）。
-    /// 读回全 0 的槽自证不过、设备不报错，可写挂载照「一槽撕裂、另一槽自证过」往下走（同条 S-辨），取号那一写落到被藏的那一槽上：
-    /// 崩溃注入里唯一一种在读故障下真的往盘上发写的步（C696（崩溃注入的读故障一支在随机历史里从没触发））。
-    /// 只进它自己那一组比重（[`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]），已有各组生成的历史不变。
+    /// 关掉这个进程的可写会话，可写挂载期间每块盘自证过、世代号最大的那一槽系统配置读回全 0（`DeviceReadingZerosOverHiddenRanges`）。
+    /// 读回全 0 的槽读得出而自证不过、设备不报错，每块盘只剩一槽自证过、没有一块盘两槽都自证过：乙入判不出（C971（多处读坏时可写挂载写出
+    /// 倒挂的新实例根），`research/prompts/e205-preregistration.md`「乙入判不出」那一行）把这几槽并进 R2 当读错计，判据 N-配置 按真处置，
+    /// 重读一次仍读回全 0，取号之前拒可写、一个写都不发；模型照条款答拒（`IdealModel::answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots`）。
+    /// 只进 [`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`] 那一组，占小份数（带文件那张表与 unlink 之后那张表
+    /// 各 1 份），那一组的取样点随机抽得到它；`history::tests` 里另有一段写死的历史钉它。
     WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    /// 关掉这个进程的可写会话，可写挂载期间只有第一块盘自证过、世代号最大的那一槽系统配置读回全 0（单故障：D22（单元原子性怎么合成）
+    /// 已定项 8「容错承诺是单故障：每盘一槽系统配置坏在承诺里」；`DeviceReadingZerosOverHiddenRanges`，挂载自己写到那一槽之后照常读得出）。
+    /// 读回全 0 的槽自证不过、设备不报错；另一块盘两槽都自证过，R2 判得出（乙入判不出不成立），可写挂载照「一槽自证不过、另一槽自证过」往下走
+    /// （同条 S-辨），取号那两轮写落到这块盘的两槽上：崩溃注入里在读故障下真的往盘上发写的步（C696（崩溃注入的读故障一支在随机历史里从没触发））。
+    /// 只进它自己那一组比重（[`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`]），已有各组生成的历史不变。
+    WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
     /// 经挂着的会话建一个只读快照（`mounted_session::UserChange::CreateSnapshot`，判决 `research/prompts/m4-snapshot-r1-main-verification.md`
     /// 第三节 S2）：会话先走空，再发一次独立发布。现行那一版有树时调（有树而文件集合为空的一版也调：会话照常发布、读它读到空，
     /// 「放开」，判决 `research/prompts/m4-segment-code-r1-main-verification.md` 第三节 F5）。
@@ -562,7 +571,7 @@ pub enum HistoryOperation {
     DestroySnapshot(SnapshotChoice),
     /// 挂着时整理一趟（`mounted_session::MountedSession::run_compaction`，判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7「对拍：
     /// `HistoryOperation` 加 `CompactWhileMounted`（含签发、批、批间崩溃）」与 G8 甲）：会话的分配器装上只供测试的整理开关
-    /// （`compaction_plan::CompactionSwitches`：强制批大小与选段，产品路径的批大小条款没写、走不进去），推完换回产品值。一趟里先走空删除续做，
+    /// （`compaction_plan::CompactionSwitches`：强制批大小与选段，执行器的可写挂载叫停整理、别处走不进去），推完换回产品值。一趟里先走空删除续做，
     /// 再签发（一次只写 logged_ops 的发布）、一批一批搬、最后一批同一次发布删意图；每一版交模型比（[`IdealModel::answer_compaction_publish`]：
     /// 只比做成的那几次发布的内容与意图在 logged_ops 里的样子，搬几批、停在哪模型不答）。
     /// [`CompactionRunEnding::CrashesAfterBatchesThenMountsWritable`] 那一种推够批数之后这个进程崩掉、照 [`HistoryOperation::CloseAndMountWritable`]
@@ -976,8 +985,8 @@ pub enum CompactionRunEnding {
     RunsUntilItStops,
     /// 至多推 `batches` 批（执行器把这一趟的发布预算压到这么多：式子里「已经过去的发布数」先抬到 3S − 4 − `batches`，盘上没有活意图时
     /// 再减签发那一次，判决 G8 `B_gc`），之后这个进程崩掉（不卸载；已发的写都落了盘），可写挂载一次。意图在 logged_ops 里（判决 G1），
-    /// 推到半路崩掉就是批间崩溃：重建出来的那一版带着意图、按映射条目的位置覆盖提示；执行器的可写挂载装产品开关，挂载里不续做
-    /// （批大小条款没写，`CompactionRunStop::BatchSizeNotDecidedByTheClauses`），下一趟整理接着推盘上那一条。
+    /// 推到半路崩掉就是批间崩溃：重建出来的那一版带着意图、按映射条目的位置覆盖提示；执行器的可写挂载装 [`compaction_switches_of_the_mounts_of_the_executor`]，
+    /// 挂载里不续做，下一趟整理接着推盘上那一条。
     CrashesAfterBatchesThenMountsWritable { batches: u64 },
 }
 
@@ -996,6 +1005,7 @@ pub enum HistoryOperationKind {
     CreateInode,
     OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
     WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
     CreateSnapshot,
     ReadSnapshot,
     DestroySnapshot,
@@ -1007,7 +1017,7 @@ pub enum HistoryOperationKind {
 }
 
 impl HistoryOperationKind {
-    pub const ALL: [HistoryOperationKind; 20] = [
+    pub const ALL: [HistoryOperationKind; 21] = [
         HistoryOperationKind::PublishFirstFile,
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::PublishWithoutUnits,
@@ -1020,6 +1030,7 @@ impl HistoryOperationKind {
         HistoryOperationKind::CreateInode,
         HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
         HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
         HistoryOperationKind::CreateSnapshot,
         HistoryOperationKind::ReadSnapshot,
         HistoryOperationKind::DestroySnapshot,
@@ -1052,6 +1063,9 @@ impl HistoryOperation {
             }
             HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            }
+            HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros => {
+                HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
             }
             HistoryOperation::CreateSnapshot => HistoryOperationKind::CreateSnapshot,
             HistoryOperation::ReadSnapshot(_) => HistoryOperationKind::ReadSnapshot,
@@ -1102,8 +1116,8 @@ pub enum NamedGenerationWeights {
     DeletingFilesOfSeveralLowerLeaves,
     /// [`GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP`]。
     LeavingOrphansForTheInstanceTableSweep,
-    /// [`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]。
-    NewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+    /// [`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`]。
+    NewestSystemConfigurationSlotReadingZeros,
     /// [`GenerationWeights::SNAPSHOT_OPERATIONS`]。
     SnapshotOperations,
     /// [`GenerationWeights::COMPACTION_WHILE_MOUNTED`]。
@@ -1147,8 +1161,8 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep => {
                 GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP
             }
-            NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
-                GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS
+            NamedGenerationWeights::NewestSystemConfigurationSlotReadingZeros => {
+                GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS
             }
             NamedGenerationWeights::SnapshotOperations => GenerationWeights::SNAPSHOT_OPERATIONS,
             NamedGenerationWeights::CompactionWhileMounted => {
@@ -1182,7 +1196,7 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::TowardTheUnitAreaWall => "unit-area-wall",
             NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves => "several-leaves",
             NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep => "orphans",
-            NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            NamedGenerationWeights::NewestSystemConfigurationSlotReadingZeros => {
                 "newest-system-configuration-slot-zeros"
             }
             NamedGenerationWeights::SnapshotOperations => "snapshots",
@@ -1503,14 +1517,18 @@ impl GenerationWeights {
     };
 
     /// 崩溃注入读故障那一支的取样点（C696（崩溃注入的读故障一支在随机历史里从没触发），设计调查的候选「丁」）：与
-    /// [`GenerationWeights::BROAD`] 逐格相同，只把崩溃恢复抛弃根那几格（份数照旧）换成「每块盘最新那一槽系统配置读回全 0 时的可写挂载」
-    /// （[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`]）。两种步都不抽随机数、生成时对会话的
-    /// 估计都与可写挂载相同，所以同一个种子在这组比重下生成的历史与 broad 那一组逐步相同、只有那几步换了种类。已有各组的份数表里没有新步，
+    /// [`GenerationWeights::BROAD`] 逐格相同，只把崩溃恢复抛弃根那几格（份数照旧）换成「只有第一块盘最新那一槽系统配置读回全 0 时的可写挂载」
+    /// （[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros`]）；带文件那张表与 unlink 之后那张表里
+    /// 那一格各再切 1 份给紧挨在它之后的「每块盘最新那一槽系统配置读回全 0 时的可写挂载」
+    /// （[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`]，3 → 2 + 1）：那一步照乙入判不出
+    /// （C971（多处读坏时可写挂载写出倒挂的新实例根））拒可写、一个写都不发，模型照条款答拒，份数小是因为它不在读故障下发写、
+    /// 占多了这一组取样读故障一支的步就少了。三种步都不抽随机数、生成时对会话的估计都与可写挂载相同，所以同一个种子在这组比重下生成的历史
+    /// 与 broad 那一组逐步相同、只有那几步换了种类。已有各组的份数表里没有这两种步，
     /// 它们生成的历史不变（`tests/random_history_generation_keeps_the_existing_weights_step_for_step.rs` 钉）。
-    pub const NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS: GenerationWeights =
+    pub const NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS: GenerationWeights =
         GenerationWeights {
-            name: "每块盘最新那一槽系统配置读回全 0 的可写挂载（崩溃注入读故障那一支的取样点）",
-            named: NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+            name: "最新那一槽系统配置读回全 0 的可写挂载（崩溃注入读故障那一支的取样点）",
+            named: NamedGenerationWeights::NewestSystemConfigurationSlotReadingZeros,
             starting_points: &[
                 (HistoryStartingPoint::AfterMakeFilesystem, 1),
                 (HistoryStartingPoint::AfterFirstFile, 1),
@@ -1524,7 +1542,7 @@ impl GenerationWeights {
                 (HistoryOperationKind::PublishWithoutUnits, 20),
                 (HistoryOperationKind::CloseAndMountWritable, 4),
                 (
-                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
                     2,
                 ),
                 (HistoryOperationKind::RollBackWhileMounted, 4),
@@ -1538,8 +1556,12 @@ impl GenerationWeights {
                 (HistoryOperationKind::CloseAndMountWritable, 6),
                 (HistoryOperationKind::Unlink, 3),
                 (
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
+                    2,
+                ),
+                (
                     HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
-                    3,
+                    1,
                 ),
                 (HistoryOperationKind::RollBackWhileMounted, 10),
                 (HistoryOperationKind::ColdStartRecover, 4),
@@ -1552,8 +1574,12 @@ impl GenerationWeights {
                 (HistoryOperationKind::RollBackWhileMounted, 15),
                 (HistoryOperationKind::CloseAndMountWritable, 10),
                 (
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
+                    2,
+                ),
+                (
                     HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
-                    3,
+                    1,
                 ),
                 (HistoryOperationKind::ColdStartRecover, 5),
                 (HistoryOperationKind::PublishOverwrite, 4),
@@ -2188,6 +2214,9 @@ fn draw_operation(
         HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
             HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
         }
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros => {
+            HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
+        }
         HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => {
             HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(
                 match overwrite_contents {
@@ -2304,11 +2333,12 @@ fn expected_session_after(
     match kind {
         // 崩溃恢复抛弃根也是一次可写挂载：落到的前一条根带不带文件，生成时照「这段历史发过文件没有」估，与可写挂载同一个估法；
         // 掉电在 journal 记录之前的那次覆盖写之后也是一次可写挂载，落到的是那次改动之前的一版；
-        // 每块盘最新那一槽系统配置读回全 0 的那一次也是可写挂载，同一个估法。
+        // 最新那一槽系统配置读回全 0 的那两种（每块盘都藏、只藏第一块盘）也是可写挂载，同一个估法。
         HistoryOperationKind::CloseAndMountWritable
         | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
         | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
-        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros => {
             match first_file {
                 ExpectedFirstFile::Written => ExpectedSession::OpenWithFile,
                 ExpectedFirstFile::NotWrittenYet => ExpectedSession::OpenWithoutFile,
@@ -2561,7 +2591,7 @@ fn copies_quarantined_by_the_versions<'version>(
         .collect()
 }
 
-/// 一次经会话的用户改动发成的每一版里实现交回的隔离：推的抬 F 的空发布、推的抬 F 之外发成的每一版（改动那一版在里面，
+/// 一次经会话的用户改动发成的每一版里实现交回的隔离：推的抬 F 的空发布、为另发的那一批搬迁推的抬 F 的空发布、推的抬 F 之外发成的每一版（改动那一版与另发的那一批在里面，
 /// `mounted_session::VersionsPublishedInThisChange`）；被拒的几种照带着的那几版收。整理不在用户改动里跑（挪出了调用线程，
 /// `mounted_session::MountedSession::run_compaction_in_the_background`）。
 fn copies_quarantined_by_a_user_change(
@@ -2569,12 +2599,157 @@ fn copies_quarantined_by_a_user_change(
 ) -> Vec<CopyQuarantinedAfterReleaseChecksumMismatch> {
     let (floor_raises, versions_published) =
         floor_raises_and_versions_published_of_a_user_change(change_result);
+    let floor_raises_for_the_relocation_batch: &[singlefs_core::mount::RaisedFloor] =
+        match change_result {
+            Ok(published) => floor_raises_pushed_for_the_relocation_batch(published),
+            Err(_) => &[],
+        };
     copies_quarantined_by_the_versions(
         floor_raises
             .iter()
+            .chain(floor_raises_for_the_relocation_batch)
             .flat_map(|raised| raised.publishes.iter())
             .chain(versions_published.iter().map(Arc::as_ref)),
     )
+}
+
+/// 一次发成的用户改动为另发的那一批搬迁推的几串抬 F（按先后，都接在改动那一版后面）。那一批没被空间拒过时是空的。
+fn floor_raises_pushed_for_the_relocation_batch(
+    published: &UserChangePublished,
+) -> &[singlefs_core::mount::RaisedFloor] {
+    match &published.relocation_after_the_change_of_the_units_read_with_one_copy_failing {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded => &[],
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated {
+            floor_raises, ..
+        }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor {
+            floor_raises,
+            ..
+        }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace {
+            floor_raises,
+            ..
+        }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
+            floor_raises,
+            ..
+        } => &floor_raises.floor_raises,
+    }
+}
+
+/// 一次发成的用户改动之后另发的那一批搬迁发成的那一版（排在 `versions_published` 末尾）；不另发、没发成的是 `None`。
+fn relocation_batch_published_after_the_change(
+    published: &UserChangePublished,
+) -> Option<&TransactionOutput> {
+    match &published.relocation_after_the_change_of_the_units_read_with_one_copy_failing {
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::Relocated { .. } => {
+            Some(Arc::as_ref(published.versions_published.last().expect(
+                "另发的那一批发成时排在 versions_published 末尾",
+            )))
+        }
+        RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NotNeeded
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::NoSpaceAfterRaisingTheFloor {
+            ..
+        }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace { .. }
+        | RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::FloorRaiseFailedWhilePushingForSpace {
+            ..
+        } => None,
+    }
+}
+
+/// 一次发成的用户改动推的抬 F 之外发成的那几版，去掉另发的那一批：走空的那几步与改动自己。
+fn versions_of_the_change_without_the_relocation_batch(
+    published: &UserChangePublished,
+) -> &[Arc<TransactionOutput>] {
+    let versions = published.versions_published.as_slice();
+    match relocation_batch_published_after_the_change(published) {
+        Some(_) => &versions[..versions.len() - 1],
+        None => versions,
+    }
+}
+
+/// 另发的那一批在模型眼里看得见的几样：搬了几个单元、搬的里头用户可见树的根单元、这一版写没写实例表片。
+fn relocation_batch_seen_by_the_model(
+    batch: &TransactionOutput,
+) -> ModelRelocationBatchAfterAUserChangeSeen {
+    ModelRelocationBatchAfterAUserChangeSeen {
+        units_relocated: u64::try_from(batch.units_relocated_by_this_publish.len())
+            .expect("一批的单元数装得进 u64"),
+        user_visible_root_units_relocated: user_visible_root_units_relocated_by_this_publish(batch),
+        instance_table: if batch
+            .rewritten
+            .iter()
+            .any(|unit| unit.is_a_page_of_the_instance_table())
+        {
+            ModelInstanceTableOfTheBatch::RewrittenWithTheSameRows
+        } else {
+            ModelInstanceTableOfTheBatch::Carried
+        },
+    }
+}
+
+/// 一次用户改动发成、它自己那几版比过之后，比会话接着为修只坏一份的单元发的东西（D4（校验和位置） 已定项 4「可写挂载里读到的，再经已有的搬迁路径把这个单元整个搬到新槽」）：
+/// 那几串抬 F 照模型的抬 F 比，发成的那一批照 [`IdealModel::answer_relocation_batch_after_a_user_change`] 比；分配代接着 `records_after_the_change` 逐次比，
+/// 那一批按搬迁的判法（[`allocation_generation_judgement_of_a_relocation_batch`]：目的地写单元的诞生代）。前面已经对不上就不再问模型（分配代照判）。
+/// 交回这几样一共写了几条根。这几条根都带着这次改动（内容照抄改动那一版）。
+fn settle_what_the_session_published_for_the_relocation_batch(
+    session: &mut WritableSession,
+    model: &mut IdealModel,
+    published: &UserChangePublished,
+    records_after_the_change: &[AllocationRecord],
+    verdict: &mut ModelVerdict,
+    harness_judgement: &mut Option<HarnessJudgement>,
+) -> usize {
+    let mut records_of_the_previous_publish = records_after_the_change;
+    let mut roots_written = 0_usize;
+    for raised in floor_raises_pushed_for_the_relocation_batch(published) {
+        if verdict.disagreement.is_none() {
+            let raise_verdict = judge_one_floor_raise_pushed_by_the_session(model, raised);
+            verdict.counts.add(&raise_verdict.counts);
+            verdict.disagreement = raise_verdict.disagreement;
+        }
+        for publish in &raised.publishes {
+            let publish_txg = publish.root.checkpoint_txg;
+            *harness_judgement = harness_judgement.take().or_else(|| {
+                allocation_generation_judgement(
+                    records_of_the_previous_publish,
+                    &publish.allocation_records,
+                    publish_txg,
+                    publish_txg,
+                    &publish.quarantined_after_release_checksum_mismatch,
+                )
+            });
+            records_of_the_previous_publish = &publish.allocation_records;
+            roots_written += 1;
+        }
+    }
+    if let Some(batch) = relocation_batch_published_after_the_change(published) {
+        if verdict.disagreement.is_none() {
+            let answer = model.answer_relocation_batch_after_a_user_change(
+                &relocation_batch_seen_by_the_model(batch),
+            );
+            let batch_verdict = judge_by_model(
+                model,
+                answer,
+                &ObservedOutcome::Succeeded(ObservedEffect::Publishes {
+                    roots: vec![observed_root_of_file_version(batch)],
+                    reported_ceiling: None,
+                }),
+            );
+            verdict.counts.add(&batch_verdict.counts);
+            verdict.disagreement = batch_verdict.disagreement;
+        }
+        *harness_judgement = harness_judgement.take().or_else(|| {
+            allocation_generation_judgement_of_a_relocation_batch(
+                records_of_the_previous_publish,
+                batch,
+            )
+        });
+        roots_written += 1;
+    }
+    session.publishes_in_this_mount += roots_written;
+    roots_written
 }
 
 /// 一次可写挂载交回的每一版里实现交回的隔离：写行那一版、暖机、删除续做、续做推的抬 F、挂载里那一趟整理、挂载交回的现行那一版
@@ -4036,6 +4211,7 @@ impl HistoryTally {
             | HistoryOperation::Unlink
             | HistoryOperation::CreateInode
             | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
             | HistoryOperation::CreateSnapshot
             | HistoryOperation::ReadSnapshot(_)
             | HistoryOperation::DestroySnapshot(_)
@@ -4244,6 +4420,12 @@ impl HistoryTally {
         );
         let _ = writeln!(
             text,
+            "  用户改动之后另发的那一批搬迁：模型比过 {} 批",
+            self.model_counts
+                .relocation_batches_after_a_user_change_matched
+        );
+        let _ = writeln!(
+            text,
             "  截断：模型比过截断意图 {} 次、不是最后一批的批 {} 次、最后一批 {} 次、不缩短的那一次 {} 次",
             self.model_counts.truncation_intents_matched,
             self.model_counts
@@ -4394,6 +4576,9 @@ fn placement_refusal_member(refusal: &PlacementRefusal) -> &'static str {
         PlacementRefusal::CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined {
             ..
         } => "CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined",
+        PlacementRefusal::CommitGeneratedFallbackWithoutASlotFreeOnEveryDevice { .. } => {
+            "CommitGeneratedFallbackWithoutASlotFreeOnEveryDevice"
+        }
     }
 }
 
@@ -5037,10 +5222,9 @@ fn apply_publish_overwrite(
     }
     // 现行那一版有删除中的文件（unlink 的一批被拒之后、回退到删除中的一版之后）：照调，会话先走空、把它走成有树而文件集合为空的一版、
     // 再拒成 `UserChangeRefused::NoFileVersionToChange`，那个成员带着走空的那几步与推的抬 F（代码轮 U10），逐版交模型比（代码轮 U11）。
-    let queue_is_walked_first = !current_file_version.deleted_inodes.is_empty();
-    // 有快照在销毁中（挂载续做被空间拒之后）同样先走空：那几批同样逐版交模型比（判决 S4：删快照照 unlink 的过程做）。
-    let snapshot_destruction_is_walked_first =
-        !current_file_version.snapshots_being_destroyed.is_empty();
+    // 有快照在销毁中（挂载续做被空间拒之后，判决 S4：删快照照 unlink 的过程做）、截断走到半路（回退到截断半路的一版之后）同样先走空，
+    // 那几批同样逐版交模型比。判的是实现判「队列空」那一个判断。
+    let queue_is_walked_first = !current_file_version.queue_of_committed_intents_is_empty();
     let content = content_choice.bytes();
     let records_before = open_session.allocator.records().to_vec();
     let stream_length_before = stream.operation_count();
@@ -5095,7 +5279,7 @@ fn apply_publish_overwrite(
         publishes_in_this_mount,
         carried_to_zero_unit_publishes,
     });
-    if queue_is_walked_first || snapshot_destruction_is_walked_first {
+    if queue_is_walked_first {
         return settle_user_change_comparing_every_version_published(
             session_after_the_change,
             model,
@@ -5229,7 +5413,9 @@ fn writes_of_the_floor_raises(floor_raises: &[singlefs_core::mount::RaisedFloor]
         .sum()
 }
 
-/// 经会话的覆盖写返回之后：先把会话推的那几串抬 F 交模型逐串比，再比这次覆盖写——做成的比根与分配代、数复用；
+/// 经会话的覆盖写返回之后：先把会话推的那几串抬 F 交模型逐串比，再比这次覆盖写——做成的比根与分配代、数复用
+/// （比的是改动那一版，不是会话的现行那一版：读到只坏一份时改动之后另发一批，现行那一版是那一批，
+/// [`settle_what_the_session_published_for_the_relocation_batch`] 接着比）；
 /// 被拒的比理由，「拒之前写没写盘」只看那几串抬 F 之外多出来的写（推了抬 F 的时候那几串的写不算这次拒绝写的）。
 /// 分配代逐次比：盘上的上一版（会话开始时分配器里的记录）→ 每一次空发布的记录 → 覆盖写之后分配器里的记录，各按那一次的 txg 判。
 /// 会话推抬 F 半路报错（`UserChangeRefused::FloorRaiseFailedWhilePushingForSpace`）时，那一串已落盘的那几次空发布不在 `floor_raises` 里：模型那一侧
@@ -5260,6 +5446,9 @@ fn settle_user_change(
             | UserChangeRefused::NoFileVersionToChange { floor_raises, .. },
         ) => floor_raises,
         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
+        Err(UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(refused)) => {
+            &refused.floor_raises
+        }
         Err(UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused)) => {
             &refused.floor_raises
         }
@@ -5287,16 +5476,16 @@ fn settle_user_change(
         records_of_the_previous_publish = &publish.allocation_records;
     }
     let refusal = match &change_result {
-        Ok(_) => {
+        Ok(published) => {
             let answer = answer_of_the_change(model);
-            let output = session.current.file_version().expect(
-                "会话发成一次覆盖写之后现行那一版带文件：`publish_user_change` 只接在带文件的一版后面、把新的一版放进 `current`",
-            );
+            let output: &TransactionOutput = versions_of_the_change_without_the_relocation_batch(published)
+                .last()
+                .expect("会话发成一次改动：这次调用发成的那几版里有改动自己那一版，这里只接没有要走空的一版，它就是最后一版");
             let publish_txg = output.root.checkpoint_txg;
             harness_judgement = harness_judgement.or_else(|| {
                 allocation_generation_judgement(
                     records_of_the_previous_publish,
-                    session.allocator.records(),
+                    &output.allocation_records,
                     publish_txg,
                     publish_txg,
                     &output.quarantined_after_release_checksum_mismatch,
@@ -5315,11 +5504,20 @@ fn settle_user_change(
                 verdict.disagreement = overwrite_verdict.disagreement;
             }
             session.publishes_in_this_mount += 1;
+            let roots_of_the_relocation_batch =
+                settle_what_the_session_published_for_the_relocation_batch(
+                    session,
+                    model,
+                    published,
+                    &output.allocation_records,
+                    &mut verdict,
+                    &mut harness_judgement,
+                );
             return AppliedStep {
                 outcome: StepOutcome::Applied(AppliedEffect::Published {
                     reuse: RecordReuse::between(records_before, session.allocator.records()),
                     floor_raises_pushed_by_the_session: floor_raises.len(),
-                    roots_carrying_the_change: 1,
+                    roots_carrying_the_change: 1 + roots_of_the_relocation_batch,
                 }),
                 harness_judgement,
                 model_verdict: Some(verdict),
@@ -5401,6 +5599,13 @@ fn member_and_reason_of_a_refused_user_change(
             ),
             refusal_reason_of_publish_error(&refused.last_refusal),
         ),
+        UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(refused) => (
+            format!(
+                "UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease({})",
+                publish_error_member(&refused.last_refusal)
+            ),
+            refusal_reason_of_publish_error(&refused.last_refusal),
+        ),
         UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused) => (
             format!(
                 "UserChangeRefused::FloorRaiseFailedWhilePushingForSpace({})",
@@ -5437,6 +5642,9 @@ fn floor_raises_and_versions_published_of_a_user_change(
             ..
         }) => (floor_raises, versions_published),
         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => {
+            (&refused.floor_raises, &refused.versions_published)
+        }
+        Err(UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(refused)) => {
             (&refused.floor_raises, &refused.versions_published)
         }
         Err(UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(refused)) => {
@@ -5799,7 +6007,8 @@ fn apply_truncate(
 
 /// 经会话的 unlink（或建 inode）返回之后：会话推的每一串抬 F 与推的抬 F 之外发成的每一版按 txg 排好，逐样交模型比——抬 F 照模型的抬 F，
 /// 发成的一版在模型的现行版本有删除中的文件时照「走空的一步」、否则照这次改动本身（`answer_of_the_change`：意图那次、建 inode 那次）；
-/// 分配代逐次比（上一版是前一样落盘的）。
+/// 分配代逐次比（上一版是前一样落盘的）。发成的改动之后另发的那一批与为它推的抬 F 不算这次改动本身，
+/// 最后接着比（[`settle_what_the_session_published_for_the_relocation_batch`]）。
 /// 被拒的比理由：被拒的是模型此刻的下一次发布（有删除中的文件就是走空的一步，否则是这次改动本身），「拒之前写没写盘」只看那几串抬 F
 /// 与发成的那几版之外多出来的写。
 fn settle_user_change_comparing_every_version_published(
@@ -5813,8 +6022,12 @@ fn settle_user_change_comparing_every_version_published(
 ) -> AppliedStep {
     let (floor_raises, versions_published) =
         floor_raises_and_versions_published_of_a_user_change(change_result);
+    let versions_of_the_change = match change_result {
+        Ok(published) => versions_of_the_change_without_the_relocation_batch(published),
+        Err(_) => versions_published,
+    };
     let published_in_txg_order =
-        floor_raises_and_versions_in_txg_order(floor_raises, versions_published);
+        floor_raises_and_versions_in_txg_order(floor_raises, versions_of_the_change);
     let mut verdict = ModelVerdict::default();
     let mut harness_judgement = None;
     let mut records_of_the_previous_publish: &[AllocationRecord] = records_before;
@@ -5884,6 +6097,16 @@ fn settle_user_change_comparing_every_version_published(
             records_of_the_previous_publish = &output.allocation_records;
             session.publishes_in_this_mount += 1;
         }
+    }
+    if let Ok(published) = change_result {
+        roots_carrying_the_change += settle_what_the_session_published_for_the_relocation_batch(
+            session,
+            model,
+            published,
+            records_of_the_previous_publish,
+            &mut verdict,
+            &mut harness_judgement,
+        );
     }
     if verdict.disagreement.is_none() {
         if steps_walked_before_the_change >= 2 {
@@ -6914,6 +7137,11 @@ fn settle_compaction_run(
                     .to_string(),
                 ObservedRefusalReason::Unexplained,
             ),
+            RelocationBatchRefused::InstanceTableOfTheVersionUnreadable(_) => (
+                "CompactionRunFailure::Batch(RelocationBatchRefused::InstanceTableOfTheVersionUnreadable)"
+                    .to_string(),
+                ObservedRefusalReason::Unexplained,
+            ),
             RelocationBatchRefused::UnitBytesNotAvailable { .. } => (
                 "CompactionRunFailure::Batch(RelocationBatchRefused::UnitBytesNotAvailable)"
                     .to_string(),
@@ -7412,8 +7640,8 @@ fn settle_mount(
                     .iter()
                     .map(|raised| raised.publishes.len())
                     .sum::<usize>();
-            // 执行器的可写挂载装产品开关（`mount_writable_with_space_admission`）：批大小条款没写，续做盘上那一条整理意图在签任何东西、
-            // 发任何写之前停（`CompactionRunStop::BatchSizeNotDecidedByTheClauses`），上面逐版比的那一串里没有续做整理的发布。
+            // 执行器的可写挂载装 [`compaction_switches_of_the_mounts_of_the_executor`]：续做盘上那一条整理意图在发任何写之前停，
+            // 上面逐版比的那一串里没有续做整理的发布。
             assert!(
                 mounted
                     .output
@@ -7421,7 +7649,7 @@ fn settle_mount(
                     .run
                     .as_ref()
                     .is_none_or(|run| run.versions_published.is_empty()),
-                "执行器的可写挂载装的是产品开关：挂载续做整理在任何写之前停"
+                "执行器的可写挂载叫停整理：挂载续做整理在任何写之前停"
             );
             let space_admission = MountSpaceAdmissionOutcome::of(&mounted.output.space_admission);
             let instance = mounted.output.instance;
@@ -7480,8 +7708,12 @@ fn apply_mount_writable(
     let image_before_mount = pool.image();
     let answer = pool.model.answer_mount_writable();
     let stream_length_before = pool.stream.operation_count();
-    let mounted =
-        mount_writable_with_space_admission(parameters, &mut pool.devices, pool.space_admission);
+    let mounted = mount_writable_with_space_admission_and_compaction_switches(
+        parameters,
+        &mut pool.devices,
+        pool.space_admission,
+        compaction_switches_of_the_mounts_of_the_executor(),
+    );
     settle_mount(
         pool,
         mounted,
@@ -7693,10 +7925,11 @@ fn apply_crash_recovery_abandoning_the_newest_root(
             )
         })
         .collect();
-    let mounted = mount_writable_with_space_admission(
+    let mounted = mount_writable_with_space_admission_and_compaction_switches(
         parameters,
         &mut devices_with_hidden_ranges,
         pool.space_admission,
+        compaction_switches_of_the_mounts_of_the_executor(),
     );
     pool.devices = devices_with_hidden_ranges
         .into_iter()
@@ -7804,8 +8037,9 @@ impl<Device: singlefs_core::block_device::BlockDevice> singlefs_core::block_devi
 /// [`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`]：前提同覆盖写（[`apply_publish_overwrite`]），
 /// 经挂着的会话发那次整份重写，盘在它的第一个 journal 记录写到达时掉电（[`DeviceLosingPowerAtTheFirstJournalRecordWrite`]）。
 /// 会话的结局不判：进程已经在这次改动里崩掉，没有人收这个结局（掉电之前做完的那几步落了盘、录制流里有它们）。会话连同模型那一侧的会话
-/// 一起丢掉，之后照可写挂载那一步（[`apply_mount_writable`]）挂一次、交模型判：模型看不见这次掉电——那次改动一样都没发布，
-/// 挂载恢复落到的就是改动之前那一版，与这个进程正常退出之后的可写挂载同一个答案。
+/// 一起丢掉，之后照可写挂载那一步（[`apply_mount_writable`]）挂一次、交模型判：那次改动一样都没发布，挂载恢复落到的就是改动之前那一版。
+/// 模型只看盘上系统配置里的 F（[`IdealModel::settle_floor_left_in_the_system_configurations_by_a_lost_power`]）：那次改动被空间拒、先推抬 F 时，
+/// 新 F 写进了系统配置、第一条根掉电没落，可写挂载的 F_生效取到它。那一格对不上时这一步报的是它，不是挂载对不上。
 fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
     pool: &mut HistoryPool,
     parameters: &MakeFilesystemParameters,
@@ -7878,8 +8112,49 @@ fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
     // 之后录下的是可写挂载另起的实例写的流。
     pool.earliest_stream_index_after_each_power_loss
         .push(pool.stream.operation_count());
+    let floor_read_from_the_system_configurations =
+        highest_floor_in_the_self_verified_system_configuration_slots(pool, parameters);
+    let floor_settled = pool
+        .model
+        .settle_floor_left_in_the_system_configurations_by_a_lost_power(
+            floor_read_from_the_system_configurations,
+        );
     pool.model.close_session();
-    apply_mount_writable(pool, parameters)
+    let mut step = apply_mount_writable(pool, parameters);
+    let verdict = step.model_verdict.get_or_insert_with(ModelVerdict::default);
+    match floor_settled {
+        Ok(ModelFloorLeftByALostPower::KeptAtTheEffectiveFloor) => {}
+        Ok(ModelFloorLeftByALostPower::RaisedToTheCeiling) => {
+            verdict.counts.lost_powers_leaving_the_floor_at_the_ceiling += 1;
+        }
+        Err(disagreement) => verdict.disagreement = Some(disagreement),
+    }
+    step
+}
+
+/// 此刻盘上每块盘两槽里自证过（整槽校验和过、fsid 与本池相同）的系统配置带的 F 的最大值：恢复算 F_生效 的系统配置那一半同一个取法
+/// （D16（发布语义） 已定项 1「生效」）。
+fn highest_floor_in_the_self_verified_system_configuration_slots(
+    pool: &HistoryPool,
+    parameters: &MakeFilesystemParameters,
+) -> ModelCheckpointTxg {
+    let image = pool.image();
+    let slot_spacing_in_bytes = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+    pool.devices
+        .iter()
+        .flat_map(|(device, _)| {
+            singlefs_core::recovery::verified_system_configuration_slots(
+                &image,
+                *device,
+                slot_spacing_in_bytes,
+                &parameters.filesystem_identifier,
+            )
+        })
+        .map(|system_configuration| {
+            ModelCheckpointTxg(system_configuration.quantities.rollback_floor.0)
+        })
+        .max()
+        .expect("掉电设备只截 journal 环的写，系统配置槽的写整个落盘：池里至少一槽自证过")
 }
 
 /// 每块盘本池自证过（整槽校验和过、fsid 与本池相同）、世代号最大的那一槽系统配置在盘上的那一段：槽号是世代号对每盘槽数取余，
@@ -7923,19 +8198,37 @@ fn newest_self_verified_system_configuration_slot_of_each_device(
         .collect()
 }
 
-/// 每块盘最新那一槽系统配置读回全 0 时的可写挂载
-/// （`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`）：关掉这个进程的会话，每块盘本池自证过、
-/// 世代号最大的那一槽（[`newest_self_verified_system_configuration_slot_of_each_device`]）整次挂载读回全 0
-/// （[`DeviceReadingZerosOverHiddenRanges`]：取号那一写落到它上面之后照常读得出）。读回全 0 的槽自证不过、设备不报读错：读阶段的见证取另一槽，
-/// R2 判不出不成立，逐盘核与取号照「一槽撕裂、另一槽自证过」往下走（D22（单元原子性怎么合成） 已定项 8 的 S-辨）。模型照一次普通可写挂载答
-/// （`IdealModel::answer_mount_writable`：模型不比系统配置落在哪一槽、带的见证值）；结局交给与可写挂载共用的 [`settle_mount`]。
-fn apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros(
+/// 可写挂载期间哪几块盘自证过、世代号最大的那一槽系统配置读回全 0。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DevicesReadingTheirNewestSystemConfigurationSlotAsZeros {
+    /// 每块盘（[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`]）：没有一块盘两槽都自证过，
+    /// 乙入判不出拒可写。
+    EveryDevice,
+    /// 只有按盘的次序排第一的那块盘（[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros`]）：
+    /// 另一块盘两槽都自证过，R2 判得出，可写挂载照常往下走。
+    OnlyTheFirstDevice,
+}
+
+/// 最新那一槽系统配置读回全 0 时的可写挂载（藏哪几块盘见 [`DevicesReadingTheirNewestSystemConfigurationSlotAsZeros`]）：关掉这个进程的会话，
+/// 藏的那几块盘本池自证过、世代号最大的那一槽（[`newest_self_verified_system_configuration_slot_of_each_device`]）整次挂载读回全 0
+/// （[`DeviceReadingZerosOverHiddenRanges`]：挂载写到它上面之后照常读得出）。读回全 0 的槽读得出而自证不过、设备不报读错。
+/// 前提是每块盘两槽都自证过（藏之前），藏的那块盘因此还剩一槽自证过。
+/// - 每块盘都藏：没有一块盘两槽都自证过，乙入判不出（C971（多处读坏时可写挂载写出倒挂的新实例根））并进 R2 当读错计、判据 N-配置 按真，
+///   重读一次仍读回全 0，取号之前拒可写。模型照这一条答拒
+///   （`IdealModel::answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots`）。
+/// - 只藏第一块盘：另一块盘两槽都自证过，R2 与乙入判不出都判得出，读阶段的见证取自证过的槽，逐盘核与取号照「一槽自证不过、另一槽自证过」
+///   往下走（D22（单元原子性怎么合成） 已定项 8 的 S-辨）。模型照一次普通可写挂载答（`IdealModel::answer_mount_writable`：模型不比系统配置
+///   落在哪一槽、带的见证值）。
+///
+/// 结局交给与可写挂载共用的 [`settle_mount`]。
+fn apply_writable_mount_with_the_newest_system_configuration_slot_reading_zeros(
     pool: &mut HistoryPool,
     parameters: &MakeFilesystemParameters,
+    devices_reading_zeros: DevicesReadingTheirNewestSystemConfigurationSlotAsZeros,
 ) -> AppliedStep {
     let image_before_mount = pool.image();
     let devices: Vec<DeviceIdentity> = pool.devices.iter().map(|(identity, _)| *identity).collect();
-    let Some(hidden) = newest_self_verified_system_configuration_slot_of_each_device(
+    let Some(mut hidden) = newest_self_verified_system_configuration_slot_of_each_device(
         parameters,
         &image_before_mount,
         &devices,
@@ -7947,7 +8240,15 @@ fn apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device
     pool.session = None;
     pool.model.close_session();
     pool.mount_attempts += 1;
-    let answer = pool.model.answer_mount_writable();
+    let answer = match devices_reading_zeros {
+        DevicesReadingTheirNewestSystemConfigurationSlotAsZeros::EveryDevice => pool
+            .model
+            .answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots(),
+        DevicesReadingTheirNewestSystemConfigurationSlotAsZeros::OnlyTheFirstDevice => {
+            hidden.truncate(1);
+            pool.model.answer_mount_writable()
+        }
+    };
     let stream_length_before = pool.stream.operation_count();
     let mut devices_with_hidden_ranges: Vec<(
         DeviceIdentity,
@@ -7968,10 +8269,11 @@ fn apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device
             )
         })
         .collect();
-    let mounted = mount_writable_with_space_admission(
+    let mounted = mount_writable_with_space_admission_and_compaction_switches(
         parameters,
         &mut devices_with_hidden_ranges,
         pool.space_admission,
+        compaction_switches_of_the_mounts_of_the_executor(),
     );
     pool.devices = devices_with_hidden_ranges
         .into_iter()
@@ -8355,9 +8657,17 @@ fn apply_operation(
             )
         }
         HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
-            apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros(
+            apply_writable_mount_with_the_newest_system_configuration_slot_reading_zeros(
                 pool,
                 &parameters,
+                DevicesReadingTheirNewestSystemConfigurationSlotAsZeros::EveryDevice,
+            )
+        }
+        HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros => {
+            apply_writable_mount_with_the_newest_system_configuration_slot_reading_zeros(
+                pool,
+                &parameters,
+                DevicesReadingTheirNewestSystemConfigurationSlotAsZeros::OnlyTheFirstDevice,
             )
         }
         HistoryOperation::CreateSnapshot => apply_create_snapshot(pool),
@@ -9474,6 +9784,7 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
         | HistoryOperation::Unlink
         | HistoryOperation::CreateInode
         | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+        | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
         | HistoryOperation::CreateSnapshot => Vec::new(),
         // 建几个往 1 那一头换。
         HistoryOperation::CreateInodes(choice) => (1..choice.count_drawn.min(SMALL_SELECTORS_TRIED_WHEN_SHRINKING))
@@ -9985,6 +10296,31 @@ fn campaign_report_of_finished_histories(
     }
 }
 
+/// 执行器的可写挂载装的整理开关：产品值，只差叫停整理（[`CompactionRunForcing::ForcedToStopForTests`]）。模型不模挂载续做整理的发布，
+/// 逐版比那一串里不要有它们；用户改动发成之后也不记「该跑了」，整理只在 `HistoryOperation::CompactWhileMounted` 那一步装上自己的开关之后跑。
+fn compaction_switches_of_the_mounts_of_the_executor() -> CompactionSwitches {
+    let CompactionSwitches {
+        batch_size,
+        forced_region,
+        run_forcing: _,
+        region_exclusion,
+        destination_policy,
+        release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor,
+        relocation_publish_order,
+    } = CompactionSwitches::PRODUCT;
+    CompactionSwitches {
+        batch_size,
+        forced_region,
+        run_forcing: CompactionRunForcing::ForcedToStopForTests,
+        region_exclusion,
+        destination_policy,
+        release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor,
+        relocation_publish_order,
+    }
+}
+
 /// 攒批会话随机历史里的一次调用（D16（发布语义） 已定项 2、10；判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「返回即落盘」
 /// 那一格：随机历史的「返回即落盘」改成按会话报告的发布点判）。每一次调用之前调用方的钟往前走 `clock_advance_in_milliseconds`。封闭集合。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -10008,6 +10344,12 @@ pub enum BatchingSessionCall {
     PublishWhenDue { clock_advance_in_milliseconds: u64 },
     /// `publish_pending_now`。
     PublishPendingNow { clock_advance_in_milliseconds: u64 },
+    /// 放锁的后台入口（`run_compaction_in_the_background_for_at_most_one_publish`）一次：`foreground_fsync_is_waiting` 是这一次调用方答的前台 fsync。
+    /// 起跑了就先排空待发，之后至多一次整理发布；三样交错都走得到：排空后接整理、整理发布推「上次发布的读数」、让路之后前台再发再接着推。
+    RunCompactionInTheBackground {
+        foreground_fsync_is_waiting: bool,
+        clock_advance_in_milliseconds: u64,
+    },
 }
 
 impl BatchingSessionCall {
@@ -10030,6 +10372,10 @@ impl BatchingSessionCall {
             }
             | BatchingSessionCall::PublishPendingNow {
                 clock_advance_in_milliseconds,
+            }
+            | BatchingSessionCall::RunCompactionInTheBackground {
+                clock_advance_in_milliseconds,
+                ..
             } => clock_advance_in_milliseconds,
         }
     }
@@ -10057,7 +10403,7 @@ pub fn random_batching_session_calls(
         .map(|_call_index| {
             let clock_advance_in_milliseconds =
                 next() % (largest_clock_advance_in_milliseconds + 1);
-            match next() % 5 {
+            match next() % 6 {
                 0 => BatchingSessionCall::AcceptOverwriteOfTheFirstFile {
                     length: usize::try_from(next() % u64::try_from(payload).expect("净荷"))
                         .expect("小于净荷")
@@ -10075,6 +10421,10 @@ pub fn random_batching_session_calls(
                     clock_advance_in_milliseconds,
                 },
                 3 => BatchingSessionCall::PublishWhenDue {
+                    clock_advance_in_milliseconds,
+                },
+                4 => BatchingSessionCall::RunCompactionInTheBackground {
+                    foreground_fsync_is_waiting: next() % 4 == 0,
                     clock_advance_in_milliseconds,
                 },
                 _ => BatchingSessionCall::PublishPendingNow {
@@ -10115,12 +10465,49 @@ pub struct BatchingSessionHistoryRun {
     pub publishes_triggered_by_the_dirty_journal_bytes: u64,
     pub publishes_triggered_by_both: u64,
     pub publishes_on_request: u64,
+    /// 后台入口发成的整理发布次数（`BatchingSessionCall::RunCompactionInTheBackground`）。
+    pub compaction_publishes_in_the_background: u64,
 }
 
 /// [`run_batching_session_calls`] 取这一刻盘上镜像的那个函数：读带着身份的各块盘，交出整池的内存镜像。
 /// `'captured` 是闭包借着的东西活多久（不写的话类型别名里的 `dyn` 默认要 `'static`，借着调用方局部量的闭包传不进来）。
 pub type ImageOfTheDevicesTaker<'captured, Device> =
     dyn Fn(&[(DeviceIdentity, Device)]) -> MemoryPool + 'captured;
+
+/// 攒批会话随机历史里后台入口的节奏：定时兜底间隔 1 毫秒（钟走了就查），写带宽不限。
+const PACING_OF_THE_BACKGROUND_CALLS_OF_THE_BATCHING_HISTORY:
+    singlefs_core::compaction_plan::CompactionPacing =
+    singlefs_core::compaction_plan::CompactionPacing {
+        timer_fallback: singlefs_core::compaction_plan::CompactionTimerFallback::EveryMilliseconds(
+            std::num::NonZeroU64::MIN,
+        ),
+        write_bandwidth_limit:
+            singlefs_core::compaction_plan::CompactionWriteBandwidthLimit::Unlimited,
+    };
+
+/// 攒批会话随机历史里后台入口问的两样：钟就是这一次调用的读数，前台 fsync 是生成的那一样。
+struct CallerOfTheBatchingHistory {
+    now: singlefs_core::compaction_plan::CallerMonotonicClockReading,
+    foreground_fsync_is_waiting: bool,
+}
+
+impl singlefs_core::compaction_plan::CallerOfTheBackgroundCompaction
+    for CallerOfTheBatchingHistory
+{
+    fn clock_reading(&self) -> singlefs_core::compaction_plan::CallerMonotonicClockReading {
+        self.now
+    }
+
+    fn answer_before_the_next_batch(
+        &self,
+    ) -> singlefs_core::compaction_plan::AnswerOfTheCallerBeforeTheNextBatch {
+        if self.foreground_fsync_is_waiting {
+            singlefs_core::compaction_plan::AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
+        } else {
+            singlefs_core::compaction_plan::AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
+        }
+    }
+}
 
 /// 实现报的触发那一支换成模型的写法（两边各自声明）。
 fn model_cause_of(
@@ -10163,6 +10550,7 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
         publishes_triggered_by_the_dirty_journal_bytes: 0,
         publishes_triggered_by_both: 0,
         publishes_on_request: 0,
+        compaction_publishes_in_the_background: 0,
     };
     let mut now_in_milliseconds = 0_u64;
     // 迭代上界是 `calls` 的条数；跨轮携带的是钟（只增）、模型与会话（各自只经自己的入口改），每一次调用都可能提前返回错误。
@@ -10174,6 +10562,7 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
         let write_time_seconds = write_time_seconds_of_the_first_call
             + u64::try_from(call_index).expect("调用序号装得进 u64");
         let mut first_file_content_accepted = None;
+        let mut is_a_compaction_published_by_this_call = false;
         let reported = match call {
             BatchingSessionCall::AcceptOverwriteOfTheFirstFile { length, .. }
             | BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { length, .. } => {
@@ -10189,7 +10578,8 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
                     BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { .. }
                     | BatchingSessionCall::AcceptNewInodes { .. }
                     | BatchingSessionCall::PublishWhenDue { .. }
-                    | BatchingSessionCall::PublishPendingNow { .. } => {
+                    | BatchingSessionCall::PublishPendingNow { .. }
+                    | BatchingSessionCall::RunCompactionInTheBackground { .. } => {
                         UserChange::SequentialWrite(file)
                     }
                 };
@@ -10255,10 +10645,45 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
                 .map_err(|refused| format!("第 {call_index} 次调用 {call:?}：{refused:?}"))?
                 .into_iter()
                 .collect(),
+            BatchingSessionCall::RunCompactionInTheBackground {
+                foreground_fsync_is_waiting,
+                ..
+            } => {
+                let after_the_call = session
+                    .run_compaction_in_the_background_for_at_most_one_publish(
+                        devices,
+                        PACING_OF_THE_BACKGROUND_CALLS_OF_THE_BATCHING_HISTORY,
+                        &CallerOfTheBatchingHistory {
+                            now,
+                            foreground_fsync_is_waiting,
+                        },
+                    )
+                    .map_err(|refused| format!("第 {call_index} 次调用 {call:?}：{refused:?}"))?;
+                let compaction_publishes = match &after_the_call.call {
+                    singlefs_core::mounted_session::BackgroundCompactionCall::NotStarted {
+                        ..
+                    } => 0,
+                    singlefs_core::mounted_session::BackgroundCompactionCall::Ran {
+                        run: compaction_run,
+                        ..
+                    } => compaction_run.versions_published.len(),
+                };
+                run.compaction_publishes_in_the_background += u64::try_from(compaction_publishes)
+                    .expect("一次调用至多一次整理发布外加走空队列");
+                is_a_compaction_published_by_this_call = compaction_publishes > 0;
+                after_the_call
+                    .pending_changes_published_before_the_run
+                    .into_iter()
+                    .collect()
+            }
         };
         let expected_publish = match call {
             BatchingSessionCall::PublishPendingNow { .. } => {
                 (!model.pending_is_empty()).then_some(None)
+            }
+            // 起不起跑看水位与备忘，模型不判：起跑了就排空，模型只判待发空时不许报排空。
+            BatchingSessionCall::RunCompactionInTheBackground { .. } => {
+                (!model.pending_is_empty() && !reported.is_empty()).then_some(None)
             }
             BatchingSessionCall::AcceptOverwriteOfTheFirstFile { .. }
             | BatchingSessionCall::AcceptSequentialWriteOfTheFirstFile { .. }
@@ -10272,12 +10697,12 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
             [one] => Some(match one.reason {
                 ReasonOfThePublish::TriggeredAfterTheAccept(cause)
                 | ReasonOfThePublish::TriggeredWhenDue(cause) => Some(model_cause_of(cause)),
-                ReasonOfThePublish::PendingChangesPublishedOnRequest => None,
+                ReasonOfThePublish::PendingChangesPublishedOnRequest
+                | ReasonOfThePublish::PendingChangesPublishedBeforeTheBackgroundCompaction => None,
                 other @ (ReasonOfThePublish::PendingChangesPublishedBeforeABarrier
                 | ReasonOfThePublish::BarrierPublishedAlone
                 | ReasonOfThePublish::PendingChangesPublishedBeforeTheUserChange
                 | ReasonOfThePublish::UserChangePublishedAlone
-                | ReasonOfThePublish::PendingChangesPublishedBeforeTheBackgroundCompaction
                 | ReasonOfThePublish::PendingChangesPublishedBeforeHandingBackTheSession) => {
                     return Err(format!(
                         "第 {call_index} 次调用 {call:?}：会话报的发布理由 {other:?} 不是这几种入口报得出的"
@@ -10328,6 +10753,10 @@ pub fn run_batching_session_calls<Device: singlefs_core::block_device::BlockDevi
                 }
                 None => run.publishes_on_request += 1,
             }
+        }
+        // 整理发布也把会话的「上次发布的读数」往前推（发布触发的时间那一支从它算）：模型跟着记，待发不动。
+        if is_a_compaction_published_by_this_call {
+            model.note_a_publish(now_in_milliseconds);
         }
         let violated: Vec<String> = singlefs_checker::walk::check_pool_image(&image)
             .into_iter()
@@ -10431,6 +10860,21 @@ pub fn root_ring_hole_table_of_the_roots_written(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model_comparison::observed_node_mapping_key;
+    use singlefs_core::allocator::Placement;
+    use singlefs_core::block_device::{BlockDevice, WriteDurability};
+    use singlefs_core::compaction_plan::RelocationBatchAfterTheChangeRefusedForSpace;
+    use singlefs_core::mount::RaisedFloor;
+    use singlefs_core::mounted_session::{
+        DiscardsAfterThePublishes, FloorRaisesPushedForTheRelocation,
+    };
+    use singlefs_core::pointer::LocationEntry;
+    use singlefs_core::records::TREE_KIND_EXTENT;
+    use singlefs_core::transaction::{
+        QuarantinedCopyReading, RelocatedUnitHolder, TransactionUnit,
+    };
+    use singlefs_core::unit::UNIT_CLASS_INDEX_NODE;
+    use std::num::NonZeroU64;
 
     /// 留孤儿那一组比重抽得到「覆盖写掉电在 journal 记录之前再挂」，别的每一组比重一次都抽不到（它们的种子钉着的取样点照旧）：
     /// 32 个种子、每段 40 步。判别力：留孤儿那一组里这一步的份数是 0 时第一条红。
@@ -10552,6 +10996,59 @@ mod tests {
             !heads_erased.is_empty(),
             "清扫抹了实例 1 的孤儿的头：{:?}",
             mounted.output.instance_table_sweep
+        );
+    }
+
+    /// 每块盘最新那一槽系统配置读回全 0 时的可写挂载
+    /// （[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`]，起点是第一个文件之后）：
+    /// 每块盘只剩一槽自证过、没有一块盘两槽都自证过，乙入判不出（C971）拒可写，拒因是「重读一次仍读不出」那一条，取号之前一个写都不发；
+    /// 模型照条款答拒、对得上，这段历史跑完。
+    /// 判别力（`crates/mutations.tsv` 各一行）：模型那一步照普通可写挂载答时报「模型说该成、实现拒了」，历史停在新发现上；
+    /// 每块盘两槽都藏时系统配置一份都选不出、拒的不是这一条，模型判拒因对不上。
+    #[test]
+    fn writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros_is_refused_as_the_model_answers(
+    ) {
+        let history = GeneratedHistory {
+            seed: HistorySeed(0),
+            starting_point: HistoryStartingPoint::AfterFirstFile,
+            operations: vec![
+                HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+            ],
+        };
+        let execution = HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        };
+        let stream = SharedStream::retaining_contents();
+        let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
+        let run = execute_history_with(&history, execution, &stream, &mut |observation| {
+            operations_after_each_step.push((observation.position, stream.operation_count()));
+        });
+        assert_eq!(
+            run.ending,
+            HistoryEnding::Completed,
+            "实现照乙入判不出拒、模型同判：{:?}",
+            run.outcomes
+        );
+        assert!(
+            matches!(
+                run.outcomes.as_slice(),
+                [StepOutcome::Refused { member }]
+                    if member.contains("NewerStateStillUnreadableAfterOneReread")
+                        && member.contains("PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion")
+            ),
+            "那一步拒可写，拒因是判据 N-配置 重读一次仍为真：{:?}",
+            run.outcomes
+        );
+        let [(StepPosition::StartingPoint, after_the_starting_point), (StepPosition::Operation(0), after_the_mount)] =
+            operations_after_each_step[..]
+        else {
+            panic!("起点与那一步各登记一次：{operations_after_each_step:?}");
+        };
+        assert_eq!(
+            after_the_starting_point, after_the_mount,
+            "拒在取号之前：录制流里一步不多"
         );
     }
 
@@ -10810,7 +11307,7 @@ mod tests {
     /// 自己生成、自己跑的那一段逐项相同。判别力：同一个种子按默认批的比重生成的是另一段历史，计数也不同（前提断言），
     /// 取样参数装成默认批那一组时这里红。
     #[test]
-    fn a_campaign_runs_and_reports_the_sampling_it_was_given() {
+    fn campaign_runs_and_reports_the_sampling_it_was_given() {
         let sampling = HistorySampling {
             operations_per_history: 6,
             weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
@@ -10923,7 +11420,7 @@ mod tests {
 
     /// 每段步数写 0：复现入口报出变量名、给的值与认得的取值，不照收（每段 0 步的一批只跑了起点，照样判成绿）。
     #[test]
-    fn a_reproduction_step_count_of_zero_is_refused_with_the_recognized_values() {
+    fn reproduction_step_count_of_zero_is_refused_with_the_recognized_values() {
         let defaults = HistorySampling {
             operations_per_history: 30,
             weights: GenerationWeights::BROAD,
@@ -11385,7 +11882,7 @@ mod tests {
 
     /// 整理的一批（txg 12）释放的一份核出对不上、置上记号（分配代 7 不变）：这一批交回了这一份才放过，没交回照报；清记号照报。
     #[test]
-    fn a_relocation_batch_setting_the_quarantine_mark_is_not_reported_only_on_a_copy_it_reported() {
+    fn relocation_batch_setting_the_quarantine_mark_is_not_reported_only_on_a_copy_it_reported() {
         let unmarked = vec![record(50186, 2, 7, false)];
         let marked = vec![with_the_quarantine_mark(record(50186, 2, 7, false))];
         let copies = [copy_quarantined_on(DeviceIdentity(0), 50186, 2)];
@@ -11627,7 +12124,7 @@ mod tests {
                 | NamedGenerationWeights::TowardTheUnitAreaWall
                 | NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves
                 | NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep
-                | NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros
+                | NamedGenerationWeights::NewestSystemConfigurationSlotReadingZeros
                 | NamedGenerationWeights::SnapshotOperations
                 | NamedGenerationWeights::CompactionWhileMounted
                 | NamedGenerationWeights::CompactionWhileMountedWithRollback
@@ -11641,5 +12138,334 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// 用户改动发成之后另发的那一批（D4（校验和位置） 已定项 4）的用例共用：可写会话开着、第一个文件已发成的一池（两块 4 GiB 的盘，不注入故障）。
+    fn pool_after_the_first_file() -> HistoryPool {
+        let device_width = HistoryDeviceWidth::FourGibibytes;
+        let Ok((pool, _verdict_of_the_first_file)) = HistoryPool::start(
+            HistoryStartingPoint::AfterFirstFile,
+            device_width,
+            SpaceAdmission::JudgedByTheFormula,
+            &SharedStream::new(),
+            &SharedFaultPlan::unarmed(device_width.fixed_geometry()),
+        ) else {
+            panic!("不注入故障时起点段的入口不报错");
+        };
+        pool
+    }
+
+    fn current_version_of_the_session(pool: &HistoryPool) -> &TransactionOutput {
+        pool.session
+            .as_ref()
+            .expect("会话开着")
+            .current
+            .version_of_trees()
+            .expect("第一个文件发成之后现行那一版有树")
+    }
+
+    /// 把 `location` 那一份头一槽改一个字节，另一份不动：之后读这个单元只坏一份。
+    fn damage_one_copy_at(pool: &mut HistoryPool, location: LocationEntry) {
+        let (_, device) = pool
+            .devices
+            .iter_mut()
+            .find(|(identity, _)| *identity == location.device)
+            .expect("位置条目点名的是池里的盘");
+        let offset = location.slot.to_device_offset();
+        let mut bytes_of_the_slot =
+            vec![0_u8; usize::try_from(SLOT_BYTES).expect("一槽装得进 usize")];
+        device
+            .read_at(offset, &mut bytes_of_the_slot)
+            .expect("不注入故障时读得出");
+        bytes_of_the_slot[100] ^= 0xFF;
+        device
+            .write_at(offset, &bytes_of_the_slot, WriteDurability::Plain)
+            .expect("不注入故障时写得进");
+    }
+
+    /// 一个数据单元装得下的一份覆盖写内容。
+    const CONTENT_OF_AN_OVERWRITE: ContentChoice = ContentChoice {
+        length: ContentLength::InsideOneDataUnit { selector: 0 },
+        fill_seed: 1,
+    };
+
+    /// 这一步执行器判的失败与模型的对不上都没有，交回模型比过的计数。
+    fn counts_of_a_step_without_a_failure(step: &AppliedStep) -> &ModelJudgementCounts {
+        assert_eq!(step.harness_judgement, None, "执行器不判失败");
+        let verdict = step.model_verdict.as_ref().expect("入口调了：模型答过");
+        assert!(
+            verdict.disagreement.is_none(),
+            "模型对得上：{:?}",
+            verdict.disagreement
+        );
+        &verdict.counts
+    }
+
+    fn roots_carrying_the_change_of(step: &AppliedStep) -> usize {
+        let StepOutcome::Applied(AppliedEffect::Published {
+            roots_carrying_the_change,
+            ..
+        }) = &step.outcome
+        else {
+            panic!("这一步发成了改动：{:?}", step.outcome);
+        };
+        *roots_carrying_the_change
+    }
+
+    /// 模型的现行版本就是会话的现行那一版：会话写的根模型一条都没漏。
+    fn assert_the_model_stands_on_the_root_of_the_session(pool: &HistoryPool) {
+        let root = pool.session.as_ref().expect("会话开着").current.root();
+        assert_eq!(
+            pool.model
+                .current_version_in_the_session()
+                .expect("模型里会话开着")
+                .key,
+            model_root_key(root.instance, root.checkpoint_txg)
+        );
+    }
+
+    /// 覆盖写那次发布读到实例表片只坏一份，会话接着另发一批换实例表：改动自己那一版照覆盖写比（分配代是它自己的 txg），那一批照另发的那一批比（模型记实例表这次重写），
+    /// 这一步写两条根、都带着这次改动，模型停在那一批上。判别力：执行器拿现行那一版当改动那一版比时（模型答 txg N、实现是 N + 1）这一条红。
+    #[test]
+    fn an_overwrite_reading_the_instance_table_with_one_copy_failing_is_followed_by_a_batch_judged_on_its_own(
+    ) {
+        let mut pool = pool_after_the_first_file();
+        let version_before = current_version_of_the_session(&pool);
+        let txg_before = version_before.root.checkpoint_txg.0;
+        let table_location = version_before.root.instance_table.locations[0];
+        damage_one_copy_at(&mut pool, table_location);
+        let publishes_before = pool
+            .session
+            .as_ref()
+            .expect("会话开着")
+            .publishes_in_this_mount;
+        let step = apply_publish_overwrite(
+            &mut pool,
+            &CONTENT_OF_AN_OVERWRITE,
+            FIXED_WRITE_TIME_SECONDS + 1,
+        );
+        assert_eq!(
+            counts_of_a_step_without_a_failure(&step)
+                .relocation_batches_after_a_user_change_matched,
+            1,
+            "另发的那一批交模型比过一次"
+        );
+        assert_eq!(
+            roots_carrying_the_change_of(&step),
+            2,
+            "改动那一版与另发的那一批"
+        );
+        assert_the_model_stands_on_the_root_of_the_session(&pool);
+        let batch = current_version_of_the_session(&pool);
+        assert_eq!(batch.root.checkpoint_txg.0, txg_before + 2);
+        assert_eq!(
+            pool.session
+                .as_ref()
+                .expect("会话开着")
+                .publishes_in_this_mount,
+            publishes_before + 2,
+            "这次挂载里写出的根连那一批一起数"
+        );
+        assert_ne!(
+            batch.root.instance_table.locations[0].slot, table_location.slot,
+            "那一批把实例表换到了新落点"
+        );
+    }
+
+    /// 可写挂载建上一版时读到数据单元只坏一份，下一次用户改动（建 inode，不重写这个单元）之后另发一批搬它：目的地的分配代是单元的诞生代，
+    /// 那一批按搬迁的判法比过（按「代要是这次的 txg」比就判红）；走的是逐版比那一支（`settle_user_change_comparing_every_version_published`），
+    /// 那一批不当成又一次改动问模型。
+    #[test]
+    fn data_unit_read_with_one_copy_failing_while_mounting_moves_in_a_batch_after_the_next_change_that_is_judged_as_a_relocation(
+    ) {
+        let mut pool = pool_after_the_first_file();
+        let data_location = current_version_of_the_session(&pool).data_pointers[0].locations[0];
+        damage_one_copy_at(&mut pool, data_location);
+        let parameters = pool.device_width.parameters();
+        let mount = apply_mount_writable(&mut pool, &parameters);
+        let _counts_of_the_mount = counts_of_a_step_without_a_failure(&mount);
+        let step = apply_create_inodes(
+            &mut pool,
+            InodeCountChoice { count_drawn: 1 },
+            FIXED_WRITE_TIME_SECONDS + 1,
+        );
+        assert_eq!(
+            counts_of_a_step_without_a_failure(&step)
+                .relocation_batches_after_a_user_change_matched,
+            1,
+            "另发的那一批交模型比过一次"
+        );
+        assert_eq!(
+            roots_carrying_the_change_of(&step),
+            2,
+            "建 inode 那一版与另发的那一批"
+        );
+        assert_the_model_stands_on_the_root_of_the_session(&pool);
+        let batch = current_version_of_the_session(&pool);
+        let [relocated] = batch.units_relocated_by_this_publish.as_slice() else {
+            panic!(
+                "那一批搬一个单元：{:?}",
+                batch.units_relocated_by_this_publish
+            );
+        };
+        assert_eq!(
+            relocated.source[0].slot, data_location.slot,
+            "搬的是挂载时读到只坏一份的那个单元"
+        );
+    }
+
+    /// 现行那一版上再覆盖写两次（抬 F 有得抬），弄坏实例表那一份，头 `attempts` 次发那一批当作被空间拒（只供测试的开关）。
+    fn pool_whose_next_overwrite_reads_the_damaged_table_with_the_batch_refused_for_space(
+        forcing: RelocationBatchAfterTheChangeRefusedForSpace,
+    ) -> HistoryPool {
+        let mut pool = pool_after_the_first_file();
+        for write_time_offset in 1..=2 {
+            let step = apply_publish_overwrite(
+                &mut pool,
+                &CONTENT_OF_AN_OVERWRITE,
+                FIXED_WRITE_TIME_SECONDS + write_time_offset,
+            );
+            let _counts = counts_of_a_step_without_a_failure(&step);
+        }
+        let table_location = current_version_of_the_session(&pool)
+            .root
+            .instance_table
+            .locations[0];
+        damage_one_copy_at(&mut pool, table_location);
+        pool.session
+            .as_mut()
+            .expect("会话开着")
+            .compaction
+            .force_the_relocation_batch_after_the_change_refused_for_space_for_tests(forcing);
+        pool
+    }
+
+    /// 那一批头一次被空间拒、推一串抬 F 之后发成：那一串接在改动那一版后面照模型的抬 F 比，分配代逐次接着比，那一批接在那一串后面比。
+    /// 判别力：那一串不交模型（模型少走几条根）或分配代不接着比时这一条红。
+    #[test]
+    fn floor_raises_pushed_for_the_batch_after_a_change_are_judged_between_the_change_and_the_batch(
+    ) {
+        let mut pool =
+            pool_whose_next_overwrite_reads_the_damaged_table_with_the_batch_refused_for_space(
+                RelocationBatchAfterTheChangeRefusedForSpace::ForcedForTheNextAttemptsForTests {
+                    attempts: NonZeroU64::new(1).expect("拒一次：1 不是 0"),
+                },
+            );
+        let step = apply_publish_overwrite(
+            &mut pool,
+            &CONTENT_OF_AN_OVERWRITE,
+            FIXED_WRITE_TIME_SECONDS + 3,
+        );
+        assert_eq!(
+            counts_of_a_step_without_a_failure(&step)
+                .relocation_batches_after_a_user_change_matched,
+            1,
+            "推过抬 F 之后那一批发成"
+        );
+        assert!(
+            roots_carrying_the_change_of(&step) > 2,
+            "改动那一版、至少一条抬 F 的空发布、那一批：{}",
+            roots_carrying_the_change_of(&step)
+        );
+        assert_the_model_stands_on_the_root_of_the_session(&pool);
+    }
+
+    /// 那一批每一次都被空间拒：一批都没发成，推的那几串照样交模型比；模型停在推的最后一条空发布上，不算比过那一批。
+    #[test]
+    fn floor_raises_pushed_for_a_batch_that_never_got_published_are_still_judged() {
+        let mut pool =
+            pool_whose_next_overwrite_reads_the_damaged_table_with_the_batch_refused_for_space(
+                RelocationBatchAfterTheChangeRefusedForSpace::ForcedOnEveryAttemptForTests,
+            );
+        let step = apply_publish_overwrite(
+            &mut pool,
+            &CONTENT_OF_AN_OVERWRITE,
+            FIXED_WRITE_TIME_SECONDS + 3,
+        );
+        assert_eq!(
+            counts_of_a_step_without_a_failure(&step)
+                .relocation_batches_after_a_user_change_matched,
+            0,
+            "那一批没发成"
+        );
+        assert!(
+            roots_carrying_the_change_of(&step) > 1,
+            "改动那一版之后至少推了一条抬 F 的空发布：{}",
+            roots_carrying_the_change_of(&step)
+        );
+        assert_the_model_stands_on_the_root_of_the_session(&pool);
+    }
+
+    /// 为另发的那一批推的抬 F 的空发布交回的隔离也收进这一步（故障归类器拿隔离清单认说谎的设备留下的）。隔离那一份合成：
+    /// 一串空发布真核出对不上要坏一份旧固定点单元，这里只核收不收。
+    #[test]
+    fn copies_quarantined_by_a_floor_raise_pushed_for_the_batch_after_a_change_are_collected() {
+        let pool = pool_after_the_first_file();
+        let quarantined = CopyQuarantinedAfterReleaseChecksumMismatch {
+            unit: TransactionUnit::InodeRoot,
+            device: DeviceIdentity(0),
+            placement: Placement {
+                slot: SlotNumber(777),
+                span: 1,
+            },
+            reading: QuarantinedCopyReading::ChecksumMismatch,
+        };
+        let mut publish = current_version_of_the_session(&pool).clone();
+        publish.quarantined_after_release_checksum_mismatch = vec![quarantined];
+        let change_result = Ok(UserChangePublished {
+            floor_raises: Vec::new(),
+            refusals_that_pushed_the_floor_raises: Vec::new(),
+            versions_published: Vec::new(),
+            discards_after_the_change: DiscardsAfterThePublishes::default(),
+            relocation_after_the_change_of_the_units_read_with_one_copy_failing:
+                RelocationAfterTheChangeOfTheUnitsReadWithOneCopyFailing::RefusedNotForSpace {
+                    refusal: Box::new(RelocationBatchRefused::NoLiveCompactionIntent),
+                    floor_raises: FloorRaisesPushedForTheRelocation {
+                        floor_raises: vec![RaisedFloor {
+                            ceiling: publish.root.checkpoint_txg,
+                            system_configuration_writes_before_the_first_publish: publish
+                                .writes
+                                .clone(),
+                            publishes: vec![publish],
+                            floor_of_the_publishes: FloorOfThePushedPublishes::RaisedToTheCeiling,
+                            reclaimed: Vec::new(),
+                            abandoned_roots_unreadable: 0,
+                        }],
+                        refusals_that_pushed_the_floor_raises: Vec::new(),
+                    },
+                },
+        });
+        assert_eq!(
+            copies_quarantined_by_a_user_change(&change_result),
+            vec![quarantined]
+        );
+    }
+
+    /// 另发的那一批交给模型的几样照这一版交回的算：搬了几个、搬的里头有没有用户可见树的根；这一版没写实例表片就是照抄。
+    #[test]
+    fn the_batch_seen_by_the_model_names_what_the_version_relocated() {
+        let pool = pool_after_the_first_file();
+        let mut batch = current_version_of_the_session(&pool).clone();
+        let extent_root = batch
+            .tree_table_entries
+            .iter()
+            .find(|entry| entry.kind == TREE_KIND_EXTENT)
+            .expect("第一个文件那一版的树表里有 extent 树那一条")
+            .root;
+        batch.units_relocated_by_this_publish = vec![UnitRelocatedByThisPublish {
+            mapping_key: observed_node_mapping_key(UNIT_CLASS_INDEX_NODE, extent_root),
+            holder: RelocatedUnitHolder::KeptForTheSnapshots,
+            source: extent_root.locations,
+            destination: extent_root.locations,
+        }];
+        let seen = relocation_batch_seen_by_the_model(&batch);
+        assert_eq!(seen.units_relocated, 1);
+        assert_eq!(
+            seen.user_visible_root_units_relocated.len(),
+            1,
+            "搬的是 extent 树的根：{:?}",
+            seen.user_visible_root_units_relocated
+        );
+        assert_eq!(seen.instance_table, ModelInstanceTableOfTheBatch::Carried);
     }
 }

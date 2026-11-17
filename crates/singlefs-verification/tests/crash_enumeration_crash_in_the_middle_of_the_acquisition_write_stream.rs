@@ -48,6 +48,12 @@ use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, writes_and_segments, CrashImage, MemoryPool,
     PublishedVersion, RetainedWrite,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::SharedStream;
 
@@ -178,21 +184,38 @@ fn highest_instance_readable_on(image: &MemoryPool) -> u32 {
     highest_in_the_slots.max(highest_in_the_ring)
 }
 
-/// 观察者「取号写到一半之后重开」（`remount_after_the_crash`）：把这个状态持久的写落到基线上，可写挂载一次；挂不上当场 panic，
+/// 观察者「取号写到一半之后重开」（`remount_after_the_crash`）：把这个状态持久的写落到基线上，可写挂载一次；可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），别的拒当场 panic；
 /// 取到的号不比崩溃镜像上读得出的每一个实例代号都大也当场 panic（重号）。挂完的盘交回，池级 checker 在判段判。
 /// 观察者的身份是这个 fn 的闭包键（入口要登记在 `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES`；没登记时取键拒算、照判不入库）。
 // gpu-exempt: writable-mount
 fn remount_after_the_crash_with_an_instance_above_every_one_on_the_disks(
     base: &MemoryPool,
     image: &CrashImage<'_>,
+    report: &RecoveryReport,
     counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices = crash_state_devices(base, image.writes, &image.persisted, &stream);
-    let highest_on_the_crash_image =
-        highest_instance_readable_on(&memory_pool_of_sparse_devices(&devices));
-    let mounted = mount_writable(&parameters(), &mut devices)
-        .unwrap_or_else(|error| panic!("取号写写到一半崩溃之后重开可写挂载被拒：{error:?}"));
+    let crash_disks = memory_pool_of_sparse_devices(&devices);
+    let highest_on_the_crash_image = highest_instance_readable_on(&crash_disks);
+    let mounted = match mount_writable(&parameters(), &mut devices) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &crash_disks,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                CHECKER_CLEAN_AFTER_THE_REMOUNT,
+                counts,
+            );
+        }
+    };
     assert!(
         mounted.output.instance.0 > highest_on_the_crash_image,
         "重号：重开取到 {:?}，崩溃镜像上已经读得出实例 {highest_on_the_crash_image}（D23（journal 的角色与格式） 已定项 16 新号取盘上最大的加一）",
@@ -223,12 +246,13 @@ fn enumerate_remounting_after_each_crash(
 ) -> Option<CrashPointReplayTally> {
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
+                   report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
         remount_after_the_crash_with_an_instance_above_every_one_on_the_disks(
             &recorded.base,
             image,
+            report,
             counts,
         )
     };
@@ -264,6 +288,10 @@ fn enumerate_remounting_after_each_crash(
 }
 
 fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointReplayTally) {
+    print_the_writable_mount_refusals_into_the_undecidable_witness(
+        "crash_in_the_middle_of_the_acquisition_write",
+        tally,
+    );
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
         (0, None),
@@ -295,9 +323,12 @@ fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointR
     assert_eq!(
         tally
             .observer_counts
-            .count_named(REMOUNTED_ABOVE_EVERY_INSTANCE_ON_THE_DISKS),
+            .count_named(REMOUNTED_ABOVE_EVERY_INSTANCE_ON_THE_DISKS)
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个崩溃状态之后都重开得了可写挂载，取到的号比盘上读得出的每一个都大"
+        "每个没被乙入判不出拒的崩溃状态之后都重开得了可写挂载，取到的号比盘上读得出的每一个都大"
     );
     assert_eq!(
         tally

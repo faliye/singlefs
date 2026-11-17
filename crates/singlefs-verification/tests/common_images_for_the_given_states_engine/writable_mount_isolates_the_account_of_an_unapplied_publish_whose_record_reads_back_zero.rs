@@ -6,15 +6,16 @@
 use crate::common_images_for_the_given_states_engine::{PoolCheckerExpectation, PoolCheckerImages};
 use crate::common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero, plain_devices_on,
-    pool_after_the_mount, record_one_publish_after_overwrites, units_of_r_overwritten_on,
-    PublishRecordedAsR, RangesReadingBackAllZero, OVERWRITE_BYTES,
+    pool_after_the_mount, record_one_publish_after_overwrites,
+    units_of_the_recorded_publish_overwritten_on, RangesReadingBackAllZero, RecordedPublishKind,
+    OVERWRITE_BYTES,
 };
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::mount::{mount_writable, unmount, ShadowLedger};
 use singlefs_verification::memory_pool::MemoryPool;
 
 /// 覆盖写几次之后录 R：攻方那一形量过 k = 1 与 4（两者逐格同数），取 1。
-pub const OVERWRITES_BEFORE_R: u64 = 1;
+pub const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 1;
 
 /// M1 里 R 的根槽与 R 的第 `hidden_record` 条记录读回全零；M1 之后覆盖写一次、正常卸载，逐步核 R 的单元没被写掉、卸载之后 I-7.4 不红。
 /// 交回 M1 之后每块盘上分配器隔离的槽数（报告里写的「M1 隔离槽数」）。
@@ -23,8 +24,8 @@ pub fn assert_the_units_of_the_publish_stay_unwritten_through_an_overwrite_and_t
     hidden_record: usize,
 ) -> Vec<(DeviceIdentity, u64)> {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
@@ -54,7 +55,7 @@ pub fn assert_the_units_of_the_publish_stay_unwritten_through_an_overwrite_and_t
     pool.overwrite(OVERWRITE_BYTES)
         .expect("384 槽小盘上 M1 之后覆盖写一次落得下");
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &pool.image()),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &pool.image()),
         Vec::<(DeviceIdentity, u64)>::new(),
         "M1 之后第一次覆盖写没取到 R 的单元（C 隔离了 R 的账里的落点）"
     );
@@ -78,7 +79,7 @@ pub fn assert_the_units_of_the_publish_stay_unwritten_through_an_overwrite_and_t
         device_size_in_bytes: recorded.pool.device_bytes,
     };
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image_after_the_unmount),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image_after_the_unmount),
         Vec::<(DeviceIdentity, u64)>::new(),
         "卸载那一串空发布也没取到 R 的单元"
     );

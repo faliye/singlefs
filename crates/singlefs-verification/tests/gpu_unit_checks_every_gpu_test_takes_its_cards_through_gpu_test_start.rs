@@ -329,7 +329,7 @@ fn calls_of(code: &str, function: &str) -> usize {
 
 /// 一条 `cfg(…)` 属性的条件（`attribute` 是去掉注释、字符串内容之后的属性原文）里有没有一处不在 `not(…)` 里面的 `test`：
 /// 有，这条属性下的项只在测试里编，是测试代码。
-fn cfg_predicate_includes_test_outside_a_not(attribute: &str) -> bool {
+fn configuration_predicate_includes_test_outside_a_not(attribute: &str) -> bool {
     let mut enclosing_functions: Vec<String> = Vec::new();
     let mut word = String::new();
     let mut pending_word: Option<String> = None;
@@ -424,7 +424,7 @@ fn attribute_at(characters: &[(usize, char)], hash_position: usize) -> Option<At
 }
 
 /// `cfg_attr(…)` 括号里那一段（去掉注释、字符串内容之后的原文）按最外层的逗号切开：第一段是条件，后面每段是一条属性。
-fn arguments_of_a_cfg_attr(inside_the_parentheses: &str) -> Vec<&str> {
+fn arguments_of_a_configuration_attribute(inside_the_parentheses: &str) -> Vec<&str> {
     let mut arguments = Vec::new();
     let mut depth = 0_usize;
     let mut start = 0;
@@ -444,7 +444,7 @@ fn arguments_of_a_cfg_attr(inside_the_parentheses: &str) -> Vec<&str> {
 }
 
 /// 属性（`[` 与 `]` 之间的原文）让它下面的东西只在测试里编：裸的 `test`（`#[test]`），或条件含 `test`（不在 `not(…)` 里，
-/// [`cfg_predicate_includes_test_outside_a_not`]）的 `cfg(…)`（`cfg` 与括号之间可以有空白），或 `cfg_attr(条件, 属性…)` 里
+/// [`configuration_predicate_includes_test_outside_a_not`]）的 `cfg(…)`（`cfg` 与括号之间可以有空白），或 `cfg_attr(条件, 属性…)` 里
 /// 带着这两种之一的（`#[cfg_attr(test, test)]`：测试里编成测试函数）。
 fn attribute_marks_test_code(attribute_inside: &str) -> bool {
     let trimmed = attribute_inside.trim();
@@ -457,7 +457,7 @@ fn attribute_marks_test_code(attribute_inside: &str) -> bool {
             .strip_prefix('(')
             .and_then(|rest| rest.trim_end().strip_suffix(')'))
             .is_some_and(|inside_the_parentheses| {
-                arguments_of_a_cfg_attr(inside_the_parentheses)
+                arguments_of_a_configuration_attribute(inside_the_parentheses)
                     .iter()
                     .skip(1)
                     .any(|attribute| attribute_marks_test_code(attribute))
@@ -467,7 +467,7 @@ fn attribute_marks_test_code(attribute_inside: &str) -> bool {
         return false;
     };
     let predicate = after_the_name.trim_start();
-    predicate.starts_with('(') && cfg_predicate_includes_test_outside_a_not(predicate)
+    predicate.starts_with('(') && configuration_predicate_includes_test_outside_a_not(predicate)
 }
 
 /// 从 `start` 起的那一项（之前的属性已经读过）到哪一个字符收尾，与它是不是 `mod 名字;`（交回名字）：头上有项的关键字的
@@ -903,7 +903,7 @@ fn every_test_file_outside_the_pool_list_that_bypasses_the_pool_is_registered_wi
 /// 红样本：库源码里 `#[cfg_attr(test, test)]` 下的函数在测试里编成测试函数，里面的起卡调用照扫；
 /// `cfg_attr` 只带别的属性（`allow`）的不算测试代码。
 #[test]
-fn test_code_under_a_cfg_attr_carrying_test_in_a_library_source_is_caught() {
+fn test_code_under_a_configuration_attribute_carrying_test_in_a_library_source_is_caught() {
     let sample = "#[cfg_attr(test, test)]\n\
                   fn takes_cards() {\n\
                   \x20   let _cards = crate::gpu_unit_checks::usable_gpu_cards();\n\
@@ -974,7 +974,7 @@ fn a_card_taking_call_after_a_string_holding_two_slashes_on_the_same_line_is_cau
 /// K4-4 红样本三：库源码里条件不只是 `test` 的 `#[cfg(all(test, feature = "gpu"))]` 与 `impl` 块里缩进的 `#[cfg(test)]`
 /// 下的项都是测试代码、照扫；`#[cfg(not(test))]` 下的是产品代码、不扫。
 #[test]
-fn test_code_under_a_compound_or_indented_cfg_test_in_a_library_source_is_caught() {
+fn test_code_under_a_compound_or_indented_configuration_test_in_a_library_source_is_caught() {
     let sample = "pub fn product() {}\n\
                   \n\
                   #[cfg(all(test, feature = \"gpu\"))]\n\
@@ -1029,7 +1029,7 @@ fn bypass_line_numbers_in_a_library_sample(sample: &str) -> Vec<usize> {
 /// 红样本一：C 字符串 `c"…"` 与原始 C 字符串 `cr#"…"#` 之后同一行的起卡调用照扫
 /// （`cr` 的 `r` 跟在 `c` 后面要认成原始串，否则 `\` 当转义、吞到下一个引号）。
 #[test]
-fn a_card_taking_call_after_a_raw_c_string_on_the_same_line_is_caught() {
+fn a_card_taking_call_after_a_raw_nul_terminated_string_on_the_same_line_is_caught() {
     let sample = r###"fn takes_cards() {
     let _a = cr#"x" "#; let _cards = usable_gpu_cards(); let _b = cr#"y"#;
     let _c = c"\\"; let _card = gpu_cards_by_priority(&[]);
@@ -1089,7 +1089,7 @@ fn a_bare_test_function_in_a_library_source_is_scanned() {
 /// 红样本四：`cfg(test)` 的几种不在行首、不紧挨着的写法：文件级的 `#![cfg(test)]`（整份都是测试代码，
 /// 下面第二项也算）、与别的属性写在同一行、`cfg` 与括号之间带空白。
 #[test]
-fn cfg_test_written_off_the_start_of_the_line_or_spaced_or_at_the_file_level_is_caught() {
+fn configuration_test_written_off_the_start_of_the_line_or_spaced_or_at_the_file_level_is_caught() {
     let file_level = "#![cfg(test)]\n\
                       fn first() {\n\
                       \x20   let _cards = crate::gpu_unit_checks::usable_gpu_cards();\n\

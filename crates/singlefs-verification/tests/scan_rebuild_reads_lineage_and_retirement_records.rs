@@ -476,7 +476,7 @@ fn an_extra_tombstone_on_a_live_file_does_not_hide_a_moved_mapping_location_of_t
 
 /// 随机历史的四批（判决 `research/prompts/m4-batch2-code-r1-main-verification.md` 第二节 T8 那一格的攻方 s2：
 /// `research/prompts/m4-batch2-code-r1-opus-model/tools/rerun.sh` 的 s2 那一段）：(首个种子, 种子数, 比重)，每段 30 步、384 槽的小盘。
-const RANDOM_HISTORY_BATCHES_OF_THE_T8_COUNT: [(u64, u64, &GenerationWeights); 4] = [
+const RANDOM_HISTORY_BATCHES_OF_THE_LINEAGE_REBUILD_COUNT: [(u64, u64, &GenerationWeights); 4] = [
     (1000, 8, &GenerationWeights::BROAD),
     (
         2000,
@@ -490,7 +490,7 @@ const RANDOM_HISTORY_BATCHES_OF_THE_T8_COUNT: [(u64, u64, &GenerationWeights); 4
         &GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP,
     ),
 ];
-const OPERATIONS_OF_EACH_RANDOM_HISTORY_OF_THE_T8_COUNT: usize = 30;
+const OPERATIONS_OF_EACH_RANDOM_HISTORY_OF_THE_LINEAGE_REBUILD_COUNT: usize = 30;
 const WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_RANDOM_HISTORY_THREADS";
 
 /// 一个镜像上 I-1.13 的判定归哪一类：成立、违例，或不适用连同理由。
@@ -525,12 +525,14 @@ fn the_scan_rebuild_is_never_violated_and_holds_after_deletions_over_random_hist
         device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
         space_admission: SpaceAdmission::JudgedByTheFormula,
     };
-    let histories: Vec<(HistorySeed, &GenerationWeights)> = RANDOM_HISTORY_BATCHES_OF_THE_T8_COUNT
-        .iter()
-        .flat_map(|(first_seed, seed_count, weights)| {
-            (*first_seed..*first_seed + *seed_count).map(move |seed| (HistorySeed(seed), *weights))
-        })
-        .collect();
+    let histories: Vec<(HistorySeed, &GenerationWeights)> =
+        RANDOM_HISTORY_BATCHES_OF_THE_LINEAGE_REBUILD_COUNT
+            .iter()
+            .flat_map(|(first_seed, seed_count, weights)| {
+                (*first_seed..*first_seed + *seed_count)
+                    .map(move |seed| (HistorySeed(seed), *weights))
+            })
+            .collect();
     let next_history = Mutex::new(0usize);
     let tally = Mutex::new(TallyOfTheScanRebuildOverRandomHistories::default());
     std::thread::scope(|scope| {
@@ -547,7 +549,7 @@ fn the_scan_rebuild_is_never_violated_and_holds_after_deletions_over_random_hist
                 let (seed, weights) = histories[history_index];
                 let history = generate_history_with_weights(
                     seed,
-                    OPERATIONS_OF_EACH_RANDOM_HISTORY_OF_THE_T8_COUNT,
+                    OPERATIONS_OF_EACH_RANDOM_HISTORY_OF_THE_LINEAGE_REBUILD_COUNT,
                     weights,
                 );
                 // 一段历史第一次失败就停（执行器文档），停之前那几步照样数进去：T8 那一格的攻方 s2 同一个数法。

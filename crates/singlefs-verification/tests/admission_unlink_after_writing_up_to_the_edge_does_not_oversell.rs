@@ -123,7 +123,10 @@ fn unlink_after_writing_up_to_the_admission_edge_publishes_every_deletion_step_a
             usize::try_from(content_length_in_bytes).expect("几 MiB 的内容长度装得进 usize"),
         ) {
             Ok(_) => {}
-            Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)) => {
+            Err(
+                UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+                | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_),
+            ) => {
                 edge_data_units = Some(data_units - 1);
                 break;
             }

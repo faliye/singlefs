@@ -541,14 +541,17 @@ pub use singlefs_verification::crash_amplification::{
 pub mod common_gpu_cards_of_the_caller;
 
 /// 清过场（服务给了卡）、用例自己写的多机配置（`SINGLEFS_MULTI_HOST_CONFIG` 指的那一份）开了 GPU，环境变量 `GPU_CARDS_BY_PRIORITY`
-/// 却没设（用例的环境守卫清掉了）时：照调用方给这个进程的显卡先后（`gpu_card_configuration::GpuConfigurationOfTheCaller`，服务交的那一张）
-/// 设上这个环境变量（一张卡都没点名是空串：本机能用的卡全用），交回的守卫丢掉时还原；别的情形不动环境、交 `None`。
+/// 却没设（用例的环境守卫清掉了）时：把调用方给这个进程的卡交给这一趟
+/// （`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`：服务交的卡串设成这个环境变量，一张卡都没点名是空串、本机能用的卡全用；
+/// 按需领卡的尝试交的是领卡通道的，把通道设回环境、不领卡），交回的守卫丢掉时还原；别的情形不动环境、交 `None`。
 /// 用例配置里写没写显卡先后都一样：配置里的卡不拿来挑卡，没经服务给卡、配置又开了 GPU 的，清没清场都照「清场与分卡由服务做」拒
-/// （`cards_by_priority_from`）。没清场的不设：要卡的那一趟没经服务给卡就该拒，没要卡的那一趟（不带 gpu 特性）不取卡。
-/// 经环境变量交过去的就是调用方的那一份，与卡池挑的卡对得上。
+/// （`cards_by_priority_from`）。没清场而调用方给了领卡通道的照样交通道，这一趟录完、第一次真要卡时才领（只录的那一趟不领）；
+/// 没清场也没有通道的不设：要卡的那一趟没经服务给卡就该拒，没要卡的那一趟（不带 gpu 特性）不取卡。
+/// 用例的环境守卫（`CrashAmplificationEnvironment`）清掉了通道目录与凭据，用例自己不设回的话这一刻环境里没有完整的通道，所以由这里设回。
+/// 经环境交过去的就是调用方的那一份，与卡池挑的卡对得上。
 ///
 /// # Panics
-/// 调用方的多机配置读不了、显卡先后写坏了，或清场之下没经服务给卡而调用方的多机配置开了 GPU（GPU 用例整条经 `task-server/task submit` 交）。
+/// 调用方的多机配置读不了、显卡先后写坏了，或清场之下没经服务给卡、也没有领卡通道而调用方的多机配置开了 GPU（GPU 用例整条经 `task-server/task submit` 交）。
 fn cards_of_the_caller_for_a_test_configuration_with_the_gpu() -> Option<EnvironmentRestoredOnDrop>
 {
     use singlefs_verification::gpu_card_configuration::{
@@ -565,18 +568,16 @@ fn cards_of_the_caller_for_a_test_configuration_with_the_gpu() -> Option<Environ
         .is_some_and(|value| value.trim().trim_matches('"') == "1");
     match GpuQuiesce::of_this_process() {
         GpuQuiesce::QuiescedByTheWrapper => {}
-        GpuQuiesce::NotQuiesced => return None,
+        GpuQuiesce::NotQuiesced => {
+            // 按需领卡的尝试起跑不清场（服务在交卡之前才清）：调用方给了领卡通道的照样往下，把通道交给这一趟（不在这里领）
+            singlefs_verification::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process()
+                .card_lease_channel()?;
+        }
     }
     if !gpu_is_enabled {
         return None;
     }
-    let cards_of_the_caller = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
-    let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[CARDS_BY_PRIORITY_KEY]);
-    restored.set_variable(
-        CARDS_BY_PRIORITY_KEY,
-        std::ffi::OsStr::new(&cards_of_the_caller),
-    );
-    Some(restored)
+    Some(common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run())
 }
 
 /// 一条已经录好的流（起点镜像、写表、段、被判的根槽写、版本表、崩溃点）按环境跑一趟崩溃放量：展开上限是这条流自己的那一个
@@ -781,7 +782,9 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
         "健康的流 {flow_name} 一个红状态都不该有：{:?}",
         run.checking.red_texts
     );
-    // 这一趟复用的块（库里这一判法单元指纹早先判过的）判红过也要红：只看这一趟判出的红数，红过一次的流再跑一遍就成了绿
+    // 这一趟复用的块（库里这一判法单元指纹早先判过的）判红过也要红：只看这一趟判出的红数，红过一次的流再跑一遍就成了绿。
+    // 给了块区间（`BLOCK_RANGE_ENVIRONMENT_VARIABLE`）的那一趟，对账与违例都只数本片的块（`run.block_range`）：本片判齐就判本片，
+    // 不等别的片判完
     if run.unjudged_blocks == 0 {
         assert!(
             run.violations.is_empty(),
@@ -806,7 +809,8 @@ pub fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
     (run, Some(line))
 }
 
-/// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。
+/// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`；
+/// 这台机器一块没选中、判器没起的（`EnvironmentRun::no_block_selected_here`）只有 `judge=none_selected_here`。
 #[must_use]
 pub fn judge_fields_of_the_summary_line(
     run: &singlefs_verification::crash_amplification::EnvironmentRun,
@@ -821,6 +825,8 @@ pub fn judge_fields_of_the_summary_line(
             gpu.states_per_second(),
             gpu.seconds_storing
         ),
+        // 这台机器一块没选中（给了块区间，空区间或份与区间没有交集）：判器没起，不写在哪判
+        None if run.no_block_selected_here => " judge=none_selected_here".to_string(),
         None => " judge=cpu".to_string(),
     }
 }
@@ -838,4 +844,51 @@ pub fn one_crash_point_over_every_write(
         writes: 0..write_count,
         ignored: false,
     }]
+}
+
+/// 新池新建文件那一段（mkfs 之后取号、暖机、发布第一个文件，`super::common::build_pool` 录的）当一条流：起点是 mkfs 之后的盘，
+/// 被判的根槽写是最后一次根槽写，版本表是那一次发布、内容是 `super::common::file_content`，整条写表一个崩溃点（设点的文件由调用方给 `file!()`）。
+/// 给只看一趟怎么取卡、录没录进库，不看这条流判出什么的用例用。
+pub struct NewPoolFileCreationAsOneCrashPoint {
+    pub base: singlefs_verification::memory_pool::MemoryPool,
+    pub writes: Vec<singlefs_verification::memory_pool::RetainedWrite>,
+    pub segments: Vec<Vec<usize>>,
+    pub judged_root_index: usize,
+    pub versions: Vec<singlefs_verification::memory_pool::PublishedVersion>,
+    pub crash_points: Vec<singlefs_verification::crash_amplification::CrashPointSpan>,
+}
+
+/// 录 [`NewPoolFileCreationAsOneCrashPoint`]（`tag` 给 `build_pool`，`code_file` 是设点的文件，`name` 是那一个崩溃点的名字）。
+///
+/// # Panics
+/// 录下的写表里没有根槽写。
+pub fn new_pool_file_creation_as_one_crash_point(
+    tag: &str,
+    code_file: &str,
+    name: &str,
+) -> NewPoolFileCreationAsOneCrashPoint {
+    let pool = super::common::build_pool(tag);
+    let operations = pool.retained_operations();
+    let (writes, segments) = singlefs_verification::memory_pool::writes_and_segments(
+        &operations[pool.mkfs_operation_count..],
+        &super::common::geometry(),
+    );
+    let judged_root_index = writes
+        .iter()
+        .rposition(|write| write.kind == singlefs_verification::segments::StepKind::RootRecordFua)
+        .expect("发布有一条根槽写");
+    let versions = vec![singlefs_verification::memory_pool::PublishedVersion {
+        instance: pool.output.root.instance,
+        checkpoint_txg: pool.output.root.checkpoint_txg,
+        content: super::common::file_content(),
+    }];
+    let crash_points = one_crash_point_over_every_write(code_file, name, writes.len());
+    NewPoolFileCreationAsOneCrashPoint {
+        base: pool.memory_pool_after_mkfs(),
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        crash_points,
+    }
 }

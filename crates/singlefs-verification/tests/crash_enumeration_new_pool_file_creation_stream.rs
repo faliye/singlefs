@@ -891,7 +891,7 @@ fn prepare(tag: &str) -> Prepared {
 
 /// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 crash-point-replay 在 release 下跑它。
 /// 判过的状态都在判定库里（崩溃枚举用例那一类，`crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）；
-/// I-3.10 那一类的逐状态计数记在观察者计数里，按块存进库、判段重建。双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：
+/// I-3.10 那一类的逐状态计数记在观察者计数里，按块存进库、判段重建。分片（门禁 `crash-point-replay` 的各片，`SINGLEFS_CRASH_AMPLIFICATION_SHARE`）：
 /// 两台各判自己那一份，那几趟不打计数行、不判下面的断言；两份都判进服务那一份之后不分片再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
 fn crash_point_replay_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {

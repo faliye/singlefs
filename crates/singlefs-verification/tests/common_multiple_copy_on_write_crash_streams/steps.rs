@@ -37,6 +37,7 @@ use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::WritableMountRefusedOnTheCrashDisks;
 use singlefs_verification::scenario::{deletion_history_batch_size, deletion_history_switches};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
@@ -1105,11 +1106,16 @@ pub struct MountedOnACopyOfTheCrashImage {
 
 /// 在 `crash_image` 的一份副本上可写挂载一次（批大小 1，同录流），挂载发的写与读录在一条新的录制流上；挂载之前的盘不动。
 ///
+/// # Errors
+/// 可写挂载被拒：交回拒因与挂载用过的录制设备，由观察者判这一拒认不认（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`）。
+///
 /// # Panics
-/// 可写挂载做不成，或续做没把队列走到空。
+/// 续做没把队列走到空。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
-fn mount_writable_on_a_copy_of(crash_image: &MemoryPool) -> (Mounted, MemoryPool, SharedStream) {
+fn mount_writable_on_a_copy_of(
+    crash_image: &MemoryPool,
+) -> Result<(Mounted, MemoryPool, SharedStream), Box<WritableMountRefusedOnTheCrashDisks>> {
     let mount_parameters = parameters();
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = crash_image
@@ -1127,14 +1133,22 @@ fn mount_writable_on_a_copy_of(crash_image: &MemoryPool) -> (Mounted, MemoryPool
             )
         })
         .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
+    let mounted = match mount_writable_with_test_only_switches_and_deletion_switches(
         &mount_parameters,
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         deletion_history_switches(),
-    )
-    .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return Err(Box::new(WritableMountRefusedOnTheCrashDisks {
+                refusal,
+                devices,
+                stream,
+            }));
+        }
+    };
     assert!(
         matches!(
             mounted.output.deletion_queue_continuation_outcome,
@@ -1150,7 +1164,7 @@ fn mount_writable_on_a_copy_of(crash_image: &MemoryPool) -> (Mounted, MemoryPool
             .collect(),
         device_size_in_bytes: crash_image.device_size_in_bytes,
     };
-    (mounted, disks_after_the_mount, stream)
+    Ok((mounted, disks_after_the_mount, stream))
 }
 
 /// 只读挂载 `image`（扫环只这一次），逐个打开 `inodes` 里的号、各从偏移 0 读整个文件：打不开的是 `None`。
@@ -1186,9 +1200,11 @@ fn contents_read_back(image: &MemoryPool, inodes: &[u64]) -> BTreeMap<u64, Conte
 /// 同一张崩溃镜像在另一份副本上再挂一次，两份挂完的盘逐字节相同（幂等判据 ①b）。落到 A 之前的挂完照旧没有树。
 /// 交回第一次挂完的盘、挂载那一趟的录制流与要加一的计数名：判段在挂完的盘上跑池级 checker（`mod.rs`）。
 ///
+/// # Errors
+/// 可写挂载被拒：拒因与挂载用过的录制设备交回观察者（`mod.rs`），由它判这一拒认不认。
+///
 /// # Panics
-/// 可写挂载做不成，或上面任何一样对不上。
-#[must_use]
+/// 上面任何一样对不上，或同一张崩溃镜像第一遍挂得上、第二遍被拒。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn mount_continue_and_read_back_every_file(
@@ -1196,10 +1212,10 @@ pub fn mount_continue_and_read_back_every_file(
     inodes_read_back: &[u64],
     landed_root: RootIdentity,
     crash_image: &MemoryPool,
-) -> MountedOnACopyOfTheCrashImage {
+) -> Result<MountedOnACopyOfTheCrashImage, Box<WritableMountRefusedOnTheCrashDisks>> {
     let landed = version_of_the_stream_at(versions, landed_root);
     let (mounted, disks_after_the_mount, stream_of_the_mount) =
-        mount_writable_on_a_copy_of(crash_image);
+        mount_writable_on_a_copy_of(crash_image)?;
     let expected_publishes = landed.map_or(0, |version| version.deletion_publishes_left);
     assert_eq!(
         mounted.output.deletion_queue_continuation.len(),
@@ -1226,7 +1242,12 @@ pub fn mount_continue_and_read_back_every_file(
             counters.push(FILES_READ_BACK_AFTER_THE_CONTINUATION_COUNTER.to_string());
             if expected_publishes > 0 {
                 let (_mounted_again, disks_after_the_repeated_mount, _stream_of_the_repeated_mount) =
-                    mount_writable_on_a_copy_of(crash_image);
+                    mount_writable_on_a_copy_of(crash_image).unwrap_or_else(|refused| {
+                        panic!(
+                            "恢复落到 {landed_root:?}：同一张崩溃镜像第一遍挂得上，第二遍被拒：{:?}",
+                            refused.refusal
+                        )
+                    });
                 assert!(
                     disks_after_the_repeated_mount == disks_after_the_mount,
                     "恢复落到 {landed_root:?}：同一张崩溃镜像在两份副本上各自续做，挂完的盘逐字节相同"
@@ -1242,9 +1263,9 @@ pub fn mount_continue_and_read_back_every_file(
             counters.push(MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER.to_string());
         }
     }
-    MountedOnACopyOfTheCrashImage {
+    Ok(MountedOnACopyOfTheCrashImage {
         disks_after_the_mount,
         stream_of_the_mount,
         counters,
-    }
+    })
 }

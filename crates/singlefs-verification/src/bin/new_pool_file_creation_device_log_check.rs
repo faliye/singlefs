@@ -949,7 +949,7 @@ mod tests {
     /// 程序录制流里有一次 discard（盘 0 上一次 discard、一道屏障，记在新池新建文件那一段）：盘上日志收到同一段的 Discard 判绿；
     /// 日志里没有那条 Discard 判红，第一处不一致落在新池新建文件那一段，结果行报程序 1 条、盘上 0 条。
     #[test]
-    fn a_discard_the_program_recorded_but_the_device_never_received_is_red_and_one_it_received_is_green(
+    fn discard_the_program_recorded_but_the_device_never_received_is_red_and_one_it_received_is_green(
     ) {
         let operations = vec![
             RetainedOperation {

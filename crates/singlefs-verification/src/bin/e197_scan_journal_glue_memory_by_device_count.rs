@@ -89,8 +89,8 @@ const LAST_REPEAT_NUMBER: u32 = 10;
 // 写不进、读不出都交 `None`，结果行写 `unreadable`（V11：那一次作废，不当 0）。
 // ============================================================================================
 
-const PROC_SELF_STATUS_FILE: &str = "/proc/self/status";
-const PROC_SELF_CLEAR_REFS_FILE: &str = "/proc/self/clear_refs";
+const PROCESS_FILESYSTEM_SELF_STATUS_FILE: &str = "/proc/self/status";
+const PROCESS_FILESYSTEM_SELF_CLEAR_REFERENCES_FILE: &str = "/proc/self/clear_refs";
 const VM_RESIDENT_FIELD: &str = "VmRSS:";
 const VM_HIGH_WATER_MARK_FIELD: &str = "VmHWM:";
 const BYTES_PER_KIBIBYTE: i64 = 1024;
@@ -125,7 +125,10 @@ struct ResidentWindowEnd {
 impl ResidentWindow {
     /// 开窗：往 `/proc/self/clear_refs` 写 `5`，随即读 `VmRSS`。写不进或读不出交 `None`。
     fn open() -> Option<ResidentWindow> {
-        ResidentWindow::open_with(PROC_SELF_CLEAR_REFS_FILE, PROC_SELF_STATUS_FILE)
+        ResidentWindow::open_with(
+            PROCESS_FILESYSTEM_SELF_CLEAR_REFERENCES_FILE,
+            PROCESS_FILESYSTEM_SELF_STATUS_FILE,
+        )
     }
 
     fn open_with(clear_refs_file: &str, status_file: &str) -> Option<ResidentWindow> {
@@ -150,7 +153,7 @@ impl ResidentWindow {
 
 impl ResidentWindowEnd {
     fn read_now() -> Option<ResidentWindowEnd> {
-        ResidentWindowEnd::read_from(PROC_SELF_STATUS_FILE)
+        ResidentWindowEnd::read_from(PROCESS_FILESYSTEM_SELF_STATUS_FILE)
     }
 
     fn read_from(status_file: &str) -> Option<ResidentWindowEnd> {
@@ -167,7 +170,7 @@ impl ResidentWindowEnd {
 
 /// 此刻的 `VmRSS`（KiB）；读不出交 `None`。池在每块盘最后一槽被读到时调它（轨迹）。
 fn vm_rss_kib_now() -> Option<u64> {
-    let status_text = std::fs::read_to_string(PROC_SELF_STATUS_FILE).ok()?;
+    let status_text = std::fs::read_to_string(PROCESS_FILESYSTEM_SELF_STATUS_FILE).ok()?;
     kibibytes_of_the_status_field(&status_text, VM_RESIDENT_FIELD)
 }
 
@@ -379,7 +382,7 @@ fn predicted_resident_peak_bytes(
 /// 登记修订三第七节 A11、A12：读缓存每项 = chunk(4096) 字节的值 + 树叶的摊分（叶 = 16 + 11 × 24 + 11 × 24 = 544 字节的请求，一块 560，升序插入每叶留 6 个键）。
 #[cfg(test)]
 fn predicted_cache_bytes(entries: u64) -> f64 {
-    let leaf_of_the_cache = glibc_chunk_bytes(16 + 11 * 24 + 11 * 24);
+    let leaf_of_the_cache = glibc_chunk_bytes(16 + 24 * 11 + 24 * 11);
     entries as f64
         * (glibc_chunk_bytes(JOURNAL_RECORD_BYTES) as f64
             + leaf_of_the_cache as f64 / ASCENDING_INSERT_KEYS_PER_TREE_LEAF)
@@ -1837,7 +1840,7 @@ mod tests {
     }
 
     #[test]
-    fn a_window_that_cannot_reset_or_read_is_unreadable_and_the_result_line_says_so() {
+    fn window_that_cannot_reset_or_read_is_unreadable_and_the_result_line_says_so() {
         let status = sample_status_file("open", SAMPLE_STATUS_TEXT);
         let status_path = status.to_str().expect("路径是 UTF-8");
         let clear_refs = sample_status_file("open-clear-refs", "");
@@ -2570,7 +2573,7 @@ mod tests {
     }
 
     /// 单测里 A7 取的几何：（每条记录点名项数 K，环槽数）。
-    const A7_UNIT_GEOMETRIES: [(usize, u64); 2] = [(64, 8192), (1, 32768)];
+    const RESIDENT_PREDICTION_UNIT_GEOMETRIES: [(usize, u64); 2] = [(64, 8192), (1, 32768)];
 
     /// 读数表的表头：这一趟跑在哪种内核、哪几个在线的处理器上（H 与内核的页计数、透明大页有关，两台各不相同时靠它认）。
     /// 处理器只记进表头认机器、不定并行度，与另两样一样从内核的文件里原样读（`/sys/devices/system/cpu/online`，如 `0-31`）。
@@ -2603,13 +2606,13 @@ mod tests {
         // 固定之后同一格低约 0.9%，二十四格最大偏差约 1.0%。
         let readings = read_the_scanning_cells(
             "mmap门槛固定131072",
-            &A7_UNIT_GEOMETRIES,
+            &RESIDENT_PREDICTION_UNIT_GEOMETRIES,
             &[1, 2, 3],
             &FIXED_MMAP_THRESHOLD_ENVIRONMENT,
         );
         assert_eq!(
             readings.len(),
-            A7_UNIT_GEOMETRIES.len() * SCANNING_ARMS.len() * 3
+            RESIDENT_PREDICTION_UNIT_GEOMETRIES.len() * SCANNING_ARMS.len() * 3
         );
         let table = std::iter::once(kernel_facts_line())
             .chain(readings.iter().map(ScanningCellReading::row))

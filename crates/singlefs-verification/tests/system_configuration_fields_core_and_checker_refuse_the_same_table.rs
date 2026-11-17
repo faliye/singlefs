@@ -8,6 +8,9 @@
 //! 「实现整池拒绝挂载」，A、D 两格 core 拒而 I-7.13 不红。
 //! E 格两边拒的理由不同：core 先判槽距上界（按同一槽自述的根环起点 0 算，槽 1 不在它之前），checker 先判根环起点等不等第一版常量；
 //! 这里照今天两边各自的判定次序钉。
+//! 另一格是环长的「在飞上限装进 4 字节」（`.claude/kb/layout/01-first-txn.md` 一「journal 在飞记录数上限 | 4」）：环长写 `3 << 44`、
+//! 单元区起始槽号跟着改成它现算的那个槽，在飞上限 2³² 装不进 4 字节；core 拒成 `JournalRingBytesOutsideTheSupportedRange`，
+//! checker 的环长判据有同一格、报 I-7.13 点名同一个成员，I-8.1 报不适用（I-7.13 与它同时不成立时走 I-7.13 那一支）。
 mod common;
 mod common_images_for_the_given_states_engine;
 #[path = "common_images_for_the_given_states_engine/system_configuration_fields_core_and_checker_refuse_the_same_table.rs"]
@@ -56,5 +59,14 @@ fn a_root_ring_base_of_zero_is_refused_by_core_for_the_slot_spacing_and_reddens_
 ) {
     PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
         scenarios_of_system_configuration_fields_core_and_checker_refuse_the_same_table::run_the_scenario_where_a_root_ring_base_of_zero_is_refused_by_core_for_the_slot_spacing_and_reddens_the_checker_table_for_the_base,
+    );
+}
+
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_system_configuration_fields_core_and_checker_refuse_the_same_table::run_the_scenario_where_a_journal_ring_whose_in_flight_record_limit_overflows_its_four_byte_field_is_refused_by_core_and_reddens_the_checker_table`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+#[test]
+fn a_journal_ring_whose_in_flight_record_limit_overflows_its_four_byte_field_is_refused_by_core_and_reddens_the_checker_table(
+) {
+    PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
+        scenarios_of_system_configuration_fields_core_and_checker_refuse_the_same_table::run_the_scenario_where_a_journal_ring_whose_in_flight_record_limit_overflows_its_four_byte_field_is_refused_by_core_and_reddens_the_checker_table,
     );
 }

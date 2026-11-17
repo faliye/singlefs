@@ -3,8 +3,7 @@
 // 回比本地常量，不判态、不要卡。带 gpu 编好的二进制直接交统一任务服务时，由服务按这一行清场、分卡。
 //! E171（三oracle合谋测试） 第 1 次重跑：入库装置（登记 `research/prompts/e171-r1-prereg.md`，5.3「装置写在哪」）。
 //!
-//! 由 `e171_three_oracle_collusion.rs`（sha256 37b5b27c…，流二钉值 481、已知坏镜像 43 条那一份）照抄起头，不 `#[path]` 引它；
-//! 那份留着不动（它是 s4 冻结树读数的装置）。改五处、加两样（登记 5.3）：
+//! 与 `e171_three_oracle_collusion.rs` 是两份装置、不 `#[path]` 引它，两份的本地常量（流一段长 `LOCAL_FIRST_STREAM_SEGMENT_LENGTHS` 这类）一样跟着 crates 改；比它改五处、加两样（登记 5.3）：
 //! ① 卸载调理想模型的卸载答（`IdealModel::answer_unmount`，对拍用 `model_comparison::observed_unmount`）；
 //! ② 每次成功调用的交回值与调用之后装置手里的实现对象，`{:?}` 文本的 sha256 记进 `call-outcomes.tsv` 新加的两列与 `call-return-values.tsv`（读法 4）；
 //! ③ 调用 panic 与交回错误同样截断照判，态上的恢复 panic 不截断（读法 5）；
@@ -110,6 +109,7 @@ use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
 use singlefs_verification::history::StepPosition;
+use singlefs_verification::known_bad_images::known_bad_images;
 use singlefs_verification::memory_pool::{
     newest_persisted_root, writes_and_segments_with_stream_indexes_and_entries, CrashImage,
     MemoryPool, PublishedVersion, RecordCheck, RetainedWrite, WrittenContents,
@@ -128,9 +128,10 @@ use singlefs_verification::model_comparison::{
     root_ring_slot_still_bad_after_one_reread_of_rollback_error,
 };
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state, refusal_reason_on_the_d23_list,
-    DiskAfterTheRefusal, ReadFaultsInTheCrashState, ReadOnlyReadBackOfTheCrashImage,
-    RefusalConditionNotMet, RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool,
+    refusal_reason_on_the_legal_refusal_list, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 use singlefs_verification::reference_filesystem_translation::{
     crash_moment_of_a_segment_closed_at, segment_closing_stream_indexes,
@@ -144,7 +145,7 @@ use singlefs_verification::{
 
 // ───────────────────────────── 本地常量（登记 5.3、S1） ─────────────────────────────
 //
-// 下面这一批与 `e170_o3_spec_executor_export.rs`「本地常量（登记 5.7、S1）」那一节同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
+// 下面这一批与 `e170_specification_executor_export.rs`「本地常量（登记 5.7、S1）」那一节同一批、同样的值与出处注释；`baseline` 开头与 crates 的同名公开常量或现算值回比，
 // 不直接引（决定几何与工作量的数写成本地常量：引了就等于装置与实现共用一个数，两边一起错而逐格相等）。
 // 这些常量只在基线那一趟回比：坏实现改了写流，这些数在坏实现那一趟本来就会变，照数记进产物。
 
@@ -208,7 +209,7 @@ const LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 294;
 /// （同一份产物第 62 行；上一版 1_678_377_089）。单测拿段长表回算它。
 const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_095;
 /// E 的数据单元落点：同一份文件第 318 行（`50176`）。
-const LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT: u64 = 50_176;
+const LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT: u64 = 50_176;
 /// 抬 F 推的空发布数：同一份文件第 306 行（`raised.publishes.len(), 2`）。
 const LOCAL_SECOND_STREAM_RAISE_FLOOR_PUBLISHES: usize = 2;
 /// 卸载推的两次空发布的 txg：同一份文件第 336 行（`vec![CheckpointTxg(18), CheckpointTxg(19)]`）。
@@ -353,7 +354,7 @@ const UNMOUNT_CALL_LABEL: &str = "unmount";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum StreamName {
     NewPoolFileCreation,
-    FixedScriptThroughEThenUnmount,
+    FixedScriptReuseAfterRaisingFloorThenUnmount,
     FirstFileUnlinkedThenInodesAcrossOneLeaf,
 }
 
@@ -361,7 +362,9 @@ impl StreamName {
     fn directory_name(self) -> &'static str {
         match self {
             Self::NewPoolFileCreation => "new_pool_file_creation",
-            Self::FixedScriptThroughEThenUnmount => "fixed_script_through_e_then_unmount",
+            Self::FixedScriptReuseAfterRaisingFloorThenUnmount => {
+                "fixed_script_through_e_then_unmount"
+            }
             Self::FirstFileUnlinkedThenInodesAcrossOneLeaf => {
                 "first_file_unlinked_then_inodes_across_one_leaf"
             }
@@ -371,7 +374,7 @@ impl StreamName {
     fn number(self) -> u8 {
         match self {
             Self::NewPoolFileCreation => 1,
-            Self::FixedScriptThroughEThenUnmount => 2,
+            Self::FixedScriptReuseAfterRaisingFloorThenUnmount => 2,
             Self::FirstFileUnlinkedThenInodesAcrossOneLeaf => 3,
         }
     }
@@ -379,7 +382,7 @@ impl StreamName {
 
 const STREAM_NAMES: [StreamName; 3] = [
     StreamName::NewPoolFileCreation,
-    StreamName::FixedScriptThroughEThenUnmount,
+    StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
     StreamName::FirstFileUnlinkedThenInodesAcrossOneLeaf,
 ];
 
@@ -844,7 +847,7 @@ impl StreamDriver {
         let call_index = self.calls.len();
         let inject_a_panic = self.switches.positive_control
             == Some(PositiveControl::PanicInTheCall)
-            && self.name == StreamName::FixedScriptThroughEThenUnmount
+            && self.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
             && call_index == PANIC_CONTROL_CALL;
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             assert!(
@@ -1005,7 +1008,7 @@ impl StreamDriver {
             return;
         }
         if self.switches.positive_control == Some(PositiveControl::ComparisonOfTheCalls)
-            && self.name == StreamName::FixedScriptThroughEThenUnmount
+            && self.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
             && self.calls[call_index].label == "publish"
             && !self.comparison_control_applied
         {
@@ -1210,7 +1213,7 @@ impl LiveStream {
             self.mount_output_text.as_deref(),
         );
         if self.driver.switches.positive_control == Some(PositiveControl::MemoryObject)
-            && self.driver.name == StreamName::FixedScriptThroughEThenUnmount
+            && self.driver.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
             && call_index == RETURN_VALUE_CONTROL_CALL
         {
             let mut allocator_with_one_more_slot = self.allocator.clone();
@@ -1323,7 +1326,7 @@ impl LiveStream {
             ));
         if let Ok(output) = &result {
             if self.driver.switches.positive_control == Some(PositiveControl::ReturnValue)
-                && self.driver.name == StreamName::FixedScriptThroughEThenUnmount
+                && self.driver.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
                 && call_index == RETURN_VALUE_CONTROL_CALL
             {
                 let mut recorded_copy = output.clone();
@@ -1662,7 +1665,7 @@ impl LiveStream {
                 let mut observed = observed_unmount(&unmounted);
                 if self.driver.switches.positive_control
                     == Some(PositiveControl::ComparisonOfTheUnmount)
-                    && self.driver.name == StreamName::FixedScriptThroughEThenUnmount
+                    && self.driver.name == StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
                 {
                     if let ObservedEffect::Publishes { roots, .. } = &mut observed {
                         if let Some(first_root) = roots.first_mut() {
@@ -1895,7 +1898,7 @@ impl LiveStream {
                 self.run_the_third_stream_after_the_first_file();
                 return;
             }
-            StreamName::FixedScriptThroughEThenUnmount => {}
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => {}
         }
         self.versions
             .push(version(1, 3, local_first_file_content()));
@@ -1948,7 +1951,7 @@ impl LiveStream {
             .map(|location| location.slot.0);
         self.checks.push(StopCheck::new(
             "second_stream_e_data_unit_slot",
-            Some(LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT),
+            Some(LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT),
             reuse_slot,
         ));
         self.versions.push(version(2, 17, later_content(31)));
@@ -1964,7 +1967,10 @@ impl LiveStream {
     /// Q5 那一形（读法 7）要的流二前四次调用：取号、暖机、第一个文件（第 2 次调用，模型跟到这一次）、第一次覆盖写（第 3 次调用，
     /// 实现照常跑完、写流照录，模型不问——那一形里它在途）。与基线流二前四次调用逐条同一个驱动。
     fn run_the_second_stream_through_the_first_overwrite(&mut self) {
-        assert_eq!(self.driver.name, StreamName::FixedScriptThroughEThenUnmount);
+        assert_eq!(
+            self.driver.name,
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount
+        );
         if !self.step_acquire_and_warm_up() || !self.step_publish_first_file() {
             return;
         }
@@ -2111,7 +2117,7 @@ fn prepared_stream_of_the_live_stream(
 }
 
 /// S1 里跟流有关的几条（只在基线那一趟）：段长表、写数、根槽写数、盘数与盘字节数对本地常量；流一整条流逐条与 `build_pool` 比。
-/// 与 `e170_o3_spec_executor_export.rs` 的 `prepare_stream` 里那一批 S1 回比同一批。
+/// 与 `e170_specification_executor_export.rs` 的 `prepare_stream` 里那一批 S1 回比同一批。
 #[allow(
     clippy::too_many_arguments,
     reason = "这几样是 prepare_stream 驱动完之后手里同时有的，拆成结构体只会多一层搬运"
@@ -2141,7 +2147,7 @@ fn stream_checks_against_the_crates(
                 LOCAL_FIRST_STREAM_WRITES,
                 LOCAL_FIRST_STREAM_ROOT_WRITES,
             ),
-            StreamName::FixedScriptThroughEThenUnmount => (
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
                 &LOCAL_SECOND_STREAM_SEGMENT_LENGTHS,
                 LOCAL_SECOND_STREAM_WRITES,
                 LOCAL_SECOND_STREAM_ROOT_WRITES,
@@ -3409,7 +3415,7 @@ struct WritableMountProbe {
     mount: &'static str,
     /// 拒的错误成员（`{:?}` 的第一个标识符）与它在不在 D23 已定项 14 那张单子上（不在写 `-`）。
     refusal_member: String,
-    refusal_on_the_d23_list: String,
+    refusal_on_the_legal_refusal_list: String,
     /// 第二截的判定：`legal`、`illegal:<没满足的条件>`、`reason_not_on_the_d23_list`；挂上了写 `-`。
     second_crop: String,
     /// 拒的理由是系统配置见证（单子上那一条）。
@@ -3423,13 +3429,16 @@ const READ_FAULTS_OF_A_CRASH_STATE: ReadFaultsInTheCrashState =
 /// 一个崩溃态上的可写挂载探针（读法 8；入参逐项照崩溃注入第二截那一处取，停机 S10）：崩溃镜像落成内存池
 /// （`crash_injection::materialized_crash_image`，第二截同一个函数），在副本上起一次可写挂载（`crash_injection::writable_mount_alone_on`，
 /// 空间准入照公式判，同第二截默认的 `SpaceAdmission::JudgedByTheFormula`）；拒了就用第二截同一个调用
-/// （`judge_writable_mount_refusal_of_a_crash_state`）判合不合法：恢复落到的版本取看 journal 那一遍的 `effective_root`，盘上同不同比拒之后的池与崩溃镜像，
-/// 只读读出在不在允许集合里取 O1-模型崩溃判官红没红（第二截取同一次崩溃上模型判的结论），读故障交「没注入」。
+/// （`judge_writable_mount_refusal_of_a_crash_state_of_the_pool`）判合不合法：本池 fsid 取建池参数（`common::parameters()`，可写挂载用的同一份），
+/// 恢复落到的版本取看 journal 那一遍的 `effective_root`（盘面由一个池的写流盖在 mkfs 的盘上造出，没有别的池的槽，筛不筛 fsid 落到同一版），
+/// 盘上同不同比拒之后的池与崩溃镜像，只读读出在不在允许集合里取 O1-模型崩溃判官红没红（第二截取同一次崩溃上模型判的结论），
+/// 读故障交「没注入」，被拒的那次挂载读的就是崩溃镜像、不带故障层。
 fn writable_mount_probe_on(
     crash_image_materialized: &MemoryPool,
     selected_version: Option<(InstanceGeneration, CheckpointTxg)>,
     crash_judge: &CrashJudgeVerdict,
 ) -> WritableMountProbe {
+    let parameters = common::parameters();
     let criterion =
         witness_criterion_on_the_crash_image(crash_image_materialized, selected_version);
     let read_only_read_back = match crash_judge {
@@ -3442,71 +3451,78 @@ fn writable_mount_probe_on(
     };
     let mounted = writable_mount_alone_on(
         crash_image_materialized,
-        &common::parameters(),
+        &parameters,
         SpaceAdmission::JudgedByTheFormula,
     );
-    let (mount, refusal_member, refusal_on_the_d23_list, second_crop, refused_for_the_witness) =
-        match mounted {
-            WritableMountAlone::Mounted { .. } => (
-                "mounted",
-                "-".to_string(),
-                "-".to_string(),
-                "-".to_string(),
-                false,
-            ),
-            WritableMountAlone::Refused {
-                refusal,
-                pool_after,
-                ..
-            } => {
-                let on_the_list = refusal_reason_on_the_d23_list(&refusal);
-                let disk = if pool_after == *crash_image_materialized {
-                    DiskAfterTheRefusal::ByteForByteUnchanged
-                } else {
-                    DiskAfterTheRefusal::Changed
-                };
-                let verdict = judge_writable_mount_refusal_of_a_crash_state(
-                    crash_image_materialized,
-                    selected_version,
-                    &refusal,
-                    disk,
-                    read_only_read_back,
-                    READ_FAULTS_OF_A_CRASH_STATE,
-                );
-                let second_crop = match verdict {
-                    WritableMountRefusalVerdict::Legal(_) => "legal".to_string(),
-                    WritableMountRefusalVerdict::Illegal {
-                        conditions_not_met, ..
-                    } => format!(
-                        "illegal:{}",
-                        conditions_not_met
-                            .iter()
-                            .map(refusal_condition_text)
-                            .collect::<Vec<String>>()
-                            .join(",")
-                    ),
-                    WritableMountRefusalVerdict::ReasonNotOnTheD23List => {
-                        "reason_not_on_the_d23_list".to_string()
-                    }
-                };
-                (
+    let (
+        mount,
+        refusal_member,
+        refusal_on_the_legal_refusal_list,
+        second_crop,
+        refused_for_the_witness,
+    ) = match mounted {
+        WritableMountAlone::Mounted { .. } => (
+            "mounted",
+            "-".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            false,
+        ),
+        WritableMountAlone::Refused {
+            refusal,
+            pool_after,
+            ..
+        } => {
+            let on_the_list = refusal_reason_on_the_legal_refusal_list(&refusal);
+            let disk = if pool_after == *crash_image_materialized {
+                DiskAfterTheRefusal::ByteForByteUnchanged
+            } else {
+                DiskAfterTheRefusal::Changed
+            };
+            let verdict = judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
+                crash_image_materialized,
+                &parameters.filesystem_identifier,
+                selected_version,
+                &refusal,
+                disk,
+                read_only_read_back,
+                READ_FAULTS_OF_A_CRASH_STATE,
+                ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
+            );
+            let second_crop = match verdict {
+                WritableMountRefusalVerdict::Legal(_) => "legal".to_string(),
+                WritableMountRefusalVerdict::Illegal {
+                    conditions_not_met, ..
+                } => format!(
+                    "illegal:{}",
+                    conditions_not_met
+                        .iter()
+                        .map(refusal_condition_text)
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ),
+                WritableMountRefusalVerdict::ReasonNotOnTheLegalRefusalList => {
+                    "reason_not_on_the_d23_list".to_string()
+                }
+            };
+            (
                     "refused",
                     error_member_of(&*refusal),
                     on_the_list.map_or_else(|| "-".to_string(), |reason| format!("{reason:?}")),
                     second_crop,
                     on_the_list
                         == Some(
-                            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+                            RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
                         ),
                 )
-            }
-        };
+        }
+    };
     WritableMountProbe {
         criterion,
         selected_version: root_text(selected_version),
         mount,
         refusal_member,
-        refusal_on_the_d23_list,
+        refusal_on_the_legal_refusal_list,
         second_crop,
         refused_for_the_system_configuration_witness: refused_for_the_witness,
     }
@@ -3610,8 +3626,8 @@ struct StateObservation {
     consulted_root: Option<(InstanceGeneration, CheckpointTxg)>,
     probe: Option<WritableMountProbe>,
     recovery_panic: Option<String>,
-    o1_nanoseconds: u128,
-    o2_nanoseconds: u128,
+    crash_judge_nanoseconds: u128,
+    pool_checker_nanoseconds: u128,
     recovery_nanoseconds: u128,
     /// 看 journal 那一遍的整份恢复报告：只在 Q5 主取样点按等价类判的那一趟留（类核对 ①、④ 与「等价类对拍」逐字段比它），
     /// 别的趟与恢复 panic 的态是 None。
@@ -3792,7 +3808,10 @@ fn piece_panic_states_text(states: &[usize; JUDGING_PIECE_COUNT]) -> String {
 }
 
 /// `name=q5_piece_panics` 那一行：十件各一个字段（修订 5 第 5.1 节第 5 条），再带 `unattributed_panic_states=`。
-fn q5_piece_panics_line(sampling_point: &str, observations: &[StateObservation]) -> String {
+fn confirmed_loss_form_piece_panics_line(
+    sampling_point: &str,
+    observations: &[StateObservation],
+) -> String {
     let states = piece_panic_states_of(observations);
     let fields: Vec<String> = JudgingPiece::ALL
         .iter()
@@ -3809,7 +3828,7 @@ fn q5_piece_panics_line(sampling_point: &str, observations: &[StateObservation])
 
 /// 一组态里有 [`unattributed_panic_states_of`] 数到的态（登记「主 agent 认定：27-2 装置交回」第 2 条）：这一趟的 Q5 不判甲乙、不进 S13，
 /// 打 `q5_not_run=unattributed_panic` 的判决行、收尾，交回退出码 3（交主 agent）；一态都没有交 `None`，调用方接着判。
-fn stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
+fn stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
     lines: &mut ResultLines,
     failed_checks: usize,
     observations: &[StateObservation],
@@ -4077,7 +4096,7 @@ fn observation_of_a_judged_state(
     } else {
         ReferenceFileSystemVoteOfAState::Off
     };
-    let o1_nanoseconds = crash_judge_started.elapsed().as_nanos();
+    let crash_judge_nanoseconds = crash_judge_started.elapsed().as_nanos();
     let pool_checker_control = switches.positive_control == Some(PositiveControl::PoolChecker)
         && stream.name == StreamName::NewPoolFileCreation
         && ordinal == context.tables.state_count - 1;
@@ -4092,7 +4111,7 @@ fn observation_of_a_judged_state(
                 check_pool_image(image)
             }
         });
-    let o2_nanoseconds = pool_checker_started.elapsed().as_nanos();
+    let pool_checker_nanoseconds = pool_checker_started.elapsed().as_nanos();
     let image_digest = sha256_text(&crash_image_digest(image));
     // None 有两种：O2 这路 oracle 关着；或引擎这一趟只录没判（占位，判归编进 gpu 特性的那一趟）——两种都不与判决比
     let pool_checker_red = pool_checker_timed_on_the_cpu.and_then(|_| {
@@ -4139,7 +4158,9 @@ fn observation_of_a_judged_state(
         landing_vector,
         image_digest,
         verdict,
-        judge_nanoseconds: o1_nanoseconds + o2_nanoseconds + recovery_nanoseconds,
+        judge_nanoseconds: crash_judge_nanoseconds
+            + pool_checker_nanoseconds
+            + recovery_nanoseconds,
         mask_matches_the_facts: context.facts.persisted_writes_of_state(ordinal) == image.persisted,
         touched_call,
         crash_judge,
@@ -4152,8 +4173,8 @@ fn observation_of_a_judged_state(
         consulted_root: judgement.consulted.effective_root,
         probe,
         recovery_panic: None,
-        o1_nanoseconds,
-        o2_nanoseconds,
+        crash_judge_nanoseconds,
+        pool_checker_nanoseconds,
         recovery_nanoseconds,
         consulted_report: match controls.consulted_reports {
             ConsultedReports::Dropped => None,
@@ -4252,7 +4273,7 @@ fn observation_of_a_panicking_state(
     let pool_checker = judging_piece_outcome(JudgingPiece::PoolChecker, injected, || {
         check_pool_image(&image)
     });
-    let o2_nanoseconds = pool_checker_started.elapsed().as_nanos();
+    let pool_checker_nanoseconds = pool_checker_started.elapsed().as_nanos();
     note_a_piece_panic(&mut piece_panics, JudgingPiece::PoolChecker, &pool_checker);
     let record_checker = match consulted.done() {
         Some(report) => judging_piece_outcome(JudgingPiece::RecordChecker, injected, || {
@@ -4317,7 +4338,7 @@ fn observation_of_a_panicking_state(
             }
         }
     };
-    let o1_nanoseconds = crash_judge_started.elapsed().as_nanos();
+    let crash_judge_nanoseconds = crash_judge_started.elapsed().as_nanos();
     let recovery_started = Instant::now();
     let timing_recovery = judging_piece_outcome(JudgingPiece::TimingRecovery, injected, || {
         let _ = singlefs_core::recovery::recover(
@@ -4370,7 +4391,9 @@ fn observation_of_a_panicking_state(
         landing_vector,
         image_digest: sha256_text(&crash_image_digest(&image)),
         verdict,
-        judge_nanoseconds: o1_nanoseconds + o2_nanoseconds + recovery_nanoseconds,
+        judge_nanoseconds: crash_judge_nanoseconds
+            + pool_checker_nanoseconds
+            + recovery_nanoseconds,
         mask_matches_the_facts: true,
         touched_call,
         crash_judge,
@@ -4392,8 +4415,8 @@ fn observation_of_a_panicking_state(
             PieceOutcome::Panicked(message) => Some(message.clone()),
             PieceOutcome::Done(_) | PieceOutcome::NotRun => None,
         },
-        o1_nanoseconds,
-        o2_nanoseconds,
+        crash_judge_nanoseconds,
+        pool_checker_nanoseconds,
         recovery_nanoseconds,
         consulted_report: match (consulted_reports, consulted.done()) {
             (ConsultedReports::Kept, Some(report)) => Some(report.clone()),
@@ -4781,12 +4804,12 @@ fn oracle_verdicts_file_text(observations: &[StateObservation]) -> String {
         .iter()
         .enumerate()
         .map(|(state_number, observation)| {
-            let (o2_word, o2_items) = match &observation.pool_checker_red {
+            let (pool_checker_word, pool_checker_items) = match &observation.pool_checker_red {
                 None => ("off", "-".to_string()),
                 Some(items) if items.is_empty() => ("green", "-".to_string()),
                 Some(items) => ("red", items.join(",")),
             };
-            let o1_detail = match &observation.crash_judge {
+            let crash_judge_detail = match &observation.crash_judge {
                 CrashJudgeVerdict::Red { what } => cell_text(what),
                 CrashJudgeVerdict::Green
                 | CrashJudgeVerdict::NotApplicable
@@ -4807,7 +4830,7 @@ fn oracle_verdicts_file_text(observations: &[StateObservation]) -> String {
                 | ReferenceFileSystemVoteOfAState::Off => ("-".to_string(), "-".to_string()),
             };
             format!(
-                "{state_number}\t{}\t{}\t{}\t{}\t{}\t{o1_detail}\t{o2_word}\t{o2_items}\t{}\t{}\t{}\t{}\t{}\t{reference_filesystem_detail}\t{}\t{allowed}\t{}\t{}\n",
+                "{state_number}\t{}\t{}\t{}\t{}\t{}\t{crash_judge_detail}\t{pool_checker_word}\t{pool_checker_items}\t{}\t{}\t{}\t{}\t{}\t{reference_filesystem_detail}\t{}\t{allowed}\t{}\t{}\n",
                 observation.batch,
                 observation.ordinal,
                 observation.segment_index,
@@ -4868,7 +4891,7 @@ fn writable_mount_probe_file_text(stream: StreamName, observations: &[StateObser
                     probe.selected_version,
                     probe.mount,
                     probe.refusal_member,
-                    probe.refusal_on_the_d23_list,
+                    probe.refusal_on_the_legal_refusal_list,
                     probe.second_crop,
                 )
             })
@@ -5330,7 +5353,7 @@ fn export_prepared_stream(
 }
 
 /// S1 里跟状态数有关的几条（只在基线那一趟）：全量与甲二状态数、每次写只取两态时的闭式、枚举表与 `crash_facts` 数的总数，
-/// 对本地常量。与 `e170_o3_spec_executor_export.rs` 的 `export_stream` 里那一批 S1 回比同一批。
+/// 对本地常量。与 `e170_specification_executor_export.rs` 的 `export_stream` 里那一批 S1 回比同一批。
 fn state_count_checks_against_the_crates(
     name: StreamName,
     stream: &PreparedStream,
@@ -5346,7 +5369,7 @@ fn state_count_checks_against_the_crates(
             LOCAL_FIRST_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM,
         ),
-        StreamName::FixedScriptThroughEThenUnmount => (
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
             LOCAL_SECOND_STREAM_FULL_STATES,
             LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM,
@@ -5478,1515 +5501,13 @@ fn timing_summary(mut nanoseconds: Vec<u128>) -> (u128, u128, u128, u128) {
     nanoseconds.sort_unstable();
     let count = nanoseconds.len();
     let total: u128 = nanoseconds.iter().sum();
-    let p95_index = (count * 95).div_ceil(100) - 1;
+    let ninety_fifth_percentile_index = (count * 95).div_ceil(100) - 1;
     (
         total,
         nanoseconds[(count - 1) / 2],
-        nanoseconds[p95_index],
+        nanoseconds[ninety_fifth_percentile_index],
         nanoseconds[count - 1],
     )
-}
-
-// ───────────────────────────── 已知坏镜像族（登记 5.5 第三族）：照抄 `checker_known_bad_images.rs` ─────────────────────────────
-//
-// 那份用例是 O2 自己的回归语料：每一份都照 O2 的判据造来让 O2 红。`known_bad_images` 与它新用到的辅助函数
-// `move_the_data_unit_of_the_first_file_two_slots_further` 照抄 sha256 e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736
-// 那一份（第 755–1326 行、第 1328–1375 行；E170 第 2 次重跑登记修订 2 读法 18）。其余导入、常量与辅助函数照抄自更早的
-// sha256 e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820 那一份，与 e426cdff… 里同名条目去空白、去收尾逗号之后逐个相同
-// （`use` 两行不比）；散在 `known_bad_images` 之后的那几个在 e426cdff… 里的行号写在模块末尾的注释里。它的 `#[test]` 没有抄。照抄、不 `#[path]` 引：
-// 那个文件有自己的 `mod common;` 与全部测试，私有的 `known_bad_images` 也引不到。条目名与条数在 `known-bad-images` 模式里与原文件逐条比（停机 S4、断言 A8）。
-#[allow(
-    dead_code,
-    unused_imports,
-    clippy::all,
-    clippy::pedantic,
-    reason = "照抄 checker_known_bad_images.rs 的辅助函数与坏镜像表，删了没人调的 verdict：那份文件里别的族用的辅助函数在这里没人调，抄来的写法也不照本文件的 lint 改"
-)]
-mod known_bad_images_copied_from_the_harness_test {
-    use super::common::{
-        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool,
-        copy_each_root_into_the_new_root_segment_of_its_journal_records, crash_state_devices,
-        format_pool, geometry, memory_pool_of_sparse_devices, parameters,
-        publish_overwrite_in_process, rewrite_journal_record_and_rechain_the_records_after_it,
-        BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
-    };
-    use singlefs_checker::image::{
-        InvariantVerdict, ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
-        DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
-        FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
-        INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
-        INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
-        JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
-        LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
-        NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
-        PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, REFERENCE_INTERVALS_ARE_EXACT,
-        ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES, ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
-        SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
-        SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
-        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
-        SYSTEM_CONFIGURATION_SLOT_GENERATIONS_FOLLOW_THE_ROTATION,
-        TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
-        UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
-    };
-    use singlefs_checker::walk::check_pool_image;
-    use singlefs_core::address::{
-        CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
-    };
-    use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
-    use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
-    use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
-    use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
-    use singlefs_core::journal::{
-        back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
-        JournalRecordPlaceInPublish,
-    };
-    use singlefs_core::make_filesystem::{
-        allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
-        INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
-    };
-    use singlefs_core::mount::{
-        mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, InstanceRow,
-        MountError, RollbackTarget, ShadowLedger, Unmounted,
-    };
-    use singlefs_core::recovery::{
-        instance_table_chain_of_root, recover, JournalPolicy, PoolReader, RecoveryFailure,
-        RecoveryOutcome,
-    };
-    use singlefs_core::system_configuration::SystemImmutableSizes;
-    use singlefs_core::transaction::{
-        acquire_instance, publish_first_file, publish_instance_table_on_version_without_file,
-        publish_overwrite, publish_sequential_write, publish_without_units, warm_up, FirstFile,
-        InstanceTableOnlyPublishPlan, InstanceTableRewrite, PoolVersion, PoolWriter,
-        TransactionOutput, TransactionUnit, ZeroUnitPublishPlan,
-    };
-    use singlefs_format::{
-        ALLOCATION_RECORD_TREE_LEAF_SLOTS, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES,
-        JOURNAL_SAFETY_FACTOR, NODE_BYTES, TREE_IDENTIFIER_EXTENT,
-    };
-    use singlefs_verification::history::{
-        allocation_statistic_mechanism, AllocationStatisticMechanism,
-    };
-    use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
-    use singlefs_verification::segments::StepKind;
-    use singlefs_verification::{RetainedOperation, SharedStream};
-
-    const SLOT: u64 = 16384;
-    const DEVICES: [u32; 2] = [0, 1];
-    /// 写完新池新建文件之后单元区里的单元：(起点槽, 字节数)。分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，
-    /// A 写出它的五个节点——两块盘各自的叶 61（50245、50246）、两块盘各自的第 1 层节点 0（50247、50248）与根（50249），先叶后根。
-    const UNITS: [(u64, usize); 14] = [
-        (50176, 32768),
-        (50178, 16384),
-        (50180, 32768),
-        (50240, 16384),
-        (50242, 32768),
-        (50244, 16384),
-        (50245, 16384),
-        (50246, 16384),
-        (50247, 16384),
-        (50248, 16384),
-        (50249, 16384),
-        (50250, 16384),
-        (50251, 16384),
-        (50252, 16384),
-    ];
-    /// 再覆盖写一次（发布 B，txg 4）之后单元区里的单元：A 的十四个槽仍在盘上（根环里 A 的根还引用着它们），加上 B 写出的十二个单元
-    /// （落点由 `overwrite_in_one_instance.rs` 的验收钉住）。
-    const UNITS_AFTER_OVERWRITE: [(u64, usize); 26] = [
-        (50176, 32768),
-        (50178, 16384),
-        (50180, 32768),
-        (50182, 32768),
-        (50240, 16384),
-        (50242, 32768),
-        (50244, 16384),
-        (50245, 16384),
-        (50246, 16384),
-        (50247, 16384),
-        (50248, 16384),
-        (50249, 16384),
-        (50250, 16384),
-        (50251, 16384),
-        (50252, 16384),
-        (50253, 16384),
-        (50254, 32768),
-        (50256, 16384),
-        (50257, 16384),
-        (50258, 16384),
-        (50259, 16384),
-        (50260, 16384),
-        (50261, 16384),
-        (50262, 16384),
-        (50263, 16384),
-        (50264, 16384),
-    ];
-    /// 发布 B 写出的分配记录树两片叶（盘 0 的叶 61、盘 1 的叶 61；I-3.9、I-3.10、I-5.4 那几份坏镜像改的就是它们）与树表（I-9.14 那一份改它）。
-    /// 每片叶只装它那块盘上的记录：一个单元两盘各一份落点，两条记录分在两片叶里。
-    const ALLOCATION_LEAVES_AFTER_OVERWRITE: [u64; 2] = [50257, 50258];
-    const TREE_TABLE_AFTER_OVERWRITE: u64 = 50264;
-    const INSTANCE_TABLE: u64 = 50176;
-    /// mkfs 种下的第 0 版树表单元：第一个文件版本换下它之后只有第 0 代根还引用。
-    const GENESIS_TREE_TABLE: u64 = 50178;
-    const DATA_UNIT: u64 = 50180;
-    const EXTENT_ROOT: u64 = 50240;
-    const INODE_LEAF: u64 = 50242;
-    const INODE_ROOT: u64 = 50244;
-    /// 新池新建文件（A）写出的分配记录树两片叶（盘 0、盘 1 各自的叶 61）：发布 B 之后只有 A 的根还（经 A 的第 1 层节点）指着它们。
-    const ALLOCATION_LEAVES: [u64; 2] = [50245, 50246];
-    const ACCOUNTING_ROOT: u64 = 50250;
-    const TREE_TABLE: u64 = 50252;
-
-    fn read(pool: &MemoryPool, device: u32, offset: u64, length: usize) -> Vec<u8> {
-        PoolReader::read(
-            pool,
-            DeviceIdentity(device),
-            DeviceOffsetInBytes(offset),
-            length,
-        )
-        .expect("读")
-    }
-
-    fn write(pool: &mut MemoryPool, device: u32, offset: u64, bytes: &[u8]) {
-        pool.devices
-            .get_mut(&DeviceIdentity(device))
-            .expect("盘")
-            .write(DeviceOffsetInBytes(offset), bytes);
-    }
-
-    /// 按类重封：先算载荷 CRC，再算头校验和（码 1：头 105、CRC 在 101；码 3：头 107、CRC 在 89；码 2：头 86 + 2k、CRC 在 76 + 2k）。
-    fn reseal_unit(bytes: &mut [u8]) {
-        let (header_end, payload_crc_offset) = match bytes[6] {
-            1 => (105usize, 101usize),
-            3 => (107, 89),
-            _ => (
-                86 + 2 * usize::from(bytes[51]),
-                76 + 2 * usize::from(bytes[51]),
-            ),
-        };
-        let payload_crc = crc32_castagnoli(&bytes[header_end..]);
-        bytes[payload_crc_offset..payload_crc_offset + 4]
-            .copy_from_slice(&payload_crc.to_le_bytes());
-        singlefs_core::unit::seal_header_checksum(bytes, header_end);
-    }
-
-    /// 根环全部槽：(盘, 偏移)。区域 r 在盘 [0, 1, 0][r] 上，起点 64 × 16384 + r × 3 MiB，槽距 4096。
-    fn root_slots() -> Vec<(u32, u64)> {
-        (0..3u64)
-            .flat_map(|region| {
-                (0..8u64).map(move |slot| {
-                    (
-                        [0u32, 1, 0][usize::try_from(region).expect("区域")],
-                        64 * SLOT + region * 3 * (1 << 20) + slot * 4096,
-                    )
-                })
-            })
-            .collect()
-    }
-
-    fn location_pattern(device: u32, slot: u64, checksum: u32) -> Vec<u8> {
-        [
-            device.to_le_bytes().to_vec(),
-            slot.to_le_bytes()[..6].to_vec(),
-            checksum.to_le_bytes().to_vec(),
-        ]
-        .concat()
-    }
-
-    fn replace_all(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
-        let mut changed = false;
-        let mut index = 0;
-        while index + needle.len() <= haystack.len() {
-            if haystack[index..index + needle.len()] == *needle {
-                haystack[index..index + needle.len()].copy_from_slice(replacement);
-                changed = true;
-                index += needle.len();
-            } else {
-                index += 1;
-            }
-        }
-        changed
-    }
-
-    /// 一个单元（两盘同槽）的整单元校验和从 old 变成 new：把引用它的位置条目逐个补上，被补的单元重封、再往上补，直到根槽。
-    /// `units` 是这份镜像单元区里的单元表：写完新池新建文件的是 `UNITS`，再覆盖写一次的是 `UNITS_AFTER_OVERWRITE`。
-    fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u64, u32, u32)>) {
-        while let Some((slot, old, new)) = changes.pop() {
-            if old == new {
-                continue;
-            }
-            for (container, length) in units.iter().copied() {
-                if container == slot {
-                    continue;
-                }
-                let mut bytes = read(pool, 0, container * SLOT, length);
-                let mut touched = false;
-                for device in DEVICES {
-                    touched |= replace_all(
-                        &mut bytes,
-                        &location_pattern(device, slot, old),
-                        &location_pattern(device, slot, new),
-                    );
-                }
-                if touched {
-                    let before = crc32_castagnoli(&read(pool, 0, container * SLOT, length));
-                    reseal_unit(&mut bytes);
-                    for device in DEVICES {
-                        write(pool, device, container * SLOT, &bytes);
-                    }
-                    changes.push((container, before, crc32_castagnoli(&bytes)));
-                }
-            }
-            for (device, offset) in root_slots() {
-                let mut bytes = read(pool, device, offset, 512);
-                let mut touched = false;
-                for location_device in DEVICES {
-                    touched |= replace_all(
-                        &mut bytes,
-                        &location_pattern(location_device, slot, old),
-                        &location_pattern(location_device, slot, new),
-                    );
-                }
-                if touched {
-                    let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
-                    bytes[138..170].copy_from_slice(&digest);
-                    write(pool, device, offset, &bytes);
-                }
-            }
-        }
-        copy_each_root_into_the_new_root_segment_of_its_journal_records(pool);
-    }
-
-    /// journal 记录头里 `checkpoint_txg`（8 字节）的偏移（D23（journal 的角色与格式） 已定项 4 / 已定项 17 的字段表）。
-    const JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET: usize = 26;
-
-    /// 只改一块盘上的那一份单元（另一块盘留着原样）：重封被改那一份的两道校验和，再把它的新整单元校验和补进引用它的
-    /// **那一块盘那一条**位置条目——位置条目逐盘各带一个整单元校验和（D4（校验和位置），指针 86 / 88 里位置条目 14 × 2），
-    /// 所以补完两份各自仍与自己那条位置条目对得上，I-2.1（校验和与内容匹配） 不跟着红；父单元两盘同内容，它自己的整单元校验和
-    /// 往上补那一段照旧走 `propagate`。
-    fn mutate_one_device_copy_of_unit(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        device: u32,
-        slot: u64,
-        change: impl Fn(&mut Vec<u8>),
-    ) {
-        let length = units
-            .iter()
-            .find(|(start, _)| *start == slot)
-            .expect("登记过的单元")
-            .1;
-        let before = read(pool, device, slot * SLOT, length);
-        let mut bytes = before.clone();
-        change(&mut bytes);
-        reseal_unit(&mut bytes);
-        write(pool, device, slot * SLOT, &bytes);
-        let (old, new) = (crc32_castagnoli(&before), crc32_castagnoli(&bytes));
-        let mut parents_changed = Vec::new();
-        for (container, container_length) in units.iter().copied() {
-            if container == slot {
-                continue;
-            }
-            let container_before = read(pool, 0, container * SLOT, container_length);
-            let mut container_bytes = container_before.clone();
-            if replace_all(
-                &mut container_bytes,
-                &location_pattern(device, slot, old),
-                &location_pattern(device, slot, new),
-            ) {
-                reseal_unit(&mut container_bytes);
-                for each_device in DEVICES {
-                    write(pool, each_device, container * SLOT, &container_bytes);
-                }
-                parents_changed.push((
-                    container,
-                    crc32_castagnoli(&container_before),
-                    crc32_castagnoli(&container_bytes),
-                ));
-            }
-        }
-        for (root_device, offset) in root_slots() {
-            let mut root_bytes = read(pool, root_device, offset, 512);
-            if replace_all(
-                &mut root_bytes,
-                &location_pattern(device, slot, old),
-                &location_pattern(device, slot, new),
-            ) {
-                let digest = wide_checksum_with_field_zeroed(&root_bytes, 512, 138);
-                root_bytes[138..170].copy_from_slice(&digest);
-                write(pool, root_device, offset, &root_bytes);
-            }
-        }
-        propagate(pool, units, parents_changed);
-    }
-
-    /// 改一个单元（两盘一起改）：`reseal` 为真时重封它的两道校验和；新的整单元校验和沿引用链补上去。
-    fn mutate_unit_of(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        slot: u64,
-        change: impl Fn(&mut Vec<u8>),
-        reseal: bool,
-    ) {
-        let length = units
-            .iter()
-            .find(|(start, _)| *start == slot)
-            .expect("登记过的单元")
-            .1;
-        let before = read(pool, 0, slot * SLOT, length);
-        let mut bytes = before.clone();
-        change(&mut bytes);
-        if reseal {
-            reseal_unit(&mut bytes);
-        }
-        for device in DEVICES {
-            write(pool, device, slot * SLOT, &bytes);
-        }
-        propagate(
-            pool,
-            units,
-            vec![(slot, crc32_castagnoli(&before), crc32_castagnoli(&bytes))],
-        );
-    }
-
-    /// 写完新池新建文件那份镜像上改一个单元。
-    fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), reseal: bool) {
-        mutate_unit_of(pool, &UNITS, slot, change, reseal);
-    }
-
-    /// 分配记录树的两片叶（两块盘各一片）逐片改、各自重封，新的整单元校验和沿引用链补上去（叶 → 那块盘的第 1 层节点 → 根 → 树表 → 根槽）；
-    /// `change` 返回它在那一片叶里改了几条记录，这里交回两片合起来的条数。
-    fn mutate_allocation_leaves(
-        pool: &mut MemoryPool,
-        units: &[(u64, usize)],
-        leaves: [u64; 2],
-        change: impl Fn(&mut Vec<u8>) -> usize,
-    ) -> usize {
-        let changed_records = std::cell::Cell::new(0usize);
-        for leaf in leaves {
-            mutate_unit_of(
-                pool,
-                units,
-                leaf,
-                |bytes| changed_records.set(changed_records.get() + change(bytes)),
-                true,
-            );
-        }
-        changed_records.get()
-    }
-
-    /// journal 记录头里这三个字段的偏移（D23（journal 的角色与格式） 已定项 17 的字段表；记录头自证校验和在 46、罩整条 4096）。
-    const JOURNAL_RECORD_INSTANCE_OFFSET: usize = 16;
-    const JOURNAL_RECORD_TRANSACTION_OFFSET: usize = 78;
-
-    /// 这几份镜像上环里的记录条数上界：读到这个计数器还没读完就说明镜像变了，断言会响（别让列表被悄悄截断）。
-    const RECORDS_READ_BACK_AT_MOST: u64 = 64;
-
-    /// 一块盘的 journal 环里从计数器 1 起连着的记录，读成 (计数器, 实例代号, 事务号)；读到没有 magic 的那一格就停。
-    /// 计数器与环槽一一对应（`record_offset`），所以这里按计数器取偏移，不整条环扫。
-    fn journal_records_on_device(pool: &MemoryPool, device: u32) -> Vec<(u64, u32, u64)> {
-        let mut records = Vec::new();
-        for counter in 1..=RECORDS_READ_BACK_AT_MOST {
-            let offset = singlefs_core::journal::record_offset(
-                counter,
-                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-            )
-            .0;
-            let bytes = read(pool, device, offset, 4096);
-            if bytes[..4] != singlefs_core::journal::JOURNAL_MAGIC {
-                break;
-            }
-            records.push((
-                counter,
-                u32::from_le_bytes(
-                    bytes[JOURNAL_RECORD_INSTANCE_OFFSET..JOURNAL_RECORD_INSTANCE_OFFSET + 4]
-                        .try_into()
-                        .expect("4 字节"),
-                ),
-                get_u64(&bytes, JOURNAL_RECORD_TRANSACTION_OFFSET),
-            ));
-        }
-        assert!(
-            u64::try_from(records.len()).expect("条数") < RECORDS_READ_BACK_AT_MOST,
-            "环里的记录多到读满了上界 {RECORDS_READ_BACK_AT_MOST}：这几份镜像上不该有这么多"
-        );
-        records
-    }
-
-    /// 一条 journal 记录的事务号改成 `transaction`，头校验和重封（罩整条 4096，字段在 46）；两盘各一份都改——
-    /// 事务号重号是写者算错号，不是一块盘的字节坏了，两盘会写出同一条记录。
-    fn set_transaction_number_of_journal_record(
-        pool: &mut MemoryPool,
-        counter: u64,
-        expected_transaction: u64,
-        transaction: u64,
-    ) {
-        let offset = singlefs_core::journal::record_offset(
-            counter,
-            singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-        )
-        .0;
-        for device in DEVICES {
-            let mut record = read(pool, device, offset, 4096);
-            assert_eq!(
-                get_u64(&record, JOURNAL_RECORD_TRANSACTION_OFFSET),
-                expected_transaction,
-                "盘 {device} 计数器 {counter} 那条记录的事务号"
-            );
-            set_u64(&mut record, JOURNAL_RECORD_TRANSACTION_OFFSET, transaction);
-            let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-            record[46..78].copy_from_slice(&digest);
-            write(pool, device, offset, &record);
-        }
-    }
-
-    /// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）：加密类型在整槽校验和（155，宽 32）、自身 MAC（16）、nonce 水位（12）、
-    /// KDF 标识（4）之后，偏移 219；第一版只读 0（不加密）。
-    const SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET: usize = 219;
-    /// 登记过的加密算法，第一版读者不读加密的卷：带它的系统配置槽自证过也整池拒绝挂载。
-    const ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ: u8 = 1;
-    /// I-7.13（系统配置池级字段在读者收的范围里） 那份坏镜像改的那一槽：盘 1 的槽 0。
-    const DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u32 = 1;
-    const OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT: u64 = 0;
-    /// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）几何段里几个 16 KiB 槽号与环长的偏移：journal 环起点 325、环长 333、
-    /// 根环起点 371、单元区起始槽号 417。checker 与实现今天各自按这几个偏移读；这里照字段表各写一份。
-    const SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET: usize = 325;
-    const SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET: usize = 333;
-    const SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET: usize = 371;
-    const SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET: usize = 417;
-    /// 系统配置自举头里的本盘设备号（4 字节）：fsid（偏移 102，宽 16）之后 20 字节、再 1 字节之后，偏移 139。
-    const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET: usize = 139;
-    /// 第一版 mkfs 写进这几格的值（字段表那一列）：journal 环从槽 1024 起、默认环长 768 MiB、根环从槽 64 起、单元区从槽 50176 起。
-    const JOURNAL_RING_START_SLOT_OF_THE_POOL: u64 = 1024;
-    const JOURNAL_RING_BYTES_OF_THE_POOL: u64 = 805_306_368;
-    const ROOT_RING_BASE_SLOT_OF_THE_POOL: u64 = 64;
-    const UNIT_AREA_START_SLOT_OF_THE_POOL: u64 = 50176;
-    /// 聚簇段 64 槽（D3（空间分配） 已定项 10 ①）：单元区起始槽号要落在它的整数倍上。
-    const CLUSTER_SEGMENT_SLOTS_OF_THE_POOL: u64 = 64;
-
-    /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
-    fn mutate_system_configuration_slot(
-        pool: &mut MemoryPool,
-        device: u32,
-        slot_offset: u64,
-        change: impl Fn(&mut Vec<u8>),
-    ) {
-        let mut bytes = read(pool, device, slot_offset, 4096);
-        change(&mut bytes);
-        let digest = wide_checksum_with_field_zeroed(&bytes, 4096, 155);
-        bytes[155..187].copy_from_slice(&digest);
-        write(pool, device, slot_offset, &bytes);
-    }
-
-    fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
-        bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
-    }
-    fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
-        bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
-    }
-    fn get_u32(bytes: &[u8], offset: usize) -> u32 {
-        u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
-    }
-
-    fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
-        bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-    }
-
-    /// 两块盘对调盘体：每块盘两个系统配置槽里的本盘设备号改成另一块盘的身份（盘 0 的两槽写 1、盘 1 的两槽写 0），整槽重封，
-    /// 别的字节不动。与盘体真对调不同的只有这一格：根环区域、单元都还在原来的盘上，所以别的不变量照判成立。
-    fn swap_the_own_device_numbers_of_the_two_devices(image: &mut MemoryPool) {
-        let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-        for (device, own_device_number_written) in [(0u32, 1u32), (1, 0)] {
-            for slot_offset in [0, spacing] {
-                mutate_system_configuration_slot(image, device, slot_offset, |bytes| {
-                    set_u32(
-                        bytes,
-                        SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET,
-                        own_device_number_written,
-                    );
-                });
-            }
-        }
-    }
-
-    /// I-7.13（系统配置池级字段在读者收的范围里） 的几何那五格（实审 Y4 的 A、B、C、D、E「读字段，不等于常量就整池拒」）：
-    /// 盘 1 槽 0 的一个几何字段改掉、整槽重封，别的三槽照原样。每项带 checker 该报的那个 `Verdict` 成员名（违例说明里带着它）。
-    fn known_bad_images_of_the_system_configuration_geometry() -> Vec<(&'static str, Mutation)> {
-        let on_the_refused_slot = |change: fn(&mut Vec<u8>)| -> Mutation {
-            Box::new(move |image: &mut MemoryPool| {
-                mutate_system_configuration_slot(
-                    image,
-                    DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                    OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                    change,
-                );
-            })
-        };
-        vec![
-            // A：单元区起始槽号往后挪一段（50176 → 50240），环长不动：不是环长现算的那个槽。
-            (
-                "UnitAreaStartNotTheSlotAfterTheJournalRing",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
-                        UNIT_AREA_START_SLOT_OF_THE_POOL + CLUSTER_SEGMENT_SLOTS_OF_THE_POOL,
-                    );
-                }),
-            ),
-            // D：环长少一槽（768 MiB − 16 KiB），单元区起始槽号跟着改成它现算的 50175（两者自洽）：不在聚簇段边界上。
-            (
-                "UnitAreaStartOffTheClusterSegmentBoundary",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET,
-                        JOURNAL_RING_BYTES_OF_THE_POOL - SLOT,
-                    );
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET,
-                        UNIT_AREA_START_SLOT_OF_THE_POOL - 1,
-                    );
-                }),
-            ),
-            // B：journal 环起点写 1023：实现按常量 1024 写记录、扫环，按字段扫的读者判的是错位 16 KiB 的另一个环。
-            (
-                "JournalRingStartSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET,
-                        JOURNAL_RING_START_SLOT_OF_THE_POOL - 1,
-                    );
-                }),
-            ),
-            // C：根环起点写 65：实现按常量 64 写根，按字段读的读者读的是另一个根环。
-            (
-                "RootRingBaseSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(
-                        bytes,
-                        SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET,
-                        ROOT_RING_BASE_SLOT_OF_THE_POOL + 1,
-                    );
-                }),
-            ),
-            // E：根环起点写 0：先于槽距判，报起点、不报「槽 1 不在根环起点之前」。
-            (
-                "RootRingBaseSlotNotTheFirstVersionConstant",
-                on_the_refused_slot(|bytes| {
-                    set_u64(bytes, SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET, 0);
-                }),
-            ),
-        ]
-    }
-
-    /// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
-    fn tree_table_entry_offset(index: usize) -> usize {
-        131 + 200 * index
-    }
-
-    /// 一个码 2 节点的自描述三段（D18（块里携带什么信息） 已定项 7：key 宽 1 字节在 51、条目数 2 字节在 82 + 2k、
-    /// 条目宽 2 字节在 84 + 2k；声明长度 2 字节在 8，条目区从 86 + 2k + 29 起）改成「条目宽 = key 宽、只装一条条目」：
-    /// 条目数改 1、声明长度改 k、largest_key 贴到那一条条目的 key 上、条目区之后的字节清零。
-    ///
-    /// 这么改是为了让**除 I-1.10（码 2 条目宽等于字段表宽） 之外的每一道都还成立**：声明长度 = 条目数 × 条目宽、
-    /// 条目宽 ≥ key 宽（`index_node_view` 判的那两道）、key 区间贴紧首末条目（I-1.1（块头自述逻辑地址））、
-    /// 声明长度之后的补齐为零且在载荷 CRC 内（I-2.3（补齐字节为零且参与校验和））。
-    /// 盘上留下的就是一个处处自洽、唯独条目宽与那棵树的字段表不符的节点——
-    /// I-1.10（码 2 条目宽等于字段表宽） 判的正是这一格，判不出来它，走读下一步就按字段表的固定偏移切这条 k 字节的条目、当场越界
-    /// （panic 面普查 R13）。
-    fn narrow_the_entry_width_to_the_key_width(bytes: &mut [u8]) {
-        let key_width = usize::from(bytes[51]);
-        let key_width_field = u16::try_from(key_width).expect("key 宽装得进 u16");
-        let entries_start = 86 + 2 * key_width + 29;
-        let first_key: Vec<u8> = bytes[entries_start..entries_start + key_width].to_vec();
-        set_u16(bytes, 8, key_width_field);
-        set_u16(bytes, 82 + 2 * key_width, 1);
-        set_u16(bytes, 84 + 2 * key_width, key_width_field);
-        bytes[52 + key_width..52 + 2 * key_width].copy_from_slice(&first_key);
-        for byte in &mut bytes[entries_start + key_width..] {
-            *byte = 0;
-        }
-    }
-
-    /// 码 2 节点头里出生序号那 4 字节的偏移**扣掉 2k**（D18（块里携带什么信息） 已定项 7 的字段表：
-    /// 诞生代号 52 + 2k、fsid 60 + 2k、写序 68 + 2k、出生序号 72 + 2k；k 是节点自述的 key 宽，在偏移 51）。
-    const INDEX_NODE_BIRTH_SEQUENCE_OFFSET_BEFORE_THE_KEYS: usize = 72;
-    /// 码 1 数据单元头里诞生代号那 8 字节的偏移（D18（块里携带什么信息） 已定项 7 的字段表）。
-    const DATA_UNIT_BIRTH_TXG_OFFSET: usize = 75;
-    /// extent 树上段叶（key 宽 24）里第一条条目内联的那条数据指针中诞生代号那 8 字节的偏移：
-    /// 条目区从 115 + 2 × 24 = 163 起，条目 = key (0, inode 8, 0) 24 + 标签 1（2 = 单单元内联）+ 数据指针 88
-    /// （D8（核心索引结构） 已定项 14），指针里诞生代号在 42。
-    const EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET: usize = 163 + 24 + 1 + 42;
-    /// 一条树表条目里诞生 txg 那 8 字节的偏移：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8
-    /// （D8（核心索引结构） 已定项 8 的字段表）。
-    const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
-    /// 分配记录树叶（key 宽 10）：条目数在 82 + 2 × 10、条目区从 115 + 2 × 10 起，每条 20 = key (设备 4, 槽号 6) +
-    /// value (跨度段 2，最高位是已释放标志, 分配代或释放代 8)。
-    const ALLOCATION_NODE_ENTRY_COUNT_OFFSET: usize = 102;
-    const ALLOCATION_NODE_ENTRY_START: usize = 135;
-    const ALLOCATION_RECORD_BYTES: usize = 20;
-    const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
-
-    fn get_u64(bytes: &[u8], offset: usize) -> u64 {
-        u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
-    }
-
-    /// 中央映射树（根兼叶，key 宽 27、条目 55）里唯一那条码 1 条目：key 的出生 txg（key 偏移 9）从 `from` 改成 `to`。
-    /// 码 1 排在最前（类标签 1 最小），头里的最小 key 就是它的 key，跟着改；改完仍按 key 升序。
-    fn rewrite_the_data_unit_mapping_key_birth_txg(bytes: &mut [u8], from: u64, to: u64) {
-        const MAPPING_KEY_BIRTH_TXG_OFFSET: usize = 9;
-        const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
-        let key_width = usize::from(bytes[51]);
-        assert_eq!(key_width, 27, "映射 key 宽 27");
-        let entries_start = 115 + 2 * key_width;
-        assert_eq!(bytes[entries_start], 1, "第一条是码 1 那一条");
-        assert_eq!(
-            bytes[entries_start..entries_start + key_width],
-            bytes[HEADER_SMALLEST_KEY_OFFSET..HEADER_SMALLEST_KEY_OFFSET + key_width],
-            "头里的最小 key 就是第一条的 key"
-        );
-        for key_start in [entries_start, HEADER_SMALLEST_KEY_OFFSET] {
-            assert_eq!(
-                get_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET),
-                from,
-                "码 1 映射 key 的出生 txg 本来是 {from}"
-            );
-            set_u64(bytes, key_start + MAPPING_KEY_BIRTH_TXG_OFFSET, to);
-        }
-    }
-
-    /// 实审 B2 新立的「中央映射条目的 key 与它指的单元头相符」：I-1.11（映射 key 与单元头相符）。
-    const MAPPING_KEY_INVARIANT: &str =
-        singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER;
-
-    /// 中央映射树（根兼叶，key 宽 27、条目 55）里指着 `slot` 那个码 2 节点的那条条目：key 尾段的出生序号（key 偏移 21，4 字节）+1。
-    /// 头里的最小 / 最大 key 是它时跟着改；改完仍按 key 严格升序（码 2 的 key 按出生树分开，这一条与左右邻不同出生树）。
-    fn raise_the_mapping_key_tail_of_the_node_at(bytes: &mut [u8], slot: u64) {
-        const MAPPING_KEY_TAIL_OFFSET: usize = 21;
-        const MAPPING_ENTRY_BYTES: usize = 55;
-        const MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET: usize = 27 + 4;
-        const HEADER_SMALLEST_KEY_OFFSET: usize = 52;
-        let key_width = usize::from(bytes[51]);
-        assert_eq!(key_width, 27, "映射 key 宽 27");
-        let header_largest_key_offset = HEADER_SMALLEST_KEY_OFFSET + key_width;
-        let entry_count = usize::from(u16::from_le_bytes([
-            bytes[82 + 2 * key_width],
-            bytes[83 + 2 * key_width],
-        ]));
-        let entries_start = 115 + 2 * key_width;
-        let entry_start = (0..entry_count)
-            .map(|index| entries_start + index * MAPPING_ENTRY_BYTES)
-            .find(|start| {
-                bytes[*start] == 2
-                    && get_u64(bytes, start + MAPPING_ENTRY_FIRST_LOCATION_SLOT_OFFSET)
-                        & 0xFFFF_FFFF_FFFF
-                        == slot
-            })
-            .expect("映射里有指着这个码 2 节点的那一条");
-        let old_key = bytes[entry_start..entry_start + key_width].to_vec();
-        let tail = entry_start + MAPPING_KEY_TAIL_OFFSET;
-        let birth_sequence = u32::from_le_bytes(bytes[tail..tail + 4].try_into().expect("4 字节"));
-        bytes[tail..tail + 4].copy_from_slice(&(birth_sequence + 1).to_le_bytes());
-        let new_key = bytes[entry_start..entry_start + key_width].to_vec();
-        for header_key in [HEADER_SMALLEST_KEY_OFFSET, header_largest_key_offset] {
-            if bytes[header_key..header_key + key_width] == old_key[..] {
-                bytes[header_key..header_key + key_width].copy_from_slice(&new_key);
-            }
-        }
-    }
-
-    /// 分配记录树叶里，把代字段等于 `from` 的已释放记录改成 `to`；返回改了几条。
-    fn rewrite_released_generations(bytes: &mut [u8], from: u64, to: u64) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-            if span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0
-                && get_u64(bytes, record + 12) == from
-            {
-                set_u64(bytes, record + 12, to);
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 分配记录树叶里槽号是 `slot` 的记录（两盘各一条）跨度改成 `span_slots`，已释放标志照留；返回改了几条。
-    fn set_allocation_record_span(bytes: &mut [u8], slot: u64, span_slots: u16) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let mut slot_bytes = [0u8; 8];
-            slot_bytes[..6].copy_from_slice(&bytes[record + 4..record + 10]);
-            if u64::from_le_bytes(slot_bytes) == slot {
-                let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-                set_u16(
-                    bytes,
-                    record + 10,
-                    (span_field & ALLOCATION_RECORD_RELEASED_FLAG) | span_slots,
-                );
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 一份坏镜像：它要让哪一条判违例，以及怎么从干净镜像改出来。
-    type Mutation = Box<dyn Fn(&mut MemoryPool)>;
-
-    fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
-        let leaf_head_checksum = crc32_castagnoli(&read(clean, 0, INODE_LEAF * SLOT, 16384));
-        let stray_node = {
-            let mut stray = read(clean, 0, EXTENT_ROOT * SLOT, 16384);
-            set_u64(&mut stray, 42, 65624);
-            reseal_unit(&mut stray);
-            stray
-        };
-        let orphan_with_instance_two = {
-            let mut orphan = read(clean, 0, DATA_UNIT * SLOT, 32768);
-            orphan[91..95].copy_from_slice(&2u32.to_le_bytes());
-            reseal_unit(&mut orphan);
-            orphan
-        };
-        let orphan_for_second_sentence = orphan_with_instance_two.clone();
-        let record_with_instance_two = {
-            let offset = singlefs_core::journal::record_offset(
-                3,
-                singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-            )
-            .0;
-            let mut record = read(clean, 0, offset, 4096);
-            record[16..20].copy_from_slice(&2u32.to_le_bytes());
-            let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-            record[46..78].copy_from_slice(&digest);
-            record
-        };
-        vec![
-            // 第 0 代根（暖机 txg 1、2）引用的 mkfs 树表单元（50178，A 换下之后只有它们引用）内容改掉再重封：那条候选根指着的块被复用。
-            (
-                "I-7.4",
-                Box::new(|image: &mut MemoryPool| {
-                    let mut unit = read(image, 0, GENESIS_TREE_TABLE * SLOT, 16384);
-                    set_u64(&mut unit, 42, 77);
-                    reseal_unit(&mut unit);
-                    for device in DEVICES {
-                        write(image, device, GENESIS_TREE_TABLE * SLOT, &unit);
-                    }
-                }),
-            ),
-            // 同一个单元的头抹成零、不重封：从第 0 代根出发的遍历读不到它。
-            (
-                "I-4.8",
-                Box::new(|image: &mut MemoryPool| {
-                    let erased = vec![0u8; 16384];
-                    for device in DEVICES {
-                        write(image, device, GENESIS_TREE_TABLE * SLOT, &erased);
-                    }
-                }),
-            ),
-            // 数据单元五元组里的锚点偏移改成 32768（extent key 的偏移是 0）。
-            (
-                "I-1.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| set_u64(bytes, 67, 32768), true)
-                }),
-            ),
-            // extent 树根头里的树 ID 改成 99。
-            (
-                "I-1.3",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, EXTENT_ROOT, |bytes| set_u64(bytes, 42, 99), true)
-                }),
-            ),
-            // inode 叶容器头里的 fsid 改掉。
-            (
-                "I-1.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 81, 0xDEAD), true)
-                }),
-            ),
-            // 盘 1 被择的那个系统配置槽里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
-            (
-                "I-1.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 1, 4096, |bytes| bytes[102] ^= 0xFF)
-                }),
-            ),
-            // 码 3 容器类身份段的首字节改成 1。
-            (
-                "I-1.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| bytes[42] = 1, true)
-                }),
-            ),
-            // 类型 2 容器的记录宽改成 139（登记的是 140）。
-            (
-                "I-1.7",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u16(bytes, 71, 139), true)
-                }),
-            ),
-            // 记账树根自述的条目宽缩到 key 宽 22（登记的字段表宽 34），别的自描述字段跟着调成自洽的一份。
-            (
-                "I-1.10",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| narrow_the_entry_width_to_the_key_width(bytes),
-                        true,
-                    )
-                }),
-            ),
-            // 数据单元盘 0 那一份翻一个载荷字节，不补任何校验和。
-            (
-                "I-2.1",
-                Box::new(|image: &mut MemoryPool| {
-                    let mut bytes = read(image, 0, DATA_UNIT * SLOT, 32768);
-                    bytes[200] ^= 1;
-                    write(image, 0, DATA_UNIT * SLOT, &bytes);
-                }),
-            ),
-            // 数据单元补齐区写一个非零字节，载荷 CRC 跟着重算（校验和对、补齐不为 0）。
-            (
-                "I-2.3",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| bytes[32000] = 1, true)
-                }),
-            ),
-            // 数据单元头里翻一个字节，不重封头校验和（整单元校验和照样补上去，I-2.1 不先挡）。
-            (
-                "I-2.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, DATA_UNIT, |bytes| bytes[60] ^= 1, false)
-                }),
-            ),
-            // 树表里 extent 树那条的根指针，两条位置条目对调（盘 1 在前）。
-            (
-                "I-2.5",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let pointer = tree_table_entry_offset(0) + 14;
-                            let first: Vec<u8> = bytes[pointer + 50..pointer + 64].to_vec();
-                            let second: Vec<u8> = bytes[pointer + 64..pointer + 78].to_vec();
-                            bytes[pointer + 50..pointer + 64].copy_from_slice(&second);
-                            bytes[pointer + 64..pointer + 78].copy_from_slice(&first);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 记账树里盘 0 的「已分配」多记 16384。
-            (
-                "I-3.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| adjust_accounting(bytes, 1, 0, 16384),
-                        true,
-                    )
-                }),
-            ),
-            // 树表里分配记录树那条的根指针，盘 0 那条位置条目改指槽 50243（压在 inode 叶容器的第二个槽上）。
-            (
-                "I-5.1",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let location = tree_table_entry_offset(2) + 14 + 50 + 4;
-                            bytes[location..location + 6]
-                                .copy_from_slice(&50243u64.to_le_bytes()[..6]);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 记账树里盘 0 的「空闲」多记 16384。
-            (
-                "I-5.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| adjust_accounting(bytes, 2, 0, 16384),
-                        true,
-                    )
-                }),
-            ),
-            // 根环全部槽抹成 0。
-            (
-                "I-7.1",
-                Box::new(|image: &mut MemoryPool| {
-                    for (device, offset) in root_slots() {
-                        write(image, device, offset, &[0u8; 512]);
-                    }
-                }),
-            ),
-            // inode 叶容器两份都改坏一个字节（不补校验和）：最新的根走不完。
-            (
-                "I-7.2",
-                Box::new(|image: &mut MemoryPool| {
-                    for device in DEVICES {
-                        let mut bytes = read(image, device, INODE_LEAF * SLOT, 32768);
-                        bytes[5000] ^= 1;
-                        write(image, device, INODE_LEAF * SLOT, &bytes);
-                    }
-                }),
-            ),
-            // 盘 0 被择的那个系统配置槽（槽 1，世代 5）里逐区域设备改成 [0, 0, 0]。
-            (
-                "I-7.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 0, 4096, |bytes| {
-                        bytes[379..391].copy_from_slice(&[0u8; 12])
-                    })
-                }),
-            ),
-            // 盘 1 槽 0 的加密类型改成 1、重算整槽校验和：这一槽自证过而带这一版读者不收的值，实现整池拒绝挂载
-            // （A3-checker-2 第四节第 1 条，别的三槽照原样）。
-            (
-                SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(
-                        image,
-                        DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                        OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT,
-                        |bytes| {
-                            bytes[SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET] =
-                                ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ
-                        },
-                    )
-                }),
-            ),
-            // 两块盘四个系统配置槽里的本盘设备号互换、整槽重封（实审 Y2-b 越格线索：盘体对调之后的池可写挂载因本盘设备号拒）。
-            (
-                SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY,
-                Box::new(swap_the_own_device_numbers_of_the_two_devices),
-            ),
-            // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
-            // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    write(image, 0, 50302 * SLOT, &orphan_with_instance_two)
-                }),
-            ),
-            // journal 环里一个空槽放一条实例代号 2 的记录（头校验和重封）⇒ ① 红：扫描方向要读 journal 环。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    write(
-                        image,
-                        0,
-                        singlefs_core::journal::record_offset(
-                            9,
-                            singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-                        )
-                        .0,
-                        &record_with_instance_two,
-                    )
-                }),
-            ),
-            // 盘 0 较新那一槽的实例代号改成 2，再放那份实例代号 2 的孤儿 ⇒ 各盘最大号 [2, 1] 不等而较大者有东西带着，② 红（① 成立）。
-            (
-                "I-7.7",
-                Box::new(move |image: &mut MemoryPool| {
-                    mutate_system_configuration_slot(image, 0, 4096, |bytes| {
-                        bytes[477..481].copy_from_slice(&2u32.to_le_bytes())
-                    });
-                    write(image, 0, 50302 * SLOT, &orphan_for_second_sentence);
-                }),
-            ),
-            // 在没人引用的槽 50300 上放一个树 ID 65624（高于水位 65548）的码 2 节点（头校验和过、诞生代号 3）。
-            (
-                "I-7.8",
-                Box::new(move |image: &mut MemoryPool| write(image, 0, 50300 * SLOT, &stray_node)),
-            ),
-            // 树表里 inode 树那条的根指针改指 inode 叶容器（码 3），校验和取那个容器前 16 KiB 的 CRC。
-            (
-                "I-9.1",
-                Box::new(move |image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| {
-                            let pointer = tree_table_entry_offset(1) + 14;
-                            for location in [pointer + 50, pointer + 64] {
-                                bytes[location + 4..location + 10]
-                                    .copy_from_slice(&INODE_LEAF.to_le_bytes()[..6]);
-                                bytes[location + 10..location + 14]
-                                    .copy_from_slice(&leaf_head_checksum.to_le_bytes());
-                            }
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // inode 树根那条内部条目的身份引用里容器号改成 2（子头里是 1）。
-            (
-                "I-9.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_ROOT, |bytes| set_u64(bytes, 131 + 18, 2), true)
-                }),
-            ),
-            // 容器号改成 5，而容器里那条记录的 inode 是 1。
-            (
-                "I-9.4",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 53, 5), true)
-                }),
-            ),
-            // inode 记录的预留段（记录偏移 139）写一个非零字节。
-            (
-                "I-9.7",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| bytes[136 + 139] = 1, true)
-                }),
-            ),
-            // inode 记录的对象出生代改成 2（数据单元五元组里是 3）。
-            (
-                "I-9.10",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 136 + 8, 2), true)
-                }),
-            ),
-            // inode 记录的 blocks（记录偏移 48）写回按分到一个 32 KiB 单元算的 64，而 size 3000 ⇒ ⌈3000 ÷ 512⌉ = 6。
-            (
-                "I-9.15",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_LEAF,
-                        |bytes| set_u64(bytes, 136 + INODE_RECORD_BLOCKS_OFFSET, 64),
-                        true,
-                    )
-                }),
-            ),
-            // 树表里 livelist 与稀疏旁表两条互换种类：盘上仍按树 ID 升序（I-1.1 不红），按发号次序 livelist 的号 65542 大过稀疏旁表的号 65541。
-            (
-                "I-9.16",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        TREE_TABLE,
-                        |bytes| swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(bytes),
-                        true,
-                    )
-                }),
-            ),
-            // 实例表里多一行 (1, 3, 0)：行的实例代号等于挂载根的实例 1，不「低于」；链指针记录仍在末尾、行仍唯一，红的只有那一半。
-            (
-                "I-3.8",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INSTANCE_TABLE,
-                        |bytes| {
-                            let chain_record: Vec<u8> = bytes[136..224].to_vec();
-                            let mut row = vec![0u8; 88];
-                            row[1..5].copy_from_slice(&1u32.to_le_bytes());
-                            row[5..13].copy_from_slice(&3u64.to_le_bytes());
-                            bytes[136..224].copy_from_slice(&row);
-                            bytes[224..312].copy_from_slice(&chain_record);
-                            set_u16(bytes, 69, 2);
-                            set_u16(bytes, 8, 176);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 盘 0 环内偏移 4096 那条记录（w4，暖机第二条空发布）的反向链字段改成 0，头校验和重封：
-            // 它不是本实例第一条（本实例第一条是 w1、计数器 1），链值必须等于 CRC32C(w1 的 487 字节头)。
-            (
-                "I-8.6",
-                Box::new(|image: &mut MemoryPool| {
-                    let offset = singlefs_core::journal::record_offset(
-                        2,
-                        singlefs_format::JOURNAL_RING_DEFAULT_BYTES,
-                    )
-                    .0;
-                    let mut record = read(image, 0, offset, 4096);
-                    let back_chain_field =
-                        JOURNAL_RECORD_BACK_CHAIN_OFFSET..JOURNAL_RECORD_BACK_CHAIN_OFFSET + 4;
-                    assert_ne!(
-                        u32::from_le_bytes(
-                            record[back_chain_field.clone()].try_into().expect("4 字节")
-                        ),
-                        0,
-                        "w4 的反向链本来是 CRC32C(w1 的头)，非 0"
-                    );
-                    record[back_chain_field].copy_from_slice(&0u32.to_le_bytes());
-                    let digest = wide_checksum_with_field_zeroed(&record, 4096, 46);
-                    record[46..78].copy_from_slice(&digest);
-                    write(image, 0, offset, &record);
-                }),
-            ),
-            // inode 叶容器**盘 1 那一份**的载荷改一个字节、重封载荷校验和与头校验和，类身份段与写序一个字节不动：
-            // 两份归并成同一组（归并键逐字节相同）而载荷不同。盘 1 那条位置条目跟着补上 ⇒ I-2.1 不先挡。
-            (
-                "I-1.8",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_one_device_copy_of_unit(image, &UNITS, 1, INODE_LEAF, |bytes| {
-                        assert_eq!(bytes[20000], 0, "记录区之后的补齐本来是 0");
-                        bytes[20000] = 1;
-                    });
-                }),
-            ),
-            // extent 树根（码 2，key 宽 24）头里的出生序号 +1，引用它的树表条目里那条指针一个字节不动：
-            // 头里的出生身份与引用它的指针记的不符 ⇒ I-1.2（块头写序已发布） 红。
-            // 出生序号不是已发布谓词的输入（谓词只读诞生代号与写序），所以 I-4.2（无被引用未提交块） 不跟着红。
-            // 中央映射里 extent 根那条 key 的尾段就是它的出生序号（D19（块指针的结构与宽度预算） 已定项 6）：跟着 +1，
-            // 不跟着改就是映射 key 与单元头不符、映射 key 那一条（I-1.11（映射 key 与单元头相符）） 一起红。
-            (
-                "I-1.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        EXTENT_ROOT,
-                        |bytes| {
-                            let offset = INDEX_NODE_BIRTH_SEQUENCE_OFFSET_BEFORE_THE_KEYS
-                                + 2 * usize::from(bytes[51]);
-                            let birth_sequence = u32::from_le_bytes(
-                                bytes[offset..offset + 4].try_into().expect("4 字节"),
-                            );
-                            bytes[offset..offset + 4]
-                                .copy_from_slice(&(birth_sequence + 1).to_le_bytes());
-                        },
-                        true,
-                    );
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| raise_the_mapping_key_tail_of_the_node_at(bytes, EXTENT_ROOT),
-                        true,
-                    );
-                }),
-            ),
-            // 中央映射里数据单元那条 key 的出生 txg 从 3 改成 4，数据单元一个字节不动：映射 key 与它指的单元头里的诞生代号不符
-            // ⇒ 映射 key 那一条（I-1.11（映射 key 与单元头相符）） 红。
-            (
-                MAPPING_KEY_INVARIANT,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
-                        true,
-                    );
-                }),
-            ),
-            // 数据单元头里的诞生代号从 3 改成 4（最新的根就是 txg 3、实例 1），引用它的 extent 记录里那条数据指针的
-            // 诞生代号跟着改成 4：指针与头仍然一致（I-1.2（块头写序已发布） 不跟着红），而这个**被引用**的块按
-            // C113（扫描重建时多版单元的现行版本判定无输入） P2 的已发布谓词判不成已发布（i == 挂载根实例 ⇒ 要 b ≤ 挂载根的 txg）
-            // ⇒ I-4.2（无被引用未提交块） 红：盘上留下的正是「提交了的根指着一个还没提交的块」。
-            // 分配记录树里那个落点的分配代也跟着改成 4（两盘各一条）：记录与单元同源，不跟着改就是 I-3.10（已分配记录的分配代等于
-            // 它罩住的单元的诞生代号） 一起红，判别力算不到 I-4.2 头上。
-            (
-                "I-4.2",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        DATA_UNIT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
-                                3,
-                                "数据单元的诞生代号本来是 3"
-                            );
-                            set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 4);
-                        },
-                        true,
-                    );
-                    mutate_unit(
-                        image,
-                        EXTENT_ROOT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET),
-                                3,
-                                "extent 记录里那条数据指针的诞生代号本来是 3"
-                            );
-                            set_u64(bytes, EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET, 4);
-                        },
-                        true,
-                    );
-                    // 中央映射里那个数据单元的 key 带着它的诞生代号（D19（块指针的结构与宽度预算） 已定项 6）：跟着改成 4，
-                    // 不跟着改就是映射 key 与单元头的出生身份不符、I-1.2 一起红（实审 B1 起 checker 拿映射 key 比单元头）。
-                    mutate_unit(
-                        image,
-                        MAPPING_ROOT,
-                        |bytes| rewrite_the_data_unit_mapping_key_birth_txg(bytes, 3, 4),
-                        true,
-                    );
-                    assert_eq!(
-                        mutate_allocation_leaves(image, &UNITS, ALLOCATION_LEAVES, |bytes| {
-                            rewrite_unreleased_allocation_generation(bytes, DATA_UNIT, 3, 4)
-                        }),
-                        2,
-                        "数据单元两盘各一条未释放记录（两片叶各一条），分配代本来是 3"
-                    );
-                }),
-            ),
-            // 记账里的 inode 号水位从 2 改成 1：树里最大的 key 就是 1，水位不再严格大于它（I-9.6）。
-            // 别的行一个字节都不动 ⇒ I-3.1 / I-5.2 那两条照旧绿。
-            (
-                "I-9.6",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        ACCOUNTING_ROOT,
-                        |bytes| set_accounting(bytes, 12, 0xFFFF_FFFF, 1),
-                        true,
-                    );
-                }),
-            ),
-            // inode 根那条条目的分隔 key 从 1 改成 2（连着把节点头的 key 区间也改成 [2, 2]，
-            // 不然 I-1.1（key 区间罩住条目） 先红、这一格就成了搭车）：分隔 key 2 大于这个孩子的最小 key 1 ⇒ I-9.12 红。
-            (
-                "I-9.12",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_ROOT,
-                        |bytes| {
-                            set_u64(bytes, 131, 2);
-                            set_u64(bytes, 52, 2);
-                            set_u64(bytes, 60, 2);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // 类型 2 容器的记录数与声明长度都改成 0。
-            (
-                "I-9.13",
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        INODE_LEAF,
-                        |bytes| {
-                            set_u16(bytes, 69, 0);
-                            set_u16(bytes, 8, 0);
-                            bytes[136..276].fill(0);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // I-3.5：A 的数据单元（50180）头里的诞生代号 3 → 2，重封、补到根：A 引用、暖机那一版（txg 2）不引用的单元诞生代号不大于 2，
-            // 也不在整棵继承下来的用户可见树里（extent 树根指针出生 txg 3）。指针、映射 key 与分配代还记 3，I-1.2、I-1.11、I-3.10 跟着红，
-            // 所以放在这一张表里（只判「它红」，不判「只红它」）；按各个组成部分的几份在
-            // `checker_judges_reference_intervals_and_every_new_root_segment_field.rs`。
-            (
-                REFERENCE_INTERVALS_ARE_EXACT,
-                Box::new(|image: &mut MemoryPool| {
-                    mutate_unit(
-                        image,
-                        DATA_UNIT,
-                        |bytes| {
-                            assert_eq!(
-                                get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
-                                3,
-                                "A 的数据单元生在 txg 3"
-                            );
-                            set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 2);
-                        },
-                        true,
-                    );
-                }),
-            ),
-            // I-5.5（判决 `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K2）：A 那一版是从 mkfs 水位第一次建树的那一版，
-            // 它唯一的数据单元（50180 = 单元区起始槽号 50176 + 4）搬到再往后两槽，每块盘上落点最小的数据单元就不在 U + 4。
-            // 分配记录与记账照旧记着 50180，这份镜像上不只红 I-5.5；这一格只要它判违例。
-            (
-                FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
-                Box::new(move_the_data_unit_of_the_first_file_two_slots_further),
-            ),
-        ]
-    }
-
-    /// 新池新建文件写出的那个数据单元（`DATA_UNIT`，32 KiB）原样搬到往后两槽（写完新池新建文件那份镜像上空着，下一个 32 KiB 对齐的槽对）：
-    /// 两盘各写一份；`UNITS` 里引用它的单元（extent 树根里的数据指针、中央映射叶）把位置条目的槽号改成新的、重封，
-    /// 新的整单元校验和沿引用链补到根槽。50180 那两份原样留着：journal 记录的点名项仍指着它。
-    fn move_the_data_unit_of_the_first_file_two_slots_further(image: &mut MemoryPool) {
-        const DATA_UNIT_BYTES: usize = 32768;
-        let moved_to = DATA_UNIT + 2;
-        assert!(
-            UNITS.iter().all(|(start, _)| *start != moved_to),
-            "槽 {moved_to} 在写完新池新建文件的镜像上空着"
-        );
-        let data_unit = read(image, 0, DATA_UNIT * SLOT, DATA_UNIT_BYTES);
-        for device in DEVICES {
-            write(image, device, moved_to * SLOT, &data_unit);
-        }
-        let checksum = crc32_castagnoli(&data_unit);
-        let mut parents_changed = Vec::new();
-        for (container, length) in UNITS.iter().copied() {
-            if container == DATA_UNIT {
-                continue;
-            }
-            let before = read(image, 0, container * SLOT, length);
-            let mut bytes = before.clone();
-            let mut touched = false;
-            for device in DEVICES {
-                touched |= replace_all(
-                    &mut bytes,
-                    &location_pattern(device, DATA_UNIT, checksum),
-                    &location_pattern(device, moved_to, checksum),
-                );
-            }
-            if touched {
-                reseal_unit(&mut bytes);
-                for device in DEVICES {
-                    write(image, device, container * SLOT, &bytes);
-                }
-                parents_changed.push((
-                    container,
-                    crc32_castagnoli(&before),
-                    crc32_castagnoli(&bytes),
-                ));
-            }
-        }
-        assert!(
-            !parents_changed.is_empty(),
-            "写完新池新建文件的镜像上有单元指着那个数据单元"
-        );
-        propagate(image, &UNITS, parents_changed);
-    }
-
-    /// 发布 B（txg 4）之后的干净镜像：A 的十二个单元（十四个槽）在这次发布里改写成已释放、释放代 4，树表是 B 写的那一版，
-    /// A 那一版仍被根环里 A 的根指着。I-3.9（释放代落在停止引用它的那一格区间里）与 I-9.14（树表条目的诞生 txg 跨根不变）
-    /// 要的跨根比较到这里才有内容：写完新池新建文件的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
-    /// 两次暖机空发布不写树表），I-9.14 在那份镜像上报「不适用」。
-
-    // 以下是散在原文件 `known_bad_images` 之后、被上面用到的常量与辅助函数，在 e426cdff… 那一份里的行号：3191 1629 3299 3381 3366 3239 3736 3233 3235 3236 3234 3231
-
-    /// inode 记录里 `blocks` 的偏移（D8（核心索引结构） 已定项 6 的偏移表：size 在 40，blocks 在 48）。
-    const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
-
-    /// 记录头里反向链那 4 字节的偏移：事务段 78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4（D23（journal 的角色与格式） 已定项 4 / 已定项 8）。
-    const JOURNAL_RECORD_BACK_CHAIN_OFFSET: usize = 91;
-
-    /// 新池新建文件写出的中央映射树根（bump 次序：分配记录树五个节点、记账树、映射树、树表）。
-    const MAPPING_ROOT: u64 = 50251;
-
-    /// 记账树叶里 (统计量, 设备) 那一行的值加 delta（条目区从 115 + 2 × 22 = 159 起，每条 34：统计量 2、树 8、设备 4、代 8、值 8、seq 4）。
-    fn adjust_accounting(bytes: &mut [u8], statistic: u16, device: u32, delta: u64) {
-        let count = usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
-        for index in 0..count {
-            let row = 159 + 34 * index;
-            if u16::from_le_bytes([bytes[row], bytes[row + 1]]) == statistic
-                && u32::from_le_bytes(bytes[row + 10..row + 14].try_into().expect("4")) == device
-            {
-                let value = u64::from_le_bytes(bytes[row + 22..row + 30].try_into().expect("8"));
-                bytes[row + 22..row + 30].copy_from_slice(&(value + delta).to_le_bytes());
-                return;
-            }
-        }
-        panic!("记账树里没有 ({statistic}, {device}) 这一行");
-    }
-
-    /// 记账树叶里 (统计量, 设备) 那一行的值改成 value（偏移口径同 `adjust_accounting`）。
-    fn set_accounting(bytes: &mut [u8], statistic: u16, device: u32, value: u64) {
-        let count = usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
-        for index in 0..count {
-            let row = 159 + 34 * index;
-            if u16::from_le_bytes([bytes[row], bytes[row + 1]]) == statistic
-                && u32::from_le_bytes(bytes[row + 10..row + 14].try_into().expect("4")) == device
-            {
-                bytes[row + 22..row + 30].copy_from_slice(&value.to_le_bytes());
-                return;
-            }
-        }
-        panic!("记账树里没有 ({statistic}, {device}) 这一行");
-    }
-
-    /// 树表单元里 livelist 与稀疏旁表两条互换种类（条目偏移 10 的 2 字节）；树 ID、根指针不动。
-    fn swap_the_kinds_of_the_livelist_and_sparse_side_table_entries(tree_table: &mut [u8]) {
-        for (index, kind_before, kind_after) in [
-            (
-                LIVELIST_TREE_TABLE_ENTRY_INDEX,
-                TREE_KIND_LIVELIST,
-                TREE_KIND_SPARSE_SIDE_TABLE,
-            ),
-            (
-                SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX,
-                TREE_KIND_SPARSE_SIDE_TABLE,
-                TREE_KIND_LIVELIST,
-            ),
-        ] {
-            let kind_offset = tree_table_entry_offset(index) + TREE_TABLE_ENTRY_KIND_OFFSET;
-            assert_eq!(
-                u16::from_le_bytes([tree_table[kind_offset], tree_table[kind_offset + 1]]),
-                kind_before,
-                "树表第 {index} 条的种类"
-            );
-            set_u16(tree_table, kind_offset, kind_after);
-        }
-    }
-
-    /// 分配记录树叶里槽号是 `slot`、**未带**已释放标志、分配代等于 `from` 的记录（两盘各一条）改成 `to`；返回改了几条。
-    fn rewrite_unreleased_allocation_generation(
-        bytes: &mut [u8],
-        slot: u64,
-        from: u64,
-        to: u64,
-    ) -> usize {
-        let count = usize::from(u16::from_le_bytes([
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
-            bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
-        ]));
-        let mut rewritten = 0;
-        for index in 0..count {
-            let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
-            let mut slot_bytes = [0u8; 8];
-            slot_bytes[..6].copy_from_slice(&bytes[record + 4..record + 10]);
-            let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
-            if u64::from_le_bytes(slot_bytes) == slot
-                && span_field & ALLOCATION_RECORD_RELEASED_FLAG == 0
-                && get_u64(bytes, record + 12) == from
-            {
-                set_u64(bytes, record + 12, to);
-                rewritten += 1;
-            }
-        }
-        rewritten
-    }
-
-    /// 新池新建文件那一版树表里十一条按发号次序排：livelist 是第 4 条（从 0 数，号 65541）、稀疏旁表第 5 条（号 65542）。
-    const LIVELIST_TREE_TABLE_ENTRY_INDEX: usize = 4;
-
-    const TREE_KIND_LIVELIST: u16 = 6;
-
-    const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
-
-    const SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX: usize = 5;
-
-    /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
-    const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
-
-    /// 对外的口子：第 755 行的 `known_bad_images` 是私有的，这里转一手（类型就是第 753 行的 `Mutation`）。
-    pub(super) fn entries_of_the_known_bad_images(
-        clean: &MemoryPool,
-    ) -> Vec<(&'static str, Box<dyn Fn(&mut MemoryPool)>)> {
-        known_bad_images(clean)
-    }
 }
 
 // ───────────────────────────── 阳性对照 O2：已知坏镜像族第一条（登记 5.2） ─────────────────────────────
@@ -7016,11 +5537,8 @@ fn pool_checker_on_the_first_known_bad_image(
 /// 这一态的物化镜像上施加已知坏镜像族的第一条改法之后的那张盘（阳性对照 O2 判的那一张）。
 fn first_known_bad_image_of(image: &CrashImage<'_>) -> MemoryPool {
     let clean = materialized_memory_pool(image);
-    let entries =
-        known_bad_images_copied_from_the_harness_test::entries_of_the_known_bad_images(&clean);
-    let (_, apply_the_first_entry) = entries
-        .first()
-        .expect("已知坏镜像族至少一条（照抄的那一份 43 条）");
+    let entries = known_bad_images(&clean);
+    let (_, apply_the_first_entry) = entries.first().expect("已知坏镜像表至少一条");
     let mut bad = clean.clone();
     apply_the_first_entry(&mut bad);
     bad
@@ -7126,7 +5644,7 @@ struct StreamTotals {
     failed_checks: usize,
     rebuilt_digest_mismatches: usize,
     mask_mismatches: usize,
-    s3_mismatches: usize,
+    pool_checker_direct_mismatches: usize,
     comparison_red_calls: usize,
     crash_judge_red_states: usize,
     reference_filesystem_red_states: usize,
@@ -7226,7 +5744,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
         .iter()
         .filter(|observation| !observation.mask_matches_the_facts)
         .count();
-    totals.s3_mismatches = export
+    totals.pool_checker_direct_mismatches = export
         .observations
         .iter()
         .filter(|observation| !observation.pool_checker_matches_the_judgement)
@@ -7244,7 +5762,7 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> StreamTotals
     lines.emit_result_line(&format!(
         "name=s3 stream={label} states={} o2_direct_differs_from_judge_crash_image={}",
         export.observations.len(),
-        totals.s3_mismatches
+        totals.pool_checker_direct_mismatches
     ));
     report_files_and_timing(lines, label, export);
     totals
@@ -7269,7 +5787,7 @@ fn report_batch(
     let reference_filesystem_is = |word: &'static str| {
         count_where(&|observation| observation.reference_filesystem.word() == word)
     };
-    let o2_red = count_where(&|observation| {
+    let red_by_the_pool_checker = count_where(&|observation| {
         observation
             .pool_checker_red
             .as_ref()
@@ -7277,7 +5795,7 @@ fn report_batch(
     });
     totals.crash_judge_red_states += crash_judge_is("red");
     totals.reference_filesystem_red_states += reference_filesystem_is("red");
-    totals.pool_checker_red_states += o2_red;
+    totals.pool_checker_red_states += red_by_the_pool_checker;
     totals.recovery_panic_states +=
         count_where(&|observation| observation.recovery_panic.is_some());
     let piece_panic_states = piece_panic_states_of(in_batch.iter().copied());
@@ -7290,7 +5808,7 @@ fn report_batch(
         .map(|observation| observation.segment_index)
         .collect();
     lines.emit_result_line(&format!(
-        "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o1_reference_filesystem_red={} o1_reference_filesystem_green={} o1_reference_filesystem_abstained={} o1_reference_filesystem_off={} recovery_panic_states={} o2_red={o2_red} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={} piece_panic_states={}",
+        "name=batch stream={label} batch={batch} states={} segments_touched={} states_with_a_torn_write={} o1_crash_judge_red={} o1_crash_judge_green={} o1_crash_judge_not_applicable={} o1_crash_judge_off={} o1_reference_filesystem_red={} o1_reference_filesystem_green={} o1_reference_filesystem_abstained={} o1_reference_filesystem_off={} recovery_panic_states={} o2_red={red_by_the_pool_checker} o2_matches_judgement_false={} judge_crash_image_pool_checker_red={} record_checker_red_states={} consulted_oracle_red_states={} ignored_oracle_red_states={} consulted_effective_root_none={} consulted_failed_outcomes={} piece_panic_states={}",
         in_batch.len(),
         segments.len(),
         count_where(&|observation| observation.landing_vector.contains('1')),
@@ -7390,7 +5908,7 @@ fn report_batch(
                 probe.selected_version,
                 probe.mount,
                 field_text(&probe.refusal_member),
-                field_text(&probe.refusal_on_the_d23_list),
+                field_text(&probe.refusal_on_the_legal_refusal_list),
                 field_text(&probe.second_crop),
             ));
         }
@@ -7403,20 +5921,20 @@ fn report_stage_times(label: &str, batch: u8, in_batch: &[&StateObservation]) {
     for (stage, pick) in [
         (
             "o1",
-            (|observation: &StateObservation| observation.o1_nanoseconds)
+            (|observation: &StateObservation| observation.crash_judge_nanoseconds)
                 as fn(&StateObservation) -> u128,
         ),
-        ("o2", |observation| observation.o2_nanoseconds),
+        ("o2", |observation| observation.pool_checker_nanoseconds),
         ("recovery", |observation| observation.recovery_nanoseconds),
     ] {
-        let (total, median, p95, maximum) = timing_summary(
+        let (total, median, ninety_fifth_percentile, maximum) = timing_summary(
             in_batch
                 .iter()
                 .map(|observation| pick(observation))
                 .collect(),
         );
         ResultLines::timing(&format!(
-            "name=stage_time stream={label} batch={batch} stage={stage} states={} total_ns={total} median_ns={median} p95_ns={p95} max_ns={maximum}",
+            "name=stage_time stream={label} batch={batch} stage={stage} states={} total_ns={total} median_ns={median} p95_ns={ninety_fifth_percentile} max_ns={maximum}",
             in_batch.len()
         ));
     }
@@ -7453,7 +5971,7 @@ fn report_files_and_timing(lines: &mut ResultLines, label: &str, export: &Stream
 
 /// 基线上 O1 不适用与不比的来源（登记第十一节 S5、第一节读法 6）：卸载由模型答之后，基线上模型一次都不许停（三条流都是），
 /// 每次调用要么对拍过（`agrees`）、要么是取号暖机那两次（`not_modelled`）。按 `StopCheck` 的形式回比：期望（本地）与实际（这一趟）。
-fn s5_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
+fn not_applicable_source_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
     let label = export.name.directory_name();
     vec![
         StopCheck::new(
@@ -7481,7 +5999,7 @@ fn s5_checks_of_the_baseline(export: &StreamExport) -> Vec<StopCheck> {
 /// 逐行那一趟（坏实现、阳性对照；不关 oracle）的 S5：O1 不适用只许来自读法 6 那三处（对拍判出不同之后、调用交回错误之后、调用 panic 之后），
 /// 都按「不合的个数」回比 0：① 交回了错误的调用没有一次留在「没问模型」（`not_modelled`）——取号、暖机出错那一形；
 /// 模型停下之后的调用（`skipped_after_the_model_stopped`）不数；② O1-模型崩溃判官的不适用只来自模型停在那三处之一的那次调用。
-fn s5_checks_of_a_bad_implementation_row(
+fn not_applicable_source_checks_of_a_bad_implementation_row(
     label: &str,
     calls: &[RecordedCall],
     model_stopped_at_call: Option<usize>,
@@ -7520,10 +6038,10 @@ fn s5_checks_of_a_bad_implementation_row(
     ]
 }
 
-/// 这一趟、这一条流要判的 S5（登记第十一节 S5）。基线那一趟判 [`s5_checks_of_the_baseline`]：只判不带对照、不关 oracle、流导出了的基线。
-/// 逐行那一趟判 [`s5_checks_of_a_bad_implementation_row`]：阳性对照照判（它让模型停在翻过的那次调用，是对拍的红）；关掉 O1 不判；
+/// 这一趟、这一条流要判的 S5（登记第十一节 S5）。基线那一趟判 [`not_applicable_source_checks_of_the_baseline`]：只判不带对照、不关 oracle、流导出了的基线。
+/// 逐行那一趟判 [`not_applicable_source_checks_of_a_bad_implementation_row`]：阳性对照照判（它让模型停在翻过的那次调用，是对拍的红）；关掉 O1 不判；
 /// 流水线 panic（`ending` 是 `None`）的流不判。
-fn s5_checks_to_judge(
+fn not_applicable_source_checks_to_judge(
     export: &StreamExport,
     run_kind: RunKind,
     switches: RunSwitches,
@@ -7534,7 +6052,7 @@ fn s5_checks_to_judge(
                 && switches.positive_control.is_none()
                 && switches.disabled_oracle.is_none()
             {
-                s5_checks_of_the_baseline(export)
+                not_applicable_source_checks_of_the_baseline(export)
             } else {
                 Vec::new()
             }
@@ -7548,7 +6066,7 @@ fn s5_checks_to_judge(
                         observation.crash_judge == CrashJudgeVerdict::NotApplicable
                     })
                     .count();
-                s5_checks_of_a_bad_implementation_row(
+                not_applicable_source_checks_of_a_bad_implementation_row(
                     export.name.directory_name(),
                     &export.calls,
                     export.model_stopped_at_call,
@@ -7563,7 +6081,7 @@ fn s5_checks_to_judge(
 
 /// 停机 S9 的两样（每一趟都判，导出了的流才判）：RefFS 一侧切的段数与装置切的段数相等（第七节 A9）；翻译停下的理由只许是
 /// 本装置走得到的那几种之一（[`ReferenceFileSystemStop`]，停在回退上说明映射或 m 表漏了东西）。
-fn s9_checks_of_a_stream(export: &StreamExport) -> Vec<StopCheck> {
+fn reference_filesystem_checks_of_a_stream(export: &StreamExport) -> Vec<StopCheck> {
     if export.not_exported.is_some() {
         return Vec::new();
     }
@@ -7716,8 +6234,8 @@ fn run_dump(command_line: &CommandLine) -> i32 {
     }
     let mut totals = StreamTotals::default();
     let mut streams_not_exported = 0usize;
-    let mut s5_failed = 0usize;
-    let mut s9_failed = 0usize;
+    let mut not_applicable_source_checks_failed = 0usize;
+    let mut reference_filesystem_checks_failed = 0usize;
     for name in &command_line.streams {
         let started = Instant::now();
         let output_root = command_line.output_directory.clone();
@@ -7732,21 +6250,28 @@ fn run_dump(command_line: &CommandLine) -> i32 {
             )
         });
         streams_not_exported += usize::from(export.not_exported.is_some());
-        let s5 = s5_checks_to_judge(&export, run_kind, switches);
-        s5_failed += s5.iter().filter(|check| !check.holds()).count();
-        let s9 = s9_checks_of_a_stream(&export);
-        s9_failed += s9.iter().filter(|check| !check.holds()).count();
-        export.checks.extend(s5);
-        export.checks.extend(s9);
+        let not_applicable_source_checks =
+            not_applicable_source_checks_to_judge(&export, run_kind, switches);
+        not_applicable_source_checks_failed += not_applicable_source_checks
+            .iter()
+            .filter(|check| !check.holds())
+            .count();
+        let reference_filesystem_checks = reference_filesystem_checks_of_a_stream(&export);
+        reference_filesystem_checks_failed += reference_filesystem_checks
+            .iter()
+            .filter(|check| !check.holds())
+            .count();
+        export.checks.extend(not_applicable_source_checks);
+        export.checks.extend(reference_filesystem_checks);
         let stream_totals = report_stream(&mut lines, &export);
         add_stream_totals(&mut totals, &stream_totals);
     }
     failed_checks += totals.failed_checks;
     lines.emit_result_line(&format!(
-        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} crash_facts_mask_mismatches={} s3_o2_judgement_mismatches={} s9_failed_checks={s9_failed} streams_not_exported={streams_not_exported} o1_comparison_red_calls={} o1_crash_judge_red_states={} o1_reference_filesystem_red_states={} o2_red_states={} recovery_panic_states={} probed_states={} counter_branch_states={} counter_branch_states_judged_legal={} undecidable_branch_states={} witness_refusals_without_either_branch={} counter_branch_states_that_mounted={} piece_panic_states={} unattributed_panic_states={}",
+        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} crash_facts_mask_mismatches={} s3_o2_judgement_mismatches={} s9_failed_checks={reference_filesystem_checks_failed} streams_not_exported={streams_not_exported} o1_comparison_red_calls={} o1_crash_judge_red_states={} o1_reference_filesystem_red_states={} o2_red_states={} recovery_panic_states={} probed_states={} counter_branch_states={} counter_branch_states_judged_legal={} undecidable_branch_states={} witness_refusals_without_either_branch={} counter_branch_states_that_mounted={} piece_panic_states={} unattributed_panic_states={}",
         totals.rebuilt_digest_mismatches,
         totals.mask_mismatches,
-        totals.s3_mismatches,
+        totals.pool_checker_direct_mismatches,
         totals.comparison_red_calls,
         totals.crash_judge_red_states,
         totals.reference_filesystem_red_states,
@@ -7762,14 +6287,15 @@ fn run_dump(command_line: &CommandLine) -> i32 {
         totals.unattributed_panic_states,
     ));
     lines.finish();
-    let s11_hit = totals.witness_refusals_without_either_branch > 0
+    let writable_mount_probe_reconciliation_hit = totals.witness_refusals_without_either_branch > 0
         || totals.counter_branch_states_that_mounted > 0;
     let stop_clause_hit = failed_checks > 0
         || totals.rebuilt_digest_mismatches > 0
-        || totals.s3_mismatches > 0
-        || s9_failed > 0
-        || s11_hit
-        || (run_kind == RunKind::Baseline && (s5_failed > 0 || streams_not_exported > 0));
+        || totals.pool_checker_direct_mismatches > 0
+        || reference_filesystem_checks_failed > 0
+        || writable_mount_probe_reconciliation_hit
+        || (run_kind == RunKind::Baseline
+            && (not_applicable_source_checks_failed > 0 || streams_not_exported > 0));
     if stop_clause_hit {
         3
     } else {
@@ -7781,7 +6307,7 @@ fn add_stream_totals(totals: &mut StreamTotals, stream: &StreamTotals) {
     totals.failed_checks += stream.failed_checks;
     totals.rebuilt_digest_mismatches += stream.rebuilt_digest_mismatches;
     totals.mask_mismatches += stream.mask_mismatches;
-    totals.s3_mismatches += stream.s3_mismatches;
+    totals.pool_checker_direct_mismatches += stream.pool_checker_direct_mismatches;
     totals.comparison_red_calls += stream.comparison_red_calls;
     totals.crash_judge_red_states += stream.crash_judge_red_states;
     totals.reference_filesystem_red_states += stream.reference_filesystem_red_states;
@@ -7880,7 +6406,7 @@ fn confirmed_loss_operations(
 /// 驱动流二到第 3 次调用（模型跟到第 2 次调用），交回驱动完的流（[`LiveStream::run_the_second_stream_through_the_first_overwrite`]）。
 fn second_stream_through_the_first_overwrite(switches: RunSwitches) -> LiveStream {
     let mut live = LiveStream::start(
-        StreamName::FixedScriptThroughEThenUnmount,
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
         "e171r1-confirmed-loss-form",
         switches,
     );
@@ -7986,7 +6512,7 @@ fn confirmed_loss_prepared_stream(
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .unwrap_or(usize::MAX);
     let prepared = PreparedStream {
-        name: StreamName::FixedScriptThroughEThenUnmount,
+        name: StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
         base: live.formatted.memory_pool_after_mkfs(),
         operations: kept,
         writes,
@@ -8301,13 +6827,16 @@ fn judge_the_confirmed_loss_shapes(
                 .filter(|observation| observation.crash_judge == CrashJudgeVerdict::NotApplicable)
                 .count(),
             equivalence_check_fields(&pairing.classification, &pairing.checks),
-            pairing.stops_at_s13()
+            pairing.stops_at_the_class_check()
         ));
         lines.emit_result_line(&format!(
             "name=q5_partition sampling_point=pairing {}",
             partition_fields(&pairing.classification, &pairing.checks)
         ));
-        lines.emit_result_line(&q5_piece_panics_line("pairing", &pairing.observations));
+        lines.emit_result_line(&confirmed_loss_form_piece_panics_line(
+            "pairing",
+            &pairing.observations,
+        ));
         // S1（修订 5 第 5.2 节）：对拍那一行打的实际截的 k 与分法里的 C 写数相等。
         let kept_check = StopCheck::new(
             "equivalence_pairing_in_flight_writes_kept_equal_the_partition",
@@ -8322,14 +6851,16 @@ fn judge_the_confirmed_loss_shapes(
             field_text(&kept_check.crates),
             kept_check.holds()
         ));
-        if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
-            lines,
-            failed_checks,
-            &pairing.observations,
-        ) {
+        if let Some(exit_code) =
+            stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
+                lines,
+                failed_checks,
+                &pairing.observations,
+            )
+        {
             return exit_code;
         }
-        if pairing.stops_at_s13() {
+        if pairing.stops_at_the_class_check() {
             lines.emit_result_line(&format!(
                 "name=verdict s1_failed_checks={failed_checks} s13=equivalence_pairing q5_not_run=equivalence_pairing_failed piece_panic_states=- unattributed_panic_states=0"
             ));
@@ -8350,20 +6881,22 @@ fn judge_the_confirmed_loss_shapes(
             control.other_piece_panic_states(),
             control.piece_panic_states[JudgingPiece::ConsultedRecovery.position()],
             control.consulted_recovery_panics_of_the_plain_pairing,
-            control.o1_columns_differing_from_the_plain_pairing,
+            control.crash_judge_columns_differing_from_the_plain_pairing,
             control.mismatching_states,
-            control.stops_at_s13,
+            control.stops_at_the_class_check,
             control.holds()
         ));
-        lines.emit_result_line(&q5_piece_panics_line(
+        lines.emit_result_line(&confirmed_loss_form_piece_panics_line(
             "piece_panic_control",
             &control.observations,
         ));
-        if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
-            lines,
-            failed_checks,
-            &control.observations,
-        ) {
+        if let Some(exit_code) =
+            stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
+                lines,
+                failed_checks,
+                &control.observations,
+            )
+        {
             return exit_code;
         }
         if !control.holds() {
@@ -8403,12 +6936,12 @@ fn judge_the_confirmed_loss_shapes(
     let directory = command_line
         .output_directory
         .join("confirmed_loss_form")
-        .join(StreamName::FixedScriptThroughEThenUnmount.directory_name());
+        .join(StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount.directory_name());
     let observation_tables = ObservationTables::of(&prepared);
     let (last_segment_writes, tearable, product) =
         last_segment_product(&prepared, &observation_tables.tables);
     let last_segment: Vec<usize> = prepared.segments.last().cloned().unwrap_or_default();
-    let (export, totals, stops_at_s13) = if command_line.truncate_at_the_return_point {
+    let (export, totals, stops_at_the_class_check) = if command_line.truncate_at_the_return_point {
         // 方向相反的取样点照读法 7 全枚举（修订 2 的五个候选都不改它）；态数超上限不跑。
         if product > CONFIRMED_LOSS_STATE_LIMIT {
             lines.emit_result_line(&format!(
@@ -8430,15 +6963,20 @@ fn judge_the_confirmed_loss_shapes(
             drive_nanoseconds,
             shapes.piece_panic_injections.sampling_point_export.as_ref(),
         );
-        let s9 = s9_checks_of_a_stream(&export);
-        export.checks.extend(s9);
+        let reference_filesystem_checks = reference_filesystem_checks_of_a_stream(&export);
+        export.checks.extend(reference_filesystem_checks);
         let totals = report_stream(lines, &export);
-        lines.emit_result_line(&q5_piece_panics_line("reverse", &export.observations));
-        if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
-            lines,
-            failed_checks + totals.failed_checks,
+        lines.emit_result_line(&confirmed_loss_form_piece_panics_line(
+            "reverse",
             &export.observations,
-        ) {
+        ));
+        if let Some(exit_code) =
+            stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
+                lines,
+                failed_checks + totals.failed_checks,
+                &export.observations,
+            )
+        {
             return exit_code;
         }
         let rows: Vec<ConfirmedLossTallyRow<'_>> = export
@@ -8468,7 +7006,10 @@ fn judge_the_confirmed_loss_shapes(
             lines.emit_result_line(&format!(
                 "name=q5_equivalence sampling_point={sampling_point} {} s13={}",
                 equivalence_check_fields(&classification, &EquivalenceCheckCounts::default()),
-                equivalence_stops_at_s13(&classification, &EquivalenceCheckCounts::default())
+                equivalence_stops_at_the_class_check(
+                    &classification,
+                    &EquivalenceCheckCounts::default()
+                )
             ));
             lines.emit_result_line(&format!(
                 "name=q5_partition sampling_point={sampling_point} {}",
@@ -8492,15 +7033,20 @@ fn judge_the_confirmed_loss_shapes(
             drive_nanoseconds,
             shapes.piece_panic_injections.sampling_point_export.as_ref(),
         );
-        let s9 = s9_checks_of_a_stream(&export);
-        export.checks.extend(s9);
+        let reference_filesystem_checks = reference_filesystem_checks_of_a_stream(&export);
+        export.checks.extend(reference_filesystem_checks);
         let totals = report_stream(lines, &export);
-        lines.emit_result_line(&q5_piece_panics_line("main", &export.observations));
-        if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
-            lines,
-            failed_checks + totals.failed_checks,
+        lines.emit_result_line(&confirmed_loss_form_piece_panics_line(
+            "main",
             &export.observations,
-        ) {
+        ));
+        if let Some(exit_code) =
+            stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
+                lines,
+                failed_checks + totals.failed_checks,
+                &export.observations,
+            )
+        {
             return exit_code;
         }
         if let Some(why) = &export.not_exported {
@@ -8515,7 +7061,7 @@ fn judge_the_confirmed_loss_shapes(
                 "name=verdict s1_failed_checks={} s4_digest_mismatches={} s3_o2_judgement_mismatches={} states=0 s13=false q5_not_run=no_root_write piece_panic_states={} unattributed_panic_states={}",
                 failed_checks + totals.failed_checks,
                 totals.rebuilt_digest_mismatches,
-                totals.s3_mismatches,
+                totals.pool_checker_direct_mismatches,
                 piece_panic_states_text(&totals.piece_panic_states),
                 totals.unattributed_panic_states
             ));
@@ -8532,7 +7078,7 @@ fn judge_the_confirmed_loss_shapes(
             lines.emit_result_line(&format!(
                 "name=q5_equivalence sampling_point={sampling_point} {} s13={}",
                 equivalence_check_fields(&classification, &evaluation.checks),
-                equivalence_stops_at_s13(&classification, &evaluation.checks)
+                equivalence_stops_at_the_class_check(&classification, &evaluation.checks)
             ));
             lines.emit_result_line(&format!(
                 "name=q5_partition sampling_point={sampling_point} {}",
@@ -8567,15 +7113,15 @@ fn judge_the_confirmed_loss_shapes(
                 (last_segment_writes, tearable, product),
                 &format!(" derived_by=equivalence_classes judged_states={judged_states}"),
             );
-            let stops = equivalence_stops_at_s13(&classification, &evaluation.checks);
+            let stops = equivalence_stops_at_the_class_check(&classification, &evaluation.checks);
             (export, totals, stops)
         }
     };
     failed_checks += totals.failed_checks;
     lines.emit_result_line(&format!(
-        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} s3_o2_judgement_mismatches={} states={} s13={stops_at_s13} piece_panic_states={} unattributed_panic_states={}",
+        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={} s3_o2_judgement_mismatches={} states={} s13={stops_at_the_class_check} piece_panic_states={} unattributed_panic_states={}",
         totals.rebuilt_digest_mismatches,
-        totals.s3_mismatches,
+        totals.pool_checker_direct_mismatches,
         export.observations.len(),
         piece_panic_states_text(&totals.piece_panic_states),
         totals.unattributed_panic_states
@@ -8583,8 +7129,8 @@ fn judge_the_confirmed_loss_shapes(
     lines.finish();
     if failed_checks > 0
         || totals.rebuilt_digest_mismatches > 0
-        || totals.s3_mismatches > 0
-        || stops_at_s13
+        || totals.pool_checker_direct_mismatches > 0
+        || stops_at_the_class_check
     {
         3
     } else {
@@ -9527,7 +8073,7 @@ fn evaluate_the_classes(
 }
 
 /// 类核对 ①–④ 任一不过，或细分到上限：停机 S13（修订 2 第 2.1 节）。
-fn equivalence_stops_at_s13(
+fn equivalence_stops_at_the_class_check(
     classification: &ConfirmedLossClassification,
     checks: &EquivalenceCheckCounts,
 ) -> bool {
@@ -9541,8 +8087,8 @@ fn equivalence_stops_at_s13(
 }
 
 /// `name=q5_equivalence` 那一行（与对拍那一行）的类核对计数：①–④ 各自的计数与 ③ 停下时还相交的写数（修订 5 第 5.5 节第 2 条：
-/// 这两种行只放类核对的计数与判定）。`s13=` 由调用方接在后面：主取样点那一行是 [`equivalence_stops_at_s13`]，对拍那一行是
-/// [`EquivalencePairing::stops_at_s13`]（再并上逐态不同与各类态数之和不等于组合数，第 5.5 节第 3 条）。
+/// 这两种行只放类核对的计数与判定）。`s13=` 由调用方接在后面：主取样点那一行是 [`equivalence_stops_at_the_class_check`]，对拍那一行是
+/// [`EquivalencePairing::stops_at_the_class_check`]（再并上逐态不同与各类态数之和不等于组合数，第 5.5 节第 3 条）。
 fn equivalence_check_fields(
     classification: &ConfirmedLossClassification,
     checks: &EquivalenceCheckCounts,
@@ -9599,10 +8145,10 @@ struct EquivalencePairing {
 
 impl EquivalencePairing {
     /// 对拍有一态不同、各类态数之和不等于组合数，或类核对不过：停机 S13。
-    fn stops_at_s13(&self) -> bool {
+    fn stops_at_the_class_check(&self) -> bool {
         self.mismatching_states > 0
             || self.class_states != self.product_of_the_choices
-            || equivalence_stops_at_s13(&self.classification, &self.checks)
+            || equivalence_stops_at_the_class_check(&self.classification, &self.checks)
     }
 }
 
@@ -9778,7 +8324,10 @@ fn crash_columns_and_consulted_recovery(
 }
 
 /// 注入那一遍对不注入那一遍，两个崩溃子列或看 journal 那遍恢复的结局不同的态数（按崩溃状态序号配对；不注入那一遍里没有的序号也算不同）。
-fn o1_columns_differing(plain: &[StateObservation], injected: &[StateObservation]) -> usize {
+fn crash_judge_columns_differing(
+    plain: &[StateObservation],
+    injected: &[StateObservation],
+) -> usize {
     let plain_of_ordinal: BTreeMap<u64, &StateObservation> = plain
         .iter()
         .map(|observation| (observation.ordinal, observation))
@@ -9801,9 +8350,9 @@ struct PiecePanicControl {
     states: u64,
     piece_panic_states: [usize; JUDGING_PIECE_COUNT],
     consulted_recovery_panics_of_the_plain_pairing: usize,
-    o1_columns_differing_from_the_plain_pairing: usize,
+    crash_judge_columns_differing_from_the_plain_pairing: usize,
     mismatching_states: usize,
-    stops_at_s13: bool,
+    stops_at_the_class_check: bool,
     observations: Vec<StateObservation>,
 }
 
@@ -9840,9 +8389,9 @@ impl PiecePanicControl {
             && self.other_piece_panic_states() == 0
             && self.piece_panic_states[JudgingPiece::ConsultedRecovery.position()]
                 == self.consulted_recovery_panics_of_the_plain_pairing
-            && self.o1_columns_differing_from_the_plain_pairing == 0
+            && self.crash_judge_columns_differing_from_the_plain_pairing == 0
             && self.mismatching_states == 0
-            && !self.stops_at_s13
+            && !self.stops_at_the_class_check
     }
 }
 
@@ -9868,9 +8417,9 @@ fn piece_panic_control_of(
             states: 0,
             piece_panic_states: [0; JUDGING_PIECE_COUNT],
             consulted_recovery_panics_of_the_plain_pairing,
-            o1_columns_differing_from_the_plain_pairing: 0,
+            crash_judge_columns_differing_from_the_plain_pairing: 0,
             mismatching_states: 0,
-            stops_at_s13: false,
+            stops_at_the_class_check: false,
             observations: Vec::new(),
         };
     };
@@ -9879,12 +8428,12 @@ fn piece_panic_control_of(
         states: injected.states,
         piece_panic_states: piece_panic_states_of(&injected.observations),
         consulted_recovery_panics_of_the_plain_pairing,
-        o1_columns_differing_from_the_plain_pairing: o1_columns_differing(
+        crash_judge_columns_differing_from_the_plain_pairing: crash_judge_columns_differing(
             &plain.observations,
             &injected.observations,
         ),
         mismatching_states: injected.mismatching_states,
-        stops_at_s13: injected.stops_at_s13(),
+        stops_at_the_class_check: injected.stops_at_the_class_check(),
         observations: injected.observations,
     }
 }
@@ -10119,7 +8668,7 @@ mod tests {
         "c71cae1b3fc678e4cabfa21d575c728edd44a4b372b3389ce763856273abecbf";
 
     #[test]
-    fn a_torn_landing_folds_to_one_and_a_persisted_write_to_two() {
+    fn torn_landing_folds_to_one_and_a_persisted_write_to_two() {
         // 写表：0 持久、1 没持久、2 原写没持久而撕裂镜像（枚举写表下标 3）持久。
         let persisted = vec![true, false, false, true];
         let torn_image_index_by_write = BTreeMap::from([(2usize, 3usize)]);
@@ -10418,7 +8967,7 @@ mod tests {
 
     /// 模型不认的版本读回来记红、认的记绿（X4：崩溃判官的结果丢掉，这里红）。
     #[test]
-    fn a_read_back_of_a_version_the_model_never_committed_is_red_and_a_committed_one_is_green() {
+    fn read_back_of_a_version_the_model_never_committed_is_red_and_a_committed_one_is_green() {
         let committed_key = model_root_key(InstanceGeneration(1), CheckpointTxg(3));
         let committed = BTreeMap::from([(committed_key, Some(Rc::<[u8]>::from(vec![7u8, 8, 9])))]);
         let green = ObservedReadBack::FileRead {
@@ -10464,7 +9013,7 @@ mod tests {
     /// 模型没有会话时问发布第一个文件：答案本身就是一格对不上，驱动把它记成 `Disagrees`、模型停在这次调用，下一次调用不比
     /// （X5：`judge_and_advance` 的不同丢掉，这里红）。
     #[test]
-    fn a_comparison_the_model_cannot_answer_is_recorded_as_a_disagreement_and_stops_the_model() {
+    fn comparison_the_model_cannot_answer_is_recorded_as_a_disagreement_and_stops_the_model() {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
             SharedStream::retaining_contents(),
@@ -10539,7 +9088,7 @@ mod tests {
     /// 取号交回错误：这条流不带故障，模型对取号只有「往前走」一种走法，驱动把它记成「模型说该成、实现拒了」，模型停在这次调用
     /// （装置一侧变异：记红丢掉，这里红）。
     #[test]
-    fn a_refused_acquire_on_a_stream_without_faults_is_recorded_as_a_comparison_red_and_stops_the_model(
+    fn refused_acquire_on_a_stream_without_faults_is_recorded_as_a_comparison_red_and_stops_the_model(
     ) {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
@@ -10599,7 +9148,7 @@ mod tests {
     /// 取号 panic：与交回错误同样截断（读法 5），结局记 `panic`、O1-对拍记「实现自崩、不比」（不红不绿），模型停在这次调用，
     /// 这条流的结局是 panic 截断（照导出照判）；`record_a_refusal_the_model_only_goes_forward_on` 收到 `None` 不记红。
     #[test]
-    fn a_panic_in_the_acquire_is_an_implementation_crash_and_not_a_comparison_red() {
+    fn panic_in_the_acquire_is_an_implementation_crash_and_not_a_comparison_red() {
         let mut driver = StreamDriver::new(
             StreamName::NewPoolFileCreation,
             SharedStream::retaining_contents(),
@@ -10638,7 +9187,7 @@ mod tests {
             writable_mount_probe: false,
         };
         let mut driver = StreamDriver::new(
-            StreamName::FixedScriptThroughEThenUnmount,
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
             SharedStream::retaining_contents(),
             0,
             switches,
@@ -10773,7 +9322,7 @@ mod tests {
 
     /// 逐行那一趟的 S5：交回了错误而 O1-对拍没问模型（`not_modelled`）的调用、与不适用来自读法 6 那三处之外的来源，各自回比 0。
     #[test]
-    fn the_row_s5_counts_the_errored_calls_left_unjudged_and_the_not_applicable_states_from_another_source(
+    fn the_row_not_applicable_source_checks_count_the_errored_calls_left_unjudged_and_the_not_applicable_states_from_another_source(
     ) {
         let errored = |text: &str| CallOutcome::ReturnedError(text.to_string());
         // 取号出错、O1-对拍没记红：第一样 1 处不合；模型停在出错的那次调用（读法 6 的来源之一），第二样 0。
@@ -10782,7 +9331,8 @@ mod tests {
             errored("X"),
             ModelVerdictOfCall::NotModelled,
         )];
-        let silent_checks = s5_checks_of_a_bad_implementation_row("s", &silent, Some(0), 3);
+        let silent_checks =
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &silent, Some(0), 3);
         assert_eq!(
             silent_checks
                 .iter()
@@ -10803,9 +9353,11 @@ mod tests {
             errored("X"),
             disagreement_for_the_test(),
         )];
-        assert!(s5_checks_of_a_bad_implementation_row("s", &red, Some(0), 9)
-            .iter()
-            .all(StopCheck::holds));
+        assert!(
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &red, Some(0), 9)
+                .iter()
+                .all(StopCheck::holds)
+        );
         // 对拍在发布上判出不同、模型停在那里，之后的可写挂载出错（`skipped_after_the_model_stopped`）：两样都 0（原登记修订 4 那一形）。
         let error_after_the_stop = [
             recorded_call_for_the_test(
@@ -10820,7 +9372,7 @@ mod tests {
             ),
         ];
         assert_eq!(
-            stop_check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&not_applicable_source_checks_of_a_bad_implementation_row(
                 "s",
                 &error_after_the_stop,
                 Some(0),
@@ -10843,7 +9395,7 @@ mod tests {
             recorded_call_for_the_test("publish", errored("Y"), ModelVerdictOfCall::Agrees),
         ];
         assert_eq!(
-            stop_check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&not_applicable_source_checks_of_a_bad_implementation_row(
                 "s",
                 &allowed_refusal,
                 Some(2),
@@ -10865,7 +9417,7 @@ mod tests {
             ),
         ];
         assert_eq!(
-            stop_check_values(&s5_checks_of_a_bad_implementation_row(
+            stop_check_values(&not_applicable_source_checks_of_a_bad_implementation_row(
                 "s",
                 &stopped_on_an_agreeing_unmount,
                 Some(1),
@@ -10886,11 +9438,14 @@ mod tests {
                 ModelVerdictOfCall::NotComparedBecauseTheImplementationCrashed,
             ),
         ];
-        assert!(
-            s5_checks_of_a_bad_implementation_row("s", &panicked, Some(1), 4)
-                .iter()
-                .all(StopCheck::holds)
-        );
+        assert!(not_applicable_source_checks_of_a_bad_implementation_row(
+            "s",
+            &panicked,
+            Some(1),
+            4
+        )
+        .iter()
+        .all(StopCheck::holds));
         // 模型没停：没有不适用的态，合规。
         let no_stop = [recorded_call_for_the_test(
             "publish",
@@ -10898,7 +9453,7 @@ mod tests {
             ModelVerdictOfCall::Agrees,
         )];
         assert!(
-            s5_checks_of_a_bad_implementation_row("s", &no_stop, None, 0)
+            not_applicable_source_checks_of_a_bad_implementation_row("s", &no_stop, None, 0)
                 .iter()
                 .all(StopCheck::holds)
         );
@@ -10907,7 +9462,8 @@ mod tests {
     /// 哪一趟判哪一份 S5：逐行那一趟判「交回了错误的调用都记了对拍的红」那一份，基线那一趟判「模型一次都不停」那一份；
     /// 关掉 O1、流水线 panic 的流不判；基线带阳性对照、流没导出也不判。
     #[test]
-    fn the_row_run_judges_the_row_s5_and_the_baseline_run_judges_the_baseline_s5() {
+    fn the_row_run_judges_the_row_not_applicable_source_checks_and_the_baseline_run_judges_the_baseline_ones(
+    ) {
         let started = Instant::now();
         let silent_acquire_stopped_by_the_error = || {
             let mut export =
@@ -10926,7 +9482,7 @@ mod tests {
             export
         };
         let export = silent_acquire_stopped_by_the_error();
-        let row_checks = s5_checks_to_judge(
+        let row_checks = not_applicable_source_checks_to_judge(
             &export,
             RunKind::BadImplementationRow,
             RunSwitches::default(),
@@ -10946,13 +9502,15 @@ mod tests {
             disabled_oracle: Some(DisabledOracle::ComparisonAndCrashJudge),
             writable_mount_probe: false,
         };
-        assert!(
-            s5_checks_to_judge(&export, RunKind::BadImplementationRow, with_the_model_off)
-                .is_empty()
-        );
+        assert!(not_applicable_source_checks_to_judge(
+            &export,
+            RunKind::BadImplementationRow,
+            with_the_model_off
+        )
+        .is_empty());
         let mut pipeline_panicked = silent_acquire_stopped_by_the_error();
         pipeline_panicked.ending = None;
-        assert!(s5_checks_to_judge(
+        assert!(not_applicable_source_checks_to_judge(
             &pipeline_panicked,
             RunKind::BadImplementationRow,
             RunSwitches::default()
@@ -10965,7 +9523,7 @@ mod tests {
             message: "炸".to_string(),
         });
         assert_eq!(
-            s5_checks_to_judge(
+            not_applicable_source_checks_to_judge(
                 &panicked,
                 RunKind::BadImplementationRow,
                 RunSwitches::default()
@@ -10999,7 +9557,11 @@ mod tests {
                 ModelVerdictOfCall::Agrees,
             ),
         ];
-        let baseline_checks = s5_checks_to_judge(&clean, RunKind::Baseline, RunSwitches::default());
+        let baseline_checks = not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            RunSwitches::default(),
+        );
         assert_eq!(
             baseline_checks
                 .iter()
@@ -11015,15 +9577,25 @@ mod tests {
         );
         // 卸载留在 not_modelled（没改调模型的卸载答）在基线上不过。
         clean.calls[3].model = ModelVerdictOfCall::NotModelled;
-        assert!(!s5_checks_to_judge(&clean, RunKind::Baseline, RunSwitches::default())[1].holds());
+        assert!(!not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            RunSwitches::default()
+        )[1]
+        .holds());
         clean.not_exported = Some("x".to_string());
-        assert!(s5_checks_to_judge(&clean, RunKind::Baseline, RunSwitches::default()).is_empty());
+        assert!(not_applicable_source_checks_to_judge(
+            &clean,
+            RunKind::Baseline,
+            RunSwitches::default()
+        )
+        .is_empty());
     }
 
     /// 交回值的摘要：整份与顶层字段逐个；字段名照 `{:?}` 文本切（嵌套括号、引号里的逗号不切）；两份只差一个字段，整份摘要不同、只那个字段的摘要不同
     /// （V2：摘要取成常量，这里红）。
     #[test]
-    fn a_return_value_digest_names_every_top_level_field_and_changes_with_one_field() {
+    fn return_value_digest_names_every_top_level_field_and_changes_with_one_field() {
         let text = r#"TransactionOutput { root: RootRecord { checkpoint_txg: CheckpointTxg(3) }, record_bytes: [1, 2, 3], name: "a, b" }"#;
         let changed = r#"TransactionOutput { root: RootRecord { checkpoint_txg: CheckpointTxg(4) }, record_bytes: [1, 2, 3], name: "a, b" }"#;
         let digest = return_value_digest_of_debug_text(text);
@@ -11080,7 +9652,7 @@ mod tests {
     /// 态上的恢复 panic 不截断（读法 5；V5：退回「交回 Err、后面的态不判」，这里红）：一段 [3, 9) 在序号 5 上 panic，
     /// 5 记成恢复 panic 的态、6、7、8 照判；另一段 [20, 22) 照判。
     #[test]
-    fn a_state_whose_recovery_panics_is_noted_and_the_states_after_it_are_still_judged() {
+    fn state_whose_recovery_panics_is_noted_and_the_states_after_it_are_still_judged() {
         let mut judged: Vec<u64> = Vec::new();
         let mut judge_run = |run: std::ops::Range<u64>| -> Result<(), u64> {
             for ordinal in run {
@@ -11167,7 +9739,7 @@ mod tests {
     /// hi 是第 2 次调用里最后进序列的操作（发布调用，第 2 个），下界 lo 还是 0；读回「没有文件」（第 2 次调用之前那一版）判绿。
     /// RefFS 判出不在允许集合里的记红（V6：票恒为绿，这里红）。
     #[test]
-    fn a_crash_in_the_segment_the_publish_closes_falls_inside_that_publish() {
+    fn crash_in_the_segment_the_publish_closes_falls_inside_that_publish() {
         let stream = reference_filesystem_stream_of(
             &calls_for_the_reference_filesystem(CallOutcome::Succeeded),
             &operations_closing_one_segment_at_39(),
@@ -11268,7 +9840,7 @@ mod tests {
     /// 见证判据的两支：干净的池上两支都假、c_见证 是所选那一版末条记录的计数器；一块盘一槽系统配置撕裂（槽里一个字节翻一位、自证不过）记 (i)、
     /// 不记 (ii)；每块盘两槽的 journal_tail 抬过所选那一版的末条（阳性对照「见证」的造法）记 (ii) 第一句。
     #[test]
-    fn a_torn_system_configuration_slot_is_the_undecidable_branch_and_a_raised_tail_is_the_counter_branch(
+    fn torn_system_configuration_slot_is_the_undecidable_branch_and_a_raised_tail_is_the_counter_branch(
     ) {
         let (clean, selected) =
             first_file_pool_and_its_selected_version("e171r1-unit-witness-branches");
@@ -11299,7 +9871,7 @@ mod tests {
     /// 每块盘两槽的 journal_tail 抬过所选那一版的末条之后，再撕盘 1 的一槽：只记 (i)、不记 (ii)，另三槽抬过的 tail 还在、c_见证 不变
     /// （登记修订 2 第 2.4 节；V11：判不出那一支并进 (ii)，三句的第一句为真，这里红）。
     #[test]
-    fn a_torn_slot_beside_raised_tails_is_only_the_undecidable_branch() {
+    fn torn_slot_beside_raised_tails_is_only_the_undecidable_branch() {
         let (clean, selected) =
             first_file_pool_and_its_selected_version("e171r1-unit-witness-torn-beside-raised");
         let mut raised = clean.clone();
@@ -11332,14 +9904,18 @@ mod tests {
     /// 流二第 3 次调用 panic（阳性对照 panic 的造法）：整条流照常导出、取样态照判，不退回「整条流不导出」
     /// （登记修订 2 第 2.4 节；V4：panic 那一支退回不导出，这里红）。
     #[test]
-    fn a_stream_stopped_by_a_panic_is_exported_and_its_sampled_states_are_judged() {
+    fn stream_stopped_by_a_panic_is_exported_and_its_sampled_states_are_judged() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let switches = RunSwitches {
             positive_control: Some(PositiveControl::PanicInTheCall),
             disabled_oracle: None,
             writable_mount_probe: false,
         };
-        let stream = prepare_stream(StreamName::FixedScriptThroughEThenUnmount, switches, false);
+        let stream = prepare_stream(
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
+            switches,
+            false,
+        );
         // 守卫认领导出目录：用例做完、断言失败、panic 都删掉它
         let directory =
             singlefs_verification::temporary_files::TemporaryPathRemovedOnDrop::claiming(
@@ -11501,7 +10077,7 @@ mod tests {
             "类核对 ①、②、④ 都过"
         );
         assert_eq!(pairing.mismatching_states, 0, "模型照常：逐态相同");
-        assert!(!pairing.stops_at_s13());
+        assert!(!pairing.stops_at_the_class_check());
         stream.model_stopped_at_call = Some(CONFIRMED_LOSS_IN_FLIGHT_CALL);
         let stopped = equivalence_pairing_of(&stream);
         let not_applicable_states = stopped
@@ -11518,7 +10094,7 @@ mod tests {
             stopped.mismatching_states, 0,
             "模型停在第 3 次调用：逐态相同"
         );
-        assert!(!stopped.stops_at_s13());
+        assert!(!stopped.stops_at_the_class_check());
         let (main, _) = confirmed_loss_prepared_stream(
             second_stream_through_the_first_overwrite(RunSwitches::default()),
             ConfirmedLossTruncation::BeforeTheInFlightBarrier,
@@ -11601,7 +10177,7 @@ mod tests {
             "那个写落没落，有恢复不同的态"
         );
         assert_eq!(pairing.mismatching_states, 0, "细分之后逐态相同");
-        assert!(!pairing.stops_at_s13());
+        assert!(!pairing.stops_at_the_class_check());
     }
 
     /// 流三照读法 2 驱动：删第一个文件（意图一次、走空一步）、一次建一个 inode 到叶容器第一次变成两片，再多建一次
@@ -11648,7 +10224,7 @@ mod tests {
     #[test]
     fn the_unmount_is_compared_with_the_model_and_its_control_turns_only_the_unmount_red() {
         let mut clean = LiveStream::start(
-            StreamName::FixedScriptThroughEThenUnmount,
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
             "e171r1-unit-unmount-clean",
             RunSwitches::default(),
         );
@@ -11665,7 +10241,7 @@ mod tests {
         assert_eq!(unmount_of(&clean), ModelVerdictOfCall::Agrees);
         assert_eq!(clean.driver.model_stopped_at_call, None);
         let mut controlled = LiveStream::start(
-            StreamName::FixedScriptThroughEThenUnmount,
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
             "e171r1-unit-unmount-control",
             RunSwitches {
                 positive_control: Some(PositiveControl::ComparisonOfTheUnmount),
@@ -11710,7 +10286,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_outcome_writes_ok_or_err_into_the_calls_file_and_a_word_into_the_outcomes_file() {
+    fn call_outcome_writes_ok_or_error_into_the_calls_file_and_a_word_into_the_outcomes_file() {
         assert_eq!(CallOutcome::Succeeded.calls_file_word(), "ok");
         assert_eq!(
             CallOutcome::ReturnedError("NoSpace".to_string()).calls_file_word(),
@@ -11796,7 +10372,7 @@ mod tests {
             "不篡改时类核对五个计数全 0"
         );
         assert!(
-            !equivalence_stops_at_s13(&fixture.pairing.classification, &checks),
+            !equivalence_stops_at_the_class_check(&fixture.pairing.classification, &checks),
             "不篡改时不停在 S13"
         );
         fixture
@@ -11850,7 +10426,7 @@ mod tests {
         fixture.pairing.observations[index].crash_judge = tampered;
         let checks = class_checks_of(&fixture);
         assert_eq!(checks.input_list_mismatches, 1, "① 数到代表 0 那一态");
-        assert!(equivalence_stops_at_s13(
+        assert!(equivalence_stops_at_the_class_check(
             &fixture.pairing.classification,
             &checks
         ));
@@ -11899,7 +10475,7 @@ mod tests {
             pairing.classification.refinements, 0,
             "写表没动，③ 看不见它，只有 ② 抓"
         );
-        assert!(equivalence_stops_at_s13(
+        assert!(equivalence_stops_at_the_class_check(
             &pairing.classification,
             &pairing.checks
         ));
@@ -11973,7 +10549,7 @@ mod tests {
 
     /// U4（修订 5 第 5.4 节，KM4；V23：类核对 ④ 前一半不计数，这里红）：S0，代表 0 的记读那一遍恢复换成 panic，④ 前一半数到它。
     #[test]
-    fn a_recording_recovery_that_differs_from_the_crash_point_replay_report_is_counted() {
+    fn recording_recovery_that_differs_from_the_crash_point_replay_report_is_counted() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let mut fixture = untampered_pairing();
         let digits = LastSegmentDigits::of(&fixture.stream, &fixture.tables.tables);
@@ -11992,7 +10568,7 @@ mod tests {
             );
         let checks = class_checks_of(&fixture);
         assert_eq!(checks.recording_report_mismatches, 1, "④ 前一半数到代表 0");
-        assert!(equivalence_stops_at_s13(
+        assert!(equivalence_stops_at_the_class_check(
             &fixture.pairing.classification,
             &checks
         ));
@@ -12000,7 +10576,7 @@ mod tests {
 
     /// U5（修订 5 第 5.4 节，KM3；V24：类核对 ④ 后一半不计数，这里红）：S0，全落 0 的观测里 RefFS 一票换掉，④ 后一半数到它（① 同时数到）。
     #[test]
-    fn a_fully_landed_state_that_differs_from_its_derived_class_is_counted() {
+    fn fully_landed_state_that_differs_from_its_derived_class_is_counted() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let mut fixture = untampered_pairing();
         let digits = LastSegmentDigits::of(&fixture.stream, &fixture.tables.tables);
@@ -12033,7 +10609,7 @@ mod tests {
     /// U6（修订 5 第 5.4 节，KM5、KM6；V25、V26：代表、全落那一态的落地串核对恒过，V27：S13 不看落地串核对，这里红）：S0，
     /// (a) 代表 0 的落地串里 c1 那一位改成 `2`；(b) 还原后全落 0 的落地串里 c1 那一位改成 `0`。各自只有落地串核对数到 1、停在 S13。
     #[test]
-    fn a_landing_string_off_the_partition_is_counted_and_stops_at_s13() {
+    fn landing_string_off_the_partition_is_counted_and_stops_at_the_class_check() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let mut fixture = untampered_pairing();
         let digits = LastSegmentDigits::of(&fixture.stream, &fixture.tables.tables);
@@ -12064,7 +10640,7 @@ mod tests {
                 "序号 {ordinal} 的 c1 那一位改成 {tampered_landing}：只有落地串核对数到它"
             );
             assert!(
-                equivalence_stops_at_s13(&fixture.pairing.classification, &checks),
+                equivalence_stops_at_the_class_check(&fixture.pairing.classification, &checks),
                 "S13 只能从落地串核对来"
             );
             fixture.pairing.observations[index].landing_vector = original;
@@ -12075,7 +10651,7 @@ mod tests {
     /// k = 4 的对拍流（1 152 态，c1…c4 两对镜像），注入 `pool_checker`（c3 落、c4 没落）、`ignored_recovery`（c3 没落、c4 落）、
     /// `record_checker`（c1 没落、c2 落、(c3,c4) 同落或同不落）：各件的态数恰为 288、288、144，两个崩溃子列与看 journal 那遍恢复逐态不变。
     #[test]
-    fn a_panic_off_the_consulted_recovery_leaves_the_two_crash_columns_to_the_four_inputs() {
+    fn panic_off_the_consulted_recovery_leaves_the_two_crash_columns_to_the_four_inputs() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let stream = equivalence_pairing_stream_keeping(4);
         let tables = ObservationTables::of(&stream);
@@ -12133,7 +10709,7 @@ mod tests {
             "注入的三件各 288、288、144 态，别的件 0"
         );
         assert_eq!(
-            o1_columns_differing(&plain.observations, &injected.observations),
+            crash_judge_columns_differing(&plain.observations, &injected.observations),
             0,
             "逐态两个崩溃子列与看 journal 那遍恢复的结局与不注入那一遍相同"
         );
@@ -12142,7 +10718,7 @@ mod tests {
             .iter()
             .all(|observation| observation.recovery_panic.is_none()));
         assert_eq!(injected.mismatching_states, 0);
-        assert!(!injected.stops_at_s13());
+        assert!(!injected.stops_at_the_class_check());
         let pool_checker_panicking: Vec<&StateObservation> = injected
             .observations
             .iter()
@@ -12183,7 +10759,7 @@ mod tests {
     /// U8（修订 5 第 5.7 节，第 5.3 节；V30：根写的前置判删掉、退回先对拍，这里红）：主取样点那一形、对拍那一形各模拟一次没有根写
     /// （只把 `judged_root_index` 设成 `usize::MAX`，写流不变），都在对拍之前退 3、记 `q5_not_run=no_root_write`。
     #[test]
-    fn a_shape_without_a_root_write_stops_before_the_pairing() {
+    fn shape_without_a_root_write_stops_before_the_pairing() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         // 守卫认领输出目录：走岔了真写进去时，用例做完、断言失败、panic 都删掉它
         let output_directory =
@@ -12287,7 +10863,7 @@ mod tests {
     /// 不点名件的规则，只让正常那一路的回调 panic；逐件重做十件一件都不 panic。`unattributed_panic_states=` 数到 1、
     /// `name=q5_piece_panics` 行带它，Q5 走 `q5_not_run=unattributed_panic` 那个出口：判决行 `s13=false`、退 3。
     #[test]
-    fn a_judging_path_panic_that_no_piece_repeats_stops_the_q5_as_unattributed() {
+    fn judging_path_panic_that_no_piece_repeats_stops_the_confirmed_loss_form_as_unattributed() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let stream = equivalence_pairing_stream();
         let observation_tables = ObservationTables::of(&stream);
@@ -12324,7 +10900,7 @@ mod tests {
             "逐件重做十件一件都没 panic"
         );
         assert_eq!(unattributed_panic_states_of(&observations), 1);
-        let piece_panics_line = q5_piece_panics_line("pairing", &observations);
+        let piece_panics_line = confirmed_loss_form_piece_panics_line("pairing", &observations);
         assert!(
             piece_panics_line.ends_with(" unattributed_panic_states=1"),
             "{piece_panics_line}"
@@ -12333,11 +10909,12 @@ mod tests {
             emitted: 0,
             collected: Some(Vec::new()),
         };
-        let exit_code = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(
-            &mut lines,
-            0,
-            &observations,
-        );
+        let exit_code =
+            stop_the_confirmed_loss_form_and_write_the_verdict_when_a_panic_is_unattributed(
+                &mut lines,
+                0,
+                &observations,
+            );
         let collected = lines.collected.expect("收集模式");
         assert_eq!(exit_code, Some(3), "退 3：{collected:?}");
         assert_eq!(
@@ -12506,7 +11083,7 @@ mod tests {
     /// 不带断言的 core 不回收，txg 26 起 I-3.1 红）：流三驱动到第 30 次建 inode 为止，每次调用都成功；取号、暖机之后的每次发布之后，
     /// 对整条流施加出的镜像（全部写落地）判 I-3.1 都成立；末次发布的最新根 txg 至少 30（根环已转过 24 槽，取样点敏感）。
     #[test]
-    fn the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1() {
+    fn the_third_stream_past_one_turn_of_the_root_ring_keeps_the_allocated_counts_matching() {
         let live =
             third_stream_through_inode_creations(INODE_CREATIONS_PAST_ONE_TURN_OF_THE_ROOT_RING);
         let unsuccessful_calls: Vec<(usize, &'static str, &CallOutcome)> = live
@@ -12589,7 +11166,7 @@ mod tests {
     /// core 断言写的变异「删断言」下第 2 次调用成功，这里红）：`LiveStream::start` 之后把分配器换成修订 6 之前的造法（不装根环表），
     /// 驱动流一三次调用：取号、暖机成功，第一个文件那次发布在 core 记根时 panic，消息带那条断言独有的一段原文。
     #[test]
-    fn a_live_stream_without_the_root_ring_panics_in_core_at_its_first_root() {
+    fn live_stream_without_the_root_ring_panics_in_core_at_its_first_root() {
         let mut live = LiveStream::start(
             StreamName::NewPoolFileCreation,
             "e171r1-unit-without-the-root-ring",
@@ -12688,7 +11265,7 @@ mod tests {
 
     /// U13–U16 的共同断言：退 3；倒数第二行（末行是 `name=done`）是判决行，带 `s13=false`、`q5_not_run=unattributed_panic` 与
     /// `unattributed_panic_states=<用例现算的数>`，判决行只有这一行。
-    fn assert_the_q5_stopped_as_unattributed(
+    fn assert_the_confirmed_loss_form_stopped_as_unattributed(
         exit_code: i32,
         collected: &[String],
         expected_unattributed_panic_states: usize,
@@ -12727,7 +11304,7 @@ mod tests {
     /// `piece_panic_control_failed`，这里红）：主那一形与对拍都是 k = 2 的流，对拍那一遍注入一条不点名件的规则（条件「c1 落」），
     /// 在对拍那一处就停：退 3、判决行 `q5_not_run=unattributed_panic`、数等于 c1 落了的态数；阳性对照一行都没打。
     #[test]
-    fn an_unattributed_panic_in_the_pairing_stops_the_q5_at_the_pairing() {
+    fn an_unattributed_panic_in_the_pairing_stops_the_confirmed_loss_form_at_the_pairing() {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let pairing = equivalence_pairing_stream();
         let (first_in_flight_write, states_where_it_landed) =
@@ -12764,7 +11341,11 @@ mod tests {
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
         let collected = lines.collected.expect("收集模式");
-        assert_the_q5_stopped_as_unattributed(exit_code, &collected, states_where_it_landed);
+        assert_the_confirmed_loss_form_stopped_as_unattributed(
+            exit_code,
+            &collected,
+            states_where_it_landed,
+        );
         assert!(
             !collected
                 .iter()
@@ -12777,7 +11358,8 @@ mod tests {
     /// `piece_panic_control_failed`，这里红）：同 U13 的两形，对拍不注入；阳性对照那一格交同一条规则（替换内置规则），
     /// 在阳性对照那一处就停：退 3、数等于 c1 落了的态数；阳性对照那一行打了，主取样点那一形一行都没打。
     #[test]
-    fn an_unattributed_panic_in_the_piece_panic_control_stops_the_q5_at_the_control() {
+    fn an_unattributed_panic_in_the_piece_panic_control_stops_the_confirmed_loss_form_at_the_control(
+    ) {
         let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
         let pairing = equivalence_pairing_stream();
         let (first_in_flight_write, states_where_it_landed) =
@@ -12814,7 +11396,11 @@ mod tests {
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
         let collected = lines.collected.expect("收集模式");
-        assert_the_q5_stopped_as_unattributed(exit_code, &collected, states_where_it_landed);
+        assert_the_confirmed_loss_form_stopped_as_unattributed(
+            exit_code,
+            &collected,
+            states_where_it_landed,
+        );
         assert_eq!(
             collected
                 .iter()
@@ -12893,7 +11479,11 @@ mod tests {
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
         let collected = lines.collected.expect("收集模式");
-        assert_the_q5_stopped_as_unattributed(exit_code, &collected, judged_states);
+        assert_the_confirmed_loss_form_stopped_as_unattributed(
+            exit_code,
+            &collected,
+            judged_states,
+        );
         assert!(
             !collected
                 .iter()
@@ -12954,7 +11544,11 @@ mod tests {
         };
         let exit_code = judge_the_confirmed_loss_shapes(&mut lines, &command_line, shapes, 0);
         let collected = lines.collected.expect("收集模式");
-        assert_the_q5_stopped_as_unattributed(exit_code, &collected, judged_states);
+        assert_the_confirmed_loss_form_stopped_as_unattributed(
+            exit_code,
+            &collected,
+            judged_states,
+        );
         assert!(
             !collected
                 .iter()

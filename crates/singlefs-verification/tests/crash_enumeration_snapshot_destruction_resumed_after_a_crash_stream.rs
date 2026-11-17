@@ -50,6 +50,10 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, CrashImage,
 };
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 
 /// 这份测试文件的仓内路径：崩溃枚举用例的设点文件（节点身份与 CPU 结论版本按它取）。
 const PATH_OF_THIS_TEST_FILE: &str =
@@ -155,10 +159,13 @@ fn assert_every_state_was_observed(tally: &CrashPointReplayTally) {
     let continuation_counts: Vec<u64> = (0..=MOST_CONTINUATION_STEPS)
         .map(|steps| counts.count_named(&format!("mount_continuation_steps_{steps}")))
         .collect();
+    let skipped_on_the_refusal_counts: Vec<u64> = (0..=MOST_CONTINUATION_STEPS)
+        .map(|steps| counts.count_named(&continuation_skipped_on_the_refusal_counter(steps)))
+        .collect();
     assert_eq!(
-        continuation_counts.iter().sum::<u64>(),
+        continuation_counts.iter().sum::<u64>() + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次，续做至多 {MOST_CONTINUATION_STEPS} 步：{continuation_counts:?}"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的续做至多 {MOST_CONTINUATION_STEPS} 步：{continuation_counts:?}"
     );
     for (steps, count) in continuation_counts.iter().enumerate() {
         assert!(
@@ -167,16 +174,20 @@ fn assert_every_state_was_observed(tally: &CrashPointReplayTally) {
         );
     }
     assert_eq!(
-        continuation_counts[MOST_CONTINUATION_STEPS],
+        continuation_counts[MOST_CONTINUATION_STEPS]
+            + skipped_on_the_refusal_counts[MOST_CONTINUATION_STEPS],
         counts.count_named("landed_on_snapshot_destruction_intent"),
-        "落到意图那一版的续做三批加最后一批"
+        "落到意图那一版的续做三批加最后一批（被乙入判不出拒的态按本来还差的步数算）"
     );
     assert_eq!(
         continuation_counts[1..MOST_CONTINUATION_STEPS]
             .iter()
-            .sum::<u64>(),
+            .sum::<u64>()
+            + skipped_on_the_refusal_counts[1..MOST_CONTINUATION_STEPS]
+                .iter()
+                .sum::<u64>(),
         counts.count_named("landed_on_snapshot_destruction_batch"),
-        "落到三批之一的续做余下的批与最后一批"
+        "落到三批之一的续做余下的批与最后一批（被乙入判不出拒的态按本来还差的步数算）"
     );
     assert_eq!(
         counts.count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),

@@ -581,10 +581,11 @@ const C_MAX_SEPARATORS: u32 = 256u;
 
 const C_SEPARATORS: u32 = 203744u;
 
-// 205280 起到 C_SCRATCH_END 为止的 6144 个字原来是 w_merge_below 的显式栈（这里起 1024 条）与展开过的单元（208352 起 1024 条），
-// 那两张抬上限时挪到草稿区末尾（C_MERGE_PENDING、C_MERGE_EXPANDED），其后各表的偏移不挪。这一段留给原来就借它的两处：一版中央映射只读读法的显式栈
-// （read_the_central_mapping_without_judging，C_MAX_PENDING 条，每条字节基、指针偏移、层级）与 I-3.5 摊落点（crash_judge_checker.wgsl 的
-// APPEARANCE_SPREAD_PLACEMENTS，整段），两处借它的时段不重叠（摊落点在主走读那几版都走完之后，那时不再读映射）
+// 205280 起到 C_SCRATCH_END 为止这 6144 个字有三处借用：一版中央映射只读读法的显式栈（read_the_central_mapping_without_judging，
+// C_MAX_PENDING 条，每条字节基、指针偏移、层级）、一版走完那一刻读它的谱系树的显式栈（crash_judge_checker.wgsl 的
+// appearance_note_the_lineage_of_the_version_just_walked，同样 C_MAX_PENDING 条）与 I-3.5 摊落点（crash_judge_checker.wgsl 的
+// APPEARANCE_SPREAD_PLACEMENTS，整段）。三处的时段不重叠：读映射在走这一版的树表条目之前，读谱系在这一版走完之后、下一版读映射之前，
+// 摊落点在主走读那几版都走完之后，那时不再读映射、也不再读谱系。w_merge_below 的显式栈与展开过的单元在草稿区末尾（C_MERGE_PENDING、C_MERGE_EXPANDED）
 const C_MAX_PENDING: u32 = 1024u;
 
 const C_PENDING: u32 = 205280u;
@@ -629,7 +630,9 @@ const_assert C_MAX_TREES_PER_TABLE == TREE_KINDS_OF_THE_TREE_TABLE + 2u * SNAPSH
 // 一个字一样：判不了的原因（后写的盖前写的，结论字只在收尾那一趟写一次）；记账头记下的最新根分配记录条数、I-3.16 占着的区间条数、F 之下仍在 defer 的条数与
 // 钉带出来的那一截条数；最新根的分配记录读全且比得上（I-3.1 那几条界数不数）；I-3.21 比几条记录（不判是 NONE）；两遍隔离豁免逐盘的豁免槽数（各 8 字）；
 // 决断逐盘记下的结论（C_ACCOUNTING_DECISION_*，8 字）；两轮分片各罩到了哪里（各 1 字，罩满是 C_ACCOUNTING_SLICE_POSITIONS）；
-// 每块盘每种读法一份 I-3.1 的界（8 盘 × 2 种读法 × C_ACCOUNTING_BOUNDS_WORDS 字：三个 64 位计数 6 字、三个「每一…」各 1 字）
+// 每块盘每种读法一份 I-3.1 的界（8 盘 × 2 种读法 × C_ACCOUNTING_BOUNDS_WORDS 字：三个 64 位计数 6 字、三个「每一…」各 1 字）；
+// 两轮分片各一份接着做的地方（各 C_ACCOUNTING_RESUME_WORDS 字：这一轮的总权重 2 字，下一片从哪一项接着做——第几块盘、第几种项、第几项，
+// 与排在它前面各项的权重之和 2 字；第几块盘是盘数时接着做的是 I-3.21 的引用，第几项是引用的下标）
 const C_ACCOUNTING_CARRY: u32 = 225808u;
 const C_ACCOUNTING_CARRY_UNDECIDABLE: u32 = C_ACCOUNTING_CARRY;
 const C_ACCOUNTING_CARRY_ALLOCATION_RECORD_COUNT: u32 = C_ACCOUNTING_CARRY + 1u;
@@ -644,7 +647,9 @@ const C_ACCOUNTING_CARRY_DECISION_OF_EACH_DEVICE: u32 = C_ACCOUNTING_CARRY + 23u
 const C_ACCOUNTING_CARRY_SLICES_COVERED_OF_EACH_ROUND: u32 = C_ACCOUNTING_CARRY + 31u;
 const C_ACCOUNTING_CARRY_BOUNDS: u32 = C_ACCOUNTING_CARRY + 33u;
 const C_ACCOUNTING_BOUNDS_WORDS: u32 = 9u;
-const C_ACCOUNTING_CARRY_WORDS: u32 = 33u + 8u * 2u * C_ACCOUNTING_BOUNDS_WORDS;
+const C_ACCOUNTING_CARRY_RESUME_OF_EACH_ROUND: u32 = C_ACCOUNTING_CARRY_BOUNDS + 8u * 2u * C_ACCOUNTING_BOUNDS_WORDS;
+const C_ACCOUNTING_RESUME_WORDS: u32 = 7u;
+const C_ACCOUNTING_CARRY_WORDS: u32 = 33u + 8u * 2u * C_ACCOUNTING_BOUNDS_WORDS + 2u * C_ACCOUNTING_RESUME_WORDS;
 
 const_assert C_CANDIDATES + C_MAX_CANDIDATES <= C_ACCOUNTING_CARRY;
 
@@ -1138,12 +1143,13 @@ const APPEARANCE_LABEL_SHIFT: u32 = 16u;
 
 const_assert C_APPEARANCE_MAX_PLACEMENTS <= APPEARANCE_PLACEMENT_INDEX_MASK + 1u;
 
-// ④ 第 3 字里第一个走到这片树表的那一版的下标的起位（低 8 位是根几棵）
+// ④ 第 3 字里第一个走到这片树表的那一版的下标的起位（低 8 位是根几棵；最高位是 crash_judge_checker.wgsl 的 APPEARANCE_WALKED_TREE_TABLE_HAS_AN_ENTRY_WITHOUT_A_CLAUSE）
 const APPEARANCE_FIRST_WALKER_SHIFT: u32 = 8u;
 
 const_assert C_APPEARANCE_MAX_USER_VISIBLE_ROOTS < (1u << APPEARANCE_FIRST_WALKER_SHIFT);
 
-// 366512 起原来那 8192 个字空着：每一版引用的落点那张表挪到草稿区末尾，接在被抛弃根引用的槽那张表（W_ABANDONED_REFERENCED_SLOTS）之后
+// 366512 起到 C_APPEARANCE_WALKED_TREE_TABLES 为止这 8192 个字：前 7808 个字是 ⑤ 每一版谱系树里的谱系记录（crash_judge_checker.wgsl 的 C_APPEARANCE_LINEAGES，
+// const_assert 守它不越过 ④），后 384 个字空着。每一版引用的落点那张表在草稿区末尾，接在被抛弃根引用的槽那张表（W_ABANDONED_REFERENCED_SLOTS）之后
 const C_APPEARANCE_VERSION_PLACEMENTS: u32 = W_ABANDONED_REFERENCED_SLOTS + 3u * W_MAX_ABANDONED_REFERENCED_SLOTS;
 
 // ④ 走过的树表（walk.rs 的 tree_table_entries_of_a_walked_tree_table 里 I-3.5 读的那一样）：第一个读得出它的那一版记下树表单元的盘、槽 lo/hi，

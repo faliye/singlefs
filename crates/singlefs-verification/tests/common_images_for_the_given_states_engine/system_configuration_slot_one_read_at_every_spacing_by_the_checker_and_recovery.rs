@@ -204,7 +204,7 @@ pub fn hand_out_expecting_the_refused_value_to_redden_the_checker_table(
 /// C651 那一格：io_min 8192 的池（槽距 8192），两块盘的槽 0 都抹掉。恢复逐档择到盘 0 在 8192 处的槽 1；
 /// checker 也逐档读，两块盘都择到 8192 处 mkfs 写下的世代号 1，I-8.5（tail 槽有效集非空） 成立、一条不变量都不红。
 /// checker 按最小槽距 4096 读时 4096 处是 mkfs 清过的 0，两块盘都择不到、I-8.5 判红——与恢复结论相反。
-pub fn run_the_scenario_where_an_io_min_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192(
+pub fn run_the_scenario_where_a_minimum_input_output_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192(
     images: &mut PoolCheckerImages,
 ) {
     let spacing = u64::from(MINIMUM_INPUT_OUTPUT_BYTES_OF_AN_8192_SPACING);
@@ -285,7 +285,7 @@ pub fn run_the_scenario_where_a_slot_carrying_a_value_the_reader_refuses_found_w
 
 /// io_min 8192 的池（槽距 8192），两块盘的槽 0 整槽写 0，盘 0 在 12288 处放一份由 mkfs 写下的槽 1 改出来的槽：在飞上限 + 1、
 /// `edit_the_slot` 再改几格、整槽校验和重封（K3-a `k3slot` 那两种槽的造法）。交回这份镜像。
-pub fn io_min_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
+pub fn minimum_input_output_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
     edit_the_slot: impl Fn(&mut SystemConfiguration),
 ) -> MemoryPool {
     let mut image = formatted_image_with_minimum_input_output_bytes(
@@ -376,7 +376,7 @@ pub fn run_the_scenario_where_a_slot_whose_in_flight_limit_is_off_by_one_and_who
     images: &mut PoolCheckerImages,
 ) {
     let image =
-        io_min_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
+        minimum_input_output_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
             |_unchanged| {},
         );
     assert_recovery_refuses_the_pool_and_the_checker_reads_the_planted_slot_as_carrying_a_refused_value(images,
@@ -390,7 +390,7 @@ pub fn run_the_scenario_where_a_slot_whose_in_flight_limit_is_off_by_one_and_who
     images: &mut PoolCheckerImages,
 ) {
     let image =
-        io_min_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
+        minimum_input_output_8192_pool_with_an_in_flight_limit_plus_one_slot_planted_at_12288_on_device_zero(
             |planted| {
                 planted.immutable.sizes.fixed_structure_slot_spacing =
                     u32::try_from(OFFSET_OF_THE_PLANTED_SLOT).expect("12288 装得进 4 字节");

@@ -639,6 +639,12 @@ impl PublishLog {
                     self.user_change_txgs.insert(version.root.checkpoint_txg.0);
                 }
             }
+            UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(refused) => {
+                self.note_floor_raises(&refused.floor_raises);
+                for version in &refused.versions_published {
+                    self.user_change_txgs.insert(version.root.checkpoint_txg.0);
+                }
+            }
             UserChangeRefused::Publish {
                 floor_raises,
                 versions_published,
@@ -912,7 +918,10 @@ fn apply_change(pool: &mut Pool, kind: ChangeKind) -> ChangeOutcome {
         Err(refusal) => {
             pool.log.note_refusal(&refusal);
             match &refusal {
-                UserChangeRefused::NoSpaceAfterRaisingTheFloor(_) => ChangeOutcome::RefusedForSpace,
+                UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+                | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_) => {
+                    ChangeOutcome::RefusedForSpace
+                }
                 UserChangeRefused::Publish { cause, .. } if refusal_is_short_of_space(cause) => {
                     ChangeOutcome::RefusedForSpace
                 }
@@ -1381,7 +1390,7 @@ fn non_data_demand_upper_bound_slots(
 }
 
 /// W4：满足 2n + U(n) ≤ 各盘可用槽数的最小值 的最大 n（单调，二分）。
-fn largest_units_satisfying_the_w4_demand(
+fn largest_units_satisfying_the_write_demand(
     available_slots: u64,
     inode_tree_internal_levels: u64,
     checkpoint_cost_blocks: u64,
@@ -1480,7 +1489,7 @@ impl StateReading {
             }
             Arm::Candidate(CandidateArm::AvailableMinimumLessTheNonDataDemandOfTheWrite) => {
                 payload_bytes
-                    * i128::from(largest_units_satisfying_the_w4_demand(
+                    * i128::from(largest_units_satisfying_the_write_demand(
                         self.minimum_available_slots(),
                         self.inode_tree_internal_levels,
                         self.checkpoint_cost_blocks,
@@ -1548,7 +1557,10 @@ fn classify_probe_result(
         }
         Ok(_) => ProbeVerdict::Completed,
         Err(_) if data_write_reached => ProbeVerdict::Admitted,
-        Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)) => ProbeVerdict::RefusedForSpace,
+        Err(
+            UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+            | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_),
+        ) => ProbeVerdict::RefusedForSpace,
         Err(UserChangeRefused::Publish { cause, .. }) => {
             if refusal_is_short_of_space(&cause) {
                 ProbeVerdict::RefusedForSpace
@@ -1693,6 +1705,7 @@ fn upper_bound_units_by_the_space_conditions(pool: &Pool, reading: &StateReading
             map.unblocked_slot_pairs_outside_the_cluster_segments(
                 pool.session.allocator.cluster_segments(),
             )
+            .0
         })
         .min()
         .expect("至少一块盘");
@@ -2056,10 +2069,10 @@ struct ArmTally {
     not_over_states: u64,
     not_over_below_lower_bound_states: u64,
     undetermined_states: u64,
-    max_over_bytes: u64,
-    max_over_at: String,
-    max_under_bytes: u64,
-    max_under_at: String,
+    maximum_over_bytes: u64,
+    maximum_over_at: String,
+    maximum_under_bytes: u64,
+    maximum_under_at: String,
     sum_under_bytes: u128,
     under_states: u64,
 }
@@ -2069,9 +2082,9 @@ impl ArmTally {
         match judgement {
             Judgement::OverReports { over_bytes } => {
                 self.over_states += 1;
-                if *over_bytes > self.max_over_bytes {
-                    self.max_over_bytes = *over_bytes;
-                    self.max_over_at = state_name.to_string();
+                if *over_bytes > self.maximum_over_bytes {
+                    self.maximum_over_bytes = *over_bytes;
+                    self.maximum_over_at = state_name.to_string();
                 }
             }
             Judgement::DoesNotOverReport { under_bytes } => {
@@ -2080,9 +2093,9 @@ impl ArmTally {
                     self.under_states += 1;
                     self.sum_under_bytes += u128::from(*under_bytes);
                 }
-                if *under_bytes > self.max_under_bytes {
-                    self.max_under_bytes = *under_bytes;
-                    self.max_under_at = state_name.to_string();
+                if *under_bytes > self.maximum_under_bytes {
+                    self.maximum_under_bytes = *under_bytes;
+                    self.maximum_under_at = state_name.to_string();
                 }
             }
             Judgement::CertainlyDoesNotOverReportBelowTheLowerBound => {
@@ -2097,13 +2110,13 @@ impl ArmTally {
         self.not_over_states += other.not_over_states;
         self.not_over_below_lower_bound_states += other.not_over_below_lower_bound_states;
         self.undetermined_states += other.undetermined_states;
-        if other.max_over_bytes > self.max_over_bytes {
-            self.max_over_bytes = other.max_over_bytes;
-            self.max_over_at.clone_from(&other.max_over_at);
+        if other.maximum_over_bytes > self.maximum_over_bytes {
+            self.maximum_over_bytes = other.maximum_over_bytes;
+            self.maximum_over_at.clone_from(&other.maximum_over_at);
         }
-        if other.max_under_bytes > self.max_under_bytes {
-            self.max_under_bytes = other.max_under_bytes;
-            self.max_under_at.clone_from(&other.max_under_at);
+        if other.maximum_under_bytes > self.maximum_under_bytes {
+            self.maximum_under_bytes = other.maximum_under_bytes;
+            self.maximum_under_at.clone_from(&other.maximum_under_at);
         }
         self.sum_under_bytes += other.sum_under_bytes;
         self.under_states += other.under_states;
@@ -2685,6 +2698,7 @@ fn half_of_the_pairs_outside_the_cluster_segments(pool: &Pool) -> u64 {
             map.unblocked_slot_pairs_outside_the_cluster_segments(
                 pool.session.allocator.cluster_segments(),
             )
+            .0
         })
         .min()
         .expect("至少一块盘")
@@ -2891,7 +2905,8 @@ fn drive_abandoned_root_and_net_release_family(run: &mut HistoryRun) {
     for (_, disk) in &mut run.pool.devices {
         disk.recording = Some(Vec::new());
     }
-    let outcome_of_p = apply_change(&mut run.pool, ChangeKind::SequentialWriteOfUnits(32));
+    let outcome_of_the_shrinking_rewrite =
+        apply_change(&mut run.pool, ChangeKind::SequentialWriteOfUnits(32));
     let recordings: Vec<Vec<RecordedWrite>> = run
         .pool
         .devices
@@ -2900,9 +2915,9 @@ fn drive_abandoned_root_and_net_release_family(run: &mut HistoryRun) {
         .collect();
     run.observe(
         "after_change",
-        &format!("p_net_release:{}", outcome_of_p.label()),
+        &format!("p_net_release:{}", outcome_of_the_shrinking_rewrite.label()),
     );
-    let txg_of_p = run
+    let txg_of_the_shrinking_rewrite = run
         .pool
         .log
         .user_change_txgs
@@ -2923,20 +2938,22 @@ fn drive_abandoned_root_and_net_release_family(run: &mut HistoryRun) {
         return;
     };
     drop(before_publish);
-    let mut devices_of_mount_b = crash_state.devices;
-    devices_of_mount_b[crash_state.root_slot_device_index]
+    let mut devices_of_the_faulted_mount = crash_state.devices;
+    devices_of_the_faulted_mount[crash_state.root_slot_device_index]
         .1
         .unreadable_byte_ranges
         .push(crash_state.root_slot_byte_range.clone());
     for (index, ranges) in crash_state.journal_record_byte_ranges.iter().enumerate() {
-        devices_of_mount_b[index]
+        devices_of_the_faulted_mount[index]
             .1
             .unreadable_byte_ranges
             .extend(ranges.iter().cloned());
     }
-    let mut log_of_mount_b = run.pool.log.clone();
-    log_of_mount_b.user_change_txgs.remove(&txg_of_p);
-    let mounted = match mount_writable(&run.pool.parameters, &mut devices_of_mount_b) {
+    let mut log_of_the_faulted_mount = run.pool.log.clone();
+    log_of_the_faulted_mount
+        .user_change_txgs
+        .remove(&txg_of_the_shrinking_rewrite);
+    let mounted = match mount_writable(&run.pool.parameters, &mut devices_of_the_faulted_mount) {
         Ok(mounted) => mounted,
         Err(error) => {
             run.lines.push(
@@ -2948,11 +2965,12 @@ fn drive_abandoned_root_and_net_release_family(run: &mut HistoryRun) {
             return;
         }
     };
-    let (output_of_mount_b, session_of_mount_b) = MountedSession::of_the_mount(mounted);
-    log_of_mount_b.note_mount(&output_of_mount_b);
-    run.pool.devices = devices_of_mount_b;
-    run.pool.session = session_of_mount_b;
-    run.pool.log = log_of_mount_b;
+    let (output_of_the_faulted_mount, session_of_the_faulted_mount) =
+        MountedSession::of_the_mount(mounted);
+    log_of_the_faulted_mount.note_mount(&output_of_the_faulted_mount);
+    run.pool.devices = devices_of_the_faulted_mount;
+    run.pool.session = session_of_the_faulted_mount;
+    run.pool.log = log_of_the_faulted_mount;
     for (_, disk) in &mut run.pool.devices {
         disk.unreadable_byte_ranges.clear();
     }
@@ -2970,23 +2988,23 @@ fn drive_abandoned_root_and_net_release_family(run: &mut HistoryRun) {
         };
         change_and_observe(run, kind);
     }
-    let abandoned_after_mount_c =
-        run.pool
-            .session
-            .allocator
-            .root_ring_occupancy()
-            .map_or(0, |occupancy| {
-                occupancy
-                    .ring_slots_recorded_as_holding_an_abandoned_root()
-                    .len()
-            });
+    let abandoned_after_the_fault_free_mount = run
+        .pool
+        .session
+        .allocator
+        .root_ring_occupancy()
+        .map_or(0, |occupancy| {
+            occupancy
+                .ring_slots_recorded_as_holding_an_abandoned_root()
+                .len()
+        });
     run.lines.push(
         ProductLine::new("abandoned_root_and_net_release_family_status")
             .field("geometry", run.pool.geometry.name)
             .field("status", "mounts_made")
             .field(
                 "abandoned_root_ring_slots_at_the_end",
-                abandoned_after_mount_c,
+                abandoned_after_the_fault_free_mount,
             )
             .finish(),
     );
@@ -3244,23 +3262,23 @@ fn append_arm_tally(
                 tally.not_over_below_lower_bound_states,
             )
             .field("undetermined_states", tally.undetermined_states)
-            .field("max_over_bytes", tally.max_over_bytes)
+            .field("max_over_bytes", tally.maximum_over_bytes)
             .field(
                 "max_over_at",
-                if tally.max_over_at.is_empty() {
+                if tally.maximum_over_at.is_empty() {
                     "none"
                 } else {
-                    tally.max_over_at.as_str()
+                    tally.maximum_over_at.as_str()
                 },
             )
             .field("under_states", tally.under_states)
-            .field("max_under_bytes", tally.max_under_bytes)
+            .field("max_under_bytes", tally.maximum_under_bytes)
             .field(
                 "max_under_at",
-                if tally.max_under_at.is_empty() {
+                if tally.maximum_under_at.is_empty() {
                     "none"
                 } else {
-                    tally.max_under_at.as_str()
+                    tally.maximum_under_at.as_str()
                 },
             )
             .field(
@@ -3599,35 +3617,43 @@ fn append_verdict(
 // ---------------------------------------------------------------------------------------------------------------------
 
 /// 门槛放在两个读数中间，「读数高于门槛」的判定在两点上必须不同；两点读数相等时没有可自证的，交回 `None`。
-fn threshold_between_flips_the_judgement(reading_a: i128, reading_b: i128) -> Option<bool> {
-    if reading_a == reading_b {
+fn threshold_between_flips_the_judgement(
+    reading_on_one_side: i128,
+    reading_on_the_other_side: i128,
+) -> Option<bool> {
+    if reading_on_one_side == reading_on_the_other_side {
         return None;
     }
-    let twice_the_threshold = reading_a + reading_b;
-    Some((2 * reading_a > twice_the_threshold) != (2 * reading_b > twice_the_threshold))
+    let twice_the_threshold = reading_on_one_side + reading_on_the_other_side;
+    Some(
+        (2 * reading_on_one_side > twice_the_threshold)
+            != (2 * reading_on_the_other_side > twice_the_threshold),
+    )
 }
 
 fn append_sensitivity_pair(
     output: &mut Vec<String>,
     quantity: &str,
-    point_a: &str,
-    reading_a: i128,
-    point_b: &str,
-    reading_b: i128,
+    point_on_one_side: &str,
+    reading_on_one_side: i128,
+    point_on_the_other_side: &str,
+    reading_on_the_other_side: i128,
     flips_on_the_registered_threshold: bool,
 ) {
-    let self_check = match threshold_between_flips_the_judgement(reading_a, reading_b) {
-        Some(true) => "flips",
-        Some(false) => "does_not_flip_stop",
-        None => "equal_readings_not_applicable",
-    };
+    let self_check =
+        match threshold_between_flips_the_judgement(reading_on_one_side, reading_on_the_other_side)
+        {
+            Some(true) => "flips",
+            Some(false) => "does_not_flip_stop",
+            None => "equal_readings_not_applicable",
+        };
     output.push(
         ProductLine::new("geometry_sensitivity")
             .field("quantity", quantity)
-            .field("point_a", point_a)
-            .field("reading_a", reading_a)
-            .field("point_b", point_b)
-            .field("reading_b", reading_b)
+            .field("point_a", point_on_one_side)
+            .field("reading_a", reading_on_one_side)
+            .field("point_b", point_on_the_other_side)
+            .field("reading_b", reading_on_the_other_side)
             .field(
                 "registered_threshold_judgement_flips",
                 flips_on_the_registered_threshold,
@@ -4043,10 +4069,10 @@ fn put_arm_tally(writer: &mut ShardWriter, tally: &ArmTally) {
         not_over_states,
         not_over_below_lower_bound_states,
         undetermined_states,
-        max_over_bytes,
-        max_over_at,
-        max_under_bytes,
-        max_under_at,
+        maximum_over_bytes,
+        maximum_over_at,
+        maximum_under_bytes,
+        maximum_under_at,
         sum_under_bytes,
         under_states,
     } = tally;
@@ -4057,10 +4083,10 @@ fn put_arm_tally(writer: &mut ShardWriter, tally: &ArmTally) {
         not_over_below_lower_bound_states,
     );
     writer.put("undetermined_states", undetermined_states);
-    writer.put("max_over_bytes", max_over_bytes);
-    writer.put("max_over_at", max_over_at);
-    writer.put("max_under_bytes", max_under_bytes);
-    writer.put("max_under_at", max_under_at);
+    writer.put("max_over_bytes", maximum_over_bytes);
+    writer.put("max_over_at", maximum_over_at);
+    writer.put("max_under_bytes", maximum_under_bytes);
+    writer.put("max_under_at", maximum_under_at);
     writer.put("sum_under_bytes", sum_under_bytes);
     writer.put("under_states", under_states);
 }
@@ -4072,10 +4098,10 @@ fn take_arm_tally(reader: &mut ShardReader) -> Result<ArmTally, String> {
         not_over_below_lower_bound_states: reader
             .take_parsed("not_over_below_lower_bound_states")?,
         undetermined_states: reader.take_parsed("undetermined_states")?,
-        max_over_bytes: reader.take_parsed("max_over_bytes")?,
-        max_over_at: reader.take("max_over_at")?,
-        max_under_bytes: reader.take_parsed("max_under_bytes")?,
-        max_under_at: reader.take("max_under_at")?,
+        maximum_over_bytes: reader.take_parsed("max_over_bytes")?,
+        maximum_over_at: reader.take("max_over_at")?,
+        maximum_under_bytes: reader.take_parsed("max_under_bytes")?,
+        maximum_under_at: reader.take("max_under_at")?,
         sum_under_bytes: reader.take_parsed("sum_under_bytes")?,
         under_states: reader.take_parsed("under_states")?,
     })
@@ -4713,7 +4739,7 @@ mod tests {
     }
 
     #[test]
-    fn a_blank_disk_reads_zero_and_keeps_what_was_written() {
+    fn blank_disk_reads_zero_and_keeps_what_was_written() {
         let mut disk = Disk::blank(1 << 20);
         disk.write_at(
             DeviceOffsetInBytes(1024),
@@ -4727,7 +4753,7 @@ mod tests {
     }
 
     #[test]
-    fn a_base_disk_does_not_store_all_zero_sectors() {
+    fn base_disk_does_not_store_all_zero_sectors() {
         let mut disk = Disk::blank(1 << 20);
         disk.write_at(
             DeviceOffsetInBytes(0),
@@ -4881,13 +4907,19 @@ mod tests {
     }
 
     #[test]
-    fn the_w4_search_returns_the_largest_n_whose_demand_fits() {
+    fn the_write_demand_search_returns_the_largest_unit_count_whose_demand_fits() {
         let available = 1000;
-        let n = largest_units_satisfying_the_w4_demand(available, 0, 10);
-        assert!(2 * n + non_data_demand_upper_bound_slots(n, 0, 10) <= available);
-        assert!(2 * (n + 1) + non_data_demand_upper_bound_slots(n + 1, 0, 10) > available);
+        let largest_units = largest_units_satisfying_the_write_demand(available, 0, 10);
+        assert!(
+            2 * largest_units + non_data_demand_upper_bound_slots(largest_units, 0, 10)
+                <= available
+        );
+        assert!(
+            2 * (largest_units + 1) + non_data_demand_upper_bound_slots(largest_units + 1, 0, 10)
+                > available
+        );
         assert_eq!(
-            largest_units_satisfying_the_w4_demand(5, 0, 10),
+            largest_units_satisfying_the_write_demand(5, 0, 10),
             0,
             "连固定部分都装不下"
         );
@@ -5136,7 +5168,7 @@ mod arm_and_residual_tests {
     }
 
     #[test]
-    fn the_w4_arm_leaves_room_for_the_non_data_demand_of_the_write() {
+    fn the_write_demand_arm_leaves_room_for_the_non_data_demand_of_the_write() {
         let reading = state_reading(
             vec![device_reading(1000, 0, 1000), device_reading(1000, 0, 1000)],
             0,
@@ -5149,7 +5181,10 @@ mod arm_and_residual_tests {
         ) / i128::from(DATA_UNIT_PAYLOAD_BYTES);
         let units = u64::try_from(units).expect("单元数");
         assert!(units < 500, "比不扣非数据需求的 500 个单元少");
-        assert_eq!(units, largest_units_satisfying_the_w4_demand(1000, 0, 10));
+        assert_eq!(
+            units,
+            largest_units_satisfying_the_write_demand(1000, 0, 10)
+        );
     }
 
     #[test]
@@ -5169,7 +5204,7 @@ mod arm_and_residual_tests {
     }
 
     #[test]
-    fn a_negative_arm_value_is_reported_as_zero_bytes() {
+    fn negative_arm_value_is_reported_as_zero_bytes() {
         assert_eq!(reported_bytes(-5), 0);
         assert_eq!(reported_bytes(7), 7);
     }
@@ -5426,7 +5461,7 @@ mod search_tests {
     }
 
     #[test]
-    fn a_pool_roomier_than_the_journal_cap_is_censored_at_the_largest_units_that_still_pass_the_record_limit(
+    fn pool_roomier_than_the_journal_cap_is_censored_at_the_largest_units_that_still_pass_the_record_limit(
     ) {
         // 固定那几条记录随单元数变（每 1000 个单元多一条）：在 12 万个单元处学来的上限偏低，下界得往上收到记录上限边上。
         // 每多少个单元多一条取几种，其中一种大到不变；并行度取 1、2、6、31，覆盖步长翻倍那一支的各种点数。
@@ -5462,7 +5497,7 @@ mod search_tests {
     }
 
     #[test]
-    fn a_space_bound_that_is_not_a_bound_is_widened_to_the_journal_cap_when_the_cap_is_known() {
+    fn space_bound_that_is_not_a_bound_is_widened_to_the_journal_cap_when_the_cap_is_known() {
         let fake = prober(30_000, 100_000, 4);
         let mut model = JournalModel {
             largest_units_below_the_record_limit: Some(64_000),
@@ -5486,7 +5521,7 @@ mod search_tests {
     }
 
     #[test]
-    fn a_state_where_the_landing_gate_refuses_before_the_record_limit_is_found_exactly_at_zero() {
+    fn state_where_the_landing_gate_refuses_before_the_record_limit_is_found_exactly_at_zero() {
         let fake = prober(0, 0, 3);
         let mut model = JournalModel::NOT_LEARNED_YET;
         assert_eq!(
@@ -5845,10 +5880,10 @@ mod shard_tests {
                         not_over_states: 2 * seed + arm_number,
                         not_over_below_lower_bound_states: arm_number,
                         undetermined_states: seed % 3,
-                        max_over_bytes: 32634 * (seed + arm_number),
-                        max_over_at: state_name.clone(),
-                        max_under_bytes: 16384 * seed,
-                        max_under_at: format!("{state_name}\twith a tab"),
+                        maximum_over_bytes: 32634 * (seed + arm_number),
+                        maximum_over_at: state_name.clone(),
+                        maximum_under_bytes: 16384 * seed,
+                        maximum_under_at: format!("{state_name}\twith a tab"),
                         sum_under_bytes: u128::from(seed) << 70,
                         under_states: seed,
                     },
@@ -6006,7 +6041,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_shard_text_parses_back_to_the_same_header_and_family_outcome() {
+    fn shard_text_parses_back_to_the_same_header_and_family_outcome() {
         let geometry = geometry_named("default_geometry_with_four_slots_per_region");
         let header = ShardHeader {
             geometry_name: geometry.name.to_string(),
@@ -6033,7 +6068,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_a_missing_shard() {
+    fn merge_refuses_a_missing_shard() {
         let mut texts = shard_texts_of_every_cell(31);
         texts.remove("narrow_devices_geometry-many_mounts.shard");
         let refusal = merge_shard_texts(&texts).expect_err("少一片不合并");
@@ -6044,7 +6079,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_a_shard_whose_done_line_is_missing() {
+    fn merge_refuses_a_shard_whose_done_line_is_missing() {
         let mut texts = shard_texts_of_every_cell(31);
         let text = texts
             .get_mut("default_geometry-overwrite.shard")
@@ -6064,7 +6099,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_a_shard_cut_short_even_if_it_ends_with_a_done_line() {
+    fn merge_refuses_a_shard_cut_short_even_if_it_ends_with_a_done_line() {
         let mut texts = shard_texts_of_every_cell(31);
         let text = texts.get_mut("default_geometry-fill.shard").expect("片在");
         let lines: Vec<&str> = text.lines().collect();
@@ -6082,7 +6117,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_an_unexpected_shard_and_a_shard_holding_another_family() {
+    fn merge_refuses_an_unexpected_shard_and_a_shard_holding_another_family() {
         let mut texts = shard_texts_of_every_cell(31);
         let extra = texts["default_geometry-fill.shard"].clone();
         texts.insert("default_geometry-hx.shard".to_string(), extra);
@@ -6105,7 +6140,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_shards_run_with_different_total_threads() {
+    fn merge_refuses_shards_run_with_different_total_threads() {
         let mut texts = shard_texts_of_every_cell(31);
         let other_threads = shard_texts_of_every_cell(30);
         texts.insert(
@@ -6124,7 +6159,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_merge_refuses_a_shard_whose_probe_threads_are_not_those_of_its_geometry_cell() {
+    fn merge_refuses_a_shard_whose_probe_threads_are_not_those_of_its_geometry_cell() {
         let mut texts = shard_texts_of_every_cell(31);
         let geometry = geometry_named("narrow_devices_geometry");
         let header = ShardHeader {
@@ -6181,7 +6216,7 @@ mod shard_tests {
     }
 
     #[test]
-    fn a_shard_value_with_backslashes_tabs_and_line_breaks_survives_escaping() {
+    fn shard_value_with_backslashes_tabs_and_line_breaks_survives_escaping() {
         for text in ["", "none", "a\\b", "\t", "\n\r", "\\t", "末尾一个反斜杠\\"] {
             assert_eq!(
                 unescape_shard_value(&escape_shard_value(text)).expect("转义过的读得回"),

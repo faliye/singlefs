@@ -63,18 +63,19 @@ use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, writes_and_segments, CrashImage, MemoryPool,
     PublishedVersion, PublishedVersionWithoutAFile, RetainedWrite,
 };
+use singlefs_verification::mount_transparency::WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER;
 use singlefs_verification::segments::StepKind;
 
 const SECOND_FILE_BYTES: usize = 4100;
 const THIRD_FILE_BYTES: usize = 2500;
 /// E 的数据单元落回最低的可再分配偶数槽对：mkfs 实例表那两槽（释放代 5，抬 F 到 11 回收了），同固定脚本。
-const REUSED_DATA_UNIT_SLOT_OF_E: u64 = 50176;
+const REUSED_DATA_UNIT_SLOT_OF_THE_LAST_OVERWRITE: u64 = 50176;
 /// 回退之后五次覆盖写（txg 10–14）各用的内容种子，同固定脚本。
 const SEEDS_OF_THE_FIVE_OVERWRITES_AFTER_THE_ROLLBACK: [usize; 5] = [13, 17, 19, 23, 29];
 /// E（txg 17）的内容种子。
-const SEED_OF_E: usize = 31;
+const SEED_OF_THE_LAST_OVERWRITE: usize = 31;
 /// E 那一版的 txg：意图 18、最后一批 19。
-const TXG_OF_E: u64 = 17;
+const TXG_OF_THE_LAST_OVERWRITE: u64 = 17;
 
 /// 段序列：前 71 段同固定脚本到 E（`crash_enumeration_fixed_script_stream.rs` 的到 E 再卸载那一串去掉卸载那 9 段；取号写两轮，开头与 B 之后重开
 /// 两次取号各两段）；之后意图那次
@@ -141,7 +142,7 @@ fn version(instance: u32, txg: u64, content: Vec<u8>) -> PublishedVersion {
 }
 
 /// 固定脚本到 E 的十五版带文件的版本（A、B、重开那三次、C、D、五次覆盖写、抬 F 的两次空发布、E），按发布的次序。
-fn versions_of_the_fixed_script_through_e() -> Vec<PublishedVersion> {
+fn versions_of_the_fixed_script_through_the_last_overwrite() -> Vec<PublishedVersion> {
     let mut versions = vec![
         version(1, 3, file_content()),
         version(1, 4, second_content()),
@@ -155,7 +156,11 @@ fn versions_of_the_fixed_script_through_e() -> Vec<PublishedVersion> {
     let latest_before_the_floor_raise =
         later_content(SEEDS_OF_THE_FIVE_OVERWRITES_AFTER_THE_ROLLBACK[4]);
     versions.extend((15..=16).map(|txg| version(2, txg, latest_before_the_floor_raise.clone())));
-    versions.push(version(2, TXG_OF_E, later_content(SEED_OF_E)));
+    versions.push(version(
+        2,
+        TXG_OF_THE_LAST_OVERWRITE,
+        later_content(SEED_OF_THE_LAST_OVERWRITE),
+    ));
     versions
 }
 
@@ -185,7 +190,9 @@ fn overwrite(
 
 /// 固定脚本到 E（不录崩溃点那一路，写法照 `crash_enumeration_fixed_script_stream.rs` 的 `prepare`）：交回 B 之后重开那一次可写挂载写出的东西
 /// （会话接在它后面）与 E 那一版。
-fn run_the_fixed_script_through_e(pool: &mut BuiltPool) -> (MountOutput, TransactionOutput) {
+fn run_the_fixed_script_through_the_last_overwrite(
+    pool: &mut BuiltPool,
+) -> (MountOutput, TransactionOutput) {
     overwrite(pool, &second_content(), InstanceGeneration(1));
     let mut devices = pool.reopen_recorded();
     let Mounted {
@@ -231,18 +238,27 @@ fn run_the_fixed_script_through_e(pool: &mut BuiltPool) -> (MountOutput, Transac
         assert_eq!(raised.publishes.len(), 2, "txg 15 落盘 0、txg 16 落盘 1");
         pool.output = current;
     }
-    let e = overwrite(pool, &later_content(SEED_OF_E), InstanceGeneration(2));
-    (mount_output, e)
+    let last_overwrite = overwrite(
+        pool,
+        &later_content(SEED_OF_THE_LAST_OVERWRITE),
+        InstanceGeneration(2),
+    );
+    (mount_output, last_overwrite)
 }
 
 /// E 那一版：txg 17、数据单元落回 mkfs 实例表那两槽（同固定脚本）。
-fn assert_e_is_the_version_of_the_fixed_script(e: &TransactionOutput) {
+fn assert_the_last_overwrite_is_the_version_of_the_fixed_script(
+    last_overwrite: &TransactionOutput,
+) {
     assert_eq!(
         (
-            e.root.checkpoint_txg.0,
-            e.data_pointers[0].locations[0].slot.0
+            last_overwrite.root.checkpoint_txg.0,
+            last_overwrite.data_pointers[0].locations[0].slot.0
         ),
-        (TXG_OF_E, REUSED_DATA_UNIT_SLOT_OF_E),
+        (
+            TXG_OF_THE_LAST_OVERWRITE,
+            REUSED_DATA_UNIT_SLOT_OF_THE_LAST_OVERWRITE
+        ),
         "E 是 txg 17、数据单元落回 mkfs 实例表那两槽（释放代 5，抬 F 到 11 回收了）"
     );
 }
@@ -267,7 +283,7 @@ fn assert_the_shape_of_the_unlink_steps(unlink: &UnlinkThroughTheSession) {
             intent.data_pointers.len()
         ),
         (
-            TXG_OF_E + 1,
+            TXG_OF_THE_LAST_OVERWRITE + 1,
             NLINK_OF_AN_INODE_BEING_DELETED,
             vec![UNLINKED_FILE],
             1
@@ -275,7 +291,7 @@ fn assert_the_shape_of_the_unlink_steps(unlink: &UnlinkThroughTheSession) {
         "意图那一版：txg 18、nlink = 0、号在队列里、一个数据单元都还在"
     );
     assert!(
-        final_batch.root.checkpoint_txg.0 == TXG_OF_E + 2
+        final_batch.root.checkpoint_txg.0 == TXG_OF_THE_LAST_OVERWRITE + 2
             && final_batch.inode_record.is_none()
             && final_batch.data_pointers.is_empty(),
         "最后一批（txg 19）删记录、释放最后一个单元"
@@ -328,8 +344,8 @@ impl Prepared {
 /// 交给判器之前只核录流那一边不随「最后一批与删意图同事务」变的形状：E、会话发成的两版、最后一批为止的段序列、十九条根槽写。
 fn prepare(tag: &str) -> Prepared {
     let mut pool = build_pool(tag);
-    let (mount_output, e) = run_the_fixed_script_through_e(&mut pool);
-    assert_e_is_the_version_of_the_fixed_script(&e);
+    let (mount_output, last_overwrite) = run_the_fixed_script_through_the_last_overwrite(&mut pool);
+    assert_the_last_overwrite_is_the_version_of_the_fixed_script(&last_overwrite);
     let unlink = unlink_the_first_file_through_the_session(&mut pool, mount_output);
     assert_the_shape_of_the_unlink_steps(&unlink);
     let base = pool.memory_pool_after_mkfs();
@@ -353,7 +369,7 @@ fn prepare(tag: &str) -> Prepared {
         19,
         "固定脚本到 E 十七条、意图与最后一批各一条根槽写"
     );
-    let versions = versions_of_the_fixed_script_through_e();
+    let versions = versions_of_the_fixed_script_through_the_last_overwrite();
     let intent = unlink
         .versions_published
         .first()
@@ -456,9 +472,10 @@ fn assert_every_state_was_mounted_and_continued_to_empty(tally: &CrashPointRepla
     );
     assert_eq!(
         counts.count_named("mount_continuation_steps_0")
-            + counts.count_named("mount_continuation_steps_1"),
+            + counts.count_named("mount_continuation_steps_1")
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次，续做 0 步或 1 步"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的续做 0 步或 1 步"
     );
     singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
         counts.count_named("mount_continuation_steps_1"),
@@ -738,14 +755,14 @@ fn record_through_the_crash_point_recorder(tag: &str) -> RecordedThroughTheCrash
     }
     let raised = raise_rollback_floor_step(&mut recorder, &mut pool, CheckpointTxg(11));
     assert_eq!(raised.publishes.len(), 2, "txg 15 落盘 0、txg 16 落盘 1");
-    let e = overwrite_step(
+    let last_overwrite = overwrite_step(
         &mut recorder,
         &mut pool,
-        &later_content(SEED_OF_E),
+        &later_content(SEED_OF_THE_LAST_OVERWRITE),
         InstanceGeneration(2),
     );
-    assert_e_is_the_version_of_the_fixed_script(&e);
-    pool.output = e;
+    assert_the_last_overwrite_is_the_version_of_the_fixed_script(&last_overwrite);
+    pool.output = last_overwrite;
     let unlink =
         unlink_the_first_file_through_the_session_step(&mut recorder, &mut pool, mount_output);
     assert_the_shape_of_the_unlink_steps(&unlink);
@@ -775,7 +792,7 @@ fn record_through_the_crash_point_recorder(tag: &str) -> RecordedThroughTheCrash
         segments,
         crash_points,
         judged_root_index,
-        versions: versions_of_the_fixed_script_through_e(),
+        versions: versions_of_the_fixed_script_through_the_last_overwrite(),
         versions_without_a_file,
     }
 }

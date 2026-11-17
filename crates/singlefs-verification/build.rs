@@ -4,7 +4,7 @@
 //!
 //! 只做生成、不藏逻辑：切分、闭包、键、工具链行的拼法、表的写法、特性的取法都在 `singlefs-unit-graph` 里（`entry_groups`、
 //! `build_toolchain`、`build_features`），命令行 `unit-graph key … --toolchain-of-the-build <profile> --lock-file Cargo.lock` 用的是同一份。
-//! 这里只取 cargo 给的：本包开了哪些特性（cargo 编本构建脚本时带着本包这一次开了的特性的 cfg，[`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`]；
+//! 这里只取 cargo 给的：本包开了哪些特性（cargo 编本构建脚本时带着本包这一次开了的特性的 cfg，[`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS`]；
 //! 不读进程环境里的 `CARGO_FEATURE_*`，外面带进来的同名变量分不出）、依赖包在这一次编译里开了哪些特性（带 `links` 的依赖包构建脚本交出的
 //! `DEP_<links>_ENABLED_FEATURES`：编测试时本包的 dev 依赖替 `singlefs-core` 并上的特性，本包的 `CARGO_FEATURE_*` 看不到）、
 //! `$RUSTC -vV`、`$CARGO -V`、`TARGET`、`CARGO_ENCODED_RUSTFLAGS`、`PROFILE`（profile 的生效值另从工作区根 `Cargo.toml` 算，
@@ -33,7 +33,7 @@ use singlefs_unit_graph::build_toolchain::{
     BuildToolchainInputs, PROFILE_SETTING_KEYS,
 };
 use singlefs_unit_graph::entry_groups::{
-    entry_group_key_with_the_features_of_the_build,
+    entry_group_key_not_following_the_listed_units,
     entry_group_table_text_with_the_features_of_the_build, EntryGroupKey, EntryGroupRequest,
 };
 use singlefs_unit_graph::sha256::sha256_of;
@@ -65,7 +65,11 @@ fn watched_file_digests_text(repository_root: &Path, watched: &BTreeSet<String>)
 
 /// 本包清单 `[features]` 里的每个特性（清单里的写法，按名字排好）与 cargo 这一次开没开它。与清单对不上（漏写、写错名字）的，
 /// `features_of_the_crate_being_built` 交错误、构建脚本停下。
-const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG: [(&str, bool); 1] = [("gpu", cfg!(feature = "gpu"))];
+const FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS: [(&str, bool); 3] = [
+    ("gpu", cfg!(feature = "gpu")),
+    ("apparatus-binaries", cfg!(feature = "apparatus-binaries")),
+    ("default", cfg!(feature = "default")),
+];
 
 fn environment_variable(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("cargo 起构建脚本时设 {name}"))
@@ -109,7 +113,7 @@ fn main() {
     let features = features_of_the_crate_being_built(
         &workspace,
         own_crate,
-        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
+        &FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS,
     )
     .unwrap_or_else(|error| panic!("本包这一次开了哪些特性取不了：{error}"));
     let features_enabled_by_the_build =
@@ -158,34 +162,66 @@ fn main() {
                     )
                 }),
         );
-    let keys: Vec<EntryGroupKey> = requests
-        .map(|(group_name, target, entry_functions)| {
-            let request = EntryGroupRequest {
-                target: TargetSelector::parse(target).unwrap_or_else(|text| {
-                    panic!("登记表里组 {group_name} 的目标写法认不得：{text}")
-                }),
-                entry_paths: entry_functions
-                    .iter()
-                    .map(|entry| (*entry).to_string())
-                    .collect(),
-                // GPU 判器那一组不论这一次开没开 gpu 都照开着收闭包（它的单元进镜像判定的版本，两条路线、两种编法同一把）
-                features: judging_units_entries::features_of_the_group_request(
-                    &group_name,
-                    &features,
-                ),
-                group_name,
-            };
-            entry_group_key_with_the_features_of_the_build(
-                &workspace,
-                &request,
-                &features_enabled_by_the_build,
-                &toolchain_lines,
-                &locked_packages,
-                &switches,
-            )
-            .unwrap_or_else(|error| {
-                panic!("登记表里组 {} 的入口写错了：{error}", request.group_name)
-            })
+    // 各组的键互不依赖：按 cargo 给的并行度分给几条线程算，结果按登记的次序收（键表逐字节与一条线程算时相同）
+    let requests: Vec<(String, &'static str, &'static [&'static str])> = requests.collect();
+    let key_of_the_request = |(group_name, target, entry_functions): &(
+        String,
+        &'static str,
+        &'static [&'static str],
+    )|
+     -> EntryGroupKey {
+        let group_name = group_name.clone();
+        let request = EntryGroupRequest {
+            target: TargetSelector::parse(target)
+                .unwrap_or_else(|text| panic!("登记表里组 {group_name} 的目标写法认不得：{text}")),
+            entry_paths: entry_functions
+                .iter()
+                .map(|entry| (*entry).to_string())
+                .collect(),
+            // GPU 判器那一组不论这一次开没开 gpu 都照开着收闭包（它的单元进镜像判定的版本，两条路线、两种编法同一把）
+            features: judging_units_entries::features_of_the_group_request(&group_name, &features),
+            group_name,
+        };
+        entry_group_key_not_following_the_listed_units(
+            &workspace,
+            &request,
+            &judging_units_entries::units_not_followed_of_the_group(&request.group_name)
+                .iter()
+                .map(|unit| (*unit).to_string())
+                .collect(),
+            &features_enabled_by_the_build,
+            &toolchain_lines,
+            &locked_packages,
+            &switches,
+        )
+        .unwrap_or_else(|error| panic!("登记表里组 {} 的入口写错了：{error}", request.group_name))
+        .key
+    };
+    let next_request = std::sync::atomic::AtomicUsize::new(0);
+    let computed_keys: Vec<std::sync::Mutex<Option<EntryGroupKey>>> = requests
+        .iter()
+        .map(|_| std::sync::Mutex::new(None))
+        .collect();
+    std::thread::scope(|scope| {
+        for _ in 0..threads.get().min(requests.len()) {
+            scope.spawn(|| loop {
+                let index = next_request.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let Some(request) = requests.get(index) else {
+                    break;
+                };
+                let key = key_of_the_request(request);
+                *computed_keys[index]
+                    .lock()
+                    .expect("没有线程在持着这把锁时 panic") = Some(key);
+            });
+        }
+    });
+    let keys: Vec<EntryGroupKey> = computed_keys
+        .into_iter()
+        .map(|slot| {
+            slot.into_inner()
+                .expect("算键的线程都已收回，没有一条在持着锁时 panic")
+                .expect("每一组的键都由某一条线程算过")
         })
         .collect();
     let output_path =
@@ -235,6 +271,18 @@ fn main() {
         watched_file_digests_text(&repository_root, &watched),
     )
     .unwrap_or_else(|error| panic!("写不了 {}：{error}", digests_path.display()));
+    // 把本包这一次开了的特性交给直接依赖本包的构建脚本（`links` 的元数据，键名是 `singlefs_unit_graph::build_features::ENABLED_FEATURES_METADATA_KEY`，
+    // 值的写法同 `crates/singlefs-core/build.rs`：开着的特性名写成 cargo 环境变量名的样子、逗号隔开）。
+    println!(
+        "cargo:{}={}",
+        singlefs_unit_graph::build_features::ENABLED_FEATURES_METADATA_KEY,
+        FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
+            .iter()
+            .filter(|(_, is_enabled_by_cargo)| *is_enabled_by_cargo)
+            .map(|(feature, _)| feature.to_ascii_uppercase().replace('-', "_"))
+            .collect::<Vec<String>>()
+            .join(",")
+    );
     for setting_key in PROFILE_SETTING_KEYS {
         println!(
             "cargo:rerun-if-env-changed={}",

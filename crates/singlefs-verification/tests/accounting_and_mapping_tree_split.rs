@@ -60,7 +60,7 @@ fn pool_with_multi_level_trees_mounts_writable_and_the_row_and_warm_up_publishes
 /// 挂载在读盘阶段报 `Recovery(InvariantViolated { invariant: "I-1.1", detail: "分隔 key 大于孩子头里的最小 key" })`，
 /// 还没取号、没预演写行：两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多。
 /// 规划那一步自己的拒绝（上一版的形状把一把 key 引到别的叶、删不掉，`CodeTwoTreeRefusal::PreviousShapeRoutesAKeyAwayFromTheLeafHoldingIt`）
-/// 从盘上因此走不到了，由 `singlefs-core` 的单测 `code_two_tree::tests::a_previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner` 钉。
+/// 从盘上因此走不到了，由 `singlefs-core` 的单测 `code_two_tree::tests::previous_shape_whose_separator_hides_a_key_is_refused_by_the_planner` 钉。
 /// 判别力：重建读中央映射树时不判节点头（`recovery.rs` 的 `rebuild_version` 那一处改回 `OnlyWhatTheShapeNeeds`），挂载改由规划那一步拒、
 /// 报的成员不再是 I-1.1——`crates/mutations.tsv` 里以「实审 A3d：重建读中央映射树不判节点头（分隔 key」开头的那一行。
 #[test]

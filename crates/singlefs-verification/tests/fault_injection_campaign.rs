@@ -1068,6 +1068,83 @@ fn rollback_refused_on_the_root_ring_slot_whose_write_the_lying_device_swallowed
     );
 }
 
+/// 默认批撞出的一段，单独跑：种子 7463871032432355126，规模与执行方式同默认批。抽出的注入点里有第 17 步（覆盖写）上一次读回坏字节：
+/// 读到只坏一份，那次改动发成之后会话另发一批搬迁修它（D4（校验和位置） 已定项 4「可写挂载期间别的读」），这一步写两条根、实现走到比改动那一版高一个 txg 的那一版。
+/// 执行器与模型把那一批当成改动之后的又一次发布认下（`history::settle_what_the_session_published_for_the_relocation_batch`）：不报新发现，模型比过那一批一次。
+/// 判别力：执行器拿会话的现行那一版当改动那一版比时，这一段报「改写或新增的分配记录的代不是这次发布的 txg」；模型那一次比数为 0 就是这一段走的不是这条路。
+#[test]
+fn a_corrupted_read_during_an_overwrite_makes_a_relocation_batch_the_executor_and_the_model_recognize(
+) {
+    let history = generate_history_with_weights(
+        HistorySeed(7_463_871_032_432_355_126),
+        DEFAULT_BATCH_OPERATIONS_PER_HISTORY,
+        &GenerationWeights::BROAD,
+    );
+    let injection = inject_faults_into_history(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        DEFAULT_BATCH_FAULTS_PER_HISTORY,
+    );
+    let rendered = injection.tally.render();
+    assert_eq!(
+        injection.tally.faults_that_panicked, 0,
+        "注入之后 core panic 了\n{rendered}"
+    );
+    assert!(
+        injection.new_findings.is_empty(),
+        "「已知红」清单外的失败：{}\n{rendered}",
+        injection
+            .new_findings
+            .iter()
+            .map(|finding| finding.render())
+            .collect::<String>()
+    );
+    let corrupted_read_on_the_overwrite = injection
+        .drawn_faults
+        .iter()
+        .find(|drawn| {
+            matches!(drawn.fault, InjectedFault::ReadReturnsCorruptedBytes { .. })
+                && drawn.segment
+                    == FaultedSegment::Operation {
+                        step_index: 17,
+                        operation_kind: HistoryOperationKind::PublishOverwrite,
+                    }
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "这一段抽出的注入点里要有第 17 步覆盖写上那一次读回坏字节：{:?}",
+                injection
+                    .drawn_faults
+                    .iter()
+                    .map(DrawnFault::render)
+                    .collect::<Vec<_>>()
+            )
+        });
+    let plan = SharedFaultPlan::armed(
+        HANDING_EVERY_STEP_IMAGE_OUT.device_width.fixed_geometry(),
+        FaultSchedule::the_nth_call_across_the_pool(
+            corrupted_read_on_the_overwrite.fault,
+            corrupted_read_on_the_overwrite.call_ordinal,
+        ),
+    );
+    let run = execute_history_with_faults(
+        &history,
+        HANDING_EVERY_STEP_IMAGE_OUT,
+        &SharedStream::new(),
+        &plan,
+        &mut |_| {},
+    );
+    assert_eq!(
+        run.tally
+            .model_counts
+            .relocation_batches_after_a_user_change_matched,
+        1,
+        "这一读坏了之后会话另发一批，模型比过它一次：{}；历史收尾 {:?}",
+        corrupted_read_on_the_overwrite.render(),
+        run.ending
+    );
+}
+
 /// 一段写死的历史上把注入点摆满：同一段历史注入 12 次，逐次判「返回错误而不是 panic」。
 #[test]
 fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {

@@ -53,6 +53,12 @@ use singlefs_verification::memory_pool::{
     writes_and_segments, writes_and_segments_with_stream_indexes, CrashImage, MemoryPool,
     PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    writable_mount_refusals_into_the_undecidable_witness_of_each_observer,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
@@ -194,7 +200,7 @@ pub fn steps_of(stream: TruncationCrashStream) -> Vec<TruncationStreamStep> {
 /// C 之前的三版带文件的发布：A（`build_pool` 里那一版）、B、C 的输出与内容。
 pub struct MultiRecordPrefix {
     pub versions: Vec<PublishedVersion>,
-    pub content_of_c: Vec<u8>,
+    pub content_of_the_newest_prefix_version: Vec<u8>,
 }
 
 /// 录完的一条流：池（录制流在它里面）、C 之前那一段、C 之后每一步与它的输出。
@@ -209,7 +215,7 @@ impl RecordedTruncationStream {
     #[must_use]
     pub fn versions(&self) -> Vec<PublishedVersion> {
         let mut versions = self.prefix.versions.clone();
-        let mut content = self.prefix.content_of_c.clone();
+        let mut content = self.prefix.content_of_the_newest_prefix_version.clone();
         for (step, output) in &self.steps {
             content = step.content_after(&content);
             versions.push(PublishedVersion {
@@ -279,7 +285,7 @@ fn multi_record_prefix(
             version(second, second_content),
             version(third, third_content.clone()),
         ],
-        content_of_c: third_content,
+        content_of_the_newest_prefix_version: third_content,
     }
 }
 
@@ -692,8 +698,10 @@ pub const MOUNT_LANDED_BEFORE_THE_FIRST_FILE_COUNTER: &str = "mount_landed_befor
 /// 挂载发的写录在一条新的录制流上，连同挂完的盘交回：判段在挂完的盘上跑池级 checker（判干净时 [`POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER`]
 /// 加一；配了 GPU 上卡）。可写挂载与续做真跑实现，只能在 CPU 上（豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。
 ///
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），共用走空跳过。
+///
 /// # Panics
-/// 可写挂载做不成，或上面任何一样对不上。
+/// 可写挂载被拒而不是认下的那一拒，或上面任何一样对不上。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn observe_the_mount_continuing_the_truncation(
@@ -728,14 +736,30 @@ pub fn observe_the_mount_continuing_the_truncation(
             )
         })
         .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
+    let mounted = match mount_writable_with_test_only_switches_and_deletion_switches(
         &mount_parameters,
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         deletion_switches_with_batches_of_one(),
-    )
-    .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &mount_parameters.filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     assert!(
         matches!(
             mounted.output.deletion_queue_continuation_outcome,
@@ -1090,14 +1114,15 @@ pub fn amplify_a_truncation_flow(
         return run;
     };
     println!(
-        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?} writable_mount_refusals_into_the_undecidable_witness={:?}",
         observing.images_judged_here,
         observing.images_judged_on_the_gpu_here,
         observing.image_judgements_reused,
         observing.blocks_observed_here,
         observing.states_observed_here,
         observing.states_of_each_observer,
-        observing.red_states_of_each_observer
+        observing.red_states_of_each_observer,
+ writable_mount_refusals_into_the_undecidable_witness_of_each_observer(observing)
     );
     let observer_names = [
         standard_prefix_observer.name(),
@@ -1105,15 +1130,18 @@ pub fn amplify_a_truncation_flow(
         ObserverOfTheTruncationSteps::MountContinuingTheTruncation.name(),
     ];
     for name in observer_names {
-        let states = observing
-            .states_of_each_observer
-            .get(name)
-            .copied()
-            .unwrap_or(0);
-        assert!(
-            states > 0,
-            "流 {flow_name} 经过标准前缀与截断那几步，观察者 {name} 一个状态都没看"
-        );
+        let states =
+            common_crash_point_observers::states_seen_by_the_observer_as_the_block_range_requires(
+                &run,
+                observing,
+                flow_name,
+                name,
+                observers
+                    .iter()
+                    .find(|attached| attached.observer_name.as_str() == name)
+                    .map(|attached| attached.nodes.as_slice()),
+                &format!("流 {flow_name} 经过标准前缀与截断那几步，观察者 {name} 一个状态都没看"),
+            );
         assert_eq!(
             observing
                 .red_states_of_each_observer
@@ -1134,7 +1162,8 @@ pub fn amplify_a_truncation_flow(
             assert_eq!(
                 (0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH + 1)
                     .map(|steps| count_named(&format!("mount_continuation_steps_{steps}")))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
                 "流 {flow_name}：标准前缀上的每个状态都可写挂载过一次"
             );
@@ -1167,16 +1196,24 @@ pub fn amplify_a_truncation_flow(
             assert_eq!(
                 (0..=TRUNCATION_CONTINUATION_PUBLISHES_AT_MOST)
                     .map(|publishes| count_named(&truncation_continuation_counter(publishes)))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
-                "流 {flow_name}：截断那几步上的每个状态都可写挂载过一次"
+                "流 {flow_name}：截断那几步上的每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
             );
-            singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
-                (1..=TRUNCATION_CONTINUATION_PUBLISHES_AT_MOST)
-                    .map(|publishes| count_named(&truncation_continuation_counter(publishes)))
-                    .sum::<u64>(),
-                &format!("流 {flow_name}：落到截断意图或不是最后一批的那几版的状态上截断续做真发过：{counts:?}"),
-            );
+            // 截断续做真发过是对整条流的：一片里的状态可以全落在发不出续做的那几版上，设了块区间的这一片不判
+            if !common_crash_point_observers::whole_flow_assertion_is_left_to_the_run_without_a_block_range(
+                &run,
+                flow_name,
+                "truncation_continuation_published_above_zero",
+            ) {
+                singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
+                    (1..=TRUNCATION_CONTINUATION_PUBLISHES_AT_MOST)
+                        .map(|publishes| count_named(&truncation_continuation_counter(publishes)))
+                        .sum::<u64>(),
+                    &format!("流 {flow_name}：落到截断意图或不是最后一批的那几版的状态上截断续做真发过：{counts:?}"),
+                );
+            }
         }
         if name != ObserverOfTheTruncationSteps::LandedVersion.name() {
             assert_eq!(

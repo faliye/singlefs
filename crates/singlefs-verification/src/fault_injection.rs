@@ -2007,12 +2007,13 @@ fn system_configuration_instance_before_a_mount_step(
     match segment {
         FaultedSegment::TheStartingPoint => Some(MKFS_INSTANCE_GENERATION),
         FaultedSegment::Operation { operation_kind, .. } => match operation_kind {
-            // 崩溃恢复抛弃根、每块盘最新那一槽系统配置读回全 0 的那一次也是可写挂载：取号、写行、暖机；
+            // 崩溃恢复抛弃根、最新那一槽系统配置读回全 0 的那两种（每块盘都藏、只藏第一块盘）也是可写挂载：取号、写行、暖机；
             // 掉电在 journal 记录之前的那次覆盖写之后也挂一次（掉电那一截不写系统配置）。
             HistoryOperationKind::CloseAndMountWritable
             | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
             | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
             | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
             // 挂着时整理以批间崩溃收尾的那一种（`CompactionRunEnding::CrashesAfterBatchesThenMountsWritable`）推完批之后，执行器
             // （`history::apply_compact_while_mounted`）调可写挂载那一步同一个 `apply_mount_writable` 挂一次：取号、写行、暖机。
             // 整理那几次发布用的是会话开着时那次挂载取的号、不换号，所以这一步之前的号就是上一步跑完时的那个。推到停的那一种不挂载、不取号，
@@ -3083,13 +3084,13 @@ pub fn classify_the_pool_checker_verdicts_of_the_images_after_a_fault(
     let first_red_step_image = violations_of_the_step_images
         .iter()
         .position(|violations| !violations.is_empty());
-    let a_write_was_swallowed_before_the_first_red_step_image =
+    let write_was_swallowed_before_the_first_red_step_image =
         first_red_step_image.is_some_and(|index| {
             images.step_images_of_the_run_with_the_fault[index].swallowed_writes_before_it > 0
         });
     assert_eq!(
         at_the_first_red_step_image_with_the_swallowed_writes_before_it_landed.is_some(),
-        a_write_was_swallowed_before_the_first_red_step_image,
+        write_was_swallowed_before_the_first_red_step_image,
         "第一张判红的每步镜像那一刻之前吞过写，就要给它的按步对照盘的结论；没吞过就不给"
     );
     assert_eq!(
@@ -3645,6 +3646,7 @@ fn run_one_fault_up_to_the_pool_checker(
             | HistoryOperation::CreateInode
             | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
             | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
             // 建快照、读快照、删快照不改文件内容（判决 `research/prompts/m4-snapshot-r1-main-verification.md` 第三节 S2、S4）。
             | HistoryOperation::CreateSnapshot
             | HistoryOperation::ReadSnapshot(_)
@@ -3706,7 +3708,7 @@ fn run_one_fault_up_to_the_pool_checker(
             if no_version_stands_for_the_reference_filesystem {
                 WhatTheReopenMustRecover::NothingBecauseNoVersionStands
             } else {
-                WhatTheReopenMustRecover::AVersionTheHistoryLeft
+                WhatTheReopenMustRecover::VersionTheHistoryLeft
             },
             &read_back,
         );
@@ -4243,7 +4245,7 @@ mod tests {
     /// 长度 0 的 discard 没有动作（`BlockDevice::discard_at` 的文档：后端照「交给了底层」交回、不记数）：注入层同一口径——不走注入判定、
     /// 不占整池调用序号、不数 discard。计划排在「整池第 1 次写报错」时，长度 0 的 discard 不吃掉那一次，下一个真写才报错。
     #[test]
-    fn a_zero_length_discard_answers_applied_and_neither_counts_nor_takes_an_injection() {
+    fn zero_length_discard_answers_applied_and_neither_counts_nor_takes_an_injection() {
         let plan = SharedFaultPlan::armed(
             TEST_GEOMETRY,
             FaultSchedule::the_nth_call_across_the_pool(InjectedFault::WriteFails, 1),
@@ -4619,7 +4621,7 @@ mod tests {
     /// 判别力：「抬 F 的上限」那一格比不并的那个数时第一条红（`crates/mutations.tsv`「故障注入认上限只比不并全零槽的那个数」）；
     /// 推空那一格一概不认时第三条红（「故障注入不认推空」）。
     #[test]
-    fn a_ceiling_held_by_the_ring_slot_a_swallowed_root_left_all_zero_is_left_by_the_lying_device_only_at_the_merged_ceiling(
+    fn ceiling_held_by_the_ring_slot_a_swallowed_root_left_all_zero_is_left_by_the_lying_device_only_at_the_merged_ceiling(
     ) {
         let observation = |disagreement: ModelDisagreement| FailureObservation {
             position: StepPosition::Operation(10),
@@ -4801,7 +4803,7 @@ mod tests {
     /// 槽对不上、实现没报槽（别的拒绝，或拒之前写了盘）一概照报。实现写的实例表行等于「被吞的根由记录重建」时模型重算的行，才认；
     /// 行对不上、模型重算不出，照报。
     #[test]
-    fn a_refused_floor_raise_and_the_rows_written_are_left_by_the_lying_device_only_when_the_swallowed_root_slot_write_explains_them(
+    fn refused_floor_raise_and_the_rows_written_are_left_by_the_lying_device_only_when_the_swallowed_root_slot_write_explains_them(
     ) {
         let observation = |disagreement: ModelDisagreement| FailureObservation {
             position: StepPosition::Operation(5),
@@ -4914,7 +4916,7 @@ mod tests {
     /// 点名的「回退目标引用的一个单元在一块盘上的那一份」与一次被吞的写有重叠的字节，才认——不管模型要它成还是要别的理由；
     /// 被吞的写落在另一块盘上、紧挨着那一份而不重叠、实现没点名那一份（别的拒绝，或拒之前写了盘），一概照报。
     #[test]
-    fn a_refused_rollback_is_left_by_the_lying_device_only_when_the_unit_copy_it_names_overlaps_a_swallowed_write(
+    fn refused_rollback_is_left_by_the_lying_device_only_when_the_unit_copy_it_names_overlaps_a_swallowed_write(
     ) {
         const UNIT_SLOT: u64 = 51_000;
         let observation = |disagreement: ModelDisagreement| FailureObservation {
@@ -5151,7 +5153,7 @@ mod tests {
     /// 而录制流里系统配置槽写已经落了盘——mkfs 写完系统配置之后才报错，盘上本该有自证过的槽，I-8.5 红就不是「mkfs 没做完」能交代的，
     /// 照报新发现。同一条失败换成一次都没落盘时认成那一形，证明这一格不是因为判法什么都不认才绿。
     #[test]
-    fn i85_only_failure_after_make_filesystem_wrote_its_system_configuration_slots_stays_a_new_finding(
+    fn tail_witness_invariant_only_failure_after_make_filesystem_wrote_its_system_configuration_slots_stays_a_new_finding(
     ) {
         let observation =
             failure_where_only_some_device_carries_a_self_verified_system_configuration_is_violated(

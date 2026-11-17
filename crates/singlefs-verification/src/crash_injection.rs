@@ -112,12 +112,11 @@ use crate::model_comparison::{
     refusal_reason_of_publish_error,
 };
 use crate::mount_transparency::{
-    judge_mount_transparency,
-    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount,
+    judge_mount_transparency, judge_writable_mount_refusal_of_a_crash_state_of_the_pool,
     read_recovery_fields, ComparedVersion, DiskAfterTheRefusal, FieldOutcome,
     FloorRaisedByTheMount, FloorRaisesInTheMountWrites, MountTransparency, MountTransparencyAction,
     ReadFaultsInTheCrashState, ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage,
-    RecoveryFieldsRead, RefusalConditionNotMet, RefusalReasonOnTheD23List,
+    RecoveryFieldsRead, RefusalConditionNotMet, RefusalReasonOnTheLegalRefusalList,
     UserVisibleTreeRootPointersOfTheContinuation, WritableMountRefusalVerdict,
 };
 use crate::numeric_environment_variable::{
@@ -266,7 +265,7 @@ pub enum CrashPointDraw {
 }
 
 /// 靶向用例那一支（[`CrashPointDraw::ExactlyOneCrashState`]）拿去跑战役或写重放行时的 panic 消息。
-const A_TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW: &str =
+const TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW: &str =
     "靶向用例那一个崩溃状态不进战役：写死的段号只对写死的那一段历史成立，重放行写不出它（只经 inject_crashes_into_history 摆）";
 
 /// 失败时那份崩溃镜像留不留。
@@ -623,8 +622,8 @@ pub struct CrashInjectionTally {
     /// 挂载透明判的时候 R2 那一版是清扫发布那一版、把清扫删的行放回去再比的次数（C704（挂载透明不认清扫发布）的处置真走到了）。
     pub mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back: u64,
     /// 崩溃后镜像上的可写挂载被拒、理由在 D23（journal 的角色与格式） 已定项 14 那张单子上的：拒得合法的、不合法的（判红）。
-    pub writable_mount_refusals_on_the_d23_list_legal: u64,
-    pub writable_mount_refusals_on_the_d23_list_illegal: u64,
+    pub writable_mount_refusals_on_the_legal_refusal_list_legal: u64,
+    pub writable_mount_refusals_on_the_legal_refusal_list_illegal: u64,
     /// 崩溃窗口末尾之前历史里有一步在注入的读故障下发过东西的崩溃状态：第二截判拒可写时不判 C670（无读故障的崩溃态上可写挂载见证判据为真没有判官）
     /// 与改法 G4 那两条。
     pub crash_points_after_a_step_reading_under_injected_faults: u64,
@@ -713,8 +712,8 @@ impl CrashInjectionTally {
             mount_transparency_violations_by_field,
             mount_transparency_fields_not_judged,
             mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back,
-            writable_mount_refusals_on_the_d23_list_legal,
-            writable_mount_refusals_on_the_d23_list_illegal,
+            writable_mount_refusals_on_the_legal_refusal_list_legal,
+            writable_mount_refusals_on_the_legal_refusal_list_illegal,
             crash_points_after_a_step_reading_under_injected_faults,
             reference_filesystem_and_model_verdicts_on_crash_images,
             reference_filesystem_and_model_verdicts_on_second_crashes,
@@ -863,10 +862,10 @@ impl CrashInjectionTally {
         }
         self.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back +=
             mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back;
-        self.writable_mount_refusals_on_the_d23_list_legal +=
-            writable_mount_refusals_on_the_d23_list_legal;
-        self.writable_mount_refusals_on_the_d23_list_illegal +=
-            writable_mount_refusals_on_the_d23_list_illegal;
+        self.writable_mount_refusals_on_the_legal_refusal_list_legal +=
+            writable_mount_refusals_on_the_legal_refusal_list_legal;
+        self.writable_mount_refusals_on_the_legal_refusal_list_illegal +=
+            writable_mount_refusals_on_the_legal_refusal_list_illegal;
         self.crash_points_after_a_step_reading_under_injected_faults +=
             crash_points_after_a_step_reading_under_injected_faults;
         for (verdict, count) in reference_filesystem_and_model_verdicts_on_crash_images {
@@ -1075,8 +1074,8 @@ impl CrashInjectionTally {
         let _ = writeln!(
             text,
             "可写挂载被拒、理由在 D23 已定项 14 那张单子上的：拒得合法 {}、不合法 {}；崩溃窗口之前有一步带读故障、不判 C670 那一条的崩溃状态 {}",
-            self.writable_mount_refusals_on_the_d23_list_legal,
-            self.writable_mount_refusals_on_the_d23_list_illegal,
+            self.writable_mount_refusals_on_the_legal_refusal_list_legal,
+            self.writable_mount_refusals_on_the_legal_refusal_list_illegal,
             self.crash_points_after_a_step_reading_under_injected_faults
         );
         let _ = writeln!(
@@ -1225,11 +1224,13 @@ fn stream_index_of_the_last_write_of_the_crash_window(
 }
 
 /// 这一类历史步在注入的读故障下读盘（`singlefs_verification::history` 的 `DeviceReadingZerosOverHiddenRanges`）：崩溃恢复抛弃根（那次可写挂载期间
-/// 最新那条根的根槽与它点名的单元读回全 0），每块盘最新那一槽系统配置读回全 0 的可写挂载（C696（崩溃注入的读故障一支在随机历史里从没触发）：
-/// 随机历史里唯一真的在读故障下往盘上发写的一种步）。别的步读的就是盘上的字节。
+/// 最新那条根的根槽与它点名的单元读回全 0），最新那一槽系统配置读回全 0 的两种可写挂载——只藏第一块盘的那一种（C696（崩溃注入的读故障一支
+/// 在随机历史里从没触发）：随机历史里真的在读故障下往盘上发写的一种步）与每块盘都藏的那一种（乙入判不出拒可写，一个写都不发）。
+/// 别的步读的就是盘上的字节。
 fn operation_reads_under_injected_faults(kind: HistoryOperationKind) -> bool {
     match kind {
         HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
+        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
         | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => true,
         HistoryOperationKind::PublishFirstFile
         | HistoryOperationKind::PublishOverwrite
@@ -1822,6 +1823,7 @@ fn inject_crashes_into_history_with_every_switch(
             RefusalOnTheCrashImage {
                 crash_image_materialized: &crash_image_materialized,
                 version_landed_on_after_the_crash: report.effective_root,
+                filesystem_identifier_of_the_pool: &parameters.filesystem_identifier,
                 read_only_read_back: if disagreement.is_none() {
                     ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet
                 } else {
@@ -3485,6 +3487,8 @@ const READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE: ReadFaultsUnderTheRefusedMount
 /// 读故障的认定沿用第一次崩溃那个态的（第二截那次挂载起在第一次崩溃的镜像上，不注入读故障）。
 struct RefusalOnTheCrashImage<'crash> {
     crash_image_materialized: &'crash MemoryPool,
+    /// 本池 fsid（建池参数里那一份）：复算判据用的系统配置只从这个 fsid 的槽里择。
+    filesystem_identifier_of_the_pool: &'crash [u8; 16],
     version_landed_on_after_the_crash: Option<(InstanceGeneration, CheckpointTxg)>,
     read_only_read_back: ReadOnlyReadBackOfTheCrashImage,
     /// 这个崩溃态注没注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：没注入的，判据 N-配置 复算为真即拒得不合法（C670），
@@ -3495,7 +3499,7 @@ struct RefusalOnTheCrashImage<'crash> {
 /// 第二截：挂载或那次发布被拒（单元区墙只计数，模型在单元区墙上只答允许拒绝的区间、而这里没有崩溃点上的模型状态可判区间），
 /// 做没做成都在之后的池上跑池级 checker；`record_check` 是第二截记录核对器的结论（第一条判据读第一次崩溃那份镜像、第二条读之后的池，
 /// [`ConclusionsAfterTheWritableMount::record_check`]）。挂载被拒而理由在 D23（journal 的角色与格式） 已定项 14
-/// 那张单子上的，判拒绝本身（`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount`，被拒的那次挂载恒交不带故障层：判据在崩溃镜像上复算为真、
+/// 那张单子上的，判拒绝本身（`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state_of_the_pool`，被拒的那次挂载恒交不带故障层：判据在崩溃镜像上复算为真、
 /// 盘上逐字节不变、只读读出在允许集合里；崩溃态没注入读故障而判据 N-配置 复算为真的另判不合法，C670，「读阶段判完之后系统配置又读不出」
 /// 那一拒的判据复算为真的同样另判不合法，改法 G4），合法的只计数，不合法的报红。别的理由被拒按「模型说该成、实现拒了」报：
 /// 模型对可写挂载与之后那一次发布（覆盖写活着的第一个文件、第一个文件、建 inode）从不要求拒，容量墙之外也不许拒（`IdealModel::answer_mount_writable`）。
@@ -3528,8 +3532,9 @@ fn judge_the_writable_mount_on_the_crash_image(
                 } else {
                     DiskAfterTheRefusal::Changed
                 };
-            match judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+            match judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
                 refusal_on_the_crash_image.crash_image_materialized,
+                refusal_on_the_crash_image.filesystem_identifier_of_the_pool,
                 refusal_on_the_crash_image.version_landed_on_after_the_crash,
                 refusal_error,
                 disk,
@@ -3538,19 +3543,19 @@ fn judge_the_writable_mount_on_the_crash_image(
                 READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE,
             ) {
                 WritableMountRefusalVerdict::Legal(_) => {
-                    tally.writable_mount_refusals_on_the_d23_list_legal += 1;
+                    tally.writable_mount_refusals_on_the_legal_refusal_list_legal += 1;
                     None
                 }
                 WritableMountRefusalVerdict::Illegal {
                     reason: reason_on_the_list,
                     conditions_not_met,
                 } => {
-                    tally.writable_mount_refusals_on_the_d23_list_illegal += 1;
+                    tally.writable_mount_refusals_on_the_legal_refusal_list_illegal += 1;
                     Some(format!(
                         "崩溃后镜像上的可写挂载拒了，理由 {reason_on_the_list:?} 在 D23 已定项 14 那张单子上，拒得不合法（{conditions_not_met:?}）：{member}"
                     ))
                 }
-                WritableMountRefusalVerdict::ReasonNotOnTheD23List => {
+                WritableMountRefusalVerdict::ReasonNotOnTheLegalRefusalList => {
                     if *reason == ObservedRefusalReason::Explained(ModelRefusalReason::UnitAreaWall)
                     {
                         tally.writable_mounts_after_the_crash_refused_at_the_unit_area_wall += 1;
@@ -4350,6 +4355,7 @@ fn judge_second_crashes_inside_the_writable_mount(
             &RefusalOnTheCrashImage {
                 crash_image_materialized: &second_crash_image_materialized,
                 version_landed_on_after_the_crash: report.effective_root,
+                filesystem_identifier_of_the_pool: &parameters.filesystem_identifier,
                 read_only_read_back: if disagreement.is_none() {
                     ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet
                 } else {
@@ -4583,16 +4589,16 @@ fn judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_with
     } else {
         DiskAfterTheRefusal::Changed
     };
-    let verdict =
-        judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
-            second_crash_image.crash_image_materialized,
-            second_crash_image.version_landed_on_after_the_crash,
-            refusal,
-            disk,
-            second_crash_image.read_only_read_back,
-            second_crash_image.read_faults,
-            READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE,
-        );
+    let verdict = judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
+        second_crash_image.crash_image_materialized,
+        second_crash_image.filesystem_identifier_of_the_pool,
+        second_crash_image.version_landed_on_after_the_crash,
+        refusal,
+        disk,
+        second_crash_image.read_only_read_back,
+        second_crash_image.read_faults,
+        READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE,
+    );
     let Some((reason, conditions_not_met)) =
         reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
             tally, verdict,
@@ -4647,83 +4653,86 @@ fn judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_with
 fn reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
     tally: &mut CrashInjectionTally,
     verdict: WritableMountRefusalVerdict,
-) -> Option<(RefusalReasonOnTheD23List, Vec<RefusalConditionNotMet>)> {
+) -> Option<(
+    RefusalReasonOnTheLegalRefusalList,
+    Vec<RefusalConditionNotMet>,
+)> {
     let (reason, conditions_not_met) = match verdict {
-        WritableMountRefusalVerdict::ReasonNotOnTheD23List
+        WritableMountRefusalVerdict::ReasonNotOnTheLegalRefusalList
         | WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable,
+            RefusalReasonOnTheLegalRefusalList::InstanceTableOfTheNewestRootUnreadable,
         )
         | WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable,
+            reason: RefusalReasonOnTheLegalRefusalList::InstanceTableOfTheNewestRootUnreadable,
             ..
         } => return None,
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
         ) => {
             tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration += 1;
             return None;
         }
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met,
         } => {
             tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration += 1;
             (
-                RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+                RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
                 conditions_not_met,
             )
         }
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
         ) => {
             tally.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage += 1;
             return None;
         }
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            reason: RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
             conditions_not_met,
         } => {
             tally.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage += 1;
             (
-                RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+                RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
                 conditions_not_met,
             )
         }
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
         ) => {
             tally.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator += 1;
             return None;
         }
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            reason: RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
             conditions_not_met,
         } => {
             tally.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator += 1;
             (
-                RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
                 conditions_not_met,
             )
         }
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+            RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
         ) => {
             tally.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify += 1;
             return None;
         }
         WritableMountRefusalVerdict::Illegal {
             reason:
-                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+                RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
             conditions_not_met,
         } => {
             tally.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify += 1;
             (
-                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+                RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
                 conditions_not_met,
             )
         }
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            RefusalReasonOnTheLegalRefusalList::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
                 ..
             },
         ) => {
@@ -4732,7 +4741,7 @@ fn reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_with
         }
         WritableMountRefusalVerdict::Illegal {
             reason:
-                reason @ RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                reason @ RefusalReasonOnTheLegalRefusalList::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
                     ..
                 },
             conditions_not_met,
@@ -5331,7 +5340,7 @@ fn draw_environment_values(draw: CrashPointDraw) -> (String, String) {
             segment_writes.to_string(),
         ),
         CrashPointDraw::ExactlyOneCrashState { .. } => {
-            panic!("{A_TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW}")
+            panic!("{TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW}")
         }
     }
 }
@@ -5671,7 +5680,7 @@ pub fn run_crash_injection_campaign_judging_the_given_states_with(
     } = *campaign;
     assert!(
         !matches!(draw, CrashPointDraw::ExactlyOneCrashState { .. }),
-        "{A_TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW}"
+        "{TARGETED_CRASH_STATE_IS_NOT_A_CAMPAIGN_DRAW}"
     );
     let slices = seed_slices(seed_count, worker_threads.count());
     let spawned_worker_threads = worker_threads.count().min(slices.len().max(1));
@@ -5966,7 +5975,7 @@ mod tests {
     /// 预期：报告不点名镜像目录，这次调用建的那一份镜像目录不在临时目录里了。
     /// 判别力（`crates/mutations.tsv`）：照常跑完那一步收尾不删目录，目录还在，这条红。
     #[test]
-    fn a_campaign_call_that_ends_normally_leaves_no_image_directory_behind() {
+    fn campaign_call_that_ends_normally_leaves_no_image_directory_behind() {
         let first_seed = SEED_BASE_OF_THE_CAMPAIGN_THAT_ENDS_NORMALLY;
         let report = run_crash_injection_campaign(
             &campaign_of_four_histories_from(first_seed),
@@ -5990,7 +5999,7 @@ mod tests {
     /// 预期：panic 接住之后，这次调用建的那一份镜像目录不在临时目录里了。
     /// 判别力（`crates/mutations.tsv`）：镜像目录守卫的 Drop 不收尾，目录还在，这条红。
     #[test]
-    fn a_campaign_call_whose_worker_thread_panics_leaves_no_image_directory_behind() {
+    fn campaign_call_whose_worker_thread_panics_leaves_no_image_directory_behind() {
         let first_seed = SEED_BASE_OF_THE_CAMPAIGN_WHOSE_WORKER_PANICS;
         let panicked = std::panic::catch_unwind(|| {
             run_crash_injection_campaign(
@@ -6733,7 +6742,7 @@ mod tests {
     /// 清扫一个头都没抹（只删行）：清扫之前最后一次发布的轮换之后，第一个写就是清扫发布的单元写，抹头那一段一个写都没有。
     /// 把清扫发布的第一个写记进抹头那一段的，二次崩溃会说崩在了没写过一个字节的抹头里（假绿）。
     #[test]
-    fn a_sweep_that_erased_no_head_puts_every_write_after_the_last_publish_before_it_into_the_sweep_publish(
+    fn sweep_that_erased_no_head_puts_every_write_after_the_last_publish_before_it_into_the_sweep_publish(
     ) {
         let write_of = |kind: StepKind, is_force_unit_access: bool| RetainedWrite {
             device: DeviceIdentity(0),
@@ -6802,7 +6811,7 @@ mod tests {
     /// 暖机（分配记录树、记账树……）、续做那一步（extent 树、inode 树根……）。
     /// 判别力：错的那一支交 None 时续做的写全归暖机段（攻方 A4）；不认续做的种类时同样交 None。
     #[test]
-    fn a_mount_that_handed_back_an_error_inside_the_continuation_marks_the_continuation_by_the_persisted_publishes(
+    fn mount_that_handed_back_an_error_inside_the_continuation_marks_the_continuation_by_the_persisted_publishes(
     ) {
         let row_publish = writes_by_structure_kind_of(&[
             WrittenStructureKind::AllocationRecordTreeNode,
@@ -6900,7 +6909,7 @@ mod tests {
     /// 写账照 U12 那一条的种类造（写行、暖机、续做那一步），续做从第 2 次发布起；只有写行与暖机的（准入推的抬 F 报错，今天就交这个成员）没有续做。
     /// 判别力：这个成员归「别的错」交 None 时续做的写全归暖机段。
     #[test]
-    fn a_mount_whose_floor_raise_failed_after_a_continuation_step_marks_the_continuation_by_the_persisted_publishes(
+    fn mount_whose_floor_raise_failed_after_a_continuation_step_marks_the_continuation_by_the_persisted_publishes(
     ) {
         let row_publish = writes_by_structure_kind_of(&[
             WrittenStructureKind::AllocationRecordTreeNode,
@@ -7246,7 +7255,7 @@ mod tests {
     /// 清扫发布那一段摆了二次崩溃，再挂判了 I-8.4、挂载透明判了；抹头那一段一个二次崩溃都没摆（没抹头时那一段一个写都没有）；
     /// 一条新发现都没有。判别力：挂载透明不放回删的行时只挂载那一个比法判红（`crates/mutations.tsv` 里点名这条的行）。
     #[test]
-    fn a_writable_mount_after_the_crash_whose_sweep_publish_deletes_a_row_is_judged_in_the_sweep_publish_phase_without_a_red_field(
+    fn writable_mount_after_the_crash_whose_sweep_publish_deletes_a_row_is_judged_in_the_sweep_publish_phase_without_a_red_field(
     ) {
         let injection =
             inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
@@ -7330,7 +7339,7 @@ mod tests {
     /// 读出的内容与没崩过的那一次相同、一条新发现都没有。判别力：历史开头那次覆盖写掉电不截写（`singlefs_verification::history` 里
     /// 掉电那一截的判法）时盘上没有孤儿，「抹了至少一个头」那条先红。
     #[test]
-    fn a_writable_mount_after_the_crash_whose_sweep_erases_heads_of_orphans_is_judged_in_the_erasing_phase_without_a_red_field(
+    fn writable_mount_after_the_crash_whose_sweep_erases_heads_of_orphans_is_judged_in_the_erasing_phase_without_a_red_field(
     ) {
         let injection =
             inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans(
@@ -7784,7 +7793,7 @@ mod tests {
     /// 短段写数超过 u64 掩码的宽（63）：整段枚举 `1u64 << 写数` 会溢出，解析时就停下，消息带变量名、原值与上限。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES=\"64\" 认不出")]
-    fn a_crash_injection_short_segment_writes_value_past_the_mask_width_panics_naming_the_limit() {
+    fn crash_injection_short_segment_writes_value_past_the_mask_width_panics_naming_the_limit() {
         let _campaign = campaign_read_back_with_only_this_variable_set(
             "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES",
             "64",
@@ -7832,7 +7841,7 @@ mod tests {
     /// 种子数写 0：重放入口停下，消息带变量名与原值，不照收（一段都不跑的一批照只判清单外失败的那一组判成绿）。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_SEEDS=\"0\" 认不出")]
-    fn a_crash_injection_seed_count_of_zero_panics_naming_the_variable_and_the_value() {
+    fn crash_injection_seed_count_of_zero_panics_naming_the_variable_and_the_value() {
         let _campaign =
             campaign_read_back_with_only_this_variable_set("SINGLEFS_CRASH_INJECTION_SEEDS", "0");
     }
@@ -7840,7 +7849,7 @@ mod tests {
     /// 每段步数写 0：重放入口照 `history` 的复现入口报的那一句停下，消息带变量名与原值。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_OPERATIONS=0：只认 正整数")]
-    fn a_crash_injection_step_count_of_zero_panics_naming_the_variable_and_the_value() {
+    fn crash_injection_step_count_of_zero_panics_naming_the_variable_and_the_value() {
         let _campaign = campaign_read_back_with_only_this_variable_set(
             "SINGLEFS_CRASH_INJECTION_OPERATIONS",
             "0",
@@ -7875,7 +7884,7 @@ mod tests {
     /// 短段写数上限写 0：重放入口停下，消息带变量名与原值（没有一段够得上，与 `none` 同义却多一种写法）。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES=\"0\" 认不出")]
-    fn a_short_segment_write_bound_of_zero_panics_naming_the_variable_and_the_value() {
+    fn short_segment_write_bound_of_zero_panics_naming_the_variable_and_the_value() {
         let _campaign = campaign_read_back_with_only_this_variable_set(
             "SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES",
             "0",
@@ -7925,7 +7934,7 @@ mod tests {
     /// 不悄悄退回单线程或默认；口径与仓里别的线程数变量相同。
     #[test]
     #[should_panic(expected = "SINGLEFS_CRASH_INJECTION_THREADS=\"0\" 认不出")]
-    fn a_crash_injection_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value() {
+    fn crash_injection_worker_thread_count_of_zero_panics_naming_the_variable_and_the_value() {
         let _threads = CrashInjectionWorkerThreads::from_the_environment_value(
             CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
             Some("0"),
@@ -8104,7 +8113,7 @@ mod tests {
     /// C670：崩溃窗口末尾那个写之前（含）历史里有一步「崩溃恢复抛弃根」往录制流里发过东西，这个崩溃态才算注入过读故障；
     /// 那一步落在窗口末尾之后的不算。
     #[test]
-    fn a_crash_state_counts_as_read_faulted_from_the_earliest_stream_step_of_an_abandoning_recovery_on(
+    fn crash_state_counts_as_read_faulted_from_the_earliest_stream_step_of_an_abandoning_recovery_on(
     ) {
         let step_kinds = [
             HistoryOperationKind::CloseAndMountWritable,
@@ -8239,7 +8248,7 @@ mod tests {
             .map(CrashPointFinding::render)
             .collect();
         assert_eq!(
-            tally.writable_mount_refusals_on_the_d23_list_illegal, 0,
+            tally.writable_mount_refusals_on_the_legal_refusal_list_illegal, 0,
             "没注入读故障的崩溃态上可写挂载以见证判据为由拒、拒得不合法：{new_findings:?}"
         );
         assert!(
@@ -8248,9 +8257,10 @@ mod tests {
         );
     }
 
-    /// 每块盘最新那一槽系统配置读回全 0 时的可写挂载（C696（崩溃注入的读故障一支在随机历史里从没触发））。
+    /// 只有第一块盘最新那一槽系统配置读回全 0 时的可写挂载（C696（崩溃注入的读故障一支在随机历史里从没触发））：读故障下发写的那一种
+    /// （每块盘都藏的那一种被乙入判不出拒可写，一个写都不发）。
     const NEWEST_SYSTEM_CONFIGURATION_SLOT_ZEROS_MOUNT: HistoryOperationKind =
-        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros;
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros;
 
     /// 单元区 384 槽的小盘、不逐步跑 checker（设计调查量读故障那一支用的那一档）。
     fn execution_on_384_slot_devices_without_the_per_step_checker() -> HistoryExecution {
@@ -8263,7 +8273,7 @@ mod tests {
     }
 
     /// C696 判别力（步表那一半；设计调查报告第三节：候选「丁」之下 2676 个注入段里 614 段按写表下标会被认成没注入）：
-    /// 比重取 `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`，从这个测试周期的种子基起取前 4 段「每块盘最新那一槽
+    /// 比重取 `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`，从这个测试周期的种子基起取前 4 段「只有第一块盘最新那一槽
     /// 系统配置读回全 0 的可写挂载」往录制流里发过东西的历史（每段 24 步），每段按种子抽 16 个崩溃状态。用例自己再跑一遍同一段历史，照录制流下标
     /// 独立数「崩溃窗口末尾那个写（录制流下标）之前那一步发过东西」的崩溃状态，崩溃注入的计数（`crash_points_after_a_step_reading_under_injected_faults`）
     /// 要与它相等；另核这批崩溃状态里按录制流下标算注入过、按写表下标算没注入的至少一个（F5 那一种接错在这批上改得了计数），注入过的至少一个。
@@ -8289,7 +8299,7 @@ mod tests {
             let history = generate_history_with_weights(
                 HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + seed_offset),
                 OPERATIONS_PER_HISTORY,
-                &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+                &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS,
             );
             let stream = SharedStream::retaining_contents();
             let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
@@ -8366,7 +8376,7 @@ mod tests {
         );
     }
 
-    /// 起点（取号、暖机、第一个文件）之后：一次「每块盘最新那一槽系统配置读回全 0 的可写挂载」（读故障下发写，C696），再一次覆盖写。
+    /// 起点（取号、暖机、第一个文件）之后：一次「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」（读故障下发写，C696），再一次覆盖写。
     fn history_of_a_newest_system_configuration_slot_zeros_mount_and_one_overwrite(
     ) -> GeneratedHistory {
         use crate::history::{ContentChoice, ContentLength};
@@ -8374,7 +8384,7 @@ mod tests {
             seed: HistorySeed(0),
             starting_point: HistoryStartingPoint::AfterFirstFile,
             operations: vec![
-                HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros,
                 HistoryOperation::PublishOverwrite(ContentChoice {
                     length: ContentLength::InsideOneDataUnit { selector: 0 },
                     fill_seed: 1,
@@ -8474,7 +8484,7 @@ mod tests {
         );
     }
 
-    /// 「每块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上摆第一次崩溃（注入过读故障的态），第二截那次可写挂载的
+    /// 「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上摆第一次崩溃（注入过读故障的态），第二截那次可写挂载的
     /// 写行那次发布上摆一个二次崩溃——根槽 FUA 没落、紧跟着的两槽系统配置轮换落了；交回这一趟崩溃注入。两条靶向用例共用这份搭建，各自断言。
     fn injection_with_a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount(
     ) -> HistoryCrashInjection {
@@ -8561,8 +8571,8 @@ mod tests {
     }
 
     /// C696「第三截调用点写死成 NoneInjected」那一种接错的靶向用例（W 为真的阳性对照，造法同
-    /// [`a_second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site`]）：第一次崩溃摆在
-    /// 「每块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上（注入过读故障的态），第二截那次可写挂载的写行那次发布上摆一个
+    /// [`second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site`]）：第一次崩溃摆在
+    /// 「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上（注入过读故障的态），第二截那次可写挂载的写行那次发布上摆一个
     /// 二次崩溃——根槽 FUA 没落、紧跟着的两槽系统配置轮换落了。二次崩溃镜像上再挂以判据 N-配置 拒、判据复算为真；崩溃态注入过读故障，
     /// 第三截判过一次、不判 C670 那一条（不合法 0 次、没有新发现）。
     /// 判别力：第三截调用点把读故障的认定写死成 NoneInjected（`crates/mutations.tsv` 一行）时不合法变 1、报一条新发现，这一条红。
@@ -8791,7 +8801,7 @@ mod tests {
     /// 判别力：给定状态表的写表把 mkfs 的写整截留在表外（基线照旧是 mkfs 之后），创世发布不进发布表，种了也不红（`crates/mutations.tsv` 那一行）。
     // crash-case-check:not-a-crash-case 只判写死的两个给定状态（种与不种），不枚举崩溃状态
     #[test]
-    fn a_genesis_unit_overwritten_by_a_reuse_the_reclaim_predicate_refuses_is_red_on_the_record_checker_of_the_given_states_judge(
+    fn genesis_unit_overwritten_by_a_reuse_the_reclaim_predicate_refuses_is_red_on_the_record_checker_of_the_given_states_judge(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, segments, stream_indexes, after_make_filesystem) =
@@ -8969,7 +8979,7 @@ mod tests {
     /// （攻方改法 F1）。
     // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个崩溃态（ExactlyOneCrashState），不枚举
     #[test]
-    fn a_crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash(
+    fn crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, segments, first_write_of_the_overwrite) =
@@ -9015,8 +9025,8 @@ mod tests {
         );
         assert_eq!(
             (
-                tally.writable_mount_refusals_on_the_d23_list_legal,
-                tally.writable_mount_refusals_on_the_d23_list_illegal
+                tally.writable_mount_refusals_on_the_legal_refusal_list_legal,
+                tally.writable_mount_refusals_on_the_legal_refusal_list_illegal
             ),
             (0, 1),
             "第二截的可写挂载以判据 N-配置 拒、崩溃态没注入读故障而判据复算为真：拒得不合法，计 1：{}",
@@ -9091,7 +9101,7 @@ mod tests {
     /// 再挂以判据 N-配置 拒；崩溃态没注入读故障、判据在这份盘面上复算为真：I-8.4 照旧记「再挂被拒」不判，C670 那一条判过一次、不合法一次，
     /// 记一条第三截的发现。判别力：再挂被拒那一支不判 C670、或换回不判 C670 的旧判官（`crates/mutations.tsv` 两行），这一条红。
     #[test]
-    fn a_remount_refused_on_a_second_crash_image_where_only_a_rotation_landed_is_an_illegal_witness_refusal(
+    fn remount_refused_on_a_second_crash_image_where_only_a_rotation_landed_is_an_illegal_witness_refusal(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, _segments, first_write_of_the_overwrite) =
@@ -9130,6 +9140,10 @@ mod tests {
             &Ok(content_read_by_the_recovery_report(&recovered.report)),
             &RefusalOnTheCrashImage {
                 crash_image_materialized: &second_crash_image,
+                filesystem_identifier_of_the_pool: &execution
+                    .device_width
+                    .parameters()
+                    .filesystem_identifier,
                 version_landed_on_after_the_crash: recovered.report.effective_root,
                 read_only_read_back: ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
                 read_faults: ReadFaultsInTheCrashState::NoneInjected,
@@ -9178,7 +9192,7 @@ mod tests {
     /// 预期：这一份判过 1 + 1 次、不合法 1 次，不合法那一份交回拒因与那一条条件、合法那一份交回 None；并起来判过 1 + 2、不合法 1 + 1，
     /// 渲染里 Q3 那一行带这两个数。判别力：`crates/mutations.tsv`「根环一簇 R12」那一行（第三截不记 Q3 那一条不合法），这一条红。
     #[test]
-    fn the_third_cut_counts_each_q3_refusal_and_each_one_whose_criterion_is_true_without_read_faults(
+    fn the_third_cut_counts_each_no_valid_root_refusal_and_each_one_whose_criterion_is_true_without_read_faults(
     ) {
         let mut tally = CrashInjectionTally::default();
         let criterion_true_without_read_faults = vec![
@@ -9188,12 +9202,12 @@ mod tests {
             reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
                 &mut tally,
                 WritableMountRefusalVerdict::Illegal {
-                    reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                    reason: RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
                     conditions_not_met: criterion_true_without_read_faults.clone(),
                 },
             ),
             Some((
-                RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
                 criterion_true_without_read_faults
             )),
             "不合法的 Q3 拒：交回拒因与那一条条件（报红用）"
@@ -9202,7 +9216,7 @@ mod tests {
             reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
                 &mut tally,
                 WritableMountRefusalVerdict::Legal(
-                    RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator
+                    RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator
                 ),
             ),
             None,
@@ -9222,7 +9236,7 @@ mod tests {
             reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
                 &mut earlier,
                 WritableMountRefusalVerdict::Illegal {
-                    reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                    reason: RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
                     conditions_not_met: vec![
                         RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults,
                     ],
@@ -9259,7 +9273,7 @@ mod tests {
     /// I-8.4 照旧记「再挂被拒」不判，G4 那一条判过一次、不合法一次，记一条第三截的发现；判据 N-配置 那两样计数不动。
     /// 判别力：第三截不认 G4 那一条（`crates/mutations.tsv` 一行），这一条红。
     #[test]
-    fn a_remount_refused_on_a_second_crash_image_where_device_zero_has_both_system_configuration_slots_torn_is_an_illegal_refusal_after_the_read_stage(
+    fn remount_refused_on_a_second_crash_image_where_device_zero_has_both_system_configuration_slots_torn_is_an_illegal_refusal_after_the_read_stage(
     ) {
         /// 撕裂一个系统配置槽时改的那个字节在槽里的位置：槽中间，落在整槽校验和罩着的范围里。
         const TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
@@ -9342,6 +9356,10 @@ mod tests {
             &Ok(content_read_by_the_recovery_report(&recovered.report)),
             &RefusalOnTheCrashImage {
                 crash_image_materialized: &second_crash_image,
+                filesystem_identifier_of_the_pool: &execution
+                    .device_width
+                    .parameters()
+                    .filesystem_identifier,
                 version_landed_on_after_the_crash: recovered.report.effective_root,
                 read_only_read_back: ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
                 read_faults: ReadFaultsInTheCrashState::NoneInjected,
@@ -9460,13 +9478,13 @@ mod tests {
     /// C670 在第三截经调用点的判法（攻方改法 F2，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节 K2）：第一个文件之后一次覆盖写的历史，
     /// 第一次崩溃摆在覆盖写那次发布的第一个写上（它一个写都没落，盘面就是起点那一版）；第二截那次可写挂载的写行那次发布上摆一个二次崩溃——
     /// 根槽 FUA 没落、紧跟着的两槽系统配置轮换落了（越过根槽那一段的段尾：今天的持久顺序下根槽 FUA 先于轮换、各成一段，段内真子集摆不出来，
-    /// 与 [`a_crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash`] 越过段尾同一个理由）。
+    /// 与 [`crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash`] 越过段尾同一个理由）。
     /// 新实例的记录不跨实例边界施加，二次崩溃镜像上只读恢复落在起点那一版，见证值比它新：再挂以判据 N-配置 拒；崩溃态没注入读故障、判据复算为真，
     /// 第三截判过一次、不合法一次。判别力：调用点（[`judge_second_crashes_inside_the_writable_mount`] 拼 [`RefusalOnTheCrashImage`] 那几行）
     /// 把读故障恒交 `Injected`、再挂的盘换成第一次崩溃的镜像、换成没叠这一段的基线（`crates/mutations.tsv` 三行），不合法都变 0。
     // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
     #[test]
-    fn a_second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site(
+    fn second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, segments, first_write_of_the_overwrite) =
@@ -9591,10 +9609,10 @@ mod tests {
     /// 量过，三段短历史 131 个第一次崩溃态上挂载写表每个前缀与每个前缀扣一个写（177198 个二次崩溃态），以及这一个第一次崩溃态上每个前缀扣至多两个写，
     /// 两种所选那一版的 (判过, 不合法) 没有一处不同；判官结论不同的只有扣下写行（或第一次暖机）那次记录、根槽落了的这一类，都只差这一支。
     /// 那几处没量到的越屏障靶向态里计数分得开（攻方量过，判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节 K3），
-    /// 钉在 [`a_second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal`]。
+    /// 钉在 [`second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal`]。
     // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
     #[test]
-    fn a_second_crash_landing_on_the_row_publish_whose_records_were_lost_names_the_selected_version_of_the_second_crash_image(
+    fn second_crash_landing_on_the_row_publish_whose_records_were_lost_names_the_selected_version_of_the_second_crash_image(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, segments, first_write_of_the_overwrite) =
@@ -9783,7 +9801,7 @@ mod tests {
     /// 上一条那一态在计数层分不开这两种接线，只在判官列出的那一支上分得开；这一态在计数层就分得开。
     // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
     #[test]
-    fn a_second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal(
+    fn second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal(
     ) {
         let (history, execution) = history_of_the_first_file_and_one_overwrite();
         let (writes, segments, first_write_of_the_overwrite) =
@@ -10030,7 +10048,7 @@ mod tests {
     /// R2 照原样交回、不记放回。判别力（`crates/mutations.tsv` 里点名这条的行）：被删的行还在也当成都不在、放回去再比时一条违例都没有；
     /// 判红不进计数时那一格是 None。
     #[test]
-    fn a_sweep_publish_still_holding_the_rows_it_deleted_is_a_mount_transparency_violation_counted_once(
+    fn sweep_publish_still_holding_the_rows_it_deleted_is_a_mount_transparency_violation_counted_once(
     ) {
         let read = recovery_fields_read_comparing_a_version_with_these_instance_table_rows(
             SWEEP_PUBLISH_OF_THE_C704_CASES,
@@ -10067,7 +10085,7 @@ mod tests {
     /// 对照：R2 那一版是清扫发布那一版，被删的行一条都不在 ⇒ 不判红，把它们放回去之后的 R2 交给逐字段判，放回计数加 1。
     /// 判别力（`crates/mutations.tsv` 里点名这条的行）：放回时不接上被删的行，交回的 R2 里只有留下的那一行。
     #[test]
-    fn a_sweep_publish_without_the_rows_it_deleted_is_compared_with_them_put_back() {
+    fn sweep_publish_without_the_rows_it_deleted_is_compared_with_them_put_back() {
         let read = recovery_fields_read_comparing_a_version_with_these_instance_table_rows(
             SWEEP_PUBLISH_OF_THE_C704_CASES,
             vec![ROW_KEPT_BY_THE_SWEEP],

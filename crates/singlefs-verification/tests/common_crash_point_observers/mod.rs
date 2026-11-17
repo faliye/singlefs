@@ -34,6 +34,11 @@ use singlefs_verification::crash_amplification::{
     ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver, ObserveACrashState,
     ObserveACrashStateHandingBackAnImage, ObserverDeduplication, ReadRangeOnTheCrashImage,
 };
+// 观察者看过状态的断言照块区间判要用的几样单独一个 use 引：引 `ImageAfterTheObserver` 的那一个 use 在可写挂载续做观察者的判法单元闭包里，
+// 往它里面加名字就改了这个观察者的键
+use singlefs_verification::crash_amplification::{
+    BlockRangeOfTheFlow, EnvironmentRun, NodeOfAnObserver, ObservingOfTheRun,
+};
 use singlefs_verification::crash_state_enumeration::{
     AttachedCrashPointReplayObserver, AttachedCrashPointReplayObserverHandingBackAnImage,
     CrashPointReplayObserver, CrashPointReplayObserverAttachment, CrashPointReplayObserverCodeFile,
@@ -41,6 +46,13 @@ use singlefs_verification::crash_state_enumeration::{
 };
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, RetainedWrite, SparseBlockDevice,
+};
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    image_after_the_refusal_into_the_undecidable_witness,
+    writable_mount_refusals_into_the_undecidable_witness_of_each_observer,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
 };
 use singlefs_verification::scenario::deletion_history_switches;
 use singlefs_verification::segments::StepKind;
@@ -50,6 +62,107 @@ use std::sync::Arc;
 
 /// 判段在可写挂载续做之后的盘上判池级 checker、一条不变量都不判违例时加一的计数（每个状态挂完的盘都判过：计数等于状态数）。
 pub const POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER: &str = "pool_checker_clean_after_the_mount";
+
+/// 设了块区间、这一片里没有某个观察者节点上的块时打的那一行的行首（[`states_seen_by_the_observer_as_the_block_range_requires`]）。
+pub const OBSERVER_OUTSIDE_THE_BLOCK_RANGE_LINE_PREFIX: &str =
+    "CRASH_POINT_REPLAY_OBSERVER_OUTSIDE_THE_BLOCK_RANGE";
+
+/// 设了块区间、对整条流的一条断言在这一片上判不了时打的那一行的行首（[`whole_flow_assertion_is_left_to_the_run_without_a_block_range`]）。
+pub const WHOLE_FLOW_ASSERTION_LEFT_TO_THE_RUN_WITHOUT_A_BLOCK_RANGE_LINE_PREFIX: &str =
+    "CRASH_AMPLIFICATION_WHOLE_FLOW_ASSERTION_LEFT_TO_THE_RUN_WITHOUT_A_BLOCK_RANGE";
+
+/// 这一趟这台机器领的块里落在 `nodes` 上的块数：照引擎交回的「领的块落在哪几个点上」
+/// （`ObservingOfTheRun::blocks_selected_here_on_each_point`）与调用方挂观察者时给的节点数，不看引擎挂没挂这个观察者。
+#[must_use]
+pub fn blocks_selected_here_on_the_nodes(
+    observing: &ObservingOfTheRun,
+    nodes: &[NodeOfAnObserver],
+) -> u64 {
+    observing
+        .blocks_selected_here_on_each_point
+        .iter()
+        .filter(|point| {
+            nodes
+                .iter()
+                .any(|node| node.holds_the_point_named(&point.code_file, &point.point_name))
+        })
+        .map(|point| point.blocks)
+        .sum()
+}
+
+/// 观察者 `observer_name` 这一趟看过的状态数（交回它）要不要大于 0，照这一趟判的那一片（`EnvironmentRun::block_range`）定：
+/// - 没设块区间（整条流）：要求大于 0，红的那一句就是 `saw_no_state`；
+/// - 设了块区间：这一片里有块落在它的节点上（`nodes`：调用方挂它时给的那几个节点，[`blocks_selected_here_on_the_nodes`]）的，
+///   照样要求大于 0；一块都没有的不要求，打一行 [`OBSERVER_OUTSIDE_THE_BLOCK_RANGE_LINE_PREFIX`]，同时要求它一个状态都没看。
+///   调用方没挂上这个观察者（`nodes` 是 `None`）照样红。整条流上它看过状态没有，由几片都判完之后不设块区间的那一趟判。
+///
+/// # Panics
+/// 照上面该大于 0 而是 0；设了块区间、这一片里没有它节点上的块，它却看过状态；设了块区间而调用方没挂上它。
+#[track_caller]
+pub fn states_seen_by_the_observer_as_the_block_range_requires(
+    run: &EnvironmentRun,
+    observing: &ObservingOfTheRun,
+    flow_name: &str,
+    observer_name: &str,
+    nodes: Option<&[NodeOfAnObserver]>,
+    saw_no_state: &str,
+) -> u64 {
+    let states = observing
+        .states_of_each_observer
+        .get(observer_name)
+        .copied()
+        .unwrap_or(0);
+    match &run.block_range {
+        BlockRangeOfTheFlow::EveryBlockOfTheFlow => {
+            assert!(states > 0, "{saw_no_state}");
+        }
+        BlockRangeOfTheFlow::BlocksInTheRange(range) => {
+            let nodes = nodes.unwrap_or_else(|| {
+                panic!("流 {flow_name}：观察者 {observer_name} 没挂上（调用方挂的观察者里没有这个名字）")
+            });
+            let blocks_on_its_nodes = blocks_selected_here_on_the_nodes(observing, nodes);
+            if blocks_on_its_nodes > 0 {
+                assert!(
+                    states > 0,
+                    "{saw_no_state}（块区间 {}-{}：这一片里落在它节点上的块有 {blocks_on_its_nodes} 块）",
+                    range.start,
+                    range.end
+                );
+            } else {
+                assert_eq!(
+                    states, 0,
+                    "流 {flow_name}：块区间 {}-{} 里没有观察者 {observer_name} 节点上的块，它却看过状态",
+                    range.start, range.end
+                );
+                println!(
+                    "{OBSERVER_OUTSIDE_THE_BLOCK_RANGE_LINE_PREFIX} flow={flow_name} observer={observer_name} block_range={}-{} blocks_on_its_nodes=0：这一片里没有它节点上的块，不要求它看过状态；整条流上看没看过由几片都判完之后不设块区间的那一趟判",
+                    range.start, range.end
+                );
+            }
+        }
+    }
+    states
+}
+
+/// 对整条流的一条断言（`what`）在这一趟上判不判：没设块区间（整条流）判，交回 `false`；设了块区间的这一片判不了，打一行
+/// [`WHOLE_FLOW_ASSERTION_LEFT_TO_THE_RUN_WITHOUT_A_BLOCK_RANGE_LINE_PREFIX`]、交回 `true`，留给几片都判完之后不设块区间的那一趟
+/// （那一趟块全按键复用，照整条流判）。
+pub fn whole_flow_assertion_is_left_to_the_run_without_a_block_range(
+    run: &EnvironmentRun,
+    flow_name: &str,
+    what: &str,
+) -> bool {
+    match &run.block_range {
+        BlockRangeOfTheFlow::EveryBlockOfTheFlow => false,
+        BlockRangeOfTheFlow::BlocksInTheRange(range) => {
+            println!(
+                "{WHOLE_FLOW_ASSERTION_LEFT_TO_THE_RUN_WITHOUT_A_BLOCK_RANGE_LINE_PREFIX} flow={flow_name} block_range={}-{} assertion={what}：这一片判不了对整条流的这一条，留给几片都判完之后不设块区间的那一趟",
+                range.start, range.end
+            );
+            true
+        }
+    }
+}
 
 /// 这一份的仓内路径（观察者代码文件，与 `file!()` 归一之后相同）。
 pub const FILE_OF_THE_CRASH_POINT_OBSERVERS: &str =
@@ -329,7 +442,8 @@ fn landed_version(
 /// [`POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER`] 加一；配了 GPU 上卡）。删除流的崩溃枚举用例与挂在标准前缀上的放量观察者
 /// （`common_crash_points::OBSERVERS_ON_THE_STANDARD_PREFIX`）调的都是这一份。可写挂载与续做真跑实现，只能在 CPU 上
 /// （豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。它交回的只随镜像字节、恢复报告与另读的输入变，
-/// 录入段按恢复镜像去重。
+/// 录入段按恢复镜像去重。可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），续做跳过，
+/// 另记这一态上续做本来还差几步（`mount_transparency::continuation_skipped_on_the_refusal_counter`）。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn observe_the_mount_continuation(
@@ -357,14 +471,41 @@ pub fn observe_the_mount_continuation(
             )
         })
         .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
+    let landed = landed_version(inputs, report.effective_root);
+    let expected_continuation_steps = match landed {
+        LandedVersion::OneOfTheDeletionPublishes(publish) => {
+            publish.continuation_steps_from_this_version
+        }
+        LandedVersion::BeforeTheFirstFile | LandedVersion::WithAFile => 0,
+    };
+    let mounted = match mount_writable_with_test_only_switches_and_deletion_switches(
         &mount_parameters,
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         deletion_history_switches(),
-    )
-    .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            counts.add(
+                &continuation_skipped_on_the_refusal_counter(expected_continuation_steps),
+                1,
+            );
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &mount_parameters.filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     assert!(
         matches!(
             mounted.output.deletion_queue_continuation_outcome,
@@ -373,13 +514,6 @@ pub fn observe_the_mount_continuation(
         "续做把队列走到空：{:?}",
         mounted.output.deletion_queue_continuation_outcome
     );
-    let landed = landed_version(inputs, report.effective_root);
-    let expected_continuation_steps = match landed {
-        LandedVersion::OneOfTheDeletionPublishes(publish) => {
-            publish.continuation_steps_from_this_version
-        }
-        LandedVersion::BeforeTheFirstFile | LandedVersion::WithAFile => 0,
-    };
     assert_eq!(
         mounted.output.deletion_queue_continuation.len(),
         expected_continuation_steps,
@@ -676,25 +810,28 @@ pub fn amplify_a_flow_through_the_standard_prefix_expanding_up_to(
     if let Some(observing) = &run.observing {
         // 判段的「现判 N、去重复用 M」：这一趟在挂完的盘上判池级 checker 的张数（其中在卡上的）、库里这一把判器版本早先判过的张数
         println!(
-            "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+            "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?} writable_mount_refusals_into_the_undecidable_witness={:?}",
             observing.images_judged_here,
             observing.images_judged_on_the_gpu_here,
             observing.image_judgements_reused,
             observing.blocks_observed_here,
             observing.states_observed_here,
             observing.states_of_each_observer,
-            observing.red_states_of_each_observer
+            observing.red_states_of_each_observer,
+ writable_mount_refusals_into_the_undecidable_witness_of_each_observer(observing)
         );
         for observer in &every_observer {
             let name = observer.name();
-            let states = observing
-                .states_of_each_observer
-                .get(name)
-                .copied()
-                .unwrap_or(0);
-            assert!(
-                states > 0,
-                "流 {flow_name} 经过标准前缀，观察者 {name} 一个状态都没看"
+            let states = states_seen_by_the_observer_as_the_block_range_requires(
+                &run,
+                observing,
+                flow_name,
+                name,
+                observers
+                    .iter()
+                    .find(|attached| attached.observer_name.as_str() == name)
+                    .map(|attached| attached.nodes.as_slice()),
+                &format!("流 {flow_name} 经过标准前缀，观察者 {name} 一个状态都没看"),
             );
             assert_eq!(
                 observing
@@ -717,9 +854,10 @@ pub fn amplify_a_flow_through_the_standard_prefix_expanding_up_to(
                     assert_eq!(
                         (0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH + 1)
                             .map(|steps| count_named(&format!("mount_continuation_steps_{steps}")))
-                            .sum::<u64>(),
+                            .sum::<u64>()
+                            + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                         states,
-                        "流 {flow_name}：经过标准前缀的每个状态都可写挂载过一次"
+                        "流 {flow_name}：经过标准前缀的每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
                     );
                     assert_eq!(
                         count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),
@@ -739,16 +877,19 @@ pub fn amplify_a_flow_through_the_standard_prefix_expanding_up_to(
                 }
             }
         }
-        assert_the_observers_attached_by_the_provenance_saw_the_flow(flow_name, observing);
+        assert_the_observers_attached_by_the_provenance_saw_the_flow(flow_name, &run, observing);
     }
     run
 }
 
 /// 崩溃放量那一处按来历挂的观察者（`singlefs_verification::crash_point_replay_provenance`：登记位上、来历是 mkfs 返回之后的流挂两槽全废盘面观察者，
 /// 它在判段从判器交回的逐盘自证槽数看）在这条流上挂上了、看过状态、一个都没判红，看过的状态数计数等于它看过的状态数。这一份不挂它，只核跑流那一处挂了。
+/// 它挂在流的每个点与末节点上（`crash_point_replay_provenance::nodes_of_every_point_of_the_flow`）：这一趟领的块所在的每个点都是它的节点，
+/// 设了块区间时照 [`states_seen_by_the_observer_as_the_block_range_requires`] 判它看没看过状态。
 fn assert_the_observers_attached_by_the_provenance_saw_the_flow(
     flow_name: &str,
-    observing: &singlefs_verification::crash_amplification::ObservingOfTheRun,
+    run: &EnvironmentRun,
+    observing: &ObservingOfTheRun,
 ) {
     use singlefs_verification::crash_point_replay_provenance::{
         observers_attached_to_the_flow, RunOfTheFlow,
@@ -759,16 +900,23 @@ fn assert_the_observers_attached_by_the_provenance_saw_the_flow(
         !attached.is_empty(),
         "流 {flow_name} 走过标准前缀、登在崩溃放量的 ITEMS 上、来历是 mkfs 返回之后：按来历挂两槽全废盘面观察者"
     );
+    let every_point_selected_here: Vec<NodeOfAnObserver> = observing
+        .blocks_selected_here_on_each_point
+        .iter()
+        .map(|point| NodeOfAnObserver {
+            setting_file: point.code_file.clone(),
+            entry_name: point.point_name.clone(),
+        })
+        .collect();
     for observer in attached {
         let name = observer.observer_name();
-        let states = observing
-            .states_of_each_observer
-            .get(name)
-            .copied()
-            .unwrap_or(0);
-        assert!(
-            states > 0,
-            "流 {flow_name}：按来历挂的观察者 {name} 一个状态都没看（跑流那一处没挂上）"
+        let states = states_seen_by_the_observer_as_the_block_range_requires(
+            run,
+            observing,
+            flow_name,
+            name,
+            Some(every_point_selected_here.as_slice()),
+            &format!("流 {flow_name}：按来历挂的观察者 {name} 一个状态都没看（跑流那一处没挂上）"),
         );
         assert_eq!(
             observing

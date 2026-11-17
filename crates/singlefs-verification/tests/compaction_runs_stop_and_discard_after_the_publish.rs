@@ -12,18 +12,20 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{
-    build_pool, disk_snapshot, file_content, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS,
+    build_pool, disk_snapshot, file_content, parameters, with_unreadable_ranges,
+    without_unreadable_ranges, BuiltPool, FailingReadsOfARange, SharedUnreadableRanges,
+    UnreadableRange, UnreadableRangeReadBack, FIXED_WRITE_TIME_SECONDS,
 };
 use singlefs_core::address::{DeviceIdentity, InodeNumber, InstanceGeneration, SlotNumber};
 use singlefs_core::admission::EmptyClusterSegmentsBelowTheFloorOnSomeDevices;
 use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::compaction_plan::{
-    region_is_empty_by_the_records, CallerMonotonicClockReading, CallerOfTheBackgroundCompaction,
-    CompactionBatchSize, CompactionBatchUnits, CompactionPacing, CompactionRegionExclusion,
-    CompactionRunForcing, CompactionRunStop, CompactionSwitches, EmptyClusterSegmentsFloor,
-    ForcedReleaseChecksumMismatchAfterIssue, ForegroundFsync, RelocationDestinationPolicy,
-    RelocationPublishOrder,
+    region_is_empty_by_the_records, AnswerOfTheCallerBeforeTheNextBatch,
+    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionBatchSize,
+    CompactionBatchUnits, CompactionPacing, CompactionRegionExclusion, CompactionRunForcing,
+    CompactionRunStop, CompactionSwitches, EmptyClusterSegmentsFloor,
+    ForcedReleaseChecksumMismatchAfterIssue, RelocationDestinationPolicy, RelocationPublishOrder,
 };
 use singlefs_core::logged_operations::{live_compaction_intent_of_the_entries, CompactionRegion};
 use singlefs_core::mount::mount_writable;
@@ -31,8 +33,9 @@ use singlefs_core::mounted_session::{
     BackgroundCompactionCall, BackgroundCompactionTrigger, CompactionRun, CompactionRunOutcome,
     MountedSession, UserChange, UserChangeRefused,
 };
+use singlefs_core::pointer::LocationEntry;
 use singlefs_core::records::TREE_KIND_SNAPSHOT_INODE_ROOT;
-use singlefs_core::recovery::walk_to_file;
+use singlefs_core::recovery::{instance_table_chain_of_root, walk_to_file};
 use singlefs_core::region_scan::RegionScanRefusal;
 use singlefs_core::transaction::{
     publish_overwrite, publish_unlink_intent, FirstFile, PoolVersion, PoolWriter, PublishError,
@@ -69,7 +72,7 @@ fn switches(
             Some(units) => CompactionBatchSize::ForcedForTests(
                 CompactionBatchUnits::new(units).expect("至少 1"),
             ),
-            None => CompactionBatchSize::NotDecidedByTheClauses,
+            None => CompactionSwitches::PRODUCT.batch_size,
         },
         forced_region,
         run_forcing,
@@ -105,8 +108,8 @@ impl CallerOfTheBackgroundCompaction for CallerWithoutAForegroundFsync {
         CallerMonotonicClockReading(std::time::Duration::ZERO)
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        ForegroundFsync::NoneWaiting
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
     }
 }
 
@@ -556,28 +559,26 @@ fn a_run_stopped_by_the_test_only_switch_writes_nothing() {
     );
 }
 
-/// 产品路径：批大小条款没写，签任何意图、发任何一个写之前停下（`BatchSizeNotDecidedByTheClauses`）。
+/// 产品路径的批大小是默认的 16（挂载参数）：一批搬的单元不超过它。
 #[test]
-fn a_run_on_the_product_path_stops_before_issuing_because_the_batch_size_is_not_decided() {
+fn a_run_on_the_product_path_moves_at_most_the_default_batch_size_in_one_batch() {
     let mut pool = build_pool("compaction-run-product-batch-size");
     let (mut session, mut devices) = mounted_session(&mut pool, CompactionSwitches::PRODUCT);
-    let operations_before = pool.stream.operations().len();
     let run = session.run_compaction(&mut devices).expect("整理一趟");
     pool.devices = Some(devices);
     assert!(
-        matches!(
-            run.outcome,
-            CompactionRunOutcome::Stopped(CompactionRunStop::BatchSizeNotDecidedByTheClauses)
-        ),
-        "{:?}",
+        !matches!(run.outcome, CompactionRunOutcome::Failed(_)),
+        "产品路径照常推：{:?}",
         run.outcome
     );
-    assert_eq!(
-        pool.stream.operations().len(),
-        operations_before,
-        "一个写都没发"
-    );
-    assert!(session.allocator.compaction().live_intent().is_none());
+    for version in &run.versions_published {
+        assert!(
+            version.units_relocated_by_this_publish.len()
+                <= singlefs_core::compaction_plan::COMPACTION_BATCH_UNITS_BY_DEFAULT.units(),
+            "一批至多 16 个单元：{}",
+            version.units_relocated_by_this_publish.len()
+        );
+    }
 }
 
 /// 同一个进程里的池装上 `N₀` 很大的合取 7 开关（判决 G6「强制合取 7 的 `N₀`」）。
@@ -895,6 +896,136 @@ fn a_segment_emptied_by_the_compaction_is_discarded_on_both_devices_once_its_slo
         discards.withheld_holding_unswept_orphan_heads.is_empty(),
         "没有孤儿头：一段都不扣"
     );
+}
+
+/// [`revolution_until_the_first_discard`] 走到头一次真要发 discard 的那次改动时的读数。
+struct RevolutionUntilTheFirstDiscard {
+    session: MountedSession,
+    devices: Vec<(
+        DeviceIdentity,
+        common::DeviceWithUnreadableRanges<common::Recorded>,
+    )>,
+    damaged_location: LocationEntry,
+    reads_of_the_page: SharedUnreadableRanges,
+    pool: BuiltPool,
+}
+
+/// 整理搬空一段之后接着转环，走到头一次真要发 discard 的那次改动（迭代上界是转一环的发布数：搬空的那一段在这一环之内回收、发 discard）。
+/// 现行那一版实例表第 0 片的头一份从整理之后起数读，照 `failing_reads` 读坏。
+fn revolution_until_the_first_discard(
+    tag: &str,
+    failing_reads: FailingReadsOfARange,
+) -> RevolutionUntilTheFirstDiscard {
+    let mut pool = build_pool(tag);
+    let (mut session, devices) = mounted_session(
+        &mut pool,
+        switches(
+            Some(4),
+            Some(region_of_the_first_publish()),
+            CompactionRunForcing::FollowTheWatermarks,
+            ForcedReleaseChecksumMismatchAfterIssue::NotForced,
+            EmptyClusterSegmentsFloor::OfTheFirstVersion,
+        ),
+    );
+    let mut devices = devices;
+    let run = session.run_compaction(&mut devices).expect("整理一趟");
+    assert_eq!(
+        run.alarm_of_the_compaction_stopped_after_a_compute_error, None,
+        "整理没停着：不报警"
+    );
+    let damaged_location = current_of(&session).root.instance_table.locations[0];
+    let reads_of_the_page = SharedUnreadableRanges::new(
+        vec![UnreadableRange {
+            device: damaged_location.device,
+            offset_in_bytes: damaged_location.slot.to_device_offset().0,
+            length_in_bytes: 512,
+            failing_reads,
+        }],
+        UnreadableRangeReadBack::DeviceError,
+    );
+    let mut devices = with_unreadable_ranges(devices, &reads_of_the_page);
+    let mut changes_until_the_discard = 0;
+    loop {
+        changes_until_the_discard += 1;
+        assert!(
+            changes_until_the_discard <= 3 * ROOT_RING_SLOTS_PER_REGION + 2,
+            "转完一环还没有一次发 discard 的改动"
+        );
+        let published = session
+            .publish_user_change(
+                &mut devices,
+                UserChange::NewInodes {
+                    count: 1,
+                    write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+                },
+            )
+            .expect("建一个 inode");
+        if !published.discards_after_the_change.applied.is_empty()
+            || !published.discards_after_the_change.unsupported.is_empty()
+        {
+            return RevolutionUntilTheFirstDiscard {
+                session,
+                devices,
+                damaged_location,
+                reads_of_the_page,
+                pool,
+            };
+        }
+    }
+}
+
+/// 发 discard 之前沿链读实例表（判孤儿头要它的行）读到只坏一份：每次改动的发布写系统配置槽之前也读那一片，所以先空跑一遍，数到发 discard 那次改动为止读了几次，
+/// 那次改动的最后一读就是发 discard 之前那一读（这一次另发的那一批没事可做）。只让这一读读坏：别的读那个数是 1，那次改动的发布都没读到它；下一次改动发成之后另发的那一批整条链重写，实例表换到新槽、两份都读得回。
+/// D4（校验和位置） 已定项 4「可写挂载里的读都计数并搬」。判别力：`crates/mutations.tsv`「可写挂载别的读：发 discard 之前读实例表」那一行。
+#[test]
+fn an_instance_table_page_read_with_one_copy_damaged_before_the_discards_is_counted_and_replaced_by_the_next_change(
+) {
+    let dry_run = revolution_until_the_first_discard(
+        "compaction-run-then-discard-counting-the-reads-of-the-instance-table",
+        FailingReadsOfARange::Never,
+    );
+    let read_before_the_discards = dry_run.reads_of_the_page.reads_of_range(0);
+    assert_eq!(
+        dry_run
+            .session
+            .other_unit_reads_with_one_copy_failing_in_this_mount(),
+        0,
+        "一读都没坏就不记"
+    );
+    let RevolutionUntilTheFirstDiscard {
+        mut session,
+        devices,
+        damaged_location,
+        reads_of_the_page,
+        mut pool,
+    } = revolution_until_the_first_discard(
+        "compaction-run-then-discard-with-the-instance-table-damaged",
+        FailingReadsOfARange::OnlyTheNth(read_before_the_discards),
+    );
+    assert_eq!(reads_of_the_page.failed_reads(), 1, "那一读读坏了");
+    assert_eq!(
+        session.other_unit_reads_with_one_copy_failing_in_this_mount(),
+        1
+    );
+    let mut devices = without_unreadable_ranges(devices);
+    session
+        .publish_user_change(
+            &mut devices,
+            UserChange::NewInodes {
+                count: 1,
+                write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+            },
+        )
+        .expect("再建一个 inode");
+    let after = current_of(&session);
+    assert_ne!(
+        after.root.instance_table.locations[0].slot, damaged_location.slot,
+        "实例表换到新槽"
+    );
+    let instance_table_read =
+        instance_table_chain_of_root(&devices, &after.root).expect("新的实例表读得回");
+    assert_eq!(instance_table_read.page_pointers.len(), 1, "一片");
+    pool.devices = Some(devices);
 }
 
 /// 码 1 数据单元头里诞生代号、事务号的偏移（D18（块里携带什么信息） 已定项 7 / 已定项 18 的偏移表；事务号 6 字节）。

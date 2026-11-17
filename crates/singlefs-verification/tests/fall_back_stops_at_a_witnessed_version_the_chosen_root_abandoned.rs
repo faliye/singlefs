@@ -16,8 +16,8 @@ mod common_unwitnessed_publish;
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, fixed_geometry_of_the_384_slot_small_devices,
     image_of_devices_reading_back_all_zero, record_one_publish_after_overwrites,
-    recorded_devices_reading_back_all_zero_on, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    recorded_devices_reading_back_all_zero_on, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -38,7 +38,7 @@ use singlefs_verification::memory_pool::{
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::SharedStream;
 
-const OVERWRITES_BEFORE_W: u64 = 5;
+const OVERWRITES_BEFORE_THE_WITNESSED_VERSION: u64 = 5;
 
 /// 取新实例的那次挂载里 `ranges` 读回全零：交回那次挂载的全部写（按落盘次序）与写行那次发布的根槽写在其中的下标。
 fn writes_of_the_mount_that_took_a_new_instance(
@@ -102,7 +102,7 @@ fn image_with_the_older_system_configuration_slot_of_device_zero_witnessing(
 
 /// 交回 Row 之后那一刻的盘面（没改系统配置槽）、下一次读时读回全零的几段（Row 写出的单元除实例表那一片、Row 的写行记录）、
 /// Row 的 (实例, txg) 与 W 那条记录的计数器。
-fn image_after_a_row_publish_abandoning_w(
+fn image_after_a_row_publish_abandoning_the_witnessed_version(
     recorded: &RecordedPublish,
 ) -> (
     MemoryPool,
@@ -135,12 +135,12 @@ fn image_after_a_row_publish_abandoning_w(
             })
             .map(|record| record.counter)
     };
-    let last_record_counter_of_w =
+    let last_record_counter_of_the_witnessed_version =
         last_record_counter_of(recorded.key).expect("前提：W 的记录还在环里、读得出");
     let row_record_counter = last_record_counter_of(row_key).expect("Row 的写行记录读得出");
     assert_eq!(
         row_record_counter,
-        last_record_counter_of_w + 1,
+        last_record_counter_of_the_witnessed_version + 1,
         "前提：Row 的写行记录接在 W 的记录后面"
     );
     let row_unit_writes: Vec<&RetainedWrite> = mount_writes[..row_root]
@@ -155,7 +155,12 @@ fn image_after_a_row_publish_abandoning_w(
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&row_unit_writes)
         .with_the_last_record_of_the_publish(&image, row_key);
-    (image, ranges, row_key, last_record_counter_of_w)
+    (
+        image,
+        ranges,
+        row_key,
+        last_record_counter_of_the_witnessed_version,
+    )
 }
 
 /// 下界单独起作用的那一形：见证到的 W 被 Row 的实例表抛弃，[W, Row) 里没有可退的根——恢复照报 Row 读不出、只读挂载打不开、
@@ -164,18 +169,20 @@ fn image_after_a_row_publish_abandoning_w(
 #[test]
 fn a_row_publish_whose_units_and_record_read_back_zero_does_not_fall_back_below_the_witnessed_version_its_instance_table_abandoned(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_W, PublishRecordedAsR::Overwrite);
-    let (image, ranges, row_key, last_record_counter_of_w) =
-        image_after_a_row_publish_abandoning_w(&recorded);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_WITNESSED_VERSION,
+        RecordedPublishKind::Overwrite,
+    );
+    let (image, ranges, row_key, last_record_counter_of_the_witnessed_version) =
+        image_after_a_row_publish_abandoning_the_witnessed_version(&recorded);
 
     // 对照：c_见证 是 P 的计数器，见证到的就是 P，[P, Row) 里 W 被抛弃、P 不被抛弃 ⇒ 退到 P。
-    let report_without_the_witness_of_w = recover(
+    let report_without_the_witness_of_the_witnessed_version = recover(
         &devices_reading_back_all_zero_on(&image, &ranges),
         JournalPolicy::Consult,
     );
     assert_eq!(
-        report_without_the_witness_of_w.outcome,
+        report_without_the_witness_of_the_witnessed_version.outcome,
         RecoveryOutcome::FileRead {
             root: recorded.previous_key,
             content: recorded.previous_content.clone(),
@@ -185,7 +192,7 @@ fn a_row_publish_whose_units_and_record_read_back_zero_does_not_fall_back_below_
 
     let image = image_with_the_older_system_configuration_slot_of_device_zero_witnessing(
         &image,
-        last_record_counter_of_w,
+        last_record_counter_of_the_witnessed_version,
     );
     let devices = devices_reading_back_all_zero_on(&image, &ranges);
     let report = recover(&devices, JournalPolicy::Consult);

@@ -13,7 +13,7 @@ use crate::common_root_ring_holes::{
     pool_overwritten_through, publish_empty, readable_root_at_txg, recording_of,
     SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS,
 };
-use crate::common_shared_by_harness_scenarios::EMPTY_PUBLISHES_AFTER_X;
+use crate::common_shared_by_harness_scenarios::EMPTY_PUBLISHES_AFTER_THE_WATCHED_ROOT;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
 use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::mount::{
@@ -47,23 +47,23 @@ pub const LAST_TXG_OF_INSTANCE_ONE_BEFORE_THE_HOLES: u64 = 17;
 pub const HOLES: usize = 3;
 
 /// 有洞的那一份：X 的 txg。
-pub const X_TXG_AFTER_THE_HOLES: u64 = 21;
+pub const WATCHED_ROOT_TXG_AFTER_THE_HOLES: u64 = 21;
 
 /// 有洞的那一份 RGall 之后的上限：洞里留着的 txg 6、7、8 与 22 那四个不同状态里第 4 新的那条。
 pub const CEILING_OVER_THE_HOLES: CheckpointTxg = CheckpointTxg(6);
 
 /// 没洞的那一份：X 的 txg（实例 1 最后一次覆盖写）。
-pub const X_TXG_WITHOUT_HOLES: u64 = 17;
+pub const WATCHED_ROOT_TXG_WITHOUT_HOLES: u64 = 17;
 
 pub type DevicesOfTheRaisingMount = Vec<(
     DeviceIdentity,
     DeviceWithUnreadableRanges<RecordingBlockDevice<SparseBlockDevice>>,
 )>;
 
-/// 准入抬 F 之前的那一刻：抬 F 那一次可写挂载的盘（X 那一槽按 `x_slot_reads`、`x_slot_read_back` 读坏）、录下的流与它的起点盘面、分配器、现行那一版。
+/// 准入抬 F 之前的那一刻：抬 F 那一次可写挂载的盘（X 那一槽按 `watched_root_slot_reads`、`watched_root_slot_read_back` 读坏）、录下的流与它的起点盘面、分配器、现行那一版。
 pub struct PoolJustBeforeTheAdmissionRaiseToTheCeiling {
     pub holes: Vec<u64>,
-    pub x_txg: u64,
+    pub watched_root_txg: u64,
     pub image_before_the_raising_mount: MemoryPool,
     pub stream: SharedStream,
     pub devices: DevicesOfTheRaisingMount,
@@ -80,34 +80,39 @@ impl PoolJustBeforeTheAdmissionRaiseToTheCeiling {
     }
 }
 
-/// 在 `image` 上做抬 F 的那一次可写挂载（X 那一槽从这一次挂载起按 `x_slot_reads`、`x_slot_read_back` 读坏），之后空发布推到 `anchor`。
-pub fn mount_reading_the_x_slot_bad_and_publish_empty_through(
+/// 在 `image` 上做抬 F 的那一次可写挂载（X 那一槽从这一次挂载起按 `watched_root_slot_reads`、`watched_root_slot_read_back` 读坏），之后空发布推到 `anchor`。
+pub fn mount_reading_the_watched_root_slot_bad_and_publish_empty_through(
     image: MemoryPool,
     holes: Vec<u64>,
-    x_txg: u64,
-    x_slot_reads: FailingReadsOfARange,
-    x_slot_read_back: UnreadableRangeReadBack,
+    watched_root_txg: u64,
+    watched_root_slot_reads: FailingReadsOfARange,
+    watched_root_slot_read_back: UnreadableRangeReadBack,
     anchor: u64,
 ) -> PoolJustBeforeTheAdmissionRaiseToTheCeiling {
     let parameters = parameters_of_the_ring_hole_pools();
     let slots_per_region = parameters.geometry.root_ring_slots_per_region;
     assert!(
-        readable_root_at_txg(&image, x_txg).is_some(),
+        readable_root_at_txg(&image, watched_root_txg).is_some(),
         "X 那一版的根落盘了"
     );
-    let x_slot = target_for_publish(CheckpointTxg(x_txg), slots_per_region);
-    let unreadable_x_slot = SharedUnreadableRanges::new(
+    let watched_root_slot = target_for_publish(CheckpointTxg(watched_root_txg), slots_per_region);
+    let unreadable_watched_root_slot = SharedUnreadableRanges::new(
         vec![UnreadableRange {
-            device: parameters.region_devices[usize::try_from(x_slot.region).expect("区域号")],
-            offset_in_bytes: slot_offset(x_slot, parameters.geometry.fixed_structure_slot_spacing)
-                .0,
+            device: parameters.region_devices
+                [usize::try_from(watched_root_slot.region).expect("区域号")],
+            offset_in_bytes: slot_offset(
+                watched_root_slot,
+                parameters.geometry.fixed_structure_slot_spacing,
+            )
+            .0,
             length_in_bytes: u64::from(parameters.geometry.physical_block_size),
-            failing_reads: x_slot_reads,
+            failing_reads: watched_root_slot_reads,
         }],
-        x_slot_read_back,
+        watched_root_slot_read_back,
     );
     let stream = SharedStream::retaining_contents();
-    let mut devices = with_unreadable_ranges(recording_of(&image, &stream), &unreadable_x_slot);
+    let mut devices =
+        with_unreadable_ranges(recording_of(&image, &stream), &unreadable_watched_root_slot);
     let mounted = mount_writable(&parameters, &mut devices).expect("抬 F 那一次可写挂载");
     let instance = mounted.output.instance;
     let mut allocator = mounted.allocator.clone();
@@ -119,7 +124,7 @@ pub fn mount_reading_the_x_slot_bad_and_publish_empty_through(
     }
     PoolJustBeforeTheAdmissionRaiseToTheCeiling {
         holes,
-        x_txg,
+        watched_root_txg,
         image_before_the_raising_mount: image,
         stream,
         devices,
@@ -130,8 +135,8 @@ pub fn mount_reading_the_x_slot_bad_and_publish_empty_through(
 
 /// 有洞的那一份，造到准入抬 F 之前（与 `raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs` 同一个做法另写一份）。
 pub fn pool_over_the_holes_just_before_the_admission_raise(
-    x_slot_reads: FailingReadsOfARange,
-    x_slot_read_back: UnreadableRangeReadBack,
+    watched_root_slot_reads: FailingReadsOfARange,
+    watched_root_slot_read_back: UnreadableRangeReadBack,
 ) -> PoolJustBeforeTheAdmissionRaiseToTheCeiling {
     let parameters = parameters_of_the_ring_hole_pools();
     let ring_length = 3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS;
@@ -143,45 +148,45 @@ pub fn pool_over_the_holes_just_before_the_admission_raise(
         holes.push(row_txg);
         image = crashed;
     }
-    let x_txg = {
+    let watched_root_txg = {
         let mut devices = devices_of(&image);
         let mounted = mount_writable(&parameters, &mut devices).expect("洞之后那一次可写挂载");
-        let x_txg = mounted.output.row_publish.root().checkpoint_txg.0;
+        let watched_root_txg = mounted.output.row_publish.root().checkpoint_txg.0;
         let instance = mounted.output.instance;
         let mut allocator = mounted.allocator.clone();
         let mut current = mounted.current.into_file_version().expect("这一版带文件");
         // 迭代上界：两次空发布。
-        for _ in 0..EMPTY_PUBLISHES_AFTER_X {
+        for _ in 0..EMPTY_PUBLISHES_AFTER_THE_WATCHED_ROOT {
             let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
             current =
                 publish_empty(&mut writer, &mut allocator, &current, instance).expect("空发布");
         }
         image = pool_of(&devices);
-        x_txg
+        watched_root_txg
     };
     let anchor = holes[0] + ring_length - 1;
-    mount_reading_the_x_slot_bad_and_publish_empty_through(
+    mount_reading_the_watched_root_slot_bad_and_publish_empty_through(
         image,
         holes,
-        x_txg,
-        x_slot_reads,
-        x_slot_read_back,
+        watched_root_txg,
+        watched_root_slot_reads,
+        watched_root_slot_read_back,
         anchor,
     )
 }
 
 /// 没洞的那一份：实例 1 覆盖写到 X = 17、进程退出，抬 F 那一次可写挂载起 X 那一槽读坏，空发布推到 X + 3S − 1（X 成了环里最旧的根）。
 pub fn pool_without_holes_just_before_the_admission_raise(
-    x_slot_read_back: UnreadableRangeReadBack,
+    watched_root_slot_read_back: UnreadableRangeReadBack,
 ) -> PoolJustBeforeTheAdmissionRaiseToTheCeiling {
     let ring_length = 3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS;
-    mount_reading_the_x_slot_bad_and_publish_empty_through(
-        pool_overwritten_through(X_TXG_WITHOUT_HOLES),
+    mount_reading_the_watched_root_slot_bad_and_publish_empty_through(
+        pool_overwritten_through(WATCHED_ROOT_TXG_WITHOUT_HOLES),
         Vec::new(),
-        X_TXG_WITHOUT_HOLES,
+        WATCHED_ROOT_TXG_WITHOUT_HOLES,
         FailingReadsOfARange::Every,
-        x_slot_read_back,
-        X_TXG_WITHOUT_HOLES + ring_length - 1,
+        watched_root_slot_read_back,
+        WATCHED_ROOT_TXG_WITHOUT_HOLES + ring_length - 1,
     )
 }
 
@@ -280,19 +285,19 @@ pub fn run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_stops_a
         UnreadableRangeReadBack::DeviceError,
     );
     assert_eq!(
-        (pool.holes.clone(), pool.x_txg),
-        (vec![18, 19, 20], X_TXG_AFTER_THE_HOLES),
+        (pool.holes.clone(), pool.watched_root_txg),
+        (vec![18, 19, 20], WATCHED_ROOT_TXG_AFTER_THE_HOLES),
         "三个洞紧跟着 X"
     );
-    let x_slot = target_for_publish(
-        CheckpointTxg(X_TXG_AFTER_THE_HOLES),
+    let watched_root_slot = target_for_publish(
+        CheckpointTxg(WATCHED_ROOT_TXG_AFTER_THE_HOLES),
         parameters_of_the_ring_hole_pools()
             .geometry
             .root_ring_slots_per_region,
     );
     assert_eq!(
-        highest_txg_the_table_records_for(&pool, x_slot),
-        Some(CheckpointTxg(X_TXG_AFTER_THE_HOLES)),
+        highest_txg_the_table_records_for(&pool, watched_root_slot),
+        Some(CheckpointTxg(WATCHED_ROOT_TXG_AFTER_THE_HOLES)),
         "前提：根环表把 X 那一槽记成挂载时读坏、能住的最大 txg 21"
     );
     assert_eq!(
@@ -310,7 +315,7 @@ pub fn run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_stops_a
 
 /// 场景：有洞的那一份，X 那一槽一直读得出。
 /// 预期：上限照读出来的根取 6（洞里的 txg 6、7、8 与 X 是四个不同状态），F 抬到 6，抬完那几条不变量不红。
-pub fn run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_with_x_readable_reaches_x(
+pub fn run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_with_the_watched_root_readable_reaches_it(
     images: &mut PoolCheckerImages,
 ) {
     let mut pool = pool_over_the_holes_just_before_the_admission_raise(
@@ -343,24 +348,24 @@ pub fn run_the_scenario_where_admission_raising_the_floor_over_the_holes_with_a_
         FailingReadsOfARange::Every,
         UnreadableRangeReadBack::Zeros,
     );
-    let x_slot = target_for_publish(
-        CheckpointTxg(X_TXG_AFTER_THE_HOLES),
+    let watched_root_slot = target_for_publish(
+        CheckpointTxg(WATCHED_ROOT_TXG_AFTER_THE_HOLES),
         parameters_of_the_ring_hole_pools()
             .geometry
             .root_ring_slots_per_region,
     );
     assert_eq!(
         (
-            highest_txg_the_table_records_for(&pool, x_slot),
-            txg_the_table_pins_for_the_slot_reading_back_all_zero(&pool, x_slot),
-            highest_txg_merged_into_the_admission_ceiling_for(&pool, x_slot)
+            highest_txg_the_table_records_for(&pool, watched_root_slot),
+            txg_the_table_pins_for_the_slot_reading_back_all_zero(&pool, watched_root_slot),
+            highest_txg_merged_into_the_admission_ceiling_for(&pool, watched_root_slot)
         ),
         (
             None,
             Some(CheckpointTxg(
-                X_TXG_AFTER_THE_HOLES % (3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS)
+                WATCHED_ROOT_TXG_AFTER_THE_HOLES % (3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS)
             )),
-            Some(CheckpointTxg(X_TXG_AFTER_THE_HOLES))
+            Some(CheckpointTxg(WATCHED_ROOT_TXG_AFTER_THE_HOLES))
         ),
         "前提：X 那一槽记成读回全零、不记成读坏；回收门槛里钉在它可能住过的最旧 txg 9，准入抬 F 的上限按它能住的最大 txg 21 并"
     );
@@ -389,8 +394,8 @@ pub fn run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at
     assert_eq!(
         raise_to_the_admission_ceiling(&mut pool),
         (
-            CheckpointTxg(X_TXG_WITHOUT_HOLES),
-            CheckpointTxg(X_TXG_WITHOUT_HOLES)
+            CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES),
+            CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES)
         ),
         "上限与抬到的 F 都停在 X 那一槽能住的 txg 17"
     );
@@ -416,41 +421,41 @@ pub fn run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at
 ) {
     let mut pool =
         pool_without_holes_just_before_the_admission_raise(UnreadableRangeReadBack::Zeros);
-    let x_slot = target_for_publish(
-        CheckpointTxg(X_TXG_WITHOUT_HOLES),
+    let watched_root_slot = target_for_publish(
+        CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES),
         parameters_of_the_ring_hole_pools()
             .geometry
             .root_ring_slots_per_region,
     );
     assert_eq!(
         (
-            highest_txg_the_table_records_for(&pool, x_slot),
-            txg_the_table_pins_for_the_slot_reading_back_all_zero(&pool, x_slot),
-            highest_txg_merged_into_the_admission_ceiling_for(&pool, x_slot)
+            highest_txg_the_table_records_for(&pool, watched_root_slot),
+            txg_the_table_pins_for_the_slot_reading_back_all_zero(&pool, watched_root_slot),
+            highest_txg_merged_into_the_admission_ceiling_for(&pool, watched_root_slot)
         ),
         (
             None,
             Some(CheckpointTxg(
-                X_TXG_WITHOUT_HOLES % (3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS)
+                WATCHED_ROOT_TXG_WITHOUT_HOLES % (3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS)
             )),
-            Some(CheckpointTxg(X_TXG_WITHOUT_HOLES))
+            Some(CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES))
         ),
         "前提：X 那一槽记成读回全零、不记成读坏；回收门槛里钉在它可能住过的最旧 txg 5，准入抬 F 的上限按它能住的最大 txg 17 并"
     );
     assert!(
-        readable_root_at_txg(&pool.image_now(), X_TXG_WITHOUT_HOLES).is_some(),
+        readable_root_at_txg(&pool.image_now(), WATCHED_ROOT_TXG_WITHOUT_HOLES).is_some(),
         "前提：抬 F 之前盘上 X 那一槽里是完好的 txg 17 的根"
     );
     assert_eq!(
-        slots_of_the_version_left_free(&pool, X_TXG_WITHOUT_HOLES),
+        slots_of_the_version_left_free(&pool, WATCHED_ROOT_TXG_WITHOUT_HOLES),
         Vec::new(),
         "抬 F 之前：X 那一槽钉在 5，X 那一版引用的单元一个都不空闲"
     );
     assert_eq!(
         raise_to_the_admission_ceiling(&mut pool),
         (
-            CheckpointTxg(X_TXG_WITHOUT_HOLES),
-            CheckpointTxg(X_TXG_WITHOUT_HOLES)
+            CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES),
+            CheckpointTxg(WATCHED_ROOT_TXG_WITHOUT_HOLES)
         ),
         "上限与抬到的 F 都停在 X 那一槽能住的 txg 17，不越过盘上完好的 X"
     );

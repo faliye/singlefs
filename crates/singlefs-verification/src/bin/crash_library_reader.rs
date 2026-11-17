@@ -1,5 +1,4 @@
-//! 崩溃判定库的读库程序（`records/2026-10-13-复用键与全仓改名.md` crates 红批第 4 条；
-//! 4-2a 报告第四节第 10 条：键对不上的条数要读判定库，python 不读它的布局）。子命令 `keys` 读 prune-server 里那一份崩溃判定库
+//! 崩溃判定库的读库程序：键对不上的块数、一项要现判几块都要读判定库，python 不读它的布局。子命令 `keys` 读 prune-server 里那一份崩溃判定库
 //! （`crash_library::LibraryOpenInThisProcess::open_or_share`：连哪一处照 `crash_library::prune_server_route_of_the_configuration`；
 //! 没写服务的地址、连不上、读写不成照 prune-server 客户端的退出码退出，码见本文件头「退出码」那一段），一行都不写：
 //! 按编进这份二进制的判器键表（`crash_identity::compiled_judging_units_keys`）数录入表里的块：几块在这一把判法单元指纹下判过、
@@ -9,7 +8,8 @@
 //! （`VerdictStore::visit_stored_conclusion_keys`；块属性与结论块同一批写、键的后缀相同、值只有几十字节，不把整块结论读回来），
 //! 两份在内存里按块键对上。
 //!
-//! 用法：`crash_library_reader keys`；`crash_library_reader item <合表项名> <设点文件>…`。
+//! 用法：`crash_library_reader keys`；`crash_library_reader item <合表项名> <设点文件>…`；
+//! `crash_library_reader items --item <合表项名> <设点文件>… [--item <合表项名> <设点文件>…]…`。
 //!
 //! 子命令 `item`（按项读法）：给崩溃点重放合表 `.claude/gate.d/crash-point-replay-items.tsv` 的一项与这一项的设点文件（相对仓根的路径，
 //! 至少一份；崩溃枚举用例与放量分项的测试目标文件 `crates/singlefs-verification/tests/<目标>.rs`，由入口照合表点名的部分现给），报这一项
@@ -19,6 +19,10 @@
 //! 路径索引同一路径只留最后登的身份，所以这是给任务服务估时的数，不是判定。几项的设点文件互不相交、合起来罩住录入表里每一块时，
 //! 各项的能复用之和等于 `keys` 的 `judged_under_the_current_key`，要现判之和等于另两格之和。
 //!
+//! 子命令 `items`（一次报几项）：连一次库，路径索引、录入表、块属性表各整表扫一遍，几项共用这一遍；按命令行上 `--item` 的次序每项打一行，
+//! 每行的写法与 `item` 那一行相同。同一份库上，它的输出与逐项各起一次 `item` 打的行依次拼起来逐字相同（本文件的单测钉）。
+//! 项名与设点文件都不以 `-` 起头；每个 `--item` 后面是项名与至少一份设点文件。
+//!
 //! 输出：一行一项，制表符隔开，`<名>=<值>` 的字段次序固定。`scripts/crash/crash-point-replay.sh --list-items --with-keys` 照这一段读，
 //! 它的自证 `list-items-with-keys` 格把下面两行标记之间的那一段（去掉行首的 `//! `）原样当这个程序的输出喂给它；本文件的单测钉格式化出来的行与
 //! 这一段逐字相同——两边的写法与读法钉在同一段字上：
@@ -27,7 +31,7 @@
 //! CRASH_LIBRARY_KEYS_JUDGE	image_judgement	current_key=0505050505050505
 //! keys-format-end
 //!
-//! `item` 的输出一行（同样钉在文件头这一段上）：
+//! `item` 的输出一行（同样钉在文件头这一段上；`items` 每项一行，同一个写法）：
 //! item-format-begin
 //! CRASH_LIBRARY_ITEM	item=acquisition-barrier	recorded_blocks=5	to_judge=3	reusable=2
 //! item-format-end
@@ -161,7 +165,7 @@ fn current_keys_of_this_binary() -> Vec<(ConclusionKind, CurrentKeyOfAJudge)> {
     )]
 }
 
-/// 数库里录下的每一块：录入表整表扫一遍、块属性表整表扫一遍（[`VerdictStore::visit_stored_conclusion_keys`]），按块键对上。
+/// 数库里录下的每一块：录入表整表扫一遍、块属性表整表扫一遍（[`stored_versions_of_each_block`]），按块键对上。
 ///
 /// # Errors
 /// 读库失败。
@@ -169,18 +173,24 @@ fn counts_of_the_library(
     store: &VerdictStore,
     current_keys: &[(ConclusionKind, CurrentKeyOfAJudge)],
 ) -> Result<BlockCounts, VerdictStoreError> {
-    counts_of_the_blocks_chosen_by(store, current_keys, &|_block_key| true)
+    let stored_versions_of_each_block = stored_versions_of_each_block(store, current_keys)?;
+    Ok(counts_of_the_recorded_blocks(
+        &store.recorded_blocks()?,
+        &stored_versions_of_each_block,
+        current_keys,
+        &|_block_key| true,
+    ))
 }
 
-/// 同 [`counts_of_the_library`]，只数 `is_chosen` 挑中的块（`item` 按这一项那几把复用键挑）。
+/// 块属性表整表扫一遍（[`VerdictStore::visit_stored_conclusion_keys`]），收每块各判器存着的版本（与 `current_keys` 同序；
+/// 不是 `current_keys` 里哪一种判器的结论不收）。
 ///
 /// # Errors
 /// 读库失败。
-fn counts_of_the_blocks_chosen_by(
+fn stored_versions_of_each_block(
     store: &VerdictStore,
     current_keys: &[(ConclusionKind, CurrentKeyOfAJudge)],
-    is_chosen: &dyn Fn(&VerdictBlockKey) -> bool,
-) -> Result<BlockCounts, VerdictStoreError> {
+) -> Result<HashMap<VerdictBlockKey, Vec<Vec<ConclusionVersion>>>, VerdictStoreError> {
     let mut stored_versions_of_each_block: HashMap<VerdictBlockKey, Vec<Vec<ConclusionVersion>>> =
         HashMap::new();
     store.visit_stored_conclusion_keys(&mut |(block_key, kind, version)| {
@@ -195,12 +205,7 @@ fn counts_of_the_blocks_chosen_by(
         }
         Ok(())
     })?;
-    Ok(counts_of_the_recorded_blocks(
-        &store.recorded_blocks()?,
-        &stored_versions_of_each_block,
-        current_keys,
-        is_chosen,
-    ))
+    Ok(stored_versions_of_each_block)
 }
 
 /// 录入表里 `is_chosen` 挑中的块按去向数（[`standing_of_a_block`]）：`stored_versions_of_each_block` 是块属性表里每块各判器存着的版本
@@ -258,19 +263,58 @@ fn item_line(item_name: &str, counts: &BlockCounts) -> String {
     )
 }
 
-/// 一项的块账：路径索引里这一项的设点文件的点（[`reuse_keys_of_the_points_set_in`]），录入表里落在它们复用键上的块按去向数。
+/// 按项数块要从库里读的三样，各整表扫一遍读进来：路径索引、录入表、块属性表里每块各判器存着的版本（与 `current_keys` 同序）。
+struct ScannedLibrary {
+    path_entries: Vec<(String, String)>,
+    recorded_blocks: Vec<(VerdictBlockKey, u64)>,
+    stored_versions_of_each_block: HashMap<VerdictBlockKey, Vec<Vec<ConclusionVersion>>>,
+}
+
+/// 把按项数块要的三样各整表扫一遍（`item` 一项扫一遍，`items` 几项共用一遍）。
 ///
 /// # Errors
 /// 读库失败。
-fn counts_of_the_item(
+fn scanned_library(
     store: &VerdictStore,
     current_keys: &[(ConclusionKind, CurrentKeyOfAJudge)],
-    setting_files: &[String],
-) -> Result<BlockCounts, VerdictStoreError> {
-    let reuse_keys = reuse_keys_of_the_points_set_in(&store.paths_with_prefix("")?, setting_files);
-    counts_of_the_blocks_chosen_by(store, current_keys, &|block_key| {
-        block_is_under_one_of_the_reuse_keys(block_key, &reuse_keys)
+) -> Result<ScannedLibrary, VerdictStoreError> {
+    Ok(ScannedLibrary {
+        path_entries: store.paths_with_prefix("")?,
+        stored_versions_of_each_block: stored_versions_of_each_block(store, current_keys)?,
+        recorded_blocks: store.recorded_blocks()?,
     })
+}
+
+/// 一项的块账，只算不读库：路径索引里这一项的设点文件的点（[`reuse_keys_of_the_points_set_in`]），录入表里落在它们复用键上的块按去向数。
+fn counts_of_the_item(
+    scanned: &ScannedLibrary,
+    current_keys: &[(ConclusionKind, CurrentKeyOfAJudge)],
+    setting_files: &[String],
+) -> BlockCounts {
+    let reuse_keys = reuse_keys_of_the_points_set_in(&scanned.path_entries, setting_files);
+    counts_of_the_recorded_blocks(
+        &scanned.recorded_blocks,
+        &scanned.stored_versions_of_each_block,
+        current_keys,
+        &|block_key| block_is_under_one_of_the_reuse_keys(block_key, &reuse_keys),
+    )
+}
+
+/// `items` 的输出：按 `items` 的次序每项一行 [`item_line`]，各项的块账都从同一遍扫库（`scanned`）里数。
+fn item_lines_of_the_scanned_library(
+    scanned: &ScannedLibrary,
+    current_keys: &[(ConclusionKind, CurrentKeyOfAJudge)],
+    items: &[ItemAndItsSettingFiles],
+) -> Vec<String> {
+    items
+        .iter()
+        .map(|item| {
+            item_line(
+                &item.item_name,
+                &counts_of_the_item(scanned, current_keys, &item.setting_files),
+            )
+        })
+        .collect()
 }
 
 /// 块键的头 32 字节（节点输入摘要，就是那个点的复用键）是不是 `reuse_keys` 里的一把。
@@ -281,16 +325,50 @@ fn block_is_under_one_of_the_reuse_keys(
     reuse_keys.contains(&hexadecimal_text(&block_key.node_input_digest.0))
 }
 
-/// 命令行点名的子命令（文件头「用法」）。
+/// `items` 点名的一项：合表项名与这一项的设点文件。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ItemAndItsSettingFiles {
+    item_name: String,
+    setting_files: Vec<String>,
+}
+
+/// 命令行点名的子命令（文件头「用法」）；每个子命令都是数块，成员名写它数的是哪些块。
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Subcommand {
     /// `keys`：数库里录下的块。
-    CountTheRecordedBlocksByKey,
+    RecordedBlocksByKey,
     /// `item <合表项名> <设点文件>…`：数这一项的块。
-    CountTheBlocksOfAnItem {
+    BlocksOfAnItem {
         item_name: String,
         setting_files: Vec<String>,
     },
+    /// `items --item <合表项名> <设点文件>…`…：一遍扫库数几项的块。
+    BlocksOfEachItem { items: Vec<ItemAndItsSettingFiles> },
+}
+
+/// `items` 之后的参数：一个 `--item` 起一项，后面是项名与至少一份设点文件，至少一项；项名与设点文件都不以 `-` 起头。
+/// 认不出交回 `None`。
+fn items_of_the_arguments(arguments: &[String]) -> Option<Vec<ItemAndItsSettingFiles>> {
+    let mut items = Vec::new();
+    let mut words = arguments.iter().peekable();
+    while let Some(marker) = words.next() {
+        if marker != "--item" {
+            return None;
+        }
+        let item_name = words.next().filter(|name| !name.starts_with('-'))?;
+        let mut setting_files = Vec::new();
+        while let Some(setting_file) = words.next_if(|word| !word.starts_with('-')) {
+            setting_files.push(setting_file.clone());
+        }
+        if setting_files.is_empty() {
+            return None;
+        }
+        items.push(ItemAndItsSettingFiles {
+            item_name: item_name.clone(),
+            setting_files,
+        });
+    }
+    (!items.is_empty()).then_some(items)
 }
 
 /// 命令行里点名的子命令。
@@ -298,19 +376,25 @@ enum Subcommand {
 /// # Errors
 /// 子命令认不得、参数多了少了：都按用法错报。
 fn subcommand_of_the_arguments(arguments: &[String]) -> Result<Subcommand, String> {
+    let refusal = || {
+        format!(
+            "认不得的参数 {arguments:?}：用法 crash_library_reader keys，或 crash_library_reader item <合表项名> <设点文件>…，或 crash_library_reader items --item <合表项名> <设点文件>… [--item …]…"
+        )
+    };
     match arguments {
-        [name] if name == "keys" => Ok(Subcommand::CountTheRecordedBlocksByKey),
+        [name] if name == "keys" => Ok(Subcommand::RecordedBlocksByKey),
         [name, item_name, setting_files @ ..]
             if name == "item" && !item_name.starts_with('-') && !setting_files.is_empty() =>
         {
-            Ok(Subcommand::CountTheBlocksOfAnItem {
+            Ok(Subcommand::BlocksOfAnItem {
                 item_name: item_name.clone(),
                 setting_files: setting_files.to_vec(),
             })
         }
-        _ => Err(format!(
-            "认不得的参数 {arguments:?}：用法 crash_library_reader keys，或 crash_library_reader item <合表项名> <设点文件>…"
-        )),
+        [name, item_arguments @ ..] if name == "items" => items_of_the_arguments(item_arguments)
+            .map(|items| Subcommand::BlocksOfEachItem { items })
+            .ok_or_else(refusal),
+        _ => Err(refusal()),
     }
 }
 
@@ -320,23 +404,33 @@ fn main() -> ExitCode {
         Ok(subcommand) => subcommand,
         Err(refusal) => {
             eprintln!("  ✗ {refusal}");
-            eprintln!("  → 怎么办：写成 crash_library_reader keys，或 crash_library_reader item <合表项名> <设点文件>…（库是 prune-server 里那一份，不收库目录）");
+            eprintln!("  → 怎么办：写成 crash_library_reader keys、crash_library_reader item <合表项名> <设点文件>…，或 crash_library_reader items --item <合表项名> <设点文件>… [--item …]…（库是 prune-server 里那一份，不收库目录）");
             return ExitCode::from(2);
         }
     };
     match subcommand {
-        Subcommand::CountTheRecordedBlocksByKey => print_the_lines_read_from_the_library(|store| {
+        Subcommand::RecordedBlocksByKey => print_the_lines_read_from_the_library(|store| {
             let current_keys = current_keys_of_this_binary();
             let counts = counts_of_the_library(store, &current_keys)?;
             Ok(keys_lines(store.library_name(), &counts, &current_keys))
         }),
-        Subcommand::CountTheBlocksOfAnItem {
+        Subcommand::BlocksOfAnItem {
             item_name,
             setting_files,
         } => print_the_lines_read_from_the_library(|store| {
             let current_keys = current_keys_of_this_binary();
-            let counts = counts_of_the_item(store, &current_keys, &setting_files)?;
+            let scanned = scanned_library(store, &current_keys)?;
+            let counts = counts_of_the_item(&scanned, &current_keys, &setting_files);
             Ok(vec![item_line(&item_name, &counts)])
+        }),
+        Subcommand::BlocksOfEachItem { items } => print_the_lines_read_from_the_library(|store| {
+            let current_keys = current_keys_of_this_binary();
+            let scanned = scanned_library(store, &current_keys)?;
+            Ok(item_lines_of_the_scanned_library(
+                &scanned,
+                &current_keys,
+                &items,
+            ))
         }),
     }
 }
@@ -531,10 +625,177 @@ mod tests {
         );
     }
 
+    /// `items` 一遍扫库报几项：输出与逐项各起一次 `item`（每次各扫一遍同一份库、照 `item` 那一支数一项）打的行依次拼起来逐字相同。
+    /// 几项里有设点文件共用的（两项都数）、有一项几份设点文件的、有设点文件对不上任何点的（零块）。
+    /// 判别力（`crates/mutations.tsv`）：几项都按头一项的设点文件数，这条红。
+    #[test]
+    fn the_items_lines_are_the_item_lines_of_each_item_one_after_another() {
+        let current = ConclusionVersion([1; 32]);
+        let another = ConclusionVersion([2; 32]);
+        let current_keys = [(
+            ConclusionKind::ImageJudgement,
+            CurrentKeyOfAJudge::Keyed(current),
+        )];
+        let block_under = |reuse_key_byte: u8, block_start: u64| VerdictBlockKey {
+            node_input_digest: singlefs_verification::verdict_store::NodeInputDigest(
+                [reuse_key_byte; 32],
+            ),
+            enumeration_plan_hash: singlefs_verification::verdict_store::EnumerationPlanHash(
+                [9; 32],
+            ),
+            block_start: singlefs_verification::verdict_store::BlockStartStateIndex(block_start),
+        };
+        let barrier_file =
+            "crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs";
+        let spill_over_file =
+            "crates/singlefs-verification/tests/crash_enumeration_record_spill_over_stream.rs";
+        let scanned = ScannedLibrary {
+            path_entries: vec![
+                (
+                    "acquisition_barrier::remount_after_the_first_file".to_string(),
+                    format!(
+                        "{barrier_file}::acquisition_barrier::remount_after_the_first_file::{}",
+                        hexadecimal_text(&[0xaa; 32])
+                    ),
+                ),
+                (
+                    "record_spill_over::two_records_whole_or_not_at_all".to_string(),
+                    format!(
+                        "{spill_over_file}::record_spill_over::two_records_whole_or_not_at_all::{}",
+                        hexadecimal_text(&[0xbb; 32])
+                    ),
+                ),
+            ],
+            recorded_blocks: vec![
+                (block_under(0xaa, 0), 4096),
+                (block_under(0xaa, 4096), 4096),
+                (block_under(0xaa, 8192), 17),
+                (block_under(0xbb, 0), 4096),
+                (block_under(0xbb, 4096), 3),
+                (block_under(0xcc, 0), 4096),
+            ],
+            stored_versions_of_each_block: [
+                (block_under(0xaa, 0), vec![vec![current]]),
+                (block_under(0xaa, 4096), vec![vec![another]]),
+                (block_under(0xbb, 0), vec![vec![another, current]]),
+                (block_under(0xcc, 0), vec![vec![current]]),
+            ]
+            .into_iter()
+            .collect(),
+        };
+        let item = |item_name: &str, setting_files: &[&str]| ItemAndItsSettingFiles {
+            item_name: item_name.to_string(),
+            setting_files: setting_files
+                .iter()
+                .map(|file| (*file).to_string())
+                .collect(),
+        };
+        let items = vec![
+            item("acquisition-barrier", &[barrier_file]),
+            item("record-spill-over", &[spill_over_file]),
+            item("both-setting-files", &[barrier_file, spill_over_file]),
+            item(
+                "not-a-setting-file",
+                &["crates/singlefs-verification/tests/not_a_setting_file.rs"],
+            ),
+            item("acquisition-barrier-again", &[barrier_file]),
+        ];
+        let item_by_item: Vec<String> = items
+            .iter()
+            .map(|each| {
+                item_line(
+                    &each.item_name,
+                    &counts_of_the_item(&scanned, &current_keys, &each.setting_files),
+                )
+            })
+            .collect();
+        assert_eq!(
+            item_lines_of_the_scanned_library(&scanned, &current_keys, &items),
+            item_by_item,
+            "一遍扫库报几项，与逐项各起一次 item 打的行依次拼起来逐字相同"
+        );
+        assert_eq!(
+            item_by_item,
+            vec![
+                "CRASH_LIBRARY_ITEM\titem=acquisition-barrier\trecorded_blocks=3\tto_judge=2\treusable=1",
+                "CRASH_LIBRARY_ITEM\titem=record-spill-over\trecorded_blocks=2\tto_judge=1\treusable=1",
+                "CRASH_LIBRARY_ITEM\titem=both-setting-files\trecorded_blocks=5\tto_judge=3\treusable=2",
+                "CRASH_LIBRARY_ITEM\titem=not-a-setting-file\trecorded_blocks=0\tto_judge=0\treusable=0",
+                "CRASH_LIBRARY_ITEM\titem=acquisition-barrier-again\trecorded_blocks=3\tto_judge=2\treusable=1",
+            ],
+            "逐项各自只数自己那几把复用键上的块（复用键对不上任何一项的那一块哪一项都不算）"
+        );
+    }
+
+    /// `items` 收一组或几组 `--item <项名> <设点文件>…`，次序照命令行；不以 `--item` 起头、项名写成选项、一组里没有设点文件、
+    /// 一组都没有、组之间夹了别的选项，都是用法错。
+    /// 判别力：一组里没有设点文件也收下，这条红。
+    #[test]
+    fn the_items_subcommand_takes_groups_of_an_item_name_and_its_setting_files() {
+        let arguments = |words: &[&str]| -> Vec<String> {
+            words.iter().map(|word| (*word).to_string()).collect()
+        };
+        let barrier_file =
+            "crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs";
+        let spill_over_file =
+            "crates/singlefs-verification/tests/crash_enumeration_record_spill_over_stream.rs";
+        assert_eq!(
+            subcommand_of_the_arguments(&arguments(&[
+                "items",
+                "--item",
+                "acquisition-barrier",
+                barrier_file,
+                "--item",
+                "both-setting-files",
+                barrier_file,
+                spill_over_file,
+            ])),
+            Ok(Subcommand::BlocksOfEachItem {
+                items: vec![
+                    ItemAndItsSettingFiles {
+                        item_name: "acquisition-barrier".to_string(),
+                        setting_files: vec![barrier_file.to_string()],
+                    },
+                    ItemAndItsSettingFiles {
+                        item_name: "both-setting-files".to_string(),
+                        setting_files: vec![barrier_file.to_string(), spill_over_file.to_string()],
+                    },
+                ],
+            })
+        );
+        for refused in [
+            arguments(&["items"]),
+            arguments(&["items", "acquisition-barrier", barrier_file]),
+            arguments(&["items", "--item", "acquisition-barrier"]),
+            arguments(&[
+                "items",
+                "--item",
+                "acquisition-barrier",
+                "--item",
+                "record-spill-over",
+                spill_over_file,
+            ]),
+            arguments(&["items", "--item", "--library", barrier_file]),
+            arguments(&[
+                "items",
+                "--item",
+                "acquisition-barrier",
+                barrier_file,
+                "--library",
+                "/library/x",
+            ]),
+        ] {
+            assert!(
+                subcommand_of_the_arguments(&refused).is_err(),
+                "{refused:?} 是用法错"
+            );
+        }
+    }
+
     /// 一块的去向：镜像判定存着这一份定义的指纹就是在这一把下判过（不分 CPU 还是 GPU 判的）；只存着别的指纹是键对不上；
     /// 什么都没有是没判过；定义那一组拒算时存着的都不算这一份的。
     #[test]
-    fn a_block_is_judged_under_the_current_key_only_when_the_judgement_stored_this_binarys_fingerprint(
+    fn block_is_judged_under_the_current_key_only_when_the_judgement_stored_this_binarys_fingerprint(
     ) {
         let current = ConclusionVersion([1; 32]);
         let another = ConclusionVersion([2; 32]);
@@ -565,8 +826,8 @@ mod tests {
         );
     }
 
-    /// 只认两个子命令：`keys` 不带参数；`item` 带项名与至少一份设点文件。别的子命令、`keys` 多给参数（连同早先的 `--library`）、
-    /// `item` 不给设点文件或项名写成选项、不给参数都是用法错。
+    /// 只认三个子命令：`keys` 不带参数；`item` 带项名与至少一份设点文件；`items` 带至少一组 `--item <项名> <设点文件>…`。
+    /// 别的子命令、`keys` 多给参数（`--library <路径>` 这类选库的参数也算）、`item` 不给设点文件或项名写成选项、不给参数都是用法错。
     /// 判别力：`--library <路径>` 照旧收下（选库的参数），这条红。
     #[test]
     fn only_the_keys_and_item_subcommands_with_their_arguments_are_taken() {
@@ -575,7 +836,7 @@ mod tests {
         };
         assert_eq!(
             subcommand_of_the_arguments(&arguments(&["keys"])),
-            Ok(Subcommand::CountTheRecordedBlocksByKey)
+            Ok(Subcommand::RecordedBlocksByKey)
         );
         assert_eq!(
             subcommand_of_the_arguments(&arguments(&[
@@ -583,7 +844,7 @@ mod tests {
                 "acquisition-barrier",
                 "crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs",
             ])),
-            Ok(Subcommand::CountTheBlocksOfAnItem {
+            Ok(Subcommand::BlocksOfAnItem {
                 item_name: "acquisition-barrier".to_string(),
                 setting_files: vec![
                     "crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs"

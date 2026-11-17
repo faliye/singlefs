@@ -1,4 +1,5 @@
 //! 验证包模块：crash、crash_state_enumeration、crash_injection、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks、crash_facts、crash_judge_tables、crash_judge_gpu、crash_judge_dispatch
+// task-server-gpu-cards: all
 //! GPU 判器与 CPU 判器逐状态对拍：六条流（新池新建文件；它改坏一次树表单元写两份副本之后的样子；它的 journal 记录提交标记改成 2、
 //! 记录标志改成 0b11、系统配置槽距改成 512 三种重封过校验和的坏法；固定脚本到回退 D）上的每个
 //! 崩溃状态，GPU 判出的红位（两遍 oracle 各七类、记录核对器两条）要与 CPU `judge_crash_image` 的 `red_items` 逐位相同，池级 checker
@@ -80,10 +81,10 @@
 //! 卡经这个进程的卡池取（`gpu_test_start::gpu_card_pool_or_report_not_run`：每张卡一个设备、内核每张卡编一次、一张卡一本显存账，
 //! 卡与额度照 `GPU_CARDS_BY_PRIORITY` 里这台机器那几项，没配就是本机能用的卡）：每条用例建好表之后按它的判器实际要的显存借，
 //! 照卡的先后装满前一张才用下一张，放不下就等别的用例还，比每张卡的账都大判红（几十条用例并行不再各按空闲显存的 3/4 互抢）；
-//! 这个测试二进制里的用例并行起（不带 `--test-threads 1`），排队的是卡池那一份账
+//! 这个测试二进制里的用例并行起，排队的是卡池那一份账
 //! （`gpu_test_start::CardLeaseWaitingRoom`：借不到时等这个进程别的线程还卡或借完再借，别的进程占着的不等，借着卡的线程再借不等）；
 //! 不按主机内存排队：测试线程数取登记的每台默认重活线程数（按内存限并发的入口只登记在 `.claude/memory-bounded-parallelism.tsv`，
-//! 这个目标不在里面；`.claude/rules/verification.md`「一个门禁：两种跑法」里 `GPU_TEST_THREADS_RELEASED_TARGETS` 那一条）；
+//! 这个目标不在里面；`.claude/rules/verification.md`「一个门禁：两种跑法」里 GPU 测试线程那一条）；
 //! 展开上限 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO`（没设取放量引擎的全量域上限 `crash_amplification::EXPAND_UP_TO_WRITES_PER_SEGMENT_OF_THE_AMPLIFICATION`，设了只往小缩）、显存额度 `SINGLEFS_CRASH_JUDGE_CARD_QUOTA_MEBIBYTES`（量速度那条用例当那张卡的额度；卡池里的读法在 `gpu_unit_checks::gpu_test_start::CARD_QUOTA_ENVIRONMENT_VARIABLE`）、
 //! CPU 判器线程数 `SINGLEFS_CRASH_JUDGE_CPU_THREADS`（没设取每台默认重活线程数：`SINGLEFS_THREAD_CAP`，再没设取 `.claude/heavy-thread-default` 的登记值）：设了而认不出（线程数 0 也算）就 panic，不退回没设时的那一档。
 //! 退役记录那四条 GPU 同判、不记判不了——删完的流（最后一批开出退役树、一条退役记录）上退役记录死亡 txg 加一（I-9.32、I-9.35）、
@@ -144,6 +145,15 @@
 //! 对拍按块：每条流按 `crash_library::STATES_PER_PAIRING_BLOCK` 切块，块键（这一次对拍的输入摘要拼上
 //! 块的序号段）与两边判器组的单元键一起进 prune-server 那一份库里配对结论那一张表（`crash_library::pairing_conclusions_of_the_blocks_reused_or_judged`）；
 //! 块键与单元键都相同的下一趟复用、不现判；没有的攒成一段两边都判、逐块比完存进库就丢，手里只压着一段的逐态结论，与整条流的状态数无关
+//! 一条流的几段块在各自的线程上同时判（[`stretches_of_a_flow_judged_at_once_on_these_cards`]），借到哪张卡照卡池的账，这个进程分到几张卡就用上几张；
+//! 文件第二行的 `task-server-gpu-cards` 声明要 `all`：张数由服务按此刻空卡现算，至少一张。
+//! CPU 判完的逐态结论压在宿主内存里等借卡，判 CPU 那一段之前先按状态数排队（[`PairingStatesHeldOnTheHost`]），压着的状态数有上界
+//! （[`most_pairing_states_held_on_the_host_of`]），不随并行的用例数涨。对拍判器的草稿区按卡的额度开（[`states_per_dispatch_of_a_pairing_judge`]），
+//! 一次派活实际带几个由判器在卡上现量。几台分着判照 [`PairingBlocksShare`]（与崩溃放量同一对份额变量）：非整份的一趟只把自己领的块判完入库，不判用例钉的数；
+//! 合并那一趟（整份）每块复用、照钉的数判。
+//! 一条流状态多到一条用例判不完的，按状态序号区间拆成几条用例（[`compare_on_every_state_with_ordinals_in`]：区间两头落在对拍分组的边界上，
+//! 块键与整条流跑时逐块相同），每条只领自己那一段序号的组（`PairingBlocksShare::only_the_groups_of_pairing_blocks_in`，与几台分份叠用），
+//! 断言这一段每个状态两边逐位相同；只在含整条流某个状态才成立的断言放在含那个状态的那一条上。
 //! （全量域上十亿态以上的流不再把逐态结论整份留在宿主内存里：CPU 那一侧按状态数预留一次约 300 GB 的分配会 SIGABRT）。
 //! 要看逐状态结论的用例交逐状态另看的几样（`StateExamination`），对拍时每个状态上看、按块累加，结果随块一起入库复用。
 //! 新池新建文件、固定脚本到回退与它们改坏一处的那十七条流一条流一个用例（按功能场景拆），
@@ -266,9 +276,9 @@ use singlefs_verification::crash_judge_tables::{
     JudgeTables,
 };
 use singlefs_verification::crash_library::{
-    judge_tables_through_the_pairing_library, pairing_conclusions_of_the_blocks_reused_or_judged,
-    toolchain_of_this_process, CrashLibrary, CrashLibraryClass, PairingAgreement, PairingJudged,
-    StageOutcome, STATES_PER_PAIRING_BLOCK,
+    groups_of_pairing_blocks_holding_the_states, judge_tables_through_the_pairing_library,
+    pairing_conclusions_of_the_blocks_reused_or_judged, toolchain_of_this_process, CrashLibrary,
+    CrashLibraryClass, PairingAgreement, PairingJudged, StageOutcome, STATES_PER_PAIRING_BLOCK,
 };
 use singlefs_verification::crash_point_replay_provenance::DevicesWithoutASelfVerifiedSystemConfigurationSlotAgainstTheBaseImage;
 use singlefs_verification::crash_state_enumeration::{
@@ -282,7 +292,8 @@ use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_read_back_from_the_pairing_library, first_usable_card_or_report_not_run,
     gpu_card_pool_or_report_not_run,
     image_with_every_write_landed_read_back_from_the_pairing_library, not_run_line,
-    usable_cards_or_report_not_run, GpuCardPool, CARD_QUOTA_ENVIRONMENT_VARIABLE,
+    usable_cards_or_report_not_run, GpuCardPoolStartedAtTheFirstLease,
+    CARD_QUOTA_ENVIRONMENT_VARIABLE,
 };
 use singlefs_verification::gpu_unit_checks::GpuCard;
 use singlefs_verification::heavy_threads::{
@@ -307,6 +318,11 @@ use singlefs_verification::segments::StepKind;
 use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::verdict_store::JudgingUnitsFingerprint;
 use singlefs_verification::SharedStream;
+
+// 对拍判器的宽度、份额各一行 `use`，不并进上面几行：比法那一组判法单元的闭包连着引进它用到的名字的 `use`，那几行的字变了比法的键跟着变，已存的对拍块全部重判
+use singlefs_verification::crash_judge_dispatch::MAXIMUM_SCRATCH_LANES;
+use singlefs_verification::crash_library::PairingBlocksShare;
+use singlefs_verification::gpu_memory_ledger::most_states_whose_need_fits_the_capacity;
 
 /// 崩溃点重放取样与崩溃点的设点文件：这份用例文件。
 const PATH_OF_THIS_TEST_FILE: &str =
@@ -433,10 +449,10 @@ fn crash_judge_cpu_threads_take_the_registered_heavy_thread_default_when_unset()
     );
 }
 
-/// 量速度的那条用例取一整张卡：空闲显存最大的那张，不经卡池记账（它量的就是一张卡独占时多快）。
+/// 量速度的那条用例取一整张卡：空闲显存最大的那张（服务经 `GPU_CARDS_BY_PRIORITY` 交了卡时限在交的卡里，额度照交的），不经卡池记账（它量的就是一张卡独占时多快）。
 /// `SINGLEFS_CRASH_JUDGE_CARD_QUOTA_MEBIBYTES` 给了就当这张卡的显存额度（量速度时照配置的额度量；
 /// 写错就 panic，[`card_quota_mebibytes_from_the_value_of_the_variable`]）。
-/// 本机没有 NVIDIA 独显适配器时打「本次未跑」那一行、交回 `None`，用例当场返回；有适配器而一张卡都没起来判红。
+/// 本机没有 NVIDIA 独显适配器、或服务交的卡一张都用不了时打「本次未跑」那一行、交回 `None`，用例当场返回；服务没交卡、有适配器而一张卡都没起来判红。
 fn the_whole_emptiest_card_or_report_not_run(test_name: &str) -> Option<GpuCard> {
     let quota = card_quota_mebibytes_from_the_value_of_the_variable(
         process_environment_variable(CARD_QUOTA_ENVIRONMENT_VARIABLE).as_deref(),
@@ -620,8 +636,8 @@ fn only_the_out_of_memory_reason_of_the_product_path_is_taken_as_the_card_runnin
 }
 
 /// 一条草稿缓冲装几个状态，按卡池里绑定上限最小的那张卡估（借卡之前还不知道借到哪张）。
-fn states_of_one_scratch_lane_on_every_card_of(cards: &GpuCardPool) -> usize {
-    states_per_scratch_lane(cards.smallest_max_storage_buffer_binding_size())
+fn states_of_one_scratch_lane_on_every_card_of(cards: GpuCardPoolStartedAtTheFirstLease) -> usize {
+    states_per_scratch_lane(cards.smallest_maximum_storage_buffer_binding_size())
 }
 
 struct RecordedFlow {
@@ -2140,7 +2156,9 @@ fn record_new_pool_with_every_system_configuration_slot_zeroed_at_the_end(
 }
 
 /// I-7.5（根槽按判定宽度对齐）：最后一次系统配置槽写的 io_min（偏移 425）改成 12288、重封——判定宽度变成 12288，根环起点 1 MiB 不是它的整数倍。
-fn record_new_pool_with_an_io_min_the_root_slots_are_not_aligned_to(tag: &str) -> RecordedFlow {
+fn record_new_pool_with_a_minimum_input_output_the_root_slots_are_not_aligned_to(
+    tag: &str,
+) -> RecordedFlow {
     let mut flow = record_new_pool_file_creation(tag, "new-pool-system-configuration-io-min-12288");
     rewrite_the_last_system_configuration_slot_and_reseal(&mut flow, &|bytes| {
         bytes[425..429].copy_from_slice(&12288u32.to_le_bytes());
@@ -2360,7 +2378,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         comparison
             .mismatches
             .iter()
@@ -2417,7 +2435,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_and_ending_the_s
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     assert!(
@@ -2531,7 +2549,7 @@ fn red_items_compared_by_the_cross_check(items: &[String]) -> String {
 const DESCRIBED_STATES: usize = 12;
 
 /// 一份状态清单：几个状态，前 [`DESCRIBED_STATES`] 个带说明。按块累加（[`Self::take_the_block`]），整条流只留这么多。
-/// 解引用成带说明的那几行：`iter()`、`&[String]` 照用；`len()`、`is_empty()` 是状态数，不是带说明的行数。
+/// 解引用成带说明的那几行：`iter()`、`&[String]` 照用；`state_count()`、`is_empty()` 是状态数，不是带说明的行数。
 struct StatesDescribed {
     count: u64,
     described: Vec<String>,
@@ -2558,7 +2576,7 @@ impl StatesDescribed {
     }
 
     /// 状态数（不是带说明的行数）。
-    fn len(&self) -> usize {
+    fn state_count(&self) -> usize {
         usize::try_from(self.count).expect("状态数装得进 usize")
     }
 
@@ -3151,16 +3169,45 @@ fn expansion_up_to(
 }
 
 fn compare_on_every_state(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     limit: usize,
 ) -> Option<Comparison> {
     compare_on_every_state_examining(cards, flow, limit, &[])
 }
 
+/// 一趟对拍判一条流的哪些状态。
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum StatesOfThePairing {
+    EveryStateOfTheFlow,
+    /// 状态序号落在这个半开区间里的（一条流状态多到一条用例判不完时，按序号区间拆成几条用例，每条判一段）。
+    TheStatesWithOrdinalsIn(std::ops::Range<u64>),
+}
+
+/// 同 [`compare_on_every_state`]，只判状态序号落在 `ordinals` 里的那一段（[`StatesOfThePairing::TheStatesWithOrdinalsIn`]）：输入摘要与块键
+/// 都与整条流那一趟相同，整条流那一趟与别的段判过的块照样复用；交回的总账只是这一段的状态。
+fn compare_on_every_state_with_ordinals_in(
+    cards: GpuCardPoolStartedAtTheFirstLease,
+    flow: &RecordedFlow,
+    limit: usize,
+    ordinals: std::ops::Range<u64>,
+) -> Option<Comparison> {
+    compare_on_every_state_of_these_segments_against_the_version_table_given_the_container_capacity_knobs(
+        cards,
+        flow,
+        flow.name,
+        &[],
+        &flow.segments,
+        &expansion_up_to(limit),
+        ContainerCapacityKnobs::PRODUCT,
+        &[],
+        &StatesOfThePairing::TheStatesWithOrdinalsIn(ordinals),
+    )
+}
+
 /// 同 [`compare_on_every_state`]，每个状态上另看 `examinations` 那几样（结果在 [`Comparison::examined`]，次序同交进来的）。
 fn compare_on_every_state_examining(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     limit: usize,
     examinations: &[StateExamination],
@@ -3174,16 +3221,17 @@ fn compare_on_every_state_examining(
         &expansion_up_to(limit),
         ContainerCapacityKnobs::PRODUCT,
         examinations,
+        &StatesOfThePairing::EveryStateOfTheFlow,
     )
 }
 
 /// 同 [`compare_on_every_state`]，切段与每段怎么展开由调用方给（`segments` 与 `flow.segments` 罩同一组写、只是分法不同时，
 /// 状态仍是这条流全量枚举里的状态）。
-/// 表建好之后、要现判的那一段块判之前才向卡池借卡，借的量是这条流的判器实际要的（[`mebibytes_a_judge_needs`]，一次派活至多一条草稿缓冲那么宽）；
+/// 表建好之后、要现判的那一段块判之前才向卡池借卡，借的量是这条流的判器实际要的（[`mebibytes_a_judge_needs`]，一次派活的宽度照 [`states_per_dispatch_of_a_pairing_judge`]）；
 /// GPU 判完那一段就还，CPU 那一侧判的时候不占着卡。建判器、判的时候卡上 wgpu 报了 Out of Memory：打「本次未跑」那一行（用例名那一格写流名）、
 /// 交 `None`，调用的用例当场返回（[`on_the_card_or_report_not_run_when_out_of_memory`]）；这一族几个函数同此。
 fn compare_on_every_state_of_these_segments(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     segments: &[Vec<usize>],
     expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
@@ -3200,7 +3248,7 @@ fn compare_on_every_state_of_these_segments(
 /// 同 [`compare_on_every_state_of_these_segments`]，两类库里的项名由调用方给：同一条流按几种切法各比一次时每种切法一个项名——
 /// 一个项名下的清单只认一份，撞了名判段会读到别的切法那一份（`crash_library` 的两段协议当场拒）。
 fn compare_on_every_state_of_these_segments_as_the_item(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     item_name: &str,
     flow: &RecordedFlow,
     segments: &[Vec<usize>],
@@ -3215,13 +3263,14 @@ fn compare_on_every_state_of_these_segments_as_the_item(
         expansion,
         ContainerCapacityKnobs::PRODUCT,
         &[],
+        &StatesOfThePairing::EveryStateOfTheFlow,
     )
 }
 
 /// 同 [`compare_on_every_state_examining`]，版本表另带文件从那一版起没有了的那几版（删除流的意图那一版）：GPU 的期望版本表
 /// （`crash_judge_tables::build_judge_tables_against_the_version_table`）与 CPU 的 oracle（`crash::CrashPointReplayVersionTable`）都认它们。
 fn compare_on_every_state_against_the_version_table(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
     limit: usize,
@@ -3236,12 +3285,13 @@ fn compare_on_every_state_against_the_version_table(
         &expansion_up_to(limit),
         ContainerCapacityKnobs::PRODUCT,
         examinations,
+        &StatesOfThePairing::EveryStateOfTheFlow,
     )
 }
 
 /// [`compare_on_every_state_of_these_segments`] 的本体，版本表照 `versions_without_a_file` 另带「没有文件的那几版」；三棵容器树都没装旋钮。
 fn compare_on_every_state_of_these_segments_against_the_version_table(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
     segments: &[Vec<usize>],
@@ -3256,6 +3306,7 @@ fn compare_on_every_state_of_these_segments_against_the_version_table(
         expansion,
         ContainerCapacityKnobs::PRODUCT,
         &[],
+        &StatesOfThePairing::EveryStateOfTheFlow,
     )
 }
 
@@ -3263,7 +3314,7 @@ fn compare_on_every_state_of_these_segments_against_the_version_table(
 /// G6），CPU 那一侧的池级 checker 违例位改按带同一组旋钮值的新入口（`check_pool_image_given_the_container_capacity_knobs`）在同一张崩溃镜像上判；
 /// 红位与恢复字照旧按 CPU 判器（`judge_crash_image`，池级 checker 走产品入口的那一份不进比较）。
 fn compare_on_every_state_given_the_container_capacity_knobs(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     knobs: ContainerCapacityKnobs,
 ) -> Option<Comparison> {
@@ -3276,6 +3327,7 @@ fn compare_on_every_state_given_the_container_capacity_knobs(
         &expansion_up_to(expand_up_to()),
         knobs,
         &[],
+        &StatesOfThePairing::EveryStateOfTheFlow,
     )
 }
 
@@ -3290,6 +3342,171 @@ fn violated_and_held_bits_of(verdicts: &[(&'static str, InvariantVerdict)]) -> (
 /// 与整条流有几块无关；取样一趟要从库里读回流、建一份撕裂表，几块攒一趟摊开它。
 const PAIRING_BLOCKS_JUDGED_TOGETHER: usize = 8;
 
+/// 一张卡上同时放几个对拍判器：草稿区按卡的额度除以它开（[`states_per_dispatch_of_a_pairing_judge`]），借卡照账，这张卡放满才借下一张。
+/// 不是 1：一个判器读回结论的时候卡上还有另一个判器的活，卡不空转（推的，`gpu_judge_throughput_by_states_per_dispatch` 量宽度，同时几个判器与吞吐的关系没量）；
+/// 不是更大：判器多了提交互相排队，单次提交的用时撞 `LONGEST_DISPATCH_SECONDS` 就减半派活宽度（量的：六个判器挤一张卡时派活宽度只有 256 与 267 两档）。
+const PAIRING_JUDGES_SHARING_A_CARD: usize = 2;
+
+/// 卡上每个判器的位子备几段块的状态压在宿主内存里（一段在卡上、一段 CPU 判好或正在判）：卡判完一段，下一段已经备好，卡不等 CPU；
+/// CPU 判一个状态比卡快（量的：判 CPU 那一段约 14 千态每秒，一张卡约 7 千），不必再多备。
+const PAIRING_SPANS_READY_FOR_A_JUDGE: usize = 2;
+
+/// 一条流至多几段块一起判：卡上放得下几个判器就几段（一条流独占整个进程时照样用满分到的每张卡）。
+fn stretches_of_a_flow_judged_at_once_on_these_cards(card_count: usize) -> std::num::NonZeroUsize {
+    std::num::NonZeroUsize::new(card_count * PAIRING_JUDGES_SHARING_A_CARD)
+        .expect("池里至少一张卡：没有卡的机器上起不出池")
+}
+
+/// 这个进程至多几个状态的 CPU 结论同时压在宿主内存里（判 CPU 那一段之前排队，[`PairingStatesHeldOnTheHost`]）：每张卡上每个判器的位子备
+/// [`PAIRING_SPANS_READY_FOR_A_JUDGE`] 段满 [`PAIRING_BLOCKS_JUDGED_TOGETHER`] 块的段。内存的上界是它乘每个状态的结论大小，加这些段各自读回的流与撕裂表。
+fn most_pairing_states_held_on_the_host_of(card_count: usize) -> u64 {
+    let spans = card_count * PAIRING_JUDGES_SHARING_A_CARD * PAIRING_SPANS_READY_FOR_A_JUDGE;
+    u64::try_from(spans * PAIRING_BLOCKS_JUDGED_TOGETHER).expect("装得进 u64")
+        * STATES_PER_PAIRING_BLOCK
+}
+
+/// 宿主内存里压着几个状态的 CPU 结论这一本账：判一段块之前按它的状态数排队，判完比完（票丢掉）才还，放得下才判。
+/// 按状态数不按段数：只有几百个状态的小流不占满一段的份额。这本账只等票回来，借卡排队另算（票在手里等卡时，卡上那几段都拿着票，判完就还，等得到头）。
+struct PairingStatesHeldOnTheHost {
+    most_states: u64,
+    counts: std::sync::Mutex<PairingStatesHeldCounts>,
+    a_ticket_came_back: std::sync::Condvar,
+}
+
+struct PairingStatesHeldCounts {
+    states_held_now: u64,
+    most_states_held_so_far: u64,
+}
+
+impl PairingStatesHeldOnTheHost {
+    fn with_room_for_these_many_states(most_states: u64) -> Self {
+        Self {
+            most_states,
+            counts: std::sync::Mutex::new(PairingStatesHeldCounts {
+                states_held_now: 0,
+                most_states_held_so_far: 0,
+            }),
+            a_ticket_came_back: std::sync::Condvar::new(),
+        }
+    }
+
+    fn pairing_states_counts_locked(&self) -> std::sync::MutexGuard<'_, PairingStatesHeldCounts> {
+        // 持锁只为加减几个数，没有会 panic 到一半的写：别的线程 panic 留下的毒照用
+        self.counts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// 等到放得下 `states` 个状态、记上账，交回的票丢掉时还。账上一个都没有时比上限大的一段也放行（否则永远等不到）。
+    fn wait_for_room_and_hold_the_states_of_a_span(
+        &self,
+        states: u64,
+    ) -> PairingStatesHeldTicket<'_> {
+        let mut counts = self.pairing_states_counts_locked();
+        // 迭代上界：每一轮等到一张票回来；票丢掉时都还（判的那一段 panic 了也还），等得到头
+        while counts.states_held_now > 0 && counts.states_held_now + states > self.most_states {
+            counts = self
+                .a_ticket_came_back
+                .wait(counts)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        }
+        counts.states_held_now += states;
+        counts.most_states_held_so_far = counts.most_states_held_so_far.max(counts.states_held_now);
+        PairingStatesHeldTicket {
+            held_on: self,
+            states,
+        }
+    }
+}
+
+/// 记在 [`PairingStatesHeldOnTheHost`] 账上的一段块的状态：丢掉时还、叫醒排队的。
+struct PairingStatesHeldTicket<'host> {
+    held_on: &'host PairingStatesHeldOnTheHost,
+    states: u64,
+}
+
+impl Drop for PairingStatesHeldTicket<'_> {
+    fn drop(&mut self) {
+        self.held_on.pairing_states_counts_locked().states_held_now -= self.states;
+        self.held_on.a_ticket_came_back.notify_all();
+    }
+}
+
+/// 这个进程那一本账（卡池一个进程一份，账跟着它）。
+fn pairing_states_held_on_this_host(
+    cards: GpuCardPoolStartedAtTheFirstLease,
+) -> &'static PairingStatesHeldOnTheHost {
+    static PAIRING_STATES_HELD: std::sync::OnceLock<PairingStatesHeldOnTheHost> =
+        std::sync::OnceLock::new();
+    PAIRING_STATES_HELD.get_or_init(|| {
+        let most_states = most_pairing_states_held_on_the_host_of(pairing_cards_of_the_pool(cards));
+        eprintln!("CRASH_JUDGE_GPU_PAIRING_HOST_QUEUE most_states_held={most_states}");
+        PairingStatesHeldOnTheHost::with_room_for_these_many_states(most_states)
+    })
+}
+
+/// 这个进程分到几张卡（卡池还没起的在这一刻起）。
+fn pairing_cards_of_the_pool(cards: GpuCardPoolStartedAtTheFirstLease) -> usize {
+    cards
+        .card_pool_started_now()
+        .cards_for_the_product_path()
+        .len()
+}
+
+/// 对拍判器一次派活最多带几个状态（草稿区按它开、显存按它借，实际带几个判器在卡上现量）：一张卡空着时借得出的（`smallest_ceiling_mebibytes`，
+/// 取池里最小的一张：借之前不知道借到哪张，每张都要放得下）平分给 [`PAIRING_JUDGES_SHARING_A_CARD`] 个判器，一个判器放得下几个状态（`mebibytes_for_states`）；
+/// 放不下一条草稿缓冲的也开一条（比卡还大的由借卡那一步判红）；不超过 [`MAXIMUM_SCRATCH_LANES`] 条缓冲，不超过这一段的状态数。
+/// 判器量宽度要草稿区至少两条缓冲（`GpuCrashJudge::judge_states` 里 `widest_to_try >= 2 * lane` 那一处），钉死一条缓冲时派活宽度只减不增。
+fn states_per_dispatch_of_a_pairing_judge(
+    smallest_ceiling_mebibytes: u64,
+    states_per_lane: usize,
+    states_of_the_span: u64,
+    mebibytes_for_states: &dyn Fn(usize) -> u64,
+) -> usize {
+    let judges_sharing_a_card = u64::try_from(PAIRING_JUDGES_SHARING_A_CARD).expect("装得进 u64");
+    most_states_whose_need_fits_the_capacity(
+        states_per_lane * MAXIMUM_SCRATCH_LANES,
+        smallest_ceiling_mebibytes / judges_sharing_a_card,
+        mebibytes_for_states,
+    )
+    .max(states_per_lane)
+    .min(usize::try_from(states_of_the_span).unwrap_or(usize::MAX))
+    .max(1)
+}
+
+/// 池里最小的一张卡空着时借得出多少（MiB）。
+///
+/// # Panics
+/// 卡上的显存读不出（借卡那一步同样判红）。
+fn smallest_card_ceiling_of_the_pool_mebibytes(cards: GpuCardPoolStartedAtTheFirstLease) -> u64 {
+    let pool = cards.card_pool_started_now();
+    let card_indices: Vec<u32> = pool
+        .cards_for_the_product_path()
+        .iter()
+        .map(|card| card.index)
+        .collect();
+    pool.card_rooms_now_and_when_empty_of(&card_indices)
+        .unwrap_or_else(|reason| panic!("{reason}"))
+        .iter()
+        .map(|room| room.ceiling_mebibytes)
+        .min()
+        .expect("池里至少一张卡：没有卡的机器上起不出池")
+}
+
+/// 判 `states_of_the_span` 个状态的对拍判器在这个卡池上开多宽（[`states_per_dispatch_of_a_pairing_judge`]）。
+fn states_per_dispatch_of_a_pairing_judge_on_these_cards(
+    cards: GpuCardPoolStartedAtTheFirstLease,
+    packed: &PackedJudgeTablesReadBack,
+    states_of_the_span: u64,
+) -> usize {
+    states_per_dispatch_of_a_pairing_judge(
+        smallest_card_ceiling_of_the_pool_mebibytes(cards),
+        states_of_one_scratch_lane_on_every_card_of(cards),
+        states_of_the_span,
+        &|states| mebibytes_a_judge_needs(packed, states),
+    )
+}
+
 /// [`compare_on_every_state_of_these_segments_against_the_version_table`] 的本体：`knobs` 是 [`ContainerCapacityKnobs::PRODUCT`] 时编判法摘要罩住的那三份内核、
 /// CPU 池级 checker 取判器那一份（产品入口）；否则见 [`compare_on_every_state_given_the_container_capacity_knobs`]。
 /// CPU 那一侧（带旋钮值重判池级 checker 的那一处在内）判的是从崩溃点重放枚举那一类的库里读回的流叠出来的镜像。
@@ -3299,13 +3516,15 @@ const PAIRING_BLOCKS_JUDGED_TOGETHER: usize = 8;
 /// （至多 [`PAIRING_BLOCKS_JUDGED_TOGETHER`] 块）两边都判、逐块比、逐块存进库（[`Comparison::to_bytes`]），比完就丢，逐块折进整条流的总账。
 /// 宿主内存只随一段的块数涨，不随整条流的状态数涨。两边哪一边的判法单元拒算：照判、不入库。
 /// 卡池借不到卡、卡上显存不够、只录那一趟（判那一侧报「本次未跑」交 `None` 的几种）：那一段一块都不存，照旧交 `None`。
+/// `states` 是 [`StatesOfThePairing::TheStatesWithOrdinalsIn`] 时只走那一段序号的组（`crash_library::groups_of_pairing_blocks_holding_the_states`，
+/// 区间两头要落在组的边界上，终点另可是整条流的状态数），输入摘要与块键都与整条流那一趟相同、块照样复用；交回的总账只是那一段的状态。
 #[allow(
     clippy::too_many_arguments,
-    reason = "对拍的输入就是这几样：卡池、流、项名、版本表另带的没有文件的几版、切段、展开、旋钮、逐状态另看的几样；收成一个类型只为让签名变短"
+    reason = "对拍的输入就是这几样：卡池、流、项名、版本表另带的没有文件的几版、切段、展开、旋钮、逐状态另看的几样、判哪一段序号；收成一个类型只为让签名变短"
 )]
 // cpu-reference-for-gpu-comparison
 fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_container_capacity_knobs(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     item_name: &str,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
@@ -3313,6 +3532,7 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
     knobs: ContainerCapacityKnobs,
     examinations: &[StateExamination],
+    states: &StatesOfThePairing,
 ) -> Option<Comparison> {
     let judge_flow = JudgeFlow {
         base: &flow.base,
@@ -3361,23 +3581,47 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
     let inputs_digest = sha256_digest(&inputs);
     let library =
         CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
-    // 判表过库只在头一段要现判的块之前做一次（全部块都复用时不录、不读，整条流复用时同）；只录那一趟它交 `None`，
+    // 判表过库只在头一段要现判的块之前做一次（全部块都复用时不录、不读，整条流复用时同；头一段判完之前只有它一段）；只录那一趟它交 `None`，
     // 那一段照旧交给 CPU 那一侧把流也录上再收手（录入段里两类库都要写到）
-    let mut packed: Option<PackedJudgeTablesReadBack> = None;
+    let packed: std::sync::OnceLock<Option<PackedJudgeTablesReadBack>> = std::sync::OnceLock::new();
     let mut comparison = Comparison::of_no_state(examinations.len());
     let started = Instant::now();
+    let share_of_this_process =
+        PairingBlocksShare::of_this_process().unwrap_or_else(|reason| panic!("{reason}"));
+    let (share, states_judged_here) = match states {
+        StatesOfThePairing::EveryStateOfTheFlow => (share_of_this_process, state_count),
+        StatesOfThePairing::TheStatesWithOrdinalsIn(ordinals) => {
+            let groups = groups_of_pairing_blocks_holding_the_states(
+                ordinals,
+                state_count,
+                std::num::NonZeroU64::new(STATES_PER_PAIRING_BLOCK).expect("块宽不是 0"),
+                std::num::NonZeroUsize::new(PAIRING_BLOCKS_JUDGED_TOGETHER)
+                    .expect("一次判的块数不是 0"),
+            )
+            .unwrap_or_else(|refusal| panic!("流 {}：{refusal}", flow.name));
+            eprintln!(
+                "CRASH_JUDGE_GPU_ORDINALS flow={} states={state_count} ordinals={ordinals:?} groups={groups:?}",
+                flow.name
+            );
+            (
+                share_of_this_process.only_the_groups_of_pairing_blocks_in(groups),
+                ordinals.end - ordinals.start,
+            )
+        }
+    };
     let blocks_of_the_flow = pairing_conclusions_of_the_blocks_reused_or_judged(
         &library,
         &inputs_digest,
         state_count,
         std::num::NonZeroU64::new(STATES_PER_PAIRING_BLOCK).expect("块宽不是 0"),
         std::num::NonZeroUsize::new(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("一次判的块数不是 0"),
+        stretches_of_a_flow_judged_at_once_on_these_cards(pairing_cards_of_the_pool(cards)),
+        &share,
         &comparison_units.and_then(|_| judging_units(JudgingUnits::GpuJudge)),
         &judging_units(JudgingUnits::JudgementOfTheCrashImages),
-        &mut |blocks| {
-            if packed.is_none() {
-                packed = packed_tables_through_the_library(item_name, &tables);
-            }
+        &|blocks: &[std::ops::Range<u64>]| {
+            let packed =
+                packed.get_or_init(|| packed_tables_through_the_library(item_name, &tables));
             Some(
                 judge_the_blocks_on_the_cpu_and_the_gpu_and_compare(
                     cards,
@@ -3407,9 +3651,21 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
         },
     )
     .unwrap_or_else(|reason| panic!("流 {} 的对拍块结论读写库失败：{reason}", flow.name))?;
+    if blocks_of_the_flow.blocks_left_to_other_shares > 0 {
+        // 几台分着判的一份：自己领的块判完入库了，整条流的总账与用例钉的数归合并那一趟（整份，每块复用）
+        eprintln!(
+            "CRASH_JUDGE_GPU_MY_SHARE_ONLY flow={} states={state_count} blocks_reused={} blocks_judged_now={} blocks_left_to_other_shares={} elapsed={:?}",
+            flow.name,
+            blocks_of_the_flow.blocks_reused,
+            blocks_of_the_flow.blocks_judged_now,
+            blocks_of_the_flow.blocks_left_to_other_shares,
+            started.elapsed()
+        );
+        return None;
+    }
     assert_eq!(
-        comparison.states, state_count,
-        "流 {}：各块的状态数合起来是整条流的状态数",
+        comparison.states, states_judged_here,
+        "流 {}：各块的状态数合起来是这一趟判的状态数（整条流的，或点名那一段序号的）",
         flow.name
     );
     for line in comparison.mismatches.iter().take(3) {
@@ -3429,8 +3685,8 @@ fn compare_on_every_state_of_these_segments_against_the_version_table_given_the_
         comparison.gpu_checker_red,
         comparison.recovery_mismatches,
         comparison.cross_check_mismatches,
-        comparison.mismatches.len(),
-        comparison.checker_mismatches.len(),
+        comparison.mismatches.state_count(),
+        comparison.checker_mismatches.state_count(),
         started.elapsed()
     );
     Some(comparison)
@@ -3733,7 +3989,7 @@ fn every_state_judged_on_the_cpu<AlsoOfTheState: Send>(
     reason = "对拍一段块的输入就是这几样：卡池、流、项名、版本表另带的没有文件的几版、切段、展开、旋钮、判表与读回的打包判表、逐状态另看的几样、这一段的块；收成一个类型只为让签名变短"
 )]
 fn judge_the_blocks_on_the_cpu_and_the_gpu_and_compare(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     item_name: &str,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
@@ -3851,7 +4107,7 @@ fn resident_and_peak_mebibytes_of_this_process() -> (String, String) {
 )]
 // cpu-reference-for-gpu-comparison
 fn judge_the_blocks_on_the_cpu_and_the_gpu_and_compare_counting_into(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     item_name: &str,
     versions_without_a_file: &[PublishedVersionWithoutAFile],
@@ -3868,6 +4124,9 @@ fn judge_the_blocks_on_the_cpu_and_the_gpu_and_compare_counting_into(
         return Some(Vec::new());
     };
     let span = first_block.start..last_block.end;
+    // 判 CPU 那一段之前先排队，判完比完才还：CPU 判完的结论压在内存里等卡的不超过这本账的上限
+    let _states_held_on_the_host = pairing_states_held_on_this_host(cards)
+        .wait_for_room_and_hold_the_states_of_a_span(span.end - span.start);
     let kernel_sources = JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs(knobs);
     let self_verified_slots_are_examined = examinations
         .iter()
@@ -3890,7 +4149,8 @@ fn judge_the_blocks_on_the_cpu_and_the_gpu_and_compare_counting_into(
     )?;
     let cpu_elapsed = cpu_started.elapsed();
     let packed = packed?;
-    let states_per_dispatch = states_of_one_scratch_lane_on_every_card_of(cards);
+    let states_per_dispatch =
+        states_per_dispatch_of_a_pairing_judge_on_these_cards(cards, packed, span.end - span.start);
     let lease = cards.lease_card_or_report_not_run(
         flow.name,
         mebibytes_a_judge_needs(packed, states_per_dispatch),
@@ -4021,7 +4281,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_judge_on_every_state_of(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -4317,7 +4577,7 @@ fn the_gpu_judge_tells_apart_two_versions_of_a_root_slot_that_differ_only_past_t
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         comparison
             .mismatches
             .iter()
@@ -4367,11 +4627,12 @@ fn resealed_publish_record_names_units_that_match_on_disk() {
         "记录载荷校验和重封过"
     );
     for entry in 0..named {
-        let o = JOURNAL_RECORD_HEADER_BYTES + entry * JOURNAL_NAMED_ENTRY_BYTES_IN_THE_RECORD;
-        let class = record[o + 28];
+        let named_entry_offset =
+            JOURNAL_RECORD_HEADER_BYTES + entry * JOURNAL_NAMED_ENTRY_BYTES_IN_THE_RECORD;
+        let class = record[named_entry_offset + 28];
         let length = if class == 2 { 16384 } else { 32768 };
         for copy in 0..2 {
-            let location = o + copy * 14;
+            let location = named_entry_offset + copy * 14;
             let device = u32::from_le_bytes(record[location..location + 4].try_into().expect("4"));
             let mut slot = [0u8; 8];
             slot[..6].copy_from_slice(&record[location + 4..location + 10]);
@@ -4631,20 +4892,32 @@ fn allocated_statistic_verdicts_on_the_cpu(
     }
 }
 
-/// 记账那一判拆成头、分片、决断、收尾几趟之后（分片两轮各切几片、每片一次提交），同一组状态整轮一片判、每轮 64 等份判、切得不齐（带一片零宽的）判、
+/// 记账分片那几条流上 CPU 一侧要数出的 I-3.1 与 I-3.18 判定（[`assert_verdicts_are_the_same_whether_the_accounting_of_the_flow_is_judged_in_one_slice_or_in_many`]）：
+/// 分片分得出差别的那几种状态。
+enum AccountingVerdictsTheCpuShowsOnTheFlow {
+    /// 合法流：不要求哪一样。
+    NoneRequired,
+    /// 至少一个状态 I-3.1 记射程里判不了（那块盘按单元那一类那一轮真走）。
+    AllocatedStatisticJudgedInPart,
+    /// 至少一个状态 I-3.1 判红，至少一个状态 I-3.1 与 I-3.18 同时判红。
+    AllocatedStatisticRedAlsoTogetherWithTheRecordSpans,
+}
+
+/// 记账那一判拆成头、分片、决断、收尾几趟（分片两轮各切几片、每片一次提交），一条流的同一组状态整轮一片判、每轮 64 等份判、切得不齐（带一片零宽的）判、
 /// 照判器自己的片宽判（[`GpuCrashJudge::judge_states`]），判出的结论逐状态逐字相同；整轮一片那一份与 CPU 判器逐状态对拍一致
-/// （`.claude/rules/test-script-discipline.md`「用上现有的硬件加速」：加速路径留一份 CPU 参照实现，两边在同一组输入上判定逐项相同）。
-/// 三条流，展开 8：固定脚本到回退；新池新建文件、最后那片分配记录叶里数据单元那条记录只记一槽（I-3.18 红，I-3.1 在那块盘上按单元那一类那一轮真走、
-/// 记射程里判不了）；同一形再把记账叶里一行已分配加 1（I-3.1 红）。CPU 一侧数：这批状态里 I-3.1 判红的、I-3.1 记射程里判不了的各至少一个，
-/// 有 I-3.1 与 I-3.18 同时判红的状态。片的边界上那一项哪片都不做、宿主推片的上端到不了一轮的末尾、决断不记「按单元那一类再数一份」，这条各红在
-/// 互比或对拍那一处（`crates/mutations.tsv` 里点名这一条的几行）。显存额度装不下一个判器就报本次未跑。
-#[test]
-fn verdicts_are_the_same_whether_the_accounting_is_judged_in_one_slice_or_in_many() {
-    const TEST_NAME: &str =
-        "verdicts_are_the_same_whether_the_accounting_is_judged_in_one_slice_or_in_many";
+/// （`.claude/rules/test-script-discipline.md`「用上现有的硬件加速」：加速路径留一份 CPU 参照实现，两边在同一组输入上判定逐项相同）；
+/// CPU 一侧数出 `verdicts_the_cpu_shows` 要的那几种状态。展开 8；流由 `record_the_flow` 在取卡之后录。
+/// 片的边界上那一项哪片都不做、宿主推片的上端到不了一轮的末尾、决断不记「按单元那一类再数一份」，各红在互比或对拍那一处
+/// （`crates/mutations.tsv` 里点名这几条用例的几行）。显存额度装不下一个判器就报本次未跑。
+/// 两类库里的项名是「`test_name`::流名」，合起来要在 1 到 200 字节以内（`crash_library::ItemName`，超了入库那一步当场 panic）。
+fn assert_verdicts_are_the_same_whether_the_accounting_of_the_flow_is_judged_in_one_slice_or_in_many(
+    test_name: &str,
+    record_the_flow: &dyn Fn() -> RecordedFlow,
+    verdicts_the_cpu_shows: AccountingVerdictsTheCpuShowsOnTheFlow,
+) {
     const EXPAND_UP_TO: usize = 8;
     const EQUAL_SLICES: u32 = 64;
-    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
     let ends_of_the_slices_of_each_plan: [(&str, Vec<u32>); 3] = [
@@ -4668,19 +4941,6 @@ fn verdicts_are_the_same_whether_the_accounting_is_judged_in_one_slice_or_in_man
             ],
         ),
     ];
-    let flows = [
-        record_fixed_script_through_rollback("crash-judge-gpu-accounting-slices"),
-        record_new_pool_with_the_record_of_a_data_unit_narrowed_to_one_slot(
-            "crash-judge-gpu-accounting-slices-narrowed",
-            "new-pool-data-unit-record-narrowed-to-one-slot",
-            AllocatedStatisticInTheAccountingLeaf::AsWritten,
-        ),
-        record_new_pool_with_the_record_of_a_data_unit_narrowed_to_one_slot(
-            "crash-judge-gpu-accounting-slices-narrowed-and-overstated",
-            "new-pool-data-unit-record-narrowed-to-one-slot-and-allocated-overstated",
-            AllocatedStatisticInTheAccountingLeaf::OneRowOverstatedByOneByte,
-        ),
-    ];
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= EXPAND_UP_TO {
             CrashPointReplaySegmentExpansion::EveryProperSubset
@@ -4692,145 +4952,204 @@ fn verdicts_are_the_same_whether_the_accounting_is_judged_in_one_slice_or_in_man
     let mut states_whose_allocated_statistic_the_cpu_judges_in_part = 0usize;
     let mut states_whose_allocated_statistic_and_record_spans_the_cpu_reddens = 0usize;
     let mut problems: Vec<String> = Vec::new();
-    for flow in &flows {
-        let item_name = format!("{TEST_NAME}::{}", flow.name);
-        let judge_flow = JudgeFlow {
-            base: &flow.base,
-            writes: &flow.writes,
-            segments: &flow.segments,
-            judged_root_index: flow.judged_root_index,
-            versions: &flow.versions,
-            expansion: &expansion,
-        };
-        let tables = build_judge_tables(&judge_flow).expect("建得出表");
-        let state_count = tables.state_count;
-        // 判表先入库、再读库（对拍那一类的库），GPU 只拿读回的那一份算；CPU 判器同样先把流入库、再从库里读回判
-        let packed = packed_tables_through_the_library(&item_name, &tables);
-        let cpu = every_state_judged_on_the_cpu(
-            flow,
-            &item_name,
-            &[],
-            &flow.segments,
-            &expansion,
-            ContainerCapacityKnobs::PRODUCT,
-            state_count,
-            0..state_count,
-            &|_image, judgement| allocated_statistic_verdicts_on_the_cpu(judgement),
+    let recorded = record_the_flow();
+    let flow = &recorded;
+    let item_name = format!("{test_name}::{}", flow.name);
+    let judge_flow = JudgeFlow {
+        base: &flow.base,
+        writes: &flow.writes,
+        segments: &flow.segments,
+        judged_root_index: flow.judged_root_index,
+        versions: &flow.versions,
+        expansion: &expansion,
+    };
+    let tables = build_judge_tables(&judge_flow).expect("建得出表");
+    let state_count = tables.state_count;
+    // 判表先入库、再读库（对拍那一类的库），GPU 只拿读回的那一份算；CPU 判器同样先把流入库、再从库里读回判
+    let packed = packed_tables_through_the_library(&item_name, &tables);
+    let cpu = every_state_judged_on_the_cpu(
+        flow,
+        &item_name,
+        &[],
+        &flow.segments,
+        &expansion,
+        ContainerCapacityKnobs::PRODUCT,
+        state_count,
+        0..state_count,
+        &|_image, judgement| allocated_statistic_verdicts_on_the_cpu(judgement),
+    );
+    let (Some(packed), Some(cpu)) = (packed, cpu) else {
+        return;
+    };
+    for (_, verdicts) in &cpu {
+        states_whose_allocated_statistic_the_cpu_reddens +=
+            usize::from(verdicts.allocated_statistic_is_violated);
+        states_whose_allocated_statistic_the_cpu_judges_in_part +=
+            usize::from(verdicts.allocated_statistic_is_partially_judged);
+        states_whose_allocated_statistic_and_record_spans_the_cpu_reddens += usize::from(
+            verdicts.allocated_statistic_is_violated
+                && verdicts.allocation_record_span_invariant_is_violated,
         );
-        let (Some(packed), Some(cpu)) = (packed, cpu) else {
-            return;
-        };
-        for (_, verdicts) in &cpu {
-            states_whose_allocated_statistic_the_cpu_reddens +=
-                usize::from(verdicts.allocated_statistic_is_violated);
-            states_whose_allocated_statistic_the_cpu_judges_in_part +=
-                usize::from(verdicts.allocated_statistic_is_partially_judged);
-            states_whose_allocated_statistic_and_record_spans_the_cpu_reddens += usize::from(
-                verdicts.allocated_statistic_is_violated
-                    && verdicts.allocation_record_span_invariant_is_violated,
-            );
-        }
-        let states_per_dispatch = states_of_one_scratch_lane_on_every_card_of(cards);
-        let Some(lease) = cards.lease_card_or_report_not_run(
+    }
+    // 这条用例照判器的宽度一次派完（`judge_states_in_one_dispatch_slicing_the_accounting_at` 不按用时调宽度），开宽了一次提交在卡上算得太久、撞驱动的超时；
+    // 判别力在记账怎么分片，不在宽度：一条缓冲
+    let states_per_dispatch = states_of_one_scratch_lane_on_every_card_of(cards);
+    let Some(lease) = cards.lease_card_or_report_not_run(
+        &item_name,
+        mebibytes_a_judge_needs(&packed, states_per_dispatch),
+    ) else {
+        return;
+    };
+    let Some((judged_by_each_plan, judged_following_the_slice_widths_of_the_judge)) =
+        on_the_card_or_report_not_run_when_out_of_memory(
             &item_name,
-            mebibytes_a_judge_needs(&packed, states_per_dispatch),
-        ) else {
-            return;
-        };
-        let Some((judged_by_each_plan, judged_following_the_slice_widths_of_the_judge)) =
-            on_the_card_or_report_not_run_when_out_of_memory(
-                &item_name,
-                lease.card(),
-                "建判器、按几种分片判这条流",
-                || {
-                    let judge = GpuCrashJudge::on_card_with_packed_tables(
-                        lease.card(),
-                        &packed,
-                        states_per_dispatch,
-                    );
-                    let dispatch_width =
-                        u64::try_from(judge.states_per_dispatch()).expect("装得进 u64");
-                    let judged_by_each_plan: Vec<Vec<[u32; VERDICT_WORDS]>> =
-                        ends_of_the_slices_of_each_plan
-                            .iter()
-                            .map(|(_, ends_of_the_slices)| {
-                                let mut verdicts = Vec::new();
-                                let mut start = 0u64;
-                                while start < state_count {
-                                    let end = (start + dispatch_width).min(state_count);
-                                    verdicts.extend(
-                                        judge
-                                            .judge_states_in_one_dispatch_slicing_the_accounting_at(
-                                                start..end,
-                                                ends_of_the_slices,
-                                            ),
-                                    );
-                                    start = end;
-                                }
-                                verdicts
-                            })
-                            .collect();
-                    (judged_by_each_plan, judge.judge_states(0..state_count))
-                },
-            )
-        else {
-            return;
-        };
-        drop(lease);
-        let judged_in_one_slice = &judged_by_each_plan[0];
-        let every_other_way = ends_of_the_slices_of_each_plan
+            lease.card(),
+            "建判器、按几种分片判这条流",
+            || {
+                let judge = GpuCrashJudge::on_card_with_packed_tables(
+                    lease.card(),
+                    &packed,
+                    states_per_dispatch,
+                );
+                let dispatch_width =
+                    u64::try_from(judge.states_per_dispatch()).expect("装得进 u64");
+                let judged_by_each_plan: Vec<Vec<[u32; VERDICT_WORDS]>> =
+                    ends_of_the_slices_of_each_plan
+                        .iter()
+                        .map(|(_, ends_of_the_slices)| {
+                            let mut verdicts = Vec::new();
+                            let mut start = 0u64;
+                            while start < state_count {
+                                let end = (start + dispatch_width).min(state_count);
+                                verdicts.extend(
+                                    judge.judge_states_in_one_dispatch_slicing_the_accounting_at(
+                                        start..end,
+                                        ends_of_the_slices,
+                                    ),
+                                );
+                                start = end;
+                            }
+                            verdicts
+                        })
+                        .collect();
+                (judged_by_each_plan, judge.judge_states(0..state_count))
+            },
+        )
+    else {
+        return;
+    };
+    drop(lease);
+    let judged_in_one_slice = &judged_by_each_plan[0];
+    let every_other_way = ends_of_the_slices_of_each_plan
+        .iter()
+        .zip(&judged_by_each_plan)
+        .skip(1)
+        .map(|((plan_name, _), verdicts)| (*plan_name, verdicts))
+        .chain(std::iter::once((
+            "照判器自己的片宽",
+            &judged_following_the_slice_widths_of_the_judge,
+        )));
+    for (plan_name, verdicts) in every_other_way {
+        assert_eq!(verdicts.len(), judged_in_one_slice.len());
+        if let Some(ordinal) = judged_in_one_slice
             .iter()
-            .zip(&judged_by_each_plan)
-            .skip(1)
-            .map(|((plan_name, _), verdicts)| (*plan_name, verdicts))
-            .chain(std::iter::once((
-                "照判器自己的片宽",
-                &judged_following_the_slice_widths_of_the_judge,
-            )));
-        for (plan_name, verdicts) in every_other_way {
-            assert_eq!(verdicts.len(), judged_in_one_slice.len());
-            if let Some(ordinal) = judged_in_one_slice
-                .iter()
-                .zip(verdicts)
-                .position(|(in_one_slice, other)| in_one_slice != other)
-            {
-                problems.push(format!(
-                    "流 {}：{plan_name}与整轮一片判出的结论不同，第一个不同的状态 {ordinal}：整轮一片 {:?}；{plan_name} {:?}",
-                    flow.name, judged_in_one_slice[ordinal], verdicts[ordinal]
-                ));
-            }
-        }
-        let cpu_judged: Vec<(JudgedOnCpu, SelfVerifiedSlotsOnTheCpu)> =
-            cpu.into_iter().map(|(judged, _)| (judged, None)).collect();
-        let comparison = compare_the_judgements_state_by_state(
-            flow.name,
-            0..state_count,
-            &cpu_judged,
-            judged_in_one_slice,
-            &[],
-            &tables.devices,
-        );
-        println!(
-            "CRASH_JUDGE_ACCOUNTING_SLICES_AGREE flow={} states={state_count} mismatches_with_the_cpu={}",
-            flow.name,
-            comparison.mismatches.len()
-        );
-        if !comparison.mismatches.is_empty() {
+            .zip(verdicts)
+            .position(|(in_one_slice, other)| in_one_slice != other)
+        {
             problems.push(format!(
-                "流 {}：整轮一片那一份与 CPU 判器 {} 个状态不一致（前几个）：\n{}",
-                flow.name,
-                comparison.mismatches.len(),
-                mismatch_listing(&comparison)
+                "流 {}：{plan_name}与整轮一片判出的结论不同，第一个不同的状态 {ordinal}：整轮一片 {:?}；{plan_name} {:?}",
+                flow.name, judged_in_one_slice[ordinal], verdicts[ordinal]
             ));
         }
     }
+    let cpu_judged: Vec<(JudgedOnCpu, SelfVerifiedSlotsOnTheCpu)> =
+        cpu.into_iter().map(|(judged, _)| (judged, None)).collect();
+    let comparison = compare_the_judgements_state_by_state(
+        flow.name,
+        0..state_count,
+        &cpu_judged,
+        judged_in_one_slice,
+        &[],
+        &tables.devices,
+    );
+    println!(
+        "CRASH_JUDGE_ACCOUNTING_SLICES_AGREE flow={} states={state_count} mismatches_with_the_cpu={}",
+        flow.name,
+        comparison.mismatches.state_count()
+    );
+    if !comparison.mismatches.is_empty() {
+        problems.push(format!(
+            "流 {}：整轮一片那一份与 CPU 判器 {} 个状态不一致（前几个）：\n{}",
+            flow.name,
+            comparison.mismatches.state_count(),
+            mismatch_listing(&comparison)
+        ));
+    }
     assert!(problems.is_empty(), "{}", problems.join("\n\n"));
-    assert!(
-        states_whose_allocated_statistic_the_cpu_reddens > 0
-            && states_whose_allocated_statistic_the_cpu_judges_in_part > 0
-            && states_whose_allocated_statistic_and_record_spans_the_cpu_reddens > 0,
-        "这批状态里 CPU 判 I-3.1 红的 {states_whose_allocated_statistic_the_cpu_reddens} 个、记射程里判不了的 {states_whose_allocated_statistic_the_cpu_judges_in_part} 个、\
-         I-3.1 与 I-3.18 同时红的 {states_whose_allocated_statistic_and_record_spans_the_cpu_reddens} 个：三样都要至少一个（分片分得出差别的状态）"
+    match verdicts_the_cpu_shows {
+        AccountingVerdictsTheCpuShowsOnTheFlow::NoneRequired => {}
+        AccountingVerdictsTheCpuShowsOnTheFlow::AllocatedStatisticJudgedInPart => {
+            assert!(
+                states_whose_allocated_statistic_the_cpu_judges_in_part > 0,
+                "流 {}：CPU 判 I-3.1 记射程里判不了的状态 {states_whose_allocated_statistic_the_cpu_judges_in_part} 个，要至少一个（分片分得出差别的状态）",
+                flow.name
+            );
+        }
+        AccountingVerdictsTheCpuShowsOnTheFlow::AllocatedStatisticRedAlsoTogetherWithTheRecordSpans => {
+            assert!(
+                states_whose_allocated_statistic_the_cpu_reddens > 0
+                    && states_whose_allocated_statistic_and_record_spans_the_cpu_reddens > 0,
+                "流 {}：CPU 判 I-3.1 红的 {states_whose_allocated_statistic_the_cpu_reddens} 个、I-3.1 与 I-3.18 同时红的 \
+                 {states_whose_allocated_statistic_and_record_spans_the_cpu_reddens} 个：两样都要至少一个（分片分得出差别的状态）",
+                flow.name
+            );
+        }
+    }
+}
+
+/// 场景：固定脚本到回退 D（合法流）。预期：记账整轮一片、每轮 64 等份、切得不齐、照判器自己的片宽判出的结论逐状态逐字相同，整轮一片那一份与 CPU 逐状态一致。
+#[test]
+fn accounting_verdicts_match_across_slicings_on_the_fixed_script_through_a_rollback() {
+    assert_verdicts_are_the_same_whether_the_accounting_of_the_flow_is_judged_in_one_slice_or_in_many(
+        "accounting_verdicts_match_across_slicings_on_the_fixed_script_through_a_rollback",
+        &|| record_fixed_script_through_rollback("crash-judge-gpu-accounting-slices"),
+        AccountingVerdictsTheCpuShowsOnTheFlow::NoneRequired,
+    );
+}
+
+/// 场景：新池新建文件、最后那片分配记录叶里数据单元那条记录只记一槽（I-3.18 红，I-3.1 在那块盘上按单元那一类那一轮真走）。
+/// 预期：几种分片判出的结论逐状态逐字相同、与 CPU 逐状态一致，CPU 判 I-3.1 记射程里判不了的状态至少一个。
+#[test]
+fn accounting_verdicts_match_across_slicings_on_a_new_pool_with_a_data_unit_record_narrowed_to_one_slot(
+) {
+    assert_verdicts_are_the_same_whether_the_accounting_of_the_flow_is_judged_in_one_slice_or_in_many(
+        "accounting_verdicts_match_across_slicings_on_a_new_pool_with_a_data_unit_record_narrowed_to_one_slot",
+        &|| {
+            record_new_pool_with_the_record_of_a_data_unit_narrowed_to_one_slot(
+                "crash-judge-gpu-accounting-slices-narrowed",
+                "new-pool-data-unit-record-narrowed-to-one-slot",
+                AllocatedStatisticInTheAccountingLeaf::AsWritten,
+            )
+        },
+        AccountingVerdictsTheCpuShowsOnTheFlow::AllocatedStatisticJudgedInPart,
+    );
+}
+
+/// 场景：新池新建文件、数据单元那条记录只记一槽那一形，再把记账叶里一行已分配加 1（I-3.1 红）。
+/// 预期：几种分片判出的结论逐状态逐字相同、与 CPU 逐状态一致，CPU 判 I-3.1 红的状态、I-3.1 与 I-3.18 同时红的状态各至少一个。
+#[test]
+fn accounting_verdicts_match_across_slicings_on_a_new_pool_with_a_data_unit_record_narrowed_and_one_allocated_row_overstated(
+) {
+    assert_verdicts_are_the_same_whether_the_accounting_of_the_flow_is_judged_in_one_slice_or_in_many(
+        "accounting_verdicts_match_across_slicings_on_a_new_pool_with_a_data_unit_record_narrowed_and_one_allocated_row_overstated",
+        &|| {
+            record_new_pool_with_the_record_of_a_data_unit_narrowed_to_one_slot(
+                "crash-judge-gpu-accounting-slices-narrowed-and-overstated",
+                "new-pool-data-unit-record-narrowed-to-one-slot-and-allocated-overstated",
+                AllocatedStatisticInTheAccountingLeaf::OneRowOverstatedByOneByte,
+            )
+        },
+        AccountingVerdictsTheCpuShowsOnTheFlow::AllocatedStatisticRedAlsoTogetherWithTheRecordSpans,
     );
 }
 
@@ -5773,6 +6092,222 @@ fn dispatch_time_at_each_scratch_size_with_the_whole_card_given() {
     }
 }
 
+/// 对拍判器的宽度：放得下时开到一张卡额度的一半（两条缓冲以上，判器才量宽度）；放不下一条缓冲的也开一条；不超过缓冲条数上限；不超过这一段的状态数。不用卡。
+/// 判别力（`crates/mutations.tsv`）：额度不平分给同卡的判器，头一种红；不保底一条缓冲，第二种红；不按这一段的状态数压，第四种红。
+#[test]
+fn a_pairing_judge_opens_half_of_the_smallest_card_and_at_least_one_scratch_lane() {
+    const STATES_PER_LANE: usize = 267;
+    const TABLES_MEBIBYTES: u64 = 100;
+    let mebibytes_for_states =
+        |states: usize| TABLES_MEBIBYTES + u64::try_from(states).expect("装得进 u64") * 8;
+    let everything = u64::MAX;
+    // 空着时借得出 13824 MiB 的卡：一个判器 6912 MiB，(6912 - 100) / 8 = 851 个状态
+    let states_on_the_card_with_room = states_per_dispatch_of_a_pairing_judge(
+        13_824,
+        STATES_PER_LANE,
+        everything,
+        &mebibytes_for_states,
+    );
+    assert_eq!(
+        states_on_the_card_with_room, 851,
+        "一张卡的额度平分给同卡的判器，一个判器放得下几个状态就开几个"
+    );
+    assert!(
+        states_on_the_card_with_room >= 2 * STATES_PER_LANE,
+        "两条缓冲以上：判器量宽度的条件进得去"
+    );
+    // 一半的额度放不下一条缓冲（267 个状态要 2236 MiB）：开一条
+    assert_eq!(
+        states_per_dispatch_of_a_pairing_judge(
+            3000,
+            STATES_PER_LANE,
+            everything,
+            &mebibytes_for_states
+        ),
+        STATES_PER_LANE,
+        "放不下一条缓冲的也开一条"
+    );
+    assert_eq!(
+        states_per_dispatch_of_a_pairing_judge(u64::MAX, STATES_PER_LANE, everything, &|_states| 1),
+        STATES_PER_LANE * MAXIMUM_SCRATCH_LANES,
+        "显存再多也不超过缓冲条数上限"
+    );
+    assert_eq!(
+        states_per_dispatch_of_a_pairing_judge(13_824, STATES_PER_LANE, 100, &mebibytes_for_states),
+        100,
+        "这一段只有 100 个状态：草稿区开 100 个"
+    );
+}
+
+/// 宿主内存那一本账：几十条线程抢，同时记着的状态数不超过上限，每一段都判到；账上空着时比上限大的一段也放行；票丢掉（连 panic 展开）都还。不用卡。
+/// 判别力（`crates/mutations.tsv`）：放得下不放得下都放行，同时记着的超过上限，这条红；票丢掉不还，后面的等不到票、这条卡到超时，主线程判红。
+#[test]
+fn spans_queue_for_room_on_the_host_and_never_hold_more_states_than_the_room() {
+    const THREADS: usize = 32;
+    const STATES_OF_A_SPAN: u64 = 3;
+    const MOST_STATES: u64 = 6;
+    let queue = Arc::new(PairingStatesHeldOnTheHost::with_room_for_these_many_states(
+        MOST_STATES,
+    ));
+    let states_judged = Arc::new(AtomicU64::new(0));
+    let everyone_ready = Arc::new(std::sync::Barrier::new(THREADS));
+    let (all_finished, all_finished_received) = mpsc::channel::<()>();
+    // 不用线程作用域：票不还时后面的线程永远等着，这条要判红、不等它们
+    for thread_index in 0..THREADS {
+        let queue = Arc::clone(&queue);
+        let states_judged = Arc::clone(&states_judged);
+        let everyone_ready = Arc::clone(&everyone_ready);
+        let all_finished = all_finished.clone();
+        std::thread::spawn(move || {
+            everyone_ready.wait();
+            // 有几条线程判的时候 panic：票在展开时也还
+            let judged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _ticket = queue.wait_for_room_and_hold_the_states_of_a_span(STATES_OF_A_SPAN);
+                std::thread::sleep(Duration::from_millis(5));
+                assert!(thread_index % 8 != 0, "这条线程判的那一段判红");
+            }));
+            drop(judged);
+            states_judged.fetch_add(STATES_OF_A_SPAN, Ordering::SeqCst);
+            drop(all_finished);
+        });
+    }
+    drop(all_finished);
+    assert_eq!(
+        all_finished_received.recv_timeout(Duration::from_secs(60)),
+        Err(mpsc::RecvTimeoutError::Disconnected),
+        "每条线程都排到了（一分钟之内全部收尾）：票丢掉都还"
+    );
+    let counts = queue.pairing_states_counts_locked();
+    assert_eq!(
+        states_judged.load(Ordering::SeqCst),
+        u64::try_from(THREADS).expect("装得进 u64") * STATES_OF_A_SPAN,
+        "每一段都判到"
+    );
+    assert_eq!(counts.states_held_now, 0, "全部还了");
+    assert!(
+        (STATES_OF_A_SPAN..=MOST_STATES).contains(&counts.most_states_held_so_far),
+        "同时记着的到上限为止：实际最多 {}",
+        counts.most_states_held_so_far
+    );
+    drop(counts);
+    let oversized = queue.wait_for_room_and_hold_the_states_of_a_span(MOST_STATES + 1);
+    assert_eq!(
+        queue.pairing_states_counts_locked().states_held_now,
+        MOST_STATES + 1,
+        "账上空着时比上限大的一段也放行"
+    );
+    drop(oversized);
+}
+
+/// 两个上界照卡数算：一条流至多几段一起判、宿主内存里至多压着几个状态，都随卡数涨、与并行的用例数无关。不用卡。
+/// 判别力（`crates/mutations.tsv`）：宿主内存那个上界不随卡数涨，两张卡那一格红；一条流几段一起判不随卡数涨，同一格红。
+#[test]
+fn the_bounds_of_the_pairing_grow_with_the_cards_and_nothing_else() {
+    assert_eq!(
+        (
+            stretches_of_a_flow_judged_at_once_on_these_cards(1).get(),
+            stretches_of_a_flow_judged_at_once_on_these_cards(2).get()
+        ),
+        (2, 4),
+        "每张卡两个判器，一条流至多那么多段一起判"
+    );
+    let states_of_a_full_span = u64::try_from(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("装得进 u64")
+        * STATES_PER_PAIRING_BLOCK;
+    assert_eq!(
+        (
+            most_pairing_states_held_on_the_host_of(1),
+            most_pairing_states_held_on_the_host_of(2)
+        ),
+        (4 * states_of_a_full_span, 8 * states_of_a_full_span),
+        "每张卡两个判器、每个判器的位子备两段满段"
+    );
+}
+
+/// 对拍判器照它开的宽度建在卡上：至少两条草稿缓冲（判器量宽度的条件进得去；日志里 `CRASH_JUDGE_DISPATCH_CALIBRATED` 由真跑核），判出的逐状态结论与一条缓冲的判器相同。
+/// 卡小到一半额度放不下两条缓冲的报本次未跑。流与展开同 `verdicts_are_the_same_whether_one_dispatch_spans_one_scratch_lane_or_several`。
+/// 判别力（`crates/mutations.tsv`）：对拍判器的宽度一律一条缓冲，这条红。
+#[test]
+fn a_pairing_judge_is_wide_enough_to_calibrate_and_judges_like_one_scratch_lane() {
+    const TEST_NAME: &str =
+        "a_pairing_judge_is_wide_enough_to_calibrate_and_judges_like_one_scratch_lane";
+    const EXPAND_UP_TO: usize = 16;
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let flow = record_fixed_script_through_rollback("crash-judge-gpu-pairing-width");
+    let expansion = expansion_up_to(EXPAND_UP_TO);
+    let judge_flow = JudgeFlow {
+        base: &flow.base,
+        writes: &flow.writes,
+        segments: &flow.segments,
+        judged_root_index: flow.judged_root_index,
+        versions: &flow.versions,
+        expansion: &expansion,
+    };
+    let tables = build_judge_tables(&judge_flow).expect("建得出表");
+    let state_count = tables.state_count;
+    // 判表先入库、再读库，GPU 只拿读回的那一份算
+    let Some(packed) = packed_tables_through_the_library(TEST_NAME, &tables) else {
+        return;
+    };
+    let states_per_lane = states_of_one_scratch_lane_on_every_card_of(cards);
+    assert!(
+        state_count >= 2 * u64::try_from(states_per_lane).expect("装得进 u64"),
+        "这条流只有 {state_count} 个状态，跨不过两条草稿缓冲"
+    );
+    let half_of_the_smallest_card = smallest_card_ceiling_of_the_pool_mebibytes(cards)
+        / u64::try_from(PAIRING_JUDGES_SHARING_A_CARD).expect("装得进 u64");
+    if mebibytes_a_judge_needs(&packed, 2 * states_per_lane) > half_of_the_smallest_card {
+        println!(
+            "{}",
+            not_run_line(
+                TEST_NAME,
+                &format!(
+                    "最小的一张卡一个判器只分得到 {half_of_the_smallest_card} MiB，放不下两条草稿缓冲"
+                )
+            )
+        );
+        return;
+    }
+    let requested =
+        states_per_dispatch_of_a_pairing_judge_on_these_cards(cards, &packed, state_count);
+    assert!(
+        requested >= 2 * states_per_lane,
+        "放得下两条缓冲的卡上，对拍判器开的宽度 {requested} 至少两条缓冲（一条 {states_per_lane} 个状态）：判器才量宽度"
+    );
+    let Some(lease) = cards.lease_card_or_report_not_run(
+        TEST_NAME,
+        mebibytes_a_judge_needs(&packed, requested)
+            + mebibytes_a_judge_needs(&packed, states_per_lane),
+    ) else {
+        return;
+    };
+    let card = lease.card();
+    let Some((wide, narrow)) = on_the_card_or_report_not_run_when_out_of_memory(
+        TEST_NAME,
+        card,
+        "建两个判器与判这条流",
+        || {
+            let wide_judge = GpuCrashJudge::on_card_with_packed_tables(card, &packed, requested);
+            let narrow_judge =
+                GpuCrashJudge::on_card_with_packed_tables(card, &packed, states_per_lane);
+            assert_eq!(
+                wide_judge.states_per_dispatch(),
+                requested,
+                "借来的卡开得出借的那么宽"
+            );
+            (
+                wide_judge.judge_states(0..state_count),
+                narrow_judge.judge_states(0..state_count),
+            )
+        },
+    ) else {
+        return;
+    };
+    drop(lease);
+    assert!(wide == narrow, "开宽的判器判出的结论与一条缓冲的逐状态相同");
+}
+
 /// 规划显卡用：同一条流（固定脚本到回退 D）在一张卡上按几种「一次派活的状态数」各判一遍，打每秒判多少态、草稿区占多少显存；
 /// 换派活的粒度不许改判定：每一档的结论逐状态与第一档相同。到这张卡的上限（绑定上限、空闲显存）那一档为止。
 #[test]
@@ -5817,7 +6352,9 @@ fn gpu_judge_throughput_by_states_per_dispatch() {
         return;
     };
     let mut reached_the_limit_of_the_card = false;
-    for requested in [256usize, 2170, 4340, 8680, 13_020, 17_360, 26_040, 34_720] {
+    for requested in [
+        256usize, 534, 1068, 2170, 4340, 8680, 13_020, 17_360, 26_040, 34_720,
+    ] {
         if reached_the_limit_of_the_card {
             break;
         }
@@ -6356,7 +6893,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_refused_value_wins_over_a_wrong_safe
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         comparison
             .mismatches
             .iter()
@@ -6382,10 +6919,11 @@ fn the_gpu_judge_agrees_with_the_cpu_when_no_system_configuration_slot_verifies_
 
 /// I-7.5：根槽不是声明的 io_min 的整数倍。
 #[test]
-fn the_gpu_judge_agrees_with_the_cpu_when_the_root_slots_are_not_aligned_to_the_declared_io_min() {
+fn the_gpu_judge_agrees_with_the_cpu_when_the_root_slots_are_not_aligned_to_the_declared_minimum_input_output(
+) {
     assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
-        "the_gpu_judge_agrees_with_the_cpu_when_the_root_slots_are_not_aligned_to_the_declared_io_min",
-        &record_new_pool_with_an_io_min_the_root_slots_are_not_aligned_to("crash-judge-gpu-i75"),
+        "the_gpu_judge_agrees_with_the_cpu_when_the_root_slots_are_not_aligned_to_the_declared_minimum_input_output",
+        &record_new_pool_with_a_minimum_input_output_the_root_slots_are_not_aligned_to("crash-judge-gpu-i75"),
         "I-7.5",
     );
 }
@@ -6483,7 +7021,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_the_flow(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -6886,7 +7424,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_after_a_rollback
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -6996,7 +7534,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_the_reference_intervals_when_a_snapshot_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7028,7 +7566,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_rollback_publish_inheriting_its_user
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7054,7 +7592,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_record_whose_unmount_marker_sets_ano
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7352,7 +7890,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_only_roots_outside_the_candidate_set_r
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7410,7 +7948,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_root_whose_tree_table_cannot_be_read
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7533,7 +8071,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_data_unit_claims_its_second_slot_and
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7601,7 +8139,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_floor_raise_with_no_earlier_root_ins
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7635,7 +8173,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_an_unmount_marked_floor_raise_with_no_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7714,7 +8252,7 @@ fn the_gpu_judge_reddens_like_the_cpu_a_floor_raise_whose_window_cannot_bound_th
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7882,7 +8420,7 @@ fn the_gpu_judge_holds_like_the_cpu_a_floor_raise_bounded_by_the_journal_while_t
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -7917,11 +8455,11 @@ fn tree_count_the_gpu_scan_kernel_records_per_tree_table() -> usize {
         .expect("上限是十进制数")
 }
 
-/// 新池新建文件与固定脚本到回退 D 两条流写下的每一张树表，条目数都不超过 GPU 扫描内核一张树表能记的树数：核心层的树表再长
-/// （删除与并发那条线批 6 把第一个文件版本的树表从 7 条加到 11 条，扫描内核那时只记 8 棵，第 9 棵起判不了），这条在取卡之前就红，
-/// 不等对拍跑到新池那条流的状态 36。没卡的机器上也判到。
-#[test]
-fn every_tree_table_the_new_pool_and_the_rollback_flows_write_fits_the_tree_count_the_gpu_scan_kernel_records(
+/// 一条流写下的每一张树表，条目数都不超过 GPU 扫描内核一张树表能记的树数：核心层的树表比扫描内核记的树数长时
+/// （新池第一个文件版本的树表 11 条，扫描内核只记 8 棵就从第 9 棵起判不了），这条在取卡之前就红，不等对拍跑到那条流上第一个判不了的状态。
+/// 没卡的机器上也判到。
+fn assert_every_tree_table_of_the_flow_fits_the_tree_count_the_gpu_scan_kernel_records(
+    flow: &RecordedFlow,
 ) {
     let capacity = tree_count_the_gpu_scan_kernel_records_per_tree_table();
     let is_a_tree_table = |bytes: &[u8]| {
@@ -7929,26 +8467,39 @@ fn every_tree_table_the_new_pool_and_the_rollback_flows_write_fits_the_tree_coun
             && index_node_key_width(bytes) == 8
             && index_node_entry_width(bytes) == 200
     };
-    for flow in [
-        record_new_pool_file_creation("crash-judge-gpu-tree-count-new-pool", "new-pool"),
-        record_fixed_script_through_rollback("crash-judge-gpu-tree-count-rollback"),
-    ] {
-        let entry_counts: Vec<usize> = flow
-            .writes
-            .iter()
-            .filter(|write| write.kind == StepKind::UnitWrite)
-            .filter_map(|write| write.bytes())
-            .filter(|bytes| is_a_tree_table(bytes))
-            .map(entry_count_of_the_tree_table_read_by_its_key_width)
-            .collect();
-        assert!(!entry_counts.is_empty(), "流 {} 写了树表单元", flow.name);
-        let largest = entry_counts.iter().copied().max().expect("至少一张");
-        assert!(
-            largest <= capacity,
-            "流 {} 写下的树表最多 {largest} 条，GPU 扫描内核一张树表只记 {capacity} 棵树：先把 C_MAX_TREES_PER_TABLE 跟上（草稿区顺移、SCRATCH_WORDS 重算）",
-            flow.name
-        );
-    }
+    let entry_counts: Vec<usize> = flow
+        .writes
+        .iter()
+        .filter(|write| write.kind == StepKind::UnitWrite)
+        .filter_map(|write| write.bytes())
+        .filter(|bytes| is_a_tree_table(bytes))
+        .map(entry_count_of_the_tree_table_read_by_its_key_width)
+        .collect();
+    assert!(!entry_counts.is_empty(), "流 {} 写了树表单元", flow.name);
+    let largest = entry_counts.iter().copied().max().expect("至少一张");
+    assert!(
+        largest <= capacity,
+        "流 {} 写下的树表最多 {largest} 条，GPU 扫描内核一张树表只记 {capacity} 棵树：先把 C_MAX_TREES_PER_TABLE 跟上（草稿区顺移、SCRATCH_WORDS 重算）",
+        flow.name
+    );
+}
+
+/// 场景：新池新建文件那条流写下的每一张树表。预期：条目数都不超过 GPU 扫描内核一张树表能记的树数（[`assert_every_tree_table_of_the_flow_fits_the_tree_count_the_gpu_scan_kernel_records`]）。
+#[test]
+fn every_tree_table_the_new_pool_file_creation_writes_fits_the_tree_count_the_gpu_scan_kernel_records(
+) {
+    assert_every_tree_table_of_the_flow_fits_the_tree_count_the_gpu_scan_kernel_records(
+        &record_new_pool_file_creation("crash-judge-gpu-tree-count-new-pool", "new-pool"),
+    );
+}
+
+/// 场景：固定脚本到回退 D 那条流写下的每一张树表。预期：条目数都不超过 GPU 扫描内核一张树表能记的树数（[`assert_every_tree_table_of_the_flow_fits_the_tree_count_the_gpu_scan_kernel_records`]）。
+#[test]
+fn every_tree_table_the_fixed_script_through_a_rollback_writes_fits_the_tree_count_the_gpu_scan_kernel_records(
+) {
+    assert_every_tree_table_of_the_flow_fits_the_tree_count_the_gpu_scan_kernel_records(
+        &record_fixed_script_through_rollback("crash-judge-gpu-tree-count-rollback"),
+    );
 }
 
 /// 第一版能出现的最大树表那条流：新池新建文件（txg 3）之后接连建 `SNAPSHOTS_AT_MOST_IN_THE_FIRST_VERSION`（10）个快照，每一版都是第一个文件的内容。
@@ -8113,6 +8664,100 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publi
     );
 }
 
+/// 回退流上回退那次发布 D（实例 2、txg 9，回退目标 A 的 txg 3，前一版 C 的 txg 8）那片谱系容器里唯一那条记录：(T_rb, T_old) 两个字段改成给定的值、重封到根。
+/// 坏镜像的造法同 `checker_judges_reference_intervals_and_every_new_root_segment_field.rs` 的
+/// `rollback_whose_lineage_record_is_later_than_the_rollback_version_reddens_only_the_reference_interval_invariant`。
+/// D 照旧整棵继承 A 的 extent 树与 inode 树（根指针出生 txg 3），(b) 只差谱系那一半。
+fn record_rollback_with_the_lineage_record_interval_changed(
+    tag: &str,
+    name: &'static str,
+    rollback_txg_of_the_record: u64,
+    rollback_target_txg_of_the_record: u64,
+) -> RecordedFlow {
+    const LINEAGE_RECORD_TYPE: u16 = 5;
+    const PACKED_UNIT_FIRST_RECORD_OFFSET: usize = 136;
+    const LINEAGE_RECORD_ROLLBACK_TXG_OFFSET: usize = 0;
+    const LINEAGE_RECORD_ROLLBACK_TARGET_TXG_OFFSET: usize = 8;
+    const TXG_OF_THE_ROLLBACK_PUBLISH: u64 = 9;
+    const TXG_OF_THE_ROLLBACK_TARGET: u64 = 3;
+    let lineage_container =
+        |bytes: &[u8]| unit_class(bytes) == 3 && packed_record_type(bytes) == LINEAGE_RECORD_TYPE;
+    record_rollback_with_a_resealed_field(tag, name, &lineage_container, &|bytes| {
+        let rollback_txg = PACKED_UNIT_FIRST_RECORD_OFFSET + LINEAGE_RECORD_ROLLBACK_TXG_OFFSET;
+        let rollback_target_txg =
+            PACKED_UNIT_FIRST_RECORD_OFFSET + LINEAGE_RECORD_ROLLBACK_TARGET_TXG_OFFSET;
+        assert_eq!(
+            u64::from_le_bytes(bytes[rollback_txg..rollback_txg + 8].try_into().expect("8")),
+            TXG_OF_THE_ROLLBACK_PUBLISH,
+            "回退那次发布写的谱系记录 T_rb 是它自己的 txg"
+        );
+        assert_eq!(
+            u64::from_le_bytes(
+                bytes[rollback_target_txg..rollback_target_txg + 8]
+                    .try_into()
+                    .expect("8")
+            ),
+            TXG_OF_THE_ROLLBACK_TARGET,
+            "谱系记录 T_old 是回退目标 A 的 txg"
+        );
+        bytes[rollback_txg..rollback_txg + 8]
+            .copy_from_slice(&rollback_txg_of_the_record.to_le_bytes());
+        bytes[rollback_target_txg..rollback_target_txg + 8]
+            .copy_from_slice(&rollback_target_txg_of_the_record.to_le_bytes());
+    })
+}
+
+/// I-3.5 谱系区间 R⁻.txg < T_rb 那一格：T_rb 改成 C 的 txg 8，恰好等于前一版的 txg，不落在 (C.txg, D.txg] 里，落在 D 上的状态 CPU 红 I-3.5。
+/// GPU 那一格的「严格小于」写成「不大于」时这一位对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_rollback_at_the_previous_version(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_rollback_at_the_previous_version",
+        &record_rollback_with_the_lineage_record_interval_changed(
+            "crash-judge-gpu-i35-lineage-rollback-at-the-previous-version",
+            "rollback-lineage-record-rollback-txg-at-the-previous-version",
+            8,
+            3,
+        ),
+        "I-3.5",
+    );
+}
+
+/// I-3.5 谱系区间 T_rb ≤ R.txg 那一格：T_rb 改成 D 的 txg 加一，不落在 (C.txg, D.txg] 里，落在 D 上的状态 CPU 红 I-3.5。
+/// GPU 不判这一格时这一位对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_rollback_later_than_itself(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_rollback_later_than_itself",
+        &record_rollback_with_the_lineage_record_interval_changed(
+            "crash-judge-gpu-i35-lineage-rollback-later-than-itself",
+            "rollback-lineage-record-rollback-txg-later-than-the-publish",
+            10,
+            3,
+        ),
+        "I-3.5",
+    );
+}
+
+/// I-3.5 谱系区间「根指针出生 txg ≤ T_old」那一格：T_old 改成 2，比整棵继承下来那两棵树的根指针出生 txg 3 小，落在 D 上的状态 CPU 红 I-3.5。
+/// GPU 不判这一格时这一位对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_target_older_than_the_inherited_roots(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_when_the_lineage_record_of_a_rollback_publish_names_a_target_older_than_the_inherited_roots",
+        &record_rollback_with_the_lineage_record_interval_changed(
+            "crash-judge-gpu-i35-lineage-target-older-than-the-inherited-roots",
+            "rollback-lineage-record-target-older-than-the-inherited-roots",
+            9,
+            2,
+        ),
+        "I-3.5",
+    );
+}
+
 /// 回退流上谱系树的根（码 2、key 宽 8、条目宽 120、第一条条目的类型段是谱系记录 5）：头里的树 ID 加 1、重封到根。
 /// 落在 D 上的状态，CPU 恢复读谱系树根时核自描述（树 ID 不是树表条目里那棵）→ 走读失败、读不到文件；CPU 池级 checker 读这个根判 I-1.3 → 红。
 /// GPU 恢复内核不读谱系树根、或读了不核树 ID，GPU 走读内核不读谱系树根时，恢复或这一位对不上。
@@ -8174,7 +8819,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_root_of_a_rollback_publish
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -8257,7 +8902,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_lineage_and_logged_operations_entr
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -9306,7 +9951,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_carries_every_kind_and_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -9418,7 +10063,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_the_statistics_of_a_newest_version_wit
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -9465,7 +10110,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_the_committed_reservation_of_a_newest_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -9820,6 +10465,98 @@ fn record_new_pool_through_the_last_deletion_batch(tag: &str, name: &'static str
     )
 }
 
+/// I-3.5「走到没有条款的形状」（`pool_checker_judges_the_deletion_state_of_every_walked_version.rs` 同一形）：删到意图、留 2、留 1，
+/// 中间那一版（留 2）树表里 `deleted_inodes` 那一条（带根）的种类改成没登记的码、重封到根。
+/// 主走读不往下走，中间那一版的引用集合数不全，它参与的那两对两边都不判；照判的话最新那一版整棵继承的 `deleted_inodes` 树红 I-3.5。
+fn record_deletion_with_an_unregistered_kind_on_the_deleted_inodes_entry_of_an_intermediate_version(
+    tag: &str,
+) -> RecordedFlow {
+    let name = "deletion-intermediate-version-tree-table-entry-of-an-unregistered-kind";
+    let mut pool = pool_with_a_three_unit_file(tag);
+    publish_the_intent(&mut pool);
+    publish_the_next_step_in_batches_of_one(&mut pool);
+    publish_the_next_step_in_batches_of_one(&mut pool);
+    let mut flow = recorded_flow_of_the_pool(
+        &pool,
+        name,
+        versions_with_the_first_file_before_its_deletion(),
+    );
+    let tree_table_copies: Vec<usize> = flow
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| {
+            write.kind == StepKind::UnitWrite && write.bytes().is_some_and(is_a_tree_table_unit)
+        })
+        .map(|(index, _)| index)
+        .collect();
+    let intermediate_version_copies =
+        &tree_table_copies[tree_table_copies.len() - 4..tree_table_copies.len() - 2];
+    assert_eq!(
+        flow.writes[intermediate_version_copies[0]].bytes(),
+        flow.writes[intermediate_version_copies[1]].bytes(),
+        "倒数第二张树表的两份副本字节相同（每一版重写树表，一张两份）"
+    );
+    corrupt_units_and_reseal_up_to_the_root(&mut flow, intermediate_version_copies, &|bytes| {
+        let entry = only_tree_table_entry_of_kind(bytes, TREE_KIND_DELETED_INODES);
+        let root_pointer = entry + TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET;
+        assert_ne!(
+            bytes[root_pointer..root_pointer + NODE_POINTER_BYTES],
+            [0u8; NODE_POINTER_BYTES],
+            "删除中间那一版的 deleted_inodes 树有根"
+        );
+        let kind = entry + TREE_TABLE_ENTRY_KIND_OFFSET;
+        bytes[kind..kind + 2].copy_from_slice(&UNREGISTERED_TREE_KIND.to_le_bytes());
+    });
+    flow
+}
+
+/// CPU 红 I-9.16、不红 I-3.5，I-3.5 在整条落盘的镜像上报部分没判、点名那一条条目的种类；GPU 每个状态逐位相同。
+/// GPU 不把这一版记成引用没收全时，最新那一版整棵继承的 `deleted_inodes` 树判红 I-3.5，这一位对不上。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_when_an_intermediate_deletion_version_carries_a_tree_table_entry_of_an_unregistered_kind(
+) {
+    const TEST_NAME: &str = "the_gpu_judge_agrees_with_the_cpu_when_an_intermediate_deletion_version_carries_a_tree_table_entry_of_an_unregistered_kind";
+    let flow = record_deletion_with_an_unregistered_kind_on_the_deleted_inodes_entry_of_an_intermediate_version(
+        "crash-judge-gpu-i35-intermediate-version-unregistered-kind",
+    );
+    let mut image_after_the_whole_flow = flow.base.clone();
+    image_after_the_whole_flow.apply_writes(&flow.writes);
+    match pool_checker_verdict_on_the_image(&image_after_the_whole_flow, "I-3.5") {
+        InvariantVerdict::PartiallyJudged(unjudged) => assert!(
+            unjudged.contains(&format!(
+                "有一版树表里有种类 {UNREGISTERED_TREE_KIND} 的条目，走读走到没有条款的形状、引用没收全，这一对不判"
+            )),
+            "I-3.5 的部分没判点名那一条条目的种类：{unjudged}"
+        ),
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::NotApplicable(_)) => {
+            panic!("中间那一版的引用没收全：I-3.5 要报部分没判，实际 {other_verdict:?}")
+        }
+    }
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains("I-9.16")
+            && !comparison.cpu_checker_red_invariants.contains("I-3.5"),
+        "流 {} 上 CPU 池级 checker 红 I-9.16、一个状态都不红 I-3.5（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert!(
+        comparison.mismatches.is_empty(),
+        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        flow.name,
+        comparison.mismatches.state_count(),
+        mismatch_listing(&comparison)
+    );
+}
+
 /// 删除中间态的流上改坏最后一个 `select` 命中的单元（两份副本）的一处、重封到根。
 fn record_deletion_with_a_resealed_field(
     tag: &str,
@@ -10053,7 +10790,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_deletion_in_progress() 
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     for invariant in ["I-9.5", "I-3.4", "I-4.7", "I-4.6"] {
@@ -10092,7 +10829,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_deletion_through_the_la
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     for invariant in ["I-9.5", "I-3.4", "I-4.7", "I-4.6"] {
@@ -10170,6 +10907,7 @@ fn segments_missing_one_write_of_each_unexpanded_segment(
 /// 这里每段每次写各比一次「之前的段全落、这一段只差这一次写」的状态（连同最后全落那一个），
 /// GPU 与 CPU 整份相同；CPU 那一侧逐状态现判，不抄数。第一批那一段的这些状态上最新落盘的根是意图那一版，第一个文件 nlink = 0，
 /// 两边都要答没有文件（C712（GPU 恢复内核不判 nlink = 0））。每种切法恰好两个状态在取卡之前判，没卡的机器上也判到。
+// harness-test-granularity:one-scenario 同一条录好的流只录一次、不重建池，各轮是同一份写序列换一种切段、每种切法只有两个状态，合起来是这条流上展开上限不展开的段那一个场景
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_on_every_state_missing_one_write_of_an_unexpanded_segment_of_a_deletion_in_progress(
 ) {
@@ -10463,7 +11201,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_each_of(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -12201,7 +12939,7 @@ fn the_gpu_judge_leaves_to_the_cpu_an_instance_table_chain_longer_than_the_pages
         left_to_the_cpu.disagreements.is_empty(),
         "流 {}：{} 处不一致（前几个）：\n{}",
         flow.name,
-        left_to_the_cpu.disagreements.len(),
+        left_to_the_cpu.disagreements.state_count(),
         left_to_the_cpu
             .disagreements
             .iter()
@@ -12621,6 +13359,9 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_separator_key_of_the_inode_root_is_n
 /// 改低之后右片那条条目的分隔 key：不大于左片最大号 233（I-9.12 第三句红），仍不大于右片最小号 234（I-9.4 第一句不红）。
 const SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_LOWERED: u64 = 200;
 
+/// 改高之后右片那条条目的分隔 key：大于右片头一条记录号 234（I-9.4 第一句红），也大于左片最大号 233（I-9.12 第三句不红）。
+const SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_RAISED: u64 = 235;
+
 /// [`the_gpu_judge_agrees_with_the_cpu_when_a_separator_key_of_the_inode_root_is_not_above_the_leaf_before_it`] 那条流：两片 inode 叶，
 /// inode 树根右片那条条目的分隔 key 改成 [`SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_LOWERED`]、重封到根。
 fn record_two_inode_leaves_with_the_separator_key_of_the_right_leaf_lowered(
@@ -12836,7 +13577,7 @@ fn the_gpu_judge_agrees_with_the_cpu_recovery_that_a_deadlist_leaf_wider_than_it
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -12860,7 +13601,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_an_unlink_rolled_back_and
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     for invariant in ["I-9.18", "I-9.19", "I-9.20", "I-9.24", "I-9.29"] {
@@ -12918,7 +13659,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening_the_identity_wit
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13041,7 +13782,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_an_abandoned_root_naming_another_objec
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13116,7 +13857,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_newest_instance_table_page_that
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13247,7 +13988,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_second_instance_table_page_whose_poi
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13297,7 +14038,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_an_inode_root_entry_of_type_zero_witho
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13749,7 +14490,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_second_copy_of_an_inode_leaf_is_a_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13824,7 +14565,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_leaf_copy_of_the_entry_type_carries_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13900,7 +14641,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_an_instance_table_pointer_whose_b
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -13986,7 +14727,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_that_the_one_birth_invariant_is_not_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -14069,7 +14810,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_a_newest_instance_table_chain_of_as_many
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致或判不了（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -14129,7 +14870,7 @@ fn the_gpu_judge_leaves_to_the_cpu_a_newest_instance_table_chain_longer_than_the
         left_to_the_cpu.disagreements.is_empty(),
         "流 {}：{} 处不一致（前几个）：\n{}",
         flow.name,
-        left_to_the_cpu.disagreements.len(),
+        left_to_the_cpu.disagreements.state_count(),
         left_to_the_cpu
             .disagreements
             .iter()
@@ -14503,7 +15244,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_version_applied_only_by_its_records_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -14554,7 +15295,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_tree_table_pointer_of_the_root_and
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -14595,7 +15336,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_records_of_a_version_applied_only_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -14648,17 +15389,247 @@ fn record_three_unit_file_crashed_before_its_root_over_two_allocation_records_co
     flow
 }
 
-/// 断号那一形（[`record_three_unit_file_crashed_before_its_root_over_two_allocation_records_covering_one_slot`]）。CPU 一侧先钉流造对了：
-/// 三条记录都落了的镜像上 txg 4 是下一次挂载先施加的那一版，I-5.4 红在它身上；首条（计数器 4）两份都不落、其余照落的镜像上 core 断号
-/// 不施加 txg 4，CPU 照同一份重放不认它，I-5.4 在 txg 3 那一版上判过而成立。GPU 扫描内核读走读内核那一份重放交来的第一次发布，
-/// 每个状态逐位相同（只看带末条标志的那一条就认计数器 6，断号的状态上 GPU 红 I-5.4 而 CPU 不红）。
+/// 断号那一形那条流（[`record_three_unit_file_crashed_before_its_root_over_two_allocation_records_covering_one_slot`]，全量域）的状态数：
+/// 一条用例判不完，按状态序号区间拆成 [`ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land`] 那几条用例；每条用例开跑之前在 CPU 上核
+/// 这条流算出的状态数等于它。
+const STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND: u64 = 1_090_519_154;
+
+/// 断号那一形那条流拆开时一条用例判几个状态（最后一条另带不满一条的零头）：对拍一组的状态数（[`STATES_PER_PAIRING_BLOCK`] ×
+/// [`PAIRING_BLOCKS_JUDGED_TOGETHER`]）的整数倍，区间两头落在组的边界上，块键与整条流跑时逐块相同。
+const STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND: u64 = 1 << 24;
+
+/// 断号那一形那条流拆成的几条用例各判的状态序号区间，按序号排：每段 [`STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND`] 个状态，
+/// 不满一段的零头并进最后一段（最后一段到整条流的状态数为止，含序号最大的那个「全部持久」的状态）。
+fn ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land() -> Vec<std::ops::Range<u64>>
+{
+    let cases = STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND
+        / STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND;
+    let mut ordinals_of_the_cases: Vec<std::ops::Range<u64>> = (0..cases - 1)
+        .map(|case| {
+            case * STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND
+                ..(case + 1) * STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND
+        })
+        .collect();
+    ordinals_of_the_cases.push(
+        (cases - 1) * STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND
+            ..STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+    );
+    ordinals_of_the_cases
+}
+
+/// 断号那一形那条流拆成的用例各判的状态序号区间（不上卡、不录流、不判状态，只算区间表）：按序号排、首尾相接、两两不交，并起来恰好是
+/// `[0, 整条流的状态数)`；每段两头落在对拍分组的边界上（终点另可是整条流的状态数），各段的组区间同样首尾相接、盖满整条流的组；
+/// 共 65 段，与下面 65 条用例一一对上（每条用例开跑前核自己那一段在表里）。
+/// 判别力（`crates/mutations.tsv`）：区间表里整段那几段的终点多一个状态（相邻两段重叠一个状态），这条红。
 #[test]
-fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first(
+fn the_ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land_cover_every_state_once() {
+    let ordinals_of_the_cases = ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land();
+    assert_eq!(
+        ordinals_of_the_cases.len(),
+        65,
+        "区间表 65 段，下面 65 条用例各判一段"
+    );
+    let states_per_block = std::num::NonZeroU64::new(STATES_PER_PAIRING_BLOCK).expect("块宽不是 0");
+    let blocks_per_group =
+        std::num::NonZeroUsize::new(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("一次判的块数不是 0");
+    let states_per_group = STATES_PER_PAIRING_BLOCK
+        * u64::try_from(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("装得进 u64");
+    let mut next_ordinal = 0u64;
+    let mut next_group = 0u64;
+    for ordinals in &ordinals_of_the_cases {
+        assert_eq!(
+            ordinals.start, next_ordinal,
+            "状态序号区间 {ordinals:?} 接着前一段的终点起：首尾相接、两两不交"
+        );
+        assert!(
+            ordinals.start < ordinals.end
+                && ordinals.end - ordinals.start
+                    < 2 * STATES_PER_CASE_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+            "状态序号区间 {ordinals:?} 不空，至多一条用例的宽度加不满一条的零头"
+        );
+        let groups = groups_of_pairing_blocks_holding_the_states(
+            ordinals,
+            STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+            states_per_block,
+            blocks_per_group,
+        )
+        .unwrap_or_else(|refusal| panic!("{refusal}"));
+        assert_eq!(
+            groups.start, next_group,
+            "状态序号区间 {ordinals:?} 的组区间 {groups:?} 接着前一段的组区间起"
+        );
+        next_ordinal = ordinals.end;
+        next_group = groups.end;
+    }
+    assert_eq!(
+        next_ordinal, STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+        "各段并起来到整条流的状态数为止"
+    );
+    assert_eq!(
+        next_group,
+        STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND.div_ceil(states_per_group),
+        "各段的组区间并起来盖满整条流的组"
+    );
+}
+
+/// 断号那一形那条流里「首条（计数器 4）两份都没落、计数器 5 与 6 四份都落了」那一类状态序号最小的一个：除了首条两份，录制流里每次写都落了
+/// （CPU 一侧钉的那张「首条两份都不落、其余照落」的镜像就是它）。改法 R1 的 GPU 一半改回只看带末条标志的那一条记录时，GPU 在它上面认计数器 6、
+/// 红 I-5.4，CPU 不红：`crates/mutations.tsv` 里那一行点名判它所在那一段的用例。
+const ORDINAL_OF_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND: u64 = 1_090_519_150;
+
+/// [`ORDINAL_OF_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND`] 落在的那一段用例的状态序号区间（区间表里到整条流的状态数为止的那一段）。
+const ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND:
+    std::ops::Range<u64> = 1_073_741_824..STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND;
+
+/// 断号那一形那条流上，「首条两份都没落、后两条四份都落了」那一类状态只在三条记录那一段里（不上卡、不判状态，只录流、建表、按序号取持久集合）：
+/// 发布先写单元、屏障，再写三条记录、屏障（`singlefs_core::transaction` 的 `persist_publish_writes`），流录到根槽 FUA 之前停，
+/// 所以六次记录写自成一段；它之前的段里记录一次都没落，它之后的状态（全部持久那一个）首条落了。逐个取这一段的状态（全量域上 63 个），
+/// 这一类里序号最小的就是 [`ORDINAL_OF_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND`]，它的持久集合是「除首条两份外每次写都落了」，
+/// 落在 [`ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND`] 那一段用例里。
+#[test]
+fn the_state_where_only_the_first_record_did_not_land_is_judged_by_the_case_ending_at_the_state_count_of_the_flow(
 ) {
+    assert!(
+        ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land().contains(
+            &ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND
+        ),
+        "状态序号区间 {:?} 是区间表里的一段",
+        ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND
+    );
+    let flow =
+        record_three_unit_file_crashed_before_its_root_over_two_allocation_records_covering_one_slot(
+            "crash-judge-gpu-r1-first-record-not-landed-ordinal",
+        );
+    let expansion = expansion_up_to(expand_up_to());
+    let judge_flow = JudgeFlow {
+        base: &flow.base,
+        writes: &flow.writes,
+        segments: &flow.segments,
+        judged_root_index: flow.judged_root_index,
+        versions: &flow.versions,
+        expansion: &expansion,
+    };
+    let tables = build_judge_tables_against_the_version_table(&judge_flow, &[]).expect("建得出表");
+    assert_eq!(
+        tables.state_count, STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+        "流 {}：全量域上的状态数是区间表拆的那个数",
+        flow.name
+    );
+    let records = journal_record_writes_of_the_publish(&flow, 4);
+    let first_counter = records
+        .iter()
+        .map(|(_, counter)| *counter)
+        .min()
+        .expect("顺序写那次发布有记录");
+    let copies_of_the_first_record: Vec<usize> = records
+        .iter()
+        .filter(|(_, counter)| *counter == first_counter)
+        .map(|(index, _)| *index)
+        .collect();
+    let copies_of_the_later_records: Vec<usize> = records
+        .iter()
+        .filter(|(_, counter)| *counter != first_counter)
+        .map(|(index, _)| *index)
+        .collect();
+    assert_eq!(
+        (
+            copies_of_the_first_record.len(),
+            copies_of_the_later_records.len()
+        ),
+        (2, 4),
+        "首条两块盘各一份，后两条两块盘共四份"
+    );
+    let segment_of_the_records = flow
+        .segments
+        .iter()
+        .position(|segment| segment.contains(&copies_of_the_first_record[0]))
+        .expect("记录写在某一段里");
+    let mut writes_of_the_segment = flow.segments[segment_of_the_records].clone();
+    writes_of_the_segment.sort_unstable();
+    let mut writes_of_the_records: Vec<usize> = records.iter().map(|(index, _)| *index).collect();
+    writes_of_the_records.sort_unstable();
+    assert_eq!(
+        writes_of_the_segment, writes_of_the_records,
+        "流 {}：三条记录两块盘六次写自成一段（单元写之后、记录之前有屏障，记录之后有屏障）",
+        flow.name
+    );
+    let states_of_the_segment = tables.segments[segment_of_the_records].states.clone();
+    let is_of_the_class = |persisted: &[bool]| {
+        copies_of_the_first_record
+            .iter()
+            .all(|index| !persisted[*index])
+            && copies_of_the_later_records
+                .iter()
+                .all(|index| persisted[*index])
+    };
+    let smallest_ordinal_of_the_class = states_of_the_segment
+        .clone()
+        .find(|ordinal| is_of_the_class(&tables.persisted_writes_of_state(*ordinal)))
+        .unwrap_or_else(|| {
+            panic!(
+                "流 {}：三条记录那一段（状态序号 {states_of_the_segment:?}）里没有首条两份都没落、后两条四份都落了的状态",
+                flow.name
+            )
+        });
+    assert_eq!(
+        smallest_ordinal_of_the_class,
+        ORDINAL_OF_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND,
+        "流 {}：这一类状态序号最小的一个（三条记录那一段的状态序号 {states_of_the_segment:?}）",
+        flow.name
+    );
+    let persisted = tables.persisted_writes_of_state(smallest_ordinal_of_the_class);
+    let landed_writes: Vec<usize> = (0..flow.writes.len())
+        .filter(|index| persisted[*index])
+        .collect();
+    let every_write_but_the_first_record: Vec<usize> = (0..flow.writes.len())
+        .filter(|index| !copies_of_the_first_record.contains(index))
+        .collect();
+    assert_eq!(
+        landed_writes, every_write_but_the_first_record,
+        "序号 {smallest_ordinal_of_the_class}：除首条两份外录制流里每次写都落了"
+    );
+    assert!(
+        persisted[flow.writes.len()..]
+            .iter()
+            .all(|is_persisted| !is_persisted),
+        "序号 {smallest_ordinal_of_the_class}：没有一次写撕裂（撕裂镜像一个都不持久）"
+    );
+    assert!(
+        ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND
+            .contains(&smallest_ordinal_of_the_class),
+        "序号 {smallest_ordinal_of_the_class} 落在状态序号区间 {:?} 那一段用例里",
+        ORDINALS_OF_THE_CASE_HOLDING_THE_STATE_WHERE_ONLY_THE_FIRST_RECORD_DID_NOT_LAND
+    );
+}
+
+/// 断号那一形（[`record_three_unit_file_crashed_before_its_root_over_two_allocation_records_covering_one_slot`]）里状态序号落在 `ordinals` 的那一段。
+/// CPU 一侧先钉流造对了：三条记录都落了的镜像上 txg 4 是下一次挂载先施加的那一版，I-5.4 红在它身上；首条（计数器 4）两份都不落、其余照落的镜像上
+/// core 断号不施加 txg 4，CPU 照同一份重放不认它，I-5.4 在 txg 3 那一版上判过而成立（两张镜像便宜，每段都钉）。GPU 扫描内核读走读内核那一份重放交来的
+/// 第一次发布，这一段每个状态逐位相同（只看带末条标志的那一条就认计数器 6，断号的状态上 GPU 红 I-5.4 而 CPU 不红）。「CPU 池级 checker 红过 I-5.4」
+/// 只在含「全部持久」那个状态（序号最大，就是三条记录都落了的那张镜像）的最后一段上断言。`test_name` 是调它的用例名（本次未跑那一行点名它）。
+fn assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+    test_name: &str,
+    ordinals: std::ops::Range<u64>,
+) {
+    assert!(
+        ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land().contains(&ordinals),
+        "用例 {test_name} 判的状态序号 {ordinals:?} 是区间表里的一段"
+    );
     let flow =
         record_three_unit_file_crashed_before_its_root_over_two_allocation_records_covering_one_slot(
             "crash-judge-gpu-r1-first-record-not-landed",
         );
+    assert_eq!(
+        crash_point_replay_plan_state_count(
+            &flow.base,
+            &flow.writes,
+            &flow.segments,
+            &expansion_up_to(expand_up_to())
+        ),
+        STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND,
+        "流 {}：全量域上的状态数是区间表拆的那个数",
+        flow.name
+    );
     let mut image_with_every_record_landed = flow.base.clone();
     image_with_every_record_landed.apply_writes(&flow.writes);
     match pool_checker_verdict_on_the_image(&image_with_every_record_landed, "I-5.4") {
@@ -14698,26 +15669,615 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_l
         InvariantVerdict::Holds,
         "首条两份都没落、后两条落了：core 断号不施加 txg 4，CPU 不认它，I-5.4 在 txg 3 那一版上判过而成立"
     );
-    let Some(cards) = gpu_card_pool_or_report_not_run(
-        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first",
-    ) else {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
-    let Some(comparison) = compare_on_every_state(cards, &flow, expand_up_to()) else {
+    let Some(comparison) =
+        compare_on_every_state_with_ordinals_in(cards, &flow, expand_up_to(), ordinals.clone())
+    else {
         return;
     };
-    assert!(
-        comparison.cpu_checker_red_invariants.contains("I-5.4"),
-        "流 {} 上 CPU 池级 checker 要红 I-5.4（红过的：{:?}）",
-        flow.name,
-        comparison.cpu_checker_red_invariants
-    );
+    if ordinals.end == STATES_OF_THE_FLOW_WHOSE_FIRST_RECORD_DID_NOT_LAND {
+        assert!(
+            comparison.cpu_checker_red_invariants.contains("I-5.4"),
+            "流 {}（状态序号 {ordinals:?}，含全部持久的那个状态）上 CPU 池级 checker 要红 I-5.4（红过的：{:?}）",
+            flow.name,
+            comparison.cpu_checker_red_invariants
+        );
+    }
     assert!(
         comparison.mismatches.is_empty(),
-        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
+        "流 {}（状态序号 {ordinals:?}）：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
+    );
+}
+
+// 断号那一形那条流按状态序号区间拆成的用例：每条判一段（[`ordinals_of_the_cases_of_the_flow_whose_first_record_did_not_land`]），名字写区间的两个端点。
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_0_to_16777216(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_0_to_16777216",
+        0..16777216,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_16777216_to_33554432(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_16777216_to_33554432",
+        16777216..33554432,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_33554432_to_50331648(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_33554432_to_50331648",
+        33554432..50331648,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_50331648_to_67108864(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_50331648_to_67108864",
+        50331648..67108864,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_67108864_to_83886080(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_67108864_to_83886080",
+        67108864..83886080,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_83886080_to_100663296(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_83886080_to_100663296",
+        83886080..100663296,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_100663296_to_117440512(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_100663296_to_117440512",
+        100663296..117440512,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_117440512_to_134217728(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_117440512_to_134217728",
+        117440512..134217728,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_134217728_to_150994944(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_134217728_to_150994944",
+        134217728..150994944,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_150994944_to_167772160(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_150994944_to_167772160",
+        150994944..167772160,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_167772160_to_184549376(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_167772160_to_184549376",
+        167772160..184549376,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_184549376_to_201326592(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_184549376_to_201326592",
+        184549376..201326592,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_201326592_to_218103808(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_201326592_to_218103808",
+        201326592..218103808,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_218103808_to_234881024(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_218103808_to_234881024",
+        218103808..234881024,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_234881024_to_251658240(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_234881024_to_251658240",
+        234881024..251658240,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_251658240_to_268435456(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_251658240_to_268435456",
+        251658240..268435456,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_268435456_to_285212672(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_268435456_to_285212672",
+        268435456..285212672,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_285212672_to_301989888(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_285212672_to_301989888",
+        285212672..301989888,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_301989888_to_318767104(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_301989888_to_318767104",
+        301989888..318767104,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_318767104_to_335544320(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_318767104_to_335544320",
+        318767104..335544320,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_335544320_to_352321536(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_335544320_to_352321536",
+        335544320..352321536,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_352321536_to_369098752(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_352321536_to_369098752",
+        352321536..369098752,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_369098752_to_385875968(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_369098752_to_385875968",
+        369098752..385875968,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_385875968_to_402653184(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_385875968_to_402653184",
+        385875968..402653184,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_402653184_to_419430400(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_402653184_to_419430400",
+        402653184..419430400,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_419430400_to_436207616(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_419430400_to_436207616",
+        419430400..436207616,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_436207616_to_452984832(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_436207616_to_452984832",
+        436207616..452984832,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_452984832_to_469762048(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_452984832_to_469762048",
+        452984832..469762048,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_469762048_to_486539264(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_469762048_to_486539264",
+        469762048..486539264,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_486539264_to_503316480(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_486539264_to_503316480",
+        486539264..503316480,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_503316480_to_520093696(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_503316480_to_520093696",
+        503316480..520093696,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_520093696_to_536870912(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_520093696_to_536870912",
+        520093696..536870912,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_536870912_to_553648128(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_536870912_to_553648128",
+        536870912..553648128,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_553648128_to_570425344(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_553648128_to_570425344",
+        553648128..570425344,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_570425344_to_587202560(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_570425344_to_587202560",
+        570425344..587202560,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_587202560_to_603979776(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_587202560_to_603979776",
+        587202560..603979776,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_603979776_to_620756992(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_603979776_to_620756992",
+        603979776..620756992,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_620756992_to_637534208(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_620756992_to_637534208",
+        620756992..637534208,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_637534208_to_654311424(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_637534208_to_654311424",
+        637534208..654311424,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_654311424_to_671088640(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_654311424_to_671088640",
+        654311424..671088640,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_671088640_to_687865856(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_671088640_to_687865856",
+        671088640..687865856,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_687865856_to_704643072(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_687865856_to_704643072",
+        687865856..704643072,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_704643072_to_721420288(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_704643072_to_721420288",
+        704643072..721420288,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_721420288_to_738197504(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_721420288_to_738197504",
+        721420288..738197504,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_738197504_to_754974720(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_738197504_to_754974720",
+        738197504..754974720,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_754974720_to_771751936(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_754974720_to_771751936",
+        754974720..771751936,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_771751936_to_788529152(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_771751936_to_788529152",
+        771751936..788529152,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_788529152_to_805306368(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_788529152_to_805306368",
+        788529152..805306368,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_805306368_to_822083584(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_805306368_to_822083584",
+        805306368..822083584,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_822083584_to_838860800(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_822083584_to_838860800",
+        822083584..838860800,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_838860800_to_855638016(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_838860800_to_855638016",
+        838860800..855638016,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_855638016_to_872415232(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_855638016_to_872415232",
+        855638016..872415232,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_872415232_to_889192448(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_872415232_to_889192448",
+        872415232..889192448,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_889192448_to_905969664(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_889192448_to_905969664",
+        889192448..905969664,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_905969664_to_922746880(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_905969664_to_922746880",
+        905969664..922746880,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_922746880_to_939524096(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_922746880_to_939524096",
+        922746880..939524096,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_939524096_to_956301312(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_939524096_to_956301312",
+        939524096..956301312,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_956301312_to_973078528(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_956301312_to_973078528",
+        956301312..973078528,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_973078528_to_989855744(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_973078528_to_989855744",
+        973078528..989855744,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_989855744_to_1006632960(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_989855744_to_1006632960",
+        989855744..1006632960,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1006632960_to_1023410176(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1006632960_to_1023410176",
+        1006632960..1023410176,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1023410176_to_1040187392(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1023410176_to_1040187392",
+        1023410176..1040187392,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1040187392_to_1056964608(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1040187392_to_1056964608",
+        1040187392..1056964608,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1056964608_to_1073741824(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1056964608_to_1073741824",
+        1056964608..1073741824,
+    );
+}
+
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1073741824_to_1090519154(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states(
+        "the_gpu_judge_agrees_with_the_cpu_that_a_publish_whose_first_record_did_not_land_is_not_the_version_the_next_mount_applies_first_on_the_states_from_1073741824_to_1090519154",
+        1073741824..1090519154,
     );
 }
 
@@ -14903,7 +16463,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_replay_stopped_by_a_named_unit_of_a_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -15242,7 +16802,7 @@ fn assert_the_gpu_judge_leaves_to_the_cpu_only_states_undecidable_for(
         left_to_the_cpu.disagreements.is_empty(),
         "流 {}：{} 处不一致（前几个）：\n{}",
         flow.name,
-        left_to_the_cpu.disagreements.len(),
+        left_to_the_cpu.disagreements.state_count(),
         left_to_the_cpu
             .disagreements
             .iter()
@@ -16042,7 +17602,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_states_holding_a_version_applied_by_its_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16117,7 +17677,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_tombstone_root_entry_of_type_zero_na
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16176,7 +17736,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_the_deleted_flow_against_a_version_table
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16220,15 +17780,18 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back(
     name: &'static str,
 ) -> RecordedFlow {
     let mut flow = record_two_overwrites(tag, name);
-    let root_of_r = flow.judged_root_index;
-    break_both_copies_of_the_tree_table_named_by_the_root_write(&mut flow, root_of_r);
+    let root_of_the_judged_publish = flow.judged_root_index;
+    break_both_copies_of_the_tree_table_named_by_the_root_write(
+        &mut flow,
+        root_of_the_judged_publish,
+    );
     flow
 }
 
 /// F2 那两条流上的三版：V⁻（新池新建文件）、V（第一次覆盖写，已确认）、R（第二次覆盖写，走读失败），(实例代号, txg)。
-const V_MINUS_OF_THE_F2_FLOWS: (u32, u64) = (1, 3);
-const V_OF_THE_F2_FLOWS: (u32, u64) = (1, 4);
-const R_OF_THE_F2_FLOWS: (u32, u64) = (1, 5);
+const VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS: (u32, u64) = (1, 3);
+const CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS: (u32, u64) = (1, 4);
+const JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS: (u32, u64) = (1, 5);
 
 /// 看 journal 那一遍 oracle 判「落到更旧的根」的那一项（`CrashStateJudgement::red_items` 里的写法）。
 fn consulted_oracle_item(kind: CrashPointReplayOracleViolationKind) -> String {
@@ -16244,13 +17807,16 @@ fn consulted_recovery_lands_on(version: (u32, u64), class: u32) -> StateConditio
 }
 
 /// 数「看 journal 那一遍报读不出、报的根是 R、实际走的那条根也是 R、结局读失败」的状态（F2 那几条流上 R 走读失败、不退的那几个状态）。
-fn states_reporting_r_unreadable() -> StateExamination {
+fn states_reporting_the_judged_publish_unreadable() -> StateExamination {
     StateExamination::CountStatesWhere(StateCondition::AllOf(vec![
         StateCondition::CpuRedItemsContain(consulted_oracle_item(
             CrashPointReplayOracleViolationKind::ReadFailed,
         )),
-        StateCondition::CpuReportedRootIs(Some(R_OF_THE_F2_FLOWS)),
-        consulted_recovery_lands_on(R_OF_THE_F2_FLOWS, RECOVERY_WORD_CLASS_FAILED),
+        StateCondition::CpuReportedRootIs(Some(JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS)),
+        consulted_recovery_lands_on(
+            JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS,
+            RECOVERY_WORD_CLASS_FAILED,
+        ),
     ]))
 }
 
@@ -16287,27 +17853,30 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_whose_newest_root_does_not_
         &[StateExamination::CountStatesWhere(StateCondition::AllOf(
             vec![
                 StateCondition::CpuRedItemsContain(recovered_to_an_older_root),
-                consulted_recovery_lands_on(V_OF_THE_F2_FLOWS, RECOVERY_WORD_CLASS_FILE_READ),
+                consulted_recovery_lands_on(
+                    CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS,
+                    RECOVERY_WORD_CLASS_FILE_READ,
+                ),
             ],
         ))],
     ) else {
         return;
     };
-    let states_falling_back_to_v = comparison.examined[0].states_counted;
+    let states_falling_back_to_the_confirmed_version = comparison.examined[0].states_counted;
     eprintln!(
-        "CRASH_JUDGE_GPU_F2 flow={} states={} states_falling_back_to_v={states_falling_back_to_v}",
+        "CRASH_JUDGE_GPU_F2 flow={} states={} states_falling_back_to_v={states_falling_back_to_the_confirmed_version}",
         flow.name, comparison.states
     );
     assert!(
-        states_falling_back_to_v > 0,
-        "流 {}：R 的根槽落了而系统配置没见证 R 的状态上，CPU 看 journal 那一遍退到 V {V_OF_THE_F2_FLOWS:?}、读出第二份内容",
+        states_falling_back_to_the_confirmed_version > 0,
+        "流 {}：R 的根槽落了而系统配置没见证 R 的状态上，CPU 看 journal 那一遍退到 V {CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS:?}、读出第二份内容",
         flow.name
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16324,8 +17893,11 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_past_the
         "crash-judge-gpu-f2-witnessed-root-unreadable",
         "two-overwrites-second-tree-table-unreadable-and-the-witnessed-root-unreadable",
     );
-    let root_of_v = root_write_of_txg(&flow, V_OF_THE_F2_FLOWS.1);
-    let WrittenContents::Bytes(root_bytes) = &mut flow.writes[root_of_v].contents else {
+    let root_of_the_confirmed_version =
+        root_write_of_txg(&flow, CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1);
+    let WrittenContents::Bytes(root_bytes) =
+        &mut flow.writes[root_of_the_confirmed_version].contents
+    else {
         panic!("根槽写是普通写");
     };
     root_bytes[ROOT_RECORD_CHECKSUM_FIELD_OFFSET] ^= 0x01;
@@ -16337,33 +17909,35 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_past_the
         &flow,
         expand_up_to(),
         &[
-            states_reporting_r_unreadable(),
-            states_where_the_consulted_recovery_falls_back_to(V_MINUS_OF_THE_F2_FLOWS),
+            states_reporting_the_judged_publish_unreadable(),
+            states_where_the_consulted_recovery_falls_back_to(
+                VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
+            ),
         ],
     ) else {
         return;
     };
-    let states_reporting_r_unreadable = comparison.examined[0].states_counted;
-    let states_falling_back_past_v = comparison.examined[1].states_counted;
+    let states_reporting_the_judged_publish_unreadable = comparison.examined[0].states_counted;
+    let states_falling_back_past_the_confirmed_version = comparison.examined[1].states_counted;
     eprintln!(
-        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_r_unreadable} states_falling_back_past_v={states_falling_back_past_v}",
+        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_the_judged_publish_unreadable} states_falling_back_past_v={states_falling_back_past_the_confirmed_version}",
         flow.name, comparison.states
     );
     assert!(
-        states_reporting_r_unreadable > 0,
-        "流 {}：R 走读失败、V 的根读不出的状态上 CPU 看 journal 那一遍报读不出、报的根是 R {R_OF_THE_F2_FLOWS:?}",
+        states_reporting_the_judged_publish_unreadable > 0,
+        "流 {}：R 走读失败、V 的根读不出的状态上 CPU 看 journal 那一遍报读不出、报的根是 R {JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS:?}",
         flow.name
     );
     assert_eq!(
-        states_falling_back_past_v, 0,
-        "流 {}：一个状态都不退到 V⁻ {V_MINUS_OF_THE_F2_FLOWS:?}（F2 只退到见证到的那一版 V 及之后、所选根之前）",
+        states_falling_back_past_the_confirmed_version, 0,
+        "流 {}：一个状态都不退到 V⁻ {VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS:?}（F2 只退到见证到的那一版 V 及之后、所选根之前）",
         flow.name
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16372,10 +17946,14 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_past_the
 // K1 / K2 W4 H4 行、K1 V1 行与第三节第 2 条） ───
 
 /// V 那次发布轮换写的系统配置槽：V 的根槽写之后、R 的根槽写之前的系统配置槽写（每次发布按单元、记录、根槽、系统配置轮换的次序落盘），每块盘一槽。
-fn system_configuration_rotation_writes_of_v(flow: &RecordedFlow) -> Vec<usize> {
-    let root_of_v = root_write_of_txg(flow, V_OF_THE_F2_FLOWS.1);
-    let root_of_r = root_write_of_txg(flow, R_OF_THE_F2_FLOWS.1);
-    let rotation: Vec<usize> = (root_of_v + 1..root_of_r)
+fn system_configuration_rotation_writes_of_the_confirmed_version(
+    flow: &RecordedFlow,
+) -> Vec<usize> {
+    let root_of_the_confirmed_version =
+        root_write_of_txg(flow, CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1);
+    let root_of_the_judged_publish =
+        root_write_of_txg(flow, JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1);
+    let rotation: Vec<usize> = (root_of_the_confirmed_version + 1..root_of_the_judged_publish)
         .filter(|index| flow.writes[*index].kind == StepKind::SystemConfigurationSlot)
         .collect();
     assert_eq!(
@@ -16395,7 +17973,7 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back_and_whose_fi
     name: &'static str,
 ) -> RecordedFlow {
     let mut flow = record_two_overwrites_whose_second_tree_table_does_not_read_back(tag, name);
-    for rotation_write in system_configuration_rotation_writes_of_v(&flow) {
+    for rotation_write in system_configuration_rotation_writes_of_the_confirmed_version(&flow) {
         let slot_bytes = usize::try_from(flow.writes[rotation_write].length_in_bytes())
             .expect("系统配置槽写 4096 字节装得进 usize");
         flow.writes[rotation_write].contents = WrittenContents::Bytes(vec![0u8; slot_bytes]);
@@ -16461,7 +18039,7 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_falling_back_to(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16480,8 +18058,8 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_falls_back_to_the_newest_ve
     assert_the_gpu_judge_agrees_with_the_cpu_falling_back_to(
         "the_gpu_judge_agrees_with_the_cpu_that_a_recovery_falls_back_to_the_newest_version_from_the_witnessed_one_when_the_newer_system_configuration_slots_read_back_as_zeros",
         &flow,
-        V_OF_THE_F2_FLOWS,
-        V_MINUS_OF_THE_F2_FLOWS,
+        CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS,
+        VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
     );
 }
 
@@ -16524,7 +18102,9 @@ const INSTANCE_TABLE_PAGE_BYTES: u64 = 2 * SLOT_BYTES;
 /// 写进两块盘基镜像里流从没写过、全零的 [`SLOT_NOTHING_IN_THE_FLOW_WROTE`]：实例表单元头只带身份 (0, 4, 片号, 0) 与诞生、写序，不带自己的落点，
 /// 换一槽照样自证得过（读者按位置条目读、只比整单元 CRC）。R 的根槽写与 R 那次发布的 journal 记录新根段里的实例表指针（写者照抄根记录里那一条）
 /// 两条位置条目的槽改指这一槽、整单元校验和换成新的，各自重封（记录的反向链一路传下去）。V⁻、V 的根记录与原来那张表一个字节都不动。
-fn point_the_chosen_root_alone_at_an_instance_table_abandoning_v(flow: &mut RecordedFlow) {
+fn point_the_chosen_root_alone_at_an_instance_table_abandoning_the_confirmed_version(
+    flow: &mut RecordedFlow,
+) {
     let root_record_pointer_field = ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET
         ..ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET + NODE_POINTER_BYTES;
     let instance_table_pointer_of = |recorded_flow: &RecordedFlow, root_write: usize| {
@@ -16533,10 +18113,14 @@ fn point_the_chosen_root_alone_at_an_instance_table_abandoning_v(flow: &mut Reco
             .expect("根槽写带字节")[root_record_pointer_field.clone()]
         .to_vec()
     };
-    let root_of_r = root_write_of_txg(flow, R_OF_THE_F2_FLOWS.1);
-    let pointer_to_the_shared_table = instance_table_pointer_of(flow, root_of_r);
+    let root_of_the_judged_publish =
+        root_write_of_txg(flow, JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1);
+    let pointer_to_the_shared_table = instance_table_pointer_of(flow, root_of_the_judged_publish);
     assert_eq!(
-        instance_table_pointer_of(flow, root_write_of_txg(flow, V_OF_THE_F2_FLOWS.1)),
+        instance_table_pointer_of(
+            flow,
+            root_write_of_txg(flow, CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1)
+        ),
         pointer_to_the_shared_table,
         "流 {}：V 与 R 的根记录指着同一张实例表",
         flow.name
@@ -16578,13 +18162,13 @@ fn point_the_chosen_root_alone_at_an_instance_table_abandoning_v(flow: &mut Reco
         "流 {}：R 指着的是一片实例表（码 3、记录类型 4）",
         flow.name
     );
-    let mut table_of_r = shared_table;
+    let mut table_of_the_judged_publish = shared_table;
     insert_an_instance_table_row_in_front(
-        &mut table_of_r,
-        V_MINUS_OF_THE_F2_FLOWS.0,
-        V_MINUS_OF_THE_F2_FLOWS.1,
+        &mut table_of_the_judged_publish,
+        VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS.0,
+        VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS.1,
     );
-    reseal_both_checksums_of_the_unit_bytes(&mut table_of_r);
+    reseal_both_checksums_of_the_unit_bytes(&mut table_of_the_judged_publish);
     for device in devices_of_an_instance_table_pointer(&pointer_to_the_shared_table) {
         assert!(
             device == DeviceIdentity(0) || device == DeviceIdentity(1),
@@ -16593,36 +18177,42 @@ fn point_the_chosen_root_alone_at_an_instance_table_abandoning_v(flow: &mut Reco
         );
     }
     assert_nothing_in_the_flow_wrote_the_slot(flow, SLOT_NOTHING_IN_THE_FLOW_WROTE);
-    write_into_the_base_on_both_devices(flow, SLOT_NOTHING_IN_THE_FLOW_WROTE, &table_of_r);
-    let pointer_to_the_table_of_r = pointer_naming_a_page_at(
+    write_into_the_base_on_both_devices(
+        flow,
+        SLOT_NOTHING_IN_THE_FLOW_WROTE,
+        &table_of_the_judged_publish,
+    );
+    let pointer_to_the_table_of_the_judged_publish = pointer_naming_a_page_at(
         &pointer_to_the_shared_table,
         SLOT_NOTHING_IN_THE_FLOW_WROTE,
-        crc32c(&table_of_r),
+        crc32c(&table_of_the_judged_publish),
     );
-    rewrite_root_record_and_reseal(flow, root_of_r, &|bytes| {
-        bytes[root_record_pointer_field.clone()].copy_from_slice(&pointer_to_the_table_of_r);
+    rewrite_root_record_and_reseal(flow, root_of_the_judged_publish, &|bytes| {
+        bytes[root_record_pointer_field.clone()]
+            .copy_from_slice(&pointer_to_the_table_of_the_judged_publish);
     });
     let journal_record_pointer_field = JOURNAL_NEW_ROOT_SEGMENT_OFFSET
         + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER_OFFSET
         ..JOURNAL_NEW_ROOT_SEGMENT_OFFSET
             + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER_OFFSET
             + NODE_POINTER_BYTES;
-    let journal_records_of_r: Vec<usize> = (0..flow.writes.len())
+    let journal_records_of_the_judged_publish: Vec<usize> = (0..flow.writes.len())
         .filter(|write_index| {
             flow.writes[*write_index].kind == StepKind::JournalRecord
                 && flow.writes[*write_index].bytes().is_some_and(|bytes| {
-                    read_u32_at(bytes, JOURNAL_RECORD_INSTANCE_OFFSET) == R_OF_THE_F2_FLOWS.0
+                    read_u32_at(bytes, JOURNAL_RECORD_INSTANCE_OFFSET)
+                        == JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.0
                         && read_u64_at(bytes, JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET)
-                            == R_OF_THE_F2_FLOWS.1
+                            == JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1
                 })
         })
         .collect();
     assert!(
-        !journal_records_of_r.is_empty(),
+        !journal_records_of_the_judged_publish.is_empty(),
         "流 {}：R 那次发布写了 journal 记录",
         flow.name
     );
-    for record in journal_records_of_r {
+    for record in journal_records_of_the_judged_publish {
         assert_eq!(
             &flow.writes[record].bytes().expect("记录写带字节")
                 [journal_record_pointer_field.clone()],
@@ -16631,13 +18221,14 @@ fn point_the_chosen_root_alone_at_an_instance_table_abandoning_v(flow: &mut Reco
             flow.name
         );
         rewrite_journal_record_and_reseal(flow, record, &|bytes| {
-            bytes[journal_record_pointer_field.clone()].copy_from_slice(&pointer_to_the_table_of_r);
+            bytes[journal_record_pointer_field.clone()]
+                .copy_from_slice(&pointer_to_the_table_of_the_judged_publish);
         });
     }
 }
 
 /// 所选根的实例表抛弃了区间里最新的那条根：H4 的底上，只让 R 认一张最前面多一行 (1, 3) 的实例表
-/// （[`point_the_chosen_root_alone_at_an_instance_table_abandoning_v`]：改好的那一片写进基镜像里流从没写过的槽，R 的根记录与记录新根段改指它）——
+/// （[`point_the_chosen_root_alone_at_an_instance_table_abandoning_the_confirmed_version`]：改好的那一片写进基镜像里流从没写过的槽，R 的根记录与记录新根段改指它）——
 /// 按 R 的实例表，实例 1 里 txg > 3 的根（V 与 R）在被抛弃的时间线上；V⁻、V 认的仍是原来那张表，V 自己照样有效。
 /// R 走读失败、c_见证 落回 V⁻ 的状态上，F2_NEWEST 在 [V⁻, R) 里按 R 的实例表滤掉 V、落 V⁻。
 /// CPU 看 journal 那一遍至少一个状态退到 V⁻、一个状态都不退到 V，GPU 逐位相同。GPU 恢复内核读得出所选根的实例表而不按它滤时落 V，这条红。
@@ -16648,12 +18239,12 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_to_a_ver
         "crash-judge-gpu-f2-newest-abandoned-by-the-chosen-instance-table",
         "two-overwrites-second-tree-table-unreadable-first-rotation-zeroed-instance-table-abandons-v",
     );
-    point_the_chosen_root_alone_at_an_instance_table_abandoning_v(&mut flow);
+    point_the_chosen_root_alone_at_an_instance_table_abandoning_the_confirmed_version(&mut flow);
     assert_the_gpu_judge_agrees_with_the_cpu_falling_back_to(
         "the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_to_a_version_the_instance_table_of_the_chosen_root_abandons",
         &flow,
-        V_MINUS_OF_THE_F2_FLOWS,
-        V_OF_THE_F2_FLOWS,
+        VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
+        CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS,
     );
 }
 
@@ -16667,8 +18258,9 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_whose_chosen_root_instance_
         "crash-judge-gpu-f2-newest-chosen-instance-table-unreadable",
         "two-overwrites-second-tree-table-unreadable-first-rotation-zeroed-chosen-instance-table-unreadable",
     );
-    let root_of_r = root_write_of_txg(&flow, R_OF_THE_F2_FLOWS.1);
-    rewrite_root_record_and_reseal(&mut flow, root_of_r, &|bytes| {
+    let root_of_the_judged_publish =
+        root_write_of_txg(&flow, JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1);
+    rewrite_root_record_and_reseal(&mut flow, root_of_the_judged_publish, &|bytes| {
         for checksum_offset in POINTER_LOCATION_CHECKSUM_OFFSETS {
             bytes[ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET + checksum_offset] ^= 0x01;
         }
@@ -16676,8 +18268,8 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_whose_chosen_root_instance_
     assert_the_gpu_judge_agrees_with_the_cpu_falling_back_to(
         "the_gpu_judge_agrees_with_the_cpu_that_a_recovery_whose_chosen_root_instance_table_does_not_read_back_falls_back_only_to_the_witnessed_version",
         &flow,
-        V_MINUS_OF_THE_F2_FLOWS,
-        V_OF_THE_F2_FLOWS,
+        VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
+        CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS,
     );
 }
 
@@ -16696,8 +18288,11 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_past_a_v
         "crash-judge-gpu-f2-no-skip-of-a-version-whose-root-does-not-read-back",
         "two-overwrites-second-tree-table-unreadable-first-rotation-zeroed-first-root-unreadable",
     );
-    let root_of_v = root_write_of_txg(&flow, V_OF_THE_F2_FLOWS.1);
-    let WrittenContents::Bytes(root_bytes) = &mut flow.writes[root_of_v].contents else {
+    let root_of_the_confirmed_version =
+        root_write_of_txg(&flow, CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1);
+    let WrittenContents::Bytes(root_bytes) =
+        &mut flow.writes[root_of_the_confirmed_version].contents
+    else {
         panic!("根槽写是普通写");
     };
     root_bytes[ROOT_RECORD_CHECKSUM_FIELD_OFFSET] ^= 0x01;
@@ -16709,33 +18304,36 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_recovery_does_not_fall_back_past_a_v
         &flow,
         expand_up_to(),
         &[
-            states_reporting_r_unreadable(),
-            states_where_the_consulted_recovery_falls_back_to(V_MINUS_OF_THE_F2_FLOWS),
+            states_reporting_the_judged_publish_unreadable(),
+            states_where_the_consulted_recovery_falls_back_to(
+                VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
+            ),
         ],
     ) else {
         return;
     };
-    let states_reporting_r_unreadable = comparison.examined[0].states_counted;
-    let states_falling_back_to_v_minus = comparison.examined[1].states_counted;
+    let states_reporting_the_judged_publish_unreadable = comparison.examined[0].states_counted;
+    let states_falling_back_to_the_version_before_the_confirmed_one =
+        comparison.examined[1].states_counted;
     eprintln!(
-        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_r_unreadable} states_falling_back_to_v_minus={states_falling_back_to_v_minus}",
+        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_the_judged_publish_unreadable} states_falling_back_to_v_minus={states_falling_back_to_the_version_before_the_confirmed_one}",
         flow.name, comparison.states
     );
     assert!(
-        states_reporting_r_unreadable > 0,
-        "流 {}：R 走读失败、c_见证 落回 V⁻、V 的根读不出的状态上，CPU 看 journal 那一遍报读不出、报的根是 R {R_OF_THE_F2_FLOWS:?}",
+        states_reporting_the_judged_publish_unreadable > 0,
+        "流 {}：R 走读失败、c_见证 落回 V⁻、V 的根读不出的状态上，CPU 看 journal 那一遍报读不出、报的根是 R {JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS:?}",
         flow.name
     );
     assert_eq!(
-        states_falling_back_to_v_minus, 0,
-        "流 {}：一个状态都不退到 V⁻ {V_MINUS_OF_THE_F2_FLOWS:?}（V 末条读得出、根读不出，退过去就越过它）",
+        states_falling_back_to_the_version_before_the_confirmed_one, 0,
+        "流 {}：一个状态都不退到 V⁻ {VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS:?}（V 末条读得出、根读不出，退过去就越过它）",
         flow.name
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16754,7 +18352,7 @@ const RECORD_SLOTS_PAST_THE_LAST_RECORD_OF_THE_FLOW: u64 = 8;
 /// F2 设计那一退的底上，流里每一次系统配置槽写的 journal tail 改成 0、重封（c_见证 恒为 0）；流尾另起一段，写一条 V 那次发布末条记录的副本，
 /// 计数器改成 0、重封，放在同一块盘上流里最后一个记录槽之后（写者写不出计数器 0 的记录，这是伪造的）。R 走读失败的状态上，那一段落没落，
 /// CPU 与 GPU 都按 D23（journal 的角色与格式） 已定项 14「c_见证 = 0 … 都不退」不退、照报 R 读不出。
-fn record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_v(
+fn record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_the_confirmed_version(
     tag: &str,
     name: &'static str,
 ) -> RecordedFlow {
@@ -16778,22 +18376,23 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witne
             },
         );
     }
-    let is_the_last_record_of_v = |write: &RetainedWrite| {
+    let is_the_last_record_of_the_confirmed_version = |write: &RetainedWrite| {
         write.kind == StepKind::JournalRecord
             && write.bytes().is_some_and(|bytes| {
-                u32::from_le_bytes(bytes[16..20].try_into().expect("4 字节")) == V_OF_THE_F2_FLOWS.0
+                u32::from_le_bytes(bytes[16..20].try_into().expect("4 字节"))
+                    == CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.0
                     && u64::from_le_bytes(bytes[26..34].try_into().expect("8 字节"))
-                        == V_OF_THE_F2_FLOWS.1
+                        == CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1
                     && bytes[7] & 1 == 1
             })
     };
-    let last_record_of_v = flow
+    let last_record_of_the_confirmed_version = flow
         .writes
         .iter()
-        .rposition(is_the_last_record_of_v)
+        .rposition(is_the_last_record_of_the_confirmed_version)
         .expect("流里有 V 那次发布带末条标志的记录");
-    let device = flow.writes[last_record_of_v].device;
-    let mut forged_record = flow.writes[last_record_of_v]
+    let device = flow.writes[last_record_of_the_confirmed_version].device;
+    let mut forged_record = flow.writes[last_record_of_the_confirmed_version]
         .bytes()
         .expect("记录写带字节")
         .to_vec();
@@ -16826,7 +18425,7 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witne
     flow
 }
 
-/// c_见证 = 0 而环里有一条计数器 0 的记录（底见 [`record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_v`]）：
+/// c_见证 = 0 而环里有一条计数器 0 的记录（底见 [`record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_the_confirmed_version`]）：
 /// CPU 与 GPU 恢复内核都对 c_见证 = 0 设守卫、不退（D23（journal 的角色与格式） 已定项 14「c_见证 = 0 … 都不退」）。CPU 看 journal 那一遍至少一个状态
 /// 照报 R 读不出、一个状态都不退到 V 或 V⁻，GPU 逐位相同。GPU 去掉守卫（找计数器 = 0 的那条记录、退到 V）时与 CPU 不一致，这条红；
 /// CPU 去掉守卫时伪造那一段落了的状态退到 V，这条也红。
@@ -16834,7 +18433,7 @@ fn record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witne
 fn the_gpu_judge_agrees_with_the_cpu_that_a_witnessed_counter_of_zero_does_not_fall_back_even_to_the_version_of_a_record_carrying_counter_zero(
 ) {
     let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_witnessed_counter_of_zero_does_not_fall_back_even_to_the_version_of_a_record_carrying_counter_zero";
-    let flow = record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_v(
+    let flow = record_two_overwrites_whose_second_tree_table_does_not_read_back_with_a_witnessed_counter_of_zero_naming_the_confirmed_version(
         "crash-judge-gpu-f2-witnessed-counter-zero",
         "two-overwrites-second-tree-table-unreadable-every-tail-zero-forged-record-of-counter-zero",
     );
@@ -16846,36 +18445,41 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_witnessed_counter_of_zero_does_not_f
         &flow,
         expand_up_to(),
         &[
-            states_reporting_r_unreadable(),
-            states_where_the_consulted_recovery_falls_back_to(V_OF_THE_F2_FLOWS),
-            states_where_the_consulted_recovery_falls_back_to(V_MINUS_OF_THE_F2_FLOWS),
+            states_reporting_the_judged_publish_unreadable(),
+            states_where_the_consulted_recovery_falls_back_to(
+                CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS,
+            ),
+            states_where_the_consulted_recovery_falls_back_to(
+                VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS,
+            ),
         ],
     ) else {
         return;
     };
-    let states_reporting_r_unreadable = comparison.examined[0].states_counted;
-    let states_falling_back_to_v = comparison.examined[1].states_counted;
-    let states_falling_back_to_v_minus = comparison.examined[2].states_counted;
+    let states_reporting_the_judged_publish_unreadable = comparison.examined[0].states_counted;
+    let states_falling_back_to_the_confirmed_version = comparison.examined[1].states_counted;
+    let states_falling_back_to_the_version_before_the_confirmed_one =
+        comparison.examined[2].states_counted;
     eprintln!(
-        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_r_unreadable} states_falling_back_to_v={states_falling_back_to_v} states_falling_back_to_v_minus={states_falling_back_to_v_minus}",
+        "CRASH_JUDGE_GPU_F2 flow={} states={} states_reporting_r_unreadable={states_reporting_the_judged_publish_unreadable} states_falling_back_to_v={states_falling_back_to_the_confirmed_version} states_falling_back_to_v_minus={states_falling_back_to_the_version_before_the_confirmed_one}",
         flow.name, comparison.states
     );
     assert!(
-        states_reporting_r_unreadable > 0,
-        "流 {}：R 走读失败、c_见证 = 0 的状态上 CPU 看 journal 那一遍报读不出、报的根是 R {R_OF_THE_F2_FLOWS:?}",
+        states_reporting_the_judged_publish_unreadable > 0,
+        "流 {}：R 走读失败、c_见证 = 0 的状态上 CPU 看 journal 那一遍报读不出、报的根是 R {JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS:?}",
         flow.name
     );
     assert_eq!(
-        (states_falling_back_to_v, states_falling_back_to_v_minus),
+        (states_falling_back_to_the_confirmed_version, states_falling_back_to_the_version_before_the_confirmed_one),
         (0, 0),
-        "流 {}：c_见证 = 0 不退，一个状态都不退到 V {V_OF_THE_F2_FLOWS:?} 或 V⁻ {V_MINUS_OF_THE_F2_FLOWS:?}",
+        "流 {}：c_见证 = 0 不退，一个状态都不退到 V {CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS:?} 或 V⁻ {VERSION_BEFORE_THE_CONFIRMED_ONE_OF_THE_FALLBACK_FLOWS:?}",
         flow.name
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -16936,7 +18540,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_an_intent_version_reading_the_shared_e
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -17102,7 +18706,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_data_pointer_names_a_node_with_the_c
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致或判不了（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -17163,7 +18767,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_a_tombstone_root_entry_of_an_unregiste
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致或判不了（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -17239,7 +18843,7 @@ fn assert_the_gpu_judge_given_the_knobs_agrees_with_the_cpu_on_a_legal_flow(
         comparison.mismatches.is_empty(),
         "流 {}（GPU 扫描内核编进旋钮值）：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -17271,7 +18875,7 @@ fn assert_the_gpu_judge_given_the_knobs_agrees_with_the_cpu_on_a_flow_reddening(
         comparison.mismatches.is_empty(),
         "流 {}（GPU 扫描内核编进旋钮值）：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -17692,7 +19296,7 @@ fn the_gpu_judge_decodes_and_judges_in_place_subsets_with_copy_on_write_none_or_
         comparison.mismatches.is_empty(),
         "甲二展开的 {} 个状态里 {} 个 GPU 与 CPU 的对拍字不同：\n{}",
         comparison.states,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         comparison
             .mismatches
             .iter()
@@ -18094,7 +19698,7 @@ fn the_gpu_judge_agrees_with_the_cpu_when_product_tombstone_containers_after_a_f
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -18487,7 +20091,7 @@ fn assert_the_gpu_judge_given_the_knob_two_agrees_with_the_cpu_that_containers_w
         comparison.mismatches.is_empty(),
         "流 {}（GPU 扫描内核编进旋钮值）：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }
@@ -18863,7 +20467,7 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_quarantined_data_unit_whose_records_
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     assert!(
@@ -19220,7 +20824,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_snapshot_its_deadlist_a
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     for invariant in ["I-3.5", "I-3.6", "I-3.7"] {
@@ -19529,7 +21133,7 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_compaction_intent_a_rel
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
     for invariant in ["I-4.4", "I-5.6", "I-3.15", "I-3.16", "I-1.14"] {
@@ -19934,14 +21538,14 @@ fn assert_the_gpu_judge_agrees_with_the_cpu_on_every_state_of_a_truncation_flow(
         comparison.checker_mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 的池级 checker 不一致（前几个）：\n{}",
         flow.name,
-        comparison.checker_mismatches.len(),
+        comparison.checker_mismatches.state_count(),
         first_lines(&comparison.checker_mismatches)
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         first_lines(&comparison.mismatches)
     );
 }
@@ -20375,7 +21979,7 @@ fn assert_the_pool_checker_half_then_the_recovery_half_agree(
         comparison.checker_mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 的池级 checker 不一致（前几个）：\n{}",
         flow.name,
-        comparison.checker_mismatches.len(),
+        comparison.checker_mismatches.state_count(),
         first_lines(&comparison.checker_mismatches)
     );
     assert_eq!(
@@ -20390,7 +21994,7 @@ fn assert_the_pool_checker_half_then_the_recovery_half_agree(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         first_lines(&comparison.mismatches)
     );
 }
@@ -20430,6 +22034,167 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_after_the_truncatio
         &flow,
         &["I-9.7"],
         &[],
+    );
+}
+
+// ─── 改坏一处的流只判最后一组对拍块：变异行点名的小用例 ───
+
+/// 只判最后一组对拍块的用例一条至多判几个状态（`.claude/rules/verification.md`「一个门禁：两种跑法」：指定范围的那几趟崩溃状态数压在 20 万量级）。
+const MOST_STATES_OF_A_CASE_ON_THE_LAST_PAIRING_GROUP: u64 = 200_000;
+
+/// 一条 `state_count` 个状态的流最后那一组对拍块的状态序号区间：起点是序号最大那个状态所在那一组的组界（一组
+/// [`STATES_PER_PAIRING_BLOCK`] × [`PAIRING_BLOCKS_JUDGED_TOGETHER`] 个状态），终点是整条流的状态数。含序号最大的那个「全部持久」的状态
+/// （流里每次写都落了），区间两头落在组的边界上或整条流的状态数上，块键与整条流跑时逐块相同。
+///
+/// # Panics
+/// `state_count` 是 0。
+fn ordinals_of_the_last_pairing_group(state_count: u64) -> std::ops::Range<u64> {
+    let states_per_group = STATES_PER_PAIRING_BLOCK
+        * u64::try_from(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("装得进 u64");
+    let last_ordinal = state_count
+        .checked_sub(1)
+        .expect("一条流至少一个状态（全部持久那一个）");
+    last_ordinal / states_per_group * states_per_group..state_count
+}
+
+/// 场景：几种整条流的状态数（不满一组、恰好一组、不整除的十几组、恰好整除的两组）各取最后一组对拍块的序号区间（不上卡、不录流，只算区间）。
+/// 预期：区间不空、终点是整条流的状态数、起点在组的边界上、不满一组，`crash_library::groups_of_pairing_blocks_holding_the_states` 收它、
+/// 交回的恰好是最后一组；恰好整除时是整一组。
+/// 判别力（`crates/mutations.tsv`）：起点照整条流的状态数（不是序号最大的那个状态）取到组界，恰好整除时区间是空的，这条红。
+#[test]
+fn the_last_pairing_group_starts_on_a_group_boundary_and_ends_at_the_state_count_of_the_flow() {
+    let states_per_block = std::num::NonZeroU64::new(STATES_PER_PAIRING_BLOCK).expect("块宽不是 0");
+    let blocks_per_group =
+        std::num::NonZeroUsize::new(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("一次判的块数不是 0");
+    let states_per_group = STATES_PER_PAIRING_BLOCK
+        * u64::try_from(PAIRING_BLOCKS_JUDGED_TOGETHER).expect("装得进 u64");
+    for (state_count, expected) in [
+        (1, 0..1),
+        (states_per_group, 0..states_per_group),
+        (
+            32 * states_per_group + 52,
+            32 * states_per_group..32 * states_per_group + 52,
+        ),
+        (2 * states_per_group, states_per_group..2 * states_per_group),
+    ] {
+        let ordinals = ordinals_of_the_last_pairing_group(state_count);
+        assert_eq!(
+            ordinals, expected,
+            "{state_count} 个状态的流最后一组对拍块的序号区间"
+        );
+        let groups = groups_of_pairing_blocks_holding_the_states(
+            &ordinals,
+            state_count,
+            states_per_block,
+            blocks_per_group,
+        )
+        .unwrap_or_else(|refusal| panic!("{state_count} 个状态：{refusal}"));
+        assert_eq!(
+            groups,
+            state_count.div_ceil(states_per_group) - 1..state_count.div_ceil(states_per_group),
+            "{state_count} 个状态：区间 {ordinals:?} 恰好是最后一组"
+        );
+    }
+}
+
+/// 改坏一处、CPU 池级 checker 红 `invariant` 的流只判最后一组对拍块（[`ordinals_of_the_last_pairing_group`]，含全部持久那个状态：
+/// 改坏的那一处在最后一次发布里，全部持久的状态上 CPU 红它）：CPU 在这一段红 `invariant`，每个状态 GPU 与 CPU 的池级 checker、
+/// 两遍恢复与整份对拍字逐位相同（[`assert_the_pool_checker_half_then_the_recovery_half_agree`]）。这一段不超过
+/// [`MOST_STATES_OF_A_CASE_ON_THE_LAST_PAIRING_GROUP`] 个状态，块键与整条流那一条用例逐块相同（那一条判过的块照样复用）。
+/// 本机没有 NVIDIA 独显适配器时报「本次未跑」返回。
+fn assert_the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_of_a_flow_reddening(
+    test_name: &str,
+    flow: &RecordedFlow,
+    invariant: &'static str,
+) {
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let state_count = crash_point_replay_plan_state_count(
+        &flow.base,
+        &flow.writes,
+        &flow.segments,
+        &expansion_up_to(expand_up_to()),
+    );
+    let ordinals = ordinals_of_the_last_pairing_group(state_count);
+    assert!(
+        ordinals.end - ordinals.start <= MOST_STATES_OF_A_CASE_ON_THE_LAST_PAIRING_GROUP,
+        "流 {}：{state_count} 个状态，最后一组对拍块 {ordinals:?} 多于 {MOST_STATES_OF_A_CASE_ON_THE_LAST_PAIRING_GROUP} 个状态，这条小用例判不了",
+        flow.name
+    );
+    let Some(comparison) =
+        compare_on_every_state_with_ordinals_in(cards, flow, expand_up_to(), ordinals)
+    else {
+        return;
+    };
+    assert!(
+        comparison.cpu_checker_red_invariants.contains(invariant),
+        "流 {} 最后一组对拍块上 CPU 池级 checker 要红 {invariant}（红过的：{:?}）",
+        flow.name,
+        comparison.cpu_checker_red_invariants
+    );
+    assert_the_pool_checker_half_then_the_recovery_half_agree(flow, &comparison);
+}
+
+/// 场景：I-9.26 那条流（inode 记录的改动计数越过所在容器的诞生代号）只判最后一组对拍块。
+/// 预期：CPU 红 I-9.26，GPU 每个状态逐位相同。整条流的每个状态由
+/// [`the_gpu_judge_agrees_with_the_cpu_when_an_inode_change_count_runs_past_its_container_birth`] 判。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_an_inode_change_count_runs_past_its_container_birth(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_of_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_an_inode_change_count_runs_past_its_container_birth",
+        &record_new_pool_with_an_inode_change_count_past_its_container_birth("crash-judge-gpu-i926"),
+        "I-9.26",
+    );
+}
+
+/// 场景：I-9.4 第四句那条流（inode 叶里两条记录对调）只判最后一组对拍块。
+/// 预期：CPU 红 I-9.4，GPU 每个状态逐位相同。整条流的每个状态由
+/// [`the_gpu_judge_agrees_with_the_cpu_when_the_records_of_an_inode_leaf_are_out_of_order`] 判。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_records_of_an_inode_leaf_are_out_of_order(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_of_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_records_of_an_inode_leaf_are_out_of_order",
+        &record_new_pool_with_the_two_records_of_the_inode_leaf_swapped(
+            "crash-judge-gpu-i94-records-swapped",
+        ),
+        "I-9.4",
+    );
+}
+
+/// 场景：I-9.7 截断字段之前那一段预留的最后一个字节写 1 那条流只判最后一组对拍块。
+/// 预期：CPU 红 I-9.7，GPU 每个状态逐位相同。整条流的每个状态由
+/// [`the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_before_the_truncation_field_are_not_zero`] 判。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_reserved_bytes_before_the_truncation_field_are_not_zero(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_of_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_reserved_bytes_before_the_truncation_field_are_not_zero",
+        &record_the_three_unit_file_with_its_record_changed(
+            "crash-judge-gpu-reserved-byte-before-the-truncation-field",
+            "reserved-byte-before-the-truncation-field",
+            &|record| record[INODE_RECORD_LAST_RESERVED_BYTE_BEFORE_THE_TRUNCATION_FIELD] = 1,
+        ),
+        "I-9.7",
+    );
+}
+
+/// 场景：I-9.7 截断字段之后那一段预留的最后一个字节写 1 那条流只判最后一组对拍块。
+/// 预期：CPU 红 I-9.7，GPU 每个状态逐位相同。整条流的每个状态由
+/// [`the_gpu_judge_agrees_with_the_cpu_when_the_reserved_bytes_after_the_truncation_field_are_not_zero`] 判。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_reserved_bytes_after_the_truncation_field_are_not_zero(
+) {
+    assert_the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_of_a_flow_reddening(
+        "the_gpu_judge_agrees_with_the_cpu_on_the_last_pairing_group_when_the_reserved_bytes_after_the_truncation_field_are_not_zero",
+        &record_the_three_unit_file_with_its_record_changed(
+            "crash-judge-gpu-reserved-byte-after-the-truncation-field",
+            "reserved-byte-after-the-truncation-field",
+            &|record| record[INODE_RECORD_LAST_RESERVED_BYTE_AFTER_THE_TRUNCATION_FIELD] = 1,
+        ),
+        "I-9.7",
     );
 }
 
@@ -20809,7 +22574,7 @@ fn record_two_overwrites(tag: &str, name: &'static str) -> RecordedFlow {
         ],
     );
     assert_eq!(
-        root_write_of_txg(&flow, R_OF_THE_F2_FLOWS.1),
+        root_write_of_txg(&flow, JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1),
         flow.judged_root_index,
         "流里最后一条根槽写是 R 的"
     );
@@ -20817,8 +22582,8 @@ fn record_two_overwrites(tag: &str, name: &'static str) -> RecordedFlow {
 }
 
 /// R 那次发布在流里的写：V 的根槽写之后、R 的根槽写之前。
-fn writes_of_the_publish_of_r(flow: &RecordedFlow) -> std::ops::Range<usize> {
-    root_write_of_txg(flow, V_OF_THE_F2_FLOWS.1) + 1..flow.judged_root_index
+fn writes_of_the_judged_publish(flow: &RecordedFlow) -> std::ops::Range<usize> {
+    root_write_of_txg(flow, CONFIRMED_VERSION_OF_THE_FALLBACK_FLOWS.1) + 1..flow.judged_root_index
 }
 
 /// 两次覆盖写那条流上：R 写出的那个数据单元两份都不落盘（流里去掉那两次单元写：R 的根槽落了的状态上冷走读读不出它、经映射仍读不出——字节丢了），
@@ -20829,7 +22594,7 @@ fn record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_
     name: &'static str,
 ) -> RecordedFlow {
     let mut flow = record_two_overwrites(tag, name);
-    let data_unit_writes_of_r: Vec<usize> = writes_of_the_publish_of_r(&flow)
+    let data_unit_writes_of_the_judged_publish: Vec<usize> = writes_of_the_judged_publish(&flow)
         .filter(|index| {
             flow.writes[*index].kind == StepKind::UnitWrite
                 && flow.writes[*index]
@@ -20838,7 +22603,7 @@ fn record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_
         })
         .collect();
     assert_eq!(
-        data_unit_writes_of_r.len(),
+        data_unit_writes_of_the_judged_publish.len(),
         2,
         "前提：R 只写了一个数据单元、两份"
     );
@@ -20857,7 +22622,7 @@ fn record_two_overwrites_whose_second_data_unit_is_lost_and_whose_second_record_
         first_part[first_location..second_location]
             .swap_with_slice(&mut second_part[..LOCATION_ENTRY_BYTES_IN_A_NAMED_UNIT]);
     });
-    drop_writes(&mut flow, &data_unit_writes_of_r);
+    drop_writes(&mut flow, &data_unit_writes_of_the_judged_publish);
     flow
 }
 
@@ -20876,67 +22641,71 @@ fn record_two_overwrites_whose_second_extent_root_is_lost_and_whose_second_inode
     name: &'static str,
 ) -> RecordedFlow {
     let mut flow = record_two_overwrites(tag, name);
-    let inode_leaf_of_r = last_unit_copies(
+    let inode_leaf_of_the_judged_publish = last_unit_copies(
         &flow,
         "inode 叶容器",
         &|bytes| unit_class(bytes) == 3 && packed_record_type(bytes) == 2,
         false,
     );
     assert!(
-        inode_leaf_of_r
+        inode_leaf_of_the_judged_publish
             .iter()
-            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+            .all(|index| writes_of_the_judged_publish(&flow).contains(index)),
         "前提：流里最后那个 inode 叶容器是 R 写的"
     );
-    corrupt_units_and_reseal_up_to_the_root(&mut flow, &inode_leaf_of_r, &|bytes| {
-        bytes[FIRST_RECORD_OF_A_PACKED_UNIT
-            + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD] = 1;
-    });
-    let extent_root_of_r = last_unit_copies(
+    corrupt_units_and_reseal_up_to_the_root(
+        &mut flow,
+        &inode_leaf_of_the_judged_publish,
+        &|bytes| {
+            bytes[FIRST_RECORD_OF_A_PACKED_UNIT
+                + INODE_RECORD_RESERVED_BYTES_BEFORE_THE_TRUNCATION_FIELD] = 1;
+        },
+    );
+    let extent_root_of_the_judged_publish = last_unit_copies(
         &flow,
         "extent 树根",
         &|bytes| unit_class(bytes) == 2 && index_node_key_width(bytes) == 24,
         false,
     );
     assert!(
-        extent_root_of_r
+        extent_root_of_the_judged_publish
             .iter()
-            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+            .all(|index| writes_of_the_judged_publish(&flow).contains(index)),
         "前提：流里最后那个 extent 树节点是 R 写的"
     );
-    drop_writes(&mut flow, &extent_root_of_r);
+    drop_writes(&mut flow, &extent_root_of_the_judged_publish);
     flow
 }
 
 /// 数 CPU 看 journal 那一遍落在 R、结局读失败的状态（判退看并集的流上不退的那几个状态）。
-fn states_staying_on_r() -> StateExamination {
+fn states_staying_on_the_judged_publish() -> StateExamination {
     StateExamination::CountStatesWhere(consulted_recovery_lands_on(
-        R_OF_THE_F2_FLOWS,
+        JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS,
         RECOVERY_WORD_CLASS_FAILED,
     ))
 }
 
 /// 一条判退看并集的流比完之后核两样：至少一个状态上 CPU 看 journal 那一遍落在 R、结局读失败（并集里有内容拒收，不退到 V；对拍时只交了
-/// [`states_staying_on_r`] 那一样考察）；每个状态对拍字逐位相同。
+/// [`states_staying_on_the_judged_publish`] 那一样考察）；每个状态对拍字逐位相同。
 fn assert_the_gpu_falls_back_on_the_union_like_the_cpu(
     flow: &RecordedFlow,
     comparison: &Comparison,
 ) {
-    let states_staying_on_r = comparison.examined[0].states_counted;
+    let states_staying_on_the_judged_publish = comparison.examined[0].states_counted;
     eprintln!(
-        "CRASH_JUDGE_GPU_FALL_BACK_UNION flow={} states={} states_staying_on_r={states_staying_on_r}",
+        "CRASH_JUDGE_GPU_FALL_BACK_UNION flow={} states={} states_staying_on_r={states_staying_on_the_judged_publish}",
         flow.name, comparison.states
     );
     assert!(
-        states_staying_on_r > 0,
-        "流 {}：R 的根槽落了而系统配置没见证 R 的状态上，三样读者的并集里有内容拒收，CPU 看 journal 那一遍不退、落在 R {R_OF_THE_F2_FLOWS:?} 报读不出",
+        states_staying_on_the_judged_publish > 0,
+        "流 {}：R 的根槽落了而系统配置没见证 R 的状态上，三样读者的并集里有内容拒收，CPU 看 journal 那一遍不退、落在 R {JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS:?} 报读不出",
         flow.name
     );
     assert!(
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(comparison)
     );
 }
@@ -20957,9 +22726,12 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_byt
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
-    let Some(comparison) =
-        compare_on_every_state_examining(cards, &flow, expand_up_to(), &[states_staying_on_r()])
-    else {
+    let Some(comparison) = compare_on_every_state_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
         return;
     };
     assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
@@ -20982,9 +22754,12 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_walk_lost_byt
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
-    let Some(comparison) =
-        compare_on_every_state_examining(cards, &flow, expand_up_to(), &[states_staying_on_r()])
-    else {
+    let Some(comparison) = compare_on_every_state_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
         return;
     };
     assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
@@ -21001,9 +22776,18 @@ fn record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separat
     tag: &str,
     name: &'static str,
 ) -> RecordedFlow {
+    record_two_inode_leaves_then_an_overwrite_whose_inode_root_names_this_separator_key_of_the_right_leaf(
+        tag,
+        name,
+        SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_LOWERED,
+    )
+}
+
+/// 新池新建文件之外再建 233 个空 inode（两片 inode 叶），覆盖写成第二份内容（R，txg 5），整条录下来，什么都不改。
+fn record_two_inode_leaves_then_an_overwrite(tag: &str, name: &'static str) -> RecordedFlow {
     let mut pool = pool_with_new_inodes(tag, INODE_RECORDS_PER_LEAF);
     overwrite_in_process_as_instance_one_and_advance_the_pool(&mut pool, &second_content());
-    let mut flow = recorded_flow_of_the_pool(
+    let flow = recorded_flow_of_the_pool(
         &pool,
         name,
         vec![
@@ -21025,10 +22809,20 @@ fn record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separat
         ],
     );
     assert_eq!(
-        root_write_of_txg(&flow, R_OF_THE_F2_FLOWS.1),
+        root_write_of_txg(&flow, JUDGED_PUBLISH_OF_THE_FALLBACK_FLOWS.1),
         flow.judged_root_index,
         "流里最后一条根槽写是 R 的"
     );
+    flow
+}
+
+/// 同 [`record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separator_key_of_the_right_leaf`]，右片那条条目的分隔 key 改成 `separator_key`。
+fn record_two_inode_leaves_then_an_overwrite_whose_inode_root_names_this_separator_key_of_the_right_leaf(
+    tag: &str,
+    name: &'static str,
+    separator_key: u64,
+) -> RecordedFlow {
+    let mut flow = record_two_inode_leaves_then_an_overwrite(tag, name);
     let inode_tree_root_over_two_leaf_containers = |bytes: &[u8]| {
         unit_class(bytes) == 2
             && usize::from(index_node_key_width(bytes)) == INODE_TREE_KEY_BYTES
@@ -21040,38 +22834,42 @@ fn record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separat
                     + CONTAINER_TREE_ENTRY_RECORD_TYPE_OFFSET,
             ) == PACKED_RECORD_TYPE_INODE
     };
-    let inode_root_of_r = last_unit_copies(
+    let inode_root_of_the_judged_publish = last_unit_copies(
         &flow,
         name,
         &inode_tree_root_over_two_leaf_containers,
         false,
     );
     assert!(
-        inode_root_of_r
+        inode_root_of_the_judged_publish
             .iter()
-            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+            .all(|index| writes_of_the_judged_publish(&flow).contains(index)),
         "前提：流里最后那个两条条目的 inode 树根是 R 写的"
     );
-    corrupt_units_and_reseal_up_to_the_root(&mut flow, &inode_root_of_r, &|bytes| {
-        let separator_of_the_right_leaf =
-            first_entry_of_a_container_number_node() + usize::from(INODE_INTERNAL_ENTRY_BYTES);
-        assert_eq!(
-            read_u64_at(bytes, separator_of_the_right_leaf),
-            INODE_RECORDS_PER_LEAF + 1,
-            "改之前右片那条条目的分隔 key 是它的容器号 234"
-        );
-        bytes[separator_of_the_right_leaf..separator_of_the_right_leaf + 8]
-            .copy_from_slice(&SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_LOWERED.to_le_bytes());
-    });
+    corrupt_units_and_reseal_up_to_the_root(
+        &mut flow,
+        &inode_root_of_the_judged_publish,
+        &|bytes| {
+            let separator_of_the_right_leaf =
+                first_entry_of_a_container_number_node() + usize::from(INODE_INTERNAL_ENTRY_BYTES);
+            assert_eq!(
+                read_u64_at(bytes, separator_of_the_right_leaf),
+                INODE_RECORDS_PER_LEAF + 1,
+                "改之前右片那条条目的分隔 key 是它的容器号 234"
+            );
+            bytes[separator_of_the_right_leaf..separator_of_the_right_leaf + 8]
+                .copy_from_slice(&separator_key.to_le_bytes());
+        },
+    );
     flow
 }
 
 /// R 那次发布在流里写出的、`select` 认得的全部单元写（每个单元两份）。
-fn unit_writes_of_the_publish_of_r(
+fn unit_writes_of_the_judged_publish(
     flow: &RecordedFlow,
     select: &dyn Fn(&[u8]) -> bool,
 ) -> Vec<usize> {
-    writes_of_the_publish_of_r(flow)
+    writes_of_the_judged_publish(flow)
         .filter(|index| {
             flow.writes[*index].kind == StepKind::UnitWrite
                 && flow.writes[*index].bytes().is_some_and(select)
@@ -21090,20 +22888,42 @@ fn record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_lowere
         record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separator_key_of_the_right_leaf(
             tag, name,
         );
-    let extent_root_of_r = last_unit_copies(
-        &flow,
+    drop_the_extent_root_written_by_the_judged_publish(&mut flow);
+    flow
+}
+
+/// 同 [`record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_lowered_separator_key_only_the_opening_reaches`]，右片那条条目的分隔 key 改高到
+/// [`SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_RAISED`]：比左片最大号大（I-9.12 第三句不红）、比右片头一条记录号大（I-9.4 第一句红，内容拒收）。
+/// 只读挂载的打开读到右片头一条就拒（`crash_judge_recovery.wgsl` 打开那一样的记录号下界那一判）。
+fn record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_raised_separator_key_only_the_opening_reaches(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut flow =
+        record_two_inode_leaves_then_an_overwrite_whose_inode_root_names_this_separator_key_of_the_right_leaf(
+            tag,
+            name,
+            SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_RAISED,
+        );
+    drop_the_extent_root_written_by_the_judged_publish(&mut flow);
+    flow
+}
+
+/// 流上 R 写出的 extent 树根两份都不落盘（流里去掉那两次单元写）。
+fn drop_the_extent_root_written_by_the_judged_publish(flow: &mut RecordedFlow) {
+    let extent_root_of_the_judged_publish = last_unit_copies(
+        &*flow,
         "extent 树根",
         &|bytes| unit_class(bytes) == 2 && index_node_key_width(bytes) == 24,
         false,
     );
     assert!(
-        extent_root_of_r
+        extent_root_of_the_judged_publish
             .iter()
-            .all(|index| writes_of_the_publish_of_r(&flow).contains(index)),
+            .all(|index| writes_of_the_judged_publish(&*flow).contains(index)),
         "前提：流里最后那个 extent 树节点是 R 写的"
     );
-    drop_writes(&mut flow, &extent_root_of_r);
-    flow
+    drop_writes(flow, &extent_root_of_the_judged_publish);
 }
 
 /// 中央映射树的节点（码 2、key 宽 27）与记账树的节点（码 2、key 宽 [`ACCOUNTING_KEY_BYTES`]）。
@@ -21126,22 +22946,113 @@ fn record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees
         record_two_inode_leaves_then_an_overwrite_whose_inode_root_lowers_the_separator_key_of_the_right_leaf(
             tag, name,
         );
-    let mapping_nodes_of_r = unit_writes_of_the_publish_of_r(&flow, &is_a_central_mapping_node);
-    let accounting_nodes_of_r = unit_writes_of_the_publish_of_r(&flow, &is_an_accounting_node);
+    drop_the_mapping_and_accounting_nodes_written_by_the_judged_publish(&mut flow);
+    flow
+}
+
+/// 同 [`record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees_and_whose_lowered_separator_key_only_the_rebuild_reaches`]，右片那条条目的分隔 key 改高到
+/// [`SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_RAISED`]：可写挂载的建上一版读到右片头一条就拒（I-9.4 第一句，`crash_judge_recovery.wgsl` 建上一版那一样的记录号下界那一判）。
+fn record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees_and_whose_raised_separator_key_only_the_rebuild_reaches(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut flow =
+        record_two_inode_leaves_then_an_overwrite_whose_inode_root_names_this_separator_key_of_the_right_leaf(
+            tag,
+            name,
+            SEPARATOR_KEY_OF_THE_RIGHT_INODE_LEAF_RAISED,
+        );
+    drop_the_mapping_and_accounting_nodes_written_by_the_judged_publish(&mut flow);
+    flow
+}
+
+/// 流上 R 写出的中央映射树节点与记账树节点都不落盘（流里去掉它们的单元写）。
+fn drop_the_mapping_and_accounting_nodes_written_by_the_judged_publish(flow: &mut RecordedFlow) {
+    let mapping_nodes_of_the_judged_publish =
+        unit_writes_of_the_judged_publish(&*flow, &is_a_central_mapping_node);
+    let accounting_nodes_of_the_judged_publish =
+        unit_writes_of_the_judged_publish(&*flow, &is_an_accounting_node);
     assert!(
-        mapping_nodes_of_r.len() >= 2 && mapping_nodes_of_r.len().is_multiple_of(2),
-        "前提：R 写了中央映射树节点、每个两份：{mapping_nodes_of_r:?}"
+        mapping_nodes_of_the_judged_publish.len() >= 2
+            && mapping_nodes_of_the_judged_publish.len().is_multiple_of(2),
+        "前提：R 写了中央映射树节点、每个两份：{mapping_nodes_of_the_judged_publish:?}"
     );
     assert!(
-        accounting_nodes_of_r.len() >= 2 && accounting_nodes_of_r.len().is_multiple_of(2),
-        "前提：R 写了记账树节点、每个两份：{accounting_nodes_of_r:?}"
+        accounting_nodes_of_the_judged_publish.len() >= 2
+            && accounting_nodes_of_the_judged_publish
+                .len()
+                .is_multiple_of(2),
+        "前提：R 写了记账树节点、每个两份：{accounting_nodes_of_the_judged_publish:?}"
     );
-    let mut dropped: Vec<usize> = mapping_nodes_of_r
+    let mut dropped: Vec<usize> = mapping_nodes_of_the_judged_publish
         .into_iter()
-        .chain(accounting_nodes_of_r)
+        .chain(accounting_nodes_of_the_judged_publish)
         .collect();
     dropped.sort_unstable();
-    drop_writes(&mut flow, &dropped);
+    drop_writes(flow, &dropped);
+}
+
+/// 映射条目的宽（key 27 + 两条位置条目 28）。
+const MAPPING_ENTRY_BYTES_IN_THE_LEAF: usize = 55;
+/// 映射 key 里码 2 尾段（出生序号 4 字节）的偏移：类标签 1 + 出生树 8 + 出生 txg 8 + 实例 4。
+const MAPPING_KEY_BIRTH_SEQUENCE_OFFSET: usize = 21;
+/// 映射 key 里出生树那一段（类标签之后 8 字节）。
+const MAPPING_KEY_BIRTH_TREE: std::ops::Range<usize> = 1..9;
+
+/// R 写出的映射树根兼叶上挑一条码 2 的 key，它后面那一条是别的树的（出生序号加一之后仍在它前面、不撞别的 key）：出生序号加一、重封到根；R 的数据单元两份都不落盘。
+/// R 的根槽落了的状态上：冷走读读文件内容那一步字节丢了；只读挂载的打开不读数据单元，读通；可写挂载的建上一版数据单元读不出不算（经映射也读不出照抄），
+/// 读完全部树，映射 key 集合对不上这一版进映射的单元（内容拒收）。并集里有内容拒收，CPU 恢复不退。
+fn record_two_inode_leaves_whose_overwrite_lost_its_data_unit_and_whose_replaced_mapping_key_only_the_rebuild_reaches(
+    tag: &str,
+    name: &'static str,
+) -> RecordedFlow {
+    let mut flow = record_two_inode_leaves_then_an_overwrite(tag, name);
+    let mapping_root_of_the_judged_publish =
+        last_unit_copies(&flow, name, &is_a_central_mapping_node, false);
+    assert!(
+        mapping_root_of_the_judged_publish
+            .iter()
+            .all(|index| writes_of_the_judged_publish(&flow).contains(index)),
+        "前提：流里最后那个中央映射树节点是 R 写的"
+    );
+    corrupt_units_and_reseal_up_to_the_root(
+        &mut flow,
+        &mapping_root_of_the_judged_publish,
+        &|bytes| {
+            let entries_start = index_node_entries_start(27);
+            let entries = usize::from(index_node_entry_count(bytes));
+            let key_at =
+                |position: usize| entries_start + position * MAPPING_ENTRY_BYTES_IN_THE_LEAF;
+            let position_of_the_key = (0..entries - 1)
+                .find(|position| {
+                    let key = key_at(*position);
+                    let next_key = key_at(*position + 1);
+                    bytes[key] == 2
+                        && bytes[next_key] == 2
+                        && bytes
+                            [key + MAPPING_KEY_BIRTH_TREE.start..key + MAPPING_KEY_BIRTH_TREE.end]
+                            != bytes[next_key + MAPPING_KEY_BIRTH_TREE.start
+                                ..next_key + MAPPING_KEY_BIRTH_TREE.end]
+                })
+                .expect("前提：映射树根里有一条码 2 的 key，后面那一条是别的树的");
+            let birth_sequence_at = key_at(position_of_the_key) + MAPPING_KEY_BIRTH_SEQUENCE_OFFSET;
+            let birth_sequence = u32::from_le_bytes(
+                bytes[birth_sequence_at..birth_sequence_at + 4]
+                    .try_into()
+                    .expect("四字节"),
+            );
+            bytes[birth_sequence_at..birth_sequence_at + 4]
+                .copy_from_slice(&(birth_sequence + 1).to_le_bytes());
+        },
+    );
+    let data_unit_of_the_judged_publish =
+        unit_writes_of_the_judged_publish(&flow, &|bytes| unit_class(bytes) == 1);
+    assert_eq!(
+        data_unit_of_the_judged_publish.len(),
+        2,
+        "前提：R 写了一个数据单元、两份：{data_unit_of_the_judged_publish:?}"
+    );
+    drop_writes(&mut flow, &data_unit_of_the_judged_publish);
     flow
 }
 
@@ -21150,7 +23061,9 @@ fn record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees
 /// R 的根槽落了而系统配置没见证 R 的状态上，冷走读与建上一版停在 extent 树根上（字节丢了）、只读挂载的打开读到右片拒收（叶序与分隔 key 那一判）：
 /// 并集里有内容拒收，CPU 恢复不退、报 R 读不出。
 /// 预期：GPU 恢复内核的打开那一样（`crash_judge_recovery.wgsl` 的 `open_reader_kind`）同判，每个状态对拍字逐位相同。
-/// 判别力：`crates/mutations.tsv` 里「GPU 判退的打开那一样不判叶序与分隔 key」那一行让这一条红（打开读通，并集只剩字节丢了，GPU 退到 V）。
+/// 判别力：这条流全量域约两千万态，变异行不点名这一条：`crates/mutations.tsv` 里「GPU 判退坏叶流：打开那一样不判叶序与分隔 key」那一行点名
+/// [`the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from`]，
+/// 同一条流上抓得到它的那几个状态都在那一条里。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from(
 ) {
@@ -21162,9 +23075,12 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
-    let Some(comparison) =
-        compare_on_every_state_examining(cards, &flow, expand_up_to(), &[states_staying_on_r()])
-    else {
+    let Some(comparison) = compare_on_every_state_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
         return;
     };
     assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
@@ -21175,8 +23091,9 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone
 /// R 的根槽落了而系统配置没见证 R 的状态上，只读挂载的打开停在映射树上、冷走读停在记账树上（都是字节丢了）、可写挂载的建上一版读到右片拒收
 /// （叶序与分隔 key 那一判）：并集里有内容拒收，CPU 恢复不退、报 R 读不出。
 /// 预期：GPU 恢复内核的建上一版那一样（`crash_judge_recovery.wgsl` 的 `rebuild_reader_kind`）同判，每个状态对拍字逐位相同。
-/// 判别力：`crates/mutations.tsv` 里「GPU 判退的建上一版那一样不判叶序与分隔 key」那一行让这一条红（建上一版接着读到记账树、字节丢了，
-/// 并集只剩字节丢了，GPU 退到 V）。
+/// 判别力：这条流全量域约两千万态，变异行不点名这一条：`crates/mutations.tsv` 里「GPU 判退坏叶流：建上一版那一样不判叶序与分隔 key」那一行点名
+/// [`the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from`]，
+/// 同一条流上抓得到它的那几个状态都在那一条里。
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from(
 ) {
@@ -21188,9 +23105,264 @@ fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_rebuild_alone
     let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
         return;
     };
-    let Some(comparison) =
-        compare_on_every_state_examining(cards, &flow, expand_up_to(), &[states_staying_on_r()])
-    else {
+    let Some(comparison) = compare_on_every_state_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 从被判的根槽写（R 的根槽写，[`RecordedFlow::judged_root_index`]）所在那一段起照 `limit` 展开，之前的段都不展开。
+/// 之前的段在这些状态里整段持久（`crash` 枚举的持久集合：所在的段之前每一段整段持久，展不展开都一样），所以这些状态就是全量域上这条流序号最大的那几个；
+/// 根槽写之前的长段（全量域约两千万态都在它们里头）不判：那些状态上 R 的根槽没落，择不到 R，读不到 R 写坏的那一处。
+fn expansion_from_the_segment_of_the_root_of_the_judged_publish(
+    flow: &RecordedFlow,
+    limit: usize,
+) -> impl Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync {
+    let every_segment_up_to_the_limit = expansion_up_to(limit);
+    let segment_of_the_root = flow
+        .segments
+        .iter()
+        .position(|segment| segment.contains(&flow.judged_root_index))
+        .expect("切段罩住流里每次写，被判的根槽写落在其中一段里");
+    move |segment_index: usize, segment: &[usize]| {
+        if segment_index < segment_of_the_root {
+            CrashPointReplaySegmentExpansion::NotExpanded
+        } else {
+            every_segment_up_to_the_limit(segment_index, segment)
+        }
+    }
+}
+
+/// 核 `expansion`（[`expansion_from_the_segment_of_the_root_of_the_judged_publish`]）判的那些状态放得进一块、持久集合与 `limit` 展开的整条流序号最大的那几个状态逐个相同：
+/// 变异行点名的用例只判它们，判的就是全量域那一趟里的状态。
+fn assert_the_states_under_the_expansion_are_the_last_states_of_the_flow(
+    flow: &RecordedFlow,
+    limit: usize,
+    expansion: &(dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion + Sync),
+) {
+    let tables_under =
+        |expansion_of_the_tables: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion| {
+            build_judge_tables_against_the_version_table(
+                &JudgeFlow {
+                    base: &flow.base,
+                    writes: &flow.writes,
+                    segments: &flow.segments,
+                    judged_root_index: flow.judged_root_index,
+                    versions: &flow.versions,
+                    expansion: expansion_of_the_tables,
+                },
+                &[],
+            )
+            .expect("建得出表")
+        };
+    let tables_of_the_whole_flow = tables_under(&expansion_up_to(limit));
+    let tables_under_the_expansion = tables_under(expansion);
+    assert!(
+        tables_under_the_expansion.state_count <= STATES_PER_PAIRING_BLOCK,
+        "流 {}：从 R 的根槽写那一段起的状态放得进一块（{STATES_PER_PAIRING_BLOCK} 态），实际 {} 态",
+        flow.name,
+        tables_under_the_expansion.state_count
+    );
+    let states_before_them_in_the_whole_flow =
+        tables_of_the_whole_flow.state_count - tables_under_the_expansion.state_count;
+    // 迭代上界是上面断言压住的状态数；跨轮不带状态
+    for ordinal in 0..tables_under_the_expansion.state_count {
+        assert_eq!(
+            tables_under_the_expansion.persisted_writes_of_state(ordinal),
+            tables_of_the_whole_flow
+                .persisted_writes_of_state(states_before_them_in_the_whole_flow + ordinal),
+            "流 {}：这一展开的第 {ordinal} 个状态与整条流序号 {} 的状态持久集合相同",
+            flow.name,
+            states_before_them_in_the_whole_flow + ordinal
+        );
+    }
+}
+
+/// 同 [`compare_on_every_state_examining`]，只判从 R 的根槽写那一段起到流尾的状态（[`expansion_from_the_segment_of_the_root_of_the_judged_publish`]），
+/// 展开不同，对拍输入摘要与块键都与全量域那一趟不同，各存各的。
+fn compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+    cards: GpuCardPoolStartedAtTheFirstLease,
+    flow: &RecordedFlow,
+    limit: usize,
+    examinations: &[StateExamination],
+) -> Option<Comparison> {
+    let expansion = expansion_from_the_segment_of_the_root_of_the_judged_publish(flow, limit);
+    assert_the_states_under_the_expansion_are_the_last_states_of_the_flow(flow, limit, &expansion);
+    compare_on_every_state_of_these_segments_against_the_version_table_given_the_container_capacity_knobs(
+        cards,
+        flow,
+        flow.name,
+        &[],
+        &flow.segments,
+        &expansion,
+        ContainerCapacityKnobs::PRODUCT,
+        examinations,
+        &StatesOfThePairing::EveryStateOfTheFlow,
+    )
+}
+
+/// 场景：与 [`the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from`]
+/// 同一条流，只判从 R 的根槽写那一段起到流尾的状态（全量域上这条流序号最大的那几个，R 的根槽落了的状态都在其中）。
+/// 预期：至少一个状态上 CPU 落在 R、报读不出，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退坏叶流：打开那一样不判叶序与分隔 key」那一行让这一条红（打开读通，并集只剩字节丢了，GPU 退到 V）；
+/// 「GPU 判退坏叶流流尾那几态：之前的段也展开」「GPU 判退坏叶流流尾那几态：之后的段不展开」两行各让一条断言红。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_lowered_separator_key_only_the_opening_reaches(
+        "crash-judge-gpu-fall-back-union-opening-refuses-the-separator-key-from-the-root-of-r",
+        "two-inode-leaves-overwrite-extent-root-lost-and-separator-key-refused-by-the-opening-from-the-root-of-r",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：与 [`the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from`]
+/// 同一条流，只判从 R 的根槽写那一段起到流尾的状态（全量域上这条流序号最大的那几个，R 的根槽落了的状态都在其中）。
+/// 预期：至少一个状态上 CPU 落在 R、报读不出，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退坏叶流：建上一版那一样不判叶序与分隔 key」那一行让这一条红（建上一版接着读到记账树、字节丢了，
+/// 并集只剩字节丢了，GPU 退到 V）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees_and_whose_lowered_separator_key_only_the_rebuild_reaches(
+        "crash-judge-gpu-fall-back-union-rebuild-refuses-the-separator-key-from-the-root-of-r",
+        "two-inode-leaves-overwrite-mapping-and-accounting-lost-and-separator-key-refused-by-the-rebuild-from-the-root-of-r",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：同 [`the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_not_above_the_leaf_before_it_is_not_fallen_back_from`]，
+/// 右片分隔 key 改高（[`record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_raised_separator_key_only_the_opening_reaches`]）的每个状态：只读挂载的打开拒在
+/// I-9.4 第一句（记录号不小于分隔 key），叶序与分隔 key 那一判不红，并集里有内容拒收，CPU 恢复不退。
+/// 判别力：这条流全量域约两千万态，变异行不点名这一条：`crates/mutations.tsv` 里「GPU 判退坏叶流：打开那一样不判记录号下界」那一行点名
+/// [`the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from`]，
+/// 同一条流上抓得到它的那几个状态都在那一条里。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_raised_separator_key_only_the_opening_reaches(
+        "crash-judge-gpu-fall-back-union-opening-refuses-the-raised-separator-key",
+        "two-inode-leaves-overwrite-extent-root-lost-and-raised-separator-key-refused-by-the-opening",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_every_state_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：与 [`the_gpu_judge_agrees_with_the_cpu_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from`]
+/// 同一条流，只判从 R 的根槽写那一段起到流尾的状态（全量域上这条流序号最大的那几个，R 的根槽落了的状态都在其中）。
+/// 预期：至少一个状态上 CPU 落在 R、报读不出，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退坏叶流：打开那一样不判记录号下界」那一行让这一条红（打开读通，并集只剩字节丢了，GPU 退到 V）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_opening_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_extent_root_and_whose_raised_separator_key_only_the_opening_reaches(
+        "crash-judge-gpu-fall-back-union-opening-refuses-the-raised-separator-key-from-the-root-of-r",
+        "two-inode-leaves-overwrite-extent-root-lost-and-raised-separator-key-refused-by-the-opening-from-the-root-of-r",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：两片 inode 叶之后覆盖写 R，R 的 inode 树根右片分隔 key 改高（重封到根）、R 的中央映射树节点与记账树节点都没落
+/// （[`record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees_and_whose_raised_separator_key_only_the_rebuild_reaches`]），只判从 R 的根槽写那一段起到流尾的状态。
+/// 只读挂载的打开停在映射树上、冷走读停在记账树上（都是字节丢了）、可写挂载的建上一版拒在 I-9.4 第一句（内容拒收）：并集里有内容拒收，CPU 恢复不退。
+/// 预期：至少一个状态上 CPU 落在 R、报读不出，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退坏叶流：建上一版那一样不判记录号下界」那一行让这一条红（建上一版接着读到记账树、字节丢了，并集只剩字节丢了，GPU 退到 V）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_separator_key_above_the_first_record_of_its_leaf_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_mapping_and_accounting_trees_and_whose_raised_separator_key_only_the_rebuild_reaches(
+        "crash-judge-gpu-fall-back-union-rebuild-refuses-the-raised-separator-key-from-the-root-of-r",
+        "two-inode-leaves-overwrite-mapping-and-accounting-lost-and-raised-separator-key-refused-by-the-rebuild-from-the-root-of-r",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
+        return;
+    };
+    assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
+}
+
+/// 场景：两片 inode 叶之后覆盖写 R，R 的映射树根一条 key 被换（重封到根）、R 的数据单元两份都没落
+/// （[`record_two_inode_leaves_whose_overwrite_lost_its_data_unit_and_whose_replaced_mapping_key_only_the_rebuild_reaches`]），只判从 R 的根槽写那一段起到流尾的状态。
+/// 冷走读字节丢了、只读挂载的打开读通、可写挂载的建上一版拒在映射 key 集合那一判（`recovery::central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots`，内容拒收）。
+/// 预期：至少一个状态上 CPU 落在 R、报读不出，每个状态对拍字逐位相同。
+/// 判别力：`crates/mutations.tsv` 里「GPU 判退：建上一版那一样不判映射 key 集合」「GPU 判退：查映射那一处不记查不到」两行让这一条红（建上一版读通，并集只剩字节丢了，GPU 退到 V）。
+#[test]
+fn the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_replaced_mapping_key_is_not_fallen_back_from(
+) {
+    let test_name = "the_gpu_judge_agrees_with_the_cpu_on_the_states_from_the_root_of_the_judged_publish_that_a_selected_version_whose_rebuild_alone_reaches_a_replaced_mapping_key_is_not_fallen_back_from";
+    let flow = record_two_inode_leaves_whose_overwrite_lost_its_data_unit_and_whose_replaced_mapping_key_only_the_rebuild_reaches(
+        "crash-judge-gpu-fall-back-union-rebuild-refuses-the-replaced-mapping-key-from-the-root-of-r",
+        "two-inode-leaves-overwrite-data-unit-lost-and-mapping-key-refused-by-the-rebuild-from-the-root-of-r",
+    );
+    let Some(cards) = gpu_card_pool_or_report_not_run(test_name) else {
+        return;
+    };
+    let Some(comparison) = compare_on_the_states_from_the_root_of_the_judged_publish_examining(
+        cards,
+        &flow,
+        expand_up_to(),
+        &[states_staying_on_the_judged_publish()],
+    ) else {
         return;
     };
     assert_the_gpu_falls_back_on_the_union_like_the_cpu(&flow, &comparison);
@@ -21304,13 +23476,13 @@ fn the_gpu_judge_hands_back_the_self_verified_system_configuration_slots_of_each
         "CRASH_JUDGE_GPU_SELF_VERIFIED_SLOTS flow={} states={} states_with_a_new_dead_device_zero={states_with_a_new_dead_device_zero} slot_mismatches={}",
         flow.name,
         comparison.states,
-        slot_mismatches.len()
+        slot_mismatches.state_count()
     );
     assert!(
         slot_mismatches.is_empty(),
         "流 {}：{} 个状态上逐盘自证槽数或判段那一判两边不同（前几个）：\n{}",
         flow.name,
-        slot_mismatches.len(),
+        slot_mismatches.state_count(),
         slot_mismatches
             .iter()
             .take(5)
@@ -21327,7 +23499,7 @@ fn the_gpu_judge_hands_back_the_self_verified_system_configuration_slots_of_each
         comparison.mismatches.is_empty(),
         "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
         flow.name,
-        comparison.mismatches.len(),
+        comparison.mismatches.state_count(),
         mismatch_listing(&comparison)
     );
 }

@@ -268,7 +268,7 @@ fn reopen_vote_after_the_last_publish_returned(
     translated.judge_a_reopen_after_an_injected_fault(
         fault,
         fault_outcome,
-        WhatTheReopenMustRecover::AVersionTheHistoryLeft,
+        WhatTheReopenMustRecover::VersionTheHistoryLeft,
         &file_read_back(root, content),
     )
 }
@@ -429,7 +429,7 @@ fn reopen_vote_after_the_last_publish_panicked(content: Vec<u8>) -> ReferenceFil
     translated.judge_a_reopen_after_an_injected_fault(
         InjectedFault::WriteFails,
         FaultOutcome::NeverFired,
-        WhatTheReopenMustRecover::AVersionTheHistoryLeft,
+        WhatTheReopenMustRecover::VersionTheHistoryLeft,
         &file_read_back(
             model_root_key(InstanceGeneration(1), CheckpointTxg(3)),
             content,

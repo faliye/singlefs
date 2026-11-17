@@ -47,6 +47,9 @@ use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, PublishedVersion,
     RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness, WritableMountRefusedOnTheCrashDisks,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
@@ -517,8 +520,8 @@ pub fn observe_root_fork_isolation(
 pub fn observe_mount_continuation(
     _inputs: &InputsOfTheObservers,
     image: &CrashImage<'_>,
-    _report: &RecoveryReport,
-    _counts: &mut CrashPointReplayObserverCounts,
+    report: &RecoveryReport,
+    counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     let mount_parameters = parameters();
     let materialized = materialized_crash_image(image);
@@ -539,8 +542,24 @@ pub fn observe_mount_continuation(
         })
         .collect();
 
-    let mut mounted = mount_writable(&mount_parameters, &mut devices)
-        .unwrap_or_else(|error| panic!("每个崩溃状态上实例 4 可写挂载接管成功：{error:?}"));
+    let mut mounted = match mount_writable(&mount_parameters, &mut devices) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &mount_parameters.filesystem_identifier,
+                &geometry(),
+                CONTINUATION_MOUNT_SUCCEEDED,
+                counts,
+            );
+        }
+    };
     let landed = mounted
         .current
         .file_version()

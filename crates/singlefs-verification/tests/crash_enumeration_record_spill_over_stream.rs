@@ -555,7 +555,7 @@ fn a_publish_whose_one_transaction_spills_over_two_records_judged_on_the_cpu_jud
                     &mut counts_of_the_state,
                 );
                 let mut counts_of_the_flow = counts_of_the_flow.lock().expect("判定线程不 panic");
-                for (name, amount) in counts_of_the_state.iter() {
+                for (name, amount) in counts_of_the_state.counts_in_name_order() {
                     counts_of_the_flow.add(name, amount);
                 }
             },

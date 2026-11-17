@@ -8,8 +8,8 @@
 mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
-    devices_reading_back_all_zero_on, record_one_publish_after_overwrites, PublishRecordedAsR,
-    RangesReadingBackAllZero, RecordedPublish,
+    devices_reading_back_all_zero_on, record_one_publish_after_overwrites,
+    RangesReadingBackAllZero, RecordedPublish, RecordedPublishKind,
 };
 use singlefs_core::recovery::RecoveryOutcome;
 use singlefs_verification::memory_pool::MemoryPool;
@@ -18,13 +18,13 @@ use singlefs_verification::mount_transparency::{
 };
 use singlefs_verification::segments::StepKind;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// S1：R 整次发布都落了，读的那一刻 R 那次轮换写的两个系统配置槽与 R 的单元读回全零。交回盘面与读回全零的那几段。
 fn confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero(
     recorded: &RecordedPublish,
 ) -> (MemoryPool, RangesReadingBackAllZero) {
-    let rotation_of_r: Vec<_> = recorded
+    let rotation_of_the_recorded_publish: Vec<_> = recorded
         .writes
         .iter()
         .filter(|write| write.kind == StepKind::SystemConfigurationSlot)
@@ -33,7 +33,7 @@ fn confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zer
         recorded.image_with_the_whole_publish_persisted(),
         RangesReadingBackAllZero::default()
             .with_the_writes(&recorded.unit_writes())
-            .with_the_writes(&rotation_of_r),
+            .with_the_writes(&rotation_of_the_recorded_publish),
     )
 }
 
@@ -106,8 +106,10 @@ fn assert_the_version_before_the_recovered_one_is_older_than_the_witnessed_versi
 #[test]
 fn reading_the_recovered_version_of_a_confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero_compares_the_witnessed_version(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) =
         confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero(&recorded);
     assert_the_recovered_version_read_is_the_witnessed_version(&recorded, &image, &ranges);
@@ -117,8 +119,10 @@ fn reading_the_recovered_version_of_a_confirmed_root_whose_newer_system_configur
 #[test]
 fn reading_the_version_before_the_recovered_one_of_a_confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero_compares_the_version_before_the_witnessed_one(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) =
         confirmed_root_whose_newer_system_configuration_slots_and_units_read_back_zero(&recorded);
     assert_the_version_before_the_recovered_one_is_older_than_the_witnessed_version(
@@ -130,8 +134,10 @@ fn reading_the_version_before_the_recovered_one_of_a_confirmed_root_whose_newer_
 #[test]
 fn reading_the_recovered_version_of_an_unwitnessed_root_whose_units_read_back_zero_compares_the_witnessed_version(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) = unwitnessed_root_whose_units_read_back_zero(&recorded);
     assert_the_recovered_version_read_is_the_witnessed_version(&recorded, &image, &ranges);
 }
@@ -140,8 +146,10 @@ fn reading_the_recovered_version_of_an_unwitnessed_root_whose_units_read_back_ze
 #[test]
 fn reading_the_version_before_the_recovered_one_of_an_unwitnessed_root_whose_units_read_back_zero_compares_the_version_before_the_witnessed_one(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) = unwitnessed_root_whose_units_read_back_zero(&recorded);
     assert_the_version_before_the_recovered_one_is_older_than_the_witnessed_version(
         &recorded, &image, &ranges,

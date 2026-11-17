@@ -3,7 +3,7 @@
 //! D23（journal 的角色与格式） 已定项 14 那张单子加一行（Q3，岔路单 `research/prompts/m3-batch10-code-r1-forks.md`
 //! ）。判法在崩溃镜像上复算「按最新那条根的实例表，环里一条不被抛弃的
 //! 自证有效根都没有」，与改法 G4 同形：注入了读故障的崩溃态上不判那一条；没注入读故障的崩溃态上复算为真，拒得不合法
-//! （`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state`）。
+//! （`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state_of_the_pool`）。
 //! 两遍按槽并（R1）之后这一拒的判据在崩溃镜像上
 //! 照旧只读一遍：崩溃镜像上没有瞬时读错，两遍读出的逐槽相同，并起来就是那一遍；所以复算判据不变。
 //! 盘面是 24 槽根环的小池（`common::build_pool`，第一个文件之后）；手工盘面是把它根环三个区域的每一个槽都清成全 0。
@@ -24,11 +24,10 @@ use singlefs_core::recovery::{
 use singlefs_core::root_ring::slot_offset;
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state,
-    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount,
-    refusal_reason_on_the_d23_list, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool,
+    refusal_reason_on_the_legal_refusal_list, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
     ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
-    RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 
 /// 第一个文件之后的小池盘面。
@@ -62,17 +61,19 @@ fn image_with_every_root_ring_slot_zeroed_by_hand(image: &MemoryPool) -> MemoryP
 /// 预期：重建分配器读根环重读仍一条有效根都没有那一拒在单子上（Q3 那一行）；读阶段择不到根的 `Recovery(NoValidRoot)` 照旧不在单子上。
 /// 判别力：单子不收新成员时第一项红。
 #[test]
-fn the_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring_is_on_the_d23_list_and_the_read_stage_one_is_not(
+fn the_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring_is_on_the_legal_refusal_list_and_the_read_stage_one_is_not(
 ) {
     assert_eq!(
-        refusal_reason_on_the_d23_list(
+        refusal_reason_on_the_legal_refusal_list(
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread
         ),
-        Some(RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator),
+        Some(RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator),
         "重建分配器读根环整环重读一次仍一条有效根都没有：在 D23 已定项 14 那张单子上"
     );
     assert_eq!(
-        refusal_reason_on_the_d23_list(&MountError::Recovery(RecoveryFailure::NoValidRoot)),
+        refusal_reason_on_the_legal_refusal_list(&MountError::Recovery(
+            RecoveryFailure::NoValidRoot
+        )),
         None,
         "读阶段择不到根（只读挂载同样挂不上）：不在单子上"
     );
@@ -93,16 +94,18 @@ fn a_refusal_for_no_valid_root_on_a_crash_image_without_read_faults_whose_root_r
         "前提：根环全 0，只读恢复也择不到根"
     );
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &image,
+            &common::parameters().filesystem_identifier,
             None,
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            reason: RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
             conditions_not_met: vec![
                 RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults
             ],
@@ -121,16 +124,18 @@ fn a_refusal_for_no_valid_root_on_a_read_faulted_crash_image_whose_root_ring_was
         "no-valid-root-in-the-ring-zeroed-with-read-faults",
     ));
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &image,
+            &common::parameters().filesystem_identifier,
             None,
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::Injected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator
+            RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator
         ),
         "注入过读故障的崩溃态上 Q3 那一条不判，判据为真：拒得合法"
     );
@@ -150,16 +155,19 @@ fn a_refusal_for_no_valid_root_on_a_crash_image_whose_root_ring_reads_back_is_il
         "前提：根环读得出，只读恢复择得到根"
     );
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &image,
+            &common::parameters().filesystem_identifier,
             selected_version,
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            reason:
+                RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
@@ -178,8 +186,9 @@ fn a_refusal_for_no_valid_root_by_a_mount_reading_through_injected_faults_is_leg
     let image = image_after_the_first_file("no-valid-root-in-the-ring-readable-transient");
     let selected_version = recover(&image, JournalPolicy::Consult).effective_root;
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &image,
+            &common::parameters().filesystem_identifier,
             selected_version,
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
             DiskAfterTheRefusal::ByteForByteUnchanged,
@@ -188,7 +197,7 @@ fn a_refusal_for_no_valid_root_by_a_mount_reading_through_injected_faults_is_leg
             ReadFaultsUnderTheRefusedMount::TheRefusedMountReadThroughInjectedFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator
+            RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator
         ),
         "被拒的那次挂载在读故障下跑：两遍读之间的瞬时读错复算不出，判据复算为假不算不合法"
     );
@@ -282,16 +291,19 @@ fn a_refusal_for_no_valid_root_on_a_crash_image_holding_an_abandoned_root_is_ill
     );
     let selected_version = recover(&image, JournalPolicy::Consult).effective_root;
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &image,
+            &common::parameters().filesystem_identifier,
             selected_version,
             &MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            reason:
+                RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],

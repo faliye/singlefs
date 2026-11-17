@@ -235,6 +235,16 @@ pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
     ),
     enumeration_of_the_item(
+        "compaction_with_a_write_while_the_intent_is_live",
+        "compaction-with-a-write-while-the-intent-is-live",
+        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
+    ),
+    enumeration_of_the_item(
+        "compaction_paused_short_of_space_dropping_the_intent",
+        "compaction-paused-short-of-space-dropping-the-intent",
+        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
+    ),
+    enumeration_of_the_item(
         "compaction_relocation_on_the_gpu_path",
         "compaction-relocation-on-the-gpu-path",
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
@@ -337,6 +347,16 @@ pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[
     enumeration_of_the_item(
         "automatic_publish_interrupted",
         "automatic-publish-interrupted",
+        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
+    ),
+    enumeration_of_the_item(
+        "frozen_publish_resent_after_a_failed_journal_write",
+        "frozen-publish-resent-after-a-failed-journal-write",
+        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
+    ),
+    enumeration_of_the_item(
+        "frozen_publish_resent_after_a_failed_last_barrier",
+        "frozen-publish-resent-after-a-failed-last-barrier",
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
     ),
     enumeration_of_the_item(
@@ -716,11 +736,6 @@ pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[
     unregistered(
         RunOfTheFlow::CrashAmplification,
         "gpu-observer-rewriting-one-location",
-        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
-    ),
-    unregistered(
-        RunOfTheFlow::CrashAmplification,
-        "the_product_path_judges_on_scratch_it_booked_on_the_card_pool",
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
     ),
     unregistered(

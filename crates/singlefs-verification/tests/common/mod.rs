@@ -14,9 +14,8 @@ use singlefs_core::make_filesystem::{
     make_filesystem, root_ring_occupancy_after_make_filesystem, MakeFilesystemOutput,
     MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::recovery::{choose_system_configuration, readable_roots, PoolReader};
-use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlotsPerRegion};
-use singlefs_core::system_configuration::SystemImmutableSizes;
+use singlefs_core::recovery::PoolReader;
+use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, publish_sequential_write, warm_up,
     FirstFile, PoolWriter, PublishError, TransactionOutput, WarmUpOutput,
@@ -27,6 +26,15 @@ use singlefs_core::unit::{
 use singlefs_format::{
     DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
     NODE_BYTES, SLOT_BYTES,
+};
+#[allow(unused_imports, reason = "每个测试文件各自只用到其中一部分")]
+pub use singlefs_verification::known_bad_images::{
+    copy_each_root_into_the_new_root_segment_of_its_journal_records,
+    parameters_of_the_common_test_pool as parameters, E142_FILESYSTEM_IDENTIFIER,
+};
+use singlefs_verification::known_bad_images::{
+    copy_each_root_into_the_new_root_segment_of_its_journal_records_in_a_ring_of_bytes,
+    journal_record_bytes_in_a_ring_of_bytes,
 };
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::segments::FixedGeometry;
@@ -39,10 +47,6 @@ static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub const IMAGE_BYTES: u64 = 4 << 30;
 /// E142 的第一个文件 3000 字节（`name=config file_bytes=3000`）。
 pub const FILE_BYTES: usize = 3000;
-/// E142 装置里的固定 fsid（`FIXED_FSID`）。
-pub const E142_FILESYSTEM_IDENTIFIER: [u8; 16] = [
-    0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x32, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x2d, 0x00,
-];
 /// E142 装置里的固定写入时间（`FIXED_WRITE_TIME_SECONDS`）。
 pub const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 
@@ -54,20 +58,6 @@ pub fn image_path(tag: &str, device: u32) -> PathBuf {
         "singlefs-step67-{tag}-{}-{sequence}-dev{device}.img",
         std::process::id()
     ))
-}
-
-pub fn parameters() -> MakeFilesystemParameters {
-    MakeFilesystemParameters {
-        filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
-        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: SystemImmutableSizes {
-            physical_block_size: 512,
-            minimum_input_output_bytes: 512,
-            fixed_structure_slot_spacing: 4096,
-            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
-            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
-        },
-    }
 }
 
 pub fn geometry() -> FixedGeometry {
@@ -420,8 +410,8 @@ pub fn publish_overwrite_in_process(
 /// 「A 的根落了、之后 B、C 两次单条发布只剩记录与单元」那段历史里 B、C 两版文件的字节数：两版都只切出一条记录，长度各不相同。
 /// 在飞上限用例与挂载读盘次序用例共用这段历史（`journal_replay_applies_no_more_records_than_the_in_flight_limit.rs`、
 /// `mounted_recovery_reads_each_candidate_once_in_order.rs`）。
-pub const CONTENT_BYTES_OF_PUBLISH_B: usize = 4100;
-pub const CONTENT_BYTES_OF_PUBLISH_C: usize = 2500;
+pub const CONTENT_BYTES_OF_THE_OLDER_OVERWRITE: usize = 4100;
+pub const CONTENT_BYTES_OF_THE_NEWER_OVERWRITE: usize = 2500;
 /// 覆盖写那几版的写入时间比池里第一版晚这么多秒。
 pub const OVERWRITE_SECONDS_AFTER_THE_FIRST_WRITE: u64 = 60;
 /// 改坏根槽时翻的那个字节在根记录里的下标：落在树表指针那一段（根记录 magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 之后），
@@ -547,32 +537,11 @@ fn journal_record_bytes_in_the_ring_of(
     device: DeviceIdentity,
     counter: u64,
 ) -> Vec<u8> {
-    PoolReader::read(
+    journal_record_bytes_in_a_ring_of_bytes(
         image,
+        geometry.parameters.geometry.journal_ring_bytes,
         device,
-        record_offset(counter, geometry.parameters.geometry.journal_ring_bytes),
-        usize::try_from(JOURNAL_RECORD_BYTES).expect("4096"),
-    )
-    .expect("环里那一格读得到")
-}
-
-/// 根环里每条自证过的根（`readable_roots`），把两块盘 journal 默认环里同 (实例, txg) 的记录的新根段改成照它的那七段
-/// （树表指针、中央映射树根指针、树 ID 水位、回退下界 F、实例表指针、分配记录树根指针、卸载记号；I-8.10（记录新根段与同代根相同）
-/// 判前四段，D23（journal 的角色与格式） 已定项 15 施加时七段都取记录里的，D23（journal 的角色与格式） 已定项 4：
-/// 一次发布的每条记录带同一份新根段），`JournalRecord::to_bytes` 重封；再按计数器从小到大，前一条被改过、又与这一条同实例的，
-/// 这一条的反向链按前一条改后的记录头重算、重封（I-8.6（反向链算法）只链本实例内逻辑前一条）。
-/// 坏镜像改了根（新整单元校验和沿引用链补到根槽、改树表指针）之后调它：盘上留下的就是「写者从一开始就写出了这样的根」的样子，
-/// 只改根不改记录的镜像每一份都会多红 I-8.10。同 (实例, txg) 有几条根时照第一条（I-8.10 那一行把它归 C88，这几份镜像上没有）；
-/// 环里从计数器 1 起读到第一格解不出就停。什么都不用改时盘面逐字节不变。交回改了几条记录（按盘各算一条）。
-///
-/// # Panics
-/// 镜像上择不出系统配置。
-pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records(
-    image: &mut MemoryPool,
-) -> usize {
-    copy_each_root_into_the_new_root_segment_of_its_journal_records_on(
-        image,
-        &PoolImageGeometry::of_four_gibibyte_devices_under_the_common_parameters(),
+        counter,
     )
 }
 
@@ -584,70 +553,11 @@ pub fn copy_each_root_into_the_new_root_segment_of_its_journal_records_on(
     image: &mut MemoryPool,
     geometry: &PoolImageGeometry,
 ) -> usize {
-    let journal_ring_bytes = geometry.parameters.geometry.journal_ring_bytes;
-    let system_configuration =
-        choose_system_configuration(&*image).expect("坏镜像只改了单元与根槽，系统配置择得出");
-    let mut root_of_each_instance_and_txg: std::collections::BTreeMap<
-        (InstanceGeneration, CheckpointTxg),
-        singlefs_core::root_record::RootRecord,
-    > = std::collections::BTreeMap::new();
-    for root in readable_roots(
-        &*image,
-        &system_configuration.immutable.region_devices,
-        &system_configuration.immutable.sizes,
-        &system_configuration.immutable.filesystem_identifier,
-    ) {
-        root_of_each_instance_and_txg
-            .entry((root.instance, root.checkpoint_txg))
-            .or_insert(root);
-    }
-    let filesystem_identifier =
-        unit_filesystem_identifier(&geometry.parameters.filesystem_identifier);
-    let record_slots_in_the_ring = journal_ring_bytes / JOURNAL_RECORD_BYTES;
-    let mut records_rewritten = 0;
-    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
-        // 跨轮携带：计数器小 1 的那一条若被改过，记它的实例与改后的字节（下一条的反向链按它重算）。
-        let mut rewritten_previous_record: Option<(InstanceGeneration, Vec<u8>)> = None;
-        // 迭代次数的上界是环的槽数；环里第一格解不出的记录就是出口。
-        for counter in 1..=record_slots_in_the_ring {
-            let bytes = journal_record_bytes_in_the_ring_of(image, geometry, device, counter);
-            let Some(record) = JournalRecord::parse(&bytes, filesystem_identifier) else {
-                break;
-            };
-            let mut rewritten = record.clone();
-            if let Some(root) =
-                root_of_each_instance_and_txg.get(&(record.instance, record.checkpoint_txg))
-            {
-                rewritten.new_tree_table = root.tree_table;
-                rewritten.new_mapping_root = root.mapping_root;
-                rewritten.new_tree_identifier_watermark = root.tree_identifier_watermark;
-                rewritten.new_rollback_floor = root.rollback_floor;
-                rewritten.new_instance_table = root.instance_table;
-                rewritten.new_allocation_record_tree_root = root.allocation_record_tree_root;
-                rewritten.new_unmount_marker = root.unmount_marker;
-                rewritten.new_reclaim_threshold = root.reclaim_threshold;
-                rewritten.new_pinned_ring_slot = root.pinned_ring_slot;
-            }
-            if let Some((previous_instance, previous_bytes)) = &rewritten_previous_record {
-                if *previous_instance == record.instance {
-                    rewritten.back_chain = back_chain_of(previous_bytes);
-                }
-            }
-            rewritten_previous_record = if rewritten == record {
-                None
-            } else {
-                let rewritten_bytes = rewritten.to_bytes();
-                image
-                    .devices
-                    .get_mut(&device)
-                    .expect("有这块盘")
-                    .write(record_offset(counter, journal_ring_bytes), &rewritten_bytes);
-                records_rewritten += 1;
-                Some((record.instance, rewritten_bytes))
-            };
-        }
-    }
-    records_rewritten
+    copy_each_root_into_the_new_root_segment_of_its_journal_records_in_a_ring_of_bytes(
+        image,
+        geometry.parameters.geometry.journal_ring_bytes,
+        &geometry.parameters.filesystem_identifier,
+    )
 }
 
 /// 块层的一次读：哪块盘、从哪个字节起、多长。读盘次序的用例（只读挂载、可写挂载）逐次记这一项。
@@ -1145,6 +1055,10 @@ pub enum FailingReadsOfARange {
     OnlyTheFirst,
     /// 第 n 次起每次都坏（之前那几次照读）。
     FromTheNthOnward(u64),
+    /// 只有最前面两次坏，之后照读（第一次读与当场重读都坏、再往后读得出）。
+    OnlyTheFirstTwo,
+    /// 只有第 n 次坏，之前之后都照读。
+    OnlyTheNth(u64),
 }
 
 /// 读坏的那一次交回什么。
@@ -1234,6 +1148,10 @@ impl SharedUnreadableRanges {
                 FailingReadsOfARange::Never => false,
                 FailingReadsOfARange::Every => true,
                 FailingReadsOfARange::OnlyTheFirst => *reads_of_this_range == 1,
+                FailingReadsOfARange::OnlyTheFirstTwo => *reads_of_this_range <= 2,
+                FailingReadsOfARange::OnlyTheNth(number_of_the_failing_read) => {
+                    *reads_of_this_range == number_of_the_failing_read
+                }
                 FailingReadsOfARange::FromTheNthOnward(first_failing) => {
                     *reads_of_this_range >= first_failing
                 }

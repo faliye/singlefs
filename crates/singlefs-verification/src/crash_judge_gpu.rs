@@ -1888,7 +1888,7 @@ mod tests {
 
     /// 结论还是初值（全 1）的状态认得出；两个内核各写过自己那几个字的才算写过。
     #[test]
-    fn a_verdict_still_at_its_initial_value_is_not_taken_as_written() {
+    fn verdict_still_at_its_initial_value_is_not_taken_as_written() {
         let untouched = [u32::MAX; VERDICT_WORDS];
         assert!(!verdict_was_written_by_both_kernels(&untouched));
         let mut only_recovery = untouched;
@@ -2512,6 +2512,236 @@ mod tests {
                 .into_iter()
                 .collect::<std::collections::BTreeMap<u32, usize>>(),
             "原因码 3 的站点号除登记的几张表之外各只在一处写下（不然看原因字分不出是哪一张表满了）；写在几处的：{sites_written_in_several_places:?}"
+        );
+    }
+
+    /// 判器三处省工夫的写法那一条流的状态数上限：几百个以内的小流，单跑几秒。
+    const MOST_STATES_OF_THE_FLOW_OF_THE_SAVED_WORK: u64 = 1000;
+
+    /// 判器三处省工夫的写法那一条流里段长不超过这个数的段逐个真子集展开，更长的段只以整段持久进入后面的状态（状态数压在几百个以内）。
+    const EXPAND_UP_TO_IN_THE_FLOW_OF_THE_SAVED_WORK: usize = 3;
+
+    /// 记账分片切成多少片的那一种切法：每片 [`crate::crash_judge_dispatch::ACCOUNTING_SLICE_POSITIONS`] ÷ 256 个位置，项少的流上多数片一项都不落、
+    /// 落了项的那几片前后都有空片，下一片从前一片停下的那一项接着做的那一份每一片都要读对。
+    const ACCOUNTING_SLICES_OF_THE_NARROW_CUT: u32 = 256;
+
+    /// 判器三处省工夫的写法（记账分片从前一片停下的那一项接着做、不每片整轮重加一遍权重；走读内核逐条 inode 记录那一圈不回头再读前一条记录的号、
+    /// 对象出生代只读一次、保留字节按字读；删除态扫描与墓碑、谱系那一遍同一版里同一条根指针读全了的 inode 树与容器树不重读）判出的结论与 CPU 参照判器逐状态相同：
+    /// 新池新建文件那条流（两块稀疏内存盘上 mkfs、取号、暖机、新建文件，录 mkfs 之后那一段）在同一张借来的卡上一次派活判完，记账分片照判器自己的片宽切、
+    /// 整轮一片、切成 [`ACCOUNTING_SLICES_OF_THE_NARROW_CUT`] 片三种切法判出的结论字逐字相同，切成那么多片的那一份与 CPU 参照判器逐状态对拍相同。
+    /// 先核这条流上真有记账那一判（I-3.1）与逐条 inode 记录那几判（I-9.7）判到的状态：三处省掉的工夫在这条流上都有活可做，判错了比得出来。
+    /// 三种切法在同一张卡上同一个判器依次判（比的就是同一批状态换一种切法），不并行。
+    #[test]
+    fn verdict_words_of_the_new_pool_file_creation_are_the_same_whatever_the_accounting_slices_and_agree_with_the_cpu_judge(
+    ) {
+        use crate::crash::{crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion};
+        use crate::crash_judge_conclusions::{
+            cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
+            CrossCheckWords,
+        };
+        use crate::crash_judge_dispatch::{
+            mebibytes_a_judge_needs, GpuCrashJudge, PackedJudgeTables, ACCOUNTING_SLICE_POSITIONS,
+        };
+        use crate::crash_judge_tables::{build_judge_tables, JudgeFlow};
+        use crate::crash_library::{judge_tables_through_the_pairing_library, StageOutcome};
+        use crate::crash_state_enumeration::{
+            sample_crash_states_on_the_cpu, CrashPointReplayItem,
+        };
+        use crate::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+        use crate::memory_pool::{
+            writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
+            SparseBlockDevice,
+        };
+        use crate::segments::FixedGeometry;
+        use crate::{RecordingBlockDevice, SharedStream};
+        use singlefs_core::address::DeviceIdentity;
+        use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+
+        const TEST_NAME: &str = "verdict_words_of_the_new_pool_file_creation_are_the_same_whatever_the_accounting_slices_and_agree_with_the_cpu_judge";
+        const DEVICE_BYTES: u64 = 4 << 30;
+        let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+            return;
+        };
+        let stream = SharedStream::retaining_contents();
+        let mut devices = [0, 1].map(|device| {
+            (
+                DeviceIdentity(device),
+                RecordingBlockDevice::with_shared_stream(
+                    DeviceIdentity(device),
+                    SparseBlockDevice::new(DEVICE_BYTES, PhysicalBlockSizeInBytes(512)),
+                    stream.clone(),
+                ),
+            )
+        });
+        let parameters = crate::known_bad_images::parameters_of_the_common_test_pool();
+        let run = crate::scenario::run_new_pool_file_creation(
+            &parameters,
+            &mut devices,
+            &stream,
+            |_, _| {},
+        )
+        .expect("新池新建文件那条路做得成");
+        let operations = stream.retained_operations();
+        let mut base =
+            MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], DEVICE_BYTES);
+        base.apply(&operations[..run.mkfs_operation_count]);
+        let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
+            &operations[run.mkfs_operation_count..],
+            &FixedGeometry {
+                fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+                journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+                root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+            },
+        );
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == crate::segments::StepKind::RootRecordFua)
+            .expect("新建文件那次发布有一条根槽写");
+        let versions = vec![PublishedVersion {
+            instance: run.output.root.instance,
+            checkpoint_txg: run.output.root.checkpoint_txg,
+            content: crate::scenario::first_file_content(),
+        }];
+        let expansion = |_segment_index: usize, segment: &[usize]| {
+            if segment.len() <= EXPAND_UP_TO_IN_THE_FLOW_OF_THE_SAVED_WORK {
+                CrashPointReplaySegmentExpansion::EveryProperSubset
+            } else {
+                CrashPointReplaySegmentExpansion::NotExpanded
+            }
+        };
+        let tables = build_judge_tables(&JudgeFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index,
+            versions: &versions,
+            expansion: &expansion,
+        })
+        .expect("新池新建文件那条流建得出判表");
+        let state_count = tables.state_count;
+        assert_eq!(
+            state_count,
+            crash_point_replay_plan_state_count(&base, &writes, &segments, &expansion),
+            "判表的状态数与崩溃点重放的计划相同"
+        );
+        assert!(
+            state_count > 0 && state_count <= MOST_STATES_OF_THE_FLOW_OF_THE_SAVED_WORK,
+            "这条流 {state_count} 个状态：至少一个，又在 {MOST_STATES_OF_THE_FLOW_OF_THE_SAVED_WORK} 个以内"
+        );
+        let every_state = usize::try_from(state_count).expect("装得进 usize");
+        // 判表先入库、再读库，GPU 只拿读回的那一份算
+        let packed = match judge_tables_through_the_pairing_library(
+            TEST_NAME,
+            &PackedJudgeTables::of(&tables),
+        ) {
+            StageOutcome::Judged(packed) => packed,
+            StageOutcome::RecordedOnly | StageOutcome::JudgedMyShareOnly { .. } => {
+                println!("JUDGE_TABLES_RECORDED_ONLY test={TEST_NAME}");
+                return;
+            }
+        };
+        let Some(lease) = cards
+            .lease_card_or_report_not_run(TEST_NAME, mebibytes_a_judge_needs(&packed, every_state))
+        else {
+            return;
+        };
+        let judge = GpuCrashJudge::on_card_with_packed_tables(lease.card(), &packed, every_state);
+        assert_eq!(
+            judge.states_per_dispatch(),
+            every_state,
+            "要一次派活判完整条流的判器开出来的派活上限"
+        );
+        let narrow_cut: Vec<u32> = (1..=ACCOUNTING_SLICES_OF_THE_NARROW_CUT)
+            .map(|slice| slice * (ACCOUNTING_SLICE_POSITIONS / ACCOUNTING_SLICES_OF_THE_NARROW_CUT))
+            .collect();
+        let with_the_slice_widths_of_the_judge = judge.judge_states_in_one_dispatch(0..state_count);
+        let in_one_slice = judge.judge_states_in_one_dispatch_slicing_the_accounting_at(
+            0..state_count,
+            &[ACCOUNTING_SLICE_POSITIONS],
+        );
+        let in_the_narrow_cut = judge
+            .judge_states_in_one_dispatch_slicing_the_accounting_at(0..state_count, &narrow_cut);
+        drop(judge);
+        drop(lease);
+        for (cut, verdicts) in [
+            ("照判器自己的片宽", &with_the_slice_widths_of_the_judge),
+            ("整轮一片", &in_one_slice),
+        ] {
+            assert_eq!(verdicts.len(), every_state, "{cut}那一份的结论一个状态一份");
+            let first_difference = verdicts
+                .iter()
+                .zip(&in_the_narrow_cut)
+                .position(|(this_cut, narrow)| this_cut != narrow);
+            assert_eq!(
+                first_difference, None,
+                "记账分片{cut}判出的结论字与切成 {ACCOUNTING_SLICES_OF_THE_NARROW_CUT} 片判出的不同，第一个不同的状态序号在这里"
+            );
+        }
+        let judged_on_some_state = |invariant: &str| {
+            let bit = 1u128
+                << super::IMPLEMENTED_INVARIANTS
+                    .iter()
+                    .position(|name| *name == invariant)
+                    .expect("池级 checker 的清单里有这一条");
+            in_the_narrow_cut
+                .iter()
+                .any(|verdict| super::pool_checker_judged_bits(verdict) & bit != 0)
+        };
+        for invariant in ["I-3.1", "I-9.7"] {
+            assert!(
+                judged_on_some_state(invariant),
+                "这条流上至少一个状态 GPU 判到了 {invariant}：不然省掉的那份工夫在这条流上没活可做，判错了也比不出来"
+            );
+        }
+        let mut cpu: Vec<CrossCheckWords> = Vec::new();
+        let Some(judged_on_the_cpu) = sample_crash_states_on_the_cpu(
+            CrashPointReplayItem {
+                name: TEST_NAME,
+                setting_file: "crates/singlefs-verification/src/crash_judge_gpu.rs",
+            },
+            &base,
+            &writes,
+            &segments,
+            judged_root_index,
+            &versions,
+            &expansion,
+            0..state_count,
+            &mut |ordinal, _image, judgement| {
+                assert_eq!(
+                    ordinal,
+                    u64::try_from(cpu.len()).expect("装得进 u64"),
+                    "CPU 参照按序号次序交回"
+                );
+                cpu.push(cross_check_words_of_cpu_judgement(judgement));
+            },
+        )
+        .judged() else {
+            return;
+        };
+        assert_eq!(judged_on_the_cpu, state_count, "CPU 参照判了整条流");
+        let disagreements: Vec<String> = cpu
+            .iter()
+            .zip(&in_the_narrow_cut)
+            .enumerate()
+            .filter_map(|(ordinal, (cpu_words, gpu_verdict))| {
+                let gpu_words = super::cross_check_words_of_gpu_verdict(gpu_verdict);
+                (!cross_check_words_agree_in_the_cross_check(&gpu_words, cpu_words))
+                    .then(|| format!("状态 {ordinal}：CPU {cpu_words:?}；GPU {gpu_words:?}"))
+            })
+            .collect();
+        assert!(
+            disagreements.is_empty(),
+            "{} 个状态 GPU 与 CPU 对拍的字不同（前几个）：\n{}",
+            disagreements.len(),
+            disagreements
+                .iter()
+                .take(8)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        println!(
+            "CRASH_JUDGE_SAVED_WORK_AGREES test={TEST_NAME} states={state_count} accounting_slices_of_the_narrow_cut={ACCOUNTING_SLICES_OF_THE_NARROW_CUT}"
         );
     }
 }

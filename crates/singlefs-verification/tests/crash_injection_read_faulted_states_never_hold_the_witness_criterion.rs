@@ -1,9 +1,9 @@
 //! 验证包模块：crash_point_replay_progress、crash_injection、crash_library、crash_amplification、gpu_unit_checks
 //! C696（崩溃注入的读故障一支在随机历史里从没触发）判别力自证里「第三截调用点写死成 NoneInjected」那一种接错，在随机历史上是等价变异
 //! ：写死之后只在三样都成立的态上改判定——第一次崩溃那一态注入过读故障、
-//! 它上面那次可写挂载途中的二次崩溃镜像上再挂以判据 N-配置 拒、那个二次崩溃镜像上判据 W（`judge_writable_mount_refusal_of_a_crash_state`
-//! 没注入读故障时报的 C670 那一条）为真。这里照 `.claude/singlefs-ai-sop/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」
-//! 第 2 点把等价性写成一条测试留档：在「每块盘最新那一槽系统配置读回全 0 的可写挂载」那一组比重的历史上，那一步发过写之后的每个崩溃态
+//! 它上面那次可写挂载途中的二次崩溃镜像上再挂以判据 N-配置 拒、那个二次崩溃镜像上判据 W（`judge_writable_mount_refusal_of_a_crash_state_of_the_pool`
+//! 没注入读故障时报的 C670 那一条）为真。这里照 `.claude/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」
+//! 第 2 点把等价性写成一条测试留档：在「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」那一组比重的历史上，那一步发过写之后的每个崩溃态
 //! （段内前缀）与它们上面可写挂载的每个写前缀（第三截的二次崩溃镜像），W 一个都不为真。真会改行为的那一种接错由
 //! `crash_injection::tests::a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount_is_not_judged_by_c670`
 //! 那条靶向用例钉（W 为真的阳性对照）。
@@ -48,9 +48,10 @@ use singlefs_verification::memory_pool::{
     SparseBlockDevice,
 };
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state, read_recovery_fields, ComparedVersion,
-    DiskAfterTheRefusal, ReadFaultsInTheCrashState, ReadOnlyReadBackOfTheCrashImage,
-    RefusalConditionNotMet, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, read_recovery_fields,
+    ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
+    WritableMountRefusalVerdict,
 };
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
@@ -127,13 +128,15 @@ fn witness_criterion_holds_without_read_faults(image: &MemoryPool) -> bool {
     let Some(selected_version) = fields.report.effective_root else {
         return false;
     };
-    match judge_writable_mount_refusal_of_a_crash_state(
+    match judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
         image,
+        &WIDTH.parameters().filesystem_identifier,
         fields.report.effective_root,
         &witness_refusal_claimed_on(selected_version),
         DiskAfterTheRefusal::ByteForByteUnchanged,
         ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
         ReadFaultsInTheCrashState::NoneInjected,
+        ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
     ) {
         WritableMountRefusalVerdict::Illegal {
             conditions_not_met, ..
@@ -144,7 +147,7 @@ fn witness_criterion_holds_without_read_faults(image: &MemoryPool) -> bool {
             )
         }),
         WritableMountRefusalVerdict::Legal(_)
-        | WritableMountRefusalVerdict::ReasonNotOnTheD23List => false,
+        | WritableMountRefusalVerdict::ReasonNotOnTheLegalRefusalList => false,
     }
 }
 
@@ -257,7 +260,7 @@ impl HistoryWhoseStepSentWrites {
 }
 
 /// 种子 `seed` 那段历史（那一组比重、24 步）：生成、执行、切写表，摆进来的段照 `segments_after_the_step_taken` 挑；
-/// 「每块盘最新那一槽系统配置读回全 0 的可写挂载」那一步一个写都没发就交 `None`。
+/// 「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」那一步一个写都没发就交 `None`。
 fn history_whose_step_sent_writes(
     seed: u64,
     execution: HistoryExecution,
@@ -266,7 +269,7 @@ fn history_whose_step_sent_writes(
     let history = generate_history_with_weights(
         HistorySeed(seed),
         OPERATIONS_PER_HISTORY,
-        &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+        &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS,
     );
     let stream = SharedStream::retaining_contents();
     let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
@@ -283,7 +286,7 @@ fn history_whose_step_sent_writes(
         if let StepPosition::Operation(step_index) = position {
             if earliest_stream_index_of_the_step.is_none()
                 && history.operations[*step_index].kind()
-                    == HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+                    == HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
                 && operations_before_the_step < *operations_after_the_step
             {
                 earliest_stream_index_of_the_step = Some(operations_before_the_step);
@@ -742,7 +745,7 @@ fn histories_whose_step_sent_writes(
     histories_taken
 }
 
-/// 场景：那一组比重、种子基起「每块盘最新那一槽系统配置读回全 0 的可写挂载」发过写的前 `scale.histories` 段历史，每段 24 步。
+/// 场景：那一组比重、种子基起「只有第一块盘最新那一槽系统配置读回全 0 的可写挂载」发过写的前 `scale.histories` 段历史，每段 24 步。
 /// 崩溃态取那一步发的第一个写之后结束的段（`scale.segments_after_the_step_taken` 挑哪几段）的每个前缀（崩溃窗口末尾在那一步之后，
 /// 崩溃注入认成注入过读故障的那一类）；每段最长那个前缀上再起一次可写挂载，挂载写的每个前缀是一个第三截的二次崩溃镜像。
 /// 每个镜像判 W；崩溃态一段历史一张给定状态表、二次崩溃一个最长前缀一张表，交 `judge` 判。
@@ -845,7 +848,7 @@ fn judge_the_read_faulted_states(
 /// 种子与规模（进给定状态表的块键）。
 fn seeds_and_scale_of(histories: usize) -> String {
     format!(
-        "seed_base={SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE} seeds_searched={SEEDS_SEARCHED} histories={histories} operations_per_history={OPERATIONS_PER_HISTORY} weights=NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS width={WIDTH:?}"
+        "seed_base={SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE} seeds_searched={SEEDS_SEARCHED} histories={histories} operations_per_history={OPERATIONS_PER_HISTORY} weights=NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS width={WIDTH:?}"
     )
 }
 
@@ -1085,26 +1088,23 @@ fn the_first_read_faulted_history_judged_on_the_gpu(
     .unwrap_or_else(|refusal| panic!("{refusal}"));
     let configuration = directory.join("multi-host-with-gpu.env");
     std::fs::write(&configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
-    // 清场之下要清场之后那一份显卡先后：调用方给这个进程的那一份经环境变量交给引擎（不读此刻的环境；
-    // 抄进配置在调用方的显卡先后只写在仓根 multi-host.env、副本里又没有那一份时抄成空串，见 common_gpu_cards_of_the_caller）
-    let cards = common_gpu_cards_of_the_caller::card_priority_value_of_the_caller();
     // 这一台是 HOSTS 里哪一项不经环境交：引擎与卡池都照调用方那份多机配置上判法认出的那一项（gpu_card_configuration::multi_host_addresses_of_the_caller）
-    use singlefs_verification::gpu_card_configuration::{
-        CARDS_BY_PRIORITY_KEY, MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
-    };
+    use singlefs_verification::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE;
     let _the_library_of_this_process = directory.make_it_the_library_of_this_process();
-    let environment = CrashAmplificationEnvironment::cleared_then_set(&[
-        (
-            MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
-            configuration.as_os_str(),
-        ),
-        (CARDS_BY_PRIORITY_KEY, std::ffi::OsStr::new(&cards)),
-    ]);
+    let environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+        configuration.as_os_str(),
+    )]);
+    // 调用方给这个进程的卡交给引擎、不在这里领：服务交了卡串的设卡串（清场之下是清场之后那一份），交领卡通道的把通道设回环境，
+    // 引擎第一次上卡时才领（common_gpu_cards_of_the_caller）；在环境守卫里建、先于它丢
+    let cards_of_the_caller =
+        common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let judged = read_faulted_states_through_the_given_states_engine(
         HISTORIES_OF_THE_SMALL_BATCH,
         fault,
         EngineStart::UnderTheCallersEnvironmentGuard,
     );
+    drop(cards_of_the_caller);
     drop(environment);
     judged
 }

@@ -1126,14 +1126,15 @@ pub fn forced_summary_of_the_check_output(standard_output: &str) -> Option<Strin
 
 /// 准入与运行条件（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`「开头先判」Rust 那一行）：起 `python3 <规范副本>/scripts/preflight.py check <源文件> [--force] -- <参数…>`
 /// （不经 `sh -c`），退出码不是 0 就按 [`exit_code_after_a_failed_check`] 退出；交回强制跑时的摘要，调用方写进产物。
-/// `source_file_name` 是调用的那一份 bin 在 `src/bin/` 下的文件名，两份 bin 各传自己的。
-pub fn preflight(source_file_name: &str) -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/{source_file_name}");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+/// `own_source_path` 是调用的那一份 bin 的源文件路径，两份 bin 各传自己的 `concat!` 常量（单元键把那份文件收成数据单元）。
+pub fn preflight(own_source_path: &str) -> Option<String> {
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../.claude/singlefs-ai-sop/scripts/preflight.py"
+    );
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(own_source_path);
     if arguments.iter().any(|argument| argument == FORCE_FLAG) {
         command.arg(FORCE_FLAG);
     }
@@ -1557,7 +1558,7 @@ mod tests {
     }
 
     #[test]
-    fn a_forced_check_line_gives_its_last_segment_with_the_blanks_joined_by_underscores() {
+    fn forced_check_line_gives_its_last_segment_with_the_blanks_joined_by_underscores() {
         assert_eq!(
             forced_summary_of_the_check_output("forced\tadmission\t输入 没变 两条\n"),
             Some("输入_没变_两条".to_string())
@@ -1570,7 +1571,7 @@ mod tests {
     }
 
     #[test]
-    fn a_check_line_that_is_not_forced_gives_no_summary() {
+    fn check_line_that_is_not_forced_gives_no_summary() {
         assert_eq!(forced_summary_of_the_check_output("met\t0123abcd\n"), None);
         assert_eq!(forced_summary_of_the_check_output("undeclared\n"), None);
         assert_eq!(forced_summary_of_the_check_output(""), None);
@@ -1582,7 +1583,7 @@ mod tests {
     }
 
     #[test]
-    fn a_refused_check_exits_78_and_every_other_failure_exits_1() {
+    fn refused_check_exits_78_and_every_other_failure_exits_1() {
         assert_eq!(exit_code_after_a_failed_check(Some(78)), 78);
         assert_eq!(exit_code_after_a_failed_check(Some(1)), 1);
         assert_eq!(exit_code_after_a_failed_check(Some(2)), 1);

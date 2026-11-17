@@ -651,6 +651,25 @@ pub fn the_run_counts(
     true
 }
 
+/// 把 glibc 分配器各分区里整页空着的内存还给系统（`malloc_trim(0)`）。一条用例的引擎收尾之后调：同一个测试二进制里几百条用例
+/// 先后收齐镜像、建表、判完放掉，glibc 不主动把放掉的块还给系统，进程常驻内存停在最高水位上不下来。
+/// 只动分配器手里的空闲块，活着的对象（这条用例的镜像、结论、自己那一份一次性的库）一个都不碰，判定不变。
+/// glibc 才有这个函数：在 glibc 目标上编，别的目标上是空函数。
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[allow(
+    unsafe_code,
+    reason = "std 没有 malloc_trim，把 glibc 分配器整页空着的内存还给系统只能调 libc；已有依赖里没有带安全封装的包"
+)]
+fn return_the_free_memory_of_the_allocator_to_the_system() {
+    // SAFETY: `malloc_trim` 不收指针、不读写调用方的内存：glibc 拿着各分区自己的锁，逐个分区找整页空着的空闲块交还内核，
+    // 已分配出去的块一个不动；它是线程安全的，并行跑的别的用例照常分配、放掉。交回值只说还没还掉内存，不是错误码，不看。
+    unsafe { libc::malloc_trim(0) };
+}
+
+/// 不是 glibc 的目标上没有 `malloc_trim`：分配器空着的内存怎么还交给那个目标的分配器自己，这里什么都不做。
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn return_the_free_memory_of_the_allocator_to_the_system() {}
+
 /// 场景写下的该判成什么里没有要现判的那几样（判成立、没判到、违例细节、与别的镜像比）时，还要不要在这条用例自己那一份清空过的库里现判
 /// （用例要在几张镜像合起来的结论上核判到位：随机历史「某一步上判成立」那一判）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -679,6 +698,7 @@ pub fn judge_the_collected_images(
         .map(|image| judge_one_image(&engine, image, container_capacity_knobs))
         .collect();
     let run = engine.finish();
+    return_the_free_memory_of_the_allocator_to_the_system();
     for (image, judged) in images.iter().zip(&conclusions) {
         let violated: Vec<Vec<(&'static str, String)>> = judged
             .states

@@ -1,6 +1,8 @@
 //! harness 判法复算判据 N-配置 时，系统配置见证判不出改取 R2（D22（单元原子性怎么合成） 已定项 8 射程；
 //! D23（journal 的角色与格式） 已定项 14 那一段；代码轮判决 `research/prompts/m3-root-ring-code-r1-main-verification.md` 第二节 RR8）：
-//! 判不出 ⟺ 有槽设备报读错，且没有一块盘两槽都自证过。撕裂的轮换（读得出、自证不过、设备没报错）不算判不出，c_见证 跳过撕裂的槽照常比；
+//! 判不出 ⟺ 有槽设备报读错，且没有一块盘两槽都自证过。可写挂载读阶段那一判另照乙入判不出（C971（多处读坏时可写挂载写出倒挂的新实例根），
+//! `research/prompts/e205-preregistration.md`「乙入判不出」那一行）把读得出而自证不过的槽（撕裂的轮换）当读错计：撕裂的轮换在有一块盘两槽都自证过时
+//! 不算判不出，c_见证 跳过撕裂的槽照常比；每块盘都撕了一槽时判不出、按真；
 //! 某块盘两槽一份自证过的都没有（C554 乙-配置续 Q1，这块盘不「可见」）：实现拒它报的是「读阶段判完之后系统配置又读不出」，
 //! 那一拒照它自己的判据复算为真；拿判据 N-配置 当理由拒它是拒错了（C664（挂载拒绝合法复算把两种拒因报成一个））。
 //! 小池是单元区 384 槽的两块内存盘，第一个文件之后的盘面（mkfs → 取号 → 暖机 → 第一个文件）。
@@ -24,7 +26,7 @@ use singlefs_verification::history::{
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::mount_transparency::{
     judge_writable_mount_refusal, read_recovery_fields, ComparedVersion, DiskAfterTheRefusal,
-    ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet, RefusalReasonOnTheD23List,
+    ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet, RefusalReasonOnTheLegalRefusalList,
     WritableMountRefusalVerdict,
 };
 use singlefs_verification::SharedStream;
@@ -123,6 +125,7 @@ fn verdict_of_a_claimed_refusal_on(
         .expect("撕裂的系统配置槽上只读恢复照样落到第一个文件那一版");
     judge_writable_mount_refusal(
         image,
+        &SMALL.parameters().filesystem_identifier,
         fields.report.effective_root,
         &claimed(selected_version),
         DiskAfterTheRefusal::ByteForByteUnchanged,
@@ -134,31 +137,53 @@ fn verdict_of_the_claimed_witness_refusal_on(image: &MemoryPool) -> WritableMoun
     verdict_of_a_claimed_refusal_on(image, witness_refusal_claimed_on)
 }
 
-/// 场景：两块盘第一个文件那次轮换写的那一槽（世代 5，槽 1）都撕裂——读得出、自证不过，设备不报错。
-/// 预期：R2 下这不是判不出，c_见证 取两块盘世代 4 那一槽、不比第一个文件那条记录的计数器大，判据复算为假：拿它当理由拒可写是拒错了，判非法。
-/// 取甲（哪块盘自证过的槽少于两份就按真）时这一拒判成合法。
-#[test]
-fn a_witness_refusal_on_a_torn_system_configuration_rotation_is_a_refusal_for_the_wrong_reason() {
+/// 第一个文件那次轮换写的那一槽（世代 5，槽 1）在 `devices` 那几块盘上撕裂——读得出、自证不过，设备不报错。
+fn pool_after_the_first_file_with_its_rotation_torn_on(devices: &[DeviceIdentity]) -> MemoryPool {
     let mut image = pool_after_the_first_file();
     let slot_of_the_first_file_rotation = offset_of_system_configuration_slot(
         GENERATION_OF_THE_FIRST_FILE_ROTATION % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
     );
-    for device in DEVICES {
+    for device in devices {
         image.flip_byte(
-            device,
+            *device,
             slot_of_the_first_file_rotation,
             TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT,
         );
     }
+    image
+}
+
+/// 场景：只有盘 0 第一个文件那次轮换写的那一槽撕裂，盘 1 两槽都自证过；设备不报错。
+/// 预期：R2 本身判得出；读得出而自证不过的槽当读错计（乙入判不出，C971（多处读坏时可写挂载写出倒挂的新实例根））也判得出——盘 1 两槽都自证过；
+/// c_见证 取盘 1 世代 5 那一槽、不比第一个文件那条记录的计数器大，判据复算为假：拿它当理由拒可写是拒错了，判非法。
+/// 取甲（哪块盘自证过的槽少于两份就按真）时这一拒判成合法；丢掉乙入判不出的另一半（不看有没有一块盘两槽都自证过）时也判成合法。
+#[test]
+fn a_witness_refusal_on_a_torn_system_configuration_rotation_is_a_refusal_for_the_wrong_reason() {
+    let image = pool_after_the_first_file_with_its_rotation_torn_on(&[DEVICES[0]]);
     assert_eq!(
         verdict_of_the_claimed_witness_refusal_on(&image),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
         },
-        "撕裂的轮换不是判不出：判据复算为假"
+        "一块盘撕裂、另一块盘两槽都自证过：判得出，判据复算为假"
+    );
+}
+
+/// 场景：两块盘第一个文件那次轮换写的那一槽都撕裂——读得出、自证不过，设备不报错。
+/// 预期：R2 本身判得出；乙入判不出把撕裂的槽当读错计，没有一块盘两槽都自证过 ⇒ 判不出，判据复算按真：这一拒合法
+/// （可写挂载读阶段重读一次仍是这一形就以这个理由拒，`crates/singlefs-verification/tests/writable_mount_counts_system_configuration_slots_still_failing_self_verification_as_read_errors.rs`）。
+#[test]
+fn a_witness_refusal_on_a_torn_system_configuration_rotation_on_every_device_is_legal() {
+    let image = pool_after_the_first_file_with_its_rotation_torn_on(&DEVICES);
+    assert_eq!(
+        verdict_of_the_claimed_witness_refusal_on(&image),
+        WritableMountRefusalVerdict::Legal(
+            RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration
+        ),
+        "两块盘都撕裂：乙入判不出判不出，判据复算为真"
     );
 }
 
@@ -197,14 +222,14 @@ fn on_a_device_without_any_self_verified_system_configuration_slot_the_refusal_a
     assert_eq!(
         verdict_of_a_claimed_refusal_on(&image, refusal_after_the_read_stage_claimed_on),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage
         ),
         "一块盘一份自证过的系统配置都没有：读阶段之后系统配置又读不出那一拒的判据为真"
     );
     assert_eq!(
         verdict_of_the_claimed_witness_refusal_on(&image),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],

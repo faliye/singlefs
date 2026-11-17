@@ -7,7 +7,9 @@
 //! - 纯形（全池读回一个值：两块盘世代 5 那一槽都报读错）：有槽报读错、没有一块盘两槽都自证过 ⇒ 判不出、拒可写；取号也拒。
 //! - 只有一块盘世代 5 那一槽报读错、另一块盘两槽都自证过 ⇒ 判得出，照常可写挂载。
 //! - 混合形（一盘报读错、另一盘读回全零）：判不出、拒可写（取甲-读错-每盘时这一形丢写，R2 拒，网格上混合形丢写 0）。
-//! - 撕裂轮换（两块盘世代 5 那一槽都读回全零：读得出、自证不过，设备没报错）：判得出、照常可写挂载（取甲时拒、之后只剩只读挂载）。
+//! - 撕裂轮换（两块盘世代 5 那一槽都读回全零：读得出、自证不过，设备没报错）：R2 本身判得出；可写挂载读阶段的见证读另照乙入判不出
+//!   （C971（多处读坏时可写挂载写出倒挂的新实例根））把读得出而自证不过的槽当读错计，没有一块盘两槽都自证过 ⇒ 判不出，重读一次仍是这一形就拒可写、
+//!   盘上逐字节不变，只读挂载照常；取号那一刻照 R2 本身判。
 mod common;
 
 use common::{
@@ -91,6 +93,26 @@ fn refused_as_undecidable_on_both_reads(
     })
 }
 
+/// 拒因：判据 N-配置 为真、重读仍为真，两遍读数都判乙入判不出那一形（设备没报读错、读得出而自证不过的槽当读错计）。
+fn refused_as_failing_self_verification_on_both_reads(
+    outcome: &Result<singlefs_core::mount::Mounted, MountError>,
+) -> bool {
+    let Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)) = outcome else {
+        return false;
+    };
+    let StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
+        first_read,
+        reread,
+    } = still_unreadable.as_ref()
+    else {
+        return false;
+    };
+    [first_read, reread].iter().all(|reading| {
+        reading.witness.comparison
+            == WitnessedCounterComparison::SomeSlotFailedSelfVerificationAndNoDeviceSelfVerifiedBothSlots
+    })
+}
+
 /// 纯形：两块盘世代 5 那一槽都报读错 ⇒ 判不出，重读一次仍判不出，拒可写、盘上逐字节不变；只读挂载照常。
 #[test]
 fn a_writable_mount_is_refused_when_the_newest_slot_of_every_device_reports_a_read_error() {
@@ -158,19 +180,27 @@ fn a_writable_mount_is_refused_when_one_device_reports_a_read_error_and_the_othe
     );
 }
 
-/// 撕裂的系统配置轮换：两块盘世代 5 那一槽都读回全零（设备没报错）⇒ 判得出（见证值取两块盘世代 4 那一槽的），照常可写挂载、取到实例 2。
+/// 撕裂的系统配置轮换：两块盘世代 5 那一槽都读回全零（设备没报错）⇒ R2 本身判得出；读阶段的见证读照乙入判不出把读回全零的槽当读错计，
+/// 没有一块盘两槽都自证过 ⇒ 判不出，两遍读都判这一形（`SomeSlotFailedSelfVerificationAndNoDeviceSelfVerifiedBothSlots`），拒可写、
+/// 盘上逐字节不变；只读挂载照常。
 #[test]
-fn a_writable_mount_goes_ahead_over_a_torn_system_configuration_rotation_on_every_device() {
+fn a_writable_mount_is_refused_over_a_torn_system_configuration_rotation_on_every_device_after_one_reread(
+) {
     let mut pool = build_pool("system-configuration-witness-torn-rotation");
     zero_the_newest_system_configuration_slot_of(&mut pool, DeviceIdentity(0));
     zero_the_newest_system_configuration_slot_of(&mut pool, DeviceIdentity(1));
+    let image_before = pool.memory_pool();
     let outcome = writable_mount_with_unreadable_ranges(&mut pool, Vec::new());
-    assert_eq!(
-        outcome.as_ref().map(|mounted| mounted.output.instance).ok(),
-        Some(InstanceGeneration(2)),
-        "撕裂的轮换不算判不出，照常可写挂载；得到 {:?}",
-        outcome.as_ref().err()
+    assert!(
+        refused_as_failing_self_verification_on_both_reads(&outcome),
+        "两块盘各一槽读回全零、没有一块盘两槽都自证过：乙入判不出拒可写；得到 {:?}",
+        outcome.as_ref().map(|mounted| mounted.output.instance)
     );
+    assert!(
+        pool.memory_pool() == image_before,
+        "拒在取号之前：盘上逐字节不变"
+    );
+    mount_read_only(&pool.memory_pool()).expect("只读挂载照常");
 }
 
 /// 取号那一刻同一判：两块盘世代 5 那一槽都报读错，不经可写挂载直接取号 ⇒ 判不出，在第一个取号写之前拒，报盘表次序第一块报读错的盘（盘 0）；

@@ -1,7 +1,7 @@
 //! 可写挂载的 C 读一次没施加的发布、账读不出、读得出的记录不齐、从中央映射也现算不成的那一拒（`C_MAPPING` 收窄，判决
 //! `research/prompts/m3-batch35-36-code-r1-main-verification.md` 第二节 K2 W1 / W2 H1、K2 W2 H3 两行）另起错误成员
 //! （`StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords`），
-//! 列进 D23（journal 的角色与格式） 已定项 14 那张单子（`RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords`）；
+//! 列进 D23（journal 的角色与格式） 已定项 14 那张单子（`RefusalReasonOnTheLegalRefusalList::AccountOfAnUnappliedPublishWithIncompleteReadableRecords`）；
 //! 判法在崩溃镜像上复算判据（主 agent 定，被攻过零轮）：点名的是水位之上没施加的发布（或较新的有效可读根），它读得出的记录不齐，
 //! 它的账两份副本都验不过（账根经新根段里的树表指针找）。「映射现算得出」那一半镜像上不复算，这一格只判必要条件。
 //!
@@ -13,39 +13,40 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::mount::{
     mount_writable, MountError, RollbackTarget, StillUnreadableAfterOneReread,
 };
 use singlefs_verification::memory_pool::{MemoryPool, RetainedWrite};
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state, read_recovery_fields, ComparedVersion,
-    DiskAfterTheRefusal, ReadFaultsInTheCrashState, ReadOnlyReadBackOfTheCrashImage,
-    RefusalConditionNotMet, RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, read_recovery_fields,
+    ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 fn recorded_publish_of_three_records() -> RecordedPublish {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     recorded
 }
 
 /// R 的根槽、树表与中央映射树根的写（两棵树的根两块盘各一份）：R 不在根环里可读、R 的账（经树表读）读不出、映射也现算不成。
-fn root_slot_tree_table_and_mapping_root_writes_of_r(
+fn root_slot_tree_table_and_mapping_root_writes_of_the_recorded_publish(
     recorded: &RecordedPublish,
 ) -> Vec<&RetainedWrite> {
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let mut writes = vec![recorded.root_slot_write()];
     for (pointer, what) in [
-        (&root_of_r.tree_table, "树表"),
-        (&root_of_r.mapping_root, "中央映射树根"),
+        (&root_of_the_recorded_publish.tree_table, "树表"),
+        (&root_of_the_recorded_publish.mapping_root, "中央映射树根"),
     ] {
         let unit_writes = recorded.unit_writes_at(pointer);
         assert_eq!(unit_writes.len(), 2, "R 自己写了{what}，两块盘各一份");
@@ -69,10 +70,11 @@ fn image_with_the_writes_zeroed(image: &MemoryPool, writes: &[&RetainedWrite]) -
 }
 
 /// 崩溃镜像：R 的根槽、树表与映射根全零，末条（第 3 条，两份）也全零——读得出的第 1、2 条缺末条，记录不齐。
-fn crash_image_with_the_last_record_account_and_mapping_of_r_zeroed(
+fn crash_image_with_the_last_record_account_and_mapping_of_the_recorded_publish_zeroed(
     recorded: &RecordedPublish,
 ) -> MemoryPool {
-    let mut zeroed_writes = root_slot_tree_table_and_mapping_root_writes_of_r(recorded);
+    let mut zeroed_writes =
+        root_slot_tree_table_and_mapping_root_writes_of_the_recorded_publish(recorded);
     zeroed_writes.extend(recorded.record_writes_of_the_record(3));
     image_with_the_writes_zeroed(
         &recorded.crash_image_with_the_root_persisted_and_the_rotation_lost(),
@@ -104,7 +106,10 @@ fn refusal_of_the_writable_mount_on(
 fn a_publish_whose_account_and_mapping_are_zero_while_its_last_record_is_missing_is_refused_with_its_own_error_member(
 ) {
     let recorded = recorded_publish_of_three_records();
-    let crash_image = crash_image_with_the_last_record_account_and_mapping_of_r_zeroed(&recorded);
+    let crash_image =
+        crash_image_with_the_last_record_account_and_mapping_of_the_recorded_publish_zeroed(
+            &recorded,
+        );
     let refusal = refusal_of_the_writable_mount_on(&recorded, &crash_image);
     assert!(
         matches!(
@@ -124,12 +129,15 @@ fn a_publish_whose_account_and_mapping_are_zero_while_its_last_record_is_missing
 
 /// 同一份崩溃镜像、同一拒：判法把它归到单子上，在崩溃镜像上复算判据为真（R 在水位之上没施加，读得出的第 1、2 条缺末条，
 /// R 的树表两份都验不过、读不到账根），盘上逐字节不变、只读读出在允许集合里，拒得合法。
-/// 判别力：新成员仍映成不在单子上（变异「C_MAPPING 那一拒仍映成不在 D23 单子上」）时判成 `ReasonNotOnTheD23List`，这一条红。
+/// 判别力：新成员仍映成不在单子上（变异「C_MAPPING 那一拒仍映成不在 D23 单子上」）时判成 `ReasonNotOnTheLegalRefusalList`，这一条红。
 #[test]
-fn a_refusal_for_an_unreadable_account_with_incomplete_records_is_legal_on_the_d23_list_when_the_crash_image_bears_it_out(
+fn a_refusal_for_an_unreadable_account_with_incomplete_records_is_legal_on_the_legal_refusal_list_when_the_crash_image_bears_it_out(
 ) {
     let recorded = recorded_publish_of_three_records();
-    let crash_image = crash_image_with_the_last_record_account_and_mapping_of_r_zeroed(&recorded);
+    let crash_image =
+        crash_image_with_the_last_record_account_and_mapping_of_the_recorded_publish_zeroed(
+            &recorded,
+        );
     let refusal = refusal_of_the_writable_mount_on(&recorded, &crash_image);
     let selected_version = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion)
         .report
@@ -140,16 +148,18 @@ fn a_refusal_for_an_unreadable_account_with_incomplete_records_is_legal_on_the_d
         "R 的根槽全零、缺末条：R 整次不施加，崩溃镜像上只读恢复落到 P"
     );
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &recorded.pool.parameters.filesystem_identifier,
             selected_version,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            RefusalReasonOnTheLegalRefusalList::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
                 unapplied_publish: recorded.key,
             }
         )
@@ -165,7 +175,7 @@ fn a_refusal_claimed_for_an_unreadable_account_with_incomplete_records_is_illega
     let recorded = recorded_publish_of_three_records();
     let crash_image = image_with_the_writes_zeroed(
         &recorded.crash_image_with_the_root_persisted_and_the_rotation_lost(),
-        &root_slot_tree_table_and_mapping_root_writes_of_r(&recorded),
+        &root_slot_tree_table_and_mapping_root_writes_of_the_recorded_publish(&recorded),
     );
     let selected_version = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion)
         .report
@@ -184,16 +194,18 @@ fn a_refusal_claimed_for_an_unreadable_account_with_incomplete_records_is_illega
         },
     ));
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &recorded.pool.parameters.filesystem_identifier,
             selected_version,
             &claimed_refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            reason: RefusalReasonOnTheLegalRefusalList::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
                 unapplied_publish: recorded.key,
             },
             conditions_not_met: vec![

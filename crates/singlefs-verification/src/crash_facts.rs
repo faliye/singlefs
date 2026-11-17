@@ -1628,7 +1628,7 @@ mod tests {
     }
 
     #[test]
-    fn a_root_whose_pointer_targets_a_missing_unit_is_red_and_becomes_green_once_the_unit_lands() {
+    fn root_whose_pointer_targets_a_missing_unit_is_red_and_becomes_green_once_the_unit_lands() {
         let unit = UnitFact {
             source: 0,
             device: 0,
@@ -1695,7 +1695,7 @@ mod tests {
     /// 一段 70 次两态的原地写（3^70、2^70 都装不进 u64 的那一形）、只判它域里从 2^64 + 7 起的 300 个态：片内第 i 个拆出的持久集合
     /// 就是 2^64 + 7 + i 的二进制（第 0 位是第一次写），片起点进事实表的字节往返不丢、片起点那几位与编号对得上。
     #[test]
-    fn a_sliced_segment_decodes_from_its_slice_start_plus_the_ordinal_within_the_slice() {
+    fn sliced_segment_decodes_from_its_slice_start_plus_the_ordinal_within_the_slice() {
         const WRITES: u32 = 70;
         const SLICE_STATES: u64 = 300;
         let slice_start_value: u128 = (1u128 << 64) + 7;
@@ -1757,7 +1757,7 @@ mod tests {
 
     /// 甲二一段（两次原地写、三次单元写，7 个态）从段内编号 3 起分片：片内第 i 个与不分片时编号 3 + i 拆出的逐个相同。
     #[test]
-    fn a_slice_of_in_place_subsets_with_copy_on_write_none_or_all_decodes_like_the_whole_segment() {
+    fn slice_of_in_place_subsets_with_copy_on_write_none_or_all_decodes_like_the_whole_segment() {
         let whole = facts_of_one_segment_in_the_order(vec![0, 1, 2, 3, 4], 7);
         let expansions = in_place_subsets_with_copy_on_write_none_or_all_of_the_model();
         let mut sliced = facts_of_one_segment_in_the_order(vec![0, 1, 2, 3, 4], 4);
@@ -1784,7 +1784,7 @@ mod tests {
 
     /// 片起点的各位与编号对不上、片越过段的域：核片起点那一步交回那一段的段号。
     #[test]
-    fn a_slice_start_whose_digits_disagree_or_whose_slice_passes_the_domain_is_found() {
+    fn slice_start_whose_digits_disagree_or_whose_slice_passes_the_domain_is_found() {
         let expansions = in_place_subsets_with_copy_on_write_none_or_all_of_the_model();
         let mut facts = facts_of_one_segment_in_the_order(vec![0, 1, 2, 3, 4], 4);
         facts.segments[0].slice_start = Some(SegmentSliceStartFact {
@@ -1817,8 +1817,8 @@ mod tests {
 
     /// 头不是这一版布局头（[`FACTS_LAYOUT_MAGIC`]）的事实表字节读到就拒，拒跑句点名这一版的布局版本，不按这一版的布局去解。
     #[test]
-    fn a_facts_table_without_the_layout_header_of_this_version_is_refused_naming_the_layout_version(
-    ) {
+    fn facts_table_without_the_layout_header_of_this_version_is_refused_naming_the_layout_version()
+    {
         let facts = FlowFacts {
             recorded_write_count: 1,
             enumerated_write_count: 1,
@@ -1877,7 +1877,7 @@ mod tests {
     /// 根指过去按整单元 CRC 对不上（与 CPU 判器在镜像上读回 0 或撕裂字节一致），没持久的状态里单元还在、判绿。
     /// 这一段 1 + (3 − 1) 个状态：没持久、撕裂（基线那一槽有旧内容，D13（验证路线） 已定项 4 的第三态）、全部持久。
     #[test]
-    fn a_persisted_or_torn_discard_over_the_unit_the_newest_root_points_to_is_red_in_the_cpu_reference(
+    fn persisted_or_torn_discard_over_the_unit_the_newest_root_points_to_is_red_in_the_cpu_reference(
     ) {
         let (base, unit_bytes) = base_with_one_unit_at_the_discarded_segment();
         let writes = vec![discard_of_the_segment()];

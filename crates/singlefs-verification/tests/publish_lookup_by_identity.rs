@@ -137,8 +137,9 @@ fn the_core_build_script_reports_the_lookup_work_counters_feature_that_cargo_ena
 }
 
 #[test]
-fn the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_cfg_says_off() {
-    scenarios::run_the_scenario_where_the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_cfg_says_off();
+fn the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_compile_time_configuration_says_off(
+) {
+    scenarios::run_the_scenario_where_the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_compile_time_configuration_says_off();
 }
 
 #[test]

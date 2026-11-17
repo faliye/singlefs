@@ -783,6 +783,38 @@ pub fn judging_units_key(
     }
 }
 
+/// 别的包的构建脚本照同一套（`singlefs-unit-graph` 的 `entry_group_table_text_with_the_features_of_the_build`）写下的键表里点名一组的判法单元键：
+/// 认表、取指纹、拼组成清单都是 [`judging_units_key`] 那一份代码。产品 GPU 包的测试包拿它取 CPU 参照那一侧的单元键，拼进对拍参照的录入键
+/// （`crate::crash_library::pairing_input_and_reference_through_the_pairing_library`）。
+///
+/// # Errors
+/// 表认不回来；表里没有这一组；这一组拒算或没编进来。交回那一句（调用方当拒算处置：照录、不复用）。
+pub fn judging_units_key_of_the_group_in_the_table_text(
+    table_text: &str,
+    group_name: &str,
+) -> Result<JudgingUnitsKey, String> {
+    let table = parse_entry_group_table(table_text)
+        .map_err(|reason| format!("判法单元键表认不回来：{reason}"))?;
+    let group = table
+        .groups
+        .iter()
+        .find(|group_of_the_table| group_of_the_table.group_name == group_name)
+        .ok_or_else(|| format!("判法单元键表里没有组 {group_name}"))?;
+    match &group.verdict {
+        ReadBackEntryGroupVerdict::Keyed { key } => Ok(JudgingUnitsKey::of_the_parts(
+            *key,
+            composition_of_the_compiled_group(group),
+        )),
+        ReadBackEntryGroupVerdict::Refused { refusal_lines } => Err(format!(
+            "组 {group_name} 的判法单元拒算：{}",
+            refusal_lines.join("；")
+        )),
+        ReadBackEntryGroupVerdict::NotCompiled { reason } => {
+            Err(format!("组 {group_name} 这一次没编进来：{reason}"))
+        }
+    }
+}
+
 /// 判定那一把版本的判法单元键：判定定义那一组（`definition` 是哪一组、`definition_units` 是它的键：判崩溃镜像的、或判给定状态的）与 GPU 判器那一组（`gpu_judge_units`）并成一把
 /// （「GPU 判器代码进键」：GPU 判器那一组的单元并进每一块的键；CPU 判与 GPU 判同一份输入块键仍逐字相同，不与硬件绑定，
 /// 与 D13（验证路线） 已定项 17 依据里「判定不与硬件、不与 CPU 还是 GPU 绑定」相容）。两条路线都取这同一把：GPU 判器那一组不论这一次
@@ -846,13 +878,87 @@ mod tests {
         effective_profile_lines, toolchain_lines_of_the_build, BuildToolchainInputs,
     };
     use singlefs_unit_graph::entry_groups::{
-        entry_group_key_with_the_features_of_the_build, EntryGroupRequest, EntryGroupVerdict,
+        entry_group_key_not_following_the_listed_units, EntryGroupRequest, EntryGroupVerdict,
     };
     use singlefs_unit_graph::heavy_threads::default_heavy_threads;
     use singlefs_unit_graph::manifest::parse_crate_manifest;
     use singlefs_unit_graph::sha256::sha256_of;
     use singlefs_unit_graph::{load_workspace, parse_lock_file, RuleSwitches, TargetSelector};
     use std::path::{Path, PathBuf};
+
+    /// 单测进程里层那一份额度同时容得下几次装工作区（`load_workspace`）：一次装工作区只要那一份的这么多分之一（至少 1 条），
+    /// 这几条同时装工作区的用例各拿各的、一起跑，不互相排成一列（推的：这个模块里装工作区的用例几十条，同时到的有几条没量过）。
+    const WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS: usize = 4;
+
+    /// 里层那一份额度是 `inner_threads_of_the_share` 条时，一次装工作区要几条：那一份的
+    /// [`WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS`] 分之一，向下取整，至少 1 条。
+    fn workspace_loading_threads_wanted(inner_threads_of_the_share: usize) -> usize {
+        (inner_threads_of_the_share / WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS).max(1)
+    }
+
+    /// 装工作区那一下开的线程：从单测进程里层那一份额度拿 [`workspace_loading_threads_wanted`] 条
+    /// （[`crate::crash_library::InnerThreadsTaken`]，放不下就等别的用例还），不照每台默认重活线程数开：libtest 已照这个数并跑那么多条用例。
+    /// 交回守卫与交给 `load_workspace` 的条数；守卫在 `load_workspace` 返回之后丢掉才还（它的线程在返回之前都收齐了）。
+    fn workspace_loading_threads_from_the_test_process_share() -> (
+        crate::crash_library::InnerThreadsTaken,
+        std::num::NonZeroUsize,
+    ) {
+        let inner_threads_of_the_share =
+            crate::crash_library::shares_of_the_test_process(default_heavy_threads().get())
+                .inner_threads;
+        let threads_taken = crate::crash_library::InnerThreadsTaken::take(
+            workspace_loading_threads_wanted(inner_threads_of_the_share),
+        );
+        let threads = std::num::NonZeroUsize::new(threads_taken.threads())
+            .expect("里层额度至少给一条（inner_threads_granted 取了 max(1)）");
+        (threads_taken, threads)
+    }
+
+    /// 场景：里层那一份额度从 1 条到 64 条逐个取，每一种按 [`workspace_loading_threads_wanted`] 与
+    /// `crate::crash_library::inner_threads_granted` 算一次装工作区拿到几条，再照 `crate::crash_library::inner_threads_fit`
+    /// 把装工作区逐次放进这一份，放到 [`WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS`] 次或放不下为止。只算数，不碰单测进程此刻占着的额度，不等别的用例。
+    /// 预期分两种：里层不少于 [`WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS`] 条时，那几次逐次都放得下（同时装工作区的用例不互相排成一列），
+    /// 几次合起来拿到的与那一份差不到 [`WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS`] 条（分份只取整掉零头）；里层少于那个数时，
+    /// 每次只拿 1 条，放得下的恰好是里层的条数那么多次（每条线程各装一次工作区，不多占也不空着）。
+    /// 判别力（`crates/mutations.tsv`）：一次装工作区要整份里层额度，里层 2 条起第二次就放不下，放进的次数对不上，这条红。
+    #[test]
+    fn workspace_loadings_sharing_the_inner_threads_fit_in_the_share_together() {
+        for inner_threads_of_the_share in 1..=64 {
+            let granted = crate::crash_library::inner_threads_granted(
+                workspace_loading_threads_wanted(inner_threads_of_the_share),
+                inner_threads_of_the_share,
+            );
+            let mut in_use = 0;
+            let mut loadings_placed = 0;
+            // 迭代上界是 WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS 次；放不下就停
+            while loadings_placed < WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS
+                && crate::crash_library::inner_threads_fit(
+                    in_use,
+                    granted,
+                    inner_threads_of_the_share,
+                )
+            {
+                in_use += granted;
+                loadings_placed += 1;
+            }
+            if inner_threads_of_the_share >= WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS {
+                assert_eq!(
+                    loadings_placed, WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS,
+                    "里层 {inner_threads_of_the_share} 条、每次装工作区拿 {granted} 条：只放进 {loadings_placed} 次（占 {in_use} 条），同时装工作区的用例排成了一列"
+                );
+                assert!(
+                    in_use + WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS > inner_threads_of_the_share,
+                    "里层 {inner_threads_of_the_share} 条、每次装工作区拿 {granted} 条：几次合起来只 {in_use} 条，余下的够再分一轮"
+                );
+            } else {
+                assert_eq!(
+                    (granted, loadings_placed),
+                    (1, inner_threads_of_the_share),
+                    "里层 {inner_threads_of_the_share} 条少于 {WORKSPACE_LOADINGS_SHARING_THE_INNER_THREADS}：每次装工作区该拿 1 条、放得下里层条数那么多次"
+                );
+            }
+        }
+    }
 
     #[test]
     fn node_label_takes_only_relative_paths_inside_the_repository() {
@@ -976,14 +1082,539 @@ mod tests {
         })
     }
 
+    /// 一组收闭包时不沿它收的单元（登记表里那一组的那一份，与构建脚本交的相同）。
+    fn units_not_followed_of_the_group_as_a_set(
+        group_name: &str,
+    ) -> std::collections::BTreeSet<String> {
+        crate::judging_units_entries::units_not_followed_of_the_group(group_name)
+            .iter()
+            .map(|unit| (*unit).to_string())
+            .collect()
+    }
+
+    /// GPU 判器那一组在 `root` 那棵树上照开着 `gpu` 收闭包，交（组成清单的行，登记了不沿它收、这一趟真够到的单元）；
+    /// `units_not_followed` 给空的就是不带登记的那一份闭包。
+    #[cfg(feature = "gpu")]
+    fn gpu_judge_composition_under(
+        root: &Path,
+        units_not_followed: &std::collections::BTreeSet<String>,
+    ) -> (Vec<String>, Vec<String>) {
+        let switches = RuleSwitches::every_rule_intact();
+        let (threads_taken, threads) = workspace_loading_threads_from_the_test_process_share();
+        let workspace = load_workspace(root, threads, &switches).expect("工作区装得起来");
+        drop(threads_taken);
+        let packages = parse_lock_file(
+            &std::fs::read_to_string(root.join("Cargo.lock")).expect("Cargo.lock 读得了"),
+        )
+        .expect("Cargo.lock 解析得了");
+        let group = JUDGING_UNITS_ENTRY_GROUPS
+            .iter()
+            .find(|group| group.group_name == "gpu_judge")
+            .expect("登记表里有 GPU 判器那一组");
+        let request = EntryGroupRequest {
+            group_name: group.group_name.to_string(),
+            target: TargetSelector::parse(group.target).expect("登记表里的目标写法认得"),
+            entry_paths: group
+                .entry_functions
+                .iter()
+                .map(|entry| (*entry).to_string())
+                .collect(),
+            features: features_of_the_group_request(group.group_name, &features_of_this_build()),
+        };
+        let computed = entry_group_key_not_following_the_listed_units(
+            &workspace,
+            &request,
+            units_not_followed,
+            &compiled_judging_units_keys().features_enabled_by_the_build,
+            &toolchain_lines_under(root),
+            &packages,
+            &switches,
+        )
+        .expect("GPU 判器那一组的入口找得到");
+        (
+            computed.key.composition_lines,
+            computed.units_reached_and_not_followed,
+        )
+    }
+
+    #[cfg(feature = "gpu")]
+    const MEMORY_LEDGER_FILE: &str = "crates/singlefs-verification/src/gpu_memory_ledger.rs";
+
+    /// 组成清单一行（`<种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹>`）里的限定名。
+    #[cfg(feature = "gpu")]
+    fn qualified_name_of_the_composition_line(line: &str) -> &str {
+        line.split('\t').nth(1).expect("组成清单的行有四段")
+    }
+
+    /// 不带登记收闭包时显存记账里进 GPU 判器那一组的单元，恰好是登记了不沿它收的那几个：登记了而不在里面的（陈旧的登记）红，
+    /// 在里面而没登记的（显存记账里新进这一组闭包的单元）也红——后一种由人判它改不改判定字，再决定登记还是让它进键。
+    /// 带登记收时显存记账的单元一个都不在闭包里，真够到的那几个（从别的模块跨进来的头几个）都在登记里。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_gpu_judge_group_reaches_no_unit_of_the_memory_ledger_beyond_the_listed_ones() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf();
+        let listed = units_not_followed_of_the_group_as_a_set("gpu_judge");
+        let listed_of_the_ledger: std::collections::BTreeSet<String> =
+            crate::judging_units_entries::UNITS_OF_THE_MEMORY_LEDGER_THE_GPU_JUDGE_GROUP_DOES_NOT_FOLLOW
+                .iter()
+                .map(|unit| (*unit).to_string())
+                .collect();
+        let (following_everything, _) =
+            gpu_judge_composition_under(&root, &std::collections::BTreeSet::new());
+        let ledger_units_reached_following_everything: std::collections::BTreeSet<String> =
+            following_everything
+                .iter()
+                .filter(|line| line.contains(MEMORY_LEDGER_FILE))
+                // `use` 行不登记（限定名里带行号、一挪就变）：模块里的单元都不在了它自然不进闭包
+                .filter(|line| !line.starts_with("use\t"))
+                .map(|line| qualified_name_of_the_composition_line(line).to_string())
+                .collect();
+        assert_eq!(
+            ledger_units_reached_following_everything, listed_of_the_ledger,
+            "左边是不带登记时显存记账里进这一组闭包的单元，右边是登记：左边多的是新进来的单元（判它改不改判定字），右边多的是陈旧的登记"
+        );
+        let (composition, reached_and_not_followed) = gpu_judge_composition_under(&root, &listed);
+        assert!(
+            !reached_and_not_followed.is_empty()
+                && reached_and_not_followed
+                    .iter()
+                    .all(|unit| listed.contains(unit)),
+            "带登记收时真够到又没沿它收的单元都在登记里、至少一个：{reached_and_not_followed:?}"
+        );
+        let ledger_units_in_the_closure: Vec<&String> = composition
+            .iter()
+            .filter(|line| line.contains(MEMORY_LEDGER_FILE))
+            .collect();
+        assert!(
+            ledger_units_in_the_closure.is_empty(),
+            "带登记收时显存记账里还有单元在 GPU 判器那一组的闭包里：{ledger_units_in_the_closure:?}"
+        );
+    }
+
+    /// 登记按限定名比：登记的每个限定名在工作区里恰好是一个单元（同名的两个单元——cfg 两臂、两个写法相同的 impl 块头——
+    /// 会被一条登记一起排掉，其中没逐个判过的那一个就漏了）。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn every_listed_unit_of_the_memory_ledger_names_exactly_one_unit_of_the_workspace() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf();
+        let switches = RuleSwitches::every_rule_intact();
+        let (threads_taken, threads) = workspace_loading_threads_from_the_test_process_share();
+        let workspace = load_workspace(&root, threads, &switches).expect("工作区装得起来");
+        drop(threads_taken);
+        let mut units_of_each_listed_name: std::collections::BTreeMap<String, usize> =
+            units_not_followed_of_the_group_as_a_set("gpu_judge")
+                .into_iter()
+                .map(|name| (name, 0))
+                .collect();
+        for unit in &workspace.units {
+            if let Some(count) = units_of_each_listed_name.get_mut(&unit.qualified_name) {
+                *count += 1;
+            }
+        }
+        let not_exactly_one: Vec<(&String, &usize)> = units_of_each_listed_name
+            .iter()
+            .filter(|(_, count)| **count != 1)
+            .collect();
+        assert!(
+            not_exactly_one.is_empty(),
+            "登记的限定名在工作区里不是恰好一个单元的（名字，单元数）：{not_exactly_one:?}"
+        );
+    }
+
+    /// 不沿登记的单元收，少掉的恰好是登记的那些：登记了而没少掉的（不带登记时本来就不在闭包里，陈旧的登记）红，
+    /// 少掉了而没登记的（跟着被切掉、没逐个判过的单元）也红。声明模块的 `mod` 行与 `use` 行不登记（限定名里带行号、一挪就变）：
+    /// 它们是因为所在模块的单元都不在了才不进闭包，不算在比对里。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn not_following_the_listed_units_drops_only_the_listed_ones() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf();
+        let listed = units_not_followed_of_the_group_as_a_set("gpu_judge");
+        let (following_everything, _) =
+            gpu_judge_composition_under(&root, &std::collections::BTreeSet::new());
+        let (not_following_the_listed, _) = gpu_judge_composition_under(&root, &listed);
+        let kept: std::collections::BTreeSet<&String> = not_following_the_listed.iter().collect();
+        let dropped: std::collections::BTreeSet<String> = following_everything
+            .iter()
+            .filter(|line| !kept.contains(line))
+            .filter(|line| !line.starts_with("mod\t") && !line.starts_with("use\t"))
+            .map(|line| qualified_name_of_the_composition_line(line).to_string())
+            .collect();
+        let dropped_and_not_listed: Vec<&String> = dropped.difference(&listed).collect();
+        let listed_and_not_dropped: Vec<&String> = listed.difference(&dropped).collect();
+        assert!(
+            dropped_and_not_listed.is_empty() && listed_and_not_dropped.is_empty(),
+            "少掉而没登记的（逐个判过再登记）：{dropped_and_not_listed:?}；登记了而没少掉的（陈旧的登记，删掉那一行）：{listed_and_not_dropped:?}"
+        );
+    }
+
+    /// 包装设备的值到不了这一组的入口，前提之一：带登记收出来的闭包里没有单元写到这些包装类型的名字
+    /// （登记的 impl 头的自身类型，`<impl … for 名字<…>>` 与 `<impl 名字<…>>` 里那个名字）。有单元写了，就可能造出这种值、
+    /// 调到登记了不沿它收的 impl：当场红，由人判是把那个 impl 从登记里拿掉还是改代码。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn no_unit_the_gpu_judge_group_keeps_names_a_wrapper_type_it_does_not_follow() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf();
+        let listed = units_not_followed_of_the_group_as_a_set("gpu_judge");
+        let wrapper_type_names: std::collections::BTreeSet<String> =
+            crate::judging_units_entries::UNITS_REACHED_ONLY_THROUGH_WRAPPER_DEVICES_THE_GPU_JUDGE_GROUP_DOES_NOT_FOLLOW
+                .iter()
+                .filter_map(|unit| {
+                    let head = &unit[unit.find("<impl ")? + "<impl ".len()..];
+                    let self_type = head.rsplit(" for ").next().expect("rsplit 至少交一段");
+                    let name: String = self_type
+                        .trim_start_matches(['&', ' '])
+                        .chars()
+                        .take_while(|character| character.is_alphanumeric() || *character == '_')
+                        .collect();
+                    (!name.is_empty()).then_some(name)
+                })
+                .collect();
+        assert!(
+            wrapper_type_names.contains("FaultInjectingBlockDevice"),
+            "对照：登记里认得出故障注入设备这个包装类型（认不出的话下面什么都没判）：{wrapper_type_names:?}"
+        );
+        let (kept, _) = gpu_judge_composition_under(&root, &listed);
+        let mut units_naming_a_wrapper_type = Vec::new();
+        for line in &kept {
+            // `use` 行里列着这个名字只是把它引进作用域（同一条 use 还引进别的、在用的名字），不是写出这个类型的值
+            if line.starts_with("use\t") || line.starts_with("mod\t") {
+                continue;
+            }
+            let Some(position) = line.split('\t').nth(2) else {
+                continue;
+            };
+            let Some((file, lines)) = position.rsplit_once(':') else {
+                continue;
+            };
+            let Some((first_line, last_line)) = lines.split_once('-') else {
+                continue;
+            };
+            let (Ok(first_line), Ok(last_line)) =
+                (first_line.parse::<usize>(), last_line.parse::<usize>())
+            else {
+                continue;
+            };
+            let Ok(source) = std::fs::read_to_string(root.join(file)) else {
+                continue;
+            };
+            let text: String = source
+                .lines()
+                .skip(first_line.saturating_sub(1))
+                .take(last_line + 1 - first_line.min(last_line + 1))
+                .filter(|source_line| !source_line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            for word in
+                text.split(|character: char| !(character.is_alphanumeric() || character == '_'))
+            {
+                if wrapper_type_names.contains(word) {
+                    units_naming_a_wrapper_type.push(format!(
+                        "{} 写了 {word}",
+                        qualified_name_of_the_composition_line(line)
+                    ));
+                    break;
+                }
+            }
+        }
+        assert!(
+            units_naming_a_wrapper_type.is_empty(),
+            "带登记收出来的闭包里有单元写到登记了不沿它收的包装类型：{units_naming_a_wrapper_type:?}"
+        );
+    }
+
+    /// 改显存记账里登记了不沿它收的一个单元（设备丢失那一行把错误文字接成一行那一处，`text_on_one_line`；派活回读时设备丢了记一笔
+    /// 那条真调用边够到它）：GPU 判器那一组的键与镜像判定那一把都不变。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn an_edit_of_a_listed_unit_of_the_memory_ledger_keeps_the_gpu_judge_key() {
+        let (before, after) = keys_before_and_after(
+            "memory-ledger-listed-unit",
+            MEMORY_LEDGER_FILE,
+            ".filter(|piece| !piece.is_empty())",
+            ".filter(|piece| !(piece.is_empty()))",
+        );
+        assert_eq!(
+            key_of_the_group(&before, "gpu_judge"),
+            key_of_the_group(&after, "gpu_judge"),
+            "GPU 判器那一组不变"
+        );
+        assert_eq!(
+            version_of_the_image_judgement(&before),
+            version_of_the_image_judgement(&after),
+            "镜像判定那一把（块的版本）不变"
+        );
+    }
+
+    /// 派活宽度那一档的判器一次派活最多带几个状态：比 1 宽、比一个就判完整条流窄，且不整除这条流的状态数（末一次派活不满）。
+    #[cfg(feature = "gpu")]
+    const DISPATCH_WIDTH_THAT_LEAVES_A_SHORT_LAST_DISPATCH: usize = 7;
+
+    /// 派活宽度那一条流的状态数上限：几百个以内的小流，单跑几秒。
+    #[cfg(feature = "gpu")]
+    const MOST_STATES_OF_THE_DISPATCH_WIDTH_FLOW: u64 = 1000;
+
+    /// 派活宽度那一条流里段长不超过这个数的段逐个真子集展开，更长的段只以整段持久进入后面的状态（状态数压在几百个以内）。
+    #[cfg(feature = "gpu")]
+    const EXPAND_UP_TO_IN_THE_DISPATCH_WIDTH_FLOW: usize = 3;
+
+    /// 一次派活多宽由调用方定、定宽度的函数（`gpu_memory_ledger::states_in_one_dispatch_capped_by_the_state_count`、
+    /// `crate::crash_judge_dispatch::states_in_flight_within` 这几个）不在 GPU 判器那一组闭包里，靠的前提「一次派活带几个状态只是切法，
+    /// 不进判定结论」（C1033（两个显存记账单元没有会红的检查））的蜕变断言：新池新建文件那条流（两块稀疏内存盘上 mkfs、取号、暖机、
+    /// 新建文件，录 mkfs 之后那一段）在同一张借来的卡上，按一次派活最多 1 个、
+    /// [`DISPATCH_WIDTH_THAT_LEAVES_A_SHORT_LAST_DISPATCH`] 个与整条流的状态数各建一个判器——前两个照判器的派活宽度调度一次次派、
+    /// 最后一个一次派活判完整条流——逐状态的结论字逐字相同，且与 CPU 参照判器逐状态对拍相同。
+    /// 先核三个判器开出来的派活上限真是 1、7 与状态数（封顶那一处真起了作用），整条流的结论里至少两种不同的字（派活错位要判得出来）。
+    /// 三个判器在同一张卡上依次建、依次判（比的就是同一批状态换一种切法），不并行；借的是三个判器各自要的显存之和。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn verdict_words_of_every_state_are_the_same_at_a_dispatch_width_of_one_of_seven_and_of_every_state_and_agree_with_the_cpu_judge(
+    ) {
+        use crate::crash::{crash_point_replay_plan_state_count, CrashPointReplaySegmentExpansion};
+        use crate::crash_judge_conclusions::{
+            cross_check_words_agree_in_the_cross_check, cross_check_words_of_cpu_judgement,
+            CrossCheckWords,
+        };
+        use crate::crash_judge_dispatch::{
+            mebibytes_a_judge_needs, GpuCrashJudge, PackedJudgeTables,
+        };
+        use crate::crash_judge_gpu::{cross_check_words_of_gpu_verdict, VERDICT_WORDS};
+        use crate::crash_judge_tables::{build_judge_tables, JudgeFlow};
+        use crate::crash_library::{judge_tables_through_the_pairing_library, StageOutcome};
+        use crate::crash_state_enumeration::{
+            sample_crash_states_on_the_cpu, CrashPointReplayItem,
+        };
+        use crate::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
+        use crate::memory_pool::{
+            writes_and_segments_with_stream_indexes, PublishedVersion, SparseBlockDevice,
+        };
+        use crate::segments::FixedGeometry;
+        use crate::{RecordingBlockDevice, SharedStream};
+        use singlefs_core::address::DeviceIdentity;
+        use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+
+        const TEST_NAME: &str = "verdict_words_of_every_state_are_the_same_at_a_dispatch_width_of_one_of_seven_and_of_every_state_and_agree_with_the_cpu_judge";
+        const DEVICE_BYTES: u64 = 4 << 30;
+        let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
+            return;
+        };
+        let stream = SharedStream::retaining_contents();
+        let mut devices = [0, 1].map(|device| {
+            (
+                DeviceIdentity(device),
+                RecordingBlockDevice::with_shared_stream(
+                    DeviceIdentity(device),
+                    SparseBlockDevice::new(DEVICE_BYTES, PhysicalBlockSizeInBytes(512)),
+                    stream.clone(),
+                ),
+            )
+        });
+        let parameters = crate::known_bad_images::parameters_of_the_common_test_pool();
+        let run = crate::scenario::run_new_pool_file_creation(
+            &parameters,
+            &mut devices,
+            &stream,
+            |_, _| {},
+        )
+        .expect("新池新建文件那条路做得成");
+        let operations = stream.retained_operations();
+        let mut base =
+            MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], DEVICE_BYTES);
+        base.apply(&operations[..run.mkfs_operation_count]);
+        let (writes, segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
+            &operations[run.mkfs_operation_count..],
+            &FixedGeometry {
+                fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+                journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+                root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+            },
+        );
+        let judged_root_index = writes
+            .iter()
+            .rposition(|write| write.kind == crate::segments::StepKind::RootRecordFua)
+            .expect("新建文件那次发布有一条根槽写");
+        let versions = vec![PublishedVersion {
+            instance: run.output.root.instance,
+            checkpoint_txg: run.output.root.checkpoint_txg,
+            content: crate::scenario::first_file_content(),
+        }];
+        let expansion = |_segment_index: usize, segment: &[usize]| {
+            if segment.len() <= EXPAND_UP_TO_IN_THE_DISPATCH_WIDTH_FLOW {
+                CrashPointReplaySegmentExpansion::EveryProperSubset
+            } else {
+                CrashPointReplaySegmentExpansion::NotExpanded
+            }
+        };
+        let tables = build_judge_tables(&JudgeFlow {
+            base: &base,
+            writes: &writes,
+            segments: &segments,
+            judged_root_index,
+            versions: &versions,
+            expansion: &expansion,
+        })
+        .expect("新池新建文件那条流建得出判表");
+        let state_count = tables.state_count;
+        assert_eq!(
+            state_count,
+            crash_point_replay_plan_state_count(&base, &writes, &segments, &expansion),
+            "判表的状态数与崩溃点重放的计划相同"
+        );
+        assert!(
+            state_count
+                > 2 * u64::try_from(DISPATCH_WIDTH_THAT_LEAVES_A_SHORT_LAST_DISPATCH)
+                    .expect("装得进 u64")
+                && state_count <= MOST_STATES_OF_THE_DISPATCH_WIDTH_FLOW,
+            "这条流 {state_count} 个状态：要跨过两次 {DISPATCH_WIDTH_THAT_LEAVES_A_SHORT_LAST_DISPATCH} 个的派活，又在 {MOST_STATES_OF_THE_DISPATCH_WIDTH_FLOW} 个以内"
+        );
+        let every_state = usize::try_from(state_count).expect("装得进 usize");
+        // 判表先入库、再读库，GPU 只拿读回的那一份算
+        let packed = match judge_tables_through_the_pairing_library(
+            TEST_NAME,
+            &PackedJudgeTables::of(&tables),
+        ) {
+            StageOutcome::Judged(packed) => packed,
+            StageOutcome::RecordedOnly | StageOutcome::JudgedMyShareOnly { .. } => {
+                println!("JUDGE_TABLES_RECORDED_ONLY test={TEST_NAME}");
+                return;
+            }
+        };
+        let widths = [
+            1,
+            DISPATCH_WIDTH_THAT_LEAVES_A_SHORT_LAST_DISPATCH,
+            every_state,
+        ];
+        let Some(lease) = cards.lease_card_or_report_not_run(
+            TEST_NAME,
+            widths
+                .iter()
+                .map(|width| mebibytes_a_judge_needs(&packed, *width))
+                .sum::<u64>(),
+        ) else {
+            return;
+        };
+        let verdicts_at_each_width: Vec<Vec<[u32; VERDICT_WORDS]>> = widths
+            .iter()
+            .map(|width| {
+                let judge =
+                    GpuCrashJudge::on_card_with_packed_tables(lease.card(), &packed, *width);
+                assert_eq!(
+                    judge.states_per_dispatch(),
+                    *width,
+                    "要一次派活至多 {width} 个状态的判器开出来的派活上限"
+                );
+                if *width == every_state {
+                    judge.judge_states_in_one_dispatch(0..state_count)
+                } else {
+                    judge.judge_states(0..state_count)
+                }
+            })
+            .collect();
+        drop(lease);
+        let in_one_dispatch = &verdicts_at_each_width[widths.len() - 1];
+        assert_eq!(
+            in_one_dispatch.len(),
+            every_state,
+            "一次派活判完的结论一个状态一份"
+        );
+        let distinct_verdicts: std::collections::BTreeSet<&[u32; VERDICT_WORDS]> =
+            in_one_dispatch.iter().collect();
+        assert!(
+            distinct_verdicts.len() >= 2,
+            "整条流的结论只有一种字：派活错了位也比不出来"
+        );
+        for (width, verdicts) in widths.iter().zip(&verdicts_at_each_width) {
+            assert_eq!(
+                verdicts.len(),
+                every_state,
+                "一次派活至多 {width} 个时的结论个数"
+            );
+            let first_difference = verdicts
+                .iter()
+                .zip(in_one_dispatch)
+                .position(|(at_this_width, at_once)| at_this_width != at_once);
+            assert_eq!(
+                first_difference, None,
+                "一次派活至多 {width} 个状态判出的结论字与一次派活判完整条流的不同，第一个不同的状态序号在这里"
+            );
+        }
+        let mut cpu: Vec<CrossCheckWords> = Vec::new();
+        let Some(judged_on_the_cpu) = sample_crash_states_on_the_cpu(
+            CrashPointReplayItem {
+                name: TEST_NAME,
+                setting_file: "crates/singlefs-verification/src/crash_identity.rs",
+            },
+            &base,
+            &writes,
+            &segments,
+            judged_root_index,
+            &versions,
+            &expansion,
+            0..state_count,
+            &mut |ordinal, _image, judgement| {
+                assert_eq!(
+                    ordinal,
+                    u64::try_from(cpu.len()).expect("装得进 u64"),
+                    "CPU 参照按序号次序交回"
+                );
+                cpu.push(cross_check_words_of_cpu_judgement(judgement));
+            },
+        )
+        .judged() else {
+            return;
+        };
+        assert_eq!(judged_on_the_cpu, state_count, "CPU 参照判了整条流");
+        let disagreements: Vec<String> = cpu
+            .iter()
+            .zip(in_one_dispatch)
+            .enumerate()
+            .filter_map(|(ordinal, (cpu_words, gpu_verdict))| {
+                let gpu_words = cross_check_words_of_gpu_verdict(gpu_verdict);
+                (!cross_check_words_agree_in_the_cross_check(&gpu_words, cpu_words))
+                    .then(|| format!("状态 {ordinal}：CPU {cpu_words:?}；GPU {gpu_words:?}"))
+            })
+            .collect();
+        assert!(
+            disagreements.is_empty(),
+            "{} 个状态 GPU 与 CPU 对拍的字不同（前几个）：\n{}",
+            disagreements.len(),
+            disagreements
+                .iter()
+                .take(8)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        println!(
+            "CRASH_JUDGE_DISPATCH_WIDTHS test={TEST_NAME} states={state_count} widths={widths:?} distinct_verdicts={}",
+            distinct_verdicts.len()
+        );
+    }
+
     /// 照入口登记表在 `root` 那棵树上逐组算键（与构建脚本同一套）：组名 → 键（拒算或不编进来的是 `None`）。
     /// 依赖包的特性取编进去的那份表里的 `build-feature` 行（构建脚本读依赖包经 `links` 交出的那一份）：编验证包的测试时，
     /// 那一趟核心层带着并上来的特性，编进去的键认它，重算这一侧也要认；那几行与核心层实际开着的对不对，另由
     /// `the_dependency_features_compiled_into_the_table_are_the_ones_the_core_layer_was_built_with` 判。
     fn registry_keys_under(root: &Path) -> KeysOfEachGroup {
         let switches = RuleSwitches::every_rule_intact();
-        let workspace =
-            load_workspace(root, default_heavy_threads(), &switches).expect("工作区装得起来");
+        let (threads_taken, threads) = workspace_loading_threads_from_the_test_process_share();
+        let workspace = load_workspace(root, threads, &switches).expect("工作区装得起来");
+        drop(threads_taken);
         let toolchain_lines = toolchain_lines_under(root);
         let packages = parse_lock_file(
             &std::fs::read_to_string(root.join("Cargo.lock")).expect("Cargo.lock 读得了"),
@@ -1015,15 +1646,17 @@ mod tests {
                         .collect(),
                     features: features_of_the_group_request(&group_name, &features_of_this_build()),
                 };
-                let computed = entry_group_key_with_the_features_of_the_build(
+                let computed = entry_group_key_not_following_the_listed_units(
                     &workspace,
                     &request,
+                    &units_not_followed_of_the_group_as_a_set(&group_name),
                     &compiled_judging_units_keys().features_enabled_by_the_build,
                     &toolchain_lines,
                     &packages,
                     &switches,
                 )
-                .unwrap_or_else(|error| panic!("组 {group_name} 的入口写错了：{error}"));
+                .unwrap_or_else(|error| panic!("组 {group_name} 的入口写错了：{error}"))
+                .key;
                 let key = match computed.verdict {
                     EntryGroupVerdict::Keyed { key } => Some(key.0),
                     EntryGroupVerdict::Refused { .. } | EntryGroupVerdict::NotCompiled { .. } => {
@@ -1442,7 +2075,7 @@ mod tests {
 
     /// U3 阳性对照：判器闭包里的一个常量改了（池级 checker 的载荷校验和偏移），CPU 判镜像与判给定状态那两组的键变。
     #[test]
-    fn a_constant_in_the_judge_closure_changes_the_cpu_judge_keys() {
+    fn constant_in_the_judge_closure_changes_the_cpu_judge_keys() {
         let (before, after) = keys_before_and_after(
             "constant-in-the-judge",
             "crates/singlefs-checker/src/lib.rs",
@@ -1483,7 +2116,7 @@ mod tests {
 
     /// U3 阴性对照：流水线里一个与判器无关的 fn 改了（`crash_amplification::run_from_environment` 的函数体），判器、核对与录入的键都不变。
     #[test]
-    fn a_pipeline_function_changes_no_judge_verifier_or_recording_key() {
+    fn pipeline_function_changes_no_judge_verifier_or_recording_key() {
         let (before, after) = keys_before_and_after(
             "pipeline-function",
             "crates/singlefs-verification/src/crash_amplification.rs",
@@ -1545,7 +2178,7 @@ mod tests {
     /// 两条路线判过的块一起换版本、现判，不再照旧复用。
     /// 判别力（`crates/mutations.tsv`）：判镜像的定义那一组的入口里拿掉 CPU 路线判一块那个入口，改了它哪一组的键都不变，这一条红。
     #[test]
-    fn a_function_unit_of_the_cpu_route_block_judging_changes_the_version_of_the_image_judgement() {
+    fn function_unit_of_the_cpu_route_block_judging_changes_the_version_of_the_image_judgement() {
         let (before, after) = keys_before_and_after(
             "cpu-route-block-judging",
             "crates/singlefs-verification/src/crash_judge_cpu_blocks.rs",
@@ -1608,7 +2241,7 @@ mod tests {
     /// （「GPU 判器代码进键」）。
     /// 判别力（`crates/mutations.tsv`）：并成那一把时不拼 GPU 判器那一把、GPU 判器那一组照这一次的特性收闭包（不开 `gpu` 的编法里交不出键），各让这一条红。
     #[test]
-    fn a_wgsl_function_of_the_gpu_judge_changes_the_version_of_the_image_judgement_but_not_the_definition_key(
+    fn wgsl_function_of_the_gpu_judge_changes_the_version_of_the_image_judgement_but_not_the_definition_key(
     ) {
         let (before, after) = keys_before_and_after(
             "gpu-judge-wgsl-function",
@@ -1659,7 +2292,7 @@ mod tests {
     /// GPU 与 CPU 判过的块一起换版本、现判，不再照旧复用；判镜像的定义那一组不变（CPU 路线不读判表）。
     /// 判别力（`crates/mutations.tsv`）：「判器键：GPU 判器那一组的入口里拿掉建表的入口」这一行让这一条红。
     #[test]
-    fn a_function_unit_building_the_gpu_judge_tables_changes_the_gpu_judge_key_and_the_version_of_the_image_judgement(
+    fn function_unit_building_the_gpu_judge_tables_changes_the_gpu_judge_key_and_the_version_of_the_image_judgement(
     ) {
         let (before, after) = keys_before_and_after(
             "gpu-judge-table-building",
@@ -1719,8 +2352,9 @@ mod tests {
         root: &Path,
     ) -> Option<[u8; DIGEST_BYTES]> {
         let switches = RuleSwitches::every_rule_intact();
-        let workspace =
-            load_workspace(root, default_heavy_threads(), &switches).expect("工作区装得起来");
+        let (threads_taken, threads) = workspace_loading_threads_from_the_test_process_share();
+        let workspace = load_workspace(root, threads, &switches).expect("工作区装得起来");
+        drop(threads_taken);
         let packages = parse_lock_file(
             &std::fs::read_to_string(root.join("Cargo.lock")).expect("Cargo.lock 读得了"),
         )
@@ -1744,15 +2378,17 @@ mod tests {
         };
         let features_enabled_on_the_dependencies =
             &compiled_judging_units_keys().features_enabled_by_the_build;
-        let computed = entry_group_key_with_the_features_of_the_build(
+        let computed = entry_group_key_not_following_the_listed_units(
             &workspace,
             &request,
+            &units_not_followed_of_the_group_as_a_set("gpu_judge"),
             features_enabled_on_the_dependencies,
             &toolchain_lines_under(root),
             &packages,
             &switches,
         )
-        .unwrap_or_else(|error| panic!("GPU 判器那一组的入口写错了：{error}"));
+        .unwrap_or_else(|error| panic!("GPU 判器那一组的入口写错了：{error}"))
+        .key;
         match computed.verdict {
             EntryGroupVerdict::Keyed { key } => Some(key.0),
             EntryGroupVerdict::Refused { .. } | EntryGroupVerdict::NotCompiled { .. } => None,
@@ -1822,10 +2458,116 @@ mod tests {
         assert!(changed.contains("gpu_judge"), "变了的是 {changed:?}");
     }
 
+    /// 一次派活带几个状态的调度（量宽度的停止判据 `calibration_goes_on`）改一处写法：GPU 判器那一组的键不变，镜像判定那一把（块的版本）也不变——
+    /// 调度只管把一段序号切成几次派活，切法不进结论，不在 GPU 判器的入口集合里；改了它判过的块照旧复用。
+    /// 判别力（`crates/mutations.tsv`）：入口换回调度上面那一层 `GpuCrashJudge::judge_states`，调度进了闭包，这一条红。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn an_edit_of_the_dispatch_width_schedule_keeps_the_gpu_judge_key() {
+        let (before, after) = keys_before_and_after(
+            "dispatch-width-schedule",
+            "crates/singlefs-verification/src/crash_judge_dispatch.rs",
+            "seconds / width as f64 <= best_earlier * CALIBRATION_WORSE_THAN_THE_BEST",
+            "(seconds / width as f64) <= best_earlier * CALIBRATION_WORSE_THAN_THE_BEST",
+        );
+        assert_eq!(
+            key_of_the_group(&before, "gpu_judge"),
+            key_of_the_group(&after, "gpu_judge"),
+            "GPU 判器那一组不变"
+        );
+        assert_eq!(
+            version_of_the_image_judgement(&before),
+            version_of_the_image_judgement(&after),
+            "镜像判定那一把（块的版本）不变"
+        );
+    }
+
+    /// 定一次派活多宽、量显存额度的单元（限定名的末段）：判器照调用方给的宽度开草稿区，这几个不该在 GPU 判器那一组的闭包里。
+    #[cfg(feature = "gpu")]
+    const UNITS_SETTING_THE_DISPATCH_WIDTH: &[&str] = &[
+        "MAXIMUM_SCRATCH_LANES",
+        "MEBIBYTES_LEFT_FOR_THE_DRIVER",
+        "states_in_flight_within",
+        "states_per_dispatch_within_the_scratch_memory",
+        "starting_narrow",
+        "of_lanes_holding",
+        "within_the_memory_budget_of_the_card",
+        "states_in_one_dispatch_capped_by_the_state_count",
+    ];
+
+    /// 场景：GPU 判器那一组在这棵树上带登记收闭包，逐行看组成清单里单元限定名的末段。
+    /// 预期：[`UNITS_SETTING_THE_DISPATCH_WIDTH`] 一个都不在；对照：上卡的入口 `on_card_with_the_given_dispatch_width` 在（末段认得出）。
+    /// 判别力（`crates/mutations.tsv`）：入口登记换回照显存额度自己定宽度的 `GpuCrashJudge::on_card_compiling_these_kernel_sources`，这一条红。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_gpu_judge_group_reaches_no_unit_setting_the_dispatch_width() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("本 crate 在仓根的 crates/ 下")
+            .to_path_buf();
+        let listed = units_not_followed_of_the_group_as_a_set("gpu_judge");
+        let (composition, _) = gpu_judge_composition_under(&root, &listed);
+        let last_segments: Vec<&str> = composition
+            .iter()
+            .filter(|line| !line.starts_with("use\t") && !line.starts_with("mod\t"))
+            .map(|line| {
+                qualified_name_of_the_composition_line(line)
+                    .rsplit("::")
+                    .next()
+                    .expect("rsplit 至少交一段")
+            })
+            .collect();
+        assert!(
+            last_segments.contains(&"on_card_with_the_given_dispatch_width"),
+            "对照：组成清单里认得出上卡的入口（认不出的话下面什么都没判）"
+        );
+        let setting_the_width: Vec<&&str> = last_segments
+            .iter()
+            .filter(|segment| UNITS_SETTING_THE_DISPATCH_WIDTH.contains(*segment))
+            .collect();
+        assert!(
+            setting_the_width.is_empty(),
+            "GPU 判器那一组的闭包里有定派活宽度、量显存额度的单元：{setting_the_width:?}"
+        );
+    }
+
+    /// 场景：留给驱动的显存（`crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER`）在临时拷贝上改一个数。
+    /// 预期：GPU 判器那一组的键、镜像判定那一把（块的版本）与观察者结论拼块那一组的键都不变——判器照调用方给的宽度开草稿区，
+    /// 拼块那一组的 GPU 入口照调用方交进来的那一下上卡判（`crate::crash_amplification` 里照卡的来路排队、定宽度的那一层不在它的闭包里），
+    /// 量显存额度的常量不在这几组的闭包里，改了它判过、拼过的块照旧复用。
+    /// 判别力（`crates/mutations.tsv`）：拼块那一组的入口登记加上照卡的来路排队、量显存额度的那一层，这一条红在拼块那一句。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn an_edit_of_the_card_memory_left_for_the_driver_keeps_the_gpu_judge_and_the_observer_composition_keys(
+    ) {
+        let (before, after) = keys_before_and_after(
+            "card-memory-left-for-the-driver",
+            "crates/singlefs-verification/src/crash_judge_dispatch.rs",
+            "pub const MEBIBYTES_LEFT_FOR_THE_DRIVER: u64 = 2560;",
+            "pub const MEBIBYTES_LEFT_FOR_THE_DRIVER: u64 = 2561;",
+        );
+        assert_eq!(
+            key_of_the_group(&before, "gpu_judge"),
+            key_of_the_group(&after, "gpu_judge"),
+            "GPU 判器那一组不变"
+        );
+        assert_eq!(
+            version_of_the_image_judgement(&before),
+            version_of_the_image_judgement(&after),
+            "镜像判定那一把（块的版本）不变"
+        );
+        assert_eq!(
+            key_of_the_group(&before, JudgingUnits::ObserverConclusionComposition.name()),
+            key_of_the_group(&after, JudgingUnits::ObserverConclusionComposition.name()),
+            "观察者结论拼块那一组不变"
+        );
+    }
+
     /// 失败点码表的条目级宏调用改一个码（9 → 99）：GPU 判器那一组的键变（WGSL 外名 `FAILURE_POINT_*` 的着落做成边，宏调用进闭包）。
     #[cfg(feature = "gpu")]
     #[test]
-    fn a_failure_point_code_changes_the_gpu_judge_key() {
+    fn failure_point_code_changes_the_gpu_judge_key() {
         let (before, after) = keys_before_and_after(
             "failure-point-code",
             "crates/singlefs-verification/src/crash_judge_conclusions.rs",

@@ -52,9 +52,10 @@ use singlefs_verification::mount_transparency::{
     FloorRaisesOfTheMount, MountTransparency, MountTransparencyAction, MountTransparencyField,
     PosixContentRead, PublishInTheMountWrites, RecoveryFieldsRead, SystemConfigurationTier,
     TreeTableEntryRootPointersByKind, UserVisibleTreeRootPointersOfTheContinuation,
-    VersionFieldsRead, D13_ROWS_ADDED_BY_THE_WRITE_BACK, D13_ROWS_OF_TODAY,
-    ROOT_RECORD_FIELD_BYTE_RANGES, SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES,
-    TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES, TREE_TABLE_ENTRY_FIELD_BYTE_RANGES,
+    VersionFieldsRead, MOUNT_TRANSPARENCY_TABLE_ROWS_ADDED_BY_THE_WRITE_BACK,
+    MOUNT_TRANSPARENCY_TABLE_ROWS_OF_TODAY, ROOT_RECORD_FIELD_BYTE_RANGES,
+    SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES, TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES,
+    TREE_TABLE_ENTRY_FIELD_BYTE_RANGES,
 };
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
@@ -1638,7 +1639,7 @@ fn a_journal_tail_below_the_highest_record_counter_in_the_ring_after_a_mount_and
 
 /// 系统运行配置那一行「R2 = 内置默认」（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J1「运行配置『R2 = 内置默认』」
 /// 那一行，改法 G1）：带文件的一版上只挂载，判官拿 R2 择到的系统配置 433..469 那 36 字节比照条款写死的内置默认（T_time 5000 毫秒即 5 s、T_dirty 2 GiB、
-/// 整理三水位各 0，D16（发布语义） 已定项 5；`.claude/kb/layout/01-first-txn.md` 系统配置字段表「可调值」那三行），这一样判绿。
+/// 整理水位预留全 0，D16（发布语义） 已定项 5；`.claude/kb/layout/01-first-txn.md` 系统配置字段表「可调值」那三行），这一样判绿。
 /// 判别力：core 的 T_time 内置默认 5000 改成 4000（攻方 MUT-A，`crates/mutations.tsv` 一行）、或单位退回秒写成 5时
 /// 这一条红——判官的期望取自被测 core 时，那一改坏下挂载透明 45 条全绿（同一判决同一行）。
 #[test]
@@ -1693,11 +1694,13 @@ fn assert_the_ranges_cover_the_width_end_to_end(
             range.name
         );
         assert!(
-            D13_ROWS_OF_TODAY.contains(&range.row_of_the_d13_field_table)
-                || D13_ROWS_ADDED_BY_THE_WRITE_BACK.contains(&range.row_of_the_d13_field_table),
+            MOUNT_TRANSPARENCY_TABLE_ROWS_OF_TODAY
+                .contains(&range.row_of_the_mount_transparency_field_table)
+                || MOUNT_TRANSPARENCY_TABLE_ROWS_ADDED_BY_THE_WRITE_BACK
+                    .contains(&range.row_of_the_mount_transparency_field_table),
             "{table_name}「{}」引的 D13 行名「{}」没登记",
             range.name,
-            range.row_of_the_d13_field_table
+            range.row_of_the_mount_transparency_field_table
         );
         next_byte = range.bytes.end;
     }

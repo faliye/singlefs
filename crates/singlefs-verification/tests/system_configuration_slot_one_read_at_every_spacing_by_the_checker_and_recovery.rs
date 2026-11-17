@@ -20,12 +20,12 @@ use singlefs_core::make_filesystem::make_filesystem;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::recovery::PoolReader;
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery::run_the_scenario_where_an_io_min_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery::run_the_scenario_where_a_minimum_input_output_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn an_io_min_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192(
+fn a_minimum_input_output_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192(
 ) {
     PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
-        scenarios_of_system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery::run_the_scenario_where_an_io_min_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192,
+        scenarios_of_system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery::run_the_scenario_where_a_minimum_input_output_8192_pool_whose_slot_zeros_are_wiped_has_the_checker_and_recovery_both_choose_slot_one_at_8192,
     );
 }
 
@@ -149,7 +149,7 @@ fn only_self_verified_slots_that_are_not_choosable_found_while_reading_every_spa
 /// 再拿同一个 fsid mkfs 一次 io_min 8192 的池，之后两块盘的槽 0 都抹掉。旧池 4096 处的槽 1 记着槽距 4096、世代号比新池的 1 大，
 /// mkfs 不清它时逐档读的两个读者都会择中它；清了之后 4096 处是 0，恢复与 checker 都择到新池 8192 处的槽 1。
 #[test]
-fn remaking_the_filesystem_with_another_io_min_leaves_no_slot_one_of_the_earlier_pool_for_either_reader(
+fn remaking_the_filesystem_with_another_minimum_input_output_leaves_no_slot_one_of_the_earlier_pool_for_either_reader(
 ) {
     let mut devices = two_sparse_devices();
     let earlier_parameters =

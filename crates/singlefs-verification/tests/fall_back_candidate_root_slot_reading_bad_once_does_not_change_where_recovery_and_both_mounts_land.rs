@@ -3,18 +3,17 @@
 //! 读根环，一个槽这一次读坏（读不出或自证不过）就当那里没有根。
 //!
 //! 盘面照 `recovery_and_both_mounts_fall_back_to_the_version_the_system_configuration_witnessed.rs` 的 H4 那一形：崩在 R 的根槽之后、轮换之前，
-//! 读的那一刻 R 的单元与每块盘较新的那个系统配置槽读回全零，c_见证 落回 P 之前那一版 Pm；不坏时恢复、只读挂载、可写挂载三处都退到已确认的 P。
+//! 每块盘 P 那次轮换写的那一槽没写成（写回再前一次轮换的内容、两槽都自证过），读的那一刻 R 的单元读回全零，c_见证 落回 P 之前那一版 Pm；不坏时恢复、只读挂载、可写挂载三处都退到已确认的 P。
 //! P 的根槽只坏一次（碰到它的第几次读坏，逐个试遍不坏时那一趟读它的每一次）：今天择根那一读坏了没事，F2 判候选那两读（`fall_back_judged_on_the_three_readers`
 //! 先问一次、触发之后再问一次）坏了任一读，P 掉出候选，[Pm, R) 里只剩 Pm，Y4 那一关（P 带末条标志的记录读得出、根读不出）不退，三处照报 R 读不出、
 //! 可写挂载拒——一次瞬时读错就把一次本来做得成的退回变成拒。退不到 Pm 是 Y4 护着的：去掉 Y4 时同一读坏三处悄悄落到 Pm（调查量过）。
-//! 这几条在今天的代码上红；改法与条款归主 agent（C562（抬 F 算上限时根槽读坏当没有根） 那一格的分法）。
 //! P 的根槽每一读都坏时三处照报 R 读不出（Y4）：这一半今天就绿，钉住改法不把「仍坏」放成退到 Pm。
 mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    record_one_publish_after_overwrites, DeviceReadingBackAllZeroOnRanges, PublishRecordedAsR,
-    RangesReadingBackAllZero, RecordedPublish,
+    record_one_publish_after_overwrites, DeviceReadingBackAllZeroOnRanges,
+    RangesReadingBackAllZero, RecordedPublish, RecordedPublishKind,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -24,11 +23,7 @@ use singlefs_core::block_device::{
 };
 use singlefs_core::mount::mount_writable;
 use singlefs_core::mounted_read::mount_read_only;
-use singlefs_core::recovery::{
-    choose_system_configuration, recover, JournalPolicy, RecoveryOutcome,
-};
-use singlefs_core::system_configuration::SystemConfiguration;
-use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
+use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
 use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
 use std::cell::Cell;
 use std::rc::Rc;
@@ -149,37 +144,7 @@ impl BlockDevice for DeviceWithASlotReadingBad {
     }
 }
 
-/// 每块盘上较新的那个系统配置槽（两槽里自证过、槽世代号大的那一槽）：盘、偏移、长度（同 H4 那一组的取法）。
-fn newer_system_configuration_slot_of_each_device(
-    image: &MemoryPool,
-) -> Vec<(DeviceIdentity, u64, u64)> {
-    let configuration = choose_system_configuration(image).expect("镜像上择得到系统配置");
-    let slot_spacing_in_bytes =
-        u64::from(configuration.immutable.sizes.fixed_structure_slot_spacing);
-    let slot_bytes =
-        usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("系统配置槽 4096 字节");
-    image
-        .devices
-        .iter()
-        .map(|(device, sparse_device)| {
-            let newer_slot_offset = [0, slot_spacing_in_bytes]
-                .into_iter()
-                .filter_map(|offset| {
-                    SystemConfiguration::parse_slot(
-                        &sparse_device.read(DeviceOffsetInBytes(offset), slot_bytes),
-                    )
-                    .ok()
-                    .map(|slot| (slot.quantities.slot_generation, offset))
-                })
-                .max()
-                .map(|(_, offset)| offset)
-                .expect("每块盘至少一槽自证过");
-            (*device, newer_slot_offset, SYSTEM_CONFIGURATION_SLOT_BYTES)
-        })
-        .collect()
-}
-
-/// H4 那一形的盘面：R 录下来、崩在它的根槽之后轮换之前；读回全零的是 R 的单元与每块盘较新的那个系统配置槽。另交 P 的根槽。
+/// H4 那一形的盘面：R 录下来、崩在它的根槽之后轮换之前，每块盘 P 那次轮换写的那一槽没写成；读回全零的是 R 的单元。另交 P 的根槽。
 struct FallBackToTheConfirmedPrevious {
     recorded: RecordedPublish,
     image: MemoryPool,
@@ -187,14 +152,17 @@ struct FallBackToTheConfirmedPrevious {
     root_slot_of_the_previous_version: (DeviceIdentity, u64, u64),
 }
 
-fn fall_back_to_the_confirmed_previous() -> FallBackToTheConfirmedPrevious {
+fn fall_back_to_the_confirmed_previous_where_both_devices_lost_their_newest_rotation_write(
+) -> FallBackToTheConfirmedPrevious {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_UNWITNESSED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
-    let image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
-    let ranges = RangesReadingBackAllZero(newer_system_configuration_slot_of_each_device(&image))
-        .with_the_writes(&recorded.unit_writes());
+    let image =
+        common_unwitnessed_publish::image_where_both_devices_lost_their_newest_rotation_write(
+            &recorded.crash_image_with_the_root_persisted_and_the_rotation_lost(),
+        );
+    let ranges = RangesReadingBackAllZero::default().with_the_writes(&recorded.unit_writes());
     let root_slot_of_the_previous_version = RangesReadingBackAllZero::default()
         .with_the_root_slot_of(&image, recorded.previous_key)
         .0[0];
@@ -311,7 +279,8 @@ fn landing_of(
 fn the_root_slot_of_the_previous_version_reading_bad_once_still_falls_back_to_it(
     bad_read: BadRead,
 ) {
-    let pool = fall_back_to_the_confirmed_previous();
+    let pool =
+        fall_back_to_the_confirmed_previous_where_both_devices_lost_their_newest_rotation_write();
     for reader in [
         Reader::Recovery,
         Reader::ReadOnlyMount,

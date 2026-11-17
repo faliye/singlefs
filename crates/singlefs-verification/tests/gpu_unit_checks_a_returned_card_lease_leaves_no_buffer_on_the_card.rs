@@ -10,7 +10,7 @@
 #![cfg(feature = "gpu")]
 
 use singlefs_verification::gpu_memory_ledger::{
-    card_memory_readings_of_one_nvidia_smi_report, OccupiedByThisProcess,
+    card_memory_readings_of_one_nvidia_smi_report, DeviceConditionOfACard, OccupiedByThisProcess,
     NVIDIA_SMI_MEMORY_AND_PROCESSES_REPORT_ARGUMENTS,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
@@ -138,6 +138,7 @@ fn submit_clearing_and_spinning(
 fn spin_pipeline_running_at_least_the_target(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
+    condition: &DeviceConditionOfACard,
 ) -> (wgpu::ComputePipeline, std::time::Duration) {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(TEST_NAME),
@@ -155,12 +156,16 @@ fn spin_pipeline_running_at_least_the_target(
         let started = std::time::Instant::now();
         let submission =
             submit_clearing_and_spinning(device, queue, &calibration_buffers, &pipeline);
-        device
-            .poll(wgpu::PollType::Wait {
-                submission_index: Some(submission),
-                timeout: Some(SPIN_CALIBRATION_SUBMISSION_WAIT),
-            })
-            .expect("标定空转内核时等得到");
+        let polled = device.poll(wgpu::PollType::Wait {
+            submission_index: Some(submission),
+            timeout: Some(SPIN_CALIBRATION_SUBMISSION_WAIT),
+        });
+        if let Err(error) = &polled {
+            condition.print_the_device_lost_marker_line_the_first_time(&format!(
+                "标定空转内核时没等到：{error:?}"
+            ));
+        }
+        polled.expect("标定空转内核时等得到");
         let spun = started.elapsed();
         if spun >= SPIN_AT_LEAST {
             return (pipeline, spun);
@@ -188,7 +193,8 @@ fn a_card_lease_returned_after_waiting_for_the_device_leaves_its_buffers_off_the
     let bus = lease.card().pci_bus_identifier.clone();
     let device = lease.card().device();
     let queue = lease.card().queue();
-    let (pipeline, spin_duration) = spin_pipeline_running_at_least_the_target(device, queue);
+    let (pipeline, spin_duration) =
+        spin_pipeline_running_at_least_the_target(device, queue, lease.card().device_condition());
     let mut readings_before: Vec<u64> = (0..3)
         .map(|_| this_process_occupancy_on_the_card_mebibytes(&bus))
         .collect();
@@ -221,7 +227,9 @@ fn a_card_lease_returned_after_waiting_for_the_device_leaves_its_buffers_off_the
         "丢借据时活还在飞（提交到丢借据 {submitted_to_the_lease_dropped:?}，空转 {spin_duration:?}）：不在飞的话分不出等没等"
     );
     assert!(
-        !pool.is_the_lease_on_the_books(index, lease_identifier),
+        !pool
+            .card_pool_started_now()
+            .is_the_lease_on_the_books(index, lease_identifier),
         "借据丢掉、等完设备之后销了账"
     );
     let occupied_after_the_lease_was_returned = this_process_occupancy_on_the_card_mebibytes(&bus);

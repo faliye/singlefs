@@ -1,6 +1,6 @@
 //! 跨请求攒批与屏障（判决 `research/prompts/m4-publish-trigger-r1-main-verification.md` 第二节「一次发布里攒什么」「返回即落盘」「RefFS」三格；
 //! D16（发布语义） 已定项 10）：数据写类并进一次发布（同一 inode 的写折叠、建 inode 求和），unlink、截断、建删快照、整理是屏障——进门先排空待发、
-//! 自己单发；`accept` 进门先做这一批合起来的准入与条数预判，过不了在任何读写之前拒；整理仍只在后台入口里跑。
+//! 自己单发；`accept` 进门先做这一批合起来的准入与条数预判，被空间拒时推抬 F 再判（那一格在 `accept_raises_the_floor_for_space.rs`），别的过不了在任何读写之前拒；整理仍只在后台入口里跑。
 //! 攻方 P3 四处（`research/prompts/m4-publish-trigger-r1-opus-output.md`：删除类并进别的改动、攒批里没发布的 unlink 被写活、整理锚在一次调用、
 //! 返回成功之后才拒）各一条；`accept` 与 `publish_when_due` 都不在调用线程上跑整理一条；原入口先排空待发一条；
 //! RefFS 按会话报告的发布点判（攻方 P5 那十四格：今天「返回即落盘」的接法判红的合法态，新接法判绿；一个请求不被触发切开）两条；
@@ -19,17 +19,19 @@ use common_admission_pool::{
     content_of, parameters_of_the_384_slot_small_devices, plain_device, PoolUnderTest,
     FIRST_WRITE_TIME_SECONDS, OVERWRITE_BYTES,
 };
-use singlefs_core::address::{DeviceIdentity, InodeNumber, SlotNumber};
+use singlefs_core::address::{DeviceIdentity, FileOffsetInBytes, InodeNumber, SlotNumber};
 use singlefs_core::allocator::{PoolAllocator, UnitAreaStart};
 use singlefs_core::compaction_plan::{
-    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionObservations,
-    CompactionPacing, CompactionRunForcing, CompactionStartJudgement, CompactionSwitches,
-    CompactionTimerFallback, CompactionWriteBandwidthLimit, ForegroundFsync,
+    AnswerOfTheCallerBeforeTheNextBatch, CallerMonotonicClockReading,
+    CallerOfTheBackgroundCompaction, CompactionObservations, CompactionPacing,
+    CompactionRunForcing, CompactionStartJudgement, CompactionSwitches, CompactionTimerFallback,
+    CompactionWriteBandwidthLimit,
 };
+use singlefs_core::mount::mount_writable;
 use singlefs_core::mounted_session::{
-    AcceptRefused, BackgroundCompactionCall, BackgroundCompactionTrigger, HowTheChangeWasTaken,
-    MountedSession, MountedSessionWithPendingChanges, PublishTriggerCause, ReasonOfThePublish,
-    UserChange,
+    AcceptRefused, BackgroundCompactionCall, BackgroundCompactionTrigger, BatchJudgedAtTheAccept,
+    HowTheChangeWasTaken, MountedSession, MountedSessionWithPendingChanges, PublishTriggerCause,
+    ReasonOfThePublish, UserChange, UserChangeRefused,
 };
 use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
@@ -345,8 +347,8 @@ impl CallerOfTheBackgroundCompaction for CallerForTests {
         reading(self.clock_in_milliseconds.get())
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        ForegroundFsync::NoneWaiting
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
     }
 }
 
@@ -618,7 +620,7 @@ const NEW_INODES_SPLITTING_THE_FIRST_LEAF_CONTAINER: u64 = INODE_LEAF_RECORDS;
 
 /// 一批合起来的准入在 `accept` 进门判（攻方 P3-丁：一批的准入与条数上限只在发布时判，超了就是返回成功之后才拒）：在会话的分配器拷贝上从单元区最高处
 /// 隔离槽，二分找到「覆盖写第一个文件并上一片叶容器那么多个建 inode」这一批刚好过不了落盘之前那几判的隔离数（两样单独各自过得了：并成一批多一个数据单元、
-/// 叶容器多分裂一片），把它装上会话。先收下覆盖写（单独过得了），再交建 inode：它单独过得了，并进待发合起来过不了，在任何读写之前拒，
+/// 叶容器多分裂一片），把它装上会话。先收下覆盖写（单独过得了），再交建 inode：它单独过得了，并进待发合起来过不了；这一版非空根不足 4 个，F 已在上限、推不出一串，在任何读写之前拒，
 /// 盘上逐字节不变，待发里只有覆盖写那一次。
 #[test]
 fn a_change_that_fits_alone_but_not_together_with_the_pending_changes_is_refused_at_the_accept() {
@@ -696,12 +698,22 @@ fn a_change_that_fits_alone_but_not_together_with_the_pending_changes_is_refused
         },
         reading(0),
     );
-    assert!(
-        matches!(
-            refused,
-            Err(AcceptRefused::PendingChangesTogetherWithThisChangeRefusedByThePublishJudgement(_))
+    match &refused {
+        Err(AcceptRefused::RefusedAfterRaisingTheFloorForSpace {
+            judgement: BatchJudgedAtTheAccept::PendingChangesTogetherWithThisChange,
+            refusal,
+        }) => assert!(
+            matches!(**refusal, UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)),
+            "F 已在上限：报空间不够，实际 {refusal:?}"
         ),
-        "并进待发合起来过不了：在收下这一刻拒，实际 {refused:?}"
+        other => panic!("并进待发合起来过不了：在收下这一刻拒，实际 {other:?}"),
+    }
+    assert!(
+        refused
+            .as_ref()
+            .err()
+            .is_some_and(|refusal| refusal.floor_raises_pushed_by_this_accept().is_empty()),
+        "F 已在上限：一串都没推"
     );
     assert_eq!(
         pool.image(),
@@ -978,6 +990,147 @@ fn a_sequential_write_across_three_units_is_published_whole_by_the_trigger_it_se
         VisibleState::OneFile(FileContent(recovered)),
     )
     .expect("RefFS：一个内容改动跟一个发布点，读出它，判绿");
+}
+
+/// 第一个文件之外的 inode 写满几个数据单元、隔一个部分写一个（旧落点放掉）、再建几次 inode 让根环转过一圈，丢掉会话重挂一次：
+/// 数据段不是这次挂载开的（这次挂载开过的段没资格选），R 外的洞也够，产品的选段选得出、签得了。第一个文件不动，随机历史照旧从它的整份写起。
+fn pool_and_a_new_mount_with_holes_in_the_data_segments(
+) -> (PoolUnderTest<SparseBlockDevice>, MountedSession) {
+    const DATA_UNITS_WRITTEN: u64 = 40;
+    const DATA_UNITS_REWRITTEN_TO_LEAVE_HOLES: u64 = 20;
+    const USER_CHANGES_TURNING_THE_ROOT_RING: usize = 30;
+    let (mut pool, mut session) = pool_and_session(UNIT_AREA_SLOTS_OF_THE_LARGER_DEVICES);
+    let inode = session
+        .current
+        .version_of_trees()
+        .expect("有树")
+        .inode_number_watermark();
+    session
+        .publish_user_change(
+            &mut pool.devices,
+            UserChange::NewInodes {
+                count: 1,
+                write_time_seconds: FIRST_WRITE_TIME_SECONDS,
+            },
+        )
+        .expect("建一个 inode");
+    let payload = singlefs_verification::model::data_unit_payload_capacity_in_bytes();
+    let content = content_of(
+        usize::try_from(DATA_UNITS_WRITTEN * payload).expect("装得进 usize"),
+        53,
+    );
+    session
+        .publish_user_change(
+            &mut pool.devices,
+            UserChange::SequentialWriteOfAnInode {
+                inode: InodeNumber(inode),
+                content: &content,
+                write_time_seconds: FIRST_WRITE_TIME_SECONDS,
+            },
+        )
+        .expect("顺序写那个 inode");
+    let one_byte = [0x5A_u8];
+    for rewritten in 0..DATA_UNITS_REWRITTEN_TO_LEAVE_HOLES {
+        session
+            .publish_user_change(
+                &mut pool.devices,
+                UserChange::WriteAtOffset {
+                    inode: InodeNumber(inode),
+                    offset: FileOffsetInBytes(2 * rewritten * payload),
+                    bytes: singlefs_core::transaction::PartialWriteBytes::new(&one_byte)
+                        .expect("一个字节不是空的"),
+                    write_time_seconds: FIRST_WRITE_TIME_SECONDS,
+                },
+            )
+            .expect("部分写一个数据单元");
+    }
+    for _turn in 0..USER_CHANGES_TURNING_THE_ROOT_RING {
+        session
+            .publish_user_change(
+                &mut pool.devices,
+                UserChange::NewInodes {
+                    count: 1,
+                    write_time_seconds: FIRST_WRITE_TIME_SECONDS,
+                },
+            )
+            .expect("建一个 inode");
+    }
+    drop(session);
+    let mounted = mount_writable(&pool.parameters, &mut pool.devices).expect("可写挂载");
+    let (_, session_of_the_new_mount) = MountedSession::of_the_mount(mounted);
+    (pool, session_of_the_new_mount)
+}
+
+/// 同下一条的随机历史，只差水位当作越线（开关照水位判、越线靠只供测试的开关）、池带洞又换过一次挂载（[`pool_and_a_new_mount_with_holes_in_the_data_segments`]）：
+/// 字母表里的后台入口真起跑、真选得出段，排空接整理、整理发布推「上次发布的读数」、让路之后前台再发再接着推，这几种交错都在按会话报告的发布点与模型、RefFS 对拍里走到。
+/// 几颗种子合起来整理真发过。
+// harness-test-granularity:one-scenario 同一个随机历史场景的几颗种子：各新起一个池互不相干
+#[test]
+fn random_batching_histories_with_the_background_entry_agree_with_the_model_and_the_reference_filesystem(
+) {
+    const SEEDS: [u64; 3] = [11, 12, 13];
+    const CALLS_OF_ONE_HISTORY: usize = 36;
+    let mut compaction_publishes = 0;
+    let mut last_stop_of_each_seed = Vec::new();
+    for seed in SEEDS {
+        let (mut pool, mut session) = pool_and_a_new_mount_with_holes_in_the_data_segments();
+        session
+            .allocator
+            .compaction_mut()
+            .watermark_crossing_forcing =
+            singlefs_core::compaction_plan::CompactionWatermarkCrossingForcing::ForcedForTests(
+                singlefs_core::compaction_plan::WatermarkQuantity::EmptyClusterSegments,
+            );
+        let first_file_at_the_start = first_file_read_back(&pool.image());
+        let version = session.current.version_of_trees().expect("有树");
+        let published = ModelFilesReadableAfterThePublishes {
+            contents_by_inode: [(FIRST_INODE_NUMBER, first_file_at_the_start.clone())]
+                .into_iter()
+                .collect(),
+            inode_number_watermark: version.inode_number_watermark(),
+        };
+        let time_threshold_in_milliseconds = 40;
+        let dirty_threshold_in_journal_bytes = 4 * JOURNAL_RECORD_BYTES;
+        let mut session = batching(
+            session,
+            pool.parameters.geometry.journal_ring_bytes,
+            Duration::from_millis(time_threshold_in_milliseconds),
+            dirty_threshold_in_journal_bytes,
+        );
+        let mut model = ModelOfThePendingChanges::after_a_publish(
+            published,
+            time_threshold_in_milliseconds,
+            dirty_threshold_in_journal_bytes,
+        );
+        let calls = random_batching_session_calls(seed, CALLS_OF_ONE_HISTORY, 25);
+        let run = run_batching_session_calls(
+            &mut session,
+            &mut pool.devices,
+            &|devices| MemoryPool {
+                devices: devices
+                    .iter()
+                    .map(|(identity, device)| (*identity, device.image.clone()))
+                    .collect(),
+                device_size_in_bytes: pool.device_bytes,
+            },
+            &calls,
+            &mut model,
+            FIRST_WRITE_TIME_SECONDS + 1,
+        )
+        .unwrap_or_else(|disagreement| panic!("种子 {seed}：{disagreement}"));
+        compaction_publishes += run.compaction_publishes_in_the_background;
+        last_stop_of_each_seed.push(session.session().compaction.observations.last_stop);
+        judge_a_crash_after_every_batching_session_call_returned(
+            &first_file_at_the_start,
+            &run.calls_seen,
+            VisibleState::OneFile(FileContent(first_file_read_back(&pool.image()))),
+        )
+        .unwrap_or_else(|red| panic!("种子 {seed}：{red}"));
+    }
+    assert!(
+        compaction_publishes > 0,
+        "几颗种子合起来后台入口真发过整理：每颗种子最后的停因 {last_stop_of_each_seed:?}"
+    );
 }
 
 /// 攒批会话的随机历史（随机历史、模型对拍、RefFS 翻译按会话报告的发布点判）：几颗种子各跑一段（收下覆盖写、顺序写、建 inode，

@@ -7,11 +7,13 @@ use crate::common_images_for_the_given_states_engine::{PoolCheckerExpectation, P
 use crate::common_unwitnessed_publish::{
     content_of, device_bytes_of_the_384_slot_small_devices, devices_reading_back_all_zero_on,
     devices_reading_back_all_zero_on_until_lifted, fixed_geometry_of_the_384_slot_small_devices,
-    image_of_devices_reading_back_all_zero, parameters_of_the_384_slot_small_devices, plain_device,
-    plain_devices_on, pool_after_the_mount, record_one_publish_after_overwrites,
-    root_is_in_the_ring, units_of_r_overwritten_on, DeviceOverASparseImage,
-    DeviceReadingBackAllZeroOnRanges, PoolUnderTest, PublishRecordedAsR, RangesReadingBackAllZero,
-    ReadBackAllZeroLift, RecordedPublish, OVERWRITE_BYTES,
+    image_of_devices_reading_back_all_zero,
+    image_where_both_devices_lost_their_newest_rotation_write,
+    parameters_of_the_384_slot_small_devices, plain_device, plain_devices_on, pool_after_the_mount,
+    record_one_publish_after_overwrites, root_is_in_the_ring,
+    units_of_the_recorded_publish_overwritten_on, DeviceOverASparseImage,
+    DeviceReadingBackAllZeroOnRanges, PoolUnderTest, RangesReadingBackAllZero, ReadBackAllZeroLift,
+    RecordedPublish, RecordedPublishKind, OVERWRITE_BYTES,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -726,36 +728,39 @@ pub fn run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_t
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_UNWITNESSED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
-    let root_of_r = recorded.root();
-    let account_locations_of_r: Vec<LocationEntry> = [
-        root_of_r.tree_table,
-        root_of_r.mapping_root,
-        root_of_r.allocation_record_tree_root,
+    let root_of_the_recorded_publish = recorded.root();
+    let account_locations_of_the_recorded_publish: Vec<LocationEntry> = [
+        root_of_the_recorded_publish.tree_table,
+        root_of_the_recorded_publish.mapping_root,
+        root_of_the_recorded_publish.allocation_record_tree_root,
     ]
     .into_iter()
     .filter(|pointer| *pointer != NodePointer::empty_root())
     .flat_map(|pointer| pointer.locations)
     .collect();
-    let unit_writes_of_r_outside_its_account: Vec<
+    let unit_writes_of_the_recorded_publish_outside_its_account: Vec<
         &singlefs_verification::memory_pool::RetainedWrite,
     > = recorded
         .unit_writes()
         .into_iter()
         .filter(|write| {
-            !account_locations_of_r.iter().any(|location| {
-                location.device == write.device && location.slot.to_device_offset() == write.offset
-            })
+            !account_locations_of_the_recorded_publish
+                .iter()
+                .any(|location| {
+                    location.device == write.device
+                        && location.slot.to_device_offset() == write.offset
+                })
         })
         .collect();
     assert!(
-        !unit_writes_of_r_outside_its_account.is_empty(),
+        !unit_writes_of_the_recorded_publish_outside_its_account.is_empty(),
         "R 那次覆盖写写出了账之外的单元（数据单元、两棵树的节点）"
     );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
-    let ranges =
-        RangesReadingBackAllZero::default().with_the_writes(&unit_writes_of_r_outside_its_account);
+    let ranges = RangesReadingBackAllZero::default()
+        .with_the_writes(&unit_writes_of_the_recorded_publish_outside_its_account);
     let mut mount_devices = devices_reading_back_all_zero_on(&crash_image, &ranges);
     let mounted = mount_writable_with_space_admission(
         &recorded.pool.parameters,
@@ -777,8 +782,8 @@ pub fn run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_t
         .expect("挂载建的分配器装着根环表");
     assert_eq!(
         root_ring_table.placements_recorded_for_the_abandoned_root(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg
         ),
         None,
         "挂载那一刻 R 记成有效根：根环表里没记着它的被抛弃根落点"
@@ -786,15 +791,15 @@ pub fn run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_t
     assert!(
         root_ring_table
             .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-                root_of_r.instance,
-                root_of_r.checkpoint_txg,
+                root_of_the_recorded_publish.instance,
+                root_of_the_recorded_publish.checkpoint_txg,
             )
             .is_some_and(|placements| !placements.is_empty()),
         "C 那一圈在 R 那一槽记着 R（R 的记录点名的、R 的账里的落点）"
     );
     let image_after_the_mount =
         image_of_devices_reading_back_all_zero(&mount_devices, recorded.pool.device_bytes);
-    let fault = ReadFaultOnChosenSlots::on_the_account_of(&root_of_r);
+    let fault = ReadFaultOnChosenSlots::on_the_account_of(&root_of_the_recorded_publish);
     let devices = devices_with_the_read_fault_on(&image_after_the_mount, &fault);
     let mut pool = pool_under_test_after_the_mount(
         &recorded.pool.parameters,
@@ -804,7 +809,7 @@ pub fn run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_t
         recorded.pool.write_time_seconds + 10_000,
     );
     fault.is_active.set(true);
-    assert_the_tree_table_of_the_abandoned_root_is_unreadable(&pool, &root_of_r);
+    assert_the_tree_table_of_the_abandoned_root_is_unreadable(&pool, &root_of_the_recorded_publish);
     let (abandoned_roots_unreadable, allocator_after_the_unmount) =
         unmount_expecting_the_floor_raised(&mut pool, "R 的账读不出");
     assert_eq!(
@@ -826,7 +831,7 @@ pub fn run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_t
 }
 
 /// 丙那一形之前覆盖写几次（攻方 `research/prompts/m3-batch10z-d-code-r1-opus-output.md` 第一节原样那一格 k = 3）。
-pub const OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_R: u64 = 3;
+pub const OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_THE_RECORDED_PUBLISH: u64 = 3;
 
 /// 丙那一形推过第一串抬 F 之后再顺序写几次（每次两个数据单元；攻方原样那一格 `Wss` 的两个 s）。
 pub const SEQUENTIAL_WRITES_AFTER_THE_FIRST_FLOOR_RAISE: usize = 2;
@@ -850,12 +855,12 @@ pub fn record_one_inode_creation_after_overwrites(overwrites_before: u64) -> Rec
     let previous_root = *pool.session().current.root();
     let previous_content = pool.content_of_the_current_version.clone();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     pool.create_one_inode().expect("录的那次建 inode 落得下");
     let root = *pool.session().current.root();
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -883,11 +888,11 @@ pub fn record_one_inode_creation_after_overwrites(overwrites_before: u64) -> Rec
 
 /// R 的账（树表、中央映射树根、分配记录树根；空指针不算）那几个单元的写，每块盘一份。
 pub fn account_writes_of(recorded: &RecordedPublish) -> Vec<&RetainedWrite> {
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     [
-        root_of_r.tree_table,
-        root_of_r.mapping_root,
-        root_of_r.allocation_record_tree_root,
+        root_of_the_recorded_publish.tree_table,
+        root_of_the_recorded_publish.mapping_root,
+        root_of_the_recorded_publish.allocation_record_tree_root,
     ]
     .into_iter()
     .filter(|pointer| *pointer != NodePointer::empty_root())
@@ -897,10 +902,10 @@ pub fn account_writes_of(recorded: &RecordedPublish) -> Vec<&RetainedWrite> {
 
 /// R 引用、R 自己没写的文件数据单元的落点（R 从所选那一版 P 继承的）：录下来的会话里 R 那一版的文件数据指针，
 /// 每条位置条目里 R 一份都没写过的那几个。从录下来的会话与写表算，不经被测的方法。
-pub fn data_unit_placements_r_shares_with_the_previous_version(
+pub fn data_unit_placements_the_recorded_publish_shares_with_the_previous_version(
     recorded: &RecordedPublish,
 ) -> Vec<PlacementOnDevice> {
-    let written_by_r = placements_written_by(recorded);
+    let written_by_the_recorded_publish = placements_written_by(recorded);
     recorded
         .pool
         .current_file_version()
@@ -913,7 +918,7 @@ pub fn data_unit_placements_r_shares_with_the_previous_version(
             span: singlefs_format::DATA_UNIT_BYTES.div_ceil(singlefs_format::SLOT_BYTES),
         })
         .filter(|placement| {
-            !written_by_r
+            !written_by_the_recorded_publish
                 .iter()
                 .any(|written| written.device == placement.device && written.slot == placement.slot)
         })
@@ -922,7 +927,7 @@ pub fn data_unit_placements_r_shares_with_the_previous_version(
 
 /// 丙那一形挂上之后，R 的账那几段还读不读回全零。
 #[derive(Clone, Copy, Debug)]
-pub enum AccountOfRAfterTheMount {
+pub enum AccountOfTheRecordedPublishAfterTheMount {
     /// 挂上之后撤掉读回全零（攻方 a2、a3 那几组）。
     ReadBackAllZeroLifted,
     /// 挂上之后照旧读回全零，写到哪一段那一段才照读（攻方 a4「故障不撤」）。
@@ -938,14 +943,14 @@ pub enum AccountOfRAfterTheMount {
 /// R 共用的那几个数据单元（丙并上的那一截）。只有 H2、没有丙时抬 F 只借到 R 的记录点名的落点，共用的数据单元回收、被顺序写发出去，I-7.4 红。
 pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor(
     images: &mut PoolCheckerImages,
-    after_the_mount: AccountOfRAfterTheMount,
+    after_the_mount: AccountOfTheRecordedPublishAfterTheMount,
 ) {
     let recorded = record_one_inode_creation_after_overwrites(
-        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let shared_with_the_previous_version =
-        data_unit_placements_r_shares_with_the_previous_version(&recorded);
+        data_unit_placements_the_recorded_publish_shares_with_the_previous_version(&recorded);
     assert!(
         !shared_with_the_previous_version.is_empty(),
         "R 建一个 inode、不写文件的数据单元：它与 P 共用文件的数据单元"
@@ -974,21 +979,21 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
         .expect("挂载建的分配器装着根环表");
     assert_eq!(
         root_ring_table.placements_recorded_for_the_abandoned_root(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg
         ),
         None,
         "挂载那一刻 R 记成有效根：根环表里没记着它的被抛弃根落点（抬 F 那一串借 C 那一圈，H2）"
     );
     let borrowed_at_the_mount = root_ring_table
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着 R 的记录点名的落点");
     match after_the_mount {
-        AccountOfRAfterTheMount::ReadBackAllZeroLifted => lift.lift(),
-        AccountOfRAfterTheMount::StillReadingBackAllZero => {}
+        AccountOfTheRecordedPublishAfterTheMount::ReadBackAllZeroLifted => lift.lift(),
+        AccountOfTheRecordedPublishAfterTheMount::StillReadingBackAllZero => {}
     }
     let (output, session) = MountedSession::of_the_mount(mounted);
     let content_of_the_selected_version = recorded
@@ -1011,7 +1016,7 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
     };
     // 同一个说明（「覆盖写之后」）在循环里交好几张，名字带上这是第几张，一个场景里不重名
     let mut images_handed_out_after_the_mount = 0_usize;
-    let mut hand_out_expecting_nothing_of_r_reused =
+    let mut hand_out_expecting_nothing_of_the_recorded_publish_reused =
         |pool_after_the_step: &PoolUnderTest<_>, after_what: &str| {
             images_handed_out_after_the_mount += 1;
             let image = pool_after_the_step.image();
@@ -1023,7 +1028,7 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
             .and_none_of_these_violated(&INVARIANTS_OF_UNIT_REUSE),
             );
                 assert_eq!(
-                units_of_r_overwritten_on(&recorded, &image),
+                units_of_the_recorded_publish_overwritten_on(&recorded, &image),
                 Vec::<(DeviceIdentity, u64)>::new(),
                 "{after_what}（{after_the_mount:?}），R 的根还在根环里：R 写的单元一份都没被写掉"
             );
@@ -1036,7 +1041,8 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
             overwrites_before_the_first_floor_raise < OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST,
             "{OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST} 次覆盖写之内准入推出抬 F（384 槽小盘）"
         );
-        let root_of_r_was_in_the_ring = root_is_in_the_ring(&pool.image(), recorded.key);
+        let root_of_the_recorded_publish_was_in_the_ring =
+            root_is_in_the_ring(&pool.image(), recorded.key);
         let published = pool.overwrite(OVERWRITE_BYTES).unwrap_or_else(|refusal| {
             panic!(
                 "第 {} 次覆盖写（{after_the_mount:?}）被拒：{refusal:?}",
@@ -1044,10 +1050,10 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
             )
         });
         overwrites_before_the_first_floor_raise += 1;
-        hand_out_expecting_nothing_of_r_reused(&pool, "覆盖写之后");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "覆盖写之后");
         if !published.floor_raises.is_empty() {
             assert!(
-                root_of_r_was_in_the_ring,
+                root_of_the_recorded_publish_was_in_the_ring,
                 "准入推抬 F 的那一刻 R 还在根环里（不然这一串里没有被抛弃根要借 C，没走到要判的那一处）"
             );
             break;
@@ -1065,7 +1071,7 @@ pub fn the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected
                     "推过抬 F 之后第 {sequential_write_number} 次顺序写（{after_the_mount:?}）被拒：{refusal:?}"
                 )
             });
-        hand_out_expecting_nothing_of_r_reused(&pool, "推过抬 F 之后顺序写");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "推过抬 F 之后顺序写");
     }
     assert!(
         free_among_the_shared_after_the_raise.is_empty(),
@@ -1096,7 +1102,7 @@ pub fn run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_share
     images: &mut PoolCheckerImages,
 ) {
     the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor(images,
-        AccountOfRAfterTheMount::ReadBackAllZeroLifted,
+        AccountOfTheRecordedPublishAfterTheMount::ReadBackAllZeroLifted,
     );
 }
 
@@ -1106,35 +1112,35 @@ pub fn run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_share
     images: &mut PoolCheckerImages,
 ) {
     the_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor(images,
-        AccountOfRAfterTheMount::StillReadingBackAllZero,
+        AccountOfTheRecordedPublishAfterTheMount::StillReadingBackAllZero,
     );
 }
 
 /// 丙并中间那一形之前覆盖写几次（攻方 `research/prompts/m3-batch10z-ghi-code-r1-opus-output.md` 第一节原样那一格 k = 3）。
-pub const OVERWRITES_BEFORE_THE_PUBLISHES_RECORDED_AS_Q_AND_R: u64 = 3;
+pub const OVERWRITES_BEFORE_THE_INTERMEDIATE_AND_THE_RECORDED_PUBLISH: u64 = 3;
 
 /// 丙并中间那一形挂上之后，会话至多覆盖写几次去等写掉 R 那一槽（384 槽小盘一圈根环 24 次发布；攻方原样那一格第 20 步写掉）。
-pub const OVERWRITES_UNTIL_THE_RING_SLOT_OF_R_IS_WRITTEN_AT_MOST: usize = 40;
+pub const OVERWRITES_UNTIL_THE_RING_SLOT_OF_THE_RECORDED_PUBLISH_IS_WRITTEN_AT_MOST: usize = 40;
 
 /// 录下来的 Q、R 两次发布：Q 之前那一刻（所选那一版 P）的盘面、Q 与 R 两次发布的全部写（按落盘次序）、两条根槽写在写表里的下标、
 /// P、Q、R 的 (实例, txg)，加起池那一份（会话停在 R 那一版）。
-pub struct RecordedQAndR {
+pub struct RecordedIntermediateAndLaterPublishes {
     pub pool: PoolUnderTest<RecordingBlockDevice<SparseBlockDevice>>,
     pub base: MemoryPool,
     pub writes: Vec<RetainedWrite>,
-    pub root_index_of_q: usize,
-    pub root_index_of_r: usize,
-    pub key_of_p: (InstanceGeneration, CheckpointTxg),
-    pub key_of_q: (InstanceGeneration, CheckpointTxg),
-    pub key_of_r: (InstanceGeneration, CheckpointTxg),
+    pub root_index_of_the_intermediate_publish: usize,
+    pub root_index_of_the_recorded_publish: usize,
+    pub key_of_the_previous_version: (InstanceGeneration, CheckpointTxg),
+    pub key_of_the_intermediate_publish: (InstanceGeneration, CheckpointTxg),
+    pub key_of_the_recorded_publish: (InstanceGeneration, CheckpointTxg),
 }
 
 /// 攻方 `research/prompts/m3-batch10z-ghi-code-r1-opus-model/src/opus10zghi-probe/tests/opus_k21_chain.rs` 的 `record_chain`（q = `s`、r = `n`）：
 /// 起池（384 槽那一档、第一个文件），覆盖写 `overwrites_before` 次得 P，再录 Q（顺序写三个数据单元，三条记录）与 R（建一个 inode，
 /// 文件的数据单元与 Q 共用）。
-pub fn record_a_sequential_write_as_q_and_an_inode_creation_as_r_after_overwrites(
+pub fn record_a_sequential_write_as_the_intermediate_publish_and_an_inode_creation_as_the_recorded_publish_after_overwrites(
     overwrites_before: u64,
-) -> RecordedQAndR {
+) -> RecordedIntermediateAndLaterPublishes {
     let stream = SharedStream::retaining_contents();
     let mut pool = PoolUnderTest::start_after_the_first_file_on_devices_of(
         parameters_of_the_384_slot_small_devices(),
@@ -1151,18 +1157,18 @@ pub fn record_a_sequential_write_as_q_and_an_inode_creation_as_r_after_overwrite
         let root = pool_being_recorded.session().current.root();
         (root.instance, root.checkpoint_txg)
     };
-    let key_of_p = key_of(&pool);
+    let key_of_the_previous_version = key_of(&pool);
     let base = pool.image();
-    let operations_before_q = stream.operation_count();
+    let operations_before_the_intermediate_publish = stream.operation_count();
     pool.sequential_write(2 * singlefs_core::unit::data_unit_payload_capacity() + 1000)
         .expect("录的那次顺序写（Q）落得下");
-    let key_of_q = key_of(&pool);
+    let key_of_the_intermediate_publish = key_of(&pool);
     pool.create_one_inode()
         .expect("录的那次建 inode（R）落得下");
-    let key_of_r = key_of(&pool);
+    let key_of_the_recorded_publish = key_of(&pool);
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_q..],
+        &operations[operations_before_the_intermediate_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -1176,29 +1182,31 @@ pub fn record_a_sequential_write_as_q_and_an_inode_creation_as_r_after_overwrite
         2,
         "录的 Q、R 两次发布各写一条根（准入够，没推抬 F）"
     );
-    RecordedQAndR {
+    RecordedIntermediateAndLaterPublishes {
         pool,
         base,
         writes,
-        root_index_of_q: root_indices[0],
-        root_index_of_r: root_indices[1],
-        key_of_p,
-        key_of_q,
-        key_of_r,
+        root_index_of_the_intermediate_publish: root_indices[0],
+        root_index_of_the_recorded_publish: root_indices[1],
+        key_of_the_previous_version,
+        key_of_the_intermediate_publish,
+        key_of_the_recorded_publish,
     }
 }
 
-impl RecordedQAndR {
+impl RecordedIntermediateAndLaterPublishes {
     /// 崩在 R 的根槽落盘之后、R 那次系统配置轮换之前（Q 那次轮换已持久）。
-    pub fn crash_image_with_the_root_of_r_persisted_and_its_rotation_lost(&self) -> MemoryPool {
+    pub fn crash_image_with_the_root_of_the_recorded_publish_persisted_and_its_rotation_lost(
+        &self,
+    ) -> MemoryPool {
         let mut image = self.base.clone();
-        image.apply_writes(&self.writes[..=self.root_index_of_r]);
+        image.apply_writes(&self.writes[..=self.root_index_of_the_recorded_publish]);
         image
     }
 
-    pub fn root_of_r(&self) -> RootRecord {
+    pub fn root_of_the_recorded_publish(&self) -> RootRecord {
         RootRecord::parse_slot(
-            self.writes[self.root_index_of_r]
+            self.writes[self.root_index_of_the_recorded_publish]
                 .bytes()
                 .expect("根槽写带字节"),
             &self.pool.parameters.filesystem_identifier,
@@ -1207,51 +1215,59 @@ impl RecordedQAndR {
     }
 
     /// Q 写出的单元写（每块盘一份）。
-    pub fn unit_writes_of_q(&self) -> Vec<&RetainedWrite> {
-        self.writes[..self.root_index_of_q]
+    pub fn unit_writes_of_the_intermediate_publish(&self) -> Vec<&RetainedWrite> {
+        self.writes[..self.root_index_of_the_intermediate_publish]
             .iter()
             .filter(|write| write.kind == StepKind::UnitWrite)
             .collect()
     }
 
-    /// 可写挂载那一刻读回全零的几段（攻方故障组 `cfgq,qroot,qlast,racct`）：每块盘上 Q 那次轮换写的系统配置槽、Q 的根槽、
-    /// Q 带末条标志的那条记录、R 写的树表 / 中央映射树根 / 分配记录树根那几份。
+    /// 可写挂载那一刻读回全零的几段（攻方故障组 `qroot,qlast,racct`）：Q 的根槽、Q 带末条标志的那条记录、R 写的树表 / 中央映射树根 / 分配记录树根那几份。
+    /// Q 那次轮换写的系统配置槽不在里面：要它读不回 Q 的见证，盘面用 [`image_where_both_devices_lost_their_newest_rotation_write`] 造（两槽都自证过，乙入判不出不拒）。
     pub fn ranges_reading_back_all_zero_at_the_mount(
         &self,
         crash_image: &MemoryPool,
     ) -> RangesReadingBackAllZero {
-        let root_of_r = self.root_of_r();
-        let account_pointers_of_r = [
-            root_of_r.tree_table,
-            root_of_r.mapping_root,
-            root_of_r.allocation_record_tree_root,
+        let root_of_the_recorded_publish = self.root_of_the_recorded_publish();
+        let account_pointers_of_the_recorded_publish = [
+            root_of_the_recorded_publish.tree_table,
+            root_of_the_recorded_publish.mapping_root,
+            root_of_the_recorded_publish.allocation_record_tree_root,
         ];
-        let writes_in_between_the_two_roots =
-            &self.writes[self.root_index_of_q..self.root_index_of_r];
-        let rotation_of_q: Vec<&RetainedWrite> = writes_in_between_the_two_roots
-            .iter()
-            .filter(|write| write.kind == StepKind::SystemConfigurationSlot)
-            .collect();
-        assert!(!rotation_of_q.is_empty(), "Q 那次轮换写了系统配置槽");
-        let account_of_r: Vec<&RetainedWrite> = writes_in_between_the_two_roots
+        let writes_in_between_the_two_roots = &self.writes
+            [self.root_index_of_the_intermediate_publish..self.root_index_of_the_recorded_publish];
+        let rotation_of_the_intermediate_publish: Vec<&RetainedWrite> =
+            writes_in_between_the_two_roots
+                .iter()
+                .filter(|write| write.kind == StepKind::SystemConfigurationSlot)
+                .collect();
+        assert!(
+            !rotation_of_the_intermediate_publish.is_empty(),
+            "Q 那次轮换写了系统配置槽"
+        );
+        let account_of_the_recorded_publish: Vec<&RetainedWrite> = writes_in_between_the_two_roots
             .iter()
             .filter(|write| write.kind == StepKind::UnitWrite)
             .filter(|write| {
-                account_pointers_of_r.iter().any(|pointer| {
-                    *pointer != NodePointer::empty_root()
-                        && pointer.locations.iter().any(|location| {
-                            location.device == write.device
-                                && location.slot.to_device_offset() == write.offset
-                        })
-                })
+                account_pointers_of_the_recorded_publish
+                    .iter()
+                    .any(|pointer| {
+                        *pointer != NodePointer::empty_root()
+                            && pointer.locations.iter().any(|location| {
+                                location.device == write.device
+                                    && location.slot.to_device_offset() == write.offset
+                            })
+                    })
             })
             .collect();
-        assert!(!account_of_r.is_empty(), "R 自己写了它的账那几个单元");
+        assert!(
+            !account_of_the_recorded_publish.is_empty(),
+            "R 自己写了它的账那几个单元"
+        );
         RangesReadingBackAllZero::default()
-            .with_the_writes(&rotation_of_q)
-            .with_the_writes(&[&self.writes[self.root_index_of_q]])
-            .with_the_last_record_of_the_publish(crash_image, self.key_of_q)
-            .with_the_writes(&account_of_r)
+            .with_the_writes(&[&self.writes[self.root_index_of_the_intermediate_publish]])
+            .with_the_last_record_of_the_publish(crash_image, self.key_of_the_intermediate_publish)
+            .with_the_writes(&account_of_the_recorded_publish)
     }
 }
 
@@ -1266,21 +1282,24 @@ pub fn some_placement_covers(placements: &[PlacementOnDevice], write: &RetainedW
 }
 
 /// 丙并中间（攻方 `research/prompts/m3-batch10z-ghi-code-r1-opus-output.md` 第一节，原样那一格 k = 3、Q 顺序写、R 建 inode、
-/// 故障 `cfgq,qroot,qlast,racct`、动作全是覆盖写；判决 `research/prompts/m3-batch10z-ghi-code-r1-main-verification.md` 第二节 K2-1 攻方一形）：
+/// 故障 `qroot,qlast,racct` 加 Q 那次轮换没写成、动作全是覆盖写；判决 `research/prompts/m3-batch10z-ghi-code-r1-main-verification.md` 第二节 K2-1 攻方一形）：
 /// 第一个文件之后覆盖写 3 次得 P，录 Q（顺序写）与 R（建 inode，数据单元与 Q 共用），崩在 R 的根槽落盘之后、R 那次轮换之前；
-/// 可写挂载那一刻 Q 轮换写的系统配置槽、Q 的根槽、Q 的末条记录、R 的账读回全零：择根退到 P，R 的记录齐、账读不出，走丙。
+/// 每块盘 Q 那次轮换写的那一槽没写成（两槽都自证过），可写挂载那一刻 Q 的根槽、Q 的末条记录、R 的账读回全零：择根退到 P，R 的记录齐、账读不出，走丙。
 /// C 里 R 那一槽并上 (P, R) 之间 Q 那一槽记着的落点，Q 写的单元全在里面。挂上之后撤故障，会话覆盖写到写掉 R 那一槽：
 /// 每一步之后、每一步最后一条根槽写之前那个段边界状态（单元与记录都落了、这一步的根没落：攻方红的那一态）池级 checker 都不红
 /// I-7.4（近 K 代块未被复用）与 I-4.8；其间有一步 Q 已离开根环而 R 还在（这一形的窗口确实走到了）。
 /// 判别力：撤掉丙并中间（变异「丙并中间 走丙那一支的根那一槽不并所选那一版与它之间那几槽」）时，写掉 Q 那一槽之后、
 /// 写掉 R 那一槽那一步根落之前那一态 I-7.4 红，违例的根是 R；挂载那一刻 C 那一槽缺 Q 的单元那一句先红。
-pub fn run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written(
+pub fn run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written(
     images: &mut PoolCheckerImages,
 ) {
-    let recorded = record_a_sequential_write_as_q_and_an_inode_creation_as_r_after_overwrites(
-        OVERWRITES_BEFORE_THE_PUBLISHES_RECORDED_AS_Q_AND_R,
+    let recorded = record_a_sequential_write_as_the_intermediate_publish_and_an_inode_creation_as_the_recorded_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_INTERMEDIATE_AND_THE_RECORDED_PUBLISH,
     );
-    let crash_image = recorded.crash_image_with_the_root_of_r_persisted_and_its_rotation_lost();
+    let crash_image = image_where_both_devices_lost_their_newest_rotation_write(
+        &recorded
+            .crash_image_with_the_root_of_the_recorded_publish_persisted_and_its_rotation_lost(),
+    );
     let ranges = recorded.ranges_reading_back_all_zero_at_the_mount(&crash_image);
     let mut faulted_devices = devices_reading_back_all_zero_on(&crash_image, &ranges);
     let mounted = mount_writable_with_space_admission(
@@ -1294,27 +1313,29 @@ pub fn run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_an
             mounted.output.effective_root.instance,
             mounted.output.effective_root.checkpoint_txg
         ),
-        recorded.key_of_p,
+        recorded.key_of_the_previous_version,
         "R 走读不成、Q 的根读不出：择根退到 P（阳性对照：故障打到了）"
     );
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            recorded.key_of_r.0,
-            recorded.key_of_r.1,
+            recorded.key_of_the_recorded_publish.0,
+            recorded.key_of_the_recorded_publish.1,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
-    let units_of_q_not_in_the_ring_slot_of_r: Vec<&RetainedWrite> = recorded
-        .unit_writes_of_q()
+    let units_of_the_intermediate_publish_not_in_the_ring_slot_of_the_recorded_publish: Vec<
+        &RetainedWrite,
+    > = recorded
+        .unit_writes_of_the_intermediate_publish()
         .into_iter()
-        .filter(|write| !some_placement_covers(&borrowed_for_r, write))
+        .filter(|write| !some_placement_covers(&borrowed_for_the_recorded_publish, write))
         .collect();
     assert!(
-        units_of_q_not_in_the_ring_slot_of_r.is_empty(),
-        "挂载那一刻 C 里 R 那一槽并上了 Q 那一槽记着的落点（丙并中间）：Q 写的单元都在里面，缺 {} 份：{units_of_q_not_in_the_ring_slot_of_r:?}",
-        units_of_q_not_in_the_ring_slot_of_r.len()
+        units_of_the_intermediate_publish_not_in_the_ring_slot_of_the_recorded_publish.is_empty(),
+        "挂载那一刻 C 里 R 那一槽并上了 Q 那一槽记着的落点（丙并中间）：Q 写的单元都在里面，缺 {} 份：{units_of_the_intermediate_publish_not_in_the_ring_slot_of_the_recorded_publish:?}",
+        units_of_the_intermediate_publish_not_in_the_ring_slot_of_the_recorded_publish.len()
     );
     let image_after_the_mount =
         image_of_devices_reading_back_all_zero(&faulted_devices, recorded.pool.device_bytes);
@@ -1322,7 +1343,7 @@ pub fn run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_an
     let content_of_the_selected_version = recorded
         .pool
         .content_of_each_root
-        .get(&recorded.key_of_p)
+        .get(&recorded.key_of_the_previous_version)
         .cloned()
         .expect("P 是录的池写过的一版");
     let mut content_of_each_root = recorded.pool.content_of_each_root.clone();
@@ -1355,14 +1376,14 @@ pub fn run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_an
         content_of_the_current_version: content_of_the_selected_version,
         content_of_each_root,
     };
-    let mut q_left_the_ring_while_r_was_in_it = false;
+    let mut intermediate_publish_left_the_ring_while_the_recorded_publish_was_in_it = false;
     let mut overwrites = 0;
-    // 迭代上界 OVERWRITES_UNTIL_THE_RING_SLOT_OF_R_IS_WRITTEN_AT_MOST；跨轮带着「Q 先离开根环、R 还在」那一个判断；
+    // 迭代上界 OVERWRITES_UNTIL_THE_RING_SLOT_OF_THE_RECORDED_PUBLISH_IS_WRITTEN_AT_MOST；跨轮带着「Q 先离开根环、R 还在」那一个判断；
     // 出口：R 离开根环的那一步判完就 break，被拒就当场判红（panic）。
     loop {
         assert!(
-            overwrites < OVERWRITES_UNTIL_THE_RING_SLOT_OF_R_IS_WRITTEN_AT_MOST,
-            "{OVERWRITES_UNTIL_THE_RING_SLOT_OF_R_IS_WRITTEN_AT_MOST} 次覆盖写之内写掉 R 那一槽（384 槽小盘一圈根环 24 次发布）"
+            overwrites < OVERWRITES_UNTIL_THE_RING_SLOT_OF_THE_RECORDED_PUBLISH_IS_WRITTEN_AT_MOST,
+            "{OVERWRITES_UNTIL_THE_RING_SLOT_OF_THE_RECORDED_PUBLISH_IS_WRITTEN_AT_MOST} 次覆盖写之内写掉 R 那一槽（384 槽小盘一圈根环 24 次发布）"
         );
         let image_before_the_step = pool.image();
         let operations_before_the_step = session_stream.operation_count();
@@ -1397,22 +1418,28 @@ pub fn run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_an
             PoolCheckerExpectation::only_the_named_invariants()
                 .and_none_of_these_violated(&INVARIANTS_OF_UNIT_REUSE),
         );
-        let r_is_in_the_ring = root_is_in_the_ring(&image_after_the_step, recorded.key_of_r);
-        if r_is_in_the_ring && !root_is_in_the_ring(&image_after_the_step, recorded.key_of_q) {
-            q_left_the_ring_while_r_was_in_it = true;
+        let recorded_publish_is_in_the_ring =
+            root_is_in_the_ring(&image_after_the_step, recorded.key_of_the_recorded_publish);
+        if recorded_publish_is_in_the_ring
+            && !root_is_in_the_ring(
+                &image_after_the_step,
+                recorded.key_of_the_intermediate_publish,
+            )
+        {
+            intermediate_publish_left_the_ring_while_the_recorded_publish_was_in_it = true;
         }
-        if !r_is_in_the_ring {
+        if !recorded_publish_is_in_the_ring {
             break;
         }
     }
     assert!(
-        q_left_the_ring_while_r_was_in_it,
+        intermediate_publish_left_the_ring_while_the_recorded_publish_was_in_it,
         "有一步之后 Q 已离开根环而 R 还在（这一形的窗口走到了：Q 那一槽先写掉、解开，R 那一槽晚一个 txg）"
     );
 }
 
 /// 正推 `research/prompts/m3-batch10z-ghi-code-r1-sonnet-model/probe_rollback_revived.tail.rs` 那一形之前覆盖写几次（探针原样 4 次）。
-pub const OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R: u64 = 4;
+pub const OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH: u64 = 4;
 
 /// 回退复活那一形推过第一串抬 F 之后再顺序写几次（每次两个数据单元；探针原样 3 次）。
 pub const SEQUENTIAL_WRITES_AFTER_THE_FLOOR_RAISE_OVER_THE_ROLLBACK: usize = 3;
@@ -1458,7 +1485,7 @@ pub fn record_one_rollback_to_the_first_file_after_overwrites(
     }
     let previous_root = *pool.session().current.root();
     let previous_content = pool.content_of_the_current_version.clone();
-    let locations_referenced_by_p: Vec<(DeviceIdentity, SlotNumber)> = pool
+    let locations_referenced_by_the_previous_version: Vec<(DeviceIdentity, SlotNumber)> = pool
         .current_file_version()
         .data_pointers
         .iter()
@@ -1466,7 +1493,7 @@ pub fn record_one_rollback_to_the_first_file_after_overwrites(
         .map(|location| (location.device, location.slot))
         .collect();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     let mut session = pool.session.take().expect("会话");
     {
         let PoolVersion::WithFile(current) = &mut session.current else {
@@ -1489,7 +1516,7 @@ pub fn record_one_rollback_to_the_first_file_after_overwrites(
     let root = *pool.session().current.root();
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -1502,7 +1529,10 @@ pub fn record_one_rollback_to_the_first_file_after_overwrites(
     let revived: Vec<PlacementOnDevice> = data_pointers_of_the_first_file
         .iter()
         .flat_map(|pointer| pointer.locations)
-        .filter(|location| !locations_referenced_by_p.contains(&(location.device, location.slot)))
+        .filter(|location| {
+            !locations_referenced_by_the_previous_version
+                .contains(&(location.device, location.slot))
+        })
         .map(|location| PlacementOnDevice {
             device: location.device,
             slot: location.slot,
@@ -1540,13 +1570,13 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
     let RecordedRollback {
         recorded, revived, ..
     } = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     assert!(
         !revived.is_empty(),
         "第一个文件那一版的数据单元 P 不引用：回退复活了它们（阳性对照：这一形走到了复活）"
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let ranges = RangesReadingBackAllZero::default().with_the_writes(&account_writes_of(&recorded));
     let lift = ReadBackAllZeroLift::default();
@@ -1565,19 +1595,19 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
         recorded.previous_key,
         "R 走读不成：择根退到 P（阳性对照：故障打到了）"
     );
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
     let revived_not_borrowed: Vec<&PlacementOnDevice> = revived
         .iter()
         .filter(|revived_placement| {
-            !borrowed_for_r.iter().any(|borrowed| {
+            !borrowed_for_the_recorded_publish.iter().any(|borrowed| {
                 borrowed.device == revived_placement.device
                     && borrowed.slot == revived_placement.slot
             })
@@ -1609,7 +1639,7 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
     };
     // 同一个说明（「覆盖写之后」）在循环里交好几张，名字带上这是第几张，一个场景里不重名
     let mut images_handed_out_after_the_mount = 0_usize;
-    let mut hand_out_expecting_nothing_of_r_reused =
+    let mut hand_out_expecting_nothing_of_the_recorded_publish_reused =
         |pool_after_the_step: &PoolUnderTest<_>, after_what: &str| {
             images_handed_out_after_the_mount += 1;
             images.hand_out(
@@ -1626,7 +1656,8 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
             overwrites_before_the_first_floor_raise < OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST,
             "{OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST} 次覆盖写之内准入推出抬 F（384 槽小盘）"
         );
-        let root_of_r_was_in_the_ring = root_is_in_the_ring(&pool.image(), recorded.key);
+        let root_of_the_recorded_publish_was_in_the_ring =
+            root_is_in_the_ring(&pool.image(), recorded.key);
         let published = pool.overwrite(OVERWRITE_BYTES).unwrap_or_else(|refusal| {
             panic!(
                 "第 {} 次覆盖写被拒：{refusal:?}",
@@ -1634,10 +1665,10 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
             )
         });
         overwrites_before_the_first_floor_raise += 1;
-        hand_out_expecting_nothing_of_r_reused(&pool, "覆盖写之后");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "覆盖写之后");
         if !published.floor_raises.is_empty() {
             assert!(
-                root_of_r_was_in_the_ring,
+                root_of_the_recorded_publish_was_in_the_ring,
                 "准入推抬 F 的那一刻 R 还在根环里（不然这一串里没有被抛弃根要借 C，没走到要判的那一处）"
             );
             break;
@@ -1650,7 +1681,7 @@ pub fn run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writ
             .unwrap_or_else(|refusal| {
                 panic!("推过抬 F 之后第 {sequential_write_number} 次顺序写被拒：{refusal:?}")
             });
-        hand_out_expecting_nothing_of_r_reused(&pool, "推过抬 F 之后顺序写");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "推过抬 F 之后顺序写");
     }
     assert!(
         free_among_the_revived_after_the_raise.is_empty(),
@@ -1675,7 +1706,7 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
         !revived.is_empty(),
         "第一个文件那一版的数据单元 P 不引用：回退复活了它们（阳性对照：这一形走到了复活）"
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let lift = ReadBackAllZeroLift::default();
     let mut devices = devices_reading_back_all_zero_on_until_lifted(&crash_image, ranges, &lift);
@@ -1693,13 +1724,13 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
         recorded.previous_key,
         "R 走读不成：择根退到 P（阳性对照：故障打到了）"
     );
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
     lift.lift();
@@ -1724,7 +1755,7 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
     };
     // 同一个说明（「覆盖写之后」）在循环里交好几张，名字带上这是第几张，一个场景里不重名
     let mut images_handed_out_after_the_mount = 0_usize;
-    let mut hand_out_expecting_nothing_of_r_reused =
+    let mut hand_out_expecting_nothing_of_the_recorded_publish_reused =
         |pool_after_the_step: &PoolUnderTest<_>, after_what: &str| {
             images_handed_out_after_the_mount += 1;
             images.hand_out(
@@ -1741,7 +1772,8 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
             overwrites_before_the_first_floor_raise < OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST,
             "{OVERWRITES_WHILE_THE_ACCOUNT_IS_UNREADABLE_AT_MOST} 次覆盖写之内准入推出抬 F（384 槽小盘）"
         );
-        let root_of_r_was_in_the_ring = root_is_in_the_ring(&pool.image(), recorded.key);
+        let root_of_the_recorded_publish_was_in_the_ring =
+            root_is_in_the_ring(&pool.image(), recorded.key);
         let published = pool.overwrite(OVERWRITE_BYTES).unwrap_or_else(|refusal| {
             panic!(
                 "第 {} 次覆盖写被拒：{refusal:?}",
@@ -1749,10 +1781,10 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
             )
         });
         overwrites_before_the_first_floor_raise += 1;
-        hand_out_expecting_nothing_of_r_reused(&pool, "覆盖写之后");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "覆盖写之后");
         if !published.floor_raises.is_empty() {
             assert!(
-                root_of_r_was_in_the_ring,
+                root_of_the_recorded_publish_was_in_the_ring,
                 "准入推抬 F 的那一刻 R 还在根环里（不然这一串里没有被抛弃根要借 C，没走到要判的那一处）"
             );
             break;
@@ -1765,12 +1797,12 @@ pub fn units_a_rollback_revived_stay_through_writes_while_these_read_back_zero_a
             .unwrap_or_else(|refusal| {
                 panic!("推过抬 F 之后第 {sequential_write_number} 次顺序写被拒：{refusal:?}")
             });
-        hand_out_expecting_nothing_of_r_reused(&pool, "推过抬 F 之后顺序写");
+        hand_out_expecting_nothing_of_the_recorded_publish_reused(&pool, "推过抬 F 之后顺序写");
     }
     let revived_not_borrowed: Vec<&PlacementOnDevice> = revived
         .iter()
         .filter(|revived_placement| {
-            !borrowed_for_r.iter().any(|borrowed| {
+            !borrowed_for_the_recorded_publish.iter().any(|borrowed| {
                 borrowed.device == revived_placement.device
                     && borrowed.slot == revived_placement.slot
             })
@@ -1852,7 +1884,7 @@ pub fn run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while
     images: &mut PoolCheckerImages,
 ) {
     let recorded_rollback = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let recorded = &recorded_rollback.recorded;
     let lineage_unit_writes = lineage_unit_writes_of(recorded);
@@ -1875,7 +1907,7 @@ pub fn run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while
     images: &mut PoolCheckerImages,
 ) {
     let recorded_rollback = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&recorded_rollback.recorded.unit_writes());
@@ -1891,7 +1923,7 @@ pub fn run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while
     images: &mut PoolCheckerImages,
 ) {
     let recorded_rollback = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let recorded = &recorded_rollback.recorded;
     let rollback_target = recorded_rollback.rollback_target;
@@ -1913,7 +1945,7 @@ pub fn run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while
     images: &mut PoolCheckerImages,
 ) {
     let recorded_rollback = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let rollback_target = root_read_from_the_ring_of(
         &recorded_rollback
@@ -2029,11 +2061,12 @@ pub fn record_one_rollback_after_overwrites(
     }
     let target_version = &versions_written[versions_written.len() - 1 - versions_back];
     let rollback_target = target_version.root;
-    let locations_referenced_by_p = &versions_written[versions_written.len() - 1].data_locations;
+    let locations_referenced_by_the_previous_version =
+        &versions_written[versions_written.len() - 1].data_locations;
     let revived: Vec<PlacementOnDevice> = target_version
         .data_locations
         .iter()
-        .filter(|location| !locations_referenced_by_p.contains(location))
+        .filter(|location| !locations_referenced_by_the_previous_version.contains(location))
         .map(|(device, slot)| PlacementOnDevice {
             device: *device,
             slot: *slot,
@@ -2045,7 +2078,7 @@ pub fn record_one_rollback_after_overwrites(
     let previous_root = *pool.session().current.root();
     let previous_content = pool.content_of_the_current_version.clone();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     let mut session = pool.session.take().expect("会话");
     {
         let PoolVersion::WithFile(current) = &mut session.current else {
@@ -2068,7 +2101,7 @@ pub fn record_one_rollback_after_overwrites(
     let root = *pool.session().current.root();
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -2112,13 +2145,13 @@ pub fn device_bytes_of_the_1536_slot_devices() -> u64 {
 }
 
 /// 攻方 `research/prompts/m3-batch10z-lm-code-r1-opus-model/runs-summary/mount-counts-b11.txt` 那一形的前缀：顺序写几次（`S` 22 次）。
-pub const SEQUENTIAL_WRITES_OF_TWENTY_DATA_UNITS_BEFORE_R: usize = 22;
+pub const SEQUENTIAL_WRITES_OF_TWENTY_DATA_UNITS_BEFORE_THE_RECORDED_PUBLISH: usize = 22;
 
 /// 每次顺序写几个数据单元（攻方 `S`）。
-pub const DATA_UNITS_OF_EACH_SEQUENTIAL_WRITE_BEFORE_R: usize = 20;
+pub const DATA_UNITS_OF_EACH_SEQUENTIAL_WRITE_BEFORE_THE_RECORDED_PUBLISH: usize = 20;
 
 /// 那一形前缀末尾回退到倒数第几版（攻方 `b8`）。
-pub const VERSIONS_BACK_OF_THE_ROLLBACK_BEFORE_R: usize = 8;
+pub const VERSIONS_BACK_OF_THE_ROLLBACK_BEFORE_THE_RECORDED_PUBLISH: usize = 8;
 
 /// 挂上之后覆盖写几次、再顺序写几次（每次两个数据单元）：攻方 b9 那一串 30 步全被拒，这里 40 步。
 pub const OVERWRITES_AFTER_THE_MOUNT_ON_THE_1536_SLOT_DEVICES: usize = 30;
@@ -2144,16 +2177,16 @@ pub fn record_one_inode_creation_after_releasing_a_large_batch_on_the_1536_slot_
         },
     );
     let mut roots_written = vec![*pool.session().current.root()];
-    for _sequential_write in 0..SEQUENTIAL_WRITES_OF_TWENTY_DATA_UNITS_BEFORE_R {
+    for _sequential_write in 0..SEQUENTIAL_WRITES_OF_TWENTY_DATA_UNITS_BEFORE_THE_RECORDED_PUBLISH {
         pool.sequential_write(
-            DATA_UNITS_OF_EACH_SEQUENTIAL_WRITE_BEFORE_R
+            DATA_UNITS_OF_EACH_SEQUENTIAL_WRITE_BEFORE_THE_RECORDED_PUBLISH
                 * singlefs_core::unit::data_unit_payload_capacity(),
         )
         .expect("1536 槽两块盘上这几次顺序写都落得下");
         roots_written.push(*pool.session().current.root());
     }
-    let rollback_target =
-        roots_written[roots_written.len() - 1 - VERSIONS_BACK_OF_THE_ROLLBACK_BEFORE_R];
+    let rollback_target = roots_written
+        [roots_written.len() - 1 - VERSIONS_BACK_OF_THE_ROLLBACK_BEFORE_THE_RECORDED_PUBLISH];
     let mut session = pool.session.take().expect("会话");
     {
         let PoolVersion::WithFile(current) = &mut session.current else {
@@ -2182,12 +2215,12 @@ pub fn record_one_inode_creation_after_releasing_a_large_batch_on_the_1536_slot_
     pool.note_root_of_the_current_content(&root_after_the_rollback);
     let previous_content = pool.content_of_the_current_version.clone();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     pool.create_one_inode().expect("录的那次建 inode 落得下");
     let root = *pool.session().current.root();
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -2230,7 +2263,7 @@ pub fn run_the_scenario_where_wide_protection_after_releasing_a_large_batch_coun
         lineage_unit_writes_of(&recorded).is_empty(),
         "建 inode 不写谱系片（R 不是回退：宽护只因为它写的单元读不出）"
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let lift = ReadBackAllZeroLift::default();
     let mut devices = devices_reading_back_all_zero_on_until_lifted(
@@ -2253,20 +2286,20 @@ pub fn run_the_scenario_where_wide_protection_after_releasing_a_large_batch_coun
         "R 走读不成：择根退到 P（阳性对照：故障打到了）"
     );
     let released_in_the_current_account = released_in_the_account_of_the_selected_version(&mounted);
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
     assert!(
         released_in_the_current_account
             .iter()
             .all(|(device, slot)| {
-                borrowed_for_r
+                borrowed_for_the_recorded_publish
                     .iter()
                     .any(|borrowed| borrowed.device == *device && borrowed.slot == *slot)
             }),
@@ -2305,10 +2338,11 @@ pub fn run_the_scenario_where_wide_protection_after_releasing_a_large_batch_coun
         UserWriteAfterTheMount::SequentialWriteOfTwoDataUnits,
         SEQUENTIAL_WRITES_AFTER_THE_MOUNT_ON_THE_1536_SLOT_DEVICES,
     ));
-    let mut root_of_r_left_the_ring = false;
+    let mut root_of_the_recorded_publish_left_the_ring = false;
     // 迭代上界是步数（40）；跨轮带的是「R 离没离开根环」；出口：被拒、双扣、C 里 R 那一槽有空闲的槽、checker 红都当场判红（panic）。
     for (step_number, user_write) in (1..).zip(steps) {
-        let root_of_r_was_in_the_ring = root_is_in_the_ring(&pool.image(), recorded.key);
+        let root_of_the_recorded_publish_was_in_the_ring =
+            root_is_in_the_ring(&pool.image(), recorded.key);
         let published = match user_write {
             UserWriteAfterTheMount::Overwrite => pool.overwrite(OVERWRITE_BYTES),
             UserWriteAfterTheMount::SequentialWriteOfTwoDataUnits => {
@@ -2323,15 +2357,19 @@ pub fn run_the_scenario_where_wide_protection_after_releasing_a_large_batch_coun
             0,
             "第 {step_number} 步之后没有一个槽同时算进「已分配」与第九项"
         );
-        if root_of_r_was_in_the_ring && root_is_in_the_ring(&pool.image(), recorded.key) {
-            let free_among_the_borrowed =
-                free_slots_covered_by(&pool.session().allocator, &borrowed_for_r);
+        if root_of_the_recorded_publish_was_in_the_ring
+            && root_is_in_the_ring(&pool.image(), recorded.key)
+        {
+            let free_among_the_borrowed = free_slots_covered_by(
+                &pool.session().allocator,
+                &borrowed_for_the_recorded_publish,
+            );
             assert!(
                 free_among_the_borrowed.is_empty(),
                 "第 {step_number} 步之后 R 还在根环里：C 里 R 那一槽的槽一个都不空闲（回收时补了隔离），空闲的 {free_among_the_borrowed:?}"
             );
         } else {
-            root_of_r_left_the_ring = true;
+            root_of_the_recorded_publish_left_the_ring = true;
         }
         images.hand_out(
             &format!("第 {step_number} 步之后被抛弃根引用的单元一个都没复用"),
@@ -2341,7 +2379,7 @@ pub fn run_the_scenario_where_wide_protection_after_releasing_a_large_batch_coun
         );
     }
     assert!(
-        root_of_r_left_the_ring,
+        root_of_the_recorded_publish_left_the_ring,
         "40 步之内 R 那一槽写掉、R 离开根环（改之前 R 一直在环里、隔离到进程结束）"
     );
 }
@@ -2384,7 +2422,7 @@ pub fn record_the_first_publish_of_one_deletion_after_overwrites(
     let previous_root = *pool.session().current.root();
     let previous_content = pool.content_of_the_current_version.clone();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     let inode = singlefs_core::address::InodeNumber(
         pool.current_file_version().inode_number_watermark() - 1,
     );
@@ -2400,7 +2438,7 @@ pub fn record_the_first_publish_of_one_deletion_after_overwrites(
     .expect("删掉刚建的那个 inode 做得成");
     let operations = stream.retained_operations();
     let (mut writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let first_root_index = writes
@@ -2429,7 +2467,7 @@ pub fn record_the_first_publish_of_one_deletion_after_overwrites(
 pub const OVERWRITES_BEFORE_THE_ROLLBACK_WHOSE_PLACEMENTS_A_FLOOR_RAISE_RECLAIMS: u64 = 10;
 
 /// 挂上之后至多覆盖写几次去等 R 那一槽写掉（R 离开根环）。
-pub const OVERWRITES_UNTIL_R_LEAVES_THE_RING_AT_MOST: usize = 40;
+pub const OVERWRITES_UNTIL_THE_RECORDED_PUBLISH_LEAVES_THE_RING_AT_MOST: usize = 40;
 
 /// H2 改法要回收时补隔离那一半（判决 `research/prompts/m3-batch10z-lm-code-r1-main-verification.md` 第三节第十四块第 1 条「I-7.4 照旧不红」）：
 /// 覆盖写 10 次、回退到倒数第 7 版录 R，崩在 R 的根槽落盘之后、轮换之前，可写挂载那一刻 R 的根槽与 R 写的谱系片读回全零（C694 的 C：
@@ -2484,7 +2522,7 @@ pub fn run_the_scenario_where_revived_units_skipped_at_the_mount_are_isolated_wh
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records();
-    let revived_not_in_c: Vec<&PlacementOnDevice> = revived
+    let revived_not_in_the_abandoned_publish: Vec<&PlacementOnDevice> = revived
         .iter()
         .filter(|revived_placement| {
             !isolated_by_the_unapplied_records.iter().any(|placement| {
@@ -2494,8 +2532,8 @@ pub fn run_the_scenario_where_revived_units_skipped_at_the_mount_are_isolated_wh
         })
         .collect();
     assert!(
-        revived_not_in_c.is_empty(),
-        "C 那一圈并进了 R 的账（记录的新根段读得出），R 复活的数据单元都在里面（阳性对照），缺 {revived_not_in_c:?}"
+        revived_not_in_the_abandoned_publish.is_empty(),
+        "C 那一圈并进了 R 的账（记录的新根段读得出），R 复活的数据单元都在里面（阳性对照），缺 {revived_not_in_the_abandoned_publish:?}"
     );
     assert_eq!(
         slots_counted_both_as_allocated_and_as_isolated(&mounted.allocator),
@@ -2574,12 +2612,12 @@ pub fn run_the_scenario_where_revived_units_skipped_at_the_mount_are_isolated_wh
         "推过抬 F 之后没有一个槽同时算进「已分配」与第九项"
     );
     let mut overwrites = 0;
-    // 迭代上界 OVERWRITES_UNTIL_R_LEAVES_THE_RING_AT_MOST；跨轮只带计数；出口：R 离开根环，
+    // 迭代上界 OVERWRITES_UNTIL_THE_RECORDED_PUBLISH_LEAVES_THE_RING_AT_MOST；跨轮只带计数；出口：R 离开根环，
     // 被拒、双扣、复活的槽空闲、checker 红都当场判红（panic）。
     while root_is_in_the_ring(&pool.image(), recorded.key) {
         assert!(
-            overwrites < OVERWRITES_UNTIL_R_LEAVES_THE_RING_AT_MOST,
-            "{OVERWRITES_UNTIL_R_LEAVES_THE_RING_AT_MOST} 次覆盖写之内 R 那一槽写掉、R 离开根环"
+            overwrites < OVERWRITES_UNTIL_THE_RECORDED_PUBLISH_LEAVES_THE_RING_AT_MOST,
+            "{OVERWRITES_UNTIL_THE_RECORDED_PUBLISH_LEAVES_THE_RING_AT_MOST} 次覆盖写之内 R 那一槽写掉、R 离开根环"
         );
         pool.overwrite(OVERWRITE_BYTES)
             .unwrap_or_else(|refusal| panic!("第 {} 次覆盖写被拒：{refusal:?}", overwrites + 1));
@@ -2647,7 +2685,7 @@ pub enum FormStuckBehindTheWideProtectionOnThe384SlotDevices {
 }
 
 /// 录下 `form` 的 R，交回录下来的 R 与挂载那一刻读回全零的那几段。
-pub fn recorded_r_and_ranges_reading_back_zero_of(
+pub fn recorded_publish_and_ranges_reading_back_zero_of(
     form: FormStuckBehindTheWideProtectionOnThe384SlotDevices,
 ) -> (RecordedPublish, RangesReadingBackAllZero) {
     match form {
@@ -2709,7 +2747,7 @@ pub fn pool_stuck_behind_the_wide_protection(
     images: &mut PoolCheckerImages,
     form: FormStuckBehindTheWideProtectionOnThe384SlotDevices,
 ) -> PoolStuckBehindTheWideProtection {
-    let (recorded, ranges) = recorded_r_and_ranges_reading_back_zero_of(form);
+    let (recorded, ranges) = recorded_publish_and_ranges_reading_back_zero_of(form);
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let lift = ReadBackAllZeroLift::default();
     let mut devices = devices_reading_back_all_zero_on_until_lifted(&crash_image, &ranges, &lift);
@@ -2791,12 +2829,12 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
         stuck,
     } = pool_stuck_behind_the_wide_protection(images, form);
     assert_eq!(
-        stuck.checkpoint_txg_of_r,
+        stuck.checkpoint_txg_of_the_last_ring_slot_the_push_reaches,
         Some(recorded.key.1),
         "{form:?}：报的 R 是录下来的那一条（R 那一槽挂载那一刻记成有效根）"
     );
     assert_eq!(
-        stuck.ring_slot_of_r,
+        stuck.last_ring_slot_the_push_reaches,
         target_for_publish(
             recorded.key.1,
             recorded.pool.parameters.geometry.root_ring_slots_per_region
@@ -2823,7 +2861,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
         2,
         "{form:?}：预演过推完之后这次覆盖写放得下，两条出路都列：{ways_out:?}"
     );
-    assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
+    assert_the_way_out_by_unmounting_names_the_recorded_publish_abandoned_and_warns_of_a_permanently_unreadable_account(
         &ways_out[0],
         &stuck,
         recorded.key.1,
@@ -2835,7 +2873,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
     .unwrap_or_else(|| {
         panic!("{form:?}：预演推完之后这次覆盖写放得下，而预演的结局是 {pushing_the_root_ring:?}")
     });
-    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots(
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
@@ -2849,7 +2887,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
     );
     let mut session = pool.session.take().expect("挂着的会话");
     let pushed = session
-        .push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states(
+        .push_the_root_ring_to_the_last_ring_slot_it_reaches_dropping_rollback_candidates_below_four_states(
             &mut pool.devices,
         );
     pool.session = Some(session);
@@ -2873,7 +2911,7 @@ pub fn wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through
     }
     assert_eq!(
         u64::try_from(pushed.versions_published.len()).expect("次数"),
-        stuck.empty_publishes_until_the_ring_slot_of_r_is_written,
+        stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
         "{form:?}：推环发的空发布次数就是报里写的那个数"
     );
     let image_after_the_push = pool.image();
@@ -2983,7 +3021,7 @@ pub const OVERWRITES_AFTER_UNMOUNTING_AND_MOUNTING_AGAIN: usize = 5;
 /// 出路一（卸载重挂）走得通：主形（覆盖写 40 次、回退到倒数第 7 版，调查报告第一节复现那一形）被宽护卡住之后正常卸载做成，
 /// 再可写挂载一次（读回全零早已撤：R 的账读得出）：R 按新实例的实例表判成被抛弃、根环表记着它自己账里的落点，宽护不再出现（C 那一圈一槽不剩），
 /// 之后覆盖写一次都不拒，池级 checker 不红 I-7.4、I-4.8。
-pub fn run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_r_and_lets_writes_through(
+pub fn run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through(
     images: &mut PoolCheckerImages,
 ) {
     let PoolStuckBehindTheWideProtection {
@@ -3020,11 +3058,11 @@ pub fn run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_prote
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表");
-    let recorded_for_r = occupancy
+    let recorded_for_the_recorded_publish = occupancy
         .placements_recorded_for_the_abandoned_root(recorded.key.0, recorded.key.1)
         .expect("再挂时根环表把 R 记成被抛弃根（按新实例的实例表）");
     assert!(
-        !recorded_for_r.is_empty(),
+        !recorded_for_the_recorded_publish.is_empty(),
         "再挂时 R 的账读得出：根环表记着它自己账里的落点"
     );
     assert!(
@@ -3089,7 +3127,7 @@ pub fn run_the_scenario_where_pushing_the_root_ring_without_placements_for_the_w
     let current_root_before = *pool.session().current.root();
     let mut session = pool.session.take().expect("挂着的会话");
     let pushed = session
-        .push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states(
+        .push_the_root_ring_to_the_last_ring_slot_it_reaches_dropping_rollback_candidates_below_four_states(
             &mut pool.devices,
         );
     pool.session = Some(session);
@@ -3106,7 +3144,7 @@ pub fn run_the_scenario_where_pushing_the_root_ring_without_placements_for_the_w
             );
             assert_eq!(
                 u64::try_from(publishes_in_the_push).expect("次数"),
-                stuck.empty_publishes_until_the_ring_slot_of_r_is_written,
+                stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
                 "这一串的次数就是报里写的那个数"
             );
         }
@@ -3265,7 +3303,7 @@ pub fn run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_c
         mounted.output.effective_root.rollback_floor, built.abandoned_root.checkpoint_txg,
         "挂载那一刻 F 是 C 的 txg（阳性对照：B 不再是候选根）"
     );
-    let recorded_for_c = mounted
+    let recorded_for_the_abandoned_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
@@ -3275,28 +3313,29 @@ pub fn run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_c
         )
         .filter(|placements| !placements.is_empty())
         .expect("挂载那一刻根环表把 C 记成被抛弃根、带着它引用的落点");
-    let defer_slots_of_c = released_above_the_floor_and_covered_by(
+    let defer_slots_of_the_abandoned_publish = released_above_the_floor_and_covered_by(
         &mounted.allocator,
-        &recorded_for_c,
+        &recorded_for_the_abandoned_publish,
         built.abandoned_root.checkpoint_txg,
     );
     assert!(
-        !defer_slots_of_c.is_empty(),
+        !defer_slots_of_the_abandoned_publish.is_empty(),
         "C 引用的槽里有现行账已释放、释放代高于 F 的（阳性对照：这一形走到了被抛弃根引用的 defer 槽）"
     );
-    let free_defer_slots_of_c_at_the_mount: Vec<&(DeviceIdentity, SlotNumber)> = defer_slots_of_c
-        .iter()
-        .filter(|(device, slot)| {
-            mounted
-                .allocator
-                .devices
-                .iter()
-                .any(|device_map| device_map.device == *device && device_map.is_free(*slot))
-        })
-        .collect();
+    let free_defer_slots_of_the_abandoned_publish_at_the_mount: Vec<&(DeviceIdentity, SlotNumber)> =
+        defer_slots_of_the_abandoned_publish
+            .iter()
+            .filter(|(device, slot)| {
+                mounted
+                    .allocator
+                    .devices
+                    .iter()
+                    .any(|device_map| device_map.device == *device && device_map.is_free(*slot))
+            })
+            .collect();
     assert!(
-        free_defer_slots_of_c_at_the_mount.is_empty(),
-        "挂载那一刻这几个 defer 槽分配位置着、不空闲：空闲的 {free_defer_slots_of_c_at_the_mount:?}"
+        free_defer_slots_of_the_abandoned_publish_at_the_mount.is_empty(),
+        "挂载那一刻这几个 defer 槽分配位置着、不空闲：空闲的 {free_defer_slots_of_the_abandoned_publish_at_the_mount:?}"
     );
     assert_eq!(
         slots_counted_both_as_allocated_and_as_isolated(&mounted.allocator),
@@ -3310,15 +3349,16 @@ pub fn run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_c
         mounted,
         built.write_time_seconds + 3000,
     );
-    let key_of_c = (
+    let key_of_the_abandoned_publish = (
         built.abandoned_root.instance,
         built.abandoned_root.checkpoint_txg,
     );
-    let mut a_defer_slot_was_reclaimed_and_isolated_while_c_was_in_the_ring = false;
+    let mut a_defer_slot_was_reclaimed_and_isolated_while_the_abandoned_publish_was_in_the_ring =
+        false;
     let mut overwrites = 0;
     // 迭代上界 OVERWRITES_UNTIL_THE_ABANDONED_ROOT_LEAVES_THE_RING_AT_MOST；跨轮带计数与「回收补隔离走到了没有」；出口：C 离开根环，
     // 被拒、双扣、C 引用的槽空闲、checker 红都当场判红（panic）。
-    while root_is_in_the_ring(&pool.image(), key_of_c) {
+    while root_is_in_the_ring(&pool.image(), key_of_the_abandoned_publish) {
         assert!(
             overwrites < OVERWRITES_UNTIL_THE_ABANDONED_ROOT_LEAVES_THE_RING_AT_MOST,
             "{OVERWRITES_UNTIL_THE_ABANDONED_ROOT_LEAVES_THE_RING_AT_MOST} 次覆盖写之内 C 那一槽写掉、C 离开根环"
@@ -3332,18 +3372,21 @@ pub fn run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_c
             0,
             "第 {overwrites} 次覆盖写之后没有一个槽同时算进「已分配」与第九项"
         );
-        if root_is_in_the_ring(&pool.image(), key_of_c) {
-            let free_among_the_placements_of_c = free_slots_covered_by(allocator, &recorded_for_c);
+        if root_is_in_the_ring(&pool.image(), key_of_the_abandoned_publish) {
+            let free_among_the_placements_of_the_abandoned_publish =
+                free_slots_covered_by(allocator, &recorded_for_the_abandoned_publish);
             assert!(
-                free_among_the_placements_of_c.is_empty(),
-                "第 {overwrites} 次覆盖写之后 C 还在根环里：它引用的槽一个都不空闲，空闲的 {free_among_the_placements_of_c:?}"
+                free_among_the_placements_of_the_abandoned_publish.is_empty(),
+                "第 {overwrites} 次覆盖写之后 C 还在根环里：它引用的槽一个都不空闲，空闲的 {free_among_the_placements_of_the_abandoned_publish:?}"
             );
-            a_defer_slot_was_reclaimed_and_isolated_while_c_was_in_the_ring |=
-                defer_slots_of_c.iter().any(|(device, slot)| {
-                    allocator.devices.iter().any(|device_map| {
-                        device_map.device == *device && device_map.is_isolated(*slot)
-                    })
-                });
+            a_defer_slot_was_reclaimed_and_isolated_while_the_abandoned_publish_was_in_the_ring |=
+                defer_slots_of_the_abandoned_publish
+                    .iter()
+                    .any(|(device, slot)| {
+                        allocator.devices.iter().any(|device_map| {
+                            device_map.device == *device && device_map.is_isolated(*slot)
+                        })
+                    });
         }
         images.hand_out(
             &format!("第 {overwrites} 次覆盖写之后 C 引用的单元一个都没复用"),
@@ -3353,7 +3396,7 @@ pub fn run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_c
         );
     }
     assert!(
-        a_defer_slot_was_reclaimed_and_isolated_while_c_was_in_the_ring,
+        a_defer_slot_was_reclaimed_and_isolated_while_the_abandoned_publish_was_in_the_ring,
         "C 离环之前有一个 defer 槽被回收、照根环表补上了隔离（阳性对照：走到了回收时补隔离那一处）"
     );
 }
@@ -3364,7 +3407,7 @@ pub fn push_the_root_ring_of<Device: DeviceOverASparseImage>(
 ) -> Result<RootRingPushed, RootRingPushRefused> {
     let mut session = pool.session.take().expect("挂着的会话");
     let pushed = session
-        .push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states(
+        .push_the_root_ring_to_the_last_ring_slot_it_reaches_dropping_rollback_candidates_below_four_states(
             &mut pool.devices,
         );
     pool.session = Some(session);
@@ -3477,7 +3520,7 @@ pub fn released_by_the_push_if_the_change_is_admitted_after_it(
 
 /// 卸载重挂那一条出路在 R 那一槽记着有效根时：点名 R 那一槽、带 R 的 txg（再挂时它按新实例的实例表判成被抛弃；它的账读不出若是盘上永久坏，
 /// 卸载之后再挂会被拒、会话已断开——这几句由调用方照这两个数写）。
-pub fn assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
+pub fn assert_the_way_out_by_unmounting_names_the_recorded_publish_abandoned_and_warns_of_a_permanently_unreadable_account(
     way_out_by_unmounting: &WayOutOfTheWideProtection,
     stuck: &StuckBehindTheWideProtection,
     checkpoint_txg_of_the_root_in_that_ring_slot: CheckpointTxg,
@@ -3486,7 +3529,7 @@ pub fn assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permane
     assert_eq!(
         *way_out_by_unmounting,
         WayOutOfTheWideProtection::UnmountThenMountWritableAgain {
-            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            ring_slot_held_by_the_wide_protection: stuck.last_ring_slot_the_push_reaches,
             checkpoint_txg_of_the_root_in_that_ring_slot: Some(
                 checkpoint_txg_of_the_root_in_that_ring_slot
             ),
@@ -3497,7 +3540,7 @@ pub fn assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permane
 
 /// 卸载重挂那一条出路在 R 那一槽没有读得出的有效根时：点名那一槽、不带 txg（再挂之后 C 那一圈不再有这一槽，不说 R 判成被抛弃；
 /// 攻方 `research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md` 第一节末：实测卸载再挂之后 C 那一圈直接没了）。
-pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readable_root(
+pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_the_recorded_publish_holds_no_readable_root(
     way_out_by_unmounting: &WayOutOfTheWideProtection,
     stuck: &StuckBehindTheWideProtection,
     why: &str,
@@ -3505,7 +3548,7 @@ pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readabl
     assert_eq!(
         *way_out_by_unmounting,
         WayOutOfTheWideProtection::UnmountThenMountWritableAgain {
-            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            ring_slot_held_by_the_wide_protection: stuck.last_ring_slot_the_push_reaches,
             checkpoint_txg_of_the_root_in_that_ring_slot: None,
         },
         "{why}：头一条出路是卸载重挂，点名 R 那一槽、那一槽没有读得出的有效根"
@@ -3514,7 +3557,7 @@ pub fn assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readabl
 
 /// 推环那一条出路：R 那一槽、推几次（就是报里写的那个数，写掉根环里同样多槽）、预演里每块盘放出来的隔离槽数（与预演的数相同）、
 /// 推完之后是再发这次改动还是只剩走空（`after_the_push`）。
-pub fn assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+pub fn assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots(
     stuck: &StuckBehindTheWideProtection,
     way_out_by_the_push: &WayOutOfTheWideProtection,
     released_on_each_device: &[(DeviceIdentity, u64)],
@@ -3524,9 +3567,9 @@ pub fn assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_an
     assert_eq!(
         *way_out_by_the_push,
         WayOutOfTheWideProtection::PushTheRootRingUpToTheRingSlotHeldByTheWideProtection {
-            ring_slot_held_by_the_wide_protection: stuck.ring_slot_of_r,
+            ring_slot_held_by_the_wide_protection: stuck.last_ring_slot_the_push_reaches,
             empty_publishes_until_that_ring_slot_is_written: stuck
-                .empty_publishes_until_the_ring_slot_of_r_is_written,
+                .empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
             isolated_slots_released_on_each_device: released_on_each_device.to_vec(),
             after_the_push,
         },
@@ -3579,11 +3622,11 @@ pub fn stuck_behind_the_wide_protection_reported_by(
 /// 第一个文件之后前缀覆盖写几次，文件每次长几个数据单元、长到几个，再录一次长几个单元的顺序写 R。
 pub const OVERWRITES_BEFORE_GROWING_THE_FILE_UNTIL_THE_DEVICES_ARE_NEARLY_FULL: u64 = 4;
 
-pub const DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_R: usize = 5;
+pub const DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_THE_RECORDED_PUBLISH: usize = 5;
 
-pub const DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_R: usize = 16;
+pub const DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_THE_RECORDED_PUBLISH: usize = 16;
 
-pub const DATA_UNITS_R_GROWS_THE_FILE_BY: usize = 3;
+pub const DATA_UNITS_THE_RECORDED_PUBLISH_GROWS_THE_FILE_BY: usize = 3;
 
 /// 攻方 K1 那一形崩在 R 第一条记录之后的盘面（不带任何读故障的自然崩溃点：可写挂载择 P，R 那几条记录在水位之上、没施加，
 /// C 那一圈只有 R 那一槽，R 那一槽没有根）。
@@ -3613,31 +3656,36 @@ pub fn pool_crashed_after_the_first_record_of_a_long_sequential_write(
     }
     let mut data_units_of_the_file = 1;
     // 迭代上界是长到的单元数；跨轮带着文件现在几个单元；出口：再长一步就越过长到的单元数。
-    while data_units_of_the_file + DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_R
-        <= DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_R
+    while data_units_of_the_file
+        + DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_THE_RECORDED_PUBLISH
+        <= DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_THE_RECORDED_PUBLISH
     {
-        data_units_of_the_file += DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_R;
+        data_units_of_the_file +=
+            DATA_UNITS_THE_FILE_GROWS_BY_EACH_TIME_BEFORE_THE_RECORDED_PUBLISH;
         pool.sequential_write(data_units_of_the_file * unit_bytes)
             .unwrap_or_else(|refusal| {
                 panic!("文件长到 {data_units_of_the_file} 个单元落得下：{refusal:?}")
             });
     }
     assert_eq!(
-        data_units_of_the_file, DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_R,
+        data_units_of_the_file, DATA_UNITS_THE_FILE_GROWS_TO_BEFORE_THE_RECORDED_PUBLISH,
         "文件长到攻方那一形的单元数"
     );
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
-    let published_r = pool
-        .sequential_write((data_units_of_the_file + DATA_UNITS_R_GROWS_THE_FILE_BY) * unit_bytes)
+    let operations_before_the_recorded_publish = stream.operation_count();
+    let recorded_publish_as_published = pool
+        .sequential_write(
+            (data_units_of_the_file + DATA_UNITS_THE_RECORDED_PUBLISH_GROWS_THE_FILE_BY)
+                * unit_bytes,
+        )
         .unwrap_or_else(|refusal| panic!("录的那次顺序写（R）落得下：{refusal:?}"));
     assert!(
-        published_r.floor_raises.is_empty(),
+        recorded_publish_as_published.floor_raises.is_empty(),
         "R 那次没推抬 F：录下来的写全是 R 自己的"
     );
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let end_of_the_first_record = writes
@@ -3781,11 +3829,11 @@ pub fn run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits
         "预演在分配器的拷贝上：会话的分配器整份不变"
     );
     assert_eq!(
-        stuck.checkpoint_txg_of_r, None,
+        stuck.checkpoint_txg_of_the_last_ring_slot_the_push_reaches, None,
         "崩在 R 第一条记录之后：R 那一槽没有读得出的有效根（阳性对照：出路一要说的是这一种）"
     );
     assert_eq!(ways_out.len(), 2, "推完放得下：两条出路都列：{ways_out:?}");
-    assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readable_root(
+    assert_the_way_out_by_unmounting_says_the_ring_slot_of_the_recorded_publish_holds_no_readable_root(
         &ways_out[0],
         &stuck,
         "长 13 个单元",
@@ -3795,7 +3843,7 @@ pub fn run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits
             .unwrap_or_else(|| {
                 panic!("预演推完之后这次改动放得下，而预演的结局是 {pushing_the_root_ring:?}")
             });
-    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots(
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
@@ -3807,7 +3855,7 @@ pub fn run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits
         .unwrap_or_else(|push_refusal| panic!("照出路二推环做得成：{push_refusal:?}"));
     assert_eq!(
         u64::try_from(pushed.versions_published.len()).expect("次数"),
-        stuck.empty_publishes_until_the_ring_slot_of_r_is_written,
+        stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
         "推环发的空发布次数就是报里写的那个数"
     );
     let released_by_the_push = isolated_slots_released_between(
@@ -3859,7 +3907,7 @@ pub fn a_write_stuck_behind_the_wide_protection_the_push_does_not_let_through_li
         1,
         "{why}：推完放不下，只列卸载再挂：{ways_out:?}"
     );
-    assert_the_way_out_by_unmounting_says_the_ring_slot_of_r_holds_no_readable_root(
+    assert_the_way_out_by_unmounting_says_the_ring_slot_of_the_recorded_publish_holds_no_readable_root(
         &ways_out[0],
         &stuck,
         &why,
@@ -3970,11 +4018,11 @@ pub fn a_long_sequential_write_stuck_behind_the_wide_protection_lists_only_unmou
         "{why}：推完放不下，只列卸载再挂：{ways_out:?}"
     );
     assert_eq!(
-        stuck.checkpoint_txg_of_r,
+        stuck.checkpoint_txg_of_the_last_ring_slot_the_push_reaches,
         Some(recorded.key.1),
         "{why}：R 那一槽记着录下来的 R（阳性对照：出路一要说的是这一种）"
     );
-    assert_the_way_out_by_unmounting_names_r_abandoned_and_warns_of_a_permanently_unreadable_account(
+    assert_the_way_out_by_unmounting_names_the_recorded_publish_abandoned_and_warns_of_a_permanently_unreadable_account(
         &ways_out[0],
         &stuck,
         recorded.key.1,
@@ -4470,7 +4518,7 @@ pub fn run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring
             .ring_slots_holding_placements_named_by_unapplied_journal_records();
         assert_eq!(
             holding.keys().copied().collect::<Vec<RootRingSlot>>(),
-            vec![stuck.ring_slot_of_r],
+            vec![stuck.last_ring_slot_the_push_reaches],
             "主形 C 那一圈只有 R 那一槽（阳性对照）"
         );
         holding.insert(ring_slot_of_the_current_version, Vec::new());
@@ -4484,15 +4532,15 @@ pub fn run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring
     } = stuck_behind_the_wide_protection_reported_by(refusal, "多记一个空串之后再写");
     assert_eq!(
         (
-            stuck_again.ring_slot_of_r,
-            stuck_again.empty_publishes_until_the_ring_slot_of_r_is_written
+            stuck_again.last_ring_slot_the_push_reaches,
+            stuck_again.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written
         ),
         (
             target_for_publish(
                 recorded.key.1,
                 recorded.pool.parameters.geometry.root_ring_slots_per_region
             ),
-            stuck.empty_publishes_until_the_ring_slot_of_r_is_written
+            stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written
         ),
         "记着空串的那一槽什么都不罩：R 那一槽与要推的次数照旧"
     );
@@ -4500,12 +4548,12 @@ pub fn run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring
         .unwrap_or_else(|push_refusal| panic!("推环做得成：{push_refusal:?}"));
     assert_eq!(
         u64::try_from(pushed.versions_published.len()).expect("次数"),
-        stuck.empty_publishes_until_the_ring_slot_of_r_is_written,
+        stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
         "推到 R 那一槽为止，不推到记着空串的那一槽"
     );
     assert_eq!(
         pushed.ring_slots_written,
-        vec![stuck.ring_slot_of_r],
+        vec![stuck.last_ring_slot_the_push_reaches],
         "交回写掉的那几槽：C 那一圈原来那一槽（记着空串的那一槽不算）"
     );
 }
@@ -4513,13 +4561,16 @@ pub fn run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring
 /// 两槽 C（攻方 M12，照攻方 `research/prompts/m3-batch10z-pqrs-code-r1-opus-model/atk_part3.rs` 的 `atk_k2_two_c_slots_push` 造法：丙并中间那一形，
 /// Q 顺序写、R 建 inode，挂载那一刻 Q 的根与末条记录、R 的账读回全零，C 那一圈有 Q、R 两槽）：挂上就推环，推的次数是到较晚轮到的 R 那一槽的距离，
 /// 交回写掉的两槽，推完 C 那一圈一槽不剩、隔离回 0，池级 checker 不红 I-7.4、I-4.8。R 那一槽取最先轮到的那一槽时推环停在 Q 那一槽、R 还记着。
-pub fn run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both(
+pub fn run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both(
     images: &mut PoolCheckerImages,
 ) {
-    let recorded = record_a_sequential_write_as_q_and_an_inode_creation_as_r_after_overwrites(
-        OVERWRITES_BEFORE_THE_PUBLISHES_RECORDED_AS_Q_AND_R,
+    let recorded = record_a_sequential_write_as_the_intermediate_publish_and_an_inode_creation_as_the_recorded_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_INTERMEDIATE_AND_THE_RECORDED_PUBLISH,
     );
-    let crash_image = recorded.crash_image_with_the_root_of_r_persisted_and_its_rotation_lost();
+    let crash_image = image_where_both_devices_lost_their_newest_rotation_write(
+        &recorded
+            .crash_image_with_the_root_of_the_recorded_publish_persisted_and_its_rotation_lost(),
+    );
     let ranges = recorded.ranges_reading_back_all_zero_at_the_mount(&crash_image);
     let mut faulted_devices = devices_reading_back_all_zero_on(&crash_image, &ranges);
     let mounted = mount_writable_with_space_admission(
@@ -4541,8 +4592,10 @@ pub fn run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_
         content_of_each_root: BTreeMap::new(),
     };
     let slots_per_region = recorded.pool.parameters.geometry.root_ring_slots_per_region;
-    let ring_slot_of_q = target_for_publish(recorded.key_of_q.1, slots_per_region);
-    let ring_slot_of_r = target_for_publish(recorded.key_of_r.1, slots_per_region);
+    let ring_slot_of_the_intermediate_publish =
+        target_for_publish(recorded.key_of_the_intermediate_publish.1, slots_per_region);
+    let last_ring_slot_the_push_reaches =
+        target_for_publish(recorded.key_of_the_recorded_publish.1, slots_per_region);
     let holding_before_the_push: Vec<RootRingSlot> = pool
         .session()
         .allocator
@@ -4551,10 +4604,13 @@ pub fn run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_
         .ring_slots_holding_placements_named_by_unapplied_journal_records()
         .into_keys()
         .collect();
-    let mut q_and_r = vec![ring_slot_of_q, ring_slot_of_r];
-    q_and_r.sort();
+    let mut intermediate_and_later_publishes = vec![
+        ring_slot_of_the_intermediate_publish,
+        last_ring_slot_the_push_reaches,
+    ];
+    intermediate_and_later_publishes.sort();
     assert_eq!(
-        holding_before_the_push, q_and_r,
+        holding_before_the_push, intermediate_and_later_publishes,
         "C 那一圈有 Q、R 两槽（阳性对照）"
     );
     let current_txg = pool.session().current.root().checkpoint_txg;
@@ -4570,19 +4626,19 @@ pub fn run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_
             + 1
     };
     assert!(
-        publishes_until_the_ring_slot_of(ring_slot_of_q)
-            < publishes_until_the_ring_slot_of(ring_slot_of_r),
+        publishes_until_the_ring_slot_of(ring_slot_of_the_intermediate_publish)
+            < publishes_until_the_ring_slot_of(last_ring_slot_the_push_reaches),
         "Q 那一槽比 R 那一槽先轮到（阳性对照：取最先轮到的与最后轮到的推的次数不同）"
     );
     let pushed = push_the_root_ring_of(&mut pool)
         .unwrap_or_else(|refusal| panic!("两槽 C 推环做得成：{refusal:?}"));
     assert_eq!(
         pushed.versions_published.len(),
-        publishes_until_the_ring_slot_of(ring_slot_of_r),
+        publishes_until_the_ring_slot_of(last_ring_slot_the_push_reaches),
         "推的次数是到较晚轮到的 R 那一槽的距离"
     );
     assert_eq!(
-        pushed.ring_slots_written, q_and_r,
+        pushed.ring_slots_written, intermediate_and_later_publishes,
         "交回写掉的那几槽：Q、R 两槽"
     );
     let allocator = &pool.session().allocator;
@@ -4886,11 +4942,13 @@ pub fn assert_the_push_with_the_device_table_changed_is_refused_without_reading_
     });
     assert_eq!(
         u64::try_from(pushed.versions_published.len()).expect("几次"),
-        stuck.empty_publishes_until_the_ring_slot_of_r_is_written,
+        stuck.empty_publishes_until_the_last_ring_slot_the_push_reaches_is_written,
         "{table_change:?} 之后换回挂载时那一份盘表：推到 R 那一槽，发的次数是报里的"
     );
     assert!(
-        pushed.ring_slots_written.contains(&stuck.ring_slot_of_r),
+        pushed
+            .ring_slots_written
+            .contains(&stuck.last_ring_slot_the_push_reaches),
         "{table_change:?} 之后换回挂载时那一份盘表：写掉了 R 那一槽：{:?}",
         pushed.ring_slots_written
     );
@@ -4995,7 +5053,7 @@ pub fn run_the_scenario_where_asking_for_the_ways_out_after_the_session_moved_wi
     assert!(counting_pool.image() == image_before, "盘逐字节不变");
 }
 
-/// 卸载再挂之后拿再挂之前的报要出路（被宽护卡住的回退那一形，同 `run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_r_and_lets_writes_through`）：
+/// 卸载再挂之后拿再挂之前的报要出路（被宽护卡住的回退那一形，同 `run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through`）：
 /// 再挂取新实例，拒成 `SessionMoved…`，被拒那一版的两个数是报里的，现行那一版的实例代号与 txg 是再挂之后那一版的（新实例）
 /// （正推 S4：现行那一版的实例代号取成报里的时照绿，入库用例里只有这一形分得开）。不预演：物理块大小没探、一个盘都没读、一个改盘调用都没有，
 /// 盘逐字节不变。

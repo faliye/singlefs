@@ -28,8 +28,8 @@ use common::{
     overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
     rewrite_journal_record_and_rechain_the_records_after_it,
     sequential_write_in_process_as_instance_one_and_advance_the_pool,
-    tear_the_root_slot_written_for_txg, BlockLayerRead, CONTENT_BYTES_OF_PUBLISH_B,
-    CONTENT_BYTES_OF_PUBLISH_C,
+    tear_the_root_slot_written_for_txg, BlockLayerRead, CONTENT_BYTES_OF_THE_NEWER_OVERWRITE,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -49,8 +49,8 @@ use singlefs_format::{JOURNAL_RECORD_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
 use singlefs_verification::memory_pool::MemoryPool;
 
 /// B、C 两版文件的填充字节：两版长度（在 `common`）与内容各不相同。
-const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
-const CONTENT_FILL_BYTE_OF_PUBLISH_C: u8 = 0xC0;
+const CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE: u8 = 0xB0;
+const CONTENT_FILL_BYTE_OF_THE_NEWER_OVERWRITE: u8 = 0xC0;
 /// 两条记录那段历史里 B 的填充字节。
 const CONTENT_FILL_BYTE_OF_THE_TWO_RECORD_PUBLISH: u8 = 0xD0;
 /// 一个候选的上一条记录在环里读得出时，反向链在第一块盘上重读它这么多次。
@@ -257,18 +257,18 @@ fn reads_of_opening_the_pool_at(image: &MemoryPool, root: &RootRecord) -> Vec<Re
 }
 
 /// 单条发布的历史：A 的根落了、B（jsn 4）与 C（jsn 5）只剩记录与单元。交回镜像与 A 那一版。
-fn single_record_publishes_b_and_c_with_their_roots_torn(
+fn older_and_newer_overwrites_with_their_roots_torn(
     tag: &str,
 ) -> (MemoryPool, (InstanceGeneration, CheckpointTxg)) {
     let mut pool = build_pool(tag);
     let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
     let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
+        &vec![CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
     );
     let third = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_C; CONTENT_BYTES_OF_PUBLISH_C],
+        &vec![CONTENT_FILL_BYTE_OF_THE_NEWER_OVERWRITE; CONTENT_BYTES_OF_THE_NEWER_OVERWRITE],
     );
     assert_eq!(
         (
@@ -291,7 +291,7 @@ fn single_record_publishes_b_and_c_with_their_roots_torn(
 }
 
 /// 两条记录的历史：A 的根落了、B 顺序写两个数据单元（jsn 4、5，txg 4）只剩记录与单元。交回镜像与 A 那一版。
-fn two_record_publish_b_with_its_root_torn(
+fn two_record_publish_with_its_root_torn(
     tag: &str,
 ) -> (MemoryPool, (InstanceGeneration, CheckpointTxg)) {
     let mut pool = build_pool(tag);
@@ -337,14 +337,14 @@ fn journal_records_of(
 #[test]
 fn mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candidate_in_journal_order(
 ) {
-    let (image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
+    let (image, first_version) = older_and_newer_overwrites_with_their_roots_torn(
         "mounted-recovery-reads-each-candidate-once",
     );
     let (ring_bytes, records) = journal_records_of(&image);
-    let candidate_b = records
+    let older_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
-    let candidate_c = records
+    let newer_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 5))
         .expect("jsn 5 在环里");
 
@@ -373,15 +373,16 @@ fn mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candi
         "所选根是 A 的；水位之上 B、C 两条，都过了点名验证、都施加，挂载到 C"
     );
 
-    let expected_reads_judging_the_candidates: Vec<ReaderEvent> = [candidate_b, candidate_c]
-        .into_iter()
-        .flat_map(|record| reads_judging_the_candidate(record, ring_bytes))
-        .collect();
+    let expected_reads_judging_the_candidates: Vec<ReaderEvent> =
+        [older_overwrite_candidate, newer_overwrite_candidate]
+            .into_iter()
+            .flat_map(|record| reads_judging_the_candidate(record, ring_bytes))
+            .collect();
     let candidates_judged_through = 2;
     assert_eq!(
         (
-            candidate_b.named.len(),
-            candidate_c.named.len(),
+            older_overwrite_candidate.named.len(),
+            newer_overwrite_candidate.named.len(),
             expected_reads_judging_the_candidates.len()
         ),
         (
@@ -423,7 +424,7 @@ fn mounting_rereads_the_previous_record_once_then_each_named_unit_of_every_candi
 fn with_the_anchor_record_torn_the_chain_head_rereads_nothing_and_the_next_candidate_rereads_the_previous_record_once(
 ) {
     let (mut image, first_version) =
-        single_record_publishes_b_and_c_with_their_roots_torn("mounted-recovery-reads-anchor-torn");
+        older_and_newer_overwrites_with_their_roots_torn("mounted-recovery-reads-anchor-torn");
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
         image.flip_byte(
             device,
@@ -436,10 +437,10 @@ fn with_the_anchor_record_torn_the_chain_head_rereads_nothing_and_the_next_candi
         !records.contains_key(&(InstanceGeneration(1), 3)),
         "jsn 3 两份都撕了，扫不出来"
     );
-    let candidate_b = records
+    let older_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
-    let candidate_c = records
+    let newer_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 5))
         .expect("jsn 5 在环里");
 
@@ -468,9 +469,11 @@ fn with_the_anchor_record_torn_the_chain_head_rereads_nothing_and_the_next_candi
         "锚点读不出：链首 jsn 4 的 txg 是 3 + 1、序号 1，接上；B、C 都过了点名验证、都施加，挂载到 C"
     );
 
-    let mut expected_reads_judging_the_candidates = named_unit_reads_of(candidate_b);
-    expected_reads_judging_the_candidates
-        .extend(reads_judging_the_candidate(candidate_c, ring_bytes));
+    let mut expected_reads_judging_the_candidates = named_unit_reads_of(older_overwrite_candidate);
+    expected_reads_judging_the_candidates.extend(reads_judging_the_candidate(
+        newer_overwrite_candidate,
+        ring_bytes,
+    ));
     assert_eq!(
         expected_reads_judging_the_candidates.len(),
         NAMED_UNITS_OF_A_SINGLE_RECORD_OVERWRITE * READS_PER_NAMED_UNIT
@@ -500,7 +503,7 @@ fn with_the_anchor_record_torn_the_chain_head_rereads_nothing_and_the_next_candi
 #[test]
 fn without_a_last_record_flag_in_the_chosen_roots_publish_a_chain_head_whose_ordinal_is_not_one_is_cut_before_any_read(
 ) {
-    let (mut image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
+    let (mut image, first_version) = older_and_newer_overwrites_with_their_roots_torn(
         "mounted-recovery-reads-chain-head-ordinal-two",
     );
     rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 3, |record| {
@@ -567,12 +570,12 @@ fn without_a_last_record_flag_in_the_chosen_roots_publish_a_chain_head_whose_ord
 fn a_two_record_publish_rereads_the_previous_record_once_and_reads_the_named_units_once_for_each_of_its_records(
 ) {
     let (image, first_version) =
-        two_record_publish_b_with_its_root_torn("mounted-recovery-reads-two-record-publish");
+        two_record_publish_with_its_root_torn("mounted-recovery-reads-two-record-publish");
     let (ring_bytes, records) = journal_records_of(&image);
-    let first_record_of_b = records
+    let first_record_of_the_two_record_publish = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
-    let last_record_of_b = records
+    let last_record_of_the_two_record_publish = records
         .get(&(InstanceGeneration(1), 5))
         .expect("jsn 5 在环里");
 
@@ -602,13 +605,15 @@ fn a_two_record_publish_rereads_the_previous_record_once_and_reads_the_named_uni
     );
 
     let mut expected_reads_judging_the_candidates =
-        reads_judging_the_candidate(first_record_of_b, ring_bytes);
-    expected_reads_judging_the_candidates
-        .extend(reads_judging_the_candidate(last_record_of_b, ring_bytes));
+        reads_judging_the_candidate(first_record_of_the_two_record_publish, ring_bytes);
+    expected_reads_judging_the_candidates.extend(reads_judging_the_candidate(
+        last_record_of_the_two_record_publish,
+        ring_bytes,
+    ));
     assert_eq!(
         (
-            first_record_of_b.named.len(),
-            last_record_of_b.named.len(),
+            first_record_of_the_two_record_publish.named.len(),
+            last_record_of_the_two_record_publish.named.len(),
             expected_reads_judging_the_candidates.len()
         ),
         (
@@ -643,23 +648,22 @@ fn a_two_record_publish_rereads_the_previous_record_once_and_reads_the_named_uni
 #[test]
 fn a_last_record_without_its_commit_marker_is_cut_after_rereading_its_previous_record_and_before_reading_its_named_units(
 ) {
-    let (mut image, first_version) = two_record_publish_b_with_its_root_torn(
-        "mounted-recovery-reads-last-record-without-commit",
-    );
+    let (mut image, first_version) =
+        two_record_publish_with_its_root_torn("mounted-recovery-reads-last-record-without-commit");
     rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 5, |record| {
         record.is_commit = false;
     });
     let (ring_bytes, records) = journal_records_of(&image);
-    let first_record_of_b = records
+    let first_record_of_the_two_record_publish = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
-    let last_record_of_b = records
+    let last_record_of_the_two_record_publish = records
         .get(&(InstanceGeneration(1), 5))
         .expect("jsn 5 在环里");
     assert_eq!(
         (
-            last_record_of_b.place_in_publish,
-            last_record_of_b.is_commit
+            last_record_of_the_two_record_publish.place_in_publish,
+            last_record_of_the_two_record_publish.is_commit
         ),
         (JournalRecordPlaceInPublish::LastRecordOfThePublish, false),
         "jsn 5 带末条标志、不带提交标记"
@@ -685,9 +689,11 @@ fn a_last_record_without_its_commit_marker_is_cut_after_rereading_its_previous_r
     );
 
     let mut expected_reads_judging_the_candidates =
-        reads_judging_the_candidate(first_record_of_b, ring_bytes);
-    expected_reads_judging_the_candidates
-        .push(reread_of_the_record_before(last_record_of_b, ring_bytes));
+        reads_judging_the_candidate(first_record_of_the_two_record_publish, ring_bytes);
+    expected_reads_judging_the_candidates.push(reread_of_the_record_before(
+        last_record_of_the_two_record_publish,
+        ring_bytes,
+    ));
     assert_eq!(
         expected_reads_judging_the_candidates.len(),
         REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE
@@ -719,17 +725,17 @@ fn a_last_record_without_its_commit_marker_is_cut_after_rereading_its_previous_r
 #[test]
 fn a_candidate_whose_back_chain_is_broken_is_cut_after_rereading_its_previous_record_and_before_reading_its_named_units(
 ) {
-    let (mut image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
+    let (mut image, first_version) = older_and_newer_overwrites_with_their_roots_torn(
         "mounted-recovery-reads-back-chain-broken",
     );
     rewrite_journal_record_and_rechain_the_records_after_it(&mut image, 5, |record| {
         record.back_chain ^= BIT_FLIPPED_IN_A_BACK_CHAIN;
     });
     let (ring_bytes, records) = journal_records_of(&image);
-    let candidate_b = records
+    let older_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
-    let candidate_c = records
+    let newer_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 5))
         .expect("jsn 5 改过反向链、重封，照样自证得过");
 
@@ -759,9 +765,11 @@ fn a_candidate_whose_back_chain_is_broken_is_cut_after_rereading_its_previous_re
     );
 
     let mut expected_reads_judging_the_candidates =
-        reads_judging_the_candidate(candidate_b, ring_bytes);
-    expected_reads_judging_the_candidates
-        .push(reread_of_the_record_before(candidate_c, ring_bytes));
+        reads_judging_the_candidate(older_overwrite_candidate, ring_bytes);
+    expected_reads_judging_the_candidates.push(reread_of_the_record_before(
+        newer_overwrite_candidate,
+        ring_bytes,
+    ));
     assert_eq!(
         expected_reads_judging_the_candidates.len(),
         REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE
@@ -789,9 +797,8 @@ fn a_candidate_whose_back_chain_is_broken_is_cut_after_rereading_its_previous_re
 /// 取了 1 条就到上限，jsn 5 在任何读之前停下——不重读 jsn 4、不读它点名的单元。重放那一截块层的读就只有 jsn 4 的这几次。
 #[test]
 fn at_the_in_flight_limit_the_next_candidate_is_cut_before_rereading_its_previous_record() {
-    let (image, first_version) = single_record_publishes_b_and_c_with_their_roots_torn(
-        "mounted-recovery-reads-in-flight-limit",
-    );
+    let (image, first_version) =
+        older_and_newer_overwrites_with_their_roots_torn("mounted-recovery-reads-in-flight-limit");
     assert_eq!(
         journal_in_flight_record_limit(THREE_RECORD_RING_BYTES),
         1,
@@ -822,7 +829,7 @@ fn at_the_in_flight_limit_the_next_candidate_is_cut_before_rereading_its_previou
         (first_version, vec![3, 4, 5]),
         "所选根是 A 的；3 槽的环里扫到 jsn 3、4、5"
     );
-    let candidate_b = records
+    let older_overwrite_candidate = records
         .get(&(InstanceGeneration(1), 4))
         .expect("jsn 4 在环里");
 
@@ -849,7 +856,7 @@ fn at_the_in_flight_limit_the_next_candidate_is_cut_before_rereading_its_previou
         "水位之上两条，上限 1：只施加 jsn 4、验过它的点名单元，重建到 B"
     );
     let expected_reads_of_the_replay =
-        reads_judging_the_candidate(candidate_b, THREE_RECORD_RING_BYTES);
+        reads_judging_the_candidate(older_overwrite_candidate, THREE_RECORD_RING_BYTES);
     assert_eq!(
         expected_reads_of_the_replay.len(),
         REREADS_OF_THE_PREVIOUS_RECORD_PER_CANDIDATE

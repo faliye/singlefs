@@ -27,9 +27,10 @@ use singlefs_core::address::{
 };
 use singlefs_core::admission::{
     accounting_tree_nodes_after_the_publish_built_on, admit_the_units_landing_on_every_device,
-    central_mapping_entries_of_one_lineage_container_cow,
-    central_mapping_entries_of_one_retirement_container_cow,
-    checkpoint_cost_of_one_lineage_container_cow, checkpoint_cost_of_one_retirement_container_cow,
+    central_mapping_entries_of_one_lineage_container_copy_on_write,
+    central_mapping_entries_of_one_retirement_container_copy_on_write,
+    checkpoint_cost_of_one_lineage_container_copy_on_write,
+    checkpoint_cost_of_one_retirement_container_copy_on_write,
     checkpoint_cost_of_the_version_to_build_on_with_node_capacities, space_budget_of_role,
     PlacementRoomOnOneDevice, SpaceBudgetOfARole, UnitsOfAPublishToLand,
 };
@@ -517,8 +518,8 @@ struct LocalCheckpointCost {
     allocation_record_tree_nodes: u64,
     central_mapping_tree_nodes: u64,
     accounting_tree_nodes: u64,
-    lineage_container_cow: u64,
-    retirement_container_cow: u64,
+    lineage_container_copy_on_write: u64,
+    retirement_container_copy_on_write: u64,
     total: u64,
 }
 
@@ -644,9 +645,10 @@ fn local_checkpoint_cost(
     );
     let lineage_levels = previous.lineage_tree_internal_levels();
     let retirement_levels = previous.retirement_tree_internal_levels();
-    let lineage_entries = central_mapping_entries_of_one_lineage_container_cow(lineage_levels);
+    let lineage_entries =
+        central_mapping_entries_of_one_lineage_container_copy_on_write(lineage_levels);
     let retirement_entries =
-        central_mapping_entries_of_one_retirement_container_cow(retirement_levels);
+        central_mapping_entries_of_one_retirement_container_copy_on_write(retirement_levels);
     let deleted = allocation_record_tree_nodes
         + accounting_nodes_before
         + lineage_entries
@@ -668,21 +670,22 @@ fn local_checkpoint_cost(
         inserted,
         capacities.of_tree(MultiLevelCodeTwoTree::CentralMapping),
     );
-    let lineage_container_cow = checkpoint_cost_of_one_lineage_container_cow(lineage_levels).0;
-    let retirement_container_cow =
-        checkpoint_cost_of_one_retirement_container_cow(retirement_levels).0;
+    let lineage_container_copy_on_write =
+        checkpoint_cost_of_one_lineage_container_copy_on_write(lineage_levels).0;
+    let retirement_container_copy_on_write =
+        checkpoint_cost_of_one_retirement_container_copy_on_write(retirement_levels).0;
     const TREE_TABLE_UNITS_PER_PUBLISH: u64 = 1;
     LocalCheckpointCost {
         allocation_record_tree_nodes,
         central_mapping_tree_nodes,
         accounting_tree_nodes: accounting_nodes_after,
-        lineage_container_cow,
-        retirement_container_cow,
+        lineage_container_copy_on_write,
+        retirement_container_copy_on_write,
         total: allocation_record_tree_nodes
             + central_mapping_tree_nodes
             + accounting_nodes_after
-            + lineage_container_cow
-            + retirement_container_cow
+            + lineage_container_copy_on_write
+            + retirement_container_copy_on_write
             + TREE_TABLE_UNITS_PER_PUBLISH,
     }
 }
@@ -1351,6 +1354,7 @@ fn passed_the_landing_check_and_the_formula(outcome: &WriteOutcome) -> bool {
 fn data_unit_pairs_outside_the_clusters_of(allocator: &PoolAllocator, device_index: usize) -> u64 {
     allocator.devices[device_index]
         .unblocked_slot_pairs_outside_the_cluster_segments(allocator.cluster_segments())
+        .0
 }
 
 fn data_unit_pairs_outside_the_clusters(pool: &Pool, device_index: usize) -> u64 {
@@ -1784,8 +1788,9 @@ fn run_edge_history(
 fn mark_the_lowest_pairs_outside_the_clusters(allocator: &mut PoolAllocator, percent: u64) {
     let cluster_segments: BTreeSet<SlotNumber> = allocator.cluster_segments().clone();
     for device_map in &mut allocator.devices {
-        let total_pairs =
-            device_map.unblocked_slot_pairs_outside_the_cluster_segments(&cluster_segments);
+        let total_pairs = device_map
+            .unblocked_slot_pairs_outside_the_cluster_segments(&cluster_segments)
+            .0;
         let wanted = total_pairs * percent / 100;
         let mut marked = 0;
         let mut candidate = device_map.unit_area_start().slot().0;
@@ -2232,6 +2237,7 @@ impl RoomReading {
                 .map(|device_map| {
                     device_map
                         .unblocked_slot_pairs_outside_the_cluster_segments(&no_cluster_segments)
+                        .0
                 })
                 .collect(),
             unblocked_slots: allocator
@@ -2363,12 +2369,12 @@ impl WalkTally {
         };
         self.aligned_pairs_peak = self.aligned_pairs_peak.max(other.aligned_pairs_peak);
         self.aligned_pairs_positive_states += other.aligned_pairs_positive_states;
-        self.aligned_pairs_final_minimum = min_of_unsigned_options(
+        self.aligned_pairs_final_minimum = minimum_of_unsigned_options(
             self.aligned_pairs_final_minimum,
             other.aligned_pairs_final_minimum,
         );
         self.unblocked_slots_peak = self.unblocked_slots_peak.max(other.unblocked_slots_peak);
-        self.unblocked_slots_final_minimum = min_of_unsigned_options(
+        self.unblocked_slots_final_minimum = minimum_of_unsigned_options(
             self.unblocked_slots_final_minimum,
             other.unblocked_slots_final_minimum,
         );
@@ -2397,7 +2403,7 @@ impl WalkTally {
     }
 }
 
-fn min_of_unsigned_options(left: Option<u64>, right: Option<u64>) -> Option<u64> {
+fn minimum_of_unsigned_options(left: Option<u64>, right: Option<u64>) -> Option<u64> {
     match (left, right) {
         (Some(left), Some(right)) => Some(left.min(right)),
         (Some(only), None) | (None, Some(only)) => Some(only),
@@ -3503,14 +3509,17 @@ const PREFLIGHT_REFUSED_EXIT_CODE: i32 = 78;
 /// `main` 的第一句：直接起 `python3 preflight.py check <本文件> [--force] -- <参数…>`（不经 `sh -c`）判准入与运行条件，
 /// 不满足就照判法的退出码退出、一步都不做；强制跑（判法的第一行以 `forced` 起头）时交回没满足的条件摘要，要写进产物。
 fn preflight() -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!(
-        "{manifest_directory}/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs"
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs"
     );
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../.claude/singlefs-ai-sop/scripts/preflight.py"
+    );
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }
@@ -4995,13 +5004,13 @@ mod tests {
     }
 
     #[test]
-    fn a_growth_write_deletes_the_four_first_file_units_and_inserts_every_rewritten_mapped_ordinary_role(
+    fn growth_write_deletes_the_four_first_file_units_and_inserts_every_rewritten_mapped_ordinary_role(
     ) {
         claims::check_that_a_growth_write_deletes_the_four_first_file_units_and_inserts_every_rewritten_mapped_ordinary_role();
     }
 
     #[test]
-    fn a_sixty_four_unit_write_on_the_small_capacity_trees_makes_the_checkpoint_cost_with_ordinary_mapping_changes_exceed_the_checkpoint_cost(
+    fn sixty_four_unit_write_on_the_small_capacity_trees_makes_the_checkpoint_cost_with_ordinary_mapping_changes_exceed_the_checkpoint_cost(
     ) {
         claims::check_that_a_sixty_four_unit_write_on_the_small_capacity_trees_makes_the_checkpoint_cost_with_ordinary_mapping_changes_exceed_the_checkpoint_cost();
     }
@@ -5049,7 +5058,7 @@ mod tests {
     }
 
     #[test]
-    fn a_capped_fill_of_the_small_geometry_publishes_several_times_and_ends_with_nothing_left_or_a_refused_single_unit(
+    fn capped_fill_of_the_small_geometry_publishes_several_times_and_ends_with_nothing_left_or_a_refused_single_unit(
     ) {
         claims::check_that_a_capped_fill_of_the_small_geometry_publishes_several_times_and_ends_with_nothing_left_or_a_refused_single_unit();
     }
@@ -5066,7 +5075,7 @@ mod tests {
     }
 
     #[test]
-    fn a_bisection_round_tries_the_predicted_edge_and_the_next_count_before_splitting_evenly() {
+    fn bisection_round_tries_the_predicted_edge_and_the_next_count_before_splitting_evenly() {
         claims::check_that_a_bisection_round_tries_the_predicted_edge_and_the_next_count_before_splitting_evenly();
     }
 
@@ -5076,7 +5085,7 @@ mod tests {
     }
 
     #[test]
-    fn a_small_base_filled_to_six_tenths_gets_an_edge_below_the_filled_units_that_independent_probes_confirm(
+    fn small_base_filled_to_six_tenths_gets_an_edge_below_the_filled_units_that_independent_probes_confirm(
     ) {
         claims::check_that_a_small_base_filled_to_six_tenths_gets_an_edge_below_the_filled_units_that_independent_probes_confirm();
     }
@@ -5087,7 +5096,7 @@ mod tests {
     }
 
     #[test]
-    fn a_geometry_whose_edge_was_not_found_stops_the_fixed_point_upper_bound_section() {
+    fn geometry_whose_edge_was_not_found_stops_the_fixed_point_upper_bound_section() {
         claims::check_that_a_geometry_whose_edge_was_not_found_stops_the_fixed_point_upper_bound_section();
     }
 

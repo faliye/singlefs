@@ -272,6 +272,21 @@ fn the_compaction_relocating_a_block_shared_with_a_snapshot_with_the_segments_sh
     );
 }
 
+/// 小域判干净：只展开写数小于 10 的段（单元段只取不写与写全两头，记录、根槽、轮换段每个真子集都展开），各批提交之后的状态都在里面；
+/// 每个状态两遍恢复 + checker + 记录核对器 + 读快照 + 抹掉源落点再读 + 可写挂载续做，判干净、每个状态都看过。
+#[test]
+fn the_compaction_relocating_a_block_shared_with_a_snapshot_with_the_segments_shorter_than_ten_expanded_is_clean(
+) {
+    let prepared = prepare(
+        "compaction-relocating-a-shared-block-crash-point-replay-segments-shorter-than-ten",
+    );
+    let Some(tally) = enumerate_the_segments_shorter_than_ten(&prepared, "clean") else {
+        return;
+    };
+    assert_clean(&tally);
+    assert_eq!(tally.observed_states, tally.states, "每个状态都看过");
+}
+
 /// 全量：每段都展开，每个状态两遍恢复 + checker + 读快照 + 抹掉源落点再读，并在工作线程上可写挂载一次核整理续做。登记成崩溃枚举用例，
 /// crash-point-replay 认下面打印的 `CRASH_POINT_REPLAY_COMPACTION_RELOCATING_A_BLOCK_SHARED_WITH_A_SNAPSHOT` 行里 `exhaustive=true`。
 #[test]

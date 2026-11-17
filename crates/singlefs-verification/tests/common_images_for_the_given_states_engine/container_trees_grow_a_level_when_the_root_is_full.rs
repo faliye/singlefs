@@ -21,8 +21,8 @@ use singlefs_checker::walk::{
 };
 use singlefs_core::address::InodeNumber;
 use singlefs_core::admission::{
-    central_mapping_entries_of_one_lineage_container_cow,
-    checkpoint_cost_of_one_lineage_container_cow, MetadataBlocks,
+    central_mapping_entries_of_one_lineage_container_copy_on_write,
+    checkpoint_cost_of_one_lineage_container_copy_on_write, MetadataBlocks,
 };
 use singlefs_core::allocator::Placement;
 use singlefs_core::container_tree::{
@@ -164,7 +164,7 @@ pub fn pool_with_a_capped_tombstone_tree_handing_its_product_image_out(
     pool
 }
 
-/// 同名的给定状态用例的场景函数：旧入口（当没装旋钮）那一判。
+/// 跑这个场景函数的给定状态用例：旧入口（当没装旋钮）那一判。
 pub fn run_the_scenario_where_a_capped_tombstone_tree_judged_as_a_product_image_reddens_only_the_full_container_invariant_on_the_product_entry(
     images: &mut PoolCheckerImages,
 ) {
@@ -391,10 +391,10 @@ pub fn run_the_scenario_where_the_third_rollback_grows_the_lineage_tree_and_the_
     assert_eq!(pool.output.lineage_tree_internal_levels(), 1);
     assert_eq!(
         (
-            checkpoint_cost_of_one_lineage_container_cow(
+            checkpoint_cost_of_one_lineage_container_copy_on_write(
                 pool.output.lineage_tree_internal_levels()
             ),
-            central_mapping_entries_of_one_lineage_container_cow(
+            central_mapping_entries_of_one_lineage_container_copy_on_write(
                 pool.output.lineage_tree_internal_levels()
             ),
         ),
@@ -512,7 +512,7 @@ impl KnobsTheTombstoneContainerOfTwoRecordsIsJudgedUnder {
 
 /// I-9.22（测试镜像里墓碑容器不超旋钮值） 只红自己的那一形：墓碑容器压到一片 2 条写出来的镜像（unlink 2、3 号同在一片容器里），
 /// 交池级 checker 时带 `judged_under` 那一组旋钮值（[`KnobsTheTombstoneContainerOfTwoRecordsIsJudgedUnder`]：报旋钮值 2 全绿；
-/// 只报墓碑容器旋钮值 1 只红 I-9.22；报旋钮值 1 时违例说明写出那片容器装了几条与旋钮值）。同名的给定状态用例三组各判一趟。
+/// 只报墓碑容器旋钮值 1 只红 I-9.22；报旋钮值 1 时违例说明写出那片容器装了几条与旋钮值）。跑这个场景函数的给定状态用例三组各判一趟。
 pub fn run_the_scenario_where_a_tombstone_container_holding_more_records_than_the_knob_reddens_only_the_knob_capacity_invariant(
     images: &mut PoolCheckerImages,
     judged_under: KnobsTheTombstoneContainerOfTwoRecordsIsJudgedUnder,

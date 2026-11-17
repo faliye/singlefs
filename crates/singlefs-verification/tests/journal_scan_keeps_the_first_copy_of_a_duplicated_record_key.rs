@@ -10,7 +10,7 @@ mod common;
 
 use common::{
     build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
-    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B,
+    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::journal::{record_offset, JournalRecord};
@@ -21,7 +21,7 @@ use singlefs_format::JOURNAL_RECORD_BYTES;
 use singlefs_verification::memory_pool::MemoryPool;
 
 /// B 那一版文件的填充字节。
-const CONTENT_FILL_BYTE_OF_PUBLISH_B: u8 = 0xB0;
+const CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE: u8 = 0xB0;
 /// 扫环先扫的盘（`MemoryPool::device_identities` 按盘号升序）与后扫的盘。
 const DEVICE_SCANNED_FIRST: DeviceIdentity = DeviceIdentity(0);
 const DEVICE_SCANNED_SECOND: DeviceIdentity = DeviceIdentity(1);
@@ -71,7 +71,7 @@ fn of_two_differing_copies_of_one_record_key_the_scan_keeps_the_copy_on_the_devi
     let first_version = (pool.output.root.instance, pool.output.root.checkpoint_txg);
     let second = overwrite_in_process_as_instance_one_and_advance_the_pool(
         &mut pool,
-        &vec![CONTENT_FILL_BYTE_OF_PUBLISH_B; CONTENT_BYTES_OF_PUBLISH_B],
+        &vec![CONTENT_FILL_BYTE_OF_THE_OLDER_OVERWRITE; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
     );
     assert_eq!(
         (

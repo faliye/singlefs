@@ -21,7 +21,7 @@ mod common_unwitnessed_publish;
 
 #[cfg(feature = "gpu")]
 use common::{build_pool, file_content, geometry};
-use common_unwitnessed_publish::{record_one_publish_after_overwrites, PublishRecordedAsR};
+use common_unwitnessed_publish::{record_one_publish_after_overwrites, RecordedPublishKind};
 use singlefs_core::journal::JournalRecord;
 use singlefs_core::mounted_read::OpenPoolForReadFailure;
 #[cfg(feature = "gpu")]
@@ -398,22 +398,22 @@ fn the_gpu_recovery_kernel_lands_on_a_root_whose_checkpoint_txg_passes_thirty_tw
 }
 
 /// 覆盖写 R 之前的覆盖写次数（与 `fall_back_judged_on_the_union_of_the_three_readers_and_only_for_lost_bytes.rs` 同一个盘面）。
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// R 的那条记录怎么交：原样，或第一个点名项的两条位置条目对调成按盘降序（字节读得到、整条校验和重封过，扫环照收；
 /// 建上一版判位置条目按盘升序，不收——内容拒收，只有建上一版这一样读者读这条记录）。
 #[derive(Clone, Copy, Debug)]
-enum RecordOfR {
+enum RecordOfTheRecordedPublish {
     AsWritten,
     FirstNamedUnitLocationsInDescendingDeviceOrder,
 }
 
 /// 崩在 R 的根槽之后、系统配置轮换之前（R 没见证、P 已确认），R 写出的那个数据单元两份都没落（盘上那两槽还是之前的字节：冷走读读不出、
-/// 经映射仍读不出——字节丢了；打开不读数据单元，建上一版照抄读不出的数据单元的位置项）。R 的记录照 `record_of_r` 交。
+/// 经映射仍读不出——字节丢了；打开不读数据单元，建上一版照抄读不出的数据单元的位置项）。R 的记录照 `record_of_the_recorded_publish` 交。
 /// 读的时候没有读故障，镜像就是一个持久集合（不是写序许可的那一种：数据单元缺而根落了，手造的）。
-fn image_whose_data_unit_of_r_was_lost(
+fn image_whose_data_unit_of_the_recorded_publish_was_lost(
     recorded: &common_unwitnessed_publish::RecordedPublish,
-    record_of_r: RecordOfR,
+    record_of_the_recorded_publish: RecordOfTheRecordedPublish,
 ) -> MemoryPool {
     let data_unit_groups: Vec<Vec<&RetainedWrite>> = recorded
         .unit_writes_grouped_by_unit()
@@ -436,9 +436,9 @@ fn image_whose_data_unit_of_r_was_lost(
             written,
             "前提：R 的记录解开再写回逐字节相同"
         );
-        match record_of_r {
-            RecordOfR::AsWritten => {}
-            RecordOfR::FirstNamedUnitLocationsInDescendingDeviceOrder => {
+        match record_of_the_recorded_publish {
+            RecordOfTheRecordedPublish::AsWritten => {}
+            RecordOfTheRecordedPublish::FirstNamedUnitLocationsInDescendingDeviceOrder => {
                 let locations = &mut record
                     .named
                     .first_mut()
@@ -485,9 +485,14 @@ fn image_whose_data_unit_of_r_was_lost(
 #[test]
 fn a_selected_version_whose_walk_lost_bytes_and_whose_rebuild_refused_content_is_fallen_back_from_only_by_the_walk_alone(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let control = image_whose_data_unit_of_r_was_lost(&recorded, RecordOfR::AsWritten);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let control = image_whose_data_unit_of_the_recorded_publish_was_lost(
+        &recorded,
+        RecordOfTheRecordedPublish::AsWritten,
+    );
     let FallBackOfTheState::Judged(control_judged) = fall_back_of_the_state(&control) else {
         panic!("前提：对照盘面上恢复走到判退那一步");
     };
@@ -513,9 +518,9 @@ fn a_selected_version_whose_walk_lost_bytes_and_whose_rebuild_refused_content_is
         "对照盘面上核对不报"
     );
 
-    let image = image_whose_data_unit_of_r_was_lost(
+    let image = image_whose_data_unit_of_the_recorded_publish_was_lost(
         &recorded,
-        RecordOfR::FirstNamedUnitLocationsInDescendingDeviceOrder,
+        RecordOfTheRecordedPublish::FirstNamedUnitLocationsInDescendingDeviceOrder,
     );
     let FallBackOfTheState::Judged(judged) = fall_back_of_the_state(&image) else {
         panic!("前提：恢复走到判退那一步");

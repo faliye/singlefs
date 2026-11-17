@@ -1,7 +1,7 @@
 //! 整理选 `gpu` 时的一批（D26（后台整理与放置回收） 已定项 13 第 1、4、8 条）：甲（扫描里的校验和核对）、乙（区域扫描里逐条记录的单元头解析与映射反查）、
 //! 丙（选段打分）三段经挂载时递进来的那一份 GPU 实现算，发布那一半照旧在 CPU 上、照发布路径逐条核计划与读盘核。
 //! 实现用一份背后照核心层 CPU 写法算的假实现（`common_background_gpu_compute`），可注入出错与不确定：
-//! 不注入时一趟整理的结局与选 `cpu` 时逐项相同（发的每一版、盘上的录制流、停在哪、观测）；某一段交回出错时这一批放弃、整理停下、盘上不动、
+//! 不注入时一趟整理的结局与选 `cpu` 时逐项相同（发的每一版、盘上的录制流、停在哪、观测）；某一段交回出错时这一批放弃、整理停下（有活意图就单发一次删意图的发布，没有就盘上不动）、
 //! 不换回 CPU；两份核判得不一样的记录这一批不搬、下一批照判；判得不一样的段这一批不当选段候选；R 里只剩判得不一样的记录时这一批不发、意图照留；
 //! 甲段判出整单元 CRC 对不上的照常交 CPU 发布路径、只计数。注入每一种出错，整理停下报的错里那一段、那张卡、那个原因逐项对得上。
 //! 设置（第 1–3 条）：挂载那一刻核心层把校验过的那一组交给实现；一批读完设置之后请求的切换（缩卡、缩显存上限、改等的上限），实现在下一批开头、
@@ -49,7 +49,7 @@ use singlefs_core::unit::data_unit_payload_capacity;
 
 /// 另一次挂载里顺序写第一个文件的数据单元数（同 `compaction_off_the_calling_thread_and_admission.rs` 闲置池那一条：数据单元最多的那一段里有 29 个）。
 const DATA_UNITS_WRITTEN_IN_AN_EARLIER_MOUNT: usize = 40;
-/// 整理一批至多搬几个（只供测试的开关；产品路径批大小条款没写）。
+/// 整理一批至多搬几个（只供测试的开关）。
 const UNITS_PER_BATCH: usize = 2;
 /// mkfs 写的每区根槽数 S（`ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM`）。
 const ROOT_RING_SLOTS_PER_REGION: u64 = 8;
@@ -411,13 +411,13 @@ fn both_cards_short_of_free_memory_for_the_smallest_piece() -> BackgroundGpuComp
         gpus_short_of_free_memory: vec![
             GpuShortOfFreeMemoryForTheSmallestPiece {
                 device: card_named("card-eight"),
-                bytes_of_the_last_chunk_not_created: 128,
-                smallest_piece_bytes: 96,
+                bytes_of_the_last_chunk_not_created: GpuMemoryInBytes(128),
+                smallest_piece_bytes: GpuMemoryInBytes(96),
             },
             GpuShortOfFreeMemoryForTheSmallestPiece {
                 device: card_named("card-sixteen"),
-                bytes_of_the_last_chunk_not_created: 160,
-                smallest_piece_bytes: 96,
+                bytes_of_the_last_chunk_not_created: GpuMemoryInBytes(160),
+                smallest_piece_bytes: GpuMemoryInBytes(96),
             },
         ],
         gpus_left_out_under_their_memory_limit: Vec::new(),
@@ -493,10 +493,10 @@ fn every_participating_gpu_short_of_free_memory_abandons_the_batch_and_leaves_th
     );
 }
 
-/// 甲段（对 R 重扫时核可搬单元的校验和）交回 GPU 出错（第 4 条）：意图已在盘上，这一批放弃、一个写都不发、盘上逐字节不变，
-/// 意图留在 logged_ops 里、R 排他撤掉（同暂停），整理停下。
+/// 甲段（对 R 重扫时核可搬单元的校验和）交回 GPU 出错（第 4 条）：意图已在盘上，这一批放弃、一个单元都不搬，整理停下；
+/// 同被空间拒的暂停，单发一次只删意图的发布丢掉意图（紧接着签发那一版），盘上与分配器这一侧都没有活意图（R 排他跟着撤）。
 #[test]
-fn a_gpu_failure_while_verifying_the_unit_checksums_of_a_live_intent_leaves_the_intent_on_disk_and_stops_the_compaction(
+fn a_gpu_failure_while_verifying_the_unit_checksums_of_a_live_intent_drops_the_intent_and_stops_the_compaction(
 ) {
     let (mut pool, region) = pool_after_a_sequential_write_in_an_earlier_mount(
         "compaction-gpu-failure-while-verifying-checksums",
@@ -504,7 +504,7 @@ fn a_gpu_failure_while_verifying_the_unit_checksums_of_a_live_intent_leaves_the_
     let (gpu_compute_kept_by_the_test, gpu_compute) = shared_cpu_backed_gpu_compute();
     let (mut session, mut devices) =
         gpu_session_with_the_intent_issued_on(&mut pool, region, &gpu_compute);
-    let before_the_run = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let txg_of_the_issue = current_of(&session).root.checkpoint_txg;
     gpu_compute_kept_by_the_test
         .lock()
         .expect("假实现没在别处 panic 过")
@@ -522,28 +522,26 @@ fn a_gpu_failure_while_verifying_the_unit_checksums_of_a_live_intent_leaves_the_
                     task_after_the_error: BackgroundTaskAfterTheComputeError::LeftStopped
                 }
             )
-        ) && run.versions_published.is_empty(),
-        "出错的那一批放弃、一个写都没发：{:?}",
+        ) && run.batches_published == 0,
+        "出错的那一批放弃、一个单元都没搬：{:?}",
         run.outcome
     );
-    assert_eq!(
-        disk_snapshot(&pool.memory_pool(), &pool.stream),
-        before_the_run,
-        "盘上逐字节不变"
+    let [dropped] = run.versions_published.as_slice() else {
+        panic!(
+            "出错停下那一趟恰好发一次只删意图的发布，实际发了 {} 次",
+            run.versions_published.len()
+        );
+    };
+    assert!(
+        dropped.root.checkpoint_txg.0 == txg_of_the_issue.0 + 1
+            && dropped.units_relocated_by_this_publish.is_empty()
+            && live_compaction_intent_of_the_entries(&dropped.logged_operations).is_none(),
+        "紧接着签发那一版的就是删意图那一版：不搬单元、logged_ops 里没有整理意图"
     );
     assert!(
-        live_compaction_intent_of_the_entries(&current_of(&session).logged_operations)
-            .is_some_and(|(_, intent)| intent.region == region),
-        "意图留在 logged_ops 里"
-    );
-    assert_eq!(
-        session
-            .allocator
-            .compaction()
-            .live_intent()
-            .map(|live| live.is_the_region_excluded_from_placement),
-        Some(false),
-        "R 排他撤掉（同暂停），意图照留"
+        session.allocator.compaction().live_intent().is_none()
+            && current_of(&session) == dropped,
+        "分配器这一侧意图连同 R 排他一起撤了，会话的现行那一版就是删意图那一版（R 原来是 {region:?}）"
     );
     assert!(
         session
@@ -868,7 +866,7 @@ fn an_issue_on_a_segment_holding_a_record_uncertain_this_round_is_held_back_and_
     );
 }
 
-/// 第 4 条「停下并报错」：实现交回的每一种错（卡出错的五种原因、等超过上限的两种、第一版不支持的三种输入）各注入一次到丙段，
+/// 第 4 条「停下并报错」：实现交回的每一种归卡、归输入的错（卡出错与开卡的各种原因、等超过上限的三种、第一版不支持的两种输入、空闲显存不够）各注入一次到丙段，
 /// 整理停下报的错里那一段、那张卡、那个原因与注入的逐项相同，这一批的记账也报出它。一个池、一个会话依次注入，每换一种先切换一次解除上一次的停下。
 #[test]
 fn every_kind_of_failure_of_the_gpu_compute_stops_the_compaction_reporting_its_segment_card_and_cause(
@@ -888,6 +886,9 @@ fn every_kind_of_failure_of_the_gpu_compute_stops_the_compaction_reporting_its_s
         BackgroundGpuComputeFailed::GpuFailed {
             device: device.clone(),
             cause,
+            pci_state_when_judged_unusable: Box::new(
+                singlefs_core::background_compute::PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+            ),
         }
     };
     let every_kind_of_failure = [
@@ -937,7 +938,7 @@ fn every_kind_of_failure_of_the_gpu_compute_stops_the_compaction_reporting_its_s
             InputNotSupportedOnTheGpu::EntryLargerThanAChunkOnTheDevice {
                 device: card_sixteen.clone(),
                 entry_position: 2,
-                input_bytes: 16,
+                smallest_piece_bytes: GpuMemoryInBytes(16),
             },
         ),
         BackgroundGpuComputeFailed::InputNotSupportedOnTheGpu(
@@ -946,6 +947,33 @@ fn every_kind_of_failure_of_the_gpu_compute_stops_the_compaction_reporting_its_s
                 key_bytes: 29,
             },
         ),
+        failed_on(
+            &card_sixteen,
+            GpuFailureOnTheDevice::OpeningThreadNotStarted {
+                reason: "假的：起不了开卡线程".to_string(),
+            },
+        ),
+        failed_on(
+            &card_eight,
+            GpuFailureOnTheDevice::OpeningPanicked {
+                said_by_the_panic: "假的：开卡 panic".to_string(),
+            },
+        ),
+        failed_on(
+            &card_sixteen,
+            GpuFailureOnTheDevice::EarlierOpeningOfTheDeviceNotReturned,
+        ),
+        failed_on(&card_eight, GpuFailureOnTheDevice::OpeningCalledOff),
+        failed_on(
+            &card_sixteen,
+            GpuFailureOnTheDevice::OpeningsInThisMountUsedUp { failed_openings: 4 },
+        ),
+        BackgroundGpuComputeFailed::WaitForTheGpuExceededTheLimit {
+            device: card_eight.clone(),
+            wait_limit: BACKGROUND_GPU_WAIT_LIMIT_BY_DEFAULT,
+            submission_waited_for:
+                SubmissionWaitedForPastTheLimit::EmptySubmissionFlushingThePendingWrites,
+        },
         both_cards_short_of_free_memory_for_the_smallest_piece(),
     ];
     for (position_in_the_list, failure) in every_kind_of_failure.iter().enumerate() {
@@ -999,6 +1027,68 @@ fn every_kind_of_failure_of_the_gpu_compute_stops_the_compaction_reporting_its_s
         );
     }
     pool.devices = Some(devices);
+}
+
+/// 第 8 条：实现交回一批里同一个条目键出现了两次（调用方组批的 bug，不归哪张卡）——只放弃这一批：一个写都没发，整理这个后台任务不停（不记成停着、
+/// 叫起不报警）；不再注入之后下一趟照常在 GPU 上算、发版。
+#[test]
+fn the_same_entry_key_twice_in_one_batch_abandons_only_that_batch_and_the_next_run_computes_as_usual(
+) {
+    let (mut pool, _) = pool_after_a_sequential_write_in_an_earlier_mount(
+        "compaction-gpu-same-entry-key-twice-abandons-only-the-batch",
+    );
+    let (gpu_compute_kept_by_the_test, gpu_compute) = shared_cpu_backed_gpu_compute();
+    gpu_compute_kept_by_the_test
+        .lock()
+        .expect("假实现没在别处 panic 过")
+        .failing_segment = Some((
+        GpuComputedSegment::LiveSlotsPerClusterSegment,
+        BackgroundGpuComputeFailed::SameEntryKeyTwiceInOneBatch {
+            position_of_the_first_occurrence: 1,
+            position_of_the_second_occurrence: 3,
+        },
+    ));
+    let (mut session, mut devices) = remount(
+        &mut pool,
+        &BackgroundComputeOfTheRemount::GpuThrough(&gpu_compute),
+        None,
+    );
+    let abandoned = session.run_compaction(&mut devices).expect("整理一趟");
+    assert!(
+        matches!(
+            abandoned.outcome,
+            CompactionRunOutcome::Stopped(
+                CompactionRunStop::BatchAbandonedAfterABackgroundComputeError {
+                    task_after_the_error:
+                        BackgroundTaskAfterTheComputeError::NotStoppedForOnlyTheBatchIsAbandoned
+                }
+            )
+        ) && abandoned.versions_published.is_empty(),
+        "这一批放弃、一个写都没发、任务不停：{:?}",
+        abandoned.outcome
+    );
+    assert!(
+        session
+            .background_compute()
+            .stopped_after_a_compute_error()
+            .is_empty(),
+        "整理没停着（叫起不报警）"
+    );
+    gpu_compute_kept_by_the_test
+        .lock()
+        .expect("假实现没在别处 panic 过")
+        .failing_segment = None;
+    let next_run = session.run_compaction(&mut devices).expect("整理一趟");
+    pool.devices = Some(devices);
+    assert!(
+        !next_run.versions_published.is_empty()
+            && next_run
+                .background_compute_of_each_batch
+                .iter()
+                .all(|batch| matches!(batch.path_taken, BackgroundComputePathTaken::Gpu(_))),
+        "下一趟照常在 GPU 上算、发版：{:?}",
+        next_run.outcome
+    );
 }
 
 /// 用例给的一组 `gpu` 设置照假实现的卡清单（「card-eight」8 GiB、「card-sixteen」16 GiB）校验过、交给实现的样子。

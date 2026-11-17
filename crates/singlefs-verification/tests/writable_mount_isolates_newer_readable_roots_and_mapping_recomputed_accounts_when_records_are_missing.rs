@@ -18,25 +18,25 @@
 mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
-    mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::mount::{MountError, RollbackTarget, StillUnreadableAfterOneReread};
 use singlefs_verification::memory_pool::RetainedWrite;
 
 /// 覆盖写几次之后录 R：攻方第一、三节都取 k = 5。
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 /// R 的每一条记录（两块盘各一份）。
-fn every_record_of_r(recorded: &RecordedPublish) -> Vec<&RetainedWrite> {
+fn every_record_of_the_recorded_publish(recorded: &RecordedPublish) -> Vec<&RetainedWrite> {
     (1..=recorded.record_count())
         .flat_map(|ordinal| recorded.record_writes_of_the_record(ordinal))
         .collect()
 }
 
 /// R 自己写的那个单元（`pointer` 指着的），两块盘各一份。
-fn unit_writes_of_r_at<'recorded>(
+fn unit_writes_of_the_recorded_publish_at<'recorded>(
     recorded: &'recorded RecordedPublish,
     pointer: &singlefs_core::pointer::NodePointer,
     what: &str,
@@ -53,19 +53,21 @@ fn unit_writes_of_r_at<'recorded>(
 #[test]
 fn a_newer_readable_root_whose_mapping_root_and_only_record_read_back_zero_keeps_its_units_through_the_mount_and_three_user_actions(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root_of_r = recorded.root();
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.mapping_root,
+            &root_of_the_recorded_publish.mapping_root,
             "中央映射树根",
         ))
-        .with_the_writes(&every_record_of_r(&recorded));
+        .with_the_writes(&every_record_of_the_recorded_publish(&recorded));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let effective =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -84,21 +86,21 @@ fn a_newer_readable_root_whose_mapping_root_and_only_record_read_back_zero_keeps
 fn a_newer_readable_root_of_three_records_whose_mapping_root_and_every_record_read_back_zero_keeps_its_units_through_the_mount_and_three_user_actions(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.mapping_root,
+            &root_of_the_recorded_publish.mapping_root,
             "中央映射树根",
         ))
-        .with_the_writes(&every_record_of_r(&recorded));
+        .with_the_writes(&every_record_of_the_recorded_publish(&recorded));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let effective =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -115,19 +117,21 @@ fn a_newer_readable_root_of_three_records_whose_mapping_root_and_every_record_re
 #[test]
 fn a_newer_readable_root_whose_tree_table_and_only_record_read_back_zero_keeps_its_units_recomputed_from_the_mapping(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root_of_r = recorded.root();
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.tree_table,
+            &root_of_the_recorded_publish.tree_table,
             "树表",
         ))
-        .with_the_writes(&every_record_of_r(&recorded));
+        .with_the_writes(&every_record_of_the_recorded_publish(&recorded));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let effective =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -145,21 +149,21 @@ fn a_newer_readable_root_whose_tree_table_and_only_record_read_back_zero_keeps_i
 fn a_publish_whose_root_slot_last_record_and_tree_table_read_back_zero_keeps_its_units_recomputed_from_the_mapping(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])
         .with_the_writes(&recorded.record_writes_of_the_record(3))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.tree_table,
+            &root_of_the_recorded_publish.tree_table,
             "树表",
         ));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let effective =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -178,20 +182,20 @@ fn a_publish_whose_root_slot_last_record_and_tree_table_read_back_zero_keeps_its
 fn a_newer_readable_root_whose_last_record_and_tree_table_read_back_zero_keeps_its_units_recomputed_from_the_mapping(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&recorded.record_writes_of_the_record(3))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.tree_table,
+            &root_of_the_recorded_publish.tree_table,
             "树表",
         ));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let effective =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -208,26 +212,26 @@ fn a_newer_readable_root_whose_last_record_and_tree_table_read_back_zero_keeps_i
 fn a_publish_whose_account_and_mapping_read_back_zero_while_its_last_record_is_missing_refuses_the_writable_mount_before_any_write(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])
         .with_the_writes(&recorded.record_writes_of_the_record(3))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.tree_table,
+            &root_of_the_recorded_publish.tree_table,
             "树表",
         ))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.mapping_root,
+            &root_of_the_recorded_publish.mapping_root,
             "中央映射树根",
         ));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let refusal =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -259,24 +263,26 @@ fn a_publish_whose_account_and_mapping_read_back_zero_while_its_last_record_is_m
 #[test]
 fn a_newer_readable_root_whose_only_record_mapping_root_and_tree_table_read_back_zero_refuses_the_writable_mount_before_any_write(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    let root_of_r = recorded.root();
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let root_of_the_recorded_publish = recorded.root();
     let ranges = RangesReadingBackAllZero::default()
-        .with_the_writes(&every_record_of_r(&recorded))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&every_record_of_the_recorded_publish(&recorded))
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.mapping_root,
+            &root_of_the_recorded_publish.mapping_root,
             "中央映射树根",
         ))
-        .with_the_writes(&unit_writes_of_r_at(
+        .with_the_writes(&unit_writes_of_the_recorded_publish_at(
             &recorded,
-            &root_of_r.tree_table,
+            &root_of_the_recorded_publish.tree_table,
             "树表",
         ));
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let refusal =
-        mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+        mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             &recorded,
             &crash_image,
             &ranges,
@@ -305,9 +311,13 @@ fn a_newer_readable_root_whose_only_record_mapping_root_and_tree_table_read_back
 #[test]
 fn every_unit_of_a_newer_readable_root_of_one_record_reading_back_zero_with_its_record_keeps_its_units(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
-    assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_r(&recorded);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_the_recorded_publish(
+        &recorded,
+    );
 }
 
 /// 同上，R 是三条记录的顺序写，三条记录都读回全零（攻方第一节 sw3 `rec_hidden=111` 那一行）。
@@ -315,15 +325,17 @@ fn every_unit_of_a_newer_readable_root_of_one_record_reading_back_zero_with_its_
 fn every_unit_of_a_newer_readable_root_of_three_records_reading_back_zero_with_every_record_keeps_its_units(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
-    assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_r(&recorded);
+    assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_the_recorded_publish(
+        &recorded,
+    );
 }
 
 /// R 写出的每一个单元逐个连同 R 的全部记录读回全零（根槽读得出），各挂一次：做成的核 R 的单元一份不少，拒的只许是 C 的映射那一支拒
 /// （点名 R）。打印每一格的结局与合计。
-fn assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_r(
+fn assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_the_recorded_publish(
     recorded: &RecordedPublish,
 ) {
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
@@ -332,8 +344,8 @@ fn assert_every_unit_reading_back_zero_with_every_record_keeps_the_units_of_r(
         let cell = format!("R 的第 {unit_index} 个单元与全部记录读回全零");
         let ranges = RangesReadingBackAllZero::default()
             .with_the_writes(unit_copies)
-            .with_the_writes(&every_record_of_r(recorded));
-        match mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+            .with_the_writes(&every_record_of_the_recorded_publish(recorded));
+        match mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
             recorded,
             &crash_image,
             &ranges,

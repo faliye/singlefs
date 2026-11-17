@@ -30,6 +30,11 @@ use singlefs_core::unlink::{UnlinkBatchDataUnitsCappedForTests, UnlinkBatchSize}
 use singlefs_verification::memory_pool::MemoryPool;
 use std::sync::Arc;
 
+pub use singlefs_verification::known_bad_images::{
+    get_u64, set_u16, set_u32, set_u64, Mutation, INODE_RECORD_BLOCKS_OFFSET,
+    TREE_TABLE_ENTRY_KIND_OFFSET,
+};
+
 use crate::common::{
     build_pool, parameters, sequential_write_in_process_as_instance_one_and_advance_the_pool,
     BuiltPool, PoolImageGeometry, FIXED_WRITE_TIME_SECONDS,
@@ -46,9 +51,6 @@ pub const FIRST_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
 /// 建空 inode 那次的写入时间。
 pub const WRITE_TIME_SECONDS_OF_THE_NEW_INODES: u64 = 1_788_000_100;
 
-/// 坏镜像：在一份干净镜像上改一处。
-pub type Mutation = Box<dyn Fn(&mut MemoryPool)>;
-
 /// 码 3 单元头里记录数（偏移 69）、声明长度（偏移 8）与记录区起点（含 29 字节预留位的头 136，D18（块里携带什么信息） 已定项 16）。
 pub const PACKED_UNIT_RECORD_COUNT_OFFSET: usize = 69;
 pub const UNIT_DECLARED_LENGTH_OFFSET: usize = 8;
@@ -57,7 +59,6 @@ pub const PACKED_UNIT_RECORDS_START: usize = 136;
 pub const INODE_RECORD_BYTES: usize = 140;
 pub const INODE_RECORD_NLINK_OFFSET: usize = 36;
 pub const INODE_RECORD_SIZE_OFFSET: usize = 40;
-pub const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
 /// `blocks` = ⌈size ÷ 512⌉（I-9.15）。
 pub const INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES: u64 = 512;
 /// inode 树与墓碑树的码 2 内部条目：分隔 key 8 + 身份引用 26 + 子指针 86（子指针从 34 起）。
@@ -83,7 +84,6 @@ pub const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// 树表（码 2，key = 树 ID 8 字节）：条目 200 字节，树的种类在条目偏移 10、头 ID 在 116（D8（核心索引结构） 已定项 8 的字段表）。
 const TREE_TABLE_KEY_BYTES: usize = 8;
 const TREE_TABLE_ENTRY_BYTES: usize = 200;
-pub const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
 pub const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: usize = 116;
 /// 树表条目里根指针 86 字节占 [14, 100)（`walk.rs` 读 `entry[14..100]`）。
 const TREE_TABLE_ENTRY_ROOT_POINTER_START: usize = 14;
@@ -370,18 +370,6 @@ fn get_u16(bytes: &[u8], offset: usize) -> u16 {
 }
 pub fn get_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("4 字节"))
-}
-pub fn get_u64(bytes: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
-}
-pub fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
-    bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
-}
-pub fn set_u32(bytes: &mut [u8], offset: usize, value: u32) {
-    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-}
-pub fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
-    bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
 }
 
 /// 一个码 2 内部条目（inode 树、墓碑树：120 字节）里子指针指的那个槽。

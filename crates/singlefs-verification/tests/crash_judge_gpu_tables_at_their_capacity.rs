@@ -122,7 +122,7 @@ use singlefs_verification::crash_judge_tables::{
 use singlefs_verification::fault_injection::SharedFaultPlan;
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
-    GpuCardPool,
+    GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::history::{
     execute_history_handing_out_every_step_image, generate_history_with_weights, GenerationWeights,
@@ -421,7 +421,7 @@ struct CpuJudgementOfAState {
 
 /// 每个状态两边各判一遍：GPU 结论字与 CPU 那一侧，按状态序号。卡借不到（等满了、或没有独显）交 `None`。
 fn judge_every_state_on_both_sides(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     test_name: &str,
     flow: &RecordedFlow,
 ) -> Option<(Vec<[u32; VERDICT_WORDS]>, Vec<CpuJudgementOfAState>)> {
@@ -1059,7 +1059,7 @@ struct CpuJudgementOfARowPublishState {
 
 /// 每个状态两边各判一遍（实例表行那两条流）：GPU 结论字与 CPU 那一侧，按状态序号。卡借不到（等满了、或没有独显）交 `None`。
 fn judge_every_row_publish_state_on_both_sides(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     test_name: &str,
     flow: &RowPublishFlow,
 ) -> Option<(

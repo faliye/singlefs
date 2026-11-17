@@ -79,7 +79,7 @@ const FIXED_STRUCTURE_SLOT_SPACING_LOCAL: u32 = 4096;
 /// 本地常量：一次准入最多 B = 4 + 2 k_tol = 8 次发布（D16（发布语义） 已定项 1「准入」那一行；`singlefs_core::mount::PUBLISHES_PER_ADMISSION_AT_MOST`）。
 const PUBLISHES_PER_ADMISSION_AT_MOST_LOCAL: u64 = 8;
 /// 本地常量：谱系容器、退役容器一次 COW 各 2 块，树根各 1 块（D28（挂载期承诺量） 已定项 4「容器 2 块 + 谱系树根 1 块」；
-/// `crates/singlefs-core/src/admission.rs` 的 `LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW` 那四个常量）。
+/// `crates/singlefs-core/src/admission.rs` 的 `LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE` 那四个常量）。
 const LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL: u64 = 2;
 const LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL: u64 = 1;
 const RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL: u64 = 2;
@@ -2143,22 +2143,22 @@ fn check_local_constants_against_the_crates() -> bool {
         (
             "lineage_container_blocks_of_one_cow",
             LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL,
-            singlefs_core::admission::LINEAGE_CONTAINER_BLOCKS_OF_ONE_COW,
+            singlefs_core::admission::LINEAGE_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE,
         ),
         (
             "lineage_tree_root_blocks_of_one_cow",
             LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL,
-            singlefs_core::admission::LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COW,
+            singlefs_core::admission::LINEAGE_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE,
         ),
         (
             "retirement_container_blocks_of_one_cow",
             RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL,
-            singlefs_core::admission::RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW,
+            singlefs_core::admission::RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COPY_ON_WRITE,
         ),
         (
             "retirement_tree_root_blocks_of_one_cow",
             RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE_LOCAL,
-            singlefs_core::admission::RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW,
+            singlefs_core::admission::RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COPY_ON_WRITE,
         ),
         (
             "unit_area_start_slot_of_the_default_ring_from_the_ring_start",
@@ -2363,13 +2363,17 @@ const PREFLIGHT_REFUSED_EXIT_CODE: i32 = 78;
 /// `main` 的第一句：直接起 `python3 preflight.py check <本文件> [--force] -- <参数…>`（不经 `sh -c`）判准入与运行条件，
 /// 不满足就照判法的退出码退出、一步都不做；强制跑（判法的第一行以 `forced` 起头）时交回没满足的条件摘要，要写进产物。
 fn preflight() -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source =
-        format!("{manifest_directory}/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs"
+    );
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../.claude/singlefs-ai-sop/scripts/preflight.py"
+    );
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }

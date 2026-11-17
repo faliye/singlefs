@@ -1110,7 +1110,7 @@ fn the_in_place_subsets_judged_on_the_cpu_judge_plans_a_distinct_persisted_set_f
 
 /// 全量：固定脚本到 E 再正常卸载，闭式 [`FULL_STATES_THROUGH_THE_UNMOUNT`] 个状态（段序列由 `prepare_the_fixed_script_stream` 钉住）。
 /// 门禁 crash-point-replay 在 release 下跑它，认下面打印的 `CRASH_POINT_REPLAY_FIXED_SCRIPT` 行里 `exhaustive=true`。判过的状态都在判定库里（崩溃枚举用例那一类，
-/// `crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）。双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：
+/// `crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）。分片（门禁 `crash-point-replay` 的各片，`SINGLEFS_CRASH_AMPLIFICATION_SHARE`）：
 /// 两台各判自己那一份，那几趟不打计数行、不判下面的断言；两份都判进服务那一份之后不分片再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
 fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
@@ -1903,7 +1903,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         .count_named("states_with_a_reused_named_unit_after_the_stale_tail");
     let records_with_a_reused_named_unit: Vec<String> = tally
         .observer_counts
-        .iter()
+        .counts_in_name_order()
         .filter(|(name, _)| name.starts_with("record_"))
         .map(|(name, count)| format!("{name}={count}"))
         .collect();

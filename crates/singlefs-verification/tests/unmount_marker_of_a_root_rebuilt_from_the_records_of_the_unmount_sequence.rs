@@ -8,7 +8,7 @@ mod common;
 
 use common::{
     build_pool, overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
-    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_PUBLISH_B,
+    tear_the_root_slot_written_for_txg, CONTENT_BYTES_OF_THE_OLDER_OVERWRITE,
 };
 use singlefs_core::address::CheckpointTxg;
 use singlefs_core::mount::{unmount, ShadowLedger, Unmounted};
@@ -27,7 +27,7 @@ fn a_root_rebuilt_from_both_records_of_the_unmount_sequence_takes_the_unmount_ma
     for fill_byte in [0xB0u8, 0xC0, 0xD0] {
         overwrite_in_process_as_instance_one_and_advance_the_pool(
             &mut pool,
-            &vec![fill_byte; CONTENT_BYTES_OF_PUBLISH_B],
+            &vec![fill_byte; CONTENT_BYTES_OF_THE_OLDER_OVERWRITE],
         );
     }
     let mut current = PoolVersion::WithFile(Arc::new(pool.output.clone()));

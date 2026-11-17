@@ -1,7 +1,7 @@
-//! 验证包模块：crash、crash_identity、crash_library、crash_amplification
+//! 验证包模块：crash、crash_state_enumeration、crash_identity、crash_library、crash_amplification
 //! 观察者按流的来历统一挂的登记完整性（G4 丙-置）。
 //! 来历表在 `singlefs_verification::crash_point_replay_provenance::PROVENANCE_OF_THE_FLOWS`，跑流的两处（崩溃枚举用例的枚举入口、崩溃放量）按它挂。
-//! 这里判三件：
+//! 这里判四件：
 //! - 每一个崩溃点重放项与崩溃放量分项在来历表里有行、表里点名的项都还登着：项名现读两处登记位——崩溃点重放合表
 //!   `.claude/gate.d/crash-point-replay-items.tsv` 的第一列（合表第二列的崩溃枚举用例经 `.claude/gate.d/stage-inputs.tsv` 的 `test=` 对到测试目标，
 //!   测试目标里调了 `enumerate_crash_states` 一族的那几项，崩溃枚举那一处跑它），与崩溃放量入口 `scripts/crash/crash-amplification.sh` 的 ITEMS
@@ -11,12 +11,14 @@
 //!   哪条流都不挂。挂法经跑流那两处调的同一个函数（`observers_on_the_nodes_with_the_ones_attached_to_the_flow`）判。
 //! - 观察者登记表 `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES` 的每一行都还有人挂：观察者代码文件在仓里，观察者名写在那份文件
 //!   或那个目标的源码里（现读源码）。
+//! - 反过来，崩溃枚举用例自己挂的每个观察者（观察者代码文件，观察者名）在观察者登记表里都有一行：`tests/` 下每份测试文件现读，
+//!   认法照 `crash_state_enumeration` 的 `observers_on_the_nodes_of_the_item`（用例文件或挂法点名的共用文件）。
 //!
 //! 测试里现拼的项名（`<流>::in_place_subsets::<标签>`、`<流>::segments_shorter_than_ten::<标签>`、`stream.flow_name()`）登记位上没有，它们的完整由跑流的那一处兜：来历表里查不到就在录任何东西
 //! 之前拒，这一条用例不扫测试源码里的项名。
 //! 判别力在 `crates/mutations.tsv`（名字以「来历表」起头的几行）：来历表漏一行、mkfs 返回之后的流不挂两槽全废观察者、mkfs 自己的流也挂，各让这里一条红。
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use singlefs_verification::crash_amplification::{
@@ -634,6 +636,292 @@ fn why_no_code_hangs_the_observer_of_the_row(entry: &ObserverEntry) -> Option<St
         "观察者 {}（观察者代码文件 {}，目标 {}）的名字在观察者代码文件与目标的源码里都没有：没有用例挂它",
         entry.observer_name, entry.observer_code_file, entry.target
     ))
+}
+
+/// 崩溃枚举用例挂自己的观察者走的三个入口（`singlefs_verification::crash_state_enumeration`）：经它们挂的观察者，观察者代码文件按挂法取，
+/// 缺省的挂法是用例文件（`CrashPointReplayObserverCodeFile::TheCaseFile`）。只写名字、不连括号：这份文件自己不算调了它们。
+const ENTRIES_HANGING_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE: [&str; 3] = [
+    "enumerate_crash_states_with_expansion",
+    "enumerate_crash_states_with_every_kind_of_observer",
+    "enumerate_crash_states_with_attached_observers",
+];
+
+/// 用例自己造的两种观察者（只记计数的、交回镜像的）的类型名：字面量写 `<类型名> {`，造它的 fn 的签名写 `-> <类型名><`。
+const TYPES_OF_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE: [&str; 2] = [
+    "CrashPointReplayObserver",
+    "CrashPointReplayObserverHandingBackAnImage",
+];
+
+fn is_an_identifier_character(character: char) -> bool {
+    character.is_alphanumeric() || character == '_'
+}
+
+/// `text` 里 `needle` 每一处的起点，只算前一个字符不是标识符字符的（`AttachedCrashPointReplayObserver {` 里的 `CrashPointReplayObserver {` 不算）。
+fn positions_of_the_word(text: &str, needle: &str) -> Vec<usize> {
+    text.match_indices(needle)
+        .map(|(position, _)| position)
+        .filter(|position| {
+            !text[..*position]
+                .chars()
+                .next_back()
+                .is_some_and(is_an_identifier_character)
+        })
+        .collect()
+}
+
+/// 几份源码里 `const <名>: &str = "<值>";` 一形的串常量（值可以折到下一行）：名 → 值。
+fn string_constants_of_the_sources(sources: &[String]) -> BTreeMap<String, String> {
+    let mut constants = BTreeMap::new();
+    for source in sources {
+        for position in positions_of_the_word(source, "const ") {
+            let Some((name, after_the_name)) =
+                source[position + "const ".len()..].split_once(": &str =")
+            else {
+                continue;
+            };
+            if name.is_empty() || !name.chars().all(is_an_identifier_character) {
+                continue;
+            }
+            let Some((value, _)) = after_the_name
+                .trim_start()
+                .strip_prefix('"')
+                .and_then(|literal| literal.split_once('"'))
+            else {
+                continue;
+            };
+            constants.insert(name.to_string(), value.to_string());
+        }
+    }
+    constants
+}
+
+/// 一格写法折成串：串字面量照取，常量（带不带模块路径）按 `constants` 取。
+///
+/// # Panics
+/// 认不出的写法：这条用例要跟着认它，不能当没挂。
+fn string_of_the_expression(
+    expression: &str,
+    constants: &BTreeMap<String, String>,
+    where_it_is: &str,
+) -> String {
+    let expression = expression.trim().trim_end_matches(',').trim();
+    if let Some(literal) = expression
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+    {
+        return literal.to_string();
+    }
+    let constant_name = expression.rsplit("::").next().unwrap_or(expression);
+    constants.get(constant_name).cloned().unwrap_or_else(|| {
+        panic!("{where_it_is} 里观察者名或观察者代码文件写成 {expression}：认不出，这条用例要跟着认这种写法")
+    })
+}
+
+/// `text` 从 `start` 起第一处 `name:` 那一格的写法（冒号之后到行末）；观察者的两种结构体第一格都是它。
+fn name_field_after(text: &str, start: usize) -> Option<&str> {
+    let after = &text[start..];
+    let position = positions_of_the_word(after, "name:").into_iter().next()?;
+    let field = &after[position + "name:".len()..];
+    field.split('\n').next()
+}
+
+/// 一格的写法：从 `text` 起到同一层的 `,` 或收住这一格所在字面量的那个括号为止。
+fn expression_up_to_the_end_of_the_field(text: &str) -> &str {
+    let mut depth = 0_usize;
+    for (position, character) in text.char_indices() {
+        match character {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' if depth == 0 => return &text[..position],
+            ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => return &text[..position],
+            _ => {}
+        }
+    }
+    text
+}
+
+/// 用例主文件 `main` 里 `position` 那一处挂的观察者的观察者代码文件：那一处直接写在 `observer:` 之后（挂法字面量
+/// `AttachedCrashPointReplayObserver…` 的那一格）、同一个字面量的 `attachment:` 点名了 `CrashPointReplayObserverCodeFile::SharedFile(<共用文件>)` 的
+/// 取共用文件，别的取用例文件。
+fn observer_code_file_at(
+    main: &str,
+    position: usize,
+    case_file: &str,
+    constants: &BTreeMap<String, String>,
+) -> String {
+    let before = main[..position].trim_end();
+    let is_the_observer_field_of_an_attachment =
+        before.strip_suffix("observer:").is_some_and(|rest| {
+            !rest
+                .chars()
+                .next_back()
+                .is_some_and(is_an_identifier_character)
+        });
+    if !is_the_observer_field_of_an_attachment {
+        return case_file.to_string();
+    }
+    let Some(attachment_start) = main[position..]
+        .find("attachment:")
+        .map(|offset| position + offset + "attachment:".len())
+    else {
+        return case_file.to_string();
+    };
+    let attachment = expression_up_to_the_end_of_the_field(&main[attachment_start..]);
+    let Some((_, shared_file_onwards)) = attachment.split_once("SharedFile(") else {
+        return case_file.to_string();
+    };
+    string_of_the_expression(
+        expression_up_to_the_end_of_the_field(shared_file_onwards),
+        constants,
+        case_file,
+    )
+}
+
+/// 一份源码里每个 fn 的名字。
+fn names_of_the_functions_defined_in(source: &str) -> BTreeSet<String> {
+    positions_of_the_word(source, "fn ")
+        .into_iter()
+        .map(|position| {
+            source[position + "fn ".len()..]
+                .chars()
+                .take_while(|character| is_an_identifier_character(*character))
+                .collect()
+        })
+        .collect()
+}
+
+/// 一份源码里造观察者的 fn（签名的返回类型是两种观察者之一）：fn 名 → 它造的观察者名（函数体里第一格 `name:`）。
+fn observer_making_functions_of_the_source(
+    source: &str,
+    constants: &BTreeMap<String, String>,
+    where_it_is: &str,
+) -> BTreeMap<String, String> {
+    let mut functions = BTreeMap::new();
+    for position in positions_of_the_word(source, "fn ") {
+        let rest = &source[position + "fn ".len()..];
+        let function_name: String = rest
+            .chars()
+            .take_while(|character| is_an_identifier_character(*character))
+            .collect();
+        let Some(body_offset) = rest.find('{') else {
+            continue;
+        };
+        let returns_an_observer = TYPES_OF_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE
+            .iter()
+            .any(|observer_type| rest[..body_offset].contains(&format!("-> {observer_type}<")));
+        if !returns_an_observer {
+            continue;
+        }
+        let name_field = name_field_after(rest, body_offset).unwrap_or_else(|| {
+            panic!("{where_it_is} 里造观察者的 fn {function_name} 的函数体里没有 name: 那一格")
+        });
+        functions.insert(
+            function_name,
+            string_of_the_expression(name_field, constants, where_it_is),
+        );
+    }
+    functions
+}
+
+/// 一个测试目标（`tests/<名>.rs`）是崩溃枚举用例、经 [`ENTRIES_HANGING_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE`] 挂观察者时，
+/// 它挂的每个（观察者代码文件，观察者名）：主文件里两种观察者的字面量，与主文件调的、它声明的模块里造观察者的 fn（主文件自己定义了同名 fn 的
+/// 按主文件的算）；观察者代码文件照 [`observer_code_file_at`]。不经那三个入口挂观察者的交空集。
+fn observers_hung_by_the_crash_enumeration_case(test_target: &str) -> BTreeSet<(String, String)> {
+    let sources = source_texts_of_the_target(&format!("test:{test_target}"));
+    let main = &sources[0];
+    let mut hung = BTreeSet::new();
+    if !ENTRIES_HANGING_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE
+        .iter()
+        .any(|entry| main.contains(&format!("{entry}(")))
+    {
+        return hung;
+    }
+    let case_file = format!("crates/singlefs-verification/tests/{test_target}.rs");
+    let constants = string_constants_of_the_sources(&sources);
+    for observer_type in TYPES_OF_THE_OBSERVERS_OF_A_CRASH_ENUMERATION_CASE {
+        for position in positions_of_the_word(main, &format!("{observer_type} {{")) {
+            let name_field = name_field_after(main, position).unwrap_or_else(|| {
+                panic!("{case_file} 里 {observer_type} 的字面量没有 name: 那一格")
+            });
+            hung.insert((
+                observer_code_file_at(main, position, &case_file, &constants),
+                string_of_the_expression(name_field, &constants, &case_file),
+            ));
+        }
+    }
+    let functions_of_the_main = names_of_the_functions_defined_in(main);
+    for module in &sources[1..] {
+        for (function_name, observer_name) in
+            observer_making_functions_of_the_source(module, &constants, &case_file)
+        {
+            if functions_of_the_main.contains(&function_name) {
+                continue;
+            }
+            for position in positions_of_the_word(main, &format!("{function_name}(")) {
+                hung.insert((
+                    observer_code_file_at(main, position, &case_file, &constants),
+                    observer_name.clone(),
+                ));
+            }
+        }
+    }
+    hung
+}
+
+/// 场景：这个包 `tests/` 下每份测试文件（每一个测试目标）；是崩溃枚举用例、经 `enumerate_crash_states_with_expansion`、
+/// `…_with_every_kind_of_observer`、`…_with_attached_observers` 挂自己的观察者的，按 `crash_state_enumeration` 的
+/// `observers_on_the_nodes_of_the_item` 的取法认它挂的每个（观察者代码文件，观察者名）：用例主文件里两种观察者的字面量，与它调的公共模块里
+/// 造观察者的 fn；观察者代码文件是用例文件，挂法点名共用文件的取共用文件。
+/// 预期：每一个在观察者登记表 `OBSERVER_ENTRIES` 里都有一行（没登记的观察者取键拒算：门禁先只录、再只判，两个进程各取各的占位键，
+/// 判段读不到录入段写的块）；认出的观察者至少一个（认法坏了这里先红）。按来历挂的观察者（`crash_point_replay_provenance`）另由上面的用例管。
+/// 判别力（`crates/mutations.tsv`「观察者登记表：读坏盘挂载流」起头的那一行）：登记表删掉读坏盘挂载流的一个观察者那一行，这条红。
+#[test]
+fn every_observer_a_crash_enumeration_case_hangs_by_itself_has_its_row_in_the_observer_registry() {
+    let registered: BTreeSet<(&str, &str)> = OBSERVER_ENTRIES
+        .iter()
+        .map(|entry| (entry.observer_code_file, entry.observer_name))
+        .collect();
+    let mut test_targets: Vec<String> = std::fs::read_dir(test_directory_of_this_package())
+        .unwrap_or_else(|error| panic!("这个包的测试目录列不出：{error}"))
+        .map(|entry| entry.expect("测试目录的目录项读得出").path())
+        .filter(|path| {
+            path.is_file() && path.extension().is_some_and(|extension| extension == "rs")
+        })
+        .map(|path| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .expect("测试文件名是 UTF-8")
+                .to_string()
+        })
+        .collect();
+    test_targets.sort();
+    let mut cases_hanging_observers = 0_usize;
+    let mut observers_hung = 0_usize;
+    let mut unregistered = Vec::new();
+    for test_target in &test_targets {
+        let hung = observers_hung_by_the_crash_enumeration_case(test_target);
+        if hung.is_empty() {
+            continue;
+        }
+        cases_hanging_observers += 1;
+        observers_hung += hung.len();
+        for (observer_code_file, observer_name) in hung {
+            if !registered.contains(&(observer_code_file.as_str(), observer_name.as_str())) {
+                unregistered.push(format!(
+                    "测试目标 {test_target}：观察者代码文件 {observer_code_file}，观察者名 {observer_name}"
+                ));
+            }
+        }
+    }
+    println!(
+        "OBSERVERS_HUNG_BY_THE_CRASH_ENUMERATION_CASES cases={cases_hanging_observers} observers={observers_hung} unregistered={}",
+        unregistered.len()
+    );
+    assert!(observers_hung > 0, "一个挂着的观察者都没认出：认法坏了");
+    assert!(
+        unregistered.is_empty(),
+        "这几个崩溃枚举用例挂的观察者在 OBSERVER_ENTRIES 里没有行（取键拒算，录入段与判段两个进程对不上块），逐个登记：{unregistered:#?}"
+    );
 }
 
 /// 场景：跑流的那一处拿一个来历表里没有的名字去查、拿一个带展开标签的项名去查、调用方挂了一个与按来历挂的同名的观察者。

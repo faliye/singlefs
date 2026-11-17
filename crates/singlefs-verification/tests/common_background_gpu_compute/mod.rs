@@ -80,6 +80,9 @@ pub fn device_lost_on_the_card_with_eight_gibibytes() -> BackgroundGpuComputeFai
         cause: GpuFailureOnTheDevice::UncapturedErrorOrDeviceLost {
             reason: "假的：设备丢了".to_string(),
         },
+        pci_state_when_judged_unusable: Box::new(
+            singlefs_core::background_compute::PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError,
+        ),
     }
 }
 

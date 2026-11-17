@@ -43,9 +43,9 @@ use singlefs_verification::fault_injection::{
 use singlefs_verification::history::HistoryDeviceWidth;
 use singlefs_verification::memory_pool::MemoryPool;
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount,
-    DiskAfterTheRefusal, ReadFaultsInTheCrashState, ReadFaultsUnderTheRefusedMount,
-    ReadOnlyReadBackOfTheCrashImage, RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, DiskAfterTheRefusal,
+    ReadFaultsInTheCrashState, ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 use std::collections::BTreeMap;
 
@@ -142,8 +142,9 @@ fn the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mo
         panic!("上面判过这次挂载拒了");
     };
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &history.image_after_the_crashed_unmount,
+            &history.pool.parameters.filesystem_identifier,
             recover(&history.image_after_the_crashed_unmount, JournalPolicy::Consult).effective_root,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
@@ -152,7 +153,7 @@ fn the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mo
             ReadFaultsUnderTheRefusedMount::TheRefusedMountReadThroughInjectedFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator
+            RefusalReasonOnTheLegalRefusalList::NoValidRootInTheRootRingOfTheRebuiltAllocator
         ),
         "拒因在 D23 已定项 14 那张单子上；被拒的那次挂载在读故障下跑，崩溃镜像上判据复算为假不算不合法：判合法"
     );

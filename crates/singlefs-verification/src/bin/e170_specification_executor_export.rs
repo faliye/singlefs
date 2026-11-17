@@ -12,8 +12,8 @@
 //! 决定几何与工作量的数写成本地常量（值抄自那两份测试文件与 `tests/common/mod.rs`，逐个注明），`main` 开头与 crates 的同名
 //! 公开常量或现算值回比，不直接引（登记 5.7、S1）。
 //!
-//!   e170_o3_spec_executor_export dump --output-directory <目录> [--compare-with <上一次导出的目录>]
-//!   e170_o3_spec_executor_export bad-states --dump-directory <dump 写出的目录> --seed-hex <第二段冻结的种子，16 个十六进制字符>
+//!   e170_specification_executor_export dump --output-directory <目录> [--compare-with <上一次导出的目录>]
+//!   e170_specification_executor_export bad-states --dump-directory <dump 写出的目录> --seed-hex <第二段冻结的种子，16 个十六进制字符>
 //!
 //! 第三段（登记 5.5、5.8「第三段」）的 `bad-states` 模式见文件末尾「第三段：坏状态」一节：P 行、N 行、盲测族造在第一段导出的同一批
 //! 流上，每行过一遍实现的判定，写进 `<目录>/<流名>/bad-*.tsv` 与 `bad-patches.bin`；回比没过同样退 3。
@@ -27,7 +27,7 @@
 /// 崩溃点重放取样过崩溃判定库的项（`crash_state_enumeration::sample_crash_states_on_the_cpu`）：项名与设点文件（这份装置自己）。
 const CRASH_POINT_REPLAY_SAMPLING_ITEM: CrashPointReplayItem<'static> = CrashPointReplayItem {
     name: "e170_o3_spec_executor_export",
-    setting_file: "crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs",
+    setting_file: "crates/singlefs-verification/src/bin/e170_specification_executor_export.rs",
 };
 
 /// 这一次取样的项名：装置一趟按不同的段、不同的序号区间取样几十次，每次是一条不同的流，项名各给一个（库里同一个项名下只登一份清单，
@@ -159,7 +159,7 @@ const LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES: u64 = 294;
 /// 流二每次写只取两态时的全量闭式 1 + Σ(2^n − 1)，单测拿段长表回算它。
 const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_095;
 /// E 的数据单元落点：`tests/crash_enumeration_fixed_script_stream.rs` 第 363 行（`50176`）。
-const LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT: u64 = 50_176;
+const LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT: u64 = 50_176;
 /// 抬 F 推的空发布数：同一份测试文件第 351 行（`raised.publishes.len(), 2`）。
 const LOCAL_SECOND_STREAM_RAISE_FLOOR_PUBLISHES: usize = 2;
 /// 卸载推的两次空发布的 txg：同一份测试文件第 381 行（`vec![CheckpointTxg(18), CheckpointTxg(19)]`）。
@@ -177,21 +177,23 @@ const TORN_SCAN_ORDINALS_PER_SEGMENT: u64 = 100_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StreamName {
     NewPoolFileCreation,
-    FixedScriptThroughEThenUnmount,
+    FixedScriptReuseAfterRaisingFloorThenUnmount,
 }
 
 impl StreamName {
     fn directory_name(self) -> &'static str {
         match self {
             Self::NewPoolFileCreation => "new_pool_file_creation",
-            Self::FixedScriptThroughEThenUnmount => "fixed_script_through_e_then_unmount",
+            Self::FixedScriptReuseAfterRaisingFloorThenUnmount => {
+                "fixed_script_through_e_then_unmount"
+            }
         }
     }
 }
 
 const STREAM_NAMES: [StreamName; 2] = [
     StreamName::NewPoolFileCreation,
-    StreamName::FixedScriptThroughEThenUnmount,
+    StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
 ];
 
 // ───────────────────────────── 流二的内容生成式（照抄测试文件） ─────────────────────────────
@@ -424,7 +426,7 @@ fn version(instance: u32, checkpoint_txg: u64, content: Vec<u8>) -> PublishedVer
 
 /// 流二：照抄同一份文件第 218–356 行 `prepare` 里 `Script::ReuseAfterRaisingFloorThenNormalUnmount` 那一支，每次调用返回时记流长。
 /// 脚本里那几条 `assert_eq!`（抬 F 两次空发布、E 落回 50176、卸载 txg 18 与 19）改成 S1 的回比，不在这里停。
-fn drive_through_e_then_unmount(
+fn drive_the_reuse_after_raising_the_floor_then_unmount(
     calls: &mut Vec<RecordedCall>,
 ) -> (common::BuiltPool, Vec<PublishedVersion>, Vec<StopCheck>) {
     let mut checks = Vec::new();
@@ -518,7 +520,7 @@ fn drive_through_e_then_unmount(
     });
     checks.push(StopCheck::new(
         "second_stream_e_data_unit_slot",
-        LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT,
+        LOCAL_SECOND_STREAM_REUSED_VERSION_DATA_UNIT_SLOT,
         reuse.data_pointers[0].locations[0].slot.0,
     ));
     versions.push(version(2, 17, later_content(31)));
@@ -562,8 +564,9 @@ fn prepare_stream(name: StreamName) -> PreparedStream {
             None,
             Vec::new(),
         ),
-        StreamName::FixedScriptThroughEThenUnmount => {
-            let (pool, versions, checks) = drive_through_e_then_unmount(&mut calls);
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => {
+            let (pool, versions, checks) =
+                drive_the_reuse_after_raising_the_floor_then_unmount(&mut calls);
             (pool, Some(versions), checks)
         }
     };
@@ -606,7 +609,7 @@ fn prepare_stream(name: StreamName) -> PreparedStream {
                 LOCAL_FIRST_STREAM_WRITES,
                 LOCAL_FIRST_STREAM_ROOT_WRITES,
             ),
-            StreamName::FixedScriptThroughEThenUnmount => (
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
                 &LOCAL_SECOND_STREAM_SEGMENT_LENGTHS,
                 LOCAL_SECOND_STREAM_WRITES,
                 LOCAL_SECOND_STREAM_ROOT_WRITES,
@@ -1338,7 +1341,7 @@ fn export_stream(name: StreamName, output_root: &Path) -> StreamExport {
             LOCAL_FIRST_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM,
         ),
-        StreamName::FixedScriptThroughEThenUnmount => (
+        StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount => (
             LOCAL_SECOND_STREAM_FULL_STATES,
             LOCAL_SECOND_STREAM_IN_PLACE_SUBSETS_STATES,
             LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM,
@@ -1695,11 +1698,11 @@ fn timing_summary(mut nanoseconds: Vec<u128>) -> (u128, u128, u128, u128) {
     nanoseconds.sort_unstable();
     let count = nanoseconds.len();
     let total: u128 = nanoseconds.iter().sum();
-    let p95_index = (count * 95).div_ceil(100) - 1;
+    let ninety_fifth_percentile_index = (count * 95).div_ceil(100) - 1;
     (
         total,
         nanoseconds[(count - 1) / 2],
-        nanoseconds[p95_index],
+        nanoseconds[ninety_fifth_percentile_index],
         nanoseconds[count - 1],
     )
 }
@@ -1828,14 +1831,14 @@ fn report_stream(lines: &mut ResultLines, export: &StreamExport) -> [usize; 5] {
             count_where(&|observation| observation.verdict.consulted_root == "none"),
             count_where(&|observation| observation.verdict.consulted_outcome.starts_with("failed:")),
         ));
-        let (total, median, p95, maximum) = timing_summary(
+        let (total, median, ninety_fifth_percentile, maximum) = timing_summary(
             in_batch
                 .iter()
                 .map(|observation| observation.judge_nanoseconds)
                 .collect(),
         );
         ResultLines::timing(&format!(
-            "name=judge_time stream={label} batch={batch} states={} total_ns={total} median_ns={median} p95_ns={p95} max_ns={maximum}",
+            "name=judge_time stream={label} batch={batch} states={} total_ns={total} median_ns={median} p95_ns={ninety_fifth_percentile} max_ns={maximum}",
             in_batch.len()
         ));
     }
@@ -1900,7 +1903,7 @@ fn main() {
     {
         let Some(bad_states_command_line) = parse_bad_states_command_line(&arguments) else {
             eprintln!(
-                "用法：e170_o3_spec_executor_export bad-states（或 bad-states-second-run）--dump-directory <第一段的导出目录> --seed-hex <16 个十六进制字符>；收到 {arguments:?}"
+                "用法：e170_specification_executor_export bad-states（或 bad-states-second-run）--dump-directory <第一段的导出目录> --seed-hex <16 个十六进制字符>；收到 {arguments:?}"
             );
             std::process::exit(2);
         };
@@ -1908,7 +1911,7 @@ fn main() {
     }
     let Some(command_line) = parse_command_line(&arguments) else {
         eprintln!(
-            "用法：e170_o3_spec_executor_export dump --output-directory <目录> [--compare-with <上一次导出的目录>]，或 bad-states --dump-directory <目录> --seed-hex <种子>；收到 {arguments:?}"
+            "用法：e170_specification_executor_export dump --output-directory <目录> [--compare-with <上一次导出的目录>]，或 bad-states --dump-directory <目录> --seed-hex <种子>；收到 {arguments:?}"
         );
         std::process::exit(2);
     };
@@ -1937,8 +1940,8 @@ fn main() {
         ));
     }
     let mut totals = [0usize; 5];
-    let mut v2_differing_files = 0usize;
-    let mut v2_differing_files_without_timing = 0usize;
+    let mut differing_files_against_the_compared_export = 0usize;
+    let mut differing_files_against_the_compared_export_without_timing = 0usize;
     for name in STREAM_NAMES {
         let export = export_stream(name, &command_line.output_directory);
         let stream_totals = report_stream(&mut lines, &export);
@@ -1952,12 +1955,13 @@ fn main() {
                 &previous.join(label),
             );
             for (file_name, identical, without_timing) in comparisons {
-                v2_differing_files += usize::from(!identical);
+                differing_files_against_the_compared_export += usize::from(!identical);
                 lines.emit_result_line(&format!(
                     "name=v2 stream={label} file={file_name} identical={identical}"
                 ));
                 if let Some(identical_without_timing) = without_timing {
-                    v2_differing_files_without_timing += usize::from(!identical_without_timing);
+                    differing_files_against_the_compared_export_without_timing +=
+                        usize::from(!identical_without_timing);
                     lines.emit_result_line(&format!(
                         "name=v2_without_timing stream={label} file={file_name} identical={identical_without_timing}"
                     ));
@@ -1968,7 +1972,7 @@ fn main() {
     failed_checks += totals[0];
     let [_, rebuilt_digest_mismatches, mask_mismatches, rejudge_mismatches, not_both_pass] = totals;
     lines.emit_result_line(&format!(
-        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} rejudge_mismatches={rejudge_mismatches} states_where_pool_checker_or_record_checker_is_red={not_both_pass} v2_compared={} v2_differing_files={v2_differing_files} v2_differing_files_without_timing={v2_differing_files_without_timing}",
+        "name=verdict s1_failed_checks={failed_checks} s4_digest_mismatches={rebuilt_digest_mismatches} crash_facts_mask_mismatches={mask_mismatches} rejudge_mismatches={rejudge_mismatches} states_where_pool_checker_or_record_checker_is_red={not_both_pass} v2_compared={} v2_differing_files={differing_files_against_the_compared_export} v2_differing_files_without_timing={differing_files_against_the_compared_export_without_timing}",
         command_line.compare_with.is_some()
     ));
     lines.finish();
@@ -2049,7 +2053,7 @@ impl BadTableVersion {
     }
 
     /// `config` 结果行里 `mode=` 写的名字（第一次的模式照旧写 `bad_states`）。
-    fn config_mode_text(self) -> &'static str {
+    fn configuration_mode_text(self) -> &'static str {
         match self {
             Self::FirstRun => "bad_states",
             Self::SecondRun => "bad_states_second_run",
@@ -2057,7 +2061,7 @@ impl BadTableVersion {
     }
 
     /// P8 的期望判定。第一次的登记写「不在」；第 1 次重跑的登记 5.5 修订按读法 3 改成「在」（落点 v_{n−1} 仍在 A(c) 里）。
-    fn p8_expected_verdict(self) -> &'static str {
+    fn previous_version_landing_expected_verdict(self) -> &'static str {
         match self {
             Self::FirstRun => "not_in",
             Self::SecondRun => "in",
@@ -2886,7 +2890,7 @@ fn bad_rows_of_stream(
             (
                 "P8",
                 BadShape::NewestRootAndRecordUnreadable {
-                    expected_verdict: table_version.p8_expected_verdict(),
+                    expected_verdict: table_version.previous_version_landing_expected_verdict(),
                 },
             ),
         ] {
@@ -3202,21 +3206,23 @@ fn lower_bound_row_base_checks(
 ) -> Vec<StopCheck> {
     let position_of = |row_name: &str| rows.iter().position(|row| row.name == row_name);
     let lower_bound = position_of(LOWER_BOUND_ROW_NAME);
-    let mk_plus_p9 = position_of(FIRST_RUN_MK_PLUS_ROW_NAME);
+    let first_run_mk_plus_row_position = position_of(FIRST_RUN_MK_PLUS_ROW_NAME);
     let mut checks = vec![StopCheck::new(
         &format!("{stream_label}_p10_row_exists_exactly_when_p9_mk_plus_row_exists"),
-        mk_plus_p9.is_some(),
+        first_run_mk_plus_row_position.is_some(),
         lower_bound.is_some(),
     )];
-    if let (Some(lower_bound), Some(mk_plus_p9)) = (lower_bound, mk_plus_p9) {
+    if let (Some(lower_bound), Some(first_run_mk_plus_row_position)) =
+        (lower_bound, first_run_mk_plus_row_position)
+    {
         checks.push(StopCheck::new(
             &format!("{stream_label}_p10_base_landing_vector_equals_p9_mk_plus"),
-            landing_vector_text(&rows[mk_plus_p9].base.persisted),
+            landing_vector_text(&rows[first_run_mk_plus_row_position].base.persisted),
             landing_vector_text(&rows[lower_bound].base.persisted),
         ));
         checks.push(StopCheck::new(
             &format!("{stream_label}_p10_base_digest_equals_p9_mk_plus"),
-            &observations[mk_plus_p9].base_digest,
+            &observations[first_run_mk_plus_row_position].base_digest,
             &observations[lower_bound].base_digest,
         ));
     }
@@ -3233,10 +3239,10 @@ struct BadStreamExport {
     files: Vec<WrittenFile>,
 }
 
-fn implementation_verdict_line(row_id: usize, observation: &BadObservation) -> String {
+fn implementation_verdict_line(row_identifier: usize, observation: &BadObservation) -> String {
     match &observation.verdict {
         Ok(verdict) => format!(
-            "{row_id}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{row_identifier}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             verdict.consulted_root,
             verdict.consulted_outcome,
             verdict.ignored_root,
@@ -3248,7 +3254,7 @@ fn implementation_verdict_line(row_id: usize, observation: &BadObservation) -> S
             verdict.pool_checker_and_record_checker_both_pass()
         ),
         Err(panic) => format!(
-            "{row_id}\tpanicked:{}\t-\t-\t-\t-\t-\t-\t-\tfalse\n",
+            "{row_identifier}\tpanicked:{}\t-\t-\t-\t-\t-\t-\t-\tfalse\n",
             field_text(panic)
         ),
     }
@@ -3319,7 +3325,7 @@ fn bad_states_of_stream(
     let mut patches_bytes = Vec::new();
     let mut expected_text = String::new();
     let mut verdicts_text = String::new();
-    for (row_id, (row, observation)) in rows.iter().zip(&observations).enumerate() {
+    for (row_identifier, (row, observation)) in rows.iter().zip(&observations).enumerate() {
         let landing: String = row
             .base
             .persisted
@@ -3341,7 +3347,7 @@ fn bad_states_of_stream(
             })
             .collect();
         states_text.push_str(&format!(
-            "{row_id}\t{landing}\t{}\t{}\t{}\n",
+            "{row_identifier}\t{landing}\t{}\t{}\t{}\n",
             observation.base_digest,
             observation.patched_digest,
             patch_list.join(",")
@@ -3352,7 +3358,7 @@ fn bad_states_of_stream(
             .and_then(|(_, found, _)| *found)
             .map_or_else(|| "none".to_string(), |ordinal| ordinal.to_string());
         expected_text.push_str(&format!(
-            "{row_id}\t{}\t{}\t{}\t{}\t{}\t{}\t{crash_state_ordinal_of_the_matched_base}\t{}\n",
+            "{row_identifier}\t{}\t{}\t{}\t{}\t{}\t{}\t{crash_state_ordinal_of_the_matched_base}\t{}\n",
             row.name,
             row.family.label(),
             row.base.label,
@@ -3363,7 +3369,7 @@ fn bad_states_of_stream(
             row.expected_landing.text(),
             row.base.notes
         ));
-        verdicts_text.push_str(&implementation_verdict_line(row_id, observation));
+        verdicts_text.push_str(&implementation_verdict_line(row_identifier, observation));
     }
     let seed_text = format!("seed_hex\t{seed_hex}\nseed_u64\t{seed}\n");
     let files = vec![
@@ -3413,7 +3419,9 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
     }
     let mut panics = 0usize;
     let mut both_pass_by_family: BTreeMap<&'static str, (usize, usize)> = BTreeMap::new();
-    for (row_id, (row, observation)) in export.rows.iter().zip(&export.observations).enumerate() {
+    for (row_identifier, (row, observation)) in
+        export.rows.iter().zip(&export.observations).enumerate()
+    {
         let (verdict_text, both_pass) = match &observation.verdict {
             Ok(verdict) => (
                 format!(
@@ -3438,7 +3446,7 @@ fn report_bad_stream(lines: &mut ResultLines, export: &BadStreamExport) -> (usiz
         tally.0 += 1;
         tally.1 += usize::from(both_pass);
         lines.emit_result_line(&format!(
-            "name=bad_row stream={label} row={row_id} name={} family={} base={} patches={} patched_bytes={} expected={} expected_landing={} base_digest={} patched_digest={} {verdict_text} impl_both_pass={both_pass}",
+            "name=bad_row stream={label} row={row_identifier} name={} family={} base={} patches={} patched_bytes={} expected={} expected_landing={} base_digest={} patched_digest={} {verdict_text} impl_both_pass={both_pass}",
             row.name,
             row.family.label(),
             row.base.label,
@@ -3524,7 +3532,7 @@ fn run_bad_states(command_line: &BadStatesCommandLine) -> i32 {
     let mut lines = ResultLines { emitted: 0 };
     lines.emit_result_line(&format!(
         "name=config segment=s3 mode={} seed_hex={} seed_u64={seed} blind_rows_per_stream={BLIND_ROWS_PER_STREAM} patched_writes_kind=system_configuration_slot judge_threads=1",
-        command_line.table_version.config_mode_text(),
+        command_line.table_version.configuration_mode_text(),
         command_line.seed_hex
     ));
     let mut failed_checks = 0usize;
@@ -3567,7 +3575,7 @@ mod tests {
         "c71cae1b3fc678e4cabfa21d575c728edd44a4b372b3389ce763856273abecbf";
 
     #[test]
-    fn a_torn_landing_folds_to_one_and_a_persisted_write_to_two() {
+    fn torn_landing_folds_to_one_and_a_persisted_write_to_two() {
         // 写表：0 持久、1 没持久、2 原写没持久而撕裂镜像（枚举写表下标 3）持久。
         let persisted = vec![true, false, false, true];
         let torn_image_index_by_write = BTreeMap::from([(2usize, 3usize)]);
@@ -3891,6 +3899,48 @@ mod tests {
         );
     }
 
+    /// 一条流现在驱动、录下来之后，`prepare_stream` 那一批停机条款 S1（段长表、写数、根槽写数、盘数与盘字节数，
+    /// 流一另有与 `build_pool` 整条流的回比，流二另有抬 F、E 落点与卸载 txg 的回比）里没过的那几条，每条写成「名字 local=… crates=…」。
+    fn broken_stop_checks_of_the_stream_recorded_now(name: StreamName) -> Vec<String> {
+        prepare_stream(name)
+            .checks
+            .iter()
+            .filter(|check| !check.holds())
+            .map(|check| {
+                format!(
+                    "{} local={} crates={}",
+                    check.name, check.local, check.crates
+                )
+            })
+            .collect()
+    }
+
+    /// 流一（新池新建文件）驱动完，S1 逐条成立：本地段长表与现在录到的流分叉时这里红，用不着跑一趟 `dump`。
+    /// 段模型那两条只拿本地表比本地拼出的表，本地表与段模型一起错的只有这条抓得到；闭式与写数都对而段序错的，这条也红。
+    #[test]
+    fn stop_checks_of_the_new_pool_file_creation_stream_hold_against_the_stream_recorded_now() {
+        let broken = broken_stop_checks_of_the_stream_recorded_now(StreamName::NewPoolFileCreation);
+        assert!(
+            broken.is_empty(),
+            "{} 的 S1 没过：{broken:?}",
+            StreamName::NewPoolFileCreation.directory_name()
+        );
+    }
+
+    /// 流二（固定脚本走到 E 再卸载）驱动完，S1 逐条成立：本地段长表与现在录到的流分叉时这里红，用不着跑一趟 `dump`。
+    /// 段模型那两条只拿本地表比本地拼出的表，本地表与段模型一起错的只有这条抓得到；闭式与写数都对而段序错的，这条也红。
+    #[test]
+    fn stop_checks_of_the_fixed_script_stream_hold_against_the_stream_recorded_now() {
+        let broken = broken_stop_checks_of_the_stream_recorded_now(
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount,
+        );
+        assert!(
+            broken.is_empty(),
+            "{} 的 S1 没过：{broken:?}",
+            StreamName::FixedScriptReuseAfterRaisingFloorThenUnmount.directory_name()
+        );
+    }
+
     fn bytes_write(device: u32, offset: u64, bytes: Vec<u8>) -> RetainedWrite {
         RetainedWrite {
             device: DeviceIdentity(device),
@@ -4088,7 +4138,7 @@ mod tests {
     /// 第 1 次重跑登记第十一节 S5 的单测形态：同一个种子、同一条流（流一，驱动快），两版的表逐行相同，只差 P8 的期望判定与末尾多出的 P10；
     /// P10 的底态与 P9-Mk+ 同一个、补丁与同底态族的 P8-Mk 同一个（同一个改法落在 Mk⁺ 上）。
     #[test]
-    fn the_second_run_table_differs_from_the_first_only_in_the_p8_expectation_and_a_final_p10_row_on_the_p9_base(
+    fn the_second_run_table_differs_from_the_first_only_in_the_previous_version_landing_expectation_and_a_final_lower_bound_row_on_the_first_run_mk_plus_base(
     ) {
         let first_run_seed = 0x8546_b125_8e42_7c34_u64;
         let stream = prepare_stream(StreamName::NewPoolFileCreation);
@@ -4152,25 +4202,28 @@ mod tests {
         assert_eq!(lower_bound_row.name, LOWER_BOUND_ROW_NAME);
         assert_eq!(lower_bound_row.family, BadFamily::AcknowledgementLowerBound);
         assert_eq!(lower_bound_row.expected_verdict, "not_in");
-        let mk_plus_p9_row = second_run_rows
+        let first_run_mk_plus_row = second_run_rows
             .iter()
             .find(|row| row.name == FIRST_RUN_MK_PLUS_ROW_NAME)
             .expect("流一有 Mk⁺ 底态、有 P9 行");
         assert_eq!(
-            lower_bound_row.base.persisted, mk_plus_p9_row.base.persisted,
+            lower_bound_row.base.persisted, first_run_mk_plus_row.base.persisted,
             "P10 的底态与 P9-Mk+ 是同一个落地向量（S5b）；取了 Mk 就差一个写"
         );
-        let mk_p8_row = second_run_rows
+        let previous_version_landing_mk_row = second_run_rows
             .iter()
             .find(|row| row.name == "P8-Mk")
             .expect("有 P8-Mk 行");
-        assert_eq!(patch_texts(lower_bound_row), patch_texts(mk_p8_row));
+        assert_eq!(
+            patch_texts(lower_bound_row),
+            patch_texts(previous_version_landing_mk_row)
+        );
         assert_eq!(
             lower_bound_row.expected_landing.text(),
-            mk_p8_row.expected_landing.text()
+            previous_version_landing_mk_row.expected_landing.text()
         );
         assert!(
-            lower_bound_row.base.persisted != mk_p8_row.base.persisted,
+            lower_bound_row.base.persisted != previous_version_landing_mk_row.base.persisted,
             "Mk⁺ 比 Mk 多一个持久的写"
         );
     }

@@ -3546,17 +3546,21 @@ enum HighWaterMark {
 
 impl CellRoundFacts {
     fn of_the_lines(lines: &[ResultLine]) -> CellRoundFacts {
-        let config = lines_named(lines, "h2_config").into_iter().next();
+        let configuration = lines_named(lines, "h2_config").into_iter().next();
         let heap = lines_named(lines, "positive_control_heap")
             .into_iter()
             .next();
         let process = lines_named(lines, "h2_process").into_iter().next();
-        let config_text = |key: &str| config.and_then(|line| line.field(key)).map(str::to_string);
+        let configuration_text = |key: &str| {
+            configuration
+                .and_then(|line| line.field(key))
+                .map(str::to_string)
+        };
         CellRoundFacts {
-            host: config_text("host"),
-            image_filesystem: config_text("image_filesystem"),
-            service_attempt: config_text("service_attempt"),
-            unit_area_slots: config.and_then(|line| line.number("unit_area_slots")),
+            host: configuration_text("host"),
+            image_filesystem: configuration_text("image_filesystem"),
+            service_attempt: configuration_text("service_attempt"),
+            unit_area_slots: configuration.and_then(|line| line.number("unit_area_slots")),
             high_water_mark_before_kibibytes: heap
                 .and_then(|line| line.number("high_water_mark_before_kibibytes")),
             high_water_mark_after_kibibytes: heap
@@ -3852,10 +3856,10 @@ fn measured_reading_of_the_lines(lines: &[ResultLine]) -> Option<CellRoundReadin
 /// 一片的行读成一格一轮的结局：程序文件对不上的不读；镜像建不出记「那一台文件系统拒」；其余记「片做完」，类在 [`CellRoundStatus::memory_threshold_class`] 里按 H 判。
 fn status_of_a_capacity_shard(lines: &[ResultLine], binary_sha256: &str) -> CellRoundStatus {
     let fields_missing = || CellRoundStatus::NotMeasured("fields_missing".to_string());
-    let Some(config) = lines_named(lines, "h2_config").into_iter().next() else {
+    let Some(configuration) = lines_named(lines, "h2_config").into_iter().next() else {
         return fields_missing();
     };
-    match config.field("binary_sha256") {
+    match configuration.field("binary_sha256") {
         Some(sha256) if sha256 == binary_sha256 => {}
         Some(sha256) => return CellRoundStatus::BinaryOtherThanTheMerge(sha256.to_string()),
         None => return fields_missing(),
@@ -4279,16 +4283,17 @@ fn every_round_slope_satisfies(judgement: &SlopeRowJudgement, holds: fn(f64) -> 
 }
 
 /// A37：分配器拷贝字节 ÷ (2 × 单元区槽数) ∈ [3.5, 4.0]，按百万分之一比。
-const A37_LOWER_MILLIONTHS: u128 = 3_500_000;
-const A37_UPPER_MILLIONTHS: u128 = 4_000_000;
+const COPY_BYTES_PER_SLOT_LOWER_MILLIONTHS: u128 = 3_500_000;
+const COPY_BYTES_PER_SLOT_UPPER_MILLIONTHS: u128 = 4_000_000;
 
 fn bytes_per_slot_per_device_millionths(copy_bytes: u64, device_bytes: u64) -> u128 {
     u128::from(copy_bytes) * 1_000_000
         / u128::from(POOL_DEVICE_COUNT * unit_area_slots(device_bytes, JOURNAL_RING_DEFAULT_BYTES))
 }
 
-fn a37_holds(millionths: u128) -> bool {
-    (A37_LOWER_MILLIONTHS..=A37_UPPER_MILLIONTHS).contains(&millionths)
+fn copy_bytes_per_slot_ratio_holds(millionths: u128) -> bool {
+    (COPY_BYTES_PER_SLOT_LOWER_MILLIONTHS..=COPY_BYTES_PER_SLOT_UPPER_MILLIONTHS)
+        .contains(&millionths)
 }
 
 /// 一格跨轮比的确定性字段（T4；登记 R2d「确定性的量，5 轮应逐字段相同」）：哪几样不同。
@@ -4479,7 +4484,7 @@ fn emit_capacity_cell_values(emitter: &mut Emitter, statuses: &CapacityStatuses)
         fields.push(format!(
             "bytes_per_slot_per_device_millionths={} bytes_per_slot_per_device_within_the_inferred_interval={}",
             joined_or_none(&per_slot),
-            !per_slot.is_empty() && per_slot.iter().all(|millionths| a37_holds(*millionths)),
+            !per_slot.is_empty() && per_slot.iter().all(|millionths| copy_bytes_per_slot_ratio_holds(*millionths)),
         ));
         emitter.emit(&fields.join(" "));
         let differing = fields_differing_across_rounds(&readings);
@@ -5069,15 +5074,17 @@ fn emit_capacity_verdict(
         .filter(|(cell, _, _)| cell.sequentially_written_units == 0)
         .filter_map(|(cell, _, status)| Some((*cell, status.reading()?)))
         .collect();
-    let a37_outside = ladder_readings.iter().any(|(cell, reading)| {
+    let copy_bytes_per_slot_ratio_outside = ladder_readings.iter().any(|(cell, reading)| {
         reading.heap_control_holds
-            && !a37_holds(bytes_per_slot_per_device_millionths(
+            && !copy_bytes_per_slot_ratio_holds(bytes_per_slot_per_device_millionths(
                 reading.copy_bytes,
                 cell.device_bytes,
             ))
     });
     let mut contradicted: Vec<&str> = Vec::new();
-    if *class("r2c") != ClassAcrossRounds::Stable(SlopeClass::Linear) || a37_outside {
+    if *class("r2c") != ClassAcrossRounds::Stable(SlopeClass::Linear)
+        || copy_bytes_per_slot_ratio_outside
+    {
         contradicted.push("r2c_or_a37");
     }
     if *class("r2a") != ClassAcrossRounds::Stable(SlopeClass::BasicallyUnrelated) {
@@ -7845,7 +7852,7 @@ mod tests {
     }
 
     #[test]
-    fn a_mount_that_stays_short_after_raising_the_floor_is_not_counted_as_admitted() {
+    fn mount_that_stays_short_after_raising_the_floor_is_not_counted_as_admitted() {
         assert!(AdmissionClass::AdmittedBeforeAcquisition.counts_as_admitted());
         assert!(AdmissionClass::AdmittedAfterTheFloorRaises.counts_as_admitted());
         assert!(!AdmissionClass::StillShortAfterTheFloorRaises.counts_as_admitted());
@@ -7919,7 +7926,7 @@ mod tests {
     }
 
     #[test]
-    fn a_roomy_disk_reaches_every_stage_and_every_reading_check_holds() {
+    fn roomy_disk_reaches_every_stage_and_every_reading_check_holds() {
         let trial = run_trial(256 * MEBIBYTE, MEBIBYTE, 8);
         let flags = trial.flags();
         assert!(flags.make_filesystem_succeeded, "{trial:?}");
@@ -7997,27 +8004,32 @@ mod tests {
             }
             let mut working = digest_words;
             for index in 0..64 {
-                let word_e = working[4];
-                let word_a = working[0];
-                let choose = (word_e & working[5]) ^ (!word_e & working[6]);
-                let majority =
-                    (word_a & working[1]) ^ (word_a & working[2]) ^ (working[1] & working[2]);
-                let mix_e =
-                    word_e.rotate_right(6) ^ word_e.rotate_right(11) ^ word_e.rotate_right(25);
-                let mix_a =
-                    word_a.rotate_right(2) ^ word_a.rotate_right(13) ^ word_a.rotate_right(22);
-                let sum_for_e = working[7]
-                    .wrapping_add(mix_e)
+                let choose_input_word = working[4];
+                let majority_input_word = working[0];
+                let choose = (choose_input_word & working[5]) ^ (!choose_input_word & working[6]);
+                let majority = (majority_input_word & working[1])
+                    ^ (majority_input_word & working[2])
+                    ^ (working[1] & working[2]);
+                let rotated_mix_of_the_choose_input = choose_input_word.rotate_right(6)
+                    ^ choose_input_word.rotate_right(11)
+                    ^ choose_input_word.rotate_right(25);
+                let rotated_mix_of_the_majority_input = majority_input_word.rotate_right(2)
+                    ^ majority_input_word.rotate_right(13)
+                    ^ majority_input_word.rotate_right(22);
+                let sum_entering_both_new_input_words = working[7]
+                    .wrapping_add(rotated_mix_of_the_choose_input)
                     .wrapping_add(choose)
                     .wrapping_add(ROUND_CONSTANTS[index])
                     .wrapping_add(schedule[index]);
-                let sum_for_a = sum_for_e.wrapping_add(mix_a).wrapping_add(majority);
+                let new_majority_input_word = sum_entering_both_new_input_words
+                    .wrapping_add(rotated_mix_of_the_majority_input)
+                    .wrapping_add(majority);
                 working = [
-                    sum_for_a,
+                    new_majority_input_word,
                     working[0],
                     working[1],
                     working[2],
-                    working[3].wrapping_add(sum_for_e),
+                    working[3].wrapping_add(sum_entering_both_new_input_words),
                     working[4],
                     working[5],
                     working[6],
@@ -8127,7 +8139,7 @@ mod tests {
     }
 
     #[test]
-    fn a_zero_reading_is_taken_as_one_byte_and_flagged() {
+    fn zero_reading_is_taken_as_one_byte_and_flagged() {
         let slope = log_log_least_squares_slope(&[(2, 0), (4, 4)]).expect("两个点");
         assert!(slope.has_zero_point);
         assert!(
@@ -8242,11 +8254,11 @@ mod tests {
     }
 
     #[test]
-    fn a37_interval_includes_both_edges() {
-        assert!(a37_holds(3_500_000));
-        assert!(a37_holds(4_000_000));
-        assert!(!a37_holds(3_499_999));
-        assert!(!a37_holds(4_000_001));
+    fn copy_bytes_per_slot_interval_includes_both_edges() {
+        assert!(copy_bytes_per_slot_ratio_holds(3_500_000));
+        assert!(copy_bytes_per_slot_ratio_holds(4_000_000));
+        assert!(!copy_bytes_per_slot_ratio_holds(3_499_999));
+        assert!(!copy_bytes_per_slot_ratio_holds(4_000_001));
         assert_eq!(
             bytes_per_slot_per_device_millionths(2 * 211_968 * 29 / 8, 4 * GIBIBYTE),
             3_625_000,
@@ -8255,7 +8267,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shard_file_counts_as_finished_only_when_its_last_line_counts_every_line() {
+    fn shard_file_counts_as_finished_only_when_its_last_line_counts_every_line() {
         // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
         let directory =
             singlefs_verification::temporary_files::TemporaryPathRemovedOnDrop::claiming(
@@ -8328,7 +8340,7 @@ mod tests {
     }
 
     #[test]
-    fn a_measured_window_reports_the_buffer_allocated_inside_it() {
+    fn measured_window_reports_the_buffer_allocated_inside_it() {
         let (length, window) = measure_in_a_window(&COUNTING_ALLOCATOR, || {
             let buffer = vec![3u8; 8 << 20];
             std::hint::black_box(&buffer);
@@ -8398,7 +8410,7 @@ mod tests {
     /// 别的线程在窗里放掉一大份、或分一大份并握着，窗报的仍恰好是发起窗的这条线程自己分的那一份。
     /// 放掉的一例是原来的缺陷：全进程的「之后减之前」掉到 0（饱和），峰值也报不出这条线程分的 3 MiB。
     #[test]
-    fn a_measured_window_counts_only_the_thread_that_measures_it() {
+    fn measured_window_counts_only_the_thread_that_measures_it() {
         const KEPT_BYTES: usize = 3 << 20;
         const OTHER_THREAD_BYTES: u64 = 40 << 20;
         let kept_bytes = u64::try_from(KEPT_BYTES).expect("装得进 u64");
@@ -8568,7 +8580,7 @@ mod tests {
     }
 
     #[test]
-    fn a_capacity_shard_reads_back_every_measured_field() {
+    fn capacity_shard_reads_back_every_measured_field() {
         let cell = capacity_cells()[1];
         let status =
             status_of_a_capacity_shard(&parsed(&synthetic_capacity_shard_lines(cell)), "same");
@@ -8604,7 +8616,7 @@ mod tests {
     }
 
     #[test]
-    fn a_capacity_shard_with_a_missing_line_or_another_binary_is_not_measured_rather_than_zero() {
+    fn capacity_shard_with_a_missing_line_or_another_binary_is_not_measured_rather_than_zero() {
         let cell = capacity_cells()[0];
         let mut lines = synthetic_capacity_shard_lines(cell);
         lines.retain(|line| !line.contains("name=h2_allocator_copy"));
@@ -8622,7 +8634,7 @@ mod tests {
     }
 
     #[test]
-    fn a_round_whose_publish_failed_gives_no_publish_quantity() {
+    fn round_whose_publish_failed_gives_no_publish_quantity() {
         let cell = capacity_cells()[0];
         let lines: Vec<String> = synthetic_capacity_shard_lines(cell)
             .into_iter()
@@ -8792,7 +8804,8 @@ mod tests {
     }
 
     #[test]
-    fn a_cell_value_line_says_whether_its_publish_is_the_registered_x5() {
+    fn cell_value_line_says_whether_its_publish_is_the_registered_overwrite_inside_data_unit_zero()
+    {
         let mut emitter = Emitter::collecting_lines();
         emit_capacity_summary(
             &mut emitter,
@@ -8816,7 +8829,7 @@ mod tests {
     }
 
     #[test]
-    fn a_deterministic_field_that_changes_between_rounds_stops_the_capacity_merge() {
+    fn deterministic_field_that_changes_between_rounds_stops_the_capacity_merge() {
         let statuses: CapacityStatuses = synthetic_capacity_statuses()
             .into_iter()
             .map(|(cell, round, status)| {
@@ -8852,7 +8865,7 @@ mod tests {
     }
 
     #[test]
-    fn a_high_water_mark_one_mebibyte_under_the_threshold_is_already_beyond_its_lower_edge() {
+    fn high_water_mark_one_mebibyte_under_the_threshold_is_already_beyond_its_lower_edge() {
         assert_eq!(MEMORY_THRESHOLD_BYTES, 25_769_803_776);
         assert_eq!(
             memory_threshold_lower_edge(MEMORY_THRESHOLD_BYTES) + 67_108_864,
@@ -8880,7 +8893,7 @@ mod tests {
     }
 
     #[test]
-    fn a_high_water_mark_of_25_gibibytes_read_in_kibibytes_is_beyond_the_threshold() {
+    fn high_water_mark_of_25_gibibytes_read_in_kibibytes_is_beyond_the_threshold() {
         let status = synthetic_status_on(capacity_cells()[0], "本机", 26_214_400);
         assert_eq!(
             status.facts().map(CellRoundFacts::high_water_mark),
@@ -8895,7 +8908,7 @@ mod tests {
     }
 
     #[test]
-    fn a_service_outcome_below_the_threshold_is_undeterminable_and_at_the_threshold_is_beyond() {
+    fn service_outcome_below_the_threshold_is_undeterminable_and_at_the_threshold_is_beyond() {
         let below = status_of_a_service_outcome(
             "type=memory-cap-at-maximum reached=21743271936 peak=none task=7 shard=0/5 attempt=3\n",
         );
@@ -8982,7 +8995,7 @@ mod tests {
     }
 
     #[test]
-    fn a_largest_capacity_with_one_round_beyond_the_threshold_leaves_four_completed_capacities() {
+    fn largest_capacity_with_one_round_beyond_the_threshold_leaves_four_completed_capacities() {
         let endpoint = ladder_cells()[4];
         let statuses = synthetic_statuses_with(|cell, round| {
             (cell == endpoint && round == 2).then(|| synthetic_status_on(cell, "本机", 26_214_400))
@@ -9030,7 +9043,7 @@ mod tests {
     }
 
     #[test]
-    fn a_round_whose_ladder_ran_on_two_hosts_gives_no_r2a_slope_in_that_round() {
+    fn round_whose_ladder_ran_on_two_hosts_gives_no_r2a_slope_in_that_round() {
         let terabyte = ladder_cells()[2];
         let statuses = synthetic_statuses_with(|cell, round| {
             (cell == terabyte && round == 3)
@@ -9139,7 +9152,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cell_whose_unit_area_slots_differ_from_the_registered_value_stops_the_capacity_merge() {
+    fn cell_whose_unit_area_slots_differ_from_the_registered_value_stops_the_capacity_merge() {
         for (device_bytes, slots) in REGISTERED_UNIT_AREA_SLOTS_BY_DEVICE_BYTES {
             assert_eq!(
                 unit_area_slots(device_bytes, JOURNAL_RING_DEFAULT_BYTES),
@@ -9271,7 +9284,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shard_context_needs_a_known_host_a_numbered_service_attempt_and_one_filesystem_word() {
+    fn shard_context_needs_a_known_host_a_numbered_service_attempt_and_one_filesystem_word() {
         assert_eq!(
             CapacityShardContext::parse("abc", "第二台", "4/5:2", "ext2/ext3"),
             Some(CapacityShardContext {
@@ -9298,8 +9311,7 @@ mod tests {
     }
 
     #[test]
-    fn a_high_water_mark_within_the_binary_size_and_the_margin_of_the_threshold_is_marked_near_it()
-    {
+    fn high_water_mark_within_the_binary_size_and_the_margin_of_the_threshold_is_marked_near_it() {
         let cell = capacity_cells()[0];
         let binary_bytes = SYNTHETIC_BINARY_BYTES.expect("合成值");
         let edge_kibibytes =
@@ -9326,7 +9338,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shard_whose_images_could_not_be_made_reads_as_filesystem_refused_on_its_host() {
+    fn shard_whose_images_could_not_be_made_reads_as_filesystem_refused_on_its_host() {
         let lines: Vec<String> = synthetic_capacity_shard_lines_on(
             capacity_cells()[4],
             "第二台",
@@ -9430,7 +9442,7 @@ mod tests {
     }
 
     #[test]
-    fn a_forced_preflight_line_gives_its_summary_with_underscores_and_a_met_line_gives_none() {
+    fn forced_preflight_line_gives_its_summary_with_underscores_and_a_met_line_gives_none() {
         assert_eq!(
             forced_summary_of("forced inputs unchanged since last run"),
             Some("inputs_unchanged_since_last_run".to_string())
@@ -9514,7 +9526,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sweep_is_due_only_strictly_above_the_threshold() {
+    fn sweep_is_due_only_strictly_above_the_threshold() {
         assert!(!sweep_is_due(369, 369));
         assert!(sweep_is_due(370, 369));
         assert!(!sweep_is_due(0, 0));
@@ -9866,7 +9878,7 @@ mod tests {
     }
 
     #[test]
-    fn a_threshold_cell_without_a_chain_read_line_counts_as_failed_for_the_new_arm() {
+    fn threshold_cell_without_a_chain_read_line_counts_as_failed_for_the_new_arm() {
         let mut shards = synthetic_history_shards(1);
         let (_, _, lines) = &mut shards[0];
         lines.retain(|line| line.name() != Some("h5_chain_read_differential"));
@@ -9874,7 +9886,7 @@ mod tests {
     }
 
     #[test]
-    fn a_repeat_of_the_first_shard_that_differs_outside_timing_stops_the_sweep_merge() {
+    fn repeat_of_the_first_shard_that_differs_outside_timing_stops_the_sweep_merge() {
         let mut emitter = Emitter::collecting_lines();
         let end = emit_sweep_summary(&mut emitter, &synthetic_history_shards(2));
         assert!(matches!(end, MergeEnd::Stopped { .. }), "{end:?}");
@@ -9903,7 +9915,7 @@ mod tests {
     /// 小盘（256 MiB、环 1 MiB）上的清扫历史走产物同一条路：θ = 4、S = 4，两种卸载方式都要走到第二次清扫、每次挂载与锚点模型对得上
     /// （不对就是停机 T5 的那一种：锚点脚本的读法与 `crates/` 的实现不一致，交主 agent 两边查）。
     #[test]
-    fn a_short_sweep_history_on_a_small_pool_runs_to_its_second_sweep_in_both_unmount_kinds() {
+    fn short_sweep_history_on_a_small_pool_runs_to_its_second_sweep_in_both_unmount_kinds() {
         for unmount_kind in [UnmountKind::Normal, UnmountKind::Crash] {
             let cell = SweepHistoryCell {
                 slots_per_region: 4,
@@ -9977,7 +9989,7 @@ mod tests {
     }
 
     #[test]
-    fn a_short_history_handed_to_the_background_never_sweeps_and_counts_one_row_per_mount() {
+    fn short_history_handed_to_the_background_never_sweeps_and_counts_one_row_per_mount() {
         let cell = SweepHistoryCell {
             slots_per_region: 8,
             arm: SweepArm::HandedToTheBackground,
@@ -10010,7 +10022,7 @@ mod tests {
     /// 小盘（256 MiB、环 1 MiB）文件镜像上的 H2 一格走产物同一条路：n = 0 时 X4 五次都分到、X5 五次都发成；n = 16 时 X4 五次都分到、
     /// 记录数比 n = 0 多出至少 16 条（记录格 X5 的结局照报、不在这里判：多单元文件上覆盖写的行为由产物给）；镜像文件跑完就删。
     #[test]
-    fn a_small_capacity_cell_on_file_images_reaches_every_measurement() {
+    fn small_capacity_cell_on_file_images_reaches_every_measurement() {
         let mut records_by_units = Vec::new();
         for units in [0u64, 16] {
             // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它

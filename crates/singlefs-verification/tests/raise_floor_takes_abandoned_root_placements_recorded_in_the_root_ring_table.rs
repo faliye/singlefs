@@ -57,19 +57,20 @@ use common_unwitnessed_publish::{
     content_of, device_bytes_of_the_384_slot_small_devices, devices_reading_back_all_zero_on,
     image_of_devices_reading_back_all_zero, parameters_of_the_384_slot_small_devices, plain_device,
     plain_devices_on, pool_after_the_mount, record_one_publish_after_overwrites,
-    root_is_in_the_ring, DeviceOverASparseImage, PoolUnderTest, PublishRecordedAsR,
-    RangesReadingBackAllZero, RecordedPublish, OVERWRITE_BYTES,
+    root_is_in_the_ring, DeviceOverASparseImage, PoolUnderTest, RangesReadingBackAllZero,
+    RecordedPublish, RecordedPublishKind, OVERWRITE_BYTES,
 };
 use scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::{
     account_writes_of, assert_none_of_the_placements_is_free,
     assert_the_rehearsed_refusal_is_the_refusal_after_pushing_the_root_ring,
     assert_the_root_ring_slot_is_unreadable,
-    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots,
-    data_unit_placements_r_shares_with_the_previous_version, devices_with_the_read_fault_on,
-    free_slots_covered_by, image_after_raising_the_floor_to_the_txg_of_the_abandoned_root,
-    isolated_slots_covered_by, isolated_slots_covered_by_the_ring_slots_holding_placements,
-    isolated_slots_of, isolated_slots_on_each_device_of, isolated_slots_released_between,
-    lineage_unit_writes_of, mounted_while_the_abandoned_root_reads, packed_unit_writes_of_type,
+    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots,
+    data_unit_placements_the_recorded_publish_shares_with_the_previous_version,
+    devices_with_the_read_fault_on, free_slots_covered_by,
+    image_after_raising_the_floor_to_the_txg_of_the_abandoned_root, isolated_slots_covered_by,
+    isolated_slots_covered_by_the_ring_slots_holding_placements, isolated_slots_of,
+    isolated_slots_on_each_device_of, isolated_slots_released_between, lineage_unit_writes_of,
+    mounted_while_the_abandoned_root_reads, packed_unit_writes_of_type,
     pool_crashed_after_the_first_record_of_a_long_sequential_write,
     pool_failing_one_changing_call_copied_from,
     pool_whose_newest_root_was_abandoned_by_a_crash_recovery, push_the_root_ring_of,
@@ -86,8 +87,9 @@ use scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_roo
     RecordedRollback, WriteStuckBehindTheWideProtection,
     DATA_UNITS_A_WRITE_STILL_REFUSED_AFTER_THE_PUSH_GROWS_THE_FILE_BY,
     DATA_UNITS_A_WRITE_THE_PUSH_LETS_THROUGH_GROWS_THE_FILE_BY,
-    OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_R,
-    OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R, OVERWRITES_BEFORE_THE_ROLLBACK_SIX_VERSIONS_BACK,
+    OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_THE_RECORDED_PUBLISH,
+    OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
+    OVERWRITES_BEFORE_THE_ROLLBACK_SIX_VERSIONS_BACK,
     OVERWRITES_BEFORE_THE_ROLLBACK_WHOSE_PLACEMENTS_A_FLOOR_RAISE_RECLAIMS,
     OVERWRITES_BEFORE_THE_UNWITNESSED_PUBLISH, VERSIONS_BACK_OF_THE_ROLLBACK_TARGET,
 };
@@ -355,9 +357,9 @@ fn unmount_takes_the_empty_placements_recorded_for_an_abandoned_root_the_credent
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_UNWITNESSED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let ranges = RangesReadingBackAllZero::default()
         .with_the_writes(&[recorded.root_slot_write()])
@@ -375,22 +377,25 @@ fn unmount_takes_the_empty_placements_recorded_for_an_abandoned_root_the_credent
         recorded.pool.device_bytes,
     );
     let mut pool = pool_after_the_mount(&recorded, &image_after_the_first_mount, first_mount);
-    let account_slots_of_r: Vec<LocationEntry> = root_of_r
+    let account_slots_of_the_recorded_publish: Vec<LocationEntry> = root_of_the_recorded_publish
         .tree_table
         .locations
         .iter()
-        .chain(root_of_r.mapping_root.locations.iter())
+        .chain(root_of_the_recorded_publish.mapping_root.locations.iter())
         .copied()
         .collect();
     let mut overwrites_after_the_first_mount = 0;
     // 迭代上界 OVERWRITES_UNTIL_THE_ACCOUNT_SLOTS_ARE_TAKEN_AT_MOST；每一轮看一次现行账，不够再覆盖写一次。
-    while !account_slots_of_r.iter().all(|location| {
-        a_later_record_covers(
-            &pool.current_file_version().allocation_records,
-            &root_of_r,
-            location,
-        )
-    }) {
+    while !account_slots_of_the_recorded_publish
+        .iter()
+        .all(|location| {
+            a_later_record_covers(
+                &pool.current_file_version().allocation_records,
+                &root_of_the_recorded_publish,
+                location,
+            )
+        })
+    {
         assert!(
             overwrites_after_the_first_mount < OVERWRITES_UNTIL_THE_ACCOUNT_SLOTS_ARE_TAKEN_AT_MOST,
             "{OVERWRITES_UNTIL_THE_ACCOUNT_SLOTS_ARE_TAKEN_AT_MOST} 次覆盖写之内 R 的树表槽与映射根槽都被重新分配"
@@ -413,8 +418,8 @@ fn unmount_takes_the_empty_placements_recorded_for_an_abandoned_root_the_credent
             .root_ring_occupancy()
             .expect("挂载建的分配器装着根环表")
             .placements_recorded_for_the_abandoned_root(
-                root_of_r.instance,
-                root_of_r.checkpoint_txg
+                root_of_the_recorded_publish.instance,
+                root_of_the_recorded_publish.checkpoint_txg
             ),
         Some(Vec::new()),
         "凭据放行：根环表把 R 记成被抛弃根，记着的落点是空串"
@@ -460,13 +465,13 @@ fn units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version
     );
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 // harness-test-granularity:one-scenario 一个池、一次挂载，循环是同一个会话里接着覆盖写，不是每轮新建一个池
 #[test]
-fn units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written(
+fn units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written_where_both_devices_lost_their_newest_rotation_write(
 ) {
     PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
-        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written,
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written,
     );
 }
 
@@ -523,10 +528,10 @@ fn units_a_rollback_revived_stay_through_writes_while_its_account_and_the_accoun
 fn a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_target_still_allocated(
 ) {
     let recorded_rollback = record_one_rollback_to_the_first_file_after_overwrites(
-        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_ROLLBACK_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let recorded = &recorded_rollback.recorded;
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let mut devices = devices_reading_back_all_zero_on(
         &crash_image,
@@ -547,21 +552,23 @@ fn a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_tar
         "R 走读不成：择根退到 P（阳性对照：故障打到了）"
     );
     let released_in_the_current_account = released_in_the_account_of_the_selected_version(&mounted);
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
-    let released_borrowed_for_r: std::collections::BTreeSet<(DeviceIdentity, SlotNumber)> =
-        borrowed_for_r
-            .iter()
-            .map(|placement| (placement.device, placement.slot))
-            .filter(|placement| released_in_the_current_account.contains(placement))
-            .collect();
+    let released_borrowed_for_the_recorded_publish: std::collections::BTreeSet<(
+        DeviceIdentity,
+        SlotNumber,
+    )> = borrowed_for_the_recorded_publish
+        .iter()
+        .map(|placement| (placement.device, placement.slot))
+        .filter(|placement| released_in_the_current_account.contains(placement))
+        .collect();
     let still_allocated_by_the_target_and_released: std::collections::BTreeSet<(
         DeviceIdentity,
         SlotNumber,
@@ -578,7 +585,7 @@ fn a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_tar
         "复活的落点都在 R_old 账里仍分配、现行账里已释放的那一截里（阳性对照：期望那一截罩着复活集）"
     );
     assert_eq!(
-        released_borrowed_for_r, still_allocated_by_the_target_and_released,
+        released_borrowed_for_the_recorded_publish, still_allocated_by_the_target_and_released,
         "C 里 R 那一槽里现行账已释放的落点，就是 R_old 账里仍分配、现行账里已释放的那一截（窄取法：不多并现行账里别的已释放落点）"
     );
 }
@@ -591,9 +598,9 @@ fn a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_tar
 fn a_root_taking_the_current_account_that_is_not_a_rollback_takes_nothing_released_and_isolates_as_before_at_the_mount(
 ) {
     let recorded = record_one_inode_creation_after_overwrites(
-        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     assert!(
         lineage_unit_writes_of(&recorded).is_empty(),
         "建 inode 不写谱系片（阳性对照：R 不是回退）"
@@ -622,13 +629,13 @@ fn a_root_taking_the_current_account_that_is_not_a_rollback_takes_nothing_releas
         !released_in_the_current_account.is_empty(),
         "挂载那一刻现行账里有已释放的落点（阳性对照：并多了看得出来）"
     );
-    let released_borrowed_for_r: Vec<PlacementOnDevice> = mounted
+    let released_borrowed_for_the_recorded_publish: Vec<PlacementOnDevice> = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）")
         .into_iter()
@@ -637,8 +644,8 @@ fn a_root_taking_the_current_account_that_is_not_a_rollback_takes_nothing_releas
         })
         .collect();
     assert!(
-        released_borrowed_for_r.is_empty(),
-        "R 不是回退：C 里 R 那一槽一个现行账里已释放的落点都不并，多并的 {released_borrowed_for_r:?}"
+        released_borrowed_for_the_recorded_publish.is_empty(),
+        "R 不是回退：C 里 R 那一槽一个现行账里已释放的落点都不并，多并的 {released_borrowed_for_the_recorded_publish:?}"
     );
     let isolated_slots_at_the_mount: u64 = mounted
         .allocator
@@ -675,7 +682,7 @@ fn wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_t
         !lineage_unit_writes.is_empty(),
         "回退那次发布写了谱系片（阳性对照：故障有处可打）"
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let mut devices = devices_reading_back_all_zero_on(
         &crash_image,
@@ -698,19 +705,19 @@ fn wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_t
         "R 走读不成：择根退到 P（阳性对照：故障打到了）"
     );
     let released_in_the_current_account = released_in_the_account_of_the_selected_version(&mounted);
-    let borrowed_for_r = mounted
+    let borrowed_for_the_recorded_publish = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）");
     let released_not_borrowed: Vec<&(DeviceIdentity, SlotNumber)> = released_in_the_current_account
         .iter()
         .filter(|(device, slot)| {
-            !borrowed_for_r
+            !borrowed_for_the_recorded_publish
                 .iter()
                 .any(|borrowed| borrowed.device == *device && borrowed.slot == *slot)
         })
@@ -728,7 +735,8 @@ fn wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_t
         0,
         "挂载那一刻没有一个槽同时算进「已分配」与第九项（D28（挂载期承诺量） 已定项 1 第九项：现行账里仍分配着的、已释放而还在 defer 窗口里的不在这里再算一次）"
     );
-    let free_among_the_borrowed = free_slots_covered_by(&mounted.allocator, &borrowed_for_r);
+    let free_among_the_borrowed =
+        free_slots_covered_by(&mounted.allocator, &borrowed_for_the_recorded_publish);
     assert!(
         free_among_the_borrowed.is_empty(),
         "C 里 R 那一槽的每个槽挂载那一刻都不空闲（分配着或隔离着）：空闲的（盘、槽）{free_among_the_borrowed:?}"
@@ -787,7 +795,7 @@ fn assert_the_root_taking_the_current_account_takes_every_released_placement_at_
     recorded: &RecordedPublish,
     ranges: &RangesReadingBackAllZero,
 ) {
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let mut devices = devices_reading_back_all_zero_on(&crash_image, ranges);
     let mounted = mount_writable_with_space_admission(
@@ -809,13 +817,16 @@ fn assert_the_root_taking_the_current_account_takes_every_released_placement_at_
         !released_in_the_current_account.is_empty(),
         "挂载那一刻现行账里有已释放的落点（阳性对照：并少了看得出来）"
     );
-    let released_borrowed_for_r: std::collections::BTreeSet<(DeviceIdentity, SlotNumber)> = mounted
+    let released_borrowed_for_the_recorded_publish: std::collections::BTreeSet<(
+        DeviceIdentity,
+        SlotNumber,
+    )> = mounted
         .allocator
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点（R 记成有效根）")
         .into_iter()
@@ -823,13 +834,13 @@ fn assert_the_root_taking_the_current_account_takes_every_released_placement_at_
         .filter(|placement| released_in_the_current_account.contains(placement))
         .collect();
     assert_eq!(
-        released_borrowed_for_r, released_in_the_current_account,
+        released_borrowed_for_the_recorded_publish, released_in_the_current_account,
         "R 的记录点名的打包单元有一片读不出、认不出是不是回退：C 里 R 那一槽并进现行账里全部已释放的落点（tri 宽护）"
     );
 }
 
 /// 删除那一形之前覆盖写几次。
-const OVERWRITES_BEFORE_THE_DELETION_RECORDED_AS_R: u64 = 3;
+const OVERWRITES_BEFORE_THE_DELETION_RECORDED_AS_THE_RECORDED_PUBLISH: u64 = 3;
 
 /// tri 第一种的删除那一形（正推 `research/prompts/m3-batch10z-lm-code-r1-sonnet-output.md` 第 2 节「删除发布墓碑片读不出 → 宽护没有入库用例」，
 /// 探针 `faults=racct,rtomb`）：R 是一次删除的第一次发布，记录点名它写的 inode 叶容器与墓碑片（叶容器排在前面）；挂载那一刻 R 的账与墓碑片
@@ -839,7 +850,7 @@ const OVERWRITES_BEFORE_THE_DELETION_RECORDED_AS_R: u64 = 3;
 fn a_deletion_whose_tombstone_unit_and_account_read_back_zero_at_the_mount_takes_every_released_placement(
 ) {
     let recorded = record_the_first_publish_of_one_deletion_after_overwrites(
-        OVERWRITES_BEFORE_THE_DELETION_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_DELETION_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
     let tombstone_unit_writes =
         packed_unit_writes_of_type(&recorded, singlefs_core::unit::PACKED_TYPE_TOMBSTONE);
@@ -868,7 +879,7 @@ fn a_deletion_whose_tombstone_unit_and_account_read_back_zero_at_the_mount_takes
 }
 
 /// 顺序写那一形之前覆盖写几次。
-const OVERWRITES_BEFORE_THE_SEQUENTIAL_WRITE_RECORDED_AS_R: u64 = 3;
+const OVERWRITES_BEFORE_THE_SEQUENTIAL_WRITE_RECORDED_AS_THE_RECORDED_PUBLISH: u64 = 3;
 
 /// tri 第一种的多条记录那一形：R 顺序写三个数据单元（三条记录，前两条只点名数据单元，inode 叶容器只在末条点名）；挂载那一刻 R 的账与它写的
 /// inode 叶容器读回全零：认不出是不是回退，C 里 R 那一槽并进现行账里全部已释放的落点。读盘一层只看第一条记录点名的打包单元（正推 X4）时
@@ -877,8 +888,8 @@ const OVERWRITES_BEFORE_THE_SEQUENTIAL_WRITE_RECORDED_AS_R: u64 = 3;
 fn a_sequential_write_whose_inode_unit_named_by_its_last_record_and_account_read_back_zero_at_the_mount_takes_every_released_placement(
 ) {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_THE_SEQUENTIAL_WRITE_RECORDED_AS_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_SEQUENTIAL_WRITE_RECORDED_AS_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     let named_by_each_record = packed_record_types_named_by_each_record_of(&recorded);
     assert!(
@@ -916,7 +927,7 @@ fn revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims
 /// 卸载之后 R 还在根环里：C 那一圈罩着的槽一个都不空闲，复活的那几个隔离着，没有一个槽同时算进「已分配」与第九项。
 /// 当场放开那一截回收之后不补隔离（改回 `PoolAllocator::reclaim_released_up_to`）时，复活的槽卸载之后空闲，这一条红。扣到生效那一截改回只回收，
 /// 这一条照绿，那一截由
-/// [`unmount_after_one_overwrite_isolates_the_shared_units_it_reclaims_held_until_the_floor_takes_effect_while_the_account_of_r_reads_back_zero`] 钉。
+/// [`unmount_after_one_overwrite_isolates_the_shared_units_it_reclaims_held_until_the_floor_takes_effect_while_the_account_of_the_recorded_publish_reads_back_zero`] 钉。
 #[test]
 fn unmount_right_after_the_mount_isolates_the_revived_units_it_reclaims_while_the_root_slot_of_the_rollback_reads_back_zero(
 ) {
@@ -970,7 +981,7 @@ fn unmount_right_after_the_mount_isolates_the_revived_units_it_reclaims_while_th
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records();
-    let revived_not_in_c: Vec<&PlacementOnDevice> = revived
+    let revived_not_in_the_abandoned_publish: Vec<&PlacementOnDevice> = revived
         .iter()
         .filter(|revived_placement| {
             !named_by_the_unapplied_records_at_the_mount
@@ -982,8 +993,8 @@ fn unmount_right_after_the_mount_isolates_the_revived_units_it_reclaims_while_th
         })
         .collect();
     assert!(
-        revived_not_in_c.is_empty(),
-        "C 那一圈并进了 R 的账（记录的新根段读得出），R 复活的数据单元都在里面（阳性对照），缺 {revived_not_in_c:?}"
+        revived_not_in_the_abandoned_publish.is_empty(),
+        "C 那一圈并进了 R 的账（记录的新根段读得出），R 复活的数据单元都在里面（阳性对照），缺 {revived_not_in_the_abandoned_publish:?}"
     );
     // R 的根槽与谱系片挂上之后照旧读回全零，到这个进程写掉那几段为止：卸载那一串读不出 R，不把它当被抛弃根算影子账。
     let (_output, mut session) = MountedSession::of_the_mount(mounted);
@@ -1109,14 +1120,14 @@ fn smallest_among_the_newest_root_txg_on_each_device(
 /// 没有一个槽同时算进「已分配」与第九项（第九项「这次挂载里释放、回收时分配器照补隔离」，I-7.4（近 K 代块未被复用））。
 /// 扣到生效那一截回收之后不补隔离（改回 `PoolAllocator::reclaim_released_up_to`）时，卸载末尾放开扣住位之后它们空闲，这一条红。
 #[test]
-fn unmount_after_one_overwrite_isolates_the_shared_units_it_reclaims_held_until_the_floor_takes_effect_while_the_account_of_r_reads_back_zero(
+fn unmount_after_one_overwrite_isolates_the_shared_units_it_reclaims_held_until_the_floor_takes_effect_while_the_account_of_the_recorded_publish_reads_back_zero(
 ) {
     let recorded = record_one_inode_creation_after_overwrites(
-        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_R,
+        OVERWRITES_BEFORE_THE_INODE_CREATION_RECORDED_AS_THE_RECORDED_PUBLISH,
     );
-    let root_of_r = recorded.root();
+    let root_of_the_recorded_publish = recorded.root();
     let shared_with_the_previous_version =
-        data_unit_placements_r_shares_with_the_previous_version(&recorded);
+        data_unit_placements_the_recorded_publish_shares_with_the_previous_version(&recorded);
     assert!(
         !shared_with_the_previous_version.is_empty(),
         "R 建一个 inode、不写文件的数据单元：它与 P 共用文件的数据单元（阳性对照：有要护的槽）"
@@ -1145,8 +1156,8 @@ fn unmount_after_one_overwrite_isolates_the_shared_units_it_reclaims_held_until_
         .root_ring_occupancy()
         .expect("挂载建的分配器装着根环表")
         .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
-            root_of_r.instance,
-            root_of_r.checkpoint_txg,
+            root_of_the_recorded_publish.instance,
+            root_of_the_recorded_publish.checkpoint_txg,
         )
         .expect("C 那一圈在 R 那一槽记着落点");
     let shared_not_borrowed: Vec<&PlacementOnDevice> = shared_with_the_previous_version
@@ -1318,12 +1329,12 @@ fn a_deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_protectio
     );
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_r_and_lets_writes_through`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_r_and_lets_writes_through(
+fn unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through(
 ) {
     PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
-        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_r_and_lets_writes_through,
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through,
     );
 }
 
@@ -1418,7 +1429,7 @@ fn pushing_the_root_ring_with_nothing_held_until_a_ring_slot_is_written_writes_n
     let image_before = pool.image();
     let mut session = pool.session.take().expect("挂着的会话");
     let pushed = session
-        .push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states(
+        .push_the_root_ring_to_the_last_ring_slot_it_reaches_dropping_rollback_candidates_below_four_states(
             &mut pool.devices,
         );
     pool.session = Some(session);
@@ -1470,7 +1481,7 @@ fn pushing_the_root_ring_on_a_version_without_file_is_refused_as_not_supported_i
     };
     let image_before = image_of(&devices);
     let pushed = session
-        .push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states(
+        .push_the_root_ring_to_the_last_ring_slot_it_reaches_dropping_rollback_candidates_below_four_states(
             &mut devices,
         );
     assert!(
@@ -1503,7 +1514,7 @@ fn defer_slots_an_abandoned_root_whose_ring_slot_reads_bad_references_are_not_co
     let image = image_after_raising_the_floor_to_the_txg_of_the_abandoned_root(&built);
     let fault =
         ReadFaultOnChosenSlots::on_the_root_ring_slot_of(&built.abandoned_root, &built.parameters);
-    let (mut pool, recorded_for_c) = mounted_while_the_abandoned_root_reads(
+    let (mut pool, recorded_for_the_abandoned_publish) = mounted_while_the_abandoned_root_reads(
         &PoolWithAnAbandonedRoot {
             parameters: built.parameters.clone(),
             device_bytes: built.device_bytes,
@@ -1519,10 +1530,13 @@ fn defer_slots_an_abandoned_root_whose_ring_slot_reads_bad_references_are_not_co
         floor, built.abandoned_root.checkpoint_txg,
         "挂载那一刻 F 是 C 的 txg（阳性对照）"
     );
-    let defer_slots_of_c =
-        released_above_the_floor_and_covered_by(&pool.session().allocator, &recorded_for_c, floor);
+    let defer_slots_of_the_abandoned_publish = released_above_the_floor_and_covered_by(
+        &pool.session().allocator,
+        &recorded_for_the_abandoned_publish,
+        floor,
+    );
     assert!(
-        !defer_slots_of_c.is_empty(),
+        !defer_slots_of_the_abandoned_publish.is_empty(),
         "C 引用的槽里有现行账已释放、释放代高于 F 的（阳性对照）"
     );
     fault.is_active.set(true);
@@ -1555,21 +1569,22 @@ fn defer_slots_an_abandoned_root_whose_ring_slot_reads_bad_references_are_not_co
         0,
         "抬完之后没有一个槽同时算进「已分配」与第九项"
     );
-    let still_allocated_defer_slots: Vec<&(DeviceIdentity, SlotNumber)> = defer_slots_of_c
-        .iter()
-        .filter(|(device, slot)| {
-            allocator.devices.iter().any(|device_map| {
-                device_map.device == *device
-                    && !device_map.is_free(*slot)
-                    && !device_map.is_isolated(*slot)
+    let still_allocated_defer_slots: Vec<&(DeviceIdentity, SlotNumber)> =
+        defer_slots_of_the_abandoned_publish
+            .iter()
+            .filter(|(device, slot)| {
+                allocator.devices.iter().any(|device_map| {
+                    device_map.device == *device
+                        && !device_map.is_free(*slot)
+                        && !device_map.is_isolated(*slot)
+                })
             })
-        })
-        .collect();
+            .collect();
     assert!(
         !still_allocated_defer_slots.is_empty(),
         "抬完之后这几个 defer 槽还分配着、这一串没回收（阳性对照：这一圈遇到了分配位置着的槽）"
     );
-    assert_none_of_the_placements_is_free(allocator, &recorded_for_c, "C 记着");
+    assert_none_of_the_placements_is_free(allocator, &recorded_for_the_abandoned_publish, "C 记着");
 }
 
 /// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_both_ways_out_and_goes_through_after_the_push`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
@@ -1691,12 +1706,12 @@ fn a_ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_writes_up_to
     );
 }
 
-/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
+/// 场景与它交给池级 checker 的镜像见 `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both`；池级 checker 那一遍在 同名的给定状态用例（`crates/singlefs-verification/tests/crash_given_states_of_the_images_harness_scenarios_hand_out.rs`）。
 #[test]
-fn pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both(
+fn pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both_where_both_devices_lost_their_newest_rotation_write(
 ) {
     PoolCheckerImages::run_a_harness_scenario_leaving_its_images_to_the_given_states_engine(
-        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both,
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both,
     );
 }
 
@@ -1775,14 +1790,18 @@ fn the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding_overla
             .root_ring_occupancy()
             .expect("挂载建的分配器装着根环表")
             .ring_slots_holding_placements_named_by_unapplied_journal_records();
-        let (ring_slot_of_r, placements_of_r) =
+        let (last_ring_slot_the_push_reaches, placements_of_the_recorded_publish) =
             holding.iter().next().expect("C 那一圈只有 R 那一槽");
         assert_ne!(
-            *ring_slot_of_r, ring_slot_written_first,
+            *last_ring_slot_the_push_reaches, ring_slot_written_first,
             "R 那一槽不是推环第一次就写的那一槽（阳性对照：注入的那一槽先轮到）"
         );
-        let overlapping_with_r: Vec<PlacementOnDevice> =
-            placements_of_r.iter().step_by(2).copied().collect();
+        let overlapping_with_the_recorded_publish: Vec<PlacementOnDevice> =
+            placements_of_the_recorded_publish
+                .iter()
+                .step_by(2)
+                .copied()
+                .collect();
         hold_isolated_free_slots_on_a_further_ring_slot(allocator, ring_slot_written_first, 2);
         let mut two_ring_slots = allocator
             .root_ring_occupancy()
@@ -1791,7 +1810,7 @@ fn the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding_overla
         two_ring_slots
             .get_mut(&ring_slot_written_first)
             .expect("刚注入的那一槽")
-            .extend(overlapping_with_r);
+            .extend(overlapping_with_the_recorded_publish);
         allocator.note_placements_named_by_unapplied_journal_records(two_ring_slots);
         isolate_free_slots(allocator, 1);
     }
@@ -1821,7 +1840,7 @@ fn the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding_overla
         "根环表里没有被抛弃根：推环放出来的就是 C 那一圈罩着的、隔离着的槽，两槽重叠的那几个只数一次"
     );
     assert_eq!(ways_out.len(), 2, "推完放得下：两条出路都列：{ways_out:?}");
-    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots(
         &stuck,
         &ways_out[1],
         &released_in_the_rehearsal,
@@ -2322,7 +2341,7 @@ fn pool_whose_unlink_is_stuck_in_the_walk_after_the_intent_behind_a_short_push(
         "意图那一次发成、被拒的是它之后走空的一步（阳性对照：卡在走空里）"
     );
     assert_eq!(
-        stuck.ring_slot_of_r, ring_slot_holding_the_injected_isolation,
+        stuck.last_ring_slot_the_push_reaches, ring_slot_holding_the_injected_isolation,
         "推环推到注入的那一槽（阳性对照：C 那一圈只剩这一槽）"
     );
     (pool, stuck, unlink)
@@ -2397,7 +2416,7 @@ fn an_unlink_whose_walk_after_the_intent_fits_after_the_push_lists_the_push_sayi
             });
     assert_eq!(ways_out.len(), 2, "{why}：列卸载再挂与推环：{ways_out:?}");
     // 报里只剩走空：推环那一条说推完之后剩下的走空在下一次改动开头走、不再发这次改动（照它再发同一个 unlink 被拒）。
-    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_r_and_the_released_slots(
+    assert_the_way_out_by_the_push_states_the_publishes_the_ring_slot_of_the_recorded_publish_and_the_released_slots(
         &stuck,
         &ways_out[1],
         &released_on_each_device,

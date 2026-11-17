@@ -17,7 +17,8 @@ mod common_unwitnessed_publish;
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, fixed_geometry_of_the_384_slot_small_devices,
     record_one_publish_after_overwrites, recorded_devices_reading_back_all_zero_on,
-    units_of_r_overwritten_on, PublishRecordedAsR, RangesReadingBackAllZero, RecordedPublish,
+    units_of_the_recorded_publish_overwritten_on, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::mount::{
@@ -241,7 +242,7 @@ fn image_with_later_units_planted_in_the_pointer_slots_of_the_recorded_root(
             .expect("R 的指针槽所在的盘在池里")
             .write(location.slot.to_device_offset(), &planted_unit);
     }
-    let overwritten = units_of_r_overwritten_on(recorded, &image);
+    let overwritten = units_of_the_recorded_publish_overwritten_on(recorded, &image);
     for location in &pointer_slots_of_the_recorded_publish {
         let (filesystem_identifier_in_the_header, instance) =
             filesystem_identifier_and_instance_of_the_self_verified_unit_at(&image, *location)
@@ -299,7 +300,7 @@ fn newer_root_whose_pointer_slots_hold_self_verified_units_of_another_pool_refus
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let image = image_with_later_units_planted_in_the_pointer_slots_of_the_recorded_root(
         &recorded,
@@ -337,7 +338,7 @@ fn newer_root_whose_pointer_slots_hold_the_same_planted_units_of_this_pool_is_pa
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let image = image_with_later_units_planted_in_the_pointer_slots_of_the_recorded_root(
         &recorded,

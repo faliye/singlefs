@@ -20,7 +20,7 @@ use crate::common_shared_by_harness_scenarios::hand_out_a_clean_image;
 use crate::common_unwitnessed_publish::{
     device_bytes_of_the_384_slot_small_devices, fixed_geometry_of_the_384_slot_small_devices,
     parameters_of_the_384_slot_small_devices, plain_device, plain_devices_on,
-    record_one_publish_after_overwrites, PoolUnderTest, PublishRecordedAsR, OVERWRITE_BYTES,
+    record_one_publish_after_overwrites, PoolUnderTest, RecordedPublishKind, OVERWRITE_BYTES,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -278,8 +278,10 @@ pub fn run_the_scenario_where_a_cloned_device_carrying_a_newer_root_and_record_i
 /// 时盘 1 过了别的几件（R 的单元与 V 同一个实例）、被补写、挂载做成，这一条红。
 pub fn run_the_scenario_where_a_device_whose_journal_ring_holds_a_record_newer_than_the_version_is_not_rewritten(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(1, PublishRecordedAsR::SequentialWriteOfThreeDataUnits);
+    let recorded = record_one_publish_after_overwrites(
+        1,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
+    );
     assert_eq!(recorded.previous_key, VERSION, "R 之前那一版是 V");
     let mut image = recorded.base.clone();
     let unit_writes: Vec<_> = recorded.unit_writes().into_iter().cloned().collect();

@@ -96,7 +96,7 @@ use singlefs_verification::crash_library::{
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
-    GpuCardPool,
+    GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::hexadecimal::hexadecimal_text;
 use singlefs_verification::memory_pool::MemoryPool;
@@ -278,7 +278,7 @@ fn cpu_verdicts_of_the_image_read_back_from_the_pairing_library(
 /// 对拍本身：CPU 那一侧从库里读回的那张表上判、GPU 那一侧从库里读回的判表上判（判表入库再读回上卡），交回两边判出的东西。
 /// 只录那一趟、卡借不到交 `None`。
 fn judgements_of_both_judges_on_the_image(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     table_name: &str,
     image: &MemoryPool,
     tables: &JudgeTables,
@@ -300,7 +300,7 @@ fn judgements_of_both_judges_on_the_image(
 /// 每趟打一行 `GPU_SCAN_REBUILD_PAIRING_CONCLUSION table=<表名> source=<ReusedFromTheLibrary|JudgedNow>`。
 /// 只录那一趟、卡借不到交 `None`（不存进库）；GPU 判不了（建不出判表，或结论里判不了那一位）判红。
 fn judge_the_image_on_both_judges(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     table_name: &str,
     image: &MemoryPool,
 ) -> Option<BothJudgesOnAnImage> {

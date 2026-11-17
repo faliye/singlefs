@@ -18,8 +18,8 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     fixed_geometry_of_the_384_slot_small_devices, record_one_publish_after_overwrites,
-    recorded_devices_reading_back_all_zero_on, units_of_r_overwritten_on, PublishRecordedAsR,
-    RangesReadingBackAllZero, RecordedPublish,
+    recorded_devices_reading_back_all_zero_on, units_of_the_recorded_publish_overwritten_on,
+    RangesReadingBackAllZero, RecordedPublish, RecordedPublishKind,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::mount::{
@@ -75,7 +75,7 @@ fn units_of_the_recorded_publish_with_both_copies_gone(
     recorded: &RecordedPublish,
     image: &MemoryPool,
 ) -> usize {
-    let overwritten = units_of_r_overwritten_on(recorded, image);
+    let overwritten = units_of_the_recorded_publish_overwritten_on(recorded, image);
     recorded
         .unit_writes_grouped_by_unit()
         .iter()
@@ -249,7 +249,7 @@ fn newer_root_whose_tree_table_has_one_copy_overwritten_and_the_rest_reading_bac
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let root_of_the_recorded_publish = recorded.root();
     let image = image_with_the_mount_taking_a_new_instance_crashed_inside_its_unit_writes(
@@ -257,7 +257,7 @@ fn newer_root_whose_tree_table_has_one_copy_overwritten_and_the_rest_reading_bac
         std::slice::from_ref(&root_of_the_recorded_publish.tree_table),
     );
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image).len(),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image).len(),
         1,
         "前提：R 写出的单元只被盖掉一份（树表那一份）"
     );
@@ -289,7 +289,7 @@ fn newer_root_whose_tree_table_and_mapping_root_each_have_one_copy_overwritten_a
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let root_of_the_recorded_publish = recorded.root();
     let image = image_with_the_mount_taking_a_new_instance_crashed_inside_its_unit_writes(
@@ -300,7 +300,7 @@ fn newer_root_whose_tree_table_and_mapping_root_each_have_one_copy_overwritten_a
         ],
     );
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image).len(),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image).len(),
         2,
         "前提：R 写出的单元只被盖掉两份（树表、映射根各一份）"
     );
@@ -336,7 +336,7 @@ fn assert_the_mount_after_the_urj_form_is_mounted_on_the_previous_version(
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let mount_taking_a_new_instance =
         writes_of_the_mount_that_could_not_see_the_recorded_publish(&recorded);
@@ -353,7 +353,7 @@ fn assert_the_mount_after_the_urj_form_is_mounted_on_the_previous_version(
         root_of_the_recorded_publish.mapping_root,
     ] {
         assert_eq!(
-            units_of_r_overwritten_on(&recorded, &image)
+            units_of_the_recorded_publish_overwritten_on(&recorded, &image)
                 .iter()
                 .filter(|(device, offset)| pointer
                     .locations
@@ -420,7 +420,7 @@ fn assert_a_mount_after_an_acquisition_that_wrote_nothing_else_is_refused(
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
     let mount_choosing_the_recorded_publish = writes_of_the_mount_that_takes_a_new_instance(
@@ -447,7 +447,7 @@ fn assert_a_mount_after_an_acquisition_that_wrote_nothing_else_is_refused(
             [..=acquisition_writes[acquisition_writes_landed - 1]],
     );
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image),
         Vec::<(DeviceIdentity, u64)>::new(),
         "前提：R 的单元一份不少"
     );
@@ -483,7 +483,7 @@ fn newer_root_whose_units_a_later_mount_kept_while_taking_its_record_slot_refuse
 ) {
     let recorded = record_one_publish_after_overwrites(
         OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
-        PublishRecordedAsR::Overwrite,
+        RecordedPublishKind::Overwrite,
     );
     let root_of_the_recorded_publish = recorded.root();
     let crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
@@ -502,7 +502,7 @@ fn newer_root_whose_units_a_later_mount_kept_while_taking_its_record_slot_refuse
     let mut image = crash_image;
     image.apply_writes(&mount_taking_a_new_instance.writes[..row_root]);
     assert_eq!(
-        units_of_r_overwritten_on(&recorded, &image),
+        units_of_the_recorded_publish_overwritten_on(&recorded, &image),
         Vec::<(DeviceIdentity, u64)>::new(),
         "前提：M1 护住了 R 的单元，一份不少"
     );

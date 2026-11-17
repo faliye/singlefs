@@ -5,8 +5,8 @@
 #![allow(dead_code, reason = "引它的测试目标各只用其中几样")]
 
 use crate::common::{
-    parameters, BuiltPool, Recorded, CONTENT_BYTES_OF_PUBLISH_B, CONTENT_BYTES_OF_PUBLISH_C,
-    FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    parameters, BuiltPool, Recorded, CONTENT_BYTES_OF_THE_NEWER_OVERWRITE,
+    CONTENT_BYTES_OF_THE_OLDER_OVERWRITE, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
 use crate::common_images_for_the_given_states_engine::{PoolCheckerExpectation, PoolCheckerImages};
 use singlefs_core::address::{
@@ -58,7 +58,7 @@ pub const INVARIANTS_THE_REREAD_KEEPS_GREEN: [&str; 5] =
     ["I-3.1", "I-3.11", "I-2.1", "I-7.4", "I-4.8"];
 
 /// 一次不注错的再挂里，根环每个槽第几次被读是重建分配器读根环那一遍（从 1 数；见引它的两份场景文件的文件头）。
-pub const READ_OF_EACH_ROOT_RING_SLOT_BY_THE_ALLOCATOR_REBUILD: u64 = 6;
+pub const READ_OF_EACH_ROOT_RING_SLOT_BY_THE_ALLOCATOR_REBUILD: u64 = 5;
 
 /// 一片实例表里数据行的上限：370 条记录减去链指针那一条。
 pub const ROWS_PER_PAGE: usize = 369;
@@ -76,7 +76,7 @@ pub const TXG_WHOSE_ROOT_SLOT_DID_NOT_PERSIST: u64 = 31;
 pub const OVERWRITE_BYTES_WITHIN_ONE_DATA_UNIT: usize = 3000;
 
 /// X 那一版之后、正常退出之前的空发布次数（攻方 `AFTER_X` 的默认值）。
-pub const EMPTY_PUBLISHES_AFTER_X: u64 = 2;
+pub const EMPTY_PUBLISHES_AFTER_THE_WATCHED_ROOT: u64 = 2;
 
 /// 建 inode、按 inode 号写、unlink 那几版的写入时间：比池里第一个文件晚。
 pub const WRITE_TIME_SECONDS_AFTER_THE_FIRST_FILE: u64 = FIXED_WRITE_TIME_SECONDS + 600;
@@ -317,12 +317,12 @@ pub fn pseudo_random_content_five_bytes_short_of_data_units(
         .collect()
 }
 
-/// 固定脚本里 B 那一次写的内容（[`CONTENT_BYTES_OF_PUBLISH_B`] 字节）。
+/// 固定脚本里 B 那一次写的内容（[`CONTENT_BYTES_OF_THE_OLDER_OVERWRITE`] 字节）。
 pub fn second_content() -> Vec<u8> {
-    content_seeded_by(CONTENT_BYTES_OF_PUBLISH_B, 3)
+    content_seeded_by(CONTENT_BYTES_OF_THE_OLDER_OVERWRITE, 3)
 }
 
-/// 固定脚本里 C 那一次写的内容（[`CONTENT_BYTES_OF_PUBLISH_C`] 字节）。
+/// 固定脚本里 C 那一次写的内容（[`CONTENT_BYTES_OF_THE_NEWER_OVERWRITE`] 字节）。
 pub fn third_content() -> Vec<u8> {
-    content_seeded_by(CONTENT_BYTES_OF_PUBLISH_C, 11)
+    content_seeded_by(CONTENT_BYTES_OF_THE_NEWER_OVERWRITE, 11)
 }

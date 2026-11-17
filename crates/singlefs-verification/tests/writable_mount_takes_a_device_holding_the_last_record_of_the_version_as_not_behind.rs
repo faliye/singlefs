@@ -4,7 +4,7 @@
 mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
-    plain_devices_on, record_one_publish_after_overwrites, PublishRecordedAsR,
+    plain_devices_on, record_one_publish_after_overwrites, RecordedPublishKind,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
@@ -13,7 +13,7 @@ use singlefs_core::mount::{
 };
 use singlefs_verification::memory_pool::MemoryPool;
 
-const OVERWRITES_BEFORE_P: u64 = 1;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 1;
 
 /// C593 那一形：P 的单元、记录与根都落了、两块盘的系统配置轮换都没落（一次正常崩溃），盘 1 上 P 写的一个单元那一份再翻坏一个字节（单故障）。
 /// 两块盘最新那份系统配置都落后于 P 的末条记录；盘 1 又缺一份 P 的单元。乙' 之下盘 1 自己的 journal 环槽里有 P 的末条记录，
@@ -22,8 +22,10 @@ const OVERWRITES_BEFORE_P: u64 = 1;
 #[test]
 fn a_device_behind_by_the_lost_rotation_missing_one_unit_copy_but_holding_the_last_record_mounts_writable(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_P, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     assert_eq!(
         recorded.key,
         (InstanceGeneration(1), CheckpointTxg(5)),
@@ -59,8 +61,10 @@ fn a_device_behind_by_the_lost_rotation_missing_one_unit_copy_but_holding_the_la
 #[test]
 fn a_device_snapshotted_halfway_through_the_unit_writes_of_the_version_is_still_refused_before_any_write(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_P, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let unit_writes_on_device_one: Vec<_> = recorded
         .writes
         .iter()
@@ -123,4 +127,43 @@ fn a_device_snapshotted_halfway_through_the_unit_writes_of_the_version_is_still_
         device_size_in_bytes: image.device_size_in_bytes,
     };
     assert_eq!(after, before, "拒在任何写之前：两块盘逐字节不变");
+}
+
+/// 两块盘的系统配置轮换都没落，盘 1 上 P 的单元都在、P 的末条记录那一份翻坏一个字节：盘 1 落后、环槽里读不出末条记录，于是逐个读单元，一个都不缺。
+/// 只落后、单元都在的盘不算不带所选那一版，P 的根住盘 0、不缺根：可写挂载建在 P 上做成。
+/// 判别力：落后支只看落后、不看缺没缺单元（`crates/mutations.tsv`「代码三方第二轮 Y2-c：落后支只看落后、不读单元」那一行）时盘 1 拒成  history-kept: 引的是变异表里那一行的名字，照名字原样写
+/// `WritableMountRefusedByDevicesWithoutTheSelectedVersion`（缺单元的清单是空的），这一条红；本盘末条记录读得出的盘走不到那一判，别的用例抓不到它。
+#[test]
+fn a_device_behind_by_the_lost_rotation_holding_every_unit_with_its_copy_of_the_last_record_bad_mounts_writable(
+) {
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
+    let mut crash_image = recorded.crash_image_with_the_root_persisted_and_the_rotation_lost();
+    let copy_of_the_last_record_on_device_one = recorded
+        .record_writes_of_the_record(recorded.record_count())
+        .into_iter()
+        .find(|write| write.device == DeviceIdentity(1))
+        .expect("P 的末条记录每块盘一份");
+    crash_image.flip_byte(
+        DeviceIdentity(1),
+        copy_of_the_last_record_on_device_one.offset,
+        600,
+    );
+    let mut devices = plain_devices_on(&crash_image);
+    let mounted = mount_writable_with_space_admission(
+        &recorded.pool.parameters,
+        &mut devices,
+        SpaceAdmission::JudgedByTheFormula,
+    )
+    .expect("盘 1 只落后、单元都在，P 的根不在盘 1：不算不带所选那一版，可写挂载做成");
+    assert_eq!(
+        (
+            mounted.output.effective_root.instance,
+            mounted.output.effective_root.checkpoint_txg
+        ),
+        recorded.key,
+        "可写挂载建在 P 上（盘 0 上 P 的末条记录与根都在）"
+    );
 }

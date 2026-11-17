@@ -10,7 +10,7 @@
 //! 「模型 RollbackWhileMounted 该成；实现 拒了：RollbackError::IsolatedUnitCopyUnreadableOrMismatched」。
 //! 随机历史的生成器一改，这个种子重放的就可能不再是这一段：那时第一条断言（这一段里有回退被认成说谎的设备留下的）先红，
 //! 照「钉值是不是还钉着那一形」重找取样点，不改成放过。不随生成器漂的判别力在 `fault_injection.rs` 的单测
-//! `a_refused_rollback_is_left_by_the_lying_device_only_when_the_unit_copy_it_names_overlaps_a_swallowed_write`。
+//! `refused_rollback_is_left_by_the_lying_device_only_when_the_unit_copy_it_names_overlaps_a_swallowed_write`。
 
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_verification::fault_injection::{

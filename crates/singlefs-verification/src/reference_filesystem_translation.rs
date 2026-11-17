@@ -570,7 +570,8 @@ impl ReferenceFileSystemTranslation {
             // 建 inode 只接在第一个文件删完之后（`HistoryOperation::CreateInode`），翻译到 unlink 写了盘那一步就已经停了；
             // 它也不改第一个文件的内容（新建的 inode 长度 0），照可写挂载与抬 F 那样不进操作序列。
             // 掉电在第一个 journal 记录写之前的那次覆盖写一样都没发布成（盘上没有能让恢复读到它的记录与根），之后那次可写挂载照可写挂载。
-            // 每块盘最新那一槽系统配置读回全 0 的可写挂载：根与单元照常读得出、落到的就是现行那一版，与可写挂载同样不进操作序列。
+            // 最新那一槽系统配置读回全 0 的可写挂载（每块盘都藏、只藏第一块盘两种）：根与单元照常读得出、落到的就是现行那一版，
+            // 与可写挂载同样不进操作序列。
             // 挂着时整理（判决 `research/prompts/m4-gc-r1-main-verification.md` 第三节 G7）只搬单元的落点、不改用户看得见的内容，
             // 先走空的删除续做只放已删的文件与已删快照的块；批间崩溃之后的可写挂载照可写挂载。不进操作序列，写的根映到现行版本。
             HistoryOperation::CloseAndMountWritable
@@ -580,6 +581,7 @@ impl ReferenceFileSystemTranslation {
             | HistoryOperation::CreateInodes(_)
             | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
             | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
             | HistoryOperation::CompactWhileMounted(_) => {
                 EventsOfAStep::nothing()
             }
@@ -1260,7 +1262,7 @@ impl JointVerdictOfTheReferenceFileSystemAndTheModel {
 /// 故障注入之后的重开要读出什么（`fault_injection::failed_reopen_is_the_right_answer` 的两种答案）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WhatTheReopenMustRecover {
-    AVersionTheHistoryLeft,
+    VersionTheHistoryLeft,
     NothingBecauseNoVersionStands,
 }
 
@@ -1495,7 +1497,7 @@ impl TranslatedHistory {
                     ReferenceFileSystemAbstention::NoVersionStandsAfterTheInjectedFault,
                 )
             }
-            WhatTheReopenMustRecover::AVersionTheHistoryLeft => {
+            WhatTheReopenMustRecover::VersionTheHistoryLeft => {
                 self.judge_a_crash(
                     ReferenceFileSystemCrashMoment::AfterEveryTranslatedStep,
                     read_back,
@@ -1721,7 +1723,7 @@ mod tests {
     /// 交回的那一次、字节由那一步的选择按长度现算）连同它那次发布；写别的文件写了盘的停在「RefFS 第一版只有第一个文件」。判别力：翻译把别的号的写
     /// 当第一个文件的交出去时第二段断言红，偏移取错时第一段断言红（`crates/mutations.tsv` 一行）。
     #[test]
-    fn a_write_at_an_offset_of_the_first_file_is_handed_as_one_write_at_that_offset_and_another_inode_stops_the_translation(
+    fn write_at_an_offset_of_the_first_file_is_handed_as_one_write_at_that_offset_and_another_inode_stops_the_translation(
     ) {
         let translation = ReferenceFileSystemTranslation::for_a_history_starting(
             HistoryStartingPoint::AfterFirstFile,
@@ -1807,7 +1809,7 @@ mod tests {
     /// 且写了盘的截断停下」）：做成、写了之后报错、没返回三种都停在「RefFS 第一版只有第一个文件」，不把别的文件的 size 当第一个文件的交出去；
     /// 任何写之前拒的照旧什么都不交。
     #[test]
-    fn a_truncation_of_an_inode_other_than_the_first_that_wrote_stops_the_translation() {
+    fn truncation_of_an_inode_other_than_the_first_that_wrote_stops_the_translation() {
         let translation = ReferenceFileSystemTranslation::for_a_history_starting(
             HistoryStartingPoint::AfterFirstFile,
         );
@@ -1854,7 +1856,7 @@ mod tests {
     /// 再写意图、一批、最后一批（三条根带着改动），翻成一个 `Truncate(100)` 连同它那次发布、都是成；这一步最后三条根映到新版本、写出它的是意图那一条
     /// （K2「先落目标」：意图那一版起读出的就是截后的）。
     #[test]
-    fn a_truncation_published_in_several_versions_is_handed_as_one_truncate_and_every_root_from_the_intent_on_maps_to_the_new_version(
+    fn truncation_published_in_several_versions_is_handed_as_one_truncate_and_every_root_from_the_intent_on_maps_to_the_new_version(
     ) {
         let seen = truncation_step_seen(
             StepEndingSeenByTheTranslation::ReturnedOk {
@@ -1907,15 +1909,15 @@ mod tests {
 
     /// 截断在任何写之前被拒（第一个文件之外的 inode、有树而文件集合为空）：交空，RefFS 的序列里没有它。
     #[test]
-    fn a_truncation_refused_before_any_write_hands_nothing_to_the_reference_filesystem() {
+    fn truncation_refused_before_any_write_hands_nothing_to_the_reference_filesystem() {
         let seen = truncation_step_seen(StepEndingSeenByTheTranslation::RefusedBeforeAnyWrite, 7);
         assert!(events_of_a_truncation_step(&seen).events.is_empty());
     }
 
     /// 截断写了之后报错（故障注入那一步）：交一个 `Truncate(n)`，它那次发布交「写了之后报错」（两可，同覆盖写）。
     #[test]
-    fn a_truncation_failing_after_writing_hands_the_truncate_and_a_publish_that_failed_after_writing(
-    ) {
+    fn truncation_failing_after_writing_hands_the_truncate_and_a_publish_that_failed_after_writing()
+    {
         let seen = truncation_step_seen(
             StepEndingSeenByTheTranslation::ReturnedAnErrorAfterItMayHaveWritten,
             100,

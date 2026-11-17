@@ -56,6 +56,12 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
@@ -250,12 +256,14 @@ fn highest_instance_readable_on(image: &MemoryPool) -> u32 {
 }
 
 /// 观察者「补写中途崩溃之后重开」（`remount_after_the_crash_of_the_rewrite`）：把这个状态持久的写（撕裂镜像在内）落到基镜像上、可写挂载一次；
-/// 挂不上、取到的号不比崩溃镜像上读得出的每一个实例代号都大、挂完之后有一块盘不是两槽都自证过，都当场 panic。挂完的盘交回，池级 checker 在判段判。
+/// 可写挂载被拒时只认乙入判不出那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`）；别的拒、取到的号不比崩溃镜像上读得出的每一个实例代号都大、
+/// 挂完之后有一块盘不是两槽都自证过，都当场 panic。挂完的盘交回，池级 checker 在判段判。
 /// 观察者的身份是这个 fn 的闭包键（入口要登记在 `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES`；没登记时取键拒算、照判不入库）。
 // gpu-exempt: writable-mount
 fn remount_after_the_crash_of_the_rewrite_with_both_slots_of_every_device_self_verified(
     base: &MemoryPool,
     image: &CrashImage<'_>,
+    report: &RecoveryReport,
     counts: &mut CrashPointReplayObserverCounts,
 ) -> ImageAfterTheObserver {
     let mut materialized = base.clone();
@@ -300,12 +308,28 @@ fn remount_after_the_crash_of_the_rewrite_with_both_slots_of_every_device_self_v
             )
         })
         .collect();
-    let mounted = mount_writable_with_space_admission(
+    let mounted = match mount_writable_with_space_admission(
         &parameters_of_the_384_slot_small_devices(),
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
-    )
-    .unwrap_or_else(|error| panic!("补写中途崩溃之后重开可写挂载被拒：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &parameters_of_the_384_slot_small_devices().filesystem_identifier,
+                &fixed_geometry_of_the_384_slot_small_devices(),
+                CHECKER_CLEAN_AFTER_THE_REMOUNT,
+                counts,
+            );
+        }
+    };
     assert!(
         mounted.output.instance.0 > highest_on_the_crash_image,
         "重号：重开取到 {:?}，崩溃镜像上已经读得出实例 {highest_on_the_crash_image}",
@@ -349,12 +373,13 @@ fn enumerate_remounting_after_each_crash(
 ) -> Option<CrashPointReplayTally> {
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
-                   _report: &RecoveryReport,
+                   report: &RecoveryReport,
                    counts: &mut CrashPointReplayObserverCounts|
      -> ImageAfterTheObserver {
         remount_after_the_crash_of_the_rewrite_with_both_slots_of_every_device_self_verified(
             &recorded.base,
             image,
+            report,
             counts,
         )
     };
@@ -390,6 +415,7 @@ fn enumerate_remounting_after_each_crash(
 }
 
 fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointReplayTally) {
+    print_the_writable_mount_refusals_into_the_undecidable_witness(FLOW_NAME, tally);
     assert_eq!(
         (tally.violations, tally.first_violation.clone()),
         (0, None),
@@ -421,9 +447,12 @@ fn assert_recovery_checker_record_checker_and_remounts_clean(tally: &CrashPointR
     assert_eq!(
         tally
             .observer_counts
-            .count_named(REMOUNTED_WITH_TWO_SELF_VERIFIED_SLOTS_ON_EVERY_DEVICE),
+            .count_named(REMOUNTED_WITH_TWO_SELF_VERIFIED_SLOTS_ON_EVERY_DEVICE)
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个崩溃状态之后都重开得了可写挂载，取号不重号，挂完每块盘两槽都自证过"
+        "每个没被乙入判不出拒的崩溃状态之后都重开得了可写挂载，取号不重号，挂完每块盘两槽都自证过"
     );
     assert_eq!(
         tally

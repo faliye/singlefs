@@ -1,8 +1,8 @@
-//! 验证包模块：crash_library、crash_amplification、gpu_unit_checks、crash_judge_dispatch
+//! 验证包模块：crash_library、crash_amplification、gpu_unit_checks
 //! 起过 GPU 用例共用的卡池的进程里，崩溃放量产品路径（`crash_amplification::run_from_environment`）在卡上建的缓冲都在这个进程的显存账上借
-//! （`crash_amplification` 文件头第 5 条）：第 ① 段判器的草稿区、第 ① 段由 CPU 判时单元校验和对拍的缓冲、第 ② 段核对的缓冲。
-//! 两条用例各在新池新建文件那条流上按环境真跑一趟，看这一趟交回的借的量，再看用的那一刻核账（判器建好与判完、对拍与核对做完时那一笔借据
-//! 还在账上，K4-1、K3-1）：哪一样改回不借、或借了又在用完之前还掉，对应的那条就红。
+//! （`crash_amplification` 文件头第 5 条）：第 ② 段核对的缓冲（第 ① 段配了 GPU 不在这个进程里判，写待判行、等 GPU 批处理服务）。
+//! 用例在新池新建文件那条流上按环境真跑一趟，看这一趟交回的借的量，再看核对做完那一刻核账（那一笔借据还在账上，K4-1）：
+//! 改回不借、或借了又在用完之前还掉，这条就红。
 //! 要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」（经这个进程的卡池判，`gpu_test_start::gpu_card_pool_or_report_not_run`），
 //! 有适配器而点名的卡找不到判红；卡上此刻借不到、或卡上 wgpu 报了 Out of Memory，产品路径打它自己的「本次未跑」那一行、这一趟照叫停的样子交回，
 //! 这里同样报「本次未跑」。要 `gpu` 特性，不带它这份文件是空的。
@@ -15,7 +15,6 @@ use std::path::PathBuf;
 
 use common::{build_pool, file_content, geometry};
 use singlefs_verification::crash_amplification::{CrashPointSpan, EnvironmentRun, GpuCardsSource};
-use singlefs_verification::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER;
 use singlefs_verification::crash_library::DisposableLibrary;
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     gpu_card_pool_or_report_not_run, not_run_line,
@@ -154,58 +153,6 @@ fn amplify_on_the_card_pool(test_name: &str) -> Option<EnvironmentRun> {
         return None;
     }
     Some(run)
-}
-
-/// 第 ① 段在卡上判（配置开了 GPU）：每张用到的卡上，判器的草稿区都在显存账上借了，判器用的就是借来的那张
-/// （额度是借的量加驱动那一份，开出来的草稿区不超过借的），判器建好那一刻与这张卡判完那一刻那一笔借据都还在账上。哪天这一支改回不借，
-/// 借的量是 `None`，借了又在判之前或判完之前还掉，核账是 `Some(false)`，判完那一刻不核是 `None`，这条都红。
-#[test]
-fn the_product_path_judges_on_scratch_it_booked_on_the_card_pool() {
-    let Some(run) =
-        amplify_on_the_card_pool("the_product_path_judges_on_scratch_it_booked_on_the_card_pool")
-    else {
-        return;
-    };
-    let gpu_judge = run
-        .gpu_judge
-        .as_ref()
-        .expect("配置开了 GPU、有卡：第 ① 段在卡上判");
-    assert!(
-        !gpu_judge.cards.is_empty(),
-        "新建的空库里每个块都要判：至少一张卡判了"
-    );
-    for card in &gpu_judge.cards {
-        let booked = card.scratch_booked_mebibytes.unwrap_or_else(|| {
-            panic!(
-                "起过卡池的进程，序号 {} 的卡上判器的草稿区要在显存账上借：没借",
-                card.index
-            )
-        });
-        assert_eq!(
-            card.memory_budget_mebibytes,
-            booked + MEBIBYTES_LEFT_FOR_THE_DRIVER,
-            "序号 {} 的卡：判器用的是借来的那张（额度是借的量加驱动那一份）",
-            card.index
-        );
-        assert!(
-            card.scratch_mebibytes <= booked,
-            "序号 {} 的卡：判器开的草稿区 {} MiB 不超过借的 {booked} MiB",
-            card.index,
-            card.scratch_mebibytes
-        );
-        assert_eq!(
-            card.scratch_lease_on_the_books_when_the_judge_was_built,
-            Some(true),
-            "序号 {} 的卡：判器建好那一刻核账，草稿区那一笔借据要还在账上（借了又在判之前还掉要红）",
-            card.index
-        );
-        assert_eq!(
-            card.scratch_lease_on_the_books_when_the_judging_finished,
-            Some(true),
-            "序号 {} 的卡：判完那一刻再核一次账，草稿区那一笔借据要还在账上（建好之后、判完之前还掉要红）",
-            card.index
-        );
-    }
 }
 
 /// 第 ② 段在卡上核（配置开了 GPU，判器与核对都走 GPU）：核对在卡上建的缓冲在显存账上借了（借的量不为 0）、核完那一刻那一笔借据还在账上、

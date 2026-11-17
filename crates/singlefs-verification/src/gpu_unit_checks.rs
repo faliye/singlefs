@@ -3,19 +3,30 @@
 //! CPU 参照（`check_unit_checksums_on_the_cpu`）是另一趟、由对拍用例逐个比，两边的输入都经库读回
 //! （`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`）；走树、恢复、记录核对器照旧在 CPU 上。
 //! 着色器与多卡枚举取自 E163（GPU多卡算单元校验和） 的装置（那边两卡 2560/2560 与 CPU 逐个相同）。
-//! 分工按显卡空闲显存（`nvidia-smi` 的 memory.free，按 PCI 总线号对上 wgpu 的适配器），空闲显存低于门槛的卡不用；
-//! GPU 用例共用的卡池（[`gpu_test_start::GpuCardPool`]）不看这个门槛，能不能借由这个进程的显存账在借的那一刻判
+//! 分工按显卡空闲显存（`nvidia-smi` 的 memory.free，按 PCI 总线号对上 wgpu 的适配器）；不走卡池的取卡入口照门槛判卡
+//! （[`MINIMUM_MEMORY_BUDGET_MEBIBYTES`]，空闲加回这个进程自己占在卡上的再判，[`card_memory_for_a_judge`]），被这个进程自己占着的卡等它还，
+//! 被别的进程占着的卡不用；GPU 用例共用的卡池（[`gpu_test_start::GpuCardPool`]）不看这个门槛，能不能借由这个进程的显存账在借的那一刻判
 //! （`singlefs_verification::gpu_memory_ledger` 文件头：只记这个进程借的，借不到不等）。
 //! 每个设备起的时候装上 wgpu 没接住的错误与设备丢失的回调（[`DeviceConditionOfACard`]）：别的线程上报的 Out of Memory
 //! （判器内核在另起的线程上编）记在设备上，接 Out of Memory 的那一层照它认出是显存不够，
 //! 按记的那条线程上正在做的那段活认（别的线程上一次 Out of Memory 不把这段活真正的 panic 说成显存不够；
 //! 编判器内核另起的线程算在那一刻在这个设备上编内核的那段活上，[`GpuCard::pipelines_compiled_once_on_this_device`]）。
+//!
+//! 起设备与编管线各打一行 GPU 阶段现场（标准错误，行头同别的 `GPU_LIFECYCLE` 行：`GPU_LIFECYCLE unix_microseconds=… elapsed_microseconds=…
+//! pid=<进程号> thread=… test=… phase=<阶段> <细节>`，[`gpu_work_trace`]），只供事后数一个进程起了几台设备、编了几套管线，不进判定、不改结局：
+//! - 每起一台设备（卡池的与不走卡池的都算，起没起好都打）一行
+//!   `phase=device_start card=<nvidia-smi 序号> pci="<总线号>" owner=<the-card-pool|outside-the-card-pool> outcome=<started|out-of-gpu-memory|device-not-started> start_microseconds=<起这一台用了多久>`
+//!   （[`DEVICE_START_LIFECYCLE_PHASE`]）；
+//! - 一个设备上按源码摘要缓存的那组管线没编过、这一次真编了（缓存没命中）一行
+//!   `phase=pipeline_compile card=<序号> pci="<总线号>" source_digest=<源码摘要的十六进制> pipelines=<编出几条> compile_microseconds=<编用了多久>`
+//!   （[`PIPELINE_COMPILE_LIFECYCLE_PHASE`]）；命中缓存不打。
 
 pub use crate::gpu_memory_ledger::DeviceConditionOfACard;
 use crate::gpu_memory_ledger::{
-    card_memory_reader_of_one_report_per_reading, pci_bus_identifier_without_the_domain,
-    BusesWithDevicesStartedOutsideTheBooks, CardMemoryReader, CauseOfTheDeviceLoss,
-    DeviceStartedOnTheBooks, DeviceWaitBeforeReturningTheLease,
+    card_memory_reader_of_one_report_per_reading, card_memory_readings_of_one_nvidia_smi_report,
+    pci_bus_identifier_without_the_domain, BusesWithDevicesStartedOutsideTheBooks,
+    CardMemoryReader, CardMemoryReading, CauseOfTheDeviceLoss, DeviceOutsideTheBooksMarkedOnTheBus,
+    DeviceStartedOnTheBooks, DeviceWaitBeforeReturningTheLease, OccupiedByThisProcess,
     NVIDIA_SMI_MEMORY_AND_PROCESSES_REPORT_ARGUMENTS,
 };
 use crate::sha256::DIGEST_BYTES;
@@ -66,9 +77,164 @@ fn device_found_idle_by_a_poll(
     }
 }
 
-/// 空闲显存低于这个数（MiB）的卡不用：本机有卡被别的服务占着时只剩几百 MiB，起上下文都难（E163 M2 那张卡 141 MiB 起不来）。
-/// 只管 [`usable_gpu_cards`] 与 [`gpu_cards_by_priority`]；卡池按账判，此刻被别的进程占着的卡照样进池，借的那一刻借不到就报本次未跑（不等）。
-pub const MINIMUM_FREE_MEMORY_MEBIBYTES: u64 = 2048;
+/// 最小一份判表上卡占多少（MiB）：打包判表一个字 4 字节，上卡按 MiB 向上取整（`crate::crash_judge_dispatch::PackedJudgeTables::mebibytes`），
+/// 表里有一个字就占这么多。
+pub const MEBIBYTES_OF_THE_SMALLEST_JUDGE_TABLES: u64 =
+    ((u32::BITS / u8::BITS) as u64).div_ceil(1024 * 1024);
+
+/// 一张卡给崩溃放量的额度（[`memory_budget_mebibytes_of`]）低于这个数（MiB）就用不了：驱动那一份
+/// （[`crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER`]）加最小一份判表（[`MEBIBYTES_OF_THE_SMALLEST_JUDGE_TABLES`]）。
+/// 额度比它小的卡连最小一份表也放不下、一个状态都派不出去（`crash_amplification::states_in_flight_within_the_budget` 交 0）；
+/// 本机有卡被别的服务占着时只剩几百 MiB，起上下文都难（E163 M2 那张卡 141 MiB 起不来）。
+/// 只管 [`usable_gpu_cards`] 与 [`gpu_cards_by_priority`]（照 [`card_memory_for_a_judge`] 判）；卡池按账判，此刻被别的进程占着的卡照样进池，
+/// 借的那一刻借不到就报本次未跑（不等）。
+pub const MINIMUM_MEMORY_BUDGET_MEBIBYTES: u64 =
+    crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER
+        + MEBIBYTES_OF_THE_SMALLEST_JUDGE_TABLES;
+
+/// 一张卡照此刻空闲判放不下、空闲加回这个进程自己占着的就放得下时，最多等这个进程还多久（[`card_memory_once_a_judge_fits`]）：
+/// 同一个测试进程里别的 GPU 用例判完就还；等到头还没还够算用不了（这个进程自己的这条线程占着、或别的用例一直占着，等多久都一样）。
+const LONGEST_WAIT_FOR_THIS_PROCESS_TO_RETURN_CARD_MEMORY: std::time::Duration =
+    std::time::Duration::from_secs(600);
+
+/// 等这个进程还显存时两次读卡之间停多久。
+const PAUSE_BETWEEN_CARD_MEMORY_READINGS: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// 一张卡此刻在这个进程看来能不能给判器（[`card_memory_for_a_judge`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CardMemoryForAJudge {
+    /// 照此刻空闲算的额度不低于 [`MINIMUM_MEMORY_BUDGET_MEBIBYTES`]：起设备。
+    RoomNow,
+    /// 照此刻空闲算的额度不够，空闲加回这个进程自己此刻占在这张卡上的就够：同一个进程里别的用例还了才放得下，等它还。
+    RoomOnceThisProcessReturnsWhatItHolds,
+    /// 加回这个进程自己占着的也不够：别的进程占着，或卡本身太小。用不了。
+    NoRoomEvenWithWhatThisProcessHolds,
+}
+
+/// 这个进程此刻自己占在一张卡上的（MiB，`nvidia-smi` 按进程号报的；没列是 0）：走不走卡池的账都算，判这张卡用不用得了时
+/// 同一个进程里别的用例起的设备与缓冲不算别人占的。
+fn mebibytes_this_process_occupies(reading: CardMemoryReading) -> u64 {
+    match reading.occupied_by_this_process {
+        OccupiedByThisProcess::NotListed => 0,
+        OccupiedByThisProcess::OnlyThroughTheBooks { mebibytes }
+        | OccupiedByThisProcess::AlsoOutsideTheBooks { mebibytes } => mebibytes,
+    }
+}
+
+/// 照一次读数（`reading`）判一张卡能不能给判器，`memory_quota_mebibytes` 是配置给它的额度（没配是 `None`）：照此刻空闲算的额度
+/// （[`memory_budget_mebibytes_of`]）不低于 [`MINIMUM_MEMORY_BUDGET_MEBIBYTES`] 是此刻放得下；不够时空闲加回这个进程自己占着的
+/// （不超过空卡上能用的）再算一次，够是等这个进程还，还不够是用不了。
+fn card_memory_for_a_judge(
+    memory_quota_mebibytes: Option<u64>,
+    reading: CardMemoryReading,
+) -> CardMemoryForAJudge {
+    if memory_budget_mebibytes_of(memory_quota_mebibytes, reading.free_mebibytes)
+        >= MINIMUM_MEMORY_BUDGET_MEBIBYTES
+    {
+        return CardMemoryForAJudge::RoomNow;
+    }
+    let free_with_what_this_process_holds_mebibytes = reading
+        .free_mebibytes
+        .saturating_add(mebibytes_this_process_occupies(reading))
+        .min(reading.total_less_reserved_mebibytes);
+    if memory_budget_mebibytes_of(
+        memory_quota_mebibytes,
+        free_with_what_this_process_holds_mebibytes,
+    ) >= MINIMUM_MEMORY_BUDGET_MEBIBYTES
+    {
+        CardMemoryForAJudge::RoomOnceThisProcessReturnsWhatItHolds
+    } else {
+        CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds
+    }
+}
+
+/// 一张卡等到此刻放得下为止（[`card_memory_for_a_judge`]）：读一次（`read_the_card`），此刻放得下、或加回这个进程占着的也放不下，
+/// 当场交；要等这个进程还的，停一会儿（`pause`）再读，最多读 `most_readings` 次（0 当 1）。交最后一次的判定与读数。
+///
+/// # Errors
+/// 读不出卡上的显存（`read_the_card` 的错）。
+fn card_memory_for_a_judge_waiting_for_this_process(
+    memory_quota_mebibytes: Option<u64>,
+    read_the_card: &mut dyn FnMut() -> Result<CardMemoryReading, String>,
+    pause: &mut dyn FnMut(),
+    most_readings: u64,
+) -> Result<(CardMemoryForAJudge, CardMemoryReading), String> {
+    let mut readings_left = most_readings.max(1);
+    loop {
+        let reading = read_the_card()?;
+        let judged = card_memory_for_a_judge(memory_quota_mebibytes, reading);
+        readings_left -= 1;
+        match judged {
+            CardMemoryForAJudge::RoomOnceThisProcessReturnsWhatItHolds if readings_left > 0 => {
+                pause();
+            }
+            CardMemoryForAJudge::RoomNow
+            | CardMemoryForAJudge::RoomOnceThisProcessReturnsWhatItHolds
+            | CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds => {
+                return Ok((judged, reading));
+            }
+        }
+    }
+}
+
+/// 这一刻 `nvidia-smi` 报的总线 `bus` 那张卡的显存：空闲、空卡上能用的与这个进程占着的出自同一份报告
+/// （[`nvidia_smi_memory_and_processes_report`]、[`card_memory_readings_of_one_nvidia_smi_report`]）。
+///
+/// # Errors
+/// `nvidia-smi` 起不来、报告里没有这张卡或读不出。
+fn card_memory_reading_now(bus: &str) -> Result<CardMemoryReading, String> {
+    let report = nvidia_smi_memory_and_processes_report()?;
+    let readings = card_memory_readings_of_one_nvidia_smi_report(
+        &report,
+        std::process::id(),
+        &[bus.to_string()],
+        &has_devices_started_outside_the_card_pool_on_the_bus,
+    )?;
+    readings
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("nvidia-smi 的报告里读不出总线 {bus} 那张卡"))
+}
+
+/// 找到的一张卡能不能在上面起设备给判器（`memory_quota_mebibytes` 是配置给它的额度，没配是 `None`）：照 `nvidia-smi` 现读、
+/// 照 [`card_memory_for_a_judge_waiting_for_this_process`] 判，被这个进程自己占着的最多等
+/// [`LONGEST_WAIT_FOR_THIS_PROCESS_TO_RETURN_CARD_MEMORY`]。此刻放得下交读到的那一份。
+///
+/// # Errors
+/// 用不了：交为什么（读不出显存；加回这个进程占着的也放不下；等这个进程还等到头也没还够）。
+fn card_memory_once_a_judge_fits(
+    discovered: &DiscoveredCard,
+    memory_quota_mebibytes: Option<u64>,
+) -> Result<CardMemoryReading, String> {
+    let most_readings = u64::try_from(
+        LONGEST_WAIT_FOR_THIS_PROCESS_TO_RETURN_CARD_MEMORY.as_millis()
+            / PAUSE_BETWEEN_CARD_MEMORY_READINGS.as_millis(),
+    )
+    .unwrap_or(u64::MAX);
+    let (judged, reading) = card_memory_for_a_judge_waiting_for_this_process(
+        memory_quota_mebibytes,
+        &mut || card_memory_reading_now(&discovered.pci_bus_identifier),
+        &mut || std::thread::sleep(PAUSE_BETWEEN_CARD_MEMORY_READINGS),
+        most_readings,
+    )?;
+    let budget_mebibytes =
+        memory_budget_mebibytes_of(memory_quota_mebibytes, reading.free_mebibytes);
+    match judged {
+        CardMemoryForAJudge::RoomNow => Ok(reading),
+        CardMemoryForAJudge::RoomOnceThisProcessReturnsWhatItHolds => Err(format!(
+            "照此刻空闲算的额度 {budget_mebibytes} MiB 低于门槛 {MINIMUM_MEMORY_BUDGET_MEBIBYTES} MiB，空闲加回这个进程自己占着的 {} MiB 就够，\
+             等这个进程还等了 {} 秒也没还够（读数 {reading:?}）",
+            mebibytes_this_process_occupies(reading),
+            LONGEST_WAIT_FOR_THIS_PROCESS_TO_RETURN_CARD_MEMORY.as_secs()
+        )),
+        CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds => Err(format!(
+            "照此刻空闲算的额度 {budget_mebibytes} MiB 低于门槛 {MINIMUM_MEMORY_BUDGET_MEBIBYTES} MiB，空闲加回这个进程自己占着的 {} MiB 也不够\
+             （别的进程占着或卡太小；读数 {reading:?}）",
+            mebibytes_this_process_occupies(reading)
+        )),
+    }
+}
+
 /// 一个 GPU 槽装一段字节：最大 32 KiB（数据单元的长度），短的按长度截断。
 const SLOT_BYTES: usize = 32_768;
 const UNIT_CHECKSUM_KERNEL_WORKGROUP_SIZE: usize = 64;
@@ -77,7 +243,7 @@ const RESULT_ENTRY_BYTES: usize = 8;
 /// 测试取卡的判定（[`gpu_test_start`]）按它认 Vulkan 适配器与 PCI 上的显示控制器。
 pub const NVIDIA_VENDOR_IDENTIFIER: u32 = 0x10DE;
 
-const CRC32C_SHADER_SOURCE: &str = r#"
+const CRC32_CASTAGNOLI_SHADER_SOURCE: &str = r#"
 struct Params { count: u32, reserved0: u32, reserved1: u32, reserved2: u32, };
 struct ResultEntry { crc: u32, local_offset: u32, };
 @group(0) @binding(0) var<uniform> params: Params;
@@ -120,13 +286,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 /// 没给额度的卡，崩溃放量最多用它空闲显存的几分之几（分子、分母）：剩下的留给卡上别的进程。
 const SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA: (u64, u64) = (3, 4);
 
-/// 一个设备上按源码摘要编好的几组管线：每个摘要一格，第一个要它的线程编、同时要它的等那一次编完（[`GpuCard::pipelines_compiled_once_on_this_device`]）。
-type CompiledPipelinesBySourceDigest = std::sync::Mutex<
-    std::collections::BTreeMap<
-        [u8; DIGEST_BYTES],
-        std::sync::Arc<std::sync::OnceLock<Vec<wgpu::ComputePipeline>>>,
-    >,
+/// 按源码摘要编好的东西：每个摘要一格，第一个要它的线程编、同时要它的等那一次编完（[`compiled_once_for_the_source_digest`]）。
+type CompiledOnceBySourceDigest<Compiled> = std::sync::Mutex<
+    std::collections::BTreeMap<[u8; DIGEST_BYTES], std::sync::Arc<std::sync::OnceLock<Compiled>>>,
 >;
+
+/// 一个设备上按源码摘要编好的几组管线（[`GpuCard::pipelines_compiled_once_on_this_device`]）。
+type CompiledPipelinesBySourceDigest = CompiledOnceBySourceDigest<Vec<wgpu::ComputePipeline>>;
 
 /// 一张起好上下文的卡。克隆出来的与原来的共用同一个设备、队列与编好的管线（wgpu 的这几样克隆的是句柄）：
 /// 一个进程里几条 GPU 用例共用一张卡就靠克隆（[`gpu_test_start::GpuCardPool`]），每张卡只起一个设备。
@@ -142,6 +308,9 @@ pub struct GpuCard {
     /// 起上下文之前 `nvidia-smi` 报的空闲显存（MiB；卡池里的卡是起池时找卡那一刻报的，只当说明，借卡不看它）。
     /// 卡池借出去的卡改成借的量加驱动那一份：账判过卡上放得下这么多，不让找卡那一刻的读数把草稿区压得比借的小。
     pub free_memory_mebibytes: u64,
+    /// 这张卡空着时能用的显存（MiB，`nvidia-smi` 报的总量减驱动保留的那一份，与 `free_memory_mebibytes` 出自同一份报告）：不走卡池的取卡入口
+    /// （[`gpu_cards_by_priority`]、[`usable_gpu_cards`]）起卡时读；卡池里的卡不读（能借多少照账），是 `None`。
+    pub usable_memory_of_the_empty_card_mebibytes: Option<u64>,
     /// 配置给这张卡的显存额度（MiB）：崩溃放量在这张卡上占的显存不超过它；没给额度的是 `None`。
     /// 卡池借出去的卡改成借的量加驱动那一份。
     pub memory_quota_mebibytes: Option<u64>,
@@ -156,6 +325,10 @@ pub struct GpuCard {
     /// 这一台放掉（`singlefs_verification::gpu_memory_ledger::DeviceStartedOnTheBooks`）。放在最后一个字段：字段照声明的次序丢，
     /// 这一份最后丢的时候，同一个克隆里的设备、队列与编好的管线已经先丢了。
     device_on_the_books: Option<std::sync::Arc<DeviceStartedOnTheBooks<'static>>>,
+    /// 不走卡池的设备在它那条总线上的那一记（[`start_the_card`] 起好时放进来，卡池的是 `None`），几个克隆共用：最后一个克隆丢掉时那条总线上减一台
+    /// （`singlefs_verification::gpu_memory_ledger::DeviceOutsideTheBooksMarkedOnTheBus`），减到 0 卡池读那张卡回到按账拆。
+    /// 与 `device_on_the_books` 同理放在设备、队列与管线之后。
+    device_outside_the_books: Option<std::sync::Arc<DeviceOutsideTheBooksMarkedOnTheBus<'static>>>,
 }
 
 /// wgpu 没接住的错误（装在每个设备上，[`start_the_card`]）：Out of Memory 先记进这个设备的情况，再与别的错一样照 wgpu 默认的做法 panic
@@ -276,19 +449,36 @@ enum DeviceOwnerOnTheCard {
     OutsideTheCardPool,
 }
 
-/// 这个进程在哪几张卡（PCI 总线号）上起过不走卡池账的设备（起之前就记，[`started_with_its_owner_recorded`]）。是这个进程的事实，
-/// 所以是进程里一份（攻方乙形）。
+impl DeviceOwnerOnTheCard {
+    /// 起设备那一行 GPU 阶段现场（[`DEVICE_START_LIFECYCLE_PHASE`]）里 `owner=` 的值。
+    fn name_in_the_lifecycle_line(self) -> &'static str {
+        match self {
+            Self::TheCardPool => "the-card-pool",
+            Self::OutsideTheCardPool => "outside-the-card-pool",
+        }
+    }
+}
+
+/// 这个进程在哪几张卡（PCI 总线号）上有不走卡池账的设备、每张几台（起之前就记、那一台的句柄都丢了就减，[`started_with_its_owner_recorded`]）。
+/// 是这个进程的事实，所以是进程里一份（攻方乙形）。
 static BUSES_WITH_DEVICES_STARTED_OUTSIDE_THE_CARD_POOL: BusesWithDevicesStartedOutsideTheBooks =
     BusesWithDevicesStartedOutsideTheBooks::new();
 
-/// 这个进程在这张卡（PCI 总线号，[`pci_bus_identifier_without_the_domain`] 写法）上起过（或正在起）不走卡池账的设备没有：起过，卡池读这张卡时
+/// 这个进程在这张卡（PCI 总线号，[`pci_bus_identifier_without_the_domain`] 写法）上有（或正在起、起不来过）不走卡池账的设备没有：有，卡池读这张卡时
 /// 这个进程占着的那一份分不出哪些是借据建的（`singlefs_verification::gpu_memory_ledger::OccupiedByThisProcess::AlsoOutsideTheBooks`）。
 fn has_devices_started_outside_the_card_pool_on_the_bus(bus: &str) -> bool {
     BUSES_WITH_DEVICES_STARTED_OUTSIDE_THE_CARD_POOL.has_devices_on_the_bus(bus)
 }
 
-/// 照设备归谁起（`start` 起设备）：卡池的直接起；不归卡池的先在总线 `bus` 上记下、再起（攻方乙形：
-/// 起好了才记，起设备到记下那一段里卡池读到的这个进程占着的已经有它，被当成借据建上的）。
+/// 这个进程此刻记着几台不走卡池账的设备（各条总线加起来：还有句柄的，加起不来过的）。只有卡池起设备的进程是 0：同一个进程里只有一套显存账。
+#[must_use]
+pub fn devices_marked_outside_the_card_pool_in_this_process() -> usize {
+    BUSES_WITH_DEVICES_STARTED_OUTSIDE_THE_CARD_POOL.devices_marked_on_every_bus()
+}
+
+/// 照设备归谁起（`start` 起设备）：卡池的直接起，交设备与 `None`；不归卡池的先在总线 `bus` 上多记一台、再起（攻方乙形：
+/// 起好了才记，起设备到记下那一段里卡池读到的这个进程占着的已经有它，被当成借据建上的），交设备与这一台在总线上的那一记
+/// （调用方放进这台设备的每一个克隆，都丢了才减一台）。
 ///
 /// # Errors
 /// `start` 的错。
@@ -296,13 +486,51 @@ fn started_with_its_owner_recorded<Device>(
     owner: DeviceOwnerOnTheCard,
     bus: &str,
     start: impl FnOnce() -> Result<Device, CardStartFailure>,
-) -> Result<Device, CardStartFailure> {
+) -> Result<(Device, Option<DeviceOutsideTheBooksMarkedOnTheBus<'static>>), CardStartFailure> {
     match owner {
-        DeviceOwnerOnTheCard::TheCardPool => start(),
+        DeviceOwnerOnTheCard::TheCardPool => start().map(|device| (device, None)),
         DeviceOwnerOnTheCard::OutsideTheCardPool => {
-            BUSES_WITH_DEVICES_STARTED_OUTSIDE_THE_CARD_POOL.start_a_device_marked_first(bus, start)
+            BUSES_WITH_DEVICES_STARTED_OUTSIDE_THE_CARD_POOL
+                .start_a_device_marked_first(bus, start)
+                .map(|(device, marked_on_the_bus)| (device, Some(marked_on_the_bus)))
         }
     }
+}
+
+/// 起设备那一行 GPU 阶段现场的阶段名（文件头）。
+pub const DEVICE_START_LIFECYCLE_PHASE: &str = "device_start";
+
+/// 编管线那一行 GPU 阶段现场的阶段名（文件头）。
+pub const PIPELINE_COMPILE_LIFECYCLE_PHASE: &str = "pipeline_compile";
+
+/// 调 `start` 起序号 `card_index`、总线 `bus` 那张卡上归 `owner` 的一台设备，起完（起没起好都算）在 `trace` 上打一行
+/// [`DEVICE_START_LIFECYCLE_PHASE`]（细节的写法在文件头），交 `start` 的结果。
+///
+/// # Errors
+/// `start` 的错。
+fn device_started_with_a_lifecycle_line<Device>(
+    card_index: u32,
+    bus: &str,
+    owner: DeviceOwnerOnTheCard,
+    start: impl FnOnce() -> Result<Device, CardStartFailure>,
+    trace: &dyn Fn(&str, std::fmt::Arguments<'_>),
+) -> Result<Device, CardStartFailure> {
+    let start_began = std::time::Instant::now();
+    let started = start();
+    let start_microseconds = start_began.elapsed().as_micros();
+    let outcome = match &started {
+        Ok(_device) => "started",
+        Err(CardStartFailure::OutOfGpuMemory { .. }) => "out-of-gpu-memory",
+        Err(CardStartFailure::DeviceNotStarted { .. }) => "device-not-started",
+    };
+    trace(
+        DEVICE_START_LIFECYCLE_PHASE,
+        format_args!(
+            "card={card_index} pci={bus:?} owner={} outcome={outcome} start_microseconds={start_microseconds}",
+            owner.name_in_the_lifecycle_line()
+        ),
+    );
+    started
 }
 
 /// 卡池读 `buses` 这几张卡显存的那一份：每读一次取一份 `run_the_report` 的报告（卡池是跑一次 `nvidia-smi`），按这个进程的进程号认它占着的，
@@ -491,8 +719,8 @@ fn nvidia_discrete_cards_reported_by_nvidia_smi() -> Vec<DiscoveredCard> {
 
 /// 驱动的名字与版本那一句（wgpu adapter info 的 `driver`、`driver_info` 两项，空格接起来；两项都空写一句没报）。
 #[must_use]
-pub fn driver_version_of_the_adapter(driver: &str, driver_info: &str) -> String {
-    match (driver.trim(), driver_info.trim()) {
+pub fn driver_version_of_the_adapter(driver: &str, driver_information: &str) -> String {
+    match (driver.trim(), driver_information.trim()) {
         ("", "") => "driver-not-reported-by-wgpu".to_string(),
         (name, "") => name.to_string(),
         ("", version) => version.to_string(),
@@ -501,15 +729,24 @@ pub fn driver_version_of_the_adapter(driver: &str, driver_info: &str) -> String 
 }
 
 /// 在找到的这张卡上起设备、编单元校验和的管线；起不来交为什么（显存不够与别的分开，[`CardStartFailure`]）。不看空闲显存（看不看由调用方定）。
-/// 设备上装好接 wgpu 没接住的错误与设备丢失的回调（[`DeviceConditionOfACard`]）；不归卡池的设备起之前记下它在哪张卡上
-/// （[`started_with_its_owner_recorded`]、[`has_devices_started_outside_the_card_pool_on_the_bus`]）。
+/// 设备上装好接 wgpu 没接住的错误与设备丢失的回调（[`DeviceConditionOfACard`]）；不归卡池的设备起之前记下它在哪张卡上、起好的那一记放进卡里
+/// （[`started_with_its_owner_recorded`]、[`has_devices_started_outside_the_card_pool_on_the_bus`]）；起完打一行 [`DEVICE_START_LIFECYCLE_PHASE`]。
 fn start_the_card(
     discovered: &DiscoveredCard,
     owner: DeviceOwnerOnTheCard,
 ) -> Result<GpuCard, CardStartFailure> {
-    started_with_its_owner_recorded(owner, &discovered.pci_bus_identifier, || {
-        start_the_device_and_the_pipeline(discovered)
-    })
+    let (mut card, marked_outside_the_books) =
+        started_with_its_owner_recorded(owner, &discovered.pci_bus_identifier, || {
+            device_started_with_a_lifecycle_line(
+                discovered.reported.index,
+                &discovered.pci_bus_identifier,
+                owner,
+                || start_the_device_and_the_pipeline(discovered),
+                &gpu_work_trace,
+            )
+        })?;
+    card.device_outside_the_books = marked_outside_the_books.map(std::sync::Arc::new);
+    Ok(card)
 }
 
 /// [`start_the_card`] 起设备、编管线的那一段（不管设备归谁）。
@@ -532,7 +769,8 @@ fn start_the_device_and_the_pipeline(
         trace: wgpu::Trace::Off,
     }))
     .map_err(|error| failure_of_a_device_request(&error, &which_card))?;
-    let device_condition = std::sync::Arc::new(DeviceConditionOfACard::default());
+    let device_condition =
+        std::sync::Arc::new(DeviceConditionOfACard::on_the_card(discovered.name.clone()));
     let condition_for_uncaptured_errors = std::sync::Arc::clone(&device_condition);
     device.on_uncaptured_error(std::sync::Arc::new(move |error: wgpu::Error| {
         handle_an_uncaptured_wgpu_error(&condition_for_uncaptured_errors, error);
@@ -545,7 +783,7 @@ fn start_the_device_and_the_pipeline(
     let out_of_memory_scope = device.push_error_scope(wgpu::ErrorFilter::OutOfMemory);
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("crc32c"),
-        source: wgpu::ShaderSource::Wgsl(CRC32C_SHADER_SOURCE.into()),
+        source: wgpu::ShaderSource::Wgsl(CRC32_CASTAGNOLI_SHADER_SOURCE.into()),
     });
     let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
         label: Some("crc32c"),
@@ -566,6 +804,7 @@ fn start_the_device_and_the_pipeline(
         pci_bus_identifier: discovered.pci_bus_identifier.clone(),
         index: discovered.reported.index,
         free_memory_mebibytes: discovered.reported.free_memory_mebibytes,
+        usable_memory_of_the_empty_card_mebibytes: None,
         memory_quota_mebibytes: None,
         device,
         queue,
@@ -573,15 +812,27 @@ fn start_the_device_and_the_pipeline(
         compiled_pipelines_by_source_digest: std::sync::Arc::default(),
         device_condition,
         device_on_the_books: None,
+        device_outside_the_books: None,
     })
 }
 
+/// 起好的卡记上判它放得下的那一次读数（[`card_memory_once_a_judge_fits`]）：空闲与空卡上能用的（额度照它们算，
+/// [`GpuCard::memory_budget_mebibytes`]、[`GpuCard::memory_budget_when_the_card_is_empty_mebibytes`]）。
+fn card_with_the_memory_reading_it_fit_by(
+    mut card: GpuCard,
+    reading: CardMemoryReading,
+) -> GpuCard {
+    card.free_memory_mebibytes = reading.free_mebibytes;
+    card.usable_memory_of_the_empty_card_mebibytes = Some(reading.total_less_reserved_mebibytes);
+    card
+}
+
 /// 配置点名的卡，按配置的次序（优先级）：`(nvidia-smi 序号, 显存额度 MiB)`。只在点名的卡上起设备（没点名的卡一个设备都不起）；
-/// 点名而用不了的卡（本机没有这个序号、空闲显存低于 [`MINIMUM_FREE_MEMORY_MEBIBYTES`]、上下文起不来）打一行说明，不悄悄换成别的卡。
+/// 起之前照 [`card_memory_once_a_judge_fits`] 判（照此刻空闲算的额度不低于 [`MINIMUM_MEMORY_BUDGET_MEBIBYTES`]，被这个进程自己占着的等它还）。
+/// 点名而用不了的卡（本机没有这个序号、额度不够而不是被这个进程自己占着、等这个进程还等到头、上下文起不来）打一行说明，不悄悄换成别的卡。
 /// 起的设备不进卡池的账（崩溃放量没有卡池的进程走这里；这个进程起过卡池的，崩溃放量照卡池里的卡用）。
 #[must_use]
 pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
-    let named_indices: Vec<u32> = configured.iter().map(|(index, _)| *index).collect();
     let discovered_cards = nvidia_discrete_cards_reported_by_nvidia_smi();
     // 点名的卡找不到时下面那一行 GPU_CARD_NOT_USABLE 分不出是哪一步没过，先把找到的每张卡（序号、空闲显存）与 nvidia-smi 报的行数记下来
     let discovered_summary: Vec<(u32, u64)> = discovered_cards
@@ -591,11 +842,22 @@ pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
     let nvidia_smi_rows = reported_cards_by_pci_bus().len();
     let mut usable: Vec<GpuCard> = discovered_cards
         .iter()
-        .filter(|discovered| named_indices.contains(&discovered.reported.index))
-        .filter(|discovered| {
-            discovered.reported.free_memory_mebibytes >= MINIMUM_FREE_MEMORY_MEBIBYTES
-        })
         .filter_map(|discovered| {
+            let (_, quota) = configured
+                .iter()
+                .find(|(index, _)| *index == discovered.reported.index)?;
+            card_memory_once_a_judge_fits(discovered, Some(*quota))
+                .map_err(|reason| {
+                    // 判成用不了的原因打出来，不让下面那一行 GPU_CARD_NOT_USABLE 把它吞成「用不了」三个字
+                    eprintln!(
+                        "GPU_CARD_SHORT_OF_MEMORY index={}：{reason}",
+                        discovered.reported.index
+                    );
+                })
+                .ok()
+                .map(|reading| (discovered, reading))
+        })
+        .filter_map(|(discovered, reading)| {
             start_the_card(discovered, DeviceOwnerOnTheCard::OutsideTheCardPool)
                 .map_err(|failure| {
                     // 起不来的原因打出来，不让下面那一行 GPU_CARD_NOT_USABLE 把它吞成「用不了」三个字
@@ -609,6 +871,7 @@ pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
                     );
                 })
                 .ok()
+                .map(|card| card_with_the_memory_reading_it_fit_by(card, reading))
         })
         .collect();
     let mut cards = Vec::with_capacity(configured.len());
@@ -620,7 +883,8 @@ pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
                 cards.push(card);
             }
             None => eprintln!(
-                "GPU_CARD_NOT_USABLE index={index}：配置点名了这张卡，本机却用不了它（没有这个序号、空闲显存低于 {MINIMUM_FREE_MEMORY_MEBIBYTES} MiB、或上下文起不来）；\
+                "GPU_CARD_NOT_USABLE index={index}：配置点名了这张卡，本机却用不了它（没有这个序号、给崩溃放量的额度低于 {MINIMUM_MEMORY_BUDGET_MEBIBYTES} MiB 而不是被这个进程自己占着、\
+                 等这个进程还等到头、或上下文起不来：上面 GPU_CARD_SHORT_OF_MEMORY、GPU_CARD_START_FAILED 那几行）；\
                  这一次 Vulkan 下与 nvidia-smi 对上的 NVIDIA 独显（序号, 空闲 MiB）：{discovered_summary:?}，nvidia-smi 报了 {nvidia_smi_rows} 张卡"
             ),
         }
@@ -628,17 +892,22 @@ pub fn gpu_cards_by_priority(configured: &[(u32, u64)]) -> Vec<GpuCard> {
     cards
 }
 
-/// 本机能用的卡：Vulkan 下的 NVIDIA 独显，空闲显存不低于 [`MINIMUM_FREE_MEMORY_MEBIBYTES`]，上下文起得来；按空闲显存从大到小排。
+/// 本机能用的卡：Vulkan 下的 NVIDIA 独显，照 [`card_memory_once_a_judge_fits`] 判得放得下（没有额度，额度照空闲的
+/// [`SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA`] 算；被这个进程自己占着的等它还），上下文起得来；按空闲显存从大到小排。
 /// 起的设备不进卡池的账。
 #[must_use]
 pub fn usable_gpu_cards() -> Vec<GpuCard> {
     let mut cards: Vec<GpuCard> = nvidia_discrete_cards_reported_by_nvidia_smi()
         .iter()
-        .filter(|discovered| {
-            discovered.reported.free_memory_mebibytes >= MINIMUM_FREE_MEMORY_MEBIBYTES
-        })
         .filter_map(|discovered| {
-            start_the_card(discovered, DeviceOwnerOnTheCard::OutsideTheCardPool).ok()
+            card_memory_once_a_judge_fits(discovered, None)
+                .ok()
+                .map(|reading| (discovered, reading))
+        })
+        .filter_map(|(discovered, reading)| {
+            start_the_card(discovered, DeviceOwnerOnTheCard::OutsideTheCardPool)
+                .ok()
+                .map(|card| card_with_the_memory_reading_it_fit_by(card, reading))
         })
         .collect();
     cards.sort_by_key(|card| std::cmp::Reverse(card.free_memory_mebibytes));
@@ -660,6 +929,21 @@ pub fn memory_budget_mebibytes_of(
             free_memory_mebibytes / denominator * numerator
         }
     }
+}
+
+/// 一张卡空着时给崩溃放量的额度（MiB）：照 [`memory_budget_mebibytes_of`] 算，空闲换成空卡上能用的
+/// （`usable_memory_of_the_empty_card_mebibytes`，[`GpuCard::usable_memory_of_the_empty_card_mebibytes`]）；没读过空卡上能用的（卡池里的卡）
+/// 照 `free_memory_mebibytes` 算，与此刻的额度相同。
+#[must_use]
+pub fn memory_budget_when_the_card_is_empty_mebibytes_of(
+    memory_quota_mebibytes: Option<u64>,
+    free_memory_mebibytes: u64,
+    usable_memory_of_the_empty_card_mebibytes: Option<u64>,
+) -> u64 {
+    memory_budget_mebibytes_of(
+        memory_quota_mebibytes,
+        usable_memory_of_the_empty_card_mebibytes.unwrap_or(free_memory_mebibytes),
+    )
 }
 
 /// 在卡上算 `range_count` 段字节的 CRC-32C（[`GpuCard::crc32c_of_ranges`]）一次要多少显存（MiB，向上取整）：每段一个 32 KiB 的槽、
@@ -772,12 +1056,52 @@ fn gpu_lifecycle_line(
     )
 }
 
+/// 按源码摘要只编一次（[`GpuCard::pipelines_compiled_once_on_this_device`] 的缓存那一半，不碰 wgpu）：`compiled_by_source_digest` 里
+/// `source_digest` 那一格没编过，这条线程调 `compile` 编、编好调 `note_the_compile`（编出来的与编用了几微秒），同时要同一个摘要的等它编完；
+/// 编过的直接交那一份，`compile` 与 `note_the_compile` 都不调。
+///
+/// # Panics
+/// `compile` panic：原样传出，这一格照旧空着，下一个要这个摘要的再编一次。
+fn compiled_once_for_the_source_digest<Compiled: Clone>(
+    compiled_by_source_digest: &CompiledOnceBySourceDigest<Compiled>,
+    source_digest: [u8; DIGEST_BYTES],
+    compile: impl FnOnce() -> Compiled,
+    note_the_compile: impl FnOnce(&Compiled, u128),
+) -> Compiled {
+    // 持锁只为取出这个摘要那一格（不在锁里编），没有会 panic 到一半的写：别的线程 panic 留下的毒不影响这张表，照用
+    let compiled_once = {
+        let mut by_source_digest = compiled_by_source_digest
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        std::sync::Arc::clone(by_source_digest.entry(source_digest).or_default())
+    };
+    compiled_once
+        .get_or_init(|| {
+            let compile_began = std::time::Instant::now();
+            let compiled = compile();
+            note_the_compile(&compiled, compile_began.elapsed().as_micros());
+            compiled
+        })
+        .clone()
+}
+
 impl GpuCard {
     /// 崩溃放量在这张卡上最多占多少显存（MiB）：给了额度的取额度与空闲显存里小的那个，
     /// 没给额度的取空闲显存的 [`SHARE_OF_FREE_MEMORY_WITHOUT_A_QUOTA`]。
     #[must_use]
     pub fn memory_budget_mebibytes(&self) -> u64 {
         memory_budget_mebibytes_of(self.memory_quota_mebibytes, self.free_memory_mebibytes)
+    }
+
+    /// 这张卡空着时崩溃放量在上面最多占多少显存（MiB，[`memory_budget_when_the_card_is_empty_mebibytes_of`]）：与
+    /// [`Self::memory_budget_mebibytes`] 同一个算法，空闲换成空卡上能用的。
+    #[must_use]
+    pub fn memory_budget_when_the_card_is_empty_mebibytes(&self) -> u64 {
+        memory_budget_when_the_card_is_empty_mebibytes_of(
+            self.memory_quota_mebibytes,
+            self.free_memory_mebibytes,
+            self.usable_memory_of_the_empty_card_mebibytes,
+        )
     }
 
     /// 这张卡的设备（崩溃放量第 ② 段的核对内核在同一张卡上另起自己的管线）。
@@ -802,7 +1126,7 @@ impl GpuCard {
     /// 别的线程同时要同一个摘要就等这一次编完、拿同一组；以后再要直接拿。管线绑在设备上，另起的设备（另一次 [`usable_gpu_cards`]）另有一份。
     /// 冷编一套判器内核要几分钟、驱动编的时候吃几 GiB 主机内存：几十条用例共用一张卡时，每条各编一遍既慢又撞主机内存上限。
     /// 编的那一段在设备上记着是为这条线程上的哪段活编的（[`DeviceConditionOfACard::compile_for_the_work_of_this_thread`]）：
-    /// `compile` 另起的线程上没接住的 Out of Memory 算那段活的。
+    /// `compile` 另起的线程上没接住的 Out of Memory 算那段活的。真编了（缓存没命中）打一行 [`PIPELINE_COMPILE_LIFECYCLE_PHASE`]。
     ///
     /// # Panics
     /// `compile` panic：原样传出，这一格照旧空着，下一个要这个摘要的再编一次。
@@ -812,20 +1136,25 @@ impl GpuCard {
         source_digest: [u8; DIGEST_BYTES],
         compile: impl FnOnce() -> Vec<wgpu::ComputePipeline>,
     ) -> Vec<wgpu::ComputePipeline> {
-        // 持锁只为取出这个摘要那一格（不在锁里编），没有会 panic 到一半的写：别的线程 panic 留下的毒不影响这张表，照用
-        let compiled_once = {
-            let mut by_source_digest = self
-                .compiled_pipelines_by_source_digest
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::sync::Arc::clone(by_source_digest.entry(source_digest).or_default())
-        };
-        compiled_once
-            .get_or_init(|| {
+        compiled_once_for_the_source_digest(
+            &self.compiled_pipelines_by_source_digest,
+            source_digest,
+            || {
                 self.device_condition
                     .compile_for_the_work_of_this_thread(compile)
-            })
-            .clone()
+            },
+            |pipelines, compile_microseconds| {
+                gpu_lifecycle_trace(
+                    self,
+                    PIPELINE_COMPILE_LIFECYCLE_PHASE,
+                    format_args!(
+                        "source_digest={} pipelines={} compile_microseconds={compile_microseconds}",
+                        crate::hexadecimal::hexadecimal_text(&source_digest),
+                        pipelines.len()
+                    ),
+                );
+            },
+        )
     }
 
     /// 一批字节段（每段不超过 32 KiB）在这张卡上算 CRC-32C，按次序交回。
@@ -1475,13 +1804,95 @@ pub mod gpu_test_start {
         }
     }
 
-    /// 本机起好的每张卡（按空闲显存从大到小，至少一张）；本机没有 NVIDIA 卡时打 [`not_run_line`] 那一行、交回 `None`（调用的用例当场返回）。
+    /// 服务交给这一台的卡（`handed_over`：序号与额度 MiB）里，`nvidia-smi` 此刻报的（`reported`：序号与空闲显存 MiB）那几张的序号与额度，
+    /// 空闲显存从大到小（一样大的照 `reported` 的次序）。点名之外的卡再空也不挑；点名而 `nvidia-smi` 没报的不挑。不碰卡。
+    #[must_use]
+    pub(in crate::gpu_unit_checks) fn handed_over_cards_emptiest_first(
+        handed_over: &[(u32, u64)],
+        reported: &[(u32, u64)],
+    ) -> Vec<(u32, u64)> {
+        let mut picked: Vec<(u64, (u32, u64))> = reported
+            .iter()
+            .filter_map(|(index, free_memory_mebibytes)| {
+                handed_over
+                    .iter()
+                    .find(|(handed_over_index, _)| handed_over_index == index)
+                    .map(|(_, memory_quota_mebibytes)| {
+                        (*free_memory_mebibytes, (*index, *memory_quota_mebibytes))
+                    })
+            })
+            .collect();
+        picked.sort_by_key(|(free_memory_mebibytes, _)| std::cmp::Reverse(*free_memory_mebibytes));
+        picked.into_iter().map(|(_, card)| card).collect()
+    }
+
+    /// 服务交了卡时起出来的卡（`started_cards`）：至少一张照交回；一张都没起来交判红的原因，写交了哪几张、`nvidia-smi` 报了哪几张。
+    ///
+    /// # Errors
+    /// 一张都没起来：交回的串是判红的原因。
+    pub(in crate::gpu_unit_checks) fn started_cards_or_the_reason_the_handed_over_cards_do_not_run<
+        StartedCard,
+    >(
+        started_cards: Vec<StartedCard>,
+        handed_over: &[(u32, u64)],
+        reported: &[(u32, u64)],
+    ) -> Result<Vec<StartedCard>, String> {
+        if started_cards.is_empty() {
+            return Err(format!(
+                "服务经 GPU_CARDS_BY_PRIORITY 交给这一台的卡（序号, 额度 MiB）{handed_over:?} 一张都用不了（交的卡都在另一台、nvidia-smi 没报这个序号、空闲显存低于门槛、或上下文起不来，上面 GPU_CARD_NOT_USABLE 那几行）；nvidia-smi 报的卡（序号, 空闲 MiB）：{reported:?}"
+            ));
+        }
+        Ok(started_cards)
+    }
+
+    /// 服务交了卡时的取卡：只在交给这一台的卡（`handed_over`）上起设备，空闲显存最大的排头（[`handed_over_cards_emptiest_first`]），额度照交的；
+    /// 按 PCI 总线号对序号、起设备都经 [`super::gpu_cards_by_priority`]。
     ///
     /// # Panics
-    /// 有卡而用不上：Vulkan 枚举出 NVIDIA 独显而一张都没起来，PCI 上有 NVIDIA 显示控制器而 Vulkan 枚举不出，
+    /// 交的卡一张都用不了：服务交了卡就是要这个用例上卡，用不了不算「本次未跑」。
+    fn usable_cards_among_those_handed_over(
+        test_name: &str,
+        handed_over: &[(u32, u64)],
+    ) -> Vec<GpuCard> {
+        let reported: Vec<(u32, u64)> = super::reported_cards_by_pci_bus()
+            .values()
+            .map(|card| (card.index, card.free_memory_mebibytes))
+            .collect();
+        let picked = handed_over_cards_emptiest_first(handed_over, &reported);
+        let cards = started_cards_or_the_reason_the_handed_over_cards_do_not_run(
+            super::gpu_cards_by_priority(&picked),
+            handed_over,
+            &reported,
+        )
+        .unwrap_or_else(|reason| panic!("{test_name}：{reason}"));
+        println!(
+            "GPU_CARDS_PICKED_AMONG_THOSE_HANDED_OVER test={test_name} handed_over={handed_over:?} started_indices={:?}",
+            cards.iter().map(|card| card.index).collect::<Vec<u32>>()
+        );
+        cards
+    }
+
+    /// 取卡：服务经环境变量 `GPU_CARDS_BY_PRIORITY` 交了卡（调用方给这个进程的那一份，
+    /// [`crate::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process`]）就只在交给这一台的卡里挑，空闲显存从大到小，每张的额度照交的，
+    /// 同一台别的卡可能分给了别的任务，一个设备都不起。
+    /// 变量没设或是空白：本机起好的每张卡（按空闲显存从大到小，至少一张），本机没有 NVIDIA 卡时打 [`not_run_line`] 那一行、交回 `None`（调用的用例当场返回）。
+    ///
+    /// # Panics
+    /// 服务交的卡读不成（写法不对、地址不在 `HOSTS` 里、多机配置判法认不出这一台），或交的卡一张都用不了。
+    /// 服务没交卡而有卡用不上：Vulkan 枚举出 NVIDIA 独显而一张都没起来，PCI 上有 NVIDIA 显示控制器而 Vulkan 枚举不出，
     /// 或 Vulkan 里没有、PCI 总线看得见而设备表读不出。
     #[must_use]
     pub fn usable_cards_or_report_not_run(test_name: &str) -> Option<Vec<GpuCard>> {
+        let cards_handed_out =
+            crate::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process()
+                .cards_by_priority(None)
+                .unwrap_or_else(|reason| panic!("{test_name}：服务交的卡认不成：{reason}"));
+        if let Some(handed_out) = cards_handed_out {
+            return Some(usable_cards_among_those_handed_over(
+                test_name,
+                &handed_out.cards_of_this_host(),
+            ));
+        }
         let cards = usable_gpu_cards();
         match decide_gpu_test_start(
             &enumerate_vulkan_adapters(),
@@ -1503,7 +1914,7 @@ pub mod gpu_test_start {
         }
     }
 
-    /// 空闲显存最大的那张卡；别的同 [`usable_cards_or_report_not_run`]。
+    /// 空闲显存最大的那张卡，服务交了卡时限在交的卡里；别的同 [`usable_cards_or_report_not_run`]。
     ///
     /// # Panics
     /// 同 [`usable_cards_or_report_not_run`]。
@@ -1511,7 +1922,7 @@ pub mod gpu_test_start {
     pub fn first_usable_card_or_report_not_run(test_name: &str) -> Option<GpuCard> {
         usable_cards_or_report_not_run(test_name).map(|cards| {
             cards.into_iter().next().expect(
-                "判成照跑只在起好的卡数大于 0 时（decide_gpu_test_start 第一句），交回的卡表不会是空的",
+                "usable_cards_or_report_not_run 交 Some 只在起好的卡数大于 0 时（decide_gpu_test_start 第一句；服务交了卡时 started_cards_or_the_reason_the_handed_over_cards_do_not_run），交回的卡表不会是空的",
             )
         })
     }
@@ -1712,23 +2123,46 @@ pub mod gpu_test_start {
             &self,
             mut attempt: impl FnMut() -> LeaseAttempt<Lease>,
         ) -> LeaseAfterWaiting<Lease> {
+            match self.lease_waiting_for_the_other_threads_keeping_the_refusal(|| match attempt() {
+                LeaseAttempt::Leased(lease) => {
+                    AttemptKeepingTheRefusal::Settled(LeaseAfterWaiting::Leased(lease))
+                }
+                LeaseAttempt::LargerThanEveryCard { reason } => {
+                    AttemptKeepingTheRefusal::Settled(LeaseAfterWaiting::LargerThanEveryCard {
+                        reason,
+                    })
+                }
+                LeaseAttempt::NoRoomNow { reason } => AttemptKeepingTheRefusal::NoRoomNow(reason),
+            }) {
+                Ok(settled) => settled,
+                Err(reason) => LeaseAfterWaiting::NoRoomAndNothingToWaitFor { reason },
+            }
+        }
+
+        /// 同 [`Self::lease_waiting_for_the_other_threads`]，借不到的结局照 `attempt` 给的原样交回（调用方照它自己的拒绝类型报）：
+        /// `attempt` 交 [`AttemptKeepingTheRefusal::Settled`] 当场交回 `Ok`（借到了，或等多久都借不到的拒绝，由调用方装在里面）；
+        /// 交 [`AttemptKeepingTheRefusal::NoRoomNow`] 时有可等的就等到账变过再借一次，没有可等的交 `Err`（最后那一次此刻借不到的拒绝）。
+        ///
+        /// # Errors
+        /// 此刻借不到，也没有可等的：最后那一次 `attempt` 给的拒绝。
+        pub fn lease_waiting_for_the_other_threads_keeping_the_refusal<Settled, RefusedForNow>(
+            &self,
+            mut attempt: impl FnMut() -> AttemptKeepingTheRefusal<Settled, RefusedForNow>,
+        ) -> Result<Settled, RefusedForNow> {
             let this_thread = std::thread::current().id();
             loop {
                 let (attempt_in_progress, changes_before_the_attempt) = self.begin_an_attempt();
                 let attempted = attempt();
                 let mut leases = attempt_in_progress.end_holding_the_lock();
-                let reason = match attempted {
-                    LeaseAttempt::Leased(lease) => return LeaseAfterWaiting::Leased(lease),
-                    LeaseAttempt::LargerThanEveryCard { reason } => {
-                        return LeaseAfterWaiting::LargerThanEveryCard { reason }
-                    }
-                    LeaseAttempt::NoRoomNow { reason } => reason,
+                let refused_for_now = match attempted {
+                    AttemptKeepingTheRefusal::Settled(settled) => return Ok(settled),
+                    AttemptKeepingTheRefusal::NoRoomNow(refused_for_now) => refused_for_now,
                 };
                 // 这一次借做完时自己加了一回：比它多才是别的线程还了卡或做完了借，那时这一次借不到的账可能已经变了，再借
                 let changes_after_this_attempt = changes_before_the_attempt + 1;
                 while leases.changes_so_far == changes_after_this_attempt {
                     if !leases.is_there_anything_for_the_thread_to_wait_for(this_thread) {
-                        return LeaseAfterWaiting::NoRoomAndNothingToWaitFor { reason };
+                        return Err(refused_for_now);
                     }
                     leases = self
                         .the_books_changed
@@ -1739,16 +2173,181 @@ pub mod gpu_test_start {
         }
     }
 
+    /// 照账借一次、拒绝留原样的结局（[`CardLeaseWaitingRoom::lease_waiting_for_the_other_threads_keeping_the_refusal`] 的 `attempt` 交它）。
+    pub enum AttemptKeepingTheRefusal<Settled, RefusedForNow> {
+        /// 定了，不用等：借到了（交回之前已经数进借着的），或等多久都借不到。
+        Settled(Settled),
+        /// 此刻借不到，账变过可能借得到：带着这一次的拒绝。
+        NoRoomNow(RefusedForNow),
+    }
+
     /// GPU 用例共用的卡池（[`card_pool::GpuCardPool`]）：只开 `gpu` 也编得进（显卡配置的读法在 `crate::gpu_card_configuration`）。
+    /// 用例经 [`gpu_card_pool_or_report_not_run`] 取的是第一次借卡才起池的把手（[`GpuCardPoolStartedAtTheFirstLease`]）。
     pub use card_pool::{
-        card_pool_started_in_this_process, gpu_card_pool_or_report_not_run,
+        card_pool_of_this_process_started_now, card_pool_started_in_this_process,
         CardOfThePoolForTheProductPath, CardPoolLeaseRefusal, GpuCardLease, GpuCardPool,
         ScratchLeaseOnACard, CARD_QUOTA_ENVIRONMENT_VARIABLE,
     };
 
+    /// 这台机器上有没有 NVIDIA 的卡，只看 Vulkan 枚举与 PCI 设备表（[`decide_gpu_test_start`] 在一张卡都还没数的时候判的那一份）：
+    /// 不读显卡配置、不领卡、不起卡池。GPU 用例开头照它判「本次未跑」（[`gpu_card_pool_or_report_not_run`]），卡池等第一次借卡时才起。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum NvidiaHardwareOfThisMachine {
+        /// Vulkan 枚举里没有 NVIDIA 独显，PCI 上也没有 NVIDIA 显示控制器（或看不见 PCI 总线）：起池也只会判成没卡，报「本次未跑」。
+        /// `reason` 是「本次未跑」那一行的原因。
+        Absent { reason: String },
+        /// 有 NVIDIA 独显，或 PCI 上有 NVIDIA 显示控制器而 Vulkan 枚举不出、或 PCI 设备表读不出：用不用得上、点名的卡在不在，
+        /// 第一次借卡起池时照调用方的显卡配置判（用不上照旧判红）。
+        PresentOrToBeJudgedByTheCardPool,
+    }
+
+    /// 判 [`NvidiaHardwareOfThisMachine`] 时交给 [`decide_gpu_test_start`] 的用得上的卡数：卡池还没起，一张卡都没数。
+    const USABLE_CARDS_COUNTED_BEFORE_THE_CARD_POOL_STARTS: usize = 0;
+
+    /// 这台机器的 [`NvidiaHardwareOfThisMachine`]：进程里第一次问时枚举一次 Vulkan 适配器、读一次 PCI 设备表，之后每次交同一份
+    /// （卡池起池也是进程里只判一次）。
+    #[must_use]
+    pub fn nvidia_hardware_of_this_machine() -> NvidiaHardwareOfThisMachine {
+        static NVIDIA_HARDWARE_OF_THIS_MACHINE: std::sync::OnceLock<NvidiaHardwareOfThisMachine> =
+            std::sync::OnceLock::new();
+        NVIDIA_HARDWARE_OF_THIS_MACHINE
+            .get_or_init(|| {
+                match decide_gpu_test_start(
+                    &enumerate_vulkan_adapters(),
+                    &read_pci_nvidia_display_controllers_on_the_bus(std::path::Path::new(
+                        PCI_BUS_DIRECTORY,
+                    )),
+                    USABLE_CARDS_COUNTED_BEFORE_THE_CARD_POOL_STARTS,
+                ) {
+                    GpuTestStart::NotRunNoGpuAdapter { reason } => {
+                        NvidiaHardwareOfThisMachine::Absent { reason }
+                    }
+                    GpuTestStart::RunOnTheUsableCards
+                    | GpuTestStart::AdapterPresentButNoCardStarted { .. }
+                    | GpuTestStart::NvidiaCardOnPciButVulkanEnumeratesNone { .. }
+                    | GpuTestStart::PciBusVisibleButListingUnreadable { .. } => {
+                        NvidiaHardwareOfThisMachine::PresentOrToBeJudgedByTheCardPool
+                    }
+                }
+            })
+            .clone()
+    }
+
+    /// GPU 用例拿的卡池把手：拿到时只判过这台机器有没有 NVIDIA 的卡（[`nvidia_hardware_of_this_machine`]），没读显卡配置、没领卡、
+    /// 没起卡池；第一次借卡（[`Self::lease_card_or_report_not_run`]）或第一次要池里的卡（[`Self::card_pool_started_now`]）时才起这个进程的卡池
+    /// （`card_pool::gpu_card_pool_or_report_not_run`：读调用方给这个进程的显卡配置，没交卡串而交了领卡通道的在这一刻领卡）。
+    /// CPU 参照过库、只录那一趟交回 `None` 而收手的用例，从头到尾不起池、不领卡。可以拷贝，传进几个帮手、几条线程都是同一个池。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct GpuCardPoolStartedAtTheFirstLease {
+        /// 起池时判成本机没卡打「本次未跑」、有卡而用不上 panic 时报的用例名（进程里每个名字只留一份，[`test_name_kept_for_this_process`]）。
+        test_name: &'static str,
+    }
+
+    /// `test_name` 在这个进程里留一份、交回它（同一个名字交同一份，留下的份数是这个进程里拿过卡池把手的不同用例名的个数）：
+    /// 卡池把手要拷贝着传进帮手与线程，用例名跟着它活到进程结束。
+    fn test_name_kept_for_this_process(test_name: &str) -> &'static str {
+        static TEST_NAMES_KEPT: std::sync::Mutex<std::collections::BTreeSet<&'static str>> =
+            std::sync::Mutex::new(std::collections::BTreeSet::new());
+        let mut kept = TEST_NAMES_KEPT
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(name) = kept.get(test_name).copied() {
+            return name;
+        }
+        let name: &'static str = Box::leak(test_name.to_string().into_boxed_str());
+        kept.insert(name);
+        name
+    }
+
+    /// GPU 用例开头取卡池：这台机器没有 NVIDIA 的卡就打一行 [`not_run_line`]、交 `None`（调用的用例当场返回）；有就交卡池把手
+    /// （[`GpuCardPoolStartedAtTheFirstLease`]），此刻不读显卡配置、不领卡、不起池，第一次借卡时才起。
+    /// 先判有没有卡、建好表知道要多少显存之后再借（[`GpuCardPoolStartedAtTheFirstLease::lease_card_or_report_not_run`]）。
+    #[must_use]
+    pub fn gpu_card_pool_or_report_not_run(
+        test_name: &str,
+    ) -> Option<GpuCardPoolStartedAtTheFirstLease> {
+        gpu_card_pool_or_report_not_run_given_the_hardware(
+            test_name,
+            &nvidia_hardware_of_this_machine(),
+        )
+    }
+
+    /// 同 [`gpu_card_pool_or_report_not_run`]，这台机器有没有 NVIDIA 的卡由调用方给（不枚举 Vulkan、不读 PCI）：
+    /// 钉「拿到把手时不起池、不领卡」的用例在没卡的机器上也给「有」，走得到借卡起池那一步。
+    #[must_use]
+    pub fn gpu_card_pool_or_report_not_run_given_the_hardware(
+        test_name: &str,
+        hardware: &NvidiaHardwareOfThisMachine,
+    ) -> Option<GpuCardPoolStartedAtTheFirstLease> {
+        match hardware {
+            NvidiaHardwareOfThisMachine::Absent { reason } => {
+                println!("{}", not_run_line(test_name, reason));
+                None
+            }
+            NvidiaHardwareOfThisMachine::PresentOrToBeJudgedByTheCardPool => {
+                Some(GpuCardPoolStartedAtTheFirstLease {
+                    test_name: test_name_kept_for_this_process(test_name),
+                })
+            }
+        }
+    }
+
+    impl GpuCardPoolStartedAtTheFirstLease {
+        /// 这个进程的卡池，没起过就在这一刻起（`card_pool::gpu_card_pool_or_report_not_run`）：判成本机没卡打「本次未跑」那一行、交 `None`。
+        ///
+        /// # Panics
+        /// 同 `card_pool::gpu_card_pool_or_report_not_run`：有卡而用不上、显卡配置写错、点名的卡少一张找不到、领卡没成。
+        fn card_pool_or_report_not_run(self) -> Option<&'static GpuCardPool> {
+            card_pool::gpu_card_pool_or_report_not_run(self.test_name)
+        }
+
+        /// 向这个进程的卡池借一张卡（[`GpuCardPool::lease_card_or_report_not_run`]）；卡池还没起的在这一刻起。
+        /// 起池判成本机没卡、或借不到：打「本次未跑」那一行，交 `None`。
+        ///
+        /// # Panics
+        /// 同 [`Self::card_pool_started_now`] 起池那一步与 [`GpuCardPool::lease_card_or_report_not_run`]。
+        #[must_use]
+        pub fn lease_card_or_report_not_run(
+            self,
+            test_name: &str,
+            need_mebibytes: u64,
+        ) -> Option<GpuCardLease> {
+            self.card_pool_or_report_not_run()?
+                .lease_card_or_report_not_run(test_name, need_mebibytes)
+        }
+
+        /// 池里存储缓冲绑定上限最小的那张卡的上限（[`GpuCardPool::smallest_maximum_storage_buffer_binding_size`]）；卡池还没起的在这一刻起。
+        ///
+        /// # Panics
+        /// 同 [`Self::card_pool_started_now`]。
+        #[must_use]
+        pub fn smallest_maximum_storage_buffer_binding_size(self) -> u64 {
+            self.card_pool_started_now()
+                .smallest_maximum_storage_buffer_binding_size()
+        }
+
+        /// 这个进程的卡池，没起过就在这一刻起：要池里有哪几张卡、每张能借多少的用例与帮手经它取。
+        ///
+        /// # Panics
+        /// 起池判成本机没卡：拿到把手时判过这台机器有 NVIDIA 的卡，起池时却判成没有（同一个进程里 Vulkan 枚举与 PCI 设备表前后不一致，
+        /// 或用例经 [`gpu_card_pool_or_report_not_run_given_the_hardware`] 在没卡的机器上给了「有」）；
+        /// 起池那一步的 panic 同 `card_pool::gpu_card_pool_or_report_not_run`。
+        #[must_use]
+        pub fn card_pool_started_now(self) -> &'static GpuCardPool {
+            self.card_pool_or_report_not_run().unwrap_or_else(|| {
+                panic!(
+                    "{}：拿卡池把手时判过这台机器有 NVIDIA 的卡，起池时却判成没有（上面「本次未跑」那一行写了起池时的原因）",
+                    self.test_name
+                )
+            })
+        }
+    }
+
     /// 起池那一步（单测在别的用例拿着改环境的锁换了配置时现起一次，核它照的是哪一份显卡配置）。
     #[cfg(test)]
-    pub(in crate::gpu_unit_checks) use card_pool::start_the_gpu_card_pool;
+    pub(in crate::gpu_unit_checks) use card_pool::{
+        attempt_keeping_the_refusal_of, start_the_gpu_card_pool,
+    };
 
     mod card_pool {
         use super::super::{
@@ -1760,8 +2359,9 @@ pub mod gpu_test_start {
         };
         use super::{
             decide_gpu_test_start, enumerate_vulkan_adapters, not_run_line,
-            read_pci_nvidia_display_controllers_on_the_bus, CardLeaseWaitingRoom, GpuTestStart,
-            LeaseAfterWaiting, LeaseAttempt, LeaseCountedOutOfTheWaitingRoom, PCI_BUS_DIRECTORY,
+            read_pci_nvidia_display_controllers_on_the_bus, AttemptKeepingTheRefusal,
+            CardLeaseWaitingRoom, GpuTestStart, LeaseAfterWaiting, LeaseAttempt,
+            LeaseCountedOutOfTheWaitingRoom, PCI_BUS_DIRECTORY,
         };
         use crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER;
         use crate::gpu_card_configuration::{
@@ -1801,6 +2401,30 @@ pub mod gpu_test_start {
             /// 账上借到了，那张卡上起设备时显存不够（[`CardStartFailure::OutOfGpuMemory`]）：那一笔已经还了，调用方报本次未跑。
             /// `reason` 是「本次未跑」那一行的原因（以「显存不够：」起头）。
             OutOfGpuMemoryStartingTheDevice { reason: String },
+        }
+
+        /// 向卡池借一次的结局在排队时等不等（[`GpuCardPool::lease_the_first_card_with_room_waiting_for_the_other_threads`]）：
+        /// 账上每张卡此刻都放不下、借到的卡上起设备时显存不够是此刻借不到（别的线程还了卡可能借得到，等）；
+        /// 借到了、要的比每张卡空着时能借的都大、卡上的显存读不出都定了（不等）。
+        pub(in crate::gpu_unit_checks) fn attempt_keeping_the_refusal_of<Lease>(
+            leased: Result<Lease, CardPoolLeaseRefusal>,
+        ) -> AttemptKeepingTheRefusal<Result<Lease, CardPoolLeaseRefusal>, CardPoolLeaseRefusal>
+        {
+            match leased {
+                Ok(lease) => AttemptKeepingTheRefusal::Settled(Ok(lease)),
+                Err(
+                    refusal @ (CardPoolLeaseRefusal::Booking(BookingRefusal::NoCardHasRoomNow {
+                        ..
+                    })
+                    | CardPoolLeaseRefusal::OutOfGpuMemoryStartingTheDevice { .. }),
+                ) => AttemptKeepingTheRefusal::NoRoomNow(refusal),
+                Err(
+                    refusal @ CardPoolLeaseRefusal::Booking(
+                        BookingRefusal::NeedLargerThanEveryCard(_)
+                        | BookingRefusal::CardMemoryUnreadable { .. },
+                    ),
+                ) => AttemptKeepingTheRefusal::Settled(Err(refusal)),
+            }
         }
 
         /// GPU 用例共用的卡：这台机器点名的每张卡在这个进程里一本显存账（[`GpuMemoryLedger`]，只记这个进程借的，
@@ -1866,7 +2490,7 @@ pub mod gpu_test_start {
         pub struct CardOfThePoolForTheProductPath {
             pub index: u32,
             pub name: String,
-            pub max_storage_buffer_binding_size: u64,
+            pub maximum_storage_buffer_binding_size: u64,
         }
 
         impl Drop for GpuCardLease {
@@ -1900,6 +2524,12 @@ pub mod gpu_test_start {
                              这一笔照旧记在账上，到那台设备上提交的活做完了、或那台设备记成丢了、放掉了才销",
                             polled.as_ref().map_err(|_panic| "等的时候 wgpu panic 了")
                         );
+                        self.card
+                            .device_condition()
+                            .print_the_device_lost_marker_line_the_first_time(&format!(
+                                "借据 {lease_identifier} 丢掉时等设备没等成：{:?}",
+                                polled.as_ref().map_err(|_panic| "等的时候 wgpu panic 了")
+                            ));
                     },
                 );
                 crate::gpu_unit_checks::gpu_lifecycle_trace(
@@ -1913,8 +2543,14 @@ pub mod gpu_test_start {
         impl GpuCardPool {
             /// 池里每张卡存储缓冲绑定上限里最小的那个（用例借之前按它估一条草稿缓冲装几个状态）。设备按适配器的上限要
             /// （`start_the_card`），没起设备也照适配器读得到。
+            /// 池里有几张卡。
             #[must_use]
-            pub fn smallest_max_storage_buffer_binding_size(&self) -> u64 {
+            pub fn card_count(&self) -> usize {
+                self.cards.len()
+            }
+
+            #[must_use]
+            pub fn smallest_maximum_storage_buffer_binding_size(&self) -> u64 {
                 self.cards
                     .iter()
                     .map(|card| {
@@ -2104,6 +2740,29 @@ pub mod gpu_test_start {
                     )
             }
 
+            /// 同 [`Self::lease_the_first_card_with_room_now`]，此刻借不到时排队（[`CardLeaseWaitingRoom`]）：这个进程别的线程借着卡或正在借，
+            /// 就等到它们还了卡或借完再照账借一次；没有可等的才交那一次的拒绝。一个进程里几条线程并行各借各的（给定状态表的判器每条工作线程判一张表）
+            /// 走它：自己这个进程借满的卡等得到头，不当成显存不够。要的比每张卡空着时能借的都大、卡上的显存读不出不等，当场交回。
+            ///
+            /// # Errors
+            /// 见 [`CardPoolLeaseRefusal`]。
+            ///
+            /// # Panics
+            /// 借到的卡上起不了设备（显存不够之外的原因）；要 0 MiB。
+            pub fn lease_the_first_card_with_room_waiting_for_the_other_threads(
+                &'static self,
+                run_name: &str,
+                need_mebibytes: u64,
+            ) -> Result<GpuCardLease, CardPoolLeaseRefusal> {
+                self.waiting_room
+                    .lease_waiting_for_the_other_threads_keeping_the_refusal(|| {
+                        attempt_keeping_the_refusal_of(
+                            self.lease_the_first_card_with_room_now(run_name, need_mebibytes),
+                        )
+                    })
+                    .and_then(|settled| settled)
+            }
+
             /// 序号是 `index`（`nvidia-smi` 给的）的那张卡在池里排第几。
             ///
             /// # Panics
@@ -2287,7 +2946,7 @@ pub mod gpu_test_start {
                     .map(|card| CardOfThePoolForTheProductPath {
                         index: card.discovered.reported.index,
                         name: card.discovered.name.clone(),
-                        max_storage_buffer_binding_size: card
+                        maximum_storage_buffer_binding_size: card
                             .discovered
                             .adapter
                             .limits()
@@ -2521,6 +3180,25 @@ pub mod gpu_test_start {
             }
         }
 
+        /// 这个进程的卡池，没起过就当场起（与 [`gpu_card_pool_or_report_not_run`] 起的是同一个，进程里只起一次）：不打「本次未跑」那一行、
+        /// 不 panic，起好交池，判成本机没卡交 `Ok(None)`。崩溃放量取卡经它
+        /// （`crate::crash_amplification::gpu_cards_in_use`：同一个进程里经引擎起步的判与直接借卡的 GPU 用例走同一套显存账）。
+        ///
+        /// # Errors
+        /// 有卡而用不上（显卡配置写错、没给这台机器点卡、点名的卡少一张找不到）：交的那一句同 [`gpu_card_pool_or_report_not_run`] panic 的那一句。
+        pub fn card_pool_of_this_process_started_now(
+        ) -> Result<Option<&'static GpuCardPool>, String> {
+            let start = GPU_CARD_POOL.get_or_init(start_the_gpu_card_pool);
+            match &start.outcome {
+                GpuCardPoolStartOutcome::Started(pool) => Ok(Some(&**pool)),
+                GpuCardPoolStartOutcome::NotRunNoGpuAdapter { .. } => Ok(None),
+                GpuCardPoolStartOutcome::CardsPresentButNotUsable { reason } => Err(format!(
+                    "{reason}（卡池照调用方给这个进程的显卡配置挑的卡：{:?}）",
+                    start.configuration
+                )),
+            }
+        }
+
         /// 这个进程已经起好的卡池；还没起过池、或起池判成没卡、有卡而用不上，交 `None`（不起池，什么都不打）。
         #[must_use]
         pub fn card_pool_started_in_this_process() -> Option<&'static GpuCardPool> {
@@ -2603,7 +3281,7 @@ mod tests {
     /// 判别力：回调改回 `expect("回调送得出去")`，头一句（收的那一头丢了之后调回调不 panic）红——不先在展开途外核这一句的话，
     /// 后面那一段展开途中再 panic、进程中止，这一条连同同一二进制里余下的用例都没有结局；超时不记设备丢了，`is_lost` 那一句与「起了一台新的」那一句红。
     #[test]
-    fn a_dispatch_whose_wait_timed_out_is_red_alone_and_the_next_dispatch_in_the_same_process_reads_back(
+    fn dispatch_whose_wait_timed_out_is_red_alone_and_the_next_dispatch_in_the_same_process_reads_back(
     ) {
         use super::{
             readback_mapping_callback, take_the_readback_after_the_wait_or_record_the_device_lost,
@@ -2691,20 +3369,25 @@ mod tests {
         assert!(!next_device.is_lost(), "下一次派活等成了，新的那一台没记丢");
     }
 
+    use super::gpu_test_start::{attempt_keeping_the_refusal_of, CardPoolLeaseRefusal};
     use super::gpu_test_start::{
-        decide_gpu_test_start, read_pci_nvidia_display_controllers_on_the_bus,
-        CardLeaseWaitingRoom, GpuTestStart, LeaseAfterWaiting, LeaseAttempt,
-        LeaseCountedOutOfTheWaitingRoom, PciNvidiaDisplayControllers,
+        decide_gpu_test_start, handed_over_cards_emptiest_first, not_run_line,
+        read_pci_nvidia_display_controllers_on_the_bus,
+        started_cards_or_the_reason_the_handed_over_cards_do_not_run,
+        usable_cards_or_report_not_run, CardLeaseWaitingRoom, GpuTestStart, LeaseAfterWaiting,
+        LeaseAttempt, LeaseCountedOutOfTheWaitingRoom, PciNvidiaDisplayControllers,
         PCI_DEVICES_SUBDIRECTORY_NAME,
     };
     use super::{
-        card_memory_reader_of_the_card_pool, cause_of_the_device_loss, device_found_idle_by_a_poll,
-        device_wait_before_returning_a_lease, failure_of_a_device_request,
-        handle_an_uncaptured_wgpu_error, has_devices_started_outside_the_card_pool_on_the_bus,
-        poll_type_before_returning_a_lease, record_the_loss_of_the_device,
-        started_with_its_owner_recorded, CardStartFailure, DeviceConditionOfACard,
-        DeviceOwnerOnTheCard,
+        card_memory_reader_of_the_card_pool, cause_of_the_device_loss,
+        compiled_once_for_the_source_digest, device_found_idle_by_a_poll,
+        device_started_with_a_lifecycle_line, device_wait_before_returning_a_lease,
+        failure_of_a_device_request, handle_an_uncaptured_wgpu_error,
+        has_devices_started_outside_the_card_pool_on_the_bus, poll_type_before_returning_a_lease,
+        record_the_loss_of_the_device, started_with_its_owner_recorded, CardStartFailure,
+        CompiledOnceBySourceDigest, DeviceConditionOfACard, DeviceOwnerOnTheCard,
     };
+    use crate::gpu_memory_ledger::{BookingRefusal, NeedLargerThanEveryCard};
     use crate::gpu_memory_ledger::{
         CauseOfTheDeviceLoss, DeviceWaitBeforeReturningTheLease, OccupiedByThisProcess,
     };
@@ -2787,6 +3470,69 @@ mod tests {
         (root, bus_directory)
     }
 
+    /// 取卡入口只在服务交的卡里挑，挑最空也限在这几张：序号 0、3 比交的两张都空，没点名就不挑；交的两张照空闲显存从大到小排，额度跟着各自那张。不要卡。
+    /// 判别力（`crates/mutations.tsv`「测试取卡入口：点名之外的卡也挑」「测试取卡入口：交的卡里挑最满的」）。
+    #[test]
+    fn only_the_cards_handed_over_are_picked_emptiest_first_even_when_another_card_is_emptier() {
+        let handed_over = [(1, 8192), (2, 16384)];
+        let reported = [(0, 30000), (1, 10000), (2, 20000), (3, 25000)];
+        assert_eq!(
+            handed_over_cards_emptiest_first(&handed_over, &reported),
+            vec![(2, 16384), (1, 8192)]
+        );
+    }
+
+    /// 服务交的卡一张都没起来要判红，不交回空卡表，判红的原因点名交的卡与 `nvidia-smi` 报的卡。不要卡。
+    /// 判别力（`crates/mutations.tsv`「测试取卡入口：交的卡一张都用不了时交回空卡表」）。
+    #[test]
+    fn handed_over_cards_of_which_none_started_give_the_reason_to_fail() {
+        let started_cards: Vec<u32> = Vec::new();
+        let reason = started_cards_or_the_reason_the_handed_over_cards_do_not_run(
+            started_cards,
+            &[(4, 8192)],
+            &[(0, 30000)],
+        )
+        .expect_err("一张都没起来要交判红的原因");
+        assert!(
+            reason.contains("[(4, 8192)]") && reason.contains("[(0, 30000)]"),
+            "原因要点名交的卡与 nvidia-smi 报的卡：{reason}"
+        );
+    }
+
+    /// 真卡接线：服务交了卡时，取卡入口起出来的每张卡都在交给这一台的卡里；服务没交卡时一个设备都不起，打「本次未跑」那一行。
+    /// 本机没被交的卡有一张空闲显存够门槛，入口不看交的卡时这一条才红（只有交的这几张用得上的机器上入口看不看都一样）。
+    /// 判别力（`crates/mutations.tsv`「测试取卡入口：不看服务交的卡」）。
+    #[test]
+    fn the_entry_under_cards_handed_out_by_the_service_starts_only_those_cards() {
+        let test_name = "the_entry_under_cards_handed_out_by_the_service_starts_only_those_cards";
+        let cards_handed_out =
+            crate::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process()
+                .cards_by_priority(None)
+                .expect("服务交的卡读得成");
+        let Some(handed_out) = cards_handed_out else {
+            println!(
+                "{}",
+                not_run_line(test_name, "服务没经 GPU_CARDS_BY_PRIORITY 交卡")
+            );
+            return;
+        };
+        let handed_over_indices: Vec<u32> = handed_out
+            .cards_of_this_host()
+            .iter()
+            .map(|(index, _)| *index)
+            .collect();
+        let Some(cards) = usable_cards_or_report_not_run(test_name) else {
+            return;
+        };
+        for card in &cards {
+            assert!(
+                handed_over_indices.contains(&card.index),
+                "起了服务没交的卡：序号 {}，交给这一台的是 {handed_over_indices:?}",
+                card.index
+            );
+        }
+    }
+
     #[test]
     fn no_nvidia_adapter_and_an_invisible_pci_bus_is_reported_as_not_run() {
         let start = decide_gpu_test_start(
@@ -2803,7 +3549,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pci_bus_directory_that_is_not_there_is_read_as_the_bus_not_being_visible() {
+    fn pci_bus_directory_that_is_not_there_is_read_as_the_bus_not_being_visible() {
         let (root, bus_directory) = fake_sysfs("bus-not-there", &FakePciBus::NotThere);
         let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
         drop(root);
@@ -2814,8 +3560,8 @@ mod tests {
     }
 
     #[test]
-    fn a_visible_pci_bus_without_its_devices_directory_is_an_unreadable_listing_not_an_invisible_bus(
-    ) {
+    fn visible_pci_bus_without_its_devices_directory_is_an_unreadable_listing_not_an_invisible_bus()
+    {
         let (root, bus_directory) = fake_sysfs(
             "bus-without-devices",
             &FakePciBus::ThereWithoutItsDevicesDirectory,
@@ -2829,7 +3575,7 @@ mod tests {
     }
 
     #[test]
-    fn a_visible_pci_bus_with_a_device_whose_vendor_cannot_be_read_and_no_nvidia_adapter_is_red() {
+    fn visible_pci_bus_with_a_device_whose_vendor_cannot_be_read_and_no_nvidia_adapter_is_red() {
         let (root, bus_directory) = fake_sysfs(
             "device-vendor-unreadable",
             &FakePciBus::ThereWithDevices(&[("0000:00:1f.3", None, Some("0x040300\n"))]),
@@ -2849,7 +3595,7 @@ mod tests {
     /// （攻方 R1）：`request_device` 交回 wgpu 的设备显存不够是显存不够（卡池报本次未跑），
     /// 设备丢了这类别的错是起不来（判红）。错是照 wgpu 的错类型造的，不要显卡。
     #[test]
-    fn a_device_request_refused_for_lack_of_memory_is_told_apart_from_other_refusals() {
+    fn device_request_refused_for_lack_of_memory_is_told_apart_from_other_refusals() {
         let refused = |device_error| {
             failure_of_a_device_request(
                 &wgpu::RequestDeviceError::from(wgpu::wgc::instance::RequestDeviceError::Device(
@@ -2911,8 +3657,8 @@ mod tests {
     /// （攻方乙形、K3）：不归卡池的设备起之前就在它的总线上记下（起的那一段里卡池已经认得出），
     /// 卡池的设备不记。总线号是造的，不与本机的卡重。
     #[test]
-    fn a_device_outside_the_card_pool_is_marked_on_its_bus_before_it_starts_and_a_pool_device_is_not(
-    ) {
+    fn device_outside_the_card_pool_is_marked_on_its_bus_before_it_starts_and_a_pool_device_is_not()
+    {
         assert_eq!(
             started_with_its_owner_recorded(
                 DeviceOwnerOnTheCard::OutsideTheCardPool,
@@ -2922,18 +3668,26 @@ mod tests {
                         "fe:00.0",
                     ))
                 }
-            ),
-            Ok(true),
-            "不归卡池：起的那一段里已经记着"
+            )
+            .map(|(marked_while_starting, marked_on_the_bus)| (
+                marked_while_starting,
+                marked_on_the_bus.is_some()
+            )),
+            Ok((true, true)),
+            "不归卡池：起的那一段里已经记着，起好交那一记"
         );
         assert_eq!(
             started_with_its_owner_recorded(DeviceOwnerOnTheCard::TheCardPool, "fd:00.0", || {
                 Ok(has_devices_started_outside_the_card_pool_on_the_bus(
                     "fd:00.0",
                 ))
-            }),
-            Ok(false),
-            "卡池的：不记"
+            })
+            .map(|(marked_while_starting, marked_on_the_bus)| (
+                marked_while_starting,
+                marked_on_the_bus.is_some()
+            )),
+            Ok((false, false)),
+            "卡池的：不记，也不交那一记"
         );
         assert!(!has_devices_started_outside_the_card_pool_on_the_bus(
             "fd:00.0"
@@ -2945,14 +3699,12 @@ mod tests {
     #[test]
     fn the_card_pool_reads_this_process_as_also_outside_the_books_on_a_bus_with_a_device_outside_the_pool(
     ) {
-        assert_eq!(
-            started_with_its_owner_recorded(
-                DeviceOwnerOnTheCard::OutsideTheCardPool,
-                "fc:00.0",
-                || { Ok(()) }
-            ),
-            Ok(())
-        );
+        let (_device, _marked_on_the_bus) = started_with_its_owner_recorded(
+            DeviceOwnerOnTheCard::OutsideTheCardPool,
+            "fc:00.0",
+            || Ok(()),
+        )
+        .expect("造的设备起得来");
         let this_process = std::process::id();
         let report = ["00000000:FC:00.0", "00000000:FB:00.0"]
             .iter()
@@ -2982,6 +3734,143 @@ mod tests {
         );
     }
 
+    /// 不归卡池的那一台的句柄都丢了（那一记跟着丢），卡池读那张卡回到按账拆：这个进程占着的不再记成分不出。
+    /// 报告是造的，总线号不与本机的卡重、不与别的用例重。
+    /// 判别力（`crates/mutations.tsv`「显存账 不走账的设备丢掉时不减」）：那一记丢掉时不减，这条红。
+    #[test]
+    fn the_card_pool_reads_this_process_through_the_books_again_once_its_device_outside_the_pool_is_dropped(
+    ) {
+        let started_outside_the_pool = started_with_its_owner_recorded(
+            DeviceOwnerOnTheCard::OutsideTheCardPool,
+            "fa:00.0",
+            || Ok(()),
+        )
+        .expect("造的设备起得来");
+        let this_process = std::process::id();
+        let report = format!(
+            "GPU 00000000:FA:00.0\n    FB Memory Usage\n        Total                                          : 16311 MiB\n\
+             \x20       Reserved                                       : 462 MiB\n\
+             \x20       Free                                           : 10000 MiB\n    Processes\n\
+             \x20       Process ID                                     : {this_process}\n\
+             \x20           Used GPU Memory                            : 1000 MiB\n"
+        );
+        let read = card_memory_reader_of_the_card_pool(
+            Box::new(move || Ok(report.clone())),
+            vec!["fa:00.0".to_string()],
+        );
+        let occupied_by_this_process = || {
+            read().map(|readings| {
+                readings
+                    .iter()
+                    .map(|reading| reading.occupied_by_this_process)
+                    .collect::<Vec<OccupiedByThisProcess>>()
+            })
+        };
+        assert_eq!(
+            occupied_by_this_process(),
+            Ok(vec![OccupiedByThisProcess::AlsoOutsideTheBooks {
+                mebibytes: 1000
+            }]),
+            "不归卡池的那一台还在：分不出"
+        );
+        drop(started_outside_the_pool);
+        assert_eq!(
+            occupied_by_this_process(),
+            Ok(vec![OccupiedByThisProcess::OnlyThroughTheBooks {
+                mebibytes: 1000
+            }]),
+            "那一台丢了：回到按账拆"
+        );
+    }
+
+    /// 起一台设备打一行起设备的 GPU 阶段现场（起没起好都打），点名卡的序号、总线号、设备归谁与结局；卡池的与不归卡池的各起一台各一行。
+    /// 不要卡。判别力（`crates/mutations.tsv`「GPU 阶段现场 起设备不打那一行」）：起完不打，这条红。
+    #[test]
+    fn starting_a_device_prints_one_device_start_lifecycle_line_naming_the_card_its_owner_and_the_outcome(
+    ) {
+        let lines = std::sync::Mutex::new(Vec::<String>::new());
+        let trace: &dyn Fn(&str, std::fmt::Arguments<'_>) = &|phase, detail| {
+            lines
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(format!("{phase} {detail}"));
+        };
+        assert_eq!(
+            device_started_with_a_lifecycle_line(
+                3,
+                "f9:00.0",
+                DeviceOwnerOnTheCard::TheCardPool,
+                || Ok::<(), CardStartFailure>(()),
+                trace,
+            ),
+            Ok(())
+        );
+        let short_of_memory = CardStartFailure::OutOfGpuMemory {
+            reason: "造的显存不够".to_string(),
+        };
+        assert_eq!(
+            device_started_with_a_lifecycle_line(
+                4,
+                "f8:00.0",
+                DeviceOwnerOnTheCard::OutsideTheCardPool,
+                || Err::<(), CardStartFailure>(short_of_memory.clone()),
+                trace,
+            ),
+            Err(short_of_memory)
+        );
+        let lines = lines
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert_eq!(lines.len(), 2, "起两台各打一行：{lines:?}");
+        assert!(
+            lines[0].starts_with(
+                "device_start card=3 pci=\"f9:00.0\" owner=the-card-pool outcome=started start_microseconds="
+            ),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].starts_with(
+                "device_start card=4 pci=\"f8:00.0\" owner=outside-the-card-pool outcome=out-of-gpu-memory start_microseconds="
+            ),
+            "{lines:?}"
+        );
+    }
+
+    /// 一个设备上按源码摘要缓存的管线：这个摘要头一次要时真编、记一次编（编管线那一行 GPU 阶段现场照它打），再要同一个摘要直接交那一份、
+    /// 不编也不记；换一个摘要再编、再记一次。不要卡。判别力（`crates/mutations.tsv`「GPU 阶段现场 编管线不打那一行」）：编完不记，这条红。
+    #[test]
+    fn the_pipelines_of_a_source_digest_note_a_compile_only_when_the_cache_misses() {
+        let compiled_by_source_digest: CompiledOnceBySourceDigest<u32> =
+            std::sync::Mutex::new(std::collections::BTreeMap::new());
+        let compiles = std::cell::Cell::new(0_usize);
+        let noted_compiles = std::cell::RefCell::new(Vec::<u32>::new());
+        let compiled_for = |source_digest: [u8; crate::sha256::DIGEST_BYTES],
+                            compiled_value: u32| {
+            compiled_once_for_the_source_digest(
+                &compiled_by_source_digest,
+                source_digest,
+                || {
+                    compiles.set(compiles.get() + 1);
+                    compiled_value
+                },
+                |compiled, _compile_microseconds| noted_compiles.borrow_mut().push(*compiled),
+            )
+        };
+        assert_eq!(compiled_for([1; crate::sha256::DIGEST_BYTES], 11), 11);
+        assert_eq!(
+            compiled_for([1; crate::sha256::DIGEST_BYTES], 12),
+            11,
+            "同一个摘要第二次要：交头一次编的那一份"
+        );
+        assert_eq!(compiled_for([2; crate::sha256::DIGEST_BYTES], 21), 21);
+        assert_eq!(compiles.get(), 2, "两个摘要各编一次");
+        assert_eq!(
+            noted_compiles.into_inner(),
+            vec![11, 21],
+            "真编了才记，命中缓存不记"
+        );
+    }
+
     /// 设备丢失的回调把这个设备记成丢了，连同 wgpu 给的原因与那一句（卡池照它重起）。不要卡。
     #[test]
     fn the_device_lost_callback_records_the_device_as_lost_with_the_reason_and_the_message() {
@@ -3000,7 +3889,7 @@ mod tests {
     /// 期望的那一句写死成 wgpu-hal 30.0.1 `DeviceError::OutOfMemory` 的
     /// `#[error("Out of memory")]`，不与产品代码取自同一个 `to_string()`：wgpu 改了这一句，这里先红。
     #[test]
-    fn a_device_lost_for_lack_of_memory_explains_a_failure_on_it_as_gpu_memory_short() {
+    fn device_lost_for_lack_of_memory_explains_a_failure_on_it_as_gpu_memory_short() {
         let out_of_memory = "Out of memory";
         assert_eq!(
             cause_of_the_device_loss(out_of_memory),
@@ -3075,7 +3964,7 @@ mod tests {
     /// （G2 乙）：借据丢掉时那一次等，队列空了或等到了才算等完、照常销账；超时、wgpu 报错、等的时候 panic、`Wait` 交回
     /// `Poll`（那是不等的结局）都算没等成，这一笔照旧记在账上。不要卡。
     #[test]
-    fn a_lease_is_returned_only_when_the_wait_for_the_device_finished() {
+    fn lease_is_returned_only_when_the_wait_for_the_device_finished() {
         let finished = DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished;
         let failed = DeviceWaitBeforeReturningTheLease::TheWaitFailed;
         assert_eq!(
@@ -3106,8 +3995,7 @@ mod tests {
     /// （超时 30 秒改成 0 或不设都照绿）：借据丢掉时那一次等的是到此刻为止的全部提交，
     /// 最多等 E174 跑前登记的 30 秒（`research/prompts/e174-preregistration.md` 第五节「等待」那一臂）。不要卡。
     #[test]
-    fn a_lease_waits_for_every_submission_so_far_for_at_most_the_thirty_seconds_registered_by_e174()
-    {
+    fn lease_waits_for_every_submission_so_far_for_at_most_the_thirty_seconds_registered_by_e174() {
         match poll_type_before_returning_a_lease() {
             wgpu::PollType::Wait {
                 submission_index: None,
@@ -3135,7 +4023,7 @@ mod tests {
     /// （的出路）：卡池借之前对有没等成借据的那张卡 poll 一次，交回队列空了才算那台设备上
     /// 提交的活都做完了（销那几笔）；还有在飞的、`Wait` 才交的那一种、报错、panic 都不算。不要卡。
     #[test]
-    fn a_poll_before_booking_takes_a_device_as_idle_only_when_its_queue_is_empty() {
+    fn poll_before_booking_takes_a_device_as_idle_only_when_its_queue_is_empty() {
         assert!(device_found_idle_by_a_poll(&Ok(Ok(
             wgpu::PollStatus::QueueEmpty
         ))));
@@ -3252,12 +4140,12 @@ mod tests {
     /// 方法体最前面 `if true { return; }`（正推 A2）、丢没丢与 poll 两个同型闭包对调（正推 A3）、整个包进 `if false { … }`（攻方 gpu-2）、
     /// 方法体里另起一个同名的 `device_found_idle_by_a_poll` 恒交真遮住外面那个（攻方 gpu-3）；整句比之后这四种都红。
     /// 整句比管不到（文本都在这个方法体之外）、由别的用例管的：
-    /// - 改 [`device_found_idle_by_a_poll`] 本身：`a_poll_before_booking_takes_a_device_as_idle_only_when_its_queue_is_empty`；
+    /// - 改 [`device_found_idle_by_a_poll`] 本身：`poll_before_booking_takes_a_device_as_idle_only_when_its_queue_is_empty`；
     /// - 卡池模块里另起模块（攻方 `mod wgpu`、`mod std`）、经 `use` 改名或通配、在条目这一层展开宏，遮住方法体里的 `std`、`wgpu`；去掉 `use`
     ///   另起一个同名的 `device_found_idle_by_a_poll`：
     ///   `the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call`，它也只看文本；
     /// - `GpuCard::device`、`GpuCard::device_condition` 交的是哪一台、哪一份：
-    ///   `a_card_hands_out_its_own_device_and_its_own_device_condition`，它也只看文本；
+    ///   `card_hands_out_its_own_device_and_its_own_device_condition`，它也只看文本；
     /// - 四个入口不调这一步：`the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first`，它也只看文本。
     ///
     /// 拦不住的写法，一种一条：
@@ -3923,7 +4811,7 @@ mod tests {
     /// `the_card_pool_scan_accepts_an_extern_block_and_still_finds_extern_crate`）。
     /// 挂 `#[cfg]`、`#[cfg_attr]` 的 `use` 引进钉住那两段调的函数判红——编译时
     /// 那条 `use` 去掉，按名字调的就落到模块里另起的同名函数上（正推 K4-1 B12、B13，
-    /// `the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_cfg`）；换不掉那几个名字的几样判绿
+    /// `the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_configuration`）；换不掉那几个名字的几样判绿
     /// （`the_card_pool_scan_accepts_writings_that_cannot_replace_what_the_pinned_bodies_call`）：`use wgpu;` 引的就是外部 crate 自己；
     /// 块里的 `use`（函数体里 `use core as std;`）只罩那一对花括号，里面没有钉住那两段的签名就不拒，有就照拒
     /// （`the_card_pool_scan_finds_a_rename_in_a_block_holding_a_pinned_body_and_an_item_level_macro_under_an_attribute`）；
@@ -4478,7 +5366,7 @@ mod tests {
     /// `#[cfg(any())]` 的 `use` 引进、模块里另起一个同名函数，编译时那条 `use` 去掉、按名字调的是另起的那一个，扫源码照绿）：挂 `#[cfg]`、
     /// 展开成 `cfg` 的 `#[cfg_attr]`、`pub(crate)` 之前的 `#[cfg]`，都红。不要卡。
     #[test]
-    fn the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_cfg() {
+    fn the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_configuration() {
         for (form, conditional_use) in [
             (
                 "cfg",
@@ -4588,7 +5476,7 @@ mod tests {
     /// - 这两格里放的是哪一台、哪一份（`start_the_card` 起设备时放进去，克隆共用同一台）；
     /// - 在方法上面加 `#[cfg]`，让签名写法与钉住的不同的另一份同名方法编进来。
     #[test]
-    fn a_card_hands_out_its_own_device_and_its_own_device_condition() {
+    fn card_hands_out_its_own_device_and_its_own_device_condition() {
         let source = include_str!("gpu_unit_checks.rs");
         let code = code_before_the_tests_module(source);
         for (signature, expected_body) in [
@@ -5113,6 +6001,323 @@ mod tests {
         assert_eq!(
             outcome, "假卡上此刻借出去 2 份，放不下 1 份",
             "借着卡的线程再借不等，当场交回「没有可等的」"
+        );
+    }
+
+    /// 假卡借一次、结局照卡池的拒绝类型交（[`attempt_keeping_the_refusal_of`] 收的那一种）：此刻借不到交 `refusal_without_room_now`。
+    fn fake_lease_or_the_refusal_of_the_card_pool<'test>(
+        card: &'test FakeCardOfShares,
+        waiting_room: &'test CardLeaseWaitingRoom,
+        refusal_without_room_now: &CardPoolLeaseRefusal,
+    ) -> Result<FakeLeaseOfShares<'test>, CardPoolLeaseRefusal> {
+        match card.attempt_to_lease(waiting_room, 1) {
+            LeaseAttempt::Leased(lease) => Ok(lease),
+            LeaseAttempt::NoRoomNow { reason: _ } => Err(refusal_without_room_now.clone()),
+            LeaseAttempt::LargerThanEveryCard { reason } => {
+                panic!("只借一份，假卡至少放得下一份：{reason}")
+            }
+        }
+    }
+
+    /// 假卡只放得下一份、在这条线程手里；另一条线程照卡池「排队、拒绝留原样」那一路借一份，头一次的拒绝是 `refusal_of_the_first_attempt`。
+    /// 等它借不到过一回（或交回）之后这条线程还卡；交回它的结局：借到了是 `Ok`，没借到是那一次的拒绝。
+    fn outcome_of_a_thread_asking_through_the_pool_while_this_thread_holds_the_only_share(
+        refusal_of_the_first_attempt: CardPoolLeaseRefusal,
+    ) -> Result<(), CardPoolLeaseRefusal> {
+        let card = std::sync::Arc::new(
+            FakeCardOfShares::with_capacity_and_held_outside_this_process(1, 0),
+        );
+        let waiting_room = std::sync::Arc::new(CardLeaseWaitingRoom::with_no_lease_out());
+        let held_by_this_thread = match card.attempt_to_lease(&waiting_room, 1) {
+            LeaseAttempt::Leased(lease) => lease,
+            LeaseAttempt::NoRoomNow { reason } | LeaseAttempt::LargerThanEveryCard { reason } => {
+                panic!("空着的假卡借得到一份：{reason}")
+            }
+        };
+        let (outcome_sender, outcome_receiver) = std::sync::mpsc::channel();
+        let asking_thread = {
+            let card = std::sync::Arc::clone(&card);
+            let waiting_room = std::sync::Arc::clone(&waiting_room);
+            std::thread::spawn(move || {
+                let outcome = waiting_room
+                    .lease_waiting_for_the_other_threads_keeping_the_refusal(|| {
+                        attempt_keeping_the_refusal_of(fake_lease_or_the_refusal_of_the_card_pool(
+                            &card,
+                            &waiting_room,
+                            &refusal_of_the_first_attempt,
+                        ))
+                    })
+                    .and_then(|settled| settled)
+                    .map(drop);
+                outcome_sender
+                    .send(outcome)
+                    .expect("收的一头等到交回或到点才丢");
+            })
+        };
+        let asking_started = std::time::Instant::now();
+        let mut outcome_before_the_share_was_returned = None;
+        while card.shares_now().attempts_without_room == 0
+            && outcome_before_the_share_was_returned.is_none()
+            && asking_started.elapsed()
+                < std::time::Duration::from_secs(LONGEST_WAIT_FOR_THE_FAKE_TESTS_SECONDS)
+        {
+            outcome_before_the_share_was_returned = outcome_receiver
+                .recv_timeout(std::time::Duration::from_millis(1))
+                .ok();
+        }
+        drop(held_by_this_thread);
+        let outcome = outcome_before_the_share_was_returned.unwrap_or_else(|| {
+            outcome_receiver
+                .recv_timeout(std::time::Duration::from_secs(
+                    LONGEST_WAIT_FOR_THE_FAKE_TESTS_SECONDS,
+                ))
+                .unwrap_or_else(|error| {
+                    panic!("还了卡之后 {LONGEST_WAIT_FOR_THE_FAKE_TESTS_SECONDS} 秒没交回（{error}）：排队的没被叫醒")
+                })
+        });
+        asking_thread.join().expect("借一份的那条线程不 panic");
+        outcome
+    }
+
+    /// 给定状态表的判器那一路（[`GpuCardPool::lease_the_first_card_with_room_waiting_for_the_other_threads`]）：账上此刻每张卡都放不下，
+    /// 而占着的是这个进程别的线程，等它还了卡再借、借得到，不把那一次的「此刻借不到」交回去（交回去调用方报显存不够）。不要卡。
+    #[test]
+    fn lease_keeping_the_refusal_waits_for_another_thread_of_this_process_when_no_card_has_room_now(
+    ) {
+        assert_eq!(
+            outcome_of_a_thread_asking_through_the_pool_while_this_thread_holds_the_only_share(
+                CardPoolLeaseRefusal::Booking(BookingRefusal::NoCardHasRoomNow {
+                    need_mebibytes: 1,
+                    card_rooms_mebibytes: vec![0],
+                })
+            ),
+            Ok(()),
+            "这个进程别的线程借着的那一份还了就借得到：等，不交「此刻借不到」"
+        );
+    }
+
+    /// 同上，头一次是借到的卡上起设备时显存不够（那一笔已经还了）：同样等这个进程别的线程还卡再借。不要卡。
+    #[test]
+    fn lease_keeping_the_refusal_waits_for_another_thread_of_this_process_when_the_device_start_ran_out_of_memory(
+    ) {
+        assert_eq!(
+            outcome_of_a_thread_asking_through_the_pool_while_this_thread_holds_the_only_share(
+                CardPoolLeaseRefusal::OutOfGpuMemoryStartingTheDevice {
+                    reason: "显存不够：造的".to_string(),
+                }
+            ),
+            Ok(()),
+            "起设备时显存不够同此刻借不到：等别的线程还卡"
+        );
+    }
+
+    /// 卡上的显存读不出：等多久都一样，别的线程借着卡也不等，当场把那一次的拒绝原样交回（调用方判红）。不要卡。
+    #[test]
+    fn lease_keeping_the_refusal_hands_back_unreadable_card_memory_at_once_without_waiting() {
+        let unreadable = CardPoolLeaseRefusal::Booking(BookingRefusal::CardMemoryUnreadable {
+            reason: "造的读不出".to_string(),
+        });
+        assert_eq!(
+            outcome_of_a_thread_asking_through_the_pool_while_this_thread_holds_the_only_share(
+                unreadable.clone()
+            ),
+            Err(unreadable),
+            "读不出不是此刻借不到：不等，拒绝原样交回"
+        );
+    }
+
+    /// 要的比每张卡空着时能借的都大：等多久都放不下，别的线程借着卡也不等，当场把那一次的拒绝原样交回。不要卡。
+    #[test]
+    fn lease_keeping_the_refusal_hands_back_a_need_larger_than_every_card_at_once_without_waiting()
+    {
+        let larger = CardPoolLeaseRefusal::Booking(BookingRefusal::NeedLargerThanEveryCard(
+            NeedLargerThanEveryCard {
+                need_mebibytes: 3,
+                largest_ceiling_mebibytes: 2,
+            },
+        ));
+        assert_eq!(
+            outcome_of_a_thread_asking_through_the_pool_while_this_thread_holds_the_only_share(
+                larger.clone()
+            ),
+            Err(larger),
+            "比每张卡都大不是此刻借不到：不等，拒绝原样交回"
+        );
+    }
+
+    /// 一次读数（MiB）：空闲 `free_mebibytes`，空卡上能用的是一张 16 GiB 卡的 15849，这个进程占着的照 `occupied_by_this_process`。
+    fn reading_of_a_sixteen_gibibyte_card(
+        free_mebibytes: u64,
+        occupied_by_this_process: OccupiedByThisProcess,
+    ) -> crate::gpu_memory_ledger::CardMemoryReading {
+        crate::gpu_memory_ledger::CardMemoryReading {
+            free_mebibytes,
+            total_less_reserved_mebibytes: 15_849,
+            occupied_by_this_process,
+        }
+    }
+
+    /// 照一串假读数走一遍等卡（[`super::card_memory_for_a_judge_waiting_for_this_process`]，额度是服务交的 16384 MiB）：交判定、读到第几份、停了几次。
+    /// 读的次数超出 `readings` 就 panic（等卡没在该交的时候交）。
+    fn card_memory_judged_over_the_readings(
+        readings: &[crate::gpu_memory_ledger::CardMemoryReading],
+        most_readings: u64,
+    ) -> (super::CardMemoryForAJudge, usize, usize) {
+        let mut readings_taken = 0_usize;
+        let mut pauses = 0_usize;
+        let (judged, reading) = super::card_memory_for_a_judge_waiting_for_this_process(
+            Some(16_384),
+            &mut || {
+                let reading = *readings.get(readings_taken).unwrap_or_else(|| {
+                    panic!(
+                        "等卡读了第 {} 份，只给了 {} 份",
+                        readings_taken + 1,
+                        readings.len()
+                    )
+                });
+                readings_taken += 1;
+                Ok(reading)
+            },
+            &mut || pauses += 1,
+            most_readings,
+        )
+        .expect("假读数都读得出");
+        assert_eq!(
+            Some(&reading),
+            readings.get(readings_taken - 1),
+            "交回的是最后读的那一份"
+        );
+        (judged, readings_taken, pauses)
+    }
+
+    /// 场景：服务交的一张 16 GiB 卡上空闲只剩 579 MiB，占着的 10680 MiB 是同一个测试进程里别的 GPU 用例的；之后这个进程还了，空闲回到 13268 MiB。
+    /// 预期：这张卡不判用不了，等这个进程还；读到空闲回到 13268 MiB 就放得下，前两份各停一次。不要卡（假读数）。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 判卡时空闲不加回这个进程自己占着的」）：空闲不加回这个进程占着的，头一份就判用不了，这条红。
+    #[test]
+    fn card_held_by_other_gpu_tests_of_this_process_is_waited_for_until_they_return_its_memory() {
+        let (judged, readings_taken, pauses) = card_memory_judged_over_the_readings(
+            &[
+                reading_of_a_sixteen_gibibyte_card(
+                    579,
+                    OccupiedByThisProcess::AlsoOutsideTheBooks { mebibytes: 10_680 },
+                ),
+                reading_of_a_sixteen_gibibyte_card(
+                    1_892,
+                    OccupiedByThisProcess::OnlyThroughTheBooks { mebibytes: 9_842 },
+                ),
+                reading_of_a_sixteen_gibibyte_card(
+                    13_268,
+                    OccupiedByThisProcess::OnlyThroughTheBooks { mebibytes: 2_400 },
+                ),
+            ],
+            600,
+        );
+        assert_eq!(
+            (judged, readings_taken, pauses),
+            (super::CardMemoryForAJudge::RoomNow, 3, 2),
+            "这个进程自己占着的卡要等它还、还了就起，不判用不了"
+        );
+    }
+
+    /// 同一张卡空闲 579 MiB，这个进程在卡上一点都没占（占着的是别的进程）。
+    /// 预期：当场判用不了，读一次、一次都不停（别的进程占着，等这个进程还等不来）。不要卡（假读数）。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 别的进程占着的卡也当这个进程自己占着去等」）：加回之后还不够也判成等，这条红。
+    #[test]
+    fn card_held_by_another_process_is_not_usable_and_not_waited_for() {
+        let (judged, readings_taken, pauses) = card_memory_judged_over_the_readings(
+            &[reading_of_a_sixteen_gibibyte_card(
+                579,
+                OccupiedByThisProcess::NotListed,
+            )],
+            600,
+        );
+        assert_eq!(
+            (judged, readings_taken, pauses),
+            (
+                super::CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds,
+                1,
+                0
+            ),
+            "别的进程占着的卡当场判用不了"
+        );
+    }
+
+    /// 这个进程一直占着同一张卡（读了 3 份都是空闲 579 MiB、这个进程占着 10680 MiB），最多读 3 份。
+    /// 预期：读满 3 份、停 2 次就交「等这个进程还」那一种（调用方照它判用不了），不一直等。不要卡（假读数，读第 4 份就 panic）。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 等这个进程还显存不设上限」）：读满了还接着等，读第 4 份 panic，这条红。
+    #[test]
+    fn waiting_for_this_process_to_return_card_memory_stops_after_the_most_readings() {
+        let held = reading_of_a_sixteen_gibibyte_card(
+            579,
+            OccupiedByThisProcess::OnlyThroughTheBooks { mebibytes: 10_680 },
+        );
+        let (judged, readings_taken, pauses) =
+            card_memory_judged_over_the_readings(&[held, held, held], 3);
+        assert_eq!(
+            (judged, readings_taken, pauses),
+            (
+                super::CardMemoryForAJudge::RoomOnceThisProcessReturnsWhatItHolds,
+                3,
+                2
+            ),
+            "读满最多的份数就交回，不再等"
+        );
+    }
+
+    /// 门槛是驱动那一份加最小一份判表（`crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER` 加 1 MiB），不另写一个数：
+    /// 空闲 2254 MiB 的卡（比 2048 大、比驱动那一份小，一个状态都放不下）判此刻放不下；额度正好是门槛的放得下、少 1 MiB 的放不下。不要卡。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 门槛不照驱动那一份加最小一份判表算」）：门槛写回 2048，这条红。
+    #[test]
+    fn the_minimum_memory_budget_is_the_driver_share_plus_the_smallest_judge_tables() {
+        assert_eq!(
+            super::MINIMUM_MEMORY_BUDGET_MEBIBYTES,
+            crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER + 1,
+            "门槛是驱动那一份加最小一份判表（一个字的表上卡按 MiB 向上取整是 1 MiB）"
+        );
+        let judged_with_free = |free_mebibytes: u64| {
+            super::card_memory_for_a_judge(
+                Some(16_384),
+                reading_of_a_sixteen_gibibyte_card(
+                    free_mebibytes,
+                    OccupiedByThisProcess::NotListed,
+                ),
+            )
+        };
+        assert_eq!(
+            judged_with_free(2_254),
+            super::CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds,
+            "空闲 2254 MiB 放不下驱动那一份与最小一份表"
+        );
+        assert_eq!(
+            judged_with_free(super::MINIMUM_MEMORY_BUDGET_MEBIBYTES),
+            super::CardMemoryForAJudge::RoomNow,
+            "额度正好是门槛的放得下"
+        );
+        assert_eq!(
+            judged_with_free(super::MINIMUM_MEMORY_BUDGET_MEBIBYTES - 1),
+            super::CardMemoryForAJudge::NoRoomEvenWithWhatThisProcessHolds,
+            "额度比门槛少 1 MiB 的放不下"
+        );
+    }
+
+    /// 不走卡池起的卡空着时的额度照空卡上能用的算：额度 16384 MiB、此刻空闲 2254 MiB、空卡上能用 15849 MiB 的卡空着时给 15849 MiB；
+    /// 没读过空卡上能用的（卡池里的卡）与此刻的额度相同。不要卡。
+    /// 判别力（`crates/mutations.tsv`「GPU 取卡 空着时的额度照此刻的空闲算」）：空着时也照此刻的空闲算，这条红。
+    #[test]
+    fn the_memory_budget_of_a_card_when_it_is_empty_follows_the_usable_memory_of_the_empty_card() {
+        assert_eq!(
+            super::memory_budget_when_the_card_is_empty_mebibytes_of(
+                Some(16_384),
+                2_254,
+                Some(15_849)
+            ),
+            15_849,
+            "空着时照空卡上能用的算"
+        );
+        assert_eq!(
+            super::memory_budget_when_the_card_is_empty_mebibytes_of(Some(16_384), 2_254, None),
+            2_254,
+            "没读过空卡上能用的，与此刻的额度相同"
         );
     }
 }

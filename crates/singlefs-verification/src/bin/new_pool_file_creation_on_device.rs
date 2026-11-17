@@ -402,7 +402,7 @@ fn swallow_the_next_barrier_on(device: DeviceIdentity) -> FaultSchedule {
 }
 
 /// 分段挂钟：**在被测进程里计**，不许让外层按结果行到达时刻切
-/// （`.claude/singlefs-ai-sop/rules/test-discipline.md`「分段计时在被测进程里计，不在转发输出的循环里计」——
+/// （`.claude/singlefs-ai-sop/rules/show-me-test.md`「分段计时在被测进程里计，不在转发输出的循环里计」——
 /// 转打可能阻塞，虚机的串口尤其慢，按到达时刻切出来的段会带着前面几行的打印积压）。
 ///
 /// 每段末尾叫一次 [`SegmentClock::mark`]，它交回那一段的挂钟与「从进程里第一次取表到这一刻」的单调读数；
@@ -3037,7 +3037,7 @@ mod tests {
         // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
         // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-verification 由主 agent 经门禁 crash-point-replay 跑）。
-        let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
+        let flushes_the_recorder_merged_into_the_barrier_that_closed_the_publish_before_the_floor_raise: u64 = 1;
         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
             .into_iter()
             .enumerate()
@@ -3066,7 +3066,7 @@ mod tests {
             );
             assert_eq!(
                 u64::try_from(projected_flushes).expect("件数")
-                    + flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d,
+                    + flushes_the_recorder_merged_into_the_barrier_that_closed_the_publish_before_the_floor_raise,
                 counted.barrier_calls + counted.force_unit_access_writes,
                 "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 加录制器并掉的那一道，与设备一层转发的屏障 + FUA 写",
                 identity.0

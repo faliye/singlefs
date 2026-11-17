@@ -11,6 +11,7 @@ use singlefs_core::admission::{
     JudgementThatFoundTheDeviceShort, PlacementRoomOnOneDevice, PoolWideCommitments, ReplicaCount,
     UnitsOfAPublishToLand,
 };
+use singlefs_core::allocator::SlotPairCount;
 
 const THE_ONLY_DEVICE: DeviceIdentity = DeviceIdentity(0);
 
@@ -66,7 +67,7 @@ fn formula_refusal_and_landing_refusal_with_the_same_bytes_are_told_apart_by_the
         admit_the_units_landing_on_every_device(
             &[PlacementRoomOnOneDevice {
                 device: THE_ONLY_DEVICE,
-                slot_pairs_for_data_units: 0,
+                slot_pairs_for_data_units: SlotPairCount(0),
                 slots_for_commit_generated_units: 1,
             }],
             UnitsOfAPublishToLand {
@@ -121,7 +122,7 @@ fn the_landing_judgement_names_whether_the_data_units_or_the_commit_generated_un
         admit_the_units_landing_on_every_device(
             &[PlacementRoomOnOneDevice {
                 device: THE_ONLY_DEVICE,
-                slot_pairs_for_data_units: 0,
+                slot_pairs_for_data_units: SlotPairCount(0),
                 slots_for_commit_generated_units: 2,
             }],
             UnitsOfAPublishToLand {
@@ -135,7 +136,7 @@ fn the_landing_judgement_names_whether_the_data_units_or_the_commit_generated_un
         admit_the_units_landing_on_every_device(
             &[PlacementRoomOnOneDevice {
                 device: THE_ONLY_DEVICE,
-                slot_pairs_for_data_units: 1,
+                slot_pairs_for_data_units: SlotPairCount(1),
                 slots_for_commit_generated_units: 2,
             }],
             UnitsOfAPublishToLand {

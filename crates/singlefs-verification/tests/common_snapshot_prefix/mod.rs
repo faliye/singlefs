@@ -40,6 +40,7 @@ use singlefs_verification::memory_pool::{
     writes_and_segments, writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion,
     PublishedVersionWithoutAFile, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::WritableMountRefusedOnTheCrashDisks;
 use singlefs_verification::scenario::{deletion_history_batch_size, deletion_history_switches};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
@@ -738,10 +739,14 @@ pub struct MountedAfterTheCrash {
 /// 在 `disks`（一张崩溃镜像落成的池）的副本上可写挂载一次：删除开关同录流（批大小 1，`deletion_history_switches`），准入按式子、影子账开着；
 /// 续做把 unlink 与删快照都走到空。挂载发的写录在一条新的录制流上，连同挂完的盘交回。
 ///
+/// # Errors
+/// 可写挂载被拒：交回拒因与挂载用过的录制设备，由观察者判这一拒认不认（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`）。
+///
 /// # Panics
-/// 可写挂载做不成，或续做没走到空：三条流的每个崩溃状态按条款都挂得上、续做都走得完。
-#[must_use]
-pub fn mount_writable_on_the_crash_disks(disks: &MemoryPool) -> MountedAfterTheCrash {
+/// 续做没走到空：挂上了的崩溃状态按条款续做都走得完。
+pub fn mount_writable_on_the_crash_disks(
+    disks: &MemoryPool,
+) -> Result<MountedAfterTheCrash, Box<WritableMountRefusedOnTheCrashDisks>> {
     let mount_parameters = parameters();
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices: Vec<_> = disks
@@ -759,14 +764,22 @@ pub fn mount_writable_on_the_crash_disks(disks: &MemoryPool) -> MountedAfterTheC
             )
         })
         .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
+    let mounted = match mount_writable_with_test_only_switches_and_deletion_switches(
         &mount_parameters,
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         deletion_history_switches(),
-    )
-    .unwrap_or_else(|error| panic!("每个崩溃状态上可写挂载都做得成：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return Err(Box::new(WritableMountRefusedOnTheCrashDisks {
+                refusal,
+                devices,
+                stream,
+            }));
+        }
+    };
     assert!(
         matches!(
             mounted.output.deletion_queue_continuation_outcome,
@@ -784,12 +797,12 @@ pub fn mount_writable_on_the_crash_disks(disks: &MemoryPool) -> MountedAfterTheC
     };
     let (writes_of_the_mount, _segments_of_the_mount) =
         writes_and_segments(&stream.retained_operations(), &geometry());
-    MountedAfterTheCrash {
+    Ok(MountedAfterTheCrash {
         mounted,
         writes_of_the_mount,
         disks_after_the_mount,
         read_ranges_of_the_mount: stream.read_ranges(),
-    }
+    })
 }
 
 /// 可写挂载之后核续做（D8（核心索引结构） 已定项 5「续做是每次恢复都跑的常规动作」、判决 S4「挂载续做同一个走空」）：续做的步数等于恢复落到的

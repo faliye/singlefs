@@ -29,8 +29,9 @@ use singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET;
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
 use singlefs_verification::memory_pool::{MemoryPool, RetainedWrite, WrittenContents};
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
-    ReadOnlyReadBackOfTheCrashImage, RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, DiskAfterTheRefusal,
+    ReadFaultsInTheCrashState, ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 use singlefs_verification::segments::StepKind;
 
@@ -124,16 +125,18 @@ fn a_refusal_after_the_read_stage_where_device_zero_carries_only_another_pools_s
         },
     ));
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &common::parameters().filesystem_identifier,
             None,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage
         ),
         "U6 照核心层口径复算为真（盘 0 一份本池自证过的都没有）；G4 那一臂读池级 checker 的逐盘数，盘 0 两槽都自证过，不另记一条"
     );

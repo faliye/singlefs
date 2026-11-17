@@ -3,7 +3,7 @@
 //! 「见证同实例就收」那一收窄形态要判的就是这一形：
 //! 盘面照模型 `research/prompts/m3-close-rootring-r3-sonnet-model/tests/rootring_r3_defense_sweep_shape.rs`：
 //! `pool_with_a_dead_instance`（实例 1 死了、实例 2 覆盖写到 txg 19）→ 实例 3 可写挂载，末尾清扫发布（删实例 1 的行，重写实例表）→
-//! 同一次挂载里再覆盖写一版 R，崩在 R 的根槽之后、轮换之前；读的那一刻 R 的实例表两份与每块盘较新的那个系统配置槽读回全零。
+//! 同一次挂载里再覆盖写一版 R，崩在 R 的根槽之后、轮换之前，每块盘世代号最大的那一次轮换没写成（两槽都自证过）；读的那一刻 R 的实例表两份读回全零。
 //! 见证到的那一版是清扫发布之前那一条（与 R 不共用实例表指针），清扫发布那条与 R 共用那张读不出的新表。
 //! 判别力：`crates/mutations.tsv`「根环一簇 R2：所选根的实例表读不出时一律另收同实例的根」那一行（退到清扫发布那条，恢复读不通那张表、留在 R 失败），这一条红。
 mod common;
@@ -25,9 +25,7 @@ use scenarios_of_instance_table_sweep_at_the_end_of_a_writable_mount::{
     pool_with_a_dead_instance, publish_an_overwrite, sweeping_at_the_end_of_the_mount_on_any_row,
     sweeping_mount_on,
 };
-use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
-};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::instance_table_sweep::{
     InstanceTableSweepAtTheEndOfTheMount, InstanceTableSweepOutcome,
 };
@@ -40,9 +38,7 @@ use singlefs_core::recovery::{
     RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::system_configuration::SystemConfiguration;
-use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
-use singlefs_verification::memory_pool::{writes_and_segments_with_stream_indexes, MemoryPool};
+use singlefs_verification::memory_pool::writes_and_segments_with_stream_indexes;
 use singlefs_verification::segments::StepKind;
 
 /// 清扫发布之后那次覆盖写的内容种子。
@@ -54,42 +50,13 @@ fn key_of(root: &RootRecord) -> (InstanceGeneration, CheckpointTxg) {
     (root.instance, root.checkpoint_txg)
 }
 
-/// 每块盘较新的那个系统配置槽（世代号大的那一槽）那一段。
-fn newer_system_configuration_slot_of_each_device(
-    image: &MemoryPool,
-) -> Vec<(DeviceIdentity, u64, u64)> {
-    let configuration = choose_system_configuration(image).expect("镜像上择得到系统配置");
-    let slot_spacing_in_bytes =
-        u64::from(configuration.immutable.sizes.fixed_structure_slot_spacing);
-    let slot_bytes =
-        usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("系统配置槽 4096 字节");
-    image
-        .devices
-        .iter()
-        .map(|(device, sparse_device)| {
-            let newer_slot_offset = [0, slot_spacing_in_bytes]
-                .into_iter()
-                .filter_map(|offset| {
-                    SystemConfiguration::parse_slot(
-                        &sparse_device.read(DeviceOffsetInBytes(offset), slot_bytes),
-                    )
-                    .ok()
-                    .map(|slot| (slot.quantities.slot_generation, offset))
-                })
-                .max()
-                .map(|(_, offset)| offset)
-                .expect("每块盘至少一槽自证过");
-            (*device, newer_slot_offset, SYSTEM_CONFIGURATION_SLOT_BYTES)
-        })
-        .collect()
-}
-
-/// 场景：见上（覆盖写 R 崩在根槽之后、轮换之前；R 的实例表与每块盘较新的系统配置槽读回全零）。
+/// 场景：见上（覆盖写 R 崩在根槽之后、轮换之前，每块盘世代号最大的那一次轮换没写成；R 的实例表读回全零）。
 /// 预期：见证到的是清扫发布之前那一条，它与所选根 R 的实例表指针不同：不另收同实例的根，只认恰好等于它的那条——恢复与只读挂载都落在它上面
-/// （改法之前只读挂载留在 R）；不退到清扫发布那条（它与 R 共用那张读不出的表）。可写挂载照它自己那一拒：判抛弃用的最新那条根 R 的实例表
+/// 不退到清扫发布那条（它与 R 共用那张读不出的表）。可写挂载照它自己那一拒：判抛弃用的最新那条根 R 的实例表
 /// 读不出，在取号之前拒、盘上逐字节不变（成败各看各，C755）。
 #[test]
-fn a_sweep_publish_that_rewrote_the_instance_table_in_the_same_instance_is_not_taken_as_kept() {
+fn sweep_publish_that_rewrote_the_instance_table_in_the_same_instance_is_not_taken_as_kept_where_both_devices_lost_their_newest_rotation_write(
+) {
     let parameters = parameters_of_the_ring_hole_pools();
     let pool = pool_with_a_dead_instance(None);
     let (mut mounted, mut devices, stream) =
@@ -134,19 +101,19 @@ fn a_sweep_publish_that_rewrote_the_instance_table_in_the_same_instance_is_not_t
         .expect("这次挂载写的根自证")
     };
     let last = *root_writes.last().expect("有根槽写");
-    let root_r = parse(last);
+    let root_after_the_sweep = parse(last);
     let sweep_root = parse(root_writes[root_writes.len() - 2]);
     let root_before_the_sweep = parse(root_writes[root_writes.len() - 3]);
     assert!(
-        root_r.instance_table == sweep_root.instance_table
+        root_after_the_sweep.instance_table == sweep_root.instance_table
             && root_before_the_sweep.instance_table != sweep_root.instance_table
-            && root_before_the_sweep.instance == root_r.instance
-            && sweep_root.instance == root_r.instance,
+            && root_before_the_sweep.instance == root_after_the_sweep.instance
+            && sweep_root.instance == root_after_the_sweep.instance,
         "前提：三条根同实例；清扫发布重写了实例表，R 照抄清扫发布那张，清扫之前那一条指着旧表"
     );
     let mut image = pool.image.clone();
     image.apply_writes(&writes[..=last]);
-    let mut ranges: Vec<(DeviceIdentity, u64, u64)> = root_r
+    let ranges: Vec<(DeviceIdentity, u64, u64)> = root_after_the_sweep
         .instance_table
         .locations
         .iter()
@@ -158,12 +125,19 @@ fn a_sweep_publish_that_rewrote_the_instance_table_in_the_same_instance_is_not_t
             )
         })
         .collect();
-    ranges.extend(newer_system_configuration_slot_of_each_device(&image));
+    let image =
+        common_unwitnessed_publish::image_where_both_devices_lost_their_newest_rotation_write(
+            &image,
+        );
     let ranges = RangesReadingBackAllZero(ranges);
     let devices_of_the_reads = devices_reading_back_all_zero_on(&image, &ranges);
     let configuration = choose_system_configuration(&devices_of_the_reads).expect("择得到系统配置");
     let chosen = choose_root(&devices_of_the_reads, &configuration).expect("择得到根");
-    assert_eq!(key_of(&chosen), key_of(&root_r), "前提：所选根是 R");
+    assert_eq!(
+        key_of(&chosen),
+        key_of(&root_after_the_sweep),
+        "前提：所选根是 R"
+    );
     assert!(
         instance_table_chain_of_root(&devices_of_the_reads, &chosen).is_err(),
         "前提：R 的实例表读不出"
@@ -195,10 +169,10 @@ fn a_sweep_publish_that_rewrote_the_instance_table_in_the_same_instance_is_not_t
             MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
                 if **still_unreadable
                     == StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-                        newest_root_on_the_reread: Some(RollbackTarget {
-                            instance: root_r.instance,
-                            checkpoint_txg: root_r.checkpoint_txg,
-                        }),
+                        root_chosen_by_the_read_stage: RollbackTarget {
+                            instance: root_after_the_sweep.instance,
+                            checkpoint_txg: root_after_the_sweep.checkpoint_txg,
+                        },
                     }
         ),
         "拒因是最新那条根 R 的实例表重读一次仍读不出：{refusal:?}"

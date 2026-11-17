@@ -461,8 +461,8 @@ impl<'card> GpuFactsVerifier<'card> {
             );
             let (digit_writes, copy_on_write_group) =
                 expansion.digit_writes_and_the_copy_on_write_group(segment);
-            let (start_lo, start_hi) = split_u64(segment.states.start);
-            let (end_lo, end_hi) = split_u64(segment.states.end);
+            let (start_low, start_high) = split_u64(segment.states.start);
+            let (end_low, end_high) = split_u64(segment.states.end);
             let digit_first = u32::try_from(segment_writes.len()).expect("装得进");
             segment_writes.extend_from_slice(digit_writes);
             let group_first = u32::try_from(segment_writes.len()).expect("装得进");
@@ -481,10 +481,10 @@ impl<'card> GpuFactsVerifier<'card> {
             segments.extend_from_slice(&[
                 digit_first,
                 u32::try_from(digit_writes.len()).expect("装得进"),
-                start_lo,
-                start_hi,
-                end_lo,
-                end_hi,
+                start_low,
+                start_high,
+                end_low,
+                end_high,
                 expansion.code(),
                 group_first,
                 u32::try_from(copy_on_write_group.len()).expect("装得进"),
@@ -494,12 +494,12 @@ impl<'card> GpuFactsVerifier<'card> {
         }
         let mut units = Vec::with_capacity(facts.units.len() * FACTS_VERIFIER_WORDS_PER_UNIT);
         for unit in &facts.units {
-            let (slot_lo, slot_hi) = split_u64(unit.slot);
+            let (slot_low, slot_high) = split_u64(unit.slot);
             units.extend_from_slice(&[
                 unit.source,
                 unit.device,
-                slot_lo,
-                slot_hi,
+                slot_low,
+                slot_high,
                 u32::from(unit.checksums_hold),
                 unit.whole_crc32c,
             ]);
@@ -511,11 +511,11 @@ impl<'card> GpuFactsVerifier<'card> {
             for pointer in &root.pointers {
                 roots.push(u32::from(pointer.all_zero));
                 for location in &pointer.locations {
-                    let (slot_lo, slot_hi) = split_u64(location.slot);
+                    let (slot_low, slot_high) = split_u64(location.slot);
                     roots.extend_from_slice(&[
                         location.device,
-                        slot_lo,
-                        slot_hi,
+                        slot_low,
+                        slot_high,
                         location.checksum,
                     ]);
                 }
@@ -611,10 +611,10 @@ impl<'card> GpuFactsVerifier<'card> {
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             cache: None,
         });
-        let (start_lo, start_hi) = split_u64(ordinals.start);
+        let (start_low, start_high) = split_u64(ordinals.start);
         let mut header = self.header_words;
-        header[6] = start_lo;
-        header[7] = start_hi;
+        header[6] = start_low;
+        header[7] = start_high;
         header[8] = u32::try_from(count).expect("一块的状态数装得进 u32");
         let header_buffer = wgpu::util::DeviceExt::create_buffer_init(
             device,
@@ -729,10 +729,10 @@ impl<'card> GpuFactsVerifier<'card> {
         if count == 0 {
             return Vec::new();
         }
-        let (start_lo, start_hi) = split_u64(ordinals.start);
+        let (start_low, start_high) = split_u64(ordinals.start);
         let mut header = self.header_words;
-        header[6] = start_lo;
-        header[7] = start_hi;
+        header[6] = start_low;
+        header[7] = start_high;
         header[8] = u32::try_from(count).expect("一块的状态数装得进 u32");
         let device = self.card.device();
         let header_buffer = wgpu::util::DeviceExt::create_buffer_init(

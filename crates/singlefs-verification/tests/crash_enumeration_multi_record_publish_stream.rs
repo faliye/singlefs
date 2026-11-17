@@ -57,6 +57,10 @@ use singlefs_verification::memory_pool::{
     closed_form_state_count_of_write_index_segments, writes_and_segments, CrashImage, MemoryPool,
     PublishedVersion, RetainedWrite,
 };
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 
 struct PreparedMultiRecordPublishStream {
@@ -347,7 +351,7 @@ fn a_crash_between_the_records_of_a_multi_record_publish_judged_on_the_cpu_judge
                     &mut counts_of_the_state,
                 );
                 let mut counts_of_the_flow = counts_of_the_flow.lock().expect("判定线程不 panic");
-                for (name, amount) in counts_of_the_state.iter() {
+                for (name, amount) in counts_of_the_state.counts_in_name_order() {
                     counts_of_the_flow.add(name, amount);
                 }
             },
@@ -382,7 +386,7 @@ fn a_crash_between_the_records_of_a_multi_record_publish_judged_on_the_cpu_judge
 /// （`common_crash_point_observers::mount_continuation_inputs_of_the_unlink_stream`，M4 第 10 条「单跑照录别项流程」）。
 /// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），crash-point-replay 认下面打印的
 /// `CRASH_POINT_REPLAY_MULTI_RECORD_PUBLISH` 行里 `exhaustive=true`。判过的状态都在判定库里（崩溃枚举用例那一类，`crash_state_enumeration` 的两段：流先录进库，判段从库读回判，被杀之后下一趟接着判没判过的）。
-/// 双机（`scripts/crash/crash-point-replay-shard-run.sh` 经崩溃放量的双机驱动）：两台各判自己那一份，只录或只判自己那一份的那一趟不打计数行、不判下面的断言；
+/// 分片（门禁 `crash-point-replay` 的各片，`SINGLEFS_CRASH_AMPLIFICATION_SHARE`）：两台各判自己那一份，只录或只判自己那一份的那一趟不打计数行、不判下面的断言；
 /// 两份都判进服务那一份之后不分片再跑的那一趟拿整条流的计数照下面逐项判、逐字打同样的行。
 #[test]
 fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean() {
@@ -492,14 +496,16 @@ fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean()
     assert_eq!(
         (0..=3)
             .map(|steps| counts.count_named(&format!("mount_continuation_steps_{steps}")))
-            .sum::<u64>(),
+            .sum::<u64>()
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
     );
     assert_eq!(
-        counts.count_named("mount_continuation_steps_0"),
+        counts.count_named("mount_continuation_steps_0")
+            + counts.count_named(&continuation_skipped_on_the_refusal_counter(0)),
         tally.states,
-        "多记录流上恢复只落到 A 之前或 A、B、C：续做一步都不用"
+        "多记录流上恢复只落到 A 之前或 A、B、C：续做一步都不用（被乙入判不出拒的态本来也不用）"
     );
     assert_the_mounted_disks_and_the_continuation_numbers_were_checked_on_every_state(
         counts,

@@ -40,9 +40,9 @@ use std::rc::Rc;
 
 /// 这段历史上一次不注错的再挂里根环每个槽读到盘上的次数，由不注错那条用例现量、钉住：读阶段与重建分配器那几遍
 /// （第 [`READ_OF_EACH_ROOT_RING_SLOT_BY_THE_ALLOCATOR_REBUILD`] 次是重建那一遍），之后可写挂载取号之前读一遍、记进预演与真做共用的那一份
-/// （第 7 次），真做取号写之前那几次读照旧读盘、其中读了一遍根环（第 8 次）；写行、暖机、抬 F 与续做再读根环都取共用的那一份、不再读盘
+/// （第 6 次），真做取号写之前那几次读照旧读盘、其中读了一遍根环（第 7 次）；写行、暖机、抬 F 与续做再读根环都取共用的那一份、不再读盘
 /// （读一次两边共用）。
-pub const READS_OF_EACH_ROOT_RING_SLOT_BY_A_REMOUNT_WITHOUT_FAULTS: u64 = 8;
+pub const READS_OF_EACH_ROOT_RING_SLOT_BY_A_REMOUNT_WITHOUT_FAULTS: u64 = 7;
 
 /// 根环每个槽被读的次数与哪几次读坏（几块盘共用一份）。
 pub struct RootRingReadsState {

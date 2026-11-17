@@ -79,6 +79,12 @@ use singlefs_format::{INSTANCE_TABLE_PAGE_RECORDS, SLOT_BYTES};
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    print_the_writable_mount_refusals_into_the_undecidable_witness,
+    WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::writable_mount_phases::{
     materialized_crash_image, publishes_before_the_instance_table_sweep_of_the_mount_output,
@@ -534,7 +540,7 @@ fn assert_the_recovery_and_the_checker_are_clean(tally: &CrashPointReplayTally) 
     );
 }
 
-/// 观察者「清扫两段之后再挂」（`remount_after_the_sweep_phases`）：这个崩溃状态当交回镜像的观察者再起一次可写挂载（有一行就扫）：挂不上、
+/// 观察者「清扫两段之后再挂」（`remount_after_the_sweep_phases`）：这个崩溃状态当交回镜像的观察者再起一次可写挂载（有一行就扫；被拒时只认乙入判不出那一拒，这一态后面的不判）：挂不上、
 /// 行还在、删前那一行判未发布的单元还剩，都当场 panic（记成红项、用例红），挂成的记一个数；挂完的盘交回、那几条不变量在判段判。
 /// 观察者的身份是这个 fn 的闭包键（入口登记在 `singlefs_verification::judging_units_entries::OBSERVER_ENTRIES`）。
 // gpu-exempt: writable-mount
@@ -560,14 +566,30 @@ fn remount_after_the_sweep_phases_without_the_deleted_row(
     materialized.apply_writes(&landed);
     let stream = SharedStream::retaining_contents_and_reads();
     let mut devices = recording_of(&materialized, &stream);
-    let mounted = mount_writable_with_instance_table_sweep_configuration(
+    let mounted = match mount_writable_with_instance_table_sweep_configuration(
         &parameters_of_the_ring_hole_pools(),
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         sweeping_on_any_row(),
-    )
-    .unwrap_or_else(|error| panic!("再挂被拒：{error:?}"));
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &parameters_of_the_ring_hole_pools().filesystem_identifier,
+                &fixed_geometry_of_the_ring_hole_pools(),
+                "checker_clean_after_the_remount",
+                counts,
+            );
+        }
+    };
     let mut after = materialized.clone();
     after.apply(&stream.retained_operations());
     let rows_after: Vec<InstanceGeneration> =
@@ -763,7 +785,7 @@ fn assert_the_rebuilt_state_was_judged(tally: &CrashPointReplayTally) {
 
 /// 枚举清扫那次挂载的写，每个状态照 F5 判、再照 C333 判重建态的实例表与分配记录（观察者挂进崩溃判定库那一路，判到的数经观察者计数带出来）；
 /// 交回 tally 与删行那一版生效的状态数。
-fn enumerate_the_sweeping_mount_judging_f5(
+fn enumerate_the_sweeping_mount_judging_the_unpublished_units_of_the_deleted_row_and_the_rebuilt_state(
     recorded: &RecordedSweepingMount,
     item_label: &str,
     expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
@@ -836,7 +858,7 @@ fn enumerate_the_sweeping_mount_judging_f5(
 fn every_crash_state_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_deleted_row() {
     let recorded = record_the_sweeping_mount();
     let Some((tally, states_where_the_deletion_took_effect)) =
-        enumerate_the_sweeping_mount_judging_f5(&recorded, "full", &full_expansion)
+        enumerate_the_sweeping_mount_judging_the_unpublished_units_of_the_deleted_row_and_the_rebuilt_state(&recorded, "full", &full_expansion)
     else {
         return;
     };
@@ -848,7 +870,7 @@ fn every_crash_state_of_the_sweeping_mount_leaves_no_unpublished_unit_of_the_del
     );
 }
 
-/// 清扫两段（抹头、清扫发布）上的每个崩溃状态再起一次可写挂载（有一行就扫）：挂载做成，之后的盘面上那几条不变量不红，
+/// 清扫两段（抹头、清扫发布）上的每个崩溃状态再起一次可写挂载（有一行就扫；被拒时只认乙入判不出那一拒，这一态后面的不判）：挂载做成，之后的盘面上那几条不变量不红，
 /// 删行那一版在那一刻生效的照 F5 判一个不剩；挂载之后实例 1 那一行要么已删、要么这一次挂载又删了（清扫这一轮整轮重扫重抹）。
 #[test]
 fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_without_the_deleted_row(
@@ -866,7 +888,7 @@ fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_with
         }
     };
     // 清扫两段上的每个崩溃状态当交回镜像的观察者再起一次可写挂载（有一行就扫；两段：录入段在 CPU 上挂，
-    // 豁免表的 writable-mount 那一行，按恢复镜像去重）：挂不上、行还在、删前那一行判未发布的单元还剩，都当场 panic（记成红项、用例红），
+    // 豁免表的 writable-mount 那一行，按恢复镜像去重）：乙入判不出之外挂不上、行还在、删前那一行判未发布的单元还剩，都当场 panic（记成红项、用例红），
     // 挂成的记一个数；挂完的盘上那几条不变量在判段判（配了 GPU 上卡），判干净时 `checker_clean_after_the_remount` 加一
     let observe = |_ordinal: u64,
                    image: &CrashImage<'_>,
@@ -907,12 +929,19 @@ fn every_crash_state_inside_the_two_sweep_phases_remounts_writable_and_ends_with
         return;
     };
     assert_the_recovery_and_the_checker_are_clean(&tally);
+    print_the_writable_mount_refusals_into_the_undecidable_witness(
+        "instance_table_sweep_phases_remount",
+        &tally,
+    );
     assert_eq!(
         tally
             .observer_counts
-            .count_named("remounted_without_the_deleted_row"),
+            .count_named("remounted_without_the_deleted_row")
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "清扫两段上的每个崩溃态都再挂成、行已删、单元不剩"
+        "清扫两段上每个没被乙入判不出拒的崩溃态都再挂成、行已删、单元不剩"
     );
     assert_eq!(
         tally

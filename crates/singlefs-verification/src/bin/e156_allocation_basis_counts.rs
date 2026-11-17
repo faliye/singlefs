@@ -24,7 +24,7 @@
 //! 按 W28 判「仍在涨 / 已平 / 不单调」并报上界数（`name=r7_tier_peaks`、`name=r7_verdict`）。锚点模型加了按给定洞 txg 造历史的入口
 //! （[`anchor_model::HoleSchedule`]），族表按 S 现算并与登记第七节 A20 的本地常量表回比；锚点的摘要与逐观测点两种行（`name=anchor_r7_summary`、
 //! `name=anchor_r7_dump`）去掉前缀之后与登记第十三节命令一的 `anchors_e156_r7.py` 输出逐行比（停机 S20；摘要行的五个键名改过，比之前先照
-//! [`emit_r7_anchor_cells`] 文档里那张对照把脚本输出换名）。
+//! [`emit_hole_family_anchor_cells`] 文档里那张对照把脚本输出换名）。
 //!
 //! 判定写在装置里（[`judge_peak_against_threshold`] 那一组函数，单测 U18），不另写 Python 判定脚本：执行员的写范围不含
 //! `scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
@@ -103,10 +103,11 @@ const E156_THRESHOLD_ONE_SPAN_TWO_UNIT_SLOTS: i64 = 2;
 const E156_THRESHOLD_ONE_SPAN_ONE_UNIT_SLOTS: i64 = 1;
 /// 第 7 次重跑登记（`research/prompts/e156-r7-prereg.md`）第七节 A20 的本地常量表，值抄自该登记第十三节命令一 `anchors_e156_r7.py`
 /// 的输出（`S=4 k_full_front=3 k_full_back=2` 等行，与各族 `holes=` 列），不读 `crates/`：前位置的洞全部落在第一圈（txg < 3S）里的最大洞数
-/// `k_满(S)`、前位置排得下的最大洞数、后位置排得下的最大洞数。[`r7_anchor_cells_of`] 用锚点模型现算，对不上就停机 S20。
-const E156_R7_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING: [(u64, u64); 3] = [(4, 2), (8, 4), (16, 8)];
-const E156_R7_FRONT_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 3), (8, 5), (16, 9)];
-const E156_R7_BACK_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 2), (8, 4), (16, 8)];
+/// `k_满(S)`、前位置排得下的最大洞数、后位置排得下的最大洞数。[`hole_family_anchor_cells_of`] 用锚点模型现算，对不上就停机 S20。
+const E156_HOLE_FAMILY_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING: [(u64, u64); 3] =
+    [(4, 2), (8, 4), (16, 8)];
+const E156_HOLE_FAMILY_FRONT_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 3), (8, 5), (16, 9)];
+const E156_HOLE_FAMILY_BACK_HOLE_COUNT_THAT_FITS: [(u64, u64); 3] = [(4, 2), (8, 4), (16, 8)];
 /// 族标签（第 7 次重跑登记 W29）：Hh = 间距不变造到洞数为止，Hc = 同一间距一直造到跨过两圈、三圈，Hs = 洞钉在同一个环槽、每圈一个。
 const E156_FAMILY_HOLE_COUNT_SWEEP: &str = "Hh";
 const E156_FAMILY_CONTINUED_SWEEP: &str = "Hc";
@@ -1606,7 +1607,7 @@ mod anchor_model {
         }
     }
 
-    /// 登记第十三节命令一 `anchors_e156_r7.py`（不带 `--dump`）每族一行的摘要，除三个键名照 [`crate::emit_r7_anchor_cells`] 文档里那张对照换过之外
+    /// 登记第十三节命令一 `anchors_e156_r7.py`（不带 `--dump`）每族一行的摘要，除三个键名照 [`crate::emit_hole_family_anchor_cells`] 文档里那张对照换过之外
     /// 格式逐字相同（Python 列表的写法与 `{:?}` 一致）。
     pub fn summary_line(slots_per_region: u64, label: &str, cell: &AnchorCell) -> String {
         let observed: Vec<&AnchorRow> = cell.rows.iter().filter(|row| row.is_observed).collect();
@@ -1628,23 +1629,23 @@ mod anchor_model {
             .map(|row| row.lag)
             .max()
             .expect("至少一个观测点");
-        let max_missing = observed
+        let maximum_missing = observed
             .iter()
             .map(|row| row.missing_txgs)
             .max()
             .expect("至少一个观测点");
-        let max_live_holes = observed
+        let maximum_live_holes = observed
             .iter()
             .map(|row| row.live_holes)
             .max()
             .expect("至少一个观测点");
-        let max_pinned = observed
+        let maximum_pinned = observed
             .iter()
             .map(|row| row.pinned_slots)
             .max()
             .expect("至少一个观测点");
         format!(
-            "S={slots_per_region} family={label} holes={:?} recovery_ends={:?} end={} fits={} observations={} q1a_tt_peak={peak} q1a_tt_positive_points={positive_points} q1a_tt_final={final_value} lag_peak={lag_peak} missing_txgs_peak={max_missing} live_holes_peak={max_live_holes} pinned_slots_peak={max_pinned}",
+            "S={slots_per_region} family={label} holes={:?} recovery_ends={:?} end={} fits={} observations={} q1a_tt_peak={peak} q1a_tt_positive_points={positive_points} q1a_tt_final={final_value} lag_peak={lag_peak} missing_txgs_peak={maximum_missing} live_holes_peak={maximum_live_holes} pinned_slots_peak={maximum_pinned}",
             cell.holes,
             cell.recovery_ends,
             cell.end,
@@ -5016,7 +5017,7 @@ fn hh_request<'anchor>(
 // ============================================================================================
 
 /// 一个族在一个 S 下的锚点格：族标签、注入的洞数（Hh 的 k、Hc 的 n、Hs 的 m）、位置、锚点模型给的洞 txg 与终点。
-struct R7FamilyCell {
+struct HoleFamilyCell {
     family: &'static str,
     hole_count: u64,
     position: HolePosition,
@@ -5024,15 +5025,15 @@ struct R7FamilyCell {
 }
 
 /// 一个 S 下第 7 次重跑的全部格：k = 0 的基准族单列，其余按 Hh 前、Hh 后、Hc、Hs 的次序（与脚本输出同序）。
-struct R7AnchorCellsOfOneSlotsPerRegion {
+struct HoleFamilyAnchorCellsOfOneSlotsPerRegion {
     front_hole_count_inside_the_first_ring: u64,
     front_hole_count_that_fits: u64,
     back_hole_count_that_fits: u64,
     without_holes: anchor_model::AnchorCell,
-    cells: Vec<R7FamilyCell>,
+    cells: Vec<HoleFamilyCell>,
 }
 
-fn r7_table_value(table: &[(u64, u64); 3], slots_per_region: u64) -> u64 {
+fn hole_family_table_value(table: &[(u64, u64); 3], slots_per_region: u64) -> u64 {
     table
         .iter()
         .find(|(slots, _)| *slots == slots_per_region)
@@ -5040,14 +5041,14 @@ fn r7_table_value(table: &[(u64, u64); 3], slots_per_region: u64) -> u64 {
         .expect("登记的 S 都在 A20 的本地常量表里")
 }
 
-fn r7_family_cell(
+fn hole_family_cell(
     slots_per_region: u64,
     family: &'static str,
     hole_count: u64,
     position: HolePosition,
     schedule: anchor_model::HoleSchedule,
-) -> R7FamilyCell {
-    R7FamilyCell {
+) -> HoleFamilyCell {
+    HoleFamilyCell {
         family,
         hole_count,
         position,
@@ -5055,7 +5056,7 @@ fn r7_family_cell(
     }
 }
 
-fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion {
+fn hole_family_anchor_cells_of(slots_per_region: u64) -> HoleFamilyAnchorCellsOfOneSlotsPerRegion {
     let front_hole_count_inside_the_first_ring =
         anchor_model::largest_front_hole_count_inside_the_first_ring(slots_per_region);
     let front_hole_count_that_fits =
@@ -5069,12 +5070,12 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
             back_hole_count_that_fits
         ),
         (
-            r7_table_value(
-                &E156_R7_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING,
+            hole_family_table_value(
+                &E156_HOLE_FAMILY_FRONT_HOLE_COUNT_INSIDE_THE_FIRST_RING,
                 slots_per_region
             ),
-            r7_table_value(&E156_R7_FRONT_HOLE_COUNT_THAT_FITS, slots_per_region),
-            r7_table_value(&E156_R7_BACK_HOLE_COUNT_THAT_FITS, slots_per_region),
+            hole_family_table_value(&E156_HOLE_FAMILY_FRONT_HOLE_COUNT_THAT_FITS, slots_per_region),
+            hole_family_table_value(&E156_HOLE_FAMILY_BACK_HOLE_COUNT_THAT_FITS, slots_per_region),
         ),
         "停机 S20：锚点模型算的 k_满、前位置排得下的最大洞数、后位置排得下的最大洞数与登记第七节 A20 的本地常量表不同"
     );
@@ -5085,7 +5086,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
     );
     let mut cells = Vec::new();
     for hole_count in 1..=front_hole_count_that_fits {
-        cells.push(r7_family_cell(
+        cells.push(hole_family_cell(
             slots_per_region,
             E156_FAMILY_HOLE_COUNT_SWEEP,
             hole_count,
@@ -5097,7 +5098,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
         ));
     }
     for hole_count in 1..=back_hole_count_that_fits {
-        cells.push(r7_family_cell(
+        cells.push(hole_family_cell(
             slots_per_region,
             E156_FAMILY_HOLE_COUNT_SWEEP,
             hole_count,
@@ -5112,7 +5113,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
         2 * front_hole_count_that_fits,
         3 * front_hole_count_that_fits,
     ] {
-        cells.push(r7_family_cell(
+        cells.push(hole_family_cell(
             slots_per_region,
             E156_FAMILY_CONTINUED_SWEEP,
             hole_count,
@@ -5125,7 +5126,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
     }
     for position in [HolePosition::Front, HolePosition::Back] {
         for hole_count in [1u64, 2, 3] {
-            cells.push(r7_family_cell(
+            cells.push(hole_family_cell(
                 slots_per_region,
                 E156_FAMILY_SAME_RING_SLOT,
                 hole_count,
@@ -5150,7 +5151,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
         },
         Some(end_of_the_longest_family),
     );
-    R7AnchorCellsOfOneSlotsPerRegion {
+    HoleFamilyAnchorCellsOfOneSlotsPerRegion {
         front_hole_count_inside_the_first_ring,
         front_hole_count_that_fits,
         back_hole_count_that_fits,
@@ -5160,7 +5161,7 @@ fn r7_anchor_cells_of(slots_per_region: u64) -> R7AnchorCellsOfOneSlotsPerRegion
 }
 
 /// 锚点脚本 `anchors_e156_r7.py` 里这一族的名字（族标签、位置、洞数前缀 k / n / m）。
-fn r7_python_label(cell: &R7FamilyCell) -> String {
+fn hole_family_python_label(cell: &HoleFamilyCell) -> String {
     let count_prefix = if cell.family == E156_FAMILY_CONTINUED_SWEEP {
         "n"
     } else if cell.family == E156_FAMILY_SAME_RING_SLOT {
@@ -5182,17 +5183,17 @@ fn r7_python_label(cell: &R7FamilyCell) -> String {
 /// 摘要行有五个键名与冻结在登记里的脚本不同（已照命名纪律改名，欠账 C430；登记里的脚本不回改）：`k_full_front` → `largest_front_hole_count_that_fits`、
 /// `k_full_back` → `largest_back_hole_count_that_fits`、`max_h_que` → `missing_txgs_peak`、`max_h_dong` → `live_holes_peak`、`max_pinned` → `pinned_slots_peak`；
 /// 拿登记里的脚本重算来比时，先把脚本输出照这五对换名。`research/results/e156-alloc-basis-counts-2026-10-18-support/` 下的两份脚本已照新名改过。
-fn emit_r7_anchor_cells(
+fn emit_hole_family_anchor_cells(
     emitter: &mut Emitter,
     slots_per_region: u64,
-    cells: &R7AnchorCellsOfOneSlotsPerRegion,
+    cells: &HoleFamilyAnchorCellsOfOneSlotsPerRegion,
 ) {
     emitter.emit(&format!(
         "name=anchor_r7_summary S={slots_per_region} largest_front_hole_count_that_fits={} largest_back_hole_count_that_fits={}",
         cells.front_hole_count_that_fits, cells.back_hole_count_that_fits
     ));
     for cell in &cells.cells {
-        let label = r7_python_label(cell);
+        let label = hole_family_python_label(cell);
         emitter.emit(&format!(
             "name=anchor_r7_summary {}",
             anchor_model::summary_line(slots_per_region, &label, &cell.anchor)
@@ -5481,10 +5482,10 @@ fn judge_and_emit_one_tier_unit(
     let peaks: Vec<i64> = readings.iter().map(|(peak, _)| *peak).collect();
     let growth = judge_tier_peaks(&peaks);
     let growth_without_the_last_tier = judge_tier_peaks(&peaks[..peaks.len() - 1]);
-    let max_peak = *peaks.iter().max().expect("至少一档");
-    let max_index = peaks
+    let maximum_peak = *peaks.iter().max().expect("至少一档");
+    let maximum_index = peaks
         .iter()
-        .position(|peak| *peak == max_peak)
+        .position(|peak| *peak == maximum_peak)
         .expect("最大值在序列里");
     let adjacent_differences: Vec<i64> = peaks.windows(2).map(|pair| pair[1] - pair[0]).collect();
     let moved_threshold_flips = threshold_moved_flips(&tiers, &peaks);
@@ -5498,7 +5499,7 @@ fn judge_and_emit_one_tier_unit(
         threshold_moved_flips: moved_threshold_flips,
     };
     emitter.emit(&format!(
-        "name=r7_tier_peaks quantity={} class={} s={slots_per_region} rho={} timing={} tiers={} families={} peaks={} adjacent_differences={} growth={} maximum_peak={max_peak} maximum_peak_tier={} maximum_peak_family={} maximum_peak_cell={} maximum_peak_txg={} maximum_peak_is_on_the_largest_tier={} first_tier_above_two_slots={} first_tier_above_one_slot={} growth_without_the_last_tier={} dropping_the_last_tier_changes_the_judgement={} threshold_moved_flips={}",
+        "name=r7_tier_peaks quantity={} class={} s={slots_per_region} rho={} timing={} tiers={} families={} peaks={} adjacent_differences={} growth={} maximum_peak={maximum_peak} maximum_peak_tier={} maximum_peak_family={} maximum_peak_cell={} maximum_peak_txg={} maximum_peak_is_on_the_largest_tier={} first_tier_above_two_slots={} first_tier_above_one_slot={} growth_without_the_last_tier={} dropping_the_last_tier_changes_the_judgement={} threshold_moved_flips={}",
         quantity.label(),
         quantity.class_label(),
         density.label(),
@@ -5508,11 +5509,11 @@ fn judge_and_emit_one_tier_unit(
         bracketed(&peaks),
         bracketed(&adjacent_differences),
         growth.label(),
-        tiers[max_index],
-        families[max_index],
+        tiers[maximum_index],
+        families[maximum_index],
         unit.sampling_point_name(),
-        readings[max_index].1,
-        max_index + 1 == peaks.len(),
+        readings[maximum_index].1,
+        maximum_index + 1 == peaks.len(),
         option_text(first_tier_with_peak_above(
             &tiers,
             &peaks,
@@ -5535,13 +5536,13 @@ fn judge_and_emit_one_tier_unit(
 fn judge_and_emit_tier_units(
     emitter: &mut Emitter,
     outcomes: &[HhRunOutcome],
-    r7_anchors: &BTreeMap<u64, R7AnchorCellsOfOneSlotsPerRegion>,
+    hole_family_anchors: &BTreeMap<u64, HoleFamilyAnchorCellsOfOneSlotsPerRegion>,
 ) -> Vec<TierUnit> {
     let mut units = Vec::new();
     for quantity in E156_TIER_QUANTITIES {
         for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
             let inside_the_first_ring =
-                r7_anchors[&slots_per_region].front_hole_count_inside_the_first_ring;
+                hole_family_anchors[&slots_per_region].front_hole_count_inside_the_first_ring;
             for density in [
                 WorkloadDensity::EveryPublishOverwrites,
                 WorkloadDensity::OneOverwriteInFourPublishes,
@@ -5578,7 +5579,7 @@ struct SameSlotControlReading {
     control_peak_every_publish: i64,
 }
 
-fn emit_r7_verdict(
+fn emit_hole_family_verdict(
     emitter: &mut Emitter,
     units: &[TierUnit],
     tier_sequence_cases_wrong: usize,
@@ -5639,14 +5640,15 @@ fn emit_r7_verdict(
             .map(|unit| format!("{}:{}", unit.quantity.label(), unit.sampling_point_name()))
             .collect::<Vec<String>>()
     };
-    let f31_units = names_where(
+    let criterion_units_not_monotonic = names_where(
         &[TierQuantity::InsideTheFirstRing, TierQuantity::AcrossRings],
         &|growth| growth == TierGrowth::NotMonotonic,
     );
-    let mut f32_units = names_where(&[TierQuantity::BackPosition], &|growth| {
-        matches!(growth, TierGrowth::StillRising | TierGrowth::NotMonotonic)
-    });
-    f32_units.extend(names_where(
+    let mut report_only_units_unlike_the_prediction =
+        names_where(&[TierQuantity::BackPosition], &|growth| {
+            matches!(growth, TierGrowth::StillRising | TierGrowth::NotMonotonic)
+        });
+    report_only_units_unlike_the_prediction.extend(names_where(
         &[TierQuantity::SameSlotFront, TierQuantity::SameSlotBack],
         &|growth| {
             matches!(
@@ -5655,10 +5657,11 @@ fn emit_r7_verdict(
             )
         },
     ));
-    let f34_units = names_where(&[TierQuantity::SameSlotBack], &|growth| {
-        matches!(growth, TierGrowth::FlatAtTheLastTiers { .. })
-    });
-    let mut f33_units: Vec<String> = Vec::new();
+    let same_slot_back_units_flat_against_the_clause_range =
+        names_where(&[TierQuantity::SameSlotBack], &|growth| {
+            matches!(growth, TierGrowth::FlatAtTheLastTiers { .. })
+        });
+    let mut sampling_points_where_the_two_ring_readings_disagree: Vec<String> = Vec::new();
     for inside in units
         .iter()
         .filter(|unit| unit.quantity == TierQuantity::InsideTheFirstRing)
@@ -5669,7 +5672,7 @@ fn emit_r7_verdict(
         }) {
             let kinds = (inside.growth.kind(), across.growth.kind());
             if kinds == ("flat", "still_rising") || kinds == ("still_rising", "flat") {
-                f33_units.push(format!(
+                sampling_points_where_the_two_ring_readings_disagree.push(format!(
                     "{}:r7a_{}_r7c_{}",
                     inside.sampling_point_name(),
                     kinds.0,
@@ -5708,10 +5711,10 @@ fn emit_r7_verdict(
     emitter.emit(&format!(
         "name=r7_verdict quantity=summary units={} criterion_units_not_monotonic={} report_only_units_unlike_the_prediction={} sampling_points_where_the_two_ring_readings_disagree={} same_slot_back_units_flat_against_the_clause_range={} dropping_the_last_tier_changed_units={dropping_changed}_of_{} threshold_moved_units_flipping={threshold_flipping}_of_{threshold_tested} tier_sequence_control_cases_wrong={tier_sequence_cases_wrong} same_slot_controls_run={} same_slot_controls_without_a_drop={same_slot_unseen}",
         units.len(),
-        bracketed(&f31_units),
-        bracketed(&f32_units),
-        bracketed(&f33_units),
-        bracketed(&f34_units),
+        bracketed(&criterion_units_not_monotonic),
+        bracketed(&report_only_units_unlike_the_prediction),
+        bracketed(&sampling_points_where_the_two_ring_readings_disagree),
+        bracketed(&same_slot_back_units_flat_against_the_clause_range),
         ring_units.len(),
         same_slot_controls.len(),
     ));
@@ -5774,12 +5777,13 @@ fn main() {
     }
 
     // 第 7 次重跑的锚点模型（登记第七节 7.2 的 `anchors_e156_r7.py` 的移植）：k_满 / 排得下的最大洞数与本地常量表回比（A20，不等即停机 S20），
-    // 摘要与逐观测点两种行去掉前缀之后与脚本的输出逐行比（报告里的命令；摘要行的五个键名先照 `emit_r7_anchor_cells` 文档里那张对照换名）。
-    let mut r7_anchors: BTreeMap<u64, R7AnchorCellsOfOneSlotsPerRegion> = BTreeMap::new();
+    // 摘要与逐观测点两种行去掉前缀之后与脚本的输出逐行比（报告里的命令；摘要行的五个键名先照 `emit_hole_family_anchor_cells` 文档里那张对照换名）。
+    let mut hole_family_anchors: BTreeMap<u64, HoleFamilyAnchorCellsOfOneSlotsPerRegion> =
+        BTreeMap::new();
     for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
-        let cells = r7_anchor_cells_of(slots_per_region);
-        emit_r7_anchor_cells(&mut emitter, slots_per_region, &cells);
-        r7_anchors.insert(slots_per_region, cells);
+        let cells = hole_family_anchor_cells_of(slots_per_region);
+        emit_hole_family_anchor_cells(&mut emitter, slots_per_region, &cells);
+        hole_family_anchors.insert(slots_per_region, cells);
     }
 
     // ===================== 第一段 =====================
@@ -6034,9 +6038,11 @@ fn main() {
     let mut all_zero_pin_cells: Vec<AllZeroPinCellTotals> = Vec::new();
     // 第 7 次重跑登记 5.2 / W30 / W31：族表按 S 现算（Hh 前 k = 1 … k_满 + 1、Hh 后 k = 1 … k_满后、Hc 两档、Hs 六格，加 k = 0 的基准族），排不下的格照跑。
     for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
-        let r7_cells = &r7_anchors[&slots_per_region];
-        let expected_lags =
-            anchor_model::tree_table_reclaim_lags(slots_per_region, r7_cells.without_holes.end);
+        let hole_family_cells = &hole_family_anchors[&slots_per_region];
+        let expected_lags = anchor_model::tree_table_reclaim_lags(
+            slots_per_region,
+            hole_family_cells.without_holes.end,
+        );
         for density in [
             WorkloadDensity::EveryPublishOverwrites,
             WorkloadDensity::OneOverwriteInFourPublishes,
@@ -6045,9 +6051,9 @@ fn main() {
                 vec![(
                     E156_FAMILY_HOLE_COUNT_SWEEP,
                     shape_of(slots_per_region, density, 0, None),
-                    &r7_cells.without_holes,
+                    &hole_family_cells.without_holes,
                 )];
-            for cell in &r7_cells.cells {
+            for cell in &hole_family_cells.cells {
                 grid_cells.push((
                     cell.family,
                     shape_of(
@@ -6221,7 +6227,7 @@ fn main() {
                         && outcome.shape.hole_count == 2
                 })
                 .expect("格表里有 Hs(2, 后)");
-            let anchor = &r7_anchors[&slots_per_region]
+            let anchor = &hole_family_anchors[&slots_per_region]
                 .cells
                 .iter()
                 .find(|cell| {
@@ -6251,8 +6257,8 @@ fn main() {
     }
 
     // R7a–R7e：每个统计单位 (量, S, ρ, 回收时点) 的档序列判 W28、报上界数；R7f（每档的多扣）在 `name=q1_trajectory ... quantity=q1a_real` 与 `q1a_every` 行。
-    let tier_units = judge_and_emit_tier_units(&mut emitter, &outcomes, &r7_anchors);
-    emit_r7_verdict(
+    let tier_units = judge_and_emit_tier_units(&mut emitter, &outcomes, &hole_family_anchors);
+    emit_hole_family_verdict(
         &mut emitter,
         &tier_units,
         tier_sequence_cases_wrong,
@@ -6492,7 +6498,7 @@ mod tests {
         FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
     };
     use super::{
-        judge_tier_peaks, r7_anchor_cells_of, reclaim_threshold_read_from_the_ring_image,
+        hole_family_anchor_cells_of, judge_tier_peaks, reclaim_threshold_read_from_the_ring_image,
         tier_sequence_positive_control_cases, valid_root_txgs_without_the_old_root_in_the_slot,
         TierGrowth, E156_FAMILY_SAME_RING_SLOT,
     };
@@ -7285,7 +7291,7 @@ mod tests {
     /// ② 交 k = 0 的 A10 判定、期望 {12} 时，实、每两项都判「不符」；③ 期望换成这一格自己量出来的两份集合时，两项各自判「符」
     /// （判定不是恒红）。M44（「实」列不读真实分配器的空闲位图、按 3S 的时间表记）在 ① 红。
     #[test]
-    fn hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_a10_judgement_sees_it(
+    fn hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_reclaim_lag_judgement_sees_it(
     ) {
         let outcome = run_the_hole_history_of_one_shape(
             &anchors_for_four_slots_per_region(),
@@ -7475,7 +7481,7 @@ mod tests {
         for (slots_per_region, cells_per_density, longest_end) in
             [(4u64, 14usize, 66u64), (8, 18, 114), (16, 26, 210)]
         {
-            let table = r7_anchor_cells_of(slots_per_region);
+            let table = hole_family_anchor_cells_of(slots_per_region);
             assert_eq!(
                 table.cells.len() + 1,
                 cells_per_density,
@@ -7517,7 +7523,7 @@ mod tests {
     #[test]
     fn hs_two_back_holes_at_four_slots_per_region_keep_the_threshold_on_txg_four_until_the_slot_is_rewritten(
     ) {
-        let table = r7_anchor_cells_of(4);
+        let table = hole_family_anchor_cells_of(4);
         let cell = table
             .cells
             .iter()

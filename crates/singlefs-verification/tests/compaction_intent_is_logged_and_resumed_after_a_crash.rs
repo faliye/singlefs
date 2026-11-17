@@ -214,7 +214,7 @@ fn assert_the_mount_continued_the_intent_to_its_end(
 }
 
 /// 签发那次发布把一条整理意图写进 logged_ops 树（判决 G1）：盘上树表里 logged_ops 那一条的根指针不再是零，根是码 2 层级 0、
-/// 一条 44 字节的条目，字节就是字段表写出的那样；不续做的可写挂载（产品开关：批大小条款没写，续做在任何写之前停下）重建时读回同一条意图，
+/// 一条 44 字节的条目，字节就是字段表写出的那样；不续做的可写挂载（开关叫停整理，续做在任何写之前停下）重建时读回同一条意图，
 /// 分配器上恢复 R 排他（D26（后台整理与放置回收） 已定项 1 第 3 条）。
 #[test]
 fn the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_back_with_its_region_excluded(
@@ -245,7 +245,31 @@ fn the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_ba
         "盘上一条条目，字节照字段表"
     );
     let mut devices = pool.reopen_recorded();
-    let mounted = mount_writable(&parameters(), &mut devices).expect("可写挂载");
+    let CompactionSwitches {
+        batch_size,
+        forced_region,
+        run_forcing: _,
+        region_exclusion,
+        destination_policy,
+        release_checksum_mismatch_after_issue,
+        empty_cluster_segments_floor,
+        relocation_publish_order,
+    } = CompactionSwitches::PRODUCT;
+    let mounted = mount_writable_with_compaction_switches(
+        &parameters(),
+        &mut devices,
+        CompactionSwitches {
+            batch_size,
+            forced_region,
+            run_forcing: CompactionRunForcing::ForcedToStopForTests,
+            region_exclusion,
+            destination_policy,
+            release_checksum_mismatch_after_issue,
+            empty_cluster_segments_floor,
+            relocation_publish_order,
+        },
+    )
+    .expect("可写挂载");
     pool.devices = Some(devices);
     assert!(
         matches!(
@@ -256,10 +280,10 @@ fn the_issue_publish_logs_the_compaction_intent_and_a_writable_mount_reads_it_ba
                 .as_ref()
                 .map(|run| &run.outcome),
             Some(CompactionRunOutcome::Stopped(
-                CompactionRunStop::BatchSizeNotDecidedByTheClauses
+                CompactionRunStop::ForcedToStopForTests
             ))
         ),
-        "产品开关下续做在任何写之前停下：{:?}",
+        "开关叫停时续做在任何写之前停下：{:?}",
         mounted.output.compaction_continuation.run
     );
     let (_, session) = MountedSession::of_the_mount(mounted);

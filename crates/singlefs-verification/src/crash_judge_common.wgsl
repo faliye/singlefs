@@ -312,6 +312,9 @@ var<private> root_count: u32;
 // 中央映射：条目数（读映射树时数的全部叶条目）与 R_MAPPING_LEAVES 里记了几片叶
 var<private> mapping_count: u32;
 var<private> mapping_leaf_count: u32;
+// R_MAPPING_LEAVES 里记的叶有一片条目窄于 55（read_code_two_tree 读映射树时开头清掉、逐片记；查映射先看它，判红不必逐片扫叶表）。
+// 只有 mapping_lookup 读它，它只在一次读通的映射树之后调，那一次读树开头已清过，begin_state 不另清
+var<private> some_mapping_leaf_has_entries_narrower_than_a_mapping_entry: bool;
 var<private> accounting_count: u32;
 var<private> allocation_count: u32;
 var<private> seen_count: u32;
@@ -357,6 +360,9 @@ var<private> files_of_the_extent_tree: u32;
 var<private> rebuild_judges_the_pointers_of_the_version: bool;
 var<private> some_pointer_of_the_version_does_not_ascend_by_device: bool;
 var<private> some_mapping_position_of_the_version_does_not_ascend_by_device: bool;
+// 建上一版那一样读者读的进映射的单元里有一个的 key 在映射里查不到（经 read_via_hint_then_mapping 记下；查映射本身判红的不记）：
+// recovery::central_mapping_keys_are_those_of_the_mapped_units_and_the_entries_kept_for_the_snapshots 那一判的 GPU 一侧
+var<private> some_mapped_unit_key_is_missing_from_the_central_mapping: bool;
 
 // ───────────────────────── 表与草稿的读写 ─────────────────────────
 
@@ -2029,53 +2035,114 @@ fn mapping_leaf_at(leaf_index: u32) -> MappingLeaf {
     let base = sw(R_MAPPING_LEAVES + leaf_index);
     return MappingLeaf(base, index_node_entries_of_the_header(base));
 }
-// 在映射叶条目里找一个 27 字节 key（逐片叶、片里逐条，次序同读树时记叶的次序）：同 key 多条取最后一条；条目窄于 55 判红
-// （一片叶里条目同宽：按片判与逐条判、遇到第一条窄的就判红相同，读树时零条目的叶不收）
+// 中央映射的一把 27 字节 key 拆成五段（类标签 1、出生树 8、出生 txg 8、实例 4、尾段 6，各段小端），次序同 compare_keys 的 schema 1：逐段按值比
+struct MappingKeyFields {
+    unit_class: u32,
+    birth_tree: vec2<u32>,
+    birth_txg: vec2<u32>,
+    instance: u32,
+    tail: vec2<u32>,
+};
+// (base, key_at) 起那 27 字节按映射 key 的布局拆开（映射叶条目与 deadlist 条目偏移 16 起的那一段都是这个布局）
+fn mapping_key_fields_at(base: u32, key_at: u32) -> MappingKeyFields {
+    return MappingKeyFields(rd8(base, key_at), rd64(base, key_at + 1u), rd64(base, key_at + 9u), rd32(base, key_at + 17u), rd48(base, key_at + 21u));
+}
+// 映射叶里 (base, entry_at) 起那条条目的 key 与 probe 比，次序同 compare_keys(1, …)：0 条目在前、1 相等、2 条目在后
+fn mapping_entry_key_order_against_the_probe(base: u32, entry_at: u32, probe: MappingKeyFields) -> u32 {
+    let entry = mapping_key_fields_at(base, entry_at);
+    if (entry.unit_class != probe.unit_class) {
+        return select(2u, 0u, entry.unit_class < probe.unit_class);
+    }
+    if (!eq64(entry.birth_tree, probe.birth_tree)) {
+        return select(2u, 0u, lt64(entry.birth_tree, probe.birth_tree));
+    }
+    if (!eq64(entry.birth_txg, probe.birth_txg)) {
+        return select(2u, 0u, lt64(entry.birth_txg, probe.birth_txg));
+    }
+    if (entry.instance != probe.instance) {
+        return select(2u, 0u, entry.instance < probe.instance);
+    }
+    if (!eq64(entry.tail, probe.tail)) {
+        return select(2u, 0u, lt64(entry.tail, probe.tail));
+    }
+    return 1u;
+}
+// 中央映射叶表里 key 等于 probe 的那条条目在叶字节里的位置（found 为假是没有）
+struct MappingEntryPosition {
+    found: bool,
+    base: u32,
+    offset: u32,
+};
+// 前提：这一份叶表是一次读通的映射树记下的（mapping_tree_failure_point 为 NONE；只有恢复内核调）。读通就说明叶内条目按 compare_keys(1, …) 严格递增
+// （read_code_two_tree 叶那一判），跨叶由分隔 key 不大于孩子最小 key、分隔 key 严格递增且大于前一个孩子的最大 key 连成严格递增（内部节点那几判），
+// 叶按深度优先次序记进 R_MAPPING_LEAVES：全表按 key 严格递增、不重，所以先在叶之间二分（比每片的末条，取第一片末条不在 probe 之前的叶）、再在那片叶里二分。
+// 读树时零条目的叶不收，每片至少一条。圈数：叶之间至多 ⌈log2(叶数 + 1)⌉，叶内至多 ⌈log2(条数 + 1)⌉
+fn mapping_entry_holding_the_key(probe: MappingKeyFields) -> MappingEntryPosition {
+    var out = MappingEntryPosition(false, 0u, 0u);
+    var low_leaf = 0u;
+    var high_leaf = mapping_leaf_count;
+    while (low_leaf < high_leaf) {
+        let middle_leaf = (low_leaf + high_leaf) >> 1u;
+        let leaf = mapping_leaf_at(middle_leaf);
+        let last_entry = leaf.entries.entries_start + (leaf.entries.entry_count - 1u) * leaf.entries.entry_width;
+        if (mapping_entry_key_order_against_the_probe(leaf.base, last_entry, probe) == 0u) {
+            low_leaf = middle_leaf + 1u;
+        } else {
+            high_leaf = middle_leaf;
+        }
+    }
+    if (low_leaf >= mapping_leaf_count) {
+        return out;
+    }
+    let leaf = mapping_leaf_at(low_leaf);
+    var low_entry = 0u;
+    var high_entry = leaf.entries.entry_count;
+    while (low_entry < high_entry) {
+        let middle_entry = (low_entry + high_entry) >> 1u;
+        let entry_at = leaf.entries.entries_start + middle_entry * leaf.entries.entry_width;
+        let order = mapping_entry_key_order_against_the_probe(leaf.base, entry_at, probe);
+        if (order == 1u) {
+            out = MappingEntryPosition(true, leaf.base, entry_at);
+            return out;
+        }
+        if (order == 0u) {
+            low_entry = middle_entry + 1u;
+        } else {
+            high_entry = middle_entry;
+        }
+    }
+    return out;
+}
+// 在映射叶条目里找一个 27 字节 key：key 的类标签是 key_class，出生树与出生 txg 是 (key_base, key_offset + 34) 起 16 字节，实例是 key_offset + 78 起 4 字节，
+// 尾段是 key_tail（事务那种 48 位全比；别的取低 32 位、高 16 位为 0）。叶表有一片条目窄于 55 就判红（不论查的 key 在哪）。
+// 前提同 mapping_entry_holding_the_key：只在映射树读通之后调（调用点都先判 mapping_tree_failure_point 为 NONE）
 fn mapping_lookup(key_base: u32, key_offset: u32, key_class: u32, key_tail: vec2<u32>, key_tail_is_transaction: bool) -> Lookup {
     var out: Lookup;
     out.found = false;
     out.failed = false;
     out.p = zero_pointer();
-    for (var leaf_index = 0u; leaf_index < mapping_leaf_count; leaf_index = leaf_index + 1u) {
-        let leaf = mapping_leaf_at(leaf_index);
-        if (leaf.entries.entry_width < 55u) {
-            out.failed = true;
-            return out;
-        }
-        let base = leaf.base;
-        for (var entry_index = 0u; entry_index < leaf.entries.entry_count; entry_index = entry_index + 1u) {
-            let o = leaf.entries.entries_start + entry_index * leaf.entries.entry_width;
-            // key：类标签 1 + 出生树 8 + 出生 txg 8 + 实例 4 + 尾段 6
-            if (rd8(base, o) != key_class) {
-                continue;
-            }
-            if (!bytes_equal(base, o + 1u, key_base, key_offset + 34u, 16u)) {
-                continue;
-            }
-            if (rd32(base, o + 17u) != rd32(key_base, key_offset + 78u)) {
-                continue;
-            }
-            var tail_matches = false;
-            if (key_tail_is_transaction) {
-                tail_matches = eq64(rd48(base, o + 21u), key_tail);
-            } else {
-                tail_matches = rd32(base, o + 21u) == key_tail.x && rd16(base, o + 25u) == 0u;
-            }
-            if (!tail_matches) {
-                continue;
-            }
-            var p = zero_pointer();
-            p.all_zero = false;
-            p.device0 = rd32(base, o + 27u);
-            p.slot0 = rd48(base, o + 31u);
-            p.sum0 = rd32(base, o + 37u);
-            p.device1 = rd32(base, o + 41u);
-            p.slot1 = rd48(base, o + 45u);
-            p.sum1 = rd32(base, o + 51u);
-            out.p = p;
-            out.found = true;
-        }
+    if (some_mapping_leaf_has_entries_narrower_than_a_mapping_entry) {
+        out.failed = true;
+        return out;
     }
+    let probe = MappingKeyFields(key_class, rd64(key_base, key_offset + 34u), rd64(key_base, key_offset + 42u), rd32(key_base, key_offset + 78u),
+        select(vec2<u32>(key_tail.x, 0u), key_tail, key_tail_is_transaction));
+    let position = mapping_entry_holding_the_key(probe);
+    if (!position.found) {
+        return out;
+    }
+    let base = position.base;
+    let entry_at = position.offset;
+    var pointer = zero_pointer();
+    pointer.all_zero = false;
+    pointer.device0 = rd32(base, entry_at + 27u);
+    pointer.slot0 = rd48(base, entry_at + 31u);
+    pointer.sum0 = rd32(base, entry_at + 37u);
+    pointer.device1 = rd32(base, entry_at + 41u);
+    pointer.slot1 = rd48(base, entry_at + 45u);
+    pointer.sum1 = rd32(base, entry_at + 51u);
+    out.p = pointer;
+    out.found = true;
     return out;
 }
 struct MappedRead {
@@ -2094,6 +2161,9 @@ fn read_via_hint_then_mapping(p: Ptr, pointer_base: u32, pointer_offset: u32, un
         let position = mapping_lookup(pointer_base, pointer_offset, unit_class, p.tail, unit_class == 1u);
         if (!position.failed && position.found && position.p.device0 >= position.p.device1) {
             some_mapping_position_of_the_version_does_not_ascend_by_device = true;
+        }
+        if (!position.failed && !position.found) {
+            some_mapped_unit_key_is_missing_from_the_central_mapping = true;
         }
     }
     out.s = read_unit_via_locations(p, unit_bytes);
@@ -2352,6 +2422,7 @@ fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
     if (schema == 1u) {
         mapping_count = 0u;
         mapping_leaf_count = 0u;
+        some_mapping_leaf_has_entries_narrower_than_a_mapping_entry = false;
     } else if (records_each_leaf_entry) {
         accounting_count = 0u;
     } else if (schema == KEY_SCHEMA_DEADLIST) {
@@ -2418,6 +2489,9 @@ fn read_code_two_tree(root_pointer: Ptr, root_pointer_base: u32, root_pointer_of
                 if (schema == 1u) {
                     sws(R_MAPPING_LEAVES + mapping_leaf_count, n.base);
                     mapping_leaf_count = mapping_leaf_count + 1u;
+                    if (n.entry_width < 55u) {
+                        some_mapping_leaf_has_entries_narrower_than_a_mapping_entry = true;
+                    }
                 } else if (schema == KEY_SCHEMA_DEADLIST) {
                     sws(R_DEADLIST_LEAVES + deadlist_leaf_count, n.base);
                     deadlist_leaf_count = deadlist_leaf_count + 1u;

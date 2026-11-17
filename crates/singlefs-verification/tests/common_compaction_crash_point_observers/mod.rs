@@ -11,14 +11,14 @@
     reason = "共用的观察者模块：每个测试文件只用其中几样，没用的在那个测试二进制里就是没用到"
 )]
 
+use super::common::{geometry, parameters};
 use super::common_compaction_prefix::{
     assert_every_live_snapshot_of_the_version_reads_its_creation_content,
     assert_the_first_file_of_the_version_reads_its_content,
     assert_the_mount_continued_the_compaction_and_the_deletions,
-    image_with_the_relocation_sources_zeroed,
-    mount_writable_with_the_compaction_switches_on_the_crash_disks,
-    version_of_the_compaction_flow_landed_on, LandedVersionOfTheCompactionFlow,
-    PreparedCompactionCrashFlow, VersionOfTheCompactionFlow,
+    attempt_the_writable_mount_with_the_compaction_switches_on_the_crash_disks,
+    image_with_the_relocation_sources_zeroed, version_of_the_compaction_flow_landed_on,
+    LandedVersionOfTheCompactionFlow, PreparedCompactionCrashFlow, VersionOfTheCompactionFlow,
     COMPACTION_BATCH_UNITS_OF_THE_CRASH_FLOWS,
 };
 use super::common_crash_point_observers::POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER;
@@ -32,6 +32,11 @@ use singlefs_verification::crash_state_enumeration::{
     CrashPointReplayObserver, CrashPointReplayObserverHandingBackAnImage,
 };
 use singlefs_verification::memory_pool::CrashImage;
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness,
+    writable_mount_refusals_into_the_undecidable_witness_of_each_observer,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 
 /// 这一份的仓内路径（观察者代码文件，与 `file!()` 归一之后相同）：崩溃放量那一路两个观察者的版本从这一份出发（`judging_units_entries::OBSERVER_ENTRIES`）。
@@ -113,6 +118,7 @@ pub fn observe_the_landed_version_reading_through_the_mapping(
 
 /// 可写挂载续做那个观察者看一个状态（模块文件头第二样）。可写挂载与续做真跑实现，只能在 CPU 上
 /// （豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），续做跳过。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn observe_the_mount_continuing_the_compaction(
@@ -125,9 +131,23 @@ pub fn observe_the_mount_continuing_the_compaction(
         .effective_root
         .expect("每个状态都择到根（oracle 另判）");
     let landed = version_of_the_compaction_flow_landed_on(versions_of_the_flow, effective_root);
-    let mounted = mount_writable_with_the_compaction_switches_on_the_crash_disks(
-        &materialized_crash_image(image),
-    );
+    let crash_disks = materialized_crash_image(image);
+    let mounted = match attempt_the_writable_mount_with_the_compaction_switches_on_the_crash_disks(
+        &crash_disks,
+    ) {
+        Ok(mounted) => mounted,
+        Err(refused) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &refused,
+                &crash_disks,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     let compaction_publishes =
         assert_the_mount_continued_the_compaction_and_the_deletions(landed, &mounted);
     counts.add(
@@ -218,9 +238,10 @@ pub fn assert_every_state_was_observed(
         (0..=COMPACTION_CONTINUATION_PUBLISHES_AT_MOST)
             .map(|publishes| counts
                 .count_named(&format!("compaction_continuation_publishes_{publishes}")))
-            .sum::<u64>(),
+            .sum::<u64>()
+            + counts.count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
         tally.states,
-        "每个状态都可写挂载过一次"
+        "每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
     );
     singlefs_verification::crash_state_enumeration::assert_the_count_is_above_zero_unless_narrowed(
         (1..=COMPACTION_CONTINUATION_PUBLISHES_AT_MOST)
@@ -575,14 +596,15 @@ pub fn amplify_a_compaction_flow(
         return run;
     };
     println!(
-        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?} writable_mount_refusals_into_the_undecidable_witness={:?}",
         observing.images_judged_here,
         observing.images_judged_on_the_gpu_here,
         observing.image_judgements_reused,
         observing.blocks_observed_here,
         observing.states_observed_here,
         observing.states_of_each_observer,
-        observing.red_states_of_each_observer
+        observing.red_states_of_each_observer,
+ writable_mount_refusals_into_the_undecidable_witness_of_each_observer(observing)
     );
     let observer_names = [
         standard_prefix_observer.name(),
@@ -590,15 +612,18 @@ pub fn amplify_a_compaction_flow(
         ObserverOfTheCompactionSteps::MountContinuingTheCompaction.name(),
     ];
     for name in observer_names {
-        let states = observing
-            .states_of_each_observer
-            .get(name)
-            .copied()
-            .unwrap_or(0);
-        assert!(
-            states > 0,
-            "流 {flow_name} 经过标准前缀与整理那几步，观察者 {name} 一个状态都没看"
-        );
+        let states =
+            common_crash_point_observers::states_seen_by_the_observer_as_the_block_range_requires(
+                &run,
+                observing,
+                flow_name,
+                name,
+                observers
+                    .iter()
+                    .find(|attached| attached.observer_name.as_str() == name)
+                    .map(|attached| attached.nodes.as_slice()),
+                &format!("流 {flow_name} 经过标准前缀与整理那几步，观察者 {name} 一个状态都没看"),
+            );
         assert_eq!(
             observing
                 .red_states_of_each_observer
@@ -619,7 +644,8 @@ pub fn amplify_a_compaction_flow(
             assert_eq!(
                 (0..=DELETION_BATCHES_BEFORE_THE_FINAL_BATCH + 1)
                     .map(|steps| count_named(&format!("mount_continuation_steps_{steps}")))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
                 "流 {flow_name}：标准前缀上的每个状态都可写挂载过一次"
             );
@@ -629,9 +655,10 @@ pub fn amplify_a_compaction_flow(
                     .map(|publishes| count_named(&format!(
                         "compaction_continuation_publishes_{publishes}"
                     )))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
-                "流 {flow_name}：整理那几步上的每个状态都可写挂载过一次"
+                "流 {flow_name}：整理那几步上的每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
             );
         }
         if name != ObserverOfTheCompactionSteps::LandedVersionReadThroughTheMapping.name() {

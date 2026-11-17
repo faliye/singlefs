@@ -385,7 +385,7 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
                     ),
                     (
                         DeviceIdentity(1),
-                        CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot(SlotNumber(196_638))
+                        CommitGeneratedDeviceAnswer::FallBack(SlotNumber(196_638))
                     ),
                 ],
             }

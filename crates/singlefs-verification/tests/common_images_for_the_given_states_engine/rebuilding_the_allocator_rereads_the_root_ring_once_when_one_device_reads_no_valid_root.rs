@@ -1260,13 +1260,13 @@ pub enum ReadsOfTheSlotFailingAfterTheRebuildPass {
 
 /// `narrow-384-20-2` 上照 [`ReadsOfTheSlotFailingAfterTheRebuildPass`] 再挂时，盘 0 最新那条根住的槽第几次读到盘上是可写挂载头一次把它读进
 /// 预演与真做共用的那一份（`mounted_session::DeviceReadOnceInThisMount`；岔路单 `research/prompts/m3-b44-code-r2-forks.md` 岔路一
-/// 「读一次两边共用」）：1–5 读阶段，6、7 重建分配器两遍，8 是可写挂载这一段里头一次读根环（之后写行、暖机、抬 F 读它都取记下的那一份）。
+/// 「读一次两边共用」）：1–4 读阶段与它之后取第一个 txg、取水位、算 F 生效值那几读，5、6 重建分配器两遍，7 是可写挂载这一段里头一次读根环（之后写行、暖机、抬 F 读它都取记下的那一份）。
 pub const READ_OF_THE_SLOT_INTO_THE_READS_SHARED_IN_THIS_MOUNT: u64 =
     READ_OF_EACH_ROOT_RING_SLOT_BY_THE_REREAD + 1;
 
 /// 同上，那一槽第几次读到盘上是写行与暖机之后推的第一次抬 F 算上限那一遍（`mount::roots_of_the_ring_for_the_ceiling`）读坏之后的当场重读：
-/// 9 是真做取号写之前那一遍（条款要那一刻再读一次盘，照旧读盘）；之后读它都取记下的那一份，抬 F 算上限那一遍读到记下的坏字节、
-/// 当场重读那一读绕过记下的那一份穿到盘上（主 agent 判定：抬 F 与续做里「读坏当场重读」那一读不许被共用的那一份吃掉），是第 10 次。
+/// 8 是真做取号写之前那一遍（条款要那一刻再读一次盘，照旧读盘）；之后读它都取记下的那一份，抬 F 算上限那一遍读到记下的坏字节、
+/// 当场重读那一读绕过记下的那一份穿到盘上（主 agent 判定：抬 F 与续做里「读坏当场重读」那一读不许被共用的那一份吃掉），是第 9 次。
 /// 重读读到自证过的换掉记下的那一份，之后再算一次上限、重算影子账那几遍取它，不再到盘上。读到盘上的次序变了这个数跟着变：
 /// 瞬时那条用例另断言这一次读前后都紧挨着一段写、这一槽上一次读到盘上在这次挂载第一个写之前
 /// （[`read_is_the_floor_raises_reread_alone_on_the_disk_between_two_writes`]），读序一变那一项就红。

@@ -2708,9 +2708,9 @@ pub fn run_the_scenario_where_the_core_build_script_reports_the_lookup_work_coun
 /// 点名打开它的判成对不上、点名那个特性；没点名它的（空、别的特性、别的参数、`--check-cfg` 里提到它、不跟在 `--cfg` 后面）不判；
 /// 表说开着时同样的参数不判。构建时对不上就停（`build.rs` 的 `main`）。
 /// 判别力：`crates/mutations.tsv` 里点名这一条的那一行（认不出 `feature` 那个键）。
-pub fn run_the_scenario_where_the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_cfg_says_off(
+pub fn run_the_scenario_where_the_core_build_script_finds_the_features_its_rustflags_open_while_its_own_compile_time_configuration_says_off(
 ) {
-    let table = singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG;
+    let table = singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS;
     assert_eq!(
         table,
         [
@@ -2800,7 +2800,7 @@ fn feature_names_of_the_core_manifest() -> Vec<String> {
 pub fn run_the_scenario_where_the_core_build_script_reports_only_the_features_cargo_enabled_even_with_the_feature_variable_brought_in_from_outside(
 ) {
     let reported_with_the_feature_off = singlefs_core_build_script::enabled_features_metadata_value(
-        &singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG,
+        &singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS,
     );
     if std::env::var_os(CHILD_RUN_MARKER_OF_THE_BUILD_SCRIPT_CHECK).is_some() {
         assert!(
@@ -2848,7 +2848,7 @@ pub fn run_the_scenario_where_the_core_build_script_reports_only_the_features_ca
         "cfg 说开着：交出 cargo 环境变量名的写法"
     );
     let mut names_in_the_table: Vec<String> =
-        singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG
+        singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
             .iter()
             .map(|(feature, _)| (*feature).to_string())
             .collect();

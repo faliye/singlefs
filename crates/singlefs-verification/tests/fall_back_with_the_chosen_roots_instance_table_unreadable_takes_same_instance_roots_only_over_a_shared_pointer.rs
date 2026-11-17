@@ -13,8 +13,8 @@ mod common_unwitnessed_publish;
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, fixed_geometry_of_the_384_slot_small_devices,
     image_of_devices_reading_back_all_zero, record_one_publish_after_overwrites,
-    recorded_devices_reading_back_all_zero_on, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    recorded_devices_reading_back_all_zero_on, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
@@ -38,7 +38,7 @@ use singlefs_verification::memory_pool::{
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::SharedStream;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 /// 实例表单元的宽（两槽，32 KiB）：读回全零那一段按它算。
 const INSTANCE_TABLE_UNIT_BYTES: u64 = 32768;
 
@@ -179,8 +179,10 @@ fn version_before_the_previous(recorded: &RecordedPublish) -> (InstanceGeneratio
 #[test]
 fn the_registered_shape_falls_back_to_the_confirmed_version_sharing_the_instance_table_pointer_of_the_chosen_root(
 ) {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) = registered_shape(&recorded);
     assert_the_instance_table_of_the_chosen_root_is_unreadable(&image, &ranges, recorded.key);
     assert_eq!(
@@ -200,8 +202,10 @@ fn the_registered_shape_falls_back_to_the_confirmed_version_sharing_the_instance
 /// 判别力：「根环一簇 R2：见证到的那一版的根读不出时也当共用指针」那一行（只读挂载落到 P），这一条红。
 #[test]
 fn with_the_witnessed_root_unreadable_the_same_instance_roots_in_the_range_are_not_taken() {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let (image, ranges) = registered_shape(&recorded);
     let ranges = ranges.with_the_root_slot_of(&image, version_before_the_previous(&recorded));
     assert_the_instance_table_of_the_chosen_root_is_unreadable(&image, &ranges, recorded.key);
@@ -239,15 +243,18 @@ fn writes_of_a_writable_mount(
 }
 
 /// 场景：`cross` 那一形（覆盖写、k = 5）。R 整次落盘（已确认，实例 1），之后一次干净的可写挂载取实例 2（写行一次、暖机），崩在这次挂载第二条根
-/// （暖机那一条）的根槽之后、它那次轮换之前；读的那一刻那条根的实例表与每块盘较新的那个系统配置槽读回全零。见证到的是 R（实例 1），
+/// （暖机那一条）的根槽之后、它那次轮换之前，每块盘世代号最大的那一次轮换没写成（两槽都自证过）；读的那一刻那条根的实例表读回全零。见证到的是 R（实例 1），
 /// 与所选根（实例 2）指着的实例表不是同一张。
-/// 预期：不另收同实例的根，只认恰好等于 R 的那条：恢复与只读挂载落在 R（改法之前只读挂载留在所选根）；可写挂载照它自己那一拒——
+/// 预期：不另收同实例的根，只认恰好等于 R 的那条：恢复与只读挂载落在 R；可写挂载照它自己那一拒——
 /// 判抛弃用的最新那条根（所选根）的实例表读不出，在取号之前拒、盘上逐字节不变（成败各看各，C755）。
 /// 判别力：「根环一簇 R2：所选根的实例表读不出时一律另收同实例的根」那一行（退到实例 2 写行那条根，恢复读不通实例表、留在所选根失败），这一条红。
 #[test]
-fn the_cross_instance_shape_falls_back_only_to_the_witnessed_version_of_the_older_instance() {
-    let recorded =
-        record_one_publish_after_overwrites(OVERWRITES_BEFORE_R, PublishRecordedAsR::Overwrite);
+fn the_cross_instance_shape_falls_back_only_to_the_witnessed_version_of_the_older_instance_where_both_devices_lost_their_newest_rotation_write(
+) {
+    let recorded = record_one_publish_after_overwrites(
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::Overwrite,
+    );
     let fsid = recorded.pool.parameters.filesystem_identifier;
     let confirmed = recorded.image_with_the_whole_publish_persisted();
     let writes =
@@ -274,9 +281,11 @@ fn the_cross_instance_shape_falls_back_only_to_the_witnessed_version_of_the_olde
         (InstanceGeneration(2), InstanceGeneration(2)),
         "前提：这次挂载取实例 2，写行与暖机两条根都是实例 2 的"
     );
-    let mut ranges = instance_table_ranges_of(&root_of_the_crash);
-    ranges.extend(newer_system_configuration_slot_of_each_device(&image));
-    let ranges = RangesReadingBackAllZero(ranges);
+    let image =
+        common_unwitnessed_publish::image_where_both_devices_lost_their_newest_rotation_write(
+            &image,
+        );
+    let ranges = RangesReadingBackAllZero(instance_table_ranges_of(&root_of_the_crash));
     assert_the_instance_table_of_the_chosen_root_is_unreadable(
         &image,
         &ranges,
@@ -305,10 +314,10 @@ fn the_cross_instance_shape_falls_back_only_to_the_witnessed_version_of_the_olde
             MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
                 if **still_unreadable
                     == StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-                        newest_root_on_the_reread: Some(RollbackTarget {
+                        root_chosen_by_the_read_stage: RollbackTarget {
                             instance: root_of_the_crash.instance,
                             checkpoint_txg: root_of_the_crash.checkpoint_txg,
-                        }),
+                        },
                     }
         ),
         "拒因是最新那条根（所选根）的实例表重读一次仍读不出：{refusal:?}"

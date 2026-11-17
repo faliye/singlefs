@@ -85,7 +85,7 @@ use singlefs_verification::{
 //    回比在 `constant_checks`（停机条款 S4）。
 // ============================================================================
 
-/// 根记录里实例表指针的偏移：登记第五节本地常量表第 1 行（`crates/singlefs-core/src/root_record.rs` 里 `spec_decode_at(bytes, 170)` 那一处）。
+/// 根记录里实例表指针的偏移：登记第五节本地常量表第 1 行（`crates/singlefs-core/src/root_record.rs` 里 `specification_decode_at(bytes, 170)` 那一处）。
 const ROOT_RECORD_INSTANCE_TABLE_POINTER_OFFSET: usize = 170;
 /// 指针里出生 txg 的偏移：登记第五节本地常量表第 2 行（`crates/singlefs-checker/src/image.rs` 里 `read_u64(bytes, 42)` 那一处）。
 const POINTER_BIRTH_TXG_OFFSET: usize = 42;
@@ -4725,10 +4725,10 @@ fn run_the_checks() -> Vec<String> {
 /// 准入与运行条件（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`「开头先判」Rust 那一行）：起 `preflight.py check`，
 /// 退出码不是 0 就原样退出；强制跑（`--force`）时交回摘要，`main` 把它作为头一行打到标准输出。
 fn preflight() -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source =
-        format!("{manifest_directory}/src/bin/e198_instance_table_pointer_birth_skip_premise.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src/bin/e198_instance_table_pointer_birth_skip_premise.rs");
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
@@ -4767,7 +4767,8 @@ fn print_result_lines(lines: &[String]) {
     for line in lines {
         writeln!(handle, "E7RESULT {line}").expect("标准输出写得进");
     }
-    writeln!(handle, "E7RESULT name=done result_lines={}", lines.len()).expect("标准输出写得进");
+    // emitted 含收尾行自己，与 replay.sh 闸 2 的逐段核口径一致。
+    writeln!(handle, "E7RESULT name=done emitted={}", lines.len() + 1).expect("标准输出写得进");
 }
 
 fn main() {

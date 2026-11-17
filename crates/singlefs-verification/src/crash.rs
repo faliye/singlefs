@@ -704,7 +704,7 @@ impl CrashPointReplayObserverCounts {
     }
 
     /// 按名字排好的全部计数。
-    pub fn iter(&self) -> impl Iterator<Item = (&str, u64)> {
+    pub fn counts_in_name_order(&self) -> impl Iterator<Item = (&str, u64)> {
         self.0.iter().map(|(name, count)| (name.as_str(), *count))
     }
 }
@@ -1865,6 +1865,159 @@ impl StateCount1280Bits {
                 .checked_add_u64(u64::from(*digit))?;
         }
         Some(value)
+    }
+
+    /// 左移 `bits` 位（乘 2^`bits`）；有一位移出 1280 位交 `None`（不截断）。
+    #[must_use]
+    pub fn checked_shift_left(&self, bits: usize) -> Option<Self> {
+        if self.is_zero() {
+            return Some(Self::ZERO);
+        }
+        if bits >= STATE_COUNT_LIMBS * 128 {
+            return None;
+        }
+        let limb_shift = bits / 128;
+        let bit_shift = bits % 128;
+        let mut limbs = [0u128; STATE_COUNT_LIMBS];
+        for (target, limb) in limbs.iter_mut().enumerate().skip(limb_shift) {
+            let source = target - limb_shift;
+            let mut value = self.limbs[source] << bit_shift;
+            if bit_shift > 0 && source > 0 {
+                value |= self.limbs[source - 1] >> (128 - bit_shift);
+            }
+            *limb = value;
+        }
+        let shifted = Self { limbs };
+        (shifted.shifted_right(bits) == *self).then_some(shifted)
+    }
+
+    /// 右移 `bits` 位（除以 2^`bits`、向下取整）；移过 1280 位是 0。
+    #[must_use]
+    pub fn shifted_right(&self, bits: usize) -> Self {
+        let limb_shift = bits / 128;
+        let bit_shift = bits % 128;
+        let mut limbs = [0u128; STATE_COUNT_LIMBS];
+        for (target, limb) in limbs.iter_mut().enumerate() {
+            let source = target + limb_shift;
+            if source >= STATE_COUNT_LIMBS {
+                break;
+            }
+            let mut value = self.limbs[source] >> bit_shift;
+            if bit_shift > 0 && source + 1 < STATE_COUNT_LIMBS {
+                value |= self.limbs[source + 1] << (128 - bit_shift);
+            }
+            *limb = value;
+        }
+        Self { limbs }
+    }
+
+    /// 读十进制数字串：只许 ASCII 数字、不空、不带前导 0（0 写 `0`，与 [`Self::decimal_text`] 一一对应）；
+    /// 带符号、空白、别的字符或越过 1280 位交 `None`。
+    #[must_use]
+    pub fn from_decimal_text(text: &str) -> Option<Self> {
+        let is_canonical_decimal = !text.is_empty()
+            && text.bytes().all(|byte| byte.is_ascii_digit())
+            && (text == "0" || !text.starts_with('0'));
+        if !is_canonical_decimal {
+            return None;
+        }
+        let mut value = Self::ZERO;
+        for digit in text.bytes() {
+            value = value
+                .checked_mul_u64(10)?
+                .checked_add_u64(u64::from(digit - b'0'))?;
+        }
+        Some(value)
+    }
+
+    /// 装得进双 128 位（[`Unsigned256Bits`]）就交回那个数。
+    #[must_use]
+    pub fn narrowed_to_256_bits(&self) -> Option<Unsigned256Bits> {
+        if self.limbs[2..].iter().any(|limb| *limb != 0) {
+            return None;
+        }
+        Some(Unsigned256Bits {
+            high: self.limbs[1],
+            low: self.limbs[0],
+        })
+    }
+}
+
+/// 双 128 位（两个 u128 拼成的 256 位）无符号整数：崩溃放量里登了分片段的流按份拆开之后的份号、份数与份内块序号
+/// （块区间变量与驱动行都写十进制数字串）。算术全部 checked（交 `None` 就是越过 256 位或减成负数），不饱和、不截断。
+/// 字段按高位在前排，派生出的大小次序就是数值的次序。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Unsigned256Bits {
+    high: u128,
+    low: u128,
+}
+
+impl Unsigned256Bits {
+    pub const ZERO: Self = Self { high: 0, low: 0 };
+
+    #[must_use]
+    pub fn from_u64(value: u64) -> Self {
+        Self {
+            high: 0,
+            low: u128::from(value),
+        }
+    }
+
+    /// 装得进 u64 就交回那个数。
+    #[must_use]
+    pub fn to_u64(&self) -> Option<u64> {
+        if self.high != 0 {
+            return None;
+        }
+        u64::try_from(self.low).ok()
+    }
+
+    #[must_use]
+    pub fn is_zero(&self) -> bool {
+        self.high == 0 && self.low == 0
+    }
+
+    /// 两数之和；越过 256 位交 `None`。
+    #[must_use]
+    pub fn checked_add(&self, other: &Self) -> Option<Self> {
+        let (low, carry) = self.low.overflowing_add(other.low);
+        let high = self
+            .high
+            .checked_add(other.high)?
+            .checked_add(u128::from(carry))?;
+        Some(Self { high, low })
+    }
+
+    /// 两数之差；`other` 比它大交 `None`。
+    #[must_use]
+    pub fn checked_sub(&self, other: &Self) -> Option<Self> {
+        let (low, borrow) = self.low.overflowing_sub(other.low);
+        let high = self
+            .high
+            .checked_sub(other.high)?
+            .checked_sub(u128::from(borrow))?;
+        Some(Self { high, low })
+    }
+
+    /// 放宽成 1280 位（[`StateCount1280Bits`]），值不变。
+    #[must_use]
+    pub fn widened(&self) -> StateCount1280Bits {
+        let mut limbs = [0u128; STATE_COUNT_LIMBS];
+        limbs[0] = self.low;
+        limbs[1] = self.high;
+        StateCount1280Bits { limbs }
+    }
+
+    /// 读十进制数字串（写法同 [`StateCount1280Bits::from_decimal_text`]）；越过 256 位交 `None`。
+    #[must_use]
+    pub fn from_decimal_text(text: &str) -> Option<Self> {
+        StateCount1280Bits::from_decimal_text(text)?.narrowed_to_256_bits()
+    }
+
+    /// 十进制，不带前导 0（0 写 `0`）。
+    #[must_use]
+    pub fn decimal_text(&self) -> String {
+        self.widened().decimal_text()
     }
 }
 
@@ -3210,7 +3363,7 @@ mod tests {
 
     /// 越过 1280 位交 `None`、不饱和：2^1279 再乘 2、1280 位全 1 再加 1、0 减 1 都拒。
     #[test]
-    fn a_state_count_past_1280_bits_is_refused_not_saturated() {
+    fn state_count_past_1280_bits_is_refused_not_saturated() {
         let mut highest_bit = StateCount1280Bits::from_u64(1);
         for _ in 0..1279 {
             highest_bit = highest_bit
@@ -3330,7 +3483,7 @@ mod tests {
 
     /// 全量展开的一段（三次两态写，2^3 − 1 = 7 个态）同上：从段内编号 3 起的一片与整段在同一个编号上拆出的态逐个相同。
     #[test]
-    fn a_slice_of_an_every_proper_subset_segment_decodes_the_same_states_as_the_whole_segment() {
+    fn slice_of_an_every_proper_subset_segment_decodes_the_same_states_as_the_whole_segment() {
         let writes = writes_of_kinds(&[
             StepKind::JournalRecord,
             StepKind::JournalRecord,
@@ -3372,7 +3525,7 @@ mod tests {
     /// 片越过段的域（片起点 + 片长大于整域的态数）：建计划时停下，不拆出域外的态。
     #[test]
     #[should_panic(expected = "越过了它按 every_proper_subset 展开的域")]
-    fn a_slice_past_the_domain_of_its_segment_is_refused_when_the_plan_is_built() {
+    fn slice_past_the_domain_of_its_segment_is_refused_when_the_plan_is_built() {
         let writes = writes_of_kinds(&[StepKind::JournalRecord, StepKind::JournalRecord]);
         let segments = vec![vec![0, 1]];
         let tearable = TearableInPlaceOverwrites::none(writes.len());
@@ -3441,7 +3594,7 @@ mod tests {
     /// 全量展开与甲二展开都是 1 + (3 − 1) 个状态；撕裂那一态的镜像那一槽前一半是 0、后一半还是旧字节，没持久那一态整槽是旧字节，
     /// 持久那一态整槽是 0。判据改回「discard 只取两态」时这一条红在「是原地覆写」那一句。
     #[test]
-    fn a_discard_longer_than_a_sector_over_old_contents_enumerates_a_torn_third_state() {
+    fn discard_longer_than_a_sector_over_old_contents_enumerates_a_torn_third_state() {
         let base = base_with_old_bytes_in_the_discarded_slot();
         let writes = vec![discard_write(
             DISCARDED_UNIT_SLOT,
@@ -3511,7 +3664,7 @@ mod tests {
     /// 不长于一个扇区的 discard、罩住的范围里原来全 0 的 discard 都只取两态（D13（验证路线） 已定项 4：不是原地覆写的写，撕裂并进「没持久」）：
     /// 两段各 2 − 1 个，再加全部持久那一个；写表后面不接撕裂镜像。
     #[test]
-    fn a_discard_of_one_sector_or_over_zeros_takes_only_two_states() {
+    fn discard_of_one_sector_or_over_zeros_takes_only_two_states() {
         let base = base_with_old_bytes_in_the_discarded_slot();
         let writes = vec![
             discard_write(DISCARDED_UNIT_SLOT, SECTOR_BYTES),
@@ -3675,7 +3828,7 @@ mod oracle_instance_tests {
     /// 文件从不消失的流上，「根不在表里只看比它旧的最新一版」与「任一更旧版有文件」判得逐项相同：多记录流与两实例同 txg 两张版本表，
     /// 实例 0–2、第 0–8 代的每个根，报没有文件、读出表里每一版的内容、读出表里没有的内容，盘上最新根槽没有或就是这个根，两种判法交回的违例类相同。
     #[test]
-    fn a_table_where_the_file_never_vanishes_judges_a_root_not_in_it_like_any_older_version_with_a_file(
+    fn table_where_the_file_never_vanishes_judges_a_root_not_in_it_like_any_older_version_with_a_file(
     ) {
         for versions in [
             the_multi_record_publish_stream_versions(),
@@ -3774,11 +3927,13 @@ mod oracle_instance_tests {
                 "第 {checkpoint_txg} 代起没有文件，读出 C 的内容是违例"
             );
         }
-        let root_of_c = (InstanceGeneration(1), CheckpointTxg(5));
+        let root_of_the_last_version_with_a_file = (InstanceGeneration(1), CheckpointTxg(5));
         assert_eq!(
             kind_judged_against_the_table(
-                &RecoveryOutcome::NoFile { root: root_of_c },
-                root_of_c,
+                &RecoveryOutcome::NoFile {
+                    root: root_of_the_last_version_with_a_file
+                },
+                root_of_the_last_version_with_a_file,
                 table
             ),
             Some(CrashPointReplayOracleViolationKind::NoFileWhereThisRootHasOne),
@@ -3789,7 +3944,7 @@ mod oracle_instance_tests {
     /// 根不在表里只看比它旧的最新那一项：文件没了之后又有一版带文件的（第 8 代），落在它后面的第 9 代报没有文件是违例、点名第 8 代；
     /// 落在没有文件那一版与第 8 代之间的第 7 代报没有文件不是违例。
     #[test]
-    fn a_root_not_in_the_table_is_judged_by_the_newest_older_entry_only() {
+    fn root_not_in_the_table_is_judged_by_the_newest_older_entry_only() {
         let with_a_file = vec![
             PublishedVersion {
                 instance: InstanceGeneration(1),
@@ -3838,7 +3993,7 @@ mod oracle_instance_tests {
     /// 同一个根既写成有文件、又写成没有文件：版本表自相矛盾，构造时停下。
     #[test]
     #[should_panic(expected = "既写成有文件、又写成文件从这一版起没有了")]
-    fn a_root_both_with_and_without_a_file_is_refused_when_the_table_is_built() {
+    fn root_both_with_and_without_a_file_is_refused_when_the_table_is_built() {
         let with_a_file = the_multi_record_publish_stream_versions();
         let without_a_file = vec![PublishedVersionWithoutAFile {
             instance: InstanceGeneration(1),
@@ -3884,7 +4039,7 @@ mod wall_clock_progress_line_tests {
 
     /// 一条消息都没来、假时钟每读一次走过一个间隔以上：每一次等完都要交一行按挂钟的进度，相邻两行之间假时钟走过的不超过两次读数。
     #[test]
-    fn a_wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message() {
+    fn wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message() {
         let (sender, receiver) = mpsc::channel::<u64>();
         let sender_still_open = RefCell::new(Some(sender));
         let clock_reads = Cell::new(0u32);

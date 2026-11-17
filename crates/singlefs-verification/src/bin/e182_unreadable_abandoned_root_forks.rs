@@ -244,7 +244,7 @@ impl OverwriteShape {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct HistorySpec {
+struct HistorySpecification {
     family: Family,
     geometry: DiskGeometry,
     first_file_units: u64,
@@ -252,14 +252,14 @@ struct HistorySpec {
     overwrite_shape: OverwriteShape,
 }
 
-fn history_name(spec: &HistorySpec) -> String {
+fn history_name(specification: &HistorySpecification) -> String {
     format!(
         "{}{}.{}.units-{}.overwrites-{}",
-        spec.overwrite_shape.label_prefix(),
-        spec.family.name(),
-        spec.geometry.name(),
-        spec.first_file_units,
-        spec.overwrites_before_the_hidden_publish
+        specification.overwrite_shape.label_prefix(),
+        specification.family.name(),
+        specification.geometry.name(),
+        specification.first_file_units,
+        specification.overwrites_before_the_hidden_publish
     )
 }
 
@@ -280,8 +280,8 @@ fn starting_points(geometry: DiskGeometry, shape: OverwriteShape) -> Vec<(u64, u
 
 /// 某个覆盖写形状的全部历史：每个起点三族（两档确认的带藏根 + 对照族）。
 /// 登记修订 12.4 的读法共 12 + 6 = 18 条；覆盖写保持 s 个单元的补臂共 (2 + 1) × 3 = 9 条。
-fn history_specs_of_the_shape(shape: OverwriteShape) -> Vec<HistorySpec> {
-    let mut specs = Vec::new();
+fn history_specifications_of_the_shape(shape: OverwriteShape) -> Vec<HistorySpecification> {
+    let mut specifications = Vec::new();
     for geometry in [DiskGeometry::Default, DiskGeometry::Narrow] {
         for (first_file_units, overwrites) in starting_points(geometry, shape) {
             for family in [
@@ -289,7 +289,7 @@ fn history_specs_of_the_shape(shape: OverwriteShape) -> Vec<HistorySpec> {
                 Family::HiddenRoot(Confirmation::Confirmed),
                 Family::NoHiddenRoot,
             ] {
-                specs.push(HistorySpec {
+                specifications.push(HistorySpecification {
                     family,
                     geometry,
                     first_file_units,
@@ -299,32 +299,32 @@ fn history_specs_of_the_shape(shape: OverwriteShape) -> Vec<HistorySpec> {
             }
         }
     }
-    specs
+    specifications
 }
 
 /// 第一段的全部历史（登记修订 12.4 的读法）：共 18 条。
-fn main_history_specs() -> Vec<HistorySpec> {
-    history_specs_of_the_shape(OverwriteShape::OneUnit)
+fn main_history_specifications() -> Vec<HistorySpecification> {
+    history_specifications_of_the_shape(OverwriteShape::OneUnit)
 }
 
 /// 补臂（修订 12.11）的全部历史：共 9 条，与第一段的 18 条并列、名字带前缀 `units-kept.`。
-fn units_kept_history_specs() -> Vec<HistorySpec> {
-    history_specs_of_the_shape(OverwriteShape::KeepingTheFirstFileUnits)
+fn units_kept_history_specifications() -> Vec<HistorySpecification> {
+    history_specifications_of_the_shape(OverwriteShape::KeepingTheFirstFileUnits)
 }
 
 /// 两个形状的全部历史（列项与样本模式按名字找历史用）。
-fn every_history_spec() -> Vec<HistorySpec> {
-    let mut specs = main_history_specs();
-    specs.extend(units_kept_history_specs());
-    specs
+fn every_history_specification() -> Vec<HistorySpecification> {
+    let mut specifications = main_history_specifications();
+    specifications.extend(units_kept_history_specifications());
+    specifications
 }
 
 /// 登记 5.1 阳性对照「路径真跑到」的补跑：G默认 的起点、两档确认、记录读得出、影子账关着。
-fn shadow_ledger_off_history_specs(shape: OverwriteShape) -> Vec<HistorySpec> {
-    let mut specs = Vec::new();
+fn shadow_ledger_off_history_specifications(shape: OverwriteShape) -> Vec<HistorySpecification> {
+    let mut specifications = Vec::new();
     for (first_file_units, overwrites) in starting_points(DiskGeometry::Default, shape) {
         for confirmation in [Confirmation::Unconfirmed, Confirmation::Confirmed] {
-            specs.push(HistorySpec {
+            specifications.push(HistorySpecification {
                 family: Family::HiddenRootRecordsReadableShadowLedgerOff(confirmation),
                 geometry: DiskGeometry::Default,
                 first_file_units,
@@ -333,7 +333,7 @@ fn shadow_ledger_off_history_specs(shape: OverwriteShape) -> Vec<HistorySpec> {
             });
         }
     }
-    specs
+    specifications
 }
 
 fn device_identities() -> [DeviceIdentity; 2] {
@@ -693,10 +693,10 @@ fn log_the_roots_of_a_stream(
 
 /// 实例 1 里每次覆盖写要写几个数据单元：登记修订 12.4 的读法是一个（`publish_overwrite` 的契约），
 /// 修订 12.11 的补臂是第一个文件的 s 个。
-fn replacing_write_unit_count(spec: &HistorySpec) -> u64 {
-    match spec.overwrite_shape {
+fn replacing_write_unit_count(specification: &HistorySpecification) -> u64 {
+    match specification.overwrite_shape {
         OverwriteShape::OneUnit => 1,
-        OverwriteShape::KeepingTheFirstFileUnits => spec.first_file_units,
+        OverwriteShape::KeepingTheFirstFileUnits => specification.first_file_units,
     }
 }
 
@@ -706,21 +706,21 @@ fn publish_the_replacing_write(
     writer: &mut PoolWriter<'_, RecordingBlockDevice<ReadsZeroDevice>>,
     allocator: &mut PoolAllocator,
     previous: &TransactionOutput,
-    spec: &HistorySpec,
+    specification: &HistorySpecification,
     content_tag: u64,
     write_time_seconds: u64,
     instance: InstanceGeneration,
 ) -> Result<TransactionOutput, PublishError> {
     let content = deterministic_content(
         content_tag,
-        usize::try_from(replacing_write_unit_count(spec)).expect("单元数装得进 usize")
+        usize::try_from(replacing_write_unit_count(specification)).expect("单元数装得进 usize")
             * DATA_UNIT_PAYLOAD_BYTES_LOCAL,
     );
     let file = FirstFile {
         content: &content,
         write_time_seconds,
     };
-    match spec.overwrite_shape {
+    match specification.overwrite_shape {
         OverwriteShape::OneUnit => publish_overwrite(writer, allocator, previous, file, instance),
         OverwriteShape::KeepingTheFirstFileUnits => {
             publish_sequential_write(writer, allocator, previous, file, instance)
@@ -737,9 +737,9 @@ struct FirstInstance {
     roots: BTreeMap<RootKey, RootLog>,
 }
 
-fn run_the_first_instance(spec: &HistorySpec) -> Result<FirstInstance, String> {
+fn run_the_first_instance(specification: &HistorySpecification) -> Result<FirstInstance, String> {
     let parameters = pool_parameters();
-    let device_bytes = spec.geometry.device_bytes();
+    let device_bytes = specification.geometry.device_bytes();
     let stream = SharedStream::retaining_contents();
     let state = Rc::new(RefCell::new(ReadsZeroState::default()));
     let mut devices = recording_devices(&empty_pool(device_bytes), &stream, &state);
@@ -771,10 +771,10 @@ fn run_the_first_instance(spec: &HistorySpec) -> Result<FirstInstance, String> {
         )
         .map_err(|error| format!("第一个文件：{error:?}"))?
     };
-    if spec.first_file_units > 1 {
+    if specification.first_file_units > 1 {
         let content = deterministic_content(
             1,
-            usize::try_from(spec.first_file_units).expect("单元数装得进 usize")
+            usize::try_from(specification.first_file_units).expect("单元数装得进 usize")
                 * DATA_UNIT_PAYLOAD_BYTES_LOCAL,
         );
         let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
@@ -788,17 +788,22 @@ fn run_the_first_instance(spec: &HistorySpec) -> Result<FirstInstance, String> {
             },
             instance,
         )
-        .map_err(|error| format!("顺序写 {} 个单元：{error:?}", spec.first_file_units))?;
+        .map_err(|error| {
+            format!(
+                "顺序写 {} 个单元：{error:?}",
+                specification.first_file_units
+            )
+        })?;
     }
     let mut last_publish_start = stream.operation_count();
-    for overwrite_index in 0..spec.overwrites_before_the_hidden_publish {
+    for overwrite_index in 0..specification.overwrites_before_the_hidden_publish {
         last_publish_start = stream.operation_count();
         let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
         previous = publish_the_replacing_write(
             &mut writer,
             &mut allocator,
             &previous,
-            spec,
+            specification,
             100 + overwrite_index,
             FIXED_WRITE_TIME_SECONDS + 120 + overwrite_index,
             instance,
@@ -895,7 +900,7 @@ struct SecondInstance {
 }
 
 fn run_the_second_instance(
-    spec: &HistorySpec,
+    specification: &HistorySpecification,
     base: &MemoryPool,
     ranges: Vec<ReadsZeroRange>,
 ) -> SecondInstance {
@@ -905,7 +910,7 @@ fn run_the_second_instance(
     let mut devices = recording_devices(base, &stream, &state);
     let mut report = MountReport::default();
     let shadow_ledger_is_off = matches!(
-        spec.family,
+        specification.family,
         Family::HiddenRootRecordsReadableShadowLedgerOff(_)
     );
     let mount_result = if shadow_ledger_is_off {
@@ -1027,7 +1032,7 @@ fn keep_going_after_the_mount(
 // ============================================================================
 
 struct RecordedHistory {
-    spec: HistorySpec,
+    specification: HistorySpecification,
     pool_geometry: PoolGeometry,
     /// 实例 2 起头的镜像（实例 1 的盘，已按确认档截好）。
     base: MemoryPool,
@@ -1062,7 +1067,7 @@ fn independent_geometry(pool: &MemoryPool) -> Result<PoolGeometry, String> {
 
 /// 实例 2 起头的镜像（实例 1 的盘，按确认档截好）与被藏根读回全零的字节区间。
 fn base_and_fault_ranges(
-    spec: &HistorySpec,
+    specification: &HistorySpecification,
     first: &FirstInstance,
 ) -> Result<(MemoryPool, Vec<ReadsZeroRange>), String> {
     let fixed = fixed_geometry_of_the_pool();
@@ -1075,22 +1080,23 @@ fn base_and_fault_ranges(
                     == Some(first.last_root)
         })
         .ok_or_else(|| "被藏根那次发布的录制流里没有它的根槽写".to_string())?;
-    let applied_final = match spec.family.confirmation() {
+    let applied_final = match specification.family.confirmation() {
         Confirmation::Unconfirmed => &final_operations[..=root_write_position],
         Confirmation::Confirmed => final_operations,
     };
     let mut base = first.pool_before_the_last_publish.clone();
     base.apply(applied_final);
-    let fault_ranges = fault_ranges_of_the_last_publish(spec.family, applied_final, &fixed);
+    let fault_ranges =
+        fault_ranges_of_the_last_publish(specification.family, applied_final, &fixed);
     Ok((base, fault_ranges))
 }
 
 /// 判法入口之一（函数单元闭包指纹的入口，见文件头）：建一条历史。
-fn record_the_history(spec: &HistorySpec) -> Result<RecordedHistory, String> {
-    let first = run_the_first_instance(spec)?;
+fn record_the_history(specification: &HistorySpecification) -> Result<RecordedHistory, String> {
+    let first = run_the_first_instance(specification)?;
     let fixed = fixed_geometry_of_the_pool();
-    let (base, fault_ranges) = base_and_fault_ranges(spec, &first)?;
-    let second = run_the_second_instance(spec, &base, fault_ranges.clone());
+    let (base, fault_ranges) = base_and_fault_ranges(specification, &first)?;
+    let second = run_the_second_instance(specification, &base, fault_ranges.clone());
     let (writes, segments, _stream_indexes) =
         writes_and_segments_with_stream_indexes(&second.operations, &fixed);
     let mut roots = first.roots;
@@ -1104,13 +1110,16 @@ fn record_the_history(spec: &HistorySpec) -> Result<RecordedHistory, String> {
     }
     let pool_geometry = independent_geometry(&base)?;
     Ok(RecordedHistory {
-        spec: *spec,
+        specification: *specification,
         pool_geometry,
         base,
         writes,
         segments,
         roots,
-        hidden_root: spec.family.hides_a_root().then_some(first.last_root),
+        hidden_root: specification
+            .family
+            .hides_a_root()
+            .then_some(first.last_root),
         fault_ranges,
         mount: second.mount,
         row_publish_root_write,
@@ -1888,7 +1897,7 @@ fn count_the_hidden_root_classification(
     let class = class_of_the_hidden_root_in_the_state(
         image,
         hidden_log,
-        history.spec.family.confirmation(),
+        history.specification.family.confirmation(),
     );
     counters.add("after_the_row_publish.states", 1);
     counters.add(&format!("after_the_row_publish.{class}"), 1);
@@ -1948,6 +1957,20 @@ const SHARD_SHARE_ENVIRONMENT_VARIABLE: &str = "E182_SHARD_SHARE";
 const REPOSITORY_ROOT_ENVIRONMENT_VARIABLE: &str = "E182_REPOSITORY_ROOT";
 const BUILD_PROFILE_ENVIRONMENT_VARIABLE: &str = "E182_BUILD_PROFILE";
 
+/// 闭包的根：组名（只当索引、不进键）、编译目标（`TargetSelector::parse` 认的写法）与这个目标里的入口 fn（头一个定 crate）。
+struct ClosureEntries {
+    group_name: &'static str,
+    target: &'static str,
+    entry_functions: &'static [&'static str],
+}
+
+/// 装置跑时取指纹的那一组：本文件两个判法入口。
+const JUDGING_ENTRIES: ClosureEntries = ClosureEntries {
+    group_name: "e182_single_device_judgement",
+    target: THIS_BINARY_TARGET,
+    entry_functions: &JUDGING_ENTRY_FUNCTIONS,
+};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ClosureFingerprint {
     key_hex: String,
@@ -1986,23 +2009,29 @@ fn worker_threads() -> usize {
 
 /// 本文件两个判法入口的函数单元闭包指纹（去注释）与这一趟的工具链行。闭包里有拒算时交 `Err`（调用方这一趟不复用、不入库）。
 fn closure_fingerprint() -> Result<ClosureFingerprint, String> {
-    closure_fingerprint_of_the_tree(&repository_root())
+    closure_fingerprint_of_the_tree(&repository_root(), &JUDGING_ENTRIES)
 }
 
-/// 在 `root` 那棵树上算闭包指纹，依赖包的特性照这一次编译（编进库的判器键表里 `build-feature` 那几行：验证包构建脚本读依赖包经
+/// 在 `root` 那棵树上算 `entries` 的闭包指纹，依赖包的特性照这一次编译（编进库的判器键表里 `build-feature` 那几行：验证包构建脚本读依赖包经
 /// `links` 交出的那一份）。编验证包的测试时，验证包的 dev 依赖替核心层并上 `lookup-work-counters`，这个二进制链进来的
 /// 核心层编的是带计数的那一份；只照本包特性算，键就是没并上时那一把，与编出来的代码对不上（D13（验证路线） 已定项 17）。
-fn closure_fingerprint_of_the_tree(root: &std::path::Path) -> Result<ClosureFingerprint, String> {
+fn closure_fingerprint_of_the_tree(
+    root: &std::path::Path,
+    entries: &ClosureEntries,
+) -> Result<ClosureFingerprint, String> {
     closure_fingerprint_with_the_features_of_the_build(
         root,
+        entries,
         &singlefs_verification::crash_identity::compiled_judging_units_keys()
             .features_enabled_by_the_build,
     )
 }
 
-/// 在 `root` 那棵树上、照给定的依赖包特性算闭包指纹（[`closure_fingerprint_of_the_tree`] 交编进来的那一份）。
+/// 在 `root` 那棵树上、照给定的依赖包特性算 `entries` 的闭包指纹（[`closure_fingerprint_of_the_tree`] 交编进来的那一份）。
+/// 树要有根 `Cargo.toml`（读 profile）与 `Cargo.lock`。
 fn closure_fingerprint_with_the_features_of_the_build(
     root: &std::path::Path,
+    entries: &ClosureEntries,
     features_enabled_by_the_build: &singlefs_unit_graph::FeaturesEnabledByTheBuild,
 ) -> Result<ClosureFingerprint, String> {
     use singlefs_unit_graph::build_toolchain::{
@@ -2045,10 +2074,11 @@ fn closure_fingerprint_with_the_features_of_the_build(
     let locked_packages =
         parse_lock_file(&lock_text).map_err(|error| format!("Cargo.lock 读不了：{error}"))?;
     let request = EntryGroupRequest {
-        group_name: "e182_single_device_judgement".to_string(),
-        target: TargetSelector::parse(THIS_BINARY_TARGET)
+        group_name: entries.group_name.to_string(),
+        target: TargetSelector::parse(entries.target)
             .map_err(|text| format!("编译目标写法认不得：{text}"))?,
-        entry_paths: JUDGING_ENTRY_FUNCTIONS
+        entry_paths: entries
+            .entry_functions
             .iter()
             .map(|entry| (*entry).to_string())
             .collect(),
@@ -2174,7 +2204,7 @@ fn plan_the_shards(histories: &[RecordedHistory]) -> Vec<ShardJob<'_>> {
         for shard_index in 0..=history.segments.len() {
             jobs.push(ShardJob {
                 history,
-                history_name: history_name(&history.spec),
+                history_name: history_name(&history.specification),
                 shard_index,
                 expansion: expansion_of_shard(history, shard_index),
                 global_number: jobs.len(),
@@ -2528,7 +2558,7 @@ fn anchor_root_slot_writes_land_by_the_ring_rule(history: &RecordedHistory) -> A
     }
     AnchorReading {
         anchor: "root_slot_writes_land_by_the_ring_rule".to_string(),
-        subject: history_name(&history.spec),
+        subject: history_name(&history.specification),
         applicable: checked > 0,
         holds: violations.is_empty(),
         detail: format!(
@@ -2542,7 +2572,7 @@ fn anchor_root_slot_writes_land_by_the_ring_rule(history: &RecordedHistory) -> A
 fn anchor_warm_up_publishes_are_at_most_three(history: &RecordedHistory) -> AnchorReading {
     AnchorReading {
         anchor: "warm_up_publishes_are_at_most_three".to_string(),
-        subject: history_name(&history.spec),
+        subject: history_name(&history.specification),
         applicable: history.mount.refused.is_none(),
         holds: history.mount.warm_up_publishes <= WARM_UP_PUBLISHES_AT_MOST_LOCAL,
         detail: format!("warm_up_publishes={}", history.mount.warm_up_publishes),
@@ -2552,7 +2582,7 @@ fn anchor_warm_up_publishes_are_at_most_three(history: &RecordedHistory) -> Anch
 /// A3 的期望：实例 2 第一次发布的 txg = max(装置日志里根环中读得出的根的 txg, 读得出的记录的 txg) + 1，读回全零的不算。
 fn first_publish_txg_expected_by_the_clause(history: &RecordedHistory) -> Option<u64> {
     let hidden = history.hidden_root;
-    let records_are_hidden_too = matches!(history.spec.family, Family::HiddenRoot(_));
+    let records_are_hidden_too = matches!(history.specification.family, Family::HiddenRoot(_));
     let newest_root_txg = checker_image::valid_roots(&history.base, &history.pool_geometry)
         .into_iter()
         .map(|(_, _, root_view)| (root_view.instance, root_view.checkpoint_txg))
@@ -2590,7 +2620,7 @@ fn anchor_first_publish_txg_follows_the_newest_readable(
     let actual = history.mount.row_publish_root.map(|(_, txg)| txg);
     AnchorReading {
         anchor: "first_publish_txg_follows_the_newest_readable".to_string(),
-        subject: history_name(&history.spec),
+        subject: history_name(&history.specification),
         applicable: history.mount.refused.is_none(),
         holds: expected.is_some() && expected == actual,
         detail: format!("expected={expected:?} actual={actual:?}"),
@@ -2600,27 +2630,27 @@ fn anchor_first_publish_txg_follows_the_newest_readable(
 /// A4：已确认档里只把 R_h 的根槽与记录读回全零、不罩较新的系统配置槽时，实例 2 的可写挂载在取号之前被拒、两块盘逐字节不变。
 fn anchor_confirmed_without_the_newer_configuration_is_refused_before_any_write(
 ) -> Result<AnchorReading, String> {
-    let spec = HistorySpec {
+    let specification = HistorySpecification {
         family: Family::HiddenRoot(Confirmation::Confirmed),
         geometry: DiskGeometry::Default,
         first_file_units: 1,
         overwrites_before_the_hidden_publish: 5,
         overwrite_shape: OverwriteShape::OneUnit,
     };
-    let first = run_the_first_instance(&spec)?;
-    let (base, fault_ranges) = base_and_fault_ranges(&spec, &first)?;
+    let first = run_the_first_instance(&specification)?;
+    let (base, fault_ranges) = base_and_fault_ranges(&specification, &first)?;
     let without_the_newer_configuration: Vec<ReadsZeroRange> = fault_ranges
         .into_iter()
         .filter(|range| range.label != "newer_system_configuration_slot")
         .collect();
-    let second = run_the_second_instance(&spec, &base, without_the_newer_configuration);
+    let second = run_the_second_instance(&specification, &base, without_the_newer_configuration);
     let wrote_nothing = second
         .operations
         .iter()
         .all(|operation| matches!(operation.operation.kind, RecordedOperationKind::Barrier));
     Ok(AnchorReading {
         anchor: "confirmed_without_the_newer_configuration_is_refused_before_any_write".to_string(),
-        subject: history_name(&spec),
+        subject: history_name(&specification),
         applicable: true,
         holds: second.mount.refused.is_some() && second.devices_equal_the_base && wrote_nothing,
         detail: format!(
@@ -2794,7 +2824,7 @@ fn three_states_for_the_controls(history: &RecordedHistory) -> Vec<Vec<bool>> {
 }
 
 /// 这个状态里有没有一次持久了的写，与这个单元在它那块盘上的字节区间相交（相交的单元被换了字节也会被这次写盖回去，换字节就不起作用）。
-fn a_persisted_write_overlaps_the_unit(
+fn persisted_write_overlaps_the_unit(
     history: &RecordedHistory,
     persisted: &[bool],
     unit: &UnitLog,
@@ -2833,7 +2863,7 @@ fn detection_control(history: &RecordedHistory) -> (u64, u64, u64) {
             let untouched_unit = log.units.iter().find(|unit| {
                 unit.device == device_number
                     && !unit_differs_in_the_image(&image, unit)
-                    && !a_persisted_write_overlaps_the_unit(history, &persisted, unit)
+                    && !persisted_write_overlaps_the_unit(history, &persisted, unit)
             });
             let Some(unit) = untouched_unit else {
                 without_a_unit += 1;
@@ -2860,7 +2890,7 @@ fn emit_detection_control(history: &RecordedHistory) -> bool {
     let holds = trials > 0 && trials == detected;
     emit_result(&format!(
         "name=positive_control control=detect_covered history={} trials={trials} detected={detected} no_unit_to_change={without_a_unit} status={}",
-        history_name(&history.spec),
+        history_name(&history.specification),
         if holds { "holds" } else { "violated" }
     ));
     holds
@@ -2905,6 +2935,22 @@ fn the_confirmed_none_covered_control_status(
     }
 }
 
+/// 已确认档的可写挂载被拒时 `mount.refused` 里带的比法成员（C971 乙入判不出之后：读回全零的系统配置槽自证不过，当读错计，
+/// 没有一块盘两槽都自证过，判不出，拒可写；这一形的对照记作废）。
+const THE_COMPARISON_THAT_VOIDS_THE_CONFIRMED_NONE_COVERED_CONTROL: &str =
+    "SomeSlotFailedSelfVerificationAndNoDeviceSelfVerifiedBothSlots";
+
+/// 对照记「作废」：这条历史的挂载被拒、拒因里是那个比法成员，而且对照读数全零（没有类 a 状态可挑，因为拒了可写就没有根槽写、`row_publish_root_write` 是 `None`）。
+/// 作废不是 not_made（那是装置没造出，算失败），也不是 holds（没试成，不能算过）；汇总里单独记数，不算检测对照失败。
+fn the_confirmed_none_covered_control_is_voided(
+    refused: Option<&str>,
+    reading: &ConfirmedNoneCoveredControlReading,
+) -> bool {
+    refused.is_some_and(|text| {
+        text.contains(THE_COMPARISON_THAT_VOIDS_THE_CONFIRMED_NONE_COVERED_CONTROL)
+    }) && *reading == ConfirmedNoneCoveredControlReading::default()
+}
+
 /// 被藏根在这个状态里的类，镜像的基底单给（对照要换基底上的字节）。
 fn the_hidden_root_class_with_the_base(
     history: &RecordedHistory,
@@ -2917,7 +2963,11 @@ fn the_hidden_root_class_with_the_base(
         writes: &history.writes,
         persisted: persisted.to_vec(),
     };
-    class_of_the_hidden_root_in_the_state(&image, hidden_log, history.spec.family.confirmation())
+    class_of_the_hidden_root_in_the_state(
+        &image,
+        hidden_log,
+        history.specification.family.confirmation(),
+    )
 }
 
 /// 按段的次序找第一个类 a 状态（实例 2 写行那次发布持久之后、被藏根的单元两块盘上都没被盖）。
@@ -3010,7 +3060,7 @@ fn class_confirmed_none_covered_to_class_some_unit_covered_control(
         let untouched_unit = hidden_log.units.iter().find(|unit| {
             unit.device == CONFIRMED_NONE_COVERED_CONTROL_DEVICE_NUMBER
                 && !unit_differs_in_the_image(&image, unit)
-                && !a_persisted_write_overlaps_the_unit(history, &persisted, unit)
+                && !persisted_write_overlaps_the_unit(history, &persisted, unit)
         });
         let Some(unit) = untouched_unit else {
             reading.no_unit_to_change += 1;
@@ -3043,19 +3093,28 @@ struct ConfirmedNoneCoveredControlTotal {
     histories: u64,
     histories_not_made: u64,
     histories_violated: u64,
+    /// 对照作废的历史数（已确认档的可写挂载被拒，没有类 a 状态）。
+    histories_voided: u64,
     trials: u64,
     changed_to_class_some_unit_covered: u64,
 }
 
 impl ConfirmedNoneCoveredControlTotal {
-    /// 汇总行的判定与判决行里算进检测对照失败数的条数：有一条历史 violated 或停机算 1 条；一条都没试成（总试数 0）也算 1 条，不当通过。
+    /// 汇总行的判定与判决行里算进检测对照失败数的条数：有一条历史 violated 或停机算 1 条；一条都没试成（总试数 0）也算 1 条，不当通过；
+    /// 但每条历史都是作废（`histories_voided == histories`）时不算：作废不是失败，也不是通过。
     fn failures(&self) -> u64 {
-        self.histories_violated + u64::from(self.histories > 0 && self.trials == 0)
+        self.histories_violated
+            + u64::from(
+                self.histories > 0 && self.trials == 0 && self.histories_voided < self.histories,
+            )
     }
 
     fn status(&self) -> &'static str {
         if self.histories_violated > 0 {
             "violated"
+        } else if self.trials == 0 && self.histories > 0 && self.histories_voided == self.histories
+        {
+            "voided"
         } else if self.trials == 0 {
             "not_made"
         } else {
@@ -3072,21 +3131,29 @@ fn emit_the_confirmed_none_covered_control(
     total.histories += 1;
     match class_confirmed_none_covered_to_class_some_unit_covered_control(history) {
         Ok(reading) => {
-            let status = the_confirmed_none_covered_control_status(
-                reading.trials,
-                reading.class_confirmed_none_covered_before_the_change,
-                reading.changed_to_class_some_unit_covered,
-            );
+            let status = if the_confirmed_none_covered_control_is_voided(
+                history.mount.refused.as_deref(),
+                &reading,
+            ) {
+                "voided"
+            } else {
+                the_confirmed_none_covered_control_status(
+                    reading.trials,
+                    reading.class_confirmed_none_covered_before_the_change,
+                    reading.changed_to_class_some_unit_covered,
+                )
+            };
             total.trials += reading.trials;
             total.changed_to_class_some_unit_covered += reading.changed_to_class_some_unit_covered;
             match status {
+                "voided" => total.histories_voided += 1,
                 "not_made" => total.histories_not_made += 1,
                 "violated" => total.histories_violated += 1,
                 _ => {}
             }
             emit_result(&format!(
                 "name=positive_control control=class_confirmed_none_covered_to_class_some_unit_covered history={} class_confirmed_none_covered_states_chosen={} trials={} class_confirmed_none_covered_before_the_change={} changed_to_class_some_unit_covered={} no_unit_to_change={} status={status}",
-                history_name(&history.spec),
+                history_name(&history.specification),
                 reading.class_confirmed_none_covered_states_chosen,
                 reading.trials,
                 reading.class_confirmed_none_covered_before_the_change,
@@ -3098,7 +3165,7 @@ fn emit_the_confirmed_none_covered_control(
             total.histories_violated += 1;
             emit_result(&format!(
                 "name=positive_control control=class_confirmed_none_covered_to_class_some_unit_covered history={} status=stopped detail={}",
-                history_name(&history.spec),
+                history_name(&history.specification),
                 token_of(&reason)
             ));
         }
@@ -3107,10 +3174,11 @@ fn emit_the_confirmed_none_covered_control(
 
 fn emit_the_confirmed_none_covered_control_total(total: &ConfirmedNoneCoveredControlTotal) {
     emit_result(&format!(
-        "name=positive_control control=class_confirmed_none_covered_to_class_some_unit_covered_total histories={} histories_not_made={} histories_violated={} trials={} changed_to_class_some_unit_covered={} status={}",
+        "name=positive_control control=class_confirmed_none_covered_to_class_some_unit_covered_total histories={} histories_not_made={} histories_violated={} histories_voided={} trials={} changed_to_class_some_unit_covered={} status={}",
         total.histories,
         total.histories_not_made,
         total.histories_violated,
+        total.histories_voided,
         total.trials,
         total.changed_to_class_some_unit_covered,
         total.status()
@@ -3144,7 +3212,7 @@ fn kept_disk_holds_a_record_of_a_newer_instance(
 /// 甲一、甲二的判法本身（登记 5.1 第三条）：在这条历史里按日志挑一个「新实例的记录与系统配置都已落到剩下那块盘、被藏根仍在环里」的状态，
 /// 甲一、甲二都必须避开被藏根。没挑到状态记「没造出」（量作废，不当通过）。交回读数。
 fn arm_witness_control(history: &RecordedHistory) -> AnchorReading {
-    let subject = history_name(&history.spec);
+    let subject = history_name(&history.specification);
     let Some(hidden_root) = history.hidden_root else {
         return AnchorReading {
             anchor: "arm_witness_control".to_string(),
@@ -3431,7 +3499,7 @@ fn emit_history_summary(history: &RecordedHistory) {
             });
     emit_result(&format!(
         "name=history history={} hidden_root={} fault_ranges={} segments={} writes={} states_closed_form={total_states} expansions={} mount_refused={} mount_stopped_after={} instance={} first_publish_root={} warm_up_publishes={} shadow_ledger_branch={} isolated_slots_per_device={} abandoned_roots_unreadable={} core_ring_slots_holding_an_abandoned_root={} reads_intercepted={} ranges_written_over={} consistency_problems={}",
-        history_name(&history.spec),
+        history_name(&history.specification),
         history.hidden_root.map_or("none".to_string(), |(instance, txg)| format!("{instance}:{txg}")),
         token_of(&format!("{ranges_by_label:?}")),
         history.segments.len(),
@@ -3457,19 +3525,21 @@ fn emit_history_summary(history: &RecordedHistory) {
 // ============================================================================
 
 /// 并行建历史（每条历史自己的实例 1、实例 2 与全知日志）；按 `specs` 的次序交回。
-fn build_the_histories(specs: &[HistorySpec]) -> Result<Vec<RecordedHistory>, String> {
+fn build_the_histories(
+    specifications: &[HistorySpecification],
+) -> Result<Vec<RecordedHistory>, String> {
     use std::sync::Mutex;
-    let next_spec = std::sync::atomic::AtomicUsize::new(0);
+    let next_specification = std::sync::atomic::AtomicUsize::new(0);
     let slots: Mutex<Vec<Option<Result<RecordedHistory, String>>>> =
-        Mutex::new((0..specs.len()).map(|_| None).collect());
+        Mutex::new((0..specifications.len()).map(|_| None).collect());
     std::thread::scope(|scope| {
-        for _ in 0..worker_threads().min(specs.len().max(1)) {
+        for _ in 0..worker_threads().min(specifications.len().max(1)) {
             scope.spawn(|| loop {
-                let index = next_spec.fetch_add(1, Ordering::SeqCst);
-                let Some(spec) = specs.get(index) else {
+                let index = next_specification.fetch_add(1, Ordering::SeqCst);
+                let Some(specification) = specifications.get(index) else {
                     break;
                 };
-                let built = record_the_history(spec);
+                let built = record_the_history(specification);
                 slots.lock().expect("历史表的锁没被毒化")[index] = Some(built);
             });
         }
@@ -3478,11 +3548,11 @@ fn build_the_histories(specs: &[HistorySpec]) -> Result<Vec<RecordedHistory>, St
         .into_inner()
         .expect("历史表的锁没被毒化")
         .into_iter()
-        .zip(specs)
-        .map(|(built, spec)| {
+        .zip(specifications)
+        .map(|(built, specification)| {
             built
                 .expect("每个下标都有线程建过")
-                .map_err(|reason| format!("{}：{reason}", history_name(spec)))
+                .map_err(|reason| format!("{}：{reason}", history_name(specification)))
         })
         .collect()
 }
@@ -3516,28 +3586,31 @@ fn parse_the_command_line(
     Ok(command_line)
 }
 
-fn selected_specs(items: &[String], shape: OverwriteShape) -> Result<Vec<HistorySpec>, String> {
-    let every_spec = history_specs_of_the_shape(shape);
+fn selected_specifications(
+    items: &[String],
+    shape: OverwriteShape,
+) -> Result<Vec<HistorySpecification>, String> {
+    let every_specification = history_specifications_of_the_shape(shape);
     if items.is_empty() {
-        return Ok(every_spec);
+        return Ok(every_specification);
     }
     let mut selected = Vec::new();
     for item in items {
-        let spec = every_spec
+        let specification = every_specification
             .iter()
-            .find(|spec| &history_name(spec) == item)
+            .find(|specification| &history_name(specification) == item)
             .ok_or_else(|| {
                 format!(
                     "没有历史叫 {item}；可点名的：{}",
-                    every_spec
+                    every_specification
                         .iter()
                         .map(history_name)
                         .collect::<Vec<_>>()
                         .join("、")
                 )
             })?;
-        if !selected.contains(spec) {
-            selected.push(*spec);
+        if !selected.contains(specification) {
+            selected.push(*specification);
         }
     }
     Ok(selected)
@@ -3557,7 +3630,7 @@ fn merge_the_report(
 ) -> JudgedHistories {
     let names: Vec<String> = histories
         .iter()
-        .map(|history| history_name(&history.spec))
+        .map(|history| history_name(&history.specification))
         .collect();
     let mut counters_by_history = vec![Counters::default(); histories.len()];
     let (mut judged, mut reused) = (0u64, 0u64);
@@ -3585,11 +3658,11 @@ fn merge_the_report(
 
 /// 建好 `specs` 的历史、按片判（或取库）、合并。`Err` 里是该停下交回的原因。
 fn judge_the_histories(
-    specs: &[HistorySpec],
+    specifications: &[HistorySpecification],
     command_line: &CommandLine,
     sentinel_check: bool,
 ) -> Result<(Vec<RecordedHistory>, JudgedHistories), String> {
-    let histories = build_the_histories(specs)?;
+    let histories = build_the_histories(specifications)?;
     let fingerprint = match closure_fingerprint() {
         Ok(fingerprint) => Some(fingerprint),
         Err(reason) => {
@@ -3654,9 +3727,9 @@ fn aggregate_by_family_and_geometry(
         aggregates
             .entry(format!(
                 "{}{}.{}",
-                history.spec.overwrite_shape.label_prefix(),
-                history.spec.family.name(),
-                history.spec.geometry.name()
+                history.specification.overwrite_shape.label_prefix(),
+                history.specification.family.name(),
+                history.specification.geometry.name()
             ))
             .or_default()
             .merge(counters);
@@ -3676,13 +3749,13 @@ fn emit_the_shadow_ledger_off_control(
     command_line: &CommandLine,
     shape: OverwriteShape,
 ) -> Result<u64, String> {
-    let specs = shadow_ledger_off_history_specs(shape);
-    let (histories, judged) = judge_the_histories(&specs, command_line, false)?;
+    let specifications = shadow_ledger_off_history_specifications(shape);
+    let (histories, judged) = judge_the_histories(&specifications, command_line, false)?;
     let mut covered_total = 0u64;
     for (history, counters) in histories.iter().zip(&judged.counters_by_history) {
         emit_history_summary(history);
-        emit_counts(&history_name(&history.spec), counters);
-        emit_questions("history", &history_name(&history.spec), counters);
+        emit_counts(&history_name(&history.specification), counters);
+        emit_questions("history", &history_name(&history.specification), counters);
         covered_total += sum_over_kept_disks(counters, &|device| {
             format!("today.kept{device}.pick.hidden_root_covered")
         });
@@ -3737,7 +3810,7 @@ fn emit_the_product(
         detection_failures += u64::from(!emit_detection_control(history));
         // 登记修订 12.12：B4 的类 a 到类 b 对照，只在已确认档带藏根的历史上跑（类 a 只出在这一族）。
         if matches!(
-            history.spec.family,
+            history.specification.family,
             Family::HiddenRoot(Confirmation::Confirmed)
         ) {
             emit_the_confirmed_none_covered_control(history, &mut confirmed_none_covered_control);
@@ -3751,7 +3824,7 @@ fn emit_the_product(
     let witness_name = arm_witness_history_name(shape);
     let witness = histories
         .iter()
-        .find(|history| history_name(&history.spec) == witness_name)
+        .find(|history| history_name(&history.specification) == witness_name)
         .map(arm_witness_control);
     let witness_status = match &witness {
         None => "not_run",
@@ -3763,8 +3836,8 @@ fn emit_the_product(
         emit_anchor_reading(reading);
     }
     for (history, counters) in histories.iter().zip(&judged.counters_by_history) {
-        emit_counts(&history_name(&history.spec), counters);
-        emit_questions("history", &history_name(&history.spec), counters);
+        emit_counts(&history_name(&history.specification), counters);
+        emit_questions("history", &history_name(&history.specification), counters);
     }
     let aggregates = aggregate_by_family_and_geometry(histories, &judged.counters_by_history);
     for (label, counters) in &aggregates {
@@ -3839,14 +3912,14 @@ fn run_single_device(
             return 2;
         }
     };
-    let specs = match selected_specs(&command_line.items, shape) {
-        Ok(specs) => specs,
+    let specifications = match selected_specifications(&command_line.items, shape) {
+        Ok(specifications) => specifications,
         Err(reason) => {
             eprintln!("用法错：{reason}");
             return 2;
         }
     };
-    let (histories, judged) = match judge_the_histories(&specs, &command_line, true) {
+    let (histories, judged) = match judge_the_histories(&specifications, &command_line, true) {
         Ok(judged_histories) => judged_histories,
         Err(reason) => {
             eprintln!("STOP: {reason}");
@@ -3892,8 +3965,8 @@ fn run_anchors_mode() -> i32 {
 }
 
 fn run_list_items() -> i32 {
-    for spec in every_history_spec() {
-        println!("{}", history_name(&spec));
+    for specification in every_history_specification() {
+        println!("{}", history_name(&specification));
     }
     0
 }
@@ -3904,9 +3977,9 @@ fn run_measure(arguments: &[String]) -> i32 {
     let measured_name = arguments
         .first()
         .map_or(ARM_WITNESS_HISTORY_NAME, String::as_str);
-    let specs = main_history_specs();
+    let specifications = main_history_specifications();
     let started = std::time::Instant::now();
-    let histories = match build_the_histories(&specs) {
+    let histories = match build_the_histories(&specifications) {
         Ok(histories) => histories,
         Err(reason) => {
             eprintln!("建历史失败：{reason}");
@@ -3930,7 +4003,7 @@ fn run_measure(arguments: &[String]) -> i32 {
         total_states += states;
         emit_result(&format!(
             "name=measure_history history={} segments={} writes={} states_closed_form={states} mount_refused={}",
-            history_name(&history.spec),
+            history_name(&history.specification),
             history.segments.len(),
             history.writes.len(),
             history.mount.refused.is_some()
@@ -3938,7 +4011,7 @@ fn run_measure(arguments: &[String]) -> i32 {
     }
     let Some(measured) = histories
         .iter()
-        .find(|history| history_name(&history.spec) == measured_name)
+        .find(|history| history_name(&history.specification) == measured_name)
     else {
         eprintln!("没有历史叫 {measured_name}");
         return 2;
@@ -4016,14 +4089,14 @@ fn run_outcome_samples(arguments: &[String]) -> i32 {
     let name = arguments
         .first()
         .map_or(ARM_WITNESS_HISTORY_NAME, String::as_str);
-    let Some(spec) = every_history_spec()
+    let Some(specification) = every_history_specification()
         .into_iter()
-        .find(|spec| history_name(spec) == name)
+        .find(|specification| history_name(specification) == name)
     else {
         eprintln!("没有历史叫 {name}");
         return 2;
     };
-    let history = match record_the_history(&spec) {
+    let history = match record_the_history(&specification) {
         Ok(history) => history,
         Err(reason) => {
             eprintln!("建历史失败：{reason}");
@@ -4087,12 +4160,17 @@ const PREFLIGHT_REFUSED_EXIT_CODE: i32 = 78;
 /// `main` 的第一句：直接起 `python3 preflight.py check <本文件> [--force] -- <参数…>`（不经 `sh -c`）判准入与运行条件，
 /// 不满足就照判法的退出码退出、一步都不做；强制跑（判法的第一行以 `forced` 起头）时交回没满足的条件摘要，要写进产物。
 fn preflight() -> Option<String> {
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/src/bin/e182_unreadable_abandoned_root_forks.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/bin/e182_unreadable_abandoned_root_forks.rs"
+    );
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../.claude/singlefs-ai-sop/scripts/preflight.py"
+    );
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }
@@ -4178,8 +4256,8 @@ mod tests {
     use super::*;
     use std::sync::OnceLock;
 
-    fn small_spec() -> HistorySpec {
-        HistorySpec {
+    fn small_specification() -> HistorySpecification {
+        HistorySpecification {
             family: Family::HiddenRoot(Confirmation::Unconfirmed),
             geometry: DiskGeometry::Default,
             first_file_units: 1,
@@ -4191,7 +4269,7 @@ mod tests {
     /// 一条小历史（G默认、一个单元、5 次覆盖写、未确认档）：几条用例共用，建一次。
     fn small_history() -> &'static RecordedHistory {
         static HISTORY: OnceLock<RecordedHistory> = OnceLock::new();
-        HISTORY.get_or_init(|| record_the_history(&small_spec()).expect("小历史建得起来"))
+        HISTORY.get_or_init(|| record_the_history(&small_specification()).expect("小历史建得起来"))
     }
 
     fn two_device_pool_with_pattern_at(offset: u64, length: usize) -> MemoryPool {
@@ -4272,7 +4350,7 @@ mod tests {
     }
 
     #[test]
-    fn a_segment_of_exactly_sixteen_writes_is_expanded_in_full_and_seventeen_takes_the_in_place_subsets(
+    fn segment_of_exactly_sixteen_writes_is_expanded_in_full_and_seventeen_takes_the_in_place_subsets(
     ) {
         assert_eq!(expansion_of_segment(16), Expansion::FullSubsets);
         assert_eq!(
@@ -4305,7 +4383,7 @@ mod tests {
     }
 
     #[test]
-    fn a_range_that_reads_zero_is_cleared_for_its_own_disk_only_and_forgotten_once_written_over() {
+    fn range_that_reads_zero_is_cleared_for_its_own_disk_only_and_forgotten_once_written_over() {
         let mut inner = SparseBlockDevice::new(
             1 << 20,
             PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_BYTES_LOCAL),
@@ -4418,7 +4496,7 @@ mod tests {
 
     /// 被盖按单元自己所在的那块盘判：盘 1 上的单元被改，只留盘 0 看不出、只留盘 1 看得出。
     #[test]
-    fn a_unit_is_covered_when_its_own_disks_bytes_differ_from_the_log() {
+    fn unit_is_covered_when_its_own_disks_bytes_differ_from_the_log() {
         let mut pool = two_device_pool_with_pattern_at(16384, 512);
         let log = RootLog {
             units: vec![
@@ -4527,7 +4605,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stored_shard_is_read_back_only_under_the_same_key() {
+    fn stored_shard_is_read_back_only_under_the_same_key() {
         // 守卫认领临时目录：用例做完、断言失败、panic 都删掉它
         let directory =
             singlefs_verification::temporary_files::TemporaryPathRemovedOnDrop::claiming(
@@ -4566,16 +4644,16 @@ mod tests {
     /// 被藏根那次发布写下的每个单元、每条 journal 记录、根槽都在读回全零的区间里（未确认档不罩系统配置，已确认档罩每块盘较新的那一槽）。
     #[test]
     fn the_unreadable_ranges_cover_every_unit_record_and_root_slot_of_the_hidden_publish() {
-        let first = run_the_first_instance(&small_spec()).expect("实例 1 跑得完");
+        let first = run_the_first_instance(&small_specification()).expect("实例 1 跑得完");
         let fixed = fixed_geometry_of_the_pool();
         let (_, unconfirmed_ranges) =
-            base_and_fault_ranges(&small_spec(), &first).expect("基镜像建得起来");
-        let confirmed_spec = HistorySpec {
+            base_and_fault_ranges(&small_specification(), &first).expect("基镜像建得起来");
+        let confirmed_specification = HistorySpecification {
             family: Family::HiddenRoot(Confirmation::Confirmed),
-            ..small_spec()
+            ..small_specification()
         };
         let (_, confirmed_ranges) =
-            base_and_fault_ranges(&confirmed_spec, &first).expect("基镜像建得起来");
+            base_and_fault_ranges(&confirmed_specification, &first).expect("基镜像建得起来");
         let final_operations = &first.operations[first.last_publish_start..];
         for (kind, label) in [
             (StepKind::UnitWrite, "unit"),
@@ -4660,43 +4738,52 @@ mod tests {
     // 覆盖写保持 s 个单元的补臂（登记修订 12.11）。
     // ------------------------------------------------------------------------
 
-    /// 补臂的 spec：G默认、第一个文件 64 个单元、2 次覆盖写、未确认档（用例里只取实例 1 与一条小历史，p 取 2 省时间）。
-    fn spec_of_the_shape(shape: OverwriteShape) -> HistorySpec {
-        HistorySpec {
+    /// 补臂的 specification：G默认、第一个文件 64 个单元、2 次覆盖写、未确认档（用例里只取实例 1 与一条小历史，p 取 2 省时间）。
+    fn specification_of_the_shape(shape: OverwriteShape) -> HistorySpecification {
+        HistorySpecification {
             first_file_units: 64,
             overwrites_before_the_hidden_publish: 2,
             overwrite_shape: shape,
-            ..small_spec()
+            ..small_specification()
         }
     }
 
     fn small_units_kept_history() -> &'static RecordedHistory {
         static HISTORY: OnceLock<RecordedHistory> = OnceLock::new();
         HISTORY.get_or_init(|| {
-            record_the_history(&spec_of_the_shape(OverwriteShape::KeepingTheFirstFileUnits))
-                .expect("补臂的小历史建得起来")
+            record_the_history(&specification_of_the_shape(
+                OverwriteShape::KeepingTheFirstFileUnits,
+            ))
+            .expect("补臂的小历史建得起来")
         })
     }
 
     #[test]
     fn the_units_kept_arm_has_nine_prefixed_histories_all_at_sixty_four_units_next_to_the_eighteen_registered_ones(
     ) {
-        let kept = units_kept_history_specs();
+        let kept = units_kept_history_specifications();
         assert_eq!(kept.len(), 9, "(默认 2 个起点 + 窄盘 1 个起点) × 三族");
-        assert_eq!(main_history_specs().len(), 18, "第一段的 18 条不动");
-        for spec in &kept {
+        assert_eq!(
+            main_history_specifications().len(),
+            18,
+            "第一段的 18 条不动"
+        );
+        for specification in &kept {
             assert_eq!(
-                spec.first_file_units, 64,
+                specification.first_file_units, 64,
                 "s = 1 时两种形状同是一个单元，不另建"
             );
             assert_eq!(
-                spec.overwrite_shape,
+                specification.overwrite_shape,
                 OverwriteShape::KeepingTheFirstFileUnits
             );
-            assert!(history_name(spec).starts_with("units-kept."));
+            assert!(history_name(specification).starts_with("units-kept."));
         }
         let kept_names: BTreeSet<String> = kept.iter().map(history_name).collect();
-        let main_names: BTreeSet<String> = main_history_specs().iter().map(history_name).collect();
+        let main_names: BTreeSet<String> = main_history_specifications()
+            .iter()
+            .map(history_name)
+            .collect();
         assert_eq!(kept_names.len(), 9, "补臂的历史名互不相同");
         assert!(
             kept_names.is_disjoint(&main_names),
@@ -4718,9 +4805,9 @@ mod tests {
             (OverwriteShape::OneUnit, 1usize),
             (OverwriteShape::KeepingTheFirstFileUnits, 64usize),
         ] {
-            let spec = spec_of_the_shape(shape);
-            let first = run_the_first_instance(&spec).expect("实例 1 跑得完");
-            let mut pool = empty_pool(spec.geometry.device_bytes());
+            let specification = specification_of_the_shape(shape);
+            let first = run_the_first_instance(&specification).expect("实例 1 跑得完");
+            let mut pool = empty_pool(specification.geometry.device_bytes());
             pool.apply(&first.operations);
             let RecoveryOutcome::FileRead { content, .. } =
                 recover(&pool, JournalPolicy::Consult).outcome
@@ -4742,7 +4829,8 @@ mod tests {
     fn the_hidden_root_of_the_units_kept_arm_references_at_least_sixty_three_more_units_than_the_registered_reading(
     ) {
         let referenced_units = |shape: OverwriteShape| -> usize {
-            let first = run_the_first_instance(&spec_of_the_shape(shape)).expect("实例 1 跑得完");
+            let first =
+                run_the_first_instance(&specification_of_the_shape(shape)).expect("实例 1 跑得完");
             first
                 .roots
                 .get(&first.last_root)
@@ -4818,34 +4906,40 @@ mod tests {
     // ------------------------------------------------------------------------
 
     /// 已确认档带藏根的小历史（G默认、64 个单元、2 次覆盖写）：类 a 只出在这一族里。
-    fn confirmed_spec_of_the_shape(shape: OverwriteShape) -> HistorySpec {
-        HistorySpec {
+    fn confirmed_specification_of_the_shape(shape: OverwriteShape) -> HistorySpecification {
+        HistorySpecification {
             family: Family::HiddenRoot(Confirmation::Confirmed),
-            ..spec_of_the_shape(shape)
+            ..specification_of_the_shape(shape)
         }
     }
 
     fn small_confirmed_history() -> &'static RecordedHistory {
         static HISTORY: OnceLock<RecordedHistory> = OnceLock::new();
         HISTORY.get_or_init(|| {
-            record_the_history(&confirmed_spec_of_the_shape(OverwriteShape::OneUnit))
-                .expect("已确认档的小历史建得起来")
+            record_the_history(&confirmed_specification_of_the_shape(
+                OverwriteShape::OneUnit,
+            ))
+            .expect("已确认档的小历史建得起来")
         })
     }
 
     fn small_confirmed_units_kept_history() -> &'static RecordedHistory {
         static HISTORY: OnceLock<RecordedHistory> = OnceLock::new();
         HISTORY.get_or_init(|| {
-            record_the_history(&confirmed_spec_of_the_shape(
+            record_the_history(&confirmed_specification_of_the_shape(
                 OverwriteShape::KeepingTheFirstFileUnits,
             ))
             .expect("补臂的已确认档小历史建得起来")
         })
     }
 
-    /// 对照在已确认档的小历史上：挑到两个类 a 状态，每个状态里盘 0 上都换得了一个单元，换之前是类 a、换之后是类 b。
+    /// 乙入判不出之下对照记作废：
+    /// 已确认档的实例 2 可写挂载把每块盘较新的那一槽系统配置读成全零，读回全零的槽自证不过、当读错计，没有一块盘两槽都自证过，
+    /// 判不出，重读一次仍是这样，拒可写（`NewerStateStillUnreadableAfterOneReread`，比法成员 `SomeSlotFailedSelfVerification…`）。
+    /// 拒了就一个字节都不写，录制流里没有根槽写，类 a 状态一个也挑不到，B4 的「类 a 变类 b」对照造不出，记作废（不是失败，也不是通过）。
+    /// 旧行为（C971 之前：挑到 2 个类 a 状态、2 次试、2 次由类 a 变类 b、status holds）作废，不再断言。
     #[test]
-    fn the_confirmed_none_covered_control_turns_two_chosen_class_confirmed_none_covered_states_into_class_some_unit_covered_by_changing_a_unit_on_device_zero(
+    fn the_confirmed_none_covered_control_is_voided_because_the_confirmed_mount_is_refused_by_the_newer_configuration_slots_reading_zero(
     ) {
         let history = small_confirmed_history();
         assert!(
@@ -4853,21 +4947,29 @@ mod tests {
             "{:?}",
             history.consistency_problems
         );
+        let refused = history
+            .mount
+            .refused
+            .as_deref()
+            .expect("已确认档的可写挂载被拒");
+        assert!(
+            refused.contains(THE_COMPARISON_THAT_VOIDS_THE_CONFIRMED_NONE_COVERED_CONTROL),
+            "{refused}"
+        );
+        assert!(
+            refused.contains("NewerStateStillUnreadableAfterOneReread"),
+            "{refused}"
+        );
+        assert_eq!(
+            history.row_publish_root_write, None,
+            "拒了可写就没有写行那次发布的根槽写"
+        );
         let reading = class_confirmed_none_covered_to_class_some_unit_covered_control(history)
             .expect("枚举得完");
         assert_eq!(
-            reading.class_confirmed_none_covered_states_chosen, 2,
-            "{reading:?}"
-        );
-        assert_eq!(reading.no_unit_to_change, 0, "{reading:?}");
-        assert_eq!(reading.trials, 2, "{reading:?}");
-        assert_eq!(
-            reading.class_confirmed_none_covered_before_the_change, 2,
-            "换之前是「已确认、没被盖」类：{reading:?}"
-        );
-        assert_eq!(
-            reading.changed_to_class_some_unit_covered, 2,
-            "换之后是「有单元被盖」类：{reading:?}"
+            reading,
+            ConfirmedNoneCoveredControlReading::default(),
+            "读数全零：{reading:?}"
         );
         assert_eq!(
             the_confirmed_none_covered_control_status(
@@ -4875,29 +4977,103 @@ mod tests {
                 reading.class_confirmed_none_covered_before_the_change,
                 reading.changed_to_class_some_unit_covered
             ),
-            "holds"
+            "not_made"
         );
+        assert!(the_confirmed_none_covered_control_is_voided(
+            history.mount.refused.as_deref(),
+            &reading
+        ));
+        // 产物里的记法：这条历史的对照行记 voided，汇总里作废数 1、不算检测对照失败。
+        let mut total = ConfirmedNoneCoveredControlTotal::default();
+        emit_the_confirmed_none_covered_control(history, &mut total);
+        assert_eq!(total.histories, 1);
+        assert_eq!(total.histories_voided, 1, "{total:?}");
+        assert_eq!(total.histories_not_made, 0, "{total:?}");
+        assert_eq!(total.status(), "voided");
+        assert_eq!(total.failures(), 0, "作废不算失败");
     }
 
-    /// 补臂的已确认档小历史上同样（被藏根引用 64 个以上的单元，挑到的类 a 状态里盘 0 上换得了一个）。挑不到类 a 状态时本用例不判（产物里记 not_made）。
+    /// 补臂的已确认档小历史同样作废：挑不到类 a 状态，「试过的都判出」会是 0 == 0 空过，这里钉住作废。
     #[test]
-    fn the_confirmed_none_covered_control_holds_on_the_units_kept_arm_wherever_it_can_be_made() {
+    fn the_confirmed_none_covered_control_on_the_units_kept_arm_is_voided_the_same_way() {
         let history = small_confirmed_units_kept_history();
         assert!(
             history.consistency_problems.is_empty(),
             "{:?}",
             history.consistency_problems
         );
+        let refused = history
+            .mount
+            .refused
+            .as_deref()
+            .expect("补臂的已确认档可写挂载被拒");
+        assert!(
+            refused.contains(THE_COMPARISON_THAT_VOIDS_THE_CONFIRMED_NONE_COVERED_CONTROL),
+            "{refused}"
+        );
+        assert_eq!(history.row_publish_root_write, None);
         let reading = class_confirmed_none_covered_to_class_some_unit_covered_control(history)
             .expect("枚举得完");
         assert_eq!(
-            reading.class_confirmed_none_covered_before_the_change, reading.trials,
-            "试过的状态换之前都是「已确认、没被盖」类：{reading:?}"
+            reading,
+            ConfirmedNoneCoveredControlReading::default(),
+            "读数全零：{reading:?}"
         );
-        assert_eq!(
-            reading.changed_to_class_some_unit_covered, reading.trials,
-            "试过的状态换之后都判成「有单元被盖」类：{reading:?}"
+        assert!(the_confirmed_none_covered_control_is_voided(
+            history.mount.refused.as_deref(),
+            &reading
+        ));
+        // 产物里的记法：这条历史的对照行记 voided，汇总里作废数 1、不算检测对照失败。
+        let mut total = ConfirmedNoneCoveredControlTotal::default();
+        emit_the_confirmed_none_covered_control(history, &mut total);
+        assert_eq!(total.histories, 1);
+        assert_eq!(total.histories_voided, 1, "{total:?}");
+        assert_eq!(total.histories_not_made, 0, "{total:?}");
+        assert_eq!(total.status(), "voided");
+        assert_eq!(total.failures(), 0, "作废不算失败");
+    }
+
+    /// 作废的认法与汇总：拒因不是那个比法成员、或读数不全零、或没被拒，都不算作废；全部作废时汇总记 voided、不算失败，
+    /// 作废混着没造出的仍算失败（没造出不是作废）。
+    #[test]
+    fn control_is_voided_only_when_the_refusal_names_the_comparison_and_nothing_was_chosen() {
+        let zero = ConfirmedNoneCoveredControlReading::default();
+        let named = format!(
+            "NewerStateStillUnreadableAfterOneReread({})",
+            THE_COMPARISON_THAT_VOIDS_THE_CONFIRMED_NONE_COVERED_CONTROL
         );
+        assert!(the_confirmed_none_covered_control_is_voided(
+            Some(&named),
+            &zero
+        ));
+        assert!(!the_confirmed_none_covered_control_is_voided(None, &zero));
+        assert!(!the_confirmed_none_covered_control_is_voided(
+            Some("NewerStateStillUnreadableAfterOneReread(InstanceTable…)"),
+            &zero
+        ));
+        let chosen = ConfirmedNoneCoveredControlReading {
+            class_confirmed_none_covered_states_chosen: 1,
+            ..zero
+        };
+        assert!(!the_confirmed_none_covered_control_is_voided(
+            Some(&named),
+            &chosen
+        ));
+        let all_voided = ConfirmedNoneCoveredControlTotal {
+            histories: 3,
+            histories_voided: 3,
+            ..ConfirmedNoneCoveredControlTotal::default()
+        };
+        assert_eq!(all_voided.status(), "voided");
+        assert_eq!(all_voided.failures(), 0, "作废不算失败");
+        let voided_and_not_made = ConfirmedNoneCoveredControlTotal {
+            histories: 3,
+            histories_voided: 2,
+            histories_not_made: 1,
+            ..ConfirmedNoneCoveredControlTotal::default()
+        };
+        assert_eq!(voided_and_not_made.status(), "not_made");
+        assert_eq!(voided_and_not_made.failures(), 1, "混着没造出的不当作废");
     }
 
     /// 判定本身：没试成不当通过；换之前不是类 a 或换之后不是类 b，都是 violated。
@@ -4925,6 +5101,7 @@ mod tests {
             histories: 3,
             histories_not_made: 2,
             histories_violated: 0,
+            histories_voided: 0,
             trials: 2,
             changed_to_class_some_unit_covered: 2,
         };
@@ -5032,7 +5209,7 @@ mod tests {
     }
 
     #[test]
-    fn a_shard_is_judged_the_same_way_twice_and_counts_the_states_of_its_segment() {
+    fn shard_is_judged_the_same_way_twice_and_counts_the_states_of_its_segment() {
         let history = small_history();
         let first = judge_the_shard(history, 0).expect("第 0 段判得完");
         let second = judge_the_shard(history, 0).expect("第 0 段判得完");
@@ -5105,42 +5282,125 @@ mod tests {
         );
     }
 
-    /// 编这个测试二进制的那棵树的根（本 crate 在 `crates/` 下，往上两层）。
-    fn repository_root_of_this_build() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("本 crate 在仓根的 crates/ 下")
-            .to_path_buf()
+    /// 合成树的根 `Cargo.toml`：只为读 profile，两个成员照写。
+    const SYNTHETIC_ROOT_MANIFEST: &str =
+        "[workspace]\nresolver = \"2\"\nmembers = [\"crates/judging\", \"crates/singlefs-core\"]\n";
+    /// 合成树的 `Cargo.lock`：两个都是路径包，没有外部依赖要按闭包收窄。
+    const SYNTHETIC_LOCK_FILE: &str = "version = 3\n\n[[package]]\nname = \"judging\"\nversion = \"0.1.0\"\n\
+        dependencies = [\n \"singlefs-core\",\n]\n\n[[package]]\nname = \"singlefs-core\"\nversion = \"0.1.0\"\n";
+    /// 合成树里的依赖包：包名与两个特性名同核心层（编进来的判器键表与 `features_the_core_layer_was_compiled_with` 点名的就是这个包、这两个特性），
+    /// 计数那个函数挂在 `lookup-work-counters` 上。
+    const SYNTHETIC_CORE_MANIFEST: &str = "[package]\nname = \"singlefs-core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\
+        links = \"singlefs-core\"\n\n[features]\nlookup-work-counters = []\ntest-only-publish-thresholds = []\n";
+    const SYNTHETIC_CORE_LIBRARY: &str = "#[cfg(feature = \"lookup-work-counters\")]\n\
+        pub fn count_one_lookup(lookups_counted: &mut u64) {\n    *lookups_counted += 1;\n}\n\n\
+        #[cfg(not(feature = \"lookup-work-counters\"))]\npub fn count_one_lookup(_lookups_counted: &mut u64) {}\n";
+    /// 合成树里的入口包：普通依赖核心层、不要它的特性，入口经调用引到计数那个函数。
+    const SYNTHETIC_JUDGING_MANIFEST: &str =
+        "[package]\nname = \"judging\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+        [dependencies]\nsinglefs-core = { path = \"../singlefs-core\" }\n";
+    const SYNTHETIC_JUDGING_LIBRARY: &str =
+        "pub fn judge_one_image() -> u64 {\n    let mut lookups_counted = 0;\n    \
+        singlefs_core::count_one_lookup(&mut lookups_counted);\n    lookups_counted\n}\n";
+    /// 合成树里闭包的根：入口包库目标里的那一个入口。
+    const SYNTHETIC_JUDGING_ENTRIES: ClosureEntries = ClosureEntries {
+        group_name: "synthetic_judgement",
+        target: "lib",
+        entry_functions: &["judging::judge_one_image"],
+    };
+
+    /// 同一进程里并行跑的几条用例各用一棵合成树：根的名字里带进程号与这个序号。
+    static SYNTHETIC_TREE_SERIAL: AtomicU64 = AtomicU64::new(0);
+
+    /// 临时目录里现造的一棵最小工作区（上面几份常量），用完删掉：用例做完、断言失败、panic 都删，写到一半 panic 留下的半棵也删。
+    struct SyntheticTree {
+        root: std::path::PathBuf,
     }
 
-    /// 核心层被并上 `lookup-work-counters` 与没并上，判法入口的闭包指纹是两把（闭包经核心层的发布引到计数那个 cfg 原子）：
-    /// 闭包指纹照给定的依赖包特性算，不只看本包特性。
-    /// 判别力（`crates/mutations.tsv`）：算指纹改回只照本包特性（给定的依赖包特性不交给单元图），这条红。
+    impl SyntheticTree {
+        /// 先认领根、再写：写到一半 panic 时 Drop 删掉写了的那一半。
+        fn new() -> Self {
+            let tree = SyntheticTree {
+                root: std::env::temp_dir().join(format!(
+                    "singlefs-e182-closure-fingerprint-tree-{}-{}",
+                    std::process::id(),
+                    SYNTHETIC_TREE_SERIAL.fetch_add(1, Ordering::SeqCst)
+                )),
+            };
+            for (relative_path, text) in [
+                ("Cargo.toml", SYNTHETIC_ROOT_MANIFEST),
+                ("Cargo.lock", SYNTHETIC_LOCK_FILE),
+                ("crates/singlefs-core/Cargo.toml", SYNTHETIC_CORE_MANIFEST),
+                ("crates/singlefs-core/src/lib.rs", SYNTHETIC_CORE_LIBRARY),
+                ("crates/judging/Cargo.toml", SYNTHETIC_JUDGING_MANIFEST),
+                ("crates/judging/src/lib.rs", SYNTHETIC_JUDGING_LIBRARY),
+            ] {
+                let path = tree.root.join(relative_path);
+                std::fs::create_dir_all(path.parent().expect("合成树的文件都在根之下"))
+                    .expect("临时目录写得了");
+                std::fs::write(&path, text).expect("临时目录写得了");
+            }
+            tree
+        }
+    }
+
+    impl Drop for SyntheticTree {
+        /// 删不掉只打一行，不在 Drop 里 panic（panic 途中再 panic 会直接中止进程）。
+        fn drop(&mut self) {
+            if let Err(error) = std::fs::remove_dir_all(&self.root) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    eprintln!("删不掉自己建的合成树 {}：{error}", self.root.display());
+                }
+            }
+        }
+    }
+
+    /// 场景：现造的合成树里，入口包经调用引到依赖包 `singlefs-core` 里挂在 `lookup-work-counters` 上的函数；照「依赖包没并上特性」与
+    /// 「并上 `lookup-work-counters`」两份依赖包特性各算一把闭包指纹。预期：两把不同，工具链行相同（闭包指纹照给定的依赖包特性算，不只看本包特性）。
+    /// 两把各在一个线程里算（互不依赖）。
+    /// 判别力（`crates/mutations.tsv`）：算指纹改回只照本包特性（给定的依赖包特性不交给单元图），两把相同，这条红。
     #[test]
     fn the_closure_key_follows_the_features_unified_onto_the_core_layer() {
-        let root = repository_root_of_this_build();
-        let without_counters = closure_fingerprint_with_the_features_of_the_build(
-            &root,
-            &singlefs_unit_graph::FeaturesEnabledByTheBuild::default(),
-        )
-        .expect("核心层没并上特性时判法入口的闭包算得出指纹");
-        let with_counters = closure_fingerprint_with_the_features_of_the_build(
-            &root,
-            &singlefs_unit_graph::FeaturesEnabledByTheBuild {
-                features_of_each_package: BTreeMap::from([(
-                    singlefs_verification::crash_identity::CORE_LAYER_PACKAGE_NAME.to_string(),
-                    BTreeSet::from([
-                        singlefs_verification::crash_identity::LOOKUP_WORK_COUNTERS_FEATURE
-                            .to_string(),
-                    ]),
-                )]),
-            },
-        )
-        .expect("核心层并上计数时判法入口的闭包算得出指纹");
+        let tree = SyntheticTree::new();
+        let features_with_counters = singlefs_unit_graph::FeaturesEnabledByTheBuild {
+            features_of_each_package: BTreeMap::from([(
+                singlefs_verification::crash_identity::CORE_LAYER_PACKAGE_NAME.to_string(),
+                BTreeSet::from([
+                    singlefs_verification::crash_identity::LOOKUP_WORK_COUNTERS_FEATURE.to_string(),
+                ]),
+            )]),
+        };
+        let features_without_counters = singlefs_unit_graph::FeaturesEnabledByTheBuild::default();
+        let (without_counters, with_counters) = std::thread::scope(|scope| {
+            let without_counters = scope.spawn(|| {
+                closure_fingerprint_with_the_features_of_the_build(
+                    &tree.root,
+                    &SYNTHETIC_JUDGING_ENTRIES,
+                    &features_without_counters,
+                )
+            });
+            let with_counters = scope.spawn(|| {
+                closure_fingerprint_with_the_features_of_the_build(
+                    &tree.root,
+                    &SYNTHETIC_JUDGING_ENTRIES,
+                    &features_with_counters,
+                )
+            });
+            (
+                without_counters
+                    .join()
+                    .expect("算没并上特性那一把的线程不 panic"),
+                with_counters
+                    .join()
+                    .expect("算并上计数那一把的线程不 panic"),
+            )
+        });
+        let without_counters =
+            without_counters.expect("依赖包没并上特性时合成树入口的闭包算得出指纹");
+        let with_counters = with_counters.expect("依赖包并上计数时合成树入口的闭包算得出指纹");
         assert_ne!(
             without_counters.key_hex, with_counters.key_hex,
-            "核心层并上计数与没并上，闭包指纹两把"
+            "依赖包并上计数与没并上，闭包指纹两把"
         );
         assert_eq!(
             without_counters.toolchain_lines, with_counters.toolchain_lines,
@@ -5148,21 +5408,57 @@ mod tests {
         );
     }
 
-    /// 装置跑时取的闭包指纹（[`closure_fingerprint_of_the_tree`]，依赖包特性取编进库的那份判器键表）等于照这个二进制链进来的
-    /// 核心层实际开着的特性（`features_the_core_layer_was_compiled_with`，从核心层编出来的代码里认）算的那一把：只编验证包、不编它的测试时
-    /// 两边都不带计数，编验证包的测试时两边都带。
-    /// 判别力（`crates/mutations.tsv`，编测试的那一行）：跑时取指纹改回不带依赖包特性，编测试时这条红。
+    /// 场景：同一棵合成树上，比装置跑时取的闭包指纹（[`closure_fingerprint_of_the_tree`]，依赖包特性取编进库的那份判器键表）与照这个二进制
+    /// 链进来的核心层实际开着的特性（`features_the_core_layer_was_compiled_with`，从核心层编出来的代码里认）算的那一把，再算一把依赖包没并上特性的。
+    /// 预期：前两把相同；编验证包的测试时 dev 依赖替核心层并上 `lookup-work-counters`，合成树的入口经调用引到挂在它上面的函数，
+    /// 所以没并上特性的那一把与前两把不同（这条用例在这次编译里有判别力的前提）。三把各在一个线程里算（互不依赖）。
+    /// 判别力（`crates/mutations.tsv`，编测试的那一行）：跑时取指纹改回不带依赖包特性，跑时那一把等于没并上特性的那一把，这条红。
     #[test]
     fn the_closure_key_is_computed_with_the_features_this_build_unified_onto_the_core_layer() {
-        let root = repository_root_of_this_build();
-        let taken_at_run_time =
-            closure_fingerprint_of_the_tree(&root).expect("跑时取的闭包指纹算得出");
+        let tree = SyntheticTree::new();
+        let features_the_core_layer_was_built_with =
+            singlefs_verification::crash_identity::features_the_core_layer_was_compiled_with();
+        let features_without_any = singlefs_unit_graph::FeaturesEnabledByTheBuild::default();
+        let (taken_at_run_time, with_the_features_the_core_layer_was_built_with, without_any) =
+            std::thread::scope(|scope| {
+                let taken_at_run_time = scope.spawn(|| {
+                    closure_fingerprint_of_the_tree(&tree.root, &SYNTHETIC_JUDGING_ENTRIES)
+                });
+                let with_the_features_the_core_layer_was_built_with = scope.spawn(|| {
+                    closure_fingerprint_with_the_features_of_the_build(
+                        &tree.root,
+                        &SYNTHETIC_JUDGING_ENTRIES,
+                        &features_the_core_layer_was_built_with,
+                    )
+                });
+                let without_any = scope.spawn(|| {
+                    closure_fingerprint_with_the_features_of_the_build(
+                        &tree.root,
+                        &SYNTHETIC_JUDGING_ENTRIES,
+                        &features_without_any,
+                    )
+                });
+                (
+                    taken_at_run_time
+                        .join()
+                        .expect("算跑时那一把的线程不 panic"),
+                    with_the_features_the_core_layer_was_built_with
+                        .join()
+                        .expect("算照核心层开着的特性那一把的线程不 panic"),
+                    without_any
+                        .join()
+                        .expect("算没并上特性那一把的线程不 panic"),
+                )
+            });
+        let taken_at_run_time = taken_at_run_time.expect("跑时取的闭包指纹算得出");
         let with_the_features_the_core_layer_was_built_with =
-            closure_fingerprint_with_the_features_of_the_build(
-                &root,
-                &singlefs_verification::crash_identity::features_the_core_layer_was_compiled_with(),
-            )
-            .expect("照链进来的核心层开着的特性算得出闭包指纹");
+            with_the_features_the_core_layer_was_built_with
+                .expect("照链进来的核心层开着的特性算得出闭包指纹");
+        let without_any = without_any.expect("依赖包没并上特性时算得出闭包指纹");
+        assert_ne!(
+            with_the_features_the_core_layer_was_built_with.key_hex, without_any.key_hex,
+            "编测试时核心层并上了计数，合成树的入口引到计数那个函数，照开着的特性算的与没并上的两把不同"
+        );
         assert_eq!(
             taken_at_run_time, with_the_features_the_core_layer_was_built_with,
             "跑时取的闭包指纹照的是这一次编译链进来的核心层实际开着的特性"

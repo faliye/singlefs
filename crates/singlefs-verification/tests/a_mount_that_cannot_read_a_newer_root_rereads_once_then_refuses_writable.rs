@@ -44,7 +44,11 @@ use singlefs_core::mount::{
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::pointer::NodePointer;
-use singlefs_core::recovery::{instance_table_of_root, root_is_abandoned_by_the_instance_table};
+use singlefs_core::recovery::{
+    choose_root, choose_system_configuration, instance_table_of_root,
+    root_is_abandoned_by_the_instance_table,
+};
+use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{TransactionOutput, FIRST_INODE_NUMBER};
 use singlefs_format::{DATA_UNIT_BYTES, JOURNAL_RECORD_BYTES};
 
@@ -387,10 +391,10 @@ fn a_newest_instance_table_unreadable_when_the_shadow_ledger_reads_it_is_reread_
             Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
                 if **still_unreadable
                     == StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-                        newest_root_on_the_reread: Some(RollbackTarget {
+                        root_chosen_by_the_read_stage: RollbackTarget {
                             instance: InstanceGeneration(3),
                             checkpoint_txg: CheckpointTxg(10),
-                        }),
+                        },
                     }
         ),
         "{:?}",
@@ -442,5 +446,136 @@ fn a_newest_instance_table_unreadable_when_the_shadow_ledger_reads_it_is_reread_
         ),
         (vec![(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)], 0),
         "影子账照隔离 C 独占的 14 槽"
+    );
+}
+
+/// 可写挂载里每个根环槽的第几次读（从 1 数）落在取树 ID 水位那一遍之后、重建分配器读根环那一遍之前：读阶段择根是第 1 次，
+/// 取新实例第一个 txg 第 2 次，取树 ID 水位第 3 次。这一读是算 F 生效值那一遍；读阶段之后再择一次根的话，那一次择根就落在这一读上。
+const READ_OF_EACH_ROOT_RING_SLOT_RIGHT_AFTER_THE_TREE_IDENTIFIER_WATERMARK: u64 = 4;
+
+/// 实例 3 的两条根（写行 txg 9、暖机 txg 10）住的两个根槽，各按 `failing_reads` 读坏。
+fn root_slots_of_the_instance_that_abandoned_the_newest_publish(
+    failing_reads: FailingReadsOfARange,
+) -> Vec<UnreadableRange> {
+    [CheckpointTxg(9), CheckpointTxg(10)]
+        .into_iter()
+        .map(|checkpoint_txg| unreadable_root_slot_of(checkpoint_txg, failing_reads))
+        .collect()
+}
+
+/// 判抛弃用的实例表照读阶段择到的根取，读阶段之后不另择根。
+/// （[`pool_after_a_recovery_abandoned_the_third_version`]）：读阶段择到实例 3 暖机那条根 (3, 10)，它的实例表抛弃 C (2, 8)。
+/// 实例 3 的两条根住的槽在读阶段之后各只读坏一次（第 [`READ_OF_EACH_ROOT_RING_SLOT_RIGHT_AFTER_THE_TREE_IDENTIFIER_WATERMARK`] 次读，
+/// 重建分配器读根环那一遍照读得出）：这一刻现择会落到 C，C 自己指着的实例表不抛弃它。
+/// 预期：可写挂载做成，判抛弃照 (3, 10) 的表，影子账照隔离 C 独占的槽：隔离数与被抛弃根读不出的条数都与同一段历史不注错的再挂相同。
+/// 判别力：判抛弃取读阶段之后现择的根的表（变异「判抛弃用的实例表取读阶段之后现择的根」）时 C 不算被抛弃、它独占的槽不隔离，这一条红。
+#[test]
+fn abandonment_at_a_writable_mount_is_judged_by_the_instance_table_of_the_root_the_read_stage_chose_even_when_its_slot_reads_bad_afterwards(
+) {
+    let (mut control_pool, _) = pool_after_a_recovery_abandoned_the_third_version(
+        "instance-table-of-the-read-stage-root-control",
+    );
+    let mut control_devices = control_pool.reopen_recorded();
+    let control = mount_writable(&parameters(), &mut control_devices).expect("不注错的再挂做成");
+    control_pool.devices = Some(control_devices);
+    assert_ne!(
+        control
+            .output
+            .isolated_slots_per_device
+            .iter()
+            .map(|(_, slots)| *slots)
+            .sum::<u64>(),
+        0,
+        "前提：不注错的再挂按 (3, 10) 的表抛弃 C、隔离 C 独占的槽"
+    );
+
+    let (mut pool, _) =
+        pool_after_a_recovery_abandoned_the_third_version("instance-table-of-the-read-stage-root");
+    let image = pool.memory_pool();
+    let root_chosen_by_the_read_stage = choose_root(
+        &image,
+        &choose_system_configuration(&image).expect("镜像上择得到系统配置"),
+    )
+    .expect("根环里有自证过的根");
+    let unreadable_for_a_fresh_choice = SharedUnreadableRanges::new(
+        root_slots_of_the_instance_that_abandoned_the_newest_publish(FailingReadsOfARange::Every),
+        UnreadableRangeReadBack::DeviceError,
+    );
+    let devices_for_a_fresh_choice =
+        with_unreadable_ranges(pool.reopen_recorded(), &unreadable_for_a_fresh_choice);
+    let root_a_fresh_choice_lands_on = choose_root(
+        &devices_for_a_fresh_choice,
+        &choose_system_configuration(&devices_for_a_fresh_choice).expect("择得到系统配置"),
+    )
+    .expect("实例 3 的两条根读不出时环里还有自证过的根");
+    pool.devices = Some(without_unreadable_ranges(devices_for_a_fresh_choice));
+    assert_eq!(
+        (
+            (
+                root_chosen_by_the_read_stage.instance,
+                root_chosen_by_the_read_stage.checkpoint_txg
+            ),
+            (
+                root_a_fresh_choice_lands_on.instance,
+                root_a_fresh_choice_lands_on.checkpoint_txg
+            )
+        ),
+        (
+            (InstanceGeneration(3), CheckpointTxg(10)),
+            (InstanceGeneration(2), CheckpointTxg(8))
+        ),
+        "前提：读阶段择到 (3, 10)；实例 3 的两条根读不出时现择落到 C"
+    );
+    let table_of = |root: &RootRecord| instance_table_of_root(&image, root).expect("实例表读得出");
+    assert_eq!(
+        (
+            root_is_abandoned_by_the_instance_table(
+                &root_a_fresh_choice_lands_on,
+                &table_of(&root_chosen_by_the_read_stage)
+            ),
+            root_is_abandoned_by_the_instance_table(
+                &root_a_fresh_choice_lands_on,
+                &table_of(&root_a_fresh_choice_lands_on)
+            )
+        ),
+        (true, false),
+        "前提：(3, 10) 的表抛弃 C，C 自己指着的表不抛弃它"
+    );
+
+    let unreadable = SharedUnreadableRanges::new(
+        root_slots_of_the_instance_that_abandoned_the_newest_publish(
+            FailingReadsOfARange::OnlyTheNth(
+                READ_OF_EACH_ROOT_RING_SLOT_RIGHT_AFTER_THE_TREE_IDENTIFIER_WATERMARK,
+            ),
+        ),
+        UnreadableRangeReadBack::DeviceError,
+    );
+    let mut devices = with_unreadable_ranges(pool.reopen_recorded(), &unreadable);
+    let remounted = mount_writable(&parameters(), &mut devices);
+    pool.devices = Some(without_unreadable_ranges(devices));
+    let remounted = remounted.expect("实例 3 的两条根槽各只在读阶段之后读坏一次：可写挂载做成");
+    assert_eq!(
+        unreadable.failed_reads(),
+        2,
+        "实例 3 的两条根槽各在第 {READ_OF_EACH_ROOT_RING_SLOT_RIGHT_AFTER_THE_TREE_IDENTIFIER_WATERMARK} 次读读坏了一次"
+    );
+    assert_eq!(
+        (
+            remounted.output.effective_root.instance,
+            remounted.output.effective_root.checkpoint_txg
+        ),
+        (InstanceGeneration(3), CheckpointTxg(10)),
+        "可写挂载建在读阶段择到的 (3, 10) 上"
+    );
+    assert_eq!(
+        (
+            remounted.output.isolated_slots_per_device.clone(),
+            remounted.output.abandoned_roots_unreadable
+        ),
+        (
+            control.output.isolated_slots_per_device.clone(),
+            control.output.abandoned_roots_unreadable
+        ),
+        "判抛弃照读阶段择到的 (3, 10) 的表：C 独占的槽照隔离，与不注错的再挂相同"
     );
 }

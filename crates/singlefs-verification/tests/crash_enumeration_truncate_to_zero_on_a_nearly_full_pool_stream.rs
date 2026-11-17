@@ -71,6 +71,10 @@ use singlefs_verification::crash_state_enumeration::{
 use singlefs_verification::memory_pool::{
     writes_and_segments, CrashImage, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
+use singlefs_verification::mount_transparency::{
+    image_after_the_refusal_into_the_undecidable_witness, WritableMountRefusedOnTheCrashDisks,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::segments::StepKind;
 use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
@@ -217,7 +221,7 @@ fn pool_after_the_remount<Device: common_admission_pool::DeviceOverASparseImage>
     pool
 }
 
-/// 顺序写 `data_units` 个数据单元写不写得进（在池的拷贝上写，原池不动）：写成是真；推满抬 F 仍被拒是假；别的拒绝 panic。
+/// 顺序写 `data_units` 个数据单元写不写得进（在池的拷贝上写，原池不动）：写成是真；推满抬 F 仍被拒、全放出来也放不下是假；别的拒绝 panic。
 fn sequential_write_of_data_units_is_accepted(
     pool: &PoolUnderTest<SparseBlockDevice>,
     data_units: u64,
@@ -225,7 +229,10 @@ fn sequential_write_of_data_units_is_accepted(
     let mut copy = copy_of_the_pool(pool);
     match copy.sequential_write(content_length_of_data_units(data_units)) {
         Ok(_) => true,
-        Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)) => false,
+        Err(
+            UserChangeRefused::NoSpaceAfterRaisingTheFloor(_)
+            | UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(_),
+        ) => false,
         Err(refusal) => {
             panic!("顺序写 {data_units} 个数据单元只该因为空间不够被拒，实际 {refusal:?}")
         }
@@ -465,8 +472,10 @@ fn assert_the_shape_of_the_steps(recorded: &RecordedTruncationAtTheEdge) {
 /// 共用走空把截断走完；续做发的次数等于恢复落到的那一版之后录流还剩的截断发布数；挂完 logged_ops 里没有截断条目、第一个文件经挂载态读者读出那一版的内容。
 /// 挂载发的写录在一条新的录制流上，连同挂完的盘交回：判段在挂完的盘上跑池级 checker。
 ///
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），共用走空跳过。
+///
 /// # Panics
-/// 可写挂载做不成（贴边的池上准入拒了挂载），恢复落到流外的一版，或上面任何一样对不上。
+/// 可写挂载被拒而不是认下的那一拒（贴边的池上准入拒了挂载也算），恢复落到流外的一版，或上面任何一样对不上。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 fn observe_the_mount_continuing_the_truncation_at_the_edge(
@@ -500,16 +509,30 @@ fn observe_the_mount_continuing_the_truncation_at_the_edge(
             )
         })
         .collect();
-    let mounted = mount_writable_with_test_only_switches_and_deletion_switches(
+    let mounted = match mount_writable_with_test_only_switches_and_deletion_switches(
         &inputs.parameters,
         &mut devices,
         SpaceAdmission::JudgedByTheFormula,
         ShadowLedger::On,
         inputs.switches,
-    )
-    .unwrap_or_else(|error| {
-        panic!("贴边的池上每个崩溃状态都可写挂载得成（落到 {effective_root:?}）：{error:?}")
-    });
+    ) {
+        Ok(mounted) => mounted,
+        Err(refusal) => {
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &WritableMountRefusedOnTheCrashDisks {
+                    refusal,
+                    devices,
+                    stream,
+                },
+                &materialized,
+                report,
+                &inputs.parameters.filesystem_identifier,
+                &fixed_geometry_of_the_384_slot_small_devices(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     assert!(
         matches!(
             mounted.output.deletion_queue_continuation_outcome,
@@ -679,7 +702,7 @@ fn assert_the_judges_and_the_mount_are_clean(tally: &CrashPointReplayTally) {
             .observer_counts
             .count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),
         tally.states,
-        "每个状态都挂得上、挂完的盘池级 checker 0 违例：{:?}",
+        "每个状态都判过：挂得上的挂完的盘、被乙入判不出拒的原样的盘，池级 checker 0 违例：{:?}",
         tally.observer_counts
     );
     let continuation_publishes: u64 = (0..=2)
@@ -690,8 +713,12 @@ fn assert_the_judges_and_the_mount_are_clean(tally: &CrashPointReplayTally) {
         })
         .sum();
     assert_eq!(
-        continuation_publishes, tally.states,
-        "每个状态的续做都发了 0、1 或 2 次：{:?}",
+        continuation_publishes
+            + tally
+                .observer_counts
+                .count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
+        tally.states,
+        "每个没被乙入判不出拒的状态的续做都发了 0、1 或 2 次：{:?}",
         tally.observer_counts
     );
     for publishes in 0..=2 {

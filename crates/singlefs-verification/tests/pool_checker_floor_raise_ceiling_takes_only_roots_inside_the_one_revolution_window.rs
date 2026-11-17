@@ -553,10 +553,10 @@ fn unmount_then_a_hole_one_revolution_later() -> UnmountThenAHoleOneRevolutionLa
 fn an_unmount_sequence_root_after_a_hole_one_revolution_later_is_not_judged_against_the_old_root_left_in_the_hole(
 ) {
     let history = unmount_then_a_hole_one_revolution_later();
-    let v = history.raised_floor;
+    let raised_floor = history.raised_floor;
     let ring_before = root_txgs_in_the_ring(&history.crashed);
     assert!(
-        ring_before.contains(&v) && ring_before.contains(&(v - 1)),
+        ring_before.contains(&raised_floor) && ring_before.contains(&(raised_floor - 1)),
         "挂载之前 v 与 v − 1 的根都在环里：{ring_before:?}"
     );
     assert_eq!(
@@ -567,8 +567,8 @@ fn an_unmount_sequence_root_after_a_hole_one_revolution_later_is_not_judged_agai
     let ring_after = root_txgs_in_the_ring(&history.after_the_remount);
     assert!(
         !ring_after.contains(&history.hole_txg)
-            && ring_after.contains(&(v - 1))
-            && !ring_after.contains(&v),
+            && ring_after.contains(&(raised_floor - 1))
+            && !ring_after.contains(&raised_floor),
         "洞那一槽留着 v − 1 的根，v 那一槽被盖掉：{ring_after:?}"
     );
     assert!(
@@ -595,15 +595,15 @@ fn an_unmount_sequence_root_after_a_hole_one_revolution_later_is_not_judged_agai
 fn an_unmount_sequence_root_raising_the_floor_above_the_previous_root_inside_both_windows_still_reddens_the_rollback_floor_invariant(
 ) {
     let history = unmount_then_a_hole_one_revolution_later();
-    let v = history.raised_floor;
+    let raised_floor = history.raised_floor;
     let mut image = history.crashed;
-    rewrite_the_floor_of_the_root_at(&mut image, v + 1, v + 1);
+    rewrite_the_floor_of_the_root_at(&mut image, raised_floor + 1, raised_floor + 1);
     match rollback_floor_verdict(&image) {
         InvariantVerdict::Violated(detail) => assert!(
             detail.contains(&format!(
-                "txg {} 那条带卸载记号的根把回退下界 F 从 0 抬到 {}，高于根环里 txg 比它小的最新那条根的 txg {v}",
-                v + 1,
-                v + 1
+                "txg {} 那条带卸载记号的根把回退下界 F 从 0 抬到 {}，高于根环里 txg 比它小的最新那条根的 txg {raised_floor}",
+                raised_floor + 1,
+                raised_floor + 1
             )),
             "红在带卸载记号那一支、前一条根 v：{detail}"
         ),

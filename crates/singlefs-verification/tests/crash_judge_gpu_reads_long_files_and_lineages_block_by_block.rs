@@ -80,7 +80,7 @@ use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
-    gpu_card_pool_or_report_not_run, GpuCardPool,
+    gpu_card_pool_or_report_not_run, GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, RetainedWrite,
@@ -536,7 +536,7 @@ struct CpuJudgementOfAState {
 
 /// 每个状态两边各判一遍：GPU 结论字与 CPU 那一侧，按状态序号。卡借不到（等满了、或没有独显）交 `None`。
 fn judge_every_state_on_both_sides(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     test_name: &str,
     flow: &RecordedFlow,
 ) -> Option<(Vec<[u32; VERDICT_WORDS]>, Vec<CpuJudgementOfAState>)> {

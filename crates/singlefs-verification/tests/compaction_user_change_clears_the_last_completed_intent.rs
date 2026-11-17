@@ -10,10 +10,10 @@ use singlefs_core::address::{DeviceIdentity, SlotNumber};
 use singlefs_core::allocator::UnitFootprint;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::compaction_plan::{
-    CallerMonotonicClockReading, CallerOfTheBackgroundCompaction, CompactionBatchSize,
-    CompactionBatchUnits, CompactionPacing, CompactionRunForcing, CompactionRunStop,
-    CompactionStartJudgement, CompactionSwitches, CompactionTimerFallback,
-    CompactionWriteBandwidthLimit, ForegroundFsync,
+    AnswerOfTheCallerBeforeTheNextBatch, CallerMonotonicClockReading,
+    CallerOfTheBackgroundCompaction, CompactionBatchSize, CompactionBatchUnits, CompactionPacing,
+    CompactionRunForcing, CompactionRunStop, CompactionStartJudgement, CompactionSwitches,
+    CompactionTimerFallback, CompactionWriteBandwidthLimit,
 };
 use singlefs_core::logged_operations::{CompactionIntent, CompactionRegion};
 use singlefs_core::mount::mount_writable;
@@ -194,8 +194,8 @@ impl CallerOfTheBackgroundCompaction for CallerWithNoForegroundFsync {
         CallerMonotonicClockReading(Duration::ZERO)
     }
 
-    fn foreground_fsync(&self) -> ForegroundFsync {
-        ForegroundFsync::NoneWaiting
+    fn answer_before_the_next_batch(&self) -> AnswerOfTheCallerBeforeTheNextBatch {
+        AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
     }
 }
 

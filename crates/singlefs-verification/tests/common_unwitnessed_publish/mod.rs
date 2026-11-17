@@ -32,7 +32,7 @@ use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
 /// 录的那一次发布 R 是哪一种。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PublishRecordedAsR {
+pub enum RecordedPublishKind {
     /// 覆盖写一次（一个数据单元，一条记录）：K1-2 那一形的 R。
     Overwrite,
     /// 顺序写三个数据单元（每个数据单元一个事务、一条记录，末条另点名全部元数据单元）：三个数据单元那一形的 R。
@@ -64,7 +64,7 @@ pub struct RecordedPublish {
 /// 起池、覆盖写或录的那次发布被拒（这几档参数下都落得下）；录的那次发布不是一条根。
 pub fn record_one_publish_after_overwrites(
     overwrites_before: u64,
-    publish: PublishRecordedAsR,
+    publish: RecordedPublishKind,
 ) -> RecordedPublish {
     let stream = SharedStream::retaining_contents();
     let mut pool = PoolUnderTest::start_after_the_first_file_on_devices_of(
@@ -81,10 +81,10 @@ pub fn record_one_publish_after_overwrites(
     let previous_root = *pool.session().current.root();
     let previous_content = pool.content_of_the_current_version.clone();
     let base = pool.image();
-    let operations_before_r = stream.operation_count();
+    let operations_before_the_recorded_publish = stream.operation_count();
     match publish {
-        PublishRecordedAsR::Overwrite => pool.overwrite(OVERWRITE_BYTES),
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits => {
+        RecordedPublishKind::Overwrite => pool.overwrite(OVERWRITE_BYTES),
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits => {
             pool.sequential_write(content_bytes_of_three_data_units())
         }
     }
@@ -92,7 +92,7 @@ pub fn record_one_publish_after_overwrites(
     let root = *pool.session().current.root();
     let operations = stream.retained_operations();
     let (writes, _segments, _stream_indexes) = writes_and_segments_with_stream_indexes(
-        &operations[operations_before_r..],
+        &operations[operations_before_the_recorded_publish..],
         &fixed_geometry_of_the_384_slot_small_devices(),
     );
     let root_indices: Vec<usize> = writes
@@ -489,7 +489,7 @@ pub fn pool_after_the_mount(
 
 /// R 写出的单元里，`image` 上逐字节已不是 R 写的那几份（盘、偏移）。
 #[must_use]
-pub fn units_of_r_overwritten_on(
+pub fn units_of_the_recorded_publish_overwritten_on(
     recorded: &RecordedPublish,
     image: &MemoryPool,
 ) -> Vec<(DeviceIdentity, u64)> {
@@ -594,7 +594,7 @@ enum UserActionAfterTheMount {
 ///
 /// # Panics
 /// 断言不成立（写掉了 R 的单元，或被拒时已经写了盘）；M1 没有写行那次发布的根槽写；三次用户动作有一次被拒（384 槽小盘上都落得下）。
-pub fn mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_user_actions(
+pub fn mount_writable_and_assert_the_units_of_the_recorded_publish_stay_unwritten_through_three_user_actions(
     recorded: &RecordedPublish,
     crash_image: &MemoryPool,
     ranges: &RangesReadingBackAllZero,
@@ -629,7 +629,7 @@ pub fn mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_use
     let mut image_before_the_row_root = crash_image.clone();
     image_before_the_row_root.apply_writes(&mount_writes[..row_root]);
     assert_eq!(
-        units_of_r_overwritten_on(recorded, &image_before_the_row_root),
+        units_of_the_recorded_publish_overwritten_on(recorded, &image_before_the_row_root),
         Vec::<(DeviceIdentity, u64)>::new(),
         "{cell}：写行那次发布的根落盘之前，M1 写下的一切都没碰 R 的单元"
     );
@@ -652,11 +652,53 @@ pub fn mount_writable_and_assert_the_units_of_r_stay_unwritten_through_three_use
         let image = pool.image();
         if root_is_in_the_ring(&image, recorded.key) {
             assert_eq!(
-                units_of_r_overwritten_on(recorded, &image),
+                units_of_the_recorded_publish_overwritten_on(recorded, &image),
                 Vec::<(DeviceIdentity, u64)>::new(),
                 "{cell}：M1 之后{user_action:?}，R 的根还在根环里，R 的单元一份都没被写掉"
             );
         }
     }
     Ok(effective)
+}
+
+/// 每块盘世代号最大的那一槽写回成世代号 g - 2 的一份：字段抄另一槽（见证值因此与另一槽相同，不是 g - 2 那次轮换写下的值），整槽校验和重封，每块盘两槽都自证过。
+/// 读这份盘面时 c_见证 落回另一槽带的值，而每块盘两槽都自证过，乙入判不出（C971（多处读坏时可写挂载写出倒挂的新实例根））不拒，可写挂载往下走到它要测的那一判。
+/// **这是两块盘都丢掉一次已确认的写的盘面，不是任何一次崩溃的状态**：世代号最大的那次轮换属于前面那次已经返回的发布（`transaction` 发布末尾那道屏障之后才返回），
+/// 后面那次发布的轮换落在另一槽、碰不到它，任何崩溃态的 c_见证 都不小于它的尾。丢写归 C6（块层语义假设写错），D22（单元原子性怎么合成） 已定项 8 射程写明不罩；
+/// 用这份盘面的用例钉的是产品在这张盘上的行为，不说这张盘走得到。造法照 `tests/common/mod.rs` 的 `abandon_the_newest_root_by_a_recovery_hiding_its_root_slot_and`。
+pub fn image_where_both_devices_lost_their_newest_rotation_write(image: &MemoryPool) -> MemoryPool {
+    let configuration = choose_system_configuration(image).expect("择得到系统配置");
+    let spacing = u64::from(configuration.immutable.sizes.fixed_structure_slot_spacing);
+    let filesystem_identifier = configuration.immutable.filesystem_identifier;
+    let mut rewritten = image.clone();
+    let identities: Vec<DeviceIdentity> = image.devices.keys().copied().collect();
+    for device in identities {
+        let mut self_verified = singlefs_core::recovery::verified_system_configuration_slots(
+            image,
+            device,
+            spacing,
+            &filesystem_identifier,
+        );
+        self_verified.sort_by_key(|slot| slot.quantities.slot_generation);
+        let [older, newest] = <[_; 2]>::try_from(self_verified).expect("每块盘两槽都自证得过");
+        let generation_of_the_newest = newest.quantities.slot_generation;
+        let mut rotation_before = older;
+        rotation_before.quantities.slot_generation = generation_of_the_newest
+            .checked_sub(2)
+            .expect("世代号最大的那一次轮换之前至少还有两次轮换");
+        let bytes = rotation_before.to_slot();
+        rewritten
+            .devices
+            .get_mut(&device)
+            .expect("池里有这块盘")
+            .write(
+                DeviceOffsetInBytes(
+                    (generation_of_the_newest
+                        % singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                        * spacing,
+                ),
+                &bytes[..],
+            );
+    }
+    rewritten
 }

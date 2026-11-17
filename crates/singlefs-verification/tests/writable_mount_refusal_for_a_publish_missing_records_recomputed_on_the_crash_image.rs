@@ -1,5 +1,5 @@
 //! 「记录有缺口时拒可写」（D23（journal 的角色与格式） 已定项 14，F1 乙）那一拒在拒绝合法判法里归到单子上
-//! （`singlefs_verification::mount_transparency::RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify`），
+//! （`singlefs_verification::mount_transparency::RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify`），
 //! 判据由判法在崩溃镜像上自己复算（判决 `research/prompts/m3-batch33t-code-r1-main-verification.md` 第二节 T4 那一行）：水位之上某次没施加的发布
 //! 读得出的记录本次发布内序号不连续或缺末条、且某个点名单元两份副本都验不过。
 //!
@@ -8,8 +8,8 @@ mod common_unwitnessed_publish;
 
 use common_unwitnessed_publish::{
     devices_reading_back_all_zero_on, image_of_devices_reading_back_all_zero,
-    record_one_publish_after_overwrites, PublishRecordedAsR, RangesReadingBackAllZero,
-    RecordedPublish,
+    record_one_publish_after_overwrites, RangesReadingBackAllZero, RecordedPublish,
+    RecordedPublishKind,
 };
 use singlefs_core::journal::JournalRecord;
 use singlefs_core::mount::{
@@ -18,18 +18,19 @@ use singlefs_core::mount::{
 use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_verification::memory_pool::{MemoryPool, RetainedWrite};
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal_of_a_crash_state, read_recovery_fields, ComparedVersion,
-    DiskAfterTheRefusal, ReadFaultsInTheCrashState, ReadOnlyReadBackOfTheCrashImage,
-    RefusalConditionNotMet, RefusalReasonOnTheD23List, WritableMountRefusalVerdict,
+    judge_writable_mount_refusal_of_a_crash_state_of_the_pool, read_recovery_fields,
+    ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
+    ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
+    RefusalReasonOnTheLegalRefusalList, WritableMountRefusalVerdict,
 };
 use singlefs_verification::segments::StepKind;
 
-const OVERWRITES_BEFORE_R: u64 = 5;
+const OVERWRITES_BEFORE_THE_RECORDED_PUBLISH: u64 = 5;
 
 fn recorded_publish_of_three_records() -> RecordedPublish {
     let recorded = record_one_publish_after_overwrites(
-        OVERWRITES_BEFORE_R,
-        PublishRecordedAsR::SequentialWriteOfThreeDataUnits,
+        OVERWRITES_BEFORE_THE_RECORDED_PUBLISH,
+        RecordedPublishKind::SequentialWriteOfThreeDataUnits,
     );
     assert_eq!(recorded.record_count(), 3, "顺序写三个数据单元切成三条记录");
     recorded
@@ -99,7 +100,7 @@ fn image_with_the_writes_zeroed(image: &MemoryPool, writes: &[&RetainedWrite]) -
 }
 
 /// 可写挂载在 `crash_image` 上读到 `ranges` 那几段全零：拒成 F1 那一个成员、点名 R，盘上逐字节不变；交回那一拒。
-fn refusal_of_the_writable_mount_for_the_missing_records_of_r(
+fn refusal_of_the_writable_mount_for_the_missing_records_of_the_recorded_publish(
     recorded: &RecordedPublish,
     crash_image: &MemoryPool,
     ranges: &RangesReadingBackAllZero,
@@ -131,7 +132,7 @@ fn refusal_of_the_writable_mount_for_the_missing_records_of_r(
 
 /// 崩溃镜像上 R 只落了第一条记录，它点名的一个单元两份盘面都是全零：可写挂载拒成 F1，判法把这一拒归到单子上、在崩溃镜像上复算判据为真
 /// （读得出的序号只有 1、没有末条；那个点名单元两份都验不过），盘上逐字节不变、只读读出在允许集合里，拒得合法。
-/// 判别力：F1 那一拒照旧归「不在单子上」（变异「F1 的拒照旧归到不在 D23 单子上」）时判成 `ReasonNotOnTheD23List`，这一条红。
+/// 判别力：F1 那一拒照旧归「不在单子上」（变异「F1 的拒照旧归到不在 D23 单子上」）时判成 `ReasonNotOnTheLegalRefusalList`，这一条红。
 #[test]
 fn a_refusal_for_a_publish_missing_records_whose_named_unit_fails_on_both_copies_of_the_crash_image_is_legal(
 ) {
@@ -141,7 +142,7 @@ fn a_refusal_for_a_publish_missing_records_whose_named_unit_fails_on_both_copies
         &crash_image_with_only_the_first_record_of_the_publish(&recorded),
         &both_copies,
     );
-    let refusal = refusal_of_the_writable_mount_for_the_missing_records_of_r(
+    let refusal = refusal_of_the_writable_mount_for_the_missing_records_of_the_recorded_publish(
         &recorded,
         &crash_image,
         &RangesReadingBackAllZero::default(),
@@ -155,16 +156,18 @@ fn a_refusal_for_a_publish_missing_records_whose_named_unit_fails_on_both_copies
         "R 整次不施加：崩溃镜像上只读恢复落到 P"
     );
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &recorded.pool.parameters.filesystem_identifier,
             selected_version,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify
+            RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify
         )
     );
 }
@@ -176,7 +179,7 @@ fn a_refusal_for_a_publish_missing_records_is_illegal_on_a_crash_image_whose_nam
     let recorded = recorded_publish_of_three_records();
     let crash_image = crash_image_with_only_the_first_record_of_the_publish(&recorded);
     let both_copies = unit_writes_of_the_first_unit_named_by_the_first_record(&recorded);
-    let refusal = refusal_of_the_writable_mount_for_the_missing_records_of_r(
+    let refusal = refusal_of_the_writable_mount_for_the_missing_records_of_the_recorded_publish(
         &recorded,
         &crash_image,
         &RangesReadingBackAllZero::default().with_the_writes(&both_copies),
@@ -185,17 +188,19 @@ fn a_refusal_for_a_publish_missing_records_is_illegal_on_a_crash_image_whose_nam
         .report
         .effective_root;
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &recorded.pool.parameters.filesystem_identifier,
             selected_version,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
             reason:
-                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+                RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
@@ -233,17 +238,19 @@ fn a_refusal_claimed_for_missing_records_is_illegal_on_a_crash_image_holding_eve
         },
     ));
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &recorded.pool.parameters.filesystem_identifier,
             selected_version,
             &claimed_refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
             reason:
-                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+                RefusalReasonOnTheLegalRefusalList::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],

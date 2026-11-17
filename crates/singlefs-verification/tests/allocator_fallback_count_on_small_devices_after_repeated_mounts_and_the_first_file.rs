@@ -1,8 +1,8 @@
 //! 分配器回落那一支的看门（判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y3「开放段回落误排」那一行）：
 //! 池级 checker 的 I-5.5 拿树表单元所在的段当这一版的开放段，假定「mkfs 之后连续可写挂载（每次挂载写行、暖机两次零单元发布）、
-//! 再写第一个文件」那一族上提交内生块不走回落（`CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot`）。
+//! 再写第一个文件」那一族上提交内生块不走回落（`CommitGeneratedDeviceAnswer::FallBack`）。
 //! 单元区 240 / 256 / 384 槽的小盘、挂载 1、12、60 次，各一条用例断言分配器的回落计数
-//! （`PoolAllocator::commit_generated_placements_that_fell_back_to_the_lowest_free_slot`）是 0；哪天走进回落，用例红，回来重看 I-5.5 的开放段认法。
+//! （`PoolAllocator::commit_generated_placements_that_fell_back`）是 0；哪天走进回落，用例红，回来重看 I-5.5 的开放段认法。
 //! 阳性对照照 `commit_generated_units_fall_back_when_the_segment_runs_out.rs` 的造法（没有全空段、开放段用满）断言计数大于 0。
 
 mod common;
@@ -126,7 +126,7 @@ fn fallbacks_over_mounts_then_the_first_file(width: HistoryDeviceWidth, mounts: 
             )
             .expect("最后那次挂载之后写第一个文件该成");
         }
-        fallbacks += allocator.commit_generated_placements_that_fell_back_to_the_lowest_free_slot();
+        fallbacks += allocator.commit_generated_placements_that_fell_back();
         pool = pool_of(devices, pool.device_size_in_bytes);
     }
     fallbacks
@@ -230,8 +230,7 @@ fn compaction_switches_with_the_empty_cluster_segments_floor_at_zero() -> Compac
 fn the_fallback_count_is_above_zero_once_no_empty_cluster_segment_is_left() {
     let mut pool = build_pool("allocator-fallback-count-positive-control");
     assert_eq!(
-        pool.allocator
-            .commit_generated_placements_that_fell_back_to_the_lowest_free_slot(),
+        pool.allocator.commit_generated_placements_that_fell_back(),
         0,
         "前提：新池新建文件那一次没走回落"
     );
@@ -260,9 +259,7 @@ fn the_fallback_count_is_above_zero_once_no_empty_cluster_segment_is_left() {
         .expect("没有全空段、每块盘仍有空槽：覆盖写要成功（C369）");
     }
     assert!(
-        pool.allocator
-            .commit_generated_placements_that_fell_back_to_the_lowest_free_slot()
-            > 0,
+        pool.allocator.commit_generated_placements_that_fell_back() > 0,
         "没有全空段时提交内生块走回落，计数要大于 0"
     );
 }

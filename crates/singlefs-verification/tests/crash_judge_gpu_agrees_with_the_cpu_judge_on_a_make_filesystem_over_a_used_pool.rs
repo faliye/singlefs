@@ -40,7 +40,7 @@ use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu_with_threads_against_the_version_table, CrashPointReplayItem,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
-    gpu_card_pool_or_report_not_run, GpuCardPool,
+    gpu_card_pool_or_report_not_run, GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::heavy_threads::{
     own_variable_or_default_heavy_threads, registered_heavy_threads,
@@ -254,7 +254,7 @@ fn pairing_inputs_digest(flow: &RecordedFlow, tables: &JudgeTables) -> [u8; DIGE
 /// 只录那一趟、卡借不到交 `None`。
 // cpu-reference-for-gpu-comparison
 fn judgements_of_both_judges(
-    cards: &'static GpuCardPool,
+    cards: GpuCardPoolStartedAtTheFirstLease,
     flow: &RecordedFlow,
     tables: &JudgeTables,
 ) -> Option<Vec<u8>> {

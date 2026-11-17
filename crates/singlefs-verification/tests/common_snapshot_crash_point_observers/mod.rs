@@ -8,6 +8,7 @@
     reason = "共用的观察者模块：每个测试文件只用其中几样，没用的在那个测试二进制里就是没用到"
 )]
 
+use super::common::{geometry, parameters};
 use super::common_crash_point_observers::POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER;
 use super::common_snapshot_prefix::{
     assert_every_live_snapshot_reads_its_creation_content,
@@ -25,6 +26,12 @@ use singlefs_verification::crash_state_enumeration::{
     CrashPointReplayObserver, CrashPointReplayObserverHandingBackAnImage,
 };
 use singlefs_verification::memory_pool::CrashImage;
+use singlefs_verification::mount_transparency::{
+    continuation_skipped_on_the_refusal_counter,
+    image_after_the_refusal_into_the_undecidable_witness,
+    writable_mount_refusals_into_the_undecidable_witness_of_each_observer,
+    WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER,
+};
 use singlefs_verification::writable_mount_phases::materialized_crash_image;
 
 /// 这一份的仓内路径（观察者代码文件，与 `file!()` 归一之后相同）。
@@ -71,6 +78,7 @@ pub fn observe_the_snapshot_of_the_landed_version(
 /// 留存的映射条目与录流时这一串删除的最后一批那一版逐项相同（`common_snapshot_prefix::assert_the_mount_continued_to_the_settled_shape`）。
 /// 挂载发的写连同挂完的盘交回：判段在挂完的盘上跑池级 checker（判干净时 [`POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER`] 加一）。
 /// 可写挂载与续做真跑实现，只能在 CPU 上（豁免表 `.claude/gate.d/gpu-exemptions.tsv` 的 writable-mount、continuation 两行）。
+/// 可写挂载按乙入判不出拒的态只认那一拒（`mount_transparency::image_after_the_refusal_into_the_undecidable_witness`），续做跳过，另记这一态上续做本来还差几步。
 // gpu-exempt: writable-mount
 // gpu-exempt: continuation
 pub fn observe_the_mount_continuation_under_a_snapshot(
@@ -83,7 +91,31 @@ pub fn observe_the_mount_continuation_under_a_snapshot(
         .effective_root
         .expect("每个状态都择到根（oracle 另判）");
     let landed = version_landed_on(versions_of_the_flow, effective_root);
-    let mounted = mount_writable_on_the_crash_disks(&materialized_crash_image(image));
+    let crash_disks = materialized_crash_image(image);
+    let mounted = match mount_writable_on_the_crash_disks(&crash_disks) {
+        Ok(mounted) => mounted,
+        Err(refused) => {
+            let continuation_steps_left = match &landed {
+                LandedVersionOfTheFlow::BeforeTheFirstFile => 0,
+                LandedVersionOfTheFlow::Version(version) => {
+                    version.continuation_steps_from_this_version
+                }
+            };
+            counts.add(
+                &continuation_skipped_on_the_refusal_counter(continuation_steps_left),
+                1,
+            );
+            return image_after_the_refusal_into_the_undecidable_witness(
+                &refused,
+                &crash_disks,
+                report,
+                &parameters().filesystem_identifier,
+                &geometry(),
+                POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER,
+                counts,
+            );
+        }
+    };
     let continuation_steps =
         assert_the_mount_continued_to_the_settled_shape(landed, &mounted.mounted);
     counts.add(&format!("mount_continuation_steps_{continuation_steps}"), 1);
@@ -290,14 +322,15 @@ pub fn amplify_a_snapshot_flow(
         return run;
     };
     println!(
-        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?}",
+        "CRASH_POINT_REPLAY_OBSERVERS flow={flow_name} images_judged_fresh={} images_judged_on_the_gpu_here={} image_judgements_reused={} blocks_observed_here={} states_observed_here={} states={:?} red={:?} writable_mount_refusals_into_the_undecidable_witness={:?}",
         observing.images_judged_here,
         observing.images_judged_on_the_gpu_here,
         observing.image_judgements_reused,
         observing.blocks_observed_here,
         observing.states_observed_here,
         observing.states_of_each_observer,
-        observing.red_states_of_each_observer
+        observing.red_states_of_each_observer,
+ writable_mount_refusals_into_the_undecidable_witness_of_each_observer(observing)
     );
     let observer_names = [
         standard_prefix_observer.name(),
@@ -305,14 +338,16 @@ pub fn amplify_a_snapshot_flow(
         ObserverOfTheSnapshotSteps::MountContinuationUnderASnapshot.name(),
     ];
     for name in observer_names {
-        let states = observing
-            .states_of_each_observer
-            .get(name)
-            .copied()
-            .unwrap_or(0);
-        assert!(
-            states > 0,
-            "快照流 {flow_name} 经过标准前缀与快照节点，观察者 {name} 一个状态都没看"
+        let states = super::common_crash_point_observers::states_seen_by_the_observer_as_the_block_range_requires(
+            &run,
+            observing,
+            flow_name,
+            name,
+            observers
+                .iter()
+                .find(|attached| attached.observer_name.as_str() == name)
+                .map(|attached| attached.nodes.as_slice()),
+            &format!("快照流 {flow_name} 经过标准前缀与快照节点，观察者 {name} 一个状态都没看"),
         );
         assert_eq!(
             observing
@@ -339,9 +374,10 @@ pub fn amplify_a_snapshot_flow(
             assert_eq!(
                 (0..=mount_continuation_steps_at_most)
                     .map(|steps| count_named(&format!("mount_continuation_steps_{steps}")))
-                    .sum::<u64>(),
+                    .sum::<u64>()
+                    + count_named(WRITABLE_MOUNT_REFUSED_INTO_THE_UNDECIDABLE_WITNESS_COUNTER),
                 states,
-                "快照流 {flow_name}：观察者 {name} 看的每个状态都可写挂载过一次"
+                "快照流 {flow_name}：观察者 {name} 看的每个状态都可写挂载过一次，没被乙入判不出拒的都续做了"
             );
             assert_eq!(
                 count_named(POOL_CHECKER_CLEAN_AFTER_THE_MOUNT_COUNTER),

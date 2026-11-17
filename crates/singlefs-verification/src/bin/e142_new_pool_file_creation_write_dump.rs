@@ -480,7 +480,7 @@ mod tests {
 
     /// mkfs 收了而后面某一步没走通的，照旧当实现的毛病（panic），不混进命令行给错了那一种。
     #[test]
-    fn a_failure_after_make_filesystem_stays_an_implementation_failure() {
+    fn failure_after_make_filesystem_stays_an_implementation_failure() {
         for failed_step in [
             NewPoolFileCreationPathStep::InstanceAcquisition,
             NewPoolFileCreationPathStep::WarmUp,

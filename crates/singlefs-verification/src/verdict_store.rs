@@ -82,6 +82,26 @@
 //! |---|---|---|
 //! | 对拍结论 | `19` ‖ 输入摘要（32 字节）‖ 一边的判法单元指纹（32 字节）‖ 另一边的判法单元指纹（32 字节） | 对拍的结论（调用方给的字节）、两边比下来一致还是不一致（1 字节，[`PairingAgreement`]；不一致的下一趟现判）、判定日期与跑法 |
 //!
+//! 对拍（GPU 一侧与 CPU 参照算同一份输入、比结果）的输入另用一张表，判的不是崩溃状态的对拍经它过库（`crash_library::pairing_input_through_the_pairing_library`）：
+//!
+//! | 表 | 键 | 值 |
+//! |---|---|---|
+//! | 对拍输入 | `1C` ‖ 摘要（32 字节） | 对拍的输入（调用方给的字节；摘要就是这份字节的 SHA-256）。录入段写进来，判段按清单里的摘要读回、核过摘要再交给两边 |
+//!
+//! 配了 GPU 的判段不在自己进程里持卡判，把要判的块写成待判行、等 GPU 批处理服务（`gpu-verification-server`）判完写回，另用两张表
+//! （协议里的 `gpu-pending/<流键>/<块号>` 与 `gpu-rejudged/<入池序号>/<流键>/<块号>` 两族）：
+//!
+//! | 表 | 键 | 值 |
+//! |---|---|---|
+//! | 待判行 | `1D` ‖ 流键（32 字节，[`GpuPendingStreamKey`]）‖ 块号（8 字节，计划里全部点的块按次序编号） | [`GpuPendingRow`]：录入表那一块的键（块键）、录下的流程的摘要、判表摘要、块的态序号区间、期待的 GPU 判器组键与结论版本键、强制现判、入池序号 |
+//! | 强制现判凭据 | `1E` ‖ 入池序号（8 字节）‖ 流键（32 字节）‖ 块号（8 字节） | [`GpuRejudgedRow`]：判它的服务持有者身份、结论摘要 |
+//!
+//! 「判完」不存：服务与判段都照判段那两个口径在库上现算（复用口径 `crash_amplification::ConclusionsStoredUnder::is_stored_for_reuse`、
+//! 续点口径 `crash_amplification::ConclusionsStoredUnder::is_judged_with_the_slots`；服务调 `crash_amplification::judging_of_a_gpu_pending_block_in_the_library`）。
+//! 服务写结论的那一帧里删掉待判行；判段写待判行时不在才写，在而不强制、这一份要强制现判就改成强制
+//! （[`VerdictStore::put_the_gpu_pending_row_unless_present_or_raise_it_to_forced`]）。服务写的那一帧的结论行照判段存结论块的同一套规矩编
+//! （[`VerdictStore::conclusion_block_rows_for_one_frame_with_the_slots_the_judge_handed_back`]），不经这个进程写库。
+//!
 //! 结论种类 = `01`（镜像判定：GPU 判器与 CPU 判器判出的都是这一种，在哪判的只进块属性）、`02`（观察者），
 //! 别的字节读回认不出。版本是 `crash_identity::ConclusionVersion`，取自判法单元指纹
 //! （`crash_identity::judging_units_key`；镜像判定那一把是判定定义那一组与 GPU 判器那一组并成的一把，`crash_identity::image_judgement_units_key`）。
@@ -157,6 +177,211 @@ pub struct StateOffsetInBlock(pub u64);
 /// 命中就不再录；判段照同一份输入现算它，凭它读清单。不带项名、流名。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RecordingKey(pub [u8; SHA256_DIGEST_BYTES]);
+
+/// 待判行的流键：一份录下的流程与它的打包判表照一把 GPU 判器组键判、结论记在一把结论版本下的那一条流（`crash_amplification::gpu_pending_stream_key`）。
+/// 块号只在一条流里有意义：同一份判表、不同的流程、判器或版本是几条流，待判行互不相盖。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GpuPendingStreamKey(pub [u8; SHA256_DIGEST_BYTES]);
+
+/// 待判行里的强制现判：服务见 [`Self::Forced`] 一律现判、不读库里已有的结论，写结论那一帧另写一行强制现判凭据（[`GpuRejudgedRow`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForcedRejudging {
+    NotForced,
+    Forced,
+}
+
+/// 待判行的值（[`VerdictStoreTable::GpuPendingRows`]）：指向录入表那一块（块键），不另抄旋钮与判表。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GpuPendingRow {
+    /// 录入表那一块的键：服务判完照它（连同结论种类与 [`Self::conclusion_version`]）写结论块。
+    pub recorded_block: VerdictBlockKey,
+    /// 录下的流程（`crash_amplification::RecordedFlow`，库里「录下的流程」那张表）的摘要：服务照它读回流、排计划，
+    /// 解结论字要的盘序、基镜像的逐盘自证槽数与按发布分的态数都从这条流来。
+    pub recorded_flow_digest: [u8; SHA256_DIGEST_BYTES],
+    /// 打包判表的摘要（`sha256(PackedJudgeTables::to_bytes())`，与库里存判表的键同一个）：服务照它读判表。
+    pub packed_judge_tables_digest: [u8; SHA256_DIGEST_BYTES],
+    /// 这一块的状态在判表里的序号区间（点的起点加块在点里的区间）。
+    pub state_ordinals: std::ops::Range<u64>,
+    /// 期待的 GPU 判器组键：服务自己编进去的那一把与它不同就不认领。
+    pub expected_gpu_judge_units: JudgingUnitsFingerprint,
+    /// 期待的结论版本键：结论写在这一把版本下。
+    pub conclusion_version: ConclusionVersion,
+    pub forced: ForcedRejudging,
+    /// 入池序号：写这一行那一刻的纳秒数（自 UNIX 纪元），服务按它排先后；强制现判凭据的键带它。
+    pub pool_entry_number: u64,
+}
+
+/// 待判行值的头一个字节：写法换了就换它，头一个字节不是它的读成不合布局。
+const GPU_PENDING_ROW_FORMAT_NUMBER: u8 = 1;
+
+/// 待判行值的字节数：格式号、块键、录下的流程的摘要、判表摘要、态序号区间两端、两把键、强制现判、入池序号。
+const GPU_PENDING_ROW_VALUE_BYTES: usize = 1
+    + BLOCK_KEY_BYTES
+    + SHA256_DIGEST_BYTES
+    + SHA256_DIGEST_BYTES
+    + 8
+    + 8
+    + SHA256_DIGEST_BYTES
+    + SHA256_DIGEST_BYTES
+    + 1
+    + 8;
+
+impl GpuPendingRow {
+    /// 存进库的字节：格式号 1 字节、块键、录下的流程的摘要、判表摘要、态序号区间的起止（各 8 字节大端）、期待的 GPU 判器组键、结论版本键、
+    /// 强制现判（`00` 不强制、`01` 强制）、入池序号（8 字节大端）。
+    #[must_use]
+    pub fn to_value_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(GPU_PENDING_ROW_VALUE_BYTES);
+        bytes.push(GPU_PENDING_ROW_FORMAT_NUMBER);
+        bytes.extend_from_slice(&self.recorded_block.to_block_key_bytes());
+        bytes.extend_from_slice(&self.recorded_flow_digest);
+        bytes.extend_from_slice(&self.packed_judge_tables_digest);
+        bytes.extend_from_slice(&self.state_ordinals.start.to_be_bytes());
+        bytes.extend_from_slice(&self.state_ordinals.end.to_be_bytes());
+        bytes.extend_from_slice(&self.expected_gpu_judge_units.0);
+        bytes.extend_from_slice(&self.conclusion_version.0);
+        bytes.push(match self.forced {
+            ForcedRejudging::NotForced => 0x00,
+            ForcedRejudging::Forced => 0x01,
+        });
+        bytes.extend_from_slice(&self.pool_entry_number.to_be_bytes());
+        bytes
+    }
+
+    /// [`Self::to_value_bytes`] 的逆；格式号不对、长度不对、强制现判那个字节认不出交回 `None`。
+    #[must_use]
+    pub fn from_value_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != GPU_PENDING_ROW_VALUE_BYTES
+            || bytes.first() != Some(&GPU_PENDING_ROW_FORMAT_NUMBER)
+        {
+            return None;
+        }
+        let (recorded_block, rest) =
+            VerdictBlockKey::from_block_key_bytes_with_suffix(&bytes[1..])?;
+        let mut cursor = ByteCursor {
+            bytes: rest,
+            position: 0,
+        };
+        let recorded_flow_digest =
+            <[u8; SHA256_DIGEST_BYTES]>::try_from(cursor.take(SHA256_DIGEST_BYTES)?).ok()?;
+        let packed_judge_tables_digest =
+            <[u8; SHA256_DIGEST_BYTES]>::try_from(cursor.take(SHA256_DIGEST_BYTES)?).ok()?;
+        let start = cursor.big_endian_u64()?;
+        let end = cursor.big_endian_u64()?;
+        let expected_gpu_judge_units =
+            <[u8; SHA256_DIGEST_BYTES]>::try_from(cursor.take(SHA256_DIGEST_BYTES)?).ok()?;
+        let conclusion_version =
+            <[u8; SHA256_DIGEST_BYTES]>::try_from(cursor.take(SHA256_DIGEST_BYTES)?).ok()?;
+        let forced = match cursor.take(1)?.first()? {
+            0x00 => ForcedRejudging::NotForced,
+            0x01 => ForcedRejudging::Forced,
+            _ => return None,
+        };
+        let pool_entry_number = cursor.big_endian_u64()?;
+        cursor.is_at_the_end().then_some(Self {
+            recorded_block,
+            recorded_flow_digest,
+            packed_judge_tables_digest,
+            state_ordinals: start..end,
+            expected_gpu_judge_units: JudgingUnitsFingerprint(expected_gpu_judge_units),
+            conclusion_version: ConclusionVersion(conclusion_version),
+            forced,
+            pool_entry_number,
+        })
+    }
+}
+
+/// 强制现判凭据的值（[`VerdictStoreTable::GpuRejudgedRows`]）：判它的服务持有者身份、它写下的那一份结论的摘要
+/// （`crash_amplification::ConclusionSpelledOutInVerdictVectors::conclusion_digest`）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GpuRejudgedRow {
+    pub holder_identity: Vec<u8>,
+    pub conclusion_digest: [u8; SHA256_DIGEST_BYTES],
+}
+
+impl GpuRejudgedRow {
+    /// 存进库的字节：持有者身份的字节数（4 字节大端）与身份、结论摘要。
+    #[must_use]
+    pub fn to_value_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(4 + self.holder_identity.len() + SHA256_DIGEST_BYTES);
+        bytes.extend_from_slice(
+            &u32::try_from(self.holder_identity.len())
+                .expect("持有者身份是进程随机号、卡序号与判线程号，几十个字节")
+                .to_be_bytes(),
+        );
+        bytes.extend_from_slice(&self.holder_identity);
+        bytes.extend_from_slice(&self.conclusion_digest);
+        bytes
+    }
+
+    /// [`Self::to_value_bytes`] 的逆；读不满、末尾多字节交回 `None`。
+    #[must_use]
+    pub fn from_value_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut cursor = ByteCursor { bytes, position: 0 };
+        let identity_length = usize::try_from(cursor.big_endian_u32()?).ok()?;
+        let holder_identity = cursor.take(identity_length)?.to_vec();
+        let conclusion_digest =
+            <[u8; SHA256_DIGEST_BYTES]>::try_from(cursor.take(SHA256_DIGEST_BYTES)?).ok()?;
+        cursor.is_at_the_end().then_some(Self {
+            holder_identity,
+            conclusion_digest,
+        })
+    }
+}
+
+/// 写一行待判行的结局（[`VerdictStore::put_the_gpu_pending_row_unless_present_or_raise_it_to_forced`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GpuPendingRowPut {
+    /// 这一行原来不在，写下的是调用方给的那一份。
+    Written,
+    /// 这一行已经在（别的趟写的），没重写：交回库里那一份。
+    AlreadyPresent(GpuPendingRow),
+    /// 这一行已经在而不强制现判，调用方给的这一份强制现判：照调用方给的整份写下（强制、它的入池序号），`replaced` 是库里原来那一份。
+    RaisedToForced { replaced: GpuPendingRow },
+}
+
+/// 一行待判行在全仓那一份判定库里的整把键（[`LibraryKeySpace::TheOneLibrary`]：键原样）：GPU 批处理服务写结论那一帧删它、
+/// 照它核删的是自己读到的那一份（服务只连全仓那一份，一次性库的名字空间不在这把键里）。
+#[must_use]
+pub fn key_bytes_of_the_gpu_pending_row_in_the_one_library(
+    stream: &GpuPendingStreamKey,
+    block_number: u64,
+) -> Vec<u8> {
+    VerdictStoreKey::GpuPendingRow(stream, block_number)
+        .to_key_bytes()
+        .0
+}
+
+/// 一行强制现判凭据在全仓那一份判定库里的整把键（同 [`key_bytes_of_the_gpu_pending_row_in_the_one_library`]）：
+/// GPU 批处理服务现判强制现判的块时与结论同一帧写它。
+#[must_use]
+pub fn key_bytes_of_the_gpu_rejudged_row_in_the_one_library(
+    pool_entry_number: u64,
+    stream: &GpuPendingStreamKey,
+    block_number: u64,
+) -> Vec<u8> {
+    VerdictStoreKey::GpuRejudgedRow(pool_entry_number, stream, block_number)
+        .to_key_bytes()
+        .0
+}
+
+/// 一块一种结论在一帧里要写的行（[`VerdictStore::conclusion_block_rows_for_one_frame_with_the_slots_the_judge_handed_back`]）：
+/// GPU 批处理服务把它连同删待判行、强制现判凭据放进自己的写结论那一帧，这一帧原子地落。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConclusionBlockRowsForOneFrame {
+    /// 这一帧写下去之后的结局；[`VerdictBlockStoring::AlreadyStoredIdentically`] 时结论行一行都没有（判器交回的逐盘槽数那一行可能有）。
+    pub storing: VerdictBlockStoring,
+    /// 要写的行（键、值，键是库里的整把键字节），守卫要看的结论块那一行在的话排最后。
+    pub rows_to_put: Vec<(Vec<u8>, Vec<u8>)>,
+    /// 一份红而整份换上时，旧的那一份有、这一份没有的行（违例、旁表）的键。
+    pub keys_to_delete: Vec<Vec<u8>>,
+    /// 守卫要看的那一行：这一块这一种结论这一把版本的结论块那一行的键。
+    pub guard_key: Vec<u8>,
+    /// 编这一帧之前读到的守卫那一行的值（不在是 `None`）：写的那一帧照它核，此刻库里那一行与它不同就整帧拒。
+    pub guard_row_as_read: Option<Vec<u8>>,
+    /// 要存的那一份结论（判定向量是这个库的编号）：结论摘要照它算（`crash_amplification::ConclusionSpelledOutInVerdictVectors`）。
+    pub conclusion_as_requested: StoredConclusionBlock,
+}
 
 /// 对拍结论的键：输入的摘要与两边判器各自的判法单元指纹（GPU 判器与 CPU 判器、GPU 核对与 CPU 参照这类）。两边次序由调用方定，
 /// 同一种对拍每一趟同一个次序。
@@ -628,7 +853,7 @@ pub struct StoredViolation {
 /// 恢复字旁表里一个状态占几个字节：[`RECOVERY_WORDS_PER_STATE`] 个字，每字 4 字节小端。
 const RECOVERY_WORD_BYTES_PER_STATE: usize = RECOVERY_WORDS_PER_STATE * std::mem::size_of::<u32>();
 
-fn recovery_words_value_bytes(words_of_each_state: &[RecoveryWordsOfState]) -> Vec<u8> {
+pub(crate) fn recovery_words_value_bytes(words_of_each_state: &[RecoveryWordsOfState]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(words_of_each_state.len() * RECOVERY_WORD_BYTES_PER_STATE);
     for words in words_of_each_state {
         for word in words.0 {
@@ -666,7 +891,7 @@ fn recovery_words_from_value_bytes(
 const ABANDONED_ROOT_NAMED_BYTES: usize = 4 + 8;
 
 /// 点名的被抛弃根旁表的值：每个状态先写它点名了几条（4 字节小端），再逐条写实例代号与 checkpoint_txg。
-fn abandoned_roots_named_value_bytes(
+pub(crate) fn abandoned_roots_named_value_bytes(
     roots_of_each_state: &[Vec<AbandonedRootNamedByThePoolChecker>],
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
@@ -1371,6 +1596,8 @@ pub enum VerdictStoreTable {
     PackedJudgeTables,
     /// 给定状态表（`crash_amplification::RecordedGivenStatesTable`）：键是它的摘要，值是它的字节。引擎先写进来、再从这里读回判。
     GivenStatesTables,
+    /// 对拍输入（调用方给的字节）：键是它的摘要，值是它的字节。录入段写进来，判段按清单里的摘要读回。
+    PairingInputs,
     /// 分片进度（C790）：键是段的内容摘要与判器（[`SlicedSegmentProgressKey`]：不带流名、段号），值是 [`SlicedSegmentProgress`]。只是加速，真相以块为准。
     SlicedSegmentProgress,
     /// 观察者两段的录入段（「观察者改走两段」）：一条流的崩溃镜像共用的基底（基础镜像与枚举写表），键是它的摘要，
@@ -1392,6 +1619,10 @@ pub enum VerdictStoreTable {
     /// 观察者真跑一次读过的段，一组一行：键是读集摘要（这份字节的 SHA-256），值是读集的字节（`crash_amplification` 写、读、验摘要）。
     /// 同一组段全库只这一行，见证行按摘要引它。
     ObserverReadSets,
+    /// 待判行（[`GpuPendingRow`]）：键是流键与块号，判段写、GPU 批处理服务读，服务写结论的那一帧里删掉。
+    GpuPendingRows,
+    /// 强制现判凭据（[`GpuRejudgedRow`]）：键是入池序号、流键与块号，服务现判强制现判那一块时与结论同一帧写，判段照哨兵的判据核。
+    GpuRejudgedRows,
 }
 
 impl VerdictStoreTable {
@@ -1425,6 +1656,9 @@ impl VerdictStoreTable {
             Self::PairingConclusions => 0x19,
             Self::ObserverReadSetWitnessRows => 0x1A,
             Self::ObserverReadSets => 0x1B,
+            Self::PairingInputs => 0x1C,
+            Self::GpuPendingRows => 0x1D,
+            Self::GpuRejudgedRows => 0x1E,
         }
     }
 
@@ -1460,7 +1694,10 @@ impl VerdictStoreTable {
             | Self::ObservedImageJudgements
             | Self::PairingConclusions
             | Self::ObserverReadSetWitnessRows
-            | Self::ObserverReadSets => EmptyValueMeaning::DeletionMarker,
+            | Self::ObserverReadSets
+            | Self::PairingInputs
+            | Self::GpuPendingRows
+            | Self::GpuRejudgedRows => EmptyValueMeaning::DeletionMarker,
         }
     }
 
@@ -1495,6 +1732,9 @@ impl VerdictStoreTable {
             0x19 => Some(Self::PairingConclusions),
             0x1A => Some(Self::ObserverReadSetWitnessRows),
             0x1B => Some(Self::ObserverReadSets),
+            0x1C => Some(Self::PairingInputs),
+            0x1D => Some(Self::GpuPendingRows),
+            0x1E => Some(Self::GpuRejudgedRows),
             _ => None,
         }
     }
@@ -1592,7 +1832,10 @@ fn version_field_starts_in_the_key(key_bytes: &[u8]) -> &'static [usize] {
         | VerdictStoreTable::ObserverFoundations
         | VerdictStoreTable::ObservedImages
         | VerdictStoreTable::ObserverReadSetWitnessRows
-        | VerdictStoreTable::ObserverReadSets => &[],
+        | VerdictStoreTable::ObserverReadSets
+        | VerdictStoreTable::PairingInputs
+        | VerdictStoreTable::GpuPendingRows
+        | VerdictStoreTable::GpuRejudgedRows => &[],
     }
 }
 
@@ -1624,6 +1867,8 @@ enum VerdictStoreKey<'key> {
     PackedJudgeTables(&'key [u8; 32]),
     /// 给定状态表的键：它的摘要。
     GivenStatesTable(&'key [u8; 32]),
+    /// 对拍输入的键：它的摘要。
+    PairingInput(&'key [u8; 32]),
     /// 核对表里一块的键：块键 + 核对代码摘要。
     VerifierBlock(&'key VerdictBlockKey, &'key [u8; 32]),
     /// 判法单元组成清单表里一把键的键：判法单元指纹。
@@ -1698,6 +1943,10 @@ enum VerdictStoreKey<'key> {
         &'key ConclusionKind,
         &'key ConclusionVersion,
     ),
+    /// 一行待判行的键：流键 + 块号（8 字节大端）。
+    GpuPendingRow(&'key GpuPendingStreamKey, u64),
+    /// 一行强制现判凭据的键：入池序号（8 字节大端）+ 流键 + 块号（8 字节大端）。
+    GpuRejudgedRow(u64, &'key GpuPendingStreamKey, u64),
 }
 
 /// 按 [`VerdictStoreKey`] 拼出来的键字节。
@@ -1746,6 +1995,7 @@ impl VerdictStoreKey<'_> {
             Self::GivenStatesTable(digest) => {
                 (VerdictStoreTable::GivenStatesTables, digest.to_vec())
             }
+            Self::PairingInput(digest) => (VerdictStoreTable::PairingInputs, digest.to_vec()),
             Self::VerifierBlock(block_key, verifier_digest) => {
                 let mut key_bytes_after_tag = block_key.to_block_key_bytes();
                 key_bytes_after_tag.extend_from_slice(&verifier_digest[..]);
@@ -1832,6 +2082,17 @@ impl VerdictStoreKey<'_> {
                     VerdictStoreTable::ObservedImageJudgements,
                     key_bytes_after_tag,
                 )
+            }
+            Self::GpuPendingRow(stream, block_number) => {
+                let mut key_bytes_after_tag = stream.0.to_vec();
+                key_bytes_after_tag.extend_from_slice(&block_number.to_be_bytes());
+                (VerdictStoreTable::GpuPendingRows, key_bytes_after_tag)
+            }
+            Self::GpuRejudgedRow(pool_entry_number, stream, block_number) => {
+                let mut key_bytes_after_tag = pool_entry_number.to_be_bytes().to_vec();
+                key_bytes_after_tag.extend_from_slice(&stream.0);
+                key_bytes_after_tag.extend_from_slice(&block_number.to_be_bytes());
+                (VerdictStoreTable::GpuRejudgedRows, key_bytes_after_tag)
             }
         };
         let mut key_bytes = Vec::with_capacity(1 + key_bytes_after_tag.len());
@@ -1999,6 +2260,11 @@ impl LibraryWriteBatch {
         });
     }
 
+    /// 同 [`Self::put`]，键与值是调用方刚拼好、之后不用的：收下就放进这一批，不另拷一份（满块的恢复字约 3 MiB）。
+    fn put_owned(&mut self, key: Vec<u8>, value: Vec<u8>) {
+        self.rows.push(LibraryWriteOfARow::Put { key, value });
+    }
+
     fn delete(&mut self, key: impl AsRef<[u8]>) {
         self.rows.push(LibraryWriteOfARow::Delete {
             key: key.as_ref().to_vec(),
@@ -2047,7 +2313,7 @@ fn put_conclusion_rows_into_the_batch(
     conclusion_version: &ConclusionVersion,
     conclusion: &StoredConclusionBlock,
 ) {
-    batch.put(
+    batch.put_owned(
         VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version)
             .to_key_bytes()
             .0,
@@ -2066,20 +2332,20 @@ fn put_conclusion_rows_into_the_batch(
             violation.verdict_vector_number.to_stored_bytes(),
         );
     }
-    batch.put(
+    batch.put_owned(
         VerdictStoreKey::ConclusionCountVector(block_key, kind, conclusion_version)
             .to_key_bytes()
             .0,
         count_vector_bytes(&conclusion.count_vector),
     );
-    batch.put(
+    batch.put_owned(
         VerdictStoreKey::ConclusionBlockAttributes(block_key, kind, conclusion_version)
             .to_key_bytes()
             .0,
         conclusion_block_attribute_bytes(&conclusion.judged_on, &conclusion.circumstances),
     );
     if let Some(recovery_words) = &conclusion.recovery_words {
-        batch.put(
+        batch.put_owned(
             VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version)
                 .to_key_bytes()
                 .0,
@@ -2087,7 +2353,7 @@ fn put_conclusion_rows_into_the_batch(
         );
     }
     if let Some(roots_of_each_state) = &conclusion.abandoned_roots_named_by_the_pool_checker {
-        batch.put(
+        batch.put_owned(
             VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
                 block_key,
                 kind,
@@ -2108,6 +2374,67 @@ enum StoredConclusionComparison {
     /// 块、违例、计数向量、恢复字逐项相同，只有在哪判的（[`JudgingDevice`]）不同：同一张表先后分到两张卡、两台机器上判就是这样，
     /// 结论算已存、留库里先存的那一份块属性，什么都不写。
     StoredIdenticallyOnAnotherJudgingDevice,
+}
+
+/// 一块一种结论在一张旁表里的那一行：结论块表没有这一块时，报错要点名的表、键与说明。
+struct SideRowOfAConclusionBlock {
+    table: VerdictStoreTable,
+    key_bytes: Vec<u8>,
+    reason: &'static str,
+}
+
+/// 读回一块一种结论时，结论违例行在读结论块那一帧前后两次扫出来都不同，最多这样读几遍（[`VerdictStore::read_conclusion_block`]）。
+/// 每一遍对不上，都要有一批改了这把键违例行的写恰好落在这一遍的两次扫之间。
+const CONCLUSION_READ_ATTEMPTS_WHILE_THE_VIOLATION_ROWS_KEEP_CHANGING: usize = 8;
+
+/// 一块一种结论那五行一帧成批点读回来的结局（[`VerdictStore::read_the_conclusion_rows_in_one_frame`]）：结论块在，交五行；不在，交同一帧里
+/// 两张旁表（恢复字、点名的被抛弃根）那两行（存块之前照它分没存过与旁表孤儿）。
+enum ConclusionRowsReadInOneFrameOrTheSideRows {
+    ConclusionBlockStored(ConclusionRowsReadInOneFrame),
+    ConclusionBlockNotStored {
+        recovery_words_value: Option<Vec<u8>>,
+        abandoned_roots_value: Option<Vec<u8>>,
+    },
+}
+
+/// 一块一种结论在结论块表这一侧的五行，一帧成批点读回来、还没解码（结论块在才有这一份）。
+struct ConclusionRowsReadInOneFrame {
+    conclusion_key: VerdictStoreKeyBytes,
+    count_key: VerdictStoreKeyBytes,
+    attribute_key: VerdictStoreKeyBytes,
+    recovery_words_key: VerdictStoreKeyBytes,
+    abandoned_roots_key: VerdictStoreKeyBytes,
+    conclusion_value_bytes: Vec<u8>,
+    count_value: Option<Vec<u8>>,
+    attribute_value: Option<Vec<u8>>,
+    recovery_words_value: Option<Vec<u8>>,
+    abandoned_roots_value: Option<Vec<u8>>,
+}
+
+/// 读窗口上登记的测试动作（用例在这里插进另一个写者）。
+#[cfg(test)]
+type ActionInAReadWindow = std::cell::RefCell<Option<Box<dyn FnMut()>>>;
+
+#[cfg(test)]
+thread_local! {
+    /// 测试开关：这个线程上存块之前那一帧读到结论块不在、旁表有行，重读结论块之前跑的动作。
+    static ACTION_BETWEEN_THE_CONCLUSION_READ_AND_THE_SIDE_ROW_READ: ActionInAReadWindow =
+        const { std::cell::RefCell::new(None) };
+    /// 测试开关：这个线程上读结论块时，先扫的结论违例行扫完、结论块那一帧还没读时跑的动作。
+    static ACTION_BETWEEN_THE_EARLIER_VIOLATION_SCAN_AND_THE_CONCLUSION_ROWS_READ: ActionInAReadWindow =
+        const { std::cell::RefCell::new(None) };
+    /// 测试开关：这个线程上读结论块时，结论块那一帧读完、后扫的结论违例行还没扫时跑的动作。
+    static ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN: ActionInAReadWindow =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// 跑 `read_window` 上登记的动作。动作跑的时候格子是空的：它里面另一个写者读库走到这一处时不再套一层。
+#[cfg(test)]
+fn run_the_action_registered_in(read_window: &'static std::thread::LocalKey<ActionInAReadWindow>) {
+    if let Some(mut action) = read_window.take() {
+        action();
+        read_window.set(Some(action));
+    }
 }
 
 /// 照判、不入库的那几把版本与这个进程里写下的、键里带着它们的行（文件头「照判、不入库的那几把版本」）。版本是判法单元拒算那几组的占位
@@ -2289,7 +2616,7 @@ impl Iterator for RowsOfTwoSourcesMergedByKey<'_> {
 /// （表标签开头）；别家（Python 三家）的键以 ASCII 族名起头，与表标签字节不撞。
 const PRUNE_SERVER_TABLE: Table = Table::Conclusions;
 
-/// 一次性库的名字空间的头一个字节（[`LibraryKeySpace::DisposableLibrary`]）：不是崩溃判定库的表标签（`0x00`–`0x1B`），不是 Python 三家族名的
+/// 一次性库的名字空间的头一个字节（[`LibraryKeySpace::DisposableLibrary`]）：不是崩溃判定库的表标签（`0x00`–`0x1E`），不是 Python 三家族名的
 /// ASCII 字节，也小于服务留给自己记账的那一段（`prune_server::protocol::SERVICE_KEY_LEADING_BYTE_MINIMUM`，`0xF0`）。
 pub const DISPOSABLE_LIBRARY_KEY_SPACE_LEADING_BYTE: u8 = 0xE0;
 
@@ -2406,11 +2733,45 @@ pub struct PruneServerStorage {
     failure_handling: PruneServerFailureHandling,
     key_space: LibraryKeySpace,
     reliable_client: std::sync::Mutex<ReliableClient>,
+    /// 从开这一端起手里拿着容错客户端的纳秒数（读、写、认领、扫各自那一次往返）：判定库锁里有多少花在往返上，
+    /// 取锁时记下它、放锁时再读一次，差就是这一次持锁里的往返（`crate::crash_library` 的持锁时长行）。
+    nanoseconds_with_the_client: std::sync::atomic::AtomicU64,
     /// 前缀扫一帧最多回几条：平常是 [`PRUNE_SERVER_SCAN_ENTRY_LIMIT`]，只有单测改小它（[`Self::scan_at_most_entries_per_frame_for_a_test`]），
     /// 在几行的库上也走「截断就拆前缀」那一支。
     scan_entry_limit: std::sync::atomic::AtomicU32,
     /// 容错客户端追加日志所在的一次性目录（[`Self::connect_with_a_journal_of_its_own`] 建的；随这一端放手删掉）；调用方自己给追加日志路径的是 `None`。
     _journal_directory: Option<crate::crash_library::ExclusiveTemporaryDirectory>,
+}
+
+/// 手里拿着的容错客户端：照 [`ReliableClient`] 用，丢掉时把拿了多久记进 [`PruneServerStorage::nanoseconds_with_the_client_so_far`]。
+struct ReliableClientInUse<'client> {
+    client: std::sync::MutexGuard<'client, ReliableClient>,
+    nanoseconds_with_the_client: &'client std::sync::atomic::AtomicU64,
+    taken_at: std::time::Instant,
+}
+
+impl std::ops::Deref for ReliableClientInUse<'_> {
+    type Target = ReliableClient;
+
+    fn deref(&self) -> &ReliableClient {
+        &self.client
+    }
+}
+
+impl std::ops::DerefMut for ReliableClientInUse<'_> {
+    fn deref_mut(&mut self) -> &mut ReliableClient {
+        &mut self.client
+    }
+}
+
+impl Drop for ReliableClientInUse<'_> {
+    fn drop(&mut self) {
+        self.nanoseconds_with_the_client.fetch_add(
+            u64::try_from(self.taken_at.elapsed().as_nanos())
+                .expect("拿着容错客户端的纳秒数装得进 u64：五百多年"),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
 }
 
 impl PruneServerStorage {
@@ -2433,6 +2794,7 @@ impl PruneServerStorage {
             failure_handling,
             key_space,
             reliable_client: std::sync::Mutex::new(reliable_client),
+            nanoseconds_with_the_client: std::sync::atomic::AtomicU64::new(0),
             scan_entry_limit: std::sync::atomic::AtomicU32::new(PRUNE_SERVER_SCAN_ENTRY_LIMIT),
             _journal_directory: None,
         }))
@@ -2465,6 +2827,7 @@ impl PruneServerStorage {
             failure_handling,
             key_space,
             reliable_client: std::sync::Mutex::new(reliable_client),
+            nanoseconds_with_the_client: std::sync::atomic::AtomicU64::new(0),
             scan_entry_limit: std::sync::atomic::AtomicU32::new(PRUNE_SERVER_SCAN_ENTRY_LIMIT),
             _journal_directory: Some(journal_directory),
         }))
@@ -2500,10 +2863,23 @@ impl PruneServerStorage {
         namespaced
     }
 
-    fn lock_the_reliable_client(&self) -> std::sync::MutexGuard<'_, ReliableClient> {
-        self.reliable_client
+    fn lock_the_reliable_client(&self) -> ReliableClientInUse<'_> {
+        let client = self
+            .reliable_client
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        ReliableClientInUse {
+            client,
+            nanoseconds_with_the_client: &self.nanoseconds_with_the_client,
+            taken_at: std::time::Instant::now(),
+        }
+    }
+
+    /// 从开这一端起手里拿着容错客户端的纳秒数（[`Self::lock_the_reliable_client`] 那几次往返加起来）。
+    #[must_use]
+    pub fn nanoseconds_with_the_client_so_far(&self) -> u64 {
+        self.nanoseconds_with_the_client
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// 成批点读，交回的次序与 `keys` 相同；分段存的拼回整值（文件头「prune-server 那一侧」）；删除记号（空值）读成不在，判定向量两张表里的空值
@@ -2862,17 +3238,17 @@ impl PruneServerStorage {
         })
     }
 
-    /// 认领一个键（租期 [`PRUNE_SERVER_NUMBER_CLAIM_LEASE_MILLISECONDS`]），交回服务答的结局。
+    /// 认领一个键（租期 [`PRUNE_SERVER_NUMBER_CLAIM_LEASE_MILLISECONDS`]），交回服务答的结局；`operation` 只进报错（认领的是什么）。
     ///
     /// # Errors
     /// 认领不成，或回的结局不是一个。
-    fn claim(&self, key_bytes: &[u8]) -> Result<ClaimOutcome, VerdictStoreError> {
+    fn claim(&self, key_bytes: &[u8], operation: &str) -> Result<ClaimOutcome, VerdictStoreError> {
         let claimed = self.lock_the_reliable_client().claim(
             &[(PRUNE_SERVER_TABLE, self.namespaced_key(key_bytes))],
             PRUNE_SERVER_NUMBER_CLAIM_LEASE_MILLISECONDS,
         );
         let outcomes = claimed.map_err(|failure| {
-            prune_server_client_failed(self.failure_handling, "认领判定向量编号", &failure)
+            prune_server_client_failed(self.failure_handling, operation, &failure)
         })?;
         let mut outcomes = outcomes.into_iter();
         match (outcomes.next(), outcomes.next()) {
@@ -2975,7 +3351,8 @@ pub struct VerdictStore {
     /// 复用哨兵判「抽中的块这一趟被现判了没有」只看它（[`Self::conclusion_blocks_offered_since`]），不看块属性：现判出同一份结论时库里一个字节都不动。
     conclusion_blocks_offered_in_this_process: Vec<ConclusionOfABlockUnderAKey>,
     /// 复用哨兵抽中强制现判的那几块：这个进程里问它复用不复用得上一律答不上（[`Self::conclusion_block_is_forced_to_be_judged_again`]），
-    /// 判段照现判、判完照存块的规矩写回；每一趟抽一次、整份换掉（[`Self::force_these_conclusion_blocks_to_be_judged_again`]）。
+    /// 判段照现判、判完照存块的规矩写回；每一趟抽一次、添进来（[`Self::also_force_these_conclusion_blocks_to_be_judged_again`]），
+    /// 用完撤掉自己那几块（[`Self::stop_forcing_these_conclusion_blocks_to_be_judged_again`]）。
     conclusion_blocks_forced_to_be_judged_again: BTreeSet<ConclusionOfABlockUnderAKey>,
     /// 开库之后在只拿 `&self` 的读里从 prune-server 取来的判定向量（编号从按编号的内存表末尾起连续）：读的方法交回判定向量的借用，
     /// 取来的这几种放进 `Box::leak` 的堆里、进程退出才放（一个进程见到的判定向量种数有限，几百上千种、每种几十字节）；
@@ -2986,6 +3363,19 @@ pub struct VerdictStore {
 
 /// 一块一种结论在库里的键：块键、结论种类、版本。
 pub type ConclusionOfABlockUnderAKey = (VerdictBlockKey, ConclusionKind, ConclusionVersion);
+
+/// 一块一种结论一把版本在库里存没存、红不红（[`VerdictStore::conclusion_blocks_stored_and_red`] 成批问的答案）：
+/// 存没存看块属性那一行（与结论块同一批写），红不红看违例表里这一块有没有行。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConclusionBlockInTheLibrary {
+    NotStored,
+    StoredGreen,
+    StoredRed,
+}
+
+/// 成批读观察者录入块那张表时一帧至多问几行：录入段录的观察者那一行一块一份、值随块长涨（一块 2^16 个状态时几百 KiB），
+/// 读回的值攒在内存里直到这一批判完，按这个数一批批读、判完就丢。
+const OBSERVER_BLOCK_ROWS_READ_TOGETHER: usize = 64;
 
 impl VerdictStore {
     /// 核过布局的服务那一端连同读回的判定向量表装成一份：这个进程里的账都从空起。
@@ -3034,15 +3424,48 @@ impl VerdictStore {
             .unwrap_or_default()
     }
 
-    /// 复用哨兵这一趟抽中强制现判的那几块：整份换掉上一趟的（给空的就是一块都不强制）。
-    pub fn force_these_conclusion_blocks_to_be_judged_again(
+    /// 这一份是不是一次性库（[`LibraryKeySpace::DisposableLibrary`]：临时服务里的一段名字空间，全仓那一份的读者看不见它的行）。
+    #[must_use]
+    pub fn is_a_disposable_library(&self) -> bool {
+        match self.service.key_space {
+            LibraryKeySpace::TheOneLibrary => false,
+            LibraryKeySpace::DisposableLibrary(_) => true,
+        }
+    }
+
+    /// 判段写成待判行、GPU 批处理服务替这一趟判完写进库的几块一种结论，照交来存的次序记进 [`Self::conclusion_blocks_offered_since`]
+    /// 那一份账（服务写的结论这个进程没经手，复用哨兵照这一份账判「这一趟现判了没有」）。强制现判的那一块由调用方核过强制现判凭据
+    /// （`crash_amplification` 的待判行那一路）才记。
+    pub fn note_the_conclusion_blocks_the_gpu_verification_server_judged_for_this_run(
         &mut self,
         blocks: impl IntoIterator<Item = ConclusionOfABlockUnderAKey>,
     ) {
-        self.conclusion_blocks_forced_to_be_judged_again = blocks.into_iter().collect();
+        self.conclusion_blocks_offered_in_this_process
+            .extend(blocks);
     }
 
-    /// 这一块这一种结论这一把版本是不是这一趟抽中强制现判的（[`Self::force_these_conclusion_blocks_to_be_judged_again`]）。
+    /// 复用哨兵一趟抽中强制现判的那几块：添进强制现判表，别的趟添的照留。同一条连接上几趟判段同时跑（每次读写现取现放，
+    /// `crate::crash_library::LibraryTakenAtEachReadOrWrite`），各趟只添、只撤自己的（[`Self::stop_forcing_these_conclusion_blocks_to_be_judged_again`]）。
+    pub fn also_force_these_conclusion_blocks_to_be_judged_again(
+        &mut self,
+        blocks: impl IntoIterator<Item = ConclusionOfABlockUnderAKey>,
+    ) {
+        self.conclusion_blocks_forced_to_be_judged_again
+            .extend(blocks);
+    }
+
+    /// 一趟用完自己抽中的强制现判那几块：从强制现判表里撤掉，别的趟添的照留。
+    pub fn stop_forcing_these_conclusion_blocks_to_be_judged_again(
+        &mut self,
+        blocks: impl IntoIterator<Item = ConclusionOfABlockUnderAKey>,
+    ) {
+        for block in blocks {
+            self.conclusion_blocks_forced_to_be_judged_again
+                .remove(&block);
+        }
+    }
+
+    /// 这一块这一种结论这一把版本是不是在强制现判表里（[`Self::also_force_these_conclusion_blocks_to_be_judged_again`]）。
     #[must_use]
     pub fn conclusion_block_is_forced_to_be_judged_again(
         &self,
@@ -3885,6 +4308,237 @@ impl VerdictStore {
         self.read_one_stored_value(&VerdictStoreKey::GivenStatesTable(digest))
     }
 
+    /// 写下一份对拍输入（键是它的摘要）。
+    ///
+    /// # Errors
+    /// 服务写不成。
+    pub fn store_pairing_input(
+        &mut self,
+        digest: &[u8; 32],
+        bytes: &[u8],
+    ) -> Result<(), VerdictStoreError> {
+        self.put_one_synced(&VerdictStoreKey::PairingInput(digest), bytes)
+    }
+
+    /// 读一份对拍输入的字节；没写过交回 None。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    pub fn read_pairing_input(
+        &self,
+        digest: &[u8; 32],
+    ) -> Result<Option<Vec<u8>>, VerdictStoreError> {
+        self.read_one_stored_value(&VerdictStoreKey::PairingInput(digest))
+    }
+
+    /// 写一行待判行，不在才写（协议「待判行」：判段重录同一块时，行已在就不重写）；行已在而不强制现判、这一份强制现判的，改成强制
+    /// （复用哨兵抽中强制现判的那一块撞上别的趟写下的不强制行：照不强制判，服务见库里已判就不判，判段就等不到强制现判凭据）。
+    /// 先在服务里认领这一行的键——认到（这把键从没写过）就写、写帧确认时认领随之释放；服务答已有结论（键写过，可能是服务判完删掉之后留的删除记号）
+    /// 就读回，在的照上面判：交回库里那一份，或照这一份整份写下改成强制；不在的照写。别的客户端认领着就隔一会再问。
+    /// 认领着的那一刻到写下之间别人读不到它；删除记号之后那一次写与改成强制那一次写不经认领（两个判段同时补写同一块时后写的盖先写的，
+    /// 两份只差入池序号与强制现判，强制的那一份不会被不强制的盖回去：不强制的那一份只在行不在时写）。
+    ///
+    /// # Errors
+    /// 读写、认领不成；等过 [`PRUNE_SERVER_NUMBER_CLAIM_WAIT_LIMIT`] 还被别人认领着；库里那一行不合布局。
+    pub fn put_the_gpu_pending_row_unless_present_or_raise_it_to_forced(
+        &self,
+        stream: &GpuPendingStreamKey,
+        block_number: u64,
+        row: &GpuPendingRow,
+    ) -> Result<GpuPendingRowPut, VerdictStoreError> {
+        let key = VerdictStoreKey::GpuPendingRow(stream, block_number).to_key_bytes();
+        let waiting_started = std::time::Instant::now();
+        loop {
+            match self.service.claim(&key.0, "认领待判行")? {
+                ClaimOutcome::Claimed => {
+                    self.put_one_row_through_the_batch(&key.0, &row.to_value_bytes())?;
+                    return Ok(GpuPendingRowPut::Written);
+                }
+                ClaimOutcome::AlreadyConcluded => {
+                    return match self
+                        .read_gpu_pending_rows(&[(*stream, block_number)])?
+                        .pop()
+                    {
+                        Some(Some(present)) => match (present.forced, row.forced) {
+                            (ForcedRejudging::NotForced, ForcedRejudging::Forced) => {
+                                self.put_one_row_through_the_batch(&key.0, &row.to_value_bytes())?;
+                                Ok(GpuPendingRowPut::RaisedToForced { replaced: present })
+                            }
+                            (ForcedRejudging::NotForced, ForcedRejudging::NotForced)
+                            | (ForcedRejudging::Forced, ForcedRejudging::NotForced)
+                            | (ForcedRejudging::Forced, ForcedRejudging::Forced) => {
+                                Ok(GpuPendingRowPut::AlreadyPresent(present))
+                            }
+                        },
+                        Some(None) | None => {
+                            self.put_one_row_through_the_batch(&key.0, &row.to_value_bytes())?;
+                            Ok(GpuPendingRowPut::Written)
+                        }
+                    };
+                }
+                ClaimOutcome::HeldByOther { .. } => {
+                    if waiting_started.elapsed() >= PRUNE_SERVER_NUMBER_CLAIM_WAIT_LIMIT {
+                        return Err(self.service.failed(
+                            PRUNE_SERVER_UNAVAILABLE_EXIT_CODE,
+                            format!(
+                                "待判行（块号 {block_number}）被别的客户端认领着，等过 {} 秒还没放",
+                                PRUNE_SERVER_NUMBER_CLAIM_WAIT_LIMIT.as_secs()
+                            ),
+                        ));
+                    }
+                    std::thread::sleep(PRUNE_SERVER_NUMBER_CLAIM_RETRY_INTERVAL);
+                }
+            }
+        }
+    }
+
+    /// 一批待判行（流键与块号），交回的次序与 `rows` 相同；不在（没写过、服务判完删了）是 `None`。成批点读。
+    ///
+    /// # Errors
+    /// 服务读不成；库里的一行不合布局（[`GpuPendingRow::from_value_bytes`] 认不出）。
+    pub fn read_gpu_pending_rows(
+        &self,
+        rows: &[(GpuPendingStreamKey, u64)],
+    ) -> Result<Vec<Option<GpuPendingRow>>, VerdictStoreError> {
+        let keys: Vec<VerdictStoreKeyBytes> = rows
+            .iter()
+            .map(|(stream, block_number)| {
+                VerdictStoreKey::GpuPendingRow(stream, *block_number).to_key_bytes()
+            })
+            .collect();
+        let key_slices: Vec<&[u8]> = keys.iter().map(|key| key.0.as_slice()).collect();
+        self.read_values_kept_in_or_out(&key_slices)?
+            .into_iter()
+            .zip(&keys)
+            .map(|(value, key)| match value {
+                None => Ok(None),
+                Some(value_bytes) => GpuPendingRow::from_value_bytes(&value_bytes)
+                    .map(Some)
+                    .ok_or_else(|| {
+                        stored_bytes_mismatch(
+                            VerdictStoreTable::GpuPendingRows,
+                            &key.0,
+                            "待判行的值不合布局",
+                        )
+                    }),
+            })
+            .collect()
+    }
+
+    /// 库里全部待判行（流键、块号、行），按键的次序（同一条流的按块号）：GPU 批处理服务从这里取待判的块。
+    ///
+    /// # Errors
+    /// 服务扫不成；库里的一行键或值不合布局。
+    pub fn every_gpu_pending_row(
+        &self,
+    ) -> Result<Vec<(GpuPendingStreamKey, u64, GpuPendingRow)>, VerdictStoreError> {
+        let mut rows = Vec::new();
+        self.visit_entries_with_key_prefix_kept_in_or_out(
+            VerdictStoreKey::WholeTablePrefix(VerdictStoreTable::GpuPendingRows).to_key_bytes(),
+            &mut |(key_bytes, value_bytes)| {
+                let not_in_the_layout = || {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::GpuPendingRows,
+                        &key_bytes,
+                        "待判行的键或值不合布局",
+                    )
+                };
+                let after_the_tag = key_bytes
+                    .get(KEY_TAG_BYTES..)
+                    .ok_or_else(not_in_the_layout)?;
+                let (stream_bytes, block_number_bytes) = after_the_tag
+                    .split_at_checked(SHA256_DIGEST_BYTES)
+                    .ok_or_else(not_in_the_layout)?;
+                let stream = GpuPendingStreamKey(
+                    <[u8; SHA256_DIGEST_BYTES]>::try_from(stream_bytes)
+                        .map_err(|_wrong_length| not_in_the_layout())?,
+                );
+                let block_number = u64::from_be_bytes(
+                    <[u8; 8]>::try_from(block_number_bytes)
+                        .map_err(|_wrong_length| not_in_the_layout())?,
+                );
+                let row =
+                    GpuPendingRow::from_value_bytes(&value_bytes).ok_or_else(not_in_the_layout)?;
+                rows.push((stream, block_number, row));
+                Ok(())
+            },
+        )?;
+        Ok(rows)
+    }
+
+    /// 删一行待判行（写删除记号）。产品里由 GPU 批处理服务在写结论的那一帧里删；判段不删。
+    ///
+    /// # Errors
+    /// 服务写不成。
+    pub fn delete_the_gpu_pending_row(
+        &self,
+        stream: &GpuPendingStreamKey,
+        block_number: u64,
+    ) -> Result<(), VerdictStoreError> {
+        let mut batch = LibraryWriteBatch::default();
+        batch.delete(
+            VerdictStoreKey::GpuPendingRow(stream, block_number)
+                .to_key_bytes()
+                .0,
+        );
+        self.write_batch_keeping_the_kept_out_rows_in_this_process(batch)
+    }
+
+    /// 写一行强制现判凭据。产品里由 GPU 批处理服务在现判强制现判那一块、写结论的那一帧里写。
+    ///
+    /// # Errors
+    /// 服务写不成。
+    pub fn store_the_gpu_rejudged_row(
+        &self,
+        pool_entry_number: u64,
+        stream: &GpuPendingStreamKey,
+        block_number: u64,
+        row: &GpuRejudgedRow,
+    ) -> Result<(), VerdictStoreError> {
+        self.put_one_row_through_the_batch(
+            &VerdictStoreKey::GpuRejudgedRow(pool_entry_number, stream, block_number)
+                .to_key_bytes()
+                .0,
+            &row.to_value_bytes(),
+        )
+    }
+
+    /// 读一行强制现判凭据；不在是 `None`。
+    ///
+    /// # Errors
+    /// 服务读不成；库里那一行不合布局。
+    pub fn read_gpu_rejudged_row(
+        &self,
+        pool_entry_number: u64,
+        stream: &GpuPendingStreamKey,
+        block_number: u64,
+    ) -> Result<Option<GpuRejudgedRow>, VerdictStoreError> {
+        let key = VerdictStoreKey::GpuRejudgedRow(pool_entry_number, stream, block_number);
+        match self.read_one_stored_value(&key)? {
+            None => Ok(None),
+            Some(value_bytes) => GpuRejudgedRow::from_value_bytes(&value_bytes)
+                .map(Some)
+                .ok_or_else(|| {
+                    stored_bytes_mismatch(
+                        VerdictStoreTable::GpuRejudgedRows,
+                        &key.to_key_bytes().0,
+                        "强制现判凭据的值不合布局",
+                    )
+                }),
+        }
+    }
+
+    /// 只拿 `&self` 写一行（[`Self::put_one_synced`] 要 `&mut self`；待判行一族在判段与服务里都只握着读的那一把）。
+    fn put_one_row_through_the_batch(
+        &self,
+        key_bytes: &[u8],
+        value_bytes: &[u8],
+    ) -> Result<(), VerdictStoreError> {
+        let mut batch = LibraryWriteBatch::default();
+        batch.put(key_bytes, value_bytes);
+        self.write_batch_keeping_the_kept_out_rows_in_this_process(batch)
+    }
+
     /// 观察者录入段写下一条流的崩溃镜像共用的基底（键是它的摘要；同一摘要再写就是同一份内容，照写）。
     ///
     /// # Errors
@@ -3941,6 +4595,28 @@ impl VerdictStore {
         deduplication_key: &[u8; 32],
     ) -> Result<Option<Vec<u8>>, VerdictStoreError> {
         self.read_one_stored_value(&VerdictStoreKey::ObservedImage(deduplication_key))
+    }
+
+    /// 读几张看过的恢复镜像的字节（[`Self::read_observed_image`] 的成批版：一帧成批点读，不逐张一帧），交回的次序与 `deduplication_keys` 相同，
+    /// 没看过的那一张是 None。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    pub fn read_observed_images_in_one_read(
+        &self,
+        deduplication_keys: &[[u8; 32]],
+    ) -> Result<Vec<Option<Vec<u8>>>, VerdictStoreError> {
+        if deduplication_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let keys: Vec<VerdictStoreKeyBytes> = deduplication_keys
+            .iter()
+            .map(|deduplication_key| {
+                VerdictStoreKey::ObservedImage(deduplication_key).to_key_bytes()
+            })
+            .collect();
+        let key_slices: Vec<&[u8]> = keys.iter().map(|key| key.0.as_slice()).collect();
+        self.read_values_kept_in_or_out(&key_slices)
     }
 
     /// 一个桶的全部读集见证行，按见证摘要的字节序；这个桶还没有见证交回空的。
@@ -4128,6 +4804,35 @@ impl VerdictStore {
             kind,
             judging_units_fingerprint,
         ))
+    }
+
+    /// 读几张观察者交回的镜像在这个判器种类与版本下的池级 checker 结论（[`Self::read_observed_image_judgement`] 的成批版：一帧成批点读），
+    /// 交回的次序与 `deduplication_keys` 相同，没判过的那一张是 None。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    pub fn read_observed_image_judgements_in_one_read(
+        &self,
+        deduplication_keys: &[[u8; 32]],
+        kind: &ConclusionKind,
+        judging_units_fingerprint: &ConclusionVersion,
+    ) -> Result<Vec<Option<Vec<u8>>>, VerdictStoreError> {
+        if deduplication_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let keys: Vec<VerdictStoreKeyBytes> = deduplication_keys
+            .iter()
+            .map(|deduplication_key| {
+                VerdictStoreKey::ObservedImageJudgement(
+                    deduplication_key,
+                    kind,
+                    judging_units_fingerprint,
+                )
+                .to_key_bytes()
+            })
+            .collect();
+        let key_slices: Vec<&[u8]> = keys.iter().map(|key| key.0.as_slice()).collect();
+        self.read_values_kept_in_or_out(&key_slices)
     }
 
     fn put_one_synced(
@@ -4409,6 +5114,141 @@ impl VerdictStore {
         Ok(found)
     }
 
+    /// 几块各自在库里存着的这一种结论的每一把版本（[`Self::conclusion_versions_stored_for`] 的成批版），交回的次序与 `block_keys` 相同、每块里按版本字节排。
+    /// 块键头两个摘要（输入摘要与枚举计划哈希）相同的几块一起扫：块属性表里键以这 64 字节起头的行按键序逐帧扫一遍
+    /// （[`Self::visit_entries_with_key_prefix_kept_in_or_out`]），只留 `block_keys` 里的块、种类是 `kind`、种类之后正好 32 字节版本的那几行；
+    /// 逐块扫读到的就是这几行，同一块的行在扫回的次序里按版本字节排，所以每块交回的与逐块扫的逐项相同。
+    /// 一帧扫回的行可以多出别的种类与不在 `block_keys` 里的块（同一个点上块长不同的那一块另成一组），只丢不留。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    pub fn conclusion_versions_stored_for_blocks(
+        &self,
+        block_keys: &[VerdictBlockKey],
+        kind: &ConclusionKind,
+    ) -> Result<Vec<Vec<ConclusionVersion>>, VerdictStoreError> {
+        let kind_bytes = conclusion_kind_key_bytes(kind);
+        let mut found: Vec<Vec<ConclusionVersion>> = vec![Vec::new(); block_keys.len()];
+        // 键是块键的字节，值是这一块在 `block_keys` 里的下标（同一块给了几次就有几个）
+        let mut positions_of_each_block: HashMap<Vec<u8>, Vec<usize>> = HashMap::new();
+        let mut prefixes_in_the_order_seen: Vec<Vec<u8>> = Vec::new();
+        for (position, block_key) in block_keys.iter().enumerate() {
+            let block_key_bytes = block_key.to_block_key_bytes();
+            let prefix_of_the_group = block_key_bytes[..2 * SHA256_DIGEST_BYTES].to_vec();
+            if !prefixes_in_the_order_seen.contains(&prefix_of_the_group) {
+                prefixes_in_the_order_seen.push(prefix_of_the_group);
+            }
+            positions_of_each_block
+                .entry(block_key_bytes)
+                .or_default()
+                .push(position);
+        }
+        // 迭代上界：组数（块键头 64 字节不同的有几种）；每组逐行看扫回的行
+        for prefix_of_the_group in prefixes_in_the_order_seen {
+            let mut prefix = vec![VerdictStoreTable::ConclusionBlockAttributes.key_tag()];
+            prefix.extend_from_slice(&prefix_of_the_group);
+            self.visit_entries_with_key_prefix_kept_in_or_out(
+                VerdictStoreKeyBytes(prefix),
+                &mut |(key_bytes, _value_bytes)| {
+                    let Some(after_the_tag) = key_bytes.get(KEY_TAG_BYTES..) else {
+                        return Ok(());
+                    };
+                    if after_the_tag.len() < BLOCK_KEY_BYTES {
+                        return Ok(());
+                    }
+                    let (block_key_bytes, suffix) = after_the_tag.split_at(BLOCK_KEY_BYTES);
+                    let Some(positions) = positions_of_each_block.get(block_key_bytes) else {
+                        return Ok(());
+                    };
+                    let Some(version_bytes) = suffix.strip_prefix(kind_bytes.as_slice()) else {
+                        return Ok(());
+                    };
+                    if let Ok(version) = <[u8; SHA256_DIGEST_BYTES]>::try_from(version_bytes) {
+                        for position in positions {
+                            found[*position].push(ConclusionVersion(version));
+                        }
+                    }
+                    Ok(())
+                },
+            )?;
+        }
+        Ok(found)
+    }
+
+    /// 几块几种结论几把版本各自存没存、红不红（交回的次序与 `conclusions` 相同）：块属性那几行一起成批点读（与结论块同一批写、值只有几十字节，
+    /// 同 [`Self::conclusions_missing_for_block`]），存着的再各问一帧违例表这一块的前缀有没有行（[`Self::conclusion_block_has_violations`]）。
+    /// 与逐块照这两样问答的相同；不把结论块读回来。
+    ///
+    /// # Errors
+    /// 服务读不成；块属性那一行在而不合布局（同 [`Self::conclusions_missing_for_block`]，按 `conclusions` 的次序报头一个）。
+    pub fn conclusion_blocks_stored_and_red(
+        &self,
+        conclusions: &[ConclusionOfABlockUnderAKey],
+    ) -> Result<Vec<ConclusionBlockInTheLibrary>, VerdictStoreError> {
+        let attribute_keys: Vec<VerdictStoreKeyBytes> = conclusions
+            .iter()
+            .map(|(block_key, kind, conclusion_version)| {
+                VerdictStoreKey::ConclusionBlockAttributes(block_key, kind, conclusion_version)
+                    .to_key_bytes()
+            })
+            .collect();
+        let key_slices: Vec<&[u8]> = attribute_keys.iter().map(|key| key.0.as_slice()).collect();
+        let attribute_values = self.read_values_kept_in_or_out(&key_slices)?;
+        let mut answers = Vec::with_capacity(conclusions.len());
+        for (((block_key, kind, conclusion_version), attribute_value), attribute_key) in conclusions
+            .iter()
+            .zip(attribute_values)
+            .zip(&attribute_keys)
+        {
+            let Some(attribute_bytes) = attribute_value else {
+                answers.push(ConclusionBlockInTheLibrary::NotStored);
+                continue;
+            };
+            if conclusion_block_attributes_from_bytes(&attribute_bytes).is_none() {
+                return Err(stored_bytes_mismatch(
+                    VerdictStoreTable::ConclusionBlockAttributes,
+                    &attribute_key.0,
+                    "块属性的字节不合布局",
+                ));
+            }
+            answers.push(
+                if self.conclusion_block_has_violations(block_key, kind, conclusion_version)? {
+                    ConclusionBlockInTheLibrary::StoredRed
+                } else {
+                    ConclusionBlockInTheLibrary::StoredGreen
+                },
+            );
+        }
+        Ok(answers)
+    }
+
+    /// 观察者录入块那张表里这几行各自在不在（[`Self::read_observer_block`] 读回的是不是 `Some`，交回的次序与 `rows` 相同）：
+    /// 每 [`OBSERVER_BLOCK_ROWS_READ_TOGETHER`] 行一帧成批点读，读回的值判完在不在就丢。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    pub fn observer_block_rows_stored(
+        &self,
+        rows: &[ConclusionOfABlockUnderAKey],
+    ) -> Result<Vec<bool>, VerdictStoreError> {
+        let mut stored = Vec::with_capacity(rows.len());
+        for rows_read_together in rows.chunks(OBSERVER_BLOCK_ROWS_READ_TOGETHER) {
+            let keys: Vec<VerdictStoreKeyBytes> = rows_read_together
+                .iter()
+                .map(|(block_key, kind, observer_version)| {
+                    VerdictStoreKey::ObserverBlock(block_key, kind, observer_version).to_key_bytes()
+                })
+                .collect();
+            let key_slices: Vec<&[u8]> = keys.iter().map(|key| key.0.as_slice()).collect();
+            stored.extend(
+                self.read_values_kept_in_or_out(&key_slices)?
+                    .into_iter()
+                    .map(|value| value.is_some()),
+            );
+        }
+        Ok(stored)
+    }
+
     /// 存一块一种结论：结论块、它的违例、计数向量、块属性与恢复字同一批同步写下去之后才返回；
     /// 违例状态的判定向量编号取块里那个状态的。同一块在别的种类、别的版本下的行不受影响。这个（块键，种类，版本）下已经存着不同的结论、
     /// 两份里有一份红的：照这一份换上（[`VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed`]）。交来的每一块都记进这个进程的账
@@ -4428,12 +5268,49 @@ impl VerdictStore {
         conclusion_version: &ConclusionVersion,
         record: &ConclusionBlockRecord,
     ) -> Result<VerdictBlockStoring, VerdictStoreError> {
-        self.store_conclusion_block_with_the_abandoned_roots_it_may_name(
+        self.store_conclusion_block_with_the_rows_written_along(
+            block_key,
+            kind,
+            conclusion_version,
+            record.clone(),
+            None,
+            LibraryWriteBatch::default(),
+        )
+    }
+
+    /// 同 [`Self::store_conclusion_block`]，收下整份记录（块与恢复字不另拷一份），判器交回了逐盘自证槽数的（`slots_bytes_the_judge_handed_back`，
+    /// 存在观察者录入块那张表、与结论块同一把键）连同结论那几行同一批、同一帧写：结论块在库里，槽数那一行就在。
+    /// 结论已存着、逐项相同（[`VerdictBlockStoring::AlreadyStoredIdentically`]）时只写槽数那一行（结论在而槽数不在的块照判一遍补上的就是这一路）。
+    ///
+    /// # Errors
+    /// 同 [`Self::store_conclusion_block`]（两份都不红而不同时槽数那一行也不写）。
+    ///
+    /// # Panics
+    /// 同 [`Self::store_conclusion_block`]。
+    pub fn store_conclusion_block_with_the_slots_the_judge_handed_back(
+        &mut self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        record: ConclusionBlockRecord,
+        slots_bytes_the_judge_handed_back: Option<Vec<u8>>,
+    ) -> Result<VerdictBlockStoring, VerdictStoreError> {
+        let mut written_along = LibraryWriteBatch::default();
+        if let Some(slots_bytes) = slots_bytes_the_judge_handed_back {
+            written_along.put_owned(
+                VerdictStoreKey::ObserverBlock(block_key, kind, conclusion_version)
+                    .to_key_bytes()
+                    .0,
+                slots_bytes,
+            );
+        }
+        self.store_conclusion_block_with_the_rows_written_along(
             block_key,
             kind,
             conclusion_version,
             record,
             None,
+            written_along,
         )
     }
 
@@ -4458,26 +5335,165 @@ impl VerdictStore {
             record.block.verdict_vector_number_of_each_state().len(),
             "点名的被抛弃根每个状态一份：调用方给的条数与块长不等"
         );
-        self.store_conclusion_block_with_the_abandoned_roots_it_may_name(
+        self.store_conclusion_block_with_the_rows_written_along(
             block_key,
             kind,
             conclusion_version,
-            record,
+            record.clone(),
             Some(abandoned_roots_named_of_each_state.to_vec()),
+            LibraryWriteBatch::default(),
         )
     }
 
-    /// [`Self::store_conclusion_block`] 与 [`Self::store_conclusion_block_naming_the_abandoned_roots`] 的本体：点名的根给了（`Some`）就同一批写旁表。
-    fn store_conclusion_block_with_the_abandoned_roots_it_may_name(
+    /// 存结论块那几个入口的本体：点名的根给了（`Some`）就同一批写旁表；`written_along` 里的行（判器交回的逐盘槽数）排在结论那几行前面、
+    /// 同一批写，结论已存着、逐项相同时只写它们（它是空的就什么都不写）。这一批怎么编在 [`Self::conclusion_block_batch_with_the_rows_written_along`]。
+    fn store_conclusion_block_with_the_rows_written_along(
         &mut self,
         block_key: &VerdictBlockKey,
         kind: &ConclusionKind,
         conclusion_version: &ConclusionVersion,
-        record: &ConclusionBlockRecord,
+        record: ConclusionBlockRecord,
         abandoned_roots_named_by_the_pool_checker: Option<
             Vec<Vec<AbandonedRootNamedByThePoolChecker>>,
         >,
+        written_along: LibraryWriteBatch,
     ) -> Result<VerdictBlockStoring, VerdictStoreError> {
+        self.conclusion_blocks_offered_in_this_process.push((
+            block_key.clone(),
+            kind.clone(),
+            *conclusion_version,
+        ));
+        let (storing, batch, _requested) = self
+            .conclusion_block_batch_with_the_rows_written_along(
+                block_key,
+                kind,
+                conclusion_version,
+                record,
+                abandoned_roots_named_by_the_pool_checker,
+                written_along,
+            )?;
+        match storing {
+            VerdictBlockStoring::AlreadyStoredIdentically if batch.is_empty() => {
+                return Ok(storing)
+            }
+            VerdictBlockStoring::AlreadyStoredIdentically
+            | VerdictBlockStoring::WrittenAndSynced
+            | VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed => {}
+        }
+        self.write_batch_keeping_the_kept_out_rows_in_this_process(batch)?;
+        Ok(storing)
+    }
+
+    /// 一块一种结论连同判器交回的逐盘自证槽数（`slots_bytes_the_judge_handed_back`）要在一帧里写的行，照
+    /// [`Self::store_conclusion_block_with_the_slots_the_judge_handed_back`] 同一套规矩编（结论相同不写结论行、一份红就整份换上、两份都不红而不同拒），
+    /// 不写库、不记这个进程交来存过：GPU 批处理服务拿它在自己的写结论那一帧里写。守卫要看的那一行（结论块那一行，
+    /// [`ConclusionBlockRowsForOneFrame::guard_key`]）在编之前先读（[`ConclusionBlockRowsForOneFrame::guard_row_as_read`]），之后才读库里那一份结论来比：
+    /// 两次读之间别人写进来的，守卫照先读的那一份核、整帧拒，不会盖掉别人刚写的那一份。判定向量编号照块里给的（调用方已登记进这个库，登记表只追加）。
+    ///
+    /// # Errors
+    /// 同 [`Self::store_conclusion_block`]。
+    ///
+    /// # Panics
+    /// 同 [`Self::store_conclusion_block`]。
+    pub fn conclusion_block_rows_for_one_frame_with_the_slots_the_judge_handed_back(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        record: ConclusionBlockRecord,
+        slots_bytes_the_judge_handed_back: Option<Vec<u8>>,
+    ) -> Result<ConclusionBlockRowsForOneFrame, VerdictStoreError> {
+        let guard_key = VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version)
+            .to_key_bytes()
+            .0;
+        let guard_row_as_read = self
+            .read_values_kept_in_or_out(&[guard_key.as_slice()])?
+            .pop()
+            .expect("点读一把键交回一项");
+        let mut written_along = LibraryWriteBatch::default();
+        if let Some(slots_bytes) = slots_bytes_the_judge_handed_back {
+            written_along.put_owned(
+                VerdictStoreKey::ObserverBlock(block_key, kind, conclusion_version)
+                    .to_key_bytes()
+                    .0,
+                slots_bytes,
+            );
+        }
+        let (storing, batch, conclusion_as_requested) = self
+            .conclusion_block_batch_with_the_rows_written_along(
+                block_key,
+                kind,
+                conclusion_version,
+                record,
+                None,
+                written_along,
+            )?;
+        let mut rows_to_put = Vec::new();
+        let mut guard_row_to_put = None;
+        let mut keys_to_delete = Vec::new();
+        for row in batch.rows {
+            match row {
+                LibraryWriteOfARow::Put { key, value } if key == guard_key => {
+                    guard_row_to_put = Some((key, value));
+                }
+                LibraryWriteOfARow::Put { key, value } => rows_to_put.push((key, value)),
+                LibraryWriteOfARow::Delete { key } => keys_to_delete.push(key),
+            }
+        }
+        rows_to_put.extend(guard_row_to_put);
+        Ok(ConclusionBlockRowsForOneFrame {
+            storing,
+            rows_to_put,
+            keys_to_delete,
+            guard_key,
+            guard_row_as_read,
+            conclusion_as_requested,
+        })
+    }
+
+    /// 单测替 GPU 批处理服务把一帧的结论行写进这个库（要写的、要删的同一批），不核守卫：服务那一侧的写结论帧核守卫与认领。
+    ///
+    /// # Errors
+    /// 服务写不成。
+    #[cfg(all(test, feature = "gpu"))]
+    pub(crate) fn write_the_conclusion_rows_of_one_frame(
+        &self,
+        frame: &ConclusionBlockRowsForOneFrame,
+    ) -> Result<(), VerdictStoreError> {
+        let mut batch = LibraryWriteBatch::default();
+        for (key, value) in &frame.rows_to_put {
+            batch.put(key, value);
+        }
+        for key in &frame.keys_to_delete {
+            batch.delete(key);
+        }
+        self.write_batch_keeping_the_kept_out_rows_in_this_process(batch)
+    }
+
+    /// 存结论块那几个入口要写的那一批（写不写由调用方定）与要存的那一份结论：断言块里的编号是这个库登记过的、恢复字每状态一份，
+    /// 拼出要存的那一份（在哪判的、判定日期与跑法是这个进程此刻的），照 [`Self::put_a_conclusion_block_into_the_batch`] 放进 `written_along` 之后。
+    #[allow(
+        clippy::type_complexity,
+        reason = "存的结局、那一批与要存的那一份结论三样一起交回，各是各的东西"
+    )]
+    fn conclusion_block_batch_with_the_rows_written_along(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        record: ConclusionBlockRecord,
+        abandoned_roots_named_by_the_pool_checker: Option<
+            Vec<Vec<AbandonedRootNamedByThePoolChecker>>,
+        >,
+        written_along: LibraryWriteBatch,
+    ) -> Result<
+        (
+            VerdictBlockStoring,
+            LibraryWriteBatch,
+            StoredConclusionBlock,
+        ),
+        VerdictStoreError,
+    > {
         let registered_count = self.known_verdict_vector_count();
         let numbers_of_each_state = record.block.verdict_vector_number_of_each_state();
         assert!(
@@ -4493,34 +5509,35 @@ impl VerdictStore {
                 "恢复字每个状态一份：调用方给的条数与块长不等"
             );
         }
+        let ConclusionBlockRecord {
+            block,
+            violating_states,
+            count_vector,
+            judged_on,
+            recovery_words,
+        } = record;
+        let violations = violating_states
+            .iter()
+            .copied()
+            .collect::<BTreeSet<StateOffsetInBlock>>()
+            .into_iter()
+            .map(|offset_in_block| StoredViolation {
+                offset_in_block,
+                verdict_vector_number: block
+                    .verdict_vector_number_at(offset_in_block)
+                    .expect("结论违例的块内序号必须在块里（调用方给的序号超出了块长）"),
+            })
+            .collect();
         let requested = StoredConclusionBlock {
-            block: record.block.clone(),
-            violations: record
-                .violating_states
-                .iter()
-                .copied()
-                .collect::<BTreeSet<StateOffsetInBlock>>()
-                .into_iter()
-                .map(|offset_in_block| StoredViolation {
-                    offset_in_block,
-                    verdict_vector_number: record
-                        .block
-                        .verdict_vector_number_at(offset_in_block)
-                        .expect("结论违例的块内序号必须在块里（调用方给的序号超出了块长）"),
-                })
-                .collect(),
-            count_vector: record.count_vector.clone(),
-            judged_on: record.judged_on.clone(),
-            recovery_words: record.recovery_words.clone(),
+            block,
+            violations,
+            count_vector,
+            judged_on,
+            recovery_words,
             abandoned_roots_named_by_the_pool_checker,
             circumstances: JudgementCircumstances::of_this_process_now(),
         };
-        self.conclusion_blocks_offered_in_this_process.push((
-            block_key.clone(),
-            kind.clone(),
-            *conclusion_version,
-        ));
-        let mut batch = LibraryWriteBatch::default();
+        let mut batch = written_along;
         let storing = self.put_a_conclusion_block_into_the_batch(
             block_key,
             kind,
@@ -4528,22 +5545,16 @@ impl VerdictStore {
             &requested,
             &mut batch,
         )?;
-        match storing {
-            VerdictBlockStoring::AlreadyStoredIdentically => return Ok(storing),
-            VerdictBlockStoring::WrittenAndSynced
-            | VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed => {}
-        }
-        self.write_batch_keeping_the_kept_out_rows_in_this_process(batch)?;
-        Ok(storing)
+        Ok((storing, batch, requested))
     }
 
     /// 一块一种结论（编号已是这个库的）放进 `batch`（规矩只在这一处）：这个（块键，种类，版本）下结论相同的什么都不放、交回
     /// [`VerdictBlockStoring::AlreadyStoredIdentically`]（只有在哪判的不同也算相同，留先存的那一份块属性）；不同而两份里有一份红的，照这一份换上、
     /// 旧的有而这一份没有的行同一批删掉（[`VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed`]）；没存过的交回 [`VerdictBlockStoring::WrittenAndSynced`]。
-    /// 交回的是这一批写下去之后的结局，写不写由调用方定。库里那一份只读一次（一帧成批点读，[`Self::read_conclusion_block`]）。
+    /// 交回的是这一批写下去之后的结局，写不写由调用方定。库里那一份照 [`Self::read_the_stored_conclusion_block_rereading_after_a_side_row`] 读。
     ///
     /// # Errors
-    /// 同 [`Self::stored_conclusion_compared_with`]（两份都不红而不同时 `batch` 里没放这一块的行）。
+    /// 同 [`Self::read_the_stored_conclusion_block_rereading_after_a_side_row`]；同 [`Self::stored_conclusion_compared_with`]（两份都不红而不同时 `batch` 里没放这一块的行）。
     fn put_a_conclusion_block_into_the_batch(
         &self,
         block_key: &VerdictBlockKey,
@@ -4554,7 +5565,11 @@ impl VerdictStore {
     ) -> Result<VerdictBlockStoring, VerdictStoreError> {
         // 记红、撤绿：库里那一份与这一份不同、两份里有一份红的，照这一份整份换上（判红写红记录、撤同一把键的绿；
         // 记着红的块下一趟现判，判完照新结论写回）；旧的那一份有、这一份没有的行同一批删掉。两份都不红的照下面的比法拒
-        let stored = self.read_conclusion_block(block_key, kind, conclusion_version)?;
+        let stored = self.read_the_stored_conclusion_block_rereading_after_a_side_row(
+            block_key,
+            kind,
+            conclusion_version,
+        )?;
         let replaced_stored = match &stored {
             Some(stored)
                 if !stored.is_the_same_conclusion_as(requested)
@@ -4573,13 +5588,7 @@ impl VerdictStore {
             Some(_) | None => false,
         };
         if !replaced_stored {
-            match self.stored_conclusion_compared_with(
-                block_key,
-                kind,
-                conclusion_version,
-                stored,
-                requested,
-            )? {
+            match self.stored_conclusion_compared_with(block_key, kind, stored, requested)? {
                 StoredConclusionComparison::StoredIdentically
                 | StoredConclusionComparison::StoredIdenticallyOnAnotherJudgingDevice => {
                     return Ok(VerdictBlockStoring::AlreadyStoredIdentically)
@@ -4611,18 +5620,122 @@ impl VerdictStore {
         self.has_an_entry_with_key_prefix_kept_in_or_out(prefix)
     }
 
-    /// 要存的一块一种结论（编号已是这个库的）与库里这个（块键，种类，版本）下存着的那一份（`stored`，调用方刚读回的）比：没存过（恢复字旁表也没有这一行）交回
-    /// `NotStored`；块、违例、计数向量、恢复字与块属性都相同交回 `StoredIdentically`；只有块属性（在哪判的）不同交回
-    /// `StoredIdenticallyOnAnotherJudgingDevice`。规矩只在这一处。
+    /// 存块之前读库里这个（块键，种类，版本）下那一份。先一帧成批点读结论块那五行（[`Self::read_the_conclusion_rows_in_one_frame`]，没存过的块——
+    /// 存块那一处的常态——这一帧就答完）：结论块在，照 [`Self::read_conclusion_block`] 整遍读（前后两次扫违例行）；结论块与两张旁表都不在，就是没存过；
+    /// 结论块不在而旁表有行时重读一次结论块：一帧成批点读里各键不是同一刻读的，结论块那一键读过之后别的进程可以把整批写进去，
+    /// 这时旁表的行不是孤儿，重读读到的那一份照常往下比。一批里结论块排在旁表前面（[`put_conclusion_rows_into_the_batch`]），一帧里原子、切成几帧也是结论块先落，
+    /// 读得到旁表的行之后结论块已经落了，所以只重读这一次：重读仍没有，结论块就是没写过，旁表那一行是孤儿。
+    /// 结论块那一帧读到在、整遍读却不在（两帧之间被换掉的那一份不会删结论块，只有直接改行的会），照旁表再点读一次、同上判。
     ///
     /// # Errors
-    /// 结论不同（`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`，带着两份差在哪）；恢复字旁表有这一行而结论块表没有；
-    /// 已存的行读回来不合布局；服务读不成。
-    fn stored_conclusion_compared_with(
+    /// 重读仍没有（[`VerdictStoreError::StoredBytesDoNotMatchTheLayout`]，报那一张旁表与那一把键）；同 [`Self::read_conclusion_block`]。
+    fn read_the_stored_conclusion_block_rereading_after_a_side_row(
         &self,
         block_key: &VerdictBlockKey,
         kind: &ConclusionKind,
         conclusion_version: &ConclusionVersion,
+    ) -> Result<Option<StoredConclusionBlock>, VerdictStoreError> {
+        let side_row = match self.read_the_conclusion_rows_in_one_frame(
+            block_key,
+            kind,
+            conclusion_version,
+        )? {
+            ConclusionRowsReadInOneFrameOrTheSideRows::ConclusionBlockStored(_rows_read) => {
+                if let Some(stored) =
+                    self.read_conclusion_block(block_key, kind, conclusion_version)?
+                {
+                    return Ok(Some(stored));
+                }
+                let side_rows_read_again = self.read_values_kept_in_or_out(&[
+                    VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version)
+                        .to_key_bytes()
+                        .0
+                        .as_slice(),
+                    VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
+                        block_key,
+                        kind,
+                        conclusion_version,
+                    )
+                    .to_key_bytes()
+                    .0
+                    .as_slice(),
+                ])?;
+                Self::side_row_of_the_conclusion_block(
+                    block_key,
+                    kind,
+                    conclusion_version,
+                    side_rows_read_again,
+                )
+            }
+            ConclusionRowsReadInOneFrameOrTheSideRows::ConclusionBlockNotStored {
+                recovery_words_value,
+                abandoned_roots_value,
+            } => Self::side_row_of_the_conclusion_block(
+                block_key,
+                kind,
+                conclusion_version,
+                vec![recovery_words_value, abandoned_roots_value],
+            ),
+        };
+        let Some(side_row) = side_row else {
+            return Ok(None);
+        };
+        #[cfg(test)]
+        run_the_action_registered_in(&ACTION_BETWEEN_THE_CONCLUSION_READ_AND_THE_SIDE_ROW_READ);
+        match self.read_conclusion_block(block_key, kind, conclusion_version)? {
+            Some(stored_by_the_other_writer) => Ok(Some(stored_by_the_other_writer)),
+            None => Err(stored_bytes_mismatch(
+                side_row.table,
+                &side_row.key_bytes,
+                side_row.reason,
+            )),
+        }
+    }
+
+    /// 这个（块键，种类，版本）在旁表（恢复字、点名的被抛弃根）里有没有行，照调用方读回的那两行的值（`stored_values`，恢复字在前）：
+    /// 两张都有时交回排在前面的那一张（恢复字），都没有交回 `None`。
+    fn side_row_of_the_conclusion_block(
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        stored_values: Vec<Option<Vec<u8>>>,
+    ) -> Option<SideRowOfAConclusionBlock> {
+        let side_rows_to_look_for = [
+            SideRowOfAConclusionBlock {
+                table: VerdictStoreTable::RecoveryWords,
+                key_bytes: VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version)
+                    .to_key_bytes()
+                    .0,
+                reason: "恢复字旁表有这一块这一种结论这一版本，结论块表没有",
+            },
+            SideRowOfAConclusionBlock {
+                table: VerdictStoreTable::AbandonedRootsNamedByThePoolChecker,
+                key_bytes: VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
+                    block_key,
+                    kind,
+                    conclusion_version,
+                )
+                .to_key_bytes()
+                .0,
+                reason: "点名的被抛弃根旁表有这一块这一种结论这一版本，结论块表没有",
+            },
+        ];
+        side_rows_to_look_for
+            .into_iter()
+            .zip(stored_values)
+            .find_map(|(side_row, stored_value)| stored_value.map(|_stored_bytes| side_row))
+    }
+
+    /// 要存的一块一种结论（编号已是这个库的）与库里这个（块键，种类，版本）下存着的那一份（`stored`，调用方刚读回的）比：没存过交回
+    /// `NotStored`；块、违例、计数向量、恢复字与块属性都相同交回 `StoredIdentically`；只有块属性（在哪判的）不同交回
+    /// `StoredIdenticallyOnAnotherJudgingDevice`。规矩只在这一处。
+    ///
+    /// # Errors
+    /// 结论不同（`DifferentConclusionUnderAStoredKeyNotDecidedInTheFirstVersion`，带着两份差在哪）。
+    fn stored_conclusion_compared_with(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
         stored: Option<StoredConclusionBlock>,
         requested: &StoredConclusionBlock,
     ) -> Result<StoredConclusionComparison, VerdictStoreError> {
@@ -4651,39 +5764,19 @@ impl VerdictStore {
             }
             return Ok(StoredConclusionComparison::StoredIdentically);
         }
-        let recovery_words_key =
-            VerdictStoreKey::RecoveryWords(block_key, kind, conclusion_version).to_key_bytes();
-        let stray_recovery_words = self.read_value_kept_in_or_out(&recovery_words_key.0)?;
-        if stray_recovery_words.is_some() {
-            return Err(stored_bytes_mismatch(
-                VerdictStoreTable::RecoveryWords,
-                &recovery_words_key.0,
-                "恢复字旁表有这一块这一种结论这一版本，结论块表没有",
-            ));
-        }
-        let abandoned_roots_key = VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
-            block_key,
-            kind,
-            conclusion_version,
-        )
-        .to_key_bytes();
-        if self
-            .read_value_kept_in_or_out(&abandoned_roots_key.0)?
-            .is_some()
-        {
-            return Err(stored_bytes_mismatch(
-                VerdictStoreTable::AbandonedRootsNamedByThePoolChecker,
-                &abandoned_roots_key.0,
-                "点名的被抛弃根旁表有这一块这一种结论这一版本，结论块表没有",
-            ));
-        }
         Ok(StoredConclusionComparison::NotStored)
     }
 
     /// 读回一块一种结论，连同违例、计数向量、块属性与恢复字；这个（块键，种类，版本）没存过时是 `None`（别的种类、别的版本存过也是 `None`）。
     ///
+    /// 服务没有把点读与前缀扫放进一帧的读法，结论块那几行与结论违例行分两帧读，其间别的进程可以换掉这把键的结论。所以读结论块那一帧前后各扫一次违例行：
+    /// 两次相同，这把键的违例行在读结论块那一刻就是这一份，交回的结论块与违例行是同一批写下的；不同就整遍重读，
+    /// 最多 `CONCLUSION_READ_ATTEMPTS_WHILE_THE_VIOLATION_ROWS_KEEP_CHANGING` 遍。
+    /// 一批写落在一帧里（`LibraryWriteBatch` 的文档），所以这两次扫看到的是这批写之前或之后的违例行，不会是半批。
+    ///
     /// # Errors
     /// 存着的结论块是空的或点名了没登记的编号、缺计数向量或块属性、计数向量或块属性或恢复字不合布局（块属性的跑法码不是这一版认得的也是）；
+    /// 每一遍两次扫到的违例行都不同（[`VerdictStoreError::StoredBytesDoNotMatchTheLayout`]，报结论违例表与这一块的前缀）；
     /// 服务读不成。
     pub fn read_conclusion_block(
         &self,
@@ -4691,6 +5784,59 @@ impl VerdictStore {
         kind: &ConclusionKind,
         conclusion_version: &ConclusionVersion,
     ) -> Result<Option<StoredConclusionBlock>, VerdictStoreError> {
+        // 迭代上界：常量。跨轮不带状态，每一遍从头读；提前出口是结论块不在，与两次扫相同
+        for _read_attempt in 0..CONCLUSION_READ_ATTEMPTS_WHILE_THE_VIOLATION_ROWS_KEEP_CHANGING {
+            let violation_rows_before_the_block =
+                self.conclusion_violation_rows_as_stored(block_key, kind, conclusion_version)?;
+            #[cfg(test)]
+            run_the_action_registered_in(
+                &ACTION_BETWEEN_THE_EARLIER_VIOLATION_SCAN_AND_THE_CONCLUSION_ROWS_READ,
+            );
+            let ConclusionRowsReadInOneFrameOrTheSideRows::ConclusionBlockStored(
+                rows_read_in_one_frame,
+            ) = self.read_the_conclusion_rows_in_one_frame(block_key, kind, conclusion_version)?
+            else {
+                return Ok(None);
+            };
+            #[cfg(test)]
+            run_the_action_registered_in(
+                &ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN,
+            );
+            let violation_rows_after_the_block =
+                self.conclusion_violation_rows_as_stored(block_key, kind, conclusion_version)?;
+            if violation_rows_before_the_block == violation_rows_after_the_block {
+                return self.conclusion_block_from_the_rows_read(
+                    block_key,
+                    kind,
+                    conclusion_version,
+                    rows_read_in_one_frame,
+                    violation_rows_after_the_block,
+                );
+            }
+        }
+        Err(stored_bytes_mismatch(
+            VerdictStoreTable::ConclusionViolations,
+            &VerdictStoreKey::ConclusionViolationsOfBlockPrefix(
+                block_key,
+                kind,
+                conclusion_version,
+            )
+            .to_key_bytes()
+            .0,
+            "读结论块那一帧前后两次扫到的结论违例行每一遍都不同：别的进程一直在换这把键的结论",
+        ))
+    }
+
+    /// 这一块一种结论的五行（结论块、计数向量、块属性、恢复字、点名的被抛弃根）一帧成批点读回来，不解码；结论块不在交回同一帧读到的两张旁表那两行。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    fn read_the_conclusion_rows_in_one_frame(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+    ) -> Result<ConclusionRowsReadInOneFrameOrTheSideRows, VerdictStoreError> {
         let conclusion_key =
             VerdictStoreKey::ConclusionBlock(block_key, kind, conclusion_version).to_key_bytes();
         let count_key = VerdictStoreKey::ConclusionCountVector(block_key, kind, conclusion_version)
@@ -4706,7 +5852,7 @@ impl VerdictStore {
             conclusion_version,
         )
         .to_key_bytes();
-        // 一块一种结论的几行一起读：垫在 prune-server 上时是一帧成批点读，不逐键一帧（违例另一帧按前缀扫）
+        // 一块一种结论的几行一起读：垫在 prune-server 上时是一帧成批点读，不逐键一帧（违例另一帧按前缀扫，对得上对不上由 `read_conclusion_block` 判）
         let [conclusion_value, count_value, attribute_value, recovery_words_value, abandoned_roots_value]: [Option<Vec<u8>>; 5] = self
             .read_values_kept_in_or_out(&[
                 conclusion_key.0.as_slice(),
@@ -4718,8 +5864,55 @@ impl VerdictStore {
             .try_into()
             .expect("问了五行：交回的个数与次序与问的相同");
         let Some(conclusion_value_bytes) = conclusion_value else {
-            return Ok(None);
+            return Ok(
+                ConclusionRowsReadInOneFrameOrTheSideRows::ConclusionBlockNotStored {
+                    recovery_words_value,
+                    abandoned_roots_value,
+                },
+            );
         };
+        Ok(
+            ConclusionRowsReadInOneFrameOrTheSideRows::ConclusionBlockStored(
+                ConclusionRowsReadInOneFrame {
+                    conclusion_key,
+                    count_key,
+                    attribute_key,
+                    recovery_words_key,
+                    abandoned_roots_key,
+                    conclusion_value_bytes,
+                    count_value,
+                    attribute_value,
+                    recovery_words_value,
+                    abandoned_roots_value,
+                },
+            ),
+        )
+    }
+
+    /// 一帧读回的五行与照它核过的结论违例行解码成一块一种结论。
+    ///
+    /// # Errors
+    /// 同 [`Self::read_conclusion_block`] 里不合布局的那几种；结论违例行不合布局（[`Self::conclusion_violations_from_the_rows_as_stored`]）。
+    fn conclusion_block_from_the_rows_read(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        rows_read_in_one_frame: ConclusionRowsReadInOneFrame,
+        violation_rows_as_stored: Vec<StoredEntry>,
+    ) -> Result<Option<StoredConclusionBlock>, VerdictStoreError> {
+        let ConclusionRowsReadInOneFrame {
+            conclusion_key,
+            count_key,
+            attribute_key,
+            recovery_words_key,
+            abandoned_roots_key,
+            conclusion_value_bytes,
+            count_value,
+            attribute_value,
+            recovery_words_value,
+            abandoned_roots_value,
+        } = rows_read_in_one_frame;
         let numbers_of_each_state = self.registered_verdict_vector_numbers_of_a_stored_block(
             VerdictStoreTable::ConclusionBlocks,
             &conclusion_key.0,
@@ -4791,7 +5984,12 @@ impl VerdictStore {
         };
         Ok(Some(StoredConclusionBlock {
             block,
-            violations: self.conclusion_violations_in_block(block_key, kind, conclusion_version)?,
+            violations: self.conclusion_violations_from_the_rows_as_stored(
+                block_key,
+                kind,
+                conclusion_version,
+                violation_rows_as_stored,
+            )?,
             count_vector,
             judged_on,
             recovery_words,
@@ -4800,20 +5998,40 @@ impl VerdictStore {
         }))
     }
 
-    /// 这一块一种结论的违例，按块内序号排。
-    fn conclusion_violations_in_block(
+    /// 这一块一种结论的结论违例行，按键序、不解码：两次扫比的是存着的字节，读到结论块不在时也不解码它们。
+    ///
+    /// # Errors
+    /// 服务读不成。
+    fn conclusion_violation_rows_as_stored(
         &self,
         block_key: &VerdictBlockKey,
         kind: &ConclusionKind,
         conclusion_version: &ConclusionVersion,
+    ) -> Result<Vec<StoredEntry>, VerdictStoreError> {
+        let prefix =
+            VerdictStoreKey::ConclusionViolationsOfBlockPrefix(block_key, kind, conclusion_version)
+                .to_key_bytes();
+        self.entries_with_key_prefix_kept_in_or_out(prefix)
+            .collect()
+    }
+
+    /// 这一块一种结论的结论违例行（[`Self::conclusion_violation_rows_as_stored`]）解码成违例，按块内序号排。
+    ///
+    /// # Errors
+    /// 版本之后不是 8 字节的块内序号、值不是 4 字节的编号、编号没登记。
+    fn conclusion_violations_from_the_rows_as_stored(
+        &self,
+        block_key: &VerdictBlockKey,
+        kind: &ConclusionKind,
+        conclusion_version: &ConclusionVersion,
+        violation_rows_as_stored: Vec<StoredEntry>,
     ) -> Result<Vec<StoredViolation>, VerdictStoreError> {
         let prefix =
             VerdictStoreKey::ConclusionViolationsOfBlockPrefix(block_key, kind, conclusion_version)
                 .to_key_bytes();
         let prefix_length = prefix.0.len();
         let mut violations = Vec::new();
-        for entry in self.entries_with_key_prefix_kept_in_or_out(prefix) {
-            let (key_bytes, number_bytes) = entry?;
+        for (key_bytes, number_bytes) in violation_rows_as_stored {
             let offset_bytes =
                 <[u8; STATE_OFFSET_IN_BLOCK_BYTES]>::try_from(&key_bytes[prefix_length..]);
             let (Ok(offset_bytes), Some(stored_number)) =
@@ -4966,6 +6184,13 @@ impl VerdictStore {
     #[must_use]
     pub fn library_name(&self) -> &str {
         &self.library_name
+    }
+
+    /// 从开库起与 prune-server 往返的纳秒数（[`PruneServerStorage::nanoseconds_with_the_client_so_far`]）：判定库锁里有多少花在往返上，
+    /// 取锁与放锁时各读一次、相减。
+    #[must_use]
+    pub fn nanoseconds_in_round_trips_so_far(&self) -> u64 {
+        self.service.nanoseconds_with_the_client_so_far()
     }
 
     /// 一次读几行（[`Self::read_value_kept_in_or_out`] 的成批版）：照判不入库的先看这个进程里的，别的一起问服务（成批点读，不逐键一帧）。
@@ -5132,7 +6357,7 @@ impl VerdictStore {
                 return Err(VerdictStoreError::EveryU32VerdictVectorNumberIsAlreadyRegistered);
             };
             let number_key = VerdictStoreKey::VerdictVectorContentByNumber(number).to_key_bytes();
-            match authority.claim(&number_key.0)? {
+            match authority.claim(&number_key.0, "认领判定向量编号")? {
                 ClaimOutcome::Claimed => {
                     // 经 write_batch 写：绿的判定向量是空字节，按编号那一行的值为空，只有这张表许写空值，别的表照旧拒
                     let mut registration = LibraryWriteBatch::default();
@@ -7107,7 +8332,7 @@ mod tests {
         }
     }
 
-    /// 表标签读回它那张表（[`VerdictStoreTable::of_key_tag`] 是 [`VerdictStoreTable::key_tag`] 的逆，认得的标签正好 28 个），
+    /// 表标签读回它那张表（[`VerdictStoreTable::of_key_tag`] 是 [`VerdictStoreTable::key_tag`] 的逆，认得的标签正好 31 个），
     /// 结论种类每一种在键里都是 [`CONCLUSION_KIND_KEY_BYTES`] 个字节：照判不入库按这两样定版本那一截的起点。
     #[test]
     fn every_table_tag_reads_back_to_its_table_and_every_conclusion_kind_takes_its_key_bytes() {
@@ -7118,7 +8343,7 @@ mod tests {
                 tables_read_back += 1;
             }
         }
-        assert_eq!(tables_read_back, 28, "28 张表各一个标签");
+        assert_eq!(tables_read_back, 31, "31 张表各一个标签");
         for kind in [ConclusionKind::ImageJudgement, ConclusionKind::Observer] {
             assert_eq!(
                 conclusion_kind_key_bytes(&kind).len(),
@@ -7135,10 +8360,10 @@ mod tests {
         let recognized_tags: Vec<u8> = (0..=u8::MAX)
             .filter(|key_tag| VerdictStoreTable::of_key_tag(*key_tag).is_some())
             .collect();
-        let expected_tags: Vec<u8> = (0x00..=0x1B).collect();
+        let expected_tags: Vec<u8> = (0x00..=0x1E).collect();
         assert_eq!(
             recognized_tags, expected_tags,
-            "认得的表标签是 00 到 1B 连着的 28 个"
+            "认得的表标签是 00 到 1E 连着的 31 个"
         );
     }
 
@@ -8177,6 +9402,977 @@ mod tests {
                 );
             }
             outcome => panic!("两份都不红而不同要拒、带着差在哪：{outcome:?}"),
+        }
+    }
+
+    /// 清掉一个读窗口上登记的动作（用例红了 panic 时也清，同一个线程上跑的下一条用例不沾）。
+    struct ActionInAReadWindowClearedWhenDropped(
+        &'static std::thread::LocalKey<ActionInAReadWindow>,
+    );
+
+    impl Drop for ActionInAReadWindowClearedWhenDropped {
+        fn drop(&mut self) {
+            self.0.set(None);
+        }
+    }
+
+    /// 跑 `run_the_reads`，其间每一次走到 `read_window` 跑一次 `action`。交回 `run_the_reads` 的结局与 `action` 跑了几次。
+    fn run_with_an_action_in_a_read_window<Outcome>(
+        read_window: &'static std::thread::LocalKey<ActionInAReadWindow>,
+        mut action: impl FnMut() + 'static,
+        run_the_reads: impl FnOnce() -> Outcome,
+    ) -> (Outcome, usize) {
+        let action_runs = std::rc::Rc::new(std::cell::Cell::new(0usize));
+        let action_runs_counted_by_the_action = std::rc::Rc::clone(&action_runs);
+        read_window.set(Some(Box::new(move || {
+            action_runs_counted_by_the_action.set(action_runs_counted_by_the_action.get() + 1);
+            action();
+        })));
+        let _cleared_when_dropped = ActionInAReadWindowClearedWhenDropped(read_window);
+        let outcome = run_the_reads();
+        (outcome, action_runs.get())
+    }
+
+    /// 跑 `store_the_block`，其间每一次存块之前那一帧读到结论块不在、旁表有行，重读结论块之前跑一次 `action`。交回 `store_the_block` 的结局与 `action` 跑了几次。
+    fn store_with_an_action_between_the_two_reads<Stored>(
+        action: impl FnMut() + 'static,
+        store_the_block: impl FnOnce() -> Stored,
+    ) -> (Stored, usize) {
+        run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_CONCLUSION_READ_AND_THE_SIDE_ROW_READ,
+            action,
+            store_the_block,
+        )
+    }
+
+    /// 两个写者都开着、都登记过绿与红两种判定向量；库里还什么结论都没存。
+    struct TwoWritersOfOneKey {
+        _library: TestLibrary,
+        this_writer: VerdictStore,
+        other_writer: VerdictStore,
+        block_key: VerdictBlockKey,
+        green_record: ConclusionBlockRecord,
+        red_record: ConclusionBlockRecord,
+    }
+
+    fn two_writers_of_one_key(library_name: &str) -> TwoWritersOfOneKey {
+        let library = TestLibrary::new(library_name);
+        let mut this_writer = library.open();
+        let mut other_writer = library.open();
+        let clean = this_writer
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = this_writer
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        other_writer
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("另一个写者登记");
+        other_writer
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("另一个写者登记");
+        TwoWritersOfOneKey {
+            _library: library,
+            this_writer,
+            other_writer,
+            block_key: block_key_named("node", 0),
+            green_record: conclusion_record(block_of(&[clean, clean]), &[]),
+            red_record: conclusion_record(block_of(&[clean, red]), &[1]),
+        }
+    }
+
+    /// `store` 把 `record` 存在 `block_key` 这把键下（用例里那一种结论、那一把版本），写不下就停。
+    fn store_the_record(
+        store: &mut VerdictStore,
+        block_key: &VerdictBlockKey,
+        record: &ConclusionBlockRecord,
+    ) -> VerdictBlockStoring {
+        store
+            .store_conclusion_block(
+                block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+                record,
+            )
+            .expect("存得下")
+    }
+
+    /// 读结论块那一帧之后、后扫违例行之前，另一个写者把库里的红结论换成绿的（同批删掉违例行）；这一趟要存的也是绿的：
+    /// 两次扫不同，整遍重读，读到绿的、比出已存相同，这一趟不判红。动作跑两次：换的那一遍与重读的那一遍。
+    /// 判别力（`crates/mutations.tsv`）：不比两次扫、读完结论块才扫违例，这条红在报两份都不红而不同。
+    #[test]
+    fn writer_replacing_a_red_conclusion_with_a_green_one_after_the_rows_read_compares_as_already_stored(
+    ) {
+        let TwoWritersOfOneKey {
+            _library,
+            mut this_writer,
+            mut other_writer,
+            block_key,
+            green_record,
+            red_record,
+        } = two_writers_of_one_key("writer-red-to-green-after-the-rows-read");
+        store_the_record(&mut this_writer, &block_key, &red_record);
+        let block_key_of_the_other_writer = block_key.clone();
+        let green_record_of_the_other_writer = green_record.clone();
+        let (stored, action_runs) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN,
+            move || {
+                store_the_record(
+                    &mut other_writer,
+                    &block_key_of_the_other_writer,
+                    &green_record_of_the_other_writer,
+                );
+            },
+            || {
+                this_writer.store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &green_record,
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("读到的不许是红的结论块配上没有违例：两份都不红而不同这一趟就判红了"),
+            VerdictBlockStoring::AlreadyStoredIdentically,
+            "重读读到另一个写者换上的绿结论，比出相同"
+        );
+        assert_eq!(action_runs, 2, "换的那一遍对不上，重读一遍对上就停");
+    }
+
+    /// 先扫违例行之后、读结论块那一帧之前，另一个写者把库里的绿结论换成红的；这一趟要存的是绿的：
+    /// 两次扫不同，整遍重读，读到红的、连着违例，照记红的规矩换上，不判红。
+    /// 判别力（`crates/mutations.tsv`）：不比两次扫、交先扫的违例行，这条红在读到红的结论块配上没有违例、报两份都不红而不同。
+    #[test]
+    fn writer_replacing_a_green_conclusion_with_a_red_one_before_the_rows_read_is_replaced_back() {
+        let TwoWritersOfOneKey {
+            _library,
+            mut this_writer,
+            mut other_writer,
+            block_key,
+            green_record,
+            red_record,
+        } = two_writers_of_one_key("writer-green-to-red-before-the-rows-read");
+        store_the_record(&mut this_writer, &block_key, &green_record);
+        let block_key_of_the_other_writer = block_key.clone();
+        let (stored, action_runs) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_EARLIER_VIOLATION_SCAN_AND_THE_CONCLUSION_ROWS_READ,
+            move || {
+                store_the_record(
+                    &mut other_writer,
+                    &block_key_of_the_other_writer,
+                    &red_record,
+                );
+            },
+            || {
+                this_writer.store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &green_record,
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("读到的不许是红的结论块配上没有违例：两份都不红而不同这一趟就判红了"),
+            VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed,
+            "重读读到红结论连着违例，两份里有一份红的照这一份换上"
+        );
+        assert_eq!(action_runs, 2, "换的那一遍对不上，重读一遍对上就停");
+    }
+
+    /// 只读不存的读者走同一份读法：读结论块那一帧之后另一个写者把红结论换成绿的，交回的是绿的结论块、没有违例，不是红的结论块配上没有违例。
+    /// 判别力（`crates/mutations.tsv`）：不比两次扫、读完结论块才扫违例，这条红在结论块是红的。
+    #[test]
+    fn reader_during_a_replacement_gets_the_block_and_the_violations_of_one_batch() {
+        let TwoWritersOfOneKey {
+            _library,
+            mut this_writer,
+            mut other_writer,
+            block_key,
+            green_record,
+            red_record,
+        } = two_writers_of_one_key("reader-during-a-replacement");
+        store_the_record(&mut this_writer, &block_key, &red_record);
+        let block_key_of_the_other_writer = block_key.clone();
+        let green_block = green_record.block.clone();
+        let (read_back, _action_runs) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN,
+            move || {
+                store_the_record(
+                    &mut other_writer,
+                    &block_key_of_the_other_writer,
+                    &green_record,
+                );
+            },
+            || {
+                this_writer.read_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+            },
+        );
+        let read_back = read_back.expect("读块").expect("这把键一直有结论");
+        assert_eq!(read_back.block, green_block, "结论块是换上的绿结论");
+        assert!(read_back.violations.is_empty(), "绿结论没有违例");
+    }
+
+    /// 别的写者每一遍都换这把键的结论：读够上限那么多遍（写在用例里：`CONCLUSION_READ_ATTEMPTS_WHILE_THE_VIOLATION_ROWS_KEEP_CHANGING`）就报结论违例表，不交半批，读者一行不写。
+    /// 判别力（`crates/mutations.tsv`）：读够遍数之后当没存过，这条红在结局不是错；上限改小，这条红在动作跑的遍数。
+    #[test]
+    fn violation_rows_changing_on_every_attempt_report_the_violations_table_after_the_bound() {
+        let TwoWritersOfOneKey {
+            _library,
+            mut this_writer,
+            mut other_writer,
+            block_key,
+            green_record,
+            red_record,
+        } = two_writers_of_one_key("violation-rows-changing-on-every-attempt");
+        store_the_record(&mut this_writer, &block_key, &red_record);
+        let block_key_of_the_other_writer = block_key.clone();
+        let mut next_record_is_green = true;
+        let (read_back, action_runs) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN,
+            move || {
+                let next_record = if next_record_is_green {
+                    &green_record
+                } else {
+                    &red_record
+                };
+                store_the_record(
+                    &mut other_writer,
+                    &block_key_of_the_other_writer,
+                    next_record,
+                );
+                next_record_is_green = !next_record_is_green;
+            },
+            || {
+                this_writer.read_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+            },
+        );
+        assert!(
+            matches!(
+                read_back,
+                Err(VerdictStoreError::StoredBytesDoNotMatchTheLayout {
+                    table: VerdictStoreTable::ConclusionViolations,
+                    reason: "读结论块那一帧前后两次扫到的结论违例行每一遍都不同：别的进程一直在换这把键的结论",
+                    ..
+                })
+            ),
+            "每一遍都对不上要报结论违例表：{read_back:?}"
+        );
+        assert_eq!(action_runs, 8, "上限是 8 遍，每一遍动作跑一次");
+    }
+
+    /// 没有别的写者时，读一遍就对上：动作只跑一次，交回存下的结论块与违例。
+    /// 判别力（`crates/mutations.tsv`）：两次扫相同反当成对不上，这条红在读够遍数报错。
+    #[test]
+    fn reading_a_conclusion_nobody_is_replacing_takes_one_attempt_and_returns_its_violations() {
+        let TwoWritersOfOneKey {
+            _library,
+            mut this_writer,
+            other_writer: _other_writer,
+            block_key,
+            green_record: _green_record,
+            red_record,
+        } = two_writers_of_one_key("reading-a-conclusion-nobody-is-replacing");
+        store_the_record(&mut this_writer, &block_key, &red_record);
+        let (read_back, action_runs) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_CONCLUSION_ROWS_READ_AND_THE_LATER_VIOLATION_SCAN,
+            || {},
+            || {
+                this_writer.read_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+            },
+        );
+        let read_back = read_back.expect("读块").expect("存过");
+        assert_eq!(read_back.block, red_record.block, "结论块是存下的");
+        assert_eq!(
+            read_back
+                .violations
+                .iter()
+                .map(|violation| violation.offset_in_block)
+                .collect::<Vec<StateOffsetInBlock>>(),
+            vec![StateOffsetInBlock(1)],
+            "违例是存下的"
+        );
+        assert_eq!(action_runs, 1, "两次扫相同，读一遍就停");
+    }
+
+    /// 每个状态点名同一条被抛弃根（点名的被抛弃根旁表的值）。
+    fn abandoned_roots_of_each_of_the_test_states(
+        states: usize,
+    ) -> Vec<Vec<AbandonedRootNamedByThePoolChecker>> {
+        vec![
+            vec![AbandonedRootNamedByThePoolChecker {
+                instance: InstanceGeneration(3),
+                checkpoint_txg: CheckpointTxg(9),
+            }];
+            states
+        ]
+    }
+
+    /// 一份库里几行的原样（键，值）。
+    type RawRowsOfALibrary = Vec<(Vec<u8>, Vec<u8>)>;
+
+    /// 另一个写者在它自己那一份库（`library_name`，登记 `verdict_vectors` 那几种、与被测的那一份同序）里存下 `record`（`roots` 给了就连同点名的根）之后，
+    /// 这一块那几行的原样（键，值）：旁表（恢复字、点名的被抛弃根）里有的那几行在前一份，结论块、计数向量、块属性三行在后一份。
+    /// 用例把前一份先直接写进被测的那一份库、后一份在存块之前那一帧之后才写，造「成批点读读过结论块那一键之后，别的进程把整批写进去」的那一刻
+    /// （一帧成批点读各键不是同一刻读的：结论块那一键读到不在、旁表那一键读到在）。
+    fn rows_of_a_conclusion_another_writer_stored(
+        library_name: &str,
+        verdict_vectors: &[&[u8]],
+        block_key: &VerdictBlockKey,
+        record: &ConclusionBlockRecord,
+        roots: Option<&[Vec<AbandonedRootNamedByThePoolChecker>]>,
+    ) -> (RawRowsOfALibrary, RawRowsOfALibrary) {
+        let library_of_the_other_writer = TestLibrary::new(library_name);
+        let mut other_writer = library_of_the_other_writer.open();
+        for bytes in verdict_vectors {
+            other_writer
+                .register_verdict_vector(&verdict_vector(bytes))
+                .expect("另一个写者登记");
+        }
+        match roots {
+            Some(roots) => other_writer.store_conclusion_block_naming_the_abandoned_roots(
+                block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+                record,
+                roots,
+            ),
+            None => other_writer.store_conclusion_block(
+                block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+                record,
+            ),
+        }
+        .expect("另一个写者在它自己那一份库里存得下");
+        let kind = ConclusionKind::ImageJudgement;
+        let rows_of = |keys: Vec<VerdictStoreKeyBytes>| -> RawRowsOfALibrary {
+            keys.into_iter()
+                .filter_map(|key| {
+                    library_of_the_other_writer
+                        .raw_value(&key.0)
+                        .map(|value| (key.0, value))
+                })
+                .collect()
+        };
+        (
+            rows_of(vec![
+                VerdictStoreKey::RecoveryWords(block_key, &kind, &JUDGEMENT_CONCLUSION_VERSION)
+                    .to_key_bytes(),
+                VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
+                    block_key,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+                .to_key_bytes(),
+            ]),
+            rows_of(vec![
+                VerdictStoreKey::ConclusionBlock(block_key, &kind, &JUDGEMENT_CONCLUSION_VERSION)
+                    .to_key_bytes(),
+                VerdictStoreKey::ConclusionCountVector(
+                    block_key,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+                .to_key_bytes(),
+                VerdictStoreKey::ConclusionBlockAttributes(
+                    block_key,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                )
+                .to_key_bytes(),
+            ]),
+        )
+    }
+
+    /// 存块之前那一帧读到结论块不在、恢复字旁表有行，读完之后另一个写者那一批的结论块那几行才落（另一个写者存的是同一份结论）：这不是孤儿，
+    /// 重读读到那一份、照常比出已存相同，这一趟不判红。动作只跑一次：重读之后不再读旁表。
+    /// 判别力（`crates/mutations.tsv`）：不重读结论块（当重读仍没有），这条红在报恢复字旁表孤儿。
+    #[test]
+    fn writer_landing_between_the_conclusion_read_and_the_recovery_words_read_compares_as_already_stored(
+    ) {
+        let library = TestLibrary::new("writer-between-reads-recovery-words");
+        let mut this_writer = library.open();
+        let clean = this_writer
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let record = conclusion_record(block_of(&[clean, clean]), &[]);
+        let (side_rows, conclusion_rows) = rows_of_a_conclusion_another_writer_stored(
+            "writer-between-reads-recovery-words-other-writer",
+            &[b""],
+            &block_key,
+            &record,
+            None,
+        );
+        assert_eq!(
+            (side_rows.len(), conclusion_rows.len()),
+            (1, 3),
+            "前提：另一个写者那一批旁表只有恢复字一行，结论块那一侧三行"
+        );
+        library.write_raw_rows(side_rows);
+        let service_of_the_other_writer = library.service();
+        let (stored, action_runs) = store_with_an_action_between_the_two_reads(
+            move || {
+                service_of_the_other_writer
+                    .write_rows_for_a_test(conclusion_rows.clone())
+                    .expect("另一个写者那一批的结论块那几行写得进去");
+            },
+            || {
+                this_writer.store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &record,
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("另一个写者写进去的是同一把键的整批，不是孤儿"),
+            VerdictBlockStoring::AlreadyStoredIdentically,
+            "重读读到另一个写者那一份，比出相同"
+        );
+        assert_eq!(action_runs, 1, "结论块第一读没有之后只读一次旁表");
+    }
+
+    /// 同上，另一个写者那一批只带点名的被抛弃根、不带恢复字：那一帧里恢复字旁表没有行、被抛弃根旁表有，照样重读、比出已存相同。
+    /// 判别力（`crates/mutations.tsv`）：只看恢复字旁表、不看被抛弃根旁表，这条红在当没存过写下去。
+    #[test]
+    fn writer_landing_between_the_conclusion_read_and_the_abandoned_roots_read_compares_as_already_stored(
+    ) {
+        let library = TestLibrary::new("writer-between-reads-abandoned-roots");
+        let mut this_writer = library.open();
+        let clean = this_writer
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let mut record = conclusion_record(block_of(&[clean, clean]), &[]);
+        record.recovery_words = None;
+        let roots = abandoned_roots_of_each_of_the_test_states(2);
+        let (side_rows, conclusion_rows) = rows_of_a_conclusion_another_writer_stored(
+            "writer-between-reads-abandoned-roots-other-writer",
+            &[b""],
+            &block_key,
+            &record,
+            Some(roots.as_slice()),
+        );
+        assert_eq!(
+            (side_rows.len(), conclusion_rows.len()),
+            (1, 3),
+            "前提：另一个写者那一批旁表只有被抛弃根一行，结论块那一侧三行"
+        );
+        library.write_raw_rows(side_rows);
+        let service_of_the_other_writer = library.service();
+        let (stored, _action_runs) = store_with_an_action_between_the_two_reads(
+            move || {
+                service_of_the_other_writer
+                    .write_rows_for_a_test(conclusion_rows.clone())
+                    .expect("另一个写者那一批的结论块那几行写得进去");
+            },
+            || {
+                this_writer.store_conclusion_block_naming_the_abandoned_roots(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &record,
+                    &roots,
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("另一个写者写进去的是同一把键的整批，不是孤儿"),
+            VerdictBlockStoring::AlreadyStoredIdentically,
+            "重读读到另一个写者那一份，比出相同"
+        );
+    }
+
+    /// 重读读到的那一份走的是存块那一整条比法，不只是比相同：另一个写者在那一帧之后落下绿的，这一趟判红的照记红的规矩换上，读回是这一趟的红结论。
+    /// 判别力（`crates/mutations.tsv`）：重读到了也当没存过，这条红在结局是写下而不是换上。
+    #[test]
+    fn writer_landing_between_the_two_reads_with_a_green_conclusion_is_replaced_by_a_red_one() {
+        let library = TestLibrary::new("writer-between-reads-green-replaced-by-red");
+        let mut this_writer = library.open();
+        let clean = this_writer
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = this_writer
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let green_record = conclusion_record(block_of(&[clean, clean]), &[]);
+        let red_record = conclusion_record(block_of(&[clean, red]), &[1]);
+        let (side_rows, conclusion_rows) = rows_of_a_conclusion_another_writer_stored(
+            "writer-between-reads-green-replaced-by-red-other-writer",
+            &[b"", b"red"],
+            &block_key,
+            &green_record,
+            None,
+        );
+        library.write_raw_rows(side_rows);
+        let service_of_the_other_writer = library.service();
+        let (stored, _action_runs) = store_with_an_action_between_the_two_reads(
+            move || {
+                service_of_the_other_writer
+                    .write_rows_for_a_test(conclusion_rows.clone())
+                    .expect("另一个写者那一批的结论块那几行写得进去");
+            },
+            || {
+                this_writer.store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &red_record,
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("两份里有一份红的照这一份换上，不报错"),
+            VerdictBlockStoring::ReplacedBecauseOneOfTheTwoIsRed,
+            "重读读到绿的那一份，这一趟红的换上"
+        );
+        let read_back = this_writer
+            .read_conclusion_block(
+                &block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+            )
+            .expect("读块")
+            .expect("换上之后在");
+        assert_eq!(
+            read_back.block,
+            block_of(&[clean, red]),
+            "读回是这一趟的红结论"
+        );
+    }
+
+    /// 没存过的块（存块那一处的常态）存块之前只读一帧：结论块那五行一帧成批点读，结论块与两张旁表都不在就当没存过写下去，
+    /// 不扫违例行、不另读旁表、不重读（两处读窗口上的动作一次都不跑）；写下的读回逐项是这一份。
+    /// 判别力（`crates/mutations.tsv`）：「判定库 存块之前那一帧不在时旁表一律当有行」那一行让这一条红在报恢复字旁表孤儿。
+    #[test]
+    fn a_block_never_stored_is_stored_after_one_read_of_its_rows() {
+        let library = TestLibrary::new("block-never-stored-one-read");
+        let mut store = library.open();
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let red = store
+            .register_verdict_vector(&verdict_vector(b"red"))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let record = conclusion_record(block_of(&[clean, red]), &[1]);
+        let ((stored, side_row_reads), violation_scans) = run_with_an_action_in_a_read_window(
+            &ACTION_BETWEEN_THE_EARLIER_VIOLATION_SCAN_AND_THE_CONCLUSION_ROWS_READ,
+            || {},
+            || {
+                store_with_an_action_between_the_two_reads(
+                    || {},
+                    || {
+                        store.store_conclusion_block(
+                            &block_key,
+                            &ConclusionKind::ImageJudgement,
+                            &JUDGEMENT_CONCLUSION_VERSION,
+                            &record,
+                        )
+                    },
+                )
+            },
+        );
+        assert_eq!(
+            stored.expect("没存过的块存得下"),
+            VerdictBlockStoring::WrittenAndSynced
+        );
+        assert_eq!(
+            (violation_scans, side_row_reads),
+            (0, 0),
+            "存块之前只读那一帧：不整遍读结论块（不扫违例行）、不重读"
+        );
+        let read_back = store
+            .read_conclusion_block(
+                &block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+            )
+            .expect("读块")
+            .expect("写下之后在");
+        assert_eq!(
+            (
+                read_back.block,
+                read_back.violations.len(),
+                read_back.recovery_words
+            ),
+            (block_of(&[clean, red]), 1, record.recovery_words.clone()),
+            "读回逐项是写下的这一份"
+        );
+    }
+
+    /// 场景（判器交回的逐盘槽数与结论同一批写）：一块结论先不带槽数存下；同一份结论再连同判器交回的逐盘槽数存一次（结论在、槽数不在的块照判一遍补上的那一路）。
+    /// 预期：第二次交回已存相同，槽数那一行照样写下、读回逐字节是交的那一份；另一块头一回就连同槽数存的，结论与槽数都读得回。
+    /// 判别力：`crates/mutations.tsv` 里「判定库 结论已存着相同时槽数那一行也不写」那一行让这一条红在第二次存之后读不回槽数。
+    #[test]
+    fn the_slots_handed_back_are_written_along_even_when_the_conclusion_is_already_stored() {
+        let library = TestLibrary::new("slots-written-along-the-conclusion");
+        let mut store = library.open();
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let kind = ConclusionKind::ImageJudgement;
+        let record = conclusion_record(block_of(&[clean, clean]), &[]);
+        let slots_bytes = b"slots handed back by the judge in the unit test".to_vec();
+        let stored_first_without_the_slots = block_key_named("node", 0);
+        store
+            .store_conclusion_block(
+                &stored_first_without_the_slots,
+                &kind,
+                &JUDGEMENT_CONCLUSION_VERSION,
+                &record,
+            )
+            .expect("存得下");
+        assert_eq!(
+            store
+                .store_conclusion_block_with_the_slots_the_judge_handed_back(
+                    &stored_first_without_the_slots,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    record.clone(),
+                    Some(slots_bytes.clone()),
+                )
+                .expect("存得下"),
+            VerdictBlockStoring::AlreadyStoredIdentically,
+            "结论逐项相同：算已存"
+        );
+        assert_eq!(
+            store
+                .read_observer_block(
+                    &stored_first_without_the_slots,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION
+                )
+                .expect("读得了"),
+            Some(slots_bytes.clone()),
+            "结论已存着，槽数那一行照样写下"
+        );
+        let stored_with_the_slots = block_key_named("node", 2);
+        assert_eq!(
+            store
+                .store_conclusion_block_with_the_slots_the_judge_handed_back(
+                    &stored_with_the_slots,
+                    &kind,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    record.clone(),
+                    Some(slots_bytes.clone()),
+                )
+                .expect("存得下"),
+            VerdictBlockStoring::WrittenAndSynced
+        );
+        assert_eq!(
+            (
+                store
+                    .read_observer_block(
+                        &stored_with_the_slots,
+                        &kind,
+                        &JUDGEMENT_CONCLUSION_VERSION
+                    )
+                    .expect("读得了"),
+                store
+                    .read_conclusion_block(
+                        &stored_with_the_slots,
+                        &kind,
+                        &JUDGEMENT_CONCLUSION_VERSION
+                    )
+                    .expect("读得了")
+                    .map(|stored| stored.block),
+            ),
+            (Some(slots_bytes), Some(record.block)),
+            "头一回连同槽数存的：结论与槽数都读得回"
+        );
+    }
+
+    /// 真孤儿：恢复字旁表有这一行、结论块表怎么读都没有：重读一次仍没有就报恢复字旁表不合布局，只读一次旁表（重读有上限），库里一行不动。
+    /// 判别力（`crates/mutations.tsv`）：重读仍没有也当没存过，这条红在把整批写了下去。
+    #[test]
+    fn recovery_words_row_without_its_conclusion_block_after_the_reread_reports_the_orphan_and_writes_nothing(
+    ) {
+        let library = TestLibrary::new("recovery-words-orphan");
+        let mut store = library.open();
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let record = conclusion_record(block_of(&[clean, clean]), &[]);
+        library.write_raw_rows(vec![(
+            VerdictStoreKey::RecoveryWords(
+                &block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+            )
+            .to_key_bytes()
+            .0,
+            recovery_words_value_bytes(&recovery_words_of_the_test_block(2)),
+        )]);
+        let rows_before = store.every_stored_entry();
+        let (stored, action_runs) = store_with_an_action_between_the_two_reads(
+            || {},
+            || {
+                store.store_conclusion_block(
+                    &block_key,
+                    &ConclusionKind::ImageJudgement,
+                    &JUDGEMENT_CONCLUSION_VERSION,
+                    &record,
+                )
+            },
+        );
+        assert!(
+            matches!(
+                stored,
+                Err(VerdictStoreError::StoredBytesDoNotMatchTheLayout {
+                    table: VerdictStoreTable::RecoveryWords,
+                    reason: "恢复字旁表有这一块这一种结论这一版本，结论块表没有",
+                    ..
+                })
+            ),
+            "重读仍没有要报恢复字旁表孤儿：{stored:?}"
+        );
+        assert_eq!(action_runs, 1, "只读一次旁表、不循环");
+        assert_eq!(
+            store.every_stored_entry(),
+            rows_before,
+            "报错之前一行都没写"
+        );
+    }
+
+    /// 真孤儿：只有被抛弃根旁表有这一行：报的是被抛弃根那一张，不是恢复字那一张。判别力（`crates/mutations.tsv`）：报错点名的表写成恢复字旁表，这条红。
+    #[test]
+    fn abandoned_roots_row_without_its_conclusion_block_after_the_reread_reports_that_table() {
+        let library = TestLibrary::new("abandoned-roots-orphan");
+        let mut store = library.open();
+        let clean = store
+            .register_verdict_vector(&verdict_vector(b""))
+            .expect("登记");
+        let block_key = block_key_named("node", 0);
+        let record = conclusion_record(block_of(&[clean, clean]), &[]);
+        library.write_raw_rows(vec![(
+            VerdictStoreKey::AbandonedRootsNamedByThePoolChecker(
+                &block_key,
+                &ConclusionKind::ImageJudgement,
+                &JUDGEMENT_CONCLUSION_VERSION,
+            )
+            .to_key_bytes()
+            .0,
+            abandoned_roots_named_value_bytes(&abandoned_roots_of_each_of_the_test_states(2)),
+        )]);
+        let stored = store.store_conclusion_block(
+            &block_key,
+            &ConclusionKind::ImageJudgement,
+            &JUDGEMENT_CONCLUSION_VERSION,
+            &record,
+        );
+        assert!(
+            matches!(
+                stored,
+                Err(VerdictStoreError::StoredBytesDoNotMatchTheLayout {
+                    table: VerdictStoreTable::AbandonedRootsNamedByThePoolChecker,
+                    reason: "点名的被抛弃根旁表有这一块这一种结论这一版本，结论块表没有",
+                    ..
+                })
+            ),
+            "重读仍没有要报被抛弃根旁表孤儿：{stored:?}"
+        );
+    }
+
+    /// 一行写死的待判行：强制现判那个字节与入池序号由调用方给。
+    fn a_gpu_pending_row(forced: ForcedRejudging, pool_entry_number: u64) -> GpuPendingRow {
+        GpuPendingRow {
+            recorded_block: block_key_named("gpu-pending", 64),
+            recorded_flow_digest: [0x10; SHA256_DIGEST_BYTES],
+            packed_judge_tables_digest: [0x21; SHA256_DIGEST_BYTES],
+            state_ordinals: 64..96,
+            expected_gpu_judge_units: JudgingUnitsFingerprint([0x32; SHA256_DIGEST_BYTES]),
+            conclusion_version: ConclusionVersion([0x43; SHA256_DIGEST_BYTES]),
+            forced,
+            pool_entry_number,
+        }
+    }
+
+    /// 待判行与强制现判凭据的值照写下的读回原样；待判行格式号不对、强制现判那个字节认不出、多一个字节都读不出。
+    /// 判别力（`crates/mutations.tsv`）：强制现判写成 `00`（读回成不强制），这条红。
+    #[test]
+    fn gpu_pending_and_rejudged_rows_read_back_as_written() {
+        for forced in [ForcedRejudging::NotForced, ForcedRejudging::Forced] {
+            let row = a_gpu_pending_row(forced, 1_700_000_000_123_456_789);
+            let bytes = row.to_value_bytes();
+            assert_eq!(bytes.len(), GPU_PENDING_ROW_VALUE_BYTES, "待判行的值定长");
+            assert_eq!(
+                GpuPendingRow::from_value_bytes(&bytes),
+                Some(row.clone()),
+                "{forced:?}：读回原样"
+            );
+            let mut wrong_format = bytes.clone();
+            wrong_format[0] = GPU_PENDING_ROW_FORMAT_NUMBER + 1;
+            assert_eq!(
+                GpuPendingRow::from_value_bytes(&wrong_format),
+                None,
+                "格式号不对读不出"
+            );
+            let mut one_more_byte = bytes.clone();
+            one_more_byte.push(0);
+            assert_eq!(
+                GpuPendingRow::from_value_bytes(&one_more_byte),
+                None,
+                "多一个字节读不出"
+            );
+        }
+        let mut unknown_forced = a_gpu_pending_row(ForcedRejudging::Forced, 7).to_value_bytes();
+        let forced_position = GPU_PENDING_ROW_VALUE_BYTES - 8 - 1;
+        unknown_forced[forced_position] = 0x02;
+        assert_eq!(
+            GpuPendingRow::from_value_bytes(&unknown_forced),
+            None,
+            "强制现判那个字节认不出读不出"
+        );
+        let rejudged = GpuRejudgedRow {
+            holder_identity: b"service-7/card-0/thread-3".to_vec(),
+            conclusion_digest: [0x54; SHA256_DIGEST_BYTES],
+        };
+        assert_eq!(
+            GpuRejudgedRow::from_value_bytes(&rejudged.to_value_bytes()),
+            Some(rejudged),
+            "强制现判凭据读回原样"
+        );
+    }
+
+    /// 待判行不在才写：头一次写下（强制现判的）；同一把键再写一份不同的（入池序号不同、不强制）交回库里那一份、库里不变；
+    /// 服务判完删掉之后（删除记号）再写照写；库里全部待判行照键列得出；强制现判凭据写下读得回、别的入池序号读不到。
+    /// 判别力（`crates/mutations.tsv`）：行已在时照写不误（交回写下了），这条红。
+    #[test]
+    fn a_gpu_pending_row_is_put_only_when_it_is_not_there() {
+        let library = TestLibrary::new("gpu-pending-row-unless-present");
+        let store = library.open();
+        let stream = GpuPendingStreamKey([0x65; SHA256_DIGEST_BYTES]);
+        let first = a_gpu_pending_row(ForcedRejudging::Forced, 1);
+        let second = a_gpu_pending_row(ForcedRejudging::NotForced, 2);
+        assert_eq!(
+            store
+                .put_the_gpu_pending_row_unless_present_or_raise_it_to_forced(&stream, 5, &first)
+                .expect("写得进库"),
+            GpuPendingRowPut::Written,
+            "头一次写下"
+        );
+        assert_eq!(
+            store
+                .put_the_gpu_pending_row_unless_present_or_raise_it_to_forced(&stream, 5, &second)
+                .expect("写得进库"),
+            GpuPendingRowPut::AlreadyPresent(first.clone()),
+            "行已在：不重写，交回库里那一份"
+        );
+        assert_eq!(
+            store
+                .read_gpu_pending_rows(&[(stream, 5), (stream, 6)])
+                .expect("读得了库"),
+            vec![Some(first.clone()), None],
+            "库里仍是头一份；没写的那一块不在"
+        );
+        assert_eq!(
+            store.every_gpu_pending_row().expect("扫得了库"),
+            vec![(stream, 5, first)],
+            "库里全部待判行"
+        );
+        store
+            .delete_the_gpu_pending_row(&stream, 5)
+            .expect("删得了");
+        assert_eq!(
+            store
+                .read_gpu_pending_rows(&[(stream, 5)])
+                .expect("读得了库"),
+            vec![None],
+            "删掉之后读成不在"
+        );
+        assert_eq!(
+            store
+                .put_the_gpu_pending_row_unless_present_or_raise_it_to_forced(&stream, 5, &second)
+                .expect("写得进库"),
+            GpuPendingRowPut::Written,
+            "删掉之后（删除记号）再写照写"
+        );
+        let rejudged = GpuRejudgedRow {
+            holder_identity: b"stand-in".to_vec(),
+            conclusion_digest: [0x76; SHA256_DIGEST_BYTES],
+        };
+        store
+            .store_the_gpu_rejudged_row(2, &stream, 5, &rejudged)
+            .expect("写得进库");
+        assert_eq!(
+            store
+                .read_gpu_rejudged_row(2, &stream, 5)
+                .expect("读得了库"),
+            Some(rejudged),
+            "强制现判凭据读得回"
+        );
+        assert_eq!(
+            store
+                .read_gpu_rejudged_row(3, &stream, 5)
+                .expect("读得了库"),
+            None,
+            "别的入池序号下没有"
+        );
+    }
+
+    /// 强制现判撞上已有的不强制行：不强制的那一行在库里，再写一份不强制的不重写；写一份强制现判的照它整份写下（强制、它的入池序号）、
+    /// 交回原来那一份；之后不强制的、另一份强制的都不再改它（强制的不被盖回不强制）。
+    /// 判别力（`crates/mutations.tsv`）：在而不强制时照旧交回库里那一份、不改成强制，这条红。
+    #[test]
+    fn a_gpu_pending_row_not_forced_is_raised_to_forced_by_a_forced_one_and_never_lowered() {
+        let library = TestLibrary::new("gpu-pending-row-raised-to-forced");
+        let store = library.open();
+        let stream = GpuPendingStreamKey([0x66; SHA256_DIGEST_BYTES]);
+        let not_forced = a_gpu_pending_row(ForcedRejudging::NotForced, 1);
+        let forced = a_gpu_pending_row(ForcedRejudging::Forced, 2);
+        let put = |row: &GpuPendingRow| {
+            store
+                .put_the_gpu_pending_row_unless_present_or_raise_it_to_forced(&stream, 9, row)
+                .expect("写得进库")
+        };
+        assert_eq!(put(&not_forced), GpuPendingRowPut::Written, "头一次写下");
+        assert_eq!(
+            put(&a_gpu_pending_row(ForcedRejudging::NotForced, 3)),
+            GpuPendingRowPut::AlreadyPresent(not_forced.clone()),
+            "不强制撞上不强制：不重写"
+        );
+        assert_eq!(
+            put(&forced),
+            GpuPendingRowPut::RaisedToForced {
+                replaced: not_forced
+            },
+            "强制撞上不强制：改成强制，交回原来那一份"
+        );
+        assert_eq!(
+            store
+                .read_gpu_pending_rows(&[(stream, 9)])
+                .expect("读得了库"),
+            vec![Some(forced.clone())],
+            "库里是强制现判的那一份（连同它的入池序号）"
+        );
+        for later in [
+            a_gpu_pending_row(ForcedRejudging::NotForced, 4),
+            a_gpu_pending_row(ForcedRejudging::Forced, 5),
+        ] {
+            assert_eq!(
+                put(&later),
+                GpuPendingRowPut::AlreadyPresent(forced.clone()),
+                "强制的那一行之后 {later:?} 不再改它"
+            );
         }
     }
 }

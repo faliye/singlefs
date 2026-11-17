@@ -380,6 +380,7 @@ const SEPARATOR_ABOVE_THE_FIRST_RECORD_OF_THE_RIGHT_LEAF: u64 = 235;
 
 /// 两片叶的池上建一个只读快照（快照的 inode 根就是活头那一棵），再把最新那条根的 inode 树根右片那条条目的分隔 key 从 234 改成 `separator`，
 /// 根头 key 区间不动，改单元的校验和沿引用链补到根槽（快照的码 14 条目跟着补）。交回镜像与快照的树号；改完的镜像上池级 checker 判 I-9.12 红（前提）。
+// cpu-reference-for-gpu-comparison
 fn image_with_a_snapshot_whose_right_inode_leaf_separator_is(
     separator: u64,
 ) -> (MemoryPool, TreeIdentifier) {
@@ -408,14 +409,14 @@ fn image_with_a_snapshot_whose_right_inode_leaf_separator_is(
         assert_eq!(before, 234, "改之前右片的分隔 key 是它的容器号 234");
         root[range].copy_from_slice(&separator.to_le_bytes());
     });
-    let verdict_of_i_9_12 = check_pool_image(&image)
+    let verdict_of_the_separator_key_invariant = check_pool_image(&image)
         .into_iter()
         .find(|(invariant, _)| *invariant == "I-9.12")
         .map(|(_, verdict)| verdict)
         .expect("池级 checker 报 I-9.12");
     assert!(
-        matches!(verdict_of_i_9_12, InvariantVerdict::Violated(_)),
-        "前提：分隔 key {separator} 那一版池级 checker 判 I-9.12 红：{verdict_of_i_9_12:?}"
+        matches!(verdict_of_the_separator_key_invariant, InvariantVerdict::Violated(_)),
+        "前提：分隔 key {separator} 那一版池级 checker 判 I-9.12 红：{verdict_of_the_separator_key_invariant:?}"
     );
     (image, snapshot_entry.tree)
 }

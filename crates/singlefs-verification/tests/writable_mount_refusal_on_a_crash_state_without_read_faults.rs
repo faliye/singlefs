@@ -1,7 +1,7 @@
 //! 验证包模块：crash
 //! C670（无读故障的崩溃态上可写挂载见证判据为真没有判官）：崩溃注入第二截判拒可写合不合法时，崩溃态没注入读故障、拒的理由是
 //! D23（journal 的角色与格式） 已定项 14 的判据 N-配置，而判据在崩溃镜像上复算（撕裂的系统配置槽跳过）仍为真 ⇒ 拒得不合法
-//! （`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state`）。注入过读故障的崩溃态不判这一条
+//! （`singlefs_verification::mount_transparency::judge_writable_mount_refusal_of_a_crash_state_of_the_pool`）。注入过读故障的崩溃态不判这一条
 //! （D13（验证路线） 已定项 1 挂载透明的射程只管不带故障的状态）。
 //! 改法 G4（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2「新拒因少一条 C670 同形的判法（J2-b）」那一行）与它同形：
 //! 某块盘一份自证过的系统配置都没有时，C664（挂载拒绝合法复算把两种拒因报成一个）之后实现报的是「读阶段判完之后系统配置又读不出」那一拒，
@@ -32,10 +32,11 @@ use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, RetainedWrite, SparseBlockDevice,
 };
 use singlefs_verification::mount_transparency::{
-    judge_writable_mount_refusal, judge_writable_mount_refusal_of_a_crash_state,
+    judge_writable_mount_refusal, judge_writable_mount_refusal_of_a_crash_state_of_the_pool,
     read_recovery_fields, ComparedVersion, DiskAfterTheRefusal, ReadFaultsInTheCrashState,
-    ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet, RefusalReasonOnTheD23List,
-    WitnessedCounterBranchThatHolds, WritableMountRefusalVerdict,
+    ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet,
+    RefusalReasonOnTheLegalRefusalList, WitnessedCounterBranchThatHolds,
+    WritableMountRefusalVerdict,
 };
 use singlefs_verification::segments::{FixedGeometry, StepKind};
 use singlefs_verification::{RetainedOperation, SharedStream};
@@ -335,16 +336,18 @@ fn a_witness_refusal_on_a_crash_image_without_read_faults_where_only_a_rotation_
     );
     let fields = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion);
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![
                 RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults(
                     WitnessedCounterBranchThatHolds::WitnessedCounterAboveTheLastRecordOfTheSelectedVersion
@@ -361,16 +364,18 @@ fn the_same_witness_refusal_in_a_crash_state_with_read_faults_injected_is_legal(
     let (error, after) = refused_writable_mount_on(&crash_image);
     let fields = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion);
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back_against_the_first_file(&healthy, &crash_image),
             ReadFaultsInTheCrashState::Injected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration
+            RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration
         )
     );
 }
@@ -406,16 +411,18 @@ fn a_refusal_after_the_read_stage_on_a_crash_image_without_read_faults_where_dev
     assert_refused_after_the_read_stage_for_device_zero(&error);
     let fields = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion);
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back_against_the_first_file(&healthy, &crash_image),
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            reason: RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
             conditions_not_met: vec![
                 RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults,
             ],
@@ -433,16 +440,18 @@ fn the_same_refusal_after_the_read_stage_in_a_crash_state_with_read_faults_injec
     assert_refused_after_the_read_stage_for_device_zero(&error);
     let fields = read_recovery_fields(&crash_image, ComparedVersion::TheRecoveredVersion);
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back_against_the_first_file(&healthy, &crash_image),
             ReadFaultsInTheCrashState::Injected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage
         )
     );
 }
@@ -461,27 +470,30 @@ fn a_refusal_after_the_read_stage_without_read_faults_where_a_rotation_tore_and_
     assert_eq!(
         judge_writable_mount_refusal(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage
         ),
         "前提：只判 U6 四条时这一拒合法（判据复算为真、盘没变、读出在允许集合里）"
     );
     assert_eq!(
-        judge_writable_mount_refusal_of_a_crash_state(
+        judge_writable_mount_refusal_of_a_crash_state_of_the_pool(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             disk_after(&crash_image, &after),
             read_only_read_back,
             ReadFaultsInTheCrashState::NoneInjected,
+            ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            reason: RefusalReasonOnTheLegalRefusalList::SystemConfigurationUnreadableAfterTheReadStage,
             conditions_not_met: vec![
                 RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults,
             ],

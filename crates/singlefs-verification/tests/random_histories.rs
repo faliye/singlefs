@@ -290,9 +290,12 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
                     "{kind:?} 不在 broad 那组比重里，却跑到了"
                 );
             }
-            // 只进它自己那一组比重（`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`，C696），broad 那一组不抽它；
-            // 跑到了没有在那一组的取样点那条用例里核（`newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms`）。
-            HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            // 只藏第一块盘的那一种与每块盘都藏的那一种只进它们自己那一组比重
+            // （`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`，C696），broad 那一组不抽；跑到了没有、
+            // 每块盘都藏的那一种照乙入判不出拒过没有，在那一组的取样点那条用例里核
+            // （`newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms`）。
+            HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros
+            | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 assert_eq!(
                     (operation.applied, operation.refused, operation.not_applicable),
                     (0, 0, 0),
@@ -665,12 +668,17 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
 }
 
 /// 崩溃注入读故障那一支的取样点（C696（崩溃注入的读故障一支在随机历史里从没触发），候选「丁」）：比重取
-/// `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`（broad 那一组、崩溃恢复抛弃根那几格换成「每块盘最新那一槽
+/// `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS`（broad 那一组、崩溃恢复抛弃根那几格换成「只有第一块盘最新那一槽
 /// 系统配置读回全 0 时的可写挂载」），种子从这个测试周期的种子基起 48 段、每段 24 步，两块 384 槽单元区的窄盘（设计调查量的那一档），
 /// 每一步之后跑池级 checker、模型照判。先判清单外的失败（checker 判红、模型对不上都在其内），再核这一步真的跑到了、可写挂载做成过——
 /// 做成就是取号、写行、暖机都在读故障下发了写（D22（单元原子性怎么合成） 已定项 8：单故障在承诺里，挂载照常往下走）。
-/// 判别力：这一步藏成每块盘两槽都读回全 0（`crates/mutations.tsv` 一行：那块盘一份自证过的系统配置都不剩，双故障）时可写挂载被拒、
-/// 一次都做不成，这一条红。
+/// 同一组比重里另有小份数的「每块盘最新那一槽系统配置读回全 0 时的可写挂载」（C971（多处读坏时可写挂载写出倒挂的新实例根）乙入判不出）：
+/// 再核它被抽到、跑到过、每次都被拒、一次都没做成；实现照乙入判不出拒、模型照条款答拒，对不上就是清单外的失败。
+/// 两条「至少一次」（只藏第一块盘的做成过、每块盘都藏的被拒过）不靠运气：种子基 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE` 永久固定，
+/// 这 48 段历史的生成与执行只看种子与比重，汇总按种子排好、与线程数无关，同一份代码跑多少次计数都相同。
+/// 判别力：这一步不只藏第一块盘、每块盘最新那一槽都藏（没有一块盘两槽都自证过，乙入判不出拒可写）时可写挂载被拒、一次都做不成，这一条红
+/// （`crates/mutations.tsv` 那一行点名的是崩溃注入同一步上的靶向用例，跑得快）；模型那一步照普通可写挂载答时每块盘都藏的那一步报
+/// 「模型说该成、实现拒了」，清单外的失败那一条红（`crates/mutations.tsv` 一行）。
 #[test]
 fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms(
 ) {
@@ -679,7 +687,7 @@ fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only
         SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         48,
         24,
-        &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+        &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_READING_ZEROS,
         HistoryExecution {
             per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
@@ -690,7 +698,7 @@ fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only
     );
     let rendered = report.render();
     print_uncaptured(&format!(
-        "── 随机历史：每块盘最新那一槽系统配置读回全 0 的取样点 ──\n{rendered}用时 {:.1} 秒\n",
+        "── 随机历史：最新那一槽系统配置读回全 0 的取样点 ──\n{rendered}用时 {:.1} 秒\n",
         started.elapsed().as_secs_f64()
     ));
     assert!(
@@ -700,16 +708,30 @@ fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only
     let step = report
         .tally
         .operations_by_kind
-        .get(&HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros)
+        .get(&HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfOneDeviceReadingZeros)
         .copied()
         .unwrap_or_default();
     assert!(
         step.applied >= 1,
-        "每块盘最新那一槽系统配置读回全 0 的可写挂载一次都没做成：{step:?}\n{rendered}"
+        "只有第一块盘最新那一槽系统配置读回全 0 的可写挂载一次都没做成：{step:?}\n{rendered}"
     );
     assert_eq!(
         step.refused, 0,
         "单故障在承诺里，这一步不许被拒：{step:?}\n{rendered}"
+    );
+    let step_hiding_every_device = report
+        .tally
+        .operations_by_kind
+        .get(&HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros)
+        .copied()
+        .unwrap_or_default();
+    assert!(
+        step_hiding_every_device.refused >= 1,
+        "每块盘最新那一槽系统配置读回全 0 的可写挂载一次都没被拒过（没抽到或前提一次都不满足）：{step_hiding_every_device:?}\n{rendered}"
+    );
+    assert_eq!(
+        step_hiding_every_device.applied, 0,
+        "没有一块盘两槽都自证过，乙入判不出拒可写，这一步不许做成：{step_hiding_every_device:?}\n{rendered}"
     );
 }
 

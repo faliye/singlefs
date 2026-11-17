@@ -25,7 +25,7 @@ use singlefs_verification::history::{
 use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
 use singlefs_verification::mount_transparency::{
     judge_writable_mount_refusal, read_recovery_fields, ComparedVersion, DiskAfterTheRefusal,
-    ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet, RefusalReasonOnTheD23List,
+    ReadOnlyReadBackOfTheCrashImage, RefusalConditionNotMet, RefusalReasonOnTheLegalRefusalList,
     WritableMountRefusalVerdict,
 };
 use singlefs_verification::SharedStream;
@@ -129,7 +129,7 @@ fn refused_mount_on(
 }
 
 /// 拒因是 R2 的判不出：读阶段判据 N-配置 为真、重读仍为真，两遍读数的比较都是「有槽设备报读错、没有一块盘两槽都自证过」。
-fn refused_as_undecidable_under_r2_on_both_reads(error: &MountError) -> bool {
+fn refused_as_undecidable_under_the_read_error_rule_on_both_reads(error: &MountError) -> bool {
     let MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) = error else {
         return false;
     };
@@ -186,7 +186,7 @@ fn a_refusal_when_the_newest_system_configuration_slot_of_every_device_reports_a
         &read_errors_on_the_newest_system_configuration_slot_of_every_device(),
     );
     assert!(
-        refused_as_undecidable_under_r2_on_both_reads(&error),
+        refused_as_undecidable_under_the_read_error_rule_on_both_reads(&error),
         "前提：两块盘世代 5 那一槽都报读错，R2 判不出，读阶段判据 N-配置 按真、重读仍真，拒：{error:?}"
     );
     let crash_image = devices_with_read_errors(
@@ -211,13 +211,14 @@ fn a_refusal_when_the_newest_system_configuration_slot_of_every_device_reports_a
     assert_eq!(
         judge_writable_mount_refusal(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields_of_the_crash_image.report.effective_root,
             &error,
             disk_after(&healthy, &after),
             read_only_read_back,
         ),
         WritableMountRefusalVerdict::Legal(
-            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration
+            RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration
         )
     );
 }
@@ -233,13 +234,14 @@ fn a_witness_refusal_on_a_healthy_pool_is_a_refusal_for_the_wrong_reason() {
     assert_eq!(
         judge_writable_mount_refusal(
             &healthy,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &witness_refusal_claimed_on(selected_version),
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
@@ -251,21 +253,29 @@ fn a_witness_refusal_on_a_healthy_pool_is_a_refusal_for_the_wrong_reason() {
 fn an_unreadable_instance_table_refusal_on_a_healthy_pool_is_a_refusal_for_the_wrong_reason() {
     let healthy = pool_after_the_first_file();
     let fields = read_recovery_fields(&healthy, ComparedVersion::TheRecoveredVersion);
+    let (instance, checkpoint_txg) = fields
+        .report
+        .effective_root
+        .expect("健康盘面上恢复落到一版");
     let refusal = MountError::NewerStateStillUnreadableAfterOneReread(Box::new(
         StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-            newest_root_on_the_reread: None,
+            root_chosen_by_the_read_stage: RollbackTarget {
+                instance,
+                checkpoint_txg,
+            },
         },
     ));
     assert_eq!(
         judge_writable_mount_refusal(
             &healthy,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &refusal,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable,
+            reason: RefusalReasonOnTheLegalRefusalList::InstanceTableOfTheNewestRootUnreadable,
             conditions_not_met: vec![
                 RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
             ],
@@ -283,7 +293,7 @@ fn a_refusal_on_read_errors_of_every_newest_system_configuration_slot_that_chang
         &read_errors_on_the_newest_system_configuration_slot_of_every_device(),
     );
     assert!(
-        refused_as_undecidable_under_r2_on_both_reads(&error),
+        refused_as_undecidable_under_the_read_error_rule_on_both_reads(&error),
         "前提：两块盘世代 5 那一槽都报读错，R2 判不出，拒：{error:?}"
     );
     let crash_image = devices_with_read_errors(
@@ -294,30 +304,32 @@ fn a_refusal_on_read_errors_of_every_newest_system_configuration_slot_that_chang
     assert_eq!(
         judge_writable_mount_refusal(
             &crash_image,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &error,
             DiskAfterTheRefusal::Changed,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
         ),
         WritableMountRefusalVerdict::Illegal {
-            reason: RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            reason: RefusalReasonOnTheLegalRefusalList::NewerPublishWitnessedBySystemConfiguration,
             conditions_not_met: vec![RefusalConditionNotMet::DiskChangedByTheRefusedMount],
         }
     );
 }
 
 #[test]
-fn a_refusal_whose_reason_is_not_on_the_d23_list_is_left_to_the_campaign() {
+fn a_refusal_whose_reason_is_not_on_the_legal_refusal_list_is_left_to_the_campaign() {
     let healthy = pool_after_the_first_file();
     let fields = read_recovery_fields(&healthy, ComparedVersion::TheRecoveredVersion);
     assert_eq!(
         judge_writable_mount_refusal(
             &healthy,
+            &SMALL.parameters().filesystem_identifier,
             fields.report.effective_root,
             &MountError::InstanceTableMalformed,
             DiskAfterTheRefusal::ByteForByteUnchanged,
             ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
         ),
-        WritableMountRefusalVerdict::ReasonNotOnTheD23List
+        WritableMountRefusalVerdict::ReasonNotOnTheLegalRefusalList
     );
 }

@@ -267,6 +267,7 @@ fn s_use_the_central_mapping_of(mapping_root: Ptr) {
     read_the_central_mapping_without_judging(mapping_root);
     s_mapping_root_loaded = mapping_root;
     s_mapping_root_is_loaded = true;
+    d_forget_the_inode_records_read_in_full();
 }
 
 // 打包表 base 起 offset 处那条映射根指针指的那一版中央映射（根环里的根取根记录偏移 256，由记录施加出来的那一版取新根段里的那一条）
@@ -788,6 +789,7 @@ fn r_references_of_root(record_base: u32, every: bool, info: u32) {
         version_mapping_count = 0u;
         version_mapping_is_indexed = false;
         s_mapping_root_is_loaded = false;
+        d_forget_the_inode_records_read_in_full();
     }
     let instance_table = parse_node_pointer(record_base, 170u);
     r_note(instance_table);
@@ -3323,6 +3325,16 @@ fn c_accounting_item_falls_in_the_slice(start: vec2<u32>, low_scaled: vec2<u32>,
     return le64(low_scaled, start_scaled) && lt64(start_scaled, high_scaled);
 }
 
+// 交接段里这一轮那一份接着做的地方（resume_row 起，C_ACCOUNTING_RESUME_WORDS 字的后五字）记成：下一片从第 device_index 块盘的第 item_kind 种项的
+// 第 item_index 项接着做，排在它前面各项的权重之和是 weight_before（device_index 是盘数时是 I-3.21 的第 item_index 条引用）
+fn c_accounting_note_where_the_next_slice_resumes(resume_row: u32, device_index: u32, item_kind: u32, item_index: u32, weight_before: vec2<u32>) {
+    sws(resume_row + 2u, device_index);
+    sws(resume_row + 3u, item_kind);
+    sws(resume_row + 4u, item_index);
+    sws(resume_row + 5u, weight_before.x);
+    sws(resume_row + 6u, weight_before.y);
+}
+
 // 头那一趟：两遍隔离豁免与 F 之下的推迟（walk.rs check_pool_image 不看有没有记账都算），I-3.17 随第二遍判，I-3.21 开头那一段；
 // 分片、决断、收尾那几趟要的计数与标记存进交接段，每块盘两种读法的界清成初值、两轮罩到的地方清成 0
 fn accounting_head() {
@@ -3382,7 +3394,11 @@ fn accounting_carry_load() {
 // 分片那一趟：照派活参数 accounting_slice_parameters 做这一轮里落在 [low, high) 那一段位置上的项，加进交接段里那几块盘这一轮那一份界；按记录自述那一轮另判
 // I-3.21 落在这一片里的那几条引用。一轮的项是：要数的每块盘（按记录自述那一轮是最新根的分配记录读全且比得上、有记账时的每一块，按单元那一类那一轮
 // 只是决断记了要再数一份的那几块）上的每条记录（数槽）、每条引用（逐槽的下沿）、按单元那一类那一轮的每条记录（两两不相交），再是 I-3.21 的每条引用；
-// 一项的位置照它前面各项的权重之和按比例摊（c_accounting_item_falls_in_the_slice）。这一片的 low 要接着这一轮罩到的地方，不然记判不了、不做
+// 一项的位置照它前面各项的权重之和按比例摊（c_accounting_item_falls_in_the_slice）。这一片的 low 要接着这一轮罩到的地方，不然记判不了、不做。
+// 一轮的项与权重在各片之间不变（分片那几趟不改 C_ALLOC_RECORDS、引用表与决断的结论），位置随前面各项的权重之和只增不减：
+// 第一片（low 是 0）先把这一轮的项整轮加一遍权重得出总权重、记进交接段，从第一项做起；之后每一片读回总权重，从前一片停下的那一项接着做
+// （交接段里那一份接着做的地方），走到位置不在 high 之前的那一项就停、记下这一项。每一项仍只落在一片里、落在哪一片与整轮从头数的相同；
+// 除第一片的权重那一遍外，每片走过的项只有落在这一片里的与停下的那一项
 fn accounting_slice() {
     let span_reading = accounting_slice_parameters.span_reading;
     if (span_reading > C_SPAN_READING_AS_THE_UNIT_CLASSES) {
@@ -3405,13 +3421,29 @@ fn accounting_slice() {
     let reclaim_threshold_computed_by_the_checker = c_reclaim_threshold_without_the_pin();
     let reclaim_threshold_on_the_newest_root = rd64(newest_root.base, ROOT_RECORD_RECLAIM_THRESHOLD_OFFSET);
     let device_count = hdr(3u);
-    var low_scaled = vec2<u32>(0u, 0u);
-    var high_scaled = vec2<u32>(0u, 0u);
-    // 两遍走同一套项、同一个次序：第一遍只加权重得出这一轮的总权重，第二遍做落在这一片里的那几项（每个调用点只展开一份）
-    for (var walk_pass = 0u; walk_pass < 2u; walk_pass = walk_pass + 1u) {
+    let resume_row = C_ACCOUNTING_CARRY_RESUME_OF_EACH_ROUND + span_reading * C_ACCOUNTING_RESUME_WORDS;
+    let is_the_first_slice_of_the_round = accounting_slice_parameters.low == 0u;
+    var weight_total = vec2<u32>(sw(resume_row), sw(resume_row + 1u));
+    // 两遍走同一套项、同一个次序：第一遍只加权重得出这一轮的总权重（只在第一片走），第二遍做落在这一片里的那几项（每个调用点只展开一份）
+    for (var walk_pass = select(1u, 0u, is_the_first_slice_of_the_round); walk_pass < 2u; walk_pass = walk_pass + 1u) {
         let does_the_items = walk_pass == 1u;
+        let low_scaled = mul64_32(weight_total, accounting_slice_parameters.low).value;
+        let high_scaled = mul64_32(weight_total, accounting_slice_parameters.high).value;
+        // 这一遍从哪一项走起：权重那一遍与第一片从头，别的片从交接段里前一片停下的那一项
+        var first_device_index = 0u;
+        var first_item_kind = 0u;
+        var first_item_index = 0u;
         var weight_before = vec2<u32>(0u, 0u);
-        for (var device_index = 0u; device_index < device_count; device_index = device_index + 1u) {
+        if (does_the_items && !is_the_first_slice_of_the_round) {
+            first_device_index = sw(resume_row + 2u);
+            first_item_kind = sw(resume_row + 3u);
+            first_item_index = sw(resume_row + 4u);
+            weight_before = vec2<u32>(sw(resume_row + 5u), sw(resume_row + 6u));
+        }
+        // 做的那一遍走到第一项位置不在这一片里（不在 high 之前）的那一项就停：之后各项的位置都不比它小
+        var stopped_before_the_end_of_the_round = false;
+        for (var device_index = first_device_index; device_index < device_count && !stopped_before_the_end_of_the_round;
+            device_index = device_index + 1u) {
             if (!records_are_counted
                 || (span_reading == C_SPAN_READING_AS_THE_UNIT_CLASSES
                     && (sw(C_ACCOUNTING_CARRY_DECISION_OF_EACH_DEVICE + device_index) & C_ACCOUNTING_DECISION_COUNTED_AGAIN_AS_THE_UNIT_CLASSES) == 0u)) {
@@ -3419,19 +3451,27 @@ fn accounting_slice() {
             }
             let device = hdr(12u + device_index);
             var bounds = c_accounting_carry_bounds_load(device_index, span_reading);
-            for (var item_kind = 0u; item_kind < C_ACCOUNTING_ITEM_KINDS; item_kind = item_kind + 1u) {
+            let resumes_in_this_device = device_index == first_device_index;
+            for (var item_kind = select(0u, first_item_kind, resumes_in_this_device);
+                item_kind < C_ACCOUNTING_ITEM_KINDS && !stopped_before_the_end_of_the_round; item_kind = item_kind + 1u) {
                 if (item_kind == C_ACCOUNTING_ITEM_RECORD_DISJOINT_FROM_THE_RECORDS_AFTER_IT && span_reading == C_SPAN_READING_AS_RECORDED) {
                     continue;
                 }
                 let is_a_walked_reference = item_kind == C_ACCOUNTING_ITEM_SLOTS_OF_A_WALKED_REFERENCE;
                 let item_count = select(c_alloc_record_count, w_reference_count[0], is_a_walked_reference);
-                for (var item_index = 0u; item_index < item_count; item_index = item_index + 1u) {
+                for (var item_index = select(0u, first_item_index, resumes_in_this_device && item_kind == first_item_kind);
+                    item_index < item_count; item_index = item_index + 1u) {
                     let row = select(C_ALLOC_RECORDS + item_index * C_ALLOC_RECORD_WORDS, C_REFERENCES0 + item_index * C_REFERENCE_WORDS,
                         is_a_walked_reference);
                     if (sw(row) != device) {
                         continue;
                     }
                     let start = weight_before;
+                    if (does_the_items && !lt64(shl64(start, C_ACCOUNTING_SLICE_POSITION_BITS), high_scaled)) {
+                        c_accounting_note_where_the_next_slice_resumes(resume_row, device_index, item_kind, item_index, start);
+                        stopped_before_the_end_of_the_round = true;
+                        break;
+                    }
                     weight_before = add64(weight_before, c_weight_of_an_accounting_item(item_kind, item_index, row, span_reading,
                         reclaim_threshold_computed_by_the_checker, reclaim_threshold_on_the_newest_root));
                     if (!does_the_items || !c_accounting_item_falls_in_the_slice(start, low_scaled, high_scaled)) {
@@ -3455,9 +3495,15 @@ fn accounting_slice() {
                 c_accounting_carry_bounds_store(device_index, span_reading, bounds);
             }
         }
-        if (records_compared != NONE) {
-            for (var reference_index = 0u; reference_index < w_reference_count[0]; reference_index = reference_index + 1u) {
+        if (records_compared != NONE && !stopped_before_the_end_of_the_round) {
+            for (var reference_index = select(0u, first_item_index, first_device_index == device_count);
+                reference_index < w_reference_count[0]; reference_index = reference_index + 1u) {
                 let start = weight_before;
+                if (does_the_items && !lt64(shl64(start, C_ACCOUNTING_SLICE_POSITION_BITS), high_scaled)) {
+                    c_accounting_note_where_the_next_slice_resumes(resume_row, device_count, 0u, reference_index, start);
+                    stopped_before_the_end_of_the_round = true;
+                    break;
+                }
                 weight_before = add64(weight_before, u64_of(records_compared + 1u));
                 if (does_the_items && c_accounting_item_falls_in_the_slice(start, low_scaled, high_scaled)) {
                     c_judge_the_start_of_a_walked_reference_against_the_records_of_the_newest_root(reference_index, records_compared,
@@ -3465,8 +3511,14 @@ fn accounting_slice() {
                 }
             }
         }
-        low_scaled = mul64_32(weight_before, accounting_slice_parameters.low).value;
-        high_scaled = mul64_32(weight_before, accounting_slice_parameters.high).value;
+        if (!does_the_items) {
+            weight_total = weight_before;
+            sws(resume_row, weight_total.x);
+            sws(resume_row + 1u, weight_total.y);
+        } else if (!stopped_before_the_end_of_the_round) {
+            // 这一轮的项做完了：之后的片（罩到 C_ACCOUNTING_SLICE_POSITIONS 之前的那几片）从最后一条引用之后接着，一项都不做
+            c_accounting_note_where_the_next_slice_resumes(resume_row, device_count, 0u, w_reference_count[0], weight_before);
+        }
     }
 }
 
@@ -4323,7 +4375,7 @@ fn d_data_units_the_size_asks_for(size_in_bytes: vec2<u32>) -> vec2<u32> {
     return asked_for;
 }
 
-// g_read_the_logged_operation_entries 收进 G_LOGGED_OPERATION_ENTRIES 的条目里有没有一条截断条目对得上这条记录（walk.rs a_truncation_intent_names_the_record）：
+// g_read_the_logged_operation_entries 收进 G_LOGGED_OPERATION_ENTRIES 的条目里有没有一条截断条目对得上这条记录（walk.rs truncation_intent_names_the_record）：
 // inode 号、对象出生代相同，目标 = 记录的 size
 fn d_a_truncation_intent_names_the_record(inode: vec2<u32>, object_birth: vec2<u32>, size_in_bytes: vec2<u32>) -> bool {
     for (var entry_index = 0u; entry_index < g_logged_operation_entry_count; entry_index = entry_index + 1u) {
@@ -4491,10 +4543,33 @@ fn d_push_container_tree_entries_in_reverse(node: Node, pending: ptr<function, u
     return true;
 }
 
+// D_INODE_RECORDS（连同条数、桶表）此刻装的是不是一次读全了的读、读的是哪一条根指针：那一张只由 d_read_inode_records 写，
+// 读全了的读只看根指针（逐段相同）、装着的那一版中央映射与镜像，所以同一条根指针在同一份映射下再读一次，读出的与表里此刻装的逐字相同，不重读
+// （墓碑与谱系那一遍一版里先逐棵 inode 树读一遍记 I-9.29，再给每棵墓碑树配的那棵、I-9.18 每棵队列不空的那棵各读一遍，配的多半是同一棵）。
+// 映射换了（s_use_the_central_mapping_of 重读、r_references_of_root 清空）、删除态扫描与墓碑、谱系那一遍每进一版，都忘掉
+var<private> d_inode_records_hold_a_whole_read: bool;
+var<private> d_inode_records_read_from: Ptr;
+
+fn d_forget_the_inode_records_read_in_full() {
+    d_inode_records_hold_a_whole_read = false;
+}
+
+// 一版 inode 树的全部记录读进 D_INODE_RECORDS（d_read_inode_records_from_the_nodes_of_the_tree）；表里此刻装的就是同一条根指针在同一份映射下读全了的那一次时不重读，照交回读全了
+fn d_read_inode_records(root_pointer: Ptr) -> bool {
+    if (d_inode_records_hold_a_whole_read && root_pointer.all_zero == d_inode_records_read_from.all_zero
+        && same_pointer(root_pointer, d_inode_records_read_from)) {
+        return true;
+    }
+    let read_in_full = d_read_inode_records_from_the_nodes_of_the_tree(root_pointer);
+    d_inode_records_hold_a_whole_read = read_in_full;
+    d_inode_records_read_from = root_pointer;
+    return read_in_full;
+}
+
 // walk.rs inode_records_without_judging：一版 inode 树的全部记录读进 D_INODE_RECORDS。根指针全零是零条记录；根层级 0 只许是零条目根；
 // 层级 ≥ 1 的往下走：类型段 2 的叶容器（码 3、记录类型 2、记录宽 ≥ 140）读每条记录，类型段 0 的内部节点（子指针非零、层级 = 父层级 − 1 且 ≥ 1、
 // 条目宽 ≥ 120）往下走，别的类型段、读不出、形状不对都交回 false（判不了）
-fn d_read_inode_records(root_pointer: Ptr) -> bool {
+fn d_read_inode_records_from_the_nodes_of_the_tree(root_pointer: Ptr) -> bool {
     d_inode_record_count = 0u;
     d_inode_records_are_indexed = false;
     if (root_pointer.all_zero) {
@@ -5168,6 +5243,7 @@ fn judge_deletion_state_of_the_versions() {
     // 先候选集里每条根、再由记录施加出来的那几版，同一个调用点
     for (var version_index = 0u; version_index < c_candidate_count + c_version_count; version_index = version_index + 1u) {
         let version = d_version_of_the_scan(version_index);
+        d_forget_the_inode_records_read_in_full();
         d_judge_deletion_state_of_a_version(version.base, version.tree_table_offset, version.mapping_root_offset);
     }
 }
@@ -6748,6 +6824,7 @@ fn judge_tombstones_and_the_lineage_of_the_versions() {
     for (var version_index = 0u; version_index < c_candidate_count + c_version_count; version_index = version_index + 1u) {
         let version = d_version_of_the_scan(version_index);
         let is_the_newest_root = version_index < c_candidate_count && sw(C_CANDIDATES + version_index) == c_newest_index;
+        d_forget_the_inode_records_read_in_full();
         d_judge_tombstones_and_the_lineage_of_a_version(version.base, version.tree_table_offset, version.txg, is_the_newest_root,
             version.mapping_root_offset);
     }

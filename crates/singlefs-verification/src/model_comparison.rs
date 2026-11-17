@@ -578,7 +578,7 @@ pub fn observed_snapshot_state_of_file_version(
 }
 
 /// 模型观测用的节点身份：按映射 key 字段表编码，不调用实现的编码器。
-fn observed_node_mapping_key(class: u8, pointer: NodePointer) -> Vec<u8> {
+pub(crate) fn observed_node_mapping_key(class: u8, pointer: NodePointer) -> Vec<u8> {
     let mut key = vec![class];
     key.extend_from_slice(&pointer.head.birth_tree.0.to_le_bytes());
     key.extend_from_slice(&pointer.head.birth_txg.0.to_le_bytes());
@@ -1307,7 +1307,8 @@ pub fn refusal_reason_of_truncation_refusal(refusal: TruncationRefusal) -> Obser
 }
 
 /// 分配器拒落点的原因说的是哪条理由：只有每块盘上都没有合政策的落点（容量不够）是单元区墙。小盘写满、各盘落点不一致是第一版不支持的
-/// 池形状，不是容量墙；模型的池是两块等大的盘、两盘的空闲图同样地变，模型里没有它的理由，出现就对不上（增补 3 第 2 件代码三方
+/// 池形状，每块盘都答回落而各盘的空槽错开、池里没有一个槽每块盘都空，也不是容量墙；模型的池是两块等大的盘、两盘的空闲图同样地变，
+/// 模型里没有它们的理由，出现就对不上（增补 3 第 2 件代码三方
 /// 第三节第 2 条：`NoSpaceFor` 装着这四种、一律映射成单元区墙的话，单元区墙的区间一开就被接走）。
 #[must_use]
 pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> ObservedRefusalReason {
@@ -1317,7 +1318,10 @@ pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> Observ
         | PlacementRefusal::UserDataSlotsDifferAcrossDevicesPerDeviceSlotsUnsupported { .. }
         | PlacementRefusal::CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined {
             ..
-        } => ObservedRefusalReason::Unexplained,
+        }
+        | PlacementRefusal::CommitGeneratedFallbackWithoutASlotFreeOnEveryDevice { .. } => {
+            ObservedRefusalReason::Unexplained
+        }
     }
 }
 
@@ -1412,7 +1416,9 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
             explained(ModelRefusalReason::UnitAreaWall)
         }
         // 读阶段判出系统配置见证过比所选那一版新的发布、重读一次仍判真（C554 乙）：崩溃恢复抛弃根那一步把最新那条根读成全 0 就走到，
-        // 模型那一步答必须拒（`IdealModel::answer_mount_writable_with_the_newest_root_unreadable`）。
+        // 模型那一步答必须拒（`IdealModel::answer_mount_writable_with_the_newest_root_unreadable`）；每块盘最新那一槽系统配置读回全 0 的
+        // 可写挂载照乙入判不出（C971（多处读坏时可写挂载写出倒挂的新实例根））把判据 N-配置 按真处置也走到，模型那一步同样答必须拒
+        // （`IdealModel::answer_mount_writable_with_no_device_holding_two_self_verified_system_configuration_slots`）。
         MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable) => {
             match **still_unreadable {
                 StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. } => {
@@ -1749,7 +1755,7 @@ mod tests {
     use singlefs_core::transaction::{OldDataUnitReadBackFailure, TransactionUnit};
     use singlefs_format::{SLOT_BYTES, UNIT_AREA_START_SLOT};
 
-    fn every_placement_refusal() -> [PlacementRefusal; 4] {
+    fn every_placement_refusal() -> [PlacementRefusal; 5] {
         [
             PlacementRefusal::NoFreeSlotOnAnyDevice,
             PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined {
@@ -1769,15 +1775,21 @@ mod tests {
                     ),
                     (
                         DeviceIdentity(1),
-                        CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot(SlotNumber(196_638)),
+                        CommitGeneratedDeviceAnswer::FallBack(SlotNumber(196_638)),
                     ),
+                ],
+            },
+            PlacementRefusal::CommitGeneratedFallbackWithoutASlotFreeOnEveryDevice {
+                fallback_slot_per_device: vec![
+                    (DeviceIdentity(0), SlotNumber(56_850)),
+                    (DeviceIdentity(1), SlotNumber(56_851)),
                 ],
             },
         ]
     }
 
     /// 单元区墙的区间开着时（单元区只有 640 槽的小盘，第一个文件之后占槽上界 17 × 64 > 640），发布的落点被拒：每块盘上都没有（容量不够）
-    /// 映射成单元区墙、模型放行；小盘写满、各盘落点不一致是第一版不支持的池形状，映射成模型没有的理由、判「模型说该成、实现拒了」
+    /// 映射成单元区墙、模型放行；小盘写满、各盘落点不一致、回落取不到每块盘都空的落点，映射成模型没有的理由、判「模型说该成、实现拒了」
     /// （增补 3 第 2 件代码三方第 2 条：`NoSpaceFor` 装着这四种、一律映射成单元区墙的话，区间一开就被接走）。
     #[test]
     fn only_a_placement_refused_on_every_device_passes_as_the_unit_area_wall() {
@@ -1826,8 +1838,7 @@ mod tests {
 
     /// 可写挂载写行与暖机之后推的抬 F 报错时，挂载交回的成员装着抬 F 的错（实审 A1b Q5）：理由、报的上限与点名的根环槽都照里面那个错取。
     #[test]
-    fn a_floor_raise_failure_after_the_mounts_publishes_is_judged_by_the_floor_raise_error_inside()
-    {
+    fn floor_raise_failure_after_the_mounts_publishes_is_judged_by_the_floor_raise_error_inside() {
         use singlefs_core::mount::FloorRaiseFailedAfterTheMountsPublishes;
         use singlefs_core::recovery::BadRootRingSlotReading;
         let wrapped = |cause: MountError| {
@@ -1866,7 +1877,7 @@ mod tests {
     /// 挂着时回退判候选集读根环、一个知道住着根的槽重读仍坏：回退交回的成员点名的槽原样交给模型比对（故障注入按它认被吞的根槽写）；
     /// 同一个成员里装的另外三样、回退别的成员都不点名槽。
     #[test]
-    fn a_rollback_refused_on_a_root_ring_slot_known_to_hold_a_root_names_that_slot_and_no_other_refusal_names_one(
+    fn rollback_refused_on_a_root_ring_slot_known_to_hold_a_root_names_that_slot_and_no_other_refusal_names_one(
     ) {
         use singlefs_core::mount::{
             NewerPublishWitness, SelectedVersionAgainstTheWitness, StillUnreadableAfterOneReread,
@@ -1915,7 +1926,7 @@ mod tests {
             ),
             candidate_judgement(
                 StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-                    newest_root_on_the_reread: Some(newest_root),
+                    root_chosen_by_the_read_stage: newest_root,
                 },
             ),
             candidate_judgement(
@@ -2014,7 +2025,7 @@ mod tests {
         let instance_table_of_the_newest_root =
             MountError::NewerStateStillUnreadableAfterOneReread(Box::new(
                 StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger {
-                    newest_root_on_the_reread: None,
+                    root_chosen_by_the_read_stage: against_the_witness.selected_version,
                 },
             ));
         assert_eq!(
@@ -2036,7 +2047,7 @@ mod tests {
     /// 两种拒因分开报之后，模型那一侧也不许再把它们混成一条。
     /// 判别力：这一成员映射成「见证过比所选那一版新的发布、重读仍判真」（`crates/mutations.tsv` 一行）时这一条红。
     #[test]
-    fn a_system_configuration_unreadable_after_the_read_stage_does_not_map_to_the_witnessed_newer_publish(
+    fn system_configuration_unreadable_after_the_read_stage_does_not_map_to_the_witnessed_newer_publish(
     ) {
         use singlefs_core::mount::{
             DeviceNotRewrittenByTheAcquisition, NewerPublishWitness, RewriteGateNotMet,
