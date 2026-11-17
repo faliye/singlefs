@@ -8,7 +8,7 @@
 |---|---|
 | `crash-point-replay.sh`、`lib_crash_point_replay_items.py` | 崩溃点重放的入口与合表的读法、核法 |
 | `crash-amplification.sh`、`crash-amplification-item.sh`、`crash-amplification-two-hosts.sh`、`crash-amplification-lib.sh`、`lib_verdict_library.py` | 崩溃放量：全量入口、一个分项、照 task-server 分片协议两片分着判（计划、各片、合并三步）、共用段、判定库 |
-| `crash-point-replay-shard-run.sh`、`crash-point-replay-shard-configuration-check.sh` | 崩溃枚举用例照 task-server 分片协议两片分着判（经 `task-server/task submit` 单独交，计划、各片、合并三步交给崩溃放量的分片驱动；门禁不在一件任务里面调它；自证在 `--selftest`）、多机配置的判法 |
+| `crash-point-replay-shard-configuration-check.sh` | 多机配置的判法（崩溃枚举用例由门禁 `crash-point-replay` 自己照 task-server 分片协议分片判，写法在它文件头「分片」） |
 | `gpu-quiesce-run.sh`、`gpu-exemptions-check.py` | 用 GPU 之前清场并回读（task-server 给 GPU 任务分卡、经它清场再起）；不走 GPU 的计算的豁免登记核对 |
 | `cpu-judging-sites-check.py` | 判器调用点（池级 checker、记录核对器、RefFS 允许集合比对与登记的判器本体）要么在判定段里、要么带豁免或 CPU 参照的标记（门禁 checker-independence-and-sync 的 cpu-judging-sites 格调它） |
 | `crash-flow-coverage.py` | 崩溃流覆盖：从崩溃点重放的日志读覆盖行与计数行，出覆盖表（入口 × StepKind）、ignore 开着的节点、评估 0 次的（流，不变量）对与上一次全量的标记；门禁 crash-point-replay 的出口 4 那四格调它判，入口每趟拿它落覆盖表 |

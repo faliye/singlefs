@@ -68,7 +68,7 @@ package_family() {
 }
 
 default_path() {
-  printf '%s/staged-tree-worktree-%s' "${TMPDIR:-/tmp}" "$(printf '%s' "$1" | git -C "$1" hash-object --stdin | cut -c1-12)"
+  printf '%s/staged-tree-worktree-%s' "${TMPDIR:-/tmp}" "$(printf '%s' "$1" | git -C "$1" hash-object --stdin | cut -c1-12)"   # shell-lint:bytes-ok git 对象名的十六进制前缀，只有 ASCII
 }
 
 # TREE 从调用方索引取出之后，worktree 操作必须使用目标自己的索引与仓定位。

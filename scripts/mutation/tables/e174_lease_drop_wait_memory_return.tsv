@@ -32,3 +32,8 @@ M31_轮键漏轮号	let parameters_text = format!("{:?} round={}", job.cell, job
 M32_轮键漏驱动	[child_line, arguments_line, parameters_line, device].concat()	[child_line, arguments_line, parameters_line].concat()
 M33_轮键带产物路径	let round_key = round_key_of(&library.child_code_key, &library.arguments_code_key, job, &device_line_of(job.cell.card)?);	let round_key = round_key_of(&library.child_code_key, &library.arguments_code_key, job, &format!("{}{}", device_line_of(job.cell.card)?, plan.output_path));
 M34_续跑读回不比键	if let Some(text) = read_back_the_round(library.store.read(&library.round_path(round_key)), &round_header(round_key, library)) {	let previous_path = library.round_path(previous_index.get(&job.key_text()).map_or(round_key.as_str(), String::as_str));\n            let previous_text = library.store.read(&previous_path);\n            if let Some(text) = read_back_the_round(previous_text.clone(), previous_text.as_deref().unwrap_or_default().lines().next().unwrap_or_default()) {
+M35_服务给的卡不看型号取头一张	        if *total == wanted_total {	        if true {
+M36_交了卡串照样领卡	(Some(handover_text), _) => Ok(Some(handover_text.to_string())),	(Some(_), Some(channel)) => lease(channel).map(Some),\n        (Some(handover_text), None) => Ok(Some(handover_text.to_string())),
+M37_领卡通道缺变量或空值也算有	let value = value_of(name).filter(|value| !value.is_empty())?;	let value = value_of(name).unwrap_or_default();
+M38_同一型几张卡报的行不同不判错	if let Some(earlier) = lines.insert(card, line.to_string()).filter(|earlier| earlier != line) {	if let Some(earlier) = lines.insert(card, line.to_string()).filter(|_| false) {
+M39_卡串不分台全收	        if host_address == this_host {	        if true {

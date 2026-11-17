@@ -34,6 +34,8 @@
 #       「reuse-three-questions 这一格判错」「reuse-sentinel 这一格判错」「binding-test-mentions-in-key 这一格判错」「litmus-same-name-subdirectories 这一格判错」
 #   REUSE_CHECKS_BREAK=rejudged-sentinel-passes  共用库的开关：哨兵被现判不红
 #       「reuse-sentinel 这一格判错」
+#   GATE_LKMM_BREAK=lookup-batch-forced-ignored  lkmm.sh 批查库时不问复用哨兵抽中了谁：抽中强制现判的那一条也读库、照复用（那一行写「复用」、强制现判没起作用）
+#       「reuse-sentinel 这一格判错」
 #   GATE_LKMM_BREAK=binding-key-drops-test-mentions  绑定那一条的键不放写出文件名的测试：删掉测试照样复用判绿
 #       「binding-test-mentions-in-key 这一格判错」
 #   GATE_LKMM_BREAK=litmus-items-by-file-name  项名只取文件名：a/ 与 b/ 的同名 litmus 共用项名与临时文件
@@ -206,6 +208,7 @@ fi
 breaks_missed=(); breaks_proven=0
 if ((${#wrong[@]} == 0)) && [[ -z "${GATE_LKMM_BREAK:-}" && -z "${REUSE_CHECKS_BREAK:-}" ]]; then
   for pair in "GATE_LKMM_BREAK=reuse-lookup-skipped reuse-three-questions" "REUSE_CHECKS_BREAK=rejudged-sentinel-passes reuse-sentinel" \
+              "GATE_LKMM_BREAK=lookup-batch-forced-ignored reuse-sentinel" \
               "GATE_LKMM_BREAK=binding-key-drops-test-mentions binding-test-mentions-in-key" \
               "GATE_LKMM_BREAK=litmus-items-by-file-name litmus-same-name-subdirectories" "GATE_LKMM_BREAK=binding-mention-substring binding-mention-boundary"; do
     switch="${pair%% *}"; cell="${pair##* }"

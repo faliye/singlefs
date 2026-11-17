@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # admission: always 每一次换钩子都要现判这一刻的规格、草稿与主工作区那几份，上一次换过不替这一次作保
 # run-condition: command bash python3
-"""先验后换：.claude/hooks/ 下的钩子与它读的共用模块、登记表，或 scripts/ 下的脚本，先在草稿里套上定点替换验过，再在主工作区定点换上；
+"""先验后换：.claude/hooks/ 下的钩子与它读的共用模块、登记表，或脚本规格目录（见 <规格.json>）下的脚本，先在草稿里套上定点替换验过，再在主工作区定点换上；
 换上之后再验一遍，不对就按反向定点替换回滚（只把这一次换上的几处改回去，不整份覆盖，别的会话这段时间里改的照留）。
-两种规格各走一遍，不混在一份里：钩子规格（文件在 .claude/hooks/ 这一层）要 --hook、拿钩子逐条喂；脚本规格（文件在 scripts/ 下，不限层数）不喂钩子，
+两种规格各走一遍，不混在一份里：钩子规格（文件在 .claude/hooks/ 这一层）要 --hook、拿钩子逐条喂；脚本规格（文件在脚本规格目录下，不限层数）不喂钩子，
 换上之后改跑 --verify 给的命令（一般是被换脚本的 --selftest）。
 
 用法：
   hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]
-  hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]   # 脚本规格：文件都在 scripts/ 下，不带 --hook 与 --feeds
+  hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]   # 脚本规格：文件都在脚本规格目录下，不带 --hook 与 --feeds
   hook-swap.py --feed-only --hook <钩子> [--feeds <喂法.json>] [--root <仓根>]   # 只喂不换：拿此刻的钩子逐条喂，一条一行写退出码，不写任何文件
   hook-swap.py --check-callers [<库.py>…] [--root <仓根>]   # 只核不换：调用方引到的名字库里都有没有（不写库就核 .claude/hooks/ 下全部 .py），不写任何文件
   hook-swap.py --read-outcome [--root <仓根>] [--scratch <草稿目录>]   # 只看结局文件：上一趟换没换完（文件头「结局文件」），不写任何文件
@@ -16,12 +16,22 @@
   hook-swap.py --selftest        # HOOK_SWAP_BREAK=<项> 时必须判红
 
 <规格.json> 同 scripts/kb/replace-batch.py：JSON 数组，每项 {"file": 路径, "old": 旧串, "new": 新串, "count": 可省，默认 1}，
-  同一个文件的多处按数组次序依次施加；file 写相对仓根的路径或绝对路径，只收 <仓根>/.claude/hooks/ 这一层里已有的普通文件，
-  或 <仓根>/scripts/ 下（任意层）已有的普通文件，两处的文件不能写进同一份规格；旧串、新串都不许空。
+  同一个文件的多处按数组次序依次施加；file 写相对仓根的路径或绝对路径，只收 <仓根>/.claude/hooks/ 这一层里已有的普通文件（钩子规格），
+  或脚本规格目录下（任意层）已有的普通文件（脚本规格）；钩子规格与脚本规格的文件不能写进同一份规格；旧串、新串都不许空。
+  脚本规格目录（SCRIPT_SPEC_DIRECTORIES，相对仓根）：scripts/、.claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/，
+  这几处的文件可以写进同一份脚本规格；其中不收的子目录（SCRIPT_SPEC_EXCLUDED）：.claude/gate.d/fixtures/（门禁样本）、prune-server/ 与
+  gpu-verification-server/ 下的 target/（编译产物）与 src/（Rust 源码，改它走实现员与三方）。
+  .claude/hooks/write-guard.sh 第十一道认同一组目录：工具员不在主工作区里用 Write / Edit 就地改这几处已存在的脚本，新版写在草稿目录、经这条脚本一次换上。
 <钩子> 是要喂 JSON 的那一份（.claude/hooks/ 下的 .sh），不在规格里也照样做语法检查与喂法。
 <喂法.json>：JSON 数组，每项 {"label": 说明, "command": Bash 命令, "exit": 0 或 2, "agent_type": 可省（省了是主 agent）, "cwd": 可省（默认 {root}），
-  "neutral": 可省（true 是新旧两版判得一样的，回滚之后拿它们再核一遍）}；也可以写 "input": 一整份钩子 JSON 代替 command、cwd 与 agent_type。
+  "neutral": 可省（true 是新旧两版判得一样的，回滚之后拿它们再核一遍；套规格之前也先拿换上之前那一版在草稿树里喂一遍，对不上的是喂法失效，退 8，--feed-only 不走这一步）}；
+  也可以写 "input": 一整份钩子 JSON 代替 command、cwd 与 agent_type。
   command、cwd 与 input 里的 {root} 换成这一次判的仓根（草稿里是草稿树，换上之后是主工作区）。
+  喂法里 tool_input.file_path（按落点判的钩子，例如 write-guard.sh）解开符号链接之后要落在 {root} 里：草稿树里只有 .claude/hooks/ 是实拷的，
+  仓根与 .claude/ 下别的项都是指回主工作区的符号链接，落在树外的目标被按落点判的钩子一律当仓外放行，期望放行的喂法也「过」、等于没判；
+  落在树外的那一条不喂，点名它，目标写成 {root}/.claude/hooks/<名字>（相对路径照 {root} 算）。
+  {root} 跟着树走：同一条喂法在草稿里验（目标在草稿目录里）与换上之后验、回滚之后核（目标在主工作区里）是两个落点；钩子按落点分工作根内外时，
+  期望随落点变的喂法在这两处不会都成立，写不进会换上的规格。
   不给 --feeds 时用内置的那一份（BUILTIN_FEEDS，按钩子相对仓根的路径取；没有内置的就要给）。
 <命令>（--verify，只给脚本规格）：换上之后在 <仓根> 里用 bash -c 跑一遍，退 0 才算验过；写被换脚本的 --selftest（例：python3 scripts/kb/replace-once.py --selftest），
   跑得过 VERIFY_TIMEOUT_SECONDS 秒的算不过。命令只在换上之后跑，草稿里（没有仓的样子）只做语法检查；不给 --verify 就只做换上之后的语法检查与回读。
@@ -52,10 +62,13 @@
   1. 读规格里每份文件此刻的内容、记下字节；在内存里依次施加，每处要恰好命中 count 次；再从改后的文本倒着施加（新旧对调、次序倒排），
      要回得到原文——回不到（新串在改后的文件里不止 count 处）就停：反向定点替换回滚不了的规格不收。
   2. 草稿树 <草稿目录>/hook-swap/tree：.claude/hooks/ 整份拷一份（不带 __pycache__），套上改后的文本；仓根与 .claude/ 下别的项一律符号链接到主工作区
-     （钩子按自己所在的位置找仓根、登记表与 preflight，链接过去判的就是主工作区的那几份）。
+     （钩子按自己所在的位置找仓根、登记表与 preflight，链接过去判的就是主工作区的那几份；喂法里写文件路径的目标不许落在这些链接上，见 <喂法.json>）。
      脚本规格的草稿树只放改后的那几份文件（按它们在仓里的相对路径），不链接仓里别的东西：脚本规格不在草稿里跑脚本，写进去的路径也就不会穿过链接落到主工作区。
+     钩子规格有标了 neutral 的喂法时，草稿树拷好、套规格之前先拿换上之前那一版把它们逐条喂一遍（目标落在草稿树外的不喂）；有一条退出码对不上就不套规格，
+     逐条点名这条喂法对换上之前那一版在草稿树里就不成立（退几、应当退几），说这是喂法失效、不是规格的毛病，退 8、主工作区一个字节不写，--dry-run 同样；
+     最常见的因是喂法的目标落在草稿树里，而钩子按落点分仓内仓外、工作根内外。没有 neutral 喂法时这一步不做。
   3. 草稿里验：规格里的文件与 <钩子> 是 .sh 的跑 `bash -n`，再把里面喂给 python 的 heredoc（`python3 … <<'PY'`）逐段编译；.py 整份编译；
-     逐条喂 <喂法>（CLAUDE_PROJECT_DIR 设成草稿树、检出记录写草稿目录；草稿树不是 git 工作树，多机配置经 scripts/hosts/lib_repository_copy.py 的
+     逐条喂 <喂法>（file_path 落在草稿树外的那一条先点名、不喂；CLAUDE_PROJECT_DIR 设成草稿树、检出记录写草稿目录；草稿树不是 git 工作树，多机配置经 scripts/hosts/lib_repository_copy.py 的
      environment_for_commands_in_the_copy 显式交给 SINGLEFS_MULTI_HOST_CONFIG），退出码要等于写的那一个，
      stderr 里不许有「没判成」「读不到共用模块」（钩子坏了放行时说的话）。有一条不对就停，主工作区一个字节不写。--dry-run 停在这里。
      脚本规格只做语法检查（.sh 的 bash -n 与内嵌 python、.py 整份编译，别的后缀不查），不喂钩子。
@@ -71,13 +84,15 @@
 
 钩子在 bash 这一层坏了时，每一条 Bash 调用都会被它拒（退 2），连改回去的那一条也起不来：这条脚本在同一个进程里回滚，不靠下一条 Bash；
 退出码 6 时只剩 Edit / Write 能改，提示行逐处写出要改回的地方，反向规格在草稿目录里。
-脚本规格收进来的原因：scripts/ 下被所有会话当工具用的脚本（scripts/kb/replace-once.py 这几份）换到一半或换坏了，别的会话每一次调用都受影响；
-原来靠手工协议（核基线、同目录临时文件加 mv、回读、跑自证、红了换回），现在同一套先验后换、基线核对、整批预演、换上之后验证、反向定点回滚都落在这一个进程里。
+脚本规格为什么要有：脚本规格目录下的脚本被别的会话当工具用（scripts/kb/replace-once.py 这几份）、被任务拷进快照去跑、或被直接起成服务（task-server/control 这类），
+换到一半或换坏了，别的会话每一次调用、每一个拷走它的任务都受影响；先验后换、基线核对、整批预演、逐份改名换上、换上之后验证、反向定点回滚都落在这一个进程里，
+中间态不在主工作区出现。
 
 退出码：0 换上了、换上之后验过（--dry-run：草稿里验过；--check-callers：调用方引到的名字都在）；1 草稿里验不过（一个字节没写；--check-callers：有缺的名字）；2 参数、路径或规格不对（一个字节没写）；
 3 草稿验过之后主工作区那几份被改了（一个字节没写）；4 换上时失败（已换上的几份回滚了）；
 5 换上之后验不过（脚本规格含 --verify 的命令退非 0 或超时）、已按反向定点替换回滚、回滚后验过；6 回滚不成或回滚后还验不过（看提示行）；
-7 上一趟换上没写完成（被杀或回滚不成，几份文件停在半截，见「结局文件」），拒绝再换，一个字节没写（--read-outcome 与 --seal-outcome 的退出码另见「结局文件」）。
+7 上一趟换上没写完成（被杀或回滚不成，几份文件停在半截，见「结局文件」），拒绝再换，一个字节没写（--read-outcome 与 --seal-outcome 的退出码另见「结局文件」）；
+8 标了 neutral 的喂法对换上之前那一版在草稿树里就不成立（喂法失效，不是规格的毛病；规格没套，一个字节没写，--dry-run 同样）。
 
 弄坏开关（只给自证判红用，生效时往 stderr 打一行；平常跑设了退 2、点名只在自证里认：--selftest 本身与它起的子进程认）。
 一条一行「HOOK_SWAP_BREAK=<项>  弄坏哪一处」，下一行起写打开后自证红的项（失败行 `✗ hook-swap 自检：` 之后的句首）：
@@ -95,10 +110,19 @@
       「内置喂法「旧路径」里的 scripts/mutate.s?」
   HOOK_SWAP_BREAK=brace-feeds-dropped  内置喂法里不带花括号与参数通配那六条
       「内置喂法带花括号与参数通配的六条」「花括号写法上放行的钩子，先验停下」
+  HOOK_SWAP_BREAK=feed-target-unchecked  喂之前不核喂法的 file_path 解开符号链接之后在不在草稿树里（落在符号链接上的照喂，按落点判的钩子当仓外放行、喂法空过）
+      「喂法目标落在符号链接上：草稿红、点名那一条与出路、不喂」「只喂不换：喂法目标落在仓根之外：点名那一条与出路」
   HOOK_SWAP_BREAK=script-verify-skipped  脚本规格换上之后不跑 --verify 的命令（输出里没有「验证命令退 0」）
       「脚本规格：过」「脚本规格：验证红回滚」
-  HOOK_SWAP_BREAK=script-paths-unrestricted  规格里的文件不限在 .claude/hooks/ 与 scripts/ 下（仓里已有的普通文件都收）
-      「脚本规格：scripts/ 之外的文件不收」
+  HOOK_SWAP_BREAK=script-paths-unrestricted  规格里的文件不限在 .claude/hooks/ 与脚本规格目录下（仓里已有的普通文件都收）
+      「脚本规格：脚本规格目录之外的文件不收」「脚本规格：.claude/gate.d/fixtures/ 下的样本不收」「脚本规格：prune-server/target/ 下的文件不收」
+      「脚本规格：gpu-verification-server/target/ 下的文件不收」「脚本规格：prune-server/src/ 下的文件不收」「脚本规格：gpu-verification-server/src/ 下的文件不收」
+  HOOK_SWAP_BREAK=script-gate-fixtures-accepted  脚本规格收 .claude/gate.d/fixtures/ 下的样本
+      「脚本规格：.claude/gate.d/fixtures/ 下的样本不收」
+  HOOK_SWAP_BREAK=script-server-target-accepted  脚本规格收 prune-server/、gpu-verification-server/ 下 target/ 里的文件
+      「脚本规格：prune-server/target/ 下的文件不收」「脚本规格：gpu-verification-server/target/ 下的文件不收」
+  HOOK_SWAP_BREAK=script-server-src-accepted  脚本规格收 prune-server/、gpu-verification-server/ 下 src/ 里的文件
+      「脚本规格：prune-server/src/ 下的文件不收」「脚本规格：gpu-verification-server/src/ 下的文件不收」
   HOOK_SWAP_BREAK=skip-caller-names  调用方引到的名字缺了也不报（换上的库去掉了调用方还在引的名字，照样验过、换上）
       「引到的名字：库里去掉一个名字，各种载入写法的调用方都被点名，草稿验不过、一个字节不写」
   HOOK_SWAP_BREAK=outcome-start-omitted  换上之前不写开始与文件行，拖到回读之后才一起写（被杀的那一趟什么都没留下）
@@ -108,6 +132,8 @@
       「结局文件：被杀在两份之间之后，下一趟拒（退 7），点名反向规格，一个字节不写」「结局文件：全换上了还没写完成就被杀，下一趟拒（退 7）、--seal-outcome 补写完成之后照换」
   HOOK_SWAP_BREAK=pending-not-checked  下一趟起手不读上一趟的结局文件（半截照换）
       「结局文件：被杀在两份之间之后，下一趟拒（退 7），点名反向规格，一个字节不写」「结局文件：全换上了还没写完成就被杀，下一趟拒（退 7）、--seal-outcome 补写完成之后照换」
+  HOOK_SWAP_BREAK=neutral-base-skipped  套规格之前不拿换上之前那一版喂标了 neutral 的喂法（喂法失效照样往下套规格，当成规格的毛病报「草稿里验不过」退 1）
+      「喂法失效：标了 neutral 的喂法对换上之前那一版在草稿树里就不成立，退 8、点名那一条、不套规格、一个字节不写」「喂法失效：--dry-run 同样退 8、点名那一条」
   HOOK_SWAP_BREAK=outcome-reader-trusts-file  判每份文件的状态时信结局文件里写的换后，不对着主工作区现算 sha256
       「结局文件：被杀在两份之间，只有开始与文件行，--read-outcome 退 3、点名已换上与没换上」「结局文件：完成之后文件又被改，--read-outcome 退 4 并点名」
 不认识的值直接拒绝，免得拼错的开关被当成「没开」。
@@ -137,9 +163,20 @@ import lib_repository_copy as repository_copy  # noqa: E402
 BREAK_VARIABLE = "HOOK_SWAP_BREAK"
 KNOWN_BREAK_MODES = ("swap-on-draft-red", "skip-embedded-python", "skip-base-check", "skip-post-swap-check", "rollback-whole-file", "stale-builtin-feed",
                      "brace-feeds-dropped", "script-verify-skipped", "script-paths-unrestricted", "skip-caller-names",
-                     "outcome-start-omitted", "outcome-complete-first", "pending-not-checked", "outcome-reader-trusts-file")
+                     "outcome-start-omitted", "outcome-complete-first", "pending-not-checked", "outcome-reader-trusts-file",
+                     "feed-target-unchecked", "script-gate-fixtures-accepted", "script-server-target-accepted", "script-server-src-accepted",
+                     "neutral-base-skipped")
 HOOKS_DIRECTORY = os.path.join(".claude", "hooks")
-SCRIPTS_DIRECTORY = "scripts"
+# 脚本规格收的目录（相对仓根，任意层）与其中不收的子目录 → 收它的弄坏开关（文件头 <规格.json>）。
+# .claude/hooks/write-guard.sh 第十一道的 SWAP_ONLY_DIRECTORIES、SWAP_ONLY_EXCLUDED 是同一组目录，两边各写一份、改的时候一起改
+SCRIPT_SPEC_DIRECTORIES = ("scripts", os.path.join(".claude", "gate.d"), os.path.join(".claude", "scripts"), "task-server", "prune-server", "gpu-verification-server")
+SCRIPT_SPEC_EXCLUDED = {
+    os.path.join(".claude", "gate.d", "fixtures"): "script-gate-fixtures-accepted",
+    os.path.join("prune-server", "target"): "script-server-target-accepted",
+    os.path.join("gpu-verification-server", "target"): "script-server-target-accepted",
+    os.path.join("prune-server", "src"): "script-server-src-accepted",
+    os.path.join("gpu-verification-server", "src"): "script-server-src-accepted",
+}
 VERIFY_TIMEOUT_SECONDS = 900
 WORK_DIRECTORY_NAME = "hook-swap"
 FEED_TIMEOUT_SECONDS = 120
@@ -149,6 +186,7 @@ BROKEN_HOOK_MARKERS = ("没判成", "读不到共用模块")
 # .sh 里喂给 python 的 heredoc 起头那一行：python / python3 …… <<'PY'（<<- 去掉行首制表符）
 EMBEDDED_PYTHON_START = re.compile(r"\bpython3?\b[^\n]*?<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
 EXIT_SWAPPED, EXIT_DRAFT_RED, EXIT_BAD_INPUT, EXIT_CHANGED, EXIT_SWAP_FAILED, EXIT_ROLLED_BACK, EXIT_ROLLBACK_FAILED, EXIT_PENDING_OUTCOME = 0, 1, 2, 3, 4, 5, 6, 7
+EXIT_NEUTRAL_FEED_STALE = 8
 OUTCOME_NAME = "singlefs-hook-swap-outcome.tsv"   # <git-dir> 下的结局文件（文件头「结局文件」）；仓根不是 git 工作树的根时放 <草稿目录>/hook-swap/outcome.tsv
 OUTCOME_COMMENTS = (
     "# 上面是这份结局文件的开始行；格式见 scripts/gate/hook-swap.py 文件头「结局文件」，制表符分隔，每行第一段是行种类：",
@@ -287,13 +325,26 @@ def sha256_of(data):
     return hashlib.sha256(data if isinstance(data, bytes) else data.encode("utf-8")).hexdigest()
 
 
+def script_spec_problem(path, root, mode):
+    """脚本规格收不收 path（解过符号链接的绝对路径）：收交 None，不收交一句为什么。
+    弄坏开关（只给自证判红用）：script-paths-unrestricted 下仓根之下都收；SCRIPT_SPEC_EXCLUDED 里每一处在它自己那条开关下也收。"""
+    real_root = os.path.realpath(root)
+    if mode == "script-paths-unrestricted":
+        return None if is_inside(path, real_root) else "不在仓根下"
+    for excluded, switch in SCRIPT_SPEC_EXCLUDED.items():
+        if mode != switch and is_inside(path, os.path.join(real_root, excluded)):
+            return f"在 {excluded}/ 下，脚本规格不收这一处"
+    if any(is_inside(path, os.path.join(real_root, directory)) for directory in SCRIPT_SPEC_DIRECTORIES):
+        return None
+    return "不在脚本规格目录下"
+
+
 def resolve_edits(spec, root, mode=""):
-    """规格 → [Edit]；路径不在 .claude/hooks/ 这一层、也不在 scripts/ 下、不是已有的普通文件、两处的文件混在一份里、旧串或新串为空、count 不是正整数，抛 BadInput。
-    mode 是弄坏开关（script-paths-unrestricted：scripts/ 的限制放开成整个仓根，只给自证判红用）。"""
+    """规格 → [Edit]；路径不在 .claude/hooks/ 这一层、也不在脚本规格目录下（script_spec_problem）、不是已有的普通文件、钩子与脚本混在一份里、旧串或新串为空、
+    count 不是正整数，抛 BadInput。mode 是弄坏开关（script_spec_problem 认的那几条，只给自证判红用）。"""
     if not isinstance(spec, list) or not spec:
         raise BadInput("规格不是非空的 JSON 数组\n→ 怎么办：写成 [{\"file\": …, \"old\": …, \"new\": …}, …]（同 replace-batch.py）")
     hooks = os.path.realpath(os.path.join(root, HOOKS_DIRECTORY))
-    scripts = os.path.realpath(os.path.join(root, SCRIPTS_DIRECTORY if mode != "script-paths-unrestricted" else ""))
     edits = []
     for number, item in enumerate(spec, 1):
         if not isinstance(item, dict) or not all(isinstance(item.get(key), str) for key in ("file", "old", "new")):
@@ -305,13 +356,15 @@ def resolve_edits(spec, root, mode=""):
             raise BadInput(f"规格第 {number} 处的旧串或新串是空的：空串回滚时找不回原处\n→ 怎么办：两边都带上前后文（删一段就把它前后的一行一起写进旧串与新串）")
         written = item["file"] if os.path.isabs(item["file"]) else os.path.join(root, item["file"])
         path = os.path.realpath(written)
-        if (os.path.dirname(path) != hooks and not is_inside(path, scripts)) or not os.path.isfile(path):
-            raise BadInput(f"规格第 {number} 处的文件 {item['file']} 不是 {hooks} 这一层、也不是 {scripts} 下已有的普通文件\n"
-                           "→ 怎么办：这条脚本只换 .claude/hooks/ 下的钩子、共用模块与登记表，和 scripts/ 下的脚本；别的文件照原来的办法改，新文件先排他建好再换")
+        problem = None if os.path.dirname(path) == hooks else script_spec_problem(path, root, mode)
+        if problem or not os.path.isfile(path):
+            raise BadInput(f"规格第 {number} 处的文件 {item['file']} 不是 {hooks} 这一层、也不是脚本规格目录下已有的普通文件（{problem or '不是已有的普通文件'}）\n"
+                           f"→ 怎么办：这条脚本只换 .claude/hooks/ 下的钩子、共用模块与登记表，和 {'、'.join(directory + '/' for directory in SCRIPT_SPEC_DIRECTORIES)} 下的脚本"
+                           f"（不含 {'、'.join(excluded + '/' for excluded in SCRIPT_SPEC_EXCLUDED)}）；门禁样本、编译产物与 Rust 源码照各自的办法改，新文件先排他建好再换")
         edits.append(Edit(number, os.path.relpath(path, root), path, item["old"], item["new"], count))
     kinds = {is_script_edit(edit, root) for edit in edits}
     if len(kinds) > 1:
-        raise BadInput("规格里既有 .claude/hooks/ 下的钩子文件、又有 scripts/ 下的脚本：两种验法不同（钩子拿 JSON 喂，脚本换上之后跑 --verify 的命令），混在一份里换不了\n"
+        raise BadInput("规格里既有 .claude/hooks/ 下的钩子文件、又有脚本规格目录下的脚本：两种验法不同（钩子拿 JSON 喂，脚本换上之后跑 --verify 的命令），混在一份里换不了\n"
                        "→ 怎么办：拆成两份规格各跑一次；脚本规格先换（它不影响钩子），钩子规格后换")
     return edits
 
@@ -414,6 +467,22 @@ def validate_feeds(feeds):
                            "→ 怎么办：每条写 {\"label\": 说明, \"command\": 命令, \"exit\": 0 或 2}，可加 agent_type、cwd、neutral")
 
 
+def feed_target_problem(feed, hook_input, root, mode):
+    """喂法的 tool_input.file_path 解开符号链接之后不在 root 里：交一句点名这一条与出路的话；在里面、没写 file_path 交 None。
+    草稿树里只有 .claude/hooks/ 是实拷的，仓根与 .claude/ 下别的项是指回主工作区的符号链接；按落点判的钩子（write-guard.sh）把树外的目标一律当仓外放行，
+    落在链接上的喂法就是空过。弄坏开关 feed-target-unchecked 下不核。"""
+    tool_input = hook_input.get("tool_input") if isinstance(hook_input, dict) else None
+    file_path = tool_input.get("file_path") if isinstance(tool_input, dict) else None
+    if mode == "feed-target-unchecked" or not isinstance(file_path, str) or not file_path:
+        return None
+    tree = os.path.realpath(root)
+    landing = os.path.realpath(os.path.normpath(file_path if os.path.isabs(file_path) else os.path.join(root, file_path)))
+    if landing == tree or landing.startswith(tree + os.sep):
+        return None
+    return (f"喂「{feed['label']}」：file_path {file_path} 解开符号链接之后落在 {landing}，不在 {tree} 里；按落点判的钩子把树外的目标当仓外放行，这一条喂法等于没判，没喂；"
+            f"出路：file_path 写成 {{root}}/.claude/hooks/<名字>（草稿树里只有 .claude/hooks/ 是实拷的，别的目录是指回主工作区的符号链接）")
+
+
 def feed_environment(root, detections_path):
     """喂钩子的环境：草稿树（符号链接拼的、不是 git 工作树）里起钩子，多机配置照 lib_repository_copy.py 的 environment_for_commands_in_the_copy
     显式交给 SINGLEFS_MULTI_HOST_CONFIG（取这份脚本所在的主工作区那一份），不靠钩子照树的位置找。"""
@@ -442,6 +511,11 @@ def feed_only(hook, root, feeds=None):
         environment = feed_environment(root, os.path.join(scratch, "detections.jsonl"))
         for feed in feeds:
             hook_input = hook_input_of(feed, root)
+            target_problem = feed_target_problem(feed, hook_input, root, mode)
+            if target_problem:
+                wrong += 1
+                lines.append(f"  ✗ {target_problem}")  # gate-lint:detail
+                continue
             command = hook_input.get("tool_input", {}).get("command", "") if isinstance(hook_input, dict) else ""
             try:
                 done = subprocess.run(["bash", hook_file], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
@@ -459,8 +533,8 @@ def feed_only(hook, root, feeds=None):
     return (EXIT_DRAFT_RED if wrong else EXIT_SWAPPED), lines
 
 
-def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutral=False):
-    """逐条喂 hook_path（<root>/.claude/hooks/ 这一层里的一份）；交 (问题列表, 喂了几条)。"""
+def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutral=False, mode=""):
+    """逐条喂 hook_path（<root>/.claude/hooks/ 这一层里的一份）；交 (问题列表, 喂了几条)。目标落在 root 之外的喂法记一条问题、不喂（feed_target_problem）。"""
     environment = feed_environment(root, detections_path)
     hook_file = os.path.join(root, HOOKS_DIRECTORY, os.path.basename(hook_path))  # 照「钩子目录 + 文件名」拼，函数单元库把这一层的钩子都算进闭包
     problems, fed = [], 0
@@ -468,8 +542,13 @@ def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutra
         for feed in feeds:
             if only_neutral and not feed.get("neutral"):
                 continue
-            fed += 1
             hook_input = hook_input_of(feed, root)
+            target_problem = feed_target_problem(feed, hook_input, root, mode)
+            if target_problem:
+                problems.append(target_problem)
+                log.write(f"{hook_path}\t{feed['label']}\t目标在草稿树外，没喂\n")
+                continue
+            fed += 1
             try:
                 done = subprocess.run(["bash", hook_file], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
                                       env=environment, cwd=root, timeout=FEED_TIMEOUT_SECONDS)
@@ -491,6 +570,44 @@ def feed_problems(hook_path, root, feeds, log_path, detections_path, only_neutra
     return problems, fed
 
 
+def neutral_feeds_failing_on_base(root, hook_relative, feeds, log_path, detections_path, mode):
+    """root 是拷好、还没套规格的草稿树：把标了 neutral 的喂法逐条喂给换上之前那一版；交 [(喂法, 实际退出码或「超时」, stderr 里的坏钩子标记或 None)]，对得上的不列。
+    目标落在 root 之外的喂法不在这里喂（套规格之后 feed_problems 照旧点名）；没有 neutral 喂法时什么都不做。弄坏开关 neutral-base-skipped 下整步跳过。"""
+    neutral = [feed for feed in feeds if feed.get("neutral")]
+    if mode == "neutral-base-skipped" or not neutral:
+        return []
+    environment = feed_environment(root, detections_path)
+    hook_file = os.path.join(root, HOOKS_DIRECTORY, os.path.basename(hook_relative))  # 照「钩子目录 + 文件名」拼，同 feed_problems
+    failing = []
+    with open(log_path, "a", encoding="utf-8") as log:
+        for feed in neutral:
+            hook_input = hook_input_of(feed, root)
+            if feed_target_problem(feed, hook_input, root, mode):
+                continue
+            try:
+                done = subprocess.run(["bash", hook_file], input=json.dumps(hook_input, ensure_ascii=False), capture_output=True, text=True,
+                                      env=environment, cwd=root, timeout=FEED_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                failing.append((feed, "超时", None))
+                log.write(f"{hook_file}\t{feed['label']}\t换上之前那一版：超时\n")
+                continue
+            log.write(f"{hook_file}\t{feed['label']}\t换上之前那一版：退 {done.returncode}（应当 {feed['exit']}）\t{json.dumps(hook_input, ensure_ascii=False)}\n{done.stderr}\n")
+            marker = next((marker for marker in BROKEN_HOOK_MARKERS if marker in done.stderr), None)
+            if done.returncode != feed["exit"] or marker:
+                failing.append((feed, done.returncode, marker))
+    return failing
+
+
+def neutral_feed_stale_lines(failing, log_path):
+    """neutral_feeds_failing_on_base 的结果 → 拒绝说明：逐条点名喂法与退出码，说是喂法失效、不是规格的毛病，带出路。"""
+    lines = [f"✗ 标了 neutral 的喂法有 {len(failing)} 条对换上之前那一版在草稿树里就不成立，规格没套，主工作区一个字节没写：",  # gate-lint:summary
+             *(f"  - 喂「{feed['label']}」：这条喂法对换上之前那一版在草稿树里就不成立（退 {got}，应当 {feed['exit']}）"
+               f"{'，stderr 里有「' + marker + '」' if marker else ''}，是喂法失效，不是规格的毛病" for feed, got, marker in failing)]
+    lines.append("→ 怎么办：把这几条喂法的 neutral 去掉、改它们的目标，或删掉这几条，再跑；常见的因：目标落在草稿树里而判法按落点分仓内仓外、工作根内外；"
+                 f"拿主工作区此刻那一版核一条喂法用 hook-swap.py --feed-only --hook <钩子> --feeds <喂法.json>；喂法的整段 stderr 在 {log_path}")
+    return lines
+
+
 def check_tree(root, relatives, hook_relative, feeds, log_path, detections_path, mode, only_neutral=False):
     """root 下这几份文件的语法检查与喂法；交 (问题列表, 一句做了什么)。hook_relative 是 None（脚本规格）时只做语法检查，不喂。"""
     problems, segments = [], 0
@@ -501,7 +618,7 @@ def check_tree(root, relatives, hook_relative, feeds, log_path, detections_path,
         segments += compiled
     if hook_relative is None:
         return problems, f"{len(checked)} 份文件语法检查、内嵌 python {segments} 段编译"
-    fed_problems, fed = feed_problems(os.path.join(root, hook_relative), root, feeds, log_path, detections_path, only_neutral)
+    fed_problems, fed = feed_problems(os.path.join(root, hook_relative), root, feeds, log_path, detections_path, only_neutral, mode)
     problems += fed_problems
     return problems, f"{len(checked)} 份文件语法检查、内嵌 python {segments} 段编译、喂了 {fed} 条"
 
@@ -1196,6 +1313,11 @@ def build_draft_tree(root, tree, planned):
             os.symlink(os.path.join(root, ".claude", entry), os.path.join(tree, ".claude", entry))
     shutil.copytree(os.path.join(root, HOOKS_DIRECTORY), os.path.join(tree, HOOKS_DIRECTORY), symlinks=True,
                     ignore=shutil.ignore_patterns("__pycache__"))
+    write_planned_texts(tree, planned)
+
+
+def write_planned_texts(tree, planned):
+    """改后的文本写进草稿树里同一相对路径的那几份（planned 为空什么都不写，树里是换上之前那一版）。"""
     for relative, text in planned.items():
         with open(os.path.join(tree, relative), "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -1447,7 +1569,7 @@ def seal_outcome(path, root, mode):
 
 def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None, after_swap=None, verify=None, after_file_swapped=None):
     """交回 (退出码, 提示行)。after_draft、after_swap、after_file_swapped 只给自证用：草稿验完之后、全部换上之后各调一次，每换上一份调一次（模拟别的会话在这段时间里改文件、或被杀在两份之间）。
-    脚本规格（文件都在 scripts/ 下）：hook 与 feeds 给 None，verify 是换上之后跑的命令（可省）；钩子规格：hook 必给，verify 给 None。"""
+    脚本规格（文件都在脚本规格目录下）：hook 与 feeds 给 None，verify 是换上之后跑的命令（可省）；钩子规格：hook 必给，verify 给 None。"""
     mode = break_mode()
     root = os.path.realpath(root)
     scratch = os.path.abspath(scratch)
@@ -1461,7 +1583,7 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
     script_spec = is_script_edit(edits[0], root)
     if script_spec:
         if hook is not None or feeds is not None:
-            raise BadInput("规格里的文件都在 scripts/ 下，不带 --hook 与 --feeds：脚本没有钩子要喂\n"
+            raise BadInput("规格里的文件都在脚本规格目录下，不带 --hook 与 --feeds：脚本没有钩子要喂\n"
                            "→ 怎么办：去掉 --hook / --feeds；换上之后要跑的检查（例：被换脚本的 --selftest）写成 --verify '<命令>'")
         hook_relative = None
     else:
@@ -1510,14 +1632,21 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
              *(f"  {relative} 换上之前 sha256 {sha256_of(base_bytes[relative])}，换上之后应当是 {sha256_of(planned[relative])}" for relative in relatives),
              tail]
     tree = os.path.join(work, "tree")
+    failing_neutral_feeds = []
     try:
         if script_spec:
             build_scripts_draft_tree(tree, planned)
         else:
-            build_draft_tree(root, tree, planned)
-        draft_problems, draft_summary = check_tree(tree, relatives, hook_relative, feeds, log_path, detections_path, mode)
+            build_draft_tree(root, tree, {})
+            failing_neutral_feeds = neutral_feeds_failing_on_base(tree, hook_relative, feeds, log_path, detections_path, mode)
+            if not failing_neutral_feeds:
+                write_planned_texts(tree, planned)
+        if not failing_neutral_feeds:
+            draft_problems, draft_summary = check_tree(tree, relatives, hook_relative, feeds, log_path, detections_path, mode)
     finally:
         shutil.rmtree(tree, ignore_errors=True)
+    if failing_neutral_feeds:
+        return EXIT_NEUTRAL_FEED_STALE, [*lines, *neutral_feed_stale_lines(failing_neutral_feeds, log_path)]
     names_problems, names_summary, names_unjudged = caller_names_check(root, relatives, planned, mode)
     draft_problems += names_problems
     draft_summary += f"、{names_summary}" if names_summary else ""
@@ -1636,6 +1765,22 @@ if lib.refused(command):
 sys.exit(0)
 PY
 """
+# 按落点判的假钩子（写闸的样子）：file_path 解开符号链接之后落在 __WORK_ROOT__ 里一律放行，落在外面时 .md 拒、别的放行。自证把它写进仓里时 __WORK_ROOT__ 换成草稿目录，
+# 所以 .md 的目标喂主工作区拒、喂草稿树（在草稿目录下）放行，别的后缀的目标两处都放行
+SELFTEST_SCOPE_GUARD = """#!/usr/bin/env bash
+set -uo pipefail
+# 版本 1
+python3 /dev/fd/3 3<<'PY'
+import json, os, sys
+work_root = __WORK_ROOT__
+landing = os.path.realpath(json.load(sys.stdin).get("tool_input", {}).get("file_path", ""))
+inside_work_root = landing.startswith(work_root + os.sep)
+if landing.endswith(".md") and not inside_work_root:
+    print("✗ 被拒：" + landing + " 是说明文件，在工作根之外", file=sys.stderr)
+    sys.exit(2)
+sys.exit(0)
+PY
+"""
 SELFTEST_LIBRARY = ('MARKER = "HEAVY"\n\n\ndef refused(command):\n    return MARKER in command\n\n\n'
                     'def refused_v2(command):\n    return MARKER in command or "*" in command\n')
 SELFTEST_LIBRARY_WITHOUT_V2 = 'MARKER = "HEAVY"\n\n\ndef refused(command):\n    return MARKER in command\n'
@@ -1649,6 +1794,25 @@ SELFTEST_OTHER_SESSION_LINE = "# 别的会话这段时间里加的一行\n"
 SELFTEST_SCRIPT = '#!/usr/bin/env python3\nVERSION = 1\n\n\ndef main():\n    return 0\n\n\nif __name__ == "__main__":\n    raise SystemExit(main())\n'
 SELFTEST_SCRIPT_SHELL = "#!/usr/bin/env bash\necho tool\n"
 SELFTEST_SCRIPT_VERIFY = "python3 scripts/tool.py"
+SELFTEST_SHELL_WITH_VERSION = "#!/usr/bin/env bash\nVERSION=1\necho sample\n"
+SELFTEST_PYTHON_VERSION_EDIT = ("VERSION = 1\n", "VERSION = 2\n")
+SELFTEST_SHELL_VERSION_EDIT = ("VERSION=1\n", "VERSION=2\n")
+# 脚本规格目录的样本：scripts/ 之外的五处每处一份已有的文件（相对仓根 → (内容, 旧串, 新串, 文件权限)），服务的控制脚本照无后缀、带执行位写
+SELFTEST_SPEC_DIRECTORY_FILES = {
+    ".claude/gate.d/sample-stage.sh": (SELFTEST_SHELL_WITH_VERSION, *SELFTEST_SHELL_VERSION_EDIT, 0o755),
+    ".claude/scripts/sample_tool.py": (SELFTEST_SCRIPT, *SELFTEST_PYTHON_VERSION_EDIT, 0o644),
+    "task-server/sample_lib.py": (SELFTEST_SCRIPT, *SELFTEST_PYTHON_VERSION_EDIT, 0o644),
+    "prune-server/control": (SELFTEST_SHELL_WITH_VERSION, *SELFTEST_SHELL_VERSION_EDIT, 0o755),
+    "gpu-verification-server/control": (SELFTEST_SHELL_WITH_VERSION, *SELFTEST_SHELL_VERSION_EDIT, 0o755),
+}
+# 脚本规格不收的子目录里各一份已有的文件：相对仓根 → (内容, 旧串, 新串, 文件权限, 那一格的名字)
+SELFTEST_EXCLUDED_FILES = {
+    ".claude/gate.d/fixtures/sample-red/stage.sh": (SELFTEST_SHELL_WITH_VERSION, *SELFTEST_SHELL_VERSION_EDIT, 0o755, "脚本规格：.claude/gate.d/fixtures/ 下的样本不收"),
+    "prune-server/target/build-tool.py": (SELFTEST_SCRIPT, *SELFTEST_PYTHON_VERSION_EDIT, 0o755, "脚本规格：prune-server/target/ 下的文件不收"),
+    "gpu-verification-server/target/release/run.sh": (SELFTEST_SHELL_WITH_VERSION, *SELFTEST_SHELL_VERSION_EDIT, 0o755, "脚本规格：gpu-verification-server/target/ 下的文件不收"),
+    "prune-server/src/main.rs": ("// VERSION=1\nfn main() {}\n", *SELFTEST_SHELL_VERSION_EDIT, 0o644, "脚本规格：prune-server/src/ 下的文件不收"),
+    "gpu-verification-server/src/build.py": (SELFTEST_SCRIPT, *SELFTEST_PYTHON_VERSION_EDIT, 0o644, "脚本规格：gpu-verification-server/src/ 下的文件不收"),
+}
 # 调用方引到的名字的样本（都引 fake_lib.refused_v2）：每份一种载入写法，fake_outer.py 把库交给另一份库 fake_inner.py 里的函数，名字在 fake_inner.py 里引
 SELFTEST_CALLER_SAMPLES = {
     "fake_spec_user.py": (
@@ -1850,7 +2014,81 @@ def selftest():
         if problems:
             failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
 
-    # 脚本规格：文件在 scripts/ 下，不喂钩子，换上之后跑 --verify 的命令
+    # 标了 neutral 的喂法先喂换上之前那一版（草稿树里、没套规格）：对不上的是喂法失效，退 8、点名那一条、不套规格、一个字节不写（开关 neutral-base-skipped 下前两格红）；
+    # 样本是按落点判的假钩子（SELFTEST_SCOPE_GUARD）：.md 的目标落在草稿树里（草稿树在工作根下）的同一条喂法，喂主工作区的那一版退 2、喂草稿树里的那一版退 0，
+    # 写闸这类按落点分仓内仓外、工作根内外的钩子上标了 neutral 的越界拒喂法就是这个样子；.txt 的目标两处都退 0，期望是 0 的喂法一律写它：
+    # 喂法的目标跟着树走（{root} 在草稿里验时是草稿树、换上之后验与回滚之后核时是主工作区），期望要在这三处都成立的才能写进会换上的规格
+    scope_hook_relative = ".claude/hooks/fake-scope-guard.sh"
+    scope_version_edit = {"file": scope_hook_relative, "old": "# 版本 1\n", "new": "# 版本 2\n"}
+    scope_refuse_everything_edit = {"file": scope_hook_relative, "old": 'if landing.endswith(".md") and not inside_work_root:', "new": "if True:"}
+    scope_stale_label = "写回员写钩子目录越界拒"
+    scope_allowed_label = "写范围内的文件放行"
+
+    def scope_feed(label, want_exit, neutral):
+        suffix = "md" if want_exit == 2 else "txt"
+        feed_input = {"tool_name": "Write", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{{root}}/.claude/hooks/hook-swap-feed-scope.{suffix}", "content": "说明\n"}}
+        feed = {"label": label, "exit": want_exit, "input": feed_input}
+        if neutral:
+            feed["neutral"] = True
+        return feed
+
+    def scope_case(label, feeds, want_code, want_text, named=(), dry_run=False, want_swapped=False, want_refused_text=None, edit=scope_version_edit):
+        nonlocal checked
+        checked += 1
+        name = f"scope-case-{checked}"
+        root = fresh_repository(name)
+        scratch = os.path.join(work, name, "scratch")
+        guard_text = SELFTEST_SCOPE_GUARD.replace("__WORK_ROOT__", json.dumps(os.path.realpath(scratch)))
+        guard_path = hooks_file(root, "fake-scope-guard.sh")
+        with open(guard_path, "w", encoding="utf-8") as handle:
+            handle.write(guard_text)
+        os.chmod(guard_path, 0o755)
+        try:
+            code, lines = swap([edit], scope_hook_relative, scratch, root, feeds=feeds, dry_run=dry_run)
+        except BadInput as error:
+            code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+        problems = []
+        if code != want_code:
+            problems.append(f"退出码 {code}（应当 {want_code}）")
+        if not any(want_text in line for line in lines):
+            problems.append(f"输出里没有「{want_text}」")
+        named_lines = [line for line in lines if line.lstrip().startswith("- 喂「")]
+        if len(named_lines) != len(named) or not all(any(f"喂「{each}」" in line for line in named_lines) for each in named):
+            problems.append(f"点名的喂法应当恰好是 {list(named)}，实际 {named_lines}")
+        if want_refused_text is not None and not any(want_refused_text in line for line in named_lines):
+            problems.append(f"点名的那一行里没有「{want_refused_text}」")
+        if code != EXIT_SWAPPED and not any(line.lstrip().startswith("→") for line in lines):
+            problems.append("拒绝没带「→」出路")
+        wanted = guard_text.replace("# 版本 1\n", "# 版本 2\n") if want_swapped else guard_text
+        if read_text(guard_path) != wanted:
+            problems.append("钩子的内容不对：" + ("没换成新版" if want_swapped else "一个字节都不该写"))
+        if not want_swapped and os.path.exists(outcome_path(root, scratch)):
+            problems.append("没换上却写了结局文件")
+        if os.path.exists(os.path.join(scratch, WORK_DIRECTORY_NAME, "tree")):
+            problems.append("草稿树没删")
+        if problems:
+            failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
+        return root
+
+    stale_feeds = [scope_feed(scope_allowed_label, 0, True), scope_feed(scope_stale_label, 2, True), scope_feed("新判法钉的一条", 2, False)]
+    stale_root = scope_case("喂法失效：标了 neutral 的喂法对换上之前那一版在草稿树里就不成立，退 8、点名那一条、不套规格、一个字节不写", stale_feeds, EXIT_NEUTRAL_FEED_STALE,
+                            "是喂法失效，不是规格的毛病", named=[scope_stale_label], want_refused_text="退 0，应当 2")
+    # 样本里的那条喂法喂主工作区的那一版是对的（退 2）：失效只在草稿树里
+    checked += 1
+    code, lines = feed_only(scope_hook_relative, stale_root, feeds=[scope_feed(scope_stale_label, 2, True)])
+    if code != EXIT_SWAPPED:
+        failures.append(f"喂法失效的样本：同一条喂法喂主工作区的那一版应当对（退 {EXIT_SWAPPED}），实际 {code}；输出 {lines[-3:]}")
+    scope_case("喂法失效：--dry-run 同样退 8、点名那一条", stale_feeds, EXIT_NEUTRAL_FEED_STALE, "是喂法失效，不是规格的毛病", named=[scope_stale_label], dry_run=True)
+    # neutral 的喂法对旧版成立、新版不对：照旧报草稿里验不过，退 1、点名那一条（新版把工作根里的目标也拒了）
+    scope_case("neutral 的喂法对旧版成立、新版不对：照旧报草稿里验不过", [scope_feed(scope_allowed_label, 0, True)], EXIT_DRAFT_RED,
+               f"喂「{scope_allowed_label}」：退 2（应当 0）", named=[scope_allowed_label], edit=scope_refuse_everything_edit)
+    # 没有 neutral 喂法的规格不喂旧版：非 neutral 的喂法在旧版上过不过都不管，只喂套了规格的那一版（旧版上就不成立的那一条照旧报草稿里验不过，不报喂法失效）
+    scope_case("没有 neutral 喂法的规格照旧：不喂旧版，喂套了规格的那一版、换上", [scope_feed(scope_allowed_label, 0, False)], EXIT_SWAPPED, "✓ 换上了 1 份", want_swapped=True)
+    scope_case("没有 neutral 喂法的规格照旧：旧版上就不成立的喂法照旧报草稿里验不过", [scope_feed(scope_stale_label, 2, False)], EXIT_DRAFT_RED,
+               f"喂「{scope_stale_label}」：退 0（应当 2）", named=[scope_stale_label])
+    scope_case("neutral 的喂法对旧版成立、新版也成立：照旧换上", [scope_feed(scope_allowed_label, 0, True)], EXIT_SWAPPED, "✓ 换上了 1 份", want_swapped=True)
+
+    # 脚本规格：文件在脚本规格目录下，不喂钩子，换上之后跑 --verify 的命令
     def run_scripts(label, spec, want_code, want_files, want_text=None, verify=None, hook=None, feeds=None, dry_run=False, after_draft=None, after_swap=None,
                     want_new_inode=None):
         nonlocal checked
@@ -1918,13 +2156,68 @@ def selftest():
                 {**script_untouched, "scripts/tool.py": SELFTEST_OTHER_SESSION_LINE + SELFTEST_SCRIPT}, after_draft=other_session_edits_script,
                 verify=SELFTEST_SCRIPT_VERIFY)
     # 规格不收的几种（开关 script-paths-unrestricted 下第一种红）
-    run_scripts("脚本规格：scripts/ 之外的文件不收", [{"file": "research/notes.txt", "old": "记录", "new": "笔记"}], EXIT_BAD_INPUT, script_untouched)
+    run_scripts("脚本规格：脚本规格目录之外的文件不收", [{"file": "research/notes.txt", "old": "记录", "new": "笔记"}], EXIT_BAD_INPUT, script_untouched)
     run_scripts("脚本规格：钩子文件与脚本混在一份规格里：不收", [{"file": ".claude/hooks/fake_lib.py", "old": 'MARKER = "HEAVY"', "new": 'MARKER = "HEAVYX"'}, script_version_edit],
                 EXIT_BAD_INPUT, script_untouched, hook=".claude/hooks/fake-guard.sh", feeds=SELFTEST_FEEDS)
     run_scripts("脚本规格：带 --hook：不收（脚本没有钩子要喂）", [script_version_edit], EXIT_BAD_INPUT, script_untouched, hook=".claude/hooks/fake-guard.sh")
     run_scripts("脚本规格：带 --feeds：不收", [script_version_edit], EXIT_BAD_INPUT, script_untouched, feeds=SELFTEST_FEEDS)
     run("钩子规格：带 --verify：不收", [SELFTEST_GOOD_EDIT], EXIT_BAD_INPUT, untouched, verify="true")
     run("钩子规格：不带 --hook：不收", [SELFTEST_GOOD_EDIT], EXIT_BAD_INPUT, untouched, hook=None)
+
+    # 脚本规格目录：scripts/ 之外的五处每处一格收得进、换上（新 inode、执行位照留）、回读对；五处连同 scripts/ 的一份写进同一份规格一起换上；
+    # 不收的子目录每处一格拒、一个字节不写（开关 script-gate-fixtures-accepted、script-server-target-accepted、script-server-src-accepted 下各自点名的格红）
+    directory_samples = {**{relative: entry[:4] for relative, entry in SELFTEST_SPEC_DIRECTORY_FILES.items()},
+                         **{relative: entry[:4] for relative, entry in SELFTEST_EXCLUDED_FILES.items()},
+                         "scripts/tool.py": (SELFTEST_SCRIPT, *SELFTEST_PYTHON_VERSION_EDIT, 0o644)}
+
+    def directories_repository(name):
+        root = fresh_repository(name)
+        for relative, (content, _, _, file_mode) in directory_samples.items():
+            path = os.path.join(root, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(content)
+            os.chmod(path, file_mode)
+        return root
+
+    def directory_case(label, relatives, want_code, want_text):
+        nonlocal checked
+        checked += 1
+        name = f"directory-case-{checked}"
+        root = directories_repository(name)
+        inodes = {relative: os.stat(os.path.join(root, relative)).st_ino for relative in relatives}
+        spec = [{"file": relative, "old": directory_samples[relative][1], "new": directory_samples[relative][2]} for relative in relatives]
+        try:
+            code, lines = swap(spec, None, os.path.join(work, name, "scratch"), root)
+        except BadInput as error:
+            code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+        problems = [] if code == want_code else [f"退出码 {code}（应当 {want_code}）"]
+        if not any(want_text in line for line in lines):
+            problems.append(f"输出里没有「{want_text}」")
+        for relative in relatives:
+            path = os.path.join(root, relative)
+            content, old, new, file_mode = directory_samples[relative]
+            want = content.replace(old, new, 1) if want_code == EXIT_SWAPPED else content
+            if read_text(path) != want:
+                problems.append(f"{relative} 回读的内容不对（sha256 {sha256_of(read_text(path))[:12]}，应当 {sha256_of(want)[:12]}）")
+            if want_code == EXIT_SWAPPED and os.stat(path).st_ino == inodes[relative]:
+                problems.append(f"{relative} 换上之后 inode 没变：在原 inode 上写的")
+            if os.stat(path).st_mode & 0o777 != file_mode:
+                problems.append(f"{relative} 的权限成了 {os.stat(path).st_mode & 0o777:o}（应当 {file_mode:o}）")
+            leftovers = [entry for entry in os.listdir(os.path.dirname(path)) if entry.startswith(".")]
+            if leftovers:
+                problems.append(f"{os.path.dirname(relative)} 里留下临时文件 {leftovers}")
+        if os.path.exists(os.path.join(work, name, "scratch", WORK_DIRECTORY_NAME, "tree")):
+            problems.append("草稿树没删")
+        if problems:
+            failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
+
+    for relative in SELFTEST_SPEC_DIRECTORY_FILES:
+        directory_case(f"脚本规格：{os.path.dirname(relative)}/ 下的文件收得进、换上、回读对", [relative], EXIT_SWAPPED, "✓ 换上了 1 份")
+    directory_case("脚本规格：六处脚本规格目录的文件写进同一份规格，一起换上、回读对", ["scripts/tool.py", *SELFTEST_SPEC_DIRECTORY_FILES], EXIT_SWAPPED,
+                   f"✓ 换上了 {1 + len(SELFTEST_SPEC_DIRECTORY_FILES)} 份")
+    for relative, entry in SELFTEST_EXCLUDED_FILES.items():
+        directory_case(entry[4], [relative], EXIT_BAD_INPUT, "脚本规格不收这一处")
 
     # 调用方引到的名字：换上的库去掉一个名字，各种载入写法的调用方（spec 加函数返回、heredoc 里 import as、self 属性、形参、列表按下标取、global 元组、
     # 转手交给另一份库里的函数）都要被点名；库里名字齐的照换，认不出去向的写法列成本次未判；只核不换用同一套判法
@@ -2147,6 +2440,53 @@ def selftest():
     read_code, _ = read_outcome(path, root, reader_mode) if os.path.exists(path) else (None, None)
     if code != EXIT_ROLLED_BACK or read_code != 1:
         failures.append(f"{label}：换上退 {code}（应当 {EXIT_ROLLED_BACK}），--read-outcome 退 {read_code}（应当 1）")
+    # 喂法目标：file_path 解开符号链接之后要落在草稿树里（开关 feed-target-unchecked 下前两格红；第三格写在实拷目录下，开关下照绿）
+    def target_feed(feed_label, file_path):
+        return {"label": feed_label, "exit": 0, "input": {"tool_name": "Write", "tool_input": {"file_path": file_path, "content": "记录\n"}}}
+    checked += 1
+    label = "喂法目标落在符号链接上：草稿红、点名那一条与出路、不喂"
+    link_root = fresh_repository("target-link")
+    link_scratch = os.path.join(work, "target-link", "scratch")
+    link_feeds = [target_feed("写仓根下的链接目标", "{root}/research/notes.txt"), target_feed("相对路径落在链接上", "scripts/tool.py"),
+                  target_feed("写实拷目录下的目标", "{root}/.claude/hooks/feed-target.md")]
+    code, lines = swap([SELFTEST_GOOD_EDIT], ".claude/hooks/fake-guard.sh", link_scratch, link_root, feeds=link_feeds, dry_run=True)
+    feed_logs = os.path.join(link_scratch, WORK_DIRECTORY_NAME)
+    log_text = "".join(read_text(os.path.join(feed_logs, name)) for name in sorted(os.listdir(feed_logs)) if name.startswith("feeds-"))
+    problems = []
+    if code != EXIT_DRAFT_RED:
+        problems.append(f"退出码 {code}（应当 {EXIT_DRAFT_RED}）")
+    for named in ("写仓根下的链接目标", "相对路径落在链接上"):
+        if not any(f"喂「{named}」" in line and "出路：" in line for line in lines):
+            problems.append(f"没点名「{named}」与出路")
+        if f"\t{named}\t退 " in log_text:
+            problems.append(f"「{named}」落在树外还是喂了")
+    if any("喂「写实拷目录下的目标」" in line for line in lines) or "\t写实拷目录下的目标\t退 0" not in log_text:
+        problems.append("写在实拷目录下的目标被点名或没喂")
+    if problems:
+        failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
+    checked += 1
+    label = "喂法目标写在实拷的 .claude/hooks/ 下：照喂、换上"
+    inside_root = fresh_repository("target-inside")
+    code, lines = swap([SELFTEST_GOOD_EDIT], ".claude/hooks/fake-guard.sh", os.path.join(work, "target-inside", "scratch"), inside_root,
+                       feeds=[target_feed("绝对路径写实拷目录", "{root}/.claude/hooks/feed-target.md"),
+                              target_feed("相对路径写实拷目录", ".claude/hooks/feed-target.md"), *SELFTEST_FEEDS])
+    if code != EXIT_SWAPPED:
+        failures.append(f"{label}：退出码 {code}（应当 {EXIT_SWAPPED}）；输出末几行 {lines[-4:]}")
+    checked += 1
+    label = "只喂不换：喂法目标落在仓根之外：点名那一条与出路"
+    only_root = fresh_repository("target-feed-only")
+    code, lines = feed_only(".claude/hooks/fake-guard.sh", only_root,
+                            feeds=[target_feed("写仓根之外的目标", os.path.join(work, "target-feed-only", "outside.md")),
+                                   target_feed("写仓根里的目标", "{root}/research/notes.txt")])
+    problems = []
+    if code != EXIT_DRAFT_RED:
+        problems.append(f"退出码 {code}（应当 {EXIT_DRAFT_RED}）")
+    if not any("✗" in line and "喂「写仓根之外的目标」" in line and "出路：" in line for line in lines):
+        problems.append("没点名「写仓根之外的目标」与出路")
+    if not any("✓" in line and "写仓根里的目标" in line for line in lines):
+        problems.append("仓根里的目标没喂过")
+    if problems:
+        failures.append(f"{label}：{'；'.join(problems)}；输出末几行 {lines[-4:]}")
     shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
         print(f"  ✗ hook-swap 自检：{failure}")  # gate-lint:detail
@@ -2155,11 +2495,16 @@ def selftest():
         return 1
     print(f"  ✓ hook-swap 自检通过（查了 {checked} 种）：草稿与换上之后都验过的换上新 inode；钩子 bash 层语法错、内嵌 python 编译不过、判法改错的草稿一个字节不写；"
           "换上之后验不过的按反向定点替换回滚、别的会话这段时间里加的一行留着；验的时候主工作区被改了不换；"
-          "不在 .claude/hooks/ 也不在 scripts/ 的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的；内置喂法里的脚本路径都在仓里；内置喂法带花括号与参数通配的六条，"
-          "在花括号写法上放行的钩子先验停下并点名那一条；脚本规格（scripts/ 下任意层）：草稿语法检查、--dry-run 停在草稿、换上之后验证命令退 0 才算验过，"
-          "验证命令退 1 按反向定点替换回滚（别的会话加的一行留着）、验的时候被改不换、scripts/ 之外的文件与钩子脚本混写的规格不收、"
+          "不在 .claude/hooks/ 也不在脚本规格目录下的文件、回滚找不回原处的规格不收；内嵌 python 切段认 <<- 与没收尾的；内置喂法里的脚本路径都在仓里；内置喂法带花括号与参数通配的六条，"
+          "在花括号写法上放行的钩子先验停下并点名那一条；脚本规格（脚本规格目录下任意层）：草稿语法检查、--dry-run 停在草稿、换上之后验证命令退 0 才算验过，"
+          "验证命令退 1 按反向定点替换回滚（别的会话加的一行留着）、验的时候被改不换、脚本规格目录之外的文件与钩子脚本混写的规格不收、"
+          ".claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/ 下的文件各自收得进、换上（新 inode、权限照留）、回读对，"
+          "六处的文件写进同一份规格一起换上，.claude/gate.d/fixtures/ 与两个服务的 target/、src/ 下的文件不收、一个字节不写、"
           "脚本规格带 --hook 或 --feeds、钩子规格带 --verify 或不带 --hook 都不收；换上的 .py 库去掉一个名字，七种载入写法的调用方（spec 加函数返回、heredoc 里 import as、self 属性、形参、"
           "列表按下标取、global 元组、转手交给另一份库的函数）都被点名、草稿验不过，名字齐的照换，认不出去向的写法列成本次未判；只核不换 --check-callers 缺名字退 1、名字齐退 0；"
+          "喂法的 file_path 解开符号链接之后落在草稿树外的，草稿红、点名那一条与出路、不喂（只喂不换同样点名），写在实拷的 .claude/hooks/ 下的照喂、换上；"
+          "标了 neutral 的喂法对换上之前那一版在草稿树里就不成立的，退 8、点名那一条、不套规格、一个字节不写（--dry-run 同样），对旧版成立而新版不对的照旧报草稿里验不过，"
+          "没有 neutral 喂法的规格不喂旧版；"
           "结局文件：换完的一趟依次写开始、文件、回读、完成，--dry-run 不写，被杀在两份之间只有开始与文件行、下一趟拒（退 7）并点名反向规格、手工退回到换前之后不再拦，"
           "全换上了没写完成的要 --seal-outcome 补写，换上之后红回滚写退回，完成之后文件又被改 --read-outcome 退 4")
     return 0
@@ -2169,7 +2514,7 @@ def main(arguments):
     if arguments == ["--selftest"]:
         return selftest()
     usage = ("hook-swap.py <规格.json> --hook <钩子> --scratch <草稿目录> [--feeds <喂法.json>] [--root <仓根>] [--dry-run]，"
-             "或 hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]（规格里的文件都在 scripts/ 下），"
+             "或 hook-swap.py <规格.json> --scratch <草稿目录> [--verify <命令>] [--root <仓根>] [--dry-run]（规格里的文件都在脚本规格目录下），"
              "或 hook-swap.py --feed-only --hook <钩子>，或 hook-swap.py --check-callers [<库.py>…]，或 hook-swap.py --read-outcome / --seal-outcome，或 hook-swap.py --selftest")
     options = {"--hook": None, "--scratch": None, "--feeds": None, "--root": REPOSITORY_ROOT, "--verify": None}
     dry_run, feed_only_mode, check_callers_mode, positional, position = False, False, False, [], 0

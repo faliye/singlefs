@@ -1,0 +1,12 @@
+# 被测的是 scripts/experiment-apparatus/e207_strict_scan_steps_compact_device.rs：它不是 scripts/experiment-apparatus 里的 bin（要 singlefs-core 与验证包），而是拷进插了读数的副本，
+# 当 crates/singlefs-verification 的集成测试 e207_strict_scan_steps_histories 的子模块编、起（入口 e207-strict-scan-steps-run.sh 的 --device-test 起它的四条单测）。
+# mutate.sh 只会在 scripts/experiment-apparatus 里起 cargo test --release --bin <名>，那里没有这份源，所以这张表不由 mutate.sh 跑，同 e207_strict_scan_steps_histories.tsv 的做法；
+# 每一行由 --device-test 里 compact_device::tests 的哪条单测抓：
+#   compact_read_does_not_zero_the_buffer_first：writes_and_reads_match_the_sparse_device_across_the_unit_area_boundary（读用 1 填过的缓冲，没写过的扇区该读出 0）。
+#   compact_zero_fill_stops_one_sector_early：zero_fill_and_discard_remove_the_written_sectors_like_the_sparse_device。
+#   compact_discard_does_nothing：同上（discard 之后整盘读回要与稀疏盘一致）。
+#   compact_write_drops_the_part_above_the_unit_area_start：writes_and_reads_match_the_sparse_device_across_the_unit_area_boundary（跨起点的一次写，上半要进紧凑存法）。
+compact_read_does_not_zero_the_buffer_first	        buffer.fill(0);	        let _ = &buffer;
+compact_zero_fill_stops_one_sector_early	                if sector >= first_sector && sector < first_sector + sectors {	                if sector >= first_sector && sector + 1 < first_sector + sectors {
+compact_discard_does_nothing	        self.write_zeroes_at(discarded_offset, discarded_length)?;	        let _ = (discarded_offset, discarded_length);
+compact_write_drops_the_part_above_the_unit_area_start	            self.unit_area.as_mut().expect("有上面那段就有紧凑存法").write(first_above, &bytes[below..]);	            self.unit_area.as_mut().expect("有上面那段就有紧凑存法").write(first_above, &bytes[below..below]);

@@ -25,7 +25,7 @@ Python 一侧这一个概念只叫「判定库」（类名 VerdictLibrary）。R
     照 lib_function_units.closure_key 取 sha256。几个入口的闭包并起来算一把；同一个根上 Rust 的工作区只读一次（几十个 Rust 入口共用）。
     不带路径、名字、行号；组成清单（单元行：种类、限定名、文件:起止、指纹）随键交回，只当索引。
   闭包里有拒算（lib_function_units.py 文件头「拒算」）：UnitKey.key 是 None，带它的那一条判定不复用、每趟现判，lookup 的原因写「拒算」并点名第一处。
-  judging_unit_key(根, 入口…)：判法单元指纹，判结局那几个函数的闭包键；这份库与 lib_function_units.py 两份（NOT_JUDGING_FILES）的单元不进它：
+  judging_unit_key(根, 入口…)：判法单元指纹，判结局那几个函数的闭包键；这份库与 lib_function_units.py 两份（NOT_JUDGING_FILES）的单元不进它，也不从它们往下连（只经它们读到的数据、起的程序不进键）：
     它们管怎么存、怎么算键，不管判对错，改它们不让任何判定作废。
   locked_dependency_lines(根, 包名)：Cargo.lock 里从这个工作区包出发传递引到的外部包，一包一行「名 版本 来源 checksum」（工作区里的 path 包不列：它们的单元已在闭包里）；
     dev-dependencies 与只在别的平台上进依赖图的包照收（lock 里分不出），方向是多作废。
@@ -198,7 +198,7 @@ class FunctionUnitIndex:
             self._workspace = function_units().RustWorkspace(self.root)
         return self._workspace
 
-    def closure(self, entry, target=None, cfg=(), features=()):
+    def closure(self, entry, target=None, cfg=(), features=(), excluded_files=()):
         units = function_units()
         language, path, qualified = units.parse_entry(self.root, entry)
         if language == "rust":
@@ -208,11 +208,13 @@ class FunctionUnitIndex:
         options = units.Options()
         options.target = target
         options.cfg = list(cfg)
+        options.excluded_files = excluded_files
         return units.closure_of(self.root, entry, options)
 
     def key(self, entries, target=None, cfg=(), features=(), toolchain=(), dependencies=(), externals=None,
             excluded_files=(), excluded_units=(), programs_keyed_elsewhere=False):
-        """几个入口的闭包并起来算一把 UnitKey。excluded_files / excluded_units（<文件>::<限定名>）里的单元不进键（调用方另把它们的取值放进键时用）。
+        """几个入口的闭包并起来算一把 UnitKey。excluded_files / excluded_units（<文件>::<限定名>）里的单元不进键（调用方另把它们的取值放进键时用）；
+        excluded_files 里的文件另不往下连：只经它们读到的数据、起的程序不进键（lib_function_units.py 文件头「按角色排除的文件」）。
         闭包里点名的外部程序（qemu-system-*、herd7、busybox、cargo）要调用方在 externals 里给（名、sha256、版本行），没给的拒算；
         programs_keyed_elsewhere 只给判法单元指纹用：判法里起的外部程序由每条判定自己的工具链那一样管，这里记一个固定的占位、不拒算。
         入口找不到、根不在抛 ValueError（调用方按算不出办：这一条照判，不复用）。弄坏开关 unit-key-from-raw-file 下键取入口文件整份原文。"""
@@ -225,7 +227,7 @@ class FunctionUnitIndex:
         excluded_files, excluded_units = set(excluded_files), set(excluded_units)
         try:
             for entry in entries:
-                closure = self.closure(entry, target, cfg, features)
+                closure = self.closure(entry, target, cfg, features, excluded_files)
                 for unit in closure.order:
                     identity = (unit.language, unit.kind, unit.name, unit.file, unit.first_line, unit.fingerprint)
                     if identity in seen or unit.file in excluded_files or f"{unit.file}::{unit.name}" in excluded_units:
@@ -249,7 +251,7 @@ class FunctionUnitIndex:
 
 
 def judging_unit_key(root, entries, index=None):
-    """判法单元指纹：判结局那几个函数（entries）的闭包键，NOT_JUDGING_FILES 两份的单元不进（弄坏开关 judging-files-included 下照进）。"""
+    """判法单元指纹：判结局那几个函数（entries）的闭包键，NOT_JUDGING_FILES 两份的单元不进、也不从它们往下连（弄坏开关 judging-files-included 下照进）。"""
     index = index or FunctionUnitIndex(root)
     excluded = () if "judging-files-included" in BREAK else NOT_JUDGING_FILES
     return index.key(entries, excluded_files=excluded, programs_keyed_elsewhere=True)

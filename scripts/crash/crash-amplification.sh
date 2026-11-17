@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # task-server-shards: *
-# task-server-cargo-family: -p singlefs-verification --release --features gpu
+# task-server-compiles: yes
 # admission: always 每次调都在这一刻的树上跑全部项或点名的分项；哪些块要重判由库里的块键与判法单元指纹定，不在这里
 # run-condition: command bash cargo python3
 # run-condition: check source "$PREFLIGHT_SCRIPT_DIRECTORY/crash-amplification-lib.sh" && crash_amplification_run_condition_holds "$PREFLIGHT_SCRIPT_DIRECTORY/../.." :: 修好设备，或改配置：多机配置 multi-host.env 开了 GPU 而一份卡都没写、点名的卡与双机开关对不上；单跑 bash -c 'source scripts/crash/crash-amplification-lib.sh && crash_amplification_run_condition_holds' 看是哪一处
@@ -19,7 +19,7 @@
 #                                                           scripts/crash/lib_crash_point_replay_items.py（文件头「指定范围的崩溃域上限」），崩溃点重放入口共用。经服务按项分片的，这一判在计划那一步做，
 #                                                           各片与合并不再判；崩溃点重放入口起这里时交 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（它已按合表项判过），这里就不再判
 #   crash-amplification.sh --list-items                     逐行列出可点名的分项：分项名、测试目标、用例函数（TAB 隔开）；不清场、不跑
-#   crash-amplification.sh --selftest                       用假的分项驱动走一遍第 1–66 格（指定范围的崩溃域上限是第 61–66 格：超上限判拒、点名项全部可复用放行、缩过域放行、估不出判拒、缩过域的记录不当全域、已判过的标记不再判；复用三问与上次红的清单是第 45、46 格，RocksDB 取值没判过不起是第 48 格，不在临时 prune-server 底下起的自证退 2 是第 53 格，缩域参数交变量是第 59 格、值写坏退 2 是第 60 格；列项、点名、拒绝、不清场、认不出的选项退 2、各种判红、本次未跑、复用数、派出收回、
+#   crash-amplification.sh --selftest                       用假的分项驱动走一遍第 1–67 格（不领卡是第 67 格：开了 GPU、环境里没有卡时每项交驱动整趟跑、驱动收到的卡是 unset，驱动报 GPU 批处理服务不在跑退 78 时整趟退 78、起服务的命令照转出；指定范围的崩溃域上限是第 61–66 格：超上限判拒、点名项全部可复用放行、缩过域放行、估不出判拒、缩过域的记录不当全域、已判过的标记不再判；复用三问与上次红的清单是第 45、46 格，RocksDB 取值没判过不起是第 48 格，不在临时 prune-server 底下起的自证退 2 是第 53 格，缩域参数交变量是第 59 格、值写坏退 2 是第 60 格；列项、点名、拒绝、不清场、认不出的选项退 2、各种判红、本次未跑、复用数、派出收回、
 #                                                           只供自证的变量、有红又有项退 78、按登记整批不判的数、驱动行的 red= 与不带参数时的零态、复用数是各行之和、几条流各留的块相加、
 #                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数时一项不穷举红在那一项、
 #                                                           只因登记的段不穷举不红而报段号与写数、没登段的流照旧红、往驱动送按段登记文件、登记文件写坏拒跑、
@@ -40,9 +40,11 @@
 # （配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有 gpu 就一定要让 GPU 工作，如果不行就明确报错拒绝，不接受默认降级）。
 # 运行条件：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上）由文件头 run-condition: check 在开跑之前判（同分项驱动，判法在
 #   crash-amplification-lib.sh 的 crash_amplification_run_condition_holds）；跑起来才知道的退 78：某一项的驱动退 78
-#   （显卡或第二台用不上）。出路都是「修好设备，或改配置」。
-# 清场与分卡由 task-server 管（records/2026-10-30-编译绕过内存总上限.md 收尾批 M03）：服务认出要卡的命令，经 scripts/crash/gpu-quiesce-run.sh 套着起这一趟、
-#   经环境 GPU_CARDS_BY_PRIORITY 交它挑的卡；这里不清场、不重起自己、不挑卡，环境原样交给每一项的分项驱动。
+#   （GPU 批处理验证服务不在跑、显卡或第二台用不上）。GPU 批处理服务不在跑的出路是驱动转出的起服务的命令（python3 gpu-verification-server/control start），
+#   别的出路是「修好设备，或改配置」。
+# 卡只归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：这里不领卡、不挑卡、不清场、不重起自己。
+#   每项交分项驱动整趟跑（录入段与判段在驱动里先后跑），开了 GPU 的判段把要判的块写成待判行、等 GPU 批处理服务判完；
+#   环境里有 GPU_CARDS_BY_PRIORITY 就原样留给驱动，没有照样跑。按项分片的一片只跑一项；合并那一步只重放。
 # 经 task-server 按项分片（用户：「崩溃放量每次执行大约 30个小时……剩下的15个小时是空闲的」）：文件头「# task-server-shards: *」让服务把这一条拆成计划、各片、合并
 #   （task-server/task_server_lib.py 文件头「分片」），一项一片，哪台空出来哪台接下一片；这一份照环境里的 TASK_SERVER_SHARD_PHASE 只跑其中一步：
 #   plan   选好分项、核过按段登记之后，往计划目录写 rows.tsv（这一趟要跑的登记行，一行一项、次序照跑的次序）与 plan.json（一项一片，label 是分项名），退 0；不起驱动。
@@ -53,10 +55,10 @@
 #          判法、ITEM 行、汇总、成功句与退出码都同不分片的那一趟。有一项找不到产物（产物表里没有那一片、或缺 item.log / item.exit）退 1、一项都不重放。
 #   读完这几个变量就从环境里清掉（TASK_SERVER_SHARD_*），不传给分项驱动：别的入口在服务的分片里调到这里时，照不分片跑。
 #   TASK_SERVER_SHARD_PHASE 是别的值退 2。弄坏开关 shard-phase-ignored 下不认这几个变量，三步都照不分片跑。
-#   带 --no-shard 的不分（默认分片，不分片才要加参数）：计划写一片、不起驱动，那一片照不分片整趟跑、退出码照整趟，合并什么都不做。弄坏开关 no-shard-ignored 下照分片。
 # 编译目录（自己用完自己删，不跨趟复用）：建好 <放量家目录>/runs/entry-<时刻>-<进程号>/ 之后，调用方没设 CARGO_TARGET_DIR 时
 #   在里面建 target、export 给每一项的分项驱动（分项驱动看到设了就不另建）；正常结束、有项红、被 TERM / INT 停（等手里那一项的驱动退出）都在 EXIT 上删
-#   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程，整趟退非 0）。调用方设了的照它、不删。
+#   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程，整趟退非 0）。调用方设了的照它、不删：
+#   文件头的会编声明「# task-server-compiles: yes」让统一任务服务给这一次尝试一份 CARGO_TARGET_DIR，撞上限重来的尝试接着用同一份、不重编，那一份归服务删。
 #
 # 展开深度：全量域只有一处，引擎里放量的展开上限常量（crates/singlefs-verification/src/crash_amplification.rs，登记在 .claude/gate.d/crash-knobs.tsv）；
 #   这里不写这个数；不指定范围、不缩域的那一趟不交给分项驱动任何展开深度。缩域（--crash-expand-up-to <n>）是唯一的改法：把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=<n>
@@ -184,15 +186,15 @@
 #       平常跑时带了只给自证用的变量（见「只供自证」）、按段登记文件核不过（见「按段登记」；逐处列出问题，不清场、一项都不跑）
 #   77  派出的项一项都没判完（全是 not-run），也没有红
 #   79  指定范围的崩溃域超上限：带了 --item、没缩域，点名的分项这一趟要现判约多少崩溃状态超过 200000 态，或估不出来（一项都没起；出路：带 --crash-expand-up-to <n> 缩域，或留给提交时不指定范围的那一趟）
-#   78  运行条件不满足（出路：修好设备，或改配置）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
-#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）、
+#   78  运行条件不满足（出路：修好设备，或改配置；GPU 批处理验证服务不在跑的出路是驱动转出的起服务的命令）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
+#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时；含开了 GPU 而 GPU 批处理验证服务不在跑）、
 #       起任何一项之前 scripts/hosts/rocksdb-prebuilt.py entry 判红（这台没装预编库、此刻进程环境的取值缺了或对不上；出路是开新会话，
 #       或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
-# 项与项之间串行（判过并行这一条路走不通）：点名的项一项一项交分项驱动，不同时起几项。理由：开了 GPU 时各项照 task-server 交的同一张卡与额度、
-#   --test-threads 1 用卡（GPU 对拍的测试各占卡的显存，不并行起）。每一项里引擎照登记的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）并行判。
+# 项与项之间串行（判过并行这一条路走不通）：点名的项一项一项交分项驱动，不同时起几项。理由：开了 GPU 时各项照 task-server 交的同一张卡与额度用卡，
+#   卡池的显存账按进程记，几个进程同时上卡互相不排队。每一项里引擎照登记的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）并行判。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
-#   （格号是 run_selftest 里的第 1–66 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
+#   （格号是 run_selftest 里的第 1–67 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
 # 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
@@ -203,7 +205,7 @@
 #       第 29 格（「分项驱动退 77 没记进本次未跑」）、第 46 格（「上次红的清单不对」：红的那一项没记成红）、
 #       第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」：这一项没记红、整趟退 0）、
 #       第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：ITEM 行记成 exit=0）、
-#       第 57 格（「按项分片的合并应当……」：重放那一项的退 1 被吞成 0、整趟退 0）、第 58 格（「带 --no-shard 应当计划写一片……」：那一片的退 1 被吞成 0）
+#       第 57 格（「按项分片的合并应当……」：重放那一项的退 1 被吞成 0、整趟退 0）、第 67 格（「不领卡、GPU 批处理服务不在跑……」：那一项记退 0、0 行判红，接着派第二项，整趟退 1）
 #   CRASH_AMPLIFICATION_BREAK=logs-single  每一项驱动的输出只写一份全量日志（tee，不经 two-logs.sh，没有 .problems.log）
 #       第 47 格（「每一项的输出应当出两份日志…」）
 #   CRASH_AMPLIFICATION_BREAK=skip-filter  调驱动时不带 --test-filter
@@ -211,7 +213,7 @@
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-item  不认得的分项名照跑
 #       第 2 格（「不认得的分项名没有退 2 并列出可点名的项」）
 #   CRASH_AMPLIFICATION_BREAK=unknown-option-accepted  认不出的选项也照收、当没给（不拒）
-#       第 7 格（「认不出的选项应当用法错退 2、一项都不跑」）
+#       第 7 格（「认不出的选项应当用法错退 2、一项都不跑」）、第 58 格（「--no-shard 不是这一份的选项，应当用法错退 2……」）
 #   CRASH_AMPLIFICATION_BREAK=expand-up-to-not-passed  给了 --crash-expand-up-to 不把变量交给分项驱动（TOTAL 行与成功句照写缩过域）
 #       第 59 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：驱动收到的是 unset）
 #   CRASH_AMPLIFICATION_BREAK=narrowed-run-unlabelled  缩过域的那一趟 TOTAL 行不接 expand_up_to=、成功句不写「缩过域、不算门禁通过」
@@ -256,7 +258,8 @@
 #   CRASH_AMPLIFICATION_BREAK=count-stopped-as-run  叫停与留了没判的块的项也记 green
 #       第 16 格（「被叫停的项没按本次未跑逐项报」）、第 17 格（「派出的项全没判完却没退 77」）、第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=item-78-as-failure  驱动退 78 照普通失败记、接着派后面的项
-#       第 18 格（「驱动退 78 却没停下退 78」）、第 20 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 21 格（「驱动退 78 而行里报了红，这一项没记红」）
+#       第 18 格（「驱动退 78 却没停下退 78」）、第 20 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 21 格（「驱动退 78 而行里报了红，这一项没记红」）、
+#       第 67 格（「不领卡、GPU 批处理服务不在跑……」：没停在头一项，整趟退 1）
 #   CRASH_AMPLIFICATION_BREAK=honor-test-variables-outside-selftest  平常跑时也认只供自证的变量，不拒；关守卫项，整值比，只在它是 CRASH_AMPLIFICATION_BREAK 唯一一项时认，与别的项同写平常跑照拒并点名
 #       第 19 格（「平常跑时带了只供自证的变量却没拒」）
 #   CRASH_AMPLIFICATION_BREAK=condition-before-red  有红又有一项驱动退 78 时整趟退 78（不让红优先）
@@ -338,9 +341,7 @@
 #   CRASH_AMPLIFICATION_BREAK=rocksdb-entry-unchecked  清场与起分项之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       第 48 格（「验证包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78…」）
 #   CRASH_AMPLIFICATION_BREAK=shard-phase-ignored  不认 TASK_SERVER_SHARD_PHASE 这几个变量，计划、一片、合并都照不分片跑（文件头「经 task-server 按项分片」）
-#       第 55 格（「按项分片的计划那一步应当……」）、第 56 格（「按项分片的一片应当……」）、第 57 格（「按项分片的合并应当……」）、第 58 格（「带 --no-shard 应当计划写一片……」：起了驱动）
-#   CRASH_AMPLIFICATION_BREAK=no-shard-ignored  不认 --no-shard，照按项分片
-#       第 58 格（「带 --no-shard 应当计划写一片……」）
+#       第 55 格（「按项分片的计划那一步应当……」）、第 56 格（「按项分片的一片应当……」）、第 57 格（「按项分片的合并应当……」）
 #   CRASH_AMPLIFICATION_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（分项在仓根照仓根的 target 编、跨趟留着）
 #       第 49 格（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」）、
 #       第 51 格（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
@@ -359,7 +360,7 @@
 #
 # gate-similar: crash-amplification-item.sh 它跑一个分项的一趟（排派活计划、定在哪跑）；这里是分项登记表与全部项的循环，每项调它
 # gate-similar: crash-amplification-two-hosts.sh 它是分片驱动，经 task-server 分片协议跑一条用例的计划、各片与合并；这里与分项驱动都不调它
-# gate-similar: crash-point-replay-shard-run.sh 它跑崩溃点重放登记的崩溃枚举用例（CPU 枚举、crash-point-replay 全绿标记）；这里跑的是走判定库的流水线用例
+# gate-similar: crash-point-replay.sh 门禁照 task-server 分片协议分片判登记的崩溃枚举用例；这里跑的是走判定库的流水线用例
 # gate-similar: gpu-quiesce-run.sh 它只管清场、回读、跑（不复原），由 task-server 套在要卡的命令外面；这里不经它、不清场
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -784,8 +785,8 @@ refuse_listing_the_items() { # <哪里不对>：打原因、出路与可点名�
 }
 
 usage() { # <哪里不对>
-  echo "  ✗ 用法不对：$1。用法：$0 [--no-shard] [--item <分项>]… [--crash-expand-up-to <n>] [--list-items] [--selftest] [--label <标签>]" >&2
-  echo "  → 怎么办：不带参数就是剪枝跑全部项；分项名照 --list-items 列的写；经服务交的默认按项分片，--no-shard 才不分；--crash-expand-up-to 后面写非负整数（缩域，只往小缩）" >&2
+  echo "  ✗ 用法不对：$1。用法：$0 [--item <分项>]… [--crash-expand-up-to <n>] [--list-items] [--selftest] [--label <标签>]" >&2
+  echo "  → 怎么办：不带参数就是剪枝跑全部项；分项名照 --list-items 列的写；经服务交的按项分片；--crash-expand-up-to 后面写非负整数（缩域，只往小缩）" >&2
   exit 2
 }
 
@@ -806,14 +807,13 @@ if (( ! running_under_selftest )) && [[ "${1:-}" != --selftest ]] && ! crash_amp
   fi
 fi
 
-selected=(); driver_arguments=(); list_only=0; selftest=0; no_shard=0; crash_expand_up_to_argument=""; crash_expand_up_to_given=0
+selected=(); driver_arguments=(); list_only=0; selftest=0; crash_expand_up_to_argument=""; crash_expand_up_to_given=0
 while (($# > 0)); do
   case "$1" in
     --item)
       if (( $# < 2 )) || [[ -z "$2" || "$2" == -* ]]; then refuse_listing_the_items "--item 后面缺项名"; fi
       selected+=("$2"); shift 2 ;;
     --list-items) list_only=1; shift ;;
-    --no-shard) no_shard=1; shift ;;
     --selftest) selftest=1; shift ;;
     --label)
       if (( $# < 2 )) || [[ -z "$2" || "$2" == -* ]]; then usage "$1 要一个值"; fi
@@ -877,6 +877,8 @@ run_selftest() {
   export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs"
   unset CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS GATE_NOT_RUN_FILE SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO STUB_EXPAND_LOG
   unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
+  # 服务给的编译目录（CARGO_TARGET_DIR）与调用方交的卡不从调用方带进来（编译目录那几格要看到本趟自己建的那一份，第 52 格自己给；第 67 格要看驱动收到的是 unset）
+  unset CARGO_TARGET_DIR GPU_CARDS_BY_PRIORITY STUB_CARD_LOG STUB_GPU_VERIFICATION_SERVER_DOWN
   unset TASK_SERVER_SHARD_PHASE TASK_SERVER_SHARD TASK_SERVER_SHARD_PLAN_DIRECTORY TASK_SERVER_SHARD_OUTPUT_DIRECTORY TASK_SERVER_SHARD_OUTPUTS TASK_SERVER_SHARD_HOST
   # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 35 格临时换成写坏的一份、跑完换回）
   local segments_root="$work/segments-root" segments_registry
@@ -898,6 +900,19 @@ if [[ -n "${STUB_TARGET_LOG:-}" ]]; then
   [[ -z "${CARGO_TARGET_DIR:-}" ]] || { mkdir -p "$CARGO_TARGET_DIR/release" && echo built > "$CARGO_TARGET_DIR/release/artifact"; }
 fi
 [[ -z "${STUB_SLEEP:-}" ]] || sleep "$STUB_SLEEP"
+# 不领卡那一格（第 67 格）：给了 STUB_CARD_LOG 的记一笔「<测试目标> <--stage 的值，没给是 none> cards=[<收到的卡>]」；
+#   STUB_GPU_VERIFICATION_SERVER_DOWN=1 时照真驱动演 GPU 批处理服务不在跑：往标准错误打 ✗ 与起服务的命令、一行汇总行都不打，退 78
+stub_stage=none; stub_previous=""
+for stub_word in "$@"; do
+  [[ "$stub_previous" == --stage ]] && stub_stage="$stub_word"
+  stub_previous="$stub_word"
+done
+[[ -z "${STUB_CARD_LOG:-}" ]] || printf '%s %s cards=[%s]\n' "$1" "$stub_stage" "${GPU_CARDS_BY_PRIORITY-unset}" >> "$STUB_CARD_LOG"
+if [[ "${STUB_GPU_VERIFICATION_SERVER_DOWN:-0}" == 1 ]]; then
+  echo "  ✗ 本机那一趟退 101；日志（假驱动）" >&2
+  echo "  → 怎么办：开了 GPU，判段只把块写成待判行、等 GPU 批处理验证服务判，服务不在跑（假驱动）：先起服务 python3 gpu-verification-server/control start，再跑 python3 gpu-verification-server/control check 照它的出路修到退 0" >&2
+  exit 78
+fi
 target="$1"; expand=7
 shape_variable="STUB_SHAPE_$(printf '%s' "${target%-red}" | tr -c 'A-Za-z0-9_' '_')"
 shape="${!shape_variable:-${STUB_SHAPE:-single-host}}"
@@ -1005,21 +1020,27 @@ if [[ "$target" == *-red ]]; then exit 1; fi
 exit 0
 STUB
   chmod +x "$stub"
-  # 假 cargo（自证用）：入口自己不起 cargo，只有指定范围的崩溃域上限起读库程序 crash_library_reader 的 item 子命令（lib_crash_point_replay_items.py 的 scoped-domain）时才起。
-  #   按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答块账（不给是录下的块全部可复用），设点文件记进 STUB_ITEM_CALLS；只问版本的答版本；别的一律退 99。
+  # 假 cargo（自证用）：入口自己不起 cargo，只有指定范围的崩溃域上限起读库程序 crash_library_reader 的 items 子命令（lib_crash_point_replay_items.py 的 scoped-domain）时才起。
+  #   照命令行上 --item 的次序每组按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答一行块账（不给是录下的块全部可复用），items 之后的参数整串记进 STUB_ITEM_CALLS；
+  #   只问版本的答版本；别的一律退 99。
   #   不写 rocksdb-prebuilt.py 认的假 cargo 标记：第 48 格要它照常判（PATH 最前面放它，后面所有格起的入口、读库程序都找得到它）
   mkdir -p "$work/bin"
   cat >"$work/bin/cargo" <<'STUB'
 #!/usr/bin/env bash
 [[ "${1:-}" == -V || "${1:-}" == --version ]] && { echo "cargo 0.0.0-selftest"; exit 0; }
-if [[ " $* " == *" --bin crash_library_reader -- item "* ]]; then
-  stub_item_name=""; previous=""
-  for argument in "$@"; do [[ "$previous" == item ]] && { stub_item_name="$argument"; break; }; previous="$argument"; done
-  [[ -z "${STUB_ITEM_CALLS:-}" ]] || printf 'item %s\n' "${*#* -- item }" >>"$STUB_ITEM_CALLS"
-  printf 'CRASH_LIBRARY_ITEM\titem=%s\trecorded_blocks=%s\tto_judge=%s\treusable=%s\n' "$stub_item_name" "${STUB_ITEM_RECORDED:-1}" "${STUB_ITEM_TO_JUDGE:-0}" "${STUB_ITEM_REUSABLE:-1}"
+if [[ " $* " == *" --bin crash_library_reader -- items "* ]]; then
+  [[ -z "${STUB_ITEM_CALLS:-}" ]] || printf 'items %s\n' "${*#* -- items }" >>"$STUB_ITEM_CALLS"
+  stub_after_items=0; previous=""
+  for argument in "$@"; do
+    if (( stub_after_items )) && [[ "$previous" == --item ]]; then
+      printf 'CRASH_LIBRARY_ITEM\titem=%s\trecorded_blocks=%s\tto_judge=%s\treusable=%s\n' "$argument" "${STUB_ITEM_RECORDED:-1}" "${STUB_ITEM_TO_JUDGE:-0}" "${STUB_ITEM_REUSABLE:-1}"
+    fi
+    [[ "$previous" == -- && "$argument" == items ]] && stub_after_items=1
+    previous="$argument"
+  done
   exit 0
 fi
-echo "假 cargo 只答读库程序的 item 子命令，收到：$*" >&2
+echo "假 cargo 只答读库程序的 items 子命令，收到：$*" >&2
 exit 99
 STUB
   chmod +x "$work/bin/cargo"
@@ -1029,7 +1050,7 @@ STUB
     echo "  → 怎么办：看 $work/bin/cargo 可不可执行、TMPDIR 是不是挂成了 noexec" >&2
     exit 1
   fi
-  # 入口不清场（文件头「清场」）：多机配置里只写假的清场命令，清场与复原各往 QUIESCE_LOG 记一笔，
+  # 入口不清场（文件头「卡只归 GPU 批处理验证服务」）：多机配置里只写假的清场命令，清场与复原各往 QUIESCE_LOG 记一笔，
   #   第 1、2、6、28 格与拒跑那几格核 QUIESCE_LOG 一笔都没有。包装的登记与本机日志都放这里的临时目录，不落进真工作根
   printf '%s\n' \
     "QUIESCE_STOP_COMMAND='printf \"quiesce stop\\\\n\" >> \"\$QUIESCE_LOG\"'" \
@@ -1083,7 +1104,7 @@ STUB
   if [[ "$(wc -l <"$log")" != 1 ]] || ! grep -q 'crash_enumeration_tree_split_streams' "$log"; then
     selftest_cell_failed "--item 没有只跑点名的那一项、或同名给两次跑了两遍（调了 $(wc -l <"$log") 次）" "看选分项那一段：点名的分项只取登记表里同名那一行，重名只取一次"
   fi
-  # 第 6 格：不清场（清场由 task-server 管，文件头「清场」）：点名三项各调一次驱动、每次带 --test-filter，不经清场包装重起（QUIESCE_LOG 一笔都没有），退 0
+  # 第 6 格：不清场（清场归 GPU 批处理验证服务，文件头「卡只归 GPU 批处理验证服务」）：点名三项各调一次驱动、每次带 --test-filter，不经清场包装重起（QUIESCE_LOG 一笔都没有），退 0
   cells=$((cells + 1)); : > "$log"
   output="$(QUIESCE_LOG="$log" entry --item fixed-script-through-rollback --item multi-record-publish --item tree-split-streams 2>/dev/null)"; exit_code=$?
   local expected_calls="driver-filtered driver-filtered driver-filtered " actual_calls
@@ -1298,7 +1319,7 @@ STUB
   not_restored_calls="$(sed -E 's/^driver .*$/driver/; s/^quiesce (.*)$/quiesce-\1/' "$log" | tr '\n' ' ')"
   if [[ "$not_restored_exit" != 0 || "$exit_code" != 1 || "$not_restored_calls" != "driver driver " ]] || grep -q '^GPU_QUIESCE ' "$errors"; then
     selftest_cell_failed "照常跑完应当退 0、有项红退 1，两趟都不清场（照常那一趟退 $not_restored_exit、有项红那一趟退 $exit_code，调用次序「$not_restored_calls」，GPU_QUIESCE 行 $(grep -c '^GPU_QUIESCE ' "$errors") 行）" \
-      "看主循环收尾的退出码：清场由 task-server 管，这里不经 gpu-quiesce-run.sh"
+      "看主循环收尾的退出码：清场归 GPU 批处理验证服务，这里不经 gpu-quiesce-run.sh"
   fi
   # 第 29 格：分项驱动排派活计划那一趟借不到显存、一项都没跑到（CRASH_AMPLIFICATION_NOT_RUN 行、退 77、0 行 CRASH_AMPLIFICATION）：
   #   两项里这一项 exit=77 verdict=not-run、不红，逐项报本次未跑（标准错误与 GATE_NOT_RUN_FILE 各一笔，原因带那一行的 reason=），整趟退 0、成功句点名它；
@@ -1729,28 +1750,14 @@ STUB
     selftest_cell_failed "按项分片的合并应当照各片存下的输出重放、不起驱动，两项的 ITEM 行与整趟退 1 同不分片（退 $exit_code，驱动被起 $(grep -c '^driver ' "$log") 次）：$output" \
       "看主循环里 shard_phase == merge 时的 item_command 与主流程 merge 分支读产物表那一段"
   fi
-  # 第 58 格：带 --no-shard 不分：计划写一片、不起驱动；那一片两项都跑、判红照退 1；合并不起驱动、退 0
+  # 第 58 格：--no-shard 不是这一份的选项（经服务交的一律按项分片）：计划那一步照认不得的参数退 2，不写计划、不起驱动
   cells=$((cells + 1)); : > "$log"
   rm -rf -- "${shard_root:?}"; mkdir -p -- "$shard_root"
-  local no_shard_wrong=""
   output="$(TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$shard_root/plan" entry --no-shard --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  if [[ "$exit_code" != 0 || -s "$log" ]] || ! python3 -c 'import json, sys; sys.exit(0 if len(json.load(open(sys.argv[1]))["shards"]) == 1 else 1)' "$shard_root/plan/plan.json" 2>/dev/null; then
-    no_shard_wrong+="计划退 $exit_code、驱动被起 $(grep -c '^driver ' "$log") 次；"
+  if [[ "$exit_code" != 2 || -s "$log" || -e "$shard_root/plan/plan.json" ]] || ! grep -qF '认不得的参数「--no-shard」' "$errors"; then
+    selftest_cell_failed "--no-shard 不是这一份的选项，应当用法错退 2、不写计划、不起驱动（退 $exit_code，驱动被起 $(grep -c '^driver ' "$log") 次，计划 $([[ -e "$shard_root/plan/plan.json" ]] && echo 写了 || echo 没写)）：$output $(tail -n 2 "$errors" | tr '\n' ' ')" \
+      "看参数那一段：认不得的参数一律 usage 退 2"
   fi
-  : > "$log"
-  output="$(CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD=0/1 TASK_SERVER_SHARD_PLAN_DIRECTORY="$shard_root/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$shard_root/output-0" \
-    entry --no-shard --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  shard_driver_lines="$(grep -c '^driver ' "$log")"
-  if [[ "$exit_code" != 1 || "$shard_driver_lines" != 2 || ! -d "$shard_root/output-0" ]]; then
-    no_shard_wrong+="那一片退 $exit_code、驱动被起 $shard_driver_lines 次；"
-  fi
-  : > "$log"
-  printf '0\t127.0.0.1\t%s\n' "$shard_root/output-0" > "$shard_root/outputs.tsv"
-  output="$(TASK_SERVER_SHARD_PHASE=merge TASK_SERVER_SHARD_PLAN_DIRECTORY="$shard_root/plan" TASK_SERVER_SHARD_OUTPUTS="$shard_root/outputs.tsv" \
-    entry --no-shard --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  [[ "$exit_code" == 0 && ! -s "$log" ]] || no_shard_wrong+="合并退 $exit_code；"
-  [[ -z "$no_shard_wrong" ]] || selftest_cell_failed "带 --no-shard 应当计划写一片、那一片整趟跑（判红照退 1）、合并什么都不做（$no_shard_wrong）：$output $(tail -n 2 "$errors" | tr '\n' ' ')" \
-    "看主流程「带 --no-shard 不分」那一段"
   # 第 59 格：缩域（文件头「展开深度」）：给了 --crash-expand-up-to 6 ⇒ 每一项的分项驱动都收到 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6，TOTAL 行接 expand_up_to=6，
   #   成功句写「缩过域、不算门禁通过」与 6、句首不写「全部项」；只在环境里设了 4 ⇒ 当作给了 4；两样都给取参数（6）；都不给 ⇒ 驱动收到的是 unset、TOTAL 行不接、成功句写全部项
   cells=$((cells + 1))
@@ -1798,7 +1805,7 @@ STUB
     "看参数解析之后缩域那一段：值要匹配 ^[0-9]+\$，不是就交 usage（退 2）"
   # 第 61–66 格：指定范围的崩溃域上限（文件头 usage 一段「指定范围的崩溃域上限」；估法与记录来源在 lib_crash_point_replay_items.py 文件头「指定范围的崩溃域上限」）。
   #   点名 tree-split-streams。运行记录放这几格自己的运行目录 $scoped_home/runs/entry-scoped-*/<分项>.log（每格先清空，不混进前面各格假驱动留下的记录）；
-  #   引擎展开上限常量（读它认哪份记录是全域）写进小仓；假 cargo 的读库程序 item 子命令按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答块账
+  #   引擎展开上限常量（读它认哪份记录是全域）写进小仓；假 cargo 的读库程序 items 子命令按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答块账
   local scoped_home="$work/scoped-home" scoped_wrong
   scoped_record() { # <目录名> <分项> <展开深度> <态数> <几天前>：放一份放量分项的运行记录（一行 CRASH_AMPLIFICATION，修改时刻照几天前定，新旧次序靠它）
     mkdir -p -- "$scoped_home/runs/$1"
@@ -1864,6 +1871,27 @@ STUB
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "收到 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1 就不再判指定范围的上限：$scoped_wrong" \
     "看 scoped_domain_guard 前面那个 if：变量是 1 就不调"
   rm -rf -- "${scoped_home:?}" "${work:?}/item-calls" "${work:?}/scoped.out" "${segments_root:?}/crates"
+  # 第 67 格：不领卡（文件头「卡只归 GPU 批处理验证服务」）。多机配置开了 GPU（写全运行条件要的键、点名这一台的卡）、环境里没有卡，点名头两项，
+  #   假驱动演 GPU 批处理服务不在跑（STUB_GPU_VERIFICATION_SERVER_DOWN=1：往标准错误打起服务的命令、退 78），每回往 STUB_CARD_LOG 记「<测试目标> <段> cards=[…]」
+  #   ⇒ 头一项整趟交驱动（不带 --stage）、驱动收到的卡是 unset，记驱动退 78（verdict=not-run）、停在这一项（第二项不派），整趟退 78，起服务的命令照转出
+  printf '%s\n' "HOSTS=127.0.0.1 2001:db8::65" "CARGO_BIN_DIRECTORY_BY_HOST=127.0.0.1=/selftest/this-cargo 2001:db8::65=/selftest/peer-cargo" \
+    "BUILD_ROOT_BY_HOST=127.0.0.1=/selftest/this-builds 2001:db8::65=/selftest/peer-builds" "SLICE_MEMORY_CAP_BY_HOST=127.0.0.1=2G 2001:db8::65=1G" \
+    ENABLE_ACROSS_MACHINES=0 ENABLE_GPU=1 QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= \
+    'GPU_CARDS_BY_PRIORITY="127.0.0.1:0:15G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:24G"' "NFS_SHARED_ROOTS=$work" >"$work/multi-host-gpu-on.env"
+  local no_card_first no_card_second no_card_first_target no_card_wrong=""
+  no_card_first="$(item_fields "${ITEMS[0]}" 1)"; no_card_second="$(item_fields "${ITEMS[1]}" 1)"
+  no_card_first_target="$(item_fields "${ITEMS[0]}" 2)"
+  cells=$((cells + 1)); : > "$log"; : > "$work/card.log"
+  env -u GPU_CARDS_BY_PRIORITY SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" STUB_CARD_LOG="$work/card.log" STUB_GPU_VERIFICATION_SERVER_DOWN=1 \
+    CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" bash "$0" --item "$no_card_first" --item "$no_card_second" >"$work/no-card.out" 2>"$errors"
+  exit_code=$?
+  [[ "$exit_code" == 78 ]] || no_card_wrong+="整趟应当退 78（退 $exit_code）；"
+  [[ "$(tr '\n' '|' <"$work/card.log")" == "$no_card_first_target none cards=[unset]|" ]] \
+    || no_card_wrong+="驱动应当只起头一项一回、不带 --stage、收到的卡是 unset（实际「$(tr '\n' '|' <"$work/card.log")」）；"
+  grep -q "^CRASH_AMPLIFICATION_ITEM item=$no_card_first exit=78 .*verdict=not-run" "$work/no-card.out" || no_card_wrong+="头一项的 ITEM 行应当是 exit=78 verdict=not-run；"
+  grep -qF 'python3 gpu-verification-server/control start' "$work/no-card.out" "$errors" || no_card_wrong+="输出里应当有驱动打的起服务的命令；"
+  [[ -z "$no_card_wrong" ]] || selftest_cell_failed "不领卡、GPU 批处理服务不在跑：$no_card_wrong" \
+    "看主循环里 item_command（每项整趟交驱动、不带 --stage、不另设 GPU_CARDS_BY_PRIORITY）与驱动退 78 那一条（停在这一项、整趟退 78）"
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
@@ -1902,7 +1930,7 @@ STUB
     echo "     → 怎么办：红的格与表里写的不同，要么改那一处判法让开关红在点名的格，要么照实改文件头那一行；单看一个开关：CRASH_AMPLIFICATION_BREAK=<开关> $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：列项、拒不认得的名与缺项名、不带参数不交展开深度、点名取并集、不清场（清场由 task-server 管）、认不出的选项退 2、给了 --crash-expand-up-to 把变量交给每一项的分项驱动并在 TOTAL 行与成功句写缩过域（环境里设了的当作给了同一个值、两样都给取参数）、缩域的值写坏退 2、照常退 0 有项红退 1、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、叫停的行不推复用数、派出收回、0 行判红、不穷举判红（不带参数时红在不穷举的那一项）、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、不带参数时零态判红、复用数是各行之和（计划行不取）、几条流各留的块相加报本次未跑、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、分项驱动退 77 而 NOT_RUN 行是跑的过程中源码变了时原因照 reason= 写不写借不到显存、点名两项以上当场声明项与项之间串行（一项不声明），$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
+  echo "  ✓ --selftest：列项、拒不认得的名与缺项名、不带参数不交展开深度、点名取并集、不清场（清场归 GPU 批处理验证服务）、认不出的选项退 2、给了 --crash-expand-up-to 把变量交给每一项的分项驱动并在 TOTAL 行与成功句写缩过域（环境里设了的当作给了同一个值、两样都给取参数）、缩域的值写坏退 2、照常退 0 有项红退 1、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、叫停的行不推复用数、派出收回、0 行判红、不穷举判红（不带参数时红在不穷举的那一项）、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、不带参数时零态判红、复用数是各行之和（计划行不取）、几条流各留的块相加报本次未跑、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、分项驱动退 77 而 NOT_RUN 行是跑的过程中源码变了时原因照 reason= 写不写借不到显存、点名两项以上当场声明项与项之间串行（一项不声明）、不领卡（每项整趟交驱动、驱动收到的卡是 unset，驱动报 GPU 批处理服务不在跑退 78 时停在头一项退 78、起服务的命令照转出），$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
@@ -1964,23 +1992,6 @@ shard_refuse() { # <卡在哪> <下一步> <退出码>
   echo "  → 怎么办：$2" >&2
   exit "$3"
 }
-# 带 --no-shard 不分（文件头「经 task-server 按项分片」）：计划写一片，那一片整趟跑，合并什么都不做
-if [[ -n "$shard_phase" ]] && (( no_shard )) && ! crash_amplification_break_is no-shard-ignored; then
-  case "$shard_phase" in
-    plan)
-      [[ -n "$shard_plan_directory" ]] || shard_refuse "环境里没有 TASK_SERVER_SHARD_PLAN_DIRECTORY" "这一步只由 task-server 照分片协议起（task-server/task_server_lib.py 文件头「分片」）" 2
-      mkdir -p -- "$shard_plan_directory" || shard_refuse "建不了计划目录 $shard_plan_directory" "看共享工作根可不可写" 78
-      printf '{"shards": [{"label": "整趟"}], "note": "不分片：--no-shard，整趟一片"}\n' > "$shard_plan_directory/plan.json"
-      echo "  ✓ 不分片（--no-shard）：计划写一片，那一片整趟跑"
-      exit 0 ;;
-    shard)
-      mkdir -p -- "$shard_output_directory" || shard_refuse "建不了产物目录 ${shard_output_directory:-（没给）}" "看共享工作根可不可写" 78
-      shard_phase="" ;;
-    merge)
-      echo "  · 不分片（--no-shard）：结论在那一片里，合并什么都不做"
-      exit 0 ;;
-  esac
-fi
 # 指定范围的崩溃域上限（文件头 usage 一段「指定范围的崩溃域上限」）：带了 --item、没缩域才判；经服务按项分片的在计划那一步判（各片与合并不再判），崩溃点重放入口起这里时交
 #   SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（它已按合表项判过）就不再判。超上限或估不出退 79，一项都没起。弄坏开关 scoped-domain-handshake-ignored 下收到那个变量也照判
 if (( ${#selected[@]} > 0 )) && [[ "$shard_phase" != shard && "$shard_phase" != merge ]] \

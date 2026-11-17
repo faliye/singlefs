@@ -46,10 +46,10 @@ hook 的检出也在这里汇给主 agent：`.claude/hooks/bash-command-detector
 watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出、叫醒主 agent。
 告警的下一步按检出记录的 outcome 一栏说：「被拒」是执行前已拒、没执行，「只记」是照常执行；没写这一栏的旧记录按发现的起头认（detection_outcome）。
 「被拒」的检出（钩子在执行前已经拒掉：写被拒、越出写范围、不经 task-server 跑项目代码被拒、认不出起什么的写法被拒……）与判不了的脚本（项目代码闸没判全）一样，
-只写进报告、不叫醒主 agent（.claude/main-agent.md「派出去之后」说的「记录不处置」那一类：拒绝信息与出路在它的工具结果里，主 agent 醒了没有可处置的）；
+只写进报告、不叫醒主 agent（.claude/skills/dispatch/SKILL.md「派出去之后」「读到告警的处置」第一项说的只记不处置那一类：拒绝信息与出路在它的工具结果里，主 agent 醒了没有可处置的）；
 叫醒的只有「只记」的、照常在跑的命令；被拒的命令叫醒看门狗，主 agent 只会反复重起它。弄坏开关 AGENT_WATCH_BREAK=refusedwakes。
 钩子判不了而照常放行、往检出记录补一行的（findings 以「<闸>没判、照常放行」「<闸>没判全」「<脚本名>.sh 」「判不了 」这类起头，全表是 UNJUDGED_DETECTION_PREFIXES）同样只写进报告、不叫醒：
-判不了不是出了事，主 agent 醒了没有可处置的（.claude/main-agent.md「派出去之后」：钩子已经拒掉的事与判不了的检出只记进调度记录）。表里没有的新起头真碰到会叫醒，
+判不了不是出了事，主 agent 醒了没有可处置的（.claude/skills/dispatch/SKILL.md「派出去之后」「读到告警的处置」第一项：钩子已经拒掉的事与判不了的检出只记进调度记录）。表里没有的新起头真碰到会叫醒，
 所以自证 selftest_unjudged_prefixes 从 .claude/hooks/ 的源码里抽出全部这类起头（名字以 PREFIX 收尾的常量、findings 那一行里的 f"<起头>：…"、入口自己记检出时的脚本名）与这张表比，
 钩子里加了新起头而没登进表的判红；加新起头时，钩子文件头的说明与这张表一起改。弄坏开关 AGENT_WATCH_BREAK=unjudgedwakes 去掉这一组。
 范围声明钩子（.claude/hooks/run-scope-guard.sh）放行的每一条也写进检出记录，会话号在 scope_session_id、带 run_scope（命令与切开的四段）：它们不是检出、不叫醒，
@@ -495,14 +495,14 @@ STATE_ROOT = os.environ.get(STATE_ROOT_VARIABLE) or work_roots.state_directory("
 SINGLE_INSTANCE_EXIT = 5
 # 钩子已经拒掉的写与判不了的脚本：只记进报告，不叫醒主 agent（主 agent 醒了也没事可做）
 # 钩子判不了而照常放行、往检出记录补一行（「放行但必记检出」，.claude/agent-common.md「不做」一节）的 findings 起头：同样只记不叫醒——
-# 判不了的事主 agent 醒了没有可处置的（.claude/main-agent.md「派出去之后」：钩子已经拒掉的事与判不了的检出只记进调度记录）。
+# 判不了的事主 agent 醒了没有可处置的（.claude/skills/dispatch/SKILL.md「派出去之后」「读到告警的处置」第一项：钩子已经拒掉的事与判不了的检出只记进调度记录）。
 # 钩子里加了新的这类起头而没登进这一张表，自证 selftest_unjudged_prefixes 判红（它从 .claude/hooks/ 的源码里抽出全部这类起头与这张表比）。
 # 弄坏开关 unjudgedwakes 去掉这一组（这些检出真碰到都叫醒）
 UNJUDGED_DETECTION_PREFIXES = (
     "开会话提示没判、照常放行", "资源提醒没判、照常放行", "弹窗闸没判、照常放行", "定时闸没判、照常放行",
     "完工清理闸没判全、照常放行", "完工清理闸没判、照常放行", "交回正文闸没判全、照常放行", "派发闸没判全、照常放行",
     "快照清单读不了、照常放行", "续做闸没判全", "写闸没判全", "范围声明闸判不了",
-    "循环提醒的停止钩子判不了、照常放行", "提交后的索引检查判不了、照常放行",
+    "循环提醒的停止钩子判不了、照常放行", "提交后的索引检查判不了、照常放行", "时刻写法闸没判、照常放行",
     "bash-command-detector.sh ", "run-scope-guard.sh ", "two-logs-guard.sh ", "判不了 ",
     "project-code-guard.sh 没判成", "项目代码闸没判全")
 INFO_DETECTION_PREFIXES = ("写被拒", "项目代码闸没判全") + (() if BROKEN_DETECTION == "unjudgedwakes" else UNJUDGED_DETECTION_PREFIXES)

@@ -25,6 +25,8 @@
 #       printf %q，退 0，不看双机开关：取这一台与第二台的地址用（scripts/hosts/multi_host_addresses.py 经它取；双机关着也照打）。判不过退 1。
 #   crash-point-replay-shard-configuration-check.sh --selftest
 #       拿临时目录里的假配置与假 ssh 走一遍各格，末尾一轮逐个打开下面点名「本份 --selftest」的弄坏开关、核它红在点名的格。退 0 全对，1 有格判错。
+#       各格与开关轮的各条开关互不依赖，在并行池里跑，并行度取每台默认重活线程数（scripts/hosts/heavy-threads.sh 的 heavy_thread_default，
+#       设了 SINGLEFS_THREAD_CAP 照它）；成功句报「并行 N 路」。串行的几处与为什么写在 configuration_selftest 上方。
 #   别的 -- 起头的参数是用法错，退 2。
 #
 # 两个开关键只在这一份里定义（别处照这里读，不另写一份）：
@@ -143,6 +145,8 @@
 #       本份 --selftest 的 prune-address-outside-hosts-refused
 #   MULTI_HOST_CONFIGURATION_BREAK=configuration-argument-ignored  不认 --configuration，照 SINGLEFS_MULTI_HOST_CONFIG 与主工作树找配置（只照环境判的样子）
 #       本份 --selftest 的 arguments-judge-the-same-on-both-hosts
+#   MULTI_HOST_CONFIGURATION_BREAK=selftest-result-lost  自证的并行池收的时候丢掉派出去的最后一项的退出码文件（收回的比派出去的少一项，那一项一格都没判）
+#       本份 --selftest 的 selftest-results-all-collected
 # 只供测试的开关：SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（这一份与调用方的 --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。只在调用方的自证里认，认法同 scripts/hosts/peer-host-lib.sh 的 peer_host_inside_selftest：
 # PEER_HOST_SELFTEST_MARK 指的文件在、首行是 PEER_HOST_SELFTEST_MARK_CONTENT（自证建、export）；没有标记设了它照连第二台。
@@ -155,6 +159,8 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 crash_point_replay_shard_check_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 主机数组里认哪一项是自己（文件头「主机数组」）：共用取法在 peer-host-lib.sh 的 peer_host_resolve_addresses（那份库只定义函数与几个全局变量）
 source "$crash_point_replay_shard_check_script_directory/../hosts/peer-host-lib.sh"
+# clip_text <字节数>：标准输入每行取前 <字节数> 个字节，再丢掉被切在中间的半个字符，输出总是合法的 UTF-8（GNU 的 cut -c 与 cut -b 都按字节切，三个字节的汉字会被切断；给人看的失败行与日志摘录用它截）
+clip_text() { cut -b "1-$1" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null; }
 
 CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS=(QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND)
 MULTI_HOST_BY_HOST_KEYS=(CARGO_BIN_DIRECTORY_BY_HOST BUILD_ROOT_BY_HOST SLICE_MEMORY_CAP_BY_HOST)  # 要写，HOSTS 里每一台恰好一项 <地址>=<值>（文件头「按台的三个键」）
@@ -197,11 +203,79 @@ if [[ -n "$configuration_break" ]]; then
 fi
 
 # ── 自证（文件头 --selftest）：每格起这一份自己，拿临时目录里的假配置判；PATH 最前面放一个假 ssh（被起一次记一行、退 255），判的那几格都不该连第二台
+#   各格互不依赖，每格是并行池里的一项：各用自己的项目录（输出、退出码、假 ssh 的记录），读的配置样本在派出那一项之前写好、之后不再改。
+#   串行的几处：
+#     假程序与配置样本先建好再派格（各格都读它们）；
+#     开关轮等各格收齐、全判对之后才起（不开关时有格红，每条开关都会显得红在点名之外的格上）；
+#     开关轮起的子进程那一轮，各格在宽度 1 的池里逐个跑（开关轮已经并行 N 路，子进程里再并行就是 N×N 个进程）；
+#     一格里比两趟输出的（arguments-judge-the-same-on-both-hosts、cargo-checked-with-each-host-item、cargo-missing-judged-the-same-on-both-hosts），
+#     两趟在那一项里先后跑：两趟共用那一项的假 ssh 记录，判的是两趟放在一起的结局。
 configuration_selftest() {
-  local work self="$crash_point_replay_shard_check_script_directory/crash-point-replay-shard-configuration-check.sh" failed=() cells=0
+  local work self="$crash_point_replay_shard_check_script_directory/crash-point-replay-shard-configuration-check.sh" failed=() cells=0 selftest_pool_width
   work="$(mktemp -d "${TMPDIR:-/tmp}/configuration-check-selftest.XXXXXX")" || { echo "  ✗ 自证建不了临时目录"; echo "     → 怎么办：看 TMPDIR（${TMPDIR:-/tmp}）能不能写，再跑"; return 1; }
   configuration_selftest_work="$work"
   trap 'rm -rf "${configuration_selftest_work:?}"' EXIT
+  # 并行池的宽度：开关轮起的子进程那一轮是 1（上面「串行的几处」），别的取每台默认重活线程数
+  if [[ -n "${CONFIGURATION_SELFTEST_WHEEL_CHILD:-}" ]]; then
+    selftest_pool_width=1
+  else
+    source "$crash_point_replay_shard_check_script_directory/../hosts/heavy-threads.sh"
+    if ! selftest_pool_width="$(heavy_thread_default)"; then
+      echo "  ✗ 自证取不到每台默认重活线程数（heavy_thread_default 的报错在上面），并行池定不了宽度，一格都没派"
+      echo "     → 怎么办：照上面那条报错修 .claude/heavy-thread-default 或 SINGLEFS_THREAD_CAP，再跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --selftest"
+      return 1
+    fi
+  fi
+  # 并行池（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）：selftest_pool_start 起一批，selftest_pool_dispatch 派一项，
+  #   selftest_pool_collect 等齐、按派活次序回读。每批一个新建的根目录，每项一个项目录，上一批的文件读不进这一批
+  local selftest_pool_root="" selftest_pool_names=() selftest_pool_directories=() selftest_pool_running=()
+  selftest_pool_start() { # <批名>：新建这一批的根目录（已在就拒）、清空派活表
+    selftest_pool_root="$work/pool-$1"
+    selftest_pool_names=() selftest_pool_directories=() selftest_pool_running=()
+    mkdir "$selftest_pool_root" || { echo "  ✗ 自证建不了并行池这一批的目录 $selftest_pool_root"; echo "     → 怎么办：看 TMPDIR（${TMPDIR:-/tmp}）能不能写、满没满，再跑"; return 1; }
+  }
+  # selftest_pool_dispatch <格名> <函数> [参数…]：派一项。池满了先等最早派出的那一项。那一项在后台跑「函数 参数…」：
+  #   输出写项目录的 output、退出码写 exit（0 判对，1 判错，别的码是那一项自己没跑完），不往 stdout 写；函数里用 selftest_item_directory 取自己的项目录
+  selftest_pool_dispatch() {
+    local name="$1" directory="$selftest_pool_root/item-${#selftest_pool_names[@]}"
+    shift
+    mkdir "$directory"   # 建不成的那一项写不出 exit，收的时候点数对不上、整份红
+    selftest_pool_names+=("$name")
+    selftest_pool_directories+=("$directory")
+    if (( ${#selftest_pool_running[@]} >= selftest_pool_width )); then
+      wait "${selftest_pool_running[0]}"   # 只为腾出位子；退出码在 exit 文件里收
+      selftest_pool_running=("${selftest_pool_running[@]:1}")
+    fi
+    { selftest_item_directory="$directory"; "$@" > "$directory/output" 2>&1; echo "$?" > "$directory/exit"; } < /dev/null &
+    selftest_pool_running+=("$!")
+  }
+  # selftest_pool_collect：逐个 wait 还在跑的项，再按派活次序回读：打每一项的输出，判错的格名记进 failed（同名只记一次）；
+  #   有 exit 文件的才算收回，收回的条数与派出去的对不上，记 selftest-results-all-collected、整份红
+  selftest_pool_collect() {
+    local pid index name item_exit collected=0
+    for pid in ${selftest_pool_running[@]+"${selftest_pool_running[@]}"}; do
+      wait "$pid"   # 退出码在各项的 exit 文件里收
+    done
+    selftest_pool_running=()
+    # 弄坏开关 selftest-result-lost（文件头「弄坏开关」）：丢掉派出去的最后一项的退出码文件
+    if [[ "$configuration_break" == selftest-result-lost ]] && (( ${#selftest_pool_directories[@]} > 0 )); then
+      rm -f "${selftest_pool_directories[-1]:?}/exit"
+    fi
+    for index in "${!selftest_pool_names[@]}"; do
+      name="${selftest_pool_names[$index]}"
+      [[ -f "${selftest_pool_directories[$index]}/exit" ]] || continue
+      collected=$((collected + 1))
+      item_exit="$(< "${selftest_pool_directories[$index]}/exit")"
+      cat "${selftest_pool_directories[$index]}/output"
+      [[ "$item_exit" == 0 ]] && continue
+      [[ " ${failed[*]-} " == *" $name "* ]] || failed+=("$name")   # 一个格名下可以有几条样本，判错的格名只记一次
+      [[ "$item_exit" == 1 ]] || echo "  ✗ 自证 $name：这一项退 $item_exit（判对退 0、判错退 1，别的码是那一项自己没跑完）"
+    done
+    if (( collected != ${#selftest_pool_names[@]} )); then
+      failed+=(selftest-results-all-collected)
+      echo "  ✗ 自证 selftest-results-all-collected：派出去 ${#selftest_pool_names[@]} 项、收回 $collected 项（没有退出码文件的那几项没判），对不上整份算红"
+    fi
+  }
   mkdir -p "$work/bin" "$work/bin-running" "$work/tree" "$work/cargo-this" "$work/cargo-peer"
   # 调用方自证的标记（文件头「只供测试的开关」）：只供测试的 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 只在它在时认
   printf '%s\n' "$PEER_HOST_SELFTEST_MARK_CONTENT" > "$work/peer-host-selftest-mark"
@@ -230,26 +304,31 @@ configuration_selftest() {
     grep -v '^NFS_SHARED_ROOTS=' "$work/complete.env" > "$1"
     [[ -z "${2:-}" ]] || echo "NFS_SHARED_ROOTS=$2" >> "$1"
   }
-  # judge_output <配置文件> [这一份的参数…]：照本机的条件起这一份（配置经 SINGLEFS_MULTI_HOST_CONFIG 给），打它的输出、退它的码
+  # judge_output <配置文件> [这一份的参数…]：照本机的条件起这一份（配置经 SINGLEFS_MULTI_HOST_CONFIG 给），打它的输出、退它的码；假 ssh 记进这一项自己的记录
   judge_output() {
     local configuration="$1"
     shift
-    env PATH="$work/bin:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$work/ssh.log" SINGLEFS_MULTI_HOST_CONFIG="$configuration" \
+    env PATH="$work/bin:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$selftest_item_directory/ssh.log" SINGLEFS_MULTI_HOST_CONFIG="$configuration" \
       SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 PEER_HOST_SELFTEST_MARK="$work/peer-host-selftest-mark" ${configuration_selftest_role[@]+"${configuration_selftest_role[@]}"} \
       bash "$self" "$@" "$work/tree" 2>&1
   }
-  # judge <格名> <配置文件> <期望退出码> <输出里要有的一段或空> [这一份的参数…]：照期望核；判错的格名记进 failed、打一行 ✗
-  judge() {
-    local cell="$1" configuration="$2" wanted_exit="$3" wanted_text="$4" exit_code=0 output
+  # judge_cell <格名> <配置文件> <期望退出码> <输出里要有的一段或空> [这一份的参数…]：并行池里的一项，照期望核；判错打一行 ✗、退 1
+  judge_cell() {
+    local cell="$1" configuration="$2" wanted_exit="$3" wanted_text="$4" exit_code=0 output ssh_log="$selftest_item_directory/ssh.log"
     shift 4
-    cells=$((cells + 1))
-    : > "$work/ssh.log"
+    : > "$ssh_log"
     output="$(judge_output "$configuration" "$@")" || exit_code=$?
-    if [[ "$exit_code" != "$wanted_exit" ]] || [[ -n "$wanted_text" && "$output" != *"$wanted_text"* ]] || [[ -s "$work/ssh.log" ]]; then
-      [[ " ${failed[*]-} " == *" $cell "* ]] || failed+=("$cell")   # 一个格名下可以有几条样本，判错的格名只记一次
-      echo "  ✗ 自证 $cell：退 $exit_code（应当 $wanted_exit），输出 $(head -c 300 <<< "$output" | tr '\n' ' ')$( [[ -n "$wanted_text" ]] && echo "（要有「$wanted_text」）")；连了 ssh $(grep -c . "$work/ssh.log") 次"  # gate-lint:detail
+    if [[ "$exit_code" != "$wanted_exit" ]] || [[ -n "$wanted_text" && "$output" != *"$wanted_text"* ]] || [[ -s "$ssh_log" ]]; then
+      echo "  ✗ 自证 $cell：退 $exit_code（应当 $wanted_exit），输出 $(tr '\n' ' ' <<< "$output" | clip_text 300)$( [[ -n "$wanted_text" ]] && echo "（要有「$wanted_text」）")；连了 ssh $(grep -c . "$ssh_log") 次"  # gate-lint:detail
+      return 1
     fi
+    return 0
   }
+  # judge <格名> <配置文件> <期望退出码> <输出里要有的一段或空> [这一份的参数…]：把这一格派进并行池（judge_cell 判）
+  judge() {
+    selftest_pool_dispatch "$1" judge_cell "$@"
+  }
+  selftest_pool_start cells || return 1
   local -a configuration_selftest_role=()
   judge complete-configuration-off "$work/complete.env" 3 "双机：关"
   # judge_both_roles <同 judge 的参数>：这一台的条件与第二台的条件（自证换掉网卡地址，192.0.2.1 是自己）各判一趟，两趟照同一个期望核（两台判同一份配置结局相同）
@@ -284,10 +363,12 @@ configuration_selftest() {
   with_key "$work/slice-without-unit.env" SLICE_MEMORY_CAP_BY_HOST "127.0.0.1=2G 192.0.2.1=50"
   judge_both_roles by-host-value-form-refused "$work/slice-without-unit.env" 1 "SLICE_MEMORY_CAP_BY_HOST 里 192.0.2.1 那一项「50」：要写那一台 slice 的总上限"
   # GPU 内核一个一个编的台（文件头「GPU 内核一个一个编的台」）：写一台、两台、空串都判得过；地址不在 HOSTS 里、写两遍判不过；--emit-addresses 原样打出
-  local serial_value
-  for serial_value in "127.0.0.1" "192.0.2.1 127.0.0.1" '""'; do
-    { cat "$work/complete.env"; echo "GPU_KERNEL_SERIAL_COMPILE_HOSTS=$serial_value"; } > "$work/serial-accepted.env"
-    judge_both_roles serial-compile-hosts-accepted "$work/serial-accepted.env" 3 "双机：关"
+  #   每个取值各写一份样本（派出去的格还在读，同一份文件不改写）：<样本名>=<取值>，从第一个 = 切
+  local serial_sample serial_value
+  for serial_sample in "one-host=127.0.0.1" "both-hosts=192.0.2.1 127.0.0.1" 'empty=""'; do
+    serial_value="${serial_sample#*=}"
+    { cat "$work/complete.env"; echo "GPU_KERNEL_SERIAL_COMPILE_HOSTS=$serial_value"; } > "$work/serial-accepted-${serial_sample%%=*}.env"
+    judge_both_roles serial-compile-hosts-accepted "$work/serial-accepted-${serial_sample%%=*}.env" 3 "双机：关"
   done
   { cat "$work/complete.env"; echo "GPU_KERNEL_SERIAL_COMPILE_HOSTS=192.0.2.1 192.0.2.9"; } > "$work/serial-outside.env"
   judge_both_roles serial-compile-hosts-outside-refused "$work/serial-outside.env" 1 "GPU_KERNEL_SERIAL_COMPILE_HOSTS 里「192.0.2.9」不在 HOSTS 里"
@@ -364,61 +445,75 @@ configuration_selftest() {
   judge prune-address-in-hosts-accepted "$work/prune-inside.env" 3 "双机：关"
   # 两台对称（文件头「两台对称」）：同一份配置，本机的条件（环境给配置）与第二台的条件（家目录不在、环境指到一份不在的配置，
   #   参数给 --configuration）判得一样：退出码与输出逐字相同
-  local same_local same_peer same_local_exit=0 same_peer_exit=0
-  cells=$((cells + 1))
-  : > "$work/ssh.log"
-  same_local="$(judge_output "$work/across.env" --emit-hosts)" || same_local_exit=$?
-  same_peer="$(configuration_selftest_role=(HOME=/nonexistent/x); judge_output "$work/absent-configuration.env" --configuration "$work/across.env" --emit-hosts)" || same_peer_exit=$?
-  if [[ "$same_local_exit" != 0 || "$same_peer_exit" != "$same_local_exit" || "$same_peer" != "$same_local" || -s "$work/ssh.log" ]]; then
-    failed+=(arguments-judge-the-same-on-both-hosts)
-    echo "  ✗ 自证 arguments-judge-the-same-on-both-hosts：本机的条件退 $same_local_exit、第二台的条件（参数给配置、家目录不在）退 $same_peer_exit（都应当 0、输出逐字相同）；第二台那一趟的输出 $(head -c 300 <<< "$same_peer" | tr '\n' ' ')"  # gate-lint:detail
-  fi
+  arguments_judged_same_cell() { # 并行池里的一项：两趟先后跑、输出放在一起比；判错打一行 ✗、退 1
+    local same_local same_peer same_local_exit=0 same_peer_exit=0
+    : > "$selftest_item_directory/ssh.log"
+    same_local="$(judge_output "$work/across.env" --emit-hosts)" || same_local_exit=$?
+    same_peer="$(configuration_selftest_role=(HOME=/nonexistent/x); judge_output "$work/absent-configuration.env" --configuration "$work/across.env" --emit-hosts)" || same_peer_exit=$?
+    if [[ "$same_local_exit" != 0 || "$same_peer_exit" != "$same_local_exit" || "$same_peer" != "$same_local" || -s "$selftest_item_directory/ssh.log" ]]; then
+      echo "  ✗ 自证 arguments-judge-the-same-on-both-hosts：本机的条件退 $same_local_exit、第二台的条件（参数给配置、家目录不在）退 $same_peer_exit（都应当 0、输出逐字相同）；第二台那一趟的输出 $(tr '\n' ' ' <<< "$same_peer" | clip_text 300)"  # gate-lint:detail
+      return 1
+    fi
+    return 0
+  }
+  selftest_pool_dispatch arguments-judge-the-same-on-both-hosts arguments_judged_same_cell
   # 查 cargo 那几格与下一格用的配置：两台那一项各指临时目录里的一份假 cargo，或第二台那一项指一个不在的目录
   with_key "$work/cargo-both.env" CARGO_BIN_DIRECTORY_BY_HOST "127.0.0.1=$work/cargo-this 192.0.2.1=$work/cargo-peer" "$work/across.env"
   with_key "$work/cargo-peer-absent.env" CARGO_BIN_DIRECTORY_BY_HOST "127.0.0.1=$work/cargo-this 192.0.2.1=$work/cargo-absent" "$work/across.env"
   # 只供测试的 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 没有调用方自证的标记：不认，照连第二台
   #   （这一台那一项的 cargo 在；假 ssh 退 255 ⇒ 判不过、退 1，ssh 记了一次以上）
-  local unmarked unmarked_exit=0
-  cells=$((cells + 1))
-  : > "$work/ssh.log"
-  unmarked="$(env -u PEER_HOST_SELFTEST_MARK PATH="$work/bin:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$work/ssh.log" \
-    SINGLEFS_MULTI_HOST_CONFIG="$work/cargo-both.env" SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 bash "$self" "$work/tree" 2>&1)" || unmarked_exit=$?
-  if [[ "$unmarked_exit" != 1 || "$unmarked" != *"连不上"* || ! -s "$work/ssh.log" ]]; then
-    failed+=(peer-is-this-machine-needs-the-mark)
-    echo "  ✗ 自证 peer-is-this-machine-needs-the-mark：没有自证的标记、设了 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 退 $unmarked_exit（应当 1、照连第二台），连了 ssh $(grep -c . "$work/ssh.log") 次；输出 $(head -c 300 <<< "$unmarked" | tr '\n' ' ')"  # gate-lint:detail
-  fi
+  unmarked_peer_cell() { # 并行池里的一项；判错打一行 ✗、退 1
+    local unmarked unmarked_exit=0 ssh_log="$selftest_item_directory/ssh.log"
+    : > "$ssh_log"
+    unmarked="$(env -u PEER_HOST_SELFTEST_MARK PATH="$work/bin:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$ssh_log" \
+      SINGLEFS_MULTI_HOST_CONFIG="$work/cargo-both.env" SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 bash "$self" "$work/tree" 2>&1)" || unmarked_exit=$?
+    if [[ "$unmarked_exit" != 1 || "$unmarked" != *"连不上"* || ! -s "$ssh_log" ]]; then
+      echo "  ✗ 自证 peer-is-this-machine-needs-the-mark：没有自证的标记、设了 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1 退 $unmarked_exit（应当 1、照连第二台），连了 ssh $(grep -c . "$ssh_log") 次；输出 $(tr '\n' ' ' <<< "$unmarked" | clip_text 300)"  # gate-lint:detail
+      return 1
+    fi
+    return 0
+  }
+  selftest_pool_dispatch peer-is-this-machine-needs-the-mark unmarked_peer_cell
   judge emit-hosts-nfs-roots "$work/across.env" 0 "NFS_SHARED_ROOTS=$work/tree:$work/bin" --emit-hosts
   # 两台都查 cargo（文件头「按台的三个键」）：双机开着、不带 --emit-hosts、不带只供测试的开关，假 ssh 把对面那条命令就地跑。
   #   这一台的条件（127.0.0.1 是自己）与第二台的条件（自证换掉网卡地址，192.0.2.1 是自己）判同一份配置：
   #   都退 0；ssh 去 192.0.2.1 问的是它那一项的目录，去 127.0.0.1 问的是 127.0.0.1 那一项的目录
-  cargo_judge() { # <配置文件> <这一台网卡上的地址>：两台都查 cargo 的那一趟，打输出与 ssh 记下的调用，退它的码
-    local cargo_exit=0
-    : > "$work/ssh.log"
-    env -u SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE PATH="$work/bin-running:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$work/ssh.log" \
+  cargo_judge() { # <配置文件> <这一台网卡上的地址>：两台都查 cargo 的那一趟，打输出与 ssh 记下的调用，退它的码（假 ssh 记进这一项自己的记录）
+    local cargo_exit=0 ssh_log="$selftest_item_directory/ssh.log"
+    : > "$ssh_log"
+    env -u SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE PATH="$work/bin-running:$PATH" CONFIGURATION_SELFTEST_SSH_LOG="$ssh_log" \
       SINGLEFS_MULTI_HOST_CONFIG="$1" CONFIGURATION_SELFTEST_LOCAL_ADDRESSES="$2" bash "$self" "$work/tree" 2>&1 || cargo_exit=$?
-    echo "ssh 调用：$(tr '\n' '|' < "$work/ssh.log")"
+    echo "ssh 调用：$(tr '\n' '|' < "$ssh_log")"
     return "$cargo_exit"
   }
-  local cargo_this cargo_peer cargo_this_exit=0 cargo_peer_exit=0
-  cells=$((cells + 1))
-  cargo_this="$(cargo_judge "$work/cargo-both.env" 127.0.0.1)" || cargo_this_exit=$?
-  cargo_peer="$(cargo_judge "$work/cargo-both.env" 192.0.2.1)" || cargo_peer_exit=$?
-  if [[ "$cargo_this_exit" != 0 || "$cargo_peer_exit" != 0 || "$cargo_this" != *"192.0.2.1 test -x $work/cargo-peer/cargo"* \
-        || "$cargo_peer" != *"127.0.0.1 test -x $work/cargo-this/cargo"* ]]; then
-    failed+=(cargo-checked-with-each-host-item)
-    echo "  ✗ 自证 cargo-checked-with-each-host-item：127.0.0.1 是自己时退 $cargo_this_exit、192.0.2.1 是自己时退 $cargo_peer_exit（都应当 0），ssh 去哪台要问那一台那一项的目录；输出 $(head -c 400 <<< "$cargo_this" | tr '\n' ' ') ‖ $(head -c 400 <<< "$cargo_peer" | tr '\n' ' ')"  # gate-lint:detail
-  fi
+  cargo_checked_cell() { # 并行池里的一项：两种条件先后各跑一趟（共用这一项的假 ssh 记录）；判错打一行 ✗、退 1
+    local cargo_this cargo_peer cargo_this_exit=0 cargo_peer_exit=0
+    cargo_this="$(cargo_judge "$work/cargo-both.env" 127.0.0.1)" || cargo_this_exit=$?
+    cargo_peer="$(cargo_judge "$work/cargo-both.env" 192.0.2.1)" || cargo_peer_exit=$?
+    if [[ "$cargo_this_exit" != 0 || "$cargo_peer_exit" != 0 || "$cargo_this" != *"192.0.2.1 test -x $work/cargo-peer/cargo"* \
+          || "$cargo_peer" != *"127.0.0.1 test -x $work/cargo-this/cargo"* ]]; then
+      echo "  ✗ 自证 cargo-checked-with-each-host-item：127.0.0.1 是自己时退 $cargo_this_exit、192.0.2.1 是自己时退 $cargo_peer_exit（都应当 0），ssh 去哪台要问那一台那一项的目录；输出 $(tr '\n' ' ' <<< "$cargo_this" | clip_text 400) ‖ $(tr '\n' ' ' <<< "$cargo_peer" | clip_text 400)"  # gate-lint:detail
+      return 1
+    fi
+    return 0
+  }
+  selftest_pool_dispatch cargo-checked-with-each-host-item cargo_checked_cell
   #   192.0.2.1 那一项的目录下没有 cargo：两种条件都退 1，都点名 192.0.2.1 那一项（第二台那一侧是本地查出的，这一侧是 ssh 查出的）
-  local cargo_missing_text="CARGO_BIN_DIRECTORY_BY_HOST 里 192.0.2.1 那一项「$work/cargo-absent」下没有可执行的 cargo"
-  cargo_this_exit=0 cargo_peer_exit=0
-  cells=$((cells + 1))
-  cargo_this="$(cargo_judge "$work/cargo-peer-absent.env" 127.0.0.1)" || cargo_this_exit=$?
-  cargo_peer="$(cargo_judge "$work/cargo-peer-absent.env" 192.0.2.1)" || cargo_peer_exit=$?
-  if [[ "$cargo_this_exit" != 1 || "$cargo_peer_exit" != 1 || "$cargo_this" != *"$cargo_missing_text"* || "$cargo_peer" != *"$cargo_missing_text"* ]]; then
-    failed+=(cargo-missing-judged-the-same-on-both-hosts)
-    echo "  ✗ 自证 cargo-missing-judged-the-same-on-both-hosts：127.0.0.1 是自己时退 $cargo_this_exit、192.0.2.1 是自己时退 $cargo_peer_exit（都应当 1，都要有「$cargo_missing_text」）；输出 $(head -c 400 <<< "$cargo_this" | tr '\n' ' ') ‖ $(head -c 400 <<< "$cargo_peer" | tr '\n' ' ')"  # gate-lint:detail
-  fi
+  cargo_missing_cell() { # 并行池里的一项：两种条件先后各跑一趟（共用这一项的假 ssh 记录）；判错打一行 ✗、退 1
+    local cargo_this cargo_peer cargo_this_exit=0 cargo_peer_exit=0
+    local cargo_missing_text="CARGO_BIN_DIRECTORY_BY_HOST 里 192.0.2.1 那一项「$work/cargo-absent」下没有可执行的 cargo"
+    cargo_this="$(cargo_judge "$work/cargo-peer-absent.env" 127.0.0.1)" || cargo_this_exit=$?
+    cargo_peer="$(cargo_judge "$work/cargo-peer-absent.env" 192.0.2.1)" || cargo_peer_exit=$?
+    if [[ "$cargo_this_exit" != 1 || "$cargo_peer_exit" != 1 || "$cargo_this" != *"$cargo_missing_text"* || "$cargo_peer" != *"$cargo_missing_text"* ]]; then
+      echo "  ✗ 自证 cargo-missing-judged-the-same-on-both-hosts：127.0.0.1 是自己时退 $cargo_this_exit、192.0.2.1 是自己时退 $cargo_peer_exit（都应当 1，都要有「$cargo_missing_text」）；输出 $(tr '\n' ' ' <<< "$cargo_this" | clip_text 400) ‖ $(tr '\n' ' ' <<< "$cargo_peer" | clip_text 400)"  # gate-lint:detail
+      return 1
+    fi
+    return 0
+  }
+  selftest_pool_dispatch cargo-missing-judged-the-same-on-both-hosts cargo_missing_cell
   judge emit-assignments-nfs-roots "$work/across.env" 0 "NFS_SHARED_ROOTS=$work/tree:$work/bin" --emit-assignments
+  cells=${#selftest_pool_names[@]}
+  selftest_pool_collect
   # 子进程那一轮（开关轮起的）只打判错的格，不再起开关轮
   if [[ -n "${CONFIGURATION_SELFTEST_WHEEL_CHILD:-}" ]]; then
     printf 'CONFIGURATION_SELFTEST_FAILED %s\n' "${failed[*]-}"
@@ -429,25 +524,31 @@ configuration_selftest() {
     echo "     → 怎么办：看上面每一格的 ✗ 那一行，改判法（这一份认键、判写法那一段）或格的期望，再跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --selftest"
     return 1
   fi
-  # 开关轮：文件头里点名「本份 --selftest 的」每条开关逐个打开、整份自证再跑一趟，判错的格要与点名的格逐格相同
-  local switch_value named_line named wheel_output wheel_failed wheel_problems=() wheel_count=0
+  # 开关轮：文件头里点名「本份 --selftest 的」每条开关打开、整份自证再跑一趟，判错的格要与点名的格逐格相同；每条开关是并行池里的一项
+  wheel_switch_cell() { # <开关值> <点名的格（、分隔）>：判错打一行 ✗、退 1
+    local named wheel_output wheel_failed
+    named="$(tr '、' ' ' <<< "$2" | xargs -n1 | LC_ALL=C sort | xargs)"
+    wheel_output="$(CONFIGURATION_SELFTEST_WHEEL_CHILD=1 MULTI_HOST_CONFIGURATION_BREAK="$1" bash "$self" --selftest 2>&1)"
+    wheel_failed="$(sed -n 's/^CONFIGURATION_SELFTEST_FAILED //p' <<< "$wheel_output" | xargs -n1 2>/dev/null | LC_ALL=C sort | xargs)"
+    [[ "$wheel_failed" == "$named" ]] && return 0
+    echo "  ✗ 开关轮：MULTI_HOST_CONFIGURATION_BREAK=$1 红的格「$wheel_failed」，点名的是「$named」"
+    return 1
+  }
+  local switch_value named_line wheel_count=0
+  selftest_pool_start wheel || return 1
   while IFS=$'\t' read -r switch_value named_line; do
     wheel_count=$((wheel_count + 1))
-    named="$(tr '、' ' ' <<< "$named_line" | xargs -n1 | LC_ALL=C sort | xargs)"
-    wheel_output="$(CONFIGURATION_SELFTEST_WHEEL_CHILD=1 MULTI_HOST_CONFIGURATION_BREAK="$switch_value" bash "$self" --selftest 2>&1)"
-    wheel_failed="$(sed -n 's/^CONFIGURATION_SELFTEST_FAILED //p' <<< "$wheel_output" | xargs -n1 2>/dev/null | LC_ALL=C sort | xargs)"
-    if [[ "$wheel_failed" != "$named" ]]; then
-      wheel_problems+=("MULTI_HOST_CONFIGURATION_BREAK=$switch_value 红的格「$wheel_failed」，点名的是「$named」")
-    fi
+    selftest_pool_dispatch "$switch_value" wheel_switch_cell "$switch_value" "$named_line"
   done < <(awk '/^#   MULTI_HOST_CONFIGURATION_BREAK=[a-z]/ { split($2, part, "="); value = part[2]; next }
                 value != "" && /^#       本份 --selftest 的 / { line = $0; sub(/^#       本份 --selftest 的 /, "", line); print value "\t" line; value = ""; next }
                 /^#   MULTI_HOST_CONFIGURATION_BREAK=/ { value = "" }' "$self")
-  if (( wheel_count == 0 || ${#wheel_problems[@]} > 0 )); then
-    printf '  ✗ 开关轮：%s\n' "${wheel_problems[@]:-文件头里一条点名本份 --selftest 的开关都没读到}"
-    echo "     → 怎么办：开关红的格与文件头点名的对不上，改点名那一行或开关所在那一处，再跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --selftest"
+  selftest_pool_collect
+  (( wheel_count > 0 )) || echo "  ✗ 开关轮：文件头里一条点名本份 --selftest 的开关都没读到"
+  if (( wheel_count == 0 || ${#failed[@]} > 0 )); then
+    echo "     → 怎么办：开关红的格与文件头点名的对不上（或开关轮收回的条数对不上），改点名那一行或开关所在那一处，再跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --selftest"
     return 1
   fi
-  echo "  ✓ 多机配置判法 --selftest：$cells 格都对；开关轮 $wheel_count 条开关各红在点名的格"
+  echo "  ✓ 多机配置判法 --selftest：$cells 格都对；开关轮 $wheel_count 条开关各红在点名的格；并行 $selftest_pool_width 路"
   return 0
 }
 if [[ "${1:-}" == --selftest ]]; then

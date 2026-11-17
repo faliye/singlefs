@@ -540,7 +540,7 @@ HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 OPERATOR_WORD = re.compile(r"^[;&|()<>]+$")
 WRITE_HINT = re.compile(r"write_text\(|write_bytes\(|\.write\(|writelines\(|open\([^)]*[\"'][wax]b?\+?[\"']")
 SCRIPT_CALL = re.compile(r"(?:^|[\s/'\"])(replace-once|replace-batch|insert-row)\.py(?=[\s'\";|&]|$)")
-INSERT_ROW_VALUE_FLAGS = {"--after", "--before", "--after-literal", "--before-literal", "--line", "--absent"}
+INSERT_ROW_VALUE_FLAGS = {"--after", "--before", "--after-literal", "--before-literal", "--line", "--absent", "--absent-literal"}
 
 
 def heredoc_bodies(command):

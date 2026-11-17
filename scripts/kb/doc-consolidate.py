@@ -314,9 +314,10 @@ def loss_check_document(before_text, after_text, file_date, dropped_history):
             text = text.replace(date, '')
         return text
     reach_lines = set(normalize(l) for l in reach.split('\n'))
+    reach_spans = history.product_name_spans(reach)
     for line in body:
-        if history.PRODUCT_LINE_RE.search(line) and normalize(line) and normalize(line) not in reach_lines:
-            missing.append('产物行：' + (line.strip()[:60] or repr(line[:60])))
+        if history.PRODUCT_LINE_RE.search(line):
+            missing += history.product_line_losses(line, normalize, reach_lines, reach_spans)
     history_only = []
     if dropped_history and hist:
         history_only = sorted(t for t in history.tokens_of(hist_text, '') - tokens_after - heading_dates if t != file_date)

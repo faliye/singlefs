@@ -42,7 +42,8 @@
   EXPAND_UP_TO_WRITES_PER_SEGMENT_OF_THE_AMPLIFICATION；读不到常量时给了就当缩过）guard 直接放行。不带 --item 的入口不调。
   一个点名项要现判多少态（estimate_subject；只数键对不上、要现判的，能复用的不算）：
     ① 没有崩溃点重放部分也没有放量部分（整趟才跑的那几类 whole-run:<类>）：0 态，来源 no-crash-domain。
-    ② 读库程序 crash_library_reader 的 item 子命令（crates/singlefs-verification/src/bin/crash_library_reader.rs 文件头「输出」）报这一项在库里录下 a 块、键对不上 b 块、复用 c 块：
+    ② 读库程序 crash_library_reader 的 items 子命令（crates/singlefs-verification/src/bin/crash_library_reader.rs 文件头「子命令 items」「输出」：点名的几项一次连库、
+       一遍扫库，每项一行，与逐项起 item 的行逐字相同；read_library_items 起一次、按 item= 归到各项）报这一项在库里录下 a 块、键对不上 b 块、复用 c 块：
        a 大于 0 且 b 为 0，现判 0 态，来源 reusable。
     ③ 否则取这一项各部分上一趟「不缩域」真跑的全域态数之和 P：
        放量分项取共享根（多机配置 NFS_SHARED_ROOTS 点名、SHARED_DATA_ROOT 所在）下 <runs>/entry-*/<分项>.log 里 CRASH_AMPLIFICATION 行（scripts/crash/crash-amplification.sh 每趟每项另存的那份），
@@ -54,7 +55,7 @@
        只认展开深度等于引擎常量的记录（缩过域的那一趟态数少，拿来估全域会估小）；同一展开深度取最新的一份（文件修改时刻）。每个部分都要有，缺一个 P 就算不出。
        P 算得出：a 大于 0 且 b 小于 a 时按块数比例估 ceil(P × b / a)，来源 prior-run-scaled；其余（库里没录这一项的块、读库程序没读到、b 等于 a）取 P，来源 prior-run。
        P 算不出：现判态数写 unknown，来源 unknown。
-  guard 的判：先看上一趟各项 P 之和是否已不超上限（全部现判也不超），不超就放行、不读库；超了或有项算不出，才起读库程序（cargo run，环境与编译目录取调用方的）逐项读，
+  guard 的判：先看上一趟各项 P 之和是否已不超上限（全部现判也不超），不超就放行、不读库；超了或有项算不出，才起一次读库程序 items 子命令（cargo run，环境与编译目录取调用方的）读点名的全部项，
   再按上面估。全部点名项的估数之和超过 SCOPED_CRASH_STATES_LIMIT，或有项 unknown：打拒绝说明（标准错误）、退 SCOPED_DOMAIN_REFUSED_EXIT；
   说明给两条出路：① 带 --crash-expand-up-to <n> 缩域再交（各项在同一展开深度下都有记录、合计不超上限的最大那个 n 算得出就写出来，算不出提示先给小 n 看这一趟报的态数）；
   缩过域的那一趟结果行写「缩过域、不算门禁通过」；② 不缩域就留给提交时不指定范围的那一趟。读库程序没读到（编不过、库连不上）只记一句原因，估数改走 P，不单独判红。
@@ -727,30 +728,48 @@ def reader_features(manifest_path, base):
     return ",".join(features)
 
 
-def read_library_item(root, base_features, subject):
-    """起读库程序 crash_library_reader item 读这一项在库里的块账 → (LibraryItem 或 None, 没读到的原因)。环境与编译目录取调用方的。"""
-    if not subject.setting_files:
-        return None, "这一项没有设点文件"
+def read_library_items(root, base_features, subjects):
+    """起一次读库程序 crash_library_reader items 读点名的全部项在库里的块账 → {项名: (LibraryItem 或 None, 没读到的原因)}，只收有崩溃域的项。
+    几项共用一次连库、一遍扫库（文件头「指定范围的崩溃域上限」②）；同名的项只交一次；输出按 item= 归到各项，缺行的那一项记没读到；
+    读库程序起不了、退非 0，每一项记同一个原因。一项都没有设点文件就不起。环境与编译目录取调用方的。"""
+    readings = {}
+    groups = {}
+    for subject in subjects:
+        if not subject.has_crash_domain() or subject.label in readings or subject.label in groups:
+            continue
+        if subject.setting_files:
+            groups[subject.label] = subject.setting_files
+        else:
+            readings[subject.label] = (None, "这一项没有设点文件")
+    if not groups:
+        return readings
     try:
         features = reader_features(os.path.join(root, VERIFICATION_MANIFEST), base_features)
     except (OSError, ValueError):
         features = base_features   # 包清单读不到（自证的小仓）就只带真跑的特性
+    item_arguments = [word for label, files in groups.items() for word in ("--item", label, *files)]
     command = ["cargo", "run", "--release", "--quiet", "--offline", "-p", "singlefs-verification"] + (["--features", features] if features else []) \
-        + ["--bin", "crash_library_reader", "--", "item", subject.label, *subject.setting_files]
+        + ["--bin", "crash_library_reader", "--", "items", *item_arguments]
     try:
         result = subprocess.run(command, cwd=root, capture_output=True, text=True, check=False)
     except OSError as error:
-        return None, f"起不了读库程序（{error}）"
+        readings.update((label, (None, f"起不了读库程序（{error}）")) for label in groups)
+        return readings
     if result.returncode != 0:
         tail = " / ".join(result.stderr.strip().splitlines()[-3:])
-        return None, f"读库程序 crash_library_reader item 退 {result.returncode}（{tail}）"
+        readings.update((label, (None, f"读库程序 crash_library_reader items 退 {result.returncode}（{tail}）")) for label in groups)
+        return readings
+    found = {}
     for line in result.stdout.splitlines():
         if line.split("\t", 1)[0] != LIBRARY_ITEM_TAG:
             continue
         fields = fields_of(line)
-        if fields.get("item") == subject.label and all(COUNT.match(fields.get(name, "")) for name in ("recorded_blocks", "to_judge", "reusable")):
-            return LibraryItem(int(fields["recorded_blocks"]), int(fields["to_judge"]), int(fields["reusable"])), ""
-    return None, "读库程序的输出里没有认得出的 CRASH_LIBRARY_ITEM 那一行"
+        label = fields.get("item")
+        if label in groups and label not in found and all(COUNT.match(fields.get(name, "")) for name in ("recorded_blocks", "to_judge", "reusable")):
+            found[label] = LibraryItem(int(fields["recorded_blocks"]), int(fields["to_judge"]), int(fields["reusable"]))
+    for label in groups:
+        readings[label] = (found[label], "") if label in found else (None, "读库程序的输出里没有认得出的这一项的 CRASH_LIBRARY_ITEM 那一行")
+    return readings
 
 
 def refusal_text(estimates, all_parts, constant, defect):
@@ -790,9 +809,10 @@ def run_scoped_domain(mode, root, runs_directory, expand_up_to, gpu, defect, sub
         if all(bound is not None for bound in bounds) and sum(bounds) <= SCOPED_CRASH_STATES_LIMIT:
             print(f"  · 指定范围的崩溃域上限 {SCOPED_CRASH_STATES_LIMIT} 态：点名的 {len(subjects)} 项上一趟不缩域真跑共 {sum(bounds)} 态，全部现判也不超上限，放行", file=stream)
             return 0
+    readings = read_library_items(root, "gpu" if gpu else "", subjects)
     estimates = []
     for subject in subjects:
-        library_item, note = (None, "没读库") if not subject.has_crash_domain() else read_library_item(root, "gpu" if gpu else "", subject)
+        library_item, note = readings.get(subject.label, (None, "没读库"))
         if library_item is None and subject.has_crash_domain():
             print(f"  ! {subject.label}：库里的块账没读到（{note}），改按上一趟真跑的态数估", file=error_stream)
         estimates.append(estimate_subject(subject, library_item, note, runs_directory, constant, defect))

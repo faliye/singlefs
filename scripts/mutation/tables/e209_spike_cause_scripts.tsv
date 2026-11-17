@@ -1,0 +1,45 @@
+# 被测的是 scripts/experiment-apparatus/e209_spike_cause_scripts.rs（取样点表、脚本表、选择子、声明行、项名单；bin e209-spike-cause-scripts，它的 9 条旧单测与 5 条补的单测都在这个 bin 里跑）。
+# 跑法：bash scripts/mutation/mutate.sh e209-spike-cause-scripts scripts/experiment-apparatus/e209_spike_cause_scripts.rs scripts/mutation/tables/e209_spike_cause_scripts.tsv
+# 每一行由哪条用例抓（用例都在这份源文件末尾的 mod tests 里）：
+#   notes_forget_the_unlinks、notes_forget_the_big_file：the_history_notes_are_two_plus_twice_the_files_plus_twenty
+#   old_selector_is_a_quarter_in、late_selector_is_six_eighths、young_minus_counts_from_the_oldest、small_files_keeps_the_big_file：the_selectors_land_on_the_registered_small_files
+#   cold_pool_keeps_the_named_files、cold_pool_leaves_young_in：the_cold_files_skip_the_four_named_ones_and_do_not_depend_on_how_many_are_taken 与 the_cold_files_are_spaced_evenly_over_what_is_left
+#   cold_pool_takes_the_leading_files、cold_number_is_the_index：the_cold_files_are_spaced_evenly_over_what_is_left
+#   truncate_declares_no_user_units、overwrite_declares_the_old_count_only、declared_line_swaps_the_old_and_new_counts：the_declared_line_carries_the_three_unit_counts
+#   create_declares_one、remount_is_a_user_operation：the_create_declaration_names_the_count_and_the_remount_is_not_a_user_operation
+#   walk_backward_not_reversed：walk_backward_is_walk_forward_reversed_in_one_round
+#   walk_forward_once、mount_twice_mounts_once：every_script_has_the_registered_number_of_steps
+#   first_repeated_without_the_control、truncate_step_is_named_like_the_selector、filler_young_starts_at_one_back、presweep_starts_at_cold_zero：the_filler_scripts_name_their_fillers_before_the_tail_steps
+#   test_geometry_keeps_presweep、training_filler_young_has_sixteen：the_training_point_has_twenty_five_scripts_and_the_test_points_ten_or_eight
+#   gate_item_not_marked、first_segment_swapped、fourth_segment_without_mount_script、item_arm_tail_accepted：the_registry_segments_hold_the_registered_item_counts
+#   sample_point_exponent_17_is_18、sample_point_of_ten_files_has_a_hundred_units：the_sample_points_carry_the_registered_geometry
+notes_forget_the_unlinks	NOTES_OF_THE_BIG_FILE + 2 * files + 2 * UNLINKS_OF_THE_HISTORY	NOTES_OF_THE_BIG_FILE + 2 * files + UNLINKS_OF_THE_HISTORY
+notes_forget_the_big_file	NOTES_OF_THE_BIG_FILE + 2 * files	2 * files
+old_selector_is_a_quarter_in	Selector::Old => small[files / 8],	Selector::Old => small[files / 4],
+late_selector_is_six_eighths	small[7 * files / 8]	small[6 * files / 8]
+young_minus_counts_from_the_oldest	small[files - 1 - usize::try_from(distance)	small[files - usize::try_from(distance)
+small_files_keeps_the_big_file	&live[1..]	&live[..]
+cold_pool_keeps_the_named_files	.filter(|inode| !taken.contains(inode))	.filter(|_| true)
+cold_pool_leaves_young_in	[Selector::Old, Selector::Mid, Selector::Late, Selector::Young].map(	[Selector::Old, Selector::Mid, Selector::Late].map(
+cold_pool_takes_the_leading_files	from[position * from.len() / count]	from[position]
+cold_number_is_the_index	pool[usize::try_from(number).expect("序号") - 1]	pool[usize::try_from(number).expect("序号")]
+truncate_declares_no_user_units	Self { user_units: 1, old_units: FIRST_FILE_UNITS, new_units: FIRST_FILE_UNITS }	Self { user_units: 0, old_units: FIRST_FILE_UNITS, new_units: FIRST_FILE_UNITS }
+overwrite_declares_the_old_count_only	user_units: old_units.max(1)	user_units: old_units
+declared_line_swaps_the_old_and_new_counts	declared.user_units, declared.old_units, declared.new_units	declared.user_units, declared.new_units, declared.old_units
+create_declares_one	Self { user_units: count, old_units: 0, new_units: 0 }	Self { user_units: 1, old_units: 0, new_units: 0 }
+remount_is_a_user_operation	!matches!(self, Self::Remount)	true
+walk_backward_not_reversed	"walk_backward" => twice(overwrites(&[Young, Late, Mid, Old, First])),	"walk_backward" => twice(overwrites(&[First, Old, Mid, Late, Young])),
+walk_forward_once	"walk_forward" => twice(overwrites(&[First, Old, Mid, Late, Young])),	"walk_forward" => overwrites(&[First, Old, Mid, Late, Young]),
+mount_twice_mounts_once	vec![Step::Remount, Step::Remount]	vec![Step::Remount]
+first_repeated_without_the_control	steps.push(Step::TruncateToTheSameSize);	steps.push(Step::CreateOne);
+truncate_step_is_named_like_the_selector	Self::TruncateToTheSameSize => "truncate_to_the_same_size".to_string(),	Self::TruncateToTheSameSize => "truncate".to_string(),
+filler_young_starts_at_one_back	(0..count).map(|distance| Step::Overwrite(YoungMinus(distance)))	(1..=count).map(|distance| Step::Overwrite(YoungMinus(distance)))
+presweep_starts_at_cold_zero	(1..=count).map(|number| Step::Overwrite(Cold(number)))	(0..count).map(|number| Step::Overwrite(Cold(number)))
+test_geometry_keeps_presweep	names.retain(|name| !name.starts_with("presweep_"));	names.retain(|_| true);
+training_filler_young_has_sixteen	[1, 4, 8].map(|count| format!("filler_young_{count}"))	[1, 4, 8, 16].map(|count| format!("filler_young_{count}"))
+gate_item_not_marked	let gate = point == "files_200_units_100" && script == "walk_forward";	let gate = false;
+first_segment_swapped	{ "first" } else { "second" }	{ "second" } else { "first" }
+fourth_segment_without_mount_script	for script in ["walk_forward", "mount_then_first"] {	for script in ["walk_forward"] {
+item_arm_tail_accepted	matches!(arm, "head" | "plain")	matches!(arm, "head" | "plain" | "tail")
+sample_point_exponent_17_is_18	unit_area_exponent: 17,	unit_area_exponent: 18,
+sample_point_of_ten_files_has_a_hundred_units	files: 10, units_per_file: 1000	files: 10, units_per_file: 100

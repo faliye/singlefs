@@ -30,6 +30,10 @@
     「包名/特性」交给 lib_function_units.py；crates-mutation-rows.py 行键里的特性行照这个并集写，只写一个 -p 的行不变）。
     弄坏开关 multiple-packages-last-only（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK）：只留最后一个 -p；
     自证是 multiple_packages_cell（本库的函数，crates-mutation-rows.py 的 --selftest 跑它）；这个开关下它必须判错。
+  被改坏的文件每份只读一遍（UnitKeys.source_bytes）：同一份单元键里第一次要它时整份读进来，之后 mutated_units 与 crates-mutation-rows.py 的 row_view 都取这一份；
+    static-check 的可达性按行切片并行时父进程 fork 之前读齐，子进程共用。读不了不记、照原样报。
+    弄坏开关 mutated-source-reread（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：不记，每次现读；
+    crates-mutation-rows.py --selftest 的「static-check 可达性那一段每份被改坏的文件只读一遍」那一格必须判错。
   闭包 = lib_function_units.py 的 rust_closure_of 从那个单元收的（测试单元按 cfg(test) 编；cargo 参数里有 --release 时 debug_assertions 不进 cfg），
     带上 cargo 参数里的特性；闭包里有拒算，这一个闭包就没有键。
 闭包算不成（precompute_closures 抛 ClosureRefused）：入口在这一组 cfg 下不编（点名的测试带 #[cfg(feature = "gpu")]、cargo 参数没开那个特性）、没有叫这个名字的包这一类
@@ -43,6 +47,11 @@
   CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_PROFILE_*、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
   从根往上每一层与 CARGO_HOME 的 .cargo/config.toml（或 config）解析之后的 build（除 jobs、target-dir、incremental）、target、profile、env 各键；
   根 Cargo.toml 解析之后的 profile、lints、workspace.lints 各键。只取解析后的值，不取原文（注释与排版不进）；文件路径不进（按层级号排）。
+  编译档里的 debug、incremental 两项三处都不进（PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
+  cargo 配置与根 Cargo.toml 的 profile 表里各档（连同 package.<包>、build-override 两层）键名恰好是这两个的；按整个键名比，debug-assertions 照进。
+  与 scripts/gate/admission.py 的 PROFILE_SETTINGS_LEFT_OUT、crates/singlefs-unit-graph/src/build_toolchain.rs 的 PROFILE_SETTING_KEYS 同一口径。
+  弄坏开关 profile-debug-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：debug 照进（incremental 照旧不进）；
+  crates-mutation-rows.py --selftest 的「改编译档的 debug 与 incremental 之后行键不变」那一格必须判错。
 依赖版本行（dependency_lines，与 crates/singlefs-unit-graph/src/lock_file.rs 的 narrowed_lock_lines 同一条规则）：闭包里每个 Rust 单元真点名的外部 crate
   （单元的词法单元里 use <外部 crate>::…、路径 <外部 crate>::…、extern crate <外部 crate>；外部 crate 是单元所在 crate 清单里不带 path 的依赖，
   代码名是依赖的键把 - 换成 _，包名取 package = 写的、没写取键），在根 Cargo.lock 里那个工作区 crate 自己的包（同名、没有 source）的 dependencies 里
@@ -91,6 +100,8 @@ PARALLEL_MINIMUM = 8   # 要算的闭包不到这么多就在本进程里算（f
 BUILD_VARIABLES = frozenset(("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "CARGO_BUILD_RUSTFLAGS",
                              "CARGO_BUILD_TARGET", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
 BUILD_KEYS_NOT_AFFECTING_OUTPUT = frozenset(("jobs", "target-dir", "incremental"))
+PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT = frozenset(("debug", "incremental"))   # 编译档里不进键的两项（文件头「工具链行」）
+PROFILE_SETTING_TABLES = ("package", "build-override")   # 一档底下照同一组键写设置的两层（package.<包>、build-override）
 CONFIGURATION_SECTIONS = ("build", "target", "profile", "env")
 MANIFEST_SECTIONS = ("profile", "lints")
 NAME_TAKING_SWITCHES = frozenset(("-p", "--package", "--bin", "--test", "--example", "--bench", "--features", "-F", "--manifest-path", "--skip"))
@@ -293,6 +304,7 @@ class UnitKeys:
         self._formal_references = set()   # mutated_units 在形式化视图上交出去的 UnitReference
         self._last_mutation_formal = False   # 紧挨着的上一次 mutated_units 判的是不是形式化视图（resolve_test 默认照它）
         self._blanked = {}   # 文件 → 剥过规格与证明的正文（verus_ghost_code_blanked，剥不了的是 None）
+        self._source_bytes = {}   # 文件 → 读到的整份字节（source_bytes：同一份单元键里每份被改坏的文件只读一遍）
         self._closures = {}
         self._tests = {}
         self._lock = None
@@ -363,12 +375,22 @@ class UnitKeys:
             lines, refusals = sorted(set(lines) | set(formal_lines)), sorted(set(refusals) | set(formal_refusals))
         return lines, refusals
 
+    def source_bytes(self, path):
+        """path（相对根）那份文件的整份字节：同一份单元键里每份文件只读一遍（文件头「单元」末段）；读不了照原样抛 OSError，不记。
+        弄坏开关 mutated-source-reread：不记，每次都现读。"""
+        if path not in self._source_bytes:
+            with open(os.path.join(self.root, path), "rb") as handle:
+                data = handle.read()
+            if break_is("mutated-source-reread"):
+                return data
+            self._source_bytes[path] = data
+        return self._source_bytes[path]
+
     def mutated_units(self, path, original):
         """(被改坏的单元的 UnitReference 列表, None) 或 (None, 拒算那一句)。见文件头「单元」「视图」。"""
         self._last_mutation_formal = False
         try:
-            with open(os.path.join(self.root, path), "rb") as handle:
-                data = handle.read()
+            data = self.source_bytes(path)
         except OSError as error:
             return None, f"被改坏的文件 {path} 读不了（{error}）"
         if path.endswith(".wgsl") and not break_is("wgsl-whole-file"):
@@ -706,6 +728,42 @@ def cargo_configuration_files(root, environment):
     return found
 
 
+def profile_settings_not_affecting_output():
+    """编译档里不进键的设置名（文件头「工具链行」）；弄坏开关 profile-debug-keyed 下只剩 incremental。"""
+    if break_is("profile-debug-keyed"):
+        return PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT - {"debug"}
+    return PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT
+
+
+def keyed_profile_settings(settings):
+    """一档的设置表（或它底下 package.<包>、build-override 那一层）去掉键名恰好是不进键那几项的；不是表的原样交回。"""
+    if not isinstance(settings, dict):
+        return settings
+    left_out = profile_settings_not_affecting_output()
+    kept = {}
+    for name, item in settings.items():
+        if name in left_out:
+            continue
+        if name == "package" and isinstance(item, dict):
+            item = {package: keyed_profile_settings(table) for package, table in item.items()}
+        elif name in PROFILE_SETTING_TABLES:
+            item = keyed_profile_settings(item)
+        kept[name] = item
+    return kept
+
+
+def keyed_profile_section(section):
+    """profile 那一张表（各档 → 设置表）照 keyed_profile_settings 逐档去掉不进键的那几项；不是表的原样交回。"""
+    if not isinstance(section, dict):
+        return section
+    return {profile: keyed_profile_settings(settings) for profile, settings in section.items()}
+
+
+def profile_variable_keyed(name):
+    """环境变量 CARGO_PROFILE_<档>_<键> 进不进键：键是 DEBUG 或 INCREMENTAL（整个键名：_DEBUG_ASSERTIONS 不算）的不进。"""
+    return not any(name.endswith("_" + setting.upper().replace("-", "_")) for setting in profile_settings_not_affecting_output())
+
+
 def toolchain_lines(root, environment):
     """见文件头「工具链行」。rustc / cargo 起不来抛 MutationUnitsError。"""
     lines = []
@@ -719,7 +777,7 @@ def toolchain_lines(root, environment):
         lines += [f"{command[0]}\t{line.strip()}" for line in completed.stdout.splitlines() if line.strip()]
     for name in sorted(environment):
         target_variable = name.startswith("CARGO_TARGET_") and name.endswith(("_RUSTFLAGS", "_RUNNER", "_LINKER"))
-        if name in BUILD_VARIABLES or name.startswith("CARGO_PROFILE_") or target_variable:
+        if name in BUILD_VARIABLES or (name.startswith("CARGO_PROFILE_") and profile_variable_keyed(name)) or target_variable:
             lines.append(f"environment\t{name}={environment[name]}")
     for rank, path in enumerate(cargo_configuration_files(root, environment)):
         try:
@@ -731,6 +789,8 @@ def toolchain_lines(root, environment):
             value = configuration.get(section)
             if section == "build" and isinstance(value, dict):
                 value = {name: item for name, item in value.items() if name not in BUILD_KEYS_NOT_AFFECTING_OUTPUT}
+            if section == "profile":
+                value = keyed_profile_section(value)
             if value:
                 lines += [f"configuration\t{rank}\t{line}" for line in flattened(section, value)]
     manifest_path = os.path.join(root, "Cargo.toml")
@@ -740,7 +800,7 @@ def toolchain_lines(root, environment):
                 manifest = tomllib.load(handle)
         except (OSError, tomllib.TOMLDecodeError) as error:
             raise MutationUnitsError(f"{manifest_path} 读不懂：{error}") from error
-        sections = [(section, manifest.get(section)) for section in MANIFEST_SECTIONS]
+        sections = [(section, keyed_profile_section(manifest.get(section)) if section == "profile" else manifest.get(section)) for section in MANIFEST_SECTIONS]
         sections.append(("workspace.lints", manifest.get("workspace", {}).get("lints")))
         for section, value in sections:
             if value:

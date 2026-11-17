@@ -12,6 +12,8 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
     除 vstd 之外还有依赖，proof、vacuity、must-red-worlds 三格开跑之前判红。
   第四段写 cargo：经 Verus 安装里的 cargo-verus 起 cargo verus focus -p <包> --offline -- <参数>，副本是 crate 连同它经 path 连到的 crate、
     仓根的 Cargo.lock 与一份只列这几个成员的工作区 Cargo.toml（整个工作区的 cargo metadata 在离线机器上过不了）；几处同时验各占一个编译目录，vstd 与依赖在里面只编一次。
+    环境里有绝对路径的 CARGO_TARGET_DIR（任务服务或整轮门禁给这一趟的编译目录）时，这些目录建在它底下的 verus-proof-check-targets/，一趟里先后几次调用共用（claim_slot_directories）、不删；
+    没有时每次调用在临时目录里建、用完删。
   两种都是一处判定一份新副本：cargo 的编译指纹不看 --verify-* 参数，同一个目录里换参数再验拿到的是上一趟的结果、stdout 没有判定行。
     没有判定行的那一处判红，不当绿。
 不带 --no-cheating：assume_specification、external_body、uninterp 与 external_*_specification 照信任清单
@@ -451,6 +453,14 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
       list-items-item-key-lines（「✗ list-items-item-key-lines 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=key-items-ignored  list-items --key-mismatches 带 --item 也比整表
       list-items-item-key-with-item（「✗ list-items-item-key-with-item 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=unit-index-not-shared  单元索引不共用：每处用到都另建一份，Rust 工作区一趟里载入多次
+      key-mismatches-two-crates-shared（「✗ key-mismatches-two-crates-shared 这一格判错」：载入次数不是 1）
+  VERUS_PROOF_CHECK_BREAK=key-mismatches-share-across-crates  list-items --key-mismatches 的共用组成不分 crate，第一个 crate 算的交给后面的 crate
+      key-mismatches-two-crates-shared（「✗ key-mismatches-two-crates-shared 这一格判错」：second_sample::double_it 的键状态不是键相同）
+  VERUS_PROOF_CHECK_BREAK=toolchain-digest-shared-across-installs  工具链摘要的共用缓存只按根存，换了 Verus 安装目录还取上一个目录的摘要
+      toolchain-digest-shared（「✗ toolchain-digest-shared 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=slot-directory-per-call  cargo 那一种几处同时验的编译目录一律每次新建临时目录，不建在 CARGO_TARGET_DIR 底下、几次调用不共用
+      slot-directories-shared-across-calls（「✗ slot-directories-shared-across-calls 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=item-done-unrecorded  每项判完不往 FORMAL_ITEM_DONE_FILE 记一行
       item-done-lines（「✗ item-done-lines 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=item-done-whole-cell-seconds  每项记的秒数是整格从起到收尾的挂钟，不是这一项自己的
@@ -590,6 +600,7 @@ singlefs-core 的被验区域登记成第二条）与各自里面的核（kernel
 import collections
 import concurrent.futures
 import contextlib
+import fcntl
 import glob
 import io
 import hashlib
@@ -1986,7 +1997,11 @@ def judging_units(cell):
 
 
 def unit_index(root, options):
-    """被判的仓的函数单元索引（lib_function_units.py 的切法，Rust 工作区读一次）：一格里各项共用，存进 options。"""
+    """被判的仓的函数单元索引（lib_function_units.py 的切法，Rust 工作区读一次）：一格里各项共用，存进 options；
+    run_per_crate 与 list-items 把同一份交给逐 crate、逐格的各次调用，一趟里 Rust 工作区只载入一次（索引只按根建，与 crate 无关）。
+    弄坏开关 unit-index-not-shared：每次调都另建一份、不存进 options。"""
+    if "unit-index-not-shared" in BREAK:
+        return FunctionUnitIndex(root)
     if options.get("unit_index") is None:
         options["unit_index"] = FunctionUnitIndex(root)
     return options["unit_index"]
@@ -2525,6 +2540,20 @@ def dependency_component(root, registry, options, unit_key):
     return [("依赖版本", digest_text("\n".join(closure_dependency_lines(root, registry, options, unit_key))))]
 
 
+def toolchain_digest(root, options):
+    """「工具链」那一样的摘要（tool_versions_text 的 for_key 那一行取摘要；要哈希 Verus 安装目录与 rustup 工具链 lib/ 下约 500 MB 的文件）。
+    options["toolchain_digests"] 给了（字典：run_per_crate 与 list-items --key-mismatches 在一趟里逐 crate、逐格的几次调用共用一份）就按（根，Verus 安装目录）存取，
+    同一趟同一个安装目录只算一次；没给每次现算。弄坏开关 toolchain-digest-shared-across-installs：共用的那一份只按根存，换了 Verus 安装目录取到的还是上一个目录的摘要。"""
+    cache = options.get("toolchain_digests")
+    slot = (root,) if "toolchain-digest-shared-across-installs" in BREAK else (root, options.get("verus_root"))
+    if cache is not None and slot in cache:
+        return cache[slot]
+    digest = digest_text(tool_versions_text(root, options.get("verus_root"), for_key="toolchain-key-with-paths" not in BREAK))
+    if cache is not None:
+        cache[slot] = digest
+    return digest
+
+
 def shared_components(root, registry, options):
     """Verus 每一项都带的几样：工具链（tool-versions 那一行去掉路径的那一份，tool_versions_text 的 for_key：Verus、它自带的 vstd、z3、rustup 工具链的版本与内容摘要）、
     rlimit（登记的数，改变结论）、crate 起法（crate_build_text：cargo 还是直接起、edition、包名）。
@@ -2536,7 +2565,7 @@ def shared_components(root, registry, options):
     if options.get("shared_components") is None:
         components = []
         if "reuse-key-without-toolchain" not in BREAK:
-            components.append(("工具链", digest_text(tool_versions_text(root, options.get("verus_root"), for_key="toolchain-key-with-paths" not in BREAK))))
+            components.append(("工具链", toolchain_digest(root, options)))
         components.append(("rlimit", digest_text(str(registry.rlimit))))
         if "reuse-key-without-crate-build" not in BREAK:
             components.append(("crate 起法", digest_text(crate_build_text(root, registry))))
@@ -3110,6 +3139,45 @@ def parallel_locations(location_count, options):
     return jobs, max(1, options["threads"] // jobs)
 
 
+SLOT_DIRECTORY_NAME = "verus-proof-check-targets"
+
+
+def claim_slot_directories(count):
+    """cargo 那一种几处同时验各占的 count 个编译目录：交 ([目录路径], 放掉它们的函数)。
+    环境里有绝对路径的 CARGO_TARGET_DIR（任务服务或整轮门禁给的这一趟的编译目录）时，建在它底下 verus-proof-check-targets/target-<编号>：
+    一趟里先后几次调用（证明、空真、必红世界三格各一个进程，各 crate，整 crate 证明）共用同一批目录，vstd 与别的依赖只编一次。
+    每个编号由 verus-proof-check-targets/target-<编号>.lock 上的一把 flock 占着（进程退出时自动放），同一时刻别的进程占着的编号跳过、取下一个；
+    放掉只放锁、不删目录（编译目录归给它的人删）。没有这个变量、不是绝对路径或这个文件系统不认 flock 时，在临时目录里建、放掉时整个删。
+    弄坏开关 slot-directory-per-call：一律每次新建临时目录，一趟里几次调用各编各的依赖。"""
+    base = os.environ.get("CARGO_TARGET_DIR") or ""
+    if "slot-directory-per-call" not in BREAK and os.path.isabs(base):
+        parent = os.path.join(base, SLOT_DIRECTORY_NAME)
+        claimed, handles, number = [], [], 0
+        try:
+            os.makedirs(parent, exist_ok=True)
+            while len(claimed) < count:
+                handle = open(os.path.join(parent, f"target-{number}.lock"), "a")
+                try:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    handle.close()
+                else:
+                    handles.append(handle)
+                    claimed.append(os.path.join(parent, f"target-{number}"))
+                number += 1
+        except OSError:
+            for handle in handles:
+                handle.close()
+            claimed = []
+        else:
+            def release():
+                for handle in handles:
+                    handle.close()
+            return claimed, release
+    temporary = tempfile.mkdtemp(prefix="verus-proof-check-targets-")
+    return [os.path.join(temporary, f"target-{slot}") for slot in range(count)], lambda: shutil.rmtree(temporary, ignore_errors=True)
+
+
 def verify_in_parallel(root, registry, manifest, executable, options, edits, judged=None):
     """edits：[(说明, {相对仓根的文件: 新内容}[, 只验的函数名, 它所在的模块])]；每一处一份副本、一次 Verus（给了函数名就只验它：模块是 None 点 --verify-root，
     不是 None 点 --verify-only-module <模块>，再 --verify-function，verus_arguments）。交回与 edits 同序的 outcome。
@@ -3118,12 +3186,13 @@ def verify_in_parallel(root, registry, manifest, executable, options, edits, jud
     if not edits:
         return []
     jobs, threads = parallel_locations(len(edits), options)
-    # cargo 那一种：几处同时验各占一个编译目录（同一个编译目录 cargo 一次只让一处用），vstd 与依赖在一个编译目录里只编一次；
+    # cargo 那一种：几处同时验各占一个编译目录（同一个编译目录 cargo 一次只让一处用），vstd 与依赖在一个编译目录里只编一次
+    # （有 CARGO_TARGET_DIR 时一趟里先后几次调用共用同一批目录，claim_slot_directories）；
     # 副本各在新目录里（copy_crate），被验的 crate 每处都现编，不会拿到上一处的结果
     slots = queue.Queue()
-    slot_root = tempfile.mkdtemp(prefix="verus-proof-check-targets-") if registry.cargo_mode else None
-    for slot in range(jobs):
-        slots.put(os.path.join(slot_root, f"target-{slot}") if slot_root else None)
+    slot_paths, release_slots = claim_slot_directories(jobs) if registry.cargo_mode else ([None] * jobs, lambda: None)
+    for slot in slot_paths:
+        slots.put(slot)
 
     def one(index, edit):
         started = time.monotonic()
@@ -3151,8 +3220,7 @@ def verify_in_parallel(root, registry, manifest, executable, options, edits, jud
             futures = [pool.submit(one, index, edit) for index, edit in enumerate(edits)]
             return [future.result() for future in futures]
     finally:
-        if slot_root:
-            shutil.rmtree(slot_root, ignore_errors=True)
+        release_slots()
 
 
 class ItemJudging:
@@ -3212,12 +3280,13 @@ def with_assert_false(line):
     return head + "{ assert(false);" + tail
 
 
-def vacuity_points(root, registry, kernels, functions):
+def vacuity_points(root, registry, kernels, functions, options):
     """空真的每一处：[(项名, 说明, {相对仓根的文件: 插了断言的内容}, (相对 crate 的文件, 插的那一行, requires 那一行), 所属函数名, 函数内第几处)]
     与每份核全部插进去的那一份（弄坏开关用）。项名 vacuity:<所属函数名>#<函数内第几处 requires>，只当索引：这一处的身份是所属函数单元与第几处，
-    不带路径与行号（空行让 requires 挪一行，项名与键都不变）。functions 是 verus_functions 交的；requires 不在其中任何一个 fn 里判红。"""
+    不带路径与行号（空行让 requires 挪一行，项名与键都不变）。functions 是 verus_functions 交的；requires 不在其中任何一个 fn 里判红。
+    工作区索引取 options 里已建的那一份（unit_index），不另建。"""
     points, all_at_once = [], []
-    workspace = unit_index(root, {}).workspace()
+    workspace = unit_index(root, options).workspace()
     for kernel in kernels:
         text = open(kernel, encoding="utf-8").read()
         relative = os.path.relpath(kernel, root).replace(os.sep, "/")
@@ -3291,7 +3360,7 @@ def check_vacuity(root, options):
     registry, kernels, manifest, executable = prepared(root, options)
     modules = kernel_modules(root, registry, manifest, kernels)
     functions = verus_functions(root, registry, kernels, options)
-    points, all_at_once = vacuity_points(root, registry, kernels, functions)
+    points, all_at_once = vacuity_points(root, registry, kernels, functions, options)
     if not points:
         raise NotRun(f"{len(kernels)} 份核里一处 requires 都没有：没有前置条件，空真这一格无对象可判")
     chosen = selected_items(options, [point[0] for point in points], "verus-vacuity")
@@ -3882,7 +3951,7 @@ def crate_item_lines(root, registry, options):
     functions = verus_functions(root, registry, kernels, options) if kernels else []
     items, left_out = proof_items(root, registry, kernels, functions, options) if kernels else ([], [])
     lines = [(entry.item, "verus-proof", f"{entry.kind} {entry.relative}:{entry.unit.first_line}") for entry in items]
-    points, _all_at_once = vacuity_points(root, registry, kernels, functions)
+    points, _all_at_once = vacuity_points(root, registry, kernels, functions, options)
     lines += [(point[0], "verus-vacuity", point[1]) for point in points]
     if kernels:
         lines += [(must_red_item(row), "verus-must-red-worlds", f"第 {row['number']} 行") for row in must_red_rows(root, registry)]
@@ -3907,6 +3976,9 @@ def run_per_crate(name, root, options, registry):
         unknown = [item for item in wanted if item not in owners and not (name == "proof" and item == "proof")]
         if unknown and "item-filter-ignored" not in BREAK:
             raise UsageError(f"{PER_CRATE_CHECKS.get(name) or name} 格里没有点名的项：{'、'.join(unknown)}", (["proof"] if name == "proof" else []) + sorted(owners))
+    # 各 crate 共用：单元索引（按根建，下面 crate_options 复制 options 时带着）与工具链摘要（按根与 Verus 安装目录，同一份字典）
+    unit_index(root, options)
+    toolchain_digests = {}
     exits, tallies = [], []
     for view in registry.crates:
         mine = [item for item in wanted if owners.get(item) == view.crate_directory or item == "proof"]
@@ -3914,7 +3986,7 @@ def run_per_crate(name, root, options, registry):
             print(f"  · {view.crate_directory}：--item 没点到这个 crate 的项，这一格这一趟不判它")
             continue
         print(f"  ── {view.crate_directory}{'（cargo verus focus）' if view.cargo_mode else ''}")
-        crate_options = dict(options, crate_view=view, items=mine, crate_tallies=tallies, shared_components=None, function_keys=None)
+        crate_options = dict(options, crate_view=view, items=mine, crate_tallies=tallies, shared_components=None, function_keys=None, toolchain_digests=toolchain_digests)
         try:
             exits.append(CHECKS[name](root, crate_options))
         except UsageError:
@@ -3978,18 +4050,23 @@ def list_items(root, verdict_library=None, verus_root=None, items=None):
     for line in lines:
         print(line)
     if verdict_library and wired:
-        report_key_mismatches(root, verdict_library, verus_root, items)
+        report_key_mismatches(root, verdict_library, verus_root, items, options["unit_index"])
     return EXIT_GREEN
 
 
-def report_key_mismatches(root, verdict_library, verus_root, items=None):
+def report_key_mismatches(root, verdict_library, verus_root, items=None, index=None):
     """list-items 给了 --key-mismatches：证明、空真、必红世界三格逐项照现在的键比判定库，每格往 stderr 打一行各几条（键对不上、无记录、键相同、拒算），
     末了一行合计（底稿第二节第 9 条 ⑦：各道 --list-items 报每项键对不上的判定条数）。只读库、不写库，不起 Verus（要装着：键里的工具链那一样读它的安装）；
-    项名逐行的 stdout 不变。必红世界里原文、第五段、rlimit 属性没过的行不起 Verus、不进库，不数。"""
+    项名逐行的 stdout 不变。必红世界里原文、第五段、rlimit 属性没过的行不起 Verus、不进库，不数。
+    三格、各 crate 的这几次调用共用：单元索引（index，list-items 列项时建的那一份；没给另建一份，只按根建、与 crate 无关）、工具链摘要（按根与 Verus 安装目录）；
+    共用组成（工具链、rlimit、crate 起法、信任清单）按 crate 共用，三格同一个 crate 的相同、不同 crate 的不同（crate 起法与信任清单各带各的）。
+    弄坏开关 key-mismatches-share-across-crates：共用组成不分 crate、第一个 crate 算的交给后面的 crate。"""
     plan, plan_items, unreadable = [], [], []
     _positional, defaults = parse_options([])
     registry = read_registry(root)
     views = registry.crates if len(registry.crates) > 1 else [None]
+    shared_index = index if index is not None else FunctionUnitIndex(root)
+    toolchain_digests, components_of_crate = {}, {}
     # 给了 items（--item，可几个）只比点名的那几项：每格只收属于它的项（proof 与 proof:*、vacuity:*、must-red:*），这一格没有点名项的整格不比；
     #   proof 这一项（整格，不按条入库）自己没有键，单独点名它时 proof 格不比。成本随点名项数走。弄坏开关 key-items-ignored 下照旧比整表
     prefixes = {"proof": ("proof:",), "vacuity": ("vacuity:",), "must-red-worlds": ("must-red:",)}
@@ -3998,13 +4075,18 @@ def report_key_mismatches(root, verdict_library, verus_root, items=None):
         if items and "key-items-ignored" not in BREAK and not named:
             continue
         for view in views:
+            crate_slot = None if view is None or "key-mismatches-share-across-crates" in BREAK else view.crate_directory
+            cell_options = dict(defaults, items=named, verdict_library=verdict_library, verus_root=verus_root, plan=plan, plan_items=plan_items,
+                                shared_components=components_of_crate.get(crate_slot), unit_index=shared_index, function_keys=None,
+                                toolchain_digests=toolchain_digests, crate_view=view)
             buffer = io.StringIO()
             try:
                 with contextlib.redirect_stdout(buffer):
-                    CHECKS[cell](root, dict(defaults, items=named, verdict_library=verdict_library, verus_root=verus_root, plan=plan, plan_items=plan_items, shared_components=None,
-                                             unit_index=None, function_keys=None, crate_view=view))
+                    CHECKS[cell](root, cell_options)
             except (Red, NotRun, UsageError) as error:
                 unreadable.append(f"{cell}{'（' + view.crate_directory + '）' if view is not None else ''}：{getattr(error, 'message', str(error))}")
+            if cell_options["shared_components"] is not None:
+                components_of_crate[crate_slot] = cell_options["shared_components"]
     totals = collections.Counter()
     merged = collections.OrderedDict()
     for cell, counts in plan:
@@ -4773,6 +4855,24 @@ def captured_stdout(function, *arguments):
     return returned, buffer
 
 
+def counting_workspace_loads(function):
+    """自证用：不带参数起 function，交 (它的返回值, 这期间 Rust 工作区（lib_function_units.py 的 RustWorkspace）被载入了几次)。"""
+    module = lib_verdict_library.function_units()
+    original = module.RustWorkspace
+    loads = []
+
+    class CountingWorkspace(original):
+        def __init__(self, *arguments, **keywords):
+            loads.append(1)
+            super().__init__(*arguments, **keywords)
+    module.RustWorkspace = CountingWorkspace
+    try:
+        returned = function()
+    finally:
+        module.RustWorkspace = original
+    return returned, len(loads)
+
+
 def selftest_kernel_with(extra, after=""):
     """SELFTEST_KERNEL 的 verus! 里另加 extra，verus! 之后接 after。"""
     return SELFTEST_KERNEL.replace("} // verus!\n", extra + "} // verus!\n") + after
@@ -4947,6 +5047,8 @@ def selftest():
     os.environ.pop(NOT_RUN_FILE_VARIABLE, None)   # 同上：放过项报本次未跑那一格自己建一份，别的格不往门禁的汇总里写
     # task-server 套的内存包装给的外层上限不进自证：jobs-not-narrowed-by-outer-memory 那一格自己设（开关 outer-memory-narrows-jobs 下别的格不跟着收）
     os.environ.pop(OUTER_MEMORY_CAP_VARIABLE, None)
+    # 服务或整轮门禁给的编译目录不进自证：cargo 那一种几处同时验的编译目录在 slot-directories-shared-across-calls 那一格自己设
+    os.environ.pop("CARGO_TARGET_DIR", None)
     # 复用哨兵：别的格比的是现判与复用的条数，键相同的全当哨兵、不抽强制现判（哨兵数比项数多）；reuse-three-questions 与 reuse-sentinel 两格自己设
     os.environ[reuse_checks.SENTINEL_COUNT_VARIABLE] = "1000"
     cases, wrong = 0, []
@@ -5334,6 +5436,37 @@ def selftest():
                                                                                   ["verus", "build", "-p", "core-sample", "--offline", "--"]) for run in cargo_runs)
                     and any(run[1] == "build" for run in cargo_runs) and not any("--no-cheating" in run for run in cargo_runs),
                     f"cargo-verus 期望照 verus focus|build -p core-sample --offline -- … 起、不带 --no-cheating，实测 {cargo_runs[:3]}")
+        # 几处同时验的编译目录（claim_slot_directories）：环境里有绝对路径的 CARGO_TARGET_DIR（服务给这一趟的编译目录）时建在它底下，先后几次调用共用同一批、放掉只放锁不删，
+        # 一次还占着的编号下一次跳过；没有这个变量时在临时目录里建、放掉整个删（开关 slot-directory-per-call 下一律每次新建临时目录，这一格判错）；
+        # 再经 run_check 在 CARGO_TARGET_DIR 下接连判两趟，两趟都判绿
+        service_target = os.path.join(work, "service-given-target")
+        os.makedirs(service_target)
+        os.environ["CARGO_TARGET_DIR"] = service_target
+        try:
+            held_paths, release_held = claim_slot_directories(2)
+            skipped_paths, release_skipped = claim_slot_directories(2)
+            release_held()
+            reclaimed_paths, release_reclaimed = claim_slot_directories(2)
+            release_reclaimed()
+            release_skipped()
+            service_exit_first, service_output_first = captured_stdout(run_check, "proof", cargo_root, dict(options, jobs=1, verdict_library=fresh_library()))
+            service_exit_second, service_output_second = captured_stdout(run_check, "proof", cargo_root, dict(options, jobs=1, verdict_library=fresh_library()))
+        finally:
+            os.environ.pop("CARGO_TARGET_DIR", None)
+        slot_parent = os.path.join(service_target, SLOT_DIRECTORY_NAME)
+        plain_paths, release_plain = claim_slot_directories(1)
+        plain_parent = os.path.dirname(plain_paths[0])
+        plain_made = os.path.isdir(plain_parent) and not plain_parent.startswith(service_target)
+        release_plain()
+        expect_true("slot-directories-shared-across-calls",
+                    held_paths == [os.path.join(slot_parent, "target-0"), os.path.join(slot_parent, "target-1")]
+                    and skipped_paths == [os.path.join(slot_parent, "target-2"), os.path.join(slot_parent, "target-3")]
+                    and reclaimed_paths == held_paths and os.path.isfile(os.path.join(slot_parent, "target-0.lock"))
+                    and service_exit_first == 0 and service_exit_second == 0
+                    and "proof:core_sample::kernel::keep_small：绿" in service_output_first.getvalue() and "proof:core_sample::kernel::keep_small：绿" in service_output_second.getvalue()
+                    and plain_made and not os.path.exists(plain_parent),
+                    f"CARGO_TARGET_DIR 下第一次占 {held_paths}、还占着时第二次占 {skipped_paths}、放掉后再占 {reclaimed_paths}；两趟 run_check 退 {service_exit_first}、{service_exit_second}；"
+                    f"没有变量时在临时目录 {plain_parent}（建了 {plain_made}，放掉后还在 {os.path.exists(plain_parent)}）")
         # 几个 crate（crate 行可以多条）：逐个 crate 判、各比各的登记数，--item 分到它所属的 crate（开关 single-crate-registry 下判错）
         multi_root = make_root("multicrate")
         os.makedirs(os.path.join(multi_root, "crates", "second", "src"))
@@ -6028,6 +6161,42 @@ def selftest():
                    and second_rows["proof"][1:] == ["1", "0", "0"]
                    and red_count == 3 and red_rows[clamp_item][3] == "1" and red_rows[small_item][3] == "0" and red_rows["proof"][3] == "1",
                    f"第一趟 {first_rows}，第二趟（全复用）{second_rows}，一项判红那一趟 {red_rows}")
+        # 一趟里共用的几样不重建、不串（run_per_crate、list-items --key-mismatches 逐 crate、逐格调用同一批函数）：
+        #   单元索引按根建、各 crate 各格共用：list-items 列两个 crate 的项并比三格的键、两个 crate 逐个判的 run_check，各只载入一次 Rust 工作区
+        #   （开关 unit-index-not-shared 下每处各建一份，载入多于一次，这一格判错）；
+        #   两个 crate 的证明记过之后列项比键，共用组成（工具链、rlimit、crate 起法、信任清单）按 crate 共用：每个 crate 的证明项都是键相同、下一趟 run_check 逐项复用
+        #   （开关 key-mismatches-share-across-crates 下后面的 crate 拿到第一个 crate 的共用组成，crate 起法里的包名不同，second_sample::double_it 键对不上）
+        multi_store = os.path.join(work, "verdict-library-multi-crate-keys")
+        run_items("proof", multi_root, verdict_library=multi_store)
+        multi_proof_items = ("proof:core_sample::kernel::clamp_to_limit", "proof:core_sample::kernel::keep_small", "proof:second_sample::double_it")
+
+        def multi_key_listing():
+            listing_error = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(listing_error):
+                listed_exit = list_items(multi_root, multi_store, install)
+            return listed_exit, listing_error.getvalue()
+        (multi_listed_exit, multi_listed_text), multi_listed_loads = counting_workspace_loads(multi_key_listing)
+        multi_states = item_key_states(multi_listed_text)
+        (_multi_exit, _multi_output, multi_verdicts), multi_checked_loads = counting_workspace_loads(lambda: run_items("proof", multi_root, verdict_library=multi_store))
+        judge_cell("key-mismatches-two-crates-shared",
+                   multi_listed_exit == 0 and all(multi_states.get(item) == "键相同" for item in multi_proof_items) and multi_listed_loads == 1
+                   and all(multi_verdicts.get(item) == ("绿", "复用") for item in multi_proof_items) and multi_checked_loads == 1,
+                   f"两个 crate 记过证明之后列项比键：退 {multi_listed_exit}，证明项的键状态 {[multi_states.get(item) for item in multi_proof_items]}，Rust 工作区载入 {multi_listed_loads} 次；"
+                   f"同一份库再判一趟：{[multi_verdicts.get(item) for item in multi_proof_items]}，载入 {multi_checked_loads} 次（期望各 1 次、键相同、复用）")
+        # 工具链摘要一趟里共用（toolchain_digest）：同一份缓存下同一个 Verus 安装目录只算一次、取到的与现算的相同，换一个安装目录取到那个目录的摘要
+        # （开关 toolchain-digest-shared-across-installs 下共用的那一份只按根存，换了安装目录取到的还是第一个目录的摘要，这一格判错）
+        other_install = os.path.join(work, "tools-other", "verus-x86-linux")
+        shutil.copytree(install, other_install)
+        open(os.path.join(other_install, "z3"), "w").write("#!/bin/sh\n# 另一份 z3\n")
+
+        def toolchain_digest_of(directory, cache):
+            return toolchain_digest(green, dict(options, verus_root=directory, toolchain_digests=cache))
+        digest_cache = {}
+        fresh_digests = (toolchain_digest_of(install, None), toolchain_digest_of(other_install, None))
+        cached_digests = (toolchain_digest_of(install, digest_cache), toolchain_digest_of(other_install, digest_cache), toolchain_digest_of(install, digest_cache))
+        judge_cell("toolchain-digest-shared",
+                   fresh_digests[0] != fresh_digests[1] and cached_digests == (fresh_digests[0], fresh_digests[1], fresh_digests[0]) and len(digest_cache) == 2,
+                   f"两个 Verus 安装目录现算的摘要期望不同、共用缓存下取到的与现算的相同、缓存里两项：现算 {fresh_digests}，共用 {cached_digests}，缓存 {len(digest_cache)} 项")
         # 门禁样本档的假工具（write-fake-tools）：写出可执行的 verus、cargo、cargo-verus，version.json 的 commit 抄登记表 release 行（开关 fake-tools-commit-unpinned 下写成全 0，这一格判错）
         fake_tools_directory = os.path.join(work, "fake-tools-written")
         with contextlib.redirect_stdout(io.StringIO()):
@@ -6443,7 +6612,8 @@ def selftest():
                      "outer-memory-narrows-jobs", "group-leftovers-kept",
                      "proof-item-narrows", "red-keeps-green", "reuse-key-without-crate-build", "reuse-key-without-closure-dependencies",
                      "toolchain-key-with-paths",
-                     "item-key-lines-skipped", "key-items-ignored", "item-done-unrecorded", "item-done-whole-cell-seconds", "fake-tools-commit-unpinned",
+                     "item-key-lines-skipped", "key-items-ignored", "unit-index-not-shared", "key-mismatches-share-across-crates",
+                     "toolchain-digest-shared-across-installs", "slot-directory-per-call", "item-done-unrecorded", "item-done-whole-cell-seconds", "fake-tools-commit-unpinned",
                      "reuse-key-without-entry-unit", "assume-specification-refused", "assume-specification-target-unkeyed",
                      *(f"FORMAL_VERIFICATION_BREAK={item}" for item in FORMAL_BREAK_ITEMS))
         # 各开关的那一趟互不依赖、各用各的临时目录：几趟同时起（每台默认重活线程数趟，按开关条数夹），按开关的次序收退出码、数份数；

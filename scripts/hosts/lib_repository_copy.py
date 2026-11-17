@@ -32,6 +32,16 @@
     这一支算不全的拒：从声明的条目里的脚本起，shell 里行首（可带 exec）是 source、.、bash、sh、python3、紧接着照脚本自己所在目录写的路径
     （"$(dirname "${BASH_SOURCE[0]}")/…"、"${BASH_SOURCE[0]%/*}/…"；ANCHORED_SHELL_REFERENCE，printf 与引号里的样本行不算）的文件在源树里不在的，抛 ClosureRefused、逐处写 <文件>:<行> 与缺的那一份（不拷半份）；python 的 import 与 $名/… 这类照目录变量拼的照旧指到不在的不收、不判。
     弄坏开关 declared-directories-not-followed 下声明的目录里的脚本不起头，declared-closure-gaps-accepted 下缺的照旧不收、不拒。
+  · 声明的条目里的脚本以仓根相对路径字面量读的文件（declared_literals=True 时；minimal-copy.py 开着它，别的调用方不开）：门禁在仓根起、读表写的是
+    WORDS_FILE = ".claude/naming-vague-words"、"$ROOT/.claude/naming-ordinal-tokens" 这类相对仓根的串，不照脚本所在目录，上一条认不到。
+    上一条收到的每一份脚本（起点连同它们 source、起、import 的）逐行读，注释行不算；认法（literal_repository_files）：先把紧跟在 } 与 ) 后面的 / 换成空格
+    （"${ROOT}/…"、f"{root}/…"），再取 ASCII 的「段/段…」（至少一个 /，前面不紧挨着字母、数字、_、.、-、/；DECLARED_LITERAL_PATH），
+    这一串与去掉开头几段之后的每一截（"$ROOT/.claude/x" 取到的 ROOT/.claude/x 去掉 ROOT 那一段）按仓根解，最长的一截在源树里是文件的收，
+    为什么以 DECLARED_LITERALS_REASON 起头；收到的是脚本的，再当起点追 source 链（为什么以 DECLARED_SCRIPTS_REASON 起头）、再读它的字面量，传递地收。
+    认不到的几类：research/ 下的（DECLARED_LITERAL_SKIPPED_TOP：副本不带 research/，要的经 declared 声明）、带 .、.. 段与 .git、target、target-*、__pycache__
+    目录段的、指到目录的、源树里不在的（只收不拒：分不出是要读的表还是要写的产物名）、仓根顶层不带 / 的单个文件名、os.path.join(root, ".claude", "x") 这类分段拼的、
+    路径拼在变量里或从参数、环境变量取的、通配。认多了的只是副本里多几份文件（合计照旧受调用方的阈值管）；认不到的经 declared 声明。
+    这一支收到的脚本照自己所在目录引到的文件不在时不拒（上一条的拒只管声明的条目自己的 source 链）。弄坏开关 declared-literals-ignored 下这一支不跟。
 管不到的（靠写代码的人与真编核对）：路径拼在变量里、从环境变量取、format! 中间夹变量的；build.rs 经 .parent() 取仓根再读的（读的是
 Cargo.toml、Cargo.lock 这类，已在清单里）；python 里不是上面那两种赋法记下的名字拼出的路径（函数返回值、参数、git 取的目录）、importlib 按变量路径载入的模块。
 写法认不出的，改调用方的写法让它认得出（先把目录赋给一个名字，再 os.path.join(<名>, …)），不另加手抄清单；副本里要起、要读的脚本与数据经 declared 声明。
@@ -43,8 +53,8 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 里不是上面那�
 <源树所在的主工作区>/multi-host.env 的绝对路径（主工作区照 git rev-parse --git-common-dir 取，git worktree 里取主仓；不在 git 里取源树自己）。
 
 用法：
-  lib_repository_copy.py entries <仓根> [--test-inputs] [--with <条目>=<为什么>]…
-      打算出的闭包：一行 REPOSITORY_COPY entry <条目>\t<为什么>，指到决不拷的打 REPOSITORY_COPY left_out，在仓里不在的打 REPOSITORY_COPY missing，
+  lib_repository_copy.py entries <仓根> [--test-inputs] [--declared-literals] [--with <条目>=<为什么>]…
+      打算出的闭包（--declared-literals 照 minimal-copy.py 开着声明的条目里的字面量那一支，文件头「闭包」）：一行 REPOSITORY_COPY entry <条目>\t<为什么>，指到决不拷的打 REPOSITORY_COPY left_out，在仓里不在的打 REPOSITORY_COPY missing，
       末行 REPOSITORY_COPY entries=<条数> started=<Rust 直接起的脚本，逗号连>；闭包算不成打 ✗ 与出路、退 1
   lib_repository_copy.py link-into <副本根> --root <仓根> --workspace <工作区目录> [--present <条目>]… [--test-inputs]
       只拷了一个工作区（scripts/experiment-apparatus 这类）的副本：闭包里副本根下还没有的仓根条目逐个符号链接回仓里那一份（只读）；
@@ -88,7 +98,7 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 里不是上面那�
   REPOSITORY_COPY_BREAK=shell-sources-not-followed  不跟 shell 脚本 source、起的文件
       「✗ 自证 shell-sources-followed：」「✗ 自证 repository-root-references-in-the-closure：」「✗ 自证 covered-scripts-followed：」
   REPOSITORY_COPY_BREAK=python-references-not-followed  不跟 python 脚本 import、点名的文件
-      「✗ 自证 python-references-followed：」「✗ 自证 python-directory-variables-followed：」
+      「✗ 自证 python-references-followed：」「✗ 自证 python-directory-variables-followed：」「✗ 自证 declared-literal-files-followed：」
   REPOSITORY_COPY_BREAK=python-directory-variables-ignored  python 里赋给名字的目录不记，os.path.join(<名>, …) 按脚本所在目录解
       「✗ 自证 python-directory-variables-followed：」
   REPOSITORY_COPY_BREAK=never-copied-copied  多机配置也拷进副本
@@ -110,9 +120,11 @@ Cargo.toml、Cargo.lock 这类，已在清单里）；python 里不是上面那�
   REPOSITORY_COPY_BREAK=covered-scripts-not-followed  罩在目录条目里、不单独成条的脚本不追 source 链（只拿单独成条的脚本起头）
       「✗ 自证 covered-scripts-followed：」「✗ 自证 closure-independent-of-reference-order：」
   REPOSITORY_COPY_BREAK=declared-directories-not-followed  声明的目录里的脚本不当追 source 链的起点（副本缺 .claude/scripts/preflight.sh）
-      「✗ 自证 declared-directory-scripts-followed：」「✗ 自证 declared-closure-gap-refused：」
+      「✗ 自证 declared-directory-scripts-followed：」「✗ 自证 declared-closure-gap-refused：」「✗ 自证 declared-literal-files-followed：」
   REPOSITORY_COPY_BREAK=declared-closure-gaps-accepted  声明的条目里的脚本照脚本所在目录 source、起的文件在源树里不在时照旧不收、不拒
       「✗ 自证 declared-closure-gap-refused：」
+  REPOSITORY_COPY_BREAK=declared-literals-ignored  declared_literals=True 也不读声明的条目里的脚本以仓根相对路径字面量引到的文件
+      「✗ 自证 declared-literal-files-followed：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -156,6 +168,11 @@ MINIMUM_REASON_CHARACTERS = 4
 SCRIPT_SUFFIXES = (".sh", ".py")
 DECLARED_SKIPPED_DIRECTORY_NAMES = ("fixtures",)   # 声明的目录里不当起点的子目录（文件头「闭包」声明的条目那一条）：门禁样本档，副本里不起
 DECLARED_SCRIPTS_REASON = "调用方声明的条目里的脚本 source、起"   # 那一支收进来的条目的为什么起头（minimal-copy.py 的弄坏开关照它认出这一支）
+# 声明的条目里的脚本以仓根相对路径字面量读的文件（文件头「闭包」字面量那一条）：认哪种串、哪一层不认、收进来的为什么起头
+DECLARED_LITERAL_PATH = re.compile(r'(?<![\w.\-/])((?:[\w.\-]+/)+[\w.\-]+)', re.ASCII)
+DECLARED_LITERAL_DIRECTORY_SLASH = re.compile(r'(?<=[})])/')
+DECLARED_LITERAL_SKIPPED_TOP = ("research",)
+DECLARED_LITERALS_REASON = "调用方声明的条目里的脚本以仓根相对路径字面量读"
 # 声明的条目那一支判「算不全」只认这一种行：行首（空白之后，可带 exec）是 source、.、bash、sh、python3，紧接着照脚本自己所在目录写的路径；
 # 写在 printf、引号与 heredoc 里的样本行（行首是别的词）不认
 ANCHORED_SHELL_REFERENCE = re.compile(r'^\s*(?:exec\s+)?(?:source|\.|bash|sh|python3)\s+"?(?:\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)|\$\{BASH_SOURCE\[0\]%/\*\})/((?:\.\./)*[\w.\-]+(?:/[\w.\-]+)*\.(?:sh|py))\b')
@@ -660,6 +677,65 @@ def script_closure(root, scripts, gaps=None):
     return found
 
 
+def literal_repository_files(root, script, is_file):
+    """一份脚本以仓根相对路径字面量引到、源树里是文件的仓根文件（文件头「闭包」字面量那一条）：[(行号, 相对仓根的路径)]。
+    is_file(<相对仓根的路径>) 判那一截在源树里是不是文件（调用方带缓存）。注释行不算。"""
+    try:
+        with open(os.path.join(root, script), encoding="utf-8", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return []
+    found = []
+    for number, line in enumerate(lines, 1):
+        if line.lstrip().startswith("#"):
+            continue
+        for match in DECLARED_LITERAL_PATH.finditer(DECLARED_LITERAL_DIRECTORY_SLASH.sub(" ", line)):
+            segments = match.group(1).rstrip(".").split("/")
+            if any(segment in ("", ".", "..") for segment in segments):   # 带 . 与 .. 段的是照某个目录写的，不按仓根解
+                continue
+            for start in range(len(segments) - 1):   # 整串在前、逐段去掉开头的在后：最长的一截是文件的收
+                tail = segments[start:]
+                if any(skipped_directory(segment) for segment in tail[:-1]):
+                    continue
+                relative = "/".join(tail)
+                if tail[0] in DECLARED_LITERAL_SKIPPED_TOP or any(relative == name or relative.startswith(name + "/") for name in NEVER_COPIED):
+                    break
+                if is_file(relative):
+                    found.append((number, relative))
+                    break
+    return found
+
+
+def declared_literal_closure(root, scripts):
+    """scripts（相对仓根：声明的条目那一支收到的脚本）以仓根相对路径字面量读的文件，连同收到的脚本再 source、起、import 的与再读的字面量，传递地收
+    （文件头「闭包」字面量那一条）：{相对仓根的路径: 为什么}；scripts 自己不在里面。"""
+    known_files = {}
+
+    def is_file(relative):
+        if relative not in known_files:
+            known_files[relative] = os.path.isfile(os.path.join(root, relative))
+        return known_files[relative]
+
+    found, scanned = {}, set()
+    pending = sorted(script for script in scripts if is_script(os.path.join(root, script)))
+    while pending:
+        current = pending.pop()
+        if current in scanned:
+            continue
+        scanned.add(current)
+        for number, relative in literal_repository_files(root, current, is_file):
+            if relative in found or relative in scripts:
+                continue
+            found[relative] = f"{DECLARED_LITERALS_REASON}（{current}:{number}）"
+            if not is_script(os.path.join(root, relative)):
+                continue
+            for path, where in sorted(script_closure(root, [relative]).items()):
+                if where and path not in found and path not in scripts:
+                    found[path] = f"{DECLARED_SCRIPTS_REASON}（{where}）"
+                pending.append(path)
+    return found
+
+
 # ── 闭包 ──
 
 def checked_declarations(declared):
@@ -690,9 +766,10 @@ def declared_scripts(root, entries):
     return sorted(found)
 
 
-def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
+def copy_closure(root, declared=(), *, test_inputs=False, workspace=None, declared_literals=False):
     """root 这棵树要拷进副本的仓根条目（文件头「闭包」）。declared 是调用方多拷的 [(条目, 为什么)]；test_inputs 为真时连测试代码一起扫；
-    workspace 给了（相对仓根的目录）时清单只有那个工作区目录本身（只拷一个工作区的副本，mutate.sh 那一种），不带 COMMON_ENTRIES。
+    workspace 给了（相对仓根的目录）时清单只有那个工作区目录本身（只拷一个工作区的副本，mutate.sh 那一种），不带 COMMON_ENTRIES；
+    declared_literals 为真时另收声明的条目里的脚本以仓根相对路径字面量读的文件（文件头「闭包」字面量那一条；弄坏开关 declared-literals-ignored 下不收）。
     算不成抛 ClosureRefused；声明写坏了抛 ValueError。每次调都现读那棵树（不缓存：同一进程里树会变，自证与门禁都在同一棵树上改了再算）。"""
     root = os.path.realpath(root)
     declarations = checked_declarations(declared)
@@ -762,6 +839,10 @@ def copy_closure(root, declared=(), *, test_inputs=False, workspace=None):
     for path, where in sorted(declared_found.items()):
         if where and not is_covered(path, list(reasons)):
             add(path, f"{DECLARED_SCRIPTS_REASON}（{where}）")
+    if declared_literals and not broken("declared-literals-ignored"):
+        for path, why in sorted(declared_literal_closure(root, declared_found).items()):
+            if not is_covered(path, list(reasons)):
+                add(path, why)
     for entry in list(reasons):
         if entry == IGNORED_BY_GIT_PREFIX or entry.startswith(IGNORED_BY_GIT_PREFIX + "/"):
             add(entry, "被 .gitignore 挡着的规范副本，按 git 列文件的拷法带不上，照文件系统拷")
@@ -940,12 +1021,14 @@ def parse_declarations(words):
 
 
 def command_entries(arguments):
-    root, declared_words, test_inputs = None, [], False
+    root, declared_words, test_inputs, declared_literals = None, [], False, False
     index = 0
     while index < len(arguments):
         word = arguments[index]
         if word == "--test-inputs":
             test_inputs = True
+        elif word == "--declared-literals":
+            declared_literals = True
         elif word == "--with" and index + 1 < len(arguments):
             declared_words.append(arguments[index + 1])
             index += 1
@@ -956,7 +1039,7 @@ def command_entries(arguments):
         index += 1
     if root is None:
         raise ValueError("要给 <仓根>")
-    closure = copy_closure(root, parse_declarations(declared_words), test_inputs=test_inputs)
+    closure = copy_closure(root, parse_declarations(declared_words), test_inputs=test_inputs, declared_literals=declared_literals)
     for entry in closure.entries:
         print(f"REPOSITORY_COPY entry {entry}\t{'；'.join(closure.reasons[entry])}")
     for name, places in sorted(closure.left_out.items()):
@@ -1469,7 +1552,9 @@ def selftest_cells(base):
     write(root, "crates/demo/src/run.rs", 'pub const PROBE: &str = "../../scripts/probe.sh";\n')
     write(root, "scripts/probe.sh", '#!/usr/bin/env bash\necho "PROBED=1"\nprintf "%s\\n" "$PWD|${SINGLEFS_MULTI_HOST_CONFIG:-unset}" >"$PROBE_LOG"\n'
           'exit "${PROBE_EXIT:-0}"\n')
-    fake_cargo = write(base, "verify-copy/bin/cargo", '#!/usr/bin/env bash\nprintf "%s\\n" "$PWD" >"$CARGO_LOG"\n[[ -f crates/demo/src/lib.rs ]] || exit 101\n')
+    # 假 cargo 的路径照字面写成「临时目录/字面尾巴」（不取 write 的返回值）：verify_copy 起它那一处，收闭包时认得出是根外的程序
+    fake_cargo = os.path.join(base, "verify-copy", "bin", "cargo")
+    write(base, "verify-copy/bin/cargo", '#!/usr/bin/env bash\nprintf "%s\\n" "$PWD" >"$CARGO_LOG"\n[[ -f crates/demo/src/lib.rs ]] || exit 101\n')
     os.chmod(fake_cargo, 0o755)
     work = os.path.join(base, "verify-copy", "work")
     probe_log, cargo_log = os.path.join(base, "verify-copy", "probe.log"), os.path.join(base, "verify-copy", "cargo.log")
@@ -1567,6 +1652,33 @@ def selftest_cells(base):
     closure, error = closure_or_error(root, [("tools", "副本里起它下面的门禁")])
     check("declared-closure-gap-refused", isinstance(error, ClosureRefused) and "tools/stage.sh:2" in str(error) and "lib/absent.sh" in str(error),
           f"声明的条目里的脚本 source 的文件在源树里不在应当拒、点名 tools/stage.sh:2 与 lib/absent.sh，实际 {closure.entries if closure else error}")
+
+    # declared-literal-files-followed（副本带 --with-gate-tables 而缺门禁在仓根读的词表 .claude/naming-vague-words）：声明的 tools/ 里的 stage.sh
+    # 以仓根相对路径字面量读 .claude/sample-words、"$ROOT/data/table.tsv"、"${ROOT}/data/braced.tsv"，起 scripts/helper.py（它 import 同目录的 side.py、再读 data/helper-table.tsv）
+    # ⇒ declared_literals=True 时这六份进闭包（为什么分别以 DECLARED_LITERALS_REASON 与 DECLARED_SCRIPTS_REASON 起头）；注释里点名的 data/comment-only.tsv、
+    # 没被点名的 data/unrelated.tsv、research/ 下的不进，点名而不在的 data/absent.tsv 不拒；不开 declared_literals 时六份都不进
+    root = make_root(base, "declared-literal-files-followed")
+    write(root, "tools/stage.sh", '#!/usr/bin/env bash\n# 表 data/comment-only.tsv 只在注释里点名\nWORDS_FILE=".claude/sample-words"\n'
+          'grep -c x "$ROOT/data/table.tsv" "${ROOT}/data/braced.tsv"\npython3 scripts/helper.py\necho research/results/big.out data/absent.tsv\n')
+    write(root, "scripts/helper.py", 'import side\nTABLE = "data/helper-table.tsv"\n')
+    write(root, "scripts/side.py", "VALUE = 1\n")
+    for table in (".claude/sample-words", "data/table.tsv", "data/braced.tsv", "data/helper-table.tsv", "data/comment-only.tsv", "data/unrelated.tsv"):
+        write(root, table, "x\n")
+    literal_declaration = [("tools", "副本里起它下面的门禁")]
+    closure, error = closure_or_error(root, literal_declaration, declared_literals=True)
+    plain, plain_error = closure_or_error(root, literal_declaration)
+    wanted = [".claude/sample-words", "data/braced.tsv", "data/helper-table.tsv", "data/table.tsv", "scripts/helper.py", "scripts/side.py"]
+    unwanted = ["data/comment-only.tsv", "data/unrelated.tsv", "data/absent.tsv"]
+    entries = closure.entries if closure else ()
+    check("declared-literal-files-followed",
+          closure is not None and plain is not None and all(entry in entries for entry in wanted) and not any(entry in entries for entry in unwanted)
+          and not any(is_covered(entry, ["research"]) for entry in entries)
+          and closure.reasons.get(".claude/sample-words", ("",))[0].startswith(DECLARED_LITERALS_REASON)
+          and closure.reasons.get("scripts/side.py", ("",))[0].startswith(DECLARED_SCRIPTS_REASON)
+          and not any(entry in plain.entries for entry in wanted),
+          f"开着 declared_literals 应当收 {wanted}、不收 {unwanted} 与 research/、为什么分别以「{DECLARED_LITERALS_REASON}」「{DECLARED_SCRIPTS_REASON}」起头，"
+          f"不开时一份都不收；实际开着的 {(entries, closure.reasons.get('.claude/sample-words'), closure.reasons.get('scripts/side.py')) if closure else error}，"
+          f"不开的 {plain.entries if plain else plain_error}")
     return failures, checked
 
 
@@ -1583,7 +1695,7 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "test-code-scanned": ["test-code-left-out", "runtime-probes-cover-every-started-script"],
     "test-inputs-ignored": ["test-code-left-out"],
     "shell-sources-not-followed": ["shell-sources-followed", "repository-root-references-in-the-closure", "covered-scripts-followed"],
-    "python-references-not-followed": ["python-references-followed", "python-directory-variables-followed"],
+    "python-references-not-followed": ["python-references-followed", "python-directory-variables-followed", "declared-literal-files-followed"],
     "python-directory-variables-ignored": ["python-directory-variables-followed"],
     "never-copied-copied": ["configuration-never-copied"],
     "declared-reason-unchecked": ["declared-entries-need-a-reason"],
@@ -1594,8 +1706,9 @@ SWITCH_EXPECTED_CELLS = {   # 文件头「弄坏开关」那一段，两处要�
     "verify-probes-skipped": ["verify-copy-builds-and-starts-the-probes-in-the-copy"],
     "copy-completeness-unchecked": ["copy-completeness-names-missing-entries"],
     "covered-scripts-not-followed": ["covered-scripts-followed", "closure-independent-of-reference-order"],
-    "declared-directories-not-followed": ["declared-directory-scripts-followed", "declared-closure-gap-refused"],
+    "declared-directories-not-followed": ["declared-directory-scripts-followed", "declared-closure-gap-refused", "declared-literal-files-followed"],
     "declared-closure-gaps-accepted": ["declared-closure-gap-refused"],
+    "declared-literals-ignored": ["declared-literal-files-followed"],
 }
 
 
@@ -1649,6 +1762,7 @@ def selftest():
     print(f"  ✓ lib_repository_copy.py 自证通过（查了 {checked} 格：path 依赖逐层跟进而指到仓根之外的拒、编译期 include 按源文件或包目录解而认不出的拒、"
           "运行期 ../ 字面量与 .join(\"..\") 串按包目录解、测试代码默认不扫而带 test_inputs 扫、shell 的 source 链与 python 的 import 传递地跟、"
           "罩在目录条目里的脚本照追 source 链而与引用的先后无关、声明的目录里的脚本照追 source 链而照脚本所在目录引到的文件不在就拒、"
+          "开着 declared_literals 时声明的条目里的脚本以仓根相对路径字面量读的文件传递地收而注释与 research/ 下的不收、"
           "python 里赋给名字的目录拼出的脚本与搜索目录照认、"
           "多机配置不进副本、声明要写为什么、副本环境取主工作区那一份配置、单个文件连上级目录拷、粗扫认得按源文件目录解的 include、本仓粗扫指到的都在闭包里、直接起的脚本都有起法、"
           "真编核对在副本里编与起探针、副本缺闭包里的条目逐条点名而拷全的不报；"

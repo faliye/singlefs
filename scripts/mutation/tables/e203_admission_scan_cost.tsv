@@ -71,3 +71,8 @@ m70_the_record_axes_extrapolate_past_the_registered_points	                && (a
 m71_the_by_delta_mapped_units_queries_are_the_whole_table	        mapped_units_queries_by_delta(mapped_units_changed_over_all_rounds, mapped_units);	        product.query_levels_of(&at, segments, "mapped_units_whole_table");
 m72_unread_point_axes_read_as_f3_not_fired	    } else if !judged_any_axis || !points_with_the_axes_unread.is_empty() {	    } else if false {
 m73_the_timing_points_take_no_axes_from_the_counts	                with_axes.points.insert(point, *axes);	                let _ = axes;
+pooled_fallback_row_is_not_a_scan_row	    (ROW_WITHOUT_A_BY_DELTA_FORMULA, RowKind::Scan),	    (ROW_WITHOUT_A_BY_DELTA_FORMULA, RowKind::Copy),
+pooled_fallback_marks_only_after_two_calls	                let mark = if calls > 0 {	                let mark = if calls > 2 {
+pooled_fallback_reconciles_every_cell	            (calls > 0) == (steps > 0),	            true,
+frozen_publish_point_is_not_voided	                voided.insert(key.0.clone());	                let _ = &voided;
+voided_point_stays_in_the_axes	    kept.points.retain(|point, _| !points.contains(point));	    kept.points.retain(|_, _| true);

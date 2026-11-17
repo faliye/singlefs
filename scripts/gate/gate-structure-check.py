@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 判的是此刻门禁目录里每道阶段的文件头与它们对 --list、--check 的反应，阶段随时在改
 # run-condition: command bash
-"""门禁阶段的结构（.claude/rules/verification.md「门禁的结构」）：每道阶段都能全跑，也能逐格点名跑。
+"""门禁阶段的结构（.claude/rules/verification-reference.md「门禁的结构」）：每道阶段都能全跑，也能逐格点名跑。
 
 对 <仓根>/.claude/gate.d/ 顶层每个 *.sh（lib-*.sh 是共用库，不判）逐道判四样：
   table    文件头（#! 之后、第一行代码之前的注释块）有格名表：每格一行 `# gate-cell: <格名> <判什么的一句>`，格名不重复
@@ -16,8 +16,11 @@
   unknown  `bash <阶段> <仓根> --check gate-structure-check-no-such-cell --force` 退 2，同样不许起重活、不许留下进程
   --force 是交给阶段的 preflight 的：只问结构，不因为「输入没变」被拒。每次起阶段限时 LIST_TIMEOUT_SECONDS 秒。
   文件头没有格名表的阶段不起它（还没改用 lib/stage-cells.sh 的阶段不认 --list，起它就是全跑）。
+并行：各道阶段、每道的 --list 与 --check 两次起阶段彼此独立，按每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads，取不到退 2）同时起，
+  各用各的 trace 文件，问题按阶段的次序汇总。环境变量 GATE_STRUCTURE_CHECK_LIST_CACHE 指到一个目录时，--list --force 的结果（退出了、没超时、没留下进程的）落进去，
+  同一棵树的同一道阶段再要它就读那一份（code-tooling.sh 的 stage-owners 格与 gate-structure 格共用，同一趟里各道阶段只被起一次 --list）。
 起法：经 scripts/gate/lib_process_group.py 的 run_in_own_session，每次起阶段放进它自己的会话与进程组；超时、异常、收到 TERM / INT / HUP
-  与正常退出之后都对整组先 TERM、过宽限 KILL，再在 /proc 里核会话里没有留下进程（.claude/singlefs-ai-sop/rules/command-safety.md
+  与正常退出之后都对整组先 TERM、过宽限 KILL，再在 /proc 里核会话里没有留下进程（.claude/rules/command-safety-by-review.md
   「装置起的样本进程，放进它自己的进程组」）。退出之后还留着的、收完还停不掉的，写进那一道的失败信息。
   code-tooling.sh 的 stage-owners 格导入 start_stage（四样返回值不变；留下的进程照样收，那一句接在 stderr 末尾）。
 判不了的：按绝对路径起的重活（target/ 下的装置二进制、写死路径的 cargo）替身拦不到；格的函数判得对不对；
@@ -28,7 +31,8 @@
     gate-structure-check.py --selftest  GATE_STRUCTURE_CHECK_BREAK=<项> 时必须判红（下面那张表）
     gate-structure-check.py --selftest-case <例名> <样本根>   只给 --selftest 用：在新会话里判一道样本阶段（例名见 SELFTEST_GROUP_CASES），
                                                               自证等它退出、数完它的样本记下的进程，再对它那一组 KILL 收尾
-自证（selftest()）：三份仓整跑这一份（bad 七道阶段里六道各犯一样、good 一道两格都对、empty 空目录），另有四例在新会话里判一道阶段（SELFTEST_GROUP_CASES）：
+自证（selftest()）：三份仓整跑这一份（bad 七道阶段里六道各犯一样、good 一道两格都对、empty 空目录），另有一例 list-cache（同一道阶段的 --list --force 经缓存连起两次只被起一次），
+另有四例在新会话里判一道阶段（SELFTEST_GROUP_CASES）：
   guard-without-preflight  带守卫的阶段、树里没有 .claude/scripts/preflight.sh：--check alpha 退 2、打出守卫的 ✗、一格都没跑
   timeout-group            阶段先放两个后台子进程（一个再起孙进程）、再前台睡过限时（自证把限时缩成 SELFTEST_LIST_TIMEOUT_SECONDS 秒）：
                            报「--list 跑了 2 秒还没退出」，start_stage 返回之后样本记下的进程一个不剩
@@ -49,8 +53,12 @@
   GATE_STRUCTURE_CHECK_BREAK=timeout-kills-leader-only  不开新会话，超时只 SIGKILL 直接起的 bash，不收组、不核会话
       timeout-group（「timeout-group：start_stage 返回之后样本记下的进程还剩」）
       left-behind（「left-behind：判出的问题里找不到「19-left-behind.sh：--list 退出之后它起的进程还留着」」、「left-behind：start_stage 返回之后样本记下的进程还剩」）
+  GATE_STRUCTURE_CHECK_BREAK=list-cache-ignored  --list --force 不读 LIST_CACHE_DIRECTORY 里已落下的结果，每次都重起阶段
+      list-cache（「list-cache：同一道阶段的 --list --force 连起两次，阶段被起了 2 次，该 1 次」）
 退出码：0 每道都对；1 有不对的（逐道列出）；2 用法错；77 门禁目录里一道阶段都没有。
 """
+import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -60,6 +68,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.dont_write_bytecode = True
@@ -69,8 +78,14 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "
 sys.path.insert(0, SCRIPT_DIRECTORY)
 from preflight import preflight  # noqa: E402
 import lib_process_group as process_group  # noqa: E402
+from lib_stage_header import header_cells  # noqa: E402
+
+sys.path.insert(0, os.path.join(REPOSITORY_ROOT, "scripts", "hosts"))
+import heavy_threads  # noqa: E402
 
 BROKEN = os.environ.get("GATE_STRUCTURE_CHECK_BREAK", "")
+# 同一棵树、同一条 --list --force 的结果落进这个目录，别的格（code-tooling.sh 的 stage-owners 格）读它，不再起第二遍；不设就不落、不读
+LIST_CACHE_DIRECTORY = os.environ.get("GATE_STRUCTURE_CHECK_LIST_CACHE", "")
 LIST_TIMEOUT_SECONDS = 60
 SELFTEST_LIST_TIMEOUT_SECONDS = 2
 # preflight 那一行之后的守卫（文件头 preflight 一样）：source 的是 …/scripts/preflight.sh（项目的 shim 或规范副本）的阶段才判
@@ -79,7 +94,6 @@ PREFLIGHT_ENTRY_LINE = re.compile(r'^\s*preflight\s+"\$\{BASH_SOURCE\[0\]\}"\s+"
 PREFLIGHT_GUARD_OPENING = "if ! declare -F preflight >/dev/null; then"
 UNKNOWN_CELL = "gate-structure-check-no-such-cell"
 HEAVY_TOOLS = ("cargo", "rustc", "rustup", "qemu-system-x86_64", "qemu-system-aarch64", "qemu-img", "herd7", "fio")
-CELL_LINE = re.compile(r"^#\s*gate-cell:\s*(\S+)\s+(\S.*?)\s*$")
 CELL_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 CLEARED_ENVIRONMENT = ("GATE_NOT_RUN_FILE", "GATE_BASE", "GATE_STAGED_FROM", "GATE_DIFF_BASE", "GATE_IN_STAGE")
 SHIM = """#!/bin/sh
@@ -87,22 +101,6 @@ printf '%s\\n' "${0##*/}" >> "$GATE_STRUCTURE_CHECK_SHIM_TRACE"
 echo "gate-structure-check：替身 ${0##*/} 被调了，按起了重活记" >&2
 exit 97
 """
-
-
-def header_cells(path):
-    """文件头注释块里的格名表：[(行号, 格名, 判什么)]。"""
-    cells = []
-    with open(path, encoding="utf-8", errors="replace") as handle:
-        for number, line in enumerate(handle, 1):
-            line = line.rstrip("\n")
-            if number == 1 and line.startswith("#!"):
-                continue
-            if line.strip() and not line.lstrip().startswith("#"):
-                break
-            match = CELL_LINE.match(line.strip())
-            if match:
-                cells.append((number, match.group(1), match.group(2)))
-    return cells
 
 
 def stage_files(root):
@@ -125,10 +123,27 @@ def make_shims(scratch):
     return shim_directory
 
 
+def list_cache_file(root, name, arguments):
+    """这一次起法的结果该落的文件：只缓存 --list --force（LIST_CACHE_DIRECTORY 设了），别的起法交 None。"""
+    if not LIST_CACHE_DIRECTORY or arguments != ["--list", "--force"]:
+        return None
+    key = hashlib.sha256(f"{os.path.realpath(root)}\0{name}".encode("utf-8")).hexdigest()[:24]
+    return os.path.join(LIST_CACHE_DIRECTORY, f"{key}.json")
+
+
 def start_stage_reporting(root, name, arguments, shim_directory, trace):
     """起一次 <root>/.claude/gate.d/<name> 那道阶段：返回 (退出码或 None（超时）, stdout, stderr, 被调了的替身, 进程收尾的问题或 None)。
     经 lib_process_group.run_in_own_session 起（文件头「起法」）：放进它自己的会话，超时与退出之后收整组、核会话里没有留下进程。
-    路径照「阶段目录 + 文件名」拼：函数单元库把这一层的阶段都算进闭包（判的就是它们）。"""
+    路径照「阶段目录 + 文件名」拼：函数单元库把这一层的阶段都算进闭包（判的就是它们）。
+    --list --force 在 LIST_CACHE_DIRECTORY 里已有这一道的结果就直接交那一份（只缓存退出了、没有超时、没有留下进程的）；弄坏开关 list-cache-ignored 下不读。"""
+    cache_file = list_cache_file(root, name, arguments)
+    if cache_file and BROKEN != "list-cache-ignored" and os.path.isfile(cache_file):
+        try:
+            with open(cache_file, encoding="utf-8") as handle:
+                cached = json.load(handle)
+            return cached["exit"], cached["stdout"], cached["stderr"], cached["called"], None
+        except (OSError, ValueError, KeyError):
+            pass
     stage_path = os.path.join(root, ".claude", "gate.d", name)
     environment = {key: value for key, value in os.environ.items() if key not in CLEARED_ENVIRONMENT}
     environment["PATH"] = shim_directory + os.pathsep + environment.get("PATH", "")
@@ -141,6 +156,15 @@ def start_stage_reporting(root, name, arguments, shim_directory, trace):
         called = sorted({line.strip() for line in handle if line.strip()})
     if BROKEN == "heavy-ignored":
         called = []
+    if cache_file and not run.timed_out and not run.problem():
+        try:
+            os.makedirs(LIST_CACHE_DIRECTORY, exist_ok=True)
+            temporary = f"{cache_file}.{os.getpid()}.{threading.get_ident()}"
+            with open(temporary, "w", encoding="utf-8") as handle:
+                json.dump({"exit": run.returncode, "stdout": run.stdout, "stderr": run.stderr, "called": called}, handle, ensure_ascii=False)
+            os.replace(temporary, cache_file)
+        except OSError:
+            pass
     return (None if run.timed_out else run.returncode), run.stdout, run.stderr, called, run.problem()
 
 
@@ -185,8 +209,24 @@ def tail(text, count=4):
     return " | ".join(lines[-count:]) if lines else "（没有输出）"
 
 
+class ImmediatePool:
+    """一次只跑一件、当场跑完的池（与 ThreadPoolExecutor 的 submit 同形）：自证里的单道样本阶段用它，起法与逐次起阶段时一样。"""
+
+    @staticmethod
+    def submit(function, *arguments):
+        future = concurrent.futures.Future()
+        future.set_result(function(*arguments))
+        return future
+
+
 def judge_stage(root, name, shim_directory, trace):
     """返回 (问题清单, 格数)；问题清单空就是这一道结构对。格名表缺时返回 (None, 0) 表示「跳过」只在弄坏开关下。"""
+    return begin_stage(root, name, shim_directory, trace, ImmediatePool())()
+
+
+def begin_stage(root, name, shim_directory, trace, pool):
+    """判一道阶段：文件头那几样当场判，--list 与 --check 写错格名两次起阶段交给 pool（彼此独立、各用各的 trace 文件）；
+    返回 finish()，调它等两次起阶段收回来，交 (问题清单, 格数)，问题的次序与逐次起时相同。"""
     stage_path = os.path.join(root, ".claude", "gate.d", name)
     problems = []
     with open(stage_path, encoding="utf-8", errors="replace") as handle:
@@ -196,8 +236,9 @@ def judge_stage(root, name, shim_directory, trace):
     cells = header_cells(stage_path)
     if not cells:
         if BROKEN == "table-ignored":
-            return None, 0
-        return problems + [f"{name}：文件头没有格名表（每格一行 # gate-cell: <格名> <判什么的一句>），--list 与 --check 没起它"], 0
+            return lambda: (None, 0)
+        no_table = (problems + [f"{name}：文件头没有格名表（每格一行 # gate-cell: <格名> <判什么的一句>），--list 与 --check 没起它"], 0)
+        return lambda: no_table
     seen = set()
     for number, cell, _title in cells:
         if not CELL_NAME.match(cell):
@@ -205,8 +246,13 @@ def judge_stage(root, name, shim_directory, trace):
         if cell in seen:
             problems.append(f"{name}:{number}：格名 {cell} 在格名表里写了两次")
         seen.add(cell)
+    listing = pool.submit(start_stage_reporting, root, name, ["--list", "--force"], shim_directory, f"{trace}.list")
+    unknown = pool.submit(start_stage_reporting, root, name, ["--check", UNKNOWN_CELL, "--force"], shim_directory, f"{trace}.unknown")
+    return lambda: finish_stage(name, cells, problems, listing, unknown)
 
-    exit_code, stdout, stderr, called, leftover_problem = start_stage_reporting(root, name, ["--list", "--force"], shim_directory, trace)
+
+def finish_stage(name, cells, problems, listing, unknown):
+    exit_code, stdout, stderr, called, leftover_problem = listing.result()
     if called:
         problems.append(f"{name}：--list 起了重活：{'、'.join(called)}")
     if leftover_problem:
@@ -224,7 +270,7 @@ def judge_stage(root, name, shim_directory, trace):
             expected_text = "；".join(f"{cell} {title}" for cell, title in expected)
             problems.append(f"{name}：--list 打出的格与格名表不一致：--list 是「{listed_text}」，格名表是「{expected_text}」")
 
-    exit_code, stdout, stderr, called, leftover_problem = start_stage_reporting(root, name, ["--check", UNKNOWN_CELL, "--force"], shim_directory, trace)
+    exit_code, stdout, stderr, called, leftover_problem = unknown.result()
     if called:
         problems.append(f"{name}：--check 写错的格名起了重活：{'、'.join(called)}")
     if leftover_problem:
@@ -241,13 +287,23 @@ def run(root):
     if not names:
         print(f"  ! {root}/.claude/gate.d/ 下一道阶段都没有，本次无对象可判")
         return 77
+    try:
+        jobs = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 取不了每台默认重活线程数：{error}")
+        print(f"  → 怎么办：{error.howto}")
+        return 2
     scratch = tempfile.mkdtemp(prefix="gate-structure-check-")
+    # 起阶段都在池里的线程上：停止信号的处理要在主线程先装好（收到 TERM、INT、HUP 时各线程起的会话逐个收整组，lib_process_group.install_stop_on_signals）
+    process_group.install_stop_on_signals(only_defaults=True)
     try:
         shim_directory = make_shims(scratch)
-        trace = os.path.join(scratch, "shim-trace")
         wrong_stages, problems, cell_count, judged = [], [], 0, 0
-        for name in names:
-            stage_problems, cells = judge_stage(root, name, shim_directory, trace)
+        # 各道阶段、每道的两次起阶段彼此独立（各自一个会话、各自的 trace 文件）：按每台默认重活线程数同时起；问题按阶段的次序汇总，与逐道串行时相同
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(int(jobs), 2 * len(names)))) as pool:
+            finishers = [begin_stage(root, name, shim_directory, os.path.join(scratch, f"shim-trace-{index}"), pool) for index, name in enumerate(names)]
+            outcomes = [finish() for finish in finishers]
+        for name, (stage_problems, cells) in zip(names, outcomes):
             if stage_problems is None:
                 continue
             judged += 1
@@ -263,7 +319,7 @@ def run(root):
         print(f"  ✗ {len(wrong_stages)}/{judged} 道阶段的结构不对：{'、'.join(wrong_stages)}")
         print("  → 怎么办：改用 .claude/gate.d/lib/stage-cells.sh（写法在它的文件头，样板是 doc-decisions.sh）："
               "文件头逐格写 # gate-cell: <格名> <判什么>，每格一个函数 stage_cell 登记；--list 之前不做任何重活。"
-              "规则：.claude/rules/verification.md「门禁的结构」。")
+              "规则：.claude/rules/verification-reference.md「门禁的结构」。")
         return 1
     print(f"  ✓ 门禁阶段的结构都对：查了 {judged} 道阶段、共 {cell_count} 格"
           f"（格名表在、--list 与表一致且没起重活、--check 写错格名退 2）")
@@ -464,6 +520,40 @@ def judge_group_case(case, root, environment):
     return wrong
 
 
+SELFTEST_COUNTING_STAGE = """#!/usr/bin/env bash
+# gate-cell: alpha 判甲
+# 自证样本：每被起一次往 starts 记一行，--list 照常打格名表
+printf "x\\n" >> starts
+case " $* " in
+  *" --list "*) printf "alpha\\t判甲\\n"; exit 0 ;;
+esac
+exit 0
+"""
+
+
+def judge_list_cache(root, work):
+    """同一道阶段的 --list --force 经 LIST_CACHE_DIRECTORY 连起两次：阶段只被起一次（样本阶段每被起一次往 starts 记一行），两次交回的相同。判错清单空就是判对。"""
+    global LIST_CACHE_DIRECTORY
+    saved = LIST_CACHE_DIRECTORY
+    LIST_CACHE_DIRECTORY = os.path.join(work, "list-cache-files")
+    scratch = tempfile.mkdtemp(prefix="gate-structure-check-cache-")
+    try:
+        shim_directory = make_shims(scratch)
+        first = start_stage_reporting(root, "20-counting.sh", ["--list", "--force"], shim_directory, os.path.join(scratch, "trace-first"))
+        second = start_stage_reporting(root, "20-counting.sh", ["--list", "--force"], shim_directory, os.path.join(scratch, "trace-second"))
+    finally:
+        LIST_CACHE_DIRECTORY = saved
+        shutil.rmtree(scratch, ignore_errors=True)
+    with open(os.path.join(root, "starts"), encoding="utf-8") as handle:
+        starts = sum(1 for line in handle if line.strip())
+    wrong = []
+    if starts != 1:
+        wrong.append(f"list-cache：同一道阶段的 --list --force 连起两次，阶段被起了 {starts} 次，该 1 次（第二次该读第一次落下的结果）")
+    if first != second:
+        wrong.append(f"list-cache：两次交回的不同：第一次 {first}，第二次 {second}")
+    return wrong
+
+
 def selftest():
     library = os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "lib", "stage-cells.sh")
     work = tempfile.mkdtemp(prefix="gate-structure-check-selftest-")
@@ -523,6 +613,10 @@ def selftest():
             if with_shim:
                 write_preflight_shim(root)
             wrong += judge_group_case(case, root, environment)
+        cache_root = os.path.join(work, "list-cache")
+        os.makedirs(os.path.join(cache_root, ".claude", "gate.d"))
+        write_stage(os.path.join(cache_root, ".claude", "gate.d"), "20-counting.sh", SELFTEST_COUNTING_STAGE)
+        wrong += judge_list_cache(cache_root, work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if wrong:

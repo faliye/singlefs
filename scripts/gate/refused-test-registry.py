@@ -35,6 +35,8 @@ python3 scripts/gate/admission.py test-plan <仓根> <种类> singlefs-verificat
       「✗ 自证 reason-too-short：」
   REFUSED_TEST_REGISTRY_BREAK=duplicate-rows-accepted  同一个测试函数登两行不判红
       「✗ 自证 duplicate-row：」
+  REFUSED_TEST_REGISTRY_BREAK=malformed-rows-accepted  不是两段的行不判红（当作没有这一行）
+      「✗ 自证 malformed-row：」
   REFUSED_TEST_REGISTRY_BREAK=count-gate-ignored  不核 PLAN 行报的拒算条数与逐条列出的 refused 行数是不是相等
       「✗ 自证 plan-count-mismatch：」
   REFUSED_TEST_REGISTRY_BREAK=unavailable-as-green  清单取不到、不完整当核过
@@ -86,6 +88,8 @@ def read_registry(root):
         where = f"{REGISTRY_TABLE}:{number}"
         fields = [field.strip() for field in line.split("\t#", 1)[0].split("\t")]
         if len(fields) != 2 or not fields[0]:
+            if broken("malformed-rows-accepted"):
+                continue
             found.append(f"{where} 是 {len(fields)} 段，要两段（测试函数全名、为什么非读活树不可，制表符分隔）")
             continue
         name, reason = fields
@@ -266,19 +270,19 @@ def selftest():
             elif wanted_text is not None and wanted_text not in shown:
                 failures.append((cell, f"应当报一处含「{wanted_text}」的问题，实际 {shown}"))
 
-        first, second = "tests/live_tree.rs::reads_the_live_tree", "tests/live_files.rs::reads_a_file_named_at_run_time"
+        tree_test, file_test = "tests/live_tree.rs::reads_the_live_tree", "tests/live_files.rs::reads_a_file_named_at_run_time"
         reason = "断言就是关于真仓里的登记表，要读活树"
-        row_first, row_second = f"{first}\t{reason}", f"{second}\t{reason}"
-        both = [row_first, row_second]
-        expect("clean", world("clean", both), plan([first, second]), 0)
-        expect("refusal-without-row", world("refusal-without-row", [row_first]), plan([first, second]), 1, f"{second} 拒算")
-        expect("registered-turns-green", world("registered-turns-green", both), plan([first, second]), 0)
-        expect("row-without-refusal", world("row-without-refusal", both), plan([first]), 1, f"{second} 已经不拒算")
-        expect("reason-too-short", world("reason-too-short", [f"{first}\t读活树", row_second]), plan([first, second]), 1, "只有 3 个字")
-        expect("duplicate-row", world("duplicate-row", both + [row_first]), plan([first, second]), 1, "登记了两次")
-        expect("malformed-row", world("malformed-row", [first, row_second]), plan([first, second]), 1, "是 1 段，要两段")
-        expect("plan-count-mismatch", world("plan-count-mismatch", both), plan([first, second], declared=3), NOT_RUN_EXIT, "PLAN 行报拒算 3 条，逐条行列出 2 条")
-        expect("plan-without-summary", world("plan-without-summary", both), plan([first, second], summary=False), NOT_RUN_EXIT, "末行")
+        tree_row, file_row = f"{tree_test}\t{reason}", f"{file_test}\t{reason}"
+        both = [tree_row, file_row]
+        expect("clean", world("clean", both), plan([tree_test, file_test]), 0)
+        expect("refusal-without-row", world("refusal-without-row", [tree_row]), plan([tree_test, file_test]), 1, f"{file_test} 拒算")
+        expect("registered-turns-green", world("registered-turns-green", both), plan([tree_test, file_test]), 0)
+        expect("row-without-refusal", world("row-without-refusal", both), plan([tree_test]), 1, f"{file_test} 已经不拒算")
+        expect("reason-too-short", world("reason-too-short", [f"{tree_test}\t读活树", file_row]), plan([tree_test, file_test]), 1, "只有 3 个字")
+        expect("duplicate-row", world("duplicate-row", both + [tree_row]), plan([tree_test, file_test]), 1, "登记了两次")
+        expect("malformed-row", world("malformed-row", [tree_test, file_row]), plan([tree_test, file_test]), 1, "是 1 段，要两段")
+        expect("plan-count-mismatch", world("plan-count-mismatch", both), plan([tree_test, file_test], declared=3), NOT_RUN_EXIT, "PLAN 行报拒算 3 条，逐条行列出 2 条")
+        expect("plan-without-summary", world("plan-without-summary", both), plan([tree_test, file_test], summary=False), NOT_RUN_EXIT, "末行")
 
         def fake_admission(name, request_body, plan_exit, plan_text):
             """假的 admission.py：test-functions-request 打判定种类与参数，test-plan 退指定的码、打指定的计划输出。"""
@@ -298,15 +302,15 @@ def selftest():
         request_text = "kind\tcrash-point-replay.sh:test-functions\nargument\t--profile\nargument\trelease\n"
         cells.append("admission-failed")
         code, _found, _registered, _count, failure, _refused = judge(world("admission-failed", both), None,
-                                                                    fake_admission("failed", request_text, 75, plan([first, second])))
+                                                                    fake_admission("failed", request_text, 75, plan([tree_test, file_test])))
         if code != NOT_RUN_EXIT or "退 75" not in (failure or ""):
             failures.append(("admission-failed", f"test-plan 退 75 应当按本次未跑退 {NOT_RUN_EXIT} 并写出退出码，实际 {code} {failure}"))
         cells.append("request-unreadable")
-        code, _found, _registered, _count, failure, _refused = judge(world("request-unreadable", both), None, fake_admission("unreadable", "", 0, plan([first, second])))
+        code, _found, _registered, _count, failure, _refused = judge(world("request-unreadable", both), None, fake_admission("unreadable", "", 0, plan([tree_test, file_test])))
         if code != NOT_RUN_EXIT or "test-functions-request" not in (failure or ""):
             failures.append(("request-unreadable", f"test-functions-request 什么都没打应当按本次未跑退 {NOT_RUN_EXIT} 并点名它，实际 {code} {failure}"))
         cells.append("admission-printed")
-        code, found, _registered, _count, failure, _refused = judge(world("admission-printed", both), None, fake_admission("printed", request_text, 0, plan([first, second])))
+        code, found, _registered, _count, failure, _refused = judge(world("admission-printed", both), None, fake_admission("printed", request_text, 0, plan([tree_test, file_test])))
         if code != 0:
             failures.append(("admission-printed", f"admission.py 打出完整计划、表对得上，应当核过，实际 {code} {found} {failure}"))
     finally:

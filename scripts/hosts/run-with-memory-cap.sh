@@ -32,7 +32,8 @@
 #   252    命令退出之后停了自己的 scope、回读没过（文件头「命令退出之后停自己的 scope」）：is-active 读到的不是 inactive 或 failed，或 cgroup.procs 里还有进程；
 #          stderr 逐个列留下的进程（进程号与命令行前 120 字）。只换掉命令自己的退出码（0–244、246–249）；245、250、253、254 照原样退，留下的进程照列。
 #   包装退非 0（命令自己的非 0、被信号杀的 128 + 信号号、245、250、253、254，包装被 TERM / INT 停）时，包装给命令建的临时目录里有东西就留着、stderr 打出路径；
-#   退 0 照删（文件头「这一条命令自己的临时目录」一段）。退出码本身不因此变。
+#   退 0 照删（文件头「这一条命令自己的临时目录」一段）。退出码本身不因此变。设了现场目录的搬进现场目录，搬齐、到总时限只搬了一部分、搬失败留在原处，
+#   三种都不改退出码（文件头「现场目录搬多少」）。
 #
 # 总上限（两台都是 50G，不设余量，不得超过这里设置的 50G；records/2026-10-30-编译绕过内存总上限.md）：照下面头一样有的定，不按整机内存减余量算：
 #   ① 环境里给了 RUN_WITH_MEMORY_CAP_SLICE_TOTAL（systemd 写法）：照它。只给自证与别的脚本的假世界压到几百 M 用；task-server 不设它。
@@ -60,19 +61,15 @@
 #   scope 还没建出来（systemd-run 还在起，stop 找不到单元）：改给 systemd-run 那一个进程发 TERM。这一次的峰值不记（量到的是半截）。
 # 命令退出之后停自己的 scope（命令退出之后 scope 里留着进程就一直活着；records/2026-10-31-task-server巡检.md）：外壳退出之后（不论命令退几、
 #   --check 那一次也算），读一次 scope 的 cgroup.procs（目录是外壳写进起跑标记的那一条），还有进程的往 stderr 打一行「还留着 N 个进程」并逐个列；再一律
-#   systemctl --user stop 自己的 $unit.scope，照 .claude/rules/service-stop-readback.md 回读：is-active 的输出是 inactive 或 failed、cgroup.procs 的内容是空的（目录已不在算空）才算停了；
+#   systemctl --user stop 自己的 $unit.scope， .claude/rules/command-safety-by-review.md 回读：is-active 的输出是 inactive 或 failed、cgroup.procs 的内容是空的（目录已不在算空）才算停了；
 #   回读没过退 252（文件头「退出码」），stderr 列留下的进程（stop_scope_after_command）。查结局（Result、读早了的 oom-kill）在停之前做完，停不改结局。
 #   弄坏开关 scope-left-after-exit 下不停（scope 里还有进程就一直活着）。
-# multi-host-run.sh 给这一层的一样（它文件头 ⑥）：RUN_WITH_MEMORY_CAP_UNIT_OUTPUT=<文件>，起 scope 之前把这一条的 scope 单元名（不带 .scope）写进去（先写 <文件>.partial 再改名），
-#   第二台清理时照它先停这一个 scope；读了就 unset，不传进命令；写不进说一句、照跑。
+# multi-host-run.sh 给这一层的两样（它文件头 ⑤⑥；读了就 unset，不传进命令；写不进说一句、照跑）：
+#   RUN_WITH_MEMORY_CAP_UNIT_OUTPUT=<文件>，起 scope 之前把这一条的 scope 单元名（不带 .scope）写进去（先写 <文件>.partial 再改名），第二台清理时照它先停这一个 scope。
+#   RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD=<文件>，建了这一条命令自己的临时目录（下面「这一条命令自己的临时目录」）就把它的全路径写进去（同样先写 <文件>.partial 再改名），
+#   包装退出时 EXIT trap 收拾完那一份之后删掉这份文件：文件还在就是包装没走到 EXIT（被 KILL / HUP），第二台清理时照它删留下的那一份。
+#   调用方给了 TMPDIR 的不写（那一份归调用方）。弄坏开关 temporary-record-unwritten 下不写，temporary-record-kept-at-exit 下退出时不删。
 #
-# 撞上限那一刻的内存明细（只记、不改判法；任务 9776 第 2 次在第二台撞 13824M，内核只杀了一个 anon-rss 0.9 GiB 的 python3，撞之前 current_bytes 从 843083776 跳到 10649669632，
-#   同一趟编译目录 203 GiB，推的是页缓存或没写回的脏页撑满了 scope）：在 scope 里跑的外壳在命令退出之后、scope 收尾之前读一次 scope 的 memory.stat（与峰值同一处），
-#   判出撞了这一条自己的上限（退 250）那一刻往 stderr 打一行，格式固定（两台同一行：第二台这一层的 stderr 经 multi-host-run.sh 接回本机日志）：
-#     RUN_WITH_MEMORY_CAP_OOM_STAT anon=<字节> file=<字节> file_dirty=<字节> file_writeback=<字节> shmem=<字节> oom_kill=<次数>
-#   前五样是 memory.stat 那几行，oom_kill 是 scope 自己 memory.events 的那一行；哪一样读不到写 unread。读这一行的是 task-server（task_server_lib.py 的 OOM_STAT_LINE：
-#   抄进那一次尝试的结局说明与推给会话的正文，分得清是堆还是页缓存）；两边的格式一起改。自证的假 cgroup（RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP）在时前五样改读它的 memory.stat。
-#   弄坏开关 cap-hit-stat-unprinted 下不打。
 # 撞顶的 scope 结局读早了（records/2026-10-23-subagent拆分提案.md 第一百三十七节）：命令退非 0、scope 自己的 memory.events 里 oom_kill 不为 0，而头一次查到的 Result 不是 oom-kill，
 #   再查至多 SCOPE_RESULT_LATE_ATTEMPTS 次（每次隔 0.1 秒）；查到 oom-kill 照撞顶办，另报一行「Result 读早了读到 …」；一直不是就按内核的计数判成 oom-kill，另报一行「Result 一直是 …」。
 #   两种都不报成「被外面停了」。
@@ -124,15 +121,32 @@
 #   SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1（名字与含义同 crates/singlefs-verification 的 KEEP_TEMPORARY_FILES_ENVIRONMENT_VARIABLE：只认 1）时不删，往 stderr 打一行
 #   「run-with-memory-cap: SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1：这一条命令的临时目录留着看现场：<路径>」，看完自己删。
 #   调用方设了 TMPDIR 的照它的：不另建、不删（那一份归调用方）。
-#   --check、--status、--selftest 不起命令，不建。包装自己被 KILL / HUP 时 EXIT trap 不走，那一份留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下（名字带包装进程号）。
+#   --check、--status、--selftest 不起命令，不建。包装自己被 KILL / HUP 时 EXIT trap 不走，那一份留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下（名字带包装进程号）；
+#   第二台那一层与本机一样建在默认的 /tmp 下（命令拿到的 TMPDIR 短，测试在它下面绑得上 Unix 套接字）；multi-host-run.sh 另给 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD，
+#   它的 ⑥ 照那份文件删留下的那一份（上面「multi-host-run.sh 给这一层的两样」；它文件头 ⑤「这一条命令自己的临时目录」）。
 # task-server 给这一层的两样（task-server/task_server_lib.py 文件头「现场」与「资源记录」的退出时峰值；包装开头读了就 unset，不传进命令）：
-#   RUN_WITH_MEMORY_CAP_PEAK_OUTPUT=<文件>  外壳在命令退出之后读的 scope 的 memory.peak（文件头「峰值表」一段：scope 收尾之前一定读到一次），是正整数就写进这份文件
-#     （先写 <文件>.partial 再改名）：命令比调用方一轮采样还短时，调用方照它记峰值（本机给 attempt_runner.py 读，第二台由 multi-host-run.sh 读了打回本机）。
-#     读不到不写；--check 不写；起了 scope 之后包装被 TERM / INT 停的不写（量到的是半截）。
+#   RUN_WITH_MEMORY_CAP_PEAK_OUTPUT=<文件>  这一条回收不掉的用量的峰值（文件头「峰值表」一段：扣了页缓存，采样子进程每 0.1 秒采的与外壳收尾时采的取大的，与峰值表记的同一个数），是正整数就写进这份文件
+#     （先写 <文件>.partial 再改名）：调用方一轮采样之间冒出来的峰值在这里，调用方与按轮采的取大的记（本机给 attempt_runner.py 读，第二台由 multi-host-run.sh 读了打回本机；撞上限的那一次同样写）。
+#     都没采到不写；--check 不写；起了 scope 之后包装被 TERM / INT 停的不写（量到的是半截）。弄坏开关 peak-output-with-page-cache 下写 scope 的 memory.peak（含页缓存）。
 #   RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY=<目录>  这一次尝试的现场目录（共享工作根下，两台同一个绝对路径；这一层不建它的上一层）：上面「退非 0 而那一份里有东西」
 #     与设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 这两种要留的，不留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下、不放标记、不进「只留最近 3 个」的轮换：
-#     整份 mv 成这个目录，stderr 打「…搬进了这一次尝试的现场目录：<目录>（命令输出里点到 <原路径> 的路径，换成这个目录读）」与一行谁删（task-server 删，不用自己删）。
-#     这个目录已在、或 mv 失败：说一句，照没设它那样留在原处、放标记、进轮换。退出码照旧。
+#     搬成这个目录（下面「现场目录搬多少」），stderr 打「…搬进了这一次尝试的现场目录：<目录>（命令输出里点到 <原路径> 的路径，换成这个目录读）」与一行谁删（task-server 删，不用自己删），
+#     原来那一份删掉。这个目录已在、或搬的过程失败：说一句，照没设它那样留在原处、放标记、进轮换。退出码照旧。
+#   现场目录搬多少（这个目录在共享根下，第二台经 NFS 写，一个一个建文件；任务 13229 第 2 次在第二台上搬约 8.9 万个文件 600 多秒没搬完、被服务判卡住，
+#     第 1 次搬了约 210 秒 mv 失败、留下 603M 半份；个数是那两次现场目录里量的条目数，秒数照日志推的）：
+#     先数一遍（不跟符号链接）：普通文件、符号链接要搬；表观至少 SCENE_SPARSE_IMAGE_MIN_BYTES、占盘不到表观一半的普通文件是稀疏的大镜像（例 replay.sh 自证 truncate 出来的 e9.img），
+#     不搬、只记路径与表观、占盘字节；套接字、管道、设备文件不搬、只记。要搬的个数过 SCENE_MOVE_ENTRY_LIMIT 或字节数过 SCENE_MOVE_BYTE_LIMIT 的，只搬日志
+#     （后缀在 SCENE_LOG_SUFFIXES 里、每份不过 SCENE_LOG_FILE_MAX_BYTES，按路径次序搬到两个上限为止），别的只记。
+#     并行与总时限（第二台往共享根逐个写小文件慢在每个文件的写等待，两个上限挡不住这种慢）：要搬的排成日志在前（后缀与大小照上一句）、别的在后，各自照路径次序；
+#     目录照路径先建好，再按这个次序派给 SCENE_MOVE_WORKERS 路的线程池并行搬，各路搬完一个在同一把锁里记数、打进度行；任何一个失败照整趟失败办（下面「中途失败」）。
+#     从开搬起过了 SCENE_MOVE_TIME_LIMIT_SECONDS 秒还没搬完的：停派、在搬的等它搬完，已搬的留下，没搬的在清单里记 time-limit-not-moved（排在后面的先落到这一种），
+#     照常写清单、改名成这个目录，照搬成了办（原来那一份删掉、不放标记，包装的退出码照旧），stderr 打一句「现场搬到总时限 N 秒没搬完：搬了 X 个，到时限没搬的 Y 个…」。
+#     每一份都写一张清单 SCENE_MANIFEST_NAME（放在现场目录里；一行一项：状态 moved / sparse-not-moved / over-limit-not-moved / special-not-moved / time-limit-not-moved、
+#     种类、表观字节、占盘字节、相对路径）。
+#     搬的过程往 stderr 打进度行「run-with-memory-cap: 搬现场进度：…」（开搬一行、每 SCENE_PROGRESS_EVERY_ENTRIES 个或隔 SCENE_PROGRESS_EVERY_SECONDS 秒一行、搬完或到总时限停一行）：
+#     服务判卡住看日志涨不涨；结局句「现场搬了 N 个（用了 S 秒）；没搬：…」不论进度行打不打都打。先搬进同一层的临时名 <这个目录>.partial-<进程号>
+#     （与这个目录在同一个文件系统），搬齐或到总时限、清单写完再改名成这个目录；
+#     中途失败（读不了、写不了、被 TERM / INT 停）先停派、等在搬的搬完，再删掉那份临时名、这个目录不建，原来那一份照旧留着。
 # 其余环境变量有默认，只在自证与特殊场合设：
 #   RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 这一条命令自己的临时目录建在哪个目录下，默认 /tmp（上一段）
 #   RUN_WITH_MEMORY_CAP_SLICE          slice 名，默认 singlefs-heavy.slice（名字里的 - 是 systemd 的层级：它挂在 singlefs.slice 底下）；只许 singlefs 开头的 .slice，别的按用法错退 251
@@ -150,6 +164,12 @@
 #                                             「exit wrapper-gone」：只给自证核「采样子进程不拖延收尾」那四例；带着自证的标记才认，读完就清掉、不传进命令
 #   RUN_WITH_MEMORY_CAP_SELFTEST_INTERRUPT_PROBE  设了的 --selftest 挂好收尾之后只开一个真 slice（一例 --check 64M），把「pid <进程号>」「slice <名>」「scratch <目录>」写进这个文件，
 #                                             再等着被停（至多 SELFTEST_INTERRUPT_PROBE_SECONDS 秒，到点退 1）：只给自证「自证开出 slice 之后被 TERM / INT 停时」那两格（文件头「自证的收尾」）；
+#                                             带着自证的标记才认，读完就清掉、不传进命令
+#   RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_ENTRY_LIMIT  搬现场的个数上限换成这个数（默认 SCENE_MOVE_ENTRY_LIMIT，文件头「现场目录搬多少」）：只给自证「搬现场超上限时」那一例用几十个文件造超上限；
+#                                             带着自证的标记才认，读完就清掉、不传进命令
+#   RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_TIME_LIMIT  搬现场的总时限换成这个数（秒，可带小数；默认 SCENE_MOVE_TIME_LIMIT_SECONDS）：只给自证「搬现场到总时限时」那一例用 1 秒造到时限；
+#                                             带着自证的标记才认，读完就清掉、不传进命令
+#   RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY  搬现场每个文件搬之前睡这么久（秒，可带小数；默认 0）：只给自证造慢拷贝（「搬现场 80 个每个慢 0.2 秒的文件时」「搬现场到总时限时」）；
 #                                             带着自证的标记才认，读完就清掉、不传进命令
 # 交给命令的两个标记：起 scope 时给命令设 RUN_WITH_MEMORY_CAP_OUTER_UNIT=<这一条的 scope 单元名>、RUN_WITH_MEMORY_CAP_OUTER_CAP=<这一条的上限>；
 #   命令要知道这一条给了多少，读 RUN_WITH_MEMORY_CAP_OUTER_CAP。
@@ -225,25 +245,32 @@
 #   RUN_WITH_MEMORY_CAP_BREAK=temporaryleft  包装退出时该删的也不删
 #       「命令正常退出之后，包装给它的临时目录应当删掉」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarydeletedonfailure  包装退非 0 也照删
-#       退 7、kill -9、撞顶、超时四格与「判红留着的只留最近 3 个」「设了现场目录、命令退 7 而临时目录里有东西时」红
+#       退 7、kill -9、撞顶、超时四格与「判红留着的只留最近 3 个」「设了现场目录、命令退 7 而临时目录里有东西时」
+#       「搬现场超上限时」「搬现场的过程」「现场里稀疏的大镜像」「搬现场中途失败时」「搬现场 80 个每个慢 0.2 秒的文件时」「搬现场到总时限时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarykeptempty  包装退非 0 而那一份是空的也留着
 #       「命令退非 0 而临时目录里什么都没写时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarykeptunbounded  留现场时不删更早留着的
 #       「判红留着的只留最近 3 个」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporaryshared  不给命令建它自己的临时目录
-#       临时目录五格（命令拿到的 TMPDIR 不在 root 底下）与「设了现场目录、命令退 7 而临时目录里有东西时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」红
+#       临时目录五格（命令拿到的 TMPDIR 不在 root 底下）与「给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 时」「设了现场目录、命令退 7 而临时目录里有东西时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」
+#       「搬现场超上限时」「搬现场的过程」「现场里稀疏的大镜像」「搬现场中途失败时」「搬现场 80 个每个慢 0.2 秒的文件时」「搬现场到总时限时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarykeepignored  不认 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1，照删
 #       「设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarycallerreplaced  调用方设了 TMPDIR 也另建一份顶掉它
 #       「调用方设了 TMPDIR 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=temporarycallerdeleted  调用方设了 TMPDIR 时照它的，退出时却连它一起删
 #       「调用方设了 TMPDIR 时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=temporary-record-unwritten  给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 也不把临时目录的全路径写进去
+#       「给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=temporary-record-kept-at-exit  包装退出时不删记着临时目录路径的那份文件（第二台清理会照它删掉留着看现场的那一份）
+#       「给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=oom-score-not-raised  scope 里的命令不抬 oom_score_adj（照内核缺省 0；TASK_OOM_SCORE_ADJUST）
 #       「scope 里的命令 oom_score_adj 应当是 500」红
-#   RUN_WITH_MEMORY_CAP_BREAK=peak-output-unwritten  命令退出之后不往 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写外壳读到的峰值（只靠调用方按轮采）
-#       「命令跑 0.1 秒就退时，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是外壳退出时读到的 scope 峰值」红
+#   RUN_WITH_MEMORY_CAP_BREAK=peak-output-unwritten  命令退出之后不往 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写峰值（只靠调用方按轮采）
+#       「命令跑 0.1 秒就退时，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是回收不掉的用量的峰值」与「页缓存涨满上限的那一趟，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是回收不掉的 16M」红
 #   RUN_WITH_MEMORY_CAP_BREAK=scene-kept-in-temporary-root  设了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY 也留在 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下、进轮换
-#       「设了现场目录、命令退 7 而临时目录里有东西时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」红
+#       「设了现场目录、命令退 7 而临时目录里有东西时」「设了现场目录与 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时」
+#       「搬现场超上限时」「搬现场的过程」「现场里稀疏的大镜像」「搬现场中途失败时」「搬现场 80 个每个慢 0.2 秒的文件时」「搬现场到总时限时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=memoryhighleft  不清 slice 上别的版本留下的 memory.high：「slice 上留着软上限 47.5G 时」「slice 原先不在、起来之后带着软上限 47.5G 时」  history-kept: 自证失败行原文，按原文匹配
 #       「清软上限之后读回不是 max 时」红
 #   RUN_WITH_MEMORY_CAP_BREAK=memoryhighunverified  清软上限之后不读回、当清掉了
@@ -254,8 +281,22 @@
 #       「平常跑（没有自证的标记）设了 RUN_WITH_MEMORY_CAP_BREAK」标记「空」与标记指到头一行不对的文件两格红
 #   RUN_WITH_MEMORY_CAP_BREAK=selftest-cleanup-unhooked  自证不挂收尾（EXIT、TERM、INT 都不挂），只在走到末尾时停自证开的 slice、删临时目录
 #       「自证开出 slice 之后被 TERM 停时」「自证开出 slice 之后被 INT 停时」两格红
-#   RUN_WITH_MEMORY_CAP_BREAK=cap-hit-stat-unprinted  撞了这一条自己的上限时不打 RUN_WITH_MEMORY_CAP_OOM_STAT 那一行（文件头「撞上限那一刻的内存明细」）
-#       「上限 64M 里分配 512 MiB 的探针撞了上限，stderr 应当恰好有一行 RUN_WITH_MEMORY_CAP_OOM_STAT」红
+#   RUN_WITH_MEMORY_CAP_BREAK=peak-output-with-page-cache  往 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写 scope 的 memory.peak（含页缓存），不是回收不掉的那一截
+#       「页缓存涨满上限的那一趟，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是回收不掉的 16M」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-move-unbounded  搬现场不看个数与字节上限，整份照搬（文件头「现场目录搬多少」）
+#       「搬现场超上限时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-progress-silent  搬现场不打进度行
+#       「搬现场的过程」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-sparse-moved  稀疏的大镜像照普通文件搬
+#       「现场里稀疏的大镜像」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-partial-left  搬现场中途失败不删搬了一半的临时名
+#       「搬现场中途失败时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-move-serial  搬现场只开 1 路，逐个搬
+#       「搬现场 80 个每个慢 0.2 秒的文件时」「搬现场到总时限时」红（后一格：1 秒时限里逐个搬只搬得完两份日志，排在日志后面的那一份也到时限没搬）
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-move-time-unlimited  搬现场不设总时限，一直搬到搬齐
+#       「搬现场到总时限时」红
+#   RUN_WITH_MEMORY_CAP_BREAK=scene-move-logs-not-first  搬现场不把日志排在前面，照路径次序派
+#       「搬现场到总时限时」红
 # 弄坏开关只在自证里认：RUN_WITH_MEMORY_CAP_BREAK 非空（guard-off 除外）、头一个参数不是 --selftest、又没有自证的标记的，在 preflight 之后、读参数之前退 2，
 #   stderr 点名这个变量只在自证（--selftest）里认，命令一行都没跑。自证的标记：RUN_WITH_MEMORY_CAP_SELFTEST_MARK=<文件>，那份文件在、头一行是 SELFTEST_MARK_CONTENT 那一行。
 #   --selftest 把它建在自己的临时目录里、export 给起的每一份包装；把这个开关原样传给包装的调用方自证（scripts/hosts/multi-host-run.sh）
@@ -294,6 +335,21 @@ MEBIBYTE=$((1024 * 1024))
 DEFAULT_KILL_GRACE_SECONDS=30
 KEPT_TEMPORARY_MARKER=".run-with-memory-cap-kept"   # 退非 0 留着的临时目录里放的标记（文件头「这一条命令自己的临时目录」一段）；只删带它的，别的包装正在用的不碰
 KEPT_TEMPORARY_DIRECTORIES_LIMIT=3              # 同一个 RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT 下留着的只留最近这么多个（照 command-safety.md 里 gate.sh 判红留现场的 3 个）
+# 搬现场的上限（文件头「现场目录搬多少」）：任务 13229 在第二台经 NFS 搬 62277 个约 210 秒、89048 个 629 秒没搬完，照慢的那次推每秒约 140 个；
+#   5000 个照这个速率约 36 秒，远在服务判卡住的 10 分钟（task-server/task_server_lib.py 错误类型表 stalled 一行）之内
+SCENE_MOVE_ENTRY_LIMIT=5000
+# 字节上限推的、没量：直连千兆 NFS（sync 导出）写按 50 MB/s 粗估，512 MiB 约 11 秒
+SCENE_MOVE_BYTE_LIMIT=$((512 * MEBIBYTE))
+# 搬现场的总时限（秒，从开搬算）：到点停派、在搬的搬完，没搬的记进清单、照搬成了办。第二台经 NFS 往共享根逐个写小文件量到过每秒不到 1 个
+#   （任务 14496：1022 秒搬了 937 个、9557315 字节），两个上限挡不住这种慢；120 秒远在服务判卡住的 10 分钟之内
+SCENE_MOVE_TIME_LIMIT_SECONDS=120
+SCENE_MOVE_WORKERS=16                             # 搬现场并行几路：慢在每个文件往共享盘写的等待，不在 CPU
+SCENE_SPARSE_IMAGE_MIN_BYTES=$((16 * MEBIBYTE))  # 表观至少这么大、占盘不到表观一半的普通文件算稀疏的大镜像，不搬（replay.sh 自证 truncate -s 512M 的 e9.img 占盘 0）
+SCENE_LOG_SUFFIXES=".log .out .err .report .txt .json .tsv .md"   # 超上限时只搬的日志：这几个后缀
+SCENE_LOG_FILE_MAX_BYTES=$MEBIBYTE                # 超上限时只搬的日志：每份不过这么大（再大的是数据，不是日志）
+SCENE_PROGRESS_EVERY_ENTRIES=100                  # 搬现场每搬这么多个打一行进度
+SCENE_PROGRESS_EVERY_SECONDS=5                    # 搬现场至多隔这么久打一行进度：服务判卡住要日志 10 分钟没涨
+SCENE_MANIFEST_NAME=".run-with-memory-cap-scene-manifest.tsv"   # 现场目录里的清单（文件头「现场目录搬多少」）
 SLICE_MEMORY_CAP_KEY="SLICE_MEMORY_CAP_BY_HOST" # 多机配置里各台总上限的键：<地址>=<总上限> 空白分隔，取这一台那一项（文件头「总上限」②）
 BROKEN_JUDGEMENT="${RUN_WITH_MEMORY_CAP_BREAK:-}"
 # 起 scope 的 systemd-run 放后台（文件头「起了 scope 之后包装被 TERM / INT 停」），脚本里 & 起的命令一律忽略 INT、进了 bash 也 trap 不上：包装自己进来时 INT 没被忽略的，给它设回默认；
@@ -316,7 +372,7 @@ if [[ -n "$BROKEN_JUDGEMENT" && "$BROKEN_JUDGEMENT" != guard-off && "${1:-}" != 
   exit 2
 fi
 # 只给自证的几个开关（文件头「其余环境变量」）：带着自证的标记才认，平常跑设了不起作用；采样那两个读完就清掉，不传进命令
-SELFTEST_SAMPLED_CGROUP="" SELFTEST_SAMPLER_TRACE="" SELFTEST_HOST="" SELFTEST_OOM_SCORE_ADJUST="" SELFTEST_INTERRUPT_PROBE=""
+SELFTEST_SAMPLED_CGROUP="" SELFTEST_SAMPLER_TRACE="" SELFTEST_HOST="" SELFTEST_OOM_SCORE_ADJUST="" SELFTEST_INTERRUPT_PROBE="" SELFTEST_SCENE_COPY_DELAY=0
 if [[ -n "${RUN_WITH_MEMORY_CAP_SELFTEST_MARK:-}" && "$(head -n 1 -- "$RUN_WITH_MEMORY_CAP_SELFTEST_MARK" 2>/dev/null)" == "$SELFTEST_MARK_CONTENT" ]]; then
   [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_OOM_SCORE_ADJUST:-}" =~ ^[0-9]+$ ]] && SELFTEST_OOM_SCORE_ADJUST="$RUN_WITH_MEMORY_CAP_SELFTEST_OOM_SCORE_ADJUST"
   [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_LATE_ATTEMPTS:-}" =~ ^[0-9]+$ ]] && SCOPE_RESULT_LATE_ATTEMPTS="$RUN_WITH_MEMORY_CAP_SELFTEST_LATE_ATTEMPTS"
@@ -324,8 +380,12 @@ if [[ -n "${RUN_WITH_MEMORY_CAP_SELFTEST_MARK:-}" && "$(head -n 1 -- "$RUN_WITH_
   SELFTEST_SAMPLER_TRACE="${RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLER_TRACE:-}"
   SELFTEST_HOST="${RUN_WITH_MEMORY_CAP_SELFTEST_HOST:-}"
   SELFTEST_INTERRUPT_PROBE="${RUN_WITH_MEMORY_CAP_SELFTEST_INTERRUPT_PROBE:-}"
+  [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_ENTRY_LIMIT:-}" =~ ^[0-9]+$ ]] && SCENE_MOVE_ENTRY_LIMIT="$RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_ENTRY_LIMIT"
+  [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_TIME_LIMIT:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] && SCENE_MOVE_TIME_LIMIT_SECONDS="$RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_TIME_LIMIT"
+  [[ "${RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] && SELFTEST_SCENE_COPY_DELAY="$RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY"
 fi
-unset RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLER_TRACE RUN_WITH_MEMORY_CAP_SELFTEST_HOST RUN_WITH_MEMORY_CAP_SELFTEST_INTERRUPT_PROBE
+unset RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLER_TRACE RUN_WITH_MEMORY_CAP_SELFTEST_HOST RUN_WITH_MEMORY_CAP_SELFTEST_INTERRUPT_PROBE \
+  RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_ENTRY_LIMIT RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_TIME_LIMIT RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY
 SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIRECTORY/heavy-threads.sh"     # heavy_thread_default：峰值表的线程数一列认 capped.sh default
 source "$SCRIPT_DIRECTORY/peer-host-lib.sh"     # peer_host_resolve_addresses、peer_host_configured_value、peer_host_value_for_host：总上限取这一台那一项（文件头「总上限」②）
@@ -342,8 +402,10 @@ TEMPORARY_ROOT="${RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT:-/tmp}"   # 这一条命令
 # task-server 给这一层的两样（文件头「task-server 给这一层的两样」）：读了就 unset，不传进命令
 PEAK_OUTPUT="${RUN_WITH_MEMORY_CAP_PEAK_OUTPUT:-}"
 SCENE_DIRECTORY="${RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY:-}"
-UNIT_OUTPUT="${RUN_WITH_MEMORY_CAP_UNIT_OUTPUT:-}"   # multi-host-run.sh 给的（文件头「multi-host-run.sh 给这一层的一样」）：scope 单元名写进它
-unset RUN_WITH_MEMORY_CAP_PEAK_OUTPUT RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY RUN_WITH_MEMORY_CAP_UNIT_OUTPUT
+# multi-host-run.sh 给的两样（文件头「multi-host-run.sh 给这一层的两样」）：scope 单元名、这一条命令自己的临时目录的全路径各写进一份
+UNIT_OUTPUT="${RUN_WITH_MEMORY_CAP_UNIT_OUTPUT:-}"
+TEMPORARY_RECORD="${RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD:-}"
+unset RUN_WITH_MEMORY_CAP_PEAK_OUTPUT RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY RUN_WITH_MEMORY_CAP_UNIT_OUTPUT RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD
 # 只认服务直接起的那一层（文件头「只认服务直接起的那一层」）：起 scope 时从命令的环境里摘掉；taskserverleaks 下不摘
 ADMITTED_BY_TASK_SERVER_UNSET=(-u RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER)
 if [[ "$BROKEN_JUDGEMENT" == taskserverleaks ]]; then ADMITTED_BY_TASK_SERVER_UNSET=(); fi
@@ -381,23 +443,15 @@ while read -r event_name event_count; do
     oom_kill) oom_kill="$event_count" ;;
   esac
 done < "$own_group/memory.events"
-current="" file_pages=0 unreclaimable="" stat_anon="" stat_file="" stat_file_dirty="" stat_file_writeback="" stat_shmem=""
+current="" file_pages=0 unreclaimable=""
 IFS= read -r current < "$own_group/memory.current"
 while read -r stat_name stat_value; do
   case "$stat_name" in
     active_file|inactive_file) [[ "$stat_value" =~ ^[0-9]+$ ]] && file_pages=$((file_pages + stat_value)) ;;
   esac
-  case "$stat_name" in
-    anon) stat_anon="$stat_value" ;;
-    file) stat_file="$stat_value" ;;
-    file_dirty) stat_file_dirty="$stat_value" ;;
-    file_writeback) stat_file_writeback="$stat_value" ;;
-    shmem) stat_shmem="$stat_value" ;;
-  esac
 done < "$own_group/memory.stat"
 [[ "$current" =~ ^[0-9]+$ ]] && unreclaimable=$((current > file_pages ? current - file_pages : 0))
-printf "peak %s\noom %s\noom_kill %s\nunreclaimable %s\nstat_anon %s\nstat_file %s\nstat_file_dirty %s\nstat_file_writeback %s\nstat_shmem %s\n" \
-  "$peak" "$own_oom" "$oom_kill" "$unreclaimable" "$stat_anon" "$stat_file" "$stat_file_dirty" "$stat_file_writeback" "$stat_shmem" > "$peak_file"
+printf "peak %s\noom %s\noom_kill %s\nunreclaimable %s\n" "$peak" "$own_oom" "$oom_kill" "$unreclaimable" > "$peak_file"
 exit "$command_exit"'
 
 # 用法错退 251（「命令一行都没跑」那一类）：退 2 就落进 0–249，与那条命令自己的退出码分不开（文件头「退出码」一段）
@@ -428,6 +482,20 @@ begin_own_temporary_directory() {
   fi
   TMPDIR="$own_temporary_directory"
   export TMPDIR
+  record_own_temporary_directory
+}
+
+# record_own_temporary_directory：给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD（文件头「multi-host-run.sh 给这一层的两样」）就把这一条命令自己的临时目录的全路径写进它
+# （先写 .partial 再改名），写成了置 temporary_record_written，EXIT trap 收拾完那一份之后删；写不进说一句、照跑。弄坏开关 temporary-record-unwritten 下不写
+temporary_record_written=0
+record_own_temporary_directory() {
+  [[ -n "$TEMPORARY_RECORD" && "$BROKEN_JUDGEMENT" != "temporary-record-unwritten" ]] || return 0
+  if { printf '%s\n' "$own_temporary_directory" > "$TEMPORARY_RECORD.partial" && mv -f -- "$TEMPORARY_RECORD.partial" "$TEMPORARY_RECORD"; } 2>/dev/null; then
+    temporary_record_written=1
+  else
+    rm -f -- "$TEMPORARY_RECORD.partial" 2>/dev/null
+    echo "run-with-memory-cap: 这一条命令的临时目录的路径写不进 $TEMPORARY_RECORD（照跑；包装被 KILL 时留下的 $own_temporary_directory 没人照它删）" >&2
+  fi
 }
 
 # prune_kept_temporary_directories <这一次留下的目录>：同一个 TEMPORARY_ROOT 下带标记的（退非 0 留着的）只留最近 KEPT_TEMPORARY_DIRECTORIES_LIMIT 个，
@@ -446,14 +514,189 @@ prune_kept_temporary_directories() {
   done
 }
 
-# move_into_scene <目录> <为什么留> <谁删>：设了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY（文件头「task-server 给这一层的两样」）就把这一份整个 mv 成那个目录、
-# stderr 点名新位置与谁删，交 0；没设、弄坏开关 scene-kept-in-temporary-root 下交 1；那个目录已在或 mv 失败说一句、交 1（调用方照原样留在 TEMPORARY_ROOT 下）
+# move_into_scene <目录> <为什么留> <谁删>：设了 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY（文件头「task-server 给这一层的两样」）就把这一份照「现场目录搬多少」搬成那个目录、
+# 删掉原来那一份，stderr 点名新位置与谁删，交 0；没设、弄坏开关 scene-kept-in-temporary-root 下交 1；那个目录已在或搬的过程失败说一句、交 1（调用方照原样留在 TEMPORARY_ROOT 下）
 move_into_scene() {
   [[ -n "$SCENE_DIRECTORY" && "$BROKEN_JUDGEMENT" != "scene-kept-in-temporary-root" ]] || return 1
-  if [[ -e "$SCENE_DIRECTORY" ]] || ! mv -- "$1" "$SCENE_DIRECTORY" 2>/dev/null; then
-    echo "run-with-memory-cap: 这一条命令的临时目录 $1 没搬进这一次尝试的现场目录 $SCENE_DIRECTORY（那里已有东西或 mv 失败），照旧留在 $TEMPORARY_ROOT 下" >&2
+  local mover_exit=0
+  if [[ -e "$SCENE_DIRECTORY" ]]; then
+    echo "run-with-memory-cap: 这一条命令的临时目录 $1 没搬进这一次尝试的现场目录 $SCENE_DIRECTORY（那里已有东西），照旧留在 $TEMPORARY_ROOT 下" >&2
     return 1
   fi
+  python3 -B /dev/fd/3 "$1" "$SCENE_DIRECTORY" "$BROKEN_JUDGEMENT" "$SCENE_MOVE_ENTRY_LIMIT" "$SCENE_MOVE_BYTE_LIMIT" "$SCENE_SPARSE_IMAGE_MIN_BYTES" \
+    "$SCENE_LOG_SUFFIXES" "$SCENE_LOG_FILE_MAX_BYTES" "$SCENE_PROGRESS_EVERY_ENTRIES" "$SCENE_PROGRESS_EVERY_SECONDS" "$SCENE_MANIFEST_NAME" \
+    "$SCENE_MOVE_WORKERS" "$SCENE_MOVE_TIME_LIMIT_SECONDS" "$SELFTEST_SCENE_COPY_DELAY" 3<<'PY' || mover_exit=$?
+# 搬现场（文件头「现场目录搬多少」）：数一遍、分出稀疏的大镜像与特殊文件、超上限只挑日志，日志排在前面，目录先建好、再派给线程池并行搬进同一层的临时名，
+# 到总时限停派、等在搬的搬完，清单写完再改名；搬齐与到总时限都交 0。中途失败停派、等在搬的搬完、删掉临时名、交 1（删不掉交 2）。进度行与结局句打在 stderr 上（服务判卡住看日志涨不涨）
+import os, shutil, signal, stat, sys, threading, time
+from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
+(source, scene, broken, entry_limit, byte_limit, sparse_minimum, log_suffixes, log_file_maximum,
+ progress_every_entries, progress_every_seconds, manifest_name, workers, time_limit, copy_delay) = sys.argv[1:15]
+entry_limit, byte_limit, sparse_minimum = int(entry_limit), int(byte_limit), int(sparse_minimum)
+log_file_maximum, progress_every_entries, progress_every_seconds = int(log_file_maximum), int(progress_every_entries), float(progress_every_seconds)
+log_suffixes = tuple(log_suffixes.split())
+workers = 1 if broken == "scene-move-serial" else int(workers)
+time_limit = None if broken == "scene-move-time-unlimited" else float(time_limit)
+copy_delay = float(copy_delay)   # 只给自证的慢拷贝：每个文件搬之前睡这么久（文件头「其余环境变量」）
+
+def say(text):
+    sys.stderr.write("run-with-memory-cap: " + text + "\n")
+    sys.stderr.flush()
+
+class Stopped(Exception):
+    pass
+
+def on_signal(number, frame):
+    raise Stopped(f"收到信号 {signal.Signals(number).name}")
+
+signal.signal(signal.SIGTERM, on_signal)
+signal.signal(signal.SIGINT, on_signal)
+
+def escaped(path):
+    return path.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n")
+
+def is_log(entry):
+    return entry[1] == "file" and entry[0].endswith(log_suffixes) and entry[2] <= log_file_maximum
+
+# 数一遍：(相对路径, 种类, 表观字节, 占盘字节)；目录不单列（搬文件之前照路径建），符号链接不跟；数不清（读不了、被停）就不开搬、交 1
+def walk_error(error):
+    raise error
+
+entries = []
+try:
+    for directory, subdirectories, files in os.walk(source, onerror=walk_error):
+        subdirectories.sort()
+        for name in sorted(files + [entry for entry in subdirectories if os.path.islink(os.path.join(directory, entry))]):
+            full = os.path.join(directory, name)
+            status = os.lstat(full)
+            relative = os.path.relpath(full, source)
+            if stat.S_ISLNK(status.st_mode):
+                entries.append((relative, "link", 0, 0))
+            elif stat.S_ISREG(status.st_mode):
+                allocated = status.st_blocks * 512
+                sparse = status.st_size >= sparse_minimum and allocated * 2 < status.st_size and broken != "scene-sparse-moved"
+                entries.append((relative, "sparse" if sparse else "file", status.st_size, allocated))
+            else:
+                entries.append((relative, "special", status.st_size, status.st_blocks * 512))
+except (OSError, Stopped) as error:
+    say(f"搬现场没开搬：数不清 {source} 里有什么（{error}）")
+    sys.exit(1)
+movable = [entry for entry in entries if entry[1] in ("file", "link")]
+movable_bytes = sum(entry[2] for entry in movable)
+over_limit = (len(movable) > entry_limit or movable_bytes > byte_limit) and broken != "scene-move-unbounded"
+chosen = set()
+if over_limit:
+    chosen_bytes = 0
+    for entry in movable:
+        if len(chosen) >= entry_limit:
+            break
+        if is_log(entry) and chosen_bytes + entry[2] <= byte_limit:
+            chosen.add(entry[0])
+            chosen_bytes += entry[2]
+else:
+    chosen = {entry[0] for entry in movable}
+to_move = [entry for entry in movable if entry[0] in chosen]
+if broken != "scene-move-logs-not-first":
+    to_move.sort(key=lambda entry: not is_log(entry))   # 稳定排序：日志在前、别的在后，各自照路径次序；到总时限没搬的是排在后面的
+total_bytes = sum(entry[2] for entry in to_move)
+silent = broken == "scene-progress-silent"
+if over_limit:
+    say(f"现场要搬 {len(movable)} 个、{movable_bytes} 字节，过了上限（{entry_limit} 个、{byte_limit} 字节）：只搬其中的日志 {len(to_move)} 个，别的只记进清单 {manifest_name}")
+
+staging = f"{scene}.partial-{os.getpid()}"
+started = time.monotonic()
+deadline = None if time_limit is None else started + time_limit
+progress_lock = threading.Lock()   # 管 moved 与 progress：各路搬完一个都在锁里记数、判要不要打进度行
+moved = set()
+progress = {"count": 0, "bytes": 0, "said": started}
+
+def move_one(entry):
+    relative, kind, size, allocated = entry
+    if copy_delay > 0:
+        time.sleep(copy_delay)
+    source_path = os.path.join(source, relative)
+    target_path = os.path.join(staging, relative)
+    if kind == "link":
+        os.symlink(os.readlink(source_path), target_path)
+    else:
+        shutil.copy2(source_path, target_path, follow_symlinks=False)
+    with progress_lock:
+        moved.add(relative)
+        progress["count"] += 1
+        progress["bytes"] += size
+        now = time.monotonic()
+        if not silent and (progress["count"] % progress_every_entries == 0 or now - progress["said"] >= progress_every_seconds):
+            say(f"搬现场进度：{progress['count']}/{len(to_move)} 个、{progress['bytes']}/{total_bytes} 字节（已用 {now - started:.0f} 秒）")
+            progress["said"] = now
+
+executor = None
+try:
+    os.mkdir(staging)
+    if not silent:
+        say(f"搬现场进度：开搬 {len(to_move)} 个、{total_bytes} 字节、{workers} 路并行、总时限 {'不设' if time_limit is None else f'{time_limit:g} 秒'} → {staging}（搬齐改名成 {scene}）")
+    for directory in sorted({os.path.dirname(entry[0]) for entry in to_move} - {""}):
+        os.makedirs(os.path.join(staging, directory), exist_ok=True)
+    executor = ThreadPoolExecutor(max_workers=workers)
+    futures = [executor.submit(move_one, entry) for entry in to_move]
+    # 等到搬齐、有一份失败或到总时限；每次至多等 1 秒，TERM / INT 在主线程上照常打断
+    while True:
+        remaining = None if deadline is None else deadline - time.monotonic()
+        if remaining is not None and remaining <= 0:
+            break
+        done, pending = wait(futures, timeout=1.0 if remaining is None else min(remaining, 1.0), return_when=FIRST_EXCEPTION)
+        for future in done:
+            future.result()
+        if not pending:
+            break
+    executor.shutdown(wait=True, cancel_futures=True)   # 到总时限：没开搬的撤掉，在搬的等它搬完
+    for future in futures:
+        if not future.cancelled():
+            future.result()
+    elapsed = time.monotonic() - started
+    states = {"sparse": "sparse-not-moved", "special": "special-not-moved"}
+    with open(os.path.join(staging, manifest_name), "w", encoding="utf-8", errors="surrogateescape") as manifest:
+        manifest.write("# 状态\t种类\t表观字节\t占盘字节\t相对路径（run-with-memory-cap.sh 文件头「现场目录搬多少」）\n")
+        for relative, kind, size, allocated in entries:
+            if relative in moved:
+                state = "moved"
+            elif relative in chosen:
+                state = "time-limit-not-moved"
+            else:
+                state = states.get(kind, "over-limit-not-moved")
+            manifest.write(f"{state}\t{kind}\t{size}\t{allocated}\t{escaped(relative)}\n")
+    os.rename(staging, scene)
+except (OSError, shutil.Error, Stopped) as error:
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    if executor is not None:
+        executor.shutdown(wait=True, cancel_futures=True)   # 先停派、等在搬的搬完，再删临时名：不然删的同时还有线程往里写
+    if broken != "scene-partial-left":
+        shutil.rmtree(staging, ignore_errors=True)
+    if os.path.lexists(staging):
+        say(f"✗ 搬现场失败（{error}），搬了一半的临时名 {staging} 还在")
+        sys.exit(2)
+    say(f"搬现场失败（{error}）：搬了一半的临时名已删，{scene} 没建")
+    sys.exit(1)
+sparse_count = sum(1 for entry in entries if entry[1] == "sparse")
+special_count = sum(1 for entry in entries if entry[1] == "special")
+moved_bytes = sum(entry[2] for entry in to_move if entry[0] in moved)
+time_limit_count = len(to_move) - len(moved)
+if not silent:
+    if time_limit_count:
+        say(f"搬现场进度：到总时限停 {len(moved)}/{len(to_move)} 个、{moved_bytes}/{total_bytes} 字节（用了 {elapsed:.0f} 秒）")
+    else:
+        say(f"搬现场进度：搬完 {len(to_move)} 个、{total_bytes} 字节（用了 {elapsed:.0f} 秒）")
+if time_limit_count:
+    say(f"现场搬到总时限 {time_limit:g} 秒没搬完：搬了 {len(moved)} 个，到时限没搬的 {time_limit_count} 个（清单里记成 time-limit-not-moved），已搬的留在现场目录里")
+say(f"现场搬了 {len(moved)} 个（用了 {elapsed:.1f} 秒）；没搬：稀疏的大镜像 {sparse_count} 个、套接字管道设备 {special_count} 个、超上限的 {len(movable) - len(to_move)} 个、"
+    f"到总时限的 {time_limit_count} 个；清单 {os.path.join(scene, manifest_name)}")
+PY
+  if (( mover_exit != 0 )); then
+    echo "run-with-memory-cap: 这一条命令的临时目录 $1 没搬进这一次尝试的现场目录 $SCENE_DIRECTORY（搬的过程失败，上一行是原因），照旧留在 $TEMPORARY_ROOT 下" >&2
+    return 1
+  fi
+  rm -rf -- "${1:?}"
+  [[ ! -e "$1" ]] || echo "run-with-memory-cap: 搬完现场之后原来那一份 $1 删不干净（rm -rf 之后回读还在）" >&2
   echo "run-with-memory-cap: $2：这一条命令的临时目录搬进了这一次尝试的现场目录：$SCENE_DIRECTORY（命令输出里点到 $1 的路径，换成这个目录读）" >&2
   echo "run-with-memory-cap: → 不用自己删：$3（task-server/task_server_lib.py 文件头「现场」）" >&2
   return 0
@@ -487,9 +730,13 @@ end_own_temporary_directory() {
   fi
 }
 
-# EXIT trap：收拾这一条命令自己的临时目录（退 0 删、退非 0 而里面有东西留着）；不调 exit，包装的退出码照旧
+# EXIT trap：收拾这一条命令自己的临时目录（退 0 删、退非 0 而里面有东西留着），再删记着它路径的那份文件（文件头「multi-host-run.sh 给这一层的两样」；
+# 弄坏开关 temporary-record-kept-at-exit 下不删）；不调 exit，包装的退出码照旧
 on_wrapper_exit() {
   end_own_temporary_directory "$?"
+  if (( temporary_record_written )) && [[ "$BROKEN_JUDGEMENT" != "temporary-record-kept-at-exit" ]]; then
+    rm -f -- "$TEMPORARY_RECORD"
+  fi
 }
 
 check_size_syntax() { # check_size_syntax <写法> <是什么>
@@ -1040,7 +1287,7 @@ sys.exit(0)
 PY
 }
 
-# write_peak_output <外壳退出时读到的 memory.peak>：设了 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT（文件头「task-server 给这一层的两样」）而读到的是正整数，写进那一份（先写临时文件再改名）；
+# write_peak_output <回收不掉的用量的峰值>：设了 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT（文件头「task-server 给这一层的两样」）而给的是正整数，写进那一份（先写临时文件再改名）；
 # 写不成说一句、退出码照旧；弄坏开关 peak-output-unwritten 下不写
 write_peak_output() {
   [[ -n "$PEAK_OUTPUT" && "$1" =~ ^[1-9][0-9]*$ && "$BROKEN_JUDGEMENT" != "peak-output-unwritten" ]] || return 0
@@ -1054,8 +1301,7 @@ write_peak_output() {
 run_capped() {
   local cap="$1" mode="$2" unit started_marker peak_file key command_threads_text exit_code result use_slice=1 slice_status
   local peak_bytes own_oom_count oom_kill_count scope_properties command_started command_ended gpu_verdict stopped_signal
-  local late_oom_note="" late_result_was late_oom_outcome stat_name stat_text=""
-  local -A memory_stat=()
+  local late_oom_note="" late_result_was late_oom_outcome
   shift 2
   if [[ "$BROKEN_JUDGEMENT" == "nocap" ]]; then
     "$@"
@@ -1085,7 +1331,7 @@ run_capped() {
     fi
   fi
   unit="singlefs-memory-cap-$$-$RANDOM$RANDOM"
-  if [[ "$mode" == run && -n "$UNIT_OUTPUT" ]]; then   # multi-host-run.sh 要的 scope 单元名（文件头「multi-host-run.sh 给这一层的一样」）
+  if [[ "$mode" == run && -n "$UNIT_OUTPUT" ]]; then   # multi-host-run.sh 要的 scope 单元名（文件头「multi-host-run.sh 给这一层的两样」）
     { printf '%s\n' "$unit" > "$UNIT_OUTPUT.partial" && mv -f -- "$UNIT_OUTPUT.partial" "$UNIT_OUTPUT"; } 2>/dev/null \
       || echo "run-with-memory-cap: scope 单元名写不进 $UNIT_OUTPUT（照跑；第二台清理时只能照会话号与标签找留下的进程）" >&2
   fi
@@ -1154,7 +1400,6 @@ run_capped() {
   trap - TERM INT
   result="$(scope_result "$unit")"
   peak_bytes="$(peak_file_value "$peak_file" peak)"
-  [[ "$mode" == run ]] && write_peak_output "$peak_bytes"
   own_oom_count="$(peak_file_value "$peak_file" oom)"
   oom_kill_count="$(peak_file_value "$peak_file" oom_kill)"
   # 回收不掉的用量的峰值（文件头「峰值表」一段）：采样子进程采到的与外壳收尾时采的那一次取大的；都没采到是空
@@ -1164,22 +1409,15 @@ run_capped() {
   if [[ -n "$sampled_peak" ]] && { [[ -z "$unreclaimable_peak" ]] || ((sampled_peak > unreclaimable_peak)); }; then
     unreclaimable_peak="$sampled_peak"
   fi
-  for stat_name in anon file file_dirty file_writeback shmem; do   # 撞上限那一刻的内存明细（文件头「撞上限那一刻的内存明细」）：外壳读的那几样
-    memory_stat[$stat_name]="$(peak_file_value "$peak_file" "stat_$stat_name")"
-  done
   if [[ -n "$SELFTEST_SAMPLED_CGROUP" ]]; then
-    # 自证的假 cgroup 目录（文件头「其余环境变量」）：memory.peak、oom_kill 与内存明细改读它的；回收不掉的峰值只认采样子进程从它那里采到的
+    # 自证的假 cgroup 目录（文件头「其余环境变量」）：memory.peak、oom_kill 改读它的；回收不掉的峰值只认采样子进程从它那里采到的
     IFS= read -r peak_bytes < "$SELFTEST_SAMPLED_CGROUP/memory.peak"
     oom_kill_count="$(awk '$1 == "oom_kill" {print $2}' "$SELFTEST_SAMPLED_CGROUP/memory.events" 2>/dev/null)"
     unreclaimable_peak="$sampled_peak"
-    for stat_name in anon file file_dirty file_writeback shmem; do
-      memory_stat[$stat_name]="$(awk -v wanted="$stat_name" '$1 == wanted {print $2}' "$SELFTEST_SAMPLED_CGROUP/memory.stat" 2>/dev/null)"
-    done
   fi
-  for stat_name in anon file file_dirty file_writeback shmem; do
-    [[ "${memory_stat[$stat_name]}" =~ ^[0-9]+$ ]] || memory_stat[$stat_name]=unread
-    stat_text+="$stat_name=${memory_stat[$stat_name]} "
-  done
+  if [[ "$mode" == run ]]; then   # 交给调用方的峰值（文件头「task-server 给这一层的两样」）；弄坏开关 peak-output-with-page-cache 下写 memory.peak
+    if [[ "$BROKEN_JUDGEMENT" == "peak-output-with-page-cache" ]]; then write_peak_output "$peak_bytes"; else write_peak_output "$unreclaimable_peak"; fi
+  fi
   rm -f -- "$peak_file" "$peak_file.partial"
   if [[ "$mode" != "run" ]]; then
     [[ "$result" != "unreadable" ]] || report_unavailable "--check 起的 scope $unit 查不到结局（systemctl --user show 出错）" "查用户级 systemd 还在不在（systemctl --user status）"
@@ -1225,10 +1463,6 @@ run_capped() {
     fi
     record_run own-cap "$key" "$cap" "$(size_in_bytes "$cap")" "$unreclaimable_peak" "$oom_kill_count" "$command_threads_text"
     echo "run-with-memory-cap: 撞了内存上限 $cap（scope $unit 的 Result=oom-kill，命令退出码 $exit_code）" >&2
-    if [[ "$BROKEN_JUDGEMENT" != "cap-hit-stat-unprinted" ]]; then   # 撞上限那一刻的内存明细（文件头那一段）：只记、不改判法
-      [[ "${oom_kill_count:-}" =~ ^[0-9]+$ ]] || oom_kill_count=unread
-      echo "RUN_WITH_MEMORY_CAP_OOM_STAT ${stat_text}oom_kill=$oom_kill_count" >&2
-    fi
     gpu_memory_note "$command_started" "$command_ended"
     return "$MEMORY_CAP_HIT_EXIT"
   fi
@@ -1460,12 +1694,6 @@ run_selftest() {
   if in_context env RUN_WITH_MEMORY_CAP_KEY=selftest-hog bash "$target" 64M python3 -c "$hog_code" 512 >"$scratch/hog.out" 2>"$scratch/hog.err"; then status=0; else status=$?; fi
   if [[ $status -ne $MEMORY_CAP_HIT_EXIT ]] || ! grep -q '撞了内存上限 64M' "$scratch/hog.err"; then
     fail "上限 64M 里分配 512 MiB 的探针应当退 $MEMORY_CAP_HIT_EXIT 并报「撞了内存上限 64M」，实际退 $status：$(cat "$scratch/hog.out" "$scratch/hog.err")"
-  fi
-  # 撞上限那一刻的内存明细（文件头那一段）：恰好一行、整行对上固定格式、oom_kill 不为 0
-  checked=$((checked + 1))
-  oom_stat_lines="$(grep -c '^RUN_WITH_MEMORY_CAP_OOM_STAT ' "$scratch/hog.err")"
-  if [[ "$oom_stat_lines" != 1 ]] || ! grep -Eq '^RUN_WITH_MEMORY_CAP_OOM_STAT anon=[0-9]+ file=[0-9]+ file_dirty=[0-9]+ file_writeback=[0-9]+ shmem=[0-9]+ oom_kill=[1-9][0-9]*$' "$scratch/hog.err"; then
-    fail "上限 64M 里分配 512 MiB 的探针撞了上限，stderr 应当恰好有一行 RUN_WITH_MEMORY_CAP_OOM_STAT anon=… file=… file_dirty=… file_writeback=… shmem=… oom_kill=<不为 0>，实际 $oom_stat_lines 行：$(grep '^RUN_WITH_MEMORY_CAP_OOM_STAT' "$scratch/hog.err")"
   fi
   # 撞了自己的上限的那一次记成撞顶（峰值记上限）（文件头「峰值表」一段）
   checked=$((checked + 1))
@@ -1973,7 +2201,7 @@ $(head_characters 600 "$scratch/memory-high-$fake_high_case.err")"
       printf '%s\n' $((40 * MEBIBYTE)) > "$fake_cgroup/memory.peak"
       printf 'low 0\nhigh 0\nmax 3\noom 1\noom_kill 1\n' > "$fake_cgroup/memory.events"
     fi
-    if in_context env RUN_WITH_MEMORY_CAP_KEY="selftest-sampled-$case_label" RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP="$fake_cgroup" bash "$target" 64M sleep 0.5 \
+    if in_context env RUN_WITH_MEMORY_CAP_KEY="selftest-sampled-$case_label" RUN_WITH_MEMORY_CAP_SELFTEST_SAMPLED_CGROUP="$fake_cgroup" RUN_WITH_MEMORY_CAP_PEAK_OUTPUT="$scratch/sampled-$case_label.peak" bash "$target" 64M sleep 0.5 \
         2>"$scratch/sampled-$case_label.err"; then sampled_status=0; else sampled_status=$?; fi
     output="$(peak_row "selftest-sampled-$case_label")"
     checked=$((checked + 1))
@@ -1981,6 +2209,10 @@ $(head_characters 600 "$scratch/memory-high-$fake_high_case.err")"
       [[ $sampled_status -eq 0 && "$output" == "7|$((16 * MEBIBYTE))|$((16 * MEBIBYTE)):clean:unreclaimable" ]] \
         || fail "页缓存涨满上限（memory.current 等于上限 64M、其中 48M 是页缓存，memory.peak 64M、oom_kill 0）的那一趟应当退 0、峰值表记回收不掉的 16M 且 clean（「7|$((16 * MEBIBYTE))|$((16 * MEBIBYTE)):clean:unreclaimable」），不记上限，\
 实际退 $sampled_status、记的「$output」（列数|峰值|近几次）：$(cat "$scratch/sampled-$case_label.err")"
+      # 交给调用方的峰值与峰值表同一个口径（文件头「task-server 给这一层的两样」）：扣了页缓存
+      checked=$((checked + 1))
+      [[ "$(cat "$scratch/sampled-$case_label.peak" 2>/dev/null)" == "$((16 * MEBIBYTE))" ]] \
+        || fail "页缓存涨满上限的那一趟，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是回收不掉的 16M（$((16 * MEBIBYTE))），实际「$(cat "$scratch/sampled-$case_label.peak" 2>/dev/null)」"
     else
       [[ $sampled_status -eq 0 && "$output" == "7|$((64 * MEBIBYTE))|$((64 * MEBIBYTE)):hit:unreclaimable" ]] \
         || fail "scope 的 memory.events 里 oom_kill 1 而 Result 没报 oom-kill（memory.peak 40M、回收不掉的 30M，没到上限 64M）的那一趟应当退 0、峰值表记成撞了顶、峰值记上限（「7|$((64 * MEBIBYTE))|$((64 * MEBIBYTE)):hit:unreclaimable」），\
@@ -2210,7 +2442,7 @@ $root 底下剩「$(ls -A "$root" 2>/dev/null | tr '\n' ' ')」：$(head_charact
     fail "设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 时临时目录应当留着、stderr 打出它的路径（退 0、$root 底下那一份与命令写的 left-by-command 都在），\
 实际退 $status、命令拿到的 TMPDIR 是「$output」、那一份$([[ -n "$output" && -e "$output" ]] && echo '在' || echo '不在')：$(head_characters 600 "$scratch/temporary-kept.err")"
   fi
-  rm -rf -- "${root:?}"
+  rm -rf -- "${scratch:?}/temporary-root-kept"
   # 调用方自己给了 TMPDIR：命令拿到的就是它，包装不另建、不删；那一份与调用方放进去的、命令写的文件都还在
   fresh_context 256M
   root="$scratch/temporary-root-caller"
@@ -2228,9 +2460,27 @@ $root 底下剩「$(ls -A "$root" 2>/dev/null | tr '\n' ' ')」：$(head_charact
 实际退 $status、命令拿到的 TMPDIR 是「$output」、调用方那一份$([[ -e "$caller" ]] && echo "在（里面：$(ls -A "$caller" 2>/dev/null | tr '\n' ' ')）" || echo '不在了')、\
 $root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-caller.err")"
   fi
+  # 给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD（文件头「multi-host-run.sh 给这一层的两样」）：命令跑着时那份文件里是它拿到的 TMPDIR 的全路径，
+  # 命令里看不到这个变量，包装退出之后那份文件（连同 .partial）不在了
+  local record_file record_seen
+  fresh_context 256M
+  root="$scratch/temporary-root-record"
+  recorded="$scratch/temporary-record.path"
+  record_file="$scratch/temporary-record.written"
+  mkdir -p "$root"
+  checked=$((checked + 1))
+  if in_context env -u TMPDIR -u SINGLEFS_KEEP_TEST_TEMPORARY_FILES RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$root" RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD="$record_file" \
+      bash "$target" 64M bash -c "${code}"'{ cat -- "$2" 2>/dev/null || echo 读不到; printf "%s\n" "${RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD-没有}"; } > "$1.record"; exit 0' \
+      temporary-case "$recorded" "$record_file" >/dev/null 2>"$scratch/temporary-record.err"; then status=0; else status=$?; fi
+  output="$(cat "$recorded" 2>/dev/null)"
+  record_seen="$(tr '\n' '|' 2>/dev/null < "$recorded.record")"
+  if [[ $status -ne 0 || "$output" != "$root"/singlefs-run-with-memory-cap-* || "$record_seen" != "$output|没有|" || -e "$record_file" || -e "$record_file.partial" ]]; then
+    fail "给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 时包装应当把建的临时目录的全路径写进那份文件、命令里看不到这个变量、退出之后删掉那份文件（退 0、命令跑着时读到「<它的 TMPDIR>|没有|」），\
+实际退 $status、命令拿到的 TMPDIR 是「$output」、命令跑着时读到「$record_seen」、那份文件退出之后$([[ -e "$record_file" ]] && echo '还在' || echo '不在了')：$(head_characters 600 "$scratch/temporary-record.err")"
+  fi
   # 设了现场目录（文件头「task-server 给这一层的两样」）：要留的那一份整个搬成那个目录（不放标记、root 底下不剩、原路径不在了）、stderr 点名新位置；
   # 退 7 的与设了 SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 退 0 的各一例。命令里看不到这两个变量
-  local scene_case scene_directory scene_environment_seen
+  local scene_case scene_directory scene_environment_seen scene_elapsed scene_manifest scene_misplaced scene_not_moved scene_logs_not_moved
   for scene_case in failed kept; do
     fresh_context 256M
     root="$scratch/temporary-root-scene-$scene_case"
@@ -2259,14 +2509,99 @@ $root 底下剩「$leftover」：$(head_characters 600 "$scratch/temporary-calle
 命令看到的「$scene_environment_seen」：$(head_characters 600 "$scratch/temporary-scene-$scene_case.err")"
     fi
   done
-  # 退出时读到的峰值（文件头「task-server 给这一层的两样」）：命令跑 0.1 秒就退，比调用方一轮采样短；外壳退出时读的 scope 的 memory.peak 写进 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份
+  # 现场目录搬多少（文件头「现场目录搬多少」）：六例，命令往 TMPDIR 里写好东西再退 7，包装把它搬进现场目录。
+  #   scene_run <例名> <命令正文> [<环境 键=值>…]：置 root、recorded、scene_directory、status、output（命令拿到的 TMPDIR）、leftover（root 底下剩的），stderr 在 $scratch/scene-<例名>.err
+  scene_run() {
+    local run_name="$1" run_body="$2"
+    shift 2
+    fresh_context 256M
+    root="$scratch/temporary-root-scene-$run_name"
+    recorded="$scratch/temporary-scene-$run_name.path"
+    scene_directory="$scratch/scene-of-attempt-$run_name"
+    mkdir -p "$root"
+    checked=$((checked + 1))
+    if in_context env -u TMPDIR -u SINGLEFS_KEEP_TEST_TEMPORARY_FILES RUN_WITH_MEMORY_CAP_TEMPORARY_ROOT="$root" RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY="$scene_directory" "$@" \
+        bash "$target" 64M bash -c "${code}${run_body}; exit 7" temporary-case "$recorded" >/dev/null 2>"$scratch/scene-$run_name.err"; then status=0; else status=$?; fi
+    output="$(cat "$recorded" 2>/dev/null)"
+    leftover="$(ls -A "$root" 2>/dev/null)"
+  }
+  manifest_has() { # manifest_has <清单> <状态> <相对路径>：清单里有这一行（第一列状态、第五列路径）交 0
+    awk -F'\t' -v state="$2" -v path="$3" '$1 == state && $5 == path { found = 1 } END { exit found ? 0 : 1 }' "$1" 2>/dev/null
+  }
+  # 超上限（个数上限经自证专用的变量换成 20）：30 个数据文件加两份日志，只搬两份日志，数据文件只记进清单，原来那一份删掉
+  scene_run bounded 'mkdir -p "$TMPDIR/bulk" "$TMPDIR/logs"; for index in $(seq 1 30); do printf "%s\n" "$index" > "$TMPDIR/bulk/part-$index.bin"; done
+    printf "日志\n" > "$TMPDIR/logs/run.log"; printf "报告\n" > "$TMPDIR/logs/detail.report"' RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_ENTRY_LIMIT=20
+  if [[ $status -ne 7 || -n "$leftover" || ! -f "$scene_directory/logs/run.log" || ! -f "$scene_directory/logs/detail.report" || -e "$scene_directory/bulk" ]] \
+      || ! manifest_has "$scene_directory/$SCENE_MANIFEST_NAME" over-limit-not-moved bulk/part-1.bin || ! manifest_has "$scene_directory/$SCENE_MANIFEST_NAME" moved logs/run.log; then
+    fail "搬现场超上限时（个数上限 20、要搬 33 个）应当只搬日志、别的只记进清单（退 7、现场里有 logs/run.log 与 logs/detail.report、没有 bulk、清单里 bulk/part-1.bin 记 over-limit-not-moved、$root 底下一个不剩），\
+实际退 $status、现场里「$(cd "$scene_directory" 2>/dev/null && find . -mindepth 1 -maxdepth 2 | sort | head -n 12 | tr '\n' ' ')」、$root 底下剩「$leftover」：$(head_characters 600 "$scratch/scene-bounded.err")"
+  fi
+  # 进度行：250 个小文件（个数上限照默认），开搬一行、每 100 个一行、搬完一行
+  scene_run progress 'mkdir -p "$TMPDIR/many"; for index in $(seq 1 250); do : > "$TMPDIR/many/entry-$index"; done'
+  if [[ $status -ne 7 || "$(find "$scene_directory/many" -type f 2>/dev/null | wc -l)" -ne 250 ]] || ! grep -qF '搬现场进度：开搬' "$scratch/scene-progress.err" \
+      || ! grep -qF '搬现场进度：100/' "$scratch/scene-progress.err" || ! grep -qF '搬现场进度：200/' "$scratch/scene-progress.err" || ! grep -qF '搬现场进度：搬完' "$scratch/scene-progress.err"; then
+    fail "搬现场的过程应当打进度行（退 7、现场里 250 个文件都在、stderr 里有「搬现场进度：开搬」「搬现场进度：100/」「搬现场进度：200/」「搬现场进度：搬完」），\
+实际退 $status、现场里 $(find "$scene_directory/many" -type f 2>/dev/null | wc -l) 个、进度行「$(grep -F '搬现场进度：' "$scratch/scene-progress.err" | tr '\n' ' ')」：$(head_characters 600 "$scratch/scene-progress.err")"
+  fi
+  # 稀疏的大镜像：truncate 出来的 32M（占盘 0）不搬、清单里记路径与表观字节，旁边的小日志照搬
+  scene_run sparse 'mkdir -p "$TMPDIR/replay-out"; truncate -s 32M "$TMPDIR/replay-out/e9.img"; printf "x\n" > "$TMPDIR/replay-out/small.log"'
+  if [[ $status -ne 7 || -n "$leftover" || ! -f "$scene_directory/replay-out/small.log" || -e "$scene_directory/replay-out/e9.img" ]] \
+      || ! awk -F'\t' '$1 == "sparse-not-moved" && $3 == 33554432 && $5 == "replay-out/e9.img" { found = 1 } END { exit found ? 0 : 1 }' "$scene_directory/$SCENE_MANIFEST_NAME" 2>/dev/null; then
+    fail "现场里稀疏的大镜像应当不搬、只记路径与大小（退 7、现场里有 replay-out/small.log、没有 replay-out/e9.img、清单里 e9.img 记 sparse-not-moved 与表观 33554432 字节），\
+实际退 $status、现场里「$(cd "$scene_directory" 2>/dev/null && find . -mindepth 1 | sort | tr '\n' ' ')」、清单「$(grep -F e9.img "$scene_directory/$SCENE_MANIFEST_NAME" 2>/dev/null | tr '\t' ' ')」：$(head_characters 600 "$scratch/scene-sparse.err")"
+  fi
+  # 中途失败：五份读得了的日志在前、一份读不了的（chmod 000）在后，搬到它时失败：搬了一半的临时名删掉、现场目录不建、原来那一份照旧留在 root 下（放标记）
+  scene_run failing 'for index in 1 2 3 4 5; do printf "%s\n" "$index" > "$TMPDIR/early-$index.log"; done; printf "锁着\n" > "$TMPDIR/locked.log"; chmod 000 "$TMPDIR/locked.log"'
+  if [[ $status -ne 7 || -e "$scene_directory" || -n "$(compgen -G "$scene_directory.partial-*")" || ! -e "$output/locked.log" || ! -f "$output/$KEPT_TEMPORARY_MARKER" ]] \
+      || ! grep -qF '搬了一半的临时名已删' "$scratch/scene-failing.err" || ! grep -qF "没搬进这一次尝试的现场目录 $scene_directory" "$scratch/scene-failing.err"; then
+    fail "搬现场中途失败时应当不留半份（退 7、$scene_directory 与 $scene_directory.partial-* 都不在、原来那一份连同 locked.log 留在 $root 下、有标记、stderr 说搬了一半的临时名已删），\
+实际退 $status、现场目录$([[ -e "$scene_directory" ]] && echo '在' || echo '不在')、临时名「$(compgen -G "$scene_directory.partial-*" | tr '\n' ' ')」、原来那一份「$output」$([[ -n "$output" && -e "$output" ]] && echo '在' || echo '不在')：\
+$(head_characters 600 "$scratch/scene-failing.err")"
+  fi
+  [[ -n "$output" && -e "$output/locked.log" ]] && chmod 600 "$output/locked.log"
+  # 并行（自证专用的慢拷贝每个文件睡 0.2 秒）：80 个文件逐个搬不会少于 80 × 0.2 = 16 秒，16 路并行约 1 秒；
+  #   结局句「现场搬了 80 个（用了 S 秒）」的 S 应当不到逐个搬的一半（8 秒）：比的是逐个搬的下限，不靠机器快慢
+  scene_run parallel 'mkdir -p "$TMPDIR/slow"; for index in $(seq 1 80); do printf "%s\n" "$index" > "$TMPDIR/slow/part-$index.bin"; done' \
+    RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY=0.2
+  # 个数不钉 80：现场里另有这一趟自己带的文件（量到搬的是 81 个），这一格核的是那 80 个都在与用时
+  scene_elapsed="$(grep -oE '现场搬了 [0-9]+ 个（用了 [0-9]+[.][0-9]+ 秒）' "$scratch/scene-parallel.err" | grep -oE '用了 [0-9]+[.][0-9]+' | grep -oE '[0-9]+[.][0-9]+' | head -n 1)"
+  if [[ $status -ne 7 || -n "$leftover" || "$(find "$scene_directory/slow" -type f 2>/dev/null | wc -l)" -ne 80 || -z "$scene_elapsed" ]] \
+      || ! awk -v elapsed="$scene_elapsed" 'BEGIN { exit (elapsed + 0 < 80 * 0.2 / 2) ? 0 : 1 }'; then
+    fail "搬现场 80 个每个慢 0.2 秒的文件时应当并行搬、用时不到逐个搬的一半（退 7、现场里 80 个都在、$root 底下一个不剩、结局句「现场搬了 80 个（用了 S 秒）」的 S 不到 8），\
+实际退 $status、现场里 $(find "$scene_directory/slow" -type f 2>/dev/null | wc -l) 个、$root 底下剩「$leftover」、用了「$scene_elapsed」秒：$(head_characters 600 "$scratch/scene-parallel.err")"
+  fi
+  # 总时限（自证专用的变量换成 1 秒，慢拷贝每个文件睡 0.5 秒）：120 个数据文件排在路径前面（a-bulk/）、两份日志排在路径后面（z-logs/），16 路 1 秒只搬得了几十个；
+  #   日志应当先搬，已搬的在现场里，没搬的数据文件在清单里记 time-limit-not-moved、不在现场里，照搬成了办（退 7、原来那一份删掉、不放标记、stderr 点名现场目录与到时限那一句）
+  scene_run timelimit 'mkdir -p "$TMPDIR/a-bulk" "$TMPDIR/z-logs"; for index in $(seq 1 120); do printf "%s\n" "$index" > "$TMPDIR/a-bulk/part-$index.bin"; done
+    printf "日志\n" > "$TMPDIR/z-logs/run.log"; printf "报告\n" > "$TMPDIR/z-logs/detail.report"' \
+    RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_COPY_DELAY=0.5 RUN_WITH_MEMORY_CAP_SELFTEST_SCENE_TIME_LIMIT=1
+  scene_manifest="$scene_directory/$SCENE_MANIFEST_NAME"
+  scene_not_moved="$(awk -F'\t' '$1 == "time-limit-not-moved" { count++ } END { print count + 0 }' "$scene_manifest" 2>/dev/null)"
+  scene_logs_not_moved="$(awk -F'\t' '$1 == "time-limit-not-moved" && $5 !~ /[.]bin$/ { count++ } END { print count + 0 }' "$scene_manifest" 2>/dev/null)"
+  scene_misplaced="$(awk -F'\t' '$1 == "moved" || $1 == "time-limit-not-moved" { print $1 "\t" $5 }' "$scene_manifest" 2>/dev/null \
+    | while IFS=$'\t' read -r manifest_state manifest_path; do
+        if [[ "$manifest_state" == moved && ! -f "$scene_directory/$manifest_path" ]] || [[ "$manifest_state" == time-limit-not-moved && -e "$scene_directory/$manifest_path" ]]; then
+          printf '%s %s；' "$manifest_state" "$manifest_path"
+        fi
+      done)"
+  if [[ $status -ne 7 || -n "$leftover" || ! -f "$scene_directory/z-logs/run.log" || ! -f "$scene_directory/z-logs/detail.report" || -e "$scene_directory/$KEPT_TEMPORARY_MARKER" \
+        || -n "$(compgen -G "$scene_directory.partial-*")" || ! "$scene_not_moved" =~ ^[1-9][0-9]*$ || "$scene_logs_not_moved" != 0 || -n "$scene_misplaced" ]] \
+      || ! manifest_has "$scene_manifest" moved z-logs/run.log || ! grep -qF '到时限没搬的' "$scratch/scene-timelimit.err" \
+      || ! grep -qF "搬进了这一次尝试的现场目录：$scene_directory" "$scratch/scene-timelimit.err"; then
+    fail "搬现场到总时限时应当照搬成了办、日志先搬、没搬的记进清单（退 7、$root 底下一个不剩、现场里有 z-logs/run.log 与 z-logs/detail.report、没有标记、没有临时名、\
+清单里至少一行 time-limit-not-moved 且都是 a-bulk/ 下的 .bin、记 moved 的都在现场里、记 time-limit-not-moved 的都不在、stderr 有「到时限没搬的」与「搬进了这一次尝试的现场目录」），\
+实际退 $status、$root 底下剩「$leftover」、time-limit-not-moved 「$scene_not_moved」行（其中不是 .bin 的「$scene_logs_not_moved」行）、清单与现场对不上的「$scene_misplaced」、\
+现场里「$(cd "$scene_directory" 2>/dev/null && find . -name '*.log' -o -name '*.report' | sort | tr '\n' ' ')」：\
+$(head_characters 600 "$scratch/scene-timelimit.err")"
+  fi
+  # 退出时交的峰值（文件头「task-server 给这一层的两样」）：命令跑 0.1 秒就退，比调用方一轮采样短；回收不掉的用量的峰值写进 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份
   fresh_context 256M
   checked=$((checked + 1))
   rm -f -- "$scratch/exit-peak"
   if in_context env RUN_WITH_MEMORY_CAP_PEAK_OUTPUT="$scratch/exit-peak" RUN_WITH_MEMORY_CAP_KEY=selftest-exit-peak bash "$target" 64M sleep 0.1 2>"$scratch/exit-peak.err"; then status=0; else status=$?; fi
   output="$(cat "$scratch/exit-peak" 2>/dev/null)"
   if [[ $status -ne 0 || ! "$output" =~ ^[1-9][0-9]*$ || -e "$scratch/exit-peak.partial" ]]; then
-    fail "命令跑 0.1 秒就退时，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是外壳退出时读到的 scope 峰值（退 0、一个正整数、不剩 .partial），实际退 $status、读到「$output」：$(head_characters 600 "$scratch/exit-peak.err")"
+    fail "命令跑 0.1 秒就退时，RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 那一份应当是回收不掉的用量的峰值（退 0、一个正整数、不剩 .partial），实际退 $status、读到「$output」：$(head_characters 600 "$scratch/exit-peak.err")"
   fi
   # scope 里的命令抬 oom_score_adj（TASK_OOM_SCORE_ADJUST）：整机吃紧时先挑任务进程，不挑常驻服务。
   # oom_score_adj 只抬得上去、降不回来，自证经服务起时已继承了抬过的值：目标取自己此刻的值 + 1（RUN_WITH_MEMORY_CAP_SELFTEST_OOM_SCORE_ADJUST），读到它才说明是被测包装设的
@@ -2438,7 +2773,7 @@ D-Bus 连不上时跑命令与 --check 都退 $MEMORY_CAP_UNAVAILABLE_EXIT 且�
 scope 里一直收 TERM 时峰值照记、起了 scope 之后给包装发 TERM / INT 时先停自己开的 scope 且标记与 scope 都不留、\
 自证开出 slice 之后被 TERM / INT 停时退 143 / 130 且它开的 slice 都不再 active、临时目录删掉、超过限时退 $TIME_LIMIT_HIT_EXIT、\
 峰值表的口径（页缓存涨满上限记回收不掉的那一截、oom_kill 大于 0 而 Result 没报的记撞顶）、采样子进程不拖延收尾（四种收尾）、撞顶的 scope 结局读早了与一直读不到都报撞了上限、\
-failed 而 Result 读到 success 时到 journal 找原因、这一条命令自己的临时目录（五种结局、空的照删、只留最近 3 个、SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 留着、调用方给的 TMPDIR 照它的且不删）、\
+failed 而 Result 读到 success 时到 journal 找原因、这一条命令自己的临时目录（五种结局、空的照删、只留最近 3 个、SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1 留着、调用方给的 TMPDIR 照它的且不删、给了 RUN_WITH_MEMORY_CAP_TEMPORARY_RECORD 就把临时目录的全路径写进它且退出时删掉）、\
 峰值表的线程数一列六种各记对、没有服务的准入标记退 $MEMORY_CAP_UNAVAILABLE_EXIT 且命令没跑、被服务起的命令里面再调这一份退 $MEMORY_CAP_UNAVAILABLE_EXIT 且命令没跑、\
 已由 task-server 准入的一条命令看不到那个变量、跑完不留 scope、--status 私有配置三种、用法错四种都退 $MEMORY_CAP_UNAVAILABLE_EXIT）"
 }
@@ -2481,4 +2816,7 @@ PEAK_TABLE="${RUN_WITH_MEMORY_CAP_PEAKS:-}"   # 空串是默认那一份，记�
 trap on_wrapper_exit EXIT
 begin_own_temporary_directory
 run_capped "$cap" run "$@"
+
+
+
 exit $?

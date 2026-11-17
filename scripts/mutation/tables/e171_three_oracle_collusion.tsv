@@ -63,3 +63,9 @@ X70_补位合计把补不上的也算换上	        substituted += substitute !=
 X71_行分析不套补位	    merged, _ = rows_with_substitutes(row_directories(rows_roots), substitution_roots or [])	    merged = row_directories(rows_roots)
 X72_编不过的日志序号与试过的名字不同号	f"compile-failed-{failed_attempt_number}.log"	f"compile-failed-{failed_attempt_number + 1}.log"
 X73_复跑开关不起作用	        if getattr(arguments, "keep_compile_failures_as_they_are", False):	        if False:
+X74_比对器补位把取回的原行当补位	        if taken_again_unsubstituted:	        if False:
+X75_只取把库里记红的行不当记红	            elif record.get("verdict") != "green":	            elif record.get("verdict") not in ("green", "red"):
+X76_只查也往输出根里写行	            elif check_only:	            elif check_only and False:
+X77_只取库里取到的行不解进输出根	                unpack_directory(output, row_directory)	                pass
+X78_只取不逐行点名缺的行	    for number, reason in missing:\n        printer(f"E171_ROW_NOT_IN_THE_LIBRARY row={number} reason={reason}")	    for number, reason in missing[:0]:\n        printer(f"E171_ROW_NOT_IN_THE_LIBRARY row={number} reason={reason}")
+X79_只取有缺照打行	    if missing:\n        printer(f"  ✗ E171 逐行驱动只取：{len(missing)} 行库里没有键相同、判绿的那一条（上面逐行 E171_ROW_NOT_IN_THE_LIBRARY），这一趟一行都不现判")	    if False:\n        printer(f"  ✗ E171 逐行驱动只取：{len(missing)} 行库里没有键相同、判绿的那一条（上面逐行 E171_ROW_NOT_IN_THE_LIBRARY），这一趟一行都不现判")

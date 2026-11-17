@@ -13,8 +13,8 @@ V9 G6 的 RefFS 列不查 RefFS 入口	    for column in (COLUMN_CRASH_JUDGE, CO
 V10 漏判取批 2	    return frozenset(row for row in members if not column_red(counts, row, streams, batch, field_names))	    return frozenset(row for row in members if not column_red(counts, row, streams, BATCHES[1], field_names))
 V11 多了按个数	    more = missed_today - missed_r1	    more = frozenset(sorted(missed_today)[len(missed_r1):])
 V12 D 不要求 r1 计入分母	        elif not counted(r1_categories, row, reading, batch):	        elif False:
-V13 键不含改坏用的变异行	f"list_line={row.list_line}", f"mutation_line={row.mutation_line_sha256}",	f"list_line={row.list_line}",
-V14 哨兵不挑	    sentinels = tuple(sorted(order[:sentinel_count(len(reusable))]))	    sentinels = tuple(sorted(order[:0]))
+V13 请求不含改坏用的变异行	f"line:mutation-line={json.dumps(row.mutation_line, ensure_ascii=False)}",	f"line:mutation-line={row.number}",
+V14 哨兵不挑	    return tuple(sorted(order[:sentinel_count(len(reusable))]))	    return tuple(sorted(order[:0]))
 # 登记修订 3 补的 24 条（登记落地清单上一段写「无用例」的那几行，每条改坏一处判法、红在 test_*.py 里点名那一格；名字以「落地」起头，不另编号）。
 落地 拷树不排除 target	["rsync", "-a", "--exclude", "target", source + "/", os.path.join(destination, entry) + "/"]	["rsync", "-a", source + "/", os.path.join(destination, entry) + "/"]
 落地 改动清单只记第一行	*SYNCED_ENTRIES).splitlines())	*SYNCED_ENTRIES).splitlines()[:1])
@@ -52,3 +52,14 @@ V14 哨兵不挑	    sentinels = tuple(sorted(order[:sentinel_count(len(reusable
 落地 逐行驱动不交多机配置	    os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(e171_research_side.REPOSITORY_ROOT, os.environ))	    pass
 落地 逐行驱动线道数默认写死 1	    parser.add_argument("--lanes", type=int, default=None,	    parser.add_argument("--lanes", type=int, default=1,
 落地 逐行驱动不给线道数时只开一条	        lanes = max(1, registered_threads // max(1, threads if threads is not None else LANE_THREADS))	        lanes = 1
+落地 O3 执行器目录换回 487	O3_EXECUTOR_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496"	O3_EXECUTOR_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487"
+落地 O3 一侧不把 frozen_o3 换到 496	point_frozen_o3_at_the_496_directory(frozen_o3)	pass
+落地 对应表 sha256 不照搬迁登记倒换	    if actual != expected_sha256 and expected_sha256 not in sha256_before_moves(content):	    if actual != expected_sha256:
+# 判定库那一层（经 scripts/experiment-apparatus/long_run_item_verdicts.py）的 6 条：每条改坏一处，红在 test_full_table_run.py 点名的那一条（名字以「复用」起头）。
+复用 拒算的行照进请求	if row.refusal and not broken("refused-row-requested"):	if False:
+复用 碰到模块集合不拒算	return any(token in mutation.original_text() + mutation.replacement_text() for token in MODULE_SET_TOKENS)	return False
+复用 合并不核库里产物的 sha256	if output is not None and sha256_bytes(output) == record.get("output_sha256")}	if output is not None}
+复用 收尾红不进复用账	    if code != 0:\n        problems.append(f"item_verdicts_finish_exit_{code}")	    if False:\n        problems.append(f"item_verdicts_finish_exit_{code}")
+复用 现判的行不记进库	if plan.recorded(number):	if False:
+复用 不入库的那一包不留	if not plan.in_the_library(number):	if False:
+判法 E171 目录只在 e171_research_side 里插	    sys.path.insert(1, e171_research_side.E171_DIRECTORY)	    pass

@@ -1,0 +1,36 @@
+# 被测的是 scripts/experiment-apparatus/e207_strict_scan_steps_histories.rs：它不是 scripts/experiment-apparatus 里的 bin，而是拷进插了读数的副本，当 crates/singlefs-verification 的集成测试编、起（入口 e207-strict-scan-steps-run.sh）。
+# mutate.sh 只会在 scripts/experiment-apparatus 里起 cargo test --release --bin <名>，那里没有这份用例，所以这张表不由 mutate.sh 跑。
+# 量窗的取法（声明行的式子与写法、冷文件池、探针前缀取哪个文件、扩展窗口与阴性对照在哪几个点上做）在 e207_strict_scan_steps_window_choices.rs，
+# 它另编成 bin，单测与变异表 scripts/mutation/tables/e207_strict_scan_steps_window_choices.tsv 经 mutate.sh 跑；这张表只留历史用例自己那几处。
+# 登记 research/prompts/e207-preregistration.md 第九节的 M13 在第一行；其余几行登记之外新增。
+# 每一行由谁抓：
+#   m13_units_of_not_refreshed：入口 --break-history units_of_not_refreshed --item files_10_units_1000__head 用弄坏开关 E207_RUN_BREAK=units_of_not_refreshed 起同一处改坏；
+#     same_mount 里 W2 第二次取到同一个文件那一行 name=declared 的 user_units 由 1 变 1000，入口打 caught=yes。
+#   probe_prefix_dropped、extended_window_dropped：丢的是调用处，单测碰不到（要起真副本走完一项历史），未证红。产物上由模型的量窗形状核对
+#     （e207_strict_scan_steps.rs 的 window_shape_mismatches，单测 the_window_shape_check_names_a_missing_probe_prefix_and_extended_window）
+#     报 window_shape_ok=false，点名 same_mount/P1:0≠1 或 same_mount/W5:0≠200 这类。
+m13_units_of_not_refreshed	    if units_of_is_refreshed_after_an_overwrite() {	    if false {
+probe_prefix_dropped	            self.probe_prefix(pool, live);	            let _ = live;
+extended_window_dropped	        if choices::extended_window_runs(self.state, self.point_name) {	        if false {
+#
+# 分片（登记第十二节执行员修订 4）三处，由入口的服务分片合并核账和小规模等价核对抓，不由单测抓（要起真副本走一遍历史）：
+#   shard_prints_every_note：每一片把放前缀的读数也打出来 → 合并出的产物比不分片的多出重复行，真实小规模等价核对（base__head 分 3 片对不分片，逐字节比）抓。
+#   shard_never_ends_early：非最后一片到区间末不收尾 → 它的正文里有 item_done，合并核账 ⑤ 点名「不是最后一片正文里有 item_done」抓。
+#   shard_start_count_not_noted：不记区间起点的固定点次数 → 片尾标记的 settle_calls_from 恒为 0，合并核账 ③ 点名「固定点次数对不上」抓（片数 ≥ 2 的项）。
+shard_prints_every_note	        self.shard.is_none_or(|shard| shard.prints_at(self.user_changes))	        true
+shard_never_ends_early	            if self.user_changes == shard.to && !shard.is_last() {	            if false {
+shard_start_count_not_noted	            if self.user_changes == shard.from {	            if false {
+#
+# 修订 3 的阳性对照与紧凑盘（入口 --break-history 与 --device-test 抓，不由单测抓）：
+#   slots_placed_undercount_switch_ignored：入口 --break-history slots_placed_undercounted --item base__head 打 caught=no（对账行里 slots_placed 不再比 image_changed_unit_slots 少）。
+#   image_witness_flip_switch_ignored：--break-history image_witness_flipped --item base__plain 的产物进模型 head_against_plain 对拍，first_differing 不再是 remounted/W2/5。
+#   image_points_use_the_compact_device：取镜像的点（base、files_1000）走了紧凑盘，pool.image() 当场停在「紧凑盘不交镜像」，任何一项 base__head 都跑不出 item_done。
+slots_placed_undercount_switch_ignored	                    if run_break_is("slots_placed_undercounted") { placed.saturating_sub(1) } else { placed }	                    placed
+image_witness_flip_switch_ignored	            let witness_is_flipped = run_break_is("image_witness_flipped") && !counted && self.state == "remounted" && operation_name == "W2" && index == 5;	            let witness_is_flipped = false;
+image_points_use_the_compact_device	    !IMAGE_POINTS.contains(&point_name) && !PER_OPERATION_IMAGE_POINTS.contains(&point_name)	    true
+# 下面 pin_ 起头的各行由谁抓：在插了读数的副本里（plain 构建）起历史用例文件末尾那三条钉绝对值的测试（the_six_mebibyte_ring_puts_the_unit_area_at_slot_1408、the_registered_points_carry_the_registered_geometry、the_base_history_makes_thirty_three_user_changes_and_notes_forty_two_steps），改坏之后该有一条红；脚本 scripts/experiment-apparatus/prove-histories-pins.sh 逐行证。
+pin_ring_bytes_five_mebibytes	const JOURNAL_RING_BYTES: u64 = 6 << 20;	const JOURNAL_RING_BYTES: u64 = 5 << 20;
+pin_units_1000_area_halved	units(1_000, 21, 1_000, 4_000)	units(1_000, 20, 1_000, 4_000)
+pin_base_unlinks_changed	    unlinks: 10,	    unlinks: 11,
+pin_unlink_step_run_twice	            one_unlink_of_the_history(pool, history)?;	            one_unlink_of_the_history(pool, history)?; one_unlink_of_the_history(pool, history)?;
+pin_big_file_fill_dropped	    fill_a_file(pool, &mut history.tally, big, data_units)?;	    let _ = data_units;

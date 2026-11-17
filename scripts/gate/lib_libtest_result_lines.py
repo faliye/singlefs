@@ -41,9 +41,9 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
   记号：一行里的 NOT_RUN_<原因>（后面接空白或行尾；kind 是 not-run，text 从它起到同一行下一处 NOT_RUN_ 之前），与判段判在 CPU 的行
       （CRASH_POINT_REPLAY_JUDGE route=cpu、CRASH_POINT_REPLAY_PARALLEL_START / _FINISHED 带 judge=cpu；kind 是 cpu-judging）。记号认作谁打的，那几条不记；
       cpu_judging_recordable（门禁在多机配置没开 GPU 时给，D13 已定项 17「复用与剪枝不看设备」）下 cpu-judging 照样交出记号、不让谁不记，not-run 照旧不记：
-      serial（这一趟带了 --test-threads 1，libtest 在测试开跑时就打「test <名> ... 」）：记号之前最近的那一条「test <名> ... 」；之前一条都没有的认作这一段全部。
+      serial（日志是只开一个测试线程跑的，libtest 在测试开跑时就打「test <名> ... 」；门禁与入口脚本的每一趟都不给它）：记号之前最近的那一条「test <名> ... 」；之前一条都没有的认作这一段全部。
       不是 serial（几条同时跑，libtest 在测试跑完才打它的结果行）：这一段里结果行（打散的按结局那一行）在记号之后的全部、连同认不出结局而起头在记号之后的，
-      即打这一行时还没跑完的都算。complete 是 candidates 一定罩住了打这一行的那一条（serial 下找到了最近那一条；别的情形要有汇总行、这一段 unseen 是 0）。
+      即打这一行时还没跑完的都算；记号接在别的测试的「test <名> ... 」后面的同样这样认，同一行里的 test 名不算打它的那一条。complete 是 candidates 一定罩住了打这一行的那一条（serial 下找到了最近那一条；别的情形要有汇总行、这一段 unseen 是 0）。
 命令行：
   lib_libtest_result_lines.py failed-names <日志|->   一行一个 FAILED 的全名（不带 should panic 那一段），- 读标准输入；
       退 0；汇总行报了失败而一条 FAILED 结果行都没取到退 3（名字取不到：日志不全、或解析又有盲区）；读不了或用法错退 2
@@ -65,9 +65,9 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
   LIBTEST_RESULT_LINES_BREAK=per-binary-count-unchecked  binary_runs 不核「结果行条数 = 汇总行三个数之和」，一律当对得上
     本库「逐条认出测试名与结局：--nocapture 打散了结果行的那一段对不上」
   LIBTEST_RESULT_LINES_BREAK=marker-withholds-whole-binary  一段里有记号就整段不记（门禁 excluded_binaries_of_log 的做法）
-    本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable 逐条打 green、withheld、marker…」；连带门禁 crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
+    本库「按条记库：一段三条、一条打了 NOT_RUN_…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」「按条记库：几条同时跑，别的测试打的记号接在结果行起头后面…」「recordable 逐条打 green、withheld、marker…」；连带门禁 crash-point-replay 的 GATE_CRASH_POINT_REPLAY_BREAK=withhold-whole-binary
   LIBTEST_RESULT_LINES_BREAK=count-mismatch-withholds-whole-binary  没打散的结果行条数与汇总行对不上就整段不记（binary_runs 的 consistent 当门槛）
-    本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」
+    本库「按条记库：结果行被打散，接得上结局的照记…」「按条记库：带 --test-threads 1 的一段…」「按条记库：没开 GPU 时判段判在 CPU 的照记…」「按条记库：几条同时跑，别的测试打的记号接在结果行起头后面…」
     「按条记库：这一段另有对不上号的单独一行结局，接出来的结局不认…」「recordable 逐条打 green、withheld、marker…」；连带同上那个门禁开关
   LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也把判段判在 CPU 的那一条不记
     本库「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable --cpu-judging-recordable…」
@@ -520,6 +520,19 @@ def selftest():
           and [name for name, _reason in recordable_accounts[0].withheld] == ["gpu_second"]
           and [(marker.kind, marker.candidates) for marker in recordable_accounts[0].markers] == [("not-run", ("gpu_second",)), ("cpu-judging", ("gpu_third",))],
           repr(recordable_accounts))
+    # 几条同时跑：记号是 parallel_third 打的，接在 parallel_first 的结果行起头后面。照 serial 认会把记号归给同一行的 parallel_first、真打它的 parallel_third 记绿
+    interleaved = "\n".join([
+        "     Running tests/parallel_gpu.rs (target/release/deps/parallel_gpu-0000000000000008)", "running 3 tests",
+        "test parallel_first ... NOT_RUN_NO_GPU_ADAPTER test=parallel_third reason=样本", "ok",
+        "test parallel_second ... ok", "test parallel_third ... ok", "",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"])
+    interleaved_account = recordable_results(interleaved)[0]
+    interleaved_as_serial = recordable_results(interleaved, serial=True)[0]
+    check("按条记库：几条同时跑，别的测试打的记号接在结果行起头后面：打这一行时还没出结果的都不记（真打它的那一条在里面）；同一段当 serial 认就把它记绿，门禁与入口不能给 serial",
+          interleaved_account.recorded == [] and "parallel_third" in dict(interleaved_account.withheld)
+          and interleaved_account.markers[0].candidates == ("parallel_first", "parallel_second", "parallel_third")
+          and [parsed.full_name for parsed in interleaved_as_serial.recorded] == ["parallel_second", "parallel_third"],
+          repr((interleaved_account, interleaved_as_serial)))
     cpu_judged = "\n".join([
         "     Running tests/plain_stream.rs (target/release/deps/plain_stream-0000000000000007)", "running 2 tests",
         "test plain_stream_not_run ... ignored", "CRASH_POINT_REPLAY_JUDGE route=cpu why_not_the_gpu=gpu_not_enabled_in_the_configuration threads=4",
@@ -560,7 +573,7 @@ def selftest():
     print(f"  ✓ lib_libtest_result_lines 自检通过（查了 {cells} 格：ok、FAILED、should panic、带理由的 ignored、用时后缀、rustdoc 全名、"
           "不是结果行的四种、汇总行、点名省掉模块路径、FAILED 全名按次序、failed-names 的标准输入、名字取不到退 3、读文件、读不了退 2、"
           "逐条认出测试名与结局（按测试二进制切段、条数与汇总行对不上的段整段不认、binary-results）、"
-          "按条记库（打了记号的那一条不记、打散的结果行接得上结局的照记、带 --test-threads 1 的段记号归正在跑的那一条、"
+          "按条记库（打了记号的那一条不记、打散的结果行接得上结局的照记、带 --test-threads 1 的段记号归正在跑的那一条、几条同时跑时接在结果行起头后面的记号打这一行时还没出结果的都算、"
           "没开 GPU 时判段判在 CPU 的照记、对不上号的单独结局、认多了与没有汇总行、recordable 与 --cpu-judging-recordable））")
     return 0
 

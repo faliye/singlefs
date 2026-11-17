@@ -26,11 +26,24 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
     照词表换，不按空格切：带空格的条目名、路径仍是一个词（条目名里的空格不会把后半截漏进键里），只有 -c 后面那一段脚本文本按空格切开、照一条命令再认；
     shell 分隔词（&& || ; |）这一个词把词表切成几条命令，逐条换；换完之后同类相邻的并成一个（「〈文件〉 〈文件〉」并成一个，
     「--item 〈条目〉 --item 〈条目〉」并成「--item 〈条目〉」）。
+    选范围的选项整个不进键（同一入口点不点、点哪几条都落一把键，共用一份内存记录）：ITEM_OPTIONS（--item、--only、--skip、--exact）连同后面那个不以 - 起头的词
+      与写成「--item=<值>」的，SELECTION_VALUE_OPTIONS（--fingerprint-of、--crash-expand-up-to）连同值，cargo test / cargo nextest 的测试名筛选词，
+      点名格与条目的环境变量（名字以 ITEM_VARIABLE_SUFFIXES 结尾、或在 ITEM_VARIABLES 里）连同值；这些去掉之后只剩空壳的 env 一并去掉。
+      弄坏开关 selection-options-kept 下留成「<选项> 〈条目〉」、变量留成「<名>=〈条目〉」。下面「条目」一段说的是选项留在键里（换成〈条目〉）的折法，现在只有照留的那两格还用。
     条目（ITEM_TOKEN）：ITEM_OPTIONS（--item、--only、--skip、--exact）后面那个不以 - 起头的词，与写成「--item=<值>」的（换成「--item 〈条目〉」两个词）；
     格名（CELL_OPTIONS，--check）：门禁按格点名，格是一道门禁里有限的几个名字，用量差得远（一格 85 MiB、另一格 16.6 GiB），所以后面那个不以 - 起头的词（逗号连起来的几格整段）照留进键，
       不同的格或格的组合是不同的键；写成「--check=<值>」的换成「--check <值>」两个词（两种写法落一个键）；值是路径形态的当文件换成〈文件〉；
       cargo test / cargo nextest 的测试名筛选词（子命令之后、不是选项也不是选项值的位置参数，-- 之前与之后都算；nextest 的 run 照留）；
       环境变量里点名格与条目的（名字以 ITEM_VARIABLE_SUFFIXES 结尾、或在 ITEM_VARIABLES 里）的值。
+    照留的条目（ITEM_KEPT_CELLS，只认 ITEM_KEPT_OPTION 即 --item；item_values_kept）：照留的命令词是表里登记的门禁阶段（仓根下的相对路径，前面带 ./、记号或目录的也认），
+      这条命令的 --check 点的格（逗号连起来的几格、给几次的都算）全在它登记的那几格里时，--item 后面那个词（与「--item=<值>」的，换成「--item <值>」两个词）照留进键，
+      不换成〈条目〉；几个 --item 各留各的、照写的次序，不并。
+      表里登了两格。门禁 code-tooling 的 break-switch-replay：它点名的是一份脚本或脚本里的一条开关（<脚本路径>:<开关名>=<值>），各份的开关数与自证用量差得远
+      （服务记的峰值：scripts/gate/admission.py 一份 1.1–1.3 GiB、task-server/task_server_lib.py 一份 16.6 GiB），这一格又按内存上限定开关趟的并行条数（上限给得越大并行越多、峰值跟着涨）。
+      门禁 crash-point-replay 的 crash-case-replay：它点名的是崩溃枚举用例（crash-case:<用例名>），各用例的稳态峰值差得远（服务记的：一条用例每片 10.3–12.2 GiB，
+      而各用例共用的那把键上记的最大只有 9.0 GiB，那条用例每片连撞三次）。点哪一份、哪一条都落一把键时，大的连撞、小的被抬高；所以各份、各条各一把键，各从自己的记录起，
+      没有记录的从服务的缺省起、撞了由服务放大重排。
+      别的入口（崩溃点重放入口、崩溃放量、crates 变异重放这类）、这两道阶段别的格与不给 --check 的、--only / --skip / --exact 照上面「条目」折。
     文件（FILE_TOKEN）：照留的那一个脚本或可执行文件之后的位置参数里写成路径形态的（path_shaped：带 /、以 FILE_EXTENSIONS 结尾、或以②的三个记号起头；
       以 - 起头、带 = 的不算）。照留的是命令词本身；命令词是解释器（INTERPRETER_NAMES）的照留它后面第一个不以 - 起头的词（-c 后面那段代码照一条命令再认，-m 后面的模块照留），
       是前缀命令（PREFIX_COMMANDS：env、nice、timeout 这类，连同它们的选项、选项值与 NAME=值）的照它后面那条命令再认。
@@ -38,6 +51,9 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
     不换的：命令词、照留的脚本、子命令（cargo test 的 test）、选项本身、KEPT_VALUE_OPTIONS（-p、--test、--features、--manifest-path 这类）的值、
       cargo test 的 -- 之后 LIBTEST_VALUE_OPTIONS（--test-threads 这类）的值、--item 这类范围开关、不是路径形态的别的位置参数（数、名字）：这些决定跑什么、要多少内存。
   ④ 换算是幂等的：换过的键再换一次不变。
+入口（command_entry；task-server 新键没有自己的记录时退回同入口的记录，task_server.py 的 family_prediction 调这一处，不另写一份认法）：
+  换算过的键按空格切词，去掉起头的赋值、前缀命令（PREFIX_COMMANDS，连同选项、选项值与时长）、解释器（INTERPRETER_NAMES，连同它的选项；-c 后面那段照一条命令再认，-m 取模块名）之后的那一个词，
+  去掉起头的 ./；它是 cargo 的取「cargo <子命令> -p <包名>」，没有 -p / --package 的取「cargo <子命令>」。一个词都不剩交整把键。
 峰值表的口径与列见 run-with-memory-cap.sh 文件头「峰值表」一段；这里只读不写（写在包装那一边，表旁的 <表>.lock 那把锁里）。
   峰值表在哪（default_peak_table）：共享数据根下的 memory-peaks.tsv（.claude/hooks/lib_work_root.py 的 shared_data_path(PEAK_TABLE_NAME)），两台读写同一份，
     不经 ~、$HOME 取（第二台的家目录是另一个）；取不到（载不到那份库、数据根取不到、那份库不认这个名字）抛 PeakTableUnavailable，不退回家目录下的那一份。
@@ -100,8 +116,14 @@ BREAK_VALUE_TOKEN = "〈开关〉"
 FOLD_TOKENS = (ITEM_TOKEN, FILE_TOKEN, BREAK_VALUE_TOKEN)
 ITEM_OPTIONS = ("--item", "--only", "--skip", "--exact")                     # 后面那个词（或 = 之后）是点名的条目，换成 ITEM_TOKEN
 CELL_OPTIONS = ("--check",)                                                    # 后面那个词（或 = 之后）是点名的门禁格名，照留进键（路径形态的换成 FILE_TOKEN）
+ITEM_KEPT_OPTION = "--item"                                                    # 文件头「键」③ 照留的条目：ITEM_KEPT_CELLS 登记的格里，这个选项后面的值照留进键
+ITEM_KEPT_CELLS = {".claude/gate.d/code-tooling.sh": ("break-switch-replay",),          # 门禁阶段（仓根下的相对路径）→ --check 只点这几格时 --item 的值照留进键
+                   ".claude/gate.d/crash-point-replay.sh": ("crash-case-replay",)}
 ITEM_VARIABLE_SUFFIXES = ("_SELFTEST_CELLS",)                                  # 环境变量名以它结尾的，值是点名的格
 ITEM_VARIABLES = ("GATE_MUTATION_ROW_SELECTION",)                              # 环境变量名照写的，值是点名的条目
+# 只选范围、不改跑法的选项（连同后面那个值）：整个不进键（选范围的选项不同、跑法相同的同一条命令共用一份内存记录；
+# 否则合入后验证「只重跑红的」那一条多了 --item 与 --fingerprint-of 就落另一把键，从 4096M 重新爬、撞上限）
+SELECTION_VALUE_OPTIONS = ("--fingerprint-of", "--crash-expand-up-to")
 BREAK_VARIABLE_SUFFIX = "_BREAK"                                               # 环境变量名以它结尾的，值是弄坏开关的项
 FILE_EXTENSIONS = (".md", ".tsv", ".json", ".txt", ".log", ".rs", ".py", ".sh", ".patch")
 INTERPRETER_NAMES = SHELL_NAMES | {"python", "python3", "perl", "ruby", "node"}
@@ -121,7 +143,8 @@ BREAK_VARIABLE = "MEMORY_PEAKS_LIB_BREAK"
 KNOWN_BREAK_MODES = ("scratch-paths-kept", "capped-kept", "outside-selftest-unnamed", "record-memory-peak", "hit-by-peak", "kernel-counted",
                      "item-and-file-arguments-kept", "row-shape-unchecked", "data-root-home-fallback", "other-hosts-read", "peak-table-per-host",
                      "margin-floored", "margin-whole-carried", "margin-children-counted", "margin-unreadable-as-zero", "scope-label-unread",
-                     "item-words-split", "check-names-folded", "scratch-nearest-directory-only")
+                     "item-words-split", "check-names-folded", "scratch-nearest-directory-only", "break-switch-items-folded", "blocked-threads-unread", "swap-unread",
+                     "entry-first-word", "selection-options-kept")
 PEAK_TABLE_COLUMNS = 7       # 峰值表一行：峰值字节、量的时刻、那一次的上限、键、线程数、近几次、哪一台（文件头「哪一台」）
 _break_modes = frozenset()
 _path_replacements_cache = {}   # path_replacements 建好的那一份（键是此刻的 SINGLEFS_WORK_ROOT、HOME 与两个弄坏开关）
@@ -146,6 +169,8 @@ PROBE_PROC_DIRECTORY_VARIABLE = "SINGLEFS_DISPATCH_PROBE_PROC_DIRECTORY"     # �
 # 在跑的 scope（文件头「在跑的 scope」）：headroom 交的 dict 里这一项，与每个 scope 那一份里的两个键
 SCOPES_REPORT_KEY = "slice_scopes"
 CPU_REPORT_KEY = "cpu"                           # headroom 交的 CPU 负载那一项（cpu_report）
+SWAP_TOTAL_KEY = "swap_total"                    # headroom 交的 swap 总量（字节，/proc/meminfo 的 SwapTotal）；读不到是 None
+SWAP_FREE_KEY = "swap_free"                      # headroom 交的 swap 空闲量（字节，/proc/meminfo 的 SwapFree）；读不到是 None
 SLICE_STARTED_KEY = "slice_started"              # headroom 交的：slice 起了（slice_total 读的是它的 memory.max）为真；没起（slice_total 是按整机内存估的）为假
 SCOPE_USED_KEY = "unreclaimable"
 SCOPE_LABEL_KEY = "run_label"
@@ -164,6 +189,41 @@ def command_key(words, explicit_key=None):
         if "item-words-split" in _break_modes:
             parts = " ".join(parts).split(" ")
     return " ".join(normalized_words(parts))[:KEY_LENGTH_LIMIT]
+
+
+CARGO_PACKAGE_OPTIONS = ("-p", "--package")   # command_entry：cargo 的入口带的包名从这两个选项取
+
+
+def command_entry(key):
+    """一把命令键的入口（文件头「入口」；task-server 定额度的同入口退回，task_server.py 的 family_prediction）：键文本按空格切词，
+    照 kept_command_position 去掉起头的赋值、前缀命令（连同选项与时长）、解释器与它的选项之后的那一个词（-c 后面那段脚本照一条命令再认、取它的命令词，-m 取模块名），
+    去掉起头的 ./；那个词是 cargo 的取「cargo <子命令> -p <包名>」（子命令是 cargo 后面头一个不以 - 或 + 起头、不是选项值的词；没有 -p / --package 的取「cargo <子命令>」）。
+    一个词都不剩交整把键。弄坏开关 entry-first-word 下取键的头一个词（env、bash、python3 这类当入口）。"""
+    words = [word for word in key.split(" ") if word]
+    if not words:
+        return key
+    if "entry-first-word" in _break_modes:
+        return words[0]
+    kept = kept_command_position(words)[0]
+    if kept >= len(words):
+        return key
+    word = words[kept]
+    if os.path.basename(word) != "cargo":
+        return word[2:] if word.startswith("./") else word
+    index = kept + 1
+    while index < len(words) and words[index].startswith(("-", "+")):
+        index += 2 if words[index] in KEPT_VALUE_OPTIONS else 1
+    subcommand = words[index] if index < len(words) else ""
+    package = ""
+    for position in range(kept + 1, len(words)):
+        option, equals, attached = words[position].partition("=")
+        if option in CARGO_PACKAGE_OPTIONS and equals:
+            package = attached
+        elif words[position] in CARGO_PACKAGE_OPTIONS and position + 1 < len(words):
+            package = words[position + 1]
+        if package:
+            break
+    return " ".join(part for part in ("cargo", subcommand, f"-p {package}" if package else "") if part)
 
 
 _work_root_library = []   # work_root_library 载入的那一份 lib_work_root（载过一次就留着；载不到记 None）
@@ -323,14 +383,15 @@ def cell_name(value):
 
 
 def folded_assignment(word):
-    """NAME=值：点名格与条目的变量换值为 ITEM_TOKEN，弄坏开关换值为 BREAK_VALUE_TOKEN，别的照原样（文件头「键」③）。"""
+    """NAME=值：点名格与条目的变量整个不进键（交空串，调用方丢掉；弄坏开关 selection-options-kept 下换值为 ITEM_TOKEN），弄坏开关换值为 BREAK_VALUE_TOKEN，
+    别的照原样（文件头「键」③）。"""
     name, _, value = word.partition("=")
     if not value:
         return word
     if name.endswith(BREAK_VARIABLE_SUFFIX):
         return f"{name}={BREAK_VALUE_TOKEN}"
     if name.endswith(ITEM_VARIABLE_SUFFIXES) or name in ITEM_VARIABLES:
-        return f"{name}={ITEM_TOKEN}"
+        return f"{name}={ITEM_TOKEN}" if "selection-options-kept" in _break_modes else ""
     return word
 
 
@@ -386,10 +447,34 @@ def cargo_test_subcommand(words, kept):
     return words[index] if index < len(words) and words[index] in CARGO_TEST_SUBCOMMANDS else ""
 
 
+def item_values_kept(words, kept):
+    """文件头「键」③ 照留的条目：照留的命令词 words[kept] 是 ITEM_KEPT_CELLS 登记的门禁阶段（仓根下的相对路径，或以「/<那个路径>」收尾的），
+    这条命令的 --check（--check <格> 与 --check=<格> 两种写法，给几次都算，逗号连起来的拆开）至少点了一格、点的格全在它登记的那几格里时交 True。
+    弄坏开关 break-switch-items-folded 下一律交 False（登记的格点名的 --item 也折成〈条目〉）。"""
+    if "break-switch-items-folded" in _break_modes or kept >= len(words):
+        return False
+    script = words[kept]
+    cells = next((cells for stage, cells in ITEM_KEPT_CELLS.items() if script == stage or script.endswith("/" + stage)), ())
+    named = []
+    index = kept + 1
+    while cells and index < len(words):
+        option, equals, attached = words[index].partition("=")
+        if option in CELL_OPTIONS and equals:
+            named += attached.split(",")
+        elif words[index] in CELL_OPTIONS and index + 1 < len(words) and not words[index + 1].startswith("-"):
+            named += words[index + 1].split(",")
+            index += 1
+        index += 1
+    return bool(named) and all(name in cells for name in named)
+
+
 def folded_command_words(words):
     """一条命令（不含 shell 分隔词）的词换成③的记号（还没并相邻的）。"""
     kept = kept_command_position(words)[0]
+    kept_items = (ITEM_KEPT_OPTION,) if item_values_kept(words, kept) else ()   # 文件头「键」③ 照留的条目：这几个选项后面的值照留
     folded = [folded_assignment(word) if ASSIGNMENT.match(word) else word for word in words[:kept + 1]]
+    folded = [word for word in folded if word]   # 点名格与条目的变量不进键（folded_assignment 交空串）
+    selection_kept = "selection-options-kept" in _break_modes   # 弄坏开关：把选范围的选项留成「选项 〈条目〉」
     subcommand = cargo_test_subcommand(words, kept)
     positionals_kept = (2 if subcommand == "nextest" else 1) if subcommand else 0   # cargo test 的 test；nextest 连同 run
     after_double_dash = False
@@ -402,15 +487,26 @@ def folded_command_words(words):
         following = words[index + 1] if index + 1 < len(words) else None
         value_options = LIBTEST_VALUE_OPTIONS if after_double_dash else KEPT_VALUE_OPTIONS
         if ASSIGNMENT.match(word):
-            folded.append(folded_assignment(word))
+            if folded_assignment(word):
+                folded.append(folded_assignment(word))
+        elif option in SELECTION_VALUE_OPTIONS and not selection_kept:   # 只选范围的选项连同值不进键（写成 = 的同样）
+            if not equals and following is not None and not following.startswith("-"):
+                index += 1
         elif option in item_options and equals:
-            folded += [option, ITEM_TOKEN]
+            if option in kept_items and attached:
+                folded += [option, attached]
+            elif selection_kept:
+                folded += [option, ITEM_TOKEN]
         elif option in CELL_OPTIONS and attached:
             folded += [option, cell_name(attached)]
         elif word in item_options:
-            folded.append(word)
+            # 点名的条目：ITEM_KEPT_CELLS 登记的格里照留（各条各一把键）；别的连同选项整个不进键（同一入口点不点、点哪几条都落一把键）
+            kept_value = word in kept_items
+            if kept_value or selection_kept:
+                folded.append(word)
             if following is not None and not following.startswith("-"):
-                folded.append(ITEM_TOKEN)
+                if kept_value or selection_kept:
+                    folded.append(following if kept_value else ITEM_TOKEN)
                 index += 1
         elif word in CELL_OPTIONS:
             folded.append(word)
@@ -429,10 +525,13 @@ def folded_command_words(words):
             folded.append(word)
             positionals_kept -= 1
         elif subcommand:
-            folded.append(ITEM_TOKEN)
+            if selection_kept:   # cargo test 的测试名筛选词不进键（点不点、点哪个都落一把键）
+                folded.append(ITEM_TOKEN)
         else:
             folded.append(FILE_TOKEN if path_shaped(word) else word)
         index += 1
+    if subcommand and folded[-1:] == ["--"] and not selection_kept:
+        folded.pop()   # 测试名筛选词与 --exact 不进键之后只剩空的 --：与不带 -- 的那一条落一把键
     return folded
 
 
@@ -441,11 +540,15 @@ def without_item_and_file_arguments(words):
     if "item-and-file-arguments-kept" in _break_modes:
         return words
     command, merged = [], []
+    selection_kept = "selection-options-kept" in _break_modes
     for word in expanded_script_words(words) + [None]:
         if word is not None and word not in SHELL_SEPARATORS:
             command.append(word)
             continue
-        for folded in folded_command_words(command) + ([] if word is None else [word]):
+        folded_words = folded_command_words(command)
+        if not selection_kept and folded_words[:1] == ["env"] and len(folded_words) > 1 and not ASSIGNMENT.match(folded_words[1]) and not folded_words[1].startswith("-"):
+            folded_words = folded_words[1:]   # 点名格与条目的变量不进键之后只剩空壳的 env，与不带 env 的那一条落一把键
+        for folded in folded_words + ([] if word is None else [word]):
             if merged and folded == merged[-1] and any(token in folded for token in FOLD_TOKENS):
                 continue
             merged.append(folded)
@@ -821,14 +924,16 @@ def headroom(environment):
     SINGLEFS_DISPATCH_PROBE_MEMINFO、PROBE_SLICE_DIRECTORY_VARIABLE 与 PROBE_PROC_DIRECTORY_VARIABLE 只给派发器的自证换掉 /proc/meminfo、slice 的 cgroup 目录与读进程环境的 /proc。
     记账在 task-server 那一本，这里不读别的账。
     交一个 dict（字节）：
-      mem_total、mem_available        /proc/meminfo
+      mem_total、mem_available        /proc/meminfo（整机的内存总量与可用量）
+      SWAP_TOTAL_KEY、SWAP_FREE_KEY   /proc/meminfo 的 SwapTotal、SwapFree（swap_report；task-server 拿整机可用内存与 swap 空闲占比对 earlyoom 的线，task_server.py 的 machine_memory_problem）；没有这两行的是 None
       slice_total、slice_used         slice 的总上限（slice 在就读它的 memory.max，不在按整机内存减 DEFAULT_RESERVE_TEXT 估）与 slice 里进程用的内存（process_memory_bytes：anon + shmem，内核的不算）
       SLICE_STARTED_KEY               slice_total 是不是读的 memory.max（没起是估的；task-server 拿多机配置里那台那一项换掉估的）
       free                            mem_available：此刻整机放得下多少
       slice_room                      slice_total − slice_used：slice 此刻放得下多少
       MARGIN_REPORT_KEY、MARGIN_MEASURED_KEY、MARGIN_PROBLEM_KEY   这台此刻的余量（measured_margin，文件头「余量」）
       SCOPES_REPORT_KEY               slice 下每个在跑的 scope 此刻回收不掉的用量与标签（slice_scopes，文件头「在跑的 scope」）
-      CPU_REPORT_KEY                  这台的 CPU：{"load1": 1 分钟负载, "procs_running": 此刻可跑的进程数, "cpus": 核数}（cpu_report；task-server 的 CPU 闸读）"""
+      CPU_REPORT_KEY                  这台的 CPU：{"load1": 1 分钟负载, "procs_running": 此刻可跑的进程数, "blocked_threads": 此刻状态 D（不可中断睡眠，多半在等 IO）的线程数,
+                                      "cpus": 核数}（cpu_report；task-server 的 CPU 闸读，负载里含等 IO 的线程，排队原因里拆开写）"""
     memory = meminfo(environment.get("SINGLEFS_DISPATCH_PROBE_MEMINFO") or "/proc/meminfo")
     cgroup_root = environment.get("RUN_WITH_MEMORY_CAP_CGROUP_ROOT") or "/sys/fs/cgroup"
     slice_directory = (environment.get(PROBE_SLICE_DIRECTORY_VARIABLE)
@@ -843,16 +948,46 @@ def headroom(environment):
         reserve = size_bytes(environment.get("RUN_WITH_MEMORY_CAP_RESERVE") or DEFAULT_RESERVE_TEXT) or 0
         slice_total = max(0, (memory["MemTotal"] - reserve) // MEBIBYTE * MEBIBYTE)
     slice_used = (process_memory_bytes(slice_directory) or 0) if slice_directory else 0
-    return dict({"mem_total": memory["MemTotal"], "mem_available": memory["MemAvailable"],
+    return dict({"mem_total": memory["MemTotal"], "mem_available": memory["MemAvailable"], **swap_report(memory),
                  "slice_total": slice_total, SLICE_STARTED_KEY: started, "slice_used": slice_used, "free": memory["MemAvailable"],
                  "slice_room": slice_total - slice_used,
                  SCOPES_REPORT_KEY: slice_scopes(slice_directory, environment.get(PROBE_PROC_DIRECTORY_VARIABLE) or PROC_ROOT),
                  CPU_REPORT_KEY: cpu_report(environment.get(PROBE_PROC_DIRECTORY_VARIABLE) or PROC_ROOT)}, **measured_margin(slice_directory))
 
 
+def swap_report(memory):
+    """headroom 交的 swap 两项（SWAP_TOTAL_KEY、SWAP_FREE_KEY）：memory 是 meminfo 读出的 {名: 字节}；没有 SwapTotal 或 SwapFree 那一行的那一项是 None。
+    弄坏开关 swap-unread 下两项一律 None。"""
+    if "swap-unread" in _break_modes:
+        return {SWAP_TOTAL_KEY: None, SWAP_FREE_KEY: None}
+    return {SWAP_TOTAL_KEY: memory.get("SwapTotal"), SWAP_FREE_KEY: memory.get("SwapFree")}
+
+
+def blocked_thread_count(proc_root):
+    """此刻状态 D（不可中断睡眠）的线程数：逐个 <proc_root>/<进程号>/task/<线程号>/stat 读状态字段（最后一个右括号之后的第一个词）数；读之前退了的线程跳过；
+    proc_root 读不了交 None。弄坏开关 blocked-threads-unread 下交 None（读不到）。"""
+    if "blocked-threads-unread" in _break_modes:
+        return None
+    try:
+        processes = os.listdir(proc_root)
+    except OSError:
+        return None
+    blocked = 0
+    for process in processes:
+        if not process.isdigit():
+            continue
+        task_root = os.path.join(proc_root, process, "task")
+        with contextlib.suppress(OSError):
+            for thread in os.listdir(task_root):
+                with contextlib.suppress(OSError):
+                    with open(os.path.join(task_root, thread, "stat"), "rb") as handle:
+                        blocked += handle.read().rpartition(b")")[2].split()[:1] == [b"D"]
+    return blocked
+
+
 def cpu_report(proc_root):
-    """这台此刻的 CPU 负载：/proc/loadavg 的 1 分钟负载、/proc/stat 的 procs_running 与核数；读不了的那一项是 None。"""
-    report = {"load1": None, "procs_running": None, "cpus": os.cpu_count()}
+    """这台此刻的 CPU 负载：/proc/loadavg 的 1 分钟负载、/proc/stat 的 procs_running、状态 D 的线程数（blocked_thread_count）与核数；读不了的那一项是 None。"""
+    report = {"load1": None, "procs_running": None, "blocked_threads": blocked_thread_count(proc_root), "cpus": os.cpu_count()}
     with contextlib.suppress(OSError, ValueError, IndexError):
         with open(os.path.join(proc_root, "loadavg"), encoding="utf-8") as handle:
             report["load1"] = float(handle.read().split()[0])
@@ -878,13 +1013,31 @@ def cpu_report(proc_root):
 #       「✗ 自证格不对：经 capped.sh 与不经落一个键」
 #   MEMORY_PEAKS_LIB_BREAK=item-and-file-arguments-kept  取键不换条目、文件参数与弄坏开关的值（文件头「键」③）
 #       「✗ 自证格不对：两份副本路径下同一条命令落一个键」（要的键里 --exact 后面是〈条目〉）
+#       「✗ 自证格不对：同一入口只差选范围的选项落一个键」（--item 后面的条目名留在键里，点不同条目落不同键）
 #       「✗ 自证格不对：只差条目、文件、开关值的命令落一个键」
 #       「✗ 自证格不对：条目名里带空格的同一条命令落一个键，带空格的一个词仍是一个词」
 #       「✗ 自证格不对：--check 后面的格名进键、不同格落不同键，--item 后面的照旧折」
+#       「✗ 自证格不对：门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键、各份各一把键，别的入口与别的格的 --item 照旧折」（照旧折的那几条对照没折）
+#       「✗ 自证格不对：门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键、各用例各一把键，不给 --check 或点别的格的照旧折」（末尾的仓根没折成〈文件〉）
 #   MEMORY_PEAKS_LIB_BREAK=item-words-split  command_key 把词表用空格接起来再切开折叠：条目名、路径里带空格的，后半截漏进键里
 #       「✗ 自证格不对：条目名里带空格的同一条命令落一个键，带空格的一个词仍是一个词」
 #   MEMORY_PEAKS_LIB_BREAK=check-names-folded  --check 后面的格名也折成〈条目〉：轻的几格与重的一格落一个键
 #       「✗ 自证格不对：--check 后面的格名进键、不同格落不同键，--item 后面的照旧折」
+#       「✗ 自证格不对：门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键、各份各一把键，别的入口与别的格的 --item 照旧折」（键里的 --check break-switch-replay 折成了〈条目〉）
+#       「✗ 自证格不对：门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键、各用例各一把键，不给 --check 或点别的格的照旧折」（键里的 --check crash-case-replay 折成了〈条目〉）
+#   MEMORY_PEAKS_LIB_BREAK=break-switch-items-folded  item_values_kept 一律交假：ITEM_KEPT_CELLS 登记的格点名的 --item 也折成〈条目〉，点哪一份脚本、哪一条用例都落一把键
+#       「✗ 自证格不对：门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键、各份各一把键，别的入口与别的格的 --item 照旧折」
+#       「✗ 自证格不对：门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键、各用例各一把键，不给 --check 或点别的格的照旧折」
+#   MEMORY_PEAKS_LIB_BREAK=selection-options-kept  选范围的选项留成「<选项> 〈条目〉」、变量留成「<名>=〈条目〉」：同一入口点不点、点哪几条落成几把键
+#       「✗ 自证格不对：同一入口只差选范围的选项落一个键」
+#       「✗ 自证格不对：只差条目、文件、开关值的命令落一个键」（钉住的键里多了〈条目〉）
+#       「✗ 自证格不对：两份副本路径下同一条命令落一个键」（要的键里没有 --exact 〈条目〉）
+#       「✗ 自证格不对：条目名里带空格的同一条命令落一个键，带空格的一个词仍是一个词」
+#       「✗ 自证格不对：--check 后面的格名进键、不同格落不同键，--item 后面的照旧折」
+#       「✗ 自证格不对：门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键、各份各一把键，别的入口与别的格的 --item 照旧折」（照旧折的那几条对照里多了 --item 〈条目〉）
+#       「✗ 自证格不对：门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键、各用例各一把键，不给 --check 或点别的格的照旧折」（照旧折的那两条对照里多了 --item 〈条目〉）
+#   MEMORY_PEAKS_LIB_BREAK=entry-first-word  command_entry 取键的头一个词：bash、env、cargo 这类当入口
+#       「✗ 自证格不对：入口的认法：去掉赋值、前缀命令与解释器之后的那一个词，cargo 取「cargo <子命令> -p <包名>」」
 #   MEMORY_PEAKS_LIB_BREAK=row-shape-unchecked  读峰值表不核行的形态：不对的行跳过，不抛 TableRowRefused
 #       「✗ 自证格不对：表里只认这一版的行，不对的行整张表读不了并点名行号、要几列与出路」
 #   MEMORY_PEAKS_LIB_BREAK=data-root-home-fallback  没设 SINGLEFS_DATA_ROOT 时不读多机配置、退回一个写死的目录（FIXED_DATA_ROOT）
@@ -916,6 +1069,12 @@ def cpu_report(proc_root):
 #       「✗ 自证格不对：余量只算 slice 自己挂着、子 cgroup 里没有的那一截（在跑任务的 scope 用的不算）」
 #   MEMORY_PEAKS_LIB_BREAK=margin-unreadable-as-zero  slice_margin_bytes 读不了的 slice 与子 cgroup 当 0
 #       「✗ 自证格不对：读不了 slice、读不了子 cgroup、查不了用户级 systemd 时量不到余量、不交数（slice 还没起的量到 0）」
+#   此刻状态 D 的线程数那一格（blocked_thread_cells，cpu_report 的 blocked_threads）的开关：
+#   MEMORY_PEAKS_LIB_BREAK=blocked-threads-unread  blocked_thread_count 不读线程的状态，一律交 None
+#       「✗ 自证格不对：CPU 那一项报状态 D 的线程数（逐个线程读 stat 的状态字段数，读之前退了的跳过，/proc 读不了交 None）」
+#   整机 swap 那一格（swap_cells，headroom 的 SWAP_TOTAL_KEY、SWAP_FREE_KEY）的开关：
+#   MEMORY_PEAKS_LIB_BREAK=swap-unread  swap_report 不读 SwapTotal、SwapFree，两项一律 None
+#       「✗ 自证格不对：整机 swap 两项照 /proc/meminfo 的 SwapTotal、SwapFree 报，没有这两行的是 None」
 #   在跑的 scope 那一格（scope_cells，文件头「在跑的 scope」）的开关：
 #   MEMORY_PEAKS_LIB_BREAK=scope-label-unread  scope_run_label 不读进程的环境，标签一律空串（第二台的 scope 对不到尝试上）
 #       「✗ 自证格不对：在跑的 scope 逐个报回收不掉的用量与标签（标签取进程环境里 TASK_SERVER_ATTEMPT_LABEL 的值，没有的是空串）」
@@ -936,7 +1095,7 @@ def self_test_cells(work):
     copy_keys = [command_key(words) for words in copies]
     no_target = [command_key(["python3", "-I", "tools/numbers_model.py", f"{work_root}/{name}", "j2_q"]) for name in ("task-alpha", "task-beta")]
     other = command_key([f"{work_root}/task-alpha/tree/target/debug/deps/other_test_name-0123456789abcdef", "--exact", "ring"])
-    wanted = f"{SCRATCH_TOKEN}/target/debug/deps/journal_ring_fields --exact {ITEM_TOKEN}"
+    wanted = f"{SCRATCH_TOKEN}/target/debug/deps/journal_ring_fields"
     local_paths = command_key([f"{home}/.cargo/bin/cargo", "build", f"--manifest-path={repository}/Cargo.toml"])
     wanted_local = f"{HOME_TOKEN}/.cargo/bin/cargo build --manifest-path={REPOSITORY_TOKEN}/Cargo.toml"
     cells.append(("两份副本路径下同一条命令落一个键",
@@ -1023,6 +1182,8 @@ def self_test_cells(work):
                   f"anon 0、shmem 1M、file 751M、kernel 126M 的 slice 算出 {counted} 字节（要的 {1 * MEBIBYTE}）"))
     cells.extend(margin_cells(work))
     cells.extend(scope_cells(work))
+    cells.extend(blocked_thread_cells(work))
+    cells.extend(swap_cells(work))
     cells.append((f"平常跑设了弄坏开关退 2 并点名 {BREAK_VARIABLE} 只在自证里认",
                   bool(named) and passed_plain and passed_selftest,
                   f"设了开关、参数 {probe_arguments} 时交回 {refused}；没设开关时放行 {passed_plain}；参数正好 --selftest 时放行 {passed_selftest}"))
@@ -1108,6 +1269,40 @@ def scope_cells(work):
              f"三个 scope 交 {scopes}（要的 {wanted}）；slice 还没起、查不了 systemd、目录不在交 {not_started}（都要空表）")]
 
 
+def blocked_thread_cells(work):
+    """CPU 那一项的 blocked_threads（cpu_report、blocked_thread_count）：假 /proc 里三个进程共五个线程，状态 D 的三个（线程名里带右括号与 R 的那一个照最后一个右括号之后取状态）、S 与 R 各一个；
+    一个进程的 task 目录下线程的 stat 读之前没了（空目录）跳过；/proc 目录不在交 None。"""
+    proc_root = os.path.join(work, "blocked-proc")
+    layout = {"5001": {"5001": "S", "5002": "D", "5003": "D"}, "5002": {"5004": "R"}, "5003": {"5005": "D"}, "5004": {}}
+    names = {"5003": "rust-lld) R (x"}   # 进程名里带右括号与「R」：状态只认最后一个右括号之后的那一个字（照第一个右括号取就成了 R）
+    for process, threads in layout.items():
+        os.makedirs(os.path.join(proc_root, process, "task"))
+        for thread, state in threads.items():
+            os.makedirs(os.path.join(proc_root, process, "task", thread))
+            with open(os.path.join(proc_root, process, "task", thread, "stat"), "w", encoding="utf-8") as handle:
+                handle.write(f"{thread} ({names.get(thread, 'worker')}) {state} 1 1 1 0 -1 0\n")
+    os.makedirs(os.path.join(proc_root, "self"))
+    counted = blocked_thread_count(proc_root)
+    absent = blocked_thread_count(os.path.join(work, "blocked-proc-absent"))
+    return [("CPU 那一项报状态 D 的线程数（逐个线程读 stat 的状态字段数，读之前退了的跳过，/proc 读不了交 None）",
+             counted == 3 and absent is None, f"假 /proc 里状态 D 的 3 个线程交 {counted}（要 3）；目录不在交 {absent}（要 None）")]
+
+
+def swap_cells(work):
+    """整机 swap 两项（swap_report）：假 /proc/meminfo 有 SwapTotal 8192 MiB、SwapFree 410 MiB 的，两项照读（字节）；没有 swap 那两行的（整机内存两行还在）两项是 None。"""
+    full = os.path.join(work, "meminfo-with-swap")
+    bare = os.path.join(work, "meminfo-without-swap")
+    with open(full, "w", encoding="utf-8") as handle:
+        handle.write("MemTotal:       63033344 kB\nMemAvailable:    5561344 kB\nSwapTotal:       8388608 kB\nSwapFree:         419840 kB\n")
+    with open(bare, "w", encoding="utf-8") as handle:
+        handle.write("MemTotal:       63033344 kB\nMemAvailable:    5561344 kB\n")
+    with_swap, without_swap = swap_report(meminfo(full)), swap_report(meminfo(bare))
+    wanted = {SWAP_TOTAL_KEY: 8192 * MEBIBYTE, SWAP_FREE_KEY: 410 * MEBIBYTE}
+    return [("整机 swap 两项照 /proc/meminfo 的 SwapTotal、SwapFree 报，没有这两行的是 None",
+             with_swap == wanted and without_swap == {SWAP_TOTAL_KEY: None, SWAP_FREE_KEY: None},
+             f"有 swap 两行的交 {with_swap}（要的 {wanted}）；没有的交 {without_swap}（要两项都是 None）")]
+
+
 def nested_copy_cells():
     """文件头「键」②嵌套多层的仓副本那两格：同一份脚本在工作根下嵌套多层的副本里（七个变体副本，加一份更深的）落一个键，工作目录参数（分开写、--work=<副本根>/work 连写）跟着折；
     同一份副本里不同的脚本、不同的参数落不同的键。样本脚本放在 scripts/ 下（本库自己就在 scripts/hosts/ 下，任何一份副本里 scripts 都是顶层目录名）。
@@ -1170,12 +1365,31 @@ def key_fold_cells(work):
         [["bash", "-c", "cat records/a.md && cargo test --offline one_name"], ["bash", "-c", "cat records/b.md && cargo test --offline two_name"]],
     ]
     group_keys = [[command_key(words) for words in group] for group in groups]
-    pinned = {group_keys[0][0]: f"bash scripts/crash/crash-amplification.sh --item {ITEM_TOKEN}",
-              group_keys[3][0]: f"cargo nextest run -p singlefs-core {ITEM_TOKEN}",
+    pinned = {group_keys[0][0]: "bash scripts/crash/crash-amplification.sh",
+              group_keys[3][0]: "cargo nextest run -p singlefs-core",
               group_keys[5][0]: f"python3 -I scripts/kb/kb-sections.py {FILE_TOKEN}",
               group_keys[6][0]: f"env MEMORY_PEAKS_LIB_BREAK={BREAK_VALUE_TOKEN} python3 scripts/hosts/memory_peaks_lib.py --selftest",
-              group_keys[10][0]: f"bash -c cat {FILE_TOKEN} && cargo test --offline {ITEM_TOKEN}"}
+              group_keys[10][0]: f"bash -c cat {FILE_TOKEN} && cargo test --offline"}
     one_per_group = all(len(set(keys)) == 1 for keys in group_keys)
+    merge = ["env", "MERGE_AND_VERIFY_KEEP_COPY=1", "bash", "scripts/gate/merge-and-verify.sh"]
+    variants = {"整批": merge + [f"{repository}/a/patch", f"{repository}/b/patch"],
+                "只重跑红的": merge + ["--item", "singlefs-verification:src/lib.rs", "--item", "singlefs-verification:tests/x.rs", f"{repository}/a/patch",
+                                    f"{repository}/b/patch", "--fingerprint-of", f"{repository}/log"],
+                "写成 = 的": merge + ["--item=singlefs-verification:src/lib.rs", f"--fingerprint-of={repository}/log", f"{repository}/a/patch"],
+                "缩过域的": merge + ["--crash-expand-up-to", "5", f"{repository}/a/patch"]}
+    variant_keys = {name: command_key(words) for name, words in variants.items()}
+    test_keys = {name: command_key(words) for name, words in {"不点名": ["cargo", "test", "-p", "singlefs-core", "--lib"],
+                                                              "点一个测试名": ["cargo", "test", "-p", "singlefs-core", "--lib", "ring_reuse"],
+                                                              "-- 之后点名": ["cargo", "test", "-p", "singlefs-core", "--lib", "--", "slot_bad", "--exact"]}.items()}
+    cell_keys = {name: command_key(words) for name, words in {"整份": ["bash", "scripts/crash/crash-point-replay.sh", "--selftest"],
+                                                              "选格": ["env", "CRASH_POINT_REPLAY_SELFTEST_CELLS=a,b", "bash", "scripts/crash/crash-point-replay.sh", "--selftest"],
+                                                              "开头赋值": ["CRASH_POINT_REPLAY_SELFTEST_CELLS=c", "bash", "scripts/crash/crash-point-replay.sh", "--selftest"]}.items()}
+    selection_wanted = (f"env MERGE_AND_VERIFY_KEEP_COPY=1 bash scripts/gate/merge-and-verify.sh {FILE_TOKEN}", "cargo test -p singlefs-core --lib",
+                        "bash scripts/crash/crash-point-replay.sh --selftest")
+    selection_got = (sorted(set(variant_keys.values())), sorted(set(test_keys.values())), sorted(set(cell_keys.values())))
+    cells.append(("同一入口只差选范围的选项落一个键",
+                  selection_got == ([selection_wanted[0]], [selection_wanted[1]], [selection_wanted[2]]),
+                  f"合入后验证四种写法 {variant_keys}、cargo test 三种 {test_keys}、选格三种 {cell_keys}；各组要落一把键，依次是 {selection_wanted}"))
     distinct_groups = len({keys[0] for keys in group_keys}) == len(groups)
     cells.append(("只差条目、文件、开关值的命令落一个键",
                   one_per_group and distinct_groups and all(key == wanted for key, wanted in pinned.items()),
@@ -1207,6 +1421,9 @@ def key_fold_cells(work):
 
     cells.append(spaced_words_cell(mutation_replay, repository, home))
     cells.append(cell_names_cell(repository, home))
+    cells.append(break_switch_items_cell(repository, home))
+    cells.append(crash_case_items_cell(repository))
+    cells.append(command_entry_cell(repository, home))
     return cells
 
 
@@ -1218,7 +1435,7 @@ def spaced_words_cell(mutation_replay, repository, home):
     item_keys = [command_key(mutation_replay + ["--quick", "--item", unit_graph_item, "--item", compaction_switch_item, repository]),
                  command_key(mutation_replay + ["--quick", "--item", compaction_switch_item, f"{home}/elsewhere"]),
                  command_key(mutation_replay + ["--quick", f"--item={unit_graph_item}", repository])]
-    wanted_items = f"bash .claude/gate.d/crates-mutation-replay.sh --quick --item {ITEM_TOKEN} {FILE_TOKEN}"
+    wanted_items = f"bash .claude/gate.d/crates-mutation-replay.sh --quick {FILE_TOKEN}"
     sections = ["python3", "-I", "scripts/kb/kb-sections.py"]
     path_keys = [command_key(sections + ["records/带 空格的 记录.md"]), command_key(sections + ["records/a.md"])]
     wanted_path = f"python3 -I scripts/kb/kb-sections.py {FILE_TOKEN}"
@@ -1240,12 +1457,92 @@ def cell_names_cell(repository, home):
             "item-instead": command_key(code_discipline + ["--item", heavy_cell, repository])}
     wanted_heavy = f"bash .claude/gate.d/code-source-discipline.sh --check {heavy_cell} {FILE_TOKEN}"
     wanted_path_value = f"bash .claude/gate.d/code-source-discipline.sh --check {FILE_TOKEN}"   # 值与后面的根都是〈文件〉，相邻的并成一个
-    wanted_item = f"bash .claude/gate.d/code-source-discipline.sh --item {ITEM_TOKEN} {FILE_TOKEN}"
+    wanted_item = f"bash .claude/gate.d/code-source-discipline.sh {FILE_TOKEN}"
     return ("--check 后面的格名进键、不同格落不同键，--item 后面的照旧折",
             keys["light"] != keys["heavy"] and keys["heavy"] == keys["heavy-other-root"] == keys["heavy-attached"] == wanted_heavy
             and keys["path-value"] == wanted_path_value and keys["item-instead"] == wanted_item,
             f"各例的键 {keys}（轻的几格与重的一格要不同；重的一格换根、写成 --check=<格> 的都是 {wanted_heavy}；路径形态的值当文件，是 {wanted_path_value}；"
             f"--item 的是 {wanted_item}）")
+
+
+def break_switch_items_cell(repository, home):
+    """门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键（文件头「键」③ 照留的条目）：点名七份（五份脚本、一份整份与它的一条开关）的各落各的键、值照留；
+    --item=<值> 与 --check=<格> 的写法落同一个键，阶段写成 ./ 起头或仓根下绝对路径的照认，末尾的项目根换了照落一个键；点一份与点两份的分开；换算幂等。
+    照旧折的对照：同一道阶段 --check 点别的格、点这一格连同别的格、不给 --check 的，崩溃点重放入口、崩溃放量入口与 crates 变异重放门禁带 --item 的，都折成〈条目〉。
+    样本不经工作根、不带 capped.sh（别的开关不弄红这一格）。"""
+    stage = ".claude/gate.d/code-tooling.sh"
+    named = ["bash", stage, "--check", "break-switch-replay"]
+    scripts = ["task-server/task_server_lib.py", "scripts/mutation/prove-red.sh", "scripts/gate/test-targets-parallel.py", "scripts/gate/admission.py",
+               "scripts/experiment-apparatus/replay.sh", "scripts/kb/replace-once.py", "scripts/kb/replace-once.py:REPLACE_ONCE_BREAK=no-clock-guard"]
+    kept = {script: command_key(named + ["--item", script]) for script in scripts}
+    wrong = {script: key for script, key in kept.items() if key != f"bash {stage} --check break-switch-replay --item {script}"}
+    first = scripts[0]
+    shapes = {"两个都写成 = 的": (command_key(["bash", stage, "--check=break-switch-replay", f"--item={first}"]), kept[first]),
+              "./ 起头的阶段": (command_key(["bash", f"./{stage}", "--check", "break-switch-replay", "--item", first]),
+                              f"bash ./{stage} --check break-switch-replay --item {first}"),
+              "两份": (command_key(named + ["--item", first, "--item", scripts[3]]), f"bash {stage} --check break-switch-replay --item {first} --item {scripts[3]}"),
+              "末尾带仓根": (command_key(named + ["--item", first, repository]), f"bash {stage} --check break-switch-replay --item {first} {FILE_TOKEN}"),
+              "末尾带别的根": (command_key(named + ["--item", first, f"{home}/elsewhere"]), f"bash {stage} --check break-switch-replay --item {first} {FILE_TOKEN}")}
+    absolute = command_key(["bash", f"{repository}/{stage}", "--check", "break-switch-replay", "--item", first])
+    absolute_kept = absolute.endswith(f"/{stage} --check break-switch-replay --item {first}") and repository not in absolute
+    folded = {"同一道阶段点别的格": (["bash", stage, "--check", "research-script-selftests", "--item", first],
+                                   f"bash {stage} --check research-script-selftests"),
+              "同一道阶段连同别的格": (["bash", stage, "--check", "break-switch-replay,research-script-selftests", "--item", first],
+                                     f"bash {stage} --check break-switch-replay,research-script-selftests"),
+              "同一道阶段不给 --check": (["bash", stage, "--item", first], f"bash {stage}"),
+              "崩溃点重放入口": (["bash", "scripts/crash/crash-point-replay.sh", "--item", "crash-case:ring_reuse"], "bash scripts/crash/crash-point-replay.sh"),
+              "崩溃放量入口": (["bash", "scripts/crash/crash-amplification.sh", "--item", "ring_reuse", "--item", "slot_bad"],
+                             "bash scripts/crash/crash-amplification.sh"),
+              "crates 变异重放门禁": (["bash", ".claude/gate.d/crates-mutation-replay.sh", "--item", "alpha", "--item", "beta", repository],
+                                    f"bash .claude/gate.d/crates-mutation-replay.sh {FILE_TOKEN}")}
+    folded_keys = {name: (command_key(words), wanted) for name, (words, wanted) in folded.items()}
+    every_key = list(kept.values()) + [key for key, _ in shapes.values()] + [absolute] + [key for key, _ in folded_keys.values()]
+    changed = [key for key in every_key if normalized_key(key) != key]
+    shape_wrong = {name: pair for name, pair in shapes.items() if pair[0] != pair[1]}
+    folded_wrong = {name: pair for name, pair in folded_keys.items() if pair[0] != pair[1]}
+    return ("门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留进键、各份各一把键，别的入口与别的格的 --item 照旧折",
+            not wrong and len(set(kept.values())) == len(kept) and not shape_wrong and absolute_kept and not folded_wrong and not changed,
+            f"照留的键里不对的 {wrong}；各份的键互不相同 {len(set(kept.values())) == len(kept)}；写法与根不对的 {shape_wrong}（(得到的, 要的)）；"
+            f"仓根下绝对路径起的 {absolute}（要以「/{stage} --check break-switch-replay --item {first}」收尾、不带仓根的字面）；"
+            f"该照旧折而没折对的 {folded_wrong}；再换一次变了的 {changed}（空表都是对）")
+
+
+def crash_case_items_cell(repository):
+    """门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键（文件头「键」③ 照留的条目）：--check crash-case-replay --crash-cases-only --item crash-case:<用例>
+    点两条用例各落各的键、值照留，末尾的仓根折成〈文件〉；照旧折的对照：同一道阶段不给 --check 的、--check 点别的格的，--item 都折成〈条目〉。换算幂等。
+    样本不经工作根、不带 capped.sh（别的开关不弄红这一格）。"""
+    stage = ".claude/gate.d/crash-point-replay.sh"
+    named = ["bash", stage, "--check", "crash-case-replay", "--crash-cases-only"]
+    cases = ("crash-case:甲", "crash-case:乙")
+    kept = {case: command_key(named + ["--item", case, repository]) for case in cases}
+    wrong = {case: key for case, key in kept.items() if key != f"bash {stage} --check crash-case-replay --crash-cases-only --item {case} {FILE_TOKEN}"}
+    folded = {"不给 --check": (command_key(["bash", stage, "--crash-cases-only", "--item", cases[0], repository]),
+                              f"bash {stage} --crash-cases-only {FILE_TOKEN}"),
+              "--check 点别的格": (command_key(["bash", stage, "--check", "feature-gated-tests", "--item", cases[0], repository]),
+                                f"bash {stage} --check feature-gated-tests {FILE_TOKEN}")}
+    folded_wrong = {name: pair for name, pair in folded.items() if pair[0] != pair[1]}
+    changed = [key for key in list(kept.values()) + [key for key, _ in folded.values()] if normalized_key(key) != key]
+    return ("门禁 crash-point-replay 的 crash-case-replay 格点名的 --item 照留进键、各用例各一把键，不给 --check 或点别的格的照旧折",
+            not wrong and len(set(kept.values())) == len(cases) and not folded_wrong and not changed,
+            f"照留的键里不对的 {wrong}；两条用例的键互不相同 {len(set(kept.values())) == len(cases)}；该照旧折而没折对的 {folded_wrong}（(得到的, 要的)）；"
+            f"再换一次变了的 {changed}（空表都是对）")
+
+
+def command_entry_cell(repository, home):
+    """入口的认法（文件头「入口」，command_entry）：键先经 command_key 换算再认入口。脚本（bash 起门禁阶段，带格名、点名项与仓根）取脚本路径；
+    带 env 赋值、解释器与它的选项、./ 起头的取去掉 ./ 的脚本路径；cargo test 带 --offline、-p 包名、--test 目标的取「cargo test -p <包>」，--package=<包> 的写法同一个，
+    不点包的取「cargo <子命令>」；bash -c 里的取那段脚本的命令词。样本不经工作根、不带 capped.sh。"""
+    samples = (("脚本", ["bash", ".claude/gate.d/crash-point-replay.sh", "--check", "crash-case-replay", "--item", "crash-case:甲", repository],
+                ".claude/gate.d/crash-point-replay.sh"),
+               ("带 env 与解释器的", ["env", "SAMPLE_FLAG=1", "python3", "-I", "./scripts/kb/kb-sections.py", f"{home}/notes.txt"], "scripts/kb/kb-sections.py"),
+               ("cargo test -p 包名", ["cargo", "test", "--offline", "-p", "singlefs-verification", "--test", "alpha", "--release"], "cargo test -p singlefs-verification"),
+               ("cargo test --package=包名", ["cargo", "test", "--package=singlefs-core", "--lib"], "cargo test -p singlefs-core"),
+               ("cargo 不点包", ["cargo", "build", "--release"], "cargo build"),
+               ("bash -c 里的命令", ["bash", "-c", "sleep 1; exit 0"], "sleep"))
+    found = {what: (command_entry(command_key(words)), wanted) for what, words, wanted in samples}
+    wrong = {what: pair for what, pair in found.items() if pair[0] != pair[1]}
+    return ("入口的认法：去掉赋值、前缀命令与解释器之后的那一个词，cargo 取「cargo <子命令> -p <包名>」",
+            not wrong, f"认错的 {wrong}（(得到的, 要的)；空表是都对）")
 
 
 def row_shape_cells(work):
@@ -1429,11 +1726,11 @@ def run_self_test():
         print(f"       | {note}")
     if failed:
         print(f"  ✗ memory_peaks_lib.py 自证 {len(cells)} 格里 {failed} 格不对（逐格在上面）")
-        print("  → 怎么办：按不对的那一格修 command_key / normalized_words / without_item_and_file_arguments / read_peak_rows / sample_unreclaimable_peak / judged_measurement / parse_recent / "
+        print("  → 怎么办：按不对的那一格修 command_key / command_entry / normalized_words / without_item_and_file_arguments / item_values_kept / read_peak_rows / sample_unreclaimable_peak / judged_measurement / parse_recent / "
               "measured_margin / slice_margin_bytes / rounded_up_to_gibibyte / slice_scopes / scope_run_label；"
               "MEMORY_PEAKS_LIB_BREAK 设着的话本来就该红")
         return 1
-    print(f"  ✓ memory_peaks_lib.py 自证 {len(cells)} 格都对（副本与草稿目录路径换成记号、嵌套多层的副本里同一份脚本落一个键而同一份副本里不同的脚本与参数分开、剥 capped.sh N、只差条目文件开关值的落一个键而包与目标与档位分开、带空格的条目名一个词落一个键、--check 后面的格名进键、表里只认这一版的行而不对的行整张表读不了、"
+    print(f"  ✓ memory_peaks_lib.py 自证 {len(cells)} 格都对（副本与草稿目录路径换成记号、嵌套多层的副本里同一份脚本落一个键而同一份副本里不同的脚本与参数分开、剥 capped.sh N、只差条目文件开关值的落一个键而包与目标与档位分开、带空格的条目名一个词落一个键、--check 后面的格名进键、门禁 code-tooling 的 break-switch-replay 格点名的 --item 照留而各份各一把键、门禁 crash-point-replay 的 crash-case-replay 格点名的用例照留而各条各一把键、入口的认法、表里只认这一版的行而不对的行整张表读不了、"
           "同一个键两台各一行而只认本台的那一行、默认的峰值表在共享数据根下、页缓存占了大半时记回收不掉的那一截、oom_kill 大于 0 记撞顶而采不到的不记、峰值到了上限而没 OOM 的不把上限往上推、新口径读回近几次里最大的、"
           "工作根取法与 lib_work_root.py 一样、平常跑设了弄坏开关退 2 并点名变量、"
           f"余量按 1 GiB 向上取整（{len(MARGIN_ROUNDING_SAMPLES)} 个读数各一格）、余量只算子 cgroup 里没有的那一截、读不了时量不到余量、在跑的 scope 逐个报用量与标签）")

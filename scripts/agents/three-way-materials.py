@@ -4,7 +4,7 @@
 """三方论证的材料：按正文引到的 kb 文件生成小节清单（默认全抄，索引表与历史节不抄）、抽附录、拼背景材料、写开工快照。
 
 用法：
-    three-way-materials.py <轮名> [--root 仓根] [--files kb文件 …] [--extra 文件:a-b …] [--no-history]
+    three-way-materials.py <轮名> [--root 仓根] [--files kb文件 …] [--extra 文件:a-b …] [--no-history] [--not-snapshotted 路径=理由 …]
     three-way-materials.py <轮名> --resume [同样的参数]   # checklist-specs.py 判红、改好清单之后接着做
     three-way-materials.py --selftest      # THREE_WAY_MATERIALS_BREAK=skip-index-extra 时必须判红
 
@@ -24,7 +24,12 @@
 产出（都排他新建，已存在就停）：research/prompts/_<轮>-checklist.md、_<轮>-appendix.md、_<轮>-background.md、<轮>-snapshot/kb-sha256.txt。
 --resume：清单已在、另三样都还没有时，沿用那份清单（人改过的照用），正文或 --files 引到而清单里没有的文件各补一张（默认全抄），
   再跑 checklist-specs.py 抽附录、拼背景材料、写快照。checklist-specs.py 判红时，说明里给的就是这一条能照抄的 --resume 命令。
-退出码：0 做成；1 checklist-specs.py 或 quote-kb.py 判红（原样转打它们的输出，按那里的下一步改清单，再照抄给出的 --resume 命令）；2 用法错、正文不在、产出已存在。
+代码轮（轮名形如 <题>-code-r<n>，n 不小于 2）另比开工快照漏收：读同一题前几轮的 research/prompts/<题>-code-r<k>-snapshot/crates-sha256.txt（sha256sum 原样输出，没有的那一轮不比），
+  前几轮收过、这一轮的 research/prompts/<轮>-snapshot/crates-sha256.txt 没收、此刻的 sha256 与最近收过它的那一轮记的不同的文件，逐个列出，退 3、什么都不写（清单、附录、背景材料、快照都不写）；
+  此刻已不在的文件不比。有前几轮的清单而这一轮的 crates-sha256.txt 还没写时同样退 3：先 sha256sum 这一轮被判的 crates 文件写进去再跑。
+  列出的文件，这一轮要判的补进这一轮的 crates-sha256.txt；确不判的，每份给一个 --not-snapshotted <路径>=<理由>（路径从仓根起，理由至少 8 个字），放行的写进背景材料末尾一节
+  与 research/prompts/<轮>-snapshot/not-snapshotted.txt（制表符分隔：路径、前一轮的轮名、前一轮记的哈希、此刻的哈希、理由）；放行的路径不在漏收清单里、理由不足 8 个字，退 2、什么都不写。
+退出码：0 做成；1 checklist-specs.py 或 quote-kb.py 判红（原样转打它们的输出，按那里的下一步改清单，再照抄给出的 --resume 命令）；2 用法错、正文不在、产出已存在、--not-snapshotted 写错；3 代码轮开工快照漏收（上一段）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头）：
   THREE_WAY_MATERIALS_BREAK=skip-index-extra  mark_checklist() 把分项索引表标「不抄」却不把它的行区间交给 --extra
@@ -42,6 +47,14 @@
       续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」）
   THREE_WAY_MATERIALS_BREAK=keep-translations  cited_files() 不排编号引出的 `.en.md`、`.ja.md` 译文，同号的三份都进清单
       译文（「✗ 自检：同号有译文时清单里只有中文那一份」）
+  THREE_WAY_MATERIALS_BREAK=omission-unchecked  snapshot_omissions() 不比前几轮的清单，漏收的一份都不列
+      漏收（「✗ 自检：漏收且改过」、「✗ 自检：放行参数」、「✗ 自检：这一轮的清单还没写」）
+  THREE_WAY_MATERIALS_BREAK=omission-unchanged-listed  snapshot_omissions() 不看此刻的内容变没变，前几轮收过而这一轮没收的一律列
+      漏收（「✗ 自检：漏收且改过」、「✗ 自检：放行参数」、「✗ 自检：漏收没改」、「✗ 自检：取最近收过的那一轮」）
+  THREE_WAY_MATERIALS_BREAK=release-not-recorded  build() 放行的漏收不写进背景材料与 not-snapshotted.txt
+      放行（「✗ 自检：放行参数」）
+  THREE_WAY_MATERIALS_BREAK=release-reason-unchecked  parse_not_snapshotted() 不核理由的字数，不足 8 个字也放行
+      放行（「✗ 自检：放行理由太短」、「✗ 自检：放行的路径不在漏收清单里」）
   QUOTE_KB_BREAK=invariants-to-readme  quote-kb.py 的开关（I 号一律退回不变量目录的 README.md），读法是那一份，这里同样红
       不变量号（「✗ 自检：正文点名 I-7.4」）、续做（「✗ 自检：checklist-specs.py 判红之后照抄给出的 --resume」：样本正文也点名了 I-7.4）
 """
@@ -202,10 +215,104 @@ def sha256_of(path):
     return digest.hexdigest()
 
 
+CODE_ROUND_NAME = re.compile(r"^(?P<topic>.+)-code-r(?P<number>\d+)$")   # 代码轮的轮名：<题>-code-r<数字>
+SNAPSHOT_LINE = re.compile(r"^(?P<hash>[0-9a-fA-F]{64}) [ *](?P<path>.+)$")   # sha256sum 原样输出：哈希、一个空格、空格（二进制模式是 *）、路径
+NOT_SNAPSHOTTED_REASON_MINIMUM = 8   # --not-snapshotted 的理由至少几个字
+NOT_SNAPSHOTTED_FILE = "not-snapshotted.txt"   # 放行的漏收落在 <轮>-snapshot/ 下的这一份（名字里没有 sha256，不算快照清单）
+SNAPSHOT_OMISSION_EXIT = 3   # 代码轮开工快照漏收的退出码
+
+
+def crates_snapshot_path(root, round_name):
+    return os.path.join(root, "research", "prompts", f"{round_name}-snapshot", "crates-sha256.txt")
+
+
+def read_crates_snapshot(path):
+    """一份 sha256sum 清单 → {仓根相对路径: 哈希}（开头的 ./ 去掉，认不出的行跳过）；读不了抛 OSError 或 UnicodeDecodeError。"""
+    listed = {}
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            found = SNAPSHOT_LINE.match(line.rstrip("\n"))
+            if found:
+                relative = found.group("path")
+                listed[relative[2:] if relative.startswith("./") else relative] = found.group("hash").lower()
+    return listed
+
+
+def snapshot_omissions(round_name, root):
+    """代码轮（<题>-code-r<n>，n 不小于 2）开工快照漏收：→ ([漏收的文件], 失败或 None)。
+    漏收的文件 = 前几轮的 crates-sha256.txt 收过、这一轮的 crates-sha256.txt 没收、此刻在盘上而 sha256 与最近收过它的那一轮记的不同；每项 {path, round, recorded, current}。
+    失败 = (退出码, 说明行)：有前几轮的清单而这一轮的清单还没写（比不了），或某份清单读不了。不是代码轮、n 为 1、前几轮都没有清单的，交 ([], None)。
+    弄坏开关 omission-unchecked 一律交 ([], None)；omission-unchanged-listed 不看内容变没变，漏收的一律列。"""
+    found = CODE_ROUND_NAME.match(round_name)
+    if found is None or int(found.group("number")) < 2 or BROKEN == "omission-unchecked":
+        return [], None
+    topic, number = found.group("topic"), int(found.group("number"))
+    earlier = [(name, crates_snapshot_path(root, name)) for name in (f"{topic}-code-r{index}" for index in range(1, number))]
+    earlier = [(name, path) for name, path in earlier if os.path.isfile(path)]
+    if not earlier:
+        return [], None
+    this_path = crates_snapshot_path(root, round_name)
+    this_relative = os.path.relpath(this_path, root)
+    try:
+        latest = {}
+        for name, path in earlier:
+            for relative, recorded in read_crates_snapshot(path).items():
+                latest[relative] = (name, recorded)
+        listed_now = read_crates_snapshot(this_path) if os.path.isfile(this_path) else None
+    except (OSError, UnicodeDecodeError) as error:
+        return [], (2, [f"  ✗ 读不了开工快照清单：{error}", "  → 怎么办：核前几轮与这一轮的 crates-sha256.txt 是可读的 UTF-8 普通文件，再跑同一条命令"])
+    if listed_now is None:
+        return [], (SNAPSHOT_OMISSION_EXIT, [
+            f"  ✗ {round_name} 是代码轮第 {number} 轮，前面的 {'、'.join(name for name, _ in earlier)} 有 crates-sha256.txt，这一轮的 {this_relative} 还没有，比不了哪些文件被漏收",
+            f"  → 怎么办：先把这一轮被判的 crates 文件记进去（前几轮收过而这一轮也要判的别漏）：sha256sum <文件…> > {this_relative}，再跑同一条命令"])
+    omitted = []
+    for relative in sorted(latest):
+        name, recorded = latest[relative]
+        absolute = os.path.join(root, relative)
+        if relative in listed_now or not os.path.isfile(absolute):
+            continue
+        current = sha256_of(absolute)
+        if current != recorded or BROKEN == "omission-unchanged-listed":
+            omitted.append({"path": relative, "round": name, "recorded": recorded, "current": current})
+    return omitted, None
+
+
+def omission_refusal(round_name, root, unreleased):
+    """漏收的文件没放行的：逐个列出（最近收过它的那一轮、那一轮记的哈希、此刻的哈希）与两条出路。"""
+    this_relative = os.path.relpath(crates_snapshot_path(root, round_name), root)
+    lines = [f"  ✗ {round_name} 的开工快照漏收了 {len(unreleased)} 份前几轮收过、此刻内容已与前一轮记的不同的文件"
+             "（这样的文件被判决点名，门禁 crates-adversarial-review 会判「判决之后又改过」）："]
+    lines += [f"    {item['path']}  {item['round']} 记 {item['recorded']}，此刻 {item['current']}" for item in unreleased]
+    lines += [f"  → 怎么办：这一轮要判的，补进 {this_relative}（sha256sum <文件…> >> {this_relative}）再跑同一条命令；",
+              f"    这一轮确不判的，每份各给一个放行参数再跑（理由至少 {NOT_SNAPSHOTTED_REASON_MINIMUM} 个字，写进背景材料与 {NOT_SNAPSHOTTED_FILE}）："]
+    lines += [f"      --not-snapshotted '{item['path']}=<理由>'" for item in unreleased]
+    return lines
+
+
+def parse_not_snapshotted(arguments):
+    """--not-snapshotted 的值（<路径>=<理由>，路径从仓根起）→ ({路径: 理由}, 说明行)。
+    写成别的样子、理由（压成单空格之后）不足 NOT_SNAPSHOTTED_REASON_MINIMUM 个字、同一路径给两次的，写进说明行。弄坏开关 release-reason-unchecked 不核理由的字数。"""
+    released, problems = {}, []
+    for argument in arguments:
+        path, separator, reason = argument.partition("=")
+        path = path.strip()
+        path = path[2:] if path.startswith("./") else path
+        reason = " ".join(reason.split())
+        if not separator or not path:
+            problems.append(f"  ✗ --not-snapshotted {argument!r} 不是 <路径>=<理由> 的写法")
+        elif len(reason) < NOT_SNAPSHOTTED_REASON_MINIMUM and BROKEN != "release-reason-unchecked":
+            problems.append(f"  ✗ --not-snapshotted {path} 的理由 {reason!r} 不足 {NOT_SNAPSHOTTED_REASON_MINIMUM} 个字")
+        elif path in released:
+            problems.append(f"  ✗ --not-snapshotted {path} 给了两次")
+        else:
+            released[path] = reason
+    return released, problems
+
+
 CHECKLIST_SECTION = re.compile(r"^### 小节清单：`([^`]+)`", re.M)
 
 
-def resume_command(round_name, root, extra_files, extra_ranges, keep_history):
+def resume_command(round_name, root, extra_files, extra_ranges, keep_history, not_snapshotted=None):
     """续做那一条能照抄的命令：同样的参数加 --resume。"""
     script = os.path.join(SCRIPT_DIRECTORY, "three-way-materials.py")
     shown = os.path.relpath(script)
@@ -218,6 +325,8 @@ def resume_command(round_name, root, extra_files, extra_ranges, keep_history):
         words += ["--extra", *extra_ranges]
     if keep_history:
         words.append("--no-history")
+    for path, reason in (not_snapshotted or {}).items():
+        words += ["--not-snapshotted", f"{path}={reason}"]
     return " ".join(shlex.quote(word) for word in words)
 
 
@@ -227,11 +336,24 @@ def counted_marks(checklist_text):
     return sum(1 for mark in marks if mark == "抄"), sum(1 for mark in marks if mark == "不抄")
 
 
-def build(round_name, root, extra_files, extra_ranges, keep_history, quiet=False, resume=False):
+def build(round_name, root, extra_files, extra_ranges, keep_history, quiet=False, resume=False, not_snapshotted=None):
     prompts = os.path.join(root, "research", "prompts")
     body_path = os.path.join(prompts, f"_{round_name}-body.md")
     if not os.path.isfile(body_path):
         return 2, [f"  ✗ 正文不在：{os.path.relpath(body_path, root)}", "  → 怎么办：先写正文 research/prompts/_<轮>-body.md，再跑这条脚本"]
+    not_snapshotted = not_snapshotted or {}
+    omitted, failure = snapshot_omissions(round_name, root)   # 先于一切写：漏收没放行的，什么都不写
+    if failure is not None:
+        return failure
+    omitted_paths = {item["path"] for item in omitted}
+    strangers = sorted(set(not_snapshotted) - omitted_paths)
+    if strangers:
+        return 2, [f"  ✗ --not-snapshotted 点名的 {'、'.join(strangers)} 不在漏收清单里（漏收的：{'、'.join(sorted(omitted_paths)) or '无'}）",
+                   "  → 怎么办：放行参数的路径照漏收清单写（从仓根起），不在清单里的不用放行"]
+    unreleased = [item for item in omitted if item["path"] not in not_snapshotted]
+    if unreleased:
+        return SNAPSHOT_OMISSION_EXIT, omission_refusal(round_name, root, unreleased)
+    released = [dict(item, reason=not_snapshotted[item["path"]]) for item in omitted]
     body_text = open(body_path, encoding="utf-8").read()
     files = cited_files(body_text, root)
     for path in extra_files:
@@ -241,7 +363,7 @@ def build(round_name, root, extra_files, extra_ranges, keep_history, quiet=False
     outputs = {name: os.path.join(prompts, f"_{round_name}-{name}.md") for name in ("checklist", "appendix", "background")}
     snapshot_path = os.path.join(prompts, f"{round_name}-snapshot", "kb-sha256.txt")
     resume = resume and BROKEN != "no-resume"
-    continue_with = resume_command(round_name, root, extra_files, extra_ranges, keep_history)
+    continue_with = resume_command(round_name, root, extra_files, extra_ranges, keep_history, not_snapshotted)
     existing_text = None
     if resume:
         if not os.path.isfile(outputs["checklist"]):
@@ -305,14 +427,24 @@ def build(round_name, root, extra_files, extra_ranges, keep_history, quiet=False
                            f"改完照抄这一条接着做，附录、背景材料与 kb-sha256.txt 一起补齐、清单不重生成：",
                            f"      {continue_with}"]
     appendix_text = open(outputs["appendix"], encoding="utf-8").read()
+    recorded_releases = released if BROKEN != "release-not-recorded" else []
+    background_text = body_text.rstrip("\n") + "\n\n" + checklist_text.rstrip("\n") + "\n\n" + appendix_text
+    if recorded_releases:
+        background_text = background_text.rstrip("\n") + "\n\n## 开工快照没收的文件（主 agent 放行）\n\n" + "\n".join(
+            f"- {item['path']}：{item['round']} 的开工快照记 {item['recorded']}，此刻 {item['current']}；这一轮的开工快照没收，理由：{item['reason']}" for item in recorded_releases) + "\n"
     with open(outputs["background"], "x", encoding="utf-8") as handle:
-        handle.write(body_text.rstrip("\n") + "\n\n" + checklist_text.rstrip("\n") + "\n\n" + appendix_text)
+        handle.write(background_text)
     os.makedirs(os.path.dirname(snapshot_path), exist_ok=True)
     with open(snapshot_path, "x", encoding="utf-8") as handle:
         for relative in files:
             handle.write(f"{sha256_of(os.path.join(root, relative))}  {relative}\n")
+    if recorded_releases:
+        with open(os.path.join(os.path.dirname(snapshot_path), NOT_SNAPSHOTTED_FILE), "x", encoding="utf-8") as handle:
+            for item in recorded_releases:
+                handle.write("\t".join((item["path"], item["round"], item["recorded"], item["current"], item["reason"])) + "\n")
     resumed = (f"（--resume 接着做：沿用已有的清单" + (f"，补了 {len(appended)} 张：{'、'.join(appended)}" if appended else "") + "）") if existing_text is not None else ""
-    lines = [f"  ✓ 材料做成：读了 {len(files)} 份 kb 文件，清单抄 {copied} 行、不抄 {skipped} 行，--extra {len(extras)} 条{resumed}",
+    released_note = f"，放行开工快照漏收 {len(released)} 份（{'、'.join(item['path'] for item in released)}）" if released else ""
+    lines = [f"  ✓ 材料做成：读了 {len(files)} 份 kb 文件，清单抄 {copied} 行、不抄 {skipped} 行，--extra {len(extras)} 条{resumed}{released_note}",
              *(f"    {os.path.relpath(path, root)}  sha256 {sha256_of(path)}" for path in [outputs['checklist'], outputs['appendix'], outputs['background'], snapshot_path]),
              f"    checklist-specs.py：{result.stdout.strip().splitlines()[-1] if result.stdout.strip() else '（无输出）'}"]
     return 0, lines
@@ -463,6 +595,88 @@ def selftest():
                 and "ZHBODY" in texts["_t-r6-appendix.md"] and "ENBODY" not in texts["_t-r6-appendix.md"] and "JABODY" not in texts["_t-r6-appendix.md"]):
             failures.append(f"同号有译文时清单里只有中文那一份：应当做成（退出码 0）、清单与快照只列 09-译文样本.md、附录不含译文正文，"
                             f"实际退 {code_translated}，清单列了 {listed}，快照列了 {snapshot_files}；{' '.join(lines_translated)[-300:]}")
+        # 代码轮开工快照漏收：题 ka 到 kf 各造一种形的前几轮清单。renamed.rs 在前一轮记下哈希之后被改过，stable.rs 没动，kept.rs 这一轮收了
+        def put(relative, text):
+            path = os.path.join(work, relative)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(text)
+        crate_names = ("kept.rs", "renamed.rs", "stable.rs")
+        for name in crate_names:
+            put(f"crates/demo/src/{name}", f"{name} 第一版\n")
+        recorded = {name: sha256_of(os.path.join(work, "crates", "demo", "src", name)) for name in crate_names}
+        put("crates/demo/src/renamed.rs", "renamed.rs 第二版\n")
+        current = {name: sha256_of(os.path.join(work, "crates", "demo", "src", name)) for name in crate_names}
+        renamed_path = "crates/demo/src/renamed.rs"
+        def code_round(round_name, names=None, hashes=None, body=False):
+            if body:
+                put(f"research/prompts/_{round_name}-body.md", f"# {round_name} 正文\n\n判 D7（样本） 已定项 1 站不站得住，见 `.claude/kb/decisions/07-样本.md`。\n")
+            if names is not None:
+                put(f"research/prompts/{round_name}-snapshot/crates-sha256.txt", "".join(f"{hashes[name]}  crates/demo/src/{name}\n" for name in names))
+        def written_outputs(round_name):
+            prompts_directory = os.path.join(work, "research", "prompts")
+            return [name for name in (f"_{round_name}-checklist.md", f"_{round_name}-appendix.md", f"_{round_name}-background.md", os.path.join(f"{round_name}-snapshot", "kb-sha256.txt"))
+                    if os.path.exists(os.path.join(prompts_directory, name))]
+        def read_text(relative):
+            path = os.path.join(work, relative)
+            return open(path, encoding="utf-8").read() if os.path.isfile(path) else ""
+        def run_captured(arguments):
+            captured = io.StringIO()
+            with contextlib.redirect_stdout(captured):
+                exit_code = run_command(arguments)
+            return exit_code, captured.getvalue()
+        code_round("ka-code-r1", crate_names, recorded)
+        code_round("ka-code-r2", ("kept.rs",), current, body=True)
+        code_omitted, lines_omitted = build("ka-code-r2", work, [], [], keep_history=False, quiet=True)
+        text_omitted = "\n".join(lines_omitted)
+        checked += 1
+        if not (code_omitted == SNAPSHOT_OMISSION_EXIT and renamed_path in text_omitted and recorded["renamed.rs"] in text_omitted and current["renamed.rs"] in text_omitted
+                and "stable.rs" not in text_omitted and "kept.rs" not in text_omitted and not written_outputs("ka-code-r2")):
+            failures.append(f"漏收且改过：前一轮收过、这一轮没收、内容变了的 renamed.rs 应当拒（退出码 {SNAPSHOT_OMISSION_EXIT}）并列出它与两个哈希，没改的 stable.rs 与这一轮收了的 kept.rs 不列，"
+                            f"什么都不写；实际退 {code_omitted}、写了 {written_outputs('ka-code-r2')}：{text_omitted[-400:]}")
+        reason = "改名之后的调用处这一轮不判"
+        code_released, lines_released = build("ka-code-r2", work, [], [], keep_history=False, quiet=True, not_snapshotted={renamed_path: reason})
+        background_released = read_text("research/prompts/_ka-code-r2-background.md")
+        checked += 1
+        if not (code_released == 0 and renamed_path in background_released and reason in background_released and recorded["renamed.rs"] in background_released
+                and read_text("research/prompts/ka-code-r2-snapshot/not-snapshotted.txt") == "\t".join((renamed_path, "ka-code-r1", recorded["renamed.rs"], current["renamed.rs"], reason)) + "\n"
+                and "kb-sha256.txt" in " ".join(written_outputs("ka-code-r2")) and "放行开工快照漏收 1 份" in "\n".join(lines_released)):
+            failures.append(f"放行参数：--not-snapshotted 给了路径与理由，应当做成（退出码 0），背景材料末尾一节与 not-snapshotted.txt 记下路径、前一轮与此刻的哈希、理由，快照照写；"
+                            f"实际退 {code_released}、写了 {written_outputs('ka-code-r2')}：{' '.join(lines_released)[-300:]}")
+        code_round("kb-code-r1", ("stable.rs",), recorded)
+        code_round("kb-code-r2", (), current, body=True)
+        code_unchanged, lines_unchanged = build("kb-code-r2", work, [], [], keep_history=False, quiet=True)
+        checked += 1
+        if code_unchanged != 0:
+            failures.append(f"漏收没改：前一轮收过、这一轮没收、内容没变的 stable.rs 应当放行（退出码 0），实际 {code_unchanged}：{' '.join(lines_unchanged)[-300:]}")
+        code_round("kc-code-r1", ("renamed.rs",), recorded)
+        code_round("kc-code-r2", ("renamed.rs",), current)
+        code_round("kc-code-r3", ("kept.rs",), current, body=True)
+        code_nearest, lines_nearest = build("kc-code-r3", work, [], [], keep_history=False, quiet=True)
+        checked += 1
+        if code_nearest != 0:
+            failures.append(f"取最近收过的那一轮：renamed.rs 第一轮记的是旧哈希、第二轮记的是此刻的哈希，第三轮没收，应当放行（退出码 0），实际 {code_nearest}：{' '.join(lines_nearest)[-300:]}")
+        code_round("kd-code-r1", ("renamed.rs",), recorded)
+        code_round("kd-code-r2", ("kept.rs",), current, body=True)
+        code_short, output_short = run_captured(["kd-code-r2", "--root", work, "--not-snapshotted", f"{renamed_path}=太短"])
+        checked += 1
+        if not (code_short == 2 and "不足" in output_short and not written_outputs("kd-code-r2")):
+            failures.append(f"放行理由太短：不足 {NOT_SNAPSHOTTED_REASON_MINIMUM} 个字的理由应当拒（退出码 2）、什么都不写，实际退 {code_short}、写了 {written_outputs('kd-code-r2')}：{output_short[-300:]}")
+        code_stranger, output_stranger = run_captured(["kd-code-r2", "--root", work, "--not-snapshotted", "crates/demo/src/stable.rs=这份并没有漏收的理由"])
+        checked += 1
+        if not (code_stranger == 2 and "不在漏收清单里" in output_stranger and not written_outputs("kd-code-r2")):
+            failures.append(f"放行的路径不在漏收清单里：应当拒（退出码 2）、什么都不写，实际退 {code_stranger}、写了 {written_outputs('kd-code-r2')}：{output_stranger[-300:]}")
+        code_round("ke-code-r1", ("renamed.rs",), recorded)
+        code_round("ke-code-r2", body=True)
+        code_unlisted, lines_unlisted = build("ke-code-r2", work, [], [], keep_history=False, quiet=True)
+        checked += 1
+        if not (code_unlisted == SNAPSHOT_OMISSION_EXIT and "ke-code-r2-snapshot/crates-sha256.txt" in "\n".join(lines_unlisted) and not written_outputs("ke-code-r2")):
+            failures.append(f"这一轮的清单还没写：前几轮有清单而这一轮的 crates-sha256.txt 不在，应当拒（退出码 {SNAPSHOT_OMISSION_EXIT}）并点名那份清单，实际退 {code_unlisted}、写了 {written_outputs('ke-code-r2')}：{' '.join(lines_unlisted)[-300:]}")
+        code_round("kf-code-r2", body=True)
+        code_alone, lines_alone = build("kf-code-r2", work, [], [], keep_history=False, quiet=True)
+        checked += 1
+        if code_alone != 0:
+            failures.append(f"前几轮没有清单：前几轮都没有 crates-sha256.txt 的代码轮没有可比的，应当做成（退出码 0），实际 {code_alone}：{' '.join(lines_alone)[-300:]}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
@@ -473,7 +687,8 @@ def selftest():
     print(f"  ✓ 自检通过（查了 {checked} 项）：索引表不抄而按行区间补抄、分项与细节按自己的标题或随父节抄、历史节不抄、"
           "附录与背景材料含该抄的每一段、快照列了 kb 文件、产出已存在时拒绝覆盖、not-numbers 声明的记号不当编号而没声明的照拉、"
           "只点名 I-7.4 与 I-8.3 时带上那两份不变量类文件、认编号与 quote-kb.py --cited 同一份读法、checklist-specs.py 判红后照抄 --resume 一次补齐、"
-          "同号有译文时只认中文那一份")
+          "同号有译文时只认中文那一份、代码轮开工快照漏收（前几轮收过而这一轮没收且内容变了的拒并什么都不写，没改的与最近收过那一轮对得上的放，"
+          "前几轮有清单而这一轮没写的拒，--not-snapshotted 放行的写进背景材料与 not-snapshotted.txt，理由不足 8 个字与不在漏收清单里的路径拒）")
     return 0
 
 
@@ -499,10 +714,11 @@ def main(argv):
 def run_command(argv):
     """生成材料的命令行解析与执行（不含 --selftest 与弄坏开关的守卫，那两样在 main()）。"""
     if not argv or argv[0].startswith("--"):
-        print("  ✗ 用法：three-way-materials.py <轮名> [--root 仓根] [--files kb文件 …] [--extra 文件:a-b …] [--no-history] [--resume]\n"
+        print("  ✗ 用法：three-way-materials.py <轮名> [--root 仓根] [--files kb文件 …] [--extra 文件:a-b …] [--no-history] [--resume] [--not-snapshotted 路径=理由 …]\n"
               "  → 怎么办：第一个参数写轮名（正文是 research/prompts/_<轮名>-body.md）")
         return 2
     round_name, root, files, extras, keep_history, resume = argv[0], REPOSITORY_ROOT, [], [], False, False
+    released_arguments = []
     rest = argv[1:]
     while rest:
         flag = rest.pop(0)
@@ -518,10 +734,17 @@ def run_command(argv):
             keep_history = True
         elif flag == "--resume":
             resume = True
+        elif flag == "--not-snapshotted" and rest:
+            released_arguments.append(rest.pop(0))
         else:
-            print(f"  ✗ 认不出参数 {flag}\n  → 怎么办：只认 --root、--files、--extra、--no-history、--resume")
+            print(f"  ✗ 认不出参数 {flag}\n  → 怎么办：只认 --root、--files、--extra、--no-history、--resume、--not-snapshotted '<路径>=<理由>'")
             return 2
-    code, lines = build(round_name, root, files, extras, keep_history, resume=resume)
+    released, problems = parse_not_snapshotted(released_arguments)
+    if problems:
+        print("\n".join(problems + ["  → 怎么办：写成 --not-snapshotted '<路径>=<理由>'（路径从仓根起，理由至少 "
+                                    f"{NOT_SNAPSHOTTED_REASON_MINIMUM} 个字，同一路径给一次）"]))
+        return 2
+    code, lines = build(round_name, root, files, extras, keep_history, resume=resume, not_snapshotted=released)
     print("\n".join(lines))
     return code
 

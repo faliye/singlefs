@@ -11,23 +11,27 @@
   insert-row.py 文件 --after 正则 --line 文本 [--absent 正则] [--dry-run]
   insert-row.py 文件 --before 正则 --line 文本 …
   insert-row.py 文件 --after-literal 文本 --line 文本 …    # 锚点按字面认（括号、竖线、点都不当正则）
+  insert-row.py 文件 --after 正则 --line 文本 --absent-literal 文本 …    # 判重按字面认（竖线、括号、点都不当正则）
   insert-row.py --selftest
 
   --after / --before  锚点正则，必须在文件里**恰好命中一次**（命中 0 次或多次都拒绝，与 replace-once 同规矩）
   --after-literal / --before-literal  同上，锚点按字面找（等于把它 re.escape 之后当正则）
   锚点命中 0 次：说明按正则认、点出锚点里的正则元字符，给 --<…>-literal 与转义好的写法，列出按字面找得到的行号；
   命中多次：列出每一处的行号与那一行。
-  --absent            插之前先确认这个正则一处都没有，用来挡重复插入（例如已经有同编号的行）
+  --absent            插之前先确认这个正则一处都没有，用来挡重复插入（例如已经有同编号的行）；
+                      正则命中文件的每一行就拒（退出码 8）：多半是把字面量当了正则（`| C1003 |` 里的 | 是「或」，空的一支让每一行都命中）
+  --absent-literal    同 --absent，串按字面找（竖线、括号、点都不当正则）；判一行表格行在不在用它
 写之前复核：读文件时记下 sha256，写之前再算一次，变了就拒绝并让人重跑——
 别人在这中间写过，读到的内容已经不是要改的那一份。
 
 写回不在原文件上就地写：同目录排他新建临时文件、fsync、照原权限位与属主、改名换上（`lib_atomic_replace.py`）；
 写前复核排在临时文件写完之后、改名换上之前。正在按偏移边跑边读这份文件的进程读的仍是旧 inode 的旧内容。
 
-退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 已有命中；3 锚点不是恰好命中一次；
+退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 或 --absent-literal 已有命中；3 锚点不是恰好命中一次；
 4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）；
 6 目标是仓里的 .md，新行带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法）；
-7 目标在仓里（任何后缀），新行带会话号（ListAgents 列的会话名）。2–7 都是原文件没动、没留临时文件。
+7 目标在仓里（任何后缀），新行带会话号（ListAgents 列的会话名）；
+8 --absent 的正则命中文件的每一行（像是把字面量当了正则，换 --absent-literal 或转义）。2–8 都是原文件没动、没留临时文件。
 
 写 .md、.json、.txt 之前判新行（退出码 6）：目标是仓里这几种后缀时，锚点定位成功之后、写之前（干跑也判），用 write-guard.sh 与门禁 doc-text 同一份判据
 （.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 调它）判 --line 给的新行；带钟点、时区词、时间戳的拒绝，逐处列出行号与形态与出路。
@@ -49,6 +53,11 @@
       写 .md 之前判新行（「✗ 自检失败：写 .md 之前判新行没判对」那几条：新行带紧凑时间戳、带日期钟点时区词、带光秃时区词、干跑也拒、入口退出码 6 与不写文件）
   INSERT_ROW_BREAK=no-session-guard  insert() 不判新行里的会话号
       写文件之前判新行里的会话号（「✗ 自检失败：写会话号之前判新行没判对」，下面逐条以「写会话号：」开头：.md 与 .py 目标的新行带会话名、干跑也拒、入口退出码 7 与不写文件）
+  INSERT_ROW_BREAK=absent-literal-as-regex  insert() 把 --absent-literal 照旧按正则判
+      字面命中（「✗ 自检失败：--absent-literal 字面命中时没拒」；自证停在第一处失败，排在它后面的
+      『✗ 自检失败：--absent-literal 字面不命中时没插成』那一格同样判这一支，只在前一格过了时才走到）
+  INSERT_ROW_BREAK=no-all-lines-guard  insert() 不判 --absent 的正则命中文件的每一行
+      正则命中每一行（「✗ 自检失败：--absent 的正则命中每一行时没拒并提示」）
   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新行带紧凑时间戳的那几条红；
       compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
@@ -125,9 +134,22 @@ def anchor_hints(lines, anchor, where, literal, matched):
     return hints
 
 
-def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_root=None):
+def visible_lines(lines):
+    """文件按行切开的结果，去掉末尾换行留下的那个空串。"""
+    return lines[:-1] if len(lines) > 1 and lines[-1] == "" else lines
+
+
+def every_line_matches(pattern, lines):
+    """正则在文件的每一行里都命中（逐行找，行首行尾锚点按单行认）；空文件不算。"""
+    visible = visible_lines(lines)
+    return bool(visible) and all(re.search(pattern, value) for value in visible)
+
+
+def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_root=None, absent_literal=None):
     if BROKEN == "literal-as-regex":   # 弄坏开关：--<where>-literal 照旧按正则认
         literal = False
+    if BROKEN == "absent-literal-as-regex" and absent_literal:   # 弄坏开关：--absent-literal 照旧按正则判
+        absent, absent_literal = absent or absent_literal, None
     with open(path, 'rb') as handle:
         original = handle.read()
     before = hashlib.sha256(original).hexdigest()
@@ -143,9 +165,21 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             print(f'  ✗ --absent 不是合法正则：{error}')
             print('     → 怎么办：修正 --absent 后重跑，没写文件')
             return 3
+        if hits and BROKEN != "no-all-lines-guard" and every_line_matches(absent, lines):   # 弄坏开关 no-all-lines-guard：不判正则命中每一行
+            print("  ✗ %s 里每一行（共 %d 行）都命中 --absent %s：像是把字面量当了正则，换 --absent-literal 或转义"
+                  % (path, len(visible_lines(lines)), shlex.quote(absent)))
+            print("     → 怎么办：要判一段字面串在不在，换 --absent-literal %s（竖线、括号、点都按字面）；确要用正则就把元字符转义：--absent %s。没写文件"
+                  % (shlex.quote(absent), shlex.quote(re.escape(absent))))
+            return 8
         if hits:
             print("  ✗ %s 里已经有 %d 处命中 --absent 的内容，不重复插" % (path, hits))
             print("     → 怎么办：先看那几处是不是你要插的这一行；确实要再插一行就换一个 --absent，或者去掉它。")
+            return 2
+    if absent_literal:
+        literal_hits = text.count(absent_literal)
+        if literal_hits:
+            print("  ✗ %s 里已经有 %d 处命中 --absent-literal 的内容，不重复插" % (path, literal_hits))
+            print("     → 怎么办：先看那几处是不是你要插的这一行；确实要再插一行就换一个 --absent-literal，或者去掉它。")
             return 2
     try:
         matched = [index for index, value in enumerate(lines) if (anchor in value if literal else re.search(anchor, value))]
@@ -326,6 +360,41 @@ def selftest():
             print("     → 这个工具自己坏了，别再拿它改公共表：挡不住重复插入意味着同一行会被插两遍。"
                   "查 absent 那条正则是不是拿去逐行匹配了，以及命中时有没有真的 return 2。")
             return 1
+        # --absent-literal：竖线、括号、点按字面认；同一串交给 --absent 是正则，「|」的空一支让每一行都命中
+        literal_path = os.path.join(work, "absent-literal.md")
+        literal_original = "| C1001 | 一 |\n| C1002 | 二 |\n\n### 已还清\n"
+
+        def absent_attempt(arguments):
+            captured_attempt = io.StringIO()
+            with contextlib.redirect_stdout(captured_attempt):
+                attempt_code = main([literal_path, "--before", r"^### 已还清", "--line", "| C1003 | 三 |"] + arguments)
+            return attempt_code, captured_attempt.getvalue()
+
+        open(literal_path, "w", encoding="utf-8").write(literal_original)
+        code, said = absent_attempt(["--absent-literal", "| C1001 |"])
+        if code != 2 or open(literal_path, encoding="utf-8").read() != literal_original:
+            print("  ✗ 自检失败：--absent-literal 字面命中时没拒（或拒了却改了文件），退 %d：\n%s" % (code, said))
+            print("     → 查 insert() 里 absent_literal 那一段是不是按字面数（text.count）、命中时 return 2；"
+                  "INSERT_ROW_BREAK=absent-literal-as-regex 设着的话这里本来就该红。")
+            return 1
+        code, said = absent_attempt(["--absent-literal", "| C1003 |"])
+        inserted = literal_original.replace("### 已还清", "| C1003 | 三 |\n### 已还清")
+        if code != 0 or open(literal_path, encoding="utf-8").read() != inserted:
+            print("  ✗ 自检失败：--absent-literal 字面不命中时没插成，退 %d：\n%s" % (code, said))
+            print("     → 查 insert() 里 absent_literal 那一段；INSERT_ROW_BREAK=absent-literal-as-regex 设着的话这里本来就该红。")
+            return 1
+        code, said = absent_attempt(["--absent-literal", ""])
+        if code != 1 or open(literal_path, encoding="utf-8").read() != inserted:
+            print("  ✗ 自检失败：--absent-literal 给空串时没拒（空串在任何文件里都有），退 %d：\n%s" % (code, said))
+            print("     → 查 main() 里 absent_literal 为空串的那一判。")
+            return 1
+        open(literal_path, "w", encoding="utf-8").write(literal_original)
+        code, said = absent_attempt(["--absent", "| C1003 |"])
+        if code != 8 or "像是把字面量当了正则，换 --absent-literal 或转义" not in said or "--absent-literal '| C1003 |'" not in said \
+                or open(literal_path, encoding="utf-8").read() != literal_original:
+            print("  ✗ 自检失败：--absent 的正则命中每一行时没拒并提示（要退 8、说像是把字面量当了正则、给 --absent-literal 的写法、不写文件），退 %d：\n%s" % (code, said))
+            print("     → 查 insert() 里 every_line_matches 那一段；INSERT_ROW_BREAK=no-all-lines-guard 设着的话这里本来就该红。")
+            return 1
         captured = io.StringIO()
         with contextlib.redirect_stdout(captured):
             code = insert(path, r"^\| [AB] \|", "after", "| D | 四 |", None, False)
@@ -408,7 +477,8 @@ def selftest():
         print("     → 这个工具自己坏了，别再拿它改脚本：就地写会让正在边跑边读那份脚本的进程读到别的内容。"
               "按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename。")
         return 1
-    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝并列出每一处的行号、"
+    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、--absent-literal 字面命中拒、字面不命中插成、空串拒、"
+          "--absent 的正则命中每一行时拒并提示换 --absent-literal 或转义、锚点不唯一拒绝并列出每一处的行号、"
           "锚点带括号命中 0 次时点出元字符并给 --before-literal 与转义好的写法、--before-literal 按字面插成、读到写之间被改过拒绝且不写也不留临时文件；"
           "写仓里的 .md 之前判新行：带紧凑时间戳、带日期时区词时分、带光秃时区词的拒绝（6，干跑也拒）并点名形态、行号与出路且不写文件，"
           "8 位数字后跟 T 但不是时间戳、只写日期、.json、.txt 与 .md 同判，.tsv 目标与仓外的 .md 放行，假仓里没有共用库时读不到判据按拒绝办（退出码 6，理由不是钟点），入口退出码 6；"
@@ -428,11 +498,16 @@ def main(argv, notation_root=None):
     parser.add_argument("--before-literal")
     parser.add_argument("--line")
     parser.add_argument("--absent")
+    parser.add_argument("--absent-literal")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--selftest", action="store_true")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()
+    if arguments.absent_literal == "":
+        print("  ✗ --absent-literal 是空串：空串在任何文件里都有")
+        print("     → 怎么办：写要判重的那一串字面量，例如 --absent-literal '| C1003 |'")
+        return 1
     anchors = [(where, literal, value) for where, literal, value in
                (("after", False, arguments.after), ("before", False, arguments.before),
                 ("after", True, arguments.after_literal), ("before", True, arguments.before_literal)) if value]
@@ -445,7 +520,8 @@ def main(argv, notation_root=None):
         print("     → 怎么办：检查路径（相对路径相对当前工作目录），文件是不是已经被别的进程删掉或改名")
         return 1
     where, literal, anchor = anchors[0]
-    return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal, notation_root=notation_root)
+    return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal, notation_root=notation_root,
+                  absent_literal=arguments.absent_literal)
 
 
 BREAK_VARIABLES = ("INSERT_ROW_BREAK",)

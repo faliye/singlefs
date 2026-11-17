@@ -12,10 +12,10 @@
 服务调的几样（task_server.py 按名字调；judge_host 多了 margin 一个参数，服务交那台此刻的余量）：
   settings_from_environment()                  读环境：清场包装的状态目录（GPU_QUIESCE_STATE_DIRECTORY，默认 ${XDG_RUNTIME_DIR:-/tmp}/singlefs-gpu-quiesce）、
                                                多机配置的判法与读法所在。
-  Peer(settings)                               多机配置里的第二台（判法 scripts/crash/crash-point-replay-shard-configuration-check.sh，读法 scripts/hosts/peer-host-lib.sh 的
+  Peer(settings, timeout=None)                 多机配置里的第二台（timeout 给了：判法至多跑这么多秒，超时当连不上）（判法 scripts/crash/crash-point-replay-shard-configuration-check.sh，读法 scripts/hosts/peer-host-lib.sh 的
                                                peer_host_load_configuration）：双机开关 ENABLE_ACROSS_MACHINES 没开（判法退 3）或配置判不过时 available 为 False、why 写为什么；
                                                memory_cap_bytes 是多机配置 SLICE_MEMORY_CAP_BY_HOST 里第二台那一项（按地址取，peer-host-lib.sh 的 PEER_HOST_SLICE_CAP）。
-  probe_local(settings, gpu)、probe_peer(peer, gpu, apps_only=False)
+  probe_local(settings, gpu)、probe_peer(peer, gpu, apps_only=False, timeout=PROBE_TIMEOUT_SECONDS)
                                                本机 / 第二台此刻的余量：内存是 memory_peaks_lib.headroom（/proc/meminfo 与 slice 的总上限、回收不掉的用量，连同这台此刻量的余量
                                                memory_peaks_lib.MARGIN_REPORT_KEY 那三项，memory_peaks_lib.py 文件头「余量」；连同 slice 下每个在跑的 scope 此刻回收不掉的用量与标签
                                                memory_peaks_lib.SCOPES_REPORT_KEY，那份文件头「在跑的 scope」：task-server 照它算那台每条在跑尝试还没涨到量的那一截（两台同一段），
@@ -165,10 +165,14 @@ print("HOST_DISPATCH_PROBE " + json.dumps(_report))
 '''
 
 
+# 载入时取一次：运行时再按行号读磁盘上的源码，文件被改过就取到别的函数
+PEER_PROBE_FUNCTION_SOURCES = "\n".join([inspect.getsource(gpu_cards), inspect.getsource(gpu_apps)])
+with open(os.path.join(SCRIPT_DIRECTORY, "memory_peaks_lib.py"), encoding="utf-8") as _peer_probe_library_handle:
+    PEER_PROBE_LIBRARY_SOURCE = _peer_probe_library_handle.read()
+
+
 def peer_probe_program():
-    with open(os.path.join(SCRIPT_DIRECTORY, "memory_peaks_lib.py"), encoding="utf-8") as handle:
-        library = handle.read()
-    return "\n".join([library, inspect.getsource(gpu_cards), inspect.getsource(gpu_apps), PROBE_DRIVER])
+    return "\n".join([PEER_PROBE_LIBRARY_SOURCE, PEER_PROBE_FUNCTION_SOURCES, PROBE_DRIVER])
 
 
 @dataclass
@@ -200,7 +204,8 @@ def settings_from_environment():
 class Peer:
     """多机配置里的第二台：available 为 False 时 why 写为什么不用它（双机关着、配置判不过）。"""
 
-    def __init__(self, settings):
+    def __init__(self, settings, timeout=None):
+        """timeout 给了：判法（要连第二台）至多跑这么多秒，超时当这一回连不上（available 为 False、why 写超时）；不给不限时。"""
         self.settings = settings
         self.available = False
         self.why = ""
@@ -213,8 +218,12 @@ class Peer:
         if broken("peer-despite-switch-off"):
             # 弄坏开关：双机关着也当开着去读第二台（借判法自己的弄坏开关 switch-off-is-on）
             environment = dict(environment, MULTI_HOST_CONFIGURATION_BREAK="switch-off-is-on")
-        completed = subprocess.run(["bash", "-c", loader, "host-dispatch", settings.peer_host_lib, settings.configuration_check, settings.repository_root],
-                                   capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL)
+        try:
+            completed = subprocess.run(["bash", "-c", loader, "host-dispatch", settings.peer_host_lib, settings.configuration_check, settings.repository_root],
+                                       capture_output=True, text=True, env=environment, stdin=subprocess.DEVNULL, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.why = f"读多机配置里的第二台（判法 {os.path.basename(settings.configuration_check)} 要连它）{timeout} 秒没跑完：第二台此刻连不上或卡住"
+            return
         if completed.returncode == 3:
             self.why = "多机配置里双机开关 ENABLE_ACROSS_MACHINES 没开"
             return
@@ -257,7 +266,8 @@ def probe_local(settings, gpu):
     return report, ""
 
 
-def probe_peer(peer, gpu, apps_only=False):
+def probe_peer(peer, gpu, apps_only=False, timeout=PROBE_TIMEOUT_SECONDS):
+    """在第二台上量余量（与卡）：→ (报告或 None, 读不成的原因)。timeout 是那一回 ssh 的时限（Peer.run）。"""
     source = peer_probe_program().encode("utf-8")
     flags = "--apps" if apps_only else ("--gpu" if gpu else "")
     if broken("probe-program-uncompressed"):
@@ -273,7 +283,7 @@ def probe_peer(peer, gpu, apps_only=False):
     if len(program) > PROBE_PROGRAM_ARGUMENT_LIMIT:
         return None, (f"第二台的余量查不成：探测程序压完 {len(program)} 字节，超过单个参数的界 {PROBE_PROGRAM_ARGUMENT_LIMIT}；"
                       "把 memory_peaks_lib.py 里只给自证用的部分挪出探测程序，或改成经标准输入送")
-    status, stdout, stderr = peer.run(text)
+    status, stdout, stderr = peer.run(text, timeout=timeout)
     report = parse_probe(stdout)
     if status != 0 or report is None:
         return None, f"第二台的余量查不成（退 {status}：{stderr.strip()[-300:]}）"
@@ -336,7 +346,7 @@ def judge_host(host, report, prediction, gpu, pending_memory, pending_gpu, confi
         margin = BREAK_FIXED_MARGIN_BYTES   # 弄坏开关：退回固定的数
     if configured_cap_bytes is not None and not broken("no-configured-cap-clamp"):
         if booked > configured_cap_bytes:
-            return Verdict(host, False, True, cap, f"要记的 {human(booked)} 比多机配置 SLICE_MEMORY_CAP_BY_HOST 里这台那一项 {human(configured_cap_bytes)} 大",
+            return Verdict(host, False, True, cap, f"内存：要记的 {human(booked)} 比多机配置 SLICE_MEMORY_CAP_BY_HOST 里这台那一项 {human(configured_cap_bytes)} 大",
                            memory_short=booked - configured_cap_bytes)
         cap = min(cap, configured_cap_bytes)
     if memory.get("slice_total") and memory["slice_total"] <= margin and not broken("total-within-margin-accepted"):
@@ -358,7 +368,7 @@ def judge_host(host, report, prediction, gpu, pending_memory, pending_gpu, confi
     memory_short = 0 if fits else max(0, needed - free, booked - room)
     gpu_short = 0
     if not fits:
-        reasons.append(f"内存：要的空闲 {human(needed)}（预测 {human(prediction.memory_predicted)} + 这台此刻的余量 {human(margin)}，不超过上限 {human(cap)}）、要记 {human(booked)}，"
+        reasons.append(f"内存：要的空闲 {human(needed)}（记录的峰值 {human(prediction.memory_predicted)} + 这台此刻的余量 {human(margin)}，不超过上限 {human(cap)}）、要记 {human(booked)}，"
                        f"此刻空闲 {human(max(free, 0))}、slice 减去余量放得下 {human(max(room, 0))}")
     if gpu and not broken("ignore-gpu"):
         gpu_report = report.get("gpu") or {}

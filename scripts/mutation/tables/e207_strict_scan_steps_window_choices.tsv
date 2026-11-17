@@ -1,0 +1,15 @@
+declared_overwrite_takes_the_old_units_only	        Self { user_units: old_units.max(1), old_units, new_units: 1 }	        Self { user_units: old_units, old_units, new_units: 1 }
+batch_declares_one_change	        Self { user_units: 3, old_units: 0, new_units: 0 }	        Self { user_units: 1, old_units: 0, new_units: 0 }
+declared_line_dropped	"E207RESULT name=declared item={item} {labels} user_units={} old_units={} new_units={}",	"E207RESULT name=declared_dropped item={item} {labels} user_units={} old_units={} new_units={}",
+cold_pool_not_split	    let pool: &[u64] = if same_mount { &small[..half] } else { &small[half..] };	    let pool: &[u64] = small;
+small_then_big_keeps_the_big_file	        &live[..live.len() - 1]	        &live[..]
+reconciled_points_split_too	    if RECONCILED_WINDOW_POINTS.contains(&point_name) {	    if false {
+probe_cold_first_takes_the_last_file	        "cold_first" => ProbePrefix::Overwrite(live[live.len() / 2]),	        "cold_first" => ProbePrefix::Overwrite(live[live.len() - 1]),
+extended_window_in_both_states	    state == "same_mount" && EXTENDED_WINDOW_POINTS.contains(&point_name)	    EXTENDED_WINDOW_POINTS.contains(&point_name)
+evenly_spaced_takes_the_first_ones	    (from.len() >= count).then(|| (0..count).map(|position| from[position * from.len() / count]).collect())	    (from.len() >= count).then(|| (0..count).map(|position| from[position]).collect())
+untouched_keeps_the_touched_files	small_files(live, small_then_big).iter().copied().filter(|inode| !touched_by_the_cold_overwrites.contains(inode)).collect();	small_files(live, small_then_big).iter().copied().filter(|inode| touched_by_the_cold_overwrites.contains(inode)).collect();
+negative_control_on_the_other_points	    NEGATIVE_CONTROL_POINTS.contains(&point_name)	    !NEGATIVE_CONTROL_POINTS.contains(&point_name)
+history_notes_without_the_unlink_pairs	    NOTES_OF_THE_BIG_FILE + 2 * files + 2 * unlinks	    NOTES_OF_THE_BIG_FILE + 2 * files + unlinks
+shard_interval_ends_one_late	    (index * total / count, (index + 1) * total / count)	    (index * total / count, (index + 1) * total / count + 1)
+shard_index_may_equal_the_count	    (count >= 1 && index < count).then_some((index, count))	    (count >= 1 && index <= count).then_some((index, count))
+hundred_units_per_file_repeat_point_in_the_reconciled_points	pub const RECONCILED_WINDOW_POINTS: [&str; 3] = ["base", "files_1000", "files_10000"];	pub const RECONCILED_WINDOW_POINTS: [&str; 4] = ["base", "files_1000", "files_10000", "files_56_units_100"];

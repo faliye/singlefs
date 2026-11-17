@@ -40,6 +40,21 @@
 #   键相同的不足 K 条报「哨兵不足 K 条」，不红；拷进不带 lib_reuse_checks.py 的树里跑的这一份说一句、不抽。状态在这一轮自己的 SHARD_ROOT 里。收尾那行「计数：」末尾接「、锚点失效 A 条、现判 N 条、复用 M 条、拒算 R 条」，
 #   stderr 逐条写现判与拒算的原因。判法（这份脚本判结局的那几支）不进键：改了判法，库里已有的判定照键复用、不会自己作废（这份 bash 的函数闭包在 lib_function_units.py 里拒算）。
 #   mutate.sh --binary-of <源文件>            # 打 cargo 从这份源文件编出的 bin 名（与下面「改的文件与跑的二进制对得上」那道核对同一份读法），在 scripts/experiment-apparatus/ 里跑
+#   mutate.sh --test-targets [<工作区目录>]   # 逐行打工作区（默认当前目录）里各包的测试目标与上不上卡（下面「上卡的表」），不编、不跑；清单读不了退 2
+#
+# 上卡的表（不领卡：.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」；环境里有 GPU_CARDS_BY_PRIORITY 就原样交给测试二进制，没有不设）：
+#   哪些测试目标上卡只在这里判（list_test_targets）：CARD_FEATURES 里的特性（e163-gpu），一个测试目标的 required-features 点到其中一个就是上卡的目标。
+#   --test-targets 一行一个测试目标「<包>TAB<种类>TAB<名字>TAB<相对包目录的根文件>TAB<点到的上卡特性，逗号隔开；不上卡写 ->」，种类是 lib、bin、test，
+#   带文档测试的 lib 另打一行种类 doc（[lib] doctest = false 的不打）；cargo 自己找到的目标（src/lib.rs、src/main.rs、src/bin/、tests/，autobins、autotests 写 false 的不找）照列。
+#   门禁 research-build-and-replay 的 research-unit-tests 格调它把单测分成上卡与不上卡两趟，不另抄一份。
+#   被测 bin 是上卡的目标时（stderr 打一行「mutate: <bin> 是上卡的目标（特性 …）」）：基线、每条变异与还原之后那一次都拆成编与跑两步。
+#   编（cargo test … --no-run）照「并行」那一段在各份副本上并行做，编出来的测试二进制（输出里 Executable 那一行）拷进分片根的 executables/；
+#   基线编不过退 2，一条变异编不过当场记「⏭ 无效」，编过了却取不出恰好一个测试二进制记「⚠️」（判失败、不入库）。
+#   都编完之后，在父进程里串行逐个跑测试二进制（测试二进制之间一个接一个上卡）：基线（红了退 2）、各条（表序）、各份副本还原之后那一次。
+#   一条要上卡跑的都没有（全复用的不到这一步；全编不过、取不出二进制、锚点失效）的，基线与还原之后那一次只编不跑。
+#   测试二进制直接起：当前目录是副本里被测包的目录（cargo test 起测试二进制的目录），环境同 cargo test 那一次另加 CARGO_MANIFEST_DIR；
+#   退 0、101 之外的码时照 cargo 的说法补一行「process didn't exit successfully: `<路径>` (signal: N)」（被信号杀）或「(exit status: N)」，judge 照旧认「没跑完」。
+#   不是上卡的目标的表：cargo test 编带跑一步。
 #
 # 在仓根下起：当前目录下有 scripts/experiment-apparatus/Cargo.toml、里面是 [workspace]（仓根自己的 Cargo.toml 也是 [workspace]，只看有没有 [workspace] 的目录检查照样放过、
 #   接着报成「基线就是红的」），就先 cd 进 scripts/experiment-apparatus/，参数里的路径从仓根起的写法改写成从那里起的：
@@ -51,7 +66,7 @@
 #
 # 变异表每行三段，用制表符分隔：变异名 <TAB> 原文 <TAB> 替换文（原文/替换文里的 \n 表示换行）
 # 替换必须恰好命中一次，不是的那一条照「锚点失效」记、不当成跑过 —— 静默失效的替换会让整份证明变成假的
-# （singlefs-ai-sop/rules/command-safety.md「脚本改文件之后要回读确认」）。
+# （rules/command-safety-by-review.md「脚本改文件之后要回读确认」）。
 #
 # 锚点失效（.claude/rules/mutation-sampling.md 第七类）：原文在源码里命中 0 次或多次的那一条，派活之前就记成「⚓ [<名>] 锚点失效：原文在 <源文件> 里命中 N 次……」，
 #   不起 cargo、不进按条判定库、不复用；别的条照跑照判、照入库。收尾「计数：」里一栏「锚点失效 A 条」（接在现判、复用、拒算那三栏前面），A 不为 0 整轮退 3（判完别的条之后）。
@@ -83,6 +98,10 @@
 #                           上限 1 时取 1，调用方设了 7 的原样收到 7。
 #                           再走一遍在仓根下起（from-root 四例，文件头「在仓根下起」，不起 cargo）：kb 的写法与 ./ 起头、scripts/ 之外两种写法各改写对、退 6 报的复跑命令是改写后的参数，
 #                           --binary-of 照样打 bin 名，既不在仓根也不在 scripts/experiment-apparatus/ 的照旧退 2。
+#                           再走一遍上卡的表（文件头「上卡的表」；假 cargo 认 --no-run、编出一份假测试二进制，假测试二进制逐次记下收到的 GPU_CARDS_BY_PRIORITY，没设记 unset）：
+#                           card-phase（bin 挂 e163-gpu、环境里给卡串）每次 cargo 都带 --no-run，测试二进制每次都收到环境里给的那一串，判抓到、退 0；
+#                           card-phase-no-cards（同形、环境里没有卡串）测试二进制每次都收到 unset（没设），判抓到、退 0；
+#                           card-plain（不挂上卡特性的表）cargo 不带 --no-run、退 0；--test-targets 打出 card-phase 那一例的 fake-bench 挂 e163-gpu。
 #                           每一例各用一份自己的临时目录：假 cargo、假 workspace、编译目录、按条判定库（MUTATE_LIBRARY_DIRECTORY）都在里面，不读别的例留下的东西；
 #                           复用哨兵的状态在每一趟自己的临时根（SHARD_ROOT）里。经统一任务服务交，登记为 selftest（.claude/hooks/selftest-registry.tsv）。
 #
@@ -111,6 +130,9 @@
 #   SINGLEFS_THREAD_CAP 设了照它，不然读 .claude/heavy-thread-default），取不到退 2、一条变异都没跑，不退回按核数算；
 #   MUTATE_JOBS 只能压小、不能加大（设成 1 就是原来的串行跑法）。
 #   实际开几个、各项给几个、卡在哪一项、每个 cargo 的编译并行度，打在 stderr 的头一行。
+#   按条入库查过判定库之后，要现判的条数（表里的条数减去复用的与锚点失效的）比头一行开的少时，工作进程数收到要现判的条数：多开的工作进程没有活可领，
+#   却各占一份副本、各编一遍基线。收小之后再打一行「这一轮开 N 个工作进程…卡在「要现判的条数」这一项…」，每个 cargo 的编译并行度与每条 cargo test 的测试线程数照新的工作进程数重算，
+#   第 2 份起的副本在这之后才拷；全部复用的不拷副本。弄坏开关 workersbytablecount 下仍按表里的条数开。
 #   内存不在这里判、不按内存收工作进程数：见下面「上限、限时与卡住」。
 #   每个 cargo 的编译并行度：先用 MUTATE_CARGO_JOBS，其次调用方已经设了的 CARGO_BUILD_JOBS，都没有就取 每台默认重活线程数 ÷ 工作进程数（至少 1；弄坏开关 workersbyprocessor 下取 核数 ÷ 工作进程数），免得 N 个 cargo 各按核数开 rustc。
 #   每条 cargo test 的测试线程数（基线、每条变异、还原之后那一次）：调用方设了 RUST_TEST_THREADS（非空）原样传、不覆盖；没设的给每次 cargo test 设
@@ -167,7 +189,10 @@
 #       各工作进程逐条加锁轮流占那一份（run_worker），不真的并发改同一份源码：并发改坏的那几例红不红不定，开关只证挤在一份副本上那一格
 #       parallel（「✗ 自检：MUTATE_JOBS=4 时变异应当落在至少 2 份副本上」，核数 ≥ 4 才判这一条）
 #   MUTATE_BREAK=nofeatures      不读 required-features、cargo test 一律不带 --features
-#       required-features（「挂了 required-features 的 bin 应当每次带」：基线退 101、整轮退 2）
+#       required-features（「挂了 required-features 的 bin 应当每次带」：基线退 101、整轮退 2）；
+#       上卡的表三例同样停在基线、退 2：card-phase 与 card-phase-no-cards（没判抓到、测试二进制一次都没起）、card-plain（退 2 不是 0）
+#       「✗ 自检：上卡的表：应当判抓到、退 0」「✗ 自检：上卡的表：测试二进制应当每次都收到环境里给的卡串」
+#       「✗ 自检：上卡的表：环境里没有卡串时测试二进制应当收到 unset」「✗ 自检：上卡的表：不挂上卡特性的表 cargo 应当不带 --no-run、退 0」
 #   MUTATE_BREAK=honorbreakoutsideselftest  平常跑时也认只供自证的变量，不拒；它是关守卫项，只在它是 MUTATE_BREAK 唯一一项时认（guard_off_honored），与别的项同写平常跑照拒并点名它
 #       outside-selftest-MUTATE_BREAK 与 outside-selftest-MUTATE_SELFTEST_RECORD_UNREACHABLE 两格（『平常跑时带了只供自证的变量 … 应当退 2』：
 #       自证起这两例的子进程从环境里接着这一项，守卫关了，两个变量都照跑、不拒）
@@ -246,6 +271,9 @@
 #       「✗ 自检：MUTATE_JOBS=4、三条的表，stderr 头一行应当报」
 #       「✗ 自检：工作进程数：SINGLEFS_THREAD_CAP=2」
 #       「✗ 自检：工作进程数：取不到每台默认重活线程数」
+#   MUTATE_BREAK=workersbytablecount  查过判定库之后不把工作进程数收到要现判的条数：仍按表里的条数开，多开的工作进程各拷一份副本、各编一遍基线
+#       unit-library-red（三条的表、记红撤绿之后那一趟只有 1 条现判：假 cargo 收到的编译目录应当只有 1 个、stderr 应当报「卡在「要现判的条数」这一项」）
+#       「✗ 自检：按条入库查过判定库之后工作进程数」
 #   MUTATE_BREAK=testthreadsunset  不给 cargo test 设 RUST_TEST_THREADS：每条 cargo test 照 libtest 默认按整机核数起线程
 #       test-threads（假 cargo 收到的是调用方那个空串）、test-threads-floor（同）、test-threads-caller（7 照样传到，但 stderr 没有「不覆盖」那一行）
 #       「✗ 自检：测试线程：调用方没设 RUST_TEST_THREADS」
@@ -254,6 +282,20 @@
 #   MUTATE_BREAK=overridecallertestthreads  调用方设了的 RUST_TEST_THREADS 也换成算出来的
 #       test-threads-caller（假 cargo 收到的是线程上限 ÷ 工作进程数，不是 7）
 #       「✗ 自检：测试线程：调用方设了的 RUST_TEST_THREADS=7」
+#   MUTATE_BREAK=cardphaseskipped  上卡的表也照不上卡的表跑（cargo test 编带跑一步，不拆成编与跑）
+#       card-phase、card-phase-no-cards（cargo 不带 --no-run、测试二进制一次都没起）
+#       「✗ 自检：上卡的表：每次 cargo 应当都带 --no-run」「✗ 自检：上卡的表：测试二进制应当每次都收到环境里给的卡串」
+#       「✗ 自检：上卡的表：环境里没有卡串时测试二进制应当收到 unset」
+#   MUTATE_BREAK=cardsdroppedfortests  起测试二进制时去掉环境里的 GPU_CARDS_BY_PRIORITY（run_test_executable）
+#       card-phase（测试二进制收到的是 unset）
+#       「✗ 自检：上卡的表：测试二进制应当每次都收到环境里给的卡串」
+#   MUTATE_BREAK=cardssetempty  环境里没有 GPU_CARDS_BY_PRIORITY 时起测试二进制设它为空串（run_test_executable）
+#       card-phase-no-cards（测试二进制收到的是空串）
+#       「✗ 自检：上卡的表：环境里没有卡串时测试二进制应当收到 unset」
+#   MUTATE_BREAK=anyfeaturecard  list_test_targets 把挂了任何 required-features 的目标都当上卡的目标（不看 CARD_FEATURES）：不挂上卡特性的表也拆成编与跑
+#       card-plain（挂 fake-feature 的表 cargo 带了 --no-run）、
+#       required-features（挂两个别的特性的表 cargo 也带了 --no-run，参数对不上）
+#       「✗ 自检：上卡的表：不挂上卡特性的表 cargo 应当不带 --no-run、退 0」「✗ 自检：挂了 required-features 的 bin 应当每次带」
 # RocksDB 预编库的取值：bin 编得到 librocksdb-sys（bin_builds_rocksdb：清单里 rocksdb 是不挂特性的依赖，或这个 bin 的 required-features 顺着 [features]
 #   一层层点到 dep:rocksdb / rocksdb）时，起任何 cargo 之前判一次（scripts/hosts/rocksdb-prebuilt.py entry --root <scripts/experiment-apparatus 的上两层>）：
 #   这台装了、此刻进程环境的取值对得上；判红退 2、一条变异都不跑。编不到的 bin（今天除 E162 那几个之外的全部）不判。
@@ -290,6 +332,88 @@ fi
 unset MUTATE_SELFTEST_MARK
 LIBTEST_RESULT_LINES="$(dirname "$SELF_PATH")/../gate/lib_libtest_result_lines.py"   # 红了哪几个的解析（文件头「红了哪几个」那两行）
 
+# 上卡的特性（文件头「上卡的表」）：测试目标的 required-features 点到其中一个，它的单测就起真卡。
+#   e163-gpu：e163_gpu_multicard_crc32c.rs 的三条 GPU 单测开服务交来的卡、建 wgpu 设备、派计算。
+#   e174-gpu 不在内：e174_lease_drop_wait_memory_return.rs 的单测全走 SimulatedCardHost（模型卡），真卡只在 child 子命令的 open_wgpu_card 里开。
+CARD_FEATURES=(e163-gpu)
+# list_test_targets <工作区目录>：逐行打各包的测试目标（文件头「上卡的表」--test-targets 那一行的格式）；清单读不了退 1、原因打在 stderr。
+#   弄坏开关 anyfeaturecard 下挂了任何 required-features 的目标都当上卡的目标（不看 CARD_FEATURES）
+list_test_targets() {
+  local any_feature=0
+  is_broken anyfeaturecard && any_feature=1
+  CARD_FEATURE_NAMES="${CARD_FEATURES[*]}" ANY_FEATURE_IS_CARD="$any_feature" python3 - "$1" <<'PY'
+import glob, os, sys, tomllib
+root = sys.argv[1]
+card_features = set(os.environ["CARD_FEATURE_NAMES"].split())
+any_feature_is_card = os.environ["ANY_FEATURE_IS_CARD"] == "1"
+
+
+def manifest_of(directory):
+    with open(os.path.join(directory, "Cargo.toml"), "rb") as handle:
+        return tomllib.load(handle)
+
+
+def card_of(target):
+    named = [feature.split("/")[-1] for feature in target.get("required-features", [])]
+    hit = named if any_feature_is_card else [feature for feature in named if feature in card_features]
+    return ",".join(hit) if hit else "-"
+
+
+def rows_of(package_directory, manifest):
+    package = manifest["package"]
+    name = package["name"]
+    exists = lambda relative: os.path.isfile(os.path.join(package_directory, relative))
+    rows = []
+    lib = manifest.get("lib")
+    lib_path = (lib or {}).get("path", "src/lib.rs")
+    if (lib is not None or (package.get("autolib", True) and exists("src/lib.rs"))) and (lib or {}).get("test", True):
+        lib_name = (lib or {}).get("name", name.replace("-", "_"))
+        rows.append(("lib", lib_name, lib_path, "-"))
+        if (lib or {}).get("doctest", True):
+            rows.append(("doc", lib_name, lib_path, "-"))
+    declared_bins = manifest.get("bin", [])
+    declared_names = {target.get("name") for target in declared_bins}
+    for target in declared_bins:
+        target_name = target.get("name")
+        default_path = "src/main.rs" if target_name == name else f"src/bin/{target_name}.rs"
+        if target.get("test", True):
+            rows.append(("bin", target_name, target.get("path", default_path), card_of(target)))
+    if package.get("autobins", True):
+        found = ([("src/main.rs", name)] if exists("src/main.rs") else []) + [
+            (os.path.relpath(path, package_directory), os.path.basename(path)[:-3] if path.endswith(".rs") and not path.endswith("/main.rs") else os.path.basename(os.path.dirname(path)))
+            for path in sorted(glob.glob(os.path.join(package_directory, "src/bin/*.rs")) + glob.glob(os.path.join(package_directory, "src/bin/*/main.rs")))]
+        declared_paths = {os.path.normpath(target.get("path", "")) for target in declared_bins}
+        for path, target_name in found:
+            if target_name not in declared_names and os.path.normpath(path) not in declared_paths:
+                rows.append(("bin", target_name, path, "-"))
+    declared_tests = manifest.get("test", [])
+    for target in declared_tests:
+        if target.get("test", True):
+            rows.append(("test", target.get("name"), target.get("path", f"tests/{target.get('name')}.rs"), card_of(target)))
+    if package.get("autotests", True):
+        declared_test_names = {target.get("name") for target in declared_tests}
+        for path in sorted(glob.glob(os.path.join(package_directory, "tests/*.rs")) + glob.glob(os.path.join(package_directory, "tests/*/main.rs"))):
+            target_name = os.path.basename(path)[:-3] if not path.endswith("/main.rs") else os.path.basename(os.path.dirname(path))
+            if target_name not in declared_test_names:
+                rows.append(("test", target_name, os.path.relpath(path, package_directory), "-"))
+    return [(name, kind, target_name, os.path.normpath(path), card) for kind, target_name, path, card in rows]
+
+
+try:
+    top = manifest_of(root)
+    packages = [(root, top)] if isinstance(top.get("package"), dict) and top["package"].get("name") else []
+    for member in (top.get("workspace") or {}).get("members") or []:
+        for directory in sorted(glob.glob(os.path.join(root, member))):
+            packages.append((directory, manifest_of(directory)))
+    for directory, manifest in packages:
+        for row in rows_of(directory, manifest):
+            print("\t".join(row))
+except (OSError, KeyError, tomllib.TOMLDecodeError) as error:
+    sys.stderr.write(f"读不懂 {root} 下的 Cargo.toml：{error!r}\n")
+    sys.exit(1)
+PY
+}
+
 # ── 自证：假的 cargo 按被测源码里写的 BEHAVIOR 演一种结局，不编译任何东西 ──
 run_selftest() {
   local scratch failures=0 checked=0 output status
@@ -310,6 +434,18 @@ run_selftest() {
 # 每次被调记一行「当前目录|CARGO_TARGET_DIR|BEHAVIOR|参数」（并行的自证拿前两段数各用了几份副本、几个编译目录）
 # 按条入库算工具链行时问的 `cargo -V` 只打一行版本、不记（FAKE_CARGO_VERSION 设了打它：工具链变了那一例）
 if [[ "${1:-}" == -V || "${1:-}" == --version ]]; then echo "${FAKE_CARGO_VERSION:-cargo 0.0.0 (mutate.sh selftest)}"; exit 0; fi
+# 照一档 BEHAVIOR 打测试那一段的输出、退那一档的退出码（cargo test 编带跑，与 --no-run 编出的假测试二进制共用）
+emit_test_output() {
+  case "$1" in
+    PASS) printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts ... ok\n\ntest result: ok. 2 passed; 0 failed\n'; return 0 ;;
+    RED|DEADCODE) printf 'running 2 tests\ntest tests::adds ... FAILED\ntest tests::subtracts ... ok\n\ntest result: FAILED. 1 passed; 1 failed\n'; return 101 ;;
+    PANICS) printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::answer_panics - should panic ... FAILED\n\ntest result: FAILED. 1 passed; 1 failed\n'; return 101 ;;
+    BROKEN) printf 'error[E0425]: cannot find value `missing` in this scope\nerror: could not compile `bench`\n'; return 101 ;;
+    *) echo "假 cargo 认不出 BEHAVIOR「$1」" >&2; return 2 ;;
+  esac
+}
+# 上卡的表那几例（文件头「上卡的表」）：--no-run 编出的假测试二进制起时设 FAKE_CARGO_EMIT_ONLY=<编的那一刻的 BEHAVIOR>，只打那一档的测试输出、不记
+if [[ -n "${FAKE_CARGO_EMIT_ONLY:-}" ]]; then emit_test_output "$FAKE_CARGO_EMIT_ONLY"; exit $?; fi
 behavior="$(sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' bench/src/bin/fake_bench.rs | head -1)"
 # FAKE_CARGO_BEHAVIOR_OVERRIDE 设了就演它（不进键：同一把键这一趟判出另一档，记红撤绿那一例用）
 behavior="${FAKE_CARGO_BEHAVIOR_OVERRIDE:-$behavior}"
@@ -333,7 +469,6 @@ while IFS= read -r included; do
     printf 'error: couldn'"'"'t read `%s`: No such file or directory (os error 2)\nerror: could not compile `bench`\n' "$included_path"; exit 101
   fi
 done < <(grep -rIo --include='*.rs' --exclude-dir=target 'include_str!("[^"]*")' . 2>/dev/null | sed 's/include_str!("\(.*\)")$/\1/')
-passing_output() { printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts ... ok\n\ntest result: ok. 2 passed; 0 failed\n'; }
 # 照真 cargo：bin 挂了 required-features 而 --features 里没给全（写成 feature 或 包名/feature 都认），不编、退 101
 enabled=""; previous=""
 for argument in "$@"; do
@@ -346,13 +481,20 @@ for feature in $(grep '^required-features' bench/Cargo.toml | grep -o '"[^"]*"' 
     printf 'error: target `fake-bench` in package `bench` requires the features: `%s`\n' "$feature"; exit 101
   fi
 done
-case "$behavior" in
-  PASS) passing_output; exit 0 ;;
-  RED|DEADCODE) printf 'running 2 tests\ntest tests::adds ... FAILED\ntest tests::subtracts ... ok\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
-  PANICS) printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::answer_panics - should panic ... FAILED\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
-  BROKEN) printf 'error[E0425]: cannot find value `missing` in this scope\nerror: could not compile `bench`\n'; exit 101 ;;
-  *) echo "假 cargo 认不出 BEHAVIOR「$behavior」" >&2; exit 2 ;;
-esac
+# --no-run 只编：BROKEN 照编不过；别的在编译目录里写一份假测试二进制（照真 cargo 同一个路径、下一次编盖掉它），打 Executable 那一行。
+# 假测试二进制起时记一行「收到的 GPU_CARDS_BY_PRIORITY（没设记 unset）|编的那一刻的 BEHAVIOR|参数」，再照那一档打测试输出
+if [[ " $* " == *" --no-run "* ]]; then
+  [[ "$behavior" == BROKEN ]] && { emit_test_output BROKEN; exit $?; }
+  executable="${CARGO_TARGET_DIR:-$PWD/target}/release/deps/fake_bench-0000000000000000"
+  mkdir -p "$(dirname "$executable")"
+  printf '#!/usr/bin/env bash\necho "${GPU_CARDS_BY_PRIORITY-unset}|%s|$*" >>"$FAKE_CARGO_LOG.executable"\nFAKE_CARGO_EMIT_ONLY=%s exec %q\n' \
+    "$behavior" "$behavior" "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cargo" >"$executable"
+  chmod +x "$executable"
+  printf '    Finished `release` profile [optimized] target(s) in 0.00s\n  Executable unittests src/bin/fake_bench.rs (%s)\n' "$executable"
+  exit 0
+fi
+emit_test_output "$behavior"
+exit $?
 FAKE_CARGO
     chmod +x "$case_directory/bin/cargo"
     printf '[workspace]\nmembers = ["bench"]\n' >"$case_directory/scripts/experiment-apparatus/Cargo.toml"
@@ -381,7 +523,7 @@ FAKE_CARGO
     local label="$1" table="$2" case_directory="$scratch/$1"
     shift 2
     : >"$scratch/$label.cargo"
-    if (cd "$case_directory/scripts/experiment-apparatus" && env -u CARGO_ENCODED_RUSTFLAGS PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" \
+    if (cd "$case_directory/scripts/experiment-apparatus" && env -u CARGO_ENCODED_RUSTFLAGS -u GPU_CARDS_BY_PRIORITY PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" \
           MUTATE_TARGET_DIR="$case_directory/target" MUTATE_LIBRARY_DIRECTORY="$case_directory/library" \
           "$@" bash "$case_script" ${case_leading_arguments[@]+"${case_leading_arguments[@]}"} fake-bench bench/src/bin/fake_bench.rs "$table" \
           >"$scratch/$label.stdout" 2>"$scratch/$label.stderr"); then
@@ -812,6 +954,16 @@ UNIT_SOURCE
   [[ "$status" == 0 && "$(real_cargo_calls "$scratch/unit-library-red.cargo")" -ge 2 ]] && grep -qF "现判：[$red_name] 上次判红（notred）" <<<"$output" \
      && grep -qF "、现判 1 条、复用 2 条、拒算 0 条" <<<"$output" && grep -qF "✅ [$red_name] 红：tests::adds" "$scratch/unit-library-red.stdout" \
     || fail "记红撤绿：库里同一把键最近一次是没红，下一趟应当现判（cargo 照起、stderr 写上次判红、计数行报现判 1 条复用 2 条）并判回抓到，实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-red.cargo") 次：$output"
+  # 查过判定库之后工作进程数收到要现判的条数：这一趟三条里只有 1 条现判（复用的两条已经认领），多开的工作进程没有活可领：假 cargo 收到的编译目录只有 1 个、
+  # stderr 在头一行之后再报一行「卡在「要现判的条数」这一项」（登记的每台默认重活线程数不到 2 时头一行本来就只开 1 个，这一例不判）。弄坏开关 workersbytablecount 下仍开三个，这一格判错
+  if ((registered_threads >= 2)); then
+    checked=$((checked + 1))
+    local fresh_targets
+    fresh_targets="$(cut -d'|' -f2 "$scratch/unit-library-red.cargo" | sort -u)"
+    if [[ "$(grep -c . <<<"$fresh_targets")" != 1 ]] || ! grep -qF "卡在「要现判的条数」这一项" "$scratch/unit-library-red.stderr"; then
+      fail "按条入库查过判定库之后工作进程数：三条的表只有 1 条现判，应当只开 1 个工作进程（假 cargo 收到 1 个编译目录）、stderr 报「卡在「要现判的条数」这一项」，实际编译目录：$(tr '\n' ' ' <<<"$fresh_targets")；stderr 开几个：$(grep '这一轮开' "$scratch/unit-library-red.stderr" | tr '\n' ' ')"
+    fi
+  fi
   run_case unit-library-red ../mutation/tables/three-distinct.tsv
   output="$(cat "$scratch/unit-library-red.out")"; status="$(cat "$scratch/unit-library-red.rc")"
   checked=$((checked + 1))
@@ -1132,15 +1284,57 @@ PY
     fail "既不在仓根、也不在 scripts/experiment-apparatus/ 下起：应当照旧退 2、报「要在 scripts/experiment-apparatus/ 下跑」、不认成仓根、一次 cargo 都不起，实际退 $(cat "$scratch/from-neither.rc")：$(cat "$scratch/from-neither.stderr")"
   fi
 
+  # ── 上卡的表（文件头「上卡的表」）──
+  # card-phase：bin 挂 e163-gpu（上卡的特性），环境里给卡串。每次 cargo 都只编（--no-run）；假测试二进制每次都收到环境里给的那一串；判抓到、退 0
+  local card_case
+  prepare_case card-phase PASS 'required-features = ["e163-gpu"]'
+  run_case card-phase ../mutation/tables/caught-only.tsv GPU_CARDS_BY_PRIORITY="selftest-host:0:8G"
+  status="$(cat "$scratch/card-phase.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 ]] || ! grep -qF "✅ [抓到] 红：tests::adds" "$scratch/card-phase.stdout" || ! grep -qxF "已还原，基线仍全绿" "$scratch/card-phase.stdout"; then
+    fail "上卡的表：应当判抓到、退 0（stdout 有「✅ [抓到] 红：tests::adds」与「已还原，基线仍全绿」），实际退 $status：$(cat "$scratch/card-phase.out")"
+  fi
+  checked=$((checked + 1))
+  if [[ ! -s "$scratch/card-phase.cargo" ]] || grep -qv -- '--no-run' <<<"$(cut -d'|' -f4- "$scratch/card-phase.cargo")"; then
+    fail "上卡的表：每次 cargo 应当都带 --no-run（只编，测试由测试二进制跑），假 cargo 收到的参数：$(cut -d'|' -f4- "$scratch/card-phase.cargo" | tr '\n' ' ')"
+  fi
+  checked=$((checked + 1))
+  if [[ ! -s "$scratch/card-phase.cargo.executable" ]] || grep -qv '^selftest-host:0:8G|' "$scratch/card-phase.cargo.executable"; then
+    fail "上卡的表：测试二进制应当每次都收到环境里给的卡串 selftest-host:0:8G（至少一次），假测试二进制记的（卡串|BEHAVIOR|参数）：$(tr '\n' ' ' <"$scratch/card-phase.cargo.executable" 2>&1)"
+  fi
+  # card-phase-no-cards：同形，环境里没有卡串（run_case 去掉了调用方的）：假测试二进制每次都收到 unset（没设、不设成空串）；判抓到、退 0
+  prepare_case card-phase-no-cards PASS 'required-features = ["e163-gpu"]'
+  run_case card-phase-no-cards ../mutation/tables/caught-only.tsv
+  status="$(cat "$scratch/card-phase-no-cards.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 || ! -s "$scratch/card-phase-no-cards.cargo.executable" ]] || grep -qv '^unset|' "$scratch/card-phase-no-cards.cargo.executable"; then
+    fail "上卡的表：环境里没有卡串时测试二进制应当收到 unset（没设）、判抓到、退 0，实际退 $status、假测试二进制记的：$(tr '\n' ' ' <"$scratch/card-phase-no-cards.cargo.executable" 2>&1)：$(cat "$scratch/card-phase-no-cards.out")"
+  fi
+  # card-plain：bin 挂的是别的特性（不是上卡的）：cargo 不带 --no-run，照常判抓到、退 0
+  prepare_case card-plain PASS 'required-features = ["fake-feature"]'
+  run_case card-plain ../mutation/tables/caught-only.tsv
+  status="$(cat "$scratch/card-plain.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 ]] || grep -q -- '--no-run' <<<"$(cut -d'|' -f4- "$scratch/card-plain.cargo")"; then
+    fail "上卡的表：不挂上卡特性的表 cargo 应当不带 --no-run、退 0，实际退 $status、假 cargo 收到的参数：$(cut -d'|' -f4- "$scratch/card-plain.cargo" | tr '\n' ' ')"
+  fi
+  # --test-targets：card-phase 那一例的工作区里打出 fake-bench 挂 e163-gpu（门禁 research-unit-tests 格读的就是这一行）
+  card_case="$scratch/card-phase/scripts/experiment-apparatus"
+  checked=$((checked + 1))
+  if ! (cd "$card_case" && bash "$case_script" --test-targets) >"$scratch/card-targets.out" 2>&1 \
+     || ! grep -qxF "$(printf 'bench\tbin\tfake-bench\tsrc/bin/fake_bench.rs\te163-gpu')" "$scratch/card-targets.out"; then
+    fail "上卡的表：--test-targets 应当打出「bench<TAB>bin<TAB>fake-bench<TAB>src/bin/fake_bench.rs<TAB>e163-gpu」，实际：$(tr '\n' ' ' <"$scratch/card-targets.out")"
+  fi
+
   rm -rf -- "${scratch:?}"
   if ((failures)); then
     echo "  ✗ mutate.sh 自检 $failures 处不对（查了 $checked 项）"
     echo "  → 怎么办：照上面逐条改——判结局的在 judge_mutation，起 cargo test 的在 run_cargo_test，基线与收尾计数在主流程，"
     echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order，required-features 在 read_required_features；"
     echo "    平常跑拒只供自证的变量在 --selftest 那一支后面（running_under_selftest），工作进程数的头一项（每台默认重活线程数）在 worker_count_and_head_line；"
-    echo "    --binary-of 在 find_declared_binary；"
+    echo "    --binary-of 在 find_declared_binary；上卡的表：判上不上卡在 list_test_targets，串行跑测试二进制在 run_card_phase，交卡串在 run_test_executable；"
     echo "    每个 cargo 带的 RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 在 MUTATE_RUSTFLAGS、MUTATE_ENCODED_RUSTFLAGS 与 RUSTFLAGS_ENVIRONMENT（run_cargo_test 用它）；"
-    echo "    每条 cargo test 的 RUST_TEST_THREADS 在 TEST_THREADS_ENVIRONMENT（worker_count_and_head_line 之后算），在仓根下起的认法与参数改写在 relative_to_apparatus 那一段；"
+    echo "    每条 cargo test 的 RUST_TEST_THREADS 在 TEST_THREADS_ENVIRONMENT（settle_test_threads_and_cargo_jobs 在 worker_count_and_head_line 之后算，工作进程数收小之后再算一次），在仓根下起的认法与参数改写在 relative_to_apparatus 那一段；"
     echo "    MUTATE_BREAK 设着的话这里本来就该红"
     exit 1
   fi
@@ -1161,7 +1355,8 @@ deny 警告：留死代码的那一条平常跑判抓到，基线、那一条与
 依赖版本行只收闭包里真点名的外部 crate 与传递依赖（逐字对得上夹具、不点的为空、改闭包外点的包照样复用、改传递依赖现判、认 package = 改名）；\
 副本根下链上装置 include_str! 读的仓内别处文件、基线编得过，认不出的写法与落到仓根之外的路径退 2 逐行点名；\
 测试线程：调用方没设时每条 cargo test 收到 max(1, 线程上限 ÷ 工作进程数)、调用方设了的原样收到；\
-在仓根下起：cd 进 scripts/experiment-apparatus/、参数改写成从那里起的写法（不起 cargo），既不在仓根也不在那里的照旧退 2）"
+在仓根下起：cd 进 scripts/experiment-apparatus/、参数改写成从那里起的写法（不起 cargo），既不在仓根也不在那里的照旧退 2；\
+上卡的表：先编后串行跑测试二进制、不领卡、环境里给的卡串原样交而没有的不设，不挂上卡特性的表编带跑一步，--test-targets 打出上卡的目标）"
 }
 
 # 这一趟在不在临时 prune-server 底下（scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service；判据只在客户端的 selftest_service_problem 一处）：
@@ -1215,6 +1410,14 @@ PRINT_BINARY_ONLY=0
 while (($#)); do
   case "$1" in
     --binary-of) PRINT_BINARY_ONLY=1; shift; break ;;
+    --test-targets)
+      # 逐行打测试目标与上不上卡（文件头「上卡的表」），不编、不跑
+      if ! list_test_targets "${2:-.}"; then
+        echo "mutate: --test-targets 读不出 ${2:-.} 下各包的测试目标（上面是原因）" >&2
+        echo "        → 怎么办：在 scripts/experiment-apparatus/ 里跑，或给工作区目录；先让 cargo metadata --manifest-path ${2:-.}/Cargo.toml 读得通这份清单" >&2
+        exit 2
+      fi
+      exit 0 ;;
     -*)
       # 认不出的选项（- 起头、不是上面两个）：退 2，不当 bin 名往下走。弄坏开关 unknownoptionaccepted：不判（没有这一道检查的样子）
       if ! is_broken unknownoptionaccepted; then
@@ -1357,6 +1560,21 @@ if ! is_broken nofeatures; then
     cargo_feature_arguments=(--features "$required_features")
   fi
 fi
+# 被测 bin 是不是上卡的目标（文件头「上卡的表」；判法只在 list_test_targets，门禁 research-unit-tests 格经 --test-targets 调同一份）。
+# 弄坏开关 cardphaseskipped：上卡的表也照不上卡的表跑
+CARD_MODE=0; CARD_TARGET_FEATURES=""
+# 先判是不是在工作区根下起的：不在的照旧退 2、报那一句（读测试目标要读这里的 Cargo.toml，放在它后面会先报读不懂清单）
+if [[ ! -f Cargo.toml ]] || ! grep -q '^\[workspace\]' Cargo.toml; then
+  echo "mutate: 要在 scripts/experiment-apparatus/ 下跑（那里才有 workspace 的 Cargo.toml）" >&2; exit 2
+fi
+if ! card_target_rows="$(list_test_targets .)"; then
+  echo "mutate: 读不出这个工作区的测试目标（上面是原因），判不了 $BIN 上不上卡，一条变异都没跑" >&2
+  echo "        → 怎么办：先让 cargo metadata --manifest-path Cargo.toml 读得通这份清单，再整张表重跑" >&2
+  exit 2
+fi
+CARD_TARGET_FEATURES="$(awk -F'\t' -v binary="$BIN" '$2 == "bin" && $3 == binary && $5 != "-" { print $5; exit }' <<<"$card_target_rows")"
+[[ -n "$CARD_TARGET_FEATURES" ]] && ! is_broken cardphaseskipped && CARD_MODE=1
+PACKAGE_DIRECTORY_IN_WORKSPACE="$(dirname "$_manifest")"   # 被测包相对工作区根的目录：测试二进制在副本里的这个目录下起（cargo test 起它的目录）
 # 这个 bin 编不编到 librocksdb-sys（文件头「RocksDB 预编库的取值」）：$_manifest 里 rocksdb 是不挂特性的依赖，或 $BIN 的 required-features 顺着 [features]
 # 一层层点到 dep:rocksdb、rocksdb、rocksdb/<特性> 或 rocksdb?/<特性>，退 0；别的退 1（清单读不了也是 1：上面 read_required_features 已经判过读不读得了）
 bin_builds_rocksdb() {
@@ -1427,6 +1645,7 @@ mutation_count=${#mutation_names[@]}
 # 每台默认重活线程数（文件头「并行」）：工作进程数的头一项与每条 cargo test 的测试线程数都取它；取不到退 2、一条变异都没跑，不退回按核数算
 source "$(dirname "$SELF_PATH")/../hosts/heavy-threads.sh"
 HOST_HEAVY_THREADS=""
+CALLER_CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-}"   # 调用方给的；下面 export CARGO_BUILD_JOBS 会把它换成算出来的，工作进程数收小之后重算时仍要认调用方给的那一个
 if ! is_broken workersbyprocessor && ! HOST_HEAVY_THREADS="$(heavy_thread_default)"; then
   echo "mutate: 取不到每台默认重活线程数（上面是原因），定不了开几个工作进程，一条变异都没跑" >&2
   echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；不退回按核数算" >&2
@@ -1447,7 +1666,11 @@ worker_count_and_head_line() {
   if [[ -n "$REQUESTED_JOBS" ]]; then
     bound_names+=("MUTATE_JOBS"); bound_counts+=("$REQUESTED_JOBS"); bound_texts+=("MUTATE_JOBS 给 $REQUESTED_JOBS 个")
   fi
-  bound_names+=("表里的条数"); bound_counts+=("$mutation_count"); bound_texts+=("表里 $mutation_count 条")
+  if [[ -n "${1:-}" ]]; then   # 查过判定库之后重算：要现判的条数代替表里的条数（复用的与锚点失效的条已经认领，没有活可领）
+    bound_names+=("要现判的条数"); bound_counts+=("$1"); bound_texts+=("查过判定库之后要现判的 $1 条（表里 $mutation_count 条，其余复用或锚点失效）")
+  else
+    bound_names+=("表里的条数"); bound_counts+=("$mutation_count"); bound_texts+=("表里 $mutation_count 条")
+  fi
   smallest="${bound_counts[0]}"
   for bound_index in "${!bound_counts[@]}"; do
     ((bound_counts[bound_index] < smallest)) && smallest="${bound_counts[bound_index]}"
@@ -1459,8 +1682,8 @@ worker_count_and_head_line() {
   WORKER_COUNT=$((smallest < 1 ? 1 : smallest))
   if [[ -n "$REQUESTED_CARGO_JOBS" ]]; then
     CARGO_JOBS_PER_WORKER="$REQUESTED_CARGO_JOBS"; CARGO_JOBS_SOURCE="MUTATE_CARGO_JOBS"
-  elif [[ -n "${CARGO_BUILD_JOBS:-}" ]]; then
-    CARGO_JOBS_PER_WORKER="$CARGO_BUILD_JOBS"; CARGO_JOBS_SOURCE="调用方的 CARGO_BUILD_JOBS"
+  elif [[ -n "$CALLER_CARGO_BUILD_JOBS" ]]; then
+    CARGO_JOBS_PER_WORKER="$CALLER_CARGO_BUILD_JOBS"; CARGO_JOBS_SOURCE="调用方的 CARGO_BUILD_JOBS"
   else
     if is_broken workersbyprocessor; then thread_budget=$processor_count; else thread_budget=$HOST_HEAVY_THREADS; fi   # 弄坏开关下按核数
     CARGO_JOBS_PER_WORKER=$((thread_budget / WORKER_COUNT < 1 ? 1 : thread_budget / WORKER_COUNT)); CARGO_JOBS_SOURCE="每台默认重活线程数 ÷ 工作进程数"
@@ -1474,27 +1697,35 @@ worker_count_and_head_line
 if ((${#cargo_feature_arguments[@]})); then
   echo "mutate: $BIN 在 $_manifest 里挂了 required-features，每次 cargo test 带 ${cargo_feature_arguments[*]}" >&2
 fi
+if ((CARD_MODE)); then
+  echo "mutate: $BIN 是上卡的目标（特性 $CARD_TARGET_FEATURES）：基线、各条与还原之后那一次先编完（cargo test --no-run），要上卡跑的条都编好之后串行跑测试二进制；不领卡，环境里的 GPU_CARDS_BY_PRIORITY 有就原样交（文件头「上卡的表」）" >&2
+fi
 print_root_invocation_note
 # 每条 cargo test 的测试线程数（文件头「并行」）：调用方设了 RUST_TEST_THREADS（非空）原样传、不覆盖；没设的取 max(1, 线程上限 ÷ 工作进程数)，
 # 线程上限是工作进程数那一项的同一个登记值（HOST_HEAVY_THREADS；弄坏开关 workersbyprocessor 下现取，取不到退 2）。
-# 只设在 run_cargo_test 起的那几次 cargo test 的环境里（TEST_THREADS_ENVIRONMENT），不 export
-TEST_THREADS_ENVIRONMENT=()
-if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设
-  if [[ -n "${RUST_TEST_THREADS:-}" ]] && ! is_broken overridecallertestthreads; then   # 弄坏开关 overridecallertestthreads：调用方设了的也换成算出来的
-    echo "mutate: 每条 cargo test 照调用方设的 RUST_TEST_THREADS=$RUST_TEST_THREADS 跑（不覆盖）" >&2
-  else
-    thread_cap_of_host="$HOST_HEAVY_THREADS"
-    if [[ -z "$thread_cap_of_host" ]] && ! thread_cap_of_host="$(heavy_thread_default)"; then
-      echo "mutate: 取不到每台默认重活线程数（上面是原因），定不了每条 cargo test 的 RUST_TEST_THREADS，一条变异都没跑" >&2
-      echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；或调用方自己设 RUST_TEST_THREADS（原样传、不覆盖）" >&2
-      exit 2
+# 只设在 run_cargo_test 起的那几次 cargo test 的环境里（TEST_THREADS_ENVIRONMENT），不 export。
+# 工作进程数收小之后（查过判定库、要现判的条数比开的少）再调一次，照新的工作进程数重算
+settle_test_threads_and_cargo_jobs() {
+  local thread_cap_of_host test_threads_per_worker
+  TEST_THREADS_ENVIRONMENT=()
+  if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设
+    if [[ -n "${RUST_TEST_THREADS:-}" ]] && ! is_broken overridecallertestthreads; then   # 弄坏开关 overridecallertestthreads：调用方设了的也换成算出来的
+      echo "mutate: 每条 cargo test 照调用方设的 RUST_TEST_THREADS=$RUST_TEST_THREADS 跑（不覆盖）" >&2
+    else
+      thread_cap_of_host="$HOST_HEAVY_THREADS"
+      if [[ -z "$thread_cap_of_host" ]] && ! thread_cap_of_host="$(heavy_thread_default)"; then
+        echo "mutate: 取不到每台默认重活线程数（上面是原因），定不了每条 cargo test 的 RUST_TEST_THREADS，一条变异都没跑" >&2
+        echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；或调用方自己设 RUST_TEST_THREADS（原样传、不覆盖）" >&2
+        exit 2
+      fi
+      test_threads_per_worker=$((thread_cap_of_host / WORKER_COUNT < 1 ? 1 : thread_cap_of_host / WORKER_COUNT))
+      TEST_THREADS_ENVIRONMENT=("RUST_TEST_THREADS=$test_threads_per_worker")
+      echo "mutate: 每条 cargo test 设 RUST_TEST_THREADS=$test_threads_per_worker（线程上限 $thread_cap_of_host ÷ 工作进程 $WORKER_COUNT 个，至少 1）" >&2
     fi
-    test_threads_per_worker=$((thread_cap_of_host / WORKER_COUNT < 1 ? 1 : thread_cap_of_host / WORKER_COUNT))
-    TEST_THREADS_ENVIRONMENT=("RUST_TEST_THREADS=$test_threads_per_worker")
-    echo "mutate: 每条 cargo test 设 RUST_TEST_THREADS=$test_threads_per_worker（线程上限 $thread_cap_of_host ÷ 工作进程 $WORKER_COUNT 个，至少 1）" >&2
   fi
-fi
-export CARGO_BUILD_JOBS="$CARGO_JOBS_PER_WORKER"
+  export CARGO_BUILD_JOBS="$CARGO_JOBS_PER_WORKER"
+}
+settle_test_threads_and_cargo_jobs
 
 SHARD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-mutate-XXXXXX")"
 PRISTINE="$SHARD_ROOT/pristine-source"   # 开跑时那一份被测源码，每条变异都从它改、每次还原都拷它
@@ -1604,20 +1835,6 @@ report_anchor_broken() {
   echo "mutate: $ANCHOR_BROKEN_COUNT 条锚点失效（上面 ⚓ 那几行），这几条没跑、不入判定库，整轮判失败（退 3）；别的条照跑完了" >&2
   echo "        → 怎么办：把变异表里那几条的原文改到源码今天的写法、让它恰好命中一次（原文里的换行写成 \\n），再跑这张表" >&2
 }
-
-# 第 2 份起的副本从第 1 份拷：同一份源码快照，不在拷的间隙里读到别人刚改的工作区
-for ((worker_index = 2; worker_index <= WORKER_COUNT; worker_index++)); do
-  if ! rsync -a "$(copy_root_of 1)/" "$(copy_root_of "$worker_index")/"; then
-    echo "mutate: 拷第 $worker_index 份副本失败" >&2; exit 2
-  fi
-done
-# ⚠️ rsync -a 保留源码的旧 mtime，而编译目录跨轮共用：上一轮在一条变异写进副本之后中途退出时
-# 那里留着一份**打着变异**编出来的二进制，它比副本里的源码新 ⇒ cargo 判「不用重编」，基线直接跑变异版。
-# 例：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
-# 先 touch 每份副本里的被测源码，逼 cargo 按这一轮的副本重编（每个工作进程的编译目录都跨轮留着，每份都要 touch）。
-for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
-  touch "$(copy_directory_of "$worker_index")/$SRC"
-done
 
 # 每个 cargo 一份同样的 RUSTFLAGS（文件头「deny 警告」那一段）：调用方设了的在前，后面接 --cap-lints warn；
 # 开跑前算一次，基线、每条变异、还原之后那一次都经 RUSTFLAGS_ENVIRONMENT 带它
@@ -1913,15 +2130,73 @@ if ((ALL_REMAINING_REUSED)); then
   exit "$reused_fail"
 fi
 
-# 跑一次 cargo test：$1 副本目录、$2 编译目录。直接起，不设内存上限、不限时（文件头「上限、限时与卡住」）；
+# 工作进程数收到要现判的条数：复用的与锚点失效的条已经认领，多开的工作进程没有活可领、却各占一份副本、各编一遍基线；
+# 收小之后工作进程数、每个 cargo 的编译并行度与每条 cargo test 的测试线程数照新的数重算（头一行之后再打一行新的）。
+# 弄坏开关 workersbytablecount：仍按表里的条数开
+JUDGING_COUNT=$((mutation_count - LIBRARY_REUSED - ANCHOR_BROKEN_COUNT))
+if ((JUDGING_COUNT >= 1 && JUDGING_COUNT < WORKER_COUNT)) && ! is_broken workersbytablecount; then
+  worker_count_and_head_line "$JUDGING_COUNT"
+  settle_test_threads_and_cargo_jobs
+fi
+# 第 2 份起的副本从第 1 份拷：同一份源码快照，不在拷的间隙里读到别人刚改的工作区
+for ((worker_index = 2; worker_index <= WORKER_COUNT; worker_index++)); do
+  if ! rsync -a "$(copy_root_of 1)/" "$(copy_root_of "$worker_index")/"; then
+    echo "mutate: 拷第 $worker_index 份副本失败" >&2; exit 2
+  fi
+done
+# ⚠️ rsync -a 保留源码的旧 mtime，而编译目录跨轮共用：上一轮在一条变异写进副本之后中途退出时
+# 那里留着一份**打着变异**编出来的二进制，它比副本里的源码新 ⇒ cargo 判「不用重编」，基线直接跑变异版。
+# 例：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
+# 先 touch 每份副本里的被测源码，逼 cargo 按这一轮的副本重编（每个工作进程的编译目录都跨轮留着，每份都要 touch）。
+for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
+  touch "$(copy_directory_of "$worker_index")/$SRC"
+done
+
+# 跑一次 cargo test：$1 副本目录、$2 编译目录，其余参数接在 cargo test 的参数后面（上卡的表只编那一步给 --no-run）。直接起，不设内存上限、不限时（文件头「上限、限时与卡住」）；
 # cargo 的 stdout 与 stderr 并成一路打到这里的 stdout（判结局读它）
 CARGO_TEST_COMMAND=(cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"})
 run_cargo_test() {
   ( cd "$1" && exec env ${RUSTFLAGS_ENVIRONMENT[@]+"${RUSTFLAGS_ENVIRONMENT[@]}"} ${TEST_THREADS_ENVIRONMENT[@]+"${TEST_THREADS_ENVIRONMENT[@]}"} \
-      CARGO_TARGET_DIR="$2" bash -c 'exec "$@" 2>&1' mutate-cargo-test "${CARGO_TEST_COMMAND[@]}" )
+      CARGO_TARGET_DIR="$2" bash -c 'exec "$@" 2>&1' mutate-cargo-test "${CARGO_TEST_COMMAND[@]}" "${@:3}" )
 }
-# 在第 $1 个工作进程的副本上、用它的编译目录跑一次 cargo test（基线与还原之后那一次）
-run_tests_in_copy() { run_cargo_test "$(copy_directory_of "$1")" "$(target_directory_of "$1")"; }
+# 在第 $1 个工作进程的副本上、用它的编译目录跑一次 cargo test（基线与还原之后那一次；上卡的表只编、给 --no-run）
+run_tests_in_copy() {
+  if ((CARD_MODE)); then run_cargo_test "$(copy_directory_of "$1")" "$(target_directory_of "$1")" --no-run
+  else run_cargo_test "$(copy_directory_of "$1")" "$(target_directory_of "$1")"; fi
+}
+
+# 上卡的表（文件头「上卡的表」）：从一份 cargo test --no-run 的输出（$1 文件）取编出来的那一个测试二进制（Executable 那一行括号里的路径，相对的接在 $2 副本目录后面），
+# 拷进分片根的 executables/$3；不是恰好一行、拷不成交回 1
+EXECUTABLES="$SHARD_ROOT/executables"
+keep_test_executable() {
+  local paths path
+  paths="$(sed -n 's/^ *Executable .* (\(.*\))$/\1/p' "$1")"
+  [[ -n "$paths" && "$(grep -c . <<<"$paths")" == 1 ]] || return 1
+  path="$paths"
+  [[ "$path" == /* ]] || path="$2/$path"
+  [[ -x "$path" ]] || return 1
+  mkdir -p "$EXECUTABLES" && cp --reflink=auto -- "$path" "$EXECUTABLES/$3"
+}
+# 上卡的表：在副本 $2 里被测包的目录下起 executables/$1（cargo test 起测试二进制的目录），环境里的 GPU_CARDS_BY_PRIORITY 有就原样交、没有不设（不领卡）；
+# stdout 与 stderr 并成一路打到这里的 stdout。退 0、101（libtest 有测试红了）之外的码照 cargo 的说法补一行「process didn't exit successfully」（judge 认「没跑完」），退出码照它的
+# 弄坏开关 cardsdroppedfortests：去掉环境里的 GPU_CARDS_BY_PRIORITY；cardssetempty：环境里没有时设成空串
+run_test_executable() {
+  local package_directory="$2/$PACKAGE_DIRECTORY_IN_WORKSPACE" executable="$EXECUTABLES/$1" status card_environment=()
+  if is_broken cardsdroppedfortests; then
+    card_environment=(-u GPU_CARDS_BY_PRIORITY)
+  elif is_broken cardssetempty && [[ -z "${GPU_CARDS_BY_PRIORITY+set}" ]]; then
+    card_environment=(GPU_CARDS_BY_PRIORITY=)
+  fi
+  ( cd "$package_directory" && exec env ${card_environment[@]+"${card_environment[@]}"} ${TEST_THREADS_ENVIRONMENT[@]+"${TEST_THREADS_ENVIRONMENT[@]}"} \
+      CARGO_MANIFEST_DIR="$(pwd)" "$executable" 2>&1 )
+  status=$?
+  if ((status > 128)); then
+    echo "error: test failed: process didn't exit successfully: \`$executable\` (signal: $((status - 128)))"
+  elif ((status != 0 && status != 101)); then
+    echo "error: test failed: process didn't exit successfully: \`$executable\` (exit status: $status)"
+  fi
+  return "$status"
+}
 
 # 从一份 cargo test 输出（$1 是文件，- 是标准输入）取红了的用例名，一行一个；退出码照 lib_libtest_result_lines.py failed-names：
 # 0 取完了（可以一个都没有），3 汇总行报了失败而一个名字都没取到，别的是解析没跑成
@@ -1962,9 +2237,10 @@ report_red_baseline() {
 
 # 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红。每份副本各跑一次、一起跑，按副本号逐个收退出码；
 # 每份的输出落进 $SHARD_ROOT/baseline-<副本号>.log，红了由 report_red_baseline 点出来
+# 上卡的表这一步只编（run_tests_in_copy 给 --no-run）；测试二进制等各条都编完之后在 run_card_phase 里串行跑。
 baseline_pids=()
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
-  if is_broken baselinelogdropped; then
+  if is_broken baselinelogdropped && ((!CARD_MODE)); then
     run_tests_in_copy "$worker_index" >/dev/null &
   else
     run_tests_in_copy "$worker_index" >"$SHARD_ROOT/baseline-$worker_index.log" &
@@ -1985,7 +2261,17 @@ for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
     exit 2
   fi
 done
-echo "基线：全绿"
+if ((CARD_MODE)); then
+  # 上卡的表：第 1 份副本编出的测试二进制留着，各条都编完之后头一个跑它（基线）
+  if ! keep_test_executable "$SHARD_ROOT/baseline-1.log" "$(copy_directory_of 1)" baseline; then
+    echo "mutate: 基线编过了，可 cargo test --no-run 的输出里取不出恰好一个测试二进制（Executable 那一行），一条变异都没跑" >&2
+    echo "        → 怎么办：在 scripts/experiment-apparatus/ 里单独跑 ${CARGO_TEST_COMMAND[*]} --no-run，看它打的 Executable 行；cargo 换了说法就改 keep_test_executable 的取法" >&2
+    exit 2
+  fi
+  echo "mutate: 基线编完了（上卡的表：测试二进制等各条都编完之后再跑）" >&2
+else
+  echo "基线：全绿"
+fi
 
 # 一条变异的判定写进结果文件：$1 行号、$2 档、$3 要不要判失败（0 / 1）、$4 要打到 stdout 的那一行（可空）、$5 要打到 stderr 的话（可空）。
 # .verdict 最后写、先写临时名再改名：父进程看见它就说明这一条的几份都齐了
@@ -2006,7 +2292,7 @@ record_verdict() {
 
 # 第 $1 个工作进程判表里第 $2 条：从开跑时那一份源码施加变异、跑、判结局，写进结果文件（record_verdict）
 judge_mutation() {
-  local worker_index="$1" row_index="$2" name copy_directory target_directory out sig red red_names names_status
+  local worker_index="$1" row_index="$2" name copy_directory target_directory out
   name="${mutation_names[row_index]}"
   copy_directory="$(copy_directory_of "$worker_index")"
   target_directory="$(target_directory_of "$worker_index")"
@@ -2021,8 +2307,29 @@ judge_mutation() {
   # ⚠️ **测试根本不终止、或无界分配：** 一条破坏可以让被测代码进死循环或吃满内存（例：E73 整轮挂死，E142 把整机拖进 OOM）。
   # ⇒ 这里不限时、不设内存上限：整条 mutate.sh 交统一任务服务，
   #   内存上限由服务给、撞了放大重排，用时远超记录而日志又满 10 分钟不涨由服务停掉、打回（文件头「上限、限时与卡住」）。
+  if ((CARD_MODE)); then
+    # 上卡的表（文件头「上卡的表」）：这里只编，测试二进制拷进 executables/row-<行号>、记 .deferred，各条都编完之后由 run_card_phase 跑、判
+    local compile_status
+    if run_cargo_test "$copy_directory" "$target_directory" --no-run >"$RESULTS/$row_index.compile"; then compile_status=0; else compile_status=$?; fi
+    cp "$PRISTINE" "$copy_directory/$SRC"   # 还原，同下面不上卡的那一路
+    if ((compile_status != 0)); then
+      record_verdict "$row_index" invalid 0 "⏭  [$name] 变异导致编译失败，本条无效（不计入盲区，也不算命中）" ""
+    elif ! keep_test_executable "$RESULTS/$row_index.compile" "$copy_directory" "row-$row_index"; then
+      record_verdict "$row_index" nameblind 1 "⚠️  [$name] 编过了，可 cargo test --no-run 的输出里取不出恰好一个测试二进制 —— 这一条没跑测试，不算盲区也不算命中" ""
+    else
+      : >"$RESULTS/$row_index.deferred"
+    fi
+    return
+  fi
   out="$(run_cargo_test "$copy_directory" "$target_directory")"
   cp "$PRISTINE" "$copy_directory/$SRC"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
+  judge_test_output "$row_index" "$out"
+}
+
+# 判一条变异的测试输出（$1 行号、$2 cargo test 或测试二进制的输出），写进结果文件（record_verdict）；judge_mutation 与上卡的表的 run_card_phase 共用
+judge_test_output() {
+  local row_index="$1" out="$2" name sig red red_names names_status
+  name="${mutation_names[row_index]}"
   # 测试进程退几都照输出判（文件头「退出码」）：点名的测试红了就是抓到。
   # ⚠️ **编译失败不等于「没抓到」。** 一个改坏了语法或穷尽性的变异根本跑不到测试，
   # 那时既不能记成「测试抓到了」，也不能记成「测试没抓到」——它是一条**无效变异**。
@@ -2092,10 +2399,53 @@ run_worker() {
       judge_mutation "$worker_index" "$row_index"
     fi
   done
+  # 上卡的表（文件头「上卡的表」）：这一次只编，输出留着取测试二进制（executables/restore-<号>），编的退出码写进 restore-<号>.compiled；
+  # restore-<号>.exit 由 run_card_phase 跑完那一份测试二进制再写
+  local restore_output=/dev/null restore_file="$SHARD_ROOT/restore-$worker_index.exit"
+  if ((CARD_MODE)); then restore_output="$SHARD_ROOT/restore-$worker_index.compile"; restore_file="$SHARD_ROOT/restore-$worker_index.compiled"; fi
   if is_broken sharedcopy; then
-    if { flock 9; run_tests_in_copy "$worker_index" >/dev/null; } 9>>"$SHARD_ROOT/sharedcopy.lock"; then restore_exit=0; else restore_exit=$?; fi
-  elif run_tests_in_copy "$worker_index" >/dev/null; then restore_exit=0; else restore_exit=$?; fi
-  echo "$restore_exit" >"$SHARD_ROOT/restore-$worker_index.exit"
+    if { flock 9; run_tests_in_copy "$worker_index" >"$restore_output"; } 9>>"$SHARD_ROOT/sharedcopy.lock"; then restore_exit=0; else restore_exit=$?; fi
+  elif run_tests_in_copy "$worker_index" >"$restore_output"; then restore_exit=0; else restore_exit=$?; fi
+  if ((CARD_MODE && restore_exit == 0)) && ! keep_test_executable "$restore_output" "$(copy_directory_of "$worker_index")" "restore-$worker_index"; then restore_exit=1; fi
+  echo "$restore_exit" >"$restore_file"
+}
+
+# 上卡的表（文件头「上卡的表」）：工作进程都收齐之后在父进程里跑。要上卡跑的条（.deferred）有一条以上，
+# 串行跑基线（红了退 2）、各条（表序，判法同 judge_test_output）、各份副本还原之后那一次（退出码写进 restore-<号>.exit）；不领卡。
+# 一条都没有的，基线与还原之后那一次只编不跑，还原之后那一次照只编的退出码记
+run_card_phase() {
+  local row_index worker_index deferred_rows=() compiled_exit baseline_exit
+  for ((row_index = 0; row_index < mutation_count; row_index++)); do
+    [[ -f "$RESULTS/$row_index.deferred" ]] && deferred_rows+=("$row_index")
+  done
+  if ((${#deferred_rows[@]} == 0)); then
+    echo "mutate: 上卡的表：一条要上卡跑测试的都没有（编不过、取不出测试二进制或锚点失效）；基线与还原之后那一次只编不跑" >&2
+    for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
+      [[ -f "$SHARD_ROOT/restore-$worker_index.compiled" ]] && cp -- "$SHARD_ROOT/restore-$worker_index.compiled" "$SHARD_ROOT/restore-$worker_index.exit"
+    done
+    return 0
+  fi
+  if run_test_executable baseline "$(copy_directory_of 1)" >"$SHARD_ROOT/baseline-1.log"; then baseline_exit=0; else baseline_exit=$?; fi
+  if ((baseline_exit != 0)); then
+    echo "mutate: 基线就是红的（上卡的表：第 1 份副本编出的测试二进制，退 $baseline_exit），先修好再来" >&2
+    report_red_baseline 1
+    exit 2
+  fi
+  echo "基线：全绿"
+  for row_index in "${deferred_rows[@]}"; do
+    judge_test_output "$row_index" "$(run_test_executable "row-$row_index" "$(copy_directory_of 1)")"
+  done
+  for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
+    [[ -f "$SHARD_ROOT/restore-$worker_index.compiled" ]] || continue
+    compiled_exit="$(cat "$SHARD_ROOT/restore-$worker_index.compiled")"
+    if [[ "$compiled_exit" != 0 ]]; then
+      echo "$compiled_exit" >"$SHARD_ROOT/restore-$worker_index.exit"
+    elif run_test_executable "restore-$worker_index" "$(copy_directory_of "$worker_index")" >/dev/null; then
+      echo 0 >"$SHARD_ROOT/restore-$worker_index.exit"
+    else
+      echo $? >"$SHARD_ROOT/restore-$worker_index.exit"
+    fi
+  done
 }
 
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
@@ -2131,6 +2481,8 @@ worker_exits=()
 for pid in "${worker_pids[@]}"; do
   if wait "$pid"; then worker_exits+=(0); else worker_exits+=($?); fi
 done
+# 上卡的表（文件头「上卡的表」）：各条都编完了，这时才串行跑测试二进制、判那几条
+((CARD_MODE)) && run_card_phase
 print_judged_rows_in_table_order
 
 # 派出去多少条就要收回来多少份判定：表里的条数、被认领的条数、收回的判定份数、按表序打到的位置，四个数要对得上

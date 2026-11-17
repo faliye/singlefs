@@ -189,15 +189,22 @@ gate_added_lines() {
 
 _lib_changed_paths_added_lines_raw() {
   local base="$1"; shift
-  local quote_option=(-c core.quotepath=false) diff_output untracked_list untracked_path parsed
+  local quote_option=(-c core.quotepath=false) untracked_list untracked_path scratch
   [[ "${_lib_changed_paths_break:-}" == quotepath ]] && quote_option=()
+  # diff 与解析出的新增行都落临时文件、不落 shell 变量：新增行上百兆时，变量与 here-string 各拷一遍要好几秒、几百兆内存。
+  # 两步都成了才往标准输出交（基准写错、路径带引号时一行都不交）；NUL 字节丢掉、末尾的空行不交，与落变量时逐字节相同。
+  scratch="$(mktemp -d)" || return 1
   # --no-renames 写死：同一次搬家，暂存前（未跟踪的新名）与暂存后（一次改名）判得要一样；
   # 前缀写死：diff.noprefix 之类的配置会让 +++ 行不带 b/，路径就解析错了。
-  diff_output="$(git "${quote_option[@]}" diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base" -- "$@")" || return 1
-  untracked_list="$(git "${quote_option[@]}" ls-files -z --others --exclude-standard -- "$@" | tr '\0' '\n')" || return 1
+  if ! git "${quote_option[@]}" diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base" -- "$@" > "$scratch/diff"; then
+    rm -rf "${scratch:?}"; return 1
+  fi
+  if ! untracked_list="$(git "${quote_option[@]}" ls-files -z --others --exclude-standard -- "$@" | tr '\0' '\n')"; then
+    rm -rf "${scratch:?}"; return 1
+  fi
   # 「+++ 」只在文件头里认（diff --git 与第一个 @@ 之间）：正文里以「++ 」开头的一行新增，在 diff 里也长成「+++ 」。
   # git 给带空格的路径在文件头末尾补一个制表符，剥掉；路径被 git 加了引号（带制表符、引号、反斜杠），这里还原不了，退非 0。
-  parsed="$(awk -v header_anywhere="$([[ "${_lib_changed_paths_break:-}" == header-anywhere ]] && echo 1)" '
+  if ! tr -d '\0' < "$scratch/diff" | awk -v header_anywhere="$([[ "${_lib_changed_paths_break:-}" == header-anywhere ]] && echo 1)" '
     /^diff --git / { header = 1; path = ""; next }
     (header || header_anywhere) && /^\+\+\+ / {
       path = substr($0, 5); sub(/\t$/, "", path)
@@ -206,8 +213,11 @@ _lib_changed_paths_added_lines_raw() {
       next }
     /^@@ / { header = 0; next }
     !header && /^\+/ && path != "" { print path "\t" substr($0, 2) }
-    END { if (quoted) exit 3 }' <<<"$diff_output")" || return 1
-  [[ -z "$parsed" ]] || printf '%s\n' "$parsed"
+    END { if (quoted) exit 3 }' > "$scratch/parsed"; then
+    rm -rf "${scratch:?}"; return 1
+  fi
+  cat "$scratch/parsed"
+  rm -rf "${scratch:?}"
   [[ "${_lib_changed_paths_break:-}" == untracked-lines ]] && return 0
   while IFS= read -r untracked_path; do
     [[ -n "$untracked_path" && -f "$untracked_path" ]] || continue

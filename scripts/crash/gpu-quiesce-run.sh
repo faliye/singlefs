@@ -164,9 +164,8 @@
 #       assigned-card-health（「✗ 自证 assigned-card-health：分到好卡…」）
 # 自证末尾那一轮走 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_switch_wheel（并行度 CRASH_AMPLIFICATION_SELFTEST_JOBS，没给取 SINGLEFS_THREAD_CAP，再没给取登记的重活默认并行度）。
 #
-# gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡；改它会废掉崩溃点重放双机分片三条用例的全绿标记（admission.py 的 SHARD_DRIVER_FILES），所以这里另写清场与登记
+# gate-similar: peer-host-lib.sh 它的 peer_host_quiesce / peer_host_quiesce_left 只在双机配置开着时读得到清场命令，也不管几趟同时用卡，所以这里另写清场与登记
 # gate-similar: crash-amplification-two-hosts.sh 它的 --quiesce 经 peer-host-lib.sh 清场，只给单跑双机驱动时用；分项驱动与崩溃放量入口经这一份
-# gate-similar: crash-point-replay-shard-run.sh 它在崩溃点重放双机分片（CPU）开跑前经 peer-host-lib.sh 清场；不上 GPU，不归这一份
 # gate-similar: run-with-memory-cap.sh 同是「包装 -- 命令」的写法，它管内存上限，这里管清场；两样各自套，次序由调用方定
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"

@@ -15,7 +15,7 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
 扫哪些（只认整串匹配 [a-z][a-z0-9_]*）：
   ① scripts/experiment-apparatus/*.rs 与 crates/*/src/**/*.rs 里的字符串字面量，三种形态：
      元组首列 ("名字", …)（左括号前面是标识符或 ! 的是函数或宏调用，不算元组）；
-     => "名字" 右侧；
+     => "名字" 右侧（cargo fmt 把放不下一行的分支折成 => { 换行 "名字" 换行 }，块里只有这一个串的，同算 => 右侧）；
      任一字符串字面量里的 键= （键前面是串首、空白或 , ; ( [ { |，后面不是 = 或 >）。
      注释、字符字面量不看。
   ② .claude/kb/**/*.md 表格行（以 | 起头的行，围栏代码块里的不算）单元格里反引号包着、整段是 [a-z][a-z0-9_]* 的串；术语改名登记表 .claude/kb/term-renames.md 不扫（登记的就是旧名）。
@@ -36,8 +36,11 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
   DATA_NAME_LINT_BREAK=string-literals-skipped  三种字面量形态一个都不扫
       「✗ 自证 tuple-column-red：」「✗ 自证 registered-green：」「✗ 自证 single-letter-red：」「✗ 自证 arrow-right-red：」「✗ 自证 key-name-red：」「✗ 自证 key-line-red：」
       「✗ 自证 numbered-green：」「✗ 自证 numbered-red：」「✗ 自证 exclusion-green：」「✗ 自证 exclusion-whole-file-green：」「✗ 自证 external-marker-no-reason-red：」
-  DATA_NAME_LINT_BREAK=arrow-right-skipped  => "名字" 右侧不扫
-      「✗ 自证 arrow-right-red：」「✗ 自证 external-marker-no-reason-red：」
+      「✗ 自证 folded-arm-red：」
+  DATA_NAME_LINT_BREAK=arrow-right-skipped  => "名字" 右侧不扫（折行的分支一起不扫）
+      「✗ 自证 arrow-right-red：」「✗ 自证 external-marker-no-reason-red：」「✗ 自证 folded-arm-red：」
+  DATA_NAME_LINT_BREAK=folded-arm-skipped  折行的 match 分支 => { "名字" } 不扫，只认与 => 紧挨着的串
+      「✗ 自证 folded-arm-red：」
   DATA_NAME_LINT_BREAK=key-names-skipped  键= 的键名不扫
       「✗ 自证 key-name-red：」「✗ 自证 key-line-red：」
   DATA_NAME_LINT_BREAK=call-arguments-judged  函数调用的字符串实参（左括号前是标识符）也当元组首列
@@ -47,7 +50,7 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
   DATA_NAME_LINT_BREAK=kb-tables-skipped  kb 表格不扫
       「✗ 自证 kb-table-red：」「✗ 自证 kb-term-renames-skipped：」「✗ 自证 kb-table-green：」
   DATA_NAME_LINT_BREAK=single-letters-passed  单字母放行
-      「✗ 自证 single-letter-red：」「✗ 自证 numbered-red：」
+      「✗ 自证 single-letter-red：」「✗ 自证 numbered-red：」「✗ 自证 folded-arm-red：」
   DATA_NAME_LINT_BREAK=registered-ignored  登记表不认
       「✗ 自证 registered-green：」
   DATA_NAME_LINT_BREAK=numbered-ignored  e<数字> 这类整类登记不认
@@ -85,7 +88,7 @@ CODE_SPAN = re.compile(r"`([^`\n]+)`")
 EXTRA_ABBREVIATIONS = {
     "mac": "message_authentication_code（几个意思，必须写全）",
 }
-BREAKS = ("string-literals-skipped", "arrow-right-skipped", "key-names-skipped", "call-arguments-judged", "comments-scanned", "kb-tables-skipped",
+BREAKS = ("string-literals-skipped", "arrow-right-skipped", "folded-arm-skipped", "key-names-skipped", "call-arguments-judged", "comments-scanned", "kb-tables-skipped",
           "single-letters-passed", "registered-ignored", "numbered-ignored", "exclusions-ignored", "stale-exclusions-passed",
           "external-marker-ignored")
 broken = set(item for item in os.environ.get("DATA_NAME_LINT_BREAK", "").split(",") if item in BREAKS)
@@ -269,6 +272,10 @@ def rust_candidates(text):
                     found.append((line, "元组首列", value))
             if before and before[:2] == ("punct", "=>") and "arrow-right-skipped" not in broken:
                 found.append((line, "=> 右侧", value))
+            folded_arm = (before and before[:2] == ("punct", "{") and before_before and before_before[:2] == ("punct", "=>")
+                          and after and after[:2] == ("punct", "}"))   # cargo fmt 折行的分支：=> { "名字" }，块里只有这一个串
+            if folded_arm and "arrow-right-skipped" not in broken and "folded-arm-skipped" not in broken:
+                found.append((line, "=> 右侧", value))
         if "key-names-skipped" not in broken:
             cleaned = re.sub(r"\\[ntr]", " ", value)
             for match in KEY_EQUALS.finditer(cleaned):
@@ -446,6 +453,9 @@ def run_selftest():
     case("registered-green", {"scripts/experiment-apparatus/e1_demo.rs": fields, **registered_mac}, 0, "扫了 1 份文件、1 个串")
     case("single-letter-red", {"scripts/experiment-apparatus/e1_demo.rs": 'const FIELDS: &[(&str, u32)] = &[("x", 1)];\n'}, 1, "「x」是单字母")
     case("arrow-right-red", {"crates/demo/src/lib.rs": 'fn arm(a: u8) -> &\'static str {\n    match a {\n        0 => "tail_cnt",\n        _ => "tail_other",\n    }\n}\n'}, 1, "crates/demo/src/lib.rs:3  => 右侧「tail_cnt」里 「cnt」是缩写，写全：count", "tail_other")
+    folded_arm_source = ('fn stream_name(stream: u8) -> &\'static str {\n    match stream {\n        0 => "new_pool_file_creation",\n        1 => {\n            "fixed_script_through_e_then_unmount"\n        }\n        _ => "tail_plain",\n    }\n}\n'
+                         'fn width_label(wide: bool) -> &\'static str {\n    if wide { "wide_cnt" } else { "narrow_cnt" }\n}\n')
+    case("folded-arm-red", {"crates/demo/src/lib.rs": folded_arm_source}, 1, "crates/demo/src/lib.rs:5  => 右侧「fixed_script_through_e_then_unmount」里 「e」是单字母", "wide_cnt")
     case("key-name-red", {"crates/demo/src/lib.rs": 'fn report() { println!("system={} num_items={}", 1, 2); }\n'}, 1, "键= 的键名「num_items」里 「num」", "「system」")
     case("key-line-red", {"crates/demo/src/lib.rs": 'fn f() {\n    println!("system={}\\\n        num_items={}", 1, 2);\n}\n'}, 1, "crates/demo/src/lib.rs:3  键= 的键名「num_items」")
     case("kb-table-red", {".claude/kb/demo.md": "| 字段 | 宽 |\n|---|---|\n| `cnt_total` | 8 |\n"}, 1, ".claude/kb/demo.md:3  kb 表格单元格「cnt_total」里 「cnt」")
@@ -478,13 +488,14 @@ def run_selftest():
         print(f"  ✗ --selftest：{len(cells)} 格里 {len(failed)} 格不对")
         print("     → 怎么办：照上面点名的格查判法；弄坏开关打开时红在点名的格是对的")
         return 1
-    print(f"  ✓ --selftest：{len(cells)} 格都对（元组首列、=> 右侧、键= 的键名、kb 表格、单字母、登记过的放行、整类编号、注释与调用实参不判、排除表只缩不涨、外部定名的行内豁免）")
+    print(f"  ✓ --selftest：{len(cells)} 格都对（元组首列、=> 右侧（含折行的 match 分支）、键= 的键名、kb 表格、单字母、登记过的放行、整类编号、注释与调用实参不判、排除表只缩不涨、外部定名的行内豁免）")
     return 0
 
 
 WHEEL = {
     "string-literals-skipped": ("tuple-column-red", "single-letter-red", "arrow-right-red", "key-name-red"),
-    "arrow-right-skipped": ("arrow-right-red",),
+    "arrow-right-skipped": ("arrow-right-red", "folded-arm-red"),
+    "folded-arm-skipped": ("folded-arm-red",),
     "key-names-skipped": ("key-name-red",),
     "call-arguments-judged": ("call-arguments-green",),
     "comments-scanned": ("comments-green",),

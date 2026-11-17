@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: none 只读会话记录与 /proc，除了 bash 与 python3 之外没有环境要求
-# 看门狗的调用入口：主 agent 每次派发（含续做）之后照 .claude/main-agent.md「派出去之后」起它，调用时只填要盯的 agent 号，
+# 看门狗的调用入口：主 agent 每次派发（含续做）之后照 .claude/skills/dispatch/SKILL.md「派出去之后」起它，调用时只填要盯的 agent 号，
 # 会话目录由 agent-watch.py 按 agent 号自己找，阈值从 scripts/agents/watch.conf 读——不在命令行上手敲。
 #
 # 一律放进 Bash 工具的 run_in_background；这里不再自己放后台（放了之后跑完的那个叫不醒主 agent）。

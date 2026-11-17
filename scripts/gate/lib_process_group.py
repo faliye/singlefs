@@ -4,11 +4,13 @@
 # gate-similar: verus-proof-check.py 它的 run_streamed 同样放进自己的进程组、退了停组里留下的，但两路输出边跑边收给进度行用、只起 Verus 那一种命令；这一份是门禁侧起阶段、自证与探针的共用起法，不并进去
 # gate-similar: doc-registries.sh 它有一段内联的 start_new_session 加 killpg，在那道门禁的格正文里、只给那一格用；这一份抽给 gate-structure-check.py 与 code-tooling.sh 的两格共用，那一段这一批不动
 """门禁侧起子进程的共用起法：每条命令放进它自己的会话与进程组，超时、异常、收到信号与正常退出之后都收整组，
-再在 /proc 里核这个会话里没有留下进程（.claude/singlefs-ai-sop/rules/command-safety.md「装置起的样本进程，放进它自己的进程组」）。
+再在 /proc 里核这个会话里没有留下进程（.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」）。
 
 调它的：scripts/gate/gate-structure-check.py 的 start_stage（起各道门禁的 --list 与 --check，超时限 LIST_TIMEOUT_SECONDS 秒）；
 .claude/gate.d/code-tooling.sh 的 stage-break-switch-replay 格（逐条开关起 stage-selftest.sh，不限时）与
 break-switch-outside-selftest 格（设上弄坏开关起探针，限 30 秒）。两边都调这一份，不各写一份起法。
+命令是调用方交的参数，函数单元库往上认到调用处：每一处调用在 scripts/gate/lib_function_units.py 的 CALLER_SUPPLIED_COMMANDS 登一行
+（文件头「调用方登记」，写明被起的那一份由哪一侧进键），新加的调用处没登记、交的命令又折不出时，经它的闭包拒算。
 
 run_in_own_session(命令, timeout=秒或 None, leader_only=False, **交给 Popen 的参数) → SessionRun
   起法：subprocess.Popen(start_new_session=True)，stdout、stderr 各接一根管道，按 UTF-8 解（坏字节换成 U+FFFD）。

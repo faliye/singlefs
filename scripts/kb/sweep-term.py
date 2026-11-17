@@ -33,11 +33,10 @@ r"""全仓术语改名：把一个概念的旧名换成新名，源码、文档�
 git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不在 git 工作树里时走整棵目录树
 （跳过 .git、target、node_modules）。根下有 `.git` 而 git 起不来、判不出是不是工作树，或 `git ls-files` 失败：退 2，不退回走整棵树。
 
-默认不扫的样本（写死在代码里，不进 `.claude/term-rename-exempt`）：门禁 doc-text 的 term-renames 格自己的判别力样本，
-即 `.claude/gate.d/fixtures/doc-text.sh/` 下目录名以 `term-renames-` 起头的那几个（`OWN_CELL_FIXTURE_PARENT`、`OWN_CELL_FIXTURE_PREFIX`）。
-那几份样本的登记表「旧」一列与带旧名的文件就是被换的那一侧，扫了它们，红样本换成绿样本，判别力归零，而那一格照样绿
-（checks-owed C441）。`--check` 与 `--apply` 都不扫，成功句与失败句报出排除了几个目录；
-别的格的样本目录、别的门禁文件名下叫 `term-renames-*` 的目录照扫。
+扫文件分片并行（scan_files）：筛掉豁免之后，文件按 git 列出的次序（排好序）分给 fork 出来的子进程各扫各的（每份文件的掩码、数旧名、--apply 的写回互不依赖），
+进程数取每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads：SINGLEFS_THREAD_CAP 设了照它，不然 .claude/heavy-thread-default；取不到往标准错误打一行、一个进程扫），
+不到 SCAN_PARALLEL_MINIMUM（64）份在本进程里扫。结果按文件次序收回：提示、被拒、路径形态的命中、各项计数和进程数无关，输出与一个进程扫时逐字相同；
+退出码、成功句与失败句不因并行变。只读的 --check 与逐份写回的 --apply 都并行。
 
 路径形态的命中只报不换：旧名所在的那一段不间断文字（以空白、引号、反引号、括号、中英文逗号句号分号冒号顿号为界，见 PATH_TOKEN_DELIMITERS）以 `~/`、`/`、`./`、`../` 起头、
 是带 `://` 的网址、带 `/` 而至少一段像文件名，或整段像一个文件名（`名字.md` / `.rs` / `.toml` / `.sh` / `.py` 等，PATH_FILE_SUFFIX；
@@ -75,14 +74,17 @@ git 忽略的（`multi-host.env` 这类本机私有的）不读、不改；不�
       连带红的格：「✗ 全仓还有 1 份文件、…处旧名，其中路径形态 0 处」
   SWEEP_TERM_BREAK=header-as-row  load_renames() 不跳登记表的表头行（「旧」「新」「匹配」「是什么」那一行），当数据行读
       表头不当记录（「✗ 自检失败：表头不当记录那一格判错：只有标记、表头与分隔行的登记表」…）
-  SWEEP_TERM_BREAK=own-fixtures-swept  不排除 term-renames 格自己的样本目录，照登记表扫、照旧名换
-      自己那一格的样本（「✗ 自检失败：自己那一格的样本那一格判错：--apply 之后样本里的旧名被换掉了」…）
+  SWEEP_TERM_BREAK=literal-screen-skips-rows-without-a-literal  必含字面的先筛（screened_out）不搜取不出字面的那几行，只中那几行的文件被筛掉
+      必含字面先筛（「✗ 自检失败：必含字面先筛那一格判错：样本 'a path here' 被先筛判成过不了，而检测正则在它上面会中」）
   SWEEP_TERM_BREAK=defer-value-as-root  位置参数照旧从全部参数里挑不以 -- 起头的，--defer 的值被当成仓根
       参数解析（「✗ 自检失败：参数解析那一格判错：不带仓根、只带 --defer deferred.md」…）
+  SWEEP_TERM_BREAK=parallel-results-unordered  并行扫收回的结果倒着交，不按派出的次序
+      分片并行（「✗ 自检失败：分片并行那一格判错：」，--check 或 --apply 四个进程打出来的字与一个进程时不同）
 
 退出码：--check 0 搜不出旧名、1 还有旧名；--apply 0 换完、3 有文件没换上（那几份原文件没动、临时文件已删）；
 2 登记表或豁免表有问题（含写不对的正则、对不上的行内锚），或根在 git 工作树里而 git 列不出文件，或参数写错、不给仓根而当前目录不在 git 仓里。
 """
+import multiprocessing
 import os
 import sys
 
@@ -94,6 +96,8 @@ import os as preflight_os, sys as preflight_sys  # noqa: E402
 preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
+preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', 'hosts'))
+from heavy_threads import HeavyThreadDefaultError, default_heavy_threads  # noqa: E402
 
 SKIP_DIRS = {".git", "target", "node_modules"}
 RESULTS_DIRECTORY = "research/results"
@@ -115,9 +119,6 @@ PATH_ROOT_PREFIXES = ("~/", "/", "./", "../")
 PATH_PLACEHOLDER_PATTERN = re.compile("\x00path(\\d+)\x00")
 PATH_REPORT_LIMIT = 50
 EXEMPT_FILE = ".claude/term-rename-exempt"
-# 门禁 doc-text 的 term-renames 格自己的判别力样本：这个目录下、目录名以这个前缀起头的，默认不扫（文件头有说明，checks-owed C441）
-OWN_CELL_FIXTURE_PARENT = ".claude/gate.d/fixtures/doc-text.sh"
-OWN_CELL_FIXTURE_PREFIX = "term-renames-"
 RENAMES_PATH = ".claude/kb/term-renames.md"
 TABLE_MARK = "<!-- term-renames:table -->"
 MATCH_KINDS = ("整串", "词边界", "正则")
@@ -170,7 +171,7 @@ def regex_row_problem(pattern):
 
 def load_renames(root):
     """从 .claude/kb/term-renames.md 的登记表读「旧 → 新」，一行一对。
-    加一条术语改名 = 往那张表加一行，这个脚本与门禁自动管到它，不用再改代码。"""
+    加一条术语改名 = 往那张表加一行，这个脚本自动管到它，不用再改代码。"""
     path = os.path.join(root, RENAMES_PATH)
     if not os.path.exists(path):
         print("  ✗ 找不到术语对照表 %s" % RENAMES_PATH)
@@ -205,9 +206,27 @@ def load_renames(root):
         pairs.append((old, new, how))
     if not pairs:
         print("  ✗ %s 的登记表一行数据都没有" % RENAMES_PATH)
-        print("     → 怎么办：每改一个全仓术语加一行，门禁才管得到它。")
+        print("     → 怎么办：每改一个全仓术语加一行，这个脚本才换得到、数得到它。")
         sys.exit(2)
     return pairs
+
+
+# 占位符里面的字（\x00archived<数字>\x00、\x00path<数字>\x00 两种的字母与数字）与占位符的边界字（NUL，按行豁免占位符的起止与数字那一段私用区字）
+PLACEHOLDER_INTERIOR_CHARACTERS = frozenset("archivedpath0123456789")
+PLACEHOLDER_BOUNDARY_CHARACTERS = frozenset(["\x00", EXEMPT_LINE_OPEN, EXEMPT_LINE_CLOSE] + [chr(EXEMPT_LINE_DIGIT_ZERO + digit) for digit in range(10)])
+
+
+def rule_pattern(old, how):
+    """登记表一行的匹配正则（整串、词边界、正则三种写法各自的那一条）。"""
+    if how == "正则":
+        return LOOKAROUND_ASSERTION.sub("", old) if broken("regex-assertions-dropped") else old
+    if how == "词边界":
+        if old.endswith("_"):
+            return r"\b" + re.escape(old)
+        if old.startswith("_"):
+            return re.escape(old) + r"\b"
+        return r"\b" + re.escape(old) + r"\b"
+    return re.escape(old)
 
 
 def compile_rules(pairs):
@@ -215,20 +234,53 @@ def compile_rules(pairs):
     （自检与被检共用同一条判据，判据错了两边一起错，见 checks-owed C428）。"""
     replacements, detectors = [], []
     for old, new, how in pairs:
-        if how == "正则":
-            pattern = LOOKAROUND_ASSERTION.sub("", old) if broken("regex-assertions-dropped") else old
-        elif how == "词边界":
-            if old.endswith("_"):
-                pattern = r"\b" + re.escape(old)
-            elif old.startswith("_"):
-                pattern = re.escape(old) + r"\b"
-            else:
-                pattern = r"\b" + re.escape(old) + r"\b"
-        else:
-            pattern = re.escape(old)
+        pattern = rule_pattern(old, how)
         replacements.append((re.compile(pattern), new))
         detectors.append("(?:%s)" % pattern)
     return replacements, re.compile("|".join(detectors))
+
+
+def required_literal(pattern):
+    """这条正则每一处命中都必含的一段字面：顶层连着的字面量里最长的那一段（顶层是顺接，每一段都要匹配上）。
+    整条带不分大小写的标志、或顶层一个字面量都没有（顶层就是分支、分组）交 None。"""
+    try:
+        import re._parser as pattern_parser
+    except ImportError:   # 3.10 及更早
+        import sre_parse as pattern_parser
+    parsed = pattern_parser.parse(pattern)
+    if parsed.state.flags & re.IGNORECASE:
+        return None
+    longest, run = "", ""
+    for operation, argument in parsed:
+        if operation is pattern_parser.LITERAL:
+            run += chr(argument)
+            continue
+        longest, run = max(longest, run, key=len), ""
+    return max(longest, run, key=len) or None
+
+
+def literal_screen(pairs):
+    """先筛用的 (必含字面的表, 取不出必含字面的那几行各自的正则)：一份文件里表里的字面一段都没有、那几条正则也都搜不中，
+    检测正则在它上面一处都不会中（掩码只把原文的片段换成占位符，占位符里的字不在任何必含字面里，所以掩过之后的命中，它的必含字面在原文里也是连着的）。
+    整段都由占位符里面的字拼成的字面（archived、path 的字母与数字：可能整个落在占位符里面）、带占位符边界字（NUL、按行豁免占位符那一段私用区字）的字面不取，那一行照正则搜。"""
+    literals, unscreened = [], []
+    for old, _new, how in pairs:
+        pattern = rule_pattern(old, how)
+        literal = old if how != "正则" else required_literal(pattern)
+        if literal is None or not set(literal) - PLACEHOLDER_INTERIOR_CHARACTERS or set(literal) & PLACEHOLDER_BOUNDARY_CHARACTERS:
+            unscreened.append(re.compile(pattern))
+        else:
+            literals.append(literal)
+    return sorted(set(literals), key=lambda literal: (-len(literal), literal)), unscreened
+
+
+def screened_out(text, screen):
+    """这份文件的原文过不了先筛（检测正则不可能中）：必含字面一段都不在、取不出字面的那几行也都搜不中。
+    弄坏开关 literal-screen-skips-rows-without-a-literal 下不搜取不出字面的那几行。"""
+    literals, unscreened = screen
+    if broken("literal-screen-skips-rows-without-a-literal"):
+        unscreened = []
+    return not any(literal in text for literal in literals) and not any(pattern.search(text) for pattern in unscreened)
 
 
 def load_exempt(root):
@@ -284,7 +336,7 @@ def load_exempt(root):
     # 对照表与这个脚本自己都写得出旧名（表里那一列就是旧名，脚本要从表里读），
     # 不豁免就会把自己吃掉 ⇒ 强制要求，不靠写表的人记得。
     myself = os.path.relpath(os.path.abspath(__file__), root)
-    # 脚本在 root 外面（门禁拿真脚本扫判别力样本就是这样）时它根本不会被扫到，不用要求豁免
+    # 脚本在 root 外面（自证拿真脚本扫临时小仓就是这样）时它根本不会被扫到，不用要求豁免
     required_paths = [RENAMES_PATH] + ([myself] if not myself.startswith("..") else [])
     for required in required_paths:
         if not any(required == e or required.startswith(e.rstrip("/") + "/") for e in entries):
@@ -299,18 +351,6 @@ def load_exempt(root):
         print("     → 怎么办：指不到的豁免项删掉或改成现存路径；不起作用的豁免会让人以为那批文件已经被绕开了。")
         sys.exit(2)
     return entries, line_exemptions
-
-
-def own_cell_fixture_directory(relative):
-    """relative 是 term-renames 格自己的样本目录里的文件时，返回那个样本目录（相对根的路径），否则 None。
-    弄坏开关 own-fixtures-swept 打开时一律 None（不排除）。"""
-    if broken("own-fixtures-swept"):
-        return None
-    parent = OWN_CELL_FIXTURE_PARENT.split("/")
-    parts = os.path.normpath(relative).split(os.sep)
-    if len(parts) > len(parent) + 1 and parts[:len(parent)] == parent and parts[len(parent)].startswith(OWN_CELL_FIXTURE_PREFIX):
-        return "/".join(parts[:len(parent) + 1])
-    return None
 
 
 def exempt(relative, entries):
@@ -456,15 +496,87 @@ def candidate_files(root):
 
 def walk(root, entries):
     for relative in candidate_files(root)[0]:
-        if not exempt(relative, entries) and own_cell_fixture_directory(relative) is None:
+        if not exempt(relative, entries):
             yield relative
 
 
-def sweep(root, apply_changes, defer=(), tally=None):
+SCAN_PARALLEL_MINIMUM = 64   # 要扫的文件不到这么多就在本进程里扫（起进程的开销比扫还大）
+_SCAN_CONTEXT = {}
+
+
+def scan_file(relative):
+    """扫一份文件（--apply 时扫完就换并写回），上下文是 sweep() 放进 _SCAN_CONTEXT 的（并行时在 fork 出来的子进程里跑，拿的是父进程那一份的拷贝）。
+    交 (相对路径, 读成了没有, 旧名处数, 路径形态的命中 [(行号, 那一段文字)], 写回被拒的说明或 None, 写回时 lib_atomic_replace 给的提示 [文字])：
+    读不了或不是 UTF-8 的交读成了=False；提示与拒绝不在这里打，由 sweep() 按文件次序打，输出次序与进程数无关。"""
+    context = _SCAN_CONTEXT
+    try:
+        with open(os.path.join(context["root"], relative), 'rb') as handle:
+            original = handle.read()
+        text = original.decode('utf-8')
+    except (UnicodeDecodeError, OSError):
+        return relative, False, 0, [], None, []
+    if screened_out(text, context["screen"]):
+        return relative, True, 0, [], None, []
+    text, kept_lines = mask_exempt_lines(text, context["line_exemptions"].get(relative, ()))
+    text, masked = mask_archived_product_names(text, context["archived_names"])
+    text, kept_paths, found_paths = mask_path_shaped(text, context["detect"])
+    replaceable = len(context["detect"].findall(text))
+    # --check 数旧名还在的全部处（含路径形态的）；--apply 只换并只数能换的，只剩路径形态命中的文件不重写
+    count = replaceable if context["apply_changes"] else replaceable + len(found_paths)
+    if not count or not context["apply_changes"]:
+        return relative, True, count, found_paths, None, []
+    for pattern, new in context["replacements"]:
+        text = pattern.sub(lambda match, new=new: new, text)
+    text = restore_path_shaped(text, kept_paths)
+    text = restore_archived_product_names(text, masked)
+    text = restore_exempt_lines(text, kept_lines)
+    try:
+        from lib_atomic_replace import unchanged_bytes
+        path = os.path.join(context["root"], relative)
+        notes = replace_file_contents_by_rename(path, text, check_before_rename=lambda: unchanged_bytes(path, original))
+    except ReplaceRefused as refusal:
+        return relative, True, count, found_paths, str(refusal), []
+    return relative, True, count, found_paths, None, list(notes)
+
+
+SCAN_CHUNK_FILES_AT_MOST = 16   # 每次交给一个子进程的文件数上限：块大小，不是并行度
+
+
+def scan_workers():
+    """扫文件开几个进程：每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads：SINGLEFS_THREAD_CAP 设了照它，不然 .claude/heavy-thread-default）；
+    取不到往标准错误打一行说明、一个进程扫。"""
+    try:
+        return max(1, int(default_heavy_threads()))
+    except HeavyThreadDefaultError as error:
+        print("  ! 取不到每台默认重活线程数（%s），一个进程扫" % error, file=sys.stderr)
+        return 1
+
+
+def scan_files(relatives, workers=None):
+    """relatives 逐份交 scan_file，结果次序同 relatives：(结果表, 用了几个进程)。不到 SCAN_PARALLEL_MINIMUM 份或只有一个进程就在本进程里扫；
+    不然 fork 出 workers 个子进程（不给取 scan_workers()）分片扫，每份文件各扫各的、互不依赖，次序与进程数无关。收回的份数对不上抛 RuntimeError。
+    弄坏开关 parallel-results-unordered：并行收回的结果倒着交（不按派出的次序）。"""
+    if len(relatives) < SCAN_PARALLEL_MINIMUM:
+        return [scan_file(relative) for relative in relatives], 1
+    workers = scan_workers() if workers is None else workers
+    if workers <= 1:
+        return [scan_file(relative) for relative in relatives], 1
+    sys.stdout.flush()   # 父进程缓冲里没写出去的字不让子进程退出时再写一遍
+    sys.stderr.flush()
+    processes = min(workers, len(relatives))
+    with multiprocessing.get_context("fork").Pool(processes=processes) as pool:
+        results = pool.map(scan_file, relatives, chunksize=max(1, min(SCAN_CHUNK_FILES_AT_MOST, len(relatives) // (processes * 8))))
+    if len(results) != len(relatives):
+        raise RuntimeError("派出 %d 份文件、收回 %d 份结果" % (len(relatives), len(results)))
+    return (results[::-1] if broken("parallel-results-unordered") else results), processes
+
+
+def sweep(root, apply_changes, defer=(), tally=None, workers=None):
     """defer 是**分批落地**用的，不是豁免：别的会话正在读那批文件时先放着，那一批照样要换，换完 --check 才绿。
     豁免只有 .claude/term-rename-exempt 一处，别把 defer 当第二处豁免用。
+    扫文件分片并行（scan_files：workers 不给取每台默认重活线程数），输出与进程数无关：文件按 git 列的次序（排好序）、提示与被拒、路径形态的命中都按这个次序打。
     tally 给一个 dict 时填进 files（有旧名的份数）、occurrences（处数）、scanned（扫了的文本文件数）、
-    excluded_fixture_directories（term-renames 格自己的样本目录排除了几个），自证用。"""
+    scan_processes（扫文件用了几个进程），自证用。"""
     entries, line_exemptions = load_exempt(root)
     entries = list(entries) + list(defer)
     exempt_line_count = sum(len(anchors) for anchors in line_exemptions.values())
@@ -473,58 +585,40 @@ def sweep(root, apply_changes, defer=(), tally=None):
     archived_names = archived_product_file_names(root)
     candidates, listing_note = candidate_files(root)
     files, occurrences, scanned = 0, 0, 0
-    own_fixture_directories = set()
     worst = []
     refused = []
     path_hits = []          # (相对路径, 行号, 路径形态的那一段文字)：只报不换
+    to_scan = []
+    real_root = os.path.realpath(root)
     for relative in candidates:
-        if os.path.commonpath([os.path.realpath(root), os.path.realpath(os.path.join(root, relative))]) != os.path.realpath(root):
+        if os.path.commonpath([real_root, os.path.realpath(os.path.join(root, relative))]) != real_root:
             continue
         if exempt(relative, entries):
             continue
-        own_fixture_directory = own_cell_fixture_directory(relative)
-        if own_fixture_directory is not None:
-            own_fixture_directories.add(own_fixture_directory)
-            continue
-        try:
-            with open(os.path.join(root, relative), 'rb') as handle:
-                original = handle.read()
-            text = original.decode('utf-8')
-        except (UnicodeDecodeError, OSError):
-            continue
-        scanned += 1
-        text, kept_lines = mask_exempt_lines(text, line_exemptions.get(relative, ()))
-        text, masked = mask_archived_product_names(text, archived_names)
-        text, kept_paths, found_paths = mask_path_shaped(text, detect)
-        replaceable = len(detect.findall(text))
+        to_scan.append(relative)
+    _SCAN_CONTEXT.update(root=root, line_exemptions=line_exemptions, archived_names=archived_names, detect=detect, replacements=replacements, apply_changes=apply_changes,
+                         screen=literal_screen(pairs))
+    try:
+        results, scan_processes = scan_files(to_scan, workers)
+    finally:
+        _SCAN_CONTEXT.clear()
+    for relative, read_ok, count, found_paths, refusal, notes in results:
+        scanned += read_ok
         path_hits += [(relative, number, token) for number, token in found_paths]
-        # --check 数旧名还在的全部处（含路径形态的）；--apply 只换并只数能换的，只剩路径形态命中的文件不重写
-        count = replaceable if apply_changes else replaceable + len(found_paths)
         if not count:
             continue
-        if apply_changes:
-            for pattern, new in replacements:
-                text = pattern.sub(lambda match, new=new: new, text)
-            text = restore_path_shaped(text, kept_paths)
-            text = restore_archived_product_names(text, masked)
-            text = restore_exempt_lines(text, kept_lines)
-            try:
-                from lib_atomic_replace import unchanged_bytes
-                path = os.path.join(root, relative)
-                notes = replace_file_contents_by_rename(path, text, check_before_rename=lambda: unchanged_bytes(path, original))
-            except ReplaceRefused as refusal:
-                refused.append((relative, count, str(refusal)))
-                continue
-            for note in notes:
-                print("  ! %s" % note)
+        if refusal is not None:
+            refused.append((relative, count, refusal))
+            continue
+        for note in notes:
+            print("  ! %s" % note)
         files += 1
         occurrences += count
         worst.append((count, relative))
     if tally is not None:
-        tally.update(files=files, occurrences=occurrences, scanned=scanned, excluded_fixture_directories=len(own_fixture_directories), path_shaped=len(path_hits))
-    excluded_note = "；默认不扫 term-renames 格自己的样本目录 %d 个" % len(own_fixture_directories)
+        tally.update(files=files, occurrences=occurrences, scanned=scanned, path_shaped=len(path_hits), scan_processes=scan_processes)
     if apply_changes:
-        print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条、按行豁免 %d 行；范围：%s%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
+        print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条、按行豁免 %d 行；范围：%s）" % (files, occurrences, len(pairs), len(entries), exempt_line_count, listing_note))
         report_path_shaped(path_hits, True)
         if refused:
             for relative, count, message in refused:                # gate-lint:detail
@@ -540,8 +634,8 @@ def sweep(root, apply_changes, defer=(), tally=None):
         for count, relative in sorted(worst, reverse=True)[:20]:   # gate-lint:detail
             print("      %-72s %d 处" % (relative, count))
         report_path_shaped(path_hits, False)
-        print("  ✗ 全仓还有 %d 份文件、%d 处旧名，其中路径形态 %d 处（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s%s）"
-              % (files, occurrences, len(path_hits), len(pairs), len(entries), exempt_line_count, listing_note, excluded_note))
+        print("  ✗ 全仓还有 %d 份文件、%d 处旧名，其中路径形态 %d 处（登记的改名 %d 条、豁免 %d 条与按行豁免 %d 行不算；范围：%s）"
+              % (files, occurrences, len(path_hits), len(pairs), len(entries), exempt_line_count, listing_note))
         print("     → 怎么办：跑 python3 scripts/kb/sweep-term.py --apply 换掉（路径形态的 --apply 不换，上面逐条列了文件:行：路径是真实存在的，"
               "登记按行豁免；是写错的引用，手改连同那份文件或目录本身）；")
         print("               确实该留旧名的，登记进 .claude/term-rename-exempt 并写明为什么：整份都该留的写路径，")
@@ -550,7 +644,6 @@ def sweep(root, apply_changes, defer=(), tally=None):
     print("  ✓ 全仓搜不出登记过的旧名了：查了 %d 份文本文件（%s）、%d 条改名登记" % (scanned, listing_note, len(pairs)))
     print("     没扫的 %d 处（.claude/term-rename-exempt 登记，各有理由）：%s" % (len(entries), "、".join(entries)))
     print("     按行豁免 %d 行（%d 份文件里，那几行留原文、别的行照扫）" % (exempt_line_count, len(line_exemptions)))
-    print("     默认没扫 term-renames 格自己的样本目录 %d 个（%s/%s*，代码里写死，判别力样本里要留着旧名）" % (len(own_fixture_directories), OWN_CELL_FIXTURE_PARENT, OWN_CELL_FIXTURE_PREFIX))
     return 0
 
 
@@ -665,8 +758,9 @@ def selftest():
             ("路径形态", check_path_shaped, "看 mask_path_shaped() 与 path_shaped()：旧名所在那一段文字带 / 或像文件名的，--apply 要掩起来不换，--check 要数并逐条报文件:行"),
             ("斜杠词", check_slash_words, "看 path_shaped()：只带 / 不算路径，行文里的斜杠词（读/写）旧名要换；以 ~/、/、./、../ 起头的、带 :// 的、有一段像文件名的才是路径形态"),
             ("按行豁免", check_line_exemptions, "看 load_exempt() 读 <路径>:「<行内锚>」那一支与锚恰好命中一行的判法、mask_exempt_lines() 只换含锚的那一行"),
-            ("自己那一格的样本", check_own_cell_fixtures, "看 own_cell_fixture_directory() 与 sweep() 里 --check / --apply 跳过它的那一句：OWN_CELL_FIXTURE_PARENT 下目录名以 OWN_CELL_FIXTURE_PREFIX 起头的样本目录默认不扫"),
             ("只扫 git 列出的", check_git_listing, "看 candidate_files()：根在 git 工作树里要走 git ls-files --cached --others --exclude-standard，不走整棵目录树"),
+            ("必含字面先筛", check_literal_screen, "看 literal_screen() 与 screened_out()：先筛判过不了的文件，检测正则在它上面必须一处都不中；required_literal() 只取顶层连着的字面量"),
+            ("分片并行", check_parallel_scan, "看 scan_files()：分片并行收回的结果要按派出的次序交（pool.map，不用 imap_unordered 或倒着交），sweep() 里提示、被拒、路径形态的命中都按这个次序打；scan_file() 不往标准输出打任何字"),
             ("参数解析", check_argument_parsing, "看 parse_arguments()：--defer 要吃掉紧跟它的那一个参数，仓根只从剩下的里取；不给仓根时 root_of_current_directory() 取当前目录所在 git 仓的根")):
         problem = check()
         if problem:
@@ -685,7 +779,6 @@ def selftest():
               "以及 sweep() 里 --apply 那一段是不是还有就地写。")
         return 1
     print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、已归档产物的名字不换不报而树里还在的照换、豁免指不到文件判红、"
-          "term-renames 格自己的样本目录（.claude/gate.d/fixtures/doc-text.sh/term-renames-*）默认不扫、--apply 之后样本里的旧名原样在、在那份样本根上 --check 仍判红而别处的旧名与别的格、别的门禁文件名下的同名目录照换、"
           "%d 字的连续串掩码在 %.0f 秒内做完且与不加左边界时逐字相同；--apply 换上的是新 inode、权限位不变、"
           "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
           "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件；"
@@ -694,7 +787,8 @@ def selftest():
           "按行豁免只留锚那一行、同一份文件里另外 2 行照判照换，锚命中 0 行或不止一行、指不到文件、读不出锚都退 2；"
           "在 git 工作树里只扫跟踪的与未跟踪而未忽略的 2 份，git 忽略的 multi-host.env、memory-peaks.tsv 不读不写；"
           "登记表只有标记、表头与分隔行时不把表头当规则、退 2 报一行数据都没有；"
-          "不带仓根只带 --defer 时仓根取当前目录所在的仓、--defer 的值不当仓根，仓根写在 --defer 之后照认，认不出的选项与缺值的 --defer 退 2"
+          "不带仓根只带 --defer 时仓根取当前目录所在的仓、--defer 的值不当仓根，仓根写在 --defer 之后照认，认不出的选项与缺值的 --defer 退 2；"
+          "分片并行：同一棵小树 --check 与 --apply 各用一个进程与四个进程扫，打出来的字、退出码、计数逐字相同，换完的两棵树逐字节相同"
           % (PRODUCT_NAME_PROBE_RUN_LENGTH, PRODUCT_NAME_PROBE_SECONDS))
     return 0
 
@@ -749,6 +843,68 @@ def check_long_run_masking():
         return "%d 字的连续串掩码用了 %.3f 秒，超时（上限 %.0f 秒）" % (PRODUCT_NAME_PROBE_RUN_LENGTH, elapsed, PRODUCT_NAME_PROBE_SECONDS)
     if verdict != "same":
         return "%d 字的连续串后面那个已归档产物的名字没被掩成占位符，或串本身被改了" % PRODUCT_NAME_PROBE_RUN_LENGTH
+    return ""
+
+
+def tree_files(root):
+    """root 下每份文件的 {相对路径: 字节}，自证比两棵树用。"""
+    found = {}
+    for base, _directories, names in os.walk(root):
+        for name in names:
+            path = os.path.join(base, name)
+            with open(path, "rb") as handle:
+                found[os.path.relpath(path, root)] = handle.read()
+    return found
+
+
+def check_parallel_scan():
+    """分片并行那一格：同一棵小树（刚好够 SCAN_PARALLEL_MINIMUM 份再多几份，带整串旧名、路径形态、按行豁免、不是 UTF-8 的文件）--check 与 --apply 各用一个进程和四个进程扫，
+    打出来的字、退出码、各项计数逐字相同，--apply 之后两棵树逐字节相同；四个进程那一趟确实起了不止一个进程，路径形态的命中不止一处（次序看得出来）。
+    返回空串是判对，否则是判错的说明。弄坏开关 parallel-results-unordered 下并行收回的结果倒着交，这一格红。"""
+    import contextlib
+    import io
+    import tempfile
+
+    def build(root):
+        write_selftest_tables(root, [("超级块", "系统配置", "整串", "中文")], ["notes/anchored.md:「超级块 锚」  # 留着"])
+        os.makedirs(os.path.join(root, "notes"))
+        with open(os.path.join(root, "notes", "anchored.md"), "w", encoding="utf-8") as handle:
+            handle.write("超级块 锚\n超级块 另一行\n")
+        with open(os.path.join(root, "notes", "not-text.bin"), "wb") as handle:
+            handle.write(b"\xff\xfe " + "超级块".encode("utf-8"))
+        for index in range(SCAN_PARALLEL_MINIMUM + 2):
+            directory = os.path.join(root, "dir%02d" % (index % 7))
+            os.makedirs(directory, exist_ok=True)
+            # 十六份里一份整串旧名（--apply 写回）、一份路径形态加整串旧名（写回）、一份只有路径形态（不重写），别的没有旧名：--apply 的写回只有十来份（写回要 fsync）
+            body = ("第 %d 份：超级块 在这里\n", "第 %d 份：见 crates/超级块/src/lib.rs 与 超级块说明.md，行文里的超级块照换\n",
+                    "第 %d 份：只有路径 crates/超级块/src/mod.rs\n")[index % 16] % index if index % 16 < 3 else "第 %d 份没有旧名\n" % index
+            with open(os.path.join(directory, "file%03d.md" % index), "w", encoding="utf-8") as handle:
+                handle.write(body)
+
+    with tempfile.TemporaryDirectory() as base:
+        for label, apply_changes in (("--check", False), ("--apply", True)):
+            runs = []
+            for workers in (1, 4):
+                root = os.path.join(base, "%s-%d" % (label.strip("-"), workers))
+                os.makedirs(root)
+                build(root)
+                tally, output = {}, io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    code = sweep(root, apply_changes, tally=tally, workers=workers)
+                runs.append((root, code, output.getvalue().replace(root, "<根>"), tally))
+            (serial_root, serial_code, serial_output, serial_tally), (parallel_root, parallel_code, parallel_output, parallel_tally) = runs
+            if serial_tally["scan_processes"] != 1 or parallel_tally["scan_processes"] < 2:
+                return "%s：一个进程那一趟用了 %d 个进程、四个进程那一趟用了 %d 个（要 1 与至少 2）" % (label, serial_tally["scan_processes"], parallel_tally["scan_processes"])
+            if serial_tally["path_shaped"] < 2 or serial_tally["files"] < 4:
+                return "%s：样本没造成（路径形态 %d 处、有旧名的 %d 份），次序看不出来" % (label, serial_tally["path_shaped"], serial_tally["files"])
+            ignored = ("scan_processes",)
+            if (serial_code, {k: v for k, v in serial_tally.items() if k not in ignored}) != (parallel_code, {k: v for k, v in parallel_tally.items() if k not in ignored}):
+                return "%s：退出码或计数不同：一个进程 %s %s、四个进程 %s %s" % (label, serial_code, serial_tally, parallel_code, parallel_tally)
+            if serial_output != parallel_output:
+                differing = next((index for index, (left, right) in enumerate(zip(serial_output.splitlines(), parallel_output.splitlines())) if left != right), None)
+                return "%s：打出来的字不同（一个进程 %d 行、四个进程 %d 行，第一处不同在第 %s 行）" % (label, len(serial_output.splitlines()), len(parallel_output.splitlines()), differing)
+            if apply_changes and tree_files(serial_root) != tree_files(parallel_root):
+                return "--apply：换完的两棵树不逐字节相同"
     return ""
 
 
@@ -831,6 +987,33 @@ LINE_EXEMPTION_SAMPLE_LINES = ["第一行：用户原话「超级块要改名」
 
 
 PATH_SHAPED_SAMPLE_LINES = ["目录 /srv/超级块/data 在第二台上真实存在", "文件 超级块说明.md:12 在别处", "行文里的超级块要换，路径旁的 超级块 也要换", "引用 [说明](docs/x.md) 与 crates/超级块/src/lib.rs", ""]
+
+
+def check_literal_screen():
+    """必含字面先筛那一格：取字面的规则对；带旧名的样本过得了先筛、--check 照数；先筛与检测正则在一批样本文本上不许出现「筛掉了却会中」。返回空串是判对。"""
+    import tempfile
+    for pattern, wanted in (("(?<!每)层 [12](?!\\d)", "层 "), ("abc(?:x|y)defgh", "defgh"), ("(?:甲|乙)", None), ("(?i)abc", None), ("ab+c", "a")):
+        if required_literal(pattern) != wanted:
+            return "正则 %s 的必含字面应当是 %r，实际 %r" % (pattern, wanted, required_literal(pattern))
+    with tempfile.TemporaryDirectory() as root:
+        write_selftest_tables(root, REGEX_SAMPLE_ROWS + [("旧整串", "新整串", "整串", "先筛样本"), ("oldword", "newword", "词边界", "先筛样本"), ("path", "route", "整串", "字面整段是占位符里面的字"), ("`(?:甲旧\\|乙旧)`", "新", "正则", "顶层是分组，取不出字面")], [])
+        pairs = load_renames(root)
+        _, detect = compile_rules(pairs)
+        screen = literal_screen(pairs)
+        if "path" in screen[0] or len(screen[1]) < 2:
+            return "「path」与顶层是分组的那一行应当不取字面、照正则搜，实际字面表 %r、照正则搜的 %d 行" % (screen[0], len(screen[1]))
+        samples = [REGEX_SAMPLE_D13_LINE, REGEX_SAMPLE_OTHER_LINE, REGEX_SAMPLE_PIPE_LINE, "这里有旧整串", "an oldword here", "no hit at all", "a path here", "甲旧与乙旧", "", "archived12", "只有新整串"]
+        for sample in samples:
+            if screened_out(sample, screen) and detect.search(sample):
+                return "样本 %r 被先筛判成过不了，而检测正则在它上面会中" % sample
+        with open(os.path.join(root, "doc.md"), "w", encoding="utf-8") as handle:
+            handle.write("\n".join(samples))
+        tally = {}
+        code = quietly(sweep, root, False, tally=tally)
+        wanted = len(detect.findall("\n".join(samples)))
+        if code != 1 or tally.get("occurrences") != wanted:
+            return "带旧名的样本 --check 应当退 1、报 %d 处，实际退 %s、%s 处" % (wanted, code, tally.get("occurrences"))
+    return ""
 
 
 def check_path_shaped():
@@ -930,58 +1113,6 @@ def check_line_exemptions():
             code = quietly(sweep, root, False)
             if code != 2:
                 return "%s时应当退 2，实际退 %s" % (why, code)
-    return ""
-
-
-OWN_FIXTURE_SAMPLE_RENAME_ROWS = [("超级块", "系统配置", "整串", "中文")]
-OWN_FIXTURE_SAMPLE_FILE = os.path.join("crates", "singlefs-core", "src", "sample.rs")
-
-
-def write_own_fixture_sample(base, with_tables):
-    """照 term-renames 格的样本布局在 base 下写一份样本根：一份带旧名的 rs，with_tables 时另有自己的登记表（旧名在「旧」一列）与排除表。"""
-    if with_tables:
-        write_selftest_tables(base, OWN_FIXTURE_SAMPLE_RENAME_ROWS, [])
-    os.makedirs(os.path.join(base, os.path.dirname(OWN_FIXTURE_SAMPLE_FILE)))
-    with open(os.path.join(base, OWN_FIXTURE_SAMPLE_FILE), "w", encoding="utf-8") as handle:
-        handle.write("// 超级块槽宽 4096\n")
-
-
-def check_own_cell_fixtures():
-    """自己那一格的样本：--apply 默认不扫门禁 doc-text 的 term-renames 格自己的样本目录（样本里的旧名原样在、仓里别处的换掉），
-    在那份样本根上 --check 仍判红；别的格的样本目录、别的门禁文件名下的 term-renames-* 目录照扫照换。返回空串是判对。"""
-    import tempfile
-    sample_roots = [os.path.join(OWN_CELL_FIXTURE_PARENT, name) for name in ("term-renames-red", "term-renames-green")]
-    swept_roots = [os.path.join(".claude", "gate.d", "fixtures", "doc-text.sh", "other-cell-red"),
-                   os.path.join(".claude", "gate.d", "fixtures", "other.sh", "term-renames-red")]
-    with tempfile.TemporaryDirectory() as root:
-        write_selftest_tables(root, OWN_FIXTURE_SAMPLE_RENAME_ROWS, [])
-        elsewhere = os.path.join(root, "crates", "elsewhere.rs")
-        os.makedirs(os.path.dirname(elsewhere))
-        with open(elsewhere, "w", encoding="utf-8") as handle:
-            handle.write("// 超级块在别处\n")
-        for relative in sample_roots:
-            write_own_fixture_sample(os.path.join(root, relative), True)
-        for relative in swept_roots:
-            write_own_fixture_sample(os.path.join(root, relative), False)
-        quietly(sweep, root, True)
-        original = "// 超级块槽宽 4096\n"
-        for relative in sample_roots:
-            kept = open(os.path.join(root, relative, OWN_FIXTURE_SAMPLE_FILE), encoding="utf-8").read()
-            if kept != original:
-                return "--apply 之后样本里的旧名被换掉了（%s 里的 sample.rs 变成 %r），红样本和绿样本换成了一样的内容" % (relative, kept)
-        if open(elsewhere, encoding="utf-8").read() != "// 系统配置在别处\n":
-            return "--apply 没换掉仓里别处的旧名"
-        for relative in swept_roots:
-            if open(os.path.join(root, relative, OWN_FIXTURE_SAMPLE_FILE), encoding="utf-8").read() != "// 系统配置槽宽 4096\n":
-                return "%s 不是 term-renames 格自己的样本，应当照扫照换" % relative
-        for relative in sample_roots:
-            code = quietly(sweep, os.path.join(root, relative), False)
-            if code != 1:
-                return "在样本根 %s 上跑 --check 应当退 1（红样本仍然红），实际退 %s" % (relative, code)
-        tally = {}
-        code = quietly(sweep, root, False, tally=tally)
-        if code != 0 or tally.get("excluded_fixture_directories") != 2:
-            return "--apply 之后仓根上 --check 应当退 0、排除 2 个样本目录，实际退 %s、排除 %s 个" % (code, tally.get("excluded_fixture_directories"))
     return ""
 
 

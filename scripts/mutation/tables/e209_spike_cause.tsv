@@ -1,0 +1,42 @@
+# 被测的是 scripts/experiment-apparatus/e209_spike_cause.rs（模型，bin e209-spike-cause；脚本表与选择子在 e209_spike_cause_scripts.rs，单测一并在这个 bin 里跑）。
+# 跑法：bash scripts/mutation/mutate.sh e209-spike-cause scripts/experiment-apparatus/e209_spike_cause.rs scripts/mutation/tables/e209_spike_cause.tsv
+# 登记 research/prompts/e209-preregistration.md 第九节十六条里的十五条在这张表（编号对应写在变异名后面的注释行）；第 16 条（孪生项与原项用同一个进程）改的是入口脚本，由入口 e209-spike-cause-run.sh 的弄坏开关 twin-in-the-same-process 与自证格 twin_item_runs_in_another_process 证红，不在这张表。
+# 第 7、8、9 条在登记里写的是计数脚本与历史用例里的改法；这里改的是模型里读同一份数据的那一处（指针图只读第一份落点、重挂载阶段的行不读、种子与拉进读反），计数脚本一侧由它自己的 --mutation-check 表管。
+# 登记 M1
+m1_mount_clears_nothing_at_a_remount	                mount_final.clear();\n                mount_pulled.clear();\n	                mount_final.retain(|_| true);\n                mount_pulled.retain(|_| true);\n
+# 登记 M2
+m2_wide_freshness_leaves_out_the_seed	let wide: NodeSet = publish.seed.union(&publish.pulled).copied().collect();	let wide: NodeSet = publish.pulled.clone();
+# 登记 M3
+m3_spike_line_uses_the_mean	floor.max(SPIKE_MULTIPLE * lower_median(final_nodes))	floor.max(SPIKE_MULTIPLE * (final_nodes.iter().sum::<u64>() / final_nodes.len().max(1) as u64))
+# 登记 M4
+m4_ordinal_counts_from_zero	                    ordinal_user: ordinal,\n                    step_index:	                    ordinal_user: ordinal - 1,\n                    step_index:
+# 登记 M5
+m5_threshold_is_the_largest_flagged_freshness	training.iter().filter(|view| view.flagged).map(|view| view.fresh[variant]).min()	training.iter().filter(|view| view.flagged).map(|view| view.fresh[variant]).max()
+# 登记 M6
+m6_comparables_are_the_last_two_items	sorted.into_iter().take(2).collect()	sorted.into_iter().rev().take(2).collect()
+# 登记 M7（模型一侧）
+m7_pointer_graph_reads_the_first_location_only	            .split('+')\n            .map(|place| {	            .split('+')\n            .take(1)\n            .map(|place| {
+# 登记 M8（模型一侧）
+m8_remount_lines_are_not_read	if text_of(fields, "phase") == "remount" {	if text_of(fields, "phase") == "remount_not_read" {
+# 登记 M9（模型一侧）
+m9_seed_and_pulled_are_swapped	        seed: set("seed"),\n        pulled: set("pulled"),	        seed: set("pulled"),\n        pulled: set("seed"),
+# 登记 M10
+m10_threshold_is_refitted_on_the_test_geometry	let geometry_errors = geometry.iter().filter(|(value, flagged)| (*value >= fit.threshold) != *flagged).count();	let geometry_errors = best_threshold(geometry).errors;
+# 登记 M11
+m11_top_rows_are_two	const TOP_ROW_COUNT: usize = 3;	const TOP_ROW_COUNT: usize = 2;
+# 登记 M12
+m12_main_floor_line_is_the_low_one	const MAIN_FLOOR_LINE_POSITION: usize = 1;	const MAIN_FLOOR_LINE_POSITION: usize = 0;
+# 登记 M13
+m13_one_step_share_line_is_half	const ONE_STEP_SHARE_AT_LEAST: f64 = 0.9;	const ONE_STEP_SHARE_AT_LEAST: f64 = 0.5;
+# 登记 M14
+m14_closure_stops_below_the_root	            if parent_level == root_level {\n                Some(Node::Root)	            if parent_level == root_level {\n                None
+# 登记 M15
+m15_ordinal_comparison_runs_one_past_the_shorter_script	for ordinal in 1..=shorter {	for ordinal in 1..=shorter + 1 {
+# 执行员加（登记之外）：常量核对不再跳过 plain 版（第一段合并报告 `constants_mismatches=1` 的那一处），由 `the_constants_and_the_history_are_checked_against_the_registered_values` 里新加的 plain 一格红
+x1_constants_check_reads_the_plain_build_too	    if item.arm == "plain" {\n        return wrong;\n    }\n	    if item.arm == "plain-skipped-never" {\n        return wrong;\n    }\n
+# 执行员加（登记之外）：报告文件 --out 改成可覆盖已有文件，由 the_report_output_file_is_new_and_holds_the_same_lines 红
+x2_report_out_file_may_overwrite	        .create_new(true)\n	        .create(true)\n        .truncate(true)\n
+# 执行员加（登记之外）：每轮的差改成除以轮数，由 the_round_shares_are_shares_of_the_sum_of_the_round_differences 红
+x3_round_share_divides_by_the_round_count	differences[position] as f64 / total as f64	differences[position] as f64 / rounds as f64
+# 执行员加（登记之外）：多出的步数为负也算每个额外节点多几步，由 the_steps_per_extra_node_exists_only_for_a_positive_extra_in_steps_and_in_nodes 红
+x4_steps_per_extra_node_allows_a_negative_extra	(extra_steps > 0 && extra_nodes > 0)	(extra_steps != 0 && extra_nodes > 0)

@@ -3,7 +3,7 @@
 # run-condition: command git
 """上一轮及更早的实验记录归档进版本库：删掉工作区里的那批，保留本轮的。
 
-规则见 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」之下那三段：
+规则见 `.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」之下那三段：
 冻结只在本轮内有效；这一轮提交之后，下一次提交把上一次留下的那批删掉；本次的照旧留着，本次的验证照旧做得了；
 要查删掉的那些，去版本库的历史里找。
 
@@ -63,7 +63,7 @@
         scripts/ 与 crates/ 下的 .tsv，钉表、变异表 scripts/mutation/tables/、crates/mutations.tsv 都在里面）。
         .tsv 登记表点名的那几份 --apply 不删、退 3，逐份列出哪张表哪一行；出路是先改登记，或者把那份留下（--keep-registered）。
   报 —— 被检查读的登记表（上面那几张 .tsv，加平铺登记表 .claude/term-rename-exempt 与 .claude/*-exclude：一行「<路径>  # 理由」，# 前面那一段是点名）
-        点名的 research/ 路径，逐条报两种（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」：
+        点名的 research/ 路径，逐条报两种（`.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」：
         删之前查一遍被检查读的登记表点名的路径，点到的不删，或者在同一次提交里改掉那几行登记）：
         ① 已经不在（文件早删了）：dangling_registry_namings 逐条列「表:行  路径」，--check 与 --apply 都判红（退 1）；
         ② 这一趟要删、被平铺登记表点名的：平铺登记表是排除表与豁免表，不保护它点到的产物——它点到的冻结证据删了，那一行就该一起删；
@@ -107,14 +107,14 @@ INPUT_TREES = (".claude/gate.d", ".claude/scripts", "scripts", "crates")
 INPUT_SUFFIX = (".sh", ".py", ".rs", ".toml")
 # 被检查读的登记表：门禁目录（照 .claude/gate-directory 登记，见 registry_trees）与这两处下的 .tsv——钉表、变异表（scripts/mutation/tables/、
 # crates/mutations.tsv）、crate 里的登记表（verus-must-red-worlds.tsv 这类）。删之前查它们非注释行点名的路径
-# （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」：删之前查一遍被检查读的登记表点名的路径）。
+# （`.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」：删之前查一遍被检查读的登记表点名的路径）。
 REGISTRY_TREES_BESIDE_GATE = ("scripts", "crates")
 REGISTRY_SUFFIX = ".tsv"
 REGISTRY_SKIPPED_DIRECTORIES = ("fixtures", "target", ".git")
 # 登记表一格里的产物路径：到空白、引号、括号、冒号（「文件:行号」）、井号、通配符为止；跟着通配符的是射程（e165-*-red-examples.tsv），不是点名，
 # 也不保护它配得到的任何一份（文件头「不认」一段）
 REGISTRY_PATH = re.compile(r"research/(?:results|prompts)/[^\s`'\"<>|()（）\[\]\\,，。、；：:#*?]+")
-# 平铺登记表：一行一条「<路径>[:「行内锚」]  # 理由」，空白加 # 之后是理由、不算点名。门禁 doc-text 的 term-renames 格读的豁免表，
+# 平铺登记表：一行一条「<路径>[:「行内锚」]  # 理由」，空白加 # 之后是理由、不算点名。scripts/kb/sweep-term.py 读的豁免表，
 # 与各道检查从 .claude/*-exclude 读的排除表（门禁 code-source-discipline 的 format-constants 格读 .claude/format-constants-exclude）
 FLAT_REGISTRY_FILES = (".claude/term-rename-exempt",)
 FLAT_REGISTRY_GLOB = ".claude/*-exclude"
@@ -362,7 +362,7 @@ def report_dangling(dangling):
     print("  ✗ 登记表点名的 %d 处路径已经不在（文件早删了，或这一趟刚删），读那张表的检查拿到的是指空的路径：" % len(dangling))
     for entry in dangling:                                         # gate-lint:detail
         print("      %s" % entry)
-    print("     → 怎么办：同一次提交里删掉那几行登记，或把那一格的路径改成仓里在的文件（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」）；")
+    print("     → 怎么办：同一次提交里删掉那几行登记，或把那一格的路径改成仓里在的文件（.claude/rules/evidence-discipline.md「原样保存的证据不许事后改」）；")
     print("               那一格只是记录引用的，改成只留文件名、不带路径（登记表的格子放不下 git show 写法）；读它的检查还要那份文件的，")
     print("               改成读跟着测试放的登记或文件不在报本次未跑（.claude/rules/directory-layout.md），不去把产物找回来。")
 
@@ -390,7 +390,7 @@ def report_flat_named(flat_named, apply_changes):
     print("  ✗ 这一趟%s的 %d 份上一轮产物被平铺登记表点名（排除表、豁免表不保护它点到的产物，删了那一行就指空）：" % (verb, len(flat_named)))
     for relative in sorted(flat_named):                            # gate-lint:detail
         print("        %s  ← %s" % (relative, "、".join(flat_named[relative])))
-    print("     → 怎么办：在归档的同一次提交里删掉那几行登记（.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」：")
+    print("     → 怎么办：在归档的同一次提交里删掉那几行登记（.claude/rules/evidence-discipline.md「原样保存的证据不许事后改」：")
     print("               删之前查一遍被检查读的登记表点名的路径，点到的不删，或者在同一次提交里改掉那几行登记）；那一行豁免的东西没了，留着只会让那道检查红。")
 
 
@@ -539,7 +539,7 @@ def missing_code_inputs(root):
 
 def stale_exclusions(root):
     """删完之后指不到东西的排除项：排除表指向不存在的路径时，那道检查自己会判红
-    （`.claude/singlefs-ai-sop/rules/show-me-test.md`「排除的每一份都要登记」）。
+    （`.claude/rules/show-me-test-by-review.md`「排除的每一份都要登记」）。
     例：归档删掉 research/results/e153-s1-probe-tests/ 之后，naming-lint 整道红。"""
     import glob as _glob
     stale = []

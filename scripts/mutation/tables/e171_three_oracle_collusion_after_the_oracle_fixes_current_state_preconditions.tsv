@@ -3,7 +3,7 @@ R2P-1 S2 两边都缺的件当成相同（第 2 步逐文件比，s2_compare.py�
 R2P-2 S2 impl-verdicts.tsv 不去耗时列（整份比）	        return hashlib.sha256(lines_without_the_last_column(path)).hexdigest()	        return file_sha256(path)
 R2P-3 S2 连流三也比	S2_STREAMS = STREAM_NAMES[:2]	S2_STREAMS = STREAM_NAMES[:3]
 R2P-4 S2 导出目录不在也照比、写产物	    missing = [path for path in (e170_dump, device_baseline) if not os.path.isdir(path)]	    missing = []
-R2P-5 S2 产物已在也照写（不先拒、不退 2）	    if os.path.exists(output):\n        print(f"✗ 产物 {output} 已存在，不覆盖（退 2）", file=sys.stderr)\n        return EXIT_USAGE\n	
+R2P-5 S2 产物已在也照写（不先拒、不退 2）	    if os.path.exists(output):\n        print(f"✗ 产物 {output} 已存在，不覆盖（退 2）", file=sys.stderr)\n        print("  → 怎么办：换一个产物名（日期标签加 -2 这类），或者核过旧的那一份没用了再把它挪走；已有的产物一律不覆盖", file=sys.stderr)\n        return EXIT_USAGE\n	
 R2P-6 S2 不同的件数一律数成 0	    differing = sum(1 for row in rows if not row[4])	    differing = sum(1 for row in rows if row[4] and not row[4])
 R2P-7 冻结树快照是空集照往下判 Z5（逐行编排外层）	    if one.row_driver_module(context).snapshot_digest(tree)[1] == 0:	    if False:
 R2P-8 核 Z5 之前不核树认不认得全	    require_readable_tree(context)\n    ORIGINAL["snapshot_check"](context)	    ORIGINAL["snapshot_check"](context)

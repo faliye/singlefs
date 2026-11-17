@@ -12,11 +12,11 @@
     apply-writer-patch.py --selftest          # APPLY_WRITER_PATCH_BREAK=<项> 时必须判红
 
 补丁目录里的文件（格式由 .claude/agents/implementation-writer.md「产出」一节定）：
-    crates.patch                 `git diff -- crates litmus ':!crates/mutations.tsv'` 的输出；没有代码改动可以没有
+    crates.patch                 `git diff` 的输出，改到的路径不限（实现员的 crates 与 litmus、跟着补丁走的登记表；拒算补丁目录里只有 .claude/gate.d/refused-tests.tsv）；只有 crates/mutations.tsv 不许在里面（变异表走下面三份文件）；没有代码改动可以没有
     mutations-append.tsv         要追加的变异行，每行六段（与 crates/mutations.tsv 同），名字在表里不许已有、在这个文件里也不许出现两次
     mutations-replacements.tsv   要整行换掉的变异行，每行六段，按第一段的名字找表里恰好一行换掉
     mutations-delete.txt         要删的变异名，一行一个，表里要恰好一行
-    result.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的层 0 流与崩溃枚举用例」一节；补丁在产品代码里新加了走不到的断言或未定条款的错误成员的，报告里要有「走不到的理由」一节（文件头「走不到的理由」）
+    result.md                    实现员的报告；补丁动了 crates/singlefs-checker/src/ 的，报告里要有「受影响的流与崩溃枚举用例」一节；补丁在产品代码里新加了走不到的断言或未定条款的错误成员的，报告里要有「走不到的理由」一节（文件头「走不到的理由」）
     baseline/<相对仓根的路径>     可以没有：补丁改的文件补丁前的原样（实现员副本里 `git show :<路径>` 取），只在补丁头 index 行左边那个 blob 不在 --root 的对象库里时读（文件头「三方合并」）
 上面前四份（crates.patch 与三份变异表文件，RECOGNIZED_PATCH_FILES）是它认得的补丁，每一份单独可以没有，可是一份都没有就拒、退 2、一个字不改：目录里有别的 *.patch（例：all.patch，
   改 task-server、scripts 这类 crates 之外的文件的补丁）的点名那几份、写明它们一个字没打，出路是用 git apply <补丁文件> 直接打、回读核过；一样补丁都没有的（空目录、给错了目录、只有
@@ -58,7 +58,7 @@
     注释与字符串、字符字面量里的字不算；#[cfg(test)] 模块、#![cfg(test)] 文件与 #[test]（#[<路径>::test]）函数里的不算。行号是补丁套上之后那份文件里的行。
   报告 result.md 里要有一节标题恰好是「走不到的理由」（任意级别的标题），节里每一处一行「- <仓根起的文件路径>:<行> <理由>」，理由至少 8 个字；列的行号对不上、少列、理由太短，
     都拒并逐处点名「文件:行 种类」与出路。多列的（行号指不到任何一处）不拦。
-  管不到的：理由写得对不对、走不走得到，靠代码轮三方照调用点重推（.claude/rules/implementation-workflow.md「代码轮正文的检查单」）；经三方合并重对过的补丁行号以打之后的文件为准，漂了的在拒绝说明里看新行号。
+  管不到的：理由写得对不对、走不走得到，靠代码轮三方照调用点重推（.claude/skills/three-way/SKILL.md「代码轮正文的检查单」）；经三方合并重对过的补丁行号以打之后的文件为准，漂了的在拒绝说明里看新行号。
 变异锚点静态核（--dry-run，拆分提案第六十二节 ②：补丁改写的代码弄断别批变异行的锚点，到合入验证才看见）：核完补丁与变异表之后，把 --root 那棵树的拷贝范围
   （scripts/hosts/lib_repository_copy.py 的 copy_closure，带测试代码扫：共用清单 crates/、Cargo.toml、Cargo.lock、.cargo/ 加 path 依赖指到的目录（例：验证包
   依赖的仓根 prune-server/）、编译期与运行期读的仓根文件连同它们 source、起的；另声明 litmus/：变异行可以锚在它下面；闭包算不成的按判不了拒）
@@ -134,8 +134,9 @@ singlefs-crash-point-replay-logs/*/all-green 最新的那一份；用例一级�
       「✗ 自检：baseline/ 里那一份的哈希对不上补丁头时应当当基线取不到、退 2、一个字不改」、
       「✗ 自检：补丁头点到的基线套不上补丁时应当当基线取不到、退 2、一个字不改」、
       「✗ 自检：带改名段的补丁上下文漂了时应当退 2、写明三方合并只认文本文件的改、增、删、一个字不改」
-  APPLY_WRITER_PATCH_BREAK=checker-section-ignored  plan() 不看动了 checker 的补丁报告里有没有「受影响的层 0 流与崩溃枚举用例」一节
-      checker（「✗ 自检：动 checker 而报告没那一节应当拒绝」）
+  APPLY_WRITER_PATCH_BREAK=checker-section-ignored  plan() 不看动了 checker 的补丁报告里有没有「受影响的流与崩溃枚举用例」一节
+      checker（「✗ 自检：动 checker 而报告没那一节应当拒绝」）、
+      checker-code-named-section（「✗ 自检：动 checker 而报告写的是带代号的节名，应当拒绝」）
   APPLY_WRITER_PATCH_BREAK=unreachable-section-ignored  plan() 不核走不到的理由那一节
       unreachable-unlisted（「✗ 自检：新加 unreachable! 而 result.md 没有「走不到的理由」一节应当拒绝并点名 文件:行」）、
       unreachable-short-reason（「✗ 自检：走不到的理由写得不足 8 个字应当拒绝」）、
@@ -269,7 +270,7 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("APPLY_WRITER_PATCH_BREAK", "")
 CRASH_VERIFY_HINT_PATCHES = int(os.environ.get("CRASH_VERIFY_HINT_PATCHES", "5"))   # 推的，没量过
-CHECKER_SECTION = "受影响的层 0 流与崩溃枚举用例"
+CHECKER_SECTION = "受影响的流与崩溃枚举用例"
 UNREACHABLE_SECTION = "走不到的理由"   # result.md 里逐处列新加的走不到的断言与未定条款的错误成员的那一节的标题（文件头「走不到的理由」）
 UNREACHABLE_ROW = re.compile(r"^\s*(?:[-*]\s+)?`?(crates/\S+?\.rs):(\d+)`?\s+(\S.*?)\s*$")   # 那一节的一行：- <文件>:<行> <理由>
 UNREACHABLE_MINIMUM_REASON_CHARACTERS = 8
@@ -394,7 +395,7 @@ def snapshot_refusal_remedy(conflicts):
     """拒绝说明里「→ 怎么办」那一行：出路只有等判决写完、用户已叫停的轮登记叫停表两条（文件头「开工快照」；没有单次放行的口子）。"""
     round_names = "、".join(round_name for round_name, _, _ in conflicts)
     return (f"→ 怎么办：等 {round_names} 的判决写完再打，或把这几处改动并进判决；用户已叫停、不会写判决的轮，在 research/prompts/abandoned-rounds.tsv 登记一行收掉它"
-            "（轮名、日期、为什么撂下、去向与出处，写法照 .claude/rules/three-way-inference.md「多轮：一次打穿不算数，三轮里多数打穿才算」，"
+            "（轮名、日期、为什么撂下、去向与出处，写法照 .claude/skills/three-way/SKILL.md「用户叫停、不写判决的轮」，"
             "与派发闸 ⑥、门禁 doc-process-records 的 abandoned-rounds 格同一份判法），之后这一轮的快照不再挡；没有单次放过的口子")
 
 
@@ -1162,13 +1163,15 @@ def plan_with_three_way(patch_directory, root):
         if any(path.startswith("crates/singlefs-checker/src/") for path in touched) and CHECKER_SECTION not in report and BROKEN != "checker-section-ignored":
             problems.append(f"补丁动了 crates/singlefs-checker/src/，result.md 里却没有「{CHECKER_SECTION}」一节")
         checked = git(root, "apply", "--check", patch)
+        applies = checked.returncode == 0
         if checked.returncode != 0 and BROKEN == "three-way-skipped":
             problems.append(f"git apply --check 不过：{checked.stderr.strip()[:300]}")
         elif checked.returncode != 0 and BROKEN != "apply-unchecked":
             three_way = three_way_merge(patch, patch_directory, root, checked.stderr)
             problems += three_way.problems
             patch = three_way.patch if not three_way.problems else patch
-        if not problems:
+            applies = not three_way.problems
+        if applies:
             problems += unreachable_problems(root, patch, report)
     table_path = os.path.join(root, "crates", "mutations.tsv")
     if not os.path.isfile(table_path):
@@ -2333,8 +2336,17 @@ def selftest():
             failures.append(f"好的补丁应当打上、按名字合表，实际 {code} {lines} {table!r}")
         checker = patch_directory("checker", ("crates/singlefs-checker/src/lib.rs", "fn check() { assert!(true); }\n"), report="只改了判定\n")
         code, lines = apply(checker, root, False, gate33)
-        if code != 2 or not any("受影响的层 0 流" in line for line in lines):
+        if code != 2 or not any(CHECKER_SECTION in line for line in lines):
             failures.append(f"动 checker 而报告没那一节应当拒绝，实际 {code} {lines}")
+        # 节名只认 CHECKER_SECTION：带代号的写法拒（样本拼着写，全仓按那个名字搜不到这里），去掉代号的写法放行（只核报告节名这一项，别的问题不管）
+        checker_source = ("crates/singlefs-checker/src/lib.rs", "fn check() { let _ = 1; }\n")
+        for name, section, refused_wanted in (
+                ("checker-code-named-section", "## 受影响的" + "层 0 " + "流与崩溃枚举用例\n\n- 没有\n", True),
+                ("checker-section", f"## {CHECKER_SECTION}\n\n- 没有\n", False)):
+            found = plan(patch_directory(name, checker_source, report=section), root)[0]
+            refused = any(f"「{CHECKER_SECTION}」一节" in problem for problem in found)
+            if refused != refused_wanted:
+                failures.append(f"动 checker 而报告写的是{'带代号的节名，应当拒绝' if refused_wanted else '「' + CHECKER_SECTION + '」，应当放行'}，实际 {found}")
         # 走不到的理由（文件头「走不到的理由」）：自己的临时仓，补丁用 plan() 核（不打）；仓里一份产品代码、一份验证包的 src
         unreachable_root = os.path.join(work, "unreachable-repo")
         for relative in ("crates/demo/src/lib.rs", "crates/singlefs-verification/src/lib.rs"):

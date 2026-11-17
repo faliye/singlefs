@@ -11,7 +11,7 @@ M9_丙0删463那一判	if record.txg != previous_record.txg {	if record.txg != p
 M10_严格连续改成jsn大于期望也接	if record.jsn != expected_jsn {	if record.jsn < expected_jsn {
 M11_丙0删484那一判	if record.ends_its_publish && readable_record_of_the_same_publish_follows(records_by_jsn, index) {	if record.ends_its_publish && readable_record_of_the_same_publish_follows(records_by_jsn, index) && false {
 M12_丙0删493那一判	if !named_units_verified(record) {	if !named_units_verified(record) && false {
-M13_丙3的模式P改成段里两个或更多残缺事务	let judged_corrupt = incomplete_a_followed_by_complete_b_in(&strict_segment);	let judged_corrupt = two_or_more_incomplete_transactions_in(&strict_segment);
+M13_丙3的模式P改成段里两个或更多残缺事务	let judged_corrupt = incomplete_transaction_followed_by_complete_transaction_in(&strict_segment);	let judged_corrupt = two_or_more_incomplete_transactions_in(&strict_segment);
 M14_多飞根序去掉F与C的次序约束	if rules.roots_in_txg_order && publish_position > 0 {	if rules.roots_in_txg_order && publish_position > 0 && false {
 M15_fsync返回去掉条件2	if blocked {	if blocked && false {
 第二段补_按配置去重的返回去掉条件2	if !self.is_appended(earlier, configuration) {	if false {

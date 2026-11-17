@@ -19,6 +19,8 @@
 定义的 required-inputs 每组一行、实现员的「要动的 crates 文件」、写回员的「规格检查已判」、执行员的「这一段回答的岔路」、每种类型的「批次」一行。
 「批次：」一行派发闸 ⑱ 判形如 records/<文件>.md#<批号>、文件在本仓或登记的工作树里，十种类型缺这一行拒（判法只在派发闸文件头 ⑱ 条）。
 「自证在哪跑」一行派发闸不单判，没填时按占位拒。
+实现员、工具员的骨架在「不碰：」后面带两行：「承接：<填 …>」（接手前一个写者已交回的副本时写它的报告路径）和「写者锁已判：<填 …>」（承接的报告或副本在别的草稿目录、
+那里的写者锁还在已交回的写者手里时写理由；派发闸 ⑯ 在这种提示里没有这一行就拒，说明里给现算好的整行，判法只在派发闸文件头 ⑯ 条）。没有接手别的写者的副本，两行都删。
 类型在写范围表（.claude/hooks/agent-write-scope.tsv，读法 lib_write_scope.py 的 load_scopes，这里不另抄）里有行的，骨架在类型专属的几行后面、「## 关的是哪几条」前面打一行「写范围：<表里这个类型的路径模式，用「、」隔开>」
 （clerk 列 records/**、research/prompts/**、research/results/** 与 $SINGLEFS_WORK_ROOT/**，不列 .claude/kb/）：主 agent 填「要改的文件」「报告」时对着它写，派发闸 ④ 就不会拒「提示要子 agent 写进写范围之外的路径」。
 表里没有行的类型、没有这张表的仓（自检的样本仓）不打这一行；--set 写范围=… 可以改写这一行。
@@ -144,6 +146,8 @@
       「✗ 自检：tooling-writer 的骨架填完，--check 应当退 0，实际」
       「✗ 自检：工具员骨架填完、另加撤掉的线程上限与长活几行，--check 应当退 0（派发闸不再判这几行），实际」
       「✗ 自检：骨架里要临时服务的自证那一行点名了登记的脚本、拼了整条包装写法，填完过派发闸 --check 应当退 0，实际」
+  DISPATCH_PROMPT_BREAK=writer-lock-line-dropped  skeleton() 不给实现员、工具员在「承接：<填 …>」后面打「写者锁已判：<填 …>」一行
+      「✗ 自检：实现员与工具员的骨架应当在「承接：<填 …>」后面紧跟一行「写者锁已判：<填 …>」（implementation-writer）」；「✗ 自检：实现员与工具员的骨架应当在「承接：<填 …>」后面紧跟一行「写者锁已判：<填 …>」（tooling-writer）」
   DISPATCH_PROMPT_BREAK=scope-line-omitted  skeleton() 不打「写范围：…」一行（拆分提案第一百六十一节骨架那一半：按类型从写范围表取模式，主 agent 填要改的文件与报告时对着它写）
       「✗ 自检：写范围一行：clerk 的骨架应当有一行「写范围：」列 records/**、research/prompts/**、research/results/** 与 $SINGLEFS_WORK_ROOT/**、不列 .claude/kb/，实际」
       「✗ 自检：写范围一行：kb-scribe 的骨架应当有一行「写范围：」列 .claude/kb/**、不列 records/，实际」
@@ -276,10 +280,16 @@ RETIRED_LINES_BEFORE = ["线程上限：<填 登记的每台默认重活线程�
 # 常设要求 D3（实现员、工具员：这一轮别的会话在改、这一件不碰的文件）与 B8（执行员续做：上一段的报告），派发闸 ⑱ ⑪ 核这两行（拆分提案第一百二十二节 ⑨）
 UNTOUCHED_LINE = "不碰：<填 这一轮别的会话在改、这一件不碰的文件，逐个列；没有写「无」>"
 HANDOVER_LINE = "承接：<填 续做时写上一段执行员的报告路径（派发闸核它在）；第一段删掉这一行>"
+# 实现员、工具员接手前一个写者已交回的副本：「承接：」点名的报告或「副本：」行点名的副本在别的草稿目录里时，那里的写者锁还在前一个写者手里，
+# 派发闸 ⑯ 要提示里有一行「写者锁已判：<理由>」才接手这些锁（拒绝说明给整行写法），不写新写者写那份副本被写闸拒。占位里不写尖括号：占位认法到第一个右尖括号为止
+WRITER_HANDOVER_LINE = "承接：<填 接手前一个实现员或工具员已交回的副本时写它的报告路径；第一次派发删掉这一行>"
+WRITER_LOCK_VALVE_LINE = ("写者锁已判：<填 承接的报告或副本在别的草稿目录、那里的写者锁还在已交回的写者手里时，写「目录 的写者锁在已交回或已停的 持锁者 手里，本次承接它的副本，接手这些锁」"
+                          "（派发闸拒绝时说明里有现算好的整行，原样放进来）；持锁的还在跑就等它交回、不写；没有承接别的写者的副本，删掉这一行>")
+WRITER_HANDOVER_LINES = [WRITER_HANDOVER_LINE] + ([] if BROKEN == "writer-lock-line-dropped" else [WRITER_LOCK_VALVE_LINE])
 ADDRESSED_SECTION_TITLE = "## 关的是哪几条"   # 常设要求 A5：派发闸 ⑱ 核这一节在、节下不空
 EXTRA_LINES = {
-    "implementation-writer": ["要动的 crates 文件：<填 从仓根起逐个列全，不与在跑的实现员撞>"] + ([] if BROKEN == "untouched-line-dropped" else [UNTOUCHED_LINE]),
-    "tooling-writer": [] if BROKEN == "untouched-line-dropped" else [UNTOUCHED_LINE],
+    "implementation-writer": ["要动的 crates 文件：<填 从仓根起逐个列全，不与在跑的实现员撞>"] + ([] if BROKEN == "untouched-line-dropped" else [UNTOUCHED_LINE]) + WRITER_HANDOVER_LINES,
+    "tooling-writer": ([] if BROKEN == "untouched-line-dropped" else [UNTOUCHED_LINE]) + WRITER_HANDOVER_LINES,
     "kb-scribe": ["规格检查已判：写回员自己起草并跑 kb-spec-check.py"],
     "experiment-runner": ["这一段回答的岔路：<填 岔路单里的哪几行>", "上一段岔路表里还差：<填 续做时写还差的行；第一段删掉这一行>",
                           *([] if BROKEN == "handover-line-dropped" else [HANDOVER_LINE])],
@@ -832,6 +842,19 @@ def selftest():
         checked += 1
         if "不碰：" in skeleton("kb-scribe", agents, {}, None):
             failures.append("不是实现员、工具员的类型（kb-scribe）骨架不该带「不碰：」一行")
+        # 实现员、工具员接手别的写者的副本：「承接：<填 …>」一行后紧跟一行「写者锁已判：<填 …>」（占位里有怎么填的一句），别的类型两行都不带；开关 writer-lock-line-dropped 下前两格红
+        for handover_type in ("implementation-writer", "tooling-writer"):
+            checked += 1
+            handover_lines = skeleton(handover_type, agents, {}, None).split("\n")
+            handover_at = next((index for index, line in enumerate(handover_lines) if line == WRITER_HANDOVER_LINE), None)
+            if handover_at is None or handover_lines[handover_at + 1:handover_at + 2] != [WRITER_LOCK_VALVE_LINE]:
+                failures.append(f"实现员与工具员的骨架应当在「承接：<填 …>」后面紧跟一行「写者锁已判：<填 …>」（{handover_type}）：\n" + "\n".join(handover_lines))
+        checked += 1
+        if "写者锁已判：" in skeleton("kb-scribe", agents, {}, None) or "承接：" in skeleton("kb-scribe", agents, {}, None):
+            failures.append("不是实现员、工具员、执行员的类型（kb-scribe）骨架不该带「承接：」「写者锁已判：」两行")
+        checked += 1
+        if not PLACEHOLDER.search(WRITER_LOCK_VALVE_LINE) or PLACEHOLDER.sub("", WRITER_LOCK_VALVE_LINE) != "写者锁已判：":
+            failures.append("「写者锁已判：<填 …>」一行的占位应当整段被占位认法吃掉（占位里不能有右尖括号）：" + WRITER_LOCK_VALVE_LINE)
         runner_lines = skeleton("experiment-runner", agents, {}, None).split("\n")
         checked += 1
         remaining_at = next((index for index, line in enumerate(runner_lines) if line.startswith("上一段岔路表里还差：")), None)

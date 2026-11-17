@@ -1,0 +1,61 @@
+m1_measured_total_is_the_knob	    operation.allocation_records.map(|records| records as f64)	    Some(operation.knob as f64)
+m2_looser_when_the_units_are_equal	    let looser = low.1 != high.1;	    let looser = low.1 == high.1;
+m3_denominator_is_the_releases	fn denominator(operation: &Operation) -> Option<u64> {\n    operation.user_units	fn denominator(operation: &Operation) -> Option<u64> {\n    Some(operation.releases)
+m4_grows_edge_exclusive	    if growth >= BAND_GROWS_AT_LEAST {	    if growth > BAND_GROWS_AT_LEAST {
+m5_scan_control_coefficient_zero	const SCAN_EVERY_PUBLISH_STEPS_PER_RECORD: u64 = 1;	const SCAN_EVERY_PUBLISH_STEPS_PER_RECORD: u64 = 0;
+m6_linear_control_keeps_the_lg_price	            Some(steps.checked_sub(lg_part)? + linear_part)	            Some(steps.checked_sub(lg_part)? + lg_part)
+m7_linear_control_takes_the_smallest_row	        Some((_, best_total)) if best_total >= *total => best,	        Some((_, best_total)) if best_total <= *total => best,
+m8_spike_line_without_the_floor	    SPIKE_FLOOR.max(SPIKE_MULTIPLE * lower_median(final_nodes))	    SPIKE_MULTIPLE * lower_median(final_nodes)
+m9_spike_line_on_the_mean	    SPIKE_FLOOR.max(SPIKE_MULTIPLE * lower_median(final_nodes))	    SPIKE_FLOOR.max(SPIKE_MULTIPLE * (final_nodes.iter().sum::<u64>() as f64 / final_nodes.len().max(1) as f64).round() as u64)
+m10_first_is_the_largest	        Pick::First => series.first().copied(),	        Pick::First => series.iter().copied().max_by_key(|(_, steps)| *steps),
+m11_steady_keeps_the_flagged	    !(steady && operation.flagged)	    !(steady && !operation.flagged)
+m12_h1_share_ninety_percent	const RELEASE_CHAIN_PULLED_SHARE_AT_LEAST: f64 = 0.8;	const RELEASE_CHAIN_PULLED_SHARE_AT_LEAST: f64 = 0.9;
+m15_local_slopes_end_to_end	    points.windows(2).map(|pair| positive_alpha(pair[0].0, pair[1].0, pair[0].1, pair[1].1)).collect()	    points.windows(2).map(|_| positive_alpha(points[0].0, points[points.len() - 1].0, points[0].1, points[points.len() - 1].1)).collect()
+m16_big_points_void_with_the_new_points	fn void_segment(segment: &'static str) -> &'static str {\n    segment\n}	fn void_segment(segment: &'static str) -> &'static str {\n    if segment == "big" { "new" } else { segment }\n}
+operation_steps_keep_the_last_settle_only	        operation.steps = operation.steps.zip(by_delta_of_settle(item, settle)).map(|(sum, steps)| sum + steps);	        operation.steps = operation.steps.zip(by_delta_of_settle(item, settle)).map(|(_, steps)| steps);
+declared_units_ignored	        let units = if item.declared.is_empty() {	        let units = if true {
+d100_set_takes_another_high_point	name: "D100", points: &["files_100_units_100", "files_100_units_1000"]	name: "D100", points: &["files_100_units_100", "files_1000_units_100"]
+q3_drops_the_d10_set	    ("per_unit_steps_as_the_change_grows", "q3", "user_units_equal_declared", &["D100", "D10"]),	    ("per_unit_steps_as_the_change_grows", "q3", "user_units_equal_declared", &["D100"]),
+controls_skip_the_steady_filter	.filter(|operation| in_the_tier(operation, tier, point.item.units_per_small_file) && kept_for_the_filter(operation, steady))	.filter(|operation| in_the_tier(operation, tier, point.item.units_per_small_file) && (arm != Arm::Tested || kept_for_the_filter(operation, steady)))
+four_times_control_coefficient_three	const SCAN_EVERY_PUBLISH_FOUR_TIMES_STEPS_PER_RECORD: u64 = 4;	const SCAN_EVERY_PUBLISH_FOUR_TIMES_STEPS_PER_RECORD: u64 = 3;
+negative_control_limit_exclusive	negative_rounds.is_none_or(|rounds| rounds <= NEGATIVE_CONTROL_ROUNDS_AT_MOST)	negative_rounds.is_none_or(|rounds| rounds < NEGATIVE_CONTROL_ROUNDS_AT_MOST)
+controls_red_without_the_linear_control	cell.outcome.band_of(Arm::ScanEveryPublish) == Some(Band::Grows) && cell.outcome.band_of(Arm::LargestLgRowLinear) == Some(Band::Grows)	cell.outcome.band_of(Arm::ScanEveryPublish) == Some(Band::Grows)
+t1e5_per_unit_reads_the_raw_steps	positive_alpha(low.0 as f64 / low.1 as f64, high.0 as f64 / high.1 as f64, low.1 as f64, high.1 as f64),	positive_alpha(low.0 as f64, high.0 as f64, low.1 as f64, high.1 as f64),
+retro_first_cold_takes_the_second_overwrite	operation.state == "same_mount" && operation.operation_name == "W2" && operation.operation_index == 1)?;	operation.state == "same_mount" && operation.operation_name == "W2" && operation.operation_index == 2)?;
+applicable_counts_every_cell	if matches!(cell.outcome.band_of(Arm::Tested), Some(Band::DoesNotGrow | Band::Between)) {	if true {
+q6_peak_at_the_smallest	.filter_map(|operation| operation.steps.map(|steps| (steps, *operation))).max_by_key(|(steps, _)| *steps);	.filter_map(|operation| operation.steps.map(|steps| (steps, *operation))).min_by_key(|(steps, _)| *steps);
+spike_flag_strictly_above_the_line	operation.flagged = operation.final_nodes >= line;	operation.flagged = operation.final_nodes > line;
+q8_h2_condition_flipped	} else if [cold, create, young].iter().all(|pair| *pair == (true, false)) {	} else if [cold, create, young].iter().all(|pair| *pair == (false, true)) {
+q9_ratio_inverted	let ratio = steps as f64 / base as f64;	let ratio = base as f64 / steps as f64;
+declared_line_not_read	"declared" => item.declared.push((	"declared_line" => item.declared.push((
+leaf_slots_off_by_one	const LEAF_SLOTS: u64 = 812;	const LEAF_SLOTS: u64 = 813;
+rewrite_set_growth_counted_as_shrinking	if round.rewrite_set_size < size_before {	if round.rewrite_set_size > size_before {
+settled_round_dirt_ignored	round.release_dirty_new + round.placement_dirty_new != 0 || round.holding_differs	round.holding_differs
+old_criterion_low_end_with_a_decimal	values[0].map_or("unread".to_string(), |value| format!("{value:.0}")),	values[0].map_or("unread".to_string(), |value| format!("{value:.1}")),
+reconciliation_ignores_the_final_set	(settle.rounds, settle.final_roles, settle.final_nodes, settle.round_work, settle.final_set_hash.clone())	(settle.rounds, settle.final_roles, settle.final_nodes, settle.round_work, String::new())
+spike_pin_final_nodes_off_by_one	("final_nodes", 433)	("final_nodes", 434)
+declared_to_mapped_lower_bound_raised	const DECLARED_TO_MAPPED_AT_LEAST: f64 = 0.5;	const DECLARED_TO_MAPPED_AT_LEAST: f64 = 1.5;
+first_touches_need_six	const FIRST_TOUCHES_AT_LEAST: usize = 5;	const FIRST_TOUCHES_AT_LEAST: usize = 6;
+plain_image_reads_the_counted_build_twice	let plain = points.get(&format!("{name}__plain"))	let plain = points.get(name)
+big_point_upper_bound_tighter	("files_1000_units_1000", 1_000_000, 1_050_000),	("files_1000_units_1000", 1_000_000, 1_010_000),
+f3_raw_edge_at_the_flat_edge	raw.is_some_and(|raw| raw >= BAND_GROWS_AT_LEAST)	raw.is_some_and(|raw| raw >= BAND_DOES_NOT_GROW_AT_MOST)
+rounds_at_the_limit_exclusive	settle.rounds >= SETTLING_ROUNDS_LIMIT	settle.rounds > SETTLING_ROUNDS_LIMIT
+declared_lines_always_match	        declared_count == operations,	        true,
+lower_pair_reads_the_low_end_twice	ends[0].zip(ends[1]).and_then(|(low, middle)| two_point_reading(low.0, middle.0).alpha);	ends[0].zip(ends[1]).and_then(|(low, _)| two_point_reading(low.0, low.0).alpha);
+window_shape_without_the_probe_prefix	    if state == "same_mount" && probe != "standard" {	    if false {
+window_shape_extended_in_both_states	    if state == "same_mount" && EXTENDED_WINDOW_POINTS.contains(&point) {	    if EXTENDED_WINDOW_POINTS.contains(&point) {
+round_work_against_the_largest_round	        .filter(|settle| !settle.detail.is_empty() && settle.detail.iter().map(|round| round.roles_rewritten).sum::<u64>() != settle.round_work)	        .filter(|settle| !settle.detail.is_empty() && settle.detail.iter().map(|round| round.roles_rewritten).max().unwrap_or(0) != settle.round_work)
+e206_lines_read_with_the_e207_keys	    if line.starts_with("E206RESULT ") {	    if line.starts_with("E207RESULT ") {
+pooled_fallback_operation_is_never_marked	            if operation.pooled_fallback_calls > 0 {\n                marked += 1;	            if operation.pooled_fallback_calls > 99 {\n                marked += 1;
+pooled_fallback_calls_of_an_operation_are_not_summed	            operation.pooled_fallback_calls += calls;	            operation.pooled_fallback_calls += 0;
+frozen_publish_point_is_kept	                    voided.insert(name.clone());	                    let _ = &voided;
+pooled_fallback_forgets_the_per_disk_fallback_steps	        per_disk_fallback_steps += judgement.row_steps.get(&key("fallback_slot_linear_scan")).copied().unwrap_or(0);	        per_disk_fallback_steps += 0;
+voided_point_stays_in_the_reported_quantities	    points.retain(|name, _| !voided.contains(name));\n    report_missing_the_pooled_fallback_row(&points, out);	    points.retain(|_, _| true);\n    report_missing_the_pooled_fallback_row(&points, out);
+ols_slope_replaced_by_the_end_to_end_slope	    let beta = least_squares_slope(points);	    let beta = positive_alpha(points[0].0, points[points.len() - 1].0, points[0].1, points[points.len() - 1].1);
+stable_between_allows_one_grows_adjacent	    } else if beta > BAND_DOES_NOT_GROW_AT_MOST && beta < BAND_GROWS_AT_LEAST && grows == 0 && does_not_grow == 0 {	    } else if beta > BAND_DOES_NOT_GROW_AT_MOST && beta < BAND_GROWS_AT_LEAST && grows <= 1 && does_not_grow == 0 {
+common_window_keeps_the_extended_operations	        .filter(|operation| !common || COMMON_WINDOW_OPERATIONS.contains(&operation.operation_name.as_str()))	        .filter(|_operation| !common || true)
+control_gate_ignored	    scan_beta.zip(linear_beta).is_some_and(|(scan, linear)| scan >= SERIES_CONTROL_BETA_AT_LEAST && linear >= SERIES_CONTROL_BETA_AT_LEAST)	    scan_beta.zip(linear_beta).is_some_and(|(scan, linear)| scan >= f64::MIN && linear >= f64::MIN)
+t_sign_ignores_the_same_mount_control	            .map(|(rows, base_differs)| rows.differing_operations > 0 && rows.same_mount_differing_operations == 0 && !base_differs);	            .map(|(rows, base_differs)| rows.differing_operations > 0 && !base_differs);
+placement_gap_counts_positive_as_negative	        negative: rows.iter().filter(|(_, (changed, placed))| placed < changed).count(),	        negative: rows.iter().filter(|(_, (changed, placed))| placed != changed).count(),
+rerun_compares_four_fields_only	                (settle.rounds, settle.final_roles, settle.final_nodes, settle.round_work, settle.final_set_hash.clone(), settle.previous_records),	                (settle.rounds, settle.final_roles, settle.final_nodes, settle.round_work, String::new(), settle.previous_records),
+outcome_precedence_swapped	    if counting && !facts.signature_of_a_changed_tree {	    if counting {

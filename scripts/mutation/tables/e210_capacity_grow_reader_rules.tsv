@@ -1,0 +1,23 @@
+甲取最大	let table_in_force = componentwise_minimum(&valid_tables);	let table_in_force = componentwise_maximum(&valid_tables);
+乙取最小	let table_in_force = componentwise_maximum(&valid_tables);	let table_in_force = componentwise_minimum(&valid_tables);
+丙不看标记	if marked_tables.is_empty() {	if true || marked_tables.is_empty() {
+丙取旧表取最大	componentwise_minimum(&marked_tables)	componentwise_maximum(&marked_tables)
+丁比较用最小	let comparison_table = componentwise_maximum(&valid_tables);	let comparison_table = lowest_table;
+丁放弃不核下界	let may_abandon = tables_differ && probe_reaches_lowest_table;	let may_abandon = tables_differ && (probe_reaches_lowest_table || true);
+越界取等	exceeds[disk] = landing[disk] > probe_sizes[disk];	exceeds[disk] = landing[disk] >= probe_sizes[disk];
+探测比较取等	named[disk] = probe_sizes[disk] < comparison_table[disk];	named[disk] = probe_sizes[disk] <= comparison_table[disk];
+去掉两轮之间的屏障	steps.push(PlanStep::PoolBarrier);	if steps.len() == 1 + DISK_COUNT * round_contents.len() { steps.push(PlanStep::PoolBarrier); }
+世代号不加一	let generation = newest_generation + 1;	let generation = newest_generation;
+撕裂当没持久	board[disk][slot_index] = Slot::Unreadable	board[disk][slot_index] = board[disk][slot_index]
+放行一切臂点名	ControlReader::AllowEverything => Decision {\n            writable_mount_made: true,\n            read_only_mount_made: true,\n            named_by_read_only: NOBODY_NAMED,	ControlReader::AllowEverything => Decision {\n            writable_mount_made: true,\n            read_only_mount_made: true,\n            named_by_read_only: standard_outcome(componentwise_maximum(&valid_tables_of(&observation.board)), observation.probe_sizes).named_by_read_only,
+一律拒臂放行	ControlReader::RejectEveryWritableMount => Decision {\n            writable_mount_made: false,	ControlReader::RejectEveryWritableMount => Decision {\n            writable_mount_made: true,
+判官取自身越界	let necessarily_named = set.class_union_of(observation);	let necessarily_named = { let _ = set.class_union_of(observation); beyond_the_end(observation.landing, observation.probe_sizes) };
+可避免用自身越界	let named_by_the_whole_class = set.class_union_of(observation);	let named_by_the_whole_class = { let _ = set.class_union_of(observation); own_beyond_the_end };
+丙去掉标记轮	acquisition_write_plan(true, ACQUISITION_WRITE_ROUNDS)	acquisition_write_plan(false, ACQUISITION_WRITE_ROUNDS)
+乙逐盘贪心	best_total_split(old_records, new_probe)	greedy_split(old_records, new_probe)
+层级判取严	if cells_needed <= ALLOCATION_RECORD_TREE_INTERNAL_FANOUT {	if cells_needed < ALLOCATION_RECORD_TREE_INTERNAL_FANOUT {
+层级跨度错一层	slots.div_ceil(span_in_slots(level - 1))	slots.div_ceil(span_in_slots(level))
+屏障口径不看有写	if writes_since_the_last_barrier > 0 {	if writes_since_the_last_barrier > 0 || true {
+对照只跑第一条臂	let arms_under_control: &[Arm] = &ARMS;	let arms_under_control: &[Arm] = &ARMS[..1];
+甲不判成链	if !tables_form_a_chain(&valid_tables) {	if !tables_form_a_chain(&valid_tables) && false {
+基线臂不判全等	if !all_tables_equal(&valid_tables) {	if !all_tables_equal(&valid_tables) && false {

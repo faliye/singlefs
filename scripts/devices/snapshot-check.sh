@@ -6,7 +6,7 @@
 #   snapshot-check.sh <轮名> [--root 仓根]    # 读 research/prompts/<轮名>-snapshot/ 下每份 *sha256*.txt，逐行 sha256sum -c，对不上的再比 HEAD
 #   snapshot-check.sh --selftest             # 造一个小仓走三条路；SNAPSHOT_CHECK_BREAK=ignore-mismatch 时必须判红
 #
-# 为什么：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」要主 agent 写判决前拿快照 sha256sum -c 一遍，对不上的倒推；
+# 为什么：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」要主 agent 写判决前拿快照 sha256sum -c 一遍，对不上的倒推（倒推的做法在 .claude/skills/three-way/SKILL.md 同名节）；
 # 这类核对手敲 grep / sha256sum 要敲很多次，每次都在大上下文里。这一条命令把它做完，判决里抄它的输出。
 # 输出每行一个文件：一致 / 工作区改了（HEAD 与快照一致，是别的会话未提交的改动）/ 提交改了（HEAD 也不是快照那一版）/
 # HEAD 里没有这份文件（`git cat-file -e HEAD:<路径>` 不过：快照时是未跟踪或没提交的，按工作区那一份核）/ 文件不在（工作区里没有）。

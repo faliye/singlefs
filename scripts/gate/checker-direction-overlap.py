@@ -11,12 +11,11 @@
 
 做法：
   调用图取 scripts/gate/lib_function_units.py 的 Rust 闭包（RustWorkspace、parse_entry、find_entry、rust_closure_of；闭包规则在它文件头），
-  不另写解析器。两个方向的入口、切点、局部绑定与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv（写法在它文件头）。
+  不另写解析器。两个方向的入口、切点与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv（写法在它文件头）。
   ① 扫描式方向的闭包是各 scan-entry 单元闭包的并。
   ② 遍历式方向的闭包是各 traversal-entry 单元闭包的并；收之前把 traversal-cut 登记的（单元, 名字）从那个单元的引用里摘掉
      （编排函数一次跑两个方向、又调比对点：这几处调扫描式方向与比对点不算遍历式在调）。摘的只是那一个单元里的那个名字，
-     遍历式别的单元点到同一个名字照连。local-binding 登记的（单元, 名字）两个方向都摘：那个名字在那个单元里是 let 绑定的局部量，
-     库按名字把它连到了同名函数。
+     遍历式别的单元点到同一个名字照连。函数里 let 绑定的局部量与同名函数不连，由库判（lib_function_units.py 文件头「局部 let 与参数绑定遮住的名字」），这里不另登记。
   比对点（comparison，今天是 I-1.13（扫描重建与遍历方向的索引相同） 那一格）拿两个方向的结果比，不属哪一个方向：编排函数调它那一处照 traversal-cut 切掉，
      它调两个方向的那几处（名字是某个 traversal-entry 或 scan-entry 单元的名字）自动摘掉，再收它自己的闭包；比对点那一侧要的遍历式读法
      （读出最新根的三张表）登记成 traversal-entry。比对点自己的闭包不判，逐个列出与扫描式共用的、只在比对点里的函数单元（与遍历式共用的只报个数）。
@@ -31,11 +30,11 @@
      别的（struct、enum、union、type、trait 头、impl 头、use、mod、mod_head、extern_crate、doctest、数据单元）  不判：不是被调用的函数，只报个数
   取不到调用图（判红）：登记表不在或读不出、哪一个方向一个入口都没有、入口找不到或命中不止一个、库报算不出、闭包里有拒算行（认不出的写法）。
   登记表核法（判红）：四列、角色认得、理由至少 8 个字、同一行不登两次；traversal-cut 的名字要是某个 scan-entry 或 comparison 单元的名字、
-  那个单元里真点到它、那个单元在遍历式方向的闭包里；comparison 单元至少被一行 traversal-cut 切到；local-binding 的单元里要有 let [mut] <名字>；
+  那个单元里真点到它、那个单元在遍历式方向的闭包里；comparison 单元至少被一行 traversal-cut 切到；
   shared-format 只许登 crates/singlefs-checker/src/lib.rs 里的单元；reporting-channel 只许登 crates/singlefs-checker/src/image.rs 里
   `impl Judgements`（自身 impl，不是 trait impl）的方法；每一行的单元都要在。
 管不到的：数据流（遍历式读出的实例表行经 PublishedPredicate 交给扫描式用，是传值不是调用，这里看不见，交集里只见得到 InstanceTableRow 这个类型）；
-  库按名字连边的过近似（同名方法、同名局部量连上就算调用；误连的照 local-binding 登记）；trait 对象背后的实现落在 crate 外的（读盘接口的实现在 harness 里）。
+  库按名字连边的过近似（同名方法连上就算调用）；trait 对象背后的实现落在 crate 外的（读盘接口的实现在 harness 里）。
 
 用法：
   checker-direction-overlap.py check [根] [--show-all]   判；--show-all 另把交集里的常量、类型与结构逐个列出
@@ -45,7 +44,7 @@
 弄坏开关（只给 --selftest 证红用；平常跑设了它退 2、点名它只在自证里认；值认不得退 2）。逐项写开关名、弄坏哪一处、打开后自证哪几格红
 （格名是 selftest() 里那一格，自证打「✗ 自证 <格名>：…」）：
   CHECKER_DIRECTION_OVERLAP_BREAK=overlap-unjudged  classify() 不判越界：交集里格式解析之外的函数单元照许
-      「✗ 自证 scan-calls-a-traversal-judge：」「✗ 自证 shared-macro：」「✗ 自证 cut-elsewhere-still-counts：」「✗ 自证 local-binding-unregistered：」
+      「✗ 自证 scan-calls-a-traversal-judge：」「✗ 自证 shared-macro：」「✗ 自证 cut-elsewhere-still-counts：」
       「✗ 自证 reporting-channel-unregistered：」
   CHECKER_DIRECTION_OVERLAP_BREAK=macros-unjudged  classify() 把 macro_rules、item_macro 当结构不判
       「✗ 自证 shared-macro：」
@@ -58,13 +57,9 @@
       「✗ 自证 cut-rows-checked：」「✗ 自证 comparison-uncut：」
   CHECKER_DIRECTION_OVERLAP_BREAK=cuts-applied-everywhere  apply_cuts() 把切点的名字从每个单元里摘掉，不只摘登记的那一个单元
       「✗ 自证 cut-rows-checked：」（先摘掉的名字让后一行切点核成「没点到」）「✗ 自证 cut-elsewhere-still-counts：」
-  CHECKER_DIRECTION_OVERLAP_BREAK=local-bindings-unverified  apply_local_bindings() 不核单元里有没有 let <名字>
-      「✗ 自证 local-binding-unverified：」
-  CHECKER_DIRECTION_OVERLAP_BREAK=local-bindings-ignored  apply_local_bindings() 登记了也不摘
-      「✗ 自证 local-binding-registered：」
   CHECKER_DIRECTION_OVERLAP_BREAK=declarations-judged  classify() 没有函数体的 trait 方法声明照函数单元判
       「✗ 自证 format-only-green：」「✗ 自证 scan-calls-a-traversal-judge：」「✗ 自证 shared-macro：」「✗ 自证 comparison-helper-shared-with-scan：」
-      「✗ 自证 local-binding-registered：」「✗ 自证 reporting-channel-green：」「✗ 自证 reporting-channel-unregistered：」
+      「✗ 自证 local-closure-not-linked：」「✗ 自证 reporting-channel-green：」「✗ 自证 reporting-channel-unregistered：」
       （scan-calls-a-traversal-judge 与 shared-macro 是越界的个数多出读盘接口那一个声明）
   CHECKER_DIRECTION_OVERLAP_BREAK=comparison-closure-unlisted  check() 不列比对点自己的闭包（与扫描式共用的、只在比对点里的函数单元）
       「✗ 自证 comparison-helper-shared-with-scan：」
@@ -95,8 +90,8 @@ FORMAT_PACKAGE_DIRECTORY = "crates/singlefs-format/"
 FORMAT_PARSING_FILE = "crates/singlefs-checker/src/lib.rs"
 REPORTING_CHANNEL_FILE = "crates/singlefs-checker/src/image.rs"
 REPORTING_CHANNEL_TYPE = "Judgements"
-ROLES = ("traversal-entry", "scan-entry", "comparison", "traversal-cut", "local-binding", "shared-format", "reporting-channel")
-ROLES_NAMING_A_NAME = ("traversal-cut", "local-binding")
+ROLES = ("traversal-entry", "scan-entry", "comparison", "traversal-cut", "shared-format", "reporting-channel")
+ROLES_NAMING_A_NAME = ("traversal-cut",)
 FUNCTION_KINDS = ("fn", "macro_rules", "item_macro")
 MACRO_KINDS = ("macro_rules", "item_macro")
 CONSTANT_KINDS = ("const", "static")
@@ -106,10 +101,10 @@ USAGE_EXIT = 2
 NOT_RUN_EXIT = 77
 BREAK_VARIABLE = "CHECKER_DIRECTION_OVERLAP_BREAK"
 KNOWN_BREAK_ITEMS = ("overlap-unjudged", "macros-unjudged", "closure-failures-accepted", "table-unchecked", "cuts-unchecked",
-                     "cuts-applied-everywhere", "local-bindings-unverified", "local-bindings-ignored", "declarations-judged",
+                     "cuts-applied-everywhere", "declarations-judged",
                      "comparison-closure-unlisted", "reporting-channel-anywhere", "reporting-channel-missing-accepted")
 HOWTO = ("越界的单元：属格式解析的搬进 crates/singlefs-checker/src/lib.rs、登记表加一行 shared-format（认不认它属格式解析由用户定，D13（验证路线） 已定项 12 只许共享格式解析），"
-         "是往判定累加器 Judgements 报判定的方法登 reporting-channel，不属的在扫描式那一侧自己写一份；库按名字误连的（同名局部量）照 local-binding 登记；取不到调用图与登记表的问题照点名的那一行改；"
+         "是往判定累加器 Judgements 报判定的方法登 reporting-channel，不属的在扫描式那一侧自己写一份；取不到调用图与登记表的问题照点名的那一行改；"
          "看一条边从哪来：python3 scripts/gate/lib_function_units.py closure <根> <入口> --explain")
 
 
@@ -213,7 +208,7 @@ def short_place(unit):
 
 def referrers_of(members, targets):
     """→ {id(目标): 闭包里点到它名字的单元，按 sort_key 取最前一个}：报「经哪个单元收进」用。不取库的 via（先到的那一条边随集合的遍历次序变，
-    两趟打出来的不一样）；摘名字（切点、局部绑定）之后、还回去之前调。"""
+    两趟打出来的不一样）；摘名字（切点）之后、还回去之前调。"""
     found = {}
     for unit in sorted(members.values(), key=function_units.Unit.sort_key):
         if unit.kind not in FUNCTION_KINDS + CONSTANT_KINDS:
@@ -266,34 +261,6 @@ def strip_name(unit, name, saved):
 def restore(saved):
     for unit, plain, methods, qualified, references in saved.values():
         unit.plain, unit.methods, unit.qualified, unit.references = plain, methods, qualified, references
-
-
-def has_let_binding(workspace, unit, name):
-    texts = workspace.files[unit.file].texts
-    for index in range(unit.first_token, max(unit.first_token, unit.last_token - 1)):
-        if texts[index] != "let":
-            continue
-        following = texts[index + 1] if index + 1 < unit.last_token else ""
-        if following == "mut" and index + 2 < unit.last_token:
-            following = texts[index + 2]
-        if following == name:
-            return True
-    return False
-
-
-def apply_local_bindings(workspace, rows, problems, saved):
-    applied = 0
-    for row in rows:
-        if row.unit is None:
-            continue
-        if not broken("local-bindings-unverified") and not has_let_binding(workspace, row.unit, row.name):
-            problems.append(f"登记表 {row.where()} local-binding {row.entry} 里没有 let {row.name}：它不是局部绑定，照调用算，这一行删掉")
-            continue
-        if broken("local-bindings-ignored"):
-            continue
-        strip_name(row.unit, row.name, saved)
-        applied += 1
-    return applied
 
 
 def apply_cuts(workspace, rows, names_that_may_be_cut, problems, saved):
@@ -409,7 +376,6 @@ def check(root, show_all=False):
                 problems.append(f"取不到调用图：登记表里一行 {role} 都没有，{what}方向没有入口")
     saved = {}
     try:
-        bindings = apply_local_bindings(workspace, by_role["local-binding"], problems, saved)
         scan, scan_origins = direction_closure(workspace, by_role["scan-entry"], "扫描式", problems)
         scan_names = {row.unit.short for row in by_role["scan-entry"] if row.unit is not None}
         entry_names = scan_names | {row.unit.short for row in by_role["traversal-entry"] if row.unit is not None}
@@ -440,10 +406,10 @@ def check(root, show_all=False):
     for unit in shared:
         groups.setdefault(classify(workspace, unit, allowed, channel), []).append(unit)
     summary = {"scan_entries": len(by_role["scan-entry"]), "scan": len(scan), "traversal_entries": len(by_role["traversal-entry"]),
-               "traversal": len(traversal), "cuts": len(cuts), "bindings": bindings, "shared": len(shared)}
+               "traversal": len(traversal), "cuts": len(cuts), "shared": len(shared)}
     allowed_functions = groups.get("format-package", []) + groups.get("format-registered", [])
     print(f"  · 扫描式 {summary['scan_entries']} 个入口、闭包 {summary['scan']} 个单元；遍历式 {summary['traversal_entries']} 个入口"
-          f"（切 {summary['cuts']} 处、局部绑定 {summary['bindings']} 处）、闭包 {summary['traversal']} 个单元；交集 {summary['shared']} 个单元")
+          f"（切 {summary['cuts']} 处）、闭包 {summary['traversal']} 个单元；交集 {summary['shared']} 个单元")
     print(f"  · 交集里格式解析的函数单元 {len(allowed_functions)} 个：")
     for unit in sorted(allowed_functions, key=function_units.Unit.sort_key):
         how = "singlefs-format 包" if unit.file.startswith(FORMAT_PACKAGE_DIRECTORY) else f"登记表 {allowed[id(unit)].where()}" if id(unit) in allowed else "弄坏开关照许"
@@ -730,16 +696,9 @@ def selftest_cases():
         ("cut-elsewhere-still-counts",
          fixture_files(walk=walk_with(root_record_extra="    let _count = scanned_units(reader).len();\n")), 1,
          ["✗ 越界 fn", "singlefs_checker::walk::scanned_units（", "singlefs_checker::walk::unit_of_header（"], []),
-        ("local-binding-unregistered",
-         fixture_files(walk=walk_with(root_record_extra="    let unit_of_header = |bytes: &[u8]| bytes.len();\n    let _width = unit_of_header(&root);\n")), 1,
-         ["✗ 越界 fn", "singlefs_checker::walk::unit_of_header（"], []),
-        ("local-binding-registered",
-         fixture_files(walk=walk_with(root_record_extra="    let unit_of_header = |bytes: &[u8]| bytes.len();\n    let _width = unit_of_header(&root);\n"),
-                       table_rows=rows + ["local-binding\tcrates/singlefs-checker/src/walk.rs::judge_root_record\tunit_of_header\t# 局部闭包与扫描式的函数同名"]), 0,
-         ["✓ 两个方向的函数单元交集都落在格式解析与常量里", "局部绑定 1 处"], ["✗"]),
-        ("local-binding-unverified",
-         fixture_files(table_rows=rows + ["local-binding\tcrates/singlefs-checker/src/walk.rs::judge_pool_image\tread_u64\t# 其实没有这样一个局部量"]), 1,
-         ["judge_pool_image 里没有 let read_u64"], []),
+        ("local-closure-not-linked",
+         fixture_files(walk=walk_with(root_record_extra="    let unit_of_header = |bytes: &[u8]| bytes.len();\n    let _width = unit_of_header(&root);\n")), 0,
+         ["✓ 两个方向的函数单元交集都落在格式解析与常量里"], ["✗"]),
         ("reporting-channel-green",
          reporting_files(rows + [REPORTING_CHANNEL_ROW]), 0,
          ["✓ 两个方向的函数单元交集都落在格式解析与常量里", "交集里报告通道的函数单元 1 个",
@@ -820,7 +779,7 @@ def selftest():
         print(f"  ✗ 自证 {len(cells)} 格里 {len(failures)} 格判错")  # gate-lint:summary
         print("     → 怎么办：按上面判错的那一格修 check() 里对应的那一段；开着弄坏开关时点名的格判错是该有的，别的格判错是开关弄坏得太宽")
         return 1
-    print(f"  ✓ 自证 {len(cells)} 格都判对（交集只在格式解析、报告通道、扫描式调遍历式判定函数、取不到闭包、登记表、切点、比对点与局部绑定、平常跑拒弄坏开关）")
+    print(f"  ✓ 自证 {len(cells)} 格都判对（交集只在格式解析、报告通道、扫描式调遍历式判定函数、取不到闭包、登记表、切点、比对点、局部闭包不连同名函数、平常跑拒弄坏开关）")
     return 0
 
 

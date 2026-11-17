@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 # E152（按里程碑对比六家文件系统的文件性能）：八个配置轮流跑 N 轮，每轮一个新虚机、一块新盘。
 #
-#   task-server/task submit -- bash scripts/devices/e152-run.sh <产物路径>                  不指定范围：八个配置、五轮，全部跑
+#   task-server/task submit -- bash scripts/devices/e152-run.sh <产物路径>                  不指定范围：单盘八个配置、五轮，全部跑
+#   task-server/task submit -- env E152_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs" bash scripts/devices/e152-run.sh <产物路径>   # 两盘镜像八个配置、五轮
 #   task-server/task submit -- env E152_ROUNDS=1 E152_CONFIGURATIONS="ext4" bash scripts/devices/e152-run.sh <产物路径>   # 指定范围加缩域
 #   bash scripts/devices/e152-run.sh --selftest                                              自证：缩过的那一趟产物头写「缩过、不当 E152 的产物」（不起虚机、不编译）
-# E152_CONFIGURATIONS 当指定范围（点名哪几个配置），E152_ROUNDS 当缩域（少于登记的 5 轮）；设了与登记不同的值，产物头 E152RUN_HEADER 接
-# reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes，这一份不当 E152 的产物。
+# E152_CONFIGURATIONS 当指定范围（点名哪几个配置），E152_ROUNDS 当缩域（少于登记的 5 轮）；登记的配置有两组：单盘一组（REGISTERED_CONFIGURATIONS）与两盘镜像一组
+# （REGISTERED_MIRROR_CONFIGURATIONS），轮数等于登记值且配置恰好是其中一组才是不缩过的一趟。别的轮数或配置，产物头 E152RUN_HEADER 接
+# reduced=yes registered_rounds=… registered_configurations=… not_e152_product=yes，这一份不当 E152 的产物；registered_configurations= 写点名的配置所属的那一组
+# （点名的名字全在单盘一组里写单盘一组，不然全在镜像一组里写镜像一组，混着点或点了登记之外的名字写单盘一组）。
 # 弄坏开关（只在 --selftest 起的那一趟里认，别处设了拒、退 2；一行「开关=值  弄坏哪一处」，下一行起是打开后红的格）：
 #   E152_RUN_BREAK=reduced-unmarked  缩过的一趟产物头不接缩过那一段（reduced_note 直接交空）
 #     「缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物」「缩过规模：只点名一个配置，产物头写缩过」
+#     「缩过规模·两盘镜像：轮数少于登记，产物头写缩过、registered_configurations= 写镜像一组」「缩过规模·两盘镜像：镜像一组少一个配置，产物头仍接缩过、registered_configurations= 写镜像一组」
+#     「缩过规模：单盘一组少一个配置，registered_configurations= 仍写单盘一组」
+#   E152_RUN_BREAK=mirror-group-unregistered  两盘镜像一组不当登记值（5 轮的镜像一组也接缩过那一段）
+#     「登记规模·两盘镜像：5 轮、镜像一组，产物头不接缩过那一段」
+#   E152_RUN_BREAK=reduced-group-always-single  缩过的一趟 registered_configurations= 一律写单盘一组，不看点名的配置属于哪一组
+#     「缩过规模·两盘镜像：轮数少于登记，产物头写缩过、registered_configurations= 写镜像一组」「缩过规模·两盘镜像：镜像一组少一个配置，产物头仍接缩过、registered_configurations= 写镜像一组」
 #
 # 不嵌套、经 task-server/task submit 交：三条 cargo build 直接起，编译并行度读服务交的 CARGO_BUILD_JOBS（每台默认重活线程数），
 # 内存上限由服务给；脚本里不套 capped.sh、run-with-memory-cap.sh，也不写线程数。
@@ -26,24 +35,50 @@ REPOSITORY="$(cd "$RESEARCH/../.." && pwd)"
 source "$RESEARCH/long-run-lib/binary-identity.sh"
 REGISTERED_ROUNDS=5
 REGISTERED_CONFIGURATIONS="raw ext4 xfs f2fs btrfs bcachefs zfs singlefs"
+REGISTERED_MIRROR_CONFIGURATIONS="raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror singlefs"
 
-# 与登记不同的轮数或配置就是缩过的一趟：产物头接这一段，不当 E152 的产物；都是登记值时不接。
+# 点名的配置所属的登记组（空格隔开）：全在单盘一组里是单盘一组，不然全在镜像一组里是镜像一组，别的（混着点、点了登记之外的名字）写单盘一组。
+registered_group_of() { # <配置，空格隔开>
+  local name in_single=1 in_mirror=1
+  for name in $1; do
+    [[ " $REGISTERED_CONFIGURATIONS " == *" $name "* ]] || in_single=0
+    [[ " $REGISTERED_MIRROR_CONFIGURATIONS " == *" $name "* ]] || in_mirror=0
+  done
+  if [[ "${E152_RUN_BREAK:-}" != reduced-group-always-single ]] && ((in_single == 0 && in_mirror == 1)); then
+    echo "$REGISTERED_MIRROR_CONFIGURATIONS"
+  else
+    echo "$REGISTERED_CONFIGURATIONS"
+  fi
+}
+
+# 轮数不是登记值、或配置不是登记的单盘一组也不是两盘镜像一组，就是缩过的一趟：产物头接这一段，不当 E152 的产物；都是登记值时不接。
 reduced_note() { # <轮数> <配置，空格隔开>
-  if [[ "$1" == "$REGISTERED_ROUNDS" && "$2" == "$REGISTERED_CONFIGURATIONS" ]]; then return 0; fi
+  local registered_group
+  if [[ "$1" == "$REGISTERED_ROUNDS" ]]; then
+    if [[ "$2" == "$REGISTERED_CONFIGURATIONS" ]]; then return 0; fi
+    if [[ "$2" == "$REGISTERED_MIRROR_CONFIGURATIONS" && "${E152_RUN_BREAK:-}" != mirror-group-unregistered ]]; then return 0; fi
+  fi
   if [[ "${E152_RUN_BREAK:-}" == reduced-unmarked ]]; then return 0; fi
-  echo " reduced=yes registered_rounds=$REGISTERED_ROUNDS registered_configurations=${REGISTERED_CONFIGURATIONS// /,} not_e152_product=yes"
+  registered_group="$(registered_group_of "$2")"
+  echo " reduced=yes registered_rounds=$REGISTERED_ROUNDS registered_configurations=${registered_group// /,} not_e152_product=yes"
 }
 
 if [[ "${1:-}" == --selftest ]]; then
   failures=0
+  cells=0
   expect() { # <名字> <条件>
+    cells=$((cells + 1))
     if eval "$2"; then echo "  ✓ $1"; else echo "  ✗ $1：条件「$2」不成立"; echo "     → 怎么办：改 reduced_note，再单独起 bash scripts/devices/e152-run.sh --selftest 到它退 0"; failures=$((failures + 1)); fi
   }
   expect "登记规模：产物头不接缩过那一段" '[[ -z "$(reduced_note "$REGISTERED_ROUNDS" "$REGISTERED_CONFIGURATIONS")" ]]'
+  expect "登记规模·两盘镜像：5 轮、镜像一组，产物头不接缩过那一段" '[[ -z "$(reduced_note "$REGISTERED_ROUNDS" "$REGISTERED_MIRROR_CONFIGURATIONS")" ]]'
   expect "缩过规模：轮数少于登记，产物头写缩过、不当 E152 的产物" '[[ "$(reduced_note 1 "$REGISTERED_CONFIGURATIONS")" == " reduced=yes registered_rounds=5 registered_configurations=raw,ext4,xfs,f2fs,btrfs,bcachefs,zfs,singlefs not_e152_product=yes" ]]'
   expect "缩过规模：只点名一个配置，产物头写缩过" '[[ "$(reduced_note "$REGISTERED_ROUNDS" ext4)" == *"reduced=yes"*"not_e152_product=yes" ]]'
-  if ((failures > 0)); then echo "e152-run.sh 自证：$failures 格红"; exit 1; fi
-  echo "e152-run.sh 自证：3 格全绿"
+  expect "缩过规模·两盘镜像：轮数少于登记，产物头写缩过、registered_configurations= 写镜像一组" '[[ "$(reduced_note 1 "$REGISTERED_MIRROR_CONFIGURATIONS")" == " reduced=yes registered_rounds=5 registered_configurations=raw-md,ext4-md,xfs-md,f2fs-md,btrfs-raid1,bcachefs-replicas2,zfs-mirror,singlefs not_e152_product=yes" ]]'
+  expect "缩过规模·两盘镜像：镜像一组少一个配置，产物头仍接缩过、registered_configurations= 写镜像一组" '[[ "$(reduced_note "$REGISTERED_ROUNDS" "raw-md ext4-md xfs-md f2fs-md btrfs-raid1 bcachefs-replicas2 zfs-mirror")" == " reduced=yes registered_rounds=5 registered_configurations=raw-md,ext4-md,xfs-md,f2fs-md,btrfs-raid1,bcachefs-replicas2,zfs-mirror,singlefs not_e152_product=yes" ]]'
+  expect "缩过规模：单盘一组少一个配置，registered_configurations= 仍写单盘一组" '[[ "$(reduced_note "$REGISTERED_ROUNDS" "raw ext4 xfs f2fs btrfs bcachefs zfs")" == *"registered_configurations=raw,ext4,xfs,f2fs,btrfs,bcachefs,zfs,singlefs not_e152_product=yes" ]]'
+  if ((failures > 0)); then echo "e152-run.sh 自证：$cells 格里 $failures 格红"; exit 1; fi
+  echo "e152-run.sh 自证：$cells 格全绿"
   exit 0
 fi
 if [[ -n "${E152_RUN_BREAK:-}" ]]; then echo "  ✗ E152_RUN_BREAK 只给 --selftest 证红用，这一趟不是自证" >&2; echo "    → 平常跑时不设它" >&2; exit 2; fi
@@ -65,10 +100,10 @@ GUEST_BINARY="$BUILT_BINARY"
 binary_identity_build e152-file-system-benchmark --release --bin e152-file-system-benchmark 2>/dev/null \
   || fail "宿主上的汇总二进制编不过，或编过了 cargo 没报出它编在哪" "cd scripts/experiment-apparatus && cargo build --release --bin e152-file-system-benchmark --message-format=json-render-diagnostics"
 HOST_BINARY="$BUILT_BINARY"
-# singlefs 的真设备二进制与门禁 qemu-device-streams 同一种编法：glibc 目标加 +crt-static（验证包默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
-SINGLEFS_BINARY="$(cd "$REPOSITORY" && binary_identity_build new_pool_file_creation_on_device --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static"]' -p singlefs-verification --bin new_pool_file_creation_on_device >/dev/null 2>&1 && printf '%s' "$BUILT_BINARY")" \
+# singlefs 的真设备二进制与门禁 qemu-device-streams 同一种编法：glibc 目标加 +crt-static、libstdc++ 静态链进来（-l static=stdc++；不带它编出的二进制 NEEDED libstdc++.so.6，在虚机里起步就段错误）（验证包默认编 RocksDB 的 C++，本机没有 musl 的 C/C++ 编译器）
+SINGLEFS_BINARY="$(cd "$REPOSITORY" && binary_identity_build new_pool_file_creation_on_device --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=["-C","target-feature=+crt-static","-L","/usr/lib/gcc/x86_64-linux-gnu/13","-L","/usr/lib/gcc/x86_64-linux-gnu/14","-l","static=stdc++","-C","link-arg=-fuse-ld=bfd"]' -p singlefs-verification --bin new_pool_file_creation_on_device >/dev/null 2>&1 && printf '%s' "$BUILT_BINARY")" \
   && [[ -n "$SINGLEFS_BINARY" ]] \
-  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\"]' -p singlefs-verification --bin new_pool_file_creation_on_device"
+  || fail "singlefs 的真设备二进制编不过" "在仓根跑 cargo build --release --target x86_64-unknown-linux-gnu --config 'target.x86_64-unknown-linux-gnu.rustflags=[\"-C\",\"target-feature=+crt-static\",\"-L\",\"/usr/lib/gcc/x86_64-linux-gnu/13\",\"-L\",\"/usr/lib/gcc/x86_64-linux-gnu/14\",\"-l\",\"static=stdc++\",\"-C\",\"link-arg=-fuse-ld=bfd\"]' -p singlefs-verification --bin new_pool_file_creation_on_device"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e152.XXXXXX")"
 trap 'rm -rf "${WORK:?}"' EXIT

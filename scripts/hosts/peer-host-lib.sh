@@ -2,8 +2,7 @@
 # 双机分片共用的第二台那几段：读本地配置、在第二台上跑命令、比工具链、核离线依赖、找规范副本、清场（不复原）、
 # 脱离 ssh 会话起一份活并轮询、按进程号连同后代停一棵进程树、按会话号与尝试标签停这一趟留下的进程、把输出里配置的主机与目录换成「第二台」。
 # 被 source 的函数库，只定义函数与几个全局变量、不改 shell 选项，不单独调。往第二台起活的只有 scripts/hosts/multi-host-run.sh --peer（task-server 派到第二台的尝试都经它），
-#   它调这里的几乎每一段。别的调用方只用其中一两段、不往第二台起活：scripts/mutation/mutation-shard-run.sh（crates 变异门禁的分片驱动，只由 task-server 按分片协议起）
-#   只调 peer_host_load_configuration；scripts/hosts/host-dispatch.py（task-server 载入的判法库）起 bash -c 'source "$1"' 调 peer_host_load_configuration、peer_host_run；
+#   它调这里的几乎每一段。别的调用方只用其中一两段、不往第二台起活：scripts/hosts/host-dispatch.py（task-server 载入的判法库）起 bash -c 'source "$1"' 调 peer_host_load_configuration、peer_host_run；
 #   scripts/hosts/gpu-card-health.py 调 peer_host_load_by_host、peer_host_run、peer_host_redact。
 #
 # 配置与崩溃点重放分片同一份：scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-assignments（只调）。配置里的主机、目录与清场命令是私有的：
@@ -70,8 +69,7 @@
 #   没有标记时 peer_host_load_configuration 一律把 peer_host_is_this_machine 置 0（平常跑漏进来的这个变量改不了 peer_host_run 连哪一台）。
 #   建标记的调用方：scripts/hosts/multi-host-run.sh 的 --selftest。
 # 弄坏开关 PEER_HOST_LIB_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时调用方的自证退 1）。这一份没有自证，红在 scripts/hosts/multi-host-run.sh 的 --selftest 里，
-#   失败行是「✗ <格名>：<细节>」。别的调用方的自证下面各开关一律不红：mutation-shard-run.sh 只调 peer_host_load_configuration，shard 那一步起门禁时还把这个变量清掉
-#   （mutation_shard_task_server_shard 的 stage_environment：env -u PEER_HOST_LIB_BREAK）；host-dispatch.py 只调 peer_host_load_configuration、peer_host_run，不碰各开关弄坏的那几步；
+#   失败行是「✗ <格名>：<细节>」。别的调用方的自证下面各开关一律不红：host-dispatch.py 只调 peer_host_load_configuration、peer_host_run，不碰各开关弄坏的那几步；
 #   gpu-card-health.py 起子进程时不带 PEER_HOST_LIB_ 起头的变量。
 # 逐项写开关名、弄坏哪一处、打开后 multi-host-run.sh 自证的哪几格红（项名是格名；括号里抄细节的句首，随跑变的路径写成 …）：
 #   PEER_HOST_LIB_BREAK=this-machine-unmarked  peer_host_load_configuration 没有自证的标记也认 SINGLEFS_CRASH_POINT_REPLAY_SHARD_PEER_IS_THIS_MACHINE=1
@@ -644,7 +642,7 @@ peer_host_stop_attempt_leftovers() { # <会话号> <会话首进程的启动时�
 peer_host_stop_attempt_scope() { # <scope 单元名文件>：停这一趟内存包装的 scope（文件头「这一趟留下的进程」；multi-host-run.sh 文件头 ⑥），经 declare -f 带到第二台上跑。
   # 文件不在或是空的打「PEER_HOST_SCOPE none」退 0（这一趟没经内存包装、或包装还没起 scope）；名字不是这一层包装起的样子（singlefs-memory-cap-<号>-<号>）打
   # 「PEER_HOST_SCOPE unrecognized」退 2。停之前读一次 cgroup.procs（目录是 /sys/fs/cgroup 接上 ControlGroup），systemctl --user stop 之后回读 is-active 的输出与
-  # cgroup.procs 的内容（.claude/rules/service-stop-readback.md；目录已不在算空）：打一行「PEER_HOST_SCOPE unit=<名> before=<停之前几个> state=<is-active 的输出> remaining=<停之后几个>」，
+  # cgroup.procs 的内容（.claude/rules/command-safety-by-review.md；目录已不在算空）：打一行「PEER_HOST_SCOPE unit=<名> before=<停之前几个> state=<is-active 的输出> remaining=<停之后几个>」，
   # 还有的每个另打一行「PEER_HOST_SCOPE_REMAINING <进程号> <命令行前 120 字>」；is-active 是 inactive 或 failed 而一个不剩退 0，不然退 1。只停这一个单元，不按名字挑别的
   local unit="" group="" before="" after="" state pid command_line
   IFS= read -r unit 2>/dev/null < "$1" || unit="${unit:-}"
@@ -712,7 +710,7 @@ peer_host_wait_detached() { # <进程号文件> <退出码文件> <轮询秒数>
 peer_host_stop_detached() { # <目录> <进程号文件> <退出码文件> <尝试标签> [keep]：停那一份连同这一趟留下的进程，停干净了补写退出回执（文件头「停下的退出回执」）；
   # 打一句结局，没停下退 1。起的那个 bash 还在（进程号文件里的号、启动时刻对得上、工作目录是这个目录）：照进程号连同后代停（peer_host_stop_process_tree）；
   # 不在（或号被重用了）而退出码文件里有回执的照收；都要再照会话号与尝试标签停这一趟留下的进程（peer_host_stop_attempt_leftovers）、停完再核。
-  # 两样都停干净了、退出码文件还没有的，写一行「<退出码> stopped <最后发的信号>」再退 0。不按已停处理、退 1 的：进程号文件里读不出号或启动时刻（按会话核不了）、
+  # 两样都停干净了、退出码文件还没有的，写一行「<退出码> stopped <最后发的信号>」再退 0。进程号文件里读不出号或启动时刻的（起的那一步没连上、那个 bash 没起来）不按会话核、只照尝试标签核。不按已停处理、退 1 的：
   # 读不了 /proc、还有停不掉的、回执写不进。第五个参数写 keep 的（multi-host-run.sh 的弄坏开关 orphan-session-unverified）：起的那个 bash 不在而没有回执就不核、退 1
   peer_host_run "$1" "$(declare -f peer_host_signal_one peer_host_process_is_alive peer_host_process_tree peer_host_stop_process_tree peer_host_attempt_leftovers peer_host_stop_attempt_leftovers)
 exit_file=$(printf '%q' "$3")
@@ -725,8 +723,13 @@ if [[ \"\$detached_pid\" =~ ^[1-9][0-9]*$ && \"\$detached_pid\" != 1 && -n \"\$d
   peer_host_stop_process_tree \"\$detached_pid\" || exit 1
 elif [[ -s \"\$exit_file\" ]]; then echo '已收到退出回执，接着核这一趟留下的进程'
 elif [[ $(printf '%q' "${5:-}") == keep ]]; then echo '父进程无法确认且没有退出回执：保留这一趟，不按已停处理'; exit 1
+elif [[ ( ! \"\$detached_pid\" =~ ^[1-9][0-9]*$ || \"\$detached_pid\" == 1 || -z \"\$detached_start\" ) && -z $(printf '%q' "$4") ]]; then
+  echo '进程号文件里读不出起的那个 bash 的号或启动时刻、又没有退出回执，尝试标签也没给：核不了，保留这一趟，不按已停处理'; exit 1
 elif [[ ! \"\$detached_pid\" =~ ^[1-9][0-9]*$ || \"\$detached_pid\" == 1 || -z \"\$detached_start\" ]]; then
-  echo '进程号文件里读不出起的那个 bash 的号或启动时刻、又没有退出回执：按会话核不了，保留这一趟，不按已停处理'; exit 1
+  # 起的那一步 ssh 没连上（握手被重置这类）时进程号文件一个字都没写：起的那个 bash 没起来。不按会话核，只照尝试标签核这一趟留下的进程，一个不剩就按没起来收
+  # （任务 16204：命令在第二台一步没起，清理每一轮都判核不了，那一次尝试一直收不了尾）
+  echo '进程号文件里读不出起的那个 bash 的号或启动时刻、又没有退出回执：不按会话核，只照尝试标签核这一趟留下的进程'
+  detached_pid=''; detached_start=''
 else echo \"起的那个 bash（进程号 \$detached_pid）不在了、没有退出回执：照会话号与尝试标签核这一趟留下的进程\"; fi
 peer_host_stop_attempt_leftovers \"\$detached_pid\" \"\$detached_start\" $(printf '%q' "$4")
 case \$? in

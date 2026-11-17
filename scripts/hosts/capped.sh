@@ -22,9 +22,10 @@
 # 设的变量：cargo 的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，crates/singlefs-verification 里各装置读的
 # SINGLEFS_CRASH_POINT_REPLAY_THREADS、SINGLEFS_CRASH_INJECTION_THREADS、SINGLEFS_FAULT_INJECTION_WORKER_THREADS、
 # SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS、SINGLEFS_RANDOM_HISTORY_THREADS，验证包各处只读的 E161_THREADS（E161 装置）、
-# SINGLEFS_CRASH_JUDGE_CPU_THREADS（GPU 对拍与记录核对器两份测试的 CPU 判器一侧）、SINGLEFS_CRASH_AMPLIFICATION_THREADS（崩溃放量的核对线程）、
+# SINGLEFS_CRASH_AMPLIFICATION_THREADS（崩溃放量的核对线程）、
 # E165_THREADS（E165 装置）、E168_THREADS（E168 装置）、E175_WORKER_THREADS（E175 装置）、E180_THREADS、E182_THREADS、E183_THREADS、E184_THREADS、E185_THREADS
-# （各自的装置与分片脚本）、GATE_MUTATION_KEY_WORKERS（crates 变异表门禁算行键的子进程数），以及通用的 SINGLEFS_THREAD_CAP
+# （各自的装置与分片脚本）、GATE_MUTATION_KEY_WORKERS（crates 变异表门禁算行键的子进程数），以及通用的 SINGLEFS_THREAD_CAP（.claude/heavy-thread-default 那个参数的覆盖名；
+# GPU 对拍与记录核对器两份测试的 CPU 判器一侧只读它，没设取登记值）
 # （实验装置自己的线程变量没登记在这里的，加进本文件的 variable_names，或让装置读 SINGLEFS_THREAD_CAP；门禁 code-tooling 的 heavy-thread-defaults 格判：
 # 装置读自己的线程变量，这里不设、文件里也没回退到 SINGLEFS_THREAD_CAP 或登记值的，红）。
 # 弄坏开关（只给 --selftest 证红用；平常跑设了就在一切之前退 2、点名变量只在自证里认，自证起的子进程由 CAPPED_SELFTEST_MARK 认）：
@@ -34,8 +35,8 @@
 #       「✗ 自检：本仓的 default 与 heavy_thread_default 同值」
 #   CAPPED_BREAK=e161-threads-unset  变量清单里去掉 E161_THREADS，装置只读它而这里不设（逐个变量的几格以清单为准，清单短了它们照绿，所以这一格单独钉）
 #       「✗ 自检：装置只读的 E161_THREADS 要在变量清单里」
-#   CAPPED_BREAK=crash-judge-cpu-threads-unset  变量清单里去掉 SINGLEFS_CRASH_JUDGE_CPU_THREADS（与 e161-threads-unset 同一格）
-#       「✗ 自检：装置只读的 SINGLEFS_CRASH_JUDGE_CPU_THREADS 要在变量清单里」
+#   CAPPED_BREAK=crash-judge-cpu-threads-unset  变量清单里去掉 SINGLEFS_THREAD_CAP，CPU 判器一侧拿不到服务定的数（与 e161-threads-unset 同一格，另红 default 的本仓同值那一格）
+#       「✗ 自检：装置只读的 SINGLEFS_THREAD_CAP 要在变量清单里」、「✗ 自检：本仓的 default 与 heavy_thread_default 同值」
 #   CAPPED_BREAK=reject-says-default-for-all  上限写错的拒绝说明一律写「没给线程上限写 default」
 #       「✗ 自检：上限写错的拒绝说明应当写」
 #   CAPPED_BREAK=admission-mark-kept  exec 命令之前不 unset CAPPED_ADMITTED_BY_TASK_SERVER：标记随环境传给命令，任务里面再套一层照跑
@@ -44,6 +45,8 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 source "$(dirname "${BASH_SOURCE[0]}")/heavy-threads.sh"
+# clip_text <字节数>：标准输入每行取前 <字节数> 个字节，再丢掉被切在中间的半个字符，输出总是合法的 UTF-8（GNU 的 cut -c 与 cut -b 都按字节切，三个字节的汉字会被切断；给人看的失败行与日志摘录用它截）
+clip_text() { cut -b "1-$1" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null; }
 
 # 弄坏开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（CAPPED_SELFTEST_MARK 对得上）而变量非空，参数解析之前就退 2（不管值是什么）。
 if [[ -n "${CAPPED_BREAK:-}" && ! ( "$#" -eq 1 && "${1:-}" == --selftest ) && "${CAPPED_SELFTEST_MARK:-}" != capped-selftest ]]; then
@@ -61,7 +64,6 @@ variable_names=(
     SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS
     SINGLEFS_RANDOM_HISTORY_THREADS
     E161_THREADS
-    SINGLEFS_CRASH_JUDGE_CPU_THREADS
     SINGLEFS_CRASH_AMPLIFICATION_THREADS
     E165_THREADS
     E168_THREADS
@@ -75,11 +77,11 @@ variable_names=(
     SINGLEFS_THREAD_CAP
 )
 # 验证包各处只读的线程变量（文件头「设的变量」）：自证逐个核它们在清单里
-device_only_variable_names=(E161_THREADS SINGLEFS_CRASH_JUDGE_CPU_THREADS SINGLEFS_CRASH_AMPLIFICATION_THREADS E165_THREADS E168_THREADS E175_WORKER_THREADS E180_THREADS E182_THREADS E183_THREADS E184_THREADS E185_THREADS)
+device_only_variable_names=(E161_THREADS SINGLEFS_THREAD_CAP SINGLEFS_CRASH_AMPLIFICATION_THREADS E165_THREADS E168_THREADS E175_WORKER_THREADS E180_THREADS E182_THREADS E183_THREADS E184_THREADS E185_THREADS)
 # 弄坏开关 e161-threads-unset、crash-judge-cpu-threads-unset：清单里去掉那一个变量（只读它的装置，capped.sh N 到不了）
 case "${CAPPED_BREAK:-}" in
     e161-threads-unset) dropped_name=E161_THREADS ;;
-    crash-judge-cpu-threads-unset) dropped_name=SINGLEFS_CRASH_JUDGE_CPU_THREADS ;;
+    crash-judge-cpu-threads-unset) dropped_name=SINGLEFS_THREAD_CAP ;;
     *) dropped_name="" ;;
 esac
 if [[ -n "$dropped_name" ]]; then
@@ -135,7 +137,7 @@ run_selftest() {
     checked=$((checked + 1))
     if env -u CAPPED_ADMITTED_BY_TASK_SERVER bash "$0" 3 touch "$admission_scratch/unadmitted-ran" 2>"$admission_scratch/unadmitted.err"; then status=0; else status=$?; fi
     if [[ "$status" != 2 || -e "$admission_scratch/unadmitted-ran" ]] || ! grep -q '任务里面不再套包装：内存、线程、机器、卡由 task-server 定；删掉这一层' "$admission_scratch/unadmitted.err"; then
-        echo "  ✗ 自检：没有服务给的准入标记应当拒（退 2、命令没跑、出路写「任务里面不再套包装」），实际退 $status：$(head -c 300 "$admission_scratch/unadmitted.err")"; failures=$((failures + 1))
+        echo "  ✗ 自检：没有服务给的准入标记应当拒（退 2、命令没跑、出路写「任务里面不再套包装」），实际退 $status：$(tr '\n' ' ' < "$admission_scratch/unadmitted.err" | clip_text 300)"; failures=$((failures + 1))
         echo "  → 怎么办：run 那一段在 exec 之前判 CAPPED_ADMITTED_BY_TASK_SERVER，没有就拒"
     fi
     checked=$((checked + 1))
@@ -159,7 +161,7 @@ run_selftest() {
         echo "  ✗ 自检：退出码应当原样传回 7，实际 $status"; failures=$((failures + 1))
         echo "  → 怎么办：设完变量要 exec 那条命令，不能吞掉它的退出码"
     fi
-    # 装置自己读的线程变量要在清单里（device_only_variable_names：E161 装置的 E161_THREADS、两份 CPU 判器测试的 SINGLEFS_CRASH_JUDGE_CPU_THREADS、
+    # 装置自己读的线程变量要在清单里（device_only_variable_names：E161 装置的 E161_THREADS、两份 CPU 判器测试的 SINGLEFS_THREAD_CAP、
     # 崩溃放量的 SINGLEFS_CRASH_AMPLIFICATION_THREADS、E165 与 E168 装置的 E165_THREADS、E168_THREADS），清单里没有，capped.sh N 就到不了那一处；
     # 清单是上面循环的被测对象，这一格钉住「这几个在里面」，不让清单被改短
     checked=$((checked + 1))

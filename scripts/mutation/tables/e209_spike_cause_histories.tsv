@@ -1,0 +1,22 @@
+# 被测的是 scripts/experiment-apparatus/e209_spike_cause_histories.rs：它不是 scripts/experiment-apparatus 里的 bin，而是拷进插了读数的副本，当 crates/singlefs-verification 的集成测试编、起（入口 e209-spike-cause-run.sh）。
+# mutate.sh 只会在 scripts/experiment-apparatus 里起 cargo test --release --bin <名>，那里没有这份用例，所以这张表不由 mutate.sh 跑。
+# 脚本表、选择子、声明行与脚本步行的写法在 e209_spike_cause_scripts.rs，它另编成 bin，单测与变异表 scripts/mutation/tables/e209_spike_cause_scripts.tsv 经 mutate.sh 跑；这张表只留历史用例自己那几处。
+# 历史用例自己没有单测（要起真副本放一遍历史），每一行由产物读法的判定函数抓，函数在模型 e209_spike_cause.rs，它的单测在模型 bin e209-spike-cause 里钉了判定函数认得出哪种坏产物；
+# 用弄坏的历史用例真起一遍的证红未做，要靠弄坏的产物才能落到下面这几处判定上：
+#   big_file_fill_not_noted、unlinks_of_the_history_cut_to_one：产物 name=history 行的 user_changes 不是 2 + 2F + 20，history_mismatch 报 user_changes≠…（单测 the_constants_and_the_history_are_checked_against_the_registered_values 钉 history_mismatch 对 221 报错）。
+#   small_files_written_with_one_unit：第一个量窗操作之前那行规模读数的 mapped_units 低于 F × K + 10，live_units_shortfall 报 mapped_units<…（同一条单测钉它对没有读数报错、对 10010 不报）。
+#   script_step_line_not_printed：产物里没有 name=script_step 行，declared_sequence_mismatch 报「步数 0 对脚本表 …」（单测 the_declared_sequence_is_checked_against_the_script_table 钉步数不同报错）。
+#   image_comparison_off：产物里没有 name=image_sha256 行，plain_matches_counts 判不相同（单测 the_twin_and_the_plain_comparisons_catch_a_different_line_and_a_different_disk 钉没有读数不当相同）。
+big_file_fill_not_noted	BIG_FILE_UNITS)?;\n    history.note();	BIG_FILE_UNITS)?;
+unlinks_of_the_history_cut_to_one	for _ in 0..scripts::UNLINKS_OF_THE_HISTORY {	for _ in 0..1 {
+small_files_written_with_one_unit	fill_a_file(pool, &mut history.tally, inode, units_per_file)?;	fill_a_file(pool, &mut history.tally, inode, 1)?;
+script_step_line_not_printed	println!("{}", scripts::script_step_line(self.item, step_index, step, mount_epoch));	let _ = scripts::script_step_line(self.item, step_index, step, mount_epoch);
+image_comparison_off	let compared_by_the_disk = point_name == IMAGE_POINT && script_name == IMAGE_SCRIPT;	let compared_by_the_disk = false;
+# 下面 pin_ 起头的各行由谁抓：在插了读数的副本里（plain 构建）起历史用例文件末尾那三条钉绝对值的测试（the_six_mebibyte_ring_puts_the_unit_area_at_slot_1408、the_training_point_carries_the_registered_geometry_and_note_count、small_history_makes_fifty_three_user_changes_notes_forty_two_steps_and_keeps_the_units_it_wrote），改坏之后该有一条红；脚本 scripts/experiment-apparatus/prove-histories-pins.sh 逐行证。
+pin_ring_bytes_five_mebibytes	const JOURNAL_RING_BYTES: u64 = 6 << 20;	const JOURNAL_RING_BYTES: u64 = 5 << 20;
+pin_write_chunk_enlarged	const DATA_UNITS_PER_WRITE_AT_MOST: u64 = 400;	const DATA_UNITS_PER_WRITE_AT_MOST: u64 = 500;
+pin_inode_batch_shrunk	const INODES_PER_BATCH: u64 = 100;	const INODES_PER_BATCH: u64 = 5;
+pin_big_file_fill_dropped	    fill_a_file(pool, &mut history.tally, big, scripts::BIG_FILE_UNITS)?;	    let _ = scripts::BIG_FILE_UNITS;
+pin_small_file_units_halved	            fill_a_file(pool, &mut history.tally, inode, units_per_file)?;	            fill_a_file(pool, &mut history.tally, inode, units_per_file / 2)?;
+pin_unit_record_keeps_only_the_last_chunk	        set_units_of(inode, Some(units_of(inode) + units));	        set_units_of(inode, Some(units));
+pin_one_more_unlink_in_the_history	    for _ in 0..scripts::UNLINKS_OF_THE_HISTORY {	    for _ in 0..(scripts::UNLINKS_OF_THE_HISTORY + 1) {

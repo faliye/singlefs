@@ -82,6 +82,15 @@
       「自证：挑测试的 -E 没按块切」
   BROAD_MUTATION_BREAK=coverers-cfg-inactive-refused  覆盖者键碰到默认 cfg 下不编的测试（entry-cfg-inactive）也整条拒
       「自证：覆盖者键没跳过默认 cfg 下不编的测试」
+  算键提速（cache_closure_keys、cache_spawning_binaries、prefill_records：外挂缓存与并行，键与参照逐项相同；这几项开关只在本库 --selftest 里认，驱动的 PRUNE_BREAKS 不转发）：
+  BROAD_MUTATION_BREAK=closure-key-cache-ignores-globals  closure_key 的缓存键不带全局行
+      「自证：同一个单元换了全局行之后装了缓存的 closure_key 没交出另一把键」
+  BROAD_MUTATION_BREAK=closure-composition-empty  惰性组成清单里没有单元行
+      「自证：装了缓存的 UnitTree 算出的键、拒算形态、相对位置、原文、定位或组成清单与没装缓存的不同」
+  BROAD_MUTATION_BREAK=spawning-cache-ignores-packages  起子进程二进制的缓存键不带包名
+      「自证：装了缓存的 spawning_binaries 与原函数不同」
+  BROAD_MUTATION_BREAK=prefill-results-unordered  并行算键按路的次序接结果、不按段的次序
+      「自证：并行算键（两路、……段）按 items 的次序收的结果与串行的不同」
   弄坏开关打开后本库 --selftest 退 1，汇总行「✗ mutation-prune.py --selftest：<格数> 格里 N 格判错」；驱动 broad-mutation.py 的 --selftest 打开同一个开关时红在哪写在它自己的文件头。
 弄坏开关只在自证里认（refuse_break_outside_selftest）：直接执行本库而命令行不是单独一个 --selftest（--index、不带参数、认不得的参数）时，环境里设了 BROAD_MUTATION_BREAK
   就在参数解析之前退 2，点名这个变量只在自证里认；被驱动当库载入时不判（驱动自己在参数解析之前拒）。
@@ -1522,6 +1531,232 @@ def selftest_coverers_cells(work, check):
           "看 coverers_key：只有 entry-cfg-inactive 这一种拒因跳过，别的拒因照旧返回 coverer-refused:<二进制> <用例名>:<形态>")
 
 
+# ── 算键提速（不改键）：外挂在 UnitTree 与本模块上的缓存与并行，由驱动在树建好之后装上 ──────────────────────────────────
+# 这一节的函数不带缺省值、不定义模块级的类与常量、不连到 JUDGING_ENTRIES 的闭包里：模块级的赋值、类头与带缺省值的 def 头、被闭包点到的函数
+# 一改，判法单元指纹就变（scripts/gate/lib_function_units.py 文件头「Python 闭包：import 时执行的模块级语句」），库里的判定一条都不沿用。
+# 缓存与并行只换算的方式：键、组成清单、拒算形态与参照（没装缓存的 UnitTree、串行）逐项相同，由 selftest_key_speed_cells 对拍。
+
+def lazy_lines_class():
+    """组成清单的惰性写法：一把键的组成清单几千行，每条变异各存一份内存放不下；遍历时才从 supplier 现取，加一个列表得一个新的惰性清单。
+    类定义在函数里、缓存在函数属性上：模块级的类头会进判法单元的闭包。"""
+    made = getattr(lazy_lines_class, "made", None)
+    if made is None:
+        class LazyLines:
+            __slots__ = ("supplier", "tail")
+
+            def __init__(self, supplier, tail):
+                self.supplier, self.tail = supplier, tail
+
+            def __iter__(self):
+                yield from self.supplier()
+                yield from self.tail
+
+            def __add__(self, other):
+                return LazyLines(self.supplier, (*self.tail, *other))
+        lazy_lines_class.made = made = LazyLines
+    return made
+
+
+def cache_closure_keys(tree):
+    """给这一棵 UnitTree 装上 closure_key 的缓存（按（单元, 目标, 全局行）存键与拒算形态，同一个单元里的几条变异共用一次闭包键的计算），
+    组成清单不存：交惰性清单，遍历时照原来的 closure_key 现算，最近用过的 16 份留着（同一个单元的几条挨着用）。键与拒算形态是原来那个函数的返回值原样。
+    弄坏开关 closure-key-cache-ignores-globals：缓存键不带全局行（换了工具链行也交旧键）；closure-composition-empty：惰性清单里没有单元行。"""
+    lazy = lazy_lines_class()
+    original = tree.closure_key
+    kept, recent = {}, {}
+
+    def cached(unit, global_lines, target_id=None):
+        captured = tuple(global_lines)
+        cache_key = (id(unit), target_id) if broken("closure-key-cache-ignores-globals") else (id(unit), target_id, captured)
+        found = kept.get(cache_key)
+        if found is None:
+            key, _composition, forms = original(unit, list(captured), target_id)
+            found = kept[cache_key] = (unit, key, forms)
+
+        def supply():
+            if broken("closure-composition-empty"):
+                return []
+            lines = recent.get(cache_key)
+            if lines is None:
+                lines = original(unit, list(captured), target_id)[1]
+                recent[cache_key] = lines
+                while len(recent) > 16:
+                    del recent[next(iter(recent))]
+            return lines
+        return found[1], lazy(supply, ()), list(found[2])
+    tree.closure_key = cached
+    return tree
+
+
+def cache_spawning_binaries():
+    """起子进程的测试二进制按（树, 包）存扫源码的那一半（树建好之后原文不变；覆盖那一遍的 profraw 份数每次现并），一个进程里只装一次。
+    弄坏开关 spawning-cache-ignores-packages：缓存键不带包名（换一组包也交上一组的）。"""
+    current = globals()["spawning_binaries"]
+    if getattr(current, "uncached", None) is not None:
+        return
+    scanned = {}
+
+    def cached(tree, packages, profile_counts=None):
+        if broken("spawning-binary-selected"):
+            return current(tree, packages, profile_counts)
+        cache_key = (id(tree),) if broken("spawning-cache-ignores-packages") else (id(tree), tuple(packages))
+        found = scanned.get(cache_key)
+        if found is None or found[0] is not tree:
+            found = scanned[cache_key] = (tree, current(tree, packages))
+        binaries = set(found[1])
+        for (binary, _test), count in (profile_counts or {}).items():
+            if count > 1:
+                binaries.add(binary)
+        return binaries
+    cached.uncached = current
+    globals()["spawning_binaries"] = cached
+
+
+def key_record(tree, item, global_lines):
+    """一条变异的键与它要带走的几样（mutation_key 的结果去掉容器单元对象与组成清单）：[键, 拒算形态, 相对位置, 原文, 定位, 找得到容器单元]。"""
+    current = mutation_key(tree, item, global_lines)
+    return [current["key"], list(current["refused"]), current["relative"], current["original"], current["locator"], current["unit"] is not None]
+
+
+def prefill_spans(count, workers):
+    """把 count 条切成连续的几段 [(起, 止)]：每路约分到八段，段短了各路忙闲匀。"""
+    size = max(1, -(-count // (max(1, workers) * 8)))
+    return [(first, min(first + size, count)) for first in range(0, count, size)]
+
+
+def prefill_child(tree, items, global_lines, spans, worker, workers, directory):
+    """fork 出来的一路：算 spans 里序号对 workers 取余等于 worker 的各段，结果写进 directory 里这一路自己的文件，用 os._exit 退（成了 0，没成 1、异常尾巴打 stderr）；不返回。"""
+    import signal
+    import traceback
+    code = 1
+    try:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        mine = {}
+        for number in range(worker, len(spans), workers):
+            first, last = spans[number]
+            mine[str(number)] = [key_record(tree, item, global_lines) for item in items[first:last]]
+            tree.closures.clear()
+        with open(os.path.join(directory, f"{worker}.json"), "w", encoding="utf-8") as handle:
+            json.dump(mine, handle)
+        code = 0
+    except BaseException:
+        traceback.print_exc()
+    finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(code)
+
+
+def prefill_records(tree, items, global_lines, workers):
+    """items 里每条变异的 key_record，按 items 的次序交回。workers 大于 1 时 fork 出这么多路各算互不相交的几段（子进程共用 fork 那一刻的内存，不各读一遍源码；
+    每算完一段清掉那一路的闭包缓存，内存不随段数涨），按段的次序收；有一路没成（退出码非 0、没留下结果、条数对不上）就打一行说明、全部退回串行算。
+    弄坏开关 prefill-results-unordered：按路的次序接各路的段（不按段的次序）。"""
+    spans = prefill_spans(len(items), workers)
+    if workers <= 1 or len(spans) < 2:
+        return [key_record(tree, item, global_lines) for item in items]
+    import shutil
+    import signal
+    import tempfile
+    sys.stdout.flush()
+    sys.stderr.flush()
+    directory = tempfile.mkdtemp(prefix="broad-mutation-keys.")
+    children, waited, failures, chunks = [], set(), [], {}
+    try:
+        for worker in range(workers):
+            process_id = os.fork()
+            if process_id == 0:
+                prefill_child(tree, items, global_lines, spans, worker, workers, directory)
+            children.append((process_id, worker))
+        for process_id, worker in children:
+            _done, status = os.waitpid(process_id, 0)
+            waited.add(process_id)
+            code = os.waitstatus_to_exitcode(status)
+            path = os.path.join(directory, f"{worker}.json")
+            if code != 0 or not os.path.isfile(path):
+                failures.append(f"第 {worker} 路退 {code}")
+                continue
+            with open(path, encoding="utf-8") as handle:
+                chunks[worker] = json.load(handle)
+    finally:
+        for process_id, _worker in children:
+            if process_id not in waited:
+                try:
+                    os.kill(process_id, signal.SIGTERM)
+                    os.waitpid(process_id, 0)
+                except (ProcessLookupError, ChildProcessError):
+                    pass
+        shutil.rmtree(directory, ignore_errors=True)
+    records = []
+    if broken("prefill-results-unordered"):
+        for worker in sorted(chunks):
+            for number in sorted(chunks[worker], key=int):
+                records.extend(chunks[worker][number])
+    else:
+        by_span = {number: rows for worker_rows in chunks.values() for number, rows in worker_rows.items()}
+        for number in range(len(spans)):
+            records.extend(by_span.get(str(number), []))
+    if failures or len(records) != len(items):
+        print(f"  · 算键的并行没成（{'；'.join(failures) or '条数对不上'}），退回串行算", file=sys.stderr, flush=True)
+        return [key_record(tree, item, global_lines) for item in items]
+    return records
+
+
+def selftest_key_speed_cells(work, check):
+    """算键提速（缓存与并行）对拍：参照是没装缓存、串行算的 UnitTree。键、拒算形态、相对位置、原文、定位、组成清单逐项相同；
+    换了全局行缓存不能交旧键；缓存的起子进程二进制与参照相同、换一组包不交上一组的；并行（两路、段比路多）按 items 的次序收、与串行逐项相同。"""
+    files = {"crates/mcore/src/ka.rs": "pub fn a(n: u64) -> u64 {\n    n + 1 + 2\n}\n\npub fn b(n: u64) -> u64 {\n    a(n) * 3 - 1\n}\n",
+             "crates/mcore/src/kc.rs": "pub fn c(n: u64) -> u64 {\n    crate::ka::b(n) / 2 + 4\n}\n",
+             T: test_calling("mcore::kc::c(1)", 3)}
+    mutations = [("crates/mcore/src/ka.rs", "+ 1", "- 1", 0), ("crates/mcore/src/ka.rs", "+ 2", "* 2", 0), ("crates/mcore/src/ka.rs", "* 3", "/ 3", 0),
+                 ("crates/mcore/src/ka.rs", "- 1", "+ 1", 0), ("crates/mcore/src/kc.rs", "/ 2", "% 2", 0), ("crates/mcore/src/kc.rs", "+ 4", "- 4", 0)]
+    root = os.path.join(work, "key-speed")
+    write_tree(root, files)
+    items = [item_for(files, mutation) for mutation in mutations]
+    plain, fast = UnitTree(root), cache_closure_keys(UnitTree(root))
+    first = sample_globals(root, [])
+    second = first + ["tool cargo-nextest 9.9.9-selftest"]
+    reference = [mutation_key(plain, item, first) for item in items]
+    cached = [mutation_key(fast, item, first) for item in items]
+    again = [mutation_key(fast, item, first) for item in items]
+    fields = ("key", "refused", "relative", "original", "locator")
+
+    def same(left, right):
+        return all(one[name] == other[name] for one, other in zip(left, right) for name in fields) and all(
+            list(one["composition"]) == list(other["composition"]) and (one["unit"] is None) == (other["unit"] is None) for one, other in zip(left, right))
+    check(len(cached) == len(reference) and all(row["key"] for row in reference) and same(reference, cached) and same(reference, again)
+          and all(list(row["composition"]) for row in reference),
+          f"装了缓存的 UnitTree 算出的键、拒算形态、相对位置、原文、定位或组成清单与没装缓存的不同（参照 {[row['key'] and row['key'][:8] for row in reference]}，"
+          f"缓存 {[row['key'] and row['key'][:8] for row in cached]}）",
+          "看 cache_closure_keys：键与拒算形态是 closure_key 的返回值原样，组成清单惰性地照 closure_key 现算（加列表得新的惰性清单）")
+    unit_plain = plain.container(items[0]["file"], tuple(items[0]["start"]), tuple(items[0]["end"]))
+    unit_fast = fast.container(items[0]["file"], tuple(items[0]["start"]), tuple(items[0]["end"]))
+    one_key = fast.closure_key(unit_fast, first)[0]
+    other_key = fast.closure_key(unit_fast, second)[0]
+    check(one_key and other_key and one_key != other_key and other_key == plain.closure_key(unit_plain, second)[0] and one_key == plain.closure_key(unit_plain, first)[0],
+          f"同一个单元换了全局行之后装了缓存的 closure_key 没交出另一把键（{one_key and one_key[:8]}、{other_key and other_key[:8]}）",
+          "看 cache_closure_keys：缓存键是（单元, 目标, 全局行），工具链行变了键就变")
+    sources = {"crates/mharness/tests/golden.rs": C2_SOURCES["crates/mharness/tests/golden.rs"], "crates/mcore/src/k.rs": "pub fn k() -> u64 {\n    1\n}\n"}
+    spawn_root = os.path.join(work, "key-speed-spawn")
+    write_tree(spawn_root, sources)
+    spawn_tree = UnitTree(spawn_root)
+    cache_spawning_binaries()
+    wrapped = spawning_binaries
+    original = getattr(wrapped, "uncached", None)
+    counts = {("mharness::other", "t"): 2, ("mharness::single", "t"): 1}
+    asked = [(["mharness"], None), (["mcore"], None), (["mharness", "mcore"], counts), (["mharness"], None)]
+    answers = [(wrapped(spawn_tree, packages, profile), original(spawn_tree, packages, profile)) for packages, profile in asked] if original else []
+    check(original is not None and len(answers) == len(asked) and all(got == want for got, want in answers) and "mharness::golden" in answers[0][0] and not answers[1][0]
+          and "mharness::other" in answers[2][0] and "mharness::single" not in answers[2][0],
+          f"装了缓存的 spawning_binaries 与原函数不同（{[(sorted(got), sorted(want)) for got, want in answers]}）",
+          "看 cache_spawning_binaries：缓存键是（树, 包），profraw 份数大于 1 的二进制每次现并进去")
+    serial = [key_record(plain, item, first) for item in items]
+    parallel = prefill_records(fast, items, first, 2)
+    check(parallel == serial and len(parallel) == len(items) and prefill_records(fast, items, first, 1) == serial,
+          f"并行算键（两路、{len(prefill_spans(len(items), 2))} 段）按 items 的次序收的结果与串行的不同（并行 {[row[0] and row[0][:8] for row in parallel]}，串行 {[row[0] and row[0][:8] for row in serial]}）",
+          "看 prefill_records：各路各算序号对路数取余相同的段，按段的次序接，不按路的次序")
+
+
 def run_selftest():
     import shutil
     import tempfile
@@ -1545,6 +1780,7 @@ def run_selftest():
                   f"看文件头「规则」里开关 {sample[2]} 那一条与 carry_decision、mutation_key、catching_test_key、coverers_key")
         selftest_list_cells(work, check)
         selftest_coverers_cells(work, check)
+        selftest_key_speed_cells(work, check)
         root = os.path.join(work, "c2")
         write_tree(root, C2_SOURCES)
         tree = UnitTree(root)
@@ -1589,7 +1825,7 @@ def run_selftest():
         print(f"     → 怎么办：照上面每一格的出路改，再跑 python3 {os.path.join(SCRIPT_DIRECTORY, 'mutation-prune.py')} --selftest", file=sys.stderr)
         return 1
     print(f"  ✓ mutation-prune.py --selftest：{len(SAMPLES)} 个样本的沿用决定（S34、T16、N37、N45、T17、INDEX 在内）、清单按单元存、覆盖者键跳过默认 cfg 下不编的测试、X1b / X3 / K1 跑全部、"
-          f"覆盖文件名归一、-E 按块切，{cells[0]} 格都对")
+          f"覆盖文件名归一、-E 按块切、算键提速（缓存与并行对拍），{cells[0]} 格都对")
     return 0
 
 

@@ -10,3 +10,4 @@ M8 分类乙不读术语改名表	new_name = renamed(row.name, renames)	new_name
 M9 改后核对的行集写死成 1–281	before_numbers = {row.number for rows in before.values() for row in rows}	before_numbers = set(range(1, 282))
 M10 判别力自证：钉值变也算乙（第八节）	any(cell.kind == VERDICT_WORD and cell.changed() for cell in assessment.cells) else	any(cell.changed() for cell in assessment.cells) else
 M11 判别力自证：干扰按同一行号而不按同文件（第八节）	if number not in removed and files.get(number) in removed_files)	if number not in removed and number in removed)
+M12 同一份文件里说法没变、行文改过的行照撤掉算	if not triples and len(same_saying) == 1:	if False:

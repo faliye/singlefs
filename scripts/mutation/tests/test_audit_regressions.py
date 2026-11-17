@@ -4,7 +4,7 @@
 """变异那几份脚本的回归单测（键、判定库、证红）。起法（单独一个 --selftest，等于 python3 -m unittest discover -s scripts/mutation/tests -v）：
   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <prune-server 二进制> -- python3 scripts/mutation/tests/test_audit_regressions.py --selftest
 门禁 code-tooling 的 research-script-selftests 格照这一句跑（.claude/hooks/selftest-registry.tsv 登记成 light）。
-判定库那几条（Library 的往返、两个写者并单元、并完刷新缓存）只对临时 prune-server 跑（判定库只在服务里，scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service）：
+判定库那几条（Library 的往返、两个写者并单元、并完刷新缓存，与证红走到判定库的那四条）只对临时 prune-server 跑（判定库只在服务里，scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service）：
 不在临时服务底下，--selftest 开跑前调客户端 selftest_service_problem、退 2、一条都不跑；直接 unittest discover 起的，那几条照 SERVICE_REMEDY 判失败（不跳过），别的照跑。
 """
 import importlib.util
@@ -56,6 +56,24 @@ def load_prove():
     with mock.patch.object(sys, 'argv', ['prove-red.sh', str(DIRECTORY)]):
         exec(compile(source, str(DIRECTORY / 'prove-red.sh'), 'exec'), namespace)
     return namespace
+
+
+@contextlib.contextmanager
+def prove_commands_stubbed(test, prove, directory):
+    """证红那几条的外部命令桩：判定库的库根是 directory 底下一棵临时 git 仓（prove-red.sh 的 LIBRARY_ROOT_FOR_SELFTEST，库在临时服务里按库目录另占一份命名空间，
+    每条用例各一份、记录不串）。只有对这棵仓起的 git 照真起，别的 subprocess.run（RocksDB 预编库的取值、工具链查询）一律交退 0、空输出。"""
+    service_library_directory(test, directory)
+    library_root = os.path.join(directory, 'library-root')
+    subprocess.run(['git', 'init', '-q', library_root], check=True, stdin=subprocess.DEVNULL)
+    real_run = subprocess.run
+
+    def run(command, *args, **kwargs):
+        if list(command[:3]) == ['git', '-C', library_root]:
+            return real_run(command, *args, **kwargs)
+        return subprocess.CompletedProcess([], 0, stdout='', stderr='')
+
+    with mock.patch.dict(prove, LIBRARY_ROOT_FOR_SELFTEST=[library_root]), mock.patch.object(subprocess, 'run', side_effect=run):
+        yield
 
 
 class CacheTests(unittest.TestCase):
@@ -254,9 +272,8 @@ class ProveTests(unittest.TestCase):
                 if len(calls) == 1:
                     return 0, baseline.format(expected=row.expected)
                 return 101, f'test tests::{row.expected} ... FAILED\n'
-            entry = subprocess.CompletedProcess([], 0, stdout='', stderr='')
             with mock.patch.dict(self.prove, run_cargo=cargo, rebuild_problem=lambda *a: None), \
-                    mock.patch.object(subprocess, 'run', return_value=entry):
+                    prove_commands_stubbed(self, self.prove, d):
                 code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', {})
             self.assertEqual(code, 2, lines)
             self.assertEqual(len(calls), 1)
@@ -276,8 +293,7 @@ class ProveTests(unittest.TestCase):
                 if len(calls) == 1:
                     return 0, f'test tests::{row.expected} ... ok\n'
                 raise RuntimeError('interrupted cargo')
-            entry = subprocess.CompletedProcess([], 0, stdout='', stderr='')
-            with mock.patch.dict(self.prove, run_cargo=cargo), mock.patch.object(subprocess, 'run', return_value=entry):
+            with mock.patch.dict(self.prove, run_cargo=cargo), prove_commands_stubbed(self, self.prove, d):
                 with self.assertRaisesRegex(RuntimeError, 'interrupted cargo'):
                     self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', {})
             self.assertEqual(source.read_bytes(), data)
@@ -294,9 +310,8 @@ class ProveTests(unittest.TestCase):
             def cargo(*args):
                 calls.append(source.read_bytes())
                 return (0, 'test tests::answer_is_42 ... ok\n') if len(calls) == 1 else (101, 'test tests::answer_is_42 ... FAILED\n')
-            entry = subprocess.CompletedProcess([], 0, stdout='', stderr='')
             with mock.patch.dict(self.prove, run_cargo=cargo, rebuild_problem=lambda *a: None), \
-                    mock.patch.object(subprocess, 'run', return_value=entry):
+                    prove_commands_stubbed(self, self.prove, d):
                 code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', ['multiline'], 'cargo', {})
             self.assertEqual(code, 0, lines)
             self.assertEqual(len(calls), 2)

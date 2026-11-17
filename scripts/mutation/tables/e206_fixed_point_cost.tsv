@@ -1,0 +1,15 @@
+m1_release_exit_falls_through_to_the_placements	                close_over_the_release_chain(graph, &mut rewritten);\n            }\n            continue;	                close_over_the_release_chain(graph, &mut rewritten);\n            }
+m2_closure_walks_one_hop	            frontier.push(next);	            let _ = &mut frontier;
+m3_limit_of_sixty_five	const SETTLING_ROUNDS_LIMIT: usize = 64;	const SETTLING_ROUNDS_LIMIT: usize = 65;
+m4_round_work_keeps_the_final_round_only	        self.per_round.iter().sum()	        *self.per_round.last().unwrap_or(&0)
+m5_effective_rounds_over_the_first_round	self.round_work() as f64 / *self.per_round.last().unwrap_or(&1) as f64	self.round_work() as f64 / *self.per_round.first().unwrap_or(&1) as f64
+m6_axis_from_one	const AXIS_LOW: f64 = 10.0;	const AXIS_LOW: f64 = 1.0;
+m7_many_rounds_above_nine	const MANY_ROUNDS_ABOVE: u64 = 8;	const MANY_ROUNDS_ABOVE: u64 = 9;
+m8_band_upper_edge_moved	const BAND_DOES_NOT_GROW_AT_MOST: f64 = 0.25;	const BAND_DOES_NOT_GROW_AT_MOST: f64 = 0.35;
+m9_p3_back_to_the_cumulative	            sum += roles.abs_diff(before);	            sum += roles.abs_diff(before).max(*roles);
+m10_premise_ratio_drops_the_release_rounds	    let numerator: u64 = settle\n        .detail\n        .iter()\n	    let numerator: u64 = settle\n        .detail\n        .iter()\n        .filter(|round| round.exit != "release_not_covered")\n
+m11_by_delta_drops_the_release_find	            input.calls_in_the_row("allocator_release_linear_find") * lg(input.allocation_records),	            0,
+m12_geometry_forgets_the_internal_layers	    let below_the_root: u64 = (0..level)	    let below_the_root: u64 = (0..1)
+pooled_fallback_judgement_is_never_marked	        marked += u64::from(judgement_calls > 0);	        marked += 0;
+pooled_fallback_forgets_the_per_disk_fallback_steps	        per_disk_fallback_steps += judgement_per_disk_fallback_steps;	        per_disk_fallback_steps += 0;
+pooled_fallback_calls_are_not_summed	        calls += judgement.rows.get(&key(ROW_WITHOUT_A_BY_DELTA_FORMULA)).map_or(0, |cell| cell.0);	        calls += 0;

@@ -9,14 +9,22 @@
 #   test_target      crates/singlefs-verification/tests/ 下的测试目标；test_filter 用例函数名（可空）
 # crash_amplification_prepare 之后可用：
 #   configuration_file（多机配置的路径，文件头「配置」一段怎么找）、gpu_switch（0 / 1）、across_machines_switch（0 / 1）、features（开了 GPU 是 gpu，没开是空串、cargo 不带 --features）、
-#   gpu_cards_by_priority（task-server 交下来的那一张卡：环境里的 GPU_CARDS_BY_PRIORITY，没交是空串）、
+#   gpu_cards_by_priority（环境里的 GPU_CARDS_BY_PRIORITY，有就原样交给本机那一趟；没有是空串，照样往下跑）、
 #   common_environment、cargo_build_arguments、cargo_test_arguments（数组）
-#   分卡与清场由 task-server 管（records/2026-10-30-编译绕过内存总上限.md 收尾批：服务照多机配置的显卡先后挑一张、经 scripts/crash/gpu-quiesce-run.sh 清场再起这一整条，
-#     挑的卡经环境 GPU_CARDS_BY_PRIORITY=<HOSTS 里的地址>:<卡号>:<额度> 交下来）：这里不读多机配置里的显卡先后、不看清没清场，交给用例的就是服务给的那一个值。
-#   crash_amplification_prepare 交回 2：开了 GPU 而环境里没有 GPU_CARDS_BY_PRIORITY（不是经服务起的），调用方退 78、一趟 cargo 都不起。
+#   卡只归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：这里不领卡、不挑卡、不清场，不读多机配置里的显卡先后。
+#     开了 GPU 的判段（验证包 crash_amplification 的 judge_my_blocks_on_gpu）把要判的块写成判定库里的待判行、等 GPU 批处理服务判完；
+#     服务不在跑时验证包打 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行、退 78，下面「运行条件与失败分类」把它认成 gpu-verification-server、调用方退 78。
 #     弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration 下从多机配置读 GPU_CARDS_BY_PRIORITY（不看环境），
-#     gpu-card-missing-unrefused 下环境里没有也交回 0；两条由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
-#     （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
+#     由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红（红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
+#   crash_amplification_recorded_blocks <日志>        打日志里 CRASH_AMPLIFICATION_RECORDED 行 blocks= 之和（CRASH_LIBRARY_RECORDED 行不带块数，记 0）。
+#   先编后判（开了 GPU 的分项驱动在录入段之后、判段之前先编好判段要的测试二进制，判段那几趟直接起它、不再经 cargo）：
+#   crash_amplification_build_judge_binary <日志>     判段之前调。照 cargo_build_arguments（带判段那一趟的特性、--no-run）在本机编一趟
+#       （同 crash_amplification_run_on_this_host 的 RocksDB 预编库核对与 TERM 转发，只起编的那一步），编成了从 <日志> 里 cargo 打的 Executable 行取这个测试目标的二进制
+#       （crash_amplification_test_binary_in_log），放进 crash_amplification_judge_binary、往标准错误打一行「· 判段要的测试二进制编好了」；取不到打一行「!」、留空。
+#       交回编那一趟的退出码（非 0 时 crash_amplification_judge_binary 留空，调用方照 crash_amplification_exit_code_of_a_failed_run 分类）。
+#   crash_amplification_judge_binary                   不空时 crash_amplification_run_on_this_host 直接起它（工作目录是验证包目录，补上 cargo 给测试进程设的 CARGO_MANIFEST_DIR、
+#       CARGO_PKG_NAME、CARGO_CRATE_NAME、CARGO_PRIMARY_PACKAGE、CARGO；libtest 参数取 cargo_test_arguments 里 -- 之后那几个），不起 cargo；空着照两步 cargo。
+#       调用方也可以直接设成别处编好的那一份（分项驱动的 --judge-binary）。弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=judge-binary-unused 下不认它、照两步 cargo。
 # 交给本机那一趟的环境由 crash_amplification_environment_for_this_host 组（数组 this_host_environment，env 的参数）；
 #   驱动自证里换掉本机那一趟时也经它组，只把起 cargo 换成假的。
 #
@@ -28,16 +36,26 @@
 #       双机开着两台都要有点名的卡，双机没开不许点名另一台的卡。
 #   这一台与另一台（两台对称，同一份多机配置两台判出同一个结局）：只照 scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-addresses 认
 #       （crash_amplification_host_addresses：它把 HOSTS 与这一台网卡上的地址求交，恰好一项是这一台），不读随台变的角色变量；哪一台起活、哪一台是第二台都不改判法。
+#       那一份判不过（退非 0）时照它的退出码与它打的「✗ …」那一句原样报：那一句说的是这一台网卡上的地址（HOSTS 里没有、有几项、读不出）才说认不出这一台，
+#       别的（缺键、写法不对）只报那一句；弄坏开关 emit-failure-said-host-unrecognized、host-unrecognized-unsaid 由本份 --selftest 证红（下面「弄坏开关」表）。
 #       弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=this-host-from-hosts-order 下不问那一份、一律当 HOSTS 头一项是这一台；card-address-outside-hosts-accepted 下
 #       显卡先后里地址不在 HOSTS 的项照认、当成另一台的卡。两条由 scripts/crash/crash-amplification-item.sh --selftest 证红。
-#   crash_amplification_failure_kind <日志…>           一趟没跑成，日志里说的是哪一类：device（显卡或显存用不上，含给定状态表的判器借不到显存那一行，运行条件，调用方退 78）、
+#   crash_amplification_failure_kind <日志…>           一趟没跑成，日志里说的是哪一类：gpu-verification-server（开了 GPU 而 GPU 批处理服务不在跑：验证包打的
+#       CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行，运行条件，调用方退 78）、
+#       observer-images-without-a-card（观察者交回的盘要在卡上判、取不到卡：验证包打的 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 行，
+#       任务不拿卡、这一族待判行 GPU 批处理服务还不收，记本次未跑，调用方退 78；经 cargo test 出来的退出码是 101，只能按这一行认）、
+#       device（显卡或显存用不上，含给定状态表的判器借不到显存那一行，运行条件，调用方退 78）、
 #       build（这份二进制跑不了这一趟：结论的版本与树对不上、配置开了 GPU 而没编进 gpu 特性，运行条件，调用方退 78）、
-#       algorithm（算法上判不了：有状态 GPU 判不了、内核展开超预算、建不出表，调用方退 248），都不是打空串；几类都有时先 device、再 build
-#   crash_amplification_exit_code_of_a_failed_run <那一趟的退出码> <日志…>   打调用方该退的码：device 与 build 78、algorithm 248，别的原样
-#     （内存包装退的 245 显存不够照原样，出路由 crash_amplification_explain_exit_code 的 245 那一支打）
+#       algorithm（算法上判不了：有状态 GPU 判不了、内核展开超预算、建不出表，调用方退 248），都不是打空串；
+#       几类都有时先 gpu-verification-server、再 observer-images-without-a-card、再 device、再 build
+#   crash_amplification_exit_code_of_a_failed_run <那一趟的退出码> <日志…>   打调用方该退的码：gpu-verification-server、observer-images-without-a-card、device 与 build 78、
+#     algorithm 248，别的原样（内存包装退的 245 显存不够照原样，出路由 crash_amplification_explain_exit_code 的 245 那一支打）
+#   crash_amplification_explain_exit_code <要退的码> [<日志…>]   打出路（标准错误）：给了日志而日志里是 gpu-verification-server 那一类时 78 打起 GPU 批处理服务的命令
+#       （python3 gpu-verification-server/control start，再照 check 的出路修到它退 0）；是 observer-images-without-a-card 那一类时 78 打
+#       「这条用例的观察者交回了盘、要上卡判，任务不拿卡；等 GPU 批处理服务收这一族待判行」（crash_amplification_observer_images_without_a_card_howto）；别的照码打。
 #   弄坏开关读 CRASH_AMPLIFICATION_ITEM_BREAK（开关表与该红的格在 scripts/crash/crash-amplification-item.sh 文件头）：
 #   accept-missing-peer-cards、accept-peer-cards-without-across、accept-missing-card-list、device-unusable-as-run-failure、algorithm-refusal-as-run-failure、
-#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、this-host-from-hosts-order、card-address-outside-hosts-accepted。
+#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、gpu-verification-server-not-running-as-run-failure、this-host-from-hosts-order、card-address-outside-hosts-accepted。
 #   given-states-run-condition-as-run-failure（给定状态表借不到显存那一行不认、不退 78）只由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 #   其中 device-unusable-as-run-failure、algorithm-refusal-as-run-failure 打开时 scripts/crash/crash-amplification-two-hosts.sh --selftest 也红
@@ -69,6 +87,15 @@
 #   crash_amplification_source_digest <树根>   打「<摘要> files=<文件数>」，读不了、一个源文件都没有交回 1。分项驱动在录入段跑成后记一份、判段起跑前与收尾后各算一次，
 #       双机驱动在计划那一步记、合并那一步核账之前算一次；对不上都是「跑的过程中源码变了」：打 CRASH_AMPLIFICATION_NOT_RUN 行、退 77（本次未跑），不落红。各驱动的开关与自证在各自文件头。
 #
+# 判器输入核对（崩溃点重放入口的测试函数那一段与门禁 crash-point-replay 各片起计划那一步放的测试二进制之前用）：
+#   crash_amplification_judging_inputs_unchanged <测试二进制> <树根>   编这个二进制时算判器键所读的文件（构建脚本写在构建输出目录 watched_file_digests.tsv 里的每一份）
+#       在树根下此刻的内容还是不是编的那一刻读到的：打「same watched=<份数>」交 0（键必然没变，直接起这个二进制）、「changed watched=… changed=<份数>：<路径>」交 1（键可能变了）、
+#       「unknown <原因>」交 2（认不出）。写法与判法在函数前的注释；弄坏开关 judging-inputs-digest-unread 见下面「弄坏开关」表。
+#   crash_amplification_judging_inputs_of_binaries <树根> <并行数> <测试二进制>…   上一条对一批二进制一次做完（一个 python 进程、同一个构建输出目录的键表与摘要答案只读只算一遍），
+#       每个二进制一行「<交回值><TAB><上一条会打的那一行>」，次序同给的次序；门禁 crash-point-replay 的片对计划那一步放进去的几百个测试二进制用它。弄坏开关 judging-inputs-batch-answers-shared。
+#   crash_amplification_place_binary_without_debug_info <源> <目标>   拷测试二进制（跨文件系统放不成硬链接时）：objcopy --strip-debug 写出去掉调试段的一份，原件不动，用不上整份 cp
+#       （交 0 去了调试段、3 整份拷、1 拷不成）。弄坏开关 debug-info-kept-on-copy。
+#
 # 线程数的缺省（所有的默认都跑 31 线程，双机各台各 31，机器忙时固定、不看忙闲）：
 #   线程只读统一任务服务交的：crash_amplification_default_threads 打服务交的 SINGLEFS_THREAD_CAP，没交取登记的重活默认并行度
 #   （.claude/heavy-thread-default，经 scripts/hosts/heavy-threads.sh）。引擎的核对线程（crash_amplification_prepare 交的 SINGLEFS_CRASH_AMPLIFICATION_THREADS）取它；
@@ -86,12 +113,25 @@
 #   等记下的进程号退出（等的上限 CRASH_AMPLIFICATION_TERM_WAIT_SECONDS，默认 100 秒，没退完打 ✗ 与出路）、
 #   放回原来的 TERM 处理，再对自己发 TERM：调用方没设 TERM 处理（崩溃放量分项驱动的主线、放后台的子 shell）就此按被停退 143；设了的，它的处理跑过之后这一趟交回 143。
 #   没被停时退出码照旧转出：编的那一步退非 0 就不起跑的那一步，交回的是那一步的退出码。日志仍是一份：编的输出在前、跑的输出在后。
+#   crash_amplification_judge_binary 不空（文件头「先编后判」）时只一步：直接起那份二进制，记下的进程号是它；crash_amplification_build_judge_binary 只起编的那一步。
 #
 # 自证（单独执行 bash scripts/crash/crash-amplification-lib.sh --selftest；被 source 时不跑）：调真的 crash_amplification_run_on_this_host，
 #   仓根换成临时目录下的假树，cargo 是 PATH 前面的假脚本（跑着时占着一个文件、收到 TERM 慢一点放掉再退），不起重活；
 #   失败行是「✗ 自证 <格名>：…」。格：term-reaches-cargo（放后台的子 shell 里被停）、term-reaches-cargo-in-foreground（调用方的 shell 里没设 TERM 处理）、
 #   term-returns-143-under-caller-trap（调用方设了 TERM 处理）、term-during-build-skips-test、exit-code-passes-through、build-failure-skips-test、caller-term-trap-kept、
 #   rocksdb-entry-refused（假树的 验证包依赖 rocksdb、进程环境里没有预编库的取值：交回 78、两步 cargo 都不起；别的格假树里没有这份清单，entry 报不判）。
+#   judging-inputs-batch-agrees（同一份假树与假二进制，按键所读的文件没变、一份不在了、摘要表是空的三种状态，把有表、没表、有表三个二进制一批交给
+#   crash_amplification_judging_inputs_of_binaries，并行 1 与 3 各一遍：每一行与逐个调时的交回值与打的一行相同）、
+#   place-binary-without-debug-info（PATH 前面放假 objcopy：成了就用它写出目标、交 0、原件不动；退非 0 就整份拷、交 3）两格也直接调库里的函数。
+#   三格直接调 crash_amplification_judging_inputs_unchanged（假的构建输出目录与带键表的假二进制）：judging-inputs-unchanged（键所读的文件没变、闭包外的文件变了都打 same 交 0）、
+#   judging-inputs-changed（键所读的一份文件内容变了、或不在了，打 changed 点名那份交 1）、judging-inputs-unknown（二进制里找不到对应的键表、摘要表是空的，打 unknown 交 2）。
+#   另两格直接调 crash_amplification_host_addresses、起真的多机配置判法（假配置，这一台的地址经判法只在自证里认的 CONFIGURATION_SELFTEST_LOCAL_ADDRESSES 给成 127.0.0.1）：
+#   emit-addresses-missing-key-named（写全的配置判得过、认出 127.0.0.1；开了 GPU 而缺 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED 的那一份报出缺键那一句、不说认不出这一台）、
+#   emit-addresses-host-absent-named（HOSTS 里没有 127.0.0.1 的那一份说认不出这一台、连着判法的原句）。
+#   judge-binary-built-before-the-judge-runs（调真的 crash_amplification_build_judge_binary 与 crash_amplification_run_on_this_host：假 cargo 在 --no-run 那一步写一份假的测试二进制、打 Executable 行；
+#   外壳编完记一笔判段开始，再起两趟本机那一趟：调用记录里只有判段开始之前那一回编，判段两趟都是直接起那份二进制（工作目录是验证包目录、libtest 参数照 -- 之后的），没有 cargo）。
+#   observer-images-without-a-card（库里的函数直接调：接在「test <名> ... 」后面的 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 行
+#   认成 observer-images-without-a-card、那一趟的 101 改退 78、78 的出路是等 GPU 批处理服务收这一族待判行；同一个记号不在行首的一句话不认、101 原样退）。
 #   只在临时 prune-server 上跑（下面「判定库」：引擎的判定只在服务里，自证不写真服务）：开跑先调 crash_amplification_selftest_service_problem，
 #   不是 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service 起的临时服务就退 2、一格都不跑。
 #   末尾一轮（开关轮）从下面的表现读开关与点名的格，逐个打开再跑一遍 --selftest，核红的格与点名的逐格相等（判法是同一份库的 crash_amplification_switch_wheel）。
@@ -104,6 +144,22 @@
 #       term-returns-143-under-caller-trap（「✗ 自证 term-returns-143-under-caller-trap：」）、caller-term-trap-kept（「✗ 自证 caller-term-trap-kept：」）
 #   CRASH_AMPLIFICATION_LIB_BREAK=rocksdb-entry-unchecked  起这一趟的 cargo 之前不调 scripts/hosts/rocksdb-prebuilt.py entry
 #       rocksdb-entry-refused（「✗ 自证 rocksdb-entry-refused：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=judging-inputs-digest-unread  判器输入核对认出构建输出目录之后不比摘要，树根下的文件变了也打 same
+#       judging-inputs-changed（「✗ 自证 judging-inputs-changed：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=judging-inputs-batch-answers-shared  一批二进制的判器输入核对每个都打同一个答案（批里排在最前那个二进制的）
+#       judging-inputs-batch-agrees（「✗ 自证 judging-inputs-batch-agrees：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=debug-info-kept-on-copy  拷测试二进制时不去调试段、整份拷
+#       place-binary-without-debug-info（「✗ 自证 place-binary-without-debug-info：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=test-line-markers-unread  判行首记号之前不去掉 libtest 的「test <名> ... 」（接在它后面的录入行与判类别的记号认不出，没跑成的当跑成或退错码）
+#       test-line-markers（「✗ 自证 test-line-markers：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=emit-failure-said-host-unrecognized  多机配置判法 --emit-addresses 退非 0 一律报「认不出这一台是 HOSTS 里哪一项」，不看它 ✗ 那一句说的是什么
+#       emit-addresses-missing-key-named（「✗ 自证 emit-addresses-missing-key-named：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=host-unrecognized-unsaid  判法 ✗ 那一句确是认不出这一台（说的是这一台网卡上的地址）也不说认不出这一台
+#       emit-addresses-host-absent-named（「✗ 自证 emit-addresses-host-absent-named：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=judge-binary-unused  本机那一趟不认判段之前编好的测试二进制，照两步 cargo 起（判段那几趟又经 cargo 编）
+#       judge-binary-built-before-the-judge-runs（「✗ 自证 judge-binary-built-before-the-judge-runs：」）
+#   CRASH_AMPLIFICATION_LIB_BREAK=observer-images-without-a-card-unrecognized  crash_amplification_failure_kind 不认观察者交回的盘取不到卡那一行（那一趟照退 101 原样退、当红）
+#       observer-images-without-a-card（「✗ 自证 observer-images-without-a-card：」）、test-line-markers（「✗ 自证 test-line-markers：」）
 #
 # 配置（多机配置合成一份，不零散配置）：
 #   只读一份多机配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（git 忽略、这台机器一份；模板是仓根的 multi-host.env.example）。
@@ -112,8 +168,8 @@
 #   开关 ENABLE_GPU、ENABLE_ACROSS_MACHINES 的判法不改（没写或写 0 算关，键的定义只在 crash-point-replay-shard-configuration-check.sh）。
 #   显卡的两个键也写在这一份里：GPU_CARDS_BY_PRIORITY（不清场时显卡的先后与每张卡的显存额度，读法在
 #   crates/singlefs-verification/src/gpu_card_configuration.rs 的 parse_cards_by_priority）、GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED（清场之后的先后与额度，同一种写法）。
-#   两个键由 task-server 读来挑卡（它挑一张、清场，经环境 GPU_CARDS_BY_PRIORITY 交给命令）；这里只在运行条件（crash_amplification_run_condition_holds）里核它们写得对不对，
-#   交给用例的是 crash_amplification_prepare 从环境取的服务那一个值（文件头「crash_amplification_prepare 之后可用」那一段）。
+#   两个键由 GPU 批处理验证服务读来开卡（gpu-verification-server/README.md）；这里只在运行条件（crash_amplification_run_condition_holds）里核它们写得对不对，
+#   交给用例的只有环境里的 GPU_CARDS_BY_PRIORITY（文件头「crash_amplification_prepare 之后可用」那一段），不从这里挑。
 # 走 GPU 的计算：开了 GPU（ENABLE_GPU=1）引擎就三类全走 GPU，不经环境变量交、不登正表。
 #   不走 GPU 的那几截计算登记在仓内豁免表 .claude/gate.d/gpu-exemptions.tsv（每行用户点头），门禁 code-source-discipline 的 gpu-exemptions 格核它与代码标记逐项对上。
 #   本机那一趟另交 SINGLEFS_MULTI_HOST_CONFIG=<这一份的绝对路径>：用例不设它时按自己的树根找 multi-host.env，在 worktree 里会找不到主工作树那一份
@@ -128,10 +184,19 @@
 #   服务连不上时引擎退 75（prune-server 不可用），调用方照 75 整趟退出、不当「库里没有」现判。
 
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
+# crash_amplification_clip_text <字节数>：标准输入每行取前 <字节数> 个字节，再丢掉被切在中间的半个字符，输出总是合法的 UTF-8（GNU 的 cut -c 与 cut -b 都按字节切，三个字节的汉字会被切断；给人看的失败行与日志摘录用它截）
+crash_amplification_clip_text() { cut -b "1-$1" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null; }
 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="-I/usr/lib/gcc/x86_64-linux-gnu/13/include -I/usr/lib/gcc/x86_64-linux-gnu/14/include"  # librocksdb-sys 的 bindgen 找 stdbool.h；哪个版本的目录在就用哪个，不在的 -I 无害
 # 给定状态表的判器借不到显存时引擎打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的 GIVEN_STATES_RUN_CONDITION_NOT_MET_LINE_PREFIX）：
 # 运行条件不满足，调用方退 78；crash_amplification_failure_kind 的 device 那一组与崩溃点重放入口 scripts/crash/crash-point-replay.sh 按条复用的那一段都照这一份认
 CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX="CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET"
+# 开了 GPU 而 GPU 批处理验证服务不在跑时验证包打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的 GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX）：
+# 运行条件不满足，调用方退 78、出路是起服务的命令（文件头「运行条件与失败分类」）；门禁 crash-point-replay 的崩溃枚举用例那一路照同一份认
+CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX="CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING"
+# 观察者交回的盘要在卡上判、取不到卡时验证包打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的
+# IMAGES_AFTER_THE_OBSERVERS_WITHOUT_A_CARD_LINE_PREFIX）：任务不拿卡，记本次未跑、调用方退 78（文件头「运行条件与失败分类」）；
+# 门禁 crash-point-replay 的崩溃枚举用例那一路照同一份认
+CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX="CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS"
 
 # 自证只在临时 prune-server 上跑（文件头「自证」；scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service）：
 #   打客户端 selftest_service_problem() 的那一句，是临时服务时打空串；读不了客户端照读不了说。分项驱动、双机驱动、崩溃放量入口的自证开跑前都调它，不是空串就退 2、一格都不跑
@@ -201,17 +266,11 @@ crash_amplification_prepare() {
   [[ "$(crash_amplification_configuration_value "$configuration_file" ENABLE_GPU)" == 1 ]] && gpu_switch=1
   [[ "$(crash_amplification_configuration_value "$configuration_file" ENABLE_ACROSS_MACHINES)" == 1 ]] && across_machines_switch=1
   (( gpu_switch )) && features="gpu"
-  # 卡是 task-server 挑好、清过场交下来的（文件头「crash_amplification_prepare 之后可用」那一段）：环境里的 GPU_CARDS_BY_PRIORITY，不读多机配置里的显卡先后。
+  # 交给本机那一趟的卡（文件头「crash_amplification_prepare 之后可用」那一段）：环境里的 GPU_CARDS_BY_PRIORITY，不读多机配置里的显卡先后；没有也不拒、不领。
   #   弄坏开关 cards-read-from-configuration 下从多机配置读（不看环境）
   gpu_cards_by_priority="${GPU_CARDS_BY_PRIORITY:-}"
   if crash_amplification_item_break_is cards-read-from-configuration; then
     gpu_cards_by_priority="$(crash_amplification_configuration_value "$configuration_file" GPU_CARDS_BY_PRIORITY)"
-  fi
-  # 开了 GPU 而服务没交卡（不是经 task-server 起的）：交回 2，调用方退 78、一趟 cargo 都不起。弄坏开关 gpu-card-missing-unrefused 下照跑
-  if (( gpu_switch )) && [[ -z "$gpu_cards_by_priority" ]] && ! crash_amplification_item_break_is gpu-card-missing-unrefused; then
-    echo "  ✗ 多机配置开了 GPU（ENABLE_GPU=1，多机配置：$configuration_file），环境里却没有 task-server 交的显卡（GPU_CARDS_BY_PRIORITY）：一趟 cargo 都没起" >&2
-    echo "  → 怎么办：经 task-server/task submit -- <这条命令> 交，服务照多机配置挑卡、清场再起；分卡与清场不在这里做" >&2
-    return 2
   fi
   common_environment=("BINDGEN_EXTRA_CLANG_ARGS=$CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS")
   local cores
@@ -234,6 +293,32 @@ crash_amplification_environment_for_this_host() { # <share> [<附加环境 键=�
   return 0
 }
 
+# 日志里录入的块数：CRASH_AMPLIFICATION_RECORDED 行 blocks= 之和；没有这种行打 0
+crash_amplification_recorded_blocks() { # <日志>
+  crash_amplification_lines_without_test_prefix "$1" \
+    | awk '$1 == "CRASH_AMPLIFICATION_RECORDED" { for (i = 2; i <= NF; i++) if ($i ~ /^blocks=[0-9]+$/) total += substr($i, 8) } END { print total + 0 }'
+}
+
+# 判段要的测试二进制（文件头「先编后判」）：不空时 crash_amplification_run_on_this_host 直接起它、不经 cargo
+crash_amplification_judge_binary="${crash_amplification_judge_binary:-}"
+
+# 判段之前编好判段要的测试二进制（文件头「先编后判」）：只起编的那一步，取 Executable 行里的二进制放进 crash_amplification_judge_binary；交回编那一趟的退出码
+crash_amplification_build_judge_binary() { # <日志>
+  local build_exit built
+  crash_amplification_judge_binary=""
+  if crash_amplification_this_host_build_only=1 crash_amplification_run_on_this_host 0/1 "$1"; then build_exit=0; else build_exit=$?; fi
+  (( build_exit == 0 )) || return "$build_exit"
+  # cargo 在仓根起（crash_amplification_run_step），编译目录落在仓根底下时 Executable 行写的是相对仓根的路径：在仓根认、再补成绝对路径
+  if built="$(cd "$repository_root" && crash_amplification_test_binary_in_log "$1" "${test_target:-}")"; then
+    [[ "$built" == /* ]] || built="$repository_root/$built"
+    crash_amplification_judge_binary="$built"
+    echo "  · 判段要的测试二进制编好了（判段之前，cargo ${cargo_build_arguments[*]}）：$built；判段直接起它，不经 cargo、不重编" >&2
+  else
+    echo "  ! 编完了，日志 $1 里却没有 ${test_target:-} 的 Executable 行（或那份文件不在）：判段照旧经 cargo test 起，树在编完之后改过会在判段重编" >&2
+  fi
+  return 0
+}
+
 # 一台机器用几个核（文件头「线程数的缺省」）：服务交的 SINGLEFS_THREAD_CAP，没交取登记的重活默认并行度（.claude/heavy-thread-default）；
 # 弄坏开关 threads-default-cores 下取本机核数减一
 crash_amplification_default_threads() {
@@ -242,6 +327,174 @@ crash_amplification_default_threads() {
     return 0
   fi
   heavy_thread_default
+}
+
+# crash_amplification_test_binary_in_log <日志> <测试目标>：cargo test 在日志里打的那个测试目标的测试二进制的路径（只编不跑的 --no-run 打「Executable tests/<目标>.rs (<路径>)」，
+#   编了再跑的打「Running tests/<目标>.rs (<路径>)」；目标住在 tests/<目标>/main.rs 的写 tests/<目标>/main.rs）。文件在且可执行才打、交 0；
+#   日志读不了、没有这一行或文件不在交 1、什么都不打。分项驱动的判段、崩溃点重放入口的测试函数那一段与门禁 crash-point-replay 计划那一步放测试二进制时用它取编好的那一份、
+#   之后直接起它、不再经 cargo：编完之后树被别的会话改过，cargo 按文件修改时间再来一趟就要重编几分钟
+crash_amplification_test_binary_in_log() {
+  local built_path
+  built_path="$(awk -v target="$2" '
+    ($1 == "Running" || $1 == "Executable") && ($2 == "tests/" target ".rs" || $2 == "tests/" target "/main.rs") {
+      line = $0; sub(/^[^(]*\(/, "", line); sub(/\)[[:space:]]*$/, "", line); print line; exit
+    }' "$1" 2>/dev/null)"
+  [[ -n "$built_path" && -f "$built_path" && -x "$built_path" ]] || return 1
+  printf '%s\n' "$built_path"
+}
+
+# crash_amplification_cargo_path <树根>：cargo test 起测试二进制时给它的环境变量 CARGO 的值（真 cargo 的路径，不是 rustup 的代理）：验证包的工具链指纹
+#   （crash_point_replay_progress.rs 的 of_the_cargo_running_this_test）读它与它旁边的 rustc。取 <树根里 rustc --print sysroot>/bin/cargo，取不到退回 PATH 上的 cargo
+crash_amplification_cargo_path() {
+  local sysroot
+  if sysroot="$(cd "$1" && rustc --print sysroot 2>/dev/null)" && [[ -x "$sysroot/bin/cargo" ]]; then printf '%s\n' "$sysroot/bin/cargo"; else type -P cargo; fi
+}
+
+# crash_amplification_judging_inputs_unchanged <测试二进制> <树根>：编这个测试二进制时算判器键所读的文件，此刻在树根下的内容还是不是编的那一刻读到的。
+#   验证包的构建脚本（crates/singlefs-verification/build.rs）逐组算判器键写进 OUT_DIR 的 judging_units_keys.tsv（库经 include_str! 编进二进制），同时把键所读的每份文件
+#   （与它的 rerun-if-changed 清单同一批）的 SHA-256 写进同目录的 watched_file_digests.tsv（每行「摘要<TAB>相对仓根的路径」）。这里认出编进这份二进制的那一份键表对应的构建输出目录
+#   （二进制所在目录的上一层的 build/singlefs-verification-*/out，键表整份在二进制里找得到的那一个），把摘要表里的每份文件按树根下此刻的内容重算一遍比：
+#   全相同，键必然相同（键只由这些文件、工具链与 Cargo.lock 定，构建脚本自己也只在这批文件变了才重算）。有一份不同或不在了，键可能变了（也可能只是闭包外的单元或注释变了），
+#   不在这里现算键：现算当前树的键没有只读的办法（缺的东西写在入口文件头「GPU」）。
+#   打一行「same watched=<份数>」交 0；「changed watched=<份数> changed=<不同的份数>：<头几份的路径>」交 1；认不出（二进制或构建输出目录读不了、键表不在二进制里、摘要表是空的）
+#   打「unknown <原因>」交 2。弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=judging-inputs-digest-unread 下认出构建输出目录之后不比摘要、一律打 same。
+#   判法只在 crash_amplification_judging_inputs_of_binaries 里：这一条是它只给一个二进制的调法。
+crash_amplification_judging_inputs_unchanged() {
+  local line code
+  line="$(crash_amplification_judging_inputs_of_binaries "$2" 1 "$1")" || return $?
+  code="${line%%$'\t'*}"
+  [[ "$code" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "${line#*$'\t'}"
+  return "$code"
+}
+
+# crash_amplification_judging_inputs_of_binaries <树根> <并行数> <测试二进制>…：上一条对一批二进制一次做完，一个 python 进程：每个构建输出目录的键表与摘要表只读一次、
+#   摘要表里的文件对同一个构建输出目录只重算一遍（同一份构建输出编出来的二进制答案相同），各二进制在键表里的查找按 <并行数> 个进程分着做（1 不分）。
+#   每个二进制打一行「<交回值><TAB><上一条会打的那一行>」，次序同给的次序，每一行与上一条单给这个二进制时打的、交的相同；起不来（python 退非 0）交回它的退出码、一行不打。
+#   弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=judging-inputs-digest-unread 同上一条；judging-inputs-batch-answers-shared 下每个二进制都打同一个答案（批里排在最前那个二进制的，批量与逐个对不上）。
+crash_amplification_judging_inputs_of_binaries() {
+  local root="$1" jobs="$2" digest_unread=0 shared_answer=0
+  shift 2
+  crash_amplification_lib_break_is judging-inputs-digest-unread && digest_unread=1
+  crash_amplification_lib_break_is judging-inputs-batch-answers-shared && shared_answer=1
+  (( $# > 0 )) || return 0
+  python3 -I - "$root" "$digest_unread" "$jobs" "$shared_answer" "$@" <<'JUDGING_INPUTS_PYTHON'
+import concurrent.futures
+import glob
+import hashlib
+import mmap
+import multiprocessing
+import os
+import sys
+
+root, digest_unread, jobs, shared_answer, binaries = sys.argv[1], sys.argv[2] == "1", int(sys.argv[3]), sys.argv[4] == "1", sys.argv[5:]
+KEYS_FILE, DIGESTS_FILE = "judging_units_keys.tsv", "watched_file_digests.tsv"
+SHOWN_PATHS = 5
+build_outputs = {}   # 二进制上一层的 build 目录 → [(键表的修改时刻, 构建输出目录, 键表开头的一段, 键表)…]：fork 之前读好，各进程共用
+
+
+def build_parent_of(binary):
+    return os.path.join(os.path.dirname(os.path.abspath(binary)), os.pardir, "build")
+
+
+def build_outputs_of(build_parent):
+    found = []
+    for directory in sorted(glob.glob(os.path.join(glob.escape(build_parent), "singlefs-verification-*", "out"))):
+        keys_path, digests_path = os.path.join(directory, KEYS_FILE), os.path.join(directory, DIGESTS_FILE)
+        try:
+            with open(keys_path, "rb") as handle:
+                table = handle.read()
+            modified = os.path.getmtime(keys_path)
+            if not table or not os.path.isfile(digests_path):
+                continue
+        except OSError:
+            continue
+        found.append((modified, directory, table[:1 << 20], table))
+    return found
+
+
+def locate(binary):
+    """交 (交回值, 打的一行, 构建输出目录)：键表整份在这个二进制里找得到的构建输出目录里取修改时刻最晚的；找不到、读不了交 2 与 unknown 那一行。"""
+    try:
+        with open(binary, "rb") as handle:
+            view = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+    except (OSError, ValueError) as error:
+        return 2, f"unknown 读不了测试二进制 {binary}：{error}", None
+    build_parent = build_parent_of(binary)
+    matched = []
+    for modified, directory, head, table in build_outputs[build_parent]:
+        at = view.find(head)
+        while at >= 0 and view[at:at + len(table)] != table:
+            at = view.find(head, at + 1)
+        if at >= 0:
+            matched.append((modified, directory))
+    if not matched:
+        return 2, f"unknown 编进 {binary} 的判器键表在 {build_parent}/singlefs-verification-*/out 里找不到对应的构建输出", None
+    return 0, "", max(matched)[1]
+
+
+def digests_answer(directory):
+    """摘要表里每份文件按树根下此刻的内容重算再比：交 (交回值, 打的一行)。"""
+    try:
+        with open(os.path.join(directory, DIGESTS_FILE), encoding="utf-8") as handle:
+            rows = [line.rstrip("\n").split("\t", 1) for line in handle if line.strip()]
+    except OSError as error:
+        return 2, f"unknown 读不了 {directory}/{DIGESTS_FILE}：{error}"
+    if not rows or any(len(row) != 2 for row in rows):
+        return 2, f"unknown {directory}/{DIGESTS_FILE} 是空的或某一行不是「摘要<TAB>路径」"
+    changed = []
+    for digest, path in rows:
+        try:
+            with open(os.path.join(root, path), "rb") as handle:
+                now = hashlib.sha256(handle.read()).hexdigest()
+        except OSError:
+            now = None
+        if now != digest and not digest_unread:
+            changed.append(path)
+    if changed:
+        return 1, f"changed watched={len(rows)} changed={len(changed)}：{' '.join(changed[:SHOWN_PATHS])}{' …' if len(changed) > SHOWN_PATHS else ''}"
+    return 0, f"same watched={len(rows)}"
+
+
+for parent in dict.fromkeys(build_parent_of(binary) for binary in binaries):
+    build_outputs[parent] = build_outputs_of(parent)
+if jobs > 1 and len(binaries) > 1:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=min(jobs, len(binaries)), mp_context=multiprocessing.get_context("fork")) as pool:
+        located = list(pool.map(locate, binaries, chunksize=max(1, len(binaries) // (jobs * 4))))
+else:
+    located = [locate(binary) for binary in binaries]
+answers = {}   # 构建输出目录 → 摘要表那一遍的答案，同一个目录只算一遍
+results = []
+for code, text, directory in located:
+    if directory is not None:
+        if directory not in answers:
+            answers[directory] = digests_answer(directory)
+        code, text = answers[directory]
+    results.append((code, text))
+if shared_answer:
+    results = [results[0]] * len(results)
+for code, text in results:
+    print(f"{code}\t{text}")
+JUDGING_INPUTS_PYTHON
+}
+
+# crash_amplification_place_binary_without_debug_info <源> <目标>：把测试二进制拷成 <目标>（跨文件系统放不成硬链接时用）：objcopy --strip-debug 直接写出去掉调试段的一份，原件不动
+#   （release 档带完整调试信息，调试段占二进制的九成以上；判器输入核对读的键表在 .rodata、不在调试段里）。objcopy 不在 PATH 上、退非 0、写出空文件时整份 cp。
+#   交 0：去了调试段；交 3：整份拷（objcopy 用不上，原因打到标准错误）；交 1：拷也不成。弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=debug-info-kept-on-copy 下不去调试段、整份拷（交 3）。
+crash_amplification_place_binary_without_debug_info() {
+  local source="$1" destination="$2" strip_output
+  if crash_amplification_lib_break_is debug-info-kept-on-copy; then
+    :
+  elif ! type -P objcopy >/dev/null; then
+    echo "  ! objcopy 不在 PATH 上：$source 整份拷、不去调试段" >&2
+  elif strip_output="$(objcopy --strip-debug "$source" "$destination" 2>&1)" && [[ -s "$destination" ]]; then
+    return 0
+  else
+    echo "  ! objcopy --strip-debug 没成（${strip_output:-写出的是空文件}）：$source 整份拷、不去调试段" >&2
+    rm -f -- "$destination"
+  fi
+  cp -- "$source" "$destination" || return 1
+  return 3
 }
 
 # 本机的一趟：先只编、再跑，两步 cargo 直接起，编译与测试线程照服务交下来的（文件头「包装、内存上限与线程」；librocksdb-sys 的 C++ 按并行度吃内存，
@@ -253,7 +506,7 @@ crash_amplification_default_threads() {
 # 只把 TERM 转给记下的那一个进程号（env exec 成的 cargo）、不再起下一步、等记下的那个进程号退出、
 # 放回原来的 TERM 处理，
 # 再对自己发 TERM：调用方没设 TERM 处理的（放后台的子 shell）就此按被停退 143，设了的（分项驱动与双机驱动的主线：trap 'exit 143' TERM）它的处理跑过之后交回 143。
-# 弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK（文件头「弄坏开关」）：term-not-forwarded、term-not-waited、term-trap-not-restored、rocksdb-entry-unchecked。
+# 弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK（文件头「弄坏开关」）：term-not-forwarded、term-not-waited、term-trap-not-restored、rocksdb-entry-unchecked、judge-binary-unused。
 crash_amplification_lib_break_is() { [[ ",${CRASH_AMPLIFICATION_LIB_BREAK:-}," == *",$1,"* ]]; }
 
 crash_amplification_process_is_running() { # <进程号>：在跑（没有、或已是僵尸都算没在跑）交回 0
@@ -349,9 +602,21 @@ crash_amplification_run_on_this_host() { # <share> <日志> [<附加环境 键=�
   if [[ "$BASHPID" == "$$" ]]; then previous_term_trap="$(trap -p TERM)"; fi
   : >"$log"
   trap 'crash_amplification_on_term' TERM
-  crash_amplification_run_step "$log" env "${local_environment[@]}" cargo "${cargo_build_arguments[@]}"; step_status=$?
-  if (( step_status == 0 && ! crash_amplification_term_received )); then
-    crash_amplification_run_step "$log" env "${local_environment[@]}" cargo "${cargo_test_arguments[@]}"; step_status=$?
+  if [[ -n "${crash_amplification_judge_binary:-}" && "${crash_amplification_this_host_build_only:-0}" != 1 ]] && ! crash_amplification_lib_break_is judge-binary-unused; then
+    # 判段之前编好的测试二进制（文件头「先编后判」）：直接起它，不经 cargo；libtest 参数取 cargo_test_arguments 里 -- 之后那几个
+    local word after_separator=0 package_directory="$repository_root/crates/singlefs-verification"
+    local -a libtest_arguments=()
+    for word in "${cargo_test_arguments[@]}"; do
+      if (( after_separator )); then libtest_arguments+=("$word"); elif [[ "$word" == -- ]]; then after_separator=1; fi
+    done
+    crash_amplification_run_step "$log" env -C "$package_directory" "${local_environment[@]}" \
+      "CARGO_MANIFEST_DIR=$package_directory" CARGO_PKG_NAME=singlefs-verification "CARGO_CRATE_NAME=${test_target:-}" CARGO_PRIMARY_PACKAGE=1 "CARGO=$(crash_amplification_cargo_path "$repository_root")" \
+      "$crash_amplification_judge_binary" ${libtest_arguments[@]+"${libtest_arguments[@]}"}; step_status=$?
+  else
+    crash_amplification_run_step "$log" env "${local_environment[@]}" cargo "${cargo_build_arguments[@]}"; step_status=$?
+    if (( step_status == 0 && ! crash_amplification_term_received )) && [[ "${crash_amplification_this_host_build_only:-0}" != 1 ]]; then
+      crash_amplification_run_step "$log" env "${local_environment[@]}" cargo "${cargo_test_arguments[@]}"; step_status=$?
+    fi
   fi
   if (( crash_amplification_term_received )); then
     echo "  · 收到 TERM：已转给本机那一趟（记下的进程号），等它退出后按被停退 143" >&2
@@ -362,6 +627,25 @@ crash_amplification_run_on_this_host() { # <share> <日志> [<附加环境 键=�
   fi
   crash_amplification_restore_term_trap "$previous_term_trap"
   return "$step_status"
+}
+
+# libtest 先打「test <名> ... 」、测试跑完才补结局，等着的时候别的测试打的行就接在这一截后面（并行、--nocapture），记号不在行首：
+# 判行首记号的地方都先去掉这一截（可连着几截）。弄坏开关 test-line-markers-unread 下不去掉，红在这份文件 --selftest 的 test-line-markers。
+crash_amplification_lines_without_test_prefix() { # <日志…>：打每份日志的每一行，行首的「test <名> ... 」去掉
+  if crash_amplification_lib_break_is test-line-markers-unread; then
+    cat -- "$@"
+    return
+  fi
+  LC_ALL=C sed -E 's/^(test [^ ]+ \.\.\. )+//' -- "$@"
+}
+
+# 打录入段记的那几行（行首的「test <名> ... 」去掉），一行都没有退 1。两种录入行与开关 library-marker-not-accepted 写在 crash_amplification_record_on_this_host 上面那一段。
+crash_amplification_recorded_lines() { # <日志>
+  local recorded_line_pattern='^(CRASH_AMPLIFICATION_RECORDED|CRASH_LIBRARY_RECORDED) '
+  if crash_amplification_item_break_is library-marker-not-accepted; then
+    recorded_line_pattern='^CRASH_AMPLIFICATION_RECORDED '
+  fi
+  grep -E "$recorded_line_pattern" < <(crash_amplification_lines_without_test_prefix "$1")
 }
 
 # 录入段（录入段在 CPU 上跑数据、写进判定库（prune-server）；判段只从服务里读，段与段之间不在内存里交数据）：本机起一趟
@@ -375,7 +659,7 @@ crash_amplification_run_on_this_host() { # <share> <日志> [<附加环境 键=�
 #   SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS、按块序号平滑轮转）。所以两片观察者录入各录各的那一份时，钉在本机那一片的录入段给 0/2（双机驱动
 #   crash-amplification-two-hosts.sh 的两片：不带权重、等分），录入段与判段的分法才是同一个；判段读到录入段没录的观察者块会报「先跑录入段」。
 crash_amplification_record_on_this_host() { # <日志> [<份> [<附加环境 键=值>…]]
-  local log="$1" share="${2:-0/1}" record_exit exit_code recorded_line_pattern
+  local log="$1" share="${2:-0/1}" record_exit exit_code
   shift $(( $# < 2 ? $# : 2 ))
   crash_amplification_run_on_this_host "$share" "$log" SINGLEFS_CRASH_AMPLIFICATION_STAGE=record "$@"; record_exit=$?
   if [[ "$record_exit" != 0 ]]; then
@@ -384,11 +668,7 @@ crash_amplification_record_on_this_host() { # <日志> [<份> [<附加环境 键
     echo "  → 怎么办：看日志里 panicked 那几行，修好再重跑同一条命令；录入段没跑成，判段一趟都不起" >&2
     return "$exit_code"
   fi
-  recorded_line_pattern='^(CRASH_AMPLIFICATION_RECORDED|CRASH_LIBRARY_RECORDED) '
-  if crash_amplification_item_break_is library-marker-not-accepted; then
-    recorded_line_pattern='^CRASH_AMPLIFICATION_RECORDED '
-  fi
-  if ! grep -hE "$recorded_line_pattern" "$log"; then
+  if ! crash_amplification_recorded_lines "$log"; then
     echo "  ✗ 录入段退 0，日志 $log 里却一行 CRASH_AMPLIFICATION_RECORDED 或 CRASH_LIBRARY_RECORDED 都没有（引擎没跑到录入段，或用例没经 run_from_environment 起）" >&2
     echo "  → 怎么办：看那份日志跑的是不是这一项的用例、用例有没有在只跑录入段的那一趟提早返回" >&2
     return 1
@@ -484,18 +764,33 @@ SOURCE_DIGEST_PYTHON
 # 显卡先后一项的写法（文件头「这一台与另一台」）：拒绝说明里照抄这一句
 CRASH_AMPLIFICATION_CARD_ENTRY_HOW_TO_WRITE='每项写 <HOSTS 里的地址>:<卡号>:<额度>（从右切两刀，地址可以是 IPv6；额度是正整数带 G 或 M，例 192.0.2.1:0:24G）'
 
+# 多机配置判法判不过的那一句里有这几个字，才是认不出这一台（那一份认主机数组里哪一项是自己的三句 refuse：读不出、HOSTS 里一项都没有、有几项，
+#   都写「这一台网卡上的地址」；别的 refuse 不写这几个字）。那一份改了这三句的说法，这里与本份 --selftest 的 emit-addresses-host-absent-named 跟着改
+CRASH_AMPLIFICATION_HOST_UNRECOGNIZED_MARK='这一台网卡上的地址'
+
 # 这一台与另一台的地址（文件头「这一台与另一台」）：只照 crash-point-replay-shard-configuration-check.sh --emit-addresses 认。
 # 置 crash_amplification_hosts、crash_amplification_this_host_address、crash_amplification_peer_host_address 与 crash_amplification_serial_compile_hosts
-#   （多机配置的 GPU_KERNEL_SERIAL_COMPILE_HOSTS，没写是空串；那一份文件头「GPU 内核一个一个编的台」）；那一份判不过把它的输出转打到标准错误、交回 1。
+#   （多机配置的 GPU_KERNEL_SERIAL_COMPILE_HOSTS，没写是空串；那一份文件头「GPU 内核一个一个编的台」）；那一份判不过交回 1，标准错误先打一行 ✗：
+#   照它的退出码与它打的头一行「✗ …」原样报（那一句说的是这一台网卡上的地址才冠「认不出这一台是 HOSTS 里哪一项」，别的不冠），再打出路，再把它的原话缩进转出。
 # 第二个参数是 1 时（调用方的弄坏开关 this-host-from-hosts-order）照那一份取 HOSTS，这一台一律当头一项、另一台当第二项（写死次序的样子）
 crash_amplification_host_addresses() { # <多机配置> [<1：照 HOSTS 次序认>]
-  local output line value emit_exit=0
+  local output line value emit_exit=0 refusal="" advice="" headline
   crash_amplification_hosts="" crash_amplification_this_host_address="" crash_amplification_peer_host_address="" crash_amplification_serial_compile_hosts=""
   output="$(bash "$(dirname "${BASH_SOURCE[0]}")/crash-point-replay-shard-configuration-check.sh" --configuration "$1" --emit-addresses 2>&1)" || emit_exit=$?
   if (( emit_exit != 0 )); then
-    printf '%s\n' "$output" >&2
-    echo "  ✗ 认不出这一台是 HOSTS 里哪一项：多机配置判法 --emit-addresses 退 $emit_exit（上面是它的原话；多机配置：$1）" >&2
-    echo "  → 怎么办：修好设备，或改配置：照上面那一句改多机配置（HOSTS 里恰好一项是这一台网卡上的地址），单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --configuration $1 --emit-addresses 核" >&2
+    while IFS= read -r line; do
+      if [[ -z "$refusal" && "$line" =~ ^[[:space:]]*✗[[:space:]]*(.*)$ ]]; then refusal="${BASH_REMATCH[1]}"
+      elif [[ -z "$advice" && "$line" =~ ^[[:space:]]*→[[:space:]]*(.*)$ ]]; then advice="${BASH_REMATCH[1]}"
+      fi
+    done <<<"$output"
+    headline="多机配置判法 --emit-addresses 退 $emit_exit：${refusal:-（它没打「✗」那一行，原话见下）}"
+    if crash_amplification_lib_break_is emit-failure-said-host-unrecognized \
+       || { [[ "$refusal" == *"$CRASH_AMPLIFICATION_HOST_UNRECOGNIZED_MARK"* ]] && ! crash_amplification_lib_break_is host-unrecognized-unsaid; }; then
+      headline="认不出这一台是 HOSTS 里哪一项：$headline"
+    fi
+    echo "  ✗ $headline（多机配置：$1）" >&2
+    echo "  → 怎么办：${advice:+$advice；}照上面那一句改多机配置（或修好那一句点名的设备），单跑 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --configuration $1 --emit-addresses 核" >&2
+    printf '%s\n' "$output" | sed 's/^/       | /' >&2
     return 1
   fi
   while IFS= read -r line; do
@@ -512,7 +807,7 @@ crash_amplification_host_addresses() { # <多机配置> [<1：照 HOSTS 次序�
     read -r crash_amplification_this_host_address crash_amplification_peer_host_address _ <<<"$crash_amplification_hosts"
   fi
   if [[ -z "$crash_amplification_this_host_address" || -z "$crash_amplification_peer_host_address" ]]; then
-    echo "  ✗ 多机配置判法 --emit-addresses 退 0 却没打出这一台与另一台的地址（读到：$(tr '\n' ' ' <<<"$output" | cut -c1-200)）" >&2
+    echo "  ✗ 多机配置判法 --emit-addresses 退 0 却没打出这一台与另一台的地址（读到：$(tr '\n' ' ' <<<"$output" | crash_amplification_clip_text 200)）" >&2
     echo "  → 怎么办：看 scripts/crash/crash-point-replay-shard-configuration-check.sh 的 --emit-addresses 那一段（要打 HOSTS、THIS_HOST_ADDRESS、PEER_HOST_ADDRESS 三行）" >&2
     return 1
   fi
@@ -611,6 +906,9 @@ crash_amplification_run_condition_holds() { # [<仓根>]：对得上交回 0；�
 }
 
 # 一趟没跑成，日志里说的是哪一类（判据是用例与判器报错的原话，出处见各串旁边）：
+#   gpu-verification-server：行首是 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 的那一行（CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX）
+#   observer-images-without-a-card：行首是 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 的那一行（观察者交回的盘要在卡上判、取不到卡；
+#     CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX）。弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=observer-images-without-a-card-unrecognized 下不认
 #   device：显卡或显存用不上——GPU_CARD_NOT_USABLE 行（crates/singlefs-verification/src/gpu_unit_checks.rs）、
 #     「这台机器却没有一张用得了的卡」「没有一张卡装得下这条流的表」「GPU_CARDS_BY_PRIORITY 里没有」（crates/singlefs-verification/src/crash_amplification.rs）、
 #     行首（可带空白）是 CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 的那一行（给定状态表的判器起过卡池而借不到显存，引擎打这一行后报错；
@@ -620,10 +918,12 @@ crash_amplification_run_condition_holds() { # [<仓根>]：对得上交回 0；�
 #     「这份二进制没有编进 gpu 特性」（多机配置开了 GPU 而编的不带 gpu 特性，crash_amplification.rs）
 #   algorithm：算法上判不了——「表越过了内核的容量」（有状态 GPU 判不了）、「全部调用展开之后 <数> 个表达式，超过预算」（内核展开超预算，crash_judge_dispatch.rs）、
 #     「GPU 判器建不出这条流的表」（crash_amplification.rs）
-# 不在的日志跳过；几类都有时先 device、再 build（这两类时那一趟判的不算数）；都不是打空串。
+# 不在的日志跳过；几类都有时先 device、再 build（这两类时那一趟判的不算数）；都不是打空串。行首的两种记号都先去掉「test <名> ... 」再认（crash_amplification_lines_without_test_prefix）。
 # 弄坏开关 version-differs-as-run-failure、gpu-feature-missing-as-run-failure：build 那两句各自不认（表与该红的格在 crash-amplification-item.sh 文件头）。
 # 弄坏开关 given-states-run-condition-as-run-failure：给定状态表借不到显存那一行不认（红在 crash-amplification-two-hosts.sh --selftest 的 shard-given-states-run-condition）。
 crash_amplification_failure_kind() { # <日志…>
+  local gpu_verification_server_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX}( |\$)"
+  local observer_images_without_a_card_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX}( |\$)"
   local device_pattern='GPU_CARD_NOT_USABLE|这台机器却没有一张用得了的卡|没有一张卡装得下这条流的表|GPU_CARDS_BY_PRIORITY 里没有'
   local given_states_run_condition_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX}( |\$)"
   local version_differs_pattern='^CRASH_POINT_REPLAY_NOT_WRITTEN_CONCLUSION_VERSION_DIFFERS_FROM_THE_BUILD( |$)'
@@ -632,9 +932,13 @@ crash_amplification_failure_kind() { # <日志…>
   local logs=() log
   for log in "$@"; do [[ -f "$log" ]] && logs+=("$log"); done
   (( ${#logs[@]} > 0 )) || return 0
+  if ! crash_amplification_item_break_is gpu-verification-server-not-running-as-run-failure \
+     && grep -qE -- "$gpu_verification_server_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo gpu-verification-server; return 0; fi
+  if ! crash_amplification_lib_break_is observer-images-without-a-card-unrecognized \
+     && grep -qE -- "$observer_images_without_a_card_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo observer-images-without-a-card; return 0; fi
   if ! crash_amplification_item_break_is device-unusable-as-run-failure && grep -qE -- "$device_pattern" "${logs[@]}"; then echo device; return 0; fi
-  if ! crash_amplification_item_break_is given-states-run-condition-as-run-failure && grep -qE -- "$given_states_run_condition_pattern" "${logs[@]}"; then echo device; return 0; fi
-  if ! crash_amplification_item_break_is version-differs-as-run-failure && grep -qE -- "$version_differs_pattern" "${logs[@]}"; then echo build; return 0; fi
+  if ! crash_amplification_item_break_is given-states-run-condition-as-run-failure && grep -qE -- "$given_states_run_condition_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo device; return 0; fi
+  if ! crash_amplification_item_break_is version-differs-as-run-failure && grep -qE -- "$version_differs_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo build; return 0; fi
   if ! crash_amplification_item_break_is gpu-feature-missing-as-run-failure && grep -qF -- "$gpu_feature_missing_pattern" "${logs[@]}"; then echo build; return 0; fi
   if ! crash_amplification_item_break_is algorithm-refusal-as-run-failure && grep -qE -- "$algorithm_pattern" "${logs[@]}"; then echo algorithm; return 0; fi
   return 0
@@ -645,13 +949,29 @@ crash_amplification_exit_code_of_a_failed_run() { # <那一趟的退出码> <日
   shift
   kind="$(crash_amplification_failure_kind "$@")"
   case "$kind" in
-    device|build) echo 78 ;;
+    gpu-verification-server|observer-images-without-a-card|device|build) echo 78 ;;
     algorithm) echo 248 ;;
     *) echo "$run_exit" ;;
   esac
 }
 
-crash_amplification_explain_exit_code() { # <调用方要退的码>：78、248 与 245（内存包装认出的显存不够）打对应的出路（标准错误），别的不打
+# crash_amplification_observer_images_without_a_card_howto：观察者交回的盘取不到卡那一类（文件头「运行条件与失败分类」）的出路，打到标准输出（调用方定往哪儿打）
+crash_amplification_observer_images_without_a_card_howto() {
+  echo "这条用例的观察者交回了盘、要上卡判，任务不拿卡；等 GPU 批处理服务收这一族待判行（日志里 ${CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX} 那一行的 reason= 是取卡报的原因）。这一条记本次未跑（退 78），不是红"
+}
+
+crash_amplification_explain_exit_code() { # <调用方要退的码> [<日志…>]：78、248 与 245（内存包装认出的显存不够）打对应的出路（标准错误），别的不打
+  # 给了日志而日志里是 GPU 批处理服务不在跑那一类（文件头「运行条件与失败分类」）：78 的出路是起服务的命令
+  local failure_kind=""
+  if [[ "$1" == 78 ]] && (( $# > 1 )); then failure_kind="$(crash_amplification_failure_kind "${@:2}")"; fi
+  if [[ "$failure_kind" == gpu-verification-server ]]; then
+    echo "  → 怎么办：开了 GPU，判段只把块写成待判行、等 GPU 批处理验证服务判，服务不在跑（日志里 ${CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX} 那一行点名控制命令与它说的原因）：先起服务 python3 gpu-verification-server/control start，再跑 python3 gpu-verification-server/control check 照它的出路修到退 0，然后重跑同一条命令（录下的照录入键复用，判过的块已经在库里）" >&2
+    return 0
+  fi
+  if [[ "$failure_kind" == observer-images-without-a-card ]]; then
+    echo "  → 怎么办：$(crash_amplification_observer_images_without_a_card_howto)" >&2
+    return 0
+  fi
   case "$1" in
     245) echo "  → 怎么办：显存不够（那一趟退了非 0，内存包装认出它起止之间内核报了 NV_ERR_NO_MEMORY，退 245），这一趟的结果不算数：nvidia-smi 看谁在用卡（同一段时间别的进程撞的也算进来），等它跑完、或少给这一趟显存，再重跑同一条命令接着判（判过的块已经在库里）" >&2 ;;
     78) echo "  → 怎么办：修好设备，或改配置：日志里 GPU_CARD_NOT_USABLE 行点名的卡用不了（没有这个序号、空闲显存不够、上下文起不来）、显存装不下这条流的表、给定状态表的判器借不到显存（CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 那一行，等卡上占着显存的跑完再跑），或第二台连不上；查那张卡或那台机器，或改显卡配置与多机配置；日志里有 CRASH_POINT_REPLAY_NOT_WRITTEN_CONCLUSION_VERSION_DIFFERS_FROM_THE_BUILD 那一行的，是二进制与盘上的树对不上、整趟没写库，重编再跑（或在提交那一趟的 worktree 里跑）；有「这份二进制没有编进 gpu 特性」的，带 --features gpu 重编，或把多机配置的 ENABLE_GPU 改成 0（退 78：运行条件不满足）" >&2 ;;
@@ -796,6 +1116,18 @@ cargo_build_arguments=(test --no-run); cargo_test_arguments=(test)
 export PATH="$cell/bin:$PATH"
 lock_state() { if [[ -e "$STUB_LOCK" ]]; then echo present; else echo absent; fi; }
 if [[ "${STUB_CALLER_TRAP:-0}" == 1 ]]; then trap 'echo caller-term-trap >>"$STUB_CALLS"' TERM; fi
+# 形态 judge-binary（格 judge-binary-built-before-the-judge-runs）：先编判段要的测试二进制（只编的那一步），记一笔判段开始，再起两趟本机那一趟（排计划与本机判）
+if [[ "$shape" == judge-binary ]]; then
+  test_target=fake_target; cargo_test_arguments=(test --test fake_target -- --nocapture)
+  if crash_amplification_build_judge_binary "$cell/build.log"; then build_exit=0; else build_exit=$?; fi
+  echo "judge-runs-begin" >>"$STUB_CALLS"
+  for run_name in placement run; do
+    if crash_amplification_run_on_this_host 0/1 "$cell/$run_name.log"; then run_exit=0; else run_exit=$?; fi
+    echo "run-returned rc=$run_exit lock=$(lock_state)" >>"$STUB_CALLS"
+  done
+  echo "build-returned rc=$build_exit binary=[$crash_amplification_judge_binary]" >>"$STUB_CALLS"
+  exit 0
+fi
 if [[ "$shape" == background ]]; then
   crash_amplification_run_on_this_host 0/1 "$cell/run.log" &
   run_pid=$!
@@ -819,6 +1151,12 @@ echo "out-$step"; echo "err-$step" >&2
 release() { sleep 0.3; rm -f -- "$STUB_LOCK"; echo "cargo-$step lock-released" >>"$STUB_CALLS"; }
 trap 'echo "cargo-$step got-TERM" >>"$STUB_CALLS"; release; exit 143' TERM
 : >"${STUB_DIR:?}/started.$step"
+# 给了 STUB_BINARY 的（格 judge-binary-built-before-the-judge-runs）：编的那一步在那里写一份假的测试二进制（被起时往调用记录记一笔工作目录、参数与 CARGO_MANIFEST_DIR 的末一段），打 cargo 那种 Executable 行
+if [[ "$step" == build && -n "${STUB_BINARY:-}" ]]; then
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "binary-run directory=${PWD##*/} arguments=$* manifest=${CARGO_MANIFEST_DIR##*/}" >>"$STUB_CALLS"' >"$STUB_BINARY"
+  chmod +x "$STUB_BINARY"
+  echo "     Executable tests/fake_target.rs ($STUB_BINARY)"
+fi
 tick=0
 if [[ "$step" == "${STUB_HOLD_STEP:-}" ]]; then while (( tick < 50 )); do sleep 0.1; tick=$((tick + 1)); done; fi
 echo "cargo-$step done" >>"$STUB_CALLS"
@@ -922,6 +1260,200 @@ CARGO
     cell_failed rocksdb-entry-refused "树里的 验证包依赖 rocksdb 而进程环境里没有预编库的取值，那一趟应当交回 78、两步 cargo 都不起、输出里有 rocksdb-prebuilt entry 的红句" \
       "看 crash_amplification_run_on_this_host 里两步 cargo 之前 rocksdb-prebuilt.py entry 那一段"
   fi
+  # 先编后判（文件头「先编后判」）：外壳先调 crash_amplification_build_judge_binary（假 cargo 的 --no-run 那一步写一份假的测试二进制、打 Executable 行），记一笔判段开始，
+  #   再起两趟本机那一趟 ⇒ 调用记录里 cargo 只起过一回、是编的那一步、在判段开始之前；判段两趟都直接起那份二进制（工作目录与 CARGO_MANIFEST_DIR 是验证包目录、参数是 -- 之后的 --nocapture）
+  local judge_cell="$work/judge-binary-built-before-the-judge-runs" judge_cargo_starts judge_last_cargo judge_runs_line
+  mkdir -p "$judge_cell/root/crates/singlefs-verification"
+  run_cell judge-binary-built-before-the-judge-runs judge-binary none STUB_BINARY="$judge_cell/fake-judge-binary"
+  judge_cargo_starts="$(grep -E '^cargo-[a-z]+ started$' "$judge_cell/calls" | tr '\n' ' ')"
+  judge_last_cargo="$(grep -nE '^cargo-' "$judge_cell/calls" | tail -n 1 | cut -d: -f1)"
+  judge_runs_line="$(line_of judge-binary-built-before-the-judge-runs '^judge-runs-begin$')"
+  if [[ "$cell_exit" != 0 || "$judge_cargo_starts" != "cargo-build started " || -z "$judge_runs_line" || -z "$judge_last_cargo" ]] || (( judge_last_cargo > judge_runs_line )) \
+     || [[ "$(grep -cxF 'binary-run directory=singlefs-verification arguments=--nocapture manifest=singlefs-verification' "$judge_cell/calls")" != 2 ]] \
+     || ! grep -qxF "build-returned rc=0 binary=[$judge_cell/fake-judge-binary]" "$judge_cell/calls"; then
+    cell_failed judge-binary-built-before-the-judge-runs "判段开始之前应当只编一回（cargo 起过的只有「cargo-build started」，实有「$judge_cargo_starts」）、判段开始之后不再起 cargo、两趟都直接起编好的二进制（工作目录与 CARGO_MANIFEST_DIR 是验证包目录、参数 --nocapture）" \
+      "看 crash_amplification_build_judge_binary（只起编的那一步、从 Executable 行取二进制）与 crash_amplification_run_on_this_host 里 crash_amplification_judge_binary 不空那一支"
+  fi
+
+  # 别的测试打的行接在 libtest 还没打结局的「test <名> ... 」后面：录入行与判类别的两种行首记号照认；不是行首的提到记号的一句话不认（库里的函数直接调，不起假 cargo）
+  local marker_directory="$work/test-line-markers" recorded_lines
+  mkdir -p "$marker_directory"; : >"$marker_directory/calls"; : >"$marker_directory/output"
+  cells=$((cells + 1)); cell_exit=0
+  printf '%s\n' 'test crash_given_states_case ... CRASH_LIBRARY_RECORDED blocks=3' 'test one ... test other ... CRASH_AMPLIFICATION_RECORDED blocks=4' >"$marker_directory/recorded.log"
+  printf '%s\n' 'test one ... ok' 'test other ... 提到 CRASH_LIBRARY_RECORDED 的一句话' >"$marker_directory/prose.log"
+  printf '%s\n' "test crash_given_states_case ... $CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX 借不到显存" >"$marker_directory/given-states.log"
+  printf '%s\n' 'test crash_given_states_case ... CRASH_POINT_REPLAY_NOT_WRITTEN_CONCLUSION_VERSION_DIFFERS_FROM_THE_BUILD built=1 run=2' >"$marker_directory/version.log"
+  printf '%s\n' "test crash_observer_case ... $CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX reason=取卡报的原因" >"$marker_directory/observer-images.log"
+  recorded_lines="$(crash_amplification_recorded_lines "$marker_directory/recorded.log")"
+  if [[ "$recorded_lines" != $'CRASH_LIBRARY_RECORDED blocks=3\nCRASH_AMPLIFICATION_RECORDED blocks=4' ]] \
+     || crash_amplification_recorded_lines "$marker_directory/prose.log" >/dev/null \
+     || [[ "$(crash_amplification_failure_kind "$marker_directory/given-states.log")" != device ]] \
+     || [[ "$(crash_amplification_failure_kind "$marker_directory/version.log")" != build ]] \
+     || [[ "$(crash_amplification_failure_kind "$marker_directory/observer-images.log")" != observer-images-without-a-card ]]; then
+    cell_failed test-line-markers "记号接在「test <名> ... 」后面：录入行应当认出、去掉前缀打出来（实有「$recorded_lines」），给定状态表借不到显存判 device，结论版本对不上判 build，观察者交回的盘取不到卡判 observer-images-without-a-card；不在行首的一句话不认" \
+      "看 crash_amplification_lines_without_test_prefix 与 crash_amplification_recorded_lines、crash_amplification_failure_kind 里几处行首记号"
+  fi
+
+  # 观察者交回的盘取不到卡（文件头「运行条件与失败分类」）：行首是那个记号的认成 observer-images-without-a-card，那一趟的 101 改退 78，78 的出路说等 GPU 批处理服务收这一族待判行；
+  #   同一个记号不在行首的一句话不认、101 原样退（库里的函数直接调，不起假 cargo；接在「test <名> ... 」后面的那一种由 test-line-markers 那一格核）
+  local no_card_directory="$work/observer-images-without-a-card" no_card_kind no_card_exit no_card_howto no_card_prose_kind no_card_prose_exit
+  mkdir -p "$no_card_directory"; : >"$no_card_directory/calls"; : >"$no_card_directory/output"
+  cells=$((cells + 1)); cell_exit=0
+  printf '%s\n' "$CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX reason=取卡报的原因：观察者交回了盘" 'test result: FAILED. 0 passed; 1 failed' >"$no_card_directory/no-card.log"
+  printf '%s\n' "test one ... 提到 $CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX 的一句话" >"$no_card_directory/prose.log"
+  no_card_kind="$(crash_amplification_failure_kind "$no_card_directory/no-card.log")"
+  no_card_exit="$(crash_amplification_exit_code_of_a_failed_run 101 "$no_card_directory/no-card.log")"
+  no_card_howto="$(crash_amplification_explain_exit_code 78 "$no_card_directory/no-card.log" 2>&1)"
+  no_card_prose_kind="$(crash_amplification_failure_kind "$no_card_directory/prose.log")"
+  no_card_prose_exit="$(crash_amplification_exit_code_of_a_failed_run 101 "$no_card_directory/prose.log")"
+  printf '%s\n' "kind=$no_card_kind exit=$no_card_exit prose-kind=$no_card_prose_kind prose-exit=$no_card_prose_exit" "$no_card_howto" >"$no_card_directory/output"
+  if [[ "$no_card_kind" != observer-images-without-a-card || "$no_card_exit" != 78 || "$no_card_howto" != *"等 GPU 批处理服务收这一族待判行"* \
+        || -n "$no_card_prose_kind" || "$no_card_prose_exit" != 101 ]]; then
+    cell_failed observer-images-without-a-card "行首是 $CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX 的日志应当判 observer-images-without-a-card（实有「$no_card_kind」）、101 改退 78（实有 $no_card_exit）、出路说等 GPU 批处理服务收这一族待判行；不在行首的一句话不认（实有「$no_card_prose_kind」）、101 原样退（实有 $no_card_prose_exit）" \
+      "看 crash_amplification_failure_kind 里 observer_images_without_a_card_pattern 那一支、crash_amplification_exit_code_of_a_failed_run 与 crash_amplification_explain_exit_code 的 observer-images-without-a-card 那一支"
+  fi
+
+  # 判器输入核对（文件头「判器输入核对」）：假树里一份键所读的文件 watched.rs、一份闭包外的文件 other.rs，假构建输出目录里放键表与摘要表，假二进制 = 一段前缀 + 键表 + 一段后缀。
+  #   库里的函数直接调，不起假 cargo
+  local inputs_directory="$work/judging-inputs" inputs_name inputs_output inputs_exit inputs_tree inputs_out
+  inputs_tree="$inputs_directory/root"; inputs_out="$inputs_directory/target/release/build/singlefs-verification-0000000000000000/out"
+  for inputs_name in judging-inputs-unchanged judging-inputs-changed judging-inputs-unknown judging-inputs-batch-agrees place-binary-without-debug-info; do
+    mkdir -p "$work/$inputs_name"; : >"$work/$inputs_name/calls"; : >"$work/$inputs_name/output"
+  done
+  mkdir -p "$inputs_tree/crates/x/src" "$inputs_out" "$inputs_directory/target/release/deps"
+  printf '%s\n' 'pub fn watched() {}' >"$inputs_tree/crates/x/src/watched.rs"
+  printf '%s\n' 'pub fn other() {}' >"$inputs_tree/crates/x/src/other.rs"
+  printf '%s\n' '# singlefs entry group keys' $'toolchain\tselftest' $'group\tselftest\tkeyed\t00ff' >"$inputs_out/judging_units_keys.tsv"
+  printf '%s\t%s\n' "$(sha256sum <"$inputs_tree/crates/x/src/watched.rs" | cut -d' ' -f1)" crates/x/src/watched.rs >"$inputs_out/watched_file_digests.tsv"
+  { printf 'before-the-table\n'; cat -- "$inputs_out/judging_units_keys.tsv"; printf 'after-the-table\n'; } >"$inputs_directory/target/release/deps/with-table"
+  printf 'a binary that carries no key table\n' >"$inputs_directory/target/release/deps/without-table"
+  inputs_call() { # <二进制的文件名>：交回值放 inputs_exit，打的一行放 inputs_output
+    inputs_exit=0
+    inputs_output="$(crash_amplification_judging_inputs_unchanged "$inputs_directory/target/release/deps/$1" "$inputs_tree")" || inputs_exit=$?
+  }
+  cells=$((cells + 1)); cell_exit=0
+  inputs_call with-table
+  if [[ "$inputs_exit" != 0 || "$inputs_output" != "same watched=1" ]]; then
+    cell_failed judging-inputs-unchanged "树没变：应当打 same watched=1 交 0（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：摘要表里每份文件都没变就是 same"
+  fi
+  inputs_batch_check() { # <树的状态> ：三个二进制（有表、没表、有表）一批交过去（并行 1 与 3 各一遍），每一行都与逐个调时的「交回值<TAB>打的一行」相同；不同记这一格判错
+    local jobs name single="" batch deps="$inputs_directory/target/release/deps"
+    for name in with-table without-table with-table; do
+      inputs_call "$name"
+      single+="${inputs_exit}"$'\t'"${inputs_output}"$'\n'
+    done
+    for jobs in 1 3; do
+      batch="$(crash_amplification_judging_inputs_of_binaries "$inputs_tree" "$jobs" "$deps/with-table" "$deps/without-table" "$deps/with-table")"$'\n'
+      if [[ "$batch" != "$single" ]]; then
+        cell_failed judging-inputs-batch-agrees "$1：一批三个二进制（有表、没表、有表，并行 $jobs）每一行应当与逐个调时的「交回值<TAB>打的一行」相同（逐个得到「${single//$'\n'/｜}」，批量得到「${batch//$'\n'/｜}」）" \
+          "看 crash_amplification_judging_inputs_of_binaries：每个二进制各答各的、按给的次序打，同一个构建输出目录的摘要答案共用，不把一个二进制的答案给批里所有二进制"
+      fi
+    done
+  }
+  cells=$((cells + 1)); cell_exit=0
+  inputs_batch_check "键所读的文件没变"
+  printf '%s\n' 'pub fn other_changed() {}' >"$inputs_tree/crates/x/src/other.rs"
+  inputs_call with-table
+  if [[ "$inputs_exit" != 0 || "$inputs_output" != "same watched=1" ]]; then
+    cell_failed judging-inputs-unchanged "键所读的文件没变、闭包外的文件变了：应当打 same watched=1 交 0（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：只比摘要表里列的那几份，表外的文件不看"
+  fi
+  cells=$((cells + 1)); cell_exit=0
+  printf '%s\n' 'pub fn watched_changed() {}' >"$inputs_tree/crates/x/src/watched.rs"
+  inputs_call with-table
+  if [[ "$inputs_exit" != 1 || "$inputs_output" != "changed watched=1 changed=1：crates/x/src/watched.rs" ]]; then
+    cell_failed judging-inputs-changed "键所读的一份文件内容变了：应当打 changed watched=1 changed=1：crates/x/src/watched.rs 交 1（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：摘要表里每份文件按树根下此刻的内容重算再比"
+  fi
+  rm -f -- "$inputs_tree/crates/x/src/watched.rs"
+  inputs_call with-table
+  if [[ "$inputs_exit" != 1 || "$inputs_output" != "changed watched=1 changed=1：crates/x/src/watched.rs" ]]; then
+    cell_failed judging-inputs-changed "键所读的一份文件不在了：应当同样打 changed 交 1（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：读不了的文件算变了"
+  fi
+  cell_exit=0
+  inputs_batch_check "键所读的一份文件不在了"
+  cells=$((cells + 1)); cell_exit=0
+  inputs_call without-table
+  if [[ "$inputs_exit" != 2 || "$inputs_output" != unknown\ * ]]; then
+    cell_failed judging-inputs-unknown "二进制里找不到对应的键表：应当打 unknown 交 2、不当没变（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：键表在二进制里找不到的构建输出目录不算数"
+  fi
+  : >"$inputs_out/watched_file_digests.tsv"
+  inputs_call with-table
+  if [[ "$inputs_exit" != 2 || "$inputs_output" != unknown\ * ]]; then
+    cell_failed judging-inputs-unknown "摘要表是空的：应当打 unknown 交 2（得到 $inputs_exit「$inputs_output」）" \
+      "看 crash_amplification_judging_inputs_unchanged：空的摘要表证明不了什么"
+  fi
+  cell_exit=0
+  inputs_batch_check "摘要表是空的"
+
+  # 拷测试二进制去掉调试段（文件头「自证」）：PATH 前面放一份假 objcopy（目标 = 源再加一行「# 去掉了调试段」；另一份退 1），库里的函数直接调
+  local place_directory="$work/place-binary-without-debug-info" place_exit
+  mkdir -p "$place_directory/bin" "$place_directory/failing"
+  printf '%s\n' '#!/usr/bin/env bash' '{ cat -- "$2"; echo "# 去掉了调试段"; } >"$3"' >"$place_directory/bin/objcopy"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$place_directory/failing/objcopy"
+  chmod +x "$place_directory/bin/objcopy" "$place_directory/failing/objcopy"
+  printf 'the binary\n' >"$place_directory/source"
+  cells=$((cells + 1)); cell_exit=0
+  place_exit=0
+  PATH="$place_directory/bin:$PATH" crash_amplification_place_binary_without_debug_info "$place_directory/source" "$place_directory/stripped" 2>>"$place_directory/output" || place_exit=$?
+  if [[ "$place_exit" != 0 || "$(tail -n 1 -- "$place_directory/stripped" 2>/dev/null)" != "# 去掉了调试段" || "$(cat -- "$place_directory/source")" != "the binary" ]]; then
+    cell_failed place-binary-without-debug-info "objcopy 在时应当用 objcopy --strip-debug 写出目标、交 0、原件不动（交 $place_exit，目标末行「$(tail -n 1 -- "$place_directory/stripped" 2>/dev/null)」）" \
+      "看 crash_amplification_place_binary_without_debug_info：objcopy --strip-debug <源> <目标> 成了就交 0，不再 cp"
+  fi
+  place_exit=0
+  PATH="$place_directory/failing:$PATH" crash_amplification_place_binary_without_debug_info "$place_directory/source" "$place_directory/copied" 2>>"$place_directory/output" || place_exit=$?
+  if [[ "$place_exit" != 3 || "$(cat -- "$place_directory/copied" 2>/dev/null)" != "the binary" ]]; then
+    cell_failed place-binary-without-debug-info "objcopy 退非 0 时应当整份拷、交 3、目标与源相同（交 $place_exit，目标「$(cat -- "$place_directory/copied" 2>/dev/null)」）" \
+      "看 crash_amplification_place_binary_without_debug_info：objcopy 没成就删掉写出的半份、整份 cp、交 3"
+  fi
+
+  # 多机配置判法 --emit-addresses 判不过时照它的 ✗ 那一句报（文件头「这一台与另一台」）：直接调 crash_amplification_host_addresses、起真的判法，
+  #   这一台的地址经判法只在自证里认的 CONFIGURATION_SELFTEST_LOCAL_ADDRESSES 给成 127.0.0.1（本份是 --selftest 起的，判法沿祖先认得出）。
+  #   写全的那一份（两个显卡键都写）先要判得过、认出 127.0.0.1，缺键那一份红就只红在缺键上；HOSTS 里没有 127.0.0.1 的那一份把地址整份换成 192.0.2.1
+  local addresses_name addresses_exit
+  addresses_call() { # <格名> <配置文件> <放输出的文件名>：交回值放 addresses_exit；标准输出打认出的这一台，标准错误是库打的
+    addresses_exit=0
+    ( export CONFIGURATION_SELFTEST_LOCAL_ADDRESSES=127.0.0.1
+      crash_amplification_host_addresses "$2" || exit $?
+      echo "this=$crash_amplification_this_host_address" ) >"$work/$1/$3.out" 2>"$work/$1/$3.err" || addresses_exit=$?
+    cat -- "$work/$1/$3.out" "$work/$1/$3.err" >>"$work/$1/output"
+  }
+  for addresses_name in emit-addresses-missing-key-named emit-addresses-host-absent-named; do
+    mkdir -p "$work/$addresses_name"; : >"$work/$addresses_name/calls"; : >"$work/$addresses_name/output"
+  done
+  printf '%s\n' "HOSTS=127.0.0.1 192.0.2.66" "CARGO_BIN_DIRECTORY_BY_HOST=127.0.0.1=/selftest/this-cargo 192.0.2.66=/selftest/other-cargo" \
+    "BUILD_ROOT_BY_HOST=127.0.0.1=/selftest/this-builds 192.0.2.66=/selftest/other-builds" "SLICE_MEMORY_CAP_BY_HOST=127.0.0.1=2G 192.0.2.66=2G" \
+    QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= ENABLE_ACROSS_MACHINES=0 ENABLE_GPU=1 \
+    'GPU_CARDS_BY_PRIORITY="127.0.0.1:0:8G"' "NFS_SHARED_ROOTS=$work" >"$work/emit-addresses-missing-key-named/missing-key.env"
+  { cat -- "$work/emit-addresses-missing-key-named/missing-key.env"; echo 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:24G"'; } >"$work/emit-addresses-missing-key-named/whole.env"
+  sed 's/127\.0\.0\.1/192.0.2.1/g' "$work/emit-addresses-missing-key-named/whole.env" >"$work/emit-addresses-host-absent-named/host-absent.env"
+
+  cells=$((cells + 1))
+  addresses_call emit-addresses-missing-key-named "$work/emit-addresses-missing-key-named/whole.env" whole
+  cell_exit="$addresses_exit"
+  if [[ "$addresses_exit" != 0 || "$(cat -- "$work/emit-addresses-missing-key-named/whole.out")" != this=127.0.0.1 ]]; then
+    cell_failed emit-addresses-missing-key-named "两个显卡键都写全的假配置应当判得过、认出这一台是 127.0.0.1（实有「$(head -n 1 -- "$work/emit-addresses-missing-key-named/whole.err")」）" \
+      "先看这一格造的假配置是不是缺了判法要的别的键（判法的原话在上面输出里），再看 crash_amplification_host_addresses 解析 --emit-addresses 那几行"
+  else
+    addresses_call emit-addresses-missing-key-named "$work/emit-addresses-missing-key-named/missing-key.env" missing-key
+    cell_exit="$addresses_exit"
+    if [[ "$addresses_exit" != 1 ]] || ! head -n 1 -- "$work/emit-addresses-missing-key-named/missing-key.err" | grep -qE '^  ✗ 多机配置判法 --emit-addresses 退 1：多机配置判不过：.*GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED 没写' \
+       || grep -qF '认不出这一台' "$work/emit-addresses-missing-key-named/missing-key.err"; then
+      cell_failed emit-addresses-missing-key-named "开了 GPU 而缺 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED：应当交回 1，头一行报退出码与判法缺键那一句、整段不说认不出这一台（实有头一行「$(head -n 1 -- "$work/emit-addresses-missing-key-named/missing-key.err")」）" \
+        "看 crash_amplification_host_addresses 判不过那一支：取判法头一行「✗ …」原样报，只有那一句里有 CRASH_AMPLIFICATION_HOST_UNRECOGNIZED_MARK 才冠认不出这一台"
+    fi
+  fi
+  cells=$((cells + 1))
+  addresses_call emit-addresses-host-absent-named "$work/emit-addresses-host-absent-named/host-absent.env" host-absent
+  cell_exit="$addresses_exit"
+  if [[ "$addresses_exit" != 1 ]] \
+     || ! head -n 1 -- "$work/emit-addresses-host-absent-named/host-absent.err" | grep -qE '^  ✗ 认不出这一台是 HOSTS 里哪一项：多机配置判法 --emit-addresses 退 1：多机配置判不过：HOSTS 里没有一项是这一台网卡上的地址'; then
+    cell_failed emit-addresses-host-absent-named "HOSTS 里没有这一台（127.0.0.1）：应当交回 1，头一行说认不出这一台、连着退出码与判法那一句（实有头一行「$(head -n 1 -- "$work/emit-addresses-host-absent-named/host-absent.err")」）" \
+      "看 crash_amplification_host_addresses 判不过那一支与 CRASH_AMPLIFICATION_HOST_UNRECOGNIZED_MARK：判法那三句说法改了的，这个常量跟着改"
+  fi
 
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
@@ -965,7 +1497,7 @@ CARGO
     echo "     → 怎么办：红的格与表里点名的不同，要么改那一处判法让开关红在点名的格，要么照实改文件头那一行；单看一个开关：CRASH_AMPLIFICATION_LIB_BREAK=<开关> bash $lib_script --selftest" >&2
     return 1
   fi
-  echo "  ✓ --selftest：本机那一趟被 TERM 停时（放后台的子 shell 里、调用方的 shell 里没设与设了 TERM 处理）TERM 到得了假 cargo、假 cargo 在那一趟返回之前退干净、退 143，编的那一步被停不起跑的那一步，没被停时两步按序起、日志按序、退出码原样转出、调用方的 TERM 处理原样放回，$cells 格都对（cargo 是假的，不起重活）；"
+  echo "  ✓ --selftest：本机那一趟被 TERM 停时（放后台的子 shell 里、调用方的 shell 里没设与设了 TERM 处理）TERM 到得了假 cargo、假 cargo 在那一趟返回之前退干净、退 143，编的那一步被停不起跑的那一步，没被停时两步按序起、日志按序、退出码原样转出、调用方的 TERM 处理原样放回，先编后判（判段开始之前只编一回、判段直接起编好的二进制、不起 cargo），多机配置判法判不过时照它那一句报（缺键报缺键、认不出这一台才说认不出），$cells 格都对（cargo 是假的，不起重活）；"
   echo "    开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的格"
   return 0
 }

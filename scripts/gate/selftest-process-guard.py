@@ -17,7 +17,8 @@
      另在 PATH 最前面放 cargo、rustc 两个替身：版本查询交给真的那一份，别的一律拒（退 97，真的那一份不起）、记一笔，记到的也判红。
   ② 真清场：起的脚本是某棵仓树里的 scripts/crash/gpu-quiesce-run.sh（路径以这一段结尾；单独一个 --selftest 的除外），
      它环境里的 SINGLEFS_MULTI_HOST_CONFIG 没设、是空的，或解开之后正是主工作树根的 multi-host.env（它读的就是真多机配置里的清场命令）。
-  ③ 私有清场脚本：参数里有一段落在 ~/.config/singlefs/quiesce 开头的路径上（私有的清场、回读、复原脚本放在那里）。
+  ③ 私有清场脚本：参数里有一段落在 ~/.config/singlefs/quiesce 开头的路径上，或落在真多机配置旁边 multi-host-quiesce- 开头的路径上
+     （多机配置 QUIESCE_* 四条命令指的私有清场、回读、复原脚本放在主工作树根下，不进仓）。
   ④ 起进程的系统调用（C613）：命令经 `strace -f --seccomp-bpf --kill-on-exit -ttt -e trace=execve -o <文件>` 起，每一次成功的 execve 取出可执行文件路径与参数。
      文件名（路径最后一段，不解开符号链接）是 cargo、rustc、herd7、verus、rust-verify（rust_verify）或 qemu-system-* 之一，
      参数又不是版本查询（-V、--version、-version、-vV 这几种，前面可以带 +<工具链>；rustc 的 --print <项> 也算查询），
@@ -386,7 +387,9 @@ def judge_process(pid, arguments, settings, broken):
                 found.append(("真清场", f"{shlex.join(arguments)}（SINGLEFS_MULTI_HOST_CONFIG={configured or '没设'}，读的是真多机配置 {settings.real_configuration}）"))
     if "private-script-ignored" not in broken:
         private_prefix = os.path.join(settings.private_directory, PRIVATE_QUIESCE_PREFIX)
-        if any(private_prefix in argument for argument in arguments):
+        # 多机配置的 QUIESCE_* 四条命令指的那几份私有脚本放在真多机配置旁边（主工作树根下 multi-host-quiesce-*.sh），同样认
+        beside_the_configuration_prefix = os.path.join(os.path.dirname(settings.real_configuration), "multi-host-quiesce-")
+        if any(private_prefix in argument or beside_the_configuration_prefix in argument for argument in arguments):
             found.append(("私有清场脚本", shlex.join(arguments)))
     return found
 
@@ -1259,7 +1262,10 @@ def library_cells(work, broken, environment, failures):
     names = {script: shlex.join(library_command(script)) for script in LIBRARY_FAKE_SCRIPTS}
 
     # 第 17 格（reuse-three-questions）：a、b、c 三份自证各一条判定，四趟——库是空的、同一份输入、改闭包外（a 加一行注释、树里另加一份没人读的文件）、
-    # 改只有 c 那一份闭包里有的函数单元；每趟逐条读「· <名字>：绿|红，现判|复用」那一行
+    # 改只有 c 那一份闭包里有的函数单元；每趟逐条读「· <名字>：绿|红，现判|复用」那一行。
+    # a、b、c 是 LIBRARY_FAKE_SCRIPTS 的前三项，写成字面元组、不写切片：run_guard_alone 起守卫时的 script 由这里的循环变量给，
+    # 单元闭包（scripts/gate/lib_function_units.py）折循环变量只认字面元组或绑着它的名字，切片折不出、起守卫那一处拒算
+    three_question_scripts = ("fake-reuse-a.py", "fake-reuse-b.py", "fake-reuse-c.py")
     repository = library_repository(os.path.join(work, "library-three-questions"))
     runs, problems = [], []
     for edit in (None, None, "unrelated", "unit"):
@@ -1273,12 +1279,12 @@ def library_cells(work, broken, environment, failures):
             selftest_write(path, text.replace('    return 1 if os.environ.get("FAKE_SELFTEST_RED") == "1" else 0\n',
                                               '    red = os.environ.get("FAKE_SELFTEST_RED") == "1"\n    return 1 if red else 0\n'))
         states = {}
-        for script in LIBRARY_FAKE_SCRIPTS[:3]:
+        for script in three_question_scripts:
             code, output = run_guard_alone(repository, script, environment, broken)
             states.update(checks.states_from_output(output))
             if code != 0:
                 problems.append(f"第 {len(runs) + 1} 趟 {script} 退 {code}：{output.strip()[-300:]}")
-        runs.append({name: states.get(name, "没报结局") for name in (names[script] for script in LIBRARY_FAKE_SCRIPTS[:3])})
+        runs.append({name: states.get(name, "没报结局") for name in (names[script] for script in three_question_scripts)})
     with contextlib.redirect_stdout(io.StringIO()) as captured:
         passed, question_problems = checks.report_three_questions(SCRIPT_KEY, *runs, [names["fake-reuse-c.py"]])
     print(captured.getvalue(), end="")   # 规范输出那一行（门禁 code-tooling 的 reuse-selftests 格认标准输出里这一行）

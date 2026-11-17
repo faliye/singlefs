@@ -19,7 +19,12 @@
   拒算行   refused\t<形态>\t<文件>:<行>\t<原样片段>
   Rust、WGSL 与数据行按（文件，起行，止行，整行）排（与 unit-graph 的 dump 同一种次序），python 与 shell 的单元行按（文件，起行，种类，限定名）排，
   拒算行按（文件，行，形态，片段）排；文件是相对根的路径，起止是 1 起算的行号；
-  原样片段是那一行原文，空白折成一个空格，至多 160 个字符。closure --explain 另打 via\t<文件>:<限定名>\t<从哪个单元来>\t<规则>，只当诊断看。
+  原样片段是那一行原文，空白折成一个空格，至多 160 个字符。closure --explain 另打 via\t<文件>:<限定名>\t<从哪个单元来>\t<规则>，只当诊断看；
+  按第一列选行的表脚本每被起一次另打 table-launch\t<脚本>\t<whole|rows|no-table>\t<起法的词>\t<从哪个单元起>（whole 是这一次连整张表：整份起、source、
+  起法折不出或只带选项而表照定义；rows 是只连点名的实验与行项；no-table 是照词剪过之后表的赋值行不剩；起法的词空着写 -、入口写 -），同样只当诊断看。
+  内联 python 里的拒算：正文出自原文里一份 here-doc 的（直接喂给解释器的在起它的那个单元里找，装进变量再交 -c 的在整份文件里找逐字相同的那一份；
+  ShellIndex.inline_body_lines），落在那份正文头一行加正文里的偏移那一行，片段是正文那一行；字面 -c 串、原文里找不到那份正文的落在起它的那一行。
+  弄坏开关 inline-refusal-lines-at-launch 下都落在起它的那一行。
 
 种类与限定名：
   Rust   种类名照 crates/singlefs-unit-graph（src/units.rs 的 output_name）：fn（自由 fn 与 impl / trait 里的方法）、impl（impl 头：属性起、到 { 之前）、
@@ -69,7 +74,7 @@
          指纹 = ast.dump(节点, include_attributes=False)
          的 sha256，节点里各层 def / class 的文档串先去掉。数据单元 docstring（被读 __doc__ 的文档串，限定名 <所属>.__doc__，模块的写 <module>.__doc__）、
          source-text（读自己原文的那份文件整份字节，限定名 <source-text>）、data-file（运行期读的仓内文件，下面「运行期读的数据文件」）。
-  shell  function（规范文本里 function <名> () 起、同缩进的 } 止；嵌套的另算一个，限定名 <外层>::<名>，外层文本里留着它；here-doc 正文跳过不切）、
+  shell  function（规范文本里 function <名> () 起、同缩进的 } 止；嵌套的另算一个，限定名 <外层>::<名>，外层的指纹里留着它、外层的命令不含它的；here-doc 正文跳过不切）、
          script-body（规范文本去掉顶层函数，限定名 <script-body>）、shell-variable（顶层赋值语句，按变量名各一单元）、
          kept-comments（数据单元：程序读的注释「# <词>:」与 # shellcheck，限定名 <kept-comments>）。规范文本 = bash -n 过了且没有告警、
          整份包进一个函数定义 eval（不执行）、取 declare -f；指纹 = 单元规范文本的 sha256。起止行是回到原文按函数头找的，只当索引。
@@ -82,9 +87,17 @@ Python 闭包：import 时执行的模块级语句（欠账 C890（判法单元�
   后面的条件与块都不执行；scripts/hosts/memory_peaks_lib.py 那一种）；and 写法里 __name__ 那一项不在最左、带 else 的认不出，留在 module-body，import 时照收。
   头一种带 else（或 elif）的：if 那一支是 main-guard，else 那一支在 import 时执行，照别的模块级语句进 module-body。
   被 import、被 spec_from_file_location 载入的模块只连 module-body，不连 main-guard（欠账 C947：不然被 import 的模块的自证分支连进判法闭包）；
+  按路径载入的模块只连载入方调到的属性（PythonModule.loaded_value_contained、ScriptClosure.attribute_seen）：载入的模块值用 <值>.属性 调它，
+    这一处认不出是哪个模块，照属性名连载入的模块里的同名单元。模块值出不了载入方那份模块的（模块名折得出、不是 "__main__"，值只在本模块里取属性、
+    放进本模块的名字与容器，规矩逐条在 loaded_value_contained 的文档串里），只照载入方自己的单元上见过的属性名连：载入方只调 read_table 的，
+    被载入那份的 main（连同它连到的自证）不因为闭包里别处有 x.main() 跟着进来。出得去的（交给调用方、登进 sys.modules、普通 .py 里放在模块级的）
+    照整个闭包见过的属性名连。弄坏开关 loaded-attributes-closure-wide 下一律照整个闭包连。
   这份文件被当程序起（子进程边、runpy.run_path、内联脚本、只写 <文件> 的入口）时连 main-guard；块里按 sys.argv 分派的分支只在给了参数时剪（下面「程序入口带参数」），
   没给参数的照旧整份收。
   一份文件里几段 main-guard 合成一个单元（被当程序起时每一段都执行）：节点是那几段，起行取头一段、止行取末一段，只有一段时指纹照旧取那一段。
+函数里读局部量的名字（local_name_reads；弄坏开关 python-local-names-resolved 下照旧按名字连）：def 与 lambda 的参数、函数体里赋值、for、with、except 绑的名字、套在里面的 def 与 class 的名字、
+  推导式的循环变量，在那一层作用域与套在里面的作用域里读到的是局部量，不连模块里的同名单元（def f(main=False) 里的 main、for main in mains 里的 main 不连 def main）。
+  global、nonlocal 声明过的名字不算局部（照按名字连）；函数里 import 绑的名字由 import 那一条认；默认值与装饰器在外层求值，不算；类体里赋的名字不算（宁可多连）。
 程序入口带参数（ScriptClosure.run 的 program_arguments；命令行 --program-argument <词>，admission.py 判定请求的 program-argument:<词>；
   弄坏开关 python-program-arguments-unnarrowed 下照旧整份收）：判定是「这份脚本带这组参数跑」时，只收这组参数真走到的那一支：
   入口是 python 文件的 main-guard，sys.argv 取 [<文件>, <参数…>]；按已知的值逐个单元剪（PythonModule.narrowing_plan）：
@@ -100,19 +113,31 @@ Python 闭包：import 时执行的模块级语句（欠账 C890（判法单元�
       不沿它们连；取这张表的那一处照上面连（取的是整张表的连全部，取一项的连那一项）。弄坏开关 python-import-time-tables-followed 下照旧沿它们连。
     子进程边：起 python 脚本的命令里脚本之后的词照样带过去（折得出的是已知的词），被起的那份照它们剪；脚本之后有认不出个数的元素的记成开口的一串。
     参数另进键：admission.py 的键加一行 program-argument（每个词照次序），参数不同的两条判定闭包相同也不共用键。
-  只认 python 的 main-guard；shell 的 script-body 与没有 main-guard 的 python 文件照旧整份收。
+  入口是 shell 文件的 script-body（只写 <文件>）：这组参数全是字面的已知词，脚本体照下面「shell 起法带字面参数」剪（ShellIndex.narrowed_script_body：
+    头一处 shift、set --、循环之前的 $1 一类代成参数，代过之后判得出真假的 if [[ … ]]、case 只收走到的那一支）；判不出真假的分支两支都收，
+    一处都折不出的整份收（只多收不少收）。按第一列选行的表照同一条记这组词（table_launched）：有不带 - 起头的词（实验号）或 --item <行项> 的只连这一趟跑得到的那几行（下面「shell 起法带字面参数」），
+    只带选项的（--selftest、--list-items）照整张表连；表只在闭包里有单元读它时才连（剪过的脚本体读不到表、别处也不读的，表与表行里的驱动都不连）。
+    照这组词剪过的脚本体里表的赋值行一行都不剩的（走到的那一支以 exit 收尾，replay.sh --selftest 那一种），这次起法不记（ShellIndex.launch_defines_tables）：
+    这个进程不定义表，闭包里别的单元读表只照别的起法连（自证里 bash replay.sh E1 那几次）；弄坏开关 shell-table-launch-without-assignment-counted 下照旧记、连整张表。
+    弄坏开关 shell-entry-arguments-unnarrowed 下 shell 入口照旧整份收；
+    shell-entry-undecided-branches-dropped 下入口那一份判不出真假的 if [[ … ]] 当走不到。
+  没有 main-guard 的 python 文件与写 <文件>::<限定名> 的入口照旧整份收（参数不用）。
 运行期读的数据文件（python；PythonModule.read_target / data_read_origins，ScriptClosure.python_data_reads；弄坏开关 python-data-reads-ignored 下回到既不收也不拒算）：
   读文件的写法：open / io.open / codecs.open（模式里没有 w a x +）、<路径>.read_text() / .read_bytes()、Path(…).open()、shutil.copy / copy2 / copyfile 的源。
   被读的文件分两类，再加一种拒算；每一处读都落进其中一种（判据逐条写在后面）：
   一、判法自己的数据：收进这一份闭包的键（数据单元，规则名 data-read）。判据：路径推得出落在根里的固定位置——
     整个折得出（fold，连同「<折不出的目录>/<仓里的相对路径>」那一种 tree_copy_file）→ 根里的文件收成 data-file（限定名是那份文件相对根的路径，
       指纹是字节 sha256，同 Rust 的 data-file）；根外的、盘上没有的跳过；
+      tree_copy_file 那一种（折不出的目录在前）登在 TAIL_READ_SCOPES 里的，同样只留登记前缀之下的（下面「按尾巴读的登记」），整个折得出的不看登记；
     只认得出字面尾巴（path_tails：os.path.join(<折不出>, "pkg", "table.tsv")、f"{目录}/notes.txt"）→ 仓里以这一截收尾的文件整组收；
       一份都没有的不是仓里的文件（这一趟自己写的、根外的），跳过；尾巴只剩后缀（".json"）的不算认得出；
+      那一处登在 TAIL_READ_SCOPES 里的，那一组只留登记前缀之下的（下面「按尾巴读的登记」）；
       折不出的前缀推得到本函数的一个参数的（PythonModule.prefix_parameter：os.path.join(<参数>, …)、os.path.dirname 一类、本函数里给它的赋值），
       那一组留到收完闭包再按调用处认（ScriptClosure.tail_read_supplied）：闭包里每一处给的都是这一趟自己建的临时目录、判法入口的参数（被判的输入），
       或又是这样的参数，就不收（归二）；有一处给的是 sys.argv、环境变量、根里的路径或推不出的（仓副本、根本身都可能），照尾巴整组收。
       弄坏开关 python-tail-reads-unanchored 下读的时候就整组收；
+      门禁样本档（.claude/gate.d/fixtures/ 底下）的文件不按尾巴收：样本只在 run_sample 一类拷走之后读，拷的那一趟按样本自己的键管，仓里多一份样本不动别的判定的键
+      （弄坏开关 python-tail-reads-samples-included 下照收）；按调用处认的时候，程序入口带参数剪掉的那几截（narrowing_plan）里的调用不算调用处（弄坏开关 python-call-sites-whole-view 下照算）；
     os.path.join(<折得出、是根里一个目录（不是根本身）>, <折不出、出处推不出>…)（fixed_directory_read）→ 那个目录整棵收成 data-directory
       （指纹同 directory_fingerprint；读的是那个目录里登记表、夹具、模板中的某一份，哪一份都可能）；
     名字照它的赋值逐个认，模块里只赋过一次的常量照它的值认；函数参数照每一处调用给的实参认：先本模块里的调用（方法按 <对象>.<方法>(…)、套着的函数按外层里的调用），
@@ -130,6 +155,14 @@ Python 闭包：import 时执行的模块级语句（欠账 C890（判法单元�
     （PythonModule.repository_content_derived：沿名字的赋值、for 与推导式的迭代对象、with … as 的对象往回找，碰到一处读根里文件或目录的读）——
     读的是根里某一份由判法自己的数据点名的文件（读进来的登记行点名的这一类），整个根当数据不成样子，哪一份又推不出。
     弄坏开关 python-root-joins-refused 下回到「根本身 + 折不出」一律拒算、拷文件的源照拒算。
+  编译产物不进键：读的路径折出来、或照字面尾巴对上的文件经过 SKIPPED_DIRECTORIES（target、.git、缓存）里的目录的，不收也不拒算（归二的 skip build-output）：
+    编出来的二进制随机器、编译目录变，两棵源码相同的树键要相同。弄坏开关 python-data-reads-follow-build-outputs 下照旧收成 data-file。
+    编它的函数登记在 BUILT_TOOL_SOURCES：(文件, 函数名) → 它编的程序的源码目录（函数是 python 函数的限定名或 shell 函数的名字）；那个函数进了闭包，
+    源码目录整棵收成 data-directory（规则名 tool-source），产生二进制的源码改了键变。
+    起编出来的工具那一处折不出（程序路径取编它那一步的输出）的，登记在 BUILT_TOOL_LAUNCHES：(文件, 起它的单元的短名, 折不出的词的 ast.unparse，
+    比法同「不拒算的程序词」) → 编它的函数（BUILT_TOOL_SOURCES 的键）：这一处不拒算，编它的源码目录照样收成 data-directory（编它的函数进不进闭包都收：
+    python 起的 bash -c 只看得见它 source 的那几份，叫不到同一份脚本里 export -f 交下来的编译函数）。
+    弄坏开关 built-tool-sources-ignored 下两种都不收；built-tool-launches-refused 下 BUILT_TOOL_LAUNCHES 登记了也照旧拒算。
   shell 闭包读的文件（重定向 <、cat 的参数这类）这一份还不收、也不拒算；读目录（os.listdir / os.walk / glob）同样还不收。
 按行进键的登记表（ROW_KEYED_TABLES，row_keyed_closure；弄坏开关 row-keyed-tables-whole 下照旧整份进键）：
   判法读一张登记表、只按其中几行取用的（按被起的那份脚本查它自己那一行、按门禁阶段查样本档那一行），那张表在这一条判定的键里只进那几行。
@@ -138,17 +171,100 @@ Python 闭包：import 时执行的模块级语句（欠账 C890（判法单元�
   换成 data-rows 单元（限定名照旧是表的路径，起止 1-<选中的行数>，指纹是那几个正则与选中的行按原次序连起来的 sha256）；有一个调用者不在登记里
   （读整张表、逐行核的）照旧整份。登记的一张：.claude/hooks/selftest-registry.tsv（门禁 code-tooling 的 research-script-selftests 那几条的判法
   scripts/gate/selftest-process-guard.py 经 .claude/hooks/lib_project_code_runs.py 读它）。
+闭包的轮数（ScriptClosure.run）：收完一轮单元、认一遍读文件的参数与调用方交进来的命令，折出新的根里脚本就再收一轮；超过 CLOSURE_ROUND_LIMIT 轮抛 FunctionUnitsError 点名入口
+  （弄坏开关 closure-round-limit-unchecked 下不查）；每轮收完的单元数记在 Closure.round_sizes，closure <根> <入口> --explain 打 round 行。闭包里按名字认的调用处（calls_by_name）随新收的单元增量并进来，
+  不每轮重扫（弄坏开关 closure-call-index-frozen 下头一次建完不再并，后收进来的调用处看不见）。
+共用一个脚本索引（PythonIndex）的闭包之间共用两样：单元自己的调用处清单（不剪的视图下存在单元的 cache["named-calls"] 里，单元随模块一起建）、运行期读的数据文件与目录的数据单元
+  （PythonIndex.data_units、data_directories，同一份文件一趟只读一遍、算一遍摘要）。两样都活在索引里，索引是这一趟的文件内容建的，下一趟（新索引）重读；
+  弄坏开关 data-units-process-wide 下数据单元整个进程共用（按根分），同一棵树里文件改了也认旧的。
 不走的子进程边（EXCLUDED_PROGRAM_EDGES；同一份判决末节第 3、5 条）：登记了的（起它的文件, 起它的单元的限定名, 被起的程序）那一条子进程边不连
   （python 单元与 shell 单元起的都认；shell 函数的限定名同单元表，嵌套的写 <外层>::<名>）。
   按实测排：那一条边只打提示、不改结局；与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES（算键的库自己，按角色排、整份文件不进键）是两种排除。
-  登记了一条：E183 跑法脚本计划那一步（plan_step）起 scripts/gate/admission.py 的准入边。准入是闸，退出码只定这一件跑不跑，标准输出只有 E7INPUT 行，
+  登记了一条：E183 跑法脚本计划那一步（plan_step）起 scripts/gate/admission.py 的准入边：准入是闸，退出码只定这一件跑不跑，标准输出只有 E7INPUT 行，
   读产物的判法先 sed 去掉这几行；它不改读数，所以不沿它把准入模块收进实验键。登记一条边之前先现查起点单元与被起的程序都在，不在的不登记。
   自证 EXCLUDED_EDGE_PYTHON_CELL 与 EXCLUDED_EDGE_SHELL_CELL 在夹具上证这套机制：自证期间临时往表里登记夹具里的一条边，核登记了的那一条不连、
   同一个单元起的另一个程序照连、不登记时那一条照连。EXCLUDED_EDGE_EXIT_CELL 在夹具上证「键不变而退出码变」必红。
   登记的准入边配三格（真仓）：ADMISSION_EDGE_ANOMALY_CELL（准入这条路上的异常只让计划那一步不跑、读数出不来）、ADMISSION_EDGE_STRIP_CELL
   （准入打的只有 E7INPUT 行，判法去掉之后读数一行不差）、ADMISSION_EDGE_REACH_CELL（切边前后少掉的单元都只经这条边可达）。
+不走的调用边（EXCLUDED_CALL_EDGES；ScriptClosure.call_edge_excluded）：登记了的（调用处的文件, 调用处单元的限定名, 被调的名字）那一条按名字连的边不连
+  （narrowed_calls 那一路同样认）；被调的单元只经这条边才到得了的，连同它读的数据文件、编的工具源码、起的程序都不进键，别的单元调它照连。
+  只登「管怎么算键、不管判对错」的那一步，同按角色排除的文件一个角色、只排这一条边。登记了一条：unit_graph_directory 调 built_unit_graph
+  （找或编产品行为视图用的 unit-graph：编它读的 Cargo.lock、.claude/heavy-thread-default、crates/singlefs-unit-graph/src 只定缓存目录名与编法，
+  程序交出的单元行逐个进各条判定的键；这三样在别的读点上照那一处的读法收，不按路径排）。BUILT_TOOL_SOURCES 里 build_unit_graph 那一行照留：
+  别的路调到它时编它的源码目录照收。弄坏开关 call-edge-exclusions-ignored 下登记了也照连。
+  自证 EXCLUDED_CALL_EDGE_CELL 在夹具上证这套机制（自证期间临时登记夹具里的一条边：登记了的那一条不连、只经它读的数据改了键不变，同一个单元调的另一个函数照连）；
+  UNIT_GRAPH_INPUTS_CELL 在真仓拷贝上证登记的那一条（unit_graph_directory 的闭包里没有 built_unit_graph、build_unit_graph 与那三样，改三样键不变）；
+  UNIT_GRAPH_DIGEST_CELL 证缓存目录名罩全三样（unit_graph_inputs_digest：三样各改一处目录名都换，弄坏开关 unit-graph-digest-skips-lock-file 下改 Cargo.lock 不换）。
+按角色排除的文件（Options.excluded_files、ScriptClosure 的 excluded_files；lib_verdict_library.py 的 judging_unit_key、FunctionUnitIndex.key 的 excluded_files、广谱变异的判法单元指纹给；
+  弄坏开关 excluded-files-followed 下只排单元、边照走）：这几份文件的单元不进闭包，也不从它们往下连：它们读的数据文件、起的程序、调到的别的文件的单元，只经它们才到得了的都不进键；
+  别的路到得了的照收。NOT_JUDGING_FILES 是 scripts/crash/lib_verdict_library.py 里同名那一份的抄录（广谱变异不载入那份库），NOT_JUDGING_FILES_CELL 判两份相同。
+  crates 变异判法不在这个射程里（.claude/rules/verification-reference.md「复用门禁的判定」一节「单元键的组成与排除」）：lib_mutation_units.judging_units 不给 excluded_files。
+  admission.py 的 KeyContext.script_closure 也给（文件头「单元键」）：入口本身在这几份里的不给（它们自己的判定、function-units-two-implementations-agree 的判法）。
+  命令行 closure / key 带 --judging 照判定算键的口径给（judging_excluded_files：按路径载入同目录的 admission.py、调它的 not_judging_files_of_entry，不另抄一份；
+  弄坏开关 closure-judging-exclusions-dropped 下带了也不给）：查一条判定为什么拒算、它的闭包里有什么，用这一种（via 链不穿过这几份）；
+  不带的什么都不排，看的是这份入口照写法连得到的全部（这几份文件自己的闭包、crates 变异判法单元指纹那一路照它）。
+不拒算的程序词（UNKEYED_PROGRAM_WORDS：(文件, 函数, 词) → 为什么；函数是起它的单元的短名，脚本体写 <script-body>）：命令位置、-c 的串或脚本路径折不出，
+  而它不是这一条判定要收的仓里代码的那几处，逐处登记：编出来的装置（Rust 入口由请求那一侧进键）、冻结根里的装置、
+  并行起测试目标的脚本起的 cargo test 与预编的测试二进制（crates 的测试，由调用方那一侧的请求进键）、只给自证换的假程序、调用方交进来的一句话、自证里起的假命令、stage_cell 登记的函数（STAGE_CELL_FUNCTIONS_REAL_CELL 判第二列都是字面名字）、
+  表行与样本给的命令（被起的那一份由各条判定的请求进键：入口是它、带 line:command=，样本根里的由 line:samples= 收）、只问环境的系统工具、
+  按需领卡的客户端（device_card_lease.py 的 take_card、return_card 起调用方给的 <树根>/task-server/task：领卡没成装置不起，领到了只定装置用哪张卡，
+  客户端的标准输出领卡那一回收成卡串、还卡那一回转到标准错误；不改读数）。领卡客户端这两行配三格（真仓，量 device_card_lease.py 这一侧）：
+  CARD_LEASE_CLIENT_WORDS_ANOMALY_CELL（领卡那一回的异常抛 CardLeaseRefused、装置不起、标准输出空着，还卡那一回的异常不改装置的退出码与标准输出；
+  弄坏开关 card-lease-client-words-granted-sample）、CARD_LEASE_CLIENT_WORDS_STRIP_CELL（还卡那一回客户端打的标准输出转到标准错误，读数一行不差；
+  弄坏开关 card-lease-client-words-return-output-kept）、CARD_LEASE_CLIENT_WORDS_REACH_CELL（读源码判 row_driver.py 与 shared_steps.py 领卡、还卡
+  都经这两个函数、不经别处起领卡客户端，device_card_lease.py 里起子进程的只有这两个函数；弄坏开关 card-lease-client-words-other-launches-unchecked）。
+  shell 的词去掉引号比（ShellIndex.resolve_inline、resolve_command、resolve_invocation），python 的照 ast.unparse 比（折不出的那个元素，或起子进程那一处的头一个参数，
+  PythonModule.refuse_launch）。shell 的路径词折得出、却落在根外或指到不在的文件的（{tree} 这类由别的程序换掉的模板），登了同样不拒算 shell-path-outside-root /
+  shell-path-missing（ShellIndex.resolve_invocation；弄坏开关 shell-registered-missing-paths-refused 下照旧拒算）。没登记的照旧拒算；弄坏开关 program-words-refused 下登记了也拒算。PROGRAM_WORDS_CELL 在夹具上证这套机制（自证期间临时登记夹具里的词），
+  REGISTERED_WORDS_REAL_CELL 判登记的文件、函数、词在真仓都还在（弄坏开关 registered-words-drifted 下多一行真仓没有的）。
+登记的被起程序（LAUNCHED_REPOSITORY_PROGRAMS：(文件, 函数, 词) → 根里被起的那几份；词的比法同「不拒算的程序词」）：命令或脚本路径折不出、
+  而被起的是仓里的代码（自证起这份文件自己的别的子命令、换了假的才不走的那一份仓内脚本、{tree} 这类模板指到的这份脚本自己）的那几处，逐处登记：
+  不拒算，登记的那几份照程序入口整份连上（参数不知道，不剪）；登记的文件有一份不在的照旧拒算。python 的脚本路径折得出、根里没有的
+  （subprocess-path-missing）同样先照这两张登记表认，没登记的照旧拒算。弄坏开关 launched-programs-refused 下登记了也拒算。
+  LAUNCHED_PROGRAMS_CELL 在夹具上证（自证期间临时登记），REGISTERED_WORDS_REAL_CELL 一并判这张表的文件、函数、词与被起的那几份在真仓都还在。
+  整条登记过的 bash -c（python 起的，头一个参数登在这两张表里）：正文是字面的也不拆开认，照登记办（inline_from_command；$1… 是带引号的多行串、换不进正文时
+  拆开认会拒算）。弄坏开关 python-registered-inline-launches-analyzed 下照旧拆开认。
+import 进来的模块加的 sys.path（PythonModule.search_directories）：这份模块在模块级 import 的仓内模块、照 SPEC_PATH_ARGUMENTS 载入的那几份，
+  它们往 sys.path 加的目录（传下去的也算）对这份模块的 import 同样生效。弄坏开关 python-imported-sys-path-ignored 下只认这份模块自己加的。
+globals 的下标与 update（collect_facts）：globals()[键] 读，键是字面量或折得出的连到那几个名字，折不出的连这份模块的每一个模块级名字（只会多收、不会少收）；
+  globals()[键] = 值、del globals()[键]、globals().update(…) 只写不读，不连（值是这个单元里的表达式或调用方交的，各在各的单元里）。都不拒算。
+  globals().get(…) 与别的用法（传参、当默认值）照旧拒算 globals-lookup。弄坏开关 python-globals-subscripts-refused 下照旧一律拒算。
+文档串的读法（PythonModule.collect_facts、reads_docstring、call_facts）：文档串不进单元指纹，被读了才收成 docstring 数据单元（规则名 docstring）。认作读的四种：
+  <对象>.__doc__ 与模块里的 __doc__ 取值（ast.Load）、<对象>.__doc__ += …（先读后写）、getattr(<对象>, "__doc__")、inspect.getdoc(<对象>)；
+  <对象> 是这份模块里的 def / class 收它的那一段，是 import 进来的模块收那份模块的模块文档串，认不出主人的收这份模块的全部文档串。
+  <对象>.__doc__ = … 与 del 只写、不读，不收（模块级给 namedtuple 一类写文档串，不把整份模块的文档串带进闭包）。
+  弄坏开关 python-docstring-writes-counted 下写也算读；python-docstring-augmented-assignment-not-read 下只认 ast.Load；
+  python-docstring-call-readers-ignored 下 getattr 与 inspect.getdoc 两种不认。
+登记表里的命令（REGISTRY_COMMAND_TEXTS：(文件, 函数) → (登记表, 命令那一列的下标)）：bash -c 的串是这个函数从登记表读进来的：登记表收成数据单元，
+  那一列的每一条命令当内联 bash 认（PythonModule.registry_command_texts）；表不在交空集合（没有要起的）。弄坏开关 python-registry-command-texts-refused 下照旧拒算 inline-script-not-literal。
+载入路径的登记（SPEC_PATH_ARGUMENTS：(文件, 路径表达式的 ast.unparse) → 根里的文件）：spec_from_file_location 的路径折不出（调用方当参数交的、从候选里现挑的），
+  而实际载入的就是仓里这一份（PythonModule.registered_spec_path）；登记值可以是几份文件的元组（载入的是其中哪一份折不出：每一份都连，有一份不在整条不认、照旧拒算）。
+  弄坏开关 spec-path-arguments-refused 下照旧拒算 spec-path-unfolded；spec-path-tuple-first-only 下元组只连头一份。
+按尾巴读的登记（TAIL_READ_SCOPES：(文件, 函数短名, 被读路径表达式的 ast.unparse) → (前缀的元组, 为什么)；PythonModule.registered_tail_scope）：
+  只认得出字面尾巴的那一处读（「运行期读的数据文件」一）照尾巴收的是全仓同名的文件，前缀推不出（os.walk 的目录变量、往上找清单的那一串）；
+  「<折不出的目录>/<至少两段的尾巴>」照 tree_copy_file 收的是根里同一相对路径的那一份（os.path.join(<请求给的根>, "crates", "mutations.tsv")），读的却可能是请求给的那棵树；
+  登记了的，那一组只留落在登记前缀之下的（前缀相对根，按整段目录比：crates 不认 crates-old/）；前缀是空元组的，读的是调用方交进来的输入（请求的 cwd 一类），一份都不收、不拒算。
+  登记的前缀写那一处真走得到的地方，不写「看着相关」的：前缀外的文件那一处读不到，前缀里的改了键照变；读得到哪一份要等请求才定的才写空元组。
+  前缀一格写 "."（TAIL_READ_ROOT_COPY）的是被判那棵树根上的那一份：只留相对根的路径就是那截字面尾巴本身的那一份（尾巴只有一段的就是根级文件，
+  os.path.join(<调用方给的根>, "Cargo.toml") 只留根上的 Cargo.toml），别处同名的照旧不收；tree_copy_file 那一种收的本来就是根里同一相对路径的那一份，照留；
+  可以与目录前缀并写（("crates", TAIL_READ_ROOT_COPY)），比法在 in_tail_read_scope。前缀推得到本函数参数的，留下的那一份同目录前缀下的一样按调用处认（「运行期读的数据文件」一）。
+  读调用方给的根上的根级文件（Cargo.toml、Cargo.lock）登 "."；只有读到的值已由调用方解析之后写进键的（依赖行、工具链行、cfg、crate 起法）才登空元组，
+  为什么一格写进键的那一处。弄坏开关 tail-read-scopes-root-ignored 下 "." 当目录前缀比（根上那一份也不留）；
+  TAIL_READ_ROOT_SCOPE_CELL 在夹具上证：登 "." 之后根上那一份改了键变、research/ 下多一份与改别处同名的一份键不变，登空元组时改根上那一份键不变。
+  弄坏开关 tail-read-scopes-ignored 下登记了也照全仓那一组收（两种都是）；tail-read-scopes-copies-unscoped 下只有 tree_copy_file 那一种不看登记。
+  TAIL_READ_SCOPES_CELL 在夹具上证两种（自证期间临时登记），REGISTERED_WORDS_REAL_CELL 判登记的那一处与前缀在真仓都在；
+  TAIL_READ_SCOPES_REAL_CELL 在真仓逐行核：登记的函数里有一处表达式的 ast.unparse 与登记的逐字相同，从那一处起 data_read_origins 真问到了这一行的登记、
+  拿到的前缀与登记的相同，收进来的文件都在前缀下（"." 只认根上那一份，空元组一份都不收）；弄坏开关 tail-read-scopes-drifted 下多登一行真仓没有的表达式。
+  那一处在 shell 脚本起的内联 python 正文里的，登记的文件写那份 shell 脚本（PythonModule.source_file），函数一格写正文里的函数名，模块级的写赋值的名字、
+  <module-body> 或 <main-guard>：TAIL_READ_SCOPES_REAL_CELL 到那份脚本各单元起的内联正文里找（ShellIndex.links 的 python-inline，同 dump），
+  REGISTERED_WORDS_REAL_CELL 不在源码里找 <module-body>、<main-guard> 这两个名字。弄坏开关 tail-read-scopes-inline-unread 下只认 .py 文件里的函数（那几行判红）。
+  TAIL_READS_RECORDS_REAL_CELL 在真仓收两批入口的闭包：登记的判法入口（registered_judging_entries）与 .claude/hooks/selftest-registry.tsv 登记成 selftest 的脚本
+  （带 --selftest 当程序入口的参数，selftest_registry_scripts；只收 .py、.sh、.bash）。按尾巴读而没登记的那几处，收的时候把落在 records/、research/ 下的文件记进
+  UNSCOPED_TAIL_READS（record_unscoped_tail_read）；读它的函数在某个闭包里、记下的文件也收进了那个闭包的，判红，逐处点名 文件:行、函数、表达式与那几份文件，
+  出路是照那一处真走到的地方登记 TAIL_READ_SCOPES。收不成闭包的入口同样判红。先在夹具上证：没登记的一处判得出、临时登记之后不判。
+  弄坏开关 tail-reads-under-records-unrecorded 下不记（夹具那一处判不出）；tail-read-scopes-ignored 下登记了照记（登记之后那一趟照判出）。
 判法入口的登记（registered_judging_entries；命令行 entries <根>）：存判定的各路判法入口从各份脚本的登记现取，不手抄——广谱变异的 JUDGING_ENTRIES 与
-  GPU_JUDGING_ENTRIES、crates 变异的 JUDGING_ENTRIES、admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、
+  GPU_JUDGING_ENTRIES、crates 变异的 JUDGING_ENTRIES、admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、E165 第二段判法模块的 JUDGING_ENTRIES、
   verus-proof-check.py 的 JUDGING_ENTRIES，加门禁阶段（.claude/gate.d/*.sh）里写死的 "judge:<文件>::<函数>" 令牌；自证真仓那几格的入口从它取。
   登记值可以是字面量，也可以是前面模块级字面量的名字与 + 拼成的式子。自证 REAL_JUDGING_CLOSURES_CELL 逐个收登记的入口的闭包，有一个拒算就红
   （拒算的那一路判定写不进库、每趟照判）；口径照 judging_unit_key：crates 变异的入口全算，别的入口去掉 lib_verdict_library.py 的 NOT_JUDGING_FILES。
@@ -198,11 +314,16 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
           只是同名的字段、局部变量不连（弄坏开关 rust-outside-crate-names-linked-unimported：照旧按同名连）；同一个目标里按模块筛照下面「R-裸名同一个目标里按模块筛」
           （committer 里 impl 成员 fn run 不连到 command_line::run；弄坏开关 rust-outside-crate-names-linked-across-modules：照旧按同名连）
   R-裸名同一个目标里按模块筛  crates/ 下的包与工作区外的 crate 一样，同一个目标里的裸名只连单元所在模块看得见的那几份
-          （RustWorkspace.candidates_seen_from_module：同一模块的、所在模块的 use 引进了它且路径点到候选所在模块的、写成 模块::名 的，super 照个数往上数层；
+          （RustWorkspace.candidates_seen_from_module：同一模块的、所在模块的 use 引进了它且路径（花括号展开之后）恰好点到候选所在模块的、写成 模块::名 的，super 照个数往上数层；
           use 路径或 …::名 的根名是 std、core、alloc 或看得见的别的 crate 的库名的指别的 crate，跳过那一处）；点不准的退回全连，
           字段名、局部变量与 impl 成员自己的名字一份都不连；名字是 use 改名的原名、单元是 macro_rules!（体里的名字在调用处解）的不筛；跨目标的只认 pub、不按模块筛。
           验证包里 CPU 判器的单元经 use 从格式库引进 SLOT_BYTES，不连到 gpu_unit_checks 里私有的同名常量。
           弄坏开关 rust-crates-names-linked-across-modules：crates/ 下的包照旧按同名连
+  局部 let 与参数绑定遮住的名字（bare_name_only_a_local_binding；与 crates/singlefs-unit-graph 的 is_bare_name_only_a_local_binding_of_the_function 同一个判法）：
+          函数单元里，名字每一处都是局部绑定或落在绑定的作用域里的（语句开头的 let [mut] 名从它的 ; 起到外层花括号收尾，参数从参数表的 ) 起到单元收尾；if let、match、for、闭包参数、解构不认），
+          不往外连同名的函数（let main = …; 不连 fn main）；同一目标、跨目标都这样。只遮函数：let 写成常量、静态量、单元结构体的名字是拿它当模式，照连。
+          绑定之前或作用域之外的同名、带路径的、宏名、作用域外的格式串捕获、宏调用括号里的 let、函数体里有嵌套条目的，都照连，宁可多连。use 改名的原名不看这一条。
+          弄坏开关 rust-let-shadowed-names-resolved：照旧连到同名函数
 
 数据目录（RustFile.runtime_manifest_path、fold_manifest_chain；crates/singlefs-unit-graph 的 fold_manifest_directory_read、fold_path_chain 同写）：
   Path::new(env!("CARGO_MANIFEST_DIR")) / PathBuf::from(…) 后接 .join("字面") 链、链后不再接别的方法，
@@ -222,6 +343,18 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   弄坏开关 rust-manifest-binding-refused-whole：不是能收的目录不跟 let、拒算，绑给 let 的有一处折不出就整处拒算、一条读都不记；
   自证「Rust：清单目录绑给 let 变量的，一处 .join(变量) 折不出、一处折出文件…」那一格必须判错。
 
+程序起自己（RustFile.own_program_path_is_handed_to_command_unchanged；closure.rs 的 entry_is_the_main_of_a_program；crates/singlefs-unit-graph 同写，两道都过才不拒算）：
+  子进程起的是在跑的这个程序文件、从同一个 main 进，换参数只换走哪条路，走的代码都已在闭包里，不连边。
+  路径形状：current_exe() 后接 ?、.unwrap()、.expect("字面串")、闭包一定不交值（以 panic!(…) 或 …process::exit(…) 收尾）的 .unwrap_or_else(…)，
+  或 match current_exe() { Ok(名字) => 同一个名字, Err(…) => <以 return 起头，或一定不交值> }；这个表达式就地写在 Command::new(…) 的括号里，
+  或绑给 let 名字（单元里这个名字不再 let），名字的每一处用法只是 Command::new(名字)、Command::new(&名字)、名字.display()，至少起一次。
+  入口：目标是 bin，这一趟不按测试编，一组入口恰好是目标根文件顶层的 fn main（rust_entry_is_the_main_of_a_program）。收闭包时判入口，不判「闭包里有 main」：单测调 main 的进程仍是 libtest。
+  --exact 折得出名字的先走「测试二进制起自己」，解不到恰好一个 #[test] fn 照旧拒算。形状不认的，单元里有 SPAWNING_WORDS 就就地拒算，没有的只是问路径。
+  弄坏开关 rust-own-program-restart-refused、rust-own-program-entry-unchecked、rust-own-program-path-unchecked 各红 OWN_PROGRAM_KEYED_CELL、OWN_PROGRAM_ENTRY_CELL、OWN_PROGRAM_PATH_CELL。
+extern 块（RustFile.extern_block_declares_only_listed_c_library_calls；crates/singlefs-unit-graph 同写，那边的形态名是 extern-function-interface）：
+  ABI 恰好是 "C"、条目前没有 #[link…]、块里只有 [#[link_name = "…"]] [pub] fn 名字(…) …;、至少一条、每条的符号（link_name，没有就取函数名）都在
+  C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 里的不拒算：标准库的文件读写走同一层 C 库，键本来就不跟 C 库变，这两个符号没有多出一类依赖。别的写法拒算 extern-block。
+  不判：工程里自己定义同名导出符号盖掉 C 库（#[no_mangle] fn pwrite）。弄坏开关 rust-extern-listed-calls-refused、rust-extern-any-block-keyed 各红 EXTERN_LISTED_CELL、EXTERN_REFUSED_CELL。
 测试二进制起自己（RustFile.current_exe_child；规则名 current-exe-child；crates/singlefs-unit-graph 同写）：
   Command::new(…current_exe()…) 后接 .arg(…) / .args([…]) 链，参数里恰好有一个字面 "--exact"，紧跟在它后面的那个参数折得出测试名的，
   从起子进程的那个单元连一条边到同一编译目标里 libtest 全名（文件在目标里的模块路径加限定名）恰好等于它的那一个 #[test] fn，不拒算 current-exe。
@@ -230,7 +363,7 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同�
   起子进程那个 fn 自己的参数名：闭包里每一处调用它（不是 .方法 调用）的那个实参各折一遍，各自再对 #[test] fn，每趟 drain 之后、WGSL 供给之前跑，
   一处都没有、折不出、实参又是参数的拒算。测试名写在 --exact 前面、用 module_path!() 拼的、套着 as_str() 的、单元里另有 let 绑定的，折不出。
   同一个函数里起了子进程的（函数里出现 SPAWNING_WORDS 里的词：Command、spawn、posix_spawn、fork、execv、execve、execvp），对不上恰好一个 #[test] fn、折不出名字、
-  不是 Command::new(current_exe()) 的写法的（含路径先存进变量再交给 Command::new），照旧拒算 current-exe。
+  不是 Command::new(current_exe()) 的写法的（路径改过、流向别处），照旧拒算 current-exe；路径原样交给 Command::new 的看入口（「程序起自己」）。
   同一个函数里不起子进程、只问 current_exe() 路径的（取路径读文件大小、current_exe().is_ok()）不拒算，也不连边：路径拿去做什么与测试要点名的那一条无关。
   不判：路径经参数交给别的函数、由那个函数起子进程的（那个函数里没有 current_exe，本来就不在这条规则里）。
   弄坏开关 rust-current-exe-refused：Command::new(current_exe()) 的写法一律不认（起了子进程的函数里折不出测试名，拒算 current-exe）；
@@ -286,20 +419,24 @@ Rust 闭包读到的 shell 脚本（rust_closure_of 的 collect_shell_sources，
 
 用法：
   lib_function_units.py dump <根> [--language rust|python|shell|wgsl] [--under <目录>]… [--judgment-kind product-behavior|formal-verification]
-  lib_function_units.py closure <根> <入口> [选项] [--explain]
-  lib_function_units.py key <根> <入口> [选项]
+  lib_function_units.py closure <根> <入口> [选项] [--judging] [--explain]
+  lib_function_units.py key <根> <入口> [选项] [--judging]
   lib_function_units.py controls <根>     V5 / V11 两处变异（crates/mutations.tsv 里原文是那两行的）在临时拷贝上施加，
                                            三个入口的键变不变与 design 报告 2.2 节那张表比；只读根，不写根
   lib_function_units.py entries <根>      判法入口的登记现取（registered_judging_entries），一行一个；只读根
   lib_function_units.py cross-run-caches  跨轮缓存的登记（cross_run_cache_registry，下面「跨轮缓存的登记」）照此刻的环境现取每一份的位置：先打 tempdir\t<tempfile.gettempdir()>，
                                            再一份一行 cache\t<名字>\t<脚本>\t<位置>（算不出的打 refused-cache\t<名字>\t<脚本>\t<原因>、退 3）；只读，不建目录
-  lib_function_units.py --selftest        临时目录里的夹具，另把本仓的 scripts/ 与 .claude/（不带 fixtures、kb）拷进临时目录量真仓那几格；不写本仓
+  lib_function_units.py --selftest        临时目录里的夹具，另把本仓的 scripts/ 与 .claude/（不带 fixtures、kb）拷进临时目录量真仓那几格；不写本仓。
+                                           各格与各开关下的每一次重判各在自己 fork 出来的子进程里跑（gather_forked），同时至多每台默认重活线程数个
+                                           （scripts/hosts/heavy_threads.py 的 default_heavy_threads，SINGLEFS_THREAD_CAP 设了照它；取不到退 2）；
+                                           结论照登记次序打（先各格、再各开关），每条子进程写下的输出打在它那一行之前；没收回结果的逐条点名、整份红
   选项：--target <目标>  --cfg <名或 名="值">（加进全局 cfg）  --no-default-cfg  --feature <包名>/<特性>  --no-default-features
         --toolchain <行>  --dependency <行>  --external <程序名>=<sha256>=<--version 那一行>
         --wgsl-module <文件>（WGSL 入口拼进同一个模块的别的 .wgsl）  --rust-strings-entry <Rust 入口>（WGSL 里没定义的名字到这个入口闭包的串字面量里找）
         --under <目录>（python / shell 扫哪几处，默认 scripts、.claude/gate.d、.claude/hooks、.claude/scripts 与入口所在目录）
         --judgment-kind product-behavior|formal-verification（Rust 单元在哪个视图上切、收、算，不给是 formal-verification；下面「判定种类」）
-        --program-argument <词>（可给几次，照次序是 python 程序入口的参数；上面「程序入口带参数」，只对只写 <文件> 的 python 入口起作用）
+        --program-argument <词>（可给几次，照次序是程序入口的参数；上面「程序入口带参数」，只对只写 <文件> 的 python 与 shell 入口起作用）
+        --judging（照判定算键的口径按角色排除文件：下面「按角色排除的文件」；不带的什么都不排）
 退出码：0 判完；2 用法错；3 算不出（根不在、bash 起不来、清单读不出）；4 拒算（closure / key 的闭包里有拒算：打拒算行，key 不打键行）。
 
 库接口（门禁里 python 写的判法直接 import 它算键，不为算键先编 Rust；产品行为视图例外，下面「判定种类」）：
@@ -333,15 +470,22 @@ Rust 闭包读到的 shell 脚本（rust_closure_of 的 collect_shell_sources，
     · 照原样那一份走的文件，闭包照原样的词法单元收边：规格与证明里点到的执行代码照收，只多不少；门禁 code-tooling 的 function-units-two-implementations-agree 格
       另有产品行为视图那一趟，逐入口比这一份与 unit-graph closure --judgment-kind product-behavior 的闭包与键。
   unit-graph 从哪来：设了 FUNCTION_UNITS_UNIT_GRAPH_DIRECTORY 起那个目录里的 unit-graph（调用方保证它是被判那一版的 crates/singlefs-unit-graph 编的；对拍格与自证用）；
-    没设照这份库所在仓的 crates/singlefs-unit-graph、.claude/heavy-thread-default 与 Cargo.lock 的内容摘要找
+    没设照这份库所在仓的 crates/singlefs-unit-graph、.claude/heavy-thread-default 与 Cargo.lock 的内容摘要（unit_graph_inputs_digest；这一步经
+    「不走的调用边」EXCLUDED_CALL_EDGES 登记的那一条调，这三样不进各条判法的闭包）找
     <跨轮缓存目录>/singlefs-unit-graph-product-view/<摘要>/unit-graph（跨轮缓存目录：设了 GATE_CROSS_RUN_TMPDIR 取它，没设取这份库所在仓的 git common-dir（git worktree 里是主仓的 .git），不在 git 仓里取 TMPDIR），没有就在那里的临时工作区经 scripts/hosts/capped.sh default
     起 cargo build --release --offline 编一份（几个进程同时要时排他锁，编完删工作区与编译目录，只留最近 3 份程序）。
   RustWorkspace 构造时取一次 Rust 那一份（fork 出来的子进程共用父进程那一份），之后载入的有 verus! 块或写着外属性 #[verifier…] 的文件照同一份改。
 
 Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先切词法单元（rust_lex 按字符逐个走，是载入整个工作区最费的一步，全仓约几秒到几十秒），
   结果只随这份文本变，而点名几行的 row-plan 每趟都是新进程、要把全仓的 .rs 重新切一遍。切出来的 (kinds, texts, lines, documents) 按文本的 sha256 存成一个 zlib 压缩的 json 文件
-  （去重的词表加 base64 的序号表，不用 pickle：缓存目录在可共写的临时目录里；全仓约 20 MB），放 <跨轮缓存目录>/singlefs-rust-lex-cache/<库的内容摘要>/（同产品行为视图那一段的跨轮缓存目录）；
-  FUNCTION_UNITS_LEX_CACHE_DIRECTORY 设了放那里，写 off 不用缓存（自证除缓存那一格外都设 off）。目录名里的库内容摘要把 rust_lex 与它的帮手都罩住：库的内容一变，旧目录整个不再取，
+  （去重的词表加 base64 的序号表，不用 pickle：缓存目录在可共写的临时目录里；全仓约 20 MB），放 <跨轮缓存目录>/singlefs-rust-lex-cache/<目录名>/（同产品行为视图那一段的跨轮缓存目录）；
+  FUNCTION_UNITS_LEX_CACHE_DIRECTORY 设了放那里，写 off 不用缓存（自证除缓存那一格外都设 off）。目录名（rust_lex_cache_namespace）取 rust_lex_cached 整个闭包的现场指纹
+  （live_closure_fingerprint：从 rust_lex_cached 起照字节码按全局名往下收，rust_lex 与它的帮手、rust_lex_cache_path、读写缓存的 load_rust_lex 与 store_rust_lex、
+  格式号 RUST_LEX_CACHE_FORM、词种名常量 IDENT / LITERAL / LIFETIME / PUNCT 都在里面；进程的计数与已算好的目录名 RUST_LEX_CACHE_PROCESS_STATE 只记名字；
+  模块放在哪、怎么载入的 MODULE_PLACEMENT_NAMES（cross_run_cache_directory 读的 __file__ 这类）也只记名字：放处已经定了缓存目录在哪，同一份代码在别的路径、
+  别的工作树里目录名照旧相同）加此刻的弄坏开关，
+  不读这份库的原文：闭包里有一样变了旧目录整个不再取，改这份库别处的注释、文档串与不在闭包里的函数，目录不换；经它算键的判法闭包里因此没有这份库整份的
+  source-text 与 data-file（自证 RUST_LEX_NAMESPACE_CLOSURE_CELL 在真仓拷贝上判）。解释器换了版本，字节码跟着变、目录跟着换。
   只留最近 3 个；文件只看文本内容，不看路径、修改时刻、不设时限；读不了、写坏了、各表对不上的照常现切再存；写不成不影响结果。
 
 跨轮缓存的登记（cross_run_cache_registry；命令行 cross-run-caches）：仓里有意跨轮复用的缓存都登记在这一处（.claude/singlefs-ai-sop/rules/command-safety.md
@@ -378,7 +522,7 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   起代码的写法逐种认（shell 里每一个解释器词，python 里每一次起子进程），每一种要么连边、要么拒算：
     解释器 + 脚本：连到那份脚本；脚本之后接着往后认（bash capped.sh N python3 x.py、run-with-memory-cap.sh 上限 bash y.sh 里的第二个解释器）。
     -c 的串、- / /dev/fd/N / bash -s 喂的 here-doc、here-string（含 { … } 3<<'词' 写在组后面的）：正文字面的、或折得出的
-      （$变量、$(cat <<'词' …)、$(只打字面行的函数)）当内联脚本：python 的切成单元（不进闭包，穿过它连下去；sys.argv、命令前设的环境变量
+      （$变量、$(cat <<'词' …)、$(只打字面行的函数)）当内联脚本：python 的切成单元（不进闭包，穿过它连下去；sys.argv、命令前设的环境变量、同一个单元里 export 过的变量
       折成那条命令里的词），bash 的切开再认；折不出拒算 inline-script-not-literal。内联 python exec sys.argv[k:] 时第 k 个词起照命令认。
       拆包切片（a, b = sys.argv[1:3]，下标是不小于 0 的整数字面量、不带步长，上界写了就等于下界加目标个数）逐个对上 a = sys.argv[1]、b = sys.argv[2]，
       别的序列的切片照同一条对上（paired_elements）；上界对不上、带步长、下标折不出的照旧不对上（该拒算的照拒算）。
@@ -402,8 +546,38 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
     shell 起法带字面参数：bash <脚本> <词…> 的词全是字面的（python 起 shell 的、程序入口带参数时照它带过去的参数），脚本体照
       narrowed_shell_body 剪过的正文收边：头一处 shift、set --、循环之前的 "$1" "${1:-}" 一类代成字面参数（引号里照引号转义、单引号与 here-doc 里的不代），
       代过之后判得出真假的 if [[ <字面> == / != <字面> ]]（不带 elif）、case <字面> in（只留头一个对得上的分支）走不到的那几行不收边；
-      脚本体单元与指纹照原来那一份（键照整份脚本体算），只剪边。有一处起法带了折不出的词，那份脚本体整份收（与 python 一侧「程序入口带参数」同一条规则）。
+      脚本体单元与指纹照原来那一份（键照整份脚本体算），只剪边。
+      脚本路径照根里同一相对路径认出来的（"$<折不出的目录>/<根里的相对路径>"、cd 到折不出的目录之后的相对路径：仓副本、临时树里的那一份）同样照这组词记、照它剪
+      （ShellIndex.record_launch_words）；弄坏开关 shell-tree-copy-launch-words-dropped 下这两种不记：这个单元起那份脚本只经它们时脚本体整份收、按第一列选行的表连整张，
+      与字面路径的起法混在一起时只照字面那几处剪。
+      起法里折不出的词之前有字面词的（bash <脚本> -- "$@"、[…, <脚本>, "--", *命令]）：字面词照代，折不出的那个词起是开口的一串（SHELL_OPEN_TAIL），那几个位置不代、也不代成空串；
+      开口的一串里有没有 --force 动不了字面词的位置。头一个词就折不出的那一处，那份脚本体整份收。弄坏开关 shell-open-tail-unnarrowed 下有一个词折不出就整份收。
+      python 起 shell 不看入口带没带参数：[…, <脚本>, 词…] 的每个词折得出（折出几个取值的逐个展开，*<参数> 照调用处给的列表摊开），同样照它们剪
+      （弄坏开关 python-shell-launch-arguments-unfolded 下整份收）。项目脚本开头 preflight "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+…} 那一句不算动了位置参数（它只摘 --force；
+      起法里带 --force 的照算动了；弄坏开关 shell-preflight-arguments-moved 下照算）。脚本体顶层的 if 走到的那一支以 exit 收尾，fi 之后的整段走不到（弄坏开关 shell-exit-branches-followed 下照收）。
+      按第一列选行的表（SHELL_ROW_SELECTED_TABLES：scripts/experiment-apparatus/replay.sh 的复跑表与按行的准入键）：起法里有不带 - 起头的词（实验号）或 --item <行项> 时，
+      这一趟跑不到的行不收边（table_rows_selected，照 replay.sh 的 want_row：没被 --item 点到的实验号整个跑；行项写成 <实验号>.<行序号>，行序号是这个实验号的行在复跑表里
+      从 1 数的次序，被点到的实验号只跑点名的那几行，准入键表的行按第二列抄的复跑表前三列认是哪一行）（表里写的 @驱动函数按名字连，别的实验与别的行的驱动走不到；
+      弄坏开关 shell-table-rows-unselected 下整张收，shell-table-row-items-unmatched 下行项照实验号拿去比第一列、点到的那一行也不收）。
+      表本身是个变量单元（TABLE=$(cat <<'TSV' …），别的变量与函数读 $TABLE 时连的是它：闭包里这份脚本只按实验号起过的，读表连到只留这些实验那几行的那一份（ScriptClosure.push_variable，ShellIndex.selected_table_variable；
+      指纹照整张表）；这份脚本在闭包里整份起过（入口就是它而没带参数、source 了它、有一处起法折不出）的，连整张表；入口就是它而带了参数的照这组词算一次起法（文件头「程序入口带参数」）（先按实验号连过的也补上，table_launched）；
+      带字面参数起（入口或 bash <脚本> <词…>）而照这组词剪过的脚本体里表的赋值行一行都不剩的，不算一次起法（launch_defines_tables，文件头「程序入口带参数」）。弄坏开关 shell-table-rows-unselected 下一律连整张表。
+      表行之外写到的驱动函数（ScriptClosure.table_unselected_drivers、written_only_as_table_row）：这份脚本在闭包里只按实验号起过时，只写在别的实验那几行的 @驱动函数，
+      单元里每一处都只写成 @<名>（行的身份：declare -A 的键、[[ "$bin" == @<名> ]]）或 <名>()（定义：载入时换掉驱动的 eval '<名>() { …; }'）的，不按词连：
+      这一趟跑的行里没有它，驱动只由表行起。不带 @ 的词（命令位置上的、放进变量再起的）照连；整份起过、一处都没起过（入口是 <文件>::<函数>）的不走这一条。
+      这一条不看起的是根里那一份还是临时目录里的副本：副本照根里同一相对路径那一份认（tree_copy_file），副本里留下的框架函数照连，表换成桩的副本带实验号起时，真表里的驱动函数不连。
+      不带实验号起的副本照整张表连（认不出表换没换，只多收不少收）。弄坏开关 shell-row-driver-mentions-linked 下照按词连，shell-row-driver-plain-words-dropped 下不带 @ 的词也不连，
+      shell-row-driver-whole-launch-dropped 下整份起也不连，shell-row-driver-selected-rows-dropped 下点名的实验那几行也写到的驱动不连。
       弄坏开关 shell-program-arguments-unnarrowed 下不剪。
+    shell 起 python：python3 <脚本> <词…> 的词照「程序入口带参数」子进程边带过去（ShellIndex.python_launch_words，KnownWords）：字面的是已知的词，一个双引号括着、里面不是 $@ 与 [@] 的是不知道的一个词，
+      别的（不带引号的展开、"$@"、拼着展开的）从那里起是开口的一串。闭包的入口带没带参数都这样；python 起 python 同样不看入口（ScriptClosure.python_edges）；被这样起的模块的 import 时赋值照「给了参数」收（narrowed_programs）。
+      同一个单元里有一处起法是经尾巴组、目录通配认出来的，那份脚本整份收。弄坏开关 shell-python-launch-arguments-unfolded 下整份收；python-program-arguments-unnarrowed 下 python 起 python 也整份收。
+    shell 里套在函数里的函数（ShellFile.parse 记的 container）：只有外层函数跑过才定义，外层函数（连同它里面）之外的单元只在命令位置上写到它的名字才连（ScriptClosure.shell_nested_function_named）：
+      驱动函数里一个叫 device 的变量不连到某个自证函数里套着的 device()，也就不沿 container 把那个自证函数整个连进来。弄坏开关 shell-nested-functions-by-any-word 下照旧按词连。
+      外层函数只认自己那一层：指纹照含套着的函数的全文算，切命令、认词用的正文（Unit.body）把套在里面的函数那几行抹空，内层的命令只归内层，
+      内层起的折不出的程序词拒算落在内层名下、照内层的短名查 UNKEYED_PROGRAM_WORDS。外层调到内层照命令位置上的那个词连。
+      赋值、local、export 与写出的脚本照全文认（Unit.whole_body；套着的函数经 container 找外层的变量与兄弟函数写出的脚本，照旧看得见）。
+      弄坏开关 shell-nested-commands-in-outer 下外层照全文认命令。
     python 的命令：字面列表、a + b、x if c else y、*展开、本函数里的赋值与 .append / .extend / +=、函数参数（本模块每一处调用给的实参）、
       调仓内函数的返回值都折；shell=True 与 os.system 的串当内联 bash；认不出拒算 subprocess-command-unfolded。另认：
       套在函数里的函数自成一层作用域（PythonModule.nested_unit / scope_of）：它的局部赋值与参数照它自己的，参数按外层函数里调它的那几处折，别的名字到外层找；
@@ -411,7 +585,7 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       （b 可以是 x.index(<字面词>)：到头一个等于它的词之前，切点前折不出的词能断定不等于它的照过）；env 后面 f"{名字}={折不出}" 名字折得出照一条赋值认；
       类里方法的参数按本模块每一处 <对象>.<方法>(…) 折；推导式的循环变量取遍它迭代的元素（序列可以是调仓内函数的返回值、{…}.get(键, 缺省)）；
       只赋过一次的元组 / 列表字面量[整数]；spec_from_file_location 载入的仓内模块的 module.NAME；pool.submit(f, 实参) 算对 f 的一处调用；
-      命令位置上折出几个取值的，每个取值当一种取法各认一遍。
+      命令位置上折出几个取值的，每个取值当一种取法各认一遍；模块体里的语句照函数体同一条认（循环、分支里赋的名字、for 取的字面列表，模块顶层赋的也算一种取法）。
       解释器后面的脚本折不出、只认得出字面尾巴（os.path.join(<折不出的目录>, "tools", "runner.py")）：仓里以这一截收尾的文件整组连上
       （script_tail_group）；一份都没有的不是仓里的脚本（这一份自己写出来的夹具、根外的程序），不连也不拒算；连尾巴都认不出的照旧拒算 subprocess-path-unfolded。
       cwd= 折不出、脚本写的是相对路径（["bash", "setup.sh"], cwd=<拷出来的样本>）同样按 /<它> 收尾整组连上。
@@ -424,6 +598,15 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       调用方交进来的命令（refuse_launch）：命令、-c 的串、脚本路径折不出，折不出的那几截（unfolded_part_origins）出处都推得出是入口函数的参数或 sys.argv、
       argparse 解出来的属性、临时目录、根外前缀（调用方交的那一条命令，由请求那一侧的单元键与 line:command= 管）：不拒算；别的函数的参数照闭包里每一处
       调它的实参接着往上认（闭包里没人调它的推不出）；出处是环境变量、推不出的照旧拒算。是不是入口在收闭包时判（ScriptClosure.caller_launch_refusals）。弄坏开关 python-caller-launches-refused 下一律照旧拒算。
+      闭包里调它的那几处（closure_call_arguments，运行期读的数据文件按调用处认参数也用它）按名字找，再只留真解析得到它的（ScriptClosure.call_reaches）：
+      f(…) 被调用处往外头一层把 f 当局部名字的函数作用域截住（套着的同名函数遮住模块级的），x.f(…) 的 x 是 import 进来的别的模块（标准库、外部包、别的仓内模块）的不算；
+      判不了的（self.f、载入的模块、局部变量上的属性）照旧算。弄坏开关 python-call-sites-matched-by-name 下一律照名字算。
+      functools.partial(f, a, k=v) / partial(f, a, k=v)（头一个实参是名字或属性）同样算 f 的一处调用：a 对上 f 的头一个参数，照 f(a, k=v) 认（partial_bound_call）；
+      弄坏开关 python-partial-call-sites-ignored 下不算（经 partial 交的实参折不到被调函数的参数上，照旧拒算）。
+      调用方登记（CALLER_SUPPLIED_COMMANDS：(调用处的文件, 调用处单元的短名, 交命令的实参的 ast.unparse) → 为什么；ScriptClosure.caller_supplied_registered）：
+      共用的起法（lib_process_group.run_in_own_session 这类）拿参数起子进程，被起的那一份由调用方那一侧的请求进键时，在调用处逐处登记：
+      往上认到这一处、照下一条认不出时，只这一处的那一条边算调用方交进来的、不拒算；同一个函数别的调用处照旧往上认，没登记的照拒算。
+      不登在被调函数自己那一处（UNKEYED_PROGRAM_WORDS）：那一行对每一个经它起程序的闭包都生效。弄坏开关 caller-supplied-commands-refused 下登记了也照旧拒算。
       别的函数的参数在每个调用点照实参折（ScriptClosure.launch_argument_supplied）：折得出的字面值是根里的 .py、.sh 就当程序连上（连完再判一轮新收进来的），
       python3、bash 这类解释器词不算折出（脚本在命令的别处）；根外的程序（outside_head）、调用处那一层的参数（接着往上一层认）、本函数里的赋值、
       外层函数的变量（套着的函数）、调仓内函数的返回值（在它那边逐个认）照样认。弄坏开关 python-launch-arguments-unfolded 下只认调用方交进来的那几样。
@@ -439,8 +622,15 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   文件级的（括号配不上、认不出的条目、语法错）：Rust 在那份文件进了入口的链接集时算进来，Python / shell 在闭包碰到那份文件时算进来；
   单元级的在那个单元进了闭包时算进来。dump 把扫到的全部列出来。
 
+自证夹具（load_selftest_fixtures）：只给自证与弄坏开关读的模块级常量（夹具文本、格名、开关到格的对照表 BREAK_CELLS）放在同目录的
+  lib_function_units_selftest_fixtures.py，--selftest 开跑前按路径载入：先把这份模块此刻的名字放进那一份、再执行它，它新定义的名字放回这份模块，格函数照名字读。
+  平常 import 这份库不载入它：那几百个常量不在这份库 import 时执行的语句里，经这份库算键的判法闭包（D13（验证路线） 已定项 17）不收它们，改一份夹具不动判法的键。
+  按「谁读」分：运行期函数也读的（别的文件点名的、写在串里按名字读的、import 时执行的语句读的、经别的文件调的函数读的）留在这份库里；
+  正文里写着 --selftest 这个词的也留在这份库里（放进那一份，门禁 code-tooling 的 research-script-selftest-coverage 格会把那一份认成实现了自证）。
+  往这份库加只给自证读的常量，写进那一份。
+
 弄坏开关（FUNCTION_UNITS_BREAK=<项>[,<项>…]，只给自证证红用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；
-自证逐个打开、核点名的那几格转红，点名的格就是 BREAK_CELLS 里这一项的那几句，自证逐条打「✓ 弄坏开关 <项> 下「<格>」红」）：
+自证逐个打开、核点名的那几格转红，点名的格就是 BREAK_CELLS（在 lib_function_units_selftest_fixtures.py）里这一项的那几句，自证逐条打「✓ 弄坏开关 <项> 下「<格>」红」）：
   FUNCTION_UNITS_BREAK=rust-open-entry-traits-ignored  去掉 R-开放（入口签名里的 dyn 与 trait 约束不连全部 impl）
       「开放入口：参数是 dyn」「R-开放：dyn Trait 只带 Trait 自己的 impl，不带只在 trait 参数里写了它的 impl」
   FUNCTION_UNITS_BREAK=rust-dyn-traits-open-every-implementation  闭包里单元的 dyn Trait 照旧连这个 trait 的全部 impl（CHA）
@@ -472,6 +662,12 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       改 bench 模块里这两样键不变，改 log::Log、改 Worker::launch 键变」
   FUNCTION_UNITS_BREAK=rust-crates-names-linked-across-modules  crates/ 下的包同一个目标里的裸名照旧按同名连到各个模块
       「R-裸名：crates/ 下的包同一个目标里按模块连：经 use 引进 format::SLOT_BYTES 的单元不连 gpu_checks 里私有的同名常量，改它键不变」
+  FUNCTION_UNITS_BREAK=rust-let-shadowed-names-resolved  局部 let 与参数绑定遮住的名字照旧往外解析
+      「R-裸名：局部 let 绑的名字不连同名函数（let sample = …; sample + 1），改那个函数键不变」
+      「R-裸名：参数名不连同名函数（fn f(sample: u32)），改那个函数键不变」
+      「R-裸名：串字面量里的 {名} 是局部 let 绑的，不连同名函数，改那个函数键不变」
+  FUNCTION_UNITS_BREAK=rust-use-paths-flattened  use 路径压平成一串比，「末段在串里」或「起头是 crate 且候选在根」就算点到（经 pub use 转出的那一份不连）
+      「R-裸名：use 路径点到的模块里没有这个名字（经 pub use 转出来的），退回全连，转出的那一份改了键变」
   FUNCTION_UNITS_BREAK=rust-verus-segments-ignored  verus! 里照普通 Rust 切（签名后第一个 { 当函数体）
       「verus! 里 ensures 带花括号：下一个函数照样切开，改它作废」「verus! 里够不到的函数改了不作废」
   FUNCTION_UNITS_BREAK=rust-cfg-ignored  cfg 一律当真
@@ -486,12 +682,29 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       「python：改文档串不作废」
   FUNCTION_UNITS_BREAK=python-docstring-readers-ignored  读 __doc__ 不收文档串数据单元
       「python：有单元读 __doc__ 时改文档串作废」
+  FUNCTION_UNITS_BREAK=python-docstring-writes-counted  X.__doc__ = … 这一类写也当读文档串
+      「python：模块级给 namedtuple 写 X.__doc__ = … 只写不读，别的文档串不跟着进闭包（改它键不变）」
+  FUNCTION_UNITS_BREAK=python-docstring-augmented-assignment-not-read  读文档串只认 ast.Load，X.__doc__ += … 不算读
+      「python：X.__doc__ += … 先读后写，照算读（改那段文档串键变）」
+  FUNCTION_UNITS_BREAK=python-docstring-call-readers-ignored  getattr(<对象>, "__doc__") 与 inspect.getdoc(<对象>) 不当读文档串
+      「python：getattr(<函数>, "__doc__") 读另一个函数的文档串（改那段文档串键变）」
+      「python：inspect.getdoc(<函数>) 读另一个函数的文档串（改那段文档串键变）」
   FUNCTION_UNITS_BREAK=python-getattr-allowed  getattr(x, <变量>) 不拒算
       「python：getattr 变量名拒算」
+  FUNCTION_UNITS_BREAK=python-globals-subscripts-refused  globals()[键] 与 globals().update(…) 照旧拒算 globals-lookup
+      「python：globals()[固定名字] 读连到那个名字的单元，不拒算（改它键变）」
+      「python：globals()[折不出的名字] 读连本模块每个名字，不拒算（改其中一个键变）」
+      「python：globals()[键] = 值、del 与 globals().update(…) 只写不读：不连、不拒算」
+  FUNCTION_UNITS_BREAK=python-imported-sys-path-ignored  import 进来的模块加的 sys.path 不算在引它的模块上
+      「python：import 进来的仓内模块在载入时往 sys.path 加的目录，对引它的模块同样生效（那个目录里的模块连得上，改它键变）」
+  FUNCTION_UNITS_BREAK=python-registered-inline-launches-analyzed  整条登记过的 bash -c 照旧拆开正文认
+      「python：整条登记过的 bash -c，正文字面而 $2 换不进去（带引号的多行串）：不登记拒算，登记了不拆开认、不拒算」
   FUNCTION_UNITS_BREAK=python-spec-paths-ignored  spec_from_file_location 不折叠、不拒算
       「python：spec_from_file_location 字面路径折叠出跨模块边」
   FUNCTION_UNITS_BREAK=python-attributes-unnarrowed  obj.m 连到全部同名方法（不按闭包里出现过的类收窄）
       「python：obj.方法 按闭包里出现过的类收窄」
+  FUNCTION_UNITS_BREAK=loaded-attributes-closure-wide  按路径载入、模块值出不了载入方的模块也照整个闭包见过的属性名连（载入方没调的 main 跟着别处的 x.main() 进来）
+      「python：按路径以非 __main__ 名载入、值不出载入方（函数里的局部名字、内联脚本模块级的容器）的模块只连载入方调到的 wanted 与 import 时执行的，别处有 x.main() 也不连它的 main；交给调用方的、以 __main__ 名载入的照整个闭包连」
   FUNCTION_UNITS_BREAK=shell-heredoc-split  here-doc 正文照样按缩进切
       「shell：here-doc 正文里有一行 `};` 不许被切开」
   FUNCTION_UNITS_BREAK=shell-names-command-position-only  函数名只在命令位置上才连
@@ -526,7 +739,7 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=shell-variable-first-line-only  顶层赋值只取第一行（$(cat <<'词' … 词) 的正文不进那个变量单元）
       「shell：顶层变量里 here-doc 的正文改了，读它的函数作废」
   FUNCTION_UNITS_BREAK=tree-copy-tails-ignored  「折不出的目录 + 根里存在的相对路径」（临时树、仓副本里的同一份）不按根里那一份认（shell 与 python）
-      「shell：`bash "$tree/<仓里的相对路径>"` 连到仓里那一份」「python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份」
+      「shell：`bash "$tree/<仓里的相对路径>"` 只连根里同一相对路径那一份，别处以这一截收尾的不连（改它键不变）」「python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份」
   FUNCTION_UNITS_BREAK=git-repository-paths-unfolded  git rev-parse --show-toplevel / --git-common-dir 不折成根（shell 的 $(…) 与 python 的 subprocess …stdout）
       「shell：git rev-parse --git-common-dir 折成根，经它 source 的库连上」「python：git rev-parse --git-common-dir 经无参函数的返回值折成根，插进 sys.path 的目录不拒算」「preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算」
   FUNCTION_UNITS_BREAK=python-call-returns-unfolded  不带参数调仓内模块级函数，不按它各处 return 的值折
@@ -618,7 +831,7 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=python-commands-literal-only  python 的命令只认字面列表与只赋过一次列表的名字（认不出的不拒算）
       「python：命令是 [解释器] + 参数（按调用处给的列表折）连到那份脚本」「python：认不出的命令（对象的属性）拒算 subprocess-command-unfolded」
   FUNCTION_UNITS_BREAK=python-path-programs-refused  shutil.which(…) 与 os.path.join(<折不出的目录>, <根外的字面尾巴>) 起的程序照样拒算
-      「python：shutil.which(…) 与 os.path.join(<折不出的目录>, "bin/x") 起的根外程序不拒算」「python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 "$1"）不拒算：程序是调用处给的词」
+      「python：shutil.which(…) 与 os.path.join(<折不出的目录>, "bin/x") 起的根外程序不拒算、不当工具链询问」「python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 "$1"）不拒算、不当工具链询问：程序是调用处给的词」
   FUNCTION_UNITS_BREAK=python-command-dictionaries-unfolded  命令里的 字典[<字面键>] 不折回字典字面量
       「python：命令里的 *选项["键"] 折回调用处给的字典字面量，连到那份脚本」
   FUNCTION_UNITS_BREAK=python-dispatch-calls-ignored  分派表[键](…) 不算对表里那几个函数的调用（参数折不到那一处调用给的实参）
@@ -630,13 +843,13 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=python-command-slices-unfolded  命令里的 f(…)[k] 与 x[a:b] 不认
       「python：f(…)[k] 取返回的元组那一项、command[:command.index(<字面词>)] 照切，连到那份脚本」
   FUNCTION_UNITS_BREAK=python-command-heads-split-ignored  命令位置上折出几个、其中有解释器的照旧拒算
-      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码）」
+      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码，不当工具链询问）」
   FUNCTION_UNITS_BREAK=python-method-parameters-unfolded  类里方法的参数不按调用处折
-      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码）」
+      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码，不当工具链询问）」
   FUNCTION_UNITS_BREAK=python-comprehension-variables-unfolded  推导式的循环变量不取遍它迭代的元素
-      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码）」
+      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码，不当工具链询问）」
   FUNCTION_UNITS_BREAK=python-element-calls-unfolded  序列是调仓内函数的返回值、{…}.get(键, 缺省) 的不取元素
-      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码）」
+      「python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码，不当工具链询问）」
   FUNCTION_UNITS_BREAK=python-sequence-indexes-unfolded  只赋过一次的元组 / 列表字面量[整数] 不折
       「python：spec_from_file_location 载入的模块的常量（module.NAME）与模块级元组[整数] 折得出，sh -c 的串连到它起的脚本」
   FUNCTION_UNITS_BREAK=python-loaded-module-constants-unfolded  spec_from_file_location 载入的模块的 module.NAME 不折
@@ -669,6 +882,41 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=python-tail-reads-unanchored  读 <参数>/<字面尾巴> 不按调用处认，读的时候就照尾巴收仓里那一组
       「python：读 <参数>/<字面尾巴>，闭包里的调用处给的是这一趟的临时目录：仓里这一截尾巴的那一组不收，改其中一份键不变」
       「python：读 <判法入口的参数>/<字面尾巴>（被判的输入）：仓里这一截尾巴的那一组不收，改其中一份键不变」
+  FUNCTION_UNITS_BREAK=python-tail-reads-samples-included  按尾巴读的那一组连门禁样本档底下的文件也收
+      「python：按字面尾巴读 Manifest.toml：门禁样本档底下多一份同名文件、改它都不动键」
+  FUNCTION_UNITS_BREAK=python-call-sites-whole-view  程序入口带参数剪掉的那几截里的调用照算调用处
+      「python：程序入口带 --selftest：main 里走不到的那一处调用不算调用处，读 <参数>/<字面尾巴> 的那一组不收（改它键不变）」
+  FUNCTION_UNITS_BREAK=python-data-reads-follow-build-outputs  读到 target 一类目录下编出来的文件照旧收成数据单元
+      「python：拷 <临时目录>/target/release/<程序>，仓里 target 下有一份编出来的二进制：不收进键，改它键不变」
+  FUNCTION_UNITS_BREAK=built-tool-sources-ignored  编工具程序的函数（BUILT_TOOL_SOURCES）进了闭包、起编出来的工具那一处登在 BUILT_TOOL_LAUNCHES 里，
+      它编的程序的源码目录都不收
+      「python：编工具程序的函数（BUILT_TOOL_SOURCES）进了闭包：它编的程序的源码目录收成数据目录，改里面一份键变、改编出来的二进制键不变」
+      「shell 函数编工具、内联 python 起编出来的那份（BUILT_TOOL_SOURCES 与 BUILT_TOOL_LAUNCHES）：不登记时拒算，登记了不拒算、改工具源码里一个函数键变」
+  FUNCTION_UNITS_BREAK=built-tool-launches-refused  BUILT_TOOL_LAUNCHES 登记了也照旧拒算（起编出来的工具那一处折不出）
+      「shell 函数编工具、内联 python 起编出来的那份（BUILT_TOOL_SOURCES 与 BUILT_TOOL_LAUNCHES）：不登记时拒算，登记了不拒算、改工具源码里一个函数键变」
+  FUNCTION_UNITS_BREAK=caller-supplied-commands-refused  CALLER_SUPPLIED_COMMANDS 登记了的调用处也照旧拒算
+      「调用方登记：共用起法拿参数起子进程，登记了的调用处交的命令不拒算」
+  FUNCTION_UNITS_BREAK=caller-supplied-commands-callee-wide  被调函数有一处调用登记了，它所有的调用处都当调用方交进来的（等于登在被调函数自己那一处）
+      「调用方登记：同一个共用起法，没登记的调用处交的命令照拒算」
+  FUNCTION_UNITS_BREAK=python-call-sites-matched-by-name  闭包里调一个函数的那几处只按名字认（ScriptClosure.call_reaches 不判）：套着的同名函数、别的模块上的同名属性调用都算
+      「python：调用方交进来的命令按调用处认，套在别的函数里的同名函数的调用 run(1, 5) 不算模块级 run 的调用处：不拒算，模块级 run 真正的调用处给的 tool/child.sh 连上（改它键变）」
+      「python：调用方交进来的命令按调用处认，import 进来的别的模块上的 other_tools.run(7) 不算 runner_lib.run 的调用处：不拒算，runner_lib.run 真正的调用处给的 tool/child.sh 连上（改它键变）」
+  FUNCTION_UNITS_BREAK=python-partial-call-sites-ignored  functools.partial(f, …) 不算 f 的调用处：经它交的实参折不到 f 的参数上
+      「python：调用方交进来的命令按调用处认，functools.partial(runner_lib.run, "tool/child.sh") 算 runner_lib.run 的一处调用：不拒算，它交的 tool/child.sh 连上（改它键变）」
+  FUNCTION_UNITS_BREAK=unit-graph-text-busy-not-waited  起 unit-graph 撞上 ETXTBSY（程序文件还有人开着写）当场抛，不隔一会儿再起
+      「产品行为视图：起 unit-graph 的那一刻程序文件还有人开着写（ETXTBSY），写的那一方关掉之后再起得成，不记成起不了」
+  FUNCTION_UNITS_BREAK=shell-nested-commands-in-outer  外层 shell 函数照全文认命令与词：套在里面的函数的命令也算外层的，拒算落在外层名下
+      「shell：外层函数里套着的函数起折不出的程序、按内层的短名登了 UNKEYED_PROGRAM_WORDS：外层只认自己那一层，外层当入口不拒算，内层起的 tool/child.sh 连上（改它键变）」
+  FUNCTION_UNITS_BREAK=inline-refusal-lines-at-launch  正文出自 here-doc 的内联 python 里的拒算落在起它的那一行（word_line 找到的头一处像起 python 的行），不落在正文那一行
+      「内联 python 的正文出自 here-doc（直接喂的、装进变量再交 -c 的）：拒算落在原文那一行（正文头一行加偏移），不落在起它的那一行或头一处像起 python 的行」
+  FUNCTION_UNITS_BREAK=closure-round-limit-unchecked  闭包 run() 的轮数不查上限
+      「闭包轮数超过上限：抛 FunctionUnitsError，点名入口与轮数」
+  FUNCTION_UNITS_BREAK=closure-call-index-frozen  闭包里按名字认的调用处头一次建完就不再并
+      「闭包的调用处索引增量：头一轮之后折出的程序里的调用处照样认得（它读的数据文件改了键变）」
+  FUNCTION_UNITS_BREAK=data-units-process-wide  运行期读的数据文件与目录的数据单元整个进程共用（按根分），不随脚本索引；同一棵树里文件改了也认旧的
+      「python：运行期 open 读的仓内文件（路径折得出）进键：改它键变」「python：读 os.path.join(<根里的目录>, <出处推不出的一截>) 收那个目录整棵：改目录里的一份键变」
+  FUNCTION_UNITS_BREAK=judging-entry-index-not-shared  closure_of 不用并行之前父进程建好的脚本索引（每个子进程各解析一遍）
+      「判法入口拒算并行：closure_of 用并行之前父进程建好的脚本索引（SHARED_SCRIPT_INDICES）」
   FUNCTION_UNITS_BREAK=python-launch-arguments-unfolded  命令参数不在调用点照实参折，只认调用方交进来的那几样（字面的不连、根外程序与返回值不认）
       「python：命令是别的函数的参数（subprocess.Popen(command)、[program, *arguments]）：照闭包里每个调用点的实参折（字面程序、根外程序、外层函数的变量、调仓内函数的返回值），不拒算」
       「python：命令参数在调用点折出根里的脚本（run_tool("pkg/tool.sh", …)）：连上那一份，改它键变」
@@ -692,8 +940,132 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=shell-program-arguments-unnarrowed  bash <脚本> <字面参数…> 起的脚本体照旧整份收边
       「shell：bash s/dispatch.sh run：if [[ "${1:-}" == --selftest ]] 那一支走不到，它起的 s/child.sh 不连（改它键不变）」
       「shell：bash s/dispatch.sh run：case "$1" 里 *) 那一支走不到，它起的 s/tools/two.py 不连（改它键不变）」
-  FUNCTION_UNITS_BREAK=shell-pwd-unfolded  shell 的 $PWD 不折
-      「shell：$PWD 照脚本体顶层那一处 cd 折（cd "$(dirname "$0")/.."），函数里 bash "$PWD/<文件>" 连到那一份」
+  FUNCTION_UNITS_BREAK=shell-entry-arguments-unnarrowed  shell 入口（script-body）给了参数也照整份收：脚本体不剪，按第一列选行的表照整份起过连整张
+      「shell 入口带参数：s/dispatch.sh 带 run，--selftest 那一支与 *) 那一支走不到（改 s/child.sh、s/tools/two.py 键不变），run 那一支走到（改 s/tools/one.py 键变）」
+      「shell 入口是 <复跑表脚本> 带参数：带 E1 时别的实验的驱动函数走不到（改 s/two.sh 键不变），只带 --selftest 照整张表连（改 s/two.sh 键变）」
+      「shell 入口是 <复跑表脚本>、--selftest 那一支以 exit 收尾、表与读表的变量在 fi 之后：带 --selftest 时表里的驱动函数都不连（改 s/one.sh、s/two.sh 键不变），不带参数时都连（改它们键变）」
+  FUNCTION_UNITS_BREAK=shell-entry-undecided-branches-dropped  shell 入口带参数时，入口那一份里判不出真假的 if [[ … ]] 当走不到（then 那一支不收）
+      「shell 入口带参数：if [[ "${1:-}" == "$SELFTEST_WORD" ]] 判不出真假，两支都收（改 then 那一支起的 s/child.sh 键变）」
+  FUNCTION_UNITS_BREAK=shell-preflight-arguments-moved  preflight 放回参数那一句算动了位置参数（后面的 $1 不代）
+      「shell：bash s/dispatch_preflight.sh run：preflight 放回参数那一句（set -- ${PREFLIGHT_ARGUMENTS[@]+…}）不算动了位置参数，--selftest 那一支照样剪掉（改 s/child.sh 键不变）」
+  FUNCTION_UNITS_BREAK=shell-exit-branches-followed  走到的那一支以 exit 收尾，fi 之后的照收边
+      「shell：bash s/dispatch_exit.sh --only：走到的那一支以 exit 收尾，fi 之后的 s/tools/two.py 不连（改它键不变）」
+      「shell 入口是 <复跑表脚本>、--selftest 那一支以 exit 收尾、表与读表的变量在 fi 之后：带 --selftest 时表里的驱动函数都不连（改 s/one.sh、s/two.sh 键不变），不带参数时都连（改它们键变）」
+  FUNCTION_UNITS_BREAK=shell-table-rows-unselected  按第一列选行的表整张收边，带实验号起也连别的实验的驱动函数
+      「shell：bash <复跑表脚本> E1：表里别的实验的驱动函数走不到，它起的 s/two.sh 不连（改它键不变）」
+      「shell 入口是 <复跑表脚本> 带参数：带 E1 时别的实验的驱动函数走不到（改 s/two.sh 键不变），只带 --selftest 照整张表连（改 s/two.sh 键变）」
+  FUNCTION_UNITS_BREAK=shell-table-row-items-unmatched  --item 的行项（<实验号>.<行序号>）照实验号拿整个词去比第一列，对不上任何一行，点到的那一行的驱动也不连
+      「shell 入口是 <复跑表脚本> 带 --item E1.2：E1.2 那一行的驱动连上（改 s/one_sweep.sh 键变），E1.1 那一行与 E2 的驱动走不到（改 s/one_grid.sh、s/two.sh 键不变）」
+  FUNCTION_UNITS_BREAK=shell-table-launch-without-assignment-counted  照这组词剪过的脚本体里表的赋值行一行都不剩的起法照旧记成一次起法（只带选项的连整张表）
+      「shell 入口是 <复跑表脚本> 只带 --selftest、走到的那一支以 exit 收尾、表在 fi 之后才赋值：这次起法不算整张表，读表只照自证里 bash <复跑表脚本> E1 那一次连（改 s/one.sh 键变、改 s/two.sh 键不变）」
+  FUNCTION_UNITS_BREAK=shell-tree-copy-launch-words-dropped  脚本路径照根里同一相对路径认出来的起法（"$<目录>/<相对路径>"、cd 到折不出的目录之后的相对路径）不记参数
+      「shell：cd 到折不出的目录（仓副本）之后 bash <复跑表脚本> E1：参数照记、照 E1 剪，表里别的实验的驱动函数走不到（改 s/two.sh 键不变），E1 那一行的连上（改 s/one.sh 键变）」
+  FUNCTION_UNITS_BREAK=shell-row-driver-mentions-linked  只按实验号起的复跑表脚本，表行之外写成 @<名>、<名>() 的驱动函数照按词连
+      「python：带实验号起拷进临时目录、表换成桩的副本：只被真表点名的驱动函数不进闭包（表行之外写成 @<名>、<名>() 的也不连），副本里留下的框架函数与它读的变量进闭包」
+  FUNCTION_UNITS_BREAK=shell-row-driver-plain-words-dropped  表行之外写成不带 @ 的词的驱动函数也不连（命令位置上的、放进变量再起的都走不到）
+      「python：带实验号起表换成桩的副本：脚本体在命令位置上调的驱动函数照连（改它起的 s/called.sh 键变）」
+      「python：带实验号起表换成桩的副本：写成不带 @ 的词的驱动函数照连（改它起的 s/plain_word.sh 键变）」
+  FUNCTION_UNITS_BREAK=shell-row-driver-whole-launch-dropped  脚本整份起过时表行里的驱动函数也不连
+      「python：不带实验号起表换成桩的副本：认不出表换没换，真表里的驱动函数照连（改它起的 s/row_only.sh 键变）」
+      「shell：同一个闭包里 <复跑表脚本> 既按实验号起、又有一处起法折不出：读表连整张，别的实验的驱动照连（改 s/two.sh 键变）」
+      「shell：入口就是 <复跑表脚本>：读表连整张（改 s/two.sh 键变）」
+      「shell 入口是 <复跑表脚本> 带参数：带 E1 时别的实验的驱动函数走不到（改 s/two.sh 键不变），只带 --selftest 照整张表连（改 s/two.sh 键变）」
+  FUNCTION_UNITS_BREAK=shell-row-driver-selected-rows-dropped  点名的实验那几行也写到的驱动函数，只要别的实验那几行写到就不连
+      「python：带实验号起表换成桩的副本，那个实验号在真表里有行：那几行的驱动函数照连，别的实验那几行也写到它也算（改它起的 s/shared.sh 键变）」
+  FUNCTION_UNITS_BREAK=python-shell-launch-arguments-unfolded  python 起 shell 的字面参数不带过去（shell_launch_words 与程序入口带参数两条路都不带，脚本体整份收）
+      「python：["bash", <脚本>, *<调用处给的字面列表>] 起 shell：脚本体照字面参数剪（改走不到的 s/child.sh 键不变）」
+  FUNCTION_UNITS_BREAK=excluded-files-followed  按角色排除的文件只排单元，边照走（它们读的数据、起的程序、调到的别的文件的单元照收）
+      「排除文件：只经它读到的数据不进键（只改判法文件一行注释键不变）」「排除文件：只经它起的程序不进键（改那个程序键不变）」
+      「命令行 closure --judging 照 admission.py 的 not_judging_files_of_entry 排除：只经 scripts/gate/lib_function_units.py 起到的 pkg/only_via_role.py 与它自己都不进闭包、别的路起的 pkg/direct.py 照进；不带 --judging 三份都进；入口就是排除文件的不排」
+  FUNCTION_UNITS_BREAK=not-judging-files-drifted  抄录的 NOT_JUDGING_FILES 少一份，与 lib_verdict_library.py 那一份不同
+      「真仓：lib_function_units.py 抄录的 NOT_JUDGING_FILES 与 lib_verdict_library.py 那一份相同」
+  FUNCTION_UNITS_BREAK=closure-judging-exclusions-dropped  命令行 closure / key 带 --judging 也什么都不排（照不带的口径收）
+      「命令行 closure --judging 照 admission.py 的 not_judging_files_of_entry 排除：只经 scripts/gate/lib_function_units.py 起到的 pkg/only_via_role.py 与它自己都不进闭包、别的路起的 pkg/direct.py 照进；不带 --judging 三份都进；入口就是排除文件的不排」
+  FUNCTION_UNITS_BREAK=shell-deferred-heredocs-unmoved  写在 if 条件上的 here-doc 不挪回去：declare -f 把正文打在 then 那一串头一条命令之后，那条命令被当正文、正文解不开
+      「shell：if python3 - <<'PY' 的 here-doc 照内联脚本切（declare -f 把正文打在 then 那一串头一条命令之后），连到它 import 的仓内模块」
+      「shell：if python3 - <<'PY' 之后 then 那一串的头一条命令不算 here-doc 正文，它起的 s/child.sh 连上（改它键变）」
+  FUNCTION_UNITS_BREAK=python-text-pieces-unfolded  f 串里的 {sys.executable}、{整数常量} 与 "<分隔>".join(<字面元组>) 折不出
+      「python：bash -c f'"{sys.executable}" <脚本>' 折得出，连到那份脚本（改它键变）」
+      「python：bash -c 的串里 f 串的 {<整数常量>} 与 " ".join(<字面元组>) 折得出，串里起的脚本连上（改它键变）」
+  FUNCTION_UNITS_BREAK=shell-open-tail-unnarrowed  起法里有一个词折不出，那份脚本体就整份收（字面词也不代）
+      「shell：bash s/dispatch.sh run "$@"：头一个词字面，--selftest 那一支走不到（改 s/child.sh 键不变）」
+      「python：["bash", <脚本>, "run", *<折不出的列表>]：头一个词字面，--selftest 那一支走不到（改 s/child.sh 键不变）」
+  FUNCTION_UNITS_BREAK=launched-programs-refused  LAUNCHED_REPOSITORY_PROGRAMS 登记了也拒算
+      「登记的被起程序（夹具）：登记了的两处（路径折不出的、路径折得出而根里没有的）不拒算、被起的那一份整份连上（改它键变），不登记时都拒算」
+      「登记的被起程序（夹具，shell）：source 的路径折不出，登记了连到那一份（改它键变），不登记拒算」
+  FUNCTION_UNITS_BREAK=shell-process-substitution-splits-command  进程替换的左括号照旧把外面那条命令切断
+      「shell：python3 - <(命令) "$y" <<'PY'：进程替换不切断外面那条命令，here-doc 照旧是 python3 的脚本，不拒算」
+  FUNCTION_UNITS_BREAK=shell-refusal-lines-by-first-mention  拒算行照旧只照解释器名、照头一处提到那个词的行找
+      「shell：拒算落在真起它的那一行（bash -c "$词" 那一行、命令位置上折不出的词跟在 && 之后的那一行），不落在头一处提到 bash 或那个词的行」
+  FUNCTION_UNITS_BREAK=shell-env-array-assignments-kept  env 起头的数组里 NAME=… 照旧当命令词
+      「shell：env 起头的数组里 NAME="$值" 是 env 的赋值，"${数组[@]}" "$@" 不拒算」
+  FUNCTION_UNITS_BREAK=shell-process-substitution-redirects-dropped  进程替换括号里的命令不带它们自己的重定向记录
+      「shell：< <(python3 - "$x" <<'PY' …) 进程替换里的 here-doc 照旧是 python3 的脚本，不拒算」
+  FUNCTION_UNITS_BREAK=program-words-refused  UNKEYED_PROGRAM_WORDS 登记了也拒算
+      「不拒算的程序词（夹具）：登记了的 shell 词与 python 词不拒算，同一份文件里没登记的一处照拒算，不登记时都拒算」
+  FUNCTION_UNITS_BREAK=shell-registered-missing-paths-refused  登了 UNKEYED_PROGRAM_WORDS 的 shell 路径词折得出、落在根外或指到不在的文件时照旧拒算
+      「shell：登了 UNKEYED_PROGRAM_WORDS 的路径词 "{tree}/…" 折得出、指到不在的文件：不拒算，同一个函数里别的起法照连（改 tool/child.sh 键变）；不登记照拒算 shell-path-missing」
+  FUNCTION_UNITS_BREAK=registered-words-drifted  登记表多一行真仓没有的词
+      「真仓：UNKEYED_PROGRAM_WORDS、REGISTRY_COMMAND_TEXTS、SPEC_PATH_ARGUMENTS、TAIL_READ_SCOPES 登记的文件、函数、词与点名的文件都还在」
+  FUNCTION_UNITS_BREAK=python-registry-command-texts-refused  bash -c 的串来自登记表也照旧拒算
+      「python：bash -c 的串来自登记表：登记表那一列的命令照内联 bash 认，改它起的脚本键变」
+      「python：bash -c 的串来自登记表：登记表收成数据单元，改表里一行键变」
+  FUNCTION_UNITS_BREAK=spec-path-arguments-refused  登记了实际载入的文件也照旧拒算 spec-path-unfolded
+      「python：spec_from_file_location 的路径折不出而登记了实际载入的文件：不拒算、连到那一份（改它键变）」
+  FUNCTION_UNITS_BREAK=spec-path-tuple-first-only  登记值是几份文件的元组时只连头一份
+      「python：spec_from_file_location 的路径折不出而登记了实际载入的文件：不拒算、连到那一份（改它键变）」
+  FUNCTION_UNITS_BREAK=tail-read-scopes-ignored  TAIL_READ_SCOPES 登记了也照全仓同名的那一组收
+      「python：按字面尾巴读而登记了前缀（TAIL_READ_SCOPES）：前缀外多一份同名文件键不变、前缀里改一份键变；登记成调用方输入的那一处一份都不收」
+      「真仓：TAIL_READ_SCOPES 每一行那一处读还在、算键时问到的就是这一行，收进来的文件都在登记的前缀下」
+      「真仓：按尾巴整组收、没登记 TAIL_READ_SCOPES 的读法，收进来的文件里没有落在 records/ 或 research/ 下的（夹具里没登记的一处判得出来、登记之后不判）」
+  FUNCTION_UNITS_BREAK=tail-reads-under-records-unrecorded  按尾巴读而没登记的那几处收进 records/、research/ 下的文件不记进 UNSCOPED_TAIL_READS
+      「真仓：按尾巴整组收、没登记 TAIL_READ_SCOPES 的读法，收进来的文件里没有落在 records/ 或 research/ 下的（夹具里没登记的一处判得出来、登记之后不判）」
+  FUNCTION_UNITS_BREAK=tail-read-scopes-copies-unscoped  「<折不出的目录>/<仓里的相对路径>」那一种（tree_copy_file）不看 TAIL_READ_SCOPES，照根里那一份收
+      「python：按字面尾巴读而登记了前缀（TAIL_READ_SCOPES）：前缀外多一份同名文件键不变、前缀里改一份键变；登记成调用方输入的那一处一份都不收」
+      「真仓：TAIL_READ_SCOPES 每一行那一处读还在、算键时问到的就是这一行，收进来的文件都在登记的前缀下」
+  FUNCTION_UNITS_BREAK=tail-read-scopes-drifted  TAIL_READ_SCOPES 多一行真仓那个函数里没有的表达式
+      「真仓：TAIL_READ_SCOPES 每一行那一处读还在、算键时问到的就是这一行，收进来的文件都在登记的前缀下」
+  FUNCTION_UNITS_BREAK=tail-read-scopes-inline-unread  核 TAIL_READ_SCOPES 时只认 .py 文件里的函数：shell 脚本起的内联 python 正文、模块级语句里登记的那几行找不到
+      「真仓：TAIL_READ_SCOPES 每一行那一处读还在、算键时问到的就是这一行，收进来的文件都在登记的前缀下」
+  FUNCTION_UNITS_BREAK=tail-read-scopes-root-ignored  TAIL_READ_SCOPES 前缀一格的 "."（被判那棵树根上的那一份）当目录前缀比，根上那一份也不收
+      「python：按字面尾巴读而前缀登了 .（TAIL_READ_SCOPES 里被判那棵树根上的那一份）：根上那一份改了键变，research/ 下多一份、改别处同名的一份键不变；登空元组时改根上那一份键不变」
+  FUNCTION_UNITS_BREAK=python-getattr-names-unfolded  getattr 的名字是变量就拒算，取遍字面值的也拒算
+      「python：getattr(<对象>, <推导式变量>)，变量取遍模块级字典字面量的值里的字面名：不拒算」
+  FUNCTION_UNITS_BREAK=shell-function-outputs-unfolded  $(函数 <字面词>) 折不出
+      「shell：函数里 python3 "$@"，调用处的脚本是 "$(只打一个词的函数 <字面词>)/<文件>"：照函数打的词折，连到那一份（改它键变）」
+  FUNCTION_UNITS_BREAK=shell-quoted-assignments-unread  env 后面带引号的 "X=…" 与数组里的 "X=…" 当命令词
+      「shell：env "X=$y" nice -n 19 bash <脚本>：带引号的赋值不算命令词，连到那份脚本（改它键变）」
+      「shell：env ${e[@]+"${e[@]}"} bash <脚本>，e=("X=$(f)")：数组里的赋值不算命令词，连到那份脚本（改它键变）」
+  FUNCTION_UNITS_BREAK=python-local-names-resolved  函数里读局部量的名字照按名字连到模块里的同名单元
+      「python：参数、局部赋值、循环变量、套着的函数里的局部量与模块里的函数同名：不连（改那个函数键不变）」
+  FUNCTION_UNITS_BREAK=python-module-body-commands-unfolded  模块体里循环、分支赋的名字当命令时不认（照旧拒算 subprocess-command-unfolded）
+      「python：模块体里循环中赋的列表与 for 取的字面列表拼成 [*a, *b]：照函数体同一条折，连到那份脚本（改它键变）」
+  FUNCTION_UNITS_BREAK=shell-exported-variables-unread  同一个单元里 export 过的变量不到内联 python 的环境里
+      「shell：同一个单元里 export 过的变量到内联 python 的环境里：os.environ[…] 折得出，sys.path 与它起的脚本都认（改它键变）」
+  FUNCTION_UNITS_BREAK=python-guard-names-unfolded  main-guard 里赋的名字折不出（sys.path.insert 拒算 sys-path-unfolded）
+      「python：main-guard 里赋的名字给 sys.path.insert：折得出，from 那份模块连上（改它键变）」
+  FUNCTION_UNITS_BREAK=stage-cell-functions-drifted  登记行里多一行拿变量当函数的 stage_cell
+      「真仓：各道门禁 stage_cell 那一行第二列都是字面函数名（stage-cells.sh 起的 "$function_name" 靠写着名字的那一行进键）」
+  FUNCTION_UNITS_BREAK=shell-heredoc-empty-rows-spanned  代位置参数时 here-doc 里的空行也记成要跨过去的一段（长度 0，走到那一处抛，不真转死）
+      「shell：bash <脚本> run，脚本里的 here-doc 带空行：代位置参数走得出来，--selftest 那一支照样剪掉（改 s/child.sh 键不变）」
+  FUNCTION_UNITS_BREAK=shell-narrowed-views-unshared  剪出同一份正文的几种字面参数各有一个视图（解析结果留几份）
+      「shell：几种字面参数剪出同一份正文的共用一个视图，剪出别的正文的是另一个」
+  FUNCTION_UNITS_BREAK=rust-own-program-restart-refused  路径原样交给 Command::new 也不认，折不出测试名的照旧拒算 current-exe
+      「Rust：bin 的 main 起自己（路径原样交给 Command::new）：不拒算、不连边，改子进程那个角色跑的函数键变；库函数从 bin 的 main 连到的同样不拒算」
+  FUNCTION_UNITS_BREAK=rust-own-program-entry-unchecked  路径原样交给 Command::new 的不看入口，一律不拒算
+      「Rust：路径原样交给 Command::new 而入口不是 bin 的 main（库单测、bin 里的单测、单测调 main、按测试编的 main、bin 的辅助函数、模块里的 main）：拒算 current-exe」
+  FUNCTION_UNITS_BREAK=rust-own-program-path-unchecked  路径怎么走都当原样交给 Command::new
+      「Rust：入口是 bin 的 main 而路径改过或流向别处（同目录的程序、父目录、失败时交回别的路径、当参数交给别的程序、交给辅助函数、名字绑成别的路径、--exact 点名不存在的）：拒算 current-exe」
+  FUNCTION_UNITS_BREAK=rust-extern-listed-calls-refused  extern 块只声明名单里的符号也拒算 extern-block
+      「Rust：extern "C" 块只声明名单里的符号（#[link_name] 或函数名）：不拒算，改调用方键变」
+  FUNCTION_UNITS_BREAK=rust-extern-any-block-keyed  extern 块一律不拒算
+      「Rust：extern 块有名单外的符号、#[link]、别的 ABI、static、别的属性：拒算 extern-block」
+  FUNCTION_UNITS_BREAK=shell-nested-functions-by-any-word  套在函数里的函数按词连，外面哪个单元写到同一个词都算
+      「shell：外面的单元里一个词与套在别的函数里的函数同名：不连（改它起的 s/child.sh 键不变）」
+  FUNCTION_UNITS_BREAK=shell-python-launch-arguments-unfolded  shell 起 python 的词不带过去，那份 python 整份收
+      「shell：python3 <脚本> alpha "$1"：--selftest 那一支走不到（改它调的函数键不变）」
+  FUNCTION_UNITS_BREAK=shell-pwd-unfolded  shell 的 $PWD 不折（落到「$<折不出的目录>/<尾巴>」那一条，仓里同名的整组连上）
+      「shell：$PWD 折出来只连折出的那一份，别处同名的不连（改它键不变）」
   FUNCTION_UNITS_BREAK=shell-pattern-removals-unfolded  ${名%词} 一类只认 %/*，别的去后缀、前缀不折
       「shell：${名%词} 与 ${名##词} 的词折得出就照 bash 去掉后缀、前缀，连到折出的那一份」
   FUNCTION_UNITS_BREAK=shell-directory-copies-ignored  cd "$目录/<根里的目录>" 不照根里那个目录认
@@ -709,7 +1081,7 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=row-keyed-tables-whole  按行进键的登记表照旧整份进键（row_keyed_closure 一张都不换）
       「按行进键的登记表：判法经登记的取用函数按入口查表里一行，改表里与这一条无关的行键不变、改它查的那一行键变；读整张表的不换」
   FUNCTION_UNITS_BREAK=python-program-arguments-unnarrowed  给了参数也照整份收
-      「python：同一程序入口带两组参数：只改另一组参数才走到的函数，这一组键不变、改这一组走到的键变；起它的脚本把参数带过去照样剪」
+      「python：同一程序入口带两组参数：只改另一组参数才走到的函数，这一组键不变、改这一组走到的键变；起它的脚本把参数带过去照样剪」「python：入口没带参数，它起的 python 带字面参数：被起的那份照它们剪（改走不到的函数键不变）」
   FUNCTION_UNITS_BREAK=python-import-time-tables-followed  给了参数时 import 时执行的赋值照旧沿字面量里当元素写的函数名连
       「python：同一程序入口带两组参数：只改另一组参数才走到的函数，这一组键不变、改这一组走到的键变；起它的脚本把参数带过去照样剪」
   FUNCTION_UNITS_BREAK=python-slice-unpacking-unpaired  a, b = s[k:k+2] 不逐个对上 s[k]、s[k+1]（内联脚本拆包 sys.argv[1:13] 折不出，sys.path.insert 拒算 sys-path-unfolded）
@@ -797,13 +1169,25 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=rust-current-exe-path-only-refused  只问路径、同一函数里不起子进程的 current_exe() 也拒算 current-exe
       「Rust：current_exe() 只问路径、同一函数里不起 Command 的不拒算：键算得出，改它的函数体键变、改别的测试键不变」
   FUNCTION_UNITS_BREAK=rust-current-exe-spawn-unrefused  起了子进程的函数里，折不出测试名的 current_exe() 也不拒算 current-exe
-      「Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判：折得出测试名的连边，折不出的（没有 --exact、路径先存进变量再交 Command::new、点名不存在的）拒算 current-exe」
+      「Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判：折得出测试名的连边，折不出的（没有 --exact、路径先存进变量再交 Command::new、路径改过、点名不存在的）拒算 current-exe」
   FUNCTION_UNITS_BREAK=rust-current-exe-constants-same-file-only  常量名只在起子进程那个单元所在的那一份文件里找（常量定义在同包别的文件里的拒算 current-exe）
       「Rust：current_exe() 的测试名里的常量定义在同包另一份文件里，--exact 后面用它：连到那条 #[test]、不拒算，改它的函数体键变、改别的测试键不变；同名常量在同包两份文件里值不同的照旧拒算 current-exe」
   FUNCTION_UNITS_BREAK=closure-directory-lines-span-files  命令行 closure 与 key 把数据目录单元打成它自己那一行（<目录>:1-<文件数>）
       「命令行 closure：数据目录单元按读它的那一处列（data-directory 加目录、读它的文件与行、目录指纹），不打成 <目录>:1-<文件数>」
   FUNCTION_UNITS_BREAK=rust-lex-cache-unverified  Rust 词法单元的磁盘缓存文件名只取文本长度（缓存不核内容）
       「Rust 词法单元的磁盘缓存：同一份文本第二次取缓存、与现切的逐项相同；改一个字符（长度不变）不沿用、切出来的随文本变；缓存文件坏了照常现切」
+  FUNCTION_UNITS_BREAK=rust-lex-cache-namespace-lexer-only  词法缓存的目录名只从 rust_lex 起收（读写缓存的两个函数与格式号不在里面）
+      「Rust 词法单元缓存的目录名：改格式号 RUST_LEX_CACHE_FORM、改一个词种名常量（IDENT 的值）、改 load_rust_lex 的读法，目录名各换」
+  FUNCTION_UNITS_BREAK=rust-lex-cache-namespace-whole-module  词法缓存的目录名把这份模块的每个函数都当起点收
+      「Rust 词法单元缓存的目录名：改 rust_lex 里一行注释、这份库别处一行注释、一个不在 rust_lex_cached 闭包里的函数（match_brackets），目录名都不换」
+  FUNCTION_UNITS_BREAK=rust-lex-cache-namespace-module-placement-read  词法缓存的目录名把 MODULE_PLACEMENT_NAMES（cross_run_cache_directory 读的 __file__）照取值
+      「Rust 词法单元缓存的目录名：改 rust_lex 里一行注释、这份库别处一行注释、一个不在 rust_lex_cached 闭包里的函数（match_brackets），目录名都不换」
+  FUNCTION_UNITS_BREAK=selftest-fixtures-loaded-at-import  在真仓拷贝上给这份库加一句模块级赋值点名 load_selftest_fixtures（import 时就载入自证夹具那一份）
+      「真仓：lib_function_units_selftest_fixtures.py 的单元不进 rust_lex_cached 的闭包（算键库 import 时执行的语句都在里面），那一份末尾加一句常量键不变」
+  FUNCTION_UNITS_BREAK=selftest-fixtures-runtime-name-moved  在读进来的原文上把运行期读的 ROW_KEYED_TABLES 从这份库挪进自证夹具那一份
+      「真仓：lib_function_units_selftest_fixtures.py 定义的名字，算键库运行期那一边（import 时执行的语句、selftest 够不到的函数与类、别的脚本经属性调的函数）一个都不读，算键库自己也不再定义」
+  FUNCTION_UNITS_BREAK=rust-lex-cache-namespace-reads-own-file  在真仓拷贝上给 rust_lex_cache_namespace 加回一句读这份库自己原文的
+      「真仓：rust_lex_cached 的闭包里没有算键库整份的 source-text 与 data-file，读写缓存的两个函数、格式号与词种名常量在里面；只改算键库一行注释它的键不变，改 load_rust_lex 键变」
   4-3k 那两条（自证里 unit_divergence_cells 末尾两格）：
   FUNCTION_UNITS_BREAK=rust-blanket-self-parameter-only  blanket 退回旧判法：自身类型里头一个名字是泛型参数才算（Box<T>、Option<Box<T>>、Sealed<T> 的 impl 不算）
       「R-方法：自身类型里出现泛型参数的 impl（(T, u32)、[T]、[T; N]、Box<T>、Option<Box<T>>、Sealed<T>）都按 blanket 放行，改 Sealed<T> 那一份作废」
@@ -816,6 +1200,13 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       「python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）」
   FUNCTION_UNITS_BREAK=python-import-time-classes-named  只因 import 时执行收进来的类头也算被点名、连方法
       「python：只因 import 时执行收进来的类头不算被点名，类里的 __init__ 改了不作废」
+  E171 重跑入口的闭包（自证 E171_CLOSURE_CELL，真仓）：
+  FUNCTION_UNITS_BREAK=e171-selftest-table-at-module-level  在拷贝上给 reuse_library.py 加一张模块级的自证格表（import 时执行的赋值把格函数拖进闭包）
+      「真仓：E171 重跑的两份入口脚本（名单核对 list_check.py、变异驱动 mutation_driver.py）的闭包都不拒算；没被单测点名的自证格（reuse_library 的 cell_rp1_layers_end_to_end、」
+  FUNCTION_UNITS_BREAK=e171-admission-selftest-at-module-level  在拷贝上给 admission.py 加一张模块级的表点名 run_selftest（import 时执行的赋值把自证拖进闭包）
+      「真仓：E171 重跑的两份入口脚本（名单核对 list_check.py、变异驱动 mutation_driver.py）的闭包都不拒算；没被单测点名的自证格（reuse_library 的 cell_rp1_layers_end_to_end、」
+  FUNCTION_UNITS_BREAK=e171-list-check-imports-reuse-library  在拷贝上给 list_check.py 加一条模块级 import reuse_library（名单核对的闭包连上复用库）
+      「真仓：E171 重跑的两份入口脚本（名单核对 list_check.py、变异驱动 mutation_driver.py）的闭包都不拒算；没被单测点名的自证格（reuse_library 的 cell_rp1_layers_end_to_end、」
   FUNCTION_UNITS_BREAK=python-main-guard-conjunctions-unrecognized  if __name__ == "__main__" and …: 不当 main-guard，留在 module-body（被 import 的模块的自证分支连进闭包）
       「python：被 import 的模块里 if __name__ == "__main__" and …: 那一段不进闭包（自证分支不收），块外的模块级语句与认不出的形态（带 else、__name__ 那一项不在最左）照收」
       「真仓：以 scripts/hosts/memory_peaks_lib.py 的 command_key 为判法入口，闭包不收它的自证（run_self_test、self_test_cells），改 self_test_cells 的函数体判法单元指纹不变」
@@ -830,6 +1221,11 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=program-edge-exclusions-shell-ignored  EXCLUDED_PROGRAM_EDGES 只认 python 单元起的，shell 函数起的照连
       「不走的子进程边（夹具）：登记了的 shell 函数起的那一条不连、同一个函数起的另一个程序照连、不登记时那一条照连」
       「不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py」
+  FUNCTION_UNITS_BREAK=call-edge-exclusions-ignored  EXCLUDED_CALL_EDGES 登记的调用边照连
+      「python：EXCLUDED_CALL_EDGES 登记的调用边不走：只经它读的数据文件改了键不变，同一个单元调的另一个函数读的改了键变」
+      「真仓：unit_graph_directory 的闭包里没有 built_unit_graph、build_unit_graph、unit_graph_inputs_digest；Cargo.lock 里头一个包的版本、.claude/heavy-thread-default、crates/singlefs-unit-graph/src 里一份文件各改一处，键都不变」
+  FUNCTION_UNITS_BREAK=unit-graph-digest-skips-lock-file  unit-graph 程序的缓存目录名（unit_graph_inputs_digest）不算 Cargo.lock
+      「unit-graph 程序的缓存目录名：Cargo.lock、.claude/heavy-thread-default、crates/singlefs-unit-graph/src 里一份文件各改一处，目录名各换」
   FUNCTION_UNITS_BREAK=excluded-edge-exit-unmeasured  改坏被切的程序之后不重跑包装，退出码照改坏之前记
       「不走的子进程边（夹具）：切了边的程序改坏后包装退出码变了而键不变的必红（对照 leak.py 必须认出），吞掉退出码的 quiet.py 不红」
   FUNCTION_UNITS_BREAK=admission-edge-admitted-sample  准入异常那几个假准入里多跑一个放行的（退 0、打带 sha256 的 E7INPUT 行），计划往下走、起编译
@@ -838,6 +1234,12 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
       「不走的子进程边（真仓 E183 准入）：准入往标准输出打的只有 E7INPUT 行（键算出、拒算两样），判法读产物前去掉这几行之后读数一行不差」
   FUNCTION_UNITS_BREAK=admission-edge-reach-unmeasured  不量 admission.py 当程序起的闭包（当它是空的）
       「不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py」
+  FUNCTION_UNITS_BREAK=card-lease-client-words-granted-sample  领卡那一回的异常样本里多跑一个领到了的（退 0、打卡串），装置照起
+      「不拒算的程序词（真仓领卡客户端）：device_card_lease.py 的 take_card 那一回的异常（抛异常、被 SIGKILL 杀、退 3、退 0 不打卡串、退 0 只打空白）抛 CardLeaseRefused、装置不起、标准输出空着；return_card 那一回的异常（抛异常、被 SIGKILL 杀、退 1、退 3）装置照起一回、退出码与标准输出就是装置的」
+  FUNCTION_UNITS_BREAK=card-lease-client-words-return-output-kept  device_card_lease.py 的 return_card 不接管客户端的标准输出（照旧接在调用方的标准输出上）
+      「不拒算的程序词（真仓领卡客户端）：device_card_lease.py 的 return_card 那一回客户端往标准输出打的行转到标准错误，调用方的标准输出与装置打的读数一行不差」
+  FUNCTION_UNITS_BREAK=card-lease-client-words-other-launches-unchecked  不核别处起领卡客户端（调用方另起的、device_card_lease.py 里这两个函数之外起子进程的），只看登记、这两个函数起的头一个词与调用点
+      「不拒算的程序词（真仓领卡客户端）：row_driver.py 与 shared_steps.py 领卡、还卡都经 device_card_lease.py 的 take_card、return_card，不经别处起领卡客户端；device_card_lease.py 里起子进程的只有这两个函数，起的头一个词是登记的 client」
   FUNCTION_UNITS_BREAK=judging-entry-literals-unfolded  判法入口的登记只认字面量（JUDGING_ENTRIES = A + (...) 折不出）
       「真仓：判法入口从登记现取（registered_judging_entries），形式化入口与包装入口都在里面、都认得出」「真仓：登记的每个判法入口的闭包都不拒算（拒算的那一路判定一条都写不进库），夹具里的 globals() 查找判得出来」
   FUNCTION_UNITS_BREAK=judging-entry-refusals-ignored  判法入口闭包里的拒算一条都不报
@@ -856,6 +1258,9 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先�
   FUNCTION_UNITS_BREAK=product-view-verifier-attributes-kept  不剥外属性 #[verifier::…] / #[verifier(…)]（Rust 那一份剥了，单元起始行对不上，拒算 product-view-unmatched）
       「产品行为视图：verus! 里的执行函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变」
       「产品行为视图：没有 verus! 块的文件里的函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变」
+  自证自己的并行（gather_forked）：
+  FUNCTION_UNITS_BREAK=selftest-lost-results-unchecked  收回的条数不与派出去的比：没收回结果的那几条不点名、不算红
+      「自证并行：每条在自己 fork 出来的进程里跑，收回的按派出去的次序排、各带自己的输出；没收回结果的（退出码 0 却没写结果、退出码 3）逐条点名，收回的条数与派出去的对不上不吃掉」
 
 折叠认的写法（上面各开关管的那几条；推的，没有夹具钉住的不写在这里）：
   临时树、仓副本、worktree 里的「$目录/<相对路径>」「os.path.join(目录, <相对路径>)」按根里同一相对路径那一份认（至少两段、在根里存在）：
@@ -882,22 +1287,31 @@ import base64
 import bisect
 import collections
 import copy
+import dis
+import errno
 import fcntl
 import fnmatch
+import gc
 import glob
 import hashlib
 import importlib.util
+import itertools
 import json
 import os
+import pickle
 import posixpath
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
+import traceback
+import types
 import zlib
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
@@ -916,6 +1330,8 @@ VERUS_GHOST_CODE_UNPARSED = "verus-ghost-code-unparsed"
 BREAK_VARIABLE = "FUNCTION_UNITS_BREAK"
 # 函数里出现这几个词算起了子进程：此时 current_exe() 折不出要点名的那一条测试，拒算 current-exe（文件头「测试二进制起自己」）
 SPAWNING_WORDS = frozenset(("Command", "spawn", "posix_spawn", "fork", "execv", "execve", "execvp"))
+# 不带 #[link] 的 extern "C" 块里只声明这几个符号时不拒算（文件头「extern 块」；crates/singlefs-unit-graph 的 C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 同一份）
+C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS = ("pwrite", "fdatasync")
 REFUSED_EXIT = 4
 SHELL_TIMEOUT_SECONDS = 600
 SNIPPET_CHARACTERS = 160
@@ -1104,11 +1520,13 @@ def descriptor_of(script):
     return int(found.group(1)) if found else None
 
 
-InlineScript = collections.namedtuple("InlineScript", "language texts argv bases file line snippet environment", defaults=((),))
+InlineScript = collections.namedtuple("InlineScript", "language texts argv bases file line snippet environment body_lines", defaults=((), ()))
 InlineScript.__doc__ = """内联脚本（python3 -c / bash -c 的串、喂给解释器标准输入的 here-doc、here-string）：texts 是它可能取到的几份正文，
 argv 是 sys.argv[1:] / $1… 逐个折出来的值（frozenset，折不出 None），bases 是相对路径与 import 先试的目录（当时的工作目录），
-file / line / snippet 是起它的那一行（拒算落在那里），environment 是同一条命令里给它设的环境变量（(名字, 取值或 None)…：
-X=… python3、env X=… python3）。"""
+file / line / snippet 是起它的那一行，environment 是同一条命令里给它设的环境变量（(名字, 取值或 None)…：
+X=… python3、env X=… python3），body_lines 是 ((正文, 那份正文的头一行在 file 里的行号)…)：正文出自原文里的一份 here-doc（直接喂给解释器的，
+或先装进变量、$(cat <<词 …) 再交 -c 的）才有那一份的行号（ShellIndex.inline_body_lines）；正文里的拒算落在那个行号加正文里的偏移那一行，
+没有行号的（字面 -c 串、原文里找不到那份正文）落在起它的那一行（PythonModule.refusal）。"""
 OPAQUE = object()
 MEMO_IN_PROGRESS = object()   # PythonModule.memoized：这一项正在算
 COMPREHENSION_UNPACKED = object()   # 推导式拆包绑的循环变量（for a, b in …）：PythonModule.comprehension_binding 交它，折不出
@@ -1159,7 +1577,7 @@ UNIT_SLOTS = ("language", "kind", "name", "file", "first_line", "last_line", "fi
               "plain", "methods", "qualified", "dyn_traits", "references", "data_references", "refusals",
               "self_types", "trait_name", "is_trait_impl", "blanket", "implicit_keys", "imports", "aliases", "import_glob", "defines",
               "declared", "node", "nodes", "facts", "body", "module", "cache", "full", "header", "module_head", "doc_module", "cfg_leaves",
-              "open_keys", "ghost_only", "self_path_root")
+              "open_keys", "ghost_only", "self_path_root", "listed_c_library_calls", "whole_body")
 
 # 弄坏开关 rust-kind-names-hyphenated 下输出行退回的旧拼法（与 crates/singlefs-unit-graph 对齐之前 python 这一份的写法）
 HYPHENATED_KIND_NAMES = {"macro_rules": "macro", "item_macro": "item-macro", "mod": "mod-decl", "extern_block": "extern-block",
@@ -1446,6 +1864,14 @@ RUST_LEX_CACHE_DIRECTORY_VARIABLE = "FUNCTION_UNITS_LEX_CACHE_DIRECTORY"   # 设
 RUST_LEX_CACHE_KEPT_NAMESPACES = 3
 RUST_LEX_CACHE_STATS = {"lexed": 0, "reused": 0}   # 本进程里 rust_lex_cached 现切了几份、取了几份缓存（自证数它）
 _RUST_LEX_CACHE_NAMESPACES = {}
+# 词法缓存的目录名不取值的两样（rust_lex_cache_namespace）：本进程的计数与已算好的目录名，跑着会变，不定缓存里存的是什么
+RUST_LEX_CACHE_PROCESS_STATE = ("RUST_LEX_CACHE_STATS", "_RUST_LEX_CACHE_NAMESPACES")
+# 字节码里按全局名取值、赋值的几种指令（live_closure_fingerprint）
+GLOBAL_NAME_OPERATIONS = frozenset(("LOAD_GLOBAL", "LOAD_NAME", "STORE_GLOBAL", "DELETE_GLOBAL", "LOAD_FROM_DICT_OR_GLOBALS"))
+# 类的属性表里随载入的方式、所在的行变的几项（live_closure_fingerprint 不取）
+CLASS_PLACEMENT_ATTRIBUTES = frozenset(("__module__", "__firstlineno__", "__dict__", "__weakref__"))
+# 模块名字表里记这份模块放在哪、怎么载入的几项（live_closure_fingerprint 只记名字、不取值）
+MODULE_PLACEMENT_NAMES = frozenset(("__file__", "__cached__", "__name__", "__spec__", "__loader__", "__package__"))
 
 
 def git_common_directory_of(root):
@@ -1662,13 +2088,90 @@ def rust_lex_cache_directory():
     return configured or cross_run_cache_directory(RUST_LEX_CACHE_DIRECTORY_NAME)
 
 
+def live_closure_fingerprint(namespace, entries, skipped=()):
+    """namespace（一份模块的名字表）里 entries 那几个名字照字节码往下收、交一把 sha256（文件头「Rust 词法单元的缓存」）。
+    函数取它的代码（字节码、常量、名字表与局部量表，套在里面的代码一样；不取文件名与行号表：只改注释、上下挪了行不变）、缺省值与闭包变量，
+    字节码里按全局名读到的、namespace 里有的名字逐个接着收；namespace 里定义的类取它的属性表（CLASS_PLACEMENT_ATTRIBUTES 那几项不取）；
+    串、数、元组、表、集合取内容；模块与别处定义的函数、类只取名字；skipped 与 MODULE_PLACEMENT_NAMES 里的名字只记名字、不取值。不读源码文件。
+    弄坏开关 rust-lex-cache-namespace-module-placement-read：MODULE_PLACEMENT_NAMES 照取值（__file__ 的路径进指纹，换个路径执行同一份代码目录名就换）。"""
+    texts, pending, entered = {}, list(entries), set()
+    unvalued = set(skipped) if "rust-lex-cache-namespace-module-placement-read" in active_breaks() else set(skipped) | MODULE_PLACEMENT_NAMES
+
+    def reach(code):
+        for instruction in dis.get_instructions(code):
+            name = instruction.argval
+            if instruction.opname in GLOBAL_NAME_OPERATIONS and name in namespace and name not in texts and name not in pending:
+                pending.append(name)
+        for constant in code.co_consts:
+            if isinstance(constant, types.CodeType):
+                reach(constant)
+
+    def code_text(code):
+        constants = [code_text(constant) if isinstance(constant, types.CodeType) else value_text(constant) for constant in code.co_consts]
+        return repr((code.co_qualname, code.co_argcount, code.co_posonlyargcount, code.co_kwonlyargcount, code.co_flags, code.co_code.hex(),
+                     code.co_exceptiontable.hex(), code.co_names, code.co_varnames, code.co_freevars, code.co_cellvars, constants))
+
+    def cell_text(cell):
+        try:
+            return value_text(cell.cell_contents)
+        except ValueError:   # 还没赋值的闭包变量
+            return "empty-cell"
+
+    def value_text(value):
+        if isinstance(value, types.FunctionType):
+            if value.__globals__ is not namespace or id(value) in entered:
+                return f"function {value.__qualname__}"
+            entered.add(id(value))
+            reach(value.__code__)
+            return repr(("function", code_text(value.__code__), value_text(value.__defaults__), value_text(value.__kwdefaults__),
+                         [cell_text(cell) for cell in value.__closure__ or ()]))
+        if isinstance(value, type):
+            if value.__module__ != namespace.get("__name__") or id(value) in entered:
+                return f"class {value.__qualname__}"
+            entered.add(id(value))
+            members = sorted((name, value_text(member)) for name, member in vars(value).items() if name not in CLASS_PLACEMENT_ATTRIBUTES)
+            return repr(("class", value.__qualname__, [base.__qualname__ for base in value.__bases__], members))
+        if isinstance(value, types.ModuleType):
+            return f"module {value.__name__}"
+        if isinstance(value, (staticmethod, classmethod)):
+            return repr((type(value).__name__, value_text(value.__func__)))
+        if isinstance(value, property):
+            return repr(("property", value_text(value.fget), value_text(value.fset), value_text(value.fdel)))
+        if isinstance(value, (tuple, list)):
+            return repr((type(value).__name__, [value_text(item) for item in value]))
+        if isinstance(value, (set, frozenset)):
+            return repr((type(value).__name__, sorted(value_text(item) for item in value)))
+        if isinstance(value, dict):
+            return repr(("dict", sorted((value_text(key), value_text(item)) for key, item in value.items())))
+        if isinstance(value, re.Pattern):
+            return repr(("pattern", value.pattern, value.flags))
+        if value is None or isinstance(value, (str, bytes, int, float, complex, bool)):
+            return repr(value)
+        return f"value {type(value).__qualname__}"
+
+    while pending:
+        name = pending.pop()
+        texts[name] = None
+        texts[name] = "skipped" if name in unvalued else value_text(namespace[name])
+    return hashlib.sha256("\n".join(f"{name}\0{texts[name]}" for name in sorted(texts)).encode("utf-8", "surrogateescape")).hexdigest()
+
+
 def rust_lex_cache_namespace():
-    """缓存按「切词法单元的代码」分目录：这份库自己的内容 sha256 加此刻的弄坏开关。库的内容一变（rust_lex 与它的帮手都在里面），旧目录整个不再取。"""
-    breaks = ",".join(sorted(active_breaks()))
-    if breaks not in _RUST_LEX_CACHE_NAMESPACES:
-        with open(os.path.realpath(__file__), "rb") as handle:
-            _RUST_LEX_CACHE_NAMESPACES[breaks] = hashlib.sha256(handle.read() + b"\0" + breaks.encode("utf-8")).hexdigest()[:24]
-    return _RUST_LEX_CACHE_NAMESPACES[breaks]
+    """缓存按「切词法单元、读写缓存的代码」分目录（文件头「Rust 词法单元的缓存」）：rust_lex_cached 经全局名够得到的函数与常量的现场指纹
+    （live_closure_fingerprint：rust_lex 与它的帮手、rust_lex_cache_path、load_rust_lex、store_rust_lex、RUST_LEX_CACHE_FORM、词种名常量都在里面）加此刻的弄坏开关。
+    不读这份库的原文：只改这份库别处的注释与函数，目录不换。弄坏开关 rust-lex-cache-namespace-lexer-only：只从 rust_lex 起收（读写缓存的两个函数与格式号不在里面）；
+    rust-lex-cache-namespace-whole-module：这份模块里的每个函数都当起点（改不在闭包里的函数目录名也换）。"""
+    breaks = active_breaks()
+    label = ",".join(sorted(breaks))
+    if label not in _RUST_LEX_CACHE_NAMESPACES:
+        namespace = rust_lex_cached.__globals__
+        if "rust-lex-cache-namespace-whole-module" in breaks:
+            entries = sorted(name for name, value in namespace.items() if isinstance(value, types.FunctionType) and value.__globals__ is namespace)
+        else:
+            entries = [rust_lex.__name__ if "rust-lex-cache-namespace-lexer-only" in breaks else rust_lex_cached.__name__]
+        fingerprint = live_closure_fingerprint(namespace, entries, RUST_LEX_CACHE_PROCESS_STATE)
+        _RUST_LEX_CACHE_NAMESPACES[label] = hashlib.sha256(f"{fingerprint}\0{label}".encode("utf-8")).hexdigest()[:24]
+    return _RUST_LEX_CACHE_NAMESPACES[label]
 
 
 def rust_lex_cache_path(text):
@@ -1766,6 +2269,11 @@ def match_brackets(kinds, texts):
     return pairs, None
 
 
+def rust_plain_string(token):
+    """普通串字面量去掉两头引号之后的原文（不解转义）；原始串、字节串、别的词 → None。"""
+    return token[1:-1] if len(token) >= 2 and token[0] == token[-1] == '"' else None
+
+
 def rust_string_value(token):
     """串字面量的值（普通串、原始串、字节串、C 串）；不是串回 None。"""
     match = re.match(r'^[bc]?r(#*)"(.*)"\1$', token, re.S)
@@ -1802,6 +2310,162 @@ def format_captures(literal):
             names.add(literal[start:end])
         position = max(end, position + 1)
     return names
+
+
+# 函数体里有这几个词的（可能嵌套条目，里面同名的不在绑定的作用域里）不按局部绑定遮（bare_name_only_a_local_binding；crates/singlefs-unit-graph 的 WORDS_STARTING_A_NESTED_ITEM）
+WORDS_STARTING_A_NESTED_ITEM = frozenset(("fn", "impl", "trait", "mod", "const", "static", "struct", "enum", "union", "type", "use", "macro_rules", "extern"))
+
+
+def function_signature_positions(texts, first, last):
+    """函数单元（词 first..last）的签名：深度 0 上头一个 fn、后面的名字、跳过尖括号里的泛型参数之后的 ( 与配对的 )、再往后深度 0 上头一个 {
+    → (名字, 参数表的开括号, 参数表的闭括号, 函数体的开括号) 的下标；哪一步对不上（没有函数体的声明也算）→ None。"""
+    def t(position):
+        return texts[position] if first <= position < last else ""
+    depth, keyword = 0, None
+    for position in range(first, last):
+        text = t(position)
+        if text in ("(", "[", "{"):
+            depth += 1
+        elif text in (")", "]", "}"):
+            depth = max(depth - 1, 0)
+        elif text == "fn" and depth == 0:
+            keyword = position
+            break
+    if keyword is None:
+        return None
+    own_name = keyword + 1
+    parameters_open = own_name + 1
+    if t(parameters_open) == "<":
+        angle = 0
+        while True:
+            text = t(parameters_open)
+            if text == "":
+                return None
+            if text == "<":
+                angle += 1
+            elif text == ">" and t(parameters_open - 1) != "-":
+                angle = max(angle - 1, 0)
+            parameters_open += 1
+            if angle == 0:
+                break
+    if t(parameters_open) != "(":
+        return None
+    depth, parameters_close = 0, None
+    for position in range(parameters_open, last):
+        text = t(position)
+        if text == "{" and parameters_close is not None and depth == 0:
+            return own_name, parameters_open, parameters_close, position
+        if text in ("(", "[", "{"):
+            depth += 1
+        elif text in (")", "]", "}"):
+            depth = max(depth - 1, 0)
+            if depth == 0 and parameters_close is None:
+                parameters_close = position
+    return None
+
+
+def parameter_binding_position(kinds, texts, parameters_open, parameters_close, name, last):
+    """参数表里绑定 name 的那一处：括号深度 0（相对参数表）上表头或 , 之后的头一个词（跳过 mut）是它、后面接单个 :。解构、&a: … 不认。没有 → None。"""
+    def t(position):
+        return texts[position] if position < last else ""
+    depth, at_start = 0, True
+    for position in range(parameters_open + 1, parameters_close):
+        word = t(position)
+        if word in ("(", "[", "{"):
+            depth += 1
+        elif word in (")", "]", "}"):
+            depth = max(depth - 1, 0)
+        elif word == "," and depth == 0:
+            at_start = True
+            continue
+        if not at_start or word == "mut":
+            continue
+        at_start = False
+        if kinds[position] == IDENT and identifier_name(word) == name and t(position + 1) == ":" and t(position + 2) != ":":
+            return position
+    return None
+
+
+def identifier_name(text):
+    return text[2:] if text.startswith("r#") else text
+
+
+def bare_name_only_a_local_binding(kinds, texts, first, last, name):
+    """函数单元（词 first..last）里 name 只是局部绑定（文件头 Rust 闭包「局部 let 与参数绑定遮住的名字」；crates/singlefs-unit-graph 的
+    is_bare_name_only_a_local_binding_of_the_function 同一个判法）：至少有一处绑定（语句开头的 let [mut] 名，或参数），别的每一处都落在绑定的作用域里。
+    let 从它的 ; 起到外层花括号收尾，参数从参数表的 ) 起到单元收尾。不算遮住的（宁可多连）：绑定之前或作用域之外的、带路径的（前后挨 ::）、
+    宏名（后接 ! 与开括号）、格式串捕获（{名}）在作用域外的、宏调用括号里的 let、函数体里有嵌套条目（WORDS_STARTING_A_NESTED_ITEM）的。
+    单个 . 后面的是字段或方法，不看；函数自己的名字不看。"""
+    signature = function_signature_positions(texts, first, last)
+    if signature is None:
+        return False
+    own_name, parameters_open, parameters_close, body_open = signature
+
+    def t(position):
+        return texts[position] if first <= position < last else ""
+    parameter = parameter_binding_position(kinds, texts, parameters_open, parameters_close, name, last)
+    has_binding = parameter is not None
+    # 还开着的每一层括号：[是不是花括号, 在不在宏调用括号里, 此刻名字绑定了没有, 有没有一条 let 在等分号]
+    stack = [[False, False, False, False]]
+    for position in range(first, last):
+        text, kind = texts[position], kinds[position]
+        innermost = stack[-1]
+        if kind == LITERAL:
+            if not innermost[2] and name in text and "{" in text and text[:1] in ('"', "r") and name in format_captures(text):
+                return False
+        elif kind == IDENT:
+            if identifier_name(text) != name or position in (own_name, parameter):
+                continue
+            let_distance = 2 if t(position - 1) == "mut" else 1
+            if innermost[0] and not innermost[1] and t(position - let_distance) == "let" and t(position - let_distance - 1) in ("{", "}", ";") and (
+                    t(position + 1) in ("=", ";") or (t(position + 1) == ":" and t(position + 2) != ":")):
+                innermost[3] = True
+                has_binding = True
+                continue
+            if t(position - 1) == "." and t(position - 2) != ".":
+                continue
+            if (t(position - 1) == ":" and t(position - 2) == ":") or (t(position + 1) == ":" and t(position + 2) == ":") or (
+                    t(position + 1) == "!" and t(position + 2) in ("(", "[", "{")):
+                return False
+            if not innermost[2]:
+                return False
+        elif kind != LIFETIME:
+            if text in ("(", "[", "{"):
+                follows_a_macro_name = position >= first + 2 and t(position - 1) == "!" and kinds[position - 2] == IDENT
+                stack.append([text == "{", innermost[1] or follows_a_macro_name, innermost[2], False])
+            elif text in (")", "]", "}"):
+                if len(stack) > 1:
+                    stack.pop()
+                if position == parameters_close and parameter is not None:
+                    stack[-1][2] = True
+            elif text == ";" and innermost[3]:
+                innermost[3] = False
+                innermost[2] = True
+    return has_binding and not any(kinds[position] == IDENT and texts[position] in WORDS_STARTING_A_NESTED_ITEM for position in range(body_open, last))
+
+
+def use_path_leading_to(rust_file, use_keyword, path_start):
+    """use 语句里 path_start 那一段前面的路径，花括号展开：use a::{b::{c, d}, e} 里 d 前面是 a、b。顺着「段 ::」收到 use 为止；use_keyword 是 use 的下标。"""
+    path, position = [], path_start
+    while True:
+        if position >= use_keyword + 4 and rust_file.t(position - 1) == ":" and rust_file.t(position - 2) == ":" and rust_file.kind(position - 3) == IDENT:
+            path.append(rust_file.t(position - 3))
+            position -= 3
+            continue
+        nested, brace = 0, None
+        for cursor in range(position - 1, use_keyword, -1):
+            text = rust_file.t(cursor)
+            if text == "}":
+                nested += 1
+            elif text == "{":
+                if nested == 0:
+                    brace = cursor
+                    break
+                nested -= 1
+        if brace is None:
+            path.reverse()
+            return path
+        position = brace
 
 
 def token_references(kinds, texts, low, high):
@@ -2430,6 +3094,7 @@ class RustFile:
                 # fn / static 之后的名字（static mut 跳过 mut，与 crates/singlefs-unit-graph 的 extern_block_declared_names 同一口径）
                 unit.defines = {self.t(j + 2) if self.t(j) == "static" and self.t(j + 1) == "mut" else self.t(j + 1) for j in range(brace, end)
                                 if self.t(j) in ("fn", "static") and self.kind(j + 2 if self.t(j) == "static" and self.t(j + 1) == "mut" else j + 1) == IDENT}
+                unit.listed_c_library_calls = self.extern_block_declares_only_listed_c_library_calls(start, k, brace, self.pairs[brace])
                 return end
         name_index = self.macro_path_at(k)
         if name_index is not None:
@@ -2619,7 +3284,11 @@ class RustFile:
                 child = None if "rust-current-exe-refused" in self.breaks else self.current_exe_child(unit, i)
                 if child is not None:
                     unit.data_references.append(("current-exe-child", child, i))
-                elif "rust-current-exe-path-only-refused" in self.breaks or (self.starts_a_process(unit) and "rust-current-exe-spawn-unrefused" not in self.breaks):
+                elif "rust-current-exe-path-only-refused" in self.breaks:
+                    self.refuse(unit, "current-exe", i)
+                elif "rust-own-program-restart-refused" not in self.breaks and self.own_program_path_is_handed_to_command_unchanged(i, unit.last_token):
+                    unit.data_references.append(("own-program-restart", None, i))
+                elif self.starts_a_process(unit) and "rust-current-exe-spawn-unrefused" not in self.breaks:
                     self.refuse(unit, "current-exe", i)
             if kind == IDENT and text in ("var_os", "var") and self.t(i + 1) == "(" and rust_string_value(self.t(i + 2)) == "CARGO_MANIFEST_DIR":
                 self.refuse(unit, "runtime-path", i)
@@ -2662,6 +3331,140 @@ class RustFile:
         if unit.first_token is None:
             return True
         return any(self.kind(i) == IDENT and self.t(i) in SPAWNING_WORDS for i in range(unit.first_token, unit.last_token))
+
+    # 程序起自己与 extern 块（文件头同名两节；crates/singlefs-unit-graph 的 rust_items.rs 同名函数逐条同义，门禁 code-tooling 的 function-units-two-implementations-agree 对拍）
+
+    def expression_ending_at_diverges(self, last_token, first_allowed):
+        """last_token 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 panic!(…)、…process::exit(…)，或以它们收尾的块。"""
+        text = self.t(last_token)
+        if text == "}":
+            before_the_brace = max(last_token - 1, 0)
+            return self.expression_ending_at_diverges(max(before_the_brace - 1, 0) if self.t(before_the_brace) == ";" else before_the_brace, first_allowed)
+        if text != ")":
+            return False
+        opening = next((position for position in range(last_token - 1, first_allowed - 1, -1) if self.t(position) == "(" and self.pairs.get(position) == last_token), None)
+        if opening is None:
+            return False
+        is_panic = opening >= 2 and self.t(opening - 1) == "!" and self.t(opening - 2) == "panic"
+        is_process_exit = (opening >= 4 and self.t(opening - 1) == "exit" and self.t(opening - 2) == ":" and self.t(opening - 3) == ":"
+                           and self.t(opening - 4) == "process")
+        return is_panic or is_process_exit
+
+    def own_path_expression_range(self, call_start, after_call, unit_end):
+        """current_exe() 调用（闭括号之后是 after_call）连同把路径取出来的写法整个是什么表达式 → (起, 止)。认的写法：后接 ?、.unwrap()、.expect("字面串")、
+        闭包一定不交值的 .unwrap_or_else(…)；或 match current_exe() { Ok(名字) => 名字, Err(…) => <return … 或一定不交值的表达式> }。别的写法 → None。"""
+        if self.t(after_call) == "?":
+            return call_start, after_call + 1
+        if self.t(after_call) == "." and self.t(after_call + 2) == "(":
+            opening = after_call + 2
+            close = self.pairs.get(opening)
+            if close is None:
+                return None
+            method = self.t(after_call + 1)
+            is_taken = (method == "unwrap" and close == opening + 1) or (method == "expect" and close == opening + 2 and rust_plain_string(self.t(opening + 1)) is not None) or (
+                method == "unwrap_or_else" and self.t(opening + 1) == "|" and close > opening + 1 and self.expression_ending_at_diverges(close - 1, opening + 1))
+            return (call_start, close + 1) if is_taken else None
+        if self.t(after_call) != "{" or self.t(call_start - 1) != "match":
+            return None
+        close = self.pairs.get(after_call)
+        if close is None or close > unit_end or self.kind(after_call + 3) != IDENT or self.t(after_call + 3) != self.t(after_call + 7) \
+                or [self.t(after_call + offset) for offset in (1, 2, 4, 5, 6, 8, 9, 10)] != ["Ok", "(", ")", "=", ">", ",", "Err", "("]:
+            return None
+        error_pattern_close = self.pairs.get(after_call + 10)
+        if error_pattern_close is None or self.t(error_pattern_close + 1) != "=" or self.t(error_pattern_close + 2) != ">":
+            return None
+        arm_start, arm_end = error_pattern_close + 3, close - 1 if self.t(close - 1) == "," else close
+        if arm_start >= arm_end or len(self.top_level_parts(arm_start, arm_end)) != 1:
+            return None
+        return (call_start - 1, close + 1) if self.t(arm_start) == "return" or self.expression_ending_at_diverges(arm_end - 1, arm_start) else None
+
+    def is_command_new_open(self, opening):
+        """opening 是 Command::new( 的开括号。"""
+        return (opening >= 4 and self.t(opening) == "(" and self.t(opening - 1) == "new" and self.t(opening - 2) == ":" and self.t(opening - 3) == ":"
+                and self.t(opening - 4) == "Command")
+
+    def let_binding_name(self, expression_start, after_expression):
+        """从 expression_start 起、到 after_expression 之前的表达式整个是 let [mut] 名字 [: 类型] = …; 的右边时交那个名字，别的交 None。"""
+        if self.t(after_expression) != ";" or self.t(expression_start - 1) != "=":
+            return None
+        equals = expression_start - 1
+        let_index = next((position for position in range(equals - 1, -1, -1) if self.t(position) in ("let", ";", "{", "}", "=")), None)
+        if let_index is None or self.t(let_index) != "let":
+            return None
+        name_index = let_index + 2 if self.t(let_index + 1) == "mut" else let_index + 1
+        if self.kind(name_index) != IDENT:
+            return None
+        is_typed = self.t(name_index + 1) == ":" and self.t(name_index + 2) != ":"
+        return self.t(name_index) if name_index + 1 == equals or is_typed else None
+
+    def own_program_path_is_handed_to_command_unchanged(self, current_exe_index, unit_end):
+        """current_exe() 的路径是不是一个字不改地交给了 Command::new：就地写在 Command::new(…) 的括号里；或绑给 let 名字（单元里这个名字不再 let），
+        名字的每一处用法只是 Command::new(名字)、Command::new(&名字) 与 名字.display()，至少起一次。拿路径拼别的路径、交给别的函数、当参数交给别的程序的不算。
+        弄坏开关 rust-own-program-path-unchecked 下路径怎么走都算。"""
+        if "rust-own-program-path-unchecked" in self.breaks:
+            return True
+        call_start = current_exe_index
+        while call_start >= 3 and self.t(call_start - 1) == ":" and self.t(call_start - 2) == ":" and self.kind(call_start - 3) == IDENT:
+            call_start -= 3
+        if self.t(current_exe_index + 2) != ")":
+            return False
+        found = self.own_path_expression_range(call_start, current_exe_index + 3, unit_end)
+        if found is None:
+            return False
+        expression_start, expression_end = found
+        if expression_start > 0 and self.is_command_new_open(expression_start - 1) and self.pairs.get(expression_start - 1) == expression_end:
+            return True
+        name = self.let_binding_name(expression_start, expression_end)
+        if name is None:
+            return False
+        if any(self.t(index) == "let" and (self.t(index + 1) == name or (self.t(index + 1) == "mut" and self.t(index + 2) == name)) for index in range(expression_end, unit_end)):
+            return False
+        uses = [index for index in range(expression_end, unit_end) if self.kind(index) == IDENT and self.t(index) == name and self.t(index - 1) != "."
+                and not (self.t(index + 1) == ":" and self.t(index + 2) == ":")]
+
+        def is_handed_to_command(index):
+            opening = index - 2 if self.t(index - 1) == "&" else index - 1
+            return self.is_command_new_open(opening) and self.pairs.get(opening) == index + 1
+
+        def is_only_displayed(index):
+            return [self.t(index + offset) for offset in (1, 2, 3, 4)] == [".", "display", "(", ")"]
+
+        return any(is_handed_to_command(index) for index in uses) and all(is_handed_to_command(index) or is_only_displayed(index) for index in uses)
+
+    def extern_block_declares_only_listed_c_library_calls(self, item_start, keyword, opening, close):
+        """extern 块（keyword 是 extern，块在 opening..close）不用拒算：ABI 是 "C"，条目前面没有 #[link…]，块里只有 fn 声明，每条的前面最多一个 #[link_name = "…"]、
+        符号（link_name 或函数名）都在 C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 里，至少声明一条。有 static、别的属性、safe fn 这类写法的一律不算。
+        弄坏开关 rust-extern-listed-calls-refused 下一律不算，rust-extern-any-block-keyed 下一律算。"""
+        if "rust-extern-listed-calls-refused" in self.breaks:
+            return False
+        if "rust-extern-any-block-keyed" in self.breaks:
+            return True
+        if rust_plain_string(self.t(keyword + 1)) != "C" or keyword + 2 != opening:
+            return False
+        if any(self.t(index) == "#" and self.t(index + 1) == "[" and self.t(index + 2) == "link" for index in range(item_start, keyword)):
+            return False
+        position, declared_any = opening + 1, False
+        while position < close:
+            link_name = None
+            if self.t(position) == "#":
+                if self.t(position + 1) != "[" or self.t(position + 2) != "link_name" or self.t(position + 3) != "=" or self.t(position + 5) != "]":
+                    return False
+                link_name = rust_plain_string(self.t(position + 4))
+                if link_name is None:
+                    return False
+                position += 6
+            if self.t(position) == "pub":
+                position += 1
+            if self.t(position) != "fn" or self.kind(position + 1) != IDENT or self.t(position + 2) != "(" or (position + 2) not in self.pairs:
+                return False
+            if (link_name if link_name is not None else self.t(position + 1)) not in C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS:
+                return False
+            declared_any = True
+            semicolon = next((index for index in range(self.pairs[position + 2], close) if self.t(index) == ";"), None)
+            if semicolon is None:
+                return False
+            position = semicolon + 1
+        return declared_any
 
     def fold_test_name(self, unit, low, high, depth):
         """测试名那一段词法单元 [low, high) → ("pieces", 几段) | ("parameter", 函数名, 位置) | None（折不出）；几段是 ("literal", 串) 与 ("constant", 常量名)。
@@ -3725,7 +4528,7 @@ class RustWorkspace:
     def candidates_seen_from_module(self, unit, identifier, name, candidates, other_crate_roots=frozenset()):
         """同一个目标里，单元按裸名 name 连得到 candidates 里的哪几份（文件头 Rust 闭包「R-裸名同一个目标里按模块筛」；crates/singlefs-unit-graph 的
         candidates_seen_from_the_module_of_the_unit 同一个判法）：与单元同一模块的；所在模块的 use 引进了 name（或是 glob）、use 路径里有候选所在模块的末段
-        （crate::x 是根模块、super 是上一层、super::super 是上两层，self 起头是本模块）的；单元里写成 前缀::name、前缀是候选所在模块末段（crate、self 照算；
+        （花括号展开之后整条比，placed_by_the_use_path：crate、self、super 起头的从根模块、本模块、往上那一层算，别的看候选所在模块以这条路径收尾）的；单元里写成 前缀::name、前缀是候选所在模块末段（crate、self 照算；
         前缀是 super 时按整条路径里 super 的个数往上数层）的。use 路径或 …::name 整条路径的根名在 other_crate_roots 里的（std、core、alloc 与看得见的
         别的 crate 的库名）指的是别的 crate，跳过这一处。认不出落在哪一份的退回全连：use 或路径点到的模块里一份都没有（经 pub use 转出来的）、
         前缀不是类型也不是哪一份所在模块、单元里另有 use 语句（函数体里的 use）、name 后面接 !。
@@ -3750,19 +4553,39 @@ class RustWorkspace:
                     found.add(id(candidate))
             return found or None
 
+        def placed_by_the_use_path(path):
+            """use 的一支路径（不含名字本身）恰好点到的候选；一份都没点到交 None。恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；
+            模块里没有这个名字的候选，名字可能是它经 pub use 转出来的，落在哪一份看不出，退回全连。"""
+            leading_supers = len(path) - len(list(itertools.dropwhile(lambda segment: segment == "super", path)))
+            exact = (tuple(path[1:]) if path[:1] == ["crate"] else own + tuple(path[1:]) if path[:1] == ["self"]
+                     else own[:max(len(own) - leading_supers, 0)] + tuple(path[leading_supers:]) if leading_supers else None)
+            found = {id(candidate) for candidate in candidates
+                     if (modules[id(candidate)] == exact if exact is not None else bool(path) and modules[id(candidate)][-len(path):] == tuple(path))}
+            return found or None
+
         rust_file = self.files[unit.file]
         for use in self.uses_by_scope.get((unit.file, unit.scope), ()):
             if use.first_token is None or not (use.import_glob or name in use.imports):
                 continue
             if use_path_root(rust_file, use.first_token, use.last_token) in other_crate_roots:
                 continue
-            segments = [rust_file.texts[index] for index in range(use.first_token, use.last_token)
-                        if rust_file.kinds[index] == IDENT and rust_file.texts[index] not in ("use", "pub", "as", name)]
-            hit = placed(segments)
-            if hit is None:
+            if "rust-use-paths-flattened" in self.breaks:
+                hit = placed([rust_file.texts[index] for index in range(use.first_token, use.last_token)
+                              if rust_file.kinds[index] == IDENT and rust_file.texts[index] not in ("use", "pub", "as", name)])
+                every = every or hit is None
+                seen |= hit or set()
+                continue
+            use_keyword = next((index for index in range(use.first_token, use.last_token)
+                                if rust_file.kinds[index] == IDENT and rust_file.texts[index] == "use"), use.first_token)
+            # 这条 use 里引进 name 的每一支（*、名字本身、原名 as name），花括号展开之后整条比
+            leaves = [index for index in range(use_keyword + 1, use.last_token)
+                      if rust_file.t(index) == "*" or (rust_file.kinds[index] == IDENT and rust_file.t(index) == name
+                                                       and rust_file.t(index + 1) not in (":", "as"))]
+            hits = [placed_by_the_use_path(use_path_leading_to(rust_file, use_keyword, index - 2 if rust_file.t(index - 1) == "as" else index)) for index in leaves]
+            if not hits or None in hits:
                 every = True
             else:
-                seen |= hit
+                seen |= set().union(*hits)
         if unit.first_token is not None and not every:
             if identifier not in self.outside_crate_type_names:
                 self.outside_crate_type_names[identifier] = frozenset(
@@ -4009,11 +4832,17 @@ class Closure:
         self.unit_targets = {}
         # 从哪几个入口收的（键里的 entry 行，entry_key_lines）：rust_closure_of、ScriptClosure.run 与 WGSL 点名的入口各记；别处自己拼的闭包不记，不出那几行
         self.entry_units = []
+        # ScriptClosure.run 每收完一轮时闭包的单元数（explain_lines 打 round 那几行）
+        self.round_sizes = []
+        # 按第一列选行的表脚本的每一次起法 [(脚本, 词或 None, 起它的单元或 None, whole|rows|no-table)]（ScriptClosure.table_launched 记，explain_lines 打 table-launch 那几行）
+        self.table_launches = []
         # 工具链询问（文件头「版本询问」）：{(文件, 行)}；每一处另有一个工具链单元在 order 里（ScriptClosure.toolchain_unit）
         self.toolchain_queries = set()
+        # 按角色排除的文件（文件头「按角色排除的文件」）：它们的单元（连同以它们为内容的数据单元）不进闭包
+        self.excluded_files = frozenset()
 
     def add(self, unit, via, rule):
-        if id(unit) in self.members:
+        if id(unit) in self.members or unit.file in self.excluded_files:
             return False
         self.members[id(unit)] = unit
         self.order.append(unit)
@@ -4164,6 +4993,15 @@ def entry_names_only_defined(workspace, entry):
     return frozenset((entry.short,)) if occurrences <= 1 else frozenset()
 
 
+def rust_entry_is_the_main_of_a_program(target, roots, entry, compiled_as_test):
+    """这一趟的入口恰好是一个 bin 目标自己的 fn main（目标根文件顶层那一个，一组入口里没有别的）、不按测试编：跑起来的进程从这个 main 起（文件头「程序起自己」）。
+    弄坏开关 rust-own-program-entry-unchecked 下入口是什么都算。"""
+    if "rust-own-program-entry-unchecked" in active_breaks():
+        return True
+    return (target.kind == "bin" and not compiled_as_test and len(roots) == 1 and roots[0] is entry and entry.kind == "fn" and entry.short == "main"
+            and entry.container is None and not entry.scope and entry.file == target.root_file)
+
+
 def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False, features=(), no_default_features=False,
                     entry_definition_name_unresolved=False, stop_at=()):
     """从入口收 Rust 闭包（3.3 八条规则），连同入口闭包拼出的 WGSL 模块（3.5）。entry_definition_name_unresolved 见文件头 Rust 闭包「入口名字的定义那一处」，
@@ -4188,6 +5026,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
     enabled = workspace.resolve_features(linked_crates, target.crate, requested, no_default_features,
                                          rust_entry_dependency_sections(target.kind, test_compiled))
     names, pairs = cfg_entries(([] if no_default_cfg else list(DEFAULT_RUST_CFG)) + list(cfg or ()))
+    entry_is_the_main_of_a_program = rust_entry_is_the_main_of_a_program(target, roots, entry, test_compiled or "test" in names)
     known_extra = set(names) | {key for key, _value in pairs}
     for crate in workspace.crates:
         known_extra |= crate.check_cfg
@@ -4235,6 +5074,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
     outside_names_by_module = "rust-outside-crate-names-linked-across-modules" not in breaks
     # 文件头 Rust 闭包「R-裸名同一个目标里按模块筛」：crates/ 下的包同一个目标里同样只连所在模块看得见的那几份
     crates_names_by_module = "rust-crates-names-linked-across-modules" not in breaks
+    local_bindings_shadow = "rust-let-shadowed-names-resolved" not in breaks
     doctest_structure = "rust-doctest-structure-linked" in breaks
     body_cfg_atoms = "rust-cfg-macro-atoms-ignored" not in breaks
     raw_wgsl = "wgsl-raw-text" in breaks
@@ -4379,6 +5219,10 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                         refuse_child(unit, index)
                     elif "rust-current-exe-children-unlinked" not in breaks:
                         push_exact(test, identifier, unit, "current-exe-child")
+            elif kind == "own-program-restart":
+                # 路径原样交给 Command::new：起的是这个程序自己。入口恰好是 bin 的 main 的，子进程从同一个 main 进，走的代码都在闭包里，不连边、不拒算
+                if not entry_is_the_main_of_a_program:
+                    refuse_child(unit, index)
             elif kind == "directory":
                 if value not in data_units:
                     data_units[value] = data_directory_unit(workspace.root, value)
@@ -4448,7 +5292,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
             closure.unit_targets.setdefault(id(unit), identifier)
             closure.refusals.update(unit.refusals)
             record_cfg_atoms(unit, identifier)
-            if unit.kind == "extern_block":
+            if unit.kind == "extern_block" and not unit.listed_c_library_calls:
                 closure.refusals.add(Refusal("extern-block", unit.file, unit.first_line, workspace.files[unit.file].row(unit.first_line)))
             alias_originals = []
             if unit.kind != "doctest" or doctest_structure:
@@ -4482,6 +5326,8 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
             for name in sorted(unit.plain) + alias_originals:
                 if unit is entry and name in entry_unresolved_names:
                     continue
+                # 只在这个名字真有同名函数要连时算一次（文件头 Rust 闭包「局部 let 与参数绑定遮住的名字」）
+                only_a_local_binding = None
                 for visible_id in visible:
                     table = workspace.by_name.get(visible_id)
                     if table is None:
@@ -4502,6 +5348,12 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
                     for candidate in candidates:
                         if candidate is unit:
                             continue
+                        if local_bindings_shadow and candidate.kind == "fn" and unit.kind == "fn" and name not in alias_originals and unit.first_token is not None:
+                            if only_a_local_binding is None:
+                                rust_file = workspace.files[unit.file]
+                                only_a_local_binding = bare_name_only_a_local_binding(rust_file.kinds, rust_file.texts, unit.first_token, unit.last_token, name)
+                            if only_a_local_binding:
+                                continue
                         if visible_id != identifier and not candidate.public:
                             continue
                         push_exact(candidate, visible_id, unit, f"name {name}")
@@ -5323,6 +6175,23 @@ def product_view_agrees(rust_file, theirs_lines):
                for unit in rust_file.units)
 
 
+UNIT_GRAPH_TEXT_BUSY_ATTEMPTS = 50        # 起 unit-graph 撞上 ETXTBSY 最多起几次
+UNIT_GRAPH_TEXT_BUSY_PAUSE_SECONDS = 0.2  # 每两次之间等多久
+
+
+def run_program_waiting_out_text_busy(command):
+    """起 command、收它的输出；起的那一刻程序文件还有人开着写（ETXTBSY：同一台上别的进程 fork 时带走了写它的句柄，句柄一关就好）隔一会儿再起，
+    最多 UNIT_GRAPH_TEXT_BUSY_ATTEMPTS 次，还不成照原样抛。别的 OSError 当场抛。弄坏开关 unit-graph-text-busy-not-waited 下撞上就抛。"""
+    for attempt in range(1, UNIT_GRAPH_TEXT_BUSY_ATTEMPTS + 1):
+        try:
+            return subprocess.run(command, capture_output=True, text=True, errors="surrogateescape", stdin=subprocess.DEVNULL)
+        except OSError as error:
+            if error.errno != errno.ETXTBSY or attempt == UNIT_GRAPH_TEXT_BUSY_ATTEMPTS or "unit-graph-text-busy-not-waited" in active_breaks():
+                raise
+            time.sleep(UNIT_GRAPH_TEXT_BUSY_PAUSE_SECONDS)
+    raise AssertionError("走不到：循环里末一次不是交回就是抛")
+
+
 class ProductViewUnavailable(Exception):
     """拿不到 Rust 那一份产品行为视图（找不到或编不出 unit-graph、它退非 0）：有 verus! 块的文件记拒算 product-view-unavailable。"""
 
@@ -5331,8 +6200,7 @@ def product_view_dump(root):
     """unit-graph dump <根> --judgment-kind product-behavior 的输出行（文件头「判定种类」）；拿不到抛 ProductViewUnavailable。"""
     program = os.path.join(unit_graph_directory(), "unit-graph")
     try:
-        completed = subprocess.run([program, "dump", os.path.abspath(root), "--judgment-kind", PRODUCT_BEHAVIOR],
-                                   capture_output=True, text=True, errors="surrogateescape", stdin=subprocess.DEVNULL)
+        completed = run_program_waiting_out_text_busy([program, "dump", os.path.abspath(root), "--judgment-kind", PRODUCT_BEHAVIOR])
     except OSError as error:
         raise ProductViewUnavailable(f"起不了 unit-graph：{error}") from error
     if completed.returncode != 0:
@@ -5353,21 +6221,8 @@ def built_unit_graph(repository):
         raise ProductViewUnavailable(f"{repository} 里没有 crates/singlefs-unit-graph")
     thread_registry = os.path.join(repository, ".claude", "heavy-thread-default")
     lock_file = os.path.join(repository, "Cargo.lock")
-    inputs = [thread_registry, lock_file]
-    for directory, subdirectories, names in os.walk(source):
-        subdirectories[:] = sorted(name for name in subdirectories if name not in SKIPPED_DIRECTORIES)
-        inputs += [os.path.join(directory, name) for name in sorted(names)]
-    digest = hashlib.sha256()
-    for path in inputs:
-        digest.update(os.path.relpath(path, repository).encode("utf-8", "surrogateescape") + b"\0")
-        try:
-            with open(path, "rb") as handle:
-                digest.update(handle.read())
-        except OSError:
-            digest.update(b"<missing>")
-        digest.update(b"\0")
     cache = unit_graph_product_view_cache_directory()
-    directory = os.path.join(cache, digest.hexdigest())
+    directory = os.path.join(cache, unit_graph_inputs_digest(repository, source, thread_registry, lock_file))
     program = os.path.join(directory, "unit-graph")
     if os.access(program, os.X_OK):
         return directory
@@ -5380,6 +6235,27 @@ def built_unit_graph(repository):
     except OSError as error:
         raise ProductViewUnavailable(f"编不了 unit-graph（{cache}）：{error}") from error
     return directory
+
+
+def unit_graph_inputs_digest(repository, source, thread_registry, lock_file):
+    """编 unit-graph 读的每一样（build_unit_graph 拷进工作区的登记文件与 Cargo.lock、source 整棵源码目录）的路径与字节摘要 → 缓存目录名：
+    三样里改了一个字节就换目录、重编，旧程序不复用。弄坏开关 unit-graph-digest-skips-lock-file：摘要里不算 Cargo.lock。"""
+    inputs = [thread_registry, lock_file]
+    if "unit-graph-digest-skips-lock-file" in active_breaks():
+        inputs.remove(lock_file)
+    for directory, subdirectories, names in os.walk(source):
+        subdirectories[:] = sorted(name for name in subdirectories if name not in SKIPPED_DIRECTORIES)
+        inputs += [os.path.join(directory, name) for name in sorted(names)]
+    digest = hashlib.sha256()
+    for path in inputs:
+        digest.update(os.path.relpath(path, repository).encode("utf-8", "surrogateescape") + b"\0")
+        try:
+            with open(path, "rb") as handle:
+                digest.update(handle.read())
+        except OSError:
+            digest.update(b"<missing>")
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def build_unit_graph(repository, source, thread_registry, lock_file, cache, directory, program):
@@ -5404,9 +6280,15 @@ def build_unit_graph(repository, source, thread_registry, lock_file, cache, dire
             tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-3:] if line.strip())
             raise ProductViewUnavailable(f"cargo build --release -p singlefs-unit-graph 退 {completed.returncode}：{tail[:300]}")
         os.makedirs(directory, exist_ok=True)
-        partial = os.path.join(directory, "unit-graph.partial")
-        shutil.copy2(os.path.join(build, "target", "release", "unit-graph"), partial)
-        os.replace(partial, program)
+        # 临时名各取各的：两个进程同时换上同一份（锁在这个文件系统上不互斥时）不写同一个文件，改名换上的那一份没有人还开着写
+        handle, partial = tempfile.mkstemp(prefix=".unit-graph-", dir=directory)
+        os.close(handle)
+        try:
+            shutil.copy2(os.path.join(build, "target", "release", "unit-graph"), partial)
+            os.replace(partial, program)
+        finally:
+            if os.path.lexists(partial):
+                os.unlink(partial)
     finally:
         shutil.rmtree(build, ignore_errors=True)
     kept = sorted((name for name in os.listdir(cache) if not name.startswith((".", "build-"))),
@@ -5750,6 +6632,8 @@ PATH_METHODS = frozenset(("resolve", "absolute", "as_posix", "expanduser", "join
 DATA_FORM = "data-path-unfolded"
 # 拷文件的调用（文件头「运行期读的数据文件」）：源照读文件认，折不出的那一截不拒算（拷进副本、样本树的那一份归起在副本上的那一趟管）
 COPY_CALLS = frozenset(("shutil.copy", "shutil.copy2", "shutil.copyfile"))
+# 门禁样本档的根：按尾巴认的读法不收这底下的文件（文件头「运行期读的数据文件」一）
+STAGE_SAMPLE_DIRECTORY = ".claude/gate.d/fixtures/"
 # 版本询问（文件头「版本询问」）：命令位置上的程序折不出、后面只有这里头的一个词的，记成工具链询问
 TOOLCHAIN_QUERY_WORDS = frozenset(("-V", "--version", "-vV"))
 # 工具链单元的种类与名字（文件头「版本询问」）；rust_toolchain_lines 另问的编译器：这两个环境变量与 cargo 配置的 build.rustc
@@ -5869,6 +6753,98 @@ def walk_nodes(nodes):
         yield from ast.walk(node)
 
 
+def function_local_names(function):
+    """def 或 lambda 自己这一层作用域绑定的名字 → (局部名字, global 与 nonlocal 声明过的名字)。import 绑的不算（resolve_name 照 import 认）；推导式、lambda、
+    套在里面的 def 与类体自成一层，里面的赋值不算这一层的（海象赋值同样不算，宁可多连）。"""
+    arguments = function.args
+    names = {argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs}
+    names |= {argument.arg for argument in (arguments.vararg, arguments.kwarg) if argument is not None}
+    declared = set()
+    pending = list(function.body) if isinstance(function.body, list) else [function.body]
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            declared.update(node.names)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif not isinstance(node, (ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+                names.add(node.id)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                names.add(node.name)
+            pending.extend(ast.iter_child_nodes(node))
+    return names - declared, declared
+
+
+def local_name_reads(unit):
+    """单元里读局部量的那几个 ast.Name（按 id，文件头「函数里读局部量的名字」）；缓存在单元上。"""
+    if unit.cache is None:
+        unit.cache = {}
+    if "local-name-reads" in unit.cache:
+        return unit.cache["local-name-reads"]
+    reads = set()
+
+    def visit(node, scopes):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            arguments = node.args
+            outer = list(arguments.defaults) + [default for default in arguments.kw_defaults if default is not None]
+            if not isinstance(node, ast.Lambda):
+                outer += node.decorator_list
+            for item in outer:
+                visit(item, scopes)
+            names, declared = function_local_names(node)
+            inner = tuple(scope - declared for scope in scopes) + (frozenset(names),)
+            for statement in node.body if isinstance(node.body, list) else [node.body]:
+                visit(statement, inner)
+            return
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+            # 头一节的序列在外层作用域里求值，别的都在推导式这一层
+            visit(node.generators[0].iter, scopes)
+            inner = scopes + (frozenset(name for generator in node.generators for name in bound_names(generator.target)),)
+            for child in ast.iter_child_nodes(node):
+                if not isinstance(child, ast.comprehension):
+                    visit(child, inner)
+            for position, generator in enumerate(node.generators):
+                if position:
+                    visit(generator.iter, inner)
+                for condition in generator.ifs:
+                    visit(condition, inner)
+            return
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Load, ast.Del)) and any(node.id in scope for scope in scopes):
+            reads.add(id(node))
+        for child in ast.iter_child_nodes(node):
+            visit(child, scopes)
+    for root in unit.nodes or []:
+        visit(root, ())
+    unit.cache["local-name-reads"] = frozenset(reads)
+    return unit.cache["local-name-reads"]
+
+
+def named_calls_in(nodes):
+    """nodes 里认得出被调名字的 ast.Call：[(节点, 名字)]，次序同 nodes。"""
+    found = []
+    for node in nodes:
+        if isinstance(node, ast.Call):
+            callee = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else None
+            if callee:
+                found.append((node, callee))
+    return found
+
+
+def partial_bound_call(call, called):
+    """call 是 functools.partial(f, …) / partial(f, …)、f 的名字是 called：交回照 f(…) 写的那一处调用（实参与关键字去掉头一个 f），不是就 None。"""
+    function = call.func
+    named_partial = (isinstance(function, ast.Name) and function.id == "partial") or (
+        isinstance(function, ast.Attribute) and function.attr == "partial" and isinstance(function.value, ast.Name) and function.value.id == "functools")
+    if not named_partial or not call.args:
+        return None
+    target = call.args[0]
+    name = target.id if isinstance(target, ast.Name) else target.attr if isinstance(target, ast.Attribute) else None
+    if name != called:
+        return None
+    return ast.copy_location(ast.Call(func=target, args=list(call.args[1:]), keywords=list(call.keywords)), call)
+
+
 def walk_nodes_skipping(nodes, skipped):
     """同 walk_nodes（每个根各自按层走），skipped 里（按 id）的节点连同它底下的都不走（程序入口带参数时剪掉的那几支）。"""
     for root in nodes:
@@ -5911,6 +6887,22 @@ def launch_arguments(elements, values, start):
         value = values[position] if position < len(values) else None
         words.append(next(iter(value)) if value is not None and len(value) == 1 else None)
     return KnownWords(tuple(words), True)
+
+
+def shell_launch_choices(elements, values, start):
+    """python 起 shell 的命令里脚本之后那几个元素（* 展开已由 command_alternatives 摊开成一种种取法）→ 每一种取法的词（{(词…)}；折出几个取值的逐个展开）；
+    折不出的元素之前有字面词的，字面词接 SHELL_OPEN_TAIL（文件头「shell 起法带字面参数」）；头一个元素就折不出、展开超过 FOLD_LIMIT 种 → None（那份脚本体整份收）。"""
+    choices = {()}
+    for position in range(start, len(elements)):
+        value = values[position] if position < len(values) else None
+        if not value:
+            if position > start and "shell-open-tail-unnarrowed" not in active_breaks():
+                return {choice + (SHELL_OPEN_TAIL,) for choice in choices}
+            return None
+        choices = {choice + (word,) for choice in choices for word in value}
+        if len(choices) > FOLD_LIMIT:
+            return None
+    return choices
 
 
 def known_equal(left, right):
@@ -6024,10 +7016,12 @@ class PythonFacts:
     （-m unittest 点名的测试模块）；handled：每个起子进程的调用各记一条认成了什么（只给量全仓的人看，不进判定）。"""
     __slots__ = ("names", "attributes", "loads", "program_links", "doc_reads", "source_read", "strings", "refusals", "import_targets", "inline_scripts",
                  "whole_modules", "handled", "data_reads", "toolchain_queries", "caller_launches", "narrowed_calls", "registry_reads",
-                 "program_arguments", "shallow_tables")
+                 "program_arguments", "shallow_tables", "shell_launch_words", "built_tools", "contained_loads")
 
     def __init__(self):
         self.names, self.attributes, self.loads, self.program_links = set(), [], [], []
+        # loads 里载入的模块值出不了这份模块的那几处（文件头「按路径载入的模块只连载入方调到的属性」，PythonModule.loaded_value_contained）
+        self.contained_loads = []
         self.doc_reads, self.source_read, self.strings, self.refusals, self.import_targets = [], False, set(), [], []
         self.inline_scripts, self.whole_modules, self.handled = [], [], []
         # 运行期读的数据文件（文件头「运行期读的数据文件」）：[(取法集合, 行, 是不是拷文件的源)]，取法见 PythonModule.data_read_origins
@@ -6037,10 +7031,14 @@ class PythonFacts:
         # 程序入口带参数（文件头「程序入口带参数」）：带着已知实参往下剪的调用 [(被调的函数单元, 已知值表)]；
         # 子进程边带过去的参数：{被起的文件: {KnownWords 或 None（不知道）…}}
         self.narrowed_calls, self.program_arguments = [], {}
+        # python 起 shell 的每一处带的字面参数（文件头「shell 起法带字面参数」）：{被起的文件: [{(词…)} 或 None（有一处折不出）…]}
+        self.shell_launch_words = {}
         # 程序入口带参数时只问键在不在（<词> in 表）的那几张本模块字典字面量的赋值单元：照 SHALLOW_IMPORT_VIEW 收（值里的函数名不连）
         self.shallow_tables = []
         # 登记表点名的程序（文件头「登记表点名的程序」）读的登记表（相对根的路径）
         self.registry_reads = []
+        # 起编出来的工具的那几处（BUILT_TOOL_LAUNCHES）：编它的源码目录（相对根），收闭包时收成数据目录
+        self.built_tools = []
 
 
 class PythonIndex:
@@ -6051,6 +7049,8 @@ class PythonIndex:
         self.folding = set()
         self._repository_names = None
         self._repository_files = None
+        # 运行期读的数据文件与目录的单元（ScriptClosure.data_unit、data_directory）：共用这个索引的闭包共用
+        self.data_units, self.data_directories = {}, {}
 
     def repository_files(self):
         """根里的全部文件（相对根，跳过 SKIPPED_DIRECTORIES）：运行期读的路径只认得出字面尾巴时，按尾巴对上的那一组（PythonModule.read_origins 的 tail）。"""
@@ -6133,8 +7133,12 @@ class PythonModule:
         return snippet_of(self.rows[line - 1]) if 0 < line <= len(self.rows) else ""
 
     def refusal(self, form, line):
-        """拒算落在哪：内联脚本的落在起它的那一行（它的正文就在那个单元里），别的落在这份文件的那一行。"""
+        """拒算落在哪：正文出自原文里一份 here-doc 的内联脚本落在原文里那一行（InlineScript 的 body_lines 里这份正文的行号加正文里的偏移）；字面 -c 串与原文里找不到正文的
+        落在起它的那一行（它的正文就在那个单元里）；别的落在这份文件的那一行。弄坏开关 inline-refusal-lines-at-launch 下 here-doc 的也落在起它的那一行。"""
         if self.inline is not None:
+            body_line = dict(self.inline.body_lines).get(self.text)
+            if body_line is not None and 0 < line <= len(self.rows):
+                return Refusal(form, self.inline.file, body_line + line - 1, snippet_of(self.rows[line - 1]))
             return Refusal(form, self.inline.file, self.inline.line, self.inline.snippet)
         return Refusal(form, self.path, line, self.row(line))
 
@@ -6362,6 +7366,27 @@ class PythonModule:
                             if values:
                                 found += sorted(values)
                 self._sys_path = found
+                if "python-imported-sys-path-ignored" not in self.index.breaks:
+                    # 模块级 import 进来的、照 SPEC_PATH_ARGUMENTS 载入的仓内模块在载入时往 sys.path 加的目录，对这份模块同样生效（sys.path 是进程里的一份）
+                    files = []
+                    for statement in self.tree.body:
+                        names = []
+                        if isinstance(statement, ast.Import):
+                            names = [(alias.name, 0) for alias in statement.names]
+                        elif isinstance(statement, ast.ImportFrom) and statement.module:
+                            names = [(statement.module, statement.level)]
+                        for dotted, level in names:
+                            status, file = self.resolve_module(dotted, level)
+                            if status == "repo":
+                                files.append(file)
+                    for (loader, _expression), targets in SPEC_PATH_ARGUMENTS.items():
+                        if loader == self.source_file():
+                            files += [targets] if isinstance(targets, str) else list(targets)
+                    for file in files:
+                        imported = self.index.module(file) if file != self.path and os.path.isfile(os.path.join(self.index.root, file)) else None
+                        if imported is not None and imported is not self:
+                            imported.search_directories()
+                            found += [directory for directory in imported._sys_path if directory != "computing" and directory not in found]
         return directories + [path for path in self._sys_path if path != "computing"]
 
     def resolve_module(self, dotted, level):
@@ -6708,6 +7733,9 @@ class PythonModule:
                 if enclosing_unit(unit) is not None:
                     # 套着的函数里没赋、不是参数的名字：外层函数的局部变量（闭包变量）或模块级的
                     return self.fold_name(name, enclosing_unit(unit), depth + 1)
+            guarded = guard_assignments(name, unit) if "python-guard-names-unfolded" not in self.index.breaks else []
+            if guarded:
+                return self.fold_all(guarded, unit, depth)
             values, found = set(), False
             for candidate in self.by_name.get(name, ()):
                 if candidate.kind == "assign":
@@ -6834,6 +7862,128 @@ class PythonModule:
         file = self.file_for_value(next(iter(values)), [posixpath.dirname(self.absolute), self.index.root])
         return self.index.module(file) if file is not None and file.endswith(".py") else None
 
+    def loaded_value_contained(self, call, unit):
+        """spec_from_file_location 这一处（call，在 unit 那一层作用域里）载入的模块值出不出这份模块（文件头「按路径载入的模块只连载入方调到的属性」）。
+        出不去要同时满足：模块名折得出、没有一个是 "__main__"（载入时不跑 main-guard）；<spec> = 这一处、<名> = importlib.util.module_from_spec(<spec>)
+        都赋给名字；<spec> 只用在 <spec>.属性 与 module_from_spec(<spec>)；模块值只用在 <值>.属性、getattr / hasattr(<值>, …)、
+        <spec>.loader.exec_module(<值>) 与条件里，赋给别的名字或放进容器（<容器>.append / insert / add(<值>)、<容器>[k] = <值>）的照同样的规矩追下去，
+        容器只用在 <容器>[k]、<容器>.append / insert / add / clear、len(<容器>) 与条件里。名字在哪一层：函数自己那一层绑过（不算 global、nonlocal 声明的）
+        看那个函数，别的看整份模块，只有内联脚本（不会被别的文件 import）许这一种。交出去的（return、当参数、登进 sys.modules、赋给属性、
+        普通 .py 里模块级的名字）一律算出得去 → False，照整个闭包见过的属性名连（ScriptClosure.attribute_seen）。"""
+        argument = call.args[0] if call.args else next((keyword.value for keyword in call.keywords if keyword.arg == "name"), None)
+        if argument is None:
+            return False
+        names = {argument.value} if isinstance(argument, ast.Constant) and isinstance(argument.value, str) else self.fold(argument, unit)
+        if not names or "__main__" in names:
+            return False
+        if self.inline is not None:
+            tree = self.tree
+        else:
+            top = unit
+            while enclosing_unit(top) is not None:
+                top = enclosing_unit(top)
+            if top is None or not isinstance(top.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                return False
+            tree = top.node
+        parents = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                parents[id(child)] = node
+        if id(call) not in parents:
+            return False
+        scopes = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+
+        def name_root(name, node):
+            current = parents.get(id(node))
+            while current is not None:
+                if isinstance(current, scopes):
+                    local, _declared = function_local_names(current)
+                    if name in local:
+                        return current
+                current = parents.get(id(current))
+            return tree if self.inline is not None else None
+
+        work, followed = [], set()
+
+        def follow(kind, name, node):
+            root = name_root(name, node)
+            if root is None:
+                return False
+            if (kind, name, id(root)) not in followed:
+                followed.add((kind, name, id(root)))
+                work.append((kind, name, root))
+            return True
+
+        def condition(node, parent):
+            return (isinstance(parent, (ast.If, ast.While, ast.IfExp, ast.Assert)) and parent.test is node) or \
+                (isinstance(parent, ast.UnaryOp) and isinstance(parent.op, ast.Not)) or \
+                (isinstance(parent, ast.Compare) and all(isinstance(operator, (ast.Is, ast.IsNot)) for operator in parent.ops))
+
+        def value_use(node):
+            """node 求出来可能是那个模块值：这一处用法出不出得去。"""
+            parent = parents.get(id(node))
+            if isinstance(parent, ast.Attribute) and parent.value is node:
+                return parent.attr != "__dict__"
+            if isinstance(parent, ast.Call) and node in parent.args:
+                function = parent.func
+                if isinstance(function, ast.Name) and function.id in ("getattr", "hasattr") and parent.args[0] is node:
+                    return True
+                if isinstance(function, ast.Attribute) and function.attr == "exec_module" and parent.args == [node]:
+                    return True
+                if isinstance(function, ast.Attribute) and function.attr in ("append", "insert", "add") and isinstance(function.value, ast.Name):
+                    return follow("container", function.value.id, parent)
+                return False
+            if isinstance(parent, (ast.Assign, ast.AnnAssign)) and parent.value is node:
+                for target in (parent.targets if isinstance(parent, ast.Assign) else [parent.target]):
+                    if isinstance(target, ast.Name):
+                        if not follow("alias", target.id, parent):
+                            return False
+                    elif isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+                        if not follow("container", target.value.id, parent):
+                            return False
+                    else:
+                        return False
+                return True
+            return condition(node, parent)
+
+        def name_use(kind, node):
+            parent = parents.get(id(node))
+            if kind == "alias":
+                return value_use(node)
+            if kind == "spec":
+                if isinstance(parent, ast.Attribute) and parent.value is node:
+                    return True
+                return isinstance(parent, ast.Call) and parent.args == [node] and self.canonical(parent.func, unit) == "importlib.util.module_from_spec" \
+                    and created(parent)
+            if isinstance(parent, ast.Subscript) and parent.value is node:
+                return value_use(parent) if isinstance(parent.ctx, ast.Load) else True
+            if isinstance(parent, ast.Attribute) and parent.value is node:
+                return parent.attr in ("append", "insert", "add", "clear") and isinstance(parents.get(id(parent)), ast.Call) \
+                    and parents[id(parent)].func is parent
+            if isinstance(parent, ast.Call) and isinstance(parent.func, ast.Name) and parent.func.id == "len" and parent.args == [node]:
+                return True
+            return condition(node, parent)
+
+        def created(module_call):
+            """importlib.util.module_from_spec(<spec>)：载入的模块值打这一处来，要赋给名字。"""
+            parent = parents.get(id(module_call))
+            return isinstance(parent, ast.Assign) and parent.value is module_call and len(parent.targets) == 1 \
+                and isinstance(parent.targets[0], ast.Name) and follow("alias", parent.targets[0].id, parent)
+
+        parent = parents[id(call)]
+        if isinstance(parent, ast.Assign) and parent.value is call and len(parent.targets) == 1 and isinstance(parent.targets[0], ast.Name):
+            if not follow("spec", parent.targets[0].id, parent):
+                return False
+        elif not (isinstance(parent, ast.Call) and parent.args == [call] and self.canonical(parent.func, unit) == "importlib.util.module_from_spec"
+                  and created(parent)):
+            return False
+        while work:
+            kind, name, root = work.pop()
+            for node in ast.walk(root):
+                if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load) and not name_use(kind, node):
+                    return False
+        return True
+
     def fold_elements(self, sequence, unit, depth):
         """元组 / 列表字面量，或绑着它的名字（本函数里只赋过一次的、模块级的）→ 各元素折出来的并；有一个折不出就整个折不出。"""
         if isinstance(sequence, ast.Name):
@@ -6862,6 +8012,19 @@ class PythonModule:
                 # 调仓内模块级函数：它各处 return 的序列的元素
                 return self.elements_of_call_returns(function.id, unit, depth)
             return None
+        if isinstance(sequence, ast.Subscript) and isinstance(sequence.value, ast.Name) and "python-getattr-names-unfolded" not in self.index.breaks:
+            # 模块级字典字面量[键]：键折不折得出都取遍每个值的元素
+            found = self.module_dictionary(sequence.value.id, unit)
+            if found is None:
+                return None
+            table, owner = found
+            values = set()
+            for part in table.values:
+                elements = self.fold_elements(part, owner, depth + 1)
+                if elements is None:
+                    return None
+                values |= elements
+            return values
         if not isinstance(sequence, (ast.Tuple, ast.List)):
             return None
         values = set()
@@ -6871,6 +8034,18 @@ class PythonModule:
                 return None
             values |= folded
         return values
+
+    def fold_format_value(self, node, unit, depth):
+        """f 串里 {…} 那一段的取值：照 fold；另认 sys.executable（折成 python3，同 command_links 的命令词）与整数常量（字面量或只赋过一次它的名字，折成十进制）。"""
+        folded = self.fold(node, unit, depth + 1)
+        if folded is not None or "python-text-pieces-unfolded" in self.index.breaks:
+            return folded
+        if self.canonical(node, unit) == "sys.executable":
+            return {"python3"}
+        if isinstance(node, ast.Name):
+            found = self.single_assignment(node.id, unit)
+            node = found[0] if found is not None else node
+        return {str(node.value)} if isinstance(node, ast.Constant) and type(node.value) is int else None
 
     def fold_inner(self, node, unit, depth):
         if isinstance(node, ElementsOf):
@@ -6883,7 +8058,7 @@ class PythonModule:
                 if isinstance(part, ast.Constant):
                     results = {result + str(part.value) for result in results}
                 elif isinstance(part, ast.FormattedValue) and part.format_spec is None and part.conversion in (-1, 115):
-                    folded = self.fold(part.value, unit, depth + 1)
+                    folded = self.fold_format_value(part.value, unit, depth)
                     if folded is None:
                         return None
                     results = {result + value for result in results for value in folded}
@@ -7002,6 +8177,12 @@ class PythonModule:
             if isinstance(node.func, ast.Attribute) and node.func.attr in ("strip", "rstrip", "decode") and not node.keywords and (
                     not node.args or (node.func.attr == "decode" and len(node.args) == 1 and isinstance(node.args[0], ast.Constant))):
                 return self.fold(node.func.value, unit, depth + 1)
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "join" and len(node.args) == 1 and not node.keywords \
+                    and isinstance(node.func.value, ast.Constant) and isinstance(node.func.value.value, str) \
+                    and "python-text-pieces-unfolded" not in self.index.breaks:
+                # "<分隔>".join(<字面元组或列表>)：元素排好序拼成一个串（这个串拿去切内联脚本认边，不进指纹）
+                elements = self.fold_elements(node.args[0], unit, depth + 1)
+                return {node.func.value.value.join(sorted(elements))} if elements is not None else None
             if node.keywords:
                 return None
             if canonical in ("os.path.join", "posixpath.join") or canonical in PATH_CONSTRUCTORS:
@@ -7347,6 +8528,8 @@ class PythonModule:
             return values
         tail = self.literal_tail(node, unit)
         copied = tree_copy_file(self.index.root, tail, directory) if tail else None
+        if copied is not None and in_skipped_directory(copied) and "python-data-reads-follow-build-outputs" not in self.index.breaks:
+            copied = None   # 编译产物、缓存（SKIPPED_DIRECTORIES）随机器与编译目录变，不是判法自己的数据（文件头「运行期读的数据文件」编译产物那一条）
         return {posixpath.join(self.index.root, copied)} if copied is not None else None
 
     def directory_wildcard(self, node, unit, suffix, depth=0):
@@ -7518,10 +8701,21 @@ class PythonModule:
             return frozenset({("skip", "descriptor")})
         values = self.path_values(node, unit)
         if values is not None:
+            # 「<折不出的目录>/<仓里的相对路径>」那一种（tree_copy_file：整个折不出）登在 TAIL_READ_SCOPES 里的，只留登记前缀之下的（文件头「按尾巴读的登记」）
+            scope = self.registered_tail_scope(node, unit) if "tail-read-scopes-copies-unscoped" not in self.index.breaks else None
+            if scope is not None and self.fold(node, unit) is not None:
+                scope = None
             out = set()
             for value in values:
                 expanded = os.path.expanduser(value) if value.startswith("~") else value
                 file = self.file_for_value(expanded, [self.index.root, posixpath.dirname(self.absolute)])
+                if file is not None and in_skipped_directory(file) and "python-data-reads-follow-build-outputs" not in self.index.breaks:
+                    out.add(("skip", "build-output"))
+                    continue
+                # tree_copy_file 收的就是根里同一相对路径的那一份：前缀登了 TAIL_READ_ROOT_COPY 的照留（文件头「按尾巴读的登记」）
+                if file is not None and scope is not None and not in_tail_read_scope(file, scope, (file,), self.index.breaks):
+                    out.add(("skip", "registered-scope"))
+                    continue
                 out.add(("file", file) if file is not None else ("skip", "not-a-repository-file"))
             return frozenset(out) or frozenset({("skip", "no-value")})
         if isinstance(node, ast.Name):
@@ -7538,14 +8732,19 @@ class PythonModule:
             return frozenset().union(*(self.data_read_origins(side, unit, depth + 1) for side in sides))
         tails = self.path_tails(node, unit)
         if tails and all(tail.strip("/") and not posixpath.basename(tail.rstrip("/")).startswith(".") for tail in tails):
+            scope = self.registered_tail_scope(node, unit)
             out = set()
             for tail in tails:
                 stripped = tail.strip("/")
-                matched = [relative for relative in self.index.repository_files() if relative == stripped or relative.endswith("/" + stripped)
-                           or (not tail.startswith("/") and relative.endswith(stripped))]
+                matched = [relative for relative in self.index.repository_files() if (relative == stripped or relative.endswith("/" + stripped)
+                           or (not tail.startswith("/") and relative.endswith(stripped)))
+                           and (not relative.startswith(STAGE_SAMPLE_DIRECTORY) or "python-tail-reads-samples-included" in self.index.breaks)
+                           and (scope is None or in_tail_read_scope(relative, scope, (stripped,), self.index.breaks))]
                 out |= {("file", relative) for relative in matched}
                 if not matched:
-                    out.add(("skip", "not-a-repository-file"))
+                    out.add(("skip", "not-a-repository-file" if scope is None else "registered-scope"))
+            if scope is None:
+                record_unscoped_tail_read(self, node, unit, out)
             anchor = self.prefix_parameter(node, unit) if "python-tail-reads-unanchored" not in self.index.breaks else None
             if anchor is not None and any(origin[0] == "file" for origin in out):
                 # 折不出的前缀是本函数的参数：仓里这一截尾巴的那一组留到收完闭包再按调用处认（ScriptClosure.tail_read_supplied）
@@ -7557,6 +8756,18 @@ class PythonModule:
         origins = self.head_origin(node, unit, depth + 1)
         # 出处推不出、前缀也推不出的：照调用方交进来的输入认（文件头「运行期读的数据文件」二的末一种），不收也不拒算
         return frozenset(origins) if origins is not None else frozenset({("skip", "unknown")})
+
+    def registered_tail_scope(self, node, unit):
+        """按字面尾巴读的这一处（连同 tree_copy_file 那一种）登在 TAIL_READ_SCOPES 里（文件头「按尾巴读的登记」）→ 仓里那一组只留的前缀（元组，相对根、不带收尾的 /；
+        空元组是调用方交进来的输入，一份都不收；TAIL_READ_ROOT_COPY 只留根上那一份，比法在 in_tail_read_scope）；没登记 → None。弄坏开关 tail-read-scopes-ignored 下一律当没登记。
+        先比文件与函数：每一处折得出的读都问到这里，那一对不在表里的不做 ast.unparse。"""
+        if unit is None or not getattr(unit, "short", None) or "tail-read-scopes-ignored" in self.index.breaks:
+            return None
+        file, function = self.source_file(), unit.short.rsplit(".", 1)[-1]
+        if not any(registered_file == file and registered_function == function for registered_file, registered_function, _expression in TAIL_READ_SCOPES):
+            return None
+        registered = TAIL_READ_SCOPES.get((file, function, ast.unparse(node)))
+        return None if registered is None else tuple(prefix.strip("/") for prefix in registered[0])
 
     def prefix_parameter(self, node, unit, depth=0):
         """被读路径最左那一截折不出的前缀是本函数的哪个参数（os.path.join / Path 的头一个实参、os.path.dirname 这类、x[…]、x / …、本函数里给它的赋值，
@@ -7976,6 +9187,16 @@ class PythonModule:
             cache[key] = facts
         return cache[key]
 
+    @staticmethod
+    def reads_docstring(node, augmented, breaks):
+        """__doc__ 这一处（名字或属性）读不读文档串：ast.Load 读，X.__doc__ += … 的目标读（augmented 是这个单元里各个 AugAssign 目标的 id）；
+        X.__doc__ = … 与 del 只写不读。弄坏开关 python-docstring-writes-counted：写也算读；python-docstring-augmented-assignment-not-read：只认 ast.Load。"""
+        if "python-docstring-writes-counted" in breaks:
+            return True
+        if isinstance(node.ctx, ast.Load):
+            return True
+        return id(node) in augmented and "python-docstring-augmented-assignment-not-read" not in breaks
+
     def collect_facts(self, unit, facts, skipped, extra):
         """单元读到的东西填进 facts、交回它：skipped（按 id）里的节点连同底下的不看，extra 是另外要看的节点（分派表取到的那一项）。"""
         breaks = self.index.breaks
@@ -7998,20 +9219,40 @@ class PythonModule:
                         file_queries.add(id(receiver))
             if file_queries:
                 facts.names.add("__file__")
+        # globals()[键] 与 globals().update(…)（文件头「globals 的下标与 update」）：读连名字，写不连，都不拒算
+        if self.binding("globals", unit) is None and "python-globals-subscripts-refused" not in breaks:
+            for query in nodes:
+                if isinstance(query, ast.Subscript):
+                    receiver, key, written = query.value, query.slice, isinstance(query.ctx, (ast.Store, ast.Del))
+                elif isinstance(query, ast.Call) and isinstance(query.func, ast.Attribute) and query.func.attr == "update":
+                    receiver, key, written = query.func.value, None, True
+                else:
+                    continue
+                if not (isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name) and receiver.func.id == "globals"
+                        and not receiver.args and not receiver.keywords):
+                    continue
+                file_queries.add(id(receiver))
+                if not written:
+                    read = {key.value} if isinstance(key, ast.Constant) and isinstance(key.value, str) else self.fold(key, self.scope_of(query, unit))
+                    facts.names |= set(read) if read is not None else set(self.by_name)
         dropped = set()
         if "python-dispatch-tables-ignored" in breaks:
             # 弄坏开关：分派表（字典字面量）里当值写的函数名不连边
             dropped = {id(value) for node in nodes if isinstance(node, ast.Dict)
                        for value in node.values if isinstance(value, ast.Name)}
+        # 函数里读局部量的名字不连模块里的同名单元（文件头「函数里读局部量的名字」）
+        local_reads = local_name_reads(unit) if "python-local-names-resolved" not in breaks else ()
+        # 读文档串只认读（文件头「文档串的读法」）：ast.Load，加 X.__doc__ += … 的目标（先读后写）；X.__doc__ = … 只写、不读
+        augmented = {id(node.target) for node in nodes if isinstance(node, ast.AugAssign)}
         for node in nodes:
             if isinstance(node, ast.Name):
-                if isinstance(node.ctx, (ast.Load, ast.Del)) and id(node) not in dropped:
+                if isinstance(node.ctx, (ast.Load, ast.Del)) and id(node) not in dropped and id(node) not in local_reads:
                     facts.names.add(node.id)
-                if node.id == "__doc__":
+                if node.id == "__doc__" and self.reads_docstring(node, augmented, breaks):
                     facts.doc_reads.append("<module>")
             elif isinstance(node, ast.Attribute):
                 facts.attributes.append((dotted_name(node.value), node.attr))
-                if node.attr == "__doc__":
+                if node.attr == "__doc__" and self.reads_docstring(node, augmented, breaks):
                     base = dotted_name(node.value)
                     facts.doc_reads.append(base if base else "*")
             elif isinstance(node, (ast.Import, ast.ImportFrom)) and unit.kind != "import":
@@ -8281,6 +9522,22 @@ class PythonModule:
     def refuse(self, facts, form, node):
         facts.refusals.append(self.refusal(form, node.lineno))
 
+    def source_file(self):
+        """这份模块算在哪份文件上：内联脚本算起它的那份。"""
+        return self.inline.file if self.inline is not None else self.path
+
+    def registered_spec_path(self, location):
+        """spec_from_file_location 折不出的路径在 SPEC_PATH_ARGUMENTS 里（文件头「载入路径的登记」）→ {根里那一份的绝对路径}；没登记、登记的文件不在 → None。"""
+        target = SPEC_PATH_ARGUMENTS.get((self.source_file(), ast.unparse(location)))
+        if target is None or "spec-path-arguments-refused" in self.index.breaks:
+            return None
+        targets = (target,) if isinstance(target, str) else tuple(target)
+        if "spec-path-tuple-first-only" in self.index.breaks:
+            targets = targets[:1]
+        if not all(os.path.isfile(os.path.join(self.index.root, item)) for item in targets):
+            return None
+        return {posixpath.join(self.index.root, item) for item in targets}
+
     def call_facts(self, node, unit, facts, breaks):
         function = node.func
         canonical = self.canonical(function, unit)
@@ -8288,22 +9545,39 @@ class PythonModule:
             attribute = node.args[1]
             if isinstance(attribute, ast.Constant) and isinstance(attribute.value, str):
                 facts.attributes.append((dotted_name(node.args[0]), attribute.value))
+                if attribute.value == "__doc__" and "python-docstring-call-readers-ignored" not in breaks:
+                    # getattr(<对象>, "__doc__") 同 <对象>.__doc__（文件头「文档串的读法」）
+                    facts.doc_reads.append(dotted_name(node.args[0]) or "*")
             elif "python-getattr-allowed" not in breaks and not self.outside_module(node.args[0], unit):
-                self.refuse(facts, "getattr-variable", node)
+                names = self.fold(attribute, unit) if "python-getattr-names-unfolded" not in breaks else None
+                if names is None:
+                    self.refuse(facts, "getattr-variable", node)
+                else:
+                    facts.attributes += [(dotted_name(node.args[0]), name) for name in sorted(names)]
         if isinstance(function, ast.Name) and function.id == "globals" and self.binding("globals", unit) is None:
             self.refuse(facts, "globals-lookup", node)
+        if canonical == "inspect.getdoc" and node.args and "python-docstring-call-readers-ignored" not in breaks:
+            # inspect.getdoc(<对象>) 读 <对象> 的文档串（文件头「文档串的读法」）
+            facts.doc_reads.append(dotted_name(node.args[0]) or "*")
         if canonical == "importlib.util.spec_from_file_location" and "python-spec-paths-ignored" not in breaks:
             location = node.args[1] if len(node.args) > 1 else next((keyword.value for keyword in node.keywords if keyword.arg == "location"), None)
             values = self.path_values(location, unit) if location is not None else None
+            if values is None and location is not None:
+                values = self.registered_spec_path(location)
             if values is None:
                 self.refuse(facts, "spec-path-unfolded", node)
             else:
+                contained = None
                 for value in sorted(values):
                     file = self.file_for_value(value, [posixpath.dirname(self.absolute), self.index.root])
                     if file is None:
                         self.refuse(facts, "spec-path-missing", node)
                     else:
                         facts.loads.append(file)
+                        if contained is None:
+                            contained = self.loaded_value_contained(node, unit)
+                        if contained:
+                            facts.contained_loads.append(file)
         if canonical in ("importlib.import_module", "__import__") and node.args:
             argument = node.args[0]
             names = {argument.value} if isinstance(argument, ast.Constant) and isinstance(argument.value, str) else (
@@ -8390,7 +9664,7 @@ class PythonModule:
             texts = self.fold(command, unit)
             if texts is None:
                 if "inline-scripts-ignored" not in breaks:
-                    self.refuse_launch(facts, INLINE_FORM, node, (command, self, unit))
+                    self.refuse_launch(facts, INLINE_FORM, node, (command, self, unit), unit)
                 facts.handled.append(("shell-string", node.lineno))
                 return
             facts.inline_scripts.append(InlineScript("shell", tuple(sorted(texts)), (None,), self.working_directories(keywords, unit), where.file, where.line,
@@ -8410,16 +9684,44 @@ class PythonModule:
         else:
             alternatives = self.command_alternatives(command, unit)
         if alternatives is None:
-            self.refuse_launch(facts, COMMAND_FORM, node, (command, self, unit))
+            self.refuse_launch(facts, COMMAND_FORM, node, (command, self, unit), unit)
             facts.handled.append(("command-unfolded", node.lineno))
             return
         for elements in alternatives:
             self.command_links(elements, unit, node, facts, keywords)
 
-    def refuse_launch(self, facts, form, node, item):
-        """起子进程那一处折不出（文件头「调用方交进来的命令」）：item 是折不出的那个元素 (节点, 所在模块, 所在单元)（OPAQUE、ValueElement 与 * 展开当推不出）。
+    @staticmethod
+    def launch_texts(node, item):
+        """起子进程那一处拿去比登记表的词：折不出的那个元素，或这一处的头一个参数，照 ast.unparse。"""
+        texts = [ast.unparse(item[0])] if isinstance(item, tuple) and isinstance(item[0], ast.AST) else []
+        if node.args:
+            texts.append(ast.unparse(node.args[0]))
+        return texts
+
+    def launch_word_registered(self, node, item, unit):
+        """起子进程那一处折不出的词登在 UNKEYED_PROGRAM_WORDS 里（文件头「不拒算的程序词」）：折不出的那个元素，或这一处的头一个参数，照 ast.unparse 比。"""
+        return program_word_registered(self.source_file(), unit.short.rsplit(".", 1)[-1], self.launch_texts(node, item))
+
+    def refuse_launch(self, facts, form, node, item, unit):
+        """起子进程那一处折不出（文件头「调用方交进来的命令」）：item 是折不出的那个元素 (节点, 所在模块, 所在单元)（OPAQUE、ValueElement 与 * 展开当推不出），
+        unit 是起子进程的那个单元。登在 UNKEYED_PROGRAM_WORDS 里的不拒算（文件头「不拒算的程序词」）。
         折不出的那几截出处都推得出是函数参数、sys.argv、argparse 的属性、临时目录、根外前缀的，记进 facts.caller_launches，收闭包时判是不是入口参数
         （ScriptClosure.caller_launch_refusals）；推不出、有环境变量的当场拒算。弄坏开关 python-caller-launches-refused 下一律当场拒算。"""
+        launched = launched_programs_registered(self.source_file(), unit.short.rsplit(".", 1)[-1], self.launch_texts(node, item), self.index.root)
+        if launched is not None:
+            # 登记的被起程序（文件头）：整份连上（program_arguments 里没有它的参数，照 push_program 不剪）
+            facts.program_links.extend(launched)
+            facts.handled.append(("registered-launched-program", node.lineno))
+            return
+        if self.launch_word_registered(node, item, unit):
+            facts.handled.append(("registered-program-word", node.lineno))
+            return
+        built = built_tool_launch_source(self.source_file(), unit.short.rsplit(".", 1)[-1], self.launch_texts(node, item))
+        if built is not None:
+            # 起的是编出来的工具（BUILT_TOOL_LAUNCHES）：不拒算，编它的源码目录收闭包时收成数据目录
+            facts.built_tools.append(built)
+            facts.handled.append(("built-tool", node.lineno))
+            return
         origins = None
         if "python-caller-launches-refused" not in self.index.breaks and isinstance(item, tuple) and not isinstance(item[0], ast.Starred):
             element, module, owner = item
@@ -8889,9 +10191,13 @@ class PythonModule:
 
     def name_command_alternatives_once(self, name, unit, depth):
         function = unit.node if unit is not None and isinstance(unit.node, (ast.FunctionDef, ast.AsyncFunctionDef)) else None
-        if function is not None:
+        # 模块体的语句照函数体同一条认（循环、分支里赋的名字，for 取的字面列表）；弄坏开关 python-module-body-commands-unfolded 下不认
+        scope = function
+        if function is None and unit is not None and unit.kind == "module-body" and "python-module-body-commands-unfolded" not in self.index.breaks:
+            scope = ast.Module(body=list(unit.nodes or []), type_ignores=[])
+        if scope is not None:
             assigned, appended = [], []
-            for statement in walk_function_statements(function):
+            for statement in walk_function_statements(scope):
                 if isinstance(statement, ast.Assign):
                     for target in statement.targets:
                         if isinstance(target, ast.Name) and target.id == name:
@@ -8917,8 +10223,14 @@ class PythonModule:
                     if statement.func.attr == "insert" or len(statement.args) != 1:
                         return None
                     appended.append((statement.func.attr, statement.args[0]))
-            arguments = function.args
-            parameters = [argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs]
+            arguments = function.args if function is not None else None
+            parameters = [argument.arg for argument in arguments.posonlyargs + arguments.args + arguments.kwonlyargs] if arguments is not None else []
+            if assigned and function is None:
+                # 模块体里循环、分支赋的之外，模块顶层赋的那几处也是取法；顶层绑的不是单个名字的赋值（def、import、拆包）认不出
+                for candidate in self.by_name.get(name, ()):
+                    if candidate.kind != "assign" or not isinstance(candidate.node, ast.Assign) or not all(isinstance(target, ast.Name) for target in candidate.node.targets):
+                        return None
+                    assigned.append(candidate.node.value)
             if assigned:
                 # command = [..., *command] 一类引用自己的赋值：里面的 command 是别的那几处赋的值
                 own = [value for value in assigned if any(isinstance(inner, ast.Name) and inner.id == name for inner in ast.walk(value))]
@@ -8948,7 +10260,7 @@ class PythonModule:
                 bases = self.parameter_command_alternatives(unit, name, depth)
                 if bases is None:
                     return None
-            elif appended:
+            elif appended and function is not None:
                 bases = [[]]
             else:
                 bases = None
@@ -9127,7 +10439,7 @@ class PythonModule:
                     facts.toolchain_queries.append(node.lineno)
                     facts.handled.append(("toolchain-query", node.lineno))
                     return
-                self.refuse_launch(facts, COMMAND_FORM, node, elements[head])
+                self.refuse_launch(facts, COMMAND_FORM, node, elements[head], unit)
                 facts.handled.append(("head-unfolded", node.lineno))
                 return
             values[head] = copied
@@ -9198,7 +10510,7 @@ class PythonModule:
                     # 登记表点名的程序是环境探针（文件头「登记表点名的程序」）：退出码与输出由调用方处置（前提每趟现判、版本经 environment-of: 进键），不连、不拒算
                     facts.handled.append(("environment-probe", node.lineno))
                 elif values[argument] is None:
-                    self.refuse_launch(facts, "subprocess-path-unfolded", node, elements[argument])
+                    self.refuse_launch(facts, "subprocess-path-unfolded", node, elements[argument], unit)
                 else:
                     cwd_unfolded = "cwd" in keywords and not self.path_values(keywords["cwd"], unit, directory=True)
                     launched = launch_arguments(elements, values, argument + 1)
@@ -9214,17 +10526,21 @@ class PythonModule:
                                 facts.handled.append(("outside-script", node.lineno))
                             continue
                         if file is None:
-                            self.refuse(facts, "subprocess-path-missing", node)
+                            # 折得出、根里没有的路径（{tree} 这类模板）：登了的照登记办，没登记的照旧拒算（文件头「登记的被起程序」）
+                            self.refuse_launch(facts, "subprocess-path-missing", node, elements[argument], unit)
                         else:
                             facts.program_links.append(file)
                             # 程序入口带参数（文件头「程序入口带参数」）：脚本之后的词带过去，被起的那份照它们剪
                             facts.program_arguments.setdefault(file, []).append(launched)
+                            facts.shell_launch_words.setdefault(file, []).append(shell_launch_choices(elements, values, argument + 1))
                 position = argument + 1
                 continue
             if mode == "inline":
                 if "inline-scripts-ignored" in breaks:
                     return
                 texts = values[argument + 1] if argument + 1 < len(values) else None
+                if texts is None and not python:
+                    texts = self.registry_command_texts(unit, facts)
                 if texts is None and not python and argument + 1 < len(values) and self.declared_check_runner(elements[argument + 1]):
                     # 上游 preflight 跑脚本文件头登记的 check 判据：判据正文在各份声明它的脚本里，从那些脚本连（ScriptClosure.declared_checks）
                     facts.handled.append(("declared-checks", node.lineno))
@@ -9232,7 +10548,7 @@ class PythonModule:
                 after = [values[position] if values[position] is not None else
                          (element_call(position, "path_values") or element_call(position, "path_values", True))
                          for position in range(argument + 2, len(values))]
-                self.inline_from_command(facts, node, "python" if python else "shell", texts, after, bases,
+                self.inline_from_command(facts, node, "python" if python else "shell", texts, after, bases, unit,
                                          source=elements[argument + 1] if argument + 1 < len(elements) else None)
                 if python and texts is not None and "inline-argv-commands-ignored" not in breaks:
                     # 正文把 sys.argv[k:] 当命令起：sys.argv[1] 是串之后那一个元素，从第 k 个起是一条命令
@@ -9249,7 +10565,7 @@ class PythonModule:
                     return
                 feed = keywords.get("input")
                 texts = self.fold(feed, unit) if feed is not None else None
-                self.inline_from_command(facts, node, "python" if python else "shell", texts, values[argument + 1:], bases, stdin=True)
+                self.inline_from_command(facts, node, "python" if python else "shell", texts, values[argument + 1:], bases, unit, stdin=True)
                 return
             return
         if interpreters == 0:
@@ -9260,6 +10576,22 @@ class PythonModule:
                     facts.program_links.append(file)
             facts.handled.append(("program", node.lineno))
 
+    def registry_command_texts(self, unit, facts):
+        """bash -c 的串是这个函数从登记表读进来的（文件头「登记表里的命令」）→ 那一列的命令（集合；表不在是空集合），登记表记进 facts.registry_reads；没登记 → None。"""
+        if "python-registry-command-texts-refused" in self.index.breaks:
+            return None
+        registered = REGISTRY_COMMAND_TEXTS.get((self.source_file(), unit.short.rsplit(".", 1)[-1]))
+        if registered is None:
+            return None
+        table, column = registered
+        path = os.path.join(self.index.root, table)
+        if not os.path.isfile(path):
+            return set()
+        facts.registry_reads.append(table)
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            rows = [line.rstrip("\n").split("\t") for line in handle if line.strip() and not line.lstrip().startswith("#")]
+        return {row[column].strip() for row in rows if len(row) > column and row[column].strip()}
+
     def declared_check_runner(self, item):
         """上游 preflight.py 里跑 check 判据的那一处：bash -c declaration.command（判据是被判脚本文件头里登记的那几行）。"""
         if item is OPAQUE or isinstance(item, ValueElement) or "declared-checks-ignored" in self.index.breaks:
@@ -9268,13 +10600,23 @@ class PythonModule:
         return self.path.endswith(PREFLIGHT_MODULE) and isinstance(element, ast.Attribute) and element.attr == "command" and \
             isinstance(element.value, ast.Name) and element.value.id == "declaration"
 
-    def inline_from_command(self, facts, node, language, texts, after, bases, stdin=False, source=None):
+    def inline_from_command(self, facts, node, language, texts, after, bases, unit, stdin=False, source=None):
         """命令里 -c 的串、input= 喂的标准输入：正文折得出记成一份 InlineScript，折不出拒算 inline-script-not-literal。
         after 是串之后（标准输入时是解释器选项之后）那几个元素的取值：python 的 sys.argv[1:]；bash 的 -c 是 $0 $1 …，标准输入是 $1 …。
-        source 是 -c 那一串的元素（折不出时看它的出处：调用方交进来的不当场拒算，refuse_launch）。"""
+        unit 是起子进程的那个单元；source 是 -c 那一串的元素（折不出时看它的出处：调用方交进来的不当场拒算，refuse_launch）。"""
         if texts is None:
-            self.refuse_launch(facts, INLINE_FORM, node, source)
+            self.refuse_launch(facts, INLINE_FORM, node, source, unit)
             return
+        if language == "shell" and "python-registered-inline-launches-analyzed" not in self.index.breaks:
+            # 这一条起法整条登记过（文件头「登记的被起程序」「不拒算的程序词」）：正文是字面的也不拆开认（$1… 换不进去的那几处会拒算），照登记办
+            launched = launched_programs_registered(self.source_file(), unit.short.rsplit(".", 1)[-1], self.launch_texts(node, source), self.index.root)
+            if launched is not None:
+                facts.program_links.extend(launched)
+                facts.handled.append(("registered-launched-program", node.lineno))
+                return
+            if self.launch_word_registered(node, source, unit):
+                facts.handled.append(("registered-program-word", node.lineno))
+                return
         argv = tuple(frozenset(value) if value is not None else None for value in after)
         if language == "shell" and stdin:
             argv = (None,) + argv
@@ -9363,6 +10705,7 @@ done
 KEPT_SHELL_COMMENT = re.compile(r"(?:^|[\s;&|()])(#\s*(?:[A-Za-z][A-Za-z0-9_-]*:|shellcheck\b).*)$")
 FUNCTION_HEADER = re.compile(r"^( *)function (\S+) \(\) $")
 HEREDOC_START = re.compile(r"(?<!<)<<(?!<)(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+HEREDOC_BODY_PLACED = ("heredoc-body", None)   # ShellIndex.resolve_inline 记在 state["placed"] 里：这个单元上一份喂给 python 的 here-doc 正文落在哪一行
 TOP_ASSIGNMENT = re.compile(r"^    (?:(?:export|readonly|declare|typeset)(?: -[A-Za-z]+)* )?([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\+?=")
 ASSIGNMENT_WORD = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(?:\[(?:[^\[\]]|\[[^\]]*\])*\])?\+?=(.*)$", re.S)
 SHELL_KEYWORDS = frozenset(("if", "then", "else", "elif", "fi", "do", "done", "while", "until", "!", "{", "}", "time", "esac", "coproc"))
@@ -9406,6 +10749,66 @@ def shell_normal_forms(contents):
             else:
                 forms.append(None)
         return forms
+
+
+# 规范文本里写在 if 条件上的 here-doc：bash 在连接符处才补打延后的正文，条件那一行以「<<词; then」收尾，正文打在 then 那一串的头一条命令之后
+SHELL_DEFERRED_HEREDOC = re.compile(r"^(.*<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2); then$")
+
+
+def raw_heredoc_bodies(raw_rows):
+    """原文里每个 here-doc → {词: [正文的行…]…}（找不到收尾那一行的不算）。"""
+    bodies = collections.defaultdict(list)
+    for position, row in enumerate(raw_rows):
+        for found in HEREDOC_START.finditer(row):
+            delimiter, strip_tabs = found.group(3), found.group(1) == "-"
+            end = next((later for later in range(position + 1, len(raw_rows))
+                        if (raw_rows[later].lstrip("\t") if strip_tabs else raw_rows[later]) == delimiter), None)
+            if end is not None:
+                bodies[delimiter].append(raw_rows[position + 1:end])
+    return bodies
+
+
+def raw_heredoc_rows(raw_rows):
+    """原文里每个 here-doc → [(<<词 所在的行号, 正文头一行的行号, 正文的行（元组）)…]，行号从 1 起；<<- 的正文去掉行首制表符；
+    一行里几个 <<词 的正文一份接一份往下排；找不到收尾那一行的不算（同 raw_heredoc_bodies）。"""
+    out = []
+    for position, row in enumerate(raw_rows):
+        cursor = position + 1   # 这一行上下一份正文从哪一行（下标）起
+        for found in HEREDOC_START.finditer(row):
+            delimiter, strip_tabs = found.group(3), found.group(1) == "-"
+            end = next((later for later in range(cursor, len(raw_rows))
+                        if (raw_rows[later].lstrip("\t") if strip_tabs else raw_rows[later]) == delimiter), None)
+            if end is None:
+                break
+            out.append((position + 1, cursor + 1, tuple(line.lstrip("\t") if strip_tabs else line for line in raw_rows[cursor:end])))
+            cursor = end + 1
+    return out
+
+
+def deferred_heredocs_moved_back(rows, raw_rows):
+    """规范文本里「<条件> <<词; then」：正文与收尾那一行挪回条件那一行后面，写成「<条件> <<词」、正文、词、「 then」、then 那一串已经打出来的那几行，
+    同这个 if 不在连接符里时 bash 打的样子。正文从原文取（规范文本里紧贴收尾那一行之前、逐行对得上的最长一份）；对不上的不动。"""
+    if not any(SHELL_DEFERRED_HEREDOC.match(row) for row in rows):
+        return rows
+    bodies = raw_heredoc_bodies(raw_rows)
+    out, position = [], 0
+    while position < len(rows):
+        row = rows[position]
+        found = SHELL_DEFERRED_HEREDOC.match(row)
+        close = next((later for later in range(position + 1, len(rows)) if rows[later] == found.group(3)), None) if found else None
+        fitting = [] if close is None else [len(body) for body in bodies.get(found.group(3), ())
+                                            if position < close - len(body) and rows[close - len(body):close] == body]
+        if not fitting:
+            out.append(row)
+            position += 1
+            continue
+        first_body = close - max(fitting)
+        out.append(found.group(1))
+        out.extend(rows[first_body:close + 1])
+        out.append(" then")
+        out.extend(rows[position + 1:first_body])
+        position = close + 1
+    return out
 
 
 def heredoc_mask(rows):
@@ -9481,15 +10884,21 @@ def rows_inside_quotes(rows, mask):
 
 
 SHELL_POSITIONAL_REFERENCE = re.compile(r'"\$\{?([1-9])(?::-)?\}?"|\$\{([1-9])(?::-)?\}|\$([1-9])(?![0-9])')
+# 起法里折不出的词从这里起（文件头「shell 起法带字面参数」）：(字面词…, SHELL_OPEN_TAIL)
+SHELL_OPEN_TAIL = "\0open-tail"
 # 位置参数从这里起就可能变了（shift、set --）或要按轮取（循环）：从头一处起不再代入
 SHELL_ARGUMENTS_MOVED = re.compile(r"(?:^|[\s;&|(])(?:shift|while|until|for|select|set\s+--|set\s+-(?=\s))(?=$|[\s;&|)])")
+# 项目脚本开头那一句（.claude/scripts/preflight.sh）：preflight 只摘掉 --force，别的参数照次序放回，位置参数没动
+SHELL_PREFLIGHT_ARGUMENTS_RESTORED = re.compile(r'^\s*set -- \$\{PREFLIGHT_ARGUMENTS\[@\]\+"\$\{PREFLIGHT_ARGUMENTS\[@\]\}"\};?$')
+SHELL_EXIT_ROW = re.compile(r"^\s*exit(?: [^;|&]*)?;?$")
 SHELL_DECIDABLE_IF = re.compile(r"^(\s*)if \[\[ (\S+) (==|!=) (\S+) \]\]; then$")
 SHELL_DECIDABLE_CASE = re.compile(r"^(\s*)case (\S+) in\s*$")
 
 
 def substituted_positionals(text, words):
     """脚本体正文里头一处 shift / set -- / 循环之前的 "$1" "${1}" "${1:-}" $1 …（单引号里的不算）代成字面参数：
-    引号外的写成 shlex.quote 的词，双引号里的照双引号的转义写；参数没给的代成空串。"""
+    引号外的写成 shlex.quote 的词，双引号里的照双引号的转义写；参数没给的代成空串。
+    words 以 SHELL_OPEN_TAIL 收尾的（开口的一串）：字面词那几个位置照代，后面的位置不知道、照原样留着。"""
     rows = text.split("\n")
     mask = heredoc_mask(rows)
     inside = rows_inside_quotes(rows, mask)
@@ -9497,13 +10906,24 @@ def substituted_positionals(text, words):
     for row in rows:
         starts.append(offset)
         offset += len(row) + 1
-    # here-doc 正文与引号里的那几行不算（python 的 here-doc 里的 for 不是这份脚本的循环）；单引号里的一截先去掉再找
-    cut = next((starts[position] for position, row in enumerate(rows) if position not in mask and position not in inside
-                and SHELL_ARGUMENTS_MOVED.search(re.sub(r"'[^']*'", "''", row))), len(text))
-    masked_spans = {starts[position]: starts[position] + len(rows[position]) for position in mask}
+    open_tail = words[-1:] == (SHELL_OPEN_TAIL,)
+    known = words[:-1] if open_tail else words
+    restored = "--force" not in known and "shell-preflight-arguments-moved" not in active_breaks()
+
+    def moves_arguments(row):
+        if restored and SHELL_PREFLIGHT_ARGUMENTS_RESTORED.match(row):
+            return False
+        return SHELL_ARGUMENTS_MOVED.search(re.sub(r'"(?:[^"\\]|\\.)*"', '""', re.sub(r"'[^']*'", "''", row)))
+    # here-doc 正文与引号里的那几行不算（python 的 here-doc 里的 for 不是这份脚本的循环）；一行里引号括着的一截先去掉再找
+    cut = next((starts[position] for position, row in enumerate(rows) if position not in mask and position not in inside and moves_arguments(row)), len(text))
+    # 空行不进：长度 0 的 span 不让 i 前进，循环出不来。弄坏开关 shell-heredoc-empty-rows-spanned 下收回去，走到那一处抛，不真转死
+    keeps_empty_rows = "shell-heredoc-empty-rows-spanned" in active_breaks()
+    masked_spans = {starts[position]: starts[position] + len(rows[position]) for position in mask if rows[position] or keeps_empty_rows}
     out, i, quoted = [], 0, False
     while i < cut:
         if i in masked_spans:
+            if masked_spans[i] == i:
+                raise FunctionUnitsError(f"代位置参数在第 {text.count(chr(10), 0, i) + 1} 行（here-doc 里的空行）不前进：弄坏开关 shell-heredoc-empty-rows-spanned 下才有长度 0 的 span")
             out.append(text[i:masked_spans[i]])
             i = masked_spans[i]
             continue
@@ -9521,7 +10941,11 @@ def substituted_positionals(text, words):
         found = SHELL_POSITIONAL_REFERENCE.match(text, i) if character in "$\"" else None
         if found and not (quoted and found.group(0).startswith('"')):
             position = int(next(group for group in found.groups() if group))
-            value = words[position - 1] if position <= len(words) else ""
+            if open_tail and position > len(known):
+                out.append(found.group(0))
+                i = found.end()
+                continue
+            value = known[position - 1] if position <= len(known) else ""
             if quoted:
                 out.append(re.sub(r'([\\"$`])', r"\\\1", value))
             else:
@@ -9535,15 +10959,18 @@ def substituted_positionals(text, words):
     return "".join(out) + text[cut:]
 
 
-def pruned_decided_branches(rows):
+def pruned_decided_branches(rows, undecided_dropped=False):
     """代过参数之后判得出真假的 if [[ <字面> == / != <字面> ]]; then … fi（不带 elif；带 else 的留判得出的那一支）与 case <字面> in …
-    （分支的模式都是字面、没有 ;& ;;&：只留头一个对得上的分支，判不出的那个分支起照留）：走不到的那几行抹空（行数不变）。"""
+    （分支的模式都是字面、没有 ;& ;;&：只留头一个对得上的分支，判不出的那个分支起照留）：走不到的那几行抹空（行数不变）。
+    脚本体顶层（缩进 4）的 if 走到的那一支以 exit 收尾：fi 之后的整段都走不到，一并抹空（弄坏开关 shell-exit-branches-followed 下不抹）。
+    undecided_dropped 只给弄坏开关 shell-entry-undecided-branches-dropped（ScriptClosure.run 的 shell 入口）：判不出真假的 if [[ … ]] 当不成立。"""
     rows = list(rows)
     for start, row in enumerate(rows):
         found = SHELL_DECIDABLE_IF.match(row)
         if found:
             left, right = literal_word(found.group(2)), literal_word(found.group(4))
-            if left is None or right is None or (found.group(4)[:1] not in "'\"" and any(mark in right for mark in "*?[")):
+            undecided = left is None or right is None or (found.group(4)[:1] not in "'\"" and any(mark in right for mark in "*?["))
+            if undecided and not undecided_dropped:
                 continue
             indent = found.group(1)
             other, end = None, None
@@ -9558,10 +10985,16 @@ def pruned_decided_branches(rows):
                     break
             if end is None or other == "elif":
                 continue
-            holds = (left == right) == (found.group(3) == "==")
+            holds = not undecided and (left == right) == (found.group(3) == "==")
             dead = range(other + 1, end) if holds and other is not None else range(start + 1, other if other is not None else end) if not holds else ()
             for position in dead:
                 rows[position] = ""
+            taken = (range(start + 1, other if other is not None else end) if holds else range(other + 1, end) if other is not None else ())
+            last = next((rows[position] for position in reversed(taken) if rows[position].strip()), "")
+            if indent == "    " and last.startswith(indent + "    ") and not last.startswith(indent + "     ") and SHELL_EXIT_ROW.match(last) \
+                    and "shell-exit-branches-followed" not in active_breaks():
+                for position in range(end + 1, len(rows)):
+                    rows[position] = ""
             continue
         found = SHELL_DECIDABLE_CASE.match(row)
         if not found or literal_word(found.group(2)) is None:
@@ -9604,11 +11037,178 @@ def pruned_decided_branches(rows):
     return rows
 
 
-def narrowed_shell_body(text, words):
+def narrowed_shell_body(text, words, undecided_dropped=False):
     """shell 起法带字面参数（文件头「shell 起法带字面参数」）：脚本体正文代进参数（substituted_positionals）、抹掉判得出走不到的分支
-    （pruned_decided_branches）。弄坏开关 shell-program-arguments-unnarrowed 下不剪（ScriptClosure.push_program）。"""
+    （pruned_decided_branches；undecided_dropped 照它）。弄坏开关 shell-program-arguments-unnarrowed 下不剪（ScriptClosure.push_program）。"""
     substituted = substituted_positionals(text, words)
-    return "\n".join(pruned_decided_branches(substituted.split("\n")))
+    return "\n".join(pruned_decided_branches(substituted.split("\n"), undecided_dropped))
+
+
+# 按第一列选行的表（文件头「shell 起法带字面参数」）：<脚本> → 它的表的变量名。带字面的实验号起时只跑第一列是这几个号的行，别的行写的驱动函数走不到
+SHELL_ROW_SELECTED_TABLES = {"scripts/experiment-apparatus/replay.sh": ("TABLE", "ADMISSION_ROW_KEYS")}
+SHELL_TABLE_ASSIGNMENT = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)=\$\(cat <<'([A-Za-z_][A-Za-z0-9_]*)'$")
+
+
+SHELL_TABLE_ROW_DRIVER = re.compile(r"@([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def table_data_rows(rows, tables):
+    """正文（按行）里 tables 点名的那几张表（<名>=$(cat <<'词' …）的数据行：(下标, 表名)，按次序。"""
+    position = 0
+    while position < len(rows):
+        found = SHELL_TABLE_ASSIGNMENT.match(rows[position])
+        position += 1
+        if not found or found.group(1) not in tables:
+            continue
+        while position < len(rows) and rows[position] != found.group(2):
+            yield position, found.group(1)
+            position += 1
+
+
+def table_row_key(row):
+    """表行的第一列：到 | / 制表符为止。"""
+    return re.split(r"[|\t/]", row, maxsplit=1)[0]
+
+
+def table_row_identity(row, table, tables):
+    """表行的身份：replay.sh 的 ROW_ORDINAL 认的「实验号|二进制|参数」（复跑表的前三列）。tables 头一张（复跑表）的行取它自己的前三列，
+    别的表（准入键表 ADMISSION_ROW_KEYS）的行取制表符分隔的第二列（那一列原样抄复跑表那一行的前三列）；没有第二列的交 None。"""
+    if table == tables[0]:
+        return "|".join((row.split("|") + ["", ""])[:3])
+    fields = row.split("\t")
+    return fields[1] if len(fields) > 1 else None
+
+
+def table_row_selection(words):
+    """起法的词 → (点名的实验号集合, {被 --item 点到的实验号: 点名的行序号集合})，照 replay.sh 读参数的写法：--item 后面那个词是行项
+    <实验号>.<行序号>（实验号取最后一个 . 之前、行序号取它之后，同 ${item%.*} 与 ${item##*.}；没有 . 的整个词既当实验号又当行序号），
+    别的不带 - 起头的词是实验号。两样都空的是不带参数、只带选项的起法。
+    弄坏开关 shell-table-row-items-unmatched 下行项照实验号认（整个词拿去比第一列，哪一行都对不上，那几行的驱动不连）。"""
+    experiments, items, expecting = set(), {}, False
+    unmatched = "shell-table-row-items-unmatched" in active_breaks()
+    for word in words:
+        if expecting:
+            expecting = False
+            if not unmatched:
+                experiment, dot, ordinal = word.rpartition(".")
+                items.setdefault(experiment if dot else word, set()).add(ordinal)
+                continue
+        elif word == "--item":
+            expecting = True
+            continue
+        if not word.startswith("-"):
+            experiments.add(word)
+    return experiments, items
+
+
+def selected_row_identities(reference_rows, tables, items):
+    """被 --item 点到的行的身份（table_row_identity）：数 reference_rows 里复跑表（tables 头一张）的行，同 replay.sh 读复跑表的写法——
+    第一列以 E 起头的才数，每个实验号从 1 数起；同一个身份写了几行的取最后那一行的序号（ROW_ORDINAL 一个身份记一个序号）。"""
+    ordinal_of, counts = {}, collections.Counter()
+    for position, table in table_data_rows(reference_rows, tables[:1]):
+        row = reference_rows[position]
+        experiment = row.split("|", 1)[0]
+        if not experiment.startswith("E"):
+            continue
+        counts[experiment] += 1
+        ordinal_of[table_row_identity(row, table, tables)] = str(counts[experiment])
+    return {identity for identity, ordinal in ordinal_of.items() if ordinal in items.get(identity.split("|", 1)[0], ())}
+
+
+def table_rows_selected(rows, tables, words, reference_rows=None):
+    """起法的词 → rows 里 tables 那几张表这一趟跑得到的数据行（下标的集合）；一个实验号、一个行项都没点名的（不带参数、只带选项）交 None，整张表照跑。
+    照 replay.sh 的 want_row：没被 --item 点到的实验号那几行都跑，被点到的实验号只跑点名的那几行（身份对上 selected_row_identities 的）。
+    行序号从 reference_rows（不给就是 rows）里的复跑表数：准入键表的变量单元里没有复跑表，调用方交整份脚本体。"""
+    experiments, items = table_row_selection(words)
+    if not experiments and not items:
+        return None
+    identities = selected_row_identities(rows if reference_rows is None else reference_rows, tables, items) if items else set()
+    selected = set()
+    for position, table in table_data_rows(rows, tables):
+        key = table_row_key(rows[position])
+        if key in items:
+            if table_row_identity(rows[position], table, tables) in identities:
+                selected.add(position)
+        elif key in experiments:
+            selected.add(position)
+    return selected
+
+
+def rows_of_selected_keys(text, tables, words, reference=None):
+    """脚本体正文里 tables 点名的那几张表：这一趟跑不到的行（table_rows_selected）抹空；不带参数、只带选项的起法整张表照跑，不抹。
+    reference 是数行序号用的整份脚本体（不给就是 text）。"""
+    rows = text.split("\n")
+    selected = table_rows_selected(rows, tables, words, None if reference is None else reference.split("\n"))
+    if selected is None:
+        return text
+    for position, _table in table_data_rows(rows, tables):
+        if position not in selected:
+            rows[position] = ""
+    return "\n".join(rows)
+
+
+def table_drivers_of_unselected_rows(text, tables, launches):
+    """脚本体正文里 tables 点名的那几张表：只写在每一次起法（launches，一次起法一组词）都跑不到的那几行的 @驱动函数
+    （有一次起法跑得到的行也写到的不算；弄坏开关 shell-row-driver-selected-rows-dropped 下也算）。整张表照跑的那一次起法这里不算它跑得到哪一行
+    （调用方 ScriptClosure.table_unselected_drivers 在那种情形下不来问，只有弄坏开关 shell-row-driver-whole-launch-dropped 下照问）。"""
+    rows = text.split("\n")
+    reached = set()
+    for words in launches:
+        reached |= table_rows_selected(rows, tables, words) or set()
+    other, named = set(), set()
+    for position, _table in table_data_rows(rows, tables):
+        (named if position in reached else other).update(SHELL_TABLE_ROW_DRIVER.findall(rows[position]))
+    if "shell-row-driver-selected-rows-dropped" in active_breaks():
+        return frozenset(other)
+    return frozenset(other - named)
+
+
+def written_only_as_table_row(text, name):
+    """text 里写到 name 的每一处都是 @<名>（表行的身份）或 <名>()（定义），没有一处能起它。词的边界同 SHELL_WORDS。
+    弄坏开关 shell-row-driver-plain-words-dropped 下不带 @ 的词也算。"""
+    if "shell-row-driver-plain-words-dropped" in active_breaks():
+        return True
+    return re.search(rf"(?<![@A-Za-z0-9_.:-]){re.escape(name)}(?![A-Za-z0-9_.:-]|\s*\(\))", text) is None
+
+
+def shell_launch_prefix(words):
+    """bash <脚本> 后面的词的字面值（折不出的是 None）→ 这一处起法（文件头「shell 起法带字面参数」）：全字面的原样；折不出的词之前有字面词的，字面词接 SHELL_OPEN_TAIL；
+    头一个就折不出 → None（那份脚本体整份收）。弄坏开关 shell-open-tail-unnarrowed 下有一个折不出就 None。"""
+    if None not in words:
+        return words
+    known = words[:words.index(None)]
+    return known + (SHELL_OPEN_TAIL,) if known and "shell-open-tail-unnarrowed" not in active_breaks() else None
+
+
+# 命令位置上的词前面那一截（word_line 找拒算行用）：命令分隔与 then / do / else 之后，隔着空白与一个双引号
+COMMAND_POSITION_BEFORE_WORD = r'(?:&&|\|\||[;|({!]|\bthen|\bdo|\belse)\s*"?'
+# env 数组里的一项赋值（NAME=值，值带不带引号都算）：数组头一个词是 env 时这些项是 env 的赋值，不是命令词
+SHELL_ENV_ARRAY_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SHELL_QUOTED_ASSIGNMENT = re.compile(r'^"[A-Za-z_][A-Za-z0-9_]*=')
+
+
+def shell_position_values(words):
+    """command_positions 用的逐词字面值：折不出而整个词是带引号的 NAME=…（env "X=$y" nice … 的一条赋值）占成 NAME=…，命令位置接着往后认（同 python 一侧 environment_assignment_shape）。
+    弄坏开关 shell-quoted-assignments-unread 下照 literal_word。"""
+    values = [literal_word(word) for word in words]
+    if "shell-quoted-assignments-unread" in active_breaks():
+        return values
+    return [word[1:].split("=", 1)[0] + "=…" if value is None and SHELL_QUOTED_ASSIGNMENT.match(word) else value for word, value in zip(words, values)]
+
+
+def shell_known_words(words):
+    """python3 <脚本> 后面的词（规范文本里的写法）→ KnownWords（文件头「shell 起 python」）：字面的是那个词，整个在一对双引号里、里面不是 $@、$*、[@]、[*] 的是不知道的一个词（None），
+    别的（不带引号的展开、拼着展开的、带通配的）从那里起是开口的一串。"""
+    known = []
+    for word in words:
+        literal = literal_word(word)
+        if literal is not None and (word[:1] in ("'", '"') or not any(mark in literal for mark in "*?[")):
+            known.append(literal)
+        elif len(word) >= 2 and word[0] == word[-1] == '"' and '"' not in word[1:-1] and not any(mark in word for mark in ("$@", "$*", "[@]", "[*]")):
+            known.append(None)
+        else:
+            return KnownWords(tuple(known), False)
+    return KnownWords(tuple(known), True)
 
 
 def heredoc_bodies(rows):
@@ -9752,6 +11352,10 @@ def double_quote_end(text, start):
     return len(text)
 
 
+# 进程替换 <( … ) / >( … ) 在外面那条命令的词里占的那个词（运行期 bash 换成 /dev/fd/N）
+PROCESS_SUBSTITUTION_WORD = "/dev/fd/63"
+
+
 def split_commands(text, redirect_targets_as_commands=False, redirects=None, details=None):
     """规范文本 → [[词…]…]：按 ; && || | & ( ) 与换行切成简单命令，词里引号与 $(…) ${…} 原样留着；重定向和它的目标丢掉
     （重定向的目标是写数据、读数据的路径，不是装代码的位置）。redirect_targets_as_commands 只给弄坏开关
@@ -9767,6 +11371,9 @@ def split_commands(text, redirect_targets_as_commands=False, redirects=None, det
     i, total = 0, len(text)
     structured = "shell-command-structure-ignored" not in active_breaks()
     cases = []   # 每层 case 此刻在认什么：pattern（分支的模式）/ body（分支里的命令）
+    # 进程替换括号里的命令：外面那条命令收尾之后再排进去（重定向记的「第几条命令」不因此错位）；
+    # 每项 (括号里切出的命令, 它们的重定向, 重定向的细节, 括号里那段在 text 里起头的下标)，排进去时把「第几条命令」与下标换算到外面这一份上
+    pending = []
 
     def end_word():
         nonlocal redirect_target
@@ -9792,6 +11399,16 @@ def split_commands(text, redirect_targets_as_commands=False, redirects=None, det
                 cases.pop()
             commands.append(list(words))
             words.clear()
+        for inner_commands, inner_redirects, inner_details, offset in pending:
+            base = len(commands)
+            commands.extend(inner_commands)
+            if "shell-process-substitution-redirects-dropped" in active_breaks():
+                continue
+            if redirects is not None:
+                redirects.extend((base + index, operator, target) for index, operator, target in inner_redirects)
+            if details is not None:
+                details.extend((base + index, operator, target, offset + start, descriptor) for index, operator, target, start, descriptor in inner_details)
+        pending.clear()
 
     while i < total:
         character = text[i]
@@ -9877,11 +11494,25 @@ def split_commands(text, redirect_targets_as_commands=False, redirects=None, det
             continue
         if character in "<>":
             if character in "<>" and text.startswith("(", i + 1) and "shell-substitutions-ignored" not in active_breaks():
-                # 进程替换 <( … ) / >( … )：括号里是要跑的命令，照命令切（左括号在下一圈当分隔）；
+                # 进程替换 <( … ) / >( … )：括号里是要跑的命令，照命令切；
                 # 「< <( … )」前面那个 < 的目标就是这个进程替换，不是括号里的第一个词
+                if "shell-process-substitution-splits-command" in active_breaks():
+                    # 弄坏开关：左括号在下一圈当分隔，外面那条命令在这里断开
+                    end_word()
+                    redirect_target = False
+                    i += 1
+                    continue
+                # 括号里的命令各成一条、排在外面那条命令之后；外面那条命令接着认：进程替换在它的词里占一个词（运行期是 /dev/fd/N），
+                # 当重定向目标的不占词
+                was_target = redirect_target and not word
                 end_word()
                 redirect_target = False
-                i += 1
+                close = matching_close(text, i + 1, "(", ")")
+                inner_redirects, inner_details = [], []
+                pending.append((split_commands(text[i + 2:close], redirect_targets_as_commands, inner_redirects, inner_details), inner_redirects, inner_details, i + 2))
+                if not was_target:
+                    words.append(PROCESS_SUBSTITUTION_WORD)
+                i = close + 1
                 continue
             redirect_descriptor = None
             if word and "".join(word).isdigit():
@@ -10012,6 +11643,11 @@ def leading_command_words(command):
     return words
 
 
+def in_skipped_directory(relative):
+    """相对根的文件路径经过 SKIPPED_DIRECTORIES 里的目录（编译产物 target、.git、缓存）。"""
+    return any(part in SKIPPED_DIRECTORIES for part in relative.split("/")[:-1])
+
+
 def tree_copy_file(root, tail, directory=False):
     """「<折不出的目录>/<字面尾巴>」→ 尾巴里最长的、至少两段、在根里存在的那一截（相对根）；没有 → None。
     临时树、仓副本、worktree 里的同一相对路径按根里那一份算：拷进去的是它，替身也只会让闭包多收不会少收。"""
@@ -10107,12 +11743,12 @@ class ShellFacts:
     """invocations：[(写法, 词, cd 过去的目录词或 None, 附带)]，写法 source / shell / python / exec / python-module / python-inline / shell-inline /
     inline-unknown（附带见 command_facts）；handled：每个解释器词各记一条它按哪一种写法认的（只给量全仓的人看，不进判定）。"""
     __slots__ = ("commands", "words", "command_words", "variable_references", "assignments", "local_names", "invocations", "programs", "directory",
-                 "generated", "handled")
+                 "generated", "handled", "exported")
 
     def __init__(self):
         self.commands, self.words, self.variable_references, self.generated = [], set(), set(), {}
         self.command_words, self.assignments, self.invocations, self.programs = set(), collections.defaultdict(list), [], set()
-        self.local_names, self.directory, self.handled = set(), None, []
+        self.local_names, self.directory, self.handled, self.exported = set(), None, [], set()
 
 
 GENERATOR_HEADS = frozenset(("printf", "echo"))
@@ -10196,6 +11832,8 @@ class ShellFile:
             self.refusals.append(Refusal("bash-syntax", self.path, 1, snippet_of(self.rows[0] if self.rows else "")))
             return
         body = lines[2:-1]
+        if "shell-deferred-heredocs-unmoved" not in self.breaks:
+            body = deferred_heredocs_moved_back(body, self.rows)
         mask = set() if "shell-heredoc-split" in self.breaks else heredoc_mask(body)
         quoted = set() if "shell-function-bounds-quote-blind" in self.breaks else rows_inside_quotes(body, mask)
         functions = []
@@ -10231,7 +11869,17 @@ class ShellFile:
             text = "\n".join(body[start:end + 1])
             first_line, last_line, cursor = self.original_lines(name, cursor)
             unit = Unit("shell", "function", qualified, self.path, first_line, last_line, sha256_text(text))
-            unit.short, unit.body, unit.container = name, text, parent
+            # 指纹照含套着的函数的全文；正文（facts 切命令、认词用的）只留这一层：套在里面的函数那几行抹空（行数不变），它们的命令只归它们自己；
+            # 全文另留在 whole_body（赋值、export 与写出的脚本照全文认：套着的函数与它的兄弟函数照旧经 container 看得见，ShellIndex.facts）
+            nested_rows = set() if "shell-nested-commands-in-outer" in self.breaks else {
+                row for inner_start, inner_end, _inner_indent, _inner_name in functions if start < inner_start and inner_end <= end
+                for row in range(inner_start, inner_end + 1)}
+            unit.short, unit.container = name, parent
+            if nested_rows:
+                unit.body = "\n".join("" if position in nested_rows else body[position] for position in range(start, end + 1))
+                unit.whole_body = text
+            else:
+                unit.body = text
             by_range[function] = unit
             self.functions[name].append(unit)
             self.units.append(unit)
@@ -10454,10 +12102,20 @@ class ShellIndex:
         return seen
 
     def facts(self, unit):
+        """单元读到的东西：照 Unit.body 切命令、认词；套着别的函数的外层函数（ShellFile.parse 留了 whole_body）赋值、local、export 与写出的脚本照全文另认一遍
+        （文件头「shell 里套在函数里的函数」外层只认自己那一层）。"""
         if unit.facts is not None:
             return unit.facts
+        facts = self.text_facts(unit.body or "")
+        if unit.whole_body is not None:
+            whole = self.text_facts(unit.whole_body)
+            facts.assignments, facts.local_names, facts.exported, facts.generated = whole.assignments, whole.local_names, whole.exported, whole.generated
+        unit.facts = facts
+        return facts
+
+    def text_facts(self, text):
+        """一段单元正文 → ShellFacts：切命令（here-doc 正文跳过）、认写出的脚本、词、变量引用，逐条命令与命令替换里的命令记进去。"""
         facts = ShellFacts()
-        text = unit.body or ""
         rows = text.split("\n")
         mask = set() if "shell-heredoc-split" in self.breaks else heredoc_mask(rows)
         visible = "\n".join("" if position in mask else row for position, row in enumerate(rows))
@@ -10470,7 +12128,6 @@ class ShellIndex:
         bodies = heredoc_bodies(rows) if mask else {}
         self.scan_commands(facts.commands, details, 0, visible, bodies, facts)
         self.scan_substitutions(visible, 0, visible, bodies, facts, 0)
-        unit.facts = facts
         return facts
 
     def scan_commands(self, commands, details, base, visible, bodies, facts):
@@ -10517,6 +12174,8 @@ class ShellIndex:
             pass
         declaration = words[0] in SHELL_DECLARATIONS
         scoped = words[0] == "local" or (words[0] in ("declare", "typeset") and "-g" not in words[1:])
+        if words[0] == "export":
+            facts.exported.update(word.split("=", 1)[0] for word in words[1:] if re.match(r"^[A-Za-z_][A-Za-z0-9_]*(?:=|$)", word))
         start = 1 if declaration else 0
         position = start
         while position < len(words):
@@ -10555,7 +12214,7 @@ class ShellIndex:
             return
         if self.interpreter_runs(words, facts, inputs, prefix):
             return
-        values = [literal_word(word) for word in words]
+        values = shell_position_values(words)
         positions = [0] if "shell-wrapped-commands-ignored" in self.breaks else command_positions(values)
         head = positions[-1]
         if head >= len(words):
@@ -10578,7 +12237,7 @@ class ShellIndex:
         """这条命令里每一个解释器词（bash / sh / python3 / python，在哪个位置都算：包装命令 env、sudo、xargs、capped.sh、
         run-with-memory-cap.sh 后面的照样认）各按它的写法记一条要装的代码；→ 认到了几个解释器词（0 交给直接执行那一条）。
         脚本之后接着往后认（bash capped.sh N python3 x.py 里的 python3 x.py）；-c 的串、标准输入喂的脚本之后的词是它的参数，不再往后认。"""
-        values = [literal_word(word) for word in words]
+        values = shell_position_values(words)
         positions = command_positions(values)
         found, position = 0, 0
         while position < len(words):
@@ -10600,7 +12259,7 @@ class ShellIndex:
                 if descriptor is not None:
                     self.stdin_script(language, words[position], words[argument + 1:], inputs, descriptor, facts, environment)
                     return found
-                facts.invocations.append((language, words[argument], facts.directory, None))
+                facts.invocations.append((language, words[argument], facts.directory, (words[argument + 1:],)))
                 if "shell-later-interpreters-ignored" in self.breaks:
                     return found
                 position = argument + 1
@@ -10827,6 +12486,29 @@ class ShellIndex:
             return {remove_shell_pattern(value, pattern, removal.group(1)) for value in base for pattern in patterns}
         return None
 
+    def function_printed_word(self, inner, unit, progress):
+        """$(函数名 <字面词…>)：看得见的那几个同名函数，整个函数体只有一条 printf '%s\\n' <一个词>：词里的 $1… 换成给的词、在那个函数里折 → 取值的并；
+        有一个不是这种写法、有一处折不出 → None。弄坏开关 shell-function-outputs-unfolded 下一律 None。"""
+        commands = split_commands(inner)
+        if unit is None or len(commands) != 1 or len(commands[0]) < 2 or "shell-function-outputs-unfolded" in self.breaks:
+            return None
+        name = literal_word(commands[0][0])
+        arguments = [literal_word(word) for word in commands[0][1:]]
+        if not name or None in arguments or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+            return None
+        paths = [unit.file] + sorted(self.downward([unit.file]) - {unit.file}) + sorted(self.upward(unit.file))
+        functions = [function for path in paths if path in self.files for function in self.files[path].functions.get(name, [])]
+        values = set()
+        for function in functions:
+            body = [command for command in self.facts(function).commands if command not in (["function", name], ["{"], ["}"])]
+            if len(body) != 1 or len(body[0]) != 3 or literal_word(body[0][0]) != "printf" or literal_word(body[0][1]) != "%s\\n":
+                return None
+            folded = self.fold_word(inline_positionals(body[0][2], [name, *arguments]), function, progress)
+            if folded is None:
+                return None
+            values |= folded
+        return values or None
+
     def fold_substitution(self, inner, unit, progress):
         captured = self.substitution_outputs.get(inner)
         if not captured and "shell-heredoc-captures-unfolded" not in self.breaks:
@@ -10840,6 +12522,9 @@ class ShellIndex:
                     return None
                 values |= folded
             return values
+        printed = self.function_printed_word(inner, unit, progress)
+        if printed is not None:
+            return printed
         commands = split_commands(inner)
         if len(commands) == 1:
             words = commands[0]
@@ -10918,6 +12603,7 @@ class ShellIndex:
         if kinds is None:
             unit.cache["links"] = out
             unit.cache["launch_arguments"] = state.get("arguments", {})
+            unit.cache["python_launch_arguments"] = state.get("python_arguments", {})
         return out
 
     def row_snippet(self, shell_file, unit, line, word):
@@ -10986,6 +12672,8 @@ class ShellIndex:
             copied = self.tree_copy_targets(unquoted, unit)
             if copied:
                 out.append((kind, sorted(copied), None))
+                if kind == "shell" and "shell-tree-copy-launch-words-dropped" not in self.breaks:
+                    self.record_launch_words(state, sorted(copied), extra)
                 return
             relative = literal_word(word)
             if directory is not None and relative and not posixpath.isabs(relative) and "shell-relative-tree-copies-ignored" not in self.breaks:
@@ -10993,6 +12681,8 @@ class ShellIndex:
                 copied = tree_copy_file(self.root, relative)
                 if copied is not None:
                     out.append((kind, [copied], None))
+                    if kind == "shell" and "shell-tree-copy-launch-words-dropped" not in self.breaks:
+                        self.record_launch_words(state, [copied], extra)
                     return
             if kind in ("shell", "python", "source") and "shell-script-tail-groups-ignored" not in self.breaks:
                 grouped = self.shell_tail_group(unquoted, unit)
@@ -11012,7 +12702,12 @@ class ShellIndex:
                         out.append((kind, sorted(supplied[0]), None))
                     if not supplied[1]:
                         return
-            if "shell-unfolded-paths-ignored" not in self.breaks:
+            launched = launched_programs_registered(unit.file, unit.short, (shell_unquoted_word(word),), self.root)
+            if launched is not None:
+                # 登记的被起程序（文件头）：路径折不出的照登记连上
+                out.append((kind, launched, None))
+                return
+            if "shell-unfolded-paths-ignored" not in self.breaks and not program_word_registered(unit.file, unit.short, (shell_unquoted_word(word),)):
                 out.append((kind, [], Refusal("shell-path-unfolded", unit.file, line, self.row_snippet(shell_file, unit, line, word))))
             return
         files = []
@@ -11025,47 +12720,111 @@ class ShellIndex:
                 status, file = self.target_of(value, unit, base)
                 if status == "ok":
                     files.append(file)
-                elif kind != "exec":
+                elif launched_programs_registered(unit.file, unit.short, (shell_unquoted_word(word),), self.root) is not None:
+                    # 登记的被起程序（文件头）：路径折得出、根里没有那一份的照登记连上
+                    files += launched_programs_registered(unit.file, unit.short, (shell_unquoted_word(word),), self.root)
+                elif kind != "exec" and ("shell-registered-missing-paths-refused" in self.breaks
+                                         or not program_word_registered(unit.file, unit.short, (shell_unquoted_word(word),))):
                     form = "shell-path-outside-root" if status == "outside" else "shell-path-missing"
                     out.append((kind, [], Refusal(form, unit.file, line, self.row_snippet(shell_file, unit, line, word))))
         if files:
             out.append((kind, files, None))
             if kind == "shell":
-                # bash <脚本> 后面的词全是字面的：记下来，收脚本体时按它剪（shell_launch_arguments、narrowed_script_body）
-                words = tuple(literal_word(item) for item in (extra[0] if extra else ()))
-                recorded = state.setdefault("arguments", {})
+                self.record_launch_words(state, files, extra)
+            elif kind == "python":
+                # python3 <脚本> 后面的词：记下来，收那份 python 时带过去（python_launch_words）
+                known = shell_known_words(extra[0] if extra else ())
                 for file in files:
-                    if None in words or recorded.get(file, set()) is None:
-                        recorded[file] = None
-                    else:
-                        recorded.setdefault(file, set()).add(words)
+                    state.setdefault("python_arguments", {}).setdefault(file, []).append(known)
+
+    def record_launch_words(self, state, files, extra):
+        """bash <脚本> 后面的词：字面的那一截记下来，收脚本体时按它剪（shell_launch_prefix、shell_launch_arguments、narrowed_script_body；
+        文件头「shell 起法带字面参数」）。脚本路径是字面的、照根里同一相对路径认出来的（tree_copy_targets、cd 到折不出的目录之后的相对路径）都照这里记：
+        一个单元起同一份脚本的每一处都记下，shell_launch_arguments 才是这个单元的全部起法；有一处头一个词就折不出的记成 None（脚本体整份收）。"""
+        words = shell_launch_prefix(tuple(literal_word(item) for item in (extra[0] if extra else ())))
+        recorded = state.setdefault("arguments", {})
+        for file in files:
+            if words is None or recorded.get(file, set()) is None:
+                recorded[file] = None
+            else:
+                recorded.setdefault(file, set()).add(words)
 
     def shell_launch_arguments(self, unit, file):
-        """这个单元起 bash <file> 的每一处带的字面参数（{(词…)}）；有一处带了折不出的、或没起过 → None（脚本体整份收）。"""
+        """这个单元起 bash <file> 的每一处带的字面参数（{(词…)}，折不出的词起接 SHELL_OPEN_TAIL）；有一处头一个词就折不出、或没起过 → None（脚本体整份收）。"""
         self.links(unit)
         return (unit.cache or {}).get("launch_arguments", {}).get(file)
 
-    def narrowed_script_body(self, file, words):
-        """bash <file> <字面参数…> 起的那份脚本体（文件头「shell 起法带字面参数」）：边照 narrowed_shell_body 剪过的正文认，
-        单元的种类、名字、指纹与原来那一份相同（键照整份脚本体算）；剪不掉什么的交原来那一份。"""
+    def python_launch_words(self, unit, file):
+        """这个单元起 python3 <file> 的每一处带的词（{KnownWords…}）；有一处没记下来（经尾巴组、目录通配认出来的）→ None（那份 python 整份收）。"""
+        links = self.links(unit)
+        recorded = (unit.cache or {}).get("python_launch_arguments", {}).get(file, [])
+        launches = sum(files.count(file) for kind, files, _refusal in links if kind == "python")
+        if "shell-python-launch-arguments-unfolded" in self.breaks or not recorded or len(recorded) != launches:
+            return None
+        return set(recorded)
+
+    def narrowed_script_body(self, file, words, undecided_dropped=False):
+        """bash <file> <字面参数…> 起的那份脚本体，也是带参数的 shell 入口（文件头「shell 起法带字面参数」「程序入口带参数」）：边照 narrowed_shell_body 剪过的正文认，
+        单元的种类、名字、指纹与原来那一份相同（键照整份脚本体算）；剪不掉什么的交原来那一份。undecided_dropped 只给弄坏开关 shell-entry-undecided-branches-dropped。"""
         cache = self.__dict__.setdefault("narrowed_bodies", {})
-        if (file, words) not in cache:
+        slot = (file, words, undecided_dropped)
+        if slot not in cache:
             body = self.files[file].script_body
-            text = narrowed_shell_body(body.body or "", words)
+            text = narrowed_shell_body(body.body or "", words, undecided_dropped)
+            if file in SHELL_ROW_SELECTED_TABLES and "shell-table-rows-unselected" not in self.breaks and SHELL_OPEN_TAIL not in words:
+                text = rows_of_selected_keys(text, SHELL_ROW_SELECTED_TABLES[file], words)
             if text == body.body:
-                cache[(file, words)] = body
+                cache[slot] = body
             else:
-                view = copy.copy(body)
+                # 几种参数剪出同一份正文的共用一个视图（解析结果只留一份）；弄坏开关 shell-narrowed-views-unshared 下一种参数一个视图
+                views = self.__dict__.setdefault("narrowed_body_views", {})
+                view_key = slot if "shell-narrowed-views-unshared" in self.breaks else (file, text)
+                if view_key not in views:
+                    view = copy.copy(body)
+                    view.body, view.facts, view.cache = text, None, None
+                    views[view_key] = view
+                cache[slot] = views[view_key]
+        return cache[slot]
+
+    def launch_defines_tables(self, file, words, undecided_dropped=False):
+        """bash <file> <words…> 这一趟定义不定义按第一列选行的表（文件头「shell 起法带字面参数」）：脚本体里有表的赋值行（SHELL_TABLE_ASSIGNMENT），
+        照这组词剪过（narrowed_shell_body；undecided_dropped 照它）之后一行都不剩的 → False（走到的那一支以 exit 收尾，这个进程里表没定义、读 $TABLE 读不到一行）；
+        别的（原来就没有赋值行、剪过还剩一行的）→ True。"""
+        tables = SHELL_ROW_SELECTED_TABLES.get(file, ())
+        shell_file = self.files.get(file)
+        if not tables or shell_file is None or shell_file.script_body is None:
+            return True
+        original = shell_file.script_body.body or ""
+
+        def assigns_table(text):
+            return any(found is not None and found.group(1) in tables for found in map(SHELL_TABLE_ASSIGNMENT.match, text.split("\n")))
+        return not assigns_table(original) or assigns_table(narrowed_shell_body(original, words, undecided_dropped))
+
+    def selected_table_variable(self, variable, words):
+        """按第一列选行的表的变量单元，只留 words 点名的实验那几行（文件头「shell 起法带字面参数」）：种类、名字、指纹与原来那一份相同，只剪边；剪不掉什么的交原来那一份。"""
+        cache = self.__dict__.setdefault("selected_variables", {})
+        if (id(variable), words) not in cache:
+            # 行项（--item <实验号>.<行序号>）的行序号照整份脚本体里的复跑表数：准入键表的变量单元里没有复跑表
+            text = rows_of_selected_keys(variable.body or "", SHELL_ROW_SELECTED_TABLES[variable.file], words,
+                                         self.files[variable.file].script_body.body or "")
+            if text == variable.body:
+                cache[(id(variable), words)] = variable
+            else:
+                view = copy.copy(variable)
                 view.body, view.facts, view.cache = text, None, None
-                cache[(file, words)] = view
-        return cache[(file, words)]
+                cache[(id(variable), words)] = view
+        return cache[(id(variable), words)]
 
     def resolve_inline(self, state, kind, interpreter, directory, extra, generator_line):
         """内联脚本：-c 的串、喂给标准输入的 here-doc / here-string。正文折得出 → python 的交一份 InlineScript（闭包里切成单元、沿它的 import
         与 sys.argv 连下去），bash 的切开再认；折不出、或标准输入从哪来认不出 → 拒算 inline-script-not-literal。"""
         unit, shell_file, facts, out, work = state["unit"], state["shell_file"], state["facts"], state["out"], state["work"]
         language = extra[0] if kind == "inline-unknown" else ("python" if kind == "python-inline" else "shell")
-        line = self.place(state, kind, interpreter, generator_line, language)
+        located = interpreter
+        if kind != "inline-unknown" and extra[0][0] == "word" and "\n" not in extra[0][1] and "shell-refusal-lines-by-first-mention" not in self.breaks:
+            # -c 的串是一个词（"$变量"）：照「解释器与这个词同在的那一行」找；只照解释器名找会落到头一处提到 bash / python3 的行上
+            located = extra[0][1]
+        line = self.place(state, kind, located, generator_line, language)
         snippet = self.row_snippet(shell_file, unit, line, interpreter)
         if kind == "inline-unknown":
             out.append((kind, [], Refusal(INLINE_FORM, unit.file, line, snippet)))
@@ -11073,7 +12832,8 @@ class ShellIndex:
         payload, rest, environment = extra
         texts = self.inline_texts(payload, unit)
         if texts is None:
-            out.append((kind, [], Refusal(INLINE_FORM, unit.file, line, snippet)))
+            if payload[0] != "word" or not program_word_registered(unit.file, unit.short, (shell_unquoted_word(payload[1]),)):
+                out.append((kind, [], Refusal(INLINE_FORM, unit.file, line, snippet)))
             return
         if language == "python":
             if "inline-argv-commands-ignored" not in self.breaks:
@@ -11088,8 +12848,12 @@ class ShellIndex:
                         facts.programs |= inner.programs
             argv = tuple(self.argument_values(argument, unit) for argument in rest[1:])
             settings = tuple((name, self.argument_values(value, unit)) for name, value in environment)
+            if "shell-exported-variables-unread" not in self.breaks:
+                # 同一个单元里 export 过、折得出的变量也到内联脚本的环境里（命令前设的同名那个排在后面、照它）
+                exported = ((name, self.argument_values(f'"${name}"', unit)) for name in sorted(facts.exported))
+                settings = tuple((name, values) for name, values in exported if isinstance(values, frozenset)) + settings
             out.append(("python-inline", [InlineScript("python", tuple(sorted(texts)), argv, self.directory_bases(directory, unit), unit.file, line, snippet,
-                                                       settings)], None))
+                                                       settings, self.inline_body_lines(state, payload, texts))], None))
             return
         for text in sorted(texts):
             inner = ShellFacts()
@@ -11248,7 +13012,14 @@ class ShellIndex:
                 for value in assigned:
                     inner = ShellFacts()
                     inner.directory = directory
-                    self.command_facts([item for command in split_commands(value[1:-1]) for item in command] + list(rest), inner, inputs)
+                    items = [item for command in split_commands(value[1:-1]) for item in command]
+                    if "shell-quoted-assignments-unread" not in self.breaks:
+                        # 数组里带引号的 NAME=…：这个数组是 env 的赋值（env "${e[@]}" <命令>），不是命令词
+                        items = [item for item in items if not SHELL_QUOTED_ASSIGNMENT.match(item)]
+                    if items and items[0] == "env" and "shell-env-array-assignments-kept" not in self.breaks:
+                        # 数组是 env 起头的前缀（env -u X NAME="$值" …）：NAME=… 那几项是 env 的赋值，不当命令词
+                        items = [item for item in items if not SHELL_ENV_ARRAY_ASSIGNMENT.match(item)]
+                    self.command_facts(items + list(rest), inner, inputs)
                     work.extend((inner_kind, inner_word, inner_directory, inner_extra, generator_line, overlay)
                                 for inner_kind, inner_word, inner_directory, inner_extra in inner.invocations)
                 return
@@ -11265,7 +13036,7 @@ class ShellIndex:
                 out.append(("function-prefix", [prefix.group(1)], None))
                 return
             outside = self.outside_program(unquoted, unit, state["facts"], 0)
-            if outside:
+            if outside or program_word_registered(unit.file, unit.short, (shell_unquoted_word(word),)):
                 return
             line = self.place(state, "command", word, generator_line, "exec")
             out.append(("command", [], Refusal("shell-command-unfolded", unit.file, line, self.row_snippet(shell_file, unit, line, word))))
@@ -11505,6 +13276,39 @@ class ShellIndex:
             files |= inner
         return files
 
+    def inline_body_lines(self, state, payload, texts):
+        """内联 python 的每份正文出自原文里哪一份 here-doc（InlineScript 的 body_lines）→ ((正文, 那份 here-doc 正文头一行的行号)…)：
+        直接喂给解释器的 here-doc（payload 是 text / heredoc）在起它的这个单元里找，同一个单元里几份正文相同的各落各的（接着上一份往后找），
+        不带引号的 here-doc 折过变量的正文，行数与原文那一份相同的照它的行号；-c 交的折出来的正文（变量里装的 $(cat <<词 …)）在整份文件里找逐字相同的那一份。
+        弄坏开关 inline-refusal-lines-at-launch 下一份都不认（拒算都落在起它的那一行）。"""
+        if "inline-refusal-lines-at-launch" in self.breaks:
+            return ()
+        shell_file, unit, placed = state["shell_file"], state["unit"], state["placed"]
+        if payload[0] in ("text", "heredoc"):
+            line = self.heredoc_body_line(shell_file, unit, payload[1], placed.get(HEREDOC_BODY_PLACED, 0))
+            if line is None:
+                return ()
+            placed[HEREDOC_BODY_PLACED] = line
+            return tuple((text, line) for text in sorted(texts) if text.count("\n") == payload[1].count("\n"))
+        found = ((text, self.heredoc_body_line(shell_file, None, text)) for text in sorted(texts))
+        return tuple((text, line) for text, line in found if line is not None)
+
+    def heredoc_body_line(self, shell_file, unit, body, after=0):
+        """here-doc 正文 body 在原文里从哪一行起：在这个单元的原文行里（函数是它的起止行，脚本体与不给单元的是整份）找逐行与 body 相同的那份正文
+        （原文里的 here-doc 由 raw_heredoc_rows 一份文件切一次），有几份时取正文头一行在 after 之后的头一份、都不在之后取头一份 → 正文头一行的行号；
+        一份都对不上（字面 -c 串、正文折过变量、bash 改写过正文）→ None。"""
+        if shell_file is None or body is None:
+            return None
+        bodies = self.__dict__.setdefault("raw_heredoc_rows_by_file", {})
+        if id(shell_file) not in bodies:
+            bodies[id(shell_file)] = raw_heredoc_rows(shell_file.rows)
+        wanted = tuple(body.split("\n"))
+        scoped = unit is not None and unit.kind == "function"
+        low, high = (unit.first_line, unit.last_line) if scoped else (1, len(shell_file.rows))
+        found = [line for start, line, lines in bodies[id(shell_file)] if low <= start <= high and lines == wanted]
+        later = [line for line in found if line > after]
+        return later[0] if later else (found[0] if found else None)
+
     @staticmethod
     def word_line(shell_file, unit, word, kind=None, after=0):
         """拒算落在哪一行：先找这个词与装代码的那个命令词（source / . / bash / sh / python3 / 直接执行）同在的一行，
@@ -11525,6 +13329,9 @@ class ShellIndex:
                    "python": r"(?:^|[\s;&|({\"'=])(?:\S*/)?python3?\s", "exec": r""}
         loader = loaders.get(kind)
         tiers = [loader] if loader is not None else []
+        if kind == "exec" and "shell-refusal-lines-by-first-mention" not in active_breaks():
+            # 命令位置上的词不一定在行首：跟在 && || ; | ( { ! 与 then / do / else 之后的也是命令位置
+            tiers.append(COMMAND_POSITION_BEFORE_WORD)
         for pattern in tiers + [None]:
             for low, high in ranges:
                 for needle in needles:
@@ -11533,6 +13340,10 @@ class ShellIndex:
                             continue
                         row = shell_file.rows[number - 1]
                         if needle not in row or row.lstrip().startswith("#"):
+                            continue
+                        if pattern is COMMAND_POSITION_BEFORE_WORD:
+                            if re.search(pattern + re.escape(needle), row):
+                                return number
                             continue
                         if pattern is None or (pattern == "" and row.lstrip().startswith((needle, f'"{needle}'))) or (
                                 pattern and re.search(pattern + r".*" + re.escape(needle), row)):
@@ -11709,22 +13520,798 @@ IMPORT_TIME_CLASS_RULE = "import-time-class"
 # 判法单元闭包不走的子进程边（文件头「不走的子进程边」）：(起它的文件, 起它的单元的限定名, 被起的程序) → 为什么。按实测排：这一条边只打提示、不改结局，
 # 自证 EXCLUDED_EDGE_PYTHON_CELL 与 EXCLUDED_EDGE_SHELL_CELL 在夹具上证这套机制（自证期间临时登记夹具里的边）。与 scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES
 # （按角色排、整份文件）是两种排除。登记一条边之前先现查起点单元与被起的程序都在；每条登记的边配三格自证（准入边那三格是 ADMISSION_EDGE_*_CELL）。
+# scripts/crash/lib_verdict_library.py 的 NOT_JUDGING_FILES 的抄录（文件头「按角色排除的文件」）：广谱变异算判法单元指纹时给 Options.excluded_files，它不载入那份库
+NOT_JUDGING_FILES = ("scripts/crash/lib_verdict_library.py", "scripts/gate/lib_function_units.py")
+# 不拒算的程序词（文件头「不拒算的程序词」）：(文件, 函数短名, 词) → 为什么；登记之前现查起它的单元与词都在（REGISTERED_WORDS_REAL_CELL）
+UNKEYED_PROGRAM_WORDS = {
+    ("scripts/crash/gpu-quiesce-run.sh", "gpu_quiesce_card_health", "$GPU_QUIESCE_CARD_HEALTH_PROGRAM"):
+        "只给自证换假程序：平常不设，走 else 那一支的 python3 gpu-card-health.py（那一支照连）",
+    ("scripts/hosts/peer-host-lib.sh", "peer_host_run", "$2"):
+        "在第二台上跑调用方给的一句话：那句话写在调用方的单元里（进调用方的键）；清场、探查这类一句话不判结局，折不出的 $(printf %q …) 不往里认",
+    ("scripts/hosts/gpu-card-health.py", "probe_on_this_machine", "probe_command_text(request)"):
+        "本文件 collect_card_readings 的源码（inspect.getsource，整份原文进键）经 base64 送进 python3 -c，没有别的代码",
+    ("scripts/gate/lib_reuse_checks.py", "run_command", "command"):
+        "reuse-selftests 格起登记的自证命令：命令是这一条判定的请求（line: 与 judge: 由那一格写），不在这个判法闭包里",
+    ("scripts/hosts/lib_repository_copy.py", "run_probe", "command"):
+        "判副本拷全没有的探针（RUNTIME_PROBES）：退出码与键名只给副本闸用，不改判定结局",
+    ("scripts/experiment-apparatus/device-code-key.py", "call_unit_graph", "unit_graph"):
+        "算键的工具 unit-graph（编出来的二进制）：管怎么算键、不管判对错，与 NOT_JUDGING_FILES 同一个角色",
+    ("scripts/experiment-apparatus/device-code-key.py", "run_device", "command"):
+        "起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）",
+    ("scripts/experiment-apparatus/device-code-key.py", "run_device", "device_binary_path(root, options)"):
+        "起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）",
+    ("scripts/experiment-apparatus/e181-landing-check-long-run.sh", "run_segment", "$LAUNCH_BINARY"):
+        "编出来的装置的私有副本：Rust 入口由复跑表的行键收（driver_e181 点名 --bin）",
+    ("scripts/experiment-apparatus/e181-landing-check-long-run.sh", "run_selftest", "{tree}/scripts/experiment-apparatus/e181-landing-check-long-run.sh"):
+        "reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己",
+    ("scripts/experiment-apparatus/long_run_item_verdicts.py", "run_in_tree", "argv"):
+        "reuse-cells 起调用方交进来的命令模板（-- 后面的词）",
+    ("scripts/experiment-apparatus/e184-segment-one-long-run.sh", "run_segment", "$binary"):
+        "--build-here 编出来的两份装置（MAIN_BINARY_NAME、DUMP_BINARY_NAME）：Rust 入口由复跑表的行键收（driver_e184_segment_one 正文里字面点名 -p 与 --bin）",
+    ("scripts/experiment-apparatus/replay.sh", "replay_one", "${bin#@}"):
+        "复跑表第二列的 @<驱动函数>：驱动由表的变量单元按名字连",
+    ("scripts/experiment-apparatus/replay.sh", "replay_one", "$REPLAY_RELEASE_DIRECTORY/$bin"):
+        "研究工作区编出来的 [[bin]]：Rust 入口由复跑表的行键收",
+    ("scripts/hosts/two_logs.py", "run_wrapped", "command"):
+        "two-logs 包装起调用方交进来的命令（-- 后面的词）",
+    ("scripts/hosts/two_logs.py", "wrapped", "shell_text"):
+        "自证里起的假命令（echo、exit 这类一句话），不起仓里的代码",
+    ("scripts/hosts/two_logs.py", "signal_goes_to_command", "f\"echo $$ > '{pid_file}'; exec sleep 60\""):
+        "自证里起的假命令，不起仓里的代码",
+    ("scripts/hosts/run-build-directory.sh", "run_build_directory_selftest", "$code$([[ $name == normal ]] && echo 'exit 0' || echo 'exit 3')"):
+        "自证里起的假编译命令（写 CARGO_TARGET_DIR、照结局退），不起仓里的代码",
+    ("scripts/crash/gpu-quiesce-run.sh", "gpu_quiesce_run_configured", "${gpu_quiesce_commands[$1]}"):
+        "多机配置 QUIESCE_STOP_COMMAND、QUIESCE_STOPPED_CHECK_COMMAND 的一句话（停私有服务、回读），不起仓里的代码；清场或回读不过这一趟不跑，不改跑出来的判定",
+    ("scripts/crash/crash-amplification-item.sh", "crash_amplification_run_on_this_host", "$CRASH_AMPLIFICATION_ITEM_LOCAL_RUN"):
+        "只供测试的变量（文件头「只供测试」）：不是自证设了就退 2，这个函数只在设了时才定义；真的那一趟走 crash-amplification-lib.sh 里同名函数（那一份照连）；"
+        "自证指到的假脚本由本文件的自证写出，代码就在本文件里",
+    ("scripts/crash/crash-amplification-item.sh", "<script-body>", "$CRASH_AMPLIFICATION_ITEM_LOCAL_RUN"):
+        "同上那一行：函数定义写在 if 里，不是顶层函数，脚本体的正文里也有这一句，脚本体那一份单元同样扫到它",
+    ("scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py", "run_captured", "command"):
+        "冻结根（--root，replay.sh 的 replay_frozen_root）副本里的 cargo 与编出来的装置、--measure 的内存包装：冻结根的内容摘要由复跑表的行键收"
+        "（admission.py 的 replay_row_request，行键里 line:frozen-root=<名> <摘要>），判这几行的就是 e165-replay-mutation-kill-bounds.sh 与它载入的这份判法模块，已进键；内存包装只设上限",
+    ("scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py", "state_lines", "['nice', '-n', '19'] + command"):
+        "跑冻结根副本里编出来的装置列状态、重放状态：同 run_captured 那一行",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py", "process_arguments", "command"):
+        "只给自证换假命令（SELFTEST_VARIABLE 设了才读）：平常走字面的 ps，那一支照连",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py", "load_hosts", "context.hosts_command"):
+        "读主机清单：只定分几片、起在哪台，判定不随机器变（所有任务多机可用），不改判定结局",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py", "planned_shards", "hosts_command_of(environment)"):
+        "读主机清单定片数：同 load_hosts 那一行，只定分几片，不改判定结局",
+    # E171 复跑行（复跑表 driver_e171_r1_*、driver_e171_second_rerun_*）的闭包里，自证与单测替身起的子进程。复跑行只跑单测（mutation_driver.py 起 python3 -m unittest）、
+    # 比对器与名单核对，不起 --selftest、不真跑编排器；下面每一处不是只有 --selftest 走到，就是单测把 subprocess.Popen / run 换成录制器、只比命令不起进程。
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py", "world_run", "world.command"):
+        "自证端到端格（--selftest）的假世界：命令是 fake_world 拼的、起本编排器自己，带假驱动 fake_row_driver.py 与假任务服务 fake_task_server.py；复跑行与单测都不起它，不改被判那一行的结局",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py", "resume_cell", "world.command"):
+        "同 world_run 那一行：自证端到端格的假世界",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py", "launch_local", "command"):
+        "编排器真跑时起逐行驱动（context.driver_path：缺省是同目录 row_driver.py，ROWS_ORCHESTRATOR_DRIVER 只给自证换假驱动）；复跑行不真跑编排器，单测也不起它；row_driver.py 由单测 import，已在闭包里",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py", "run_world",
+     "one.served_command(world.root, wrapper_command(world, config_path, stop_file))"):
+        "自证端到端格（--selftest）：在假世界里起修订 8 这一层的一遍，复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "launch_local_two", "command"):
+        "第二段编排器真跑时起逐行驱动（context.driver_path）；单测 test_thread_shares 把 subprocess.Popen 换成录制器、只比命令里的 --lanes 与 --threads，不起进程",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "launch_peer_two", "command"):
+        "第二段编排器真跑时经 shard_relay.py 转交第二台的 peer_side.py 起驱动；单测 test_thread_shares 把 subprocess.Popen 换成录制器，不起进程",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "check_rows_two", "context.check"):
+        "编排器真跑时核产物的 check_product.py（context.check 取 --check 参数，真跑与自证都指同目录那一份）；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "relay_to_exited_server",
+     "one.shard_relay.__file__"):
+        "自证端到端格（--selftest）起 shard_relay.py（第一段编排器 import 的那个模块自己的路径）；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "world_run_two", "world.command"):
+        "自证端到端格（--selftest）的假世界，同第一段编排器 world_run 那一行",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "resume_cell_two", "world.command"):
+        "自证端到端格（--selftest）的假世界，同第一段编排器 world_run 那一行",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py", "regrow_cell",
+     "one.served_command(world.root, ['python3', '-B', wrapper] + world.direct[3:])"):
+        "自证端到端格（--selftest）：加槽那一格在假世界里起第二段编排器，复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py", "cell_e2e_local_gate_opens",
+     "world.base.command"):
+        "自证端到端格（--selftest）的假世界；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py", "cell_e2e_yield",
+     "world.base.command"):
+        "自证端到端格（--selftest）的假世界；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_11.py", "run_pass", "command"):
+        "自证端到端格（--selftest）：在假世界里把这一层自己（os.path.abspath(__file__) run）起一遍；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "check_prerequisites", "command"):
+        "前提核对起的三条命令是本目录的 revision_8_placeholders.py、frozen_tree_lines_revision_8.py 与 -c 载入 frozen_o3：这几份都由单测 import，已在闭包里",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "launch", "script"):
+        "起单元脚本：缺省是同目录 segment_one_unit_revision_8.sh，UNITS_R8_UNIT_SCRIPT 只给自证换假脚本；单测 test_thread_shares 把 subprocess.Popen 换成录制器，"
+        "真脚本由 test_revision_8 自己的 bash <脚本> 起法进闭包",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "plan",
+     "override('UNITS_R8_UNIT_SCRIPT', UNIT_SCRIPT)"):
+        "plan 打各单元的命令（单元脚本 PRINT_ONLY=1）：缺省是同目录 segment_one_unit_revision_8.sh，UNITS_R8_UNIT_SCRIPT 只给自证换假脚本；真脚本由 test_revision_8 自己的 bash <脚本> 起法进闭包",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "plan", "command"):
+        "plan 打第 11–13 步逐行编排的 plan（rows_command 拼的缺省是同目录 rows_orchestrator_revision_8.py，UNITS_R8_ROWS_ORCHESTRATOR 只给自证换假的）：那份由单测 import，已在闭包里",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "run",
+     "rows_command(settings, done, 'run', budget)"):
+        "单元编排真跑时起第 11–13 步的逐行编排（rows_command 拼的缺省是同目录 rows_orchestrator_revision_8.py，UNITS_R8_ROWS_ORCHESTRATOR 只给自证换假的）；复跑行不真跑单元编排，单测不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "world_run", "world.command(mode)"):
+        "自证端到端格（--selftest）的假世界；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py", "cell_e2e_resume", "world.command()"):
+        "自证端到端格（--selftest）的假世界；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/shard_relay.py", "start_request", "request['argv']"):
+        "代跑的那一片按请求文件里记的 argv 起（请求是编排器经任务服务写的，命令内容进编排器那一侧的键）；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/peer_side.py", "run_driver", "command + driver_arguments"):
+        "第二台上起逐行驱动：驱动路径来自 expected.json（编排器真跑时写的 kit），驱动参数由编排器交；复跑行与单测都不起它",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/peer_side.py", "run_driver", "expected['driver']"):
+        "同上一行：驱动路径来自 expected.json",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py", "selfproof_run", "binary"):
+        "编出来的装置（stream-constants，Rust 入口由复跑表的行键收）：单测 test_thread_shares 把 subprocess.run 换成录制器、只比命令与环境里的线程数变量，不起进程",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py", "selfproof_run", "command"):
+        "同上一行：命令是 nice 起编出来的装置，词在 binary 上",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/revision_8_selftest_harness.py", "run_selftest", "script"):
+        "各层自证的共用跑法：script 是调用它的那一层自己的路径（os.path.abspath(__file__)），起的是那一层的 --selftest 子进程；复跑行与单测都不跑 --selftest",
+    ("scripts/prune-server/prune_server_client_selftest.py", "__init__", "command"):
+        "起临时 prune-server：它只存判定、管怎么存，不判对错，起它的命令不改被判那一条的结局（同 NOT_JUDGING_FILES 的角色划分）",
+    ("scripts/experiment-apparatus/e165-pin-red-examples.py", "run_reporting_progress", "command"):
+        "起 cargo 或 --binary 给的程序（编出来的装置），只有 --replay 走到；脚本文件头说明这一下不在判法闭包里，装置的身份由行键里的装置那几样进键；"
+        "冻结根驱动起这份脚本只带追加与 --check，不走到它",
+    (".claude/gate.d/crash-point-replay.sh", "crash_point_replay_pass_output", "$program_file"):
+        "弄坏开关 pass-output-program-in-scratch 才走：那份文件由本脚本把 $crash_point_replay_pass_output_program 写进草稿目录，同一段正文经 python3 -B -c 那一支进键",
+    (".claude/gate.d/lib/stage-cells.sh", "stage_cells_run", "$function_name"):
+        "stage_cell 登记那一行第二列的函数：名字写在阶段脚本 stage_cell 那一行上，函数按词连（ScriptClosure.shell_names）；第二列都是字面名字由 STAGE_CELL_FUNCTIONS_REAL_CELL 判",
+    (".claude/hooks/lib_selftest_scratch.py", "child_path_problems", "command"):
+        "拉起调用方自证的子进程：调用方给的命令都是 [解释器, 调用方自己, --selftest]（session-start.sh、bash-command-detector.sh、agent-watch.py、quote-kb.py），代码就是调用方，已进键",
+    ("scripts/gate/admission.py", "seen_by_the_case", "launched"):
+        "自证：样本用例的命令把 cargo 起往后换成打变量的 sh，不起仓里的代码",
+    ("scripts/gate/admission.py", "stage_variables_seen_by_the_case", "launched"):
+        "自证：样本用例的命令把 cargo 起往后换成打变量的 sh，不起仓里的代码",
+    # 完工清理闸与交回闸当入口（开关复跑格逐条开关起它们的自证）时闭包里折不出的几处
+    (".claude/hooks/completion-cleanup-guard.sh", "creator", "arguments"):
+        "自证造运行目录的假入口：起的是系统的 sleep，或照 Bash 工具的起法起 bash -c 包住自证用例给的一句内建 read（launcher_command 都是自证里的字面串），不起仓里的代码",
+    (".claude/hooks/completion-cleanup-guard.sh", "hold", "arguments"):
+        "自证留一个占着目录的进程：调用处给的都是系统的 sleep 这类占位命令（自证用例里的字面列表），不起仓里的代码",
+    (".claude/singlefs-ai-sop/scripts/claude-hook-lib.sh", "claude_hook_fields", "$CLAUDE_HOOK_FIELDS_PROGRAM"):
+        "python3 -c 的串是同一份文件里 here-doc 字面量赋给 CLAUDE_HOOK_FIELDS_PROGRAM 的那一段（读钩子输入打四个字段）：正文在这份文件里、已进键",
+    ("prune-server/control", "run", "self.command(arguments)"):
+        "自证的 World 起的是这一份文件自己（command 交回 [sys.executable, os.path.realpath(__file__), *arguments]）：代码就是 prune-server/control，已进键",
+    ("prune-server/control", "cell_watch_forwarded_streams_lines", "world.command(['watch'])"):
+        "同 run 那一行：自证起这一份文件自己的 watch 子命令",
+    ("prune-server/control", "cell_forwarded_watch_exits_on_hangup", "world.command(['watch'])"):
+        "同 run 那一行：自证起这一份文件自己的 watch 子命令",
+    ("prune-server/control", "cell_watch_accepts_transitional_states", "world.command(['watch'])"):
+        "同 run 那一行：自证起这一份文件自己的 watch 子命令",
+    # task-server 自证（task_server_lib.py --selftest）的闭包：下面几处起的是系统工具，或自证里换成假程序的那一处；假程序的正文写在 task_server_selftest.py 的单元里（已进键）
+    ("prune-server/control", "run_systemctl", "paths.systemctl"):
+        "系统工具 systemctl（prune-server 的用户级单元），不起仓里的代码；task-server 自证里退 75 的那一格把 check 换成假程序（TASK_SERVER_PRUNE_SERVER_CHECK），走不到这里",
+    ("prune-server/control", "admin", "paths.binary"):
+        "编出来的 prune-server 的 admin 子命令（问健康、管理动作）：它只存判定、管怎么存，不判对错（同 NOT_JUDGING_FILES 的角色划分）；task-server 自证里走不到，同 run_systemctl 那一行",
+    ("prune-server/control", "forward", "paths.ssh"):
+        "系统工具 ssh：服务在另一台时在同一绝对路径上起同一条 control，两台跑的就是这一份文件（已进键）；task-server 自证里走不到，同 run_systemctl 那一行",
+    ("task-server/control", "run_systemctl", "systemctl()"):
+        "系统工具 systemctl（服务自己的用户级单元）；TASK_SERVER_CONTROL_SYSTEMCTL 只给自证换假的（fake-systemctl），不起仓里的代码",
+    ("task-server/task", "submit", "command"):
+        "弄坏开关 fallback-run-when-unreachable 才走：连不上服务时就地起调用方交进来的命令；自证里那条命令是格里写的假命令，正文在 task_server_selftest.py 的单元里",
+    ("task-server/attempt_runner.py", "sample_gpu", "self.specification.get('nvidia_smi') or 'nvidia-smi'"):
+        "系统工具 nvidia-smi，只读显存占用记峰值；TASK_SERVER_NVIDIA_SMI 只给自证换假的（经说明的 nvidia_smi 交下来）",
+    ("task-server/attempt_runner.py", "main", "specification['argv']"):
+        "起这一次尝试的命令：调用方交给服务的那一条，记在服务写的说明里；自证里都是格里写的假命令，正文在 task_server_selftest.py 的单元里",
+    ("task-server/task_server.py", "own_unit_state", "systemctl"):
+        "系统工具 systemctl（服务自己的用户级单元），只读 is-active；TASK_SERVER_CONTROL_SYSTEMCTL 只给自证换假的",
+    ("task-server/task_server.py", "card_busy", "scheduler.nvidia_smi"):
+        "系统工具 nvidia-smi，只读卡上的计算进程；TASK_SERVER_NVIDIA_SMI 只给自证换假的",
+    ("task-server/task_server.py", "compute_processes_now", "scheduler.nvidia_smi"):
+        "系统工具 nvidia-smi，只读卡上的计算进程与卡的编号；TASK_SERVER_NVIDIA_SMI 只给自证换假的",
+    ("task-server/task_server.py", "card_utilizations", "scheduler.nvidia_smi"):
+        "系统工具 nvidia-smi，只读卡的利用率；TASK_SERVER_NVIDIA_SMI 只给自证换假的",
+    ("task-server/task_server.py", "run", "command"):
+        "check_prune_server 里套的 run：只给自证换假程序（TASK_SERVER_PRUNE_SERVER_CHECK 那一种取法），平常走另一种取法 python3 prune-server/control check（那一支照连）",
+    ("task-server/task_server.py", "start_unit", "command"):
+        "系统工具 systemd-run（TASK_SERVER_SYSTEMD_RUN 只给自证换假的）起尝试的单元；被起的 attempt_runner.py 由同一个函数里 Popen(runner) 那一处连着",
+    ("task-server/task_server_lib.py", "peer_shell_timed", "ssh"):
+        "系统工具 ssh（TASK_SERVER_PEER_SSH 只给自证换假的）：在第二台跑探查与清理的一句话，那句话写在调用方的单元里（进调用方的键）",
+    ("task-server/task_server.py", "remove_build_directory", "self.scheduler.peer_runner"):
+        "multi-host-run.sh --remove-build-directory；自证的世界一律把 TASK_SERVER_PEER_RUNNER 换成假脚本（FAKE_PEER_RUNNER），不起真的；真的那份由它自己的 --selftest 判",
+    ("task-server/task_server.py", "peer_cleanup_confirmed", "self.peer_runner"):
+        "multi-host-run.sh --recover-cleanup；同 remove_build_directory 那一行",
+    ("task-server/task_server.py", "quiesce_for_card_lease", "self.gpu_quiesce"):
+        "按需领卡交卡前的清场（scripts/crash/gpu-quiesce-run.sh，只清场回读、跑 true）；自证的世界把 TASK_SERVER_GPU_QUIESCE 换成假清场，不起真的；真的那份由它自己的 --selftest 判",
+    ("task-server/task_server.py", "workspace_write_judged", "read_back"):
+        "起任务工作目录那棵树里的 apply-writer-patch.py --read-outcome，只读结局文件；自证里工作目录是假仓根、起的是格里写的假脚本（FAKE_APPLY_WRITER_PATCH），不起真的",
+    (".claude/gate.d/code-tooling.sh", "cell_prune_server_selftest", "$ROOT/.prune-server-selftest-program"):
+        "只给自证换的假程序：被判的根是样本（judged_root_is_sample）、根里放了这份才起它，正文在样本里（stage-break-switch-replay 的 line:samples 收样本目录的内容）；"
+        "真仓里走 else 那一支编出来的 prune-server",
+    # 下面七行起的是表行或调用方给的命令：被起的那一份由各条判定自己的请求进键，同 scripts/gate/lib_reuse_checks.py 的 run_command 那一行
+    (".claude/gate.d/code-tooling.sh", "start_selftest", "$inner"):
+        "research-script-selftests 起 runner 表的一行（真仓是 SELFTEST_RUNNERS，样本根是 .selftest-runners）：被起的那一份由这一格每条判定的请求进键"
+        "（同一份文件里往 $scratch/requests 写请求行的那段 printf：入口是那一行的脚本，带 line:command=<那一行> 与 bash 起的 program-argument:）；"
+        "样本根里的表行由 stage-break-switch-replay 请求的 line:samples= 收",
+    (".claude/gate.d/code-tooling.sh", "run_selftest_once", "path"):
+        "break-switch-replay 起登记表 break-switch-replay-files.tsv 的一行：被起的那份脚本就是这一格每条判定的入口"
+        "（同一份文件 break-switch-replay 程序的 request_line：入口是那份脚本，带 program-argument:--selftest、line:command=、line:switch=）；"
+        "样本根里的登记表由 stage-break-switch-replay 请求的 line:samples= 收",
+    (".claude/gate.d/code-tooling.sh", "run_selftest_once", "command"):
+        "同 path 那一行；命令头是包装写法的前缀（SELFTEST_TEMPORARY_SERVICE_PREFIX）时折不出命令位置的词，"
+        "包装由同一个 request_line 的 file:scripts/prune-server/prune_server_client_selftest.py 与 line:temporary-service=wrapped 进键",
+    (".claude/gate.d/code-tooling.sh", "run_trip", "path"):
+        "selftest-cells-alone 带选格变量起 .claude/hooks/selftest-registry.tsv 登记成 selftest、有选格变量的那几份：被起的那份脚本就是这一格每条判定的入口"
+        "（同一份文件 selftest-cells-alone 程序的 request_line：入口是那份脚本，带 program-argument:--selftest、line:command=、line:cell=）；"
+        "样本根里的登记表由 stage-break-switch-replay 请求的 line:samples= 收",
+    (".claude/gate.d/code-tooling.sh", "run_trip", "command"):
+        "同 path 那一行；包装写法的前缀由同一个 request_line 的 file:scripts/prune-server/prune_server_client_selftest.py 与 line:temporary-service=wrapped 进键",
+    ("scripts/gate/selftest-process-guard.py", "main", "command[0]"):
+        "守卫本次不盯时原样 exec 调用方给的那条命令（-- 之后）：被起的那条命令由起守卫的那一侧进键（code-tooling.sh 的 research-script-selftests："
+        "入口是 runner 那一行的脚本、line:command=<那一行>）；这一份的 --selftest 起的是自证自己写的样本命令（本文件里的字面量）",
+    ("scripts/gate/selftest-process-guard.py", "guard", "argv"):
+        "守卫起调用方给的那条命令、盯它的进程树（经 strace 起时前面多 strace 与它的参数）：被起的那条命令同 main 那一行，由起守卫的那一侧进键",
+    ("scripts/gate/selftest-process-guard.py", "find_strace", "path"):
+        "系统工具 strace（PATH 上的，或自证给的替身路径 override）：只起一次 strace … -- true 问这台机器能不能跟踪 execve，不跑仓里的代码",
+    ("scripts/mutation/prove-red.sh", "run_cargo", "cargo"):
+        "证红起 cargo test：平常是 PATH 上的 cargo，编的是 crates，由每条变异行自己的行键管（crates-mutation-rows.py 的 KeyContext：点名测试的闭包、"
+        "工具链行、依赖版本行）；自证里是这份脚本自证写出的假 cargo 桩（os.path.join(work, \"bin\", …)），正文在自证的单元里、已进这份脚本的键",
+    ('task-server/task_server.py', 'kill_log_lines', "[self.journalctl, '--no-pager', '-q', '-o', 'cat', f'--since=@{int(since)}', f'--until=@{int(until) + 1}', *selector]"):
+        '只问环境的系统工具 journalctl：读本机日志里杀进程的那几行（self.journalctl 只给自证换假的）',
+    ('task-server/task_server_selftest.py', 'cell_runner_threads_file_counts', '[\'bash\', \'-c\', \'"$1" -c "$2" "$3" "$4" "$5" "$6" & wait\', \'runner-threads\', sys.executable, RUNNER_THREADS_PROGRAM, ready, str(RUNNER_THREADS_SPINNING), str(RUNNER_THREADS_SLEEPING), RUNNER_THREADS_NAME]'):
+        '自证里起的假程序：bash 只把 sys.executable -c RUNNER_THREADS_PROGRAM 放到后台再 wait；RUNNER_THREADS_PROGRAM 是这份文件里的字面量，随这份文件进键',
+    ('scripts/hosts/queue-health.py', 'read_compute_processes', 'command'):
+        '只问环境的系统工具 nvidia-smi（QUEUE_HEALTH_NVIDIA_SMI 只给自证换假的）',
+    ('scripts/hosts/queue-health.py', 'run', "['bash', '-c', text]"):
+        '自证的假第二台（FakePeer）：把这份文件拼给第二台的那段 shell 文本放在这一台的 bash 里跑；文本由这份文件的函数拼出，随这份文件进键',
+    ('scripts/agents/agent-watch.py', 'selftest_in', '[\'bash\', \'-c\', f"exec 3>>\'{held_output}\'; exec sleep 60"]'):
+        '自证里起的假命令：拿着一个文件句柄睡 60 秒，给看门狗当被盯的进程',
+    ('scripts/agents/agent-watch.py', 'selftest_in', '[sys.executable, \'-c\', f"import time\\nhandle = open({writing_file!r}, \'a\')\\ndeadline = time.time() + 60\\nwhile time.time() < deadline:\\n    handle.write(\'一行\\\\n\')\\n    handle.flush()\\n    time.sleep(0.3)\\n"]'):
+        '自证里起的假命令：往临时文件里隔一会儿写一行，给看门狗当还在写输出的进程',
+    ('scripts/agents/agent-watch.py', 'selftest_in', '[\'bash\', \'-c\', f"exec 3>>\'{silent_file}\'; touch -d \'1 hour ago\' \'{silent_file}\'; exec sleep 60"]'):
+        '自证里起的假命令：拿着一个一小时没动的文件句柄睡 60 秒，给看门狗当不出声的进程',
+    ('scripts/kb/ledger-append-section.py', 'problems_with_sample_leftover_check', '[sys.executable, \'-c\', "import subprocess; print(subprocess.Popen([\'sleep\', \'%d\'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).pid, flush=True)" % LEFTOVER_SAMPLE_SECONDS]'):
+        '自证里起的假命令：起一个睡几秒的 sleep、打出它的进程号就退出',
+    ('scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/drive.py', 'subprocess_runner', 'command'):
+        '起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）',
+    ('scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/drive.py', 'runner', 'command'):
+        '自证的假装置（fake_runner）：这份文件自己写出来的假二进制，退出码由 E197_FAKE_BINARY_EXIT 定',
+    ('scripts/experiment-apparatus/e209_spike_cause_counters.py', 'mutation_check', "[sys.executable, '-I', str(mutated), '--selftest']"):
+        '变异核对：起的是这份文件改坏一处的拷贝的 --selftest；代码就是这份文件，已是这条判定的入口',
+    ('scripts/gate/apply-writer-patch.py', 'after_landing', 'gate33'):
+        '调用方交进来的 mutation-tables 那一格的命令，只在弄坏开关 mutation-tables-in-process 下在这个进程里起；自证交的是这份文件里的假格',
+    ('scripts/hosts/compile-then-swap.py', 'build', 'command'):
+        '系统工具 cargo（nice cargo build 与 cargo test --no-run 两条字面命令）：编的是 crates 的装置，Rust 入口由调用方那一侧的请求进键',
+    ('scripts/mutation/broad-mutation.py', 'raw_mutants_of_package', '[fake_driver, package]'):
+        '只给自证换的假程序（BROAD_MUTATION_LIST_DRIVER）；平常走 cargo mutants --list 那一支',
+    ('scripts/mutation/broad-mutation.py', 'run_step', 'argv'):
+        '步表里的 cargo 命令（check、build、nextest、test：crates 的测试，由每条变异的单元键进键）；自证的步表是假驱动',
+    ('scripts/mutation/broad-mutation.py', 'listed', "[executable, '--list', '--format', 'terse']"):
+        '预编的测试二进制只列测试名（crates 的测试，由每条变异的单元键进键）',
+    ('scripts/mutation/broad-mutation.py', 'cover', 'argv'):
+        '带覆盖插桩起预编的测试二进制（crates 的测试，由每条变异的单元键进键）',
+    ('scripts/mutation/prove-red.sh', 'run_cargo_to_log', 'cargo'):
+        '同 run_cargo 那一行：系统工具 cargo（自证换假的），crates 的测试由变异行的单元键进键',
+    ('.claude/gate.d/crash-point-replay.sh', 'crash_point_replay_prebuild_case_binaries', '$word'):
+        '准入模块交的登记用例命令去掉测试名的那一截（cargo test … --no-run）：只预先编测试二进制，用例由各自的单元键进键',
+    ('scripts/mutation/mutate.sh', 'run_test_executable', '$executable'):
+        '预编的测试二进制（crates 的测试，由变异条目的单元键进键）',
+    ('scripts/mutation/mutation-shard-run.sh', 'mutation_shard_task_server_shard', '$(mutation_shard_llvm_check_command)'):
+        '那个函数打出的一段字面 shell：只问这一台的 llvm 工具与 rustc 版本（系统工具），正文随这份文件进键',
+    ('scripts/gate/merge-and-verify.sh', 'verification_call', '$VERIFICATION_STAGE'):
+        '快照里的 crash-point-replay 门禁（自证换成假的）：它的判定按它自己的键入库，合入后验证只转它的退出码与输出',
+    ('scripts/gate/merge-and-verify.sh', 'verification_step', '$VERIFICATION_STAGE'):
+        '同 verification_call 那一行',
+    ('scripts/gate/merge-and-verify.sh', 'selftest', '$merge_rows_line'):
+        '自证照这份脚本自己打出的那条核变异行的命令（LC_ALL=C grep -xF，系统工具）原样起一遍',
+    ('scripts/gate/merge-and-verify.sh', 'selftest', '$merge_check_line'):
+        '自证照这份脚本自己打出的那条核对命令（find 加 sha256sum，系统工具）原样起一遍',
+    ('.claude/gate.d/doc-decisions.sh', 'grid_stale_open_items', '$OPEN_ITEM_REVIEW_SOURCE'):
+        "这份文件里 read -d '' 读进变量的一段字面 python（只 import 标准库、起 git），正文随这份文件进键",
+    ('.claude/gate.d/lkmm.sh', 'cell_litmus_verdicts', '.lkmm-key-samples/change.sh'):
+        '样本根里的脚本（只在样本档起）：由这一格请求里样本目录的摘要进键',
+    ('.claude/gate.d/qemu-device-streams.sh', 'cell_device_streams', '$qemu_path'):
+        '外部程序 QEMU（vm-bench.sh 交的路径），不是仓里的代码',
+    ('.claude/gate.d/qemu-device-streams.sh', 'run_key_samples', '.qemu-key-samples/change.sh'):
+        '样本根里的脚本（只在样本档起）：由这一格请求里样本目录的摘要进键',
+    ('.claude/gate.d/qemu-device-streams.sh', 'run_key_samples_three_questions', '.qemu-key-samples/change.sh'):
+        '样本根里的脚本（只在样本档起）：由这一格请求里样本目录的摘要进键',
+    ('.claude/gate.d/qemu-device-streams.sh', 'run_key_samples_three_questions', '.qemu-key-samples/unrelated.sh'):
+        '样本根里的脚本（只在样本档起）：由这一格请求里样本目录的摘要进键',
+    ('scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py', 'run_with_time_limit', 'command'):
+        '起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）',
+    ('scripts/hosts/test-environment-check.py', 'run_with_sudo', "['sudo', '-S', '-p', '', *command]"):
+        '只问环境的系统工具：sudo 起 smartctl、nvme 读盘的健康信息',
+    ('scripts/hosts/test-environment-check.py', 'start_holder_process', 'command'):
+        '自证里起的假进程：解释器 -c SLEEPER_CODE（这份文件里的字面量）拿着一个文件睡着',
+    ('scripts/crash/crash-amplification-two-hosts.sh', '<script-body>', '$CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN'):
+        '只供自证的变量：自证指到这份文件自己写出的假脚本，代码就在这份文件里；真的那一趟不设它',
+    ('scripts/crash/crash-amplification-two-hosts.sh', 'crash_amplification_run_on_this_host', '$CRASH_AMPLIFICATION_TWO_HOSTS_LOCAL_RUN'):
+        '只供自证的变量：自证指到这份文件自己写出的假脚本，代码就在这份文件里；真的那一趟不设它',
+    ('scripts/experiment-apparatus/e10-aging-compaction-run.sh', '<script-body>', '$BINARY'):
+        '起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）',
+    ('scripts/experiment-apparatus/e10-aging-compaction-run.sh', 'judge_shard', '$LAUNCH_BINARY'):
+        '起编出来的装置：Rust 入口由复跑表的行键收（admission.py 的 replay_row_request）',
+    ('scripts/experiment-apparatus/e10-aging-compaction-run.sh', 'run_selftest', '{tree}/scripts/experiment-apparatus/e10-aging-compaction-run.sh'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e185-r2-segment-run.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e185-r3-segment-run.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ('scripts/experiment-apparatus/e185-r4-segment-run.sh', 'selftest', '{tree}/$SCRIPT_KEY'):
+        'reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己',
+    ("scripts/gate/test-targets-parallel.py", "list_names", "command"):
+        "列测试函数名（--list --format terse）：起 cargo test 或编好的 Rust 测试二进制（entry.binary，--prebuild-into 放进清单的），不是仓里要收进闭包的 python 或 shell；"
+        "被测的 crates 代码由调用方那一侧的请求进键（门禁 crash-point-replay 按条复用的键、合入后验证补丁改到的测试目标），这一份只定怎么分片，不改每条测试的结局（文件头「结局」）",
+    ("scripts/gate/test-targets-parallel.py", "run_piece", "command"):
+        "跑一件测试目标：起 cargo test 或编好的 Rust 测试二进制（同 list_names 那一行）；一件的结局由被测的 crates 与调用方的键管，这一份只定哪几件一起起、各分几条线程，不改每条测试的结局",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/device_card_lease.py", "take_card", "client"):
+        "按需领卡的客户端（调用方给的 <树根>/task-server/task，折不出）：领卡没成抛 CardLeaseRefused、装置不起，领到了只定装置用哪张卡，"
+        "客户端的标准输出收成卡串；不改读数。CARD_LEASE_CLIENT_WORDS_ANOMALY_CELL、CARD_LEASE_CLIENT_WORDS_STRIP_CELL、CARD_LEASE_CLIENT_WORDS_REACH_CELL 量这两行",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/device_card_lease.py", "return_card", "client"):
+        "按需领卡的客户端（同 take_card 那一行）：还卡没成只打一行「!」、不改装置那一步的结局，客户端的标准输出转到标准错误；不改读数。"
+        "三格同 take_card 那一行",
+}
+# 编工具程序的函数（文件头「运行期读的数据文件」编译产物那一条）：(文件, 函数名) → 它编的程序的源码目录（相对根）。函数是 python 函数的限定名
+# 或 shell 函数的名字；这个函数进了闭包，那个目录整棵收成数据目录（它读的 target 下编出来的二进制不进键，由产生它的源码代表）
+# 登记的被起程序（文件头「登记的被起程序」）：(文件, 起它的单元的短名, 词) → 根里被起的那几份，整份连上
+LAUNCHED_REPOSITORY_PROGRAMS = {
+    # in_executor <执行器目录> <脚本> <参数…>：脚本体里各步点名的、与这份驱动同目录的那几份 python 脚本（执行器目录就是这份驱动所在的目录）
+    ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh', 'in_executor', '${@:2}'): ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/comparator_v1_against_stored.py', 'scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/comparator_two_versions.py', 'scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/comparator_witness_classes.py'),
+    ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh', 'in_executor', '${@:2}'): ('scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_q5_record_path_counts.py', 'scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/comparator_q5_format_constants.py'),
+    # preflight.py 起这两份时把自己的路径放进 PREFLIGHT_PROGRAM：source 的是它旁边那份 lib.sh（规范副本里的）
+    ('.claude/scripts/lkmm.sh', '<script-body>', '${PREFLIGHT_PROGRAM%/*}/lib.sh'): ('.claude/singlefs-ai-sop/scripts/lib.sh',),
+    ('.claude/scripts/fetch-deps.sh', '<script-body>', '${PREFLIGHT_PROGRAM%/*}/lib.sh'): ('.claude/singlefs-ai-sop/scripts/lib.sh',),
+    # bash -c 的字面正文 source "$1" 再调它里面的函数：$1 是 settings.peer_host_lib、$2 是 settings.configuration_check（两处取法都是同仓那两份，自证另交假的）
+    ('scripts/hosts/host-dispatch.py', '__init__', "['bash', '-c', loader, 'host-dispatch', settings.peer_host_lib, settings.configuration_check, settings.repository_root]"): ('scripts/hosts/peer-host-lib.sh', 'scripts/crash/crash-point-replay-shard-configuration-check.sh'),
+    ('scripts/hosts/host-dispatch.py', 'run', "['bash', '-c', runner, 'host-dispatch', self.settings.peer_host_lib, self.declarations, text]"): ('scripts/hosts/peer-host-lib.sh',),
+    # 自证的驱动世界起这份文件自己（command 交回 [sys.executable, SELF_PATH, …]），参数折不出：整份连上
+    ('scripts/mutation/broad-mutation.py', 'run', 'self.command(home, *arguments, source=source)'): ('scripts/mutation/broad-mutation.py',),
+    # 同 run 那一行
+    ('scripts/mutation/broad-mutation.py', 'selftest_basic_cells', "selftest.command('first', '--list-items')"): ('scripts/mutation/broad-mutation.py',),
+    # 同 run 那一行
+    ('scripts/mutation/broad-mutation.py', 'selftest_basic_cells', "selftest.command('second')"): ('scripts/mutation/broad-mutation.py',),
+    # 同 run 那一行：经一段字面的转起脚本
+    ('scripts/mutation/broad-mutation.py', 'selftest_test_variable_cells', "[sys.executable, '-c', relay, *selftest.command('first', '--item', '2')]"): ('scripts/mutation/broad-mutation.py',),
+    # 同 run 那一行
+    ('scripts/mutation/broad-mutation.py', 'selftest_stop_cells', "selftest.command('stop', '--item', '1')"): ('scripts/mutation/broad-mutation.py',),
+    # 同 run 那一行
+    ('scripts/mutation/broad-mutation.py', 'selftest_stop_cells', "selftest.command('stop', '--item', '1', '--lock-wait', '0')"): ('scripts/mutation/broad-mutation.py',),
+    # 两处调用起的都是 [python3, admission, test-functions-request / test-plan, …]：admission 是这份脚本所在仓里的 scripts/gate/admission.py
+    ('scripts/gate/refused-test-registry.py', 'run_command', 'command'): ('scripts/gate/admission.py',),
+    # admission 是钩子所在仓里的 scripts/gate/admission.py（RUNNER_DISPATCH_GUARD_ADMISSION_SCRIPT 只给自证换假的）
+    ('.claude/hooks/runner-dispatch-guard.sh', 'designer_admission_verdict', "[sys.executable, admission, 'experiment', project_root, f'E{int(match.group(1))}']"): ('scripts/gate/admission.py',),
+    # 变异锚点静态核：static_check_command 交的是 [python, STATIC_CHECK_SCRIPT, static-check, <树>]，STATIC_CHECK_SCRIPT 是 crates-mutation-rows.py（自证另交假的）
+    ('scripts/gate/apply-writer-patch.py', 'run_static_check', 'command'): ('scripts/mutation/crates-mutation-rows.py',),
+    # reuse-cells 的命令模板：{tree} 是它拷出来的树，起的就是这份脚本自己的 items 子命令，整份连上
+    ('scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py', 'run_reuse_cells', "[sys.executable, '-B', os.path.join(os.path.dirname(HERE), 'long_run_item_verdicts.py'), 'reuse-cells', '--script', script, '--template', world.repo, '--items', ','.join((item_name(unit) for unit in units)), '--work', os.path.join(scratch, 'cells'), '--fake-judge', '--', *command]"): ('scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py',),
+}
+BUILT_TOOL_SOURCES = {
+    ("scripts/gate/lib_function_units.py", "build_unit_graph"): "crates/singlefs-unit-graph/src",
+    (".claude/gate.d/code-tooling.sh", "function_units_build_unit_graph"): "crates/singlefs-unit-graph/src",
+}
+# 起编出来的工具的那一处（文件头「运行期读的数据文件」编译产物那一条）：(文件, 起它的单元的短名, 折不出的那个词的 ast.unparse) → 编它的函数
+# （BUILT_TOOL_SOURCES 的键）。这一处不拒算，编它的那份源码目录收成数据目录（规则名 tool-source），编它的函数进不进闭包都收
+BUILT_TOOL_LAUNCHES = {
+    # function-units-two-implementations-agree 的程序里 rust() 起这一趟现编的 unit-graph（binary 取 function_units_build_unit_graph 打的末行）
+    (".claude/gate.d/code-tooling.sh", "rust", "binary"): (".claude/gate.d/code-tooling.sh", "function_units_build_unit_graph"),
+}
+# 调用方登记（文件头「调用方登记」）：(调用处的文件, 调用处单元的短名, 交命令的那个实参的 ast.unparse) → 为什么。被调函数拿这个实参起子进程、
+# 又折不出的，只从这一处起的那一条边不拒算；别的调用处照旧往上认
+CALLER_SUPPLIED_COMMANDS = {
+    (".claude/gate.d/code-tooling.sh", "replay", "cmd"):
+        "stage-break-switch-replay 经 lib_process_group.run_in_own_session 逐条开关起 stage-selftest.sh 喂那一道的样本：被起的阶段由这一格每条判定的请求进键"
+        "（同一份文件 stage-break-switch-replay 程序的 request_line：入口 .claude/gate.d/<阶段>、line:samples= 样本目录的摘要、"
+        "line:feeder= stage-selftest.sh 与 lib.sh 与包装的摘要）",
+    (".claude/gate.d/code-tooling.sh", "probe", "['env', f'{name}={value}', *interpreter, path, *PROBE_ARGUMENTS]"):
+        "break-switch-outside-selftest 经 run_in_own_session 设上开关起被判那棵树里读开关的每一份脚本当探针：这一格不复用、每趟现判；"
+        "整份 code-tooling.sh 当入口的 stage-break-switch-replay 喂的是样本根里的脚本，由它请求的 line:samples= 收（同一份文件 request_line）",
+    ("scripts/gate/gate-structure-check.py", "start_stage_reporting", "['bash', stage_path, root, *arguments]"):
+        "经 run_in_own_session 起 <根>/.claude/gate.d/ 下各道阶段的 --list 与 --check：自证起的是自证写进临时根的样本阶段"
+        "（正文是本文件 SELFTEST_*_STAGE 那几段字面量，进这一份自证自己的键）；真仓上 code-tooling.sh 的 gate-structure、stage-owners 两格起它，每趟现判、不复用",
+}
+# 登记表里的命令（文件头「登记表里的命令」）：(文件, 函数短名) → (登记表, 命令那一列的下标)
+REGISTRY_COMMAND_TEXTS = {(".claude/gate.d/doc-registries.sh", "counting_command_result"): (".claude/gate.d/counted-claims.tsv", 2)}
+# 载入路径的登记（文件头「载入路径的登记」）：(文件, 路径表达式的 ast.unparse) → 根里实际载入的那一份
+SPEC_PATH_ARGUMENTS = {
+    # 交回闸：两处路径由 decide 照 cite-check.py 所在目录拼好交进来（自证另交不在的路径量「读不到」那一支）
+    (".claude/hooks/handback-guard.sh", "agent_watch_path"): "scripts/agents/agent-watch.py",
+    (".claude/hooks/handback-guard.sh", "os.path.join(scripts_directory, 'kb', 'kb-spec-check.py')"): "scripts/kb/kb-spec-check.py",
+    ("scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_sweep_costs/small_disk_anchor_check.py", "anchors_path"):
+        "scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_sweep_costs/anchors_e183.py",
+    ("scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_sweep_costs/sweep_history_anchor_check.py", "anchors_path"):
+        "scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_sweep_costs/anchors_e183.py",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/frozen_o3.py", "path"): ".claude/gate.d/lib-lag-baseline.py",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_o3.py", "path"): ".claude/gate.d/lib-lag-baseline.py",
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py", "path"):
+        "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py",
+    # reuse_library.load_repinned 载入的是冻结层之一（调用方当参数交的）：第一段编排器、第二段编排器、修订 8 的逐行编排、修订 10 的第二段编排
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py", "path"): (
+        "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py",
+        "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py",
+        "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_revision_8.py",
+        "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two_revision_10.py"),
+    # patch-of-the-current-tree.py 的 load_sibling 载入同仓的两份（它 main 里两处调用的字面参数）
+    ("scripts/gate/patch-of-the-current-tree.py", "path"): ("scripts/gate/lib_rebuilt_packages.py", "scripts/agents/snapshot-tree.py"),
+    # mutation-shard-run.sh 算每片行数的内联 python：sys.argv[1] 是调用处交的 crates-mutation-rows.py
+    ("scripts/mutation/mutation-shard-run.sh", "rows_module_path"): "scripts/mutation/crates-mutation-rows.py",
+    # merge-and-verify.sh 的几段内联 python：路径是脚本体里 $REBUILT、$RERUN_FAILED_TESTS 与快照里的 lib_crash_point_replay_items.py 当参数交的
+    ("scripts/gate/merge-and-verify.sh", "library"): "scripts/gate/lib_rebuilt_packages.py",
+    ("scripts/gate/merge-and-verify.sh", "library_path"): "scripts/crash/lib_crash_point_replay_items.py",
+    ("scripts/gate/merge-and-verify.sh", "path"): ("scripts/gate/rerun-failed-tests.py", "scripts/gate/lib_rebuilt_packages.py", "scripts/gate/admission.py"),
+    # broad-mutation-samples.py 的 build_units 载入广谱变异驱动（门禁 broad-mutation 造样本时当参数交的那一份）
+    (".claude/gate.d/lib/broad-mutation-samples.py", "driver_path"): "scripts/mutation/broad-mutation.py",
+    # write-guard.sh 的 load_notations_library 载入共用判据库：平常是 notations_library_path(hook_dir)（钩子所在仓的这一份）；
+    # 自证「读不到判据就拒绝」那两格交的是临时目录里不在的一份（什么都没载入）
+    (".claude/hooks/write-guard.sh", "library_path"): ".claude/gate.d/lib-forbidden-notations.py",
+}
+
+
+# TAIL_READ_SCOPES 前缀一格的「被判那棵树根上的那一份」（文件头「按尾巴读的登记」）
+TAIL_READ_ROOT_COPY = "."
+
+
+def in_tail_read_scope(relative, scope, tails, breaks):
+    """相对根的文件 relative 落不落在登记的前缀 scope 里：目录前缀按整段目录比（crates 不认 crates-old/）；TAIL_READ_ROOT_COPY 只认相对根的路径
+    就是那一处字面尾巴（tails 里的一截，不带首尾的 /）的那一份。弄坏开关 tail-read-scopes-root-ignored 下 TAIL_READ_ROOT_COPY 也当目录前缀比（一份都不认）。"""
+    for prefix in scope:
+        if prefix == TAIL_READ_ROOT_COPY and "tail-read-scopes-root-ignored" not in breaks:
+            if relative in tails:
+                return True
+        elif relative.startswith(prefix + "/"):
+            return True
+    return False
+
+
+# 按尾巴读的登记（文件头「按尾巴读的登记」）：(文件, 函数短名, 被读路径表达式的 ast.unparse) → (仓里那一组只留的前缀（相对根）, 为什么)；
+# 前缀是空元组的：那一处读的是调用方交进来的输入，一份都不收；前缀写 TAIL_READ_ROOT_COPY（"."）的只留被判那棵树根上的那一份。登记之前现查那一处与前缀都在（REGISTERED_WORDS_REAL_CELL）；
+# 登记的是算键时真问到登记的那一处（照尾巴收的，或 tree_copy_file 那一种）：参数照调用处的实参认的，登的是实参那一处的函数与表达式（TAIL_READ_SCOPES_REAL_CELL 逐行核）
+TAIL_READ_SCOPES = {
+    ("scripts/agents/snapshot-tree.py", "selftest", "os.path.join(head_snapshot, DEFAULT_LIST)"): ((),
+        "自证读的是它自己在临时仓里建的那一份快照清单（head_snapshot 在自证的临时目录下），不读真仓的 research/prompts/<轮>-snapshot/；"
+        "真仓里每开一轮三方就多一份同名清单，不是这一处的输入"),
+    ("task-server/task_server_lib.py", "cargo_manifest_scope", "os.path.join(current, 'Cargo.toml')"): ((),
+        "从提交任务的起点目录往上找第一份清单：起点是请求那一侧的 cwd（task_server.py 拒整工作区编译那一处交 run.directory），"
+        "读到哪一份由请求定，不是判法自己的数据；自证里起点都在每格自己的临时目录下"),
+    ("task-server/task_server_lib.py", "package_directories", "os.path.join(directory, 'Cargo.toml')"): (("crates", "scripts/experiment-apparatus"),
+        "os.walk 只走仓根下 BINARY_SOURCE_ROOTS 那两处（task_server_lib.py 同名常量，改了照改这一行）；别处的 Cargo.toml 它读不到"),
+    ("task-server/task_server.py", "prove_red_uses_gpu", "os.path.join(root, 'crates', 'mutations.tsv')"): ((),
+        "变异表取请求里 --copy 给的副本，没给取服务所在的仓根，相对路径照请求的 cwd 认：读哪一棵树的表由请求定，只定这条任务要不要卡，"
+        "不是判法自己的数据；自证都给 --copy <临时树>"),
+    ("task-server/task_server.py", "mutation_gate_card_need", "os.path.join(root, MUTATION_TABLE_IN_TREE)"): ((),
+        "根取请求里头一个是目录的词，没有取请求的 cwd（再没有取服务所在的仓根）：读哪一棵树的表由请求定，只定这条门禁要不要卡，"
+        "不是判法自己的数据；自证给的是临时树"),
+    ("scripts/gate/rerun-failed-tests.py", "workspace_packages", "os.path.join(workspace_root, 'Cargo.toml')"): ((),
+        "workspace_root 是 --root 给的工作区（不给取这份脚本所在的仓根）：读哪一棵树的根清单由调用方定"
+        "（merge-and-verify.sh 给集成副本，自证给临时工作区），不是判法自己的数据"),
+    ("scripts/gate/rerun-failed-tests.py", "workspace_packages", "os.path.join(member, 'Cargo.toml')"): ((),
+        "member 是 workspace_root 那份根清单 members 展开的目录，都在调用方给的工作区底下：读哪几份由调用方给的根定，不是判法自己的数据"),
+    ("scripts/gate/verus-proof-check.py", "crate_identifier", "os.path.join(registry.root, registry.crate_directory, 'Cargo.toml')"): (("crates",),
+        "registry.root 是被判那棵树，registry.crate_directory 取那棵树 .claude/gate.d/verus-pins.tsv 的 crate 行：判真仓时读的是登记的那几个 crate 的清单，"
+        "都在 crates/ 下（往 crates/ 外登 crate 行要照改这一行）；records/、research/ 里同名的读不到"),
+    ("scripts/gate/verus-proof-check.py", "crate_package_name", "os.path.join(registry.root, registry.crate_directory, 'Cargo.toml')"): (("crates",),
+        "同 crate_identifier 那一行：被判那棵树里 verus-pins.tsv 登记的 crate 的清单，都在 crates/ 下（往 crates/ 外登 crate 行要照改这一行）"),
+    ("scripts/hosts/compile-then-swap.py", "locate_bin", "os.path.join(crate_directory, 'Cargo.toml')"): (("crates",),
+        "从目标往上找 crate 的清单：目标与往上的每一层都要在 <root>/crates 里（check_crates，出了 crates/ 就拒；只有自证的弄坏开关 outside-crates 不核），"
+        "crates/ 外的 Cargo.toml 读不到"),
+    ("scripts/hosts/lib_repository_copy.py", "coarse_repository_root_references", "os.path.join(package_root, 'Cargo.toml')"): (("crates",),
+        "读清单的那一轮走的是开头那份 list(package_roots) 的拷贝，只有 crates/<名>/Cargo.toml；path 依赖接进来的目录只扫 .rs、不读清单"),
+    # 只走固定几个目录的：被判那棵树里登记、成员或包目录都在这几处下（根级的清单登记写不出「只留根上那一份」，那一份不收）
+    (".claude/gate.d/crash-point-replay.sh", "manifest", "package_directory / 'Cargo.toml'"): (("crates",),
+        "product_gpu_target_rows 起的内联 python：package_directory = pathlib.Path(sys.argv[1])，"
+        "唯一的调用处（product-gpu-real-card-tests 格）交 \"crates/$PRODUCT_GPU_PACKAGE_NAME\"（相对被判那棵树），"
+        "读的只有 crates/ 下那个包的清单（调用处换到 crates/ 外的包目录要照改这一行）；"
+        "读法：manifest = package_directory / \"Cargo.toml\""),
+    ("scripts/experiment-apparatus/device-code-key.py", "read_manifest", "os.path.join(directory, 'Cargo.toml')"): (("crates", "prune-server", "scripts/experiment-apparatus", TAIL_READ_ROOT_COPY),
+        "directory 只有三种来处：package_layout 认的包目录（只认 scripts/experiment-apparatus 与 crates/<名>，别的退 2）"
+        "、构建根（装置包目录或仓根）、闭包里 Rust 单元往上最近的包目录（crates/<名>；"
+        "包目录给 crates/singlefs-verification 时经 path 依赖到 prune-server/；"
+        "装置包下的 e176_crates_oracle 在 scripts/experiment-apparatus 里）；构建根是仓根的那一份是根级清单，留根上那一份（TAIL_READ_ROOT_COPY）：toolchain_lines 只把它的 [profile.release] 摊进工具链行，别的表进不进键没核到底；"
+        "读法：with open(os.path.join(directory, \"Cargo.toml\"), \"rb\") as handle:"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py", "path_dependency_entries", "os.path.join(crates_directory, crate, 'Cargo.toml')"): (("crates",),
+        "crates_directory = os.path.join(source_root, \"crates\")，crate 取 os.listdir(crates_directory)："
+        "只读源树 crates/<名>/Cargo.toml；"
+        "读法：manifest = os.path.join(crates_directory, crate, \"Cargo.toml\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/list_check.py", "main", "os.path.join(repository, COMPATIBILITY_RECORD)"): (("records",),
+        "repository 是 --repository 给的仓根，COMPATIBILITY_RECORD 是写死的 records/2026-10-31-删兼容旧版本代码.md："
+        "只读 records/ 下这一份（常量改到 records/ 外要照改这一行）；"
+        "读法：record_text = read_text(os.path.join(repository, COMPATIBILITY_RECORD))"),
+    ("scripts/gate/admission.py", "manifest_dependency_names", "os.path.join(root, directory or '.', 'Cargo.toml')"): (("crates", "prune-server", TAIL_READ_ROOT_COPY),
+        "唯一的调用处交的 directory 是闭包里 Rust 单元所在 crate 的目录（workspace.crate_of_path：根清单 members 的 crates/<名>，"
+        "加经 path 依赖收进来的 prune-server/）；directory 为空时（仓根是包）读的是根级清单，留根上那一份（TAIL_READ_ROOT_COPY）：读到的依赖表只有落到 Cargo.lock 的包经依赖行进键，表里的 features 这类不进；"
+        "读法：sections = manifest_sections(os.path.join(root, directory or \".\", \"Cargo.toml\")) or {}"),
+    ("scripts/gate/admission.py", "workspace_package_directories", "os.path.join(root, directory, 'Cargo.toml')"): (("crates", TAIL_READ_ROOT_COPY),
+        "directory 取根清单 [workspace] members 按 glob 展开的目录（仓里的 members 都在 crates/ 下，往 crates/ 外加成员要照改这一行）；"
+        "根清单写了 [package] 时另有 \".\"（根级清单，留根上那一份 TAIL_READ_ROOT_COPY：读到的包名到目录的表不由别处写进键；仓根现在不是包）；"
+        "读法：name = ((manifest_sections(os.path.join(root, directory, \"Cargo.toml\")) or {}).get(\"package\") or {}).get(\"name\")"),
+    ("scripts/gate/admission.py", "workspace_binary_entry", "os.path.join(root, directory, 'Cargo.toml')"): (("crates",),
+        "directory 取 workspace_package_directories(root) 的值，同那一行：都是 crates/ 下的工作区成员；"
+        "读法：sections = manifest_sections(os.path.join(root, directory, \"Cargo.toml\")) or {}"),
+    ("scripts/gate/admission.py", "run_real_crash_case_features_cells", "os.path.join(repository_root, directory, 'Cargo.toml')"): (("crates",),
+        "directory 取 workspace_package_directories(repository_root) 的值，同那一行：都是 crates/ 下的工作区成员；"
+        "读法：declared = (manifest_sections(os.path.join(repository_root, directory, \"Cargo.toml\")) or {}).get(\"features\") or {}"),
+    ("scripts/gate/lib_function_units.py", "load_manifest", "os.path.join(root, path)"): (("crates", "prune-server", TAIL_READ_ROOT_COPY),
+        "调用处只有 discover_rust_crates 两处：path 是 \"Cargo.toml\"（根级清单，留根上那一份 TAIL_READ_ROOT_COPY：members、exclude、[workspace.dependencies] 定工作区的 crate 与依赖，不由别处写进键）"
+        "或 posixpath.join(directory, \"Cargo.toml\")，"
+        "directory 是根清单 members 展开的 crates/<名>（没有 [workspace] 时取 crates/ 下各目录）"
+        "与经 path 依赖收进来的仓内 crate（prune-server/）；"
+        "读法：with open(os.path.join(root, path), \"rb\") as handle:"),
+    ("scripts/gate/verus-proof-check.py", "kernel_files", "os.path.join(crate, 'Cargo.toml')"): (("crates",),
+        "crate = os.path.join(root, registry.crate_directory)，"
+        "crate_directory 取被判那棵树 verus-pins.tsv 的 crate 行，都在 crates/ 下（同 crate_identifier 那一行）；"
+        "读法：manifest = os.path.join(crate, \"Cargo.toml\")"),
+    ("scripts/gate/verus-proof-check.py", "crate_manifest", "os.path.join(root, registry.crate_directory, 'Cargo.toml')"): (("crates",),
+        "同 crate_identifier 那一行：被判那棵树里 verus-pins.tsv 登记的 crate 的清单，都在 crates/ 下；"
+        "读法：path = os.path.join(root, registry.crate_directory, \"Cargo.toml\")"),
+    ("scripts/gate/verus-proof-check.py", "path_dependencies", "os.path.join(root, crate_directory, 'Cargo.toml')"): (("crates",),
+        "从 verus-pins.tsv 登记的 crate 起顺 dependencies、build-dependencies 的 path 依赖往下走（出了仓根判红）："
+        "登记的两个 crate 往下连到的都在 crates/ 下（往 crates/ 外接 path 依赖要照改这一行）；"
+        "读法：manifest_path = os.path.join(root, crate_directory, \"Cargo.toml\")"),
+    # 读调用方给的根上的根级文件（Cargo.toml、Cargo.lock）：读到的值没有别处写进键的登 TAIL_READ_ROOT_COPY（只留根上那一份）；
+    # 读到的值由调用方解析之后写进键的（依赖行、工具链行、cfg、crate 起法）登空元组，为什么一格写进键的那一处
+    ("scripts/crash/lib_verdict_library.py", "locked_dependency_lines", "os.path.join(root, 'Cargo.lock')"): ((),
+        "root 是调用方给的根（verus-proof-check.py 交被判那棵树，e165-pin-red-examples.py 交 --root），读那棵树根上的 Cargo.lock，"
+        "读到的包由调用方照依赖行写进键（verus-proof-check.py 的 closure_dependency_lines 进「依赖版本」；lib_verdict_library.py 命令行 --dependency-of 进 index.key 的 dependencies；"
+        "e165-pin-red-examples.py 进 FunctionUnitIndex.key 的 dependencies），文件不再收；"
+        "读法：path = os.path.join(root, \"Cargo.lock\")"),
+    ("scripts/gate/admission.py", "lock", "os.path.join(closure_root, 'Cargo.lock')"): ((),
+        "closure_root 是调用方交的闭包根（被判那棵树），读它根上的 Cargo.lock，读到的包照依赖行进键（compute_unit_key 把 dependency_lines 交给 closure_key）；"
+        "读法：path = os.path.join(closure_root, \"Cargo.lock\")"),
+    ("scripts/gate/admission.py", "manifest_dependency_names", "os.path.join(root, 'Cargo.toml')"): ((TAIL_READ_ROOT_COPY,),
+        "读调用方交的根上那份根清单的 [workspace.dependencies]：只有落到 Cargo.lock 的包名、版本经依赖行进键（dependency_lines 拿它定 allowed），"
+        "表里的 features、default-features 不进键，留根上那一份；"
+        "读法：shared = ((manifest_sections(os.path.join(root, \"Cargo.toml\")) or {}).get(\"workspace\") or {}).get(\"dependencies\") or {}"),
+    ("scripts/gate/admission.py", "profile_lines", "os.path.join(closure_root, 'Cargo.toml')"): ((),
+        "closure_root 是调用方交的闭包根，读它根上的清单，[profile.<名>] 摊开的值照 setting 行进工具链行（compute_unit_key 交给 closure_key）；"
+        "读法：sections = manifest_sections(os.path.join(closure_root, \"Cargo.toml\")) or {}"),
+    ("scripts/gate/admission.py", "rust_cfg_for_profile", "os.path.join(closure_root, 'Cargo.toml')"): ((TAIL_READ_ROOT_COPY,),
+        "closure_root 是调用方交的闭包根，读它根上的清单定 debug_assertions 留不留（closure_of_entry 交给 Rust 闭包的 cfg，closure_key 收 cfg 行）；"
+        "第二处调用 test_functions_of_package（admission.py:3528）拿 cfg 判测试编不编，那份清单按不按含 cfg 的键复用没追到底，宁多收：留根上那一份；"
+        "读法：sections = manifest_sections(os.path.join(closure_root, \"Cargo.toml\")) or {}"),
+    ("scripts/gate/admission.py", "workspace_package_directories", "os.path.join(root, 'Cargo.toml')"): ((TAIL_READ_ROOT_COPY,),
+        "root 是调用方交的根，读它根上的根清单取 members：包名到目录的表（workspace_binary_entry、run_real_crash_case_features_cells 等几处用）不由别处写进键，留根上那一份；"
+        "读法：root_sections = manifest_sections(os.path.join(root, \"Cargo.toml\")) or {}"),
+    ("scripts/gate/lib_function_units.py", "run_controls", "os.path.join(root, name)"): ((TAIL_READ_ROOT_COPY,),
+        "root 是命令行 controls <根> 给的根，name 只取 \"Cargo.toml\"、\"Cargo.lock\"：拷那棵树根上的两份，副本上算的对照键不由别处收进这两份，留根上那一份；"
+        "读法：if os.path.isfile(os.path.join(root, name)):（下一行 shutil.copy2 拷它）"),
+    ("scripts/gate/verus-proof-check.py", "copy_crate", "os.path.join(root, 'Cargo.lock')"): ((TAIL_READ_ROOT_COPY,),
+        "root 是被判那棵树（命令行给），把它根上的 Cargo.lock 整份拷进副本、定副本里 cargo 解析出的版本；键里「依赖版本」只收闭包点名的包（closure_dependency_lines），"
+        "整份锁对判定的影响没核到底，留根上那一份；"
+        "读法：shutil.copy2(os.path.join(root, \"Cargo.lock\"), os.path.join(work, \"Cargo.lock\"))"),
+    ("scripts/gate/verus-proof-check.py", "check_toolchain", "os.path.join(root, 'Cargo.lock')"): ((TAIL_READ_ROOT_COPY,),
+        "root 是被判那棵树，读它根上的 Cargo.lock 核登记的版本（toolchain 一项每趟现核、不复用；它所在的判法闭包在别处复不复用没核到底，留根上那一份）；"
+        "读法：lock_path = os.path.join(root, \"Cargo.lock\")"),
+    ("scripts/gate/verus-proof-check.py", "compare_mir", "os.path.join(root, 'Cargo.lock')"): ((TAIL_READ_ROOT_COPY,),
+        "root 是被判那棵树，把它根上的 Cargo.lock 整份拷进 MIR 比对的副本，同 copy_crate 那一行，留根上那一份；"
+        "读法：shutil.copy2(os.path.join(root, \"Cargo.lock\"), os.path.join(copy, \"Cargo.lock\"))"),
+    ("scripts/gate/verus-proof-check.py", "crate_build_text", "os.path.join(root, 'Cargo.toml')"): ((),
+        "root 是被判那棵树，读它根清单的 [workspace.package] edition，读到的值照「crate 起法」那一样进键（shared_components 把 crate_build_text 的摘要放进复用键）；"
+        "读法：with open(os.path.join(root, \"Cargo.toml\"), \"rb\") as handle:"),
+    ("scripts/mutation/crates-mutation-rows.py", "read_lock_file_packages", "os.path.join(root, 'Cargo.lock')"): ((TAIL_READ_ROOT_COPY,),
+        "root 是调用方给的树根（path_packages_reaching_external 交的根、种子源树 seed_source），读那棵树根上的 Cargo.lock："
+        "读到的 path 包与它们够不够得着外部包不由别处写进键，留根上那一份；"
+        "读法：with open(os.path.join(root, \"Cargo.lock\"), \"rb\") as handle:"),
+    ("scripts/mutation/lib_mutation_units.py", "toolchain_lines", "os.path.join(root, 'Cargo.toml')"): ((),
+        "root 是 mutate_plan 交的 workspace_root（调用方给的工作区），读它根清单的几张表照 manifest 行进工具链行"
+        "（mutate_plan 的 toolchain_key 进键；crates-mutation-rows.py 的 key_toolchain_lines 进行键的 toolchain）；"
+        "读法：manifest_path = os.path.join(root, \"Cargo.toml\")"),
+    ("scripts/mutation/lib_mutation_units.py", "read_lock_packages", "os.path.join(root, 'Cargo.lock')"): ((),
+        "root 是 UnitKeys 的 self.root（调用方给的工作区），读它根上的 Cargo.lock；读到的包只经 dependency_lines 进依赖版本行再进键"
+        "（UnitKeys.dependencies_of、mutation-prune.py 的 dependency_lines、verus-proof-check.py 的 closure_dependency_lines，三处都是），文件不再收；"
+        "读法：path = os.path.join(root, \"Cargo.lock\")"),
+    ("scripts/mutation/mutation-prune.py", "build_environment_lines", "os.path.join(root, 'Cargo.toml')"): ((),
+        "root 是调用方给的工作区根，读它根清单的 [profile]，解析后的值照 profile 行进构建环境行（global_lines 收成 build 行，进 closure_key 的工具链行）；"
+        "读法：manifest = os.path.join(root, \"Cargo.toml\")"),
+    # 从调用方给的目录往上找清单：读到哪一份由给的目录定
+    ("scripts/gate/lib_rebuilt_packages.py", "package_of", "os.path.join(directory, 'Cargo.toml')"): ((),
+        "从调用方给的树里一份文件所在目录往上找第一份带 [package] 的清单（不出树根）：读到哪一份由给的树与文件定；"
+        "读法：manifest = os.path.join(directory, \"Cargo.toml\")"),
+    ("scripts/gate/lib_rebuilt_packages.py", "workspace_root_of", "os.path.join(directory, 'Cargo.toml')"): ((),
+        "同 package_of 那一行：从调用方给的树里一份文件所在目录往上找包与工作区的清单；"
+        "读法：manifest = os.path.join(directory, \"Cargo.toml\")"),
+    ("scripts/hosts/target-prune.py", "workspace_root_of", "os.path.join(current, 'Cargo.toml')"): ((),
+        "从调用方给的目录往上找写了 [workspace] 的清单（不出给的根）：读到哪一份由调用方给的目录定；"
+        "读法：manifest = os.path.join(current, \"Cargo.toml\")"),
+    # 调用方给的目录或参数（行目录、集成副本、命令行给的路径）
+    ("scripts/agents/verdict-skeleton.py", "write_skeleton", "os.path.join(repository, 'research', 'prompts', f'{round_name}-main-verification.md')"): ((),
+        "这一处是写出的目标，不读：open 用 'x'（弄坏开关 overwrite-existing 下 'w'）新建判决骨架，路径由 --repository 与轮名定；"
+        "读法：target = out or os.path.join(repository, 'research', 'prompts', f'{round_name}-main-verification.md')"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py", "compare", "os.path.join(directory, 'o3.out')"): ((),
+        "directory 取命令行给的 --step-12-row-0、--cross-host-row-0 两个行目录；"
+        "读法：o3_hashes = [sha256_of_file(os.path.join(directory, \"o3.out\")) if os.path.exists(os.path.join(directory, \"o3.out\")) else \"missing\""),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py", "row_differences", "os.path.join(first, name)"): ((),
+        "first、second 是调用方交的两个行目录；"
+        "读法：left, right = os.path.join(first, name), os.path.join(second, name)"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py", "row_differences", "os.path.join(second, name)"): ((),
+        "同 os.path.join(first, name) 那一行；"
+        "读法：left, right = os.path.join(first, name), os.path.join(second, name)"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py", "run_o3_step", "os.path.join(row_directory, 'o3.out')"): ((),
+        "row_directory 是调用方交的这一行的输出目录，o3.out 是冻结执行器刚写出的；"
+        "读法：output = os.path.join(row_directory, \"o3.out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_comparator.py", "q1_lines", "os.path.join(row_directory, 'o3.out')"): ((),
+        "row_directory = os.path.join(rows_root, f\"row-{number}\")，rows_root 是调用方交的行目录根；"
+        "读法：o3 = read_o3(os.path.join(row_directory, \"o3.out\"))"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py", "read_row_o3", "os.path.join(directory, FROZEN_EXECUTOR_OUTPUT)"): ((),
+        "directory 是调用方交的行目录；"
+        "读法：path = os.path.join(directory, FROZEN_EXECUTOR_OUTPUT)"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py", "run_o3_step", "os.path.join(row_directory, 'o3.out')"): ((),
+        "row_directory 是调用方交的这一行的输出目录，o3.out 是冻结执行器刚写出的；"
+        "读法：output = os.path.join(row_directory, \"o3.out\")"),
+    ("scripts/gate/merge-and-verify.sh", "<module-body>", "os.path.join(tree, 'Cargo.toml')"): ((),
+        "verification_member_present 起的内联 python：tree = sys.argv[1]，"
+        "是调用处交的集成副本或自证的树（\"$tree_root\"、\"$tree\"）；"
+        "读法：with open(os.path.join(tree, \"Cargo.toml\"), \"rb\") as handle:"),
+    ("scripts/gate/merge-and-verify.sh", "<module-body>", "os.path.join(tree, member, 'Cargo.toml')"): ((),
+        "同 os.path.join(tree, 'Cargo.toml') 那一行：member 是那棵树根清单的 members；"
+        "读法：with open(os.path.join(tree, member, \"Cargo.toml\"), \"rb\") as handle:"),
+    # 自证与测试自己建的临时目录
+    ("scripts/agents/checklist-specs.py", "selftest", "os.path.join(directory, 'checklist.md')"): ((),
+        "directory 是 tempfile.TemporaryDirectory()；"
+        "读法：checklist = os.path.join(directory, 'checklist.md')"),
+    ("scripts/agents/dispatch-prompt.py", "selftest", "os.path.join(work, 'attack.md')"): ((),
+        "work = tempfile.mkdtemp(prefix=\"dispatch-prompt-selftest-\")；"
+        "读法：attack = os.path.join(work, \"attack.md\")"),
+    ("scripts/agents/snapshot-tree.py", "selftest", "os.path.join(head_snapshot, HEAD_DIFF)"): ((),
+        "head_snapshot 是自证在 work = tempfile.mkdtemp(…) 下的样本仓里建的快照目录；"
+        "读法：shutil.copy(os.path.join(head_snapshot, HEAD_DIFF), os.path.join(repository, \"research\", \"prompts\", \"r4-snapshot\", HEAD_DIFF))"),
+    ("scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh", "selftest", "os.path.join(temporary, 'r2.out')"): ((),
+        "脚本体 exec python3 - 起的内联正文里的 selftest："
+        "temporary 是 tempfile.TemporaryDirectory(prefix=\"e165-kill-bounds-selftest-\")；"
+        "读法：output = read(os.path.join(temporary, \"r2.out\"))"),
+    ("scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh", "selftest", "os.path.join(temporary, 'r3.out')"): ((),
+        "同 r2.out 那一行；"
+        "读法：output = read(os.path.join(temporary, \"r3.out\"))"),
+    ("scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh", "selftest", "os.path.join(temporary, 'r4.out')"): ((),
+        "同 r2.out 那一行；"
+        "读法：output = read(os.path.join(temporary, \"r4.out\"))"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py", "cell_before_snapshot_end_to_end", "os.path.join(repository, path)"): ((),
+        "repository = fake_repository(os.path.join(scratch, \"repo\"))，scratch 是自证格的临时目录；"
+        "读法：\"\".join(f\"{sha256_of_file(os.path.join(repository, path))}  {path}\\n\" for path in (\"Cargo.toml\", \"crates/fake/src/row_15.rs\")))"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_list_check.py", "run_after_check", "os.path.join(root, 'out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：output = os.path.join(root, \"out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_one.py", "test_only_counter_branch_states_are_listed_with_their_fields", "os.path.join(scratch, 'out')"): ((),
+        "scratch 是 tempfile.TemporaryDirectory()；"
+        "读法：output = os.path.join(scratch, \"out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_one.py", "test_the_trajectory_lines_by_segment_and_by_inode_creation", "os.path.join(scratch, 'out')"): ((),
+        "scratch 是 tempfile.TemporaryDirectory()；"
+        "读法：output = os.path.join(scratch, \"out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/test_segment_one.py", "lines_of", "os.path.join(scratch, 'out')"): ((),
+        "scratch 是 tempfile.TemporaryDirectory()；"
+        "读法：output = os.path.join(scratch, \"out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_collusion_pipeline.py", "test_result_lines_count_the_done_line_and_refuse_an_existing_file", "os.path.join(root, 'out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：path = os.path.join(root, \"out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_collusion_pipeline.py", "test_a_positive_control_counts_red_only_when_the_matrix_carries_the_red", "os.path.join(output, 'out')"): ((),
+        "output 是 tempfile.TemporaryDirectory()；"
+        "读法：with open(os.path.join(output, \"out\"), encoding=\"utf-8\") as handle:"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py", "test_a_patch_that_runs_past_the_end_of_the_blob_is_refused", "os.path.join(root, 's.tsv')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：write(os.path.join(root, \"s.tsv\"), …)"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py", "test_states_unrecoverable_streams_errors_digest_mismatches_and_the_freeze_lines_are_read", "os.path.join(root, 'o3.out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：path = os.path.join(root, \"o3.out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_columns.py", "test_an_output_without_the_complete_marker_is_not_complete", "os.path.join(root, 'o3.out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：path = os.path.join(root, \"o3.out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_comparison.py", "test_a_control_for_o3_is_counted_and_the_unknown_oracle_name_is_refused", "os.path.join(root, 'out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：with open(os.path.join(root, \"out\"), encoding=\"utf-8\") as handle:"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_comparison.py", "test_the_executor_state_lines_are_sorted_and_lose_the_time_and_the_process_number", "os.path.join(root, 'o3.out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：path = os.path.join(root, \"o3.out\")"),
+    ("scripts/experiment-apparatus/e171_three_oracle_collusion/test_o3_comparison.py", "render", "os.path.join(root, 'out')"): ((),
+        "root 是 tempfile.TemporaryDirectory()；"
+        "读法：with open(os.path.join(root, \"out\"), encoding=\"utf-8\") as handle:"),
+    ("scripts/gate/admission.py", "run_unit_key_cells", "os.path.join(work, 'Cargo.lock')"): ((),
+        "work = tempfile.mkdtemp(prefix=\"admission-selftest-units-\")，样本仓建在里面；"
+        "读法：lock = os.path.join(work, \"Cargo.lock\")"),
+    ("scripts/gate/admission.py", "run_unit_key_cells", "os.path.join(work, 'Cargo.toml')"): ((),
+        "work 同 Cargo.lock 那一行，两处都是交给 cell(…) 改的样本清单；"
+        "读法：cell(\"仓根 Cargo.toml 加一行注释（N07）\", os.path.join(work, \"Cargo.toml\"), …)"),
+    ("scripts/gate/stage-mine.py", "selftest_keep_foreign", "os.path.join(repo, 'record.md')"): ((),
+        "repo 是 tempfile.TemporaryDirectory()；"
+        "读法：with open(os.path.join(repo, 'record.md'), encoding='utf-8') as handle:"),
+    ("scripts/hosts/test-environment-check.py", "check_host_disk", "os.path.join(case_directory, 'report.md')"): ((),
+        "case_directory 是 host_environment 在自证的 workspace（tempfile.mkdtemp）下 mkdtemp 的；"
+        "读法：report_path = os.path.join(case_directory, 'report.md')"),
+    ("scripts/kb/quote-kb.py", "selftest_in", "os.path.join(os.path.dirname(src), 'checklist.md')"): ((),
+        "src 在 work 下，work 是共用库建的自证临时目录（selftest 交进来）；"
+        "读法：ck = os.path.join(os.path.dirname(src), 'checklist.md')"),
+    ("scripts/kb/stale-candidates.py", "experiment_page_selftest_failures", "os.path.join(directory, 'facts.tsv')"): ((),
+        "directory 是 tempfile.TemporaryDirectory() 里建的样本仓；"
+        "读法：locations = {row[3] for row in build_candidates(directory, None, read_fact_table(os.path.join(directory, 'facts.tsv')))}"),
+    ("scripts/kb/stale-candidates.py", "carrier_lines_selftest_failures", "os.path.join(directory, 'facts.tsv')"): ((),
+        "directory 是 tempfile.TemporaryDirectory() 里建的样本仓；"
+        "读法：locations = {row[3] for row in build_candidates(directory, None, read_fact_table(os.path.join(directory, 'facts.tsv')))}"),
+    ("scripts/kb/stale-candidates.py", "selftest", "os.path.join(directory, 'candidates.tsv')"): ((),
+        "directory 是 tempfile.TemporaryDirectory() 里建的样本仓；"
+        "读法：table_path = os.path.join(directory, 'candidates.tsv')"),
+}
+
+
+# 按尾巴读而没登记 TAIL_READ_SCOPES 的那几处收进来的、落在 records/、research/ 下的文件（文件头「按尾巴读的登记」末段，TAIL_READS_RECORDS_REAL_CELL 读）：
+# {(根的绝对路径, 文件, 行, 函数短名, 表达式, 是不是内联脚本): {相对根的文件…}}；只记不改判定，键与闭包照旧
+UNSCOPED_TAIL_READS = {}
+TAIL_READ_RECORD_PREFIXES = ("records/", "research/")
+
+
+def record_unscoped_tail_read(module, node, unit, origins):
+    """按尾巴读、没登记 TAIL_READ_SCOPES 的这一处收进来的文件里，落在 records/、research/ 下的记进 UNSCOPED_TAIL_READS。
+    弄坏开关 tail-reads-under-records-unrecorded 下不记。"""
+    if "tail-reads-under-records-unrecorded" in module.index.breaks:
+        return
+    under = {origin[1] for origin in origins if origin[0] == "file" and origin[1].startswith(TAIL_READ_RECORD_PREFIXES)}
+    if under:
+        short = (getattr(unit, "short", None) or "").rsplit(".", 1)[-1]
+        key = (module.index.root, module.source_file(), getattr(node, "lineno", 0), short, ast.unparse(node), module.inline is not None)
+        UNSCOPED_TAIL_READS.setdefault(key, set()).update(under)
+
+
+def shell_unquoted_word(word):
+    """登记表里比 shell 的词用的写法：去掉包着它的那一对双引号（里面的引号照留，同原文）。"""
+    return word[1:-1] if len(word) >= 2 and word[0] == word[-1] == '"' else word
+
+
+def program_word_registered(file, function, words):
+    """words 里有一个登在 UNKEYED_PROGRAM_WORDS 的 (file, function, 词) 上（文件头「不拒算的程序词」）。弄坏开关 program-words-refused 下一律不算。"""
+    return "program-words-refused" not in active_breaks() and any((file, function, word) in UNKEYED_PROGRAM_WORDS for word in words)
+
+
+def launched_programs_registered(file, function, words, root):
+    """words 里有一个登在 LAUNCHED_REPOSITORY_PROGRAMS 的 (file, function, 词) 上（文件头「登记的被起程序」）→ 被起的那几份（相对根）；
+    没登记、登记的有一份不在根里 → None。弄坏开关 launched-programs-refused 下一律 None。"""
+    if "launched-programs-refused" in active_breaks():
+        return None
+    for word in words:
+        targets = LAUNCHED_REPOSITORY_PROGRAMS.get((file, function, word))
+        if targets is not None:
+            return list(targets) if all(os.path.isfile(os.path.join(root, target)) for target in targets) else None
+    return None
+
+
+def built_tool_launch_source(file, function, words):
+    """words 里有一个登在 BUILT_TOOL_LAUNCHES 的 (file, function, 词) 上、编它的函数登在 BUILT_TOOL_SOURCES 里（文件头「运行期读的数据文件」编译产物那一条）
+    → 那份源码目录（相对根）；没登记 → None。弄坏开关 built-tool-launches-refused 下一律 None。"""
+    if "built-tool-launches-refused" in active_breaks():
+        return None
+    for word in words:
+        builder = BUILT_TOOL_LAUNCHES.get((file, function, word))
+        if builder is not None and builder in BUILT_TOOL_SOURCES:
+            return BUILT_TOOL_SOURCES[builder]
+    return None
+
+
 ADMISSION_EDGE = ("scripts/experiment-apparatus/e183-capacity-cells.sh", "plan_step", "scripts/gate/admission.py")
 EXCLUDED_PROGRAM_EDGES = {
     ADMISSION_EDGE: "准入是闸：退出码只定跑不跑（77 不跑、3 退 78、别的退 2，都在编译之前），标准输出只有 E7INPUT 行，"
                     "读产物的判法先 sed '/^E7INPUT /d'；不改读数",
 }
+# 不走的调用边（文件头「不走的调用边」）：(调用处的文件, 调用处单元的限定名, 被调的名字) → 为什么。登记了的那一条按名字连的边不连，被调的那个单元
+# 只经这条边才到得了的，连同它读的数据、起的程序都不进键；别的单元调它照连
+EXCLUDED_CALL_EDGES = {
+    ("scripts/gate/lib_function_units.py", "unit_graph_directory", "built_unit_graph"):
+        "找或编产品行为视图用的 unit-graph 程序（编它读的 Cargo.lock、.claude/heavy-thread-default、crates/singlefs-unit-graph/src 只定缓存目录名与编法）："
+        "程序交出的单元行逐个进各条判定的键（文件头「判定种类」），程序本身管怎么算键、不管判对错，同 NOT_JUDGING_FILES 的角色",
+}
+
+
+# 闭包 run() 的轮数上限（收完一轮、认调用方交进来的命令、折出新程序再收一轮）：超了抛 FunctionUnitsError 点名入口，不一直转
+CLOSURE_ROUND_LIMIT = 64
+# 并行之前父进程建好的脚本索引：(根的绝对路径, under) → ScriptClosure；closure_of 取它的 python 与 shell（prepare_shared_script_index）
+SHARED_SCRIPT_INDICES = {}
+# 弄坏开关 data-units-process-wide 下数据单元的单元表：(根的绝对路径, data_units 或 data_directories) → {路径: 单元}
+PROCESS_WIDE_DATA_UNITS = {}
+
+
+def default_script_directories(root):
+    return [place for place in DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(root, place))]
 
 
 class ScriptClosure:
-    def __init__(self, root, under):
+    def __init__(self, root, under, excluded_files=()):
         self.root = os.path.abspath(root)
         self.breaks = active_breaks()
         self.python = PythonIndex(self.root)
         self.under = list(under)
         self.shell = None
         self.closure = Closure()
+        # 按角色排除的文件（文件头「按角色排除的文件」）：单元不进闭包，也不从它们往下连
+        self.excluded_files = frozenset(excluded_files) if "excluded-files-followed" not in self.breaks else frozenset()
+        self.closure.excluded_files = self.excluded_files
         self.named_classes, self.attributes_seen, self.loaded_modules, self.modules_seen = set(), set(), set(), set()
+        # 按路径载入、模块值出不了载入方的（文件头「按路径载入的模块只连载入方调到的属性」）：{载入方模块的路径: 载入的文件} 与 {模块的路径: 它的单元上见过的属性名}
+        self.contained_loads, self.attributes_by_module = collections.defaultdict(set), collections.defaultdict(set)
         self.import_time_classes = set()   # 只当类头收进来（IMPORT_TIME_CLASS_RULE）、还没被点名的类头：之后被点名时再连方法
         self.methods_by_name = collections.defaultdict(list)
         self.closure_sourcers, self.processed_shell = collections.defaultdict(set), collections.defaultdict(list)
@@ -11733,11 +14320,21 @@ class ScriptClosure:
         self.inline_seen, self.inline_units = set(), {}
         # 程序入口带参数（文件头「程序入口带参数」）：给了参数才剪；收过边的 (单元 id, 视图)（视图 None 是整份，盖住别的视图）
         self.narrowing, self.views_done = False, set()
+        # 带着已知的词起的 python 程序（文件头「shell 起 python」）：这几份模块的 import 时赋值照「给了参数」收
+        self.narrowed_programs = set()
+        # 按第一列选行的表（文件头「shell 起法带字面参数」）：{脚本: 按实验号起过的那几组词}，整份起过的是 None、没有这一项的也照整张表，只起过不定义表的那几种（table_launched）是空集合、读表一行都不连；读表的每一处 {脚本: [(表的变量单元, 来处, 规则名)]}
+        self.table_selections, self.table_references = {}, {}
+        # 表行之外写到的驱动函数（table_unselected_drivers）：{(脚本, 这几次起法的词): 只写在这几次起法都跑不到的那几行的 @驱动函数}
+        self.unselected_drivers = {}
         # 运行期读的文件里本模块没有调用处的参数 [(函数单元, 参数名, 读它的模块, 读它的单元, 行, 是不是拷文件的源)] 与调用方交进来的命令 [(拒算, 出处)]：收完闭包再判
         self.pending_parameters, self.pending_launches = [], []
         # 读 <参数>/<字面尾巴> 的每一处 [(取法, 读它的单元)] 与已经照尾巴收过的那几处（下标）：每收完一轮闭包按调用处重认一遍
         self.tail_reads, self.tail_reads_collected = [], set()
-        self.calls_by_name = None
+        # 闭包里按名字认的调用处（closure_call_arguments）：{被调的名字: [(调用节点, 所在单元)]}；新收的（单元, 视图）记在 pending，用的时候并进来，不整份重建
+        self.calls_by_name = collections.defaultdict(list)
+        self.call_index_pending, self.call_nodes_indexed = [], set()
+        # call_reaches 问过的每一层 def 自己绑的名字：{id(节点): (节点, 局部名字, global 与 nonlocal 声明过的)}
+        self.scope_names = {}
 
     def shell_index(self, extra=()):
         if self.shell is None:
@@ -11748,7 +14345,7 @@ class ScriptClosure:
 
     def push(self, unit, via, rule, view=None):
         """view：None 整份收；frozenset 的已知值表是程序入口带参数剪过的那一种；SHALLOW_IMPORT_VIEW 是给了参数时 import 时执行的赋值（文件头「程序入口带参数」）。"""
-        if unit is None:
+        if unit is None or unit.file in self.excluded_files:
             return
         if id(unit) in self.closure.members and self.view_done(unit, view):
             self.named_after_import_time(unit, rule)
@@ -11767,11 +14364,15 @@ class ScriptClosure:
     def push_program(self, file, via, launched=None, shell_arguments=None):
         """launched：程序入口带参数时起它的那几处带过去的参数（KnownWords 的集合）；None 是不知道、整份收（文件头「程序入口带参数」子进程边）。
         shell_arguments：shell 起 shell 的每一处带的字面参数（{(词…)}，ShellIndex.shell_launch_arguments）；None 是有一处不知道，脚本体整份收。"""
+        if file in self.excluded_files:
+            return
         language = language_of_file(self.root, file)
         if language == "python":
             module = self.python.module(file)
             if module is not None:
                 self.closure.refusals.update(module.refusals)
+                if launched:
+                    self.narrowed_programs.add(file)
                 for unit in module.program_entries():
                     if launched and unit.kind == "main-guard":
                         for words in sorted(launched, key=repr):
@@ -11783,30 +14384,102 @@ class ScriptClosure:
             shell_file = index.files.get(file)
             if shell_file is not None:
                 self.closure.refusals.update(shell_file.refusals)
-                if shell_arguments is None and launched and all(words.exact and None not in words.words for words in launched):
+                if shell_arguments is None and launched and "python-shell-launch-arguments-unfolded" not in self.breaks \
+                        and all(words.exact and None not in words.words for words in launched):
                     shell_arguments = {tuple(words.words) for words in launched}
                 if shell_arguments and shell_file.script_body is not None and "shell-program-arguments-unnarrowed" not in self.breaks:
                     # 文件头「shell 起法带字面参数」：边照按参数剪过的脚本体认（单元与指纹照原来那一份）
                     for words in sorted(shell_arguments):
+                        self.table_launched(file, None if SHELL_OPEN_TAIL in words else words, via=via)
                         self.push(index.narrowed_script_body(file, words), via, "program")
                 else:
+                    self.table_launched(file, None, via=via)
                     self.push(shell_file.script_body, via, "program")
 
+    def table_launched(self, file, words, undecided_dropped=False, via=None):
+        """file 在闭包里按 words（实验号那几个词）起了一次；words 是 None 是整份起了（入口就是它、source 了它、起法折不出）。读表的已经连过的按新的取法补上（文件头「shell 起法带字面参数」）。
+        照 words 剪过的脚本体里表的赋值行一行都不剩的（ShellIndex.launch_defines_tables；undecided_dropped 照它）不算一次起法：这个进程里表没定义，只记下这份脚本起过
+        （table_selections 里至少有一个空集合，读表的不再照「没起过」连整张）。弄坏开关 shell-table-launch-without-assignment-counted 下照旧记这组词。"""
+        if file not in SHELL_ROW_SELECTED_TABLES:
+            return
+        if words is not None and "shell-table-launch-without-assignment-counted" not in self.breaks \
+                and not self.shell_index([file]).launch_defines_tables(file, words, undecided_dropped):
+            self.closure.table_launches.append((file, words, via, "no-table"))
+            self.table_selections.setdefault(file, set())
+            return
+        self.closure.table_launches.append((file, words, via, "whole" if words is None or not any(table_row_selection(words)) else "rows"))
+        selected = self.table_selections.setdefault(file, set())
+        if selected is None or words in selected:
+            return
+        if words is None:
+            self.table_selections[file] = None
+        else:
+            selected.add(words)
+        for variable, via, rule in self.table_references.get(file, ()):
+            self.push(variable if words is None else self.shell_index().selected_table_variable(variable, words), via, rule)
+
+    def table_unselected_drivers(self, file):
+        """file 是按第一列选行的表脚本、闭包里只按实验号与行项起过时，只写在这几次起法都跑不到的那几行的 @驱动函数（文件头「shell 起法带字面参数」表行之外写到的驱动函数；
+        跑得到哪几行照 table_rows_selected：实验号整个跑，--item 点到的实验号只跑点名的行）；别的情形是空集合。
+        后来起到那几行时，驱动由那一趟视图里的表行连上，所以这里此刻排掉的不用补。"""
+        tables = SHELL_ROW_SELECTED_TABLES.get(file)
+        if tables is None or "shell-row-driver-mentions-linked" in self.breaks or "shell-table-rows-unselected" in self.breaks:
+            return frozenset()
+        launches = tuple(sorted(self.table_selections.get(file) or ()))
+        whole = any(not any(table_row_selection(words)) for words in launches)
+        if (not launches or whole) and "shell-row-driver-whole-launch-dropped" not in self.breaks:
+            return frozenset()
+        if (file, launches) not in self.unselected_drivers:
+            self.unselected_drivers[(file, launches)] = table_drivers_of_unselected_rows(self.shell.files[file].script_body.body or "", tables, launches)
+        return self.unselected_drivers[(file, launches)]
+
+    def push_variable(self, variable, via, rule):
+        """单元读到一个 shell 变量：按第一列选行的表照这份脚本在闭包里的起法连（table_launched），别的连它本身。弄坏开关 shell-table-rows-unselected 下连整张表。"""
+        tables = SHELL_ROW_SELECTED_TABLES.get(variable.file, ())
+        if variable.name not in tables or "shell-table-rows-unselected" in self.breaks:
+            self.push(variable, via, rule)
+            return
+        self.table_references.setdefault(variable.file, []).append((variable, via, rule))
+        selected = self.table_selections.get(variable.file)
+        if selected is None:
+            self.push(variable, via, rule)
+            return
+        for words in sorted(selected):
+            self.push(self.shell_index().selected_table_variable(variable, words), via, rule)
+
     def run(self, entries, program_arguments=None):
-        """program_arguments：python 程序入口带的参数（文件头「程序入口带参数」）；None 是没给，照整份收。"""
+        """program_arguments：程序入口带的参数（文件头「程序入口带参数」）：python 的 main-guard 照 sys.argv 剪，shell 的 script-body 照字面参数剪
+        （narrowed_script_body，按第一列选行的表照这组词记一次起法）；None 是没给，照整份收。"""
         self.closure.entry_units.extend(entry for entry in entries if entry is not None)
-        self.narrowing = program_arguments is not None and "python-program-arguments-unnarrowed" not in self.breaks
+        shell_words = None
+        if program_arguments is not None and "shell-entry-arguments-unnarrowed" not in self.breaks:
+            shell_words = tuple(program_arguments)
         for entry in entries:
-            view = None
+            if entry is not None and entry.language == "shell":
+                self.table_launched(entry.file, shell_words if entry.kind == "script-body" else None,
+                                    "shell-entry-undecided-branches-dropped" in self.breaks)
+        # 给了参数时 import 时执行的赋值只收赋值本身（文件头「程序入口带参数」）：只在入口是 python 时才这样收
+        self.narrowing = program_arguments is not None and "python-program-arguments-unnarrowed" not in self.breaks \
+            and any(entry is not None and entry.language == "python" for entry in entries)
+        for entry in entries:
+            unit, view = entry, None
             if self.narrowing and entry is not None and entry.language == "python" and entry.kind == "main-guard":
                 view = frozenset({(ARGV_BINDING, KnownWords((entry.file, *program_arguments), True))})
-            self.push(entry, None, "entry", view)
+            elif shell_words is not None and entry is not None and entry.language == "shell" and entry.kind == "script-body":
+                unit = self.shell_index().narrowed_script_body(entry.file, shell_words, "shell-entry-undecided-branches-dropped" in self.breaks)
+            self.push(unit, None, "entry", view)
+        rounds = 0
         while True:
+            rounds += 1
+            if rounds > CLOSURE_ROUND_LIMIT and "closure-round-limit-unchecked" not in self.breaks:
+                names = "、".join(f"{entry.file}::{entry.name}" for entry in self.closure.entry_units)
+                raise FunctionUnitsError(f"闭包收了 {CLOSURE_ROUND_LIMIT} 轮还没收完（入口 {names}；此刻 {len(self.closure.order)} 个单元、{len(self.todo)} 个待收）："
+                                         "每轮都折出新的程序，看 closure <根> <入口> --explain 的 round 那几行与最后收进来的单元")
             self.drain_pending_units()
-            # 闭包里按名字认的调用处随新收进来的单元重认；调用方交进来的命令在调用处折出的根里脚本（supplied_program_linked）推进 todo：连完再判一轮
-            self.calls_by_name = None
+            # 调用方交进来的命令在调用处折出的根里脚本（supplied_program_linked）推进 todo：连完再判一轮
             self.resolve_parameter_reads()
             self.caller_launch_refusals()
+            self.closure.round_sizes.append(len(self.closure.order))
             if not self.todo:
                 return self.closure
 
@@ -11827,6 +14500,8 @@ class ScriptClosure:
             if unit.data:
                 continue
             if unit.language == "python":
+                if unit.scope != "inline":
+                    self.call_index_pending.append((unit, view))
                 self.python_edges(unit, rule, view)
             elif unit.language == "shell":
                 self.shell_edges(unit)
@@ -11844,6 +14519,8 @@ class ScriptClosure:
 
     def push_whole(self, file, via):
         """整份连上的模块（-m unittest 点名的测试模块：测试方法按名字反射着调）：它的每个单元。"""
+        if file in self.excluded_files:
+            return
         module = self.python.module(file)
         if module is None:
             return
@@ -11870,7 +14547,7 @@ class ScriptClosure:
                 continue
             if unit.kind in ("import", "assign", "def-head"):
                 # 给了参数时 import 时执行的赋值只收赋值本身，值里当元素写的函数名由取这张表的那一处连（文件头「程序入口带参数」）
-                self.push(unit, module.module_body, IMPORT_TIME_RULE, SHALLOW_IMPORT_VIEW if self.narrowing and unit.kind == "assign" else None)
+                self.push(unit, module.module_body, IMPORT_TIME_RULE, SHALLOW_IMPORT_VIEW if (self.narrowing or module.path in self.narrowed_programs) and unit.kind == "assign" else None)
             elif unit.kind == "class":
                 self.push(unit, module.module_body, IMPORT_TIME_CLASS_RULE)
 
@@ -11881,6 +14558,15 @@ class ScriptClosure:
                 self.push(method, head, f"method {method.short}")
 
     def attribute_seen(self, name, via):
+        seen_here = self.attributes_by_module[via.module.path]
+        if name not in seen_here:
+            seen_here.add(name)
+            # 模块值出不了载入方的那几份：只照载入方自己的单元上见过的属性名连（文件头「按路径载入的模块只连载入方调到的属性」）
+            for path in sorted(self.contained_loads.get(via.module.path, ())):
+                module = self.python.module(path)
+                if module is not None:
+                    for unit in module.by_name.get(name, ()):
+                        self.push(unit, via, f"loaded {name}")
         if name in self.attributes_seen:
             return
         self.attributes_seen.add(name)
@@ -11908,7 +14594,8 @@ class ScriptClosure:
         for relative in facts.registry_reads:
             self.closure.add(self.data_unit(relative), unit, "registry")
         for callee, callee_view in facts.narrowed_calls:
-            self.push(callee, unit, f"call {callee.name}", callee_view)
+            if not self.call_edge_excluded(unit, callee.name):
+                self.push(callee, unit, f"call {callee.name}", callee_view)
         for table in facts.shallow_tables:
             self.push(table, unit, "table-keys", SHALLOW_IMPORT_VIEW)
         if unit.container is not None:
@@ -11926,6 +14613,8 @@ class ScriptClosure:
         if view == SHALLOW_IMPORT_VIEW and "python-import-time-tables-followed" not in self.breaks:
             names = names - module.table_reference_names(unit)
         for name in sorted(names):
+            if self.call_edge_excluded(unit, name):
+                continue   # 登记了的那一条调用边不走（EXCLUDED_CALL_EDGES）
             for target in module.resolve_name(name, unit, facts):
                 self.push(target, unit, f"name {name}")
         self.closure.refusals.update(facts.refusals)
@@ -11944,7 +14633,14 @@ class ScriptClosure:
             loaded = self.python.module(file)
             if loaded is None:
                 continue
-            if file not in self.loaded_modules:
+            if facts.contained_loads.count(file) == facts.loads.count(file) and "loaded-attributes-closure-wide" not in self.breaks:
+                # 模块值出不了这份模块（PythonModule.loaded_value_contained）：只连这份模块的单元上见过的属性名，main 与 main-guard 不跟着别处的 .main 进来
+                if file not in self.contained_loads[module.path]:
+                    self.contained_loads[module.path].add(file)
+                    for name in sorted(self.attributes_by_module.get(module.path, ())):
+                        for target in loaded.by_name.get(name, ()):
+                            self.push(target, unit, f"loaded {name}")
+            elif file not in self.loaded_modules:
                 self.loaded_modules.add(file)
                 for name in sorted(self.attributes_seen):
                     for target in loaded.by_name.get(name, ()):
@@ -11955,12 +14651,19 @@ class ScriptClosure:
                 continue   # 登记了的那一条子进程边不走（EXCLUDED_PROGRAM_EDGES）
             # 每一处起它的都带着参数（一处不知道就整份收）才照参数剪（文件头「程序入口带参数」子进程边）
             launched = facts.program_arguments.get(file, [])
-            self.push_program(file, unit, set(launched) if self.narrowing and launched and len(launched) == facts.program_links.count(file) else None)
+            # shell 脚本体按字面参数剪不看入口带没带参数（文件头「shell 起法带字面参数」）：每一处起它的都折得出才剪
+            choices = facts.shell_launch_words.get(file, [])
+            shell_arguments = None
+            if language_of_file(self.root, file) == "shell" and choices and len(choices) == facts.program_links.count(file) and None not in choices \
+                    and "python-shell-launch-arguments-unfolded" not in self.breaks:
+                shell_arguments = set().union(*choices)
+            self.push_program(file, unit, set(launched) if "python-program-arguments-unnarrowed" not in self.breaks and launched and len(launched) == facts.program_links.count(file) else None, shell_arguments)
         for script in facts.inline_scripts:
             self.push_inline(script, unit)
         for file in facts.whole_modules:
             self.push_whole(file, unit)
         self.python_data_reads(module, unit, facts)
+        self.built_tool_sources(unit, [BUILT_TOOL_SOURCES.get((unit.file, unit.name))] + facts.built_tools)
         if unit.kind == "main-guard" and module.inline is None and "declared-checks-ignored" not in self.breaks:
             # 程序入口调 preflight：它先在仓根跑这份文件头登记的 check 判据
             for script in declared_checks(self.root, module.path, module.rows):
@@ -11988,22 +14691,44 @@ class ScriptClosure:
             if program is not None:
                 self.closure.programs.setdefault(program, (unit.file, unit.first_line))
 
+    def call_edge_excluded(self, unit, name):
+        """unit 按名字连 name 的那一条边登在 EXCLUDED_CALL_EDGES 里（文件头「不走的调用边」）；弄坏开关 call-edge-exclusions-ignored 下一律照连。"""
+        return (unit.file, unit.name, name) in EXCLUDED_CALL_EDGES and "call-edge-exclusions-ignored" not in self.breaks
+
     def toolchain_unit(self, file, line):
         """工具链询问那一处（文件头「版本询问」）→ 它的工具链单元；rust_toolchain_lines 一个闭包只问一次。"""
         if "toolchain_fingerprint" not in self.__dict__:
             self.toolchain_fingerprint = sha256_text("".join(text + "\n" for text in rust_toolchain_lines(self.root)))
         return Unit("data", TOOLCHAIN_UNIT_KIND, TOOLCHAIN_UNIT_KIND, file, line, line, self.toolchain_fingerprint, data=True)
 
+    def shared_data_units(self, name):
+        """data_unit 与 data_directory 的单元表（name 是 data_units 或 data_directories）：共用一个脚本索引（PythonIndex）的闭包共用一张，
+        一趟里几十个闭包读同一批数据文件时，每份只读一遍、算一遍摘要；索引随这一趟的文件内容一起建，下一趟（新索引）重读。
+        弄坏开关 data-units-process-wide 下整个进程共用一张（按根分），同一棵树里文件改了也认旧的。"""
+        if "data-units-process-wide" in self.breaks:
+            return PROCESS_WIDE_DATA_UNITS.setdefault((self.root, name), {})
+        return getattr(self.python, name)
+
     def data_unit(self, path):
-        """运行期读的仓内文件 → 它的数据单元（data-file，字节 sha256；同一份只造一个）。"""
-        units = self.__dict__.setdefault("data_units", {})
+        """运行期读的仓内文件 → 它的数据单元（data-file，字节 sha256；同一份只造一个，共用同一个脚本索引的闭包之间也只造一个）。"""
+        units = self.shared_data_units("data_units")
         if path not in units:
             units[path] = data_file_unit(self.root, path)
         return units[path]
 
+    def built_tool_sources(self, unit, sources):
+        """编工具程序的函数进了闭包（BUILT_TOOL_SOURCES，python 函数与 shell 函数都认）、起编出来的工具的那一处（BUILT_TOOL_LAUNCHES）：
+        sources 里每个源码目录（相对根，None 跳过）整棵收成数据目录，规则名 tool-source。弄坏开关 built-tool-sources-ignored 下不收。"""
+        if "built-tool-sources-ignored" in self.breaks:
+            return
+        for source in dict.fromkeys(source for source in sources if source is not None):
+            if os.path.isdir(os.path.join(self.root, source)):
+                self.closure.add(self.data_directory(source), unit, "tool-source")
+
     def data_directory(self, path):
-        """运行期读的根里固定目录（文件头「运行期读的数据文件」一）→ 它的数据单元（data-directory，指纹同 directory_fingerprint；同一个只造一个）。"""
-        units = self.__dict__.setdefault("data_directories", {})
+        """运行期读的根里固定目录（文件头「运行期读的数据文件」一）→ 它的数据单元（data-directory，指纹同 directory_fingerprint；同一个只造一个，
+        共用同一个脚本索引的闭包之间也只造一个）。"""
+        units = self.shared_data_units("data_directories")
         if path not in units:
             units[path] = data_directory_unit(self.root, path)
         return units[path]
@@ -12072,16 +14797,18 @@ class ScriptClosure:
             for argument, caller in self.closure_call_arguments(function, name):
                 for origin in sorted(caller.module.data_read_origins(argument, caller), key=lambda item: tuple(str(part) for part in item if not isinstance(part, Unit))):
                     self.data_read_origin(origin, module, reader, line, copied)
+        resolved = {}
         for position, (origin, reader) in enumerate(self.tail_reads):
             # 闭包里有一处给的不是这一趟的临时目录、也不是被判的输入：照尾巴收仓里那一组
-            if position not in self.tail_reads_collected and not self.tail_read_supplied(origin[1], origin[2], {}):
+            if position not in self.tail_reads_collected and not self.tail_read_supplied(origin[1], origin[2], resolved):
                 self.tail_reads_collected.add(position)
                 for relative in sorted(origin[3]):
                     self.closure.add(self.data_unit(relative), reader, "data-read")
 
     def closure_call_arguments(self, function, name):
         """闭包里调 function 的每一处给参数 name 的实参 [(实参节点, 调用处的作用域单元)]：按名字认（f(…)、x.f(…)；__init__ 认 类名(…)），
-        方法去掉 self；带 * / ** 的那一处认不出对哪个参数、跳过；没给的取缺省值（作用域是 function 自己）。"""
+        只留真解析得到 function 的那几处（call_reaches）；方法去掉 self；带 * / ** 的那一处认不出对哪个参数、跳过；没给的取缺省值（作用域是 function 自己）。
+        functools.partial(f, …) 照 f(…) 算一处（partial_bound_call；弄坏开关 python-partial-call-sites-ignored 下不算）。"""
         definition = function.node
         if not isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef)):
             return []
@@ -12095,27 +14822,126 @@ class ScriptClosure:
         defaults = dict(zip(positional[len(positional) - len(arguments.defaults):], arguments.defaults))
         defaults.update({argument.arg: default for argument, default in zip(arguments.kwonlyargs, arguments.kw_defaults) if default is not None})
         position = positional.index(name) if name in positional else None
-        if self.calls_by_name is None:
-            self.calls_by_name = collections.defaultdict(list)
-            for member in self.closure.order:
-                if getattr(member, "language", None) != "python" or member.data or getattr(member, "module", None) is None:
-                    continue
-                for node in walk_nodes(member.nodes or []):
-                    if isinstance(node, ast.Call):
-                        callee = node.func.id if isinstance(node.func, ast.Name) else node.func.attr if isinstance(node.func, ast.Attribute) else None
-                        if callee:
-                            self.calls_by_name[callee].append((node, member))
+        self.index_pending_calls()
         out = []
-        for call, member in self.calls_by_name.get(called, ()):
+        sites = [(call, call, member) for call, member in self.calls_by_name.get(called, ())]
+        if "python-partial-call-sites-ignored" not in self.breaks:
+            for written, member in self.calls_by_name.get("partial", ()):
+                bound = partial_bound_call(written, called)
+                if bound is not None:
+                    sites.append((bound, written, member))
+        for call, written, member in sites:
+            if not self.call_reaches(call, member, function, written):
+                continue
             if any(isinstance(item, ast.Starred) for item in call.args) or any(keyword.arg is None for keyword in call.keywords):
                 continue
             argument = call.args[position] if position is not None and position < len(call.args) else None
             argument = next((keyword.value for keyword in call.keywords if keyword.arg == name), argument)
             if argument is not None:
-                out.append((argument, member.module.scope_of(call, member)))
+                out.append((argument, member.module.scope_of(written, member)))
             elif defaults.get(name) is not None:
                 out.append((defaults[name], function))
         return out
+
+    def call_reaches(self, call, member, function, written=None):
+        """按名字认到的一处调用（calls_by_name）真解析得到 function 才算它的调用处（文件头「调用方交进来的命令」调用处那一条）。判不了的照旧算。
+        f(…)，function 不是类里的方法：从调用处那一层往外，头一层把 f 当局部名字的函数作用域就是 f 解析到的地方，function 正是那一层里定义的才算
+        （套着的同名函数遮住外层的）；那一层 global / nonlocal 声明过 f 的照旧算。没有一层绑它、到了模块级的：function 是套着的函数不算；
+        function 是模块级函数时，同一个模块算，别的模块里 import 了 f 的照 import 解到的是不是 function 那一份，没 import 而自己有模块级同名 def / class 的不算，别的照旧算。
+        x.f(…)：x 往外每一层都不是局部名字、import 绑的是标准库或外部包、或解到的仓内模块不是 function 那一份的不算（subprocess.run 不是模块级 run 的调用处）；
+        x 是 self、局部变量、载入的模块、属性链与调用的结果都判不了，照旧算。弄坏开关 python-call-sites-matched-by-name 下一律照名字算。
+        written 是源码里真写着的那个节点（functools.partial(f, …) 那一处，call 是照 f(…) 写的那一份）：作用域照它找，没给就是 call。"""
+        if "python-call-sites-matched-by-name" in self.breaks:
+            return True
+        module = getattr(member, "module", None)
+        if module is None or getattr(function, "module", None) is None:
+            return True
+        if isinstance(call.func, ast.Name):
+            name, attribute = call.func.id, False
+            if function.container is not None:
+                return True
+        elif isinstance(call.func, ast.Attribute) and isinstance(call.func.value, ast.Name):
+            name, attribute = call.func.value.id, True
+        else:
+            return True
+        # function 定义在哪一层函数里（套着的函数）；定义在 main-guard 这类模块级代码里的照模块级函数认
+        defining = enclosing_unit(function)
+        defining_node = defining.node if defining is not None and isinstance(defining.node, (ast.FunctionDef, ast.AsyncFunctionDef)) else None
+        place = module.scope_of(call if written is None else written, member)
+        scope = place
+        while scope is not None:
+            if isinstance(scope.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                names, declared = self.scope_local_names(scope.node)
+                if name in declared:
+                    return True
+                if name in names:
+                    return attribute or (defining_node is not None and defining_node is scope.node)
+            scope = enclosing_unit(scope)
+        if attribute:
+            return self.binding_reaches(module, module.binding(name, place), function, True)
+        if defining_node is not None:
+            return False
+        if module is function.module:
+            return True
+        binding = module.binding(name, place)
+        if binding is not None:
+            return self.binding_reaches(module, binding, function, True)
+        return not any(candidate.kind in ("def", "class") and candidate.container is None for candidate in module.by_name.get(name, ()))
+
+    @staticmethod
+    def binding_reaches(module, binding, function, unresolved):
+        """module 里一个 import 绑定解到的模块是不是 function 那一份（call_reaches）：标准库、外部包 → False；仓内的照每一份解到的文件比；解不出的交 unresolved。"""
+        if binding is None:
+            return unresolved
+        if binding[0] == "import":
+            dotted, level = binding[1], 0
+        else:
+            dotted, level = (f"{binding[1]}.{binding[4]}" if binding[1] else binding[4]), binding[2]
+            status, _file = module.resolve_module(dotted, level)
+            if status != "repo":
+                # from 包 import 名字：名字不是子模块时，照包本身那一份比（名字是它里面的函数或类）
+                dotted = binding[1]
+        status, file = module.resolve_module(dotted, level)
+        if status in ("stdlib", "external"):
+            return False
+        if status != "repo":
+            return unresolved
+        return function.module.path in (module.all_resolutions(dotted, level) or [file])
+
+    def scope_local_names(self, node):
+        """一层 def 自己绑的名字（function_local_names），按节点记下来：同一层在 call_reaches 里反复问。"""
+        cached = self.scope_names.get(id(node))
+        if cached is None or cached[0] is not node:
+            cached = (node, *function_local_names(node))
+            self.scope_names[id(node)] = cached
+        return cached[1], cached[2]
+
+    def index_pending_calls(self):
+        """新收进闭包的（单元, 视图）里的调用并进 calls_by_name：程序入口带参数剪掉的那几截（narrowing_plan）
+        里的调用不算；同一个节点只记一次。弄坏开关 closure-call-index-frozen 下头一次建完就不再并（后收进来的调用处看不见）。"""
+        if "closure-call-index-frozen" in self.breaks and self.call_nodes_indexed:
+            return
+        while self.call_index_pending:
+            member, view = self.call_index_pending.pop()
+            if getattr(member, "module", None) is None:
+                continue
+            for node, callee in self.named_calls_of(member, view):
+                if id(node) not in self.call_nodes_indexed:
+                    self.call_nodes_indexed.add(id(node))
+                    self.calls_by_name[callee].append((node, member))
+
+    def named_calls_of(self, member, view):
+        """member 在 view 下的调用 [(ast.Call 节点, 被调的名字)]，按层走的次序，只留认得出名字的（f(…) 取 f，x.f(…) 取 f）。
+        不剪的（view 不是程序入口带参数剪过的那一种）存在单元自己的 cache["named-calls"] 里：单元随它的模块（文件内容）一起建，每个闭包收进同一个单元都不再各走一遍语法树；
+        剪过的按 narrowing_plan 现走。"""
+        if isinstance(view, frozenset) and "python-call-sites-whole-view" not in self.breaks:
+            skipped, extra = member.module.narrowing_plan(member, dict(view))[:2]
+            return named_calls_in(itertools.chain(walk_nodes_skipping(member.nodes or [], skipped), walk_nodes(extra)))
+        if member.cache is None:
+            member.cache = {}
+        if "named-calls" not in member.cache:
+            member.cache["named-calls"] = named_calls_in(walk_nodes_skipping(member.nodes or [], ()))
+        return member.cache["named-calls"]
 
     def caller_launch_refusals(self):
         """调用方交进来的命令（文件头「调用方交进来的命令」）：折不出的那几截出处都是这一次入口的参数，或 sys.argv、argparse 的属性、临时目录、根外前缀的
@@ -12152,8 +14978,19 @@ class ScriptClosure:
         if key not in resolved:
             resolved[key] = False   # 正在判：绕回来的当推不出
             sites = self.closure_call_arguments(function, name)
-            resolved[key] = bool(sites) and all(self.launch_argument_supplied(argument, caller, resolved, depth + 1) for argument, caller in sites)
+            if "caller-supplied-commands-callee-wide" in self.breaks and any(self.caller_supplied_registered(argument, caller) for argument, caller in sites):
+                resolved[key] = True   # 弄坏开关：一处登记了就当整个被调函数都登记了
+                return True
+            resolved[key] = bool(sites) and all(self.launch_argument_supplied(argument, caller, resolved, depth + 1)
+                                                or self.caller_supplied_registered(argument, caller) for argument, caller in sites)
         return resolved[key]
+
+    def caller_supplied_registered(self, argument, caller):
+        """调用方登记（文件头「调用方登记」）：这一处调用（调用处的文件、调用处单元的短名、实参的 ast.unparse）登在 CALLER_SUPPLIED_COMMANDS 里。
+        只在这一处往下认不出时问（认得出的照常连），只管这一处；弄坏开关 caller-supplied-commands-refused 下一律不算。"""
+        if "caller-supplied-commands-refused" in self.breaks or caller is None or getattr(caller, "module", None) is None:
+            return False
+        return (caller.module.source_file(), caller.short.rsplit(".", 1)[-1], ast.unparse(argument)) in CALLER_SUPPLIED_COMMANDS
 
     def launch_argument_supplied(self, argument, caller, resolved, depth=0):
         """闭包里一处调用给命令参数的实参，在调用处折（文件头「调用方交进来的命令」：被调函数的参数按每个调用点的实参折）：
@@ -12215,15 +15052,30 @@ class ScriptClosure:
         index = self.shell
         shell_file = index.files[unit.file]
         names = facts.command_words if "shell-names-command-position-only" in self.breaks else facts.words
+        unselected = self.table_unselected_drivers(unit.file)
         for name in sorted(names & index.function_names_in(visible)):
+            if name in unselected and written_only_as_table_row(unit.body or "", name):
+                continue   # 文件头「shell 起法带字面参数」表行之外写到的驱动函数
             for target in index.functions_in(visible, name):
-                if target is not unit:
+                if target is not unit and self.shell_nested_function_named(unit, target, name, facts):
                     self.push(target, unit, f"name {name}")
         for name in sorted(facts.variable_references):
             targets = shell_file.variables.get(name) or [variable for path in sorted(visible) if path in index.files
                                                           for variable in index.files[path].variables.get(name, [])]
             for target in targets:
-                self.push(target, unit, f"variable {name}")
+                self.push_variable(target, unit, f"variable {name}")
+
+    def shell_nested_function_named(self, unit, target, name, facts):
+        """单元里写到 target 的名字算不算连它（文件头「shell 里套在函数里的函数」）：顶层函数算；套在函数里的，单元在同一个外层函数（连同它里面）的算，外面的只认命令位置上的词。"""
+        owner = target.container
+        if owner is None or "shell-nested-functions-by-any-word" in self.breaks:
+            return True
+        scope = unit
+        while scope is not None:
+            if scope is owner:
+                return True
+            scope = scope.container
+        return name in facts.command_words
 
     def shell_edges(self, unit):
         index = self.shell_index()
@@ -12240,6 +15092,7 @@ class ScriptClosure:
             self.closure.add(shell_file.kept, unit, "kept-comments")
         if not inline:
             self.shell_names(unit, facts, self.visible_files(unit.file))
+            self.built_tool_sources(unit, [BUILT_TOOL_SOURCES.get((unit.file, unit.name))])
         if unit.kind == "script-body" and shell_file is not None and "declared-checks-ignored" not in self.breaks:
             # 脚本体调 preflight：它先在仓根跑这份文件头登记的 check 判据
             for script in declared_checks(self.root, unit.file, shell_file.rows):
@@ -12263,6 +15116,7 @@ class ScriptClosure:
                     if added is None:
                         continue
                     self.closure.refusals.update(added.refusals)
+                    self.table_launched(file, None, via=unit)
                     self.push(added.script_body, unit, "source")
                     sourced.add(file)
                     if not inline and unit.file not in self.closure_sourcers[file]:
@@ -12274,7 +15128,8 @@ class ScriptClosure:
                     if (unit.file, unit.name, file) in EXCLUDED_PROGRAM_EDGES and "program-edge-exclusions-ignored" not in self.breaks \
                             and "program-edge-exclusions-shell-ignored" not in self.breaks:
                         continue   # 登记了的那一条子进程边不走（EXCLUDED_PROGRAM_EDGES；shell 函数起的同样认）
-                    self.push_program(file, unit, shell_arguments=index.shell_launch_arguments(unit, file) if kind == "shell" else None)
+                    self.push_program(file, unit, index.python_launch_words(unit, file) if kind == "python" else None,
+                                      index.shell_launch_arguments(unit, file) if kind == "shell" else None)
         if prefixes:
             # "前缀_$1" 派活：看得见的函数里名字以这个前缀起头的都连
             visible = index.downward(sourced) if inline else self.visible_files(unit.file)
@@ -12329,8 +15184,30 @@ class Options:
         self.wgsl_modules, self.rust_strings_entry, self.explain = [], None, False
         # 判定种类（文件头「判定种类」）；product_dump 只给库接口的调用方交 Rust 那一份 dump 行用，命令行不认
         self.judgment_kind, self.product_dump = FORMAL_VERIFICATION, None
-        # python 程序入口带的参数（文件头「程序入口带参数」）；None 是没给
+        # 程序入口（python 与 shell）带的参数（文件头「程序入口带参数」）；None 是没给
         self.program_arguments = None
+        # 按角色排除的文件（文件头「按角色排除的文件」）；judging 是命令行 --judging（照判定算键的口径定排哪几份，command_closure）
+        self.excluded_files = ()
+        self.judging = False
+
+
+def judging_excluded_files(entry):
+    """命令行 closure / key --judging（文件头「按角色排除的文件」）：这个入口照判定算键的口径按角色排除哪几份。取法只在 admission.py 的
+    not_judging_files_of_entry 一处（KeyContext.collected_script_closure 用的同一个函数、同一种载入法：它自己的 function_units() 交的库），
+    这里按路径载入这份库同目录的 admission.py 调它，不另抄。弄坏开关 closure-judging-exclusions-dropped 下交空（照不带 --judging 的口径收）。"""
+    if "closure-judging-exclusions-dropped" in active_breaks():
+        return ()
+    specification = importlib.util.spec_from_file_location("admission_for_judging_closure", os.path.join(LIBRARY_ROOT, "scripts", "gate", "admission.py"))
+    admission = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(admission)
+    return tuple(admission.not_judging_files_of_entry(admission.function_units(), entry.partition("::")[0]))
+
+
+def command_closure(root, entry, options):
+    """命令行 closure / key 收的闭包：带 --judging 的先照判定算键的口径定按角色排除哪几份（judging_excluded_files），再 closure_of。"""
+    if options.judging:
+        options.excluded_files = judging_excluded_files(entry)
+    return closure_of(root, entry, options)
 
 
 def closure_of(root, entry, options=None):
@@ -12379,9 +15256,14 @@ def closure_of(root, entry, options=None):
                 closure.data_sites |= supplied.data_sites
                 closure.cfg_atoms = (closure.cfg_atoms or set()) | supplied.cfg_atoms
         return closure
-    under = options.under or [place for place in DEFAULT_SCRIPT_DIRECTORIES if os.path.isdir(os.path.join(root, place))]
-    under = list(dict.fromkeys(list(under) + [posixpath.dirname(path) or "."]))
-    script = ScriptClosure(root, under)
+    under = options.under or default_script_directories(root)
+    directory = posixpath.dirname(path) or "."
+    if not any(directory == place or directory.startswith(place.rstrip("/") + "/") for place in under):
+        under = list(dict.fromkeys(list(under) + [directory]))
+    script = ScriptClosure(root, under, options.excluded_files)
+    shared = SHARED_SCRIPT_INDICES.get((os.path.abspath(root), tuple(under))) if "judging-entry-index-not-shared" not in script.breaks else None
+    if shared is not None:
+        script.python, script.shell = shared.python, shared.shell
     if language == "python":
         module = script.python.module(path)
         if module is None:
@@ -12407,7 +15289,7 @@ def closure_of(root, entry, options=None):
             raise UsageError(f"{path} 里限定名 {qualified} 命中 {len(entries)} 个单元（要恰好一个；dump 看限定名）")
     else:
         entries = [shell_file.script_body]
-    return script.run(entries)
+    return script.run(entries, None if qualified else options.program_arguments)
 
 
 def closure_unit_lines(closure):
@@ -12642,7 +15524,7 @@ def dump_lines(root, language=None, under=None, judgment_kind=FORMAL_VERIFICATIO
                         site = Unit("data", "data" if kind == "file" else "data-directory", value, unit.file, line, line, data_digests[(kind, value)], data=True)
                         units.append(site)
                         counts["data"] += 1
-                if unit.kind == "extern_block":
+                if unit.kind == "extern_block" and not unit.listed_c_library_calls:
                     refusals.add(Refusal("extern-block", unit.file, unit.first_line, rust_file.row(unit.first_line)))
                 for tree, raw, line in unit.conditions or ():
                     if tree is None or not cfg_tree_known(tree, known):
@@ -12705,6 +15587,9 @@ def explain_lines(closure):
         via, rule = closure.via.get(id(unit), (None, ""))
         source = f"{via.file}:{via.name}" if via is not None else "-"
         lines.append(f"via\t{unit.file}:{unit.name}\t{source}\t{rule}")
+    lines += [f"round\t{number}\t{size}" for number, size in enumerate(closure.round_sizes, 1)]
+    lines += [f"table-launch\t{file}\t{outcome}\t{' '.join(words) if words else '-'}\t{f'{via.file}:{via.name}' if via is not None else '-'}"
+              for file, words, via, outcome in closure.table_launches]
     return lines
 
 
@@ -12785,880 +15670,7 @@ def run_controls(root):
 
 # ── 自证 ────────────────────────────────────────────────────────────────────
 
-RUST_FIXTURE = {
-    "crates/fcore/Cargo.toml": '[package]\nname = "fcore"\n',
-    "crates/fcore/src/lib.rs": '''pub const WIDTH: usize = 4;
-pub trait Device {
-    fn read(&self) -> u32;
-    fn doubled(&self) -> u32 {
-        self.read() * 2
-    }
-}
-pub fn recover(device: &dyn Device) -> u32 {
-    device.read() + 1
-}
-pub fn recover_generic<D: Device>(device: &D) -> u32 {
-    device.doubled()
-}
-pub struct Money(pub u32);
-impl std::ops::Add for Money {
-    type Output = Money;
-    fn add(self, other: Money) -> Money {
-        Money(self.0 + other.0)
-    }
-}
-pub struct Guard;
-impl Drop for Guard {
-    fn drop(&mut self) {
-        let _ = 1;
-    }
-}
-macro_rules! make_constant_function {
-    ($name:ident) => {
-        pub fn $name() -> u32 {
-            5
-        }
-    };
-}
-make_constant_function!(five);
-pub trait Limit {
-    const LIMIT: u32;
-}
-pub fn limit_of<T: Limit>() -> u32 {
-    T::LIMIT
-}
-pub fn helper() -> u32 {
-    3
-}
-pub static TABLE: [fn() -> u32; 1] = [helper];
-pub fn unrelated() -> u32 {
-    99
-}
-pub struct Buffer {
-    pub bytes: [u8; WIDTH],
-}
-''',
-    "crates/fharness/Cargo.toml": '[package]\nname = "fharness"\n[dependencies]\nfcore = { path = "../fcore" }\n',
-    "crates/fharness/src/lib.rs": '''use fcore::{Device, Limit};
-pub struct Memory;
-impl Device for Memory {
-    fn read(&self) -> u32 {
-        7
-    }
-}
-pub struct Small;
-impl Limit for Small {
-    const LIMIT: u32 = 10;
-}
-pub struct Other;
-impl Device for Other {
-    fn read(&self) -> u32 {
-        8
-    }
-}
-''',
-    "crates/ftier/Cargo.toml": '[package]\nname = "ftier"\n[dependencies]\nfcore = { path = "../fcore" }\nfharness = { path = "../fharness" }\nfextra = { path = "../fextra" }\n',
-    "crates/ftier/src/lib.rs": '''use fcore::{recover, recover_generic, Device, Money};
-use fharness::{Memory, Small};
-pub fn judge_through_dyn() -> u32 {
-    recover(&Memory)
-}
-pub fn judge_through_generic() -> u32 {
-    recover_generic(&Memory)
-}
-pub fn judge_operator() -> u32 {
-    (Money(1) + Money(2)).0
-}
-pub fn judge_drop() -> u32 {
-    let _guard = fcore::Guard;
-    0
-}
-pub fn judge_macro() -> u32 {
-    fcore::five()
-}
-pub fn judge_associated_constant() -> u32 {
-    fcore::limit_of::<Small>()
-}
-pub fn judge_table() -> u32 {
-    (fcore::TABLE[0])()
-}
-pub fn judge_open(device: &dyn Device) -> u32 {
-    device.read()
-}
-pub fn judge_array_length() -> usize {
-    std::mem::size_of::<fcore::Buffer>()
-}
-pub fn judge_listing() -> u32 {
-    fextra::shade_count()
-}
-pub fn judge_speed() -> u32 {
-    fextra::speed()
-}
-pub fn judge_proven() -> u32 {
-    fextra::proven()
-}
-pub fn judge_documented() -> u32 {
-    fextra::documented()
-}
-pub fn judge_table_rows() -> usize {
-    fextra::table_rows()
-}
-pub fn judge_kernel() -> String {
-    fextra::kernel_source()
-}
-pub fn judge_greeting() -> String {
-    fextra::greet()
-}
-''',
-    "crates/fextra/Cargo.toml": '[package]\nname = "fextra"\n[features]\ndefault = ["fast"]\nfast = []\nslow = []\n',
-    "crates/fextra/src/lib.rs": '''#[macro_export]
-macro_rules! listing {
-    ($($item:item)*) => { $($item)* };
-}
-crate::listing! {
-    pub enum Shade {
-        Light,
-        Dark,
-    }
-}
-pub fn shade_count() -> u32 {
-    Shade::Dark as u32 + 1
-}
-#[cfg(feature = "fast")]
-pub fn speed() -> u32 {
-    11
-}
-#[cfg(feature = "slow")]
-pub fn speed() -> u32 {
-    22
-}
-verus! {
-pub fn bounded(x: u32) -> (r: u32)
-    ensures
-        if x > 0 { r > 0 } else { r == 0 },
-{
-    x
-}
-pub fn proven() -> u32 {
-    9
-}
-} // verus!
-/// 文档说明。
-///
-/// ```
-/// assert_eq!(fextra::documented(), 4);
-/// ```
-pub fn documented() -> u32 {
-    4
-}
-pub const TABLE_TEXT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/data/table.txt"));
-pub fn table_rows() -> usize {
-    TABLE_TEXT.lines().count()
-}
-pub const KERNEL_COMMON: &str = include_str!("common.wgsl");
-pub const KERNEL_MAIN: &str = include_str!("main.wgsl");
-pub fn prelude() -> String {
-    format!("const GENERATED_{}: u32 = 1u;", "LIMIT")
-}
-pub fn kernel_source() -> String {
-    format!("{}\\n{KERNEL_COMMON}\\n{KERNEL_MAIN}", prelude())
-}
-const GREETING: &str = "hi";
-pub fn greet() -> String {
-    format!("{GREETING}!")
-}
-''',
-    "crates/fextra/data/table.txt": "row\nrow\n",
-    "crates/fextra/src/common.wgsl": '''// 共用的那一半
-fn helper_used(x: u32) -> u32 {
-    return x + GENERATED_LIMIT;
-}
-fn helper_unused(x: u32) -> u32 {
-    return x * 7u;
-}
-''',
-    "crates/fextra/src/main.wgsl": '''@group(0) @binding(0) var<storage, read_write> output: array<u32>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    output[id.x] = helper_used(id.x);
-}
-''',
-}
-RUST_FIXTURE_ENTRY_FILE = "crates/ftier/src/lib.rs"
-RUST_FIXTURE_CASES = (
-    ("dyn 分派到下游 crate 的 impl", "judge_through_dyn", "crates/fharness/src/lib.rs", "    fn read(&self) -> u32 {\n        7", "    fn read(&self) -> u32 {\n        70", "changed"),
-    ("dyn 分派：闭包里的 dyn 不连没被点名的另一个 impl，改它不作废", "judge_through_dyn", "crates/fharness/src/lib.rs", "        8\n", "        80\n", "same"),
-    ("泛型约束分派", "judge_through_generic", "crates/fharness/src/lib.rs", "    fn read(&self) -> u32 {\n        7", "    fn read(&self) -> u32 {\n        70", "changed"),
-    ("trait 默认方法", "judge_through_generic", "crates/fcore/src/lib.rs", "self.read() * 2", "self.read() * 3", "changed"),
-    ("运算符重载", "judge_operator", "crates/fcore/src/lib.rs", "Money(self.0 + other.0)", "Money(self.0 * other.0)", "changed"),
-    ("Drop 隐式调用", "judge_drop", "crates/fcore/src/lib.rs", "let _ = 1;", "let _ = 2;", "changed"),
-    ("声明宏展开出的函数", "judge_macro", "crates/fcore/src/lib.rs", "        pub fn $name() -> u32 {\n            5", "        pub fn $name() -> u32 {\n            6", "changed"),
-    ("关联常量（经泛型）", "judge_associated_constant", "crates/fharness/src/lib.rs", "const LIMIT: u32 = 10;", "const LIMIT: u32 = 11;", "changed"),
-    ("函数指针表", "judge_table", "crates/fcore/src/lib.rs", "pub fn helper() -> u32 {\n    3", "pub fn helper() -> u32 {\n    4", "changed"),
-    ("开放入口：参数是 dyn", "judge_open", "crates/fharness/src/lib.rs", "    fn read(&self) -> u32 {\n        7", "    fn read(&self) -> u32 {\n        70", "changed"),
-    ("数组长度里的常量", "judge_array_length", "crates/fcore/src/lib.rs", "pub const WIDTH: usize = 4;", "pub const WIDTH: usize = 5;", "changed"),
-    ("阴性：够不到的函数", "judge_macro", "crates/fcore/src/lib.rs", "    99\n", "    98\n", "same"),
-    ("阴性：只改注释", "judge_operator", "crates/fcore/src/lib.rs", "        Money(self.0 + other.0)", "        // 只加注释\n        Money(self.0 + other.0)", "same"),
-    ("带路径的条目级宏调用定义的枚举：改了作废", "judge_listing", "crates/fextra/src/lib.rs", "        Light,\n        Dark,", "        Dark,\n        Light,", "changed"),
-    ("verus! 里 ensures 带花括号：下一个函数照样切开，改它作废", "judge_proven", "crates/fextra/src/lib.rs", "    9\n", "    10\n", "changed"),
-    ("verus! 里够不到的函数改了不作废", "judge_proven", "crates/fextra/src/lib.rs", "{\n    x\n}", "{\n    x + 0\n}", "same"),
-    ("cfg(feature) 关着的单元改了不作废", "judge_speed", "crates/fextra/src/lib.rs", "    22\n", "    23\n", "same"),
-    ("cfg(feature) 开着的单元改了作废", "judge_speed", "crates/fextra/src/lib.rs", "    11\n", "    12\n", "changed"),
-    ("只改文档注释不作废", "judge_documented", "crates/fextra/src/lib.rs", "/// 文档说明。", "/// 文档说明，改了措辞。", "same"),
-    ("改文档注释里的代码块：入口 fn 不作废", "judge_documented", "crates/fextra/src/lib.rs", "documented(), 4);", "documented(), 5);", "same"),
-    ("include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), …)) 读的文件改了作废", "judge_table_rows", "crates/fextra/data/table.txt", "row\nrow\n", "row\nrow\nrow\n", "changed"),
-    ("WGSL 只改注释不作废", "judge_kernel", "crates/fextra/src/common.wgsl", "// 共用的那一半", "// 共用的那一半，改了措辞", "same"),
-    ("WGSL 够不到的函数改了不作废", "judge_kernel", "crates/fextra/src/common.wgsl", "x * 7u", "x * 8u", "same"),
-    ("WGSL 够得到的函数改了作废", "judge_kernel", "crates/fextra/src/common.wgsl", "x + GENERATED_LIMIT", "x - GENERATED_LIMIT", "changed"),
-    ("format! 串里内联捕获的常量改了作废", "judge_greeting", "crates/fextra/src/lib.rs", 'GREETING: &str = "hi";', 'GREETING: &str = "hello";', "changed"),
-)
 
-# 与 crates/singlefs-unit-graph 对齐的那几条（dump 写法、模块头、文档测试指纹、数据单元、WGSL 外名着落、{{{名}}}、union）的小工作区
-ALIGNMENT_FIXTURE = {
-    "crates/falign/Cargo.toml": '[package]\nname = "falign"\n',
-    "crates/falign/src/lib.rs": '''#![allow(dead_code)]
-//! 模块说明。
-//!
-//! ```
-//! // 只是注释
-//! assert_eq!(falign::width(), 4);
-//! ```
-pub mod nested {
-    #![allow(unused)]
-    pub fn inside() -> u32 {
-        1
-    }
-}
-mod helpers;
-pub const WIDTH: u32 = 4;
-pub fn width() -> u32 {
-    WIDTH
-}
-macro_rules! declare_named {
-    ($name:ident) => {
-        pub fn $name() -> u32 {
-            2
-        }
-    };
-}
-declare_named!(union);
-pub fn call_union() -> u32 {
-    union()
-}
-pub fn wrapped() -> String {
-    format!("{{{WIDTH}}}")
-}
-pub const TABLE_TEXT: &str = include_str!("table.txt");
-pub fn table() -> usize {
-    TABLE_TEXT.len()
-}
-pub const KERNEL: &str = include_str!("kernel.wgsl");
-macro_rules! failure_name {
-    ($name:ident) => {
-        concat!(stringify!(FAILURE_), stringify!($name))
-    };
-}
-pub fn kernel_source() -> String {
-    format!("const {}: u32 = 0u;\\nconst T_{}: u32 = 1u;\\n{KERNEL}", failure_name!(POINT_NONE), "HEADER")
-}
-pub const KERNEL_COUNT: &str = include_str!("kernel_count.wgsl");
-pub fn count_kernel_source() -> String {
-    let COUNT_LIMIT = 3;
-    format!("const X: u32 = {}u;\\n{KERNEL_COUNT}", COUNT_LIMIT)
-}
-''',
-    "crates/falign/src/helpers.rs": "pub fn help() -> u32 {\n    5\n}\n",
-    "crates/falign/src/main.rs": "fn main() {\n    println!(\"{}\", falign::width());\n}\n",
-    "crates/falign/src/bin/tool.rs": "fn main() {}\n",
-    "crates/falign/src/table.txt": "row\n",
-    "crates/falign/src/kernel.wgsl": '''@group(0) @binding(0) var<storage, read_write> output: array<u32>;
-@compute @workgroup_size(1)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    output[id.x] = T_HEADER + FAILURE_POINT_NONE;
-}
-''',
-    "crates/falign/src/kernel_count.wgsl": '''@compute @workgroup_size(1)
-fn main() {
-    _ = COUNT_LIMIT;
-}
-''',
-}
-ALIGNMENT_ENTRY_FILE = "crates/falign/src/lib.rs"
-
-
-PYTHON_FIXTURE = {
-    "pkg/a.py": '''"""模块文档串"""
-import importlib.util
-import os
-import subprocess
-import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-spec = importlib.util.spec_from_file_location("b_module", os.path.join(HERE, "b.py"))
-b_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(b_module)
-
-
-def helper():
-    """helper 的文档串"""
-    # 只是注释
-    return 1
-
-
-def entry():
-    return helper() + b_module.value()
-
-
-def described():
-    return helper.__doc__
-
-
-def dynamic(name):
-    return getattr(b_module, name)()
-
-
-def launch():
-    return subprocess.run([sys.executable, os.path.join(HERE, "c.py")], check=False)
-
-
-class Reader:
-    def read(self):
-        return 1
-
-
-class Writer:
-    def read(self):
-        return 2
-
-
-def use_reader():
-    return Reader().read()
-
-
-if __name__ == "__main__":
-    print(entry())
-''',
-    "pkg/b.py": '''def value():
-    return 2
-
-
-def unused():
-    return 3
-''',
-    "pkg/c.py": '''def main():
-    return 5
-
-
-if __name__ == "__main__":
-    main()
-''',
-    "pkg/d.py": '''import os
-import runpy
-import subprocess
-import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-
-
-def handle_alpha():
-    return 11
-
-
-def handle_beta():
-    return 12
-
-
-HANDLERS = {"alpha": handle_alpha, "beta": handle_beta}
-
-
-def dispatch(name):
-    return HANDLERS[name]()
-
-
-def run_copy(tree):
-    return runpy.run_path(os.path.join(tree, "pkg", "c.py"), run_name="__main__")
-
-
-def write_data(tree):
-    target = os.path.join(tree, "pkg", "out.py")
-    with open(target, "w", encoding="utf-8") as handle:
-        handle.write("data")
-    return subprocess.run([sys.executable, os.path.join(HERE, "c.py"), target], check=False)
-
-
-def common_directory():
-    return subprocess.run(["git", "-C", HERE, "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True).stdout.strip()
-
-
-def main_repository_value():
-    sys.path.insert(0, os.path.join(os.path.dirname(common_directory()), "pkg"))
-    import b
-    return b.value()
-''',
-    "pkg/constants.py": '''TOOLS_RELATIVE = "pkg/tools"
-''',
-    "pkg/g.py": '''import importlib.util
-import os
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = {}
-
-
-def cached_b():
-    path = os.path.join(HERE, "b.py")
-    if path not in CACHE:
-        specification = importlib.util.spec_from_file_location("cached_b", path)
-        module = importlib.util.module_from_spec(specification)
-        specification.loader.exec_module(module)
-        CACHE[path] = module
-    return CACHE[path].value()
-''',
-    "pkg/k.py": '''import os
-import subprocess
-import sys
-
-
-def run_tool_named(root, name):
-    return subprocess.run([sys.executable, os.path.join(root, "pkg", "tools", name)], check=False)
-''',
-    "pkg/j.py": '''import importlib.util
-import os
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-MODULE_PATHS = {"b": os.path.join(HERE, "b.py"), "c": os.path.join(HERE, "c.py")}
-
-
-def load_named(name):
-    specification = importlib.util.spec_from_file_location(name, MODULE_PATHS[name])
-    module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
-    return module.value()
-''',
-    "pkg/h.py": '''import os
-import subprocess
-import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-STOP_SCRIPT = os.environ.get("FIXTURE_STOP_SCRIPT") or os.path.join(HERE, "c.py")
-STUB = "print('stub')\\n"
-
-
-def stop():
-    return subprocess.run([sys.executable, STOP_SCRIPT, "stop"], check=False)
-
-
-def run_stub():
-    stub = os.path.join(os.environ["STUB_DIRECTORY"], os.environ["STUB_NAME"])
-    with open(stub, "w") as handle:
-        handle.write(STUB)
-    return subprocess.run([sys.executable, stub], check=False)
-''',
-    "pkg/f.py": '''import os
-
-
-def patched_os_function(name, replacement):
-    original = getattr(os, name)
-    setattr(os, name, replacement)
-    return original
-''',
-    "pkg/e.py": '''import os
-import sys
-
-import constants
-
-
-def load_tool(repository):
-    sys.path.insert(0, os.path.join(repository, constants.TOOLS_RELATIVE))
-    import tool
-    return tool.run()
-''',
-    "pkg/tools/tool.py": '''def run():
-    return 7
-''',
-    "pkg/more_tools/tool.py": '''def run():
-    return 8
-''',
-    "pkg/tools/main_tool.py": '''def main():
-    return 9
-
-
-if __name__ == "__main__":
-    main()
-''',
-    "pkg/i.py": '''import importlib
-import os
-import subprocess
-import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOL_DIRECTORIES = (os.path.join(HERE, "tools"), os.path.join(HERE, "more_tools"))
-TOOL_MODULE = "tool"
-
-
-def load_named(name):
-    for directory in TOOL_DIRECTORIES:
-        if os.path.basename(directory) == name:
-            sys.path.insert(0, directory)
-            break
-    import tool
-    return tool.run()
-
-
-def load_by_constant(name):
-    for directory in TOOL_DIRECTORIES:
-        if os.path.basename(directory) == name:
-            sys.path.insert(0, directory)
-    return importlib.import_module(TOOL_MODULE).run()
-
-
-def load_each():
-    values = []
-    for name in MODULE_FILES:
-        specification = importlib.util.spec_from_file_location("each", os.path.join(HERE, name))
-        module = importlib.util.module_from_spec(specification)
-        specification.loader.exec_module(module)
-        values.append(module.value())
-    return ",".join(name for name, _code in [("x", 1)])
-
-
-MODULE_FILES = ("b.py",)
-''',
-    "pkg/m.py": '''import os
-import shutil
-import subprocess
-import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-
-
-def run_inline():
-    return subprocess.run([sys.executable, "-c", "import sys; sys.path.insert(0, sys.argv[1]); import b; b.value()", HERE], check=False)
-
-
-def run_dynamic(code):
-    return subprocess.run([sys.executable, "-c", code], check=False)
-
-
-def run_unknown(interpreter):
-    return subprocess.run([interpreter, os.path.join(HERE, "c.py")], check=False)
-
-
-def run_dynamic_from_environment():
-    return run_dynamic(os.environ["SNIPPET"])
-
-
-def run_unknown_from_environment():
-    return run_unknown(os.environ["INTERPRETER"])
-
-
-def launch_with(extra):
-    return subprocess.run([sys.executable] + extra, check=False)
-
-
-def launch_tool():
-    return launch_with([os.path.join(HERE, "c.py")])
-
-
-def launch_job(job):
-    return subprocess.run(job.command, check=False)
-
-
-def run_tests():
-    return subprocess.run([sys.executable, "-m", "unittest", "test_sample"], cwd=HERE, check=False)
-
-
-def version_of(name, toolchain):
-    found = subprocess.run([shutil.which(name), "--version"], check=False)
-    return found, subprocess.run([os.path.join(toolchain, "bin", "llvm-cov"), "--version"], check=False)
-
-
-def run_with_options(options):
-    return subprocess.run([*options["launcher"], os.path.join(HERE, "c.py")], check=False)
-
-
-def run_default():
-    return run_with_options({"launcher": ["python3"]})
-
-
-def launch_listed(command):
-    return subprocess.run(command, check=False)
-
-
-LAUNCHERS = {"listed": launch_listed}
-
-
-def launch_from_table():
-    return LAUNCHERS["listed"]([sys.executable, os.path.join(HERE, "c.py")])
-''',
-    "pkg/test_sample.py": '''import unittest
-
-
-class SampleTest(unittest.TestCase):
-    def test_one(self):
-        return 3
-''',
-    ".claude/singlefs-ai-sop/scripts/preflight.py": '''import subprocess
-
-
-def run_check(declaration):
-    return subprocess.run(["bash", "-c", declaration.command], check=False)
-''',
-}
-
-SHELL_FIXTURE = {
-    "s/main.sh": '''#!/usr/bin/env bash
-# admission: always 样本
-set -euo pipefail
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$here/lib.sh"
-emit() {
-  cat <<'EOF'
-first
-    };
-second
-EOF
-}
-cell_alpha() { echo alpha; }
-cell_beta() { echo beta; }
-LIBRARY_TEXT="$(cat <<'PY'
-print("library")
-PY
-)"
-use_library() { printf '%s\\n' "$LIBRARY_TEXT"; }
-run_cell() { "$1"; }
-run_cell cell_alpha
-bash "$here/child.sh"
-''',
-    "s/lib.sh": '''#!/usr/bin/env bash
-lib_function() { echo lib; }
-''',
-    "s/child.sh": '''#!/usr/bin/env bash
-echo child
-''',
-    "s/dynamic.sh": '''#!/usr/bin/env bash
-x="$1"
-bash "$x"
-''',
-    "s/broken.sh": '''#!/usr/bin/env bash
-if then fi (
-''',
-    "s/tools.sh": '''#!/usr/bin/env bash
-build() {
-  cargo build
-}
-build
-''',
-    "s/copies.sh": '''#!/usr/bin/env bash
-tree="$1"
-bash "$tree/s/child.sh"
-''',
-    "s/versions.sh": '''#!/usr/bin/env bash
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-run_in() {
-  local directory
-  case "$1" in
-    alpha) directory="$here/alpha" ;;
-    beta) directory="$here/beta" ;;
-  esac
-  (cd "$directory" && bash tool.sh)
-}
-run_in alpha
-run_in beta
-''',
-    "s/alpha/tool.sh": '''#!/usr/bin/env bash
-echo alpha tool
-''',
-    "s/beta/tool.sh": '''#!/usr/bin/env bash
-echo beta tool
-''',
-    "s/nested.sh": '''#!/usr/bin/env bash
-outer() {
-  local helper
-  helper="$(dirname "${BASH_SOURCE[0]}")/child.sh"
-  inner() { bash "$helper"; }
-  inner
-}
-outer
-''',
-    "s/selfcopy.sh": '''#!/usr/bin/env bash
-copy="$1/run.sh"
-cp "$(dirname "${BASH_SOURCE[0]}")/child.sh" "$copy"
-bash "$copy"
-''',
-    "s/common.sh": '''#!/usr/bin/env bash
-if common="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
-  source "${common%/*}/s/lib.sh"
-fi
-lib_function
-''',
-    "s/redirect.sh": '''#!/usr/bin/env bash
-out="$1"
-grep -v '^#' "$2" > "$out/filtered.sh"
-''',
-    "s/arguments.sh": '''#!/usr/bin/env bash
-write_stage() { printf '%s\\n' "$2" | tee "$1" >/dev/null; }
-write_stage "$1/stage.sh" 'echo stage'
-''',
-    "s/generator.sh": '''#!/usr/bin/env bash
-out="$1"
-cat > "$out/run.sh" <<'RUN'
-bash s/child.sh
-RUN
-bash "$out/run.sh"
-''',
-    "s/inline.sh": '''#!/usr/bin/env bash
-tree="$1"
-bash -c 'source "$1"; lib_function' inline-case "$tree/s/lib.sh"
-''',
-    "s/py/helper_mod.py": '''def run():
-    return 1
-''',
-    "s/py/tool.py": '''def main():
-    return 2
-
-
-if __name__ == "__main__":
-    main()
-''',
-    "s/inline_python.sh": '''#!/usr/bin/env bash
-python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); import helper_mod; helper_mod.run()' "$(dirname "${BASH_SOURCE[0]}")/py"
-''',
-    "s/heredoc_python.sh": '''#!/usr/bin/env bash
-here="$(dirname "${BASH_SOURCE[0]}")"
-python3 - "$here/py" <<'PY'
-import sys
-sys.path.insert(0, sys.argv[1])
-import helper_mod
-helper_mod.run()
-PY
-''',
-    "s/inline_expanded.sh": '''#!/usr/bin/env bash
-code="$1"
-python3 -c "$code"
-bash -c "$2"
-''',
-    "s/inline_bash_folded.sh": '''#!/usr/bin/env bash
-step="bash $(dirname "${BASH_SOURCE[0]}")/child.sh"
-bash -c "$step"
-''',
-    "s/second.sh": '''#!/usr/bin/env bash
-here="$(dirname "${BASH_SOURCE[0]}")"
-bash "$here/lib.sh" 2 python3 -B "$here/py/tool.py"
-''',
-    "s/substitution.sh": '''#!/usr/bin/env bash
-check_output="$(bash "$(dirname "${BASH_SOURCE[0]}")/child.sh" 2>&1)" || exit 1
-printf '%s\\n' "$check_output"
-''',
-    "s/process_substitution.sh": '''#!/usr/bin/env bash
-file="$(pick_file)"
-mapfile -t lines < <(read_lines "$file")
-''',
-    "s/message.sh": '''#!/usr/bin/env bash
-die() { echo "$1" >&2; exit 1; }
-command -v true >/dev/null || die "qemu-system-x86_64 缺失" "装上 qemu-system-x86 再跑"
-[[ -n "${1:-}" ]] || die "缺 qemu-system-x86_64" "装上 qemu-system-x86 再跑"
-''',
-    "s/module.sh": '''#!/usr/bin/env bash
-cd "$(dirname "${BASH_SOURCE[0]}")/py" && python3 -m tool
-''',
-    "s/head.sh": '''#!/usr/bin/env bash
-runner="$(find_runner)"
-"$runner" --flag
-''',
-    "s/wrapped.sh": '''#!/usr/bin/env bash
-timeout 60 "$(dirname "${BASH_SOURCE[0]}")/child.sh"
-''',
-    "s/subscript.sh": '''#!/usr/bin/env bash
-declare -A item
-key="$1" address="$2" value="$3"
-item[$key $address]="$value"
-item[$key]+=" more"
-echo "${item[$key $address]}"
-''',
-    "s/structure.sh": '''#!/usr/bin/env bash
-x="$(pick_x)" y="$(pick_y)"
-if [[ -n "$x" || "$y" == ok ]]; then echo yes; fi
-case "$1" in
-  "$x") echo first ;;
-  *) echo other ;;
-esac
-pair=( "$x" "$y" )
-(( $# > 0 )) && echo "${pair[0]}"
-''',
-    "s/array.sh": '''#!/usr/bin/env bash
-command_words=(bash "$(dirname "${BASH_SOURCE[0]}")/child.sh")
-"${command_words[@]}"
-''',
-    "s/capture.sh": '''#!/usr/bin/env bash
-code_of() {
-  printf '%s\\n' "import sys" "sys.path.insert(0, sys.argv[1])" "import helper_mod" "helper_mod.run()"
-}
-code="$(code_of)"
-python3 -c "$code" "$(dirname "${BASH_SOURCE[0]}")/py"
-''',
-    "s/nested_inline_positionals.sh": '''#!/usr/bin/env bash
-code_of() {
-  printf '%s\\n' "import sys" "sys.path.insert(0, sys.argv[1])" "import helper_mod" "helper_mod.run()"
-}
-code="$(code_of)"
-here="$(dirname "${BASH_SOURCE[0]}")"
-bash -c 'bash -c "python3 -c \\"\\$1\\" \\"\\$2\\"" inner "$2" "$1"' outer "$here/py" "$code"
-''',
-    "s/declared.sh": '''#!/usr/bin/env bash
-# run-condition: check bash "$PREFLIGHT_SCRIPT_DIRECTORY/child.sh" :: 先让同目录的 child.sh 跑通
-echo declared
-''',
-    "s/argv_exec.sh": '''#!/usr/bin/env bash
-extra=(SAMPLE=1)
-python3 -c 'import os, sys; os.execvp(sys.argv[1], sys.argv[1:])' env "${extra[@]}" bash "$(dirname "${BASH_SOURCE[0]}")/child.sh"
-''',
-    "s/positional_tool.sh": '''#!/usr/bin/env bash
-tool_path="$1"
-python3 - "$tool_path" <<'PY'
-import subprocess
-import sys
-tool = sys.argv[1]
-subprocess.run([tool, "--version"], check=False)
-PY
-''',
-    "s/argv_slice.sh": '''#!/usr/bin/env bash
-here="$(dirname "${BASH_SOURCE[0]}")"
-watch_helper() {
-  exec python3 -B /dev/fd/3 "$here/py" "$1" 3<<'PY'
-import sys
-(directory, label) = sys.argv[1:3]
-sys.path.insert(0, directory)
-import helper_mod
-helper_mod.run()
-PY
-}
-watch_helper sample
-''',
-    "s/argv_slice_mismatched.sh": '''#!/usr/bin/env bash
-here="$(dirname "${BASH_SOURCE[0]}")"
-watch_helper() {
-  exec python3 -B /dev/fd/3 "$here/py" "$1" 3<<'PY'
-import sys
-(directory, label) = sys.argv[1:4]
-sys.path.insert(0, directory)
-import helper_mod
-helper_mod.run()
-PY
-}
-watch_helper sample
-''',
-    "s/group.sh": '''#!/usr/bin/env bash
-here="$(dirname "${BASH_SOURCE[0]}")"
-{
-  python3 /dev/fd/3 "$here/py"
-} 3<<'PY'
-import sys
-sys.path.insert(0, sys.argv[1])
-import helper_mod
-helper_mod.run()
-PY
-''',
-}
 
 
 def write_tree(base, files):
@@ -13679,199 +15691,6 @@ def edit_file(base, path, old, new):
         handle.write(text.replace(old, new))
 
 
-# 起子进程的几种折法与运行期读的数据文件的夹具（文件头「起代码的写法逐种认」python 的命令、「运行期读的数据文件」）：每个函数对一格
-FOLDS_FIXTURE = {
-    "pkg/folds.py": '''import concurrent.futures
-import importlib.util
-import os
-import shutil
-import subprocess
-import sys
-import tempfile
-
-import rows
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-EDGE = ("pkg/c.py", "plan", "pkg/b.py")
-TABLE = os.path.join(HERE, "table.tsv")
-
-
-def nested_launch():
-    script = os.path.join(HERE, "c.py")
-
-    def run(extra):
-        command = [sys.executable, script] + extra
-        return subprocess.run(command, check=False)
-    return run(["--quiet"])
-
-
-def concatenated(steps):
-    git = ["git", "-C", HERE]
-    for step in steps:
-        subprocess.run(git + step, check=False)
-
-
-def concatenated_caller():
-    return concatenated([["status"], ["log"]])
-
-
-def launch_plan():
-    return 4, [sys.executable, os.path.join(HERE, "c.py"), "--", "marker", "test"]
-
-
-def sliced_launch():
-    command = launch_plan()[1]
-    launched = command[:command.index("marker")] + ["--flag"]
-    return subprocess.run(launched, check=False)
-
-
-def interpreter_lines(language):
-    return {"python": ["python3"], "shell": ["bash"]}.get(language, [])
-
-
-class Versions:
-    def interpreter(self, name):
-        return subprocess.run([name, "--version"], check=False)
-
-    def every(self, language):
-        return [self.interpreter(name) for name in interpreter_lines(language)]
-
-
-def loaded_constant():
-    path = os.path.join(os.path.dirname(HERE), EDGE[2])
-    specification = importlib.util.spec_from_file_location("loaded_b", path)
-    module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
-    return subprocess.run(["sh", "-c", module.COMMAND], check=False)
-
-
-def run_from_copy(tree):
-    return subprocess.run([sys.executable, os.path.join(tree, "tools", "runner.py")], check=False)
-
-
-def run_generated():
-    return subprocess.run([sys.executable, os.path.join(os.environ["GENERATED_DIRECTORY"], "generated", "made.py")], check=False)
-
-
-def run_in_copy(copy):
-    return subprocess.run(["bash", "setup.sh"], cwd=copy, check=False)
-
-
-def submitted_run(command):
-    return subprocess.run(["bash", "-c", command], check=False)
-
-
-def submit_all():
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return pool.submit(submitted_run, "python3 pkg/c.py").result()
-
-
-def environment_launch(threads):
-    return subprocess.run(["env", "-u", "UNSET_ME", f"WORKERS={threads}", sys.executable, os.path.join(HERE, "c.py")], check=False)
-
-
-def table_rows():
-    with open(TABLE, encoding="utf-8") as handle:
-        return handle.read().splitlines()
-
-
-def rows_under(root):
-    return open(os.path.join(root, "pkg", "table.tsv"), encoding="utf-8").read()
-
-
-def rows_from_argument():
-    return rows_under(sys.argv[1])
-
-
-def scratch_rows():
-    work = tempfile.mkdtemp()
-    with open(os.path.join(work, "notes.txt"), "w") as handle:
-        handle.write("x")
-    return open(os.path.join(work, "notes.txt")).read()
-
-
-def listed_rows():
-    with open(os.path.join(HERE, "index.txt"), encoding="utf-8") as listing:
-        return [open(os.path.join(ROOT, line.strip())).read() for line in listing]
-
-
-def template_rows():
-    chosen = sorted(os.listdir(os.path.join(HERE, "templates")))[0]
-    return open(os.path.join(HERE, "templates", chosen)).read()
-
-
-def rows_through_library(request):
-    return rows.read_rows(TABLE) + rows.read_rows(request)
-
-
-class TableReader:
-    def __init__(self):
-        self.path = TABLE
-
-    def lines(self):
-        with open(self.path, encoding="utf-8") as handle:
-            return handle.read().splitlines()
-
-
-def compiler_version():
-    program = os.environ["RUSTC"]
-    return subprocess.run([program, "-V"], capture_output=True, check=False).stdout
-
-
-def judge_file(path):
-    return open(path).read().strip()
-
-
-def parsed_rows():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--table")
-    arguments = parser.parse_args()
-    return open(arguments.table).read()
-
-
-def listed_members(units):
-    members = {line.split("\\t")[0] for line in units} | {"pkg/table.tsv"}
-    return [open(os.path.join(ROOT, relative)).read() for relative in sorted(members)]
-
-
-def copy_listed(work):
-    with open(os.path.join(HERE, "index.txt"), encoding="utf-8") as listing:
-        for line in listing:
-            shutil.copyfile(os.path.join(ROOT, line.strip()), os.path.join(work, line.strip()))
-''',
-    "pkg/b.py": '''COMMAND = "python3 pkg/c.py"
-
-
-def value():
-    return 2
-''',
-    "pkg/c.py": '''def main():
-    return 5
-
-
-if __name__ == "__main__":
-    main()
-''',
-    "pkg/tools/runner.py": '''def run():
-    return 7
-
-
-if __name__ == "__main__":
-    run()
-''',
-    "pkg/sample/setup.sh": "#!/usr/bin/env bash\necho prepared\n",
-    "pkg/table.tsv": "alpha\t1\n",
-    "pkg/other.tsv": "gamma\t2\n",
-    "pkg/index.txt": "pkg/table.tsv\n",
-    "pkg/templates/first.txt": "first\n",
-    "pkg/templates/second.txt": "second\n",
-    "pkg/rows.py": """def read_rows(path):
-    with open(path, encoding="utf-8") as handle:
-        return handle.read().splitlines()
-""",
-}
 # shell 一侧的几种折法（文件头「起代码的写法逐种认」shell 那几条）的夹具：$PWD、${名%词} / ${名##词}、cd 到临时树里的目录、cd 到折不出的目录之后的相对路径、
 # 「<根里的目录>/$1」、函数里 python3 "$@"
 SHELL_FOLDS_FIXTURE = {
@@ -13886,6 +15705,11 @@ SHELL_FOLDS_FIXTURE = {
     "s/relative_copy.sh": '#!/usr/bin/env bash\nrun_in_copy() {\n  (cd "$1" && bash s/child.sh)\n}\nrun_in_copy "$1"\n',
     "s/directory_wildcard.sh": '#!/usr/bin/env bash\nrun_named() {\n  python3 "s/tools/$1"\n}\nrun_named one.py\n',
     "s/positional_wrapper.sh": '#!/usr/bin/env bash\nrun_python() {\n  PYTHONDONTWRITEBYTECODE=1 python3 "$@"\n}\nrun_python s/tools/one.py --flag\n',
+    "s/printed_word_wrapper.sh": ('#!/usr/bin/env bash\ncd "$(dirname "$0")/.." || exit 1\nrun_python() {\n  PYTHONDONTWRITEBYTECODE=1 python3 "$@"\n}\n'
+                                  'where_is() { printf \'%s\\n\' "$PWD/s/$1"; }\nrun_python "$(where_is tools)/one.py" --flag\n'),
+    "s/quoted_assignment_env.sh": '#!/usr/bin/env bash\nthreads=4\nenv "E_THREADS=$threads" nice -n 19 s/child.sh --flag\n',
+    "s/quoted_assignment_array.sh": ('#!/usr/bin/env bash\ncount_of() { echo 4; }\nrun() {\n  local environment=()\n  environment+=("E_THREADS=$(count_of)")\n'
+                                     '  env ${environment[@]+"${environment[@]}"} \\\n    s/child.sh --flag\n}\nrun\n'),
     "s/relative_cd.sh": '#!/usr/bin/env bash\n(cd s/tools && python3 one.py)\n',
     "s/quoted_brace.sh": ("#!/usr/bin/env bash\ncount_rows() {\n  rows=\"$(awk '\n    /x/ {\n      split($2, field, \"=\")\n    }\n"
                           "    END { print NR }\n' \"$1\")\"\n  bash s/child.sh \"$rows\"\n}\ncount_rows input.tsv\n"),
@@ -13896,139 +15720,130 @@ SHELL_FOLDS_FIXTURE = {
     "s/dispatch.sh": ('#!/usr/bin/env bash\nif [[ "${1:-}" == --selftest ]]; then\n  bash s/child.sh\n  exit $?\nfi\ncase "$1" in\n  run)\n'
                       '    python3 s/tools/one.py\n    ;;\n  *)\n    python3 s/tools/two.py\n    ;;\nesac\n'),
     "s/dispatch_caller.sh": "#!/usr/bin/env bash\nbash s/dispatch.sh run\n",
+    "s/open_tail_caller.sh": '#!/usr/bin/env bash\nbash s/dispatch.sh run "$@"\n',
+    "s/open_tail_first_word.sh": '#!/usr/bin/env bash\nbash s/dispatch.sh "$@"\n',
+    "s/open_tail_launcher.py": 'import subprocess\nimport sys\n\n\ndef judge():\n    return subprocess.run(["bash", "s/dispatch.sh", "run", *sys.argv[1:]], check=False)\n',
+    "s/dispatch_preflight.sh": ('#!/usr/bin/env bash\npreflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}\n'
+                                'if [[ "${1:-}" == --selftest ]]; then\n  bash s/child.sh\n  exit $?\nfi\npython3 s/tools/one.py\n'),
+    "s/dispatch_preflight_caller.sh": "#!/usr/bin/env bash\nbash s/dispatch_preflight.sh run\n",
+    "s/dispatch_exit.sh": '#!/usr/bin/env bash\nif [[ "${1:-}" == --only ]]; then\n  bash s/child.sh\n  exit $?\nfi\npython3 s/tools/two.py\n',
+    "s/dispatch_exit_caller.sh": "#!/usr/bin/env bash\nbash s/dispatch_exit.sh --only\n",
+    "s/launcher.py": ('import subprocess\n\n\ndef run_script(arguments):\n    return subprocess.run(["bash", "s/dispatch.sh", *arguments], check=False)\n\n\n'
+                      'def judge():\n    return run_script(["run"])\n'),
+    "s/nested_word.sh": ("#!/usr/bin/env bash\nonly_selftest() {\n  device() {\n    bash s/child.sh\n  }\n  device\n}\nnamed_as_a_word() {\n  device=\"$1\"\n  echo \"$device\"\n}\n"
+                         "named_as_a_word disk\n"),
+    "s/nested_called_inside.sh": "#!/usr/bin/env bash\nouter() {\n  helper() {\n    bash s/child.sh\n  }\n  helper\n}\nouter\n",
+    "s/nested_called_outside.sh": "#!/usr/bin/env bash\nouter() {\n  helper() {\n    bash s/child.sh\n  }\n}\nouter\nhelper\n",
+    "s/commands/dispatch.py": ('import sys\n\n\ndef alpha():\n    return 301\n\n\ndef beta():\n    return 302\n\n\nCOMMANDS = {"alpha": alpha}\n\n\n'
+                              'def main(arguments):\n    if arguments[:1] == ["--selftest"]:\n        return beta()\n    return COMMANDS[arguments[0]]()\n\n\n'
+                              'if __name__ == "__main__":\n    sys.exit(main(sys.argv[1:]))\n'),
+    "s/python_words.sh": "#!/usr/bin/env bash\npython3 s/commands/dispatch.py alpha \"$1\"\n",
+    "s/python_words_open.sh": "#!/usr/bin/env bash\npython3 s/commands/dispatch.py \"$@\"\n",
+    "s/module_body_command.py": ('import subprocess\n\nfor name in ("first", "second"):\n    prefix = ["bash", "s/child.sh"]\n    for arguments in (["one"], ["two"]):\n'
+                                 '        subprocess.run([*prefix, *arguments], check=False)\n'),
+    "s/exported_path.sh": ('#!/usr/bin/env bash\nEXPORTED_SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"\nexport EXPORTED_SELF_PATH\n'
+                           'exec python3 - "$@" <<\'PYTHON\'\nimport os\nimport subprocess\nimport sys\n\nSCRIPT_DIRECTORY = os.path.dirname(os.environ["EXPORTED_SELF_PATH"])\n'
+                           'sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "tools"))\nsubprocess.run(["bash", os.path.join(SCRIPT_DIRECTORY, "child.sh")], check=False)\nPYTHON\n'),
+    "s/guard_path/run.py": ('import os\nimport sys\n\n\ndef main():\n    return 0\n\n\nif __name__ == "__main__":\n'
+                            '    HELPER_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "guard_helpers")\n    if os.path.isdir(HELPER_DIRECTORY):\n'
+                            '        sys.path.insert(0, HELPER_DIRECTORY)\n        from guard_helper import guard_value\n        guard_value()\n    sys.exit(main())\n'),
+    "s/guard_helpers/guard_helper.py": "def guard_value():\n    return 601\n",
+    "s/heredoc_blank_row.sh": ('#!/usr/bin/env bash\ncat <<\'TEXT\'\nbefore the blank row\n\nafter the blank row\nTEXT\nif [[ "${1:-}" == --selftest ]]; then\n  bash s/child.sh\n  exit $?\nfi\n'
+                               'python3 s/tools/one.py\n'),
+    "s/heredoc_blank_row_caller.sh": "#!/usr/bin/env bash\nbash s/heredoc_blank_row.sh run\n",
+    "s/shared_view.sh": '#!/usr/bin/env bash\nif [[ "${1:-}" == --selftest ]]; then\n  bash s/child.sh\n  exit $?\nfi\npython3 s/tools/one.py\n',
 }
-SHELL_PWD_CELL = "shell：$PWD 照脚本体顶层那一处 cd 折（cd \"$(dirname \"$0\")/..\"），函数里 bash \"$PWD/<文件>\" 连到那一份"
-SHELL_PATTERN_REMOVAL_CELL = "shell：${名%词} 与 ${名##词} 的词折得出就照 bash 去掉后缀、前缀，连到折出的那一份"
-SHELL_DIRECTORY_COPY_CELL = "shell：cd \"$目录/<根里的目录>\" 之后的相对路径照根里那个目录认，连到那一份"
-SHELL_RELATIVE_COPY_CELL = "shell：cd 到折不出的目录之后 bash <根里的相对路径>（至少两段）连到根里那一份"
-SHELL_DIRECTORY_WILDCARD_CELL = "shell：python3 \"<根里的目录>/$1\" 连到那个目录里每一份 .py"
-SHELL_POSITIONAL_SCRIPT_CELL = "shell：函数里 python3 \"$@\" 的脚本照每一处调用给的那个词认，连到那一份"
-SHELL_RELATIVE_CD_CELL = "shell：cd <根里的相对目录> 之后 python3 <那个目录里的文件> 连到那一份（不报不在）"
-SHELL_QUOTED_BRACE_CELL = "shell：函数里多行 awk 程序带一行与函数收尾同缩进的 }：函数照引号外的 } 收尾，awk 之后的 bash s/child.sh 连上（改它键变）"
-SHELL_TAIL_GROUP_CELL = "shell：bash \"$<折不出的目录>/$<折得出的变量>/driver.sh\" 连到仓里以 .sample/driver.sh 收尾的那一组（改它键变）"
-SHELL_TAIL_OUTSIDE_CELL = "shell：bash \"$<折不出的目录>/.nowhere/run.sh\" 仓里没有以它收尾的脚本：不是仓里的脚本，不拒算"
+SHELL_ARGUMENTS_PREFLIGHT_CELL = ("shell：bash s/dispatch_preflight.sh run：preflight 放回参数那一句（set -- ${PREFLIGHT_ARGUMENTS[@]+…}）不算动了位置参数，"
+                                  "--selftest 那一支照样剪掉（改 s/child.sh 键不变）")
+SHELL_PYTHON_ARGUMENTS_SKIPPED_CELL = "shell：python3 <脚本> alpha \"$1\"：--selftest 那一支走不到（改它调的函数键不变）"
+SHELL_PYTHON_ARGUMENTS_OPEN_CELL = "shell：python3 <脚本> \"$@\"：词不知道，--selftest 那一支照收（改它调的函数键变）"
+# 按第一列选行的表（SHELL_ROW_SELECTED_TABLES）：夹具用登记的那个路径，caller 带实验号起它
+SHELL_TABLE_FIXTURE = {
+    "scripts/experiment-apparatus/replay.sh": ("#!/usr/bin/env bash\ndriver_one() {\n  bash s/one.sh\n}\ndriver_two() {\n  bash s/two.sh\n}\n"
+                                               "TABLE=$(cat <<'TSV'\nE1|@driver_one||one.out|exact\nE2|@driver_two||two.out|exact\nTSV\n)\n"
+                                               "ADMISSION_ROW_KEYS=$(cat <<'TSV'\nE2/extra\tE2|@driver_two|\treplay\nTSV\n)\n"
+                                               "bad_rows=$(printf '%s\\n' \"$TABLE\" | grep -c slash)\n"
+                                               "printf '%s\\n' \"$bad_rows\" \"$ADMISSION_ROW_KEYS\"\n"),
+    "s/one.sh": "#!/usr/bin/env bash\necho one\n",
+    "s/two.sh": "#!/usr/bin/env bash\necho two\n",
+    "s/caller.sh": "#!/usr/bin/env bash\nbash scripts/experiment-apparatus/replay.sh E1\n",
+    "s/caller_mixed.sh": "#!/usr/bin/env bash\nbash scripts/experiment-apparatus/replay.sh E1\nbash scripts/experiment-apparatus/replay.sh \"$1\"\n",
+}
+# 只带选项、走到的那一支以 exit 收尾、表在 fi 之后才赋值的复跑表脚本（replay.sh --selftest 那一种；ShellIndex.launch_defines_tables）：
+# 自证那一支只按实验号 E1 起自己，E2 那一行的驱动只由整张表连得到
+SHELL_TABLE_SELFTEST_FIXTURE = {
+    "scripts/experiment-apparatus/replay.sh": ("#!/usr/bin/env bash\ndriver_one() {\n  bash s/one.sh\n}\ndriver_two() {\n  bash s/two.sh\n}\n"
+                                               "selftest_body() {\n  bash scripts/experiment-apparatus/replay.sh E1\n}\n"
+                                               "if [[ \"${1:-}\" == \"--selftest\" ]]; then\n  selftest_body\n  exit $?\nfi\n"
+                                               "TABLE=$(cat <<'TSV'\nE1|@driver_one||one.out|exact\nE2|@driver_two||two.out|exact\nTSV\n)\n"
+                                               "printf '%s\\n' \"$TABLE\"\n"),
+    "s/one.sh": "#!/usr/bin/env bash\necho one\n",
+    "s/two.sh": "#!/usr/bin/env bash\necho two\n",
+}
+SHELL_TABLE_SELFTEST_ENTRY_CELL = ("shell 入口是 <复跑表脚本> 只带 --selftest、走到的那一支以 exit 收尾、表在 fi 之后才赋值：这次起法不算整张表，"
+                                   "读表只照自证里 bash <复跑表脚本> E1 那一次连（改 s/one.sh 键变、改 s/two.sh 键不变）")
+# 入口自己只带 --selftest、那一支以 exit 收尾、自证那一支不再起自己（ShellIndex.narrowed_script_body 照这组词剪入口）：表的赋值与读表的变量都在 fi 之后
+SHELL_ENTRY_EXIT_TABLE_FIXTURE = {
+    "scripts/experiment-apparatus/replay.sh": ("#!/usr/bin/env bash\ndriver_one() {\n  bash s/one.sh\n}\ndriver_two() {\n  bash s/two.sh\n}\n"
+                                               "if [[ \"${1:-}\" == \"--selftest\" ]]; then\n  echo selftest\n  exit $?\nfi\n"
+                                               "TABLE=$(cat <<'TSV'\nE1|@driver_one||one.out|exact\nE2|@driver_two||two.out|exact\nTSV\n)\n"
+                                               "bad_rows=$(printf '%s\\n' \"$TABLE\" | grep -c slash)\n"
+                                               "printf '%s\\n' \"$bad_rows\"\n"),
+    "s/one.sh": "#!/usr/bin/env bash\necho one\n",
+    "s/two.sh": "#!/usr/bin/env bash\necho two\n",
+}
+SHELL_ENTRY_EXIT_TABLE_CELL = ('shell 入口是 <复跑表脚本>、--selftest 那一支以 exit 收尾、表与读表的变量在 fi 之后：'
+                               '带 --selftest 时表里的驱动函数都不连（改 s/one.sh、s/two.sh 键不变），不带参数时都连（改它们键变）')
+# 仓副本里起复跑表脚本（cd 到折不出的目录之后的相对路径，照根里同一相对路径那一份认）：起法的字面参数照记（ShellIndex.record_launch_words）
+SHELL_TABLE_TREE_COPY_FIXTURE = {
+    **{path: SHELL_TABLE_FIXTURE[path] for path in ("scripts/experiment-apparatus/replay.sh", "s/one.sh", "s/two.sh")},
+    "s/copy_caller.sh": '#!/usr/bin/env bash\nrun_in_copy() {\n  (cd "$1" && bash scripts/experiment-apparatus/replay.sh E1)\n}\nrun_in_copy "$1"\n',
+}
+# shell 入口带参数（文件头「程序入口带参数」）：入口是 script-body、闭包从 closure_of 带 Options.program_arguments 起
+SHELL_ENTRY_FIXTURE = {
+    **{path: SHELL_FOLDS_FIXTURE[path] for path in ("s/dispatch.sh", "s/child.sh", "s/tools/one.py", "s/tools/two.py")},
+    "s/dispatch_undecided.sh": ('#!/usr/bin/env bash\nif [[ "${1:-}" == "$SELFTEST_WORD" ]]; then\n  bash s/child.sh\n  exit $?\nfi\n'
+                                'python3 s/tools/one.py\n'),
+}
+SHELL_ENTRY_ARGUMENTS_CELL = ("shell 入口带参数：s/dispatch.sh 带 run，--selftest 那一支与 *) 那一支走不到（改 s/child.sh、s/tools/two.py 键不变），"
+                              "run 那一支走到（改 s/tools/one.py 键变）")
+SHELL_ENTRY_TABLE_CELL = ("shell 入口是 <复跑表脚本> 带参数：带 E1 时别的实验的驱动函数走不到（改 s/two.sh 键不变），"
+                          "只带 --selftest 照整张表连（改 s/two.sh 键变）")
 SHELL_ARGUMENTS_SKIPPED_CELL = "shell：bash s/dispatch.sh run：if [[ \"${1:-}\" == --selftest ]] 那一支走不到，它起的 s/child.sh 不连（改它键不变）"
-SHELL_ARGUMENTS_TAKEN_CELL = "shell：bash s/dispatch.sh run：case \"$1\" 里 run) 那一支走到，它起的 s/tools/one.py 连上（改它键变）"
-SHELL_ARGUMENTS_OTHER_CASE_CELL = "shell：bash s/dispatch.sh run：case \"$1\" 里 *) 那一支走不到，它起的 s/tools/two.py 不连（改它键不变）"
-FOLD_NESTED_CELL = "python：套在函数里的函数起子进程，它的局部变量与外层的变量照那一层作用域折，连到那份脚本"
-FOLD_CONCATENATION_CELL = "python：git + step（step 是循环里取的、折不出）命令位置上是 git，不拒算"
-FOLD_SLICE_CELL = "python：f(…)[k] 取返回的元组那一项、command[:command.index(<字面词>)] 照切，连到那份脚本"
-FOLD_VERSIONS_CELL = "python：方法参数按每一处 .方法(…) 调用折，推导式变量取遍函数返回的字典里的列表，命令位置上折出几个各认一遍（python3 / bash --version 不跑代码）"
-FOLD_LOADED_CELL = "python：spec_from_file_location 载入的模块的常量（module.NAME）与模块级元组[整数] 折得出，sh -c 的串连到它起的脚本"
-FOLD_TAIL_GROUP_CELL = "python：os.path.join(<折不出的目录>, \"tools\", \"runner.py\") 连到仓里以 tools/runner.py 收尾的那一份"
-FOLD_OUTSIDE_SCRIPT_CELL = "python：os.path.join(<折不出的目录>, \"generated\", \"made.py\") 仓里没有以它收尾的文件：不是仓里的脚本，不拒算"
-FOLD_CWD_GROUP_CELL = "python：[\"bash\", \"setup.sh\"] 在折不出的 cwd= 里起：仓里以 /setup.sh 收尾的整组连上"
-FOLD_SUBMITTED_CELL = "python：pool.submit(f, 实参) 算一处调用，f 的命令参数按它折，连到那份脚本"
-FOLD_ENVIRONMENT_CELL = "python：env -u X NAME={折不出} 之后的命令照命令位置认，连到那份脚本"
-DATA_READ_CHANGED_CELL = "python：运行期 open 读的仓内文件（路径折得出）进键：改它键变"
-DATA_READ_UNRELATED_CELL = "python：运行期 open 读的仓内文件进键：改不相干的文件键不变"
-DATA_READ_TAIL_CELL = "python：读 <sys.argv 给的目录>/pkg/table.tsv 照字面尾巴收仓里那一份：改它键变"
-DATA_READ_SCRATCH_CELL = "python：读这一趟自己在 mkdtemp 建的目录里写的文件（仓里没有这一截尾巴）不拒算"
-DATA_READ_REFUSED_CELL = "python：读 os.path.join(<根本身>, <读进来的登记行点名的一截>) 拒算 data-path-unfolded"
-DATA_READ_DIRECTORY_CELL = "python：读 os.path.join(<根里的目录>, <出处推不出的一截>) 收那个目录整棵：改目录里的一份键变"
-DATA_READ_LIBRARY_CELL = "python：别的模块里的函数读它参数给的文件：闭包里的调用处给仓里的常量收进键（改它键变），给入口参数的不收也不拒算"
-DATA_READ_ATTRIBUTE_CELL = "python：读 self.<属性>：照本类方法里给它的赋值认，赋的是仓里的常量就收进键（改它键变）"
-TOOLCHAIN_QUERY_CELL = "python：[<环境给的编译器>, \"-V\"] 是工具链询问：不拒算，工具链单元进键：换一版假 rustc 键变，闭包里没有询问的换 rustc 键不变"
-CALLER_LAUNCH_CELL = "python：判法入口的参数给的命令（-c 的串、解释器）是调用方交进来的：不拒算"
-REGISTRY_PROGRAMS_CELL = "python：登记表点名的程序（REGISTRY_LISTED_PROGRAMS）是环境探针：不连、不拒算，改登记表点名的一份探针，起探针的入口键不变"
-ROW_KEYED_CELL = "按行进键的登记表：判法经登记的取用函数按入口查表里一行，改表里与这一条无关的行键不变、改它查的那一行键变；读整张表的不换"
-PROGRAM_ARGUMENTS_CELL = "python：同一程序入口带两组参数：只改另一组参数才走到的函数，这一组键不变、改这一组走到的键变；起它的脚本把参数带过去照样剪"
-DATA_READ_INPUT_CELL = "python：入口函数读它参数给的文件（调用方的输入）不拒算"
-DATA_READ_PARSED_CELL = "python：读 argparse 解出来的路径（调用方的输入）不拒算"
-DATA_READ_LISTING_CELL = "python：读 os.path.join(<根本身>, <算出来的名单里的一截>)（不是读根里的文件得来的）：被判的输入，不拒算"
-DATA_READ_COPY_CELL = "python：拷文件的源 os.path.join(<根本身>, <读进来的登记行点名的一截>)：拷副本，不拒算"
-TAIL_ANCHOR_SCRATCH_CELL = "python：读 <参数>/<字面尾巴>，闭包里的调用处给的是这一趟的临时目录：仓里这一截尾巴的那一组不收，改其中一份键不变"
-TAIL_ANCHOR_JUDGE_CELL = "python：读 <判法入口的参数>/<字面尾巴>（被判的输入）：仓里这一截尾巴的那一组不收，改其中一份键不变"
-TAIL_ANCHOR_ARGUMENT_CELL = "python：读 <参数>/<字面尾巴>，闭包里的调用处给的是 sys.argv：照尾巴收仓里那一组，改其中一份键变"
-TAIL_ANCHOR_FIXTURE = {
-    "pkg/__init__.py": "",
-    "fixtures/sample/Manifest.toml": "name = sample\n",
-    "pkg/manifest_reader.py": '''import os
+OPEN_TAIL_SKIPPED_CELL = "shell：bash s/dispatch.sh run \"$@\"：头一个词字面，--selftest 那一支走不到（改 s/child.sh 键不变）"
+OPEN_TAIL_FIRST_WORD_CELL = "shell：bash s/dispatch.sh \"$@\"：头一个词就折不出，--selftest 那一支照收（改 s/child.sh 键变）"
+OPEN_TAIL_PYTHON_CELL = "python：[\"bash\", <脚本>, \"run\", *<折不出的列表>]：头一个词字面，--selftest 那一支走不到（改 s/child.sh 键不变）"
+TAIL_VIEW_CELL = "python：程序入口带 --selftest：main 里走不到的那一处调用不算调用处，读 <参数>/<字面尾巴> 的那一组不收（改它键不变）"
+TAIL_VIEW_FIXTURE = {
+    "elsewhere/Manifest.toml": "real\n",
+    "pkg/packages.py": '''import os
 import sys
 import tempfile
 
 
 def package_name(tree, relative):
     directory = os.path.dirname(os.path.join(tree, relative))
-    while True:
-        manifest = os.path.join(directory, "Manifest.toml")
-        if os.path.isfile(manifest):
-            return open(manifest, encoding="utf-8").read()
-        if directory == tree:
-            return None
-        directory = os.path.dirname(directory)
+    with open(os.path.join(directory, "Manifest.toml"), encoding="utf-8") as handle:
+        return handle.read()
 
 
-def judge(tree):
+def check(tree):
     return package_name(tree, "src/lib.rs")
 
 
-def scratch_run():
-    with tempfile.TemporaryDirectory() as work:
-        return package_name(os.path.join(work, "tree"), "src/lib.rs")
+def selftest():
+    work = tempfile.mkdtemp()
+    return check(os.path.join(work, "tree"))
 
 
-def from_argument():
-    return package_name(sys.argv[1], "src/lib.rs")
-''',
-}
-LAUNCH_ARGUMENT_CELL = ("python：命令是别的函数的参数（subprocess.Popen(command)、[program, *arguments]）：照闭包里每个调用点的实参折"
-                        "（字面程序、根外程序、外层函数的变量、调仓内函数的返回值），不拒算")
-LAUNCH_ARGUMENT_SCRIPT_CELL = "python：命令参数在调用点折出根里的脚本（run_tool(\"pkg/tool.sh\", …)）：连上那一份，改它键变"
-LAUNCH_ARGUMENT_REFUSED_CELL = "python：命令参数在调用点给的是环境变量（os.environ[…]）：折不出，照旧拒算 subprocess-command-unfolded"
-LAUNCH_ARGUMENT_FIXTURE = {
-    "pkg/__init__.py": "",
-    "pkg/tool.sh": "#!/bin/bash\necho tool\n",
-    "pkg/launch.py": '''import os
-import subprocess
+def main(arguments):
+    if arguments == ["--selftest"]:
+        return selftest()
+    return check(arguments[1])
 
 
-def run_group(command, **options):
-    return subprocess.Popen(command, stdout=subprocess.PIPE, start_new_session=True, **options)
-
-
-def run_tool(program, arguments):
-    return run_group([program, *arguments], cwd="/")
-
-
-def tool_program(executable, wrapped):
-    if not wrapped:
-        return executable
-    return os.path.join(os.path.dirname(executable), "tool-wrapper")
-
-
-def installed_tool(directory):
-    executable = os.path.join(directory, "tool-binary")
-    return executable, "1.0"
-
-
-def prepared(options):
-    executable, _version = installed_tool(options["tool_root"])
-    return options, executable
-
-
-def check(root, options):
-    _options, executable = prepared(options)
-    run_tool("cargo", ["build"])
-
-    def one(wrapped):
-        return run_tool(tool_program(executable, wrapped), ["--check"])
-    return [one(True), one(False)]
-
-
-def check_script(root, options):
-    _options, executable = prepared(options)
-    run_tool("pkg/tool.sh", ["--check"])
-    return run_tool(tool_program(executable, True), [])
-
-
-def check_unfolded(root):
-    return run_tool(os.environ["TOOL_PROGRAM"], ["--check"])
-
-
-def selftest_sample():
-    run_group(["bash", "-c", "echo sample"])
-    return tool_program("/opt/tool/bin/tool-binary", False)
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
 ''',
 }
 
@@ -14228,65 +16043,6 @@ def alignment_cells():
     ]
 
 
-# R-结构（模块头、mod 声明、use）与 R-隐式按自身类型认 trait impl 的小工作区（与 crates/singlefs-unit-graph 的 closure.rs 同一口径）
-CLOSURE_RULES_FIXTURE = {
-    "crates/frules/Cargo.toml": '[package]\nname = "frules"\n',
-    "crates/frules/src/lib.rs": '''#![allow(dead_code)]
-mod sub;
-pub mod inline_area {
-    #![allow(unused)]
-    pub fn inside() -> u32 {
-        1
-    }
-}
-pub fn outside() -> u32 {
-    2
-}
-pub mod tools {
-    pub fn used() -> u32 {
-        3
-    }
-    pub fn unused() -> u32 {
-        4
-    }
-    pub fn original() -> u32 {
-        5
-    }
-}
-use tools::*;
-pub fn glob_caller() -> u32 {
-    used()
-}
-pub mod listing {
-    use crate::tools::{used, unused};
-    pub fn list_caller() -> u32 {
-        used()
-    }
-}
-pub mod renaming {
-    use crate::tools::original as renamed;
-    pub fn alias_caller() -> u32 {
-        renamed()
-    }
-}
-pub struct Inner;
-pub struct Outer;
-impl From<Inner> for Outer {
-    fn from(_value: Inner) -> Outer {
-        Outer
-    }
-}
-pub fn make_inner() -> Inner {
-    Inner
-}
-pub fn make_outer() -> Outer {
-    Outer
-}
-''',
-    "crates/frules/src/sub.rs": "pub fn in_sub() -> u32 {\n    6\n}\n",
-}
-CLOSURE_RULES_FILE = "crates/frules/src/lib.rs"
-
 
 def closure_member_names(base, entry):
     return {f"{unit.kind} {unit.name}" for unit in closure_of(base, entry).order if not unit.data}
@@ -14379,211 +16135,6 @@ def closure_rule_cells():
     ]
 
 
-# 闭包外的四类边（文件头 Rust 闭包「闭包外的四类边」）：每格一个小工作区，改的那一处补边前不在入口的闭包里（键不变），补边后在（键变）；
-# 每格配一个弄坏开关（BREAK_CELLS 里 rust-macro-generated-types-unnamed 到 rust-excluded-path-dependencies-dropped 那六项）退回补边前；
-# 工作区外的 crate 按调用关系连的两格（OUTSIDE_IMPORT_CELL、OUTSIDE_MODULE_CELL）各配 rust-outside-crate-* 一个开关，退回按同名连
-MACRO_EDGE_FIXTURE = {
-    "crates/fmacro/Cargo.toml": '[package]\nname = "fmacro"\n',
-    "crates/fmacro/src/lib.rs": '''macro_rules! listed_enumeration {
-    ($(#[$attribute:meta])* $visibility:vis enum $name:ident { $($variant:ident,)+ }) => {
-        $(#[$attribute])*
-        $visibility enum $name { $($variant,)+ }
-    };
-}
-listed_enumeration! {
-    pub enum Weight {
-        Light,
-        Heavy,
-    }
-}
-impl Weight {
-    pub fn amount(self) -> u32 {
-        match self {
-            Weight::Light => 1,
-            Weight::Heavy => 9,
-        }
-    }
-}
-pub fn heavy_amount() -> u32 {
-    Weight::Heavy.amount()
-}
-macro_rules! code_table {
-    ($($constant:ident = $code:literal,)*) => {
-        $(pub const $constant: u32 = $code;)*
-        pub const EVERY_CODE: &[u32] = &[$($constant,)*];
-    };
-}
-code_table! {
-    CODE_NONE = 0,
-    CODE_FULL = 7,
-}
-pub fn code_count() -> usize {
-    EVERY_CODE.len()
-}
-''',
-}
-MACRO_EDGE_FILE = "crates/fmacro/src/lib.rs"
-ALLOCATOR_EDGE_FIXTURE = {
-    "crates/falloc/Cargo.toml": '[package]\nname = "falloc"\n',
-    "crates/falloc/src/main.rs": '''use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-static GROWTHS: AtomicUsize = AtomicUsize::new(0);
-
-struct CountingAllocator;
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(pointer, layout) }
-    }
-    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
-        GROWTHS.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.realloc(pointer, layout, size) }
-    }
-}
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
-
-fn growths() -> usize {
-    let mut values = Vec::new();
-    values.push(1_u8);
-    GROWTHS.load(Ordering::Relaxed)
-}
-
-fn main() {
-    println!("{}", growths());
-}
-''',
-}
-FOREIGN_IMPL_EDGE_FIXTURE = {
-    "crates/fforeign/Cargo.toml": '[package]\nname = "fforeign"\n',
-    "crates/fforeign/src/lib.rs": '''pub trait Measured {
-    fn measure(&self) -> u64;
-}
-
-impl Measured for std::time::Duration {
-    fn measure(&self) -> u64 {
-        self.as_secs() + 1
-    }
-}
-
-pub fn measure_of<Value>(value: &Value) -> u64
-where
-    Value: Measured,
-{
-    value.measure()
-}
-
-pub fn measured_second() -> u64 {
-    measure_of(&std::time::Duration::from_secs(1))
-}
-''',
-}
-BUILD_ENVIRONMENT_EDGE_FIXTURE = {
-    "crates/fbuild/Cargo.toml": '[package]\nname = "fbuild"\n',
-    "crates/fbuild/build.rs": '''fn reported_features() -> String {
-    String::from("plain")
-}
-
-fn main() {
-    println!("cargo::rustc-env=FBUILD_REPORTED_FEATURES={}", reported_features());
-}
-''',
-    "crates/fbuild/src/lib.rs": '''pub fn reported() -> &'static str {
-    env!("FBUILD_REPORTED_FEATURES")
-}
-''',
-}
-EXCLUDED_PATH_DEPENDENCY_EDGE_FIXTURE = {
-    "Cargo.toml": '[workspace]\nmembers = ["crates/fuser"]\nexclude = ["fservice"]\n',
-    "crates/fuser/Cargo.toml": '[package]\nname = "fuser"\n\n[dependencies]\nfservice = { path = "../../fservice" }\n',
-    "crates/fuser/src/lib.rs": "pub fn stop_count() -> u32 {\n    fservice::stopped_connections()\n}\n",
-    "fservice/Cargo.toml": '[package]\nname = "fservice"\n\n[workspace]\n',
-    "fservice/src/lib.rs": "pub fn stopped_connections() -> u32 {\n    3\n}\n",
-}
-# 工作区外的 crate 按调用关系连（文件头 Rust 闭包「工作区外的 path 依赖」后半）：fuser 只在字段名里写着 halted；fservice 里 log 与 bench 两个模块各有一个 Log，
-# bench 模块里的 fn launch 与 Worker::launch 同名
-OUTSIDE_CRATE_NAME_FIXTURE = {
-    "Cargo.toml": '[workspace]\nmembers = ["crates/fuser"]\nexclude = ["fservice"]\n',
-    "crates/fuser/Cargo.toml": '[package]\nname = "fuser"\n\n[dependencies]\nfservice = { path = "../../fservice" }\n',
-    "crates/fuser/src/lib.rs": '''use fservice::control;
-use fservice::restarts;
-
-pub struct Counters {
-    pub halted: u32,
-}
-
-pub fn served() -> u32 {
-    let counters = Counters { halted: 1 };
-    fservice::stopped_connections() + restarts() + control::paused() + counters.halted
-}
-''',
-    "fservice/Cargo.toml": '[package]\nname = "fservice"\n\n[workspace]\n',
-    "fservice/src/lib.rs": '''pub mod control {
-    pub fn paused() -> u32 {
-        5
-    }
-}
-
-pub mod bench {
-    pub struct Log {
-        pub entries: u64,
-    }
-
-    pub fn launch() -> u32 {
-        7
-    }
-}
-
-pub mod log {
-    pub struct Log {
-        pub entries: u32,
-    }
-}
-
-use log::Log;
-
-pub struct Worker;
-
-impl Worker {
-    fn launch(&self) -> u32 {
-        2
-    }
-}
-
-pub fn stopped_connections() -> u32 {
-    Worker.launch() + Log { entries: 1 }.entries
-}
-
-pub fn restarts() -> u32 {
-    4
-}
-
-pub fn halted() -> u32 {
-    6
-}
-''',
-}
-OUTSIDE_CRATE_NAME_ENTRY = "crates/fuser/src/lib.rs::served"
-OUTSIDE_CRATE_NAME_FILE = "fservice/src/lib.rs"
-OUTSIDE_IMPORT_CELL = ("工作区外的 crate 按引进的名字连：别的包里只是同名的字段 halted 不连到它的 fn halted，改它键不变；"
-                       "use 引进的 restarts、use 引进的模块下的 control::paused、写成路径的 stopped_connections 照连，改它们键变")
-OUTSIDE_MODULE_CELL = ("工作区外的 crate 里按模块连：use 引进 log::Log 的只连它、不连 bench 模块里同名的 Log，Worker::launch 自己的名字不连 bench::launch；"
-                       "改 bench 模块里这两样键不变，改 log::Log、改 Worker::launch 键变")
-CRATES_MODULE_PRIVATE_CELL = "R-裸名：crates/ 下的包同一个目标里按模块连：经 use 引进 format::SLOT_BYTES 的单元不连 gpu_checks 里私有的同名常量，改它键不变"
-CRATES_MODULE_IMPORTED_CELL = "R-裸名：crates/ 下的包同一个目标里按模块连：经 use 引进的 format::SLOT_BYTES 照连，改它键变"
-CRATES_MODULE_FIXTURE = {
-    "crates/fmodules/Cargo.toml": '[package]\nname = "fmodules"\n',
-    "crates/fmodules/src/lib.rs": "pub mod format;\nmod gpu_checks;\nmod cpu_checks;\n",
-    "crates/fmodules/src/format.rs": "pub const SLOT_BYTES: usize = 64;\n",
-    "crates/fmodules/src/gpu_checks.rs": "const SLOT_BYTES: usize = 32;\n\npub fn gpu_slots() -> usize {\n    SLOT_BYTES * 2\n}\n",
-    "crates/fmodules/src/cpu_checks.rs": "use crate::format::SLOT_BYTES;\n\npub fn cpu_slots() -> usize {\n    SLOT_BYTES + 1\n}\n",
-}
-
 
 def outside_crate_edit_verdicts(work, edits):
     """OUTSIDE_CRATE_NAME_FIXTURE 上入口 served 的键：逐个改 edits 里的 (说明, 旧, 新)，每改一处跟前一把比 → ([(说明, changed / same / 拒算)], 改动前的键)。"""
@@ -14621,13 +16172,6 @@ def outside_module_cell(work):
     return first is not None and verdicts == wanted, f"期望 {wanted}，实际 {verdicts}（改前键 {first}）"
 
 
-MACRO_TYPE_EDGE_CELL = "R-宏：条目级宏调用里 enum 定义的类型算被点名，.方法() 连到写给它的 impl，改方法作废"
-MACRO_LITERAL_EDGE_CELL = "R-宏：macro_rules! 体里按字面写出的常量名登到这个宏的每次调用名下，点名它的入口连上调用，改调用体作废"
-ALLOCATOR_EDGE_CELL = "#[global_allocator]：链接集里的分配器 static 进闭包，连上它的 GlobalAlloc impl，改 realloc 作废"
-FOREIGN_IMPL_EDGE_CELL = "R-方法：本仓 trait 写在外部类型上的 impl（impl Tr for std::time::Duration）经泛型约束调到，方法连上，改它作废"
-BUILD_ENVIRONMENT_EDGE_CELL = "构建脚本经 cargo::rustc-env 交的值：用 env! 读它的单元连到本 crate 构建脚本的 main，改 main 里算的值作废"
-EXCLUDED_PATH_DEPENDENCY_EDGE_CELL = "工作区外的 path 依赖（根清单 exclude 里）：顺 path 依赖收进来，调到它的函数连上，改它作废"
-
 
 def closure_edge_cells():
     return [
@@ -14645,40 +16189,19 @@ def closure_edge_cells():
                                                           "    3\n", "    4\n", "changed")),
         (OUTSIDE_IMPORT_CELL, outside_import_cell),
         (OUTSIDE_MODULE_CELL, outside_module_cell),
+        (LET_SHADOW_BOUND_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::bound", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
+        (LET_SHADOW_PARAMETER_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::parameter", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
+        (LET_SHADOW_CAPTURE_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::captured", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
+        (LET_SHADOW_BEFORE_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::before", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "changed")),
+        (LET_SHADOW_OTHER_BLOCK_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::other_block", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "changed")),
+        (LET_SHADOW_CONSTANT_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::constant_pattern", "crates/fshadow/src/lib.rs", "= 21;", "= 22;", "changed")),
+        (USE_PATH_EXACT_CELL, compare_cell(USE_PATH_EXACT_FIXTURE, "crates/fprelude/src/user.rs::width", "crates/fprelude/src/deep.rs", "= 64;", "= 65;", "changed")),
         (CRATES_MODULE_PRIVATE_CELL, compare_cell(CRATES_MODULE_FIXTURE, "crates/fmodules/src/cpu_checks.rs::cpu_slots", "crates/fmodules/src/gpu_checks.rs",
                                                   "usize = 32;", "usize = 33;", "same")),
         (CRATES_MODULE_IMPORTED_CELL, compare_cell(CRATES_MODULE_FIXTURE, "crates/fmodules/src/cpu_checks.rs::cpu_slots", "crates/fmodules/src/format.rs",
                                                    "usize = 64;", "usize = 65;", "changed")),
     ]
 
-
-# 4-3d：键的 cfg 成分收窄、WGSL 外名的 _ 后缀与供名字的边、trait 成员里的 Self::x、文档测试不连结构、use a::{self} 的小工作区；
-# 闭包成员与 crates/singlefs-unit-graph 的 unit-graph closure 逐行核过（报告里有命令与原样输出）
-CFG_ATOMS_FIXTURE = {
-    "crates/fcfg/Cargo.toml": '[package]\nname = "fcfg"\n\n[features]\ngpu = []\n',
-    "crates/fcfg/src/lib.rs": '''pub fn plain_entry() -> u32 {
-    helper() + 1
-}
-fn helper() -> u32 {
-    2
-}
-pub fn macro_entry() -> u32 {
-    if cfg!(feature = "gpu") { 3 } else { 4 }
-}
-pub fn statement_entry() -> u32 {
-    #[cfg(feature = "gpu")]
-    let value = 8;
-    #[cfg(not(feature = "gpu"))]
-    let value = 9;
-    value
-}
-#[cfg_attr(feature = "gpu", inline)]
-pub fn attribute_only_entry() -> u32 {
-    7
-}
-''',
-}
-CFG_ATOMS_FILE = "crates/fcfg/src/lib.rs"
 
 
 def cfg_keys(base, entry, features):
@@ -14800,7 +16323,6 @@ mod tests {
     }
 }
 '''
-WGSL_TEST_SUPPLIER_CELL = "WGSL 外名的着落不收测试函数：串里有外名的 #[test] fn 不并进闭包，改它的函数体键不变，改真给名字的宏调用键变"
 
 
 def wgsl_defined_suffix_cell(work):
@@ -14861,24 +16383,6 @@ def wgsl_single_module_cell(work):
     return not closure.refusals and "doubled" in names, f"WGSL 成员 {names}，拒算 {[refusal.text() for refusal in closure.refusals]}"
 
 
-TRAIT_SELF_FIXTURE = {
-    "crates/ftrait/Cargo.toml": '[package]\nname = "ftrait"\n',
-    "crates/ftrait/src/lib.rs": '''pub trait Shape {
-    fn area(&self) -> u32 {
-        Self::scale() * 2
-    }
-    fn scale() -> u32 {
-        3
-    }
-}
-pub struct Square;
-impl Shape for Square {}
-pub fn measure(square: &Square) -> u32 {
-    square.area()
-}
-''',
-}
-
 
 def trait_self_path_cell(work):
     """trait 成员里的 Self::scale() 落到这个 trait 自己的成员 scale：改 scale 的默认实现，measure 的键变。"""
@@ -14892,24 +16396,6 @@ def trait_self_path_cell(work):
     return "fn <trait Shape>::scale" in members and before is not None and before != after, \
         f"measure 的闭包里有没有 <trait Shape>::scale {'fn <trait Shape>::scale' in members}；改 scale 前键 {before}、后 {after}"
 
-
-DOCTEST_STRUCTURE_FIXTURE = {
-    "crates/fdoc/Cargo.toml": '[package]\nname = "fdoc"\n',
-    "crates/fdoc/src/lib.rs": '''use std::fmt::Debug;
-/// ```
-/// assert_eq!(fdoc::shown(), 1);
-/// ```
-pub fn owner() -> u32 {
-    10
-}
-pub fn shown() -> u32 {
-    1
-}
-pub fn debug_text(value: &dyn Debug) -> String {
-    format!("{value:?}")
-}
-''',
-}
 
 
 def doctest_structure_cell(work):
@@ -14932,22 +16418,6 @@ def doctest_structure_cell(work):
     return ok, f"文档测试的闭包里连上了 {linked}；键：改前 {before}、改 owner 后 {owner_edited}、改 shown 后 {shown_edited}"
 
 
-USE_SELF_FIXTURE = {
-    "crates/fuse/Cargo.toml": '[package]\nname = "fuse"\n',
-    "crates/fuse/src/lib.rs": '''pub mod store {
-    pub fn open() -> u32 {
-        1
-    }
-}
-pub mod user {
-    use crate::store::{self};
-    pub fn reader() -> u32 {
-        store::open()
-    }
-}
-''',
-}
-
 
 def use_self_import_cell(work):
     """use crate::store::{self} 引进名字 store：只写 store::open() 的单元连上这条 use，改这条 use 作废。"""
@@ -14961,33 +16431,6 @@ def use_self_import_cell(work):
     after, _ = fixture_key(base, entry)
     return uses == ["use user::use@7"] and before is not None and before != after, f"reader 的闭包里 use {uses}；改那条 use 前键 {before}、后 {after}"
 
-
-OPEN_TRAIT_ARGUMENT_FIXTURE = {
-    "crates/fopen/Cargo.toml": '[package]\nname = "fopen"\n',
-    "crates/fopen/src/lib.rs": '''pub trait Sink {
-    fn level(&self) -> u32;
-}
-pub trait Wrap<T: ?Sized> {
-    fn wrap(&self) -> u32;
-}
-pub struct Meter;
-impl Sink for Meter {
-    fn level(&self) -> u32 {
-        1
-    }
-}
-pub struct Holder;
-impl Wrap<dyn Sink> for Holder {
-    fn wrap(&self) -> u32 {
-        2
-    }
-}
-pub fn feed(sink: &dyn Sink) -> u32 {
-    sink.level()
-}
-''',
-}
-OPEN_TRAIT_ARGUMENT_FILE = "crates/fopen/src/lib.rs"
 
 
 def open_trait_argument_cell(work):
@@ -15006,23 +16449,6 @@ def open_trait_argument_cell(work):
     return ok, f"feed 的闭包里有 Holder 的 {holder_in}；键：改前 {before}、改 Holder 的 wrap 后 {holder_edited}、改 Meter 的 level 后 {meter_edited}"
 
 
-BLANKET_FIXTURE = {
-    "crates/fblanket/Cargo.toml": '[package]\nname = "fblanket"\n',
-    "crates/fblanket/src/lib.rs": '''pub trait Shout {
-    fn shout(&self) -> u32;
-}
-impl<T: Copy> Shout for T {
-    fn shout(&self) -> u32 {
-        6
-    }
-}
-pub fn yell(value: &u32) -> u32 {
-    value.shout()
-}
-''',
-}
-BLANKET_FILE = "crates/fblanket/src/lib.rs"
-
 
 def blanket_method_cell(work):
     """blanket impl（impl<T: Copy> Shout for T）够得到的方法算边：yell 调 value.shout()，闭包里有 blanket impl 的 shout，改它键变。"""
@@ -15037,56 +16463,6 @@ def blanket_method_cell(work):
     return bool(impl_members) and before is not None and after is not None and before != after, \
         f"yell 的闭包里 impl 成员 {impl_members}；改 blanket impl 的 shout 前键 {before}、后 {after}"
 
-
-# 4-3k：自身类型里任何深度出现 impl 的泛型参数就是 blanket（Box<T>、Option<Box<T>> 旧判法认不出：头一个名字不是泛型参数）；
-# 同一份写法在 code-tooling 的 function-units-two-implementations-agree-green 样本里与 unit-graph 对拍
-BLANKET_SHAPES_FIXTURE = {
-    "crates/fshapes/Cargo.toml": '[package]\nname = "fshapes"\n',
-    "crates/fshapes/src/lib.rs": '''pub trait Weigh {
-    fn weigh(&self) -> u32;
-}
-impl<T> Weigh for (T, u32) {
-    fn weigh(&self) -> u32 {
-        self.1
-    }
-}
-impl<T> Weigh for [T] {
-    fn weigh(&self) -> u32 {
-        self.len() as u32
-    }
-}
-impl<T, const N: usize> Weigh for [T; N] {
-    fn weigh(&self) -> u32 {
-        N as u32
-    }
-}
-impl<T: Weigh> Weigh for Box<T> {
-    fn weigh(&self) -> u32 {
-        (**self).weigh() + 1
-    }
-}
-impl<T: Weigh> Weigh for Option<Box<T>> {
-    fn weigh(&self) -> u32 {
-        match self {
-            Some(inner) => inner.weigh() + 2,
-            None => 0,
-        }
-    }
-}
-pub struct Sealed<T>(pub T);
-impl<T> Weigh for Sealed<T> {
-    fn weigh(&self) -> u32 {
-        5
-    }
-}
-pub fn heaviest(pair: &(u8, u32)) -> u32 {
-    pair.weigh()
-}
-''',
-}
-BLANKET_SHAPES_FILE = "crates/fshapes/src/lib.rs"
-# Box、Option 与 u32 在 PRIMITIVE_TYPES 里、算被点名，这五份总是进闭包；Sealed<T> 没被点名，只有按 blanket 放行才进
-BLANKET_SHAPES_SELF_TYPES = ("(T, u32)", "[T]", "[T; N]", "Box<T>", "Option<Box<T>>", "Sealed<T>")
 
 
 def blanket_shapes_cell(work):
@@ -15104,24 +16480,6 @@ def blanket_shapes_cell(work):
     return not missing and before is not None and after is not None and before != after, \
         f"闭包里的 impl 头 {sorted(heads)}，缺 {missing}；改 Sealed<T> 那一份的 weigh 前键 {before}、后 {after}"
 
-
-# 4-3k：WGSL 外名在同一链接集里别的 include_str! 读进来的 .wgsl 里有定义（入口只读 kernel.wgsl，SHARED_LIMIT 在 shared.wgsl 里）
-WGSL_OTHER_FILE_FIXTURE = {
-    "crates/fkernels/Cargo.toml": '[package]\nname = "fkernels"\n',
-    "crates/fkernels/src/lib.rs": '''pub const KERNEL_SOURCE: &str = include_str!("kernel.wgsl");
-pub const SHARED_SOURCE: &str = include_str!("shared.wgsl");
-pub fn kernel_text() -> &'static str {
-    KERNEL_SOURCE
-}
-''',
-    "crates/fkernels/src/kernel.wgsl": '''@compute @workgroup_size(1)
-fn main() {
-    let limit = SHARED_LIMIT + 1u;
-}
-''',
-    "crates/fkernels/src/shared.wgsl": "const SHARED_LIMIT: u32 = 7u;\n",
-}
-WGSL_OTHER_FILE_RUST = "crates/fkernels/src/lib.rs"
 
 
 def wgsl_other_file_definition_cell(work):
@@ -15141,24 +16499,6 @@ def wgsl_other_file_definition_cell(work):
         f"闭包里有 SHARED_SOURCE 与 SHARED_LIMIT：{pulled}（成员 {sorted(names)}）；拒算 {refused}；改常量前键 {before}、后 {after}"
 
 
-# 4-3h：const _ 不是 R-裸名的着落（gpu 特性下才编的 const _ 编译期断言被 let _ = …、_ => 里的 _ 拉进闭包，带不带 gpu 的两趟键就分了）；
-# include_str! 读根外的文件（工作区在根下一层，读仓根下的登记文件）照 crates/singlefs-unit-graph 收成数据单元
-UNDERSCORE_FIXTURE = {
-    "crates/funderscore/Cargo.toml": '[package]\nname = "funderscore"\n\n[features]\ngpu = []\n',
-    "crates/funderscore/src/lib.rs": '''pub const LIMIT: u32 = 4;
-#[cfg(feature = "gpu")]
-const _: () = assert!(LIMIT == 4);
-pub fn pick(value: u32) -> u32 {
-    let _ = value;
-    match value {
-        0 => 1,
-        _ => LIMIT,
-    }
-}
-''',
-}
-UNDERSCORE_FILE = "crates/funderscore/src/lib.rs"
-
 
 def underscore_const_cell(work):
     """const _ 没有名字：pick 里的 let _ 与 _ => 不把 gpu 特性下的 const _ 拉进闭包，带不带 gpu 特性两种目标下两把键都相同、闭包里没有 const _。"""
@@ -15175,19 +16515,6 @@ def underscore_const_cell(work):
     return None not in without + with_gpu and without == with_gpu and not underscores, \
         f"不带 gpu {without}、带 gpu {with_gpu}；带 gpu 时闭包里的 _ 单元 {underscores}"
 
-
-OUTSIDE_INCLUDE_FIXTURE = {
-    "workspace/crates/finclude/Cargo.toml": '[package]\nname = "finclude"\n',
-    "workspace/crates/finclude/src/lib.rs": '''pub fn threads() -> usize {
-    include_str!("../../../../thread-default").trim().len()
-}
-pub fn missing() -> usize {
-    include_str!("../../../../not-there").len()
-}
-''',
-    "thread-default": "31\n",
-}
-OUTSIDE_INCLUDE_FILE = "crates/finclude/src/lib.rs"
 
 
 def outside_include_cell(work):
@@ -15291,69 +16618,6 @@ def shell_folding_cell(work):
     return {"s/lib.sh", "s/child.sh"} <= files and key is not None, f"闭包碰到的文件 {sorted(files)}，拒算 {[refusal.form for refusal in refusals]}"
 
 
-# Rust 闭包读到的 shell 脚本（文件头「Rust 闭包读到的 shell 脚本」）：入口照 gpu_card_configuration.rs 起配置判法的写法拼出脚本路径
-SHELL_DATA_FIXTURE = {
-    "crates/fshell/Cargo.toml": '[package]\nname = "fshell"\n',
-    "crates/fshell/src/lib.rs": '''pub fn runs_the_sourcing_script() -> bool {
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/sourcing.sh");
-    std::process::Command::new("bash").arg(&script).status().is_ok()
-}
-pub fn runs_the_plain_script() -> bool {
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/plain.sh");
-    std::process::Command::new("bash").arg(&script).status().is_ok()
-}
-pub fn runs_the_dotted_script() -> bool {
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/dotted.sh");
-    std::process::Command::new("bash").arg(&script).status().is_ok()
-}
-pub fn runs_the_unfolded_script() -> bool {
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/unfolded.sh");
-    std::process::Command::new("bash").arg(&script).status().is_ok()
-}
-''',
-    "scripts/sourcing.sh": '''#!/usr/bin/env bash
-set -uo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/lib/first.sh"
-first_function
-''',
-    "scripts/lib/first.sh": '''#!/usr/bin/env bash
-first_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$first_directory/second.sh"
-first_function() {
-  echo first
-}
-''',
-    "scripts/lib/second.sh": '''#!/usr/bin/env bash
-second_function() {
-  echo second
-}
-''',
-    "scripts/dotted.sh": '''#!/usr/bin/env bash
-SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SCRIPT_DIRECTORY/lib/dot-only.sh"
-dot_function
-''',
-    "scripts/lib/dot-only.sh": '''#!/usr/bin/env bash
-dot_function() {
-  echo dot
-}
-''',
-    "scripts/plain.sh": '''#!/usr/bin/env bash
-echo plain
-''',
-    "scripts/unfolded.sh": '''#!/usr/bin/env bash
-library="$1"
-source "$library"
-''',
-}
-SHELL_DATA_FILE = "crates/fshell/src/lib.rs"
-SHELL_DATA_HOST_LINE = "host: x86_64-unknown-linux-gnu"
-SHELL_DATA_SOURCE_CELL = ("Rust 闭包读到的 shell 脚本：它 source 进来的文件收成 data-file 单元，改一处读这份脚本的入口键变、读另一份不 source 它的脚本的入口键不变；"
-                          "被 source 的每一份按读这份脚本的那一处记一条数据位置，unit_graph_key（与 crates/singlefs-unit-graph 对拍的那一把）随它变")
-SHELL_DATA_DOT_CELL = "Rust 闭包读到的 shell 脚本：. <路径> 照 source 收（路径经 $(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd) 赋的变量），改被引的文件键变"
-SHELL_DATA_NESTED_CELL = "Rust 闭包读到的 shell 脚本：两层（脚本 source 的库再 source 一份）逐层收，改里层那份键变"
-SHELL_DATA_UNFOLDED_CELL = "Rust 闭包读到的 shell 脚本：source 的路径折不出拒算 shell-path-unfolded"
-
 
 def shell_data_edit_trip(work, entry, path, old, new):
     """→ (改动前的键, 改后键, 改动前闭包里经 shell-source 收进来的文件, 改动前与改后的 unit_graph_key)。"""
@@ -15399,21 +16663,6 @@ def shell_data_nested_cell(work):
                 f"{before and before[:12]} → {after and after[:12]}（要都有、不同）")
 
 
-MANIFEST_ROOT_CELL = "Rust：清单目录往上拼出仓根（目录）拒算 runtime-path；点名清单目录里一份文件再往上取仓根的不拒算、那份文件的字节进键"
-# 实验准入入口（scripts/experiment-apparatus/lib.rs::admit_experiment_run_or_exit）取仓根的两种写法
-MANIFEST_ROOT_FIXTURE = {
-    "crates/fbench/Cargo.toml": '[package]\nname = "fbench"\n',
-    "crates/fbench/src/lib.rs": '''// 只是注释
-pub fn root_by_parent_directories() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
-}
-pub fn root_by_named_source() -> std::path::PathBuf {
-    let this_source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("lib.rs");
-    this_source.ancestors().nth(4).expect("lib.rs 在 <根>/crates/fbench/src/ 下").to_path_buf()
-}
-''',
-}
-
 
 def manifest_root_cell(work):
     base = os.path.join(work, "tree")
@@ -15426,58 +16675,6 @@ def manifest_root_cell(work):
     return ok, (f"往上拼目录的：键{'有' if directory_key else '无'}、拒算 {sorted(directory_forms)}（要拒算 runtime-path）；"
                 f"点名文件的：拒算 {sorted(named_forms)}，改那份文件里一句注释前后键{'相同' if before == after else '不同'}（要算得出且不同）")
 
-
-CURRENT_EXE_FIXTURE = {
-    "crates/fexe/Cargo.toml": '[package]\nname = "fexe"\n',
-    "crates/fexe/src/lib.rs": '''#[cfg(test)]
-mod tests {
-    use std::process::Command;
-    const CHILD_NAME: &str = "the_child_runs_alone";
-    const CHILD_TEST: &str = "tests::the_child_runs_alone";
-    fn run_the_child_by_name(name: &str) {
-        let output = Command::new(std::env::current_exe().expect("路径")).args(["--exact", name, "--nocapture"]).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn the_parent_starts_the_child_by_a_constant() {
-        let output = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", CHILD_TEST]).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn the_parent_starts_the_child_through_a_parameter() {
-        run_the_child_by_name(CHILD_TEST);
-    }
-    #[test]
-    fn the_parent_names_the_child_by_a_format_of_literals_and_constants() {
-        let output = Command::new(std::env::current_exe().expect("路径")).arg("--exact").arg(format!("{}::{CHILD_NAME}", "tests")).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn the_child_runs_alone() {
-        let value = 1;
-        assert_eq!(value, 1);
-    }
-    #[test]
-    fn the_unrelated_test() {
-        let note = 5;
-        assert_eq!(note, 5);
-    }
-    #[test]
-    fn the_parent_asks_for_a_name_nobody_defines() {
-        let _ = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::missing"]).output();
-    }
-    #[test]
-    fn the_parent_names_itself_before_the_exact_flag_by_a_module_path() {
-        let test_name = format!("{}::x", module_path!().split_once("::").expect("包名").1);
-        let _ = Command::new(std::env::current_exe().expect("路径")).args([test_name.as_str(), "--exact"]).output();
-    }
-}
-''',
-}
-CURRENT_EXE_CELL = "Rust：current_exe() 交给 Command::new 起子进程、--exact 后面点名的测试（常量、参数、字面与常量拼的）连到那条 #[test]，改它的函数体键变、改别的测试键不变；点名不存在的、测试名写在 --exact 前面的照旧拒算 current-exe"
-CURRENT_EXE_KEYED = ("the_parent_starts_the_child_by_a_constant", "the_parent_starts_the_child_through_a_parameter",
-                     "the_parent_names_the_child_by_a_format_of_literals_and_constants")
-CURRENT_EXE_REFUSED = ("the_parent_asks_for_a_name_nobody_defines", "the_parent_names_itself_before_the_exact_flag_by_a_module_path")
 
 
 def current_exe_cell(work):
@@ -15503,42 +16700,6 @@ def current_exe_cell(work):
                 f"改无关的测试后键同前：{[outside[name] == kept[name][0] for name in CURRENT_EXE_KEYED]}；改子进程测试的函数体后键都变：{[inside[name] != kept[name][0] for name in CURRENT_EXE_KEYED]}")
 
 
-CURRENT_EXE_CONSTANT_FIXTURE = {
-    "crates/fexec/Cargo.toml": '[package]\nname = "fexec"\n',
-    "crates/fexec/src/lib.rs": '''#[cfg(test)]
-mod names;
-#[cfg(test)]
-mod other_names;
-#[cfg(test)]
-mod tests {
-    use crate::names::{AMBIGUOUS_TEST, CHILD_TEST};
-    #[test]
-    fn the_parent_names_the_child_by_a_constant_from_another_file() {
-        let output = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", CHILD_TEST]).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn the_parent_names_a_constant_defined_twice_with_different_values() {
-        let _ = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", AMBIGUOUS_TEST]).output();
-    }
-    #[test]
-    fn the_child_runs_alone() {
-        let value = 1;
-        assert_eq!(value, 1);
-    }
-    #[test]
-    fn the_unrelated_test() {
-        let note = 5;
-        assert_eq!(note, 5);
-    }
-}
-''',
-    "crates/fexec/src/names.rs": 'pub const CHILD_TEST: &str = "tests::the_child_runs_alone";\npub const AMBIGUOUS_TEST: &str = "tests::the_child_runs_alone";\n',
-    "crates/fexec/src/other_names.rs": 'pub const AMBIGUOUS_TEST: &str = "tests::missing";\n',
-}
-CURRENT_EXE_CONSTANT_CELL = ("Rust：current_exe() 的测试名里的常量定义在同包另一份文件里，--exact 后面用它：连到那条 #[test]、不拒算，改它的函数体键变、改别的测试键不变；"
-                             "同名常量在同包两份文件里值不同的照旧拒算 current-exe")
-
 
 def current_exe_constant_cell(work):
     base = os.path.join(work, "tree")
@@ -15560,31 +16721,6 @@ def current_exe_constant_cell(work):
                 f"改无关的测试后键同前：{outside == kept}；改子进程测试的函数体后键变：{inside is not None and inside != kept}")
 
 
-CURRENT_EXE_PATH_ONLY_FIXTURE = {
-    "crates/fexp/Cargo.toml": '[package]\nname = "fexp"\n',
-    "crates/fexp/src/lib.rs": '''#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_only_asks_whether_it_has_a_path() {
-        assert!(std::env::current_exe().is_ok());
-    }
-    #[test]
-    fn it_reads_the_size_of_the_file_it_was_started_from() {
-        let started_from = std::env::current_exe().expect("路径");
-        let size = std::fs::metadata(&started_from).expect("读得到").len();
-        assert!(size > 0);
-    }
-    #[test]
-    fn the_unrelated_test() {
-        let note = 5;
-        assert_eq!(note, 5);
-    }
-}
-''',
-}
-CURRENT_EXE_PATH_ONLY_CELL = "Rust：current_exe() 只问路径、同一函数里不起 Command 的不拒算：键算得出，改它的函数体键变、改别的测试键不变"
-CURRENT_EXE_PATH_ONLY_ENTRIES = ("it_only_asks_whether_it_has_a_path", "it_reads_the_size_of_the_file_it_was_started_from")
-
 
 def current_exe_path_only_cell(work):
     base = os.path.join(work, "tree")
@@ -15604,44 +16740,6 @@ def current_exe_path_only_cell(work):
                 f"改它们自己的函数体后键都变：{[inside[name] != kept[name][0] for name in CURRENT_EXE_PATH_ONLY_ENTRIES]}")
 
 
-CURRENT_EXE_SPAWN_FIXTURE = {
-    "crates/fexs/Cargo.toml": '[package]\nname = "fexs"\n',
-    "crates/fexs/src/lib.rs": '''#[cfg(test)]
-mod tests {
-    use std::process::Command;
-    #[test]
-    fn it_starts_itself_and_names_the_child() {
-        let output = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::the_child_runs_alone"]).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn it_starts_itself_without_naming_a_test() {
-        let output = Command::new(std::env::current_exe().expect("路径")).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn it_takes_the_path_first_and_hands_it_to_command() {
-        let program = std::env::current_exe().expect("路径");
-        let output = Command::new(program).args(["--exact", "tests::the_child_runs_alone"]).output().expect("起得来");
-        assert!(output.status.success());
-    }
-    #[test]
-    fn it_names_a_test_nobody_defines() {
-        let _ = Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::missing"]).output();
-    }
-    #[test]
-    fn the_child_runs_alone() {
-        let value = 1;
-        assert_eq!(value, 1);
-    }
-}
-''',
-}
-CURRENT_EXE_SPAWN_CELL = ("Rust：同一函数里起 Command 的 current_exe() 照旧按起自己判：折得出测试名的连边，"
-                          "折不出的（没有 --exact、路径先存进变量再交 Command::new、点名不存在的）拒算 current-exe")
-CURRENT_EXE_SPAWN_KEYED = "it_starts_itself_and_names_the_child"
-CURRENT_EXE_SPAWN_REFUSED = ("it_starts_itself_without_naming_a_test", "it_takes_the_path_first_and_hands_it_to_command", "it_names_a_test_nobody_defines")
-
 
 def current_exe_spawn_cell(work):
     base = os.path.join(work, "tree")
@@ -15656,41 +16754,8 @@ def current_exe_spawn_cell(work):
     ok = (kept is not None and reached == "current-exe-child" and inside is not None and inside != kept
           and all(key is None and forms == {"current-exe"} for key, forms in refused.values()))
     return ok, (f"点名了测试的入口：键{'有' if kept else '无'}（拒算 {sorted(kept_forms)}）、子进程测试进闭包的规则 {reached}（要 current-exe-child）、改子进程测试的函数体后键变：{inside is not None and inside != kept}；"
-                f"没点名、路径先存变量、点名不存在的：{ {name: (key is not None, sorted(forms)) for name, (key, forms) in refused.items()} }（要都无键、拒算 current-exe）")
+                f"没点名、路径先存变量、路径改过、点名不存在的：{ {name: (key is not None, sorted(forms)) for name, (key, forms) in refused.items()} }（要都无键、拒算 current-exe）")
 
-
-MANIFEST_DIRECTORY_FIXTURE = {
-    "crates/fdir/Cargo.toml": '[package]\nname = "fdir"\n',
-    "crates/fdir/rules/first.txt": "rule one\n",
-    "crates/fdir/rules/nested/second.txt": "rule two\n",
-    "crates/fdir/src/lib.rs": '''use std::path::Path;
-const MANIFEST: &str = env!("CARGO_MANIFEST_DIR");
-pub fn unrelated_value() -> u32 {
-    1
-}
-pub fn count_rules_directly() -> usize {
-    std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("rules")).expect("列得了").count()
-}
-pub fn count_rules_by_variable() -> usize {
-    let rules = Path::new(env!("CARGO_MANIFEST_DIR")).join("rules");
-    std::fs::read_dir(&rules).expect("列得了").count()
-}
-pub fn count_rules_by_constant() -> usize {
-    let root = Path::new(MANIFEST);
-    let nested = root.join("rules").join("nested");
-    std::fs::read_dir(nested).expect("列得了").count()
-}
-pub fn count_every_crate() -> usize {
-    std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("..")).expect("列得了").count()
-}
-pub fn count_by_climbing_from_a_variable() -> usize {
-    let rules = Path::new(env!("CARGO_MANIFEST_DIR")).join("rules");
-    std::fs::read_dir(rules.parent().expect("有上一级")).expect("列得了").count()
-}
-''',
-}
-MANIFEST_DIRECTORY_CELL = "Rust：清单目录折出 crates/ 之下的目录收成数据目录（直接写、绑 let 变量、经私有常量），目录里一份文件改了键变、闭包外的改了键不变；crates/ 整个与变量上接别的方法的拒算 runtime-path"
-MANIFEST_DIRECTORY_ENTRIES = ("count_rules_directly", "count_rules_by_variable", "count_rules_by_constant")
 
 
 def manifest_directory_cell(work):
@@ -15715,38 +16780,6 @@ def manifest_directory_cell(work):
                 f"改闭包外的函数后键同前：{outside == kept}；改目录里一份文件后三个入口的键都变：{[inside[name] != kept[name] for name in MANIFEST_DIRECTORY_ENTRIES]}")
 
 
-# prune-server/src/preflight.rs 的写法：清单目录绑给 let，一处 .join(参数) 折不出，一处 .join("…") 折出一份文件（crates/singlefs-unit-graph 的 fold_path_chain 逐处折）
-MANIFEST_BINDING_FIXTURE = {
-    "crates/fpre/Cargo.toml": '[package]\nname = "fpre"\n',
-    "crates/fpre/tools/check.py": "print('check')\n",
-    "crates/fpre/src/lib.rs": '''use std::path::Path;
-pub fn check_from_the_manifest_directory(source_relative_to_manifest: &str) -> usize {
-    let manifest_directory = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let source = manifest_directory.join(source_relative_to_manifest);
-    let script = manifest_directory
-        .join("tools")
-        .join("check.py");
-    source.as_os_str().len() + script.as_os_str().len()
-}
-pub fn check_from_the_crates_directory(source_relative_to_manifest: &str) -> usize {
-    let crates_directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let source = crates_directory.join(source_relative_to_manifest);
-    let script = crates_directory.join("fpre").join("tools/check.py");
-    source.as_os_str().len() + script.as_os_str().len()
-}
-pub fn check_through_an_alias() -> usize {
-    let tools: std::path::PathBuf = Path::new(env!("CARGO_MANIFEST_DIR")).join("tools");
-    let renamed = tools;
-    let script = Path::new(renamed).join("check.py");
-    script.as_os_str().len()
-}
-''',
-}
-MANIFEST_BINDING_CELL = ("Rust：清单目录绑给 let 变量的，一处 .join(变量) 折不出、一处折出文件：这个单元拒算 runtime-path、那份文件照记一条 data 读"
-                         "（绑的是清单目录本身与 crates/ 整个都一样）；别名再绑一层、Path::new(别名) 接的链照跟")
-# 入口 → (env! 那一行, 要不要拒算)：每个入口都只读 crates/fpre/tools/check.py 一份，读记在 env! 那一行
-MANIFEST_BINDING_ENTRIES = {"check_from_the_manifest_directory": (3, True), "check_from_the_crates_directory": (11, True), "check_through_an_alias": (17, False)}
-
 
 def manifest_binding_cell(work):
     base = os.path.join(work, "tree")
@@ -15762,8 +16795,6 @@ def manifest_binding_cell(work):
     return ok, (f"dump 的数据读 {reads}（要 {want_reads}）；键与拒算对不上的入口 (有没有键, 拒算) {wrong}"
                 f"（要 check_from_the_manifest_directory、check_from_the_crates_directory 无键、拒算 runtime-path，check_through_an_alias 有键、不拒算）")
 
-
-RUST_LEX_CACHE_CELL = "Rust 词法单元的磁盘缓存：同一份文本第二次取缓存、与现切的逐项相同；改一个字符（长度不变）不沿用、切出来的随文本变；缓存文件坏了照常现切"
 
 
 def rust_lex_cache_cell(work):
@@ -15798,7 +16829,244 @@ def rust_lex_cache_cell(work):
                 f"缓存文件写坏 ({damaged[1]}、{damaged[2]}，{damaged[0] == direct_first})（要 头一趟 (1、0)、第二趟 (0、1)、换文本 (1、0)、再一趟 (0、1)、写坏 (1、0)，结果都同现切）")
 
 
-DIRECTORY_CLOSURE_LINE_CELL = "命令行 closure：数据目录单元按读它的那一处列（data-directory 加目录、读它的文件与行、目录指纹），不打成 <目录>:1-<文件数>"
+def library_variant_namespace(work, label, edits):
+    """这份库此刻的原文照 edits（(说明, 原文, 改成)，原文要恰好命中一次）改过，另执行成一份模块（不进 sys.modules、不跑它的自证）
+    → (它算出的词法缓存目录名, None)；原文命中不是一次的 → (None, 说明)。"""
+    with open(os.path.join(LIBRARY_ROOT, "scripts", "gate", "lib_function_units.py"), encoding="utf-8") as handle:
+        text = handle.read()
+    for what, old, new in edits:
+        if text.count(old) != 1:
+            return None, f"{what}：「{old.strip()}」在这份库里命中 {text.count(old)} 次（要恰好一次）：原文改了，照新原文改那一张改法表"
+        text = text.replace(old, new)
+    module = types.ModuleType(f"lib_function_units_variant_{label}")
+    module.__file__ = os.path.join(work, label, "lib_function_units.py")
+    exec(compile(text, module.__file__, "exec"), module.__dict__)
+    return module.rust_lex_cache_namespace(), None
+
+
+def rust_lex_namespace_cell(edits, want):
+    """RUST_LEX_NAMESPACE_CHANGED_CELL / RUST_LEX_NAMESPACE_KEPT_CELL：这份库原样一份、照 edits 里每一处各改一份，各另执行成模块算词法缓存的目录名，
+    每一份与原样那一份比，变没变都要是 want（changed 或 same）。"""
+    def judge(work):
+        base, problem = library_variant_namespace(work, "base", ())
+        if base is None:
+            return False, problem
+        wrong = []
+        for index, edit in enumerate(edits):
+            namespace, problem = library_variant_namespace(work, f"edit-{index}", (edit,))
+            if namespace is None:
+                return False, problem
+            got = "changed" if namespace != base else "same"
+            if got != want:
+                wrong.append(f"{edit[0]}：目录名{'换了' if got == 'changed' else '没换'}")
+        return not wrong, f"要{'都换' if want == 'changed' else '都不换'}，对不上的 {wrong}（目录名照 rust_lex_cache_namespace 与 live_closure_fingerprint 改）"
+    return judge
+
+
+def rust_lex_namespace_closure_cell(work):
+    """RUST_LEX_NAMESPACE_CLOSURE_CELL：真仓拷一份（real_tree），照这份库自己的规则收 rust_lex_cached 的闭包：没有这份库整份的 source-text 与 data-file，
+    load_rust_lex、store_rust_lex、rust_lex、RUST_LEX_CACHE_FORM、IDENT 在里面；再照 RUST_LEX_NAMESPACE_CLOSURE_EDITS 在拷贝上逐处改（逐个累加），
+    改注释那一处键不变、改 load_rust_lex 那一处键变。弄坏开关 rust-lex-cache-namespace-reads-own-file：在拷贝上给 rust_lex_cache_namespace
+    加回一句读这份库自己原文的，这一格必红。"""
+    tree = real_tree(work)
+    library = "scripts/gate/lib_function_units.py"
+    entry = f"{library}::rust_lex_cached"
+    if "rust-lex-cache-namespace-reads-own-file" in active_breaks():
+        edit_file(tree, library, *RUST_LEX_NAMESPACE_OWN_FILE_EDIT)
+    closure = closure_of(tree, entry)
+    members = {(unit.kind, unit.name) for unit in closure.order if unit.file == library}
+    whole = sorted(f"{kind} {name}" for kind, name in members if kind in ("source-text", "data-file"))
+    wanted = ("load_rust_lex", "store_rust_lex", "rust_lex", "RUST_LEX_CACHE_FORM", "IDENT")
+    missing = [name for name in wanted if not any(member_name == name for _kind, member_name in members)]
+    previous, wrong = closure_key(closure, allow_refused=True)[0], []
+    for what, old, new, want in RUST_LEX_NAMESPACE_CLOSURE_EDITS:
+        edit_file(tree, library, old, new)
+        key = closure_key(closure_of(tree, entry), allow_refused=True)[0]
+        if ("changed" if key != previous else "same") != want:
+            wrong.append(f"{what}：键{'变了' if key != previous else '没变'}")
+        previous = key
+    return not whole and not missing and not wrong, (f"闭包里这份库的单元 {len(members)} 个：整份的 {whole}（要没有），该在而不在的 {missing}；"
+                                                     f"键对不上的 {wrong}（整份的沿 closure --explain 的 via 找读这份库原文的那一处）")
+
+
+def excluded_call_edge_cell(work):
+    """EXCLUDED_CALL_EDGE_CELL：自证期间临时把夹具里 entry 调 locate 那一条边登进 EXCLUDED_CALL_EDGES（EXCLUDED_CALL_EDGE_FIXTURE_EDGES）：
+    改只经 locate 读的 pkg/locator.txt 键不变，改 judge_input 读的 pkg/judged.txt 键变；跑完把表还原。"""
+    registered = dict(EXCLUDED_CALL_EDGES)
+    EXCLUDED_CALL_EDGES.update(EXCLUDED_CALL_EDGE_FIXTURE_EDGES)
+    got = {}
+    try:
+        for path, old, new in (("pkg/locator.txt", "locator\n", "locator changed\n"), ("pkg/judged.txt", "judged\n", "judged changed\n")):
+            base = os.path.join(work, path.replace("/", "-"))
+            write_tree(base, EXCLUDED_CALL_EDGE_FIXTURE)
+            before = closure_key(closure_of(base, "pkg/tool.py::entry"), allow_refused=True)[0]
+            edit_file(base, path, old, new)
+            after = closure_key(closure_of(base, "pkg/tool.py::entry"), allow_refused=True)[0]
+            got[path] = "changed" if before != after else "same"
+    finally:
+        EXCLUDED_CALL_EDGES.clear()
+        EXCLUDED_CALL_EDGES.update(registered)
+    want = {"pkg/locator.txt": "same", "pkg/judged.txt": "changed"}
+    return got == want, f"改了键变没变 {got}（要 {want}：登记了的边不连，同一个单元的别的边照连）"
+
+
+def unit_graph_inputs_cell(work):
+    """UNIT_GRAPH_INPUTS_CELL：真仓拷一份（real_tree，另拷 Cargo.lock 与 crates/singlefs-unit-graph），照这份库自己的规则收 unit_graph_directory 的闭包：
+    built_unit_graph、build_unit_graph、unit_graph_inputs_digest 不在；Cargo.lock 头一个包的版本、.claude/heavy-thread-default、crates/singlefs-unit-graph/src
+    里头一份 .rs 各改一处（逐个累加），键都不变。弄坏开关 call-edge-exclusions-ignored 下那一条边照连，这一格必红。"""
+    tree = real_tree(work)
+    shutil.copy2(os.path.join(LIBRARY_ROOT, "Cargo.lock"), os.path.join(tree, "Cargo.lock"))
+    shutil.copytree(os.path.join(LIBRARY_ROOT, "crates", "singlefs-unit-graph"), os.path.join(tree, "crates", "singlefs-unit-graph"), ignore=REAL_TREE_IGNORED)
+    library = "scripts/gate/lib_function_units.py"
+    entry = f"{library}::unit_graph_directory"
+    closure = closure_of(tree, entry)
+    base_key = closure_key(closure, allow_refused=True)[0]
+    present = sorted(unit.name for unit in closure.order
+                     if unit.file == library and unit.name in ("built_unit_graph", "build_unit_graph", "unit_graph_inputs_digest"))
+    source = files_under(tree, (".rs",), ["crates/singlefs-unit-graph/src"])[0]
+    changed = []
+    for path, edit in (("Cargo.lock", lambda text: text.replace('\nversion = "', '\nversion = "0.0.0-', 1)),
+                       (".claude/heavy-thread-default", lambda text: text + "# 自证追加的一行\n"),
+                       (source, lambda text: text + "// 自证追加的一行\n")):
+        absolute = os.path.join(tree, path)
+        with open(absolute, encoding="utf-8") as handle:
+            text = handle.read()
+        with open(absolute, "w", encoding="utf-8") as handle:
+            handle.write(edit(text))
+        if closure_key(closure_of(tree, entry), allow_refused=True)[0] != base_key:
+            changed.append(path)
+    return not present and not changed, (f"{entry} 的闭包里有 {present}（要没有）；改了键就变的 {changed}（要没有）：编 unit-graph 那一步照"
+                                         "「不走的调用边」EXCLUDED_CALL_EDGES 那一行不进判法闭包")
+
+
+def unit_graph_digest_cell(work):
+    """UNIT_GRAPH_DIGEST_CELL：临时目录里摆一份只有 crates/singlefs-unit-graph（Cargo.toml、src/main.rs）、Cargo.lock、.claude/heavy-thread-default 的小仓，
+    unit_graph_inputs_digest 先算一遍，再三样各改一处（逐个累加）各算一遍：每一次都与上一次不同（编 unit-graph 读的三样都罩在缓存目录名里）。"""
+    repository = os.path.join(work, "repository")
+    write_tree(repository, UNIT_GRAPH_DIGEST_FIXTURE)
+    source = os.path.join(repository, "crates", "singlefs-unit-graph")
+    thread_registry, lock_file = os.path.join(repository, ".claude", "heavy-thread-default"), os.path.join(repository, "Cargo.lock")
+    previous, unchanged = unit_graph_inputs_digest(repository, source, thread_registry, lock_file), []
+    for path in ("Cargo.lock", ".claude/heavy-thread-default", "crates/singlefs-unit-graph/src/main.rs"):
+        with open(os.path.join(repository, path), "a", encoding="utf-8") as handle:
+            handle.write("# 自证追加的一行\n" if not path.endswith(".rs") else "// 自证追加的一行\n")
+        digest = unit_graph_inputs_digest(repository, source, thread_registry, lock_file)
+        if digest == previous:
+            unchanged.append(path)
+        previous = digest
+    return not unchanged, f"改了缓存目录名却没换的 {unchanged}（要没有：编 unit-graph 读的每一样都要进 unit_graph_inputs_digest）"
+
+
+def selftest_fixtures_outside_cell(work):
+    """SELFTEST_FIXTURES_OUTSIDE_CELL：真仓拷一份（real_tree），收 rust_lex_cached 的闭包（这份库 import 时执行的语句都在里面）：
+    lib_function_units_selftest_fixtures.py 的单元一个都不在；那一份末尾加一句常量之后键不变。弄坏开关 selftest-fixtures-loaded-at-import：
+    在拷贝上给这份库加一句模块级的赋值点名 load_selftest_fixtures（import 时就载入那一份），这一格必红。"""
+    tree = real_tree(work)
+    library, fixtures = "scripts/gate/lib_function_units.py", "scripts/gate/lib_function_units_selftest_fixtures.py"
+    entry = f"{library}::rust_lex_cached"
+    if "selftest-fixtures-loaded-at-import" in active_breaks():
+        edit_file(tree, library, *SELFTEST_FIXTURES_IMPORT_EDIT)
+    closure = closure_of(tree, entry)
+    inside = sorted(unit.name for unit in closure.order if unit.file == fixtures)
+    before = closure_key(closure, allow_refused=True)[0]
+    with open(os.path.join(tree, fixtures), "a", encoding="utf-8") as handle:
+        handle.write(SELFTEST_FIXTURES_APPENDED)
+    after = closure_key(closure_of(tree, entry), allow_refused=True)[0]
+    return not inside and before == after, (f"{entry} 的闭包里有那一份的单元 {len(inside)} 个（头几个 {inside[:5]}，要没有）；"
+                                            f"那一份加一句之后键{'变了' if before != after else '没变'}（要没变）：照文件头「自证夹具」只在自证里载入它")
+
+
+def library_external_calls(root, names):
+    """names 里哪几个被别的脚本当这份库的属性点名（提到 lib_function_units 的 .py / .sh 里写着 .<名字> 或 import … <名字>）。"""
+    found = set()
+    for top in DEFAULT_SCRIPT_DIRECTORIES + ("task-server", "prune-server"):
+        for directory, subdirectories, files in os.walk(os.path.join(root, top)):
+            subdirectories[:] = sorted(name for name in subdirectories if name not in SKIPPED_DIRECTORIES and name != "fixtures")
+            for name in sorted(files):
+                if not name.endswith((".py", ".sh")) or name.startswith("lib_function_units"):
+                    continue
+                with open(os.path.join(directory, name), encoding="utf-8", errors="replace") as handle:
+                    text = handle.read()
+                if "lib_function_units" in text:
+                    found |= {called for called in names if re.search(rf"\.{re.escape(called)}\b|import[^\n]*\b{re.escape(called)}\b", text)}
+    return found
+
+
+def selftest_fixture_name_problems(library_text, fixtures_text, external_calls):
+    """fixtures_text 定义的名字被 library_text 运行期那一边读到的几处 → 说明的列表（空是对的）。运行期那一边：import 时执行的语句、
+    从 selftest 经名字够不到的顶层函数与类、external_calls 里的函数，经函数体、类体与模块级常量的值里读的名字往下够（selftest 那一条边不走）；
+    library_text 自己也定义了的同样点名。"""
+    library, fixtures = ast.parse(library_text), ast.parse(fixtures_text)
+
+    def read(node):
+        return {inner.id for inner in ast.walk(node) if isinstance(inner, ast.Name) and isinstance(inner.ctx, (ast.Load, ast.Del))}
+    # 模块级常量（两份里的）→ 它的值读到的名字；那一份定义的名字
+    moved, values = set(), {}
+    for tree in (library, fixtures):
+        for statement in tree.body:
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)) and statement.value is not None:
+                for target in (statement.targets if isinstance(statement, ast.Assign) else [statement.target]):
+                    for node in ast.walk(target):
+                        if isinstance(node, ast.Name):
+                            values.setdefault(node.id, set()).update(read(statement.value))
+                            if tree is fixtures:
+                                moved.add(node.id)
+    bodies, import_time, defined = {}, set(), set()
+
+    def executed_at_import(definition):
+        """def / class 在 import 时求值的那几块：装饰器、缺省值；类另有基类、关键字与类体里不是 def 的语句（类体里 def 的装饰器与缺省值）。"""
+        if isinstance(definition, ast.ClassDef):
+            parts = list(definition.decorator_list) + list(definition.bases) + [keyword.value for keyword in definition.keywords]
+            for inner in definition.body:
+                parts += executed_at_import(inner) if isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) else [inner]
+            return parts
+        return list(definition.decorator_list) + list(definition.args.defaults) + [value for value in definition.args.kw_defaults if value is not None]
+    for statement in library.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bodies[statement.name] = read(statement)
+            defined.add(statement.name)
+            for part in executed_at_import(statement):
+                import_time |= read(part)
+        else:
+            import_time |= read(statement)
+            defined |= {inner.id for inner in ast.walk(statement) if isinstance(inner, ast.Name) and isinstance(inner.ctx, ast.Store)}
+            defined |= {(alias.asname or alias.name).split(".")[0] for inner in ast.walk(statement) if isinstance(inner, (ast.Import, ast.ImportFrom))
+                        for alias in inner.names}
+
+    def reach(roots):
+        seen, pending = set(), list(roots)
+        while pending:
+            name = pending.pop()
+            if name not in seen and name != "selftest":
+                seen.add(name)
+                pending += list(bodies.get(name, ())) + list(values.get(name, ()))
+        return seen
+    selftest_side = reach(bodies.get("selftest", ()))
+    runtime = reach((set(bodies) - selftest_side - {"selftest"}) | import_time | set(external_calls))
+    problems = [f"import 时执行的语句读 {name}" for name in sorted(import_time & moved)]
+    problems += [f"运行期的 {name} 读 {sorted(bodies[name] & moved)}" for name in sorted(runtime) if name in bodies and bodies[name] & moved]
+    problems += [f"这份库自己也定义 {name}" for name in sorted(defined & moved)]
+    return problems
+
+
+def selftest_fixture_names_cell(_work):
+    """SELFTEST_FIXTURE_NAMES_CELL：读本仓这份库与 lib_function_units_selftest_fixtures.py 的原文（selftest_fixture_name_problems），别的脚本点名的函数现扫
+    （library_external_calls）。弄坏开关 selftest-fixtures-runtime-name-moved：在读进来的原文上把 ROW_KEYED_TABLES（admission.py 调的 row_keyed_closure 读它）
+    从这份库挪进那一份，这一格必红。"""
+    with open(os.path.join(LIBRARY_ROOT, "scripts", "gate", "lib_function_units.py"), encoding="utf-8") as handle:
+        library_text = handle.read()
+    with open(os.path.join(LIBRARY_ROOT, "scripts", "gate", "lib_function_units_selftest_fixtures.py"), encoding="utf-8") as handle:
+        fixtures_text = handle.read()
+    if "selftest-fixtures-runtime-name-moved" in active_breaks():
+        statement = next(node for node in ast.parse(library_text).body if isinstance(node, ast.Assign)
+                         and any(isinstance(target, ast.Name) and target.id == "ROW_KEYED_TABLES" for target in node.targets))
+        rows = library_text.split("\n")
+        moved = "\n".join(rows[statement.lineno - 1:statement.end_lineno])
+        library_text = "\n".join(rows[:statement.lineno - 1] + rows[statement.end_lineno:])
+        fixtures_text += "\n" + moved + "\n"
+    names = {node.name for node in ast.parse(library_text).body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    problems = selftest_fixture_name_problems(library_text, fixtures_text, library_external_calls(LIBRARY_ROOT, names))
+    return not problems, f"{len(problems)} 处不对：{problems[:8]}（运行期也读的常量留在这份库里，文件头「自证夹具」）"
 
 
 def directory_closure_line_cell(work):
@@ -15812,6 +17080,763 @@ def directory_closure_line_cell(work):
     return got == want, f"打出的数据目录行 {got}（要 {want}）"
 
 
+def program_words_cell(work):
+    """PROGRAM_WORDS_CELL：不登记时四处都拒算；自证期间临时登记两处（PROGRAM_WORDS_FIXTURE_ROWS），那两处不拒算、另两处照拒算；跑完把表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, PROGRAM_WORDS_FIXTURE)
+    seam, other = ("tool/seam.sh::run_seam", "tool/launch.py::launch_seam"), ("tool/seam.sh::run_other", "tool/launch.py::launch_other")
+
+    def refused(entries):
+        return [fixture_key(base, entry)[0] is None for entry in entries]
+
+    before = refused(seam + other)
+    registered = dict(UNKEYED_PROGRAM_WORDS)
+    UNKEYED_PROGRAM_WORDS.update(PROGRAM_WORDS_FIXTURE_ROWS)
+    try:
+        after_seam, after_other = refused(seam), refused(other)
+    finally:
+        UNKEYED_PROGRAM_WORDS.clear()
+        UNKEYED_PROGRAM_WORDS.update(registered)
+    return all(before) and not any(after_seam) and all(after_other), (f"不登记时拒算 {before}（要全 True）；登记之后登记的那两处拒算 {after_seam}（要全 False）、"
+                                                                      f"没登记的那两处拒算 {after_other}（要全 True）")
+
+
+
+def launched_programs_cell(work):
+    """LAUNCHED_PROGRAMS_CELL：不登记时两处都拒算；自证期间临时登记，两处都不拒算、改被起那一份里只有脚本体走到的 drive 键变；跑完把表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, LAUNCHED_PROGRAMS_FIXTURE)
+    entries = ("tool/driver.py::launch_self", "tool/driver.py::launch_template")
+    before = [fixture_key(base, entry)[0] is None for entry in entries]
+    registered = dict(LAUNCHED_REPOSITORY_PROGRAMS)
+    LAUNCHED_REPOSITORY_PROGRAMS.update(LAUNCHED_PROGRAMS_FIXTURE_ROWS)
+    try:
+        first = [fixture_key(base, entry)[0] for entry in entries]
+        edit_file(base, "tool/driver.py", "return 7", "return 70")
+        second = [fixture_key(base, entry)[0] for entry in entries]
+    finally:
+        LAUNCHED_REPOSITORY_PROGRAMS.clear()
+        LAUNCHED_REPOSITORY_PROGRAMS.update(registered)
+    changed = [one is not None and two is not None and one != two for one, two in zip(first, second)]
+    return all(before) and all(changed), f"不登记时拒算 {before}（要全 True）；登记之后算得出键、改 drive 键变 {changed}（要全 True）"
+
+
+
+def registered_inline_launch_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, REGISTERED_INLINE_LAUNCH_FIXTURE)
+    before = fixture_key(base, "tool/threads.py::launch")
+    after = with_program_word_rows(REGISTERED_INLINE_LAUNCH_ROWS, lambda: fixture_key(base, "tool/threads.py::launch"))
+    return before[0] is None and after[0] is not None, f"不登记时拒算 {sorted(before[1])}（要拒算）；登记之后拒算 {sorted(after[1])}（要不拒算）"
+
+
+
+def launched_shell_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, LAUNCHED_SHELL_FIXTURE)
+    before = fixture_key(base, "tool/source_lib.sh")[0]
+    registered = dict(LAUNCHED_REPOSITORY_PROGRAMS)
+    LAUNCHED_REPOSITORY_PROGRAMS.update(LAUNCHED_SHELL_FIXTURE_ROWS)
+    try:
+        first = fixture_key(base, "tool/source_lib.sh")[0]
+        edit_file(base, "tool/lib.sh", "echo 7", "echo 70")
+        second = fixture_key(base, "tool/source_lib.sh")[0]
+    finally:
+        LAUNCHED_REPOSITORY_PROGRAMS.clear()
+        LAUNCHED_REPOSITORY_PROGRAMS.update(registered)
+    return before is None and first is not None and second is not None and first != second, (
+        f"不登记时{'拒算' if before is None else '没拒算'}（要拒算）；登记之后{'算得出键' if first else '拒算'}、改 tool/lib.sh 键{'变' if first != second else '不变'}（要变）")
+
+
+
+def refusal_lines_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, REFUSAL_LINES_FIXTURE)
+    got = {file: sorted((refusal.form, refusal.line) for refusal in closure_of(base, file).refusals) for file in sorted(REFUSAL_LINES_FIXTURE)}
+    wanted = {"s/command_word.sh": [("shell-command-unfolded", 4)], "s/inline_word.sh": [(INLINE_FORM, 4)]}
+    return got == wanted, f"拒算落在 {got}（要 {wanted}）"
+
+
+def with_program_word_rows(rows, judge):
+    """自证期间临时把 rows 并进 UNKEYED_PROGRAM_WORDS 再判，跑完还原。"""
+    registered = dict(UNKEYED_PROGRAM_WORDS)
+    UNKEYED_PROGRAM_WORDS.update(rows)
+    try:
+        return judge()
+    finally:
+        UNKEYED_PROGRAM_WORDS.clear()
+        UNKEYED_PROGRAM_WORDS.update(registered)
+
+
+
+def nested_program_words_registered_cell(work):
+    """NESTED_PROGRAM_WORDS_REGISTERED_CELL：临时登记 NESTED_PROGRAM_WORDS_INNER_ROWS，外层当入口改 tool/child.sh 前后各算一把键：都算得出、改了变。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, NESTED_PROGRAM_WORDS_FIXTURE)
+
+    def keys():
+        before = fixture_key(base, NESTED_PROGRAM_WORDS_OUTER)
+        edit_file(base, "tool/child.sh", "echo child", "echo child changed")
+        return before, fixture_key(base, NESTED_PROGRAM_WORDS_OUTER)
+    (before, before_refused), (after, after_refused) = with_program_word_rows(NESTED_PROGRAM_WORDS_INNER_ROWS, keys)
+    ok = None not in (before, after) and before != after
+    return ok, (f"按内层短名登记之后外层当入口：改前拒算 {sorted(before_refused)}、改后拒算 {sorted(after_refused)}（都要不拒算）；"
+                f"改 tool/child.sh 之后键{'变了' if ok else '没变或算不出'}（要变）")
+
+
+def nested_program_words_unregistered_cell(work):
+    """NESTED_PROGRAM_WORDS_UNREGISTERED_CELL：不登记时内层当入口拒算 shell-command-unfolded；只按外层的短名登记（NESTED_PROGRAM_WORDS_OUTER_ROWS）时外层当入口照拒算。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, NESTED_PROGRAM_WORDS_FIXTURE)
+    inner, inner_refused = fixture_key(base, NESTED_PROGRAM_WORDS_INNER)
+    outer, outer_refused = with_program_word_rows(NESTED_PROGRAM_WORDS_OUTER_ROWS, lambda: fixture_key(base, NESTED_PROGRAM_WORDS_OUTER))
+    ok = inner is None and "shell-command-unfolded" in inner_refused and outer is None and "shell-command-unfolded" in outer_refused
+    return ok, (f"不登记时内层当入口拒算 {sorted(inner_refused)}（要有 shell-command-unfolded）；"
+                f"只按外层短名登记时外层当入口拒算 {sorted(outer_refused)}（要有 shell-command-unfolded）")
+
+
+def registered_missing_path_cell(work):
+    """REGISTERED_MISSING_PATH_CELL：不登记时入口拒算 shell-path-missing；临时登记 REGISTERED_MISSING_PATH_ROWS 之后不拒算，改 tool/child.sh 前后各算一把键、变了。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, REGISTERED_MISSING_PATH_FIXTURE)
+    entry = "tool/template_launch.sh::run_cells"
+    unregistered, unregistered_refused = fixture_key(base, entry)
+
+    def keys():
+        before = fixture_key(base, entry)
+        edit_file(base, "tool/child.sh", "echo child", "echo child changed")
+        return before, fixture_key(base, entry)
+    (before, before_refused), (after, after_refused) = with_program_word_rows(REGISTERED_MISSING_PATH_ROWS, keys)
+    ok = unregistered is None and "shell-path-missing" in unregistered_refused and None not in (before, after) and before != after
+    return ok, (f"不登记时拒算 {sorted(unregistered_refused)}（要有 shell-path-missing）；登记之后改前拒算 {sorted(before_refused)}、改后拒算 {sorted(after_refused)}"
+                f"（都要不拒算），改 tool/child.sh 之后键{'变了' if before is not None and after is not None and before != after else '没变或算不出'}（要变）")
+
+
+def spec_path_arguments_cell(work):
+    """SPEC_PATH_ARGUMENTS_CELL：不登记时拒算 spec-path-unfolded；自证期间临时登记夹具里那一处，不拒算、改载入的那一份键变；跑完把表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SPEC_PATH_FIXTURE)
+    entry = "tool/check.py::load"
+    unregistered, forms = fixture_key(base, entry)
+    registered = dict(SPEC_PATH_ARGUMENTS)
+    SPEC_PATH_ARGUMENTS[("tool/check.py", "anchors_path")] = "tool/anchors.py"
+    try:
+        before, before_refused = fixture_key(base, entry)
+        edit_file(base, "tool/anchors.py", "VALUE = 1", "VALUE = 2")
+        after, after_refused = fixture_key(base, entry)
+        # 登记值是元组（载入的是几份里的哪一份折不出）：每一份都连，改元组里不是头一份的那一份键也变
+        SPEC_PATH_ARGUMENTS[("tool/check.py", "anchors_path")] = ("tool/anchors.py", "tool/anchors_other.py")
+        tuple_before, tuple_before_refused = fixture_key(base, entry)
+        edit_file(base, "tool/anchors_other.py", "VALUE = 3", "VALUE = 4")
+        tuple_after, tuple_after_refused = fixture_key(base, entry)
+    finally:
+        SPEC_PATH_ARGUMENTS.clear()
+        SPEC_PATH_ARGUMENTS.update(registered)
+    return (unregistered is None and "spec-path-unfolded" in forms and None not in (before, after) and before != after
+            and None not in (tuple_before, tuple_after) and tuple_before != tuple_after,
+            f"不登记时拒算 {sorted(forms)}（要 spec-path-unfolded）；登记之后改前 {before}（拒算 {sorted(before_refused)}）、改后 {after}（拒算 {sorted(after_refused)}），要两把都有、不相等；"
+            f"登记元组之后改第二份：改前 {tuple_before}（拒算 {sorted(tuple_before_refused)}）、改后 {tuple_after}（拒算 {sorted(tuple_after_refused)}），要两把都有、不相等")
+
+
+def tail_read_scopes_cell(work):
+    """TAIL_READ_SCOPES_CELL：不登记时 scan 照尾巴收全仓的 Manifest.toml（前缀外多一份键变）、climb 改 elsewhere 那一份键变、
+    rows 照 tree_copy_file 收根里的 tables/rows.tsv（改它键变）；自证期间临时登记 scan 那一处只留 members、climb 与 rows 那两处是调用方的输入：
+    前缀外多一份、改 elsewhere、改 tables/rows.tsv 键都不变，改 members 底下那一份 scan 键照变；跑完把表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, TAIL_READ_SCOPES_FIXTURE)
+    scan, climb, rows = "pkg/scoped.py::scan", "pkg/scoped.py::climb", "pkg/scoped.py::rows"
+    scan_read = ("pkg/scoped.py", "member_texts", "os.path.join(directory, 'Manifest.toml')")
+    climb_read = ("pkg/scoped.py", "nearest", "os.path.join(current, 'Manifest.toml')")
+    rows_read = ("pkg/scoped.py", "table_rows", "os.path.join(tree, 'tables', 'rows.tsv')")
+    observed = {}
+    observed["scan 不登记"] = fixture_key(base, scan)[0]
+    observed["climb 不登记"] = fixture_key(base, climb)[0]
+    observed["rows 不登记"] = fixture_key(base, rows)[0]
+    write_tree(base, {"outside/Manifest.toml": "name = outside\n"})
+    observed["scan 不登记、前缀外多一份"] = fixture_key(base, scan)[0]
+    edit_file(base, "elsewhere/Manifest.toml", "name = elsewhere", "name = moved")
+    observed["climb 不登记、改 elsewhere"] = fixture_key(base, climb)[0]
+    edit_file(base, "tables/rows.tsv", "row", "row moved")
+    observed["rows 不登记、改 tables/rows.tsv"] = fixture_key(base, rows)[0]
+    registered = dict(TAIL_READ_SCOPES)
+    TAIL_READ_SCOPES[scan_read] = (("members",), "自证夹具")
+    TAIL_READ_SCOPES[climb_read] = ((), "自证夹具")
+    TAIL_READ_SCOPES[rows_read] = ((), "自证夹具")
+    try:
+        observed["scan 登记"] = fixture_key(base, scan)[0]
+        observed["climb 登记"] = fixture_key(base, climb)[0]
+        observed["rows 登记"] = fixture_key(base, rows)[0]
+        write_tree(base, {"another/Manifest.toml": "name = another\n"})
+        edit_file(base, "elsewhere/Manifest.toml", "name = moved", "name = moved again")
+        edit_file(base, "tables/rows.tsv", "row moved", "row moved again")
+        observed["scan 登记、前缀外多一份"] = fixture_key(base, scan)[0]
+        observed["climb 登记、改 elsewhere"] = fixture_key(base, climb)[0]
+        observed["rows 登记、改 tables/rows.tsv"] = fixture_key(base, rows)[0]
+        edit_file(base, "members/one/Manifest.toml", "name = one", "name = first")
+        observed["scan 登记、改 members 底下那一份"] = fixture_key(base, scan)[0]
+    finally:
+        TAIL_READ_SCOPES.clear()
+        TAIL_READ_SCOPES.update(registered)
+    held = (None not in observed.values()
+            and observed["scan 不登记"] != observed["scan 不登记、前缀外多一份"]
+            and observed["climb 不登记"] != observed["climb 不登记、改 elsewhere"]
+            and observed["rows 不登记"] != observed["rows 不登记、改 tables/rows.tsv"]
+            and observed["scan 登记"] == observed["scan 登记、前缀外多一份"] != observed["scan 登记、改 members 底下那一份"]
+            and observed["climb 登记"] == observed["climb 登记、改 elsewhere"]
+            and observed["rows 登记"] == observed["rows 登记、改 tables/rows.tsv"])
+    return held, (f"各趟的键 {observed}；要：不登记时 scan 前缀外多一份键变、climb 改 elsewhere 键变、rows 改 tables/rows.tsv 键变；"
+                  "登记之后 scan 前缀外多一份键不变、改 members 底下那一份键变，climb 改 elsewhere 键不变，rows 改 tables/rows.tsv 键不变；没有一把拒算（None）")
+
+
+def tail_read_root_scope_cell(work):
+    """TAIL_READ_ROOT_SCOPE_CELL：自证期间临时登记 root_manifest 那一处只留根上那一份（TAIL_READ_ROOT_COPY）：research/ 下多一份、改 members 底下那一份键不变，
+    改根上的 Manifest.toml 键变；再临时登成空元组对照：改根上那一份键不变（"." 收回的正是空元组漏掉的那一份）。跑完把表还原。
+    弄坏开关 tail-read-scopes-root-ignored 下 "." 一份都不留，改根上那一份键不变，判红。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, TAIL_READ_ROOT_SCOPE_FIXTURE)
+    entry = "pkg/rooted.py::head"
+    root_read = ("pkg/rooted.py", "root_manifest", "os.path.join(tree, 'Manifest.toml')")
+    registered = dict(TAIL_READ_SCOPES)
+    observed = {}
+    try:
+        TAIL_READ_SCOPES[root_read] = ((TAIL_READ_ROOT_COPY,), "自证夹具")
+        observed["登根上那一份"] = fixture_key(base, entry)[0]
+        write_tree(base, {"research/round/Manifest.toml": "name = research\n"})
+        observed["登根上那一份、research 下多一份"] = fixture_key(base, entry)[0]
+        edit_file(base, "members/one/Manifest.toml", "name = one", "name = first")
+        observed["登根上那一份、改 members 底下那一份"] = fixture_key(base, entry)[0]
+        edit_file(base, "Manifest.toml", "name = root", "name = moved")
+        observed["登根上那一份、改根上那一份"] = fixture_key(base, entry)[0]
+        TAIL_READ_SCOPES[root_read] = ((), "自证夹具")
+        observed["登空元组"] = fixture_key(base, entry)[0]
+        edit_file(base, "Manifest.toml", "name = moved", "name = moved again")
+        observed["登空元组、改根上那一份"] = fixture_key(base, entry)[0]
+    finally:
+        TAIL_READ_SCOPES.clear()
+        TAIL_READ_SCOPES.update(registered)
+    held = (None not in observed.values()
+            and observed["登根上那一份"] == observed["登根上那一份、research 下多一份"] == observed["登根上那一份、改 members 底下那一份"]
+            != observed["登根上那一份、改根上那一份"]
+            and observed["登空元组"] == observed["登空元组、改根上那一份"])
+    return held, (f"各趟的键 {observed}；要：登根上那一份之后 research 下多一份、改 members 底下那一份键都不变，改根上那一份键变；"
+                  "登空元组之后改根上那一份键不变；没有一把拒算（None）")
+
+
+def registered_words_real_cell(work):
+    """REGISTERED_WORDS_REAL_CELL：几张登记表点名的文件在真仓都在、函数名与词都还写在那份文件里（引号不比）；SPEC_PATH_ARGUMENTS 点名载入的那一份也在；
+    TAIL_READ_SCOPES 那一处的函数名与路径表达式都还写在那份文件里，登记的前缀是真仓里的目录；BUILT_TOOL_LAUNCHES、CALLER_SUPPLIED_COMMANDS 的函数与词
+    都还写在那份文件里，BUILT_TOOL_LAUNCHES 点名的编译函数登在 BUILT_TOOL_SOURCES 里。"""
+    tree = LIBRARY_ROOT   # 只读不改，登记的文件也在 scripts/ 与 .claude/ 之外（task-server/、prune-server/），不用拷贝
+
+    def plain(text):
+        return text.replace('"', "").replace("'", "")
+
+    def source_of(file):
+        path = os.path.join(tree, file)
+        if not os.path.isfile(path):
+            return None
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            return plain(handle.read())
+
+    unparsed = {}
+
+    def unparsed_of(file):
+        """python 文件里每个列表、f 串、二元式照 ast.unparse 的写法（去引号）：跨行写的、相邻字面量拼起来的词在源码里逐字找不到，照这个认。解不开交空集合。"""
+        if file not in unparsed:
+            try:
+                with open(os.path.join(tree, file), encoding="utf-8", errors="replace") as handle:
+                    parsed = ast.parse(handle.read())
+                unparsed[file] = {plain(ast.unparse(node)) for node in ast.walk(parsed) if isinstance(node, (ast.List, ast.JoinedStr, ast.BinOp))}
+            except (SyntaxError, ValueError):
+                unparsed[file] = set()
+        return unparsed[file]
+
+    rows = dict(UNKEYED_PROGRAM_WORDS)
+    if "registered-words-drifted" in active_breaks():
+        rows[("scripts/gate/admission.py", "no_such_function", "no_such_word")] = "弄坏开关"
+    wanted = [(file, [function, word]) for file, function, word in rows]
+    wanted += [(file, [function]) for file, function in REGISTRY_COMMAND_TEXTS]
+    wanted += [(table, []) for table, _column in REGISTRY_COMMAND_TEXTS.values()]
+    wanted += [(file, [expression]) for file, expression in SPEC_PATH_ARGUMENTS]
+    wanted += [(target, []) for value in SPEC_PATH_ARGUMENTS.values() for target in ((value,) if isinstance(value, str) else value)]
+    wanted += [(file, [function]) for file, function in BUILT_TOOL_SOURCES]
+    wanted += [(file, [function, word]) for file, function, word in BUILT_TOOL_LAUNCHES]
+    wanted += [(file, [function, argument]) for file, function, argument in CALLER_SUPPLIED_COMMANDS]
+    wanted += [(file, [function, word]) for file, function, word in LAUNCHED_REPOSITORY_PROGRAMS]
+    wanted += [(target, []) for targets in LAUNCHED_REPOSITORY_PROGRAMS.values() for target in targets]
+    # 函数一格写的是内联 python 正文的模块体、main-guard 的（<module-body>、<main-guard>），不是源码里写的名字：只核表达式
+    wanted += [(file, [piece for piece in (function, expression) if piece not in PYTHON_STATEMENT_UNIT_NAMES])
+               for file, function, expression in TAIL_READ_SCOPES]
+    problems = [f"{directory} 不在" for directory in BUILT_TOOL_SOURCES.values() if not os.path.isdir(os.path.join(LIBRARY_ROOT, directory))]
+    problems += [f"BUILT_TOOL_LAUNCHES 的 {launch} 点名的编译函数 {builder} 不在 BUILT_TOOL_SOURCES 里" for launch, builder in BUILT_TOOL_LAUNCHES.items()
+                 if builder not in BUILT_TOOL_SOURCES]
+    problems += [f"按尾巴读的登记前缀 {prefix} 不在" for prefixes, _why in TAIL_READ_SCOPES.values() for prefix in prefixes
+                 if not os.path.isdir(os.path.join(LIBRARY_ROOT, prefix))]
+    for file, pieces in wanted:
+        source = source_of(file)
+        if source is None:
+            problems.append(f"{file} 不在")
+            continue
+        problems += [f"{file} 里没有「{piece}」" for piece in pieces
+                     if piece != "<script-body>" and plain(piece) not in source and plain(piece) not in unparsed_of(file)]
+    return not problems, f"对不上的 {problems}（文件搬了、函数或那一处写法改了：照现状改登记表那一行，那一处不再起就删那一行）"
+
+
+
+def tail_read_scope_modules(index, file, inline_read):
+    """TAIL_READ_SCOPES_REAL_CELL 核 file 那几行时去哪几份模块里找那一处：.py 是那份文件自己；别的（shell 脚本）是它各单元起的内联 python 正文
+    （ShellIndex.links 的 python-inline，同 dump 的认法；内联模块的 source_file 算在这份 shell 脚本上，与算键时问到的是同一把键）。
+    不在、解不开、一份内联正文都没认出交空表。弄坏开关 tail-read-scopes-inline-unread 下 shell 脚本也照 .py 读（解不开）。"""
+    if file.endswith(".py") or not inline_read:
+        module = index.module(file)
+        return [] if module is None or module.tree is None else [module]
+    if not os.path.isfile(os.path.join(index.root, file)):
+        return []
+    shell = ShellIndex(index.root, [file])
+    shell_file = shell.files.get(file)
+    if shell_file is None:
+        return []
+    scripts = dict.fromkeys(script for unit in shell_file.units if not unit.data
+                            for kind, found, _refusal in shell.links(unit) if kind == "python-inline" for script in found)
+    return [module for script in scripts for module in index.inline_modules(script) if module.tree is not None]
+
+
+def tail_read_scope_statements(unit, inline_read):
+    """一个 python 单元里去哪几句找登记的那一处：函数单元是那个 def；模块级赋值、模块体、main-guard（TAIL_READ_SCOPE_STATEMENT_KINDS）是它们的那几句。
+    弄坏开关 tail-read-scopes-inline-unread 下只认函数单元。"""
+    node = getattr(unit, "node", None)
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return [node]
+    if inline_read and getattr(unit, "kind", None) in TAIL_READ_SCOPE_STATEMENT_KINDS:
+        return list(getattr(unit, "nodes", None) or ())
+    return []
+
+
+def tail_read_scopes_real_cell(work):
+    """TAIL_READ_SCOPES_REAL_CELL：真仓里逐行核 TAIL_READ_SCOPES（文件头「按尾巴读的登记」）：登记的文件里有短名是登记函数名的单元（函数，或模块级语句：
+    tail_read_scope_statements；shell 脚本到它起的内联 python 正文里找：tail_read_scope_modules），单元里有一处表达式
+    的 ast.unparse 与登记的逐字相同；从那几处起 data_read_origins，算的时候真问到了这一行（PythonModule.registered_tail_scope 对这把键交回的前缀与登记的相同），
+    收进来的文件都落在登记前缀下（TAIL_READ_ROOT_COPY 只认根上那一份：in_tail_read_scope；空元组一份都不收）。几份模块先全部换上记问询的那一层再起算：一处读经调用处问到别的登记模块时也记得到。
+    弄坏开关 tail-read-scopes-drifted 下多一行真仓那个函数里没有的表达式；tail-read-scopes-inline-unread 下只认 .py 文件里的函数单元。"""
+    rows = dict(TAIL_READ_SCOPES)
+    if "tail-read-scopes-drifted" in active_breaks():
+        rows[("task-server/task_server.py", "prove_red_uses_gpu", "os.path.join(root, 'crates', 'no-such-table.tsv')")] = ((), "弄坏开关")
+    index = PythonIndex(LIBRARY_ROOT)   # 只读不改，同 registered_words_real_cell
+    asked = []   # (文件, 函数短名, 表达式, 交回的前缀)：registered_tail_scope 每问一次记一行
+
+    def record_questions(module):
+        answer = module.registered_tail_scope
+
+        def recorded_tail_scope(node, unit):
+            scope = answer(node, unit)
+            short = getattr(unit, "short", None) or ""
+            asked.append((module.source_file(), short.rsplit(".", 1)[-1], ast.unparse(node), scope))
+            return scope
+        module.registered_tail_scope = recorded_tail_scope
+
+    inline_read = "tail-read-scopes-inline-unread" not in active_breaks()
+    problems, modules = [], {}
+    for file in sorted({file for file, _function, _expression in rows}):
+        found = tail_read_scope_modules(index, file, inline_read)
+        if not found:
+            problems.append(f"{file} 不在或解不开" + ("（shell 脚本里一份内联 python 正文都没认出）" if inline_read and not file.endswith(".py") else ""))
+            continue
+        for module in found:
+            record_questions(module)
+        modules[file] = found
+    for (file, function, expression), (prefixes, _why) in sorted(rows.items()):
+        if file not in modules:
+            continue
+        sites = [(node, unit) for module in modules[file] for unit in module.units
+                 if (getattr(unit, "short", None) or "").rsplit(".", 1)[-1] == function
+                 for statement in tail_read_scope_statements(unit, inline_read)
+                 for node in ast.walk(statement) if isinstance(node, ast.expr) and ast.unparse(node) == expression]
+        if not sites:
+            problems.append(f"{file} 的 {function} 里没有一处「{expression}」")
+            continue
+        wanted = tuple(prefix.strip("/") for prefix in prefixes)
+        collected = set()
+        for node, unit in sites:
+            for origin in unit.module.data_read_origins(node, unit):
+                if origin[0] in ("file", "directory"):
+                    collected.add(origin[1])
+                elif origin[0] == "param-tail":
+                    collected |= set(origin[3])
+        answers = {scope for asked_file, asked_function, asked_expression, scope in asked
+                   if (asked_file, asked_function, asked_expression) == (file, function, expression)}
+        if wanted not in answers:
+            problems.append(f"{file} 的 {function}「{expression}」：算键时问到这一行交回的前缀是 {sorted(answers, key=repr) or '一次都没问到'}，登记的是 {wanted}")
+        # TAIL_READ_ROOT_COPY 认的那截尾巴（同 data_read_origins_once）：照尾巴收的取 path_tails，tree_copy_file 那一种取它收的根里那一份
+        tails = set()
+        for node, unit in sites:
+            tails |= {tail.strip("/") for tail in (unit.module.path_tails(node, unit) or ())}
+            literal = unit.module.literal_tail(node, unit)
+            copied = tree_copy_file(index.root, literal) if literal else None
+            if copied is not None:
+                tails.add(copied)
+        outside = sorted(path for path in collected if not in_tail_read_scope(path, wanted, tails, active_breaks()))
+        if outside:
+            problems.append(f"{file} 的 {function}「{expression}」：收进了登记前缀 {wanted or '（空元组：一份都不该收）'} 外的 {outside[:5]}"
+                            + (f" 等 {len(outside)} 份" if len(outside) > 5 else ""))
+    return not problems, (f"核了 {len(rows)} 行，对不上的 {problems}（那一处搬了、写法改了、换了函数：照算键时真问到的那一处（参数照调用处的实参认）改登记表那一行；"
+                          "前缀外收进了文件：登记的前缀不是那一处真走到的地方，照它真读的范围改）")
+
+
+SELFTEST_REGISTRY = ".claude/hooks/selftest-registry.tsv"
+
+
+def selftest_registry_scripts(root):
+    """root 里 .claude/hooks/selftest-registry.tsv 第二列正好是 selftest 的那几行的路径（samples 那几种是门禁样本档，不算）；表不在交空表。"""
+    path = os.path.join(root, SELFTEST_REGISTRY)
+    if not os.path.isfile(path):
+        return []
+    scripts = []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            fields = line.rstrip("\n").split("\t")
+            if line.strip() and not line.lstrip().startswith("#") and len(fields) >= 2 and fields[1].strip() == "selftest":
+                scripts.append(fields[0].strip())
+    return scripts
+
+
+def records_tail_reads_of(job):
+    """(入口, {(文件, 行, 函数短名, 表达式): [文件…]}, 收不成的原因或 None)：一个入口的闭包里，按尾巴读而没登记 TAIL_READ_SCOPES 的那几处（UNSCOPED_TAIL_READS 记的）
+    收进来的、落在 records/、research/ 下的文件——读它的函数在这个闭包里（内联脚本认它所在的那份文件），记下的文件也收进了这个闭包的才算。"""
+    root, entry, arguments = job
+    options = Options()
+    options.program_arguments = arguments
+    try:
+        closure = closure_of(root, entry, options)
+    except (FunctionUnitsError, UsageError) as error:
+        return entry, {}, str(error)
+    absolute = os.path.abspath(root)
+    members = {(unit.file, (unit.short or "").rsplit(".", 1)[-1]) for unit in closure.order if not unit.data}
+    member_files = {file for file, _short in members}
+    collected = {unit.file for unit in closure.order if unit.data and unit.file.startswith(TAIL_READ_RECORD_PREFIXES)}
+    hits = {}
+    for (site_root, file, line, short, expression, inline), files in UNSCOPED_TAIL_READS.items():
+        if site_root != absolute or not ((file, short) in members or (inline and file in member_files)):
+            continue
+        inside = sorted(files & collected)
+        if inside:
+            hits[(file, line, short, expression)] = inside
+    return entry, hits, None
+
+
+def records_tail_reads(root, jobs):
+    """jobs 是 [(入口, 程序入口的参数或 None)] → ({(文件, 行, 函数短名, 表达式): (收进来的文件的集合, 入口的集合)}, {入口: 收不成的原因})。
+    按每台默认重活线程数并行（judging_entry_refusal_workers）；同 judging_entry_refusals，父进程先建好脚本索引、冻进永久代，子进程共用。
+    开跑前清掉这个根之前记下的那几处：同一个进程里前一趟（登记之前）记的不带到这一趟。"""
+    import concurrent.futures
+    import gc
+    import multiprocessing
+    absolute = os.path.abspath(root)
+    for stale in [key for key in UNSCOPED_TAIL_READS if key[0] == absolute]:
+        del UNSCOPED_TAIL_READS[stale]
+    workers = judging_entry_refusal_workers(os.environ)
+    _prepared, key = prepare_shared_script_index(root)
+    gc.collect()
+    gc.freeze()
+    try:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs))), mp_context=multiprocessing.get_context("fork")) as pool:
+            results = list(pool.map(records_tail_reads_of, [(root, entry, arguments) for entry, arguments in jobs]))
+    finally:
+        gc.unfreeze()
+        SHARED_SCRIPT_INDICES.pop(key, None)
+    if len(results) != len(jobs):
+        return {}, {"（整趟）": f"派出去 {len(jobs)} 个入口、收回 {len(results)} 个"}
+    sites, problems = {}, {}
+    for entry, hits, problem in results:
+        if problem is not None:
+            problems[entry] = problem
+        for site, files in hits.items():
+            known_files, entries = sites.get(site, (set(), set()))
+            sites[site] = (known_files | set(files), entries | {entry})
+    return sites, problems
+
+
+def tail_reads_records_real_cell(work):
+    """TAIL_READS_RECORDS_REAL_CELL（文件头「按尾巴读的登记」末段）：先在夹具上证 scan 那一处没登记时判得出 records/、research/ 下那两份，
+    临时登记前缀 members 之后一处都不判（跑完把表还原）；再在真仓收登记的判法入口与自证登记表里的自证的闭包，有一处判红就红。"""
+    fixture = os.path.join(work, "fixture")
+    write_tree(fixture, TAIL_READS_RECORDS_FIXTURE)
+    scan_entry = [("pkg/scoped.py::scan", None)]
+    scan_read = ("pkg/scoped.py", "member_texts", "os.path.join(directory, 'Manifest.toml')")
+    wanted = {"records/round/Manifest.toml", "research/round/Manifest.toml"}
+    unregistered, unregistered_problems = records_tail_reads(fixture, scan_entry)
+    found = {(file, short, expression): files for (file, _line, short, expression), (files, _entries) in unregistered.items()}
+    registered = dict(TAIL_READ_SCOPES)
+    TAIL_READ_SCOPES[scan_read] = (("members",), "自证夹具")
+    try:
+        scoped, scoped_problems = records_tail_reads(fixture, scan_entry)
+    finally:
+        TAIL_READ_SCOPES.clear()
+        TAIL_READ_SCOPES.update(registered)
+    fixture_held = not unregistered_problems and not scoped_problems and found == {scan_read: wanted} and not scoped
+    if not fixture_held:
+        return False, (f"夹具：没登记时要恰好判出 {scan_read} 收进 {sorted(wanted)}，实际 {found}（收不成的 {unregistered_problems}）；"
+                       f"登记 members 之后要一处都不判，实际 {sorted(scoped)}（收不成的 {scoped_problems}）")
+    entries = [(entry, None) for entry in registered_judging_entries(LIBRARY_ROOT)
+               if entry.split("::", 1)[0].endswith(TAIL_READS_RECORDS_SCRIPT_SUFFIXES)]
+    entries += [(path, ["--selftest"]) for path in selftest_registry_scripts(LIBRARY_ROOT) if path.endswith(TAIL_READS_RECORDS_SCRIPT_SUFFIXES)]
+    real, real_problems = records_tail_reads(LIBRARY_ROOT, entries)
+    lines = [f"{file}:{line} {short}「{expression}」收进 {len(files)} 份 {sorted(files)[:5]}（{len(entry_set)} 个入口的闭包，头一个 {sorted(entry_set)[0]}）"
+             for (file, line, short, expression), (files, entry_set) in sorted(real.items())]
+    lines += [f"入口 {entry} 收不成闭包：{problem}" for entry, problem in sorted(real_problems.items())]
+    return not lines, (f"真仓 {len(entries)} 个入口里 {len(lines)} 处不对：{lines}（按尾巴整组收的那一处没登记 TAIL_READ_SCOPES：照那一处真走到的地方登记一行"
+                       "（文件, 函数短名, 表达式）→（前缀, 为什么），读的是调用方交进来的输入的写空元组；收不成闭包的照那一句修）")
+
+
+
+def tool_source_cell(work):
+    """TOOL_SOURCE_CELL：自证期间临时把夹具里的 build_program 登记进 BUILT_TOOL_SOURCES；改源码目录里的 main.rs 键变，改 target 下的二进制键不变；跑完把表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, BUILD_OUTPUT_FIXTURE)
+    registered = dict(BUILT_TOOL_SOURCES)
+    BUILT_TOOL_SOURCES[("pkg/build.py", "build_program")] = "crates/sample-tool"
+    try:
+        before, before_refused = fixture_key(base, BUILD_OUTPUT_ENTRY)
+        edit_file(base, "target/release/tool", "one", "two")
+        after_binary, _refused = fixture_key(base, BUILD_OUTPUT_ENTRY)
+        edit_file(base, "crates/sample-tool/src/main.rs", "fn main() {}", "fn main() { let _ = 1; }")
+        after_source, after_refused = fixture_key(base, BUILD_OUTPUT_ENTRY)
+    finally:
+        BUILT_TOOL_SOURCES.clear()
+        BUILT_TOOL_SOURCES.update(registered)
+    if None in (before, after_binary, after_source):
+        return False, f"拒算了：改前 {sorted(before_refused)}，改源码后 {sorted(after_refused)}"
+    return before == after_binary and before != after_source, (f"改 target 下的二进制：期望键不变，实际{'不变' if before == after_binary else '变了'}；"
+                                                              f"改源码目录里的 main.rs：期望键变，实际{'变了' if before != after_source else '不变'}")
+
+
+
+def built_tool_launch_cell(work):
+    """BUILT_TOOL_LAUNCH_CELL：不登记时 rust() 起 binary 那一处拒算；自证期间临时登记夹具里的编译函数（BUILT_TOOL_SOURCES）与起它的那一处（BUILT_TOOL_LAUNCHES），
+    不拒算、改 crates/sample-tool/src/main.rs 里的 helper 键变；跑完把两张表还原。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, BUILT_TOOL_LAUNCH_FIXTURE)
+    unregistered, unregistered_refused = fixture_key(base, BUILT_TOOL_LAUNCH_ENTRY)
+    sources, launches = dict(BUILT_TOOL_SOURCES), dict(BUILT_TOOL_LAUNCHES)
+    BUILT_TOOL_SOURCES.update(BUILT_TOOL_LAUNCH_FIXTURE_SOURCES)
+    BUILT_TOOL_LAUNCHES.update(BUILT_TOOL_LAUNCH_FIXTURE_LAUNCHES)
+    try:
+        before, before_refused = fixture_key(base, BUILT_TOOL_LAUNCH_ENTRY)
+        edit_file(base, "crates/sample-tool/src/main.rs", "    1\n", "    2\n")
+        after, after_refused = fixture_key(base, BUILT_TOOL_LAUNCH_ENTRY)
+    finally:
+        BUILT_TOOL_SOURCES.clear()
+        BUILT_TOOL_SOURCES.update(sources)
+        BUILT_TOOL_LAUNCHES.clear()
+        BUILT_TOOL_LAUNCHES.update(launches)
+    ok = unregistered is None and None not in (before, after) and before != after
+    return ok, (f"不登记时拒算 {sorted(unregistered_refused)}（要拒算）；登记之后改前拒算 {sorted(before_refused)}、改后拒算 {sorted(after_refused)}（都要不拒算）；"
+                f"改 helper 之后键{'变了' if None not in (before, after) and before != after else '没变或算不出'}（要变）")
+
+
+# 夹具：group.py 的 run_in_group 同 scripts/gate/lib_process_group.py 的 run_in_own_session（拿参数起子进程、本模块里没人调它）；
+# callers.py 两处调用交的命令都取环境变量（往上认不出），自证期间只登记 registered_site 那一处
+CALLER_SUPPLIED_FIXTURE = {
+    "pkg/group.py": "import subprocess\n\n\ndef run_in_group(command, timeout=None):\n    return subprocess.run(command, check=False, timeout=timeout).returncode\n",
+    "pkg/callers.py": ('import os\n\nimport group\n\n\n'
+                       'def registered_site():\n    return group.run_in_group(["bash", os.environ["SAMPLE_SCRIPT"], "--selftest"], timeout=30)\n\n\n'
+                       'def unregistered_site():\n    return group.run_in_group(["bash", os.environ["OTHER_SCRIPT"], "--check"])\n\n\n'
+                       'def both_sites():\n    return registered_site() + unregistered_site()\n'),
+}
+CALLER_SUPPLIED_FIXTURE_ROWS = {("pkg/callers.py", "registered_site", "['bash', os.environ['SAMPLE_SCRIPT'], '--selftest']"): "夹具"}
+
+
+def with_caller_rows(judge):
+    """自证期间临时把 CALLER_SUPPLIED_FIXTURE_ROWS 并进 CALLER_SUPPLIED_COMMANDS 再判，跑完还原。"""
+    registered = dict(CALLER_SUPPLIED_COMMANDS)
+    CALLER_SUPPLIED_COMMANDS.update(CALLER_SUPPLIED_FIXTURE_ROWS)
+    try:
+        return judge()
+    finally:
+        CALLER_SUPPLIED_COMMANDS.clear()
+        CALLER_SUPPLIED_COMMANDS.update(registered)
+
+
+def caller_supplied_registered_cell(work):
+    """CALLER_SUPPLIED_REGISTERED_CELL：registered_site 当入口，不登记时拒算（run_in_group 的命令往上认到这一处、认不出）；登记了这一处不拒算。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, CALLER_SUPPLIED_FIXTURE)
+    before, before_refused = fixture_key(base, "pkg/callers.py::registered_site")
+    after, after_refused = with_caller_rows(lambda: fixture_key(base, "pkg/callers.py::registered_site"))
+    return before is None and after is not None, (f"不登记时拒算 {sorted(before_refused)}（要拒算）；登记了 registered_site 那一处之后拒算 {sorted(after_refused)}"
+                                                  "（要不拒算）")
+
+
+def caller_supplied_unregistered_cell(work):
+    """CALLER_SUPPLIED_UNREGISTERED_CELL：只登记了 registered_site 那一处；unregistered_site 当入口、both_sites（两处都调）当入口都照拒算。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, CALLER_SUPPLIED_FIXTURE)
+    alone, alone_refused = with_caller_rows(lambda: fixture_key(base, "pkg/callers.py::unregistered_site"))
+    both, both_refused = with_caller_rows(lambda: fixture_key(base, "pkg/callers.py::both_sites"))
+    return alone is None and both is None, (f"unregistered_site 当入口拒算 {sorted(alone_refused)}、both_sites 当入口拒算 {sorted(both_refused)}"
+                                            "（都要拒算：没登记的那一处不跟着登记了的那一处放行）")
+
+
+
+def unit_graph_text_busy_cell(work):
+    """造一份可执行的小脚本，另一条线程开着它写、过一会儿关掉；这期间起它：先核直接起真撞 ETXTBSY（撞不上这台判不了、照实报），再核等过去之后起得成。"""
+    program = os.path.join(work, "busy-program")
+    with open(program, "w", encoding="utf-8") as handle:
+        handle.write("#!/bin/sh\necho started\n")
+    os.chmod(program, 0o755)
+    writer = open(program, "r+b")   # noqa: SIM115  要跨线程开着、到点才关
+    try:
+        try:
+            subprocess.run([program], capture_output=True, stdin=subprocess.DEVNULL)
+            return False, "开着写的时候直接起它没有撞 ETXTBSY：这台的内核不拒，这一格在这里造不出要验的条件"
+        except OSError as error:
+            if error.errno != errno.ETXTBSY:
+                return False, f"开着写的时候直接起它抛的不是 ETXTBSY：{error}"
+        closer = threading.Timer(3 * UNIT_GRAPH_TEXT_BUSY_PAUSE_SECONDS, writer.close)
+        closer.start()
+        try:
+            completed = run_program_waiting_out_text_busy([program])
+        except OSError as error:
+            return False, f"写的那一方 {3 * UNIT_GRAPH_TEXT_BUSY_PAUSE_SECONDS} 秒后就关了，等过去之后该起得成，实际抛 {error}"
+        finally:
+            closer.join()
+    finally:
+        writer.close()
+    return completed.returncode == 0 and completed.stdout == "started\n", f"退 {completed.returncode}、输出 {completed.stdout!r}（要退 0、打 started）"
+
+
+
+
+def inline_refusal_line_cell(work):
+    """INLINE_REFUSAL_LINE_CELL：s/inline_refusal_line.sh 的闭包里 globals-lookup 的拒算恰好两条，各落在夹具里两处 globals().get(…) 那一行、片段是那一行原文。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, INLINE_REFUSAL_LINE_FIXTURE)
+    path = "s/inline_refusal_line.sh"
+    closure = closure_of(base, path)
+    wanted = sorted((path, number, text.strip()) for number, text in enumerate(INLINE_REFUSAL_LINE_FIXTURE[path].splitlines(), 1) if "globals().get(" in text)
+    got = sorted((refusal.file, refusal.line, refusal.snippet) for refusal in closure.refusals if refusal.form == "globals-lookup")
+    return got == wanted, f"globals-lookup 的拒算落在 {got}（要 {wanted}：here-doc 正文头一行加正文里的偏移）"
+
+
+HEREDOC_BLANK_ROW_CELL = "shell：bash <脚本> run，脚本里的 here-doc 带空行：代位置参数走得出来，--selftest 那一支照样剪掉（改 s/child.sh 键不变）"
+
+
+def stage_cell_functions_real_cell(_work):
+    """STAGE_CELL_FUNCTIONS_REAL_CELL：门禁目录顶层每道阶段的 stage_cell 行第二列是字面函数名；弄坏开关 stage-cell-functions-drifted 下多一行拿变量当函数的。"""
+    directory = os.path.join(LIBRARY_ROOT, ".claude", "gate.d")
+    rows = []
+    for name in sorted(os.listdir(directory)):
+        if name.endswith(".sh"):
+            with open(os.path.join(directory, name), encoding="utf-8", errors="replace") as handle:
+                rows += [(name, line.split()) for line in handle if line.lstrip().startswith("stage_cell ")]
+    if "stage-cell-functions-drifted" in active_breaks():
+        rows.append(("弄坏开关", ["stage_cell", "a-cell", '"$function_variable"']))
+    drifted = [(name, words[1:3]) for name, words in rows if len(words) < 3 or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", words[2])]
+    return bool(rows) and not drifted, (f"查了 {len(rows)} 行 stage_cell，第二列不是字面函数名的：{drifted}（写成字面函数名，"
+                                        "不然那个函数连不进键；要动态选函数就改 UNKEYED_PROGRAM_WORDS 里 stage_cells_run 那一行的理由）")
+
+
+def narrowed_view_shared_cell(work):
+    """NARROWED_VIEW_SHARED_CELL：s/shared_view.sh 只看 $1，("run", "one") 与 ("run", "two") 剪出同一份正文，("--selftest",) 剪出另一份。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_FOLDS_FIXTURE)
+    file = "s/shared_view.sh"
+    index = ShellIndex(base, [file])
+    first, second = index.narrowed_script_body(file, ("run", "one")), index.narrowed_script_body(file, ("run", "two"))
+    other = index.narrowed_script_body(file, ("--selftest",))
+    return first is second and first is not other and first is not index.files[file].script_body, (
+        f"同一份正文共用一个视图：{first is second}（要 True）；别的正文另一个：{first is not other}（要 True）；剪过的不是原来那一份：{first is not index.files[file].script_body}（要 True）")
+
+
+def own_program_tree(work, label, files):
+    base = os.path.join(work, label)
+    write_tree(base, {OWN_PROGRAM_MANIFEST_PATH: OWN_PROGRAM_MANIFEST, **files})
+    return base
+
+
+def own_program_source(restart_function, after=""):
+    """main 分两个角色：带参数的那个角色跑 role_body，不带参数的起自己（起自己的写法由 restart_function 给）。"""
+    return ("fn role_body() -> u32 {\n    1\n}\n" + restart_function
+            + "\nfn main() {\n    if std::env::args().count() > 1 {\n        role_body();\n    } else {\n        restart();\n    }\n}\n" + after)
+
+
+def own_program_keyed_cell(work):
+    """OWN_PROGRAM_KEYED_CELL：四种写法从 main 算得出键，改 role_body 键变；库函数里起自己、从 bin 的 main 连到的算得出键。"""
+    problems = []
+    for label, restart in OWN_PROGRAM_RESTARTS_KEYED.items():
+        base = own_program_tree(work, label, {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)})
+        kept, forms = fixture_key(base, OWN_PROGRAM_MAIN_ENTRY)
+        edit_file(base, OWN_PROGRAM_MAIN_FILE, "fn role_body() -> u32 {\n    1", "fn role_body() -> u32 {\n    2")
+        after = fixture_key(base, OWN_PROGRAM_MAIN_ENTRY)[0]
+        if kept is None or after is None or kept == after:
+            problems.append(f"{label}：改前键{'有' if kept else '无'}（拒算 {sorted(forms)}），改后键{'有' if after else '无'}，变了：{kept != after}")
+    base = own_program_tree(work, "library", {OWN_PROGRAM_LIBRARY_FILE: OWN_PROGRAM_LIBRARY_RESTART, OWN_PROGRAM_MAIN_FILE: "fn main() {\n    frestart::restart_from_library();\n}\n"})
+    kept, forms = fixture_key(base, OWN_PROGRAM_MAIN_ENTRY)
+    if kept is None:
+        problems.append(f"library：拒算 {sorted(forms)}")
+    return not problems, f"该算得出键、改角色函数键变的没做到：{problems}"
+
+
+def own_program_entry_cell(work):
+    """OWN_PROGRAM_ENTRY_CELL：同一种起自己的写法，入口不是 bin 的 main 的每一种都拒算 current-exe。"""
+    restart = OWN_PROGRAM_RESTARTS_KEYED["command-new"]
+    compiled_as_test = Options()
+    compiled_as_test.cfg = ["test"]
+    test_module = "#[cfg(test)]\nmod tests {\n    #[test]\n    fn it_restarts() {\n        super::restart();\n    }\n    #[test]\n    fn it_calls_main() {\n        super::main();\n    }\n}\n"
+    library = OWN_PROGRAM_LIBRARY_RESTART + "#[cfg(test)]\nmod tests {\n    #[test]\n    fn it_restarts() {\n        super::restart_from_library();\n    }\n}\n"
+    module_main = "mod inner {\n    pub fn main() {\n        super::restart();\n    }\n}\n"
+    cases = (
+        ("library-test", {OWN_PROGRAM_LIBRARY_FILE: library}, OWN_PROGRAM_LIBRARY_FILE + "::tests::it_restarts", None),
+        ("bin-test", {OWN_PROGRAM_MAIN_FILE: own_program_source(restart, test_module)}, OWN_PROGRAM_MAIN_FILE + "::tests::it_restarts", None),
+        ("bin-test-calling-main", {OWN_PROGRAM_MAIN_FILE: own_program_source(restart, test_module)}, OWN_PROGRAM_MAIN_FILE + "::tests::it_calls_main", None),
+        ("main-compiled-as-test", {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)}, OWN_PROGRAM_MAIN_ENTRY, compiled_as_test),
+        ("helper-entry", {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)}, OWN_PROGRAM_MAIN_FILE + "::restart", None),
+        ("module-main", {OWN_PROGRAM_MAIN_FILE: own_program_source(restart, module_main)}, OWN_PROGRAM_MAIN_FILE + "::inner::main", None),
+    )
+    problems = []
+    for label, files, entry, options in cases:
+        key, forms = fixture_key(own_program_tree(work, label, files), entry, options)
+        if key is not None or "current-exe" not in forms:
+            problems.append(f"{label}：键{'有' if key else '无'}，拒算 {sorted(forms)}")
+    return not problems, f"该拒算 current-exe 的没拒算：{problems}"
+
+
+def own_program_path_cell(work):
+    """OWN_PROGRAM_PATH_CELL：入口是 bin 的 main，路径改过或流向别处的每一种都拒算 current-exe。"""
+    problems = []
+    for label, restart in OWN_PROGRAM_RESTARTS_REFUSED.items():
+        key, forms = fixture_key(own_program_tree(work, label, {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)}), OWN_PROGRAM_MAIN_ENTRY)
+        if key is not None or "current-exe" not in forms:
+            problems.append(f"{label}：键{'有' if key else '无'}，拒算 {sorted(forms)}")
+    return not problems, f"该拒算 current-exe 的没拒算：{problems}"
+
+
+def extern_block_tree(work, label, library):
+    base = os.path.join(work, label)
+    write_tree(base, {"crates/fextern/Cargo.toml": '[package]\nname = "fextern"\n', EXTERN_BLOCK_FILE: library})
+    return base
+
+
+def extern_listed_cell(work):
+    """EXTERN_LISTED_CELL：#[link_name] 指到名单里的两个符号的算得出键、改调用方键变；函数名就是名单里的符号的算得出键。"""
+    base = extern_block_tree(work, "link-names", EXTERN_LISTED_LINK_NAMES)
+    kept, forms = fixture_key(base, EXTERN_BLOCK_ENTRY)
+    edit_file(base, EXTERN_BLOCK_FILE, "fdatasync_raw(3)", "fdatasync_raw(4)")
+    after = fixture_key(base, EXTERN_BLOCK_ENTRY)[0]
+    own_name, own_name_forms = fixture_key(extern_block_tree(work, "own-name", EXTERN_LISTED_OWN_NAME), EXTERN_BLOCK_ENTRY)
+    return kept is not None and after is not None and kept != after and own_name is not None, (
+        f"link_name：改前键{'有' if kept else '无'}（拒算 {sorted(forms)}），改调用方后键变：{kept != after}；函数名：键{'有' if own_name else '无'}（拒算 {sorted(own_name_forms)}）")
+
+
+def extern_refused_cell(work):
+    """EXTERN_REFUSED_CELL：EXTERN_BLOCKS_REFUSED 每一种都拒算 extern-block。"""
+    problems = []
+    for label, library in EXTERN_BLOCKS_REFUSED.items():
+        key, forms = fixture_key(extern_block_tree(work, label, library), EXTERN_BLOCK_ENTRY)
+        if key is not None or "extern-block" not in forms:
+            problems.append(f"{label}：键{'有' if key else '无'}，拒算 {sorted(forms)}")
+    return not problems, f"该拒算 extern-block 的没拒算：{problems}"
+
+
 def no_refusal_cell(fixture, entry):
     def judge(work):
         base = os.path.join(work, "tree")
@@ -15821,7 +17846,167 @@ def no_refusal_cell(fixture, entry):
     return judge
 
 
-FAKE_TOOLCHAIN_SCRIPT = '#!/bin/sh\necho "{name} $(cat "{version}")"\n'
+def no_refusal_no_toolchain_query_cell(fixture, entry):
+    """不拒算，也不落到「版本询问」那一条（文件头）：程序是认得出的根外程序或折出的解释器，工具链单元不进键。"""
+    def judge(work):
+        base = os.path.join(work, "tree")
+        write_tree(base, fixture)
+        closure = closure_of(base, entry)
+        key, refusals = closure_key(closure)
+        return key is not None and not closure.toolchain_queries, (f"不该拒算、不该当工具链询问，实际拒算 {sorted(refusal.form for refusal in refusals)}、"
+                                                                   f"工具链询问 {sorted(closure.toolchain_queries)}")
+    return judge
+
+
+def launch_argument_cell(work):
+    """LAUNCH_ARGUMENT_CELL：check 的闭包不拒算命令参数；字面的 cargo 是登记的外部程序，照规矩由调用方给 externals（给了才算得出键）。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, LAUNCH_ARGUMENT_FIXTURE)
+    key, refusals = closure_key(closure_of(base, "pkg/launch.py::check"), externals={"cargo": ("0" * 64, "cargo 1.90.0")})
+    return key is not None, f"不该拒算，实际拒算 {sorted(refusal.form for refusal in refusals)}"
+
+
+def tail_view_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, TAIL_VIEW_FIXTURE)
+
+    def key_now():
+        options = Options()
+        options.program_arguments = ["--selftest"]
+        return fixture_key(base, "pkg/packages.py", options)
+    before, before_forms = key_now()
+    edit_file(base, "elsewhere/Manifest.toml", "real", "changed")
+    after, after_forms = key_now()
+    return before is not None and before == after, f"键改前 {before}（拒算 {sorted(before_forms)}）、改后 {after}（拒算 {sorted(after_forms)}）"
+
+
+def closure_round_limit_cell(work):
+    """CLOSURE_ROUND_LIMIT_CELL：check 要收两轮；上限临时压到 1，closure_of 抛 FunctionUnitsError，话里点名入口。"""
+    global CLOSURE_ROUND_LIMIT
+    base = os.path.join(work, "tree")
+    write_tree(base, CLOSURE_ROUNDS_FIXTURE)
+    limit = CLOSURE_ROUND_LIMIT
+    CLOSURE_ROUND_LIMIT = 1
+    try:
+        closure_of(base, "pkg/launch.py::check")
+    except FunctionUnitsError as error:
+        return "pkg/launch.py::check" in str(error), f"抛了，话里没点名入口：{error}"
+    finally:
+        CLOSURE_ROUND_LIMIT = limit
+    return False, "上限压到 1，闭包照样收完，没有抛"
+
+
+def shared_script_index_cell(work):
+    base = os.path.join(work, "tree")
+    write_tree(base, {"scripts/one.py": "def entry():\n    return 1\n"})
+    prepared, key = prepare_shared_script_index(base)
+    try:
+        closure = closure_of(base, "scripts/one.py::entry")
+        shared = any(getattr(unit, "module", None) is prepared.python.module("scripts/one.py") for unit in closure.order)
+        return shared, f"闭包里的单元不是父进程建好的那份索引里的（闭包 {len(closure.order)} 个单元）"
+    finally:
+        SHARED_SCRIPT_INDICES.pop(key, None)
+
+
+def shell_table_copy_cell(work):
+    """SHELL_TABLE_COPY_CELL：闭包成员，不靠键（复跑表脚本的字节经副本那一处读进键，键变不变分不出函数连没连）。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_TABLE_COPY_FIXTURE)
+    closure = closure_of(base, "scripts/gate/copy_launcher.py::judge")
+    key, refusals = closure_key(closure)
+    names = {unit.name for unit in closure.order if unit.file == SHELL_TABLE_COPY_RUNNER}
+    files = {unit.file for unit in closure.order}
+    table_only = [name for name in ("driver_row_only", "driver_deferred", "driver_compared", "driver_replaced", "driver_shared") if name in names]
+    table_only += sorted(files & {"s/row_only.sh", "s/deferred.sh", "s/compared.sh", "s/replaced.sh", "s/shared.sh"})
+    left_behind = [name for name in ("<script-body>", "framework_judge", "framework_helper", "DEFERRED_ROOT") if name not in names]
+    return key is not None and not table_only and not left_behind, (f"只被真表点名的进了闭包 {table_only}；副本里留下的没进闭包 {left_behind}；"
+                                                                     f"拒算 {sorted(refusal.form for refusal in refusals)}")
+
+
+def shell_table_real_cell(_work):
+    with open(os.path.join(LIBRARY_ROOT, "scripts/experiment-apparatus/replay.sh"), encoding="utf-8") as handle:
+        text = handle.read()
+    wanted = ("TABLE=$(cat <<'TSV'\n", "ADMISSION_ROW_KEYS=$(cat <<'TSV'\n", 'ONLY+=("$replay_argument")', "want() {",
+              'elif [[ "$replay_argument" == "--item" ]]; then replay_expecting_item=1', '[[ "$exp" == E* ]] || continue',
+              'ROW_ORDINAL["$exp|$bin|$args"]="${replay_ordinal_of_experiment["$exp"]}"',
+              '[[ "${replay_identity%%|*}" == "${replay_item%.*}" && "${ROW_ORDINAL["$replay_identity"]}" == "${replay_item##*.}" ]]')
+    missing = [item.strip() for item in wanted if item not in text]
+    return not missing, f"replay.sh 里找不到 {missing}：选行的写法变了，看 SHELL_ROW_SELECTED_TABLES 与 rows_of_selected_keys 还对不对"
+
+
+def excluded_file_cell(path, old, new, want, excluded):
+    """EXCLUDED_FILE_*_CELL：pkg/judge.py::judge 的键，排除 excluded 那几份（文件头「按角色排除的文件」），改 path 里的 old 之后键变不变。"""
+    def judge(work):
+        base = os.path.join(work, "tree")
+        write_tree(base, EXCLUDED_FILE_FIXTURE)
+        options = Options()
+        options.excluded_files = excluded
+        before, before_refused = fixture_key(base, "pkg/judge.py::judge", options)
+        edit_file(base, path, old, new)
+        after, after_refused = fixture_key(base, "pkg/judge.py::judge", options)
+        if before is None or after is None:
+            return False, f"拒算了：改前 {sorted(before_refused)}，改后 {sorted(after_refused)}"
+        got = "changed" if before != after else "same"
+        return got == want, f"期望 {want}，实际 {got}"
+    return judge
+
+
+def not_judging_files_cell(_work):
+    recorded = tuple(module_literal(LIBRARY_ROOT, "scripts/crash/lib_verdict_library.py", "NOT_JUDGING_FILES"))
+    copied = NOT_JUDGING_FILES[:-1] if "not-judging-files-drifted" in active_breaks() else NOT_JUDGING_FILES
+    return copied == recorded, f"这份抄的 {copied}，lib_verdict_library.py 那一份 {recorded}：两处一起改"
+
+
+def judging_closure_cell(work):
+    """JUDGING_CLOSURE_CELL：命令行 closure 的收法（parse_options、command_closure）在夹具上带与不带 --judging 各收一遍 pkg/entry.py，
+    另带 --judging 收入口就是那份排除文件的；比闭包里有哪几份文件，三趟都不许拒算。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, JUDGING_CLOSURE_FIXTURE)
+    role, direct, only = "scripts/gate/lib_function_units.py", "pkg/direct.py", "pkg/only_via_role.py"
+
+    def collected(entry, arguments):
+        options, _positional = parse_options(arguments)
+        closure = command_closure(base, entry, options)
+        return {unit.file for unit in closure.order}, sorted(refusal.text() for refusal in closure.refusals)
+
+    judging, judging_refused = collected("pkg/entry.py", ["--judging"])
+    whole, whole_refused = collected("pkg/entry.py", [])
+    role_entry, role_refused = collected(role, ["--judging"])
+    problems = []
+    if direct not in judging or role in judging or only in judging:
+        problems.append(f"带 --judging 收 pkg/entry.py：要有 {direct}、不要 {role} 与 {only}，实际 {sorted(judging)}")
+    if not {direct, role, only} <= whole:
+        problems.append(f"不带 --judging 收 pkg/entry.py：{direct}、{role}、{only} 都要在，实际 {sorted(whole)}")
+    if only not in role_entry:
+        problems.append(f"带 --judging 收 {role}（入口就在排除文件里，照 admission.py 不排）：要有 {only}，实际 {sorted(role_entry)}")
+    if judging_refused or whole_refused or role_refused:
+        problems.append(f"夹具拒算了：{judging_refused + whole_refused + role_refused}")
+    return not problems, "；".join(problems) or "带 --judging 排掉只经排除文件起到的那一份与排除文件自己，不带的照收，入口在排除文件里的不排"
+
+
+def loaded_attributes_cell(work):
+    """LOADED_ATTRIBUTES_CELL（文件头「按路径载入的模块只连载入方调到的属性」）：夹具上四个入口各收一遍，看 pkg/library.py 的哪几个单元进了闭包。
+    值不出载入方的两种（pkg/loader.py 函数里的局部名字；s/run.sh 内联脚本里放进模块级容器再取）只许有 wanted 与 import 时执行的、不许有 main、
+    main-guard 与拒算；交给调用方的（pkg/escaping.py）与以 __main__ 名载入的（pkg/as_main.py）照整个闭包连，要有 main。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, LOADED_ATTRIBUTES_FIXTURE)
+    library = "pkg/library.py"
+
+    def collected(entry):
+        closure = closure_of(base, entry)
+        return {unit.name for unit in closure.order if unit.file == library}, sorted(refusal.text() for refusal in closure.refusals)
+
+    problems = []
+    for entry in ("pkg/loader.py::entry", "s/run.sh"):
+        names, refused = collected(entry)
+        if not {"wanted", "<module-body>"} <= names or names & {"main", "<main-guard>"} or refused:
+            problems.append(f"{entry}（值不出载入方）：要有 wanted 与 <module-body>、不要 main 与 <main-guard>、不拒算，实际 {sorted(names)}，拒算 {refused}")
+    for entry in ("pkg/escaping.py::entry", "pkg/as_main.py::entry"):
+        names, _refused = collected(entry)
+        if not {"wanted", "main"} <= names:
+            problems.append(f"{entry}（值交给调用方、以 __main__ 名载入）：照整个闭包连，要有 wanted 与 main，实际 {sorted(names)}")
+    return not problems, "；".join(problems) or "值不出载入方的只连调到的 wanted，main 不跟着别处的 x.main() 进来；交出去的与 __main__ 名的照整个闭包连"
+
 
 
 def toolchain_query_cell(work):
@@ -15872,30 +18057,6 @@ def caller_launch_cell(work):
     return not refused, "；".join(refused)
 
 
-# 登记表点名的程序（文件头「登记表点名的程序」）那一格的夹具：run_probe 起的脚本路径来自登记行，登记表写在 REGISTRY_LISTED_PROGRAMS 里
-REGISTRY_FIXTURE = {
-    "pkg/probes.py": '''import os
-import subprocess
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REGISTRY = "pkg/registry.tsv"
-REGISTRY_LISTED_PROGRAMS = {"run_probe": (REGISTRY, r"probe=(\\S+)")}
-
-
-def run_probe(root, parts):
-    return subprocess.run(["bash", os.path.join(root, parts["script"])], check=False).returncode
-
-
-def check_all():
-    with open(os.path.join(ROOT, REGISTRY), encoding="utf-8") as handle:
-        rows = handle.read().splitlines()
-    return [run_probe(ROOT, {"script": row.split("probe=")[1]}) for row in rows]
-''',
-    "pkg/registry.tsv": "alpha\tprobe=pkg/probe_alpha.sh\nbeta\tprobe=pkg/probe_beta.sh\n",
-    "pkg/probe_alpha.sh": "#!/usr/bin/env bash\necho alpha\n",
-    "pkg/probe_beta.sh": "#!/usr/bin/env bash\necho beta\n",
-}
-
 
 def registry_programs_cell(work):
     """REGISTRY_PROGRAMS_CELL：check_all 读登记表、照每一行调 run_probe（起探针的那一处登在 REGISTRY_LISTED_PROGRAMS 里）：
@@ -15908,41 +18069,6 @@ def registry_programs_cell(work):
     ok = before[0] is not None and after[0] == before[0]
     return ok, f"改前键 {before[0]}（拒算 {before[1]}）；改探针之后键 {after[0]}（拒算 {after[1]}）"
 
-
-# 按行进键的登记表（文件头「按行进键的登记表」）那一格的夹具：guard.py 按 ROW_KEYED_TABLES 登记的取用函数 registered_selftest 查一行，audit 不在登记里、读整张
-ROW_KEYED_FIXTURE = {
-    ".claude/hooks/selftest-registry.tsv": "scripts/a.py\tselftest\t# 甲\nscripts/b.py\tselftest\t# 乙\n.claude/gate.d/x.sh\tsamples:tools\t# 丙\n",
-    "pkg/guard.py": '''import os
-
-REGISTRY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".claude", "hooks", "selftest-registry.tsv")
-
-
-def selftest_registry_at(path):
-    rows = {}
-    with open(path, encoding="utf-8") as handle:
-        for line in handle.read().split("\\n"):
-            fields = line.split("\\t")
-            if len(fields) > 1:
-                rows.setdefault(fields[0], fields[1])
-    return rows
-
-
-def read_selftest_registry(path):
-    return selftest_registry_at(path)
-
-
-def registered_selftest(key):
-    return read_selftest_registry(REGISTRY).get(key)
-
-
-def judge(key):
-    return registered_selftest(key) is not None
-
-
-def audit():
-    return sorted(read_selftest_registry(REGISTRY))
-''',
-}
 
 
 def row_keyed_cell(work):
@@ -16043,8 +18169,85 @@ def program_arguments_cell(work):
     return ok, f"改前 {before}；改 beta_work 之后 {beta_changed}；改 alpha_work 之后 {alpha_changed}"
 
 
-LOADER_FILES = (".claude/scripts/preflight.sh", ".claude/scripts/project_preflight.py")
-CANONICAL_FILES = ("preflight.sh", "preflight.py", "proc.py")   # preflight.py 按名字载入同目录的 proc.py（load_package_module）
+def entry_arguments_key(base, entry, arguments):
+    """入口带 arguments（Options.program_arguments）算的 (键或 None, 拒算形态的集合)。"""
+    options = Options()
+    options.program_arguments = list(arguments)
+    return fixture_key(base, entry, options)
+
+
+def shell_entry_edits_cell(entry, arguments, edits, fixture=SHELL_ENTRY_FIXTURE):
+    """SHELL_ENTRY_ARGUMENTS_CELL、SHELL_ENTRY_UNDECIDED_CELL（SHELL_ENTRY_FIXTURE）、SHELL_TABLE_ITEM_CELL（SHELL_TABLE_ITEM_FIXTURE）：fixture 里 entry 带 arguments，
+    edits 逐条 (路径, 旧, 新, 期望 same|changed) 改一处、同上一次的键比。"""
+    def judge(work):
+        base = os.path.join(work, "tree")
+        write_tree(base, fixture)
+        previous, previous_refused = entry_arguments_key(base, entry, arguments)
+        outcomes = []
+        for path, old, new, want in edits:
+            edit_file(base, path, old, new)
+            after, after_refused = entry_arguments_key(base, entry, arguments)
+            if previous is None or after is None:
+                return False, f"改 {path} 前后拒算了：{sorted(previous_refused)}、{sorted(after_refused)}"
+            outcomes.append((path, want, "changed" if after != previous else "same"))
+            previous = after
+        return all(want == got for _path, want, got in outcomes), "；".join(f"改 {path} 期望 {want}、实际 {got}" for path, want, got in outcomes)
+    return judge
+
+
+def shell_entry_table_cell(work):
+    """SHELL_ENTRY_TABLE_CELL：SHELL_TABLE_FIXTURE 的复跑表脚本当入口，带 E1 与带 --selftest 各算一把键；改 s/two.sh（只由 E2 那一行的驱动起），
+    带 E1 的键不变、带 --selftest 的变。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_TABLE_FIXTURE)
+    entry = "scripts/experiment-apparatus/replay.sh"
+
+    def keys():
+        return {label: entry_arguments_key(base, entry, arguments)[0] for label, arguments in (("E1", ["E1"]), ("selftest", ["--selftest"]))}
+    before = keys()
+    edit_file(base, "s/two.sh", "echo two", "echo two changed")
+    after = keys()
+    ok = None not in before.values() and None not in after.values() and after["E1"] == before["E1"] and after["selftest"] != before["selftest"]
+    return ok, f"改前 {before}；改 s/two.sh 之后 {after}"
+
+
+def shell_entry_exit_table_cell(work):
+    """SHELL_ENTRY_EXIT_TABLE_CELL：SHELL_ENTRY_EXIT_TABLE_FIXTURE 的复跑表脚本当入口，带 --selftest 与不带参数各算一把键；先改 s/one.sh、再改 s/two.sh
+    （各只由表里一行的驱动起），每改一处都同上一次比：带 --selftest 的都不变，不带参数的都变。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_ENTRY_EXIT_TABLE_FIXTURE)
+    entry = "scripts/experiment-apparatus/replay.sh"
+
+    def keys():
+        return {label: entry_arguments_key(base, entry, arguments)[0] for label, arguments in (("selftest", ["--selftest"]), ("bare", []))}
+    previous, outcomes = keys(), []
+    for path, old, new in (("s/one.sh", "echo one", "echo one changed"), ("s/two.sh", "echo two", "echo two changed")):
+        edit_file(base, path, old, new)
+        after = keys()
+        if None in previous.values() or None in after.values():
+            return False, f"改 {path} 前后有一把键算不出（拒算了）：{previous}、{after}"
+        outcomes.append((path, after["selftest"] == previous["selftest"], after["bare"] != previous["bare"]))
+        previous = after
+    return all(same and changed for _path, same, changed in outcomes), "；".join(
+        f"改 {path}：带 --selftest 的键{'不变' if same else '变了'}（要不变）、不带参数的键{'变了' if changed else '不变'}（要变）" for path, same, changed in outcomes)
+
+
+def shell_table_tree_copy_cell(work):
+    """SHELL_TABLE_TREE_COPY_CELL：SHELL_TABLE_TREE_COPY_FIXTURE 的 s/copy_caller.sh 当入口（不带参数），先改 s/two.sh、再改 s/one.sh，每改一处同上一次比：
+    改 s/two.sh 键不变、改 s/one.sh 键变。"""
+    base = os.path.join(work, "tree")
+    write_tree(base, SHELL_TABLE_TREE_COPY_FIXTURE)
+    previous, previous_refused = fixture_key(base, "s/copy_caller.sh")
+    outcomes = []
+    for path, old, new, want in (("s/two.sh", "echo two", "echo two changed", "same"), ("s/one.sh", "echo one", "echo one changed", "changed")):
+        edit_file(base, path, old, new)
+        after, after_refused = fixture_key(base, "s/copy_caller.sh")
+        if previous is None or after is None:
+            return False, f"改 {path} 前后拒算了：{sorted(previous_refused)}、{sorted(after_refused)}"
+        outcomes.append((path, want, "changed" if after != previous else "same"))
+        previous, previous_refused = after, after_refused
+    return all(want == got for _path, want, got in outcomes), "；".join(f"改 {path} 期望 {want}、实际 {got}" for path, want, got in outcomes)
+
 
 
 def loader_tree(base, canonical):
@@ -16182,7 +18385,7 @@ def module_literal(root, path, name):
 
 def registered_judging_entries(root):
     """存判定的各路判法入口，从各份脚本的登记现取（不手抄）：广谱变异 JUDGING_ENTRIES 与 GPU_JUDGING_ENTRIES、crates 变异 JUDGING_ENTRIES、
-    admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、verus-proof-check.py 的 JUDGING_ENTRIES，
+    admission.py 的 REPLAY_SCRIPT 与 REPLAY_JUDGING_FUNCTIONS、e165 的 JUDGING_ENTRY、E165 第二段判法模块的 JUDGING_ENTRIES、verus-proof-check.py 的 JUDGING_ENTRIES，
     再加门禁阶段（.claude/gate.d/*.sh）里写死的 "judge:<文件>::<函数>" 令牌（$STAGE_NAME 换成那一道阶段自己）。去重、保持登记的次序。"""
     root = os.path.abspath(root)
     entries = []
@@ -16192,6 +18395,7 @@ def registered_judging_entries(root):
     replay_script = module_literal(root, "scripts/gate/admission.py", "REPLAY_SCRIPT")
     entries += [f"{replay_script}::{function}" for function in module_literal(root, "scripts/gate/admission.py", "REPLAY_JUDGING_FUNCTIONS")]
     entries.append(f"scripts/experiment-apparatus/e165-pin-red-examples.py::{module_literal(root, 'scripts/experiment-apparatus/e165-pin-red-examples.py', 'JUDGING_ENTRY')}")
+    entries += [f"scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py::{function}" for function in module_literal(root, "scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py", "JUDGING_ENTRIES")]
     entries += [f"scripts/gate/verus-proof-check.py::{function}" for function in module_literal(root, "scripts/gate/verus-proof-check.py", "JUDGING_ENTRIES").values()]
     for stage in sorted(glob.glob(os.path.join(root, JUDGING_ENTRY_STAGE_DIRECTORY, "*.sh"))):
         with open(stage, encoding="utf-8") as handle:
@@ -16204,65 +18408,7 @@ def registered_judging_entries(root):
 
 # ── import 时执行的模块级语句与不走的子进程边（文件头「Python 闭包：import 时执行的模块级语句」「不走的子进程边」）的自证 ──
 
-IMPORT_TIME_FIXTURE = {
-    "tool/entry.py": ("import sys\n\nimport helper\n\n\ndef judge():\n    return helper.verdict()\n\n\n"
-                      "if __name__ == \"__main__\":\n    sys.exit(judge())\n"),
-    "tool/helper.py": ("import os\n\nUNUSED = 0\n\n\nclass Settings:\n    threshold = 0\n\n    def __init__(self):\n        self.value = 1\n\n\n"
-                       "def verdict():\n    return 0\n\n\ndef unused(value=0):\n    return value\n"),
-}
-IMPORT_TIME_ENTRY = "tool/entry.py::judge"
-# 每一种改动：(名, 文件, 原文, 改成) —— 前四种是 import 时就执行、让 python3 tool/entry.py 退非 0 的模块级语句，末一种是对照：
-# 改的是程序入口（main-guard）、不在 judge 的闭包里，退出码变了而键不变，这一格的判法必须认出它
-IMPORT_TIME_EDITS = (
-    ("模块级 import", "tool/helper.py", "import os\n", "from os import missing_name_for_selftest\n"),
-    ("模块级赋值", "tool/helper.py", "UNUSED = 0\n", "UNUSED = int(\"selftest\")\n"),
-    ("类头", "tool/helper.py", "    threshold = 0\n", "    threshold = int(\"selftest\")\n"),
-    ("没人调的 def 的缺省值", "tool/helper.py", "def unused(value=0):", "def unused(value=int(\"selftest\")):"),
-)
-IMPORT_TIME_CONTROL = ("程序入口（main-guard）", "tool/entry.py", "    sys.exit(judge())\n", "    sys.exit(judge() + 3)\n")
-IMPORT_TIME_EXIT_CELL = "python：import 时执行的模块级 import、赋值、类头与 def 缺省值改了让程序退出码变的，入口的键都变（键不变而退出码变的必红，对照那一种必须认出）"
-IMPORT_TIME_CLASS_CELL = "python：只因 import 时执行收进来的类头不算被点名，类里的 __init__ 改了不作废"
-EXCLUDED_EDGE_PYTHON_CELL = "不走的子进程边（夹具）：登记了的 python 单元起的那一条不连、同一个单元起的另一个程序照连、不登记时那一条照连"
-EXCLUDED_EDGE_SHELL_CELL = "不走的子进程边（夹具）：登记了的 shell 函数起的那一条不连、同一个函数起的另一个程序照连、不登记时那一条照连"
-# 每个入口单元起两个程序：hint 是自证期间登记成不走的那一条，kept 不登记；EXCLUDED_PROGRAM_EDGES 平时的内容不进这一格
-EXCLUDED_EDGE_FIXTURE = {
-    "tool/entry.py": ("import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
-                      "def judge():\n    subprocess.run([sys.executable, os.path.join(HERE, \"kept.py\")], check=False)\n"
-                      "    return subprocess.run([sys.executable, os.path.join(HERE, \"hint.py\")], check=False)\n"),
-    "tool/kept.py": "def work():\n    return 1\n\n\nif __name__ == \"__main__\":\n    work()\n",
-    "tool/hint.py": "def work():\n    return 2\n\n\nif __name__ == \"__main__\":\n    work()\n",
-    "tool/run.sh": '''#!/usr/bin/env bash
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-launch() {
-  bash "$here/kept.sh"
-  bash "$here/hint.sh"
-}
-launch
-''',
-    "tool/kept.sh": "#!/usr/bin/env bash\necho kept\n",
-    "tool/hint.sh": "#!/usr/bin/env bash\necho hint\n",
-}
-EXCLUDED_EDGE_PYTHON_ENTRY = "tool/entry.py::judge"
-EXCLUDED_EDGE_SHELL_ENTRY = "tool/run.sh::launch"
-EXCLUDED_EDGE_FIXTURE_EDGES = {
-    ("tool/entry.py", "judge", "tool/hint.py"): "夹具：python 单元起的程序，只打提示",
-    ("tool/run.sh", "launch", "tool/hint.sh"): "夹具：shell 函数起的程序，只打提示",
-}
-REAL_ENTRIES_CELL = "真仓：判法入口从登记现取（registered_judging_entries），形式化入口在里面、都认得出"
-REAL_TREE_IGNORED = shutil.ignore_patterns("__pycache__", "fixtures", "kb", "target")
-REAL_FORMAL_SCRIPT = "scripts/gate/verus-proof-check.py"
-# 真仓上的三格，入口都是形式化入口（check_proof 经 reuse_checks.ReuseSentinel 等点到 lib_reuse_checks.py，那份模块因此被载入）：
-# (格名, 文件, 原文, 改成)；原文在那份文件里要恰好一次，对不上这一格红、出路是照新原文改这里
-REAL_IMPORT_TIME_EDITS = (
-    ("真仓：改 scripts/gate/lib_reuse_checks.py 一个模块级 import，形式化入口的键变", "scripts/gate/lib_reuse_checks.py", "\nimport re\n", "\nimport re, json\n"),
-    ("真仓：改 scripts/gate/lib_reuse_checks.py 的一个类头（ReuseSentinel），形式化入口的键变", "scripts/gate/lib_reuse_checks.py",
-     "\nclass ReuseSentinel:\n", "\nclass ReuseSentinel:\n    IMPORT_TIME_SELFTEST = 1\n"),
-    ("真仓：改一个没人调的 def 的缺省值（scripts/gate/lib_reuse_checks.py 的 write_target_last_run），形式化入口的键变", "scripts/gate/lib_reuse_checks.py",
-     'def write_target_last_run(script_key, target, exit_code, test_filter="", target_file=""):',
-     'def write_target_last_run(script_key, target, exit_code, test_filter=None, target_file=""):'),
-)
 LIBRARY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-_REAL_IMPORT_TIME_RESULTS = {}
 
 
 def run_fixture_program(base, path):
@@ -16370,20 +18516,6 @@ def excluded_edge_cell(entry, hint, kept):
     return judge
 
 
-# 「键不变而退出码变」必红那一格（夹具）：quiet.py 与 leak.py 都起 hint.py，两条边自证期间都登记成不走；改坏 hint.py 之后
-# quiet.py 吞掉它的退出码、leak.py 把它的退出码当自己的。两个的键都不变，退出码只有 leak.py 变，判法必须认出 leak.py
-EXCLUDED_EDGE_EXIT_CELL = "不走的子进程边（夹具）：切了边的程序改坏后包装退出码变了而键不变的必红（对照 leak.py 必须认出），吞掉退出码的 quiet.py 不红"
-EXCLUDED_EDGE_EXIT_HEAD = "import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
-EXCLUDED_EDGE_EXIT_LAUNCH = "subprocess.run([sys.executable, os.path.join(HERE, \"hint.py\")], check=False)"
-EXCLUDED_EDGE_EXIT_FIXTURE = {
-    "tool/hint.py": "def work():\n    return 0\n\n\nif __name__ == \"__main__\":\n    work()\n",
-    "tool/quiet.py": EXCLUDED_EDGE_EXIT_HEAD + f"def run():\n    {EXCLUDED_EDGE_EXIT_LAUNCH}\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(run())\n",
-    "tool/leak.py": EXCLUDED_EDGE_EXIT_HEAD + f"def run():\n    return {EXCLUDED_EDGE_EXIT_LAUNCH}.returncode\n\n\nif __name__ == \"__main__\":\n    sys.exit(run())\n",
-}
-EXCLUDED_EDGE_EXIT_WRAPPERS = ("tool/quiet.py", "tool/leak.py")
-EXCLUDED_EDGE_EXIT_EDGES = {(wrapper, "run", "tool/hint.py"): "夹具：自证期间登记成不走" for wrapper in EXCLUDED_EDGE_EXIT_WRAPPERS}
-EXCLUDED_EDGE_EXIT_EDIT = ("tool/hint.py", "    work()\n", "    raise RuntimeError(\"selftest\")\n")
-
 
 def excluded_edge_exit_cell(work):
     """自证期间临时登记 EXCLUDED_EDGE_EXIT_EDGES；每个包装在原树与改坏 hint.py 的树上各量（键、python3 <包装> 的退出码），
@@ -16411,29 +18543,6 @@ def excluded_edge_exit_cell(work):
     want = ["tool/leak.py"]
     return blind == want, f"键不变而退出码变的（要恰好是 {want}）：{blind}；{'；'.join(lines)}"
 
-
-# 登记的准入边（ADMISSION_EDGE）的三格，都在本仓上量（准入异常那一格起本仓的跑法脚本，只走到计划那一步、编译换成假的）
-ADMISSION_EDGE_KEY = "E183/h2"
-ADMISSION_EDGE_ANOMALY_CELL = ("不走的子进程边（真仓 E183 准入）：准入这条路上的异常（崩、被杀、退 77、退 3、退 0 不打行、打别的行）"
-                               "只让计划那一步退非 0、不起编译、不写计划，读数出不来")
-ADMISSION_EDGE_STRIP_CELL = "不走的子进程边（真仓 E183 准入）：准入往标准输出打的只有 E7INPUT 行（键算出、拒算两样），判法读产物前去掉这几行之后读数一行不差"
-ADMISSION_EDGE_REACH_CELL = "不走的子进程边（真仓 E183 准入）：切边前后少掉的单元都在 admission.py 当程序起的闭包里（只经这条边可达），且确实少了 admission.py"
-# 准入异常那一格的假准入：(名, 正文)。每个都先在 ADMISSION_EDGE_MARK 指的文件里记一笔，证明计划那一步真问到了它
-ADMISSION_EDGE_ANOMALIES = (
-    ("崩（抛异常）", "raise RuntimeError(\"selftest\")\n"),
-    ("被 SIGKILL 杀", "import signal\nos.kill(os.getpid(), signal.SIGKILL)\n"),
-    ("退 77", "import sys\nsys.exit(77)\n"),
-    ("退 3", "import sys\nsys.exit(3)\n"),
-    ("退 0 什么都不打", "pass\n"),
-    ("退 0 打别的行", "print(\"selftest junk\")\n"),
-)
-# 弄坏开关 admission-edge-admitted-sample 下多跑的那一个：放行，计划往下走、起编译，这一格必须红
-ADMISSION_EDGE_ADMITTED = ("放行（弄坏开关 admission-edge-admitted-sample 加的）",
-                           "print(\"E7INPUT name=input_fingerprint key=E183/h2 sha256=\" + \"0123456789abcdef\" * 4 + \" units=2\")\n")
-ADMISSION_EDGE_MARK_LINE = "import os\nopen(os.environ[\"ADMISSION_EDGE_MARK\"], \"w\").write(\"asked\")\n"
-ADMISSION_EDGE_FAKE_CARGO = "#!/usr/bin/env bash\necho \"$*\" >> \"$ADMISSION_EDGE_CARGO_CALLS\"\nexit 1\n"
-ADMISSION_EDGE_DROPPED_VARIABLES = ("CARGO_TARGET_DIR", "MULTI_HOST_RUN_PEER_SCRATCH")
-ADMISSION_EDGE_READINGS = ("E7RESULT name=selftest_reading value=1", "E7RESULT name=done emitted=1")
 
 
 def admission_edge_anomaly_cell(work):
@@ -16542,12 +18651,203 @@ def admission_edge_reach_cell(work):
         f"{[refusal.text() for refusal in cut_closure.refusal_list()[:3]]}（要：有 {program} 的单元、另两样都空）")
 
 
-# main-guard 的两种写法与几段合一（文件头「Python 闭包：import 时执行的模块级语句」；欠账 C947）那三格
-MAIN_GUARD_IMPORT_CELL = ("python：被 import 的模块里 if __name__ == \"__main__\" and …: 那一段不进闭包（自证分支不收），"
-                          "块外的模块级语句与认不出的形态（带 else、__name__ 那一项不在最左）照收")
-MAIN_GUARD_PROGRAM_CELL = "python：被起的程序里每一段 main-guard 都收（if __name__ == \"__main__\" and …: 那一段与后面另一段），起它的参数不是字面量也连自证分支"
-MAIN_GUARD_REAL_CELL = ("真仓：以 scripts/hosts/memory_peaks_lib.py 的 command_key 为判法入口，闭包不收它的自证（run_self_test、self_test_cells），"
-                        "改 self_test_cells 的函数体判法单元指纹不变")
+CARD_LEASE_CLIENT_WORDS_NOISE = "CARD_LEASE_CLIENT_WORDS_NOISE"
+
+
+def card_lease_client_words_text():
+    """本仓 device_card_lease.py 的原文。转走还卡输出的原文（CARD_LEASE_CLIENT_WORDS_RETURN 的左边）要恰好一次，不是就抛 AssertionError 点名；
+    弄坏开关 card-lease-client-words-return-output-kept 下换成右边。"""
+    with open(os.path.join(LIBRARY_ROOT, CARD_LEASE_CLIENT_WORDS_LAUNCHER), encoding="utf-8") as handle:
+        text = handle.read()
+    kept, passed = CARD_LEASE_CLIENT_WORDS_RETURN
+    if text.count(kept) != 1:
+        raise AssertionError(f"{CARD_LEASE_CLIENT_WORDS_LAUNCHER} 里「{kept}」命中 {text.count(kept)} 次（要恰好一次）：还卡那一回客户端的标准输出要转走、"
+                             "不进调用方的标准输出；原文改了就照新原文改 CARD_LEASE_CLIENT_WORDS_RETURN")
+    if "card-lease-client-words-return-output-kept" in active_breaks():
+        text = text.replace(kept, passed)
+    return text
+
+
+def card_lease_client_words_bench(work):
+    """一格的目录：task-server/task 是假领卡客户端（device_card_lease.py 照 <树根>/task-server/task 起它，树根就是这个目录），本仓 device_card_lease.py
+    的原文与起法写在旁边；→ (目录, 环境)。环境去掉弄坏开关、服务给的变量与 GPU_CARDS_BY_PRIORITY。"""
+    bench = os.path.join(work, "card-lease-client-words")
+    write_tree(bench, {"task-server/task": CARD_LEASE_CLIENT_WORDS_FAKE_CLIENT, "device_card_lease.py": card_lease_client_words_text(),
+                       "harness.py": CARD_LEASE_CLIENT_WORDS_HARNESS})
+    os.chmod(os.path.join(bench, "task-server", "task"), 0o755)
+    environment = {name: value for name, value in os.environ.items()
+                   if not name.endswith("_BREAK") and not name.startswith("TASK_SERVER_") and name != "GPU_CARDS_BY_PRIORITY"}
+    environment.update(CARD_LEASE_CLIENT_WORDS_READINGS="\n".join(CARD_LEASE_CLIENT_WORDS_READINGS),
+                       CARD_LEASE_CLIENT_WORDS_REFUSED_EXIT=str(CARD_LEASE_CLIENT_WORDS_REFUSED_EXIT))
+    return bench, environment
+
+
+def card_lease_client_words_run(bench, environment, take, give_back, device_exit):
+    """在 bench 上起一趟：子进程载入 device_card_lease.py 领卡、装置、还卡；假客户端领卡那一回演 take、还卡那一回演 give_back，装置退 device_exit。
+    → (退出码，120 秒没退是 None；标准输出；标准错误；事件行)。"""
+    events = os.path.join(bench, f"events-{take}-{give_back}-{device_exit}")
+    run_environment = dict(environment, CARD_LEASE_CLIENT_WORDS_EVENTS=events, CARD_LEASE_CLIENT_WORDS_TAKE=take, CARD_LEASE_CLIENT_WORDS_RETURN=give_back,
+                           CARD_LEASE_CLIENT_WORDS_DEVICE_EXIT=str(device_exit))
+    command = [sys.executable, os.path.join(bench, "harness.py"), os.path.join(bench, "device_card_lease.py"), os.path.join(bench, "task-server", "task"), bench]
+    try:
+        completed = subprocess.run(command, cwd=bench, env=run_environment, capture_output=True, text=True, timeout=120)
+        exit_code, stdout, stderr = completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired:
+        exit_code, stdout, stderr = None, "", "120 秒没退"
+    seen = []
+    if os.path.exists(events):
+        with open(events, encoding="utf-8") as handle:
+            seen = handle.read().splitlines()
+    return exit_code, stdout, stderr, seen
+
+
+def card_lease_client_words_anomaly_cell(work):
+    """领卡那几个异常（还卡照常、装置退 0）都要问到了领卡、take_card 抛 CardLeaseRefused（起法退 CARD_LEASE_CLIENT_WORDS_REFUSED_EXIT）、装置没起、
+    标准输出空着；还卡那几个异常（领卡照常）在装置退 0 与退 3 下都要装置照卡串起一回、照卡串还一回、退出码是装置的、标准输出恰好是装置的读数。
+    弄坏开关 card-lease-client-words-granted-sample 下领卡那几个里多一个领到了的。"""
+    bench, environment = card_lease_client_words_bench(work)
+    takes = CARD_LEASE_CLIENT_WORDS_TAKE_ANOMALIES + (
+        (CARD_LEASE_CLIENT_WORDS_GRANTED_SAMPLE,) if "card-lease-client-words-granted-sample" in active_breaks() else ())
+    wrong, lines = [], []
+    for label, take in takes:
+        exit_code, stdout, _stderr, seen = card_lease_client_words_run(bench, environment, take, "granted", 0)
+        started = [line for line in seen if line.startswith("device:")]
+        asked = any(line.startswith("lease:take:") for line in seen)
+        lines.append(f"领卡{label}：退 {exit_code}，{'问了' if asked else '没问'}领卡，装置起了 {len(started)} 回，标准输出 {stdout.splitlines()[:3]}")
+        if not asked or exit_code != CARD_LEASE_CLIENT_WORDS_REFUSED_EXIT or started or stdout:
+            wrong.append(f"领卡{label}")
+    for label, give_back in CARD_LEASE_CLIENT_WORDS_RETURN_ANOMALIES:
+        for device_exit in CARD_LEASE_CLIENT_WORDS_DEVICE_EXITS:
+            exit_code, stdout, _stderr, seen = card_lease_client_words_run(bench, environment, "granted", give_back, device_exit)
+            started = [line for line in seen if line.startswith("device:")]
+            returned = [line for line in seen if line.startswith("lease:return:")]
+            lines.append(f"还卡{label}、装置退 {device_exit}：退 {exit_code}，装置 {started}，还卡 {returned}，标准输出 {stdout.splitlines()[:3]}")
+            if exit_code != device_exit or started != [f"device:{CARD_LEASE_CLIENT_WORDS_CARD}"] \
+                    or returned != [f"lease:return:{CARD_LEASE_CLIENT_WORDS_CARD}"] or stdout.splitlines() != list(CARD_LEASE_CLIENT_WORDS_READINGS):
+                wrong.append(f"还卡{label}、装置退 {device_exit}")
+    return not wrong, f"判错的：{wrong}（要空）；{'；'.join(lines)}"
+
+
+def card_lease_client_words_strip_cell(work):
+    """起一趟：领卡照常，还卡那一回假客户端往标准输出与标准错误各打一行 CARD_LEASE_CLIENT_WORDS_NOISE，装置退 0。要：退 0、标准输出恰好是装置的读数、
+    那一行在标准错误里出现两回（客户端自己打的与 return_card 转过来的）。弄坏开关 card-lease-client-words-return-output-kept 下 return_card 不转走
+    （card_lease_client_words_text）。"""
+    bench, environment = card_lease_client_words_bench(work)
+    exit_code, stdout, stderr, seen = card_lease_client_words_run(bench, environment, "granted", "noisy", 0)
+    routed = stderr.splitlines().count(CARD_LEASE_CLIENT_WORDS_NOISE)
+    readings = list(CARD_LEASE_CLIENT_WORDS_READINGS)
+    return exit_code == 0 and stdout.splitlines() == readings and routed == 2, (
+        f"退 {exit_code}（要 0），标准输出 {stdout.splitlines()}（要恰好是 {readings}），标准错误里 {CARD_LEASE_CLIENT_WORDS_NOISE} {routed} 行（要 2），"
+        f"事件 {seen}")
+
+
+def card_lease_client_words_parse(path, text):
+    """解析一份原文；解析不了抛 AssertionError 点名那份文件。"""
+    try:
+        return ast.parse(text, filename=path)
+    except SyntaxError as error:
+        raise AssertionError(f"{path} 解析不了：{error}") from error
+
+
+def card_lease_client_words_launches(call):
+    """这一处调用起不起子进程：subprocess 上的任何函数，os.system、os.popen、os.exec*、os.spawn*、os.posix_spawn*。"""
+    function = call.func
+    if not (isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name)):
+        return False
+    if function.value.id == "subprocess":
+        return True
+    return function.value.id == "os" and (function.attr in ("system", "popen") or function.attr.startswith(("exec", "spawn", "posix_spawn")))
+
+
+def card_lease_client_words_named(call, name):
+    """这一处调用是不是 device_card_lease.<name>(…)。"""
+    function = call.func
+    return (isinstance(function, ast.Attribute) and function.attr == name and isinstance(function.value, ast.Name)
+            and function.value.id == "device_card_lease")
+
+
+def card_lease_client_words_problems(texts):
+    """texts：{CARD_LEASE_CLIENT_WORDS_LAUNCHER 与 CARD_LEASE_CLIENT_WORDS_CALLERS 各份: 原文}。→ 判出的问题（去重、照判出的次序），每条以那份文件起头。
+    device_card_lease.py：UNKEYED_PROGRAM_WORDS 里登着这两个函数的 client；这两个函数各有起子进程的一处，每一处头一个参数是列表、头一个元素是登记的词；
+    别的函数与模块级语句一处子进程都不起。调用方：经 device_card_lease.take_card、return_card 的调用点各至少一处；device_card_lease.client_of(…) 的结果
+    只交给这两个函数当头一个参数（直接写在实参里，或赋给一个名字、所在函数里读这个名字的每一处都是这样）；不碰 device_card_lease.CLIENT_RELATIVE；
+    文档串之外没有等于 "lease" 或带「lease take」「lease return」的字符串。弄坏开关 card-lease-client-words-other-launches-unchecked 下只看登记、
+    这两个函数起的头一个词与调用点，别处起客户端的那几样不核。"""
+    unchecked = "card-lease-client-words-other-launches-unchecked" in active_breaks()
+    launcher, word, functions = CARD_LEASE_CLIENT_WORDS_LAUNCHER, CARD_LEASE_CLIENT_WORDS_WORD, CARD_LEASE_CLIENT_WORDS_FUNCTIONS
+    problems = [f"{launcher}：UNKEYED_PROGRAM_WORDS 里没有 ({function}, {word}) 那一行" for function in functions
+                if (launcher, function, word) not in UNKEYED_PROGRAM_WORDS]
+    launching = collections.defaultdict(list)
+    for statement in card_lease_client_words_parse(launcher, texts[launcher]).body:
+        owner = statement.name if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) else "<模块级语句>"
+        launching[owner] += [call for call in ast.walk(statement) if isinstance(call, ast.Call) and card_lease_client_words_launches(call)]
+    for function in functions:
+        if not launching[function]:
+            problems.append(f"{launcher}：{function} 里没有起子进程的那一处（登记的词落空）")
+        for call in launching[function]:
+            head = call.args[0] if call.args else None
+            if not (isinstance(head, ast.List) and head.elts and isinstance(head.elts[0], ast.Name) and head.elts[0].id == word):
+                problems.append(f"{launcher}：{function} 第 {call.lineno} 行起的头一个词不是登记的 {word}：{ast.unparse(call)[:120]}")
+    others = sorted(owner for owner, calls in launching.items() if calls and owner not in functions)
+    if others and not unchecked:
+        problems.append(f"{launcher}：{others} 也起子进程（领卡客户端只许经 {list(functions)} 起）")
+    for caller in CARD_LEASE_CLIENT_WORDS_CALLERS:
+        tree = card_lease_client_words_parse(caller, texts[caller])
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+        for function in functions:
+            if not any(card_lease_client_words_named(call, function) for call in calls):
+                problems.append(f"{caller}：没有经 device_card_lease.{function} 的调用点")
+        if unchecked:
+            continue
+        handed = {id(call.args[0]) for call in calls if call.args and any(card_lease_client_words_named(call, function) for function in functions)}
+        assigned = set()
+        for scope in ast.walk(tree):
+            if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            names = set()
+            for node in ast.walk(scope):
+                if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and card_lease_client_words_named(node.value, "client_of") \
+                        and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    names.add(node.targets[0].id)
+                    assigned.add(id(node.value))
+            for node in ast.walk(scope):
+                if isinstance(node, ast.Name) and node.id in names and isinstance(node.ctx, ast.Load) and id(node) not in handed:
+                    problems.append(f"{caller}：第 {node.lineno} 行把 client_of 给的 {node.id} 交给了 take_card、return_card 之外的地方")
+        for call in calls:
+            if card_lease_client_words_named(call, "client_of") and id(call) not in handed and id(call) not in assigned:
+                problems.append(f"{caller}：第 {call.lineno} 行 client_of 的结果没有交给 take_card、return_card")
+        docstrings = {id(node.body[0].value) for node in ast.walk(tree)
+                      if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body and is_docstring(node.body[0])}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == "CLIENT_RELATIVE" and isinstance(node.value, ast.Name) and node.value.id == "device_card_lease":
+                problems.append(f"{caller}：第 {node.lineno} 行自己拼领卡客户端的路径（device_card_lease.CLIENT_RELATIVE）")
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings \
+                    and (node.value == "lease" or re.search(r"\blease (take|return)\b", node.value)):
+                problems.append(f"{caller}：第 {node.lineno} 行文档串之外写着领卡客户端的子命令 {node.value[:60]!r}")
+    return list(dict.fromkeys(problems))
+
+
+def card_lease_client_words_reach_cell(_work):
+    """本仓 device_card_lease.py、row_driver.py、shared_steps.py 的原文判一次（card_lease_client_words_problems），要一条问题都没有；
+    CARD_LEASE_CLIENT_WORDS_BYPASSES 每个绕道样本各判一次，要判出点名那份文件的、本仓那一次没有的问题。
+    弄坏开关 card-lease-client-words-other-launches-unchecked 下绕道判不出、这一格红。"""
+    texts = {}
+    for path in (CARD_LEASE_CLIENT_WORDS_LAUNCHER,) + CARD_LEASE_CLIENT_WORDS_CALLERS:
+        with open(os.path.join(LIBRARY_ROOT, path), encoding="utf-8") as handle:
+            texts[path] = handle.read()
+    real = card_lease_client_words_problems(texts)
+    lines, missed = [f"本仓：{real or '没有问题'}"], []
+    for label, path, old, new in CARD_LEASE_CLIENT_WORDS_BYPASSES:
+        if texts[path].count(old) != 1:
+            raise AssertionError(f"绕道样本「{label}」的原文在 {path} 里命中 {texts[path].count(old)} 次（要恰好一次）：照新原文改 CARD_LEASE_CLIENT_WORDS_BYPASSES")
+        found = [problem for problem in card_lease_client_words_problems({**texts, path: texts[path].replace(old, new)})
+                 if problem.startswith(f"{path}：") and problem not in real]
+        lines.append(f"{label}：{found or '判不出'}")
+        if not found:
+            missed.append(label)
+    return not real and not missed, f"本仓的问题 {real}、判不出的绕道样本 {missed}（都要空）；{'；'.join(lines)}"
+
+
 # library.py 照 memory_peaks_lib.py 的写法：if __name__ == "__main__" and globals().get("__file__"): 里按 sys.argv 分派到自证；
 # fallback.py 是认不出、要照收的两种（带 else、__name__ 那一项不在最左）；twice.py 有两段 main-guard
 MAIN_GUARD_FIXTURE = {
@@ -16565,10 +18865,6 @@ MAIN_GUARD_FIXTURE = {
                          "def launch(flag):\n    subprocess.run([sys.executable, os.path.join(HERE, \"twice.py\")], check=False)\n"
                          "    return subprocess.run([sys.executable, os.path.join(HERE, \"library.py\"), flag], check=False).returncode\n"),
 }
-MAIN_GUARD_REAL_LIBRARY = "scripts/hosts/memory_peaks_lib.py"
-MAIN_GUARD_REAL_ENTRY = f"{MAIN_GUARD_REAL_LIBRARY}::command_key"   # 峰值表的键：库里不碰自证的一个函数；做入口时库的 module-body 照收、main-guard 不收
-MAIN_GUARD_REAL_SELFTEST_UNITS = ("run_self_test", "self_test_cells")
-MAIN_GUARD_REAL_EDITED = "self_test_cells"   # 改它的函数体：它只经 main-guard 里的 run_self_test 到，闭包不收它，指纹就不变
 
 
 def main_guard_closure_names(closure):
@@ -16676,15 +18972,14 @@ def real_entries_cell(work):
     return not unknown and len(entries) > 2, f"登记现取 {len(entries)} 个判法入口（形式化入口 {formal}），文件不在的 {unknown}"
 
 
-REAL_JUDGING_CLOSURES_CELL = "真仓：登记的每个判法入口的闭包都不拒算（拒算的那一路判定一条都写不进库），夹具里的 globals() 查找判得出来"
-JUDGING_REFUSAL_FIXTURE = {"tool/judge.py": 'def verdict(row):\n    original = globals()["verdict"]\n    return original is not None and row\n\n\ndef judge(row):\n    return verdict(row)\n'}
-
 
 def judging_entry_refusals_of(job):
     """(入口, 拒算行)：一个入口的闭包里算进判法单元指纹的拒算——crates 变异的入口全算，别的入口去掉 lib_verdict_library.py 的 NOT_JUDGING_FILES 那几份
     （照 judging_unit_key 与 lib_mutation_units.judging_units 的口径；弄坏开关 judging-entry-refusals-ignored 下一条都不报）。"""
     root, entry, not_judging = job
-    closure = closure_of(root, entry)
+    options = Options()
+    options.excluded_files = not_judging
+    closure = closure_of(root, entry, options)
     if "judging-entry-refusals-ignored" in active_breaks():
         return entry, []
     return entry, sorted(refusal.text() for refusal in closure.refusals if refusal.file not in not_judging)
@@ -16702,20 +18997,48 @@ def judging_entry_refusal_workers(environment, registration_file=None):
                 return int(handle.read().split()[0])
         except (OSError, ValueError, IndexError):
             return 1
-    specification = importlib.util.spec_from_file_location("heavy_threads_for_judging_entry_refusals",
+    return int(heavy_threads_module().default_heavy_threads(environment, registration_file=registration_file))
+
+
+def heavy_threads_module():
+    """这份库所在仓的 scripts/hosts/heavy_threads.py（每台默认重活线程数的取法只在那一处，这里不另解析），按路径载入、不进 sys.modules。
+    判法入口拒算（judging_entry_refusal_workers）与自证（selftest）的并行度都从它取。"""
+    specification = importlib.util.spec_from_file_location("heavy_threads_for_function_units",
                                                            os.path.join(LIBRARY_ROOT, "scripts", "hosts", "heavy_threads.py"))
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)
-    return int(module.default_heavy_threads(environment, registration_file=registration_file))
+    return module
+
+
+def prepare_shared_script_index(root):
+    """父进程把 root 下默认几个目录里的 python 模块与 shell 脚本先解析好，登进 SHARED_SCRIPT_INDICES（closure_of 取用）→ (那份 ScriptClosure, 登记的键)。"""
+    under = default_script_directories(root)
+    prepared = ScriptClosure(root, under)
+    for path in files_under(root, (".py",), under):
+        prepared.python.module(path)
+    prepared.shell_index()
+    key = (os.path.abspath(root), tuple(under))
+    SHARED_SCRIPT_INDICES[key] = prepared
+    return prepared, key
 
 
 def judging_entry_refusals(root, entries, not_judging_by_entry):
-    """{入口: 拒算行}，只列有拒算的；按每台默认重活线程数并行（judging_entry_refusal_workers；一个入口要几秒到十几秒）。"""
+    """{入口: 拒算行}，只列有拒算的；按每台默认重活线程数并行（judging_entry_refusal_workers；一个入口要几秒到十几秒）。
+    fork 之前父进程解析好全部脚本、冻进永久代（prepare_shared_script_index、gc.freeze）：子进程共用解析过的模块，不各解析一份、回收也不逐页抄。"""
     import concurrent.futures
+    import gc
+    import multiprocessing
     workers = judging_entry_refusal_workers(os.environ)
     jobs = [(root, entry, not_judging_by_entry.get(entry, ())) for entry in entries]
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs)))) as pool:
-        results = list(pool.map(judging_entry_refusals_of, jobs))
+    _prepared, key = prepare_shared_script_index(root)
+    gc.collect()
+    gc.freeze()
+    try:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs))), mp_context=multiprocessing.get_context("fork")) as pool:
+            results = list(pool.map(judging_entry_refusals_of, jobs))
+    finally:
+        gc.unfreeze()
+        SHARED_SCRIPT_INDICES.pop(key, None)
     return {entry: refusals for entry, refusals in results if refusals}
 
 
@@ -16733,25 +19056,40 @@ def real_judging_closures_cell(work):
                                       f"夹具里 globals() 查找判出 {probe}（要判出一条）")
 
 
-# 跨轮缓存的登记（文件头「跨轮缓存的登记」）那两格
-CROSS_RUN_CACHE_CELL = ("真仓：跨轮缓存登记表（cross_run_cache_registry）里的每一份，在 TMPDIR 指到一个临时目录、GATE_CROSS_RUN_TMPDIR 没设、在 git 仓里"
-                        "（.git 是目录，或 git worktree 里 .git 是文件）时现取的位置都不落在 TMPDIR 之下；worktree 里落在 git 目录底下的几份与主仓共用 common-dir 那一处")
-CROSS_RUN_CACHE_SCAN_CELL = ("真仓：提到 GATE_CROSS_RUN_TMPDIR 的脚本都登记进跨轮缓存表或在不登记表里写明为什么，不登记表里的每一份都在、都还提到它；"
-                             "夹具里没登记的一份判得出来")
-CROSS_RUN_CACHE_PROBE_SECONDS = 300
-CROSS_RUN_CACHE_MENTION = "GATE_CROSS_RUN_TMPDIR"
-CROSS_RUN_CACHE_SCANNED_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/scripts", ".claude/hooks", "task-server", "prune-server")
-CROSS_RUN_CACHE_SCANNED_SUFFIXES = (".py", ".sh", ".bash")
-CROSS_RUN_CACHE_SKIPPED_DIRECTORIES = frozenset(("fixtures", "__pycache__", "target", ".git", "node_modules"))
-# 提到 GATE_CROSS_RUN_TMPDIR 而不往那里放跨轮缓存的脚本：{路径: 为什么不登记}；只缩不涨，指不到的、不再提到它的这一格判红
-CROSS_RUN_CACHE_NOT_CACHES = {
-    "scripts/hosts/test-environment-check.py": "只把它当 gate.sh 开跑前的临时目录、在那里扫残留，不往里放跨轮的东西",
-    "scripts/kb/verify-citations.sh": "文本缓存每趟自己 mktemp -d、跑完连目录删；这个名字只出现在弄坏开关（改前的样子）与自证里",
-}
-CROSS_RUN_CACHE_SCAN_FIXTURE = {
-    "scripts/sample/keeps-cache.sh": '#!/usr/bin/env bash\ncache_directory="${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/sample-cache"\nmkdir -p "$cache_directory"\n',
-    "scripts/sample/plain.sh": "#!/usr/bin/env bash\necho plain\n",
-}
+E171_RESEARCH_DIRECTORY = "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes"
+
+
+def e171_closure_cell(work):
+    """E171_CLOSURE_CELL：真仓拷一份，两份入口脚本各收一遍闭包（去掉 NOT_JUDGING_FILES，同复跑行的口径）：拒算为空、该不在的单元都不在、名单核对不连 reuse_library.py。
+    弄坏开关各在拷贝上把一处切掉的边接回去，对应的那一项必红：e171-selftest-table-at-module-level（reuse_library.py 加一张模块级的自证格表）、
+    e171-admission-selftest-at-module-level（admission.py 加一张模块级的表点名 run_selftest）、e171-list-check-imports-reuse-library（list_check.py 模块级 import reuse_library）。"""
+    tree = real_tree(work)
+    breaks = active_breaks()
+    reuse_library = f"{E171_RESEARCH_DIRECTORY}/reuse_library.py"
+    if "e171-selftest-table-at-module-level" in breaks:
+        with open(os.path.join(tree, reuse_library), "a", encoding="utf-8") as handle:
+            handle.write("\n\nSELFTEST_CELLS_PROBE = {\"probe\": cell_rp1_layers_end_to_end}\n")
+    if "e171-admission-selftest-at-module-level" in breaks:
+        with open(os.path.join(tree, "scripts/gate/admission.py"), "a", encoding="utf-8") as handle:
+            handle.write("\n\nSELFTEST_PROBE = {\"probe\": run_selftest}\n")
+    if "e171-list-check-imports-reuse-library" in breaks:
+        edit_file(tree, f"{E171_RESEARCH_DIRECTORY}/list_check.py", "from result_lines import ResultLines, field\n",
+                  "from result_lines import ResultLines, field\nimport reuse_library  # noqa: F401\n")
+    problems = []
+    for script in E171_ENTRY_SCRIPTS:
+        options = Options()
+        options.excluded_files = NOT_JUDGING_FILES
+        closure = closure_of(tree, f"{E171_RESEARCH_DIRECTORY}/{script}", options)
+        refusals = sorted(refusal.text() for refusal in closure.refusals if refusal.file not in NOT_JUDGING_FILES)
+        members = {(unit.file, unit.name) for unit in closure.order}
+        problems += [f"{script} 拒算 {line}" for line in refusals]
+        problems += [f"{script} 的闭包里有 {file}:{name}" for file, name in E171_CLOSURE_ABSENT if (f"{E171_RESEARCH_DIRECTORY}/{file}", name) in members]
+        problems += [f"{script} 的闭包里有 admission.py:{name}" for name in E171_ADMISSION_ABSENT if ("scripts/gate/admission.py", name) in members]
+        if script == "list_check.py":
+            reuse_units = sorted(name for file, name in members if file == reuse_library)
+            problems += [f"list_check.py 的闭包连上了 reuse_library.py（{len(reuse_units)} 个单元，头几个 {reuse_units[:3]}）"] if reuse_units else []
+    return not problems, f"{len(problems)} 处不对：{problems[:12]}（拒算的照那一行改成算得出键的写法或登记 UNKEYED_PROGRAM_WORDS；不该在的单元沿 closure --explain 的 via 找进来的边）"
+
 
 
 def cross_run_cache_layout(work, tree, label):
@@ -16858,38 +19196,6 @@ def cross_run_cache_scan_cell(work):
                 f"夹具里扫出 {probe}（要恰好 scripts/sample/keeps-cache.sh）")
 
 
-# 两个互相收进对方闭包的入口（键里的 entry 行，entry_key_lines）：一个 trait impl 里的两个方法（方法连 impl 头、impl 头点名类型、类型照 R-隐式收它的
-# trait impl 全部成员，两个方法收到的单元一模一样；core 的 impl BlockDevice for FileBackedBlockDevice 的样子），与 python 里互相调用的两个 def
-ENTRY_UNIT_KEY_CELL = "键：两个互相收进对方闭包的入口，键不同（一个 trait impl 里的两个方法、python 里互相调用的两个 def：闭包的单元多重集相同，键各是各的）"
-ENTRY_UNIT_KEY_RUST_FILE = "crates/fsiblings/src/lib.rs"
-ENTRY_UNIT_KEY_FIXTURE = {
-    "crates/fsiblings/Cargo.toml": '[package]\nname = "fsiblings"\n',
-    ENTRY_UNIT_KEY_RUST_FILE: '''pub trait SampleStore {
-    fn fill(&self, count: u64) -> u64;
-    fn width(&self) -> u64;
-}
-
-pub struct SampleDevice {
-    pub width: u64,
-}
-
-impl SampleStore for SampleDevice {
-    fn fill(&self, count: u64) -> u64 {
-        count.min(self.width)
-    }
-
-    fn width(&self) -> u64 {
-        self.width
-    }
-}
-''',
-    "tool/pair.py": "def ping(count):\n    return pong(count - 1) if count > 0 else 0\n\n\ndef pong(count):\n    return ping(count - 1) if count > 0 else 1\n",
-}
-ENTRY_UNIT_KEY_PAIRS = (
-    ("Rust", (f"{ENTRY_UNIT_KEY_RUST_FILE}::<impl SampleStore for SampleDevice>::fill", f"{ENTRY_UNIT_KEY_RUST_FILE}::<impl SampleStore for SampleDevice>::width")),
-    ("python", ("tool/pair.py::ping", "tool/pair.py::pong")),
-)
-
 
 def entry_unit_key_cell(work):
     """每一对入口先核夹具造对了（两个闭包的单元多重集相同），再核两把键都算得出、不相同。弄坏开关 key-entry-units-dropped 下键里不出 entry 行，两把键相同，这一格判错。"""
@@ -16909,54 +19215,6 @@ def entry_unit_key_cell(work):
             problems.append(f"{language} 两个入口的键相同：键里没有入口单元自己（entry_key_lines）")
     return not problems, "；".join(problems + lines)
 
-
-# unit_graph_key 的 entry 行（照 crates/singlefs-unit-graph 的 reuse_key 与 entry_key_lines）：一个 trait impl 里的方法入口（entry 行连 impl 头），
-# 一个挂了两个文档测试的条目（文档测试入口记所挂条目的全部文档测试，照 Rust 那一份 resolve_entry_units 文档测试那一支）
-ENTRY_LINES_SHAPE_CELL = ("键：unit_graph_key 照 crates/singlefs-unit-graph 的 reuse_key 带 entry 行（数据行之后、工具链行之前，排序去重；impl 方法入口连 impl 头；"
-                          "文档测试入口记所挂条目的全部文档测试、各一行，闭包从它们一起收）")
-ENTRY_LINES_RUST_KEYS_CELL = ("键：夹具上 unit_graph_key 与 crates/singlefs-unit-graph 的 unit-graph closure 打的键逐字相同"
-                              "（一个 impl 方法入口、一个文档测试入口；Rust 那一侧是录下的键 ENTRY_LINES_RUST_KEYS）")
-ENTRY_LINES_FILE = "crates/fentrylines/src/lib.rs"
-ENTRY_LINES_METHOD = "<impl Shape for Square>::area"
-ENTRY_LINES_HOST_LINE = "host: x86_64-unknown-linux-gnu"
-ENTRY_LINES_FIXTURE = {
-    "crates/fentrylines/Cargo.toml": '[package]\nname = "fentrylines"\nversion = "0.1.0"\nedition = "2021"\n',
-    ENTRY_LINES_FILE: '''pub trait Shape {
-    fn area(&self) -> u64;
-}
-
-pub struct Square {
-    pub side: u64,
-}
-
-impl Shape for Square {
-    fn area(&self) -> u64 {
-        self.side * self.side
-    }
-}
-
-/// Twice the value.
-///
-/// ```
-/// assert_eq!(fentrylines::documented(2), 4);
-/// ```
-///
-/// ```
-/// assert_eq!(fentrylines::documented(3), 6);
-/// ```
-pub fn documented(value: u64) -> u64 {
-    value * 2
-}
-''',
-}
-# Rust 那一侧录下的键（unit-graph closure 打的 key 行）：ENTRY_LINES_FIXTURE 用 write_tree 写出成一棵树（<根>），带 entry 行的那一版 crates/singlefs-unit-graph 编的
-#   unit-graph closure <根> fentrylines::Square::area --toolchain-line 'host: x86_64-unknown-linux-gnu'               → "impl-method"
-#   unit-graph closure <根> fentrylines::documented --target doctest --toolchain-line 'host: x86_64-unknown-linux-gnu'  → "doctest"
-# 还没录的写 None（那一格判红、说明里打出 python 这一边的键）。夹具或 Rust 那一份的键的写法改了就重录。
-ENTRY_LINES_RUST_KEYS = {
-    "impl-method": "e74ceaa6abb0198ba10e62a909dccfc1e321557f4775cae362a3481a5a8762e7",
-    "doctest": "3597d88a25cc2c3fad7d6f222e704d2ea205ccd9fe3c41ab81451c81391e6670",
-}
 
 
 def entry_lines_closures(work):
@@ -17018,16 +19276,6 @@ def entry_lines_rust_keys_cell(work):
     return not problems, "；".join(problems + notes)
 
 
-# 标准写法的 main-guard 带 else：if 那一支是 main-guard，else 那一支在被 import 时执行、进 module-body
-MAIN_GUARD_ELSE_CELL = ("python：if __name__ == \"__main__\": … else: … 被 import 时 else 那一支照收、if 那一支不收；被当程序起时 if 那一支照收")
-MAIN_GUARD_ELSE_FIXTURE = {
-    "tool/either.py": ("import sys\n\n\ndef main_work():\n    return 1\n\n\ndef imported_work():\n    return 2\n\n\ndef value():\n    return 0\n\n\n"
-                       "if __name__ == \"__main__\":\n    sys.exit(main_work())\nelse:\n    imported_work()\n"),
-    "tool/importer.py": "import either\n\n\ndef judge():\n    return either.value()\n",
-    "tool/runner.py": ("import os\nimport subprocess\nimport sys\n\nHERE = os.path.dirname(os.path.abspath(__file__))\n\n\n"
-                       "def run():\n    return subprocess.run([sys.executable, os.path.join(HERE, \"either.py\")], check=False).returncode\n"),
-}
-
 
 def main_guard_else_cell(work):
     """import either 的 judge：imported_work（else 那一支调的）在、main_work（if 那一支调的）与 <main-guard> 不在；
@@ -17042,10 +19290,6 @@ def main_guard_else_cell(work):
     return not missing and not extra and not unlaunched, (f"被 import 时闭包里缺 {missing}、多 {extra}；被当程序起时缺 {unlaunched}")
 
 
-# 判法入口拒算的并行进程数（judging_entry_refusal_workers）
-JUDGING_ENTRY_WORKERS_CELL = ("判法入口拒算的并行进程数：没设 SINGLEFS_THREAD_CAP 取登记的每台默认重活线程数（头一行是注释的登记文件照样取到），"
-                              "设了照它，不退回按核数算")
-
 
 def judging_entry_workers_cell(work):
     """自证造一份登记文件（头一行注释，再一行「7  # 理由」）：没设 SINGLEFS_THREAD_CAP 取到 7，设成 3 取到 3；真仓的登记照样取得到。"""
@@ -17059,43 +19303,6 @@ def judging_entry_workers_cell(work):
     return unset == registered and capped == 3 and real >= 1, (f"没设 SINGLEFS_THREAD_CAP 取到 {unset}（要登记的 {registered}）、"
                                                               f"设成 3 取到 {capped}、真仓的登记取到 {real}")
 
-
-# verus! 里的 assume_specification（与 crates/singlefs-unit-graph 的
-# tests/unit_graph_verus_assume_specifications_are_units_in_the_formal_view_and_blanked_in_the_product_view.rs 同一份夹具、同一套期望）
-ASSUME_SPECIFICATION_FILE = "crates/fassume/src/lib.rs"
-ASSUME_SPECIFICATION_FIXTURE = {
-    "crates/fassume/Cargo.toml": '[package]\nname = "fassume"\nversion = "0.1.0"\nedition = "2021"\n',
-    ASSUME_SPECIFICATION_FILE: '''pub const LIMIT_IN_BYTES: u64 = 32;
-
-pub fn width_of(value: u64) -> u64 {
-    value + 1
-}
-
-pub fn judge_limit() -> u64 {
-    LIMIT_IN_BYTES
-}
-
-verus! {
-
-#[allow(unsafe_code, reason = "夹具：Verus 把 assume_specification 展开成 unsafe fn 声明")]
-pub assume_specification[ crate::LIMIT_IN_BYTES ] -> (limit: u64) returns 32u64;
-
-assume_specification[ width_of ](value: u64) -> (width: u64)
-    ensures width == value + 1;
-
-pub assume_specification<Element>[ Vec::<Element>::len ](vector: &Vec<Element>) -> (length: usize);
-
-pub open spec fn spec_limit() -> u64 {
-    32
-}
-
-}
-''',
-    "Cargo.lock": "# 夹具不解析依赖\n",
-}
-ASSUME_SPECIFICATION_FORMS_CELL = ("verus!：assume_specification 带属性带 pub、不带 pub 带参数表与 ensures、带泛型参数表三种写法各切成一个单元"
-                                   "（种类、名字、起止、按点名路径末段的名字找得到），dump 一条拒算都没有，后面的 spec fn 照旧自成单元")
-ASSUME_SPECIFICATION_KEY_CELL = "verus!：点到常量的入口按名字连上它的 assume_specification，改它交回的值形式化键变"
 
 
 def assume_specification_forms_cell(work):
@@ -17112,37 +19319,6 @@ def assume_specification_forms_cell(work):
     ok = not refusal_lines and got == want and len(dumped) == len(want) and spec_function == [(21, 23)]
     return ok, f"拒算 {refusal_lines}；assume_specification 单元 {got}（要 {want}）；dump 里 {len(dumped)} 行；spec_limit 起止 {spec_function}"
 
-
-# 只在 dev 依赖里开的特性（crates/singlefs-unit-graph 的 resolve_features：入口 crate 照目标种类顺 dev 依赖，别的 crate 只顺普通依赖）：
-# fbin 的普通依赖不开 counters、dev 依赖开；fhelper 同样只在 dev 依赖里开，fvia 只经普通依赖链到 fhelper
-FEATURE_SECTIONS_FIXTURE = {
-    "crates/fcore/Cargo.toml": '[package]\nname = "fcore"\n\n[features]\ncounters = []\n',
-    "crates/fcore/src/lib.rs": '''pub fn count() -> u32 {
-    counted_value()
-}
-#[cfg(feature = "counters")]
-fn counted_value() -> u32 {
-    1
-}
-#[cfg(not(feature = "counters"))]
-fn counted_value() -> u32 {
-    0
-}
-''',
-    "crates/fbin/Cargo.toml": ('[package]\nname = "fbin"\n\n[dependencies]\nfcore = { path = "../fcore" }\n\n'
-                               '[dev-dependencies]\nfcore = { path = "../fcore", features = ["counters"] }\n'),
-    "crates/fbin/src/main.rs": "fn main() {\n    let _ = fcore::count();\n}\n",
-    "crates/fbin/tests/counting.rs": "#[test]\nfn counting_sees_the_counters() {\n    assert_eq!(fcore::count(), 1);\n}\n",
-    "crates/fhelper/Cargo.toml": ('[package]\nname = "fhelper"\n\n[dependencies]\nfcore = { path = "../fcore" }\n\n'
-                                  '[dev-dependencies]\nfcore = { path = "../fcore", features = ["counters"] }\n'),
-    "crates/fhelper/src/lib.rs": "pub fn helped() -> u32 {\n    fcore::count()\n}\n",
-    "crates/fvia/Cargo.toml": '[package]\nname = "fvia"\n\n[dependencies]\nfhelper = { path = "../fhelper" }\n',
-    "crates/fvia/tests/via.rs": "#[test]\nfn via_the_helper() {\n    let _ = fhelper::helped();\n}\n",
-}
-FEATURE_SECTIONS_COUNTED_LINE = 4   # crates/fcore/src/lib.rs 里 cfg(feature = "counters") 那一份 counted_value 起的行（单元从属性起）
-FEATURE_SECTIONS_UNCOUNTED_LINE = 8   # cfg(not(feature = "counters")) 那一份起的行
-FEATURE_SECTIONS_ENTRY_CRATE_CELL = "R-目标：入口 crate 的 dev 依赖里才开的特性，不按 cfg(test) 编的 bin 当它没开，集成测试当它开着"
-FEATURE_SECTIONS_LINKED_CRATE_CELL = "R-目标：经普通依赖链进来的 crate，它的 dev 依赖里开的特性哪个目标都不顺"
 
 
 def counted_value_lines(base, entry):
@@ -17167,19 +19343,6 @@ def feature_sections_linked_crate_cell(work):
     via = counted_value_lines(base, "crates/fvia/tests/via.rs::via_the_helper")
     return via == ([FEATURE_SECTIONS_UNCOUNTED_LINE], False), f"经 fhelper 的集成测试入口 {via}（要 [{FEATURE_SECTIONS_UNCOUNTED_LINE}] 不开）"
 
-
-# verus! 里 } 之后紧跟的 ;（结构体字面量当初值的 const、impl 里的关联 const）：unit-graph 的 verus_item_starts 不拿 ; 当起头，; 归前一个条目、进它的指纹
-VERUS_SEMICOLON_FILE = "crates/fsemicolon/src/lib.rs"
-VERUS_SEMICOLON_CONSTANT = "pub const ORIGIN: Pair = Pair { left: 0, right: 0 };"
-VERUS_SEMICOLON_ASSOCIATED = "pub const UNIT: Pair = Pair { left: 1, right: 1 };"
-VERUS_SEMICOLON_FIXTURE = {
-    "crates/fsemicolon/Cargo.toml": '[package]\nname = "fsemicolon"\n',
-    VERUS_SEMICOLON_FILE: (f"verus! {{\npub struct Pair {{\n    pub left: u64,\n    pub right: u64,\n}}\n{VERUS_SEMICOLON_CONSTANT}\n"
-                           f"impl Pair {{\n    {VERUS_SEMICOLON_ASSOCIATED}\n}}\npub fn total(pair: Pair) -> u64 {{\n    pair.left + pair.right\n}}\n}}\n"),
-    "Cargo.lock": "# 夹具不解析依赖\n",
-}
-VERUS_SEMICOLON_CELL = ("verus!：} 之后紧跟的 ; 归前一个条目（结构体字面量当初值的 const 与 impl 里的关联 const），指纹是连 ; 在内的词法单元以 0x1f 连的 sha256，"
-                        "后面的条目照旧切开")
 
 
 def verus_semicolon_cell(work):
@@ -17212,6 +19375,7 @@ def import_time_cells():
         (IMPORT_TIME_CLASS_CELL, compare_cell(IMPORT_TIME_FIXTURE, IMPORT_TIME_ENTRY, "tool/helper.py", "        self.value = 1\n", "        self.value = 2\n", "same")),
         (REAL_ENTRIES_CELL, real_entries_cell),
         (REAL_JUDGING_CLOSURES_CELL, real_judging_closures_cell),
+        (E171_CLOSURE_CELL, e171_closure_cell),
     ] + [(name, real_import_time_cell(name)) for name, _path, _old, _new in REAL_IMPORT_TIME_EDITS] + [
         (EXCLUDED_EDGE_PYTHON_CELL, excluded_edge_cell(EXCLUDED_EDGE_PYTHON_ENTRY, "tool/hint.py", "tool/kept.py")),
         (EXCLUDED_EDGE_SHELL_CELL, excluded_edge_cell(EXCLUDED_EDGE_SHELL_ENTRY, "tool/hint.sh", "tool/kept.sh")),
@@ -17219,6 +19383,9 @@ def import_time_cells():
         (ADMISSION_EDGE_ANOMALY_CELL, admission_edge_anomaly_cell),
         (ADMISSION_EDGE_STRIP_CELL, admission_edge_strip_cell),
         (ADMISSION_EDGE_REACH_CELL, admission_edge_reach_cell),
+        (CARD_LEASE_CLIENT_WORDS_ANOMALY_CELL, card_lease_client_words_anomaly_cell),
+        (CARD_LEASE_CLIENT_WORDS_STRIP_CELL, card_lease_client_words_strip_cell),
+        (CARD_LEASE_CLIENT_WORDS_REACH_CELL, card_lease_client_words_reach_cell),
         (MAIN_GUARD_IMPORT_CELL, main_guard_fixture_cell(
             "tool/user.py::judge",
             (("tool/library.py", "work"), ("tool/library.py", "LIMIT"), ("tool/library.py", "registered"),
@@ -17237,52 +19404,6 @@ def import_time_cells():
 # 照原样切出的 dump」，不起 cargo、不编；起 unit-graph 的那一条路由一个只认 dump --judgment-kind product-behavior 的假程序走一趟
 PRODUCT_VIEW_FILE = "crates/fverus/src/lib.rs"
 PRODUCT_VIEW_ENTRY = f"{PRODUCT_VIEW_FILE}::caller"
-PRODUCT_VIEW_SOURCE = """verus! {
-pub open spec fn doubled(x: u64) -> u64 {
-    x * 2
-}
-proof fn lemma_doubled_is_even(x: u64)
-    ensures
-        doubled(x) % 2 == 0,
-{
-    assert(doubled(x) == x * 2);
-}
-pub fn scaled(x: u64) -> (r: u64)
-    requires
-        x < 1000,
-    ensures
-        r == doubled(x),
-{
-    proof {
-        lemma_doubled_is_even(x);
-    }
-    helper(x) * 2
-}
-fn helper(x: u64) -> u64 {
-    x + 0
-}
-} // verus!
-pub fn caller() -> u64 {
-    scaled(3)
-}
-"""
-# 只给 Verus 看的那几段：spec 与 proof 函数整条、具名返回值的「(r:」与「)」、requires 与 ensures、函数体里的 proof 块
-PRODUCT_VIEW_GHOST_PIECES = (
-    "pub open spec fn doubled(x: u64) -> u64 {\n    x * 2\n}",
-    "proof fn lemma_doubled_is_even(x: u64)\n    ensures\n        doubled(x) % 2 == 0,\n{\n    assert(doubled(x) == x * 2);\n}",
-    "(r: ",
-    ")\n    requires\n        x < 1000,\n    ensures\n        r == doubled(x),",
-    "proof {\n        lemma_doubled_is_even(x);\n    }",
-)
-PRODUCT_VIEW_FIXTURE = {
-    "crates/fverus/Cargo.toml": '[package]\nname = "fverus"\n',
-    PRODUCT_VIEW_FILE: PRODUCT_VIEW_SOURCE,
-    "crates/fplain/Cargo.toml": '[package]\nname = "fplain"\n',
-    "crates/fplain/src/lib.rs": "pub fn plain() -> u32 {\n    7\n}\n",
-}
-PRODUCT_VIEW_LEMMA_CELL = "产品行为视图：引理里加一句 assert(true);，产品行为键不变、形式化键变"
-PRODUCT_VIEW_ENSURES_CELL = "产品行为视图：verus! 里执行函数的 ensures 改了，产品行为键不变"
-PRODUCT_VIEW_EXECUTABLE_CELL = "产品行为视图：verus! 里被调到的执行代码改了，产品行为键变"
 
 
 def product_view_files(edit=None):
@@ -17413,62 +19534,6 @@ def product_view_program_cell(work):
                 f"产品行为视图的 dump 里还列着只给 Verus 看的 {ghost_listed}")
 
 
-# 只在规格里点到的执行侧条目（HeaderModel 只出现在 ghost 字段的类型、ensures、let ghost、proof 块与循环头里）：unit-graph 剥完再切、再收闭包，
-# 闭包里没有它；手工剥过的拷贝照原样切出来的 dump 当 Rust 那一份，照原样收它的闭包当 Rust 那一份的闭包
-PRODUCT_VIEW_EDGES_FILE = "crates/fghostedges/src/lib.rs"
-PRODUCT_VIEW_EDGES_ENTRY = f"{PRODUCT_VIEW_EDGES_FILE}::caller"
-PRODUCT_VIEW_EDGES_SOURCE = """verus! {
-pub struct HeaderModel {
-    pub width: nat,
-}
-pub open spec fn spec_header(width: u64) -> HeaderModel {
-    HeaderModel { width: width as nat }
-}
-pub struct Recorded {
-    pub width: u64,
-    pub history: Ghost<Seq<HeaderModel>>,
-}
-pub fn parse_header(width: u64) -> (parsed: Recorded)
-    ensures
-        spec_header(width) == (HeaderModel { width: parsed.width as nat }),
-{
-    let ghost before = spec_header(width);
-    proof {
-        assert(before.width == width as nat);
-    }
-    let mut total = 0u64;
-    while total < width
-        invariant
-            total <= width,
-            spec_header(total) == if total == 0 { HeaderModel { width: 0 } } else { spec_header(total) },
-        decreases width - total,
-    {
-        total = total + 1;
-    }
-    Recorded { width: total, history: Ghost(Seq::empty()) }
-}
-} // verus!
-pub fn caller() -> u64 {
-    parse_header(3).width
-}
-"""
-# 照 crates/singlefs-unit-graph 的剥法要剥的那几截：spec 函数整条、ghost 字段连逗号、具名返回值的「(名:」与「)」、ensures、let ghost、proof 块、
-# 循环头的 invariant 与 decreases、字面量里列尾的 Ghost(…) 字段连它前面那个逗号
-PRODUCT_VIEW_EDGES_GHOST_PIECES = (
-    "pub open spec fn spec_header(width: u64) -> HeaderModel {\n    HeaderModel { width: width as nat }\n}",
-    "pub history: Ghost<Seq<HeaderModel>>,",
-    "(parsed: ",
-    ")\n    ensures\n        spec_header(width) == (HeaderModel { width: parsed.width as nat }),",
-    "let ghost before = spec_header(width);",
-    "proof {\n        assert(before.width == width as nat);\n    }",
-    "invariant\n            total <= width,\n            spec_header(total) == if total == 0 { HeaderModel { width: 0 } } else { spec_header(total) },\n"
-    "        decreases width - total,",
-    ", history: Ghost(Seq::empty())",
-)
-PRODUCT_VIEW_EDGES_CELL = ("产品行为视图：只在规格里点到的执行侧条目（ghost 字段的类型、ensures、let ghost、proof 块、循环头里点到的结构体）不进闭包，"
-                           "闭包与 unit-graph 剥完再收的那一份逐个相同")
-PRODUCT_VIEW_UNVERIFIED_CELL = "产品行为视图：这一份剥出来的与 Rust 那一份交的核不上，照原样那一份收（闭包只多不少，规格里点到的结构体照收）"
-
 
 def product_view_edges_closures(work, extra_pieces=()):
     """→ (产品行为视图下入口的闭包行, Rust 那一份的替身：手工剥过的拷贝照原样收的闭包行)；extra_pieces 是 Rust 那一份另剥的几截（这一份认不出的写法）。"""
@@ -17506,11 +19571,6 @@ def product_view_unverified_cell(work):
     ok = not forms and "HeaderModel" in names and set(closure_names(expected)) <= set(names)
     return ok, f"产品行为视图的闭包 {names}（拒算 {forms}，要有 HeaderModel、不拒算）；Rust 那一份剥完再收的 {closure_names(expected)}"
 
-
-# 外属性 #[verifier::…]：Rust 那一份剥掉它（verus! 里外都剥），打头的属性一剥，单元的起始行往下挪；这一份照同一套词法剥了再切，两边的起止才对得上
-PRODUCT_VIEW_ATTRIBUTE_LINE = "#[verifier::external_body]"
-PRODUCT_VIEW_ATTRIBUTE_INSIDE_CELL = "产品行为视图：verus! 里的执行函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变"
-PRODUCT_VIEW_ATTRIBUTE_OUTSIDE_CELL = "产品行为视图：没有 verus! 块的文件里的函数只多一行 #[verifier::external_body]，产品行为视图配得上、产品行为键不变"
 
 
 def product_view_attribute_cell(inside_verus):
@@ -17554,6 +19614,169 @@ def product_view_cells():
     ]
 
 
+# ── 自证的并行：每条活在自己 fork 出来的子进程里跑（gather_forked） ─────────────────
+
+ForkedOutcome = collections.namedtuple("ForkedOutcome", "value raised stdout stderr")
+LostTask = collections.namedtuple("LostTask", "index reason stdout stderr")
+
+
+def gather_forked(tasks, jobs, run_one):
+    """tasks 每条在自己 fork 出来的子进程里跑 run_one(task)，同时至多 jobs 个：模块级缓存、环境变量、登记表的临时改动都是那个子进程自己的一份，
+    不带到别的条、不带回父进程；临时目录各建各的。子进程的标准输出与标准错误（连同它起的子进程写的）各写进一份文件，
+    交回值或抛出的回溯 pickle 进 <下标>.result（forked_child），退出码 0 且读得出这一份才算收回。
+    → (outcomes, lost)：outcomes 按 tasks 的次序，收回的是 ForkedOutcome（raised 是抛出时的回溯文本，没抛是 None），没收回的是 None；
+    lost 是没收回的每一条 LostTask（原因与它写下的输出），派出去的条数与收回的对不上它就不空，调用方整份判红。
+    父进程这一段抛了（中断）：只停自己 fork 的那几个进程号、收完尸再往外抛。
+    弄坏开关 selftest-lost-results-unchecked：不比条数，lost 总是空的（没收回的那几条只在 outcomes 里是 None）。"""
+    statuses, running, position, refused_fork = {}, {}, 0, None
+    with tempfile.TemporaryDirectory(prefix="function-units-forked-") as directory:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        gc.collect()
+        gc.freeze()   # 子进程共用 fork 之前的对象，回收不逐页抄
+        try:
+            while (position < len(tasks) and refused_fork is None) or running:
+                while position < len(tasks) and refused_fork is None and len(running) < max(1, jobs):
+                    try:
+                        pid = os.fork()
+                    except OSError as error:
+                        refused_fork = f"fork 不出子进程：{error}"
+                        break
+                    if pid == 0:
+                        forked_child(directory, position, run_one, tasks[position])
+                    running[pid] = position
+                    position += 1
+                if running:
+                    pid, status = os.waitpid(-1, 0)
+                    if pid in running:
+                        statuses[running.pop(pid)] = status
+        finally:
+            gc.unfreeze()
+            for pid in running:
+                os.kill(pid, signal.SIGTERM)
+            for pid in running:
+                os.waitpid(pid, 0)
+        outcomes, lost = [], []
+        for index in range(len(tasks)):
+            outcome, missing = read_forked_outcome(directory, index, statuses.get(index), refused_fork)
+            outcomes.append(outcome)
+            if missing is not None:
+                lost.append(missing)
+    if "selftest-lost-results-unchecked" in active_breaks():
+        return outcomes, []
+    return outcomes, lost
+
+
+def forked_child(directory, index, run_one, task):
+    """gather_forked 的子进程：标准输出与标准错误（文件描述符 1、2）改到 <下标>.stdout、<下标>.stderr，跑 run_one(task)，
+    (交回值, None) 或 (None, 回溯) pickle 进 <下标>.result（先写 .part 再改名），然后 os._exit：不回到父进程的调用栈、不跑父进程的 finally 与 atexit。"""
+    code = 1
+    try:
+        for descriptor, suffix in ((1, "stdout"), (2, "stderr")):
+            target = os.open(os.path.join(directory, f"{index}.{suffix}"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.dup2(target, descriptor)
+            os.close(target)
+        try:
+            record = pickle.dumps((run_one(task), None))
+        except BaseException:   # 交回值 pickle 不了的也落在这里：照抛了记
+            record = pickle.dumps((None, traceback.format_exc()))
+        partial = os.path.join(directory, f"{index}.result.part")
+        with open(partial, "wb") as handle:
+            handle.write(record)
+        os.replace(partial, os.path.join(directory, f"{index}.result"))
+        code = 0
+    finally:
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        finally:
+            os._exit(code)
+
+
+def read_forked_outcome(directory, index, status, refused_fork):
+    """第 index 条的结局 → (ForkedOutcome, None) 或 (None, LostTask)。status 是 waitpid 交的状态，没派出去的是 None。"""
+    streams = []
+    for suffix in ("stdout", "stderr"):
+        try:
+            with open(os.path.join(directory, f"{index}.{suffix}"), "rb") as handle:
+                streams.append(handle.read())
+        except OSError:
+            streams.append(b"")
+    if status is None:
+        return None, LostTask(index, f"没派出去：{refused_fork}", *streams)
+    if os.WIFSIGNALED(status):
+        return None, LostTask(index, f"子进程被信号 {os.WTERMSIG(status)} 打断", *streams)
+    if os.waitstatus_to_exitcode(status) != 0:
+        return None, LostTask(index, f"子进程退出码 {os.waitstatus_to_exitcode(status)}", *streams)
+    try:
+        with open(os.path.join(directory, f"{index}.result"), "rb") as handle:
+            value, raised = pickle.load(handle)
+    except FileNotFoundError:
+        return None, LostTask(index, "子进程退出码 0 却没写结果", *streams)
+    except (OSError, pickle.UnpicklingError, EOFError, ValueError, TypeError) as error:
+        return None, LostTask(index, f"结果读不出：{type(error).__name__}：{error}", *streams)
+    return ForkedOutcome(value, raised, *streams), None
+
+
+def forked_gather_cell(work):
+    """FORKED_GATHER_CELL：五条假活、同时至多 3 个。头一条睡 0.3 秒、最后才收回；第二条退出码 0 不写结果，第三条退出码 3，
+    第四条往标准输出打一行，第五条抛 ValueError。work 不用（gather_forked 自己建临时目录）。"""
+    def run_one(task):
+        if task == "slow":
+            time.sleep(0.3)
+        elif task == "vanished":
+            os._exit(0)
+        elif task == "crashed":
+            os._exit(3)
+        elif task == "printed":
+            print("printed")
+        elif task == "raised":
+            raise ValueError("假活抛的")
+        return task
+    outcomes, lost = gather_forked(("slow", "vanished", "crashed", "printed", "raised"), 3, run_one)
+    values = [None if outcome is None else outcome.value for outcome in outcomes]
+    printed = outcomes[3].stdout if outcomes[3] is not None else None
+    raised = outcomes[4].raised if outcomes[4] is not None else None
+    reasons = {item.index: item.reason for item in lost}
+    ok = (values == ["slow", None, None, "printed", None] and printed == b"printed\n" and raised is not None and "ValueError: 假活抛的" in raised
+          and sorted(reasons) == [1, 2] and "没写结果" in reasons[1] and "退出码 3" in reasons[2])
+    return ok, (f"收回的值 {values}（要 ['slow', None, None, 'printed', None]）、第四条的标准输出 {printed!r}、第五条抛出 {raised!r}、"
+                f"没收回的 {reasons}（要第 1、2 条：退出码 0 没写结果、退出码 3）")
+
+
+def run_selftest_task(task):
+    """自证的一条活（gather_forked 的子进程里跑）：(开关, 格函数)。开关不是 None 的，在这个子进程里把 FUNCTION_UNITS_BREAK 换成它
+    （只有这个进程与它起的子进程看得见，不用改回去）。"""
+    switch, judge = task
+    if switch is not None:
+        os.environ[BREAK_VARIABLE] = switch
+    return run_cell(judge)
+
+
+def replay_forked_output(stdout, stderr):
+    """子进程写下的输出照原样打到这个进程的标准输出与标准错误（在它那一格的结论行之前）。"""
+    for stream, content in ((sys.stdout, stdout), (sys.stderr, stderr)):
+        if content:
+            stream.flush()
+            stream.buffer.write(content)
+            stream.buffer.flush()
+
+
+def forked_cell_result(outcome, lost):
+    """一条自证活的结局 → (通过, 说明, 跑完了)，先把它写下的输出打出来。没收回的（lost）与抛了 run_cell 不接的异常的：不通过、没跑完。
+    没收回、又不在 lost 里的（弄坏开关 selftest-lost-results-unchecked 下）交 None。"""
+    if lost is not None:
+        replay_forked_output(lost.stdout, lost.stderr)
+        return False, f"没收回结果：{lost.reason}", False
+    if outcome is None:
+        return None
+    replay_forked_output(outcome.stdout, outcome.stderr)
+    if outcome.raised is not None:
+        return False, f"抛了 run_cell 不接的异常：\n{outcome.raised}", False
+    ok, detail = outcome.value
+    return ok, detail, True
+
+
 def selftest_cells():
     cells = []
     for name, entry, path, old, new, want in RUST_FIXTURE_CASES:
@@ -17576,12 +19799,26 @@ def selftest_cells():
         (CURRENT_EXE_SPAWN_CELL, current_exe_spawn_cell),
         (DIRECTORY_CLOSURE_LINE_CELL, directory_closure_line_cell),
         (RUST_LEX_CACHE_CELL, rust_lex_cache_cell),
+        (RUST_LEX_NAMESPACE_CHANGED_CELL, rust_lex_namespace_cell(RUST_LEX_NAMESPACE_CHANGED_EDITS, "changed")),
+        (RUST_LEX_NAMESPACE_KEPT_CELL, rust_lex_namespace_cell(RUST_LEX_NAMESPACE_KEPT_EDITS, "same")),
+        (RUST_LEX_NAMESPACE_CLOSURE_CELL, rust_lex_namespace_closure_cell),
+        (EXCLUDED_CALL_EDGE_CELL, excluded_call_edge_cell),
+        (UNIT_GRAPH_INPUTS_CELL, unit_graph_inputs_cell),
+        (UNIT_GRAPH_DIGEST_CELL, unit_graph_digest_cell),
+        (SELFTEST_FIXTURES_OUTSIDE_CELL, selftest_fixtures_outside_cell),
+        (SELFTEST_FIXTURE_NAMES_CELL, selftest_fixture_names_cell),
         ("WGSL 里没定义、Rust 串里也没有的名字拒算", wgsl_undefined_cell),
         ("dump 的单元行形态（带路径的宏、verus! 两个 fn、impl 头与方法）", rust_dump_cell),
         ("python：只改注释不作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::entry", "pkg/a.py", "    # 只是注释\n", "    # 只是注释，改了措辞\n", "same")),
         ("python：改文档串不作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::entry", "pkg/a.py", '"""helper 的文档串"""', '"""helper 的文档串，改了"""', "same")),
         ("python：有单元读 __doc__ 时改文档串作废", compare_cell(PYTHON_FIXTURE, "pkg/a.py::described", "pkg/a.py", '"""helper 的文档串"""',
                                                          '"""helper 的文档串，改了"""', "changed")),
+        (DOCSTRING_WRITE_CELL, compare_cell(DOCSTRING_READS_FIXTURE, "pkg/docs.py::plain", "pkg/docs.py", '"""other 的文档串"""', '"""other 的文档串，改了"""', "same")),
+        (DOCSTRING_AUGMENTED_CELL, compare_cell(DOCSTRING_READS_FIXTURE, "pkg/docs.py::augmented", "pkg/docs.py", '"""described 的文档串"""',
+                                                '"""described 的文档串，改了"""', "changed")),
+        (DOCSTRING_GETATTR_CELL, compare_cell(DOCSTRING_READS_FIXTURE, "pkg/docs.py::by_getattr", "pkg/docs.py", '"""described 的文档串"""',
+                                              '"""described 的文档串，改了"""', "changed")),
+        (DOCSTRING_GETDOC_CELL, compare_cell(DOCSTRING_READS_FIXTURE, "pkg/docs.py::by_getdoc", "pkg/docs.py", '"""other 的文档串"""', '"""other 的文档串，改了"""', "changed")),
         ("python：getattr 变量名拒算", refused_cell(PYTHON_FIXTURE, "pkg/a.py::dynamic", "getattr-variable")),
         ("python：globals 只查询 __file__ 不拒算", no_refusal_cell(
             {"sample.py": 'def entry():\n    return globals().get("__file__")\n'}, "sample.py::entry")),
@@ -17589,6 +19826,13 @@ def selftest_cells():
             {"sample.py": 'def entry(name):\n    return globals().get(name)\n'}, "sample.py::entry", "globals-lookup")),
         ("python：globals 查询其他固定名字仍拒算", refused_cell(
             {"sample.py": 'def entry():\n    return globals().get("handler")\n'}, "sample.py::entry", "globals-lookup")),
+        ("python：globals()[固定名字] 读连到那个名字的单元，不拒算（改它键变）", compare_cell(
+            {"sample.py": 'def helper():\n    return 5\n\n\ndef entry():\n    return globals()["helper"]()\n'}, "sample.py::entry", "sample.py", "return 5", "return 50", "changed")),
+        ("python：globals()[折不出的名字] 读连本模块每个名字，不拒算（改其中一个键变）", compare_cell(
+            {"sample.py": 'import os\n\n\ndef helper():\n    return 5\n\n\ndef entry():\n    return globals()[os.environ["NAME"]]()\n'}, "sample.py::entry", "sample.py",
+            "return 5", "return 50", "changed")),
+        ("python：globals()[键] = 值、del 与 globals().update(…) 只写不读：不连、不拒算", no_refusal_cell(
+            {"sample.py": 'HOOK = None\n\n\ndef entry(replaced):\n    globals()["HOOK"] = len\n    globals().update(replaced)\n    del globals()["HOOK"]\n'}, "sample.py::entry")),
         ("python：getattr(<标准库模块>, 变量名) 不拒算（够不到仓里的代码）", no_refusal_cell(PYTHON_FIXTURE, "pkg/f.py::patched_os_function")),
         ("python：os.environ.get(…) or <缺省路径> 按缺省折，连到那份脚本", compare_cell(PYTHON_FIXTURE, "pkg/h.py::stop", "pkg/c.py", "    return 5", "    return 50", "changed")),
         ("python：自己写出字面文本再起的脚本不拒算", no_refusal_cell(PYTHON_FIXTURE, "pkg/h.py::run_stub")),
@@ -17623,13 +19867,53 @@ def selftest_cells():
         (ENTRY_LINES_SHAPE_CELL, entry_lines_shape_cell),
         (ENTRY_LINES_RUST_KEYS_CELL, entry_lines_rust_keys_cell),
         ("shell：`bash \"$tree/<仓里的相对路径>\"` 连到仓里那一份", compare_cell(SHELL_FIXTURE, "s/copies.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (TREE_COPY_EXACT_CELL, compare_cell(dict(SHELL_FIXTURE, **{"elsewhere/s/child.sh": "#!/usr/bin/env bash\necho elsewhere\n"}), "s/copies.sh", "elsewhere/s/child.sh",
+                                            "echo elsewhere", "echo elsewhere changed", "same")),
         (SHELL_PWD_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/pwd_script.sh", "top_child.sh", "echo top", "echo top changed", "changed")),
+        (SHELL_PWD_EXACT_CELL, compare_cell(dict(SHELL_FOLDS_FIXTURE, **{"elsewhere/top_child.sh": "#!/usr/bin/env bash\necho elsewhere\n"}), "s/pwd_script.sh", "elsewhere/top_child.sh",
+                                            "echo elsewhere", "echo elsewhere changed", "same")),
         (SHELL_QUOTED_BRACE_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/quoted_brace.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
         (SHELL_TAIL_GROUP_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/tail_group.sh", "fixtures/one/.sample/driver.sh", "echo driver", "echo driver changed", "changed")),
         (SHELL_TAIL_OUTSIDE_CELL, no_refusal_cell(SHELL_FOLDS_FIXTURE, "s/tail_outside.sh")),
         (SHELL_ARGUMENTS_SKIPPED_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_caller.sh", "s/child.sh", "echo child", "echo child changed", "same")),
         (SHELL_ARGUMENTS_TAKEN_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_caller.sh", "s/tools/one.py", "return 1", "return 10", "changed")),
         (SHELL_ARGUMENTS_OTHER_CASE_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_caller.sh", "s/tools/two.py", "return 2", "return 20", "same")),
+        (SHELL_ARGUMENTS_PREFLIGHT_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_preflight_caller.sh", "s/child.sh", "echo child", "echo child changed", "same")),
+        (SHELL_ARGUMENTS_EXIT_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_exit_caller.sh", "s/tools/two.py", "return 2", "return 20", "same")),
+        (SHELL_ARGUMENTS_EXIT_TAKEN_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/dispatch_exit_caller.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (PYTHON_SHELL_ARGUMENTS_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/launcher.py::judge", "s/child.sh", "echo child", "echo child changed", "same")),
+        (SHELL_NESTED_WORD_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/nested_word.sh", "s/child.sh", "echo child", "echo child changed", "same")),
+        (SHELL_NESTED_INSIDE_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/nested_called_inside.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (SHELL_NESTED_OUTSIDE_COMMAND_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/nested_called_outside.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (SHELL_PYTHON_ARGUMENTS_SKIPPED_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/python_words.sh", "s/commands/dispatch.py", "return 302", "return 3020", "same")),
+        (SHELL_PYTHON_ARGUMENTS_TAKEN_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/python_words.sh", "s/commands/dispatch.py", "return 301", "return 3010", "changed")),
+        (SHELL_PYTHON_ARGUMENTS_OPEN_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/python_words_open.sh", "s/commands/dispatch.py", "return 302", "return 3020", "changed")),
+        (PYTHON_LAUNCH_WITHOUT_ENTRY_ARGUMENTS_CELL, compare_cell(ARGUMENTS_FIXTURE, "tool/launcher.py", "tool/dispatch.py", "    return 2\n", "    return 20\n", "same")),
+        (SHELL_TABLE_UNSELECTED_CELL, compare_cell(SHELL_TABLE_FIXTURE, "s/caller.sh", "s/two.sh", "echo two", "echo two changed", "same")),
+        (SHELL_TABLE_SELECTED_CELL, compare_cell(SHELL_TABLE_FIXTURE, "s/caller.sh", "s/one.sh", "echo one", "echo one changed", "changed")),
+        (SHELL_TABLE_MIXED_CELL, compare_cell(SHELL_TABLE_FIXTURE, "s/caller_mixed.sh", "s/two.sh", "echo two", "echo two changed", "changed")),
+        (SHELL_TABLE_ENTRY_CELL, compare_cell(SHELL_TABLE_FIXTURE, "scripts/experiment-apparatus/replay.sh", "s/two.sh", "echo two", "echo two changed", "changed")),
+        (SHELL_ENTRY_ARGUMENTS_CELL, shell_entry_edits_cell("s/dispatch.sh", ["run"], [("s/child.sh", "echo child", "echo child changed", "same"),
+                                                                                       ("s/tools/two.py", "return 2", "return 20", "same"),
+                                                                                       ("s/tools/one.py", "return 1", "return 10", "changed")])),
+        (SHELL_ENTRY_UNDECIDED_CELL, shell_entry_edits_cell("s/dispatch_undecided.sh", ["run"], [("s/child.sh", "echo child", "echo child changed", "changed")])),
+        (SHELL_ENTRY_TABLE_CELL, shell_entry_table_cell),
+        (SHELL_TABLE_ITEM_CELL, shell_entry_edits_cell("scripts/experiment-apparatus/replay.sh", ["--item", "E1.2"],
+                                                       [("s/one_sweep.sh", "echo one-sweep", "echo one-sweep changed", "changed"),
+                                                        ("s/one_grid.sh", "echo one-grid", "echo one-grid changed", "same"),
+                                                        ("s/two.sh", "echo two", "echo two changed", "same")], SHELL_TABLE_ITEM_FIXTURE)),
+        (SHELL_TABLE_SELFTEST_ENTRY_CELL, shell_entry_edits_cell("scripts/experiment-apparatus/replay.sh", ["--selftest"],
+                                                                 [("s/one.sh", "echo one", "echo one changed", "changed"),
+                                                                  ("s/two.sh", "echo two", "echo two changed", "same")], SHELL_TABLE_SELFTEST_FIXTURE)),
+        (SHELL_ENTRY_EXIT_TABLE_CELL, shell_entry_exit_table_cell),
+        (SHELL_TABLE_TREE_COPY_CELL, shell_table_tree_copy_cell),
+        (SHELL_TABLE_REAL_CELL, shell_table_real_cell),
+        (SHELL_TABLE_COPY_CELL, shell_table_copy_cell),
+        (SHELL_TABLE_COPY_FRAMEWORK_CELL, compare_cell(SHELL_TABLE_COPY_FIXTURE, "scripts/gate/copy_launcher.py::judge", "s/framework.sh", "echo framework", "echo framework changed", "changed")),
+        (SHELL_TABLE_COPY_CALLED_CELL, compare_cell(SHELL_TABLE_COPY_FIXTURE, "scripts/gate/copy_launcher.py::judge", "s/called.sh", "echo called", "echo called changed", "changed")),
+        (SHELL_TABLE_COPY_PLAIN_WORD_CELL, compare_cell(SHELL_TABLE_COPY_FIXTURE, "scripts/gate/copy_launcher.py::judge", "s/plain_word.sh", "echo plain-word", "echo plain-word changed", "changed")),
+        (SHELL_TABLE_COPY_WHOLE_CELL, compare_cell(SHELL_TABLE_COPY_FIXTURE, "scripts/gate/copy_launcher_whole.py::judge", "s/row_only.sh", "echo row-only", "echo row-only changed", "changed")),
+        (SHELL_TABLE_COPY_REAL_ROW_CELL, compare_cell(SHELL_TABLE_COPY_FIXTURE, "scripts/gate/copy_launcher_real_row.py::judge", "s/shared.sh", "echo shared", "echo shared changed", "changed")),
         (SHELL_PATTERN_REMOVAL_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/pattern_removal.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
         (SHELL_DIRECTORY_COPY_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/directory_copy.sh", "s/tools/one.py", "    return 1", "    return 10", "changed")),
         (SHELL_RELATIVE_COPY_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/relative_copy.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
@@ -17668,9 +19952,6 @@ def selftest_cells():
     cells += product_view_cells()
     return cells
 
-
-NESTED_POSITIONALS_CELL = ("shell：bash -c '…' 里套着的里层 bash -c \"…\\$1…\"：外层只换没转义的 $1…$9，转义的 \\$1 留给里层照它自己的参数折"
-                           "（里层的 $1 是外层的 $2），连到它 import 的仓内模块")
 
 
 def silent_form_cells():
@@ -17711,8 +19992,8 @@ def silent_form_cells():
         ("python：认不出的命令（对象的属性）拒算 subprocess-command-unfolded", refused_cell(PYTHON_FIXTURE, "pkg/m.py::launch_job", COMMAND_FORM)),
         ("python：-m unittest <测试模块> 整份连上（测试方法改了作废）", compare_cell(PYTHON_FIXTURE, "pkg/m.py::run_tests", "pkg/test_sample.py", "        return 3",
                                                                     "        return 30", "changed")),
-        ("python：shutil.which(…) 与 os.path.join(<折不出的目录>, \"bin/x\") 起的根外程序不拒算", no_refusal_cell(PYTHON_FIXTURE, "pkg/m.py::version_of")),
-        ("python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 \"$1\"）不拒算：程序是调用处给的词", no_refusal_cell(SHELL_FIXTURE, "s/positional_tool.sh")),
+        ("python：shutil.which(…) 与 os.path.join(<折不出的目录>, \"bin/x\") 起的根外程序不拒算、不当工具链询问", no_refusal_no_toolchain_query_cell(PYTHON_FIXTURE, "pkg/m.py::version_of")),
+        ("python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 \"$1\"）不拒算、不当工具链询问：程序是调用处给的词", no_refusal_no_toolchain_query_cell(SHELL_FIXTURE, "s/positional_tool.sh")),
         ("python：上游 preflight 跑文件头登记的判据（bash -c declaration.command）不拒算，判据从声明它的脚本连",
          no_refusal_cell(PYTHON_FIXTURE, ".claude/singlefs-ai-sop/scripts/preflight.py::run_check")),
         ("python：命令里的 *选项[\"键\"] 折回调用处给的字典字面量，连到那份脚本", compare_cell(PYTHON_FIXTURE, "pkg/m.py::run_default", "pkg/c.py", "    return 5",
@@ -17722,7 +20003,7 @@ def silent_form_cells():
         (FOLD_NESTED_CELL, compare_cell(FOLDS_FIXTURE, "pkg/folds.py::nested_launch", "pkg/c.py", "    return 5", "    return 50", "changed")),
         (FOLD_CONCATENATION_CELL, no_refusal_cell(FOLDS_FIXTURE, "pkg/folds.py::concatenated")),
         (FOLD_SLICE_CELL, compare_cell(FOLDS_FIXTURE, "pkg/folds.py::sliced_launch", "pkg/c.py", "    return 5", "    return 50", "changed")),
-        (FOLD_VERSIONS_CELL, no_refusal_cell(FOLDS_FIXTURE, "pkg/folds.py::Versions.interpreter")),
+        (FOLD_VERSIONS_CELL, no_refusal_no_toolchain_query_cell(FOLDS_FIXTURE, "pkg/folds.py::Versions.interpreter")),
         (FOLD_LOADED_CELL, compare_cell(FOLDS_FIXTURE, "pkg/folds.py::loaded_constant", "pkg/c.py", "    return 5", "    return 50", "changed")),
         (FOLD_TAIL_GROUP_CELL, compare_cell(FOLDS_FIXTURE, "pkg/folds.py::run_from_copy", "pkg/tools/runner.py", "    return 7", "    return 70", "changed")),
         (FOLD_OUTSIDE_SCRIPT_CELL, no_refusal_cell(FOLDS_FIXTURE, "pkg/folds.py::run_generated")),
@@ -17743,7 +20024,77 @@ def silent_form_cells():
         (DATA_READ_ATTRIBUTE_CELL, compare_cell(FOLDS_FIXTURE, "pkg/folds.py::TableReader.lines", "pkg/table.tsv", "alpha", "beta", "changed")),
         (TOOLCHAIN_QUERY_CELL, toolchain_query_cell),
         (CALLER_LAUNCH_CELL, caller_launch_cell),
-        (LAUNCH_ARGUMENT_CELL, no_refusal_cell(LAUNCH_ARGUMENT_FIXTURE, "pkg/launch.py::check")),
+        (LAUNCH_ARGUMENT_CELL, launch_argument_cell),
+        (TAIL_SAMPLE_CELL, compare_cell(dict(TAIL_ANCHOR_FIXTURE, **{".claude/gate.d/fixtures/stage.sh/one/Manifest.toml": "name = sample\n"}),
+                                        "pkg/manifest_reader.py::from_argument", ".claude/gate.d/fixtures/stage.sh/one/Manifest.toml", "sample", "changed", "same")),
+        (TAIL_VIEW_CELL, tail_view_cell),
+        (EXCLUDED_FILE_DATA_CELL, excluded_file_cell("pkg/judge.py", "# 只改这一行注释", "# 只改这一行注释（改了措辞）", "same", ("pkg/role.py",))),
+        (EXCLUDED_FILE_PROGRAM_CELL, excluded_file_cell("pkg/only_via_role.py", "return 401", "return 4010", "same", ("pkg/role.py",))),
+        (EXCLUDED_FILE_KEPT_CELL, excluded_file_cell("pkg/judge.py", "return 402", "return 4020", "changed", ("pkg/role.py",))),
+        (EXCLUDED_FILE_UNSET_CELL, excluded_file_cell("pkg/judge.py", "# 只改这一行注释", "# 只改这一行注释（改了措辞）", "changed", ())),
+        (NOT_JUDGING_FILES_CELL, not_judging_files_cell),
+        (JUDGING_CLOSURE_CELL, judging_closure_cell),
+        (LOADED_ATTRIBUTES_CELL, loaded_attributes_cell),
+        (OPEN_TAIL_SKIPPED_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/open_tail_caller.sh", "s/child.sh", "echo child", "echo child changed", "same")),
+        (OPEN_TAIL_TAKEN_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/open_tail_caller.sh", "s/tools/one.py", "return 1", "return 10", "changed")),
+        (OPEN_TAIL_FIRST_WORD_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/open_tail_first_word.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (OPEN_TAIL_PYTHON_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/open_tail_launcher.py::judge", "s/child.sh", "echo child", "echo child changed", "same")),
+        (DEFERRED_HEREDOC_BODY_CELL, compare_cell(SHELL_FIXTURE, "s/heredoc_in_if.sh", "s/py/helper_mod.py", "    return 1", "    return 10", "changed")),
+        (DEFERRED_HEREDOC_THEN_CELL, compare_cell(SHELL_FIXTURE, "s/heredoc_in_if.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (TEXT_PIECES_EXECUTABLE_CELL, compare_cell(TEXT_PIECES_FIXTURE, "pkg/launch.py::by_executable", "pkg/child.py", "return 1", "return 2", "changed")),
+        (TEXT_PIECES_INTEGER_CELL, compare_cell(TEXT_PIECES_FIXTURE, "pkg/launch.py::by_integer", "pkg/child.sh", "echo child", "echo child changed", "changed")),
+        (PROGRAM_WORDS_CELL, program_words_cell),
+        (LAUNCHED_PROGRAMS_CELL, launched_programs_cell),
+        (REFUSAL_LINES_CELL, refusal_lines_cell),
+        (ENV_ARRAY_CELL, no_refusal_cell(ENV_ARRAY_FIXTURE, "s/env_array.sh")),
+        (PROCESS_SUBSTITUTION_HEREDOC_CELL, no_refusal_cell(PROCESS_SUBSTITUTION_HEREDOC_FIXTURE, "s/psub_heredoc.sh")),
+        (LAUNCHED_SHELL_CELL, launched_shell_cell),
+        (PROCESS_SUBSTITUTION_ARGUMENT_CELL, no_refusal_cell(PROCESS_SUBSTITUTION_ARGUMENT_FIXTURE, "s/psub.sh")),
+        (REGISTERED_INLINE_LAUNCH_CELL, registered_inline_launch_cell),
+        (IMPORTED_SYS_PATH_CELL, compare_cell(IMPORTED_SYS_PATH_FIXTURE, "pkg/main.py::entry", "pkg/lib/helper_mod.py", "return 3", "return 30", "changed")),
+        (REGISTERED_WORDS_REAL_CELL, registered_words_real_cell),
+        (BUILD_OUTPUT_CELL, compare_cell(BUILD_OUTPUT_FIXTURE, BUILD_OUTPUT_ENTRY, "target/release/tool", "one", "two", "same")),
+        (TOOL_SOURCE_CELL, tool_source_cell),
+        (BUILT_TOOL_LAUNCH_CELL, built_tool_launch_cell),
+        (CALLER_SUPPLIED_REGISTERED_CELL, caller_supplied_registered_cell),
+        (CALLER_SUPPLIED_UNREGISTERED_CELL, caller_supplied_unregistered_cell),
+        (CALL_SITE_SHADOWED_CELL, compare_cell(CALL_SITE_FIXTURE, "tool/shadowed_run.py::main", "tool/child.sh", "echo child", "echo child changed", "changed")),
+        (CALL_SITE_ATTRIBUTE_CELL, compare_cell(CALL_SITE_FIXTURE, "tool/attribute_caller.py::main", "tool/child.sh", "echo child", "echo child changed", "changed")),
+        (UNIT_GRAPH_TEXT_BUSY_CELL, unit_graph_text_busy_cell),
+        (CALL_SITE_PARTIAL_CELL, compare_cell(CALL_SITE_FIXTURE, "tool/partial_caller.py::main", "tool/child.sh", "echo child", "echo child changed", "changed")),
+        (CALL_SITE_UNDECIDED_CELL, refused_cell(CALL_SITE_FIXTURE, "tool/holder_caller.py::main", COMMAND_FORM)),
+        (NESTED_PROGRAM_WORDS_REGISTERED_CELL, nested_program_words_registered_cell),
+        (NESTED_PROGRAM_WORDS_UNREGISTERED_CELL, nested_program_words_unregistered_cell),
+        (REGISTERED_MISSING_PATH_CELL, registered_missing_path_cell),
+        (INLINE_REFUSAL_LINE_CELL, inline_refusal_line_cell),
+        (REGISTRY_COMMAND_TEXTS_CELL, compare_cell(REGISTRY_COMMAND_FIXTURE, ".claude/gate.d/doc-registries.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (REGISTRY_COMMAND_TABLE_CELL, compare_cell(REGISTRY_COMMAND_FIXTURE, ".claude/gate.d/doc-registries.sh", ".claude/gate.d/counted-claims.tsv", "(1)", "(2)", "changed")),
+        (SPEC_PATH_ARGUMENTS_CELL, spec_path_arguments_cell),
+        (TAIL_READ_SCOPES_CELL, tail_read_scopes_cell),
+        (TAIL_READ_ROOT_SCOPE_CELL, tail_read_root_scope_cell),
+        (TAIL_READ_SCOPES_REAL_CELL, tail_read_scopes_real_cell),
+        (TAIL_READS_RECORDS_REAL_CELL, tail_reads_records_real_cell),
+        (GETATTR_NAMES_CELL, no_refusal_cell(GETATTR_NAMES_FIXTURE, "pkg/options.py::missing")),
+        (FUNCTION_PRINTED_WORD_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/printed_word_wrapper.sh", "s/tools/one.py", "    return 1", "    return 10", "changed")),
+        (QUOTED_ASSIGNMENT_ENV_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/quoted_assignment_env.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (QUOTED_ASSIGNMENT_ARRAY_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/quoted_assignment_array.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (LOCAL_NAME_SHADOW_CELL, compare_cell(LOCAL_NAME_FIXTURE, "pkg/shadow.py::shadowing", "pkg/shadow.py", "return 501", "return 5010", "same")),
+        (STAGE_CELL_FUNCTIONS_REAL_CELL, stage_cell_functions_real_cell),
+        (MODULE_BODY_COMMAND_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/module_body_command.py", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (EXPORTED_VARIABLE_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/exported_path.sh", "s/child.sh", "echo child", "echo child changed", "changed")),
+        (GUARD_NAME_PATH_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/guard_path/run.py", "s/guard_helpers/guard_helper.py", "return 601", "return 602", "changed")),
+        (HEREDOC_BLANK_ROW_CELL, compare_cell(SHELL_FOLDS_FIXTURE, "s/heredoc_blank_row_caller.sh", "s/child.sh", "echo child", "echo child changed", "same")),
+        (NARROWED_VIEW_SHARED_CELL, narrowed_view_shared_cell),
+        (OWN_PROGRAM_KEYED_CELL, own_program_keyed_cell),
+        (OWN_PROGRAM_ENTRY_CELL, own_program_entry_cell),
+        (OWN_PROGRAM_PATH_CELL, own_program_path_cell),
+        (EXTERN_LISTED_CELL, extern_listed_cell),
+        (EXTERN_REFUSED_CELL, extern_refused_cell),
+        (LOCAL_NAME_REAL_CALL_CELL, compare_cell(LOCAL_NAME_FIXTURE, "pkg/shadow.py::real_call", "pkg/shadow.py", "return 501", "return 5010", "changed")),
+        (LOCAL_NAME_GLOBAL_CELL, compare_cell(LOCAL_NAME_FIXTURE, "pkg/shadow.py::by_global", "pkg/shadow.py", "return 502", "return 5020", "changed")),
+        (CLOSURE_ROUND_LIMIT_CELL, closure_round_limit_cell),
+        (CLOSURE_CALL_INDEX_CELL, compare_cell(CLOSURE_ROUNDS_FIXTURE, "pkg/launch.py::check", "pkg/table.tsv", "alpha", "beta", "changed")),
+        (SHARED_SCRIPT_INDEX_CELL, shared_script_index_cell),
         (TAIL_ANCHOR_SCRATCH_CELL, compare_cell(TAIL_ANCHOR_FIXTURE, "pkg/manifest_reader.py::scratch_run", "fixtures/sample/Manifest.toml", "sample", "changed", "same")),
         (TAIL_ANCHOR_JUDGE_CELL, compare_cell(TAIL_ANCHOR_FIXTURE, "pkg/manifest_reader.py::judge", "fixtures/sample/Manifest.toml", "sample", "changed", "same")),
         (TAIL_ANCHOR_ARGUMENT_CELL, compare_cell(TAIL_ANCHOR_FIXTURE, "pkg/manifest_reader.py::from_argument", "fixtures/sample/Manifest.toml", "sample",
@@ -17753,215 +20104,9 @@ def silent_form_cells():
         (REGISTRY_PROGRAMS_CELL, registry_programs_cell),
         (ROW_KEYED_CELL, row_keyed_cell),
         (PROGRAM_ARGUMENTS_CELL, program_arguments_cell),
+        (FORKED_GATHER_CELL, forked_gather_cell),
     ]
 
-
-BREAK_CELLS = (
-    ("rust-open-entry-traits-ignored", ("开放入口：参数是 dyn", "R-开放：dyn Trait 只带 Trait 自己的 impl，不带只在 trait 参数里写了它的 impl")),
-    ("rust-dyn-traits-open-every-implementation", ("dyn 分派：闭包里的 dyn 不连没被点名的另一个 impl，改它不作废",)),
-    ("rust-constants-dropped", ("关联常量（经泛型）", "函数指针表", "数组长度里的常量")),
-    ("rust-macros-dropped", ("声明宏展开出的函数", "带路径的条目级宏调用定义的枚举：改了作废")),
-    ("rust-trait-impl-edges-dropped", ("运算符重载", "Drop 隐式调用", "关联常量（经泛型）")),
-    ("rust-verus-segments-ignored", ("verus! 里 ensures 带花括号：下一个函数照样切开，改它作废", "verus! 里够不到的函数改了不作废")),
-    ("rust-cfg-ignored", ("cfg(feature) 关着的单元改了不作废", "认不出的 cfg 谓词拒算")),
-    ("rust-manifest-directory-reads-unrefused", (MANIFEST_ROOT_CELL,)),
-    ("rust-manifest-directories-refused", (MANIFEST_DIRECTORY_CELL,)),
-    ("rust-manifest-binding-refused-whole", (MANIFEST_BINDING_CELL,)),
-    ("shell-data-sources-unfollowed", (SHELL_DATA_SOURCE_CELL, SHELL_DATA_DOT_CELL, SHELL_DATA_NESTED_CELL, SHELL_DATA_UNFOLDED_CELL)),
-    ("shell-data-sources-unsited", (SHELL_DATA_SOURCE_CELL,)),
-    ("shell-data-sources-nested-unfollowed", (SHELL_DATA_NESTED_CELL,)),
-    ("shell-dot-source-unrecognized", (SHELL_DATA_DOT_CELL,)),
-    ("shell-data-source-refusals-dropped", (SHELL_DATA_UNFOLDED_CELL,)),
-    ("rust-current-exe-refused", (CURRENT_EXE_CELL,)),
-    ("rust-current-exe-children-unlinked", (CURRENT_EXE_CELL,)),
-    ("rust-current-exe-constants-same-file-only", (CURRENT_EXE_CONSTANT_CELL,)),
-    ("rust-current-exe-path-only-refused", (CURRENT_EXE_PATH_ONLY_CELL,)),
-    ("rust-current-exe-spawn-unrefused", (CURRENT_EXE_SPAWN_CELL,)),
-    ("closure-directory-lines-span-files", (DIRECTORY_CLOSURE_LINE_CELL,)),
-    ("rust-lex-cache-unverified", (RUST_LEX_CACHE_CELL,)),
-    ("rust-doc-comments-kept", ("只改文档注释不作废", "改文档注释里的代码块：入口 fn 不作废")),
-    ("wgsl-raw-text", ("WGSL 只改注释不作废", "WGSL 够不到的函数改了不作废")),
-    ("python-comments-kept", ("python：只改注释不作废",)),
-    ("python-docstrings-kept", ("python：改文档串不作废",)),
-    ("python-docstring-readers-ignored", ("python：有单元读 __doc__ 时改文档串作废",)),
-    ("python-getattr-allowed", ("python：getattr 变量名拒算",)),
-    ("python-spec-paths-ignored", ("python：spec_from_file_location 字面路径折叠出跨模块边",)),
-    ("python-attributes-unnarrowed", ("python：obj.方法 按闭包里出现过的类收窄",)),
-    ("shell-heredoc-split", ("shell：here-doc 正文里有一行 `};` 不许被切开",)),
-    ("shell-names-command-position-only", ("shell：函数名当参数传照样连上",)),
-    ("shell-unfolded-paths-ignored", ("shell：`bash \"$x\"` 折不出拒算",)),
-    ("shell-raw-text", ("shell：脚本体只改注释不作废",)),
-    ("external-programs-unchecked", ("键：点名了 cargo 而调用方没给 --external 拒算、给了出键",)),
-    ("key-entry-units-dropped", (ENTRY_UNIT_KEY_CELL,)),
-    ("key-entry-doctest-owner-chained", ("R-结构：文档测试不连所挂的条目与那个模块的 use",)),
-    ("unit-graph-key-entry-lines-dropped", (ENTRY_LINES_SHAPE_CELL, ENTRY_LINES_RUST_KEYS_CELL)),
-    ("rust-doctest-entry-alone", (ENTRY_LINES_SHAPE_CELL, ENTRY_LINES_RUST_KEYS_CELL)),
-    ("cross-run-cache-under-tmpdir", (CROSS_RUN_CACHE_CELL,)),
-    ("cross-run-cache-git-directory-only", (CROSS_RUN_CACHE_CELL,)),
-    ("cross-run-cache-run-times-old-spelling", (CROSS_RUN_CACHE_CELL,)),
-    ("cross-run-cache-mentions-unscanned", (CROSS_RUN_CACHE_SCAN_CELL,)),
-    ("rust-format-captures-ignored", ("format! 串里内联捕获的常量改了作废", "WGSL 够得到的函数改了作废")),
-    ("shell-variable-first-line-only", ("shell：顶层变量里 here-doc 的正文改了，读它的函数作废",)),
-    ("tree-copy-tails-ignored", ("shell：`bash \"$tree/<仓里的相对路径>\"` 连到仓里那一份", "python：os.path.join(<折不出的目录>, <仓里的相对路径>) 连到仓里那一份")),
-    ("git-repository-paths-unfolded", ("shell：git rev-parse --git-common-dir 折成根，经它 source 的库连上",
-                                       "python：git rev-parse --git-common-dir 经无参函数的返回值折成根，插进 sys.path 的目录不拒算",
-                                       "preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算")),
-    ("python-call-returns-unfolded", ("python：git rev-parse --git-common-dir 经无参函数的返回值折成根，插进 sys.path 的目录不拒算",
-                                      "preflight 装载器：只拷了 .claude/ 的小树里 source 与 import 都解到树里的规范副本，两份装载器的闭包不拒算")),
-    ("shell-redirect-targets-loaded", ("shell：重定向到变量路径不拒算",)),
-    ("shell-path-arguments-loaded", ("shell：把路径当参数传给自己的函数不拒算",)),
-    ("python-command-arguments-loaded", ("python：写数据的路径与传给 subprocess 的参数不拒算",)),
-    ("shell-generated-scripts-ignored", ("shell：自己用 cat <<词 写出来再起的脚本不拒算、正文里装的连上",)),
-    ("shell-inline-positionals-ignored", ("shell：bash -c '…\"$1\"…' <名字> <路径> 里的 $1 换成那个路径",)),
-    ("shell-inline-positionals-escapes-ignored", (NESTED_POSITIONALS_CELL,)),
-    ("shell-copied-scripts-ignored", ("shell：自己 cp 出来再起的脚本连到源那一份",)),
-    ("shell-enclosing-locals-ignored", ("shell：套在外层函数里的函数看得见外层的 local",)),
-    ("shell-cd-first-directory-only", ("shell：cd 过去的目录折出几个，相对路径在每一个底下都连",)),
-    ("shell-pwd-unfolded", (SHELL_PWD_CELL,)),
-    ("shell-function-bounds-quote-blind", (SHELL_QUOTED_BRACE_CELL,)),
-    ("shell-script-tail-groups-ignored", (SHELL_TAIL_GROUP_CELL, SHELL_TAIL_OUTSIDE_CELL)),
-    ("shell-program-arguments-unnarrowed", (SHELL_ARGUMENTS_SKIPPED_CELL, SHELL_ARGUMENTS_OTHER_CASE_CELL)),
-    ("shell-pattern-removals-unfolded", (SHELL_PATTERN_REMOVAL_CELL,)),
-    ("shell-directory-copies-ignored", (SHELL_DIRECTORY_COPY_CELL,)),
-    ("shell-relative-tree-copies-ignored", (SHELL_RELATIVE_COPY_CELL,)),
-    ("shell-directory-wildcards-ignored", (SHELL_DIRECTORY_WILDCARD_CELL,)),
-    ("shell-positional-scripts-refused", (SHELL_POSITIONAL_SCRIPT_CELL,)),
-    ("shell-relative-directories-unrooted", (SHELL_RELATIVE_CD_CELL,)),
-    ("python-dispatch-tables-ignored", ("python：分派表（字典字面量）里的函数改了作废",)),
-    ("python-module-constants-unfolded", ("python：import 进来的模块常量（module.NAME）折进路径，插进 sys.path 的目录连上",)),
-    ("python-getattr-stdlib-refused", ("python：getattr(<标准库模块>, 变量名) 不拒算（够不到仓里的代码）",)),
-    ("python-subscript-targets-rebind", ("python：表[路径] = … 不当成重新绑定路径，spec 载入照样折得出",)),
-    ("python-environment-defaults-unfolded", ("python：os.environ.get(…) or <缺省路径> 按缺省折，连到那份脚本",)),
-    ("python-written-scripts-ignored", ("python：自己写出字面文本再起的脚本不拒算",)),
-    ("python-loop-variables-unfolded", ("python：for 循环变量取遍元组里的目录，插进 sys.path 不拒算、各目录里的同名模块都连",)),
-    ("python-imports-first-directory-only", ("python：for 循环变量取遍元组里的目录，插进 sys.path 不拒算、各目录里的同名模块都连",)),
-    ("python-import-names-unfolded", ("python：importlib.import_module(<模块级常量>) 折出模块名",)),
-    ("python-path-tables-unfolded", ("python：路径表（字典字面量）[键] 取遍表里的路径，spec 载入连上",)),
-    ("python-comprehension-scope-leaks", ("python：推导式里的循环变量不算函数里的赋值，for 取遍元组拼出的脚本连上",)),
-    ("python-directory-wildcards-ignored", ("python：os.path.join(<仓里的目录>, <折不出的文件名>) 起的脚本连到那个目录里每一份",)),
-    ("inline-scripts-ignored", ("shell：python3 -c '<字面串>' 当内联脚本切，sys.argv 折成后面的词，连到它 import 的仓内模块",
-                                "shell：python3 - <<'PY' 喂的 here-doc 当内联脚本切，连到它 import 的仓内模块",
-                                "shell：python3 -c / bash -c 的串带折不出的展开拒算 inline-script-not-literal",
-                                "shell：bash -c \"$串\" 的串折得出就切开再认，连到它起的脚本",
-                                "python：[sys.executable, \"-c\", <字面串>, …] 当内联脚本切，连到它 import 的仓内模块",
-                                "python：-c 的串折不出（出处是环境变量）拒算 inline-script-not-literal")),
-    ("shell-later-interpreters-ignored", ("shell：一条命令里第二个解释器（bash 包装脚本 N python3 x.py）照第一个的规则认，连到 x.py",)),
-    ("shell-substitutions-ignored", ("shell：起同目录脚本连边（写在命令替换里：x=\"$(bash 同目录/y.sh)\"）",
-                                     "shell：< <(命令 \"$x\") 里的命令照命令认，前面那个 < 不吞掉它的第一个词")),
-    ("external-program-words-unfiltered", ("shell：die 消息里出现 qemu-system-x86_64 不算外部程序",)),
-    ("python-modules-ignored", ("shell：python3 -m <仓内模块> 连到那份模块的程序入口", "python：-m unittest <测试模块> 整份连上（测试方法改了作废）")),
-    ("shell-unfolded-commands-allowed", ("shell：命令位置上折不出的程序拒算 shell-command-unfolded",)),
-    ("shell-wrapped-commands-ignored", ("shell：包装命令（timeout 60）后面直接执行的脚本连上",)),
-    ("shell-command-structure-ignored", ("shell：[[ … || … ]]、(( … ))、case 分支的模式、数组字面量里的词不当命令",
-                                         "shell：{ python3 /dev/fd/3 …; } 3<<'PY'（重定向写在组后面）照内联脚本切")),
-    ("shell-subscript-assignment-split", ("shell：名字[下标]=值、名字[下标]+=值（下标里带空格与展开）照赋值认、不当命令",)),
-    ("shell-array-commands-unfolded", ("shell：\"${数组[@]}\" 当命令时按数组的字面赋值摊开，连到它起的脚本",)),
-    ("shell-heredoc-captures-unfolded", ("shell：python3 -c \"$(打印正文的函数)\" 折出函数打的那几行当内联脚本",)),
-    ("declared-checks-ignored", ("shell：文件头登记的 check 判据（preflight 开跑前跑）照内联 bash 认，连到它起的脚本",
-                                 "python：上游 preflight 跑文件头登记的判据（bash -c declaration.command）不拒算，判据从声明它的脚本连")),
-    ("inline-argv-commands-ignored", ("shell：内联 python exec sys.argv[1:] 时后面那几个词照命令认",)),
-    ("python-unfolded-heads-allowed", ("python：变量解释器折不出（出处是环境变量）拒算 subprocess-command-unfolded",)),
-    ("python-commands-literal-only", ("python：命令是 [解释器] + 参数（按调用处给的列表折）连到那份脚本", "python：认不出的命令（对象的属性）拒算 subprocess-command-unfolded")),
-    ("python-path-programs-refused", ("python：shutil.which(…) 与 os.path.join(<折不出的目录>, \"bin/x\") 起的根外程序不拒算",
-                                      "python：内联脚本起 sys.argv[k]（取的是起它那份脚本的 \"$1\"）不拒算：程序是调用处给的词")),
-    ("python-command-dictionaries-unfolded", ("python：命令里的 *选项[\"键\"] 折回调用处给的字典字面量，连到那份脚本",)),
-    ("python-dispatch-calls-ignored", ("python：经分派表 表[键](…) 调到的函数，命令参数按那一处调用折",)),
-    ("python-nested-scopes-unfolded", (FOLD_NESTED_CELL,)),
-    ("python-command-concatenation-unfolded", (FOLD_CONCATENATION_CELL,)),
-    ("python-command-slices-unfolded", (FOLD_SLICE_CELL,)),
-    ("python-command-heads-split-ignored", (FOLD_VERSIONS_CELL,)),
-    ("python-method-parameters-unfolded", (FOLD_VERSIONS_CELL,)),
-    ("python-comprehension-variables-unfolded", (FOLD_VERSIONS_CELL,)),
-    ("python-element-calls-unfolded", (FOLD_VERSIONS_CELL,)),
-    ("python-sequence-indexes-unfolded", (FOLD_LOADED_CELL,)),
-    ("python-loaded-module-constants-unfolded", (FOLD_LOADED_CELL,)),
-    ("python-script-tail-groups-ignored", (FOLD_TAIL_GROUP_CELL, FOLD_OUTSIDE_SCRIPT_CELL, FOLD_CWD_GROUP_CELL)),
-    ("python-submitted-functions-unfolded", (FOLD_SUBMITTED_CELL,)),
-    ("python-environment-assignments-unfolded", (FOLD_ENVIRONMENT_CELL,)),
-    ("python-data-reads-ignored", (DATA_READ_CHANGED_CELL, DATA_READ_TAIL_CELL, DATA_READ_REFUSED_CELL, DATA_READ_DIRECTORY_CELL, DATA_READ_LIBRARY_CELL,
-                                   DATA_READ_ATTRIBUTE_CELL)),
-    ("python-parsed-arguments-unread", (DATA_READ_PARSED_CELL,)),
-    ("python-directory-reads-refused", (DATA_READ_DIRECTORY_CELL,)),
-    ("python-root-joins-refused", (DATA_READ_LISTING_CELL, DATA_READ_COPY_CELL)),
-    ("python-parameter-callers-unresolved", (DATA_READ_LIBRARY_CELL,)),
-    ("python-attribute-reads-unfolded", (DATA_READ_ATTRIBUTE_CELL,)),
-    ("python-caller-launches-refused", (CALLER_LAUNCH_CELL,)),
-    ("python-launch-arguments-unfolded", (LAUNCH_ARGUMENT_CELL, LAUNCH_ARGUMENT_SCRIPT_CELL)),
-    ("python-tail-reads-unanchored", (TAIL_ANCHOR_SCRATCH_CELL, TAIL_ANCHOR_JUDGE_CELL)),
-    ("python-toolchain-queries-refused", (TOOLCHAIN_QUERY_CELL,)),
-    ("python-toolchain-queries-unkeyed", (TOOLCHAIN_QUERY_CELL,)),
-    ("python-registry-programs-ignored", (REGISTRY_PROGRAMS_CELL,)),
-    ("python-registry-programs-linked", (REGISTRY_PROGRAMS_CELL,)),
-    ("python-membership-tables-followed", (PROGRAM_ARGUMENTS_CELL,)),
-    ("row-keyed-tables-whole", (ROW_KEYED_CELL,)),
-    ("python-program-arguments-unnarrowed", (PROGRAM_ARGUMENTS_CELL,)),
-    ("python-import-time-tables-followed", (PROGRAM_ARGUMENTS_CELL,)),
-    ("python-slice-unpacking-unpaired", ("shell：exec python3 -B /dev/fd/3 … 3<<'PY' 里 (目录, 标签) = sys.argv[1:3] 拆包逐个对上，sys.path.insert(0, 目录) 折得出、连到它 import 的仓内模块",)),
-    ("rust-kind-names-hyphenated", ("dump：种类名照 crates/singlefs-unit-graph 的拼法（macro_rules、item_macro、mod、mod_head、wgsl_compute）",)),
-    ("rust-qualified-names-file-local", ("dump：限定名带 crate、目标与模块路径前缀，文档测试写 <模块>::<doctest line 行>",)),
-    ("rust-doctest-fingerprint-from-rows", ("文档测试：代码块里只改注释指纹不变、改代码指纹变",)),
-    ("rust-module-heads-dropped", ("模块头：#![…] 与行内模块头切成单元，模块里的单元连它，改内属性作废",)),
-    ("rust-data-dump-unlisted", ("dump：include_str! 读的数据文件按读它的那一处列一行 data",)),
-    ("wgsl-external-names-by-long-identifiers", ("WGSL 外名：首段连 _ 落在 macro_rules! 体或串字面量里有着落", "WGSL 外名：只在别的单元的长标识符里出现的拒算")),
-    ("wgsl-external-name-sources-unlinked", ("WGSL 外名的着落做成边：给名字的 Rust 单元改了 WGSL 入口作废",)),
-    ("rust-escaped-brace-captures-skipped", ("format! 串里 {{{名}}}（转义的 {{ 后紧跟的捕获）改了作废",)),
-    ("rust-union-as-keyword", ("条目级宏调用里的 union 算它可能定义的名字",)),
-    ("rust-module-heads-unlinked", ("R-结构：改文件开头的 #![…]，经 mod 声明连进来的子模块里的入口作废", "R-结构：改行内模块头的内属性，只那个模块里的入口作废")),
-    ("rust-module-declarations-unlinked", ("R-结构：改文件开头的 #![…]，经 mod 声明连进来的子模块里的入口作废",)),
-    ("rust-use-names-resolved", ("R-结构：use 引进的名字不往下解，没用到的那个改了不作废",)),
-    ("rust-use-aliases-unresolved", ("R-结构：use a::b as c 之后调 c()，按 b 再解",)),
-    ("rust-trait-impls-by-trait-arguments", ("R-隐式：只点名 trait 参数里的类型，那个 trait impl 不进闭包",)),
-    ("rust-macro-generated-types-unnamed", (MACRO_TYPE_EDGE_CELL,)),
-    ("rust-macro-rules-literal-names-unlinked", (MACRO_LITERAL_EDGE_CELL,)),
-    ("rust-global-allocators-unlinked", (ALLOCATOR_EDGE_CELL,)),
-    ("rust-foreign-self-trait-impls-unlinked", (FOREIGN_IMPL_EDGE_CELL,)),
-    ("rust-build-environment-unlinked", (BUILD_ENVIRONMENT_EDGE_CELL,)),
-    ("rust-excluded-path-dependencies-dropped", (EXCLUDED_PATH_DEPENDENCY_EDGE_CELL,)),
-    ("rust-outside-crate-names-linked-unimported", (OUTSIDE_IMPORT_CELL,)),
-    ("rust-outside-crate-names-linked-across-modules", (OUTSIDE_MODULE_CELL,)),
-    ("rust-crates-names-linked-across-modules", (CRATES_MODULE_PRIVATE_CELL,)),
-    ("rust-cfg-atoms-unnarrowed", ("cfg 成分：闭包没引到 gpu 的入口，带不带 gpu 特性两种目标下键相同",)),
-    ("rust-cfg-macro-atoms-ignored", ("cfg 成分：闭包里有 cfg!、语句上的 #[cfg] 或 #[cfg_attr] 引到 gpu 的入口，带不带 gpu 特性键不同",)),
-    ("wgsl-defined-name-suffixes-ignored", ("WGSL 外名：条目级宏调用定义的名字以 _ 加外名收尾就有着落",
-                                            "WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变")),
-    ("wgsl-prefix-remainders-unchecked", ("WGSL 外名：首段只落在无关的串里、其余那一段哪儿都没有的拒算",)),
-    ("wgsl-name-suppliers-not-pulled-in", ("WGSL 外名的着落做成边：只靠外名点到的条目级宏调用并进闭包，改它里面的码键变",)),
-    ("wgsl-name-suppliers-include-test-code", (WGSL_TEST_SUPPLIER_CELL,)),
-    ("wgsl-modules-per-naming-unit", ("WGSL：闭包读到的几份 .wgsl 合成一个模块，名字跨文件解",)),
-    ("rust-trait-self-paths-ignored", ("R-路径：trait 成员里的 Self::x 落到这个 trait 自己的成员 x",)),
-    ("rust-doctest-structure-linked", ("R-结构：文档测试不连所挂的条目与那个模块的 use",)),
-    ("rust-use-self-imports-ignored", ("R-结构：use a::{self} 引进名字 a，只写 a::f() 的单元连上这条 use",)),
-    ("rust-open-by-trait-arguments", ("R-开放：dyn Trait 只带 Trait 自己的 impl，不带只在 trait 参数里写了它的 impl",)),
-    ("rust-blanket-impls-ignored", ("R-方法：blanket impl 够得到的方法算边，改它作废",)),
-    ("rust-underscore-items-named", ("R-裸名：const _ 没有名字，let _ 与 _ => 不把 gpu 特性下的 const _ 拉进闭包，带不带 gpu 特性键相同",)),
-    ("rust-includes-outside-root-refused", ("include_str! 读根外的文件：读得到收成数据单元、改它键变，读不到拒算 include-missing",)),
-    ("rust-blanket-self-parameter-only", ("R-方法：自身类型里出现泛型参数的 impl（(T, u32)、[T]、[T; N]、Box<T>、Option<Box<T>>、Sealed<T>）都按 blanket 放行，改 Sealed<T> 那一份作废",)),
-    ("wgsl-other-file-definitions-unlinked", ("WGSL 外名在链接集里别的 include_str! 读进来的 .wgsl 里有定义：读它的 Rust 单元与那份 .wgsl 拉进闭包，改那个常量作废",)),
-    ("rust-assume-specifications-unrecognized", (ASSUME_SPECIFICATION_FORMS_CELL, ASSUME_SPECIFICATION_KEY_CELL)),
-    ("rust-assume-specification-names-unlinked", (ASSUME_SPECIFICATION_FORMS_CELL, ASSUME_SPECIFICATION_KEY_CELL)),
-    ("rust-dependency-features-from-every-section", (FEATURE_SECTIONS_ENTRY_CRATE_CELL, FEATURE_SECTIONS_LINKED_CRATE_CELL)),
-    ("rust-verus-semicolon-split-off", (VERUS_SEMICOLON_CELL,)),
-    ("python-import-time-statements-ignored", (IMPORT_TIME_EXIT_CELL,)),
-    ("python-def-heads-ignored", (IMPORT_TIME_EXIT_CELL,)),
-    ("python-import-time-classes-named", (IMPORT_TIME_CLASS_CELL,)),
-    ("python-main-guard-conjunctions-unrecognized", (MAIN_GUARD_IMPORT_CELL, MAIN_GUARD_REAL_CELL)),
-    ("python-main-guards-last-only", (MAIN_GUARD_PROGRAM_CELL,)),
-    ("python-main-guard-else-dropped", (MAIN_GUARD_ELSE_CELL,)),
-    ("program-edge-exclusions-ignored", (EXCLUDED_EDGE_PYTHON_CELL, EXCLUDED_EDGE_SHELL_CELL, ADMISSION_EDGE_REACH_CELL)),
-    ("program-edge-exclusions-shell-ignored", (EXCLUDED_EDGE_SHELL_CELL, ADMISSION_EDGE_REACH_CELL)),
-    ("excluded-edge-exit-unmeasured", (EXCLUDED_EDGE_EXIT_CELL,)),
-    ("admission-edge-admitted-sample", (ADMISSION_EDGE_ANOMALY_CELL,)),
-    ("admission-edge-header-unstripped", (ADMISSION_EDGE_STRIP_CELL,)),
-    ("admission-edge-reach-unmeasured", (ADMISSION_EDGE_REACH_CELL,)),
-    ("judging-entry-literals-unfolded", (REAL_ENTRIES_CELL, REAL_JUDGING_CLOSURES_CELL)),
-    ("judging-entry-refusals-ignored", (REAL_JUDGING_CLOSURES_CELL,)),
-    ("judging-entry-workers-head-word", (JUDGING_ENTRY_WORKERS_CELL,)),
-    ("product-view-kept-formal", (PRODUCT_VIEW_LEMMA_CELL, PRODUCT_VIEW_ENSURES_CELL)),
-    ("product-view-strips-executable-code", (PRODUCT_VIEW_EXECUTABLE_CELL,)),
-    ("product-view-edges-from-the-written-tokens", (PRODUCT_VIEW_EDGES_CELL,)),
-    ("product-view-blanking-unverified", (PRODUCT_VIEW_UNVERIFIED_CELL,)),
-    ("product-view-verifier-attributes-kept", (PRODUCT_VIEW_ATTRIBUTE_INSIDE_CELL, PRODUCT_VIEW_ATTRIBUTE_OUTSIDE_CELL)),
-)
 
 
 def run_cell(judge):
@@ -17972,48 +20117,94 @@ def run_cell(judge):
             return False, f"抛了 {type(error).__name__}：{error}"
 
 
-def with_break(switch, judge):
-    previous = os.environ.get(BREAK_VARIABLE)
-    os.environ[BREAK_VARIABLE] = switch
-    try:
-        return run_cell(judge)
-    finally:
-        if previous is None:
-            os.environ.pop(BREAK_VARIABLE, None)
-        else:
-            os.environ[BREAK_VARIABLE] = previous
+def load_selftest_fixtures():
+    """文件头「自证夹具」：自证开跑前按路径载入同目录的 lib_function_units_selftest_fixtures.py（只给自证读的夹具文本、格名、开关到格的对照表），
+    先把这份模块此刻的名字放进它、再执行它，它新定义的名字放回这份模块 → 放回了几个。fork 出来的各格进程照父进程这一份读。"""
+    namespace = load_selftest_fixtures.__globals__
+    specification = importlib.util.spec_from_file_location(
+        "lib_function_units_selftest_fixtures", os.path.join(LIBRARY_ROOT, "scripts", "gate", "lib_function_units_selftest_fixtures.py"))
+    fixtures = importlib.util.module_from_spec(specification)
+    present = {name: value for name, value in namespace.items() if not name.startswith("__")}
+    vars(fixtures).update(present)
+    specification.loader.exec_module(fixtures)
+    added = {name: value for name, value in vars(fixtures).items() if not name.startswith("__") and name not in present}
+    namespace.update(added)
+    return len(added)
 
 
 def selftest():
     started = time.monotonic()
     failures, checked = [], 0
+    load_selftest_fixtures()
     os.environ[RUST_LEX_CACHE_DIRECTORY_VARIABLE] = "off"   # 词法单元缓存只在它自己那一格用（那一格临时换一个目录）；别的格都现切，弄坏开关也只波及那一格
     if active_breaks():
         print(f"  ℹ {BREAK_VARIABLE}={os.environ.get(BREAK_VARIABLE)} 设着：点名的那几格本来就该红")
+    heavy = heavy_threads_module()
+    try:
+        threads = int(heavy.default_heavy_threads(os.environ))
+    except heavy.HeavyThreadDefaultError as error:
+        print(f"  ✗ lib_function_units.py 自证开不了并行：{error}")
+        print(f"    → 怎么办：{error.howto}")
+        return 2
     cells = selftest_cells()
     by_name = dict(cells)
+    # 各格与各开关下的重判都是一条活，各在自己 fork 出来的进程里跑（gather_forked）；结论照登记次序打：先各格，再各开关
+    tasks, labels, switched = [], [], {}
     for name, judge in cells:
+        tasks.append((None, judge))
+        labels.append(name)
+    for switch, red_cells in BREAK_CELLS:
+        for cell in red_cells:
+            if cell in by_name and (switch, cell) not in switched:
+                switched[(switch, cell)] = len(tasks)
+                tasks.append((switch, by_name[cell]))
+                labels.append(f"弄坏开关 {switch} 下「{cell}」")
+    jobs = max(1, min(threads, len(tasks)))
+    print(f"  ℹ 并行 {jobs} 个进程（每台默认重活线程数 {threads}）：{len(cells)} 格、{len(switched)} 次开关下重判，各在自己 fork 出来的进程里跑")
+    outcomes, lost = gather_forked(tasks, jobs, run_selftest_task)
+    lost_by_index = {item.index: item for item in lost}
+    for index, name in enumerate(labels[:len(cells)]):
+        result = forked_cell_result(outcomes[index], lost_by_index.get(index))
+        if result is None:
+            continue
         checked += 1
-        ok, detail = run_cell(judge)
+        ok, detail, _finished = result
         print(f"  {'✓' if ok else '✗'} {name}" + ("" if ok else f"：{detail}"))  # gate-lint:detail
         if not ok:
             failures.append(name)
     for switch, red_cells in BREAK_CELLS:
         checked += 1
         missing = [cell for cell in red_cells if cell not in by_name]
-        flipped = [cell for cell in red_cells if cell in by_name and not with_break(switch, by_name[cell])[0]]
-        ok = not missing and flipped == list(red_cells)
+        flipped, unfinished = [], []
+        for cell in red_cells:
+            index = switched.get((switch, cell))
+            result = None if index is None else forked_cell_result(outcomes[index], lost_by_index.get(index))
+            if result is None:
+                continue
+            ok, detail, finished = result
+            if not finished:
+                unfinished.append(f"{cell}：{detail}")
+            elif not ok:
+                flipped.append(cell)
+        ok = not missing and not unfinished and flipped == list(red_cells)
         label = f"弄坏开关 {switch} 下「{'」「'.join(red_cells)}」转红"
-        print(f"  {'✓' if ok else '✗'} {label}" + ("" if ok else f"：只红了 {flipped}，表里没有 {missing}"))  # gate-lint:detail
+        detail = f"：只红了 {flipped}，表里没有 {missing}" + (f"，没跑完 {unfinished}" if unfinished else "")
+        print(f"  {'✓' if ok else '✗'} {label}" + ("" if ok else detail))  # gate-lint:detail
         if not ok:
             failures.append(label)
+    if lost:
+        print(f"  ✗ lib_function_units.py 自证并行：派出去 {len(tasks)} 条、收回 {len(tasks) - len(lost)} 条，对不上："
+              + "；".join(f"{labels[item.index]}（{item.reason}）" for item in lost))
+        print("    → 怎么办：看上面那几条没收回的输出（子进程被信号打断多是撞了内存上限、退出码非 0 多是格里调了 os._exit 或 fork 之后崩了），"
+              "照它改那一格或交任务服务放大上限重排；收回的条数对不上整份不算过")
     elapsed = time.monotonic() - started
-    if failures:
-        print(f"  ✗ lib_function_units.py 自证没过：{len(failures)} 格判错（共 {checked} 格，{elapsed:.1f} 秒）")
+    if failures or lost:
+        print(f"  ✗ lib_function_units.py 自证没过：{len(failures)} 格判错" + (f"、{len(lost)} 条没收回" if lost else "")
+              + f"（共 {checked} 格，并行 {jobs} 个进程，{elapsed:.1f} 秒）")
         print("    → 怎么办：照上面每一格改对应语言那一段的切分或闭包规则；FUNCTION_UNITS_BREAK 设着的话点名的那几格本来就该红")
         return 1
     print(f"  ✓ lib_function_units.py 自证通过：{checked} 格都对（Rust 夹具 {len(RUST_FIXTURE_CASES)} 格加拒算与形态、python、shell、键；"
-          f"弄坏开关 {len(BREAK_CELLS)} 个各红在点名的格；{elapsed:.1f} 秒）")
+          f"弄坏开关 {len(BREAK_CELLS)} 个各红在点名的格；并行 {jobs} 个进程；{elapsed:.1f} 秒）")
     return 0
 
 
@@ -18040,6 +20231,10 @@ def parse_options(arguments):
             continue
         if argument == "--explain":
             options.explain = True
+            i += 1
+            continue
+        if argument == "--judging":
+            options.judging = True
             i += 1
             continue
         if argument in VALUE_OPTIONS:
@@ -18097,7 +20292,7 @@ def main(arguments):
             return 0
         if command in ("closure", "key") and len(positional) == 2:
             root, entry = positional
-            closure = closure_of(root, entry, options)
+            closure = command_closure(root, entry, options)
             if command == "closure":
                 for line in closure_unit_lines(closure):
                     print(line)

@@ -41,16 +41,26 @@
   HISTORY_CONSOLIDATE_BREAK=git-show-ignores-path  normalized_line() 比产物行时把反引号里的 `.out` `.tsv` `.log` `.json` `.csv` 产物名一律抹成同一个记号，路径与产物名不同也算同一行
       产物行换成 git show 写法又改了产物名或目录，要判丢而没判（「✗ 自检：git show 引用写法：」，逐格点名是哪个后缀、改了什么）
       不设开关时 --selftest 也把这个开关打开一次，核上面那几格都红（没红的是『弄坏开关 git-show-ignores-path』）
+  HISTORY_CONSOLIDATE_BREAK=mentioned-product-names-unchecked  product_line_losses() 对只提到产物名的叙述句什么都不核
+      叙述句的产物名或目录改了，要判丢而没判（「✗ 自检：git show 引用写法：」，逐格点名是哪个后缀、叙述句改了什么）
+      不设开关时 --selftest 也把这个开关打开一次，核上面那几格都红（没红的是『弄坏开关 mentioned-product-names-unchecked』）
   HISTORY_CONSOLIDATE_BREAK=english-quotes-unprotected  引名的引号只认「」『』：strip_same_date() 把英语 "…" 与 “…” 里的同日日期当重复日期删，引名核对也不认这两种引号
       英语引号里的同日日期被删了（「✗ 自检：英语引号里的引名：」，逐格点名是哪种引号、删成了什么）
       不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 english-quotes-unprotected）
+  HISTORY_CONSOLIDATE_BREAK=identical-skip-by-key  loss_check() 对改前改后都有的日期块一律跳过，不比这一块的全文是不是逐字相同（应当只跳过逐字相同的）
+      改了一块里的数没判丢（「✗ 自检：逐字相同的块跳过：」，逐格点名是哪一对改前改后、跳过与逐块全算交出的有什么不同）
+      不设开关时 --selftest 也把这个开关打开一次，核那一格红（没红的那一项是 弄坏开关 identical-skip-by-key）
 
 引名：「」『』与英语的 "…"、“…” 四种引号里的一段（判法只在 QUOTE_PAIRS 一处，doc-consolidate.py 经 strip_same_date 与 missing_quoted_names 用同一份）。
 引号里的日期是被引的小节名的一部分，同日也不删；丢失核对把引号里带日期的那一段当引名，要在改后找得到。
 
-产物行（行里有 RESULT，或反引号里写着 `.out` `.tsv` `.log` `.json` `.csv` 的产物名）要在改后逐字找得到；
-唯一放宽：反引号里的 `<路径>` 与 `git show <提交>:<同一路径>` 算同一处，两个方向都行（归档脚本删产物时做的改写）；
-路径、产物名、同一行别的字改了照旧判丢。
+产物行与产物名分开核（判法只在 product_line_losses 一处，doc-consolidate.py 用同一份）：
+- 产物行：整行抄自产物的行，认法是行里有 RESULT（装置打的结果行；.claude/product-line-prefixes 登记的前缀都含它）。要在改后逐字找得到，
+  路径、产物名、同一行别的字改了都判丢。
+- 只提到产物名的叙述句（行里没有 RESULT，反引号里写着 `.out` `.tsv` `.log` `.json` `.csv` 的产物名）：不是抄自产物的行，不要求逐字；
+  核的是那一行每个反引号里的产物名段在改后找得到，产物名或它的目录改了判丢。句子里别的字（例：一条搬了家的规则路径）改了不判丢，
+  它带的数、编号、引名由 loss_check 别的几步逐个核。
+两样共用一条放宽：反引号里的 `<路径>` 与 `git show <提交>:<同一路径>` 算同一处，两个方向都行（归档脚本删产物时做的改写）。
 """
 import argparse
 import collections
@@ -549,10 +559,14 @@ def block_map(text):
 
 POINTER_RE = re.compile(r'见 ((?:D|E)\d+（.*?）) 节同日条目')
 GIT_REF_RE = re.compile(r'`git show ([0-9a-f]+):([^`]+)`')
-PRODUCT_LINE_RE = re.compile(r'RESULT|`[^`]*\.(?:out|tsv|log|json|csv)`')
+PRODUCT_LINE_RE = re.compile(r'RESULT|`[^`]*\.(?:out|tsv|log|json|csv)`')  # 行里有产物：抄自产物的行，或提到产物名的叙述句
+COPIED_PRODUCT_LINE_RE = re.compile(r'RESULT')  # 整行抄自产物的行（文件头「产物行与产物名分开核」）
+BACKTICK_SPAN_RE = re.compile(r'`([^`]*)`')
+PRODUCT_NAME_RE = re.compile(r'\.(?:out|tsv|log|json|csv)$')
 GIT_SHOW_SPAN_RE = re.compile(r'`git show [0-9a-f]{7,40}:([^`\s]+)`')
 ANY_PRODUCT_SPAN_RE = re.compile(r'`[^`]*\.(?:out|tsv|log|json|csv)`')
 LOSS_CHECK_BREAK = ''  # 只给 --selftest 证红用：见 LOSS_CHECK_BREAK_MODES
+SKIP_BREAK = ''  # 只给 --selftest 证红用：见 SKIP_BREAK_MODES
 
 
 def normalized_line(line, block_date=''):
@@ -567,6 +581,29 @@ def normalized_line(line, block_date=''):
     if block_date:
         text = text.replace(block_date, '')
     return re.sub(r'[\s，,（）()]+', '', text)
+
+
+def product_name_spans(text):
+    """文本里反引号括着、以产物后缀收尾的段，去掉空白；`git show <提交>:<路径>` 与 `<路径>` 算同一段。"""
+    text = GIT_SHOW_SPAN_RE.sub(lambda match: '`' + match.group(1) + '`', text)
+    spans = set()
+    for line in text.split('\n'):  # 反引号按行配对：一行里落单的反引号不串到下一行
+        for span in BACKTICK_SPAN_RE.findall(line):
+            if PRODUCT_NAME_RE.search(span.strip()):
+                spans.add('产物' if LOSS_CHECK_BREAK == 'git-show-ignores-path' else re.sub(r'\s+', '', span))
+    return spans
+
+
+def product_line_losses(line, normalize, reach_lines, reach_spans):
+    """一行里的产物丢没丢（文件头「产物行与产物名分开核」）：抄自产物的行要逐字在 reach_lines 里；只提到产物名的叙述句，每个产物名段要在 reach_spans 里。"""
+    if COPIED_PRODUCT_LINE_RE.search(line):
+        normalized = normalize(line)
+        if normalized and normalized not in reach_lines:
+            return ['产物行：' + (line.strip()[:60] or repr(line[:60]))]
+        return []
+    if LOSS_CHECK_BREAK == 'mentioned-product-names-unchecked':
+        return []
+    return ['产物名：' + span[:60] for span in sorted(product_name_spans(line) - reach_spans)]
 
 
 def git_referenced_text(text, repo, cache):
@@ -593,7 +630,31 @@ def reachable_text(block, after_blocks, repo, cache):
     return '\n'.join(pieces)
 
 
-def loss_check(before_text, after_text, repo):
+def block_losses(key, before_block_text, after_block, after_blocks, repo, cache):
+    """改前的一个日期块（key 是（节名, 日期），before_block_text 是它的全文）在改后找不到的东西，空表是一样没丢。"""
+    reach = reachable_text(after_block, after_blocks, repo, cache)
+    before_ids, before_numbers = ids_and_numbers(before_block_text)
+    after_ids, after_numbers = ids_and_numbers(reach)
+    missing = sorted(before_ids - after_ids) + sorted(before_numbers - after_numbers, key=lambda n: (len(n), n))
+    missing += sorted(embedded_dates(before_block_text) - embedded_dates(reach))
+    missing += sorted(other_dates(before_block_text, key[1]) - other_dates(reach, key[1]))
+    missing += ['引名：' + name[:50] for name in missing_quoted_names(before_block_text, reach)]
+    # 抄自产物的行一个字都不许变，只提到产物名的叙述句核产物名在：都到改后（含指到的家节）里找
+    reach_lines = set(normalized_line(l, key[1]) for l in reach.split('\n'))
+    reach_spans = product_name_spans(reach)
+    for line in before_block_text.split('\n'):
+        if line.lstrip().startswith(('> 快查·改前', '快查·改前')):
+            continue  # 旧态的摘要，旧态在 git 与改前引用里；它带的数与编号另有 tokens 那一半在核
+        if PRODUCT_LINE_RE.search(line):
+            missing += product_line_losses(line, lambda text: normalized_line(text, key[1]), reach_lines, reach_spans)
+    return missing
+
+
+def loss_check(before_text, after_text, repo, skip_identical=True):
+    """两份变更史逐块核丢失，交（核了几块, [(块的键, 找不到的东西)]）。
+    改后这一块与改前逐字相同时不算：比对的范围（改后这一块、它指到的家节同日块、两者引的 git 版本拼起来）以这一块自己的全文打头，
+    编号与数、日期、引名、产物行与产物名每一样都在里面，一样也不会缺；核了几块照数。skip_identical=False 逐块都算（--selftest 拿它与跳过的比）。
+    弄坏开关 identical-skip-by-key（只给 --selftest 证红用）：改前改后都有的块一律跳过，不比全文。"""
     before_blocks = {k: b.text() for k, b in block_map(before_text).items()}
     after_blocks = block_map(after_text)
     cache = {}
@@ -605,20 +666,9 @@ def loss_check(before_text, after_text, repo):
             losses.append((key, ['整块不见了']))
             continue
         checked += 1
-        reach = reachable_text(after_block, after_blocks, repo, cache)
-        before_ids, before_numbers = ids_and_numbers(before_block_text)
-        after_ids, after_numbers = ids_and_numbers(reach)
-        missing = sorted(before_ids - after_ids) + sorted(before_numbers - after_numbers, key=lambda n: (len(n), n))
-        missing += sorted(embedded_dates(before_block_text) - embedded_dates(reach))
-        missing += sorted(other_dates(before_block_text, key[1]) - other_dates(reach, key[1]))
-        missing += ['引名：' + name[:50] for name in missing_quoted_names(before_block_text, reach)]
-        # 实验类的产物行整行抄自产物，一个字都不许变：这些行要在改后（含指到的家节）逐字找得到
-        reach_lines = set(normalized_line(l, key[1]) for l in reach.split('\n'))
-        for line in before_block_text.split('\n'):
-            if line.lstrip().startswith(('> 快查·改前', '快查·改前')):
-                continue  # 旧态的摘要，旧态在 git 与改前引用里；它带的数与编号另有 tokens 那一半在核
-            if PRODUCT_LINE_RE.search(line) and normalized_line(line, key[1]) and normalized_line(line, key[1]) not in reach_lines:
-                missing.append('产物行：' + line.strip()[:60])
+        if skip_identical and (SKIP_BREAK == 'identical-skip-by-key' or after_block.text() == before_block_text):
+            continue
+        missing = block_losses(key, before_block_text, after_block, after_blocks, repo, cache)
         if missing:
             losses.append((key, missing))
     return checked, losses
@@ -725,7 +775,8 @@ SAMPLE = '''# 决策变更史
 
 
 BREAK_MODES = ('drop-number',)  # 弄坏开关 HISTORY_CONSOLIDATE_BREAK 认的取值，只给 --selftest 用（文件头逐个写了打开后哪几项红）
-LOSS_CHECK_BREAK_MODES = ('git-show-ignores-path',)  # 弄坏的是 loss-check 本身（不是迁移结果）：产物行比对不看路径
+# 弄坏的是 loss-check 本身（不是迁移结果）：产物行与产物名比对不看路径；叙述句的产物名不核
+LOSS_CHECK_BREAK_MODES = ('git-show-ignores-path', 'mentioned-product-names-unchecked')
 
 
 GIT_SHOW_HISTORY = '''# 决策变更史
@@ -736,7 +787,8 @@ GIT_SHOW_HISTORY = '''# 决策变更史
 
 #### E1（甲） 已定项 1
 
-- 产物 `research/results/e1-run.%s`，通过 34 项。
+- 产物 `research/results/e1-run.%s`，照 `.claude/old-rules/evidence.md` 核过，通过 34 项。
+- E1RESULT name=passed value=34 file=`research/results/e1-rows.%s` 通过
 '''
 
 
@@ -747,22 +799,66 @@ def git_show_cases(mode):
     problems = []
     try:
         for extension in ('out', 'tsv', 'log', 'json', 'csv'):
-            plain = GIT_SHOW_HISTORY % extension
-            shown = plain.replace(f'`research/results/e1-run.{extension}`',
-                                  f'`git show 0123456789ab:research/results/e1-run.{extension}`')
-            if shown == plain:
+            plain = GIT_SHOW_HISTORY % (extension, extension)
+            shown = plain
+            for product in ('e1-run', 'e1-rows'):  # 两行各引各的产物：一行的产物名不替另一行撑着
+                shown = shown.replace(f'`research/results/{product}.{extension}`',
+                                      f'`git show 0123456789ab:research/results/{product}.{extension}`')
+            if shown.count('git show') != 2:
                 problems.append(f'样本没换成 git show 写法（{extension}）')
             for name, before, after in (('写成 git show', plain, shown), ('git show 写回路径', shown, plain)):
                 if loss_check(before, after, repo=None)[1]:
                     problems.append(f'.{extension} 产物行{name}不该判丢')
-            renamed = shown.replace('e1-run', 'e1-other')
-            moved = shown.replace('research/results/', 'research/old/')
-            reworded = shown.replace('通过', '失败')
-            for name, after in (('产物名改了', renamed), ('目录改了', moved), ('同一行别的字改了', reworded)):
-                if not loss_check(plain, after, repo=None)[1]:
-                    problems.append(f'.{extension} 产物行换成 git show 写法又{name}，要判丢，没判')
+            narrative, copied = [line for line in shown.split('\n') if 'e1-r' in line]
+            for kind, row, product in (('叙述句', narrative, 'e1-run'), ('抄自产物的行', copied, 'e1-rows')):
+                # 只动这一行：另一行原样留着，判出来的丢只能来自这一行
+                renamed = shown.replace(row, row.replace(product, 'e1-other'))
+                moved = shown.replace(row, row.replace('research/results/', 'research/old/'))
+                for name, after in (('产物名改了', renamed), ('目录改了', moved)):
+                    if not loss_check(plain, after, repo=None)[1]:
+                        problems.append(f'.{extension} {kind}换成 git show 写法又{name}，要判丢，没判')
+            if not loss_check(plain, shown.replace(copied, copied.replace('通过', '失败')), repo=None)[1]:
+                problems.append(f'.{extension} 抄自产物的行别的字改了，要判丢，没判')
+            relocated = shown.replace('`.claude/old-rules/evidence.md`', '`.claude/rules/evidence.md`')
+            if relocated == shown:
+                problems.append(f'样本叙述句里的规则路径没换（{extension}）')
+            if loss_check(plain, relocated, repo=None)[1]:
+                problems.append(f'.{extension} 叙述句只换了一条规则路径、产物名没变，不该判丢')
     finally:
         LOSS_CHECK_BREAK = previous
+    return problems
+
+
+SKIP_BREAK_MODES = ('identical-skip-by-key',)  # 弄坏的是 loss_check 跳过逐字相同块的判法：改前改后都有的块一律跳过
+
+
+def identical_skip_cases(mode):
+    """loss_check 跳过逐字相同的块：返回不合预期的句子（空表示全对）。mode 非空时打开跳过判法的弄坏开关。
+    每一对（改前, 改后）上，跳过与逐块全算（skip_identical=False 的参照）交出的（核了几块, 丢失）要逐项相同，另几对点名了该判丢的要判丢。"""
+    global SKIP_BREAK
+    previous, SKIP_BREAK = SKIP_BREAK, mode
+    problems = []
+    try:
+        changed_one_block = SAMPLE.replace('槽宽 555 字节，爆 43 字节', '槽宽 555 字节，爆 44 字节', 1)
+        pairs = (
+            ('原样不动', SAMPLE, SAMPLE, False),
+            ('只改了一块里的一个数', SAMPLE, changed_one_block, True),
+            ('干净迁移', SAMPLE, migrate(SAMPLE, repo=None)[0], False),
+            ('迁移时丢一个数', SAMPLE, migrate(SAMPLE, repo=None, break_mode='drop-number')[0], True),
+        )
+        if changed_one_block == SAMPLE:
+            problems.append('样本里「槽宽 555 字节，爆 43 字节」没换成 44，只改一块的那一对没造出来')
+        for name, before, after, must_lose in pairs:
+            skipped = loss_check(before, after, repo=None)
+            full = loss_check(before, after, repo=None, skip_identical=False)
+            if skipped != full:
+                problems.append(f'{name}：跳过逐字相同的块与逐块全算交出的不同（跳过 {skipped}，全算 {full}）')
+            if must_lose and not skipped[1]:
+                problems.append(f'{name}：改了块里的数，要判丢，没判')
+            if not must_lose and skipped[1]:
+                problems.append(f'{name}：没丢东西，不该判丢：{skipped[1]}')
+    finally:
+        SKIP_BREAK = previous
     return problems
 
 
@@ -801,9 +897,9 @@ def english_quote_cases(mode):
 
 def selftest():
     break_mode = os.environ.get('HISTORY_CONSOLIDATE_BREAK', '')
-    if break_mode and break_mode not in BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES:
+    if break_mode and break_mode not in BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES + SKIP_BREAK_MODES:
         print(f'✗ 自检：HISTORY_CONSOLIDATE_BREAK={break_mode} 认不得')
-        print(f'  → 取值只有 {" ".join(BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
+        print(f'  → 取值只有 {" ".join(BREAK_MODES + LOSS_CHECK_BREAK_MODES + QUOTE_BREAK_MODES + SKIP_BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
         return 2
     after, report, _before_blocks, _git = migrate(SAMPLE, repo=None, break_mode=break_mode if break_mode in BREAK_MODES else None)
     checked, losses = loss_check(SAMPLE, after, repo=None)
@@ -842,7 +938,14 @@ def selftest():
     caught = []
     for mode in LOSS_CHECK_BREAK_MODES:
         if not git_show_cases(mode):
-            problems.append(f'弄坏开关 {mode}：loss-check 不看路径，git show 引用写法的几种情形没红')
+            problems.append(f'弄坏开关 {mode}：git show 引用写法的几种情形没红')
+        else:
+            caught.append(f'{mode} 红')
+    for case in identical_skip_cases(break_mode if break_mode in SKIP_BREAK_MODES else ''):
+        problems.append('逐字相同的块跳过：' + case)
+    for mode in SKIP_BREAK_MODES:
+        if not identical_skip_cases(mode):
+            problems.append(f'弄坏开关 {mode}：改前改后都有的块一律跳过，改了一块里的数那一对没红')
         else:
             caught.append(f'{mode} 红')
     for case in english_quote_cases(break_mode if break_mode in QUOTE_BREAK_MODES else ''):

@@ -1,0 +1,32 @@
+# 被测的是 scripts/experiment-apparatus/e206_fixed_point_cost_histories.rs：它不是 scripts/experiment-apparatus 里的 bin，而是拷进插了读数的副本，当 crates/singlefs-verification 的集成测试编、起（入口 e206-fixed-point-cost-run.sh）。
+# mutate.sh 只会在 scripts/experiment-apparatus 里起 cargo test --release --bin <名>，那里没有这份用例，所以这张表不由 mutate.sh 跑。
+# 登记 research/prompts/e206-preregistration.md 第九节没写这张表：登记之外新增，只为过门禁 mutation-tables 格与证用例的判别力。
+# 每一行由谁抓：在插了读数的副本里带着改坏的用例起最小的点 base__p1（入口 --item base__p1；写 files_1000 / data_units_1000 的行起对应的 __p1 点），读它的原始输出里的 E206RESULT 行，对照没改坏那一份。
+#   done_marker_dropped、remounted_window_skipped：name=item_done 的行从有变无（前者）；后者 state=remounted 的读数行从有变无。
+#   w1_one_overwrite_short：op=W1 的发布条数从 32 变 31。
+#   w3_unlink_dropped：op=W3 每轮的发布条数从 3 变 2。
+#   cold_file_always_first：W2 的冷文件不再散开，files_1000__p1 里 op=W2 各次的读数与没改坏那份对不上。
+#   negative_control_dropped：name 带 negative_control 的读数（op=negative_control）从有变无。
+#   history_unlinks_one_short：name=history 行的 user_changes 少 2、changes 少 2。
+#   history_peak_rounds_mislabeled：name=history 行的 peak_rounds 取值变成 settle_calls 的值。
+#   write_chunk_halved：data_units_1000__p1 的 name=history 行 user_changes 与 changes 变多。
+#   remount_every_ignored：remount_every_1000__p1 的 name=history 行里崩溃后挂载的读数从有变无。
+#   reconciliation_slots_zeroed：name=reconciliation 行的 image_changed_unit_slots 从非 0 变 0（base__p1 里 W1 的 op_index=1 那行）。
+done_marker_dropped	println!("E206RESULT name=item_done item={item}");	();
+remounted_window_skipped	Measured { item: &item, state: "remounted", point_name }.window(&mut pool, &live, point);	();
+w1_one_overwrite_short	for index in 1..=FIRST_FILE_OVERWRITES {	for index in 1..FIRST_FILE_OVERWRITES {
+w3_unlink_dropped	overwrite_inode(pool, tally, inode)?;\n                unlink_inode(pool, tally, inode)	overwrite_inode(pool, tally, inode)?;\n                Ok(())
+cold_file_always_first	live[share * live.len() / SHARD_FOR_THE_COLD_FILES % live.len()]	live[0]
+negative_control_dropped	if NEGATIVE_CONTROL_POINTS.contains(&self.point_name) {	if false {
+history_unlinks_one_short	for _ in 0..point.unlinks {\n            one_unlink_of_the_history	for _ in 0..point.unlinks.saturating_sub(1) {\n            one_unlink_of_the_history
+history_peak_rounds_mislabeled	history.lines.peak_rounds,\n        history.lines.peak_round_work,	history.lines.settle_calls,\n        history.lines.peak_round_work,
+write_chunk_halved	const DATA_UNITS_PER_WRITE_AT_MOST: u64 = 400;	const DATA_UNITS_PER_WRITE_AT_MOST: u64 = 200;
+remount_every_ignored	if self.remount_every.is_some_and(|every| self.user_changes % every == 0) {	if false {
+reconciliation_slots_zeroed	image_changed_unit_slots(&before, &pool.image()),	0,
+# 下面 pin_ 起头的各行由谁抓：在插了读数的副本里（plain 构建）起历史用例文件末尾那三条钉绝对值的测试（the_six_mebibyte_ring_puts_the_unit_area_at_slot_1408、the_registered_points_carry_the_registered_geometry、the_base_history_makes_thirty_three_user_changes_and_notes_forty_two_steps），改坏之后该有一条红；脚本 scripts/experiment-apparatus/prove-histories-pins.sh 逐行证。
+pin_ring_bytes_five_mebibytes	const JOURNAL_RING_BYTES: u64 = 6 << 20;	const JOURNAL_RING_BYTES: u64 = 5 << 20;
+pin_user_scale_area_off_by_a_segment	(1 << 30) - 1408	(1 << 30) - 1024
+pin_data_units_1000000_area_halved	power_of_two(22), data_units: 1_000_000	power_of_two(21), data_units: 1_000_000
+pin_base_unlinks_changed	    unlinks: 10,	    unlinks: 11,
+pin_unlink_step_run_twice	            one_unlink_of_the_history(pool, history)?;	            one_unlink_of_the_history(pool, history)?; one_unlink_of_the_history(pool, history)?;
+pin_big_file_fill_dropped	    fill_a_file(pool, &mut history.tally, big, data_units)?;	    let _ = data_units;

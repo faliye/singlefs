@@ -1,4 +1,4 @@
-V1_R-S择现行取写序最小	let candidate = (unit.write_order, unit_id);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 > current.0 {	let candidate = (unit.write_order, unit_id);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 < current.0 {
+V1_R-S择现行取写序最小	let candidate = (unit.write_order, unit_identifier);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 > current.0 {	let candidate = (unit.write_order, unit_identifier);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 < current.0 {
 V2_删空的类型2容器照样写	if plan.inode_containers[position].records.is_empty() {	if false && plan.inode_containers[position].records.is_empty() {
 V3_记账每盘行数6改5	const ACCOUNTING_PER_DEVICE_ROWS: u64 = 6;	const ACCOUNTING_PER_DEVICE_ROWS: u64 = 5;
 V4_G紧放回规则失效	self.reclaim_released_records_where(|record| record.generation < txg);	let _ = txg;
