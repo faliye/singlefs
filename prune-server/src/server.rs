@@ -1092,9 +1092,30 @@ pub fn start_in_this_process(
     state_directory: &Path,
     socket_path: &Path,
 ) -> Result<ServiceInThisProcess, ServeFailure> {
+    start_in_this_process_listening_on(
+        state_directory,
+        socket_path,
+        NETWORK_ADDRESS_OF_A_SERVICE_IN_THIS_PROCESS,
+        CommitterSettings {
+            group_window: Duration::from_millis(DEFAULT_GROUP_COMMIT_MILLISECONDS),
+            group_maximum_frames: DEFAULT_GROUP_COMMIT_FRAMES,
+            selftest_commit_delay: None,
+            selftest_storage_failure_key: None,
+            selftest_write_failure_file: None,
+        },
+    )
+}
+
+/// [`start_in_this_process`]，TCP 绑 `network_address`、提交线程取 `committer`（测试要别的绑定地址、别的组提交窗口与自证造错时用）。
+pub(crate) fn start_in_this_process_listening_on(
+    state_directory: &Path,
+    socket_path: &Path,
+    network_address: &str,
+    committer: CommitterSettings,
+) -> Result<ServiceInThisProcess, ServeFailure> {
     let settings = ServerSettings {
         socket_path: socket_path.to_path_buf(),
-        network_address: NETWORK_ADDRESS_OF_A_SERVICE_IN_THIS_PROCESS.to_string(),
+        network_address: network_address.to_string(),
         state_directory: state_directory.to_path_buf(),
         library_directory: library_directory_in(state_directory),
         worker_threads: WORKER_THREADS_OF_A_SERVICE_IN_THIS_PROCESS,
@@ -1111,13 +1132,7 @@ pub fn start_in_this_process(
             write_timeout: Duration::from_millis(DEFAULT_WRITE_TIMEOUT_MILLISECONDS),
             busy_retry: Duration::from_millis(DEFAULT_BUSY_RETRY_MILLISECONDS),
         },
-        committer: CommitterSettings {
-            group_window: Duration::from_millis(DEFAULT_GROUP_COMMIT_MILLISECONDS),
-            group_maximum_frames: DEFAULT_GROUP_COMMIT_FRAMES,
-            selftest_commit_delay: None,
-            selftest_storage_failure_key: None,
-            selftest_write_failure_file: None,
-        },
+        committer,
     };
     let (release_sender, released) = mpsc::channel();
     let opened = open_the_service(
@@ -1166,11 +1181,9 @@ impl ServiceInThisProcess {
         self.stop_requested.store(true, Ordering::SeqCst);
         // 接连接的线程堵在 accept 上：各连一下叫醒它，它看到停服标记就收尾（这一条连接不收）
         let _ = UnixStream::connect(&self.socket_path);
-        let mut wake_address = self.bound_network_address;
-        if wake_address.ip().is_unspecified() {
-            wake_address.set_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
-        }
-        let _ = TcpStream::connect(wake_address);
+        let _ = TcpStream::connect(loopback_address_to_wake_the_listener(
+            self.bound_network_address,
+        ));
         let mut problems = Vec::new();
         for accept_thread in self.accept_threads.drain(..) {
             match accept_thread.join() {
@@ -1217,6 +1230,20 @@ impl ServiceInThisProcess {
             Err(problems.join("；"))
         }
     }
+}
+
+/// 叫醒堵在 accept 上的接连接线程要连的地址：监听绑在未指定地址（`0.0.0.0`、`::`）上的，换成同一地址族的回环
+/// （绑在 `::` 上、`bindv6only` 开着的主机连 `127.0.0.1` 会被拒），别的原样。
+fn loopback_address_to_wake_the_listener(bound_address: SocketAddr) -> SocketAddr {
+    let mut wake_address = bound_address;
+    if bound_address.ip().is_unspecified() {
+        let loopback = match bound_address {
+            SocketAddr::V4(_) => std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            SocketAddr::V6(_) => std::net::IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+        };
+        wake_address.set_ip(loopback);
+    }
+    wake_address
 }
 
 impl Drop for ServiceInThisProcess {
@@ -1674,7 +1701,9 @@ fn handle_reader_request(
             | RequestView::PrefixScan { .. }
             | RequestView::Statistics
             | RequestView::Claim { .. }
-            | RequestView::DeletePrefix { .. } => {
+            | RequestView::DeletePrefix { .. }
+            | RequestView::WriteIfAbsent { .. }
+            | RequestView::GuardedConclusionWrite(_) => {
                 shared.fault_log.record(
                     FaultKind::DispatchBug,
                     Some(record),
@@ -1728,6 +1757,7 @@ fn handle_connection<Stream: ConnectionStream>(
         origin.transport,
         origin.peer_address.clone(),
         response_sender.clone(),
+        &shared.fault_log,
     );
     let mut frames = FrameReader::new(stream, limits.frame_read_timeout);
     loop {
@@ -1971,6 +2001,8 @@ fn decoded_operation_code(view: &RequestView<'_>) -> u8 {
         RequestView::ConnectedClients => OperationCode::ConnectedClients.code(),
         RequestView::AnnounceStop => OperationCode::AnnounceStop.code(),
         RequestView::DeletePrefix { .. } => OperationCode::DeletePrefix.code(),
+        RequestView::WriteIfAbsent { .. } => OperationCode::WriteIfAbsent.code(),
+        RequestView::GuardedConclusionWrite(_) => OperationCode::GuardedConclusionWrite.code(),
     }
 }
 
@@ -2054,6 +2086,8 @@ fn execute_request(
         RequestView::BatchedWrite { .. }
         | RequestView::Claim { .. }
         | RequestView::DeletePrefix { .. }
+        | RequestView::WriteIfAbsent { .. }
+        | RequestView::GuardedConclusionWrite(_)
         | RequestView::ConnectionAnnouncement(_)
         | RequestView::ConnectedClients
         | RequestView::AnnounceStop => {
@@ -2233,35 +2267,16 @@ fn execute_request(
 mod tests {
     use super::*;
     use crate::client::{RouteAddress, SimpleClient};
+    use crate::in_process_service_for_tests::{
+        committer_settings_grouping, ServiceUnderTest, TemporaryDirectoryOfTheTest,
+    };
     use crate::protocol::Table;
-
-    /// 这条用例独占的临时目录（`${TMPDIR:-/tmp}` 下按进程号与用例名起名），丢掉时删。
-    struct TemporaryDirectoryOfTheTest {
-        path: PathBuf,
-    }
-
-    impl TemporaryDirectoryOfTheTest {
-        fn create(test_name: &str) -> TemporaryDirectoryOfTheTest {
-            let path = std::env::temp_dir()
-                .join(format!("prune-server-{test_name}-{}", std::process::id()));
-            std::fs::create_dir(&path).unwrap_or_else(|error| {
-                panic!("建不了这条用例的临时目录 {}：{error}", path.display())
-            });
-            TemporaryDirectoryOfTheTest { path }
-        }
-    }
-
-    impl Drop for TemporaryDirectoryOfTheTest {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
-    }
 
     /// 在这个进程里起的一份：客户端经 socket 写得进、读得回；停服之后 socket 不在、连不上，库已经关上——同一个状态目录马上再起一份
     /// 开得了库（RocksDB 的 LOCK 放了）、读得回停服之前写的那一行。
     /// 判别力：停服不关连着的连接（`shut_down_every_connection` 什么都不做），客户端还连着，库等不到关上，`stop` 交回错误，这条红。
     #[test]
-    fn a_service_started_in_this_process_serves_a_client_and_after_the_stop_releases_its_library_and_socket(
+    fn service_started_in_this_process_serves_a_client_and_after_the_stop_releases_its_library_and_socket(
     ) {
         let directory = TemporaryDirectoryOfTheTest::create("in-process-stop");
         let state_directory = directory.path.join("state");
@@ -2305,5 +2320,79 @@ mod tests {
         );
         drop(client_of_the_restarted);
         restarted.stop().expect("重起的那一份同样停得干净");
+    }
+
+    fn assert_wake_address_is(bound_address: &str, expected_wake_address: &str) {
+        let bound_address: SocketAddr = bound_address.parse().expect("写死的地址合规");
+        let expected_wake_address: SocketAddr =
+            expected_wake_address.parse().expect("写死的地址合规");
+        assert_eq!(
+            loopback_address_to_wake_the_listener(bound_address),
+            expected_wake_address,
+            "绑在 {bound_address} 的监听，停服时该连 {expected_wake_address} 叫醒接连接的线程"
+        );
+    }
+
+    /// 判别力：未指定地址一律换成 IPv4 回环（不分地址族），绑在 `::` 上的监听被指到 `127.0.0.1`，下面的 IPv6 那条红。
+    #[test]
+    fn listener_bound_to_the_ipv4_unspecified_address_is_woken_through_the_ipv4_loopback() {
+        assert_wake_address_is("0.0.0.0:4321", "127.0.0.1:4321");
+    }
+
+    #[test]
+    fn listener_bound_to_the_ipv6_unspecified_address_is_woken_through_the_ipv6_loopback() {
+        assert_wake_address_is("[::]:4321", "[::1]:4321");
+    }
+
+    #[test]
+    fn listener_bound_to_a_specific_ipv4_address_is_woken_at_that_address() {
+        assert_wake_address_is("10.1.2.3:4321", "10.1.2.3:4321");
+    }
+
+    #[test]
+    fn listener_bound_to_a_specific_ipv6_address_is_woken_at_that_address() {
+        assert_wake_address_is("[2001:db8::1]:4321", "[2001:db8::1]:4321");
+    }
+
+    /// 绑在 IPv6 未指定地址上的服务，停服在时限内回来、socket 删掉。本机绑不了 `[::1]`（没有 IPv6 回环）时这条没法判：
+    /// 打一行 `NOT_RUN_NO_IPV6_LOOPBACK` 报本次未跑、直接返回，不算判过。
+    /// 判别力：在 `bindv6only` 开着的主机上，叫醒连 `127.0.0.1` 连不上，`stop` 等不到接连接的线程收尾，这条超时红；
+    /// 双栈主机上 `127.0.0.1` 也连得进 `::`，这条绿与否不区分，区分靠上面四条纯函数用例。
+    #[test]
+    fn service_listening_on_the_ipv6_unspecified_address_stops_within_the_time_limit() {
+        const STOP_TIME_LIMIT: Duration = Duration::from_secs(10);
+        if TcpListener::bind("[::1]:0").is_err() {
+            println!(
+                "NOT_RUN_NO_IPV6_LOOPBACK 本次未跑：本机绑不了 [::1]（没有 IPv6 回环），绑 [::]:0 的服务停服那条路没判"
+            );
+            return;
+        }
+        let running = ServiceUnderTest::start_listening_on(
+            "ipv6-stop",
+            "[::]:0",
+            committer_settings_grouping(
+                Duration::from_millis(DEFAULT_GROUP_COMMIT_MILLISECONDS),
+                DEFAULT_GROUP_COMMIT_FRAMES,
+            ),
+        );
+        let bound_address = running.service.bound_network_address();
+        assert!(
+            bound_address.is_ipv6() && bound_address.ip().is_unspecified(),
+            "该绑在 IPv6 未指定地址上：{bound_address}"
+        );
+        let socket_path = running.service.socket_path().to_path_buf();
+        let ServiceUnderTest {
+            service,
+            directory: directory_kept_until_the_end,
+        } = running;
+        let stop_started = Instant::now();
+        service.stop().expect("绑在 [::] 上的服务停得干净");
+        let stop_took = stop_started.elapsed();
+        assert!(
+            stop_took < STOP_TIME_LIMIT,
+            "停服用了 {stop_took:?}，该在 {STOP_TIME_LIMIT:?} 之内"
+        );
+        assert!(!socket_path.exists(), "停服之后 socket 不在");
+        drop(directory_kept_until_the_end);
     }
 }

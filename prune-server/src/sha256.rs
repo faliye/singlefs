@@ -92,7 +92,7 @@ const BLOCK_BYTES: usize = 64;
 /// 尾部那个「消息位数」字段 64 位。
 const MESSAGE_LENGTH_FIELD_BYTES: usize = 8;
 /// 摘要 256 位。
-const DIGEST_BYTES: usize = 32;
+pub const DIGEST_BYTES: usize = 32;
 
 /// 一段字节的 SHA-256 摘要，小写十六进制（与 `sha256sum`、Python 的 `hexdigest()` 打出来的那 64 个字符逐字相同）。
 #[must_use]
@@ -104,8 +104,9 @@ pub fn sha256_hexadecimal(message: &[u8]) -> String {
     hexadecimal
 }
 
-/// 一段字节的 SHA-256 摘要。
-fn sha256_digest(message: &[u8]) -> [u8; DIGEST_BYTES] {
+/// 一段字节的 SHA-256 摘要（写结论帧守卫那一行的样子按它比，`protocol.rs` 文件头「写结论」）。
+#[must_use]
+pub fn sha256_digest(message: &[u8]) -> [u8; DIGEST_BYTES] {
     let mut hash_values = INITIAL_HASH_VALUES;
     let (whole_blocks, tail) = message.as_chunks::<BLOCK_BYTES>();
     for block in whole_blocks {
@@ -254,7 +255,7 @@ mod tests {
     /// 正好整块的消息（64 字节）：尾巴是空的，补白单独占一整块；整块那一支与补白那一支各走一次。
     /// 判别力（`crates/mutations.tsv`）：跳过消息里的头一个整块，这条红。
     #[test]
-    fn a_message_of_exactly_one_block_is_padded_into_a_block_of_its_own() {
+    fn message_of_exactly_one_block_is_padded_into_a_block_of_its_own() {
         assert_eq!(
             sha256_hexadecimal(&[b'a'; 64]),
             "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"

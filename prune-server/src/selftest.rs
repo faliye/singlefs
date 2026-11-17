@@ -42,6 +42,16 @@ use crate::selftest_fault_cells::{
     cell_reconnect_gives_up_at_limit, cell_replay_after_disconnect_and_server_kill,
     cell_server_kill_while_client_writes,
 };
+use crate::selftest_gpu_judging_cells::{
+    cell_conclusion_guard_checked_after_deduplication,
+    cell_conclusion_write_deletes_the_pending_row,
+    cell_conclusion_write_proceeds_after_the_lease_expires,
+    cell_conclusion_write_proceeds_for_its_own_holder,
+    cell_conclusion_write_refused_when_the_pending_row_changed,
+    cell_conclusion_write_refused_while_another_holder_leases,
+    cell_differing_conclusion_refused_not_dropped, cell_forced_rejudge_writes_the_rejudged_row,
+    cell_pending_rows_written_only_if_absent,
+};
 use crate::selftest_hardening_cells::{
     cell_claim_lease_covers_the_holder_after_the_answer, cell_claim_response_within_frame_limit,
     cell_connect_bounded_by_reconnect_total, cell_delete_prefix_response_within_pending_budget,
@@ -60,7 +70,8 @@ use crate::selftest_library_layout_cells::{
 use crate::selftest_service_cells::{
     cell_client_write_timeout_when_peer_stops_reading, cell_control_install_start_stop_check,
     cell_fault_line_on_server_error, cell_intentional_stop_fails_clients_fast,
-    cell_stop_lists_connected_clients, cell_tcp_proxy_server_kill_client_fails,
+    cell_stop_lists_connected_clients, cell_stop_refuses_while_clients_connected,
+    cell_swap_binary_keeps_clients, cell_tcp_proxy_server_kill_client_fails,
     cell_unannounced_server_death_bounded, cell_watch_reports_new_fault_line,
     cell_watch_reports_server_unreachable, cell_watch_reports_unit_not_running,
 };
@@ -103,7 +114,7 @@ struct Cell {
     function: CellFunction,
 }
 
-const CELLS: [Cell; 54] = [
+const CELLS: [Cell; 65] = [
     Cell {
         name: "batched-point-read",
         remedy: "看 storage.rs 的 read_points：同一张表的键要一次 batched_multi_get_cf 查完，次序与请求相同",
@@ -219,6 +230,16 @@ const CELLS: [Cell; 54] = [
         name: "stop-lists-connected-clients",
         remedy: "看 connections.rs 的 announcement_from_environment（报到带 TASK_SERVER_TASK、TASK_SERVER_ATTEMPT、主机名、进程号）、server.rs 的 handle_reader_request（报到记进登记、宣布停服务回清单）、control 的 stop（打清单、排他写停服务记录）",
         function: cell_stop_lists_connected_clients,
+    },
+    Cell {
+        name: "swap-binary-keeps-clients",
+        remedy: "看 prune-server/control 的 swap_binary（不宣布停服务，只 systemctl restart；回读进程可执行文件的 sha256）与 server.rs 宣布停服务那一段（只有 announce-stop 才让服务发「服务停了」，SIGTERM 不发）、reliable_client.rs 的 ensure_connected（连接断了在重连总时长里重连）",
+        function: cell_swap_binary_keeps_clients,
+    },
+    Cell {
+        name: "stop-refuses-while-clients-connected",
+        remedy: "看 prune-server/control 的 stop（先 connected-clients 列连着的客户端，有就拒、退 78、打任务号；带 --even-with-connected-clients 才往下宣布停服务）",
+        function: cell_stop_refuses_while_clients_connected,
     },
     Cell {
         name: "intentional-stop-fails-clients-fast",
@@ -371,6 +392,54 @@ const CELLS: [Cell; 54] = [
         function: cell_prefix_scan_resumes_after_the_last_key,
     },
     Cell {
+        name: "conclusion-write-refused-while-another-holder-leases",
+        remedy: "看 committer.rs 的 conclusion_guard_refusal（认领键被别的持有者持着、租期没到整帧回状态 7 种类 1）与 reliable_client.rs 的 handle_response\
+                 （状态 7 从追加日志里勾掉、交 ConclusionRefused）",
+        function: cell_conclusion_write_refused_while_another_holder_leases,
+    },
+    Cell {
+        name: "conclusion-write-proceeds-after-the-lease-expires",
+        remedy: "看 committer.rs 的 conclusion_guard_refusal：认领的租期按服务的时钟过了就不拒",
+        function: cell_conclusion_write_proceeds_after_the_lease_expires,
+    },
+    Cell {
+        name: "conclusion-write-proceeds-for-its-own-holder",
+        remedy: "看 committer.rs 的 conclusion_guard_refusal（比的是帧里的持有者身份，自己持着与没人持着都照写）与 add_guarded_conclusion_write\
+                 （写完释放认领键上的认领）",
+        function: cell_conclusion_write_proceeds_for_its_own_holder,
+    },
+    Cell {
+        name: "differing-conclusion-refused-not-dropped",
+        remedy: "看 committer.rs 的 conclusion_guard_refusal（守卫那一行此刻的 SHA-256 与帧里的期待不同整帧回状态 7 种类 2、带此刻的样子）与 storage.rs 的 guard_row_state",
+        function: cell_differing_conclusion_refused_not_dropped,
+    },
+    Cell {
+        name: "conclusion-guard-checked-after-deduplication",
+        remedy: "看 committer.rs 的 add_guarded_conclusion_write：先 answer_if_already_applied 去重，没生效过的才核认领与守卫那一行",
+        function: cell_conclusion_guard_checked_after_deduplication,
+    },
+    Cell {
+        name: "pending-rows-written-only-if-absent",
+        remedy: "看 committer.rs 的 add_write_if_absent（逐条点读已落盘的库，在的不写）与 gpu_judging_rows.rs 的 gpu_pending_key（块号补零的十六进制）",
+        function: cell_pending_rows_written_only_if_absent,
+    },
+    Cell {
+        name: "conclusion-write-deletes-the-pending-row",
+        remedy: "看 committer.rs 的 add_guarded_conclusion_write（删键同一组删掉）与 gpu_judging_rows.rs 的 GpuConclusion::guarded_write（删键是这一块的 gpu-pending/）",
+        function: cell_conclusion_write_deletes_the_pending_row,
+    },
+    Cell {
+        name: "conclusion-write-refused-when-the-pending-row-changed",
+        remedy: "看 committer.rs 的 conclusion_guard_refusal（删键那一行此刻的 SHA-256 与帧里给它的期待不同整帧回状态 7 种类 3、带那把键与此刻的样子）\
+                 与 gpu_judging_rows.rs 的 GpuConclusion::guarded_write（删键的期待取 pending_row_as_read）",
+        function: cell_conclusion_write_refused_when_the_pending_row_changed,
+    },
+    Cell {
+        name: "forced-rejudge-writes-the-rejudged-row",
+        remedy: "看 gpu_judging_rows.rs 的 GpuConclusion::guarded_write（强制现判另带 gpu-rejudged/ 那一行、摘要取写的值或期待）与 reliable_client.rs 的 write_gpu_conclusion",
+        function: cell_forced_rejudge_writes_the_rejudged_row,
+    },
+    Cell {
         name: OWN_PROCESS_CELL_NAME,
         remedy: "看 selftest.rs 的 run_cell_isolated 与 run_cell_in_own_process（每格另起一个 selftest-cell 进程只跑它，父进程是跑格的进程）",
         function: cell_runs_alone_in_own_process,
@@ -477,10 +546,31 @@ pub(crate) fn start_test_server(
     network_arguments: &[String],
     extra: &[&str],
 ) -> Result<TestServer, String> {
+    spawn_test_server(context, network_arguments, extra, None)
+}
+
+/// 同 [`start_test_server`]（TCP 走回环、不另加参数），服务只带 `switches` 这几项弄坏开关：别的格的开关不碰这一格的服务。
+pub(crate) fn start_test_server_with_switches(
+    context: &CellContext,
+    switches: &BreakSwitches,
+) -> Result<TestServer, String> {
+    spawn_test_server(context, &loopback_arguments(), &[], Some(switches))
+}
+
+/// `switches` 给了就只把这几项交给服务（`PRUNE_SERVER_BREAK`），不给照继承跑格的进程的环境。
+fn spawn_test_server(
+    context: &CellContext,
+    network_arguments: &[String],
+    extra: &[&str],
+    switches: Option<&BreakSwitches>,
+) -> Result<TestServer, String> {
     let directory = CellDirectory::create()?;
     let library = directory.path.join("library");
     let mut command = server_command(context, &directory.path, &library)?;
     command.args(network_arguments).args(extra);
+    if let Some(only_these) = switches {
+        command.env(BREAK_VARIABLE, only_these.environment_text());
+    }
     let mut process = SpawnedProcess::spawn(command, StandardError::Capture)?;
     let line = process
         .wait_for_line_starting_with(LISTENING_LINE_PREFIX, SERVER_READY_TIMEOUT)

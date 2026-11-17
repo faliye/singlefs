@@ -39,7 +39,8 @@
 //!       末行 `PRUNE_SERVER_CELL_RESULT result=passed|failed`（`src/selftest.rs` 文件头「每格各在自己的进程里」）
 //! 容错客户端的退出码（`src/reliable_client.rs` 文件头）：75 prune-server 不可用（服务停了、连不上、忙到上限），3 别的错。
 //!
-//! 协议：长度前缀的二进制帧，一帧一批操作（成批点读走 multi_get、成批写带客户端身份与请求号、按前缀扫、统计、认领），
+//! 协议：长度前缀的二进制帧，一帧一批操作（成批点读走 multi_get、成批写带客户端身份与请求号、按前缀扫、统计、认领、删前缀、
+//! 不在才写、带认领与守卫那一行的写结论；GPU 判的三族键在 `src/gpu_judging_rows.rs` 文件头），
 //! 可流水，回应带请求序号、可能乱序，忙时回状态 5 带「多少毫秒后再来」；格式在 `src/protocol.rs` 文件头。
 //! 表「录入、事实、结论」是协议里的分表码，库里同在默认列族、同一个键空间；0xF0–0xFF 起头的键留给服务的记账，客户端碰了回状态 1。
 //! 容错客户端（追加日志、重连重放、帧超时、keepalive、退避加抖动、窗口、忙退避）在 `src/reliable_client.rs`。
@@ -82,7 +83,11 @@
 //!   bench-environment-judgment         压测环境判法（loadavg 超阈值不干净）、loadavg 与 diskstats 解析、忙度换算的已知答案
 //!   control-install-start-stop-check   control 在假 systemctl 下：install --dry-run 不写不起；服务不通时 install 退 1、通时退 0、单元 ExecStart 不带 --library；
 //!                                      start 回读 is-active 打 failed 退 1；check 退 0、打出状态目录下的库目录；stop 回读 cgroup.procs 有进程退 1、正常退 0
-//!   stop-lists-connected-clients       两个带不同任务号的自证客户端连着时 control stop：清单两行字段对、停服务记录排他写了一份
+//!   stop-lists-connected-clients       两个带不同任务号的自证客户端连着时 control stop --even-with-connected-clients：清单两行字段对、停服务记录排他写了一份
+//!   swap-binary-keeps-clients          两个带不同任务号的自证客户端写着时 control swap-binary：服务被 SIGTERM 换成新进程（假 systemctl 的 restart 由这一格杀旧起新），
+//!                                      control 退 0、回读进程可执行文件的 sha256 对上；两个客户端都没退出（不收「服务停了」、不退 75），重连上新服务、清单里又有它们
+//!   stop-refuses-while-clients-connected 一个报了任务号的自证客户端连着时 control stop：退 78、打出任务号、systemctl 没收到 stop、服务没宣布停服务（客户端照常写）；
+//!                                      带 --even-with-connected-clients 才停：退 0、客户端收到「服务停了」退 75
 //!   intentional-stop-fails-clients-fast 宣布停服务再 SIGTERM：客户端 15 秒内退 75、说「服务停了」
 //!   unannounced-server-death-bounded   服务 kill -9 不重起：客户端在重连上限（6 秒）里退 75、说「连不上」
 //!   fault-line-on-server-error         自证造的存储写失败：故障日志新增一行，种类与报到身份的字段齐
@@ -134,6 +139,18 @@
 //!   segmented-rewrite-survives-writer-death  存着两段长旧值的键改写新值，容错客户端写完段与版本登记键、不写清单就丢掉：另一个客户端读回旧值、登记旧新两版；
 //!                                      写第三个值之后读回它、写到一半那一版的段删了；同一个值再写一遍之后登记只剩第三个值那一版
 //!   prefix-scan-resumes-after-the-last-key  前缀下七把键每帧至多三条：从上一帧最后一把键之后续扫，三帧（3、3、1）扫完、逐把相同不重不漏；续扫起点不以前缀起头回状态 1
+//!   conclusion-write-refused-while-another-holder-leases  别的持有者持着 gpu-claim/、租期没到：写结论整帧回状态 7（认领被别人持着，带持有者与剩余租期），
+//!                                      结论块与旁表行都没落；容错客户端把那一帧从追加日志里勾掉，重开不重放
+//!   conclusion-write-proceeds-after-the-lease-expires  别人的认领租期 300 毫秒、过了 1 秒：写结论照写，结论块落了
+//!   conclusion-write-proceeds-for-its-own-holder  没人持着照写；帧里的持有者自己持着、租期没到照写，写完认领释放、别的持有者随即认领到
+//!   differing-conclusion-refused-not-dropped  两个写的一方都读到「不在」：先到的落下，后到的整帧回状态 7（守卫那一行变了，带库里那一份的 SHA-256）、
+//!                                      库里还是先到的；带重读到的那一份再写才换上
+//!   conclusion-guard-checked-after-deduplication  写结论落下、别的持有者接着认领之后，同一请求号重发回「早已生效」（2 条），不当守卫不过
+//!   pending-rows-written-only-if-absent  待判行不在才写：录两块的那一帧写 2 条；重录那一帧一块已在只写新的 1 条、已在的不改；按流的前缀扫回三行、按块号升序
+//!   conclusion-write-deletes-the-pending-row  写结论那一帧删掉 gpu-pending/ 那一行，旁表行与结论块同一帧落下
+//!   conclusion-write-refused-when-the-pending-row-changed  写的一方读到的待判行读完之后被升成强制现判：写结论整帧回状态 7（删键那一行变了，
+//!                                      带那把键与升过那一份的 SHA-256），升过的那一行还在、结论没落；带重读到的那一份再写才落下
+//!   forced-rejudge-writes-the-rejudged-row  强制现判两次（写结论块的、库里相同不重写的）：两行 gpu-rejudged/ 都在，持有者是判它的那一个、结论摘要是结论块的 SHA-256
 //!   cell-runs-alone-in-own-process     这一格在跑格的进程为它另起的进程里单独跑：父进程是跑格的进程（别的格起子进程复制不到它的描述符）
 //!
 //! 弄坏开关 PRUNE_SERVER_BREAK=<项>（逗号分隔；只在自证起的服务与压测器带 --selftest-instance 时认，自证进程自己读它弄坏客户端与判法）。
@@ -175,6 +192,8 @@
 //!   PRUNE_SERVER_BREAK=client-announcement-omits-task             报到时任务号报空                                 stop-lists-connected-clients
 //!   PRUNE_SERVER_BREAK=announcement-ignored                       服务不把报到记进登记                             stop-lists-connected-clients
 //!   PRUNE_SERVER_BREAK=control-stop-record-skipped                stop 不写停服务记录                              stop-lists-connected-clients
+//!   PRUNE_SERVER_BREAK=control-swap-announces-stop                swap-binary 在 restart 之前宣布停服务            swap-binary-keeps-clients
+//!   PRUNE_SERVER_BREAK=control-stop-ignores-connected-clients     stop 不看连着的客户端、不带确认参数也照停        stop-refuses-while-clients-connected
 //!   PRUNE_SERVER_BREAK=stop-notice-not-sent                       宣布停服务不给客户端发「服务停了」               intentional-stop-fails-clients-fast
 //!   PRUNE_SERVER_BREAK=stop-notice-retried                        客户端收到「服务停了」照常重连                   intentional-stop-fails-clients-fast
 //!   PRUNE_SERVER_BREAK=unreachable-exit-code-generic              「连不上」退 3 而不是 75                         unannounced-server-death-bounded
@@ -213,6 +232,15 @@
 //!   PRUNE_SERVER_BREAK=segments-overwritten-in-place              写大值段键不带版本、就地覆写旧段（改前）         segmented-rewrite-survives-writer-death
 //!   PRUNE_SERVER_BREAK=response-built-before-budget               工作线程先编好整份回应再记额度（改前）           worker-responses-within-pending-budget
 //!   PRUNE_SERVER_BREAK=scan-resume-key-ignored                    按前缀扫不看续扫起点、每帧从前缀起               prefix-scan-resumes-after-the-last-key
+//!   PRUNE_SERVER_BREAK=conclusion-guard-claim-unchecked           写结论不核认领                                   conclusion-write-refused-while-another-holder-leases
+//!   PRUNE_SERVER_BREAK=conclusion-guard-expired-claim-refused     写结论把租期过了的别人的认领也当成持着           conclusion-write-proceeds-after-the-lease-expires
+//!   PRUNE_SERVER_BREAK=conclusion-guard-own-claim-refused         写结论把自己持着的认领也当成别人持着             conclusion-write-proceeds-for-its-own-holder
+//!   PRUNE_SERVER_BREAK=conclusion-guard-row-unchecked             写结论不核守卫那一行、照写盖掉                   differing-conclusion-refused-not-dropped
+//!   PRUNE_SERVER_BREAK=conclusion-guard-before-deduplication      写结论先核认领与守卫那一行、再去重               conclusion-guard-checked-after-deduplication
+//!   PRUNE_SERVER_BREAK=write-if-absent-overwrites                 不在才写照成批写写、键在也盖掉                   pending-rows-written-only-if-absent
+//!   PRUNE_SERVER_BREAK=conclusion-write-pending-rows-kept         写结论不删帧里的删键（待判行留着）               conclusion-write-deletes-the-pending-row
+//!   PRUNE_SERVER_BREAK=conclusion-guard-deleted-row-unchecked     写结论不核删键、读完之后被改过的也照删           conclusion-write-refused-when-the-pending-row-changed
+//!   PRUNE_SERVER_BREAK=rejudged-row-dropped                       容错客户端写 GPU 结论不带强制现判那一行          forced-rejudge-writes-the-rejudged-row
 //!
 //! 没有弄坏开关的格：single-library-holder（拒的是 RocksDB 自己的 LOCK）、tcp-route-from-configuration（读配置那一处由
 //! missing-tcp-address-refused 的开关管）、bench-runs-every-mode（跑通性的冒烟格；fault-injection 的逐键核对与它的去重、重放

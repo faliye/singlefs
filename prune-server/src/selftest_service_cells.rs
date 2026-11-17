@@ -1,4 +1,5 @@
-//! 自证里服务转正那一批的格（格表在 `selftest.rs` 的 `CELLS`）：常驻单元与控制命令、停服务列客户端、停服务时客户端快失败、
+//! 自证里服务转正那一批的格（格表在 `selftest.rs` 的 `CELLS`）：常驻单元与控制命令、停服务列客户端、换二进制客户端不退出、
+//! 连着客户端时拒停、停服务时客户端快失败、
 //! 服务没打招呼就断了时客户端有限时退出、故障行、监听三格、写超时、经 TCP 代理杀服务。
 //!
 //! 起的子进程（服务、控制命令、自证客户端）的弄坏开关都由这一格自己定：环境变量 `PRUNE_SERVER_BREAK` 只交这一格要证红的那几项
@@ -27,7 +28,7 @@ use crate::reliable_client::{
 };
 use crate::selftest::{line_field, CellContext, CellDirectory};
 use crate::selftest_fault_cells::within_deadline;
-use crate::server::LISTENING_LINE_PREFIX;
+use crate::server::{FRAMES_HANDLED_COUNTER, LISTENING_LINE_PREFIX};
 use crate::spawned::{SpawnedProcess, StandardError};
 
 /// 控制命令跑在哪个临时目录里（`prune-server/control` 文件头）。
@@ -54,6 +55,12 @@ case "$1" in
   start)
     if [ -f "$root/fake/start-result" ]; then cat "$root/fake/start-result" > "$root/fake/state"; else echo active > "$root/fake/state"; fi
     echo 4242 > "$processes"; exit 0 ;;
+  restart)
+    # 换二进制那一格：旧进程由自证杀、新进程由自证起（`fake/restart-done` 里是新进程号），这里只等它们
+    : > "$root/fake/restart-requested"
+    for _ in $(seq 1 1200); do [ -f "$root/fake/restart-done" ] && break; sleep 0.1; done
+    [ -f "$root/fake/restart-done" ] || { echo "自证没放行 restart" >&2; exit 1; }
+    echo active > "$root/fake/state"; cat "$root/fake/restart-done" > "$processes"; exit 0 ;;
   stop)
     echo inactive > "$root/fake/state"
     if [ -f "$root/fake/stop-leaves-process" ]; then echo 4242 > "$processes"; else : > "$processes"; fi
@@ -92,7 +99,24 @@ impl SandboxServer {
         switches: &BreakSwitches,
         extra: &[&str],
     ) -> Result<SandboxServer, String> {
-        let mut command = Command::new(&context.executable);
+        SandboxServer::spawn_executable(
+            &context.executable,
+            socket,
+            state_directory,
+            switches,
+            extra,
+        )
+    }
+
+    /// 起 `executable` 这个二进制当服务（换二进制那一格起新进程时用装好的那一份）。
+    fn spawn_executable(
+        executable: &Path,
+        socket: &Path,
+        state_directory: &Path,
+        switches: &BreakSwitches,
+        extra: &[&str],
+    ) -> Result<SandboxServer, String> {
+        let mut command = Command::new(executable);
         command
             .arg("serve")
             .arg("--selftest-instance")
@@ -188,6 +212,9 @@ impl ControlRun {
     }
 }
 
+/// `control stop` 在服务上连着客户端时要带的确认参数（`prune-server/control` 文件头）。
+const EVEN_WITH_CLIENTS_FLAG: &str = "--even-with-connected-clients";
+
 /// 控制命令的临时根目录：路径照 `prune-server/control` 的 `Paths` 自证那一支。
 struct ControlSandbox {
     directory: CellDirectory,
@@ -269,6 +296,13 @@ impl ControlSandbox {
         std::fs::create_dir_all(self.root().join("bin"))
             .and_then(|()| std::os::unix::fs::symlink(&context.executable, self.binary()))
             .map_err(|error| format!("链不了二进制：{error}"))
+    }
+
+    /// 控制命令读的 /proc 换成真的（自证根下的 `proc` 指向它）：服务是真进程，
+    /// 换二进制之后回读它的可执行文件要读真的 `/proc/<进程号>/exe`。
+    fn use_real_process_filesystem(&self) -> Result<(), String> {
+        std::os::unix::fs::symlink("/proc", self.root().join("proc"))
+            .map_err(|error| format!("链不了 /proc：{error}"))
     }
 
     fn spawn_server(
@@ -537,12 +571,12 @@ pub(crate) fn cell_stop_lists_connected_clients(context: &CellContext) -> Result
         &client_switches,
     )?;
     let stop = sandbox.run_control(
-        &["stop"],
+        &["stop", EVEN_WITH_CLIENTS_FLAG],
         &context
             .break_switches
             .only(BreakSwitch::ControlStopRecordSkipped),
     )?;
-    expect_exit(&stop, 0, "stop")?;
+    expect_exit(&stop, 0, "stop（带确认参数，连着两个客户端）")?;
     let listed: Vec<String> = stop
         .standard_output
         .lines()
@@ -595,6 +629,275 @@ pub(crate) fn cell_stop_lists_connected_clients(context: &CellContext) -> Result
         record
             .file_name()
             .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+    ))
+}
+
+/// 换二进制那一格里等假 systemctl 的 restart 到、等控制命令收尾的上限。
+const SWAP_STEP_TIMEOUT: Duration = Duration::from_secs(60);
+/// 换了二进制之后客户端重连上新服务的上限（自证客户端的重连间隔封顶 1 秒）。
+const CLIENT_RECONNECT_LIMIT: Duration = Duration::from_secs(30);
+
+/// 等 `path` 出现；`process`（控制命令）在它出现之前退了，或到点还没出现，回错。
+fn wait_for_file_while_running(
+    path: &Path,
+    process: &mut SpawnedProcess,
+    what: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    let deadline = Instant::now() + timeout;
+    while !path.exists() {
+        if let Some(status) = process.wait_for_exit(Duration::ZERO) {
+            return Err(format!(
+                "{what}：{} 还没出现，控制命令先退了（退出码 {:?}）；标准错误：{}",
+                path.display(),
+                status.code(),
+                process.standard_error_text()
+            ));
+        }
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "{what}：{} 秒没等到 {}",
+                timeout.as_secs(),
+                path.display()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    Ok(())
+}
+
+/// 自证客户端（任务号，进程）都还在跑；有退了的回错，带它的退出码与 failed 行。
+fn ensure_clients_running(
+    clients: &mut [(&str, SpawnedProcess)],
+    when: &str,
+) -> Result<(), String> {
+    for (task, client) in clients.iter_mut() {
+        if let Some(status) = client.wait_for_exit(Duration::ZERO) {
+            let failed_line = client
+                .remaining_lines(Duration::from_secs(5))
+                .into_iter()
+                .find(|line| line.starts_with(&format!("{SELFTEST_CLIENT_LINE_PREFIX} failed")))
+                .unwrap_or_default();
+            return Err(format!(
+                "{when}：任务 {task} 的客户端退了（退出码 {:?}）：{failed_line}",
+                status.code()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// 服务此刻列出的客户端报到的任务号。
+fn connected_task_numbers(route: &RouteAddress) -> Result<Vec<String>, String> {
+    let clients = SimpleClient::connect(route, BreakSwitches::none())?.connected_clients()?;
+    Ok(clients
+        .iter()
+        .filter_map(|client| {
+            client
+                .announcement
+                .as_ref()
+                .map(|announcement| announcement.task.clone())
+        })
+        .collect())
+}
+
+/// 服务到此刻处理过的帧数。
+fn frames_handled(route: &RouteAddress) -> Result<u64, String> {
+    let counters = SimpleClient::connect(route, BreakSwitches::none())?.statistics()?;
+    Ok(counters
+        .iter()
+        .find(|counter| counter.name == FRAMES_HANDLED_COUNTER)
+        .map_or(0, |counter| counter.value))
+}
+
+pub(crate) fn cell_swap_binary_keeps_clients(context: &CellContext) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::ControlSwapAnnouncesStop);
+    let sandbox = ControlSandbox::create()?;
+    sandbox.link_binary(context)?;
+    sandbox.use_real_process_filesystem()?;
+    let mut old_server = sandbox.spawn_server(context, &BreakSwitches::none())?;
+    let mut clients: Vec<(&str, SpawnedProcess)> = Vec::new();
+    for task in ["303", "404"] {
+        let journal = sandbox.root().join(format!("client-{task}.journal"));
+        // 重连总时长给到 60 秒：换的这几秒里客户端要等得起；要是被宣布了停服务，它们当场退 75，不等。
+        let client = spawn_selftest_client(
+            context,
+            &sandbox.socket(),
+            &journal,
+            60,
+            Some((task, "1")),
+            &BreakSwitches::none(),
+        )?;
+        clients.push((task, client));
+    }
+    let executable = context.executable.display().to_string();
+    let mut control = SpawnedProcess::spawn(
+        sandbox.control_command(&["swap-binary", "--binary", &executable], &switches),
+        StandardError::Capture,
+    )?;
+    wait_for_file_while_running(
+        &sandbox.fake("restart-requested"),
+        &mut control,
+        "swap-binary 等 systemctl restart",
+        SWAP_STEP_TIMEOUT,
+    )?;
+    // 假 systemctl 的 restart 在等：照 systemd 那样给旧进程 SIGTERM、起新进程，再放行。
+    old_server.process.send_signal(libc::SIGTERM)?;
+    old_server
+        .process
+        .wait_for_exit(SERVER_READY_TIMEOUT)
+        .ok_or("旧服务收了 SIGTERM 还没退出")?;
+    let new_server = SandboxServer::spawn_executable(
+        &sandbox.binary(),
+        &sandbox.socket(),
+        &sandbox.state_directory(),
+        &BreakSwitches::none(),
+        &[],
+    )?;
+    sandbox.set_fake(
+        "restart-done",
+        &format!("{}\n", new_server.process.process_identifier()),
+    )?;
+    let status = control
+        .wait_for_exit(SWAP_STEP_TIMEOUT)
+        .ok_or("swap-binary 放行 restart 之后 60 秒还没退出")?;
+    let swap = ControlRun {
+        exit_code: status.code(),
+        standard_output: control.remaining_lines(Duration::from_secs(5)).join("\n"),
+        standard_error: control.standard_error_text(),
+    };
+    expect_exit(&swap, 0, "swap-binary")?;
+    let calls = std::fs::read_to_string(sandbox.fake("calls.log")).unwrap_or_default();
+    if !calls
+        .lines()
+        .any(|line| line.starts_with("--user restart "))
+        || calls.lines().any(|line| line.starts_with("--user stop "))
+        || !swap.standard_output.contains("换之前连着的客户端 2 个")
+        || !swap.standard_output.contains("换好了")
+    {
+        return Err(format!(
+            "swap-binary 该列出换之前连着的 2 个客户端、用 systemctl restart（不 stop）、说换好了；systemctl 的调用：{calls}；{}",
+            swap.describe()
+        ));
+    }
+    ensure_clients_running(&mut clients, "swap-binary 退 0 之后")?;
+    let route = new_server.unix_route();
+    let deadline = Instant::now() + CLIENT_RECONNECT_LIMIT;
+    loop {
+        ensure_clients_running(&mut clients, "换了二进制之后等客户端重连")?;
+        let tasks = connected_task_numbers(&route)?;
+        if ["303", "404"]
+            .iter()
+            .all(|task| tasks.iter().any(|found| found == task))
+        {
+            break;
+        }
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "换了二进制之后 {} 秒里两个客户端没都重连上新服务，新服务列出的任务号：{tasks:?}",
+                CLIENT_RECONNECT_LIMIT.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let handled_before = frames_handled(&route)?;
+    std::thread::sleep(Duration::from_secs(1));
+    ensure_clients_running(&mut clients, "重连上之后写了一秒")?;
+    let handled_after = frames_handled(&route)?;
+    if handled_after < handled_before + 5 {
+        return Err(format!(
+            "客户端重连上之后该接着写（每 100 毫秒一帧），一秒里新服务处理的帧数只从 {handled_before} 涨到 {handled_after}"
+        ));
+    }
+    Ok(format!(
+        "两个任务号的客户端写着时 swap-binary：control 退 0、不宣布停服务、用 restart 换上新进程（可执行文件 sha256 回读对上）；\
+         客户端没退（不退 75），重连上新服务、清单里又有 303 与 404，之后一秒新服务又处理了 {} 帧",
+        handled_after - handled_before
+    ))
+}
+
+pub(crate) fn cell_stop_refuses_while_clients_connected(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only(BreakSwitch::ControlStopIgnoresConnectedClients);
+    let sandbox = ControlSandbox::create()?;
+    sandbox.link_binary(context)?;
+    let server = sandbox.spawn_server(context, &BreakSwitches::none())?;
+    let mut client = spawn_selftest_client(
+        context,
+        &sandbox.socket(),
+        &sandbox.root().join("client.journal"),
+        30,
+        Some(("505", "1")),
+        &BreakSwitches::none(),
+    )?;
+    let refused = sandbox.run_control(&["stop"], &switches)?;
+    expect_exit(&refused, 78, "有任务连着时 stop（该拒停）")?;
+    let listed_task = refused.standard_output.lines().map(str::trim).any(|line| {
+        line.starts_with(CLIENT_LINE_PREFIX) && line_field(line, "task").as_deref() == Some("505")
+    });
+    if !listed_task
+        || !refused.standard_error.contains("505")
+        || !refused.standard_error.contains("swap-binary")
+        || !refused.standard_error.contains(EVEN_WITH_CLIENTS_FLAG)
+    {
+        return Err(format!(
+            "拒停该列出任务 505 的那一行、标准错误点名任务号 505，出路写 swap-binary 与 {EVEN_WITH_CLIENTS_FLAG}；{}",
+            refused.describe()
+        ));
+    }
+    let calls_after_refusal =
+        std::fs::read_to_string(sandbox.fake("calls.log")).unwrap_or_default();
+    let stop_records = std::fs::read_dir(sandbox.state_directory().join("stops"))
+        .map_or(0, |entries| entries.filter_map(Result::ok).count());
+    if calls_after_refusal
+        .lines()
+        .any(|line| line.starts_with("--user stop "))
+        || stop_records != 0
+    {
+        return Err(format!(
+            "拒停时 systemctl 不该收到 stop、不该写停服务记录；systemctl 的调用：{calls_after_refusal}；停服务记录 {stop_records} 份"
+        ));
+    }
+    // 拒停没有宣布停服务：客户端照常写，服务清单里还有它。
+    if client.wait_for_exit(Duration::from_secs(2)).is_some() {
+        return Err("拒停之后客户端退了：拒停不该宣布停服务".to_string());
+    }
+    let tasks = connected_task_numbers(&server.unix_route())?;
+    if !tasks.iter().any(|task| task == "505") {
+        return Err(format!("拒停之后服务清单里该还有任务 505，列出：{tasks:?}"));
+    }
+    let confirmed = sandbox.run_control(&["stop", EVEN_WITH_CLIENTS_FLAG], &switches)?;
+    expect_exit(
+        &confirmed,
+        0,
+        &format!("带 {EVEN_WITH_CLIENTS_FLAG} 的 stop"),
+    )?;
+    let calls_after_confirmed_stop =
+        std::fs::read_to_string(sandbox.fake("calls.log")).unwrap_or_default();
+    if !calls_after_confirmed_stop
+        .lines()
+        .any(|line| line.starts_with("--user stop "))
+    {
+        return Err(format!(
+            "带 {EVEN_WITH_CLIENTS_FLAG} 的 stop 该照停，systemctl 的调用：{calls_after_confirmed_stop}"
+        ));
+    }
+    let (exit_code, failed_line, waited) = wait_client_exit(&mut client, INTENTIONAL_STOP_LIMIT)?;
+    if exit_code != Some(PRUNE_SERVER_UNAVAILABLE_EXIT_CODE) || !failed_line.contains("服务停了")
+    {
+        return Err(format!(
+            "带确认参数的 stop 宣布了停服务，客户端该退 {PRUNE_SERVER_UNAVAILABLE_EXIT_CODE} 并说「服务停了」，退了 {exit_code:?}：{failed_line}"
+        ));
+    }
+    Ok(format!(
+        "任务 505 的客户端连着时 stop：退 78、列出任务号、出路写 swap-binary 与确认参数，systemctl 没收到 stop、客户端照常写；\
+         带 {EVEN_WITH_CLIENTS_FLAG} 才停（客户端 {:.1} 秒后退 {PRUNE_SERVER_UNAVAILABLE_EXIT_CODE}、说「服务停了」）",
+        waited.as_secs_f64()
     ))
 }
 

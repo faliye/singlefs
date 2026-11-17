@@ -956,7 +956,7 @@ mod tests {
     /// 段键带这个值的 sha256。
     /// 判别力（`crates/mutations.tsv`）：切段时每段取两段长（段与段重叠），这条红。
     #[test]
-    fn a_value_longer_than_a_segment_is_planned_as_segments_then_a_manifest() {
+    fn value_longer_than_a_segment_is_planned_as_segments_then_a_manifest() {
         let value: Vec<u8> = (0..2 * SEGMENT_BYTES + 5)
             .map(|position| u8::try_from(position % 251).expect("取模 251 放得进 u8"))
             .collect();
@@ -1008,7 +1008,7 @@ mod tests {
     /// 写到一半死掉（新段写了、清单没写）的那一版在下一次写之前算过期，此刻清单那一版不算。
     /// 判别力（`crates/mutations.tsv`）：版本登记键只写这一次的版本、不并上此刻那一版，这条红。
     #[test]
-    fn a_rewrite_writes_beside_the_current_version_and_registers_both() {
+    fn rewrite_writes_beside_the_current_version_and_registers_both() {
         let value = SEGMENT_MANIFEST_MAGIC.to_vec();
         let version = sha256_hexadecimal(&value);
         let stored_versions = StoredVersions {
@@ -1067,7 +1067,7 @@ mod tests {
     /// 以清单开头的短值也分段存（否则读回来会被当成清单），没分段存过的短值照原样写、不写版本登记键。
     /// 判别力（`crates/mutations.tsv`）：以清单开头的短值不分段，这条红。
     #[test]
-    fn a_short_value_starting_with_the_manifest_magic_is_segmented_and_a_plain_one_is_not() {
+    fn short_value_starting_with_the_manifest_magic_is_segmented_and_a_plain_one_is_not() {
         let mut looks_like_a_manifest = SEGMENT_MANIFEST_MAGIC.to_vec();
         looks_like_a_manifest.extend_from_slice(b"not a manifest");
         let version = sha256_hexadecimal(&looks_like_a_manifest);
@@ -1108,7 +1108,7 @@ mod tests {
     /// 原键的形状是段键或版本登记键的，写之前就拒、一条都不写；表标签开头、中间带 NUL 的二进制键照收。
     /// 判别力（`crates/mutations.tsv`）：写之前不核原键的形状，这条红。
     #[test]
-    fn a_key_shaped_like_a_segment_or_version_registry_key_is_refused_and_other_binary_keys_are_accepted(
+    fn key_shaped_like_a_segment_or_version_registry_key_is_refused_and_other_binary_keys_are_accepted(
     ) {
         for reserved in [b"key\x00000003".to_vec(), b"key\x00versions".to_vec()] {
             match version_registry_keys_to_read_before_writing(&[(
@@ -1150,8 +1150,7 @@ mod tests {
     /// 版本登记键不是升序、不重的逗号隔开的版本当读错，不在与空值是一个都没有；此刻那一版只认解得开的清单，坏了的清单不报错、当没有。
     /// 判别力（`crates/mutations.tsv`）：登记键里的版本不核升序，这条红。
     #[test]
-    fn a_version_registry_that_is_not_ascending_versions_is_unreadable_and_an_absent_one_is_empty()
-    {
+    fn version_registry_that_is_not_ascending_versions_is_unreadable_and_an_absent_one_is_empty() {
         assert_eq!(parse_version_registry(b"key", None), Ok(Vec::new()));
         assert_eq!(parse_version_registry(b"key", Some(b"")), Ok(Vec::new()));
         let both = format!("{OLDER_VERSION},{NEWER_VERSION}");
@@ -1261,7 +1260,7 @@ mod tests {
     /// 读到旧清单配新段：等到写的一方写了新清单，照新清单拼回新值（同一把键正被重写时读的一方不退 3）。
     /// 判别力（`crates/mutations.tsv`）：拼不回不重读原键、当场交拼不回，这条红。
     #[test]
-    fn a_reader_that_met_a_rewrite_halfway_rereads_the_manifest_and_assembles_the_new_value() {
+    fn reader_that_met_a_rewrite_halfway_rereads_the_manifest_and_assembles_the_new_value() {
         let mut service = service_rewriting_hello_into_jello(3);
         let outcome =
             assemble_rereading_the_original_key(being_assembled_from(b"hello", 2), &mut service);
@@ -1283,7 +1282,7 @@ mod tests {
     /// 清单一直没换（写到一半断了或被改过）：等完照旧交头一次拼不回的原因，不当成读到了值。
     /// 判别力（`crates/mutations.tsv`）：等完清单没换却交成拼回了，这条红。
     #[test]
-    fn a_manifest_that_never_changes_after_every_wait_is_still_refused() {
+    fn manifest_that_never_changes_after_every_wait_is_still_refused() {
         let mut service = service_rewriting_hello_into_jello(usize::MAX);
         let outcome =
             assemble_rereading_the_original_key(being_assembled_from(b"hello", 2), &mut service);
@@ -1303,7 +1302,7 @@ mod tests {
 
     /// 段齐、核得过的头一次就拼回，不等、不重读。
     #[test]
-    fn a_value_that_assembles_at_once_does_not_wait() {
+    fn value_that_assembles_at_once_does_not_wait() {
         let mut service = service_rewriting_hello_into_jello(0);
         service.segments = BTreeMap::from([(0, b"hello".to_vec()), (1, Vec::new())]);
         let outcome =
@@ -1372,7 +1371,7 @@ mod tests {
     /// 清单解不开（各段之和不等于整值字节数、一段长过上限、排法不是 Python 写的那一种）当读错；不以清单开头的不是清单。
     /// 判别力（`crates/mutations.tsv`）：不核各段之和等于整值字节数，这条红。
     #[test]
-    fn a_manifest_that_does_not_add_up_or_is_laid_out_otherwise_is_unreadable() {
+    fn manifest_that_does_not_add_up_or_is_laid_out_otherwise_is_unreadable() {
         let digest = sha256_hexadecimal(b"hello");
         let sum_differs = format!("{{\"length\":6,\"segments\":[5],\"sha256\":\"{digest}\"}}");
         let segment_too_long = format!(

@@ -2,7 +2,9 @@
 //! （records/2026-11-01-判定库服务化.md「用户定案」那几条）。
 //!
 //! 模块：
-//! - `protocol`：长度前缀的二进制帧，一帧一批操作（成批点读、成批写、按前缀扫、统计、认领、按前缀删），回应带请求序号；
+//! - `protocol`：长度前缀的二进制帧，一帧一批操作（成批点读、成批写、按前缀扫、统计、认领、按前缀删、不在才写、带守卫的写结论），回应带请求序号；
+//! - `gpu_judging_rows`：GPU 判的三族键与行（待判行 `gpu-pending/`、认领 `gpu-claim/`、强制现判行 `gpu-rejudged/`）与写结论帧的拼法；
+//!   `selftest_gpu_judging_cells`：自证里不在才写、写结论核认领与守卫那一行、删待判行、强制现判行那八格；
 //! - `storage`：RocksDB 那一层，服务只有自己那一份库、只有默认列族：三类表「录入、事实、结论」只是分表码、键原样，
 //!   已生效的请求号与认领记录两张记账表也在默认列族、各一个客户端碰不到的键前缀；
 //! - `server`：两处监听（unix socket、TCP）、每条连接一个读线程一个写线程、准入（待处理有界，满了回忙）、
@@ -18,6 +20,7 @@
 //! - `preflight`：准入与运行条件的现判；`process_watch`：读 `/proc` 取服务的内存峰值与 CPU 秒数；
 //! - `interruption`：压测器收 SIGTERM / SIGINT 之后收尾删压测库；`spawned`：起子进程、读它报的就绪行。
 //! - `connections`：服务这一侧的连接登记与客户端报到的身份；`fault_log`：服务自身出错时追加的故障行；
+//!   `in_process_service_for_tests`：单元测试共用的临时目录与在测试进程里起的服务（只编进测试）；
 //! - `oversized_values`：离线子命令 `drop-oversized-values`，服务停着时开库删掉一把键单独一帧也读不回的整值（分段之前写进来的旧行）；
 //! - `administration`：控制命令调的 `admin` 子命令（服务通不通、列连着的客户端、宣布停服务）与自证起的客户端子进程；
 //!   `selftest_service_cells`：自证里常驻单元、控制命令、停服务、故障行、监听、写超时与经 TCP 代理杀服务这几格；
@@ -37,6 +40,9 @@ pub mod connections;
 pub mod environment;
 pub mod fault_log;
 pub mod fault_proxy;
+pub mod gpu_judging_rows;
+#[cfg(test)]
+mod in_process_service_for_tests;
 pub mod interruption;
 pub mod journal;
 pub mod keepalive;
@@ -48,6 +54,7 @@ pub mod reliable_client;
 pub mod segmented_values;
 pub mod selftest;
 pub mod selftest_fault_cells;
+pub mod selftest_gpu_judging_cells;
 pub mod selftest_hardening_cells;
 pub mod selftest_library_layout_cells;
 pub mod selftest_service_cells;

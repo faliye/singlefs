@@ -7,14 +7,16 @@
 //!   回应带着它那一帧的待处理名额（`server::PendingSlot`，名额里记着请求与回应的字节）一起排进队，写出去或丢掉（连接没了）
 //!   才放手，所以对端不读时回应占的内存受待处理额度管（`server.rs` 文件头「额度」）。不带名额的几种（忙、拒绝、列客户端、
 //!   宣布停服务、服务停了）一条连接至多排 `UNBUDGETED_OUTBOUND_BYTES_PER_CONNECTION` 字节，再多就关这条连接：
-//!   只发不收的客户端拿忙回应也堆不满服务的内存。弄坏开关 response-slot-released-on-enqueue 退回回应一进队就放名额的写法。
+//!   只发不收的客户端拿忙回应也堆不满服务的内存；关连接的那一刻往故障日志记一行 `outbound-overflow-closed`（连接身份与积压的未计费字节）。
+//!   弄坏开关 response-slot-released-on-enqueue 退回回应一进队就放名额的写法。
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+use crate::fault_log::{FaultKind, FaultLog};
 use crate::server::PendingSlot;
 
 /// 不带待处理名额的回应（忙、拒绝、管理回应、服务停了）一条连接的写出队里至多排这么多字节，再多就关这条连接（文件头）。
@@ -72,6 +74,12 @@ pub struct OutboundTotals {
     pub overflow_closures: AtomicU64,
 }
 
+/// 不带名额的回应排超上限、连接被关时，往哪份故障日志记一行、记哪条连接。
+struct OverflowReport {
+    fault_log: Arc<FaultLog>,
+    connection: Arc<ConnectionRecord>,
+}
+
 /// 一条连接的写出队的账。
 struct OutboundAccount {
     queued_bytes: AtomicUsize,
@@ -80,6 +88,8 @@ struct OutboundAccount {
     /// 把这条连接两个方向都关掉（堵在写里的写线程随即出错、读线程读到流尾）。
     shut_down: Box<dyn Fn() + Send + Sync>,
     is_closed_for_overflow: AtomicBool,
+    /// 登记这条连接时接上（[`ConnectionRegistry::register`]）；接上之前通道不交给任何会发不带名额回应的线程。
+    overflow_report: OnceLock<OverflowReport>,
     /// 弄坏开关 response-slot-released-on-enqueue：回应一进队就放名额。
     releases_slot_on_enqueue: bool,
 }
@@ -111,6 +121,7 @@ impl Responder {
             totals,
             shut_down,
             is_closed_for_overflow: AtomicBool::new(false),
+            overflow_report: OnceLock::new(),
             releases_slot_on_enqueue,
         });
         (Responder { sender, account }, receiver)
@@ -182,11 +193,42 @@ impl Responder {
                     .totals
                     .overflow_closures
                     .fetch_add(1, Ordering::Relaxed);
+                let report = self
+                    .account
+                    .overflow_report
+                    .get()
+                    .expect("登记连接时接上了故障日志，通道在那之后才交给发回应的线程");
+                report.fault_log.record(
+                    FaultKind::OutboundOverflowClosed,
+                    Some(&*report.connection),
+                    &format!(
+                        "不带名额的回应排超了上限，关这条连接：已积压 {} 字节未计费回应，再排 {frame_bytes} 字节就超过每条连接的上限 {UNBUDGETED_OUTBOUND_BYTES_PER_CONNECTION} 字节（对端不收回应）",
+                        reached - frame_bytes
+                    ),
+                );
                 (self.account.shut_down)();
             }
             return Err(WriterGone);
         }
         self.enqueue(frame, false, None)
+    }
+
+    /// 接上故障日志与这条连接的登记：不带名额的回应排超上限、关连接时往 `fault_log` 记一行，带 `connection` 的身份。
+    /// 一条连接的通道只接一次（登记时，[`ConnectionRegistry::register`]）。
+    fn report_overflow_closure_to(
+        &self,
+        fault_log: Arc<FaultLog>,
+        connection: Arc<ConnectionRecord>,
+    ) {
+        let is_first_report = self
+            .account
+            .overflow_report
+            .set(OverflowReport {
+                fault_log,
+                connection,
+            })
+            .is_ok();
+        assert!(is_first_report, "一条连接的通道只登记一次");
     }
 
     /// 关这条连接两个方向（读线程随即读到流尾、收尾）：在调用方进程里起的那一份服务停服时用（`server::ServiceInThisProcess::stop`）。
@@ -340,12 +382,14 @@ impl Default for ConnectionRegistry {
 }
 
 impl ConnectionRegistry {
-    /// 登记一条新连接；`responder` 是往这条连接写回应的通道（宣布停服务时经它发通知）。
+    /// 登记一条新连接；`responder` 是往这条连接写回应的通道（宣布停服务时经它发通知），
+    /// 通道上不带名额的回应排超上限、连接被关时往 `fault_log` 记一行带这条连接的身份。
     pub fn register(
         &self,
         transport: Transport,
         peer_address: String,
         responder: Responder,
+        fault_log: &Arc<FaultLog>,
     ) -> Arc<ConnectionRecord> {
         let record = Arc::new(ConnectionRecord {
             connection: self.next_connection.fetch_add(1, Ordering::SeqCst),
@@ -354,6 +398,7 @@ impl ConnectionRegistry {
             connected_since_milliseconds: now_milliseconds(),
             announcement: Mutex::new(None),
         });
+        responder.report_overflow_closure_to(Arc::clone(fault_log), Arc::clone(&record));
         self.connections
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -422,5 +467,92 @@ impl ConnectionRegistry {
             .filter(|responder| responder.send_and_wait_flushed(frame.to_vec(), deadline))
             .count();
         (delivered, responders.len() - delivered)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::in_process_service_for_tests::TemporaryDirectoryOfTheTest;
+
+    /// 一帧不带名额的回应的字节数：一帧不超上限，两帧合起来超。
+    const UNBUDGETED_FRAME_BYTES: usize = UNBUDGETED_OUTBOUND_BYTES_PER_CONNECTION * 6 / 10;
+
+    /// 对端不收回应：写线程那一端（`writer_side`）一帧都不取。不带名额的回应排超每条连接的上限时，这条连接被关、
+    /// 故障日志里记一行 `outbound-overflow-closed`，带这条连接的号、走哪条、对端地址与积压的未计费字节；同一条连接只记一行。
+    /// 判别力：关连接时不记故障行，日志里一行都没有，这条红。
+    #[test]
+    fn unbudgeted_responses_queued_past_the_limit_close_the_connection_and_record_one_fault_line_naming_it(
+    ) {
+        let directory = TemporaryDirectoryOfTheTest::create("overflow-fault-line");
+        let fault_log = Arc::new(
+            FaultLog::open(&directory.path, &BreakSwitches::none())
+                .expect("临时目录在，开得了故障日志"),
+        );
+        let was_shut_down = Arc::new(AtomicBool::new(false));
+        let totals = Arc::new(OutboundTotals::default());
+        let (responder, writer_side) = Responder::channel(
+            Arc::clone(&totals),
+            Box::new({
+                let was_shut_down = Arc::clone(&was_shut_down);
+                move || was_shut_down.store(true, Ordering::SeqCst)
+            }),
+            false,
+        );
+        let registry = ConnectionRegistry::default();
+        let record = registry.register(
+            Transport::UnixSocket,
+            "peer-of-the-test".to_string(),
+            responder.clone(),
+            &fault_log,
+        );
+
+        responder
+            .send(vec![0; UNBUDGETED_FRAME_BYTES])
+            .expect("头一帧没超上限，排得进");
+        assert!(
+            !was_shut_down.load(Ordering::SeqCst),
+            "头一帧没超上限，连接不该关"
+        );
+        assert!(
+            responder.send(vec![0; UNBUDGETED_FRAME_BYTES]).is_err(),
+            "第二帧让积压超了上限，该排不进去"
+        );
+        assert!(
+            was_shut_down.load(Ordering::SeqCst),
+            "排超上限，这条连接该被关"
+        );
+        assert!(
+            responder.send(vec![0; UNBUDGETED_FRAME_BYTES]).is_err(),
+            "连接已经关了，再排还是排不进"
+        );
+        assert_eq!(
+            totals.overflow_closures.load(Ordering::SeqCst),
+            1,
+            "一条连接只数一次关闭"
+        );
+
+        let logged =
+            std::fs::read_to_string(fault_log.path()).expect("故障日志在临时目录里，读得了");
+        let fault_lines: Vec<&str> = logged.lines().collect();
+        assert_eq!(
+            fault_lines.len(),
+            1,
+            "关一条连接该记一行故障，日志全文：{logged}"
+        );
+        for expected_field in [
+            "kind=outbound-overflow-closed".to_string(),
+            format!("connection={}", record.connection),
+            "transport=unix".to_string(),
+            "peer=peer-of-the-test".to_string(),
+            format!("已积压 {UNBUDGETED_FRAME_BYTES} 字节未计费回应"),
+        ] {
+            assert!(
+                fault_lines[0].contains(&expected_field),
+                "故障行里该有「{expected_field}」，实际：{}",
+                fault_lines[0]
+            );
+        }
+        drop(writer_side);
     }
 }

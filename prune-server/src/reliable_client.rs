@@ -30,6 +30,16 @@
 //!   （`ReconnectPolicy::maximum_attempts`）回 `ClientFailure::StorageFailing`（退 75），帧留在日志里。同一次调用里排着的别的帧照常发、照常收。
 //!   读、扫、认领、删前缀回状态 4 照旧是这一帧失败、连接继续。弄坏开关 write-storage-failure-abandoned 退回改前：写帧回状态 4 就从操作表拿掉、
 //!   回「服务拒了」退 3、不再重放。
+//! - 不在才写（`write_if_absent`、`submit_write_if_absent`）与写结论（`write_guarded_conclusion`、`submit_guarded_conclusion_write`）
+//!   与成批写同一套：带请求号、记进追加日志、断线重放、回忙退避、存储出错照同一请求号再交（`protocol.rs` 文件头「不在才写」「写结论」）。
+//! - 写结论：服务回状态 7（守卫不过：认领被别的持有者持着、租期没到，守卫那一行或一把删键那一行此刻的样子与写的一方读到的不同）是这一帧的结局，
+//!   不是协议错：这一帧一条都没写，从操作表与追加日志里勾掉，交 `Completion::ConclusionRefused`（`write_guarded_conclusion` 交
+//!   `GuardedConclusionWriteOutcome::Refused`），调用方照种类定。重开时从追加日志重放的写结论帧收到它照样勾掉、交进完成队。
+//!   勾掉了的帧不再重放；收到状态 7 之后、勾掉之前客户端死了的，重开时重放那一帧，服务照它此刻的认领与那一行再判一遍。
+//! - 认领可以替别的持有者认领（`claim_as`、`submit_claim_as`）：持有者身份进认领帧的身份字段，不必是这个客户端的身份（GPU 服务一个客户端
+//!   替几张卡、几个判线程认领，`gpu_judging_rows` 文件头「认领」）；`claim` 照旧用这个客户端的身份。
+//! - GPU 判的三族（`gpu_judging_rows` 文件头）：`write_gpu_pending_rows` 走不在才写，`claim_gpu_blocks` 走 `claim_as`，`write_gpu_conclusion` 走写结论；
+//!   弄坏开关 rejudged-row-dropped 让 `write_gpu_conclusion` 不带强制现判的那一行。
 //! - 重复的回应（序号已经回过，例如网络把一帧送了两遍）不算错，记一笔、丢掉。
 //! - 单条超限当场报：写、读、扫、认领的帧拼好之后先核帧体长度，超过 `MAXIMUM_FRAME_BODY_BYTES` 的当场回 `ClientFailure::Protocol`
 //!   （说是哪一种帧、几条、帧体多大、上限多少），不记追加日志、不发、不重试（服务会拒整条连接，重发照样拒）。
@@ -62,16 +72,21 @@ use crate::client::{
     open_announced_stream, ClientStream, ConnectDeadline, PrefixDeletionFrame, RouteAddress,
 };
 use crate::connections::announcement_from_environment;
+use crate::gpu_judging_rows::{
+    gpu_claim_key, gpu_pending_key, GpuClaimHolder, GpuConclusion, GpuPendingRow,
+    GPU_REJUDGED_FAMILY_PREFIX,
+};
 use crate::journal::{Journal, JournalOptions, JournalStatistics};
 use crate::keepalive::{enable_keepalive, read_keepalive, KeepaliveSettings};
 use crate::protocol::{
-    begin_point_read_frame, begin_write_frame, decode_response_body, encode_claim_frame,
-    encode_delete_prefix_frame, encode_prefix_scan_frame_after, encode_statistics_frame,
-    is_frame_length_acceptable, replace_claim_lease, replace_request_sequence, ClaimOutcome,
-    ClientAnnouncement, PointReadFrameBuilder, RejectionStatus, Response, ResponseOutcome,
+    begin_point_read_frame, begin_write_frame, begin_write_if_absent_frame, decode_response_body,
+    encode_claim_frame, encode_delete_prefix_frame, encode_guarded_conclusion_write_frame,
+    encode_prefix_scan_frame_after, encode_statistics_frame, is_frame_length_acceptable,
+    replace_claim_lease, replace_request_sequence, ClaimOutcome, ClientAnnouncement, GuardRefusal,
+    GuardedConclusionWrite, PointReadFrameBuilder, RejectionStatus, Response, ResponseOutcome,
     ScanEntry, StatisticsCounter, Table, WriteFrameBuilder, CONNECTION_LEVEL_SEQUENCE,
-    FRAME_LENGTH_FIELD_BYTES, MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME, MAXIMUM_FRAME_BODY_BYTES,
-    RESPONSE_HEADER_BYTES,
+    FRAME_LENGTH_FIELD_BYTES, MAXIMUM_CLIENT_IDENTITY_BYTES, MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME,
+    MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES,
 };
 use crate::segmented_values::{
     assemble_rereading_the_original_key, current_version_of_stored, frame_ranges,
@@ -423,6 +438,13 @@ pub enum Completion {
         operation: OperationIdentifier,
         failure: ClientFailure,
     },
+    /// 写结论守卫不过（服务回状态 7，文件头「写结论」）：这一帧一条都没写，已从追加日志里勾掉。
+    ConclusionRefused {
+        operation: OperationIdentifier,
+        request_number: u64,
+        refusal: GuardRefusal,
+        message: String,
+    },
 }
 
 impl Completion {
@@ -434,9 +456,30 @@ impl Completion {
             | Completion::Statistics { operation, .. }
             | Completion::ScanEntries { operation, .. }
             | Completion::PrefixDeleted { operation, .. }
-            | Completion::Failed { operation, .. } => *operation,
+            | Completion::Failed { operation, .. }
+            | Completion::ConclusionRefused { operation, .. } => *operation,
         }
     }
+}
+
+/// 写一帧不在才写或写结论落下之后服务回的确认。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct WriteAcknowledgement {
+    /// 真写了几条（不在才写只数不在而写了的）。
+    pub entries_written: u32,
+    /// 这个请求号以前生效过，这一次没再写（重连重发落下的）。
+    pub is_already_applied: bool,
+}
+
+/// 写结论一帧的结局（文件头「写结论」）。
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum GuardedConclusionWriteOutcome {
+    Written(WriteAcknowledgement),
+    /// 守卫不过，一条都没写：认领被别的持有者持着，或守卫那一行、一把删键那一行此刻的样子与写的一方读到的不同（带服务读到的那一份）。
+    Refused {
+        refusal: GuardRefusal,
+        message: String,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -760,23 +803,36 @@ impl ReliableClient {
         capacity_in_bytes: usize,
         fill: impl FnOnce(&mut WriteFrameBuilder),
     ) -> Result<(OperationIdentifier, u64), ClientFailure> {
+        self.submit_journaled_frame(
+            &format!("成批写 {entry_count} 条"),
+            |client_identity, request_number| {
+                let mut builder = begin_write_frame(
+                    0,
+                    client_identity,
+                    request_number,
+                    entry_count,
+                    capacity_in_bytes,
+                );
+                fill(&mut builder);
+                builder.finish()
+            },
+        )
+    }
+
+    /// 带请求号的一帧（成批写、不在才写、写结论）：分请求号、编帧、核帧长、记进追加日志、发出去，不等确认；回操作号与请求号。
+    /// `build_frame` 拿客户端身份与分到的请求号编整帧（序号字段写 0，发时换）；`what` 说是哪一种帧、几条（帧长超限时报）。
+    fn submit_journaled_frame(
+        &mut self,
+        what: &str,
+        build_frame: impl FnOnce(&[u8], u64) -> Vec<u8>,
+    ) -> Result<(OperationIdentifier, u64), ClientFailure> {
         self.wait_for_window()?;
         let request_number = self.next_request_number;
         self.next_request_number += 1;
-        let mut builder = begin_write_frame(
-            0,
-            &self.client_identity,
-            request_number,
-            entry_count,
-            capacity_in_bytes,
-        );
-        fill(&mut builder);
-        let frame = builder.finish();
-        if let Some(failure) = oversize_frame_failure(
-            &frame,
-            &format!("成批写 {entry_count} 条（请求号 {request_number}）"),
-        )
-        .filter(|_| !self.is_enabled(BreakSwitch::OversizeFrameSentAndRetried))
+        let frame = build_frame(&self.client_identity, request_number);
+        if let Some(failure) =
+            oversize_frame_failure(&frame, &format!("{what}（请求号 {request_number}）"))
+                .filter(|_| !self.is_enabled(BreakSwitch::OversizeFrameSentAndRetried))
         {
             // 没记日志、没发：这个请求号收回，下一帧照用。
             self.next_request_number = request_number;
@@ -789,6 +845,192 @@ impl ReliableClient {
         let operation = self.register(OperationKind::Write { request_number }, frame);
         self.send_unsent()?;
         Ok((operation, request_number))
+    }
+
+    /// 不在才写一帧（`protocol.rs` 文件头「不在才写」）：记进追加日志、发出去，不等确认；回操作号与请求号。
+    ///
+    /// # Errors
+    /// 帧体超过帧长上限（[`ClientFailure::Protocol`]，没记日志、没发）；追加日志写不进；发的时候连不上、服务停了。
+    pub fn submit_write_if_absent(
+        &mut self,
+        entries: &[TableEntry],
+    ) -> Result<(OperationIdentifier, u64), ClientFailure> {
+        let entry_count = u32::try_from(entries.len())
+            .map_err(|_| ClientFailure::Protocol("一帧的条数超过 u32".to_string()))?;
+        let capacity: usize = entries
+            .iter()
+            .map(|(_, key, value)| WRITE_BYTES_PER_ENTRY + key.len() + value.len())
+            .sum();
+        self.submit_journaled_frame(
+            &format!("不在才写 {entry_count} 条"),
+            |client_identity, request_number| {
+                let mut builder = begin_write_if_absent_frame(
+                    0,
+                    client_identity,
+                    request_number,
+                    entry_count,
+                    capacity,
+                );
+                for (table, key, value) in entries {
+                    builder.entry(*table, key, value);
+                }
+                builder.finish()
+            },
+        )
+    }
+
+    /// 不在才写一帧并等确认：键已在的那几条不动，回真写了几条（[`WriteAcknowledgement`]）。
+    ///
+    /// # Errors
+    /// 同 [`Self::submit_write_if_absent`]；等确认时连不上、忙到上限、存储一直出错（退 75），服务拒了这一帧。
+    pub fn write_if_absent(
+        &mut self,
+        entries: &[TableEntry],
+    ) -> Result<WriteAcknowledgement, ClientFailure> {
+        let (operation, _) = self.submit_write_if_absent(entries)?;
+        match self.wait_for(operation)? {
+            Completion::WriteAcknowledged {
+                entries_written,
+                is_already_applied,
+                ..
+            } => Ok(WriteAcknowledgement {
+                entries_written,
+                is_already_applied,
+            }),
+            other @ (Completion::Values { .. }
+            | Completion::Claims { .. }
+            | Completion::Statistics { .. }
+            | Completion::ScanEntries { .. }
+            | Completion::PrefixDeleted { .. }
+            | Completion::Failed { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
+                "不在才写收到的不是写确认：{other:?}"
+            ))),
+        }
+    }
+
+    /// 写结论一帧（`protocol.rs` 文件头「写结论」）：记进追加日志、发出去，不等确认；回操作号与请求号。
+    /// 守卫不过的那一帧收到状态 7 时从追加日志里勾掉、交 [`Completion::ConclusionRefused`]（文件头「写结论」）。
+    ///
+    /// # Errors
+    /// 持有者身份不在 1 到 255 字节之内（[`ClientFailure::Protocol`]，没记日志、没发）；别的同 [`Self::submit_write_if_absent`]。
+    pub fn submit_guarded_conclusion_write(
+        &mut self,
+        request: &GuardedConclusionWrite,
+    ) -> Result<(OperationIdentifier, u64), ClientFailure> {
+        let holder_bytes = request.holder_identity.len();
+        if holder_bytes == 0 || holder_bytes > MAXIMUM_CLIENT_IDENTITY_BYTES {
+            return Err(ClientFailure::Protocol(format!(
+                "写结论的持有者身份 {holder_bytes} 字节，要 1 到 {MAXIMUM_CLIENT_IDENTITY_BYTES} 字节；没记日志、没发"
+            )));
+        }
+        self.submit_journaled_frame(
+            &format!(
+                "写结论 {} 条、删 {} 把",
+                request.entries.len(),
+                request.deleted_keys.len()
+            ),
+            |client_identity, request_number| {
+                encode_guarded_conclusion_write_frame(0, client_identity, request_number, request)
+            },
+        )
+    }
+
+    /// 写结论一帧并等结局：落下了回 [`GuardedConclusionWriteOutcome::Written`]，守卫不过回 [`GuardedConclusionWriteOutcome::Refused`]
+    /// （不是错：调用方照种类定，`protocol.rs` 文件头「回应帧」状态 7）。
+    ///
+    /// # Errors
+    /// 同 [`Self::submit_guarded_conclusion_write`]；等结局时连不上、忙到上限、存储一直出错（退 75），服务拒了这一帧（帧的写法不对）。
+    pub fn write_guarded_conclusion(
+        &mut self,
+        request: &GuardedConclusionWrite,
+    ) -> Result<GuardedConclusionWriteOutcome, ClientFailure> {
+        let (operation, _) = self.submit_guarded_conclusion_write(request)?;
+        match self.wait_for(operation)? {
+            Completion::WriteAcknowledged {
+                entries_written,
+                is_already_applied,
+                ..
+            } => Ok(GuardedConclusionWriteOutcome::Written(
+                WriteAcknowledgement {
+                    entries_written,
+                    is_already_applied,
+                },
+            )),
+            Completion::ConclusionRefused {
+                refusal, message, ..
+            } => Ok(GuardedConclusionWriteOutcome::Refused { refusal, message }),
+            other @ (Completion::Values { .. }
+            | Completion::Claims { .. }
+            | Completion::Statistics { .. }
+            | Completion::ScanEntries { .. }
+            | Completion::PrefixDeleted { .. }
+            | Completion::Failed { .. }) => Err(ClientFailure::Protocol(format!(
+                "写结论收到的不是写确认或守卫不过：{other:?}"
+            ))),
+        }
+    }
+
+    /// GPU 待判行（`gpu_judging_rows` 文件头「待判行」）照不在才写写进去：同一块的待判行已在就不重写。
+    /// `rows` 每条是（流键，块号，待判行）；回真写了几条。
+    ///
+    /// # Errors
+    /// 同 [`Self::write_if_absent`]。
+    pub fn write_gpu_pending_rows(
+        &mut self,
+        rows: &[(Vec<u8>, u64, GpuPendingRow)],
+    ) -> Result<WriteAcknowledgement, ClientFailure> {
+        let entries: Vec<TableEntry> = rows
+            .iter()
+            .map(|(stream_key, block_number, row)| {
+                (
+                    Table::Conclusions,
+                    gpu_pending_key(stream_key, *block_number),
+                    row.encode(),
+                )
+            })
+            .collect();
+        self.write_if_absent(&entries)
+    }
+
+    /// 以 `holder` 的身份认领几块（`gpu_judging_rows` 文件头「认领」）：认领键是各块的 `gpu-claim/` 那一把，租期 `lease_milliseconds`；
+    /// 结局与 [`Self::claim`] 相同、次序与 `blocks` 相同。持有者身份不是这个客户端的身份（同一个客户端可以替几个判线程认领）。
+    ///
+    /// # Errors
+    /// 同 [`Self::claim_as`]。
+    pub fn claim_gpu_blocks(
+        &mut self,
+        holder: &GpuClaimHolder,
+        blocks: &[(Vec<u8>, u64)],
+        lease_milliseconds: u32,
+    ) -> Result<Vec<ClaimOutcome>, ClientFailure> {
+        let keys: Vec<(Table, Vec<u8>)> = blocks
+            .iter()
+            .map(|(stream_key, block_number)| {
+                (Table::Conclusions, gpu_claim_key(stream_key, *block_number))
+            })
+            .collect();
+        self.claim_as(&holder.identity(), &keys, lease_milliseconds)
+    }
+
+    /// 写一块 GPU 判出的结论（`gpu_judging_rows` 文件头「写结论」）：认领键、删的待判行、强制现判的那一行由 [`GpuConclusion::guarded_write`] 拼。
+    /// 弄坏开关 rejudged-row-dropped 下拼好之后去掉 `gpu-rejudged/` 那一行。
+    ///
+    /// # Errors
+    /// 结论拼不成（强制现判而既不写守卫那一行、帧里的期待又是「不在」，结论摘要无从取）回 [`ClientFailure::Protocol`]；别的同 [`Self::write_guarded_conclusion`]。
+    pub fn write_gpu_conclusion(
+        &mut self,
+        conclusion: &GpuConclusion,
+    ) -> Result<GuardedConclusionWriteOutcome, ClientFailure> {
+        let mut request = conclusion
+            .guarded_write()
+            .map_err(ClientFailure::Protocol)?;
+        if self.is_enabled(BreakSwitch::RejudgedRowDropped) {
+            request
+                .entries
+                .retain(|(_, key, _)| !key.starts_with(GPU_REJUDGED_FAMILY_PREFIX));
+        }
+        self.write_guarded_conclusion(&request)
     }
 
     pub fn submit_write_entries(
@@ -833,12 +1075,33 @@ impl ReliableClient {
         keys: &[(Table, Vec<u8>)],
         lease_milliseconds: u32,
     ) -> Result<OperationIdentifier, ClientFailure> {
+        let holder_identity = self.client_identity.clone();
+        self.submit_claim_as(&holder_identity, keys, lease_milliseconds)
+    }
+
+    /// 以 `holder_identity`（1 到 255 字节，不一定是这个客户端的身份）认领一批键：GPU 服务一个客户端替几张卡、几个判线程各自认领
+    /// （`gpu_judging_rows` 文件头「认领」）。别的同 [`Self::submit_claim`]。
+    ///
+    /// # Errors
+    /// 持有者身份长度不对（[`ClientFailure::Protocol`]，没发）；帧体超过帧长上限；发的时候连不上、服务停了。
+    pub fn submit_claim_as(
+        &mut self,
+        holder_identity: &[u8],
+        keys: &[(Table, Vec<u8>)],
+        lease_milliseconds: u32,
+    ) -> Result<OperationIdentifier, ClientFailure> {
+        if holder_identity.is_empty() || holder_identity.len() > MAXIMUM_CLIENT_IDENTITY_BYTES {
+            return Err(ClientFailure::Protocol(format!(
+                "认领的持有者身份 {} 字节，要 1 到 {MAXIMUM_CLIENT_IDENTITY_BYTES} 字节；没发",
+                holder_identity.len()
+            )));
+        }
         self.wait_for_window()?;
         let borrowed: Vec<(Table, &[u8])> = keys
             .iter()
             .map(|(table, key)| (*table, key.as_slice()))
             .collect();
-        let frame = encode_claim_frame(0, &self.client_identity, lease_milliseconds, &borrowed);
+        let frame = encode_claim_frame(0, holder_identity, lease_milliseconds, &borrowed);
         if let Some(failure) = oversize_frame_failure(&frame, &format!("认领 {} 个键", keys.len()))
             .filter(|_| !self.is_enabled(BreakSwitch::OversizeFrameSentAndRetried))
         {
@@ -956,7 +1219,8 @@ impl ReliableClient {
             | Completion::Claims { .. }
             | Completion::Statistics { .. }
             | Completion::ScanEntries { .. }
-            | Completion::PrefixDeleted { .. }) => Err(ClientFailure::Protocol(format!(
+            | Completion::PrefixDeleted { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "成批点读收到的不是值：{other:?}"
             ))),
         }
@@ -967,7 +1231,21 @@ impl ReliableClient {
         keys: &[(Table, Vec<u8>)],
         lease_milliseconds: u32,
     ) -> Result<Vec<ClaimOutcome>, ClientFailure> {
-        let operation = self.submit_claim(keys, lease_milliseconds)?;
+        let holder_identity = self.client_identity.clone();
+        self.claim_as(&holder_identity, keys, lease_milliseconds)
+    }
+
+    /// 以 `holder_identity` 认领一批键并等结局（[`Self::submit_claim_as`]）。
+    ///
+    /// # Errors
+    /// 同 [`Self::submit_claim_as`]；等结局时连不上、忙到上限（退 75），服务拒了这一帧。
+    pub fn claim_as(
+        &mut self,
+        holder_identity: &[u8],
+        keys: &[(Table, Vec<u8>)],
+        lease_milliseconds: u32,
+    ) -> Result<Vec<ClaimOutcome>, ClientFailure> {
+        let operation = self.submit_claim_as(holder_identity, keys, lease_milliseconds)?;
         match self.wait_for(operation)? {
             Completion::Claims { outcomes, .. } => Ok(outcomes),
             Completion::Failed { failure, .. } => Err(failure),
@@ -975,7 +1253,8 @@ impl ReliableClient {
             | Completion::Values { .. }
             | Completion::Statistics { .. }
             | Completion::ScanEntries { .. }
-            | Completion::PrefixDeleted { .. }) => Err(ClientFailure::Protocol(format!(
+            | Completion::PrefixDeleted { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "认领收到的不是认领结局：{other:?}"
             ))),
         }
@@ -992,7 +1271,8 @@ impl ReliableClient {
             | Completion::Values { .. }
             | Completion::Claims { .. }
             | Completion::ScanEntries { .. }
-            | Completion::PrefixDeleted { .. }) => Err(ClientFailure::Protocol(format!(
+            | Completion::PrefixDeleted { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "统计收到的不是计数：{other:?}"
             ))),
         }
@@ -1051,7 +1331,8 @@ impl ReliableClient {
             | Completion::Values { .. }
             | Completion::Claims { .. }
             | Completion::Statistics { .. }
-            | Completion::PrefixDeleted { .. }) => Err(ClientFailure::Protocol(format!(
+            | Completion::PrefixDeleted { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "按前缀扫收到的不是扫回的行：{other:?}"
             ))),
         }
@@ -1095,7 +1376,8 @@ impl ReliableClient {
             | Completion::Values { .. }
             | Completion::Claims { .. }
             | Completion::Statistics { .. }
-            | Completion::ScanEntries { .. }) => Err(ClientFailure::Protocol(format!(
+            | Completion::ScanEntries { .. }
+            | Completion::ConclusionRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "删前缀收到的不是删前缀的结局：{other:?}"
             ))),
         }
@@ -1870,7 +2152,8 @@ impl ReliableClient {
             | ResponseOutcome::PrefixDeleted { .. }
             | ResponseOutcome::ConnectedClients(_)
             | ResponseOutcome::Busy { .. }
-            | ResponseOutcome::Rejected { .. }) => Err(ClientFailure::Protocol(format!(
+            | ResponseOutcome::Rejected { .. }
+            | ResponseOutcome::GuardRefused { .. }) => Err(ClientFailure::Protocol(format!(
                 "服务拒了整条连接：{other:?}"
             ))),
         }
@@ -1984,6 +2267,21 @@ impl ReliableClient {
                 self.completions.push_back(Completion::Statistics {
                     operation: identifier,
                     counters,
+                });
+                Ok(())
+            }
+            (
+                OperationKind::Write { request_number },
+                ResponseOutcome::GuardRefused { refusal, message },
+            ) => {
+                // 守卫不过是这一帧的结局、不是协议错（文件头「写结论」）：一条都没写，从追加日志里勾掉，结局交调用方。
+                self.operations.remove(&identifier);
+                self.acknowledge_in_journal(request_number)?;
+                self.completions.push_back(Completion::ConclusionRefused {
+                    operation: identifier,
+                    request_number,
+                    refusal,
+                    message,
                 });
                 Ok(())
             }
@@ -2105,7 +2403,7 @@ mod tests {
     /// 平常每次发出去都给整段租约（文件头「认领」），这一份只在那个开关下用；开关证红在自证 claim-lease-covers-the-holder-after-the-answer。
     /// 判别力（`crates/mutations.tsv`）：不减去过了的毫秒数，这条红。
     #[test]
-    fn a_resent_claim_gets_only_the_lease_left_since_it_was_submitted() {
+    fn resent_claim_gets_only_the_lease_left_since_it_was_submitted() {
         assert_eq!(claim_lease_left(10_000, Duration::from_secs(3)), 7_000);
         assert_eq!(
             claim_lease_left(10_000, Duration::from_secs(30)),

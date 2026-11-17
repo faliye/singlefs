@@ -29,14 +29,31 @@
 //! - 删前缀（操作码 9）：`u32 前缀长`、前缀、`u32 续扫起点长`、续扫起点、`u32 本帧至多几把`、`u8 只数不删`（0 删、1 只数）。
 //!   不认表码、不认键的种类：键以前缀起头的行都是目标，三张表同一个键空间。前缀不许空（空前缀等于清空整个库）、不许落在服务记账那一段；
 //!   续扫起点空是从前缀起，不空时必须以前缀起头、从排在它之后的第一把键起数（上一帧回的最后一把键，已删的墓碑不用再跳过）；
-//!   本帧至多几把在 1 到 `MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME` 之间。提交线程里成批做：同一组里排在前面的写先提交，
+//!   本帧至多几把在 1 到 `MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME` 之间。提交线程里成批做：同一组里排在前面的写与真删先提交，
 //!   删的是已落盘的库；删的键与回应同一组提交、WAL 同步之后才回，删掉的键上的认领同一组释放。回应（带最后一把键）记不进服务的待处理额度时
 //!   整帧回忙（状态 5）、一把都不删（`committer.rs` 文件头「删前缀」）。只数不删时不改库、不动认领，数的口径与删一样。
 //!   删本来就幂等，所以不按（身份，请求号）去重，也不进客户端的追加日志：重发只会让某一帧报的数少一批，库里的结果不变。
+//! - 不在才写（操作码 10）：内容与成批写相同。去重与成批写相同；没生效过的逐条看这把键在不在已落盘的库里（同一帧里同一把键写几次只认头一次）：
+//!   不在的写、在的不动；同一批里记下「这个请求号已生效」，记的条数是真写了的条数；WAL 同步之后回确认，回应与成批写相同（写了几条是真写了的）。
+//!   不释放认领。提交线程做它之前先把这一组里改过数据行的写提交掉，读的是已落盘的库。GPU 待判行（`gpu_judging_rows` 文件头）走它。
+//! - 写结论（操作码 11）：`u8 身份长`、身份、`u64 请求号`、`u8 持有者身份长`、持有者身份（1 到 255 字节）、`u32 认领键长`、认领键、
+//!   `u32 守卫键长`、守卫键、`u8 守卫那一行的期待`（0 不在；1 在，再跟 32 字节值的 SHA-256）、`u32 条数`、每条与成批写相同、`u32 删键数`、
+//!   每把 `u32 键长`、键、`u8 这一行的期待`（与守卫那一行的期待同一种写法：写的一方读到的那一份）。
+//!   回状态 1 的写法：认领键或守卫键空；守卫键在条目里出现不止一次、或出现了而不是最后一条（一份结论有多行时守卫放在最后落的那一行）；
+//!   认领键在条目或删键里（它只记认领，写了它之后认领它就回「已有结论」）；删键空、与某条条目的键相同、或就是守卫键；任一把键落在服务记账那一段。
+//!   提交线程做它之前先把这一组里改过数据行的写提交掉（核的是已落盘的库），再照次序判：
+//!   1. 按（身份，请求号）去重：早已生效的照回确认（带「早已生效」），不再核认领与守卫那一行；
+//!   2. 核认领：认领键被别的持有者持着、租期没到，整帧拒（状态 7 种类 1）；租期过了、持有者就是帧里的持有者、没人持着，往下走；
+//!   3. 核守卫那一行：库里那一行此刻的样子（不在，或值的 SHA-256）与帧里的期待不同，整帧拒（状态 7 种类 2，带此刻的样子），不覆盖、不悄悄丢；
+//!   4. 核删键：逐把比库里那一行此刻的样子与帧里给它的期待，有一把不同就整帧拒（状态 7 种类 3，带那一把键与此刻的样子）：
+//!      删的只是写的一方读到的那一份，读完之后被别人改过的（待判行被判段升成强制现判）不删；
+//!   5. 都过了：条目写进、删键删掉、认领键与条目键、删键上的认领释放、记下请求号已生效，同一组提交、WAL 同步之后回确认（与成批写相同）。
+//!
+//!   GPU 判出的结论（`gpu_judging_rows` 文件头：认领键是 `gpu-claim/` 那一行，删键是 `gpu-pending/` 那一行，强制现判另带一条 `gpu-rejudged/`）走它。
 //!
 //! 回应帧：`[u32 帧体长度][u64 请求序号][u8 状态][u8 操作码][内容]`。状态 0 是做完，内容按操作码：
 //! - 成批点读：`u32 个数`，每个 `u8 在不在`（0 / 1），在的再跟 `u32 值长`、值，次序与请求里的键相同；
-//! - 成批写：`u32 写了几条`、`u8 早已生效`（1：这个请求号以前生效过，这一次没再写）；
+//! - 成批写、不在才写、写结论：`u32 写了几条`、`u8 早已生效`（1：这个请求号以前生效过，这一次没再写）；
 //! - 按前缀扫：`u8 有没有被条数上限或帧长上限截断`、`u32 条数`，每条 `u32 键长`、键、`u32 值长`、值，按键升序；
 //! - 统计：`u32 个数`，每个 `u32 名字长`、名字、`u64 值`；
 //! - 认领：`u32 个数`，每个 `u8 结局`：0 认领到；1 别人持有，再跟 `u8 持有者身份长`、身份、`u64 剩余租期毫秒`；2 已有结论。
@@ -51,6 +68,12 @@
 //! 因为帧边界已经找不回来），4 存储层出错。1、2、4 之后连接照常可用。
 //! 6 服务停了：序号 0、操作码 0，服务在宣布停服务之后主动发给每条连接（之后来的帧也只回这一种）；客户端收到就不再重试，
 //! 照 `reliable_client` 文件头的退出码表退出。
+//! 状态 7 是守卫不过（只回写结论）：内容是 `u8 种类`，1 认领被别的持有者持着、租期没到，再跟 `u8 持有者身份长`、持有者身份、`u64 剩余租期毫秒`；
+//! 2 守卫那一行此刻的样子与帧里的期待不同，再跟 `u8 在不在`（0 / 1）、在的再跟 32 字节值的 SHA-256；
+//! 3 一把删键那一行此刻的样子与帧里给它的期待不同，再跟 `u32 键长`、那一把键、`u8 在不在`、在的再跟 32 字节值的 SHA-256；之后 `u32 说明长`、说明。
+//! 这一帧一条都没写、连接照常可用。它不是协议错：容错客户端从追加日志里勾掉这一帧、把种类交给调用方（`reliable_client` 文件头「写结论」），
+//! 调用方照种类定：认领被别人持着就不写；守卫那一行变了就重读那一行、照它自己的规则比（两份都绿而不同报红，有一份红整份换时带重读到的那一份再写）；
+//! 删键那一行变了就重读那一行、照它自己的规则定删不删、带重读到的那一份再写。
 //! 状态 5 是忙：这条连接或整个服务的待处理帧数（或待处理字节数）到了上限，这一帧没有排队、没有做；内容是
 //! `u32 多少毫秒后再来`、`u32 说明长`、说明。客户端照这个毫秒数加抖动退避之后重发同一帧（写帧带同一个请求号）。
 //! 待处理字节数记着收着的帧体与没写出去的回应（`server.rs` 文件头「额度」）：收帧时记不进的，帧体照读完丢掉、回忙；
@@ -59,6 +82,8 @@
 //! 流水：客户端不等回应接着发；读、扫、统计由几个工作线程并行处理，写与认领由一个提交线程按到达次序组提交，
 //! 回应按完成先后写回，可能乱序，客户端按回应里的序号对回请求。同一条连接上先写后读同一个键要等写的回应到了再发读；
 //! 同一个客户端两帧写同一个键，回了忙的那一帧重发之后可能落在后发的那一帧之后，要定次序就等前一帧的确认再发后一帧。
+
+use crate::sha256::{sha256_digest, DIGEST_BYTES};
 
 /// 帧体长度上限：满块一帧 65536 态、每态一条约 130 字节，约 9 MB；留出几倍余量，又不让一个坏长度把服务的内存吃满。
 pub const MAXIMUM_FRAME_BODY_BYTES: u32 = 64 * 1024 * 1024;
@@ -79,6 +104,67 @@ pub const MAXIMUM_CLIENT_IDENTITY_BYTES: usize = 255;
 /// 删前缀一帧至多数到或删掉的键数：提交线程一帧里扫这么多把键、把这么多个删除记进同一个写批，
 /// 写批与提交线程占着的时间都有界，前缀下键多时客户端分几帧接着来（文件头「删前缀」）。
 pub const MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME: u32 = 200_000;
+/// 写结论帧里守卫那一行的样子带的值摘要的字节数（SHA-256，文件头「写结论」）。
+pub const GUARD_ROW_DIGEST_BYTES: usize = DIGEST_BYTES;
+/// 守卫那一行的样子的编码：`u8` 0 不在。
+const GUARD_ROW_ABSENT_CODE: u8 = 0;
+/// 同上：`u8` 1 在，再跟值的 SHA-256。
+const GUARD_ROW_PRESENT_CODE: u8 = 1;
+/// 守卫不过（状态 7）的种类：认领被别的持有者持着、租期没到。
+const GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE: u8 = 1;
+/// 守卫不过（状态 7）的种类：守卫那一行此刻的样子与帧里的期待不同。
+const GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE: u8 = 2;
+/// 守卫不过（状态 7）的种类：一把删键那一行此刻的样子与帧里给它的期待不同。
+const GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE: u8 = 3;
+
+/// 守卫那一行的样子（文件头「写结论」）：不在，或值的 SHA-256。写结论帧里是写的一方读到的那一份，守卫不过的回应里是服务此刻读到的那一份。
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum GuardRowState {
+    Absent,
+    Present {
+        value_digest: [u8; GUARD_ROW_DIGEST_BYTES],
+    },
+}
+
+impl GuardRowState {
+    /// 读到的一行（`None` 是不在）的样子。
+    #[must_use]
+    pub fn of_stored_value(value: Option<&[u8]>) -> GuardRowState {
+        match value {
+            None => GuardRowState::Absent,
+            Some(stored) => GuardRowState::Present {
+                value_digest: sha256_digest(stored),
+            },
+        }
+    }
+
+    fn put(self, encoder: &mut FrameEncoder) {
+        match self {
+            GuardRowState::Absent => encoder.put_u8(GUARD_ROW_ABSENT_CODE),
+            GuardRowState::Present { value_digest } => {
+                encoder.put_u8(GUARD_ROW_PRESENT_CODE);
+                encoder.bytes.extend_from_slice(&value_digest);
+            }
+        }
+    }
+}
+
+/// 写结论帧守卫不过（状态 7）的两种（文件头「回应帧」状态 7）。
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum GuardRefusal {
+    /// 认领键被别的持有者持着、租期没到。
+    ClaimHeldByOther {
+        holder_identity: Vec<u8>,
+        remaining_lease_milliseconds: u64,
+    },
+    /// 守卫那一行此刻的样子（`current`）与写的一方读到的那一份不同。
+    GuardRowChanged { current: GuardRowState },
+    /// 删键 `key` 那一行此刻的样子（`current`）与写的一方读到的那一份不同。
+    DeletedRowChanged {
+        key: Vec<u8>,
+        current: GuardRowState,
+    },
+}
 
 /// 三类表「录入、事实、结论」：协议里的分表码，库里同在默认列族（`storage.rs` 文件头）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
@@ -131,10 +217,12 @@ pub enum OperationCode {
     ConnectedClients,
     AnnounceStop,
     DeletePrefix,
+    WriteIfAbsent,
+    GuardedConclusionWrite,
 }
 
 impl OperationCode {
-    pub const ALL: [OperationCode; 9] = [
+    pub const ALL: [OperationCode; 11] = [
         OperationCode::BatchedPointRead,
         OperationCode::BatchedWrite,
         OperationCode::PrefixScan,
@@ -144,6 +232,8 @@ impl OperationCode {
         OperationCode::ConnectedClients,
         OperationCode::AnnounceStop,
         OperationCode::DeletePrefix,
+        OperationCode::WriteIfAbsent,
+        OperationCode::GuardedConclusionWrite,
     ];
 
     pub fn code(self) -> u8 {
@@ -157,15 +247,19 @@ impl OperationCode {
             OperationCode::ConnectedClients => 7,
             OperationCode::AnnounceStop => 8,
             OperationCode::DeletePrefix => 9,
+            OperationCode::WriteIfAbsent => 10,
+            OperationCode::GuardedConclusionWrite => 11,
         }
     }
 
-    /// 写、认领与删前缀要改库（或要读已落盘的库），交提交线程按到达次序组提交；别的交工作线程并行做，或由读线程当场做（报到、列客户端、宣布停服务）。
+    /// 写（成批写、不在才写、写结论）、认领与删前缀要改库（或要读已落盘的库），交提交线程按到达次序组提交；别的交工作线程并行做，或由读线程当场做（报到、列客户端、宣布停服务）。
     pub fn changes_library(self) -> bool {
         match self {
-            OperationCode::BatchedWrite | OperationCode::Claim | OperationCode::DeletePrefix => {
-                true
-            }
+            OperationCode::BatchedWrite
+            | OperationCode::Claim
+            | OperationCode::DeletePrefix
+            | OperationCode::WriteIfAbsent
+            | OperationCode::GuardedConclusionWrite => true,
             OperationCode::BatchedPointRead
             | OperationCode::PrefixScan
             | OperationCode::Statistics
@@ -186,7 +280,9 @@ impl OperationCode {
             | OperationCode::PrefixScan
             | OperationCode::Statistics
             | OperationCode::Claim
-            | OperationCode::DeletePrefix => false,
+            | OperationCode::DeletePrefix
+            | OperationCode::WriteIfAbsent
+            | OperationCode::GuardedConclusionWrite => false,
         }
     }
 
@@ -207,10 +303,11 @@ pub enum ResponseStatus {
     StorageFailed,
     Busy,
     ServerStopping,
+    GuardRefused,
 }
 
 impl ResponseStatus {
-    pub const ALL: [ResponseStatus; 7] = [
+    pub const ALL: [ResponseStatus; 8] = [
         ResponseStatus::Completed,
         ResponseStatus::MalformedPayload,
         ResponseStatus::UnknownOperation,
@@ -218,6 +315,7 @@ impl ResponseStatus {
         ResponseStatus::StorageFailed,
         ResponseStatus::Busy,
         ResponseStatus::ServerStopping,
+        ResponseStatus::GuardRefused,
     ];
 
     pub fn code(self) -> u8 {
@@ -229,6 +327,7 @@ impl ResponseStatus {
             ResponseStatus::StorageFailed => 4,
             ResponseStatus::Busy => 5,
             ResponseStatus::ServerStopping => 6,
+            ResponseStatus::GuardRefused => 7,
         }
     }
 
@@ -431,9 +530,46 @@ pub fn begin_write_frame(
     entry_count: u32,
     capacity_in_bytes: usize,
 ) -> WriteFrameBuilder {
+    begin_entries_frame(
+        OperationCode::BatchedWrite,
+        sequence,
+        client_identity,
+        request_number,
+        entry_count,
+        capacity_in_bytes,
+    )
+}
+
+/// 不在才写帧（文件头「不在才写」）：内容与成批写帧相同，操作码 10。
+pub fn begin_write_if_absent_frame(
+    sequence: u64,
+    client_identity: &[u8],
+    request_number: u64,
+    entry_count: u32,
+    capacity_in_bytes: usize,
+) -> WriteFrameBuilder {
+    begin_entries_frame(
+        OperationCode::WriteIfAbsent,
+        sequence,
+        client_identity,
+        request_number,
+        entry_count,
+        capacity_in_bytes,
+    )
+}
+
+/// 成批写与不在才写共用的帧头：身份、请求号、条数。
+fn begin_entries_frame(
+    operation: OperationCode,
+    sequence: u64,
+    client_identity: &[u8],
+    request_number: u64,
+    entry_count: u32,
+    capacity_in_bytes: usize,
+) -> WriteFrameBuilder {
     let mut encoder = begin_request(
         sequence,
-        OperationCode::BatchedWrite.code(),
+        operation.code(),
         capacity_in_bytes + client_identity.len() + 13,
     );
     put_client_identity(&mut encoder, client_identity);
@@ -444,6 +580,81 @@ pub fn begin_write_frame(
         declared_entries: entry_count,
         added_entries: 0,
     }
+}
+
+/// 一帧写结论要带的东西（文件头「写结论」逐个字段）；客户端身份与请求号由发它的客户端填。
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct GuardedConclusionWrite {
+    /// 认领的持有者身份（1 到 255 字节）：核认领时与认领键上记的持有者比。
+    pub holder_identity: Vec<u8>,
+    pub claim_key: Vec<u8>,
+    pub guard_key: Vec<u8>,
+    /// 写的一方读到的守卫那一行的样子。
+    pub guard_expectation: GuardRowState,
+    /// 守卫键在里面时排最后一条。
+    pub entries: Vec<(Table, Vec<u8>, Vec<u8>)>,
+    pub deleted_keys: Vec<GuardedDeletion>,
+}
+
+/// 写结论帧里的一把删键与写的一方读到的那一行（文件头「写结论」第 4 步）：库里那一行此刻的样子与 `expectation` 不同，整帧拒。
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct GuardedDeletion {
+    pub key: Vec<u8>,
+    pub expectation: GuardRowState,
+}
+
+/// 一把删键在写结论帧里另占的字节（键长 4、期待 1 加摘要），不含键本身。
+const GUARDED_DELETION_FIXED_BYTES: usize = 4 + 1 + GUARD_ROW_DIGEST_BYTES;
+
+/// 写结论帧在条目与删键之外另占的字节（身份长 1、请求号 8、持有者身份长 1、认领键长 4、守卫键长 4、期待 1 加摘要、条数 4、删键数 4）。
+const GUARDED_CONCLUSION_FIXED_BYTES: usize =
+    1 + 8 + 1 + 4 + 4 + 1 + GUARD_ROW_DIGEST_BYTES + 4 + 4;
+
+/// 写结论帧（文件头「写结论」）。持有者身份长度不在 1 到 255 字节之内是调用方的 bug（容错客户端编帧之前先核，`reliable_client.rs`）。
+pub fn encode_guarded_conclusion_write_frame(
+    sequence: u64,
+    client_identity: &[u8],
+    request_number: u64,
+    request: &GuardedConclusionWrite,
+) -> Vec<u8> {
+    let capacity = GUARDED_CONCLUSION_FIXED_BYTES
+        + client_identity.len()
+        + request.holder_identity.len()
+        + request.claim_key.len()
+        + request.guard_key.len()
+        + request
+            .entries
+            .iter()
+            .map(|(_, key, value)| 9 + key.len() + value.len())
+            .sum::<usize>()
+        + request
+            .deleted_keys
+            .iter()
+            .map(|deletion| GUARDED_DELETION_FIXED_BYTES + deletion.key.len())
+            .sum::<usize>();
+    let mut encoder = begin_request(
+        sequence,
+        OperationCode::GuardedConclusionWrite.code(),
+        capacity,
+    );
+    put_client_identity(&mut encoder, client_identity);
+    encoder.put_u64(request_number);
+    put_client_identity(&mut encoder, &request.holder_identity);
+    encoder.put_length_prefixed(&request.claim_key);
+    encoder.put_length_prefixed(&request.guard_key);
+    request.guard_expectation.put(&mut encoder);
+    encoder.put_u32(u32_from_usize(request.entries.len(), "写结论的条数"));
+    for (table, key, value) in &request.entries {
+        encoder.put_u8(table.code());
+        encoder.put_length_prefixed(key);
+        encoder.put_length_prefixed(value);
+    }
+    encoder.put_u32(u32_from_usize(request.deleted_keys.len(), "写结论的删键数"));
+    for deletion in &request.deleted_keys {
+        encoder.put_length_prefixed(&deletion.key);
+        deletion.expectation.put(&mut encoder);
+    }
+    encoder.finish()
 }
 
 impl WriteFrameBuilder {
@@ -599,25 +810,25 @@ pub fn encode_raw_request_frame(sequence: u64, operation_code: u8, payload: &[u8
     encoder.finish()
 }
 
-/// 按位置读帧体的游标；越界是「内容解不开」，不是 panic。
-struct ByteCursor<'frame> {
+/// 按位置读帧体的游标；越界是「内容解不开」，不是 panic。GPU 判的几种行的值（`gpu_judging_rows`）照同一套小端写法，也拿它读。
+pub(crate) struct ByteCursor<'frame> {
     bytes: &'frame [u8],
     position: usize,
 }
 
 impl<'frame> ByteCursor<'frame> {
-    fn new(bytes: &'frame [u8]) -> ByteCursor<'frame> {
+    pub(crate) fn new(bytes: &'frame [u8]) -> ByteCursor<'frame> {
         ByteCursor { bytes, position: 0 }
     }
 
-    fn remaining(&self) -> usize {
+    pub(crate) fn remaining(&self) -> usize {
         self.bytes.len() - self.position
     }
 
-    fn take(&mut self, byte_count: usize, what: &str) -> Result<&'frame [u8], String> {
+    pub(crate) fn take(&mut self, byte_count: usize, what: &str) -> Result<&'frame [u8], String> {
         if byte_count > self.remaining() {
             return Err(format!(
-                "读{what}要 {byte_count} 字节，帧里只剩 {} 字节",
+                "读{what}要 {byte_count} 字节，只剩 {} 字节",
                 self.remaining()
             ));
         }
@@ -626,25 +837,25 @@ impl<'frame> ByteCursor<'frame> {
         Ok(field)
     }
 
-    fn u8(&mut self, what: &str) -> Result<u8, String> {
+    pub(crate) fn u8(&mut self, what: &str) -> Result<u8, String> {
         Ok(self.take(1, what)?[0])
     }
 
-    fn u32(&mut self, what: &str) -> Result<u32, String> {
+    pub(crate) fn u32(&mut self, what: &str) -> Result<u32, String> {
         let field = self.take(4, what)?;
         Ok(u32::from_le_bytes(
             field.try_into().expect("take 回的正好是 4 字节"),
         ))
     }
 
-    fn u64(&mut self, what: &str) -> Result<u64, String> {
+    pub(crate) fn u64(&mut self, what: &str) -> Result<u64, String> {
         let field = self.take(8, what)?;
         Ok(u64::from_le_bytes(
             field.try_into().expect("take 回的正好是 8 字节"),
         ))
     }
 
-    fn length_prefixed(&mut self, what: &str) -> Result<&'frame [u8], String> {
+    pub(crate) fn length_prefixed(&mut self, what: &str) -> Result<&'frame [u8], String> {
         let length = self.u32(what)?;
         self.take(usize_from_u32(length), what)
     }
@@ -660,6 +871,44 @@ impl<'frame> ByteCursor<'frame> {
             return Err("客户端身份长是 0".to_string());
         }
         self.take(usize::from(length), "客户端身份")
+    }
+
+    /// 写结论帧里的持有者身份（`u8 长`、身份，1 到 255 字节）。
+    fn holder_identity(&mut self) -> Result<&'frame [u8], String> {
+        let length = self.u8("持有者身份长")?;
+        if length == 0 {
+            return Err("持有者身份长是 0".to_string());
+        }
+        self.take(usize::from(length), "持有者身份")
+    }
+
+    /// 守卫那一行的样子（`u8` 0 不在；1 在，再跟 32 字节值的 SHA-256）。
+    fn guard_row_state(&mut self, what: &str) -> Result<GuardRowState, String> {
+        match self.u8(what)? {
+            GUARD_ROW_ABSENT_CODE => Ok(GuardRowState::Absent),
+            GUARD_ROW_PRESENT_CODE => {
+                let digest = self.take(GUARD_ROW_DIGEST_BYTES, what)?;
+                Ok(GuardRowState::Present {
+                    value_digest: digest.try_into().expect("take 回的正好是摘要那么多字节"),
+                })
+            }
+            other => Err(format!(
+                "{what}只能是 {GUARD_ROW_ABSENT_CODE}（不在）或 {GUARD_ROW_PRESENT_CODE}（在），收到 {other}"
+            )),
+        }
+    }
+
+    /// 成批写、不在才写、写结论的条目：`u32 条数`，每条 `u8 表`、`u32 键长`、键、`u32 值长`、值。
+    fn entries(&mut self) -> Result<Vec<EntryInTable<'frame>>, String> {
+        let entry_count = self.u32("条数")?;
+        let mut entries = Vec::with_capacity(self.capacity_for(entry_count, 9));
+        for _ in 0..entry_count {
+            let table = self.table()?;
+            let key = self.length_prefixed("键")?;
+            let value = self.length_prefixed("值")?;
+            entries.push(EntryInTable { table, key, value });
+        }
+        Ok(entries)
     }
 
     fn short_text(&mut self, what: &str) -> Result<String, String> {
@@ -849,6 +1098,82 @@ pub enum RequestView<'frame> {
         maximum_keys: u32,
         count_only: bool,
     },
+    WriteIfAbsent {
+        client_identity: &'frame [u8],
+        request_number: u64,
+        entries: Vec<EntryInTable<'frame>>,
+    },
+    GuardedConclusionWrite(GuardedConclusionWriteView<'frame>),
+}
+
+/// 解开的写结论帧（文件头「写结论」），键与值借用帧体；解帧时已核过那几条写法（`guarded_conclusion_write_problem`）。
+#[derive(Debug, PartialEq, Eq)]
+pub struct GuardedConclusionWriteView<'frame> {
+    pub client_identity: &'frame [u8],
+    pub request_number: u64,
+    pub holder_identity: &'frame [u8],
+    pub claim_key: &'frame [u8],
+    pub guard_key: &'frame [u8],
+    pub guard_expectation: GuardRowState,
+    pub entries: Vec<EntryInTable<'frame>>,
+    pub deleted_keys: Vec<GuardedDeletionView<'frame>>,
+}
+
+/// 解开的一把删键与帧里给它的期待（[`GuardedDeletion`] 借用帧体的那一份）。
+#[derive(Debug, PartialEq, Eq)]
+pub struct GuardedDeletionView<'frame> {
+    pub key: &'frame [u8],
+    pub expectation: GuardRowState,
+}
+
+/// 写结论帧违反文件头「写结论」那几条写法时回说明（服务回状态 1），合规回 `None`。
+fn guarded_conclusion_write_problem(view: &GuardedConclusionWriteView<'_>) -> Option<String> {
+    if view.claim_key.is_empty() {
+        return Some("认领键是空的".to_string());
+    }
+    if view.guard_key.is_empty() {
+        return Some("守卫键是空的".to_string());
+    }
+    let guard_positions: Vec<usize> = view
+        .entries
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| entry.key == view.guard_key)
+        .map(|(position, _)| position)
+        .collect();
+    match guard_positions.as_slice() {
+        [] => {}
+        [position] if position + 1 == view.entries.len() => {}
+        [_] | [_, _, ..] => {
+            return Some(format!(
+                "守卫键在条目里的位置（从 0 数）是 {guard_positions:?}，共 {} 条：守卫那一行只许写一次、且排最后一条（一份结论有多行时守卫放在最后落的那一行）",
+                view.entries.len()
+            ));
+        }
+    }
+    let claim_key_written = view.entries.iter().any(|entry| entry.key == view.claim_key);
+    let claim_key_deleted = view
+        .deleted_keys
+        .iter()
+        .any(|deletion| deletion.key == view.claim_key);
+    if claim_key_written || claim_key_deleted {
+        return Some(
+            "认领键在条目或删键里：认领键只记认领，不当数据行写、也不删（写了它，之后认领它就回「已有结论」）"
+                .to_string(),
+        );
+    }
+    for GuardedDeletionView { key, .. } in &view.deleted_keys {
+        if key.is_empty() {
+            return Some("删键里有空键".to_string());
+        }
+        if *key == view.guard_key || view.entries.iter().any(|entry| entry.key == *key) {
+            return Some(format!(
+                "删键 {:02x?} 是守卫键或某条条目的键：同一帧里不又写又删同一把键",
+                &key[..key.len().min(16)]
+            ));
+        }
+    }
+    None
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -938,10 +1263,20 @@ fn service_key_refusal(view: &RequestView<'_>) -> Option<String> {
             .iter()
             .find(|key| is_service_key(key.key))
             .and_then(|key| refused("键", key.key)),
-        RequestView::BatchedWrite { entries, .. } => entries
+        RequestView::BatchedWrite { entries, .. } | RequestView::WriteIfAbsent { entries, .. } => {
+            entries
+                .iter()
+                .find(|entry| is_service_key(entry.key))
+                .and_then(|entry| refused("键", entry.key))
+        }
+        RequestView::GuardedConclusionWrite(conclusion) => conclusion
+            .entries
             .iter()
-            .find(|entry| is_service_key(entry.key))
-            .and_then(|entry| refused("键", entry.key)),
+            .map(|entry| entry.key)
+            .chain(conclusion.deleted_keys.iter().map(|deletion| deletion.key))
+            .chain([conclusion.claim_key, conclusion.guard_key])
+            .find(|key| is_service_key(key))
+            .and_then(|key| refused("键", key)),
         RequestView::PrefixScan { prefix, .. } | RequestView::DeletePrefix { prefix, .. }
             if is_service_key(prefix) =>
         {
@@ -974,19 +1309,52 @@ fn decode_request_payload<'frame>(
         OperationCode::BatchedWrite => {
             let client_identity = cursor.client_identity()?;
             let request_number = cursor.u64("请求号")?;
-            let entry_count = cursor.u32("条数")?;
-            let mut entries = Vec::with_capacity(cursor.capacity_for(entry_count, 9));
-            for _ in 0..entry_count {
-                let table = cursor.table()?;
-                let key = cursor.length_prefixed("键")?;
-                let value = cursor.length_prefixed("值")?;
-                entries.push(EntryInTable { table, key, value });
-            }
+            let entries = cursor.entries()?;
             Ok(RequestView::BatchedWrite {
                 client_identity,
                 request_number,
                 entries,
             })
+        }
+        OperationCode::WriteIfAbsent => {
+            let client_identity = cursor.client_identity()?;
+            let request_number = cursor.u64("请求号")?;
+            let entries = cursor.entries()?;
+            Ok(RequestView::WriteIfAbsent {
+                client_identity,
+                request_number,
+                entries,
+            })
+        }
+        OperationCode::GuardedConclusionWrite => {
+            let client_identity = cursor.client_identity()?;
+            let request_number = cursor.u64("请求号")?;
+            let holder_identity = cursor.holder_identity()?;
+            let claim_key = cursor.length_prefixed("认领键")?;
+            let guard_key = cursor.length_prefixed("守卫键")?;
+            let guard_expectation = cursor.guard_row_state("守卫那一行的期待")?;
+            let entries = cursor.entries()?;
+            let deleted_key_count = cursor.u32("删键数")?;
+            let mut deleted_keys = Vec::with_capacity(cursor.capacity_for(deleted_key_count, 5));
+            for _ in 0..deleted_key_count {
+                let key = cursor.length_prefixed("删键")?;
+                let expectation = cursor.guard_row_state("删键那一行的期待")?;
+                deleted_keys.push(GuardedDeletionView { key, expectation });
+            }
+            let conclusion = GuardedConclusionWriteView {
+                client_identity,
+                request_number,
+                holder_identity,
+                claim_key,
+                guard_key,
+                guard_expectation,
+                entries,
+                deleted_keys,
+            };
+            match guarded_conclusion_write_problem(&conclusion) {
+                Some(problem) => Err(problem),
+                None => Ok(RequestView::GuardedConclusionWrite(conclusion)),
+            }
         }
         OperationCode::Claim => {
             let client_identity = cursor.client_identity()?;
@@ -1084,6 +1452,10 @@ pub fn encode_rejection(
         status != ResponseStatus::Busy,
         "忙的回应带「多少毫秒后再来」，走 encode_busy"
     );
+    assert!(
+        status != ResponseStatus::GuardRefused,
+        "守卫不过的回应带种类，走 encode_guard_refusal"
+    );
     let mut encoder = begin_response(sequence, status, operation_code, message.len() + 4);
     encoder.put_length_prefixed(message.as_bytes());
     encoder.finish()
@@ -1113,14 +1485,59 @@ pub fn encode_write_acknowledgement(
     entries_written: u32,
     is_already_applied: bool,
 ) -> Vec<u8> {
-    let mut encoder = begin_response(
+    encode_entries_acknowledgement(
         sequence,
-        ResponseStatus::Completed,
-        OperationCode::BatchedWrite.code(),
-        5,
-    );
+        OperationCode::BatchedWrite,
+        entries_written,
+        is_already_applied,
+    )
+}
+
+/// 成批写、不在才写、写结论的确认（三者回应相同，操作码照请求）：写了几条、这个请求号是不是早已生效。
+pub fn encode_entries_acknowledgement(
+    sequence: u64,
+    operation: OperationCode,
+    entries_written: u32,
+    is_already_applied: bool,
+) -> Vec<u8> {
+    let mut encoder = begin_response(sequence, ResponseStatus::Completed, operation.code(), 5);
     encoder.put_u32(entries_written);
     encoder.put_u8(u8::from(is_already_applied));
+    encoder.finish()
+}
+
+/// 写结论守卫不过（状态 7，文件头「回应帧」）：种类与它带的东西、说明。
+pub fn encode_guard_refusal(sequence: u64, refusal: &GuardRefusal, message: &str) -> Vec<u8> {
+    let key_bytes = match refusal {
+        GuardRefusal::DeletedRowChanged { key, .. } => key.len(),
+        GuardRefusal::ClaimHeldByOther { .. } | GuardRefusal::GuardRowChanged { .. } => 0,
+    };
+    let mut encoder = begin_response(
+        sequence,
+        ResponseStatus::GuardRefused,
+        OperationCode::GuardedConclusionWrite.code(),
+        message.len() + key_bytes + MAXIMUM_CLIENT_IDENTITY_BYTES + GUARD_ROW_DIGEST_BYTES + 16,
+    );
+    match refusal {
+        GuardRefusal::ClaimHeldByOther {
+            holder_identity,
+            remaining_lease_milliseconds,
+        } => {
+            encoder.put_u8(GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE);
+            put_client_identity(&mut encoder, holder_identity);
+            encoder.put_u64(*remaining_lease_milliseconds);
+        }
+        GuardRefusal::GuardRowChanged { current } => {
+            encoder.put_u8(GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE);
+            current.put(&mut encoder);
+        }
+        GuardRefusal::DeletedRowChanged { key, current } => {
+            encoder.put_u8(GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE);
+            encoder.put_length_prefixed(key);
+            current.put(&mut encoder);
+        }
+    }
+    encoder.put_length_prefixed(message.as_bytes());
     encoder.finish()
 }
 
@@ -1263,6 +1680,11 @@ pub enum ResponseOutcome {
         status: RejectionStatus,
         message: String,
     },
+    /// 写结论守卫不过（状态 7）：这一帧一条都没写。
+    GuardRefused {
+        refusal: GuardRefusal,
+        message: String,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -1317,6 +1739,33 @@ pub fn decode_response_body(body: &[u8]) -> Result<Response, String> {
                 message,
             }
         }
+        ResponseStatus::GuardRefused => {
+            let refusal = match cursor.u8("守卫不过的种类")? {
+                GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE => {
+                    let holder_identity = cursor.client_identity()?.to_vec();
+                    let remaining_lease_milliseconds = cursor.u64("剩余租期毫秒")?;
+                    GuardRefusal::ClaimHeldByOther {
+                        holder_identity,
+                        remaining_lease_milliseconds,
+                    }
+                }
+                GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE => GuardRefusal::GuardRowChanged {
+                    current: cursor.guard_row_state("守卫那一行此刻的样子")?,
+                },
+                GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE => GuardRefusal::DeletedRowChanged {
+                    key: cursor.length_prefixed("变了的删键")?.to_vec(),
+                    current: cursor.guard_row_state("删键那一行此刻的样子")?,
+                },
+                other => {
+                    return Err(format!(
+                        "守卫不过的种类只能是 {GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE}、{GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE} 或 {GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE}，收到 {other}"
+                    ))
+                }
+            };
+            let message =
+                String::from_utf8_lossy(cursor.length_prefixed("守卫不过的说明")?).into_owned();
+            ResponseOutcome::GuardRefused { refusal, message }
+        }
     };
     if cursor.remaining() != 0 {
         return Err(format!(
@@ -1356,7 +1805,9 @@ fn decode_completed_payload(
             }
             Ok(ResponseOutcome::PointValues(values))
         }
-        OperationCode::BatchedWrite => {
+        OperationCode::BatchedWrite
+        | OperationCode::WriteIfAbsent
+        | OperationCode::GuardedConclusionWrite => {
             let entries_written = cursor.u32("写了几条")?;
             let is_already_applied = match cursor.u8("早已生效标记")? {
                 0 => false,
@@ -1467,7 +1918,7 @@ mod tests {
     /// 换了租约的认领帧，服务解出来的租约是换上的那个数，身份与键不变。
     /// 判别力（`crates/mutations.tsv`）：租约的位置少算客户端身份的长度字节，这条红。
     #[test]
-    fn a_claim_frame_with_its_lease_replaced_decodes_to_the_new_lease_and_the_same_keys() {
+    fn claim_frame_with_its_lease_replaced_decodes_to_the_new_lease_and_the_same_keys() {
         let keys: [(Table, &[u8]); 2] = [
             (Table::Conclusions, b"first"),
             (Table::Conclusions, b"second"),
@@ -1511,7 +1962,7 @@ mod tests {
 
     /// 删前缀帧解出来的前缀、续扫起点、本帧上限与只数标记，与编进去的相同。
     #[test]
-    fn a_delete_prefix_frame_decodes_to_what_was_encoded() {
+    fn delete_prefix_frame_decodes_to_what_was_encoded() {
         let decoded =
             decode_delete_prefix(b"\x1cabc", b"\x1cabc/last", 7).expect("合规的删前缀帧解得开");
         assert_eq!(
@@ -1527,8 +1978,7 @@ mod tests {
 
     /// 空前缀、不以前缀起头的续扫起点、0 与超上限的本帧上限、落在服务记账那一段的前缀，各被拒成内容解不开。
     #[test]
-    fn a_delete_prefix_frame_with_a_prefix_that_would_clear_the_library_or_a_bad_bound_is_refused()
-    {
+    fn delete_prefix_frame_with_a_prefix_that_would_clear_the_library_or_a_bad_bound_is_refused() {
         let over_limit = MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME + 1;
         for (description, prefix, after_key, maximum_keys) in [
             ("空前缀", b"".as_slice(), b"".as_slice(), 10),
@@ -1557,6 +2007,157 @@ mod tests {
             assert!(
                 matches!(rejection, RequestRejection::MalformedPayload { .. }),
                 "{description}：该被拒成内容解不开，实际 {rejection:?}"
+            );
+        }
+    }
+
+    fn sample_guarded_conclusion_write() -> GuardedConclusionWrite {
+        GuardedConclusionWrite {
+            holder_identity: b"holder".to_vec(),
+            claim_key: b"gpu-claim/aa/0000000000000001".to_vec(),
+            guard_key: b"\x10conclusion-block".to_vec(),
+            guard_expectation: GuardRowState::of_stored_value(Some(b"what the writer read")),
+            entries: vec![
+                (
+                    Table::Conclusions,
+                    b"\x11side-row".to_vec(),
+                    b"side".to_vec(),
+                ),
+                (
+                    Table::Conclusions,
+                    b"\x10conclusion-block".to_vec(),
+                    b"block".to_vec(),
+                ),
+            ],
+            deleted_keys: vec![GuardedDeletion {
+                key: b"gpu-pending/aa/0000000000000001".to_vec(),
+                expectation: GuardRowState::of_stored_value(Some(b"the pending row as read")),
+            }],
+        }
+    }
+
+    fn decode_guarded_conclusion_write(
+        request: &GuardedConclusionWrite,
+    ) -> Result<DecodedRequest<'static>, RequestRejection> {
+        let frame = encode_guarded_conclusion_write_frame(5, b"client", 9, request);
+        // 同 decode_delete_prefix：测试里泄漏一份帧体，解出来的视图借用它
+        let body: &'static [u8] = Box::leak(
+            frame[FRAME_LENGTH_FIELD_BYTES..]
+                .to_vec()
+                .into_boxed_slice(),
+        );
+        decode_request_body(body, TrailingBytes::Rejected, ServiceKeys::Refused)
+            .map_err(|(_, rejection)| rejection)
+    }
+
+    /// 写结论帧解出来的持有者、认领键、守卫键、期待、条目与删键，与编进去的相同。
+    #[test]
+    fn guarded_conclusion_write_frame_decodes_to_what_was_encoded() {
+        let request = sample_guarded_conclusion_write();
+        let decoded = decode_guarded_conclusion_write(&request).expect("合规的写结论帧解得开");
+        let RequestView::GuardedConclusionWrite(conclusion) = decoded.view else {
+            panic!("解出来不是写结论：{decoded:?}");
+        };
+        assert_eq!(conclusion.client_identity, b"client");
+        assert_eq!(conclusion.request_number, 9);
+        assert_eq!(conclusion.holder_identity, b"holder");
+        assert_eq!(conclusion.claim_key, request.claim_key.as_slice());
+        assert_eq!(conclusion.guard_key, request.guard_key.as_slice());
+        assert_eq!(conclusion.guard_expectation, request.guard_expectation);
+        let decoded_entries: Vec<(&[u8], &[u8])> = conclusion
+            .entries
+            .iter()
+            .map(|entry| (entry.key, entry.value))
+            .collect();
+        let encoded_entries: Vec<(&[u8], &[u8])> = request
+            .entries
+            .iter()
+            .map(|(_, key, value)| (key.as_slice(), value.as_slice()))
+            .collect();
+        assert_eq!(decoded_entries, encoded_entries);
+        assert_eq!(
+            conclusion.deleted_keys,
+            vec![GuardedDeletionView {
+                key: request.deleted_keys[0].key.as_slice(),
+                expectation: request.deleted_keys[0].expectation,
+            }]
+        );
+    }
+
+    /// 守卫键不是最后一条、写了两次、认领键当条目写、删键就是条目的键：各被拒成内容解不开（文件头「写结论」）。
+    #[test]
+    fn guarded_conclusion_write_with_the_guard_row_not_last_or_a_claim_key_written_is_refused() {
+        let guard_row_in_front = {
+            let mut request = sample_guarded_conclusion_write();
+            request.entries.reverse();
+            request
+        };
+        let guard_row_twice = {
+            let mut request = sample_guarded_conclusion_write();
+            let guard_row = request.entries[1].clone();
+            request.entries.insert(0, guard_row);
+            request
+        };
+        let claim_key_written = {
+            let mut request = sample_guarded_conclusion_write();
+            let claim_row = (Table::Conclusions, request.claim_key.clone(), b"x".to_vec());
+            request.entries.insert(0, claim_row);
+            request
+        };
+        let deleted_key_written = {
+            let mut request = sample_guarded_conclusion_write();
+            request.deleted_keys.push(GuardedDeletion {
+                key: b"\x11side-row".to_vec(),
+                expectation: GuardRowState::Absent,
+            });
+            request
+        };
+        for (description, request) in [
+            ("守卫那一行排在最前", guard_row_in_front),
+            ("守卫那一行写了两次", guard_row_twice),
+            ("认领键当条目写", claim_key_written),
+            ("删键是某条条目的键", deleted_key_written),
+        ] {
+            let rejection = decode_guarded_conclusion_write(&request).expect_err(description);
+            assert!(
+                matches!(rejection, RequestRejection::MalformedPayload { .. }),
+                "{description}：该被拒成内容解不开，实际 {rejection:?}"
+            );
+        }
+    }
+
+    /// 守卫不过的三种回应解出来与编进去的相同。
+    #[test]
+    fn guard_refusal_response_decodes_to_what_was_encoded() {
+        for refusal in [
+            GuardRefusal::DeletedRowChanged {
+                key: b"gpu-pending/aa/0000000000000001".to_vec(),
+                current: GuardRowState::of_stored_value(Some(b"raised to forced")),
+            },
+            GuardRefusal::DeletedRowChanged {
+                key: b"gpu-pending/aa/0000000000000002".to_vec(),
+                current: GuardRowState::Absent,
+            },
+            GuardRefusal::ClaimHeldByOther {
+                holder_identity: b"another-holder".to_vec(),
+                remaining_lease_milliseconds: 1_234,
+            },
+            GuardRefusal::GuardRowChanged {
+                current: GuardRowState::Absent,
+            },
+            GuardRefusal::GuardRowChanged {
+                current: GuardRowState::of_stored_value(Some(b"stored")),
+            },
+        ] {
+            let frame = encode_guard_refusal(4, &refusal, "说明");
+            let response =
+                decode_response_body(&frame[FRAME_LENGTH_FIELD_BYTES..]).expect("解得开");
+            assert_eq!(
+                response.outcome,
+                ResponseOutcome::GuardRefused {
+                    refusal,
+                    message: "说明".to_string(),
+                }
             );
         }
     }

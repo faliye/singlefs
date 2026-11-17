@@ -725,7 +725,8 @@ impl ConnectionReceiver {
                 | ResponseOutcome::Claims(_)
                 | ResponseOutcome::PrefixDeleted { .. }
                 | ResponseOutcome::ConnectedClients(_)
-                | ResponseOutcome::Busy { .. }) => {
+                | ResponseOutcome::Busy { .. }
+                | ResponseOutcome::GuardRefused { .. }) => {
                     ReceiveFailure::ConnectionRejected(format!("序号 0 的回应不是拒绝：{other:?}"))
                 }
             });
@@ -948,7 +949,8 @@ impl SimpleClient {
             | ResponseOutcome::ConnectedClients(_)
             | ResponseOutcome::ServerStopping { .. }
             | ResponseOutcome::Busy { .. }
-            | ResponseOutcome::Rejected { .. }) => {
+            | ResponseOutcome::Rejected { .. }
+            | ResponseOutcome::GuardRefused { .. }) => {
                 Err(format!("删前缀回的不是删前缀的结局：{other:?}"))
             }
         }

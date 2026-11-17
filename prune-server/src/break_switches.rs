@@ -83,6 +83,10 @@ pub enum BreakSwitch {
     AnnouncementIgnored,
     /// `control stop` 不写停服务记录。
     ControlStopRecordSkipped,
+    /// `control swap-binary` 在 restart 之前照样叫服务宣布停服务：连着的客户端收到「服务停了」退 75，不等服务回来。
+    ControlSwapAnnouncesStop,
+    /// `control stop` 不先看服务上连着没连着客户端，不带确认参数也照停。
+    ControlStopIgnoresConnectedClients,
     /// 服务宣布停服务时不给连着的客户端发「服务停了」。
     StopNoticeNotSent,
     /// 客户端收到「服务停了」当成连接断了，照常重连重试。
@@ -162,10 +166,28 @@ pub enum BreakSwitch {
     ResponseBuiltBeforeBudget,
     /// 按前缀扫不看续扫起点，每帧都从前缀起（续扫的客户端拿不到前缀下后面的条目）。
     ScanResumeKeyIgnored,
+    /// 写结论不核认领：别的持有者持着、租期没到也照写。
+    ConclusionGuardClaimUnchecked,
+    /// 写结论把租期过了的别人的认领也当成持着、整帧拒。
+    ConclusionGuardExpiredClaimRefused,
+    /// 写结论把帧里的持有者自己持着的认领也当成别人持着、整帧拒（核成「没人持着才写」）。
+    ConclusionGuardOwnClaimRefused,
+    /// 写结论不核守卫那一行：库里那一份与写的一方读到的不同也照写、盖掉。
+    ConclusionGuardRowUnchecked,
+    /// 写结论不核删键：删键那一行与写的一方读到的不同（读完之后被改过）也照删。
+    ConclusionGuardDeletedRowUnchecked,
+    /// 写结论先核认领与守卫那一行、再去重：重发一帧早已落下的写结论被当成守卫不过拒掉。
+    ConclusionGuardBeforeDeduplication,
+    /// 不在才写照成批写写：键在也盖掉。
+    WriteIfAbsentOverwrites,
+    /// 写结论不删帧里的删键（待判行留着）。
+    ConclusionWritePendingRowsKept,
+    /// 容错客户端写 GPU 结论时不带强制现判的那一行 `gpu-rejudged/`。
+    RejudgedRowDropped,
 }
 
 impl BreakSwitch {
-    pub const ALL: [BreakSwitch; 75] = [
+    pub const ALL: [BreakSwitch; 86] = [
         BreakSwitch::MultiGetPerKey,
         BreakSwitch::WriteSyncPerEntry,
         BreakSwitch::PrefixScanOverruns,
@@ -203,6 +225,8 @@ impl BreakSwitch {
         BreakSwitch::ClientAnnouncementOmitsTask,
         BreakSwitch::AnnouncementIgnored,
         BreakSwitch::ControlStopRecordSkipped,
+        BreakSwitch::ControlSwapAnnouncesStop,
+        BreakSwitch::ControlStopIgnoresConnectedClients,
         BreakSwitch::StopNoticeNotSent,
         BreakSwitch::StopNoticeRetried,
         BreakSwitch::UnreachableExitCodeGeneric,
@@ -241,6 +265,15 @@ impl BreakSwitch {
         BreakSwitch::SegmentsOverwrittenInPlace,
         BreakSwitch::ResponseBuiltBeforeBudget,
         BreakSwitch::ScanResumeKeyIgnored,
+        BreakSwitch::ConclusionGuardClaimUnchecked,
+        BreakSwitch::ConclusionGuardExpiredClaimRefused,
+        BreakSwitch::ConclusionGuardOwnClaimRefused,
+        BreakSwitch::ConclusionGuardRowUnchecked,
+        BreakSwitch::ConclusionGuardDeletedRowUnchecked,
+        BreakSwitch::ConclusionGuardBeforeDeduplication,
+        BreakSwitch::WriteIfAbsentOverwrites,
+        BreakSwitch::ConclusionWritePendingRowsKept,
+        BreakSwitch::RejudgedRowDropped,
     ];
 
     pub fn name(self) -> &'static str {
@@ -290,6 +323,10 @@ impl BreakSwitch {
             BreakSwitch::ClientAnnouncementOmitsTask => "client-announcement-omits-task",
             BreakSwitch::AnnouncementIgnored => "announcement-ignored",
             BreakSwitch::ControlStopRecordSkipped => "control-stop-record-skipped",
+            BreakSwitch::ControlSwapAnnouncesStop => "control-swap-announces-stop",
+            BreakSwitch::ControlStopIgnoresConnectedClients => {
+                "control-stop-ignores-connected-clients"
+            }
             BreakSwitch::StopNoticeNotSent => "stop-notice-not-sent",
             BreakSwitch::StopNoticeRetried => "stop-notice-retried",
             BreakSwitch::UnreachableExitCodeGeneric => "unreachable-exit-code-generic",
@@ -336,6 +373,21 @@ impl BreakSwitch {
             BreakSwitch::SegmentsOverwrittenInPlace => "segments-overwritten-in-place",
             BreakSwitch::ResponseBuiltBeforeBudget => "response-built-before-budget",
             BreakSwitch::ScanResumeKeyIgnored => "scan-resume-key-ignored",
+            BreakSwitch::ConclusionGuardClaimUnchecked => "conclusion-guard-claim-unchecked",
+            BreakSwitch::ConclusionGuardExpiredClaimRefused => {
+                "conclusion-guard-expired-claim-refused"
+            }
+            BreakSwitch::ConclusionGuardOwnClaimRefused => "conclusion-guard-own-claim-refused",
+            BreakSwitch::ConclusionGuardRowUnchecked => "conclusion-guard-row-unchecked",
+            BreakSwitch::ConclusionGuardDeletedRowUnchecked => {
+                "conclusion-guard-deleted-row-unchecked"
+            }
+            BreakSwitch::ConclusionGuardBeforeDeduplication => {
+                "conclusion-guard-before-deduplication"
+            }
+            BreakSwitch::WriteIfAbsentOverwrites => "write-if-absent-overwrites",
+            BreakSwitch::ConclusionWritePendingRowsKept => "conclusion-write-pending-rows-kept",
+            BreakSwitch::RejudgedRowDropped => "rejudged-row-dropped",
         }
     }
 
@@ -382,6 +434,10 @@ impl BreakSwitch {
             BreakSwitch::ClientAnnouncementOmitsTask
             | BreakSwitch::AnnouncementIgnored
             | BreakSwitch::ControlStopRecordSkipped => "stop-lists-connected-clients",
+            BreakSwitch::ControlSwapAnnouncesStop => "swap-binary-keeps-clients",
+            BreakSwitch::ControlStopIgnoresConnectedClients => {
+                "stop-refuses-while-clients-connected"
+            }
             BreakSwitch::StopNoticeNotSent | BreakSwitch::StopNoticeRetried => {
                 "intentional-stop-fails-clients-fast"
             }
@@ -437,6 +493,27 @@ impl BreakSwitch {
             BreakSwitch::SegmentsOverwrittenInPlace => "segmented-rewrite-survives-writer-death",
             BreakSwitch::ResponseBuiltBeforeBudget => "worker-responses-within-pending-budget",
             BreakSwitch::ScanResumeKeyIgnored => "prefix-scan-resumes-after-the-last-key",
+            BreakSwitch::ConclusionGuardClaimUnchecked => {
+                "conclusion-write-refused-while-another-holder-leases"
+            }
+            BreakSwitch::ConclusionGuardExpiredClaimRefused => {
+                "conclusion-write-proceeds-after-the-lease-expires"
+            }
+            BreakSwitch::ConclusionGuardOwnClaimRefused => {
+                "conclusion-write-proceeds-for-its-own-holder"
+            }
+            BreakSwitch::ConclusionGuardRowUnchecked => "differing-conclusion-refused-not-dropped",
+            BreakSwitch::ConclusionGuardDeletedRowUnchecked => {
+                "conclusion-write-refused-when-the-pending-row-changed"
+            }
+            BreakSwitch::ConclusionGuardBeforeDeduplication => {
+                "conclusion-guard-checked-after-deduplication"
+            }
+            BreakSwitch::WriteIfAbsentOverwrites => "pending-rows-written-only-if-absent",
+            BreakSwitch::ConclusionWritePendingRowsKept => {
+                "conclusion-write-deletes-the-pending-row"
+            }
+            BreakSwitch::RejudgedRowDropped => "forced-rejudge-writes-the-rejudged-row",
         }
     }
 

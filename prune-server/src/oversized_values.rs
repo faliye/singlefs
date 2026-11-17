@@ -13,7 +13,7 @@
 //!
 //! 次序：开库（只开已有的库、不建；服务开着它时 RocksDB 的 LOCK 拒开，先 `control stop`）→ 从头扫一遍认出清单 →
 //! [`OversizedValueRemoval::ListOnly`]（`--dry-run`）到这里就关库，库一个字节不动；[`OversizedValueRemoval::DropAndReadBack`]
-//! 把清单里的键放进一个写批删掉、同步 WAL，再逐把点读核没了。扫与删在同一次开库里，锁在这个进程手里，中间没有别的写者。
+//! 把清单里的键连同它们的认领行（`storage.rs` 文件头的认领记录）放进一个写批删掉、同步 WAL，再逐把点读核键与认领行都没了。扫与删在同一次开库里，锁在这个进程手里，中间没有别的写者。
 
 use std::path::{Path, PathBuf};
 
@@ -29,7 +29,7 @@ use crate::protocol::{
 use crate::segmented_values::has_the_shape_of_a_segment_or_version_registry_key;
 use crate::server::{DESCRIPTOR_LIMIT_TOO_LOW_EXIT_CODE, LIBRARY_MISMATCHED_EXIT_CODE};
 use crate::storage::{
-    library_options, open_single_column_family_library, LibraryOpenFailure,
+    claim_key, library_options, open_single_column_family_library, LibraryOpenFailure,
     DESCRIPTOR_LIMIT_NEXT_STEP,
 };
 
@@ -155,7 +155,8 @@ pub fn find_oversized_values_then_drop_unless_listing_only(
     })
 }
 
-/// 把 `oversized_values` 的键放进一个写批删掉、同步 WAL，再逐把点读核没了（文件头「次序」）。
+/// 把 `oversized_values` 的键连同各自的认领行放进一个写批删掉、同步 WAL，再逐把点读核没了（文件头「次序」）。
+/// 认领行不删的话，重起时 `load_claims` 把没到期的认领读回来，别的客户端重写这把键要等到租期满。
 fn drop_rows_then_read_them_back_absent(
     database: &DB,
     oversized_values: &[OversizedValue],
@@ -164,6 +165,7 @@ fn drop_rows_then_read_them_back_absent(
         let mut batch = WriteBatch::default();
         for oversized in oversized_values {
             batch.delete(&oversized.key);
+            batch.delete(claim_key(&oversized.key));
         }
         let mut unsynced = WriteOptions::default();
         unsynced.set_sync(false);
@@ -176,11 +178,13 @@ fn drop_rows_then_read_them_back_absent(
     }
     let mut still_present = Vec::new();
     for oversized in oversized_values {
-        let stored = database.get_pinned(&oversized.key).map_err(|error| {
-            OversizedValuesFailure::Storage(format!("删除之后点读失败：{error}"))
-        })?;
-        if stored.is_some() {
-            still_present.push(oversized.key.clone());
+        for deleted_key in [oversized.key.clone(), claim_key(&oversized.key)] {
+            let stored = database.get_pinned(&deleted_key).map_err(|error| {
+                OversizedValuesFailure::Storage(format!("删除之后点读失败：{error}"))
+            })?;
+            if stored.is_some() {
+                still_present.push(deleted_key);
+            }
         }
     }
     if !still_present.is_empty() {

@@ -10,7 +10,7 @@
   · 多机配置里要有 PRUNE_SERVER_TCP_ADDRESS（判不了服务在哪台）；
   · 共用取法要取得到地址：配置整份判不过（HOSTS 没写、PRUNE_SERVER_TCP_ADDRESS 的 IP 不在 HOSTS 里、缺别的键都算）就退 78，原因照抄判法的那一句，不补缺省；
   · 经 ssh 之前，这一条不是别的那台转来的（转去时带 PRUNE_SERVER_CONTROL_FORWARDED=1；两台都不认那个 IP 是自己的，就是配置错了，不来回转）。
-install --binary 转去时，二进制的路径（解开符号链接之后）要在多机配置 NFS_SHARED_ROOTS 某一段下、这台读得到（两台同一绝对路径），
+install --binary 与 swap-binary --binary 转去时，二进制的路径（解开符号链接之后）要在多机配置 NFS_SHARED_ROOTS 某一段下、这台读得到（两台同一绝对路径），
 不是就退 78；那台读不到同样退 78。watch 转去时照样前台、按行转打（ssh 带 ServerAliveInterval），对端退出就退它的退出码；
 ssh 断了或连不上（ssh 退 255）按「服务不通」报、退 1，别的子命令 ssh 退 255 退 78；那台的 watch 读到标准输入的尽头（这台的 watch 退了、ssh 断了）就退出。
 
@@ -25,9 +25,19 @@ ssh 断了或连不上（ssh 退 255）按「服务不通」报、退 1，别的
                                                 照模板写用户级单元 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/singlefs-prune-server.service，
                                                 systemctl --user daemon-reload、start（开机不自起、不 enable；单元带 Restart=always，不是 systemctl stop 停掉的
                                                 由 systemd 隔 RestartSec 秒拉起，模板文件头）；回读服务通不通（admin health）到通了才退 0，
-                                                限时里不通退 1。单元已经在跑的不重起：换了二进制或单元之后 control stop、control start 才换上
+                                                限时里不通退 1。单元已经在跑的不重起：换了二进制或单元之后用 swap-binary 换上（连着客户端时不用 stop、start）
   python3 prune-server/control start            systemctl --user start 之后回读 is-active 的输出与服务通不通，都对退 0，不对退 1
-  python3 prune-server/control stop             不等在跑的读写：先叫服务宣布停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时没写进套接字的连接，
+  python3 prune-server/control swap-binary --binary <编好的 prune-server>
+                                                换二进制、不让连着的客户端退出：先做 install --binary 那一套（拷成装好的二进制并回读 sha256、写单元、daemon-reload、
+                                                单元在跑不重起、回读服务通），再 systemctl --user restart 把服务换上新二进制。不宣布停服务：服务收 SIGTERM 立刻结束、不发「服务停了」，
+                                                连着的 Python 与 Rust 容错客户端把这一断当连接断了，照各自的重连总时长（缺省 120 秒）等服务回来、重发没确认的帧（重放幂等）。
+                                                换之前连着的客户端（主机、任务号、第几次、进程号）先打出来；单元没在跑的当它是 install 再 start（没有连着的客户端要保护）。
+                                                回读：is-active 打 active、服务通、单元 cgroup.procs 里每个进程的可执行文件（/proc/<进程号>/exe，换掉的旧文件已被删也读得到内容）
+                                                的 sha256 都等于装好的二进制的 sha256；cgroup 读不到、里面没有进程、sha256 对不上都不算换上，限时内没都对上退 1，都对退 0
+  python3 prune-server/control stop [--even-with-connected-clients]
+                                                停之前先列此刻连着服务的客户端（只列，不宣布停服务）：有一个在连就拒停、退 78，打出清单与任务号，出路写先请那几条的会话取消或等它们跑完、
+                                                或换二进制用 swap-binary；带 --even-with-connected-clients 才往下停；服务不通、列不到的照停。往下停是：
+                                                不等在跑的读写：先叫服务宣布停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时没写进套接字的连接，
                                                 服务往故障日志记 stop-notice-undelivered 一行，那几条客户端收不到、只能靠重连上限退出，stop 照停、可以退 0），
                                                 打出发通知之前连着的客户端（主机、任务号、第几次、进程号）并排他写进状态目录 stops/ 下的停服务记录，
                                                 再 systemctl --user stop（SIGTERM 立刻结束进程；systemctl stop 停的 systemd 不拉起，不 disable，本来也没 enable：开机不自起）；
@@ -47,14 +57,15 @@ ssh 断了或连不上（ssh 退 255）按「服务不通」报、退 1，别的
                                                 （头一个词、--state-directory），起 <二进制> drop-oversized-values --state-directory <状态目录> [--dry-run]，
                                                 它的标准输出与标准错误原样打、退它的退出码。次序：control stop → 这一条带 --dry-run（只打清单）→
                                                 不带 --dry-run（删掉、同步、逐把点读核没了）→ 再带 --dry-run（oversized_rows=0）→ control start → control check
-退出码：0 成了；1 回读不对或 watch 判出了问题；2 用法错，或只在自证里认的变量设在了别处；78 运行条件不满足（出路写在 stderr）；
+退出码：0 成了；1 回读不对或 watch 判出了问题；2 用法错，或只在自证里认的变量设在了别处；78 运行条件不满足（含 stop 因连着客户端而拒停；出路写在 stderr）；
 经 ssh 转去的退那台的退出码；drop-oversized-values 起了二进制的退二进制的退出码。
-自证（prune-server --selftest 的 control-install-start-stop-check、stop-lists-connected-clients 与 watch-reports-* 几格）设
-PRUNE_SERVER_CONTROL_SELFTEST_ROOT=<临时目录>：路径都换到它底下，systemctl 换成它底下的 fake-systemctl，cgroup 根换成它底下的 cgroup/，
+自证（prune-server --selftest 的 control-install-start-stop-check、stop-lists-connected-clients、swap-binary-keeps-clients、
+stop-refuses-while-clients-connected 与 watch-reports-* 几格）设
+PRUNE_SERVER_CONTROL_SELFTEST_ROOT=<临时目录>：路径都换到它底下，systemctl 换成它底下的 fake-systemctl，cgroup 根换成它底下的 cgroup/，/proc 换成它底下的 proc/，
 回读与监听的间隔变短；只有这时才认弄坏开关 PRUNE_SERVER_BREAK（表在 src/break_switches.rs），这份文件读的几项：
 control-dry-run-writes、control-install-readback-skipped、control-start-readback-skipped、control-stop-readback-skipped、
 control-stop-record-skipped、watch-ignores-unit-state、watch-ignores-health、watch-ignores-fault-log、watch-counts-old-fault-lines、
-control-check-omits-library。那几格的多机配置要整份判得过（共用取法照判），写 HOSTS=127.0.0.1 192.0.2.1、PRUNE_SERVER_TCP_ADDRESS=127.0.0.1:0
+control-check-omits-library、control-swap-announces-stop、control-stop-ignores-connected-clients。那几格的多机配置要整份判得过（共用取法照判），写 HOSTS=127.0.0.1 192.0.2.1、PRUNE_SERVER_TCP_ADDRESS=127.0.0.1:0
 与判法要的别的键（NFS_SHARED_ROOTS 指自证根），回环在 lo 上、每一台都有，判成这台。ssh 一律换成自证根下的 fake-ssh。
 
 自己的自证（python3 prune-server/control --selftest）：每格在临时目录里造一份自证根（整份判得过的多机配置：这一台写 127.0.0.1（每一台的 lo 上都有），
@@ -93,9 +104,13 @@ fake-ssh 把收到的参数逐次记进 fake/ssh-calls.log、打一行标准输�
       install-build-hint-saves-binary（✗ install-build-hint-saves-binary：提示里没有把二进制拷到共享根的 && cp）
   PRUNE_SERVER_CONTROL_BREAK=watch-running-states-narrowed  watch 只认 active 算在跑，activating、reloading、deactivating 当单元不在跑
       watch-accepts-transitional-states（✗ watch-accepts-transitional-states：is-active 打 activating 时 watch 退了）
+  PRUNE_SERVER_CONTROL_BREAK=swap-exe-unchecked  swap-binary 回读不核进程的可执行文件 sha256（只看 is-active、服务通、cgroup 里有进程）
+      swap-binary-replaces-running-binary（✗ swap-binary-replaces-running-binary：restart 之后进程还跑旧可执行文件时 swap-binary 退 0）
 这几条之外，stop-stays-stopped（stop 之后隔一阵再回读仍 inactive；假 systemctl 在 stop 之后又把单元拉起时 stop 退 1）、
 drop-oversized-runs-installed-binary（单元停着时起单元 ExecStart 的二进制、--state-directory 取单元的、--dry-run 照传、退它的退出码）、
 drop-oversized-forwarded-over-ssh（服务在第二台时经 ssh 转去同一条）三格没有专门的开关。
+swap-binary 不宣布停服务、stop 因连着客户端而拒停这两条要真服务与真客户端才看得出，由 prune-server --selftest 的 swap-binary-keeps-clients、
+stop-refuses-while-clients-connected 两格用 PRUNE_SERVER_BREAK 的 control-swap-announces-stop、control-stop-ignores-connected-clients 证红，这份自证不重复。
 """
 import concurrent.futures
 import hashlib
@@ -139,8 +154,11 @@ FAST_WATCH_SECONDS = 0.3
 RESTART_SETTLE_MARGIN_SECONDS = 1.0
 FAST_RESTART_SETTLE_SECONDS = 0.3
 ADMIN_TIMEOUT_SECONDS = 10.0
+# swap-binary 的 restart 之后回读：新进程起来、开库、通，落在容错客户端一轮重连（至多 120 秒）里
+SWAP_READBACK_SECONDS = 60.0
+EVEN_WITH_CLIENTS_FLAG = "--even-with-connected-clients"
 STOPPED_STATES = ("inactive", "failed")
-# 单元算在的状态：active、activating、reloading、deactivating 都算在（.claude/rules/service-stop-readback.md），watch 只在状态落在这四个之外时报单元不在跑
+# 单元算在的状态：active、activating、reloading、deactivating 都算在（.claude/rules/command-safety-by-review.md），watch 只在状态落在这四个之外时报单元不在跑
 RUNNING_STATES = ("active", "activating", "reloading", "deactivating")
 # 编法的提示：编译目录归服务、任务一结束就被服务删，所以编和拷到共享根在同一条提交命令里做完（README.md「装」第 1 条）
 BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server"
@@ -178,6 +196,7 @@ class Paths:
             self.configuration = os.path.join(root, "multi-host.env")
             self.systemctl = os.path.join(root, "fake-systemctl")
             self.cgroup_root = os.path.join(root, "cgroup")
+            self.proc_root = os.path.join(root, "proc")
             self.ssh = os.path.join(root, "fake-ssh")
         else:
             config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
@@ -189,6 +208,7 @@ class Paths:
             self.configuration = os.environ.get(MULTI_HOST_CONFIGURATION_VARIABLE) or os.path.join(REPOSITORY, "multi-host.env")
             self.systemctl = "systemctl"
             self.cgroup_root = "/sys/fs/cgroup"
+            self.proc_root = "/proc"
             self.ssh = "ssh"
         self.fault_log = os.path.join(self.state_directory, FAULT_LOG_FILE_NAME)
         self.stop_records = os.path.join(self.state_directory, STOP_RECORD_DIRECTORY_NAME)
@@ -245,7 +265,7 @@ def unit_active_state(paths):
 
 def unit_processes(paths):
     """单元 cgroup.procs 里的进程号，回 (进程号表, 读不到的原因)：单元没有 cgroup 是空表；systemctl show 失败（退非 0、起不来、超时）与
-    cgroup.procs 读不了，都回 (None, 原因)——读不到不能证明为空，照内容判空不空（.claude/rules/service-stop-readback.md）。"""
+    cgroup.procs 读不了，都回 (None, 原因)——读不到不能证明为空，照内容判空不空（.claude/rules/command-safety-by-review.md）。"""
     code, group, error = run_systemctl(paths, "show", "-p", "ControlGroup", "--value", UNIT_NAME, timeout=30)
     if code != 0 and not control_broken("cgroup-show-failure-ignored"):
         return None, f"systemctl show -p ControlGroup 退 {code}：{error or '（没有标准错误）'}"
@@ -489,8 +509,25 @@ def print_task_queries(numbers):
         say(f"  · 任务 {number}：task-server/task status {number}（看是哪个会话交的，请它取消、等修好重起之后重交）")
 
 
-def stop():
+def refuse_stop_with_clients(lines):
+    """stop 拒停：服务上还连着客户端，停服务会让它们退 75、没做完的白跑。打清单与任务号，出路写全；退 78。"""
+    say(f"  · 此刻连着服务的客户端 {len(lines)} 个（只列了、没宣布停服务，服务照常在跑）：")
+    for line in lines:
+        say(f"      {line}")
+    numbers = task_numbers(lines)
+    print_task_queries(numbers)
+    return fail(f"服务上连着 {len(lines)} 个客户端（任务号：{'、'.join(numbers) if numbers else '都没报任务号'}），有意停会让它们退 75、没做完的白跑",
+                f"换二进制用 python3 prune-server/control swap-binary --binary <编好的 prune-server>（不宣布停服务，连着的客户端等服务回来接着做）；"
+                f"要有意停：先请这几条任务的会话取消或等它们跑完，再跑 stop；确要照停（服务自身出了缺陷、客户端本来就在受害）加 {EVEN_WITH_CLIENTS_FLAG}",
+                RUN_CONDITION_EXIT)
+
+
+def stop(even_with_clients):
     paths = Paths()
+    if not even_with_clients and not broken("control-stop-ignores-connected-clients"):
+        listed, connected, _ = client_lines(paths, "connected-clients")
+        if listed and connected:
+            return refuse_stop_with_clients(connected)
     clients_known, lines, problem = client_lines(paths, "announce-stop")
     if clients_known:
         say(f"  · 宣布了停服务（服务尽力给连着的客户端各发一帧「服务停了」，收到的退 75 不再重试；限时没写进套接字的连接记在故障日志 stop-notice-undelivered 一行，那几条客户端收不到、只能靠重连上限退出）；停之前连着的客户端 {len(lines)} 个：")
@@ -517,6 +554,74 @@ def stop():
                     f"看 journalctl --user -u {UNIT_NAME} -n 100 是谁起的它；再跑一次 python3 prune-server/control stop，还被拉起就把这一行交主 agent", 1)
     say(f"  ✓ {UNIT_NAME} 停了（is-active 打「{state}」、cgroup 里没有进程；隔 {settle} 秒再回读仍是「{later_state}」，没被拉起）")
     print_task_queries(task_numbers(lines))
+    return 0
+
+
+def executable_sha256(paths, process):
+    """进程的可执行文件内容的 sha256：(摘要, 读不到的原因)。读 /proc/<进程号>/exe：换掉的旧文件已被删，它指着的还是进程此刻跑的那一份内容。"""
+    path = os.path.join(paths.proc_root, str(process), "exe")
+    try:
+        return file_sha256(path), ""
+    except OSError as error:
+        return None, f"{path} 读不了（{type(error).__name__}: {error}）"
+
+
+def swap_readback_problem(paths, expected_sha256):
+    """restart 之后回读：单元在跑、服务通、cgroup 里有进程且每个进程的可执行文件都是新二进制；回没对上的那一句，都对回空串。"""
+    state = unit_active_state(paths)
+    if state != "active":
+        return f"is-active 打的是「{state}」"
+    reachable, detail = health(paths)
+    if not reachable:
+        return f"服务不通：{detail}"
+    processes, unreadable = unit_processes(paths)
+    if processes is None:
+        return f"单元 cgroup 读不到（{unreadable}）"
+    if not processes:
+        return "单元 cgroup 里没有进程"
+    if control_broken("swap-exe-unchecked"):
+        return ""
+    for process in processes:
+        actual, why = executable_sha256(paths, process)
+        if actual != expected_sha256:
+            return f"进程 {process} 跑的可执行文件{f' sha256 是 {actual}' if actual else f'读不到：{why}'}，装好的新二进制是 {expected_sha256}"
+    return ""
+
+
+def swap_binary(source):
+    """换二进制、不宣布停服务（文件头 swap-binary）：install --binary 那一套，再 systemctl restart，回读进程跑的是新二进制。"""
+    paths = Paths()
+    listed, clients, problem = client_lines(paths, "connected-clients")
+    if listed:
+        say(f"  · 换之前连着的客户端 {len(clients)} 个（不宣布停服务：服务收 SIGTERM 不发「服务停了」，它们照各自的重连总时长等服务回来、重发没确认的帧）：")
+        for line in clients:
+            say(f"      {line}")
+    else:
+        say(f"  · 连着的客户端拿不到（服务不通，照换）：{problem}")
+    installed = install(False, source)
+    if installed != 0:
+        return installed
+    expected = file_sha256(paths.binary)
+    if broken("control-swap-announces-stop"):
+        client_lines(paths, "announce-stop")
+    started = time.monotonic()
+    code, _, error = run_systemctl(paths, "restart", UNIT_NAME, timeout=120)
+    if code != 0:
+        return fail(f"systemctl --user restart {UNIT_NAME} 退 {code}：{error}",
+                    f"服务可能此刻是停的：看 systemctl --user status {UNIT_NAME} 与 journalctl --user -u {UNIT_NAME} -n 100；"
+                    "起得来（python3 prune-server/control start）就再跑一次同一条 swap-binary", 1)
+    deadline = time.monotonic() + paths.readback_seconds(SWAP_READBACK_SECONDS)
+    while True:
+        unmatched = swap_readback_problem(paths, expected)
+        if not unmatched or time.monotonic() >= deadline:
+            break
+        time.sleep(0.2)
+    if unmatched:
+        return fail(f"restart 之后回读没对上：{unmatched}",
+                    f"看 journalctl --user -u {UNIT_NAME} -n 100；连着的客户端重连总时长缺省 120 秒，修好之前它们会退 75；"
+                    "起得来就再跑一次同一条 swap-binary", 1)
+    say(f"  ✓ 换好了：{UNIT_NAME} 在跑、服务通、进程的可执行文件 sha256 是 {expected}；restart 发出到回读对上 {time.monotonic() - started:.1f} 秒，"
+        "换之前连着的客户端照各自的重连总时长等服务回来，没有宣布停服务")
     return 0
 
 
@@ -663,8 +768,8 @@ def watch():
             else:
                 say(f"  · 此刻连着的客户端：拿不到（{problem}）")
             print_task_queries(task_numbers(lines + fault_lines))
-            say("  → 怎么办：照 prune-server/README.md「出了问题怎么处置」：是服务自身的缺陷就 python3 prune-server/control stop、"
-                "照客户端清单通知会话取消、修、python3 prune-server/control start、再起 watch、通知可以重交")
+            say("  → 怎么办：照 prune-server/README.md「出了问题怎么处置」：是服务自身的缺陷就 python3 prune-server/control stop "
+                f"{EVEN_WITH_CLIENTS_FLAG}（有客户端连着时不带它会被拒）、照客户端清单通知会话取消、修、python3 prune-server/control start、再起 watch、通知可以重交")
             return 1
         if os.environ.get(FORWARDED_VARIABLE) and not control_broken("forwarded-watch-ignores-hangup"):
             if standard_input_ended(interval):
@@ -761,7 +866,7 @@ def shared_binary_refusal(paths, host, binary):
 def forward(paths, host, arguments):
     """经 ssh 到服务那台 host，在同一绝对路径的仓里起同一条 control：对端的输出原样打、退它的退出码（ssh 自己失败另报）。"""
     is_watch = arguments[:1] == ["watch"]
-    if arguments[:1] == ["install"] and "--binary" in arguments:
+    if arguments[:1] in (["install"], ["swap-binary"]) and "--binary" in arguments:
         refused = shared_binary_refusal(paths, host, arguments[arguments.index("--binary") + 1])
         if refused:
             return refused
@@ -818,9 +923,13 @@ def parse_arguments(arguments):
             return (lambda: install(dry_run, None)), head
         if len(rest) == 2 and rest[0] == "--binary":
             return (lambda: install(dry_run, os.path.abspath(rest[1]))), head + ["--binary", os.path.realpath(rest[1])]
+    if arguments[:1] == ["swap-binary"] and len(arguments) == 3 and arguments[1] == "--binary":
+        return (lambda: swap_binary(os.path.abspath(arguments[2]))), ["swap-binary", "--binary", os.path.realpath(arguments[2])]
+    if arguments[:1] == ["stop"] and arguments[1:] in ([], [EVEN_WITH_CLIENTS_FLAG]):
+        return (lambda: stop(arguments[1:] == [EVEN_WITH_CLIENTS_FLAG])), list(arguments)
     if arguments[:1] == ["drop-oversized-values"] and arguments[1:] in ([], ["--dry-run"]):
         return (lambda: drop_oversized_values(arguments[1:] == ["--dry-run"])), list(arguments)
-    commands = {"start": start, "stop": stop, "check": check, "watch": watch}
+    commands = {"start": start, "check": check, "watch": watch}
     if len(arguments) == 1 and arguments[0] in commands:
         return commands[arguments[0]], list(arguments)
     return None, None
@@ -873,7 +982,8 @@ exit 1
 """
 # 记状态的假 systemctl（单元自己拉起、stop、drop-oversized-values 那几格）：调用逐行记进 fake/systemctl-calls.log，单元状态在 fake/unit-state；
 # 有 fake/restarted-after-stop 时 stop 之后头一次 is-active 打 inactive、之后打 active（当单元停了又被拉起）；
-# 有 fake/stop-leaves-process 时 stop 之后 cgroup.procs 里还留着进程号；有 fake/show-exit 时 show 不打输出、退那个码（当问不到 cgroup）
+# 有 fake/stop-leaves-process 时 stop 之后 cgroup.procs 里还留着进程号；有 fake/show-exit 时 show 不打输出、退那个码（当问不到 cgroup）；
+# restart 换成进程 4343、它的 proc/4343/exe 是装好的二进制的拷贝（当新二进制起来了），有 fake/restart-keeps-old-binary 时拷的是 fake/old-binary（当还跑着旧可执行文件）
 FAKE_SYSTEMCTL_STATEFUL = """#!/bin/sh
 root="$(cd "$(dirname "$0")" && pwd)"
 printf '%s\\n' "$*" >> "$root/fake/systemctl-calls.log"
@@ -882,6 +992,11 @@ processes="$root/cgroup/fake.slice/cgroup.procs"
 case "$1" in
   daemon-reload|enable) exit 0 ;;
   start) echo active > "$root/fake/unit-state"; echo 4242 > "$processes"; exit 0 ;;
+  restart)
+    echo active > "$root/fake/unit-state"
+    if [ -f "$root/fake/restart-keeps-old-binary" ]; then loaded="$root/fake/old-binary"; else loaded="$root/bin/prune-server"; fi
+    mkdir -p "$root/proc/4343"; cp "$loaded" "$root/proc/4343/exe"; echo 4343 > "$processes"
+    exit 0 ;;
   stop)
     echo inactive > "$root/fake/unit-state"
     if [ -f "$root/fake/stop-leaves-process" ]; then echo 4242 > "$processes"; else : > "$processes"; fi
@@ -931,6 +1046,7 @@ SELFTEST_SWITCH_CELLS = {
     "cgroup-show-failure-ignored": ("stop-refuses-unreadable-cgroup",),
     "build-hint-leaves-build-directory": ("install-build-hint-saves-binary",),
     "watch-running-states-narrowed": ("watch-accepts-transitional-states",),
+    "swap-exe-unchecked": ("swap-binary-replaces-running-binary",),
 }
 
 
@@ -1110,6 +1226,20 @@ def cell_install_binary_shared_root(base, switches):
     calls = world.ssh_calls()
     expect(problems, len(calls) == 1 and remote_words(calls[0]) == expected_remote_words(["install", "--binary", inside]),
            f"远端命令该是 {expected_remote_words(['install', '--binary', inside])}，fake-ssh 收到 {calls}")
+    # swap-binary --binary 同样：共享根外的拒、共享根下的转去；stop 带的确认参数原样转去
+    swap_world = SelftestWorld(base, "swap-binary-shared", remote_configuration(), switches, ssh_exit=5)
+    swap_shared = os.path.join(swap_world.root, "shared")
+    swap_outside = os.path.realpath(swap_world.write("outside/prune-server", "fake binary\n"))
+    swap_inside = os.path.realpath(swap_world.write("shared/build/prune-server", "fake binary\n"))
+    swap_world.write_configuration(remote_configuration() + [(SHARED_ROOTS_KEY, swap_shared)])
+    expect_refused(problems, swap_world, swap_world.run(["swap-binary", "--binary", swap_outside]), ["swap-binary", "--binary", swap_outside], [SHARED_ROOTS_KEY])
+    code, _, error = swap_world.run(["swap-binary", "--binary", swap_inside])
+    expect(problems, code == 5, f"共享根下的 swap-binary --binary 该转去、带回对端的 5，退了 {code}：{error.strip()}")
+    code, _, error = swap_world.run(["stop", EVEN_WITH_CLIENTS_FLAG])
+    expect(problems, code == 5, f"stop {EVEN_WITH_CLIENTS_FLAG} 该转去、带回对端的 5，退了 {code}：{error.strip()}")
+    calls = swap_world.ssh_calls()
+    expected_calls = [expected_remote_words(["swap-binary", "--binary", swap_inside]), expected_remote_words(["stop", EVEN_WITH_CLIENTS_FLAG])]
+    expect(problems, [remote_words(call) for call in calls] == expected_calls, f"远端命令该是 {expected_calls}，fake-ssh 收到 {calls}")
     return problems
 
 
@@ -1287,6 +1417,33 @@ def cell_watch_accepts_transitional_states(base, switches):
     return problems
 
 
+def cell_swap_binary_replaces_running_binary(base, switches):
+    """swap-binary：装好的二进制换成 --binary 给的、用 systemctl restart（不 stop、不 kill）、回读单元里每个进程的可执行文件是新二进制才退 0；
+    restart 之后进程还跑着旧可执行文件时退 1、说 sha256 对不上。"""
+    problems = []
+    for keeps_old in (False, True):
+        label = "restart 之后进程还是旧可执行文件" if keeps_old else "restart 之后进程是新二进制"
+        world = SelftestWorld(base, "swap-binary", host_configuration(LOCAL_ADDRESS), switches, recording=True)
+        source = world.write("new/prune-server", FAKE_BINARY_RECORDING + "# 新二进制\n", executable=True)
+        world.write("fake/old-binary", FAKE_BINARY_RECORDING)
+        world.write("fake/unit-state", "active\n")
+        world.write("cgroup/fake.slice/cgroup.procs", "4242\n")
+        world.write("proc/4242/exe", FAKE_BINARY_RECORDING)
+        if keeps_old:
+            world.write("fake/restart-keeps-old-binary", "")
+        code, output, error = world.run(["swap-binary", "--binary", source])
+        calls = file_text(os.path.join(world.root, "fake", "systemctl-calls.log")).splitlines()
+        expect(problems, f"--user restart {UNIT_NAME}" in calls and not any(" stop " in f" {line} " or " kill " in f" {line} " for line in calls),
+               f"{label}：swap-binary 该用 systemctl restart（不 stop、不 kill），systemctl 的调用：{calls}")
+        if keeps_old:
+            expect(problems, code == 1 and "sha256" in error, f"{label}：swap-binary 该退 1、说 sha256 对不上，退了 {code}：{error.strip()}；标准输出末尾：{output.strip()[-200:]}")
+        else:
+            expect(problems, code == 0 and "换好了" in output, f"{label}：swap-binary 该退 0、说换好了，退了 {code}：{error.strip()}；标准输出末尾：{output.strip()[-200:]}")
+            expect(problems, file_sha256(source) == file_sha256(os.path.join(world.root, "bin", "prune-server")),
+                   f"{label}：装好的二进制该与 --binary 给的内容相同")
+    return problems
+
+
 def drop_world(base, cell, switches, unit_state):
     """drop-oversized-values 那几格的自证根：单元状态是 unit_state，单元文件的 ExecStart 指 <根>/installed/prune-server、--state-directory 指 <根>/unit-state
     （都不是 Paths 的缺省位置，证明是从单元文件取的）。"""
@@ -1357,6 +1514,7 @@ SELFTEST_CELLS = {
     "stop-refuses-unreadable-cgroup": cell_stop_refuses_unreadable_cgroup,
     "install-build-hint-saves-binary": cell_install_build_hint_saves_binary,
     "watch-accepts-transitional-states": cell_watch_accepts_transitional_states,
+    "swap-binary-replaces-running-binary": cell_swap_binary_replaces_running_binary,
 }
 
 
@@ -1402,8 +1560,8 @@ def main(arguments):
     here, forwarded_arguments = parse_arguments(arguments)
     if here is None:
         return fail(f"认不出「{' '.join(arguments)}」",
-                    "写成 python3 prune-server/control install [--dry-run] [--binary <编好的 prune-server>] | start | stop | check | watch"
-                    " | drop-oversized-values [--dry-run] | --selftest", USAGE_EXIT)
+                    "写成 python3 prune-server/control install [--dry-run] [--binary <编好的 prune-server>] | swap-binary --binary <编好的 prune-server>"
+                    f" | start | stop [{EVEN_WITH_CLIENTS_FLAG}] | check | watch | drop-oversized-values [--dry-run] | --selftest", USAGE_EXIT)
     paths = Paths()
     place, value = service_host(paths)
     if place == "refused":

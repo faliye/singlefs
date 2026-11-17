@@ -41,7 +41,7 @@ const PATIENT_RECONNECT: ReconnectPolicy = ReconnectPolicy {
     maximum_total: Duration::from_secs(60),
 };
 
-fn client_settings(
+pub(crate) fn client_settings(
     route: RouteAddress,
     journal_path: PathBuf,
     break_switches: &BreakSwitches,
@@ -57,7 +57,7 @@ fn client_settings(
     settings
 }
 
-fn failure_text(failure: &ClientFailure) -> String {
+pub(crate) fn failure_text(failure: &ClientFailure) -> String {
     failure.to_string()
 }
 
@@ -1120,7 +1120,8 @@ pub(crate) fn cell_group_commit_coalesces_syncs(context: &CellContext) -> Result
                 | ResponseOutcome::ConnectedClients(_)
                 | ResponseOutcome::ServerStopping { .. }
                 | ResponseOutcome::Busy { .. }
-                | ResponseOutcome::Rejected { .. }) => {
+                | ResponseOutcome::Rejected { .. }
+                | ResponseOutcome::GuardRefused { .. }) => {
                     return Err(format!("写确认不对：{other:?}"))
                 }
             }

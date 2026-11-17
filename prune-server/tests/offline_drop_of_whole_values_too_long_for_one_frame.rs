@@ -1,7 +1,8 @@
 //! 离线子命令 `drop-oversized-values` 的认法与删法（`prune_server::oversized_values` 文件头）：每条用例在自己独占的临时目录里用服务写库的那一条路
 //! （`VerdictLibrary` 的组提交）造一份库，写一行比「一把键单独一帧读得回」长一个字节的整值、一行恰好最长读得回的整值、一份真分段存的值
 //! （清单、段键、版本登记键，照 `plan_segmented_write` 拆）、一行形状是段键而值同样超界的行、判定向量两张表的空值行与一行小值；
-//! 再照只列与删两种跑，核认出的只有超界的那一行整值、库里别的行逐把不变。不起服务、不连真服务。
+//! 再照只列与删两种跑，核认出的只有超界的那一行整值、库里别的行逐把不变；另一条用例给超界整值那把键记一条没到期的认领，核删的时候认领行一并删掉。
+//! 不起服务、不连真服务。
 //! 界不从被测模块取：照 `protocol` 文件头的回应帧格式（帧长上限减回应帧头、个数、在不在、值长）在这里另算一遍。
 
 use std::collections::BTreeMap;
@@ -9,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use prune_server::break_switches::BreakSwitches;
+use prune_server::committer::now_milliseconds;
 use prune_server::oversized_values::{
     find_oversized_values_then_drop_unless_listing_only, OversizedValue, OversizedValueRemoval,
 };
@@ -19,7 +21,7 @@ use prune_server::segmented_values::{
     plan_segmented_write, segment_key, version_registry_key, SegmentPlacement, StoredVersions,
     SEGMENT_MANIFEST_MAGIC,
 };
-use prune_server::storage::VerdictLibrary;
+use prune_server::storage::{claim_key, ClaimRecord, VerdictLibrary};
 
 /// 成批点读回应里 `u32 个数` 的字节数（`protocol` 文件头「回应帧」）。
 const POINT_READ_COUNT_FIELD_BYTES: usize = 4;
@@ -45,6 +47,9 @@ const SMALL_WHOLE_VALUE_KEY: &[u8] = b"unit-verdicts/singlefs-unit-verdicts/kind
 /// 造库那一批写的客户端身份与请求号（组提交顺带记一行已生效的请求号，记账行留在库里、扫时一起数）。
 const FIXTURE_CLIENT_IDENTITY: &[u8] = b"offline-drop-fixture";
 const FIXTURE_REQUEST_NUMBER: u64 = 1;
+/// 超界整值那把键上的认领：持有者的身份，与租期（一小时，远比用例跑的时间长，删的时候还没到期）。
+const UNEXPIRED_CLAIM_HOLDER: &[u8] = b"claim-holder-that-died";
+const UNEXPIRED_CLAIM_LEASE_MILLISECONDS: u64 = 60 * 60 * 1000;
 
 static TEMPORARY_DIRECTORY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -259,5 +264,67 @@ fn dropping_removes_just_that_row_and_keeps_segments_and_empty_verdict_vector_ro
         rows_of_the_library(&library_directory),
         rows_expected_after,
         "删完库里该只少超界的那一行整值：段键形状的、分段存的清单与段与版本登记键、判定向量空值的、记账行都该原样在"
+    );
+}
+
+/// 在已有的库里给 `key` 记一条认领，租期到点远在现在之后（没到期）；开库、写、同步、关库。
+fn add_unexpired_claim_row(library_directory: &Path, key: &[u8]) {
+    let library = VerdictLibrary::open(library_directory, 1, BreakSwitches::none())
+        .unwrap_or_else(|failure| panic!("记认领时开不了临时库：{failure:?}"));
+    let mut group = library.begin_group();
+    library.add_claim(
+        &mut group,
+        &claim_key(key),
+        &ClaimRecord {
+            holder_identity: UNEXPIRED_CLAIM_HOLDER.to_vec(),
+            lease_expiry_milliseconds: now_milliseconds() + UNEXPIRED_CLAIM_LEASE_MILLISECONDS,
+        },
+    );
+    library
+        .commit_group(group)
+        .unwrap_or_else(|failure| panic!("记认领时写不进去：{}", failure.message()));
+}
+
+/// 带没到期认领的超界整值，离线删掉时认领行一并删掉：库里不剩那条认领行，重起时 `load_claims` 也读不回它。
+/// 判别力：只删数据行、认领行留在库里，认领行还在，这条红。
+#[test]
+fn dropping_an_oversized_whole_value_also_removes_the_unexpired_claim_row_on_its_key() {
+    let directory = TemporaryDirectory::create();
+    let library_directory = directory.path.join("library");
+    write_fixture_library(&library_directory);
+    add_unexpired_claim_row(&library_directory, OVERSIZED_WHOLE_VALUE_KEY);
+    let claim_row_key = claim_key(OVERSIZED_WHOLE_VALUE_KEY);
+    let mut rows_expected_after = rows_of_the_library(&library_directory);
+    assert!(
+        rows_expected_after.remove(&claim_row_key).is_some(),
+        "删之前库里该有超界整值那把键的认领行"
+    );
+    assert!(
+        rows_expected_after
+            .remove(OVERSIZED_WHOLE_VALUE_KEY)
+            .is_some(),
+        "删之前库里该有超界的那一行整值"
+    );
+
+    find_oversized_values_then_drop_unless_listing_only(
+        &library_directory,
+        OversizedValueRemoval::DropAndReadBack,
+    )
+    .unwrap_or_else(|failure| panic!("删那一趟失败：{failure:?}"));
+
+    assert_eq!(
+        rows_of_the_library(&library_directory),
+        rows_expected_after,
+        "删完库里该只少超界的那一行整值与它的认领行"
+    );
+    let reopened = VerdictLibrary::open(&library_directory, 1, BreakSwitches::none())
+        .unwrap_or_else(|failure| panic!("删完重开不了临时库：{failure:?}"));
+    let claims_after_restart = reopened
+        .load_claims(now_milliseconds())
+        .unwrap_or_else(|message| panic!("重开之后读不了认领表：{message}"));
+    assert!(
+        !claims_after_restart.contains_key(&claim_row_key),
+        "重起时不该把已删整值的认领读回来：{:?}",
+        claims_after_restart.keys().collect::<Vec<_>>()
     );
 }

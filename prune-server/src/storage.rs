@@ -11,6 +11,10 @@
 //! - 开库选项照 `verdict_store.rs` 的 `library_options`（`library_options` 这里同名，逐项对着抄）：LZ4、比较器与表格式取 RocksDB 缺省、
 //!   不建默认之外的列族；库目录不在就建（服务自己的库）；目录在而不是 RocksDB（非空、没有 CURRENT）、有默认之外的列族、
 //!   RocksDB 因选项对不上拒开，一律退 6，不改库、不 repair；被别的进程锁着、读写出错退 3。
+//! - 回收：删掉的行（删前缀、换键时删的旧组成清单）先只落删除标记，被盖住的值在更低一层的文件里照旧占着盘。开库选项开两项让 RocksDB 自己还：
+//!   删除标记多的 SST 落盘时标成要压实（`DELETION_WINDOW_ENTRIES`、`DELETION_TRIGGER_ENTRIES`、`DELETION_TRIGGER_RATIO`），
+//!   建成超过 `PERIODIC_COMPACTION_SECONDS` 的 SST 重写一遍（开这两项之前落盘的删除标记文件靠它压到底）。服务没有手动压实的入口。
+//!   单测 `rows_deleted_after_reaching_the_bottom_level_give_their_space_back` 判前一项：去掉那一项它等不到空间还回来。
 //! - 文件数上限：开库选项不设 `max_open_files`（`verdict_store.rs` 也不设，RocksDB 缺省不限），开库时 RocksDB 把库里的 SST 全打开、
 //!   一直开着，库里有几个文件就占几个描述符；systemd 用户单元与登录会话给的软上限常是 1024，硬上限高得多，库一大就撞软上限、
 //!   RocksDB 报「Too many open files」拒开。所以每次开库之前（`open_single_column_family_library`：服务、自证与压测起的临时服务都走它）
@@ -49,7 +53,7 @@ use rocksdb::{
 
 use crate::break_switches::{BreakSwitch, BreakSwitches};
 use crate::command_line::DEFAULT_MAXIMUM_CONNECTIONS;
-use crate::protocol::{is_service_key, EntryInTable, KeyInTable};
+use crate::protocol::{is_service_key, EntryInTable, GuardRowState, KeyInTable};
 
 /// 已生效的请求号那张记账表的键前缀（文件头）。
 pub const APPLIED_REQUEST_KEY_TAG: u8 = 0xF0;
@@ -154,9 +158,18 @@ fn raise_descriptor_limit_for(
     Ok(())
 }
 
+/// 删掉的行占的空间怎么还（文件头「回收」）：新落盘的 SST 里任意连着 `DELETION_WINDOW_ENTRIES` 条里有 `DELETION_TRIGGER_ENTRIES` 条删除标记，
+/// 或整个文件里删除标记占到 `DELETION_TRIGGER_RATIO`，RocksDB 把这个文件标成要压实、自己往下压，删除标记与它盖住的值在最底层一起消掉。
+const DELETION_WINDOW_ENTRIES: usize = 128;
+const DELETION_TRIGGER_ENTRIES: usize = 64;
+const DELETION_TRIGGER_RATIO: f64 = 0.5;
+/// 一个 SST 建成之后过这么久 RocksDB 自己把它重写一遍（文件头「回收」）：加上面那一项之前落盘的删除标记文件没被标过，靠这一项压到底；七天。
+const PERIODIC_COMPACTION_SECONDS: u64 = 7 * 24 * 60 * 60;
+
 /// 开库选项，照 `crates/singlefs-verification/src/verdict_store.rs` 的 `library_options`：落在库文件里、开错了会拒开或改写的几项逐项相同——
 /// LZ4 压缩、比较器与表格式取 RocksDB 缺省（它没设，这里也不设）；`creates_library` 是库不在时建不建（服务自己的库建）。
-/// 另加的几项只管这个进程怎么跑，不进 SST 与 MANIFEST：不建列族、后台线程数、统计、WAL 手动同步（回确认之前照样 `flush_wal(true)`）。
+/// 另加的几项只管这个进程怎么跑，不改键值怎么存、不带它们的进程照样开得了这份库：不建列族、后台线程数、统计、WAL 手动同步（回确认之前照样 `flush_wal(true)`）、
+/// 删除标记多的文件自动压实与文件超龄重写（`DELETION_WINDOW_ENTRIES` 一组与 `PERIODIC_COMPACTION_SECONDS`）。
 pub(crate) fn library_options(background_threads: usize, creates_library: bool) -> Options {
     let mut options = Options::default();
     options.create_if_missing(creates_library);
@@ -166,6 +179,12 @@ pub(crate) fn library_options(background_threads: usize, creates_library: bool) 
     options.enable_statistics();
     options.set_statistics_level(StatsLevel::ExceptHistogramOrTimers);
     options.set_manual_wal_flush(true);
+    options.add_compact_on_deletion_collector_factory(
+        DELETION_WINDOW_ENTRIES,
+        DELETION_TRIGGER_ENTRIES,
+        DELETION_TRIGGER_RATIO,
+    );
+    options.set_periodic_compaction_seconds(PERIODIC_COMPACTION_SECONDS);
     options
 }
 
@@ -477,7 +496,15 @@ impl VerdictLibrary {
         group.batch.delete(key);
     }
 
-    /// 库里有没有这个键（认领判「已有结论」用）。
+    /// 写结论帧守卫那一行此刻在库里的样子（不在，或值的 SHA-256；`protocol.rs` 文件头「写结论」）。
+    pub fn guard_row_state(&self, key: &[u8]) -> Result<GuardRowState, String> {
+        self.database
+            .get_pinned(key)
+            .map(|value| GuardRowState::of_stored_value(value.as_deref()))
+            .map_err(|error| format!("点读守卫那一行失败：{error}"))
+    }
+
+    /// 库里有没有这个键（认领判「已有结论」、不在才写判在不在用）。
     pub fn contains_key(&self, key: &[u8]) -> Result<bool, String> {
         self.database
             .get_pinned(key)
@@ -747,5 +774,81 @@ impl VerdictLibrary {
             .iter()
             .map(|ticker| (ticker.name(), options.get_ticker_count(*ticker)))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{library_options, DB};
+    use std::path::PathBuf;
+    use std::time::{Duration, Instant};
+
+    /// 测试自己的库目录，成功、失败、panic 都删。
+    struct TemporaryLibrary(PathBuf);
+
+    impl Drop for TemporaryLibrary {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// 压不动的值：每把键一段不重复的伪随机字节（LZ4 压不小，文件大小跟着行数走）。
+    fn incompressible_value(seed: u64, length: usize) -> Vec<u8> {
+        let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        (0..length)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                state.to_le_bytes()[0]
+            })
+            .collect()
+    }
+
+    fn live_sst_bytes(database: &DB) -> u64 {
+        database
+            .property_int_value("rocksdb.live-sst-files-size")
+            .expect("读 RocksDB 的属性不会失败：库开着")
+            .expect("这个属性 RocksDB 一直有")
+    }
+
+    #[test]
+    fn rows_deleted_after_reaching_the_bottom_level_give_their_space_back() {
+        const ROWS: u64 = 400;
+        const VALUE_BYTES: usize = 16 * 1024;
+        let library = TemporaryLibrary(std::env::temp_dir().join(format!(
+            "prune-server-space-back-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        )));
+        let database =
+            DB::open(&library_options(2, true), &library.0).expect("临时目录下建一份空库不会失败");
+        let key = |row: u64| format!("unit-verdicts/retired-kind/compositions/{row:08}");
+        for row in 0..ROWS {
+            database
+                .put(key(row), incompressible_value(row + 1, VALUE_BYTES))
+                .expect("写一行不会失败");
+        }
+        database.flush().expect("落盘不会失败");
+        database.compact_range::<&[u8], &[u8]>(None, None);
+        let bytes_before_deleting = live_sst_bytes(&database);
+        assert!(
+            bytes_before_deleting >= ROWS * VALUE_BYTES as u64 / 2,
+            "写进去的 {ROWS} 行压到底之后应当占着盘：只有 {bytes_before_deleting} 字节"
+        );
+        for row in 0..ROWS {
+            database.delete(key(row)).expect("删一行不会失败");
+        }
+        database.flush().expect("落盘不会失败");
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let mut bytes_after_deleting = live_sst_bytes(&database);
+        while bytes_after_deleting >= bytes_before_deleting / 10 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+            bytes_after_deleting = live_sst_bytes(&database);
+        }
+        assert!(
+            bytes_after_deleting < bytes_before_deleting / 10,
+            "删光之后 60 秒里空间没还回来：删前 {bytes_before_deleting} 字节、此刻 {bytes_after_deleting} 字节（删除标记多的文件没被自动压实）"
+        );
     }
 }

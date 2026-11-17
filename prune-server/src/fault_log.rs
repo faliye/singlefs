@@ -11,6 +11,8 @@
 //!   dispatch-bug              服务把帧分派错了地方（工作线程收到写、提交线程收到读这类，是服务的 bug）
 //!   internal-panic            服务里有线程 panic（断言没过）
 //!   stop-notice-undelivered   宣布停服务时有连接的「服务停了」限时内没写进套接字（写线程堵着）
+//!   outbound-overflow-closed  不带名额的回应（忙、拒绝）在一条连接的写出队里排超了上限、这条连接被关（对端不收回应）；
+//!                             说明里写积压的未计费字节与上限，连接那几段是被关的那条连接
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,6 +34,8 @@ pub enum FaultKind {
     InternalPanic,
     /// 宣布停服务时有连接的「服务停了」限时内没写进套接字（那几条客户端只能靠重连上限退出）。
     StopNoticeUndelivered,
+    /// 不带名额的回应排超了一条连接的写出队上限，这条连接被关。
+    OutboundOverflowClosed,
 }
 
 impl FaultKind {
@@ -42,6 +46,7 @@ impl FaultKind {
             FaultKind::DispatchBug => "dispatch-bug",
             FaultKind::InternalPanic => "internal-panic",
             FaultKind::StopNoticeUndelivered => "stop-notice-undelivered",
+            FaultKind::OutboundOverflowClosed => "outbound-overflow-closed",
         }
     }
 }

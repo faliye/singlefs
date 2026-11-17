@@ -6,8 +6,10 @@
 
 帧格式照 prune-server/src/protocol.rs 文件头（冻结，这里只照抄、不另定）：
   每帧 [u32 帧体长度][帧体]，整数小端；请求帧体 [u64 序号][u8 操作码][内容]，回应帧体 [u64 序号][u8 状态][u8 操作码][内容]。
-  用到的操作码：成批点读 1、成批写 2（带客户端身份与请求号）、按前缀扫 3、统计 4、报到 6（序号 0、服务不回）、宣布停服务 8（只认 unix socket，只给自证）、删前缀 9。
-  回应状态：0 做完、1 内容解不开、2 认不得的操作码、3 帧长度不对（序号 0，服务随后关连接）、4 存储层出错、5 忙、6 服务停了（序号 0）。
+  用到的操作码：成批点读 1、成批写 2（带客户端身份与请求号）、按前缀扫 3、统计 4、认领 5、报到 6（序号 0、服务不回）、宣布停服务 8（只认 unix socket，只给自证）、删前缀 9、
+  不在才写 10、写结论 11（两者也带客户端身份与请求号）。
+  回应状态：0 做完、1 内容解不开、2 认不得的操作码、3 帧长度不对（序号 0，服务随后关连接）、4 存储层出错、5 忙、6 服务停了（序号 0）、
+  7 守卫不过（只回写结论：认领被别的持有者持着、租期没到，或守卫那一行、一把删键那一行此刻的样子与写的一方读到的不同；不是错，见「GPU 判的三族」）。
   表只用结论表（表号 3）。TCP 上不认证（服务那一侧没有认证）。
 
 三家缺省走服务，开关已废：三家（scripts/crash/lib_verdict_library.py 的 VerdictLibrary、scripts/gate/admission.py 的 VerdictLibrary、
@@ -64,6 +66,20 @@
       服务从排在它之后的第一把键接着扫（prune-server/src/protocol.rs 文件头「按前缀扫」），到不截断为止；发的帧数是条目数除以一帧装下的条数，
       不往下拆前缀。一帧被截断而一行都没回（头一行的值就装不下一帧）当场退 3（scan-row-over-frame）；Rust 那一侧
       （crates/singlefs-verification/src/verdict_store.rs 的 visit_stored_rows_with_prefix）同一条。
+
+GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_judging_rows.rs 文件头逐字节相同，那一份是说明的出处；GPU 批处理服务与 CPU 一侧的判段走 Rust 那一份，
+  这里给查库与自证用）：结论表里 gpu-pending/<流键>/<块号>（待判行）、gpu-claim/<流键>/<块号>（认领键，只认领、不当数据行写）、
+  gpu-rejudged/<入池序号>/<流键>/<块号>（强制现判行）；流键写成小写十六进制，块号与入池序号写成 16 位小写十六进制、补零。
+  键：gpu_pending_key、gpu_pending_prefix_of_stream、gpu_claim_key、gpu_rejudged_key；持有者身份：gpu_claim_holder_identity；
+  值：encode_gpu_pending_row / decode_gpu_pending_row、encode_gpu_rejudged_row / decode_gpu_rejudged_row；写结论帧的参数：gpu_conclusion_write。
+  调用（一问一答，与别的帧同一套容错；三种写都带请求号，回存储出错照同一请求号重发）：
+    Client.write_if_absent_frame(entries)          不在才写：键已在的不动，交 (真写了几条, 早已生效)；待判行走它
+    Client.claim(holder_identity, keys, lease)     以给的持有者身份认领，交每个键的 (claimed | held-by-other | already-concluded, 持有者, 剩余租期)
+    Client.write_guarded_conclusion(...)           写结论（prune-server/src/protocol.rs 文件头「写结论」）：交 dict，result 是 written、
+                                                   claim-held-by-other（带 holder、remaining_lease_milliseconds）、guard-row-changed（带 current：库里那一份的 SHA-256 或 None）
+                                                   或 deleted-row-changed（带 key 与 current：删键那一行此刻的样子与写的一方读到的不同）；deleted_keys 每把带写的一方读到的那一份；
+                                                   守卫不过不退出、一条都没写，调用方照 result 定（守卫那一行或删键那一行变了就重读、照自己的规则定过再写）
+  这三族不经 LibraryStore、不带命名空间（键前缀不是五族的族名）；不分段（值都远短于一段）。
 
 连哪一处（library_store 第一次读写时才连，一个进程一条连接，fork 出来的子进程自己另连）：
   unix socket：SINGLEFS_PRUNE_SERVER_SOCKET 设了用它，没设 ${XDG_RUNTIME_DIR}/singlefs-prune-server/server.sock；这个路径上有 socket 文件就走它（本机）。
@@ -206,6 +222,11 @@
   write-storage-failure-replayed      服务带 --selftest-write-failure-file 起、造错文件在：写一条收到存储出错、照同一请求号退避重发，等故障日志出现
                                       storage-write-failed 之后删掉造错文件，这一次写做完（不抛错）、重发过至少一次、读回值；造错文件一直在、重连总时长 2 秒：
                                       写在限时里退 75（storage-failing），不退 3
+  gpu-pending-rows-written-only-if-absent  不在才写两帧待判行（重录那一帧一块已在、一块新的）：录两块的那一帧写 2 条、重录那一帧写 1 条，已在的那一行不改，
+                                      按流的前缀扫回三行、按块号升序；键、持有者身份与待判行的值与 Rust 那一份钉住的字节相同（gpu_judging_rows.rs 的单测同一组字面值）
+  gpu-conclusion-write-guarded        写结论：别的持有者持着、租期没到交 claim-held-by-other（持有者对、不退出）；持有者自己写（强制现判）交 written 3 条；
+                                      读到「不在」的旧写方再写交 guard-row-changed、带库里那一份的 SHA-256；库里结论块是持有者写的、待判行删了、
+                                      强制现判行的持有者与结论摘要对
 弄坏开关 PRUNE_SERVER_CLIENT_BREAK=<项>（只在自证里认：自证给自己和它起的子进程设 PRUNE_SERVER_CLIENT_SELFTEST=1；直接执行别的用法时设了就退 2）。
 一条一行「PRUNE_SERVER_CLIENT_BREAK=<项>  弄坏哪一处」，下一行起写打开后红的格（失败行「✗ 自证 <格名>：」的句首；自证末尾的开关轮按 BREAK_RED_CELLS 逐条核同一格）：
   PRUNE_SERVER_CLIENT_BREAK=read-failure-reported-as-absent  读失败时交回「键都不在」
@@ -268,6 +289,12 @@
       delete-prefix-by-namespace（「✗ 自证 delete-prefix-by-namespace：」）
   PRUNE_SERVER_CLIENT_BREAK=write-storage-failure-abandoned  写帧回存储出错当「服务拒了」退 3、不重放（改前的样子）
       write-storage-failure-replayed（「✗ 自证 write-storage-failure-replayed：」）
+  PRUNE_SERVER_CLIENT_BREAK=write-if-absent-sent-as-write  不在才写照成批写（操作码 2）发，键在也盖掉
+      gpu-pending-rows-written-only-if-absent（「✗ 自证 gpu-pending-rows-written-only-if-absent：」）
+  PRUNE_SERVER_CLIENT_BREAK=guard-refusal-exits  写结论收到守卫不过（状态 7）当认不得的回应退 3，不交给调用方
+      gpu-conclusion-write-guarded（「✗ 自证 gpu-conclusion-write-guarded：」）
+  PRUNE_SERVER_CLIENT_BREAK=gpu-rejudged-row-dropped  gpu_conclusion_write 不带强制现判行
+      gpu-conclusion-write-guarded（「✗ 自证 gpu-conclusion-write-guarded：」）
 没有弄坏开关的格：round-trip-unix、prefix-scan、tcp-round-trip（帧格式由服务那一侧的自证与弄坏开关管，这里错了每一格都红）。
 """
 import contextlib
@@ -336,6 +363,11 @@ OPERATION_STATISTICS = 4
 OPERATION_DELETE_PREFIX = 9
 OPERATION_ANNOUNCEMENT = 6
 OPERATION_ANNOUNCE_STOP = 8
+OPERATION_CLAIM = 5
+OPERATION_WRITE_IF_ABSENT = 10
+OPERATION_GUARDED_CONCLUSION_WRITE = 11
+# 带身份与请求号、服务按它们去重的几种写（回存储出错时照同一请求号重发，文件头「容错」）
+REQUEST_NUMBERED_OPERATIONS = (OPERATION_WRITE, OPERATION_WRITE_IF_ABSENT, OPERATION_GUARDED_CONCLUSION_WRITE)
 STATUS_COMPLETED = 0
 STATUS_MALFORMED_PAYLOAD = 1
 STATUS_UNKNOWN_OPERATION = 2
@@ -343,6 +375,16 @@ STATUS_FRAME_LENGTH_REJECTED = 3
 STATUS_STORAGE_FAILED = 4
 STATUS_BUSY = 5
 STATUS_SERVER_STOPPING = 6
+STATUS_GUARD_REFUSED = 7
+CLAIM_OUTCOMES = {0: "claimed", 1: "held-by-other", 2: "already-concluded"}   # 认领回应里每个键的结局码
+GUARD_ROW_DIGEST_BYTES = 32                  # 写结论守卫那一行的样子带的 SHA-256 字节数
+GUARD_REFUSAL_KINDS = {1: "claim-held-by-other", 2: "guard-row-changed", 3: "deleted-row-changed"}   # 守卫不过（状态 7）的种类码
+
+# GPU 判的三族（文件头「GPU 判的三族」；与 prune-server/src/gpu_judging_rows.rs 逐字节相同）
+GPU_PENDING_FAMILY_PREFIX = b"gpu-pending/"
+GPU_CLAIM_FAMILY_PREFIX = b"gpu-claim/"
+GPU_REJUDGED_FAMILY_PREFIX = b"gpu-rejudged/"
+GPU_HOLDER_IDENTITY_PREFIX = "gpu-service/"
 # 一帧装的上限：远低于服务的帧长上限，键多、值大时切成几帧（每帧一个写批，原子性只在一帧之内）
 FRAME_BATCH_BYTES = 16 * 1024 * 1024
 FRAME_BATCH_KEYS = 8192
@@ -559,6 +601,14 @@ class AnswerOverFrameLimit(Exception):
     """成批点读这一帧被服务整帧拒成「内容解不开」（读回的值合计会超过帧长上限）：连接照用，由 read_frame_halving 对半拆键再问（文件头「容错」）。"""
 
 
+class GuardRefusedAnswer(Exception):
+    """写结论这一帧守卫不过（状态 7）：一条都没写、连接照用；content 是回应内容，由 write_guarded_conclusion 解开交调用方（文件头「GPU 判的三族」）。"""
+
+    def __init__(self, content):
+        super().__init__("守卫不过")
+        self.content = content
+
+
 class Cursor:
     def __init__(self, data):
         self.data = data
@@ -718,6 +768,10 @@ class Client:
                     time.sleep(pause)
                     self.busy_waits.append((retry_milliseconds, time.monotonic() - started))
                     continue
+                if status == STATUS_GUARD_REFUSED and answered == sequence:
+                    if operation == OPERATION_GUARDED_CONCLUSION_WRITE and not break_is("guard-refusal-exits"):
+                        raise GuardRefusedAnswer(content)
+                    fail("protocol", f"操作码 {operation} 的帧收到守卫不过（状态 {status}）：只有写结论会回它")
                 message = self.rejection_message(content)
                 if status == STATUS_SERVER_STOPPING:
                     if break_is("stop-notice-retried"):
@@ -732,7 +786,7 @@ class Client:
                                             f"上限 {MAXIMUM_FRAME_BODY_BYTES} 字节）：{message}")
                 if status == STATUS_MALFORMED_PAYLOAD and oversized_answer_splittable:
                     raise AnswerOverFrameLimit(message)
-                if status == STATUS_STORAGE_FAILED and operation == OPERATION_WRITE and not break_is("write-storage-failure-abandoned"):
+                if status == STATUS_STORAGE_FAILED and operation in REQUEST_NUMBERED_OPERATIONS and not break_is("write-storage-failure-abandoned"):
                     # 写帧回存储出错：退避之后同一个请求号重发（文件头「容错」写帧回存储出错）
                     now = time.monotonic()
                     storage_started = now if storage_started is None else storage_started
@@ -845,6 +899,83 @@ class Client:
         already = cursor.unpack("<B", "早已生效")
         cursor.finished()
         return written, already == 1
+
+    def take_request_number(self, request_number):
+        """带请求号的写用的号：给了照用（只给自证造重发），没给分下一个。"""
+        if request_number is not None:
+            return request_number
+        request_number = self.next_request_number
+        self.next_request_number += 1
+        return request_number
+
+    @staticmethod
+    def entries_payload(entries):
+        return struct.pack("<I", len(entries)) + b"".join(struct.pack("<BI", TABLE_CONCLUSIONS, len(key)) + key + length_prefixed(value)
+                                                          for key, value in entries)
+
+    def write_if_absent_frame(self, entries, request_number=None):
+        """一帧不在才写（prune-server/src/protocol.rs 文件头「不在才写」）：[(键, 值)] 里键已在库里的不动、不在的写，原样写、不分段；
+        交 (真写了几条, 早已生效)。GPU 待判行走它（文件头「GPU 判的三族」）。弄坏开关 write-if-absent-sent-as-write 下照成批写发（键在也盖掉）。"""
+        request_number = self.take_request_number(request_number)
+        operation = OPERATION_WRITE if break_is("write-if-absent-sent-as-write") else OPERATION_WRITE_IF_ABSENT
+        payload = struct.pack("<B", len(self.identity)) + self.identity + struct.pack("<Q", request_number) + self.entries_payload(entries)
+        cursor = Cursor(self.exchange(operation, payload, f"不在才写 {len(entries)} 条"))
+        written = cursor.unpack("<I", "写了几条")
+        already = cursor.unpack("<B", "早已生效")
+        cursor.finished()
+        return written, already == 1
+
+    def claim(self, holder_identity, keys, lease_milliseconds):
+        """一帧认领（prune-server/src/protocol.rs 文件头「认领」）：以 holder_identity（1 到 255 字节）认领 keys，租期 lease_milliseconds 毫秒；
+        交与 keys 同序的 (结局, 持有者身份或 None, 剩余租期毫秒或 None)，结局是 claimed、held-by-other、already-concluded。"""
+        if not 1 <= len(holder_identity) <= MAXIMUM_CLIENT_IDENTITY_BYTES:
+            fail("protocol", f"认领的持有者身份 {len(holder_identity)} 字节，要 1 到 {MAXIMUM_CLIENT_IDENTITY_BYTES} 字节；没发")
+        payload = (struct.pack("<B", len(holder_identity)) + holder_identity + struct.pack("<II", lease_milliseconds, len(keys))
+                   + b"".join(struct.pack("<BI", TABLE_CONCLUSIONS, len(key)) + key for key in keys))
+        cursor = Cursor(self.exchange(OPERATION_CLAIM, payload, f"认领 {len(keys)} 个键"))
+        count = cursor.unpack("<I", "认领结局个数")
+        if count != len(keys):
+            fail("protocol", f"认领发了 {len(keys)} 个键，回了 {count} 个结局")
+        outcomes = []
+        for _ in range(count):
+            code = cursor.unpack("<B", "认领结局")
+            if code not in CLAIM_OUTCOMES:
+                fail("protocol", f"认领结局只能是 {sorted(CLAIM_OUTCOMES)}，收到 {code}")
+            if CLAIM_OUTCOMES[code] == "held-by-other":
+                holder = cursor.take(cursor.unpack("<B", "持有者身份长"), "持有者身份")
+                outcomes.append(("held-by-other", bytes(holder), cursor.unpack("<Q", "剩余租期毫秒")))
+            else:
+                outcomes.append((CLAIM_OUTCOMES[code], None, None))
+        cursor.finished()
+        return outcomes
+
+    def write_guarded_conclusion(self, holder_identity, claim_key, guard_key, guard_expectation, entries, deleted_keys, request_number=None):
+        """一帧写结论（prune-server/src/protocol.rs 文件头「写结论」）：holder_identity 是认领的持有者，guard_expectation 是写的一方读到的守卫那一行
+        （None 是不在，不然是值的 SHA-256 的 32 字节），entries 里守卫键在的话排最后，deleted_keys 是 [(键, 写的一方读到的那一行：同 guard_expectation 的写法)]，
+        同一帧删掉、库里那一行此刻与读到的不同就整帧拒。交一个 dict：
+        {"result": "written", "entries_written": 几条, "already_applied": 真假}；
+        {"result": "claim-held-by-other", "holder": 持有者身份, "remaining_lease_milliseconds": 毫秒, "message": 说明}；
+        {"result": "guard-row-changed", "current": None 或库里那一份的 SHA-256, "message": 说明}；
+        {"result": "deleted-row-changed", "key": 那一把删键, "current": None 或库里那一份的 SHA-256, "message": 说明}。守卫不过不是错，调用方照 result 定。"""
+        if not 1 <= len(holder_identity) <= MAXIMUM_CLIENT_IDENTITY_BYTES:
+            fail("protocol", f"写结论的持有者身份 {len(holder_identity)} 字节，要 1 到 {MAXIMUM_CLIENT_IDENTITY_BYTES} 字节；没发")
+        for what, state in [("守卫那一行", guard_expectation)] + [(f"删键 {shown_key(key)} 那一行", state) for key, state in deleted_keys]:
+            if state is not None and len(state) != GUARD_ROW_DIGEST_BYTES:
+                fail("protocol", f"{what}的期待要么 None 要么 {GUARD_ROW_DIGEST_BYTES} 字节的 SHA-256，给的是 {len(state)} 字节；没发")
+        request_number = self.take_request_number(request_number)
+        payload = (struct.pack("<B", len(self.identity)) + self.identity + struct.pack("<Q", request_number)
+                   + struct.pack("<B", len(holder_identity)) + holder_identity + length_prefixed(claim_key) + length_prefixed(guard_key)
+                   + guard_row_state_bytes(guard_expectation) + self.entries_payload(entries)
+                   + struct.pack("<I", len(deleted_keys))
+                   + b"".join(length_prefixed(key) + guard_row_state_bytes(state) for key, state in deleted_keys))
+        try:
+            cursor = Cursor(self.exchange(OPERATION_GUARDED_CONCLUSION_WRITE, payload, f"写结论 {len(entries)} 条、删 {len(deleted_keys)} 把"))
+        except GuardRefusedAnswer as refused:
+            return decode_guard_refusal(refused.content)
+        written = cursor.unpack("<I", "写了几条")
+        already = cursor.unpack("<B", "早已生效")
+        cursor.finished()
+        return {"result": "written", "entries_written": written, "already_applied": already == 1}
 
     def write_batches(self, entries):
         """[(键, 值)] 照原样按帧上限切成几帧写，不分段；同一帧里的原子。"""
@@ -1229,6 +1360,123 @@ def manifest_of(key, value):
     if not valid:
         fail("segmented-read", f"{shown_key(key)} 的分段清单解不开：{value[:160]!r}")
     return manifest
+
+
+def decode_guard_refusal(content):
+    """守卫不过（状态 7）的回应内容解成 Client.write_guarded_conclusion 交的那种 dict。"""
+    cursor = Cursor(content)
+    kind_code = cursor.unpack("<B", "守卫不过的种类")
+    if kind_code not in GUARD_REFUSAL_KINDS:
+        fail("protocol", f"守卫不过的种类只能是 {sorted(GUARD_REFUSAL_KINDS)}，收到 {kind_code}")
+    refusal = {"result": GUARD_REFUSAL_KINDS[kind_code]}
+    if refusal["result"] == "claim-held-by-other":
+        refusal["holder"] = bytes(cursor.take(cursor.unpack("<B", "持有者身份长"), "持有者身份"))
+        refusal["remaining_lease_milliseconds"] = cursor.unpack("<Q", "剩余租期毫秒")
+    else:
+        if refusal["result"] == "deleted-row-changed":
+            refusal["key"] = bytes(cursor.length_prefixed("变了的删键"))
+        present = cursor.unpack("<B", "在不在")
+        if present not in (0, 1):
+            fail("protocol", f"守卫那一行此刻的「在不在」只能是 0 或 1，收到 {present}")
+        refusal["current"] = bytes(cursor.take(GUARD_ROW_DIGEST_BYTES, "守卫那一行的 SHA-256")) if present else None
+    refusal["message"] = cursor.length_prefixed("守卫不过的说明").decode("utf-8", "replace")
+    cursor.finished()
+    return refusal
+
+
+# ── GPU 判的三族（文件头「GPU 判的三族」）──
+
+def guard_row_state_of(value):
+    """读到的守卫那一行（None 是不在）的样子：None，或值的 SHA-256（32 字节）。"""
+    return None if value is None else hashlib.sha256(value).digest()
+
+
+def guard_row_state_bytes(state):
+    """守卫那一行、删键那一行的样子在写结论帧里的写法：b"\\x00" 不在，b"\\x01" 再跟值的 SHA-256。"""
+    return b"\x00" if state is None else b"\x01" + state
+
+
+def gpu_block_fields(stream_key, block_number):
+    return stream_key.hex().encode() + b"/" + b"%016x" % block_number
+
+
+def gpu_pending_key(stream_key, block_number):
+    return GPU_PENDING_FAMILY_PREFIX + gpu_block_fields(stream_key, block_number)
+
+
+def gpu_pending_prefix_of_stream(stream_key):
+    return GPU_PENDING_FAMILY_PREFIX + stream_key.hex().encode() + b"/"
+
+
+def gpu_claim_key(stream_key, block_number):
+    return GPU_CLAIM_FAMILY_PREFIX + gpu_block_fields(stream_key, block_number)
+
+
+def gpu_rejudged_key(pool_sequence, stream_key, block_number):
+    return GPU_REJUDGED_FAMILY_PREFIX + b"%016x/" % pool_sequence + gpu_block_fields(stream_key, block_number)
+
+
+def gpu_claim_holder_identity(service_start_random, card_index, judging_thread_index):
+    return f"{GPU_HOLDER_IDENTITY_PREFIX}{service_start_random:016x}/card-{card_index}/thread-{judging_thread_index}".encode()
+
+
+def encode_gpu_pending_row(recording_table_key, judge_table_digest, start_state_sequence, end_state_sequence,
+                           expected_gpu_judge_group_key, expected_conclusion_version_key, is_forced, pool_sequence):
+    return (length_prefixed(recording_table_key) + length_prefixed(judge_table_digest) + struct.pack("<QQ", start_state_sequence, end_state_sequence)
+            + length_prefixed(expected_gpu_judge_group_key) + length_prefixed(expected_conclusion_version_key)
+            + struct.pack("<BQ", 1 if is_forced else 0, pool_sequence))
+
+
+def decode_gpu_pending_row(value):
+    """待判行的值解成 dict（键名与 encode_gpu_pending_row 的参数名相同）；解不开退 3（protocol）。"""
+    cursor = Cursor(value)
+    row = {"recording_table_key": bytes(cursor.length_prefixed("录入表的键")), "judge_table_digest": bytes(cursor.length_prefixed("判表摘要")),
+           "start_state_sequence": cursor.unpack("<Q", "状态序号区间的起"), "end_state_sequence": cursor.unpack("<Q", "状态序号区间的止"),
+           "expected_gpu_judge_group_key": bytes(cursor.length_prefixed("期待的 GPU 判器组键")),
+           "expected_conclusion_version_key": bytes(cursor.length_prefixed("期待的结论版本键"))}
+    forced = cursor.unpack("<B", "强制现判")
+    if forced not in (0, 1):
+        fail("protocol", f"待判行的强制现判只能是 0 或 1，收到 {forced}")
+    row["is_forced"] = forced == 1
+    row["pool_sequence"] = cursor.unpack("<Q", "入池序号")
+    cursor.finished()
+    return row
+
+
+def encode_gpu_rejudged_row(holder_identity, conclusion_digest):
+    return struct.pack("<B", len(holder_identity)) + holder_identity + conclusion_digest
+
+
+def decode_gpu_rejudged_row(value):
+    """强制现判行的值解成 (持有者身份, 结论摘要)；解不开退 3（protocol）。"""
+    cursor = Cursor(value)
+    length = cursor.unpack("<B", "持有者身份长")
+    if length == 0:
+        fail("protocol", "强制现判行的持有者身份长是 0")
+    holder = bytes(cursor.take(length, "持有者身份"))
+    digest = bytes(cursor.take(GUARD_ROW_DIGEST_BYTES, "结论摘要"))
+    cursor.finished()
+    return holder, digest
+
+
+def gpu_conclusion_write(stream_key, block_number, holder_identity, conclusion_block_key, guard_expectation, side_entries,
+                         conclusion_block_value, forced_pool_sequence, pending_row_as_read):
+    """一块 GPU 判出的结论拼成 Client.write_guarded_conclusion 的参数（dict，照 **展开）：认领键是这一块的 gpu-claim/、删键是这一块的 gpu-pending/
+    （期待是 pending_row_as_read：写的一方读到的那一行待判行的值，None 是不在），
+    旁表行在前、强制现判行（forced_pool_sequence 不是 None 时）在结论块那一行之前、结论块那一行（conclusion_block_value 不是 None 时）排最后；
+    强制现判行的结论摘要取写的值的 SHA-256，不写结论块时取 guard_expectation（那时它不能是 None）。
+    弄坏开关 gpu-rejudged-row-dropped 下不带强制现判行。"""
+    entries = list(side_entries)
+    if forced_pool_sequence is not None and not break_is("gpu-rejudged-row-dropped"):
+        digest = guard_row_state_of(conclusion_block_value) if conclusion_block_value is not None else guard_expectation
+        if digest is None:
+            fail("protocol", "强制现判而结论块那一行这一次不写、读到的那一份又是「不在」：结论摘要无从取")
+        entries.append((gpu_rejudged_key(forced_pool_sequence, stream_key, block_number), encode_gpu_rejudged_row(holder_identity, digest)))
+    if conclusion_block_value is not None:
+        entries.append((conclusion_block_key, conclusion_block_value))
+    return {"holder_identity": holder_identity, "claim_key": gpu_claim_key(stream_key, block_number), "guard_key": conclusion_block_key,
+            "guard_expectation": guard_expectation, "entries": entries,
+            "deleted_keys": [(gpu_pending_key(stream_key, block_number), guard_row_state_of(pending_row_as_read))]}
 
 
 PROCESS_CLIENT = {}

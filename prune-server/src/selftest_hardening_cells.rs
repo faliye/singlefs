@@ -2001,7 +2001,8 @@ pub(crate) fn cell_delete_prefix_response_within_pending_budget(
             | ResponseOutcome::PrefixDeleted { .. }
             | ResponseOutcome::ConnectedClients(_)
             | ResponseOutcome::ServerStopping { .. }
-            | ResponseOutcome::Rejected { .. }) => {
+            | ResponseOutcome::Rejected { .. }
+            | ResponseOutcome::GuardRefused { .. }) => {
                 return Err(format!(
                     "只数不删的序号 {sequence} 回 {other_outcome:?}，该是忙或数到 1 把、最后一把是那把长键"
                 ))

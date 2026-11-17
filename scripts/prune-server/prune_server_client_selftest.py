@@ -11,10 +11,15 @@
   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <命令> [<参数>…]
 三条整条都不带二进制，没给 --server-binary 就现编；自己编了、两台都读得到的二进制才在子命令后另加 --server-binary <路径>。
 格的清单、弄坏开关、末行的写法都在 scripts/prune-server/prune_server_client.py 文件头「命令行」「自证的格」两段；
-弄坏开关轮怎么跑与这一份自己加的两格、九条开关写在下面。
+弄坏开关轮怎么跑与这一份自己加的三格、十三条开关写在下面。
 
---cells 只走点名的格（次序照 CELLS，重复的走一次）；格名认不出、缺格名、有空项退 2，并列出可用的格名。点名了格就不跑末尾的弄坏开关轮，打一行说明本次未跑。
-不给 --cells 走全部格，成功句的格数是 CELLS 的条数。
+--cells 只走点名的格（次序照 CELLS，重复的走一次），在本进程里逐格串行跑；格名认不出、缺格名、有空项退 2，并列出可用的格名。点名了格就不跑末尾的弄坏开关轮，打一行说明本次未跑。
+不给 --cells 走全部格，成功句的格数是 CELLS 的条数；各格并行跑，每格一个 --selftest --cells <格名> 子进程（有的格改本进程的环境变量，不能在同一个进程里开线程并行）：
+并行度取每台默认重活线程数（scripts/hosts/heavy_threads.py，再按格数夹），每个子进程自己一个进程组、自己一个 TMPDIR、环境里带 SWEEP_TOKEN_VARIABLE 标记、
+带 SWEEP_CHILD_SECONDS 秒的时限（超时、停整组、核留下的后代都与弄坏开关轮同一份实现 run_sweep_job）。各格的临时目录、socket、TCP 端口（服务绑 127.0.0.1:0）、服务状态目录与库都在格自己的目录里，
+格之间没有共用的可写状态。收回按 CELLS 的次序逐格判、逐格打 ✓ / ✗（后面的格先跑完也等前面的）：一格要同时有它子进程打的「✓ 自证 <格名>：」行、
+一格全绿的末行、子进程退 0 且退出之后没有带标记的进程留下，才算绿；红的格打子进程自己的 ✗ 块并附子进程的问题，子进程没交出结果的补一行写明退出码与输出末尾。
+收回的条数不等于派出的条数，没收回的格按红算并打一行说明。末行 PRUNE_SERVER_CLIENT_SELFTEST 的写法不变。
 
 弄坏开关轮（全绿之后）：每个开关起一个 --selftest 子进程，只交它在 BREAK_RED_CELLS 里点名的红格（同一个开关点名几格交几格），判红的依据是
 「退出码不是 0，且标准输出里有每一格的『✗ 自证 <格名>：』」。各开关的子进程互相独立，并行跑，并行度取每台默认重活线程数
@@ -25,11 +30,14 @@
 自证里的假进程另盯着开关子进程的临时目录，目录一删就退）。临时目录无论如何删掉。
 逐个收回每个开关的结果，收回的条数不等于派出的条数整轮报错。末行 PRUNE_SERVER_CLIENT_BREAK_SWEEP switches=… matched=… unmatched=… 的写法不变。
 
-这一份自己加的格（run_break_sweep 与 --cells 的解析是它们的被测物，假子进程不起服务、不编译）：
+这一份自己加的格（run_break_sweep、--cells 的解析与 judge_cells_in_children 是它们的被测物，假子进程不起服务、不编译）：
   sweep-child-runs-only-named-cells  sweep_child_command 拼出的命令交给 parse_selftest_options，走的恰是点名的格；--cells 缺格名、认不出的格名拒并列出可用格名；不给 --cells 走全部
   sweep-stops-hung-child             三个假子进程并行：卡死的（忽略 TERM，另起两个忽略 TERM 的孙进程，一个同组、一个换了会话并盯着父进程、父进程没了就自己退）要在时限加两倍宽限之内被停、
                                      记「超时」、组里停 2 个、到点时组外带标记的 1 个、停完组之后宽限之内这个组外的自己退掉（没有点名留下的进程）、临时目录删了、
                                      整轮回来时没有带标记的进程留下；红在点名格的记对上；退 0 没红的记没对上；收回 3 条
+  cells-run-in-parallel-children     judge_cells_in_children 对假的格子进程：四个假子进程互相等齐才退（一路一路跑等不齐），退出的次序与派出的次序相反；
+                                     要全部等齐、各自一个进程号与进程组与临时目录（跑完删了）、都不是本进程的，逐格交出的次序是派出的次序、全绿、收回 4 条没抛错；
+                                     另一趟三个假子进程各演一种红（打 ✗ 行退 1、打 ✓ 行与全绿的末行却退 1、什么都不打退 0）都判红并点名那一格
 弄坏开关 PRUNE_SERVER_CLIENT_BREAK=<项>（写法同 scripts/prune-server/prune_server_client.py 文件头「弄坏开关」，一条一行，下一行写打开后红的格）：
   PRUNE_SERVER_CLIENT_BREAK=sweep-child-runs-all-cells  sweep_child_command 不带 --cells，子进程走全部格
       sweep-child-runs-only-named-cells（「✗ 自证 sweep-child-runs-only-named-cells：」）
@@ -50,6 +58,14 @@
   PRUNE_SERVER_CLIENT_BREAK=sweep-descendants-left  卡死的假子进程里换了会话的孙进程不盯父进程，只带临时目录没了就退与 SWEEP_FAKE_BACKSTOP_SECONDS 秒的自退时限：
                                                    停完整组之后它还留着，被点名列出、判红，开关子进程的临时目录一删它自己退掉
       sweep-stops-hung-child（「✗ 自证 sweep-stops-hung-child：」）
+  PRUNE_SERVER_CLIENT_BREAK=cells-run-serially  整份趟的各格子进程一路一路跑，不并行
+      cells-run-in-parallel-children（「✗ 自证 cells-run-in-parallel-children：」）
+  PRUNE_SERVER_CLIENT_BREAK=cells-merged-by-completion  整份趟的各格结果按子进程跑完的次序交，不按 CELLS 的次序
+      cells-run-in-parallel-children（「✗ 自证 cells-run-in-parallel-children：」）
+  PRUNE_SERVER_CLIENT_BREAK=cell-result-dropped  整份趟收回的各格结果丢掉最后一条再核条数
+      cells-run-in-parallel-children（「✗ 自证 cells-run-in-parallel-children：」）
+  PRUNE_SERVER_CLIENT_BREAK=cell-child-exit-code-ignored  整份趟判一格的子进程绿不看退出码、时限与留下的进程，只看它打没打 ✓ 行与末行
+      cells-run-in-parallel-children（「✗ 自证 cells-run-in-parallel-children：」）
 """
 import concurrent.futures
 import contextlib
@@ -80,6 +96,8 @@ from prune_server_client import (  # noqa: E402  客户端的常量、类与函�
     Client, LibraryStore, PruneServerFailure, break_is, encode_frame, encode_manifest, manifest_of, manifest_version, process_client, read_response, request_body,
     namespace_of, parse_version_registry, reset_process_client, segment_key, segment_key_parts, segment_version_prefix, segments_needed, selftest_service_problem,
     version_registry_key,
+    decode_gpu_pending_row, decode_gpu_rejudged_row, encode_gpu_pending_row, gpu_claim_holder_identity, gpu_claim_key, gpu_conclusion_write,
+    gpu_pending_key, gpu_pending_prefix_of_stream, gpu_rejudged_key, guard_row_state_of,
 )
 
 
@@ -91,7 +109,8 @@ CELLS = ("round-trip-unix", "prefix-scan", "tcp-round-trip", "busy-retried-after
          "connection-variables-refused-outside-temporary-service", "command-line-read", "namespace-only-under-temporary-service",
          "batched-read-answer-over-frame-limit-split", "binary-not-built-without-target-directory", "delete-prefix-by-namespace",
          "delete-by-item-name-picks-by-value", "write-storage-failure-replayed",
-         "sweep-child-runs-only-named-cells", "sweep-stops-hung-child")
+         "gpu-pending-rows-written-only-if-absent", "gpu-conclusion-write-guarded",
+         "sweep-child-runs-only-named-cells", "sweep-stops-hung-child", "cells-run-in-parallel-children")
 BREAK_RED_CELLS = (("read-failure-reported-as-absent", "unreachable-exits-75"), ("reconnect-unbounded", "unreachable-exits-75"),
                    ("stop-notice-retried", "stopped-exits-75"), ("busy-retry-without-delay", "busy-retried-after-delay"),
                    ("family-prefixes-shared", "families-over-service"),
@@ -120,6 +139,9 @@ BREAK_RED_CELLS = (("read-failure-reported-as-absent", "unreachable-exits-75"), 
                    ("item-name-ignores-kind", "delete-by-item-name-picks-by-value"),
                    ("item-name-dry-run-deletes", "delete-by-item-name-picks-by-value"),
                    ("write-storage-failure-abandoned", "write-storage-failure-replayed"),
+                   ("write-if-absent-sent-as-write", "gpu-pending-rows-written-only-if-absent"),
+                   ("guard-refusal-exits", "gpu-conclusion-write-guarded"),
+                   ("gpu-rejudged-row-dropped", "gpu-conclusion-write-guarded"),
                    ("sweep-child-runs-all-cells", "sweep-child-runs-only-named-cells"),
                    ("cells-option-ignored", "sweep-child-runs-only-named-cells"),
                    ("unknown-cell-name-accepted", "sweep-child-runs-only-named-cells"),
@@ -128,7 +150,11 @@ BREAK_RED_CELLS = (("read-failure-reported-as-absent", "unreachable-exits-75"), 
                    ("sweep-group-not-signalled", "sweep-stops-hung-child"),
                    ("sweep-job-directory-kept", "sweep-stops-hung-child"),
                    ("sweep-outcome-dropped", "sweep-stops-hung-child"),
-                   ("sweep-descendants-left", "sweep-stops-hung-child"))
+                   ("sweep-descendants-left", "sweep-stops-hung-child"),
+                   ("cells-run-serially", "cells-run-in-parallel-children"),
+                   ("cells-merged-by-completion", "cells-run-in-parallel-children"),
+                   ("cell-result-dropped", "cells-run-in-parallel-children"),
+                   ("cell-child-exit-code-ignored", "cells-run-in-parallel-children"))
 CARGO_TARGET_DIRECTORY_VARIABLE = "CARGO_TARGET_DIR"   # 任务服务给的编译目录；没有它就不现编服务二进制（resolve_binary）
 SERVER_READY_SECONDS = 120
 CHILD_TIMEOUT_SECONDS = 60
@@ -1185,9 +1211,10 @@ def cell_batched_read_answer_over_frame_limit_split(binary, work):
 def cell_binary_not_built_without_target_directory(_binary, _work):
     """没给服务二进制、环境里又没有任务服务给的编译目录时 resolve_binary 不起 cargo、交 (None, 为什么)，为什么点名 --server-binary；
     有编译目录时才走 build_server_binary。build_server_binary 在这一格里换成只记调用的替身，不真起 cargo。"""
+    global build_server_binary
     calls = []
-    original = globals()["build_server_binary"]
-    globals()["build_server_binary"] = lambda: (calls.append("built"), ("/built/prune-server", ""))[1]
+    original = build_server_binary
+    build_server_binary = lambda: (calls.append("built"), ("/built/prune-server", ""))[1]
     saved = {name: os.environ.pop(name, None) for name in (BINARY_VARIABLE, CARGO_TARGET_DIRECTORY_VARIABLE)}
     try:
         without_directory = resolve_binary([])
@@ -1196,7 +1223,7 @@ def cell_binary_not_built_without_target_directory(_binary, _work):
         with_directory = resolve_binary([])
         calls_with_directory = list(calls)
     finally:
-        globals()["build_server_binary"] = original
+        build_server_binary = original
         os.environ.pop(CARGO_TARGET_DIRECTORY_VARIABLE, None)
         for name, value in saved.items():
             if value is not None:
@@ -1414,7 +1441,86 @@ def cell_write_storage_failure_replayed(binary, work):
         server.stop()
 
 
-SWEEP_CHILD_SECONDS = 2 * (SERVER_READY_SECONDS + STORAGE_FAILURE_LINE_SECONDS + CHILD_TIMEOUT_SECONDS)   # 弄坏开关轮里一个开关的子进程时限：点名格里内部时限合计最长的一格（write-storage-failure-replayed：起服务、等故障日志、收写线程）的两倍
+GPU_SELFTEST_STREAM_KEY = b"\x1cpython-gpu-selftest-stream"   # gpu-pending-rows-written-only-if-absent、gpu-conclusion-write-guarded：流键（以表标签那样的字节起头）
+GPU_SELFTEST_SERVICE_START_RANDOM = 0x5E1F7E57                   # 同两格：持有者身份里的服务进程随机号
+GPU_SELFTEST_LEASE_MILLISECONDS = 60_000                         # gpu-conclusion-write-guarded：认领的租期，比一格跑的时间长得多
+GPU_PINNED_PENDING_ROW_HEXADECIMAL = ("02000000047202000000abcd0100000000000000020000000000000001000000670100000076010300000000000000")
+# 同上：与 prune-server/src/gpu_judging_rows.rs 单测 gpu_keys_holder_identity_and_pending_row_match_the_bytes_pinned_for_the_python_client 同一组字面值
+
+
+def gpu_sample_pending_row(block_number, recording_table_key):
+    return encode_gpu_pending_row(recording_table_key, hashlib.sha256(b"selftest judge table").digest(), block_number * 65536, (block_number + 1) * 65536,
+                                  b"selftest-gpu-judge-group", b"selftest-conclusion-version", False, 1)
+
+
+def cell_gpu_pending_rows_written_only_if_absent(binary, work):
+    """待判行不在才写（客户端文件头「GPU 判的三族」）：录两块的那一帧写 2 条，重录那一帧（块 7 已在、块 9 新的）写 1 条，块 7 不改，按流的前缀扫回三行、按块号升序；
+    键、持有者身份、待判行的值与 Rust 那一份钉住的字节相同。判别力：弄坏开关 write-if-absent-sent-as-write。"""
+    server = TestServer(binary, os.path.join(work, "server"))
+    try:
+        pinned_row = encode_gpu_pending_row(b"\x04r", b"\xab\xcd", 1, 2, b"g", b"v", True, 3)
+        pinned = (gpu_pending_key(b"\x00/", 42) == b"gpu-pending/002f/000000000000002a"
+                  and gpu_claim_holder_identity(0x1234, 1, 2) == b"gpu-service/0000000000001234/card-1/thread-2"
+                  and pinned_row == bytes.fromhex(GPU_PINNED_PENDING_ROW_HEXADECIMAL)
+                  and decode_gpu_pending_row(pinned_row)["pool_sequence"] == 3)
+        with environment_for(unix_environment(server)):
+            client = process_client()
+            stream = GPU_SELFTEST_STREAM_KEY
+            recorded = [(gpu_pending_key(stream, number), gpu_sample_pending_row(number, b"\x04recorded")) for number in (7, 8)]
+            again = [(gpu_pending_key(stream, number), gpu_sample_pending_row(number, b"\x04again")) for number in (7, 9)]
+            written_recorded, _ = client.write_if_absent_frame(recorded)
+            written_again, _ = client.write_if_absent_frame(again)
+            stored = client.read_many_raw([gpu_pending_key(stream, 7), gpu_pending_key(stream, 9)])
+            scanned = [key for key, _value in client.raw_scan_stream(gpu_pending_prefix_of_stream(stream))]
+        expected_keys = [gpu_pending_key(stream, number) for number in (7, 8, 9)]
+        kept = stored == [recorded[0][1], again[1][1]]
+        passed = pinned and written_recorded == 2 and written_again == 1 and kept and scanned == expected_keys
+        return passed, (f"字面值钉住的键、持有者身份、待判行的值对得上 {pinned}；录两块的那一帧写 {written_recorded} 条（要 2）、重录那一帧写 {written_again} 条（要 1），"
+                        f"块 7 不改、块 9 是重录那一帧写的 {kept}，按流的前缀扫回 {len(scanned)} 行、按块号升序 {scanned == expected_keys}")
+    finally:
+        server.stop()
+
+
+def cell_gpu_conclusion_write_guarded(binary, work):
+    """写结论核认领与守卫那一行（客户端文件头「GPU 判的三族」）：别的持有者持着、租期没到交 claim-held-by-other；持有者自己写（强制现判）交 written 3 条；
+    读到「不在」的旧写方再写交 guard-row-changed、带库里那一份的 SHA-256；库里结论块是持有者写的、待判行删了、强制现判行对。
+    判别力：弄坏开关 guard-refusal-exits、gpu-rejudged-row-dropped。"""
+    server = TestServer(binary, os.path.join(work, "server"))
+    try:
+        stream, block, pool_sequence = GPU_SELFTEST_STREAM_KEY, 1, 4
+        holder = gpu_claim_holder_identity(GPU_SELFTEST_SERVICE_START_RANDOM, 0, 0)
+        other = gpu_claim_holder_identity(GPU_SELFTEST_SERVICE_START_RANDOM, 1, 0)
+        conclusion_key, side = b"\x10python-gpu-conclusion/0001", [(b"\x11python-gpu-side/0001", b"side row")]
+        with environment_for(unix_environment(server)):
+            client = process_client()
+            try:
+                pending_row = gpu_sample_pending_row(block, b"\x04recording")
+                client.write_if_absent_frame([(gpu_pending_key(stream, block), pending_row)])
+                claimed = client.claim(holder, [gpu_claim_key(stream, block)], GPU_SELFTEST_LEASE_MILLISECONDS)
+                by_other = client.write_guarded_conclusion(**gpu_conclusion_write(stream, block, other, conclusion_key, None, side, b"verdicts of the other", None,
+                                                                                  pending_row))
+                by_holder = client.write_guarded_conclusion(**gpu_conclusion_write(stream, block, holder, conclusion_key, None, side, b"verdicts of the holder",
+                                                                                   pool_sequence, pending_row))
+                stale = client.write_guarded_conclusion(**gpu_conclusion_write(stream, block, other, conclusion_key, None, [], b"verdicts of the other", None,
+                                                                                pending_row))
+                stored = client.read_many_raw([conclusion_key, gpu_pending_key(stream, block), gpu_rejudged_key(pool_sequence, stream, block)])
+            except PruneServerFailure as failure:
+                return False, f"写结论那几步退出了：退 {failure.code}（{failure.kind}）：{failure.message[-200:]}（守卫不过该交给调用方、不退出）"
+        holder_digest = guard_row_state_of(b"verdicts of the holder")
+        refused_for_holder = by_other.get("result") == "claim-held-by-other" and by_other.get("holder") == holder
+        written_by_holder = by_holder == {"result": "written", "entries_written": 3, "already_applied": False}
+        stale_refused = stale.get("result") == "guard-row-changed" and stale.get("current") == holder_digest
+        rejudged = decode_gpu_rejudged_row(stored[2]) if stored[2] is not None else None
+        stored_ok = stored[0] == b"verdicts of the holder" and stored[1] is None and rejudged == (holder, holder_digest)
+        passed = claimed == [("claimed", None, None)] and refused_for_holder and written_by_holder and stale_refused and stored_ok
+        return passed, (f"认领 {claimed}；别的持有者写交 {by_other.get('result')}（要 claim-held-by-other、持有者对 {by_other.get('holder') == holder}）；"
+                        f"持有者写交 {by_holder}（要 written 3 条）；旧写方再写交 {stale.get('result')}（要 guard-row-changed、带库里那一份的 SHA-256 {stale.get('current') == holder_digest}）；"
+                        f"结论块是持有者写的、待判行删了、强制现判行对 {stored_ok}")
+    finally:
+        server.stop()
+
+
+SWEEP_CHILD_SECONDS = 2 * (SERVER_READY_SECONDS + STORAGE_FAILURE_LINE_SECONDS + CHILD_TIMEOUT_SECONDS)   # 弄坏开关轮里一个开关的子进程、整份趟里一格的子进程的时限：各格里内部时限合计最长的一格（write-storage-failure-replayed：起服务、等故障日志、收写线程）的两倍
 SWEEP_STOP_GRACE_SECONDS = 5           # 同一处：对整组发 TERM 之后等多久再发 KILL，也是发 KILL 之后核进程都没了、收尾输出各等多久
 SWEEP_TOKEN_VARIABLE = "PRUNE_CLIENT_SELFTEST_SWEEP_JOB"   # 开关子进程环境里的标记表（逗号隔开，后代继承）：收尾按它找出换了进程组、换了会话、被收养的后代
 SWEEP_CELL_LIMIT_SECONDS = 3           # sweep-stops-hung-child：假卡死的子进程的时限
@@ -1442,6 +1548,31 @@ exec(holder)
 """
 
 
+PARALLEL_CELL_LIMIT_SECONDS = 30       # cells-run-in-parallel-children：假的格子进程的时限
+FAKE_CELL_RENDEZVOUS_SECONDS = 8       # 同一格：假的格子进程等齐其余几个的上限（一路一路跑时头一个等不到，到点记没等齐）
+FAKE_CELL_RELEASE_GAP_SECONDS = 1.0    # 同一格：等齐之后各假子进程按派出的次序倒着、隔这么久一个地退出（跑完的次序与派出的次序相反）
+# cells-run-in-parallel-children 的假格子进程，命令行参数：格名、等齐用的目录（空串不等）、要等齐的个数、等齐上限秒数、等齐之后的停留秒数、
+# 模式（green 打 ✓ 行与一格全绿的末行；red 打 ✗ 行与一格红的末行；silent 什么都不打）、退出码。
+FAKE_CELL_CHILD = """import os, sys, time
+name, directory, count, wait, delay, mode, code = sys.argv[1:8]
+met = 1
+if directory:
+    open(os.path.join(directory, name), "w").close()
+    deadline = time.monotonic() + float(wait)
+    while len(os.listdir(directory)) < int(count) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    met = int(len(os.listdir(directory)) >= int(count))
+time.sleep(float(delay))
+if mode == "green":
+    print(f"  ✓ 自证 {name}：met={met} pid={os.getpid()} group={os.getpgrp()} tmpdir={os.environ['TMPDIR']}")
+    print("PRUNE_SERVER_CLIENT_SELFTEST cells=1 passed=1 failed=0 failed_cells=-")
+elif mode == "red":
+    print(f"  ✗ 自证 {name}：红了")
+    print(f"PRUNE_SERVER_CLIENT_SELFTEST cells=1 passed=0 failed=1 failed_cells={name}")
+sys.exit(int(code))
+"""
+
+
 def sweep_hung_child_command():
     """假卡死子进程的命令行。换了会话的孙进程盯着起它的子进程（模式 parent），子进程没了它就退；
     弄坏开关 sweep-descendants-left 下它不盯（模式 directory），子进程没了它还留着，直到临时目录没了。"""
@@ -1451,18 +1582,20 @@ def sweep_hung_child_command():
 
 @dataclasses.dataclass(frozen=True)
 class SweepJob:
-    """弄坏开关轮里的一个开关：name 是开关名，red_cells 是打开后要红的格，command 与 environment 是它的子进程。"""
+    """一个子进程的活：name 是开关名（整份趟里是格名），red_cells 是打开后要红的格，command 与 environment 是它的子进程。
+    must_pass 为真时不核红格，核的是子进程退 0（整份趟里一格一个子进程）。"""
     name: str
     red_cells: tuple
     command: list
     environment: dict
+    must_pass: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
 class SweepOutcome:
     """一个开关的结果：matched 是红在点名的格且没有留下进程，detail 是没对上的原因（对上的写空串），output 是子进程的标准输出，
     stopped_in_group 是到点按进程组停掉的进程数，outside_seen 是到点时进程组外带标记的进程数，left 是宽限之后还留着的带标记的进程数（点名写在 detail 里，不停），
-    seconds 是从起到记完的用时。"""
+    seconds 是从起到记完的用时，returncode 是子进程的退出码（起不来为 None），error 是它的标准错误。"""
     name: str
     matched: bool
     detail: str
@@ -1471,6 +1604,8 @@ class SweepOutcome:
     outside_seen: int
     left: int
     seconds: float
+    returncode: object = None
+    error: str = ""
 
 
 def wait_until(condition, seconds):
@@ -1575,7 +1710,7 @@ def run_sweep_job(job, token, time_limit, grace):
 
         timed_out, in_group, outside_seen = False, 0, 0
         try:
-            output, _error = process.communicate(timeout=None if break_is("sweep-child-without-time-limit") else time_limit)
+            output, error_output = process.communicate(timeout=None if break_is("sweep-child-without-time-limit") else time_limit)
         except subprocess.TimeoutExpired:
             timed_out = True
             members = set(live_group_members(process.pid))
@@ -1585,9 +1720,9 @@ def run_sweep_job(job, token, time_limit, grace):
         left = [process_description(process_id) for process_id, _start in marked_processes(token)]
         if timed_out:
             try:
-                output, _error = process.communicate(timeout=grace)
+                output, error_output = process.communicate(timeout=grace)
             except subprocess.TimeoutExpired as error:
-                output = text_of(error.stdout)
+                output, error_output = text_of(error.stdout), text_of(error.stderr)
                 process.stdout.close()
                 process.stderr.close()
         problems = []
@@ -1595,9 +1730,13 @@ def run_sweep_job(job, token, time_limit, grace):
             problems.append(f"超时：{time_limit} 秒没退出，按进程组停了 {in_group} 个进程，到点时进程组外带标记的有 {outside_seen} 个")
         if left:
             problems.append(f"{'停完进程组' if timed_out else '子进程退出'}之后 {grace} 秒还留着 {len(left)} 个带标记的进程：{'、'.join(left)}（不由自证去停，要它们在父进程没了之后自己退）")
-        if not timed_out and not (process.returncode != 0 and all(f"✗ 自证 {cell}：" in output for cell in job.red_cells)):
+        if job.must_pass:
+            if not timed_out and process.returncode != 0:
+                problems.append(f"退 {process.returncode}，要 0")
+        elif not timed_out and not (process.returncode != 0 and all(f"✗ 自证 {cell}：" in output for cell in job.red_cells)):
             problems.append(f"要红在 {'、'.join(job.red_cells)}，退 {process.returncode}")
-        return SweepOutcome(job.name, not problems, "；".join(problems), output, in_group, outside_seen, len(left), time.monotonic() - started)
+        return SweepOutcome(job.name, not problems, "；".join(problems), output, in_group, outside_seen, len(left), time.monotonic() - started,
+                            process.returncode, text_of(error_output))
     finally:
         if not break_is("sweep-job-directory-kept"):
             shutil.rmtree(directory, ignore_errors=True)
@@ -1624,6 +1763,60 @@ def sweep_child_command(binary, cells):
     return command
 
 
+def cell_child_command(binary, name):
+    """整份趟里一格的子进程：本文件的 --selftest，只走这一格（子进程里走串行路）。写死带 --cells：不带它子进程又会把各格再并行一遍。"""
+    return [sys.executable, os.path.realpath(__file__), "--selftest", "--server-binary", binary, "--cells", name]
+
+
+def cell_block(output):
+    """一格的子进程标准输出：交 (末行之前的行, 末行)；末行是 PRUNE_SERVER_CLIENT_SELFTEST 起头的那一行，没有交空串。"""
+    lines = []
+    for line in output.splitlines():
+        if line.startswith("PRUNE_SERVER_CLIENT_SELFTEST "):
+            return lines, line
+        lines.append(line)
+    return lines, ""
+
+
+def judge_cell_outcome(name, outcome):
+    """一格的子进程结果判成 (是否绿, 要打的文字)：绿要同时有它打的「✓ 自证 <格名>：」行、一格全绿的末行、子进程退 0 且没留下进程；
+    打的是它自己的块（多行的说明连着）。红时有它打的「✗ 自证 <格名>：」块就原样打，另附子进程的问题；没有就补一行说明子进程交了什么。
+    弄坏开关 cell-child-exit-code-ignored 下不看退出码、时限与留下的进程，只看它打没打 ✓ 行与末行。"""
+    block, summary = cell_block(outcome.output)
+    printed_green = any(line.startswith(f"  ✓ 自证 {name}：") for line in block)
+    printed_red = any(line.startswith(f"  ✗ 自证 {name}：") for line in block)
+    summary_green = summary == "PRUNE_SERVER_CLIENT_SELFTEST cells=1 passed=1 failed=0 failed_cells=-"
+    exited_clean = outcome.matched or break_is("cell-child-exit-code-ignored")
+    if printed_green and summary_green and exited_clean:
+        return True, "\n".join(block)
+    if printed_red:
+        text = "\n".join(block)
+        return False, text + (f"\n     → 这一格的子进程另有：{outcome.detail}" if outcome.detail else "")  # gate-lint:detail
+    return False, (f"  ✗ 自证 {name}：这一格的子进程没交出绿的结果（{outcome.detail or '退 ' + str(outcome.returncode)}）；"  # gate-lint:detail
+                   f"标准输出末尾「{' '.join(block)[-200:]}」；标准错误末尾「{outcome.error.strip()[-300:]}」")
+
+
+def judge_cells_in_children(selected, command_of, threads, time_limit, grace, token_root):
+    """selected 里的格各起一个子进程并行跑（至多 threads 路；run_sweep_job：各自一个进程组、一个临时目录、带时限和标记，退出之后核留下的进程），
+    按 selected 的次序逐格判，判完一格交一个 (格名, 是否绿, 要打的文字)；后面的格先跑完也等前面的。交完核收回的条数，不等于派出的条数抛 RuntimeError。
+    弄坏开关 cells-run-serially 下一路一路跑，cells-merged-by-completion 下按跑完的次序交，cell-result-dropped 下收回之后丢掉最后一条再核条数。"""
+    jobs = [SweepJob(name, (name,), command_of(name), dict(os.environ), must_pass=True) for name in selected]
+    paths = 1 if break_is("cells-run-serially") else max(1, min(len(jobs), threads))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=paths) as executor:
+        futures = [executor.submit(run_sweep_job, job, job_token(token_root, index), time_limit, grace) for index, job in enumerate(jobs)]
+        collected = list(concurrent.futures.as_completed(futures)) if break_is("cells-merged-by-completion") else futures
+        if break_is("cell-result-dropped"):
+            collected = collected[:-1]
+        returned = 0
+        for future in collected:
+            outcome = future.result()
+            returned += 1
+            passed, text = judge_cell_outcome(outcome.name, outcome)
+            yield outcome.name, passed, text
+    if returned != len(jobs):
+        raise RuntimeError(f"各格的子进程派出 {len(jobs)} 条，只收回 {returned} 条")
+
+
 def parse_selftest_options(arguments):
     """--selftest 后面的 --cells <格名>[,<格名>…]：交 (要走的格, 拒绝的原因)。没给 --cells 走全部 CELLS；给了只走点名的，次序照 CELLS、重复的走一次；
     缺格名、有空项、认不出的格名交 (None, 原因)，原因里列出可用的格名。
@@ -1636,7 +1829,7 @@ def parse_selftest_options(arguments):
     available = f"可用的格名：{'、'.join(CELLS)}"
     if not value or "" in names:
         return None, f"--cells 后面要写 <格名>[,<格名>…]（给的是「{value}」）；{available}"
-    unknown = [name for name in names if name not in CELL_FUNCTIONS]
+    unknown = [name for name in names if name not in selftest_cell_functions()]
     if unknown and not break_is("unknown-cell-name-accepted"):
         return None, f"--cells 认不出 {'、'.join(unknown)}；{available}"
     if break_is("cells-option-ignored"):
@@ -1706,32 +1899,84 @@ def cell_sweep_stops_hung_child(_binary, _work):
                     f"卡死的子进程的临时目录 {directory or '（没读到）'} {'还在' if directory_left else '删了'}")
 
 
-CELL_FUNCTIONS = {"round-trip-unix": cell_round_trip_unix, "prefix-scan": cell_prefix_scan,
-                  "tcp-round-trip": cell_tcp_round_trip,
-                  "busy-retried-after-delay": cell_busy_retried_after_delay, "stopped-exits-75": cell_stopped_exits_75,
-                  "unreachable-exits-75": cell_unreachable_exits_75, "families-over-service": cell_families_over_service,
-                  "unreachable-family-exits-75": cell_unreachable_family_exits_75,
-                  "connect-bounded-by-reconnect-total": cell_connect_bounded_by_reconnect_total,
-                  "large-value-round-trip": cell_large_value_round_trip,
-                  "segmented-read-incomplete-refused": cell_segmented_read_incomplete_refused,
-                  "segmented-read-sees-a-rewrite": cell_segmented_read_sees_a_rewrite,
-                  "segmented-rewrite-survives-writer-death": cell_segmented_rewrite_survives_writer_death,
-                  "segment-count-over-index-digits-refused": cell_segment_count_over_index_digits_refused,
-                  "scan-row-over-frame-refused": cell_scan_row_over_frame_refused,
-                  "prefix-scan-continues-after-the-last-key": cell_prefix_scan_continues_after_the_last_key,
-                  "segment-key-shapes-only-reserved": cell_segment_key_shapes_only_reserved,
-                  "oversize-frame-reported-at-once": cell_oversize_frame_reported_at_once,
-                  "temporary-service-exits-with-parent": cell_temporary_service_exits_with_parent,
-                  "service-problem-judges-given-environment": cell_service_problem_judges_given_environment,
-                  "connection-variables-refused-outside-temporary-service": cell_connection_variables_refused_outside_temporary_service,
-                  "command-line-read": cell_command_line_read, "namespace-only-under-temporary-service": cell_namespace_only_under_temporary_service,
-                  "batched-read-answer-over-frame-limit-split": cell_batched_read_answer_over_frame_limit_split,
-                  "binary-not-built-without-target-directory": cell_binary_not_built_without_target_directory,
-                  "delete-prefix-by-namespace": cell_delete_prefix_by_namespace,
-                  "delete-by-item-name-picks-by-value": cell_delete_by_item_name_picks_by_value,
-                  "write-storage-failure-replayed": cell_write_storage_failure_replayed,
-                  "sweep-child-runs-only-named-cells": cell_sweep_child_runs_only_named_cells,
-                  "sweep-stops-hung-child": cell_sweep_stops_hung_child}
+def parallel_children_run(names, commands, threads, root):
+    """judge_cells_in_children 对假子进程跑一趟：交 (逐格交出的 (格名, 是否绿, 文字), 抛出的 RuntimeError 的说明，没抛是空串)。"""
+    results, error = [], ""
+    try:
+        for result in judge_cells_in_children(names, commands.__getitem__, threads, PARALLEL_CELL_LIMIT_SECONDS, SWEEP_CELL_GRACE_SECONDS, root):
+            results.append(result)
+    except RuntimeError as raised:
+        error = str(raised)
+    return results, error
+
+
+def cell_cells_run_in_parallel_children(_binary, work):
+    """整份趟里各格在子进程里并行、次序确定（judge_cells_in_children）：四个假的格子进程互相等齐才退（一路一路跑等不齐，记没等齐），
+    退出的次序与派出的次序相反；要全部等齐、各自一个进程号与进程组（组号就是自己的进程号）与临时目录（跑完删了）、都不是本进程的，
+    逐格交出的次序是派出的次序、全绿、收回 4 条没抛错。另一趟三个假的格子进程各演一种红（打 ✗ 行退 1、打 ✓ 行与全绿的末行却退 1、什么都不打退 0），都要判红，
+    红的说明里点名那一格。
+    弄坏开关 cells-run-serially 下一路一路跑（等不齐），cells-merged-by-completion 下按跑完的次序交，cell-result-dropped 下收回少一条抛错，
+    cell-child-exit-code-ignored 下打了 ✓ 行却退 1 的判绿。"""
+    names = ("fake-slowest", "fake-slower", "fake-faster", "fake-fastest")
+    rendezvous = os.path.join(work, "rendezvous")
+    os.makedirs(rendezvous)
+
+    def green_command(name, delay, mode="green", code=0, directory=""):
+        return [sys.executable, "-c", FAKE_CELL_CHILD, name, directory, str(len(names)), str(FAKE_CELL_RENDEZVOUS_SECONDS), str(delay), mode, str(code)]
+
+    commands = {name: green_command(name, FAKE_CELL_RELEASE_GAP_SECONDS * (len(names) - 1 - position), directory=rendezvous) for position, name in enumerate(names)}
+    results, error = parallel_children_run(names, commands, len(names), secrets.token_hex(8))
+    fields = [dict(word.split("=", 1) for word in text.split("：", 1)[-1].split() if "=" in word) for _name, _passed, text in results]
+    order_kept = [name for name, _passed, _text in results] == list(names)
+    all_green = len(results) == len(names) and all(passed for _name, passed, _text in results)
+    met_together = len(fields) == len(names) and all(entry.get("met") == "1" for entry in fields)
+    own_processes = (len({entry.get("pid") for entry in fields}) == len(names) and str(os.getpid()) not in {entry.get("pid") for entry in fields}
+                     and all(entry.get("group") == entry.get("pid") for entry in fields))
+    directories = [entry.get("tmpdir", "") for entry in fields]
+    own_directories = len(set(directories)) == len(names) and os.environ.get("TMPDIR", "") not in directories and not any(os.path.exists(path) for path in directories)
+    failing = ("fake-prints-red", "fake-exits-red-after-green", "fake-prints-nothing")
+    failing_commands = {"fake-prints-red": green_command("fake-prints-red", 0, "red", 1), "fake-exits-red-after-green": green_command("fake-exits-red-after-green", 0, "green", 1),
+                        "fake-prints-nothing": green_command("fake-prints-nothing", 0, "silent", 0)}
+    red_results, red_error = parallel_children_run(failing, failing_commands, len(failing), secrets.token_hex(8))
+    red_named = [passed is False and f"✗ 自证 {name}：" in text for name, passed, text in red_results]
+    red_judged = [name for name, _passed, _text in red_results] == list(failing) and len(red_named) == len(failing) and all(red_named) and not red_error
+    passed = (not error and order_kept and all_green and met_together and own_processes and own_directories and red_judged)
+    return passed, (f"绿的一趟：次序{'对' if order_kept else '不对'}（{[name for name, _p, _t in results]}），全绿 {all_green}，四个子进程互相等齐 {met_together}，"
+                    f"各自的进程与进程组 {own_processes}，各自的临时目录且已删 {own_directories}，抛错「{error}」（要没有）；"
+                    f"红的一趟：收回 {len(red_results)} 条、各自判红并点名 {red_named}，抛错「{red_error}」（要没有）")
+
+
+def selftest_cell_functions():
+    """自证各格，格名到函数。表写在函数体里：写成模块级赋值，会在载入这个模块时把全部格函数连同它们起的子进程拖进载入一方的判法单元闭包。"""
+    return {"round-trip-unix": cell_round_trip_unix, "prefix-scan": cell_prefix_scan,
+            "tcp-round-trip": cell_tcp_round_trip,
+            "busy-retried-after-delay": cell_busy_retried_after_delay, "stopped-exits-75": cell_stopped_exits_75,
+            "unreachable-exits-75": cell_unreachable_exits_75, "families-over-service": cell_families_over_service,
+            "unreachable-family-exits-75": cell_unreachable_family_exits_75,
+            "connect-bounded-by-reconnect-total": cell_connect_bounded_by_reconnect_total,
+            "large-value-round-trip": cell_large_value_round_trip,
+            "segmented-read-incomplete-refused": cell_segmented_read_incomplete_refused,
+            "segmented-read-sees-a-rewrite": cell_segmented_read_sees_a_rewrite,
+            "segmented-rewrite-survives-writer-death": cell_segmented_rewrite_survives_writer_death,
+            "segment-count-over-index-digits-refused": cell_segment_count_over_index_digits_refused,
+            "scan-row-over-frame-refused": cell_scan_row_over_frame_refused,
+            "prefix-scan-continues-after-the-last-key": cell_prefix_scan_continues_after_the_last_key,
+            "segment-key-shapes-only-reserved": cell_segment_key_shapes_only_reserved,
+            "oversize-frame-reported-at-once": cell_oversize_frame_reported_at_once,
+            "temporary-service-exits-with-parent": cell_temporary_service_exits_with_parent,
+            "service-problem-judges-given-environment": cell_service_problem_judges_given_environment,
+            "connection-variables-refused-outside-temporary-service": cell_connection_variables_refused_outside_temporary_service,
+            "command-line-read": cell_command_line_read, "namespace-only-under-temporary-service": cell_namespace_only_under_temporary_service,
+            "batched-read-answer-over-frame-limit-split": cell_batched_read_answer_over_frame_limit_split,
+            "binary-not-built-without-target-directory": cell_binary_not_built_without_target_directory,
+            "delete-prefix-by-namespace": cell_delete_prefix_by_namespace,
+            "delete-by-item-name-picks-by-value": cell_delete_by_item_name_picks_by_value,
+            "write-storage-failure-replayed": cell_write_storage_failure_replayed,
+            "gpu-pending-rows-written-only-if-absent": cell_gpu_pending_rows_written_only_if_absent,
+            "gpu-conclusion-write-guarded": cell_gpu_conclusion_write_guarded,
+            "sweep-child-runs-only-named-cells": cell_sweep_child_runs_only_named_cells,
+            "sweep-stops-hung-child": cell_sweep_stops_hung_child,
+            "cells-run-in-parallel-children": cell_cells_run_in_parallel_children}
 
 
 def resolve_binary(arguments):
@@ -1748,6 +1993,31 @@ def resolve_binary(arguments):
     return build_server_binary()
 
 
+def judge_cells_in_process(selected, binary):
+    """selected 里的格在本进程里逐格串行跑（每格自己一个临时目录），跑完一格交一个 (格名, 是否绿, 要打的文字)。"""
+    for name in selected:
+        work = selftest_root()
+        try:
+            passed, detail = selftest_cell_functions()[name](binary, work)
+        except (RuntimeError, OSError, subprocess.SubprocessError, PruneServerFailure) as error:
+            passed, detail = False, f"这一格的现场出错：{type(error).__name__}：{error}"
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        yield name, passed, f"  {'✓' if passed else '✗'} 自证 {name}：{detail}"  # gate-lint:detail
+
+
+def default_parallel_threads():
+    """并行度：每台默认重活线程数（登记位 .claude/heavy-thread-default）。交 (线程数, 取不了的错误)，取得了错误是 None；不退回别的数。"""
+    hosts_directory = os.path.join(REPOSITORY_ROOT, "scripts", "hosts")
+    if hosts_directory not in sys.path:
+        sys.path.append(hosts_directory)
+    import heavy_threads
+    try:
+        return heavy_threads.default_heavy_threads(), None
+    except heavy_threads.HeavyThreadDefaultError as error:
+        return 0, error
+
+
 def selftest(arguments):
     os.environ[SELFTEST_VARIABLE] = "1"
     # 三家照这个名字载入客户端：让它们用的就是这一进程里已经 import 的那一份客户端模块（同一个进程级连接，environment_for 换服务时一起丢掉）
@@ -1762,20 +2032,28 @@ def selftest(arguments):
         print(f"  ✗ 自证起不了服务：{problem or binary + ' 不可执行'}")
         print(f"     → 怎么办：--server-binary <编好的 prune-server 二进制> 或 {BINARY_VARIABLE}=<路径>；只有任务服务给了 {CARGO_TARGET_DIRECTORY_VARIABLE} 才在这里现编")
         return EXIT_USAGE
-    failed = []
-    for name in selected:
-        work = selftest_root()
-        try:
-            passed, detail = CELL_FUNCTIONS[name](binary, work)
-        except (RuntimeError, OSError, subprocess.SubprocessError, PruneServerFailure) as error:
-            passed, detail = False, f"这一格的现场出错：{type(error).__name__}：{error}"
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
-        if passed:
-            print(f"  ✓ 自证 {name}：{detail}")
-        else:
-            failed.append(name)
-            print(f"  ✗ 自证 {name}：{detail}")  # gate-lint:detail
+    if "--cells" in arguments:
+        results = judge_cells_in_process(selected, binary)
+    else:
+        threads, error = default_parallel_threads()
+        if error is not None:
+            print(f"  ✗ 自证各格并行取不了每台默认重活线程数：{error}")
+            print(f"     → 怎么办：{error.howto}；不退回别的数")
+            return EXIT_USAGE
+        print(f"  · 各格并行：{len(selected)} 格各在一个子进程里并行 {max(1, min(len(selected), threads))} 路，每格限时 {SWEEP_CHILD_SECONDS} 秒，结果按格的次序逐格判")
+        results = judge_cells_in_children(selected, lambda name: cell_child_command(binary, name), threads, SWEEP_CHILD_SECONDS, SWEEP_STOP_GRACE_SECONDS,
+                                          secrets.token_hex(8))
+    failed, judged = [], []
+    try:
+        for name, passed, text in results:
+            judged.append(name)
+            if not passed:
+                failed.append(name)
+            print(text, flush=True)  # gate-lint:detail
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        failed.extend(name for name in selected if name not in judged)
+        print(f"  ✗ 自证各格的子进程没收齐：{error}")
+        print("     → 怎么办：没收回结果的格按红算；单独跑那几格看它们的子进程为什么没交结果（--cells <格名>）")
     print(f"PRUNE_SERVER_CLIENT_SELFTEST cells={len(selected)} passed={len(selected) - len(failed)} failed={len(failed)} failed_cells={','.join(failed) or '-'}")
     if failed:
         return 1
@@ -1795,14 +2073,9 @@ def break_sweep(binary):
         cells_by_switch.setdefault(switch, []).append(red_cell)
     jobs = [SweepJob(switch, tuple(cells), sweep_child_command(binary, cells), dict(os.environ, **{BREAK_VARIABLE: switch}))
             for switch, cells in cells_by_switch.items()]
-    # 并行度：每台默认重活线程数（登记位 .claude/heavy-thread-default），再按开关条数夹；取不了就拒，不退回别的数
-    hosts_directory = os.path.join(REPOSITORY_ROOT, "scripts", "hosts")
-    if hosts_directory not in sys.path:
-        sys.path.append(hosts_directory)
-    import heavy_threads
-    try:
-        threads = heavy_threads.default_heavy_threads()
-    except heavy_threads.HeavyThreadDefaultError as error:
+    # 并行度：每台默认重活线程数，再按开关条数夹；取不了就拒
+    threads, error = default_parallel_threads()
+    if error is not None:
         print(f"  ✗ 弄坏开关轮取不了每台默认重活线程数：{error}")
         print(f"     → 怎么办：{error.howto}；不退回别的数")
         return EXIT_USAGE
