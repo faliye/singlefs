@@ -8,7 +8,6 @@
 .claude/kb/checks-owed.md:a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_healthy_flow_judged_after_its_twin_with_a_miswritten_version_table_reads_back_its_own_verdicts  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_leaf_below_the_floor_borrows_half_the_difference_from_its_right_neighbour_and_retires_nothing  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:a_named_unit_whose_first_copy_reads_bad_has_its_second_copy_read_once_by_the_f1_check  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_newer_readable_root_whose_only_record_mapping_root_and_tree_table_read_back_zero_refuses_the_writable_mount_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_pool_without_any_device_is_refused_as_having_no_device  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -21,7 +20,6 @@
 .claude/kb/checks-owed.md:a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_twin_whose_root_slot_write_alone_differs_reads_back_its_own_verdicts  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:a_wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unblocked_slot_is_refused_by_the_space_admission_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:a_write_whose_slot_pairs_outside_this_mounts_cluster_segments_are_all_taken_is_refused_for_its_data_unit_before_any_write  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -30,11 +28,7 @@
 .claude/kb/checks-owed.md:a_live_file_with_one_data_unit_beyond_its_size_and_no_entry_reddens_the_count_and_the_account  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/checks-owed.md:a_node_header_carrying_another_pools_identifier_forged_on_the_second_slot_of_a_file_unit_is_claimed_and_the_watermark_invariant_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/checks-owed.md:a_node_header_forged_on_the_second_slot_of_a_file_unit_is_claimed_by_that_unit_and_the_watermark_invariant_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
-.claude/kb/checks-owed.md:a_publish_of_two_records_is_whole  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
-.claude/kb/checks-owed.md:a_record_without_the_last_flag_alone_is_not_a_concatenation  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/checks-owed.md:a_tree_identifier_watermark_pressed_below_the_trees_issued_by_a_root_rotated_out_of_the_ring_reddens_only_the_watermark_invariant  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
-.claude/kb/checks-owed.md:a_use_with_an_alias_brings_only_the_alias_into_the_module_names  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
-.claude/kb/experiments/183-容量斜率读缓存小盘准入与清扫阈值的代价数.md:a_mount_that_stays_short_after_raising_the_floor_is_not_counted_as_admitted  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），kb 逐字引 crates 里现存的测试函数名
 .claude/kb/checks-owed.md:a_data_unit_left_beyond_the_size_by_a_shorter_overwrite_is_not_claimed_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
 .claude/kb/checks-owed.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
 .claude/kb/checks-owed.en.md:a_deletion_in_progress_leaves_only_that_object_out_and_the_scan_rebuild_holds  # 开头的 a 是英语冠词不是代号（按语义判，用户 2026-10-19 定），C827 逐字引 crates/singlefs-verification/tests/scan_rebuild_agrees_with_the_walked_index.rs 的测试名
@@ -56,13 +50,9 @@
 .claude/kb/checks-owed.md:judge_pointer_mac_and_nonce_are_zero  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:k  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:locality_id  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:m1_  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:m3_  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:m5_  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:n5  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:neg_control  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:o3_only_strict  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/checks-owed.md:prev  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:q1_gamma  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:seq  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/checks-owed.md:spec_hash  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -401,9 +391,6 @@
 .claude/kb/layout/03-third-txn.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/layout/03-third-txn.en.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/layout/03-third-txn.ja.md:a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
-.claude/kb/layout/03-third-txn.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/layout/03-third-txn.en.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
-.claude/kb/layout/03-third-txn.ja.md:a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/02-second-txn.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/milestone/02-second-txn.en.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
 .claude/kb/milestone/02-second-txn.ja.md:a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply  # 译文照抄中文原文的串：中文那一份登记为 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑；随中文原文一起改名
@@ -470,7 +457,6 @@
 .claude/kb/prior-art.md:zfs_livelist_max_entries  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/prior-art.md:zfs_livelist_min_percent_shared  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/prior-art.md:zfs_reconstruct_indirect_combinations_max  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
-.claude/kb/tooling.md:a_  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/tooling.md:cmp  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/tooling.md:max_model_len  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
 .claude/kb/tooling.md:max_tokens  # 2026-10-13 立 C430 之前的名字，kb 表格逐字引它，改名要连产物一起重跑
@@ -725,6 +711,7 @@ crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:largest_
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:max_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:max_u  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots  # 产物里 config 行与判决行的闸名，折行的 match 分支里；改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:smallest_n  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1822  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs:v1823  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -754,24 +741,24 @@ crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_gro
 crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_intent  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_of_each_geometry  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs:w_max_series  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:bad_s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs:v2_differing_files_without_timing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:bad_s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:fixed_script_through_e_then_unmount  # 产物里的流名（stream= 列），折行的 match 分支里；改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:p95_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:s1_failed_checks  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:s4_digest_mismatches  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:total_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:v2_compared  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:v2_differing_files  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs:v2_differing_files_without_timing  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:base_o2_red  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:e170_bad_rows_failing_s3_or_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:fixed_script_through_e_then_unmount  # 产物里的流名（stream= 列），折行的 match 分支里；改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:known_bad_entries_failing_s4  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -803,7 +790,7 @@ crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracl
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:drive_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:elapsed_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:err  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:fixed_script_through_e_then_unmount  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:fixed_script_through_e_then_unmount  # 产物里的流名（stream= 列），折行的 match 分支里；改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:max_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:median_ns  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:new_pool_file_creation_o1_every_errored_call_is_judged_by_the_comparison  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑
@@ -2742,6 +2729,7 @@ scripts/experiment-apparatus/main.rs:acc  # 2026-10-13 立 C430 之前的名字�
 .claude/kb/tooling.ja.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 .claude/kb/tooling.md  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs  # 键名逐字落进留存产物，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 crates/singlefs-unit-graph/src/shell_sources.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
@@ -2749,3 +2737,19 @@ scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs  # 存量�
 scripts/experiment-apparatus/e187_quarantine_mark_cost.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e71_accounting_keys_single_generation.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
 scripts/experiment-apparatus/e97_entry_encoding_single_generation.rs  # 存量实验源码与知识库表格名字，改名要连产物一起重跑
+scripts/experiment-apparatus/e206_fixed_point_cost_histories.rs:op  # 已落进留存产物：research/results/e206-fixed-point-cost-* 里的 reconciliation 行逐字带 op=，改名要连产物一起重跑
+scripts/experiment-apparatus/e206_fixed_point_cost_histories.rs:op_index  # 已落进留存产物：research/results/e206-fixed-point-cost-* 里的 reconciliation 行逐字带 op_index=，改名要连产物一起重跑
+scripts/experiment-apparatus/e206_fixed_point_cost.rs:op  # 已落进留存产物：模型读 research/results/e206-fixed-point-cost-* 里的 op= 键，报告行沿用同一个键名，改名要连产物一起重跑
+scripts/experiment-apparatus/e206_fixed_point_cost.rs:op_index  # 已落进留存产物：模型读 research/results/e206-fixed-point-cost-* 里的 op_index= 键，改名要连产物一起重跑
+.claude/kb/experiments/206-发布固定点轮数的代价.md:files_1000_units_100__p1  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-发布固定点轮数的代价.md:q8_first_publish  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-发布固定点轮数的代价.md:q8_peak  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-发布固定点轮数的代价.md:control_p3  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-cost-of-the-publish-fixed-point-rounds.en.md:files_1000_units_100__p1  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-cost-of-the-publish-fixed-point-rounds.en.md:q8_first_publish  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-cost-of-the-publish-fixed-point-rounds.en.md:q8_peak  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-cost-of-the-publish-fixed-point-rounds.en.md:control_p3  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-パブリッシュ固定点ラウンド数のコスト.ja.md:files_1000_units_100__p1  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-パブリッシュ固定点ラウンド数のコスト.ja.md:q8_first_publish  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-パブリッシュ固定点ラウンド数のコスト.ja.md:q8_peak  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑
+.claude/kb/experiments/206-パブリッシュ固定点ラウンド数のコスト.ja.md:control_p3  # 已落进留存产物：E206 实验页整行引 research/results/e206-fixed-point-cost-* 的项名与行名，改名要连产物一起重跑

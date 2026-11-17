@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # 完工清理闸（Claude Code 钩子）：主 agent 结束一轮、子 agent 交回与收工时，自己认领、自己建的仓副本、编译目录与运行目录里的库拷贝还在，
-# 或自己的 Bash 命令点到过的迁库遗留（数据根、判定库服务状态目录与没有归属文件的工作根目录里的旧库与库备份）还在，就拦下，
+# 或自己的 Bash 命令点到过的迁库遗留（数据根、判定库服务状态目录与没有归属文件的工作根目录里的旧库与库备份）还在，
+# 或主 agent 本会话合入后验证留下的快照（<工作根>/merge-and-verify/<一层>/repo）还在，就拦下，
 # 列出路径与 du 的大小，要它删完再收工（用完就删：.claude/main-agent.md「一轮怎么开、怎么收」第 11 条，.claude/agent-common.md「写」一节）。
 # hook-events: Stop SubagentStop PreToolUse:SubagentHandback
-# gate-similar: handback-scratch-check.sh 上游的交回尾门禁，同挂 PreToolUse:SubagentHandback 与 SubagentStop、同样判自己建的编译目录与仓副本，但只看临时目录（/tmp、$TMPDIR）、按调用时间窗认归属、交回报告写一行「没删」就放行，也不管主 agent；这里看工作根里本会话认领的目录与崩溃放量的运行目录、按归属文件认、只认交付物声明、不收「没删」说明、还挂主 agent 的 Stop；它在上游副本里，不许就地改，并不进去
+# gate-similar: handback-scratch-check.sh 上游的交回尾门禁，同挂 PreToolUse:SubagentHandback 与 SubagentStop、同样判自己建的编译目录与仓副本，但只看临时目录（/tmp、$TMPDIR）、按调用时间窗认归属、交回报告写一行「没删」就放行，也不管主 agent；这里看工作根里本会话认领的目录与崩溃放量的运行目录、按归属文件认、只认交付物声明与子 agent 交回正文里「交主 agent 删 <全路径>：<原因>」一行、不收「没删」说明、还挂主 agent 的 Stop；它在上游副本里，不许就地改，并不进去
 # gate-similar: handback-guard.sh 同挂 PreToolUse:SubagentHandback，判交回正文、报告与自己起的后台任务还在跑；这里判磁盘上留下的副本。后台任务在跑的认法两边都从 scripts/agents/agent-watch.py 导入 own_background_tasks_still_running，不另写一份；判的对象与出路不同，并进去要让交回正文闸兼管归属文件与运行目录
 # gate-similar: remind-rearm-stop-guard.sh 同挂 Stop，判循环提醒的登记有没有进程在等、没在等就交出重起命令；这里判磁盘上的副本，读的输入（提醒登记目录对归属文件、会话记录与运行目录）与放行条件都不同
 # gate-similar: gate-reuse-check.sh 上游的 Stop / SubagentStop 收工自检，判这一轮新写的门禁与钩子写没写 gate-similar，本仓没注册；对象不同
@@ -31,6 +32,14 @@
 #     按会话号取 tasks 与 attempts 两张表。不用 task-server/task status --json：不带号只列在排、在跑与完成了没人取的，wait 取过结局的正是要列的那几个却不在里面；
 #     按号逐个问要先知道号、一个号一次往返；服务停着时收工照样要判得了。库不在（服务没装过）的不判也不记；库在而读不了、读库的共用模块载不进的照「没判全」记。
 #     库的位置可由 COMPLETION_CLEANUP_TASK_SERVER_DATABASE 换，只给自证造样本库用，平常不设。
+#   主 agent 另判合入后验证留下的快照（scripts/gate/merge-and-verify.sh 带 MERGE_AND_VERIFY_KEEP_COPY=1 留下的 <工作根>/merge-and-verify/<一层>/repo；
+#     那一趟在 <一层>/.owner 写三行归属记录，写法同 scripts/hosts/work-directory-ownership.sh 的归属文件）：
+#     <工作根>/merge-and-verify/ 下一层、.owner 的 session 是本会话的（三行写全才认，与上面认领目录同一个 owner_session），同层 repo/ 还在（是目录、不是符号链接）的，
+#     按「合入后验证快照」列 repo 的路径与 du 的大小，删法 rm -rf -- <repo>（只删 repo/，日志与 .owner 留着）；
+#     repo/ 已删的、别的会话的、没有 .owner（或写得不对）的一层不列，子 agent 不判（子 agent 不跑合入后验证）。
+#     那一层里有进程开着（那一趟还在跑，或有进程的工作目录、打开的文件落在这一层里）的整层不列。
+#     要留的（验证段后面还要在它上面验、修补要以它为基线建副本的）在那一层的 .deliverables 写一行「repo 基线 <为什么留>」（下面「要留的交付物」）。
+#     <工作根>/merge-and-verify/ 本身在而列不出时记一处没判全。
 #   两者都另判崩溃放量的运行目录：$SINGLEFS_CRASH_AMPLIFICATION_HOME/runs/ 下一层（没设时是工作根下的 crash-amplification/runs/ 下一层，
 #     与 scripts/crash/crash-amplification-lib.sh 的 crash_amplification_home_directory 同一取法），
 #     只判认得出确凿归属的；创建时间与 Bash 调用的时间窗重叠一条不算。确凿归属这样认：
@@ -71,19 +80,31 @@
 #   仓副本：有 .git（目录；.git 是文件的报成工作树），或同时有 Cargo.toml 与 crates（这两样的认法从 agent-watch.py 导入 scratch_hog_kind）；
 #   库拷贝：同时有 CURRENT 与 MANIFEST-*（RocksDB 的整份拷贝：判定库只在 prune-server 里一份，草稿与运行目录里不该有本地的库拷贝）。
 #   旧文件库：目录名里带判定库的种类名（整个名字，或前后是 . - _ 与名字两头），里面不空；起头那一处（认领目录、草稿目录、扫的根）本身不按名字认。
-#     种类名现读三处，不在这里另抄：scripts/prune-server/prune_server_client.py 文件头「键空间」一节里「例 / 种类固定 / 种类是」后面的名字，
-#     .claude/gate.d/verdict-library-scripts.tsv 第三列的「键空间 <族>/<种类>/」与「<族> 族 <种类>/」，.claude/gate.d/retired-names.tsv 种类是「目录名」的那几行。
+#     种类名现读两处，不在这里另抄：scripts/prune-server/prune_server_client.py 文件头「键空间」一节里「例 / 种类固定 / 种类是」后面的名字，
+#     .claude/gate.d/verdict-library-scripts.tsv 第三列的「键空间 <族>/<种类>/」与「<族> 族 <种类>/」。
 #     哪一处读不了或一个名字都读不出，记一处没判全（旧文件库与带种类名的库备份就认不全）。
 #   库备份：文件名以 .tar、.tar.gz、.tgz、.tar.zst 结尾，名字里（不分大小写）带 verdict、library 或上面的种类名之一的普通文件；不跟符号链接。
 #   旧文件库与库备份在认领目录、草稿目录与上面迁库遗留那几处都认；迁库遗留那几处只认库拷贝、旧文件库与库备份三样，编译目录与仓副本不归这一类。
 #   在用的不列，判法调 scripts/hosts/run_build_directory.py 的 open_holders（与它的 holders 同一份：本进程以外的进程的工作目录、根目录、可执行文件、
 #     打开的文件描述符或内存映射落在里面；只看得到本用户的；库备份是文件，看有没有进程的文件描述符或内存映射指着它这一份）。认领目录与草稿目录看列出的那一处（含它底下各层）；运行目录看整个运行目录：
 #     那一趟的日志或别的子目录有进程开着，就是那一趟还在跑，里面的库拷贝与编译目录都不列。
+#   换上流程的草稿树：路径是 <认领目录或草稿目录>/hook-swap/tree 这一形（scripts/gate/hook-swap.py 在 --scratch 点的目录下建，那一趟自己跑完或出错就删；
+#     它在建树、编译、喂钩子的间隙里没有进程的工作目录或文件描述符落在树里）的行，决定拦之前（后台任务与子 agent 判过之后）最后再看一眼，下面两种不列：
+#     有进程在用：in_use 的判法（open_holders）看得到的，或有进程的命令行点到这棵树、点到它的草稿目录本身（hook-swap.py 那一趟命令行里 --scratch 点的是草稿目录；
+#       点到草稿目录底下别的文件不算）；
+#     这一刻已经没了（那一趟刚删掉树，单子里会打成 du 量不出的「?」）。
+#     没有进程在用、还在的照列，删法照旧 rm -rf -- <树>。
 # 要留的交付物：报告、补丁与打补丁前的备份是普通文件与目录的，本来就不在单上。要留的副本写进它所在那个认领目录的 .deliverables
-#   （与归属文件同一层；子 agent 的草稿目录本身也认），一行一条：
-#     <相对那个目录的路径>  <种类>  <为什么留>      种类四选一：报告、补丁、备份、交接；为什么留至少 4 个字；# 起头的行是注释
+#   （与归属文件同一层；子 agent 的草稿目录本身也认；合入后验证的那一层也认，快照写 repo），一行一条：
+#     <相对那个目录的路径>  <种类>  <为什么留>      种类五选一：报告、补丁、备份、交接、基线；为什么留至少 4 个字；# 起头的行是注释
 #   交接：子 agent 交给主 agent 接着用的副本（主 agent 照它的报告在里面跑命令）。子 agent 交回、收工时不列；主 agent 结束一轮时照列，用完就删。
+#   基线：主 agent 自己留着、后面要在它上面跑命令或以它为基线建副本的树（写段下一批的段树、合入后验证留下的快照）。只认主 agent 的声明：
+#     主 agent 结束一轮时不列，用完就删；子 agent 交回、收工时写了也照列（要交给主 agent 的用交接）；编译目录不能声明成基线。
 #   声明了的那一棵里仓副本、库拷贝、旧文件库与库备份不列，编译目录照列（编译目录不能声明成交付物）；路径落到那个目录外、种类不认得、理由太短的行不算，列进拦下的说明。
+# 删不掉的（只子 agent，只编译目录、工作树与仓副本三种，只认认领目录与草稿目录里单子上列出的那几处）：子 agent 在交回正文里逐个写一行
+#   「交主 agent 删 <全路径>：<删不掉的原因，至少 HAND_TO_MAIN_REASON_MINIMUM 个字>」（写法见 HAND_TO_MAIN_LINE：行首可带列表符号，路径可用反引号或引号包着；
+#   路径要与单子上列的一字不差，上层目录不替下层）的，交回、收工时不列。交回工具那一次看这一次交回的 message；SubagentStop 看已送达的交回正文与收工前的回复；
+#   被交回闸拒掉（is_error）的那次交回正文不算。库拷贝、旧文件库、库备份、迁库遗留与服务编译目录不认这种写法；主 agent 结束一轮时照旧列这些副本，由主 agent 删。
 # 拦下：Stop 与 SubagentStop 打 {"decision": "block", "reason": …}；PreToolUse 退 2、说明写 stderr。说明逐个列种类、路径与 du -sh 的大小
 #   （du 合起来最多 DU_TIMEOUT_SECONDS 秒，量不出写「?」）和删法。
 # 拦过一次、续跑回来（stop_hook_active 为真）还是同一张单（一个都没删）：放行，把单子作 systemMessage 交给用户处置（免得卡死）；单子变了照拦。PreToolUse 每次都拦。
@@ -118,6 +139,9 @@
 #       「✗ 自证 unchanged-after-block-releases：」
 #       「✗ 自证 changed-after-block-blocks-again：」
 #       「✗ 自证 block-lists-size：」
+#       「✗ 自证 subagent-hand-short-reason-blocks：」
+#       「✗ 自证 subagent-hand-ancestor-blocks：」
+#       「✗ 自证 main-hand-declaration-ignored：」
 #   COMPLETION_CLEANUP_BREAK=repository-copy-unrecognized  不认仓副本（.git、Cargo.toml 加 crates）
 #       「✗ 自证 main-repository-copy-left：」
 #       「✗ 自证 main-handover-copy-left：」
@@ -125,6 +149,11 @@
 #       「✗ 自证 subagent-assigned-relative-by-repository-root：」
 #       「✗ 自证 subagent-assigned-shared-reading：」
 #       「✗ 自证 main-scratchpad-copy-left：」
+#       「✗ 自证 swap-tree-idle-listed：」
+#       「✗ 自证 subagent-hand-undeclared-blocks：」
+#       「✗ 自证 subagent-hand-short-reason-blocks：」
+#       「✗ 自证 subagent-hand-ancestor-blocks：」
+#       「✗ 自证 main-hand-declaration-ignored：」
 #   COMPLETION_CLEANUP_BREAK=library-copy-unrecognized  不认库拷贝（CURRENT 加 MANIFEST-*）
 #       「✗ 自证 main-run-library-copy-left：」
 #       「✗ 自证 own-run-blocked-after-creator-exits：」
@@ -136,6 +165,7 @@
 #       「✗ 自证 relative-after-cd-attributed：」
 #       「✗ 自证 no-owner-mentioned-copy-blocked：」
 #       「✗ 自证 no-owner-unmentioned-reported-not-blocked：」
+#       「✗ 自证 subagent-hand-library-copy-blocks：」
 #   COMPLETION_CLEANUP_BREAK=all-sessions  归属是别的会话的目录也当本会话的判
 #       「✗ 自证 other-session-directory-ignored：」
 #       「✗ 自证 other-session-leftover-ignored：」
@@ -143,6 +173,8 @@
 #       「✗ 自证 deliverables-only-passes：」
 #       「✗ 自证 subagent-handover-passes：」
 #       「✗ 自证 declared-archive-passes：」
+#       「✗ 自证 merge-snapshot-declared-baseline-passes：」
+#       「✗ 自证 segment-tree-declared-baseline-passes：」
 #   COMPLETION_CLEANUP_BREAK=build-directory-declarable  声明成交付物的那一棵里编译目录也不列
 #       「✗ 自证 build-directory-never-deliverable：」
 #   COMPLETION_CLEANUP_BREAK=handover-exempt-for-main  主 agent 也不列声明成交接的副本
@@ -160,6 +192,7 @@
 #       「✗ 自证 run-held-deep-not-listed：」
 #       「✗ 自证 mapped-copy-not-listed：」
 #       「✗ 自证 held-leftover-not-listed：」
+#       「✗ 自证 merge-snapshot-held-not-listed：」
 #   COMPLETION_CLEANUP_BREAK=subagent-sees-whole-session  子 agent 也判本会话认领的全部目录
 #       「✗ 自证 subagent-ignores-siblings：」
 #       「✗ 自证 subagent-assigned-relative-not-by-cwd：」
@@ -289,6 +322,44 @@
 #       「✗ 自证 library-archive-blocked：」
 #   COMPLETION_CLEANUP_BREAK=declaration-outside-accepted  .deliverables 里落到认领目录外的路径也照收（数据根层的旧库靠声明放得过）
 #       「✗ 自证 data-root-leftover-not-declarable：」
+#   COMPLETION_CLEANUP_BREAK=hand-declaration-ignored  不读交回正文与收工前回复里的「交主 agent 删」行
+#       「✗ 自证 subagent-hand-to-main-passes：」
+#       「✗ 自证 subagent-hand-undeclared-blocks：」
+#       「✗ 自证 subagent-hand-stop-delivered-passes：」
+#       「✗ 自证 subagent-hand-stop-reply-passes：」
+#   COMPLETION_CLEANUP_BREAK=hand-reason-unchecked  原因不到 HAND_TO_MAIN_REASON_MINIMUM 个字的「交主 agent 删」行也认
+#       「✗ 自证 subagent-hand-short-reason-blocks：」
+#   COMPLETION_CLEANUP_BREAK=hand-ancestor-accepted  上层目录写了「交主 agent 删」就连它底下的副本一起不列
+#       「✗ 自证 subagent-hand-ancestor-blocks：」
+#   COMPLETION_CLEANUP_BREAK=hand-all-kinds  库拷贝、旧文件库与库备份也认「交主 agent 删」行
+#       「✗ 自证 subagent-hand-library-copy-blocks：」
+#   COMPLETION_CLEANUP_BREAK=hand-exempt-for-main  主 agent 结束一轮时也认自己会话里写的「交主 agent 删」行
+#       「✗ 自证 main-hand-declaration-ignored：」
+#   COMPLETION_CLEANUP_BREAK=hand-way-unlisted  拦下的单子里不写「交主 agent 删」这一条出路
+#       「✗ 自证 subagent-block-names-hand-way：」
+#       「✗ 自证 subagent-hand-way-passes-handback-gates：」
+#   COMPLETION_CLEANUP_BREAK=hand-way-example-oversized  单子里的例子行拖到超过交回正文闸的字数上限
+#       「✗ 自证 subagent-hand-way-passes-handback-gates：」
+#   COMPLETION_CLEANUP_BREAK=merge-snapshots-unseen  不看合入后验证留下的快照
+#       「✗ 自证 main-merge-snapshot-left：」
+#   COMPLETION_CLEANUP_BREAK=snapshot-session-unchecked  别的会话的合入后验证快照也列
+#       「✗ 自证 other-session-merge-snapshot-ignored：」
+#   COMPLETION_CLEANUP_BREAK=snapshot-owner-unchecked  合入后验证的一层没有归属文件（或写得不对）也当本会话的
+#       「✗ 自证 merge-snapshot-without-owner-ignored：」
+#   COMPLETION_CLEANUP_BREAK=snapshot-removed-listed  快照 repo/ 已删的一层也列（列那一层的目录）
+#       「✗ 自证 merge-snapshot-removed-not-listed：」
+#   COMPLETION_CLEANUP_BREAK=baseline-declaration-ignored  主 agent 声明的「基线」不认
+#       「✗ 自证 merge-snapshot-declared-baseline-passes：」
+#       「✗ 自证 segment-tree-declared-baseline-passes：」
+#   COMPLETION_CLEANUP_BREAK=baseline-exempt-for-subagent  子 agent 声明的「基线」也认
+#       「✗ 自证 subagent-baseline-declaration-listed：」
+#   COMPLETION_CLEANUP_BREAK=subagent-snapshots-judged  子 agent 交回、收工时也判本会话的合入后验证快照
+#       「✗ 自证 subagent-merge-snapshots-not-listed：」
+#   COMPLETION_CLEANUP_BREAK=merge-snapshot-root-unlisted-unnoted  <工作根>/merge-and-verify/ 在而列不出时当作没有快照，不进没判全的几处
+#       「✗ 自证 merge-snapshot-root-unlisted-pass-reported：」
+#   COMPLETION_CLEANUP_BREAK=swap-tree-always-listed  <草稿目录>/hook-swap/tree 这一形的行不做最后一看：命令行点到的、已经没了的也列
+#       「✗ 自证 swap-tree-in-use-not-listed：」
+#       「✗ 自证 swap-tree-gone-not-listed：」
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给钩子的 JSON。
@@ -359,9 +430,26 @@ BREAK_TABLE = [
     ("archives-unrecognized", "library-archive-blocked"),
     ("archive-any-name", "library-archive-blocked"),
     ("declaration-outside-accepted", "data-root-leftover-not-declarable"),
+    ("hand-declaration-ignored", "subagent-hand-to-main-passes"),
+    ("hand-reason-unchecked", "subagent-hand-short-reason-blocks"),
+    ("hand-ancestor-accepted", "subagent-hand-ancestor-blocks"),
+    ("hand-all-kinds", "subagent-hand-library-copy-blocks"),
+    ("hand-exempt-for-main", "main-hand-declaration-ignored"),
+    ("hand-way-unlisted", "subagent-block-names-hand-way"),
+    ("hand-way-example-oversized", "subagent-hand-way-passes-handback-gates"),
+    ("merge-snapshots-unseen", "main-merge-snapshot-left"),
+    ("snapshot-session-unchecked", "other-session-merge-snapshot-ignored"),
+    ("snapshot-owner-unchecked", "merge-snapshot-without-owner-ignored"),
+    ("snapshot-removed-listed", "merge-snapshot-removed-not-listed"),
+    ("baseline-declaration-ignored", "merge-snapshot-declared-baseline-passes"),
+    ("baseline-exempt-for-subagent", "subagent-baseline-declaration-listed"),
+    ("subagent-snapshots-judged", "subagent-merge-snapshots-not-listed"),
+    ("merge-snapshot-root-unlisted-unnoted", "merge-snapshot-root-unlisted-pass-reported"),
+    ("swap-tree-always-listed", "swap-tree-in-use-not-listed"),
 ]
 BREAK_ITEMS = tuple(item for item, _ in BREAK_TABLE)
 SELFTEST_ENTRIES = (["--selftest"], ["--selftest-cells"])
+NOT_RUN = []   # 自证里别的闸不在、没喂成的格：成功句里报「本次未跑」
 NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 HANDBACK_TOOL = "SubagentHandback"
 SUBAGENT_IDLE_SECONDS = 1800
@@ -377,9 +465,19 @@ UNJUDGED_SKIP_PREFIX = "完工清理闸没判、照常放行"   # 判不了（re
 INPUT_PREFIX_BYTES = 200
 DU_TIMEOUT_SECONDS = 30
 DECLARATION_FILE = ".deliverables"
-DELIVERABLE_KINDS = ("报告", "补丁", "备份", "交接")
+DELIVERABLE_KINDS = ("报告", "补丁", "备份", "交接", "基线")
 HANDOVER_KIND = "交接"
+BASELINE_KIND = "基线"   # 主 agent 自己留着、后面要在它上面跑命令或以它为基线建副本的树：只认主 agent 的声明（文件头「要留的交付物」）
+MERGE_SNAPSHOT_DIRECTORY_NAME = "merge-and-verify"   # 合入后验证的日志目录根：<工作根>/merge-and-verify/<一层>/（scripts/gate/merge-and-verify.sh）
+MERGE_SNAPSHOT_NAME = "repo"   # 留下的快照在每一层里的名字
+SWAP_TREE_PARTS = ("hook-swap", "tree")   # scripts/gate/hook-swap.py 在 --scratch 点的草稿目录下建的草稿树：<草稿目录>/hook-swap/tree，那一趟自己跑完或出错就删
 REASON_MINIMUM_CHARACTERS = 4
+# 子 agent 删不掉的副本交给主 agent 删：交回正文里的一行「交主 agent 删 <全路径>：<原因>」（文件头「删不掉的」）
+HAND_TO_MAIN_PHRASE = "交主 agent 删"
+HAND_TO_MAIN_REASON_MINIMUM = 8
+HAND_TO_MAIN_LINE = re.compile(r"^[ \t>*•-]*" + HAND_TO_MAIN_PHRASE + r"[ \t]*[`'\"]?(/[^\s`'\"：:]+)[`'\"]?[ \t]*[：:][ \t]*(.+?)[ \t]*$", re.MULTILINE)
+HAND_TO_MAIN_EXAMPLE_REASON = "rm 被权限拒，删不掉"
+HAND_TO_MAIN_OVERSIZED_PADDING = 4200   # 弄坏开关 hand-way-example-oversized：例子行的原因后面接这么多个字，越过交回正文闸的字数上限
 RUN_COMMAND_KEYWORDS = re.compile(r"crash-amplification|crash-point-replay|broad-mutation|mutation-shard-run|qemu-device-streams|lkmm\.sh|crates-mutation-replay"
                                   r"|formal-verification|research-build-and-replay|model-differential-and-scenarios|gate-staged|gate\.sh")
 TIMER_AND_WATCHDOG_SCRIPTS = ("remind.sh", "watch.sh", "agent-watch.py")
@@ -389,6 +487,7 @@ STATE_DIRECTORY_NAME = "completion-cleanup-guard"
 SCRATCHPAD_ROOT_VARIABLE = "COMPLETION_CLEANUP_SCRATCHPAD_ROOT"
 KIND_BUILD, KIND_WORKTREE, KIND_REPOSITORY, KIND_LIBRARY = "编译目录", "工作树", "仓副本", "库拷贝"
 KIND_SERVICE_BUILD = "服务编译目录"   # task-server 给的编译目录：只经 task-server/task clean <号> 删
+KIND_MERGE_SNAPSHOT = "合入后验证快照"   # 合入后验证带 MERGE_AND_VERIFY_KEEP_COPY=1 留下的 <一层>/repo
 TASK_SERVER_DATABASE_VARIABLE = "COMPLETION_CLEANUP_TASK_SERVER_DATABASE"   # 只给自证造样本库用：设了就读它，平常不设
 TASK_SERVER_CLIENT = "task-server/task"
 TASK_SERVER_FINISHED_STATE = "finished"
@@ -405,20 +504,19 @@ CRASH_AMPLIFICATION_DIRECTORY_NAME = "crash-amplification"   # 没设上面那�
 UNKNOWN_SECTION_TITLE = "认不出是谁的"
 UNKNOWN_SHOWN_MAX = 30   # 「认不出是谁的」一节最多列几处（每处要核一遍在不在用），其余只报个数
 KIND_OLD_LIBRARY, KIND_LIBRARY_ARCHIVE = "旧文件库", "库备份"
+HAND_TO_MAIN_KINDS = (KIND_BUILD, KIND_WORKTREE, KIND_REPOSITORY)   # 「交主 agent 删」只认这三种
 LEFTOVER_KINDS = frozenset((KIND_LIBRARY, KIND_OLD_LIBRARY, KIND_LIBRARY_ARCHIVE))   # 迁库遗留那几处只认这三样
 LEFTOVER_SCAN_MAX_DEPTH = 4
 PRUNE_STATE_SCAN_MAX_DEPTH = 2
 ARCHIVE_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".tar.zst")
 ARCHIVE_WORDS = ("verdict", "library")
 SPECIES_TOKEN = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)+"   # 种类名的样子：小写、带连字符的目录名
-# 种类名现读的三处（文件头「判什么」旧文件库那一段）；自证换成样本文件
+# 种类名现读的两处（文件头「判什么」旧文件库那一段）；自证换成样本文件
 SPECIES_SOURCES = {
     "client": os.path.join(REPOSITORY_ROOT, "scripts", "prune-server", "prune_server_client.py"),
     "registry": os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "verdict-library-scripts.tsv"),
-    "retired": os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "retired-names.tsv"),
 }
 CLIENT_KEY_SPACE_HEADING = "键空间"
-RETIRED_DIRECTORY_KIND = "目录名"
 GLOB_CHARACTERS = re.compile(r"[*?\[]")
 VARIABLE_ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 VARIABLE_REFERENCE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
@@ -617,11 +715,15 @@ def subagent_roots(session, agent_transcript, calls):
 
 # ── 交付物声明
 def declarations(directories, role):
-    """读这几个目录里的 .deliverables：交 ({声明了的绝对路径: 种类}, [写坏的行])；只收这个角色免列的种类。
+    """读这几个目录里的 .deliverables：交 ({声明了的绝对路径: 种类}, [写坏的行])；只收这个角色免列的种类
+    （主 agent 免列报告、补丁、备份、基线，子 agent 免列报告、补丁、备份、交接；弄坏开关 baseline-declaration-ignored 下主 agent 不认基线，
+    baseline-exempt-for-subagent 下子 agent 也认基线）。
     路径落到那个目录外的行不算（数据根层的旧库靠声明放不过）；弄坏开关 declaration-outside-accepted 下照收。"""
     exempt_kinds = set() if broken("deliverables-ignored") else {"报告", "补丁", "备份"}
     if exempt_kinds and (role == "subagent" or broken("handover-exempt-for-main")):
         exempt_kinds.add(HANDOVER_KIND)
+    if exempt_kinds and (broken("baseline-exempt-for-subagent") or (role == "main" and not broken("baseline-declaration-ignored"))):
+        exempt_kinds.add(BASELINE_KIND)
     exempt, problems = {}, []
     for directory in dict.fromkeys(directory for directory in directories if directory):
         path = os.path.join(directory, DECLARATION_FILE)
@@ -1060,22 +1162,10 @@ def registry_species(path):
     return names
 
 
-def retired_species(path):
-    """retired-names.tsv 里种类是「目录名」的那几行的名字（退役的旧库目录名）。"""
-    names = []
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            columns = line.rstrip("\n").split("\t")
-            if not line.startswith("#") and len(columns) >= 2 and columns[0] and columns[1] == RETIRED_DIRECTORY_KIND:
-                names.append(columns[0])
-    return names
-
-
 def library_species(notes):
-    """旧文件库与库备份认的种类名：SPECIES_SOURCES 三处现读、合起来去重。哪一处读不了或一个都读不出，往 notes 记一处没判全
+    """旧文件库与库备份认的种类名：SPECIES_SOURCES 两处现读、合起来去重。哪一处读不了或一个都读不出，往 notes 记一处没判全
     （弄坏开关 leftover-unjudged-unnoted 下不记）。"""
-    readers = (("client", client_species, f"文件头「{CLIENT_KEY_SPACE_HEADING}」一节"), ("registry", registry_species, "第三列的键空间"),
-               ("retired", retired_species, f"种类是「{RETIRED_DIRECTORY_KIND}」的行"))
+    readers = (("client", client_species, f"文件头「{CLIENT_KEY_SPACE_HEADING}」一节"), ("registry", registry_species, "第三列的键空间"))
     names = []
     for key, reader, where in readers:
         path = SPECIES_SOURCES[key]
@@ -1511,6 +1601,96 @@ def not_in_use(found_in_roots, found_in_runs):
     return kept
 
 
+# ── 合入后验证留下的快照（文件头「判哪几处」合入后验证快照那一段）
+def merge_snapshot_layers(session, notes):
+    """<工作根>/merge-and-verify/ 下归属是本会话的每一层：交 [一层的路径]。.owner 要三行写全（owner_session），没有或写得不对的不认；
+    <工作根>/merge-and-verify/ 在而列不出时往 notes 记一句、交空表（照「放行但必记检出」）。
+    弄坏开关 snapshot-owner-unchecked 下没有归属文件的一层也认，snapshot-session-unchecked 下别的会话的也认，merge-snapshot-root-unlisted-unnoted 下列不出不记。"""
+    base = os.path.join(os.path.normpath(work_root()), MERGE_SNAPSHOT_DIRECTORY_NAME)
+    if os.path.islink(base) or not os.path.isdir(base):
+        return []
+    try:
+        names = sorted(os.listdir(base))
+    except OSError as error:
+        if not broken("merge-snapshot-root-unlisted-unnoted"):
+            notes.append(f"合入后验证的日志目录根 {base} 列不出（{type(error).__name__}: {error}），本会话留下的快照没判；出路：ls -ld {base} 看权限，修好再收工")
+        return []
+    layers = []
+    for name in names:
+        path = os.path.join(base, name)
+        if os.path.islink(path) or not os.path.isdir(path):
+            continue
+        owner = owner_session(path)
+        if owner is None and not broken("snapshot-owner-unchecked"):
+            continue
+        if owner is not None and owner != session and not broken("snapshot-session-unchecked"):
+            continue
+        layers.append(path)
+    return layers
+
+
+def merge_snapshots(layers, exempt):
+    """每一层里还在的快照：交 {一层: [(快照路径, 种类)]}。快照是同层的 repo/（目录、不是符号链接）；一层的 .deliverables 声明成交付物的（exempt）不列。
+    弄坏开关 snapshot-removed-listed 下 repo/ 已删的一层也列（列那一层的目录），merge-snapshots-unseen 下不看快照、交空表。"""
+    found = {}
+    if broken("merge-snapshots-unseen"):
+        return found
+    for layer in layers:
+        snapshot = os.path.join(layer, MERGE_SNAPSHOT_NAME)
+        present = os.path.isdir(snapshot) and not os.path.islink(snapshot)
+        target = snapshot if present else (layer if broken("snapshot-removed-listed") else None)
+        if target is not None and snapshot not in exempt:
+            found[layer] = [(target, KIND_MERGE_SNAPSHOT)]
+    return found
+
+
+def snapshots_not_in_use(found):
+    """一层里有进程开着（那一趟还在跑，或有进程在快照里）的整层不列，判法同运行目录（看整层，不只看列出的那一处）；弄坏开关 open-files-ignored 下都列。"""
+    if broken("open-files-ignored"):
+        return [item for items in found.values() for item in items]
+    return [item for layer, items in found.items() if not in_use(layer) for item in items]
+
+
+# ── 换上流程的草稿树（文件头「判什么」换上流程的草稿树那一段）
+def swap_tree_scratch(path):
+    """path 是 <草稿目录>/hook-swap/tree 这一形就交草稿目录，不是交 None。"""
+    parts = os.path.normpath(path).split(os.sep)
+    if len(parts) > len(SWAP_TREE_PARTS) + 1 and tuple(parts[-len(SWAP_TREE_PARTS):]) == SWAP_TREE_PARTS:
+        return os.sep.join(parts[:-len(SWAP_TREE_PARTS)])
+    return None
+
+
+def named_on_command_lines(tree, scratch):
+    """本进程以外有进程的命令行点到这棵树（树本身或它底下的路径），或点到它的草稿目录本身（词里 --x=<路径> 取等号后面也算；草稿目录底下别的路径不算）。"""
+    own = os.getpid()
+    pattern = re.compile(r"(?<![\w./-])(?:" + re.escape(tree) + r"(?=$|[/\s'\"=:,;)])|" + re.escape(scratch) + r"(?=$|[\s'\"=:,;)]))")
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit() or int(entry) == own:
+            continue
+        try:
+            with open(os.path.join("/proc", entry, "cmdline"), "rb") as handle:
+                command = handle.read().replace(b"\0", b" ").decode(errors="replace")
+        except OSError:
+            continue
+        if pattern.search(command):
+            return True
+    return False
+
+
+def swap_trees_still_left(leftovers):
+    """决定拦之前最后再看一眼：<草稿目录>/hook-swap/tree 这一形的行，有进程在用（in_use 的判法，或命令行点到树与草稿目录：那一趟换上还在跑）、
+    或这一刻已经没了（那一趟刚删掉）的不列；没有进程在用、还在的照列，别的行原样留下。弄坏开关 swap-tree-always-listed 下不看，都列。"""
+    if broken("swap-tree-always-listed"):
+        return leftovers
+    kept = []
+    for path, kind in leftovers:
+        scratch = swap_tree_scratch(path)
+        if scratch is not None and (not os.path.lexists(path) or in_use(path) or named_on_command_lines(path, scratch)):
+            continue
+        kept.append((path, kind))
+    return kept
+
+
 # ── 单子
 def sizes(paths):
     if not paths:
@@ -1560,12 +1740,12 @@ def unknown_lines(unknown, omitted=0):
     return lines
 
 
-def block_text(role, leftovers, problems, notes, unknown=(), omitted=0, place_paths=()):
+def block_text(role, leftovers, problems, notes, unknown=(), omitted=0, place_paths=(), event=""):
     if role == "main":
         head = ("✗ 完工清理：这一轮做完了（没有在跑的后台任务与子 agent），本会话认领的目录与它起的运行目录里还剩下面这些仓副本、编译目录与库拷贝，"
-                "或本会话点到过的迁库遗留还在；用完就删，删完再收工。")
+                "或本会话合入后验证留下的快照、点到过的迁库遗留还在；用完就删，删完再收工。")
         rule = ".claude/main-agent.md「一轮怎么开、怎么收」第 11 条"
-        kinds = "报告、补丁、备份"
+        kinds = f"报告、补丁、备份、{BASELINE_KIND}（主 agent 自己留着、后面要在它上面跑命令或以它为基线建副本的树）"
     else:
         head = "✗ 完工清理：交回之前先删掉你自己认领、自己建的仓副本、编译目录与库拷贝，与你的命令点到过的迁库遗留（下面这些还在）；用完就删，删完再交回。"
         rule = ".claude/agent-common.md「写」一节"
@@ -1576,9 +1756,20 @@ def block_text(role, leftovers, problems, notes, unknown=(), omitted=0, place_pa
              f"   不留给以后的趟复用，也不等别的活来用（{rule}）。",
              f"   报告、补丁与打补丁前的备份是普通文件的不在单上；要留的副本写进它所在认领目录的 {DECLARATION_FILE}：一行「<相对路径> <种类> <为什么留>」，"
              f"种类是 {kinds}；编译目录声明了也照列。写法在 {HOOK_PATH} 文件头「要留的交付物」。"]
+    handable = next((path for path, kind in leftovers if kind in HAND_TO_MAIN_KINDS), None)
+    if role != "main" and handable is not None and not broken("hand-way-unlisted"):
+        where = "回复里" if event == "SubagentStop" else "这一次交回的正文里"
+        example_reason = HAND_TO_MAIN_EXAMPLE_REASON + ("字" * HAND_TO_MAIN_OVERSIZED_PADDING if broken("hand-way-example-oversized") else "")
+        lines += [f"   删不掉的{'、'.join(HAND_TO_MAIN_KINDS)}（rm 被权限拒、被别的闸挡）：{where}逐个写一行「{HAND_TO_MAIN_PHRASE} <全路径>：<删不掉的原因，至少 {HAND_TO_MAIN_REASON_MINIMUM} 个字>」"
+                  f"（全路径照抄上面的清单，上层目录不替下层），写了再{'收工' if event == 'SubagentStop' else '交回'}就放行；主 agent 结束一轮时照旧列它们、由它删。"
+                  f"{KIND_LIBRARY}、{KIND_OLD_LIBRARY}、{KIND_LIBRARY_ARCHIVE}不认这一种写法。",
+                  f"   例：{HAND_TO_MAIN_PHRASE} {handable}：{example_reason}"]
     if any(kind == KIND_SERVICE_BUILD for _, kind in leftovers):
         lines.append(f"   {KIND_SERVICE_BUILD}是 task-server 给的（wait 末行 build=）：只经 `{TASK_SERVER_CLIENT} clean <号>` 删，不直接 rm（项目代码闸照拒直接删）；"
                      "它删前删后报大小，记进报告。")
+    if any(kind == KIND_MERGE_SNAPSHOT for _, kind in leftovers):
+        lines.append(f"   {KIND_MERGE_SNAPSHOT}是合入后验证带 MERGE_AND_VERIFY_KEEP_COPY=1 留下的 <日志目录>/repo，那一层的 .owner 记着是本会话的：只删 repo、日志留着；"
+                     f"验证段后面还要在它上面验、或修补要以它为基线建副本的，在它所在日志目录的 {DECLARATION_FILE} 写一行「{MERGE_SNAPSHOT_NAME} {BASELINE_KIND} <为什么留>」，用完就删。")
     if any(path in place_paths for path, _ in leftovers):
         lines.append(f"   数据根、判定库服务的状态目录与没有归属文件的工作根目录里的迁库遗留（{KIND_LIBRARY}、{KIND_OLD_LIBRARY}、{KIND_LIBRARY_ARCHIVE}）"
                      f"是你的命令点到过的：判定已在 prune-server 那一份里，这些不靠声明留；真要留，先问用户。")
@@ -1617,6 +1808,48 @@ def clear_state(path):
         pass
 
 
+# ── 交主 agent 删
+def hand_to_main_texts(role, event, hook_input, calls, own_transcript):
+    """可能写着「交主 agent 删」行的文字：交回工具那一次是这一次交回的 message；子 agent 收工是已送达（结果不是错误）的交回正文加收工前的回复；
+    主 agent 只在弄坏开关 hand-exempt-for-main 下取自己会话里的回复。"""
+    if role == "subagent" and event == "PreToolUse":
+        tool_input = hook_input.get("tool_input")
+        message = tool_input.get("message") if isinstance(tool_input, dict) else None
+        return [message] if isinstance(message, str) else []
+    texts = []
+    if role == "subagent":
+        texts += [str(call["input"].get("message") or "") for call in calls if call["name"] == HANDBACK_TOOL and not call["result_is_error"]]
+    texts += [text for _, text in module("session_transcript").assistant_texts(own_transcript)]
+    return texts
+
+
+def handed_to_main(role, event, hook_input, calls, own_transcript):
+    """{路径: 原因}：交回正文（或收工前的回复）里写了「交主 agent 删 <全路径>：<原因>」、原因够长的路径。主 agent 不认（弄坏开关 hand-exempt-for-main 下认），
+    弄坏开关 hand-declaration-ignored 下谁都不认，hand-reason-unchecked 下原因多短都认。"""
+    if broken("hand-declaration-ignored") or (role == "main" and not broken("hand-exempt-for-main")):
+        return {}
+    minimum = 0 if broken("hand-reason-unchecked") else HAND_TO_MAIN_REASON_MINIMUM
+    handed = {}
+    for text in hand_to_main_texts(role, event, hook_input, calls, own_transcript):
+        for match in HAND_TO_MAIN_LINE.finditer(text):
+            reason = match.group(2).strip()
+            if len(reason) >= minimum:
+                handed[os.path.normpath(match.group(1))] = reason
+    return handed
+
+
+def handed_leftovers(found_in_roots, handed):
+    """认领目录与草稿目录里单子上的那几处里，已经写了「交主 agent 删」的路径：只认 HAND_TO_MAIN_KINDS 三种，路径要与单子上的一字不差
+    （弄坏开关 hand-all-kinds 下什么种类都认，hand-ancestor-accepted 下上层目录写了也算）。"""
+    declared = set()
+    for path, kind in found_in_roots:
+        if kind not in HAND_TO_MAIN_KINDS and not broken("hand-all-kinds"):
+            continue
+        if path in handed or (broken("hand-ancestor-accepted") and any(is_strictly_under(path, above) for above in handed)):
+            declared.add(path)
+    return declared
+
+
 # ── 判
 def decide(hook_input):
     """钩子输入 → {"action": pass / block / release / skip, "text": …, "paths": […]}。"""
@@ -1649,12 +1882,17 @@ def decide(hook_input):
     calls, _ = module("session_transcript").tool_calls(own_transcript)
     notes = []
     roots = main_roots(session, main_transcript, notes) if role == "main" or broken("subagent-sees-whole-session") else subagent_roots(session, own_transcript, calls)
-    exempt, problems = declarations([directory for root in roots for directory in (root[0], root[1])], role)
+    layers = merge_snapshot_layers(session, notes) if role == "main" or broken("subagent-snapshots-judged") else []
+    exempt, problems = declarations([*(directory for root in roots for directory in (root[0], root[1])), *layers], role)
     species = library_species(notes)
     budget = {"visited": 0, "truncated": set(), "limit": scan_limit(), "unreadable": [], "species": species}
     found_in_roots = []
     for path, _, skipped in roots:
         found_in_roots += scan(path, SCAN_MAX_DEPTH, exempt, skipped, budget)
+    handed = handed_to_main(role, event, hook_input, calls, own_transcript)
+    if handed:
+        declared_away = handed_leftovers(found_in_roots, handed)
+        found_in_roots = [(path, kind) for path, kind in found_in_roots if path not in declared_away]
     own_runs, unknown_runs = classify_runs(role, session, own_transcript, calls, now, notes)
     found_in_runs = {path: scan(path, RUN_SCAN_MAX_DEPTH, {}, set(), budget) for path in own_runs}
     found_unknown = {path: scan(path, RUN_SCAN_MAX_DEPTH, {}, set(), budget) for path in unknown_runs}
@@ -1677,23 +1915,26 @@ def decide(hook_input):
                      "出路：ls -ld 看权限，不用的删掉")
     service = service_builds(role, session, notes)
     SERVICE_BUILD_TASKS.update(service)
-    leftovers = sorted(dict(not_in_use(found_in_roots + own_leftovers, found_in_runs) + [(path, KIND_SERVICE_BUILD) for path, _ in service]).items())
+    snapshots = snapshots_not_in_use(merge_snapshots(layers, exempt))
+    leftovers = sorted(dict(not_in_use(found_in_roots + own_leftovers, found_in_runs) + [(path, KIND_SERVICE_BUILD) for path, _ in service] + snapshots).items())
     listed = {path for path, _ in leftovers}
     leftover_unknown, omitted = shown_unknown([item for item in unknown_leftovers if item[0] not in listed])
     unknown = sorted(dict(not_in_use([], found_unknown) + leftover_unknown).items())
     state_file = state_path(session, actor)
+    if leftovers:
+        if background_work(own_transcript) or (role == "main" and running_subagents(main_transcript, now)):
+            return {"action": "pass", "running": True}
+        leftovers = swap_trees_still_left(leftovers)
     if not leftovers:
         clear_state(state_file)
         return {"action": "pass", "notes": notes, "unknown": unknown, "unknown_omitted": omitted}
-    if background_work(own_transcript) or (role == "main" and running_subagents(main_transcript, now)):
-        return {"action": "pass", "running": True}
     paths = [path for path, _ in leftovers]
     place_paths = {path for path, _ in own_leftovers}
     if event != "PreToolUse" and hook_input.get("stop_hook_active") is True and not broken("release-never"):
         if load_state(state_file).get("paths") == paths or broken("release-on-any-continuation"):
             return {"action": "release", "text": release_text(leftovers, unknown, omitted), "paths": paths, "unknown": unknown}
     save_state(state_file, paths)
-    return {"action": "block", "text": block_text(role, leftovers, problems, notes, unknown, omitted, place_paths), "paths": paths, "unknown": unknown}
+    return {"action": "block", "text": block_text(role, leftovers, problems, notes, unknown, omitted, place_paths, event), "paths": paths, "unknown": unknown}
 
 
 def report_unjudged_pass(hook_input, notes, stream, detections_path=None):
@@ -2011,12 +2252,28 @@ class Scenario:
         return {"hook_event_name": "SubagentStop", "session_id": self.session, "transcript_path": self.main_transcript,
                 "agent_id": agent_id, "agent_transcript_path": path, "stop_hook_active": active}
 
-    def handback_input(self, agent_id):
+    def handback_input(self, agent_id, message="交回"):
         return {"hook_event_name": "PreToolUse", "tool_name": HANDBACK_TOOL, "session_id": self.session,
-                "transcript_path": self.main_transcript, "agent_id": agent_id, "tool_input": {"message": "交回"}}
+                "transcript_path": self.main_transcript, "agent_id": agent_id, "tool_input": {"message": message}}
+
+    @staticmethod
+    def handback_call(call_id, started, message, rejected=False):
+        """会话记录里交回工具的一次调用与它的结果（rejected 为真是被交回闸拒掉的那一次）。"""
+        result = {"type": "tool_result", "tool_use_id": call_id, "content": "完成"}
+        if rejected:
+            result["is_error"] = True
+        return [{"type": "assistant", "timestamp": iso(started),
+                 "message": {"role": "assistant", "content": [{"type": "tool_use", "id": call_id, "name": HANDBACK_TOOL, "input": {"message": message}}]}},
+                {"type": "user", "timestamp": iso(started + 1), "message": {"role": "user", "content": [result]}}]
+
+    @staticmethod
+    def reply(seconds, text):
+        """会话记录里 agent 回复的一段文字。"""
+        return {"type": "assistant", "timestamp": iso(seconds), "message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}
 
 
 def selftest_cells():
+    global birth_times, decide, background_work   # 几格把它们换成替身再换回，逐个写明（不按字符串名字查模块的名字表：算键的闭包要折得出换的是谁）
     base = tempfile.mkdtemp(prefix="completion-cleanup-selftest-")
     failures, checked = [], [0]
 
@@ -2211,6 +2468,155 @@ def selftest_cells():
                                                               "bash scripts/hosts/work-directory-ownership.sh claim w-handover --purpose 自证"))
         outcome = s.decide(s.subagent_stop_input("ahandover", agent))
         check("subagent-handover-passes", outcome.get("action") == "pass", f"子 agent 交回时交接副本不列，实际 {outcome}")
+        # 合入后验证留下的快照（文件头「判哪几处」合入后验证快照那一段）：本会话的一层里 repo/ 还在的列（路径、种类、删法）
+        s = scenario("merge-snapshot")
+        snapshot = s.repository_copy(os.path.join(s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4242"), MERGE_SNAPSHOT_NAME))
+        outcome = s.decide(s.stop_input())
+        check("main-merge-snapshot-left", blocked_with(outcome, snapshot, KIND_MERGE_SNAPSHOT, f"rm -rf -- {snapshot}"),
+              f"本会话合入后验证留下的快照 {snapshot} 应当拦下、列出种类、路径与删法，实际 {outcome}")
+        # 别的会话的一层不列
+        s = scenario("merge-snapshot-other-session")
+        theirs = s.repository_copy(os.path.join(s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4343", session="s-somebody-else"), MERGE_SNAPSHOT_NAME))
+        outcome = s.decide(s.stop_input())
+        check("other-session-merge-snapshot-ignored", outcome.get("action") == "pass" and theirs not in str(outcome),
+              f"别的会话的合入后验证快照 {theirs} 不该列，实际 {outcome}")
+        # repo/ 已删（日志与归属文件还在）的一层不列
+        s = scenario("merge-snapshot-removed")
+        layer = s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4444")
+        with open(os.path.join(layer, "test.log"), "w", encoding="utf-8") as handle:
+            handle.write("日志留着\n")
+        outcome = s.decide(s.stop_input())
+        check("merge-snapshot-removed-not-listed", outcome.get("action") == "pass" and layer not in str(outcome),
+              f"快照 repo/ 已删、日志与归属文件还在的一层 {layer} 不该列，实际 {outcome}")
+        # 没有归属文件、归属文件只写了两行的一层不列（旧目录）
+        s = scenario("merge-snapshot-no-owner")
+        without = s.repository_copy(os.path.join(s.work, MERGE_SNAPSHOT_DIRECTORY_NAME, "2000-01-01-4545", MERGE_SNAPSHOT_NAME))
+        short = s.repository_copy(os.path.join(s.work, MERGE_SNAPSHOT_DIRECTORY_NAME, "2000-01-01-4646", MERGE_SNAPSHOT_NAME))
+        with open(os.path.join(os.path.dirname(short), ".owner"), "w", encoding="utf-8") as handle:
+            handle.write(f"session: {s.session}\ncreated: 2000-01-01\n")
+        outcome = s.decide(s.stop_input())
+        check("merge-snapshot-without-owner-ignored", outcome.get("action") == "pass" and not any(path in str(outcome) for path in (without, short)),
+              f"没有归属文件的一层 {without} 与归属文件只有两行的一层 {short} 不该列，实际 {outcome}")
+        # 一层的 .deliverables 里把 repo 声明成基线：放行
+        s = scenario("merge-snapshot-declared")
+        layer = s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4747")
+        s.repository_copy(os.path.join(layer, MERGE_SNAPSHOT_NAME))
+        with open(os.path.join(layer, DECLARATION_FILE), "w", encoding="utf-8") as handle:
+            handle.write(f"{MERGE_SNAPSHOT_NAME} {BASELINE_KIND} 验证段后面还要在它上面验\n")
+        outcome = s.decide(s.stop_input())
+        check("merge-snapshot-declared-baseline-passes", outcome.get("action") == "pass",
+              f"一层的 {DECLARATION_FILE} 里声明成{BASELINE_KIND}的快照应当放行，实际 {outcome}")
+        # 一层里有进程开着（那一趟还在跑）：整层不列
+        s = scenario("merge-snapshot-held")
+        layer = s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4848")
+        snapshot = s.repository_copy(os.path.join(layer, MERGE_SNAPSHOT_NAME))
+        with open(os.path.join(layer, "test.log"), "w", encoding="utf-8") as handle:
+            s.hold(["sleep", "120"], stdout=handle)
+        outcome = s.decide(s.stop_input())
+        check("merge-snapshot-held-not-listed", outcome.get("action") == "pass" and snapshot not in str(outcome),
+              f"那一层的日志有进程开着（那一趟还在跑），快照 {snapshot} 不该列，实际 {outcome}")
+        s.stop()
+        # 子 agent 交回时不判主 agent 会话的快照（子 agent 不跑合入后验证、删它不归子 agent）
+        s = scenario("merge-snapshot-subagent")
+        snapshot = s.repository_copy(os.path.join(s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-4949"), MERGE_SNAPSHOT_NAME))
+        s.subagent("amerge", "派发")
+        outcome = s.decide(s.handback_input("amerge"))
+        check("subagent-merge-snapshots-not-listed", outcome.get("action") == "pass" and snapshot not in str(outcome),
+              f"子 agent 交回时本会话的合入后验证快照 {snapshot} 不该列，实际 {outcome}")
+        # <工作根>/merge-and-verify/ 在而列不出（chmod 成 300：进得去、列不出）：照常放行，没判全的一句记进 notes
+        s = scenario("merge-snapshot-root-unlisted")
+        s.repository_copy(os.path.join(s.owned(f"{MERGE_SNAPSHOT_DIRECTORY_NAME}/2000-01-01-5050"), MERGE_SNAPSHOT_NAME))
+        snapshot_root = os.path.join(s.work, MERGE_SNAPSHOT_DIRECTORY_NAME)
+        os.chmod(snapshot_root, 0o300)
+        try:
+            outcome = s.decide(s.stop_input())
+        finally:
+            os.chmod(snapshot_root, 0o700)
+        check("merge-snapshot-root-unlisted-pass-reported",
+              outcome.get("action") == "pass" and any(f"合入后验证的日志目录根 {snapshot_root} 列不出" in note for note in outcome.get("notes") or []),
+              f"{snapshot_root} 列不出应当放行，并在没判全的几处里点名它，实际 {outcome}")
+        # 主 agent 声明成基线的段树：放行；子 agent 声明成基线不认（交接才是子 agent 给主 agent 的）
+        s = scenario("segment-tree")
+        directory = s.owned("w-segment-tree")
+        segment_tree = s.repository_copy(os.path.join(directory, "segment-tree"))
+        with open(os.path.join(directory, DECLARATION_FILE), "w", encoding="utf-8") as handle:
+            handle.write(f"segment-tree {BASELINE_KIND} 写段下一批以它为基线\n")
+        outcome = s.decide(s.stop_input())
+        check("segment-tree-declared-baseline-passes", outcome.get("action") == "pass",
+              f"主 agent 声明成{BASELINE_KIND}的段树 {segment_tree} 应当放行，实际 {outcome}")
+        declared_by_subagent, _ = declarations([directory], "subagent")
+        check("subagent-baseline-declaration-listed", segment_tree not in declared_by_subagent,
+              f"子 agent 角色读同一份 {DECLARATION_FILE} 时{BASELINE_KIND}不算免列，{segment_tree} 应当不在免列表里，实际 {declared_by_subagent}")
+        # 交主 agent 删（文件头「删不掉的」）：子 agent 删不掉的编译目录与仓副本，交回正文里逐个写一行就不拦，没写、写得太短、只写了上层目录的照拦
+        s = scenario("hand")
+        directory = s.owned("w-hand")
+        hand_target = s.build_directory(os.path.join(directory, "target"))
+        hand_copy = s.repository_copy(os.path.join(directory, "repository"))
+        claim = s.bash_call("toolu_claim", s.now - 80, s.now - 79, "bash scripts/hosts/work-directory-ownership.sh claim w-hand --purpose 自证")
+        reason = "rm 被权限拒，连续五次交不回"
+        both = f"做完了。\n交主 agent 删 {hand_target}：{reason}\n交主 agent 删 {hand_copy}：{reason}\n"
+        s.subagent("ahand", "派发", claim)
+        outcome = s.decide(s.handback_input("ahand", both))
+        check("subagent-hand-to-main-passes", outcome.get("action") == "pass",
+              f"交回正文里逐个写了「交主 agent 删 <全路径>：<原因>」的编译目录 {hand_target} 与仓副本 {hand_copy} 应当放行，实际 {outcome}")
+        outcome = s.decide(s.handback_input("ahand", f"做完了。\n交主 agent 删 {hand_target}：{reason}\n"))
+        check("subagent-hand-undeclared-blocks", blocked_with(outcome, hand_copy) and hand_target not in outcome.get("text", ""),
+              f"只写了编译目录 {hand_target}，没写的仓副本 {hand_copy} 应当照拦、写了的不列，实际 {outcome}")
+        short_outcome = s.decide(s.handback_input("ahand", f"交主 agent 删 {hand_target}：删不掉\n交主 agent 删 {hand_copy}：删不掉\n"))
+        check("subagent-hand-short-reason-blocks", blocked_with(short_outcome, hand_target, hand_copy),
+              f"原因只有 3 个字（至少 {HAND_TO_MAIN_REASON_MINIMUM} 个字）应当照拦、两处都列，实际 {short_outcome}")
+        outcome = s.decide(s.handback_input("ahand", f"交主 agent 删 {directory}：{reason}\n"))
+        check("subagent-hand-ancestor-blocks", blocked_with(outcome, hand_target, hand_copy),
+              f"只写了上层目录 {directory}，它底下的 {hand_target}、{hand_copy} 应当照拦，实际 {outcome}")
+        # 出路与例子看一份什么都没写的交回拦下的单子，不借上面原因太短那一份的结果（hand-reason-unchecked 下那一份放行、单子是空的，只有原因太短那一格该红）
+        blocked_text = s.decide(s.handback_input("ahand", "做完了。\n")).get("text", "")
+        example = re.search(r"例：(交主 agent 删 [^\n]+)", blocked_text)
+        parsed = HAND_TO_MAIN_LINE.search(example.group(1)) if example else None
+        check("subagent-block-names-hand-way",
+              "交主 agent 删 <全路径>：<删不掉的原因，至少 8 个字>" in blocked_text and parsed is not None and parsed.group(1) in (hand_target, hand_copy) and len(parsed.group(2)) >= 8,
+              f"拦下的单子应当写出「交主 agent 删 <全路径>：<删不掉的原因，至少 8 个字>」这一条出路、附一行照写就认的例子，实际 {blocked_text!r}")
+        # 出路本身要过得了别的闸：那行例子放进交回正文，喂给同挂 PreToolUse[SubagentHandback] 的交回正文闸与上游的交回尾门禁，都要放行
+        gate_scripts = (os.path.join(HOOK_DIR, "handback-guard.sh"),
+                        os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts", "claude-hooks", "handback-scratch-check.sh"))
+        absent_gates = [path for path in gate_scripts if not os.path.isfile(path)]
+        if absent_gates:
+            NOT_RUN.append(f"subagent-hand-way-passes-handback-gates（{'、'.join(absent_gates)} 不在）")
+        else:
+            gate_exits = None   # 例子取不出也判红
+            if example:
+                gate_environment = {key: value for key, value in os.environ.items() if key != BREAK_VARIABLE}
+                gate_environment.update(s.environment())
+                gate_environment.update({"CLAUDE_PROJECT_DIR": REPOSITORY_ROOT, "HANDBACK_SCRATCH_CHECK_STATE_DIRECTORY": os.path.join(s.root, "scratch-state")})
+                gate_payload = dict(s.handback_input("ahand", f"做完了。\n{example.group(1)}\n"), agent_type="tooling-writer")
+                gate_exits = tuple(subprocess.run(["bash", script], input=json.dumps(gate_payload), capture_output=True, text=True, env=gate_environment,
+                                                  timeout=120).returncode for script in gate_scripts)
+            check("subagent-hand-way-passes-handback-gates", gate_exits == (0, 0),
+                  f"拦下的单子里那行例子写进交回正文，交回正文闸与上游交回尾门禁都应当放行（退出码 0），实际 {gate_exits}")
+        # 子 agent 收工（SubagentStop）：已送达的交回正文、收工前的回复里写了就放行；被交回闸拒掉的那次交回正文不算
+        delivered = s.subagent("ahand-delivered", "派发", claim + s.handback_call("toolu_handback", s.now - 30, both))
+        outcome = s.decide(s.subagent_stop_input("ahand-delivered", delivered))
+        rejected = s.subagent("ahand-rejected", "派发", claim + s.handback_call("toolu_handback", s.now - 30, both, rejected=True))
+        rejected_outcome = s.decide(s.subagent_stop_input("ahand-rejected", rejected))
+        check("subagent-hand-stop-delivered-passes", outcome.get("action") == "pass" and rejected_outcome.get("action") == "block",
+              f"收工时已送达的交回正文里写了「交主 agent 删」应当放行、被拒掉的那次不算（照拦），实际 送达 {outcome}，被拒 {rejected_outcome}")
+        replied = s.subagent("ahand-reply", "派发", [*claim, s.reply(s.now - 30, both)])
+        outcome = s.decide(s.subagent_stop_input("ahand-reply", replied))
+        check("subagent-hand-stop-reply-passes", outcome.get("action") == "pass", f"收工前的回复里写了「交主 agent 删」应当放行，实际 {outcome}")
+        # 只认编译目录、工作树与仓副本：库拷贝写了也照拦
+        s = scenario("hand-library")
+        library = s.library_copy(os.path.join(s.owned("w-hand-library"), "library-copy"))
+        s.subagent("alibrary", "派发", s.bash_call("toolu_claim", s.now - 80, s.now - 79, "bash scripts/hosts/work-directory-ownership.sh claim w-hand-library --purpose 自证"))
+        outcome = s.decide(s.handback_input("alibrary", f"交主 agent 删 {library}：{reason}\n"))
+        check("subagent-hand-library-copy-blocks", blocked_with(outcome, library), f"库拷贝 {library} 写了「交主 agent 删」也应当照拦，实际 {outcome}")
+        # 主 agent 结束一轮时照旧列：会话里写了「交主 agent 删」也不认
+        s = scenario("hand-main")
+        directory = s.owned("w-hand-main")
+        main_target = s.build_directory(os.path.join(directory, "target"))
+        main_copy = s.repository_copy(os.path.join(directory, "repository"))
+        s.write(s.main_transcript, [s.reply(s.now - 30, f"交主 agent 删 {main_target}：{reason}\n交主 agent 删 {main_copy}：{reason}\n")], append=True)
+        outcome = s.decide(s.stop_input())
+        check("main-hand-declaration-ignored", blocked_with(outcome, main_target, main_copy),
+              f"主 agent 结束一轮时，编译目录 {main_target} 与仓副本 {main_copy} 写了「交主 agent 删」也应当照列，实际 {outcome}")
         # 有在跑的后台任务：放行
         s = scenario("background")
         s.build_directory(os.path.join(s.owned("w-busy"), "target"))
@@ -2247,6 +2653,39 @@ def selftest_cells():
         check("held-copy-not-listed", blocked_with(outcome, idle) and held not in outcome.get("text", ""),
               f"有进程在用的 {held} 不该列、没人用的 {idle} 照列，实际 {outcome}")
         s.stop()
+        # 换上流程的草稿树 <认领目录>/hook-swap/tree：没有进程在用的照列
+        s = scenario("swap-tree-idle")
+        idle_tree = s.repository_copy(os.path.join(s.owned("w-swap-idle"), "hook-swap", "tree"))
+        outcome = s.decide(s.stop_input())
+        check("swap-tree-idle-listed", blocked_with(outcome, idle_tree, f"rm -rf -- {idle_tree}"), f"没有进程在用的换上草稿树 {idle_tree} 应当拦下、列出删法，实际 {outcome}")
+        # 换上流程的草稿树：命令行点到草稿目录（hook-swap.py 的 --scratch）、点到树里的文件的，进程的工作目录与文件描述符都不在树里，照样不列
+        s = scenario("swap-tree-in-use")
+        scratch_named = s.owned("w-swap-scratch-named")
+        tree_by_scratch = s.repository_copy(os.path.join(scratch_named, "hook-swap", "tree"))
+        tree_by_file = s.repository_copy(os.path.join(s.owned("w-swap-tree-named"), "hook-swap", "tree"))
+        sleeper = "import time\ntime.sleep(120)\n"
+        s.hold([sys.executable, "-c", sleeper, "hook-swap.py", "--scratch", scratch_named], stdout=subprocess.DEVNULL)
+        s.hold([sys.executable, "-c", sleeper, "bash", os.path.join(tree_by_file, ".claude", "hooks", "fed.sh")], stdout=subprocess.DEVNULL)
+        outcome = s.decide(s.stop_input())
+        check("swap-tree-in-use-not-listed", outcome.get("action") == "pass" and tree_by_scratch not in str(outcome) and tree_by_file not in str(outcome),
+              f"命令行点到草稿目录 {scratch_named}、点到 {tree_by_file} 里文件的换上草稿树不该列，实际 {outcome}")
+        s.stop()
+        # 换上流程的草稿树：决定拦之前那一趟刚删掉树（后台任务那一步换成替身，里面把树删了），不列
+        s = scenario("swap-tree-gone")
+        gone_tree = s.repository_copy(os.path.join(s.owned("w-swap-gone"), "hook-swap", "tree"))
+
+        def background_work_after_tree_removed(transcript):
+            shutil.rmtree(gone_tree)
+            return []
+
+        real_background_work = background_work
+        background_work = background_work_after_tree_removed
+        try:
+            outcome = s.decide(s.stop_input())
+        finally:
+            background_work = real_background_work
+        check("swap-tree-gone-not-listed", not os.path.lexists(gone_tree) and outcome.get("action") == "pass",
+              f"拦之前换上草稿树 {gone_tree} 已经没了，不该列，实际 {outcome}")
         # 子 agent：只判自己认领的，主 agent 的别的目录不判
         s = scenario("subagent-scope")
         mine = s.build_directory(os.path.join(s.owned("sub-claimed"), "target"))
@@ -2359,11 +2798,11 @@ def selftest_cells():
         s = scenario("birth-unknown")
         run = s.run_directory(s.dead_pid(), owner_session=s.session)
         real_birth_times = birth_times
-        globals()["birth_times"] = lambda paths: {path: None for path in sorted(paths)}
+        birth_times = lambda paths: {path: None for path in sorted(paths)}
         try:
             outcome = s.decide(s.stop_input())
         finally:
-            globals()["birth_times"] = real_birth_times
+            birth_times = real_birth_times
         detections = os.path.join(s.root, "detections-birth.jsonl")
         printed = io.StringIO()
         report_unjudged_pass(s.stop_input(), outcome.get("notes") or [], printed, detections)
@@ -2498,18 +2937,16 @@ def selftest_cells():
               and moved_outcome.get("action") == "block" and moved in moved_outcome.get("paths", []) and purged in moved_outcome.get("paths", []),
               f"只用 du、ls、find 点过的 {looked} 应当只进「{UNKNOWN_SECTION_TITLE}」、不拦，实际 {looked_outcome}；"
               f"同一条命令里 mv 点到的 {moved}、find -delete 点到的 {purged} 应当拦下，实际 {moved_outcome}")
-        # 种类名现读三处（这里换成样本文件）：样本里的名字认，样本里没有的不认（不是钩子里抄的一份）
+        # 种类名现读两处（这里换成样本文件）：样本里的名字认，样本里没有的不认（不是钩子里抄的一份）
         s = scenario("leftover-species")
         samples = os.path.join(s.root, "species-samples")
         os.makedirs(samples)
-        sample_sources = {"client": os.path.join(samples, "client.py"), "registry": os.path.join(samples, "registry.tsv"), "retired": os.path.join(samples, "retired.tsv")}
+        sample_sources = {"client": os.path.join(samples, "client.py"), "registry": os.path.join(samples, "registry.tsv")}
         with open(sample_sources["client"], "w", encoding="utf-8") as handle:
             handle.write('"""样本\n\n键空间（样本）：\n  族名：unit-verdicts（种类是 singlefs-sample-verdicts/ 下那一层）\n连哪一处：样本\n"""\n')
         with open(sample_sources["registry"], "w", encoding="utf-8") as handle:
             handle.write("# 样本\nscripts/sample.py\t-\tprune-server（unit-verdicts 族，键空间 unit-verdicts/singlefs-sample-ledger/…）\treuse-three-questions\n")
-        with open(sample_sources["retired"], "w", encoding="utf-8") as handle:
-            handle.write(f"# 样本\nsample-retired-store\t{RETIRED_DIRECTORY_KIND}\t删掉：样本\n")
-        sampled = [s.filled(os.path.join(s.data, "old", name)) for name in ("singlefs-sample-verdicts", "singlefs-sample-ledger", "sample-retired-store")]
+        sampled = [s.filled(os.path.join(s.data, "old", name)) for name in ("singlefs-sample-verdicts", "singlefs-sample-ledger")]
         unlisted = s.filled(os.path.join(s.data, "old", "singlefs-unit-verdicts"))
         s.bash("mkdir -p " + " ".join(sampled + [unlisted]))
         saved_sources = dict(SPECIES_SOURCES)
@@ -2519,7 +2956,7 @@ def selftest_cells():
         finally:
             SPECIES_SOURCES.update(saved_sources)
         check("species-read-from-registries", blocked_with(outcome, *sampled) and unlisted not in outcome.get("text", ""),
-              f"种类名照样本三处读：{sampled} 应当拦下，样本里没有的 {unlisted} 不该认，实际 {outcome}")
+              f"种类名照样本两处读：{sampled} 应当拦下，样本里没有的 {unlisted} 不该认，实际 {outcome}")
         # 种类名一处都读不出：照常放行，记一处没判全
         s = scenario("leftover-species-unreadable")
         SPECIES_SOURCES.update({key: os.path.join(s.root, f"missing-{key}") for key in SPECIES_SOURCES})
@@ -2528,7 +2965,7 @@ def selftest_cells():
         finally:
             SPECIES_SOURCES.update(saved_sources)
         check("species-unreadable-pass-reported", outcome.get("action") == "pass" and any("种类名读不出" in note for note in outcome.get("notes") or []),
-              f"种类名的三处都读不了应当放行并记「种类名读不出」一处没判全，实际 {outcome}")
+              f"种类名的两处都读不了应当放行并记「种类名读不出」一处没判全，实际 {outcome}")
         # 数据根取不到（变量没设、多机配置不在）：照常放行，记一处没判全
         s = scenario("leftover-data-root-unconfigured")
         outcome = s.decide(s.stop_input(), {module("lib_work_root").DATA_ROOT_VARIABLE: "",
@@ -2658,11 +3095,11 @@ def selftest_cells():
         real_decide = decide
         def exploding_decide(hook_input):
             raise RuntimeError("自证造的出错")
-        globals()["decide"] = exploding_decide
+        decide = exploding_decide
         try:
             code, out, err = hook_main_in_process(json.dumps(s.stop_input()).encode("utf-8"), s.environment())
         finally:
-            globals()["decide"] = real_decide
+            decide = real_decide
         entries = detection_entries(detections)
         check("self-error-pass-recorded",
               code == 0 and out == "" and "自己出错" in err and len(entries) == 1 and entries[0].get("outcome") == "只记"
@@ -2734,7 +3171,7 @@ def selftest_cells_main():
         print(f"✗ 自证：{len(failures)} 格红（共判了 {checked} 格）")
         print("→ 怎么办：照上面每一格的下一步改，再单独跑 completion-cleanup-guard.sh --selftest")
         return 1
-    print(f"✓ 各格都对（判了 {checked} 格）")
+    print(f"✓ 各格都对（判了 {checked} 格{f'；本次未跑 {len(NOT_RUN)} 格：' + '、'.join(NOT_RUN) if NOT_RUN else ''}）")
     return 0
 
 

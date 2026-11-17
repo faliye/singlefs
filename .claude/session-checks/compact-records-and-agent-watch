@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+# session-check-sources: compact
+# session-check-timeout: 10
+# admission: always Claude Code 每一次压缩之后都要现读此刻 records/ 下的文件与这一次的钩子输入，上一次的结论不替这一次作保
+# run-condition: command python3
+"""会话检查项：压缩之后点名 records/ 下最近动过的记录，与看门狗查子 agent 的 report 命令。
+
+登记在 .claude/session-checks/，由上游钩子 session-checks.sh 在 compact 时起（rules/communication-discipline.md「会话启动与压缩之后的检测」）：
+标准输入是钩子的 JSON，工作目录是项目根，退 0 的输出拼进上下文，退非 0 由上游报「没查成」并记一条检出。只报、不改任何东西。
+上游钩子压缩之后已经补了一段通用的对齐提示（对话语言、分支与未提交的路径数、先看子 agent 还在不在跑、接续的状态以记录与文件为准）；这里只写它没有的两条：
+  - records/ 下最近动过的三份记录（按修改时刻，新的在前；没有 records/ 或里面没有 .md 写「（没有）」），状态表与岔路单在里面；
+  - 看门狗查这个会话子 agent 的命令 `python3 scripts/agents/agent-watch.py report --session-dir <会话目录>`，会话目录取钩子输入里 transcript_path 所在目录加 session_id
+    （两样缺一样写占位 <会话目录>）；在跑的照 CLAUDE.md「派出去之后要盯住」重起看门狗。
+别的 source（startup、resume、clear）不报；标准输入不是 JSON 对象、判的时候抛异常退 1、stderr 一行写原因，上游报「没查成」。
+
+  item 的退出码：0（有输出就拼进上下文）；1 输入或判的时候出错；2 平常跑设了弄坏开关。
+  compact-records-and-agent-watch --selftest  在临时目录里造项目的 records/ 与会话号，喂造出来的钩子 JSON；各格并行跑；弄坏开关见下，设着时自证必须判红
+
+弄坏开关 COMPACT_RECORDS_BREAK=<项>（只给 --selftest 证红用；平常跑设了就在读标准输入之前退 2、点名变量只在自证里认，自证起的子进程由 COMPACT_RECORDS_SELFTEST_MARK 认），
+打开后自证哪几格红（失败行「✗ 自检：<格名>：…」）：
+  COMPACT_RECORDS_BREAK=records-unlisted  不写最近动过的记录那一条
+      「✗ 自检：压缩之后点名最近动过的记录」、「✗ 自检：最近动过的记录新的在前」、「✗ 自检：没有 records 目录时写（没有）」
+  COMPACT_RECORDS_BREAK=records-oldest-first  最近动过的记录按修改时刻从旧到新排
+      「✗ 自检：最近动过的记录新的在前」
+  COMPACT_RECORDS_BREAK=watch-command-dropped  不写看门狗的 report 命令那一条
+      「✗ 自检：压缩之后给看门狗的 report 命令」、「✗ 自检：读不到会话号时写占位」
+  COMPACT_RECORDS_BREAK=duplicate-branch-line  把上游那一段已有的分支与未提交路径数也写一遍
+      「✗ 自检：不重复上游那一段」
+  COMPACT_RECORDS_BREAK=other-source-reports  startup、resume、clear 也报
+      「✗ 自检：startup 不报」、「✗ 自检：resume 不报」、「✗ 自检：clear 不报」
+  COMPACT_RECORDS_BREAK=input-accepted  输入不是 JSON 对象也照常往下判、退 0
+      「✗ 自检：坏 JSON 退 1 并点名原因」、「✗ 自检：JSON 数组退 1 并点名原因」
+  COMPACT_RECORDS_BREAK=exception-swallowed  判的时候抛的异常吞掉、退 0
+      「✗ 自检：判的时候抛异常退 1 并点名原因」
+  COMPACT_RECORDS_BREAK=keepscratch  自证的临时目录走回 mkdtemp 不删
+      「✗ 自检：通过那条路上临时目录没删」、「✗ 自检：red 那条路上临时目录没删」、「✗ 自检：crash 那条路上临时目录没删」
+"""
+import concurrent.futures
+import contextlib
+import importlib.util
+import io
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+REPOSITORY = os.path.dirname(os.path.dirname(HERE))
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
+from project_preflight import preflight  # noqa: E402
+
+ITEM_NAME = "compact-records-and-agent-watch"
+BROKEN_JUDGEMENT = os.environ.get("COMPACT_RECORDS_BREAK", "")
+RECORDS_LISTED = 3
+REPORTED_SOURCE = "compact"
+SELFTEST_MARK_VARIABLE = "COMPACT_RECORDS_SELFTEST_MARK"
+SELFTEST_MARK_CONTENT = "compact-records-and-agent-watch --selftest 起的子进程"
+SELFTEST_ROLE_VARIABLE = "COMPACT_RECORDS_SELFTEST_ROLE"
+
+
+def recent_records(project_root):
+    """records/ 下最近动过的 RECORDS_LISTED 份 .md（按修改时刻，新的在前）；没有 records/ 交空表。"""
+    records_directory = os.path.join(project_root, "records")
+    if not os.path.isdir(records_directory):
+        return []
+    names = [name for name in os.listdir(records_directory) if name.endswith(".md")]
+    newest_first = BROKEN_JUDGEMENT != "records-oldest-first"
+    return sorted(names, key=lambda name: os.path.getmtime(os.path.join(records_directory, name)), reverse=newest_first)[:RECORDS_LISTED]
+
+
+def session_directory(hook_input):
+    transcript = hook_input.get("transcript_path") or ""
+    session_id = hook_input.get("session_id") or ""
+    return os.path.join(os.path.dirname(transcript), session_id) if transcript and session_id else "<会话目录>"
+
+
+def report_for(hook_input):
+    if hook_input.get("source") != REPORTED_SOURCE and BROKEN_JUDGEMENT != "other-source-reports":
+        return ""
+    project_root = os.environ.get("CLAUDE_PROJECT_DIR") or hook_input.get("cwd") or os.getcwd()
+    lines = []
+    if BROKEN_JUDGEMENT != "records-unlisted":
+        records = recent_records(project_root)
+        lines.append("- 最近动过的记录（状态表与岔路单在里面）：" + ("、".join(f"records/{name}" for name in records) if records else "（没有）"))
+    if BROKEN_JUDGEMENT != "watch-command-dropped":
+        lines.append(f"- 子 agent 的看门狗：`python3 scripts/agents/agent-watch.py report --session-dir {session_directory(hook_input)}` 看这个会话里最近活动过的子 agent；"
+                     "在跑的照 CLAUDE.md「派出去之后要盯住」重起看门狗。")
+    if BROKEN_JUDGEMENT == "duplicate-branch-line":
+        lines.append("- 分支（读不出）；工作区未提交 0 个路径（`git status --short` 看清哪些是这一轮的）。")
+    return "\n".join(lines)
+
+
+def hook_main(raw, build_report=report_for):
+    """钩子的原始输入（字节）→ 退出码。要补的提示打到标准输出；输入不对与判的时候抛异常退 1、stderr 一行写原因（上游报「没查成」并记检出）。"""
+    try:
+        hook_input = json.loads(raw.decode("utf-8"))
+        problem = None if isinstance(hook_input, dict) else f"输入顶层是 {type(hook_input).__name__}，不是 JSON 对象"
+    except ValueError as error:
+        hook_input, problem = None, f"输入不是合法的 JSON（{error}；前 200 字节：{raw[:200].decode('utf-8', 'replace')!r}）"
+    if problem and BROKEN_JUDGEMENT != "input-accepted":
+        print(f"{ITEM_NAME}：{problem}，这一次没判", file=sys.stderr)
+        return 1
+    if problem:
+        hook_input = {}
+    try:
+        text = build_report(hook_input)
+    except Exception as error:  # noqa: BLE001 —— 判的时候出什么错都退 1、点名原因，不吞
+        if BROKEN_JUDGEMENT == "exception-swallowed":
+            return 0
+        print(f"{ITEM_NAME}：判的时候抛异常（{type(error).__name__}: {error}），这一次没判", file=sys.stderr)
+        return 1
+    if text:
+        print(text)
+    return 0
+
+
+# ── 自证 ─────────────────────────────────────────────────────────────────────
+
+TRANSCRIPT_PATH = "/home/x/.claude/projects/p/abc.jsonl"
+WATCH_COMMAND = "python3 scripts/agents/agent-watch.py report --session-dir /home/x/.claude/projects/p/abc"
+
+
+def make_project(work, name, records):
+    """造一个项目根：records 是 .md 文件名的表，按表里的次序越往后越新（修改时刻逐份加一秒）；None 是不建 records/。"""
+    project = os.path.join(work, name)
+    os.makedirs(project)
+    if records is not None:
+        os.makedirs(os.path.join(project, "records"))
+        for index, record in enumerate(records):
+            path = os.path.join(project, "records", record)
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("记录\n")
+            os.utime(path, (1_000_000 + index, 1_000_000 + index))
+    return project
+
+
+def run_item(project, source, with_session=True, raw=None):
+    """起这一份检查项自己（像上游钩子那样：标准输入给钩子的 JSON，工作目录是项目根）；raw 给了就原样当标准输入。"""
+    hook_input = {"hook_event_name": "SessionStart", "source": source}
+    if with_session:
+        hook_input.update({"session_id": "abc", "transcript_path": TRANSCRIPT_PATH})
+    environment = dict(os.environ, CLAUDE_PROJECT_DIR=project)
+    return subprocess.run([sys.executable, os.path.realpath(__file__)], input=json.dumps(hook_input) if raw is None else raw,
+                          capture_output=True, text=True, env=environment, cwd=project, timeout=60)
+
+
+def check_output(label, completed, wanted, unwanted=()):
+    """一格的判定：退出码 0、wanted 都在标准输出里、unwanted 一个都不在；不对交一句失败说明，对交空串。"""
+    missing = [piece for piece in wanted if piece not in completed.stdout]
+    present = [piece for piece in unwanted if piece in completed.stdout]
+    if completed.returncode != 0 or missing or present:
+        return (f"{label}：退出码 {completed.returncode}（应当是 0），缺 {missing}，不该有却有 {present}；"
+                f"输出：{completed.stdout[-600:]}{completed.stderr[-300:]}")
+    return ""
+
+
+def check_refusal(label, completed, wanted_in_error):
+    """输入或判的时候出错的一格：退出码 1、标准输出空、stderr 点名原因。"""
+    if completed.returncode != 1 or completed.stdout.strip() or wanted_in_error not in completed.stderr:
+        return (f"{label}：应当退 1、不补提示、stderr 点名「{wanted_in_error}」；实际退 {completed.returncode}，"
+                f"stdout {completed.stdout[:120]!r}，stderr {completed.stderr.strip()[:200]!r}")
+    return ""
+
+
+def prepare_cells(work):
+    """逐格造好项目根，回 [(格名, 起它并判的函数)]；各格互不依赖，由调用方并行跑。"""
+    short_history = make_project(work, "short-history", ["a.md", "b.md", "c.md"])
+    long_history = make_project(work, "long-history", ["a.md", "b.md", "c.md", "d.md"])
+    without_records = make_project(work, "no-records-directory", None)
+    cells = []
+
+    def add(label, project, source, wanted=(), unwanted=(), with_session=True):
+        cells.append((label, lambda: check_output(label, run_item(project, source, with_session), wanted, unwanted)))
+
+    add("压缩之后点名最近动过的记录", short_history, "compact", ["最近动过的记录", "records/c.md", "records/b.md", "records/a.md"])
+    add("最近动过的记录新的在前", long_history, "compact", ["records/d.md、records/c.md、records/b.md"], ["records/a.md"])
+    add("压缩之后给看门狗的 report 命令", short_history, "compact", [WATCH_COMMAND, "派出去之后要盯住"])
+    add("不重复上游那一段", short_history, "compact", [], ["分支 ", "工作区未提交", "ListAgents", "上下文刚压缩过", "git status"])
+    add("没有 records 目录时写（没有）", without_records, "compact", ["（没有）"])
+    add("读不到会话号时写占位", short_history, "compact", ["--session-dir <会话目录>"], [], with_session=False)
+    for source in ("startup", "resume", "clear"):
+        add(f"{source} 不报", short_history, source, [], ["最近动过的记录", "agent-watch.py"])
+    cells.append(("坏 JSON 退 1 并点名原因", lambda: check_refusal("坏 JSON 退 1 并点名原因", run_item(short_history, "compact", raw="{不是 JSON"), "输入不是合法的 JSON")))
+    cells.append(("JSON 数组退 1 并点名原因", lambda: check_refusal("JSON 数组退 1 并点名原因", run_item(short_history, "compact", raw="[]"), "不是 JSON 对象")))
+    return cells
+
+
+def raising_report_cell():
+    """判的时候抛异常：退 1、stderr 点名原因。进程内换掉判的函数，标准输出与标准错误换成内存里的。"""
+    def raising_report(hook_input):
+        raise RuntimeError("自证造的异常")
+    label = "判的时候抛异常退 1 并点名原因"
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = hook_main(json.dumps({"hook_event_name": "SessionStart", "source": "compact", "session_id": "s-raise"}).encode("utf-8"), raising_report)
+    if code != 1 or out.getvalue() or "判的时候抛异常（RuntimeError: 自证造的异常）" not in err.getvalue():
+        return f"{label}：应当退 1、不补提示、stderr 点名异常；实际退 {code}，stdout {out.getvalue()[:120]!r}，stderr {err.getvalue().strip()[:200]!r}"
+    return ""
+
+
+def selftest_in(work):
+    cells = prepare_cells(work)
+    sys.path.insert(0, os.path.join(REPOSITORY, "scripts", "hosts"))
+    import heavy_threads
+    try:
+        threads = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        print(f"  ✗ 自检：取不了每台默认重活线程数：{error}")
+        print(f"    → 怎么办：{error.howto}")
+        return 1
+    parallel = max(1, min(threads, len(cells)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel) as pool:
+        results = list(pool.map(lambda cell: cell[1](), cells))
+    failures = [result for result in results if result]
+    if len(results) != len(cells):
+        failures.append(f"收回的格数 {len(results)} 与派出去的 {len(cells)} 对不上")
+    exception_failure = raising_report_cell()
+    if exception_failure:
+        failures.append(exception_failure)
+    for failure in failures:
+        print(f"  ✗ 自检：{failure}")  # gate-lint:detail
+    if failures:
+        print("    → 看 report_for() / recent_records() / session_directory() 与 hook_main()；COMPACT_RECORDS_BREAK（records-unlisted、records-oldest-first、"
+              "watch-command-dropped、duplicate-branch-line、other-source-reports、input-accepted、exception-swallowed）设着的话这里本来就该红")
+        return 1
+    print(f"  ✓ 自检通过（查了 {len(cells) + 1} 种，并行 {parallel} 路）：压缩之后点名 records/ 下最近动过的三份记录（新的在前、没有写「（没有）」）与看门狗的 report 命令"
+          "（会话目录取自 transcript_path 与 session_id、缺了写占位），不重复上游那一段通用提示；startup、resume、clear 不报；输入不是 JSON 对象、判的时候抛异常退 1 并点名原因")
+    return 0
+
+
+def selftest():
+    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证起的子进程（环境原样继承）靠它认：弄坏开关只在自证里认
+    library_path = os.path.join(HERE, "..", "hooks", "lib_selftest_scratch.py")
+    try:
+        library_specification = importlib.util.spec_from_file_location("lib_selftest_scratch", library_path)
+        scratch = importlib.util.module_from_spec(library_specification)
+        library_specification.loader.exec_module(scratch)
+    except Exception as error:  # noqa: BLE001 —— 文件不在、语法错、导入时抛的都算读不到
+        print(f"  ✗ 自检：{ITEM_NAME} 读不到共用的临时目录库 {library_path}（{error!r}）")
+        print("    → 怎么办：恢复 .claude/hooks/lib_selftest_scratch.py，再跑 .claude/session-checks/compact-records-and-agent-watch --selftest")
+        return 1
+    exit_code, problems = scratch.run_with_scratch(selftest_in, "compact-records-selftest-", BROKEN_JUDGEMENT == "keepscratch",
+                                                   SELFTEST_ROLE_VARIABLE, [sys.executable, os.path.realpath(__file__), "--selftest"])
+    return scratch.merged_exit_code(exit_code, problems, ".claude/session-checks/compact-records-and-agent-watch 的 selftest()", "COMPACT_RECORDS_BREAK=keepscratch")
+
+
+def refuse_break_outside_selftest(arguments):
+    """弄坏开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（标记对得上）而 COMPACT_RECORDS_BREAK 非空，读标准输入之前就退 2。"""
+    if not BROKEN_JUDGEMENT or arguments == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
+        return None
+    print(f"  ✗ {ITEM_NAME}：COMPACT_RECORDS_BREAK={BROKEN_JUDGEMENT} 是弄坏开关，只在自证（{ITEM_NAME} --selftest）里认，平常跑设了就拒，这一次没补提示", file=sys.stderr)
+    print(f"     → 怎么办：去掉 COMPACT_RECORDS_BREAK 再跑；要证红就跑 COMPACT_RECORDS_BREAK=<项> .claude/session-checks/{ITEM_NAME} --selftest", file=sys.stderr)
+    return 2
+
+
+def main(arguments):
+    refused = refuse_break_outside_selftest(arguments)
+    if refused is not None:
+        return refused
+    if arguments == ["--selftest"]:
+        return selftest()
+    return hook_main(sys.stdin.buffer.read())
+
+
+if __name__ == "__main__":
+    preflight(__file__)
+    sys.exit(main(sys.argv[1:]))

@@ -4,11 +4,15 @@
 # PreToolUse hook（Bash）：起验证脚本的命令要在开头带一份范围声明（跑什么、范围多大、为什么这么跑），种类与范围要与命令的形状对得上；
 #   没声明、缺段、对不上、子 agent 经 task-server/task submit 交的，执行前拒绝（退出 2，stderr 写给 agent 的说明）；放行的每一条把命令与四段声明追加进检出记录，
 #   范围合不合适由主 agent 事后对着记录看。主 agent 与子 agent 一样判，子 agent 另拒经 submit 交的（种类不论）。
+#   主 agent 的 task-server/task submit 带放宽检查的标识（--full-gate、--whole-package-confirmed）的，要用户在界面上确认（下面「放宽检查的提交标识」）。
+#   不指定范围的提交时门禁与入口没带放宽标识的、指定范围而点到会走崩溃枚举的目标或项又没缩域的，同样执行前拒（下面「提交时才许不指定范围地跑」「指定范围的崩溃域」）。
+#   主 agent 经 task-server/task submit 交的启动测试与验证没点名的，同样执行前拒（下面「经 submit 交的要点名」，与服务提交时拒 ⑦ 同一份判据）。
 # hook-events: PreToolUse:Bash
 # gate-similar: project-code-guard.sh 同挂 PreToolUse[Bash]、同样认门禁阶段与 cargo test、同样把执行的脚本读进去逐行判，切词与剥包装都从它用的 lib_shell_words.py、lib_project_code_runs.py 导入；它判的是不是不经 task-server 跑项目代码，这里判的是每一次起验证带没带范围声明、种类与范围对不对得上，放行条件与拒绝说明都不同，并进去会让一个钩子同时管两套规矩
 # gate-similar: bash-command-detector.sh 同挂 PreToolUse[Bash]、同用 lib_shell_words.py 切词；它判命令的形状（等待循环、放出追踪、单独的 &、覆盖产物、终止进程、就地改文件），不认验证脚本也不看环境变量里的声明
 # gate-similar: timer-only-remind-guard.sh 的 matcher 含 Bash、同用 lib_shell_words.py；它拒 remind.sh 之外的定时写法，与起验证脚本无关
 # gate-similar: pattern-process-guard.sh 上游的钩子，同挂 PreToolUse[Bash]；它拒按模式找进程，判据与 shell-lint 同一份，与验证脚本的范围无关，也不许在上游副本里加本工程的判据
+# gate-similar: root-entry-guard.sh 上游的钩子，同挂 PreToolUse[Bash]、同样打 permissionDecision 为 ask 的 JSON 要用户确认；它判命令写不写项目根的登记表、跑完多没多出条目，这里判提交带不带放宽检查的标识，对象不同，也不许在上游副本里加本工程的判据
 #
 # 为什么：该做的是红了只跑红的、改了只点名改到的，这个东西靠 prompt 根本控制不住，要做成门禁、跑之前提醒，
 #   「提醒 agent 是跑单个一条 还是跑整个 让agent解释清楚 选好参数才跑」「agent 启动脚本的时候 必须要解释清楚 跑什么 范围多大 为什么要这么跑。范围是不是合适。」
@@ -20,13 +24,58 @@
 #   种类只认 whole、items、target；写别的照种类认不出拒。
 #   为什么：去掉「要跑」「验证」「跑一下」「跑一遍」「看看」「确认一下」之后，字母、汉字与数字至少 12 个（空白与标点不算）；
 #   整轮门禁（gate-staged.sh、gate.sh）的为什么里写了「提交前整轮」就放，不数字数。
-# 经 task-server 提交（records/2026-10-30-编译绕过内存总上限.md 批 3b）：`task-server/task submit [--cwd <目录>] -- <命令…>` 交给服务的那一条照下面那张表判，
+# 经 task-server 提交（records/2026-10-30-编译绕过内存总上限.md 批 3b）：`task-server/task submit [--cwd <目录>] [--manual] [--full-gate] [--whole-package-confirmed <确认文件>] -- <命令…>` 交给服务的那一条照下面那张表判，
 #   认 submit 用 lib_project_code_runs.py 的 task_server_submission（本仓的客户端或逐字节相同的拷贝）；声明写在 submit 前面：
 #   `SINGLEFS_RUN_SCOPE='…' task-server/task submit -- <命令…>`——客户端把 SINGLEFS_RUN_SCOPE 当白名单变量带进任务，服务起的那一条看得见它；
 #   写在 `--` 之后的要写成 `env SINGLEFS_RUN_SCOPE='…' <命令…>`（服务按词起命令，`名字=值` 打头的词不当赋值），钩子两处都认。
 #   子 agent 经 submit 交的一律拒（子 agent 一律不往统一任务服务交任务，records/2026-10-29-subagent拆分提案.md 第一百七十四节）：判定只调
 #   lib_project_code_runs.py 的 subagent_task_server_refusal（project-code-guard.sh 的 ② 是同一处），出路那一句是它的 SUBAGENT_HAND_BACK_WAY_OUT，这里不另写一份。
 #   task-server/task 的 wait、status、cancel、log、clean 不是验证命令，不要声明。
+# 放宽检查的提交标识（lib_run_scope.py 的 submit_flag_asks）：--full-gate 免两小时提醒，--whole-package-confirmed 让整包测试过提交检查；对话不许自己用，要用户在界面上确认。
+#   主 agent 的命令里 task-server/task submit 在 `--` 之前带这两个标识之一的，钩子不放行也不拒：标准输出打 permissionDecision 为 ask 的 JSON、退 0（写法同 root-entry-guard.sh），
+#   理由写带哪个标识、标识的作用、命令全文与对话不许自己用。用户点同意就放行，不另留记录文件。范围声明不合的照上面退 2，不弹窗。
+#   判法按切词（lib_shell_words.py）：范围声明写在前面、bash -c 里面、&& 连着的后一段、eval 的字面代码、--cwd 写在标识前面、python3 起客户端、cd 进去再起的都认；
+#   flock 这类包装、脚本里的转发函数、python3 -c 这类程序里字面写着的、命令位置上执行的驱动脚本、交给服务的那一条里又起的，往里接着判；赋过字面值的变量（参数上的、命令词上的）展开再判。
+#   只是提到这个词的不算：grep 的参数、commit message、confirm 的 --why、echo 的文字、范围声明的值、交给服务的那一条（`--` 之后）的参数。
+#   `--` 之前的词（子命令位上的同样）算不出的（没赋过的变量、命令替换、xargs 这类读进来的）判 ask，理由写「参数里有变量，认不出带没带标识」；命令词整个算不出的不判，由 project-code-guard.sh 拒。
+#   子 agent 不判：它们起 submit 由 project-code-guard.sh 拒。判的时候抛了异常（判范围声明那一段的同样）：命令文字里提到标识的照弹窗，理由写没判成。
+#   罩不住的：仓里的工具脚本（scripts/、.claude/ 下，上面「驱动脚本」那一条）里写的提交不读；判法文件读不到或导入就出错时这条命令照常执行、不弹窗（文件头末尾「判不了」那一段）；别处改了名的客户端拷贝内容不同的不认。
+# 提交时才许不指定范围地跑（lib_run_scope.py 的 commit_gate_problem）：门禁 crash-point-replay、qemu-device-streams、lkmm、crates-mutation-replay、formal-verification、broad-mutation
+#   （.claude/skills/crash-test/commit-stages.md 开头点名的六道，task-server/task_server_lib.py 的 COMMIT_GATE_ENTRIES 同一组）不带 --check / --item 的那一形，
+#   与 scripts/crash/crash-point-replay.sh、scripts/crash/crash-amplification.sh 不带 --item 的那一形：主 agent 经 task-server/task submit 交而 `--` 之前一个放宽标识
+#   （--full-gate、--whole-package-confirmed）都没带的，执行前拒，说明写出路——提交时照 commit-stages.md 带 --full-gate（会弹窗要用户确认），平时改成点名项或格；带了其中一个的照旧走弹窗（上面「放宽检查的提交标识」）。
+#   崩溃放量入口不带 --item 的那一形只认 --full-gate（每次提交必跑、与六道同列，整包确认标识顶替不了）；崩溃点重放入口两个标识都认。
+#   不判：子 agent（经 submit 交的另被拒）、没经 submit 的直接起（由 project-code-guard.sh 拒）、gate-staged.sh、gate.sh、replay.sh 不带实验号的那一形（整轮门禁与实验复跑照原来的判法）。
+# 指定范围的崩溃域（lib_run_scope.py 的 crash_domain_problem）：.claude/rules/verification.md「一个门禁：两种跑法」写指定范围的那几趟崩溃状态数压在 20 万量级。四种形状在执行前判：
+#   崩溃点重放入口点名项（--item）、cargo test 点名验证包测试目标（-p singlefs-verification --test <目标>）、证红脚本 scripts/mutation/prove-red.sh 点名的变异行、
+#   变异门禁 crates-mutation-replay.sh --item 点名的行。放行：命令里带 --crash-expand-up-to；范围声明的为什么一段写了「全域理由：<理由>」，理由去掉不说理由的词之后至少 12 个字
+#   （证红脚本不要求声明，要写理由就带一份四段声明）；交它的那一条 submit 带 --full-gate（不指定范围的提交时那一趟，上一段另判）；
+#   这一条看得到的环境里设了（值非空；经服务交的写成 `-- env <名>=<值> <命令…>`）点到的目标读的每一个缩域变量（下面「读哪一个」；多设一个不拒）。
+#   设了缩域变量而不是它读的那一个的拒，说明点名该设哪一个；点到的目标里有判不出读哪一个的，设了两个之一照放行，往检出记录记一行「范围声明闸判不了」。
+#   没缩域的：钩子只读静态登记判点到的目标或项会不会走崩溃枚举，不估态数——
+#     项：.claude/gate.d/crash-point-replay-items.tsv 里这一项的 crash-case 键或放量分项不是 - 的会走；
+#     测试目标：.claude/gate.d/stage-inputs.tsv 的 crash-case: 行 test= 点名的、scripts/crash/crash-amplification.sh 的 ITEMS 点名的，或 crates/singlefs-verification/tests/<目标>.rs 里写了缩域变量名（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO、SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO，注释里的也算）的会走；
+#     变异行：crates/mutations.tsv 里行号或变异名对上的行（读哪几棵树的表见下面「读哪几棵树」），第五段点名的验证包测试目标按上一条判。
+#   会走而没缩对的拒，说明写该设的缩域变量与全域理由的写法；判不出的（项不在合表里、变异名不在表里、测试目标没登记也读不到源码、登记表读不了）放行，往检出记录记一行「范围声明闸判不了」。
+#   读哪一个（lib_run_scope.py 的 target_shrink_variables；放行照它判，拒绝说明的出路照它点名）：崩溃点重放入口点名的项、登记过的崩溃枚举用例与放量分项的目标（经放量引擎）
+#   读 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO；测试源码的代码里写了哪个变量名就读哪个（注释里提到的不算，rust_code_without_comments），
+#   SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO 只在直接调判器的对拍里写；两样都占的两个都读。读不到测试源码（目标是 tests/<目标>/main.rs 这类）、没登记而代码里两个都没写的判不出。
+#   读哪几棵树（lib_run_scope.py 的 crash_domain_trees）：变异表、合表与登记表、测试源码都按这个次序读，前面的树里有的以它为准，没有的才退回后面的，每一棵都没有才记「范围声明闸判不了」（说明里写读过哪几棵）：
+#     命令点明的树——证红脚本 --copy 点名的副本、变异门禁（crates-mutation-replay.sh）的根参数；写成 `$名` 而同一条命令里前面赋过字面值的先展开
+#     （包在 task-server/task submit、flock 这类里面的同样认；展开不出的记一处判不了、不读这一棵）；
+#     命令的当前目录那棵——从当前目录往上找带 .claude/gate.d/stage-inputs.tsv 的那一层（经 task-server/task submit 交的取 --cwd，--cwd 写成赋过字面值的变量的先展开；找不到不读这一棵）；
+#     CLAUDE_PROJECT_DIR（主工作区）。同一棵只读一回；登记表读不了的那一棵只信「会走」、不信「不走」。
+#   判不到的：门禁 crash-point-replay 点名 crash-case 用例（--item crash-case:<用例>）、崩溃放量入口点名分项、合入后验证、不点名 --test 的整包 cargo test、验证包 src/ 下的内联测试；
+#   一个目标里只有部分用例枚举全域的，也按整个目标判；点到的目标会枚举，不等于这一趟的态数超 20 万（态数估法在 scripts/crash/lib_crash_point_replay_items.py，入口自己估、超了退 79）。
+# 经 submit 交的要点名（lib_run_scope.py 的 unnamed_submission_problem；records/2026-10-29-subagent拆分提案.md 第二百二十九节「收口要做的」）：
+#   判据只一份，task-server/task_server_lib.py 的 unnamed_run_problem（服务提交时拒 ⑦ 调同一个函数，经 lib_project_code_runs.task_server_library 载入，这里不另写）：
+#   cargo test 没在 `--` 之后带 --exact 与测试全名；scripts/gate/merge-and-verify.sh、scripts/crash/crash-point-replay.sh、scripts/crash/crash-amplification.sh 没带 --item；
+#   scripts/mutation/prove-red.sh 没在 --copy <副本> <crate> 之后写变异名；.claude/gate.d/ 的门禁阶段 --item、--check 都没带，或 --check 点了起测试的格
+#   （task_server_lib.py 的 TEST_STARTING_GATE_CELLS）而没带 --item。只查不跑的写法不判；交它的 submit 带 --full-gate 或 --whole-package-confirmed 的不判。
+#   判的是交给服务的那一条（与它剥了包装的那一层、bash -c 里命令位置上的每一条）；读进去的驱动脚本里的不判（服务只看得见提交的这一条）。
+#   不指定范围的提交时门禁与两份崩溃入口归上面「提交时才许不指定范围地跑」判，这里不重复拒；子 agent 经 submit 交的另被拒，不判这一条。
+#   拒绝说明逐条写哪一种没点名，「→ 怎么办：」写照这条命令改成点名的样子（判据交的 next_step），不附声明模板；被拒的记进检出记录（findings 以「范围声明被拒」起头）。
+#   task_server_lib.py 载不进、判据抛了异常：这一条照常放行，那一处记进「范围声明闸判不了」。
 # 要声明的命令（只认命令位置）。包在外面的照剥、剥出来的照同一张表判，外面写的声明带进里面那一条：bash -c、run-with-memory-cap.sh、capped.sh、env、nice、timeout、
 #   stdbuf 这类由 lib_shell_words.py 剥；flock、/usr/bin/time、systemd-run、chrt、prlimit、strace、perf 由 lib_project_code_runs.py
 #   的 command_under_launcher 剥；scripts/crash/gpu-quiesce-run.sh -- 由 command_under_gpu_quiesce 剥。
@@ -47,9 +96,16 @@
 #               同一条命令里前面 `cat > 文件 <<EOF`、`cat <<EOF > 文件`、`tee [-a] 文件 <<EOF` 写出的，拿写出的正文判）读进去，里面每一条要声明的命令照同一张表判。
 #               外面那一条的声明不带进脚本：脚本里每一条要在自己那一行（或脚本里它前面的 export）带声明，缺的、对不上的逐条列出（脚本:行）拒。
 #               读到第 6 层为止，绕回外层的不再读；超过 1 MiB、有 NUL 字节、不是 UTF-8 的不读。
+#               bash / sh / source 起的脚本路径写成 `$名`、`${名}` 而同一条命令里前面赋过字面值的（`D=<目录>; bash $D/x.sh`，包在 task-server/task submit、flock 里的外层赋的也认），
+#               展开之后读（lib_run_scope.py 的 script_path_word，读脚本正文的是 driver_script_text）；展开不出的（没赋过、for 的循环变量、命令替换）不读，
+#               项目代码闸对这一形执行前拒。同一条命令里用 echo、sed 重定向写出、再起的脚本：判的这一刻文件还不在盘上，读不到（项目代码闸对其中的有的执行前拒），
+#               写出之后用后一条命令起它、路径写成字面的，照上面读。
 #               仓里的工具脚本不读：路径落在某一层带 .claude/hooks/ 的目录下的 scripts/ 或 .claude/ 里（主工作区与仓副本都算），它们里面起的验证由调它们的那一条负责。
 # 范围一段：items 与 target 的范围里第一个阿拉伯数字等于 N；whole 的范围里有「整轮」或「整包」。种类对不上时不再核范围。
 # 种类与命令的形状对不上就拒，说明写「声明的是点名的几项（items），命令跑的是整轮（whole）」这类。
+#   种类或范围数对不上的说明另写这条命令该写的整段「种类=…」「范围=<数> <单位>」（数与单位是闸自己数出来的那一个，lib_run_scope.py 的 declaration_to_write）与数法（count_basis：
+#   门禁的格与项各自去重后相加、实验复跑数命令里的实验号、cargo test 数点名的目标或 --exact 的筛选词……），不改数法；
+#   命令的参数里有变量或命令替换拼的词（`$items`、`--item=$名`）时再写一句「把 --item 写成字面」（variable_built_hint）：闸只数写成字面的 --item / --check，数不到变量里拼的。
 # 子 agent（hook 输入带 agent_type）经 task-server/task submit 交的一律拒（上面「经 task-server 提交」），说明写「写进报告「要主 agent 跑的命令」一节交回」；
 #   子 agent 直接起的这里只判声明（直接跑项目代码由 project-code-guard.sh 的 ① 拒，主 agent 也一样）。主 agent 带对的声明照放。
 # 不要声明的形态（照常放行、不记）：
@@ -62,7 +118,7 @@
 #   上面几类之外的命令：钩子与研究脚本的 --selftest、stage-selftest.sh 喂样本、python 起的脚本、仓里的工具脚本等。各入口的 --force 先摘掉再判（同它们的 preflight）。
 # 拒绝说明（stderr，写给 agent）：逐条写命令（驱动脚本里的写 脚本:行）、跑的是什么、范围多大、哪里不合、上次这一道红的清单；
 #   再给照抄的声明模板（种类、跑什么、范围按命令现算好，为什么留尖括号让 agent 填；驱动脚本里的写「在 <脚本> 那一行的命令前面加」，命令超过 2000 字的不整条贴），
-#   只跑红的与改到的写法（门禁 --check <格> / --item <项>，崩溃入口 --item <项>，cargo test -p <包> --test <目标> -- <测试名> --exact 或
+#   只跑红的与改到的写法（门禁 --check <格> / --item <项>，崩溃用例 --check crash-case-replay --crash-cases-only --item crash-case:<用例名>，崩溃放量 --item <分项>，cargo test -p <包> --test <目标> -- <测试名> --exact 或
 #   python3 scripts/gate/rerun-failed-tests.py <上次日志> -p <包>（它打出的每条命令开头已带 target 声明），merge-and-verify 写挑测试目标在脚本里做、种类 items、不带 --item 范围写补丁目录份数，只重跑红的写 --skip-apply --item <包>:<目标根文件> <同一批补丁目录>），与声明的写法。
 #   上次红的清单：读 <目录>/<脚本相对仓根的路径，/ 换成 __>.tsv（目录是 SINGLEFS_LAST_RUNS_DIRECTORY，没设是数据根下的 last-runs：同目录 lib_work_root.py 的 shared_data_path，数据根 SINGLEFS_DATA_ROOT 没设是 ~/.local/share/singlefs；
 #   一行一个项名，空行与 # 开头的行不算）；没有这份文件或是空的写「没有上次红的记录」。各道跑完写这份文件归下一批。cargo test 没有这份文件，说明里指到 rerun-failed-tests.py。
@@ -91,8 +147,22 @@
 # 自证：在临时目录里造驱动脚本与一份仓的样子；每种写法一绿一红（门禁整道、--check、--item、查清单；崩溃点重放、崩溃放量与它的两份驱动；replay.sh；
 #   merge-and-verify；gate-staged.sh 与 gate.sh；cargo test 整工作区、整包、点名目标、--exact；bash -c、capped.sh、env、nice 与 timeout、export、flock、gpu-quiesce-run.sh、
 #   /usr/bin/time；驱动脚本缺声明与都带、外面带声明、套两层、直接执行、heredoc 写出、仓里的工具脚本；缺段、值空、写两次、种类认不出、
-#   种类对不上、范围数对不上、为什么太短；子 agent 经 submit 交的拒、直接起的只判声明），在内存里逐格判；另起这份入口喂 hook 的 JSON，
-#   核退出码、拒绝说明里的模板与只跑红的写法、上次红的清单、放行与被拒的检出记录、判法文件读不到时放行并记一条检出（设与没设 AGENT_HOOK_DETECTIONS 各一格）、平常跑设了弄坏开关退 2（不带标记、标记文件内容对不上各一格）与带标记的自证子进程照认开关。末了开关轮：下面每个开关逐个打开再判一遍，点名的格都要红。
+#   种类对不上、范围数对不上、为什么太短；子 agent 经 submit 交的拒、直接起的只判声明；放宽检查的提交标识每种写法该弹窗与不该弹窗的各格），在内存里逐格判；另起这份入口喂 hook 的 JSON，
+#   核退出码、拒绝说明里的模板与只跑红的写法、上次红的清单、放行与被拒的检出记录、判法文件读不到时放行并记一条检出（设与没设 AGENT_HOOK_DETECTIONS 各一格）、平常跑设了弄坏开关退 2（不带标记、标记文件内容对不上各一格）与带标记的自证子进程照认开关。
+#   提交时才许不指定范围地跑：六道门禁逐道各一格拒、崩溃点重放门禁带 --full-gate 放、两份入口没带标识拒与带 --whole-package-confirmed 放、点名格的与直接起的放，另起入口核说明写 commit-stages.md 与 --full-gate、不附声明模板。
+#   指定范围的崩溃域：样本树里造登记表与测试源码（登记过的崩溃枚举目标、登记过的放量分项目标、源码里读缩域变量的目标、不走崩溃枚举的目标、两行变异表），四种形状各有拒与放；
+#   缩域（选项、命令前的变量、`-- env` 之后的变量）、全域理由（够长与太短）、带 --full-gate、别的包的目标各一格，项或变异名在登记里找不到的放行并记判不了，另起入口核说明写缩域变量与全域理由的写法；
+#   拒绝说明的出路点对缩域变量两格（变异门禁点名登记过的崩溃枚举目标的行点放量那个，cargo test 点名源码里只写了判器那个变量名的目标点判器那个）；
+#   写对变量才放：设了读的那一个放（重放入口、证红、变异门禁设放量那个，对拍目标设判器那个），设的不是读的那一个拒（重放入口只设判器那个、对拍目标只设放量那个、
+#   变异门禁只设判器那个且说明点名放量那个），两个都设放，判不出读哪一个的（登记过、源码在 tests/<目标>/main.rs）设了之一放行并记判不了；
+#   对拍目标的样本源码注释里提到放量那个，核注释不算读它。
+#   命令点明的副本：样本树里的副本（copy-tree/）新登记了崩溃枚举目标，主工作区那一棵没有它；证红 --copy 写字面路径、写成赋过字面值的变量（包在 submit 里）、submit 的 --cwd 写成变量指到副本、
+#   变异门禁的根参数指到副本各一格拒，点名的行副本里没有而主工作区有的退回主工作区那一份判一格拒，两边都没有、--copy 写成展开不出值的变量各记一处判不了一格（说明写读过哪几棵树、点名那个变量）。
+#   驱动脚本路径写成赋过字面值的变量：直接起、包在 submit 里起（里面一行缺声明）各一格拒，里面都带声明一格放。
+#   范围数对不上的说明：一格加两项数成 3 项、实验复跑写成 2 行而命令点名一个实验、--item 拼在变量里声明成 items 而命令数成整轮各一格，核说明里写整段范围与「把 --item 写成字面」。
+#   经 submit 交的要点名：合入后验证不带 --item 拒、带的放；cargo test 只点目标拒、点 --exact 的测试函数放；证红不给变异名拒、给了放；门禁点起测试的格不带 --item 拒、
+#   只点不起测试的格放；带 --full-gate、带 --whole-package-confirmed 的不点名也放；另起入口核说明写没点名与改成点名的样子（--exact）、不附声明模板、记一行被拒。
+#   末了开关轮：下面每个开关逐个打开再判一遍，点名的格都要红。
 # 弄坏开关 RUN_SCOPE_GUARD_BREAK=<项>（几个用逗号连；只给自证判红用；自证与它起的子进程里认不出的项抛异常，钩子照常放行并报一句；平常跑设了照下一句拒）。
 #   只在自证里认（门禁 code-tooling 的 break-switch-outside-selftest 格）：平常跑（不是 --selftest，也不是自证起的子进程）设了它，入口在找判法文件、读 hook 的 JSON 之前
 #   就退 2，stderr 点名它只在自证里认；自证起的子进程由环境里的 RUN_SCOPE_GUARD_SELFTEST_MARK 认（指的那份文件在、内容是「run-scope-guard.sh --selftest 起的子进程」，
@@ -101,19 +171,25 @@
 #   开关是有人设上的，设着照常放行就是让这道闸带着弄坏的那一处判每一条命令。
 #   设了开关再跑 --selftest：照它判一遍，下面写的格红、退 1，开关轮不跑；不设时末了跑开关轮，逐个打开、核红的格与这里写的逐格相等。逐项写开关、弄坏哪一处、红的格（写全）：
 #   RUN_SCOPE_GUARD_BREAK=declaration-optional  没带声明也放
-#       红：「门禁整道：没带声明拒」「崩溃点重放不指定范围跑：没带声明拒」「崩溃放量全部分项：没带声明拒」「崩溃放量双机驱动：没带声明拒」「replay.sh 全部实验：没带声明拒」「gate-staged.sh 没带声明拒」「cargo test 整工作区：没带声明拒」「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「bash -c 里的门禁没带声明拒」「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「capped.sh 包着的 cargo test 没带声明拒」「env 带别的变量、没带声明拒」「nice 与 timeout 包着、没带声明拒」「flock 包着的门禁没带声明拒」「gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒」「/usr/bin/time 包着的 cargo test 没带声明拒」「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：没带声明拒（退出码 2）」「入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法」「入口：拒绝说明附上次红的清单」「入口：没有上次红的记录时照写」「入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）」
+#       红：「task-server 提交带 --full-gate 的门禁整道：没带声明拒」「task-server 提交带 --whole-package-confirmed 的 cargo test 整工作区：没带声明拒」「门禁整道：没带声明拒」「崩溃点重放不指定范围跑：没带声明拒」「崩溃放量全部分项：没带声明拒」「崩溃放量双机驱动：没带声明拒」「replay.sh 全部实验：没带声明拒」「gate-staged.sh 没带声明拒」「cargo test 整工作区：没带声明拒」「bash -c 里的门禁没带声明拒」「here-string 喂给 bash 的 cargo test 整工作区：没带声明拒」「printf 经管道喂给 bash 的门禁：没带声明拒」「echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒」「capped.sh 包着的 cargo test 没带声明拒」「env 带别的变量、没带声明拒」「nice 与 timeout 包着、没带声明拒」「flock 包着的门禁没带声明拒」「gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒」「/usr/bin/time 包着的 cargo test 没带声明拒」「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：没带声明拒（退出码 2）」「入口：拒绝说明写跑的是什么、照抄模板与只跑红的写法」「入口：拒绝说明附上次红的清单」「入口：没有上次红的记录时照写」「入口：被拒的记一行（session_id、范围声明被拒、outcome 被拒）」「驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」「task-server 提交里起的驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」
 #   RUN_SCOPE_GUARD_BREAK=segments-unchecked  不核四段齐不齐、值空不空、写没写两次、种类认不认得
 #       红：「声明缺段：没写为什么拒」「声明值空：范围一段是空的拒」「声明写两次：种类写两次拒」「声明种类认不出拒」
 #   RUN_SCOPE_GUARD_BREAK=kind-unchecked  不核声明的种类与命令的形状
-#       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 whole：拒」「cargo test 整包声明成 target：种类对不上拒」
+#       红：「门禁 --item 声明成 whole：种类对不上拒」「merge-and-verify 声明成 whole：拒」「cargo test 整包声明成 target：种类对不上拒」「声明成 items 而 --item 是变量拼的：命令数成整轮，说明写整段 范围=整轮 与 把 --item 写成字面」
 #   RUN_SCOPE_GUARD_BREAK=count-unchecked  不核范围一段的数（items、target）与整轮整包（whole）
-#       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」「merge-and-verify 两份补丁写成 1 份：范围数对不上拒」
+#       红：「门禁 --check 两格写成 1 格：范围数对不上拒」「whole 范围没写整轮或整包拒」「cargo test 两个目标写成 3 个：范围数对不上拒」「cargo test --exact 两个测试写成 1 个：范围数对不上拒」「崩溃点重放点名一项另加展开深度：写成两项拒（深度的值不是项）」「merge-and-verify 点名两项写成 1 项：范围数对不上拒」「merge-and-verify 两份补丁写成 1 份：范围数对不上拒」「范围数对不上：一格加两项数成 3 项，说明写整段 范围=3 项 与格项相加的数法」「范围数对不上：实验复跑点一个实验写成 2 行，说明写整段 范围=1 个实验」
 #   RUN_SCOPE_GUARD_BREAK=reason-unchecked  不核为什么一段的字数
 #       红：「gate.sh 为什么只写验证拒」「为什么太短拒」「为什么只写要跑验证拒」
+#   RUN_SCOPE_GUARD_BREAK=count-hint-unprinted  范围数或种类对不上的说明不写这条命令该写的整段「种类=…」「范围=<数> <单位>」与数法，只写点名了几格几项（弄坏的是说明，判拒不变）
+#       红：「范围数对不上：一格加两项数成 3 项，说明写整段 范围=3 项 与格项相加的数法」「范围数对不上：实验复跑点一个实验写成 2 行，说明写整段 范围=1 个实验」「声明成 items 而 --item 是变量拼的：命令数成整轮，说明写整段 范围=整轮 与 把 --item 写成字面」
+#   RUN_SCOPE_GUARD_BREAK=variable-built-hint-dropped  命令里有变量拼的词而范围或种类对不上时，说明里不写「把 --item 写成字面」
+#       红：「声明成 items 而 --item 是变量拼的：命令数成整轮，说明写整段 范围=整轮 与 把 --item 写成字面」
 #   RUN_SCOPE_GUARD_BREAK=subagent-submissions-allowed  子 agent 经 task-server/task submit 交的验证命令不按 lib_project_code_runs.subagent_task_server_refusal 拒（许子 agent 自己交）
 #       红：「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
 #   RUN_SCOPE_GUARD_BREAK=scripts-unread  命令位置上执行的驱动脚本不读进去
-#       红：「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
+#       红：「驱动脚本里一行缺声明拒」「外面带声明、驱动脚本里一行缺声明拒」「驱动脚本再起驱动脚本、里面缺声明拒」「直接执行的驱动脚本缺声明拒」「同一条命令里 heredoc 写出的驱动脚本缺声明拒」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」「驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」「task-server 提交里起的驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」
+#   RUN_SCOPE_GUARD_BREAK=driver-path-variables-unexpanded  bash / sh / source 起的脚本路径写成赋过字面值的变量（`D=<目录>; bash $D/x.sh`）的不展开，照旧不读进去
+#       红：「驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」「task-server 提交里起的驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」
 #   RUN_SCOPE_GUARD_BREAK=wrappers-opaque  flock、/usr/bin/time、gpu-quiesce-run.sh 不剥，里面那条不判
 #       红：「flock 包着的门禁没带声明拒」「gpu-quiesce-run.sh 包着的崩溃点重放没带声明拒」「/usr/bin/time 包着的 cargo test 没带声明拒」
 #   RUN_SCOPE_GUARD_BREAK=allowed-unrecorded  放行的不记进检出记录
@@ -125,17 +201,17 @@
 #   RUN_SCOPE_GUARD_BREAK=replay-list-items-declared  replay.sh 的 --list-items 也要声明
 #       红：「replay.sh --list-items 不要声明」
 #   RUN_SCOPE_GUARD_BREAK=merge-as-whole  merge-and-verify 照整轮（whole）判，带不带 --item 都是
-#       红：「merge-and-verify 声明成 whole：拒」「merge-and-verify 两份补丁：声明成 items 放」「merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）」「merge-and-verify 点名两项：声明成 items 放」
+#       红：「merge-and-verify 声明成 whole：拒」「merge-and-verify 两份补丁：声明成 items 放」「merge-and-verify 两份补丁另加展开深度：写成 2 份补丁放（深度的值不是补丁）」「merge-and-verify 点名两项：声明成 items 放」「task-server 提交合入后验证带 --item：放」
 #   RUN_SCOPE_GUARD_BREAK=merge-list-items-declared  merge-and-verify 的 --list-items 也要声明
 #       红：「merge-and-verify --list-items 不要声明」
 #   RUN_SCOPE_GUARD_BREAK=tooling-scripts-read  仓里的工具脚本（scripts/、.claude/ 下）也读进去
 #       红：「仓里的工具脚本不读：放行」
 #   RUN_SCOPE_GUARD_BREAK=cargo-targets-as-whole  cargo test 点名目标的也当整包
-#       红：「cargo test 两个目标、带对的声明：放」「cargo test --lib --exact 两个测试、带对的声明：放」「子 agent cargo test 点名目标、带对的声明：放」「capped.sh 外面带声明放」「驱动脚本里每一行都带声明：放」
+#       红：「cargo test 两个目标、带对的声明：放」「cargo test --lib --exact 两个测试、带对的声明：放」「子 agent cargo test 点名目标、带对的声明：放」「capped.sh 外面带声明放」「驱动脚本里每一行都带声明：放」「驱动脚本路径写成赋过字面值的变量、里面每一行都带声明：放」「cargo test 点名不走崩溃枚举的目标：放」「task-server 提交 cargo test 点名崩溃枚举目标、-- 之后 env 带缩域变量：放」「cargo test 点名别的包的目标：这一条不判，放」「cargo test 点名代码里只读判器缩域变量的目标、两个缩域变量都带：放」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」「task-server 提交 cargo test 点名 --exact 的测试函数：放」
 #   RUN_SCOPE_GUARD_BREAK=template-keeps-declaration  照抄模板时不摘命令开头已有的那份声明（照抄出来两份，bash 取后一份）
 #       红：「入口：命令开头已有声明时模板只留一份」
 #   RUN_SCOPE_GUARD_BREAK=failure-unrecorded  判不了的几样（hook 输入不是 JSON 对象、判的时候出异常、喂给 shell 的不是字面、读不到判法文件）只打 stderr 或什么都不说、不记检出
-#       红：「入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出」「入口：判的时候抛异常放行、stderr 报一句、记一条检出」「入口：here-string 喂给 bash 的是变量放行、记一条检出」「入口：判法文件读不到时记一条检出（结局只记、会话号照输入）」「入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」
+#       红：「入口：hook 输入不是 JSON 对象（坏 JSON、数组）放行、stderr 写诊断、各记一条检出」「入口：判的时候抛异常放行、stderr 报一句、记一条检出」「入口：here-string 喂给 bash 的是变量放行、记一条检出」「入口：驱动脚本读不了时放行、记一条检出（范围声明闸判不了）」「入口：判法文件读不到时记一条检出（结局只记、会话号照输入）」「入口：判法文件读不到、没设 AGENT_HOOK_DETECTIONS 时记进 lib_work_root.py 的默认位置」
 #   RUN_SCOPE_GUARD_BREAK=judge-crash-unrecorded  判法文件在而没跑完（导入就出错、被信号停掉，退 0 与 2 以外的码）时只打 stderr、不记检出（exec 判法，退几都照常放行）
 #       红：「入口：判法文件在而导入就出错时放行、stderr 报一句、记一条检出（结局只记、会话号照输入）」
 #   RUN_SCOPE_GUARD_BREAK=driver-unread-unrecorded  读不了、太大的驱动脚本静默不读、不交判不了的说明
@@ -147,7 +223,75 @@
 #   RUN_SCOPE_GUARD_BREAK=honor-outside-selftest-with-others  带标记的自证子进程里，关守卫项与别的项同写也照认（honor-outside-selftest 写在哪一项都认；只在带标记的子进程里认，平常跑同写照拒）
 #       红：「入口：关守卫项与别的项同写：带标记的子进程里也退 2、点名它」
 #   RUN_SCOPE_GUARD_BREAK=task-server-submissions-unread  task-server/task submit -- 之后那一条不判（当名单上的客户端放过去）
-#       红：「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」
+#       红：「task-server 提交的门禁整道：没带声明拒」「task-server 提交的 cargo test 整工作区：没带声明拒」「task-server 提交带 --full-gate 的门禁整道：没带声明拒」「task-server 提交带 --manual 的门禁整道：没带声明拒」「task-server 提交带 --whole-package-confirmed 的 cargo test 整工作区：没带声明拒」「子 agent 经 task-server 提交崩溃点重放不指定范围跑、带对的声明：拒（子 agent 不往服务交任务）」「子 agent 经 task-server 提交点名目标、带对的声明：拒（子 agent 不往服务交任务）」「入口：子 agent 经 task-server 交验证命令拒、说明写写进报告交回」「入口：命令开头已有声明时模板只留一份」「task-server 提交不指定范围的崩溃点重放门禁、没带放宽标识：拒（提交时带 --full-gate）」「task-server 提交六道提交时门禁各自不指定范围、没带放宽标识：都拒」「task-server 提交不指定范围的崩溃点重放入口、没带放宽标识：拒」「task-server 提交不指定范围的崩溃放量入口、没带放宽标识：拒（提交时带 --full-gate）」「task-server 提交不指定范围的崩溃放量入口、只带 --whole-package-confirmed：拒（整包确认顶替不了 --full-gate）」「入口：不指定范围的提交没带放宽标识拒（退出码 2、说明写 commit-stages.md 与 --full-gate、不附声明模板）」「task-server 提交证红、--copy 写成赋过字面值的变量、点名副本里新登记的崩溃枚举目标的变异行、没缩域：拒」「task-server 提交 --cwd 写成赋过字面值的变量指到副本、cargo test 点名副本里新登记的崩溃枚举目标、没缩域：拒」「task-server 提交里起的驱动脚本路径写成赋过字面值的变量：读进去、里面一行缺声明拒」「task-server 提交合入后验证不带 --item：拒（启动测试与验证要点名）」「task-server 提交 cargo test 点名目标、不点名测试函数：拒」「task-server 提交证红不点名变异：拒」「task-server 提交门禁点起测试的格、不带 --item：拒」「入口：经 submit 交的 cargo test 不点名测试函数拒（退出码 2、说明写没点名与改成点名的样子 --exact、不附声明模板、记一行被拒）」
+#   RUN_SCOPE_GUARD_BREAK=submit-flags-unjudged  放宽标识一律不判，带了也不弹窗
+#       红：「提交带 --full-gate：弹窗」「提交带 --whole-package-confirmed：弹窗」「范围声明写在前面：弹窗」「bash -c 里面：弹窗」「&& 连着的后一段：弹窗」「--cwd 在标识前面：弹窗」「两个标识都带：都点名」「python3 起客户端：弹窗」「cd 进 task-server 再起：弹窗」「cd 到算不出的目录再起：弹窗」「cd 到算不出的目录再起 ./task：弹窗」「eval 字面代码：弹窗」「赋过字面值的变量写在参数上：认出标识」「数组写在参数上：认出标识」「标识写成等号带值：弹窗」「参数是变量：弹窗认不出」「数组全部元素写在参数上：弹窗认不出」「eval 给出的参数是变量：弹窗认不出」「子命令位是变量：弹窗认不出」「参数是命令替换：弹窗认不出」「xargs 读进来的参数：弹窗认不出」「flock 包着：弹窗」「python3 -c 里字面写着：弹窗」「驱动脚本里：弹窗」「交给服务的那一条里又提交：弹窗」「脚本里的转发函数：弹窗」「命令词是赋过字面值的变量：弹窗」「eval 赋过字面值的变量：弹窗」「判放宽标识时抛异常：不牵连范围声明、提到标识的照弹窗、记一处判不了」「入口：提交带 --full-gate 弹窗（退 0、ask、理由写标识、作用、命令全文与不许自己用）」「入口：参数是变量弹窗、理由写认不出带没带标识」
+#   RUN_SCOPE_GUARD_BREAK=submit-flags-by-substring  命令文字里提到标识就弹窗，不按切词判
+#       红：「grep 这个词：不弹窗」「commit message 带这个词：不弹窗」「--why 里提到这个词：不弹窗」「交给服务的那一条里提到这个词：不弹窗」「echo 这条命令的文字：不弹窗」「范围声明的值里提到这个词：不弹窗」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-variables-unread  `--` 之前算不出的词不当认不出，只判写出来的标识
+#       红：「参数是变量：弹窗认不出」「数组全部元素写在参数上：弹窗认不出」「eval 给出的参数是变量：弹窗认不出」「子命令位是变量：弹窗认不出」「参数是命令替换：弹窗认不出」「xargs 读进来的参数：弹窗认不出」「入口：参数是变量弹窗、理由写认不出带没带标识」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-after-separator  `--` 之后交给服务的那一条的参数也当 submit 的选项判
+#       红：「交给服务的那一条里提到这个词：不弹窗」「交给服务的那一条参数是变量：不弹窗」「xargs 读进来的落在交给服务的那一条里：不弹窗」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-first-option-only  只判 submit 后面紧跟的一个词
+#       红：「--cwd 在标识前面：弹窗」「两个标识都带：都点名」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-client-by-path-only  客户端只认解得开路径、对得上本仓那一份的，当前目录算不出的不认
+#       红：「cd 到算不出的目录再起：弹窗」「cd 到算不出的目录再起 ./task：弹窗」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-nesting-unread  包装、转发函数、程序里写着的、驱动脚本、交给服务的那一条与命令词上的变量都不往里判
+#       红：「xargs 读进来的参数：弹窗认不出」「flock 包着：弹窗」「python3 -c 里字面写着：弹窗」「驱动脚本里：弹窗」「交给服务的那一条里又提交：弹窗」「脚本里的转发函数：弹窗」「命令词是赋过字面值的变量：弹窗」「eval 赋过字面值的变量：弹窗」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-subagents-asked  子 agent 带标识的也弹窗
+#       红：「子 agent 带标识：不弹窗（由项目代码闸拒）」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-raise-propagated  判放宽标识抛了异常时不接住（范围声明跟着没判）
+#       红：「判放宽标识时抛异常：不牵连范围声明、提到标识的照弹窗、记一处判不了」
+#   RUN_SCOPE_GUARD_BREAK=submit-flag-ask-silent  判出来了也不打 ask 的 JSON（等于放行）
+#       红：「入口：提交带 --full-gate 弹窗（退 0、ask、理由写标识、作用、命令全文与不许自己用）」「入口：参数是变量弹窗、理由写认不出带没带标识」「入口：判的时候抛异常、命令文字里提到标识：弹窗」
+#   RUN_SCOPE_GUARD_BREAK=commit-whole-flag-unchecked  不核提交时才许跑的六道门禁与崩溃点重放、崩溃放量两份入口（不指定范围那一形）经 submit 交时带没带放宽标识：一个标识都没带的也放
+#       红：「task-server 提交不指定范围的崩溃点重放门禁、没带放宽标识：拒（提交时带 --full-gate）」「task-server 提交六道提交时门禁各自不指定范围、没带放宽标识：都拒」「task-server 提交不指定范围的崩溃点重放入口、没带放宽标识：拒」「task-server 提交不指定范围的崩溃放量入口、没带放宽标识：拒（提交时带 --full-gate）」「task-server 提交不指定范围的崩溃放量入口、只带 --whole-package-confirmed：拒（整包确认顶替不了 --full-gate）」「入口：不指定范围的提交没带放宽标识拒（退出码 2、说明写 commit-stages.md 与 --full-gate、不附声明模板）」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-replay-items-unjudged  崩溃点重放入口点名的项不判会不会走崩溃枚举
+#       红：「崩溃点重放点名会走崩溃枚举的项、没缩域：拒」「崩溃点重放点名放量分项的项、没缩域：拒」「崩溃点重放点名会走崩溃枚举的项、全域理由太短：拒」「入口：崩溃域没缩拒（退出码 2、说明写缩域变量与全域理由的写法）」「崩溃点重放点名的项不在合表里：放行、记一处判不了」「崩溃点重放点名会走崩溃枚举的项、命令前只带判器缩域变量：拒（入口读的是放量那个）」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-cargo-targets-unjudged  cargo test 点名的验证包测试目标不判会不会走崩溃枚举
+#       红：「cargo test 点名登记过的崩溃枚举目标、没缩域：拒」「cargo test 点名源码里读缩域变量的目标、没缩域：拒」「cargo test 点名登记过的放量分项目标、没缩域：拒」「cargo test 点名源码里只读判器缩域变量的目标、没缩域：拒绝说明的出路点名判器那个变量」「cargo test 点名代码里只读判器缩域变量的目标、命令前只带放量缩域变量：拒（注释里提到放量那个不算读它）」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」「task-server 提交 --cwd 写成赋过字面值的变量指到副本、cargo test 点名副本里新登记的崩溃枚举目标、没缩域：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-prove-red-unjudged  证红脚本点名的变异行不判会不会走崩溃枚举
+#       红：「证红点名会走崩溃枚举的变异行、没缩域：拒」「证红点名的变异名不在变异表里：放行、记一处判不了」「证红点名副本里新登记的崩溃枚举目标的变异行（--copy 写字面路径）、没缩域：拒」「task-server 提交证红、--copy 写成赋过字面值的变量、点名副本里新登记的崩溃枚举目标的变异行、没缩域：拒」「证红点名的变异名副本里与主工作区都没有：放行、记一处判不了、说明写读过的树」「证红 --copy 写成展开不出值的变量：放行、记一处判不了、说明点名那个变量」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-mutation-items-unjudged  变异门禁点名的行不判会不会走崩溃枚举
+#       红：「变异门禁点名会走崩溃枚举的行（变异名）、没缩域：拒」「变异门禁点名会走崩溃枚举的行（行号）、没缩域：拒」「变异门禁点名登记过的崩溃枚举目标的行、没缩域：拒绝说明的出路点名放量那个变量」「变异门禁点名登记过的崩溃枚举目标的行、只带判器缩域变量：拒，说明点名该设放量那个」「变异门禁点名副本里新写的行（根参数指到副本）、没缩域：拒」「变异门禁根参数指到副本、点名的行副本里没有而主工作区有：退回主工作区那一份判、没缩域：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-registry-unread  不读登记表（stage-inputs.tsv 的 crash-case 行与崩溃放量入口的 ITEMS）：登记过的测试目标也当不走崩溃枚举
+#       红：「cargo test 点名登记过的崩溃枚举目标、没缩域：拒」「cargo test 点名登记过的放量分项目标、没缩域：拒」「证红点名会走崩溃枚举的变异行、没缩域：拒」「变异门禁点名会走崩溃枚举的行（变异名）、没缩域：拒」「变异门禁点名会走崩溃枚举的行（行号）、没缩域：拒」「变异门禁点名登记过的崩溃枚举目标的行、没缩域：拒绝说明的出路点名放量那个变量」「变异门禁点名登记过的崩溃枚举目标的行、只带判器缩域变量：拒，说明点名该设放量那个」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」「证红点名副本里新登记的崩溃枚举目标的变异行（--copy 写字面路径）、没缩域：拒」「task-server 提交证红、--copy 写成赋过字面值的变量、点名副本里新登记的崩溃枚举目标的变异行、没缩域：拒」「task-server 提交 --cwd 写成赋过字面值的变量指到副本、cargo test 点名副本里新登记的崩溃枚举目标、没缩域：拒」「变异门禁点名副本里新写的行（根参数指到副本）、没缩域：拒」「变异门禁根参数指到副本、点名的行副本里没有而主工作区有：退回主工作区那一份判、没缩域：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-source-scan-skipped  不看测试源码里读没读缩域变量：没登记的测试目标一律当不走崩溃枚举
+#       红：「cargo test 点名源码里读缩域变量的目标、没缩域：拒」「cargo test 点名源码里只读判器缩域变量的目标、没缩域：拒绝说明的出路点名判器那个变量」「cargo test 点名代码里只读判器缩域变量的目标、命令前只带放量缩域变量：拒（注释里提到放量那个不算读它）」「变异门禁根参数指到副本、点名的行副本里没有而主工作区有：退回主工作区那一份判、没缩域：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-shrink-ignored  命令里写了 --crash-expand-up-to、环境里设了缩域变量的都当没缩
+#       红：「崩溃点重放点名会走崩溃枚举的项、带 --crash-expand-up-to：放」「崩溃点重放点名会走崩溃枚举的项、命令前带放量缩域变量：放」「task-server 提交崩溃点重放点名项、-- 之后 env 带缩域变量：放」「task-server 提交 cargo test 点名崩溃枚举目标、-- 之后 env 带缩域变量：放」「证红点名会走崩溃枚举的变异行、命令前带放量缩域变量：放」「变异门禁点名会走崩溃枚举的行、命令前带放量缩域变量：放」「cargo test 点名代码里只读判器缩域变量的目标、两个缩域变量都带：放」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-reason-ignored  范围声明的为什么一段写了全域理由也照判
+#       红：「崩溃点重放点名会走崩溃枚举的项、为什么里写了全域理由：放」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-reason-length-unchecked  全域理由不核字数，写了就认
+#       红：「崩溃点重放点名会走崩溃枚举的项、全域理由太短：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-full-gate-judged  交它的那一条 submit 带 --full-gate 的也照判
+#       红：「task-server 提交带 --full-gate、崩溃点重放点名项没缩域：这一条不判，放」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-unknown-unrecorded  判不出会不会走崩溃枚举、判不出读哪一个缩域变量的目标或项，放行时不记进判不了的清单
+#       红：「崩溃点重放点名的项不在合表里：放行、记一处判不了」「证红点名的变异名不在变异表里：放行、记一处判不了」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」「证红点名的变异名副本里与主工作区都没有：放行、记一处判不了、说明写读过的树」「证红 --copy 写成展开不出值的变量：放行、记一处判不了、说明点名那个变量」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-target-variable-fixed  判点到的目标读哪个缩域变量不分目标，读得到源码的一律当判器那个（放行与拒绝说明的出路都照它）
+#       红：「变异门禁点名登记过的崩溃枚举目标的行、没缩域：拒绝说明的出路点名放量那个变量」「证红点名会走崩溃枚举的变异行、命令前带放量缩域变量：放」「变异门禁点名会走崩溃枚举的行、命令前带放量缩域变量：放」「变异门禁点名登记过的崩溃枚举目标的行、只带判器缩域变量：拒，说明点名该设放量那个」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-target-variable-source-unread  判点到的目标读哪个缩域变量不看测试源码，一律当放量那个
+#       红：「cargo test 点名源码里只读判器缩域变量的目标、没缩域：拒绝说明的出路点名判器那个变量」「task-server 提交 cargo test 点名崩溃枚举目标、-- 之后 env 带缩域变量：放」「cargo test 点名代码里只读判器缩域变量的目标、命令前只带放量缩域变量：拒（注释里提到放量那个不算读它）」「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-variable-comments-counted  判点到的目标读哪个缩域变量时测试源码注释里写的变量名也算
+#       红：「task-server 提交 cargo test 点名崩溃枚举目标、-- 之后 env 带缩域变量：放」「cargo test 点名源码里只读判器缩域变量的目标、没缩域：拒绝说明的出路点名判器那个变量」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-shrink-variable-unchecked  设了两个缩域变量之一就放，不核是不是点到的目标读的那一个
+#       红：「崩溃点重放点名会走崩溃枚举的项、命令前只带判器缩域变量：拒（入口读的是放量那个）」「cargo test 点名代码里只读判器缩域变量的目标、命令前只带放量缩域变量：拒（注释里提到放量那个不算读它）」「变异门禁点名登记过的崩溃枚举目标的行、只带判器缩域变量：拒，说明点名该设放量那个」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-extra-variable-refused  多设了点到的目标不读的那一个缩域变量也拒（读的那一个设了也拒）
+#       红：「cargo test 点名代码里只读判器缩域变量的目标、两个缩域变量都带：放」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-variable-unknown-refused  判不出点到的目标读哪一个缩域变量的，设了缩域变量也照没缩对拒
+#       红：「cargo test 点名登记过而读不到源码的目标、带缩域变量：判不出读哪一个，放行、记一处判不了」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-named-tree-unread  命令点明的树（证红 --copy 点名的副本、变异门禁的根参数）不读：变异表、登记表与测试源码只读命令当前目录那一棵与项目根
+#       红：「证红点名副本里新登记的崩溃枚举目标的变异行（--copy 写字面路径）、没缩域：拒」「task-server 提交证红、--copy 写成赋过字面值的变量、点名副本里新登记的崩溃枚举目标的变异行、没缩域：拒」「变异门禁点名副本里新写的行（根参数指到副本）、没缩域：拒」「证红点名的变异名副本里与主工作区都没有：放行、记一处判不了、说明写读过的树」「证红 --copy 写成展开不出值的变量：放行、记一处判不了、说明点名那个变量」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-tree-fallback-dropped  只读排头那一棵树（命令点明的副本，没点明的取命令当前目录那一棵），里面没有的不退回别的树
+#       红：「变异门禁根参数指到副本、点名的行副本里没有而主工作区有：退回主工作区那一份判、没缩域：拒」
+#   RUN_SCOPE_GUARD_BREAK=crash-domain-tree-variables-unexpanded  `$名` 写的树（证红 --copy、变异门禁的根参数、submit 的 --cwd）不展开，当成路径里的字面字符
+#       红：「task-server 提交证红、--copy 写成赋过字面值的变量、点名副本里新登记的崩溃枚举目标的变异行、没缩域：拒」「task-server 提交 --cwd 写成赋过字面值的变量指到副本、cargo test 点名副本里新登记的崩溃枚举目标、没缩域：拒」「证红 --copy 写成展开不出值的变量：放行、记一处判不了、说明点名那个变量」
+#   RUN_SCOPE_GUARD_BREAK=unnamed-submissions-unjudged  经 task-server/task submit 交的那一条不判点没点名（不收 SubmittedRun，task_server_lib.unnamed_run_problem 不调）
+#       红：「task-server 提交合入后验证不带 --item：拒（启动测试与验证要点名）」「task-server 提交 cargo test 点名目标、不点名测试函数：拒」「task-server 提交证红不点名变异：拒」「task-server 提交门禁点起测试的格、不带 --item：拒」「入口：经 submit 交的 cargo test 不点名测试函数拒（退出码 2、说明写没点名与改成点名的样子 --exact、不附声明模板、记一行被拒）」
+#   RUN_SCOPE_GUARD_BREAK=unnamed-full-gate-dropped  判点没点名时不把 submit 带的 --full-gate 交给判据（提交时那一趟也照判）
+#       红：「task-server 提交带 --full-gate 的门禁整道、submit 前面带对的声明：放」「task-server 提交带 --full-gate、证红不点名变异：放（提交时那一趟不判点名）」
+#   RUN_SCOPE_GUARD_BREAK=unnamed-confirmed-dropped  判点没点名时不把 submit 带的 --whole-package-confirmed 交给判据（用户确认过的整包也照判）
+#       红：「提交带 --whole-package-confirmed：弹窗」「task-server 提交带 --whole-package-confirmed、证红不点名变异：放（用户确认过的整包不判点名）」
 #   开关与红的格以 lib_run_scope.py 的 BREAK_SWITCH_CELLS 为准，开关轮核每个开关名都写在这一段里。
 # 退役判据：各道入口都认了范围参数、主 agent 连续四周对着检出记录没挑出不合适的范围，或要声明的那几道入口都不在了，删掉这个钩子与它的注册。
 set -uo pipefail

@@ -44,7 +44,7 @@
   自证    python3 <仓根>/.claude/hooks/lib_work_root.py --selftest：在内存里换环境判数据根、工作根与两张名单，命令行那几格起它自己的入口（SINGLEFS_WORK_ROOT_BREAK=<项> 时必须判红）
   写范围表 .claude/hooks/agent-write-scope.tsv 的路径模式以 $SINGLEFS_WORK_ROOT/ 起头的，由 expand_scope_pattern 展开成工作根那一条
   钩子判不了而照常放行时 record_unjudged_pass 往检出记录追加一行（结局「只记」）：ask-user-claim-guard.sh、
-  timer-only-remind-guard.sh、session-start.sh 调它；读不到这一份的钩子 stderr 说一句没记成
+  timer-only-remind-guard.sh 调它；读不到这一份的钩子 stderr 说一句没记成
 
 弄坏开关 SINGLEFS_WORK_ROOT_BREAK=<项>（只给用它的钩子与脚本的自证判红用；这份库的命令行入口平常跑设了就退 2、点名变量只在自证里认，别的脚本的 --selftest 起的子进程照认）。
 打开后红在哪几格：用它的各份自证里都有格，下面各列一份自证实测红的失败行（write-guard.sh、runner-dispatch-guard.sh 的 --selftest），别的钩子的格名见它们各自的文件头：

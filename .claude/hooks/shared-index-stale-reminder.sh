@@ -11,7 +11,7 @@
 # gate-similar: project-code-guard.sh 在执行前按命令文本拒不经 task-server 跑项目代码，与索引无关；这里命令做完才查
 # gate-similar: timer-only-remind-guard.sh 同挂 Bash 这一个工具，但挂 PreToolUse，判的是定时办法，与提交无关
 # gate-similar: pattern-process-guard.sh 上游 SOP 的钩子，只判按模式找进程的写法，上游副本也不归本仓改
-# gate-similar: session-start.sh 开会话时打一次本机状态；这里在每次提交之后现查共用索引，触发点不同
+# gate-similar: session-checks.sh 上游钩子，开会话与压缩之后跑项目登记的检查项；这里在每次提交之后现查共用索引，触发点不同
 # gate-similar: scripts/gate/stage-mine.py 管提交之前「只暂存这一轮的块」，不看提交之后共用索引与 HEAD 的差；判法在 scripts/gate/shared-index-stale-check.py，这个钩子只是把它挂到提交之后自动跑
 #
 # 认法：lib_shell_words.commands_at_command_position 切出命令位置上的每一条命令（前缀、包装、cd 照它），命令词是 git（取文件名），

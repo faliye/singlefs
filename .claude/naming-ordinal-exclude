@@ -2,7 +2,7 @@
 # 判法在 .claude/gate.d/code-source-discipline.sh 的 cell_ordinal_names 上方：指向不存在的、那一处已经没有违规的、没写理由的都判红，改完删那一行（排除只缩不涨）。
 crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置，产物钉 sha256；下次重跑时连装置一起改名
 crates/singlefs-verification/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs  # FirstStream、first_stream 按先后叫新池新建文件流，改名漏了；改成 NewPoolFileCreationStream、new_pool_file_creation_stream 归下一批实现员

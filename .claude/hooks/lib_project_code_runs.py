@@ -114,16 +114,23 @@ runs_compiled_code 认，认不出起什么的写法由 unrecognized_launch 认�
 
 弄坏开关（只给自证判红用）：LIB_PROJECT_CODE_RUNS_BREAK 设成下面一个或几个（逗号分隔），--selftest 与 project-code-guard.sh --selftest 都必须判红；
 平常跑（命令行不是单独一个 --selftest）设了就拒、退 2，不认识的值也拒。一条一行「LIB_PROJECT_CODE_RUNS_BREAK=<项>  弄坏哪一处」，下一行起写打开后红的自证项（失败行 `✗ lib_project_code_runs 自检：` 之后的句首）。
+  LIB_PROJECT_CODE_RUNS_BREAK=active-sessions-unlisted  MAIN_AGENT_TOOLS_RUN_DIRECTLY 里 scripts/agents/active-sessions.py 那一项不认（别的会话工具照认）
+      「名单：主 agent 查活动会话的 active-sessions.py」
   LIB_PROJECT_CODE_RUNS_BREAK=admitted-variable-unjudged  两份判法都不认「已由 task-server 准入」开关
       「绕开：命令文本里 export 准入开关」「绕开：python 代码里写 environ 的准入开关」「绕开：命令前设准入开关」
   LIB_PROJECT_CODE_RUNS_BREAK=bench-unjudged  cargo bench 不判（bench 在链接 验证包的包上、验证包上、工作区全量上都放过去）
       「跑编译出来的代码：cargo bench --no-run 只编不跑」
   LIB_PROJECT_CODE_RUNS_BREAK=brace-command-words-bare  命令词展开过的那几条直接 classify，不再切词剥包装
-      「花括号：花括号写在包装上（{nice,-n,5} herd7 x）」
+      「展开：花括号拼出 cargo test（{cargo,test,-p,singlefs-core}）」
   LIB_PROJECT_CODE_RUNS_BREAK=brace-expansion-literal  花括号一律照字面、不展开
-      「花括号：命令词里的花括号展开（herd{7,x} 起的是 herd7）」「花括号展开与 bash 一致：{a,b}」
+      「花括号：数字序列展开（herd{1..9} 里有 herd7）」「展开：花括号拼出 cargo test（{cargo,test,-p,singlefs-core}）」
+      「花括号展开与 bash 一致：」（词表里 bash 展得开的每一个词都红，一项照出这几十行）
   LIB_PROJECT_CODE_RUNS_BREAK=brace-sequence-literal  {1..3}、{a..e} 这类序列不展开
-      「花括号：数字序列展开（herd{1..9} 里有 herd7）」「花括号展开与 bash 一致：{1..3}」
+      「花括号：数字序列展开（herd{1..9} 里有 herd7）」「花括号展开与 bash 一致：{1..3}」「花括号展开与 bash 一致：{3..1}」「花括号展开与 bash 一致：{01..10}」
+      「花括号展开与 bash 一致：{1..10..3}」「花括号展开与 bash 一致：{a..e}」「花括号展开与 bash 一致：{a..e..2}」「花括号展开与 bash 一致：{-2..2}」
+      「花括号展开与 bash 一致：{-01..3}」「花括号展开与 bash 一致：{1..-03}」「花括号展开与 bash 一致：{0..00}」「花括号展开与 bash 一致：{1..05..2}」
+      「花括号展开与 bash 一致：{01..100..33}」「花括号展开与 bash 一致：{100..00..50}」「花括号展开与 bash 一致：{+1..3}」「花括号展开与 bash 一致：{1..3..0}」
+      「花括号展开与 bash 一致：x{1..3}y{a,b}」「花括号展开与 bash 一致：{1..2}{3..4}」
   LIB_PROJECT_CODE_RUNS_BREAK=build-scripts-unjudged  starts_a_build 不认 SCRIPTS_STARTING_BUILDS 里的脚本（compile-then-swap.py 一律交 None）
       「起编译：python3 起 compile-then-swap.py」「起编译：直接执行别处树里的 compile-then-swap.py」
   LIB_PROJECT_CODE_RUNS_BREAK=build-subcommands-unjudged  starts_a_build 不认会编的 cargo（一律交 None）
@@ -139,13 +146,14 @@ runs_compiled_code 认，认不出起什么的写法由 unrecognized_launch 认�
   LIB_PROJECT_CODE_RUNS_BREAK=configuration-before-subcommand-only  cargo 子命令之后的 --config 不认
       「跑编译出来的代码：--config 写在子命令之后的别名」
   LIB_PROJECT_CODE_RUNS_BREAK=device-layer-unrecognized  实验装置那一层的登记不认
-      「样本表：装置那一层登记过的单独 --selftest 认」
-  LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen  command_under_dispatch_launcher() 一律交 None（multi-host-run.sh --peer … -- 里面那条看不见，registered_selftest 照旧把
-      「启动器：multi-host-run.sh --peer 带 --memory-cap、--label 各一个值」「派发起法：multi-host-run.sh --peer -- <脚本> --selftest 不当派发器自己的自证」
+      「样本表：装置那一层登记过的单独 --selftest 认」「样本登记表里写坏的几行逐条报出来（…）」
+      「要临时服务：仓里的表（…）与自证登记表、脚本源码对得上」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」
+  LIB_PROJECT_CODE_RUNS_BREAK=dispatch-launchers-unseen  command_under_dispatch_launcher() 一律交 None（multi-host-run.sh --peer … -- 里面那条看不见）
+      「启动器：multi-host-run.sh --peer 带 --memory-cap、--label 各一个值」
   LIB_PROJECT_CODE_RUNS_BREAK=expanded-project-code-unjudged  展开（花括号、通配）出来的本仓的代码、会编的 cargo、剥掉的包装一律不认（project_code_program_use 交 None）
       「展开：通配起本仓的脚本经 capped.sh（scripts/hosts/capped.s? 4 true）」「展开：花括号拼出 cargo test（{cargo,test,-p,singlefs-core}）」
   LIB_PROJECT_CODE_RUNS_BREAK=external-programs-unlisted  外部程序名单不查（qemu-system-*、herd7、e152-file-system-benchmark 直接起放过去）
-      「外部程序：qemu-system-x86_64」「外部程序：herd7 跑 litmus」「外部程序：e152-file-system-benchmark 光名字从 PATH 起」
+      「应当是 external-program，实际 None」（外部程序、包在命令外面的启动器、花括号、通配、标准输入与命令词变量里，该认出外部程序的每一格都红，一项照出这些行）
   LIB_PROJECT_CODE_RUNS_BREAK=extra-launchers-unseen  名单外启动器不剥（应当是起的那条命令，实际 None）；project-code-guard.sh 的八格见它的文件头
       「启动器：」
   LIB_PROJECT_CODE_RUNS_BREAK=family-copy-content-unchecked  内容相同的拷贝也不认
@@ -154,28 +162,40 @@ runs_compiled_code 认，认不出起什么的写法由 unrecognized_launch 认�
       「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」「样本表：门禁目录顶层 lib- 起头的共用库登记过，单独 --selftest 认」
   LIB_PROJECT_CODE_RUNS_BREAK=gpu-quiesce-opaque  command_under_gpu_quiesce 一律交 None，gpu-quiesce-run.sh -- <命令> 不剥（里面那条看不见）
       「gpu-quiesce-run.sh 清场之后起命令的包装」
+  LIB_PROJECT_CODE_RUNS_BREAK=gpu-verification-server-directory-unrecognized  自证认的目录里去掉 gpu-verification-server（selftest_directories；登记表里 gpu-verification-server/control 那一行算写坏的行，它的 --selftest 不当自证）
+      「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」「样本表：gpu-verification-server 那一层登记过的单独 --selftest 认」
   LIB_PROJECT_CODE_RUNS_BREAK=herd7-version-flag-counted  herd7 只问版本（-version、--version）也算外部程序
       「外部程序：herd7 -version 只问版本，放行」「外部程序：herd7 --version 只问版本，放行」
   LIB_PROJECT_CODE_RUNS_BREAK=launcher-drops-property-environment  systemd-run -p Environment= / EnvironmentFile= 设的变量不带进里面那条命令
       「启动器环境：systemd-run -p Environment= 设别名」「启动器环境：systemd-run -p EnvironmentFile= 文件里设别名」
-  LIB_PROJECT_CODE_RUNS_BREAK=launcher-drops-setenv  systemd-run -E / --setenv= 设的变量不带进里面那条命令
-      「启动器环境：systemd-run -E 设别名」「启动器环境：systemd-run --setenv= 设别名」
+      「启动器环境：systemd-run --property=Environment= 设两个变量、第二个是别名」「启动器环境：systemd-run --prop Environment=（长选项只写前缀）设别名」
+  LIB_PROJECT_CODE_RUNS_BREAK=launcher-drops-setenv  systemd-run -E / --setenv= 设的变量不带进里面那条命令（strace -E / --env 设的同样不带）
+      「启动器环境：systemd-run -E 设别名」「启动器环境：systemd-run --setenv= 设别名」「启动器环境：systemd-run -qE 合写设别名」
+      「启动器环境：strace -E 设别名」「启动器环境：strace --env= 设别名」「启动器环境：strace --env 值另起一个词设别名」「启动器环境：strace -fE 合写设别名」
   LIB_PROJECT_CODE_RUNS_BREAK=launcher-long-options-partial  启动器的长选项只写前缀、值另起一个词的不认
       「strace --output 文件（值另起一个词）包一层」「strace -c --summary-col calls（长选项只写前缀）包一层」
+      「systemd-run --user --scope --expand-environment no（值另起一个词）包一层」「strace --string-limit 200 包一层」
+      「启动器环境：systemd-run --prop Environment=（长选项只写前缀）设别名」
   LIB_PROJECT_CODE_RUNS_BREAK=launcher-whole-word-options  启动器的短选项合写不逐字母查表，整个词当一个选项
-      「strace -fo 文件（短选项合写）」「flock -xw 10 锁文件（短选项合写）」
+      「strace -fo 文件（短选项合写）」「flock -xw 10 锁文件（短选项合写）」「systemd-run --user --scope -qu 名字（短选项合写）」
+      「/usr/bin/time -ao 文件（短选项合写）」
   LIB_PROJECT_CODE_RUNS_BREAK=libtest-list-by-presence  libtest_lists_only() 见到 --list 这个词就算只列（不跳过带值选项的值、不在 -- 处停）
       「libtest 参数：--skip --list（--list 是 --skip 的值）不是只列」「libtest 参数：--logfile --list（--list 是日志文件名）不是只列」「libtest 参数：-- 之后的 --list 是过滤词，不是只列」「libtest 参数：-- 隔开两段之后的 --list 是过滤词，不是只列」
   LIB_PROJECT_CODE_RUNS_BREAK=main-agent-tools-refused  MAIN_AGENT_TOOLS_RUN_DIRECTLY 不认
       「名单：主 agent 停进程的 proc.py」「名单：主 agent 的 task-server/control stop」「名单：主 agent 起定时提醒的 remind.sh」「名单：主 agent 直接起服务自证」
+      「名单：主 agent 的 task-server/control pause」「名单：主 agent 的 task-server/control recognized-card-lease」「名单：主 agent 的 task-server/control resume」
+      「名单：主 agent 的 gpu-verification-server/control start」「名单：主 agent 查活动会话的 active-sessions.py」
   LIB_PROJECT_CODE_RUNS_BREAK=mutants-help-counted  test_invocation 里 cargo mutants 只带 --help、-h、--version、-V 的照旧算跑测试
       「跑编译出来的代码：cargo mutants --help 只打帮助，不起 cargo test」「跑编译出来的代码：cargo mutants -V -h 只打版本与帮助，不起 cargo test」
   LIB_PROJECT_CODE_RUNS_BREAK=pattern-caret-negation-literal  [^…] 不换成 [!…]
       「通配：tools/herd[^x] 的 [^…] 照 bash 当取反」
   LIB_PROJECT_CODE_RUNS_BREAK=pattern-command-words-literal  命令词带通配的只照字面判、不展开
       「通配：tools/her?7 展开成 tools/herd7」「通配：tools/herd* 展开成 herd7 与 herd7-helper，其中有 herd7」
+      「展开：通配起本仓的脚本经 capped.sh（scripts/hosts/capped.s? 4 true）」「通配：tools/herd[^x] 的 [^…] 照 bash 当取反」
+      「通配：POSIX 字符类 tools/her[[:alpha:]]7 交给 bash 展开」「通配：展开出来的是 nice 包装，包装里的 herd7 照认」
+      「bash 起不来时 POSIX 字符类起外部程序照拒」
   LIB_PROJECT_CODE_RUNS_BREAK=pattern-expansions-bare  通配展开出来的那条直接 classify，不再切词剥包装
-      「通配：展开出来的是 nice 包装，包装里的 herd7 照认」
+      「通配：展开出来的是 nice 包装，包装里的 herd7 照认」「展开：通配起本仓的脚本经 capped.sh（scripts/hosts/capped.s? 4 true）」
   LIB_PROJECT_CODE_RUNS_BREAK=posix-brackets-by-python-glob  带 `[:`、`[=`、`[.` 的词照旧交给 python glob（POSIX 字符类、等价类、整理符号认不出，零命中照字面判）
       「通配：POSIX 字符类 tools/her[[:alpha:]]7 交给 bash 展开」「bash 起不来时 POSIX 字符类起外部程序照拒」
   LIB_PROJECT_CODE_RUNS_BREAK=posix-brackets-unresolved-literal  bash 展不开或判不出时照字面判（与零命中一样），不拒
@@ -183,53 +203,60 @@ runs_compiled_code 认，认不出起什么的写法由 unrecognized_launch 认�
   LIB_PROJECT_CODE_RUNS_BREAK=project-scripts-unjudged  project_code_use 一律交 None（本仓的脚本都不当项目代码）
       「本仓代码：」「名单：」
   LIB_PROJECT_CODE_RUNS_BREAK=prune-server-directory-unrecognized  自证认的目录里去掉 prune-server（selftest_directories；登记表里 prune-server/control 那一行算写坏的行，它的 --selftest 不当自证）
-      「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」
+      「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」「样本表：prune-server 那一层登记过的单独 --selftest 认」
   LIB_PROJECT_CODE_RUNS_BREAK=quoted-braces-expanded  引号里的花括号也照展
       「花括号：命令词位置单引号 {herd7,x.litmus} 照字面放行」「花括号：命令词位置双引号 {herd7,x.litmus} 照字面放行」
   LIB_PROJECT_CODE_RUNS_BREAK=run-build-directory-opaque  command_under_run_build_directory 一律交 None，run-build-directory.sh <命令> 不剥（里面那条看不见）
       「run-build-directory.sh 这一趟自己的编译目录的包装」
   LIB_PROJECT_CODE_RUNS_BREAK=same-family-by-path-tail  同族脚本退回只按路径尾部认
-      「同族：别处树里的门禁阶段拷贝不按名字判（读正文）」「同族：别处树里的 mutate.sh 拷贝不按名字判（读正文）」
+      「同族：别处树里的门禁阶段拷贝不按名字判（读正文）」「同族：别处树里的 mutate.sh 拷贝不按名字判（读正文）」「路径尾部相同的别处 crash-point-replay.sh 拷贝不按名字判（读正文）」
   LIB_PROJECT_CODE_RUNS_BREAK=script-body-launches-unjudged  script_body_unresolved_launch() 一律交 None（脚本正文里经变量起的自证、门禁阶段、入口脚本、cargo 看不见）：
       「脚本正文：数组变量的定义里写着 --selftest，照认不出」「脚本正文：cargo test 的参数是解不出的变量，照认不出」
+      「脚本正文："$@" 转发、起它的参数里写着 --selftest，照认不出」
   LIB_PROJECT_CODE_RUNS_BREAK=selftest-extra-arguments-allowed  带了 --selftest 之外参数的也当单独一个 --selftest
-      「样本表：带了 --selftest 之外参数的不认」
+      「样本表：带了 --selftest 之外参数的不认」「样本表：门禁共用库目录里的库带 --selftest 之外的参数不认」
   LIB_PROJECT_CODE_RUNS_BREAK=selftest-pattern-words-judged  命令词带通配的也当自证判
       「样本表：命令词带通配的不当登记过的自证」
   LIB_PROJECT_CODE_RUNS_BREAK=selftest-registry-by-path-tail  登记表只按路径尾部认，别的树里的同名脚本也算登记过
-      「样本表：别的树里路径尾部相同的脚本不算登记」
+      「样本表：别的树里路径尾部相同的脚本不算登记」「样本表：别的树里装置那一层路径尾部相同的不认」「要临时服务：别的树里路径尾部相同的不拒」
   LIB_PROJECT_CODE_RUNS_BREAK=selftest-registry-lenient  登记表里写坏的行照收、不报
       「样本登记表里写坏的几行逐条报出来（种类、理由、目录、重复、文件不在、门禁阶段那几行的种类与假工具目录）」
+      「样本表：种类写坏的一行不算登记」「样本表：理由太短的一行不算登记」
   LIB_PROJECT_CODE_RUNS_BREAK=sourced-libraries-unread  不换脚本所在目录的写法
       「source 的库：$(dirname "${BASH_SOURCE[0]}") 换成脚本所在目录」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-directory-pwd-unexpanded  阶段目录写成 $PWD/… 时不换成当前目录
       「门禁样本：阶段目录写成 $PWD/…、--item 点名一道登记过的」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-feed-script-by-name  不带 --item 时只按名字认 stage-selftest.sh，别处树里的拷贝也信
-      「门禁样本：别处树里的 stage-selftest.sh 拷贝不带 --item」
+      「门禁样本：别处树里的 stage-selftest.sh 拷贝不带 --item」「门禁样本：相对着写、当前目录不在本仓的 stage-selftest.sh 不带 --item」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-items-as-directory  --item / --list-items 不认，当阶段目录判
-      「门禁样本：--item 点名一道登记过的」「门禁样本：--list-items 只列、不喂样本」
+      「门禁样本：--item 点名一道登记过的」「门禁样本：--list-items 只列、不喂样本」「门禁样本：--item 点名不存在的阶段（它自己退 2、一份样本都不喂）」
+      「门禁样本：阶段目录写成 $PWD/…、--item 点名一道登记过的」「门禁样本：--item 与值之间夹的 --force 照 preflight 摘掉」
+      「门禁样本：--item 点名里夹登记表外的，说明点名那一道、不点没毛病的那一道」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-items-script-by-name  带 --item 时只按名字认 stage-selftest.sh，别处树里的拷贝也信
-      「门禁样本：别处树里的 stage-selftest.sh 拷贝带 --list-items」
+      「门禁样本：别处树里的 stage-selftest.sh 拷贝带 --list-items」「门禁样本：别处树里的 stage-selftest.sh 拷贝 --item 点名一道」
+      「门禁样本：别处树里的 stage-selftest.sh 拷贝不带 --item」「门禁样本：相对着写、当前目录不在本仓的 stage-selftest.sh 不带 --item」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-items-unjudged  --item 点名的几道不判
-      「门禁样本：--item 点名里夹一道登记表外的」「门禁样本：--item 点名的样本多一份 setup.sh」
+      「门禁样本：--item 点名里夹一道登记表外的」「门禁样本：--item 点名的样本多一份 setup.sh」「门禁样本：--item 一个值里带空格点到登记表外的」
+      「门禁样本：--item 点名写在变量里」「门禁样本：--item 点名里夹登记表外的，说明点名那一道、不点没毛病的那一道」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-samples-fixtures-unchecked  喂的样本不与暂存区比
-      「门禁样本：样本多一份 setup.sh」「门禁样本：内容改过」「门禁样本：执行位改过」「门禁样本：少了文件」
+      「门禁样本：样本：喂的样本多一份 setup.sh」「门禁样本：样本：内容改过」「门禁样本：样本：执行位改过」「门禁样本：样本：少了文件」
+      「门禁样本：样本：暂存之前新加的样本（样本仓自己的阶段目录）」「门禁样本：--item 点名的样本多一份 setup.sh」「门禁样本：样本与暂存区不同的说明点名那份文件」
   LIB_PROJECT_CODE_RUNS_BREAK=stage-samples-ignored  门禁样本一律不认
       「门禁样本：样本档全登记、与暂存区相同的阶段目录」「门禁样本：--item 点名一道登记过的」「门禁样本：--list-items 只列、不喂样本」「门禁样本：--item 点名不存在的阶段（它自己退 2、一份样本都不喂）」「门禁样本：阶段目录写成 $PWD/…、--item 点名一道登记过的」「门禁样本：--item 与值之间夹的 --force 照 preflight 摘掉」「门禁样本：样本与暂存区不同的说明点名那份文件」「门禁样本：--item 点名里夹登记表外的，说明点名那一道、不点没毛病的那一道」
   LIB_PROJECT_CODE_RUNS_BREAK=strace-drops-env  strace -E / --env 设的变量不带进里面那条命令
-      「启动器环境：strace -E 设别名」「启动器环境：strace --env= 设别名」
+      「启动器环境：strace -E 设别名」「启动器环境：strace --env= 设别名」「启动器环境：strace --env 值另起一个词设别名」「启动器环境：strace -fE 合写设别名」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-builds-unjudged  两份判法都不认直接删服务的编译目录
       「绕开：python 代码 shutil.rmtree 服务的编译目录」「绕开：rm -rf 服务的编译目录」「绕开：rm 写 ~ 起头的编译目录」「绕开：rm 状态目录下的 builds」「绕开：find -delete 编译目录」「绕开：find -exec rm 编译目录」「绕开：rm -rf 编译目录的上级」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-directory-unrecognized  自证认的目录里去掉 task-server（selftest_directories；登记表里那一层的行算写坏的行，那一层的 --selftest 不当自证）
-      「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」
+      「样本登记表里写坏的几行逐条报出来（…）」「仓里的登记表（…）没有写坏的行、指到的文件在 … 里都在」「样本表：task-server 那一层登记过的单独 --selftest 认」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-paths-unjudged  task_server_text_bypass 不认库、密钥、socket 与载入共用库
       「绕开：点到库文件名」「绕开：点到签名密钥文件名」「绕开：点到 socket」「绕开：python 代码载入 task_server_lib」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-scripts-unjudged  task_server_command_bypass 不认直接起服务本体与每次尝试的那一层
       「绕开：直接起服务本体」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-submission-unparsed  task_server_submission 一律交 None
-      「提交：submit -- 后面那条」「提交：--cwd 照这一条的目录解开」「提交：仓副本里逐字节相同的客户端」「样本表：task-server/task submit -- 里那条带 --selftest，不当客户端自己的自证」
-  LIB_PROJECT_CODE_RUNS_BREAK=task-server-submit-as-selftest  registered_selftest 不认 `task-server/task submit -- <命令…>`：里面那条带的 --selftest 当客户端自己的自证判
-      「样本表：task-server/task submit -- 里那条带 --selftest，不当客户端自己的自证」
+      「提交：submit -- 后面那条」「提交：--cwd 照这一条的目录解开」「提交：仓副本里逐字节相同的客户端」「提交：--manual 不带值，-- 后面那条照认」「提交：--full-gate 不带值，-- 后面那条照认」「提交：--whole-package-confirmed 带一个值，-- 后面那条照认」「提交：几个选项混写，--cwd 照解开」
+  LIB_PROJECT_CODE_RUNS_BREAK=task-server-submit-flags-unparsed  task_server_submission 只认 --cwd（带 --manual、--full-gate、--whole-package-confirmed 的提交一律交 None，-- 后面那条不判）
+      「提交：--manual 不带值，-- 后面那条照认」「提交：--full-gate 不带值，-- 后面那条照认」「提交：--whole-package-confirmed 带一个值，-- 后面那条照认」「提交：几个选项混写，--cwd 照解开」
   LIB_PROJECT_CODE_RUNS_BREAK=task-server-units-unjudged  task_server_command_bypass 不认 systemctl 停禁改它的单元
       「绕开：systemctl --user stop 服务单元」「绕开：systemctl --user kill 一次尝试的单元」「绕开：systemctl --user stop 通配」
   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-bare-unjudged  temporary_service_bare_selftest() 一律交 None（要临时服务的自证写成裸 --selftest 也不拦）：
@@ -246,11 +273,13 @@ runs_compiled_code 认，认不出起什么的写法由 unrecognized_launch 认�
       「要临时服务：own-server 行的裸 --selftest 不拒」
   LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-table-lenient  要临时服务的表写坏的行照收、不报（判定认不出、理由太短、键重复）：
       「要临时服务：理由太短的一行不算登记」「要临时服务：样本表写坏的、两边对不上的几行逐条报出来（判定、理由、键重复、文件不在、没登记、源码里没有核对、漏登）」
-  LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-wrapper-unseen  temporary_service_wrapped() 一律交 None（临时 prune-server 的包装 `prune_server_client_selftest.py --with-temporary-service … -- <原命令>`
-      「样本表：包装 --server-binary -- 里那条带 --selftest，不当包装自己的自证」
+  LIB_PROJECT_CODE_RUNS_BREAK=temporary-service-wrapper-unseen  temporary_service_wrapped() 一律交 None（临时 prune-server 的包装 `prune_server_client_selftest.py --with-temporary-service … -- <原命令>` 剥不开，里面那条看不见）
+      「临时 prune-server 的包装给了 --server-binary 剥开里面那条」
   LIB_PROJECT_CODE_RUNS_BREAK=text-tools-refused  TEXT_TOOLS_RUN_DIRECTLY 不认（名单上的文本工具也要经 task-server）
       「名单：replace-once.py 定点改」「名单：仓副本里逐字节相同的 replace-once.py」「名单：认领草稿目录」「名单：gate-overlap.py --list」「名单：提交客户端的 wait」「名单：task-server/control check」「名单：改标签的 relabel-item.py」「名单：备份原文件的 copy-originals.py」
-      「名单：建仓副本的 minimal-copy.py」「名单：打副本闭包的 lib_repository_copy.py entries」（这两格照判法推的、还没复跑）
+      「名单：建仓副本的 minimal-copy.py」「名单：打副本闭包的 lib_repository_copy.py entries」「展开：通配起文本工具 scripts/kb/replace-onc?.py 不拒（谁都能直接跑）」
+      「名单：提交客户端的 clean」「名单：task-server/control bookings」「名单：task-server/control key-stats」「名单：直接起 ledger-append-section.py 不拒」
+      「名单：直接起 append-record.py 不拒」「名单：直接起 quote-rust-items.py 不拒」「名单：确认单打的 task confirm 主 agent 直接起」
   LIB_PROJECT_CODE_RUNS_BREAK=two-logs-opaque  command_under_two_logs 一律交 None，two-logs.sh <名> -- <命令> 不剥（里面那条看不见）
       「two-logs.sh 日志出两份的包装」「two-logs.sh --quiet 日志出两份的包装」
   LIB_PROJECT_CODE_RUNS_BREAK=unrecognized-launches-allowed  unrecognized_launch() 一律交 None
@@ -288,9 +317,13 @@ SCRIPT_CATEGORY_DIRECTORIES = tuple(f"scripts/{category}" for category in ("agen
 TASK_SERVER_DIRECTORY = "task-server"
 # 判定库服务的根目录：control 脚本（装、起、停、查、监听，--selftest 只起假的 ip、ssh、systemctl）住在这一层，自证同样登记在登记表里
 PRUNE_SERVER_DIRECTORY = "prune-server"
+# GPU 批处理验证服务的根目录：control 脚本（装、起、停、查，--selftest 只起假的 ssh、systemctl）住在这一层，自证同样登记在登记表里
+GPU_VERIFICATION_SERVER_DIRECTORY = "gpu-verification-server"
 # scripts/mutation/tests：变异那几份脚本的回归单测（test_audit_regressions.py，单独一个 --selftest 跑 unittest），登记表里那一行落在这一层
 MUTATION_REGRESSION_TESTS_DIRECTORY = "scripts/mutation/tests"
-SELFTEST_DIRECTORIES = SCRIPT_CATEGORY_DIRECTORIES + (MUTATION_REGRESSION_TESTS_DIRECTORY, TASK_SERVER_DIRECTORY, PRUNE_SERVER_DIRECTORY, ".claude/hooks", ".claude/gate.d/lib")
+# 会话检查项目录（.claude/session-checks/，一项一个可执行文件，由上游钩子 session-checks.sh 起）：检查项的自证登记在登记表里，键落在这一层
+SESSION_CHECKS_DIRECTORY = ".claude/session-checks"
+SELFTEST_DIRECTORIES = SCRIPT_CATEGORY_DIRECTORIES + (MUTATION_REGRESSION_TESTS_DIRECTORY, TASK_SERVER_DIRECTORY, PRUNE_SERVER_DIRECTORY, GPU_VERIFICATION_SERVER_DIRECTORY, ".claude/hooks", SESSION_CHECKS_DIRECTORY, ".claude/gate.d/lib")
 # 实验装置那一层（文件头「实验装置那一层」）：这个目录下正好一层的目录，登记了的单独 --selftest 才当自证
 DEVICE_SELFTEST_PARENT = "scripts/experiment-apparatus"
 GATE_LIBRARY_DIRECTORY = ".claude/gate.d/lib"
@@ -320,7 +353,7 @@ KNOWN_SCRIPT_LOCATIONS = {
     "gate-staged.sh": "scripts/gate/gate-staged.sh", "mutate.sh": "scripts/mutation/mutate.sh",
     "vm-bench.sh": "scripts/devices/vm-bench.sh", "e152-run.sh": "scripts/devices/e152-run.sh",
     "capped.sh": "scripts/hosts/capped.sh", "run-with-memory-cap.sh": "scripts/hosts/run-with-memory-cap.sh",
-    "crash-point-replay-shard-run.sh": "scripts/crash/crash-point-replay-shard-run.sh", "mutation-shard-run.sh": "scripts/mutation/mutation-shard-run.sh",
+    "mutation-shard-run.sh": "scripts/mutation/mutation-shard-run.sh",
     "broad-mutation.py": "scripts/mutation/broad-mutation.py",
     "crash-amplification.sh": "scripts/crash/crash-amplification.sh", "crash-amplification-item.sh": "scripts/crash/crash-amplification-item.sh",
     "crash-amplification-two-hosts.sh": "scripts/crash/crash-amplification-two-hosts.sh",
@@ -464,8 +497,7 @@ WORD_EXPANSION_DEPTH_LIMIT = 4
 # 花括号展开只看这几种记号（brace_gobble）；一个词最多看这么多个，配不上的花括号多到超过的这个词不展开
 BRACE_TOKENS = re.compile(r"\$\{|[{},]|\.\.")
 BRACE_SCAN_LIMIT = 200000
-# 花括号里的序列：{<起>..<止>[..<步长>]}，起止同是整数或同是一个字母；步长是整数（0 当 1，正负只看起止的方向）
-BRACE_SEQUENCE = re.compile(r"([+-]?[0-9]+|[A-Za-z])\.\.([+-]?[0-9]+|[A-Za-z])(?:\.\.([+-]?[0-9]+))?")
+# 花括号里的序列 {<起>..<止>[..<步长>]} 的展开交 shell_words.brace_sequence（起止同是整数或同是一个字母；步长是整数，0 当 1，正负只看起止的方向）
 # cargo llvm-cov 不起测试的子命令；cargo hack 后面接的、起测试或跑程序的子命令
 LLVM_COV_NON_RUNNING_SUBCOMMANDS = {"report", "clean", "show-env"}
 HACK_INNER_SUBCOMMANDS = {"test", "t", "run", "r", "nextest", "miri", "llvm-cov", "mutants"}
@@ -619,11 +651,14 @@ class SelftestRow(NamedTuple):
 
 def selftest_directories():
     """自证认的那几个目录（SELFTEST_DIRECTORIES）。弄坏开关 task-server-directory-unrecognized 下去掉 task-server、
-    prune-server-directory-unrecognized 下去掉 prune-server（登记表里那一层的行算写坏的行，那一层的 --selftest 不当自证）。"""
+    prune-server-directory-unrecognized 下去掉 prune-server、gpu-verification-server-directory-unrecognized 下去掉 gpu-verification-server
+    （登记表里那一层的行算写坏的行，那一层的 --selftest 不当自证）。"""
     if break_is_set("task-server-directory-unrecognized"):
         return tuple(place for place in SELFTEST_DIRECTORIES if place != TASK_SERVER_DIRECTORY)
     if break_is_set("prune-server-directory-unrecognized"):
         return tuple(place for place in SELFTEST_DIRECTORIES if place != PRUNE_SERVER_DIRECTORY)
+    if break_is_set("gpu-verification-server-directory-unrecognized"):
+        return tuple(place for place in SELFTEST_DIRECTORIES if place != GPU_VERIFICATION_SERVER_DIRECTORY)
     return SELFTEST_DIRECTORIES
 
 
@@ -757,8 +792,8 @@ def selftest_registered_file(word, directory, key):
 def registered_selftest(word, arguments, directory):
     """命令是不是登记表里登记过的自证：是交那一行（SelftestRow），不是交 None。
     脚本、钩子、门禁目录顶层 lib- 起头的共用库只认参数正好是 ["--selftest"]，.claude/gate.d/lib/ 下的共用库直接执行就是跑自证，不带参数或单独一个 --selftest 都算；命令词要解到登记表所在仓里那一份文件
-    （selftest_registered_file）；命令词带通配的不当自证（弄坏开关 selftest-pattern-words-judged 下照判）；派发起法与 task-server/task submit 的 `--`
-    之后那条里的 --selftest 是里面那条的，不是外面这一条自己的自证；实验装置那一层只认登记了的单独 --selftest。
+    （selftest_registered_file）；命令词带通配的不当自证（弄坏开关 selftest-pattern-words-judged 下照判）；派发起法 `… -- <命令…>`
+    之后那条里的 --selftest 是里面那条的，不是外面这一条自己的自证（task-server/task submit -- <命令…> 同理：外面这一条的参数以 submit 起头，不是单独的 --selftest）；实验装置那一层只认登记了的单独 --selftest。
     弄坏开关 selftest-extra-arguments-allowed 下带了别的参数也算单独。"""
     if SELFTEST_PATTERN_CHARACTERS & set(word) and not break_is_set("selftest-pattern-words-judged"):
         return None   # 通配写出的命令词：展开之前判不出起的是哪一份（case 的模式行切成命令时也是这样的词），不当自证
@@ -767,8 +802,6 @@ def registered_selftest(word, arguments, directory):
         return None
     if command_under_dispatch_launcher([word] + list(arguments), directory) is not None:
         return None   # 派发起法 `… -- <命令…>`：--selftest 落在里面那条命令里，不是派发器自己的自证（里面那条由调用方剥开另判）
-    if not break_is_set("task-server-submit-as-selftest") and task_server_submission([word] + list(arguments), directory) is not None:
-        return None   # task-server/task submit -- <命令…>：--selftest 落在交给服务的那条里，不是客户端自己的自证
     gate_library = os.path.dirname(key) == GATE_LIBRARY_DIRECTORY
     if not gate_library and "--selftest" not in arguments:
         return None
@@ -1036,7 +1069,7 @@ def starts_a_build(words, directory):
 
 # ── 只认经 task-server/task 起（文件头「经 task-server 起」；records/2026-10-30-编译绕过内存总上限.md 批 3b ① ③） ──
 TASK_SERVER_CLIENT = "task-server/task"
-TASK_SERVER_CLIENT_SUBCOMMANDS = frozenset({"submit", "confirm", "wait", "status", "cancel", "log", "clean"})   # confirm：交任务的二次确认（task-server/task_server.py 文件头 ⑦），只给主 agent
+TASK_SERVER_CLIENT_SUBCOMMANDS = frozenset({"submit", "confirm", "promote", "wait", "status", "cancel", "log", "clean"})   # confirm：交任务的二次确认（task-server/task_server.py 文件头 ⑦），只给主 agent；promote：在排的任务提前到队头，run-scope-guard.sh 弹窗要用户确认
 # 子 agent 起提交客户端只许这两个只读的子命令（文件头「经 task-server 起」subagent_task_server_refusal）
 SUBAGENT_TASK_SERVER_SUBCOMMANDS = frozenset({"status", "log"})
 # 子 agent 被拒时的出路：project-code-guard.sh 与 run-scope-guard.sh 的拒绝说明都照这一句写
@@ -1044,6 +1077,9 @@ SUBAGENT_HAND_BACK_WAY_OUT = ("子 agent 不往统一任务服务交任务，tas
                               "把要跑的命令照共用约束 .claude/agent-common.md「不做」一节「子 agent 不交任务」那一条拼成 submit 的整条（范围声明写在 submit 前面），"
                               "写进报告「要主 agent 跑的命令」一节交回，写明在哪棵树里起、跑完看哪几行，由主 agent 交服务")
 TASK_SERVER_SUBMIT_DIRECTORY_OPTION = "--cwd"
+# task-server/task submit 别的几个选项：写法照客户端 submit 的那一段（只认分开写的，`--选项=值` 客户端按用法错退 2）；task_server_submission 跳过它们才找得到 `--`
+TASK_SERVER_SUBMIT_BARE_OPTIONS = ("--manual", "--full-gate")
+TASK_SERVER_SUBMIT_VALUE_OPTION = "--whole-package-confirmed"
 TASK_SERVER_LIBRARY_PATH = os.path.join(HOOK_REPOSITORY, "task-server", "task_server_lib.py")
 # 直接跑、不经 task-server 的本仓脚本只有这两张表（钩子与看门狗都引这一处，别处不另抄）。
 # 相对仓根的路径 → 放行的参数形态："any" 是除带 --selftest 之外都放；("first", {词…}) 是第一个参数是其中之一；("exact", (词…)) 是参数恰好这几个
@@ -1063,25 +1099,32 @@ TEXT_TOOLS_RUN_DIRECTLY = {
     "scripts/kb/relabel-item.py": "any",          # 主 agent 定的（records/2026-10-30-编译绕过内存总上限.md 问题清单 #7）：kb-scribe 定义点名的改标签工具
     "scripts/agents/copy-originals.py": "any",    # 同上：共用约束「写」一节教的备份原文件写法
     "scripts/kb/quote-kb.py": "any",              # 与 checklist-specs.py 同类的 kb 抽取工具
+    "scripts/kb/quote-rust-items.py": "any",      # 与 quote-kb.py 同类的 Rust 源码抽取工具：只读 .rs 文本、按项名整段写到标准输出，不编译、不起项目代码
     "scripts/kb/append-record.py": "any",          # records/2026-10-29-subagent拆分提案.md 一百七十六节 ⑭：bash-command-detector.sh ⑲ 拒 Bash 往 records/ 追加、出路就是它，与 insert-row.py 同类的写前复核工具，主 agent 与子 agent 都直接跑
     "scripts/kb/ledger-append-section.py": "any",  # 主 agent 定的（records/2026-10-29-一百三十七节那一轮调度记录.md 批次 #19）：往现行拆分提案账本追加一节，取号与写入一步做完（records/2026-10-29-subagent拆分提案.md 第一百五十六节），主 agent 与子 agent 都直接跑
     "scripts/hosts/minimal-copy.py": "any",        # 副本拷贝不全的问题必须根治（records/2026-10-29-subagent拆分提案.md 第一百九十九节）：建仓副本只用它（范围按闭包现算），只 rsync、不编，主 agent 与子 agent 都直接跑
     "scripts/hosts/lib_repository_copy.py": ("first", frozenset({"entries"})),  # 同上：只打算出的副本闭包，不拷不编
     ".claude/singlefs-ai-sop/scripts/gate-overlap.py": ("exact", ("--list",)),
     TASK_SERVER_CLIENT: ("first", TASK_SERVER_CLIENT_SUBCOMMANDS),
-    "task-server/control": ("first", frozenset({"check"})),
+    "task-server/control": ("first", frozenset({"check", "records", "bookings", "key-stats"})),   # records、key-stats 只读本机那份库（mode=ro），bookings 只读服务 /health 的记账明细，起在服务里会派到第二台、读不到
 }
 # 只给主 agent 直接跑的会话工具：起在服务的单元里就丢了会话身份（停进程按会话认、定时提醒与看门狗按会话号认）或停不了服务自己（control 的装与起停）
+ACTIVE_SESSIONS_SCRIPT = "scripts/agents/active-sessions.py"
 MAIN_AGENT_TOOLS_RUN_DIRECTLY = {
     ".claude/singlefs-ai-sop/scripts/proc.py": "any",
     "scripts/agents/remind.sh": "any",
     "scripts/agents/watch.sh": "any",
     "scripts/agents/agent-watch.py": "any",
     "scripts/agents/lib_session_registry.py": "any",  # 会话登记表现场查（by-session、by-name）：读本机 ~/.claude/sessions 与 /proc，起在服务里会派到第二台、查到的是那一台的登记表
+    "scripts/agents/who-touched.py": "any",  # 查谁改过某个路径、谁提到过某个符号：读本机 ~/.claude/sessions 与会话记录，只读；起在服务里会派到第二台、查到的是那一台的登记表
+    ACTIVE_SESSIONS_SCRIPT: "any",  # 查此刻活着的会话与各自最近一次自己动作：读本机 ~/.claude/sessions 与会话记录，只读；起在服务里会派到第二台、那一台的登记表是空的；带 --selftest 的那一形不在名单里
     "scripts/agents/dispatch-prompt.py": "any",
-    "task-server/control": ("first", frozenset({"install", "start", "stop", "watch", "clear-queue", "pause", "resume"})),
+    "scripts/hosts/queue-health.py": "any",  # 按任务号现算内存：读此刻两台的 /proc 与 cgroup，排队就量不到此刻，起在服务里也会派到任意一台
+    "task-server/control": ("first", frozenset({"install", "start", "stop", "watch", "clear-queue", "drop-history", "pin-cap", "unpin-cap", "pause", "resume", "recognized-card-lease"})),
     # 判定库服务的装与起停、监听：装的是本机用户级 systemd 单元，起在任务服务里就装到别处或丢了会话
-    "prune-server/control": ("first", frozenset({"install", "start", "stop", "check", "watch"})),
+    "prune-server/control": ("first", frozenset({"install", "swap-binary", "start", "stop", "check", "watch"})),
+    # GPU 批处理验证服务的装与起停、查：装、起的是点名了卡的每一台的用户级 systemd 单元（第二台经 ssh 转），起在任务服务里就落到派到的那一台、丢了会话
+    "gpu-verification-server/control": ("first", frozenset({"install", "start", "stop", "check"})),
     # 用户「模拟任务来跑」：服务自证起的是临时目录里的模拟服务与假主机，不进真队列等真任务
     "task-server/task_server_lib.py": ("exact", ("--selftest",)),
 }
@@ -1165,13 +1208,16 @@ def same_as_own_copy(relative, real_path):
 
 def directly_run_level(relative, real_path, arguments):
     """名单上直接跑的脚本：谁都能跑交 "anyone"，只给主 agent 交 "main-agent"，不在名单上（或参数不合、内容与本仓那一份不同）交 "nobody"。
-    弄坏开关 text-tools-refused 下 TEXT_TOOLS_RUN_DIRECTLY 不认，main-agent-tools-refused 下 MAIN_AGENT_TOOLS_RUN_DIRECTLY 不认。"""
+    弄坏开关 text-tools-refused 下 TEXT_TOOLS_RUN_DIRECTLY 不认，main-agent-tools-refused 下 MAIN_AGENT_TOOLS_RUN_DIRECTLY 不认，
+    active-sessions-unlisted 下 MAIN_AGENT_TOOLS_RUN_DIRECTLY 里只有 ACTIVE_SESSIONS_SCRIPT 那一项不认。"""
     if relative is None or not same_as_own_copy(relative, real_path):
         return "nobody"
     form = TEXT_TOOLS_RUN_DIRECTLY.get(relative)
     if form is not None and argument_form_allows(form, arguments) and not break_is_set("text-tools-refused"):
         return "anyone"
     form = MAIN_AGENT_TOOLS_RUN_DIRECTLY.get(relative)
+    if relative == ACTIVE_SESSIONS_SCRIPT and break_is_set("active-sessions-unlisted"):
+        form = None
     if form is not None and argument_form_allows(form, arguments) and not break_is_set("main-agent-tools-refused"):
         return "main-agent"
     return "nobody"
@@ -1234,8 +1280,10 @@ def subagent_task_server_refusal(words, directory, launcher=None):
 def task_server_submission(words, directory, launcher=None):
     """命令词是本仓的 task-server/task（仓副本里与它逐字节相同的拷贝同算；python3 起的、直接执行的都认）而子命令是 submit：
     交 (`--` 之后那条命令的词, 任务的当前目录：--cwd 给了的取它照这一条的目录解开，没给是 None)；不是交 None。
+    `--` 之前认 --cwd <目录>、--manual、--full-gate、--whole-package-confirmed <文件>（次序不限，写法照客户端 submit 的那一段）。
     认不出的选项、没写 `--`、`--` 之后没有词的，客户端按用法错退 2、什么都不起，交 None（这一条照名单上的客户端放行）。
-    弄坏开关 task-server-submission-unparsed 下一律交 None（submit 那一条只当名单上的客户端放行，后面那条一个字都不判）。"""
+    弄坏开关 task-server-submission-unparsed 下一律交 None（submit 那一条只当名单上的客户端放行，后面那条一个字都不判）；
+    task-server-submit-flags-unparsed 下只认 --cwd（带另外三个选项的提交一律交 None）。"""
     if break_is_set("task-server-submission-unparsed") or len(words) < 2 or words[1] != "submit":
         return None
     if task_server_client_subcommand(words, directory, launcher) != "submit":
@@ -1255,6 +1303,13 @@ def task_server_submission(words, directory, launcher=None):
         if argument.startswith(TASK_SERVER_SUBMIT_DIRECTORY_OPTION + "="):
             task_directory, position = argument.split("=", 1)[1], position + 1
             continue
+        if not break_is_set("task-server-submit-flags-unparsed"):
+            if argument in TASK_SERVER_SUBMIT_BARE_OPTIONS:
+                position += 1
+                continue
+            if argument == TASK_SERVER_SUBMIT_VALUE_OPTION and position + 1 < len(arguments):
+                position += 2
+                continue
         return None
     return None
 
@@ -2448,26 +2503,6 @@ def brace_gobble(word, position, wanted, budget):
     return None
 
 
-def brace_sequence(amble):
-    """{<起>..<止>[..<步长>]} 里面那一段照 bash 展开成的几份（最多 WORD_EXPANSION_LIMIT 份）；不是合法的序列交 None。
-    整数照 bash 补零：起或止写成 0 起头的两位以上（或 -0 起头的三位以上）时，宽度取这样写的那几边的长度里大的那个（与 lib_shell_words.py 共用 brace_sequence_width）。
-    弄坏开关 brace-sequence-literal 下一律交 None。"""
-    found = BRACE_SEQUENCE.fullmatch(amble)
-    if found is None or break_is_set("brace-sequence-literal"):
-        return None
-    first, last, step = found.group(1), found.group(2), abs(int(found.group(3) or 1)) or 1
-    if first.isalpha() != last.isalpha():
-        return None
-    if first.isalpha():
-        begin, end, render = ord(first), ord(last), chr
-    else:
-        width = shell_words.brace_sequence_width(first, last)
-        begin, end = int(first), int(last)
-        render = (lambda value: f"{value:0{width}d}") if width else str
-    step = step if begin <= end else -step
-    return [render(value) for value in range(begin, end + (1 if step > 0 else -1), step)[:WORD_EXPANSION_LIMIT]]
-
-
 def brace_expansion(word):
     """一个词照 bash 的花括号展开成的几份（最多 WORD_EXPANSION_LIMIT 份），没有能展开的交 [word]；展开出来的空串照 bash 去掉。
     认的写法：{a,b}（最外层至少一个逗号，各份再各自展开）与序列 {1..3}、{a..e}、{01..10..3}；前后缀照接，几处花括号照乘。
@@ -2487,7 +2522,8 @@ def brace_expansion(word):
 
 
 def brace_expansion_with_empties(word, budget):
-    """照 bash braces.c 的 brace_expand（空串留着，brace_expansion 再去掉）；budget 见 brace_gobble。"""
+    """照 bash braces.c 的 brace_expand（空串留着，brace_expansion 再去掉）；budget 见 brace_gobble。序列交 shell_words.brace_sequence（整数补零、最多 WORD_EXPANSION_LIMIT 份），
+    弄坏开关 brace-sequence-literal 下序列一律不展开。"""
     opening = brace_gobble(word, 0, "{", budget)
     if opening is None:
         return [word]
@@ -2505,7 +2541,8 @@ def brace_expansion_with_empties(word, budget):
                 break
             position = comma + 1
     else:
-        middles = brace_sequence(amble)
+        sequence = None if break_is_set("brace-sequence-literal") else shell_words.brace_sequence(amble, "u" * len(amble), WORD_EXPANSION_LIMIT)
+        middles = None if sequence is None else [text for text, _ in sequence][:WORD_EXPANSION_LIMIT]
         if middles is None:
             if close + 1 >= len(word):
                 return [word]
@@ -2802,6 +2839,7 @@ SAMPLE_SELFTEST_REGISTRY = (
     "scripts/sample_top.py\tselftest\t# 样本：直接放在 scripts/ 下、不在哪个分类目录里\n"
     "task-server/sample_server_lib.py\tselftest\t# 样本：统一任务服务那一层的脚本，自证用假驱动\n"
     "prune-server/sample_control\tselftest\t# 样本：判定库服务那一层的脚本，自证只起假的 ip、ssh、systemctl\n"
+    "gpu-verification-server/sample_control\tselftest\t# 样本：GPU 批处理验证服务那一层的脚本，自证只起假的 ssh、systemctl\n"
     ".claude/gate.d/lib-sample-library.py\tselftest\t# 样本：门禁目录顶层以 lib- 起头的共用库，自证用假驱动\n"
     ".claude/gate.d/lib/sample-library.py\tselftest\t# 样本：门禁共用库目录里的库，直接执行就是跑自证\n")
 # 样本表里该报出来的行（键）：种类认不出、理由太短、不在登记目录里、重复、文件不在
@@ -2940,7 +2978,7 @@ def selftest_registry_cells(work, results):
                      ".claude/gate.d/sample-stage.sh", ".claude/gate.d/sample-stage-plain.sh", ".claude/gate.d/lib/sample-library.py", "elsewhere-tree/scripts/gate/sample-selftest.sh",
                      *(SAMPLE_DEVICE_LAYER + name for name in ("sample_orchestrator.py", "deeper/sample_too_deep.py", "sample_unregistered.py")),
                      "scripts/sample_top.py", ".claude/gate.d/lib-sample-library.py", ".claude/gate.d/lib-sample-unregistered.py", "task-server/sample_server_lib.py",
-                     "prune-server/sample_control", f"{TEMPORARY_SERVICE_WRAPPER_DIRECTORY}/{TEMPORARY_SERVICE_WRAPPER_SCRIPT}",
+                     "prune-server/sample_control", "gpu-verification-server/sample_control", f"{TEMPORARY_SERVICE_WRAPPER_DIRECTORY}/{TEMPORARY_SERVICE_WRAPPER_SCRIPT}",
                      "elsewhere-tree/" + SAMPLE_DEVICE_LAYER + "sample_orchestrator.py"):
         os.makedirs(os.path.dirname(os.path.join(work, relative)), exist_ok=True)
         with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
@@ -2967,11 +3005,13 @@ def selftest_registry_cells(work, results):
         ("样本表：装置那一层登记了而带 --cells 的不认", SAMPLE_DEVICE_LAYER + "sample_orchestrator.py", ["--selftest", "--cells", "x"], None),
         ("样本表：别的树里装置那一层路径尾部相同的不认", os.path.join(work, "elsewhere-tree", SAMPLE_DEVICE_LAYER + "sample_orchestrator.py"), ["--selftest"], None),
         # 统一任务服务那一层（task-server/）：登记了的单独 --selftest 认；`task-server/task submit -- …` 里那条带的 --selftest 不当客户端自己的自证
-        # （LIB_PROJECT_CODE_RUNS_BREAK=task-server-directory-unrecognized 下头一格红，task-server-submit-as-selftest 与 task-server-submission-unparsed 下第二格红）
+        # （LIB_PROJECT_CODE_RUNS_BREAK=task-server-directory-unrecognized 下头一格红；第二格对任何开关都不红，只钉这句话在「参数以 submit 起头不是单独的 --selftest」的判法下成立）
         ("样本表：task-server 那一层登记过的单独 --selftest 认", "task-server/sample_server_lib.py", ["--selftest"], "selftest"),
         ("样本表：task-server/task submit -- 里那条带 --selftest，不当客户端自己的自证", TASK_SERVER_CLIENT, ["submit", "--", "python3", "task-server/sample_server_lib.py", "--selftest"], None),
         # 判定库服务那一层（prune-server/）：同上（LIB_PROJECT_CODE_RUNS_BREAK=prune-server-directory-unrecognized 下这一格红）
         ("样本表：prune-server 那一层登记过的单独 --selftest 认", "prune-server/sample_control", ["--selftest"], "selftest"),
+        # GPU 批处理验证服务那一层（gpu-verification-server/）：同上（LIB_PROJECT_CODE_RUNS_BREAK=gpu-verification-server-directory-unrecognized 下这一格红）
+        ("样本表：gpu-verification-server 那一层登记过的单独 --selftest 认", "gpu-verification-server/sample_control", ["--selftest"], "selftest"),
         ("样本表：包装 --server-binary -- 里那条带 --selftest，不当包装自己的自证", f"{TEMPORARY_SERVICE_WRAPPER_DIRECTORY}/{TEMPORARY_SERVICE_WRAPPER_SCRIPT}",
          [TEMPORARY_SERVICE_WRAPPER_MODE, TEMPORARY_SERVICE_BINARY_OPTION, "/sample/prune-server", "--", "bash", "scripts/gate/sample-selftest.sh", "--selftest"], None),
     ]
@@ -3078,6 +3118,11 @@ def selftest():
             ("two-logs.sh --quiet 日志出两份的包装", ["scripts/hosts/two-logs.sh", "--quiet", "run-one", "--", *inner], work, "external-program"),
             ("run-build-directory.sh 这一趟自己的编译目录的包装", ["scripts/hosts/run-build-directory.sh", "--", *inner], work, "external-program"),
             ("gpu-quiesce-run.sh 清场之后起命令的包装", ["scripts/crash/gpu-quiesce-run.sh", "--", *inner], work, "external-program"),
+            # 临时 prune-server 的包装：给了 --server-binary 的剥开、里面那条照认（开关 temporary-service-wrapper-unseen 下这一格红）；没给的不剥（现编或退 2，里面那条看不见）
+            ("临时 prune-server 的包装给了 --server-binary 剥开里面那条",
+             [f"{TEMPORARY_SERVICE_WRAPPER_DIRECTORY}/{TEMPORARY_SERVICE_WRAPPER_SCRIPT}", TEMPORARY_SERVICE_WRAPPER_MODE, TEMPORARY_SERVICE_BINARY_OPTION, "/sample/prune-server", "--", *inner],
+             work, "external-program"),
+            ("临时 prune-server 的包装没给 --server-binary 不剥", [f"{TEMPORARY_SERVICE_WRAPPER_DIRECTORY}/{TEMPORARY_SERVICE_WRAPPER_SCRIPT}", TEMPORARY_SERVICE_WRAPPER_MODE, "--", *inner], work, None),
             ("systemd-run -E 设的不是别名（值的末段叫 strace 也不当包装剥）", ["systemd-run", "--user", "--scope", "-E", "TRACER=/usr/bin/strace", *inner], work, "external-program"),
         ]
         for label, argv, cwd, want in launcher_cases:
@@ -3178,8 +3223,9 @@ def selftest():
                        "{a,{b}}", "a{{b}}", "a{b{c,d}", "{a,b}{", "}{a,b}", "{}a,b}", "..{},aa,}a.", "ab{}1..,}{.{", "{1..3}", "{3..1}", "{01..10}", "{1..10..3}",
                        "{a..e}", "{a..e..2}", "{1..a}", "{-2..2}", "{-01..3}", "{1..-03}", "{0..00}", "{1..05..2}", "{01..100..33}", "{100..00..50}", "{+1..3}", "{1..3..0}",
                        "{1...3}", "{a..}", "x{1..3}y{a,b}", "{1..2}{3..4}", "{a,b}{c,d}{e,f}"]
-        script = "set -f\n" + "".join(f"set -- {word}\nprintf '%s\\0' \"$#\" \"$@\"\n" for word in brace_words)
-        answer = subprocess.run(["bash"], input=script, capture_output=True, text=True).stdout.split("\0")
+        # 词从参数交进去、eval 照字面那一行（set -- <词>）解析，与把每个词写进脚本正文同一种展开；脚本正文是字面串（门禁按条复用收闭包时折得出）
+        brace_expansion_script = 'set -f\nfor word in "$@"; do\n  eval "set -- $word"\n  printf \'%s\\0\' "$#" "$@"\ndone\n'
+        answer = subprocess.run(["bash", "-c", brace_expansion_script, "bash", *brace_words], capture_output=True, text=True).stdout.split("\0")
         position = 0
         try:
             for word in brace_words:
@@ -3235,7 +3281,6 @@ def selftest():
             ("门禁目录顶层的共用库 lib-*.sh 不是阶段", ".claude/gate.d/lib-sample.sh", work, False),
             ("lib/ 底下的共用库不是阶段", ".claude/gate.d/lib/stage-cells.sh", work, False),
             ("仓内位置上的 gate-staged.sh 按名字判", "scripts/gate/gate-staged.sh", work, True),
-            ("仓内位置上的 crash-point-replay-shard-run.sh 按名字判", "scripts/crash/crash-point-replay-shard-run.sh", work, True),
             ("仓内位置上的 mutation-shard-run.sh 按名字判", "scripts/mutation/mutation-shard-run.sh", work, True),
             ("仓内位置上的 broad-mutation.py 按名字判", "scripts/mutation/broad-mutation.py", work, True),
             ("规范副本里的 stage-selftest.sh 按名字判（放行时不读正文）", ".claude/singlefs-ai-sop/scripts/stage-selftest.sh", work, True),
@@ -3440,7 +3485,7 @@ def selftest():
             FAMILY_OWN_REPOSITORY = work
         # 经 task-server 起（文件头「经 task-server 起」）：本仓的代码怎么认、名单上直接跑的、submit 后面那条、绕开服务的写法。
         # 开关 project-scripts-unjudged 下「本仓代码：」照拒的那几格红（应当是 nobody，实际 None）；text-tools-refused 下「名单：」谁都能跑的几格红（应当是 anyone，实际 nobody）；
-        # main-agent-tools-refused 下「名单：主 agent」四格红；task-server-submission-unparsed 下「提交：」认出的三格红（实际 None）；
+        # main-agent-tools-refused 下「名单：主 agent」放行那几格红，active-sessions-unlisted 下「名单：主 agent 查活动会话的 active-sessions.py」一格红；task-server-submission-unparsed 下「提交：」认出的三格红（实际 None）；
         # task-server-paths-unjudged 下「绕开：」点到库、密钥、socket 与载入共用库的四格红（应当是 True，实际 False）；admitted-variable-unjudged 下「绕开：」设准入开关的两格红；
         # task-server-scripts-unjudged 下「绕开：直接起服务本体」一格红；task-server-units-unjudged 下「绕开：systemctl」照拒的三格红；
         # task-server-builds-unjudged 下「绕开：」删编译目录的七格红（应当是 True，实际 False）；text-tools-refused 下「名单：提交客户端的 clean」一格红
@@ -3473,6 +3518,7 @@ def selftest():
                 ("本仓代码：work-directory-ownership.sh 的 sweep 不在名单的参数里", ["scripts/hosts/work-directory-ownership.sh", "sweep"], HOOK_REPOSITORY, "shell", "nobody"),
                 ("本仓代码：gate-overlap.py 不带 --list", [".claude/singlefs-ai-sop/scripts/gate-overlap.py", "."], HOOK_REPOSITORY, "python", "nobody"),
                 ("本仓代码：minimal-copy.py 带 --selftest 不在名单的参数里", ["scripts/hosts/minimal-copy.py", "--selftest"], HOOK_REPOSITORY, "python", "nobody"),
+                ("本仓代码：active-sessions.py 带 --selftest 不在名单的参数里", [ACTIVE_SESSIONS_SCRIPT, "--selftest"], HOOK_REPOSITORY, "python", "nobody"),
                 ("本仓代码：lib_repository_copy.py 的 link-into 不在名单的参数里",
                  ["scripts/hosts/lib_repository_copy.py", "link-into", "/x", "--root", HOOK_REPOSITORY, "--workspace", "scripts/experiment-apparatus"],
                  HOOK_REPOSITORY, "python", "nobody"),
@@ -3483,21 +3529,27 @@ def selftest():
                 ("名单：提交客户端的 wait", [TASK_SERVER_CLIENT, "wait", "7"], HOOK_REPOSITORY, None, "anyone"),
                 ("名单：提交客户端的 clean", [TASK_SERVER_CLIENT, "clean", "7"], HOOK_REPOSITORY, None, "anyone"),
                 ("名单：task-server/control check", ["task-server/control", "check"], HOOK_REPOSITORY, "python", "anyone"),
+                ("名单：task-server/control bookings", ["task-server/control", "bookings"], HOOK_REPOSITORY, "python", "anyone"),
+                ("名单：task-server/control key-stats", ["task-server/control", "key-stats"], HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：改标签的 relabel-item.py", ["scripts/kb/relabel-item.py", "D19", "6", "--dry-run"], HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：备份原文件的 copy-originals.py", ["scripts/agents/copy-originals.py", "copy", "/x", "a.md"], HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：直接起 ledger-append-section.py 不拒", ["scripts/kb/ledger-append-section.py", "--title", "x", "--body-file", "-", "--dry-run"],
                  HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：直接起 append-record.py 不拒", ["scripts/kb/append-record.py", "records/x.md", "-", "--dry-run"], HOOK_REPOSITORY, "python", "anyone"),
+                ("名单：直接起 quote-rust-items.py 不拒", ["scripts/kb/quote-rust-items.py", "crates/x/src/lib.rs::item"], HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：建仓副本的 minimal-copy.py", ["scripts/hosts/minimal-copy.py", HOOK_REPOSITORY, "/x/copy", "--with-test-inputs"], HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：打副本闭包的 lib_repository_copy.py entries", ["scripts/hosts/lib_repository_copy.py", "entries", HOOK_REPOSITORY, "--test-inputs"],
                  HOOK_REPOSITORY, "python", "anyone"),
                 ("名单：主 agent 停进程的 proc.py", [".claude/singlefs-ai-sop/scripts/proc.py", "stop", "1"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("名单：主 agent 的 task-server/control stop", ["task-server/control", "stop"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("名单：主 agent 的 task-server/control pause", ["task-server/control", "pause", "--reason", "x"], HOOK_REPOSITORY, "python", "main-agent"),
+                ("名单：主 agent 的 task-server/control recognized-card-lease", ["task-server/control", "recognized-card-lease", "show"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("名单：主 agent 的 task-server/control resume", ["task-server/control", "resume"], HOOK_REPOSITORY, "python", "main-agent"),
+                ("名单：主 agent 的 gpu-verification-server/control start", ["gpu-verification-server/control", "start"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("名单：主 agent 直接起服务自证", ["task-server/task_server_lib.py", "--selftest"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("名单：服务自证带别的参数不认", ["task-server/task_server_lib.py", "--selftest", "x"], HOOK_REPOSITORY, "python", "nobody"),
                 ("名单：主 agent 起定时提醒的 remind.sh", ["scripts/agents/remind.sh", "30", "x"], HOOK_REPOSITORY, "shell", "main-agent"),
+                ("名单：主 agent 查活动会话的 active-sessions.py", [ACTIVE_SESSIONS_SCRIPT, "--within-minutes", "60"], HOOK_REPOSITORY, "python", "main-agent"),
                 ("不是本仓代码：草稿里自己的辅助脚本", ["own-draft-helper.sh"], work, "shell", None),
                 ("不是本仓代码：PATH 上的 cargo（由 starts_a_build 认）", ["cargo", "build"], HOOK_REPOSITORY, None, None),
                 ("不是本仓代码：盘上不在的脚本", ["not-here-137.sh"], work, "shell", None),
@@ -3508,6 +3560,15 @@ def selftest():
                 ("提交：--cwd 照这一条的目录解开", [TASK_SERVER_CLIENT, "submit", "--cwd", "crates", "--", "ls"], HOOK_REPOSITORY,
                  (["ls"], os.path.join(HOOK_REPOSITORY, "crates"))),
                 ("提交：仓副本里逐字节相同的客户端", [TASK_SERVER_CLIENT, "submit", "--", "ls"], copy_root, (["ls"], None)),
+                ("提交：--manual 不带值，-- 后面那条照认", [TASK_SERVER_CLIENT, "submit", "--manual", "--", "cargo", "build"], HOOK_REPOSITORY, (["cargo", "build"], None)),
+                ("提交：--full-gate 不带值，-- 后面那条照认", [TASK_SERVER_CLIENT, "submit", "--full-gate", "--", "cargo", "build"], HOOK_REPOSITORY, (["cargo", "build"], None)),
+                ("提交：--whole-package-confirmed 带一个值，-- 后面那条照认", [TASK_SERVER_CLIENT, "submit", "--whole-package-confirmed", "/sample/confirmed", "--", "cargo", "test"], HOOK_REPOSITORY,
+                 (["cargo", "test"], None)),
+                ("提交：几个选项混写，--cwd 照解开", [TASK_SERVER_CLIENT, "submit", "--full-gate", "--cwd", "crates", "--whole-package-confirmed", "/sample/confirmed", "--manual", "--", "ls"], HOOK_REPOSITORY,
+                 (["ls"], os.path.join(HOOK_REPOSITORY, "crates"))),
+                ("提交：--whole-package-confirmed 把 -- 当值取走之后没有 --，是用法错，不认", [TASK_SERVER_CLIENT, "submit", "--whole-package-confirmed", "--", "ls"], HOOK_REPOSITORY, None),
+                ("提交：--whole-package-confirmed=<文件> 客户端不认，是用法错，不认", [TASK_SERVER_CLIENT, "submit", "--whole-package-confirmed=/sample/confirmed", "--", "ls"], HOOK_REPOSITORY, None),
+                ("提交：认不出的选项是用法错，不认", [TASK_SERVER_CLIENT, "submit", "--sample-unknown", "--", "ls"], HOOK_REPOSITORY, None),
                 ("提交：没写 -- 的是用法错，不认", [TASK_SERVER_CLIENT, "submit", "cargo", "build"], HOOK_REPOSITORY, None),
                 ("提交：wait 不是提交", [TASK_SERVER_CLIENT, "wait", "7"], HOOK_REPOSITORY, None),
                 ("提交：别处同名而内容不同的 task 不认", ["task-server/task", "submit", "--", "ls"], changed_root, None)):

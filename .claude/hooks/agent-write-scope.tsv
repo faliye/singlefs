@@ -23,7 +23,11 @@ experiment-runner	scripts/experiment-apparatus/Cargo.toml	在末尾追加这个�
 experiment-runner	research/prompts/e*-preregistration*.md	跑前登记的「修订」一段：原登记 e<号>-preregistration.md 与带轮号的 e<号>-preregistration-r<N>.md 都算
 experiment-runner	.claude/kb/experiments/**	实验页
 experiment-runner	.claude/kb/experiments.md	实验索引行
+experiment-runner	.claude/kb/experiments.en.md	实验索引行的英语版（experiment-runner.md「写范围」；三语索引与中文那一份同改）
+experiment-runner	.claude/kb/experiments.ja.md	实验索引行的日语版（同上）
 experiment-runner	.claude/kb/experiments-history.md	重跑已有实验时这个实验的历史条目（agent-defs-r1 判决 D2）
+experiment-runner	.claude/kb/experiments-history.en.md	这个实验的历史条目的英语版（experiment-runner.md「写范围」；与中文那一份同改）
+experiment-runner	.claude/kb/experiments-history.ja.md	这个实验的历史条目的日语版（同上）
 experiment-runner	research/prompts/e*-r*-prereg.md	重跑已有实验的重跑登记（agent-defs-r1 判决 D2）
 experiment-runner	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
 tooling-writer	.claude/hooks/**	tooling-writer.md「写范围」：钩子与它们的表
@@ -32,12 +36,14 @@ tooling-writer	.claude/scripts/**	tooling-writer.md「写范围」
 tooling-writer	scripts/**	tooling-writer.md「写范围」：研究脚本与看门狗
 tooling-writer	task-server/**	tooling-writer.md「写范围」：统一任务服务（records/2026-10-30-编译绕过内存总上限.md）
 tooling-writer	prune-server/**	tooling-writer.md「写范围」：判定库服务（records/2026-11-01-判定库服务化.md）
+tooling-writer	gpu-verification-server/**	tooling-writer.md「写范围」：GPU 批处理验证服务（records/2026-11-17-崩溃判器与测试流的效率优化.md）
 tooling-writer	.gitignore	tooling-writer.md「写范围」：只加或改 task-server 这类基础设施的忽略行
 tooling-writer	.claude/settings.json	tooling-writer.md「写范围」：只改 hooks 一节，注册新钩子
 tooling-writer	.claude/agents/*.md	tooling-writer.md「写范围」第二种活：照判决改定义
 tooling-writer	.claude/agent-common.md	tooling-writer.md「写范围」第二种活
 tooling-writer	.claude/main-agent.md	tooling-writer.md「写范围」第二种活
 tooling-writer	.claude/rules/*.md	tooling-writer.md「写范围」第二种活
+tooling-writer	.claude/skills/**	tooling-writer.md「写范围」第二种活：流程细则在技能里，照判决改技能
 tooling-writer	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
 investigator	crates/**	investigator.md「写范围」：派发提示写「查到就修」时在主工作区改
 investigator	crates/mutations.tsv	investigator.md「写范围」：查到就修时追加变异行

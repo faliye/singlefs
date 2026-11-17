@@ -49,7 +49,7 @@ records/2026-10-01-对接上游测试脚本规范.md  # 当时的定义与欠账
 crates/mutations.tsv  # 变异名与按名字引它的表：名字是标识，判定库按名字复用、别的表按名字点名，改名要连判定库一起作废
 crates/singlefs-verification/src/bin/e158_root_choice_repair.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 crates/singlefs-verification/src/crash_state_enumeration.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
@@ -68,7 +68,6 @@ records/2026-09-27-同步远端冲突块.md  # 整份是 2026-09-27 当时冲突
 research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out  # E142（新池新建文件的干跑） 的留存产物：装置源码没改、复跑仍要逐字节相同，产物照 .claude/rules/path-moves.md「留存产物分两类」不动
 scripts/agents/agent-watch.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/crash/crash-point-replay.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-scripts/crash/crash-point-replay-shard-run.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/crash/lib_crash_point_replay_items.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
@@ -86,6 +85,8 @@ scripts/experiment-apparatus/e170_second_run_o3_spec_executor/crash_image.py  # 
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/crash_image.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_487/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496/crash_image.py  # 实验装置：源码 sha256 钉在 research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out 的 name=freeze 行，改一个字就要重出 V2；与 487 目录同一份文件同样登记
+scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 钉在 research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out 的 name=freeze 行，改一个字就要重出 V2；与 487 目录同一份文件同样登记
 scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e171_three_oracle_collusion/baseline_checks.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
@@ -335,3 +336,7 @@ records/2026-10-01-门禁注释精简.md  # 历史记录：记的是改名前那
 .claude/kb/experiments-history.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名
 .claude/kb/experiments-history.en.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名
 .claude/kb/experiments-history.ja.md:「heavy-test-guard.sh」  # 变更史里记当时的文件名
+.claude/kb/experiments/171-三oracle合谋测试.md:「「层 0」改「崩溃点重放」」  # 说改名本身：这一句列的是改名登记换掉的旧称，换成新名就成了假话
+.claude/kb/experiments/171-3オラクル共謀テスト.ja.md:「「层 0」を「崩溃点重放」に」  # 说改名本身（日语译文那一句）：换成新名就成了假话
+.claude/kb/experiments/171-three-oracle-collusion-test.en.md:「「层 0」 became」  # 说改名本身（英语译文那一句）：换成新名就成了假话
+records/2026-11-13-全量提交门禁前收尾调度.md:「三条改名正则的前看排除集没有「里」字」  # 说改名正则本身换错了哪几处：引的就是旧名与那几条正则，换成新名就成了假话

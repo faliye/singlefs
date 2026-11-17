@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# PreToolUse hook（SubagentHandback）：子 agent 交回之前拦七样——自己起的后台任务还在跑（全部子 agent），交回正文太长、三方腿报告里的引文对不上、
-# 书记员与执行员的绿行不报数、实现员执行员工具员改了 .rs 而报告里没把两条命名检查交主 agent、写回员规格的目标不在又没写进「找不到的目标」、执行员报告里的登记落地清单没有或指不到
-# （这六样只判项目子 agent）。
+# PreToolUse hook（SubagentHandback）：子 agent 交回之前拦八样——自己起的后台任务还在跑（全部子 agent），交回正文太长、三方腿报告里的引文对不上、
+# 书记员与执行员的绿行不报数、实现员执行员工具员改了 .rs 而报告里没把两条命名检查交主 agent、写回员规格的目标不在又没写进「找不到的目标」、执行员报告里的登记落地清单没有或指不到、
+# 报告「要主 agent 跑的命令」一节里一行不止一条命令（这七样只判项目子 agent）。
 # hook-events: PreToolUse:SubagentHandback
 # gate-similar: handback-scratch-check.sh 同挂 PreToolUse[SubagentHandback]，但它判的是临时目录里自己建的编译目录与仓副本删没删（上游副本，本仓不许就地改），判据与这里四样没有一条相同（④ 判的是自己起的后台任务还在不在跑，不是临时目录），并进去要改上游
 # gate-similar: continuation-guard.sh 也按 agent 号去主会话目录下找子 agent 的会话记录，但它挂 SendMessage、判收件人交回过没有；这里只取子 agent 第一条记录的时刻当「开工时刻」，找法两行，不值得抽共用
@@ -35,17 +35,23 @@
 #      cp / mv 的目标：目标是 .rs，或目标是目录、来源是 .rs；-t 照认；目标里的变量照这一段赋过的值展开；拆分提案第九十节 ㉕；同一条里先算写、再算命名检查；
 #      目标以命令替换起头、接着 /crates/ 或 /scripts/ 的按仓根展开：$(pwd) 取命令当时的目录，$(git rev-parse --show-toplevel) 与别的写法取命令当时的目录往上第一层带 .git 的，
 #      找不到取项目根，拆分提案第一百二十二节 ⑪），
-#      改动所在的树是主工作区（CLAUDE_PROJECT_DIR）、带 .git 的副本（git worktree）或没有 .git 的副本（rsync 拷的，那棵树按仓根算），而这一次读的报告（naming_report_texts：派发提示里行首「报告：」点名的那几份；
+#      改动所在的树是主工作区（CLAUDE_PROJECT_DIR）、本仓登记过的 git worktree（.git 是文件、在 git worktree list 里）或别的副本（rsync 拷的没有 .git；scripts/hosts/minimal-copy.py 建的
+#      副本根 .git 是 git init 的目录、没登记成 worktree；这两种都按仓根算），而这一次读的报告（naming_report_texts：派发提示里行首「报告：」点名的那几份；
 #      提示里没有这一行的，取交回正文点名的）里，标题含「要主 agent 跑的命令」的那几节（sections_titled，到同级或更高一级的下一个标题为止）没把那棵树的两条命名检查都写上：
 #      门禁 code-source-discipline.sh 的 `--check` 点名的格含 vague-names、test-file-names、ordinal-names、data-names 四格、后面跟着根；上游 naming-lint.sh 后面跟着根
 #      （NAMING_STAGE_IN_REPORT、NAMING_LINT_IN_REPORT；根照 resolved 展开 ~、$HOME、$SINGLEFS_WORK_ROOT 起头的写法，相对路径从项目根起，真实路径与那棵树相同才算）。
 #      子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），命名检查由主 agent 交：只看报告里写没写，
-#      不看会话记录里跑没跑过。读不了的报告按那一节没写算。改动所在的树没有 .git 的（rsync 拷的副本）照仓根判：那一节两条的根要填仓根
-#      （共用约束写明 <根> 填仓根、两条交主 agent 在补丁打进主工作区后跑）。
+#      不看会话记录里跑没跑过。读不了的报告按那一节没写算。改动所在的树不是本仓登记过的工作树的（rsync 拷的没有 .git；minimal-copy.py 建的 .git 是目录、没有提交、
+#      不在 git worktree list 里）照仓根判：那一节两条的根要填仓根（共用约束写明 rsync 拷的副本 <根> 填仓根、两条交主 agent 在补丁打进主工作区后跑；
+#      命名检查的排除表按全仓登记，部分副本里判不全）。这一类副本里改、交补丁的，根还可以写占位 `<快照>`（共用约束「命名检查交主 agent 跑」：在副本里改、交补丁的
+#      <根> 写 <快照>，由主 agent 在验证段第 2 步在第 1 步留下的快照上交）：两条都写 `<快照>` 才算，只在这一次的改动全落在这类副本里时认（主工作区或登记过的 git worktree
+#      里也改了的，根仍要填那棵树）；副本根与别的路径照拒。登记没登记照同目录 lib_three_way_legs.py 的 registered_trees 认（与 ② 读同一份列表，naming_tree_registered）；
+#      取不到列表的（读不到那份库、git worktree list 起不来或退非 0）按 .git 的形态认：是文件当 git worktree、判那一棵，是目录照仓根判，stderr 写一句。
 #      拒了就逐棵树列出最后改的 .rs、缺哪一条、读的是哪几份报告，给出两条命令原样（NAMING_SUBMIT_COMMANDS，<根> 填那棵树），出路是写进那一节再交回。
-#      认不出的：Bash 里 cp -r 整个目录、install、sed -i、python 写的 .rs；改完又被删掉的 git worktree 副本看不到 .git，按 rsync 副本照仓根判；
+#      认不出的：Bash 里 cp -r 整个目录、install、sed -i、python 写的 .rs；改完又被删掉的 git worktree 副本（目录不在了，列表不收）与登记在别的仓里的 worktree 照仓根判；
 #      报告里两条写成别的样子的（--check 与格名之间夹别的词、根写成变量或命令替换）不认，照拒绝说明给的原样写。
-#      弄坏开关 naming-report-section-unchecked（整份报告都找，不看节）、naming-report-root-unchecked（根不核）、naming-rsync-copy-unjudged（rsync 副本不判）。
+#      弄坏开关 naming-report-section-unchecked（整份报告都找，不看节）、naming-report-root-unchecked（根不核）、naming-rsync-copy-unjudged（不是登记过的工作树的副本不判）、
+#      naming-git-init-copy-as-worktree（副本根带 .git 的一律当 git worktree，minimal-copy.py 建的副本也照副本根判）、naming-snapshot-anywhere（占位 `<快照>` 在哪棵树都认）。
 #   ⑥ kb-scribe（拆分提案第九十节 ⑦，.claude/agents/kb-scribe.md「规格里的目标文件不存在」那一句）：规格里每一条的目标文件（kb-spec-check.py 的 load_spec /
 #      parse_markdown_spec 认的两种写法，旧串、新串都在的条目才算）在主工作区（CLAUDE_PROJECT_DIR）不在，交回正文、交回点名的报告与派发提示「报告：」那一份里
 #      都没有一节标题含「找不到的目标」、节里写着这个文件（从仓根起的路径或绝对路径）的，拒，逐个列出。规格从派发提示（它会话记录的第一条）里找：
@@ -60,8 +66,18 @@
 #      .rs / .py / .sh 里 grep 得到。缺这一节、一行都没有、文件:行指不到、用例名 grep 不到，拒，逐条列出。派发提示写着「只修锚点」或「只补落产物」的不判（派发闸 ⑪ 放行的两种）：
 #      只认行首标签与整句（一行去掉行首的 - * > _ 与粗体之后以那两种之一起头，后面是行尾或冒号、逗号、句号、分号、括号；句中的「不是只补落产物」不认，拆分提案第一百二十二节 ⑪）。
 #      认不出的：只写「:行号」不写文件的（行号接在函数名后面、文件写在节首的那种）不核；只把装置挪进主工作区（cp / mv）、只写实验页的不判。
+#   ⑧ 全部项目子 agent（共用约束 .claude/agent-common.md「不做」一节「子 agent 不交任务」那一条）：派发提示里行首「报告：」点名的那几份（提示里没有这一行的，取交回正文点名的；
+#      取法与 ⑤ 同一处 report_paths）与交回正文本身里，标题含「要主 agent 跑的命令」的那几节（section_lines，节的认法同 ⑤ ⑥ ⑦）逐行判，一行里有下面任一样就拒：
+#      交任务的命令（`task-server/task submit`，命令词是 task-server/task、下一个词是 submit）多于一条；有交任务命令的那一段里，引号外用 `;`、`;;`、`&&`、`||` 串接了别的命令；
+#      引号外有 `echo $? >`（`>`、`>>`、`>|`；记下的是交任务那条命令的退出码，不是任务本身的）。怎么切段：行里有反引号代码段的，逐段判，两段之间只隔着 `;`、`&&`、`||` 的也算串接；
+#      没有代码段的判整行；代码块（``` 或 ~~~ 围起的）里的行判整行，以 \ 收尾的续行接上下一行一起判。切词用同目录 lib_shell_words.py 的 shell_tokens
+#      （经 lib_project_code_runs.py 的 shell_words 取同一份），引号与反斜杠照 bash 认：范围声明 SINGLEFS_RUN_SCOPE='种类=…; 跑什么=…' 里的分号、
+#      同一条 submit 后面 bash -c '…' 引号里的 && 与 echo $? > 不算。只判含 task-server/task 的行，代码块里另判含 $? 的行（只看 echo $? >）。
+#      拒了就逐行列出出处（报告路径或「交回正文」）、行号、原因与那一行，出路是一行只写一条 submit、别的拆成各自一行，结局看各自任务末行 TASK_SERVER_RESULT 的 type= 与 exit=。
+#      认不出的：代码块里写着「# …」的行被当成标题、截断那一节（节的认法同 ⑤ ⑥ ⑦），截断之后的行不判；没有代码段的说明文字里的 ASCII 分号照判。
+#      弄坏开关 no-command-lines（不判 ⑧）、command-chain-unchecked、command-span-gap-unchecked、command-one-per-line-unchecked、command-exit-capture-unchecked（各关一样）。
 # 这一道自己出错（读不了报告、cite-check 跑不起来、JSON 解析不了）不拒：放行，错误写进 stderr。判不了而放行的几处（JSON 读不懂、判的时候抛异常、
-#   读不到 lib_work_root.py、② ④ ⑤ ⑥ ⑦ 找不到自己的会话记录、读不到共用模块或 cite-check、agent-watch.py、kb-spec-check.py、切不开命令、报告或规格读不了，
+#   读不到 lib_work_root.py、② ④ ⑤ ⑥ ⑦ ⑧ 找不到自己的会话记录、读不到共用模块或 cite-check、agent-watch.py、kb-spec-check.py、切不开命令、报告或规格读不了，
 #   UNJUDGED_SITES 逐处列名）照「放行但必记检出」：放行时检出记录（AGENT_HOOK_DETECTIONS，没设取同目录 lib_work_root.py 的 default_detections_path）
 #   追加一行、结局「只记」，findings 以「交回正文闸没判全、照常放行」起头（record_unjudged）；拒的那一次照拒，不另记。
 #   往拒的方向偏的几处不算放行、不记：⑤ ⑥ ⑦ 读不了的报告按那一节没写算。
@@ -95,6 +111,7 @@
 #       「正好在上限的项目子 agent 应当返回 0，实际 2」
 #       「回扫员不核引文 应当返回 0，实际 2」
 #       「入口:读不到 lib_work_root.py 放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 (2, 0, None, False)」
+#       「入口:读不到 lib_work_root.py 时记下的那一行点名它 应当返回 True，实际 False」
 #       「书记员绿行带数 应当返回 0，实际 2」
 #       「回扫员的绿行不判 应当返回 0，实际 2」
 #       「起过的后台任务都跑完了 应当返回 0，实际 2」
@@ -103,13 +120,17 @@
 #       「改 .rs 的 Edit 被钩子拒了不算改动放行 应当返回 0，实际 2」
 #       「只改 .md 放行 应当返回 0，实际 2」
 #       「rsync 副本里改了 .rs、那一节两条的根填仓根放行 应当返回 0，实际 2」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填仓根放行 应当返回 0，实际 2」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写占位 <快照> 放行 应当返回 0，实际 2」
 #       「git worktree 副本里改的、那一节根写成副本根放行 应当返回 0，实际 2」
+#       「取不到 git worktree 列表时 .git 是文件的副本照副本根判、根写成副本根放行 应当返回 0，实际 2」
 #       「回扫员改 .rs 不判命名检查 应当返回 0，实际 2」
 #       「Bash 里 mv 写 .rs 之后报告写了两条命名检查放行 应当返回 0，实际 2」
 #       「Bash 里把 .rs 拷到草稿目录不算改动放行 应当返回 0，实际 2」
 #       「Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs 之后那一节根写成副本根放行 应当返回 0，实际 2」
 #       「改了 .rs 报告没写的拒绝说明给出两条命令（根填改动所在的树）、写进「要主 agent 跑的命令」一节、不教自己交 应当返回 True，实际 False」
 #       「派发提示没有「报告：」一行的拒绝说明写明一份报告都没读到 应当返回 True，实际 False」
+#       「改了 .rs 报告没写的拒绝说明写明副本里改、交补丁的两条根可以写占位 <快照> 应当返回 True，实际 False」
 #       「写回员规格目标都在放行 应当返回 0，实际 2」
 #       「写回员规格目标不在、报告「找不到的目标」一节写了它放行 应当返回 0，实际 2」
 #       「写回员没有规格不判 应当返回 0，实际 2」
@@ -122,6 +143,12 @@
 #       「回扫员没有登记落地清单不判 应当返回 0，实际 2」
 #       「执行员没有登记落地清单的拒绝说明写出那一节与出路 应当返回 True，实际 False」
 #       「那个后台任务结束之后再交回放行 应当返回 0，实际 2」
+#       「交回命令:一行一条、范围声明引号里的分号放行 应当返回 0，实际 2」
+#       「交回命令:同一条交任务命令里 bash -c 引号内的 && 与 echo $? > 放行 应当返回 0，实际 2」
+#       「交回命令:别的节里串接的命令不判 应当返回 0，实际 2」
+#       「交回命令:代码块里没有交任务命令的行用分号串接不判 应当返回 0，实际 2」
+#       「交回命令:续行接上下一行判、引号里的分号放行 应当返回 0，实际 2」
+#       「交回命令:拒绝说明列出报告路径、行号与原因，给出一行一条的出路 应当返回 True，实际 False」
 #   HANDBACK_GUARD_BREAK=no-green-count  green_count_problems() 不判 ③ 绿行没有数
 #       书记员绿行没数（「应当返回 2，实际 0」）
 #       执行员报告文件里的绿行没数（「应当返回 2，实际 0」）
@@ -147,6 +174,8 @@
 #       「改了 .rs、派发提示没有「报告：」一行、交回也没点名报告拒 应当返回 2，实际 0」
 #       「rsync 副本里改了 .rs、报告没列两条命名检查拒 应当返回 2，实际 0」
 #       「rsync 副本里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「没登记成本仓 worktree 的副本（.git 是文件）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
 #       「执行员改了 scripts/ 下 .rs、报告没写命名检查拒 应当返回 2，实际 0」
 #       「Bash 里 mv 写进 crates/ 的 .rs、报告没写命名检查拒 应当返回 2，实际 0」
 #       「Bash 里 cp 到 crates/ 下的目录、来源是 .rs，报告没写命名检查拒 应当返回 2，实际 0」
@@ -157,16 +186,33 @@
 #       「Bash 里 > 重定向写到 "$(pwd)/crates/…rs"、报告没写命名检查拒 应当返回 2，实际 0」
 #       「改了 .rs 报告没写的拒绝说明给出两条命令（根填改动所在的树）、写进「要主 agent 跑的命令」一节、不教自己交 应当返回 True，实际 False」
 #       「派发提示没有「报告：」一行的拒绝说明写明一份报告都没读到 应当返回 True，实际 False」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写成不相干的路径拒 应当返回 2，实际 0」
+#       「主工作区里改了 .rs、那一节两条的根写占位 <快照> 拒 应当返回 2，实际 0」
+#       「改了 .rs 报告没写的拒绝说明写明副本里改、交补丁的两条根可以写占位 <快照> 应当返回 True，实际 False」
 #   HANDBACK_GUARD_BREAK=naming-report-section-unchecked  naming_report_commands() 不认节：报告里哪儿写了两条都算（推的，没跑）
 #       改了 .rs、两条写在报告别的节里拒（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=naming-report-root-unchecked  naming_report_commands() 不核根：那一节写了两条就算，根填的是哪棵树都认
 #       「改了 .rs、那一节两条的根填的是别的树拒 应当返回 2，实际 0」
 #       「rsync 副本里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「没登记成本仓 worktree 的副本（.git 是文件）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写成不相干的路径拒 应当返回 2，实际 0」
+#       「主工作区里改了 .rs、那一节两条的根写占位 <快照> 拒 应当返回 2，实际 0」
 #   HANDBACK_GUARD_BREAK=naming-any-file  naming_source_tree() 不看后缀，crates/ 或 scripts/ 下改什么文件都要命名检查
 #       只改 .md 放行（「应当返回 0，实际 2」）
-#   HANDBACK_GUARD_BREAK=naming-rsync-copy-unjudged  naming_source_tree() 没有 .git 的副本（rsync 拷的）不判
+#   HANDBACK_GUARD_BREAK=naming-rsync-copy-unjudged  naming_source_tree() 不是本仓登记过的工作树的副本（rsync 拷的、minimal-copy.py 建的、登记在别的仓里的）不判
 #       「rsync 副本里改了 .rs、报告没列两条命名检查拒 应当返回 2，实际 0」
 #       「rsync 副本里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「没登记成本仓 worktree 的副本（.git 是文件）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写成不相干的路径拒 应当返回 2，实际 0」
+#   HANDBACK_GUARD_BREAK=naming-git-init-copy-as-worktree  naming_tree_registered() 不看 git worktree list，副本根带 .git 的（minimal-copy.py 建的 git init 的仓、登记在别的仓里的 worktree 也算）一律当 git worktree、判那一棵
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填仓根放行 应当返回 0，实际 2」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「没登记成本仓 worktree 的副本（.git 是文件）里改了 .rs、那一节两条的根填副本根拒 应当返回 2，实际 0」
+#       「minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写占位 <快照> 放行 应当返回 0，实际 2」
+#   HANDBACK_GUARD_BREAK=naming-snapshot-anywhere  naming_problems() 占位 `<快照>` 在哪棵树都认（主工作区与登记过的 git worktree 里改的也认）
+#       「主工作区里改了 .rs、那一节两条的根写占位 <快照> 拒 应当返回 2，实际 0」
 #   HANDBACK_GUARD_BREAK=naming-substitution-target-unexpanded  bash_rs_writes() 目标以命令替换起头的照旧不算（$(git rev-parse --show-toplevel)/crates/…rs 认不出落点）
 #       Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs、报告没写命名检查拒（「应当返回 2，实际 0」）
 #       Bash 里 > 重定向写到 "$(pwd)/crates/…rs"、报告没写命名检查拒（「应当返回 2，实际 0」）
@@ -204,6 +250,25 @@
 #       执行员登记落地清单的文件在副本与主工作区里都找不到拒（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=landing-case-unchecked  landing_problems() 不 grep 清单里的用例名
 #       执行员登记落地清单的用例名 grep 不到拒（「应当返回 2，实际 0」）
+#   HANDBACK_GUARD_BREAK=no-command-lines  decide() 不判 ⑧ 报告「要主 agent 跑的命令」一节里一行不止一条命令
+#       「交回命令:代码块里一行用分号串起两条交任务的命令、带 echo $? > 拒 应当返回 2，实际 0」
+#       「交回命令:代码块里交任务的命令后面用 && 接别的命令拒 应当返回 2，实际 0」
+#       「交回命令:代码块里交任务那一行之后另起一行 echo $? > 拒 应当返回 2，实际 0」
+#       「交回命令:两段反引号之间只隔着分号拒 应当返回 2，实际 0」
+#       「交回命令:一行里两段反引号各一条交任务的命令拒 应当返回 2，实际 0」
+#       「交回命令:反引号段里交任务的命令后面用 || 接别的命令拒 应当返回 2，实际 0」
+#       「交回命令:交回正文里那一节也判 应当返回 2，实际 0」
+#       「交回命令:拒绝说明列出报告路径、行号与原因，给出一行一条的出路 应当返回 True，实际 False」
+#   HANDBACK_GUARD_BREAK=command-chain-unchecked  command_line_problems() 不判段里引号外的 ; ;; && ||
+#       「交回命令:代码块里交任务的命令后面用 && 接别的命令拒 应当返回 2，实际 0」
+#       「交回命令:反引号段里交任务的命令后面用 || 接别的命令拒 应当返回 2，实际 0」
+#       「交回命令:交回正文里那一节也判 应当返回 2，实际 0」
+#   HANDBACK_GUARD_BREAK=command-span-gap-unchecked  command_line_problems() 不判两段反引号之间只隔着串接符的
+#       「交回命令:两段反引号之间只隔着分号拒 应当返回 2，实际 0」
+#   HANDBACK_GUARD_BREAK=command-one-per-line-unchecked  command_line_problems() 不数一行里交任务的命令有几条
+#       「交回命令:一行里两段反引号各一条交任务的命令拒 应当返回 2，实际 0」
+#   HANDBACK_GUARD_BREAK=command-exit-capture-unchecked  command_line_problems() 不判引号外的 echo $? >
+#       「交回命令:代码块里交任务那一行之后另起一行 echo $? > 拒 应当返回 2，实际 0」
 #   HANDBACK_GUARD_BREAK=honor-break-outside-selftest  main() 平常跑设了弄坏开关也照认、照常判
 #       平常跑设了 HANDBACK_GUARD_BREAK 退 2、点名它只在自证里认（「应当返回 (2, True)，实际 (0, False)」）
 #   HANDBACK_GUARD_BREAK=leg-report-subdirectory-kept  leg_reports_named() 用这里自己的一份认法（子目录、<轮> 占位都认），不调 lib_three_way_legs.py
@@ -300,12 +365,18 @@
 #       「没判全:⑦ 找不到执行员自己的会话记录记一处（landing-transcript） 应当返回 True，实际 False」
 #   HANDBACK_GUARD_BREAK=landing-split-unrecorded  landing_applies() 切不开一条 Bash 命令时只打 stderr、不记进没判全的几处
 #       「没判全:⑦ 切不开那一条 Bash 命令记一处（landing-split） 应当返回 True，实际 False」
+#   HANDBACK_GUARD_BREAK=command-transcript-unrecorded  command_problems() 找不到这个子 agent 自己的会话记录时只打 stderr、不记进没判全的几处
+#       「没判全:⑧ 找不到自己的会话记录记一处（command-transcript） 应当返回 True，实际 False」
+#   HANDBACK_GUARD_BREAK=command-report-unrecorded  command_problems() 点名的报告读不了时只打 stderr、不记进没判全的几处
+#       「没判全:⑧ 点名的报告读不了记一处（command-report） 应当返回 True，实际 False」
+#   HANDBACK_GUARD_BREAK=command-split-unrecorded  command_line_problems() 切不开那一节的一行时只打 stderr、不记进没判全的几处
+#       「没判全:⑧ 切不开那一节的一行记一处（command-split） 应当返回 True，实际 False」
 #   HANDBACK_GUARD_BREAK=input-unrecorded  main() 读不懂 hook 的 JSON（坏 JSON、顶层不是对象）时只打 stderr、不记检出
 #       「走真实 stdin 入口：坏 JSON 放行并记一条检出（结局只记、会话号读不到） 应当返回 (0, 1, '只记', '读不到')，实际 …」
 #   HANDBACK_GUARD_BREAK=exception-unrecorded  judge() 判的时候抛异常不接住、照原样抛出（进程退 1，放行、不记检出）
 #       「入口:判的时候抛异常放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
 #   HANDBACK_GUARD_BREAK=work-root-unrecorded  judge() 读不到 lib_work_root.py 时只打 stderr、不记检出
-#       「入口:读不到 lib_work_root.py 放行并记一条检出（结局只记） 应当返回 (0, 1, '只记', True)，实际 …」
+#       「入口:读不到 lib_work_root.py 时记下的那一行点名它 应当返回 True，实际 False」
 #   LIB_PROMPT_SCRATCH_LINE_BREAK=label-anywhere（同目录 lib_prompt_scratch_line.py：「草稿目录」在一行里哪都认）  ⑥ 把列表里转述的「- 草稿目录：」也当本提示的草稿目录
 #       写回员提示里列表起头的「- 草稿目录：」是转述，不在那里找起草的规格（「应当返回 0，实际 2」）
 #   SINGLEFS_WORK_ROOT_BREAK=session-temporary-mentions-unseen（同上：不挑会话临时目录根下的路径）  ③ 认不出会话临时目录根下的报告文件
@@ -357,14 +428,25 @@ NAMING_SUBMIT_COMMANDS = ("SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 co
                           "task-server/task submit -- bash .claude/singlefs-ai-sop/scripts/naming-lint.sh {root}")
 # ⑤ 报告里交主 agent 跑的那一节（标题含这几个字）与节里认的两条：门禁 code-source-discipline.sh 的 --check 点名的格含那四格、跟着根；上游 naming-lint.sh 跟着根
 NAMING_COMMANDS_SECTION = "要主 agent 跑的命令"
-NAMING_STAGE_IN_REPORT = re.compile(r"code-source-discipline\.sh\s+--check(?:\s+|=)(?P<cells>[A-Za-z0-9_,-]+)\s+(?P<root>[^\s`'\"|;&()<>，。；、]+)")
-NAMING_LINT_IN_REPORT = re.compile(r"naming-lint\.sh\s+(?P<root>[^\s`'\"|;&()<>，。；、]+)")
+# 根的写法：路径（字符类里不收尖括号），或定义里的占位 <快照>（在副本里改、交补丁的，主 agent 在验证段第 2 步的快照上交）
+NAMING_SNAPSHOT_ROOT = "<快照>"
+NAMING_ROOT_WORD = r"(?P<root>" + NAMING_SNAPSHOT_ROOT + r"|[^\s`'\"|;&()<>，。；、]+)"
+NAMING_STAGE_IN_REPORT = re.compile(r"code-source-discipline\.sh\s+--check(?:\s+|=)(?P<cells>[A-Za-z0-9_,-]+)\s+" + NAMING_ROOT_WORD)
+NAMING_LINT_IN_REPORT = re.compile(r"naming-lint\.sh\s+" + NAMING_ROOT_WORD)
 NAMING_ANY_ROOT = "<哪棵树都认>"   # 只有弄坏开关 naming-report-root-unchecked 下记它（naming_report_commands）
 # ⑤ Bash 里写 .rs 也算改动（拆分提案第九十节 ㉕）：输出重定向（>、>>、>|、&>）的目标、tee 的文件参数、cp / mv 的目标
 NAMING_COPYING_COMMANDS = frozenset({"cp", "mv"})
 # ⑤ 写 .rs 的目标以命令替换起头、接着 /crates/ 或 /scripts/ 的（拆分提案第一百二十二节 ⑪：$(git rev-parse --show-toplevel)/crates/…rs 原来认不出落点、不计）
 NAMING_SUBSTITUTION_TARGET = re.compile(r"^[\"']?(?P<substitution>\$\([^()]*\)|`[^`]*`)[\"']?(?P<rest>/(?:crates|scripts)/\S*\.rs)[\"']?$")
 NAMING_COPY_OPTIONS_WITH_VALUE = frozenset({"-S", "--suffix"})
+# ⑧ 「要主 agent 跑的命令」一节里一行最多一条交任务的命令（共用约束 .claude/agent-common.md「不做」一节「子 agent 不交任务」那一条）：
+#   交任务的命令词、引号外串接别的命令的运算符、记退出码的重定向、代码块的围栏、行内代码段、两段之间只隔着串接符
+SUBMIT_CLIENT = "task-server/task"
+COMMAND_CHAIN_OPERATORS = frozenset({";", ";;", "&&", "||"})
+EXIT_CAPTURE_REDIRECTS = frozenset({">", ">>", ">|"})
+CODE_FENCE = re.compile(r"^ {0,3}(?:`{3,}|~{3,})")
+CODE_SPAN = re.compile(r"(`+)(.+?)(?<!`)\1(?!`)")
+CHAIN_GAP = re.compile(r"\s*(?:;;?|&&|\|\|)\s*")
 # ⑦ 执行员交回的报告里要有的「登记落地清单」一节（.claude/agents/experiment-runner.md 第 3c 步、「产出」一节；拆分提案第九十节 ①）
 LANDING_CHECKED_AGENTS = {"experiment-runner"}
 LANDING_SECTION = "登记落地清单"
@@ -401,7 +483,8 @@ SELFTEST_MARK_CONTENT = "handback-guard.sh --selftest 起的子进程"
 UNJUDGED = []
 UNJUDGED_PREFIX = "交回正文闸没判全、照常放行"
 UNJUDGED_SITES = ("input", "exception", "work-root", "leg-types", "leg-definitions", "citation-transcript", "cite-check", "green-report", "background-transcript", "background",
-                  "rs-split", "naming-transcript", "project-code-library", "scratch-line", "scribe-transcript", "kb-spec", "spec-unreadable", "landing-transcript", "landing-split")
+                  "rs-split", "naming-transcript", "project-code-library", "scratch-line", "scribe-transcript", "kb-spec", "spec-unreadable", "landing-transcript", "landing-split",
+                  "command-transcript", "command-report", "command-split")
 
 
 def note_unjudged(site, message):
@@ -730,7 +813,7 @@ def bash_rs_writes(command, directory, heavy, project_root=None):
         def landing(word):
             substituted = NAMING_SUBSTITUTION_TARGET.match(word) if BROKEN != "naming-substitution-target-unexpanded" else None
             if substituted:
-                root = substituted_root(substituted.group("substitution"), item.directory, project_root)
+                root = substituted_root(substituted.group("substitution"), item.directory, project_root, shell)
                 return os.path.normpath(root + substituted.group("rest")) if root else None
             expanded = shell.expand_known_variables(os.path.expanduser(word), variables)
             return shell.resolve_path(item.directory, expanded) if expanded is not None and "$" not in expanded else None
@@ -769,31 +852,38 @@ def bash_rs_writes(command, directory, heavy, project_root=None):
     return written
 
 
-def substituted_root(substitution, directory, project_root):
+def substituted_root(substitution, directory, project_root, shell):
     """⑤ 目标起头的那一段命令替换按哪一棵树的根展开：$(pwd) / `pwd`（可带 -P）取命令当时的目录；$(git rev-parse --show-toplevel) 与别的写法取命令当时的目录
-    往上第一层带 .git 的（git_toplevel），找不到取 project_root。"""
+    往上第一层带 .git 的（shell.git_toplevel：shell 是 lib_shell_words，它照 git 的认法解开符号链接、核 .git 的形状与属主），找不到或认不准取 project_root。"""
     inner = substitution[2:-1] if substitution.startswith("$(") else substitution[1:-1]
     if re.fullmatch(r"\s*pwd(?:\s+-[LP])?\s*", inner) and directory:
         return os.path.normpath(directory)
-    return git_toplevel(directory) or (os.path.normpath(project_root) if project_root else None)
+    return shell.git_toplevel(directory) or (os.path.normpath(project_root) if project_root else None)
 
 
-def git_toplevel(directory):
-    """directory 往上第一层带 .git（目录或 worktree 的 .git 文件）的目录；没有交 None。"""
-    candidate = os.path.normpath(directory) if directory else None
-    while candidate:
-        if os.path.exists(os.path.join(candidate, ".git")):
-            return candidate
-        parent = os.path.dirname(candidate)
-        candidate = parent if parent != candidate else None
-    return None
+def naming_tree_registered(tree, project_root):
+    """⑤ 带 .git 的 tree 是不是本仓登记过的工作树（同目录 lib_three_way_legs.py 的 registered_trees：项目根与 git worktree list 列出的各棵，与 ② 读同一份）。
+    minimal-copy.py 建的副本根 .git 是 git init 的目录、不在列表里，登记在别的仓里的 worktree 也不在，都交 False（照仓根判）。
+    取不到列表（读不到那份库、git worktree list 起不来或退非 0）时按 .git 的形态认：是文件（git worktree 的样子）交 True，是目录交 False，stderr 写一句。
+    弄坏开关 naming-git-init-copy-as-worktree 下不看列表、一律交 True（git init 的副本也当 worktree）。"""
+    if BROKEN == "naming-git-init-copy-as-worktree":
+        return True
+    if three_way_legs is None:
+        error = f"读不到 lib_three_way_legs.py：{three_way_legs_error!r}"
+    else:
+        trees, error = three_way_legs.registered_trees(project_root)
+        if error is None:
+            return any(three_way_legs.same_tree(tree, registered) for registered in trees)
+    print(f"! handback-guard：取不到本仓的 git worktree 列表（{error}），⑤ 按 .git 的形态认 {tree}：是文件当 git worktree、判那一棵，是目录照仓根判", file=sys.stderr)
+    return os.path.isfile(os.path.join(tree, ".git"))
 
 
 def naming_source_tree(path, project_root):
-    """改的文件是某棵树里 crates/ 或 scripts/ 下的 .rs 时交 (那棵树的根, 判不判)；不是交 None。
-    主工作区（project_root）与带 .git 的副本（git worktree）判那棵树；没有 .git 的副本（rsync 拷的）照仓根判：交 (project_root, 判)，
-    报告里两条的根要填仓根（共用约束「命名检查交主 agent 跑」：rsync 副本里改的 <根> 填仓根，主 agent 在补丁打进主工作区之后交）。
-    弄坏开关 naming-any-file 下不看后缀，naming-rsync-copy-unjudged 下没有 .git 的副本不判。"""
+    """改的文件是某棵树里 crates/ 或 scripts/ 下的 .rs 时交 (那棵树的根, 判不判, 是不是照仓根判的副本)；不是交 None。
+    主工作区（project_root）与本仓登记过的 git worktree（naming_tree_registered）判那棵树；别的副本（rsync 拷的没有 .git，minimal-copy.py 建的 .git 是 git init 的目录）
+    照仓根判：交 (project_root, 判)，报告里两条的根要填仓根（共用约束「命名检查交主 agent 跑」：rsync 副本里改的 <根> 填仓根，主 agent 在补丁打进主工作区之后交）。
+    第三项是 True 的（副本）两条命令的根还可以写占位 NAMING_SNAPSHOT_ROOT（naming_problems）。
+    弄坏开关 naming-any-file 下不看后缀，naming-rsync-copy-unjudged 下不是登记过的工作树的副本不判。"""
     if not isinstance(path, str) or not path or (not path.endswith(".rs") and BROKEN != "naming-any-file"):
         return None
     absolute = os.path.normpath(path if os.path.isabs(path) else os.path.join(project_root, path))
@@ -803,25 +893,28 @@ def naming_source_tree(path, project_root):
         return None
     for project in dict.fromkeys((os.path.normpath(project_root), os.path.realpath(project_root))):
         if project in trees:
-            return project, True
+            return project, True, False
     for tree in reversed(trees):
-        if os.path.exists(os.path.join(tree, ".git")):
-            return tree, True
+        if os.path.exists(os.path.join(tree, ".git")) and naming_tree_registered(tree, project_root):
+            return tree, True, False
     if BROKEN == "naming-rsync-copy-unjudged":
-        return trees[-1], False
-    return os.path.normpath(project_root), True
+        return trees[-1], False, True
+    return os.path.normpath(project_root), True, True
+
+
+def report_paths(records, message):
+    """⑤ ⑧ 读哪几份报告：派发提示里行首「报告：」点名的那几份；提示里没有这一行的，取交回正文点名的（REPORT_MENTION）。→ ([路径，去重], 认报告的说法)。"""
+    named = prompt_label_paths(first_prompt(records), "报告")
+    if named:
+        return list(dict.fromkeys(named)), "派发提示「报告：」那一行"
+    return list(dict.fromkeys(REPORT_MENTION.findall(work_root_tokens_expanded(message)))), "派发提示没有「报告：」一行，取交回正文点名的报告"
 
 
 def naming_report_texts(records, message, project_root):
-    """⑤ 读哪几份报告：派发提示里行首「报告：」点名的那几份；提示里没有这一行的，取交回正文点名的（REPORT_MENTION）。
-    → ([(绝对路径, 正文；读不了是 None，按那一节没写算)], 认报告的说法)。"""
-    named = prompt_label_paths(first_prompt(records), "报告")
-    source = "派发提示「报告：」那一行"
-    if not named:
-        named = REPORT_MENTION.findall(work_root_tokens_expanded(message))
-        source = "派发提示没有「报告：」一行，取交回正文点名的报告"
+    """⑤ 读 report_paths 认出的那几份报告 → ([(绝对路径, 正文；读不了是 None，按那一节没写算)], 认报告的说法)。"""
+    named, source = report_paths(records, message)
     texts = []
-    for path in dict.fromkeys(named):
+    for path in named:
         absolute = resolved(path, project_root)
         try:
             with open(absolute, encoding="utf-8", errors="replace") as handle:
@@ -835,11 +928,13 @@ def naming_report_texts(records, message, project_root):
 def naming_report_commands(text, project_root):
     """⑤ 一份报告里「要主 agent 跑的命令」那几节写着的命名检查：{(哪一条, 根的真实路径)}。哪一条是 "stage"（门禁 code-source-discipline.sh 的 --check
     点名的格含 NAMING_CHECK_CELLS 那四格）或 "lint"（上游 naming-lint.sh）；根照 resolved 展开（~、$HOME、$SINGLEFS_WORK_ROOT 起头的照展开，相对路径从项目根起）。
-    节的认法同 ⑥ ⑦（sections_titled）。弄坏开关 naming-report-section-unchecked 下整份报告都找（不看节），naming-report-root-unchecked 下根一律记成 NAMING_ANY_ROOT。"""
+    占位 NAMING_SNAPSHOT_ROOT 原样记（不当路径展开）。节的认法同 ⑥ ⑦（sections_titled）。弄坏开关 naming-report-section-unchecked 下整份报告都找（不看节），naming-report-root-unchecked 下根一律记成 NAMING_ANY_ROOT。"""
     body = text if BROKEN == "naming-report-section-unchecked" else sections_titled(text, NAMING_COMMANDS_SECTION)
 
     def root_of(word):
-        return NAMING_ANY_ROOT if BROKEN == "naming-report-root-unchecked" else os.path.realpath(resolved(word.rstrip("/") or "/", project_root))
+        if BROKEN == "naming-report-root-unchecked":
+            return NAMING_ANY_ROOT
+        return word if word == NAMING_SNAPSHOT_ROOT else os.path.realpath(resolved(word.rstrip("/") or "/", project_root))
     found = {("stage", root_of(match.group("root"))) for match in NAMING_STAGE_IN_REPORT.finditer(body)
              if NAMING_CHECK_CELLS <= set(match.group("cells").split(","))}
     return found | {("lint", root_of(match.group("root"))) for match in NAMING_LINT_IN_REPORT.finditer(body)}
@@ -848,12 +943,13 @@ def naming_report_commands(text, project_root):
 def naming_problems(hook_input, message, project_root, heavy):
     """⑤：改了 .rs（Edit / Write / MultiEdit，或 Bash 里 mv、cp、重定向、tee 写的，bash_rs_writes）的那几棵树里，报告（naming_report_texts）的
     「要主 agent 跑的命令」一节没把那棵树的两条命名检查都写上的 → ([(树, 最后改的文件, [缺的那几条])], [(读的报告, 读得了没有)], 认报告的说法)。
+    根写占位 NAMING_SNAPSHOT_ROOT 的只在这棵树上的改动全是副本里的（naming_source_tree 第三项）时认；弄坏开关 naming-snapshot-anywhere 下哪棵树都认。
     只看会话记录里的改动与报告里写的命令，不看会话记录里跑没跑过。读不了会话记录交 ([], [], "")（记一处没判全）。"""
     records = own_transcript_records(hook_input)
     if records is None:
         note_unjudged("naming-transcript", "! handback-guard：找不到这个子 agent 自己的会话记录，命名检查这一条没判（放行）")
         return [], [], ""
-    last_edit = {}
+    last_edit, copies_only = {}, {}
     for name, arguments, cwd, ran in tool_calls(records):
         if not ran:
             continue
@@ -867,6 +963,7 @@ def naming_problems(hook_input, message, project_root, heavy):
             tree = naming_source_tree(path, project_root)
             if tree is not None and tree[1]:
                 last_edit[tree[0]] = path
+                copies_only[tree[0]] = copies_only.get(tree[0], True) and tree[2]
     if not last_edit:
         return [], [], ""
     texts, source = naming_report_texts(records, message, project_root)
@@ -877,7 +974,8 @@ def naming_problems(hook_input, message, project_root, heavy):
     problems = []
     for tree, path in last_edit.items():
         root = os.path.realpath(tree)
-        missing = [kind for kind in ("stage", "lint") if (kind, root) not in listed and (kind, NAMING_ANY_ROOT) not in listed]
+        accepted = (root, NAMING_ANY_ROOT) + ((NAMING_SNAPSHOT_ROOT,) if copies_only[tree] or BROKEN == "naming-snapshot-anywhere" else ())
+        missing = [kind for kind in ("stage", "lint") if not any((kind, word) in listed for word in accepted)]
         if missing:
             problems.append((tree, path, missing))
     return problems, [(path, text is not None) for path, text in texts], source
@@ -895,7 +993,8 @@ def naming_refusal(agent_type, problems, reports, source):
             + f"\n→ 怎么办：在派发提示「报告：」点名的那份报告里加一节「## {NAMING_COMMANDS_SECTION}」，把下面两条原样写进去（<根> 已填好改动所在的树；"
             "在哪个目录起写仓根；跑完看末行 TASK_SERVER_RESULT，exit=0 是过、exit=1 是判红），子 agent 自己不交，写好再交回"
             "（.claude/hooks/handback-guard.sh 文件头 ⑤）：\n" + "\n".join(commands[:20]) +
-            f"\n  在 rsync 拷的副本（没有 .git）里改的照仓根判：<根> 填仓根，主 agent 在补丁打进主工作区之后交。")
+            f"\n  在不是本仓登记过的工作树的副本里改的（rsync 拷的没有 .git，minimal-copy.py 建的 .git 是 git init 的目录）照仓根判：<根> 填仓根，主 agent 在补丁打进主工作区之后交；"
+            f"在副本里改、交补丁的，两条的 <根> 也可以写占位 {NAMING_SNAPSHOT_ROOT}，由主 agent 在验证段第 2 步在快照上交（不写副本根）。")
 
 
 def first_prompt(records):
@@ -1011,10 +1110,10 @@ def scribe_target_problems(hook_input, message, project_root, scripts_directory)
     return list(dict.fromkeys(problems))
 
 
-def sections_titled(text, title):
-    """文字里标题含 title 的那几节的正文（到同级或更高一级的下一个标题为止；下一个标题又含 title 的接着收）。"""
+def section_lines(text, title):
+    """文字里标题含 title 的那几节的行：[(在整份文字里的行号, 行)]（到同级或更高一级的下一个标题为止；下一个标题又含 title 的接着收）。"""
     kept, level = [], None
-    for line in text.splitlines():
+    for number, line in enumerate(text.splitlines(), 1):
         heading = MARKDOWN_HEADING.match(line)
         if heading:
             if level is not None and len(heading.group(1)) <= level:
@@ -1023,8 +1122,102 @@ def sections_titled(text, title):
                 level = len(heading.group(1))
                 continue
         if level is not None:
-            kept.append(line)
-    return "\n".join(kept)
+            kept.append((number, line))
+    return kept
+
+
+def sections_titled(text, title):
+    """文字里标题含 title 的那几节的正文（section_lines 的行连起来）。"""
+    return "\n".join(line for _, line in section_lines(text, title))
+
+
+def submit_count(tokens):
+    """⑧ 切好的记号里交任务的命令有几条：一个词是 task-server/task（或以 /task-server/task 收尾），紧跟着的词是 submit。命令替换的正文不算。"""
+    kept = [(kind, text) for kind, text in tokens if kind is not None]
+    return sum(1 for index in range(len(kept) - 1)
+               if kept[index][0] is False and (kept[index][1] == SUBMIT_CLIENT or kept[index][1].endswith("/" + SUBMIT_CLIENT))
+               and kept[index + 1] == (False, "submit"))
+
+
+def chains_commands(tokens):
+    """⑧ 切好的记号里有没有引号外的 ; ;; && ||（引号里的切词时已并进词里）。"""
+    return any(kind is True and text in COMMAND_CHAIN_OPERATORS for kind, text in tokens)
+
+
+def captures_exit_status(tokens):
+    """⑧ 切好的记号里有没有引号外的 echo $? >（>、>>、>|）。"""
+    kept = [(kind, text) for kind, text in tokens if kind is not None]
+    return any(kept[index] == (False, "echo") and kept[index + 1] == (False, "$?") and kept[index + 2][0] is True
+               and kept[index + 2][1] in EXIT_CAPTURE_REDIRECTS for index in range(len(kept) - 2))
+
+
+def command_line_problems(text, shell):
+    """⑧ 一份文字里「要主 agent 跑的命令」那几节逐行判（文件头 ⑧）→ [(行号, 那一行, [原因…])]。shell 是 lib_shell_words（用它的 shell_tokens）。
+    代码块里以 \\ 收尾的续行接上下一行，行号记头一行的。切不开的一行不判，记一处没判全（command-split）。"""
+    problems, in_fence, carried = [], False, None
+    for number, line in section_lines(text, NAMING_COMMANDS_SECTION):
+        if CODE_FENCE.match(line):
+            in_fence, carried = not in_fence, None
+            continue
+        spans, gaps = [], []
+        if in_fence:
+            if carried is not None:
+                number, line = carried[0], carried[1] + "\n" + line
+            if line.endswith("\\"):
+                carried = (number, line)
+                continue
+            carried = None
+            pieces = [line]
+        else:
+            spans = list(CODE_SPAN.finditer(line))
+            pieces = [span.group(2) for span in spans] or [line]
+            gaps = [line[spans[index].end():spans[index + 1].start()] for index in range(len(spans) - 1)]
+        if SUBMIT_CLIENT not in line and not (in_fence and "$?" in line):
+            continue
+        try:
+            tokenized = [shell.shell_tokens(piece) for piece in pieces]
+        except Exception as error:   # 切词抛异常（case 模式切不出来这类）：这一行认不出几条命令
+            note_unjudged("command-split", f"! handback-guard：切不开「{NAMING_COMMANDS_SECTION}」一节第 {number} 行（{type(error).__name__}：{error}），⑧ 没判这一行")
+            continue
+        counts = [submit_count(tokens) for tokens in tokenized]
+        reasons = []
+        if sum(counts) > 1 and BROKEN != "command-one-per-line-unchecked":
+            reasons.append(f"一行里有 {sum(counts)} 条交任务的命令")
+        if BROKEN != "command-chain-unchecked" and any(count and chains_commands(tokens) for count, tokens in zip(counts, tokenized)):
+            reasons.append("交任务的命令在引号外用 ; && || 串接了别的命令")
+        if BROKEN != "command-span-gap-unchecked" and any((counts[index] or counts[index + 1]) and CHAIN_GAP.fullmatch(gap) for index, gap in enumerate(gaps)):
+            reasons.append("两段命令之间只隔着 ; && ||，是串在一起的")
+        if (any(counts) or in_fence) and BROKEN != "command-exit-capture-unchecked" and any(captures_exit_status(tokens) for tokens in tokenized):
+            reasons.append("带 echo $? >（记下的是交任务那条命令的退出码，不是任务本身的）")
+        if reasons:
+            problems.append((number, line, reasons))
+    return problems
+
+
+def command_problems(hook_input, message, project_root, shell):
+    """⑧：report_paths 认出的那几份报告与交回正文本身，逐份交 command_line_problems → [(出处, 行号, 那一行, [原因…])]，出处是报告的绝对路径或「交回正文」。
+    找不到会话记录的只判交回正文与它点名的报告（记一处没判全 command-transcript）；读不了的报告不判（记一处没判全 command-report）。"""
+    records = own_transcript_records(hook_input)
+    if records is None:
+        note_unjudged("command-transcript", "! handback-guard：找不到这个子 agent 自己的会话记录，⑧ 只判了交回正文与它点名的报告")
+        records = []
+    texts = [("交回正文", message)]
+    for path in report_paths(records, message)[0]:
+        absolute = resolved(path, project_root)
+        try:
+            with open(absolute, encoding="utf-8", errors="replace") as handle:
+                texts.append((absolute, handle.read()))
+        except OSError as error:
+            note_unjudged("command-report", f"! handback-guard：读不了报告 {absolute}（{error}），⑧ 没判这一份的「{NAMING_COMMANDS_SECTION}」一节")
+    return [(origin, number, line, reasons) for origin, text in texts for number, line, reasons in command_line_problems(text, shell)]
+
+
+def command_refusal(agent_type, problems):
+    listed = [f"  {origin} 第 {number} 行：{'；'.join(reasons)}\n    {line.strip()[:400]}" for origin, number, line, reasons in problems[:12]]
+    return (f"✗ {agent_type} 的「{NAMING_COMMANDS_SECTION}」一节里有一行不止一条命令（.claude/agent-common.md「不做」一节「子 agent 不交任务」那一条）："
+            "主 agent 照行交，一行里串着的只确认到交任务的那一条，echo $? > 记下的是交任务那条命令的退出码：\n" + "\n".join(listed) +
+            "\n→ 怎么办：一行只写一条 `task-server/task submit …`（范围声明写在 submit 前面），用分号、&&、|| 串着的别的命令拆成各自一行（要跑项目代码的照样写成 submit），"
+            "不写 echo $? >：每条任务的结局看它自己末行 TASK_SERVER_RESULT 的 type= 与 exit=，写进那一项的「跑完看哪几行」；改好再交回（.claude/hooks/handback-guard.sh 文件头 ⑧）。")
 
 
 def table_data_rows(text):
@@ -1242,6 +1435,11 @@ def decide(hook_input, project_root, cite_check):
                        "\n→ 怎么办：照 .claude/agents/kb-scribe.md 那一句办：整份不写，报告里加一节「## 找不到的目标」，逐条写规格里的文件（从仓根起的路径）与旧串，"
                        "以及 `git log --diff-filter=DR --name-only -- <文件名>` 和 `grep -rnF <旧串的一段>` 查到的新位置（查不到写查不到），再交回；"
                        "目标其实在的，核规格里的路径是不是写错了（从仓根起写）。")
+    if BROKEN != "no-command-lines":
+        heavy = project_code_runs_library()
+        problems = command_problems(hook_input, message, project_root, heavy.shell_words) if heavy is not None else []
+        if problems:
+            return 2, command_refusal(agent_type, problems)
     return 0, None
 
 
@@ -1461,7 +1659,7 @@ def selftest(hook_dir):
             legs_case("三方腿类型表:样本仓没登记的攻方不核引文", "three-way-attack", 0),
         ]
 
-        # ⑤ 命名检查：样本树就是 work（项目根）；git worktree 副本带 .git 文件，rsync 副本不带。判的是派发提示「报告：」那一份里「要主 agent 跑的命令」一节写没写那两条
+        # ⑤ 命名检查：样本树就是 work（项目根）；worktree 带一份指到不在的目录的 .git 文件、没登记在哪个仓里，rsync 副本不带 .git；要照副本根判的（登记过的 worktree、$(git rev-parse --show-toplevel) 展开到它的）与 minimal-copy 形态的副本在样本仓 naming_repository 里判。判的是派发提示「报告：」那一份里「要主 agent 跑的命令」一节写没写那两条
         def transcript(agent_id, records, prompt="# 派发"):
             with open(os.path.join(session, "subagents", f"agent-{agent_id}.jsonl"), "w", encoding="utf-8") as handle:
                 handle.write(json.dumps({"type": "user", "timestamp": started.isoformat(), "message": {"role": "user", "content": prompt}}, ensure_ascii=False) + "\n")
@@ -1475,6 +1673,20 @@ def selftest(hook_dir):
         worktree, copy = os.path.join(work, "worktree"), os.path.join(work, "rsync-copy")
         os.makedirs(worktree)
         open(os.path.join(worktree, ".git"), "w").write("gitdir: /nonexistent\n")
+        # 样本仓 naming_repository 是真 git 仓，naming_worktree 由 git worktree add 登记；naming_minimal_copy 照 minimal-copy.py 拷完的样子在副本根 git init（.git 是目录、没有提交、不在 git worktree list 里）；
+        # naming_list_unreadable 的 .git 指到不在的目录，git worktree list 退非 0（取不到列表时按 .git 的形态认）
+        naming_repository, naming_worktree, naming_minimal_copy, naming_list_unreadable = (
+            os.path.join(work, name) for name in ("naming-repository", "naming-worktree", "naming-minimal-copy", "naming-list-unreadable"))
+        for directory in (naming_repository, naming_minimal_copy):
+            os.makedirs(directory)
+            sample_git(directory, "init", "-q")
+        sample_git(naming_repository, "commit", "-q", "--allow-empty", "-m", "selftest")
+        sample_git(naming_repository, "worktree", "add", "-q", "--detach", naming_worktree)
+        os.makedirs(naming_list_unreadable)
+        open(os.path.join(naming_list_unreadable, ".git"), "w").write("gitdir: /nonexistent\n")
+        for tree in (naming_repository, naming_list_unreadable):
+            os.makedirs(os.path.join(tree, ".claude", "agents"))
+            open(os.path.join(tree, ".claude", "agents", "implementation-writer.md"), "w").write("# implementation-writer\n")
         done, refused = (False, "ok"), (True, "PreToolUse:Edit hook error: ✗ 拒")
         def edited(path, outcome=done):
             return ("Edit", {"file_path": path, "old_string": "a", "new_string": "b"}, outcome, work)
@@ -1514,8 +1726,23 @@ def selftest(hook_dir):
         transcript("naming-rsync-copy-root", [edited(os.path.join(copy, "crates", "core", "src", "lib.rs"))],
                    naming_report("rsync-copy-root", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(copy)))
         transcript("naming-scripts", [edited(os.path.join(work, "scripts", "experiment-apparatus", "e1_probe.rs"))])
-        transcript("naming-worktree", [edited(os.path.join(worktree, "crates", "core", "src", "lib.rs"))],
-                   naming_report("worktree", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(worktree)))
+        transcript("naming-worktree", [edited(os.path.join(naming_worktree, "crates", "core", "src", "lib.rs"))],
+                   naming_report("worktree", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(naming_worktree)))
+        naming_minimal_source = os.path.join(naming_minimal_copy, "crates", "core", "src", "lib.rs")
+        transcript("naming-minimal-copy-listed", [edited(naming_minimal_source)],
+                   naming_report("minimal-copy-listed", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(naming_repository)))
+        transcript("naming-minimal-copy-root", [edited(naming_minimal_source)],
+                   naming_report("minimal-copy-root", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(naming_minimal_copy)))
+        # 占位 <快照>：minimal-copy 副本里改的两条都写它放行；根写成不相干的路径拒；主工作区里改的写它拒
+        transcript("naming-minimal-copy-snapshot", [edited(naming_minimal_source)],
+                   naming_report("minimal-copy-snapshot", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(NAMING_SNAPSHOT_ROOT)))
+        transcript("naming-minimal-copy-unrelated-root", [edited(naming_minimal_source)],
+                   naming_report("minimal-copy-unrelated-root", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(os.path.join(work, "elsewhere"))))
+        transcript("naming-snapshot-main-workspace", [edited(core_source)],
+                   naming_report("snapshot-main-workspace", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(NAMING_SNAPSHOT_ROOT)))
+        # worktree 的 .git 是文件、没登记在 naming_repository 里：在样本仓下照仓根判（根填副本根拒），在取不到列表的 naming_list_unreadable 下按 .git 是文件照副本根判（放行）
+        transcript("naming-unregistered-worktree", [edited(os.path.join(worktree, "crates", "core", "src", "lib.rs"))],
+                   naming_report("unregistered-worktree", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(worktree)))
         # Bash 里写 .rs 也算改动（拆分提案第九十节 ㉕）：mv、cp 到目录、> 重定向、>>、tee；写到草稿目录的不算
         transcript("naming-bash-mv", [bash_call(f"mv {work}/draft-lib.rs crates/core/src/lib.rs")], no_section_prompt)
         transcript("naming-bash-cp-directory", [bash_call("cp patch/files/lib.rs crates/core/src/")], no_section_prompt)
@@ -1525,15 +1752,20 @@ def selftest(hook_dir):
         transcript("naming-bash-mv-listed", [bash_call(f"mv {work}/draft-lib.rs crates/core/src/lib.rs")], listed_prompt)
         transcript("naming-bash-scratch-copy", [bash_call(f"cp crates/core/src/lib.rs {work}/originals/lib.rs")], no_section_prompt)
         # 目标以命令替换起头的（拆分提案第一百二十二节 ⑪）：$(git rev-parse --show-toplevel) 按命令当时的目录往上找 .git 那一层展开，"$(pwd)" 按命令当时的目录展开
-        transcript("naming-bash-substitution", [bash_call("cp draft-lib.rs $(git rev-parse --show-toplevel)/crates/core/src/lib.rs", done, worktree)], no_section_prompt)
+        transcript("naming-bash-substitution", [bash_call("cp draft-lib.rs $(git rev-parse --show-toplevel)/crates/core/src/lib.rs", done, naming_worktree)], no_section_prompt)
         transcript("naming-bash-pwd-substitution", [bash_call("cat > \"$(pwd)/crates/core/src/lib.rs\" <<'EOF'\nfn probe() {}\nEOF")], no_section_prompt)
-        transcript("naming-bash-substitution-listed", [bash_call("cp draft-lib.rs $(git rev-parse --show-toplevel)/crates/core/src/lib.rs", done, worktree)],
-                   naming_report("substitution-listed", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(worktree)))
+        transcript("naming-bash-substitution-listed", [bash_call("cp draft-lib.rs $(git rev-parse --show-toplevel)/crates/core/src/lib.rs", done, naming_worktree)],
+                   naming_report("substitution-listed", f"# 报告\n\n## {NAMING_COMMANDS_SECTION}\n\n" + naming_commands(naming_worktree)))
 
         def naming_refusal_of(agent_id):
             return decide({"tool_name": "SubagentHandback", "tool_input": {"message": "交回"}, "agent_type": "implementation-writer", "agent_id": agent_id,
                            "transcript_path": session + ".jsonl"}, work, cite_check)[1] or ""
         unlisted_refusal, no_report_refusal = naming_refusal_of("naming-unlisted"), naming_refusal_of("naming-no-report")
+
+        def tree_case(label, want, agent_id, root):
+            """⑤ 换项目根判的格：root 是样本仓 naming_repository（登记了 naming_worktree）或取不到 worktree 列表的 naming_list_unreadable。"""
+            return (label, want, decide({"tool_name": "SubagentHandback", "tool_input": {"message": "交回"}, "agent_type": "implementation-writer",
+                                         "agent_id": agent_id, "transcript_path": session + ".jsonl"}, root, cite_check)[0])
         cases += [
             case("改了 .rs、报告里没有「要主 agent 跑的命令」一节拒", "implementation-writer", "交回", 2, "naming-unlisted"),
             case("改了 .rs、报告「要主 agent 跑的命令」一节写了两条命名检查（根填那棵树）放行", "implementation-writer", "交回", 0, "naming-listed"),
@@ -1548,7 +1780,14 @@ def selftest(hook_dir):
             case("rsync 副本里改了 .rs、那一节两条的根填仓根放行", "implementation-writer", "交回", 0, "naming-rsync-copy-listed"),
             case("rsync 副本里改了 .rs、那一节两条的根填副本根拒", "implementation-writer", "交回", 2, "naming-rsync-copy-root"),
             case("执行员改了 scripts/ 下 .rs、报告没写命名检查拒", "experiment-runner", "交回" + landing_sample, 2, "naming-scripts"),
-            case("git worktree 副本里改的、那一节根写成副本根放行", "implementation-writer", "交回", 0, "naming-worktree"),
+            tree_case("git worktree 副本里改的、那一节根写成副本根放行", 0, "naming-worktree", naming_repository),
+            tree_case("minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填仓根放行", 0, "naming-minimal-copy-listed", naming_repository),
+            tree_case("minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根填副本根拒", 2, "naming-minimal-copy-root", naming_repository),
+            tree_case("minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写占位 <快照> 放行", 0, "naming-minimal-copy-snapshot", naming_repository),
+            tree_case("minimal-copy 副本（副本根 git init、没登记成 worktree）里改了 .rs、那一节两条的根写成不相干的路径拒", 2, "naming-minimal-copy-unrelated-root", naming_repository),
+            case("主工作区里改了 .rs、那一节两条的根写占位 <快照> 拒", "tooling-writer", "交回", 2, "naming-snapshot-main-workspace"),
+            tree_case("没登记成本仓 worktree 的副本（.git 是文件）里改了 .rs、那一节两条的根填副本根拒", 2, "naming-unregistered-worktree", naming_repository),
+            tree_case("取不到 git worktree 列表时 .git 是文件的副本照副本根判、根写成副本根放行", 0, "naming-unregistered-worktree", naming_list_unreadable),
             case("回扫员改 .rs 不判命名检查", "sweep", "交回", 0, "naming-unlisted"),
             case("Bash 里 mv 写进 crates/ 的 .rs、报告没写命名检查拒", "implementation-writer", "交回", 2, "naming-bash-mv"),
             case("Bash 里 cp 到 crates/ 下的目录、来源是 .rs，报告没写命名检查拒", "tooling-writer", "交回", 2, "naming-bash-cp-directory"),
@@ -1557,14 +1796,58 @@ def selftest(hook_dir):
             case("Bash 里 tee 写 .rs、报告没写命名检查拒", "implementation-writer", "交回", 2, "naming-bash-tee"),
             case("Bash 里 mv 写 .rs 之后报告写了两条命名检查放行", "implementation-writer", "交回", 0, "naming-bash-mv-listed"),
             case("Bash 里把 .rs 拷到草稿目录不算改动放行", "implementation-writer", "交回", 0, "naming-bash-scratch-copy"),
-            case("Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs、报告没写命名检查拒", "implementation-writer", "交回", 2, "naming-bash-substitution"),
+            tree_case("Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs、报告没写命名检查拒", 2, "naming-bash-substitution", naming_repository),
             case("Bash 里 > 重定向写到 \"$(pwd)/crates/…rs\"、报告没写命名检查拒", "implementation-writer", "交回", 2, "naming-bash-pwd-substitution"),
-            case("Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs 之后那一节根写成副本根放行", "implementation-writer", "交回", 0, "naming-bash-substitution-listed"),
+            tree_case("Bash 里 cp 写到 $(git rev-parse --show-toplevel)/crates/…rs 之后那一节根写成副本根放行", 0, "naming-bash-substitution-listed", naming_repository),
             ("改了 .rs 报告没写的拒绝说明给出两条命令（根填改动所在的树）、写进「要主 agent 跑的命令」一节、不教自己交", True,
              all(part in unlisted_refusal for part in (f"ordinal-names,data-names {work}", f"naming-lint.sh {work}", f"## {NAMING_COMMANDS_SECTION}", "→ 怎么办",
                                                         os.path.join(naming_reports, "no-section.md")))
              and "task-server/task wait" not in unlisted_refusal),
+            ("改了 .rs 报告没写的拒绝说明写明副本里改、交补丁的两条根可以写占位 <快照>", True, f"也可以写占位 {NAMING_SNAPSHOT_ROOT}" in unlisted_refusal),
             ("派发提示没有「报告：」一行的拒绝说明写明一份报告都没读到", True, "一份都没有" in no_report_refusal and "派发提示没有「报告：」一行" in no_report_refusal),
+        ]
+
+        # ⑧ 「要主 agent 跑的命令」一节一行最多一条交任务的命令：报告照 ⑤ 的写法放进 naming_reports、派发提示行首「报告：」点名它；会话记录里没有改动（⑤ 不判）
+        command_scope = "SINGLEFS_RUN_SCOPE='种类=target; 跑什么=cargo build 全部目标; 范围=1 个工作区; 为什么=自证'"
+        command_build = f"{command_scope} {SUBMIT_CLIENT} submit -- cargo build --offline --all-targets"
+        command_test = f"{command_scope} {SUBMIT_CLIENT} submit -- cargo test -p core --lib"
+        chained_line = f"{command_build}; echo $? > {work}/exit-build; {command_test}; echo $? > {work}/exit-test"
+        def command_report(name, section_body, other_sections=""):
+            return naming_report(f"command-{name}", f"# 报告\n\n## 改了什么\n\n见下。\n{other_sections}\n## {NAMING_COMMANDS_SECTION}\n\n{section_body}\n## 没做什么\n\n无。\n")
+        command_samples = {
+            "semicolon-chain": f"2. 合成一条：\n\n```\n{chained_line}\n```\n\n   跑完看末行。\n",
+            "and-chain": f"```\n{command_build} && cat {work}/build.log\n```\n",
+            "exit-next-line": f"```\n{command_build}\necho $? > {work}/exit-build\n```\n",
+            "span-gap": f"1. `{command_build}`; `cat {work}/build.log`\n",
+            "two-spans": f"1. `{command_build}` 与 `{command_test}`\n",
+            "or-chain": f"1. `{command_build} || true`\n",
+            "one-per-line": f"1. `{command_build}`\n   在哪个目录起：仓根\n2. `{command_test}`\n   跑完看末行 TASK_SERVER_RESULT 的 exit=。\n",
+            "bash-c": f"```\n{command_scope} {SUBMIT_CLIENT} submit -- bash -c 'cargo build --offline && cargo test -p core --lib; echo $? > {work}/exit-inner'\n```\n",
+            "fence-without-submit": f"```\nfor name in build test; do cat {work}/exit-$name; done\n```\n",
+            "continued": f"```\n{command_scope} \\\n  {SUBMIT_CLIENT} submit -- cargo build --offline --all-targets\n```\n",
+        }
+        for name, body in command_samples.items():
+            transcript(f"command-{name}", [], command_report(name, body))
+        transcript("command-other-section", [], command_report("other-section", f"1. `{command_build}`\n", f"\n## 我跑过的\n\n```\n{chained_line}\n```\n"))
+        chained_report = os.path.join(naming_reports, "command-semicolon-chain.md")
+        chained_line_number = open(chained_report, encoding="utf-8").read().splitlines().index(chained_line) + 1
+        chained_refusal = decide({"tool_name": "SubagentHandback", "tool_input": {"message": "交回"}, "agent_type": "implementation-writer",
+                                  "agent_id": "command-semicolon-chain", "transcript_path": session + ".jsonl"}, work, cite_check)[1] or ""
+        cases += [
+            case("交回命令:代码块里一行用分号串起两条交任务的命令、带 echo $? > 拒", "implementation-writer", "交回", 2, "command-semicolon-chain"),
+            case("交回命令:代码块里交任务的命令后面用 && 接别的命令拒", "tooling-writer", "交回", 2, "command-and-chain"),
+            case("交回命令:代码块里交任务那一行之后另起一行 echo $? > 拒", "implementation-writer", "交回", 2, "command-exit-next-line"),
+            case("交回命令:两段反引号之间只隔着分号拒", "implementation-writer", "交回", 2, "command-span-gap"),
+            case("交回命令:一行里两段反引号各一条交任务的命令拒", "implementation-writer", "交回", 2, "command-two-spans"),
+            case("交回命令:反引号段里交任务的命令后面用 || 接别的命令拒", "implementation-writer", "交回", 2, "command-or-chain"),
+            case("交回命令:交回正文里那一节也判", "sweep", f"交回\n\n## {NAMING_COMMANDS_SECTION}\n\n1. `{command_build}; cat build.log`\n", 2),
+            case("交回命令:一行一条、范围声明引号里的分号放行", "implementation-writer", "交回", 0, "command-one-per-line"),
+            case("交回命令:同一条交任务命令里 bash -c 引号内的 && 与 echo $? > 放行", "implementation-writer", "交回", 0, "command-bash-c"),
+            case("交回命令:别的节里串接的命令不判", "implementation-writer", "交回", 0, "command-other-section"),
+            case("交回命令:代码块里没有交任务命令的行用分号串接不判", "implementation-writer", "交回", 0, "command-fence-without-submit"),
+            case("交回命令:续行接上下一行判、引号里的分号放行", "implementation-writer", "交回", 0, "command-continued"),
+            ("交回命令:拒绝说明列出报告路径、行号与原因，给出一行一条的出路", True,
+             all(part in chained_refusal for part in (chained_report, f"第 {chained_line_number} 行", "→ 怎么办", "一行只写一条", "TASK_SERVER_RESULT"))),
         ]
 
         # ⑥ 写回员规格的目标：规格与报告放工作根下（派发提示认工作根下的规格文件），目标一份在 work 里、一份不在
@@ -1750,12 +2033,24 @@ def selftest(hook_dir):
                 sys.argv[1] = saved_directory
 
         def with_globals(replaced, thunk):
-            saved = {name: globals()[name] for name in replaced}
-            globals().update(replaced)
+            # 只换这四个模块级名字，逐个写明（不按字符串名字查模块的名字表：算键的闭包要折得出换的是谁）
+            global three_way_legs, prompt_scratch_line, decide, work_roots
+            unknown = sorted(set(replaced) - {"three_way_legs", "prompt_scratch_line", "decide", "work_roots"})
+            if unknown:
+                raise KeyError(f"with_globals 只认 three_way_legs、prompt_scratch_line、decide、work_roots，认不出 {unknown}")
+            saved = (three_way_legs, prompt_scratch_line, decide, work_roots)
+            if "three_way_legs" in replaced:
+                three_way_legs = replaced["three_way_legs"]
+            if "prompt_scratch_line" in replaced:
+                prompt_scratch_line = replaced["prompt_scratch_line"]
+            if "decide" in replaced:
+                decide = replaced["decide"]
+            if "work_roots" in replaced:
+                work_roots = replaced["work_roots"]
             try:
                 return thunk()
             finally:
-                globals().update(saved)
+                three_way_legs, prompt_scratch_line, decide, work_roots = saved
 
         unjudged_probes = [
             ("leg-types", "读不到 lib_three_way_legs.py", lambda: with_globals({"three_way_legs": None}, lambda: citation_checked_agents(work))),
@@ -1774,6 +2069,10 @@ def selftest(hook_dir):
             ("spec-unreadable", "⑥ 草稿目录里的规格读不了", lambda: with_globals({"prompt_scratch_line": draft_reader}, lambda: scribe_spec_entries("提示", work, failing_spec))),
             ("landing-transcript", "⑦ 找不到执行员自己的会话记录", lambda: landing_problems({}, "交回", work, None)),
             ("landing-split", "⑦ 切不开那一条 Bash 命令", lambda: landing_applies(landing_records, unsplittable)),
+            ("command-transcript", "⑧ 找不到自己的会话记录", lambda: command_problems({}, "交回", work, None)),
+            ("command-report", "⑧ 点名的报告读不了", lambda: command_problems(own_input, "见 research/prompts/unreadable-report.md", work, None)),
+            ("command-split", "⑧ 切不开那一节的一行",
+             lambda: command_line_problems(f"## {NAMING_COMMANDS_SECTION}\n\n`{SUBMIT_CLIENT} submit -- true`\n", types.SimpleNamespace(shell_tokens=raising))),
         ]
         saved_stderr = sys.stderr
         for site, description, probe in unjudged_probes:
@@ -1822,6 +2121,9 @@ def selftest(hook_dir):
         plain_input = {"tool_name": "SubagentHandback", "tool_input": {"message": "交回"}, "agent_type": "sweep", "session_id": "s-unjudged"}
         cases.append(("入口:判的时候抛异常放行并记一条检出（结局只记）", (0, 1, "只记", True), judged_in_process(plain_input, {"decide": raising})))
         cases.append(("入口:读不到 lib_work_root.py 放行并记一条检出（结局只记）", (0, 1, "只记", True), judged_in_process(plain_input, {"work_roots": None})))
+        # 别的几处（⑧ 找不到会话记录这类）也会在同一趟记一行，只数行数分不出工作根这一处记没记：核记下的那一行点名 lib_work_root.py
+        cases.append(("入口:读不到 lib_work_root.py 时记下的那一行点名它", True,
+                      any("lib_work_root.py" in str(finding) for finding in ((unjudged_lines() or [{}])[-1].get("findings") or []))))
         before = len(unjudged_lines())
         broken_entry = subprocess.run(["bash", os.path.join(hook_dir, "handback-guard.sh")], input='{"tool_name": "SubagentHandback"', capture_output=True, text=True,
                                       timeout=60, env={**os.environ, "CLAUDE_PROJECT_DIR": work, SELFTEST_MARK_VARIABLE: mark, "AGENT_HOOK_DETECTIONS": unjudged_detections})
@@ -1832,18 +2134,20 @@ def selftest(hook_dir):
         for label, want, got in failures:
             print(f"  ✗ 自检：{label} 应当返回 {want}，实际 {got}")  # gate-lint:detail
         if failures:
-            print("    → 看 decide()、citation_problems()、leg_reports_named()、green_count_problems()、naming_problems()、naming_report_commands()、"
-                  "bash_rs_writes()、tool_calls()、naming_refusal()、landing_problems()、scribe_target_problems()、prompt_scratch_directories()、main() 的判法；"
+            print("    → 看 decide()、citation_problems()、leg_reports_named()、green_count_problems()、naming_problems()、naming_tree_registered()、naming_report_commands()、"
+                  "bash_rs_writes()、tool_calls()、naming_refusal()、landing_problems()、scribe_target_problems()、prompt_scratch_directories()、command_line_problems()、command_problems()、main() 的判法；"
                   "HANDBACK_GUARD_BREAK 设着的话这里本来就该红")
             return 1
         print(f"  ✓ handback-guard 自检通过（查了 {len(cases)} 种）：子 agent 交回时自己起的后台任务还在跑拒（通用 agent 也判、主 agent 不判、说明里列出进程号与两条出路），"
               "跑完了或停掉之后放行；项目子 agent 超长交回拒（拒绝说明写明 result.md 与三方腿的 -output.md）、正好在上限放行、非项目 agent 与主 agent 不判；"
               "三方腿（类型读定义 frontmatter 的 leg: three-way，样本仓与本仓读到的都与 frontmatter 逐个相同）引文对不上或没点名报告拒、对上放行；书记员与执行员绿行没数或报 0 项拒（交回正文与点名的报告文件都查，报告在 research/prompts/、工作根（含 ~ 写法）与会话临时目录根下都认）；"
               "实现员、执行员、工具员改了 .rs 而派发提示「报告：」那一份的「要主 agent 跑的命令」一节没写全两条命名检查拒（没有那一节、只写一条、少一格、根填别的树、写在别的节、"
-              "没有报告都拒，拒绝说明给出两条填好根的命令、不教自己交），写全了、只改 .md、Edit 被拒、worktree 副本根对上放行，rsync 副本里改的照仓根判（根填仓根放行、没列或填副本根拒）；Bash 里 mv、cp、>、>>、tee 写的 .rs 也算改动；"
+              "没有报告都拒，拒绝说明给出两条填好根的命令、不教自己交），写全了、只改 .md、Edit 被拒、登记过的 worktree 副本根对上放行（取不到 worktree 列表时 .git 是文件的照副本根判），rsync 副本、minimal-copy.py 建的 git init 副本与没登记成本仓 worktree 的副本里改的照仓根判（根填仓根放行、没列或填副本根拒；两条的根写占位 <快照> 的副本放行、主工作区或登记过的 worktree 里改的写它拒、根写成不相干的路径拒）；Bash 里 mv、cp、>、>>、tee 写的 .rs 也算改动；"
               "三方腿只点名子目录下、<轮> 占位与仓外同名的报告按没点名拒，项目根起头、./ 起头、$SINGLEFS_WORK_ROOT/ 起头的照认，相对路径按干活的那棵 worktree 核、哪一棵都没有拒；"
               "写回员规格目标不在而「找不到的目标」一节没写拒（规格文件、提示正文、草稿目录里起草的都认），目标都在、那一节写了、没有规格放行；"
               "执行员写了装置或落了产物而登记落地清单没有、一行都没有、文件:行指不到、用例名 grep 不到拒，只补落产物、只写实验页不判；"
+              "报告与交回正文「要主 agent 跑的命令」一节里一行两条交任务的命令、引号外用 ; && || 串接、两段反引号之间只隔着分号、带 echo $? > 拒（拒绝说明列出报告路径与行号），"
+              "一行一条、范围声明与 bash -c 引号里的分号和 &&、别的节、代码块里不交任务的行、续行放行；"
               "走真实 stdin 入口拒得出，平常跑设了弄坏开关退 2 并点名只在自证里认；"
               "写 .rs 的目标以 $(git rev-parse --show-toplevel)、\"$(pwd)\" 起头的按仓根展开、照判命名检查；只修锚点、只补落产物的豁免只认行首标签与整句，句中「不是只补落产物」照判登记落地清单；"
               f"判不了而放行的 {len(UNJUDGED_SITES)} 处各记进没判全的几处，放行时检出记录多一行（结局只记）")

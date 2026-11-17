@@ -165,6 +165,6 @@ scripts/experiment-apparatus/lib.rs  # 实验二进制共用的库（e7_index_be
 crates/singlefs-verification/src/bin/deletion_write_dump.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e170_o3_spec_executor_export.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
+crates/singlefs-verification/src/bin/e170_specification_executor_export.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）

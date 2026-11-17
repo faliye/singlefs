@@ -39,7 +39,7 @@
 #       「stdin：questions 不是列表放行并记一条检出（结局只记、会话号照输入）」
 #   ASK_USER_CLAIM_GUARD_BREAK=exception-unrecorded  判的时候抛异常不接住，照原样抛出（进程退 1，Claude Code 照常放行、不记检出）
 #       「判的时候抛异常放行并记一条检出（结局只记、会话号照输入）」
-# 管不到的：出处是不是真的、数是不是那个产物里的、「推的」写得如不如实——这几样靠人（verify-before-claiming.md）；
+# 管不到的：出处是不是真的、数是不是那个产物里的、「推的」写得如不如实——这几样靠人（evidence-discipline.md）；
 #   换个说法（「肯定」「绝对」「百分之百」）就过去了，词表只认上面九个；出处写在前一句、断言写在后一句的照拒。
 #
 #   ask-user-claim-guard.sh             # 从 stdin 读 hook 的 JSON

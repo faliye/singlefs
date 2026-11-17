@@ -1,18 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(bash scripts/devices/vm-kernel.sh*)",
-      "Bash(scripts/devices/vm-kernel.sh*)",
-      "Bash(bash scripts/devices/vm-bench.sh*)",
-      "Bash(scripts/devices/vm-bench.sh*)",
-      "Bash(bash scripts/devices/vm-geom.sh*)",
-      "Bash(scripts/devices/vm-geom.sh*)",
-      "Bash(bash .claude/scripts/qemu.sh*)",
-      "Bash(.claude/scripts/qemu.sh*)",
-      "Bash(GATE_QEMU=1 bash .claude/scripts/gate.sh*)",
-      "Bash(qemu-system-x86_64 *)",
       "Bash(qemu-img *)",
-      "Bash(kvm *)",
       "Bash(lsblk*)",
       "Bash(blkid*)",
       "Bash(findmnt*)",
@@ -37,10 +26,17 @@
       "Bash(sudo -n umount /dev/loop*)",
       "Bash(sudo -n umount /dev/mapper/*)",
       "Bash(python3 .claude/singlefs-ai-sop/scripts/proc.py stop *)",
-      "Bash(task-server/task submit -- python3 scripts/gate/hook-swap.py *)",
-      "Bash(python3 scripts/kb/replace-once.py .claude/hooks/lib_project_code_runs.py *)",
+      "Bash(task-server/task *)",
+      "Bash(python3 task-server/control check*)",
+      "Bash(python3 scripts/hosts/queue-health.py*)",
       "Bash(python3 scripts/hosts/minimal-copy.py*)",
-      "Bash(python3 scripts/hosts/lib_repository_copy.py entries*)"
+      "Bash(python3 scripts/hosts/lib_repository_copy.py entries*)",
+      "Bash(python3 scripts/kb/replace-once.py *)",
+      "Bash(python3 scripts/kb/replace-batch.py *)",
+      "Bash(python3 scripts/kb/append-record.py *)",
+      "Bash(python3 scripts/agents/dispatch-prompt.py *)",
+      "Bash(bash scripts/agents/watch.sh*)",
+      "Bash(bash scripts/hosts/work-directory-ownership.sh *)"
     ],
     "deny": [
       "Bash(*losetup -D*)",
@@ -68,6 +64,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/continuation-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/message-target-guard.sh"
           }
         ]
       },
@@ -89,6 +89,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-scope-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/find-timestamp-guard.sh"
           },
           {
             "type": "command",
@@ -179,11 +183,19 @@
     ],
     "SessionStart": [
       {
-        "matcher": "startup|resume|compact",
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/session-checks.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/session-number-title.sh"
           }
         ]
       }
@@ -199,6 +211,14 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/completion-cleanup-guard.sh",
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/courtesy-phrase-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/unanswered-message-check.sh"
           }
         ]
       }
@@ -214,6 +234,20 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/completion-cleanup-guard.sh",
             "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/courtesy-phrase-check.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/session-number-title.sh"
           }
         ]
       }

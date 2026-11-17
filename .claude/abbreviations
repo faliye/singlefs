@@ -6,3 +6,4 @@ txg  # transaction group：事务组号。D16（发布语义）采纳 checkpoint
 jsn  # journal sequence number：journal 记录序号，每条记录一个、全局单调，字段定义在 D23（journal 的角色与格式）的记录头字段表
 crc  # cyclic redundancy check：循环冗余校验。D19（块指针的结构与宽度预算） 已定项 2 与 D23（journal 的角色与格式） 已定项 11 定的都是完整 32 位 CRC32C（Castagnoli 多项式），名字里的 crc32 指它
 cap  # capacity：打包容器一个容器装几个对象，D27（小数据打包容器）与 E114 / E149 的用法；不是 capability
+pci  # peripheral component interconnect：外设总线标准。卡的 PCI 总线地址（`0000:01:00.0` 这一形）与内核在 sysfs 导出的 PCI 设备目录，D26（后台整理与放置回收） 已定项 13 第 4 条判卡用不了那一刻读它

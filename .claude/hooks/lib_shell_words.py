@@ -16,11 +16,11 @@ env 后面带 `=` 的词照 GNU env 都当赋值，名字不合 shell 变量名�
 `bash [选项] 脚本` 与 `bash -c '…'`（递归进去；`--rcfile` / `--init-file` 带一个值，`--` 与单独的 `-` 之后的那个词是脚本；-c 之后照 bash 接着认选项，选项完了的那个词是代码（`bash -c -- '…'`）；带 -s 的从标准输入读，后面的词是位置参数、不是脚本；
 短选项之后的长选项（`bash -c --posix '…'`）bash 报错、带 -n 只查语法，都什么都不跑：ShellInvocation.runs_nothing）、eval 的参数（用空格连起来当一条完整的命令再切，同 bash -c）、`python3 [选项] 脚本`、`source` / `.`（后面跟的像一个路径才算）、`capped.sh N …`（N 写 `default` 的一样剥）与 `run-with-memory-cap.sh <上限> …`，
 （被执行的只是脚本位上那一个词：`bash -n 脚本` 只查语法、`python3 - 词…` 的程序从标准输入读，后面的词都是参数，都不当被执行的脚本交出；
-弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，哪几份自证的哪几项红见「弄坏开关」一段），
+弄坏开关 LIB_SHELL_WORDS_BREAK=arguments-as-executed 把这两种里的参数照旧当被执行的脚本，红格登在哪见「弄坏开关」一段），
 python 的选项照解释器的语义切（python_invocation）：短选项可以合写（`-Bu`），`-W`、`-X` 与 `--check-hash-based-pycs` 带一个值（贴着写或另起一个词），
 值不当脚本名；`-c <代码>` 的程序是那段代码、没有被执行的脚本，交出的是 python 这一条本身（代码由调用方从参数里取）；`-m <模块>` 交出
 `<模块里的点换成斜杠>.py` 当被执行的脚本（launcher 是 "python"），`-m runpy <模块>` 取后面那个模块，调用方拿它与仓内脚本的位置比
-（弄坏开关 LIB_SHELL_WORDS_BREAK=python-options-by-dash 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」，哪几份自证的哪几项红见「弄坏开关」一段），
+（弄坏开关 LIB_SHELL_WORDS_BREAK=python-options-by-dash 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」，红格登在哪见「弄坏开关」一段），
 数组赋值 `名字=(…)`（元素是值，不当命令）、`command -v` / `-V`（查名字，后面那个词不当命令），
 以及 cd / pushd 换目录、export / unset 改变量对后面命令的影响。喂给非 shell 命令的 heredoc 正文每一层都先剥掉；
 heredoc 挂在没收尾的命令替换或进程替换里的命令上（`x=$(bash <<EOF`、`diff <(bash <<EOF`）时，在那一层里找挂它的命令（open_substitution_tail，
@@ -70,7 +70,8 @@ git（-c 与配置里读到的别名，`!` 起头的照命令；core.pager、cor
 这一条设的 GIT_EXTERNAL_DIFF、GIT_PAGER、PAGER、GIT_EDITOR、EDITOR、VISUAL、GIT_SSH_COMMAND、GIT_ASKPASS 这类环境变量；配置经 `git config --get-regexp` 照 git 自己的读法取，
 这一份库里只有这一处起子进程）、tar（--to-command、-I / --use-compress-program、--checkpoint-action=exec、-F / --info-script、--rsh-command）、ssh（-o ProxyCommand、LocalCommand、KnownHostsCommand）、
 less（+…! 命令、这一条设的 LESSOPEN / LESSCLOSE）、vim 一族（-c、--cmd、+ 的 ex 命令以 ! 起头的照命令，带 system()、:terminal、python 这类的认不出）。
-字面写着的命令交 EmbeddedLaunches.texts，调用方同 bash -c 那样再判；写法认不出的（变量、拼接、__import__ / getattr / exec 动态取、ctypes、--config-env、GIT_EXEC_PATH）交 unjudged，调用方照认不出办；
+字面写着的命令交 EmbeddedLaunches.texts，调用方同 bash -c 那样再判；写法认不出的（变量、拼接、__import__ / getattr / exec 动态取、ctypes、--config-env、GIT_EXEC_PATH，
+make -C 的目录与 git -c 的配置名、别名值写成这段命令文本里代入不了的变量或命令替换）交 unjudged，调用方照认不出办（make -C、git -c 前面赋过字面值的照代入）；
 程序从文件读的代码（awk -f、sed -f、make 的 -f 与默认的 GNUmakefile / makefile / Makefile）交 program_files，调用方读正文交 program_text_launches。
 不读的：python / perl / ruby / tclsh 起的脚本文件（同共用约束「写」一节，脚本文件里与 python subprocess 起的写法由子 agent 自己守）、git 的钩子目录（core.hooksPath、.git/hooks）、ssh 的配置文件、
 Makefile 里 include 进来的文件（交 unjudged）、vim 的 -S / -u 读的文件。弄坏开关 LIB_SHELL_WORDS_BREAK=embedded-launches-unseen 下一条都不认。
@@ -79,16 +80,21 @@ Makefile 里 include 进来的文件（交 unjudged）、vim 的 -S / -u 读的�
 echo（-n / -e / -E 照 bash 内建认）、不带文件操作数而读 heredoc 的 cat 时它们交出的文字。喂进去的不是字面的判不了，每处一句说明交在 ShellScan.unjudged_shell_inputs：
 here-string 或 printf / echo 的参数里有 `$`、反引号（变量、命令替换；单引号里写的同样算，切词时分不出，字面的那一部分照切）、不带引号结束词的 heredoc 正文里有它们、
 管道前一段是别的命令（cat 文件、花括号组、子 shell……）、标准输入从文件或别的描述符来（`< 文件`、`<&`、`<>`；`< /dev/null` 不算）。调用方按各自的「判不了」处置（放行并记检出）。
-弄坏开关 LIB_SHELL_WORDS_BREAK=shell-standard-input-unread 下不再切、也不交说明，哪几份自证的哪几项红见「弄坏开关」一段。
+弄坏开关 LIB_SHELL_WORDS_BREAK=shell-standard-input-unread 下不再切、也不交说明，红格登在哪见「弄坏开关」一段。
 脚本文件本身不在这里读，要读的 hook 自己读，再把正文交回 commands_at_command_position。
 判不到的：变量里拼出来的命令、eval 的参数里外层先展开的变量与命令替换（展开成什么判不到，照原文切）、喂给 shell 的标准输入不是字面的（交判不了的说明，见上）、管道前一段是花括号组或子 shell 时组里 printf / echo 的文字（整组当判不了）、
 进程替换的输出再交给 shell 执行（`bash <(…)`、`source <(…)`，括号里的命令照判，它打印出来的不判；project-code-guard.sh 照认不出拒）、Makefile 起的命令
 （xargs 与名单外启动器由 lib_project_code_runs.py 的 command_under_extra_launcher 剥）；
-喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉），没收尾的替换开在上一行的同样认不出；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效；
+喂给 shell 的 heredoc 正文里引号没配对时，其后的切词会错；heredoc 挂的命令从上一行续行过来时认不出它喂给谁（当数据剥掉），没收尾的替换开在上一行的同样认不出；圆括号子 shell 里的 cd 与 export 当成对后面的命令也生效（变量记值另分作用域，见下）；
 花括号展开不分 `[[ ]]`、case 模式这类 bash 不展开的位置（照展，判得偏严）；只定义的函数认 `function 名字 { …; }` 与 `名字() { …; }` 两种写法，函数体里套花括号的、函数体之外有变量或命令替换的照判（偏严）；`builtin` 认的是 bash 5.2 的内建表（enable -f 载进来的不认，照不跑放行）；
 命令替换与进程替换里的命令按替换所在那条命令开始时的目录与 export 判（替换里的 cd 不影响外面）。
 变量展开判不到的：值从上一条 Bash、source 进来的文件、eval 来的（目录照旧认不出）；单引号里的 `$名字` 照样展开（引号在切词时已去掉，分不出）；
-bash -c 的那段代码按外层记下的全部变量展开（没 export 的变量里层真跑时看不到，这里照样展开，判得偏严）；圆括号子 shell 里赋的值当成对后面的命令也生效。
+bash -c 的那段代码按外层记下的全部变量展开（没 export 的变量里层真跑时看不到，这里照样展开，判得偏严）；
+变量记值分作用域（VariableScopes，认不准的记成算不出、偏严）：圆括号子 shell、管道段、放后台的里面改过的值出来之后算不出；`&&` / `||` 之后、if / case / 循环 / 函数体里
+把记过的值改成别的，离开那一串、那一组之后算不出（一串 `&&` 里接着用的照新值）；循环体里后一遍用到前一遍赋的值不认；export 进环境的与 cd 的目录照旧不分作用域。
+别名（认不准开没开展开的照开着算，偏严）：shopt -s expand_aliases、set -o posix 之后，起来时就开着的 shell（bash -O expand_aliases、-i、posix 模式、读启动文件的，sh / dash / ksh / ash / zsh）
+里定义的别名照展开（shell_starts_with_aliases）；eval、trap、命令替换、source /dev/stdin 的代码带着外面先定义的别名，eval 里定义的别名对后面的行同样生效；
+别名的值的头一个词是别的别名的接着展开；同一行里定义的不展开只照 bash 认。
 认得出起的是什么、不起重活与 claude 的照放（「认不出的一律拒」的另一半）：sed 脚本词里没展开的 bash 展开（`$((…))`、`$[…]` 换成整数，
 `$(…)`、反引号与变量换成只认在行号地址位上的占位）在原样切不下去时逐种组合再切（sed_expanded_variants）；a / i / c 的文本认 `a\\` 换行与行末续行（sed_script_parse）；
 python 起命令的 argv 头一项字面、参数不是字面的，参数换成一个值算不出的词照一段命令交出，赋过字面值没改过的名字与字面串的 .split() / shlex.split() 照算出的值（python_command_value）；
@@ -102,324 +108,172 @@ python 起命令的 argv 是字面列表接 `+ 列表` 或 `*列表` 的，接�
 （python_list_tail、python_tail_command_word_judged）；python 代码里只调 compile、代码不是字面的，不当起命令（字面的代码照扫，exec / eval 照判）；
 sed 的 s 命令标志区照 GNU sed 认（g p e i I m M、数字、空白，w 读到行尾，`;`、换行、`}`、`#` 收尾），有别的字 GNU sed 编译就报 unknown option to `s'、整个脚本一行都不跑，不当 e 标志；
 `cd 目录 && ( … )`、`cd 目录 && time ( … )` 的子 shell 照 `&&` 守着算（guarded_subshell_boundary）；只定义、不调用的 `名字() { …; }` 同 `function 名字 { …; }` 一样不判函数体。
-弄坏开关（LIB_SHELL_WORDS_BREAK，几个用逗号连；只给自证判红用）。这一份没有自己的 --selftest，由导入它的几份的自证判红：
-lib_project_code_runs.py、project-code-guard.sh、bash-command-detector.sh 各自的 --selftest（目录变量那两个开关另有 lib_workspace_cargo_lock.py 的 --selftest）。
-逐项写开关名、弄坏哪一处、打开后哪几份自证的哪几项红（项名是那份自证的用例标签，括号里是失败行在标签之后的开头；
-失败行 lib_project_code_runs.py 以「✗ lib_project_code_runs 自检：」起头，project-code-guard.sh、bash-command-detector.sh 以「✗ 自检：」起头；
-project-code-guard.sh 的自证还原样转出 lib_project_code_runs.py 自证的失败行）：
+弄坏开关（LIB_SHELL_WORDS_BREAK，几个用逗号连；只给自证判红用）。这一份没有自己的 --selftest，由导入它的几份的自证判红。
+每条开关在这里只留「名字、弄坏哪一处」；打开后哪几份自证的哪几格红只登记一处：project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+（门禁 code-tooling 的 break-switch-replay 格逐条设上开关、跑那一份的 --selftest，点名的格与实际红的格逐格比），这里不抄第二份。
+每条开关下面那一行只是指路（break-switch-headers 格要求每条开关有点名的项）；写着「尚未登记」的，两份钩子的自证里读不出会红的格。
   LIB_SHELL_WORDS_BREAK=arguments-as-executed  `bash -n 脚本` 的目标与 `python3 - 词…` 后面的词照旧当被执行的脚本交出
-      lib_project_code_runs.py --selftest：
-        python3 - 后面的门禁文件名是参数（门禁目录里跑）（「应当是 None，实际 commit-check-stage」）
-        bash -n 只查门禁的语法（「应当是 None，实际 commit-check-stage」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那两项）：
-        工具实现员 bash -n 查门禁的语法（「应当是 0，实际 2」）
-        工具实现员在门禁目录里 python3 - 读几份门禁（2026-09-28 误拦的那一条原样，目录换成自检的临时工作区）（「应当是 0，实际 2」）（history-kept: 自证用例标签的原文，改了就对不上自证里的标签）
-        实现员 bash -n 只查语法（「应当是 0，实际 2」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh --selftest：
-        看门狗:前台 bash -n 只查语法（「应当是 0，实际 1」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=python-options-by-dash  python_invocation() 退回「以 - 开头的词都当选项跳过、第一个不以 - 开头的词当脚本」：带值选项的值当成脚本名，-m、-c 不认
-      lib_project_code_runs.py --selftest：
-        python3 -W ignore 起广谱变异（「应当是 broad-mutation，实际 None」）
-        python3 -X dev 起广谱变异（「应当是 broad-mutation，实际 None」）
-        python3 -BW default（合写、值另起一个词）起广谱变异（「应当是 broad-mutation，实际 None」）
-        python3 --check-hash-based-pycs never 起广谱变异（「应当是 broad-mutation，实际 None」）
-        cd 进 scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
-        python3 -m research.scripts.broad-mutation（命名空间包）（「应当是 broad-mutation，实际 None」）
-        python3 -m runpy broad-mutation（「应当是 broad-mutation，实际 None」）
-        PYTHONPATH 指到 scripts 再 python3 -m broad-mutation（「应当是 broad-mutation，实际 None」）
-        python3 -c runpy.run_path 起广谱变异（「应当是 broad-mutation，实际 None」）
-        python3 -c exec(open(驱动).read())（「应当是 broad-mutation，实际 None」）
-        python3 -c runpy.run_module 按模块名起（「应当是 broad-mutation，实际 None」）
-        PYTHONPATH 指到 scripts 再 python3 -m 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
-        export PYTHONPATH 再 python3 -m 起红例重放（「应当是 verus-stage，实际 None」）
-        python3 -c runpy.run_path 起判法脚本跑必红世界（「应当是 verus-stage，实际 None」）
-        经 PYTHONPATH 起判法脚本的 --selftest：不在登记表的位置上，照旧算提交时才跑的检查（「应当是 commit-check-selftest，实际 None」）
-        python3 -c 里改 sys.argv 成 proof、代码之后写 tool-versions（「应当是 verus-stage，实际 None」）
-        python3 -c 里改 sys.argv 成 --replay、代码之后不写词（「应当是 verus-stage，实际 None」）
-        python3 -c 里 __import__ 按模块名起判法脚本验证明（「应当是 verus-stage，实际 None」）
-        python3 -c 里 importlib.import_module 起红例重放（「应当是 verus-stage，实际 None」）
-        python3 -c 里 spec_from_file_location 载入判法脚本再调 run_check、代码之后写 toolchain（「应当是 verus-stage，实际 None」）
-        python3 -c 的 print 包着 __import__ 起判法脚本（「应当是 verus-stage，实际 None」）
-        python3 -c 的 print 包着 __import__、代码只有这一句（「应当是 verus-stage，实际 None」）
-        python3 -c runpy.run_path 起红例钉表、代码之后写 --check（「应当是 verus-stage，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那 23 项）：
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh 的 --selftest 不红
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=array-appends-unseen  record_array_writes() 什么都不记：`名字+=值`、`名字[下标]=值` 照旧不改记下的值
-      lib_project_code_runs.py --selftest：cargo 那张表里「变量里的阶段路径：S 先赋目录、再 += 接上 crates 变异那一道的文件名」一格（「应当是 crates-mutation-stage，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那一项）：
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh、detached-run.sh 的 --selftest 不红
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
   LIB_SHELL_WORDS_BREAK=env-chdir-ignored  skip_prefixes() 不交 env 的 -C / --chdir 换的目录：commands_at_command_position 里这一条命令照外面的当前目录判
-      lib_project_code_runs.py --selftest：cargo 那张表里「env 换目录」开头的十一格里十格红（「换的目录只管这一条」那格不红）：
-        env 换目录：-C 换进探针再 cargo test -p 探针自己的包名（「应当是 verification-cargo，实际 None」）
-        env 换目录：-C 换进 验证包目录裸跑、-C 贴着目录写、--chdir=目录、--chdir 目录（分两个词）、bash -c 里的 env -C（「应当是 verification-cargo，实际 full-cargo」）
-        env 换目录：绝对路径、当前目录在别处、经内存包装（「应当是 verification-cargo，实际 None」）
-        env 换目录：换进 验证包目录裸跑放行、换进不依赖 验证包的探针裸跑放行、两个 -C 取最后一个（「应当是 None，实际 full-cargo」）
-        另有「变量目录裸跑：」那一批的「export D 之后经内存包装 env -C $D/验证包目录」一格（「应当是 verification-cargo，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那十一项）：
-        实现员经内存包装 env -C 换进探针再 cargo test -p 探针自己的包名、env -C 换进 验证包目录裸跑、env --chdir=目录换进 验证包目录、env --chdir 目录（分两个词）、
-        主 agent env -C 换进链接 验证包的探针 cargo run（「应当是 2，实际 0」）
-        实现员经内存包装 env -C 换进不依赖 验证包的探针裸跑 cargo test：放行（「应当是 0，实际 2」）
-        实现员经内存包装 env -iC 合写换进 验证包目录 cargo test：照拒、实现员经内存包装 env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
-        实现员 export D 之后经内存包装 env -C $D/验证包目录裸跑：照拒（「应当是 2，实际 0」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh 的 --selftest 不红
-  LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed  skip_prefixes() 里 env 的选项退回只认整词 -u / --unset / -C / --chdir：合写的 -iC、-0iu、缩写的 --chd、单独的 - 与 -S / --split-string
-      不认（选项簇当不带值的开关，它的值词当命令词；-S 的字符串整个当命令词）
-      lib_project_code_runs.py --selftest：cargo 那张表里「env 选项」开头六格里五格红（「-iC 换进 验证包目录裸跑放行」不红）、「env 拆串」开头七格里六格红（放行的一格不红）：
-        env 选项：-iC 合写、-iC 目录贴着写、--chd 缩写（「应当是 verification-cargo，实际 None 或 full-cargo」）
-        env 选项：-0iu 合写、单独一个 -（「应当是 full-cargo，实际 None」）
-        env 拆串：-S、-iS、--split-string=、串里带 -C 与赋值、串后面还有参数、经内存包装与 capped.sh（「应当是 verification-cargo，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那十一项）：
-        实现员经内存包装 env -iC 合写换进 验证包目录 cargo test：照拒、env -S 拆串里是 验证包的 cargo test：照拒、env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh 的 --selftest 不红（它的自证里没有 env 带选项簇或 -S 的用例，未实跑，由主 agent 复跑核）
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
+  LIB_SHELL_WORDS_BREAK=env-option-clusters-unparsed  skip_prefixes() 里 env 的选项退回只认整词 -u / --unset / -C / --chdir：合写的 -iC、-0iu、缩写的 --chd、单独的 - 与 -S / --split-string 不认（选项簇当不带值的开关，它的值词当命令词；-S 的字符串整个当命令词）
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
   LIB_SHELL_WORDS_BREAK=env-split-string-unexpanded  skip_prefixes_expanding() 不拆 env 的 -S / --split-string（-S 与它的字符串整个跳过，里面的命令不判）
-      lib_project_code_runs.py --selftest：cargo 那张表里「env 拆串」开头七格里六格红（放行的「串里点名 验证包放行」不红；「应当是 verification-cargo，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那六项）：
-        实现员经内存包装 env -S 拆串里是 验证包的 cargo test：照拒、env -S 拆串里先换目录再 cargo test：照拒（「应当是 2，实际 0」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh 的 --selftest 不红（同上，未实跑）
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
   LIB_SHELL_WORDS_BREAK=directory-variables-unexpanded  expand_known_variables() 遇到 `$` 一律交 None：cd / pushd / env -C 的目录写在变量里的照旧认不出
-      lib_project_code_runs.py --selftest：
-        变量目录裸跑：D=… 之后 cd $D/验证包目录、经内存包装、export D 之后经内存包装 env -C $D/验证包目录、cd $HOME/… 指到 验证包目录、
-        嵌套变量 D=$B/…、外层赋的变量在 bash -c 里的 cd（「应当是 verification-cargo，实际 None」）
-        变量目录裸跑：cd ${D} 工作区根、经内存包装全量、declare D=… 之后 cd $D 全量（「应当是 full-cargo，实际 None」）
-        变量里的阶段路径：S=…; bash "$S" 起 crates 变异那一道整道、目录放变量里拼出 crates 变异那一道、S 先赋目录、再 += 接上 crates 变异那一道的文件名（「应当是 crates-mutation-stage，实际 None」）、
-        export 之后直接执行形式化那一道（「应当是 verus-stage，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 上面那些项）：
-        实现员 D=… 之后 cd $D/验证包目录、经内存包装裸跑 cargo test：照拒、实现员 cd ${D} 工作区根、经 timeout、nice、capped.sh、内存包装四层全量：照拒、
-        实现员 export D 之后经内存包装 env -C $D/验证包目录裸跑：照拒、实现员 cd $HOME/… 指到 验证包目录、经内存包装裸跑：照拒、
-        主 agent D=… 之后 cd $D 全量：照拒（「应当是 2，实际 0」）
-        cd 进写在变量里的主工作区再起：拒（转出 lib_workspace_cargo_lock.py 那一格，「应当拒，实际 放行」）
-        lib_project_code_runs.py 的自检、lib_workspace_cargo_lock.py 的自检（「应当是 0，实际 1」）
-      lib_workspace_cargo_lock.py --selftest：
-        cd 进写在变量里的主工作区再起：拒（「应当拒，实际 放行」）
-      bash-command-detector.sh --selftest：
-        通删工作根:D=… 之后 cd $D 进工作根再 rm -rf *、通删工作根:cd $HOME/… 进工作根再 rm -r 第一层部分通配（「应当是 1，实际 0」；后一格只在工作根在家目录下时写成 $HOME）
-        覆盖产物:cd $HOME/… 算得出来、按那个目录解析（仓外，放行）（「应当是 0，实际 1」）
-      timer-only-remind-guard.sh、scripts/agents/agent-watch.py、scripts/gate/selftest-process-guard.py 的 --selftest 不红
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=variable-rebinding-unseen  for / select / read / unset 改写过的变量照旧用之前记下的值（rebind_variables() 与 unset 那一处不记成算不出）
-      lib_project_code_runs.py --selftest：
-        变量目录裸跑：for 改写过的变量照旧认不出（放行）、read 读进来的变量照旧认不出（放行）、unset 之后照旧认不出（放行）（「应当是 None，实际 verification-cargo」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那三项）：
-        实现员 for 改写过的变量照旧认不出、经内存包装裸跑：放行（「应当是 0，实际 2」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh、lib_workspace_cargo_lock.py、timer-only-remind-guard.sh、agent-watch.py、
-      selftest-process-guard.py 的 --selftest 不红
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
   LIB_SHELL_WORDS_BREAK=shell-standard-input-unread  commands_at_command_position() 不把 here-string 与管道喂给 shell 的文本当命令再切、也不交判不了的说明
-      lib_project_code_runs.py --selftest：
-        标准输入：here-string 喂给 bash 跑全量、标准输入：printf 经管道喂给 bash 跑全量、标准输入：echo 经管道喂给 sh 跑全量（「应当是 full-cargo，实际 None」）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那三项）：
-        实现员 here-string 喂给 bash 跑 --workspace、实现员 printf 经管道喂给 bash 跑 --workspace、实现员 echo 经管道喂给 sh 跑 --workspace、
-        主 agent here-string 喂给 bash 跑 --workspace（「应当是 2，实际 0」）
-        实现员 here-string 喂给 bash 的是变量：认不出照拒、照记检出：记几条检出、实现员 cat 文件经管道喂给 bash：放行并记检出：记几条检出（「应当是 1，实际 0」）
-        stdin:here-string 喂给 bash 的是变量认不出照拒（退出码 2）、stderr 点名判不了、记一条检出（「应当是 (0, True, 1, 's-fed')」）
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      bash-command-detector.sh --selftest：
-        stdin:here-string 喂给 bash 的是变量放行（退出码 0）、记一条检出（「应当是 (0, 1, True)，实际 (0, 0, False)」）
-        stdin:拒了的命令里有判不了的输入（grep 的输出经管道喂给 bash），照记一条、结局被拒（「应当是 (2, 1, '被拒')，实际 (2, 0, '只记')」）
-        stdin:here-string 里前台起看门狗照拒（退出码 2）（「应当是 2，实际 0」）
-      run-scope-guard.sh --selftest（这个开关不在它的开关轮里，设着跑时开关轮另报「另有这几格红」）：
-        here-string 喂给 bash 的 cargo test 整工作区：没带声明拒、printf 经管道喂给 bash 的门禁：没带声明拒、echo 经管道喂给 sh 的 cargo test 整工作区：没带声明拒（「应当是 2，实际 0」）
-        入口：here-string 喂给 bash 的是变量放行、记一条检出（「应当是 (0, 1, True, '只记')」）
-  下面七项是边角：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=redirect-fd-dropped  shell_tokens() 不把 fd 号挂到重定向运算符上：redirects_standard_output() 把 `2> 文件` 也当改标准输出
-      project-code-guard.sh --selftest：主 agent cat > 拷出、另把 stderr 丢进 /dev/null 再起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」（「应当是 0，实际 1」）、
-        「：读进去几份脚本」（「应当是 1，实际 0」），cat > 拷出、起的是 2> 写的那一份：认不出写法写出再起，照拒（「应当是 0，实际 2」）、它的「：记几条检出」（「应当是 1，实际 0」）、「：读进去几份脚本」（「应当是 0，实际 1」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=link-source-from-current-directory  link_source_word() 原样交回：ln -s 的相对源照当前目录解
-      project-code-guard.sh --selftest：主 agent ln -s 的相对源从链接所在的目录算、经它起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」（「应当是 0，实际 1」）、
-        「：读进去几份脚本」（「应当是 1，实际 0」），ln -s 的相对源在链接所在的目录里不在：认不出写法写出再起，照拒（「应当是 0，实际 2」）、它的「：记几条检出」（「应当是 1，实际 0」）、「：读进去几份脚本」（「应当是 0，实际 1」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=env-leading-equals-as-command  skip_prefixes() 里 env 后面开头就是 `=` 的词当命令词
-      project-code-guard.sh --selftest：主 agent env =1 开头就是 = 的赋值起全量照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-c-options-unparsed  shell_invocation() 取紧跟 -c 的那个词当代码（`bash -c -- '…'` 的代码取成 --）
-      project-code-guard.sh --selftest：主 agent bash -c -- 的代码里起全量照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=builtin-non-builtin-run  skip_prefixes() 把 builtin 后面不是内建的词照旧当命令词
-      project-code-guard.sh --selftest：builtin 后面不是内建：bash 报错不跑，放行（「应当是 0，实际 2」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=uncalled-functions-run  drop_uncalled_function_bodies() 原样交回：只定义、调不到的函数体照命令判
-      project-code-guard.sh --selftest：function 只定义不调用：函数体不跑，放行、名字() { 函数体 } 只定义不调用：函数体不跑，放行（「应当是 0，实际 2」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-s-positionals-as-script  shell_invocation() 把 -s 后面的词照旧当脚本
-      project-code-guard.sh --selftest：bash -s -- 后面的词是位置参数、不是脚本：放行（「应当是 0，实际 2」）、它的「：读进去几份脚本」（「应当是 0，实际 1」）
-  这一批修补的十项（W1、W2 那三项与这七项）下，两个 hook 之外的 lib_project_code_runs.py、lib_workspace_cargo_lock.py、run-scope-guard.sh、handback-guard.sh、timer-only-remind-guard.sh、
-  shared-index-stale-reminder.sh、scripts/agents/agent-watch.py、scripts/gate/selftest-process-guard.py、scripts/hosts/memory_peaks_lib.py
-  的 --selftest 都不红（逐项实跑过；brace-sequence-unpadded 下 lib_project_code_runs.py 红的那五格除外）；这一批新加的格在已有的 braces-unexpanded、env-loose-assignments-as-command、
-  shell-option-values-as-script、function-keyword-as-command 下也红，逐格写在 project-code-guard.sh、bash-command-detector.sh 文件头「同一批回归修补……在已有开关下也红」那一段
-  下面九项：lib_project_code_runs.py、lib_workspace_cargo_lock.py、run-scope-guard.sh、
-  handback-guard.sh、timer-only-remind-guard.sh、shared-index-stale-reminder.sh 的 --selftest 在这九项下都不红（逐项实跑过）；
-  scripts/agents/agent-watch.py、scripts/gate/selftest-process-guard.py、scripts/hosts/memory_peaks_lib.py 的 --selftest 没在这九项下跑过：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=time-options-as-command  skip_prefixes() 不跳 time 关键字后面的 -p / --（-p 当命令词）
-      project-code-guard.sh --selftest：主 agent time -p 起全量照拒、主 agent time -- 起全量照拒、实现员 time -p 包着内存包装起 验证包照拒（「应当是 2，实际 0」）
-      bash-command-detector.sh --selftest：等待循环:前台 time -p 包着的 bash -c 里没有 timeout（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=builtin-as-command  skip_prefixes() 把 builtin 当命令词（后面的 source / cd 不认）
-      project-code-guard.sh --selftest：主 agent builtin source 读进全量脚本照拒、实现员先进 验证包目录、再 builtin cd 进 验证包目录经内存包装裸跑照拒（「应当是 2，实际 0」），
-        主 agent builtin source 读进全量脚本照拒：读进去几份脚本（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-option-values-as-script  shell_invocation() 不认 --rcfile / --init-file 的值，`--` 与单独的 `-` 当脚本
-      project-code-guard.sh --selftest：主 agent bash --rcfile 起全量脚本照拒、bash -- 起全量脚本照拒、bash - 起全量脚本照拒（「应当是 2，实际 0」），三格各自的「：读进去几份脚本」（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=function-keyword-as-command  skip_prefixes() 把 function 关键字当命令词
-      project-code-guard.sh --selftest：主 agent function 关键字定义的函数里起全量照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=braces-unexpanded  brace_expand() 原样交回（引号外的花括号不展开）
-      project-code-guard.sh --selftest：主 agent cp X{,.bak} 拷出再起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」（「应当是 0，实际 1」）、「：读进去几份脚本」（「应当是 1，实际 0」）
-      lib_project_code_runs.py --selftest：「命令文本：命令词的花括号照 bash 展开（{x,mutate}.sh：bash 起的是 x.sh，mutate.sh 是它的参数）」
-        「命令文本：花括号里的字母序列照 bash 展开（repla{x..y}.sh：bash 起的是头一份，算门禁阶段）」（花括号留到 lib_project_code_runs.py 的 brace_expansion 照「每一份单独当命令」判）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=double-slash-kept  resolve_path() 留着开头的 //（os.path.normpath 的样子）
-      bash-command-detector.sh --selftest：就地改仓内文件:cd 到 // 开头写的 /tmp/ 下的目录之后 sed -i 相对路径放行（「应当是 0，实际 1」）
-      project-code-guard.sh --selftest 不红（它按实际路径比，开头的 // 本来就并掉了）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=env-loose-assignments-as-command  skip_prefixes() 里 env 后面名字不合变量名的 `名字=值` 当命令词
-      project-code-guard.sh --selftest：主 agent env -- 带不合变量名的赋值起全量照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=eval-unread  commands_at_command_position() 不切 eval 的参数（eval 当一条普通命令）
-      project-code-guard.sh --selftest：主 agent eval 字面代码里起全量照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=heredoc-open-substitution-unseen  heredoc_feeds_shell() 照整行找挂它的命令（没收尾的 $( / <( 里的 bash 认不出，正文当数据剥掉）
-      project-code-guard.sh --selftest：主 agent $(bash <<EOF) 里起全量照拒、主 agent <(bash <<EOF) 里起全量照拒（「应当是 2，实际 0」）
-      bash-command-detector.sh --selftest：等待循环:前台 $(bash <<EOF) 里的循环、等待循环:前台 <(bash <<EOF) 里的循环（「应当是 1，实际 0」）
-  下面三项：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=brace-empties-kept  brace_expand() 留着花括号展开出来的空串（`{cargo,} test` 切成 `cargo '' test`）
-      project-code-guard.sh --selftest：主 agent {cargo,} 空的一份起全量照拒、主 agent {,} 写在命令词前面起全量照拒、
-        主 agent cargo {,test} 空的一份起全量照拒、实现员 {bash,} 空的一份经内存包装起 验证包照拒（「应当是 2，实际 0」）
-  LIB_SHELL_WORDS_BREAK=brace-sequence-unpadded  brace_sequence_width() 一律交 0：补零的整数序列（{01..03}）不补零（lib_project_code_runs.py 的 brace_sequence 共用它，一并不补）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那五项）：主 agent cp 补零的序列拷出再起全量脚本照拒（「应当是 2，实际 0」）、
-        它的「：记几条检出」（「应当是 0，实际 1」）、它的「：读进去几份脚本」（「应当是 1，实际 0」）、lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
-      lib_project_code_runs.py --selftest：花括号展开与 bash 一致：{01..10}、{-01..3}、{1..-03}、{0..00}、{1..05..2}（「应当是 [」；{01..100..33}、{100..00..50} 同样红）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=brace-sequence-unpadded  brace_sequence_width() 一律交 0：补零的整数序列（{01..03}）不补零（lib_project_code_runs.py 的花括号展开调同一个 brace_sequence，一并不补）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=double-quoted-substitution-unclosed  open_substitution_tail() 把双引号里的 `$(` 一律当没收尾（顶层的 bash <<EOF 当挂在替换里，正文当数据剥掉）
-      project-code-guard.sh --selftest：主 agent cd "$(git rev-parse --show-toplevel)" 之后 bash <<EOF 里起全量照拒、主 agent FOO="$(pwd)" bash <<EOF 里起全量照拒
-        （「应当是 2，实际 0」）
-      bash-command-detector.sh --selftest：等待循环:前台 cd "$(…)" 之后 bash <<EOF 里的循环、等待循环:前台 echo "$(date)" | bash <<EOF 里的循环（「应当是 1，实际 0」）
-  下面十三项：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=function-calls-literal-only  function_never_called() 只数原文里的字面：拆开拼写的调用（`"fo"o`、`fo{o,}`、`fo\\o`）认不出，函数体照不判
-      project-code-guard.sh --selftest：主 agent function 定义之后引号拆开拼写调用照拒、主 agent function 定义之后花括号拆开拼写调用照拒、
-        主 agent function 定义之后反斜杠拆开拼写调用照拒、编译目录：function 定义之后拆开拼写调用：拒（退出码 2）（「应当是 2，实际 0」），
-        lib_workspace_cargo_lock.py 的自检（「应当是 0，实际 1」；另原样转出 lib_workspace_cargo_lock.py 下面那一格）
-      lib_workspace_cargo_lock.py --selftest：编译目录：function 定义之后拆开拼写调用：拒（「命令」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=redirect-fd-number-literal  redirection_fd() 照字面比 fd 号：`01>` 不算 1 号
-      project-code-guard.sh --selftest：主 agent cat 01> 拷出再起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」（「应当是 0，实际 1」）、「：读进去几份脚本」（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=redirect-fd-quoted-digits  shell_tokens() 把引号或反斜杠写出的数字（`"2">`、`\\2>`）也当 fd 号
-      project-code-guard.sh --selftest：主 agent cat 源 "2"> 拷出（引号里的 2 是源）再起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」「：读进去几份脚本」
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=redirect-fd-duplication-unseen  standard_output_destination() 不跟 `n>&m`，只取直接改标准输出的最后一个
-      project-code-guard.sh --selftest：主 agent cat 3> 再 >&3 拷出再起全量脚本照拒、主 agent heredoc 写文件：cat <<EOF 3> 再 >&3 写出再起全量脚本照拒（「应当是 2，实际 0」），
-        两格各自的「：记几条检出」「：读进去几份脚本」
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-long-options-after-short  shell_invocation() 把短选项之后的长选项照旧当选项跳过
-      project-code-guard.sh --selftest：bash -c 之后的长选项：bash 报错不跑，放行（「应当是 0，实际 2」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-syntax-only-code-run  shell_invocation() 带 -n 时 -c 的代码照判
-      project-code-guard.sh --selftest：bash -c -n 只查语法：放行（「应当是 0，实际 2」）
-  LIB_SHELL_WORDS_BREAK=shell-option-clusters-unvalued  shell_invocation() 里合写的短选项簇不吃 -o / -O 的值词（`bash -euo pipefail -c …` 的 pipefail 不吃掉：
-      pipefail 被当成 -c 的代码或脚本，整条 -c 的代码没进判）
-      lib_project_code_runs.py --selftest：「选项簇：bash -euo pipefail -c 全量」「选项簇：bash -eo pipefail -c 全量」「选项簇：bash -ouc pipefail 全量」「选项簇：bash -oo pipefail errexit -c 全量（两个 o 各吃一个词）」四格红（应当是 full-cargo，实际 None）
-      project-code-guard.sh --selftest（另转出 lib_project_code_runs.py 那四格）：实现员 bash -euo pipefail -c 全量照拒、实现员 bash -euo pipefail 起全量脚本照拒（「应当是 2，实际 0」），lib_project_code_runs.py 的自检（「应当是 0，实际 1」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=shell-option-clusters-unvalued  shell_invocation() 里合写的短选项簇不吃 -o / -O 的值词（`bash -euo pipefail -c …` 的 pipefail 不吃掉，被当成 -c 的代码或脚本，整条 -c 的代码没进判）
+      尚未登记：project-code-guard.sh、bash-command-detector.sh 的自证里读不出会红的格
   LIB_SHELL_WORDS_BREAK=env-options-after-assignment  skip_prefixes() 里 env 认到赋值之后照旧认选项
-      project-code-guard.sh --selftest：env =1 之后的 -u 是命令词：env 报错不跑，放行（「应当是 0，实际 2」）、lib_project_code_runs.py 的自检（「应当是 0，实际 1」；另转出下面那一格）
-      lib_project_code_runs.py --selftest：env 拆串：拆出来的串里赋值之后的 -C 是命令词，env 报错不跑（「应当是 None，实际 verification-cargo」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=brace-sequence-width-padded-ends-only  brace_sequence_width() 只取补零写的那几边的长度
-      project-code-guard.sh --selftest：主 agent cp 带步长、两端宽度不一的补零序列拷出再起全量脚本照拒（「应当是 2，实际 0」）、它的「：记几条检出」「：读进去几份脚本」，
-        lib_project_code_runs.py 的自检（「应当是 0，实际 1」；另转出下面两格）
-      lib_project_code_runs.py --selftest：花括号展开与 bash 一致：{01..100..33}、{100..00..50}（「应当是 [」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=ansi-c-quotes-unseen  shell_tokens()、open_substitution_tail()、command_substitution_end() 把 `$'…'` 照普通单引号配对
-      project-code-guard.sh --selftest：主 agent $'…' 里带 \\' 之后 bash <<EOF 里起全量照拒（「应当是 2，实际 0」）
-      bash-command-detector.sh --selftest：等待循环:前台 $'a\\'b' 之后 $(bash <<EOF) 里的循环（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=case-patterns-as-commands  case_patterns_and_conditionals_folded() 不改 case 的模式
-      project-code-guard.sh --selftest：case 里 ;; 之后的模式词不当命令：放行、case 里 | 隔开的模式词不当命令：放行（「应当是 0，实际 2」）
-      bash-command-detector.sh --selftest：stdin:子 agent case 里 ;; 之后的 reboot 模式不当命令放行（退出码 0）、stdin:子 agent case 里 ;; 之后的 claude 模式不当命令放行（退出码 0）（「应当是 0，实际 2」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=conditional-expression-split  case_patterns_and_conditionals_folded() 不改 `[[ … ]]`
-      project-code-guard.sh --selftest：[[ ]] 里 && 之后的词不当命令：放行（「应当是 0，实际 2」）
-  LIB_SHELL_WORDS_BREAK=redirect-target-braces-expanded  shell_tokens() 照旧展开重定向目标上的花括号（展开出来多的词成了这一条的参数；随第 3 条一起改：
-    几个源的 cat 认成拷贝之后，`cat s.sh > d{,}.sh` 被当成把 s.sh 接进 d.sh，而 bash 报 ambiguous redirect、什么都不写；展开成几个词的目标现在照原样留一个词：拷出再执行认不出这个落点，写范围那一类照落点算不出拒）
-      project-code-guard.sh --selftest：重定向目标花括号展开成几个词：bash 报 ambiguous redirect 不写，放行（「应当是 0，实际 2」）、它的「：记几条检出」（「应当是 1，实际 0」）、
-        「：读进去几份脚本」（「应当是 0，实际 1」）
-  LIB_SHELL_WORDS_BREAK=extended-assignments-as-command  skip_prefixes() 把 `名字+=值`、`名字[下标]=值` 照旧当命令词（随第 6 条一起改：ANSI-C 引号解开之后，
-    定义里的 \\t 把测试目标名隔成单独的词，这类赋值词被当成没展开的命令词误拒）
-      project-code-guard.sh --selftest：数组元素赋值与 += 追加是赋值、不是命令词：放行（「应当是 0，实际 2」）
-  下面六项：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=redirect-target-braces-expanded  shell_tokens() 照旧展开重定向目标上的花括号（展开出来多的词成了这一条的参数）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=extended-assignments-as-command  skip_prefixes() 把 `名字+=值`、`名字[下标]=值` 照旧当命令词
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=substitution-case-and-comment-unseen  command_substitution_end() 不认命令替换里的 case 模式与注释
-      project-code-guard.sh --selftest：一百三十七：命令替换里不加括号的 case 模式不提前收尾，里面的 --all 照拒、一百三十七：命令替换里注释的 ) 不收尾，后面的 --all 照拒（「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=coproc-as-command  skip_prefixes() 把 coproc 当命令词
-      project-code-guard.sh --selftest：一百三十七：coproc 后面那条照判（「应当是 2，实际 0」）
-      bash-command-detector.sh --selftest：一百三十七：coproc 照拒（退出码 2）不红（③ 照旧按命令词认 coproc），coproc-prefix-unseen 与它同设才红
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=quoted-braces-as-unknown  brace_expand() 交的词不带引号信息（引号里的花括号也当认不准）
-      project-code-guard.sh --selftest：一百三十七：函数体外引号里的花括号不当认不准的调用，只定义的函数体不判：放行（「应当是 0，实际 2」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=env-ignore-environment-kept  skip_prefixes() 不认 env -i 清掉环境
-      project-code-guard.sh --selftest：一百三十七：env -i 清掉 BASH_ENV 再起 bash：放行（「应当是 0，实际 2」）与它的「：读进去几份脚本」（「应当是 0，实际 1」），推的
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=shell-standard-input-file-unread  shell_standard_input_files() 一律交 []（`bash -s < 文件` 只记判不了）
-      project-code-guard.sh --selftest：一百三十七：bash -s < 文件 读那份文件判、一百三十七：cat 文件 | bash 读那份文件判（「应当是 2，实际 0」与「：读进去几份脚本」），
-        一百三十七：sh -s < 轻脚本放行：读进去几份脚本（「应当是 1，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=function-launchers-unseen  launcher_functions() 交空集
-      project-code-guard.sh --selftest：一百三十七：脚本里经自己的 run_logged 起 --all 照拒（「应当是 2，实际 0」）
-  下面五项（shell 启动时先读的文件当被起的脚本判；逐格的失败行原文写在 project-code-guard.sh 与 bash-command-detector.sh 文件头各开关名下）：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=startup-files-unread  startup_file_words() 一个文件都不交：BASH_ENV / ENV / --rcfile / .bashrc / zsh 的启动文件都不当被起的脚本
-      project-code-guard.sh --selftest：112 格红（凡是靠启动文件判拒、判读进去几份的格：一百三十七那一批 86 格、「d137 H6」「d137 A2」读 BASH_ENV 的 9 格、「d137 已知没认：」登录与系统级 17 格）；不读它的那几格（bash 不带 --posix 的 ENV、sh 的 BASH_ENV、bash -n、env -i、unset、文件不在、-f、--no-rcs 这类）不红
-      bash-command-detector.sh --selftest：「起 claude:一百三十七：」开头、靠启动文件判拒的 14 格与「起 claude:d137 已知没认：」登录、系统级拒的 5 格，共 19 格（「应当是 1，实际 0」）
-      lib_project_code_runs.py --selftest 不红
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=declared-exports-unseen  环境里的变量只认 `export 名字=值`（declare -x、typeset -x、local -x、先赋值后 export、先 export 后赋值、export -n、declare +x、set -a 不认）
-      project-code-guard.sh --selftest：21 格红；bash-command-detector.sh --selftest：4 格红（含 export -n 撤掉之后起 bash 一格，「应当是 0，实际 1」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=interactive-startup-files-unread  shell_start_options() 的 -i 不另看：交互的 bash 照旧读 BASH_ENV、不读 .bashrc 与 --rcfile / --init-file
-      project-code-guard.sh --selftest：17 格红（一百三十七那一批 13 格、「d137 已知没认：系统级」读 /etc/bash.bashrc 的 4 格）；bash-command-detector.sh --selftest：4 格红（含 bash -i 不读 BASH_ENV 一格，「应当是 0，实际 1」；
-        「起 claude:d137 已知没认：系统级 bash -i 读 /etc/bash.bashrc（样本目录）里起 claude」一格）；sh -i 与 ENV 的格不红（sh 本来就读 ENV）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=zsh-startup-files-unread  zsh 的 .zshenv、.zshrc 不读
-      project-code-guard.sh --selftest：13 格红；bash-command-detector.sh --selftest：1 格红
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=executed-script-startup-unread  executed_script_startup() 什么都不交：直接执行的脚本起来时它的 shell 先读的启动文件不读，#! 指到认不出的解释器的不判
-      project-code-guard.sh --selftest：16 格红；bash-command-detector.sh --selftest：2 格红
-  这十八项下 run-scope-guard.sh、handback-guard.sh、timer-only-remind-guard.sh、shared-index-stale-reminder.sh、
-  scripts/agents/agent-watch.py、scripts/gate/selftest-process-guard.py、scripts/hosts/memory_peaks_lib.py 的 --selftest 都不红，上面没点名的
-  lib_project_code_runs.py、lib_workspace_cargo_lock.py 也不红（逐项实跑过）；
-  这一批新加的格在已有的 arguments-as-executed、braces-unexpanded、brace-sequence-unpadded、env-leading-equals-as-command、env-loose-assignments-as-command、
-  function-keyword-as-command、uncalled-functions-run、heredoc-open-substitution-unseen、redirect-fd-dropped 下也红，逐格写在 project-code-guard.sh、bash-command-detector.sh
-  文件头「三方 shell-words-r2 判决……在已有开关下也红」那一段
-  下面四项：project-code-guard.sh --selftest 的「d137 …」各格红：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=trap-action-unread  commands_at_command_position() 不把 trap 'action' 的字符串当 shell 代码再切（trap 的参数不判）
-      project-code-guard.sh --selftest：「d137 H2：trap 'cargo test --all' EXIT 照拒」「…ERR…」「…0…」「d137 H2：trap 'bash startup-heavy.sh' DEBUG 读正文照拒」（连同它的「读进去几份脚本」）
-        「d137 H2：trap -- 'cargo test --all' EXIT（-- 之后是 action）照拒」（都「应当是 2，实际 0」）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=standard-input-device-script-unread  起 shell 的脚本路径是标准输入设备（/dev/stdin、/dev/fd/0、/proc/self/fd/0）时不当标准输入、照旧当一份脚本文件读
-      project-code-guard.sh --selftest：「d137 H4：bash /dev/stdin < 文件 读那份文件判，照拒」（连同它的「读进去几份脚本」）「d137 H4：echo 代码 | bash /dev/stdin 照拒」
-        「d137 H4：bash /dev/fd/0 <<< 代码 照拒」「d137 H4：source /dev/stdin <<< 代码 照拒」（应当是 2，实际 0）、「d137 H4：bash /dev/stdin < 轻脚本 放行：读进去几份脚本」（应当是 1，实际 0）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=tilde-plus-minus-unexpanded  expand_directory_tilde() 不展开 `~+`（$PWD）与 `~-`（$OLDPWD）（当普通路径、落不到实处）
-      project-code-guard.sh --selftest：「d137 H6：bash ~+/脚本 照 $PWD 解、读正文照拒」（连同「记几条检出」「读进去几份脚本」）「d137 H6：BASH_ENV=~+/脚本 起 bash，照 $PWD 解、读正文照拒」（连同「读进去几份脚本」）
-        「d137 H6：bash ~-/脚本 的 OLDPWD 算不出，认不出起哪一份，照拒」（连同「记几条检出」；~- 这两格在 PROJECT_CODE_GUARD_BREAK=relative-script-undeterminable-directory-allowed 下也红）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=renamed-shells-unseen  is_shell_name() 只认 bash / sh / dash / zsh / ksh，rbash、ash 不当 shell，busybox 的 sh / ash applet 不剥
-      project-code-guard.sh --selftest：「d137 H8：rbash -c 代码 照 shell 判、照拒」「d137 H8：rbash 起脚本 读正文照拒」（连同「读进去几份脚本」）「d137 H8：busybox sh -c 代码 照拒」「d137 H8：busybox ash -c 代码 照拒」（应当是 2，实际 0；dash、ksh 两格不红，它们在 SHELL_NAMES）
-  下面三项（逐格的失败行原文写在 project-code-guard.sh 与 bash-command-detector.sh 文件头各开关名下）：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=login-profiles-unread  startup_file_words() 不认登录 shell（-l、--login、exec -l、exec -a -名字）：/etc/profile、.bash_profile、.bash_login、.profile、.bash_logout 都不交
-      project-code-guard.sh --selftest：13 格红（登录那五格照拒与读进去几份、轻 profile 那格的读进去几份、系统级 bash -l 那格与它的读进去几份）；bash-command-detector.sh --selftest：4 格红（登录三格、系统级 bash -l 一格）；
-        逐格的失败行原文写在两份钩子文件头这一条下
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=system-startup-files-unread  startup_file_words() 不交 SYSTEM_STARTUP_DIRECTORY 下的系统级启动文件（/etc/profile、/etc/bash.bashrc、/etc/zsh/ 下的）
-      project-code-guard.sh --selftest：6 格红（系统级照拒的三格与它们的读进去几份）；bash-command-detector.sh --selftest：2 格红；逐格的失败行原文写在两份钩子文件头这一条下
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=embedded-launches-unseen  embedded_launches() 一条都不认：别的程序里起的命令不交
-      project-code-guard.sh --selftest：24 格红；bash-command-detector.sh --selftest：8 格红；lib_project_code_runs.py --selftest 不红；逐格的失败行原文写在两份钩子文件头这一条下
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=aliases-unexpanded  shell_aliases() 交空：shopt -s expand_aliases 之后定义的别名不展开成它的值（命令词是别名时照普通命令判）
-      project-code-guard.sh --selftest：「d137 H3：别名展开成 cargo test --all 照拒」「d137 H3：别名 cargo 自展开（换行、先定义后 shopt）照拒」「d137 H3：别名展开成起脚本（同一条里 alias 先提到脚本、认不出写法）照拒」（应当是 2，实际 0；两格无害别名不红）
-  下面七项（认得出起的是什么、不起重活的照放）；逐格的失败行原文写在 project-code-guard.sh 文件头各开关名下，
-  bash-command-detector.sh --selftest 在这七项下都不红（实测 0 格）：
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=sed-expansions-unparsed  sed_script_commands() 不另算 sed 脚本词里没展开的 bash 展开，原样切、切不下去照「解析不下去」拒
-      project-code-guard.sh --selftest：3 格红（「d137-r2」开头的那几格）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=sed-text-first-line-only  sed_script_parse() 的 a / i / c 文本只读到头一个换行（`a\\` 换行之后的文本行被当命令读）
-      project-code-guard.sh --selftest：2 格红（「d137-r2」开头的那几格）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=python-argument-variables-unresolved  scan_python() 起命令的参数只认整个字面的（argv 里有一项是变量、赋过字面值的变量、字面串的 .split() 都整条认不出）
-      project-code-guard.sh --selftest：3 格红（「d137-r2」开头的那几格）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=awk-command-variables-unresolved  scan_awk() 不认赋过字面串的变量（`cmd = "date"; cmd | getline`、命令行 cmd=sort 再 print | cmd 照写成变量拒）
-      project-code-guard.sh --selftest：2 格红（「d137-r2」开头的那几格）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=cd-known-targets-unexpanded  changed_directory() 不认 $PWD、$OLDPWD、`cd -`、起头的 `$(git rev-parse --show-toplevel)` 与 `$(pwd)`（cd 之后目录算不出）
-      project-code-guard.sh --selftest：9 格红（「d137-r2」开头的那几格）
-  LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen  CommandAtPosition.cd_failure_skips 一律是假（`cd 不在的目录 && 相对脚本`、`|| exit` 守着的也照「cd 会失败」拒；H5）
-      project-code-guard.sh --selftest：5 格红（「d137-r2」开头的那几格）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=cd-failure-guards-unseen  CommandAtPosition.cd_failure_skips 一律是假（`cd 不在的目录 && 相对脚本`、`|| exit` 守着的也照「cd 会失败」拒）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
   LIB_SHELL_WORDS_BREAK=non-interactive-return-unseen  non_interactive_return_offset() 交 None：非交互 shell source 的文件里 `case $- in *i*) ;; *) return;; esac` 这类守卫不截、整份照读
-      project-code-guard.sh --selftest：1 格红（「d137-r2」开头的那几格）
-  下面七项：逐格的失败行原文写在 bash-command-detector.sh 文件头各开关名下
-  （aliases-same-line-expanded 那一条写在 project-code-guard.sh 文件头），
-  lib_project_code_runs.py 的 --selftest 在这七项下都不红，project-code-guard.sh 的只在 aliases-same-line-expanded 下红一格：
-  LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded  commands_at_command_position() 不看别名定义在哪一行：同一行里先定义再用的照展开（E4）
-      project-code-guard.sh --selftest：1 格红（「d137 闸误拒 E4：同一行先 alias 再用，这一行不展开别名、放行」）
-  LIB_SHELL_WORDS_BREAK=heredoc-variables-unexpanded  interpreter_standard_input() 不代入 heredoc 正文里前面赋过字面值的变量：结束词不带引号、正文有 `$` 一律判不了（E1）
-      bash-command-detector.sh --selftest：1 格红（「d137 误拒 E1」开头、正文变量前面赋过字面值的那一格）
-  LIB_SHELL_WORDS_BREAK=python-list-concatenation-unresolved  python_command_value() 不认 argv 的 `+ 列表` 与 `*列表`：整条认不出（E6）
-      bash-command-detector.sh --selftest：2 格红（「d137 误拒 E6」开头、命令词是 du 的那两格）
-  LIB_SHELL_WORDS_BREAK=python-compile-as-execution  scan_python() 把 compile 与 exec、eval 一样当执行（E7）
-      bash-command-detector.sh --selftest：1 格红（「d137 误拒 E7」开头、只调 compile 的那一格）
-  LIB_SHELL_WORDS_BREAK=sed-unknown-flags-as-execution  sed_script_parse() 的 s 标志区退回扫到 `;`、换行、`}`、`w` 为止、区里有 e 就算 e 标志（E8）
-      bash-command-detector.sh --selftest：1 格红（「d137 误拒 E8」开头、标志区有 GNU sed 不认的字的那一格）
-  LIB_SHELL_WORDS_BREAK=cd-subshell-guards-unseen  commands_at_command_position() 不调 guarded_subshell_boundary()：括号进出一律断开 `&&` 一串（E9）
-      bash-command-detector.sh --selftest：2 格红（「d137 误拒 E9」开头、照 && 守着的那两格）
-  LIB_SHELL_WORDS_BREAK=posix-uncalled-functions-run  drop_uncalled_function_bodies() 只认 function 关键字：只定义不调用的 `名字() { …; }` 照判函数体（legA-r2 零星）
-      project-code-guard.sh --selftest：1 格红（「名字() { 函数体 } 只定义不调用：函数体不跑，放行」）
-  这一批新加的格在已有开关下也红（逐格写在 bash-command-detector.sh 文件头）：cd-failure-guards-unseen 下 E9 照 && 守着的那两格；
-  python-argument-variables-unresolved 下 E6 命令词是 du 的那两格；builtin-non-builtin-run 下检出钩子 builtin coproc 那两格（「stdin:d137 误拒：builtin」开头）
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded  commands_at_command_position() 不看别名定义在哪一行：同一行里先定义再用的照展开
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=heredoc-variables-unexpanded  interpreter_standard_input() 不代入 heredoc 正文里前面赋过字面值的变量：结束词不带引号、正文有 `$` 一律判不了
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=python-list-concatenation-unresolved  python_command_value() 不认 argv 的 `+ 列表` 与 `*列表`：整条认不出
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=python-compile-as-execution  scan_python() 把 compile 与 exec、eval 一样当执行
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=sed-unknown-flags-as-execution  sed_script_parse() 的 s 标志区退回扫到 `;`、换行、`}`、`w` 为止、区里有 e 就算 e 标志
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=cd-subshell-guards-unseen  commands_at_command_position() 不调 guarded_subshell_boundary()：括号进出一律断开 `&&` 一串
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=posix-uncalled-functions-run  drop_uncalled_function_bodies() 只认 function 关键字：只定义不调用的 `名字() { …; }` 照判函数体
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=alias-start-options-unseen  shell_starts_with_aliases() 一律交假、set -o posix 不算开：bash -O expand_aliases、sh / dash 这类起来时就开着别名展开的 -c 代码里的别名不展开
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=alias-nested-texts-unseen  eval、trap、命令替换、source /dev/stdin 的代码不带外面的别名，eval 里定义的别名不收
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=compound-stdin-closers-unseen  compound_redirected_stdin_files() 只认 exec、`}`、`done`、`)` 上的 `< 文件`：fi / esac 收尾、调函数时的 `< 文件`、`<&` / here-string / heredoc 下发、管道接进复合命令、bash -c 与 eval 代码里的都不认
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=embedded-option-variables-unexpanded  embedded_launches() 的 make -C 目录与 scan_git() 的 -c 配置写成变量的不代入、不交说明
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=variable-scopes-unseen  commands_at_command_position() 不建 VariableScopes：子 shell、管道段、放后台、`||` 之后、if 里赋的值照旧当对后面都生效
+      红格见 project-code-guard.sh、bash-command-detector.sh 文件头同名开关下
+  LIB_SHELL_WORDS_BREAK=perl-bare-options-take-next-word  embedded_launches() 把 perl 里值只能贴着写的选项（-i、-l、-0、-x、-C、-d、-D）当成带值选项：单独写的 `perl -i -e '…'` 的 -e 连同代码被当成值跳过，里面起的命令不判
+      红格见 project-code-guard.sh 文件头同名开关下
 """
 import os
 import re
@@ -1102,7 +956,7 @@ def case_patterns_and_conditionals_folded(tokens):
 
 
 BRACE_EXPANSION_LIMIT = 64   # 一个词最多展开成这么多个；再多的照原样留一个词（bash 照展，这里只防判定卡住）
-BRACE_SEQUENCE = re.compile(r"^(-?\d+|[A-Za-z])\.\.(-?\d+|[A-Za-z])(?:\.\.(-?\d+))?$")
+BRACE_SEQUENCE = re.compile(r"([+-]?[0-9]+|[A-Za-z])\.\.([+-]?[0-9]+|[A-Za-z])(?:\.\.([+-]?[0-9]+))?")   # 整数起止、步长认带 + 号的（bash 也认）；匹配用 fullmatch
 
 
 QUOTED_EMPTY = "\x02"   # 引号写出的空串（`''`、`""`）在切词时占的一个位置（掩码 "e"），brace_expand 交回之前去掉
@@ -1168,7 +1022,7 @@ def brace_expand_once(word, mask, limit):
                     bounds = [index] + commas + [close]
                     alternatives = [(word[bounds[i] + 1:bounds[i + 1]], mask[bounds[i] + 1:bounds[i + 1]]) for i in range(len(bounds) - 1)]
                 else:
-                    alternatives = brace_sequence(word[index + 1:close], mask[index + 1:close])
+                    alternatives = brace_sequence(word[index + 1:close], mask[index + 1:close], limit)
                 if alternatives is not None:
                     if len(alternatives) > limit:
                         return None
@@ -1189,7 +1043,7 @@ def brace_expand_once(word, mask, limit):
 def brace_sequence_width(first, last):
     """bash 的整数序列补零：起或止有一边写成 0 起头的两位以上（或 -0 起头的三位以上）时，每一份补零到起、止两边写法的长度里大的那个
     （`{01..03}`、`{-01..2}`；另一边没补零而写得更长的照它，`{01..100..3}` 补到三位，同 bash 5.2 的 expand_seqterm）；不补零交 0。
-    这里的 brace_sequence 与 lib_project_code_runs.py 的 brace_sequence 共用这一份。弄坏开关 LIB_SHELL_WORDS_BREAK=brace-sequence-unpadded 下一律交 0；
+    brace_sequence 和 lib_project_code_runs.py 的花括号展开都调这一份。弄坏开关 LIB_SHELL_WORDS_BREAK=brace-sequence-unpadded 下一律交 0；
     brace-sequence-width-padded-ends-only 下只取补零写的那几边的长度。"""
     if words_break_is_set("brace-sequence-unpadded"):
         return 0
@@ -1199,19 +1053,19 @@ def brace_sequence_width(first, last):
     return max(padded) if words_break_is_set("brace-sequence-width-padded-ends-only") else max(len(first), len(last))
 
 
-def brace_sequence(inner, inner_mask):
-    """`{1..3}`、`{a..c}`、`{1..10..2}` 的展开（全部在引号外才算；整数照 bash 补零：brace_sequence_width）：交回 [(词, 掩码)]；不是序列交 None。"""
-    match = BRACE_SEQUENCE.match(inner) if "q" not in inner_mask else None
+def brace_sequence(inner, inner_mask, limit):
+    """`{1..3}`、`{a..c}`、`{1..10..2}`、`{+1..3}` 的展开（全部在引号外才算；整数照 bash 补零：brace_sequence_width）：交回 [(词, 掩码)]，
+    最多 limit + 1 份：交回的比 limit 多，就是展开出来超过了 limit（多出来的不是全部），超过了怎么办由调用方定；不是序列交 None。"""
+    match = BRACE_SEQUENCE.fullmatch(inner) if "q" not in inner_mask else None
     if match is None:
         return None
     first, last, step = match.group(1), match.group(2), abs(int(match.group(3) or 1)) or 1
-    if first.lstrip("-").isdigit() != last.lstrip("-").isdigit():
+    numeric = first[-1].isdigit()
+    if numeric != last[-1].isdigit():
         return None
-    numeric = first.lstrip("-").isdigit()
     low, high = (int(first), int(last)) if numeric else (ord(first), ord(last))
-    if abs(high - low) // step + 1 > BRACE_EXPANSION_LIMIT:
-        return [None] * (BRACE_EXPANSION_LIMIT + 1)
-    values = range(low, high + (1 if high >= low else -1), step if high >= low else -step)
+    direction = 1 if high >= low else -1
+    values = range(low, high + direction, step * direction)[:limit + 1]
     width = brace_sequence_width(first, last) if numeric else 0
     texts = [(f"{value:0{width}d}" if width else str(value)) if numeric else chr(value) for value in values]
     return [(text, "u" * len(text)) for text in texts]
@@ -1850,41 +1704,84 @@ class CompoundStdinFeeds(NamedTuple):
     files: tuple           # 下发给里层 shell 的 stdin 文件词（按调用方的目录解；算得出的）
     has_bare_shell: bool   # 这一层里有没有裸的读标准输入的 shell（不带 -c、不带脚本、自己没有 < 的）
     undeterminable: bool   # 有没有算不出来源的 stdin 文件（写成变量 / 命令替换）
+    unrecognized: tuple = ()   # 认不出下发给里层 shell 的是什么的几处，每处一句（调用方照认不出拒）：从别的描述符（`<&3`）、here-string 或 heredoc 下发，管道接进复合命令
 
 
-def compound_redirected_stdin_files(text):
-    """exec < 文件、{ … } < 文件、( … ) < 文件、while / until / for … done < 文件：这几种把标准输入从一份文件下发给里层读标准输入的 bash / sh。
-    交 CompoundStdinFeeds。没有裸 shell 时 files 为空（`while read … done < 文件`、`{ echo; } < 文件` 这类不下发）；下发的文件照 `bash 文件` 由调用方读正文判。"""
+COMPOUND_CLOSING_WORDS = ("}", "done", "fi", "esac")   # 收尾词上的输入重定向管整个复合命令
+COMPOUND_PIPED_OPENINGS = frozenset({"if", "while", "until", "for", "select", "case"})   # 管道接进来、里层裸 shell 读到的是管道（花括号组由 piped_from 认）
+
+
+def compound_stdin_closers_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=compound-stdin-closers-unseen：只认 exec、`}`、`done` 与 `)` 上的 `< 文件`；fi / esac 收尾、调这段文本里定义的函数、
+    `<&` / here-string / heredoc 下发、管道接进复合命令、bash -c 与 eval 的代码里的都不认（只给自检证红用）。"""
+    return words_break_is_set("compound-stdin-closers-unseen")
+
+
+def compound_redirected_stdin_files(text, depth=0):
+    """exec < 文件、{ … } < 文件、( … ) < 文件、while / until / for … done < 文件、if … fi < 文件、case … esac < 文件、调这段文本里定义的函数时 `函数 < 文件`：
+    这几种把标准输入从一份文件下发给里层读标准输入的 bash / sh。交 CompoundStdinFeeds。没有裸 shell 时 files 为空（`while read … done < 文件`、`{ echo; } < 文件` 这类不下发）；
+    下发的文件照 `bash 文件` 由调用方读正文判。下发的是别的描述符（`<&3`）、here-string 与 heredoc，或管道接进 `( … )`、if / case / 循环的，认不出里层 shell 读到什么，
+    每处一句交在 unrecognized（认不出的一律拒，偏严）；bash -c 与 eval 的代码照同一套再找一遍、并进来。弄坏开关 LIB_SHELL_WORDS_BREAK=compound-stdin-closers-unseen 下只认 exec、`}`、`done` 与 `)` 上的 `< 文件`。"""
     tokens = shell_tokens(strip_data_heredocs(text))
     simple, _targets, _substitutions, redirections = simple_commands(tokens)
-    ambient, has_bare_shell = [], False
+    closers_seen = not compound_stdin_closers_unseen()
+    closing_words = COMPOUND_CLOSING_WORDS if closers_seen else ("}", "done")
+    functions = set(function_bodies(text)) if closers_seen else set()
+    ambient, has_bare_shell, unrecognized, nested = [], False, [], []
     for words, redirs in zip(simple, redirections):
         skipped = skip_prefixes(words)
         if skipped.command_position is not None:
-            rest = words[skipped.command_position + 1:]
-            if is_shell_name(os.path.basename(words[skipped.command_position])) and shell_reads_standard_input(rest):
+            name, rest = os.path.basename(words[skipped.command_position]), words[skipped.command_position + 1:]
+            if is_shell_name(name) and shell_reads_standard_input(rest):
                 if not any(operator in STANDARD_INPUT_REDIRECTS for operator, _ in redirs):
                     has_bare_shell = True
+            if closers_seen and depth < MAXIMUM_NESTING:
+                code = shell_invocation(rest).code_string if is_shell_name(name) else (" ".join(rest) if name == "eval" else None)
+                if code:
+                    nested.append(compound_redirected_stdin_files(code, depth + 1))
         exec_only = skipped.command_position is None and "exec" in skipped.prefix_names
-        group_close = bool(words) and words[-1] in ("}", "done")
-        if exec_only or group_close:
+        group_close = bool(words) and words[-1] in closing_words
+        function_call = skipped.command_position is not None and words[skipped.command_position] in functions
+        if exec_only or group_close or function_call:
             ambient += [target for operator, target in redirs if operator in AMBIENT_STDIN_OPERATORS and redirection_fd(operator) in (None, 0)]
-    # ( … ) < 文件：) 后面的 < 文件被 simple_commands 当没有词的尾命令丢掉，另扫一遍 token
+            if closers_seen:
+                carrier = "exec" if exec_only else words[skipped.command_position] if function_call else words[-1]
+                unrecognized += [f"`{carrier} {operator} {unjudged_snippet(target)}` 把标准输入从"
+                                 f"{'别的描述符' if operator == '<&' else 'here-string' if operator == '<<<' else 'heredoc'}下发给里层读标准输入的 shell"
+                                 for operator, target in redirs
+                                 if redirection_fd(operator) in (None, 0) and ((operator == "<&" and target != "-") or operator in ("<<<", "<<", "<<-"))]
+    # ( … ) < 文件：) 后面的 < 文件被 simple_commands 当没有词的尾命令丢掉，另扫一遍 token；`( … ) <&3`、`( … ) <<< 字` 同样认不出
     for index in range(len(tokens) - 2):
         if (tokens[index] == (True, ")") and tokens[index + 1][0] is True and tokens[index + 1][1] in AMBIENT_STDIN_OPERATORS
                 and redirection_fd(tokens[index + 1][1]) in (None, 0) and tokens[index + 2][0] is False):
             ambient.append(tokens[index + 2][1])
-    if not has_bare_shell:
-        return CompoundStdinFeeds((), False, False)
-    files, undeterminable = [], False
-    for target in ambient:
-        if target == "/dev/null":
-            continue
-        if has_expansion([target]):
-            undeterminable = True
-        else:
-            files.append(target)
-    return CompoundStdinFeeds(tuple(files), True, undeterminable)
+        if (closers_seen and tokens[index] == (True, ")") and tokens[index + 1][0] is True and redirection_fd(tokens[index + 1][1]) in (None, 0)
+                and tokens[index + 2][0] is False and ((tokens[index + 1][1] == "<&" and tokens[index + 2][1] != "-") or tokens[index + 1][1] in ("<<<", "<<", "<<-"))):
+            unrecognized.append(f"`( … ) {tokens[index + 1][1]} {unjudged_snippet(tokens[index + 2][1])}` 把标准输入从别的描述符、here-string 或 heredoc 下发给里层读标准输入的 shell")
+    # 管道接进 ( … ) 或 if / case / 循环：里层的裸 shell 读的是管道前一段交出来的东西
+    if closers_seen:
+        for index in range(len(tokens) - 1):
+            if tokens[index][0] is True and tokens[index][1] in PIPE_SEPARATORS:
+                following = index + 1
+                while following < len(tokens) and tokens[following] == (True, "\n"):
+                    following += 1
+                if following < len(tokens) and (tokens[following] == (True, "(") or (tokens[following][0] is False and tokens[following][1] in COMPOUND_PIPED_OPENINGS)):
+                    unrecognized.append(f"管道接进 `{tokens[following][1]} …` 复合命令，里层读标准输入的 shell 读到的是管道前一段交出来的东西")
+    files, undeterminable, found = [], False, []
+    if has_bare_shell:   # 这一层没有裸 shell 的，这一层的下发不算（下发给的是别的命令）
+        for target in ambient:
+            if target == "/dev/null":
+                continue
+            if has_expansion([target]):
+                undeterminable = True
+            else:
+                files.append(target)
+        found += unrecognized
+    for inner in nested:
+        files += inner.files
+        undeterminable = undeterminable or inner.undeterminable
+        found += inner.unrecognized
+    return CompoundStdinFeeds(tuple(files), has_bare_shell or any(inner.has_bare_shell for inner in nested), undeterminable, tuple(dict.fromkeys(found)))
 
 
 # 目录词里认的变量引用：`$名字`、`${名字}`；别的写法（`${名字:-默认}`、`$1`、`$$`、`$(…)`）不认，留着的 `$` 算展开不了
@@ -2533,12 +2430,20 @@ def aliases_unexpanded():
     return words_break_is_set("aliases-unexpanded")
 
 
-def shell_aliases(text, definition_lines=None):
-    """text 里 `alias 名字='值'` 定义的别名（名字 -> 值，值照字面当命令再切）；只在文本里有 `shopt -s expand_aliases` 开着时才交
-    （非交互 bash 默认不展开别名）。弄坏开关 LIB_SHELL_WORDS_BREAK=aliases-unexpanded 下交空。
-    definition_lines 是一个 dict 时，按名字记下定义它的那几行（从 0 数，照切好的分隔符里的换行数；commands_at_command_position 拿它认同一行里定义的不展开）。"""
-    if aliases_unexpanded() or "alias" not in text:
-        return {}
+def alias_start_options_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=alias-start-options-unseen：起 shell 时就开着别名展开的（-O expand_aliases、-i、posix 模式、sh / dash / zsh 这类、读启动文件的）
+    照不开算，set -o posix 也不算开（只给自检证红用）。"""
+    return words_break_is_set("alias-start-options-unseen")
+
+
+def alias_nested_texts_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=alias-nested-texts-unseen：eval、trap、命令替换与 source /dev/stdin 的代码不带外面定义的别名，eval 里定义的别名不收（只给自检证红用）。"""
+    return words_break_is_set("alias-nested-texts-unseen")
+
+
+def shell_alias_definitions(text, definition_lines, depth=0, eval_line=None):
+    """text 里的别名定义与开没开展开：交 (名字 -> 值, 开没开)。`shopt -s expand_aliases` 与 `set -o posix`（posix 模式的 bash 照展开别名）算开；
+    eval 的参数照一段代码接着找（eval 跑的时候才切，那里面定义的别名对后面的行同样生效），定义的行记成 eval 所在的那一行。"""
     boundaries = []
     simple = simple_commands(shell_tokens(strip_data_heredocs(text)), boundaries=boundaries)[0]
     enabled, found, line = False, {}, 0
@@ -2551,18 +2456,148 @@ def shell_aliases(text, definition_lines=None):
         head = os.path.basename(rest[0])
         if head == "shopt" and "-s" in rest[1:] and "expand_aliases" in rest[1:]:
             enabled = True
+        elif (head == "set" and not alias_start_options_unseen()
+              and ("-oposix" in rest[1:] or any(rest[position:position + 2] == ["-o", "posix"] for position in range(1, len(rest))))):
+            enabled = True
         elif head == "alias":
             for argument in rest[1:]:
                 assignment = ASSIGNMENT.match(argument)
                 if assignment:
                     found[assignment.group(1)] = assignment.group(2)
                     if definition_lines is not None:
-                        definition_lines.setdefault(assignment.group(1), set()).add(line)
-    return found if enabled else {}
+                        definition_lines.setdefault(assignment.group(1), set()).add(line if eval_line is None else eval_line)
+        elif head == "eval" and len(rest) > 1 and depth < MAXIMUM_NESTING and not alias_nested_texts_unseen():
+            inner_found, inner_enabled = shell_alias_definitions(" ".join(rest[1:]), definition_lines, depth + 1, line if eval_line is None else eval_line)
+            found.update(inner_found)
+            enabled = enabled or inner_enabled
+    return found, enabled
+
+
+def shell_aliases(text, definition_lines=None, enabled_from_start=False):
+    """text 里 `alias 名字='值'` 定义的别名（名字 -> 值，值照字面当命令再切）；只在文本里有 `shopt -s expand_aliases` 或 `set -o posix` 开着、
+    或跑这段文本的 shell 起来时就开着（enabled_from_start，shell_starts_with_aliases）时才交（非交互、不在 posix 模式的 bash 默认不展开别名）。
+    eval 的参数里定义的同样收（shell_alias_definitions）。弄坏开关 LIB_SHELL_WORDS_BREAK=aliases-unexpanded 下交空。
+    definition_lines 是一个 dict 时，按名字记下定义它的那几行（从 0 数，照切好的分隔符里的换行数；commands_at_command_position 拿它认同一行里定义的不展开）。"""
+    if aliases_unexpanded() or "alias" not in text:
+        return {}
+    found, enabled = shell_alias_definitions(text, definition_lines)
+    return found if enabled or enabled_from_start else {}
+
+
+def shell_starts_with_aliases(name, arguments, environment):
+    """这个 shell 起来时就开着别名展开（认不准开没开的照开着算，偏严）：sh、dash、ksh、ash、zsh（非交互也展开别名）；bash 带 `-O expand_aliases`、
+    带 -i、posix 模式（bash_in_posix_mode），或起来时要先读启动文件（startup_file_words：BASH_ENV、--rcfile 这类，文件里可能 shopt -s expand_aliases）。
+    弄坏开关 LIB_SHELL_WORDS_BREAK=alias-start-options-unseen 下一律交假。"""
+    if alias_start_options_unseen():
+        return False
+    if name != "bash":
+        return name in POSIX_STARTUP_SHELL_NAMES or name == "zsh"
+    if shell_start_options(name, arguments).interactive or bash_in_posix_mode(arguments, environment):
+        return True
+    position = 0
+    while position < len(arguments):
+        argument = arguments[position]
+        if argument in ("-", "--") or not argument.startswith(("-", "+")):
+            break
+        if argument == "-O" and arguments[position + 1:position + 2] == ["expand_aliases"]:
+            return True
+        position += 2 if argument in ("-o", "+o", "-O", "+O") or argument in SHELL_LONG_OPTIONS_WITH_VALUE else 1
+    return bool(startup_file_words(name, arguments, environment))
+
+
+def variable_scopes_unseen():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=variable-scopes-unseen：变量不分作用域，子 shell、管道段、放后台的、`&&` / `||` 之后、if / case / 循环 / 函数体里赋的值
+    照旧当对后面的命令都生效（只给自检证红用）。"""
+    return words_break_is_set("variable-scopes-unseen")
+
+
+SCOPE_OPENING_WORDS = frozenset({"{", "if", "while", "until", "for", "select", "case"})
+SCOPE_CONDITIONAL_OPENINGS = frozenset({"if", "while", "until", "for", "select", "case"})   # 里面的命令跑不跑、跑几遍由条件定
+SCOPE_CLOSING_WORDS = frozenset({"}", "fi", "done", "esac"})
+SCOPE_PASSING_WORDS = frozenset({"then", "do", "else", "elif", "!", "time"})
+
+
+def forget_changed_variables(before, variables, known_only):
+    """variables 里与 before 不同的名字记成算不出（None）。known_only 为真时只管 before 里记过的名字
+    （条件赋值：之前没记过的，没跑的那一路本来就展开不了，留着新值）。"""
+    for name, value in list(variables.items()):
+        if name in before:
+            if before[name] != value:
+                variables[name] = None
+        elif not known_only:
+            variables[name] = None
+
+
+class VariableScopes:
+    """commands_at_command_position 记变量时的作用域（认不准的记成算不出，偏严；不照 bash 一条条还原外面的值）。每条简单命令记它的赋值之前调 before_command：
+    ① 圆括号子 shell：`(` 处记下此刻的变量，`)` 处里面改过的名字记成算不出（子 shell 里赋的不带出来）；
+    ② 管道段与放后台的：前面紧挨 `|`、`|&`，或后面紧跟 `|`、`|&`、单独的 `&` 的这一条，它改过的名字在下一条之前记成算不出（各段在子 shell 里跑）；
+       花括号组与 if / case / 循环整个接在管道里或放后台的，在收尾词处照同一条记；
+    ③ `&&` / `||` 之后的条件赋值：一串 `&&` 里接着用的照新值（前面不成这一条根本不跑）；这一串断开（`;`、换行、`&`、括号）或遇到 `||` 时，
+       之前记过值、又被改成别的的名字记成算不出；
+    ④ if / case / 循环 / 函数体（与紧跟在 `&&` / `||` 后面起头的组）：收尾词处，之前记过值、里面改成别的的名字记成算不出。
+    循环体里后一遍用到前一遍赋的值（回边）不认，照第一遍的值判。弄坏开关 LIB_SHELL_WORDS_BREAK=variable-scopes-unseen 下不建它（调用方照旧不分作用域）。"""
+
+    def __init__(self):
+        self.parentheses = []        # 每个没收尾的 `(` 处的变量
+        self.groups = []             # 每个没收尾的组：(起头词，函数体记成 "function", 起头处的变量, 接在管道后面, 紧跟在 `&&` / `||` 后面)
+        self.and_or_before = None    # 这一串 `&&` / `||` 里头一处条件赋值之前的变量；不在条件里是 None
+        self.or_seen = False         # 这一串里从 and_or_before 记下起遇到过 `||`
+        self.segment_before = None   # 上一条是管道段或放后台时，它之前的变量
+
+    def flush_and_or(self, variables):
+        if self.and_or_before is not None:
+            forget_changed_variables(self.and_or_before, variables, True)
+        self.and_or_before, self.or_seen = None, False
+
+    def before_command(self, boundary, words, following, variables):
+        """boundary：这一条与前一条之间的分隔符（simple_commands 的 boundaries，没经 guarded_subshell_boundary 改过）；following：这一条与后一条之间的。"""
+        if self.segment_before is not None:
+            forget_changed_variables(self.segment_before, variables, False)
+            self.segment_before = None
+        operator = boundary[0] if boundary and boundary[0] in ("&&", "||") else None
+        if operator is None:
+            self.flush_and_or(variables)
+        elif operator == "||" or self.or_seen:
+            self.flush_and_or(variables)
+            self.and_or_before, self.or_seen = dict(variables), operator == "||"
+        elif self.and_or_before is None:
+            self.and_or_before = dict(variables)
+        for separator in boundary:
+            if separator == "(":
+                self.parentheses.append(dict(variables))
+            elif separator == ")" and self.parentheses:
+                forget_changed_variables(self.parentheses.pop(), variables, False)
+        piped_in = bool(boundary) and boundary[0] in PIPE_SEPARATORS
+        piped_out = bool(following) and (following[0] in PIPE_SEPARATORS or following[0] == "&")
+        if words and words[0] in SCOPE_CLOSING_WORDS and self.groups:
+            opening, before, group_piped_in, conditional_entry = self.groups.pop()
+            if group_piped_in or piped_out:
+                forget_changed_variables(before, variables, False)
+            elif opening in SCOPE_CONDITIONAL_OPENINGS or opening == "function" or conditional_entry:
+                forget_changed_variables(before, variables, True)
+            return
+        function_body = [separator for separator in boundary if separator != "\n"][-2:] == ["(", ")"]   # `名字() {` 的花括号
+        position, opened = 0, False
+        while position < len(words):
+            word = words[position]
+            if word == "function":
+                position, function_body = position + 2, True   # `function 名字 {`：关键字与函数名之后的花括号是函数体
+                continue
+            if word in SCOPE_OPENING_WORDS:
+                self.groups.append(("function" if word == "{" and function_body else word, dict(variables), piped_in and not opened, operator is not None))
+                position, opened, function_body = position + 1, True, False
+                continue
+            if word not in SCOPE_PASSING_WORDS:
+                break
+            position += 1
+        if (piped_in or piped_out) and not opened:
+            self.segment_before = dict(variables)
 
 
 def commands_at_command_position(text, directory=None, environment=None, depth=0, stripped_heredocs=None, memory_capped=False, variables=None,
-                                 uncalled_functions_skipped=False, wrappers=(), directory_guarded=True, interactive=False):
+                                 uncalled_functions_skipped=False, wrappers=(), directory_guarded=True, interactive=False,
+                                 inherited_aliases=None, aliases_enabled=False, alias_same_line=True):
     """整段命令文本里命令位置上的每一条命令（前缀与包装剥掉、cd 与 export 跟着走），连同各层的放后台与输出重定向写法。
     stripped_heredocs 是递归时往里传的、各层剥掉的 heredoc 正文（记号里的下标指向它），调用方不用给。
     memory_capped：这段文本整个跑在 run-with-memory-cap.sh 里（它是经它起的脚本的正文）；每条命令的 memory_capped 从它起算。
@@ -2577,7 +2612,11 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
     directory_guarded：起这段文本的那一条在外层的 cd_failure_skips（递归时往里传；最外层是真）；每条命令的 cd_failure_skips 是它与这一层里前面各处可能失败的 cd 都守着它
     （`&&` 一串、`|| exit` 之后）的合取：`;`、换行、`||`、`&` 断开 `&&` 一串，括号进出一律断开（弄坏开关 cd-failure-guards-unseen 下都是假），
     只有 `&&` 后面紧跟的子 shell（`cd 目录 && ( … )`、`cd 目录 && time ( … )`）照守着算（guarded_subshell_boundary；弄坏开关 cd-subshell-guards-unseen 下照旧断开）。
-    interactive：跑这段文本的 shell 可能是交互的（递归进 bash -i 的代码、脚本照那个 shell 改），记进每条命令的 interactive。"""
+    interactive：跑这段文本的 shell 可能是交互的（递归进 bash -i 的代码、脚本照那个 shell 改），记进每条命令的 interactive。
+    别名（认不准开没开展开的照开着算，偏严）：aliases_enabled 是跑这段文本的 shell 起来时就开着别名展开（shell_starts_with_aliases；递归进 bash -c、喂给 shell 的标准输入时由这里给）；
+    inherited_aliases 是外面那一层此刻生效的别名（eval、trap、命令替换、source /dev/stdin 的代码跑的时候才切，外面先定义的照展开，不看同一行）；
+    alias_same_line 为假时同一行里定义的照展开（同一行不展开只照 bash 认，sh / dash / zsh 这类认不准照展开）。
+    变量的作用域（VariableScopes，认不准的记成算不出，偏严）：圆括号子 shell、管道段、放后台的、`&&` / `||` 之后、if / case / 循环 / 函数体里赋的值，离开那一段之后照 VariableScopes 的规则记。"""
     if stripped_heredocs is None:
         stripped_heredocs = []
     tokens = shell_tokens(strip_data_heredocs(text, stripped_bodies=stripped_heredocs))
@@ -2585,11 +2624,16 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
     if uncalled_functions_skipped and depth == 0:
         tokens = drop_uncalled_function_bodies(tokens, text, stripped_heredocs)
     alias_lines = {}
-    aliases = shell_aliases(text, alias_lines)   # shopt -s expand_aliases 开着时，命令词是别名的展开
+    aliases = shell_aliases(text, alias_lines, aliases_enabled)   # shopt -s expand_aliases 开着时，命令词是别名的展开
+    if inherited_aliases and not alias_nested_texts_unseen():
+        aliases = {**inherited_aliases, **aliases}   # 外面那一层先定义的：这段代码跑的时候才切，照展开
+    # eval、trap 的代码在同一个 shell 里跑：这一层开着展开（有生效的别名，或起来时就开着），它们的代码也照开着切
+    nested_aliases_enabled = (bool(aliases) or aliases_enabled) and not alias_nested_texts_unseen()
     # 同一行里定义的别名这一行不展开（bash 读完一整行才执行；复跑分类报告 d137-replay-classify 二节 E4）：行号照分隔符里的换行数，与 shell_aliases 记的对得上才认；
     # 去掉过只定义的函数体的（行号对不上）照旧展开。弄坏开关 LIB_SHELL_WORDS_BREAK=aliases-same-line-expanded 下不看行号
-    if tokens is not undropped_tokens or words_break_is_set("aliases-same-line-expanded"):
+    if tokens is not undropped_tokens or words_break_is_set("aliases-same-line-expanded") or not alias_same_line:
         alias_lines = None
+    scopes = None if variable_scopes_unseen() else VariableScopes()
     command_line = 0   # 这一条简单命令在 text 里第几行（从 0 数）
     separators, boundaries = [], []
     simple, output_targets, substitutions, redirections = simple_commands(tokens, separators, boundaries)
@@ -2610,6 +2654,8 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
     for index, (words, command_substitutions, command_redirections) in enumerate(zip(simple, substitutions, redirections)):
         boundary = boundaries[index] if index < len(boundaries) else ()
         command_line += boundary.count("\n")
+        if scopes is not None:
+            scopes.before_command(boundary, words, boundaries[index + 1] if index + 1 < len(boundaries) else (), variables)
         if not words_break_is_set("cd-subshell-guards-unseen"):
             boundary, cd_and_chain, cd_failure_poisoned, cd_seen = guarded_subshell_boundary(
                 boundary, simple[index - 1] if index else [], subshell_guards, cd_and_chain, cd_failure_poisoned, cd_seen)
@@ -2624,7 +2670,7 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
         for substitution in command_substitutions:
             if depth < MAXIMUM_NESTING:
                 inner = commands_at_command_position(substitution, directory, exported, depth + 1, stripped_heredocs, memory_capped, variables, wrappers=wrappers,
-                                                     directory_guarded=command_guarded, interactive=interactive)
+                                                     directory_guarded=command_guarded, interactive=interactive, inherited_aliases=aliases)
                 commands += inner.commands
                 prefix_names |= inner.prefix_names
                 has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2672,12 +2718,13 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
             remaining = remaining[skipped.command_position:]
             name, arguments = os.path.basename(remaining[0]), remaining[1:]
             if remaining[0] in aliases and depth < MAXIMUM_NESTING and (alias_lines is None or alias_lines.get(remaining[0]) != {command_line}):
-                # 命令词是 shopt -s expand_aliases 之后定义的别名：展开成别名的值再切；
-                # 别名的值当文本重切，它自己的 text 里没有别名定义，不会再展开同一个名字、不会无限递归
+                # 命令词是开着展开时定义的别名：展开成别名的值再切；
+                # 值的头一个词是别的别名的照 bash 接着展开（带进去的别名去掉正在展开的这一个：同一个名字不再展开第二遍、不会无限递归）
                 expanded_text = aliases[remaining[0]] + ("".join(" " + shlex.quote(argument) for argument in arguments))
                 inner = commands_at_command_position(expanded_text, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                      command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     inherited_aliases={alias: value for alias, value in aliases.items() if alias != remaining[0]})
                 commands += inner.commands
                 prefix_names |= inner.prefix_names
                 has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2721,11 +2768,13 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                 break
             if name == "eval" and arguments and not words_break_is_set("eval-unread"):
                 # eval 把参数（引号已去掉）用空格连起来当代码再跑一遍：连起来的文字照一条完整的命令再切（同 bash -c）。
-                # 参数里外层先展开的变量与命令替换照原文切（展开成什么判不到，变量里拼出来的命令照旧认不出）
+                # 参数里外层先展开的变量与命令替换照原文切（展开成什么判不到，变量里拼出来的命令照旧认不出）；
+                # eval 跑的时候才切它的代码：外面先定义的别名照展开（同一行定义的也算），开没开照外面这一层
                 if depth < MAXIMUM_NESTING:
                     inner = commands_at_command_position(" ".join(arguments), command_directory, command_environment, depth + 1, stripped_heredocs,
                                                          command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     inherited_aliases=aliases, aliases_enabled=nested_aliases_enabled)
                     commands += inner.commands
                     prefix_names |= inner.prefix_names
                     has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2745,7 +2794,8 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                 if action is not None and action != "-" and depth < MAXIMUM_NESTING:
                     inner = commands_at_command_position(action, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                          command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     inherited_aliases=aliases, aliases_enabled=nested_aliases_enabled)
                     commands += inner.commands
                     prefix_names |= inner.prefix_names
                     has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2767,11 +2817,15 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     # 启动时先读 BASH_ENV / ENV 指的文件：在这个 shell 自己的脚本、代码之前执行
                     commands += startup_file_commands(shell_name, arguments, command_environment, variables, command_directory, command_memory_capped, command_wrappers,
                                                       command_login, attached["interactive"])
+                # 新起的 shell 不带外面的别名；它起来时开没开别名展开照 shell_starts_with_aliases（认不准的照开着算），同一行不展开只照 bash 认
+                started_with_aliases = shell_starts_with_aliases(shell_name, arguments, command_environment)
+                same_line_rule = shell_name == "bash" or alias_start_options_unseen()
                 if invocation.code_string is not None:
                     if depth < MAXIMUM_NESTING:
                         inner = commands_at_command_position(invocation.code_string, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                              command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     aliases_enabled=started_with_aliases, alias_same_line=same_line_rule)
                         commands += inner.commands
                         prefix_names |= inner.prefix_names
                         has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2795,7 +2849,8 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     if fed.code is not None and depth < MAXIMUM_NESTING:
                         inner = commands_at_command_position(fed.code, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                              command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     aliases_enabled=started_with_aliases, alias_same_line=same_line_rule)
                         commands += inner.commands
                         prefix_names |= inner.prefix_names
                         has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2830,7 +2885,8 @@ def commands_at_command_position(text, directory=None, environment=None, depth=0
                     if fed.code is not None and depth < MAXIMUM_NESTING:
                         inner = commands_at_command_position(fed.code, command_directory, command_environment, depth + 1, stripped_heredocs,
                                                              command_memory_capped, variables, wrappers=command_wrappers,
-                                                     directory_guarded=command_guarded, interactive=attached["interactive"])
+                                                     directory_guarded=command_guarded, interactive=attached["interactive"],
+                                                     inherited_aliases=aliases, aliases_enabled=nested_aliases_enabled)
                         commands += inner.commands
                         prefix_names |= inner.prefix_names
                         has_lone_ampersand = has_lone_ampersand or inner.has_lone_ampersand
@@ -2898,6 +2954,10 @@ TCL_LAUNCH_COMMANDS = {"exec", "spawn", "exp_spawn", "system", "exp_system"}
 TCL_OPAQUE_COMMANDS = {"eval", "uplevel", "subst", "interp", "source"}
 AWK_NAMES = {"awk", "gawk", "mawk", "nawk"}
 PERL_NAME = re.compile(r"^perl[0-9.]*$")
+# perl 带值的选项，值另起一个词（-I 的目录；-M、-m 的模块名也按这一类跳过）
+PERL_OPTIONS_WITH_VALUE_WORD = ("-I", "-M", "-m")
+# perl 的值只能贴着选项写的选项（perlrun：-i[后缀]、-l[八进制]、-0[八进制]、-x[目录]、-C[数字]、-d[:模块]、-D[标志]）：单独写时后面的词是下一个选项或脚本，不是它的值
+PERL_OPTIONS_WITH_ATTACHED_VALUE = ("-x", "-0", "-l", "-i", "-C", "-d", "-D")
 RUBY_NAME = re.compile(r"^ruby[0-9.]*$")
 PHP_NAME = re.compile(r"^php[0-9.]*$")
 LUA_NAME = re.compile(r"^(?:lua[0-9.]*|luajit)$")
@@ -2934,6 +2994,11 @@ EMBEDDED_NESTING = 4
 def embedded_launches_unseen():
     """弄坏开关 LIB_SHELL_WORDS_BREAK=embedded-launches-unseen：别的程序里起的命令一条都不认。"""
     return words_break_is_set("embedded-launches-unseen")
+
+
+def perl_attached_options_take_next_word():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=perl-bare-options-take-next-word：perl 里值只能贴着写的选项（-i、-l、-0 这类）单独写时也吃掉下一个词。"""
+    return words_break_is_set("perl-bare-options-take-next-word")
 
 
 def heredoc_variables_unexpanded():
@@ -4081,9 +4146,15 @@ def git_config_commands(arguments, directory, environment):
     return GIT_CONFIG_QUERY_CACHE[key]
 
 
-def scan_git(arguments, directory, environment, texts, unjudged):
+def embedded_option_variables_unexpanded():
+    """弄坏开关 LIB_SHELL_WORDS_BREAK=embedded-option-variables-unexpanded：make -C 的目录、git -c 的配置写成变量、命令替换的不代入也不交说明（目录照字面拼、配置照字面认；只给自检证红用）。"""
+    return words_break_is_set("embedded-option-variables-unexpanded")
+
+
+def scan_git(arguments, directory, environment, texts, unjudged, variables=None):
     """git：-c 给的与配置里读到的别名（`!` 起头的照命令交出，别的接着照别名链找，最多 EMBEDDED_NESTING 层）、带命令的配置项（core.pager、core.fsmonitor、diff.external……）
-    与这一条设的带命令的环境变量（GIT_EXTERNAL_DIFF、GIT_PAGER、GIT_SSH_COMMAND……）照命令交出；GIT_EXEC_PATH、GIT_CONFIG_PARAMETERS 与 --config-env 交说明。"""
+    与这一条设的带命令的环境变量（GIT_EXTERNAL_DIFF、GIT_PAGER、GIT_SSH_COMMAND……）照命令交出；GIT_EXEC_PATH、GIT_CONFIG_PARAMETERS 与 --config-env 交说明。
+    -c 的配置写成变量、命令替换的：variables（这段命令文本里前面赋过的）代入得了的照代入；代入不了而配置名本身不是字面、或配置名是 alias.* 的交说明（认不出设的是哪一项、别名起什么）。"""
     options, position, given = [], 0, {}
     while position < len(arguments):
         argument = arguments[position]
@@ -4094,6 +4165,18 @@ def scan_git(arguments, directory, environment, texts, unjudged):
             value = arguments[position + 1] if position + 1 < len(arguments) else ""
             position += 1
         position += 1
+        if option == "-c" and ("$" in value or "`" in value) and not embedded_option_variables_unexpanded():
+            expanded = expand_known_variables(value, variables or {})
+            if expanded is not None:
+                value = expanded
+            else:
+                written_name = value.partition("=")[0]
+                if "$" in written_name or "`" in written_name:
+                    unjudged.append(f"git -c {value} 的配置名写成变量或命令替换，认不出设的是哪一项、起不起命令")
+                    continue
+                if written_name.lower().startswith("alias."):
+                    unjudged.append(f"git -c {value} 的别名值写成变量或命令替换，认不出这个别名起的是什么")
+                    continue
         options.append((option, value))
         if option == "-c":
             name, _, config_value = value.partition("=")
@@ -4303,7 +4386,8 @@ def embedded_launches(command):
         elif invocation.module is None and invocation.script_index is None:
             scan_code("python", [], True)
     elif PERL_NAME.match(name):
-        codes, script_index = interpreter_code_options(arguments, ("-e", "-E"), ("-I", "-M", "-m", "-x", "-0", "-l", "-i", "-C", "-d", "-D"), flag_takes_code="eE")
+        perl_value_options = PERL_OPTIONS_WITH_VALUE_WORD + (PERL_OPTIONS_WITH_ATTACHED_VALUE if perl_attached_options_take_next_word() else ())
+        codes, script_index = interpreter_code_options(arguments, ("-e", "-E"), perl_value_options, flag_takes_code="eE")
         scan_code("perl", codes, not codes and script_index is None)
     elif RUBY_NAME.match(name):
         codes, script_index = interpreter_code_options(arguments, ("-e",), ("-I", "-r", "-C", "-E", "-F", "-K", "-T", "-W", "-x", "--encoding"), flag_takes_code="e")
@@ -4412,6 +4496,7 @@ def embedded_launches(command):
             files += [ProgramFile("sed", (script_file,), command.directory) for script_file in script_files]
     elif name in MAKE_NAMES:
         makefiles, evaluations, directory, variables, position, runs_nothing = [], [], command.directory, [], 0, False
+        directory_unresolved = False   # -C 的目录写成变量而代入不了：Makefile 认不出在哪（交说明，不按目录找）
         while position < len(arguments):
             argument = arguments[position]
             if argument in ("-f", "--file", "--makefile", "-C", "--directory", "-E", "--eval", "-I", "--include-dir", "-o", "--old-file", "--assume-old", "-W", "--what-if", "--new-file", "--assume-new"):
@@ -4429,6 +4514,14 @@ def embedded_launches(command):
             if argument in ("-f", "--file", "--makefile"):
                 makefiles.append(value)
             elif argument in ("-C", "--directory"):
+                if ("$" in value or "`" in value) and not embedded_option_variables_unexpanded():
+                    # 目录写成变量、命令替换：前面赋过字面值的照代入；代入不了的认不出读哪一份 Makefile（照认不出拒），默认的几份 Makefile 不再按别的目录找
+                    expanded = expand_known_variables(value, command.variables or {})
+                    if expanded is None:
+                        unjudged.append(f"make -C {value} 的目录写成变量或命令替换，认不出读的是哪一份 Makefile")
+                        directory_unresolved = True
+                        continue
+                    value = expanded
                 directory = resolve_path(directory, os.path.expanduser(value)) if directory is not None or os.path.isabs(value) else None
             elif argument in ("-E", "--eval"):
                 evaluations.append(value)
@@ -4448,12 +4541,14 @@ def embedded_launches(command):
                 if problem:
                     unjudged.append(f"make 从标准输入读 Makefile：{problem}")
             other_makefiles = [makefile for makefile in makefiles if makefile not in ("-", "/dev/stdin")]
-            if other_makefiles:
+            if directory_unresolved:
+                files += [ProgramFile("make", (makefile,), directory, tuple(variables)) for makefile in other_makefiles if os.path.isabs(makefile)]
+            elif other_makefiles:
                 files += [ProgramFile("make", (makefile,), directory, tuple(variables)) for makefile in other_makefiles]
             elif not makefiles:
                 files.append(ProgramFile("make", MAKE_DEFAULT_FILES, directory, tuple(variables)))
     elif name == "git":
-        scan_git(arguments, command.directory, environment, texts, unjudged)
+        scan_git(arguments, command.directory, environment, texts, unjudged, command.variables)
     else:
         scan_options_for_commands(name, arguments, environment, texts, unjudged)
     return EmbeddedLaunches(tuple(text for text in texts if text.strip()), tuple(dict.fromkeys(unjudged)), tuple(files))

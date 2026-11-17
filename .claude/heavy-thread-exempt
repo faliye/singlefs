@@ -53,7 +53,6 @@ scripts/hosts/heavy_threads.py:BREAK_VARIABLE = "HEAVY_THREADS_BREAK"  # 弄坏�
 scripts/hosts/heavy-threads.sh:${HEAVY_THREADS_BREAK:-}  # 弄坏开关的变量名，只给自证证红，不定并行度
 scripts/mutation/mutate.sh:grep -qF "MUTATE_JOBS"  # 与依赖产物共用一起改：MUTATE_JOBS 是调用方把工作进程数压小的开关（只能压小，不能加大），不是并行度默认值；这是自证里第一次出现它的一行
 scripts/mutation/mutate.sh:REQUESTED_CARGO_JOBS="${MUTATE_CARGO_JOBS:-}"  # 与依赖产物共用一起改：MUTATE_CARGO_JOBS 是调用方指定每个 cargo 编译并行度的开关，没设按每台默认重活线程数 ÷ 工作进程数
-scripts/mutation/crates-mutation-rows.py:STAGE_VARIABLES = ("GATE_MUTATION_WORKERS"  # 与依赖产物共用一起改：自证起每一格之前从环境里清掉的变量名清单，GATE_MUTATION_WORKERS / GATE_MUTATION_CARGO_JOBS 是调用方压低并发度的开关，随 mutate.sh 同改
 scripts/gate/admission.py:"REPLAY_JOBS": "1"  # 自证里给假 replay 脚本的环境：同时跑 1 条，是场景本身，不是默认
 scripts/gate/admission.py:name not in (THREAD_CAP_VARIABLE, "HEAVY_THREADS_BREAK")  # 自证里从环境里去掉上限与弄坏开关两个变量，不读它们的值，不定并行度
 scripts/gate/verus-proof-check.py:int(os.environ.get("GATE_VERUS_JOBS") or 0)  # 空真与必红世界几处同时验的处数，0 取 min(处数, N // 4)，每处自己的 Verus 线程仍取登记值，是并发处数不是线程默认

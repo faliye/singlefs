@@ -79,7 +79,10 @@
 #   复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：绑定、herd7 两种判定各一份，组成表都算好之后、判之前抽（候选按键文件查，verdict-library-candidate，
 #     与 lookup 分开）；抽中强制现判的那一条那一行写「强制现判」、不读库；哨兵被现判、强制现判判定与库里不同，算一项红。种子与条数取 SINGLEFS_REUSE_SENTINEL_SEED、
 #     SINGLEFS_REUSE_SENTINEL_COUNT。弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped：一律不读库，自证（scripts/gate/lkmm-selftest.sh）
-#     reuse-three-questions 那一格判错、reuse-sentinel 那一格要的红照判。
+#     reuse-three-questions 那一格判错、reuse-sentinel 那一格要的红照判。绑定那一份的哨兵判红（键相同却现判了）不停在绑定那一步：
+#     herd7 那一份照判、照记库，整趟末尾一并退 1（只有绑定检查自己判红才在绑定那一步退 1）。
+#   弄坏开关 GATE_LKMM_BREAK=lookup-batch-forced-ignored：批查库时不问复用哨兵抽中了谁，抽中强制现判的那一条也读库复用，
+#     自证 reuse-sentinel 那一格判错（那一行写「复用」、不写「强制现判（复用哨兵抽中」）。
 #   复用三问与哨兵的自证在 scripts/gate/lkmm-selftest.sh（拿门禁 lkmm 的样本 litmus-key-samples-anchor-body-changed 的 setup.sh 造现场、假 herd7 跑这一份）：
 #     这一份的 --selftest 会被项目代码闸按 herd7 拦，自证另放一份可以单独起的。
 # 准入经 .claude/scripts/preflight.sh 判（规范副本先找这棵树的、再找主仓的，两处都没有就拒绝；坑写在它的文件头），不直接 source 副本里的 lib.sh：
@@ -418,19 +421,18 @@ exit_when_library_unavailable() {
   howto "python3 prune-server/control check 看服务在不在、第二台连的地址通不通；服务回来之后重跑同一条命令"
   exit 75
 }
-# lookup_item <种类> <项> <组成表>：交 0 复用、1 现判；打那一行的前半，原因留在 $item_reason
+# lookup_item <项> <状态文件>：交 0 复用、1 现判，原因留在 $item_reason；读的是 sentinel_plan 那一次批查写的 <状态文件>.lookups 里这一项的结果
+#   （一行「项<TAB>forced|skipped|reuse|judge<TAB>原因<TAB>变了的单元」）。那一份里没有这一项（批查没跑成、写到一半）按现判，不当复用
 lookup_item() {
-  item_reason=""
-  local answer="" status=0
-  answer="$(python3 "$VERDICT_LIBRARY_MODULE" lookup "$VERDICT_LIBRARY" "$1" "$2" "$3")" || status=$?
-  if ((status == 0)); then
-    item_reason="${answer#*$'\t'}"; return 0
-  fi
-  exit_when_library_unavailable "$status" "查 $2"
-  item_reason="$(printf '%s' "$answer" | cut -f2)"
-  local detail; detail="$(printf '%s' "$answer" | cut -f3)"
-  [[ -n "$detail" ]] && item_reason="$item_reason：$detail"
-  return 1
+  local looked_item mode reason detail
+  item_reason="批查没有这一项的结果，现判"; lookup_mode=judge
+  while IFS=$'\t' read -r looked_item mode reason detail; do
+    [[ "$looked_item" == "$1" ]] || continue
+    lookup_mode="$mode"; item_reason="$reason"
+    [[ -n "$detail" && "$mode" == judge ]] && item_reason="$reason：$detail"
+    break
+  done 2>/dev/null < "$2.lookups"
+  [[ "$lookup_mode" == reuse ]]
 }
 record_item() { # record_item <种类> <项> <组成表> <一句判定> <跑法>
   local status=0
@@ -453,36 +455,90 @@ count_item() { # count_item <复用 0|1> <原因>
 # ── 复用哨兵（scripts/gate/lib_reuse_checks.py 文件头「二」）：绑定、herd7 两种判定各一份，组成表都算好之后、判之前从判定库里抽 ──
 REUSE_CHECKS_MODULE="$LKMM_SCRIPT_DIRECTORY/../../scripts/gate/lib_reuse_checks.py"
 LKMM_SCRIPT_KEY=".claude/scripts/lkmm.sh"
-# sentinel_plan <种类> <标签> <状态文件> <项数组名> <组成表数组名>：候选是这把键在库里有判绿记录的项（verdict-library-candidate 按键文件查，与 lookup 分开）
+# sentinel_plan <种类> <标签> <状态文件> <项数组名> <组成表数组名>：这一种判定的每一项，一个 python 进程查完候选、抽完哨兵之后另一个进程查完每一项的库
+#   （不是每项各起几个进程）。候选是这把键在库里有判绿记录的项（lib_reuse_checks.py 的 verdict_library_candidate，与 lookup 分开）；
+#   抽完哨兵之后每一项照 judge_lookup 的次序问一遍（抽中强制现判的不读库；弄坏开关 reuse-lookup-skipped 下一律不读库；别的读库 lookup），结果写进 <状态文件>.lookups
+#   （一行「项<TAB>forced|skipped|reuse|judge<TAB>原因<TAB>变了的单元」），judge_lookup 读它。两个 python 进程退 75（prune-server 不可用）整道退 75
 sentinel_plan() {
-  local kind="$1" label="$2" state="$3" index candidates="$3.candidates"
+  local kind="$1" label="$2" state="$3" index candidates="$3.candidates" items_file="$3.items" batch_status=0 skip_lookup=0 forced_ignored=0
   local -n plan_items="$4" plan_tables="$5"
   : > "$candidates"
-  local candidate_status
-  for index in "${!plan_items[@]}"; do
-    candidate_status=0
-    python3 "$REUSE_CHECKS_MODULE" verdict-library-candidate "$VERDICT_LIBRARY" "$kind" "${plan_tables[$index]}" || candidate_status=$?
-    exit_when_library_unavailable "$candidate_status" "查复用哨兵的候选 ${plan_items[$index]}"
-    ((candidate_status == 0)) && printf '%s\t绿\n' "${plan_items[$index]}" >> "$candidates"
-  done
+  for index in "${!plan_items[@]}"; do printf '%s\t%s\n' "${plan_items[$index]}" "${plan_tables[$index]}"; done > "$items_file"
+  python3 - "$VERDICT_LIBRARY_MODULE" "$REUSE_CHECKS_MODULE" "$VERDICT_LIBRARY" "$kind" "$items_file" "$candidates" <<'PY_CANDIDATES' || batch_status=$?
+import os, sys
+sys.dont_write_bytecode = True
+library_module, checks_module, directory, kind, items_path, candidates_path = sys.argv[1:7]
+sys.path.insert(0, os.path.dirname(library_module))
+import lib_verdict_library as library
+sys.path.insert(0, os.path.dirname(checks_module))
+import lib_reuse_checks as checks
+with open(items_path, encoding="utf-8") as items, open(candidates_path, "w", encoding="utf-8") as candidates:
+    for line in items:
+        item, _tab, table = line.rstrip("\n").partition("\t")
+        try:
+            components, judging_units = library.read_components(table)
+            candidate = checks.verdict_library_candidate(directory, kind, components, judging_units)
+        except ValueError:
+            continue   # 组成表读不了：不是候选
+        if candidate:
+            candidates.write(f"{item}\t绿\n")
+            candidates.flush()
+PY_CANDIDATES
+  exit_when_library_unavailable "$batch_status" "查复用哨兵的候选（$kind）"
+  ((batch_status == 0)) || warn "复用哨兵（$label）候选没查完（上面是 python 的报错）：没查到的项不当候选"
   python3 "$REUSE_CHECKS_MODULE" sentinel-plan "$state" --script "$LKMM_SCRIPT_KEY" --label "$label" --candidates "$candidates" || warn "复用哨兵（$label）没抽成"
+  [[ ",${GATE_LKMM_BREAK:-}," == *,reuse-lookup-skipped,* ]] && skip_lookup=1
+  [[ ",${GATE_LKMM_BREAK:-}," == *,lookup-batch-forced-ignored,* ]] && forced_ignored=1
+  batch_status=0
+  python3 - "$VERDICT_LIBRARY_MODULE" "$REUSE_CHECKS_MODULE" "$VERDICT_LIBRARY" "$kind" "$state" "$skip_lookup" "$forced_ignored" "$items_file" "$state.lookups" <<'PY_LOOKUPS' || batch_status=$?
+import os, sys
+sys.dont_write_bytecode = True
+library_module, checks_module, directory, kind, state, skip, forced_ignored, items_path, output_path = sys.argv[1:10]
+sys.path.insert(0, os.path.dirname(library_module))
+import lib_verdict_library as library
+sys.path.insert(0, os.path.dirname(checks_module))
+import lib_reuse_checks as checks
+try:
+    sentinel = checks.load_sentinel(state)
+except Exception:
+    sentinel = None   # 没抽成哨兵（状态文件不在或读不了）：没有强制现判的项，照 sentinel-forced 读不到时的退 1
+with open(items_path, encoding="utf-8") as items, open(output_path, "w", encoding="utf-8") as output:
+    for line in items:
+        item, _tab, table = line.rstrip("\n").partition("\t")
+        if sentinel is not None and forced_ignored != "1" and sentinel.forced(item):
+            record = (item, "forced", "复用哨兵抽中：键相同，这一趟不读库", "")
+        elif skip == "1":
+            record = (item, "skipped", "无记录（弄坏开关 reuse-lookup-skipped：没读库）", "")
+        else:
+            try:
+                components, judging_units = library.read_components(table)
+                store = library.VerdictLibrary(directory, kind, judging_units)
+                reused, reason = store.lookup(item, components)
+                record = (item, "reuse", reason, "") if reused else (item, "judge", reason, store.detail(item))
+            except ValueError as error:
+                record = (item, "judge", f"组成表读不了（{error}）", "")
+        output.write("\t".join(field.replace("\t", " ").replace("\n", " ") for field in record) + "\n")
+        output.flush()
+PY_LOOKUPS
+  exit_when_library_unavailable "$batch_status" "查判定库（$kind）"
+  ((batch_status == 0)) || warn "判定库（$kind）没查完（上面是 python 的报错）：没查到的项按现判"
 }
 # judge_lookup <种类> <项> <组成表> <状态文件>：交 0 复用、1 现判；judged_word 是那一行写「现判」还是「强制现判」（抽中的那一条不读库）。
-# 弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped 下一律不读库（复用哨兵该判红「复用失灵」）
+# 读 sentinel_plan 写的 <状态文件>.lookups（lookup_item）。弄坏开关 GATE_LKMM_BREAK=reuse-lookup-skipped 下一律不读库（复用哨兵该判红「复用失灵」）
 judge_lookup() {
   judged_word=现判
-  if python3 "$REUSE_CHECKS_MODULE" sentinel-forced "$4" "$2" 2>/dev/null; then
-    judged_word=强制现判; item_reason="复用哨兵抽中：键相同，这一趟不读库"; return 1
-  fi
-  if [[ ",${GATE_LKMM_BREAK:-}," == *,reuse-lookup-skipped,* ]]; then
-    item_reason="无记录（弄坏开关 reuse-lookup-skipped：没读库）"; return 1
-  fi
-  lookup_item "$1" "$2" "$3"
+  if lookup_item "$2" "$4"; then return 0; fi
+  if [[ "$lookup_mode" == forced ]]; then judged_word=强制现判; fi
+  return 1
 }
-sentinel_observe() { # sentinel_observe <状态文件> <项> <结局> <判定>
-  python3 "$REUSE_CHECKS_MODULE" sentinel-observe "$@" || warn "复用哨兵没记下 $2 的结局（这一条哨兵这一趟不判）"
+# sentinel_observe <状态文件> <项> <结局> <判定>：先记在 <状态文件>.pending，sentinel_finish 里一次交给 sentinel-observe-many（它追加进 <状态文件>.observed）
+sentinel_observe() {
+  printf '%s\t%s\t%s\n' "$2" "$3" "$4" >> "$1.pending"
 }
-sentinel_finish() { # sentinel_finish <状态文件>：哨兵被现判、强制现判判定与库里不同交 1（✗ 行带出路）
+sentinel_finish() { # sentinel_finish <状态文件>：先把记下的结局一次交出去，再判；哨兵被现判、强制现判判定与库里不同交 1（✗ 行带出路）
+  if [[ -s "$1.pending" ]]; then
+    python3 "$REUSE_CHECKS_MODULE" sentinel-observe-many "$1" "$1.pending" || warn "复用哨兵没记下这一趟的结局（这一趟哨兵不判）"
+  fi
   python3 "$REUSE_CHECKS_MODULE" sentinel-finish "$1"
 }
 tally_text() {
@@ -608,8 +664,10 @@ for index in "${!binding_items[@]}"; do
   record_item binding-litmus "$item" "$table" "$anchor_count 个锚点各恰好命中一个单元，crates/ 下有 .rs 写出 $litmus_key" "lkmm.sh 绑定检查（锚点经 lib_function_units.py 解析）"
   n_bound=$((n_bound+1))
 done
-sentinel_finish "$WORK/sentinel-binding.json" || fails=$((fails+1))
-[[ $fails -eq 0 ]] || { bad "代码绑定检查未过：$fails 项"; exit 1; }   # gate-lint:summary
+binding_sentinel_red=0
+sentinel_finish "$WORK/sentinel-binding.json" || binding_sentinel_red=1
+[[ $fails -eq 0 ]] || { bad "代码绑定检查未过：$((fails + binding_sentinel_red)) 项"; exit 1; }   # gate-lint:summary
+fails=$binding_sentinel_red   # 绑定那一份的哨兵判红不在这里停：带着往下判 herd7 那一份，末尾一并退 1
 
 # ── herd7 ──
 find_herd7 || { report_herd7_missing; exit 1; }

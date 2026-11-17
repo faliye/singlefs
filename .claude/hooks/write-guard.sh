@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
 # run-condition: command python3
-# PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的十道判定（一至五、七至十写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
+# PreToolUse hook（Write、Edit、MultiEdit：.claude/settings.json 里注册在 matcher "Write|Edit|MultiEdit" 上）：写文件之前的十一道判定（一至五、七至十一写在下面，六是语法检查、写在 --selftest 那一段），合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
 #    为什么：几个会话同时在一个仓里干活。一个会话用 Write 新建 `research/prompts/e137-preregistration.md`，
@@ -74,8 +74,19 @@
 #    （「## 」后接汉字数字再接「、」）。登记表读不到、current 不是恰好一行的，这一道没判、照常放行，记一处没判全。
 #    为什么：几个会话同时往账本末尾追加，各自读文件、各自取号，节号会撞，到提交时门禁才判出重号（records/2026-10-29-subagent拆分提案.md 第一百五十六节）。
 #    出路：scripts/kb/ledger-append-section.py，现取最大节号加一，一次写入索引表末行与末尾新节，写前复核 sha256，撞了拒。Bash 里的写归 bash-command-detector.sh 的 ⑯。
-# 十道判定合在这一个 hook 里：一至五、七至十各占文件头一段，六写在 --selftest 那一行的说明里。
-# 十道都判完再报：不成立的几道一次列全，每道带自己的出路；钟点与会话号逐处列出（行号与总数）。只有一处例外：
+# 十一、工具员就地改主工作区里已存在的脚本（Write、Edit、MultiEdit）：agent_type 在 SWAP_ONLY_AGENTS（tooling-writer）里，目标解开符号链接之后落在主工作区
+#    （CLAUDE_PROJECT_DIR）的 SWAP_ONLY_DIRECTORIES（scripts/、.claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/）下、
+#    不在 SWAP_ONLY_EXCLUDED（.claude/gate.d/fixtures/ 与两个服务的 target/、src/）下，是已存在的普通文件，且是 .sh、.py 或带执行位的，就拒。
+#    目录与 scripts/gate/hook-swap.py 脚本规格收的那一组相同（它的 SCRIPT_SPEC_DIRECTORIES、SCRIPT_SPEC_EXCLUDED），两边各写一份、改的时候一起改。
+#    放行：新建文件；不带执行位的数据与文档（.tsv、.md、.json、.txt 这类）；fixtures 下的样本；草稿目录与仓副本里的文件（落在主工作区之外）；别的 agent 类型与主 agent。
+#    钩子（.claude/hooks/）不在这一道的目录里：钩子照旧只经 hook-swap.py 的钩子规格换上。
+#    判不了的照「放行但必记检出」：子 agent 的调用认不出 agent 类型（带 agent_id 而 agent_type 缺、空或不是字符串）、目标 stat 失败（不是「不存在」）。
+#    为什么：分几次 Edit 改一份脚本，中间态对别的会话可见，被拷进快照的任务跑到半截的版本（records/2026-10-29-subagent拆分提案.md 第二百三十一节）。
+#    出路：新版整份写在草稿目录，把 hook-swap.py 的脚本规格（一件活改几份的写进同一份规格）与那条换上命令写进报告「要主 agent 跑的命令」一节，由主 agent 一次换上。
+#    Bash 里用定点替换工具分几次改同一份脚本，这道闸看不见。
+# gate-similar: bash-command-detector.sh 它的 ⑦ 只看 Bash 里在同一个 inode 上改已存在的脚本（出路改名换上或定点替换），看不见 Write / Edit 工具的调用，也不分 agent 类型；这一道挂在 Write / Edit / MultiEdit 上，按 agent 类型与目录判，与写闸别的几道共用落点与检出记录
+# 十一道判定合在这一个 hook 里：一至五、七至十一各占文件头一段，六写在 --selftest 那一行的说明里。
+# 十一道都判完再报：不成立的几道一次列全，每道带自己的出路；钟点与会话号逐处列出（行号与总数）。只有一处例外：
 # 先编后换那一道拒了，写范围那一道不再报（目标是同一个，先编后换的出路已经写了范围外的交回主 agent）。
 # 它们拒的是一次写，不停任务和脚本；拒绝时退出码 2、stderr 交给做这次写的模型，同时往检出记录
 # （默认工作根下的 agent-hook-detections.jsonl，lib_work_root.py 的 default_detections_path；环境变量 AGENT_HOOK_DETECTIONS 可改）追加一行，
@@ -111,6 +122,8 @@
 #                              #     「范围:定义已删的旧实例写仓里拒」「stdin:内置 agent 写仓里拒」
 #                              # 写范围表里 kb-scribe 的不变量清单两行（下一层与各层子目录）与 experiment-runner 的重跑比对对象登记一行：
 #                              #   WRITE_GUARD_BREAK=scope-new-rows-dropped（自检用的表副本去掉这三行、experiment-runner 跑前登记那一行退回只认 e*-preregistration.md，退回加行与放宽之前的表）：「范围:kb-scribe 写不变量清单的 .md」「范围:kb-scribe 写不变量清单子目录里的 .md」「范围:experiment-runner 写重跑比对对象登记」「范围:experiment-runner 带轮号的跑前登记」
+#                              # 写范围表里 experiment-runner 的英语、日语实验索引与历史条目四行：
+#                              #   WRITE_GUARD_BREAK=scope-runner-language-rows-dropped（自检用的表副本去掉这四行）：「范围:experiment-runner 写英语实验索引」「范围:experiment-runner 写日语实验索引」「范围:experiment-runner 写英语历史条目」「范围:experiment-runner 写日语历史条目」
 #                              # 紧凑时间戳（五里的 ISO 基本格式写法）有三个开关，打开时点名的几格红（格名都以「紧凑时间戳:」起头，另有「stdin:」两格）：
 #                              #   WRITE_GUARD_BREAK=compact-timestamp-skipped（本钩子把命中的「ISO 紧凑时间戳」形态丢掉不报）：拒绝的几例（Write、Edit、MultiEdit、路径里、带冒号的时分、
 #                              #     带连字符的日期、带小数秒与偏移）与「stdin:Write 写进紧凑时间戳拒绝（退出码 2）」「stdin:紧凑时间戳的拒绝点名形态与那一处」
@@ -186,6 +199,14 @@
 #                              # 第十道（往现行账本追加节标题）：WRITE_GUARD_BREAK=ledger-append-ignored（判到该拒的也放行）时
 #                              #   「账本追加:Edit 往现行账本追加节标题拒」「账本追加:MultiEdit 往现行账本追加节标题拒」「账本追加:Write 往现行账本追加节标题拒」
 #                              #   「账本追加:拒绝点名新脚本、账本与出路」「stdin:往现行账本追加节标题拒（退出码 2）」「stdin:往现行账本追加节标题的拒绝点名新脚本与出路」红
+# 第十一道（工具员就地改主工作区里已存在的脚本）的弄坏开关：
+#   WRITE_GUARD_BREAK=script-in-place-allowed  第十一道整道不判：该拒的放行，判不了的那两种也不记没判全
+#       「整份换上:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒」「整份换上:工具员 Edit 主工作区已存在、带执行位无后缀的 gpu-verification-server/control 拒」
+#       「整份换上:工具员 Write 整份重写已存在的 .claude/gate.d/ 下的 .sh 拒」「整份换上:工具员 MultiEdit 已存在的 .claude/scripts/ 下的 .py 拒」
+#       「整份换上:工具员 Edit 已存在的 task-server/ 下的 .py 拒」「整份换上:工具员 Edit 已存在、带执行位无后缀的 prune-server/control 拒」
+#       「stdin:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒并点名 hook-swap.py 与出路」
+#       「stdin:工具员 Edit 主工作区已存在的 gpu-verification-server/control 拒并点名 hook-swap.py 与出路」
+#       「整份换上:认不出 agent 类型的子 agent 调用照常放行、记一处没判全」「整份换上:目标 stat 失败照常放行、记一处没判全」
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -656,6 +677,67 @@ def decide_ledger_append(hook_input, project_root):
                "一次写入索引表末行与末尾新节，写前复核 sha256，撞了拒（重跑取下一个号）；索引行的判定、历史行、当日还开着的几行用 --judgement、--history-rows、--open-rows 给。\n"
                "→ 改已有节的节号或标题文字（撞了号改成下一个空号）：新旧串里节标题个数相同的 Edit 放行，索引表里同步改。")
 
+# 十一、这几个项目 subagent 不在主工作区里就地改已存在的脚本，出路是草稿目录里写完整份、经 scripts/gate/hook-swap.py 一次换上。
+# 目录与 hook-swap.py 的 SCRIPT_SPEC_DIRECTORIES、SCRIPT_SPEC_EXCLUDED 相同，两边各写一份、改的时候一起改。
+SWAP_ONLY_AGENTS = ("tooling-writer",)
+SWAP_ONLY_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/scripts", "task-server", "prune-server", "gpu-verification-server")
+SWAP_ONLY_EXCLUDED = (".claude/gate.d/fixtures", "prune-server/target", "prune-server/src", "gpu-verification-server/target", "gpu-verification-server/src")
+SWAP_ONLY_SCRIPT_SUFFIXES = (".sh", ".py")
+HOOK_SWAP_SCRIPT = "scripts/gate/hook-swap.py"
+
+def swap_only_directory(relative):
+    """相对仓根的路径落在 SWAP_ONLY_DIRECTORIES 里哪一处（SWAP_ONLY_EXCLUDED 下的不算）：交那一处，不在交 None。"""
+    def under(directory):
+        return relative.startswith(directory + "/")
+    if any(under(directory) for directory in SWAP_ONLY_EXCLUDED):
+        return None
+    return next((directory for directory in SWAP_ONLY_DIRECTORIES if under(directory)), None)
+
+def decide_script_swap_only(hook_input, project_root):
+    """十一、SWAP_ONLY_AGENTS 里的 agent 用 Write / Edit / MultiEdit 改主工作区 SWAP_ONLY_DIRECTORIES 下已存在的脚本（.sh、.py 或带执行位的普通文件）。
+    认不出 agent 类型的子 agent 调用、目标 stat 失败的照常放行并记一处没判全。弄坏开关 WRITE_GUARD_BREAK=script-in-place-allowed 下该拒的也放行。"""
+    import stat
+    if hook_input.get("tool_name") not in ("Write", "Edit", "MultiEdit") or os.environ.get("WRITE_GUARD_BREAK") == "script-in-place-allowed":
+        return 0, None
+    agent_type = hook_input.get("agent_type")
+    recognized = isinstance(agent_type, str) and bool(agent_type)
+    if recognized and agent_type not in SWAP_ONLY_AGENTS:
+        return 0, None
+    if agent_type is None and not hook_input.get("agent_id"):   # 主 agent：输入里没有 agent_type 也没有 agent_id
+        return 0, None
+    target = landing_target(hook_input, project_root)
+    if not target:
+        return 0, None
+    relative = os.path.relpath(target, landing_root(project_root))
+    if relative == ".." or relative.startswith("../") or os.path.isabs(relative):   # 落在主工作区之外：草稿目录、仓副本
+        return 0, None
+    if swap_only_directory(relative) is None:
+        return 0, None
+    try:
+        status = os.stat(target)
+    except (FileNotFoundError, NotADirectoryError):   # 新建文件
+        return 0, None
+    except OSError as error:
+        note_unjudged(f"第十一道（就地改已存在的脚本）：{relative} stat 失败（{type(error).__name__}: {error.strerror or error}），认不出它在不在、是不是脚本，这一次没判、照常放行")
+        return 0, None
+    if not stat.S_ISREG(status.st_mode):
+        return 0, None
+    executable = bool(status.st_mode & 0o111)
+    if not relative.endswith(SWAP_ONLY_SCRIPT_SUFFIXES) and not executable:   # 不带执行位的数据与文档
+        return 0, None
+    if not recognized:
+        note_unjudged(f"第十一道（就地改已存在的脚本）：子 agent 的调用认不出 agent 类型（agent_type={agent_type!r}），{relative} 是主工作区里已存在的脚本，这一次没判、照常放行")
+        return 0, None
+    suffix = os.path.splitext(relative)[1]
+    kind = f"{suffix} 脚本" if relative.endswith(SWAP_ONLY_SCRIPT_SUFFIXES) else f"带执行位的{suffix or '无后缀'}文件"
+    return 2, (f"✗ {agent_type} 不在主工作区里就地改已存在的脚本 {relative}（{kind}）：分几次改的中间态对别的会话可见，被拷进快照的任务、直接起它的服务会跑到改到一半的版本。\n"
+               f"→ 怎么办：新版整份写在草稿目录（照主工作区此刻那一份拷过去再改），把 {HOOK_SWAP_SCRIPT} 的脚本规格（JSON 数组，每项 file / old / new，"
+               "旧串在主工作区那一份里恰好命中 count 次；一件活改几份文件的写进同一份规格）与那条换上命令写进报告「要主 agent 跑的命令」一节，由主 agent 一次换上："
+               f"`task-server/task submit -- python3 {HOOK_SWAP_SCRIPT} <草稿目录>/<规格.json> --scratch <草稿目录> --root <仓根> --dry-run` 先验，"
+               f"再去掉 --dry-run、加 --verify '<被换脚本的 --selftest 命令>' 换上。\n"
+               "→ 不拦的：新建文件，.tsv / .md / .json / .txt 这类不带执行位的数据与文档，.claude/gate.d/fixtures/ 下的样本，草稿目录与仓副本里的文件；"
+               "钩子（.claude/hooks/）照旧经 hook-swap.py 的钩子规格换上。")
+
 SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "scripts")
 PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"   # 只给弄坏开关 python-syntax-subprocess 用
 
@@ -736,7 +818,7 @@ def decide_shell_syntax(hook_input, project_root):
                f"→ 怎么办：先在草稿目录里改到 `{checker_name}` 过，再写进来；钩子、门禁与脚本带着语法错误上线，之后每一次调用都会收到它的报错。")
 
 def decide(hook_input, project_root, table_path, prime_marks_library, clock_times_library=None):
-    """返回 (0, None, None) 放行；(2, 说明, 哪几道（「、」连）) 拒绝。十道都判完，不成立的按下面的次序一次列全；
+    """返回 (0, None, None) 放行；(2, 说明, 哪几道（「、」连）) 拒绝。十一道都判完，不成立的按下面的次序一次列全；
     先编后换拒了不再判写范围，钟点那一道读不到判据时会话号与批次代号不再报同一句。弄坏开关 WRITE_GUARD_BREAK=stop-at-first 判到第一道不成立就交回。"""
     if clock_times_library is None:
         clock_times_library = prime_marks_library
@@ -750,7 +832,8 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
               ("写了会话号", lambda: decide_session_names(hook_input, project_root, clock_times_library)),
               ("写了批次代号", lambda: decide_batch_codes(hook_input, project_root, clock_times_library)),
               ("写别的子 agent 持锁的草稿目录", lambda: decide_writer_lock(hook_input, project_root)),
-              ("往现行账本追加节标题", lambda: decide_ledger_append(hook_input, project_root)))
+              ("往现行账本追加节标题", lambda: decide_ledger_append(hook_input, project_root)),
+              ("就地改已存在的脚本", lambda: decide_script_swap_only(hook_input, project_root)))
     refused = []   # [(哪一道, 说明)]
     for label, judge in judges:
         already = {name for name, _ in refused}
@@ -770,7 +853,7 @@ def decide(hook_input, project_root, table_path, prime_marks_library, clock_time
     if len(refused) == 1:
         return 2, refused[0][1], labels
     blocks = [f"── 第 {number} 道：{label} ──\n{message}" for number, (label, message) in enumerate(refused, 1)]
-    return 2, (f"✗ 这一次写有 {len(refused)} 道判定不成立（{labels}）：十道都判完了，下面一次列全，逐道照各自的「→」改完再写。\n"
+    return 2, (f"✗ 这一次写有 {len(refused)} 道判定不成立（{labels}）：十一道都判完了，下面一次列全，逐道照各自的「→」改完再写。\n"
                + "\n".join(blocks)), labels
 
 def record_detection(hook_input, finding, detections_path, outcome="被拒"):
@@ -869,6 +952,12 @@ def selftest(hook_dir):
                          for row in kept_rows]
             with open(table, "w", encoding="utf-8") as table_target:
                 table_target.writelines(kept_rows)
+        if os.environ.get("WRITE_GUARD_BREAK") == "scope-runner-language-rows-dropped":   # 弄坏开关：表副本去掉执行员的英语、日语实验索引与历史条目四行
+            with open(table, encoding="utf-8") as table_source:
+                kept_rows = [row for row in table_source if not row.startswith(tuple(f"experiment-runner\t.claude/kb/{name}\t" for name in (
+                    "experiments.en.md", "experiments.ja.md", "experiments-history.en.md", "experiments-history.ja.md")))]
+            with open(table, "w", encoding="utf-8") as table_target:
+                table_target.writelines(kept_rows)
         def case(label, tool_name, agent, path, want):
             hook_input = {"tool_name": tool_name, "tool_input": {"file_path": path}}
             if agent:
@@ -956,6 +1045,13 @@ def selftest(hook_dir):
             case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/scripts/mutation/mutate.sh", 2),
             case("范围:experiment-runner 写重跑比对对象登记", "Edit", "experiment-runner", f"{work}/.claude/gate.d/replay-comparison-units.tsv", 0),
             case("范围:experiment-runner 写别的门禁文件越界", "Edit", "experiment-runner", f"{work}/.claude/gate.d/doc-experiments.sh", 2),
+            # 实验索引与历史条目的英语、日语版（WRITE_GUARD_BREAK=scope-runner-language-rows-dropped 下前四格红）；别的语言与译名对照表不在范围里
+            case("范围:experiment-runner 写英语实验索引", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.en.md", 0),
+            case("范围:experiment-runner 写日语实验索引", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.ja.md", 0),
+            case("范围:experiment-runner 写英语历史条目", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments-history.en.md", 0),
+            case("范围:experiment-runner 写日语历史条目", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments-history.ja.md", 0),
+            case("范围:experiment-runner 写别的语言的实验索引越界", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.fr.md", 2),
+            case("范围:experiment-runner 写译名对照表越界", "Edit", "experiment-runner", f"{work}/.claude/kb/translation-glossary.en.md", 2),
             case("范围:未登记的项目 agent", "Edit", "unscoped-writer", f"{work}/anything.md", 2),
             case("两道都中时先报覆盖", "Write", "kb-scribe", f"{work}/untracked.md", 2),
             # 四、实验执行员对主工作区 crates/ 下 .rs 的写：拒的那一道要是「绕过先编后换」，不是写范围那一道（出路不同）
@@ -1065,7 +1161,7 @@ def selftest(hook_dir):
             clock_case("钟点:只写日期放行", "records/x.md", {"content": "用户 2026-09-26 定\n"}, None),
             clock_case("钟点:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": f"2026-09-27 22{colon}41 {jst} 编过\n"}, None),
             clock_case("钟点:排除的门禁样本放行", ".claude/gate.d/fixtures/x/red/expect", {"content": f"改于 2026-09-05 00{colon}00\n"}, None),
-            clock_case("钟点:排除的 hook 自检放行", ".claude/hooks/session-start.sh", {"content": f"2026-09-25 07{colon}58{colon}02 {utc}\n"}, None),
+            clock_case("钟点:排除的检查项自检放行", ".claude/session-checks/kernel-memory-kills", {"content": f"2026-09-25 07{colon}58{colon}02 {utc}\n"}, None),
             clock_case("钟点:排除的 c510 提示放行", "research/prompts/_c510-date-gate-r1-body.md", {"content": f"本机时钟是 {utc}\n"}, None),
             clock_case("钟点:只在 old_string 里有放行", "records/x.md", {"old_string": f"{jst} 15{colon}3x", "new_string": ""}, None),
             clock_case("钟点:读不到判据就拒绝", "records/x.md", {"content": "普通内容\n"}, "描述里写了钟点",
@@ -1350,6 +1446,104 @@ def selftest(hook_dir):
         cases.append(("stdin:往现行账本追加节标题拒（退出码 2）", 2, ledger_entry.returncode))
         cases.append(("stdin:往现行账本追加节标题的拒绝点名新脚本与出路", True,
                       all(fragment in ledger_entry.stderr for fragment in ("scripts/kb/ledger-append-section.py", "records/ledger.md", "→ 怎么办"))))
+        # 十一、工具员就地改主工作区里已存在的脚本：拒的几格判的是拒绝的那一道（只这一道），弄坏开关 WRITE_GUARD_BREAK=script-in-place-allowed 下「整份换上:… 拒」
+        # 与「stdin:工具员 Edit 主工作区已存在的 … 拒并点名 hook-swap.py 与出路」几格红，放行与判不了的几格照样绿
+        open(os.path.join(work, ".claude", "agents", "tooling-writer.md"), "w").write("---\n")
+        swap_only_files = {   # 相对仓根 → (内容, 文件权限)；都 git add 过，Write 整份覆盖那一道不判
+            "scripts/mutation/crates-mutation-rows.py": ("def main():\n    return 0\n", 0o644),
+            "gpu-verification-server/control": ("#!/usr/bin/env bash\necho stop\n", 0o755),
+            ".claude/gate.d/stage.sh": ("#!/usr/bin/env bash\necho stage\n", 0o755),
+            ".claude/scripts/tool.py": ("def main():\n    return 0\n", 0o644),
+            "task-server/task_lib.py": ("def main():\n    return 0\n", 0o644),
+            "prune-server/control": ("#!/usr/bin/env bash\necho stop\n", 0o755),
+            "scripts/table.tsv": ("a\tb\n", 0o644),
+            "scripts/notes.md": ("说明\n", 0o644),
+            "scripts/settings.json": ("{}\n", 0o644),
+            "task-server/notes.txt": ("说明\n", 0o644),
+            ".claude/gate.d/fixtures/sample-red/stage.sh": ("#!/usr/bin/env bash\necho sample\n", 0o755),
+        }
+        for relative, (content, file_mode) in swap_only_files.items():
+            os.makedirs(os.path.dirname(os.path.join(work, relative)), exist_ok=True)
+            with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
+                handle.write(content)
+            os.chmod(os.path.join(work, relative), file_mode)
+        subprocess.run(["git", "-C", work, "add", *swap_only_files], check=True)
+        subprocess.run(["git", "-C", work, "commit", "-qm", "swap-only samples"], check=True)
+        copied_script = os.path.join(outside_directory, "copy", "scripts", "mutation", "crates-mutation-rows.py")   # 草稿目录与仓副本：主工作区之外的同名脚本
+        os.makedirs(os.path.dirname(copied_script))
+        with open(copied_script, "w", encoding="utf-8") as handle:
+            handle.write("def main():\n    return 0\n")
+        def swap_only_finding(tool_name, relative, tool_input, agent="tooling-writer"):
+            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/{relative}")}
+            if agent:
+                hook_input["agent_type"] = agent
+            return decide(hook_input, work, table, library)[2]
+        def swap_only_code(hook_input):
+            with contextlib.redirect_stderr(io.StringIO()):
+                return decide_script_swap_only(hook_input, work)[0]
+        swap_label = "就地改已存在的脚本"
+        cases += [
+            ("整份换上:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒", swap_label,
+             swap_only_finding("Edit", "scripts/mutation/crates-mutation-rows.py", {"old_string": "return 0", "new_string": "return 1"})),
+            ("整份换上:工具员 Edit 主工作区已存在、带执行位无后缀的 gpu-verification-server/control 拒", swap_label,
+             swap_only_finding("Edit", "gpu-verification-server/control", {"old_string": "echo stop", "new_string": "echo stop all"})),
+            ("整份换上:工具员 Write 整份重写已存在的 .claude/gate.d/ 下的 .sh 拒", swap_label,
+             swap_only_finding("Write", ".claude/gate.d/stage.sh", {"content": "#!/usr/bin/env bash\necho stage two\n"})),
+            ("整份换上:工具员 MultiEdit 已存在的 .claude/scripts/ 下的 .py 拒", swap_label,
+             swap_only_finding("MultiEdit", ".claude/scripts/tool.py", {"edits": [{"old_string": "return 0", "new_string": "return 2"}]})),
+            ("整份换上:工具员 Edit 已存在的 task-server/ 下的 .py 拒", swap_label,
+             swap_only_finding("Edit", "task-server/task_lib.py", {"old_string": "return 0", "new_string": "return 3"})),
+            ("整份换上:工具员 Edit 已存在、带执行位无后缀的 prune-server/control 拒", swap_label,
+             swap_only_finding("Edit", "prune-server/control", {"old_string": "echo stop", "new_string": "echo stop all"})),
+            # 不拦的几种：新建、不带执行位的数据与文档、fixtures 下的样本、草稿目录与仓副本、别的 agent 类型与主 agent
+            ("整份换上:工具员新建 scripts/ 下的 .py 放行", None,
+             swap_only_finding("Write", "scripts/mutation/new_tool.py", {"content": "def main():\n    return 0\n"})),
+            ("整份换上:工具员改不带执行位的 .tsv、.md、.json、.txt 放行", (None, None, None, None),
+             tuple(swap_only_finding("Edit", relative, {"old_string": old, "new_string": old + "x"})
+                   for relative, old in (("scripts/table.tsv", "a"), ("scripts/notes.md", "说明"), ("scripts/settings.json", "{}"), ("task-server/notes.txt", "说明")))),
+            ("整份换上:工具员改 .claude/gate.d/fixtures/ 下带执行位的样本放行", None,
+             swap_only_finding("Edit", ".claude/gate.d/fixtures/sample-red/stage.sh", {"old_string": "echo sample", "new_string": "echo sample two"})),
+            ("整份换上:工具员改主工作区之外（草稿目录与仓副本）的同名脚本放行", 0,
+             swap_only_code({"tool_name": "Edit", "agent_type": "tooling-writer",
+                             "tool_input": {"file_path": copied_script, "old_string": "return 0", "new_string": "return 1"}})),
+            ("整份换上:实现员改同一份脚本不归这一道", 0,
+             swap_only_code({"tool_name": "Edit", "agent_type": "implementation-writer",
+                             "tool_input": {"file_path": f"{work}/scripts/mutation/crates-mutation-rows.py", "old_string": "return 0", "new_string": "return 1"}})),
+            ("整份换上:主 agent 改同一份脚本放行", None,
+             swap_only_finding("Edit", "scripts/mutation/crates-mutation-rows.py", {"old_string": "return 0", "new_string": "return 1"}, agent=None)),
+        ]
+        # 判不了照常放行而记一处没判全：带 agent_id 而没有 agent_type 的子 agent 调用；目标所在目录不许进（chmod 000）、stat 失败
+        del UNJUDGED[:]
+        untyped_code = swap_only_code({"tool_name": "Edit", "agent_id": "a0000000000000ff6",
+                                       "tool_input": {"file_path": f"{work}/scripts/mutation/crates-mutation-rows.py", "old_string": "return 0", "new_string": "return 1"}})
+        untyped_notes = list(UNJUDGED)
+        del UNJUDGED[:]
+        cases.append(("整份换上:认不出 agent 类型的子 agent 调用照常放行、记一处没判全", (0, True),
+                      (untyped_code, any("认不出 agent 类型" in note for note in untyped_notes))))
+        sealed_directory = os.path.join(work, "scripts", "sealed")
+        os.makedirs(sealed_directory)
+        with open(os.path.join(sealed_directory, "tool.py"), "w", encoding="utf-8") as handle:
+            handle.write("def main():\n    return 0\n")
+        os.chmod(sealed_directory, 0)
+        try:
+            sealed_code = swap_only_code({"tool_name": "Edit", "agent_type": "tooling-writer",
+                                          "tool_input": {"file_path": os.path.join(sealed_directory, "tool.py"), "old_string": "return 0", "new_string": "return 1"}})
+        finally:
+            os.chmod(sealed_directory, 0o700)
+        sealed_notes = list(UNJUDGED)
+        del UNJUDGED[:]
+        cases.append(("整份换上:目标 stat 失败照常放行、记一处没判全", (0, True), (sealed_code, any("stat 失败" in note for note in sealed_notes))))
+        # 走真实入口：上面两回事故的两条写法，拒绝点名 hook-swap.py、「要主 agent 跑的命令」与草稿目录，只这一道（检出记录单用一份）
+        swap_only_environment = dict(environment, AGENT_HOOK_DETECTIONS=os.path.join(work, "swap-only-detections.jsonl"))
+        for label, relative, old, new in (
+                ("stdin:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒并点名 hook-swap.py 与出路", "scripts/mutation/crates-mutation-rows.py", "return 0", "return 1"),
+                ("stdin:工具员 Edit 主工作区已存在的 gpu-verification-server/control 拒并点名 hook-swap.py 与出路", "gpu-verification-server/control", "echo stop", "echo stop all")):
+            swap_only_entry = subprocess.run(["bash", script], capture_output=True, text=True, env=swap_only_environment,
+                                             input=json.dumps({"tool_name": "Edit", "agent_type": "tooling-writer",
+                                                               "tool_input": {"file_path": f"{work}/{relative}", "old_string": old, "new_string": new}}))
+            cases.append((label, (2, True), (swap_only_entry.returncode,
+                                             all(fragment in swap_only_entry.stderr for fragment in (relative, HOOK_SWAP_SCRIPT, "要主 agent 跑的命令", "草稿目录", "→ 怎么办"))
+                                             and "道判定不成立" not in swap_only_entry.stderr)))
         # 判不了照常放行而记检出：坏 JSON、JSON 数组各喂一次，检出记录单用一份（开关 unparsable-input-silent 下诊断与检出那几格红）
         unjudged_detections = os.path.join(work, "unjudged-detections.jsonl")
         def run_raw(raw_text, extra_environment=None):
@@ -1597,7 +1791,13 @@ def selftest(hook_dir):
                         os.environ.pop("LIB_WRITER_LOCK_BREAK", None)
                     else:
                         os.environ["LIB_WRITER_LOCK_BREAK"] = saved_lock_break
-                code, notes = unjudged_after(lambda: globals().__setitem__("writer_lock", None), lambda: globals().__setitem__("writer_lock", saved_library), "w1/u.md")
+                def drop_writer_lock_library():
+                    global writer_lock   # 照名字换掉模块里的那一份（不按名字现取 globals()）
+                    writer_lock = None
+                def restore_writer_lock_library():
+                    global writer_lock
+                    writer_lock = saved_library
+                code, notes = unjudged_after(drop_writer_lock_library, restore_writer_lock_library, "w1/u.md")
                 cases.append(("写者锁:读不到库时记一处没判全", (0, True), (code, any("读不到 lib_writer_lock.py" in note for note in notes))))
                 code, notes = unjudged_after(lambda: os.environ.__setitem__("LIB_WRITER_LOCK_BREAK", "selftest-unknown-mode"), restore_lock_break, "w2/u.md")
                 cases.append(("写者锁:自己出错时记一处没判全", (0, True), (code, any("写者锁这一道自己出错" in note for note in notes))))
@@ -1674,9 +1874,9 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() / decide_batch_codes() / decide_writer_lock() / decide_ledger_append() 与入口；"
+        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() / decide_batch_codes() / decide_writer_lock() / decide_ledger_append() / decide_script_swap_only() 与入口；"
               "WRITE_GUARD_DISABLE_WRITER_LOCK / LIB_WRITER_LOCK_BREAK / WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES、"
-              "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored / builtin-agents-unscoped / python-syntax-subprocess / library-reloaded-each-time / landing-lexical-only / unparsable-input-silent / unjudged-not-recorded / ledger-append-ignored 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
+              "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored / builtin-agents-unscoped / python-syntax-subprocess / library-reloaded-each-time / landing-lexical-only / unparsable-input-silent / unjudged-not-recorded / ledger-append-ignored / script-in-place-allowed 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
           "未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 放行、没有项目定义的 agent（内置类型、定义已删的旧实例）只许写工作根（仓里与仓外别处拒）、范围内放行、"
@@ -1699,6 +1899,9 @@ def selftest(hook_dir):
           ".py 的语法在本进程里判、不起子进程，共用判据库一次写入只装一次；"
           "往现行账本（拆分提案账本登记表里 current 那一份）追加「## <节号>、」标题（Edit、MultiEdit、Write 各一例）拒绝并点名 ledger-append-section.py 与出路，改节号、改正文、封存的账本、别的文件放行，"
           "登记表读不到时放行并记一处没判全；"
+          "工具员用 Write、Edit、MultiEdit 改主工作区 scripts/、.claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/ 下已存在的 .sh、.py 与带执行位无后缀的脚本拒绝"
+          "（经入口的两例点名 hook-swap.py、「要主 agent 跑的命令」与草稿目录），新建、不带执行位的 .tsv / .md / .json / .txt、fixtures 下的样本、主工作区之外（草稿目录与仓副本）、实现员与主 agent 放行，"
+          "认不出 agent 类型与 stat 失败的照常放行并记一处没判全；"
           f"写进仓里 .md、.tsv 的批次代号（数字加字母加短横序号、两位数字加字母、挨着批次词的、天干编号的批号）拒绝，{len(batch_cases) + len(batch_context_cases)} 格里"
           "两位会话短号、单位与倍数、路径与标识符、不带批次词的候选名、.py 与 .sh、变异表、仓外与反引号、字段值、算式、引号里的放行")
     return 0
