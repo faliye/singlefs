@@ -1,0 +1,2 @@
+                let reply = reply_line(&mut ends.replies);
+                if reply == "absent" {

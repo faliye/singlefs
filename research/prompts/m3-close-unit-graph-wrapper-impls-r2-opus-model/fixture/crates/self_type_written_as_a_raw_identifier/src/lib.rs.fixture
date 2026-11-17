@@ -1,0 +1,25 @@
+//! 两份实现不等价：impl 的自身类型写成原始标识符 `r#Wrapper<Inner>`。Rust 一份的头一个名字去掉 `r#`（`Wrapper`，等它被点名），
+//! Python 一份照原文取 `r#Wrapper`，按名字找不到类型单元，照 blanket 放行。入口不用 `Wrapper`，入口的值不随改动变；比的是两份的闭包。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for r#Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    Base.put(3)
+}

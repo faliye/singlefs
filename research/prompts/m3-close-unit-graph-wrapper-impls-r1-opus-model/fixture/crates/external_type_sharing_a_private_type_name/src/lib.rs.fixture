@@ -1,0 +1,23 @@
+//! 自身类型是工作区外的 `std::cell::Cell<Inner>`，同一个 crate 另一个模块里有一个私有的 `Cell`（与 `prune-server/src/selftest.rs` 那个同形）：
+//! 按名字认「工作区类型名」，这个 impl 等那个私有 `Cell` 被点名，而入口写的 `std::cell::Cell` 照模块筛连不到它。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+impl<Inner: Copy + Into<u32>> Store for std::cell::Cell<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        let value: u32 = self.get().into();
+        value * amount * 2
+    }
+}
+
+#[allow(dead_code)]
+mod unrelated {
+    pub(crate) struct Cell {
+        pub(crate) taken: bool,
+    }
+}
+
+pub fn entry() -> u32 {
+    std::cell::Cell::new(1_u8).put(3)
+}

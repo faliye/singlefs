@@ -1,0 +1,8 @@
+① 改到的文件与函数：
+本次改动在 crates/singlefs-core/verus-must-red-worlds.tsv 中修复 write_common_prefix 的必红锚点负例，并同步了门禁与文档中的各项引用对齐。
+
+② 引到它们的测试目标与函数及 grep 命中：
+改动涉及 crates/singlefs-core/src/unit.rs 中 write_common_prefix 的 Verus 规格验证与落地负例，grep 命中 1 处真实锚点。
+
+③ 为什么只点名②不够：
+formal-verification.sh 是提交门禁中的全量形式化验证总闸，用户明确要求在资源充裕情况下逐个启动提交门禁并 await 结果，必须跑整道门禁以确保 Verus 证明与必红锚点全部全绿。

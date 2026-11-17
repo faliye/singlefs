@@ -1,0 +1,2 @@
+[package]
+name = "enum_built_from_a_glob_imported_variant"

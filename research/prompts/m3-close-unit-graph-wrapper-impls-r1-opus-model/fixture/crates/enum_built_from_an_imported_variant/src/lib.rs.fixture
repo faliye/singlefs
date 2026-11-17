@@ -1,0 +1,32 @@
+//! 泛型 enum 照 use 引进的变体名造值：入口里只写 `Doubled`，enum 的名字 `Layered` 只在 use 那一行（use 不往下解名字）。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub enum Layered<Inner> {
+    Plain(Inner),
+    Doubled(Inner),
+}
+
+impl<Inner: Store> Store for Layered<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        match self {
+            Layered::Plain(inner) => inner.put(amount),
+            Layered::Doubled(inner) => inner.put(amount) * 2,
+        }
+    }
+}
+
+use crate::Layered::Doubled;
+
+pub fn entry() -> u32 {
+    Doubled(Base).put(3)
+}

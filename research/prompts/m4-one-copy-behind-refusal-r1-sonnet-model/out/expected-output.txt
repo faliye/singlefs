@@ -1,0 +1,47 @@
+RESULT family=F1_crash_and_one_damaged_copy arm=today states=122736 refused=840 over_refuse=840 false_allow=0 newly_false_allow=0
+RESULT family=F1_crash_and_one_damaged_copy arm=window states=122736 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F1_crash_and_one_damaged_copy arm=adjacent_literal states=122736 refused=252 over_refuse=252 false_allow=0 newly_false_allow=0
+RESULT family=F1_crash_and_one_damaged_copy arm=adjacent_publish states=122736 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F1_crash_and_one_damaged_copy arm=always_pass states=122736 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F1_crash_and_one_damaged_copy arm=always_refuse states=122736 refused=122736 over_refuse=122736 false_allow=0 newly_false_allow=0
+RESULT family=F2_stale_disk_swapped_in arm=today states=28080 refused=21528 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F2_stale_disk_swapped_in arm=window states=28080 refused=21528 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F2_stale_disk_swapped_in arm=adjacent_literal states=28080 refused=21528 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F2_stale_disk_swapped_in arm=adjacent_publish states=28080 refused=21528 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F2_stale_disk_swapped_in arm=always_pass states=28080 refused=0 over_refuse=0 false_allow=21528 newly_false_allow=21528
+RESULT family=F2_stale_disk_swapped_in arm=always_refuse states=28080 refused=28080 over_refuse=6552 false_allow=0 newly_false_allow=0
+RESULT family=F3_stale_disk_tail_raised_without_units arm=today states=14040 refused=402 over_refuse=0 false_allow=11856 newly_false_allow=0
+RESULT family=F3_stale_disk_tail_raised_without_units arm=window states=14040 refused=0 over_refuse=0 false_allow=12258 newly_false_allow=402
+RESULT family=F3_stale_disk_tail_raised_without_units arm=adjacent_literal states=14040 refused=144 over_refuse=0 false_allow=12114 newly_false_allow=258
+RESULT family=F3_stale_disk_tail_raised_without_units arm=adjacent_publish states=14040 refused=0 over_refuse=0 false_allow=12258 newly_false_allow=402
+RESULT family=F3_stale_disk_tail_raised_without_units arm=always_pass states=14040 refused=0 over_refuse=0 false_allow=12258 newly_false_allow=402
+RESULT family=F3_stale_disk_tail_raised_without_units arm=always_refuse states=14040 refused=14040 over_refuse=1782 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=today states=829702 refused=8308 over_refuse=8308 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=window states=829702 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=adjacent_literal states=829702 refused=2568 over_refuse=2568 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=adjacent_publish states=829702 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=always_pass states=829702 refused=0 over_refuse=0 false_allow=0 newly_false_allow=0
+RESULT family=F5_crash_and_two_damaged_copies arm=always_refuse states=829702 refused=829702 over_refuse=829702 false_allow=0 newly_false_allow=0
+EXAMPLE family=F1_crash_and_one_damaged_copy arm=adjacent_literal kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True, False, True)), '损坏', (0, ('c', 0))) shape=[(('a',), 1), (('a', 'b'), 2)]
+EXAMPLE family=F1_crash_and_one_damaged_copy arm=adjacent_literal kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True, True, False)), '损坏', (1, ('c', 0))) shape=[(('a',), 1), (('a', 'b'), 2)]
+EXAMPLE family=F1_crash_and_one_damaged_copy arm=today kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True)), '损坏', (0, ('b', 0))) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F1_crash_and_one_damaged_copy arm=today kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True)), '损坏', (0, ('c', 0))) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_literal kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_literal kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, True)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_literal kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('b',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_literal kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('c',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_publish kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_publish kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, True)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_publish kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('b',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=adjacent_publish kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('c',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=today kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=today kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, True)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=window kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=window kind=false_allow selected_version=1 tails={0: 1, 1: 1} crash=(('单元段', (False, True)), '盘1缺的发布', 0) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=window kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('b',), 1)]
+EXAMPLE family=F3_stale_disk_tail_raised_without_units arm=window kind=newly_false_allow selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (True, False)), '盘1缺的发布', 0) shape=[(('a',), 1), (('c',), 1)]
+EXAMPLE family=F5_crash_and_two_damaged_copies arm=adjacent_literal kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True, False, True)), '两处损坏', ((0, ('a', 0)), (0, ('c', 0)))) shape=[(('a',), 1), (('a', 'b'), 2)]
+EXAMPLE family=F5_crash_and_two_damaged_copies arm=adjacent_literal kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True, False, True)), '两处损坏', ((0, ('a', 1)), (0, ('c', 0)))) shape=[(('a',), 1), (('a', 'b'), 2)]
+EXAMPLE family=F5_crash_and_two_damaged_copies arm=today kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True)), '两处损坏', ((0, ('a', 0)), (0, ('b', 0)))) shape=[(('a',), 1), (('a',), 1)]
+EXAMPLE family=F5_crash_and_two_damaged_copies arm=today kind=over_refuse selected_version=2 tails={0: 1, 1: 1} crash=(('记录段', (False, True)), '两处损坏', ((0, ('a', 0)), (0, ('c', 0)))) shape=[(('a',), 1), (('a',), 1)]
+PINS ok

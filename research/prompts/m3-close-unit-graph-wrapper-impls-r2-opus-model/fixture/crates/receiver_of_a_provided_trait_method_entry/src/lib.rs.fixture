@@ -1,0 +1,32 @@
+//! 入口是 trait 自带体的方法 `Source::total`：`self` 是闭包外的 `caller` 造的 `Wrapper<Base>`。入口签名只有 `&self`，
+//! 入口所在的 trait 头上没有约束；收严二不开入口自己所在的那个 trait。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub trait Source {
+    fn amount(&self) -> u32;
+    fn total(&self) -> u32 {
+        self.amount() + 0
+    }
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Source for Wrapper<Inner> {
+    fn amount(&self) -> u32 {
+        self.0.put(3) * 2
+    }
+}
+
+pub fn caller() -> u32 {
+    Wrapper(Base).total()
+}

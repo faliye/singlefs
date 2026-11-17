@@ -1,0 +1,1 @@
+                if reply == "absent" || reply.starts_with("failed ") {

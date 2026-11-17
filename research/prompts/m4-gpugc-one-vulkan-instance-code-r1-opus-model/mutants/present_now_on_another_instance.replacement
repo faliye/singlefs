@@ -1,0 +1,2 @@
+        Box::new(AdaptersEnumeratedByTheInstance {
+            vulkan_instance: VulkanInstanceOfThisProcess::with_the_backends(wgpu::Backends::empty()),

@@ -1,0 +1,32 @@
+//! 泛型参数名 `Reader` 与另一个模块里的私有类型同名（真仓 `PoolReader` 的十一个包装 impl 的泛型参数都叫 `Reader`，
+//! `crates/singlefs-verification/src/verification_read.rs` 有 `struct Reader`）。题面写「去掉它自己的泛型参数之后」，原型没去。
+pub trait Source {
+    fn amount(&self) -> u32;
+}
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Source for Base {
+    fn amount(&self) -> u32 {
+        1
+    }
+}
+
+impl<Reader: Source> Store for Reader {
+    fn put(&self, amount: u32) -> u32 {
+        self.amount() * amount * 2
+    }
+}
+
+#[allow(dead_code)]
+mod unrelated {
+    pub(crate) struct Reader;
+}
+
+pub fn entry() -> u32 {
+    Base.put(3)
+}

@@ -1,0 +1,2 @@
+[package]
+name = "downcast_to_an_alias_of_a_trait_object"

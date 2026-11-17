@@ -1,0 +1,14 @@
+//! 自身类型是工作区外的 `std::io::Cursor<Bytes>`，工作区里另一个 crate（不在链接集里）有一个私有的 `Cursor`。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+impl<Bytes: AsRef<[u8]>> Store for std::io::Cursor<Bytes> {
+    fn put(&self, amount: u32) -> u32 {
+        u32::try_from(self.get_ref().as_ref().len()).unwrap_or(0) * amount * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    std::io::Cursor::new(vec![7_u8]).put(3)
+}

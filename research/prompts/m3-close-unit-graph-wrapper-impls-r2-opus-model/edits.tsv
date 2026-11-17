@@ -1,0 +1,13 @@
+# 每个夹具一行，制表符分隔五段：crate 名、单元图入口（crate 名之后的路径）、驱动程序里调的函数、改动的原文、替换文。
+# 原文在那个 crate 的 lib.rs 里恰好一次；它所在的那一行落在哪个 fn 单元的行区间里，那个单元就是「被改的方法」。
+trait_object_field_of_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+trait_object_held_by_a_static	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+trait_object_behind_a_dyn_any_parameter	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+receiver_of_a_provided_trait_method_entry	Source::total	caller	self.0.put(3) * 2	self.0.put(3) * 3
+struct_in_an_inactive_cfg_arm_alias_in_the_active_arm	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+bound_in_parentheses_on_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+higher_ranked_bound_on_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+variant_imported_through_a_raw_identifier_path	entry	entry	inner.put(amount) * 2	inner.put(amount) * 3
+self_type_written_as_a_raw_identifier	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+signature_type_also_defined_in_an_unlinked_file	entry	caller	self.0 * 2	self.0 * 3
+wrapper_named_in_the_entry_control	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3

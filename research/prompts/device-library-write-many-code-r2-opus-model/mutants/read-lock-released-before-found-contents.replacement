@@ -1,0 +1,4 @@
+                drop(ends);
+                let Backend::Relay(relay_ends) = &*self.backend else { unreachable!() };
+                let mut ends = relay_ends.lock().expect("变异：重新拿锁");
+                let mut contents = vec![0_u8; length];

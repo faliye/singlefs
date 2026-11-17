@@ -1,0 +1,545 @@
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -4,15 +4,16 @@
+ //! 不在任何开放的聚簇段里、不在 `R` 保护期内（第一版 R 为空）。
+ //! 提交内生块（D3（空间分配） 已定项 5 / 已定项 10）：从开放聚簇段 bump，开放段 = 单元区内最低的 64 槽对齐全空段，bump 只在内存；
+ //! 码 3 容器按数据单元那一档取落点（起点 32768 对齐），码 2 节点取最低空槽。
+-//! 开放段装不下、又没有全空段时回落（D3（空间分配） 已定项 8 ②）：该设备内槽号最小的空槽，与 bump 游标绕开同一套位（已分配、影子账隔离、抬 F 扣住）。
++//! 开放段装不下、又没有全空段时回落（D3（空间分配） 已定项 8 ②）：先取这次发布分配记录树重写集的叶里槽号最小的空槽（[`RewriteSetLeaves`]），
++//! 那些叶里没有再取该设备内槽号最小的空槽，与 bump 游标绕开同一套位（已分配、影子账隔离、抬 F 扣住）。
+ //! 落点按设备取（D3（空间分配） 已定项 8 第 1 条「在每一块被选中的设备上各自取」）：每块盘按自己的空闲图各答一个，各盘一致才分配；
+ //! 有的盘答不出、或各盘答得不同，在动任何状态之前拒绝（`PlacementRefusal`）——`Placement` 两盘同槽，各盘不同槽第一版不支持。
+ //! 记账（D5（快照 / 空间记账机制） 已定项 7 / 已定项 8）：已分配 = 落点之和、容量 = 单元区、runs = 空闲槽的连续段数（逐设备）、
+ //! 逐段的已用槽数、全空聚簇段数（逐设备，`DeviceFreeMap::empty_segments`）——这几样在分配那一刻增量维护，运行时不扫盘（`.claude/rules/fs-design.md` 第一格）。
+ 
+ use singlefs_format::{
+-    ALLOCATION_RECORD_BYTES, CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS,
+-    SLOT_BYTES,
++    ALLOCATION_RECORD_BYTES, ALLOCATION_RECORD_TREE_LEAF_SLOTS, CLUSTER_SEGMENT_SLOTS,
++    JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+ };
+ 
+ use std::collections::{BTreeMap, BTreeSet};
+@@ -191,6 +192,49 @@
+     FallBackToLowestFreeSlot(SlotNumber),
+ }
+ 
++/// 这次发布分配记录树重写集里的叶（回落时先取的去处，D3（空间分配） 已定项 8 第 2 条）：叶序号 = 槽号 ÷ `ALLOCATION_RECORD_TREE_LEAF_SLOTS`，
++/// 只含每块盘上都在重写集里的叶——提交内生块的落点两盘同槽，取在这样的叶里，两块盘上都不多弄脏一片叶。
++/// 空集 = 没有偏好，回落取该设备内槽号最小的空槽。由发布路径按这次发布的重写角色算（演练与真发读同一串角色，得同一个集合）。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct RewriteSetLeaves {
++    leaf_indices: BTreeSet<u64>,
++}
++
++impl RewriteSetLeaves {
++    /// 没有偏好的空集。
++    #[must_use]
++    pub const fn none() -> Self {
++        Self {
++            leaf_indices: BTreeSet::new(),
++        }
++    }
++
++    /// 每块盘各自重写集里的叶序号（`leaf_indices_per_device` 一块盘一项）取交集：一片叶只有在池里每块盘上都重写，才算数。
++    #[must_use]
++    pub fn present_on_every_device(leaf_indices_per_device: &[BTreeSet<u64>]) -> Self {
++        let Some((first_device, other_devices)) = leaf_indices_per_device.split_first() else {
++            return Self::none();
++        };
++        Self {
++            leaf_indices: first_device
++                .iter()
++                .copied()
++                .filter(|leaf_index| {
++                    other_devices
++                        .iter()
++                        .all(|leaf_indices| leaf_indices.contains(leaf_index))
++                })
++                .collect(),
++        }
++    }
++
++    /// 集合里有几片叶。
++    #[must_use]
++    pub fn leaf_count(&self) -> usize {
++        self.leaf_indices.len()
++    }
++}
++
+ /// 分配器拒绝一次分配的原因。拒绝发生在动任何状态之前：记录、位图、计数、开放段与 bump 游标都照旧。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub enum PlacementRefusal {
+@@ -1042,11 +1086,11 @@
+         let unit_area_end = self.unit_area_end_slot();
+         let mut candidate = self.unit_area_start.slot().0;
+         while candidate + footprint.slots() <= unit_area_end {
+-            let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {
+-                !self.is_blocked_for_commit_generated(SlotNumber(slot))
+-                    && !excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(slot)))
+-            });
+-            if is_whole_span_unblocked {
++            if self.is_whole_span_unblocked_for_commit_generated(
++                candidate,
++                footprint,
++                excluded_region,
++            ) {
+                 return Some(SlotNumber(candidate));
+             }
+             candidate += footprint.alignment_in_slots();
+@@ -1054,6 +1098,23 @@
+         None
+     }
+ 
++    /// 从 `candidate` 起的整个跨度在这块盘的单元区里，每一槽都不被挡（[`Self::is_blocked_for_commit_generated`]）、也不在活整理意图的 `R` 里：
++    /// 回落认一个落点的判法，只有这一处。
++    #[must_use]
++    fn is_whole_span_unblocked_for_commit_generated(
++        &self,
++        candidate: u64,
++        footprint: UnitFootprint,
++        excluded_region: Option<CompactionRegion>,
++    ) -> bool {
++        candidate >= self.unit_area_start.slot().0
++            && candidate + footprint.slots() <= self.unit_area_end_slot()
++            && (candidate..candidate + footprint.slots()).all(|slot| {
++                !self.is_blocked_for_commit_generated(SlotNumber(slot))
++                    && !excluded_region.is_some_and(|region| region.contains_slot(SlotNumber(slot)))
++            })
++    }
++
+     /// 开放段没有或装不下时这块盘给提交内生块的去处：最低的全空段；没有全空段就回落；连回落的空槽都没有就 `None`。
+     #[must_use]
+     pub fn commit_generated_answer_without_open_segment(
+@@ -1911,6 +1972,9 @@
+     /// 那一族上断言它是 0：I-5.5 的开放段认法（池级 checker 拿树表单元所在的段当开放段）假定这一族不走回落，哪天走进回落，用例红、
+     /// 回来重看那一格。
+     commit_generated_placements_that_fell_back_to_the_lowest_free_slot: u64,
++    /// 上一项里落进了重写集的叶（[`RewriteSetLeaves`]）的次数：回落取到的不是该设备内槽号最小的空槽、而是重写集的叶里最小的空槽。
++    /// 只增、只住内存、`new` 与 `rebuild_from_records` 起步是 0，只读，产品路径不按它分支（回落偏好那一支的观测）。
++    commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves: u64,
+     /// 分配器眼里的根环（`RootRingOccupancy`）：挂载时装（`mount::rebuilt_allocator`），mkfs 同一个进程里由建分配器的一方装
+     /// （`make_filesystem::root_ring_occupancy_after_make_filesystem`）。`None`：建分配器的一方没装（`new` 与 `rebuild_from_records`
+     /// 都不装）。没装的分配器不许记根：`record_root_written_by_this_process` 断言（C551），只做不发布的事：分配，
+@@ -1959,6 +2023,7 @@
+             reuse_window: ReuseWindow::GatedByTheRollbackFloor,
+             placements_reclaimed_on_release_by_the_forced_zero_reuse_window: 0,
+             commit_generated_placements_that_fell_back_to_the_lowest_free_slot: 0,
++            commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves: 0,
+             root_ring: None,
+             frozen_publish: None,
+             instance_rows_after_this_mounts_row_publish: 0,
+@@ -2253,6 +2318,12 @@
+         self.commit_generated_placements_that_fell_back_to_the_lowest_free_slot
+     }
+ 
++    /// 回落的落点里取在重写集的叶里的次数（[`RewriteSetLeaves`]）：每取一个这样的落点加一，同时也算进上一个读口。
++    #[must_use]
++    pub fn commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves(&self) -> u64 {
++        self.commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves
++    }
++
+     /// 重开时从盘上那棵分配记录树重建分配器（D23（journal 的角色与格式） 已定项 14：defer 队列、分配器游标、记账的现行值从所选根那棵账重新载入）：
+     /// 每条记录把自己那块盘上的槽标成占着，已释放的再进 defer 队列；空闲计数随 `mark_allocated` 减、与写路径同一条事件路径。
+     /// 开放段与 bump 游标只在内存、盘上没有（分配记录树不记它们），重开后按「没有开放段」起步：下一个提交内生块从最低的全空段开——
+@@ -2566,15 +2637,34 @@
+             .ok()
+     }
+ 
++    /// 提交内生块：见 `try_allocate_commit_generated_preferring_the_rewrite_set`，没有重写集（回落取该设备内槽号最小的空槽）。
++    ///
++    /// # Errors
++    /// 同 [`Self::try_allocate_commit_generated_preferring_the_rewrite_set`]。
++    pub fn try_allocate_commit_generated(
++        &mut self,
++        footprint: UnitFootprint,
++        generation: CheckpointTxg,
++    ) -> Result<Placement, PlacementRefusal> {
++        self.try_allocate_commit_generated_preferring_the_rewrite_set(
++            footprint,
++            generation,
++            &RewriteSetLeaves::none(),
++        )
++    }
++
+     /// 提交内生块：从开放段 bump；容器按 32768 对齐档，节点取游标处最低空槽。开放段没有或装不下时每块盘按自己的空闲图答一个去处——
+-    /// 最低的全空段（开新段），没有全空段就回落到槽号最小的空槽（D3（空间分配） 已定项 8 ②）——各盘答得一致才分配。
++    /// 最低的全空段（开新段），没有全空段就回落（D3（空间分配） 已定项 8 ②）——各盘答得一致才分配。
++    /// 回落先取 `rewrite_set_leaves`（这次发布分配记录树重写集里的叶）里槽号最小、整跨度在每块盘上都不被挡的空槽，那些叶里一个都没有才取
++    /// 该设备内槽号最小的空槽；各盘的回落答案不一致时仍然拒绝，偏好只在各盘都答回落且答案一致之后才看。
+     ///
+     /// # Errors
+     /// 拒绝时分配器一样都没动（装不下的开放段也照旧开着）：全部盘都没有去处、有的盘没有、各盘的去处不同。
+-    pub fn try_allocate_commit_generated(
++    pub fn try_allocate_commit_generated_preferring_the_rewrite_set(
+         &mut self,
+         footprint: UnitFootprint,
+         generation: CheckpointTxg,
++        rewrite_set_leaves: &RewriteSetLeaves,
+     ) -> Result<Placement, PlacementRefusal> {
+         if let Some(open) = self.open_segment {
+             if let Some(slot) = self.bump_slot_in_open_segment(open, footprint) {
+@@ -2623,11 +2713,22 @@
+                     .expect("每块盘都答了同一个全空段（已分配、隔离、扣住都是 0，整段在每块盘的单元区里）：64 槽装得下任何一个单元");
+                 Ok(self.record_bumped(slot, footprint, generation))
+             }
+-            CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot(slot) => {
++            CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot(lowest_free_slot) => {
+                 // 回落之后没有段可 bump 了，但刚才那一段仍是聚簇段、仍装着这次提交的内生块：它留在 `cluster_segments` 里，
+                 // 用户数据照旧不许落进去（D3（空间分配） 已定项 8 第 2 条；增补 2 第 20c 行）。
+                 self.open_segment = None;
+                 self.commit_generated_placements_that_fell_back_to_the_lowest_free_slot += 1;
++                let slot = match self.lowest_slot_in_the_rewrite_set_leaves(
++                    footprint,
++                    excluded_region,
++                    rewrite_set_leaves,
++                ) {
++                    Some(slot_in_the_rewrite_set) => {
++                        self.commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves += 1;
++                        slot_in_the_rewrite_set
++                    }
++                    None => lowest_free_slot,
++                };
+                 let placement = Placement {
+                     slot,
+                     span: footprint.slots(),
+@@ -2638,6 +2739,35 @@
+         }
+     }
+ 
++    /// 重写集的叶里起点槽号最小、整个跨度在每块盘上都不被挡（同回落的同一套位）、不在活 `R` 里的落点；那些叶里一个都没有就 `None`。只读。
++    /// 一片叶罩 `ALLOCATION_RECORD_TREE_LEAF_SLOTS` 个槽（偶数）：两槽的单元起在偶数槽，不跨叶。
++    fn lowest_slot_in_the_rewrite_set_leaves(
++        &self,
++        footprint: UnitFootprint,
++        excluded_region: Option<CompactionRegion>,
++        rewrite_set_leaves: &RewriteSetLeaves,
++    ) -> Option<SlotNumber> {
++        for leaf_index in &rewrite_set_leaves.leaf_indices {
++            let first_slot_of_the_leaf = leaf_index * ALLOCATION_RECORD_TREE_LEAF_SLOTS;
++            let past_the_last_slot_of_the_leaf =
++                first_slot_of_the_leaf + ALLOCATION_RECORD_TREE_LEAF_SLOTS;
++            let mut candidate = first_slot_of_the_leaf;
++            while candidate + footprint.slots() <= past_the_last_slot_of_the_leaf {
++                if self.devices.iter().all(|device| {
++                    device.is_whole_span_unblocked_for_commit_generated(
++                        candidate,
++                        footprint,
++                        excluded_region,
++                    )
++                }) {
++                    return Some(SlotNumber(candidate));
++                }
++                candidate += footprint.alignment_in_slots();
++            }
++        }
++        None
++    }
++
+     /// 开放段里从游标起第一个整跨度在每块盘上都不被挡的对齐起点；段里装不下就 `None`。只读，不挪游标。
+     fn bump_slot_in_open_segment(
+         &self,
+@@ -4009,6 +4139,139 @@
+         }
+     }
+ 
++    /// 新池新建文件之前的形态：开段 [50240, 50304) 的第一槽已发出、其余槽占满、别的全空段各占掉段首一槽 ⇒ 一个全空段都没有、开放段装不下，
++    /// 下一个提交内生块回落；段外面（槽 50179 起）还有大片空槽。
++    fn pool_after_mkfs_whose_next_commit_generated_block_falls_back() -> PoolAllocator {
++        let mut pool = pool_after_mkfs();
++        let first = pool
++            .allocate_commit_generated(UnitFootprint::OneSlot, CheckpointTxg(3))
++            .expect("开段");
++        assert_eq!(first.slot, SlotNumber(50240));
++        fill_free_slots(&mut pool, 50241, 50304);
++        for device_map in &mut pool.devices {
++            let full_segments = device_map.unit_area_slots() / CLUSTER_SEGMENT_SLOTS;
++            for segment_index in 0..full_segments {
++                if device_map.segment_is_empty(usize::try_from(segment_index).expect("段号")) {
++                    device_map.mark_allocated(
++                        SlotNumber(UNIT_AREA_START_SLOT + segment_index * CLUSTER_SEGMENT_SLOTS),
++                        1,
++                    );
++                }
++            }
++        }
++        pool
++    }
++
++    /// 两块盘上都重写的叶（槽号 ÷ 叶宽）。
++    fn rewrite_set_leaves_of_both_devices(leaf_indices: &[u64]) -> RewriteSetLeaves {
++        let on_each_device: BTreeSet<u64> = leaf_indices.iter().copied().collect();
++        RewriteSetLeaves::present_on_every_device(&[on_each_device.clone(), on_each_device])
++    }
++
++    /// 回落先取重写集的叶里槽号最小的空槽：叶 62 罩 [50344, 51156)，它的最低空槽 50344 比全池最低的空槽（叶 61 里，50179）高。
++    /// 没有重写集时同一个形态取全池最低。只有一块盘上重写的叶不算数（交集）。
++    #[test]
++    fn fallback_takes_the_lowest_free_slot_in_the_rewrite_set_leaves_first() {
++        let leaf_62 = rewrite_set_leaves_of_both_devices(&[62]);
++        let mut without_preference = pool_after_mkfs_whose_next_commit_generated_block_falls_back();
++        let lowest_free_slot = without_preference.devices[0]
++            .lowest_commit_generated_fallback_slot(UnitFootprint::OneSlot)
++            .expect("段外面有空槽");
++        assert!(lowest_free_slot.0 < 62 * ALLOCATION_RECORD_TREE_LEAF_SLOTS);
++        let placement = without_preference
++            .try_allocate_commit_generated(UnitFootprint::OneSlot, CheckpointTxg(4))
++            .expect("回落");
++        assert_eq!(
++            placement.slot, lowest_free_slot,
++            "没有重写集：该设备内槽号最小的空槽"
++        );
++        assert_eq!(
++            without_preference
++                .commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves(),
++            0
++        );
++
++        let mut preferring = pool_after_mkfs_whose_next_commit_generated_block_falls_back();
++        let placement = preferring
++            .try_allocate_commit_generated_preferring_the_rewrite_set(
++                UnitFootprint::OneSlot,
++                CheckpointTxg(4),
++                &leaf_62,
++            )
++            .expect("回落");
++        assert_eq!(
++            placement.slot,
++            SlotNumber(62 * ALLOCATION_RECORD_TREE_LEAF_SLOTS)
++        );
++        assert_eq!(
++            preferring.commit_generated_placements_that_fell_back_to_the_lowest_free_slot(),
++            1
++        );
++        assert_eq!(
++            preferring.commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves(),
++            1
++        );
++        assert_eq!(preferring.open_segment(), None, "回落不开段");
++
++        let only_on_one_device =
++            RewriteSetLeaves::present_on_every_device(&[BTreeSet::from([62]), BTreeSet::new()]);
++        assert_eq!(
++            only_on_one_device.leaf_count(),
++            0,
++            "只在一块盘上重写的叶不算"
++        );
++    }
++
++    /// 重写集的叶里挡一槽、两槽的单元要整跨度不被挡：叶 62 的最低槽在盘 1 上被隔离 ⇒ 一槽的单元取 50345，两槽的单元取 50346（偶数起点）。
++    /// 重写集的叶里一个空槽都没有 ⇒ 退到该设备内槽号最小的空槽，不算进重写集那一支。
++    #[test]
++    fn fallback_in_the_rewrite_set_leaves_skips_slots_blocked_on_any_device_and_gives_way_when_the_leaves_are_full(
++    ) {
++        let leaf_62 = rewrite_set_leaves_of_both_devices(&[62]);
++        let first_slot_of_leaf_62 = 62 * ALLOCATION_RECORD_TREE_LEAF_SLOTS;
++        let mut pool = pool_after_mkfs_whose_next_commit_generated_block_falls_back();
++        pool.isolate_abandoned(DeviceIdentity(1), SlotNumber(first_slot_of_leaf_62), 1);
++        let one_slot = pool
++            .try_allocate_commit_generated_preferring_the_rewrite_set(
++                UnitFootprint::OneSlot,
++                CheckpointTxg(4),
++                &leaf_62,
++            )
++            .expect("回落");
++        assert_eq!(one_slot.slot, SlotNumber(first_slot_of_leaf_62 + 1));
++        let two_slots = pool
++            .try_allocate_commit_generated_preferring_the_rewrite_set(
++                UnitFootprint::TwoSlotsAligned,
++                CheckpointTxg(4),
++                &leaf_62,
++            )
++            .expect("回落");
++        assert_eq!(two_slots.slot, SlotNumber(first_slot_of_leaf_62 + 2));
++        assert_eq!(two_slots.span, 2);
++
++        let mut full_leaf = pool_after_mkfs_whose_next_commit_generated_block_falls_back();
++        let lowest_free_slot = full_leaf.devices[0]
++            .lowest_commit_generated_fallback_slot(UnitFootprint::OneSlot)
++            .expect("段外面有空槽");
++        fill_free_slots(
++            &mut full_leaf,
++            first_slot_of_leaf_62,
++            first_slot_of_leaf_62 + ALLOCATION_RECORD_TREE_LEAF_SLOTS,
++        );
++        let placement = full_leaf
++            .try_allocate_commit_generated_preferring_the_rewrite_set(
++                UnitFootprint::OneSlot,
++                CheckpointTxg(4),
++                &leaf_62,
++            )
++            .expect("回落");
++        assert_eq!(placement.slot, lowest_free_slot);
++        assert_eq!(
++            full_leaf.commit_generated_placements_that_fell_back_into_the_rewrite_set_leaves(),
++            0
++        );
++    }
++
+     /// 回落把开放段置空之后，那一段仍是聚簇段、仍不给用户数据
+     /// （D3（空间分配） 已定项 8 第 2 条「聚簇段只给提交内生块」；已定项 10 ② 的量词是「任何开放的聚簇段」）。
+     /// 形态：开段 [50240, 50304) 发七个提交内生块（新池新建文件的前七个，字节表零 t2..t8）⇒ 游标停在 50249；段里游标前方的槽占满、单元区里一个全空段都不剩
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -50,7 +50,7 @@
+     AllocationRecordTreeNodePosition, AllocationRecordTreePlan, AllocationRecordTreeVersion,
+ };
+ use crate::allocator::{
+-    AllocationRecord, Placement, PlacementRefusal, PoolAllocator, UnitFootprint,
++    AllocationRecord, Placement, PlacementRefusal, PoolAllocator, RewriteSetLeaves, UnitFootprint,
+ };
+ use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
+ use crate::checksum::crc32_castagnoli;
+@@ -2019,8 +2019,9 @@
+             nodes_after.extend(nodes_holding_records(&geometry, rehearsal.records()));
+             continue;
+         }
++        let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(&rewritten_roles, allocator);
+         for identity in &rewritten_roles {
+-            allocate_placement_for_role(&mut rehearsal, *identity, txg)?;
++            allocate_placement_for_role(&mut rehearsal, *identity, txg, &rewrite_set_leaves)?;
+         }
+         let changed =
+             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
+@@ -2174,8 +2175,10 @@
+     // 实例表链的各片最前、尾片先（D3（空间分配） 已定项 10 ⑤），分配记录树的节点在它们之后按位置先叶后根取：
+     // 这些节点自己的分配记录也要进这棵树，所以落点都取完才装节点。
+     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
++    let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(&settled.rewritten_roles, allocator);
+     for identity in &settled.rewritten_roles {
+-        let placement = allocate_placement_for_role(allocator, *identity, txg)?;
++        let placement =
++            allocate_placement_for_role(allocator, *identity, txg, &rewrite_set_leaves)?;
+         slots.insert(*identity, placement.slot);
+     }
+     // 落点取完、这次不再分配：记下这条根盖掉的根环槽（同 `publish_admitted` 那一处；失败时分配器由调用方整个换回去），
+@@ -2450,7 +2453,8 @@
+     ))
+ }
+ 
+-/// 一个角色这次发布的落点：用户数据按政策函数，其余是提交内生块（码 3 容器按数据单元那一档，D3（空间分配） 已定项 10 ⑤）。
++/// 一个角色这次发布的落点：用户数据按政策函数，其余是提交内生块（码 3 容器按数据单元那一档，D3（空间分配） 已定项 10 ⑤）；
++/// 提交内生块回落时先取 `rewrite_set_leaves`（这次发布分配记录树重写集里的叶）里的空槽。
+ /// 取不到时带上是哪个角色、分配器给的原因。
+ ///
+ /// # Errors
+@@ -2459,12 +2463,16 @@
+     allocator: &mut PoolAllocator,
+     identity: TransactionUnit,
+     txg: CheckpointTxg,
++    rewrite_set_leaves: &RewriteSetLeaves,
+ ) -> Result<Placement, PublishError> {
+     let placement = match identity.placement() {
+         PlacementRule::UserData => allocator.try_allocate_user_data(txg),
+-        PlacementRule::CommitGenerated(footprint) => {
+-            allocator.try_allocate_commit_generated(footprint, txg)
+-        }
++        PlacementRule::CommitGenerated(footprint) => allocator
++            .try_allocate_commit_generated_preferring_the_rewrite_set(
++                footprint,
++                txg,
++                rewrite_set_leaves,
++            ),
+     };
+     placement.map_err(|refusal| PublishError::PlacementRefused {
+         unit: identity,
+@@ -2472,6 +2480,33 @@
+     })
+ }
+ 
++/// 这次发布重写的角色里分配记录树的叶（层级 0），每块盘上都重写的那几片的序号：回落先取这些叶里的空槽
++/// （[`PoolAllocator::try_allocate_commit_generated_preferring_the_rewrite_set`]）。演练和真发读的都是同一串重写角色
++/// （`settle_the_allocation_record_tree` 交回的 `resolved.rewritten_roles`），所以两边得同一个集合、取同一串落点。
++fn rewrite_set_leaves_of_the_roles(
++    rewritten_roles: &[TransactionUnit],
++    allocator: &PoolAllocator,
++) -> RewriteSetLeaves {
++    let leaf_indices_per_device: Vec<BTreeSet<u64>> = allocator
++        .devices
++        .iter()
++        .map(|device_map| {
++            rewritten_roles
++                .iter()
++                .filter_map(|role| match allocation_record_tree_node_of_role(*role) {
++                    Some(AllocationRecordTreeNode::BelowTheRoot(position))
++                        if position.level == 0 && position.device == device_map.device =>
++                    {
++                        Some(position.index_in_device)
++                    }
++                    _ => None,
++                })
++                .collect()
++        })
++        .collect();
++    RewriteSetLeaves::present_on_every_device(&leaf_indices_per_device)
++}
++
+ /// 池里现行的那一版：还没发布过文件版本（树表 0 条，零单元发布或写行那次发布写出的根）、带文件的一版，
+ /// 或有树而文件集合为空的一版（D8（核心索引结构） 已定项 16 第 5 条，判定见 [`TransactionOutput::is_a_version_with_trees_and_no_file`]）。
+ /// 有树的两种由 [`PoolVersion::of_a_version_of_trees`] 按同一个判定分，不由调用方挑。
+@@ -13632,10 +13667,11 @@
+ /// （D26（后台整理与放置回收） 已定项 5 第 2 条、D3（空间分配） 已定项 7「分配代」口径），活 R 由分配器排除。
+ ///
+ /// # Errors
+-/// 取不到 ⇒ `PlacementRefused`，带着释放判定用的那个角色。
++/// 取不到 ⇒ `PlacementRefused`，带着释放判定用的那个角色。提交内生块的搬迁回落时同 [`allocate_placement_for_role`]，先取 `rewrite_set_leaves` 里的空槽。
+ fn allocate_relocation_destination(
+     allocator: &mut PoolAllocator,
+     relocation: &RelocationOfThePublish,
++    rewrite_set_leaves: &RewriteSetLeaves,
+ ) -> Result<Placement, PublishError> {
+     let rule = relocation.role_for_the_checks.placement();
+     let placement = match (allocator.compaction().switches.destination_policy, rule) {
+@@ -13646,7 +13682,11 @@
+         (
+             RelocationDestinationPolicy::UserDataPlacementForDataAndOpenSegmentForTheRest,
+             PlacementRule::CommitGenerated(footprint),
+-        ) => allocator.try_allocate_commit_generated(footprint, relocation.birth_txg),
++        ) => allocator.try_allocate_commit_generated_preferring_the_rewrite_set(
++            footprint,
++            relocation.birth_txg,
++            rewrite_set_leaves,
++        ),
+         (
+             RelocationDestinationPolicy::LowestUnblockedSlotForEveryUnitForTests,
+             PlacementRule::UserData,
+@@ -13924,11 +13964,13 @@
+             nodes_after.extend(nodes_holding_records(&geometry, rehearsal.records()));
+             continue;
+         }
++        let rewrite_set_leaves =
++            rewrite_set_leaves_of_the_roles(&resolved.rewritten_roles, allocator);
+         for relocation in &relocations_in_effect {
+-            allocate_relocation_destination(&mut rehearsal, relocation)?;
++            allocate_relocation_destination(&mut rehearsal, relocation, &rewrite_set_leaves)?;
+         }
+         for identity in &resolved.rewritten_roles {
+-            allocate_placement_for_role(&mut rehearsal, *identity, plan.txg)?;
++            allocate_placement_for_role(&mut rehearsal, *identity, plan.txg, &rewrite_set_leaves)?;
+         }
+         let changed =
+             nodes_whose_contents_changed(&geometry, previous_records, rehearsal.records());
+@@ -15584,10 +15626,12 @@
+     // 整理的一批：源落点上面已经随释放进了 defer；目的落点在这次重写的角色之前取（固定点里走的是同一串，`settle_the_allocation_record_tree`），
+     // 分配代写单元的诞生代。目的地定下之后，上一版拷一份、把搬走的单元的映射位置换到目的地（`take_the_mapping_positions_over_the_location_hints`）：
+     // 照抄这些单元的角色、装映射条目、重写它们的父节点与树表时，读的都是这一份。
++    let rewrite_set_leaves = rewrite_set_leaves_of_the_roles(rewritten, allocator);
+     let mut relocated_copies: Vec<(PublishedUnit, NamedUnit, UnitRelocatedByThisPublish)> =
+         Vec::with_capacity(relocations.len());
+     for relocation in relocations {
+-        let destination = allocate_relocation_destination(allocator, relocation)?;
++        let destination =
++            allocate_relocation_destination(allocator, relocation, &rewrite_set_leaves)?;
+         let destination_locations = pool.location_entries(destination.slot, &relocation.bytes);
+         let mut key_tail = [0u8; 10];
+         key_tail.copy_from_slice(&relocation.mapping_key[17..27]);
+@@ -15669,7 +15713,8 @@
+     // 落点先于内容：分配记录树要装自己那条（D3（空间分配） 已定项 5），所以这次重写的落点在装任何单元之前全部取定。
+     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
+     for identity in rewritten {
+-        let placement = allocate_placement_for_role(allocator, *identity, txg)?;
++        let placement =
++            allocate_placement_for_role(allocator, *identity, txg, &rewrite_set_leaves)?;
+         slots.insert(*identity, placement.slot);
+     }
+     // 这次的根要盖掉根环里的一个槽：落点都取完了、这次不再分配，在装记账行之前记下它——盖掉的是被抛弃的根就清它的隔离位，

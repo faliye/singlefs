@@ -1,0 +1,81 @@
+E209RESULT name=header for_item=files_100_units_100__plain__walk_forward twin=no build=plain profile=release opt_level=3 test_threads=31 histories=78f906c1a220cdd2 scripts=d2db955400c9d47f diff_file=e209-spike-cause-counters-diff-2026-11-13-r2.diff diff_lines=0 item_key=1a99e01abdbfc716b0eeb79354dc698d5934b3d6f5530e3ff080094f6de5c598
+E209RESULT name=source_sha256 file=crates/singlefs-core/src/transaction.rs sha256=d6b2083d2d950d7fc7eae9a61fee3fffd67f11df1f999be1df78a6265c3a628b
+E209RESULT name=source_sha256 file=crates/singlefs-core/src/allocation_record_tree.rs sha256=991623b6a9b5028eb692b8e88a3e6acaab6c1471c5302b23dffeb6f42ea958ce
+E209RESULT name=source_sha256 file=crates/singlefs-core/src/allocator.rs sha256=eb822f0920329af40400071c5b2f306b3fe92e1899fdca8984f5edf65a426faf
+E209RESULT name=anchor id=call_site_open file=crates/singlefs-core/src/transaction.rs line=13435 hits=1
+E209RESULT name=anchor id=call_site_close file=crates/singlefs-core/src/transaction.rs line=13445 hits=1
+E209RESULT name=anchor id=settle_begin file=crates/singlefs-core/src/transaction.rs line=14029 hits=1
+E209RESULT name=anchor id=round_begin file=crates/singlefs-core/src/transaction.rs line=14032 hits=1
+E209RESULT name=anchor id=round_resolved file=crates/singlefs-core/src/transaction.rs line=14051 hits=1
+E209RESULT name=anchor id=round_released file=crates/singlefs-core/src/transaction.rs line=14076 hits=1
+E209RESULT name=anchor id=round_after_the_release file=crates/singlefs-core/src/transaction.rs line=14084 hits=1
+E209RESULT name=anchor id=merge_begin_after_the_release file=crates/singlefs-core/src/transaction.rs line=14087 hits=1
+E209RESULT name=anchor id=merge_end_after_the_release file=crates/singlefs-core/src/transaction.rs line=14093 hits=1
+E209RESULT name=anchor id=round_after_the_placements file=crates/singlefs-core/src/transaction.rs line=14106 hits=1
+E209RESULT name=anchor id=round_settled file=crates/singlefs-core/src/transaction.rs line=14108 hits=1
+E209RESULT name=anchor id=merge_begin_after_the_placements file=crates/singlefs-core/src/transaction.rs line=14116 hits=1
+E209RESULT name=anchor id=merge_end_after_the_placements file=crates/singlefs-core/src/transaction.rs line=14122 hits=1
+E209RESULT name=anchor id=row_call_site_open file=crates/singlefs-core/src/transaction.rs line=2184 hits=1
+E209RESULT name=anchor id=row_call_site_close file=crates/singlefs-core/src/transaction.rs line=2186 hits=1
+E209RESULT name=anchor id=row_settle_begin file=crates/singlefs-core/src/transaction.rs line=2005 hits=1
+E209RESULT name=anchor id=row_round_begin file=crates/singlefs-core/src/transaction.rs line=2008 hits=1
+E209RESULT name=anchor id=row_round_resolved file=crates/singlefs-core/src/transaction.rs line=2038 hits=1
+E209RESULT name=anchor id=row_round_settled file=crates/singlefs-core/src/transaction.rs line=2063 hits=1
+E209RESULT name=anchor id=code_two_keys file=crates/singlefs-core/src/code_two_tree.rs line=691 hits=1
+E209RESULT name=anchor id=code_two_keys_zero_root file=crates/singlefs-core/src/code_two_tree.rs line=709 hits=1
+E209RESULT name=insertion_check scope=e207_counts edits=132 inserted_statement_lines_checked=205 problems=0
+E209RESULT name=e206_anchor_on_this_tree id=call_site_open hits=1
+E209RESULT name=e206_anchor_on_this_tree id=call_site_close hits=1
+E209RESULT name=e206_anchor_on_this_tree id=settle_begin hits=1
+E209RESULT name=e206_anchor_on_this_tree id=rounds_limit hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_begin hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_resolved hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_released hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_after_the_release hits=1
+E209RESULT name=e206_anchor_on_this_tree id=merge_after_the_release hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_after_the_placements hits=1
+E209RESULT name=e206_anchor_on_this_tree id=round_settled hits=1
+E209RESULT name=e206_anchor_on_this_tree id=merge_after_the_placements hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_call_site_open hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_call_site_close hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_settle_begin hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_round_begin hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_round_resolved hits=1
+E209RESULT name=e206_anchor_on_this_tree id=row_round_settled hits=1
+E209RESULT name=e206_anchor_on_this_tree id=code_two_keys hits=1
+E209RESULT name=e206_anchor_on_this_tree id=code_two_keys_zero_root hits=1
+E209RESULT name=anchor_e209 id=merge_end_after_the_release_gets_the_geometry hits=1
+E209RESULT name=anchor_e209 id=merge_end_after_the_placements_gets_the_geometry hits=1
+E209RESULT name=anchor_e209 id=record_fields hits=1
+E209RESULT name=anchor_e209 id=record_initial hits=1
+E209RESULT name=anchor_e209 id=thread_fields hits=1
+E209RESULT name=anchor_e209 id=merge_end_signature hits=1
+E209RESULT name=anchor_e209 id=first_merge_lists hits=1
+E209RESULT name=anchor_e209 id=settled_nodes hits=1
+E209RESULT name=anchor_e209 id=pointer_graph_in_the_first_round hits=1
+E209RESULT name=anchor_e209 id=node_functions hits=1
+E209RESULT name=point item=files_100_units_100__plain__walk_forward point=files_100_units_100 arm=plain script=walk_forward build=plain unit_area_slots=524288 unlinks=10 data_units=10 files=100 units_per_small_file=100 shape=small_files_of_units
+E209RESULT name=history item=files_100_units_100__plain__walk_forward user_changes=222 settle_calls=0 peak_rounds=0 peak_round_work=0 changes=123 changes_refused=0 floor_raises=0
+E209RESULT name=image_sha256 item=files_100_units_100__plain__walk_forward when=history_end sha256=24a6b0e387378eb0661abd6e5f6d588bad75610a2cb57368509116e9ba77b06e
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=1 operation=overwrite_first mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_first operation_index=1 user_units=1 old_units=1 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=2 operation=overwrite_old mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_old operation_index=2 user_units=100 old_units=100 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=3 operation=overwrite_mid mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_mid operation_index=3 user_units=100 old_units=100 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=4 operation=overwrite_late mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_late operation_index=4 user_units=100 old_units=100 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=5 operation=overwrite_young mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_young operation_index=5 user_units=100 old_units=100 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=6 operation=overwrite_first mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_first operation_index=6 user_units=1 old_units=1 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=7 operation=overwrite_old mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_old operation_index=7 user_units=1 old_units=1 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=8 operation=overwrite_mid mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_mid operation_index=8 user_units=1 old_units=1 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=9 operation=overwrite_late mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_late operation_index=9 user_units=1 old_units=1 new_units=1
+E209RESULT name=script_step item=files_100_units_100__plain__walk_forward step_index=10 operation=overwrite_young mount_epoch=0
+E209RESULT name=declared item=files_100_units_100__plain__walk_forward phase=script mount_epoch=0 operation=overwrite_young operation_index=10 user_units=1 old_units=1 new_units=1
+E209RESULT name=image_sha256 item=files_100_units_100__plain__walk_forward when=script_end sha256=0e1e3a8d97bddb379da2bc861d1687abd6e1c39af0e34dfb18402969b789144f
+E209RESULT name=item_done item=files_100_units_100__plain__walk_forward

@@ -1,0 +1,11 @@
+[package]
+name = "refusal-precheck-oracle-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "乙甲代码轮第一轮攻方腿的探针：只在冻结副本的拷贝里编，不进仓"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-verification = { path = "../singlefs-verification" }

@@ -1,0 +1,33 @@
+//! 两份实现不等价：`use` 路径里穿过的名字写成原始标识符 `r#Layered`。Rust 一份记「穿过」时去掉 `r#`（记 `Layered`），
+//! Python 一份照原文记 `r#Layered`；impl 头的头一个名字是 `Layered`，Rust 一份照 blanket 放行，Python 一份等 `Layered` 被点名。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub enum Layered<Inner> {
+    Plain(Inner),
+    Doubled(Inner),
+}
+
+impl<Inner: Store> Store for Layered<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        match self {
+            Self::Plain(inner) => inner.put(amount),
+            Self::Doubled(inner) => inner.put(amount) * 2,
+        }
+    }
+}
+
+use crate::r#Layered::Doubled;
+
+pub fn entry() -> u32 {
+    Doubled(Base).put(3)
+}

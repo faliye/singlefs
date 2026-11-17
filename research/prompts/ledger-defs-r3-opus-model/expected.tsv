@@ -1,0 +1,5 @@
+# 样本名<TAB>期望退出码（run-scope-guard.sh 照主 agent 判：输入里不带 agent_type）
+cargo-test-target-the-definition-grep-counts-as-enumerating	0
+cargo-test-registered-target-control	2
+prove-red-new-case-without-cwd	0
+prove-red-new-case-with-cwd-at-the-writer-copy	2

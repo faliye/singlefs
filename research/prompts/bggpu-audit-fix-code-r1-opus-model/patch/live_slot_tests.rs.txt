@@ -1,0 +1,60 @@
+
+    // ── 攻方模型（bggpu-audit-fix-code-r1）：只在冻结副本的拷贝里插进 `mod tests`，不进仓 ──
+    /// 丙段一批里同一个段出现两次：交回的是 `SameEntryKeyTwiceInOneBatch` 转成的出错，还是开头那一处整段清单断言先 panic。
+    /// 三种重复的摆法 × 两份核的结局（交成、出错）都试。
+    #[test]
+    fn attack_model_a_repeated_segment_meets_the_full_list_assertion_first() {
+        let unit_area = unit_area_of_three_segments();
+        let full = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+        let arrangements: Vec<(&str, Vec<ClusterSegmentEntryKey>)> = vec![
+            ("middle_segment_twice_in_place_of_the_last", vec![full[0], full[1], full[1]]),
+            ("last_segment_appended_again", vec![full[0], full[1], full[2], full[2]]),
+            ("first_segment_appended_again", vec![full[0], full[1], full[2], full[0]]),
+        ];
+        for (arrangement, segments) in arrangements {
+            for kernels_failed in [false, true] {
+                let both_kernel_live_slots: Result<Vec<(u64, u64)>, SameEntryKeyTwiceInOneBatch> =
+                    if kernels_failed {
+                        Err(SameEntryKeyTwiceInOneBatch {
+                            position_of_the_first_occurrence: 9,
+                            position_of_the_second_occurrence: 9,
+                        })
+                    } else {
+                        Ok(vec![(0, 0); segments.len()])
+                    };
+                let mut uncertainty = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
+                let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    reconciled_live_slots_of_the_segments(
+                        &[],
+                        unit_area,
+                        &segments,
+                        both_kernel_live_slots,
+                        &mut uncertainty,
+                    )
+                }));
+                let outcome = match caught {
+                    Ok(Ok(_reconciled)) => "outcome=reconciled".to_string(),
+                    Ok(Err(repeated)) => format!(
+                        "outcome=returned_error first={} second={}",
+                        repeated.position_of_the_first_occurrence,
+                        repeated.position_of_the_second_occurrence
+                    ),
+                    Err(payload) => format!(
+                        "outcome=panicked message={}",
+                        payload
+                            .downcast_ref::<String>()
+                            .cloned()
+                            .or_else(|| payload.downcast_ref::<&str>().map(|said| (*said).to_string()))
+                            .unwrap_or_default()
+                            .lines()
+                            .next()
+                            .unwrap_or("")
+                            .replace(char::is_whitespace, "_")
+                    ),
+                };
+                println!(
+                    "name=attack_model_live_slot arrangement={arrangement} kernels_failed={kernels_failed} {outcome}"
+                );
+            }
+        }
+    }

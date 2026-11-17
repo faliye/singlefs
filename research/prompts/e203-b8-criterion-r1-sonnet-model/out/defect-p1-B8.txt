@@ -1,0 +1,4 @@
+p1 B8     files      kinds=160 per_unit_kinds=0 {'no': 160}
+p1 B8     data_units kinds=160 per_unit_kinds=1 {'no': 160}
+p1 B8     unlinks    kinds=160 per_unit_kinds=0 {'no': 160}
+p1 B8     U          kinds=160 per_unit_kinds=0 {'grows': 160}

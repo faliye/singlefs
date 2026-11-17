@@ -1,0 +1,348 @@
+name=model segment=reconciliation_split products=2 retro_products=0 leaf_slots=812 internal_fanout=169 settling_rounds_at_most=64 disks=2
+name=verdict quantity=item_checks item=base__head item_done=true refused=none declared_lines=162 window_operations=162 declared_lines_match=true constants_match=true did_not_settle=0 rounds_at_the_limit=0 clause_violations=0 rewrite_set_shrank=0 settled_round_unclean=0 round_work_mismatches=0 window_shape_ok=true window_shape_mismatches=- negative_control_rounds=2 negative_control_ok=true
+name=verdict quantity=item_checks item=base__plain item_done=true refused=none declared_lines=162 window_operations=0 declared_lines_match=false constants_match=true did_not_settle=0 rounds_at_the_limit=0 clause_violations=0 rewrite_set_shrank=0 settled_round_unclean=0 round_work_mismatches=0 window_shape_ok=true window_shape_mismatches=- negative_control_rounds=not_in_this_point negative_control_ok=true
+name=op_row item=base__head state=same_mount operation=W1 operation_index=1 order=0 user_units=1 old_units=1 new_units=1 allocation_records=922 mapped_units=35 steps=2102 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=2 order=1 user_units=1 old_units=1 new_units=1 allocation_records=948 mapped_units=35 steps=2098 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=3 order=2 user_units=1 old_units=1 new_units=1 allocation_records=976 mapped_units=35 steps=2098 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=4 order=3 user_units=1 old_units=1 new_units=1 allocation_records=1004 mapped_units=35 steps=2098 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=5 order=4 user_units=1 old_units=1 new_units=1 allocation_records=1032 mapped_units=35 steps=2254 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=6 order=5 user_units=1 old_units=1 new_units=1 allocation_records=1040 mapped_units=35 steps=2254 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=7 order=6 user_units=1 old_units=1 new_units=1 allocation_records=1046 mapped_units=35 steps=2254 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=8 order=7 user_units=1 old_units=1 new_units=1 allocation_records=1052 mapped_units=35 steps=2258 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=9 order=8 user_units=1 old_units=1 new_units=1 allocation_records=1056 mapped_units=35 steps=2258 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=10 order=9 user_units=1 old_units=1 new_units=1 allocation_records=1062 mapped_units=35 steps=2258 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=11 order=10 user_units=1 old_units=1 new_units=1 allocation_records=1066 mapped_units=35 steps=2254 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=12 order=11 user_units=1 old_units=1 new_units=1 allocation_records=1072 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=13 order=12 user_units=1 old_units=1 new_units=1 allocation_records=1076 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=14 order=13 user_units=1 old_units=1 new_units=1 allocation_records=1080 mapped_units=35 steps=2034 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=15 order=14 user_units=1 old_units=1 new_units=1 allocation_records=1082 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=16 order=15 user_units=1 old_units=1 new_units=1 allocation_records=1086 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=17 order=16 user_units=1 old_units=1 new_units=1 allocation_records=1090 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=18 order=17 user_units=1 old_units=1 new_units=1 allocation_records=1094 mapped_units=35 steps=2022 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=19 order=18 user_units=1 old_units=1 new_units=1 allocation_records=1100 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=20 order=19 user_units=1 old_units=1 new_units=1 allocation_records=1104 mapped_units=35 steps=2030 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=21 order=20 user_units=1 old_units=1 new_units=1 allocation_records=1108 mapped_units=35 steps=2022 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=22 order=21 user_units=1 old_units=1 new_units=1 allocation_records=1114 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=23 order=22 user_units=1 old_units=1 new_units=1 allocation_records=1118 mapped_units=35 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=24 order=23 user_units=1 old_units=1 new_units=1 allocation_records=1122 mapped_units=35 steps=2030 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=25 order=24 user_units=1 old_units=1 new_units=1 allocation_records=1124 mapped_units=35 steps=3654 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=26 order=25 user_units=1 old_units=1 new_units=1 allocation_records=1126 mapped_units=35 steps=2262 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=27 order=26 user_units=1 old_units=1 new_units=1 allocation_records=1128 mapped_units=35 steps=3658 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=28 order=27 user_units=1 old_units=1 new_units=1 allocation_records=1128 mapped_units=35 steps=2262 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=29 order=28 user_units=1 old_units=1 new_units=1 allocation_records=1130 mapped_units=35 steps=2266 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=30 order=29 user_units=1 old_units=1 new_units=1 allocation_records=1132 mapped_units=35 steps=2262 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=31 order=30 user_units=1 old_units=1 new_units=1 allocation_records=1134 mapped_units=35 steps=2262 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W1 operation_index=32 order=31 user_units=1 old_units=1 new_units=1 allocation_records=1136 mapped_units=35 steps=2258 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=1 order=32 user_units=10 old_units=10 new_units=1 allocation_records=1140 mapped_units=35 steps=3763 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=2 order=33 user_units=1 old_units=1 new_units=1 allocation_records=1142 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=3 order=34 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=4 order=35 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=5 order=36 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=6 order=37 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=7 order=38 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=8 order=39 user_units=1 old_units=1 new_units=1 allocation_records=1144 mapped_units=25 steps=2030 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=9 order=40 user_units=1 old_units=1 new_units=1 allocation_records=1142 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=10 order=41 user_units=1 old_units=1 new_units=1 allocation_records=1142 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=11 order=42 user_units=1 old_units=1 new_units=1 allocation_records=1142 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=12 order=43 user_units=1 old_units=1 new_units=1 allocation_records=1142 mapped_units=25 steps=2002 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=13 order=44 user_units=1 old_units=1 new_units=1 allocation_records=1156 mapped_units=25 steps=2200 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=14 order=45 user_units=1 old_units=1 new_units=1 allocation_records=1182 mapped_units=25 steps=1982 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=15 order=46 user_units=1 old_units=1 new_units=1 allocation_records=1204 mapped_units=25 steps=1982 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=16 order=47 user_units=1 old_units=1 new_units=1 allocation_records=1226 mapped_units=25 steps=2200 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=17 order=48 user_units=1 old_units=1 new_units=1 allocation_records=1252 mapped_units=25 steps=2010 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=18 order=49 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=3626 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=19 order=50 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=20 order=51 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=21 order=52 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=22 order=53 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=23 order=54 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=24 order=55 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=25 order=56 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=26 order=57 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=27 order=58 user_units=1 old_units=1 new_units=1 allocation_records=1264 mapped_units=25 steps=2248 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=28 order=59 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2022 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=29 order=60 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2022 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=30 order=61 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=31 order=62 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=3638 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W2 operation_index=32 order=63 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2248 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=1 order=64 user_units=3 old_units=0 new_units=0 allocation_records=1270 mapped_units=25 steps=9301 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=2 order=65 user_units=3 old_units=0 new_units=0 allocation_records=1268 mapped_units=25 steps=9075 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=3 order=66 user_units=3 old_units=0 new_units=0 allocation_records=1268 mapped_units=25 steps=9071 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=4 order=67 user_units=3 old_units=0 new_units=0 allocation_records=1266 mapped_units=25 steps=9075 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=5 order=68 user_units=3 old_units=0 new_units=0 allocation_records=1264 mapped_units=25 steps=9075 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=6 order=69 user_units=3 old_units=0 new_units=0 allocation_records=1262 mapped_units=25 steps=9305 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=7 order=70 user_units=3 old_units=0 new_units=0 allocation_records=1260 mapped_units=25 steps=9301 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W3 operation_index=8 order=71 user_units=3 old_units=0 new_units=0 allocation_records=1258 mapped_units=25 steps=7326 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=1 order=72 user_units=1 old_units=1 new_units=1 allocation_records=1256 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=2 order=73 user_units=1 old_units=1 new_units=1 allocation_records=1256 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=3 order=74 user_units=1 old_units=1 new_units=1 allocation_records=1256 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=4 order=75 user_units=1 old_units=1 new_units=1 allocation_records=1256 mapped_units=25 steps=3546 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=5 order=76 user_units=1 old_units=1 new_units=1 allocation_records=1258 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=6 order=77 user_units=1 old_units=1 new_units=1 allocation_records=1258 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=7 order=78 user_units=1 old_units=1 new_units=1 allocation_records=1258 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=W4 operation_index=8 order=79 user_units=1 old_units=1 new_units=1 allocation_records=1258 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=same_mount operation=negative_control operation_index=1 order=80 user_units=1 old_units=1 new_units=1 allocation_records=1260 mapped_units=25 steps=1574 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=1 order=0 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=2 order=1 user_units=1 old_units=1 new_units=1 allocation_records=1262 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=3 order=2 user_units=1 old_units=1 new_units=1 allocation_records=1264 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=4 order=3 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=5 order=4 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=6 order=5 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=7 order=6 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=8 order=7 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2201 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=9 order=8 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=10 order=9 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=11 order=10 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=12 order=11 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2201 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=13 order=12 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=14 order=13 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=15 order=14 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=16 order=15 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=17 order=16 user_units=1 old_units=1 new_units=1 allocation_records=1272 mapped_units=25 steps=2201 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=18 order=17 user_units=1 old_units=1 new_units=1 allocation_records=1272 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=19 order=18 user_units=1 old_units=1 new_units=1 allocation_records=1274 mapped_units=25 steps=1967 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=20 order=19 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=21 order=20 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=1967 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=22 order=21 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=3562 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=23 order=22 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=24 order=23 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=25 order=24 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=26 order=25 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2201 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=27 order=26 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=28 order=27 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=29 order=28 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=30 order=29 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=31 order=30 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2201 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W1 operation_index=32 order=31 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=1 order=32 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=2 order=33 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=3 order=34 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=4 order=35 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=3622 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=5 order=36 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=6 order=37 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=7 order=38 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=3622 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=8 order=39 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=9 order=40 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=10 order=41 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=11 order=42 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=12 order=43 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=13 order=44 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=3630 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=14 order=45 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=15 order=46 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=16 order=47 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=17 order=48 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=18 order=49 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=19 order=50 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=20 order=51 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=21 order=52 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2026 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=22 order=53 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=3630 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=23 order=54 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=24 order=55 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=25 order=56 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=26 order=57 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=27 order=58 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=28 order=59 user_units=1 old_units=1 new_units=1 allocation_records=1278 mapped_units=25 steps=2256 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=29 order=60 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=30 order=61 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=31 order=62 user_units=1 old_units=1 new_units=1 allocation_records=1276 mapped_units=25 steps=2260 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W2 operation_index=32 order=63 user_units=1 old_units=1 new_units=1 allocation_records=1274 mapped_units=25 steps=2252 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=1 order=64 user_units=3 old_units=0 new_units=0 allocation_records=1274 mapped_units=25 steps=9301 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=2 order=65 user_units=3 old_units=0 new_units=0 allocation_records=1272 mapped_units=25 steps=9075 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=3 order=66 user_units=3 old_units=0 new_units=0 allocation_records=1270 mapped_units=25 steps=8226 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=4 order=67 user_units=3 old_units=0 new_units=0 allocation_records=1268 mapped_units=25 steps=9075 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=5 order=68 user_units=3 old_units=0 new_units=0 allocation_records=1266 mapped_units=25 steps=9073 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=6 order=69 user_units=3 old_units=0 new_units=0 allocation_records=1266 mapped_units=25 steps=9305 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=7 order=70 user_units=3 old_units=0 new_units=0 allocation_records=1264 mapped_units=25 steps=9079 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W3 operation_index=8 order=71 user_units=3 old_units=0 new_units=0 allocation_records=1262 mapped_units=25 steps=10600 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=1 order=72 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=2 order=73 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=1971 final_nodes=5 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=3 order=74 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=3554 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=4 order=75 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=5 order=76 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=6 order=77 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=7 order=78 user_units=1 old_units=1 new_units=1 allocation_records=1266 mapped_units=25 steps=2193 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=W4 operation_index=8 order=79 user_units=1 old_units=1 new_units=1 allocation_records=1268 mapped_units=25 steps=2197 final_nodes=7 flagged=false
+name=op_row item=base__head state=remounted operation=negative_control operation_index=1 order=80 user_units=1 old_units=1 new_units=1 allocation_records=1270 mapped_units=25 steps=1796 final_nodes=7 flagged=false
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=9 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=10 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=11 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=12 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=13 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=14 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=15 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=16 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=17 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=18 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=19 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=20 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=21 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=22 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=23 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=24 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=25 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=26 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=27 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=28 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=29 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=30 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=31 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W1 operation_index=32 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=9 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=10 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=11 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=12 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=13 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=14 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=15 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=16 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=17 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=18 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=19 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=20 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=21 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=22 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=23 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=24 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=25 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=26 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=27 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=28 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=29 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=30 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=31 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W2 operation_index=32 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W3 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=W4 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=same_mount operation=negative_control operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=9 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=10 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=11 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=12 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=13 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=14 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=15 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=16 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=17 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=18 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=19 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=20 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=21 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=22 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=23 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=24 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=25 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=26 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=27 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=28 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=29 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=30 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=31 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W1 operation_index=32 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=9 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=10 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=11 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=12 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=13 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=14 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=15 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=16 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=17 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=18 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=19 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=20 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=21 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=22 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=23 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=24 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=25 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=26 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=27 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=28 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=29 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=30 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=31 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W2 operation_index=32 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W3 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=2 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=3 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=4 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=5 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=6 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=7 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=W4 operation_index=8 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=op_pooled_fallback item=base__head state=remounted operation=negative_control operation_index=1 pooled_fallback_calls=0 pooled_fallback_steps=0 per_disk_fallback_steps=0 by_delta_arms_total=complete
+name=q6_spike_flags point=base state=same_mount operations=81 median_final_nodes=7 line=28 flagged=0 flagged_operations=- peak_steps=9305 peak_at=W3#6 final_steps=1574
+name=q6_spike_flags point=base state=remounted operations=81 median_final_nodes=7 line=28 flagged=0 flagged_operations=- peak_steps=10600 peak_at=W3#8 final_steps=1796
+name=q6_spike_flags point=base__plain state=same_mount operations=0 median_final_nodes=0 line=28 flagged=0 flagged_operations=- peak_steps=unread peak_at=unread final_steps=unread
+name=q6_spike_flags point=base__plain state=remounted operations=0 median_final_nodes=0 line=28 flagged=0 flagged_operations=- peak_steps=unread peak_at=unread final_steps=unread
+name=verdict quantity=void_frozen_publish operations=162 operations_without_the_reading=0 points_voided=0 voided_points=-
+name=verdict quantity=missing_pooled_fallback operations=162 operations_with_pooled_fallback_calls=0 points_marked=0 marked_points=-
+name=occupancy point=base units_per_small_file=1 mapped_units_at_the_history_end=35 change_share=0.0286 far_below_the_total=true
+name=verdict quantity=q7 flagged_operations=0 stale_chain_cause_holds_on=0 stale_chain_cause_fails_on=0
+name=f3_looser_instances count=0
+name=verdict quantity=sources_agree products=2 products_without_the_three_lines=1 files=3 files_with_more_than_one_value=0 agree=not_run
+name=verdict quantity=head_against_plain point=base operations=162 differing=1 first_differing=remounted/W2/5 remount_before_the_crash_same=true remount_after_the_mount_same=true
+name=verdict quantity=placement_gap point=base operations=162 negative=0 first_negative=- zero=38 positive=124
+name=verdict quantity=rerun_against_the_first_segment point=base settles=not_run
+name=verdict quantity=head_against_plain point=files_1000 operations=not_run
+name=verdict quantity=placement_gap point=files_1000 operations=not_run
+name=verdict quantity=rerun_against_the_first_segment point=files_1000 settles=not_run
+name=verdict quantity=state_rows_against_e206 point=base operations=not_run
+name=verdict quantity=state_rows_against_e206 point=files_1000 operations=not_run
+name=verdict quantity=state_rows_against_e206 point=files_10000 operations=not_run
+name=verdict quantity=reconciliation_split point=base outcome=not_run reason=head_differs
+name=verdict quantity=reconciliation_split point=files_1000 outcome=not_run reason=not_run

@@ -1,0 +1,33 @@
+//! 提到 `Any` 才开：入口参数的类型是别名 `Erased`（`dyn std::any::Any`），入口自己的词里没有 `Any`；入口里向下转型成 `Box<dyn Store>`。
+//! 盒子由闭包外的 `caller` 造。
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub type Erased = dyn std::any::Any;
+
+pub fn entry(thing: &Erased) -> u32 {
+    thing.downcast_ref::<Box<dyn Store>>().map_or(0, |store| store.put(3))
+}
+
+pub fn caller() -> u32 {
+    let boxed: Box<dyn Store> = Box::new(Wrapper(Base));
+    entry(&boxed)
+}

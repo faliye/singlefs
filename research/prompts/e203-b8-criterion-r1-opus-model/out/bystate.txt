@@ -1,0 +1,8 @@
+files same_mount raw_first=0.289 raw_peak=0.204 ratioRs_first=0.070 ratioRs_at_peak=0.083 ratioRs_max=0.063
+files remounted raw_first=0.201 raw_peak=0.178 ratioRs_first=0.064 ratioRs_at_peak=0.063 ratioRs_max=0.064
+data_units same_mount raw_first=0.095 raw_peak=0.978 ratioRs_first=0.058 ratioRs_at_peak=0.021 ratioRs_max=0.047
+data_units remounted raw_first=0.033 raw_peak=0.050 ratioRs_first=0.033 ratioRs_at_peak=0.034 ratioRs_max=0.033
+unlinks same_mount raw_first=0.178 raw_peak=0.094 ratioRs_first=0.033 ratioRs_at_peak=0.046 ratioRs_max=0.031
+unlinks remounted raw_first=0.072 raw_peak=0.073 ratioRs_first=0.025 ratioRs_at_peak=0.005 ratioRs_max=0.031
+unit_area same_mount raw_first=0.022 raw_peak=0.055 ratioRs_first=0.002 ratioRs_at_peak=-0.009 ratioRs_max=-0.002
+unit_area remounted raw_first=0.109 raw_peak=0.024 ratioRs_first=0.006 ratioRs_at_peak=0.001 ratioRs_max=-0.001

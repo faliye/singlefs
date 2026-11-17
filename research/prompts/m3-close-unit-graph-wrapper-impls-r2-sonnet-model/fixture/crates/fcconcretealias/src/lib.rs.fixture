@@ -1,0 +1,20 @@
+// 今天的规则本来就漏的一形（全具体类型的 impl，没有泛型参数）：impl 写在类型别名上，值照原名造
+pub trait ConcAliasDev {
+    fn conc_alias_read(&self) -> u8;
+}
+pub struct ConcAliasBase;
+impl ConcAliasDev for ConcAliasBase {
+    fn conc_alias_read(&self) -> u8 {
+        1
+    }
+}
+pub struct ConcAliasWrapper(pub ConcAliasBase);
+pub type ConcAliasName = ConcAliasWrapper;
+impl ConcAliasDev for ConcAliasName {
+    fn conc_alias_read(&self) -> u8 {
+        self.0.conc_alias_read() * 2
+    }
+}
+pub fn entry_concrete_alias() -> u8 {
+    ConcAliasWrapper(ConcAliasBase).conc_alias_read()
+}

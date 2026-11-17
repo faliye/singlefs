@@ -1,0 +1,16 @@
+// 对照：trait 名经 use 引进来，约束里只写 Device（入库测试 an_entry_whose_signature_names_the_trait_takes_the_implementation_for_the_wrapper_nobody_names 的形态）
+pub mod dev {
+    pub trait Device {
+        fn read_the_device(&self) -> u8;
+    }
+    pub struct Faulty<Inner>(pub Inner);
+    impl<Inner> Device for Faulty<Inner> {
+        fn read_the_device(&self) -> u8 {
+            0x52
+        }
+    }
+}
+use dev::Device;
+pub fn entry_use_bound<D: Device>(device: &D) -> u8 {
+    device.read_the_device()
+}

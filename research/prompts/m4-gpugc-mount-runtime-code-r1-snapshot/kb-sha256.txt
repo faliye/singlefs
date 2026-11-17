@@ -1,0 +1,4 @@
+eee29b59f934a9b1910ec5ab5ea7005ecf2650c268800803343991be9adab416  .claude/kb/decisions/26-后台整理与放置回收.md
+30695c2730f27f9aaf7b27f49b5941d14e8ccee2105809ba8c783bee3288c63e  .claude/kb/decisions/16-发布语义.md
+e7f4373916e2a97334bfc661e7c7f7d8e221acbd5d5c26d8f7ebe0f63e6253e5  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
+32abbe1a950ed59722baddffdd623644bf7a0d5619dc45a24d579377ea0a1529  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md

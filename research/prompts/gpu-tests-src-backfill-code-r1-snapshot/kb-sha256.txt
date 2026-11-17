@@ -1,0 +1,2 @@
+520ddeb221261ef294c45242cdce24ba724a0914302cc1f0613ae8b40028f2b1  research/prompts/e202-preregistration.md
+39a2f1fb72da056968c66617ecd13842f37cc60f974e900abe0536ee7897463a  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md

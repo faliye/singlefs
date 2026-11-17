@@ -1,0 +1,4 @@
+59d8175caef0f137ec864d970d8de5fd616725581d385585a1f1332f6be9d37a  .claude/kb/decisions/04-校验和位置.md
+df8522b5ebd34c6e3275fd095c91298775248afad27d8bff526ccd597f113526  .claude/kb/decisions/18-块里携带什么信息.md
+5d1ff265d6bdd4cea4d2094a12f9d2424b11687523058980d19d2b4fee05d7bc  .claude/kb/decisions/23-journal的角色与格式.md
+31cc6190582864baf324c14979924d768bbd195036f3ca0bbc732c9e160ce0c3  .claude/kb/checks-owed.md

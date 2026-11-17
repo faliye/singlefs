@@ -1,0 +1,19 @@
+E7RESULT name=r1_registered class=1 different_pairs=2 outcome_name_only=2 other_fields=0 unpaired_old=0 unpaired_new=0 diff_lines=4
+E7RESULT name=r1_registered_row old_line=30 new_line=30 kind=outcome_name_only fields=outcome:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r1_registered_row old_line=41 new_line=41 kind=outcome_name_only fields=outcome:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r1_unmasked class=1 different_pairs=2 outcome_name_only=2 other_fields=0 unpaired_old=0 unpaired_new=0 diff_lines=4
+E7RESULT name=r1_unmasked_row old_line=30 new_line=30 kind=outcome_name_only fields=outcome:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r1_unmasked_row old_line=41 new_line=41 kind=outcome_name_only fields=outcome:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r2_rows old_rows=3523 new_rows=3523 old_n=3523 new_n=3523 differs=false new_n_equals_results=true new_results=3523
+E7RESULT name=rf5 new_outcome_lines=2 path_run=true
+E7RESULT name=r3 verdict=照旧 geometries=9 same_rows=27 changed_rows=0 missing=0 extra=0 page_x3_holds=s4_g_min_64mib=true,s4_g_1=true,s4_g_4=true,s8_g_min_64mib=true,s8_g_1=true,s8_g_4=true page_claims=g_min_n_code_3_3_4=true,other_six_n_code_ge_21=true,nine_n_clause_ge_22=true
+E7RESULT name=r4 verdict=照旧 chosen=16:s16_g_min_128mib,4:s4_g_min_64mib,8:s8_g_min_64mib trial_same=13 trial_changed=2 trial_missing=0 trial_extra=0
+E7RESULT name=r4_trial_changed geometry=s4_g_min_32mib fields=end:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r4_trial_changed geometry=s16_g_min_64mib fields=end:stopped_at:sequential_write:NoSpaceAfterRaisingTheFloor:NoSpaceAfterRaisingTheFloor->stopped_at:sequential_write:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease:NoSpaceEvenWithEverythingAFloorRaiseCouldRelease
+E7RESULT name=r5 verdict=照旧 excess=s4_g_min_64mib:0,s4_g_1:0,s4_g_4:0,s8_g_min_64mib:2,s8_g_1:0,s8_g_4:0,s16_g_min_128mib:2,s16_g_1:2,s16_g_4:2 same_as_stored=9 changed=0
+E7RESULT name=r6 verdict=照旧 rows=3 n_code=21 changed=
+E7RESULT name=r7 verdict=第二段输入没变 differences=0
+E7RESULT name=r8 product_guard_lines=0 product_not_run=0 log_guard_not_run=0+0|0+0 total=0 ok=true
+E7RESULT name=r9 deterministic=true rows=3523/3523 diff_lines=0
+E7RESULT name=r1_candidate candidate=1 registered_class=1 unmasked_class=1 row_count_differs=false
+E7RESULT name=done emitted=18

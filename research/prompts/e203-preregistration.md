@@ -711,6 +711,51 @@ m1、m10 的数（推的，`python3 -I -c "print(2*(2*16384+5*256), 2*(3*2**30+5
 - **改了什么**：s36 的查询次数改成这一轮按差量要问的次数（这一轮进出 `mapped_units` 的角色数），与做法一致；s25 第二处查找补记调用数，计数与计时两个构建都重跑 18 个点（Y1 仍照修订 6 留给不指定范围那一趟）；计时报告的点轴值从同名计数产物取，取不到的点 Q3、Q10 报读不到、F3 报 unknown。
 - **比原来多要求什么（收严）**：s25 的步数按两处查找都记，B1 这一行只会更大；F3 读不到数时不再算「没打中」；s36 与同一行的做法对上。
 - **判据**：判据、阈值、臂、作废与停机条款一个字不改。
+### 修订 8：更正修订 7 的两处说法；B8 剩下那一格记「不稳定」、另量固定点；Q9 用户规模同样记外推不可信（用户与主 agent，2026-11-07，修订 7 重跑与推论轮 e203-forks-r2 判决之后）
+
+依据：判决 `research/prompts/e203-forks-r2-main-verification.md` 第二节。修订 7 重跑的合并报告任务 10180。主 agent 比新旧 base 计数产物：共有行 1412，calls 不同 60 行，steps 不同 0 行。用户定（弹窗原话「记「不稳定」，另量固定点」「先写 E203 实验页再定」）。
+
+- **更正**：修订 7「比原来多要求什么」里「s25 的步数按两处查找都记，B1 这一行只会更大」不成立：补记的只是调用数，步数一格不变。修订 7 把 s36 列在收严下也不成立：照原判据，D、F 两轴 12 格由任务 9595 的 12 格「随」变成任务 10180 的 11 格「不随」，是放宽；它在修订 7 里已记过一次输、全量重跑过，新定义的 B8 算新实验，被攻过零轮。
+- **记一次输**：照 F2 字面（任一种挂载状态、任一种被量的发布），任务 10180 `name=verdict clause=F2 fired=true`，原样记下；那一格是 `name=q6 axis=F state=same_mount kind=overwrite low_end=2102 high_end=152344 alpha=0.620064 band=GrowsWithTheAxis`，只出在 files_10000 同一次挂载覆盖写第 1 轮（固定点 22 轮），同一点第 2–5 轮与重挂载都不随。
+- **改了什么**：这一格照第八节第 1 条记「不稳定」，B8 这一行这一段不判翻面也不判站住，等固定点那一笔：另登记一个计数实验，量固定点为什么走到 22 轮、轮数上界的代价，量完照原判据再判。Q9 用户规模那几行用的外推与 Q4 同一套，F6 打中时同样记「外推不可信，不判」。
+- **比原来多要求什么（收严）**：B8 这一行多一个前提（固定点轮数那一笔量完）才判；Q9 的用户规模数不再作数。
+- **判据**：判据、阈值、臂、作废与停机条款一个字不改。
+
+### 修订 9：被测的分配器换了实现，s26 的步、s1 与 s24 的整份拷贝元素数、池级回落按叶取落点这三处的数法随之收严（执行员，2026-11-12，新树上还没重量之前；读数口径只收严，判据、门槛、取样点、各条的去留与报告方式一个字没动）
+
+- **为什么**：被测的产品代码换了实现。三份文件现在的 sha256 前 16 位：`crates/singlefs-core/src/allocator.rs` 61ac7a8f38b4b78d、`crates/singlefs-core/src/transaction.rs` d6b2083d2d950d7f、`crates/singlefs-core/src/admission.rs` 301ffb704c7c9f57；已出的第一段产物头 `name=source_sha256` 记的旧值是 `transaction.rs` 8bfdc6628feb2509、`allocation_record_tree.rs` 991623b6a9b50282、`allocator.rs` 329eb0744cfab392。新实现里：用户数据落点按「还有没挡偶数槽对的聚簇段」集合升序走，落进的那一段里按 2 槽步进逐对看；每块盘的空闲图多了四个随整份拷贝一起克隆的增量集合；提交内生块回落在每块盘各答一遍之后，池里再按分配记录树的叶取落点；固定点并重写集改走 `merge_into_the_rewrite_set_walking_the_release_chain`、循环变量改名 `round_index`。第一段旧产物（`research/results/` 下 E207 的 `*-head-2026-11-12*.out`）量在旧分配器上，被量的代码变了，作废、不引。这不是判据打中之后改口径：新树上第一段一项也还没重量，旧产物上也没有哪一条判据被拿来改口径。
+- **主 agent 定的（派发提示原文）**：
+  - 「s26 的步：认上一段的读法——走到集合里一段记 1 步、答案段内每看一对记 1 步，两条都留；上界「集合段数 + 32」。」
+  - 「s1 / s24 整份拷贝元素数：把 `DeviceFreeMap` 今天会随整份拷贝克隆的四个集合（`is_under_an_unreleased_record`、`slot_pairs_without_an_unreleased_record_per_segment`、`segments_with_an_unblocked_slot_pair`、`unblocked_slots_per_allocation_record_tree_leaf`）加进 `e203_whole_copy_elements`；加之前对着今天的 `DeviceFreeMap` 与 `PoolAllocator` 定义把字段清单从头对一遍（另一个会话的补丁可能已落，以现读为准），再有漏的一并加、报告列出。」
+  - 「池级回落按叶取落点那一段（`commit_generated_fallback_slot_open_on_every_device`、`slots_open_on_every_device_in_the_leaf`、`lowest_slot_open_on_every_device_in_the_leaf`）：开一行新计数（名字照登记已有的编号体系取下一个没用过的），逐叶、逐槽各数什么写清；它在准入之前走不走、在 B8 模型里归哪一项，照登记对「准入之前的步」的定义现读代码判，判不出的写进报告交主 agent。」
+  - 三样都照「只许收严、原判据与门槛一个字不动」办。
+- **每一处相对原口径多数了什么**：
+  - s26：原口径「每看一个候选对 1 步，候选里 `.any` 每比一个聚簇段再记 1 步」。新实现没有候选 × 聚簇段两层循环，改成：走到集合里的一段记 1 步（对应原来「比一个聚簇段」，问聚簇段集合与 `R` 各一次）、答案那一段里每看一对记 1 步（对应原来「看一个候选对」，至多 32 对）。两条都留；调用那一刻读的上界 = 集合里的段数 + 32。这一处步数的口径换了形状，数出来比原口径少（不再逐候选对走过聚簇段），不是多数；B8 式子表 s26 一行（`c26 × (L₆₄(S) + 32)`）不动：它写的是 B8 的做法、不是实现（E207 登记第三节「B8 不是实现」），吃的是调用次数 c26，与实现这一步走几段无关；模型单测里 s26 那一条只是对账函数的合成输入，随之只改了名字与注释、合成上界取 2 × (10 + 32) = 84。
+  - s1、s24：整份拷贝的元素数多数六个集合。四个是主 agent 点名的：`is_under_an_unreleased_record`（每个单元区槽一位）、`slot_pairs_without_an_unreleased_record_per_segment`（每段一格）、`segments_with_an_unblocked_slot_pair`（段号）、`unblocked_slots_per_allocation_record_tree_leaf`（每叶一格）。字段清单从头对一遍后再有的漏数两个：`PoolAllocator` 的 `allocation_record_tree_of_the_version_without_file`（有值时数它的记录条数与节点数之和）、`RootRingOccupancy` 的 `instance_table_judging_the_rereads` 里的行数。核对写进脚本：`--check-anchors` 对今天 `allocator.rs` 里 `DeviceFreeMap`、`PoolAllocator`、`RootRingOccupancy` 三个结构体的每个字段核，要么在助手里点了名、要么在脚本里写明不数的理由，多一个少一个都退 3。没数、写了理由的有两个：`frozen_publish`（只在发布落盘失败冻结时有值，被量的发布里是空；里面的字段在 `transaction.rs` 里私有）、`compaction`（里面 `quarantines_noted_by_the_publishes` 是 `compaction_plan.rs` 里私有的 `Vec`，没有取长度的访问器）；这两个留给主 agent 定要不要为它们在副本里加访问器。
+  - 池级回落按叶取落点：新开一行 s37 `pooled_fallback_by_the_leaf`（类型扫；号取清单里下一个没用过的）。一步的算法：重写集里走到的每片叶 1 步（`commit_generated_fallback_slot_open_on_every_device` 的 `find_map` 每进一次）；叶里每个候选 1 步、候选上每块盘的判各 1 步（`lowest_slot_open_on_every_device_in_the_leaf` 的 `while` 体与 `all` 闭包）；每块盘都空的单槽数逐槽数一遍：每槽 1 步、槽上每块盘的判各 1 步（`slots_open_on_every_device_in_the_leaf` 的 `filter` 闭包与 `all` 闭包）；单槽最多的那片叶的挑选：单元区罩到的每片叶 1 步（`lowest_slot_in_the_leaf_with_the_most_slots_open_on_every_device` 的 `for` 体，没有提前出口）、叶上每块盘读一次没挡槽数各 1 步。这最后一个函数不在主 agent 点名的三个里，但三个点名函数的前后各接着它与它里面的走法，不数它这一行就漏掉按叶线性走的那一段，所以并进同一行。每次调用记 1 次调用、整个函数体一个计时守卫。每块盘各取一次最低、最高叶序号的那一遍（盘数步）不记。
+  - s14、s25、s27、s28、s29：锚点随新实现的写法挪了位置，数的量不变（s29 仍是每块盘那一遍按盘回落的扫，池级回落另记在 s37）。E206 与 E203 的固定点循环头、并重写集两处锚点同样随新写法改了锚文，数的还是原来那个量（每轮、每次并入各一个读数点），没有多数也没有少数。
+- **它在准入之前走不走、在 B8 模型里归哪一项**：走。`try_allocate_commit_generated_preferring_the_rewrite_set` 由 `settle_the_allocation_record_tree` 的每一轮预演里的 `allocate_placement_for_role` 调（落在读法第 1 条的 S2），也被 S3 的真取落点与树表 0 条那一版的写行固定点调；一次回落只发生在每块盘都答回落（没有全空聚簇段）时，所以与 s29 同条件触发，每个取样点都可能走到 0 次。第五节 B8 式子表没有这一行，模型 `e203_admission_scan_cost.rs` 的 `ROW_TABLE`（35 行）与 E206、E207 两份模型的行表也没有它，因此这一行的步数进产物行、不进 B1 与 B8 的合计；要不要加进行表、B8 一列写什么式子，登记里读不出，交主 agent 定。
+- **判据**：判据、阈值、臂、作废与停机条款、取样点、第六、七、九节各条的去留与报告方式一个字不改。
+
+### 修订 10：s37 池级回落按叶取落点的归属定了，整份拷贝里 `compaction` 改成数、`frozen_publish` 改成每个被量的发布读一次（执行员，2026-11-12，新树上还没重量之前；读数口径只收严，判据、门槛、取样点、各条的去留与报告方式一个字没动）
+
+- **为什么**：修订 9 把 s37 的归属、`compaction` 与 `frozen_publish` 两个字段交主 agent 定，主 agent 定了，这一条把定下的落进装置与登记。三份被测文件此刻的 sha256 前 16 位：`allocator.rs` f124997462f3a4ad、`transaction.rs` d6b2083d2d950d7f、`admission.rs` 7cc59211bf6fcbee。与修订 9 记的相比，`transaction.rs` 没变，`allocator.rs`（61ac7a8f38b4b78d）与 `admission.rs`（301ffb704c7c9f57）因另一个会话的补丁落地而变了；变了之后把修订 9 与本条涉及的全部锚点（`allocator.rs` 的 s14、s25–s29、s37 各函数头与锚文、`admission.rs` 的三个函数头与锚文）与整份拷贝的字段清单（`DeviceFreeMap` 26 个、`PoolAllocator` 19 个、`RootRingOccupancy` 6 个字段）对新内容用只读脚本重核，函数头与锚文各恰好命中一次、字段清单没有漏数也没有多余，数的量没变。新树上第一段 12 项仍一项没重量。
+- **主 agent 定的（派发提示原文）**：
+  - 「量的那一侧（B1，今天的实现）：s37 在准入之前的段（P0、S1、S2）里的步数进 B1 的扫类合计，S3 里的照登记读法归准入之后、照报不进合计（与 s25–s29 在 S3 里的数同样处置，登记第 166 行「s35 不用：准入之后真取落点那一格就是 s25–s29 在 S3 里的数」）。」
+  - 「推的那一侧（B8、B4）：不给 s37 编式子（B8 对这一步的做法没人定过）。写死一条报告条款：每个取样点、每种发布报 c37（准入之前的调用次数）；c37 = 0 的点 B8、B4 合计照常；c37 > 0 的点，那一点的 B8、B4 合计标「缺 s37 一行，只对清单内的步」，不拿这一点判 B8 站不站得住，报告里列出这些点与它们各自的 s37 步数、s29 步数；岔路单第 9、10、11 行的够判条件落在这种点上的，停下交主 agent（要先由设计员给 B8 定这一步的做法）。」
+  - 「s37 与 s29 同条件触发（每块盘都答回落）；登记第 194 行那一句「s29 在所有取样点上都是 0」是推的，这一段不改它，重量之后以读数为准。」
+  - 「整份拷贝里没数的两个字段。`compaction` 里的 `quarantines_noted_by_the_publishes` 要数——在副本里给它加取长度的助手，产品源码不动；加不了（私有到追加助手也够不着）就写明够不着在哪一层、停下交主 agent。`frozen_publish` 不数，另加一条读数：被量的每次发布读一次它是不是空，不空的那一点整点作废并报出来。」
+  - 「多并进 s37 的那个函数（`lowest_slot_in_the_leaf_with_the_most_slots_open_on_every_device`）：认，留在 s37 里。」
+  - 以上都照「只许收严、判据门槛取样点不动、产物一项没重量之前写进登记修订」办。
+- **每一处落成什么**：
+  - s37 量的一侧：模型 `e203_admission_scan_cost.rs` 的 `ROW_TABLE` 加这一行（36 行，类型扫），准入之前三段（P0、S1、S2）里的步数自然进 B1 扫类合计（`scan_rows()`），S3 的步照报不进合计；`RECONCILED_ROWS` 加一行，关系取「调过 ⇔ 有步」（s37 只记步、没有表长可比，所以不核表长；每次调用至少走一片叶，调过没有步、没调过却有步都算不符）。E206、E207 两份模型的行表（`CALLED_ROWS`）各加这一行，读调用次数 pooled_fallback_calls。
+  - s37 推的一侧：三份模型的 B8 式子表都不加 s37 一行，B8、B4 合计里它是 0。报告条款：E203 模型打 `name=by_delta_pooled_fallback`（每点每状态每种发布一行：pooled_fallback_calls、s37 步数、s29 步数、B8 合计与 `by_delta_arms_total=complete|missing_pooled_fallback_row_only_for_the_listed_steps`）与 `name=verdict quantity=by_delta_pooled_fallback`；E207 模型打 `name=op_pooled_fallback`（每次操作一行）与 `name=verdict quantity=missing_pooled_fallback`（标记的操作数、点数与点名）；E206 模型打 `name=by_delta_pooled_fallback`（每份产物一行）。pooled_fallback_calls > 0 的点，B8、B4 合计只对清单内的步，不拿这一点判 B8 站不站得住；岔路单第 9、10、11 行的够判条件落在这种点上的，读报告的执行员停下交主 agent，要先由设计员给 B8 定这一步的做法。
+  - `compaction`：`e203_whole_copy_elements` 加 `self.compaction.clone().take_the_quarantines_noted_by_the_publishes().len()`。够得着：`take_the_quarantines_noted_by_the_publishes` 是 `compaction_plan.rs` 里已有的公开方法，对克隆调用不改原值，所以不用加访问器、产品源码不动；这一笔只在计数构建的助手里算，不进任何步数。脚本里 `compaction` 从「不数、有理由」移到「数」，`--check-anchors` 的字段核对照旧。
+  - `frozen_publish`：不数长度；E203 的规模读数行（histories 的 `state_text`）与 E206、E207 共用的 `state_line` 各加字段 `frozen_publish_set`，值取产品里已有的公开访问器 `allocator.frozen_publish().is_some()`，被量的每次发布做之前读一次。不空（值 1）的点整点作废：E203 模型 `points_with_a_frozen_publish` 把该点的读数从计数与计时产物里整点拿掉、打 `name=void_frozen_publish` 与 `name=verdict clause=void_frozen_publish`；E207 模型同名函数照此作废并打 `name=verdict quantity=void_frozen_publish`。产物里没带这个字段的格另报个数（`cells_without_the_reading`、`operations_without_the_reading`），不当「空」也不当「不空」。
+- **相对原口径多数了什么**：B1 扫类合计多了 s37 在准入之前三段里的步（修订 9 起就在产物行里，这一条只把它归进合计）；整份拷贝元素数多了 `compaction` 里隔离落点的条数；多了一条作废（冻结的发布）。每一处都只会让量更大或让点被作废，没有放宽。
+- **判据**：判据、阈值、臂、作废与停机条款、取样点、第六、七、九节各条的去留与报告方式一个字不改；新加的两条报告（pooled_fallback_calls 标记、冻结作废）都是在原有判据之外多打的行，不改任何一格的判法。
+- **改名（产物之前，只改名字不改判法）**：上面新加的报告键名与 verdict 的 quantity 值去掉字母加数字的代号，换成说出是什么的名字：`c37` 改 `pooled_fallback_calls`，`s37_steps` 改 `pooled_fallback_steps`，`s29_steps` 改 `per_disk_fallback_steps`，`b8_total` 改 `by_delta_total`，`b8_b4_total` 改 `by_delta_arms_total`，`b8_pooled_fallback` 改 `by_delta_pooled_fallback`，`missing_s37` 改 `missing_pooled_fallback`（连同 `…_row_only_for_the_listed_steps` 与 `…_above_zero` 变成 `…_with_pooled_fallback_calls` 的键名）。上面引主 agent 原话的两条不改。三份模型同一套。
+
 ## 十三、读过的文件与跑过的命令
 
 ### 读过的文件（行区间；grep 命中行也列）
@@ -751,5 +796,5 @@ grep -E 'MemTotal|MemAvailable' /proc/meminfo; nproc; cat .claude/heavy-thread-d
 独立单位：每个取样点 × 每个构建是一个单位（一条用例、一份产物），两两独立；同一个点的两种挂载状态共用前面那一段历史，写在同一条用例里先量「同一次挂载」再重挂载量，不拆。
 线程：取登记值 `.claude/heavy-thread-default` 的 31；编译照服务给的线程；计数构建的用例按点并行（第一段 8 条、第二段 10 条用例，至多 31 条线程）；计时构建一条线程（`--test-threads=1`）；模型与变异照 `mutate.sh` 的并行度。
 串行：计时构建的全部用例一条接一条，因为几条一起跑会抢内存带宽与缓存、挂钟不可比；同一条用例里历史各步、两种挂载状态、5 轮之间串行，因为后一步读前一步留下的那一版；计数构建与计时构建之间没有次序，可以同时编、同时跑，但计时构建跑的时候不与别的重活同机（由服务排）。
-预计挂钟：第一段约 50 分钟（推的：两次 release 编译各约 10 分钟，没量过；计数历史并行约 5 分钟，u = 10⁴ 那一点约 3 × 10⁴ 次发布 × 每次约 2 毫秒；计时历史串行约 8 分钟；变异 15 条约 15 分钟）；第二段约 2 小时（推的：编译 20 分钟；Y1 = 10⁵ 次删约 3 × 10⁵ 次发布 × 每次约 4–8 毫秒 ≈ 20–40 分钟，计数构建并行时它最长；计时构建串行约 60 分钟）；第三段约 40 分钟（推的：编译 20 分钟；X2 每份分配器 7784618016 字节、一次发布拷 3–6 份，每份推的约 1–2 秒，历史约 50 次发布 ≈ 每个构建 10 分钟）。第二段过 2 小时：分片单元是上面「独立单位」那一格的一个单位；续跑入口是 `e203-admission-scan-cost-run.sh` 同一条命令重起，只补末行没有 `E203RESULT name=item_done` 的单位。第三段的常驻峰值推的约 31 GB（4 份分配器同时活着 × 7.8 GB），撞内存上限由服务报，那一点记「本次未跑」。
+预计挂钟：第一段约 50 分钟（推的：两次 release 编译各约 10 分钟，没量过；计数历史并行约 5 分钟，u = 10⁴ 那一点约 3 × 10⁴ 次发布 × 每次约 2 毫秒；计时历史串行约 8 分钟；变异 15 条约 15 分钟）；第二段约 2 小时（推的：编译 20 分钟；Y1 = 10⁵ 次删约 3 × 10⁵ 次发布 × 每次约 4–8 毫秒 ≈ 20–40 分钟，计数构建并行时它最长；计时构建串行约 60 分钟）；第三段约 40 分钟（推的：编译 20 分钟；X2 每次发布拷 3–6 份分配器，一次发布推的约 10–12 秒，历史约 50 次发布，50 次 × 12 秒 ≈ 10 分钟）。第二段过 2 小时：分片单元是上面「独立单位」那一格的一个单位；续跑入口是 `e203-admission-scan-cost-run.sh` 同一条命令重起，只补末行没有 `E203RESULT name=item_done` 的单位。第三段的常驻峰值推的约 31 GB（4 份分配器同时活着 × 7.8 GB），撞内存上限由服务报，那一点记「本次未跑」。
 预计在用核数：第一段编译时 31 个核，计数历史约 8 个核（8 条用例），计时 1 个核，变异至多 31 个核；第二段编译 31 个、计数约 10 个、计时 1 个；第三段编译 31 个、跑时 1–2 个（推的，依据是上面「线程」一行与用例条数）。

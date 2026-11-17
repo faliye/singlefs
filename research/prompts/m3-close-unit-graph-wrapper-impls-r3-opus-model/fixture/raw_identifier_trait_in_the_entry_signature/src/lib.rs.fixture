@@ -1,0 +1,30 @@
+//! 两份实现不等价：入口签名写 `&dyn r#Store`。Rust 一份的签名 trait 名去掉 `r#`、开 `Store`；Python 一份的 `entry_signature_traits` 取原文
+//! `r#Store`，`impls_of_trait` 里没有这个键，不开。今天两份都靠 blanket 放行收 `Wrapper` 的 impl，收严之后 Python 一份不收。
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry(store: &dyn r#Store) -> u32 {
+    store.put(3)
+}
+
+pub fn caller() -> u32 {
+    entry(&Wrapper(Base))
+}

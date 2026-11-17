@@ -1,0 +1,15 @@
+// 对照：入口的泛型约束写成带路径的 trait 名（D: dev::Device）：`::` 的第二个冒号后面紧跟 Device，也算写在 trait 位置的名字，照开
+pub mod dev {
+    pub trait Device {
+        fn read_the_device(&self) -> u8;
+    }
+    pub struct Faulty<Inner>(pub Inner);
+    impl<Inner> Device for Faulty<Inner> {
+        fn read_the_device(&self) -> u8 {
+            0x52
+        }
+    }
+}
+pub fn entry_path_bound<D: dev::Device>(device: &D) -> u8 {
+    device.read_the_device()
+}

@@ -1,0 +1,22 @@
+// 擦除在一个单元里（提到 Any），向下转型的目标 Box<dyn Held> 写在另一个单元里（不提 Any）
+use std::any::Any;
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub static SLOT: Mutex<Option<Box<dyn Any + Send>>> = Mutex::new(None);
+pub fn typed<T: 'static>(value: &(dyn Any + Send)) -> Option<&T> {
+    value.downcast_ref::<T>()
+}
+pub fn entry_any_split() -> u8 {
+    let slot = SLOT.lock().unwrap();
+    slot.as_ref()
+        .and_then(|value| typed::<Box<dyn Held>>(&**value))
+        .map_or(0, |held| held.read_the_held())
+}

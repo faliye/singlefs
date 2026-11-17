@@ -1,0 +1,10 @@
+# 辩方腿自己的夹具，一行一格，制表符分隔五段：格名、crate 名、Rust 一份的入口、Python 一份的入口（<文件>::之后那一截）、原文（在那个 crate 的 lib.rs 里恰好一次；它所在的那一行落在哪个 fn 单元的行区间里，那个单元就是「被看的 impl 方法」）。
+form11_field_dyn	fcfield	fcfield::Session::entry_field_dyn	<impl Session>::entry_field_dyn	self.0.field_read() ^ 1
+form11_impl_bound	fcbound	fcbound::Holder::entry_bound	<impl Holder < Device >>::entry_bound	self.0.bound_read() ^ 1
+form11_nested_field	fcnested	fcnested::Outside::entry_nested	<impl Outside>::entry_nested	self.0.nested_read() ^ 1
+form11_alias_field	fcalias	fcalias::Session::entry_alias_field	<impl Session>::entry_alias_field	self.0.alias_dev_read() ^ 1
+form11_trait_head	fctrait	fctrait::Runner::entry_trait_default	<trait Runner>::entry_trait_default	self.0.trait_dev_read() ^ 1
+control_named_wrapper	fccontrol	fccontrol::entry_control	entry_control	self.0.control_read() ^ 1
+control_never_named_wrapper	fccontrol	fccontrol::entry_control	entry_control	self.0.control_read() ^ 2
+status_quo_concrete_enum_variant	fcconcreteenum	fcconcreteenum::entry_concrete_enum	entry_concrete_enum	inner.conc_enum_read() * 2
+status_quo_concrete_alias_impl	fcconcretealias	fcconcretealias::entry_concrete_alias	entry_concrete_alias	self.0.conc_alias_read() * 2

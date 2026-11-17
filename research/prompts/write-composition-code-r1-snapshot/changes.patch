@@ -1,0 +1,118 @@
+--- a/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+@@ -203,6 +203,104 @@
+     assert(overwritten_bytes(overwritten_bytes(seq![0u8, 0], 1, seq![2u8]), 0, seq![1u8, 1])[1] == 1);
+ }
+ 
++/// 分割点可落在请求的任一端；两段的边界字节既不能遗漏，也不能重复使用错误的偏移。
++pub proof fn lemma_split_overwrite_equals_one_write(
++    original_bytes: Seq<u8>, write_start: int, written_bytes: Seq<u8>, split_offset: int,
++)
++    requires
++        overwrite_fits(original_bytes, write_start, written_bytes),
++        0 <= split_offset <= written_bytes.len(),
++    ensures
++        overwrite_fits(original_bytes, write_start, written_bytes.subrange(0, split_offset)),
++        overwrite_fits(
++            overwritten_bytes(original_bytes, write_start, written_bytes.subrange(0, split_offset)),
++            write_start + split_offset, written_bytes.subrange(split_offset, written_bytes.len() as int)),
++        overwritten_bytes(
++            overwritten_bytes(original_bytes, write_start, written_bytes.subrange(0, split_offset)),
++            write_start + split_offset, written_bytes.subrange(split_offset, written_bytes.len() as int))
++            == overwritten_bytes(original_bytes, write_start, written_bytes),
++{
++    let leading_bytes = written_bytes.subrange(0, split_offset);
++    let trailing_bytes = written_bytes.subrange(split_offset, written_bytes.len() as int);
++    let after_leading_write = overwritten_bytes(original_bytes, write_start, leading_bytes);
++    let after_split_write = overwritten_bytes(after_leading_write, write_start + split_offset, trailing_bytes);
++    let after_whole_write = overwritten_bytes(original_bytes, write_start, written_bytes);
++    assert forall|byte: int| 0 <= byte < original_bytes.len() implies
++        #[trigger] after_split_write[byte] == after_whole_write[byte] by {
++        if write_start <= byte < write_start + split_offset {
++            assert(leading_bytes[byte - write_start] == written_bytes[byte - write_start]);
++        } else if write_start + split_offset <= byte < write_start + written_bytes.len() {
++            assert(trailing_bytes[byte - (write_start + split_offset)] == written_bytes[byte - write_start]);
++        }
++    }
++    assert(after_split_write =~= after_whole_write);
++}
++
++/// 不要求两段互斥或等长；交集取后写字节，只被先写覆盖的字节保留先写值，其余保留原值。
++pub proof fn lemma_overlapping_overwrites_keep_the_latest_byte(
++    original_bytes: Seq<u8>, earlier_start: int, earlier_bytes: Seq<u8>, later_start: int, later_bytes: Seq<u8>,
++)
++    requires
++        overwrite_fits(original_bytes, earlier_start, earlier_bytes),
++        overwrite_fits(original_bytes, later_start, later_bytes),
++    ensures
++        overwrite_fits(overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes),
++        overwritten_bytes(overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes).len()
++            == original_bytes.len(),
++        forall|byte: int| 0 <= byte < original_bytes.len()
++            && later_start <= byte < later_start + later_bytes.len() ==>
++            #[trigger] overwritten_bytes(overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes)[byte]
++                == later_bytes[byte - later_start],
++        forall|byte: int| 0 <= byte < original_bytes.len()
++            && !(later_start <= byte < later_start + later_bytes.len())
++            && earlier_start <= byte < earlier_start + earlier_bytes.len() ==>
++            #[trigger] overwritten_bytes(overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes)[byte]
++                == earlier_bytes[byte - earlier_start],
++        forall|byte: int| 0 <= byte < original_bytes.len()
++            && !(later_start <= byte < later_start + later_bytes.len())
++            && !(earlier_start <= byte < earlier_start + earlier_bytes.len()) ==>
++            #[trigger] overwritten_bytes(overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes)[byte]
++                == original_bytes[byte],
++{
++    lemma_overwrite_changes_exactly_the_requested_bytes(original_bytes, earlier_start, earlier_bytes);
++    lemma_overwrite_changes_exactly_the_requested_bytes(
++        overwritten_bytes(original_bytes, earlier_start, earlier_bytes), later_start, later_bytes);
++}
++
++/// 用具体字节钉住分割端点和重叠优先级，避免只让两个抽象表达式互相作证。
++pub proof fn witness_split_and_overlapping_overwrite_bytes()
++    ensures
++        overwrite_fits(seq![1u8, 2, 3, 4, 5, 6], 1, seq![7u8, 8, 9]),
++        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![7u8]), 2, seq![8u8, 9])
++            == seq![1u8, 7, 8, 9, 5, 6],
++        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, Seq::<u8>::empty()), 1, seq![7u8, 8, 9])
++            == seq![1u8, 7, 8, 9, 5, 6],
++        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![7u8, 8, 9]), 4, Seq::<u8>::empty())
++            == seq![1u8, 7, 8, 9, 5, 6],
++        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![7u8, 8, 9]), 2, seq![4u8, 5])
++            == seq![1u8, 7, 4, 5, 5, 6],
++        overwritten_bytes(overwritten_bytes(seq![1u8, 2, 3, 4, 5, 6], 1, seq![7u8]), 4, seq![9u8])
++            == seq![1u8, 7, 3, 4, 9, 6],
++{
++    let original_bytes = seq![1u8, 2, 3, 4, 5, 6];
++    let written_bytes = seq![7u8, 8, 9];
++    lemma_split_overwrite_equals_one_write(original_bytes, 1, written_bytes, 1);
++    lemma_split_overwrite_equals_one_write(original_bytes, 1, written_bytes, 0);
++    lemma_split_overwrite_equals_one_write(original_bytes, 1, written_bytes, 3);
++    lemma_overlapping_overwrites_keep_the_latest_byte(original_bytes, 1, written_bytes, 2, seq![4u8, 5]);
++    lemma_overlapping_overwrites_keep_the_latest_byte(original_bytes, 1, seq![7u8], 4, seq![9u8]);
++    assert(written_bytes.subrange(0, 1) =~= seq![7u8]);
++    assert(written_bytes.subrange(1, 3) =~= seq![8u8, 9]);
++    assert(written_bytes.subrange(0, 0) =~= Seq::<u8>::empty());
++    assert(written_bytes.subrange(0, 3) =~= written_bytes);
++    assert(written_bytes.subrange(3, 3) =~= Seq::<u8>::empty());
++    assert(overwritten_bytes(original_bytes, 1, written_bytes) =~= seq![1u8, 7, 8, 9, 5, 6]);
++    assert(overwritten_bytes(overwritten_bytes(original_bytes, 1, written_bytes), 2, seq![4u8, 5])
++        =~= seq![1u8, 7, 4, 5, 5, 6]);
++    assert(overwritten_bytes(overwritten_bytes(original_bytes, 1, seq![7u8]), 4, seq![9u8])
++        =~= seq![1u8, 7, 3, 4, 9, 6]);
++}
++
+ /// 重写从写入起点开始；跨过已有尾部时，未满的旧尾单元也必须重写。
+ pub fn first_unit_to_rewrite(first_written: u64, existing: u64, tail_is_partial: bool) -> (first: u64)
+     ensures
+--- a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
++++ b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+@@ -391,3 +391,8 @@
+ gpu-score-theorem-needs-permutation	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	        original.to_multiset() == sorted.to_multiset(),\n        records_are_sorted(sorted)	        records_are_sorted(sorted)	proof_errors=1	landing=theorem_sorted_search_equals_full_record_walk
+ gpu-score-counter-needs-record-bound	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	0 <= visited <= records.len() <= u32::MAX,	0 <= visited <= records.len(),	proof_errors=1	landing=lemma_every_walk_prefix_fits_the_gpu_counter
+ gpu-score-witness-is-checked	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	pub proof fn witness_scoring_search_with_duplicates_and_crossing_records() {	pub proof fn witness_scoring_search_with_duplicates_and_crossing_records() {\n    assert(false);	proof_errors=1	landing=witness_scoring_search_with_duplicates_and_crossing_records
++overwrite-split-must-equal-the-whole-write	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == overwritten_bytes(original_bytes, write_start, written_bytes),	            != overwritten_bytes(original_bytes, write_start, written_bytes),	proof_errors=1	landing=lemma_split_overwrite_equals_one_write
++overwrite-overlap-must-keep-later-bytes	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	                == later_bytes[byte - later_start],	                == original_bytes[byte],	proof_errors=1	landing=lemma_overlapping_overwrites_keep_the_latest_byte
++overwrite-overlap-must-preserve-earlier-survivors	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	                == earlier_bytes[byte - earlier_start],	                == original_bytes[byte],	proof_errors=1	landing=lemma_overlapping_overwrites_keep_the_latest_byte
++overwrite-overlap-must-preserve-untouched-bytes	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	                == original_bytes[byte],	                != original_bytes[byte],	proof_errors=1	landing=lemma_overlapping_overwrites_keep_the_latest_byte
++overwrite-composition-witness-rejects-earlier-overlap-byte	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == seq![1u8, 7, 4, 5, 5, 6],	            == seq![1u8, 7, 8, 5, 5, 6],	proof_errors=1	landing=witness_split_and_overlapping_overwrite_bytes

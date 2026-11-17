@@ -1,0 +1,4 @@
+//! 没有哪个 `mod` 声明这份文件：它不属于任何编译目标，rustc 不编它。
+pub struct Holder {
+    pub extra: Box<dyn Extra>,
+}

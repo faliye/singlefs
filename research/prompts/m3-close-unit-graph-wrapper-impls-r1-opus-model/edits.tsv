@@ -1,0 +1,12 @@
+# 每个夹具一行，制表符分隔五段：crate 名、单元图入口（crate 名之后的路径）、驱动程序里调的函数、改动的原文、替换文。
+# 原文在那个 crate 的 lib.rs 里恰好一次；它所在的那一行落在哪个 fn 单元的行区间里，那个单元就是「被改的 impl 方法」。
+impl_written_on_a_generic_alias	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+enum_built_from_an_imported_variant	entry	entry	inner.put(amount) * 2	inner.put(amount) * 3
+enum_built_from_a_glob_imported_variant	entry	entry	inner.put(amount) * 2	inner.put(amount) * 3
+external_type_sharing_a_private_type_name	entry	entry	value * amount * 2	value * amount * 3
+external_type_sharing_a_type_name_in_another_crate	entry	entry	.unwrap_or(0) * amount * 2	.unwrap_or(0) * amount * 3
+associated_type_name_in_the_self_type	entry	entry	.unwrap_or(0) * amount * 2	.unwrap_or(0) * amount * 3
+generic_parameter_sharing_a_type_name	entry	entry	self.amount() * amount * 2	self.amount() * amount * 3
+wrapper_built_by_the_caller_of_an_open_entry	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+wrapper_reached_through_a_renamed_reexport	make::entry	make::entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+wrapper_named_in_the_entry	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3

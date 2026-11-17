@@ -1,0 +1,3 @@
+079b7072cb390e4024babe4616a6877f47c5f9121168450d028ebc8c8592d7f8  .claude/kb/experiments/158-择根与修复四岔路.md
+ca8a89016444f34685680747035b61bd5e60948c32844b553a142bc23e3c6e7a  .claude/kb/experiments/174-借据丢掉时等待与显存回还.md
+b0329b62f9ff334b676037f439d5b781f98bf5ec20ae3318cca52be88dfb5ddf  .claude/kb/experiments/178-叶容器与记录死亡的计数.md

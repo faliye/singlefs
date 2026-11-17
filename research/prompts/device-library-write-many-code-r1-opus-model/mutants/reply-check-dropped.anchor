@@ -1,0 +1,2 @@
+    if reply != "written" {
+        give_up_on_reply(&reply, asked);

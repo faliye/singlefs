@@ -1,0 +1,15 @@
+// 入口是 trait 里的缺省方法，约束写在 trait 头的超 trait 上
+pub trait TraitDev {
+    fn trait_dev_read(&self) -> u8;
+}
+pub struct TraitFaulty<Inner>(pub Inner);
+impl<Inner: TraitDev> TraitDev for TraitFaulty<Inner> {
+    fn trait_dev_read(&self) -> u8 {
+        self.0.trait_dev_read() ^ 1
+    }
+}
+pub trait Runner: TraitDev {
+    fn entry_trait_default(&self) -> u8 {
+        self.trait_dev_read()
+    }
+}

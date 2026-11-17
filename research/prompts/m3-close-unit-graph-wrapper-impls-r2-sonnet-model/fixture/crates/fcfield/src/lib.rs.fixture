@@ -1,0 +1,18 @@
+// 入口接收者的字段是 Box<dyn Trait>：闭包里没有单元点名 FieldFaulty，入口签名也不写 dyn 与约束
+pub trait FieldDev {
+    fn field_read(&self) -> u8;
+}
+pub struct FieldFaulty<Inner>(pub Inner);
+impl<Inner: FieldDev> FieldDev for FieldFaulty<Inner> {
+    fn field_read(&self) -> u8 {
+        self.0.field_read() ^ 1
+    }
+}
+pub struct Session {
+    pub dev: Box<dyn FieldDev>,
+}
+impl Session {
+    pub fn entry_field_dyn(&self) -> u8 {
+        self.dev.field_read()
+    }
+}

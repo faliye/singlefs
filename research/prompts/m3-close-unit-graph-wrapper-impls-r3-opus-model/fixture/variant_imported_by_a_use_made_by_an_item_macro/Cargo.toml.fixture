@@ -1,0 +1,2 @@
+[package]
+name = "variant_imported_by_a_use_made_by_an_item_macro"

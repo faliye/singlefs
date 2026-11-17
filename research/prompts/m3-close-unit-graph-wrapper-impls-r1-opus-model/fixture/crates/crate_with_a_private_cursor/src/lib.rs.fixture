@@ -1,0 +1,9 @@
+//! 只放一个私有的 `Cursor`（与 `crates/singlefs-verification/src/crash_facts.rs` 那个同形）：别的 crate 不依赖它、也看不见它。
+#[allow(dead_code)]
+struct Cursor {
+    at: usize,
+}
+
+pub fn nothing() -> u32 {
+    0
+}

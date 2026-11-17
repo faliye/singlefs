@@ -1,0 +1,8 @@
+                let header = format!("write {relative} {}\n", text.len()).into_bytes();
+                if let Err(error) = ends.requests.write_all(&header) {
+                    give_up(OTHER_ERROR_EXIT_CODE, &format!("{asked}：写不进转交判定库的管道：{error}"));
+                }
+                drop(ends);
+                let Backend::Relay(relay_ends) = &*self.backend else { unreachable!() };
+                let mut ends = relay_ends.lock().expect("变异：重新拿锁");
+                send_write_request_and_wait_for_written(&mut ends, text.as_bytes(), &asked);

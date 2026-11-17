@@ -1,0 +1,39 @@
+//! 第五条「没有 `use` 的路径从它身上穿过去」只认 use 单元：`use crate::Layered::Doubled;` 写在 `macro_rules!` 的展开式里、由条目级宏调用
+//! 造出来，不是 use 单元，`Layered` 不进「路径穿过的名字」。入口照引进来的变体 `Doubled` 造值，`Layered` 没人写。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub enum Layered<Inner> {
+    Plain(Inner),
+    Doubled(Inner),
+}
+
+impl<Inner: Store> Store for Layered<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        match self {
+            Layered::Plain(inner) => inner.put(amount),
+            Layered::Doubled(inner) => inner.put(amount) * 2,
+        }
+    }
+}
+
+macro_rules! bring_in_the_doubling_variant {
+    () => {
+        use crate::Layered::Doubled;
+    };
+}
+
+bring_in_the_doubling_variant!();
+
+pub fn entry() -> u32 {
+    Doubled(Base).put(3)
+}

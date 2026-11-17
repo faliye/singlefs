@@ -1,0 +1,34 @@
+//! 「入口在 trait 头下时开这个 trait」对父 trait：入口是 `Source::total`（trait 自带体），`Source` 的父 trait 写成高阶 `for<'a> Store<'a>`，
+//! 唯一的 `Source` impl 是 blanket、约束同样写成高阶。开 `Source` 时取约束只认紧跟 `:` 的名字（这里是 `for`），`Store` 不开；
+//! `self.put` 按 R-方法 落到 `Store` 的成员，`Wrapper` 的 impl 等 `Wrapper` 被点名。`self` 是闭包外的 `caller` 造的 `Wrapper<Base>`。
+pub trait Store<'a> {
+    fn put(&self, amount: &'a u32) -> u32;
+}
+
+pub struct Base;
+
+impl<'a> Store<'a> for Base {
+    fn put(&self, amount: &'a u32) -> u32 {
+        *amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<'a, Inner: Store<'a>> Store<'a> for Wrapper<Inner> {
+    fn put(&self, amount: &'a u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub trait Source: for<'a> Store<'a> {
+    fn total(&self) -> u32 {
+        self.put(&3)
+    }
+}
+
+impl<Thing> Source for Thing where Thing: for<'a> Store<'a> {}
+
+pub fn caller() -> u32 {
+    Wrapper(Base).total()
+}

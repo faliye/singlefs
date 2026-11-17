@@ -1,0 +1,2 @@
+adb06b5004eb4c3ec8ded7b666d62f145aa8d5e06c5d46fc2f9b6859ecf9ff07  .claude/kb/decisions/03-空间分配.md
+7cbef007d196e18e0c11bbf246ea1c30d8253336c3dcac2ec786af21179e6e34  .claude/kb/decisions/26-后台整理与放置回收.md

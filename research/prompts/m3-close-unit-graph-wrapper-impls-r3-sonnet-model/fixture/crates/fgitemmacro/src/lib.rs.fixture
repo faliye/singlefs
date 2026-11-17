@@ -1,0 +1,27 @@
+// 对照：条目级宏调用里写 static（花括号调用、不是 thread_local!）：这一格走 ItemMacroInvocation 那一支，入库测试没有一条走到它
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+macro_rules! holder {
+    ($($body:tt)*) => {
+        $($body)*
+    };
+}
+holder! {
+    pub static REGISTRY: Mutex<Vec<Box<dyn Held + Send>>> = Mutex::new(Vec::new());
+}
+pub fn entry_item_macro() -> u8 {
+    REGISTRY
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

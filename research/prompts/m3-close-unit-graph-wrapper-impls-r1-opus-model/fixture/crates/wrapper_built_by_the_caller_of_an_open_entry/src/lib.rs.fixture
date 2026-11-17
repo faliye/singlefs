@@ -1,0 +1,40 @@
+//! 入口签名是 `&dyn Source`（R-开放）；开放进来的 `Adapter<Inner>` 的方法调 `Inner` 的 `put`，`Inner` 是调用方（闭包外）造的 `Wrapper<Base>`。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub trait Source {
+    fn total(&self) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub struct Adapter<Inner>(pub Inner);
+
+impl<Inner: Store> Source for Adapter<Inner> {
+    fn total(&self) -> u32 {
+        self.0.put(3)
+    }
+}
+
+pub fn entry(source: &dyn Source) -> u32 {
+    source.total()
+}
+
+pub fn caller() -> u32 {
+    entry(&Adapter(Wrapper(Base)))
+}

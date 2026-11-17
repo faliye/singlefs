@@ -1,0 +1,316 @@
+
+    // ── 攻方模型（bggpu-audit-fix-code-r1）：只在冻结副本的拷贝里插进 `mod tests`，不进仓 ──
+    // 替身卡的量代价照产品那一份走账（`GpuInUse::measured_cost_of_one_submission` 经
+    // `both_kernel_outcomes_of_a_checksum_chunk` 先 `hold` 再交、超时记成还在跑），开关是
+    // `cost_measured_through_the_checksum_chunk`（apply_model.py 加进替身卡的字段）。
+
+    fn attack_model_payload_text(payload: &(dyn std::any::Any + Send)) -> String {
+        payload
+            .downcast_ref::<&str>()
+            .map(|said| (*said).to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "（不是字符串）".to_string())
+            .replace(char::is_whitespace, "_")
+    }
+
+    /// 交一次切换（`switch` 改外壳），接住 panic；交回一行结局。
+    fn attack_model_switch_outcome(
+        background_gpu: &mut BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>,
+        switch: impl FnOnce(&mut BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>),
+    ) -> String {
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            switch(&mut *background_gpu);
+        }));
+        match caught {
+            Ok(()) => {
+                let card_at_one = background_gpu.cards_on_this_host.iter().find(|card| {
+                    card.discrete_gpu.identifier == card_identifier("0000:01:00.0")
+                });
+                format!(
+                    "outcome=returned card_at_one_open={} card_at_one_running={} card_at_one_measurements={}",
+                    card_at_one.is_some(),
+                    card_at_one.is_some_and(|card| card
+                        .budget
+                        .memory_account()
+                        .has_a_submission_running_past_its_wait()),
+                    card_at_one.map_or(0, |card| card.cost_measurements),
+                )
+            }
+            Err(payload) => format!(
+                "outcome=panicked message={}",
+                attack_model_payload_text(payload.as_ref())
+            ),
+        }
+    }
+
+    /// 两张替身卡（「0000:01:00.0」量代价照产品走账、「0000:41:00.0」照旧）。`measured_at_the_mount` 为假时
+    /// 「0000:01:00.0」开卡时没量代价（产品：挂载时因显存上限晾下，`CostAtTheOpening::NotMeasuredForTheGpuIsLeftOut`）。
+    fn attack_model_two_cards(
+        measured_at_the_mount: bool,
+    ) -> BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests> {
+        let mut card_at_one = CardComputedOnTheCpuForTests::of_the_address("0000:01:00.0", None, 0);
+        card_at_one.cost_measured_through_the_checksum_chunk = true;
+        if !measured_at_the_mount {
+            card_at_one.measured_cost = None;
+        }
+        let card_at_forty_one =
+            CardComputedOnTheCpuForTests::of_the_address("0000:41:00.0", None, 0);
+        let (background_gpu, _present) = background_gpu_over_cards_on_the_cpu(
+            vec![card_at_one, card_at_forty_one],
+            &GpuMemoryLeakedInThisProcess::with_nothing_leaked(),
+        );
+        background_gpu
+    }
+
+    /// 历史甲（前缀）：「0000:01:00.0」没量过代价、被晾下；切换请回来，量代价那一次提交等超过上限（记成还在跑）。
+    fn attack_model_prefix_measurement_timed_out_at_a_switch(
+    ) -> (BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>, String) {
+        let mut background_gpu = attack_model_two_cards(false);
+        let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds();
+        let leaving_it_out = settings_admitted_on_the_cards(
+            &background_gpu,
+            None,
+            vec![smallest_piece_bytes - 1, 1 << 30],
+        );
+        let left_out = attack_model_switch_outcome(&mut background_gpu, |gpu| {
+            gpu.use_the_settings_from_the_next_batch(&leaving_it_out);
+        });
+        background_gpu.cards_on_this_host[0]
+            .submissions_timing_out
+            .push_back(true);
+        let bringing_it_back =
+            settings_admitted_on_the_cards(&background_gpu, None, vec![1 << 30, 1 << 30]);
+        let brought_back = attack_model_switch_outcome(&mut background_gpu, |gpu| {
+            gpu.use_the_settings_from_the_next_batch(&bringing_it_back);
+        });
+        let not_split = format!("{:?}", background_gpu.batch_not_split_over_the_gpus())
+            .chars()
+            .take(40)
+            .collect::<String>()
+            .replace(char::is_whitespace, "_");
+        (
+            background_gpu,
+            format!(
+                "prefix_left_out[{left_out}] prefix_brought_back[{brought_back}] batch_not_split={not_split}"
+            ),
+        )
+    }
+
+    /// 历史乙（前缀）：「0000:01:00.0」量过代价、参与；一批校验和头一次交等超过上限、之后三回等前一次都没等到——
+    /// 报这张卡用不了，账上照旧记着还在跑的那次提交；切换给它装不下最小一片的上限（晾下）。
+    fn attack_model_prefix_batch_timed_out_then_left_out(
+    ) -> (BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>, String) {
+        let mut background_gpu = attack_model_two_cards(true);
+        {
+            let card_at_one = &mut background_gpu.cards_on_this_host[0];
+            card_at_one.submissions_timing_out = VecDeque::from([true]);
+            card_at_one.earlier_submission_waits_timing_out = VecDeque::from([true, true, true]);
+        }
+        let unit_bytes = unit_bytes_of(1, 1000);
+        let batch = background_gpu.both_kernel_outcomes_of_the_batch(&units_to_verify(&unit_bytes));
+        let batch_said = match &batch {
+            Ok(_outcomes) => "ok".to_string(),
+            Err(failed) => format!("{failed:?}")
+                .chars()
+                .take(60)
+                .collect::<String>()
+                .replace(char::is_whitespace, "_"),
+        };
+        let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds();
+        let leaving_it_out = settings_admitted_on_the_cards(
+            &background_gpu,
+            None,
+            vec![smallest_piece_bytes - 1, 1 << 30],
+        );
+        let left_out = attack_model_switch_outcome(&mut background_gpu, |gpu| {
+            gpu.use_the_settings_from_the_next_batch(&leaving_it_out);
+        });
+        (
+            background_gpu,
+            format!("prefix_batch={batch_said} prefix_left_out[{left_out}]"),
+        )
+    }
+
+    /// 前缀之后由用户定的那一次切换，放开扫的五种。
+    fn attack_model_user_switches(
+        background_gpu: &BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>,
+    ) -> Vec<(&'static str, Option<AdmittedGpuSettings>)> {
+        let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds();
+        let held_on_the_card_at_one = background_gpu.cards_on_this_host[0]
+            .budget
+            .memory_account()
+            .bytes_held();
+        vec![
+            (
+                "both_named_large_limit",
+                Some(settings_admitted_on_the_cards(background_gpu, None, vec![1 << 30, 1 << 30])),
+            ),
+            (
+                "both_named_limit_just_holding_the_smallest_piece",
+                Some(settings_admitted_on_the_cards(
+                    background_gpu,
+                    None,
+                    vec![held_on_the_card_at_one + smallest_piece_bytes, 1 << 30],
+                )),
+            ),
+            (
+                "both_named_limit_one_byte_short",
+                Some(settings_admitted_on_the_cards(
+                    background_gpu,
+                    None,
+                    vec![held_on_the_card_at_one + smallest_piece_bytes - 1, 1 << 30],
+                )),
+            ),
+            (
+                "only_the_other_card_named",
+                Some(settings_admitted_on_the_cards(
+                    background_gpu,
+                    Some(vec![card_identifier("0000:41:00.0")]),
+                    vec![1 << 30],
+                )),
+            ),
+            ("switched_to_the_cpu", None),
+        ]
+    }
+
+    fn attack_model_sweep(
+        history: &str,
+        prefix: fn() -> (BackgroundGpuOverTheCards<CardComputedOnTheCpuForTests>, String),
+    ) {
+        let (probe_gpu, _prefix_said) = prefix();
+        let switch_names: Vec<&'static str> = attack_model_user_switches(&probe_gpu)
+            .into_iter()
+            .map(|(name, _settings)| name)
+            .collect();
+        drop(probe_gpu);
+        for switch_name in switch_names {
+            let (mut background_gpu, prefix_said) = prefix();
+            let settings = attack_model_user_switches(&background_gpu)
+                .into_iter()
+                .find(|(name, _settings)| *name == switch_name)
+                .expect("同一份名单")
+                .1;
+            let held_before = background_gpu.cards_on_this_host[0]
+                .budget
+                .memory_account()
+                .bytes_held();
+            let outcome = attack_model_switch_outcome(&mut background_gpu, |gpu| match &settings {
+                Some(settings) => gpu.use_the_settings_from_the_next_batch(settings),
+                None => gpu.use_no_gpu_from_the_next_batch(),
+            });
+            println!(
+                "name=attack_model history={history} user_switch={switch_name} bytes_held_on_the_card_at_one_before={held_before} {prefix_said} {outcome}"
+            );
+        }
+    }
+
+    #[test]
+    fn attack_model_measurement_at_a_switch_on_a_card_with_a_submission_still_running() {
+        attack_model_sweep(
+            "measurement_timed_out_at_a_switch",
+            attack_model_prefix_measurement_timed_out_at_a_switch,
+        );
+        attack_model_sweep(
+            "batch_timed_out_then_left_out",
+            attack_model_prefix_batch_timed_out_then_left_out,
+        );
+    }
+
+    /// 对照：没有还在跑的提交时，照产品走账的量代价在请回来那一刻照常量成（替身卡这条路本身不 panic）。
+    #[test]
+    fn attack_model_control_bring_back_without_a_running_submission() {
+        let mut background_gpu = attack_model_two_cards(true);
+        let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds();
+        let leaving_it_out = settings_admitted_on_the_cards(
+            &background_gpu,
+            None,
+            vec![smallest_piece_bytes - 1, 1 << 30],
+        );
+        background_gpu.use_the_settings_from_the_next_batch(&leaving_it_out);
+        let bringing_it_back =
+            settings_admitted_on_the_cards(&background_gpu, None, vec![1 << 30, 1 << 30]);
+        let outcome = attack_model_switch_outcome(&mut background_gpu, |gpu| {
+            gpu.use_the_settings_from_the_next_batch(&bringing_it_back);
+        });
+        println!(
+            "name=attack_model_control history=no_running_submission user_switch=both_named_large_limit {outcome}"
+        );
+    }
+
+    /// 暂存口径的独立核：照 `ChunkFootprint::bytes_held_by_a_chunk`（连同暂存的那个数）逐个比切批的判与切片，
+    /// 不经 `chunk_fits_with_the_staging_of_its_input` 与 `largest_piece_input_bytes` 的折算。线性同余取样，种子写死。
+    #[test]
+    fn attack_model_staging_arithmetic_sweep() {
+        use crate::memory_limit_and_chunks::{
+            chunks_that_fit_on_the_gpu, pieces_cut_to_fit_on_the_gpu, ChunkBoundsOfAGpu,
+            ChunkFootprint, PieceOfAnEntry,
+        };
+        let mut state: u64 = 0x5EED_0B66_A0D1_7001;
+        let mut next = |bound: u64| -> u64 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) % bound
+        };
+        let (mut fit_cases, mut fit_disagreements) = (0_u64, 0_u64);
+        let (mut cut_cases, mut chunks_over_the_limit, mut pieces_not_largest, mut cut_refusals_wrong) =
+            (0_u64, 0_u64, 0_u64, 0_u64);
+        for _case in 0..200_000 {
+            let footprint = ChunkFootprint {
+                bytes_per_chunk_besides_the_entries: next(300),
+                bytes_per_entry_besides_its_input: next(120),
+                bytes_per_entry_in_the_largest_entry_buffer: 1 + next(16),
+            };
+            let limit = next(6000);
+            let bounds = ChunkBoundsOfAGpu {
+                memory_limit: Some(singlefs_core::background_compute::GpuMemoryInBytes(limit)),
+                largest_storage_binding_in_bytes: 1 << 40,
+                largest_entry_count_per_dispatch: 1 << 40,
+            };
+            let input = next(4000);
+            fit_cases += 1;
+            let judged = chunks_that_fit_on_the_gpu(&[input], footprint, bounds).is_ok();
+            let by_the_staging_arithmetic = footprint.bytes_held_by_a_chunk(input, 1) <= limit;
+            if judged != by_the_staging_arithmetic {
+                fit_disagreements += 1;
+            }
+            let entry_count = 1 + next(5);
+            let lengths: Vec<u64> = (0..entry_count).map(|_entry| next(4000)).collect();
+            cut_cases += 1;
+            match pieces_cut_to_fit_on_the_gpu(&lengths, footprint, bounds) {
+                Ok(chunks) => {
+                    for chunk in &chunks {
+                        let input_of_the_chunk: u64 =
+                            chunk.iter().map(PieceOfAnEntry::input_byte_count).sum();
+                        let held = footprint.bytes_held_by_a_chunk(
+                            input_of_the_chunk,
+                            u64::try_from(chunk.len()).expect("小"),
+                        );
+                        if held > limit {
+                            chunks_over_the_limit += 1;
+                        }
+                        for piece in chunk {
+                            let whole = lengths[piece.entry_position];
+                            let piece_bytes = piece.input_byte_count();
+                            let is_cut = piece_bytes < whole;
+                            let is_last_piece = piece.input_bytes.end == whole;
+                            if is_cut
+                                && !is_last_piece
+                                && footprint.bytes_held_by_a_chunk(piece_bytes + 4, 1) <= limit
+                            {
+                                pieces_not_largest += 1;
+                            }
+                        }
+                    }
+                }
+                Err(_smallest_piece) => {
+                    if footprint.bytes_held_by_a_chunk(1, 1) <= limit {
+                        cut_refusals_wrong += 1;
+                    }
+                }
+            }
+        }
+        println!(
+            "name=attack_model_staging_arithmetic fit_cases={fit_cases} fit_disagreements={fit_disagreements} cut_cases={cut_cases} chunks_over_the_limit={chunks_over_the_limit} pieces_not_largest={pieces_not_largest} cut_refusals_wrong={cut_refusals_wrong}"
+        );
+    }

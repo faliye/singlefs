@@ -1,0 +1,18 @@
+// 向下转型的目标是一个别名，别名里写 dyn：提到 Any 的单元里没有 dyn，写 dyn 的别名单元里没有 Any
+use std::any::Any;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub type HeldBox = Box<dyn Held>;
+pub fn held_in(value: &dyn Any) -> Option<&HeldBox> {
+    value.downcast_ref::<HeldBox>()
+}
+pub fn entry_any_alias(value: &dyn Any) -> u8 {
+    held_in(value).map_or(0, |held| held.read_the_held())
+}

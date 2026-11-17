@@ -1,0 +1,2287 @@
+diff --git a/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md b/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
+new file mode 100644
+index 000000000..69054f9c9
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
+@@ -0,0 +1,117 @@
++# GPU GC 形式化验证的覆盖与边界
++
++入口是 [gpu_gc_proofs.rs](gpu_gc_proofs.rs)。这些性质补充 GPU GC 的仲裁、计数、算术与准入；已有根环、旧读者、回退和崩溃协议证明不重复计入。G01–G20 各有独立契约和必红变异，常量、递归终止与见证不占这 20 项的名额。
++
++容量与资源记账的 G21–G30 位于 [gpu_gc_capacity_proofs.rs](gpu_gc_capacity_proofs.rs)：整批准入、最大输入、收紧上限、预留、释放、等待完成后释放、失败折半、派发覆盖、映射表占用及追加输入准入。这些是产品直接调用的可执行核；并不证明外层资源账本所有调用都符合协议。
++
++## 两份打分算法的归纳证明
++
++[gpu_gc_scoring_proofs.rs](gpu_gc_scoring_proofs.rs) 的 `theorem_sorted_search_equals_full_record_walk` 将二分查找、候选窗口、逐槽计数和排列组合起来：对任意长度不超过 `u32::MAX` 的合法记录序列，排序后的搜索算法与原始无序表逐记录求交的精确总和相等。重复记录保留重数。证明不枚举固定条数、固定槽号或固定循环次数。
++
++证明链包括：
++
++- `lower_bound_of_sorted_records` 对二分循环状态 `(below, above)` 归纳，验证前缀/后缀不变量、下标界限与严格递减量，得到完整下界性质；下界不是输入假设。
++- `lemma_candidate_window_keeps_every_contribution` 从两端的下界性质及最大跨度推导：窗内全是目标设备，窗外贡献为零。下界使用饱和减法，覆盖从段前伸入的记录。
++- `lemma_counting_slots_equals_interval_intersection` 对跨度归纳，从逐槽成员判定推导交集长度。
++- `lemma_search_prefix_matches_the_walk` 对已访问记录数归纳，证明裁剪窗口与整表扫描的前缀对应。
++- `lemma_permuting_records_preserves_the_walk` 以多重集合相等为排列条件，利用已验证的可交换 fold 引理证明排序保持总和。
++- `lemma_every_walk_prefix_fits_the_gpu_counter` 证明每个扫描前缀的值介于 0 与 `已访问条数 × 65535`，因此装得进 u64。没有假设总分不超过段长。
++
++前提是排序表按 `(device, start)` 非降、排序保持整个记录的多重集合、记录起止有效且跨度不超过 65535、记录数装得进 u32、段为有效的 u64 非空半开区间。非空见证含重复、异盘、释放及跨段记录；另有空表见证。
++
++这是**算法模型的机器检查证明**，不是 WGSL 源码的直接验证。二分模型以递归表示每一次循环状态转移，使用数学整数并证明中间值落在 u32 范围内；逐槽模型使用完整整数槽号。WGSL 的实际双字操作、排序索引解引用、缓冲区布局与派发到该模型的精化仍未证明。主机的 `sort_by_key` 确实建立上述排列与有序前提，也仍须另证。不得把此定理称为整个 GPU GC 已验证。
++
++复跑算法模块（`VERUS` 取下文固定工具路径，提交后核对并确认任务）：
++
++```sh
++task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
++  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
++  --verify-only-module gpu_gc_scoring_proofs crates/singlefs-replay-prefix/src/lib.rs
++
++task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
++  --item must-red:gpu-score-binary-skips-entry \
++  --item must-red:gpu-score-window-too-narrow \
++  --item must-red:gpu-score-search-counts-released \
++  --item must-red:gpu-score-permutation-needs-multiplicity
++```
++
++完整反例清单为 `verus-must-red-worlds.tsv` 中 `gpu-score-` 开头的各行。实现反例覆盖二分跳项/错误上界、逐槽偏移、窗口过窄、释放误计、跳过记录；前提反例覆盖有序、合法跨度、重数、排列和计数上界；另外检查归纳步和见证。编译失败、类型错误或只有求解超时都不能计为抓住反例。
++
++## 覆盖清单
++
++“产品核”表示产品直接调用 Verus 验证的同一份可执行函数。“模型”表示抽象状态或算术定理，到 Rust 容器、WGSL 或设备实现的精化仍未证明。
++
++| 编号 | 性质与被验入口 | 对应 GPU GC 路径 | 层次 |
++| --- | --- | --- | --- |
++| G01 | 一致才确认，首轮分歧暂缓，第二轮交 CPU，三种决策互斥且计数不溢出。`reconcile_gpu_entry` | `two_kernel_reconciliation::reconcile_the_two_kernel_outcomes` | 产品核 |
++| G02 | 连续两次分歧恰好触发一次 CPU 判定，之后重新计数。`lemma_two_disagreements_trigger_exactly_one_cpu_judgment` | 双核仲裁 | 模型 |
++| G03 | 一次一致打断连续分歧，不能累计隔轮分歧。`lemma_agreement_restarts_the_disagreement_history` | 双核仲裁 | 模型 |
++| G04 | GPU 批失败不改状态；成功轮次精确更新计数与 CPU 调用次数。`lemma_failed_batch_keeps_all_counts_and_cpu_calls` | `reconcile_unless_the_batch_failed` | 模型 |
++| G05 | 不同条目的更新可交换，重排后计数表和 CPU 调用总数相同。`lemma_distinct_entry_updates_commute` | 按条目键保存的计数表 | 模型 |
++| G06 | 稀疏表只保存一个未决轮次，未出现的条目不变。`lemma_count_updates_preserve_the_sparse_counter_invariant` | 同上 | 模型 |
++| G07 | 区间贡献非负、对称、不超过任一跨度，相邻区间贡献零。`lemma_live_slot_intersection_bounds` | 逐记录求交的打分核 | 模型 |
++| G08 | 段切开后的贡献可加，跨界记录不漏不重算。`lemma_splitting_a_segment_preserves_live_slot_contributions` | 两份打分核的段边界 | 模型 |
++| G09 | 任意有限记录表在任意切口分片，分片求和等于整表。`lemma_record_slices_preserve_the_score` | `live_slots_summed_over_the_record_slices` | 模型，归纳而非定深枚举 |
++| G10 | 重复记录保留计数重数，不能误改为槽集合去重。`lemma_duplicate_records_keep_their_multiplicity` | 两份打分核和 CPU 参照 | 模型 |
++| G11 | 已释放或异盘记录贡献零；同盘活记录贡献恰为交集长度，严格相交才为正。`lemma_released_and_foreign_records_do_not_score` | 打分核的记录过滤 | 模型 |
++| G12 | 双 u32 的高字优先比较等价于全宽槽号比较。`lemma_two_word_slot_order_is_u64_order` | WGSL 槽号比较 | 模型 |
++| G13 | 低字加跨度至多进位一次，全宽和合法时高字不溢出。`lemma_two_word_span_addition_carries_exactly_once` | WGSL `slot_past_the_span` | 模型 |
++| G14 | 两核分片计数各自累加，任一溢出都拒绝。`checked_live_slot_totals` | `live_slots_summed_over_the_record_slices` | 产品核 |
++| G15 | 最小非零四字节对齐输入长度，向上取整溢出拒绝。`checked_gpu_input_bytes` | `memory_limit_and_chunks::input_buffer_bytes` | 产品核 |
++| G16 | 预算包含对齐输入、逐条占用和固定占用，乘加溢出拒绝。`checked_gpu_chunk_bytes` | `ChunkFootprint::bytes_held_by_a_chunk` | 产品核 |
++| G17 | 扣除其他阶段已占显存后不回绕；未超额时已占加剩余恰为总限。`remaining_gpu_memory` | `ChunkBoundsOfAGpu::with_the_room_left_after` | 产品核 |
++| G18 | 下一记录片有进展、不过界，与余下区间不重不漏，避免先加后取 min 的溢出。`next_gpu_record_slice_end` | `live_slot_plan_on_a_gpu` | 产品核 |
++| G19 | 同盘、未释放、起点及全跨度在区内才扫描，跨度溢出拒绝。`gpu_record_is_in_scan_region` | `region_record_kernels::record_is_one_the_region_scan_reads` | 产品核 |
++| G20 | 只接受 counted=1，拒绝填充字和未知字，保留数值高低两字。`decoded_gpu_live_slots` | `live_slot_kernels::decoded_live_slot_outcomes` | 产品核 |
++
++## 衔接与未覆盖边界
++
++后台 GPU crate 直接依赖 `singlefs-replay-prefix`，调用表内八个产品核。两轮阈值、四字节对齐和 counted 判定字由核定义，主机引用同一份常量。两份 WGSL 仍独立实现，CPU 打分参照也保持独立。
++
++仲裁适配层将真实结果的相等比较传给 G01，只有 `ask_cpu` 分支调用 CPU，只有暂缓分支保存一个未决轮次。`Map<int, nat>` 抽象条目身份与稀疏表；模型不证明 `HashMap`、结果类型的 `PartialEq`、批内键唯一性或外层循环的精化。G04 对应批失败时的提前返回，不能据此宣称整个批处理循环已验证。
++
++G07–G11 按记录分别计数，重叠记录可多次贡献同一槽，不能推导“总分不超过段长”。G09 依赖真实分片有序、不重不漏；G18 验证下一片的边界，Vec 构建、GPU 派发与返回段数仍属于适配层。G14 防止回绕，不会把错误 GPU 计数变成正确结果。
++
++G12–G13 没有直接解析或验证 WGSL 源码；G13 显式要求尾端点装得进 u64。G19 对任意 u64 输入定义并拒绝溢出，继续允许原实现允许的零跨度；合法单元跨度、钉住和隔离是调用方的其他检查。
++
++G15–G16 的外层接口保留返回 u64 的形状，核返回 `None` 时明确 panic，正常输入行为不变。G17 不证明多任务预留的原子性，无上限时外层仍保持 `None`。G20 无法检测“两份核都给出相同错误结果”。
++
++本次不覆盖 GPU 驱动、编译器、执行内存模型、设备屏障、校验和算法及整个 GC 发布路径到模型的精化，不构成整个 GPU GC 的完整正确性证明。
++
++## 见证、反例与复跑
++
++两条见证不占 20 项名额：`witness_gpu_gc_protocol_and_score_premises` 构造非空计数表、跨段活记录、切口与进位边界；`witness_gpu_gc_arithmetic_boundaries` 调用产品核，覆盖空输入、全宽极值、预算/累计溢出、越界记录与未写判定字。
++
++`verus-must-red-worlds.tsv` 的 `gpu-gc-G01` 到 `gpu-gc-G20` 分别改坏上述决策、前提、边界或计算；另两条 `gpu-gc-witness_*` 向见证注入不可能断言，两条 `gpu-gc-audit-*` 改坏模型中的贡献值和 CPU 调用累计，共 24 条。要求 Verus 报证明错误且落点匹配，编不过或只耗尽求解资源都不算。八处 `requires` 另做入口空真筛查；筛查不是一般可满足性证明，具体可满足输入由见证补充。
++
++仓根执行，`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的可执行文件。任务服务按返回的确认单确认后运行。
++
++```sh
++task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
++  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
++  --verify-only-module gpu_gc_proofs crates/singlefs-replay-prefix/src/lib.rs
++
++task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
++  --item must-red:gpu-gc-G01 --item must-red:gpu-gc-G02 \
++  --item must-red:gpu-gc-G03 --item must-red:gpu-gc-G04
++
++task-server/task submit --manual -- cargo test -p singlefs-replay-prefix --offline \
++  --test gpu_gc_arithmetic_matches_wide_integer_reference
++
++task-server/task submit --manual -- cargo test -p singlefs-background-gpu --offline \
++  --lib two_kernel_reconciliation::tests -- memory_limit_and_chunks::tests \
++  live_slot_kernels::tests region_record_kernels::tests
++```
++
++反例按同样写法继续点名 G05–G20、两条见证和两条审计反例，每批至多四项。模块共 26 条义务：20 项核心性质、3 条常量、1 条递归终止、2 个见证。新增四个独立核对测试用 u128 覆盖全宽边界、4096 条十二轮历史核对仲裁，并检查判定字和两份累计值的独立性。后台包命令点名四个模块的 56 个测试，不开启真 GPU 特性。
++
++严格自测还直接检查真实主机适配层：
++
++```sh
++task-server/task submit --manual -- cargo test -p singlefs-background-gpu --offline \
++  --test gpu_gc_formal_contracts_through_the_host
++task-server/task submit --manual -- cargo test -p singlefs-background-gpu-tests --offline \
++  --test background_gpu_compute_agrees_with_the_cpu_backed_test_double
++```
++
++新增两个主机测试穷举 117,649 条六步历史（两条目的相符/分歧、失败批、空批、重挂），逐步核对状态、决策、回调次数和批统计；另对 32 个不同初态、输入与排列的批次检查按键结果及回调位置。有限枚举补充适配层证据，不替代任意长度的形式化证明。严格自测发现、修正及实测结果见 [GPU_GC_SELFTEST.md](GPU_GC_SELFTEST.md)。
+diff --git a/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md b/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md
+new file mode 100644
+index 000000000..2338f40e2
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md
+@@ -0,0 +1,65 @@
++# GPU GC 20 项新增形式化验证的严格自测
++
++本轮自测发现并修复了两处**契约漏检**。它们不是本轮发现的产品故障：实验改坏的是模型，原契约未拒绝错误模型。覆盖边界仍以 [GPU_GC_PROOFS.md](GPU_GC_PROOFS.md) 为准。
++
++## 先构造错误，再补强契约
++
++任务 `12857` 在修复前分别应用下面两个变异，两次 Verus 都返回 `verified 186、errors 0`，因此反例门禁正确判为失败：
++
++| 错误模型 | 为什么是错误 | 原来漏在哪里 | 修复 |
++| --- | --- | --- | --- |
++| `record_contribution` 将每条记录的贡献截顶为 2 | 同盘未释放记录 `[0,3)` 对段 `[0,3)` 应贡献 3，截顶后只有 2 | G11 只约束零值和正负；G09/G10 只约束同一贡献函数的分片与重数；见证贡献恰好为 2 | G11 增加同盘活记录的贡献恰等于交集长度 |
++| 成功 `round_state` 直接保留旧 `cpu_calls` | 条目已有一次分歧，再次分歧且本轮成功时应恰增加一次 CPU 调用 | G04 只约束失败轮次；G02 检查调用条件，没有约束累计状态 | G04 增加成功轮次的计数表与 CPU 调用精确更新；G05 进一步比较交换次序后的完整状态和调用总数 |
++
++这两个实验均已加入 `verus-must-red-worlds.tsv`，名称为 `gpu-gc-audit-score-capped-at-two` 和 `gpu-gc-audit-successful-cpu-call-lost`。原 G04 变异的锚点也已收窄到失败分支的完整后置条件，避免补强契约后匹配歧义。
++
++## 实测
++
++任务编号由本机 `task-server/task` 分配，可用 `task-server/task log <编号>` 查对应原始输出。以下不是只检查证明数量：反例要求真实证明错误及指定函数落点，编译失败、求解资源耗尽或进程被杀均不算抓到。
++
++| 检查 | 结果 | 任务 |
++| --- | --- | --- |
++| 修复后 GPU GC 模块，`--no-cheating --rlimit 10` | 26 条义务通过，0 错误 | `12858` 的完成尝试 |
++| `singlefs-replay-prefix` 全包证明及信任边界检查 | 170 个验证项重新执行，义务合计 186，0 错误，复用 0；禁止标记、axiom、未登记可信声明均为 0 | `12871` |
++| 产品编译与 `verus --compile` 的 MIR 对比 | 产品 109 个条目全部存在，规整后的整段内容逐字相同 | `12871` |
++| 24 个必红反例：G01–G20、两个见证、两个审计反例 | 全部重新执行并捕获；编译有效，证明错误落点匹配，未用资源耗尽冒充证明错误；复用 0 | `12872`–`12877`，末批取第 2 次完成尝试 |
++| 8 处入口 `requires` 空真筛查 | 全部在入口插入的 `assert(false)` 处报错，未检出空真；复用 0 | `12878`、`12879` |
++| 固定工具链与依赖来源 | Verus 版本、commit、归档 SHA256、6 个包的版本/出处/源码指纹及两种 rustc 版本均与登记一致 | `12882` |
++| 全宽算术及仲裁对拍 | 4 通过，0 失败、忽略；用 u128 独立参照核对预算、溢出、片界、准入、双核累计和回读 | `12880` |
++| 真实主机仲裁适配层 | 2 通过，0 失败、忽略 | `12860` |
++| 既有 CPU 测试替身端到端对拍 | 11 通过，0 失败、忽略 | `12860` |
++| 四个主机模块回归，含 WGSL 验证器检查 | 56 通过，0 失败、忽略；其他模块的 112 项未纳入本次范围 | `12881` 第 2 次完成尝试 |
++| 真 GPU 活槽统计测试 | 6 通过，0 失败、忽略、过滤；含双核对拍、跨 32 位槽界、小显存分段/分片及预算过低时排除设备 | `12861` |
++| 真 GPU 区域记录分类测试 | 6 通过，0 失败、忽略、过滤；含双核与 CPU 对拍、小显存切批、映射分片及单元分片 | `12861` |
++
++修复后的 `12877` 明确捕获了修复前能通过的两个错误模型：打分截顶的证明错误落在 G11，漏记 CPU 调用落在 G04。任务的首次尝试因内存上限中断，未计为抓到；这里只采用任务服务自动重试后的完整成功结果。
++
++普通测试合计 85 项通过（4 + 2 + 11 + 56 + 6 + 6）。`12881` 的首次编译也因内存上限中断，只计自动重试后的结果。真 GPU 任务此前因设备占用排队，最终在第二台的卡 1（`0000:05:00.0`）完成；每个用例均有 `GPUS_HANDED_OVER_BY_THE_TASK_SERVER` 记录，日志没有 `NOT_RUN_NO_GPU_ADAPTER` 或 `GPU_DEVICE_LOST`，不是无设备返回成功。预算过低的用例按设计验证排除设备的路径，不声称该用例派发了着色器。
++
++证明、反例和入口空真检查通过项目提供的 `prune_server_client_selftest.py --with-temporary-service` 使用临时判定库，仍使用仓根计算的标准库名及真实固定版本 Verus。临时服务初始没有判定记录，日志逐条记下“现判、复用 0”。没有修改判器、放宽求解限制或启用破坏判器的测试开关。
++
++例如，不复用既有判定地重跑本次发现的两个反例：
++
++```sh
++task-server/task submit --manual -- python3 scripts/prune-server/prune_server_client_selftest.py \
++  --with-temporary-service -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
++  --item must-red:gpu-gc-audit-score-capped-at-two \
++  --item must-red:gpu-gc-audit-successful-cpu-call-lost
++```
++
++按任务服务确认单核对项数与范围后确认；工具链与内存、线程额度均由现有入口管理。
++
++真 GPU 两组测试的复跑入口：
++
++```sh
++task-server/task submit --manual -- cargo test -p singlefs-background-gpu-tests --offline \
++  --features tests-on-a-real-gpu \
++  --test live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference \
++  --test region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference -- --nocapture
++```
++
++新增主机测试在 [gpu_gc_formal_contracts_through_the_host.rs](../../singlefs-background-gpu/tests/gpu_gc_formal_contracts_through_the_host.rs)：穷举 `7^6 = 117649` 条六步事件历史，涵盖两条目的相符/分歧、失败批、空批和重新创建挂载状态，逐步检查按键计数、决策、CPU 回调次数及批统计。另检查 4 种初始状态 × 4 种相符组合 × 2 种顺序，共 32 个批次，核对回调位置和按键结果。参照使用每条目一个布尔未决状态，不调用被验证的仲裁函数来计算预期值。
++
++## 结果的边界
++
++上述有限历史枚举验证实际 Rust 主机接口，不能替代任意长度历史的精化证明。MIR 一致说明产品编译包含被验证的可执行核，不代表外围容器、WGSL、驱动或硬件已形式化验证。八个直接调用的产品核与十二个抽象模型的区分保持不变。
+diff --git a/crates/singlefs-replay-prefix/src/README.md b/crates/singlefs-replay-prefix/src/README.md
+index 5cf72e06e..bc7e9e325 100644
+--- a/crates/singlefs-replay-prefix/src/README.md
++++ b/crates/singlefs-replay-prefix/src/README.md
+@@ -4,7 +4,7 @@
+ 
+ 本次 GC 扩展的审查记录在 [records](../../../records/2026-10-24-GC形式化与core改动复核.md)。原始验证记录在 [扩展报告](../../../records/2026-10-24-GC实现与旧读者及崩溃协议形式化扩展.md)。以下说明当前源码，而非冻结历史。
+ 
+-## 七份源文件各负责什么
++## 八份源文件各负责什么
+ 
+ | 文件 | 可执行产品入口 | 验证内容与主要边界 |
+ | --- | --- | --- |
+@@ -12,11 +12,12 @@
+ | [compaction_plan_proofs.rs](compaction_plan_proofs.rs) | `choose_compaction_segment`、`plan_compaction_batch` | 选段资格、贪心和平局规则；计划顺序、数量、互异性和进展；另有按槽区间的搬迁保持引理（P4），前提含回退候选与读者的区间，它不是产品 I/O 代码 |
+ | [gc_ring_interval_proofs.rs](gc_ring_interval_proofs.rs) | 无 | GC 搬迁协议的根环版：映射值是槽区间，F 分内存与持久两层，根按版本号点名；任意有限历史的读取保持、三个反例被拒、G7 |
+ | [gc_crash_proofs.rs](gc_crash_proofs.rs) | **只有** `released_record_can_be_reclaimed` | 回收比较核，与「门槛蕴涵没被引用」那一条引理（两条前提显式写在 requires 里） |
++| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 新增 20 项核心性质与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
+ | [file_range_proofs.rs](file_range_proofs.rs) | `next_tail_batch`、`bytes_in_unit`、`checked_write_end`、`payload_length_from_start`、`units_covering_size`、`units_for_sequential_write`、`rounded_size_fits`、`checked_unit_byte_range`、`checked_bytes_in_indexed_unit` | 截断/删除的批量释放边界、进展与尾区间分区；部分写交集的精确覆盖、两侧偏移与容量上界；相邻单元无重叠无遗漏；按单元号算单元端点的乘加与溢出拒绝 |
+ | [unlink_proofs.rs](unlink_proofs.rs) | `next_unlink_batch`、`size_after_an_unlink_batch` | unlink 的分批计划：整串计划的形状与步数、每个数据单元恰好释放一次、从任一中间版续做的计划等于一路做下来的后半截；删除批的下段节点每层至多重写截口那一个（按跨度模型）；size 乘法不回绕 |
+-| [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价 |
++| [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价；抽象字节模型的覆盖规律与整单元覆盖不依赖旧内容 |
+ 
+-核的入口文件为 `lib.rs`，另六份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
++核的入口文件为 `lib.rs`，另七份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
+ 
+ ## core 到 compaction 核的转换
+ 
+@@ -146,6 +147,32 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
+ 
+ `first_written_unit` 与 `last_written_unit` 另调用 `unit_containing_byte`，分别定位写入首字节与末字节（end - 1）。核要求正容量，证明 `index × capacity <= byte < (index + 1) × capacity`；区间端点是数学整数，因此也覆盖 byte = u64::MAX，并不保证实际构造下一个单元地址时不会溢出。core 包装测试通过枚举写到的字节集合核对首尾单元，核测试以 u128 端点检查极值。
+ 
++## 固定长度覆盖写的字节规律
++
++`partial_write_proofs` 的 `overwritten_bytes` 用 `Seq<u8>` 表示固定长度文件内的覆盖写，`overwrite_fits` 要求写入起点非负、整个请求位于文件内。新增五项证明义务：
++
++- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件。
++- `lemma_overwriting_the_same_range_keeps_only_the_last_write`：同起点、同长度的连续覆盖只保留最后一次的内容。
++- `lemma_disjoint_overwrites_commute`：不相交的两次覆盖可以交换顺序，两种顺序下第二次写仍满足范围前提；允许相邻区间和空请求。
++- `lemma_whole_unit_overwrite_does_not_depend_on_old_bytes`：利用现有整单元覆盖引理，证明分类核的覆盖条件足以使单元结果不依赖旧内容。
++- `witness_overwrite_laws_and_overlapping_write_order`：给出满足各引理前提的具体非空调用、EOF 处的空请求，以及重叠写交换后结果不同的反例。
++
++这五项是对抽象字节模型的证明，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不新增运行时代码或可信假设。必红表新增五条契约反例及三条删除关键前提的反例（同长度、不相交、整单元覆盖）。
++
++复跑本模块（仓根执行；`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的 `verus`，任务服务按确认单确认后运行）：
++
++```sh
++task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
++  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
++  --verify-only-module partial_write_proofs crates/singlefs-replay-prefix/src/lib.rs
++task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
++  --item must-red:overwrite-last-needs-equal-lengths \
++  --item must-red:overwrite-commute-needs-disjoint-ranges \
++  --item must-red:overwrite-whole-needs-coverage
++task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
++  --lib partial_write_proofs::tests --offline
++```
++
+ ## 按单元号计算部分写区间
+ 
+ `file_range_proofs::checked_unit_byte_range` 验证单元起点乘法与终点加法，返回精确端点，或在完整区间超出 u64 时返回 None。零容量得到空区间，恰好到 u64::MAX 的终点可以表示。`PartialWriteOfAFile::data_unit` 已使用此核；无法表示的地址显式拒绝，不依赖 debug 构建的算术溢出检查。
+diff --git a/crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs b/crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
+index a95e842ee..0889ab163 100644
+--- a/crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
+@@ -1437,7 +1437,7 @@ proof fn one_movable_allocation_is_planned_and_not_reported_emptied(
+ }
+ 
+ // 选段：唯一一段装着钉住的槽，「选中它」不合 P1。
+-proof fn a_segment_holding_a_pinned_slot_is_not_a_sound_choice(only: CompactionKernelSegment)
++proof fn segment_holding_a_pinned_slot_is_not_a_sound_choice(only: CompactionKernelSegment)
+     requires
+         only.holds_a_pinned_slot,
+     ensures
+@@ -1548,7 +1548,7 @@ mod tests {
+ 
+     /// 能搬、钉住、能搬、已死、能搬，K = 2 ⇒ 搬下标 0 与 2，跳过钉住与已死、不取第三个能搬的。
+     #[test]
+-    fn a_batch_takes_the_first_movable_units_up_to_the_batch_size() {
++    fn batch_takes_the_first_movable_units_up_to_the_batch_size() {
+         let allocations = [
+             allocation(64, movable(10)),
+             allocation(65, CompactionKernelAllocationClass::Pinned),
+diff --git a/crates/singlefs-replay-prefix/src/file_range_proofs.rs b/crates/singlefs-replay-prefix/src/file_range_proofs.rs
+index d6057231a..11b70963a 100644
+--- a/crates/singlefs-replay-prefix/src/file_range_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/file_range_proofs.rs
+@@ -272,8 +272,8 @@ pub fn witness_file_range_boundaries() {
+     proof { lemma_rounded_size_bounds_written_unit_addresses(1, 1, 0); }
+     let _empty_units = units_for_sequential_write(0, 32_634);
+     assert(_empty_units == 1);
+-    let _max_units = units_covering_size(u64::MAX, 1);
+-    assert(_max_units == u64::MAX);
++    let _maximum_units = units_covering_size(u64::MAX, 1);
++    assert(_maximum_units == u64::MAX);
+     let _rounded_overflow = rounded_size_fits(u64::MAX, 2);
+     assert(!_rounded_overflow);
+     let _end = checked_write_end(u64::MAX - 3, 3);
+@@ -292,8 +292,8 @@ pub fn witness_file_range_boundaries() {
+     assert(_high.0 == u64::MAX - 1 && _high.1);
+     let _adjacent = bytes_in_unit(0, 10, 10, 20);
+     assert(_adjacent is None) by {
+-        if let Some((a, b, n)) = _adjacent {
+-            assert(in_both_ranges(10 + a as int, 0, 10, 10, 20));
++        if let Some((offset_in_unit, offset_in_write, length)) = _adjacent {
++            assert(in_both_ranges(10 + offset_in_unit as int, 0, 10, 10, 20));
+         }
+     }
+ }
+@@ -530,7 +530,9 @@ mod tests {
+                             Some((in_unit, in_write, length)) => {
+                                 assert!(length > 0);
+                                 let actual = (0..length)
+-                                    .map(|i| unit_start + in_unit + i)
++                                    .map(|offset_in_overlap| {
++                                        unit_start + in_unit + offset_in_overlap
++                                    })
+                                     .collect::<Vec<_>>();
+                                 assert_eq!(actual, expected);
+                                 assert_eq!(write_start + in_write, expected[0]);
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+new file mode 100644
+index 000000000..4df8fcb72
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+@@ -0,0 +1,218 @@
++//! GPU GC 的切批准入、最大分片、显存账本和派发尺寸；产品调用同一份 exec 核。
++//! G21–G30 续接 gpu_gc_proofs；设备完成信号的真实性和外围容器不在本模块证明。
++use crate::gpu_gc_proofs::{checked_gpu_chunk_bytes, checked_gpu_input_bytes};
++use vstd::prelude::*;
++
++verus! {
++
++pub struct GpuChunkCapacity {
++    pub fixed_bytes: u64,
++    pub bytes_per_entry: u64,
++    pub entry_buffer_bytes: u64,
++    pub binding_bytes: u64,
++    pub dispatch_entries: u64,
++    pub memory_limit: Option<u64>,
++}
++
++pub open spec fn chunk_fits(input: u64, entries: u64, capacity: GpuChunkCapacity) -> bool {
++    crate::gpu_gc_proofs::aligned_input_size(input) <= capacity.binding_bytes
++        && entries * capacity.entry_buffer_bytes <= capacity.binding_bytes
++        && entries <= capacity.dispatch_entries
++        && match capacity.memory_limit {
++            None => true,
++            Some(limit) => crate::gpu_gc_proofs::aligned_input_size(input) + entries * capacity.bytes_per_entry + capacity.fixed_bytes <= limit,
++        }
++}
++
++/// G21：显存、输入绑定、条目绑定和派发四道界必须同时满足；乘加溢出不能误放行。
++pub fn gpu_chunk_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> (fits: bool)
++    ensures fits == chunk_fits(input, entries, *capacity),
++{
++    let aligned = match checked_gpu_input_bytes(input) {
++        Some(bytes) => bytes,
++        None => return false,
++    };
++    let entry_bytes = match entries.checked_mul(capacity.entry_buffer_bytes) {
++        Some(bytes) => bytes,
++        None => return false,
++    };
++    if aligned > capacity.binding_bytes || entry_bytes > capacity.binding_bytes
++        || entries > capacity.dispatch_entries { return false; }
++    match capacity.memory_limit {
++        None => true,
++        Some(limit) => match checked_gpu_chunk_bytes(input, entries, capacity.bytes_per_entry, capacity.fixed_bytes) {
++            Some(bytes) => bytes <= limit,
++            None => false,
++        },
++    }
++}
++
++/// G22：最大单条分片是装得下的最大四字节倍数；None 当且仅当最小输入也放不下。
++#[allow(clippy::question_mark, reason = "被验函数体逐支写出溢出那一支，与 ensures 的 match 对照")]
++pub fn largest_gpu_piece_input(capacity: &GpuChunkCapacity) -> (answer: Option<u64>)
++    ensures
++        match answer {
++            None => !chunk_fits(0, 1, *capacity),
++            Some(bytes) => bytes >= 4 && bytes % 4 == 0
++                && chunk_fits(bytes, 1, *capacity)
++                && forall|input: u64| #[trigger] chunk_fits(input, 1, *capacity) ==> input <= bytes,
++        },
++{
++    if capacity.entry_buffer_bytes > capacity.binding_bytes || capacity.dispatch_entries == 0 {
++        return None;
++    }
++    let room = match capacity.memory_limit {
++        None => u64::MAX,
++        Some(limit) => match limit.checked_sub(capacity.fixed_bytes) {
++            None => return None,
++            Some(left) => match left.checked_sub(capacity.bytes_per_entry) {
++                None => return None,
++                Some(input_room) => input_room,
++            },
++        },
++    };
++    let bounded = if room < capacity.binding_bytes { room } else { capacity.binding_bytes };
++    let bytes = bounded / 4 * 4;
++    if bytes < 4 { None } else { Some(bytes) }
++}
++
++/// G23：动态收紧显存上限，原来无限额时采用新上限；已有限额时绝不放宽。
++pub fn tightened_gpu_memory_limit(previous: Option<u64>, available: u64) -> (limit: u64)
++    ensures limit == match previous { None => available, Some(old) => if old < available { old } else { available } },
++        limit <= available,
++{
++    match previous {
++        None => available,
++        Some(old) => if old < available { old } else { available },
++    }
++}
++
++/// G24：尚有未完成提交、账本溢出或超限时拒绝新增占用；无上限也不允许整数回绕。
++pub fn checked_gpu_memory_hold(held: u64, bytes: u64, pending: bool, limit: Option<u64>) -> (answer: Option<u64>)
++    ensures match answer {
++        Some(total) => !pending && total == held + bytes
++            && match limit { None => true, Some(bound) => total <= bound },
++        None => pending || held + bytes > u64::MAX
++            || match limit { None => false, Some(bound) => held + bytes > bound },
++    },
++{
++    if pending { return None; }
++    match held.checked_add(bytes) {
++        None => None,
++        Some(total) => match limit {
++            Some(bound) => if total > bound { None } else { Some(total) },
++            None => Some(total),
++        },
++    }
++}
++
++/// G25：只释放已记账的字节；拒绝超额释放，成功时保留所有未释放的占用。
++pub fn checked_gpu_memory_release(held: u64, bytes: u64) -> (answer: Option<u64>)
++    ensures match answer {
++        None => bytes > held,
++        Some(left) => bytes <= held && left + bytes == held,
++    },
++{
++    held.checked_sub(bytes)
++}
++
++/// G26：等待未成功时保留全部占用，只有完成才释放本段；两种结局都拒绝虚构的段大小。
++pub fn gpu_bytes_after_submission_wait(held: u64, chunk: u64, completed: bool) -> (answer: Option<u64>)
++    ensures match answer {
++        None => chunk > held,
++        Some(left) => chunk <= held && left == if completed { held - chunk } else { held as int },
++    },
++{
++    if chunk > held { None }
++    else if completed { Some(held - chunk) }
++    else { Some(held) }
++}
++
++/// G27：显存不足后把失败段占用折半，正占用时严格下降，零时仍为零，取整误差至多一。
++pub fn gpu_memory_cap_after_allocation_failure(failed_bytes: u64) -> (next: u64)
++    ensures
++        2 * next <= failed_bytes < 2 * next + 2,
++        failed_bytes > 0 ==> next < failed_bytes,
++        failed_bytes == 0 ==> next == 0,
++{
++    failed_bytes / 2
++}
++
++/// G28：派发覆盖恰好所需的工作组数，零条目不派发；全宽条数不因加法取整溢出。
++#[allow(clippy::cast_possible_truncation, reason = "ensures 证了 groups 不超过 entries，装得进 u32")]
++pub fn gpu_workgroups_for_entries(entries: u32, per_group: u32) -> (groups: u32)
++    requires per_group > 0,
++    ensures
++        groups <= entries,
++        groups == 0 <==> entries == 0,
++        entries <= groups * per_group,
++        entries > 0 ==> (groups - 1) * per_group < entries,
++{
++    let wide = crate::file_range_proofs::units_covering_size(entries as u64, per_group as u64);
++    wide as u32
++}
++
++pub open spec fn mapping_entries_at_least_one(entries: u64) -> int {
++    if entries == 0 { 1 } else { entries as int }
++}
++
++/// G29：映射条目/落点/排序索引三张表含空表占位；返回总量与最大绑定量，任何溢出拒绝。
++#[allow(clippy::question_mark, reason = "被验函数体逐支写出溢出那一支，与 ensures 的 match 对照")]
++pub fn checked_gpu_mapping_table_bytes(entries: u64, locations: u64) -> (answer: Option<(u64, u64)>)
++    ensures match answer {
++        None => 60 * mapping_entries_at_least_one(entries) + 16 * mapping_entries_at_least_one(locations) > u64::MAX,
++        Some((total, largest)) => total == 60 * mapping_entries_at_least_one(entries) + 16 * mapping_entries_at_least_one(locations)
++            && largest == if 56 * mapping_entries_at_least_one(entries) > 16 * mapping_entries_at_least_one(locations) {
++                56 * mapping_entries_at_least_one(entries)
++            } else { 16 * mapping_entries_at_least_one(locations) },
++    },
++{
++    let count = if entries == 0 { 1 } else { entries };
++    let location_count = if locations == 0 { 1 } else { locations };
++    let entry_bytes = match count.checked_mul(56) { Some(bytes) => bytes, None => return None };
++    let location_bytes = match location_count.checked_mul(16) { Some(bytes) => bytes, None => return None };
++    let sorted_bytes = match count.checked_mul(4) { Some(bytes) => bytes, None => return None };
++    let subtotal = match entry_bytes.checked_add(location_bytes) { Some(bytes) => bytes, None => return None };
++    let total = match subtotal.checked_add(sorted_bytes) { Some(bytes) => bytes, None => return None };
++    let largest = if entry_bytes > location_bytes { entry_bytes } else { location_bytes };
++    Some((total, largest))
++}
++
++/// G30：向当前批追加输入，只有和可表示且整批满足四道界才接受；拒绝不能把和回绕成小批。
++#[allow(clippy::manual_filter, reason = "被验函数体不用闭包，逐支写")]
++pub fn extended_gpu_chunk_input(previous: u64, additional: u64, entries: u64, capacity: &GpuChunkCapacity) -> (answer: Option<u64>)
++    ensures match answer {
++        Some(total) => total == previous + additional && chunk_fits(total, entries, *capacity),
++        None => previous + additional > u64::MAX
++            || !chunk_fits((previous + additional) as u64, entries, *capacity),
++    },
++{
++    match previous.checked_add(additional) {
++        None => None,
++        Some(total) => if gpu_chunk_fits(total, entries, capacity) { Some(total) } else { None },
++    }
++}
++
++/// 非空见证：恰好装满、超出一字节、超时保留、完成释放、空表占位及全宽派发。
++#[allow(unused_variables, reason = "assert 在普通 Rust 构建中擦除，执行调用保留")]
++pub fn witness_gpu_capacity_and_accounting_boundaries() {
++    let capacity = GpuChunkCapacity { fixed_bytes: 16, bytes_per_entry: 40, entry_buffer_bytes: 16,
++        binding_bytes: 128, dispatch_entries: 2, memory_limit: Some(100) };
++    let largest = largest_gpu_piece_input(&capacity);
++    let accepted = gpu_chunk_fits(44, 1, &capacity);
++    let rejected = gpu_chunk_fits(45, 1, &capacity);
++    let held = checked_gpu_memory_hold(60, 40, false, Some(100));
++    let pending = checked_gpu_memory_hold(60, 0, true, None);
++    let kept = gpu_bytes_after_submission_wait(100, 40, false);
++    let released = gpu_bytes_after_submission_wait(100, 40, true);
++    let tables = checked_gpu_mapping_table_bytes(0, 0);
++    let groups = gpu_workgroups_for_entries(u32::MAX, 64);
++    assert(largest == Some(44));
++    assert(accepted && !rejected);
++    assert(held == Some(100) && pending == None);
++    assert(kept == Some(100) && released == Some(60));
++    assert(tables == Some((76, 56)));
++    assert(groups == 67108864);
++}
++
++} // verus!
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+new file mode 100644
+index 000000000..fa8003be9
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+@@ -0,0 +1,385 @@
++//! GPU GC 的主机端纯核与着色器算术模型。20 项核心性质见 src/README.md。
++//! 仲裁、预算、分片、回读与区域准入的 exec 函数由产品直接调用；
++//! Map/Seq 与双字算术证明不等于验证 WGSL 编译器、GPU 执行或设备 I/O。
++use crate::file_range_proofs::units_for_sequential_write;
++use vstd::prelude::*;
++
++verus! {
++
++pub const GPU_UNCERTAIN_ROUNDS_BEFORE_CPU: u32 = 2;
++pub const GPU_INPUT_ALIGNMENT: u64 = 4;
++pub const GPU_LIVE_SLOTS_COUNTED: u32 = 1;
++
++pub struct ReconciliationStep {
++    pub confirmed: bool,
++    pub ask_cpu: bool,
++    pub uncertain_rounds: u32,
++}
++
++pub open spec fn next_uncertain_count(previous: nat, agree: bool) -> nat {
++    if agree || previous >= 1 { 0 } else { 1 }
++}
++
++pub open spec fn cpu_is_needed(previous: nat, agree: bool) -> bool {
++    !agree && previous >= 1
++}
++
++/// G01：三种决策互斥且完备；第一次分歧不放行，第二次交 CPU；计数不溢出。
++pub fn reconcile_gpu_entry(previous: u32, agree: bool) -> (step: ReconciliationStep)
++    ensures
++        step.confirmed == agree,
++        step.ask_cpu == cpu_is_needed(previous as nat, agree),
++        !(step.confirmed && step.ask_cpu),
++        step.uncertain_rounds == next_uncertain_count(previous as nat, agree),
++        step.uncertain_rounds <= 1,
++        (!step.confirmed && !step.ask_cpu) <==> (!agree && previous == 0),
++{
++    if agree {
++        ReconciliationStep { confirmed: true, ask_cpu: false, uncertain_rounds: 0 }
++    } else if previous >= GPU_UNCERTAIN_ROUNDS_BEFORE_CPU - 1 {
++        ReconciliationStep { confirmed: false, ask_cpu: true, uncertain_rounds: 0 }
++    } else {
++        ReconciliationStep { confirmed: false, ask_cpu: false, uncertain_rounds: 1 }
++    }
++}
++
++/// G02：从零开始的两次分歧，恰好第二次调用 CPU，之后从零重新计数。
++pub proof fn lemma_two_disagreements_trigger_exactly_one_cpu_judgment()
++    ensures
++        !cpu_is_needed(0, false),
++        cpu_is_needed(next_uncertain_count(0, false), false),
++        next_uncertain_count(next_uncertain_count(0, false), false) == 0,
++        !cpu_is_needed(next_uncertain_count(next_uncertain_count(0, false), false), false),
++{
++}
++
++/// G03：中间一次一致会打断连续分歧，不能把隔轮的分歧累加到 CPU 门槛。
++pub proof fn lemma_agreement_restarts_the_disagreement_history(previous: nat)
++    ensures
++        next_uncertain_count(previous, true) == 0,
++        !cpu_is_needed(next_uncertain_count(previous, true), false),
++        next_uncertain_count(next_uncertain_count(previous, true), false) == 1,
++{
++}
++
++pub open spec fn count_of(counts: Map<int, nat>, key: int) -> nat {
++    if counts.dom().contains(key) { counts[key] } else { 0 }
++}
++
++pub open spec fn update_count(counts: Map<int, nat>, key: int, agree: bool) -> Map<int, nat> {
++    if next_uncertain_count(count_of(counts, key), agree) == 0 { counts.remove(key) }
++    else { counts.insert(key, 1) }
++}
++
++pub open spec fn round_state(counts: Map<int, nat>, cpu_calls: nat, key: int, agree: bool, succeeded: bool)
++    -> (Map<int, nat>, nat)
++{
++    if succeeded {
++        (update_count(counts, key, agree), cpu_calls + if cpu_is_needed(count_of(counts, key), agree) { 1nat } else { 0nat })
++    } else { (counts, cpu_calls) }
++}
++
++/// G04：GPU 批失败不构成一轮；成功轮次恰按仲裁更新状态，并精确记录 CPU 调用。
++pub proof fn lemma_failed_batch_keeps_all_counts_and_cpu_calls(counts: Map<int, nat>, cpu_calls: nat, key: int, agree: bool)
++    ensures
++        round_state(counts, cpu_calls, key, agree, false) == (counts, cpu_calls),
++        round_state(counts, cpu_calls, key, agree, true).0 == update_count(counts, key, agree),
++        round_state(counts, cpu_calls, key, agree, true).1
++            == cpu_calls + if !agree && count_of(counts, key) >= 1 { 1nat } else { 0nat },
++{
++}
++
++/// G05：不同条目的更新可交换；批内重排不串扰计数与 CPU 调用总数。
++pub proof fn lemma_distinct_entry_updates_commute(counts: Map<int, nat>, first: int, second: int, first_agrees: bool, second_agrees: bool)
++    requires first != second,
++    ensures
++        update_count(update_count(counts, first, first_agrees), second, second_agrees)
++            == update_count(update_count(counts, second, second_agrees), first, first_agrees),
++        count_of(update_count(counts, first, first_agrees), second) == count_of(counts, second),
++        cpu_is_needed(count_of(update_count(counts, first, first_agrees), second), second_agrees)
++            == cpu_is_needed(count_of(counts, second), second_agrees),
++        round_state(
++            round_state(counts, 0, first, first_agrees, true).0,
++            round_state(counts, 0, first, first_agrees, true).1,
++            second, second_agrees, true,
++        ) == round_state(
++            round_state(counts, 0, second, second_agrees, true).0,
++            round_state(counts, 0, second, second_agrees, true).1,
++            first, first_agrees, true,
++        ),
++{
++    assert(update_count(update_count(counts, first, first_agrees), second, second_agrees)
++        =~= update_count(update_count(counts, second, second_agrees), first, first_agrees));
++}
++
++/// G06：稀疏表只保存一个未决轮次；更新保持此不变量，未出现的条目保持原值。
++pub proof fn lemma_count_updates_preserve_the_sparse_counter_invariant(counts: Map<int, nat>, key: int, agree: bool)
++    requires forall|other: int| counts.dom().contains(other) ==> #[trigger] counts[other] == 1,
++    ensures
++        forall|other: int| update_count(counts, key, agree).dom().contains(other)
++            ==> #[trigger] update_count(counts, key, agree)[other] == 1,
++        forall|other: int| other != key ==> #[trigger] count_of(update_count(counts, key, agree), other) == count_of(counts, other),
++        count_of(update_count(counts, key, agree), key) == next_uncertain_count(count_of(counts, key), agree),
++{
++}
++
++pub open spec fn overlap_slots(left_start: int, left_end: int, right_start: int, right_end: int) -> int {
++    let begin = if left_start > right_start { left_start } else { right_start };
++    let end = if left_end < right_end { left_end } else { right_end };
++    if begin < end { end - begin } else { 0 }
++}
++
++/// G07：逐记录求交的活槽贡献对称、非负，不超过任一跨度；相邻区间贡献零。
++pub proof fn lemma_live_slot_intersection_bounds(left_start: int, left_end: int, right_start: int, right_end: int)
++    requires left_start <= left_end, right_start <= right_end,
++    ensures
++        0 <= overlap_slots(left_start, left_end, right_start, right_end) <= left_end - left_start,
++        overlap_slots(left_start, left_end, right_start, right_end) <= right_end - right_start,
++        overlap_slots(left_start, left_end, right_start, right_end) == overlap_slots(right_start, right_end, left_start, left_end),
++        (left_end <= right_start || right_end <= left_start) ==> overlap_slots(left_start, left_end, right_start, right_end) == 0,
++{
++}
++
++/// G08：在任意槽界切开段，左右贡献之和等于原段；跨段记录不漏、不重算。
++pub proof fn lemma_splitting_a_segment_preserves_live_slot_contributions(record_start: int, record_end: int, start: int, seam: int, end: int)
++    requires record_start <= record_end, start <= seam <= end,
++    ensures overlap_slots(record_start, record_end, start, end) == overlap_slots(record_start, record_end, start, seam) + overlap_slots(record_start, record_end, seam, end),
++{
++}
++
++pub struct ScoringRecord {
++    pub device: int,
++    pub released: bool,
++    pub start: int,
++    pub end: int,
++}
++
++pub open spec fn record_contribution(record: ScoringRecord, device: int, start: int, end: int) -> int {
++    if record.released || record.device != device { 0 }
++    else { overlap_slots(record.start, record.end, start, end) }
++}
++
++pub open spec fn record_slice_sum(records: Seq<ScoringRecord>, device: int, start: int, end: int, first: int, past: int) -> int
++    decreases past - first,
++{
++    if past <= first { 0 }
++    else { record_slice_sum(records, device, start, end, first, past - 1)
++        + record_contribution(records[past - 1], device, start, end) }
++}
++
++/// G09：任意长度记录表在任意切口分片后求和等于整表；空片、空表同样成立。
++pub proof fn lemma_record_slices_preserve_the_score(records: Seq<ScoringRecord>, device: int, start: int, end: int, first: int, seam: int, past: int)
++    requires 0 <= first <= seam <= past <= records.len(),
++    ensures record_slice_sum(records, device, start, end, first, past)
++        == record_slice_sum(records, device, start, end, first, seam) + record_slice_sum(records, device, start, end, seam, past),
++    decreases past - seam,
++{
++    if past > seam {
++        lemma_record_slices_preserve_the_score(records, device, start, end, first, seam, past - 1);
++    }
++}
++
++/// G10：重复记录保留计数重数，不能误把求和改成槽集合的并集大小。
++pub proof fn lemma_duplicate_records_keep_their_multiplicity(record: ScoringRecord, device: int, start: int, end: int)
++    ensures record_slice_sum(seq![record, record], device, start, end, 0, 2)
++        == 2 * record_contribution(record, device, start, end),
++{
++    reveal_with_fuel(record_slice_sum, 3);
++}
++
++/// G11：异盘或已释放记录贡献零；活记录贡献恰为交集长度，不能仅保持正负号。
++pub proof fn lemma_released_and_foreign_records_do_not_score(record: ScoringRecord, device: int, start: int, end: int)
++    requires record.start < record.end, start < end,
++    ensures
++        (record.released || record.device != device) ==> record_contribution(record, device, start, end) == 0,
++        (record_contribution(record, device, start, end) > 0) <==>
++            (!record.released && record.device == device && record.start < end && start < record.end),
++        !record.released && record.device == device ==>
++            record_contribution(record, device, start, end) == overlap_slots(record.start, record.end, start, end),
++{
++}
++
++pub open spec fn words_value(low: u32, high: u32) -> int {
++    low as int + 4294967296int * high as int
++}
++
++/// G12：WGSL 的高字优先比较等价于完整 64 位槽号比较，不截掉高字。
++pub proof fn lemma_two_word_slot_order_is_u64_order(al: u32, ah: u32, bl: u32, bh: u32)
++    ensures
++        0 <= words_value(al, ah) <= u64::MAX,
++        (words_value(al, ah) < words_value(bl, bh)) <==> (ah < bh || (ah == bh && al < bl)),
++        (words_value(al, ah) == words_value(bl, bh)) <==> (al == bl && ah == bh),
++{
++}
++
++/// G13：低字相加回绕后的进位恰为一次；全宽和有效时高字也不溢出。
++pub proof fn lemma_two_word_span_addition_carries_exactly_once(low: u32, high: u32, span: u32)
++    requires words_value(low, high) + span <= u64::MAX,
++    ensures
++        0 <= (low as int + span) % 4294967296 < 4294967296,
++        high + (if low as int + span >= 4294967296 { 1int } else { 0int }) <= u32::MAX,
++        (low as int + span) % 4294967296
++            + 4294967296 * (high + if low as int + span >= 4294967296 { 1int } else { 0int })
++            == words_value(low, high) + span,
++        ((low as int + span) % 4294967296 < low) <==> (low as int + span >= 4294967296),
++{
++    if low as int + span >= 4294967296 {
++        assert((low as int + span) % 4294967296 == low as int + span - 4294967296);
++    } else {
++        assert((low as int + span) % 4294967296 == low as int + span);
++    }
++}
++
++/// G14：两份核分片累计各加各的，任一份溢出就拒绝，不混合或截断结果。
++#[allow(clippy::manual_map, reason = "被验函数体照 ensures 的两层 match 逐支写，不用闭包")]
++pub fn checked_live_slot_totals(walking: u64, searching: u64, next_walking: u64, next_searching: u64) -> (answer: Option<(u64, u64)>)
++    ensures match answer {
++        Some((walking_total, searching_total)) => walking_total == walking + next_walking && searching_total == searching + next_searching,
++        None => walking + next_walking > u64::MAX || searching + next_searching > u64::MAX,
++    },
++{
++    match walking.checked_add(next_walking) {
++        None => None,
++        Some(walking_total) => match searching.checked_add(next_searching) {
++            None => None,
++            Some(searching_total) => Some((walking_total, searching_total)),
++        },
++    }
++}
++
++pub open spec fn aligned_input_size(input: u64) -> int {
++    if input == 0 { 4 } else { crate::file_range_proofs::covering_units(input, 4) * 4 }
++}
++
++/// G15：输入缓冲恰为最小非零四字节对齐长度；全宽向上取整溢出显式拒绝。
++pub fn checked_gpu_input_bytes(input: u64) -> (answer: Option<u64>)
++    ensures match answer {
++        None => aligned_input_size(input) > u64::MAX,
++        Some(bytes) => bytes == aligned_input_size(input) && bytes >= 4
++            && bytes >= input && bytes % 4 == 0 && (input > 0 ==> bytes < input + 4),
++    },
++{
++    let words = units_for_sequential_write(input, GPU_INPUT_ALIGNMENT);
++    words.checked_mul(GPU_INPUT_ALIGNMENT)
++}
++
++/// G16：预算计算包含对齐输入、逐条固定占用和整批固定占用，乘加任一溢出都拒绝。
++pub fn checked_gpu_chunk_bytes(input: u64, entries: u64, per_entry: u64, fixed: u64) -> (answer: Option<u64>)
++    ensures match answer {
++        None => aligned_input_size(input) + entries * per_entry + fixed > u64::MAX,
++        Some(bytes) => bytes == aligned_input_size(input) + entries * per_entry + fixed,
++    },
++{
++    match checked_gpu_input_bytes(input) {
++        None => None,
++        Some(aligned) => match entries.checked_mul(per_entry) {
++            None => None,
++            Some(overhead) => match aligned.checked_add(overhead) {
++                None => None,
++                Some(subtotal) => subtotal.checked_add(fixed),
++            },
++        },
++    }
++}
++
++/// G17：各后台阶段共享显存预算；已占超限时不回绕，正的新增分配必在总限内。
++#[allow(clippy::implicit_saturating_sub, reason = "被验函数体与 ensures 的分支逐字对照，不换成饱和减")]
++pub fn remaining_gpu_memory(limit: u64, held: u64) -> (remaining: u64)
++    ensures
++        remaining == if held < limit { limit - held } else { 0int },
++        remaining <= limit,
++        held <= limit ==> held + remaining == limit,
++{
++    if held >= limit { 0 } else { limit - held }
++}
++
++pub open spec fn in_slice(index: int, start: u64, end: u64) -> bool {
++    start <= index < end
++}
++
++/// G18：下一记录片有进展、不过界；减法取余量避免 start + capacity 溢出。
++pub fn next_gpu_record_slice_end(start: u64, total: u64, capacity: u64) -> (end: u64)
++    requires start <= total, capacity > 0,
++    ensures
++        start <= end <= total,
++        end - start <= capacity,
++        end == if total - start <= capacity { total as int } else { start + capacity },
++        start < total ==> end > start,
++        forall|index: int| #[trigger] in_slice(index, start, total)
++            <==> (in_slice(index, start, end) || in_slice(index, end, total)),
++        forall|index: int| !(#[trigger] in_slice(index, start, end) && in_slice(index, end, total)),
++{
++    if total - start <= capacity { total } else { start + capacity }
++}
++
++/// G19：只有同盘未释放、起点在区内且全跨度都在区内的记录才允许扫描。
++pub fn gpu_record_is_in_scan_region(same_device: bool, released: bool, slot: u64, span: u64, start: u64, end: u64) -> (read: bool)
++    ensures read == (same_device && !released && start <= slot < end && slot + span <= end),
++{
++    if !same_device || released || slot < start || slot >= end { return false; }
++    match slot.checked_add(span) {
++        None => false,
++        Some(past) => past <= end,
++    }
++}
++
++/// G20：判定字必须是 counted=1，填充字/未知字不成为活槽数；解码保留两个字。
++pub fn decoded_gpu_live_slots(low: u32, high: u32, verdict: u32) -> (answer: Option<u64>)
++    ensures match answer {
++        None => verdict != 1,
++        Some(value) => verdict == 1 && value == words_value(low, high),
++    },
++{
++    if verdict != GPU_LIVE_SLOTS_COUNTED { None } else { Some(low as u64 + 4294967296u64 * high as u64) }
++}
++
++/// 非空协议与打分见证，不计入 G01–G20。
++pub proof fn witness_gpu_gc_protocol_and_score_premises()
++    ensures
++        overlap_slots(9, 12, 10, 20) == 2,
++        record_slice_sum(seq![ScoringRecord { device: 7, released: false, start: 9, end: 12 }], 7, 10, 20, 0, 1) == 2,
++        count_of(update_count(Map::<int, nat>::empty(), 7, false), 7) == 1,
++{
++    let counts = Map::<int, nat>::empty().insert(7, 1nat);
++    lemma_distinct_entry_updates_commute(counts, 7, 8, false, false);
++    lemma_count_updates_preserve_the_sparse_counter_invariant(counts, 7, false);
++    lemma_record_slices_preserve_the_score(seq![ScoringRecord { device: 7, released: false, start: 9, end: 12 }], 7, 10, 20, 0, 0, 1);
++    lemma_live_slot_intersection_bounds(9, 12, 10, 20);
++    lemma_splitting_a_segment_preserves_live_slot_contributions(9, 12, 10, 11, 20);
++    lemma_released_and_foreign_records_do_not_score(ScoringRecord { device: 7, released: false, start: 9, end: 12 }, 7, 10, 20);
++    lemma_two_word_span_addition_carries_exactly_once(u32::MAX, 0, 1);
++}
++
++/// 产品纯核的极值见证，不计入 G01–G20；普通 Rust 下也可以执行。
++#[allow(unused_variables, reason = "assert 在普通 Rust 构建中擦除，执行调用保留")]
++pub fn witness_gpu_gc_arithmetic_boundaries()
++{
++    let defer = reconcile_gpu_entry(0, false);
++    assert(!defer.confirmed && !defer.ask_cpu && defer.uncertain_rounds == 1);
++    let judge = reconcile_gpu_entry(defer.uncertain_rounds, false);
++    assert(judge.ask_cpu && judge.uncertain_rounds == 0);
++    let empty = checked_gpu_input_bytes(0);
++    let too_large = checked_gpu_input_bytes(u64::MAX);
++    let footprint = checked_gpu_chunk_bytes(1, 2, 40, 16);
++    let overflow = checked_gpu_chunk_bytes(1, u64::MAX, 2, 0);
++    let remaining = remaining_gpu_memory(1, u64::MAX);
++    let past = next_gpu_record_slice_end(u64::MAX - 1, u64::MAX, u64::MAX);
++    let scan = gpu_record_is_in_scan_region(true, false, u64::MAX - 1, 2, 0, u64::MAX);
++    let decoded = decoded_gpu_live_slots(u32::MAX, u32::MAX, 1);
++    let unwritten = decoded_gpu_live_slots(0, 0, u32::MAX);
++    let sum = checked_live_slot_totals(1, 2, 3, 4);
++    let sum_overflow = checked_live_slot_totals(0, u64::MAX, 1, 1);
++    assert(empty == Some(4));
++    assert(too_large == None);
++    assert(footprint == Some(100));
++    assert(overflow == None);
++    assert(remaining == 0);
++    assert(past == u64::MAX);
++    assert(!scan);
++    assert(decoded == Some(u64::MAX));
++    assert(unwritten == None);
++    assert(sum == Some((4, 6)));
++    assert(sum_overflow == None);
++}
++
++} // verus!
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
+new file mode 100644
+index 000000000..f98c13d46
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
+@@ -0,0 +1,271 @@
++//! 两份 GPU 活槽打分算法的精确等价证明：二分边界、候选裁剪、逐槽计数与排列。
++//! 这里验证算法模型；WGSL 到此模型的翻译、主机排序/打包与 GPU 执行仍是未证边界。
++#[allow(
++    unused_imports,
++    reason = "只有 Verus 编译时留下的证明代码用这些名字；普通构建擦掉证明代码之后没人用，擦掉的 spec fn 也不在，所以整模块导入"
++)]
++use crate::gpu_gc_proofs::*;
++use vstd::prelude::*;
++
++verus! {
++
++pub open spec fn record_key_before(record: ScoringRecord, device: int, slot: int) -> bool {
++    record.device < device || (record.device == device && record.start < slot)
++}
++
++pub open spec fn records_are_sorted(records: Seq<ScoringRecord>) -> bool {
++    forall|earlier: int, later: int| 0 <= earlier < later < records.len() ==>
++        records[earlier].device < records[later].device
++        || (records[earlier].device == records[later].device
++            && records[earlier].start <= records[later].start)
++}
++
++pub open spec fn is_lower_bound(records: Seq<ScoringRecord>, device: int, slot: int, boundary: int) -> bool {
++    0 <= boundary <= records.len()
++        && (forall|position: int| 0 <= position < boundary ==>
++            #[trigger] record_key_before(records[position], device, slot))
++        && (forall|position: int| boundary <= position < records.len() ==>
++            !#[trigger] record_key_before(records[position], device, slot))
++}
++
++/// 对 WGSL 二分循环的 (below, above) 状态归纳；不把“返回下界”作为假设。
++pub proof fn lower_bound_of_sorted_records(records: Seq<ScoringRecord>, device: int, slot: int, below: int, above: int) -> (boundary: int)
++    requires
++        records_are_sorted(records),
++        0 <= below <= above <= records.len() <= u32::MAX,
++        forall|position: int| 0 <= position < below ==>
++            #[trigger] record_key_before(records[position], device, slot),
++        forall|position: int| above <= position < records.len() ==>
++            !#[trigger] record_key_before(records[position], device, slot),
++    ensures is_lower_bound(records, device, slot, boundary),
++    decreases above - below,
++{
++    if below < above {
++        let middle = below + (above - below) / 2;
++        assert(below <= middle < above);
++        if record_key_before(records[middle], device, slot) {
++            assert forall|position: int| 0 <= position < middle + 1 implies
++                #[trigger] record_key_before(records[position], device, slot) by {
++                if position < middle {
++                    assert(records[position].device < records[middle].device
++                        || (records[position].device == records[middle].device
++                            && records[position].start <= records[middle].start));
++                }
++            }
++            lower_bound_of_sorted_records(records, device, slot, middle + 1, above)
++        } else {
++            assert forall|position: int| middle <= position < records.len() implies
++                !#[trigger] record_key_before(records[position], device, slot) by {
++                if middle < position {
++                    assert(records[middle].device < records[position].device
++                        || (records[middle].device == records[position].device
++                            && records[middle].start <= records[position].start));
++                }
++            }
++            lower_bound_of_sorted_records(records, device, slot, below, middle)
++        }
++    } else { below }
++}
++
++/// 逐槽核的内循环，按实际访问的每个槽定义；规格不借用区间交长度。
++pub open spec fn slots_counted_one_by_one(first: int, span: nat, start: int, end: int) -> int
++    decreases span,
++{
++    if span == 0 { 0 }
++    else {
++        slots_counted_one_by_one(first, (span - 1) as nat, start, end)
++            + if start <= first + span - 1 < end { 1int } else { 0int }
++    }
++}
++
++pub proof fn lemma_counting_slots_equals_interval_intersection(first: int, span: nat, start: int, end: int)
++    requires start <= end,
++    ensures slots_counted_one_by_one(first, span, start, end)
++        == overlap_slots(first, first + span, start, end),
++    decreases span,
++{
++    if span > 0 {
++        lemma_counting_slots_equals_interval_intersection(first, (span - 1) as nat, start, end);
++    }
++}
++
++pub open spec fn earliest_candidate_start(start: int) -> int {
++    if start >= 65535 { start - 65535 } else { 0 }
++}
++
++pub open spec fn valid_scoring_records(records: Seq<ScoringRecord>) -> bool {
++    forall|position: int| 0 <= position < records.len() ==>
++        0 <= records[position].start <= records[position].end <= u64::MAX
++        && records[position].end - records[position].start <= 65535
++}
++
++/// 候选窗内不混入异盘；窗外记录无贡献，包括窗前跨段记录的最大跨度边界。
++pub proof fn lemma_candidate_window_keeps_every_contribution(
++    records: Seq<ScoringRecord>, device: int, start: int, end: int,
++    first: int, past: int, position: int,
++)
++    requires
++        valid_scoring_records(records), 0 <= start < end,
++        is_lower_bound(records, device, earliest_candidate_start(start), first),
++        is_lower_bound(records, device, end, past),
++        0 <= position < records.len(),
++    ensures
++        first <= past,
++        first <= position < past ==> records[position].device == device,
++        !(first <= position < past) ==> record_contribution(records[position], device, start, end) == 0,
++{
++    if past < first {
++        assert(record_key_before(records[past], device, earliest_candidate_start(start)));
++        assert(!record_key_before(records[past], device, end));
++    }
++    let record = records[position];
++    assert(0 <= record.start <= record.end <= u64::MAX);
++    assert(record.end - record.start <= 65535);
++    if position < first {
++        assert(record_key_before(record, device, earliest_candidate_start(start)));
++    } else {
++        assert(!record_key_before(record, device, earliest_candidate_start(start)));
++    }
++    if position < past {
++        assert(record_key_before(record, device, end));
++    } else {
++        assert(!record_key_before(record, device, end));
++    }
++}
++
++/// 外循环只累加二分出的窗口，已释放记录跳过；重复记录不会被去重。
++pub open spec fn searched_slot_sum(records: Seq<ScoringRecord>, start: int, end: int, first: int, past: int) -> int
++    decreases past - first,
++{
++    if past <= first { 0 }
++    else {
++        let record = records[past - 1];
++        searched_slot_sum(records, start, end, first, past - 1)
++            + if record.released { 0int } else {
++                slots_counted_one_by_one(record.start, (record.end - record.start) as nat, start, end)
++            }
++    }
++}
++
++pub proof fn lemma_search_prefix_matches_the_walk(
++    records: Seq<ScoringRecord>, device: int, start: int, end: int,
++    first: int, past: int, visited: int,
++)
++    requires
++        valid_scoring_records(records), 0 <= start < end,
++        is_lower_bound(records, device, earliest_candidate_start(start), first),
++        is_lower_bound(records, device, end, past),
++        first <= past, 0 <= visited <= records.len(),
++    ensures
++        record_slice_sum(records, device, start, end, 0, visited)
++            == searched_slot_sum(records, start, end, first, if visited < past { visited } else { past }),
++    decreases visited,
++{
++    if visited > 0 {
++        lemma_search_prefix_matches_the_walk(records, device, start, end, first, past, visited - 1);
++        lemma_candidate_window_keeps_every_contribution(records, device, start, end, first, past, visited - 1);
++        if first < visited <= past {
++            let record = records[visited - 1];
++            lemma_counting_slots_equals_interval_intersection(record.start, (record.end - record.start) as nat, start, end);
++        }
++    }
++}
++
++pub proof fn lemma_record_sum_is_a_fold(records: Seq<ScoringRecord>, device: int, start: int, end: int, visited: int)
++    requires 0 <= visited <= records.len(),
++    ensures record_slice_sum(records, device, start, end, 0, visited)
++        == records.take(visited).fold_left(0int, |total: int, record: ScoringRecord|
++            total + record_contribution(record, device, start, end)),
++    decreases visited,
++{
++    if visited > 0 {
++        lemma_record_sum_is_a_fold(records, device, start, end, visited - 1);
++        assert(records.take(visited).drop_last() =~= records.take(visited - 1));
++    }
++}
++
++/// 排序只要求多重集合相同；允许重复、重叠记录，不能把排列假设弱化成集合相同。
++pub proof fn lemma_permuting_records_preserves_the_walk(original: Seq<ScoringRecord>, sorted: Seq<ScoringRecord>, device: int, start: int, end: int)
++    requires original.to_multiset() == sorted.to_multiset(),
++    ensures record_slice_sum(original, device, start, end, 0, original.len() as int)
++        == record_slice_sum(sorted, device, start, end, 0, sorted.len() as int),
++{
++    let add_contribution = |total: int, record: ScoringRecord| total + record_contribution(record, device, start, end);
++    vstd::seq_lib::lemma_fold_left_permutation(original, sorted, add_contribution, 0int);
++    lemma_record_sum_is_a_fold(original, device, start, end, original.len() as int);
++    lemma_record_sum_is_a_fold(sorted, device, start, end, sorted.len() as int);
++    assert(original.take(original.len() as int) =~= original);
++    assert(sorted.take(sorted.len() as int) =~= sorted);
++}
++
++/// 任意有限表：实际二分控制流的两端之间逐槽计数，等于原始无序表逐记录求交。
++pub proof fn theorem_sorted_search_equals_full_record_walk(
++    original: Seq<ScoringRecord>, sorted: Seq<ScoringRecord>, device: int, start: int, end: int,
++) -> (window: (int, int))
++    requires
++        original.to_multiset() == sorted.to_multiset(),
++        records_are_sorted(sorted), valid_scoring_records(sorted),
++        sorted.len() <= u32::MAX, 0 <= start < end <= u64::MAX,
++    ensures
++        is_lower_bound(sorted, device, earliest_candidate_start(start), window.0),
++        is_lower_bound(sorted, device, end, window.1),
++        window.0 <= window.1,
++        searched_slot_sum(sorted, start, end, window.0, window.1)
++            == record_slice_sum(original, device, start, end, 0, original.len() as int),
++{
++    let first = lower_bound_of_sorted_records(sorted, device, earliest_candidate_start(start), 0, sorted.len() as int);
++    let past = lower_bound_of_sorted_records(sorted, device, end, 0, sorted.len() as int);
++    if past < first {
++        lemma_candidate_window_keeps_every_contribution(sorted, device, start, end, first, past, past);
++    }
++    lemma_search_prefix_matches_the_walk(sorted, device, start, end, first, past, sorted.len() as int);
++    lemma_permuting_records_preserves_the_walk(original, sorted, device, start, end);
++    (first, past)
++}
++
++/// 每个前缀都装得进 u64；允许重数，所以界限是记录数乘跨度，不是段长。
++pub proof fn lemma_every_walk_prefix_fits_the_gpu_counter(records: Seq<ScoringRecord>, device: int, start: int, end: int, visited: int)
++    requires valid_scoring_records(records), start <= end, 0 <= visited <= records.len() <= u32::MAX,
++    ensures 0 <= record_slice_sum(records, device, start, end, 0, visited) <= visited * 65535 < u64::MAX,
++    decreases visited,
++{
++    if visited > 0 {
++        lemma_every_walk_prefix_fits_the_gpu_counter(records, device, start, end, visited - 1);
++        let record = records[visited - 1];
++        crate::gpu_gc_proofs::lemma_live_slot_intersection_bounds(record.start, record.end, start, end);
++    }
++}
++
++/// 非空实例含异盘、释放、重复及从段前伸入的记录；另覆盖空表与饱和下界。
++pub proof fn witness_scoring_search_with_duplicates_and_crossing_records() {
++    broadcast use vstd::seq_lib::group_to_multiset_ensures;
++    let crossing = ScoringRecord { device: 7, released: false, start: 9, end: 12 };
++    let foreign = ScoringRecord { device: 6, released: false, start: 10, end: 11 };
++    let released = ScoringRecord { device: 7, released: true, start: 10, end: 14 };
++    let sorted = seq![foreign, crossing, crossing, released];
++    let original = seq![crossing, foreign, released, crossing];
++    // vstd 的 Seq::to_multiset 是 closed，本模块看不见它的定义；多于一个元素的 seq! 展开成数组视图，
++    // group_to_multiset_ensures 里的 to_multiset_build 只认 s.push(a).to_multiset()。
++    // 所以先把两张表写成从空表逐个 push 的形态，再逐步换成多重集合的 insert，两边的计数按 add、singleton 的公理逐值相等。
++    let nothing_pushed = Seq::<ScoringRecord>::empty();
++    assert(sorted =~= nothing_pushed.push(foreign).push(crossing).push(crossing).push(released));
++    assert(original =~= nothing_pushed.push(crossing).push(foreign).push(released).push(crossing));
++    assert(sorted.to_multiset() =~= nothing_pushed.to_multiset()
++        .insert(foreign).insert(crossing).insert(crossing).insert(released));
++    assert(original.to_multiset() =~= nothing_pushed.to_multiset()
++        .insert(crossing).insert(foreign).insert(released).insert(crossing));
++    assert(original.to_multiset() =~= sorted.to_multiset());
++    assert(records_are_sorted(sorted));
++    assert(valid_scoring_records(sorted));
++    let window = theorem_sorted_search_equals_full_record_walk(original, sorted, 7, 10, 20);
++    lemma_every_walk_prefix_fits_the_gpu_counter(sorted, 7, 10, 20, 4);
++    reveal_with_fuel(record_slice_sum, 5);
++    assert(searched_slot_sum(sorted, 10, 20, window.0, window.1) == 4);
++    let empty = Seq::<ScoringRecord>::empty();
++    theorem_sorted_search_equals_full_record_walk(empty, empty, 7, 0, 1);
++    let longest_crossing = seq![ScoringRecord { device: 7, released: false, start: 1, end: 65536 }];
++    let crossing_window = theorem_sorted_search_equals_full_record_walk(longest_crossing, longest_crossing, 7, 65535, 65537);
++    assert(searched_slot_sum(longest_crossing, 65535, 65537, crossing_window.0, crossing_window.1) == 1);
++}
++
++} // verus!
+diff --git a/crates/singlefs-replay-prefix/src/lib.rs b/crates/singlefs-replay-prefix/src/lib.rs
+index dfa16a74e..203b1c0c7 100644
+--- a/crates/singlefs-replay-prefix/src/lib.rs
++++ b/crates/singlefs-replay-prefix/src/lib.rs
+@@ -33,6 +33,9 @@ pub mod compaction_plan_proofs;
+ pub mod file_range_proofs;
+ pub mod gc_crash_proofs;
+ pub mod gc_ring_interval_proofs;
++pub mod gpu_gc_capacity_proofs;
++pub mod gpu_gc_proofs;
++pub mod gpu_gc_scoring_proofs;
+ pub mod partial_write_proofs;
+ pub mod unlink_proofs;
+ 
+@@ -272,7 +275,7 @@ pub open spec fn is_a_later_record_of_the_same_instance<RootSource>(
+ 
+ // 已定项 4 读者规则第四格（C540）：同一 (实例代号, checkpoint_txg) 里这一条之后还有读得出的记录。
+ // 「之后」按计数器、不要求紧接着；往后看到 txg 越过这一条的就不再看——同实例 txg 随计数器不降（K10）时与「之后任一条同 txg」逐态相同
+-pub open spec fn a_later_record_of_the_same_publish_is_readable<RootSource>(
++pub open spec fn later_record_of_the_same_publish_is_readable<RootSource>(
+     records: Seq<CoreRecord<RootSource>>,
+     position: int,
+ ) -> bool {
+@@ -350,7 +353,7 @@ pub open spec fn passes_every_check_before_the_named_units<
+     &&& back_chain_reported_holding(back_chain_broken, position)
+     &&& obeys_the_reader_rules_and_the_commit_markers(records[position], previous)
+     &&& !(is_last_record_of_its_publish(records[position])
+-        && a_later_record_of_the_same_publish_is_readable(records, position))
++        && later_record_of_the_same_publish_is_readable(records, position))
+ }
+ 
+ #[verifier::opaque]
+@@ -373,7 +376,7 @@ pub open spec fn fails_a_check_before_the_named_units<RootSource, BackChain: Fn(
+     ||| back_chain_reported_broken(back_chain_broken, position)
+     ||| !obeys_the_reader_rules_and_the_commit_markers(records[position], previous)
+     ||| (is_last_record_of_its_publish(records[position])
+-        && a_later_record_of_the_same_publish_is_readable(records, position))
++        && later_record_of_the_same_publish_is_readable(records, position))
+ }
+ 
+ pub open spec fn previous_in_the_chain<RootSource>(
+@@ -1727,7 +1730,7 @@ proof fn lemma_a_publish_end_that_passed_the_fourth_reader_rule_closes_its_txg<R
+         records_ascend_by_instance_and_counter(records),
+         journal_txg_does_not_decrease_with_the_counter_within_an_instance(records),
+         0 <= end_index < records.len(),
+-        !a_later_record_of_the_same_publish_is_readable(records, end_index),
++        !later_record_of_the_same_publish_is_readable(records, end_index),
+     ensures
+         forall|record_index: int|
+             end_index < record_index < records.len() && (#[trigger] records[record_index]).instance
+@@ -2155,7 +2158,7 @@ proof fn lemma_the_landed_record_closes_its_txg<
+     assert forall|position_in_chain: int|
+         0 <= position_in_chain < admitted.len() && is_last_record_of_its_publish(
+             records[#[trigger] admitted[position_in_chain]],
+-        ) implies !a_later_record_of_the_same_publish_is_readable(
++        ) implies !later_record_of_the_same_publish_is_readable(
+         records,
+         admitted[position_in_chain],
+     ) by {
+@@ -3124,7 +3127,7 @@ fn readable_record_of_the_same_publish_follows<RootSource>(
+         index < records.len(),
+         records_ascend_by_instance_and_counter(records@),
+     ensures
+-        follows == a_later_record_of_the_same_publish_is_readable(records@, index as int),
++        follows == later_record_of_the_same_publish_is_readable(records@, index as int),
+ {
+     let record = &records[index];
+     let mut later_index = index + 1;
+@@ -4112,7 +4115,7 @@ pub fn witness_nonempty_replay_and_its_fixed_point() {
+ }
+ 
+ // ===== spec 自己的冒烟（防 spec 恒真或恒假）=====
+-proof fn a_publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreRecord<u64>)
++proof fn publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreRecord<u64>)
+     requires
+         first.checkpoint_txg == second.checkpoint_txg,
+         first.ordinal_within_publish.0 == 1,
+@@ -4129,7 +4132,7 @@ proof fn a_publish_of_two_records_is_whole(first: CoreRecord<u64>, second: CoreR
+     assert(is_concatenation_of_whole_publishes(both.subrange(0, 0)));
+ }
+ 
+-proof fn a_record_without_the_last_flag_alone_is_not_a_concatenation(only: CoreRecord<u64>)
++proof fn record_without_the_last_flag_alone_is_not_a_concatenation(only: CoreRecord<u64>)
+     requires
+         !is_last_record_of_its_publish(only),
+     ensures
+@@ -4187,7 +4190,7 @@ mod tests {
+ 
+     /// 所选根那次发布的末条（计数器 1）之后，txg 2 的发布两条都在、第二条带末条标志 ⇒ 整次施加，新根段取末条的。
+     #[test]
+-    fn a_two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record(
++    fn two_record_publish_after_the_anchor_is_applied_whole_and_the_new_root_segment_comes_from_its_last_record(
+     ) {
+         let records = [
+             record(
+@@ -4238,7 +4241,7 @@ mod tests {
+ 
+     /// 同样的锚点，txg 2 的发布只有第一条（不带末条标志）⇒ 末条没到，一条都不施加，新根段还是所选根的。
+     #[test]
+-    fn a_publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays() {
++    fn publish_whose_last_record_is_missing_is_not_applied_and_the_root_segment_stays() {
+         let records = [
+             record(
+                 1,
+@@ -4295,7 +4298,7 @@ mod tests {
+ 
+     /// txg 大的赢，哪怕另一个槽的实例代号更高（D22 已定项 7 txg 为主、实例代号只破平局）。
+     #[test]
+-    fn a_later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg() {
++    fn later_checkpoint_txg_is_chosen_over_a_higher_instance_with_an_earlier_checkpoint_txg() {
+         let root_slots = [root_choice_key(2, 2), root_choice_key(3, 1)];
+         assert_eq!(
+             choose_root_slot(&root_slots),
+@@ -4317,7 +4320,7 @@ mod tests {
+ 
+     /// 第一个自证过的槽不是最新的：往后看完全部槽再择（D22 已定项 24 先验全部候选再择新）。
+     #[test]
+-    fn a_newer_root_after_the_first_self_verified_slot_is_chosen_over_it() {
++    fn newer_root_after_the_first_self_verified_slot_is_chosen_over_it() {
+         let root_slots = [None, root_choice_key(2, 1), None, root_choice_key(3, 1)];
+         assert_eq!(
+             choose_root_slot(&root_slots),
+diff --git a/crates/singlefs-replay-prefix/src/partial_write_proofs.rs b/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+index 372d838f4..ab99ad51b 100644
+--- a/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+@@ -1,5 +1,5 @@
+ //! 部分写的纯计划核：单元来源、重写起点和写后单元数由 core 直接调用。
+-//! 这里只证明决策；单元端点换算、旧尾单元是否不满的判定及实际读写由调用方负责。
++//! 证明计划决策与固定长度覆盖写的抽象字节规律；实际读写到字节模型的精化仍由调用方负责。
+ use crate::file_range_proofs::units_covering_size;
+ use vstd::prelude::*;
+ 
+@@ -42,27 +42,27 @@ pub open spec fn byte_in_range(byte: int, start: u64, end: u64) -> bool {
+     start <= byte < end
+ }
+ 
+-pub open spec fn unit_is_touched(ws: u64, we: u64, us: u64, ue: u64) -> bool {
+-    ws < ue && us < we
++pub open spec fn unit_is_touched(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64) -> bool {
++    write_start < unit_end && unit_start < write_end
+ }
+ 
+-pub open spec fn unit_is_covered(ws: u64, we: u64, us: u64, ue: u64) -> bool {
+-    ws <= us && ue <= we
++pub open spec fn unit_is_covered(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64) -> bool {
++    write_start <= unit_start && unit_end <= write_end
+ }
+ 
+ /// 旧单元没盖满就读旧数据；新单元只在被部分覆盖时读残留；未写到的新单元补零。
+-pub fn classify_partial_write_unit(has_old: bool, ws: u64, we: u64, us: u64, ue: u64)
++pub fn classify_partial_write_unit(has_old: bool, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
+     -> (answer: PartialWriteUnitSource)
+-    requires ws < we, us < ue,
++    requires write_start < write_end, unit_start < unit_end,
+     ensures
+-        answer is OldReadBack <==> has_old && !unit_is_covered(ws, we, us, ue),
+-        answer is OldCoveredWhole <==> has_old && unit_is_covered(ws, we, us, ue),
+-        answer is NewReadResidue <==> !has_old && unit_is_touched(ws, we, us, ue) && !unit_is_covered(ws, we, us, ue),
+-        answer is NewCoveredWhole <==> !has_old && unit_is_covered(ws, we, us, ue),
+-        answer is ZeroGap <==> !has_old && !unit_is_touched(ws, we, us, ue),
++        answer is OldReadBack <==> has_old && !unit_is_covered(write_start, write_end, unit_start, unit_end),
++        answer is OldCoveredWhole <==> has_old && unit_is_covered(write_start, write_end, unit_start, unit_end),
++        answer is NewReadResidue <==> !has_old && unit_is_touched(write_start, write_end, unit_start, unit_end) && !unit_is_covered(write_start, write_end, unit_start, unit_end),
++        answer is NewCoveredWhole <==> !has_old && unit_is_covered(write_start, write_end, unit_start, unit_end),
++        answer is ZeroGap <==> !has_old && !unit_is_touched(write_start, write_end, unit_start, unit_end),
+ {
+-    let touched = ws < ue && us < we;
+-    let whole = ws <= us && ue <= we;
++    let touched = write_start < unit_end && unit_start < write_end;
++    let whole = write_start <= unit_start && unit_end <= write_end;
+     if has_old {
+         if whole { PartialWriteUnitSource::OldCoveredWhole } else { PartialWriteUnitSource::OldReadBack }
+     } else if !touched {
+@@ -75,36 +75,134 @@ pub fn classify_partial_write_unit(has_old: bool, ws: u64, we: u64, us: u64, ue:
+ }
+ 
+ /// 非空区间的端点判定等价于逐字节“全部覆盖”；部分覆盖不能被误判为免读旧数据。
+-pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(ws: u64, we: u64, us: u64, ue: u64)
+-    requires ws < we, us < ue,
++pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
++    requires write_start < write_end, unit_start < unit_end,
+     ensures
+-        unit_is_covered(ws, we, us, ue) <==>
+-            (forall|byte: int| #[trigger] byte_in_range(byte, us, ue) ==> byte_in_range(byte, ws, we)),
++        unit_is_covered(write_start, write_end, unit_start, unit_end) <==>
++            (forall|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) ==> byte_in_range(byte, write_start, write_end)),
+ {
+-    if !unit_is_covered(ws, we, us, ue) {
+-        if ws > us {
+-            assert(byte_in_range(us as int, us, ue));
+-            assert(!byte_in_range(us as int, ws, we));
++    if !unit_is_covered(write_start, write_end, unit_start, unit_end) {
++        if write_start > unit_start {
++            assert(byte_in_range(unit_start as int, unit_start, unit_end));
++            assert(!byte_in_range(unit_start as int, write_start, write_end));
+         } else {
+-            assert(byte_in_range(ue - 1, us, ue));
+-            assert(!byte_in_range(ue - 1, ws, we));
++            assert(byte_in_range(unit_end - 1, unit_start, unit_end));
++            assert(!byte_in_range(unit_end - 1, write_start, write_end));
+         }
+     }
+ }
+ 
+ /// 相交判定恰好表示存在共同字节；相邻端点不算相交。
+-pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(ws: u64, we: u64, us: u64, ue: u64)
+-    requires ws < we, us < ue,
++pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
++    requires write_start < write_end, unit_start < unit_end,
+     ensures
+-        unit_is_touched(ws, we, us, ue) <==>
+-            (exists|byte: int| #[trigger] byte_in_range(byte, us, ue) && byte_in_range(byte, ws, we)),
++        unit_is_touched(write_start, write_end, unit_start, unit_end) <==>
++            (exists|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) && byte_in_range(byte, write_start, write_end)),
+ {
+-    if unit_is_touched(ws, we, us, ue) {
+-        let byte = if ws > us { ws as int } else { us as int };
+-        assert(byte_in_range(byte, us, ue) && byte_in_range(byte, ws, we));
++    if unit_is_touched(write_start, write_end, unit_start, unit_end) {
++        let byte = if write_start > unit_start { write_start as int } else { unit_start as int };
++        assert(byte_in_range(byte, unit_start, unit_end) && byte_in_range(byte, write_start, write_end));
+     }
+ }
+ 
++/// 固定长度文件内的写入；扩展文件、补洞与 I/O 不在这个字节模型中。
++pub open spec fn overwrite_fits(old: Seq<u8>, start: int, data: Seq<u8>) -> bool {
++    0 <= start && start + data.len() <= old.len()
++}
++
++pub open spec fn overwritten_bytes(old: Seq<u8>, start: int, data: Seq<u8>) -> Seq<u8> {
++    Seq::new(old.len(), |byte: int|
++        if start <= byte < start + data.len() { data[byte - start] } else { old[byte] })
++}
++
++/// 写内每个字节来自请求，写外每个字节仍是原值；空写也包括在内。
++pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)
++    requires overwrite_fits(old, start, data),
++    ensures
++        overwritten_bytes(old, start, data).len() == old.len(),
++        forall|byte: int| 0 <= byte < old.len() ==>
++            #[trigger] overwritten_bytes(old, start, data)[byte] ==
++                if start <= byte < start + data.len() { data[byte - start] } else { old[byte] },
++        data.len() == 0 ==> overwritten_bytes(old, start, data) == old,
++{
++    if data.len() == 0 {
++        assert(overwritten_bytes(old, start, data) =~= old);
++    }
++}
++
++/// 同一段写两次，后一次完全取代前一次；不是只证明最后一个字节。
++pub proof fn lemma_overwriting_the_same_range_keeps_only_the_last_write(
++    old: Seq<u8>, start: int, first: Seq<u8>, last: Seq<u8>,
++)
++    requires
++        overwrite_fits(old, start, first),
++        first.len() == last.len(),
++    ensures
++        overwrite_fits(overwritten_bytes(old, start, first), start, last),
++        overwritten_bytes(overwritten_bytes(old, start, first), start, last)
++            == overwritten_bytes(old, start, last),
++{
++    assert(overwritten_bytes(overwritten_bytes(old, start, first), start, last)
++        =~= overwritten_bytes(old, start, last));
++}
++
++/// 不相交的写可以交换顺序，包括相邻区间与空写；重叠写没有这个性质。
++pub proof fn lemma_disjoint_overwrites_commute(
++    old: Seq<u8>, first_start: int, first: Seq<u8>, second_start: int, second: Seq<u8>,
++)
++    requires
++        overwrite_fits(old, first_start, first),
++        overwrite_fits(old, second_start, second),
++        first_start + first.len() <= second_start || second_start + second.len() <= first_start,
++    ensures
++        overwrite_fits(overwritten_bytes(old, first_start, first), second_start, second),
++        overwrite_fits(overwritten_bytes(old, second_start, second), first_start, first),
++        overwritten_bytes(overwritten_bytes(old, first_start, first), second_start, second)
++            == overwritten_bytes(overwritten_bytes(old, second_start, second), first_start, first),
++{
++    assert(overwritten_bytes(overwritten_bytes(old, first_start, first), second_start, second)
++        =~= overwritten_bytes(overwritten_bytes(old, second_start, second), first_start, first));
++}
++
++/// 分类核的“整单元覆盖”条件蕴涵该单元的结果不依赖旧内容。
++pub proof fn lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(
++    left: Seq<u8>, right: Seq<u8>, data: Seq<u8>, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64,
++)
++    requires
++        write_start < write_end, unit_start < unit_end,
++        left.len() == right.len(),
++        overwrite_fits(left, write_start as int, data),
++        data.len() == write_end - write_start,
++        unit_is_covered(write_start, write_end, unit_start, unit_end),
++    ensures
++        forall|byte: int| #[trigger] byte_in_range(byte, unit_start, unit_end) ==>
++            0 <= byte < left.len()
++            && overwritten_bytes(left, write_start as int, data)[byte]
++                == overwritten_bytes(right, write_start as int, data)[byte],
++{
++    lemma_whole_coverage_means_every_unit_byte_is_written(write_start, write_end, unit_start, unit_end);
++}
++
++/// 非空见证与重叠写反例：以上前提可满足，交换律确实需要不相交条件。
++pub proof fn witness_overwrite_laws_and_overlapping_write_order()
++    ensures
++        overwrite_fits(seq![1u8, 2, 3, 4], 1, seq![8u8, 9]),
++        overwritten_bytes(seq![1u8, 2, 3, 4], 1, seq![8u8, 9]) == seq![1u8, 8, 9, 4],
++        overwritten_bytes(seq![1u8, 2, 3, 4], 4, Seq::<u8>::empty()) == seq![1u8, 2, 3, 4],
++        overwritten_bytes(overwritten_bytes(seq![0u8, 0], 0, seq![1u8, 1]), 1, seq![2u8])
++            != overwritten_bytes(overwritten_bytes(seq![0u8, 0], 1, seq![2u8]), 0, seq![1u8, 1]),
++{
++    let old = seq![1u8, 2, 3, 4];
++    lemma_overwrite_changes_exactly_the_requested_bytes(old, 1, seq![8u8, 9]);
++    lemma_overwrite_changes_exactly_the_requested_bytes(old, 4, Seq::<u8>::empty());
++    lemma_overwriting_the_same_range_keeps_only_the_last_write(old, 1, seq![5u8, 6], seq![8u8, 9]);
++    lemma_disjoint_overwrites_commute(old, 0, seq![7u8], 1, seq![8u8, 9]);
++    lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(old, seq![5u8, 6, 7, 8], seq![8u8, 9], 1, 3, 1, 3);
++    assert(overwritten_bytes(old, 1, seq![8u8, 9]) =~= seq![1u8, 8, 9, 4]);
++    assert(overwritten_bytes(overwritten_bytes(seq![0u8, 0], 0, seq![1u8, 1]), 1, seq![2u8])[1] == 2);
++    assert(overwritten_bytes(overwritten_bytes(seq![0u8, 0], 1, seq![2u8]), 0, seq![1u8, 1])[1] == 1);
++}
++
+ /// 重写从写入起点开始；跨过已有尾部时，未满的旧尾单元也必须重写。
+ pub fn first_unit_to_rewrite(first_written: u64, existing: u64, tail_is_partial: bool) -> (first: u64)
+     ensures
+@@ -170,15 +268,22 @@ mod tests {
+     #[test]
+     fn unit_sources_match_the_bytes_actually_overwritten() {
+         let mut seen = [false; 5];
+-        for ws in 0..7 {
+-            for we in ws + 1..9 {
+-                for us in 0..7 {
+-                    for ue in us + 1..9 {
+-                        let written =
+-                            (us..ue).filter(|byte| (ws..we).contains(byte)).count() as u64;
++        for write_start in 0..7 {
++            for write_end in write_start + 1..9 {
++                for unit_start in 0..7 {
++                    for unit_end in unit_start + 1..9 {
++                        let written = (unit_start..unit_end)
++                            .filter(|byte| (write_start..write_end).contains(byte))
++                            .count() as u64;
+                         for old in [false, true] {
+                             let (index, reads_old, reads_residue, gap, whole) =
+-                                match classify_partial_write_unit(old, ws, we, us, ue) {
++                                match classify_partial_write_unit(
++                                    old,
++                                    write_start,
++                                    write_end,
++                                    unit_start,
++                                    unit_end,
++                                ) {
+                                     PartialWriteUnitSource::OldReadBack => {
+                                         (0, true, false, false, false)
+                                     }
+@@ -196,10 +301,13 @@ mod tests {
+                                     }
+                                 };
+                             seen[index] = true;
+-                            assert_eq!(reads_old, old && written < ue - us);
+-                            assert_eq!(reads_residue, !old && 0 < written && written < ue - us);
++                            assert_eq!(reads_old, old && written < unit_end - unit_start);
++                            assert_eq!(
++                                reads_residue,
++                                !old && 0 < written && written < unit_end - unit_start
++                            );
+                             assert_eq!(gap, !old && written == 0);
+-                            assert_eq!(whole, written == ue - us);
++                            assert_eq!(whole, written == unit_end - unit_start);
+                         }
+                     }
+                 }
+diff --git a/crates/singlefs-replay-prefix/src/unlink_proofs.rs b/crates/singlefs-replay-prefix/src/unlink_proofs.rs
+index fab92ddb2..0d9afc32d 100644
+--- a/crates/singlefs-replay-prefix/src/unlink_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/unlink_proofs.rs
+@@ -92,14 +92,14 @@ pub proof fn lemma_unlink_plan_shape(remaining: nat, batch: nat)
+         step_before(unlink_plan(remaining, batch)[0]) == remaining,
+         unlink_plan(remaining, batch).last() is Final,
+         step_before(unlink_plan(remaining, batch).last()) <= batch,
+-        forall|i: int| 0 <= i < unlink_plan(remaining, batch).len() - 1 ==> {
+-            &&& #[trigger] unlink_plan(remaining, batch)[i] is Batch
+-            &&& step_before(unlink_plan(remaining, batch)[i]) == step_after(unlink_plan(remaining, batch)[i]) + batch
+-            &&& step_after(unlink_plan(remaining, batch)[i]) >= 1
+-            &&& step_before(unlink_plan(remaining, batch)[i + 1]) == step_after(unlink_plan(remaining, batch)[i])
++        forall|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len() - 1 ==> {
++            &&& #[trigger] unlink_plan(remaining, batch)[step_index] is Batch
++            &&& step_before(unlink_plan(remaining, batch)[step_index]) == step_after(unlink_plan(remaining, batch)[step_index]) + batch
++            &&& step_after(unlink_plan(remaining, batch)[step_index]) >= 1
++            &&& step_before(unlink_plan(remaining, batch)[step_index + 1]) == step_after(unlink_plan(remaining, batch)[step_index])
+         },
+-        forall|i: int| 0 <= i < unlink_plan(remaining, batch).len() ==>
+-            step_before(#[trigger] unlink_plan(remaining, batch)[i]) <= remaining,
++        forall|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len() ==>
++            step_before(#[trigger] unlink_plan(remaining, batch)[step_index]) <= remaining,
+     decreases remaining,
+ {
+     if remaining > batch {
+@@ -110,22 +110,22 @@ pub proof fn lemma_unlink_plan_shape(remaining: nat, batch: nat)
+         let plan = unlink_plan(remaining, batch);
+         assert(plan == head + tail);
+         assert(plan.last() == tail.last());
+-        assert forall|i: int| 0 <= i < plan.len() - 1 implies {
+-            &&& #[trigger] plan[i] is Batch
+-            &&& step_before(plan[i]) == step_after(plan[i]) + batch
+-            &&& step_after(plan[i]) >= 1
+-            &&& step_before(plan[i + 1]) == step_after(plan[i])
++        assert forall|step_index: int| 0 <= step_index < plan.len() - 1 implies {
++            &&& #[trigger] plan[step_index] is Batch
++            &&& step_before(plan[step_index]) == step_after(plan[step_index]) + batch
++            &&& step_after(plan[step_index]) >= 1
++            &&& step_before(plan[step_index + 1]) == step_after(plan[step_index])
+         } by {
+-            if i > 0 {
+-                assert(plan[i] == tail[i - 1]);
+-                assert(plan[i + 1] == tail[i]);
++            if step_index > 0 {
++                assert(plan[step_index] == tail[step_index - 1]);
++                assert(plan[step_index + 1] == tail[step_index]);
+             } else {
+                 assert(plan[1] == tail[0]);
+             }
+         }
+-        assert forall|i: int| 0 <= i < plan.len() implies step_before(#[trigger] plan[i]) <= remaining by {
+-            if i > 0 {
+-                assert(plan[i] == tail[i - 1]);
++        assert forall|step_index: int| 0 <= step_index < plan.len() implies step_before(#[trigger] plan[step_index]) <= remaining by {
++            if step_index > 0 {
++                assert(plan[step_index] == tail[step_index - 1]);
+             }
+         }
+     }
+@@ -159,14 +159,14 @@ pub proof fn lemma_unlink_plan_length(remaining: nat, batch: nat)
+     }
+ }
+ 
+-/// 第 7 条 ①「计划相等」：做完第 i 批（不是最后一批）之后从它留下的单元数续做，算出的整串与不崩溃一路做下来的后半截逐步相同。
+-pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, i: int)
++/// 第 7 条 ①「计划相等」：做完第 step_index 批（不是最后一批）之后从它留下的单元数续做，算出的整串与不崩溃一路做下来的后半截逐步相同。
++pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, step_index: int)
+     requires
+         batch > 0,
+-        0 <= i < unlink_plan(remaining, batch).len() - 1,
++        0 <= step_index < unlink_plan(remaining, batch).len() - 1,
+     ensures
+-        unlink_plan(remaining, batch).subrange(i + 1, unlink_plan(remaining, batch).len() as int)
+-            == unlink_plan(step_after(unlink_plan(remaining, batch)[i]), batch),
++        unlink_plan(remaining, batch).subrange(step_index + 1, unlink_plan(remaining, batch).len() as int)
++            == unlink_plan(step_after(unlink_plan(remaining, batch)[step_index]), batch),
+     decreases remaining,
+ {
+     lemma_unlink_plan_shape(remaining, batch);
+@@ -175,12 +175,12 @@ pub proof fn lemma_continued_plan_equals_the_rest(remaining: nat, batch: nat, i:
+     let tail = unlink_plan(rest, batch);
+     assert(remaining > batch);
+     assert(plan == seq![UnlinkPlanStep::Batch { before: remaining, kept: rest }] + tail);
+-    if i == 0 {
++    if step_index == 0 {
+         assert(plan.subrange(1, plan.len() as int) =~= tail);
+     } else {
+-        lemma_continued_plan_equals_the_rest(rest, batch, i - 1);
+-        assert(plan[i] == tail[i - 1]);
+-        assert(plan.subrange(i + 1, plan.len() as int) =~= tail.subrange(i, tail.len() as int));
++        lemma_continued_plan_equals_the_rest(rest, batch, step_index - 1);
++        assert(plan[step_index] == tail[step_index - 1]);
++        assert(plan.subrange(step_index + 1, plan.len() as int) =~= tail.subrange(step_index, tail.len() as int));
+     }
+ }
+ 
+@@ -189,12 +189,12 @@ pub proof fn lemma_each_data_unit_released_exactly_once(remaining: nat, batch: n
+     requires
+         batch > 0,
+     ensures
+-        (unit < remaining) <==> exists|i: int| 0 <= i < unlink_plan(remaining, batch).len()
+-            && released_by(#[trigger] unlink_plan(remaining, batch)[i], unit),
+-        forall|i: int, j: int|
+-            0 <= i < unlink_plan(remaining, batch).len() && 0 <= j < unlink_plan(remaining, batch).len()
+-            && released_by(#[trigger] unlink_plan(remaining, batch)[i], unit)
+-            && released_by(#[trigger] unlink_plan(remaining, batch)[j], unit) ==> i == j,
++        (unit < remaining) <==> exists|step_index: int| 0 <= step_index < unlink_plan(remaining, batch).len()
++            && released_by(#[trigger] unlink_plan(remaining, batch)[step_index], unit),
++        forall|step_index: int, other_step_index: int|
++            0 <= step_index < unlink_plan(remaining, batch).len() && 0 <= other_step_index < unlink_plan(remaining, batch).len()
++            && released_by(#[trigger] unlink_plan(remaining, batch)[step_index], unit)
++            && released_by(#[trigger] unlink_plan(remaining, batch)[other_step_index], unit) ==> step_index == other_step_index,
+     decreases remaining,
+ {
+     let plan = unlink_plan(remaining, batch);
+@@ -209,35 +209,35 @@ pub proof fn lemma_each_data_unit_released_exactly_once(remaining: nat, batch: n
+         lemma_each_data_unit_released_exactly_once(rest, batch, unit);
+         lemma_unlink_plan_shape(rest, batch);
+         assert(plan == seq![UnlinkPlanStep::Batch { before: remaining, kept: rest }] + tail);
+-        assert forall|i: int| 1 <= i < plan.len() implies #[trigger] plan[i] == tail[i - 1] by {}
++        assert forall|step_index: int| 1 <= step_index < plan.len() implies #[trigger] plan[step_index] == tail[step_index - 1] by {}
+         // 后半截释放的单元都在 rest 之下，与第一批 [rest, remaining) 不交。
+-        assert forall|i: int| 0 <= i < tail.len() && released_by(#[trigger] tail[i], unit) implies unit < rest by {
+-            assert(step_before(tail[i]) <= rest);
++        assert forall|step_index: int| 0 <= step_index < tail.len() && released_by(#[trigger] tail[step_index], unit) implies unit < rest by {
++            assert(step_before(tail[step_index]) <= rest);
+         }
+         if unit < remaining {
+             if unit >= rest {
+                 assert(released_by(plan[0], unit));
+             } else {
+-                let k = choose|k: int| 0 <= k < tail.len() && released_by(#[trigger] tail[k], unit);
+-                assert(plan[k + 1] == tail[k]);
+-                assert(released_by(plan[k + 1], unit));
++                let tail_step_index = choose|tail_step_index: int| 0 <= tail_step_index < tail.len() && released_by(#[trigger] tail[tail_step_index], unit);
++                assert(plan[tail_step_index + 1] == tail[tail_step_index]);
++                assert(released_by(plan[tail_step_index + 1], unit));
+             }
+         } else {
+-            assert forall|i: int| 0 <= i < plan.len() implies !released_by(#[trigger] plan[i], unit) by {
+-                if i > 0 {
+-                    assert(plan[i] == tail[i - 1]);
++            assert forall|step_index: int| 0 <= step_index < plan.len() implies !released_by(#[trigger] plan[step_index], unit) by {
++                if step_index > 0 {
++                    assert(plan[step_index] == tail[step_index - 1]);
+                 }
+             }
+         }
+-        assert forall|i: int, j: int|
+-            0 <= i < plan.len() && 0 <= j < plan.len()
+-            && released_by(#[trigger] plan[i], unit)
+-            && released_by(#[trigger] plan[j], unit) implies i == j by {
+-            if i > 0 {
+-                assert(plan[i] == tail[i - 1]);
++        assert forall|step_index: int, other_step_index: int|
++            0 <= step_index < plan.len() && 0 <= other_step_index < plan.len()
++            && released_by(#[trigger] plan[step_index], unit)
++            && released_by(#[trigger] plan[other_step_index], unit) implies step_index == other_step_index by {
++            if step_index > 0 {
++                assert(plan[step_index] == tail[step_index - 1]);
+             }
+-            if j > 0 {
+-                assert(plan[j] == tail[j - 1]);
++            if other_step_index > 0 {
++                assert(plan[other_step_index] == tail[other_step_index - 1]);
+             }
+         }
+     }
+@@ -276,28 +276,28 @@ pub proof fn lemma_deletion_batch_rewrites_only_the_cut_path(index: nat, span: n
+         lower_node_exists(index, span, kept) ==> lower_node_exists(index, span, before),
+         lower_node_dropped(index, span, before, kept) <==> (kept <= index * span && index * span < before),
+ {
+-    let q = kept / span;
+-    let r = kept % span;
+-    assert(kept == q * span + r && 0 <= r < span) by {
++    let quotient = kept / span;
++    let remainder = kept % span;
++    assert(kept == quotient * span + remainder && 0 <= remainder < span) by {
+         vstd::arithmetic::div_mod::lemma_fundamental_div_mod(kept as int, span as int);
+         vstd::arithmetic::div_mod::lemma_mod_bound(kept as int, span as int);
+-        vstd::arithmetic::mul::lemma_mul_is_commutative(span as int, q as int);
++        vstd::arithmetic::mul::lemma_mul_is_commutative(span as int, quotient as int);
+     }
+     if lower_node_rewritten(index, span, kept) {
+-        // index × span < kept < index × span + span 且 q × span ≤ kept < q × span + span ⇒ index == q、r ≠ 0。
+-        // index < q 时 (index + 1) × span ≤ q × span ≤ kept；index > q 时 (q + 1) × span ≤ index × span < kept：都矛盾。
++        // index × span < kept < index × span + span 且 quotient × span ≤ kept < quotient × span + span ⇒ index == quotient、remainder ≠ 0。
++        // index < quotient 时 (index + 1) × span ≤ quotient × span ≤ kept；index > quotient 时 (quotient + 1) × span ≤ index × span < kept：都矛盾。
+         assert((index + 1) * span == index * span + span) by (nonlinear_arith);
+-        assert((q + 1) * span == q * span + span) by (nonlinear_arith);
+-        if index < q {
+-            vstd::arithmetic::mul::lemma_mul_inequality((index + 1) as int, q as int, span as int);
++        assert((quotient + 1) * span == quotient * span + span) by (nonlinear_arith);
++        if index < quotient {
++            vstd::arithmetic::mul::lemma_mul_inequality((index + 1) as int, quotient as int, span as int);
+         }
+-        if index > q {
+-            vstd::arithmetic::mul::lemma_mul_inequality((q + 1) as int, index as int, span as int);
++        if index > quotient {
++            vstd::arithmetic::mul::lemma_mul_inequality((quotient + 1) as int, index as int, span as int);
+         }
+-        assert(index == q);
+-        assert(r != 0);
++        assert(index == quotient);
++        assert(remainder != 0);
+     }
+-    if index == q && r != 0 {
++    if index == quotient && remainder != 0 {
+         assert(index * span < kept && kept < index * span + span);
+     }
+ }
+@@ -361,8 +361,8 @@ mod tests {
+                     .collect();
+                 released.sort_unstable();
+                 assert_eq!(released, (0..remaining).collect::<Vec<_>>());
+-                for (i, &(_, kept)) in steps.iter().enumerate().take(steps.len() - 1) {
+-                    assert_eq!(plan(kept, batch), steps[i + 1..].to_vec());
++                for (step_index, &(_, kept)) in steps.iter().enumerate().take(steps.len() - 1) {
++                    assert_eq!(plan(kept, batch), steps[step_index + 1..].to_vec());
+                 }
+             }
+         }
+diff --git a/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs b/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
+new file mode 100644
+index 000000000..266847237
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
+@@ -0,0 +1,136 @@
++use singlefs_replay_prefix::gpu_gc_proofs::*;
++
++const EDGES: [u64; 9] = [
++    0,
++    1,
++    3,
++    4,
++    5,
++    u32::MAX as u64,
++    1u64 << 32,
++    u64::MAX - 3,
++    u64::MAX,
++];
++
++#[test]
++fn gpu_budget_arithmetic_matches_a_u128_reference_at_full_width() {
++    for input in EDGES {
++        let aligned = u128::from(input).max(4).div_ceil(4) * 4;
++        assert_eq!(checked_gpu_input_bytes(input), u64::try_from(aligned).ok());
++        for entries in EDGES {
++            for per_entry in EDGES {
++                for fixed in EDGES {
++                    let expected = (u128::from(entries) * u128::from(per_entry))
++                        .checked_add(aligned)
++                        .and_then(|bytes| bytes.checked_add(u128::from(fixed)))
++                        .and_then(|bytes| u64::try_from(bytes).ok());
++                    assert_eq!(
++                        checked_gpu_chunk_bytes(input, entries, per_entry, fixed),
++                        expected
++                    );
++                }
++            }
++        }
++    }
++    for limit in EDGES {
++        for held in EDGES {
++            assert_eq!(
++                remaining_gpu_memory(limit, held),
++                limit.saturating_sub(held)
++            );
++        }
++    }
++}
++
++#[test]
++fn gpu_slices_scans_and_independent_totals_match_wide_arithmetic() {
++    for total in EDGES {
++        for start in EDGES.into_iter().filter(|start| *start <= total) {
++            for capacity in EDGES.into_iter().filter(|capacity| *capacity > 0) {
++                let expected = u128::from(total).min(u128::from(start) + u128::from(capacity));
++                assert_eq!(
++                    u128::from(next_gpu_record_slice_end(start, total, capacity)),
++                    expected
++                );
++            }
++        }
++    }
++    for slot in EDGES {
++        for span in EDGES {
++            for start in EDGES {
++                for end in EDGES {
++                    for same_device in [false, true] {
++                        for released in [false, true] {
++                            let expected = same_device
++                                && !released
++                                && (start..end).contains(&slot)
++                                && u128::from(slot) + u128::from(span) <= u128::from(end);
++                            assert_eq!(
++                                gpu_record_is_in_scan_region(
++                                    same_device,
++                                    released,
++                                    slot,
++                                    span,
++                                    start,
++                                    end
++                                ),
++                                expected
++                            );
++                        }
++                    }
++                }
++            }
++        }
++    }
++    for walking in EDGES {
++        for searching in EDGES {
++            for next_walking in EDGES {
++                for next_searching in EDGES {
++                    let left = u64::try_from(u128::from(walking) + u128::from(next_walking)).ok();
++                    let right =
++                        u64::try_from(u128::from(searching) + u128::from(next_searching)).ok();
++                    assert_eq!(
++                        checked_live_slot_totals(walking, searching, next_walking, next_searching),
++                        left.zip(right)
++                    );
++                }
++            }
++        }
++    }
++}
++
++#[test]
++fn gpu_readback_rejects_unwritten_words_and_preserves_both_halves() {
++    for value in EDGES {
++        let bytes = value.to_le_bytes();
++        let low = u32::from_le_bytes(bytes[..4].try_into().unwrap());
++        let high = u32::from_le_bytes(bytes[4..].try_into().unwrap());
++        for verdict in [0, 1, 2, u32::MAX] {
++            assert_eq!(
++                decoded_gpu_live_slots(low, high, verdict),
++                (verdict == 1).then_some(value)
++            );
++        }
++    }
++}
++
++#[test]
++fn gpu_reconciliation_matches_the_two_round_history_rule() {
++    for history in 0u32..(1 << 12) {
++        let mut previous_disagreement = false;
++        let mut counter = 0;
++        for round in 0..12 {
++            let agree = history & (1 << round) != 0;
++            let expected_cpu = !agree && previous_disagreement;
++            let step = reconcile_gpu_entry(counter, agree);
++            assert_eq!(step.confirmed, agree);
++            assert_eq!(step.ask_cpu, expected_cpu);
++            previous_disagreement = !agree && !expected_cpu;
++            assert_eq!(step.uncertain_rounds, u32::from(previous_disagreement));
++            counter = step.uncertain_rounds;
++        }
++    }
++    let invalid_old_count = reconcile_gpu_entry(u32::MAX, false);
++    assert!(invalid_old_count.ask_cpu);
++    assert_eq!(invalid_old_count.uncertain_rounds, 0);
++}
+diff --git a/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs b/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
+new file mode 100644
+index 000000000..37b3f549d
+--- /dev/null
++++ b/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
+@@ -0,0 +1,214 @@
++use singlefs_replay_prefix::gpu_gc_capacity_proofs::*;
++
++const EDGES: [u64; 10] = [0, 1, 3, 4, 5, 16, 63, 1 << 32, u64::MAX - 3, u64::MAX];
++
++fn reference_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> bool {
++    let input_bytes = u128::from(input).max(1).div_ceil(4) * 4;
++    if input_bytes > u128::from(capacity.binding_bytes)
++        || u128::from(entries) * u128::from(capacity.entry_buffer_bytes)
++            > u128::from(capacity.binding_bytes)
++        || entries > capacity.dispatch_entries
++    {
++        return false;
++    }
++    capacity.memory_limit.is_none_or(|limit| {
++        (u128::from(entries) * u128::from(capacity.bytes_per_entry))
++            .checked_add(input_bytes)
++            .and_then(|total| total.checked_add(u128::from(capacity.fixed_bytes)))
++            .is_some_and(|total| total <= u128::from(limit))
++    })
++}
++
++#[test]
++fn chunk_admission_and_extension_match_full_width_arithmetic() {
++    for binding in EDGES {
++        for entry_bytes in EDGES {
++            for limit in [None, Some(0), Some(100), Some(u64::MAX)] {
++                let capacity = GpuChunkCapacity {
++                    fixed_bytes: 16,
++                    bytes_per_entry: 40,
++                    entry_buffer_bytes: entry_bytes,
++                    binding_bytes: binding,
++                    dispatch_entries: 3,
++                    memory_limit: limit,
++                };
++                for input in EDGES {
++                    for entries in EDGES {
++                        assert_eq!(
++                            gpu_chunk_fits(input, entries, &capacity),
++                            reference_fits(input, entries, &capacity)
++                        );
++                        for additional in [0, 1, 4, u64::MAX] {
++                            let expected =
++                                u64::try_from(u128::from(input) + u128::from(additional))
++                                    .ok()
++                                    .filter(|total| reference_fits(*total, entries, &capacity));
++                            assert_eq!(
++                                extended_gpu_chunk_input(input, additional, entries, &capacity),
++                                expected
++                            );
++                        }
++                    }
++                }
++            }
++        }
++    }
++    let unlimited = GpuChunkCapacity {
++        fixed_bytes: u64::MAX,
++        bytes_per_entry: u64::MAX,
++        entry_buffer_bytes: 0,
++        binding_bytes: 4,
++        dispatch_entries: 2,
++        memory_limit: None,
++    };
++    // 无限额仍检查每个绑定和派发，但不把虚构的有限总额加进准入条件。
++    assert!(gpu_chunk_fits(1, 2, &unlimited));
++}
++
++#[test]
++fn largest_piece_matches_exhaustive_search_and_is_maximal() {
++    for binding in 0..=40 {
++        for fixed in [0, 1, 16, 40, u64::MAX] {
++            for per_entry in [0, 1, 4, 40, u64::MAX] {
++                for entry_buffer in [0, 4, 64] {
++                    for dispatch in [0, 1] {
++                        for limit in [
++                            None,
++                            Some(0),
++                            Some(3),
++                            Some(4),
++                            Some(20),
++                            Some(100),
++                            Some(u64::MAX),
++                        ] {
++                            let capacity = GpuChunkCapacity {
++                                fixed_bytes: fixed,
++                                bytes_per_entry: per_entry,
++                                entry_buffer_bytes: entry_buffer,
++                                binding_bytes: binding,
++                                dispatch_entries: dispatch,
++                                memory_limit: limit,
++                            };
++                            let expected =
++                                (1..=binding).rfind(|input| reference_fits(*input, 1, &capacity));
++                            assert_eq!(
++                                largest_gpu_piece_input(&capacity),
++                                expected,
++                                "binding={binding} fixed={fixed} per_entry={per_entry} entry_buffer={entry_buffer} dispatch={dispatch} limit={limit:?}"
++                            );
++                        }
++                    }
++                }
++            }
++        }
++    }
++    let capacity = GpuChunkCapacity {
++        fixed_bytes: 0,
++        bytes_per_entry: 0,
++        entry_buffer_bytes: 0,
++        binding_bytes: u64::MAX,
++        dispatch_entries: 1,
++        memory_limit: None,
++    };
++    assert_eq!(largest_gpu_piece_input(&capacity), Some(u64::MAX - 3));
++    assert!(!gpu_chunk_fits(u64::MAX - 2, 1, &capacity));
++}
++
++#[test]
++fn holds_releases_and_waits_preserve_the_exact_ledger() {
++    for held in EDGES {
++        for bytes in EDGES {
++            for limit in [None, Some(0), Some(100), Some(u64::MAX)] {
++                for pending in [false, true] {
++                    let sum = u128::from(held) + u128::from(bytes);
++                    let expected = if pending || limit.is_some_and(|bound| sum > u128::from(bound))
++                    {
++                        None
++                    } else {
++                        u64::try_from(sum).ok()
++                    };
++                    assert_eq!(
++                        checked_gpu_memory_hold(held, bytes, pending, limit),
++                        expected
++                    );
++                    if let Some(total) = expected {
++                        assert_eq!(checked_gpu_memory_release(total, bytes), Some(held));
++                        for _ in 0..3 {
++                            assert_eq!(
++                                gpu_bytes_after_submission_wait(total, bytes, false),
++                                Some(total)
++                            );
++                        }
++                        assert_eq!(
++                            gpu_bytes_after_submission_wait(total, bytes, true),
++                            Some(held)
++                        );
++                    }
++                }
++            }
++            let release = if bytes > held {
++                None
++            } else {
++                Some(held - bytes)
++            };
++            assert_eq!(checked_gpu_memory_release(held, bytes), release);
++            assert_eq!(gpu_bytes_after_submission_wait(held, bytes, true), release);
++            assert_eq!(
++                gpu_bytes_after_submission_wait(held, bytes, false),
++                (bytes <= held).then_some(held)
++            );
++        }
++    }
++}
++
++#[test]
++fn memory_caps_never_expand_and_allocation_failure_makes_progress() {
++    for available in EDGES {
++        for previous in [None, Some(0), Some(17), Some(u64::MAX)] {
++            let actual = tightened_gpu_memory_limit(previous, available);
++            assert_eq!(actual, previous.unwrap_or(u64::MAX).min(available));
++        }
++        let mut cap = available;
++        let mut rounds = 0;
++        while cap > 0 {
++            let next = gpu_memory_cap_after_allocation_failure(cap);
++            assert_eq!(u128::from(next), u128::from(cap) / 2);
++            assert!(next < cap);
++            cap = next;
++            rounds += 1;
++        }
++        assert!(rounds <= 64);
++        assert_eq!(gpu_memory_cap_after_allocation_failure(0), 0);
++    }
++}
++
++#[test]
++fn mapping_buffers_and_dispatch_cover_their_exact_full_width_sizes() {
++    for entries in EDGES {
++        for locations in EDGES {
++            let entry = 56 * u128::from(entries.max(1));
++            let location = 16 * u128::from(locations.max(1));
++            let index = 4 * u128::from(entries.max(1));
++            let expected = u64::try_from(entry + location + index).ok().map(|total| {
++                (
++                    total,
++                    u64::try_from(entry.max(location).max(index)).unwrap(),
++                )
++            });
++            assert_eq!(
++                checked_gpu_mapping_table_bytes(entries, locations),
++                expected
++            );
++        }
++    }
++    assert_eq!(checked_gpu_mapping_table_bytes(0, 0), Some((76, 56)));
++    for entries in [0, 1, 63, 64, 65, u32::MAX - 1, u32::MAX] {
++        for per_group in [1, 2, 3, 32, 64, 256, u32::MAX] {
++            let expected = u64::from(entries).div_ceil(u64::from(per_group));
++            assert_eq!(
++                u64::from(gpu_workgroups_for_entries(entries, per_group)),
++                expected
++            );
++        }
++    }
++}
+diff --git a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+index d7b2c854e..2bab0c59e 100644
+--- a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
++++ b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+@@ -23,10 +23,10 @@ ensures·counter_of_the_last_record_the_root_covers 交回的锚点改成不等
+ ensures·replay_core 整个结论取反	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        replay_follows_the_prefix_rules(	    ensures\n        !replay_follows_the_prefix_rules(	proof_errors=2	landing=replay_core,witness_nonempty_replay_and_its_fixed_point
+ ensures·replay_core 报「所选根 txg 没有后继」那一臂改成恒假	crates/singlefs-replay-prefix/src/lib.rs	        Err(CoreFailure::ChosenRootCheckpointTxgHasNoSuccessor) => flagged.len() < 2\n            && root_checkpoint_txg.0 == u64::MAX,	        Err(CoreFailure::ChosenRootCheckpointTxgHasNoSuccessor) => false,	proof_errors=2	landing=replay_core
+ ensures·replay_core 施加了的每一条都改成要求在所选根之下	crates/singlefs-replay-prefix/src/lib.rs	    &&& forall|position: int|\n        0 <= position < applied.len() ==> above_the_chosen_root(	    &&& forall|position: int|\n        0 <= position < applied.len() ==> !above_the_chosen_root(	proof_errors=4	landing=lemma_replay_core_result_lands_no_earlier_than_the_chosen_root,lemma_replay_core_result_replays_an_applied_record_twice_as_once,replay_core
+-ensures·冒烟：两条记录的整次发布改成断言不是拼接	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        is_concatenation_of_whole_publishes(seq![first, second]),	    ensures\n        !is_concatenation_of_whole_publishes(seq![first, second]),	proof_errors=1	landing=a_publish_of_two_records_is_whole
+-ensures·冒烟：一条不带末条标志的记录改成断言是拼接	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        !is_concatenation_of_whole_publishes(seq![only]),	    ensures\n        is_concatenation_of_whole_publishes(seq![only]),	proof_errors=1	landing=a_record_without_the_last_flag_alone_is_not_a_concatenation
++ensures·冒烟：两条记录的整次发布改成断言不是拼接	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        is_concatenation_of_whole_publishes(seq![first, second]),	    ensures\n        !is_concatenation_of_whole_publishes(seq![first, second]),	proof_errors=1	landing=publish_of_two_records_is_whole
++ensures·冒烟：一条不带末条标志的记录改成断言是拼接	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        !is_concatenation_of_whole_publishes(seq![only]),	    ensures\n        is_concatenation_of_whole_publishes(seq![only]),	proof_errors=1	landing=record_without_the_last_flag_alone_is_not_a_concatenation
+ ensures·is_above_the_chosen_root 交回的判定取反	crates/singlefs-replay-prefix/src/lib.rs	        is_above == above_the_chosen_root(*record, root_instance, root_checkpoint_txg),	        is_above == !above_the_chosen_root(*record, root_instance, root_checkpoint_txg),	proof_errors=4	landing=is_above_the_chosen_root,replay_core
+-ensures·readable_record_of_the_same_publish_follows 交回的判定取反	crates/singlefs-replay-prefix/src/lib.rs	        follows == a_later_record_of_the_same_publish_is_readable(records@, index as int),	        follows == !a_later_record_of_the_same_publish_is_readable(records@, index as int),	proof_errors=5	landing=judge_the_candidate,readable_record_of_the_same_publish_follows
++ensures·readable_record_of_the_same_publish_follows 交回的判定取反	crates/singlefs-replay-prefix/src/lib.rs	        follows == later_record_of_the_same_publish_is_readable(records@, index as int),	        follows == !later_record_of_the_same_publish_is_readable(records@, index as int),	proof_errors=5	landing=judge_the_candidate,readable_record_of_the_same_publish_follows
+ ensures·maximum_transaction_of 交回的改成严格大于起点	crates/singlefs-replay-prefix/src/lib.rs	    ensures\n        maximum.0 >= start.0,	    ensures\n        maximum.0 > start.0,	proof_errors=1	landing=maximum_transaction_of
+ ensures·maximum_transaction_of 攒着的每条事务号改成严格小于交回的	crates/singlefs-replay-prefix/src/lib.rs	                ==> records@[#[trigger] records_of_the_open_publish@[position] as int].transaction.0\n                <= maximum.0,	                ==> records@[#[trigger] records_of_the_open_publish@[position] as int].transaction.0\n                < maximum.0,	proof_errors=1	landing=maximum_transaction_of
+ ensures·maximum_transaction_of 交回的改成「不等于起点、或是攒着的某一条的」	crates/singlefs-replay-prefix/src/lib.rs	        maximum == start || exists|position: int|	        maximum != start || exists|position: int|	proof_errors=2	landing=maximum_transaction_of,replay_core
+@@ -195,7 +195,7 @@ ensures·P3 「搬」改成至少两项	crates/singlefs-replay-prefix/src/compac
+ 证明负例·lemma_a_planned_batch_keeps_every_read 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    let positions = planned_positions(planned);\n    let keys = planned_mapping_keys(allocations, positions);\n	{\n    assert(false);\n    let positions = planned_positions(planned);\n    let keys = planned_mapping_keys(allocations, positions);\n	proof_errors=1	landing=lemma_a_planned_batch_keeps_every_read
+ 证明负例·lemma_under_the_premise_a_plan_takes_the_leading_allocations 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    lemma_every_position_is_movable_when_every_allocation_is(allocations, allocations.len() as int);\n	{\n    assert(false);\n    lemma_every_position_is_movable_when_every_allocation_is(allocations, allocations.len() as int);\n	proof_errors=1	landing=lemma_under_the_premise_a_plan_takes_the_leading_allocations
+ 证明负例·one_movable_allocation_is_planned_and_not_reported_emptied 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    let allocations = seq![only];\n	{\n    assert(false);\n    let allocations = seq![only];\n	proof_errors=1	landing=one_movable_allocation_is_planned_and_not_reported_emptied
+-证明负例·a_segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n}\n	{\n    assert(false);\n}\n	proof_errors=1	landing=a_segment_holding_a_pinned_slot_is_not_a_sound_choice
++证明负例·a_segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n}\n	{\n    assert(false);\n}\n	proof_errors=1	landing=segment_holding_a_pinned_slot_is_not_a_sound_choice
+ 不变式负例·compaction_plan_proofs 第114行不变式不能恒假	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	    while position < segments.len()\n        invariant\n            position <= segments.len(),\n            best matches Some(best_position) ==> best_position < position\n	    while position < segments.len()\n        invariant\n            false,\n            position <= segments.len(),\n            best matches Some(best_position) ==> best_position < position\n	proof_errors=1	landing=choose_compaction_segment
+ 不变式负例·compaction_plan_proofs 第412行不变式不能恒假	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	    while position < allocations.len()\n        invariant\n            position <= allocations.len(),\n            batch_units >= 1,\n	    while position < allocations.len()\n        invariant\n            false,\n            position <= allocations.len(),\n            batch_units >= 1,\n	proof_errors=1	landing=plan_compaction_batch
+ 改判定·P1 贪心选最少改成最多	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	Some(_) => segment.live_slots < best_live_slots,	Some(_) => segment.live_slots > best_live_slots,	proof_errors=1	landing=choose_compaction_segment
+@@ -302,19 +302,19 @@ sequential-write-empty-keeps-one-unit	crates/singlefs-replay-prefix/src/file_ran
+ rounded-size-refuses-overflow	crates/singlefs-replay-prefix/src/file_range_proofs.rs	count.checked_mul(capacity).is_some()	count.checked_mul(capacity).is_none()	proof_errors=1	landing=rounded_size_fits
+ unit-count-monotonicity-needs-ordered-sizes	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        smaller <= larger,	        true,	proof_errors=2	landing=lemma_covering_units_are_monotone
+ partial-old-unit-must-read-uncovered-bytes	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	if whole { PartialWriteUnitSource::OldCoveredWhole } else { PartialWriteUnitSource::OldReadBack }	if whole { PartialWriteUnitSource::OldCoveredWhole } else { PartialWriteUnitSource::OldCoveredWhole }	proof_errors=2	landing=classify_partial_write_unit
+-partial-touching-endpoints-are-not-written	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	let touched = ws < ue && us < we;	let touched = ws <= ue && us <= we;	proof_errors=2	landing=classify_partial_write_unit
+-partial-equal-range-covers-whole-unit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	let whole = ws <= us && ue <= we;	let whole = ws < us && ue < we;	proof_errors=3	landing=classify_partial_write_unit
++partial-touching-endpoints-are-not-written	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	let touched = write_start < unit_end && unit_start < write_end;	let touched = write_start <= unit_end && unit_start <= write_end;	proof_errors=2	landing=classify_partial_write_unit
++partial-equal-range-covers-whole-unit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	let whole = write_start <= unit_start && unit_end <= write_end;	let whole = write_start < unit_start && unit_end < write_end;	proof_errors=3	landing=classify_partial_write_unit
+ partial-new-gap-does-not-read-residue	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	} else if !touched {\n        PartialWriteUnitSource::ZeroGap	} else if !touched {\n        PartialWriteUnitSource::NewReadResidue	proof_errors=2	landing=classify_partial_write_unit
+ partial-new-partial-unit-reads-residue	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	    } else {\n        PartialWriteUnitSource::NewReadResidue	    } else {\n        PartialWriteUnitSource::NewCoveredWhole	proof_errors=2	landing=classify_partial_write_unit
+ partial-rewrite-at-old-end-includes-partial-tail	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	    if first_written < existing { first_written }	    if first_written <= existing { first_written }	proof_errors=1	landing=first_unit_to_rewrite
+ partial-rewrite-does-not-skip-partial-tail	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	else if existing > 0 && tail_is_partial { existing - 1 }\n    else { existing }	else if existing > 0 && tail_is_partial { existing }\n    else { existing }	proof_errors=1	landing=first_unit_to_rewrite
+ partial-after-count-keeps-old-suffix	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        existing\n    } else { needed }	        needed\n    } else { needed }	proof_errors=2	landing=units_after_partial_write
+-partial-whole-coverage-needs-nonempty-unit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(ws: u64, we: u64, us: u64, ue: u64)\n    requires ws < we, us < ue,	pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(ws: u64, we: u64, us: u64, ue: u64)\n    requires ws < we,	proof_errors=2	landing=lemma_whole_coverage_means_every_unit_byte_is_written
++partial-whole-coverage-needs-nonempty-unit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)\n    requires write_start < write_end, unit_start < unit_end,	pub proof fn lemma_whole_coverage_means_every_unit_byte_is_written(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)\n    requires write_start < write_end,	proof_errors=2	landing=lemma_whole_coverage_means_every_unit_byte_is_written
+ partial-byte-index-is-not-the-next-unit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	    let index = byte / capacity;	    let index = byte / capacity + 1;	proof_errors=2	landing=unit_containing_byte
+ partial-byte-index-needs-positive-capacity	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub fn unit_containing_byte(byte: u64, capacity: u64) -> (index: u64)\n    requires capacity > 0,	pub fn unit_containing_byte(byte: u64, capacity: u64) -> (index: u64)\n    requires true,	proof_errors=3	landing=unit_containing_byte
+ tail-partition-needs-positive-batch	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn lemma_tail_batches_partition_the_released_suffix(existing: u64, desired: u64, batch: u64, next: u64, unit: int)\n    requires\n        batch > 0,	pub proof fn lemma_tail_batches_partition_the_released_suffix(existing: u64, desired: u64, batch: u64, next: u64, unit: int)\n    requires\n        true,	proof_errors=1	landing=lemma_tail_batches_partition_the_released_suffix
+ adjacent-partition-needs-seam-inside-range	crates/singlefs-replay-prefix/src/file_range_proofs.rs	    requires left <= seam <= right,	    requires left <= right,	proof_errors=1	landing=lemma_adjacent_units_partition_the_write
+-partial-touch-needs-nonempty-write	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(ws: u64, we: u64, us: u64, ue: u64)\n    requires ws < we, us < ue,	pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(ws: u64, we: u64, us: u64, ue: u64)\n    requires ws <= we, us < ue,	proof_errors=1	landing=lemma_touched_unit_has_exactly_a_nonempty_intersection
++partial-touch-needs-nonempty-write	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)\n    requires write_start < write_end, unit_start < unit_end,	pub proof fn lemma_touched_unit_has_exactly_a_nonempty_intersection(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)\n    requires write_start <= write_end, unit_start < unit_end,	proof_errors=1	landing=lemma_touched_unit_has_exactly_a_nonempty_intersection
+ indexed-range-multiplication-is-not-addition	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let start = unit_index.checked_mul(capacity)?;	let start = unit_index.checked_add(capacity)?;	proof_errors=1	landing=checked_unit_byte_range
+ indexed-range-end-includes-capacity	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let end = start.checked_add(capacity)?;	let end = start.checked_add(0)?;	proof_errors=1	landing=checked_unit_byte_range
+ indexed-range-exact-max-is-representable	crates/singlefs-replay-prefix/src/file_range_proofs.rs	Some((start, end))\n}	if end == u64::MAX { None } else { Some((start, end)) }\n}	proof_errors=1	landing=checked_unit_byte_range
+@@ -323,3 +323,71 @@ indexed-intersection-preserves-write-order	crates/singlefs-replay-prefix/src/fil
+ indexed-intersection-uses-the-requested-unit	crates/singlefs-replay-prefix/src/file_range_proofs.rs	match checked_unit_byte_range(unit_index, capacity) {	match checked_unit_byte_range(unit_index + 1, capacity) {	proof_errors=3	landing=checked_bytes_in_indexed_unit
+ indexed-intersection-does-not-drop-written-bytes	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let intersection = bytes_in_unit(write_start, write_end, start, end);	let intersection: Option<(u64, u64, u64)> = None;	proof_errors=1	landing=checked_bytes_in_indexed_unit
+ indexed-range-proof-needs-rounded-admission	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        covering_units(size, capacity) * capacity <= u64::MAX,	        true,	proof_errors=1	landing=lemma_rounded_size_bounds_written_unit_addresses
++
++# 固定长度部分写字节模型：五项契约与三个关键前提。
++overwrite-contract-lemma_overwrite_changes_exactly_the_requested_bytes	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)\n    requires overwrite_fits(old, start, data),\n    ensures\n	pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)\n    requires overwrite_fits(old, start, data),\n    ensures\n        false,\n	proof_errors=1	landing=lemma_overwrite_changes_exactly_the_requested_bytes
++overwrite-contract-lemma_overwriting_the_same_range_keeps_only_the_last_write	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_overwriting_the_same_range_keeps_only_the_last_write(\n    old: Seq<u8>, start: int, first: Seq<u8>, last: Seq<u8>,\n)\n    requires\n        overwrite_fits(old, start, first),\n        first.len() == last.len(),\n    ensures\n	pub proof fn lemma_overwriting_the_same_range_keeps_only_the_last_write(\n    old: Seq<u8>, start: int, first: Seq<u8>, last: Seq<u8>,\n)\n    requires\n        overwrite_fits(old, start, first),\n        first.len() == last.len(),\n    ensures\n        false,\n	proof_errors=1	landing=lemma_overwriting_the_same_range_keeps_only_the_last_write
++overwrite-contract-lemma_disjoint_overwrites_commute	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_disjoint_overwrites_commute(\n    old: Seq<u8>, first_start: int, first: Seq<u8>, second_start: int, second: Seq<u8>,\n)\n    requires\n        overwrite_fits(old, first_start, first),\n        overwrite_fits(old, second_start, second),\n        first_start + first.len() <= second_start || second_start + second.len() <= first_start,\n    ensures\n	pub proof fn lemma_disjoint_overwrites_commute(\n    old: Seq<u8>, first_start: int, first: Seq<u8>, second_start: int, second: Seq<u8>,\n)\n    requires\n        overwrite_fits(old, first_start, first),\n        overwrite_fits(old, second_start, second),\n        first_start + first.len() <= second_start || second_start + second.len() <= first_start,\n    ensures\n        false,\n	proof_errors=1	landing=lemma_disjoint_overwrites_commute
++overwrite-contract-lemma_whole_unit_overwrite_does_not_depend_on_old_bytes	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(\n    left: Seq<u8>, right: Seq<u8>, data: Seq<u8>, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64,\n)\n    requires\n        write_start < write_end, unit_start < unit_end,\n        left.len() == right.len(),\n        overwrite_fits(left, write_start as int, data),\n        data.len() == write_end - write_start,\n        unit_is_covered(write_start, write_end, unit_start, unit_end),\n    ensures\n	pub proof fn lemma_whole_unit_overwrite_does_not_depend_on_old_bytes(\n    left: Seq<u8>, right: Seq<u8>, data: Seq<u8>, write_start: u64, write_end: u64, unit_start: u64, unit_end: u64,\n)\n    requires\n        write_start < write_end, unit_start < unit_end,\n        left.len() == right.len(),\n        overwrite_fits(left, write_start as int, data),\n        data.len() == write_end - write_start,\n        unit_is_covered(write_start, write_end, unit_start, unit_end),\n    ensures\n        false,\n	proof_errors=1	landing=lemma_whole_unit_overwrite_does_not_depend_on_old_bytes
++overwrite-contract-witness_overwrite_laws_and_overlapping_write_order	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn witness_overwrite_laws_and_overlapping_write_order()\n    ensures\n	pub proof fn witness_overwrite_laws_and_overlapping_write_order()\n    ensures\n        false,\n	proof_errors=1	landing=witness_overwrite_laws_and_overlapping_write_order
++overwrite-last-needs-equal-lengths	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        first.len() == last.len(),\n		proof_errors=1	landing=lemma_overwriting_the_same_range_keeps_only_the_last_write
++overwrite-commute-needs-disjoint-ranges	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        first_start + first.len() <= second_start || second_start + second.len() <= first_start,\n		proof_errors=1	landing=lemma_disjoint_overwrites_commute
++overwrite-whole-needs-coverage	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        unit_is_covered(write_start, write_end, unit_start, unit_end),\n		proof_errors=1	landing=lemma_whole_unit_overwrite_does_not_depend_on_old_bytes
++
++# GPU GC：G01–G20 各一条必红变异，另验两条见证确实进入证明。
++gpu-gc-G01	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	ReconciliationStep { confirmed: false, ask_cpu: false, uncertain_rounds: 1 }	ReconciliationStep { confirmed: true, ask_cpu: false, uncertain_rounds: 1 }	proof_errors=1	landing=reconcile_gpu_entry
++gpu-gc-G02	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	!cpu_is_needed(0, false),	cpu_is_needed(0, false),	proof_errors=1	landing=lemma_two_disagreements_trigger_exactly_one_cpu_judgment
++gpu-gc-G03	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	next_uncertain_count(previous, true) == 0,	next_uncertain_count(previous, true) == 1,	proof_errors=1	landing=lemma_agreement_restarts_the_disagreement_history
++gpu-gc-G04	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        round_state(counts, cpu_calls, key, agree, false) == (counts, cpu_calls),	        round_state(counts, cpu_calls, key, agree, false) == (counts, cpu_calls + 1),	proof_errors=1	landing=lemma_failed_batch_keeps_all_counts_and_cpu_calls
++gpu-gc-G05	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	    requires first != second,\n		proof_errors=1	landing=lemma_distinct_entry_updates_commute
++gpu-gc-G06	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	    requires forall|other: int| counts.dom().contains(other) ==> #[trigger] counts[other] == 1,\n		proof_errors=1	landing=lemma_count_updates_preserve_the_sparse_counter_invariant
++gpu-gc-G07	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	<= left_end - left_start,	<= left_end - left_start - 1,	proof_errors=1	landing=lemma_live_slot_intersection_bounds
++gpu-gc-G08	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	requires record_start <= record_end, start <= seam <= end,	requires record_start <= record_end, start <= end,	proof_errors=1	landing=lemma_splitting_a_segment_preserves_live_slot_contributions
++gpu-gc-G09	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	first, seam, past - 1);	first, seam, past - 2);	proof_errors=1	landing=lemma_record_slices_preserve_the_score
++gpu-gc-G10	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	== 2 * record_contribution	== record_contribution	proof_errors=1	landing=lemma_duplicate_records_keep_their_multiplicity
++gpu-gc-G11	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	(!record.released && record.device == device && record.start < end && start < record.end),	(!record.released && record.start < end && start < record.end),	proof_errors=1	landing=lemma_released_and_foreign_records_do_not_score
++gpu-gc-G12	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	(ah < bh || (ah == bh && al < bl)),	(ah > bh || (ah == bh && al < bl)),	proof_errors=1	landing=lemma_two_word_slot_order_is_u64_order
++gpu-gc-G13	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	((low as int + span) % 4294967296 < low) <==> (low as int + span >= 4294967296),	((low as int + span) % 4294967296 < low) <==> (low as int + span > 4294967296),	proof_errors=1	landing=lemma_two_word_span_addition_carries_exactly_once
++gpu-gc-G14	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	match searching.checked_add(next_searching) {	match searching.checked_add(next_walking) {	proof_errors=1	landing=checked_live_slot_totals
++gpu-gc-G15	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	words.checked_mul(GPU_INPUT_ALIGNMENT)	words.checked_mul(1)	proof_errors=1	landing=checked_gpu_input_bytes
++gpu-gc-G16	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	Some(subtotal) => subtotal.checked_add(fixed),	Some(subtotal) => Some(subtotal),	proof_errors=1	landing=checked_gpu_chunk_bytes
++gpu-gc-G17	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	if held >= limit { 0 } else { limit - held }	if held >= limit { 0 } else { limit }	proof_errors=1	landing=remaining_gpu_memory
++gpu-gc-G18	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	if total - start <= capacity { total } else { start + capacity }	if total - start <= capacity { total } else { start + capacity - 1 }	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G19	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	None => false,	None => true,	proof_errors=1	landing=gpu_record_is_in_scan_region
++gpu-gc-G20	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	if verdict != GPU_LIVE_SLOTS_COUNTED { None } else	if false { None } else	proof_errors=1	landing=decoded_gpu_live_slots
++gpu-gc-witness_gpu_gc_protocol_and_score_premises	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	pub proof fn witness_gpu_gc_protocol_and_score_premises()\n    ensures\n	pub proof fn witness_gpu_gc_protocol_and_score_premises()\n    ensures\n        false,\n	proof_errors=1	landing=witness_gpu_gc_protocol_and_score_premises
++gpu-gc-witness_gpu_gc_arithmetic_boundaries	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	pub fn witness_gpu_gc_arithmetic_boundaries()\n{\n	pub fn witness_gpu_gc_arithmetic_boundaries()\n{\n    assert(false);\n	proof_errors=1	landing=witness_gpu_gc_arithmetic_boundaries
++
++# 严格自测：防止分数截顶与成功轮次漏记 CPU 调用在模型中悄悄通过。
++gpu-gc-audit-score-capped-at-two	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	    else { overlap_slots(record.start, record.end, start, end) }	    else { let score = overlap_slots(record.start, record.end, start, end); if score > 2 { 2 } else { score } }	proof_errors=2	landing=lemma_released_and_foreign_records_do_not_score,lemma_search_prefix_matches_the_walk
++gpu-gc-audit-successful-cpu-call-lost	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	cpu_calls + if cpu_is_needed(count_of(counts, key), agree) { 1nat } else { 0nat }	cpu_calls	proof_errors=1	landing=lemma_failed_batch_keeps_all_counts_and_cpu_calls
++
++# G21–G30：产品直接调用的容量、记账、派发与映射表核。
++gpu-gc-G21	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	|| entries > capacity.dispatch_entries	|| false	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G22	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let bytes = bounded / 4 * 4;	let bytes = if bounded >= 8 { bounded / 4 * 4 - 4 } else { bounded / 4 * 4 };	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G23	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(old) => if old < available { old } else { available },	Some(old) => available,	proof_errors=1	landing=tightened_gpu_memory_limit
++gpu-gc-G24	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if pending { return None; }	if false { return None; }	proof_errors=1	landing=checked_gpu_memory_hold
++gpu-gc-G25	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	held.checked_sub(bytes)	held.checked_sub(0)	proof_errors=1	landing=checked_gpu_memory_release
++gpu-gc-G26	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	else { Some(held) }	else { Some(held - chunk) }	proof_errors=1	landing=gpu_bytes_after_submission_wait
++gpu-gc-G27	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	failed_bytes / 2	failed_bytes / 1	proof_errors=1	landing=gpu_memory_cap_after_allocation_failure
++gpu-gc-G28	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	wide as u32	entries / per_group	proof_errors=1	landing=gpu_workgroups_for_entries
++gpu-gc-G29	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let sorted_bytes = match count.checked_mul(4)	let sorted_bytes = match count.checked_mul(3)	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G30	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(total) => if gpu_chunk_fits(total, entries, capacity)	Some(total) => if gpu_chunk_fits(additional, entries, capacity)	proof_errors=1	landing=extended_gpu_chunk_input
++gpu-gc-capacity-witness	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	pub fn witness_gpu_capacity_and_accounting_boundaries() {	pub fn witness_gpu_capacity_and_accounting_boundaries() {\n    assert(false);	proof_errors=1	landing=witness_gpu_capacity_and_accounting_boundaries
++
++# GPU 打分算法：实现偏移、裁剪漏算、重数、承重前提与归纳步的反例。
++gpu-score-binary-skips-entry	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	lower_bound_of_sorted_records(records, device, slot, middle + 1, above)	lower_bound_of_sorted_records(records, device, slot, middle + 2, above)	proof_errors=1	landing=lower_bound_of_sorted_records
++gpu-score-binary-drops-upper	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	lower_bound_of_sorted_records(records, device, slot, below, middle)	lower_bound_of_sorted_records(records, device, slot, below, middle - 1)	proof_errors=1	landing=lower_bound_of_sorted_records
++gpu-score-binary-needs-sorted-records	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	        records_are_sorted(records),\n		proof_errors=1	landing=lower_bound_of_sorted_records
++gpu-score-slot-loop-shifted	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	if start <= first + span - 1 < end { 1int }	if start <= first + span < end { 1int }	proof_errors=1	landing=lemma_counting_slots_equals_interval_intersection
++gpu-score-slot-count-induction-starts-one-slot-late	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	lemma_counting_slots_equals_interval_intersection(first, (span - 1) as nat, start, end);	lemma_counting_slots_equals_interval_intersection(first + 1, (span - 1) as nat, start, end);	proof_errors=1	landing=lemma_counting_slots_equals_interval_intersection
++gpu-score-window-too-narrow	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	if start >= 65535 { start - 65535 } else { 0 }	if start >= 65535 { start - 65533 } else { 0 }	proof_errors=1	landing=lemma_candidate_window_keeps_every_contribution
++gpu-score-search-counts-released	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	+ if record.released { 0int } else {	+ if false { 0int } else {	proof_errors=1	landing=lemma_search_prefix_matches_the_walk
++gpu-score-search-skips-record	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	searched_slot_sum(records, start, end, first, past - 1)	searched_slot_sum(records, start, end, first, past - 2)	proof_errors=2	landing=lemma_search_prefix_matches_the_walk,searched_slot_sum
++gpu-score-candidate-needs-valid-spans	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	    first: int, past: int, position: int,\n)\n    requires\n        valid_scoring_records(records), 0 <= start < end,	    first: int, past: int, position: int,\n)\n    requires\n        0 <= start < end,	proof_errors=1	landing=lemma_candidate_window_keeps_every_contribution
++gpu-score-prefix-skips-induction-step	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	lemma_search_prefix_matches_the_walk(records, device, start, end, first, past, visited - 1);	lemma_search_prefix_matches_the_walk(records, device, start, end, first, past, visited - 2);	proof_errors=1	landing=lemma_search_prefix_matches_the_walk
++gpu-score-fold-skips-induction-step	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	lemma_record_sum_is_a_fold(records, device, start, end, visited - 1);	lemma_record_sum_is_a_fold(records, device, start, end, visited - 2);	proof_errors=1	landing=lemma_record_sum_is_a_fold
++gpu-score-permutation-needs-multiplicity	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	    requires original.to_multiset() == sorted.to_multiset(),	    requires original.to_set() == sorted.to_set(),	proof_errors=2	landing=lemma_permuting_records_preserves_the_walk,theorem_sorted_search_equals_full_record_walk
++gpu-score-theorem-needs-permutation	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	        original.to_multiset() == sorted.to_multiset(),\n        records_are_sorted(sorted)	        records_are_sorted(sorted)	proof_errors=1	landing=theorem_sorted_search_equals_full_record_walk
++gpu-score-counter-needs-record-bound	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	0 <= visited <= records.len() <= u32::MAX,	0 <= visited <= records.len(),	proof_errors=1	landing=lemma_every_walk_prefix_fits_the_gpu_counter
++gpu-score-witness-is-checked	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	pub proof fn witness_scoring_search_with_duplicates_and_crossing_records() {	pub proof fn witness_scoring_search_with_duplicates_and_crossing_records() {\n    assert(false);	proof_errors=1	landing=witness_scoring_search_with_duplicates_and_crossing_records

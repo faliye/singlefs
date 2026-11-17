@@ -1,0 +1,5 @@
+                drop(ends);
+                let Backend::Relay(relay_ends) = &*self.backend else { unreachable!() };
+                let mut ends = relay_ends.lock().expect("转交判定库的锁没有中毒");
+                let reply = reply_line(&mut ends.replies);
+                if reply == "absent" {

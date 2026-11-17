@@ -1,0 +1,5 @@
+25aae7361112632b9a983cfbe0562758fc6a359b57b7fb10b19d03ea7e97d194  .claude/rules/verification.md
+b680fa8e76703c331433371c1b911f38d2f0fd88bf03cc3c8a960e6a99263a04  .claude/rules/implementation-workflow.md
+0402b3aeccd54e8197bbeb576d6abca457ef0cd258bdeaa7fc3a25937dcd83ab  .claude/rules/three-way-inference.md
+32713df7b4413f03e53a4db276c0a05c7ae8ae077faa3d5ccb0fa7127960648e  .claude/rules/verification-reference.md
+7855544bfb792b60fe98011b8391265e42a924992eb26ee83f157e26fbf077c1  .claude/skills/three-way/SKILL.md

@@ -1,0 +1,18 @@
+# 每个夹具一行，制表符分隔五段：crate 名、单元图入口（crate 名之后的路径）、驱动程序里调的函数、改动的原文、替换文。
+# 原文在那个 crate 的 lib.rs 里恰好一次；它所在的那一行落在哪个 fn 单元的行区间里，那个单元就是「被改的方法」。每个夹具各自成根。
+wrapper_named_in_the_entry_control	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+struct_in_an_inactive_cfg_arm_glob_import_in_the_active_arm	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+struct_in_an_inactive_cfg_arm_alias_made_by_an_item_macro	entry	entry	self.0.put(amount) * 2	self.0.put(amount) * 3
+higher_ranked_supertrait_of_the_entry_trait	Source::total	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+trait_object_alias_held_by_a_static	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+auto_trait_written_first_in_a_static_trait_object	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+trait_object_held_by_a_static_inside_a_function_body	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+downcast_to_an_alias_of_a_trait_object	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+any_reached_through_a_type_alias	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+parenthesized_bound_on_the_entry_signature	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+trait_object_field_of_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+bound_in_parentheses_on_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+higher_ranked_bound_on_an_opened_implementation	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+raw_identifier_any_in_the_entry	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+raw_identifier_trait_in_the_entry_signature	entry	caller	self.0.put(amount) * 2	self.0.put(amount) * 3
+variant_imported_by_a_use_made_by_an_item_macro	entry	entry	inner.put(amount) * 2	inner.put(amount) * 3

@@ -1,0 +1,2 @@
+0c03fba0e3015e4f1d51ff0f3ed5c6ca256b5874d5c83d2812f9ddad0301f8d8  .claude/kb/decisions/08-核心索引结构.md
+bd36fa955cf594636dd5584dd5cf69ca35a29767ff01ac3c9216cdc834409845  .claude/kb/decisions/28-挂载期承诺量.md

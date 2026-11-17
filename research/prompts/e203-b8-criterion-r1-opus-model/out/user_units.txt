@@ -1,0 +1,7 @@
+base W2_1_steps=3763 user_units=11 steps_per_user_unit=342.1 released_sum=41 released_per_user_unit=3.73 final_roles=14
+data_units_100 W2_1_steps=17196 user_units=101 steps_per_user_unit=170.3 released_sum=221 released_per_user_unit=2.19 final_roles=14
+data_units_1000 W2_1_steps=179806 user_units=1008 steps_per_user_unit=178.4 released_sum=2055 released_per_user_unit=2.04 final_roles=20
+data_units_10000 W2_1_steps=3231038 user_units=10069 steps_per_user_unit=320.9 released_sum=30549 released_per_user_unit=3.03 final_roles=66
+alpha_steps_per_user_unit_on_axis=-0.009 alpha_released_per_user_unit_on_axis=-0.030
+same_change_cell data_units_100 W2_1 steps=17196 Rs=221 mapped=125 records=1414 files_1000_units_100 W2_2 steps=35407 Rs=247 mapped=101573 records=239668
+alpha_raw_on_records=0.141 alpha_raw_on_mapped=0.108 alpha_ratioRs_on_records=0.119

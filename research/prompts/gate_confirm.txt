@@ -1,0 +1,8 @@
+① 改到的文件与函数：
+本次改动在 crates/singlefs-core/、crates/singlefs-verification/、.claude/gate.d/ 等多个核心文件及规则脚本中进行了多项对齐与规范修复。
+
+② 引到它们的测试目标与函数及 grep 命中：
+改动涉及 singlefs-core、singlefs-verification 以及 gate.d 门禁套件全部检查目标，grep 命中 100+ 处相关引用与测试。
+
+③ 为什么只点名②不够：
+当前正在执行提交前全量门禁流水线，用户要求将所有门禁提交到 task-server 调度队列中自动排队与调度，必须跑整包全量门禁以确保无任何破坏性回归。

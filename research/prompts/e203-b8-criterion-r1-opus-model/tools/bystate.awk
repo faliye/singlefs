@@ -1,0 +1,4 @@
+BEGIN{FS="\t"; split("files data_units unlinks unit_area",ax," "); lo["files"]="base";hi["files"]="files_10000";lo["data_units"]="base";hi["data_units"]="data_units_10000";lo["unlinks"]="base";hi["unlinks"]="unlinks_10000";lo["unit_area"]="files_1000_unit_area_2_pow_14";hi["unit_area"]="files_1000_unit_area_2_pow_24";sp["files"]=1000;sp["data_units"]=1000;sp["unlinks"]=1000;sp["unit_area"]=1024}
+$1=="publish"&&$4=="p2a"{k=$6 SUBSEP $3; if($24>p[k]){p[k]=$24;pr[k]=$24/$13}; r=$24/$13; if(r>m[k])m[k]=r; if($7=="W1"&&$8==1&&$9==0){f[k]=$24;fr[k]=r}}
+function a(x,y,s){return sprintf("%.3f",log(y/x)/log(s))}
+END{for(i=1;i<=4;i++){x=ax[i];for(st=1;st<=2;st++){s=(st==1?"same_mount":"remounted");l=s SUBSEP lo[x];h=s SUBSEP hi[x];print x,s,"raw_first="a(f[l],f[h],sp[x]),"raw_peak="a(p[l],p[h],sp[x]),"ratioRs_first="a(fr[l],fr[h],sp[x]),"ratioRs_at_peak="a(pr[l],pr[h],sp[x]),"ratioRs_max="a(m[l],m[h],sp[x])}}}

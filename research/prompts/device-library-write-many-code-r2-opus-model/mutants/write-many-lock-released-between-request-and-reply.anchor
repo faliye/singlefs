@@ -1,0 +1,3 @@
+                    request.extend_from_slice(text.as_bytes());
+                }
+                send_write_request_and_wait_for_written(&mut ends, &request, &asked);

@@ -1,0 +1,6 @@
+0bf6c8d5e2e0fafe64b81d797627a85eb3d30542937898e0e798ec9ac3fd1908  .claude/kb/layout/01-first-txn.md
+fb33ee1bb7123d9b0b05b0db30c9acda28d0d265328230e56205fa4891526d42  .claude/kb/decisions/12-目标介质.md
+9f8d5510cdfcbabe3b8075fd8dfaf91dbddf858bd97ff60960421c8fd6992937  .claude/kb/decisions/22-单元原子性怎么合成.md
+9d23ea807c6c1b59fa024386fbc8d46dc2ba67c1e19de8ca0d21104b347d1d47  .claude/kb/decisions/02-RAID条带策略.md
+1bc12fe8547092ddd1df4f11d33856322de010de46d76832944175dcd83fccba  .claude/kb/decisions/15-格式冻结政策.md
+c017ef7b240421140dfc283b50377e51639c60694854f356ae37edc06ead45c6  .claude/kb/checks-owed.md

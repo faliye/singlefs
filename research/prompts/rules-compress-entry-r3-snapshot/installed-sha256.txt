@@ -1,0 +1,4 @@
+b3c4f4330e214e638ca4c510eb899d368032811db24a9983969b7af842bb93a1  CLAUDE.md
+c46a7ac02322a6abc96c4b06a438cd74ab22bc8053332f312546cab9675b27eb  .claude/main-agent.md
+5359265246e21fa71be22b02afd6ba97ede4f5e6ab6453fc7cbb88cc9e25ef1c  .claude/skills/merge-verify/SKILL.md
+5921b9d35ec96df671901cbb2ef4e3425567391409ba1b9f220d64d7e97edf02  .claude/skills/dispatch/SKILL.md

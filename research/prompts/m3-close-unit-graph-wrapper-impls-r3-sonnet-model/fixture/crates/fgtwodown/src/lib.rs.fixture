@@ -1,0 +1,19 @@
+// 对照：入口签名点名 Outer，Outer 的字段是 Middle，Middle 的字段才是 Box<dyn Held>：沿字段找两层
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub struct Middle {
+    pub dev: Box<dyn Held>,
+}
+pub struct Outer {
+    pub inner: Middle,
+}
+pub fn entry_two_down(outer: &Outer) -> u8 {
+    outer.inner.dev.read_the_held()
+}

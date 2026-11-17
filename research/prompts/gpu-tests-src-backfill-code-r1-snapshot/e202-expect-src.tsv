@@ -1,0 +1,128 @@
+385	.expect	段数装得进 u64
+448	.expect	10 秒
+449	.expect	10 秒
+557	.expect	一段字节数装得进 u64
+566	.expect	凑满了一块
+686	.expect	CLOCK_MONOTONIC_RAW 单调不减：此刻不早于起点
+907	.expect	写长装得进 u64
+1017	.expect	录制摘要只在借着盘的那条线程上喂，没在别处 panic 过
+1030	.expect	512
+1062	.expect	块内偏移
+1063	.expect	块内长度
+1064	.expect	请求里的偏移
+1075	.expect	64 KiB
+1101	.expect	块表只在借着盘的那条线程上改，没在别处 panic 过
+1158	.expect	块数装得进 u64
+1169	.expect	读长装得进 u64
+1192	.expect	写长装得进 u64
+1194	.expect	64 KiB
+1256	.expect	512
+1344	.expect	小于活数据文件数
+1418	.expect	净荷容量装得进 u64
+1435	.expect	读回的字节数装得进 u64
+1461	.expect	512
+1480	.expect	第一个文件发过之后，会话的现行那一版都有树
+1488	.expect	mkfs
+1502	.expect	小于 256
+1505	.expect	取号
+1506	.expect	暖机
+1510	.expect	暖机两代根
+1518	.expect	新池新建文件
+1709	.expect	段数
+1951	.expect	步数装得进 u64
+1967	.expect	步数装得进 u64
+1979	.expect	条数装得进 u64
+1981	.expect	条数装得进 u64
+2126	.expect	版数
+2127	.expect	抬 F 串数
+2144	.expect	抬 F 到准入上限
+2218	.expect	片数装得进 u64
+2223	.expect	一条记录装得进空树
+2225	.expect	条数装得进 u64
+2228	.expect	扇出装得进 u64
+2236	.expect	条数装得进 u64
+2254	.expect	净荷容量装得进 u64
+2261	.expect	一个单元的净荷不是空的
+2422	.expect	造数据挂载那一次可写挂载
+2497	.expect	单元区装得下下一个用户数据单元
+2549	.expect	片数装得进 u64
+2552	.expect	造碎片挂载那一次可写挂载
+2666	.expect	单元数
+2668	.expect	映射单元条数
+2681	.expect	P 装得进 usize
+2961	.expect	段下标
+2982	.expect	多判记录只在 GC 线程上写，没在别处 panic 过
+3011	.expect	条目数
+3027	.expect	条目数
+3048	.expect	条目数
+3049	.expect	段数
+3148	.expect	单元字节
+3169	.expect	段数
+3369	.expect	1 毫秒不是 0
+3389	.expect	批大小至少 1
+3465	.expect	版数
+3472	.expect	单元数
+3531	.expect	条数
+3532	.expect	条数
+3627	.expect	批数
+3642	.expect	批数
+3664	.expect	批数
+3679	.expect	读数个数
+3809	.expect	调用数
+4396	.expect	意图数
+4400	.expect	意图数
+4413	.expect	意图数
+4475	.expect	P
+4563	.expect	碎片段起点在聚簇段边界上、装得进 6 字节
+4622	.expect	P
+4633	.expect	净荷容量装得进 u64
+4640	.expect	一个单元的净荷不是空的
+4645	.expect	单元下标
+4752	.expect	GC 线程在等
+4753	.expect	GC 线程交回会话
+4757	.expect	GC 线程在等
+4802	.expect	盘表是挂载核过的那一份、现行那一版有树：后台入口不拒
+4841	.expect	前台线程在等
+4850	.expect	GC 线程没有 panic
+4852	.expect	前台线程没有 panic
+5079	.expect	录制摘要没在别处 panic 过
+5091	.expect	P
+5107	.expect	卡数
+5121	.expect	多判记录没在别处 panic 过
+5178	.expect	调用数
+5180	.expect	调用数
+5229	.expect	调用数
+5514	.expect	重复次数
+6052	.expect	次数
+6385	.expect	重复次数
+6662	.expect	调用数
+6684	.expect	次数
+6695	.expect	调用数
+6789	.expect	用户改动次数装得进 u32
+6795	.expect	会话锁没在别处 panic 过
+6811	.expect	计数锁没在别处 panic 过
+6839	.expect	计数锁没在别处 panic 过
+6844	.expect	会话锁没在别处 panic 过
+6854	.expect	盘表是挂载核过的那一份、现行那一版有树：后台入口不拒
+6888	.expect	计数锁没在别处 panic 过
+6898	.expect	计数锁没在别处 panic 过
+6909	.expect	GC 线程没有 panic
+6912	.expect	前台线程没有 panic
+6922	.expect	会话锁没在别处 panic 过
+6944	.expect	改动数
+7127	.expect	P
+7141	.expect	卡数
+7200	.expect	调用数
+7202	.expect	调用数
+7371	.expect	重复次数
+7645	.expect	重复次数
+7849	.expect	几何核那条线程没有 panic
+8054	.expect	段数装得进 usize
+8068	.expect	段下标
+8267	.expect	丙段计时只在调后台入口的那条线程上写，没在别处 panic 过
+8389	.expect	丙段计时只在这条线程上写，没在别处 panic 过
+8396	.expect	盘表是挂载核过的那一份、现行那一版有树：后台入口不拒
+8405	.expect	丙段计时只在这条线程上写，没在别处 panic 过
+8576	.expect	写下的盘号装得进 u32
+8593	.expect	写下的盘号装得进 u32
+8596	.expect	写下的跨槽数装得进 u16

@@ -1,0 +1,21 @@
+// static 的类型是一个 type 别名，dyn 写在别名里
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub type Registered = Mutex<Vec<Box<dyn Held + Send>>>;
+pub static REGISTERED: Registered = Mutex::new(Vec::new());
+pub fn entry_static_of_an_alias() -> u8 {
+    REGISTERED
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

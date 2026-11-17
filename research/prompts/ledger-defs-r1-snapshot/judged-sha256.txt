@@ -1,0 +1,6 @@
+00ae0887059c7e85a34e4dfe1d133227526d0df2b734505da9df53e3cd6753a1  .claude/main-agent.md
+0cdb5366ccb66c36b4e7319d10a70c639dfc4e0811d6312c9898043f0304966c  .claude/agent-common.md
+439e24bb06b476f87989dcc7d658a6651c75617d3e8b0d8188f95427db4ddaae  .claude/agents/implementation-writer.md
+e8b7333e2dc752c96802afe163e2e8337ad46ebfb8712d06a3bbc2a3b7dd5177  .claude/agents/investigator.md
+0ff5915940500b221acdd4ad9e187b15aacb2d556cdeda96d29c3d8a68d7ad29  .claude/rules/implementation-workflow.md
+676020682b5692e4fa169e6e7e6dfea77c2d7ed056e6860af9b55ac49ea554ea  .claude/rules/long-run-split.md

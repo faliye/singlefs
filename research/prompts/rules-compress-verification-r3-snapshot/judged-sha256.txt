@@ -1,0 +1,3 @@
+58c9d45cd688b06359105114868cdfacc446b38ce2dafdddb2682b0fe7b1d3bc  .claude/rules/verification.md
+27a1ab71a7a2a9cab97e7bbabca0dfa1a3eb17c9d965a0f9c3660e36c893d60d  .claude/rules/implementation-workflow.md
+bcc837d3b2f6918b8c9a323c12ca1ea3f8841aae34d8663d209cdee77e211233  .claude/rules/three-way-inference.md

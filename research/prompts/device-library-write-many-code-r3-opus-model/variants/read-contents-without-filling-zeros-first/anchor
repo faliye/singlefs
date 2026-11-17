@@ -1,0 +1,7 @@
+                contents.resize(length, 0_u8);
+                if let Err(error) = ends.replies.read_exact(&mut contents) {
+                    give_up(
+                        OTHER_ERROR_EXIT_CODE,
+                        &format!("{asked}：回应里的 {length} 字节没读全：{error}"),
+                    );
+                }

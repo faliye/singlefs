@@ -1,0 +1,2 @@
+466db11b4bef3bf6e28dfd19ebff12f37e4f06070909f3a2e65d507698b4d35c  .claude/kb/decisions/26-后台整理与放置回收.md
+ab1096b59211733d089afa855e50d647419bf6b26a37f0ad5bd94d34056a5cf5  crates/singlefs-checker/invariants/07-分配器.md

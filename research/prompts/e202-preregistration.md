@@ -473,6 +473,17 @@ checker 档与产品 GPU 包互不依赖：门禁 `.claude/gate.d/checker-indepe
 10. **挂钟改读不受 NTP 调频的单调钟（用户 2026-11-05 弹窗定「甲」）。** 依据：任务 6790（小池单测）失败说明里 22 个窗口有 21 个「GC 线程 CPU 比挂钟多」，多出 0.6–22 ppm、最大差 7363 ns（主 agent 从日志算的）；第七段查出原因在钟源：`Instant` 读 `CLOCK_MONOTONIC`，受 NTP 调频，线程 CPU 钟（`CLOCK_THREAD_CPUTIME_ID`）不受。第五节「计时与计数怎么做」里读挂钟那一处、第一节「GC 挂钟」读法、量 W 与包含自检里的「每次调用挂钟」都改成读 `CLOCK_MONOTONIC_RAW`，经产品 GPU 包公开的安全函数取（与 `host_cpu_time_of_this_thread` 同一个包、同一种写法；新加的那一处 unsafe 登记进 `.claude/gate.d/unsafe-allowances.tsv`，并进用户点名的 unsafe 治理三方）。包含自检的三条不等式一个字不动。比原文的变动：挂钟不再跟 NTP 调时，量出的挂钟与墙上时间差至多是调频那几十 ppm，不影响成对相减的符号与第 4 行的趋势分类。
 11. **前台用户改动只覆盖写一个文件的最后一个单元（第六段造池换写法跟着改）。** 依据：执行员第三段查出核心层按偏移覆盖写会把偏移所在单元一直到文件末尾整段重写（`crates/singlefs-core/src/transaction.rs:11645`），第六段为装进一层 inode 树（`crates/singlefs-core/src/inode_tree.rs:279`–`:285`）把活数据放进 16 单元一个的文件。第五节「负载」里前台改动「在 [0, P) 里均匀取一个单元覆盖写」改成「按种子在 P ÷ 16 个活数据文件里均匀取一个，覆盖写它的最后一个单元」，每次仍只重写一个单元。比原文窄：被改的单元只落在每个文件的末单元上，GC 要搬的活单元分布跟着变，实验页写明。
 
+第 12 条由主 agent 写，时点在装置搬进测试包、加 `--cards`、续跑核卡改完之后，任何产物之前（交替跑、并发跑都还没起过）；依据是用户定案与读代码，没有产物读数。补记的原因：代码轮 `research/prompts/gpu-tests-src-backfill-code-r1-main-verification.md` 第三节第 4 条判「与跑前登记对不上」。
+
+12. **「全部卡」臂开的是服务交来的卡，张数由 `lockstep --cards <张数>` 设；开了哪几张卡逐张记进产物，续跑时核（第一节「卡」那一行与第四节臂表「GPU 全部卡臂」那一行的开法由这一条替掉）。** 用户定案原话（`records/2026-11-11-GPU两段与按需领卡核查.md:334`）：「E202 开头这个全部卡的说明是错误的。 而是根据设定来使用设定值设定的全部卡。 设定了记账用几张。」；张数可设是同一份记录第 412 行的弹窗定案「做成可设，服务改好前先写 all」。改成：
+    - 卡只用服务交的：环境变量 `GPU_CARDS_BY_PRIORITY` 有卡串就只开那几张，没有而有领卡通道时在起步镜像造完、开设备之前按需领；两样都没有报错退出，装置不自己枚举本机的卡（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs` 文件头「卡只用服务交的」那一段）。
+    - 「全部卡」臂：`lockstep --cards N` 只开服务交来的卡里排在前头的 N 张（先后照服务交来的卡串），不给开交来的全部；`background_gpu_devices` 点名开的那几张（原文写「不给 `background_gpu_devices`」，不再成立）。N 小于 2、不是数、多于交来的张数退 2；这一台一张都没交退 77；没给 `--cards` 而只交来一张时这条臂与点名一张卡臂相同，报本次未跑。每张参与的卡上限照旧 1 GiB。
+    - 「点名一张卡」臂：开的是交来的卡里的一张，哪一张记进产物（原文「本进程看得到的独立显卡里 PCI 地址最小的那一张」的范围收成服务交来的卡）。
+    - 产物多两种行：`name=every_card_arm_cards` 记全部卡臂开了几张、照什么开的（`named_by=cards_option` 或 `every_handed_over_card`）、每张的 PCI 地址与型号；`name=one_card_arm_card` 记点名一张卡臂那一张的 PCI 地址与型号（交替跑与并发跑都打）。
+    - 续跑核卡（并进第十一节停机条款）：这几样与产物里已有的同种行有一处不同，或产物里有这条臂跑出的结果行（`name=run`、`name=concurrent_run`）而没有这种行，打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 退 2；一条结果行都没跑出来的那一趟不挡以后的续跑。什么观测会让它触发：同一份 `--product` 续跑时换了卡、换了张数或换了一台。
+    - 起法里的包名（第十四节那四条命令）：装置住测试包，`-p singlefs-background-gpu` 换成 `-p singlefs-background-gpu-tests`，全部卡臂的张数在 `lockstep` 后面加 `--cards <张数>`。
+    比原文的变动：「全部卡」的范围从「本进程看得到的全部独显」收成「服务交来的、`--cards` 点到的那几张」，两组卡的重复不混进同一份产物（收严）；第四节「做完会怎样」那一句与第六节各量、第十节失败条款一个字不动。卡的身份取 PCI 地址加型号，认不出「两台同一个槽插同一种型号」那一形（实现员报告 `~/.local/share/singlefs/work/e202-apparatus-backfill-fixes/result.md`，没量过），产物合并时另看产物所在的机器。
+
 ## 十三、读过的文件与跑过的命令
 
 ### 读过的文件（行号区间；grep 命中行也算）

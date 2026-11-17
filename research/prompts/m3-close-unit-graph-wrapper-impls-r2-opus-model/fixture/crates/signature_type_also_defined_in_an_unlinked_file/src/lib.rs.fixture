@@ -1,0 +1,25 @@
+//! 两份实现不等价：入口签名点名 `Holder`；同一个 crate 里另有一份没有哪个 `mod` 声明的 `src/stray.rs`，里面也有一个 `Holder`，
+//! 字段是 `Box<dyn Extra>`。Rust 一份的 `type_units_by_name` 收工作区里每一个单元（连不属于任何目标的文件），沿它开 `Extra`；
+//! Python 一份只收进了目标的文件。入口的值不随改动变；比的是两份的闭包。
+pub trait Extra {
+    fn extra(&self) -> u32;
+}
+
+pub struct Plain(pub u32);
+
+impl Extra for Plain {
+    fn extra(&self) -> u32 {
+        self.0 * 2
+    }
+}
+
+pub struct Holder;
+
+pub fn entry(holder: &Holder) -> u32 {
+    let _ = holder;
+    3
+}
+
+pub fn caller() -> u32 {
+    entry(&Holder)
+}

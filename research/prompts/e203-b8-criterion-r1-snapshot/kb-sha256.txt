@@ -1,0 +1,4 @@
+159a4283a3bd77f95cc387730b3aa3e6d2257f0ee93d1a294d6d3d6acf8755bb  .claude/kb/experiments/206-发布固定点轮数的代价.md
+6dac9876820efc83e1a30d45621cf5e2349ae0d85c82fc8512c133d94cb65a01  .claude/kb/experiments/203-准入之前扫类的步代价.md
+0c03fba0e3015e4f1d51ff0f3ed5c6ca256b5874d5c83d2812f9ddad0301f8d8  .claude/kb/decisions/08-核心索引结构.md
+bd36fa955cf594636dd5584dd5cf69ca35a29767ff01ac3c9216cdc834409845  .claude/kb/decisions/28-挂载期承诺量.md

@@ -1,0 +1,25 @@
+name=rerun_roots repo=/home/fy5090/code/singlefs frozen=/home/fy5090/.local/share/singlefs/work/c996-code-r2-opus/copy model=/home/fy5090/.local/share/singlefs/work/c996-code-r2-verdict/opus-model work=/home/fy5090/.local/share/singlefs/work/c996-code-r2-verdict-run
+name=rerun_append target=/home/fy5090/.local/share/singlefs/work/c996-code-r2-verdict-run/tree/crates/singlefs-background-gpu/src/background_gpu.rs already_appended=yes
+name=rerun_append target=/home/fy5090/.local/share/singlefs/work/c996-code-r2-verdict-run/tree/crates/singlefs-core/src/background_compute.rs already_appended=yes
+name=rerun_exit background_gpu_lib=0 core_lib=0
+name=attack_repaired_failure_of_the_settings_before_the_switch answered_at_the_handing_in=StillOpeningItsCards answered_once_opened=PutInEffect { not_split_over_the_gpus: None } participating=[GpuDeviceIdentifier([48, 48, 48, 48, 58, 52, 49, 58, 48, 48, 46, 48])]
+name=attack_repaired_left_out_after_the_opening answered_every_card_left_out=true batch_failed=true devices_given_work=[]
+name=attack_repaired_superseded_card device_not_opened=Some(GpuDeviceIdentifier([48, 48, 48, 48, 58, 56, 49, 58, 48, 48, 46, 48])) gpus_opened=[GpuDeviceIdentifier([48, 48, 48, 48, 58, 48, 49, 58, 48, 48, 46, 48])] participating=[GpuDeviceIdentifier([48, 48, 48, 48, 58, 48, 49, 58, 48, 48, 46, 48])] drops_of_forty_one=1 openings=["0000:41:00.0", "0000:81:00.0", "0000:81:00.0", "0000:81:00.0", "0000:81:00.0"]
+name=attack_repaired_stale_failure arm=handed_in_again_after_the_poll not_opened_before=true not_opened_after=true openings=8
+name=attack_repaired_stale_failure arm=handed_in_again_before_the_poll openings_when_handed_in_again=4 causes_reported=Some(4) openings_after_the_poll=8
+name=attack_retry_after_not_opened arm=switched_to_the_cpu_first not_opened=true gpus_opened_after_not_opened=[] still_opening_at_the_retry=true batch_panicked_with=Some("参与的卡一张都不剩只有两种：换设置时量代价出错（上面交回了），或这组设置点的卡都因显存上限不用") devices_given_work=[]
+name=attack_opening_panic arm=mount panicked=true starts=1
+name=attack_opening_panic arm=switch panicked=false opened=true starts=2
+name=attack_retry_after_not_opened arm=stayed_on_the_gpu not_opened=true gpus_opened_after_not_opened=[GpuDeviceIdentifier([48, 48, 48, 48, 58, 48, 49, 58, 48, 48, 46, 48])] still_opening_at_the_retry=true batch_panicked_with=None devices_given_work=[GpuDeviceIdentifier([48, 48, 48, 48, 58, 48, 49, 58, 48, 48, 46, 48])]
+name=attack_hung_opening_across_mounts earlier_mount_first=Some(WaitForTheGpuExceededTheLimit { wait_limit: 50ms }) earlier_mount_again=Some(DeviceOrPipelineDidNotStart { reason: "这张卡上前一次开卡到点之后还没回来（还挂在驱动里），这一次不再起" }) starts_within_the_earlier_mount=1 later_mount_first=Some(WaitForTheGpuExceededTheLimit { wait_limit: 50ms }) starts_after_the_later_mount=2
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 201 filtered out; finished in 0.10s
+name=attack_core_retry_after_not_opened switched_to_the_cpu_first=false times_told_no_gpu_takes_part=0 route_while_opening=Some(Gpu) route_once_not_opened=None devices_in_effect_once_not_opened=Some([GpuDeviceIdentifier([48, 48, 48, 48, 58, 52, 49, 58, 48, 48, 46, 48])]) route_at_the_retry=Some(Gpu) stopped_at_the_retry=false handed_in_at_the_retry=true
+name=attack_repaired_left_out_after_the_opening arm=card_not_open_at_the_switch route_while_opening=Some(Gpu) route_once_opened=None stopped_by_gpu_unusable_under_the_settings_handed_in=true
+name=attack_errors_while_opening arm=switch_opening routes=[Some(Gpu), Some(Gpu), Some(Gpu)] after_each_error=[StopLiftedByTheSwitchRequestedBeforeTheError, StopLiftedByTheSwitchRequestedBeforeTheError, StopLiftedByTheSwitchRequestedBeforeTheError] stopped=false
+name=attack_repaired_stale_stop stopped_at_the_mount=true stopped_after_the_request=false route_at_the_handing_in=Some(Gpu) route_once_opened=Some(Gpu) stopped=false
+name=attack_repaired_stop_outlives_the_switch arm=error_before_the_handing_in after_the_error=StopLiftedByTheSwitchRequestedBeforeTheError stopped=false
+name=attack_repaired_left_out_after_the_opening arm=card_already_open route_at_the_handing_in=None stopped_by_gpu_unusable_under_the_settings_handed_in=true
+name=attack_core_retry_after_not_opened switched_to_the_cpu_first=true times_told_no_gpu_takes_part=1 route_while_opening=Some(Cpu(CpuRequestedByTheSettings)) route_once_not_opened=None devices_in_effect_once_not_opened=Some([GpuDeviceIdentifier([48, 48, 48, 48, 58, 52, 49, 58, 48, 48, 46, 48])]) route_at_the_retry=Some(Gpu) stopped_at_the_retry=false handed_in_at_the_retry=true
+name=attack_repaired_stop_outlives_the_switch arm=error_after_the_handing_in route_while_opening=Some(Gpu) after_the_error=StopLiftedByTheSwitchRequestedBeforeTheError route_once_opened=Some(Gpu) stopped=false devices_in_effect=Some([GpuDeviceIdentifier([48, 48, 48, 48, 58, 52, 49, 58, 48, 48, 46, 48])])
+name=attack_errors_while_opening arm=no_switch route_of_the_failing_batch=Some(Gpu) after_the_error=LeftStopped compensating=true
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 441 filtered out; finished in 0.00s

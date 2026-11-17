@@ -1,0 +1,85 @@
+--- a/crates/singlefs-core/src/mounted_session.rs
++++ b/crates/singlefs-core/src/mounted_session.rs
+@@ -3391,20 +3391,12 @@
+             .put_the_switch_requested_from_the_next_batch_in_effect();
+         let parameters = parameters_and_device_table.parameters_on_disk();
+         let background_compute = parameters_and_device_table.background_compute_of_this_mount();
+-        if compaction_stays_stopped(allocator, background_compute) {
+-            return Ok(start_while_the_compaction_stays_stopped(
+-                allocator,
+-                current,
+-                parameters.geometry.root_ring_slots_per_region.count(),
+-                compaction.publishes_since_the_last_user_change,
+-            ));
+-        }
+         let is_judged_as_the_product_does = matches!(
+             allocator.compaction().switches.run_forcing,
+             CompactionRunForcing::FollowTheWatermarks
+         );
+         // 挂载不给新预算（D26（后台整理与放置回收） 已定项 13 第 5 条的加门）：这次挂载头一次判后台起跑时，已经过去的发布数取根环里最新那个用户状态之后的根数
+-        // （写行、暖机、上一次挂载的整理都在里面）。读不通当那一份已扣完。
++        // （写行、暖机、上一次挂载的整理都在里面）。读不通当那一份已扣完。排在停没停那一判之前：停着而有活意图时起跑的那一趟同样吃这一份。
+         if is_judged_as_the_product_does
+             && compaction.take_the_reading_of_the_publishes_of_the_mount_from_the_ring()
+         {
+@@ -3424,6 +3416,14 @@
+                 .publishes_since_the_last_user_change
+                 .max(publishes_read_from_the_ring);
+         }
++        if compaction_stays_stopped(allocator, background_compute) {
++            return Ok(start_while_the_compaction_stays_stopped(
++                allocator,
++                current,
++                parameters.geometry.root_ring_slots_per_region.count(),
++                compaction.publishes_since_the_last_user_change,
++            ));
++        }
+         let foreground_cannot_write = foreground_cannot_write_under_the_switches(allocator);
+         // 放锁的后台入口上一次调用之后还没完的那一趟接着推：一趟只判一次起跑。整理停着的那一判在上面：停着时这一趟留着，解除之后接着推。
+         // 那一份预算扣完就不再推整理，只有两样例外：删除续做不占预算，队列没走空照走；这一趟的破例还没用掉。
+@@ -4502,8 +4502,32 @@
+             .max(1)
+         }
+     };
++    // 回退门只在后台入口、开关照水位判时判（显式入口没有产品调用方，可写挂载续做只推盘上那一条，发布数有上界）。
++    let is_the_rollback_gate_judged = matches!(pacing, PacingOfTheRun::PacedByTheCaller { .. })
++        && matches!(
++            switches.run_forcing,
++            CompactionRunForcing::FollowTheWatermarks
++        );
+     if compaction_stays_stopped(allocator, background_compute) {
+         let stop = CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError;
++        // 停着时单发的删意图也是一次整理发布，同样过回退门（D26（后台整理与放置回收） 已定项 13 第 5 条）：门关着就不发，意图与 R 排他留到门开；
++        // 全空段低于底额、前台写不进时这一次破例，同循环里每趟的第一次发布。
++        let is_this_drop_the_exception =
++            budget_rule == CompactionRunBudget::AtLeastOnePublishWhileTheForegroundCannotWrite;
++        if budget != 0 && is_the_rollback_gate_judged && !is_this_drop_the_exception {
++            if let Some(stop_of_the_gate) =
++                stop_of_the_rollback_gate(parameters, &*devices, allocator, current)
++            {
++                return finish(
++                    compaction,
++                    current.root().checkpoint_txg,
++                    versions_published,
++                    background_compute_of_each_batch,
++                    0,
++                    CompactionRunOutcome::Stopped(stop_of_the_gate),
++                );
++            }
++        }
+         let dropped_on_the_stop = if budget == 0 {
+             Ok(CompactionStep::Stopped(stop))
+         } else {
+@@ -4623,12 +4647,6 @@
+             ),
+         );
+     }
+-    // 回退门只在后台入口、开关照水位判时判（显式入口没有产品调用方，可写挂载续做只推盘上那一条，发布数有上界）。
+-    let is_the_rollback_gate_judged = matches!(pacing, PacingOfTheRun::PacedByTheCaller { .. })
+-        && matches!(
+-            switches.run_forcing,
+-            CompactionRunForcing::FollowTheWatermarks
+-        );
+     let mut publishes_of_the_run: u64 = 0;
+     let mut batches_published: u64 = 0;
+     // 循环：每一轮发成一次整理发布或停。迭代上界是预算（每发成一次计一次，到 budget 停）；跨轮携带的是现行那一版、已发的次数与批数。

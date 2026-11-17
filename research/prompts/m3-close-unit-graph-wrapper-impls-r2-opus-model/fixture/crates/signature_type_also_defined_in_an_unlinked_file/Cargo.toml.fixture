@@ -1,0 +1,2 @@
+[package]
+name = "signature_type_also_defined_in_an_unlinked_file"

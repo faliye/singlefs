@@ -1,0 +1,26 @@
+//! impl 写在泛型别名上，值照原名造：闭包里只有原名 `Wrapper` 被点名，别名 `Doubling` 没有。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+pub type Doubling<Inner> = Wrapper<Inner>;
+
+impl<Inner: Store> Store for Doubling<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    Wrapper(Base).put(3)
+}

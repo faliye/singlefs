@@ -1,0 +1,31 @@
+E206RESULT name=header for_item=base__plain build=plain profile=release opt_level=3 test_threads=31 histories=701008ce42d0534e diff_file=e206-fixed-point-cost-counters-diff-2026-11-09-r2.diff diff_lines=0 item_key=4d9d02b15987e721e4b46e3088e49e8c8f1fc1dcbb33adbb35a22cf081e96940
+E206RESULT name=source_sha256 file=crates/singlefs-core/src/transaction.rs sha256=805afb9d52abe6e3b2cd70bfe88e1bb058824afc7fb7337306423a3aae651bf5
+E206RESULT name=source_sha256 file=crates/singlefs-core/src/allocation_record_tree.rs sha256=991623b6a9b5028eb692b8e88a3e6acaab6c1471c5302b23dffeb6f42ea958ce
+E206RESULT name=source_sha256 file=crates/singlefs-core/src/allocator.rs sha256=a07e50d8b41c2dbca6a564108e9cc13ac09572703f3f1f541d744988c2433d49
+E206RESULT name=anchor id=call_site_open file=crates/singlefs-core/src/transaction.rs line=12861 hits=1
+E206RESULT name=anchor id=call_site_close file=crates/singlefs-core/src/transaction.rs line=12871 hits=1
+E206RESULT name=anchor id=settle_begin file=crates/singlefs-core/src/transaction.rs line=13376 hits=1
+E206RESULT name=anchor id=rounds_limit file=crates/singlefs-core/src/transaction.rs line=13378 hits=1
+E206RESULT name=anchor id=round_begin file=crates/singlefs-core/src/transaction.rs line=13379 hits=1
+E206RESULT name=anchor id=round_resolved file=crates/singlefs-core/src/transaction.rs line=13398 hits=1
+E206RESULT name=anchor id=round_released file=crates/singlefs-core/src/transaction.rs line=13423 hits=1
+E206RESULT name=anchor id=round_after_the_release file=crates/singlefs-core/src/transaction.rs line=13431 hits=1
+E206RESULT name=anchor id=merge_after_the_release file=crates/singlefs-core/src/transaction.rs line=13434 hits=1
+E206RESULT name=anchor id=round_after_the_placements file=crates/singlefs-core/src/transaction.rs line=13446 hits=1
+E206RESULT name=anchor id=round_settled file=crates/singlefs-core/src/transaction.rs line=13448 hits=1
+E206RESULT name=anchor id=merge_after_the_placements file=crates/singlefs-core/src/transaction.rs line=13455 hits=1
+E206RESULT name=anchor id=row_call_site_open file=crates/singlefs-core/src/transaction.rs line=2099 hits=1
+E206RESULT name=anchor id=row_call_site_close file=crates/singlefs-core/src/transaction.rs line=2101 hits=1
+E206RESULT name=anchor id=row_settle_begin file=crates/singlefs-core/src/transaction.rs line=1932 hits=1
+E206RESULT name=anchor id=row_round_begin file=crates/singlefs-core/src/transaction.rs line=1935 hits=1
+E206RESULT name=anchor id=row_round_resolved file=crates/singlefs-core/src/transaction.rs line=1965 hits=1
+E206RESULT name=anchor id=row_round_settled file=crates/singlefs-core/src/transaction.rs line=1984 hits=1
+E206RESULT name=anchor id=code_two_keys file=crates/singlefs-core/src/code_two_tree.rs line=691 hits=1
+E206RESULT name=anchor id=code_two_keys_zero_root file=crates/singlefs-core/src/code_two_tree.rs line=709 hits=1
+E206RESULT name=point item=base__plain point=base arm=plain build=plain unit_area_slots=131072 unlinks=10 data_units=10 files=10 shape=big_then_small churn_seed=1
+E206RESULT name=history item=base__plain user_changes=42 settle_calls=0 peak_rounds=0 peak_round_work=0 changes=33 changes_refused=0 floor_raises=0
+E206RESULT name=image_sha256 item=base__plain when=history_end sha256=a97bb56210604ecb68cd4f689ec0f525a646552bc144c6b0c303b5d4079306bf
+E206RESULT name=reconciliation item=base__plain phase=window state=same_mount op=W1 op_index=1 image_changed_unit_slots=32 slots_placed=0
+E206RESULT name=reconciliation item=base__plain phase=window state=same_mount op=W2 op_index=1 image_changed_unit_slots=30 slots_placed=0
+E206RESULT name=reconciliation item=base__plain phase=window state=same_mount op=W3 op_index=1 image_changed_unit_slots=116 slots_placed=0
+E206RESULT name=item_done item=base__plain

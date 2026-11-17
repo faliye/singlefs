@@ -1,0 +1,37 @@
+p2a
+   base mapped 35 B8 2102 B4_pre 36 T_last 14
+   unlinks_100 mapped 35 B8 2258 B4_pre 36 T_last 14
+   unlinks_1000 mapped 40 B8 2734 B4_pre 66 T_last 16
+   unlinks_10000 mapped 98 B8 7184 B4_pre 66 T_last 26
+   data_units_100 mapped 125 B8 2283 B4_pre 36 T_last 14
+   files_100 mapped 125 B8 2331 B4_pre 36 T_last 14
+   data_units_1000 mapped 1038 B8 3627 B4_pre 36 T_last 20
+   files_1000_unit_area_2_pow_14 mapped 1043 B8 7337 B4_pre 36 T_last 23
+   files_1000 mapped 1045 B8 4595 B4_pre 36 T_last 25
+   files_1000_unit_area_2_pow_20 mapped 1045 B8 4599 B4_pre 36 T_last 25
+   files_1000_unit_area_2_pow_24 mapped 1047 B8 8529 B4_pre 36 T_last 27
+   data_units_10000 mapped 10145 B8 4040 B4_pre 36 T_last 18
+   files_10000 mapped 10221 B8 15440 B4_pre 36 T_last 84
+   files_1000_units_10 mapped 11127 B8 17694 B4_pre 36 T_last 99
+   files_30000 mapped 30619 B8 63856 B4_pre 36 T_last 171
+   files_1000_units_100 mapped 101581 B8 168373 B4_pre 36 T_last 448
+   B8 OLS slope vs mapped over 16 points 0.419 endpoint alpha 0.55
+   B4_pre OLS slope vs mapped over 16 points -0.034 endpoint alpha 0.0
+p1
+   base mapped 35 B8 2102 B4_pre 36 T_last 14
+   unlinks_100 mapped 35 B8 2258 B4_pre 36 T_last 14
+   unlinks_1000 mapped 40 B8 2734 B4_pre 66 T_last 16
+   unlinks_10000 mapped 98 B8 12789 B4_pre 66 T_last 26
+   data_units_100 mapped 125 B8 2283 B4_pre 36 T_last 14
+   files_100 mapped 125 B8 2331 B4_pre 36 T_last 14
+   data_units_1000 mapped 1038 B8 5401 B4_pre 36 T_last 20
+   files_1000_unit_area_2_pow_14 mapped 1043 B8 9283 B4_pre 36 T_last 23
+   files_1000 mapped 1045 B8 6961 B4_pre 36 T_last 25
+   files_1000_unit_area_2_pow_20 mapped 1045 B8 6965 B4_pre 36 T_last 25
+   files_1000_unit_area_2_pow_24 mapped 1047 B8 10903 B4_pre 36 T_last 27
+   data_units_10000 mapped 10145 B8 5958 B4_pre 36 T_last 18
+   files_10000 mapped 10221 B8 152344 B4_pre 36 T_last 84
+   files_1000_units_10 mapped 11127 B8 250526 B4_pre 36 T_last 99
+   files_30000 mapped 30619 B8 637836 B4_pre 36 T_last 171
+   B8 OLS slope vs mapped over 15 points 0.65 endpoint alpha 0.844
+   B4_pre OLS slope vs mapped over 15 points -0.04 endpoint alpha 0.0

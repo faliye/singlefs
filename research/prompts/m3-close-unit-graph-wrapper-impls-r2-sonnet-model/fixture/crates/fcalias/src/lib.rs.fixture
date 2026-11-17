@@ -1,0 +1,19 @@
+// 接收者的字段类型是写着 Box<dyn Trait> 的类型别名：要经别名单元找到 dyn
+pub trait AliasDev {
+    fn alias_dev_read(&self) -> u8;
+}
+pub struct AliasFaulty<Inner>(pub Inner);
+impl<Inner: AliasDev> AliasDev for AliasFaulty<Inner> {
+    fn alias_dev_read(&self) -> u8 {
+        self.0.alias_dev_read() ^ 1
+    }
+}
+pub type Shared = Box<dyn AliasDev>;
+pub struct Session {
+    pub dev: Shared,
+}
+impl Session {
+    pub fn entry_alias_field(&self) -> u8 {
+        self.dev.alias_dev_read()
+    }
+}

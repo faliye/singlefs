@@ -1,0 +1,32 @@
+name=gate_geometry margin=8 kept_states=4 intent_publishes_at_most=5
+scenario=busy_ring
+S=4 ring=12 allowed=0 formula_3S_minus_12=0 finishes_one_intent=no
+S=5 ring=15 allowed=3 formula_3S_minus_12=3 finishes_one_intent=no
+S=6 ring=18 allowed=6 formula_3S_minus_12=6 finishes_one_intent=yes
+S=7 ring=21 allowed=9 formula_3S_minus_12=9 finishes_one_intent=yes
+S=8 ring=24 allowed=12 formula_3S_minus_12=12 finishes_one_intent=yes
+S=9 ring=27 allowed=15 formula_3S_minus_12=15 finishes_one_intent=yes
+S=10 ring=30 allowed=18 formula_3S_minus_12=18 finishes_one_intent=yes
+S=11 ring=33 allowed=21 formula_3S_minus_12=21 finishes_one_intent=yes
+S=12 ring=36 allowed=24 formula_3S_minus_12=24 finishes_one_intent=yes
+S=13 ring=39 allowed=27 formula_3S_minus_12=27 finishes_one_intent=yes
+S=14 ring=42 allowed=30 formula_3S_minus_12=30 finishes_one_intent=yes
+S=15 ring=45 allowed=33 formula_3S_minus_12=33 finishes_one_intent=yes
+S=16 ring=48 allowed=36 formula_3S_minus_12=36 finishes_one_intent=yes
+scenario=every_user_state_followed_by_j_empty_roots
+S=4 j=0 allowed=0 finishes_one_intent=no
+S=4 j=1 allowed=0 finishes_one_intent=no
+S=4 j=2 allowed=0 finishes_one_intent=no
+S=4 j=3 allowed=0 finishes_one_intent=no
+S=5 j=0 allowed=3 finishes_one_intent=no
+S=5 j=1 allowed=0 finishes_one_intent=no
+S=5 j=2 allowed=0 finishes_one_intent=no
+S=5 j=3 allowed=0 finishes_one_intent=no
+S=6 j=0 allowed=6 finishes_one_intent=yes
+S=6 j=1 allowed=3 finishes_one_intent=no
+S=6 j=2 allowed=0 finishes_one_intent=no
+S=6 j=3 allowed=0 finishes_one_intent=no
+S=8 j=0 allowed=12 finishes_one_intent=yes
+S=8 j=1 allowed=9 finishes_one_intent=yes
+S=8 j=2 allowed=6 finishes_one_intent=yes
+S=8 j=3 allowed=3 finishes_one_intent=no

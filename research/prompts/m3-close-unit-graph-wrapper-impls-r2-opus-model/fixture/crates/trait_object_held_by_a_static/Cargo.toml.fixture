@@ -1,0 +1,2 @@
+[package]
+name = "trait_object_held_by_a_static"

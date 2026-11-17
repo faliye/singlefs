@@ -70,7 +70,7 @@
 
 ## 五、被判的文件
 
-这一轮判的 `crates/` 文件（冻结副本）：`crates/singlefs-checker/src/lib.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/journal.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/root_record.rs`、`crates/singlefs-core/src/root_ring.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-format/src/lib.rs`，以及 `crates/singlefs-harness/tests/` 下 19 份（清单在 `research/prompts/m3-root-ring-code-r1-snapshot/crates-sha256.txt`）。
+这一轮判的 `crates/` 文件（冻结副本）：`crates/singlefs-checker/src/lib.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/journal.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/root_record.rs`、`crates/singlefs-core/src/root_ring.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-format/src/lib.rs`，以及 `crates/singlefs-harness/tests/` 下 19 份（清单在 `research/prompts/m3-root-ring-code-r1-snapshot/crates-sha256.txt`）。
 
 第二轮攻 RR1–RR5 落地之后的样子与这一轮站住的各格（一次抽样的「没打中」要再抽一次），换攻击面：第一轮的修补本身、产生结论的方法、没被看过的地方。
 

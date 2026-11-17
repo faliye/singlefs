@@ -1,0 +1,2151 @@
+diff --git a/crates/singlefs-unit-graph/src/bin/unit_graph.rs b/crates/singlefs-unit-graph/src/bin/unit_graph.rs
+index 95be418e7..31343006d 100644
+--- a/crates/singlefs-unit-graph/src/bin/unit_graph.rs
++++ b/crates/singlefs-unit-graph/src/bin/unit_graph.rs
+@@ -5,7 +5,10 @@
+ //!                      [--toolchain-line <行>…] [--toolchain-of-the-build <profile>]
+ //!                      [--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <种类>] [--threads <N>]
+ //!   unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]
++//!   unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]
+ //!
++//! `why` 只查不算键：闭包里「文件路径 + 空格 + 限定名」含 `--unit` 那个子串的单元，各是经哪条边头一回被排进闭包的
++//! （行格式见库的 `output::why_lines`）；目标三元组照 closure 一样从工具链行取，依赖行不用，有拒算照打链、退 0。
+ //! 给几个入口时一起收一个闭包（`compute_closure_of_entries`：几个入口都在 `--target` 点名的那个目标里、同一个 crate）。
+ //! `--toolchain-of-the-build <profile>` 照这台机器现拼一次构建的工具链行（`build_toolchain::toolchain_lines_of_the_build`，与
+ //! `singlefs-verification` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
+@@ -49,7 +52,7 @@ use singlefs_unit_graph::conditional_compilation::target_triple_of_toolchain_lin
+ use singlefs_unit_graph::heavy_threads::default_heavy_threads;
+ use singlefs_unit_graph::lock_file::{narrowed_lock_lines, parse_lock_file, LockedPackage};
+ use singlefs_unit_graph::output::{
+-    closure_lines, dump_lines, key_line, parse_time_refusals, refusal_lines,
++    closure_lines, dump_lines, key_line, parse_time_refusals, refusal_lines, why_lines,
+ };
+ use singlefs_unit_graph::rule_switches::RuleSwitches;
+ use singlefs_unit_graph::verus_ghost_code::JudgmentKind;
+@@ -60,7 +63,8 @@ const USAGE: &str = concat!(
+     "      unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features] ",
+     "[--toolchain-line <行>…（其中一行 host: <三元组> 或 target: <三元组>）] [--toolchain-of-the-build <profile>] ",
+     "[--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
+-    "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]"
++    "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]\n",
++    "      unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]"
+ );
+ 
+ /// 用法错、读不了、入口找不到。
+@@ -73,6 +77,7 @@ enum Command {
+     Dump,
+     Closure,
+     Key,
++    Why,
+ }
+ 
+ struct Arguments {
+@@ -88,6 +93,8 @@ struct Arguments {
+     build_profile: Option<String>,
+     judgment_kind: JudgmentKind,
+     threads: Option<NonZeroUsize>,
++    /// `why` 要查的单元：文件路径或限定名里的一段。
++    unit_pattern: Option<String>,
+ }
+ 
+ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+@@ -98,6 +105,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+         "dump" => Command::Dump,
+         "closure" => Command::Closure,
+         "key" => Command::Key,
++        "why" => Command::Why,
+         other => return Err(format!("认不得子命令「{other}」")),
+     };
+     let mut positional = Vec::new();
+@@ -114,6 +122,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+         build_profile: None,
+         judgment_kind: JudgmentKind::FormalVerification,
+         threads: None,
++        unit_pattern: None,
+     };
+     let mut position = 1usize;
+     while position < raw.len() {
+@@ -127,6 +136,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+             | "--lock-line"
+             | "--lock-file"
+             | "--toolchain-of-the-build"
++            | "--unit"
+             | "--judgment-kind" => {
+                 let Some(value) = value else {
+                     return Err(format!("{current} 后面缺值"));
+@@ -149,6 +159,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+                         RequestedCondition::parse(value)
+                             .map_err(|text| format!("--cfg 认不得「{text}」"))?,
+                     ),
++                    "--unit" => arguments.unit_pattern = Some(value.clone()),
+                     "--toolchain-line" => arguments.toolchain_lines.push(value.clone()),
+                     "--lock-file" => arguments.lock_file = Some(PathBuf::from(value)),
+                     "--toolchain-of-the-build" => arguments.build_profile = Some(value.clone()),
+@@ -183,10 +194,13 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
+     };
+     if !positional_count_fits {
+         return Err(format!(
+-            "dump 要 1 个位置参数（根），closure 与 key 要根与至少一个入口；给了 {} 个",
++            "dump 要 1 个位置参数（根），closure、key 与 why 要根与至少一个入口；给了 {} 个",
+             positional.len()
+         ));
+     }
++    if (command == Command::Why) != arguments.unit_pattern.is_some() {
++        return Err("--unit <子串> 只给 why 用，why 必须给".to_string());
++    }
+     if arguments.lock_file.is_some() && !arguments.lock_lines.is_empty() {
+         return Err("--lock-line 与 --lock-file 只能给一种".to_string());
+     }
+@@ -274,7 +288,7 @@ fn lines_of(
+             );
+             (lines, summary, 0)
+         }
+-        Command::Closure | Command::Key => {
++        Command::Closure | Command::Key | Command::Why => {
+             let mut toolchain_lines = arguments.toolchain_lines.clone();
+             if let Some(profile) = &arguments.build_profile {
+                 match toolchain_lines_of_this_machine(workspace, profile) {
+@@ -323,6 +337,15 @@ fn lines_of(
+                     Ok(outcome) => outcome,
+                     Err(error) => return (Vec::new(), error.to_string(), EXIT_USAGE),
+                 };
++            if let (Command::Why, Some(pattern)) = (arguments.command, &arguments.unit_pattern) {
++                let lines = why_lines(workspace, &outcome, pattern);
++                let summary = format!(
++                    "入口 {entry_path}：闭包 {} 个 Rust 单元，含「{pattern}」的单元打了 {} 行",
++                    outcome.units.len(),
++                    lines.len()
++                );
++                return (lines, summary, 0);
++            }
+             let lock_lines = match &arguments.lock_file {
+                 None => arguments.lock_lines.clone(),
+                 Some(path) => {
+diff --git a/crates/singlefs-unit-graph/src/build_features.rs b/crates/singlefs-unit-graph/src/build_features.rs
+index ea974768b..731111e96 100644
+--- a/crates/singlefs-unit-graph/src/build_features.rs
++++ b/crates/singlefs-unit-graph/src/build_features.rs
+@@ -115,8 +115,8 @@ fn environment_name_of(name: &str) -> String {
+     name.to_ascii_uppercase().replace('-', "_")
+ }
+ 
+-/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`features_with_their_cfg` 说开着的那几个，按清单里的名字排好）。
+-/// `features_with_their_cfg` 是它构建脚本里逐个写的（特性名、`cfg!(feature = "<名>")`）：cargo 编构建脚本时带着本包这一次开了的特性的 cfg，
++/// 正在编的包自己开了哪些特性（清单 `[features]` 里、`features_with_their_conditional_compilation_flags` 说开着的那几个，按清单里的名字排好）。
++/// `features_with_their_conditional_compilation_flags` 是它构建脚本里逐个写的（特性名、`cfg!(feature = "<名>")`）：cargo 编构建脚本时带着本包这一次开了的特性的 cfg，
+ /// 并过之后的，别的包并上来的也在里面；不读进程环境里的 `CARGO_FEATURE_*`（外面带进来的同名变量分不出）。
+ ///
+ /// # Errors
+@@ -124,11 +124,11 @@ fn environment_name_of(name: &str) -> String {
+ pub fn features_of_the_crate_being_built(
+     workspace: &Workspace,
+     crate_being_built: CrateIndex,
+-    features_with_their_cfg: &[(&str, bool)],
++    features_with_their_conditional_compilation_flags: &[(&str, bool)],
+ ) -> Result<Vec<String>, BuildFeaturesError> {
+     let workspace_crate = &workspace.crates[crate_being_built.0];
+     let features_of_the_manifest = &workspace_crate.manifest.features;
+-    let names_in_the_table: BTreeSet<&str> = features_with_their_cfg
++    let names_in_the_table: BTreeSet<&str> = features_with_their_conditional_compilation_flags
+         .iter()
+         .map(|(feature, _)| *feature)
+         .collect();
+@@ -152,7 +152,7 @@ pub fn features_of_the_crate_being_built(
+     Ok(features_of_the_manifest
+         .keys()
+         .filter(|feature| {
+-            features_with_their_cfg
++            features_with_their_conditional_compilation_flags
+                 .iter()
+                 .any(|(name, is_enabled_by_cargo)| {
+                     *name == feature.as_str() && *is_enabled_by_cargo
+@@ -267,6 +267,17 @@ pub fn features_enabled_on_the_dependencies(
+ #[path = "../../singlefs-core/build.rs"]
+ mod singlefs_core_build_script;
+ 
++/// `singlefs-background-gpu` 的构建脚本本身，只在单测里编进来读它的特性表（`tests::the_background_gpu_build_script_lists_every_feature_of_its_manifest`）。
++/// 本包没有 `tests-on-a-real-gpu`，表里那一格的 cfg 在这里恒为假；构建脚本的 `main` 在这里用不上。
++#[cfg(test)]
++#[allow(
++    dead_code,
++    unexpected_cfgs,
++    reason = "构建脚本的 main 在单测里不调；它写的 cfg!(feature = \"tests-on-a-real-gpu\") 是 singlefs-background-gpu 的特性，本包没有这个特性"
++)]
++#[path = "../../singlefs-background-gpu/build.rs"]
++mod singlefs_background_gpu_build_script;
++
+ #[cfg(test)]
+ mod tests {
+     use std::num::NonZeroUsize;
+@@ -366,7 +377,7 @@ mod tests {
+     /// 场景：建一棵小工作区，作用域照常走完。预期：走完之前根在，走完之后根不在。
+     /// 判别力（`crates/mutations.tsv`）：小工作区的 Drop 不删，根还在，这条红。
+     #[test]
+-    fn a_fixture_workspace_is_gone_once_the_scope_ends_normally() {
++    fn fixture_workspace_is_gone_once_the_scope_ends_normally() {
+         let root = {
+             let workspace = FixtureWorkspace::new(&[("crates/judging/src/lib.rs", "")]);
+             assert!(
+@@ -385,7 +396,7 @@ mod tests {
+     /// 预期：panic 接住之后，写了的那一半不在了（同一进程里别的用例的小工作区并行建着，按头一份夹具的内容认这一棵）。
+     /// 判别力（`crates/mutations.tsv`）：小工作区的 Drop 不删，半棵还在，这条红。
+     #[test]
+-    fn a_fixture_workspace_half_written_when_a_panic_hits_is_gone() {
++    fn fixture_workspace_half_written_when_a_panic_hits_is_gone() {
+         let panicked = std::panic::catch_unwind(|| {
+             FixtureWorkspace::new(&[
+                 ("crates/judging/src/lib.rs", HALF_WRITTEN_FIXTURE_TEXT),
+@@ -466,7 +477,7 @@ mod tests {
+     /// 只编判器的包（计数没开）与和脚手架一起编（脚手架的 dev 依赖把计数并上来）两种编法：判器闭包里计数那个原子的真值分别是
+     /// 假与真，键各是那一种编法编出来的代码该有的那一把——开的那一把等于把计数特性写进判器对依赖的 `features` 之后算的键。
+     #[test]
+-    fn a_feature_another_package_unified_onto_the_dependency_flips_its_atom_and_the_key() {
++    fn feature_another_package_unified_onto_the_dependency_flips_its_atom_and_the_key() {
+         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
+         let workspace = fixture.load();
+         let (alone, alone_key) =
+@@ -568,7 +579,7 @@ mod tests {
+ 
+     /// 带特性的直接依赖没交出那一行：交错误，不当成没开。
+     #[test]
+-    fn a_direct_dependency_with_features_that_reported_nothing_is_an_error() {
++    fn direct_dependency_with_features_that_reported_nothing_is_an_error() {
+         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
+         let workspace = fixture.load();
+         assert_eq!(
+@@ -586,7 +597,7 @@ mod tests {
+ 
+     /// 交出的名字对不上清单里的特性：交错误。
+     #[test]
+-    fn a_reported_feature_missing_from_the_manifest_is_an_error() {
++    fn reported_feature_missing_from_the_manifest_is_an_error() {
+         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
+         let workspace = fixture.load();
+         assert_eq!(
+@@ -604,7 +615,7 @@ mod tests {
+ 
+     /// 带特性的包只经别的包间接依赖：cargo 不把它的元数据交给这个构建脚本，交错误。
+     #[test]
+-    fn a_dependency_with_features_reached_only_through_another_package_is_an_error() {
++    fn dependency_with_features_reached_only_through_another_package_is_an_error() {
+         let fixture = FixtureWorkspace::new(&[
+             ("crates/counting-basis/Cargo.toml", COUNTING_MANIFEST),
+             ("crates/counting-basis/src/lib.rs", COUNTING_LIBRARY),
+@@ -632,7 +643,7 @@ mod tests {
+ 
+     /// 带特性的直接依赖没写 links：交错误。
+     #[test]
+-    fn a_direct_dependency_with_features_but_without_links_is_an_error() {
++    fn direct_dependency_with_features_but_without_links_is_an_error() {
+         let manifest_without_links = COUNTING_MANIFEST.replace("links = \"counting-basis\"\n", "");
+         let fixture = FixtureWorkspace::new(&[
+             (
+@@ -684,7 +695,7 @@ mod tests {
+ 
+     /// 特性表与清单 `[features]` 不是同一组名字：清单里有、表里漏写的，表里写了、清单里没有的，都交错误、逐个点名，不按「没开」算。
+     #[test]
+-    fn a_feature_table_that_disagrees_with_the_manifest_is_an_error() {
++    fn feature_table_that_disagrees_with_the_manifest_is_an_error() {
+         let fixture = fixture_with_judging_manifest(JUDGING_MANIFEST);
+         let workspace = fixture.load();
+         let counting_crate = workspace
+@@ -728,7 +739,7 @@ mod tests {
+         );
+     }
+ 
+-    /// `singlefs-core` 清单 `[features]` 里的每个特性在它构建脚本的特性表（`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG`）里恰好一行、
++    /// `singlefs-core` 清单 `[features]` 里的每个特性在它构建脚本的特性表（`FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS`）里恰好一行、
+     /// 表里没有清单之外的名字（`crates/singlefs-core/build.rs` 文件头点名的这一条）。构建脚本只读 cfg、构建时自己不比：清单加了特性而表没加，
+     /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，`cargo build` 与验证包的构建都不报。
+     /// 表编进来读（同一份源码），清单照原文解（`manifest::parse_crate_manifest`）。
+@@ -739,7 +750,7 @@ mod tests {
+         let names_in_the_manifest: Vec<&str> =
+             manifest.features.keys().map(String::as_str).collect();
+         let mut names_in_the_table: Vec<&str> =
+-            super::singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CFG
++            super::singlefs_core_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
+                 .iter()
+                 .map(|(feature, _)| *feature)
+                 .collect();
+@@ -753,4 +764,53 @@ mod tests {
+             "核心层构建脚本的特性表与清单 [features] 逐个相同"
+         );
+     }
++
++    /// `singlefs-background-gpu` 的清单与构建脚本，取法同 [`CORE_MANIFEST_TEXT`]。
++    const BACKGROUND_GPU_MANIFEST_TEXT: &str = include_str!(concat!(
++        env!("CARGO_MANIFEST_DIR"),
++        "/../singlefs-background-gpu/Cargo.toml"
++    ));
++    const BACKGROUND_GPU_BUILD_SCRIPT_TEXT: &str = include_str!(concat!(
++        env!("CARGO_MANIFEST_DIR"),
++        "/../singlefs-background-gpu/build.rs"
++    ));
++
++    /// 产品 GPU 包那一侧的约定与这里读的对得上：清单写了 links、构建脚本照 [`ENABLED_FEATURES_METADATA_KEY`] 打元数据
++    /// （它的测试包的构建脚本经 [`features_enabled_on_the_dependencies`] 读，算对拍里参照一侧的判法单元键）。
++    #[test]
++    fn the_background_gpu_build_script_reports_under_the_key_read_here() {
++        let manifest = crate::manifest::parse_crate_manifest(BACKGROUND_GPU_MANIFEST_TEXT)
++            .expect("产品 GPU 包清单读得了");
++        assert_eq!(manifest.links.as_deref(), Some("singlefs-background-gpu"));
++        assert!(
++            BACKGROUND_GPU_BUILD_SCRIPT_TEXT.contains(&format!(
++                "\"cargo::metadata={ENABLED_FEATURES_METADATA_KEY}={{}}\""
++            )),
++            "产品 GPU 包构建脚本照 {ENABLED_FEATURES_METADATA_KEY} 交出特性"
++        );
++    }
++
++    /// 产品 GPU 包清单 `[features]` 里的每个特性在它构建脚本的特性表里恰好一行、表里没有清单之外的名字：清单加了特性而表没加，
++    /// 那个特性开着时交出去的元数据里没有它，依赖方的判法单元键按没开算，构建不报。
++    #[test]
++    fn the_background_gpu_build_script_lists_every_feature_of_its_manifest() {
++        let manifest = crate::manifest::parse_crate_manifest(BACKGROUND_GPU_MANIFEST_TEXT)
++            .expect("产品 GPU 包清单读得了");
++        let names_in_the_manifest: Vec<&str> =
++            manifest.features.keys().map(String::as_str).collect();
++        let mut names_in_the_table: Vec<&str> =
++            super::singlefs_background_gpu_build_script::FEATURES_OF_THIS_PACKAGE_WITH_THEIR_CONDITIONAL_COMPILATION_FLAGS
++                .iter()
++                .map(|(feature, _)| *feature)
++                .collect();
++        names_in_the_table.sort_unstable();
++        assert!(
++            !names_in_the_manifest.is_empty(),
++            "产品 GPU 包清单 [features] 里至少有 tests-on-a-real-gpu：{names_in_the_manifest:?}"
++        );
++        assert_eq!(
++            names_in_the_table, names_in_the_manifest,
++            "产品 GPU 包构建脚本的特性表与清单 [features] 逐个相同"
++        );
++    }
+ }
+diff --git a/crates/singlefs-unit-graph/src/build_toolchain.rs b/crates/singlefs-unit-graph/src/build_toolchain.rs
+index 37197f7e4..89f871c69 100644
+--- a/crates/singlefs-unit-graph/src/build_toolchain.rs
++++ b/crates/singlefs-unit-graph/src/build_toolchain.rs
+@@ -13,36 +13,27 @@ use std::collections::BTreeMap;
+ 
+ use crate::manifest::{parse_toml_entries, TomlValue};
+ 
+-/// 进键的 profile 设置：会改编出来的代码怎么跑的那几样（按 cargo 文档 Profiles 一节的键名）。
+-pub const PROFILE_SETTING_KEYS: [&str; 8] = [
++/// 进键的 profile 设置：会改编出来的代码跑出的结果的那几样（按 cargo 文档 Profiles 一节的键名）。
++/// `debug`（调试信息）与 `incremental`（增量编译）不改编出来的代码跑出的结果，不进键：根清单与 `CARGO_PROFILE_<名>_<键>`
++/// 里写了也不读。`codegen-units` 进键：它改代码分区与栈深。依据是 D13（验证路线） 已定项 17
++/// 「工具链（含 cargo 解析后的生效构建环境与外部工具版本）」那一句。
++pub const PROFILE_SETTING_KEYS: [&str; 6] = [
+     "opt-level",
+-    "debug",
+     "debug-assertions",
+     "overflow-checks",
+     "lto",
+     "panic",
+-    "incremental",
+     "codegen-units",
+ ];
+ 
+ /// 内置 profile 的默认值与它继承谁（cargo 文档 Profiles 一节「Default profiles」）。
+-fn builtin_profile(profile_name: &str) -> Option<(Option<&'static str>, [&'static str; 8])> {
++fn builtin_profile(profile_name: &str) -> Option<(Option<&'static str>, [&'static str; 6])> {
+     // 次序照 [`PROFILE_SETTING_KEYS`]
+     match profile_name {
+-        "dev" => Some((
+-            None,
+-            [
+-                "0", "true", "true", "true", "false", "unwind", "true", "256",
+-            ],
+-        )),
+-        "release" => Some((
+-            None,
+-            [
+-                "3", "false", "false", "false", "false", "unwind", "false", "16",
+-            ],
+-        )),
+-        "test" => Some((Some("dev"), [""; 8])),
+-        "bench" => Some((Some("release"), [""; 8])),
++        "dev" => Some((None, ["0", "true", "true", "false", "unwind", "256"])),
++        "release" => Some((None, ["3", "false", "false", "false", "unwind", "16"])),
++        "test" => Some((Some("dev"), [""; 6])),
++        "bench" => Some((Some("release"), [""; 6])),
+         _ => None,
+     }
+ }
+@@ -216,20 +207,80 @@ mod tests {
+     fn the_release_profile_takes_the_root_manifest_over_the_builtin_defaults() {
+         let lines =
+             effective_profile_lines(ROOT_MANIFEST, "release", &no_environment).expect("算得出");
+-        assert!(
+-            lines.contains(&"profile.overflow-checks: true".to_string()),
+-            "{lines:?}"
++        // 根清单里的 `debug = true` 不出行；`codegen-units` 取内置默认
++        assert_eq!(
++            lines,
++            [
++                "profile: release",
++                "profile.opt-level: 3",
++                "profile.debug-assertions: true",
++                "profile.overflow-checks: true",
++                "profile.lto: false",
++                "profile.panic: unwind",
++                "profile.codegen-units: 16",
++            ]
+         );
+-        assert!(
+-            lines.contains(&"profile.debug-assertions: true".to_string()),
+-            "{lines:?}"
++    }
++
++    /// 根清单只在 `[profile.release]` 里多写这几行的一份（其余照 [`ROOT_MANIFEST`] 那样起头）。
++    fn release_manifest_with(release_settings: &str) -> String {
++        format!(
++            "[workspace]\nmembers = [\"crates/alpha\"]\n\n[profile.release]\n{release_settings}"
++        )
++    }
++
++    fn release_lines_of(release_settings: &str) -> Vec<String> {
++        effective_profile_lines(
++            &release_manifest_with(release_settings),
++            "release",
++            &no_environment,
++        )
++        .expect("算得出")
++    }
++
++    #[test]
++    fn debug_and_incremental_leave_the_profile_lines_byte_for_byte_unchanged() {
++        assert_eq!(
++            release_lines_of("debug = true\n"),
++            release_lines_of("debug = false\n"),
++            "只差 debug"
+         );
+-        assert!(
+-            lines.contains(&"profile.codegen-units: 16".to_string()),
+-            "内置默认：{lines:?}"
++        assert_eq!(
++            release_lines_of("debug = 2\nincremental = true\n"),
++            release_lines_of("debug = 2\nincremental = false\n"),
++            "只差 incremental"
++        );
++        let without_environment = release_lines_of("debug = 2\n");
++        let with_environment =
++            effective_profile_lines(&release_manifest_with("debug = 2\n"), "release", &|name| {
++                matches!(
++                    name,
++                    "CARGO_PROFILE_RELEASE_DEBUG" | "CARGO_PROFILE_RELEASE_INCREMENTAL"
++                )
++                .then(|| "true".to_string())
++            })
++            .expect("算得出");
++        assert_eq!(
++            without_environment, with_environment,
++            "只差 CARGO_PROFILE_RELEASE_DEBUG 与 CARGO_PROFILE_RELEASE_INCREMENTAL"
+         );
+     }
+ 
++    #[test]
++    fn debug_assertions_opt_level_and_codegen_units_each_change_the_profile_lines() {
++        for (settings, changed_settings) in [
++            ("debug-assertions = false\n", "debug-assertions = true\n"),
++            ("opt-level = 3\n", "opt-level = 2\n"),
++            ("codegen-units = 16\n", "codegen-units = 1\n"),
++        ] {
++            assert_ne!(
++                release_lines_of(settings),
++                release_lines_of(changed_settings),
++                "{settings:?} 与 {changed_settings:?}"
++            );
++        }
++    }
++
+     #[test]
+     fn bench_and_a_custom_profile_inherit_release_and_the_environment_overrides_last() {
+         let bench =
+@@ -259,7 +310,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn the_dev_profile_without_a_table_keeps_the_builtin_overflow_checks() {
++    fn the_development_profile_without_a_table_keeps_the_builtin_overflow_checks() {
+         let lines = effective_profile_lines(ROOT_MANIFEST, "dev", &no_environment).expect("算得出");
+         assert!(
+             lines.contains(&"profile.overflow-checks: true".to_string()),
+diff --git a/crates/singlefs-unit-graph/src/closure.rs b/crates/singlefs-unit-graph/src/closure.rs
+index d5303a560..9c6fcc3b7 100644
+--- a/crates/singlefs-unit-graph/src/closure.rs
++++ b/crates/singlefs-unit-graph/src/closure.rs
+@@ -23,6 +23,10 @@
+ //! R-裸名同一个目标里按模块筛（`crates/` 下的包与工作区外的 crate 一样，各一个弄坏开关）：只连单元所在模块看得见的那几份
+ //! （`candidates_seen_from_the_module_of_the_unit`：本模块定义的、经 use 引进的、glob use 的模块里的、写成 `模块::名` 的），点不准的退回全连；
+ //! 名字是 use 改名的原名、单元是 `macro_rules!`（体里的名字在调用处解）的不筛。跨目标的只认 `pub`、不按模块筛。
++//! use 引进的名字要 use 路径恰好点到候选所在的模块才算点准：路径点到的模块里没有这个名字的候选，名字是那个模块经 `pub use` 转出来的，落在哪一份看不出，退回全连。
++//! R-裸名局部绑定遮住同名函数（一个弄坏开关；跨目标的同样遮）：函数单元里，名字每一处都是局部绑定或落在绑定的作用域里的
++//! （`is_bare_name_only_a_local_binding_of_the_function`），不往外连同名的函数。只遮函数：`let` 写成常量、静态量、单元结构体的名字是拿它当模式，
++//! 不是新绑定（rustc 对静态量与元组结构体报 E0530），这几种照连。
+ //! 拒算：单元自己带的（`rust_items` 切分时记下）、链接到的文件切不全的、数据文件读不了的、构建脚本或 bin 找不到的、
+ //! proc-macro crate、cfg 谓词判不了的、工具链的目标三元组查不出的、WGSL 外名没有着落的，全部收进 `ClosureOutcome::refusals`；有一条拒算就不交键。
+ //! WGSL 外名（`.wgsl` 里用到、模块里没定义的名字）的着落（`WgslExternalNameSources::supply`）：整名是闭包里某个 Rust 串字面量的一个词；
+@@ -40,6 +44,10 @@
+ //! `--exact` 后面跟着折得出的测试名（字面串、同一 crate 的 `const …: &str`、全由它们组成的 `format!` / `concat!`；或起子进程的函数的
+ //! 一个参数，取闭包里每一处调用在那个位置上交的实参），就连到入口目标里那个 `#[test] fn`；折不出、解不到恰好一个的拒算 `current-exe`。
+ //! 单元里不起子进程（没有 `Command`、`spawn` 这类词）、只问 `current_exe()` 路径的不拒算、不连边（`rust_items` 的 `SPAWNING_WORDS`）。
++//! 程序起自己（[`SourceRead::OwnProgramRestart`]，`finish` 判）：`current_exe()` 的路径原样交给 `Command::new`、没有折得出的 `--exact`。
++//! 入口恰好是一个 bin 目标的 `fn main`、这一趟不按测试编的（`entry_is_the_main_of_a_program`）不拒算、不连边：子进程跑的还是这个 `main`，
++//! 它闭包里的代码都已收齐，换参数只换走哪条路。入口是别的函数（`tests::…`、bin 里的辅助函数、模块里另一个叫 `main` 的）、是测试目标、
++//! 或一组入口里另有别的入口的，拒算 `current-exe`：按测试编的程序里 `main` 是 libtest 的，参数选中哪条测试说不清。
+ 
+ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+ use std::fmt;
+@@ -50,10 +58,12 @@ use crate::conditional_compilation::{
+     rendered_predicate, split_at_top_level_commas, target_platform_of_triple,
+     CompilationConditions, ConditionalCompilationSet, Evaluation, Predicate, TargetPlatform,
+ };
+-use crate::lexer::{lex_source, token_text, DocumentationCommentTreatment, TokenKind};
++use crate::lexer::{
++    identifier_name, lex_source, token_text, DocumentationCommentTreatment, Token, TokenKind,
++};
+ use crate::manifest::DependencySection;
+ use crate::rule_switches::{BrokenRule, RuleSwitches};
+-use crate::rust_items::{normalized_path, test_name_pieces_of_texts};
++use crate::rust_items::{normalized_path, references_of_tokens, test_name_pieces_of_texts};
+ use crate::sha256::{sha256_of, Sha256Digest};
+ use crate::shell_sources::ShellNormalizationFailure;
+ use crate::units::{
+@@ -204,6 +214,15 @@ pub struct DataUnit {
+     pub kind: DataUnitKind,
+ }
+ 
++/// 闭包里一个单元头一回被排进待收队列的那条边：正在收哪个单元（入口与收尾几步并进来的没有）、照哪条规则、经哪个名字（规则不按名字连的为空）。
++/// 只给人查「它是经哪条边进来的」用，不进键、不进组成清单；同一个单元可以经好几条边进来，记的只是头一条。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct FirstEdgeIntoTheClosure {
++    pub from: Option<UnitIndex>,
++    pub rule: &'static str,
++    pub name: String,
++}
++
+ /// 一次收闭包的结果。
+ #[derive(Clone, Debug)]
+ pub struct ClosureOutcome {
+@@ -217,6 +236,10 @@ pub struct ClosureOutcome {
+     pub wgsl_units: Vec<WgslUnitIndex>,
+     pub data_units: Vec<DataUnit>,
+     pub refusals: Vec<Refusal>,
++    /// 闭包里每个单元头一回被排进来的那条边（[`FirstEdgeIntoTheClosure`]）：只当索引，不进键。
++    pub first_edges: BTreeMap<UnitIndex, FirstEdgeIntoTheClosure>,
++    /// 调用方登记了「不沿它收」、这一趟又真够到了的单元（限定名，排好序）：它们不在 `units` 里，也没从它们往下收。
++    pub units_reached_and_not_followed: Vec<String>,
+ }
+ 
+ /// 调用方拼进键的外部输入：工具链（`rustc -vV` 与解析后的构建环境）与依赖解析结果，各是原文行。本 crate 不跑 rustc；
+@@ -863,6 +886,14 @@ struct ClosureRun<'workspace> {
+     condition_atoms: BTreeSet<String>,
+     /// 头一份 bash 规范化跑不下去的 shell 脚本（`follow_shell_sources`）：有了它这一趟交 `EntryError::ShellNormalizationFailed`，不交闭包。
+     shell_normalization_failure: Option<ShellNormalizationFailure>,
++    /// 每个被排进队列的单元头一回是经哪条边排进来的（`record_the_first_edge`）；不改收什么，只当索引。
++    first_edges: BTreeMap<UnitIndex, FirstEdgeIntoTheClosure>,
++    /// 此刻正在收的单元与正在走的规则：`push` 照它们记头一条边。
++    unit_being_visited: Option<UnitIndex>,
++    rule_being_followed: &'static str,
++    /// 调用方登记的不沿它收的单元（限定名）：够到了不进闭包、不往下收，记进 `units_reached_and_not_followed`。
++    units_not_followed: BTreeSet<String>,
++    units_reached_and_not_followed: BTreeSet<String>,
+ }
+ 
+ /// R-方法：基本类型与 `Self`、`Vec`、`Option`、`Result`、`Box`、`String` 恒被点名。
+@@ -874,6 +905,362 @@ const ALWAYS_NAMED_TYPES: [&str; 23] = [
+ /// R-裸名按模块筛候选时，路径根名是这几个的指标准库，不点本目标里的哪一份（另几个是看得见的别的 crate 的库名）。
+ const PATH_ROOTS_OF_THE_STANDARD_CRATES: [&str; 3] = ["std", "core", "alloc"];
+ 
++/// 函数体里这几个词起头的可能是嵌套条目。嵌套条目看不见外层函数的局部绑定，里面的同名引用要往外解；哪一处在嵌套条目里不细分，
++/// 函数体里有这几个词的函数一律不算遮住（`fn` 指针类型、`*const` 这类不是条目的写法同样算，只多连）。
++const WORDS_STARTING_A_NESTED_ITEM: [&str; 13] = [
++    "fn",
++    "impl",
++    "trait",
++    "mod",
++    "const",
++    "static",
++    "struct",
++    "enum",
++    "union",
++    "type",
++    "use",
++    "macro_rules",
++    "extern",
++];
++
++/// use 语句里 `path_start` 那一段前面的路径，花括号展开：`use a::{b::{c, d}, e}` 里 `d` 前面是 `a`、`b`。顺着 `段::` 往前收，碰到不是 `段::` 的就跳到包着它的 `{` 接着收，
++/// 收到 `use` 为止；`use_keyword` 是 `use` 的位置。
++fn use_path_leading_to<'source>(
++    source: &'source str,
++    tokens: &[Token],
++    use_keyword: usize,
++    path_start: usize,
++) -> Vec<&'source str> {
++    let text_at = |position: usize| {
++        tokens
++            .get(position)
++            .map_or("", |token| token_text(source, token))
++    };
++    let mut path = Vec::new();
++    let mut position = path_start;
++    loop {
++        if position >= use_keyword + 4
++            && text_at(position - 1) == ":"
++            && text_at(position - 2) == ":"
++            && tokens[position - 3].kind == TokenKind::Identifier
++        {
++            path.push(text_at(position - 3));
++            position -= 3;
++            continue;
++        }
++        let mut nested_braces = 0usize;
++        let mut enclosing_brace = None;
++        for cursor in (use_keyword + 1..position).rev() {
++            match text_at(cursor) {
++                "}" => nested_braces += 1,
++                "{" if nested_braces == 0 => {
++                    enclosing_brace = Some(cursor);
++                    break;
++                }
++                "{" => nested_braces -= 1,
++                _ => {}
++            }
++        }
++        let Some(brace) = enclosing_brace else {
++            path.reverse();
++            return path;
++        };
++        position = brace;
++    }
++}
++
++/// 函数单元的签名在它词法单元里的位置（`function_signature_positions`）。
++struct FunctionSignaturePositions {
++    own_name: usize,
++    parameters_open: usize,
++    parameters_close: usize,
++    body_open: usize,
++}
++
++/// 找函数单元的签名：深度 0 上头一个 `fn`、后面的名字、跳过尖括号里的泛型参数之后的 `(` 与配对的 `)`、再往后深度 0 上头一个 `{`。
++/// 哪一步对不上（`verus!` 里的怪写法、没有函数体的声明）交 None。
++fn function_signature_positions(
++    source: &str,
++    tokens: &[Token],
++) -> Option<FunctionSignaturePositions> {
++    let text_at = |position: usize| {
++        tokens
++            .get(position)
++            .map_or("", |token| token_text(source, token))
++    };
++    let mut depth_before_the_keyword = 0usize;
++    let mut function_keyword = None;
++    for position in 0..tokens.len() {
++        match text_at(position) {
++            "(" | "[" | "{" => depth_before_the_keyword += 1,
++            ")" | "]" | "}" => {
++                depth_before_the_keyword = depth_before_the_keyword.saturating_sub(1)
++            }
++            "fn" if depth_before_the_keyword == 0 => {
++                function_keyword = Some(position);
++                break;
++            }
++            _ => {}
++        }
++    }
++    let own_name = function_keyword? + 1;
++    let mut parameters_open = own_name + 1;
++    if text_at(parameters_open) == "<" {
++        let mut angle_depth = 0usize;
++        loop {
++            match text_at(parameters_open) {
++                "" => return None,
++                "<" => angle_depth += 1,
++                ">" if text_at(parameters_open - 1) != "-" => {
++                    angle_depth = angle_depth.saturating_sub(1);
++                }
++                _ => {}
++            }
++            parameters_open += 1;
++            if angle_depth == 0 {
++                break;
++            }
++        }
++    }
++    if text_at(parameters_open) != "(" {
++        return None;
++    }
++    let mut depth_from_the_parameters = 0usize;
++    let mut parameters_close = None;
++    let mut body_open = None;
++    for position in parameters_open..tokens.len() {
++        match text_at(position) {
++            "{" if parameters_close.is_some() && depth_from_the_parameters == 0 => {
++                body_open = Some(position);
++                break;
++            }
++            "(" | "[" | "{" => depth_from_the_parameters += 1,
++            ")" | "]" | "}" => {
++                depth_from_the_parameters = depth_from_the_parameters.saturating_sub(1);
++                if depth_from_the_parameters == 0 && parameters_close.is_none() {
++                    parameters_close = Some(position);
++                }
++            }
++            _ => {}
++        }
++    }
++    Some(FunctionSignaturePositions {
++        own_name,
++        parameters_open,
++        parameters_close: parameters_close?,
++        body_open: body_open?,
++    })
++}
++
++/// 参数表里绑定 `name` 的那一处：括号深度 1 上紧跟 `(` 或 `,`、可带 `mut`、后面接单个 `:`。解构的参数（`(a, b): …`、`&a: …`）不认。
++fn parameter_binding_position(
++    source: &str,
++    tokens: &[Token],
++    signature: &FunctionSignaturePositions,
++    name: &str,
++) -> Option<usize> {
++    let text_at = |position: usize| {
++        tokens
++            .get(position)
++            .map_or("", |token| token_text(source, token))
++    };
++    let mut delimiter_depth = 0usize;
++    let mut is_at_parameter_start = true;
++    for position in signature.parameters_open + 1..signature.parameters_close {
++        let word = text_at(position);
++        match word {
++            "(" | "[" | "{" => delimiter_depth += 1,
++            ")" | "]" | "}" => delimiter_depth = delimiter_depth.saturating_sub(1),
++            "," if delimiter_depth == 0 => {
++                is_at_parameter_start = true;
++                continue;
++            }
++            _ => {}
++        }
++        if !is_at_parameter_start {
++            continue;
++        }
++        if word == "mut" {
++            continue;
++        }
++        is_at_parameter_start = false;
++        if tokens
++            .get(position)
++            .is_some_and(|token| token.kind == TokenKind::Identifier)
++            && identifier_name(word) == name
++            && text_at(position + 1) == ":"
++            && text_at(position + 2) != ":"
++        {
++            return Some(position);
++        }
++    }
++    None
++}
++
++/// `name_position` 上的名字是一条语句开头的 `let [mut] 名` 绑定：`let` 紧跟 `{`、`}` 或 `;`（`if let`、`while let`、`&& let` 不算），名字后面接 `=`、`;`
++/// 或单个 `:`。解构模式不认。
++fn is_statement_let_binding_at(source: &str, tokens: &[Token], name_position: usize) -> bool {
++    let text_at = |position: usize| {
++        tokens
++            .get(position)
++            .map_or("", |token| token_text(source, token))
++    };
++    let let_distance = if name_position >= 1 && text_at(name_position - 1) == "mut" {
++        2
++    } else {
++        1
++    };
++    let Some(let_position) = name_position.checked_sub(let_distance) else {
++        return false;
++    };
++    let Some(before_the_let) = let_position.checked_sub(1) else {
++        return false;
++    };
++    text_at(let_position) == "let"
++        && matches!(text_at(before_the_let), "{" | "}" | ";")
++        && match text_at(name_position + 1) {
++            "=" | ";" => true,
++            ":" => text_at(name_position + 2) != ":",
++            _ => false,
++        }
++}
++
++/// 还开着的一层括号，只记判局部绑定要的那几样。
++#[derive(Clone, Copy)]
++struct OpenDelimiterOfTheBindingScan {
++    is_brace: bool,
++    is_inside_a_macro_call: bool,
++    /// 这一层此刻看得见 `name` 的局部绑定（外层绑定了的算）。
++    is_name_bound: bool,
++    /// 这一层有一条 `let 名` 还没走到它的 `;`：初始值里的 `名` 指外面的，走到 `;` 才算绑定了。
++    is_let_waiting_for_its_semicolon: bool,
++}
++
++/// 函数单元 `tokens` 里 `name` 只是局部绑定：至少有一处绑定（语句开头的 `let [mut] 名`，或参数），别的每一处都落在绑定的作用域里。块级作用域按花括号认：
++/// `let` 从它的 `;` 起到外层花括号收尾，参数从参数表的 `)` 起到单元收尾。这几样不算遮住（宁可多连）：绑定之前或作用域之外出现的、`let` 初始值里的；
++/// 带路径的（前后挨 `::`）、宏名（后接 `!` 与开括号）；格式串捕获（`{名}`）在作用域外的；宏调用括号里的 `let`（展开成什么看不出，不当绑定；
++/// 作用域里写在宏调用实参里的名字照算局部的）；解构、`if let`、`match`、`for`、闭包参数绑定的不认（这几处的名字按「作用域外」算）；函数体里有嵌套条目的词
++/// （`WORDS_STARTING_A_NESTED_ITEM`）的。单个 `.` 后面的是字段或方法，不指函数，不看；函数自己的名字不看。
++fn is_bare_name_only_a_local_binding_of_the_function(
++    source: &str,
++    tokens: &[Token],
++    name: &str,
++) -> bool {
++    let Some(signature) = function_signature_positions(source, tokens) else {
++        return false;
++    };
++    let text_at = |position: usize| {
++        tokens
++            .get(position)
++            .map_or("", |token| token_text(source, token))
++    };
++    let parameter_position = parameter_binding_position(source, tokens, &signature, name);
++    let mut has_binding = parameter_position.is_some();
++    let mut open_delimiters = vec![OpenDelimiterOfTheBindingScan {
++        is_brace: false,
++        is_inside_a_macro_call: false,
++        is_name_bound: false,
++        is_let_waiting_for_its_semicolon: false,
++    }];
++    for (position, token) in tokens.iter().enumerate() {
++        let text = token_text(source, token);
++        let innermost = *open_delimiters
++            .last()
++            .expect("最外面那一层不出栈（下面的出栈判了长度），栈不空");
++        match token.kind {
++            TokenKind::Lifetime => {}
++            TokenKind::Literal => {
++                if !innermost.is_name_bound
++                    && text.contains(name)
++                    && references_of_tokens(source, std::slice::from_ref(token), None)
++                        .plain_names
++                        .iter()
++                        .any(|captured| captured == name)
++                {
++                    return false;
++                }
++            }
++            TokenKind::Punctuation => match text {
++                "(" | "[" | "{" => {
++                    let follows_a_macro_name = position >= 2
++                        && text_at(position - 1) == "!"
++                        && tokens[position - 2].kind == TokenKind::Identifier;
++                    open_delimiters.push(OpenDelimiterOfTheBindingScan {
++                        is_brace: text == "{",
++                        is_inside_a_macro_call: innermost.is_inside_a_macro_call
++                            || follows_a_macro_name,
++                        is_name_bound: innermost.is_name_bound,
++                        is_let_waiting_for_its_semicolon: false,
++                    });
++                }
++                ")" | "]" | "}" => {
++                    if open_delimiters.len() > 1 {
++                        open_delimiters.pop();
++                    }
++                    if position == signature.parameters_close && parameter_position.is_some() {
++                        open_delimiters
++                            .last_mut()
++                            .expect("上面只在长度大于 1 时出栈，栈不空")
++                            .is_name_bound = true;
++                    }
++                }
++                ";" => {
++                    let scope = open_delimiters
++                        .last_mut()
++                        .expect("最外面那一层不出栈（上面的出栈判了长度），栈不空");
++                    if scope.is_let_waiting_for_its_semicolon {
++                        scope.is_let_waiting_for_its_semicolon = false;
++                        scope.is_name_bound = true;
++                    }
++                }
++                _ => {}
++            },
++            TokenKind::Identifier => {
++                if identifier_name(text) != name
++                    || position == signature.own_name
++                    || Some(position) == parameter_position
++                {
++                    continue;
++                }
++                if innermost.is_brace
++                    && !innermost.is_inside_a_macro_call
++                    && is_statement_let_binding_at(source, tokens, position)
++                {
++                    let scope = open_delimiters
++                        .last_mut()
++                        .expect("最外面那一层不出栈（上面的出栈判了长度），栈不空");
++                    scope.is_let_waiting_for_its_semicolon = true;
++                    has_binding = true;
++                    continue;
++                }
++                let is_after_a_single_dot = position >= 1
++                    && text_at(position - 1) == "."
++                    && !(position >= 2 && text_at(position - 2) == ".");
++                if is_after_a_single_dot {
++                    continue;
++                }
++                let is_after_a_path_separator =
++                    position >= 2 && text_at(position - 1) == ":" && text_at(position - 2) == ":";
++                let is_before_a_path_separator =
++                    text_at(position + 1) == ":" && text_at(position + 2) == ":";
++                let is_a_macro_name = text_at(position + 1) == "!"
++                    && matches!(text_at(position + 2), "(" | "[" | "{");
++                if is_after_a_path_separator || is_before_a_path_separator || is_a_macro_name {
++                    return false;
++                }
++                if !innermost.is_name_bound {
++                    return false;
++                }
++            }
++        }
++    }
++    has_binding
++        && !tokens[signature.body_open..].iter().any(|token| {
++            token.kind == TokenKind::Identifier
++                && WORDS_STARTING_A_NESTED_ITEM.contains(&token_text(source, token))
++        })
++}
++
+ impl<'workspace> ClosureRun<'workspace> {
+     fn new(
+         workspace: &'workspace Workspace,
+@@ -902,10 +1289,30 @@ impl<'workspace> ClosureRun<'workspace> {
+             wgsl_name_suppliers_tried: HashSet::new(),
+             condition_atoms: BTreeSet::new(),
+             shell_normalization_failure: None,
++            first_edges: BTreeMap::new(),
++            unit_being_visited: None,
++            rule_being_followed: "入口",
++            units_not_followed: BTreeSet::new(),
++            units_reached_and_not_followed: BTreeSet::new(),
++        }
++    }
++
++    /// 记下 `unit` 头一回被排进来的那条边；已经记过的不改。
++    fn record_the_first_edge(&mut self, unit: UnitIndex, name: &str) {
++        if !self.first_edges.contains_key(&unit) {
++            self.first_edges.insert(
++                unit,
++                FirstEdgeIntoTheClosure {
++                    from: self.unit_being_visited,
++                    rule: self.rule_being_followed,
++                    name: name.to_string(),
++                },
++            );
+         }
+     }
+ 
+     fn push(&mut self, unit: UnitIndex, target: TargetIndex) {
++        self.record_the_first_edge(unit, "");
+         if !self.seen_pairs.contains(&(unit, target)) {
+             self.pending.push((unit, target));
+         }
+@@ -967,8 +1374,10 @@ impl<'workspace> ClosureRun<'workspace> {
+             if !self.seen_pairs.insert((unit, target)) {
+                 continue;
+             }
++            self.unit_being_visited = Some(unit);
+             self.visit_unit_for_target(unit, target);
+         }
++        self.unit_being_visited = None;
+     }
+ 
+     fn visit_unit_for_target(&mut self, unit_index: UnitIndex, target: TargetIndex) {
+@@ -977,6 +1386,11 @@ impl<'workspace> ClosureRun<'workspace> {
+         if !self.is_kind_kept(unit.kind) {
+             return;
+         }
++        if self.units_not_followed.contains(&unit.qualified_name) {
++            self.units_reached_and_not_followed
++                .insert(unit.qualified_name.clone());
++            return;
++        }
+         match self.activity(unit_index, target) {
+             Activity::Inactive => return,
+             Activity::Active => {}
+@@ -1000,6 +1414,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                 .switches
+                 .is_intact(BrokenRule::DynTraitsOpenEveryImplementation)
+             {
++                self.rule_being_followed = "R-开放";
+                 for trait_name in &unit.references.dyn_trait_names {
+                     self.open_trait(trait_name);
+                 }
+@@ -1009,6 +1424,7 @@ impl<'workspace> ClosureRun<'workspace> {
+             return;
+         }
+         if unit.kind.is_type() {
++            self.rule_being_followed = "R-隐式（类型被点名）";
+             self.name_type(&unit.name);
+         }
+         if unit.kind == UnitKind::ItemMacroInvocation
+@@ -1020,12 +1436,14 @@ impl<'workspace> ClosureRun<'workspace> {
+                 .types_declared_by_item_macro
+                 .get(&unit_index)
+             {
++                self.rule_being_followed = "R-隐式（条目级宏调用生成的类型被点名）";
+                 for type_name in type_names {
+                     self.name_type(type_name);
+                 }
+             }
+         }
+         if unit.kind == UnitKind::TraitHead {
++            self.rule_being_followed = "trait 头带它的 impl";
+             // trait 头进闭包时它的 blanket impl 连同成员一起进
+             if let Some(implementations) = workspace
+                 .indexes
+@@ -1105,6 +1523,7 @@ impl<'workspace> ClosureRun<'workspace> {
+         {
+             return alias_originals;
+         }
++        self.rule_being_followed = "R-结构";
+         if let Some(container) = unit.container {
+             self.push(container, target);
+         }
+@@ -1155,6 +1574,7 @@ impl<'workspace> ClosureRun<'workspace> {
+         if !self.switches.is_intact(BrokenRule::BareNames) {
+             return;
+         }
++        self.rule_being_followed = "R-裸名";
+         let workspace = self.workspace;
+         let unit = &workspace.units[unit_index.0];
+         let visible = self.link.visible_targets(target);
+@@ -1170,6 +1590,9 @@ impl<'workspace> ClosureRun<'workspace> {
+             .is_intact(BrokenRule::CratesDirectoryNamesByModule);
+         // macro_rules! 体里的裸名在调用处解，定义所在模块看不出它落在哪一份：一律全连
+         let is_resolved_at_the_call_site = unit.kind == UnitKind::MacroRulesDefinition;
++        let local_bindings_shadow_same_named_functions = self
++            .switches
++            .is_intact(BrokenRule::LocalBindingsShadowSameNamedFunctions);
+         let unit_crate = workspace.targets[target.0].crate_index;
+         let roots_naming_another_crate: BTreeSet<&str> = PATH_ROOTS_OF_THE_STANDARD_CRATES
+             .iter()
+@@ -1185,6 +1608,8 @@ impl<'workspace> ClosureRun<'workspace> {
+             )
+             .collect();
+         for name in unit.references.plain_names.iter().chain(alias_originals) {
++            // 只在这个名字真有同名函数要连时算一次（文件头「R-裸名局部绑定遮住同名函数」）；use 改名的原名不是这个单元写的名字，不算遮住
++            let mut is_only_a_local_binding: Option<bool> = None;
+             for visible_target in &visible {
+                 let Some(found) = workspace
+                     .indexes
+@@ -1228,10 +1653,28 @@ impl<'workspace> ClosureRun<'workspace> {
+                     candidates = &seen_from_the_module;
+                 }
+                 for found_unit in candidates {
++                    if local_bindings_shadow_same_named_functions
++                        && workspace.units[found_unit.0].kind == UnitKind::Function
++                        && unit.kind == UnitKind::Function
++                        && !alias_originals.contains(name)
++                        && *is_only_a_local_binding.get_or_insert_with(|| {
++                            unit.token_range.is_some_and(|(first_token, end_token)| {
++                                let file = &workspace.files[unit.file.0];
++                                is_bare_name_only_a_local_binding_of_the_function(
++                                    &file.source,
++                                    &file.tokens[first_token..end_token],
++                                    name,
++                                )
++                            })
++                        })
++                    {
++                        continue;
++                    }
+                     if *visible_target == target
+                         || workspace.units[found_unit.0].is_public
+                         || ignores_visibility
+                     {
++                        self.record_the_first_edge(*found_unit, name);
+                         self.push(*found_unit, *visible_target);
+                     }
+                 }
+@@ -1272,12 +1715,12 @@ impl<'workspace> ClosureRun<'workspace> {
+     }
+ 
+     /// 同一个目标里，单元按裸名 `name` 连得到 `candidates` 里的哪几份（与 `scripts/gate/lib_function_units.py` 的
+-    /// `RustWorkspace.candidates_seen_from_module` 同一个判法）：与单元同一模块的；所在模块的 use 引进了 `name`（或是 glob）、use 路径里有
+-    /// 候选所在模块末段的（`crate` 对根模块、`super` 对上一层、`super::super` 对上两层，`self` 起头对本模块）；单元里写成 `前缀::name`、
+-    /// 前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
++    /// `RustWorkspace.candidates_seen_from_module` 同一个判法）：与单元同一模块的；所在模块的 use 引进了 `name`（或是 glob）、引进它的那一支路径
++    /// （花括号展开之后）恰好点到候选所在模块的（`crate`、`self`、`super` 起头的从根模块、本模块、往上那一层接着走，要整条相等；别的起头的相对路径要是候选模块路径的后缀）；
++    /// 单元里写成 `前缀::name`、前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
+     /// use 路径或 `…::name` 整条路径的根名在 `roots_naming_another_crate` 里的（别的 crate 的库名、`std`、`core`、`alloc`）指的是别的 crate，
+     /// 不点这个目标里的哪一份，跳过这一处。
+-    /// 认不出落在哪一份的退回全连：use 或前缀一份都没点到（经 `pub use` 转出来的）、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
++    /// 认不出落在哪一份的退回全连：use 的某一支或前缀一份都没点到（经 `pub use` 转出来的）、这条 use 里找不到引进 `name` 的那一支、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
+     /// 前缀是本目标的类型或 trait、或 `Self` 的是关联项（R-路径另管），跳过这一处。哪一样都不沾的（字段名、局部变量、impl 成员自己的名字）一份都不连。
+     fn candidates_seen_from_the_module_of_the_unit(
+         &self,
+@@ -1335,6 +1778,39 @@ impl<'workspace> ClosureRun<'workspace> {
+                 .collect();
+             (!found.is_empty()).then_some(found)
+         };
++        // use 的一支路径（不含名字本身）恰好点到的候选（下标）；一份都没点到交 None。
++        // 恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；模块里没有这个名字的候选，名字可能是它经 `pub use` 转出来的
++        let placed_by_the_use_path = |path: &[&str]| -> Option<BTreeSet<usize>> {
++            let leading_supers = path
++                .iter()
++                .take_while(|segment| **segment == "super")
++                .count();
++            let own_module_words = own_module.iter().map(String::as_str);
++            let exact_module: Option<Vec<&str>> = match path.first().copied() {
++                Some("crate") => Some(path[1..].to_vec()),
++                Some("self") => Some(own_module_words.chain(path[1..].iter().copied()).collect()),
++                Some("super") => Some(
++                    own_module_words
++                        .take(own_module.len().saturating_sub(leading_supers))
++                        .chain(path[leading_supers..].iter().copied())
++                        .collect(),
++                ),
++                Some(_) | None => None,
++            };
++            let found: BTreeSet<usize> = candidate_modules
++                .iter()
++                .enumerate()
++                .filter(|(_, module)| {
++                    let module_words: Vec<&str> = module.iter().map(String::as_str).collect();
++                    match &exact_module {
++                        Some(exact) => module_words == *exact,
++                        None => !path.is_empty() && module_words.ends_with(path),
++                    }
++                })
++                .map(|(candidate_position, _)| candidate_position)
++                .collect();
++            (!found.is_empty()).then_some(found)
++        };
+         let mut is_placement_unknown = false;
+         if let Some(uses) = workspace
+             .indexes
+@@ -1368,12 +1844,29 @@ impl<'workspace> ClosureRun<'workspace> {
+                 if path_root.is_some_and(|root| roots_naming_another_crate.contains(root)) {
+                     continue;
+                 }
+-                let segments: Vec<&str> = (first_token..end_token)
+-                    .filter(|position| is_identifier_at(*position))
+-                    .map(text_at)
+-                    .filter(|word| !matches!(*word, "use" | "pub" | "as") && *word != name)
++                // 这条 use 里引进 name 的每一支（`*`、名字本身）的路径，花括号展开之后；`原名 as name` 那一支 `as` 前面不是 `段::`，路径只到外层花括号，多半点不到，退回全连
++                let use_keyword = (first_token..end_token)
++                    .find(|position| is_identifier_at(*position) && text_at(*position) == "use")
++                    .unwrap_or(first_token);
++                let paths_bringing_in_the_name: Vec<Vec<&str>> = (use_keyword + 1..end_token)
++                    .filter(|position| {
++                        text_at(*position) == "*"
++                            || (is_identifier_at(*position)
++                                && text_at(*position) == name
++                                && text_at(*position + 1) != ":")
++                    })
++                    .map(|leaf| use_path_leading_to(&file.source, &file.tokens, use_keyword, leaf))
+                     .collect();
+-                match placed(&segments) {
++                let placed_by_every_path = (!paths_bringing_in_the_name.is_empty())
++                    .then(|| {
++                        paths_bringing_in_the_name
++                            .iter()
++                            .map(|path| placed_by_the_use_path(path))
++                            .collect::<Option<Vec<BTreeSet<usize>>>>()
++                    })
++                    .flatten()
++                    .map(|hits| hits.into_iter().flatten().collect::<BTreeSet<usize>>());
++                match placed_by_every_path {
+                     Some(hit) => seen.extend(hit),
+                     None => is_placement_unknown = true,
+                 }
+@@ -1469,6 +1962,7 @@ impl<'workspace> ClosureRun<'workspace> {
+         if !self.switches.is_intact(BrokenRule::MethodCalls) {
+             return;
+         }
++        self.rule_being_followed = "R-方法";
+         let workspace = self.workspace;
+         let unit = &workspace.units[unit_index.0];
+         let foreign_type_implementations = self.foreign_type_trait_implementations();
+@@ -1499,6 +1993,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                     false
+                 };
+                 if is_eligible {
++                    self.record_the_first_edge(*member, method_name);
+                     self.push_with_a_linked_target(*member);
+                 }
+             }
+@@ -1509,6 +2004,7 @@ impl<'workspace> ClosureRun<'workspace> {
+         if !self.switches.is_intact(BrokenRule::QualifiedPaths) {
+             return;
+         }
++        self.rule_being_followed = "R-路径";
+         let workspace = self.workspace;
+         let unit = &workspace.units[unit_index.0];
+         let own_container = unit
+@@ -1565,6 +2061,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                     false
+                 };
+                 if is_match {
++                    self.record_the_first_edge(*member, &format!("{qualifier}::{member_name}"));
+                     self.push_with_a_linked_target(*member);
+                 }
+             }
+@@ -1591,6 +2088,7 @@ impl<'workspace> ClosureRun<'workspace> {
+         if !self.switches.is_intact(BrokenRule::GlobalAllocatorEdges) {
+             return;
+         }
++        self.rule_being_followed = "全局分配器";
+         let workspace = self.workspace;
+         for allocator in &workspace.indexes.global_allocators {
+             for membership in &workspace.memberships[workspace.units[allocator.0].file.0] {
+@@ -1823,6 +2321,8 @@ impl<'workspace> ClosureRun<'workspace> {
+                 }
+                 // 子进程测试边在闭包收完一趟之后连（`pull_in_child_process_tests`）：参数写法要看闭包里的调用处
+                 SourceRead::ChildTestProcess { .. } => {}
++                // 拒不拒算要看入口，在 `finish` 判
++                SourceRead::OwnProgramRestart { .. } => {}
+                 SourceRead::BinaryExecutable { binary_name, line } => {
+                     match workspace.target_of_crate(
+                         crate_index,
+@@ -2004,6 +2504,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                 | SourceRead::BuildScriptEnvironmentValue { .. }
+                 | SourceRead::BinaryExecutable { .. }
+                 | SourceRead::Directory { .. }
++                | SourceRead::OwnProgramRestart { .. }
+                 | SourceRead::ChildTestProcess { .. } => false,
+             });
+             if includes_a_defining_file {
+@@ -2030,6 +2531,7 @@ impl<'workspace> ClosureRun<'workspace> {
+             .collect();
+         let includers =
+             self.wgsl_includers_outside_the_closure(&names_the_wgsl_module_leaves_undefined);
++        self.rule_being_followed = "WGSL 外名的着落";
+         if !includers.is_empty() {
+             // 先只并读 `.wgsl` 的单元：下一趟在合起来的模块上重算外名，定义在那几份里的名字不再去找 Rust 侧的着落
+             for (includer, linked_target) in &includers {
+@@ -2237,6 +2739,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                 }
+             }
+         }
++        self.rule_being_followed = "子进程测试";
+         let mut pushed = false;
+         for child in children {
+             if !self.seen_pairs.contains(&(child, self.entry_target)) {
+@@ -2247,11 +2750,32 @@ impl<'workspace> ClosureRun<'workspace> {
+         pushed
+     }
+ 
+-    fn finish(mut self, entry_target: TargetIndex, entry_units: Vec<UnitIndex>) -> ClosureOutcome {
++    fn finish(
++        mut self,
++        entry_target: TargetIndex,
++        entry_units: Vec<UnitIndex>,
++        is_entry_compiled_as_test: bool,
++    ) -> ClosureOutcome {
+         let workspace = self.workspace;
++        let entry_is_the_main_of_a_program = entry_is_the_main_of_a_program(
++            workspace,
++            entry_target,
++            &entry_units,
++            is_entry_compiled_as_test,
++        );
+         for unit_index in &self.in_closure {
+             let unit = &workspace.units[unit_index.0];
+             for read in &unit.reads {
++                if let SourceRead::OwnProgramRestart { line, fragment } = read {
++                    if !entry_is_the_main_of_a_program {
++                        self.refusals.insert(Refusal {
++                            file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
++                            line: *line,
++                            form: RefusalForm::CurrentExecutablePath,
++                            fragment: fragment.clone(),
++                        });
++                    }
++                }
+                 if let SourceRead::ChildTestProcess {
+                     line,
+                     test_name,
+@@ -2322,6 +2846,12 @@ impl<'workspace> ClosureRun<'workspace> {
+             }
+             wgsl_units = reached.into_iter().collect();
+         }
++        let in_closure = &self.in_closure;
++        let first_edges = self
++            .first_edges
++            .into_iter()
++            .filter(|(unit, _)| in_closure.contains(unit))
++            .collect();
+         ClosureOutcome {
+             entry_target_kind: workspace.targets[entry_target.0].kind,
+             entry_units,
+@@ -2330,10 +2860,29 @@ impl<'workspace> ClosureRun<'workspace> {
+             wgsl_units,
+             data_units: self.data_units.into_iter().collect(),
+             refusals: self.refusals.into_iter().collect(),
++            first_edges,
++            units_reached_and_not_followed: self
++                .units_reached_and_not_followed
++                .into_iter()
++                .collect(),
+         }
+     }
+ }
+ 
++/// 这一趟的入口恰好是一个 bin 目标自己的 `fn main`（目标根文件顶层那一个，一组入口里没有别的）、不按测试编：跑起来的进程从这个 `main` 起。
++fn entry_is_the_main_of_a_program(
++    workspace: &Workspace,
++    entry_target: TargetIndex,
++    entry_units: &[UnitIndex],
++    is_entry_compiled_as_test: bool,
++) -> bool {
++    workspace.targets[entry_target.0].kind == TargetKind::Binary
++        && !is_entry_compiled_as_test
++        && workspace
++            .main_function_of(entry_target)
++            .is_some_and(|main| entry_units == [main])
++}
++
+ fn entry_conditions_of(
+     request: &ClosureRequest,
+     target_kind: TargetKind,
+@@ -2582,6 +3131,30 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
+     additional_entry_paths: &[String],
+     features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+     switches: &RuleSwitches,
++) -> Result<ClosureOutcome, EntryError> {
++    compute_closure_of_entries_not_following_the_listed_units(
++        workspace,
++        request,
++        additional_entry_paths,
++        features_enabled_by_the_build,
++        switches,
++        &BTreeSet::new(),
++    )
++}
++
++/// 同 [`compute_closure_of_entries_with_the_features_of_the_build`]，另给一张「不沿它收」的单元登记（限定名）：够到登记的单元时
++/// 它不进闭包、不从它往下收（经别的边够得到的单元照进），真够到的那几个交在 `ClosureOutcome::units_reached_and_not_followed`。
++/// 登记是空的，与那一个函数逐字相同。登记什么、为什么不改判定结局由调用方担（登记的表与它的自证在调用方那一侧）。
++///
++/// # Errors
++/// 同 [`compute_closure_of_entries_with_the_features_of_the_build`]。
++pub fn compute_closure_of_entries_not_following_the_listed_units(
++    workspace: &Workspace,
++    request: &ClosureRequest,
++    additional_entry_paths: &[String],
++    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
++    switches: &RuleSwitches,
++    units_not_followed: &BTreeSet<String>,
+ ) -> Result<ClosureOutcome, EntryError> {
+     let mut features_enabled_on_the_dependencies_by_the_build = BTreeMap::new();
+     for (package_name, features) in &features_enabled_by_the_build.features_of_each_package {
+@@ -2634,6 +3207,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
+             )?);
+         }
+         let mut run = ClosureRun::new(workspace, link, switches, entry_target);
++        run.units_not_followed.clone_from(units_not_followed);
+         for entry in &entries {
+             run.push(*entry, entry_target);
+             let signature_traits = workspace.units[entry.0]
+@@ -2644,6 +3218,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
+                 run.open_trait(trait_name);
+             }
+         }
++        run.rule_being_followed = "链进来的别的目标的 main";
+         for root in &extra_roots {
+             if let Some(main) = workspace.main_function_of(*root) {
+                 run.push(main, *root);
+@@ -2658,7 +3233,7 @@ pub fn compute_closure_of_entries_with_the_features_of_the_build(
+             return Err(EntryError::ShellNormalizationFailed(failure));
+         }
+         if run.requested_roots.is_subset(&extra_roots) {
+-            let mut outcome = run.finish(entry_target, entries);
++            let mut outcome = run.finish(entry_target, entries, entry_conditions.is_test);
+             if platform.is_none() {
+                 let entry_unit = &workspace.units[outcome
+                     .entry_units
+diff --git a/crates/singlefs-unit-graph/src/conditional_compilation.rs b/crates/singlefs-unit-graph/src/conditional_compilation.rs
+index 9d7d61883..236f96042 100644
+--- a/crates/singlefs-unit-graph/src/conditional_compilation.rs
++++ b/crates/singlefs-unit-graph/src/conditional_compilation.rs
+@@ -84,7 +84,7 @@ pub struct TargetPlatform {
+ macro_rules! target_platform_table {
+     ($(
+         $triple:literal: names [$($name:literal),*],
+-        arch $arch:literal, os $os:literal, family $family:literal, env $environment:literal,
++        arch $arch:literal, os $operating_system:literal, family $family:literal, env $environment:literal,
+         endian $endian:literal, pointer_width $pointer_width:literal, vendor $vendor:literal,
+         atomics [$($atomic:literal),*];
+     )*) => {
+@@ -94,7 +94,7 @@ macro_rules! target_platform_table {
+             names: &[$($name),*],
+             key_values: &[
+                 ("target_arch", $arch),
+-                ("target_os", $os), // naming-lint:external rustc 定的 cfg 名
++                ("target_os", $operating_system), // naming-lint:external rustc 定的 cfg 名
+                 ("target_family", $family),
+                 ("target_env", $environment), // naming-lint:external rustc 定的 cfg 名
+                 ("target_endian", $endian),
+@@ -608,12 +608,18 @@ mod tests {
+         let macos = platform_of("aarch64-apple-darwin");
+         let windows = platform_of("x86_64-pc-windows-msvc");
+         let thirty_two_bit = platform_of("i686-unknown-linux-gnu");
+-        let os_is_linux = &conditions("cfg ( target_os = \"linux\" )")[0];
+-        let os_is_macos = &conditions("cfg ( target_os = \"macos\" )")[0];
+-        assert_eq!(linux.evaluate(os_is_linux), Evaluation::Holds);
+-        assert_eq!(linux.evaluate(os_is_macos), Evaluation::DoesNotHold);
+-        assert_eq!(macos.evaluate(os_is_macos), Evaluation::Holds);
+-        assert_eq!(macos.evaluate(os_is_linux), Evaluation::DoesNotHold);
++        let operating_system_is_linux = &conditions("cfg ( target_os = \"linux\" )")[0];
++        let operating_system_is_macos = &conditions("cfg ( target_os = \"macos\" )")[0];
++        assert_eq!(linux.evaluate(operating_system_is_linux), Evaluation::Holds);
++        assert_eq!(
++            linux.evaluate(operating_system_is_macos),
++            Evaluation::DoesNotHold
++        );
++        assert_eq!(macos.evaluate(operating_system_is_macos), Evaluation::Holds);
++        assert_eq!(
++            macos.evaluate(operating_system_is_linux),
++            Evaluation::DoesNotHold
++        );
+         let unix = &conditions("cfg ( unix )")[0];
+         assert_eq!(linux.evaluate(unix), Evaluation::Holds);
+         assert_eq!(windows.evaluate(unix), Evaluation::DoesNotHold);
+@@ -723,7 +729,8 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_cfg_inside_cfg_attr_only_applies_when_the_condition_holds() {
++    fn conditional_compilation_inside_conditional_compilation_attribute_only_applies_when_the_condition_holds(
++    ) {
+         let attribute = conditions("cfg_attr ( feature = \"gpu\" , cfg ( test ) )");
+         assert_eq!(attribute.len(), 1);
+         assert_eq!(
+diff --git a/crates/singlefs-unit-graph/src/entry_groups.rs b/crates/singlefs-unit-graph/src/entry_groups.rs
+index 436dc1c1b..e936b6526 100644
+--- a/crates/singlefs-unit-graph/src/entry_groups.rs
++++ b/crates/singlefs-unit-graph/src/entry_groups.rs
+@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
+ 
+ use crate::build_features::FeaturesEnabledByTheBuild;
+ use crate::closure::{
+-    compute_closure_of_entries_with_the_features_of_the_build, reuse_key, ClosureRequest,
++    compute_closure_of_entries_not_following_the_listed_units, reuse_key, ClosureRequest,
+     EntryError,
+ };
+ use crate::closure::{ExternalKeyInputs, RequestedCondition};
+@@ -114,6 +114,39 @@ pub fn entry_group_key_with_the_features_of_the_build(
+     locked_packages: &[LockedPackage],
+     switches: &RuleSwitches,
+ ) -> Result<EntryGroupKey, EntryError> {
++    entry_group_key_not_following_the_listed_units(
++        workspace,
++        request,
++        &BTreeSet::new(),
++        features_enabled_by_the_build,
++        toolchain_lines,
++        locked_packages,
++        switches,
++    )
++    .map(|keyed| keyed.key)
++}
++
++/// 一组的结果，连同登记了不沿它收、这一趟真够到的单元（限定名，排好序）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct EntryGroupKeyNotFollowingTheListedUnits {
++    pub key: EntryGroupKey,
++    pub units_reached_and_not_followed: Vec<String>,
++}
++
++/// 同 [`entry_group_key_with_the_features_of_the_build`]，另给这一组「不沿它收」的单元登记（限定名；
++/// [`crate::closure::compute_closure_of_entries_not_following_the_listed_units`]）。登记是空的，键与那一个函数逐字相同。
++///
++/// # Errors
++/// 同 [`entry_group_key`]；表里点名的包工作区里没有。
++pub fn entry_group_key_not_following_the_listed_units(
++    workspace: &Workspace,
++    request: &EntryGroupRequest,
++    units_not_followed: &BTreeSet<String>,
++    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
++    toolchain_lines: &[String],
++    locked_packages: &[LockedPackage],
++    switches: &RuleSwitches,
++) -> Result<EntryGroupKeyNotFollowingTheListedUnits, EntryError> {
+     let workspace = workspace.view_for_judgment(JudgmentKind::ProductBehavior);
+     if request.entry_paths.is_empty() {
+         return Err(EntryError::MalformedEntryPath(format!(
+@@ -130,17 +163,20 @@ pub fn entry_group_key_with_the_features_of_the_build(
+     // 每一趟要么交出闭包，要么去掉一个不编进来的入口：至多入口数加一趟
+     let mut outcome = loop {
+         let Some((first_entry, additional_entries)) = compiled_entries.split_first() else {
+-            return Ok(EntryGroupKey {
+-                group_name: request.group_name.clone(),
+-                verdict: EntryGroupVerdict::NotCompiled {
+-                    reason: format!(
+-                        "组里的入口在这组特性下都不编进来：{}",
+-                        entries_not_compiled.join("、")
+-                    ),
++            return Ok(EntryGroupKeyNotFollowingTheListedUnits {
++                key: EntryGroupKey {
++                    group_name: request.group_name.clone(),
++                    verdict: EntryGroupVerdict::NotCompiled {
++                        reason: format!(
++                            "组里的入口在这组特性下都不编进来：{}",
++                            entries_not_compiled.join("、")
++                        ),
++                    },
++                    entries_not_compiled,
++                    composition_lines: Vec::new(),
++                    watched_files: BTreeSet::new(),
+                 },
+-                entries_not_compiled,
+-                composition_lines: Vec::new(),
+-                watched_files: BTreeSet::new(),
++                units_reached_and_not_followed: Vec::new(),
+             });
+         };
+         let closure_request = ClosureRequest {
+@@ -154,12 +190,13 @@ pub fn entry_group_key_with_the_features_of_the_build(
+             uses_default_features: false,
+             target_triple: target_triple.clone(),
+         };
+-        match compute_closure_of_entries_with_the_features_of_the_build(
++        match compute_closure_of_entries_not_following_the_listed_units(
+             workspace,
+             &closure_request,
+             additional_entries,
+             features_enabled_by_the_build,
+             switches,
++            units_not_followed,
+         ) {
+             Ok(outcome) => break outcome,
+             Err(EntryError::EntryInactive(path)) => {
+@@ -199,12 +236,15 @@ pub fn entry_group_key_with_the_features_of_the_build(
+                 .collect(),
+         },
+     };
+-    Ok(EntryGroupKey {
+-        group_name: request.group_name.clone(),
+-        verdict,
+-        entries_not_compiled,
+-        composition_lines,
+-        watched_files: watched_files_of_the_closure(workspace, &outcome),
++    Ok(EntryGroupKeyNotFollowingTheListedUnits {
++        key: EntryGroupKey {
++            group_name: request.group_name.clone(),
++            verdict,
++            entries_not_compiled,
++            composition_lines,
++            watched_files: watched_files_of_the_closure(workspace, &outcome),
++        },
++        units_reached_and_not_followed: outcome.units_reached_and_not_followed,
+     })
+ }
+ 
+@@ -597,7 +637,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_unit_line_before_its_group_and_a_malformed_key_are_refused() {
++    fn unit_line_before_its_group_and_a_malformed_key_are_refused() {
+         assert!(parse_entry_group_table(&format!(
+             "{ENTRY_GROUP_TABLE_HEADER}\nunit\tlost\tfn\ta::b\tf:1-2\t{}\n",
+             "00".repeat(DIGEST_BYTES)
+diff --git a/crates/singlefs-unit-graph/src/lexer.rs b/crates/singlefs-unit-graph/src/lexer.rs
+index 6913f23fb..ebcd2bb23 100644
+--- a/crates/singlefs-unit-graph/src/lexer.rs
++++ b/crates/singlefs-unit-graph/src/lexer.rs
+@@ -476,7 +476,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_range_after_a_number_is_not_part_of_the_number() {
++    fn range_after_a_number_is_not_part_of_the_number() {
+         assert_eq!(texts("0..10"), ["0", ".", ".", "10"]);
+         assert_eq!(texts("tuple.0.1"), ["tuple", ".", "0.1"]);
+     }
+diff --git a/crates/singlefs-unit-graph/src/lock_file.rs b/crates/singlefs-unit-graph/src/lock_file.rs
+index 5b18145cd..291d42e1b 100644
+--- a/crates/singlefs-unit-graph/src/lock_file.rs
++++ b/crates/singlefs-unit-graph/src/lock_file.rs
+@@ -329,7 +329,7 @@ mod tests {
+ 
+     /// 同名同版本、来源不同的两个包：带来源的那一项挑得出，不带来源的挑不出（两个候选）。
+     #[test]
+-    fn a_dependency_item_with_a_source_picks_the_package_of_that_source_among_same_name_same_version_packages(
++    fn dependency_item_with_a_source_picks_the_package_of_that_source_among_same_name_same_version_packages(
+     ) {
+         let packages = parse_lock_file(
+             "version = 4\n\n[[package]]\nname = \"gamma\"\nversion = \"1.0.0\"\n\
+@@ -353,8 +353,8 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_dependency_item_with_a_version_picks_that_version_and_a_bare_name_needs_a_single_candidate(
+-    ) {
++    fn dependency_item_with_a_version_picks_that_version_and_a_bare_name_needs_a_single_candidate()
++    {
+         let packages = parse_lock_file(LOCK_TEXT).expect("夹具锁文件读得了");
+         assert_eq!(
+             resolve_dependency_item(&packages, "gamma 2.0.0").map(|package| &package.version[..]),
+@@ -371,7 +371,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_package_without_a_version_is_an_error() {
++    fn package_without_a_version_is_an_error() {
+         assert_eq!(
+             parse_lock_file("[[package]]\nname = \"alpha\"\n"),
+             Err(LockFileError::PackageWithoutNameOrVersion {
+diff --git a/crates/singlefs-unit-graph/src/manifest.rs b/crates/singlefs-unit-graph/src/manifest.rs
+index 85a35729d..0f053bd19 100644
+--- a/crates/singlefs-unit-graph/src/manifest.rs
++++ b/crates/singlefs-unit-graph/src/manifest.rs
+@@ -570,7 +570,7 @@ mod tests {
+ 
+     /// `[lib] crate-type = ["proc-macro"]` 与 `proc-macro = true` 同义：都认成过程宏 crate。
+     #[test]
+-    fn a_library_declaring_the_proc_macro_crate_type_is_a_procedure_macro_crate() {
++    fn library_declaring_the_procedural_macro_crate_type_is_a_procedure_macro_crate() {
+         let manifest = parse_crate_manifest(
+             "[package]\nname = \"demo-macros\"\n\n[lib]\ncrate-type = [\"proc-macro\"]\n",
+         )
+diff --git a/crates/singlefs-unit-graph/src/output.rs b/crates/singlefs-unit-graph/src/output.rs
+index f064bb756..3b6adf150 100644
+--- a/crates/singlefs-unit-graph/src/output.rs
++++ b/crates/singlefs-unit-graph/src/output.rs
+@@ -287,6 +287,90 @@ pub fn closure_lines(
+     lines
+ }
+ 
++fn unit_position_text(workspace: &Workspace, unit_index: UnitIndex) -> String {
++    let unit = &workspace.units[unit_index.0];
++    format!(
++        "{}\t{}\t{}:{}-{}",
++        unit.kind.output_name(),
++        unit.qualified_name,
++        workspace.files[unit.file.0].relative_path,
++        unit.start_line,
++        unit.end_line
++    )
++}
++
++/// `why` 的全部行：闭包里「文件路径 + 空格 + 限定名」含 `pattern` 的单元（命中的单元），各是经哪条边头一回被排进来的。
++/// 头一条边的来处不是命中单元的（从命中集合外面跨进来的那几个）打整条链，一直追到入口：
++///   `why\t<种类>\t<限定名>\t<文件>:<起>-<止>`，下面每一跳一行 `\tvia\t<规则>\t<经哪个名字，没有为 ->\t<来处的种类>\t<限定名>\t<文件>:<起>-<止>`，
++///   没有来处的那一跳（入口、收尾几步并进来的）写 `\tvia\t<规则>\t<名字>\t-`；
++/// 来处也是命中单元的只打一行 `inside\t<单元>\t<规则>\t<名字>\t<来处>`。同一个单元可以经好几条边进来，这里只有头一条：
++/// 切掉它之后重跑一遍，看别的边还带不带它进来。只当索引，不进键。
++#[must_use]
++pub fn why_lines(workspace: &Workspace, outcome: &ClosureOutcome, pattern: &str) -> Vec<String> {
++    let is_matched = |unit_index: UnitIndex| {
++        let unit = &workspace.units[unit_index.0];
++        format!(
++            "{} {}",
++            workspace.files[unit.file.0].relative_path, unit.qualified_name
++        )
++        .contains(pattern)
++    };
++    let name_text = |name: &str| if name.is_empty() { "-" } else { name }.to_string();
++    let mut crossing = Vec::new();
++    let mut inside = Vec::new();
++    for unit_index in &outcome.units {
++        if !is_matched(*unit_index) {
++            continue;
++        }
++        let Some(edge) = outcome.first_edges.get(unit_index) else {
++            continue;
++        };
++        match edge.from {
++            Some(from) if is_matched(from) => inside.push(format!(
++                "inside\t{}\t{}\t{}\t{}",
++                unit_position_text(workspace, *unit_index),
++                edge.rule,
++                name_text(&edge.name),
++                unit_position_text(workspace, from)
++            )),
++            Some(_) | None => {
++                crossing.push(format!(
++                    "why\t{}",
++                    unit_position_text(workspace, *unit_index)
++                ));
++                let mut current = *unit_index;
++                // 每一跳的来处都比这一跳更早被记下，链一定走到没有来处的那一跳；步数另按闭包大小封顶
++                for _ in 0..=outcome.units.len() {
++                    let Some(step) = outcome.first_edges.get(&current) else {
++                        break;
++                    };
++                    match step.from {
++                        Some(from) => {
++                            crossing.push(format!(
++                                "\tvia\t{}\t{}\t{}",
++                                step.rule,
++                                name_text(&step.name),
++                                unit_position_text(workspace, from)
++                            ));
++                            current = from;
++                        }
++                        None => {
++                            crossing.push(format!(
++                                "\tvia\t{}\t{}\t-",
++                                step.rule,
++                                name_text(&step.name)
++                            ));
++                            break;
++                        }
++                    }
++                }
++            }
++        }
++    }
++    crossing.extend(inside);
++    crossing
++}
++
+ /// 拒算行（`key` 拒算时只打这几行）。
+ #[must_use]
+ pub fn refusal_lines(workspace: &Workspace, refusals: &[Refusal]) -> Vec<String> {
+diff --git a/crates/singlefs-unit-graph/src/rule_switches.rs b/crates/singlefs-unit-graph/src/rule_switches.rs
+index 260e9afac..b2a4fd104 100644
+--- a/crates/singlefs-unit-graph/src/rule_switches.rs
++++ b/crates/singlefs-unit-graph/src/rule_switches.rs
+@@ -8,6 +8,8 @@
+ //!   crates-directory-names-by-module      R-裸名：`crates/` 下的包同一个目标里的裸名照旧连到每一份同名条目（不按单元所在模块筛）
+ //!                                         → `tests/unit_graph_bare_names_inside_a_crate_link_only_the_items_seen_from_the_module_of_the_unit.rs`
+ //!                                         里「别的模块里同名的私有常量」那一格
++//!   local-bindings-shadow-same-named-functions  R-裸名：函数里的局部绑定不遮同名函数（名字只是 `let` 或参数绑定的，照旧连到同名函数）
++//!                                         → `tests/unit_graph_local_bindings_shadow_same_named_functions.rs` 里「let 遮住同名函数」那一格
+ //!   qualified-paths                       R-路径：不解 `Q::x` → 「经类型路径调关联函数」
+ //!   method-calls                          R-方法：不解 `.x(` → 「trait 默认方法」「经点调固有方法」
+ //!   trait-implementation-edges            R-隐式：类型被点名不带它的 trait impl → 「运算符重载」「Drop 隐式调用」「关联常量（经泛型）」
+@@ -59,6 +61,7 @@ pub enum BrokenRule {
+     TargetScope,
+     BareNames,
+     CratesDirectoryNamesByModule,
++    LocalBindingsShadowSameNamedFunctions,
+     QualifiedPaths,
+     MethodCalls,
+     TraitImplementationEdges,
+@@ -88,10 +91,11 @@ pub enum BrokenRule {
+ 
+ impl BrokenRule {
+     /// 全部开关，按文件头那张表的次序。
+-    pub const EVERY_RULE: [BrokenRule; 28] = [
++    pub const EVERY_RULE: [BrokenRule; 29] = [
+         BrokenRule::TargetScope,
+         BrokenRule::BareNames,
+         BrokenRule::CratesDirectoryNamesByModule,
++        BrokenRule::LocalBindingsShadowSameNamedFunctions,
+         BrokenRule::QualifiedPaths,
+         BrokenRule::MethodCalls,
+         BrokenRule::TraitImplementationEdges,
+@@ -126,6 +130,9 @@ impl BrokenRule {
+             BrokenRule::TargetScope => "target-scope",
+             BrokenRule::BareNames => "bare-names",
+             BrokenRule::CratesDirectoryNamesByModule => "crates-directory-names-by-module",
++            BrokenRule::LocalBindingsShadowSameNamedFunctions => {
++                "local-bindings-shadow-same-named-functions"
++            }
+             BrokenRule::QualifiedPaths => "qualified-paths",
+             BrokenRule::MethodCalls => "method-calls",
+             BrokenRule::TraitImplementationEdges => "trait-implementation-edges",
+diff --git a/crates/singlefs-unit-graph/src/rust_items.rs b/crates/singlefs-unit-graph/src/rust_items.rs
+index 0ccd0644a..d9b4fe6c5 100644
+--- a/crates/singlefs-unit-graph/src/rust_items.rs
++++ b/crates/singlefs-unit-graph/src/rust_items.rs
+@@ -50,8 +50,8 @@ const BUILD_SCRIPT_OUTPUT_DIRECTORY_VARIABLE: &str = "OUT_DIR";
+ /// 清单目录拼出的目录绑到名字、名字的用法再绑到名字，最多跟这么多层（再深的拒算）。
+ const DEEPEST_DIRECTORY_BINDING_CHAIN: usize = 4;
+ 
+-/// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试就拒算 `current-exe`；一个都没有的只是在问路径，
+-/// 不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
++/// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试、路径又不是一个字不改地交给 `Command::new`（那一形看入口，
++/// [`SourceRead::OwnProgramRestart`]）就拒算 `current-exe`；一个都没有的只是在问路径，不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
+ const SPAWNING_WORDS: [&str; 7] = [
+     "Command",
+     "spawn",
+@@ -62,6 +62,11 @@ const SPAWNING_WORDS: [&str; 7] = [
+     "execvp",
+ ];
+ 
++/// 不带 `#[link]` 的 `extern "C"` 块里只声明这几个符号时不拒算（`extern_block_declares_only_listed_system_library_calls`）：C 库的系统调用封装，
++/// 标准库的文件读写走的是同一层，换 C 库影响它们的程度与 `std::fs` 相同。名单只收仓里真在用的。
++/// 与 `scripts/gate/lib_function_units.py` 同一份。
++const SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS: [&str; 2] = ["pwrite", "fdatasync"];
++
+ const RUST_KEYWORDS: [&str; 39] = [
+     "as",
+     "async",
+@@ -1638,6 +1643,241 @@ impl<'scan> RustScanner<'scan> {
+         }
+     }
+ 
++    /// `last_token` 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 `panic!(…)`、`…process::exit(…)`，或以它们收尾的块。
++    fn expression_ending_at_diverges(&self, last_token: usize, first_allowed: usize) -> bool {
++        match self.text_of(last_token) {
++            "}" => {
++                let before_the_brace = last_token.saturating_sub(1);
++                let last_inside = if self.text_of(before_the_brace) == ";" {
++                    before_the_brace.saturating_sub(1)
++                } else {
++                    before_the_brace
++                };
++                self.expression_ending_at_diverges(last_inside, first_allowed)
++            }
++            ")" => {
++                let Some(open) = (first_allowed..last_token).rev().find(|position| {
++                    self.text_of(*position) == "(" && self.closes[*position] == Some(last_token)
++                }) else {
++                    return false;
++                };
++                let is_panic =
++                    open >= 2 && self.text_of(open - 1) == "!" && self.text_of(open - 2) == "panic";
++                let is_process_exit = open >= 4
++                    && self.text_of(open - 1) == "exit"
++                    && self.text_of(open - 2) == ":"
++                    && self.text_of(open - 3) == ":"
++                    && self.text_of(open - 4) == "process";
++                is_panic || is_process_exit
++            }
++            _ => false,
++        }
++    }
++
++    /// `current_exe()` 调用（闭括号之后是 `after_call`）连同把路径取出来的写法整个是什么表达式：交 `[起, 止)`。认的写法：
++    /// 后接 `?`、`.unwrap()`、`.expect("字面串")`、闭包一定不交值的 `.unwrap_or_else(…)`；或
++    /// `match current_exe() { Ok(名字) => 名字, Err(…) => <return … 或一定不交值的表达式> }`。别的写法（失败时换一个路径、取到路径又接方法）交 `None`。
++    fn own_path_expression_range(
++        &self,
++        call_start: usize,
++        after_call: usize,
++        unit_end: usize,
++    ) -> Option<(usize, usize)> {
++        if self.text_of(after_call) == "?" {
++            return Some((call_start, after_call + 1));
++        }
++        if self.text_of(after_call) == "." && self.text_of(after_call + 2) == "(" {
++            let open = after_call + 2;
++            let close = self.close_of(open);
++            let is_taken = match self.text_of(after_call + 1) {
++                "unwrap" => close == open + 1,
++                "expect" => {
++                    close == open + 2 && plain_string_content(self.text_of(open + 1)).is_some()
++                }
++                "unwrap_or_else" => {
++                    self.text_of(open + 1) == "|"
++                        && close > open + 1
++                        && self.expression_ending_at_diverges(close - 1, open + 1)
++                }
++                _ => false,
++            };
++            return is_taken.then_some((call_start, close + 1));
++        }
++        if self.text_of(after_call) != "{" || self.text_before(call_start) != "match" {
++            return None;
++        }
++        let close = self.close_of(after_call);
++        if close > unit_end
++            || self.text_of(after_call + 1) != "Ok"
++            || self.text_of(after_call + 2) != "("
++            || !self.is_identifier(after_call + 3)
++            || self.text_of(after_call + 4) != ")"
++            || self.text_of(after_call + 5) != "="
++            || self.text_of(after_call + 6) != ">"
++            || self.text_of(after_call + 7) != self.text_of(after_call + 3)
++            || self.text_of(after_call + 8) != ","
++            || self.text_of(after_call + 9) != "Err"
++            || self.text_of(after_call + 10) != "("
++        {
++            return None;
++        }
++        let error_pattern_close = self.close_of(after_call + 10);
++        if self.text_of(error_pattern_close + 1) != "="
++            || self.text_of(error_pattern_close + 2) != ">"
++        {
++            return None;
++        }
++        let arm_start = error_pattern_close + 3;
++        let arm_end = if self.text_of(close - 1) == "," {
++            close - 1
++        } else {
++            close
++        };
++        if arm_start >= arm_end {
++            return None;
++        }
++        let arm_texts: Vec<&str> = (arm_start..arm_end)
++            .map(|index| self.text_of(index))
++            .collect();
++        let is_one_arm = split_at_top_level_commas(&arm_texts).len() == 1;
++        let arm_does_not_hand_a_value = self.text_of(arm_start) == "return"
++            || self.expression_ending_at_diverges(arm_end - 1, arm_start);
++        (is_one_arm && arm_does_not_hand_a_value).then_some((call_start - 1, close + 1))
++    }
++
++    /// `open_paren` 是 `Command::new(` 的开括号。
++    fn is_command_new_open(&self, open_paren: usize) -> bool {
++        open_paren >= 4
++            && self.text_of(open_paren) == "("
++            && self.text_of(open_paren - 1) == "new"
++            && self.text_of(open_paren - 2) == ":"
++            && self.text_of(open_paren - 3) == ":"
++            && self.text_of(open_paren - 4) == "Command"
++    }
++
++    /// `current_exe()` 的路径是不是一个字不改地交给了 `Command::new`：起的就是这个程序文件本身。两种写法：就地写在 `Command::new(…)` 的括号里；
++    /// 或绑给 `let` 名字（同一个单元里这个名字不再 `let`），名字的每一处用法只是 `Command::new(名字)`、`Command::new(&名字)` 与 `名字.display()`，至少起一次。
++    /// 拿路径拼别的路径（`.parent()`、`.with_file_name(…)`、`.join(…)`）、交给别的函数、当参数交给别的程序（`Command::new("sh").arg(名字)`）的不算：
++    /// 那样起的可能是别的程序。
++    fn own_program_path_is_handed_to_command_unchanged(
++        &self,
++        current_exe_index: usize,
++        unit_end: usize,
++    ) -> bool {
++        let call_start = self.path_expression_start(current_exe_index);
++        if self.text_of(current_exe_index + 2) != ")" {
++            return false;
++        }
++        let Some((expression_start, expression_end)) =
++            self.own_path_expression_range(call_start, current_exe_index + 3, unit_end)
++        else {
++            return false;
++        };
++        if expression_start > 0
++            && self.is_command_new_open(expression_start - 1)
++            && self.close_of(expression_start - 1) == expression_end
++        {
++            return true;
++        }
++        let Some(name) = self.let_binding_name(expression_start, expression_end) else {
++            return false;
++        };
++        let is_bound_again = (expression_end..unit_end).any(|index| {
++            self.text_of(index) == "let"
++                && (self.name_at(index + 1) == name
++                    || (self.text_of(index + 1) == "mut" && self.name_at(index + 2) == name))
++        });
++        if is_bound_again {
++            return false;
++        }
++        let uses = self.uses_of_the_binding(&name, expression_end, unit_end);
++        let is_handed_to_command = |use_index: usize| {
++            let open = if self.text_before(use_index) == "&" {
++                use_index - 2
++            } else {
++                use_index - 1
++            };
++            self.is_command_new_open(open) && self.close_of(open) == use_index + 1
++        };
++        let is_only_displayed = |use_index: usize| {
++            self.text_of(use_index + 1) == "."
++                && self.text_of(use_index + 2) == "display"
++                && self.text_of(use_index + 3) == "("
++                && self.text_of(use_index + 4) == ")"
++        };
++        uses.iter()
++            .any(|use_index| is_handed_to_command(*use_index))
++            && uses
++                .iter()
++                .all(|use_index| is_handed_to_command(*use_index) || is_only_displayed(*use_index))
++    }
++
++    /// `extern` 块（`keyword_index` 是 `extern`，块在 `open..close`）不用拒算：ABI 是 `"C"`，条目前面没有 `#[link…]`，块里只有 `fn` 声明，
++    /// 每条的前面最多一个 `#[link_name = "…"]`、符号（`link_name` 或函数名）都在 [`SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS`] 里，至少声明一条。
++    /// 有 `static`、别的属性、`safe fn` 这类写法的一律不算。
++    fn extern_block_declares_only_listed_system_library_calls(
++        &self,
++        item_start: usize,
++        keyword_index: usize,
++        open: usize,
++        close: usize,
++    ) -> bool {
++        if plain_string_content(self.text_of(keyword_index + 1)) != Some("C")
++            || keyword_index + 2 != open
++        {
++            return false;
++        }
++        let has_link_attribute = (item_start..keyword_index).any(|index| {
++            self.text_of(index) == "#"
++                && self.text_of(index + 1) == "["
++                && self.text_of(index + 2) == "link"
++        });
++        if has_link_attribute {
++            return false;
++        }
++        let mut position = open + 1;
++        let mut declared_any = false;
++        while position < close {
++            let mut link_name = None;
++            if self.text_of(position) == "#" {
++                let is_link_name = self.text_of(position + 1) == "["
++                    && self.text_of(position + 2) == "link_name"
++                    && self.text_of(position + 3) == "="
++                    && self.text_of(position + 5) == "]";
++                if !is_link_name {
++                    return false;
++                }
++                link_name = plain_string_content(self.text_of(position + 4));
++                if link_name.is_none() {
++                    return false;
++                }
++                position += 6;
++            }
++            if self.text_of(position) == "pub" {
++                position += 1;
++            }
++            if self.text_of(position) != "fn"
++                || !self.is_identifier(position + 1)
++                || self.text_of(position + 2) != "("
++            {
++                return false;
++            }
++            let declared_name = self.name_at(position + 1);
++            let symbol = link_name.unwrap_or(&declared_name);
++            if !SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS.contains(&symbol) {
++                return false;
++            }
++            declared_any = true;
++            let Some(semicolon) =
++                (self.close_of(position + 2)..close).find(|index| self.text_of(*index) == ";")
++            else {
++                return false;
++            };
++            position = semicolon + 1;
++        }
++        declared_any
++    }
++
+     /// 单元的词法单元 `[first, end)` 里有没有起子进程的词（[`SPAWNING_WORDS`]，标识符逐字比）。
+     fn starts_a_process(&self, first: usize, end: usize) -> bool {
+         (first..end)
+@@ -1748,6 +1988,15 @@ impl<'scan> RustScanner<'scan> {
+                             test_name,
+                             fragment,
+                         }),
++                        // 路径一个字不改地交给 `Command::new`：起的是这个程序自己，拒不拒算看入口（闭包的 `finish`）
++                        None if self
++                            .own_program_path_is_handed_to_command_unchanged(index, end) =>
++                        {
++                            reads.push(SourceRead::OwnProgramRestart {
++                                line: self.line_of(index),
++                                fragment,
++                            })
++                        }
+                         // 同一个单元里起了子进程、又折不出点名的那一条测试：子进程跑什么说不清，拒算
+                         None if self.starts_a_process(first, end) => refusals.push(self.refusal(
+                             RefusalForm::CurrentExecutablePath,
+@@ -2249,9 +2498,16 @@ impl<'scan> RustScanner<'scan> {
+                         true,
+                     );
+                     new_unit.declared_names = Some(self.extern_block_declared_names(open, close));
+-                    new_unit
+-                        .extra_refusals
+-                        .push(RefusalForm::ExternalFunctionInterface);
++                    if !self.extern_block_declares_only_listed_system_library_calls(
++                        item_start,
++                        keyword_index,
++                        open,
++                        close,
++                    ) {
++                        new_unit
++                            .extra_refusals
++                            .push(RefusalForm::ExternalFunctionInterface);
++                    }
+                     self.push_unit(new_unit, scan_context);
+                     return close + 1;
+                 }
+@@ -2852,7 +3108,7 @@ mod tests {
+ 
+     /// `use a::b as c;`：进当前模块可用名字集的只有别名 `c`，原名 `b` 不进（早先 `b` 也被记进去，别处同名的条目会被误认成命中了这条 use）。
+     #[test]
+-    fn a_use_with_an_alias_brings_only_the_alias_into_the_module_names() {
++    fn use_with_an_alias_brings_only_the_alias_into_the_module_names() {
+         let parsed = parse("use a::b as c;\n");
+         let imports = parsed.units[0]
+             .imports
+@@ -2911,7 +3167,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_path_qualified_item_macro_invocation_is_one_unit_that_declares_its_names() {
++    fn path_qualified_item_macro_invocation_is_one_unit_that_declares_its_names() {
+         let parsed = parse("singlefs_verification::enum_listing_every_member! {\n    #[derive(Debug)]\n    pub enum Color { Red, Green }\n}\n");
+         assert!(
+             parsed.file_level_refusals.is_empty(),
+@@ -2968,7 +3224,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_verus_ensures_clause_with_braces_stays_inside_its_function_unit() {
++    fn verus_ensures_clause_with_braces_stays_inside_its_function_unit() {
+         let parsed = parse(
+             "verus! {\npub fn chosen(value: u64) -> (result: u64)\n    ensures if value > 0 { result == value } else { result == 0 },\n{\n    value\n}\n\
+              pub open spec fn never_called() -> bool { true }\n}\n",
+@@ -3042,7 +3298,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn a_capture_right_after_an_escaped_brace_still_counts_as_a_bare_name() {
++    fn capture_right_after_an_escaped_brace_still_counts_as_a_bare_name() {
+         let parsed = parse("fn show() -> String { format!(\"{{{WRAPPED_WIDTH}}}\") }\n");
+         assert!(
+             parsed.units[0]
+diff --git a/crates/singlefs-unit-graph/src/shell_sources.rs b/crates/singlefs-unit-graph/src/shell_sources.rs
+index c554228b2..39c20dd73 100644
+--- a/crates/singlefs-unit-graph/src/shell_sources.rs
++++ b/crates/singlefs-unit-graph/src/shell_sources.rs
+@@ -3265,8 +3265,11 @@ mod tests {
+         assert_eq!(python_normpath("///a"), "/a");
+         assert_eq!(python_normpath("../a/.."), "..");
+         // 拼出来，不写成整段字面量：以两级上跳起头的字面量会被 crates 变异表的静态核当成逃出 crates/ 的路径
+-        let two_levels_up_then_a = concat!("..", "/../a");
+-        assert_eq!(python_normpath(two_levels_up_then_a), two_levels_up_then_a);
++        let path_climbing_two_levels_then_naming_one_file = concat!("..", "/../a");
++        assert_eq!(
++            python_normpath(path_climbing_two_levels_then_naming_one_file),
++            path_climbing_two_levels_then_naming_one_file
++        );
+         assert_eq!(python_normpath("/.."), "/");
+         assert_eq!(python_dirname("a"), "");
+         assert_eq!(python_dirname("/a"), "/");
+diff --git a/crates/singlefs-unit-graph/src/units.rs b/crates/singlefs-unit-graph/src/units.rs
+index 046b9d026..694d16b94 100644
+--- a/crates/singlefs-unit-graph/src/units.rs
++++ b/crates/singlefs-unit-graph/src/units.rs
+@@ -275,6 +275,10 @@ pub enum SourceRead {
+         line: u32,
+         digest: Sha256Digest,
+     },
++    /// `current_exe()` 的路径原样交给 `Command::new`（`rust_items` 的 `own_program_path_is_handed_to_command_unchanged`），又不是
++    /// [`SourceRead::ChildTestProcess`] 那一形：起的就是在跑的这个程序。入口是一个 bin 的 `fn main`、不按测试编的时候它再进一次
++    /// 已在闭包里的 `main`，不算新代码；别的入口（在跑的是 libtest，参数选中哪条测试说不清）拒算 `current-exe`，`fragment` 是那一条的原样片段。
++    OwnProgramRestart { line: u32, fragment: String },
+     /// `Command::new(current_exe())` 起本测试二进制的一个子进程，参数里 `--exact` 后面跟着的测试名：闭包里解到入口目标里那个
+     /// `#[test] fn`，连一条边（`current-exe-child`）。解不出来时照旧拒算 `current-exe`，`fragment` 就是那一条的原样片段。
+     ChildTestProcess {
+diff --git a/crates/singlefs-unit-graph/src/verus_ghost_code.rs b/crates/singlefs-unit-graph/src/verus_ghost_code.rs
+index c5e046dc8..6104fbe1e 100644
+--- a/crates/singlefs-unit-graph/src/verus_ghost_code.rs
++++ b/crates/singlefs-unit-graph/src/verus_ghost_code.rs
+@@ -780,7 +780,7 @@ mod tests {
+ 
+     /// 没有 `verus!` 的原样交回：别的宏名带花括号的调用（里面写得像 Verus）也不剥。
+     #[test]
+-    fn a_source_without_verus_blocks_comes_back_byte_for_byte() {
++    fn source_without_verus_blocks_comes_back_byte_for_byte() {
+         let source = "fn plain(value: u64) -> u64 {\n    value + 1\n}\nlookalike! {\n    fn inside(width: usize) -> (named: usize) ensures named == width, { width }\n}\n";
+         assert_eq!(
+             source_with_verus_ghost_code_blanked(source).as_deref(),
+diff --git a/crates/singlefs-unit-graph/src/wgsl.rs b/crates/singlefs-unit-graph/src/wgsl.rs
+index 898891ea7..336d72563 100644
+--- a/crates/singlefs-unit-graph/src/wgsl.rs
++++ b/crates/singlefs-unit-graph/src/wgsl.rs
+@@ -584,7 +584,7 @@ mod tests {
+ 
+     /// `switch x { case LIMIT: … }`：冒号前的 `LIMIT` 是被比的常量、是引用，不是局部声明（早先被当成参数名吞掉，常量改了内核的闭包不变）。
+     #[test]
+-    fn a_constant_named_in_a_switch_case_selector_is_a_reference_not_a_local_declaration() {
++    fn constant_named_in_a_switch_case_selector_is_a_reference_not_a_local_declaration() {
+         let parsed = parse_wgsl_file(
+             "const LIMIT: u32 = 3u;\nconst OTHER: u32 = 5u;\n\
+              fn pick(x: u32) -> u32 { switch x { case LIMIT, OTHER: { return 1u; } case 7u: { return 2u; } default: { return 0u; } } }\n",

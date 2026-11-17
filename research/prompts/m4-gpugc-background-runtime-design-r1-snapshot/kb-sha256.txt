@@ -1,0 +1,9 @@
+e37ac8d1949d4b5ece92ecf61842f084e5947d0c766dd671c0dff1263ce352f8  .claude/kb/mount-parameters.md
+00422bedeef9ed2dffb091fd8ecf49dd94f7e07326621157b5bb1635f02c3de7  .claude/kb/layout/01-first-txn.md
+cbc3e3ba60af782dacc104b06f5359472e8d006230ba88e4dd6276ec18a0cc79  .claude/kb/milestone/12-twelfth-txn.md
+8ca09f10ff5230e5d95281718060025393c9e3cfef72f9d37e65688dc6e69e79  .claude/kb/milestone/06-sixth-txn.md
+19edb0f69f21e0d78109ed68ce3e2c629741c4a17726fff7f0dbeaa0a582421e  .claude/kb/decisions/26-后台整理与放置回收.md
+30695c2730f27f9aaf7b27f49b5941d14e8ccee2105809ba8c783bee3288c63e  .claude/kb/decisions/16-发布语义.md
+ceea22b493bbd05ec2e223f3a7a6da1f98339be9fe4a26053816451d87f0625d  .claude/kb/milestone/04-fourth-txn.md
+32abbe1a950ed59722baddffdd623644bf7a0d5619dc45a24d579377ea0a1529  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md
+cb5288c81bbb9b7fbe7a92bc038b6afc38ce454001bd4417476dbdde0cc96441  .claude/kb/decisions/24-后台重活能不能卸给GPU.md

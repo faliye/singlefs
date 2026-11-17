@@ -1,0 +1,2 @@
+[package]
+name = "enum_built_from_an_imported_variant"

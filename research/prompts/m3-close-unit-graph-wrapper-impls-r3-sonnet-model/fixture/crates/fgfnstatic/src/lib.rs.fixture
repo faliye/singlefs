@@ -1,0 +1,23 @@
+// 全局状态写在函数体里的 static（函数单元里的 dyn，不是 static 单元），值由别处经这个函数放进去
+use std::sync::{Mutex, OnceLock};
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub fn the_registry() -> &'static Mutex<Vec<Box<dyn Held + Send>>> {
+    static LOCAL: OnceLock<Mutex<Vec<Box<dyn Held + Send>>>> = OnceLock::new();
+    LOCAL.get_or_init(|| Mutex::new(Vec::new()))
+}
+pub fn entry_static_inside_a_function() -> u8 {
+    the_registry()
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

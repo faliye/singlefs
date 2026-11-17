@@ -1,0 +1,2 @@
+        Box::new(AdaptersEnumeratedByTheInstance {
+            vulkan_instance,

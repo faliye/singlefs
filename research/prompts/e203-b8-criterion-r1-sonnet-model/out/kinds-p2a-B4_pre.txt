@@ -1,0 +1,12 @@
+p2a B4_pre files      kinds=160 per_unit_kinds=0 {'no': 160}
+    a=0.091 ('same_mount', 'W3', '8') y=[49.0, 58.0, 74.0, 92.0] T=[14, 14, 18, 19] per_unit=False
+    a=0.091 ('same_mount', 'W3', '7') y=[49.0, 58.0, 74.0, 92.0] T=[14, 14, 18, 19] per_unit=False
+p2a B4_pre data_units kinds=160 per_unit_kinds=1 {'no': 160}
+    a=0.000 ('same_mount', 'W4', '8') y=[36.0, 36.0, 36.0, 36.0] T=[14, 14, 14, 14] per_unit=False
+    a=0.000 ('same_mount', 'W4', '7') y=[36.0, 36.0, 36.0, 36.0] T=[14, 14, 14, 14] per_unit=False
+p2a B4_pre unlinks    kinds=160 per_unit_kinds=0 {'no': 160}
+    a=0.088 ('same_mount', 'W4', '8') y=[36.0, 36.0, 66.0, 66.0] T=[14, 14, 18, 18] per_unit=False
+    a=0.088 ('same_mount', 'W4', '7') y=[36.0, 36.0, 66.0, 66.0] T=[14, 14, 18, 18] per_unit=False
+p2a B4_pre U          kinds=160 per_unit_kinds=0 {'no': 160}
+    a=0.000 ('same_mount', 'W4', '8') y=[36.0, 36.0, 36.0, 36.0] T=[18, 18, 18, 18] per_unit=False
+    a=0.000 ('same_mount', 'W4', '7') y=[36.0, 36.0, 36.0, 36.0] T=[18, 18, 18, 18] per_unit=False

@@ -1,0 +1,28 @@
+//! 自身类型里有关联类型的名字 `Item`；另一个模块里一个 `impl Iterator` 的 `type Item` 是单元图里的类型别名单元，名字算「工作区类型名」。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+impl<Element: 'static> Store for Vec<Box<dyn Iterator<Item = Element>>> {
+    fn put(&self, amount: u32) -> u32 {
+        u32::try_from(self.len()).unwrap_or(0) * amount * 2
+    }
+}
+
+#[allow(dead_code)]
+mod unrelated {
+    pub(crate) struct Counter(pub(crate) u32);
+
+    impl Iterator for Counter {
+        type Item = u32;
+
+        fn next(&mut self) -> Option<u32> {
+            None
+        }
+    }
+}
+
+pub fn entry() -> u32 {
+    let streams: Vec<Box<dyn Iterator<Item = u8>>> = vec![Box::new(std::iter::once(1_u8))];
+    streams.put(3)
+}

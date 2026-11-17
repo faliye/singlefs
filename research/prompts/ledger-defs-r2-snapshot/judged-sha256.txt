@@ -1,0 +1,4 @@
+ecae5c2b48b90076274ea12ce77b2638a3824c45d130daab1faf53c709f40a54  .claude/main-agent.md
+49f98dced5c3412b1f65b7dbbc5e26c0a72251a59f4250304d4576ff626166cb  .claude/agent-common.md
+347fe5b2b784ec9d66cf991ae895fc72a00f533a6ce5cc4bc0b8fc354d928061  .claude/agents/implementation-writer.md
+1355f6d71f6eb9c93ae7f1fc18aa72cb6d6f84a2f162db01a2747a84c7bb4c3a  .claude/rules/long-run-split.md

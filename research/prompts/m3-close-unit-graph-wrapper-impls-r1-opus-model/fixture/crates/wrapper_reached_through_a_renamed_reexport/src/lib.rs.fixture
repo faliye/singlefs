@@ -1,0 +1,32 @@
+//! 包装类型经改名的 `pub use … as` 转出，另一个模块按转出的名字造值：那个模块的 use 里没有这条改名，原名 `Wrapper` 不被点名。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+mod wrappers {
+    pub struct Wrapper<Inner>(pub Inner);
+
+    impl<Inner: super::Store> super::Store for Wrapper<Inner> {
+        fn put(&self, amount: u32) -> u32 {
+            self.0.put(amount) * 2
+        }
+    }
+}
+
+pub use wrappers::Wrapper as Doubling;
+
+pub mod make {
+    use crate::Store;
+
+    pub fn entry() -> u32 {
+        crate::Doubling(crate::Base).put(3)
+    }
+}

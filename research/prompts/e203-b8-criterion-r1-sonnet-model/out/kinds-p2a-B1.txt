@@ -1,0 +1,12 @@
+p2a B1     files      kinds=160 per_unit_kinds=0 {'no': 100, 'between': 60}
+    a=0.383 ('same_mount', 'W1', '1') y=[2504338.0, 2552204.0, 3340407.0, 35221439.0] T=[14, 14, 20, 22] per_unit=False
+    a=0.369 ('same_mount', 'W1', '14') y=[2532534.0, 2537620.0, 3413244.0, 32297045.0] T=[14, 14, 18, 20] per_unit=False
+p2a B1     data_units kinds=160 per_unit_kinds=1 {'no': 159, 'grows': 1}
+    a=1.049 ('same_mount', 'W2', '1') y=[106777.5, 23365.6, 11543.9, 129170.2] T=[24, 114, 1028, 10152] per_unit=True
+    a=0.182 ('same_mount', 'W2', '25') y=[2524905.0, 3509321.0, 4163475.0, 8846331.0] T=[14, 14, 14, 14] per_unit=False
+p2a B1     unlinks    kinds=160 per_unit_kinds=0 {'no': 160}
+    a=0.131 ('same_mount', 'W1', '1') y=[2504338.0, 2522159.0, 2582569.0, 6206968.0] T=[14, 14, 18, 18] per_unit=False
+    a=0.131 ('same_mount', 'W1', '11') y=[2533204.0, 2552141.0, 2711365.0, 6274762.0] T=[14, 14, 18, 18] per_unit=False
+p2a B1     U          kinds=160 per_unit_kinds=0 {'grows': 160}
+    a=0.927 ('same_mount', 'W2', '27') y=[671309.0, 2881437.0, 19826589.0, 415081256.0] T=[20, 20, 20, 20] per_unit=False
+    a=0.912 ('remounted', 'W1', '3') y=[747236.0, 3119415.0, 20064567.0, 414439461.0] T=[18, 18, 18, 18] per_unit=False

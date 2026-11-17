@@ -1,0 +1,14 @@
+# 推的：正推腿读代码得出的预期，没跑过；主 agent 跑出来之后，以跑出来的行为准，对不上的格就是要回头核的格。
+# 0 = 被看的 impl 方法不进闭包（值不经点名到得了闭包、键却不含它）；1 = 进闭包。
+name=gap_static_of_a_struct_holding_dyn rust_members=0 python_members=0 closures_equal=yes
+name=control_static_holding_dyn_directly rust_members=1 python_members=1 closures_equal=yes
+name=gap_static_of_an_alias_holding_dyn rust_members=0 python_members=0 closures_equal=yes
+name=gap_any_downcast_to_an_alias_of_dyn rust_members=0 python_members=0 closures_equal=yes
+name=gap_any_downcast_in_a_second_unit rust_members=0 python_members=0 closures_equal=yes
+name=gap_static_inside_a_function rust_members=0 python_members=0 closures_equal=yes
+name=control_bound_written_with_a_path rust_members=1 python_members=1 closures_equal=yes
+name=control_dyn_written_with_a_path rust_members=1 python_members=1 closures_equal=yes
+name=control_bound_written_with_a_use rust_members=1 python_members=1 closures_equal=yes
+name=gap_dyn_after_an_auto_trait_in_a_static rust_members=0 python_members=0 closures_equal=yes
+name=control_item_macro_static rust_members=1 python_members=1 closures_equal=yes
+name=control_entry_type_two_fields_down rust_members=1 python_members=1 closures_equal=yes

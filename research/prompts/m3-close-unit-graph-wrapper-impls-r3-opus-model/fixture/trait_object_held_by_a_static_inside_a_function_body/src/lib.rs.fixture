@@ -1,0 +1,37 @@
+//! static 写在函数体里（不切成 static 单元，算在函数单元里）：函数单元既不是 static、也不提 `Any`，它写的 `dyn Store` 不开。
+//! 放进去的 `Wrapper<Base>` 由闭包外的 `caller` 装好。
+use std::sync::Mutex;
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+fn installed() -> &'static Mutex<Option<Box<dyn Store + Send>>> {
+    static INSTALLED: Mutex<Option<Box<dyn Store + Send>>> = Mutex::new(None);
+    &INSTALLED
+}
+
+pub fn entry() -> u32 {
+    installed().lock().unwrap().as_ref().map_or(0, |store| store.put(3))
+}
+
+pub fn caller() -> u32 {
+    *installed().lock().unwrap() = Some(Box::new(Wrapper(Base)));
+    entry()
+}

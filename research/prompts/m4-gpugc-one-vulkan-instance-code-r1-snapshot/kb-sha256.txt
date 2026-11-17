@@ -1,0 +1,2 @@
+3ff0449711d2cede55777c3342445279ba7c0273e9f378c669b43896bff9ab6d  .claude/kb/decisions/26-后台整理与放置回收.md
+56720fe8b0726bef08c093f24eece2c36015132649cb73bfd4adccbe8577e82d  .claude/kb/milestone/04-fourth-txn.md

@@ -1,0 +1,34 @@
+//! static 与 `Any` 那一条开的是单元的 `dyn_trait_names`：`dyn` 后面只取头一个 trait 的名字。trait 对象把自动 trait 写在前面
+//! （`dyn Send + Sync + Store`），记下的是 `Send`，`Store` 不开。放进去的 `Wrapper<Base>` 由闭包外的 `caller` 装好。
+use std::sync::OnceLock;
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub static INSTALLED: OnceLock<Box<dyn Send + Sync + Store>> = OnceLock::new();
+
+pub fn entry() -> u32 {
+    INSTALLED.get().map_or(0, |store| store.put(3))
+}
+
+pub fn caller() -> u32 {
+    let _ = INSTALLED.set(Box::new(Wrapper(Base)));
+    entry()
+}

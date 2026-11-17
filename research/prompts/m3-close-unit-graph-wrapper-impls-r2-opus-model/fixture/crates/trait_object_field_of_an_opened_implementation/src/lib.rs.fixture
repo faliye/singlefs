@@ -1,0 +1,46 @@
+//! 入口签名是 `&dyn Source`（R-开放 开 Source）；开进来的 `impl Source for Holder` 是全具体的、头上没有约束，
+//! `Holder` 的字段是 `Box<dyn Store>`，装进去的 `Wrapper<Base>` 由闭包外的 `caller` 造。收严二只沿入口签名里点名的类型找字段，
+//! 不沿被 R-开放 开进来的 impl 的自身类型找。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub trait Source {
+    fn total(&self) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub struct Holder {
+    pub store: Box<dyn Store>,
+}
+
+impl Source for Holder {
+    fn total(&self) -> u32 {
+        self.store.put(3)
+    }
+}
+
+pub fn entry(source: &dyn Source) -> u32 {
+    source.total()
+}
+
+pub fn caller() -> u32 {
+    entry(&Holder {
+        store: Box::new(Wrapper(Base)),
+    })
+}

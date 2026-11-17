@@ -1,0 +1,18 @@
+// 入口是泛型 impl 里的方法，trait 约束写在 impl 头上，不在方法签名里
+pub trait BoundDev {
+    fn bound_read(&self) -> u8;
+}
+pub struct BoundFaulty<Inner>(pub Inner);
+impl<Inner: BoundDev> BoundDev for BoundFaulty<Inner> {
+    fn bound_read(&self) -> u8 {
+        self.0.bound_read() ^ 1
+    }
+}
+pub struct Holder<Device> {
+    pub dev: Device,
+}
+impl<Device: BoundDev> Holder<Device> {
+    pub fn entry_bound(&self) -> u8 {
+        self.dev.bound_read()
+    }
+}

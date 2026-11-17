@@ -1,0 +1,10 @@
+[package]
+name = "floor-raise-precheck-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "抬 F 先算代码轮攻方腿的探针：只在冻结副本的拷贝里编，不进仓"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }

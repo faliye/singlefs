@@ -1,0 +1,2 @@
+[package]
+name = "variant_imported_through_a_raw_identifier_path"

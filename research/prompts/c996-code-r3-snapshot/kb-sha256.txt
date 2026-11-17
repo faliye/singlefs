@@ -1,0 +1,2 @@
+438a9659d00508583345bfa6bbf51917fae7f3927ed4f9a4c1b6f6055ad30ae4  .claude/kb/decisions/26-后台整理与放置回收.md
+d36dcefe6e65e9356d1d47dc8ebd48a5adc9e8a1241673de0660945c178e69b3  .claude/kb/checks-owed.md

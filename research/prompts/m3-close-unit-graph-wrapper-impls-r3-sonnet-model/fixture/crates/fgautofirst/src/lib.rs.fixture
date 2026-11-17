@@ -1,0 +1,20 @@
+// static 里的 dyn 把自动 trait 写在前面（dyn Send + Held）：dyn 后面的路径只记头一段
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub static AUTO_FIRST: Mutex<Vec<Box<dyn Send + Held>>> = Mutex::new(Vec::new());
+pub fn entry_auto_trait_first() -> u8 {
+    AUTO_FIRST
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

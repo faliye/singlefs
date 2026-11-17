@@ -1,0 +1,9 @@
+# 样本名<TAB>期望退出码（run-scope-guard.sh 照主 agent 判：输入里不带 agent_type）
+control-mutation-gate-no-shrink	2
+mutation-gate-env-amplification-variable	0
+mutation-gate-env-judge-variable	0
+prove-red-env-amplification-variable	0
+prove-red-full-domain-declaration-as-written	0
+cargo-test-env-amplification-variable	0
+new-case-row-on-a-tree-without-its-registration	0
+new-case-row-on-a-tree-with-its-registration	2

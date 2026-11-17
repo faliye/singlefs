@@ -1,0 +1,33 @@
+//! 同一段模块里 `Wrapper` 有两臂：`cfg(not(unix))` 一臂是 struct，`cfg(unix)` 一臂是 `real::Real` 的别名。在 unix 上编的是别名那一臂，
+//! impl 写在别名上，值照原名 `real::Real` 造。等不等的第三条只问「同一份文件同一段模块里有没有叫这个名字的 struct」，不问那一臂编不编进来。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub mod real {
+    pub struct Real<Inner>(pub Inner);
+}
+
+#[cfg(not(unix))]
+pub struct Wrapper<Inner>(pub Inner);
+
+#[cfg(unix)]
+pub type Wrapper<Inner> = real::Real<Inner>;
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    real::Real(Base).put(3)
+}

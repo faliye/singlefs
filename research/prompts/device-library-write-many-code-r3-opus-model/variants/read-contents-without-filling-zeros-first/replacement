@@ -1,0 +1,12 @@
+                let announced = u64::try_from(length).unwrap_or(u64::MAX);
+                match (&mut ends.replies).take(announced).read_to_end(&mut contents) {
+                    Ok(taken) if taken == length => {}
+                    Ok(taken) => give_up(
+                        OTHER_ERROR_EXIT_CODE,
+                        &format!("{asked}：回应里的 {length} 字节没读全：只读到 {taken} 字节"),
+                    ),
+                    Err(error) => give_up(
+                        OTHER_ERROR_EXIT_CODE,
+                        &format!("{asked}：回应里的 {length} 字节没读全：{error}"),
+                    ),
+                }

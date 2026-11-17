@@ -1,0 +1,32 @@
+//! 同上一种写法，变体经 glob 引进。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub enum Layered<Inner> {
+    Plain(Inner),
+    Doubled(Inner),
+}
+
+impl<Inner: Store> Store for Layered<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        match self {
+            Layered::Plain(inner) => inner.put(amount),
+            Layered::Doubled(inner) => inner.put(amount) * 2,
+        }
+    }
+}
+
+use crate::Layered::*;
+
+pub fn entry() -> u32 {
+    Doubled(Base).put(3)
+}

@@ -1,0 +1,12 @@
+                    request.extend_from_slice(text.as_bytes());
+                }
+                if let Err(error) = ends.requests.write_all(&request) {
+                    give_up(OTHER_ERROR_EXIT_CODE, &format!("{asked}：写不进转交判定库的管道：{error}"));
+                }
+                drop(ends);
+                let Backend::Relay(relay_ends) = &*self.backend else { unreachable!() };
+                let mut ends = relay_ends.lock().expect("变异：重新拿锁");
+                let reply = reply_line(&mut ends.replies);
+                if reply != "written" {
+                    give_up_on_reply(&reply, &asked);
+                }

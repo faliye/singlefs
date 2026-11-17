@@ -1,0 +1,7 @@
+840c5c6d47254b8e14f3e67536e51669e51822365103f3ff07565ebfdceb330a  .claude/kb/experiments/207-严格判据下的扫类步数.md
+9e8faa09ffcda61a2f47cb653e4c503d5e1bb61df3b017dda6df17d3a57db084  .claude/kb/experiments/209-尖峰成因.md
+2d61f4c08f088632bc640e900d49f5fa66b14e3b7e1ff5f2dcb84dc7260a7dd1  .claude/kb/checks-owed.md
+6dac9876820efc83e1a30d45621cf5e2349ae0d85c82fc8512c133d94cb65a01  .claude/kb/experiments/203-准入之前扫类的步代价.md
+c2d49de3dc95e013d1b2f846bdbe7d975c200118b30f25f7138aa9bac9d31ac5  .claude/kb/experiments/206-发布固定点轮数的代价.md
+7894251aa96b5a58fa07c654ad61d7d3198367f668f26f7461cd9c55ac19eb52  .claude/kb/decisions/08-核心索引结构.md
+e421d01a4b3f8851eab8d9704d4b7f64445c797843786022bf2f2dd52d040d7e  .claude/kb/decisions/28-挂载期承诺量.md

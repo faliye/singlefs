@@ -1,0 +1,3 @@
+59d8175caef0f137ec864d970d8de5fd616725581d385585a1f1332f6be9d37a  .claude/kb/decisions/04-校验和位置.md
+ba090e2fe6a260953519a170df0f8c750e204f9fe62c03ff8c86e8cb0b734499  .claude/kb/checks-owed.md
+9a4a797e397ac3ddfbbfbc55c0b4d27602b28012f88d5f1570e7187af582f516  crates/singlefs-checker/invariants/09-inode树结构.md

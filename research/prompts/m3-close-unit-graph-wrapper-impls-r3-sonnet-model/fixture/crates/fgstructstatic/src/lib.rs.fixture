@@ -1,0 +1,26 @@
+// static 的类型是一个 struct，dyn 写在 struct 的字段里：static 单元自己的词法单元里没有 dyn
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub struct Registry {
+    pub items: Mutex<Vec<Box<dyn Held + Send>>>,
+}
+pub static REGISTRY: Registry = Registry {
+    items: Mutex::new(Vec::new()),
+};
+pub fn entry_static_of_a_struct() -> u8 {
+    REGISTRY
+        .items
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

@@ -1,0 +1,1 @@
+{"hook_event_name": "PreToolUse", "tool_name": "Bash", "session_id": "ledger-defs-r1-opus-probe", "tool_use_id": "probe-prove-red-on-a-crash-row", "cwd": "@REPO@", "tool_input": {"command": "task-server/task submit -- bash scripts/mutation/prove-red.sh --copy @REPO@ singlefs-verification '取号屏障那条崩溃枚举用例选中的段按甲二展开（不是全部真子集）'", "description": "probe"}}

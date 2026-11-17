@@ -1,0 +1,1 @@
+3efb612b179e43a9735c0f86a489be0d8d4dff893dddae846cced0cb3455fc3f  .claude/kb/tooling.md

@@ -1,0 +1,12 @@
+compaction_plan.rs:1527:pub const ROOT_RING_SLOTS_LEFT_BY_A_COMPACTION_PUBLISH: u64 = 8;
+compaction_plan.rs:1536:    (3 * root_ring_slots_per_region)
+compaction_plan.rs:1537:        .saturating_sub(4)
+mounted_session.rs:4105:            < ROLLBACK_STATES_KEPT_BY_THE_COMPACTION
+mounted_session.rs:2880:        compaction.last_completed_intent = None;
+mounted_session.rs:4220:        let walk = publish_the_queue_until_it_is_empty(
+format-lib.rs:299:pub const ROOT_RING_SLOTS_PER_REGION_MINIMUM: u64 = 4;
+format-lib.rs:303:pub const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
+mount-runtime-lib.rs:507:        self.publish_when_due_once()?;
+mount-runtime-lib.rs:585:            self.publish_when_due_once()?;
+mount-runtime-lib.rs:606:                self.publish_when_due_once()?;
+mount-runtime-lib.rs:509:        if self.resend_the_frozen_publish_if_any()? {

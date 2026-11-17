@@ -1,0 +1,21 @@
+// 接收者的字段是另一个结构体，那个结构体的字段里才有 Box<dyn Trait>：沿字段里点名的类型要找两层
+pub trait NestedDev {
+    fn nested_read(&self) -> u8;
+}
+pub struct NestedFaulty<Inner>(pub Inner);
+impl<Inner: NestedDev> NestedDev for NestedFaulty<Inner> {
+    fn nested_read(&self) -> u8 {
+        self.0.nested_read() ^ 1
+    }
+}
+pub struct Inside {
+    pub dev: Box<dyn NestedDev>,
+}
+pub struct Outside {
+    pub inside: Inside,
+}
+impl Outside {
+    pub fn entry_nested(&self) -> u8 {
+        self.inside.dev.nested_read()
+    }
+}

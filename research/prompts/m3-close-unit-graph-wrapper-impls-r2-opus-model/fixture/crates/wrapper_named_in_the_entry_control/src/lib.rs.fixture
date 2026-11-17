@@ -1,0 +1,24 @@
+//! 对照：入口自己写出 `Wrapper` 造值，四种规则都该收被改的方法、改它键都变（证判法不是一律判「不在」）。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    Wrapper(Base).put(3)
+}

@@ -1,0 +1,31 @@
+//! 两份实现不等价：入口的参数写成 `&dyn std::any::r#Any`。Rust 一份的裸名去掉 `r#`（`Any`），照「提到 `Any`」开入口里的 `dyn Store`；
+//! Python 一份判「提到 `Any`」时拿 `unit.plain` 原样比，里面是 `r#Any`，不开。盒子由闭包外的 `caller` 造。
+
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub struct Wrapper<Inner>(pub Inner);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry(thing: &dyn std::any::r#Any) -> u32 {
+    thing.downcast_ref::<Box<dyn Store>>().map_or(0, |store| store.put(3))
+}
+
+pub fn caller() -> u32 {
+    let boxed: Box<dyn Store> = Box::new(Wrapper(Base));
+    entry(&boxed)
+}

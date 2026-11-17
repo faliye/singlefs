@@ -1,0 +1,1227 @@
+diff -ruN r1-baseline/CLAUDE-merged.md revised/CLAUDE-merged.md
+--- r1-baseline/CLAUDE-merged.md	2026-11-16 12:07:26.583741809 +0000
++++ revised/CLAUDE-merged.md	2026-11-16 12:13:12.623051914 +0000
+@@ -81,7 +81,7 @@
+ | `crates/singlefs-checker/invariants/` | 不变量清单（按类拆开），checker 是它的可执行形式 |
+ | `.claude/kb/feature-bits.md` | feature bit 的记账表（位号 / 类别 / 名称 / 引入版本 / 引入 commit / 状态 / 语义一句话），形态由 D15（格式冻结政策） 已定项 10 定；**位号的唯一登记位**是 D15（格式冻结政策） 已定项 4 那张表，门禁 code-source-discipline 的 feature-bits 格判两处逐位一致 |
+ | `.claude/kb/term-renames.md` | 全仓术语改名登记表（旧名 / 新名 / 匹配）；`scripts/kb/sweep-term.py` 照它换全仓、`--check` 数剩几处，没有门禁复查；做法见 `.claude/rules/path-moves.md`「改一个全仓术语」 |
+-| `.claude/kb/freeze-layer-membership.md` | 冻结层归属登记表：一行一个结构，写它落 D15（格式冻结政策） 已定项 7 的哪一层或哪个独立冻结组件、态别、退不退出冻结、依据哪条分项；门禁 doc-decisions 的 freeze-layer-membership 格判三条（写在 `.claude/gate.d/doc-decisions.sh` 文件头格名表那一格），态别判得对不对门禁管不了 |
++| `.claude/kb/freeze-layer-membership.md` | 冻结层归属登记表：一行一个结构，写它落 D15（格式冻结政策） 已定项 7 的哪一层或哪个独立冻结组件、态别、退不退出冻结、依据哪条分项；门禁 doc-decisions 的 freeze-layer-membership 格判三条（每层、每棵树、每个单元类都有行；写「退出」的必须是派生态；依据点名的分项存在且已定；三份清单怎么现读见 `.claude/kb/freeze-layer-membership.md`「门禁判哪三条」），态别判得对不对门禁管不了 |
+ | `.claude/kb/tooling.md` | 本机工具的现状与用法（本地模型与网关、Rust 工具链、虚机装置、造设备、并发暂存与提交、门禁常见红的写法） |
+ | `.claude/kb/INDEX.md` | kb 的导航表，本身不放事实；`kb-discipline.md` 第 8 条对它不判「## 历史版本」节；带历史节的 kb 文件登记在 `.claude/history-carriers` |
+ | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
+diff -ruN r1-baseline/contradictions.md revised/contradictions.md
+--- r1-baseline/contradictions.md	2026-11-16 12:07:26.585731307 +0000
++++ revised/contradictions.md	2026-11-16 12:21:45.386071425 +0000
+@@ -4,32 +4,32 @@
+ 
+ 出处的简写：「入口」= `rules-compress-entry/result.md`，「入口第二遍」= `rules-compress-entry-second/result.md`，「验证」= `rules-compress-verification/result.md`，「规则第二遍」= `rules-compress-rules-second/result.md`，「常驻」= `rules-compress-residents/result.md`，「共用」= `rules-compress-common/result.md`，「定义」= `rules-compress-definitions/result.md`，「按需」= `rules-compress-ondemand/result.md`，都在 `~/.local/share/singlefs/work/` 下；「合稿」是这一件合稿时新核出的。
+ 
+-## 写手报告与合稿核出的矛盾（85 条）
++## 写手报告与合稿核出的矛盾（第一版 85 条，这一版补合稿-4 到合稿-12）
+ 
+ | 编号 | 两处原话（仓里原件 文件:行〔原话〕） | 合稿里改成的那一句（合稿树 文件:行〔那一句里的一段〕） | 依据 | 改没改做法 | 说明 |
+ |---|---|---|---|---|---|
+-| 入口-1 | `.claude/main-agent.md:18`〔不指定范围的只在提交时或用户要求时由主 agent 经服务交〕；`.claude/main-agent.md:26`〔提交之外任务确实要跑，先弹窗问用户，同意了才跑〕 | `.claude/main-agent.md:26`〔提交之外，用户要求的照跑；主 agent 自己判要跑的，先弹窗问用户，同意了才跑〕 | `.claude/skills/crash-test/commit-stages.md:9`「只在这两种时候跑」；`.claude/skills/gate/staged-gate.md:8` 同 | 改了判据 | 用户要求的那一趟不再另弹窗；`--full-gate` 的弹窗照旧（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
++| 入口-1 | `.claude/main-agent.md:18`〔不指定范围的只在提交时或用户要求时由主 agent 经服务交〕；`.claude/main-agent.md:26`〔提交之外任务确实要跑，先弹窗问用户，同意了才跑〕 | `.claude/main-agent.md:26`〔提交之外要跑不指定范围的，照 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条先弹窗〕 | `.claude/skills/crash-test/commit-stages.md:9`「只在这两种时候跑」；`.claude/skills/gate/staged-gate.md:8` 同 | 改了判据 | 第一遍稿写成「用户要求的那一趟不再另弹窗」，用户定案第 18 条改回：提交之外要跑不指定范围的一律先弹窗，用户要求的那一趟也确认一次；句子只住 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条，`.claude/main-agent.md`、`.claude/agent-common.md`、`.claude/skills/crash-test/SKILL.md`、`.claude/rules/session-wrapup.md` 指过去（出处：rules-compress-entry/result.md「矛盾与不明晰」；用户定案 18） |
+ | 入口-2 | `.claude/main-agent.md:57`〔退 3 用户不同意、这一批放弃、任务被停这三支同样删〕 | `.claude/skills/merge-verify/SKILL.md:19`〔这三种情形同样删〕 | 同一行「结局分五支」列的是绿、退 3、退 1、退 2、退 75 | 只改措辞 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-3 | `.claude/main-agent.md:7`〔fmt、clippy〕；`.claude/main-agent.md:118`〔fmt、clippy、build〕 | `.claude/main-agent.md:57`〔编一次，只跑补丁改到的测试目标〕 | `scripts/gate/merge-and-verify.sh:9`「fmt、clippy 与 build」 | 只改措辞 | 合入后验证跑什么只在验证段第 1 步与技能里写一次（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+-| 入口-4 | `.claude/main-agent.md:7`〔一批阶段任务结束〕；`.claude/main-agent.md:124`〔条目少、主 agent 自己写得清的，主 agent 自己写规格〕 | `.claude/main-agent.md:9`〔派发表「一批阶段任务结束」「定案之后写回 kb」两行〕 | `.claude/main-agent.md:121`、`:124` 两处都许主 agent 自己写 | 改指针 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
++| 入口-4 | `.claude/main-agent.md:7`〔一批阶段任务结束〕；`.claude/main-agent.md:124`〔条目少、主 agent 自己写得清的，主 agent 自己写规格〕 | `.claude/main-agent.md:9`〔`crates/` 与 kb 里，主 agent 可以自己写的只有两类：…（派发表「一批阶段任务结束」「定案之后写回 kb」两行）；别的文件的简单任务照共用约束「派发」一节自己直接做〕 | `.claude/main-agent.md:121`、`:124` 两处都许主 agent 自己写 | 改了判据（已收窄） | 第一遍稿把「可以自己写」写成穷举的「只有两类」，与共用约束「派发」一节「简单任务自己直接做」对不上（两条腿都打中）；这一版把「只有」限定在 `crates/` 与 kb 两处，与派发表同义，别的文件另指共用约束（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-5 | `.claude/main-agent.md:80`〔它只管 agent 与本机的根分区〕；`.claude/main-agent.md:82`〔工作根所在文件系统的可用量〕 | `.claude/skills/dispatch/SKILL.md:26`〔读工作根所在文件系统的可用量〕 | `scripts/agents/watch.conf:23`；`root-free-gib-alert` | 只改措辞 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-6 | `.claude/main-agent.md:30`〔回到第 2 步记下延后项的那几处〕 | `.claude/main-agent.md:30`〔回到第 2 条登延后项的那几处与第 8 条的收拢表〕 | 同一节与 `runner-dispatch-guard.sh`、`completion-cleanup-guard.sh` 都写「第 N 条」 | 改指针 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-7 | `CLAUDE.md:8`〔代码在 `crates/` 下十一个 crate〕 | `CLAUDE.md:7`〔代码在 `crates/` 下十一个 crate：〕 | `ls crates` 11 个目录（量的，写手报告） | 只改措辞 | 拆成独立一句（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-8 | `CLAUDE.md:22`〔两版封存当历史，不再改〕 | `CLAUDE.md:21`〔（除非要查来历，别读它们）〕 | `.claude/singlefs-ai-sop/rules/rules-discipline.md`「4. 指向历史的链接要带劝阻句」 | 只改措辞 | 补劝阻句（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-9 | `CLAUDE.md:22`〔改完记进那份计划〕 | `CLAUDE.md:21`〔改完记进现行账本〕 | `.claude/gate.d/split-proposal-ledgers.tsv` 里 current 那一行 | 改指针 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口-10 | `.claude/main-agent.md:117`〔下面那一行〕 | `.claude/main-agent.md:91`〔照「一批实现员交回到齐、合入之前」那一行做合入后验证〕 | `.claude/singlefs-ai-sop/rules/rules-discipline.md`「7. 正文不许用位置指代，也不许自称」 | 改指针 | 位置指代改成行名与「**代码轮三方**」（出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+-| 入口-11 | `.claude/main-agent.md:72`〔这份清单只取验证包不带特性那一趟的测试函数〕 | `.claude/skills/merge-verify/SKILL.md:28`〔refused-test-registry.py〕 | `.claude/main-agent.md:69` 的 `refused-test-registry.py list <快照>` | 只改措辞 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
++| 入口-11 | `.claude/main-agent.md:72`〔这份清单只取验证包不带特性那一趟的测试函数〕 | `.claude/skills/merge-verify/SKILL.md:58`〔的清单只取验证包不带特性那一趟的测试函数〕；`.claude/main-agent.md:68`〔`refused-test-registry.py` 的清单罩不到…这三类审 diff 时照实现员定义第 3c 步看〕 | `.claude/main-agent.md:69` 的 `refused-test-registry.py list <快照>` | 只改措辞 | （出处：rules-compress-entry/result.md「矛盾与不明晰」） |
+ | 入口第二遍-1 | `.claude/main-agent.md:24`〔类别按 agent 定义分（调查、调研、改 `crates/`、改门禁与定义与脚本、写回 kb、跑实验、回扫、分诊、三方腿各是一类）〕 | `.claude/skills/dispatch/SKILL.md:12`〔类别按 agent 定义分（调查、调研、改 `crates/`、改门禁与定义与脚本、写回 kb、跑实验、回扫、分诊、三方腿各是一类）〕 | 第一遍稿删了括号，三方腿三份定义算一类的判据丢了 | 改回原判据 | 照原文放回 dispatch 第 1 条（出处：rules-compress-entry-second/result.md「④」） |
+ | 入口第二遍-2 | `.claude/main-agent.md:33`〔照各份报告的算法改钉值〕 | `.claude/skills/merge-verify/SKILL.md:47`〔照各份实现员报告的算法改〕 | 第一遍稿丢了「按哪份算法改」 | 改回原判据 | 放回 merge-verify 验证段第 5 步（出处：rules-compress-entry-second/result.md「④」） |
+ | 验证-1 | `.claude/rules/verification.md:39`〔先只编（`--no-run`，不持卡）、编完领一张、跑完就还〕 | `.claude/rules/verification-reference.md:16`〔显卡与清场〕 | `.claude/gate.d/crash-point-replay.sh:352-361`（规则原话是弄坏开关 `feature-pass-outer-takes-card` 打开之后的做法） | 改了判据 | 规则不再写这一趟怎么领卡，照门禁文件头「显卡与清场」（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+-| 验证-2 | `.claude/rules/implementation-workflow.md:88`〔计划按多机配置点名的卡数写 N 片〕 | `.claude/rules/verification-reference.md:16`〔分片〕 | `.claude/gate.d/crash-point-replay.sh:137-145`（卡数是片数的上界） | 改了判据 | 规则不写片数，照门禁文件头「分片」（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
++| 验证-2 | `.claude/rules/implementation-workflow.md:88`〔计划按多机配置点名的卡数写 N 片〕 | `.claude/rules/verification-reference.md:16`〔分片〕 | `.claude/gate.d/crash-point-replay.sh:137-145`（卡数是片数的上界） | 改了判据 | 规则不写片数，照门禁文件头「分片」；参考件补全上界的三种取法（卡数、没开 GPU 取 `HOSTS` 的台数、登记了 `shards-at-least=` 的取它与卡数的大者）；提交技能里「计划按多机配置点名的卡数写 N 片」「按上一次用时分成两堆」两句同样删成指文件头（两位腿报技能里这两处没登）（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-3 | `.claude/rules/implementation-workflow.md:88`〔按上一次现跑的用时分成两堆〕 | `.claude/rules/verification-reference.md:211`〔mutation-shard-run.sh〕 | `.claude/gate.d/crates-mutation-replay.sh:139-141`（片数按内存定） | 改了判据 | 规则不写堆数，照两份文件头（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-4 | `.claude/rules/verification.md:124`〔有一格红整道退 1〕 | `.claude/rules/verification-reference.md:114`〔stage-cells.sh〕 | `.claude/gate.d/lib/stage-cells.sh:52-56`（没有红、有格退 75 的整道退 75） | 改了判据 | 整道退出码照共用库文件头，补上 75 那一支（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-5 | `.claude/rules/verification.md:84`〔显式覆盖配置文件里的那个参数〕；`.claude/rules/implementation-workflow.md:86`〔经服务跑的线程固定是这个数、不许覆盖〕 | `.claude/rules/verification.md:69`〔线程数例外：经服务交的命令里不许写〕 | `task-server/task_server_lib.py:2084`（`SINGLEFS_THREAD_CAP` 在提交时拒的名单里） | 改了判据 | `verification.md:84` 的显式覆盖不再管线程数（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-6 | `.claude/rules/verification.md:55`〔起跑就分卡的（带 `gpu` 特性的 cargo、手跑的 GPU 测试）〕 | `.claude/rules/verification-reference.md:71`〔起跑就分卡的〕 | 同一行末句与 `.claude/gate.d/crash-point-replay.sh:334` | 只改措辞 | 门禁里按需领卡的那一趟另起一句（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-7 | `.claude/rules/verification.md:126`〔derive(Clone)〕 | `.claude/rules/verification-reference.md:130`〔formal-verification 的项〕 | `scripts/gate/verus-proof-check.py:55-60`（另有带值的 const、`assume_specification`，项名带 `proof:`） | 改指针 | 参考件不再抄项的清单，指到判法脚本（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 验证-8 | `.claude/rules/implementation-workflow.md:86`〔客户端当场拒〕 | `.claude/rules/implementation-workflow.md:58`〔当场拒〕 | `task-server/task_server_lib.py:2084` | 只改措辞 | 不写是哪一方拒（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+-| 验证-9 | `.claude/rules/implementation-workflow.md:90`〔那一行计数行都要带 `exhaustive=true`〕 | `.claude/rules/verification-reference.md:146`〔缩过域的那一趟不判〕 | `scripts/gate/admission.py:163-164`；`.claude/gate.d/crash-point-replay.sh:204` | 改了判据 | 缩过域的那一趟不判 `exhaustive=`（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
++| 验证-9 | `.claude/rules/implementation-workflow.md:90`〔那一行计数行都要带 `exhaustive=true`〕 | `.claude/rules/verification-reference.md:146`〔缩过域的那一趟 `exhaustive=false` 不判、成功句写缩过域、不算门禁通过；这一行没有 `exhaustive=` 字段照判红〕 | `scripts/gate/admission.py:163-164`；`.claude/gate.d/crash-point-replay.sh:204` | 改了判据（已照脚本文件头改对） | 第一遍稿只写「缩过域的那一趟不判」，丢了脚本的另一半「没有 `exhaustive=` 字段照判红」（两位腿都判改错）；现照 `scripts/gate/admission.py` 文件头 `exhaustive=<前缀>` 那一条与 `.claude/gate.d/crash-point-replay.sh` 文件头写（出处：rules-compress-verification/result.md「⑥ 矛盾与不明晰」） |
+ | 规则第二遍-1 | `.claude/rules/implementation-workflow.md:29`〔被别的会话定点替换过的把那几处替换反着做一遍〕 | `.claude/skills/three-way/SKILL.md:72`〔被别的会话定点替换过的〕 | 第一遍稿丢了「别的会话」，射程扩到一切定点替换 | 改回原判据 | （出处：rules-compress-rules-second/result.md「核出前两份稿改错的地方」） |
+ | 规则第二遍-2 | `.claude/rules/three-way-inference.md:124`〔不按日期判〕 | `.claude/skills/three-way/SKILL.md:35`〔不按日期判〕 | `.claude/agent-common.md:105`「不按日期、不按轮名免」 | 改回原判据 | （出处：rules-compress-rules-second/result.md「核出前两份稿改错的地方」） |
+ | 规则第二遍-3 | `.claude/rules/three-way-inference.md:124`〔行号只当提示〕 | `.claude/skills/three-way/SKILL.md:39`〔行号只当提示〕 | 第一遍稿删了「对不上而原话找得到照收」的括注 | 改回原判据 | （出处：rules-compress-rules-second/result.md「核出前两份稿改错的地方」） |
+@@ -39,29 +39,29 @@
+ | 常驻-4 | `.claude/rules/exhaustive-interleaving.md:20`〔共享的 `code-discipline.md` 的「分支」与「函数与嵌套」两节〕；`.claude/rules/code-discipline-by-review.md:15`〔## 函数与嵌套：按「能单独验证」切，按路径数限〕 | `.claude/rules/fs-design.md:113`〔「函数与嵌套：按「能单独验证」切，按路径数限」〕 | 两份文件的 `grep -n '^#'` | 改指针 | 写两处全名（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-5 | `.claude/rules/show-me-test-by-review.md:36`〔「一个语义概念全仓一个名字」〕 | `.claude/rules/show-me-test-by-review.md:22`〔里「一个语义概念全仓一个名字」那一行〕 | `.claude/singlefs-ai-sop/rules/code-discipline.md:11`、`:29` | 改指针 | （出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-6 | `.claude/rules/show-me-test-by-review.md:77`〔门禁是下限，不是上限〕 | `.claude/rules/show-me-test-by-review.md:51`〔**门禁是下限，不是上限。**〕 | `sop-first.md` 里没有这句（`grep -n 下限` 0 命中，写手量的） | 改指针 | 判据留，指针删（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-7 | `.claude/rules/writing-discipline-by-review.md:16`〔正文只写现状，历史放文末〕 | `.claude/rules/writing-discipline-by-review.md:12`〔历史放不放、放在哪照各自的规则〕 | `rules-discipline.md`「5. 规则文件不留历史节」；`.claude/rules/changelog-format.md`「只有决策与实验有历史，别的文件没有」 | 只改措辞 | 「历史放文末」对规则与没登记的 kb 是错的（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-8 | `.claude/rules/session-wrapup.md:54`〔分不清的时候跑 `bash .claude/scripts/gate.sh --staged`〕；`.claude/main-agent.md:18`〔不指定范围的只在提交时或用户要求时由主 agent 经服务交〕 | `.claude/rules/session-wrapup.md:37`〔只拿 HEAD 与暂存区跑〕 | `.claude/main-agent.md:18`、`.claude/agent-common.md:68` | 改了判据 | 不再为分清谁的红另跑整道门禁（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-7 | `.claude/rules/writing-discipline-by-review.md:16`〔正文只写现状，历史放文末〕 | `.claude/rules/writing-discipline-by-review.md:12`〔历史放不放、放在哪照各自的规则〕 | `rules-discipline.md`「5. 规则文件不留历史节」；`.claude/rules/changelog-format.md`「只有决策与实验有历史，别的文件没有」 | 改了判据（标签更正） | 收窄了通则里「历史放文末」那半句，照两份更具体的规则；「历史放文末」对规则与没登记的 kb 是错的（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-8 | `.claude/rules/session-wrapup.md:54`〔分不清的时候跑 `bash .claude/scripts/gate.sh --staged`〕；`.claude/main-agent.md:18`〔不指定范围的只在提交时或用户要求时由主 agent 经服务交〕 | `.claude/rules/session-wrapup.md:37`〔分不清是谁的红、确要跑整轮门禁的，先照 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条弹窗问用户，同意了才跑 `gate.sh --staged`…等改动停下再跑，或者用 `--staged`〕 | `.claude/main-agent.md:18`、`.claude/agent-common.md:68` | 改回原判据（加先弹窗） | 第一遍稿把「分不清的时候跑 `--staged`」删成「不为分清是谁的红另起门禁」，改了判据（两位腿都判）；这一版把那条路留着、写明先弹窗（用户定案 18），「等改动停下再跑，或者用 `--staged`」从原件放回（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-9 | `.claude/rules/timer-only-remind.md:23`〔不在拒绝范围〕；`.claude/agent-common.md:85`〔`kill -0` 探活这类真会结束的循环同样照拒〕 | `.claude/rules/timer-only-remind.md:21`〔bash-command-detector.sh〕 | `.claude/agent-common.md:85` ② 写的是钩子现行判法 | 只改措辞 | 限定为定时闸的拒绝范围，补一句 ② 另拒（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-10 | `.claude/rules/command-safety-by-review.md:8`〔shell 里用 `setsid` 起〕；`.claude/agent-common.md:72`〔shell 用 `setsid --wait` 起〕 | `.claude/rules/command-safety-by-review.md:10`〔`setsid --wait`〕 | `.claude/agent-common.md:72`、`:79`；后被用户定案第 6 条整节改写 | 只改措辞 | 合稿里这一节已照用户定案第 6 条改写，见「用户定」一节（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-11 | `.claude/rules/command-safety-by-review.md:21`〔不杀进程、不停子 agent，只有调度的一方不响应时例外〕；`.claude/main-agent.md:76`〔看门狗只报、不停子 agent 也不停进程〕 | `.claude/rules/command-safety-by-review.md:17`〔检出卡住与空转的工具（hook、看门狗脚本）只记录、只报告〕 | `.claude/main-agent.md:76` | 只改措辞 | 检出工具只报，终止归报告的人或 agent（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-10 | `.claude/rules/command-safety-by-review.md:8`〔shell 里用 `setsid` 起〕；`.claude/agent-common.md:72`〔shell 用 `setsid --wait` 起〕 | `.claude/rules/command-safety-by-review.md:9`〔shell 里用 `setsid --wait` 起（不带 `-f`）〕 | `.claude/agent-common.md:72`、`:79`；用户定案第 6 条撤回后，这一节照仓里原件的做法恢复、与钩子 bash-command-detector.sh 文件头 ⑥ 一致（用户定案第 20 条） | 只改措辞 | 原件规则写 `setsid`、共用约束写 `setsid --wait`，合稿统一写 `setsid --wait`（不带 `-f`），写法以钩子文件头 ⑥ 为准；做法没改，见「用户定」一节第 20 条（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-11 | `.claude/rules/command-safety-by-review.md:21`〔不杀进程、不停子 agent，只有调度的一方不响应时例外〕；`.claude/main-agent.md:76`〔看门狗只报、不停子 agent 也不停进程〕 | `.claude/rules/command-safety-by-review.md:17`〔检出卡住与空转的工具（hook、看门狗脚本）只记录、只报告〕 | `.claude/main-agent.md:76` | 改了判据（标签更正） | 原件许检出的工具在调度的一方不响应时自己终止，合稿删了这一支（与 `.claude/main-agent.md:76` 看门狗只报不停一致）；终止归报告的人或 agent。是否放回交用户定（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-12 | `.claude/rules/command-safety-by-review.md:30`〔长活放后台，定期回来复检，不在前台干等〕；`.claude/agent-common.md:79`〔等自己起的后台任务一律结束本轮等完成通知，不写轮询〕 | `.claude/rules/command-safety-by-review.md:16`〔主 agent 这边由看门狗复检〕 | `.claude/main-agent.md`「派出去之后」 | 只改措辞 | （出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-13 | `.claude/rules/command-safety-by-review.md:61`〔没给就按 `nproc` 取〕；`.claude/rules/implementation-workflow.md:86`〔线程数的环境变量没设就取登记的每台默认重活线程数〕 | `.claude/rules/command-safety-by-review.md:39`〔没给时一律取登记的每台默认重活线程数〕 | 用户定案第 3 条 | 改了判据 | 见「用户定」第 3 条（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-14 | `.claude/rules/command-safety-by-review.md:41`〔报给用户或调度的一方〕；`.claude/main-agent.md:38`〔没有会话认领、或对应的会话已经不在，自己做〕 | `.claude/rules/command-safety-by-review.md:30`〔主 agent 自己就是调度的一方〕 | `.claude/main-agent.md:38` | 只改措辞 | （出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-15 | `.claude/rules/three-way-inference.md:164`〔第一段排他新建，回复只写短句〕；`.claude/agent-common.md:127`〔交回内容只写文件路径、`sha256sum` 与判定一览〕 | `.claude/skills/three-way/SKILL.md:62`〔agent-common.md〕 | `.claude/agent-common.md:127`；交回正文闸 `:109` | 只改措辞 | 交回内容照共用约束「报告」一节（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-15 | `.claude/rules/three-way-inference.md:164`〔第一段排他新建，回复只写短句〕；`.claude/agent-common.md:127`〔交回内容只写文件路径、`sha256sum` 与判定一览〕 | `.claude/agent-common.md:121`〔分段落盘照 `.claude/rules/three-way-inference.md`「云端腿的报告要分段落盘」，交回只写文件路径、`sha256sum` 与判定一览〕 | `.claude/agent-common.md:127`；交回正文闸 `:109` | 只改措辞 | 交回内容照共用约束「报告」一节（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-16 | `.claude/rules/session-wrapup.md:53`〔command-safety-by-review.md〕；`.claude/rules/command-safety-by-review.md:44`〔门禁红在不是自己改的文件上怎么判，见〕 | `.claude/rules/session-wrapup.md:37`〔command-safety-by-review.md〕 | 判法在 session-wrapup「4.」，求助在 command-safety-by-review | 改指针 | 两处互指只留一头（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-17 | `.claude/rules/fs-design.md:169`〔| 能 | 值得 |〕 | `.claude/rules/fs-design.md:95`〔能就值得，不能就不值得〕 | — | 只改措辞 | 表头当成了数据，写成一句（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 常驻-18 | `.claude/rules/format-evolution.md:17`〔本文作废〕；`.claude/rules/fs-design.md:4`〔本文只写〕 | `.claude/rules/fs-design.md:4`〔`fs-design.md` 只写跨决策生效的纪律〕 | `rules-discipline.md`「7. 正文不许用位置指代，也不许自称」 | 只改措辞 | 写手改成「这份规则」，合稿再改成文件名（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+-| 常驻-19 | `.claude/rules/session-wrapup.md:65`〔它认 `### 日期` 下写成「（其 <序号>）」的条目〕；`.claude/rules/changelog-format.md:30`〔不写 `#### ` 子条目、「（其N）」〕 | `.claude/rules/session-wrapup.md:38`〔`history-ordinal.sh` 不认的编号形态〕 | `.claude/singlefs-ai-sop/rules/kb-discipline.md:127-128` | 改指针 | 只留指针到上游「8.」（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
++| 常驻-19 | `.claude/rules/session-wrapup.md:65`〔它认 `### 日期` 下写成「（其 <序号>）」的条目〕；`.claude/rules/changelog-format.md:30`〔不写 `#### ` 子条目、「（其N）」〕 | `.claude/rules/session-wrapup.md:38`〔`history-ordinal.sh` 不认的编号形态〕 | `.claude/singlefs-ai-sop/rules/kb-discipline.md:87`（第一遍稿写 :127-128，该文件只有 96 行） | 改指针 | 只留指针到上游「8.」（出处：rules-compress-residents/result.md「矛盾与不明晰」） |
+ | 共用-1 | `.claude/agent-common.md:64`〔`tooling-writer` 例外〕；`.claude/agents/kb-scribe.md:43`〔这几处只许由那个脚本改，你不手改〕 | `.claude/agent-common.md:49`〔`kb-scribe` 只经 `scripts/kb/relabel-item.py` 改 `.claude/rules/*.md`〕 | `.claude/agent-common.md:3`「与定义冲突时以定义为准」 | 只改措辞 | 例外照各自定义写全（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-2 | `.claude/agent-common.md:23`〔「开工先读：」一行点名的别的文件，只读点名的那几个小节〕；`.claude/agent-common.md:73`〔1,000 行以内的整读一次〕 | `.claude/agent-common.md:19`〔别的文件：1,000 行以内的整读一次〕 | 前一条只管「开工先读」点名的，后一条是通则 | 只改措辞 | 两条射程分开写（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-3 | `.claude/agent-common.md:75`〔如果验证为红给其他任务发消息〕 | `.claude/agent-common.md:51`〔子 agent 写进报告交主 agent，主 agent 照〕 | 14 份定义的 tools 里没有 SendMessage（写手量的） | 改了判据 | 子 agent 不发消息，写进报告交主 agent（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-4 | `.claude/agent-common.md:76`〔遇到同时需要修改的内容协商处理〕 | `.claude/agent-common.md:52`〔要和别的会话协商的，子 agent 写进报告交主 agent〕 | 同上；主 agent 那一半在 `.claude/main-agent.md:32` | 改了判据 | （出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-5 | `.claude/agent-common.md:76`〔改动一律走三方〕；`.claude/agents/experiment-runner.md:32`〔不进代码轮判决的点名清单〕 | `.claude/agent-common.md:52`〔`crates/` 下全部代码（含测试代码）与治理文件的改动一律走三方〕 | 今天改定的三方口径；`.claude/rules/implementation-workflow.md:10` | 改了判据 | 射程写明；执行员那一句见「定义-1」（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-6 | `.claude/agent-common.md:66`〔子 agent 直接跑、不经服务的只有〕 | `.claude/agent-common.md:58`〔`scripts/hosts/minimal-copy.py`〕 | `.claude/hooks/lib_project_code_runs.py:1091-1092` | 只改措辞 | 名单补两样，写明以 `TEXT_TOOLS_RUN_DIRECTLY` 为准（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+-| 共用-7 | `.claude/agent-common.md:27`〔Write / Edit 由 `.claude/hooks/write-guard.sh` 当场拒〕 | `.claude/agent-common.md:21`〔写进仓里的，写闸当场拒〕 | `.claude/hooks/write-guard.sh:31`（仓外不判） | 只改措辞 | （出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+-| 共用-8 | `.claude/agent-common.md:113`〔gate-overlap〕；`.claude/agents/tooling-writer.md:29`〔gate-overlap.py --list〕 | `.claude/agent-common.md:108`〔工具员查已有门禁的 `gate-overlap.py --list` 不算〕 | `--list` 只列不判；`lib_project_code_runs.py:1094` | 只改措辞 | （出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
++| 共用-7 | `.claude/agent-common.md:27`〔Write / Edit 由 `.claude/hooks/write-guard.sh` 当场拒〕 | `.claude/agent-common.md:21`〔写进仓里的，写闸当场拒〕 | `.claude/hooks/write-guard.sh:32`（仓外不判；:31 是那一道的起始行） | 只改措辞 | （出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
++| 共用-8 | `.claude/agent-common.md:113`〔gate-overlap〕；`.claude/agents/tooling-writer.md:29`〔gate-overlap.py --list〕 | `.claude/agent-common.md:108`〔工具员查已有门禁的 `gate-overlap.py --list` 不算〕 | `--list` 只列不判；`.claude/hooks/lib_project_code_runs.py:1094` | 只改措辞 | （出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 共用-9 | `.claude/agent-common.md:51`〔闸只认自己认领的目录与派发提示点名的草稿目录里的那几份〕 | `.claude/agent-common.md:100`〔只认认领目录与草稿目录里的〕 | `.claude/hooks/completion-cleanup-guard.sh:104` | 只改措辞 | 两处并成一处（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+-| 共用-10 | `.claude/agent-common.md:114`〔在副本里改、交补丁的，`<根>` 写 `<快照>`〕 | `.claude/agent-common.md:109`〔实现员一律在副本里改、交补丁〕 | `.claude/hooks/handback-guard.sh:44-45` 的文件头写的是共用约束里已没有的一句（rsync 副本根填仓根） | 只改措辞 | 写手拿不准、没改；钩子文件头那一句要不要改交主 agent（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
++| 共用-10 | `.claude/agent-common.md:114`〔在副本里改、交补丁的，`<根>` 写 `<快照>`〕 | `.claude/agent-common.md:109`〔实现员一律在副本里改、交补丁〕 | `.claude/hooks/handback-guard.sh:44-45` 的文件头写的是共用约束里已没有的一句（rsync 副本根填仓根） | 改了判据（标签更正） | 合稿把条件句换成「实现员一律在副本里改、交补丁」，是用户定案第 1 条的落点；命名检查的 `<根>` 一处，实现员定义改成与共用约束同写 `<快照>`；钩子文件头那一句要不要改交主 agent（出处：rules-compress-common/result.md「④ 矛盾与不明晰」） |
+ | 定义-1 | `.claude/agents/experiment-runner.md:32`〔不进代码轮判决的点名清单〕；`.claude/rules/implementation-workflow.md:10`〔验证包 `crates/singlefs-verification/`〕 | `.claude/agents/experiment-runner.md:36`〔算测试代码，进代码轮三方〕 | 今天改定的三方口径（`crates/` 下全部代码含测试代码进代码轮） | 改了判据 | 入库装置进代码轮（出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-2 | `.claude/agents/implementation-writer.md:15`〔共用约束「写」一节建副本那一条〕 | `.claude/agents/implementation-writer.md:15`〔共用约束「建仓副本」〕 | 共用约束合稿给那一条起名「建仓副本」 | 改指针 | 四处同改（出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-3 | `.claude/agents/experiment-designer.md:31`〔NOT*RUN〕；`.claude/agents/experiment-runner.md:40`〔not*run〕 | `.claude/agents/experiment-runner.md:47`〔`NOT_RUN_<原因>`〕 | 代码里打的是 `NOT_RUN_<原因>`（写手 `grep` 量的） | 只改措辞 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+@@ -69,32 +69,41 @@
+ | 定义-5 | `.claude/agents/prior-art.md:32`〔要进 kb 由主 agent 交书记员〕；`.claude/agents/experiment-runner.md:21`〔书记员翻分项状态之后〕 | `.claude/agents/prior-art.md:32`〔写回员（`kb-scribe`）〕 | `.claude/gate.d/stage-owners.tsv` 里「书记员」各行第三列是 `kb-scribe` | 只改措辞 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-6 | `.claude/agents/mutation-triage.md:21`〔crates-mutation-replay 的输出路径〕；`.claude/agents/mutation-triage.md:23`〔即主 agent 跑这一道时留下的日志路径〕 | `.claude/agents/mutation-triage.md:21`〔crates-mutation-replay〕 | 派发闸按 frontmatter `required-inputs:` 判 | 只改措辞 | 两项并成一项（出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-7 | `.claude/agents/mutation-triage.md:30`〔「不指定范围的只在提交时跑，指定范围的随时跑」〕 | `.claude/agents/mutation-triage.md:29`〔共用约束「门禁只有一个，跑法两种」〕 | 分诊员不读 `implementation-workflow.md` | 改指针 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+-| 定义-8 | `.claude/agents/sweep.md:30`〔阶段同步走第 7–11 步〕 | `.claude/agents/sweep.md:30`〔逐行盘点走第 12 步〕 | 输入列了五种活（`sweep.md:20-25`） | 只改措辞 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+-| 定义-9 | `.claude/agents/kb-scribe.md:24`〔`.claude/rules/format-evolution.md` 那一节〕 | `.claude/agents/kb-scribe.md:16`〔「决策正文只写现状，依据写成指针；决策与实验双向登记」〕 | `kb-scribe.md:16` 点了两节 | 改指针 | 写出节名（出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
++| 定义-8 | `.claude/agents/sweep.md:30`〔阶段同步走第 7–11 步〕 | `.claude/agents/sweep.md:30`〔逐行盘点走第 12 步〕 | 输入列了五种活（`.claude/agents/sweep.md:20-25`） | 只改措辞 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
++| 定义-9 | `.claude/agents/kb-scribe.md:24`〔`.claude/rules/format-evolution.md` 那一节〕 | `.claude/agents/kb-scribe.md:16`〔「决策正文只写现状，依据写成指针；决策与实验双向登记」〕 | `.claude/agents/kb-scribe.md:16` 点了两节 | 改指针 | 写出节名（出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-10 | `.claude/agents/experiment-designer.md:32`〔照本条末尾写进「未定项：」〕 | `.claude/agents/experiment-designer.md:39`〔写进第一节末尾的「未定项：」一段〕 | `rules-discipline.md`「7.」 | 只改措辞 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+ | 定义-11 | `.claude/agents/investigator.md:15`〔（第 7 步）〕 | `.claude/agents/investigator.md:15`〔第 6 步〕 | 原第 6 步删掉后改号 | 改指针 | （出处：rules-compress-definitions/result.md「④ 矛盾与不明晰」） |
+-| 按需-M1 | `.claude/rules/code-discipline-by-review.md:77`〔| 函数要短：一两屏，最好不到 20 行 |〕 | `.claude/rules/code-discipline-by-review.md:45`〔改写「函数要短：一两屏，最好不到 20 行」〕 | 同一行写法与 `code-discipline-by-review.md:17` | 只改措辞 | 处置「留下」改「改写」，写法不变（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
++| 按需-M1 | `.claude/rules/code-discipline-by-review.md:77`〔| 函数要短：一两屏，最好不到 20 行 |〕 | `.claude/rules/code-discipline-by-review.md:45`〔改写「函数要短：一两屏，最好不到 20 行」〕 | 同一行写法与 `.claude/rules/code-discipline-by-review.md:17` | 只改措辞 | 处置「留下」改「改写」，写法不变（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M2 | `.claude/rules/code-discipline-by-review.md:143`〔历史进 git 和 CHANGELOG〕；`.claude/agent-common.md:56`〔历史的落点：改了什么、怎么证的红进 commit message〕 | `.claude/rules/code-discipline-by-review.md:74`〔代码与脚本的注释、说明只写现状，不写历史〕 | `.claude/agent-common.md:56` 更具体 | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M3 | `.claude/rules/path-moves.md:17`〔`.claude/gate.d/` 顶层〕；`.claude/gate.d/lib-lag-baseline.py:82`〔.claude/agents/、.claude/agent-common.md、.claude/main-agent.md、.claude/rules/、.claude/hooks/〕 | `.claude/rules/path-moves.md:12`〔`.claude/gate.d/`〕 | 代码 `.claude/gate.d/lib-lag-baseline.py:235-238` 与规则一致，文件头少两类 | 只改措辞 | 规则照留；文件头补两类交工具员（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+-| 按需-M4 | `.claude/rules/test-script-discipline.md:7`〔`.claude/singlefs-ai-sop/rules/show-me-test.md`（新测试先证明会红）〕 | `.claude/rules/test-script-discipline.md:4`〔新增的测试必须先证明它会红〕 | 上游 `show-me-test.md` 没有这一节；在 `.claude/rules/show-me-test-by-review.md:4` | 改指针 | `implementation-workflow.md:9`、`:23` 同样的错指由合稿改了（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
++| 按需-M4 | `.claude/rules/test-script-discipline.md:7`〔`.claude/singlefs-ai-sop/rules/show-me-test.md`（新测试先证明会红）〕 | `.claude/rules/test-script-discipline.md:4`〔新增的测试必须先证明它会红〕 | 上游 `show-me-test.md` 没有这一节；在 `.claude/rules/show-me-test-by-review.md:4` | 改指针 | 上游 `show-me-test.md` 整份没有掉：`test-script-discipline.md:4` 两份都写（项目那一节与上游「门禁不许假装通过」「每一个弄坏开关都必须会红」）；`implementation-workflow.md:9`、`:23` 同样的错指由合稿改了，`:23` 的裸文件名补回目录（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M5 | `.claude/rules/mutation-sampling.md:4`〔变异测试的总纲在那里的 `test-discipline.md`〕 | `.claude/rules/mutation-sampling.md:3`〔变异测试证明的是断言会红，不是覆盖〕 | 上游目录里没有 `test-discipline.md` | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M6 | `.claude/rules/machine-first.md:53`〔那里是唯一的一处〕 | `.claude/rules/machine-first.md:56`〔逐条审过的流行做法〕 | 逐条审过的表在 `.claude/rules/code-discipline-by-review.md:35-172` | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+-| 按需-M7 | `.claude/rules/machine-first.md:78`〔`.claude/singlefs-ai-sop/rules/writing-discipline.md` 那一套〕 | `.claude/rules/machine-first.md:13`〔design-doc-discipline.md〕 | 上游 writing-discipline.md 没有「现状与历史」 | 改指针 | 改指 design-doc-discipline、kb-discipline 与 rules-discipline（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
++| 按需-M7 | `.claude/rules/machine-first.md:78`〔`.claude/singlefs-ai-sop/rules/writing-discipline.md` 那一套〕 | `.claude/rules/machine-first.md:95`〔文档纪律不在放宽之列：…照 design-doc-discipline.md、kb-discipline.md 与 rules-discipline.md〕 | 上游 writing-discipline.md 没有「现状与历史」 | 改指针 | 改指 design-doc-discipline、kb-discipline 与 rules-discipline（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M8 | `.claude/rules/pushback-discipline-by-review.md:6`〔不按来源分类，只分带证据的和不带的〕 | `.claude/rules/machine-first.md:106`〔不按来源分类，只看证据〕 | `.claude/rules/show-me-test-by-review.md:86` 的节名 | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+-| 按需-M9 | `.claude/rules/pushback-discipline-by-review.md:8`〔警告记录的格式在 `.claude/rules/pushback-discipline-by-review.md`〕 | `.claude/rules/machine-first.md:106`〔pushback-discipline.md〕 | 格式在上游 `pushback-discipline.md:6-20`「警告写在哪」 | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
++| 按需-M9 | `.claude/rules/pushback-discipline-by-review.md:8`〔警告记录的格式在 `.claude/rules/pushback-discipline-by-review.md`〕 | `.claude/rules/machine-first.md:106`〔pushback-discipline.md〕 | 格式在上游 `.claude/singlefs-ai-sop/rules/pushback-discipline.md:6-20`「警告写在哪」 | 改指针 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M10 | `.claude/skills/crash-test/SKILL.md:8`〔共享的 `.claude/rules/test-discipline.md` 与 `show-me-test.md`〕 | `.claude/skills/crash-test/SKILL.md:8`〔show-me-test.md〕 | test-discipline.md 是项目本地的，show-me-test.md 在上游 | 改指针 | 写两条全路径（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+-| 按需-M11 | `.claude/skills/crash-test/SKILL.md:20`〔没罩住的报「本次未跑」〕；`.claude/rules/verification.md:39`〔缺的在各片里判，有红块判红〕 | `.claude/skills/crash-test/SKILL.md:12`〔一个门禁：两种跑法〕 | `.claude/gate.d/crash-point-replay.sh:133`「一块不现判才算过」 | 改了判据 | 删掉「没罩住的报本次未跑」，照 verification.md（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
++| 按需-M11 | `.claude/skills/crash-test/SKILL.md:20`〔没罩住的报「本次未跑」〕；`.claude/rules/verification.md:39`〔缺的在各片里判，有红块判红〕 | `.claude/skills/crash-test/SKILL.md:18`〔各格判什么在 `.claude/rules/verification-reference.md`「门禁管哪一半」〕 | `.claude/gate.d/crash-point-replay.sh:133`「一块不现判才算过」 | 改了判据 | 删掉「没罩住的报本次未跑」，照 verification.md（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M12 | `.claude/skills/crash-test/SKILL.md:40`〔带 `--item` 的三条入口〕；`.claude/agent-common.md:68`〔带 `--item` 的四条〕 | `.claude/skills/crash-test/SKILL.md:35`〔四条〕 | `.claude/agent-common.md:68` | 只改措辞 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M13 | `.claude/skills/gate/SKILL.md:12`〔门禁阶段、样本自检与各类 lint 都只在提交时跑，平时不单跑〕；`.claude/rules/verification.md:34`〔主 agent 随时经任务服务交〕 | `.claude/skills/gate/SKILL.md:11`〔--check〕 | 两种跑法的权威落点是 `verification.md`（压缩口径第 2 条） | 改了判据 | 带 `--check`、`--item` 的照指定范围随时交（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M14 | `.claude/skills/gate/SKILL.md:12`〔登记为 light 的单独一个 `--selftest` 例外，谁都能跑〕；`.claude/hooks/selftest-registry.tsv:8`〔没有轻重之分〕 | `.claude/skills/gate/SKILL.md:12`〔子 agent 不交〕 | 登记表里已没有 light / heavy 两档；`.claude/agent-common.md:113` | 改了判据 | 改了谁主 agent 交谁的自证与样本档，子 agent 不交（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M15 | `.claude/skills/trilingual/SKILL.md:20`〔判法比之前把〕 | `.claude/skills/trilingual/SKILL.md:20`〔判法比对前把〕 | — | 只改措辞 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M16 | `.claude/skills/remind/SKILL.md:42`〔`crontab`（`-l` 除外）〕；`.claude/rules/timer-only-remind.md:17`〔`crontab`、`at`、`batch`〕 | `.claude/rules/timer-only-remind.md:15`〔`crontab`（`-l` 除外）〕 | `.claude/hooks/timer-only-remind-guard.sh:17`、`:119` 放行 `crontab -l` | 只改措辞 | 合稿把 timer-only-remind.md 那一行补上例外（出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+ | 按需-M17 | `.claude/rules/path-moves.md:73`〔没有门禁复查〕 | `.claude/rules/path-moves.md:58`〔术语改名没有门禁复查全仓剩几处旧名〕 | 同文件 `:37-43` 那张表 | 只改措辞 | （出处：rules-compress-ondemand/result.md「④ 矛盾与不明晰」） |
+-| 合稿-1 | `.claude/rules/implementation-workflow.md:10`〔打中的写回代码，再攻一轮〕；`.claude/rules/three-way-inference.md:120`〔同一个结论再攻两轮，三轮里多数打穿才算打穿〕 | `.claude/rules/implementation-workflow.md:10`〔打中的写回代码，开不开下一轮照〕 | 用户定案第 2 条（写成一处、另一处指过去） | 改指针 | 代码轮也照 three-way-inference.md「多轮」（出处：合稿这一件新核出的） |
++| 合稿-1 | `.claude/rules/implementation-workflow.md:10`〔打中的写回代码，再攻一轮〕；`.claude/rules/three-way-inference.md:120`〔同一个结论再攻两轮，三轮里多数打穿才算打穿〕 | `.claude/rules/implementation-workflow.md:10`〔代码轮的轮数照这一格，不照「先挂起、三轮多数」：第一轮一致没打中就停；打中的，主 agent 现查坐实、做成会红的测试后写回代码，改完再攻一轮，那一轮没新打中就收，最多三轮〕 | 用户定案第 2 条与第 17 条 | 改了判据（用户定案 17） | 第一遍稿把代码轮并进「先挂起、三轮多数」（两位腿都判改了判据）；用户定案第 17 条：代码轮现查坐实就改、再攻一轮、最多三轮，「先挂起、三轮多数」只管设计推论轮；`implementation-workflow.md` 与 `three-way-inference.md` 各写明自己管哪一类轮，另一处指过去（出处：合稿这一件新核出的） |
+ | 合稿-2 | `.claude/main-agent.md:27`〔`scripts/prune-server/`〕；`.claude/agent-common.md:56`〔`prune-server/`〕 | `.claude/main-agent.md:27`〔判定库服务 `prune-server/` 与它的客户端 `scripts/prune-server/`〕 | 主 agent 现查：仓根 `prune-server/` 是服务本体，`scripts/prune-server/` 是客户端与自证（调度记录「现查的三件」） | 只改措辞 | 两处都写明；`implementation-workflow.md`「治理文件同规矩」同改（出处：合稿这一件新核出的） |
+ | 合稿-3 | `.claude/rules/implementation-workflow.md:9`〔（`.claude/singlefs-ai-sop/rules/show-me-test.md`）〕 | `.claude/rules/implementation-workflow.md:9`〔`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」〕 | 上游 `show-me-test.md` 的节名里没有这一节（「按需-M4」） | 改指针 | `:23` 同改（出处：合稿这一件新核出的） |
++| 合稿-4 | `CLAUDE.md:71`〔read-once 登记行〕 | `CLAUDE.md:66`〔参考件 `.claude/rules/verification-reference.md` 不 `@` 常驻…〕与其后一行 `<!-- doc-lint:read-once verification-reference.md -->` | `.claude/gate.d/code-tooling.sh` rules-manifest 格只认 `@` 与 read-once 两种登记 | 改了判据（新文件的登记办法） | 参考件是到那一步才读，不是开会话读一次；登进 read-once 只为过 rules-manifest 格。第一遍稿合稿说明里列了拿不准，总表漏登（正推腿提醒） |
++| 合稿-5 | `.claude/rules/show-me-test-by-review.md:12`〔存进仓里的变异清单〕 | `.claude/rules/show-me-test-by-review.md:7`、`.claude/rules/implementation-workflow.md:9`〔`crates/` 的测试进 `crates/mutations.tsv`，实验装置的进 `scripts/mutation/tables/` 下它那一张表〕 | 用户定案第 4 条没点路径；两位腿判第一遍稿把清单写死成一份文件 | 改回原判据 | 原件泛称「变异清单」，第一遍稿写成 `crates/mutations.tsv`；两处各写明两种测试各进哪一张表 |
++| 合稿-6 | `.claude/rules/code-discipline-by-review.md:4`〔无〕 | `.claude/rules/code-discipline-by-review.md:4`〔删掉「两处说同一件事以上游为准」〕 | 原件整份没有这句；用户定案删 | 改回原判据 | 第一遍稿多写了一条新判据 |
++| 合稿-7 | `.claude/rules/verification.md:138-146`〔「门禁管哪一半」表里的几条判据〕 | `.claude/rules/verification.md` 「测试不分档，红了只重跑红的」与「门禁的结构」〔测试文件声明模块、登记进崩溃点重放合表、判器调用点标记写在哪、变异行筛选词筛得到、每道阶段认第一个参数当项目根〕 | 原件这几条只在那张表里写过，表挪进参考件后常驻稿罩不到写代码的人 | 改回原判据 | 放回常驻稿；参考件那张表同名两节改名「工作线程那一半归哪一格」 |
++| 合稿-8 | `.claude/rules/verification.md:112`、`:126`、`:67`、`.claude/rules/implementation-workflow.md:88`〔source、可点的项、第三列、每一种跑法〕 | `.claude/rules/verification-reference.md:116`、`:130`、`:106`、`:18`〔不 source 它跑格；多一类挂特性的测试文件 `feature-gated:<文件名>`；第三列只许是「不算：」行与「无判定库：<欠账号或待立>」；经服务交的每一种跑法〕 | `.claude/gate.d/crash-point-replay.sh:237`、`:40`、`.claude/gate.d/verdict-library-scripts.tsv:3`、`.claude/gate.d/crash-point-replay.sh:135` | 改了判据（照脚本文件头，补登） | 四处第一遍稿照脚本文件头改了字而总表没登（两位腿各打中）；第三列的「无判定库」从现状句变成许可句，射程变宽，与表头一致 |
++| 合稿-9 | `.claude/main-agent.md:5`〔整份读一次、第一次派发之前〕 | `.claude/main-agent.md:5`〔每次开始验证段之前读 merge-verify、每次派发之前读 dispatch；正文不在此刻的上下文里就整份重读，压缩过上下文之后再做这两件事之前同样重读〕 | 常驻稿第 12 条许会话压缩上下文接着做 | 改了判据 | 第一遍稿写「读一次」，压缩之后技能正文不在而常驻稿没叫重读（两位腿都打中） |
++| 合稿-10 | `.claude/agent-common.md:22`〔一律整份读，不受读入大小的限制〕 | `.claude/agent-common.md:17`〔定义「开工先读：」点名的与共用约束点名的规则开工整份读；步骤里写「照 <规则>「<节>」」的做那一步之前读那一节〕 | 第一遍稿的「点到就整份读」读得出两种 | 改了判据（主 agent 定） | 两句管两件事 |
++| 合稿-11 | `.claude/agent-common.md:28`、`:29`、`.claude/agents/tooling-writer.md:16`〔开工另读、另读〕 | 同左 | 原件只写指针、没写读取要求 | 改了判据（补登） | 第一遍稿新加的三处入口，是下沉后补的；总表漏登（正推腿提醒） |
++| 合稿-12 | 上游规则 `.claude/singlefs-ai-sop/rules/*.md` 的节名 | 全树 43 处指上游的「节」指针改成指到文件、并在项目这一侧留判据句 | 上游正在自己压缩，节名会变（用户定案） | 改指针 | 开工先读行里的节名改成括号里的要点，不再是会被核的节标题 |
+ 
+-## 用户定案的十二条与主 agent 对其余拿不准条款的处置（用户定）
++## 用户定案与主 agent 对其余拿不准条款的处置（用户定：第 1 到 20 条，第 6、13 条已撤回）
+ 
+ 这一节的条目进三方时标明是用户定案：判据由用户定，三方核的是合稿落得对不对、有没有落全，不再判该不该这样定。
+ 
+@@ -103,27 +112,37 @@
+ | 用户定-1（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:118`〔实现员「一律交补丁」〕 | `.claude/main-agent.md:27`〔同时派几个时一律交补丁〕；`.claude/agents/implementation-writer.md:15`〔没写的在主工作区改〕 | `.claude/main-agent.md:47`〔实现员一律在草稿目录的副本里改、交补丁，只派一个也这样〕；`.claude/agents/implementation-writer.md:15`〔一律在草稿目录的副本里改、交补丁目录〕；`.claude/agent-common.md:109`〔实现员一律在副本里改、交补丁〕；`.claude/skills/dispatch/SKILL.md:14`〔实现员一律交补丁，只派一个也这样〕 | 改了判据 |
+ | 用户定-2（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:119`〔三方开轮：「两句管两件事，都留」〕 | `.claude/main-agent.md:116`〔第三轮为最终轮〕；`.claude/rules/three-way-inference.md:120`〔同一个结论再攻两轮〕 | `.claude/rules/three-way-inference.md:43`〔**开不开下一轮**〕；`.claude/main-agent.md:90`〔开不开第二、三轮照同一份「多轮：一次打穿不算数，三轮里多数打穿才算」〕；`.claude/rules/implementation-workflow.md:10`〔打中的写回代码，开不开下一轮照〕 | 改了判据 |
+ | 用户定-3（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:120`〔并行度缺省：「全部取登记的线程数」〕 | `.claude/rules/command-safety-by-review.md:61`〔没给就按 `nproc` 取〕 | `.claude/rules/command-safety-by-review.md:39`〔没给时一律取登记的每台默认重活线程数〕 | 改了判据 |
+-| 用户定-4（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:121`〔新测试先证明会红：「两样都要」〕 | `.claude/rules/show-me-test-by-review.md:13`〔commit message 里的叙述是没有 harness 时的退路，不是首选〕 | `.claude/rules/show-me-test-by-review.md:7`〔两样都要〕；`.claude/rules/implementation-workflow.md:9`〔变异行与 commit message，两样都要〕 | 改了判据 |
++| 用户定-4（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:121`〔新测试先证明会红：「两样都要」〕 | `.claude/rules/show-me-test-by-review.md:13`〔commit message 里的叙述是没有 harness 时的退路，不是首选〕 | `.claude/rules/show-me-test-by-review.md:7`〔两样都要：存进仓里的变异清单（`crates/` 的测试进 `crates/mutations.tsv`，实验装置的进 `scripts/mutation/tables/` 下它那一张表）与 commit message〕；`.claude/rules/implementation-workflow.md:9`〔同上〕 | 改了判据 |
+ | 用户定-5（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:124`〔上下文吃紧：「执行员例外，可以交回」〕 | `.claude/agents/experiment-runner.md:33`〔上下文吃紧或卡住时〕；`.claude/agent-common.md:73`〔上下文多大都不是交回的理由〕 | `.claude/agent-common.md:68`〔例外只有 `experiment-runner`〕；`.claude/agents/experiment-runner.md:39`〔上下文吃紧或卡住时〕 | 改了判据 |
+-| 用户定-6（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:125`〔进程组信号：「一律不许」〕 | `.claude/rules/command-safety-by-review.md:9`〔超时与结束时对整组发信号〕；`.claude/agent-common.md:72`〔超时与结束时在脚本里对整组发信号〕 | `.claude/rules/command-safety-by-review.md:4`〔## 装置起的样本进程，逐个按进程号停〕；`.claude/agent-common.md:67`〔**样本进程逐个按进程号停**〕；`.claude/agents/tooling-writer.md:33`〔自证、门禁判法与装置里起的进程逐个按进程号停〕 | 改了判据 |
++| 用户定-6（用户定，已撤回） | `records/2026-11-16-三方豁免取消与存量补轮.md:125`〔进程组信号：「一律不许」〕 | `.claude/rules/command-safety-by-review.md:9`〔超时与结束时对整组发信号〕；`.claude/agent-common.md:72`〔超时与结束时在脚本里对整组发信号〕 | 撤回：用户定案第 20 条维持钩子 ⑥ 的判法，上面两处照原件恢复（见用户定-20），不再有「逐个按进程号停」 | 撤回（第一遍稿的「改了判据」不再成立） |
+ | 用户定-7（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:126`〔钩子怎么认写法的细节：「下沉，只留合规写法」〕 | `.claude/agent-common.md:82`〔执行前拒绝的写法〕 | `.claude/agent-common.md:73`〔逐条以它的文件头为准〕 | 只改措辞 |
+ | 用户定-8（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:127`〔示例：「留格式示例，删代码示例」〕 | `.claude/rules/changelog-format.md:17`〔```markdown〕；`.claude/rules/fs-design.md:140`〔```rust〕 | `.claude/rules/changelog-format.md:11`〔## D24（后台重活能不能卸给 GPU）〕 | 只改措辞 |
+ | 用户定-9（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:136`〔RefFS 的依赖：「只许 std」〕 | `.claude/rules/verification.md:14`〔依赖只有 `std`〕；`.claude/rules/verification.md:140`〔RefFS 的依赖闭包只有自己与 `singlefs-format`〕 | `.claude/rules/verification.md:11`〔依赖只有 `std`〕；`.claude/rules/verification-reference.md:153`〔门禁那一格还许 `singlefs-format`，收严记在欠账〕 | 改了判据 |
+ | 用户定-10（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:137`〔`quote-rust-items.py`：「加进可直接跑的名单」〕 | `.claude/agents/three-way-materials.md:29`〔quote-rust-items.py〕 | `.claude/agents/three-way-materials.md:29`〔quote-rust-items.py〕；`.claude/agent-common.md:58`〔名单以 `.claude/hooks/lib_project_code_runs.py` 的 `TEXT_TOOLS_RUN_DIRECTLY` 为准〕 | 改了判据 |
+ | 用户定-11（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:138`〔说明句：「两类都删」〕 | `.claude/rules/verification.md:3`〔这是 singlefs 的项目本地规则〕；`CLAUDE.md:122`〔2026-10-11 的全量都 0 红〕 | `.claude/rules/verification.md:1`〔# 验证纪律：只有一个门禁，不指定范围与指定范围两种跑法〕；`.claude/rules/implementation-workflow.md:3`〔三方论证照 `.claude/rules/three-way-inference.md`。〕 | 只改措辞 |
+ | 用户定-12（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:139`〔钩子已拒而共用约束没列的七类：「补进去，每类一行」〕 | `.claude/agent-common.md:82`〔执行前拒绝的写法〕 | `.claude/agent-common.md:83`〔⑨ `experiment-runner` 在 Bash 里写主工作区〕；`.claude/agent-common.md:85`〔⑪ 命令位置上的 `rm -r`〕；`.claude/agent-common.md:89`〔⑯ 往现行账本〕；`.claude/agent-common.md:90`〔⑰ 往仓里的文件写字面内容〕；`.claude/agent-common.md:91`〔⑱ 带路径撤掉工作区里没暂存的改动〕；`.claude/agent-common.md:97`〔第六道：写进〕；`.claude/agent-common.md:98`〔第十道：往现行账本写〕 | 改了判据 |
++| 用户定-13（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:150`〔进程组存量：「这一轮就全改掉」〕 | — | — | 撤回（用户定-20） |
++| 用户定-14（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:149-151`〔`nproc` 存量：取并行度缺省的那几处登进 `.claude/heavy-thread-exempt` 逐批改〕 | — | 脚本一侧的活，规则侧已落在 `.claude/rules/command-safety-by-review.md:39`；见 `references.md`「四」 | 没改 |
++| 用户定-15（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:152`〔脚本活的次序〕 | — | 本组无文字落点；`references.md` 登了按旧节名引规则的出路句随规则同一步换 | 没改 |
++| 用户定-16（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:153`〔`apply-writer-patch.py` 的节名常量去掉「层 0」〕 | `.claude/agents/implementation-writer.md:51`〔受影响的层 0 流与崩溃枚举用例〕 | 与主 agent 处置-2 同一处：常量改完之前定义里的节名照旧 | 没改 |
++| 用户定-17（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:169`〔代码轮打中之后：「现查坐实就改，再攻一轮」〕 | `.claude/rules/implementation-workflow.md:10`、`.claude/rules/three-way-inference.md:43`、`:70`〔代码轮：现查坐实、做成会红的测试后写回代码，改完再攻一轮，那一轮没新打中就收，最多三轮；「先挂起、三轮多数」只管设计推论轮；「没打中」的结论拿去支撑别的结论时才再抽一次〕 | 同合稿-1 | 改了判据 |
++| 用户定-18（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:170`〔提交之外跑不指定范围的门禁：「一律先弹窗」，用户要求的也弹一次〕 | `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条（句子只住这一处）；`.claude/main-agent.md:26`、`.claude/agent-common.md:59`、`.claude/skills/crash-test/SKILL.md:12`、`.claude/rules/session-wrapup.md:37`、`.claude/rules/implementation-workflow.md:51` 指过去 | 同入口-1、常驻-8 | 改了判据 |
++| 用户定-19（用户定） | `records/2026-11-16-三方豁免取消与存量补轮.md:171`〔调查员「查到就修」：「照旧在主工作区改」〕 | `.claude/main-agent.md:47`、`.claude/agent-common.md:109`、`.claude/agents/investigator.md:23`、`.claude/agents/implementation-writer.md:15`、`.claude/skills/dispatch/SKILL.md:14`〔写明它是实现员「一律交补丁」的例外〕 | — | 改了判据 |
++| 用户定-20（用户定，撤回第 6、13 条） | 用户定案第 20 条（主 agent 转述：维持钩子 `.claude/hooks/bash-command-detector.sh` 文件头 ⑥ 的判法：命令行上与脚本里都只许对自己用新会话起的那一个子进程的进程组发信号，别的组、循环里逐个发、先挑进程再发一律不许） | `.claude/rules/command-safety-by-review.md:4`〔装置起的样本进程，放进它自己的进程组〕；`.claude/agent-common.md:67`〔样本进程放进它自己的进程组〕、`:80`〔⑥ 放行行补上对自己用新会话起的子进程的进程组发信号〕；`.claude/agents/tooling-writer.md:33`〔不对别的进程组发信号；自己写的装置与脚本里只对自己用新会话起的那一个子进程的组发〕；三条三方腿的样本进程一句指共用约束与规则节 | 钩子文件头第 166 到 196 行（现读） | 改回原判据（第 6、13 条撤回，规则照仓里原件的做法恢复） |
+ | 主 agent 处置-1（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔`session-wrapup.md`「改 singlefs-ai-sop」不加限定〕 | `.claude/rules/session-wrapup.md:29`〔改 singlefs-ai-sop，并抬 `VERSION`〕 | `.claude/rules/session-wrapup.md:22`〔改 singlefs-ai-sop，并抬 `VERSION`〕 | 没改 |
+ | 主 agent 处置-2（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔实现员报告节名里的「层 0」是 `scripts/gate/apply-writer-patch.py` 的常量〕 | `.claude/agents/implementation-writer.md:41`〔受影响的层 0 流与崩溃枚举用例〕 | `.claude/agents/implementation-writer.md:51`〔受影响的层 0 流与崩溃枚举用例〕 | 没改 |
+ | 主 agent 处置-3（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔子 agent 平常能不能跑 `task-server/control check` 原文没写，不加条款〕 | `.claude/agent-common.md:81`〔不起 `task-server/control`〕 | `.claude/agent-common.md:69`〔不起 `task-server/control`〕 | 没改 |
+ | 主 agent 处置-4（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔`code-discipline-by-review.md` 两行「留下」的写法原样〕 | `.claude/rules/code-discipline-by-review.md:60`〔名字要念得出来〕；`.claude/rules/code-discipline-by-review.md:120`〔三次重复之后再抽象〕 | `.claude/rules/code-discipline-by-review.md:38`〔留下「名字要念得出来」〕；`.claude/rules/code-discipline-by-review.md:64`〔留下「三次重复之后再抽象」〕 | 没改 |
+ | 主 agent 处置-5（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔测试三份规则与 `path-moves.md`、`directory-layout.md` 不并〕 | — | `.claude/rules/test-script-discipline.md:2`〔# 测试用例与测试脚本的写法〕 | 没改 |
+-| 主 agent 处置-6（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔`exhaustive-interleaving` 指 `verification.md` 的后两样找不到对应的节，记欠账〕 | `.claude/rules/exhaustive-interleaving.md:16`〔写在 `.claude/rules/verification.md`〕 | `.claude/rules/fs-design.md:112`〔规则里还没有对应的节，记在欠账表〕 | 只改措辞 |
++| 主 agent 处置-6（主 agent 定） | `records/2026-11-16-三方豁免取消与存量补轮.md:141`〔`exhaustive-interleaving` 指 `verification.md` 的后两样找不到对应的节，记欠账〕 | `.claude/rules/exhaustive-interleaving.md:16`〔写在 `.claude/rules/verification.md`〕 | `.claude/rules/fs-design.md:112`〔每条 Never 有自己的去屏障对照组、绑到代码的锚点：`.claude/rules/verification-reference.md`「门禁管哪一半」lkmm 那一行与 `.claude/scripts/lkmm.sh` 文件头「会失败的检查」第 3、4 条〕 | 改指针（腿打中，现核后改） |
+ 
+ 补充（这几条的落法里合稿自己做了取舍，进三方时请单独核）：
+-- 用户定-2：合稿在 `.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算」首段写全开轮条件（第一轮一致没打中就停；有打中的或不收敛的开第二、三轮；打中的按三轮多数判；第三轮为最终轮、论证前两轮的结论和判定过程），`.claude/main-agent.md` 派发表「要推论」一行与 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」第 2 步改成指过去。原 `implementation-workflow.md:10`「打中的写回代码，再攻一轮」与「同一个结论再攻两轮」也不一致，一并归到这一处（见「合稿-1」）。
+-- 用户定-6：样本进程停法改成逐个按进程号停；合稿另留了一句「要认出脱离父子链的子孙，可以用 `setsid --wait`、`start_new_session=True` 起在它自己的会话里、按会话号在 `/proc` 里认」，信号仍逐个按进程号发。全仓按旧做法对进程组发信号的代码与按旧节名引它的地方很多（`references.md`「做法要跟着改的代码处」），合稿只改了规则与定义，代码那一侧没动。
++- 用户定-2：合稿在 `.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算」首段写全开轮条件（第一轮一致没打中就停；有打中的或不收敛的开第二、三轮；打中的按三轮多数判；第三轮为最终轮、论证前两轮的结论和判定过程），`.claude/main-agent.md` 派发表「要推论」一行与 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」第 2 步改成指过去。原 `implementation-workflow.md:10`「打中的写回代码，再攻一轮」与「同一个结论再攻两轮」也不一致，一并归到这一处（见「合稿-1」）。 用户定案第 17 条之后：这一节只管设计推论轮，代码轮另见 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」第 2 步（现查坐实就改、再攻一轮、最多三轮）。
++- 用户定-6、用户定-13：已撤回（用户定案第 20 条）。第一遍稿的「逐个按进程号停」「按会话号在 `/proc` 里认」两句删掉，`.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」一节与共用约束对应条目照仓里原件的做法恢复；`references.md` 里为这两条登的改脚本、改钩子的条目删掉。
+ - 用户定-9：门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤ 此刻还许 `singlefs-format`，收严那一格归治理文件那一批，欠账号要主 agent 登。
+ - 用户定-10：钩子库 `.claude/hooks/lib_project_code_runs.py` 的 `TEXT_TOOLS_RUN_DIRECTLY` 还没加 `quote-rust-items.py`，合稿只照定案留着 `three-way-materials.md` 叫材料员直接跑；钩子改完之前材料员照这一句跑会被项目代码闸拒（推的，没跑）。
+ - 用户定-11：开头声明句合稿里删了三份：`verification.md`、`implementation-workflow.md`（保留「三方论证照 `.claude/rules/three-way-inference.md`」这一指针）、`verification-reference.md`（「这是 singlefs 的项目本地规则的参考件」半句）；其余写手已删的照收。`CLAUDE.md`「一句话版本」里那句 2026-10-11 实测第一遍稿已删。
+-- 用户定-12：七类各一行，逐条对着 `.claude/hooks/bash-command-detector.sh` 文件头 ⑨（:106）、⑪（:215）、⑯（:307）、⑰（:295）、⑱（:317）与 `.claude/hooks/write-guard.sh` 文件头第六道（:125 的 --selftest 说明，判法函数 :714）、第十道（:71）写。
+-- 主 agent 处置-6：合稿在 `.claude/rules/fs-design.md`「并发交错由工具穷举判定」写「规则里还没有对应的节，记在欠账表 `.claude/kb/checks-owed.md`」，欠账号没写，要主 agent 登了再补。
++- 用户定-12：七类各一行，逐条对着 `.claude/hooks/bash-command-detector.sh` 文件头 ⑨（:106）、⑪（:215）、⑯（:307）、⑰（:295）、⑱（:317）与 `.claude/hooks/write-guard.sh` 文件头第六道（:125 的 --selftest 说明，判法函数 :714）、第十道（:71）写。 范围声明闸、项目代码闸、交回正文闸、只管主 agent 的三道的逐句对文件头：修稿时只核了交回正文闸文件头 ① 到 ⑧ 与 `.claude/hooks/run-scope-guard.sh` 文件头的提交时才许不指定范围地跑一段，项目代码闸的名单没逐句核（见 result.md「拿不准」）。
++- 主 agent 处置-6：`.claude/rules/fs-design.md`「并发交错由工具穷举判定」那一句改成工具、对照组、绑到代码三样各指到真有那句话的地方（参考件「各道的判定单位」「门禁管哪一半」与 `.claude/scripts/lkmm.sh` 文件头），不再写「记在欠账表」；`.claude/rules/verification.md` 此刻没有对应的节这一半第一遍稿判错了。
++- 用户定-17、18、19：见各自行。第 18 条里「用户要求的那一趟也弹窗确认一次」与带 `--full-gate` 提交标识时钩子 `.claude/hooks/run-scope-guard.sh` 的界面确认是不是同一次弹窗，修稿时没核，规则里写成「先弹窗问用户，同意了才跑」；两次弹窗还是一次，交主 agent 或用户定。
++- 用户定-20：钩子文件头 ⑥ 第 166 到 196 行现读：放行「对自己用新会话起的那一个子进程的进程组发信号」（shell 里同一层 `setsid [--wait] <命令> &`（不带 `-f`）、紧跟着 `名字=$!`，之后 `kill -<信号> -- -"$名字"`；python 里子进程是带 `start_new_session=True`（或 `process_group=0`）的 `Popen`，组号写 `<子进程>.pid` 或 `os.getpgid(<子进程>.pid)`），别的组号、循环里逐个发、先挑进程再发照拒；同一份判定由门禁 code-tooling 的 research-gate-lint 格扫脚本。规则与共用约束照此写，不再有「新写停样本进程的代码要等钩子那一批」这一句。
+diff -ruN r1-baseline/dot-claude/agent-common.md revised/dot-claude/agent-common.md
+--- r1-baseline/dot-claude/agent-common.md	2026-11-16 12:07:26.585633148 +0000
++++ revised/dot-claude/agent-common.md	2026-11-16 12:23:02.249278149 +0000
+@@ -14,14 +14,14 @@
+ 
+ `.claude/agents/` 下的定义都开了 `omitClaudeMd`：项目 CLAUDE.md、它 `@` 的规则、用户级 CLAUDE.md 与主 agent 的私有记忆都不进子 agent 的上下文。
+ 
+-- 规则文件（`.claude/rules/` 与 `.claude/singlefs-ai-sop/rules/` 下的 `.md`）点到就整份读，不受读入大小的限制；「开工先读：」点名的小节是这件活要照做的那几条。
++- 规则文件（`.claude/rules/` 与 `.claude/singlefs-ai-sop/rules/` 下的 `.md`）：定义「开工先读：」一行点名的，与共用约束点名的（「每个定义都照守」那一条，与「写」一节里写「开工另读」的），开工整份读，不受读入大小的限制；「开工先读：」点名的小节是这件活要照做的那几条。定义与共用约束的步骤里写「照 <规则>「<节>」」的，做那一步之前读那一节，读全；只写「照 <规则>」没写节的，做那一步之前读那一份。
+ - 「开工先读：」点名的别的文件只读点名的小节：先 `grep -n '^#' 文件` 找起止行，再按行读；点的是整份的，先看节标题，只读与这件活有关的节。
+-- 别的文件：1,000 行以内的整读一次（Read 或 `cat`），不切片；超过的先 `grep -n` 定位再按行段读；读过、之后没改过的不重读。
+-- 每个定义都照守、不再各自点名的三处：跑命令照 `.claude/singlefs-ai-sop/rules/command-safety.md`「退不回去的操作，动手前先想一遍」「`pkill -f` / `killall` 一律禁用」；给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「文风要简单自然」；说外部状态之前现查（`.claude/rules/evidence-discipline.md`「陈述外部状态之前，现查一次」）。
++- 没被「开工先读：」点名的别的文件：1,000 行以内的整读一次（Read 或 `cat`），不切片；超过的先 `grep -n` 定位再按行段读；读过、之后没改过的不重读。
++- 每个定义都照守、不再各自点名的三处：跑命令照 `.claude/singlefs-ai-sop/rules/command-safety.md`（退不回去的操作，动手前先想一遍；`pkill -f` / `killall` 一律禁用）；给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`（文风要简单自然）；说外部状态之前现查（`.claude/rules/evidence-discipline.md`「陈述外部状态之前，现查一次」）。
+ - 报告与进度记录里的时间只写日期，用 `TZ=Asia/Tokyo date +%F` 取（不用裸 `date`），不写时刻与时区（门禁 doc-text 的 clock-times 格判；写进仓里的，写闸当场拒）。
+ - 候选、臂、方案、判据、提问编号有了变体，起一个新名字（那一族下一个没用过的号，或短的描述性名字），不加撇号类角标（U+2032、U+2033、U+2034、U+02B9、U+02BA；门禁 doc-text 的 prime-marks 格全仓判，写法照 `.claude/rules/path-moves.md`「变体起新名字，不用角标」）。
+ - 派发提示与定义都没给的项目事实（某份 kb 在哪、某条决策的原文）去仓里现查，不凭印象补。
+-- **找不到历史实验的数据、提示或产物，去 `git log` 里看**：早于本轮的实验记录不留在工作区（本轮的留着，下一次提交删上一批；门禁 doc-experiments 的 archive-past-rounds 格判）；只写文件名、不写路径的引用当已归档的查，不当坏链接。查法：`git log --all --diff-filter=D --name-only -- "*<文件名>*"` 找删它的提交，`git show <提交>^:<路径>` 读当时的内容。读到的是当时的数、不是结论，怎么用照 `.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」「旧证据是参考，不是依据」那一条。
++- **找不到历史实验的数据、提示或产物，去 `git log` 里看**：早于本轮的实验记录不留在工作区（本轮的留着，下一次提交删上一批；门禁 doc-experiments 的 archive-past-rounds 格判）；只写文件名、不写路径的引用当已归档的查，不当坏链接。查法：`git log --all --diff-filter=D --name-only -- "*<文件名>*"` 找删它的提交，`git show <提交>^:<路径>` 读当时的内容。读到的是当时的数、不是结论：拿它支撑新结论之前先重新跑一遍（`.claude/singlefs-ai-sop/rules/kb-discipline.md`）；别的用法照 `.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」「旧证据是参考，不是依据」那一条。
+ 
+ ## 写
+ 
+@@ -39,7 +39,7 @@
+ - 进仓的文字不写会话全名（`singlefs-<两位>`；非写不可写两位短号，或写「别的会话」「<做什么>那一路的会话」），不写批次字母代号（`5a`、`9g`、`5g-rs`、`24c-1`、`SC02`），写那一批做了什么；调度记录依赖表的「第 N 批」批号照留。
+ - **里程碑 17 收尾之前不兼容任何旧东西，代码与格式尤其如此**：格式锁定之前没有旧盘、旧库、旧产物要认，旧逻辑不做特殊处理。不写、不留：认旧版本的分支、为旧镜像或旧库单开的拒绝分支与错误种类、旧布局号与旧版本号常量、迁移脚本与补旧行的子命令、只为旧行放宽的读法（`legacy_ok` 这类）、只为旧数据留的编号约束（「新码接在最后、旧码不动」这类），以及造旧形态输入的测试与它们的变异行。格式、布局、编号、表的列改了，读者只认这一版：别的一律走同一条「认不得」的拒绝，出路写重建、换新目录或重跑，不按旧版本分别认、分别报；旧库、旧镜像、旧产物不迁移。`research/` 下是当时的记录，豁免，门禁与脚本里只为读它留的放宽照留。改的文件里碰到的兼容代码连同它的测试与变异行一并删掉；不在自己写范围里的，写进报告交主 agent。
+ - **代码与脚本的注释、说明只写现状，不写历史**：射程是 `crates/`、`scripts/`、`task-server/`、`prune-server/`、`.claude/hooks/`、`.claude/gate.d/`、`.claude/scripts/` 下的注释（`//`、`///`、`//!`、`/* */`、`#`）、Python 文档串、脚本文件头（用法、判法、弄坏开关说明、退出码表）与这几处的 `README.md`；`.claude/gate.d/fixtures/` 与 `.claude/singlefs-ai-sop/` 不管。只写这段代码此刻是什么、做什么、为什么非这样不可；不写日期、谁定的与哪一轮打中的（「用户弹窗定案」「第二轮攻方腿」「三轮判决第三节」、批号）、改动经过（「此前」「原先」「起初」「最初」「后来改成」「改成了」「换成了」「修过」）、旧值与旧做法、弄坏开关的「改前的样子」（写开关弄坏了什么、打开后哪一项该红）；要指依据，写现行登记位的编号与名字（决策分项、欠账号、不变量号、规则文件与小节标题）。判据：放到这段代码第一次写下的那天去读还是真话，就是现状；说运行时先后的（「放回原来的值」「后来的写被拒」）照写。历史的落点：改了什么、怎么证的红进 commit message；决策与实验的变更进 `.claude/kb/decisions-history.md`、`.claude/kb/experiments-history.md`；一轮的经过、量到的数与用户原话进 `records/`；三方打中了什么进 `research/prompts/<轮>-main-verification.md`。特殊缘由只三类：日期本身是数据（日期格式的说明与例子、测试输入里的日期、解析历史条目的代码讲它认的形态）、引外部文档或源码写读到的那一天、绕开外部工具缺陷写从哪个版本起与修好后删哪一段；那一行的注释写 `history-kept: <理由>`，理由至少 8 个字，「留着方便查来历」不算。路径与文件名里的日期是名字，照写。改存量照命中逐行改写，不整段删 `///` 或 `// SAFETY:`（`.claude/singlefs-ai-sop/scripts/comment-only-change.py` 把整段增删算改代码）。门禁 doc-text 的 comment-history 格全仓判；存量在只缩不涨的 `.claude/gate.d/comment-history-lag.tsv`，改净一个文件删它那一行，新写的不许往里加。
+-- 写进仓里的注释与 `.md` 引 D、E 编号写成「编号（简称）」，简称取登记位里的（`.claude/singlefs-ai-sop/rules/kb-discipline.md`「5. 编号只能做索引，不能做称呼」）。
++- 写进仓里的注释与 `.md` 引 D、E 编号写成「编号（简称）」，简称取登记位里的（`.claude/singlefs-ai-sop/rules/kb-discipline.md`（5. 编号只能做索引，不能做称呼））。
+ - 私有主机信息不进仓：本机的主机名与服务名，第二台的主机名与别名、IP、第二台上的路径，两台的服务单元名，清场脚本的内容，不写进 kb、records、research、规则、定义、代码注释与 commit message；写「本机」「第二台」，真实值只在仓根被 git 忽略的 `multi-host.env` 与 `~/.config/singlefs/` 里。贴原样输出、整行抄原话、冻结证据里遇到私有值的，换成 `〔本机主机名〕`、`〔第二台的主机名〕` 这类说法，同一行注明换掉了什么；这一句优先于「贴原样输出」「整行抄」「证据不许事后改」。门禁 doc-text 的 `private-values` 格判新加的行。
+ - **进仓的文字只写本项目的东西**：记录、kb、判决、注释、commit message 不写本机与第二台上不归本项目的目录名、路径、别的工程与它们的占用；要说空间只说本项目自己的目录与总的可用量，别的写「其余不归 singlefs」。门禁 doc-text 的 `out-of-project-names` 格判新加的行（singlefs 自己的脚本读的仓外路径登记在 `.claude/out-of-project-paths`，只放行那条路径本身）。
+ 
+@@ -55,8 +55,8 @@
+ - **子 agent 不交任务**：跑项目代码的命令（编译、测试、门禁、实验、自证这类；写进脚本、python 的 subprocess、`make` 这类间接起的同样算）都经统一任务服务 `task-server/task submit [--cwd <目录>] -- <原命令>` 交（不给 `--cwd` 取此刻的目录，打出任务号），只由主 agent 交。子 agent 不起 `task-server/task` 的 `submit`、`wait`、`cancel`、`clean`，不起 Bash 的 `run_in_background`（项目代码闸与检出钩子 ⑩ 执行前拒）；测试、带 `--item` 的门禁与崩溃放量入口、clippy / build、证红、`--selftest`、样本档、弄坏开关、命名检查、喂钩子、实验与模型复跑，一律写进报告「要主 agent 跑的命令」一节。主 agent 交、等到结局，新派一个同类 agent 接着做。子 agent 只读 `task-server/task status` 与主 agent 给了号的 `task-server/task log <号>`。
+   - 命令怎么写：范围声明写在 submit 前面（`SINGLEFS_RUN_SCOPE='…' task-server/task submit -- <原命令>`，写法照 `.claude/hooks/run-scope-guard.sh` 文件头）；服务白名单里的环境变量照带，白名单外的写成 `-- env <名>=<值> <命令…>`。不带包装前缀（`capped.sh`、`two-logs.sh`、`gpu-quiesce-run.sh`、`nice`、`timeout`、`run-with-memory-cap.sh`、`host-dispatch.py`、`multi-host-run.sh`、`detached-run.sh`），不写脚本自己的上限、线程与挑台参数（`--memory`、`--memory-cap`、`--threads`、`--peer`、`--local-only`）与 `SINGLEFS_THREAD_CAP`（submit 前面、命令里、`-- env` 里都算），写了提交时当场拒。线程固定是 `.claude/heavy-thread-default` 登记的每台默认重活线程数，不许覆盖；内存上限、机器、卡、GPU 清场、排队次序、分片、卡住、撞上限放大重排都由服务定，调用方不写、不判；撞到最大上限的由服务报错、经 `task wait` 叫醒，主 agent 改命令重交，或新派同类 agent 改。`scripts/gate/rerun-failed-tests.py` 打出的命令已带范围声明与 `task-server/task submit --`，原样交、不再插。`.claude/hooks/selftest-temporary-service.tsv` 里判定是 required 的脚本（仓副本里的同一份也算），自证照那张表文件头 required 一条写成 `task-server/task submit -- python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest`（`.py` 用 `python3`，别的用 `bash`；这一层不算包装前缀）。草稿脚本里起自证、门禁阶段、入口脚本或 cargo 的，每一条写字面路径与字面参数，不经数组、变量或 `"$@"` 拼。
+   - 「要主 agent 跑的命令」一节一条一项，每项三样：命令原样（拼成 submit 的整条，不另加标签）；在哪个目录起（主工作区写仓根，草稿目录与副本写绝对路径，即 submit 的 `--cwd`；副本在 `.deliverables` 写成「交接」）；跑完看哪几行判结果（`TASK_SERVER_RESULT` 行的 `type=` 与 `exit=`，`task-server/task log <号>` 里的成功句、`✗` 行、计数行各是什么算过）。每一行最多一条交任务的命令，不用分号、`&&`、`||` 串别的命令，不带 `echo $? >`（交回闸拒，`.claude/hooks/handback-guard.sh` 文件头 ⑧），每条的结局看它自己任务末行的 `TASK_SERVER_RESULT`。交主 agent 跑的验证链里不夹不指定范围的任何一步，不指定范围的单列一条。报告另写做完的、没做的、等哪几条结果才能往下做的，停在能交接的点交回；主 agent 新派同类 agent 时，派发提示写一行「承接：<前一份报告的路径>」，并指到任务号与输出路径。
+-  - 子 agent 直接跑、不经服务的只有：读文件；Edit / Write 与定义点名的写入工具（`scripts/kb/` 下的定点写入脚本、`append-record.py`、`ledger-append-section.py`、`scripts/agents/copy-originals.py`）；只读的 git 命令（`status`、`diff`、`log`、`show`、`ls-files`、`rev-parse`）；`ls`、`grep`、`wc`、`sha256sum`、`diff`、`du`、`ps` 这类只读命令；自己草稿目录里的 `cp`、`rsync`、`mkdir`、`rm`；`cargo fmt`（不编）；语法检查（`bash -n`、`python3 -m py_compile`）；`scripts/hosts/minimal-copy.py`；认领草稿目录（`scripts/hosts/work-directory-ownership.sh claim`）；定义点名的读写 kb 与材料的文本工具；工具员查已有门禁的 `gate-overlap.py --list`；`task-server/task status` 与 `log <号>`。名单以 `.claude/hooks/lib_project_code_runs.py` 的 `TEXT_TOOLS_RUN_DIRECTLY` 为准。
+-- **门禁只有一个，跑法两种**（`.claude/rules/verification.md`「一个门禁：两种跑法」）：不指定范围（不带选条参数，门禁照单元键自己选、判全部项；范围声明种类 `whole`）只在提交时由主 agent 跑（`.claude/skills/crash-test/commit-stages.md`、`.claude/skills/gate/staged-gate.md`），提交之外要跑先弹窗问用户；指定范围（`--item`、`--check`、点名测试目标；种类 `items` 或 `target`）主 agent 随时经任务服务交；子 agent 两种都写进「要主 agent 跑的命令」一节。
++  - 子 agent 直接跑、不经服务的只有：读文件；Edit / Write 与定义点名的写入工具（`scripts/kb/replace-once.py`、`replace-batch.py`、`insert-row.py`、`relabel-item.py`、`append-record.py`、`ledger-append-section.py`，与 `scripts/agents/copy-originals.py`）；只读的 git 命令（`status`、`diff`、`log`、`show`、`ls-files`、`rev-parse`）；`ls`、`grep`、`wc`、`sha256sum`、`diff`、`du`、`ps` 这类只读命令；自己草稿目录里的 `cp`、`rsync`、`mkdir`、`rm`；`cargo fmt`（不编）；语法检查（`bash -n`、`python3 -m py_compile`）；`scripts/hosts/minimal-copy.py`；认领草稿目录（`scripts/hosts/work-directory-ownership.sh claim`）；定义点名的读写 kb 与材料的文本工具；工具员查已有门禁的 `gate-overlap.py --list`；`task-server/task status` 与 `log <号>`。名单以 `.claude/hooks/lib_project_code_runs.py` 的 `TEXT_TOOLS_RUN_DIRECTLY` 为准。
++- **门禁只有一个，跑法两种**（`.claude/rules/verification.md`「一个门禁：两种跑法」）：不指定范围（不带选条参数，门禁照单元键自己选、判全部项；范围声明种类 `whole`）只在提交时由主 agent 跑（`.claude/skills/crash-test/commit-stages.md`、`.claude/skills/gate/staged-gate.md`），提交之外要跑照 `.claude/rules/verification.md`「提交之外」那一条先弹窗；指定范围（`--item`、`--check`、点名测试目标；种类 `items` 或 `target`）主 agent 随时经任务服务交；子 agent 两种都写进「要主 agent 跑的命令」一节。
+   - 带 `--item` 的四条（登记的崩溃枚举用例走门禁 `crash-point-replay` 的 `--check crash-case-replay --crash-cases-only --item crash-case:<用例名>`、崩溃放量 `scripts/crash/crash-amplification.sh --item`、formal-verification、crates-mutation-replay）整条照 `.claude/agents/implementation-writer.md`「做什么」第 1d 步，`--item` 可给几次，各条的 `--list-items` 列可点的项；证红照它第 3a 步。点名测试目标写 `SINGLEFS_RUN_SCOPE='种类=target; 跑什么=<crate> 的测试目标 <目标>; 范围=1 个测试目标; 为什么=…' task-server/task submit -- cargo test -p <crate> --test <目标>`（或 `--lib`）；没登记成崩溃枚举用例、也不是放量分项的测试函数走这一条，按块那一路与放量入口都不起。
+   - 点到会走崩溃枚举的目标（`cargo test` 点名的验证包测试目标、变异门禁 `--item` 点到的行第五段点名的验证包测试目标：`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行 `test=` 点名的、`scripts/crash/crash-amplification.sh` 的 `ITEMS` 点名的，或测试源码里读 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`、`SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 的），范围声明闸要缩域与全域理由之一，两样都没有的执行前拒；判法在 `.claude/hooks/run-scope-guard.sh` 文件头「指定范围的崩溃域」，会不会走以闸的判定为准、不自己另判。闸从命令的当前目录往上找带 `.claude/gate.d/stage-inputs.tsv` 的那一层读登记表：写段的命令对着自己改动所在的副本（这一次的登记行已写在副本里），验证段第 2 步对着第 1 步留下的快照。自己新写的崩溃枚举用例一律按会走算、二选一写上；别的目标先照不会走写，主 agent 交上去被拒、拒绝说明点名的就是会走的，照说明二选一改（写段的命令由承接的实现员改）。
+     - 缩域写成 `task-server/task submit [--cwd <根>] -- env <缩域变量>=<n> <命令…>`：登记的崩溃枚举用例与放量分项的目标设 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`；测试源码的代码里（注释不算）写了 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 的目标（直接调判器的对拍）设它；两样都占的两个都设。没设它读的那一个照拒（拒绝说明点名该设哪一个），多设一个不拒；判不出读哪一个的（读不到测试源码、没登记而代码里两个都没写）设两个之一照放、记一条检出。`cargo test` 不认 `--crash-expand-up-to`，只用变量。变异门禁点名的行不缩域、写全域理由，缩域证红只走 `scripts/mutation/prove-red.sh`。缩域只当写段的快速反馈，结论不算数：同一行、同一个目标在验证段第 2 步要在全域上判过一次（范围声明的为什么一段末尾写全域理由）。
+@@ -64,7 +64,7 @@
+   - 崩溃放量入口点名的分项没缩域而估出这一趟要现判的崩溃状态超 200000 或估不出时，不编不跑、退 79，出路照 `scripts/crash/crash-amplification.sh` 文件头用法里「指定范围的崩溃域上限」：入口命令加 `--crash-expand-up-to <n>`（缩过域的不算门禁通过），或留给提交时不指定范围的那一趟。clippy / build 逐条的判法在 `.claude/hooks/project-code-guard.sh` 文件头；`cargo fmt` 子 agent 照跑。合入后验证 `scripts/gate/merge-and-verify.sh`（只跑补丁改到的测试目标，种类 `items`）与它给出的只重跑红的命令只由主 agent 跑，照 `.claude/main-agent.md`「写与验分两段」验证段。被项目代码闸拒了不换写法绕过去，交回里写明要跑什么、为什么。
+ - **日常开发的测试不跑整个包**：提交阶段的门禁之外，测试命令只点名这一次改到的测试目标与测试函数（`cargo test -p <包> --test <目标> [<测试名>]`、`cargo test -p <包> --lib <测试名>`、`--item <项>`、`--check` 点名少数几格）。算整包的：`cargo test -p <包>` 不点名目标、`--lib --tests`、`--workspace`、门禁 crash-point-replay 验证包那一步的格（`--check` 点 crash-case-replay 而不带 `--crash-cases-only`、点 feature-gated-tests、点 product-gpu-real-card-tests，点哪一格、点几格都算）；`--check crash-case-replay --crash-cases-only --item crash-case:<名>` 不算。确要跑整包的，写命令之前把范围确认三遍，写成一份文件（工作根 `~/.local/share/singlefs/work/` 下的草稿目录，三段各以 ①、②、③ 起头），并逐条写在报告那一项下面：① 这一次改到的文件与函数（`git diff --stat` 与函数名逐个列）；② 每个改到的函数被哪些测试目标与测试函数引到（`grep` 命令与命中，输出不截断）；③ 拿 ② 的清单逐条对命令的范围，写明为什么只点名 ② 那几条不够。有一遍答不出，就改成只点名 ② 的清单。那一项的命令在 submit 后面带 `--whole-package-confirmed <那份文件的绝对路径>`，没带的整包测试提交时被服务拒；带它的提交只由主 agent 起，弹窗要用户确认，对话不自己决定。带了标识照样受两小时提醒：累计满两小时服务不停、推提醒给提交它的会话，范围不对的主 agent `task-server/task cancel <号>`、改范围重交，确要跑这么久的照推送给的 `task-server/task confirm <号> --why '<为什么要跑这么久、范围为什么是这些>'` 确认；没带 `--full-gate` 的累计满四小时服务停这一次尝试、记结局 `over-four-hours` 打回，出路是收小范围或分片重交。
+ - **停任务与停进程**：要停经服务交的任务，主 agent 用 `task-server/task cancel <号>`；`cancel`、`clean` 只对自己交的号做（服务只认会话；不带号的 `task-server/task status` 列的是整个会话的）。子 agent 不 `cancel`、不 `clean`；`proc.py` 只给主 agent。主 agent 停自己起的一条链（脚本、后台任务）：先 `ps -o pid,ppid,args --ppid <pid>` 逐层列出整棵子进程，从最底层起逐个 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`（它只停给定那一个、不带子进程），停完再列一遍确认一个不剩；不留正在跑的那一步「让它跑完」。
+-- **样本进程逐个按进程号停**：装置、判法、自证与复跑脚本里起样本进程（真 shell、被测程序）时，判据是每条样本跑完，它起的进程一个不剩。超时与结束时逐个按进程号发信号，连同它再起的子孙进程，不对进程组发、不按名字或 cgroup 挑；跑完在 `/proc` 里核一遍，留下的逐个停掉、写进这条样本的失败信息。写法照 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，逐个按进程号停」；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」⑥）。
++- **样本进程放进它自己的进程组**：装置与判法里起样本进程（真 shell、被测程序）时，在脚本里把每条样本放进它自己的进程组（shell 用 `setsid --wait` 起，python 用 `start_new_session=True` 起），超时与结束时在脚本里只对自己这样起的那一个子进程的组发信号，不对别的进程组发、不在循环里逐个发，跑完核没有留下进程；写法照 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」；命令行里停进程照旧一次点名一个（「执行前拒绝的写法」⑥）。
+ - 几条只读命令（`ls`、`grep`、`wc`、`sha256sum` 这类）合成一次 Bash。长命令的输出落进草稿目录的文件、只读汇总行：`<命令> > <草稿目录>/<名>.txt 2>&1; echo rc=$?; tail -n 20 <草稿目录>/<名>.txt`（`echo rc=$?` 紧跟命令；汇总也可用 `grep -c`、`grep ✗` 读；接管道、`|| true` 或中间夹别的命令的，交回闸认不出命令自己的退出码），不把整份日志、整份 diff 读进上下文。上下文多大都不是交回的理由，活没做完就接着做；例外只有 `experiment-runner`：上下文吃紧时照它定义第 2b 步停在最后一个写完整的点交回，主 agent 新派执行员承接。
+ - **长活交回主 agent**：子 agent 要跑的一律交回（「子 agent 不交任务」），不起 `run_in_background`（⑩）；前台命令的 `timeout` 不超过 240000 毫秒（超过的记一条检出）。子 agent 读 `task-server/task status`、`log` 退 78 或报了别的错的，不起 `task-server/control`，把命令与输出写进草稿目录的进度记录，接着做定义里还能做的。跑超过 30 分钟的量，每完成一格往草稿目录的 `progress.md` 追加一行（格名、耗时、下一格预计多久），主 agent 读它看进度、不发消息问。
+   - 主 agent 交的任务用 `run_in_background` 起 `task-server/task wait <号>`（任务完成时退出，末行 `TASK_SERVER_RESULT …`，退出码是任务的），不设超时、不中途杀，起完结束本轮（这一条回复只写一句在等什么、不再调工具）等完成通知；不前台干等、不写轮询输出文件的循环、不起缓存计时器；跑得久的同样走这条。排队位次与「在等：…」看 `task-server/task status [<号>]`；最后一次尝试的日志看 `task-server/task log <号>`（默认最后 200 行，整份加 `--all`）；分片的任务读 `task wait` 末行的 `log=`（没成那一片的日志）与 `shard=`。任务卡住由服务判（`task-server/task_server_lib.py` 文件头「错误类型」表的 `stalled` 一行），经 `task wait` 叫醒，调用方不另判。`task wait` 退 78（连不上服务）：先 `task-server/task status <号>`，在排或在跑就再起 `task wait <号>`，不重交。
+@@ -77,14 +77,14 @@
+     ③ 把活放出追踪：`disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux` / `screen` 的分离模式、不等到结束的 `systemd-run`；run_in_background 里不带 `--wait` 的 `setsid` 只记一条检出。
+     ④ run_in_background 里以单独的 `&` 收尾的作业，同一条命令里没有等齐它的 `wait`（不带参数的 `wait` 算等齐之前全部；`wait <进程号>…` 写几个号算等了几个；`wait -n`、`tail --pid`、`kill -0` 轮询各算等了一个；等的少于 `&` 的照拒）。要并行就每件写成 `{ <命令>; echo "$?" > <文件>; } &`（文件名带批号与件号，每批开跑前先删这一批的文件），最后单独一个不带参数的 `wait` 等齐，数一遍文件、与派出去的件数对不上整批作废，对得上再按派活的次序逐个读；不用 `wait "$pid"` 收。
+     ⑤ 整份覆盖 `research/results/` 下已存在又没进 git 的产物；要换就按日期另存新文件名，旧的留着。
+-    ⑥ 终止进程不是点名一个自己起的进程号或任务号（目标带负号、是 0 或 `$PPID`、一次几个、命令替换或通配，循环里逐个发（`proc.py stop` 同样），按名字、cgroup 或 `/proc` 挑，写死的号指到自己会话的祖先、别的会话的进程或 SSH / VSCode / 本地模型服务，`systemctl` 停这类单元，关机重启）。放行 `kill "$!"`、`kill %1`；主 agent 另有单独一条 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`。
++    ⑥ 终止进程不是点名一个自己起的进程号或任务号（目标带负号、是 0 或 `$PPID`、一次几个、命令替换或通配，循环里逐个发（`proc.py stop` 同样），按名字、cgroup 或 `/proc` 挑，写死的号指到自己会话的祖先、别的会话的进程或 SSH / VSCode / 本地模型服务，`systemctl` 停这类单元，关机重启）。放行 `kill "$!"`、`kill %1`，与对自己用新会话起的那一个子进程的进程组发信号（「样本进程放进它自己的进程组」那一条）；主 agent 另有单独一条 `python3 .claude/singlefs-ai-sop/scripts/proc.py stop <pid>`。
+     ⑦ 在同一个 inode 上改已存在的脚本（`.sh`、`.py` 或带执行位的，在仓里、工作根或会话临时目录根下）。出路：写到同目录临时文件再 `mv` 换上，或用 `scripts/kb/replace-once.py` / `insert-row.py` 定点改；追加与新建不拦。
+     ⑧ 有 Edit 工具的项目子 agent 在 Bash 里用 `sed -i` 或 python 代码（`python3 -c`、喂给 python 的 heredoc 与管道正文）就地改仓内文件、把文件挪进仓内路径；`sed -i` 的目标在 `/tmp/` 或工作根下的、python 的目标在本仓之外的不拦（cd 进草稿目录里的仓副本写相对路径照写）。出路：仓内文件用 Edit。
+     ⑨ `experiment-runner` 在 Bash 里写主工作区 `crates/` 下的 `.rs`（覆盖、追加、`sed -i`、挪走与删掉都算）。出路：在草稿目录的副本里改，经 `scripts/hosts/compile-then-swap.py` 编过再整份换进来。
+     ⑩ 子 agent 用 run_in_background 起命令；主 agent 不判。
+     ⑪ 命令位置上的 `rm -r` 作用在工作根（会话临时目录根 `/tmp/claude-<uid>/` 同样算）本身、它的上级或它底下第一层带通配的路径（主 agent 与子 agent 一样拒）。出路：`scripts/hosts/work-directory-ownership.sh` 的 `claim` 与 `sweep`，或点名工作根下一个具体目录删。
+     ⑫ 子 agent 在 Bash 里写本仓里写范围之外的文件，或落点此刻算不出（「写」一节「Bash 里写的落点要此刻算得出」）；没有项目定义的 agent 写工作根之外（`/dev/`、`/proc/` 下除外）。主 agent、表里没有行的项目定义与算得出而落在仓外的落点不判。
+-    ⑬ 项目子 agent 在 Bash 里起 `claude` 会话，经包装、shell 启动文件、脚本正文与别的程序里起的同样认（`command -v claude`、`which claude` 不拒）；主 agent 不判。
++    ⑬ 项目子 agent 在 Bash 里起 `claude` 会话，经包装、shell 启动文件、脚本正文与别的程序里起的同样认（`command -v claude`、`which claude` 不拒）；主 agent 不判。出路：要另起一个 agent 的活写进报告交回主 agent。
+     ⑮ 暂存区非空时不带具体路径清整个索引（`git reset`（`--soft` 除外）、`git restore --staged`、`git stash`、`git rm --cached` 点整棵树，`git checkout [<提交>] -- <整棵树>`）。出路：只清自己的路径 `git restore --staged -- <路径…>`。
+     ⑯ 往现行账本（`.claude/gate.d/split-proposal-ledgers.tsv` 里 current 那一行点名的账本）用重定向、`tee` 或 python 写进「## <汉字节号>、」节标题。出路：`python3 scripts/kb/ledger-append-section.py`。
+     ⑰ 往仓里的文件写字面内容（`cat`、`echo`、`printf`、`tee` 经重定向写进的），内容里有会话号、钟点或批次代号。出路：去掉它们，照拒绝说明给的写法改，或用 Edit、`scripts/kb/insert-row.py`、`scripts/kb/replace-once.py` 写。
+@@ -97,26 +97,26 @@
+     第六道：写进 `.claude/hooks/`、`.claude/gate.d/`、`.claude/scripts/`、`scripts/` 下的 `.sh` 过不了 `bash -n`、`.py` 过不了语法解析。出路：改对语法再写。
+     第十道：往现行账本写，让「## <汉字节号>、」节标题净增。出路：`python3 scripts/kb/ledger-append-section.py`。
+   - 交回闸（上游 `.claude/singlefs-ai-sop/scripts/claude-hooks/handback-scratch-check.sh`，只判子 agent）：临时目录里自己建的编译目录、工作树与仓副本还在，交回报告里又没逐个写全路径与为什么不删。
+-  - 完工清理闸（`.claude/hooks/completion-cleanup-guard.sh`，挂 SubagentHandback、SubagentStop 与 Stop）：子 agent 交回、收工时，自己认领的目录、派发提示点名的草稿目录与自己起的崩溃放量运行目录里还有仓副本、编译目录或库拷贝；主 agent 结束一轮、手里没有在跑的后台任务与子 agent 时，本会话认领的目录、临时草稿目录与起的运行目录里还有这几样。`.deliverables` 声明了的报告、补丁、备份不列；「基线」只认主 agent 的声明；编译目录声明了也照列；子 agent 交回正文写了「交主 agent 删」一行的编译目录、工作树与仓副本（只认认领目录与草稿目录里的，崩溃放量运行目录与别处的写了照列；路径与清单一字不差，上层不替下层；库拷贝、旧文件库、库备份不认），子 agent 交回、收工时不列，主 agent 结束一轮时照列、由主 agent 删。
++  - 完工清理闸（`.claude/hooks/completion-cleanup-guard.sh`，挂 SubagentHandback、SubagentStop 与 Stop）：子 agent 交回、收工时，自己认领的目录、派发提示点名的草稿目录与自己起的崩溃放量运行目录里还有仓副本、编译目录或库拷贝；主 agent 结束一轮、手里没有在跑的后台任务与子 agent 时，本会话认领的目录、临时草稿目录与起的运行目录里还有这几样。`.deliverables` 声明了的报告、补丁、备份不列；写成「交接」的副本，子 agent 交回、收工时不列（主 agent 结束一轮时照列、用完就删）；「基线」只认主 agent 的声明；编译目录声明了也照列；子 agent 交回正文写了「交主 agent 删」一行的编译目录、工作树与仓副本（只认认领目录与草稿目录里的，崩溃放量运行目录与别处的写了照列；路径与清单一字不差，上层不替下层；库拷贝、旧文件库、库备份不认），子 agent 交回、收工时不列，主 agent 结束一轮时照列、由主 agent 删。
+   - 范围声明闸（`.claude/hooks/run-scope-guard.sh`）：起验证的命令（崩溃点重放与崩溃放量入口、门禁阶段的一道或几格、`cargo test` 点名的包与目标、合入后验证、实验复跑；驱动脚本里的逐条判）开头没带 `SINGLEFS_RUN_SCOPE='种类=…; 跑什么=…; 范围=…; 为什么=…'`，或四段与命令形状对不上（`crash-amplification.sh` 不带 `--item`、整轮门禁、`cargo test` 整包与整工作区都是 whole）、为什么太短；子 agent 经 submit 交的一律拒。
+   - 定时闸（`.claude/hooks/timer-only-remind-guard.sh`）：除 `bash scripts/agents/remind.sh` 之外的定时办法。
+   - 交回正文闸（`.claude/hooks/handback-guard.sh`，只判项目子 agent）：交回正文超过 4000 字；三方腿的报告过不了 `scripts/agents/cite-check.py`；书记员与执行员报了没数或 0 项的绿行；实现员、执行员、工具员在主工作区或 git worktree 副本里改了 `crates/`、`scripts/` 下的 `.rs` 而没写「命名检查交主 agent 跑」那两条；写回员缺「找不到的目标」一节、执行员缺「登记落地清单」一节（各自定义写了什么时候要）；「要主 agent 跑的命令」一节一行不止一条交任务的命令、串接别的命令或带 `echo $? >`；自己起的后台任务还有进程开着输出文件（出路：结束本轮等完成通知，或逐个停掉再交回）。
+-  - 只管主 agent 用的工具的三道。弹窗闸（`.claude/hooks/ask-user-claim-guard.sh`）：问句或选项里一句话带断言词（不可能、一定、必然、从来不、永远不、恒为这类）而同一句既没有出处（路径、命令、文件:行号、产物行、量过的数）也没写「推的」「没量过」「推测」「估计」「粗估」之一。续做闸（`.claude/hooks/continuation-guard.sh`）：给已交回、或最后一次任务通知是 failed / killed 的子 agent 发消息。派发闸（`.claude/hooks/runner-dispatch-guard.sh`）：提示叫子 agent 跑项目代码、往任务服务交任务或起门禁阶段；缺骨架 `scripts/agents/dispatch-prompt.py` 打出的行或 `<填 …>` 占位没填；缺定义 frontmatter `required-inputs:` 要的输入；写范围外的路径、撞文件、在跑的子 agent 满 5 个、写者锁持有者还在跑、报告行的路径或文件名不合、要改的文件落在没写判决的三方轮开工快照里（用户叫停的轮登进 `research/prompts/abandoned-rounds.tsv` 才不挡，写法在 `.claude/skills/three-way/SKILL.md`「用户叫停、不写判决的轮」）。
++  - 只管主 agent 用的工具的三道。弹窗闸（`.claude/hooks/ask-user-claim-guard.sh`）：问句或选项里一句话带断言词（不可能、一定、必然、从来不、永远不、恒为这类）而同一句既没有出处（路径、命令、文件:行号、产物行、量过的数）也没写「推的」「没量过」「推测」「估计」「粗估」之一。续做闸（`.claude/hooks/continuation-guard.sh`）：给已交回、或最后一次任务通知是 failed / killed 的子 agent 发消息。派发闸（`.claude/hooks/runner-dispatch-guard.sh`）：提示叫子 agent 跑项目代码、往任务服务交任务或起门禁阶段；派内置通用类型而没有一行「通用已判：<理由>」（一次性的活派 `clerk`）；派 `experiment-designer` 写重跑登记而准入判输入没变、前提没齐又没有一行「准入已判：<理由>」；写者锁持有者还在跑又没有一行「写者锁已判：<理由>」；缺骨架 `scripts/agents/dispatch-prompt.py` 打出的行或 `<填 …>` 占位没填；缺定义 frontmatter `required-inputs:` 要的输入；写范围外的路径、撞文件、在跑的子 agent 满 5 个、写者锁持有者还在跑、报告行的路径或文件名不合、要改的文件落在没写判决的三方轮开工快照里（用户叫停的轮登进 `research/prompts/abandoned-rounds.tsv` 才不挡，写法在 `.claude/skills/three-way/SKILL.md`「用户叫停、不写判决的轮」）。
+ 
+ ## 门禁
+ 
+ - 扫仓的门禁阶段（本地与共享）与提交前的整轮门禁归主 agent：只在提交前照 `.claude/skills/gate/staged-gate.md` 跑 `scripts/gate/gate-staged.sh`（它起整轮 `gate.sh`），提交时的六道门禁照 `.claude/skills/crash-test/commit-stages.md`。子 agent 交回前不跑门禁阶段与各类 lint（gate-lint、shell-lint、preflight-lint、gate-overlap、doc-lint、rules-lint、hooks-registered、命名检查；工具员查已有门禁的 `gate-overlap.py --list` 不算）。脚本与钩子的 `--selftest`、门禁样本档与弄坏开关下的证红，照钩子拒绝说明里写的起法写进「要主 agent 跑的命令」一节；自证一律用假驱动，不起编译与重活（`.claude/hooks/selftest-registry.tsv` 登记的由 `scripts/gate/selftest-process-guard.py` 盯）；改了谁，主 agent 经任务服务交谁的 `--selftest`。派发提示的「自证在哪跑：」一行写这些命令在哪棵树里跑（submit 的 `--cwd`），照它填命令里的路径。语法检查（`bash -n`、`python3 -m py_compile`）照做。
+-- **命名检查交主 agent 跑**：改了 `crates/`、`scripts/` 下 `.rs` 的子 agent（`implementation-writer`、`experiment-runner`、`tooling-writer`）交回前，把两条命令写进「要主 agent 跑的命令」一节，`<根>` 填改动所在的树（主工作区写仓根，git worktree 建的副本写副本根）：`SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.sh 的 vague-names、test-file-names、ordinal-names、data-names 四格; 范围=4 格; 为什么=交回前核自己改动里的命名' task-server/task submit -- bash .claude/gate.d/code-source-discipline.sh --check vague-names,test-file-names,ordinal-names,data-names <根>` 与 `task-server/task submit -- bash .claude/singlefs-ai-sop/scripts/naming-lint.sh <根>`；跑完看末行 `TASK_SERVER_RESULT`（`exit=0` 是过，`exit=1` 是判红，别的码不算跑完）与 `task-server/task log <号>` 的汇总行。命中在这一批改动的文件里的，主 agent 新派同类 agent（带「承接：」）修掉再交一遍；命中在别的文件里的，照「红了先看它点名的文件与行」那一句办。实现员一律在副本里改、交补丁（只派一个也这样，`.claude/agents/implementation-writer.md`），`<根>` 写 `<快照>`，由主 agent 在验证段第 2 步在第 1 步留下的快照上交（次序照 `.claude/main-agent.md`「写与验分两段」验证段）。
++- **命名检查交主 agent 跑**：改了 `crates/`、`scripts/` 下 `.rs` 的子 agent（`implementation-writer`、`experiment-runner`、`tooling-writer`）交回前，把两条命令写进「要主 agent 跑的命令」一节，`<根>` 填改动所在的树（主工作区写仓根，git worktree 建的副本写副本根）：`SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 code-source-discipline.sh 的 vague-names、test-file-names、ordinal-names、data-names 四格; 范围=4 格; 为什么=交回前核自己改动里的命名' task-server/task submit -- bash .claude/gate.d/code-source-discipline.sh --check vague-names,test-file-names,ordinal-names,data-names <根>` 与 `task-server/task submit -- bash .claude/singlefs-ai-sop/scripts/naming-lint.sh <根>`；跑完看末行 `TASK_SERVER_RESULT`（`exit=0` 是过，`exit=1` 是判红，别的码不算跑完）与 `task-server/task log <号>` 的汇总行。命中在这一批改动的文件里的，主 agent 新派同类 agent（带「承接：」）修掉再交一遍；命中在别的文件里的，照「红了先看它点名的文件与行」那一句办。实现员一律在副本里改、交补丁（只派一个也这样，`.claude/agents/implementation-writer.md`；调查员「查到就修」那一支是例外，照旧在主工作区改），`<根>` 写 `<快照>`，由主 agent 在验证段第 2 步在第 1 步留下的快照上交（次序照 `.claude/main-agent.md`「写与验分两段」验证段）。
+ - 退出码 77 是「本次未跑」，不是通过。贴绿行时连它报的「查了多少项」一起贴；报「查了 0 项」或根本没报数的，按没判写。红了先看它点名的文件与行在不在这一轮的改动里；不在的不修，照写。
+ 
+ ## 报告
+ 
+-- 写结论、依据与没做什么，不写做事的经过、不复述派发提示与定义；要求的命令与原样输出、行号、推翻条件照样给，嫌长就放进报告文件、交回里指过去。
++- 交回与报告在不影响正确性的前提下写简练：写结论、依据与没做什么，不写做事的经过、不复述派发提示与定义；要求的命令与原样输出、行号、推翻条件照样给，嫌长就放进报告文件、交回里指过去。
+ - 引规则与 kb 的条款优先写 `文件@小节标题`（标题逐字、不带井号；`scripts/agents/cite-check.py` 认这种写法），不为一个行号再读一遍文件；引脚本、代码、产物写那份文件自己的行号，用 `grep -n` 或 `awk 'NR==行号'` 现取，不从背景材料里数、不从 `sed -n 'A,Bp'` 的输出里数偏移；没现查过的写「行号待查」。引原文整行抄，不摘句；贴的命令输出是这一次真跑出来的原样。
+ - 能用命令核的事实，贴命令与原样输出，输出不截断、嫌长先数；报告里的条数、阶段数、命中数用命令数，不手数。
+ - 转述的数各标「量的」或「推的」，写明是哪个量（哪个文件、哪份产物、源文件还是编出来的二进制）；收到的数没标的按「推的」办（`.claude/rules/evidence-discipline.md`「进结论的每个数，先问它是量的还是拍的」）。
+ - 说「没有」「只有」「全仓」之前，把话缩到真核过的那个范围（`.claude/rules/evidence-discipline.md`「核了窄的那一句，说出口的却是宽的那一句」）。
+ - 结论写「什么现象会推翻它」。报告末尾有「没做什么」一节：跑不动的、没验的、按定义不归你的，照实列。
+ - 跑出来的产物先落盘进仓里该在的位置（实验产物与重跑日志进 `research/results/`，报告、提示与判决进 `research/prompts/`），再往下做；停机条款没过、按定义不写实验页、或主 agent 还没定要不要留的，草稿产物连同它在哪个仓外路径、跑了什么、为什么不入库写进报告。门禁 doc-experiments 的 evidence-in-repo 格判形式：装置或变异表改了而 `research/results/` 里没有一份不比它旧的产物、kb 与这一轮新写的提示里把 `/tmp` 路径当依据引用，都红。
+-- 定义点名的产出文件（跑前登记、腿的 output、样本、运行记录、实验页、代码与 kb 的改动）照定义写进文件。三方论证云端腿的报告就是派发提示给的 `research/prompts/<轮>-*-output.md`，交回只写文件路径、`sha256sum` 与判定一览（`.claude/rules/three-way-inference.md`「云端腿的报告要分段落盘」）。其余定义的报告全文写进派发提示给的报告路径，没给的写草稿目录的 `result.md`；交回只写结论、报告路径与 `sha256sum`，不超过 4000 字，主 agent 按路径存档。交回只调一次（第二次被拒）。报告文件名不带 report；用 Write 建以 REPORT、SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）的 `.md` 会被工具层当场拒，Bash 写的不拦。
++- 定义点名的产出文件（跑前登记、腿的 output、样本、运行记录、实验页、代码与 kb 的改动）照定义写进文件。三方论证云端腿的报告就是派发提示给的 `research/prompts/<轮>-*-output.md`（分段落盘照 `.claude/rules/three-way-inference.md`「云端腿的报告要分段落盘」），交回只写文件路径、`sha256sum` 与判定一览。其余定义的报告全文写进派发提示给的报告路径，没给的写草稿目录的 `result.md`；交回只写结论、报告路径与 `sha256sum`，不超过 4000 字，主 agent 按路径存档。交回只调一次（第二次被拒）。报告文件名不带 report；用 Write 建以 REPORT、SUMMARY、FINDINGS、ANALYSIS 开头（不分大小写）的 `.md` 会被工具层当场拒，Bash 写的不拦。
+ - 干到一半收到主 agent 的消息：当成追加的输入并进这一轮做，报告里写明在哪一步收到、改了什么；与定义或原输入冲突的，停在那一处交回。
+diff -ruN r1-baseline/dot-claude/agents/clerk.md revised/dot-claude/agents/clerk.md
+--- r1-baseline/dot-claude/agents/clerk.md	2026-11-16 12:07:26.584675453 +0000
++++ revised/dot-claude/agents/clerk.md	2026-11-16 12:18:48.256340098 +0000
+@@ -13,7 +13,7 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 只做派发提示写明的那一件活，出口达成就交回；活里冒出的别的问题写进报告，不自己扩。
+-开工先读：派发提示点名的文件；规则只读三样，别的不读：共用约束「规则怎么读」一节那三处；派发提示另点名的规则；改 `records/` 下的文件时，`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`「1. 正文只写当前现状，历史一律放到文末」、`.claude/rules/machine-first.md`「设计文档：长度相称，该说服的就说服」。
++开工先读：派发提示点名的文件；规则只读三样，别的不读：共用约束「规则怎么读」一节那三处；派发提示另点名的规则；改 `records/` 下的文件时，`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`（1. 正文只写当前现状，历史一律放到文末）、`.claude/rules/machine-first.md`「设计文档：长度相称，该说服的就说服」。
+ 
+ ## 输入（主 agent 必须给）
+ 
+diff -ruN r1-baseline/dot-claude/agents/experiment-runner.md revised/dot-claude/agents/experiment-runner.md
+--- r1-baseline/dot-claude/agents/experiment-runner.md	2026-11-16 12:07:26.584728753 +0000
++++ revised/dot-claude/agents/experiment-runner.md	2026-11-16 12:18:48.256999875 +0000
+@@ -13,7 +13,7 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 照登记做，不改判据。单测跑完、产物一次没跑之前看出登记要补的，写进登记的「修订」一段（改了什么、依据哪个单测读数、时点在产物之前），原判据原样保留；修订只许收严或补一条臂与判据。登记第六、七、九节里任何一条的去留与报告方式（进不进产物）不自己动：主 agent 在派发提示里已经定了的照做，修订里写明依据是派发提示的哪一句，其余交主 agent 定。产物跑过之后不改登记，交主 agent。
+-开工先读：`.claude/rules/test-discipline.md` 全篇；`.claude/rules/evidence-discipline.md`「引产物就整行抄」及其子小节「重跑之后要回对正文，复跑绿不代表正文对」；`.claude/rules/mutation-sampling.md`；`.claude/singlefs-ai-sop/rules/code-discipline.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/rules/test-script-discipline.md`「编译与算法都要快」「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；`.claude/rules/verification.md`「一个门禁：两种跑法」；`.claude/rules/changelog-format.md`；`.claude/rules/command-safety-by-review.md`「结果抓取要有完整性闸」「别用 echo 假装命令成功」；`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md`；要写实验页时另读 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」**整节**。
++开工先读：`.claude/rules/test-discipline.md` 全篇；`.claude/rules/evidence-discipline.md`「引产物就整行抄」及其子小节「重跑之后要回对正文，复跑绿不代表正文对」；`.claude/rules/mutation-sampling.md`；`.claude/singlefs-ai-sop/rules/code-discipline.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/rules/test-script-discipline.md`「编译与算法都要快」「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；`.claude/rules/verification.md`「一个门禁：两种跑法」；`.claude/rules/changelog-format.md`；`.claude/rules/command-safety-by-review.md`「结果抓取要有完整性闸」「别用 echo 假装命令成功」；`.claude/singlefs-ai-sop/rules/command-safety.md`（测试镜像一律放临时目录）；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md`；要写实验页时另读 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」**整节**。
+ 
+ ## 输入（主 agent 必须给）
+ 
+diff -ruN r1-baseline/dot-claude/agents/implementation-writer.md revised/dot-claude/agents/implementation-writer.md
+--- r1-baseline/dot-claude/agents/implementation-writer.md	2026-11-16 12:07:26.584623084 +0000
++++ revised/dot-claude/agents/implementation-writer.md	2026-11-16 12:18:48.257706191 +0000
+@@ -12,8 +12,8 @@
+ 
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+-一律在草稿目录的副本里改、交补丁目录（「产出」一节），只派你一个也这样，不碰主工作区。副本照共用约束「建仓副本」建：派发提示给了段树或快照路径的从那棵树建（`<仓根>` 填它），补丁出的是「那棵树此刻 → 改后」，没给的从主工作区建；新写崩溃枚举用例、放量分项或要拒算测试的另带 `--with-gate-tables` 与 `--with scripts=<为什么>`（登记行写在副本里、跟着补丁走，第 7a 步；拒算的只列进报告、拒算表不写，第 3c 步）。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步，第 2 步三方对抗与第 3 步 checker 由主 agent 另派。
+-开工先读：`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「测试不分档，红了只重跑红的」「一个门禁：两种跑法」（测试文件按测什么起名、一条用例一个场景、测试文件第一行声明模块）；`.claude/rules/format-evolution.md`「硬约束」「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」「第三类不许当等价变异留档」「第八类：变异跑了但无效——替换编不过，那条行为零覆盖」「判据」；`.claude/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」「子 agent 交回之前，删掉自己建的编译目录与仓副本」；`.claude/rules/timer-only-remind.md`「不用」；`.claude/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」；`.claude/rules/machine-first.md`「AI 友好 ≠ 不可读」「遇到一条通行准则，走这个流程」「判据」。
++一律在草稿目录的副本里改、交补丁目录（「产出」一节），只派你一个也这样，不碰主工作区（调查员「查到就修」那一支是这条「一律交补丁」的例外，照旧在主工作区改，见 `.claude/agents/investigator.md`）。副本照共用约束「建仓副本」建：派发提示给了段树或快照路径的从那棵树建（`<仓根>` 填它），补丁出的是「那棵树此刻 → 改后」，没给的从主工作区建；新写崩溃枚举用例、放量分项或要拒算测试的另带 `--with-gate-tables` 与 `--with scripts=<为什么>`（登记行写在副本里、跟着补丁走，第 7a 步；拒算的只列进报告、拒算表不写，第 3c 步）。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步，第 2 步三方对抗与第 3 步 checker 由主 agent 另派。
++开工先读：`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「测试不分档，红了只重跑红的」「一个门禁：两种跑法」（测试文件按测什么起名、一条用例一个场景、测试文件第一行声明模块）；`.claude/rules/format-evolution.md`「硬约束」「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」「第三类不许当等价变异留档」「第八类：变异跑了但无效——替换编不过，那条行为零覆盖」「判据」；`.claude/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」；`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」；`.claude/singlefs-ai-sop/rules/command-safety.md`（测试镜像一律放临时目录；子 agent 交回之前，删掉自己建的编译目录与仓副本）；`.claude/rules/timer-only-remind.md`「不用」；`.claude/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」；`.claude/rules/machine-first.md`「AI 友好 ≠ 不可读」「遇到一条通行准则，走这个流程」「判据」。
+ 改崩溃点重放（崩溃枚举用例、崩溃放量流水线、判定库 `verdict_store`、GPU 判器）的，开工另读 `.claude/kb/verification-build.md`「八、崩溃点重放：崩溃放量的流程与用户定案」；改法与那一节「用户定的」那张表对不上的，照第 6 步停在那一处、写进报告交主 agent。
+ 
+ ## 输入（主 agent 必须给）
+@@ -28,7 +28,7 @@
+ 
+ ## 做什么
+ 
+-1. 编译、测试、证红、命名检查与带 `--item` 的门禁与崩溃放量入口照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节（`--cwd`、`<根>` 与 `--copy` 填你改动所在的树；要主 agent 在副本里跑的，副本在它所在认领目录的 `.deliverables` 写成「交接」）。不指定范围的照第 4 步办：派发提示点名要跑的才写。`cargo fmt` 你自己跑。
++1. 编译、测试、证红、命名检查与带 `--item` 的门禁与崩溃放量入口照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节（`--cwd`、带 `--item` 的命令里的 `<根>` 与 `--copy` 填你的副本；命名检查的 `<根>` 写 `<快照>`，由主 agent 在验证段第 2 步照共用约束「命名检查交主 agent 跑」填；要主 agent 在副本里跑的，副本在它所在认领目录的 `.deliverables` 写成「交接」）。不指定范围的照第 4 步办：派发提示点名要跑的才写。`cargo fmt` 你自己跑。
+    1b. 第 3 步的证红、第 4 步动到的测试二进制、`cargo clippy`、`cargo build` 都拼成 `SINGLEFS_RUN_SCOPE='…' task-server/task submit -- <命令>`，拼法照共用约束「子 agent 不交任务」那一条的「命令怎么写」。
+    1c. 承接时动到的测试二进制跑红了的，修完只重跑红的那几条：写 `task-server/task submit -- python3 scripts/gate/rerun-failed-tests.py <主 agent 给的那一趟 task wait 末行 log= 的日志> -p <包>`，并写明主 agent 跑完把它打印的命令（开头已带 `SINGLEFS_RUN_SCOPE='种类=target; …' task-server/task submit --`）从 `task-server/task log <号> --all` 里取出原样交、不再插 submit；不整份重跑。
+    1d. 登记的崩溃枚举用例、崩溃放量分项、formal-verification、crates-mutation-replay 带 `--item` 的命令照第 1 步写进报告，点这一次改到的项；命令原样可抄，`<根>` 填你改动所在的树，范围声明的为什么一段填这一次的理由：
+@@ -39,7 +39,7 @@
+    - 改到整趟才跑的那几类的测试目标的（小输入的 GPU 与 CPU 对拍、剪枝自证、钉回来的红例，`scripts/crash/crash-point-replay.sh` 的 `WHOLE_RUN_GROUPS`），点名那一类（类名照 `bash scripts/crash/crash-point-replay.sh --list-items` 列的 `whole-run:` 那几行）：`SINGLEFS_RUN_SCOPE='种类=items; 跑什么=崩溃点重放入口点名整趟才跑的那一类 whole-run:<类名>; 范围=点名的 <N> 项; 为什么=<为什么这么跑、这个范围为什么合适>' task-server/task submit --cwd <根> -- bash scripts/crash/crash-point-replay.sh --item whole-run:<类名> [--item whole-run:<类名>…]`
+    - 改到挂特性的测试文件的（`tests/` 里 `cfg` 点到特性的，门禁 crash-point-replay 的 feature-gated-tests 格；文件名照 `bash .claude/gate.d/crash-point-replay.sh --list-items <根>` 列的 `feature-gated:` 那几行）：`SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crash-point-replay.sh 的 feature-gated-tests 格点名的 feature-gated:<文件名>; 范围=<项数加一> 项（1 格加点名的 <N> 项）; 为什么=<为什么这么跑、这个范围为什么合适>' task-server/task submit --cwd <根> -- bash .claude/gate.d/crash-point-replay.sh --check feature-gated-tests --item feature-gated:<文件名> [--item feature-gated:<文件名>…] <根>`
+ 
+-   `--item` 按自己改到的文件点名；项名拿不准的，把各自的 `--list-items` 一并写进去（用例名是 `bash .claude/gate.d/crash-point-replay.sh --list-items <根>` 列的 `crash-case:<用例名>` 那几行，分项是 `bash scripts/crash/crash-amplification.sh --list-items`），主 agent 跑完照列出的项补 `--item` 再交；带 GPU 的照样这样写（哪几张卡由服务分）。崩溃放量那一条点名的分项没缩域时，入口开跑前先估这一趟要现判的崩溃状态数，超 200000 或估不出就不编不跑、退 79（共用约束「门禁只有一个，跑法两种」），出路两条：入口命令里加 `--crash-expand-up-to <n>`（深度的值不算项，范围一段照旧写分项数；`<n>` 照说明给的写，缩过域的那一趟成功句写「缩过域、不算门禁通过」），或留给提交时不指定范围的那一趟。目标里没登记成崩溃枚举用例、也不是放量分项的测试函数，走第 4 步动到的测试目标那一条 `cargo test`（模板与点到会走崩溃枚举的目标怎么写，照共用约束「门禁只有一个，跑法两种」）。每条写明跑完看哪几行（`TASK_SERVER_RESULT` 末行的 `type=` 与 `exit=`、判结果的那几行），红了由承接的实现员接着改。这几个入口不带 `--item` 的，与门禁 crash-point-replay 点 crash-case-replay 格而不带 `--crash-cases-only` 的，是不指定范围或整包，不写。
++   `--item` 按自己改到的文件点名；项名拿不准的，把各自的 `--list-items` 一并写进去（用例名是 `bash .claude/gate.d/crash-point-replay.sh --list-items <根>` 列的 `crash-case:<用例名>` 那几行，分项是 `bash scripts/crash/crash-amplification.sh --list-items`），主 agent 跑完照列出的项补 `--item` 再交；带 GPU 的照样这样写（哪几张卡由服务分）。崩溃放量那一条点名的分项没缩域时，入口开跑前先估这一趟要现判的崩溃状态数，超 200000 或估不出就不编不跑、退 79（共用约束「门禁只有一个，跑法两种」），出路两条：入口命令里加 `--crash-expand-up-to <n>`（深度的值不算项，范围一段照旧写分项数；`<n>` 照入口退 79 时打的说明给的值写，缩过域的那一趟成功句写「缩过域、不算门禁通过」），或留给提交时不指定范围的那一趟。目标里没登记成崩溃枚举用例、也不是放量分项的测试函数，走第 4 步动到的测试目标那一条 `cargo test`（模板与点到会走崩溃枚举的目标怎么写，照共用约束「门禁只有一个，跑法两种」）。每条写明跑完看哪几行（`TASK_SERVER_RESULT` 末行的 `type=` 与 `exit=`、判结果的那几行），红了由承接的实现员接着改。这几个入口不带 `--item` 的，与门禁 crash-point-replay 点 crash-case-replay 格而不带 `--crash-cases-only` 的，是不指定范围或整包，不写。
+ 
+    新写的变异行，证红命令两样各写一条：副本上的那一条照第 3a 步（`task-server/task submit --cwd <副本> -- bash scripts/mutation/prove-red.sh --copy <副本> <crate> <变异名…>`）；验证段用的那一条点名这几行，由主 agent 在验证段第 2 步在第 1 步留下的快照上交，一律全域：`SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 crates-mutation-replay.sh 带 --item 点名新变异行; 范围=<N> 行; 为什么=<哪几条新测试靠这几行证红>；全域理由：<至少 12 个字，为什么这几行要在全部崩溃状态上判>' task-server/task submit --cwd <快照> -- bash .claude/gate.d/crates-mutation-replay.sh --item '<行名>' [--item '<行名>'…] <快照>`（`<行名>` 写变异名原样，`<N>` 是点名的行数，`<快照>` 原样写这个占位、主 agent 照第 1 步打出的快照路径填；点到的目标不走崩溃枚举的去掉「；全域理由：…」那一截）。变异门禁这两条点到的行，第五段点名的验证包测试目标会走崩溃枚举的（判法照共用约束「门禁只有一个，跑法两种」），范围声明闸要缩域与全域理由之一：`crates-mutation-replay.sh` 这一条不缩域、写全域理由；缩域证红只走第 3a 步。`<缩域变量>`（第 3a 步用）挑哪个、会不会走对着哪棵树判、自己新写的崩溃枚举用例按会走算，照共用约束同一条。
+ 2. 读条款与代码，写实现与测试。名字、分支、类型、错误照 `code-discipline.md`；`expect` 写清依赖哪条不变量。注释、文档串与文件头照共用约束「代码与脚本的注释、说明只写现状，不写历史」；改到的文件里碰到的历史式注释一并改写。
+diff -ruN r1-baseline/dot-claude/agents/investigator.md revised/dot-claude/agents/investigator.md
+--- r1-baseline/dot-claude/agents/investigator.md	2026-11-16 12:07:26.584773393 +0000
++++ revised/dot-claude/agents/investigator.md	2026-11-16 12:18:48.258221388 +0000
+@@ -13,14 +13,14 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 先查：复现、定位、给推翻条件。派发提示写了「查到就修」的，定位之后接着修（第 6 步）；没写的只查不修，修法与要不要修归主 agent。
+-开工先读：`.claude/rules/evidence-discipline.md`「所有结论要三次推导：正推 / 反推 / 校验」「假设要写得出能否掉它的观测」「核了窄的那一句，说出口的却是宽的那一句」；`.claude/rules/test-discipline.md`「阴性结果要能和「代码没跑到」分开」；`.claude/rules/verification.md`「一个门禁：两种跑法」；`.claude/singlefs-ai-sop/rules/command-safety.md`「子 agent 交回之前，删掉自己建的编译目录与仓副本」；`.claude/rules/timer-only-remind.md`「不用」；派发提示写了「查到就修」的，另读 `.claude/agents/implementation-writer.md`「开工先读：」那一行点名的规则与小节。
++开工先读：`.claude/rules/evidence-discipline.md`「所有结论要三次推导：正推 / 反推 / 校验」「假设要写得出能否掉它的观测」「核了窄的那一句，说出口的却是宽的那一句」；`.claude/rules/test-discipline.md`「阴性结果要能和「代码没跑到」分开」；`.claude/rules/verification.md`「一个门禁：两种跑法」；`.claude/singlefs-ai-sop/rules/command-safety.md`（子 agent 交回之前，删掉自己建的编译目录与仓副本）；`.claude/rules/timer-only-remind.md`「不用」；派发提示写了「查到就修」的，另读 `.claude/agents/implementation-writer.md`「开工先读：」那一行点名的规则与小节。
+ 
+ ## 输入（主 agent 必须给）
+ 
+ - 现象原文：产物整行、门禁的 ✗ 与 → 行、种子、跑出现象的命令。
+ - 要回答的问题：是真是假、机理、最小复现，哪几样。
+ - 只读，还是可以在草稿目录的仓副本里改（改坏、加打印、二分）。
+-- 写「查到就修」的：给压着的条款（kb 文件路径与小节标题）与一行「要动的 crates 文件：…」，这时在主工作区改。
++- 写「查到就修」的：给压着的条款（kb 文件路径与小节标题）与一行「要动的 crates 文件：…」，这时在主工作区改（这一支是实现员「一律交补丁」的例外，不在副本里改、不交补丁）。
+ - 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
+ 
+ ## 做什么
+diff -ruN r1-baseline/dot-claude/agents/prior-art.md revised/dot-claude/agents/prior-art.md
+--- r1-baseline/dot-claude/agents/prior-art.md	2026-11-16 12:07:26.584849392 +0000
++++ revised/dot-claude/agents/prior-art.md	2026-11-16 12:18:48.258811454 +0000
+@@ -13,7 +13,7 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 别家怎么做是线索，不是证据：只交能核实、能重跑的事实，不写「所以我们该怎么做」。
+-开工先读：`.claude/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」「陈述外部状态之前，现查一次」（连同它的三个子小节）；`.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」。
++开工先读：`.claude/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」「陈述外部状态之前，现查一次」（连同它的三个子小节）；`.claude/singlefs-ai-sop/rules/kb-discipline.md`（2. 每条带出处与状态）。
+ 
+ ## 输入（主 agent 必须给）
+ 
+diff -ruN r1-baseline/dot-claude/agents/three-way-attack.md revised/dot-claude/agents/three-way-attack.md
+--- r1-baseline/dot-claude/agents/three-way-attack.md	2026-11-16 12:07:26.584899312 +0000
++++ revised/dot-claude/agents/three-way-attack.md	2026-11-16 12:18:48.259176982 +0000
+@@ -14,7 +14,7 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 假设主 agent 的倾向是错的，造可达的历史、输入或操作序列去打穿它。
+-开工先读：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「判决由主 agent 做，不由投票做」「多轮：一次打穿不算数，三轮里多数打穿才算」；`.claude/rules/evidence-discipline.md`「判据自己也会写错：打中之后先判是哪一种」「别的项目怎么做，是线索不是证据」「不许先有结论再建模型」；`.claude/rules/machine-first.md`「对不上就当场说」「分清「我核过」和「我印象里」」；`.claude/singlefs-ai-sop/rules/command-safety.md`「子 agent 交回之前，删掉自己建的编译目录与仓副本」。
++开工先读：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「判决由主 agent 做，不由投票做」「多轮：一次打穿不算数，三轮里多数打穿才算」；`.claude/rules/evidence-discipline.md`「判据自己也会写错：打中之后先判是哪一种」「别的项目怎么做，是线索不是证据」「不许先有结论再建模型」；`.claude/rules/machine-first.md`「对不上就当场说」「分清「我核过」和「我印象里」」；`.claude/singlefs-ai-sop/rules/command-safety.md`（子 agent 交回之前，删掉自己建的编译目录与仓副本）。
+ 
+ ## 输入（主 agent 必须给）
+ 
+@@ -36,7 +36,7 @@
+    - 随机跑批分小批：每批的段数按先跑一小段估出的时长定，不给批设限时（命令外面不套 `timeout`）；每批的段数与估时写进报告。
+ 3c. 内存与进程：
+    - 编译与跑（`cargo build` 同样）照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节（`--cwd` 填副本）。
+-   - 起样本进程照共用约束「样本进程逐个按进程号停」。
++   - 起样本进程照共用约束「样本进程放进它自己的进程组」与 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」。
+    - 自己 Bash 里直接跑的一条命令里并行起几件的，照共用约束「执行前拒绝的写法」④ 的写法收退出码：文件写成 `<草稿目录>/b<批号>-<件号>.rc`，每批开跑前 `rm -f <草稿目录>/b<批号>-*.rc`。写进报告的交任务命令不这样写，一行一条。
+    - 不改正在跑的脚本，要改的照共用约束「执行前拒绝的写法」⑦ 写同目录临时文件再 `mv` 换上。
+ 4. 打中之后先答四句：分不分辨臂；被判的系统当时看不看得到判别它的东西；满足的是判据字面的哪一个分句；跑前条款给的每个改法在打中的那几格上还中不中。
+diff -ruN r1-baseline/dot-claude/agents/three-way-defense.md revised/dot-claude/agents/three-way-defense.md
+--- r1-baseline/dot-claude/agents/three-way-defense.md	2026-11-16 12:07:26.584924422 +0000
++++ revised/dot-claude/agents/three-way-defense.md	2026-11-16 12:15:43.185973167 +0000
+@@ -28,7 +28,7 @@
+ 1. 对判决里每一条打中：它引的原文现查在不在、字面满足的是哪一个分句、同一形状在别的臂上是不是同样成立。每一句引文（kb 条款、代码行、产物行）写进报告之前，在被引文件里 `grep -nF` 那句原文一次：命中 0 次不写成引文（换成转述并标「转述」），行号取命中的那一行；不从背景材料里数行号、不把自己的读法写成条款原文。
+ 2. 找得到同类先例的，贴出处；找不到就写找不到，不用重新论证利弊顶替。
+ 3. 每条结论写「什么现象会推翻它」。
+-4. 写模型的，报告开头给复跑命令与每个文件的 sha256。模型与复跑命令照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节，判决要引的数由主 agent 复跑，跑出之前读数写「推的，待主 agent 跑」；起样本进程照共用约束「样本进程逐个按进程号停」。
++4. 写模型的，报告开头给复跑命令与每个文件的 sha256。模型与复跑命令照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节，判决要引的数由主 agent 复跑，跑出之前读数写「推的，待主 agent 跑」；起样本进程照共用约束「样本进程放进它自己的进程组」与 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」。
+ 4b. 写了模型的，写进报告的复跑命令是 `rerun.sh` 外面再包一层的脚本（范例 `research/prompts/m4-gpugc-floor-raise-precheck-code-r3-opus-model/tools/rerun-from-a-clean-work-directory.sh`）：收运行目录参数，开头先删掉那一个运行目录，再调同一个 `<模型目录>/tools/rerun.sh`；只删工作根 `~/.local/share/singlefs/work/` 下、名字以 `-run` 收尾的目录，别的一律不删、退 2；探针的内存与时间写进报告。
+ 5. 交回前跑 `python3 scripts/agents/cite-check.py <报告>`，贴末行；对不上的改行号或引文到绿再交回（交回闸对三方腿跑同一个脚本）。
+ 
+diff -ruN r1-baseline/dot-claude/agents/three-way-forward.md revised/dot-claude/agents/three-way-forward.md
+--- r1-baseline/dot-claude/agents/three-way-forward.md	2026-11-16 12:07:26.584945072 +0000
++++ revised/dot-claude/agents/three-way-forward.md	2026-11-16 12:15:43.185871818 +0000
+@@ -27,7 +27,7 @@
+ 
+ 1. 读背景材料；附录不够时读 kb 原文与 `crates/` 源码。
+ 2. 每一格各报各的判定（一致 / 冲突 / 规则没说），冲突的两句并排整行抄。每一句引文（kb 条款、代码行、产物行）写进报告之前，在被引文件里 `grep -nF` 那句原文一次：命中 0 次不写成引文（换成转述并标「转述」），行号取命中的那一行；不从背景材料里数行号、不把自己的读法写成条款原文。
+-3. 能用只读命令（`grep`、读文件、只读的 git 命令）核的事实照核并贴原样输出；要起脚本、跑模型或装置才核得了的，照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节，那一格写「待主 agent 跑」；命令也写不出、只能由主 agent 实测的，写「复核不了」与原因。写模型的，报告开头给复跑命令与每个文件的 sha256；起样本进程照共用约束「样本进程逐个按进程号停」。
++3. 能用只读命令（`grep`、读文件、只读的 git 命令）核的事实照核并贴原样输出；要起脚本、跑模型或装置才核得了的，照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节，那一格写「待主 agent 跑」；命令也写不出、只能由主 agent 实测的，写「复核不了」与原因。写模型的，报告开头给复跑命令与每个文件的 sha256；起样本进程照共用约束「样本进程放进它自己的进程组」与 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」。
+ 4. 每条结论写「什么现象会推翻它」。
+ 5. 写了模型的，`<模型目录>/tools/rerun.sh` 整份跑一次：照第 3 步写进报告「要主 agent 跑的命令」一节（在新 shell 里起；跑完看 `task wait` 末行，退非 0 的件数为 0 算过），判决要引的数由主 agent 复跑。写进报告的复跑命令是 `rerun.sh` 外面再包一层的脚本（范例 `research/prompts/m4-gpugc-floor-raise-precheck-code-r3-opus-model/tools/rerun-from-a-clean-work-directory.sh`）：收运行目录参数，开头先删掉那一个运行目录，再调同一个 `<模型目录>/tools/rerun.sh`；只删工作根 `~/.local/share/singlefs/work/` 下、名字以 `-run` 收尾的目录，别的一律不删、退 2；探针的内存与时间写进报告。交回前跑 `python3 scripts/agents/cite-check.py <报告>`，贴末行；对不上的改行号或引文到绿再交回（交回闸对三方腿跑同一个脚本）。
+ 
+diff -ruN r1-baseline/dot-claude/agents/tooling-writer.md revised/dot-claude/agents/tooling-writer.md
+--- r1-baseline/dot-claude/agents/tooling-writer.md	2026-11-16 12:07:26.584990442 +0000
++++ revised/dot-claude/agents/tooling-writer.md	2026-11-16 12:18:48.259652060 +0000
+@@ -13,7 +13,7 @@
+ 开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
+ 
+ 在主工作区改。两种活：一是门禁阶段、钩子、研究脚本、看门狗（`.claude/gate.d/`、`.claude/hooks/`、`.claude/scripts/`、`scripts/`）；二是照判决或用户定案改 agent 定义、共用约束与项目规则（`.claude/agents/`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/rules/`）。
+-开工先读：`.claude/singlefs-ai-sop/rules/sop-first.md`「每一条拒绝都必须给出下一步」「加门禁或钩子之前，先找已有的」「边界」；`.claude/singlefs-ai-sop/rules/command-safety.md`「并行不许把失败吃掉」「子 shell 里的赋值传不回父进程」「管道里的退出码不是你想要的那个」「测试镜像一律放临时目录」；`.claude/rules/command-safety-by-review.md`「脚本改文件之后要回读确认，警告是免费的信号」「进程边界上的三种静默失效」「别用 echo 假装命令成功」「结果抓取要有完整性闸」「带闸的脚本，判完了才交出产物」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」；`.claude/rules/show-me-test-by-review.md`「一条改动不同步铺满全仓时，排除的每一份都要登记」；`.claude/singlefs-ai-sop/rules/code-discipline.md`「注释、断言、常量、重复」；`.claude/rules/implementation-workflow.md`「复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」「测试与崩溃检测优先多线程」；`.claude/rules/verification.md`「门禁的结构」；写门禁、改算键的代码时另读 `.claude/rules/verification-reference.md`「门禁的结构」「复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」；`.claude/rules/test-script-discipline.md`「入口脚本：不带参数就是不指定范围」「测试脚本自己也要被测试证明有效」「判定可复用：按输入存，按前缀剪」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」；`.claude/rules/path-moves.md`「怎么做」，只取不含 git 写操作的第 1、3、4、5、6、7 步（搬文件、改路径时）；第 2 步整条（`git mv`、`.claude/gate.d/path-moves.tsv` 的登记行、整目录搬前搬后跑的 `move-directory-in-use-check.py`）交主 agent，在报告里写明要搬什么、登记行怎么写；`.claude/rules/timer-only-remind.md`「不用」；`.claude/rules/machine-first.md`「AI 友好 ≠ 不可读」「推论：人的注意力该花在哪」「遇到一条通行准则，走这个流程」「判据」；第二种活另读 `.claude/singlefs-ai-sop/rules/rules-discipline.md`「1. 正文只写四样」「3. 搬出来的东西直接删掉」「4. 指向历史的链接要带劝阻句」「5. 规则文件不留历史节」「7. 正文不许用位置指代，也不许自称」与 `.claude/rules/implementation-workflow.md`「改 agent 定义与共用约束，走同一条三步」。
++开工先读：`.claude/singlefs-ai-sop/rules/sop-first.md`（每一条拒绝都必须给出下一步；加门禁或钩子之前，先找已有的；边界）；`.claude/singlefs-ai-sop/rules/command-safety.md`（并行不许把失败吃掉；子 shell 里的赋值传不回父进程；管道里的退出码不是你想要的那个；测试镜像一律放临时目录）；`.claude/rules/command-safety-by-review.md`「脚本改文件之后要回读确认，警告是免费的信号」「进程边界上的三种静默失效」「别用 echo 假装命令成功」「结果抓取要有完整性闸」「带闸的脚本，判完了才交出产物」；`.claude/singlefs-ai-sop/rules/preflight-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/show-me-test.md`（门禁不许假装通过）；`.claude/rules/show-me-test-by-review.md`「一条改动不同步铺满全仓时，排除的每一份都要登记」；`.claude/singlefs-ai-sop/rules/code-discipline.md`（注释、断言、常量、重复）；`.claude/rules/implementation-workflow.md`「复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」「测试与崩溃检测优先多线程」；`.claude/rules/verification.md`「门禁的结构」；写门禁、改算键的代码时另读 `.claude/rules/verification-reference.md`「门禁的结构」「复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」；`.claude/rules/test-script-discipline.md`「入口脚本：不带参数就是不指定范围」「测试脚本自己也要被测试证明有效」「判定可复用：按输入存，按前缀剪」；`.claude/rules/directory-layout.md`「scripts/：反复要用的脚本」；`.claude/rules/path-moves.md`「怎么做」，只取不含 git 写操作的第 1、3、4、5、6、7 步（搬文件、改路径时）；第 2 步整条（`git mv`、`.claude/gate.d/path-moves.tsv` 的登记行、整目录搬前搬后跑的 `move-directory-in-use-check.py`）交主 agent，在报告里写明要搬什么、登记行怎么写；`.claude/rules/timer-only-remind.md`「不用」；`.claude/rules/machine-first.md`「AI 友好 ≠ 不可读」「推论：人的注意力该花在哪」「遇到一条通行准则，走这个流程」「判据」；第二种活另读 `.claude/singlefs-ai-sop/rules/rules-discipline.md`（1. 正文只写四样；3. 搬出来的东西直接删掉；4. 指向历史的链接要带劝阻句；5. 规则文件不留历史节；7. 正文不许用位置指代，也不许自称）与 `.claude/rules/implementation-workflow.md`「改 agent 定义与共用约束，走同一条三步」。
+ 
+ ## 输入（主 agent 必须给）
+ 
+@@ -30,7 +30,7 @@
+ 2. 每条改法先造一个该红的输入：给被改的脚本加弄坏开关或样本目录。说不出该红的输入，这一条停下交主 agent。
+ 3. 改已存在的脚本照共用约束「执行前拒绝的写法」⑦：写同目录临时文件再 `mv`，或用 `scripts/kb/replace-once.py` 定点改。改 `.claude/hooks/` 下的钩子只经 `scripts/gate/hook-swap.py` 换上（草稿里先验、换上后再验、不对按反向定点替换回滚），不直接定点改：新版写在草稿目录，`hook-swap.py` 那条命令写进报告「要主 agent 跑的命令」一节，由主 agent 起。`scripts/` 下被各会话当写工具用的脚本（`scripts/kb/` 那几份定点写入脚本这类）换上也经它、同样交主 agent 起，走它的脚本规格（文件都在 `scripts/` 下，不带 `--hook` 与 `--feeds`，`--verify` 给被换脚本的 `--selftest`）。
+ 4. 新门禁阶段与新钩子写 `# gate-similar:` 与 `# hook-events:`；新钩子在 `.claude/settings.json` 的 `hooks` 一节注册、带 `--selftest`（自证由上游 `hooks-registered.sh` 跑），注册在哪个 matcher 上的判据挂进 `.claude/gate.d/code-tooling.sh` 的 agent-write-scope 格；新研究脚本写 `admission:` / `run-condition:` 文件头、开头调 `preflight`，自证挂进 `.claude/gate.d/code-tooling.sh` 的 research-script-selftests 格的 runner 表（`SELFTEST_RUNNERS`）。
+-5. 自证、门禁判法与装置里起的进程逐个按进程号停（`kill "$!"`、`kill -TERM "$pid"`），不对进程组发、不按名字或 cgroup 挑；每条样本跑完，它起的进程一个不剩，跑完在 `/proc` 里核一遍（共用约束「样本进程逐个按进程号停」）。
++5. 自证里只对自己起的进程号发信号（`kill "$!"`、`proc.py stop <pid>`），不按名字或 cgroup 挑；不对别的进程组发信号；自己写的装置与脚本里只对自己用新会话起的那一个子进程的组发（写法照共用约束「样本进程放进它自己的进程组」与 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」）。
+ 6. 第二种活：只写判决或规格给的改法，不另加条款；改完在报告里逐份列出改过的定义、共用约束与规则，交主 agent 开定义三方（门禁 doc-process-records 的 agent-def-adversarial-review 格）。
+ 7. 交回前不跑门禁阶段与各类 lint（共用约束「门禁」一节；改了 `scripts/` 下 `.rs` 的，照「命名检查交主 agent 跑」）。改了的脚本与门禁，`--selftest`、样本档与每个新开关打开之后的那一条，照钩子拒绝说明里写的起法逐条照第 1 步写进报告，每条写跑完看哪几行（关着开关绿；打开开关红在点名的那一格）；语法检查（`bash -n`、`python3 -m py_compile`）照做。证据写全：样本红绿各至少一份与各自的期望、自证格与弄坏开关。主 agent 跑的那几条红了的、开关没红在点名那一格的，新派工具员接着改。
+ 
+diff -ruN r1-baseline/dot-claude/main-agent.md revised/dot-claude/main-agent.md
+--- r1-baseline/dot-claude/main-agent.md	2026-11-16 12:07:26.583836078 +0000
++++ revised/dot-claude/main-agent.md	2026-11-16 12:17:59.552672321 +0000
+@@ -2,11 +2,11 @@
+ 
+ **所有任务从 `.claude/main-agent.md` 进。** 它只写怎么做；为什么这么定、实测的数在 `records/2026-09-16-subagent拆分提案.md`（除非要查来历，别读它），公共上下文在 `CLAUDE.md`。
+ 
+-两份流程细则放在按需读的技能里，到那一步之前整份读一次：开始「写与验分两段」验证段之前先整份读 `.claude/skills/merge-verify/SKILL.md`；会话里第一次派发之前先整份读 `.claude/skills/dispatch/SKILL.md`。
++两份流程细则放在按需读的技能里：每次开始「写与验分两段」验证段之前读 `.claude/skills/merge-verify/SKILL.md`，每次派发之前读 `.claude/skills/dispatch/SKILL.md`；技能正文不在此刻的上下文里就整份重读，压缩过上下文之后再做这两件事之前同样重读。
+ 
+ ## 职责
+ 
+-主 agent 只调度和判断：和用户说话、写三方正文与判决、定案、git 暂存与提交、合入后验证（「写与验分两段」验证段）、收尾报进度；其余照「什么时候派哪个 agent」派。主 agent 可以自己写的只有两类：探索性的 `crates/` 改动（派发表「改 `crates/`：探索性的」那一行），与定案后自己写得清的小处 kb 改动（派发表「一批阶段任务结束」「定案之后写回 kb」两行）。定义在 `.claude/agents/`，每个定义「输入」一节是派发时必须给的，缺一样它不开工；共用约束在 `.claude/agent-common.md`。
++主 agent 只调度和判断：和用户说话、写三方正文与判决、定案、git 暂存与提交、合入后验证（「写与验分两段」验证段）、收尾报进度；其余照「什么时候派哪个 agent」派。`crates/` 与 kb 里，主 agent 可以自己写的只有两类：探索性的 `crates/` 改动（派发表「改 `crates/`：探索性的」那一行），与定案后自己写得清的小处 kb 改动（派发表「一批阶段任务结束」「定案之后写回 kb」两行）；别的文件的简单任务照 `.claude/agent-common.md`「派发」一节自己直接做。定义在 `.claude/agents/`，每个定义「输入」一节是派发时必须给的，缺一样它不开工；共用约束在 `.claude/agent-common.md`。
+ 
+ ## 禁止
+ 
+@@ -23,7 +23,7 @@
+ 
+ 1. **开工前写死这一轮的课题、出口、派发上限与截止批次**：要关哪几项、做到什么算完（形态照实验的岔路单）。这一轮的任务列全进依赖表，逐个标依赖谁、输入齐没齐、批次；课题、出口与依赖表写进这一轮的调度记录（`records/`），第 7、8 条对着它判。没有依赖、输入齐的同类任务各成一批、在同一条消息里同时派；同时在跑的子 agent 最多 5 个，不分模型（派发闸 ⑦ 拒第 6 个），超出的排下一波。批内冒出的发现只进下一轮的清单，不当场派。细则：做这一步之前先读 `.claude/skills/dispatch/SKILL.md`「一轮怎么开、怎么收」第 1 条。
+ 2. **冒出新点先判阻塞**：只问一句——**这个决策能不能留到下次开？它挡不挡着本轮的课题？** 挡着就在本轮定，改动并进第 4 条的下一批。不挡就延后，并在判的同一步登一行：里程碑收口表、`.claude/kb/checks-owed.md` 或决策正文；子 agent 与协作工具的事登进 `records/2026-10-29-subagent拆分提案.md` 的编号小节。调度记录里写「延后」的那一行，同一行写出登的那一行的编号或 文件:行；延后到 `.claude/gate.d/deferral-registries.tsv` 登记的流程文件（提交时或提交前一定会跑到的，例 `.claude/skills/gate/staged-gate.md`、`.claude/skills/crash-test/commit-stages.md`）的，那一行点名那份流程文件（从仓根起的全路径）就算登记。只写进调度记录不算延后，算没去向。判据不是花了多少 token、跑了多久。
+-3. **不指定范围的只在提交时跑**（`.claude/rules/implementation-workflow.md`「不指定范围的只在提交时跑，指定范围的随时跑」）：提交之外，用户要求的照跑；主 agent 自己判要跑的，先弹窗问用户，同意了才跑。
++3. **不指定范围的只在提交时跑**（`.claude/rules/implementation-workflow.md`「不指定范围的只在提交时跑，指定范围的随时跑」）：提交之外要跑不指定范围的，照 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条先弹窗。
+ 4. **派实现员之前先聚簇，不为一条发现单派**：这一轮已抓到、条款已定、要改 `crates/` 的改动全部列出，按要动的 `crates/` 文件聚簇，文件有交集的并进同一个实现员一次改完；批内冒出的新发现并进下一批，凑批再派。治理文件（定义、共用约束、门禁、钩子、规则、研究脚本、技能、统一任务服务 `task-server/`、判定库服务 `prune-server/` 与它的客户端 `scripts/prune-server/`）的改动同样按批：一周合一批、一批走一轮三方，不为一条发现开一轮，不等用户点名、不登豁免。细则：做这一步之前先读 `.claude/skills/dispatch/SKILL.md`「一轮怎么开、怎么收」第 4 条。
+ 5. **弹窗问用户之前，问句里每一句事实写出处**（产物的整行、命令与输出、文件:行号）；推出来、没量过的，句子里写明「推的，没量过」。
+ 6. **派一个 agent 之前说清它关的是哪几条已经抓到的问题**（可以不止一条，逐条列）；说不出来的那条该进记录、不该进本轮。调查、调研类点名的是要回答的问题，不是已抓到的问题。
+@@ -44,7 +44,7 @@
+ **写段**
+ 
+ 1. 开工时把这一段该实现的条款与要补的测试全部列进调度记录的依赖表，照「一轮怎么开、怎么收」第 4 条聚簇；没有依赖的同一条消息里同时派。几份补丁的登记行落在同一张表（`.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/crash-point-replay-items.tsv`、`scripts/crash/crash-amplification.sh` 的 `ITEMS`；`git apply --numstat` 上算撞文件）的算有依赖，排先后，后一份以段树为基线。删接口（函数、类型、字段、模块）的补丁与改它调用方的补丁不拆成两批，并进同一个实现员的同一份补丁一次改完。
+-2. 写段的补丁不打主工作区：实现员一律在草稿目录的副本里改、交补丁，只派一个也这样（`.claude/agents/implementation-writer.md`）。新崩溃枚举用例与放量分项的登记行跟着实现员的补丁走（`.claude/agents/implementation-writer.md`「产出」），主 agent 不往哪一棵树里手写登记行；主 agent 收的拒算行照「合入后验证之后判新出现的拒算」第 1 条做成拒算补丁目录，并进这一批。没有依赖的一批，实现员的副本从主工作区建，交回的补丁留在各自的补丁目录里，等验证段第 1 步一起打。有依赖的（后一批要以前一批改后的样子为基线）才建段树：主 agent 在自己认领的草稿目录下用 `python3 scripts/hosts/minimal-copy.py <仓根> <段树> --with-test-inputs --with-gate-tables --with scripts=<为什么> --with .claude/scripts=<为什么> --with .claude/singlefs-ai-sop=<为什么>` 建；前一批交回后补丁只打不验：先 `git apply --numstat` 核几份互不撞文件，再 `task-server/task submit -- python3 scripts/gate/apply-writer-patch.py <补丁目录> --root <段树>` 逐份打进段树，打的次序记进调度记录；依赖它的下一批以段树为基线直接派（派发提示写明段树路径，实现员的副本从段树建，补丁出的是「段树此刻 → 改后」），不等合入后验证、不等代码轮。段树在验证段第 1 步那一条交出去时删（之后的修补以第 1 步留下的快照为基线）；一段在写段里跨轮停下也删，续做时以主工作区此刻照这一条重建，把这一段的补丁照调度记录里的次序再打进去。要留着当基线的段树，在它所在认领目录的 `.deliverables` 写一行「<段树相对那个目录的路径> 基线 <为什么留>」（写法照 `.claude/hooks/completion-cleanup-guard.sh` 文件头「要留的交付物」），删段树的同一步删这一行。
++2. 写段的补丁不打主工作区：实现员一律在草稿目录的副本里改、交补丁，只派一个也这样（`.claude/agents/implementation-writer.md`）；调查员「查到就修」那一支是例外，照旧在主工作区改（`.claude/agents/investigator.md`）。新崩溃枚举用例与放量分项的登记行跟着实现员的补丁走（`.claude/agents/implementation-writer.md`「产出」），主 agent 不往哪一棵树里手写登记行；主 agent 收的拒算行照「合入后验证之后判新出现的拒算」第 1 条做成拒算补丁目录，并进这一批。没有依赖的一批，实现员的副本从主工作区建，交回的补丁留在各自的补丁目录里，等验证段第 1 步一起打。有依赖的（后一批要以前一批改后的样子为基线）才建段树：主 agent 在自己认领的草稿目录下用 `python3 scripts/hosts/minimal-copy.py <仓根> <段树> --with-test-inputs --with-gate-tables --with scripts=<为什么> --with .claude/scripts=<为什么> --with .claude/singlefs-ai-sop=<为什么>` 建；前一批交回后补丁只打不验：先 `git apply --numstat` 核几份互不撞文件，再 `task-server/task submit -- python3 scripts/gate/apply-writer-patch.py <补丁目录> --root <段树>` 逐份打进段树，打的次序记进调度记录；依赖它的下一批以段树为基线直接派（派发提示写明段树路径，实现员的副本从段树建，补丁出的是「段树此刻 → 改后」），不等合入后验证、不等代码轮。段树在验证段第 1 步那一条交出去时删（之后的修补以第 1 步留下的快照为基线）；一段在写段里跨轮停下也删，续做时以主工作区此刻照这一条重建，把这一段的补丁照调度记录里的次序再打进去。要留着当基线的段树，在它所在认领目录的 `.deliverables` 写一行「<段树相对那个目录的路径> 基线 <为什么留>」（写法照 `.claude/hooks/completion-cleanup-guard.sh` 文件头「要留的交付物」），删段树的同一步删这一行。
+ 3. 写段不跑：`scripts/gate/merge-and-verify.sh`、带 `--item` 的门禁与崩溃放量入口、代码轮三方、验证包那一步、实验装置与实验跑片。实现员只写代码、测试与变异行、自己跑 `cargo fmt`，别的命令写进报告「要主 agent 跑的命令」一节交回（清单照 `.claude/rules/implementation-workflow.md`「不指定范围的只在提交时跑，指定范围的随时跑」「实现员交回前」那一行）；主 agent 交、等到结局，红了或证不红的新派实现员（带「承接：」）接着改。这几条命令算写的一部分，不算验证。
+ 4. `apply-writer-patch.py` 打完报的 code-source-discipline 红，记进调度记录，留到验证段一起看，不为它单派。
+ 5. 写段冒出的新发现：挡着这一段的，并进写段的下一批接着写；不挡的，照「一轮怎么开、怎么收」第 2 条延后。
+@@ -65,13 +65,13 @@
+ 
+ 新增的测试除了无需接入剪枝复用库的，都必须接入（单元键算得出、按条复用）；不接入的要二次确认。拒算表 `.claude/gate.d/refused-tests.tsv` 只由主 agent 判过再登：实现员把要拒算的测试连同理由列在报告「拒算的测试」一节，不写拒算表；主 agent 收的那几行做成一份只含拒算表的补丁目录（拒算补丁目录），接在这一批补丁目录的最后，不另往哪一棵树里手写这一行。
+ 
+-1. 写段收到实现员的补丁时，报告「拒算的测试」一节逐条判该不该拒：能改成算得出单元键的不收，退给实现员改测试（并进写段下一批）；断言就是关于真仓、非读活树不可的才收；实现员不登记，主 agent 也不替它登记。细则（怎么判、行的写法、拒算补丁目录怎么做）：做这一步之前先读 `.claude/skills/merge-verify/SKILL.md`「合入后验证之后判新出现的拒算」第 1 条。
++1. 写段收到实现员的补丁时，报告「拒算的测试」一节逐条判该不该拒：能改成算得出单元键的不收，退给实现员改测试（并进写段下一批）；断言就是关于真仓、非读活树不可的才收；实现员不往拒算表里写，主 agent 也不往哪一棵树里手写，收的行只走拒算补丁目录；`refused-test-registry.py` 的清单罩不到挂特性的测试文件、产品 GPU 包的测试包与别的包里的新测试，这三类审 diff 时照实现员定义第 3c 步看有没有读活树、有没有列进报告。细则（怎么判、行的写法、拒算补丁目录怎么做）：做这一步之前先读 `.claude/skills/merge-verify/SKILL.md`「合入后验证之后判新出现的拒算」第 1 条。
+ 2. 验证段第 2 步在快照上交 `refused-test-registry.py list`，这一批的「未登记」「已不拒算」都没有才算判完。细则（两种行各怎么办）：做这一步之前先读 `.claude/skills/merge-verify/SKILL.md`「合入后验证之后判新出现的拒算」第 2 条。
+ 3. `task-server/task submit -- python3 scripts/gate/refused-test-registry.py check` 退 0，与提交时门禁 code-source-discipline 的 refused-tests 格同一件事。退 77（判定库服务不可用、清单不完整）不算判过，等服务回来重交。
+ 
+ ## 派出去之后
+ 
+-盯住，不能一直干等，也不强制结束：结不结束、怎么处置由主 agent 看了定。看门狗一个会话一只，会话里第一次派发之后起；看门狗只报，不停子 agent 也不停进程；hook 不停任务和脚本，拒哪几种写法列在 `.claude/agent-common.md`「不做」一节「执行前拒绝的写法」那一条（主 agent 同样被拒）。改了定义、共用约束或规则之后，当场给每个在跑的子 agent 发消息：写明改了哪一条、它手上哪一步要停掉或改做；除此之外不给在跑的子 agent 发消息：派发提示一次给全，要补的写进下一次派发。主 agent 自己交的任务后台起 `task-server/task wait <号>`、结束本轮等叫醒。细则（看门狗怎么起、告警两组与处置、叫醒之后、坏卡与服务健康、自己交的任务怎么看与停、预计超过一小时的活）：先读 `.claude/skills/dispatch/SKILL.md`「派出去之后」。
++盯住，不能一直干等，也不强制结束：结不结束、怎么处置由主 agent 看了定。看门狗一个会话一只，会话里第一次派发之后起；看门狗只报，不停子 agent 也不停进程；hook 不停任务和脚本，拒哪几种写法列在 `.claude/agent-common.md`「不做」一节「执行前拒绝的写法」那一条（主 agent 同样被拒）。改了定义、共用约束或规则之后，当场给每个在跑的子 agent 发消息：写明改了哪一条、它手上哪一步要停掉或改做；除此之外不给在跑的子 agent 发消息：派发提示一次给全，要补的写进下一次派发。主 agent 自己交的任务后台起 `task-server/task wait <号>`、结束本轮等叫醒；`task wait` 以 `needs-attention` 退出时任务还在、不是结局，读它打出的那一行提醒、处置完再起 `task wait`；服务健康的毛病处置之后用 `python3 task-server/control check` 回读，退 0 才算健康。细则（看门狗怎么起、告警两组与处置、叫醒之后、坏卡与服务健康、自己交的任务怎么看与停、预计超过一小时的活）：先读 `.claude/skills/dispatch/SKILL.md`「派出去之后」。
+ 
+ ## 交回怎么读
+ 
+@@ -92,8 +92,8 @@
+ | 一批实现员交回到齐、合入之前 | 有实验登记钉死了常量、还没拍树的（以实验页最新一次修订为准），先在「主工作区 + 这一批补丁」的副本上跑它的常量核对，钉死的常量全过才往下 → 主 agent 照「写与验分两段」验证段做合入后验证（各实现员报告里带 `--item` 的门禁与崩溃放量入口，主 agent 已在各自的副本里经服务交过，`.claude/agents/implementation-writer.md` 第 1d 步）→ 主 agent 审 diff → **代码轮三方**。细则在技能同名条目 |
+ | 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 并进同一批的合入后验证与 **代码轮三方** → **提交门禁** |
+ | 跑变异表、看抓到 / 无效 / 没红 | 主 agent 跑表 → `mutation-triage` 读输出分诊 → 要补取样点、补断言的：`crates/` 那侧并进「一轮怎么开、怎么收」第 4 条的下一批交 `implementation-writer`，`research/` 那侧主 agent 先写问题单 → `experiment-designer` 写重跑登记 → `experiment-runner`。细则在技能同名条目 |
+-| 一批阶段任务结束（里程碑一步、一轮判决、一段实验、一批定义或脚本改完，同时结束的几件算一批、一批做一次），这一批交回到齐、暂存之前 | `sweep` 写事实表 → 候选表按组切段，一段派一个 `sweep` 逐行判 → 主 agent 核各份报告、按判定种类抽查 → 主 agent 逐处判，自己改或交 `kb-scribe`；回扫报告「交实现员」的行进下一轮的清单 → 主 agent 写 `research/prompts/<阶段>-sync.md` → 「暂存之后、提交之前跑门禁」那一行。细则在技能同名条目 |
+-| 暂存之后、提交之前跑门禁 | 主 agent 经 `task-server/task submit -- python3 scripts/gate/stage-mine.py …` 暂存 → 主 agent 照 `.claude/skills/crash-test/commit-stages.md` 跑六道门禁（`crash-point-replay`、qemu-device-streams、lkmm、crates-mutation-replay、formal-verification、broad-mutation）与崩溃放量全部分项（`scripts/crash/crash-amplification.sh` 不带 `--item`），都不指定范围；`--full-gate` 的写法与弹窗确认、次序与各道判什么照那一份与 `.claude/rules/verification.md`「一个门禁：两种跑法」（含 `crash-point-replay` 的 feature-gated-tests 格带 `tests/` 里 `cfg` 点到的特性另跑一趟、带 `gpu` 特性那一趟按需领卡）→ 主 agent 照 `.claude/skills/gate/staged-gate.md` 经服务交 `scripts/gate/gate-staged.sh`并分诊（六道在整轮里照各自的单元键复用、不另外直接调） |
++| 一批阶段任务结束（里程碑一步、一轮判决、一段实验、一批定义或脚本改完，同时结束的几件算一批、一批做一次），这一批交回到齐、暂存之前 | `sweep` 写事实表（交回的事实表过了 `scripts/kb/stale-candidates.py --check-facts` 才往下）→ 候选表按组切段，一段派一个 `sweep` 逐行判 → 主 agent 核各份报告、按判定种类抽查 → 主 agent 逐处判，自己改或交 `kb-scribe`；回扫报告「交实现员」的行进下一轮的清单 → 主 agent 写 `research/prompts/<阶段>-sync.md` → 「暂存之后、提交之前跑门禁」那一行。细则在技能同名条目 |
++| 暂存之后、提交之前跑门禁 | 主 agent 经 `task-server/task submit -- python3 scripts/gate/stage-mine.py …` 暂存 → 主 agent 照 `.claude/skills/crash-test/commit-stages.md` 跑六道门禁（`crash-point-replay`、qemu-device-streams、lkmm、crates-mutation-replay、formal-verification、broad-mutation）与崩溃放量全部分项（`scripts/crash/crash-amplification.sh` 不带 `--item`），都不指定范围；`--full-gate` 的写法与弹窗确认、次序照那一份，各道判什么照 `.claude/rules/verification-reference.md`「门禁管哪一半」（`crash-point-replay` 的 feature-gated-tests 格带 `tests/` 里 `cfg` 点到的特性另跑一趟、带 `gpu` 特性那一趟按需领卡：同一份「门禁 crash-point-replay 怎么跑」）→ 主 agent 照 `.claude/skills/gate/staged-gate.md` 经服务交 `scripts/gate/gate-staged.sh`并分诊（六道在整轮里照各自的单元键复用、不另外直接调） |
+ | 撤回一个数、改格式常量、新立一条判据 | `sweep` |
+ | 定案之后写回 kb | `kb-scribe`（一批定案一份规格，条目多的按 kb 文件不相交切给几个写回员同时写；条目少、主 agent 自己写得清的，主 agent 自己写）→ 全部写完后主 agent 交一次 decision-items-sync → 变异表锚点腐化的：`scripts/mutation/tables/` 的派 `experiment-runner` 只修锚点，`crates/` 下的并进「一轮怎么开、怎么收」第 4 条下一批交 `implementation-writer`。细则在技能同名条目 |
+ | 改门禁、钩子、研究脚本、看门狗，或照判决改定义与共用约束 | `tooling-writer`（按文件聚簇，一件可关多条，照 `.claude/agents/tooling-writer.md`「输入」给）→ 主 agent 照它报告「要主 agent 跑的命令」一节起自证、样本档、弄坏开关与钩子换上，红了或开关没红在点名那一格的新派工具员接着改 → 这一批改动（门禁、钩子、脚本、定义、共用约束、规则、技能、两个服务都算）照「一轮怎么开、怎么收」第 4 条并进当周那一批走一轮三方（照 `.claude/rules/implementation-workflow.md`「改 agent 定义与共用约束，走同一条三步」） |
+diff -ruN r1-baseline/dot-claude/rules/changelog-format.md revised/dot-claude/rules/changelog-format.md
+--- r1-baseline/dot-claude/rules/changelog-format.md	2026-11-16 12:07:26.584222476 +0000
++++ revised/dot-claude/rules/changelog-format.md	2026-11-16 12:18:48.260143087 +0000
+@@ -3,7 +3,7 @@
+ ## 只有决策与实验有历史，别的文件没有
+ 
+ - 历史只记决策（`.claude/kb/decisions/`）与实验（`.claude/kb/experiments/`），各住一份变更史：`.claude/kb/decisions-history.md`、`.claude/kb/experiments-history.md`。
+-- 其余文件（`records/`、`.claude/kb/milestone/`、欠账表、不变量清单、布局表、`tooling.md`、`prior-art.md` 这类）不留历史节，改动直接改正文，经过靠 git。哪些 kb 文件带「## 历史版本」照 `.claude/history-carriers` 判，判法在 `.claude/singlefs-ai-sop/rules/kb-discipline.md`「8. 正文只写现状，历史放文末的「历史版本」」。
++- 其余文件（`records/`、`.claude/kb/milestone/`、欠账表、不变量清单、布局表、`tooling.md`、`prior-art.md` 这类）不留历史节，改动直接改正文，经过靠 git。哪些 kb 文件带「## 历史版本」照 `.claude/history-carriers` 判，判法在 `.claude/singlefs-ai-sop/rules/kb-discipline.md`（8. 正文只写现状，历史放文末的「历史版本」）。
+ 
+ ## 变更史：条目、日期、变更清单三层
+ 
+diff -ruN r1-baseline/dot-claude/rules/code-discipline-by-review.md revised/dot-claude/rules/code-discipline-by-review.md
+--- r1-baseline/dot-claude/rules/code-discipline-by-review.md	2026-11-16 12:07:26.584029737 +0000
++++ revised/dot-claude/rules/code-discipline-by-review.md	2026-11-16 12:18:48.260405875 +0000
+@@ -1,7 +1,7 @@
+ <!-- doc-lint:rule-definition -->
+ # 编码纪律：machine-first 的实施细则（靠 review 的那一半）
+ 
+-与 `.claude/singlefs-ai-sop/rules/code-discipline.md`（`code-discipline-by-review.md` 里叫「上游」）同射程，只写上游没写的；两处说同一件事以上游为准。
++与 `.claude/singlefs-ai-sop/rules/code-discipline.md`（`code-discipline-by-review.md` 里叫「上游」）同射程，只写上游没写的。
+ 
+ ## 错误：能恢复的写进类型，破坏不变量的就断言
+ 
+@@ -84,7 +84,7 @@
+ - 废弃「一个测试只写一个断言」：一个测试一个场景；断言可以多条，每条的消息写清期望什么。
+ - 改写「覆盖率达到某个比例」：拿路径数和变异清单说话（`.claude/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」）。
+ - 改写「依赖一律 mock」：优先用对拍的模型和真实实现。
+-- 改写「测试金字塔」：单元测试是快速反馈；准入靠 `.claude/singlefs-ai-sop/rules/show-me-test.md`「最终判据由项目定」。
++- 改写「测试金字塔」：单元测试是快速反馈；准入靠 `.claude/singlefs-ai-sop/rules/show-me-test.md`（最终判据由项目定）。
+ - 放宽「测试代码也要 DRY」：每个测试自己读得出场景；搭建可以抽成辅助函数，断言不藏进去。
+ - 废弃「不稳定的测试多跑几次就过」：照 `.claude/rules/test-discipline.md`「单次观测不算数」如实说不稳定，不重跑到绿。
+ - 留下「先写测试」：先看着它红（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」）。
+diff -ruN r1-baseline/dot-claude/rules/command-safety-by-review.md revised/dot-claude/rules/command-safety-by-review.md
+--- r1-baseline/dot-claude/rules/command-safety-by-review.md	2026-11-16 12:07:26.584243646 +0000
++++ revised/dot-claude/rules/command-safety-by-review.md	2026-11-16 12:18:48.260652564 +0000
+@@ -1,15 +1,16 @@
+ <!-- doc-lint:rule-definition -->
+ # 进程与命令规范（靠 review 的那一半）
+ 
+-## 装置起的样本进程，逐个按进程号停
++## 装置起的样本进程，放进它自己的进程组
+ 
+-装置、判法、自证与复跑脚本起样本进程（真 shell、被测程序、样本命令）时，判据是每条样本跑完，它起的进程一个不剩：
++装置、判法与复跑脚本起样本进程（真 shell、被测程序、样本命令）时，判据是：每条样本跑完，它起的进程一个不剩。
+ 
+-- 信号只按进程号逐个发，不对进程组发（不写 `os.killpg`、`kill -- -<号>`、`kill 0`），也不按名字或 cgroup 挑。
+-- 超时与结束时，先列出这条样本起的整棵进程（直接起的那一个与它再起的子孙，`/proc/<号>/task/*/children` 或 `ps -o pid --ppid <号>` 逐层往下），从最底层起逐个先 TERM、过宽限再 KILL；不只停直接起的那一个（进程替换起的 `cat` 这类孙进程拿着管道写端，读的一方永远等不到 EOF）。命令行上停进程照旧一次点名一个。
+-- 跑完在 `/proc` 里核一遍它起的进程一个不剩；留下的逐个停掉，并写进这条样本的失败信息。要认出脱离了父子链的子孙，样本可以用 `setsid --wait`、`start_new_session=True` 起在它自己的会话里，按会话号在 `/proc` 里认；信号照旧逐个按进程号发。
++- 每条样本放进它自己的进程组：shell 里用 `setsid --wait` 起（不带 `-f`），同一层紧跟着 `名字=$!`；Python 的 `subprocess` 带 `start_new_session=True`。
++- 超时与结束时对整组发信号，先 TERM，过宽限再 KILL：Python 用 `os.killpg(<进程组号>, <信号>)`，shell 用 `kill -TERM -- -"$名字"`。组号只取自己用新会话起的那一个子进程的（shell 里的 `$!`、Python 里的 `<子进程>.pid`）：不对别的进程组发信号，不在循环里逐个发，不先挑进程再发。不只停直接起的那一个。认得出的写法与照旧拒的写法以钩子 `.claude/hooks/bash-command-detector.sh` 文件头 ⑥ 为准。
++- 跑完按进程组号在 `/proc` 里核一遍，组里没有留下进程；留下的停掉，并写进这条样本的失败信息。
++- 只停直接子进程会留下孙进程：进程替换起的 `cat` 拿着管道的写端，读这根管道的一方永远等不到 EOF。
+ 
+-没做成检查，靠 review。
++这一条还没做成检查：起的是不是样本、超时与收尾时停没停整组，脚本里认不准，靠 review。
+ 
+ ## 起了后台任务和子 agent，就要定时复检，调度的一方不响应才终止
+ 
+@@ -25,7 +26,7 @@
+ 管干活中遇到的、自己这次任务解决不了或不归自己这次任务的问题：门禁红在不是自己改的文件上、要改的文件正被别的会话改着、要用的东西归别的任务产出、修不动或拿不准怎么修。动手修、绕开或停下干等之前，按顺序做：
+ 
+ 1. 列出正在跑的 agent 与会话（`ListAgents`），按任务名、它在改的文件与最近的动作，判有没有哪一个在管问题所在的那一块；拿不准是不是它管的，也发消息去问。
+-2. 有在管的，发消息给它（`SendMessage`），不自己去改它管的那一块。消息写清：哪个文件、哪一行、什么现象、怎么复现、是不是自己这次改动带来的、要它做什么或问它什么；转述别处的做法照 `.claude/singlefs-ai-sop/rules/communication-discipline.md`「转述别处的做法，带出处或原文」。
++2. 有在管的，发消息给它（`SendMessage`），不自己去改它管的那一块。消息写清：哪个文件、哪一行、什么现象、怎么复现、是不是自己这次改动带来的、要它做什么或问它什么；转述别处的做法照 `.claude/singlefs-ai-sop/rules/communication-discipline.md`（转述别处的做法，带出处或原文）。
+ 3. 自己修不动、或缺别人手上的信息与权限，主动发消息求助，不闷头绕开，也不干等。
+ 4. 一个在管的都没有：归自己这次任务的，自己处理；不归的，报给用户或调度的一方，写清问题在哪、建议交给谁。主 agent 自己就是调度的一方，照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 15 条。
+ 5. 发出去之后接着做手上不依赖它的活，收到回复再接那一块；对方一直不响应，报给用户或调度的一方，不擅自接手它管的那一块。
+diff -ruN r1-baseline/dot-claude/rules/evidence-discipline.md revised/dot-claude/rules/evidence-discipline.md
+--- r1-baseline/dot-claude/rules/evidence-discipline.md	2026-11-16 12:07:26.584270486 +0000
++++ revised/dot-claude/rules/evidence-discipline.md	2026-11-16 12:18:48.260956712 +0000
+@@ -29,7 +29,7 @@
+ | 某个不变量实现了没 | 读 `crates/singlefs-checker/invariants` 下各类文件的「checker 状态」列，再 grep 实现它的检查的源码，确认它真的在 |
+ | 某个决策定了没 | 读 `.claude/kb/decisions.md` 的状态：已定 / 半定 / 待定 |
+ | 工具链与环境齐不齐 | 跑 `.claude/singlefs-ai-sop/scripts/env.sh` |
+-| 别家实现怎么做的 | 现查它的文档或源码，kb 里照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」标来源与「未在本项目验证」 |
++| 别家实现怎么做的 | 现查它的文档或源码，kb 里照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`（2. 每条带出处与状态）标来源与「未在本项目验证」 |
+ | 被测对象或它的产物现在什么状态 | 现场跑项目的检查，不靠「上次跑过是好的」 |
+ 
+ - 改 kb 或 TODO 里任何一行状态，先跑那一行对应的命令。
+@@ -52,13 +52,13 @@
+ 
+ - 交出去、还没跑完的检查（测试、门禁、复跑、自证），正文、记录与报告里只写「交了、等结局」，不写「绿」「过」「全抓」；结局出来、读过判定的那一行，再改成结论并引那一行。
+ - 几件检查写在同一句里的，没出结局的那一件单独拆出去写。
+-- 被取消、撞了资源上限或被打断的那一次运行，日志里已经打出的 ✓ 不算结局；结局以调度它的那一方给出的最终判定为准。
++- 被取消、撞了资源上限或被打断的那一次运行，日志里已经打出的 ✓ 不算结局；结局以调度它的那一方给出的最终判定为准，引的时候引那一行。
+ 
+ ## 原样保存的证据不许事后改
+ 
+ - 发给模型的提示、跑出来的原始输出、当时的日志，在这一轮里一个字都不改；改提示只能连同重跑一起改，要补说明另开一份文件。冻结的是内容，文件与目录的路径照 `.claude/rules/path-moves.md`「怎么做」改。
+ - 冻结只在这一轮内有效：这一轮提交之后，下一次提交把上一次留下的那批证据（提示、腿的报告、原始输出、留存产物）删掉，本次的照留；要查删掉的去版本库的历史里找。删之前查一遍被检查读的登记表（门禁登记表、钉表、变异清单这类）点名的路径：点到的不删，或者在同一次提交里改掉那几行登记。
+-- 旧证据是参考，不是依据：对早先的结论有疑问，重新验证（`.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」里「所有旧数据都只是参考」），不去翻旧证据；要推翻早先的结论，照 `.claude/rules/three-way-inference.md` 重走一轮，不拿旧文件对质。
++- 旧证据是参考，不是依据：对早先的结论有疑问，重新验证（`.claude/singlefs-ai-sop/rules/kb-discipline.md`（2. 每条带出处与状态）里「所有旧数据都只是参考」），不去翻旧证据；要推翻早先的结论，照 `.claude/rules/three-way-inference.md` 重走一轮，不拿旧文件对质。
+ - 正文引产物的检查按「这次改动」判，不按全仓判：当天写进正文的数要和当天的产物逐字对得上，早先抄下的行当历史参考、不再判。
+ - 门禁绕开这批目录：`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 从 `.claude/doc-lint-exclude` 读清单，一行一条，每条写明为什么；指向不存在的目录、或一个文件都没排到，判红。
+ 
+@@ -78,7 +78,7 @@
+ | **机制**：拆成机制，再论证机制在我们的前提下成立 | **搬运**：把结论连同它没写出来的前提一起搬过来 |
+ 
+ - 「没有任何现役实现走某条路」不证明这条路错，但举证责任在要走这条路的一边：得说清别人为什么不走。
+-- 引用别家实现时，同时写下它和这个项目的一处已知差异；写不出差异，这次引用就是搬运。来源与「未在本项目验证」照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」标。
++- 引用别家实现时，同时写下它和这个项目的一处已知差异；写不出差异，这次引用就是搬运。来源与「未在本项目验证」照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`（2. 每条带出处与状态）标。
+ 
+ ## 假设要写得出能否掉它的观测
+ 
+@@ -95,7 +95,7 @@
+ | 结果反过来**接不接受** | 跑之前就写下「要是量出相反的数，我会怎么改结论」 |
+ | 是不是**只在一个点**上取了值 | 一个尺寸、一个参数、一个负载算出来的倍数，不能叫「最坏情况」 |
+ | 给的区间，**同一份产物里有没有反例** | 说得出这个区间覆盖了产物里的全部取样点 |
+-| 这个数是不是**某个没扫过的参数**的函数 | 说得出这条臂的代价与收益依赖装置里哪几个旋钮、每个都扫过 |
++| 这个数是不是**某个没扫过的参数**的函数 | 先问它是哪个参数的函数，再写进正文：说得出这条臂的代价与收益依赖装置里哪几个旋钮、每个都扫过 |
+ 
+ - 推翻一个旧结论时，要比确立时更严，不是更松。
+ - 稻草人对照臂：给对面那条路挑一个没人会真用的实现方式，拿它量出的差当那条路的代价。判据：对面那条臂的样子，支持那条路的人认不认。
+diff -ruN r1-baseline/dot-claude/rules/format-evolution.md revised/dot-claude/rules/format-evolution.md
+--- r1-baseline/dot-claude/rules/format-evolution.md	2026-11-16 12:07:26.584305006 +0000
++++ revised/dot-claude/rules/format-evolution.md	2026-11-16 12:16:41.435832127 +0000
+@@ -45,7 +45,7 @@
+ 
+ ## 改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`
+ 
+-门禁 code-source-discipline（`.claude/gate.d/code-source-discipline.sh`）的 format-constants 格只核 `const 名字 = 值` 那一行；同一个值的派生形态常量改了不会跟着红：消息串（`expect("148")`）、按预留宽写的读写（`skip(24)`、`len() - 24`）、下标（`[147]`）、倍数（`7 × 148 = 1036`）、商与平方（`⌊16253 / 148⌋ = 109`、`109²`）、测试里钉住的产物值（随字节变的校验和）、门禁脚本里抄过去的数。
++门禁 code-source-discipline（`.claude/gate.d/code-source-discipline.sh`）的 format-constants 格只核 `const 名字 = 值` 那一行；同一个值的派生形态常量改了不会跟着红：消息串（`expect("148")`）、按预留宽写的读写（`skip(24)`、`len() - 24`）、下标（`[147]`，即值 − 1）、倍数（`7 × 148 = 1036`）、商与平方（`⌊16253 / 148⌋ = 109`、`109²`）、测试里钉住的产物值（随字节变的校验和）、门禁脚本里抄过去的数。
+ 
+ 1. 动手前按字面量、消息串、预留宽的读写、下标、倍数、商与平方、测试与门禁里钉的产物值逐类全仓搜，输出不截断。
+ 2. 改完把只可能指旧值的串登记进它 `format-const` 标记的 `stale=`（`|` 分隔）。登记前现扫一遍，kb 正文与源码里命中 0 次才登记；裸数字（`148`）不许登记。format-constants 格只扫 kb 正文与 `scripts/experiment-apparatus/`、`research/`、`crates/` 下的 `.rs`（`research/prompts/` 下冻结证据里的 `.rs` 由 `.claude/format-constants-exclude` 放行）；别处（门禁脚本、`research/results/` 下的产物、规则与 agent 定义、`records/`、`research/prompts/`、kb 的历史节与变更史，以及别的 `.md`、`.tsv`、`Cargo.toml`、`litmus/`）照第 1 步手工全仓搜。
+diff -ruN r1-baseline/dot-claude/rules/fs-design.md revised/dot-claude/rules/fs-design.md
+--- r1-baseline/dot-claude/rules/fs-design.md	2026-11-16 12:07:26.584333295 +0000
++++ revised/dot-claude/rules/fs-design.md	2026-11-16 12:18:48.261267651 +0000
+@@ -84,7 +84,7 @@
+ 
+ ## 这两条教条在格式层的形态
+ 
+-`.claude/rules/machine-first.md` 的两条推论（穷举的显式分支、用类型让非法状态无法表示）代码上照用（`.claude/singlefs-ai-sop/rules/code-discipline.md`「类型：让非法状态写不出来」），格式层也照用。
++`.claude/rules/machine-first.md` 的两条推论（穷举的显式分支、用类型让非法状态无法表示）代码上照用（`.claude/singlefs-ai-sop/rules/code-discipline.md`（类型：让非法状态写不出来）），格式层也照用。
+ 
+ ### 格式层的「让非法状态无法表示」，形态是 incompat feature bit
+ 
+@@ -109,6 +109,6 @@
+ | 工具 | 在给定的形式模型下穷举所有允许的交错，给出判定 | 对写下来的那个形式模型完备 |
+ | 模型 | 把代码里的同步模式翻成形式模型、枚举该问哪些场景 | 不完备 |
+ 
+-- 口径：精确的是工具，不是模型。「有没有漏掉一个该问的场景」「写下的和代码今天做的是不是一回事」没有任何东西保证。工具是门禁 lkmm（每份 litmus 一条判定，`.claude/rules/verification.md`「一个门禁：两种跑法」）；怎么证明它的判定分得出差别、怎么把写下的模型绑到代码上，规则里还没有对应的节，记在欠账表 `.claude/kb/checks-owed.md`。
+-- 它撑起「穷尽性能被机器检查」，以及由此推出的「宁可写穷举的显式分支」「控制流路径数有限，才验得完」（`.claude/singlefs-ai-sop/rules/code-discipline.md`「分支：穷举写全，不写通配臂」、`.claude/rules/code-discipline-by-review.md`「函数与嵌套：按「能单独验证」切，按路径数限」）。
++- 口径：精确的是工具，不是模型。「有没有漏掉一个该问的场景」「写下的和代码今天做的是不是一回事」没有任何东西保证。工具是门禁 lkmm（每份 litmus 一条判定，`.claude/rules/verification-reference.md`「各道的判定单位」）；怎么证明它的判定分得出差别、怎么把写下的模型绑到代码上：每条 Never 有自己的去屏障对照组、绑到代码的锚点，`.claude/rules/verification-reference.md`「门禁管哪一半」lkmm 那一行与 `.claude/scripts/lkmm.sh` 文件头「会失败的检查」第 3、4 条。
++- 它撑起「穷尽性能被机器检查」，以及由此推出的「宁可写穷举的显式分支」「控制流路径数有限，才验得完」（`.claude/singlefs-ai-sop/rules/code-discipline.md`（分支：穷举写全，不写通配臂）、`.claude/rules/code-discipline-by-review.md`「函数与嵌套：按「能单独验证」切，按路径数限」）。
+ - 收回条件：用来穷举交错的工具，判定和真机上的结论对不上，就收回「穷尽性能机检」，那个工具降为参考，不再当门禁。
+diff -ruN r1-baseline/dot-claude/rules/implementation-workflow.md revised/dot-claude/rules/implementation-workflow.md
+--- r1-baseline/dot-claude/rules/implementation-workflow.md	2026-11-16 12:07:26.583965208 +0000
++++ revised/dot-claude/rules/implementation-workflow.md	2026-11-16 12:22:52.322684407 +0000
+@@ -6,8 +6,8 @@
+ 
+ | 步 | 做什么 | 谁在判 |
+ |---|---|---|
+-| 1 写代码 | `crates/` 下的改动带测试，每条新测试先证明会红（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」） | show-me-test 阶段判「有没有测试」；会不会红写进 `crates/mutations.tsv` 的变异行与 commit message，两样都要 |
+-| 2 多 agent 正反对抗推理 | 改完的 `crates/` 代码（产品代码与测试代码）走一轮三方：材料带上 diff 与它压着的条款，`three-way-forward`（或 `three-way-defense`）核「代码做的是不是条款说的」、`three-way-attack` 攻「哪一格会错」（不派本地模型的腿）；打中的写回代码，开不开下一轮照 `.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算」；代码轮正文每一轮按「代码轮正文的检查单」一节逐格点名。射程是 `crates/` 下的全部代码：各包的 `src/`（含其中的 `#[cfg(test)]` 模块）与 `tests/`，验证包 `crates/singlefs-verification/`、池级 checker `crates/singlefs-checker/`、函数单元图 `crates/singlefs-unit-graph/` 同样在内，加 `crates/mutations.tsv`；只改了注释的文件不走（去掉注释与空白之后代码与改前逐个相同；文档注释里会编成 doctest 的代码块、文档注释与 `// SAFETY:` 注释的增删照代码算；判法是规范副本的 `.claude/singlefs-ai-sop/scripts/comment-only-change.py`，show-me-test 用同一份） | 门禁 doc-process-records 的 crates-adversarial-review 格判形式：这次改动里每个 `crates/*/src/*.rs`（`crates/singlefs-verification/`、`crates/singlefs-checker/`、`crates/singlefs-unit-graph/` 下的与只改了注释的除外）都要在同一次改动带来的 `research/prompts/*-main-verification.md` 里被按路径点名；那三个包的 `src/`、各包的 `tests/` 与 `crates/mutations.tsv` 这一格还没判，由主 agent 写判决时逐份点名。豁免表 `.claude/crates-review-exempt` 与 `.claude/agent-def-review-exempt` 不再加行，现有的行补完一轮三方删一行。点名了判得对不对，要人看；同一道的 code-round-checklist 格判代码轮正文（`_<题>-code-r<数字>-body.md`）里检查单八格的标题在不在、底下写没写字，答案对不对由腿与主 agent 核 |
++| 1 写代码 | `crates/` 下的改动带测试，每条新测试先证明会红（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」） | show-me-test 阶段判「有没有测试」；会不会红写进存进仓里的变异清单（`crates/` 的测试进 `crates/mutations.tsv`，实验装置的进 `scripts/mutation/tables/` 下它那一张表）与 commit message，两样都要 |
++| 2 多 agent 正反对抗推理 | 改完的 `crates/` 代码（产品代码与测试代码）走一轮三方：材料带上 diff 与它压着的条款，`three-way-forward`（或 `three-way-defense`）核「代码做的是不是条款说的」、`three-way-attack` 攻「哪一格会错」（不派本地模型的腿）；**代码轮的轮数不照「先挂起、三轮多数」**（那一套只管设计推论轮，在 `.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算」）：第一轮两条腿结论一致、没打中就停；打中的，主 agent 现查坐实、做成会红的测试后写回代码，改完再攻一轮，那一轮没新打中就收，最多三轮；代码轮正文每一轮按「代码轮正文的检查单」一节逐格点名。射程是 `crates/` 下的全部代码：各包的 `src/`（含其中的 `#[cfg(test)]` 模块）与 `tests/`，验证包 `crates/singlefs-verification/`、池级 checker `crates/singlefs-checker/`、函数单元图 `crates/singlefs-unit-graph/` 同样在内，加 `crates/mutations.tsv`；只改了注释的文件不走（去掉注释与空白之后代码与改前逐个相同；文档注释里会编成 doctest 的代码块、文档注释与 `// SAFETY:` 注释的增删照代码算；判法是规范副本的 `.claude/singlefs-ai-sop/scripts/comment-only-change.py`，show-me-test 用同一份） | 门禁 doc-process-records 的 crates-adversarial-review 格判形式：这次改动里每个 `crates/*/src/*.rs`（`crates/singlefs-verification/`、`crates/singlefs-checker/`、`crates/singlefs-unit-graph/` 下的与只改了注释的除外）都要在同一次改动带来的 `research/prompts/*-main-verification.md` 里被按路径点名；那三个包的 `src/`、各包的 `tests/` 与 `crates/mutations.tsv` 这一格还没判，由主 agent 写判决时逐份点名。豁免表 `.claude/crates-review-exempt` 与 `.claude/agent-def-review-exempt` 不再加行，现有的行补完一轮三方删一行。点名了判得对不对，要人看；同一道的 code-round-checklist 格判代码轮正文（`_<题>-code-r<数字>-body.md`）里检查单八格的标题在不在、底下写没写字，答案对不对由腿与主 agent 核 |
+ | 3 checker 测试 | 池级 checker、崩溃点重放、变异表：三方打中的每一条先做成会红的量再改；每一处改法在 `crates/mutations.tsv` 留一条「改回去它就红」的变异 | 门禁 `crash-point-replay`、crates-mutation-replay、code-source-discipline 的 mutation-tables 格（`scripts/mutation/tables/` 与 `crates/mutations.tsv` 的静态几样）、`check.sh` |
+ 
+ **次序不能倒**：第 2 步攻的是写好的产品代码与它的测试，攻在计划上的那一轮替代不了它。只改测试代码的同样走第 2 步，并进按批的代码轮；测试怎么写、覆盖够不够、用例对不对在同一轮里攻。
+@@ -20,7 +20,7 @@
+ 
+ **治理文件同规矩**：项目规则（`.claude/rules/`）、技能（`.claude/skills/`）、钩子（`.claude/hooks/`）、门禁（`.claude/gate.d/`）、`scripts/` 下的脚本、统一任务服务 `task-server/` 与判定库服务 `prune-server/`（客户端在 `scripts/prune-server/`）的改动按批走一轮三方（`.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条），判决按路径点名改过的每一份，不等用户点名、不登豁免；这几类门禁还没判，由主 agent 写判决时逐份点名。
+ 
+-**三步在定义上各取什么**：第 1 步不适用（`show-me-test.md`「没有测试的 patch 一律不收」只管 `crates/*/src/`）；第 2 步就是「改它们与改 `crates/` 同规矩」那一轮三方；第 3 步照 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」里「设计论证同样照办」那一句：三方打中的每一条，先在模型里做成一个必须报非 0 的世界，再改定义。
++**三步在定义上各取什么**：第 1 步不适用（`.claude/singlefs-ai-sop/rules/show-me-test.md`（没有测试的 patch 一律不收）只管 `crates/*/src/`）；第 2 步就是「改它们与改 `crates/` 同规矩」那一轮三方；第 3 步照 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」里「设计论证同样照办」那一句：三方打中的每一条，先在模型里做成一个必须报非 0 的世界，再改定义。
+ 
+ ## 代码轮派腿之前记一份开工快照
+ 
+@@ -35,7 +35,7 @@
+ ## 复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判
+ 
+ - 改动之后一条判定要不要重判，判据是**它的单元键在判定库里有没有键相同、作数的判定**；键由什么组成在 `.claude/rules/verification.md`「一个门禁：两种跑法」。
+-- 复用由阶段自己做、自己报：每道的成功句报这一趟现判、复用各几条，有拒算的另报拒算几条（broad-mutation 的这几个数在它起的驱动的成功句里）；作废的判定报得出是哪几个函数单元变了。收尾报告抄每道的这一句；没有这一句的那一道按没跑算（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
++- 复用由阶段自己做、自己报：每道的成功句报这一趟现判、复用各几条，有拒算的另报拒算几条（broad-mutation 的这几个数在它起的驱动的成功句里）；作废的判定报得出是哪几个函数单元变了。收尾报告抄每道的这一句；没有这一句的那一道按没跑算（`.claude/singlefs-ai-sop/rules/show-me-test.md`（门禁不许假装通过））。
+ - 复用核查（同一份输入跑第二趟现判 0、哨兵与强制现判那一条）固定在一棵快照树上做，不在活的主工作区量。
+ - ⚠️ **不许拿「我只改了文档」当理由**（`.claude/rules/fs-design.md`「门禁的范围必须可判定」）。
+ 
+@@ -48,7 +48,7 @@
+ | 场合 | 跑不跑 |
+ |---|---|
+ | 实现员交回前 | 一条都不交（`.claude/agent-common.md`「子 agent 不交任务」），只自己跑 `cargo fmt`；动到的测试目标、clippy / build、证红、命名检查、登记的崩溃枚举用例（门禁 `crash-point-replay` 按块那一路）、崩溃放量分项、formal-verification、crates-mutation-replay 带 `--item`（点这一次改到的项）各写成 `task-server/task submit --cwd <自己的副本> -- <命令>` 写进报告 |
+-| 每次提交代码、提交之外要跑不指定范围的、其余任何时候 | 照 `.claude/rules/verification.md`「一个门禁：两种跑法」那张表与提交时只走一条路那一条 |
++| 每次提交代码、提交之外要跑不指定范围的、其余任何时候 | 照 `.claude/rules/verification.md`「一个门禁：两种跑法」那张表、「提交之外」那一条与提交时只走一条路那一条 |
+ | 仓副本里正文改过的脚本的自证 | 子 agent 不交，把命令写进交回报告；主 agent 经 `task-server/task submit --cwd <集成副本> -- …` 交，不弹窗；跑之前主 agent 逐份 `diff -u <主工作区里那一份> <副本里那一份>` 看那份自证（连同它 source / import 的库），正文起编译、测试或别的重活的不交，退回改成假驱动 |
+ 
+ herd7 / LKMM、QEMU 与 Verus 不归上游 singlefs-ai-sop 管，是本工程自己的三道门禁 lkmm、qemu-device-streams、formal-verification；三道都在 `gate.sh` 里，`--staged` 那条路同样跑，单跑一道不算跑过门禁。
+diff -ruN r1-baseline/dot-claude/rules/machine-first.md revised/dot-claude/rules/machine-first.md
+--- r1-baseline/dot-claude/rules/machine-first.md	2026-11-16 12:07:26.584074497 +0000
++++ revised/dot-claude/rules/machine-first.md	2026-11-16 12:18:48.261807378 +0000
+@@ -10,7 +10,7 @@
+ | 谁在用 | 模型写、模型改、机器验 | 人做判断、人担责任 |
+ | 优化什么 | 可机检、可穷举、可强制进入、可回退 | 可判断、可信、看得出取舍 |
+ | 具体形态 | 显式穷举分支胜过聪明的通用路径；类型让非法状态无法表示；不变量写成断言；宁可生成重复也不手工维护 | 决策带依据；门禁失败带下一步；数字带口径；未验证的显式标出 |
+-| 写在哪 | 「遇到一条通行准则，走这个流程」「放宽的（人脑带宽的产物）」「留下的（与谁读代码无关）」、`.claude/singlefs-ai-sop/rules/code-discipline.md`、`.claude/rules/code-discipline-by-review.md`、`.claude/singlefs-ai-sop/rules/kb-discipline.md` 与项目自己的设计纪律 | `.claude/singlefs-ai-sop/rules/sop-first.md`「每一条拒绝都必须给出下一步」、`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`、「设计文档：长度相称，该说服的就说服」「提议不因为来自谁而免检」、决策记录的依据要求 |
++| 写在哪 | 「遇到一条通行准则，走这个流程」「放宽的（人脑带宽的产物）」「留下的（与谁读代码无关）」、`.claude/singlefs-ai-sop/rules/code-discipline.md`、`.claude/rules/code-discipline-by-review.md`、`.claude/singlefs-ai-sop/rules/kb-discipline.md` 与项目自己的设计纪律 | `.claude/singlefs-ai-sop/rules/sop-first.md`（每一条拒绝都必须给出下一步）、`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`、「设计文档：长度相称，该说服的就说服」「提议不因为来自谁而免检」、决策记录的依据要求 |
+ 
+ ## AI 友好 ≠ 不可读
+ 
+@@ -92,7 +92,7 @@
+ - 模块边界要有明确契约
+ - 推理范围要有界
+ 
+-文档纪律不在放宽之列：正文只写现状、历史的落点照 `.claude/singlefs-ai-sop/rules/design-doc-discipline.md`「1. 正文只写当前现状，历史一律放到文末」、`.claude/singlefs-ai-sop/rules/kb-discipline.md`「8. 正文只写现状，历史放文末的「历史版本」」与 `.claude/singlefs-ai-sop/rules/rules-discipline.md`，决策记录进 kb。
++文档纪律不在放宽之列：正文只写现状、历史的落点照 `.claude/singlefs-ai-sop/rules/design-doc-discipline.md`（1. 正文只写当前现状，历史一律放到文末）、`.claude/singlefs-ai-sop/rules/kb-discipline.md`（8. 正文只写现状，历史放文末的「历史版本」）与 `.claude/singlefs-ai-sop/rules/rules-discipline.md`，决策记录进 kb。
+ 
+ ## 设计文档：长度相称，该说服的就说服
+ 
+@@ -103,7 +103,7 @@
+ 
+ ## 提议不因为来自谁而免检
+ 
+-用户提的方案和别处来的方案过同一道闸（`.claude/rules/show-me-test-by-review.md`「不按来源分类，只看证据」管提交，这一条管提议）。警告记录的格式在 `.claude/singlefs-ai-sop/rules/pushback-discipline.md`「警告写在哪：`.claude/warnings/<日期>.md`」。
++用户提的方案和别处来的方案过同一道闸（`.claude/rules/show-me-test-by-review.md`「不按来源分类，只看证据」管提交，这一条管提议）。警告记录的格式在 `.claude/singlefs-ai-sop/rules/pushback-discipline.md`（警告写在哪：`.claude/warnings/<日期>.md`）。
+ 
+ ### 对不上就当场说
+ 
+diff -ruN r1-baseline/dot-claude/rules/session-wrapup.md revised/dot-claude/rules/session-wrapup.md
+--- r1-baseline/dot-claude/rules/session-wrapup.md	2026-11-16 12:07:26.584400255 +0000
++++ revised/dot-claude/rules/session-wrapup.md	2026-11-16 12:18:48.262126576 +0000
+@@ -12,7 +12,7 @@
+ ## 1. 这轮敲的脚本/命令，有没有该收归 `scripts/` 的？
+ 
+ - 判据是「会不会被抄第二遍」，不是「写得好不好」。
+-- 踩过的坑做成会红的检查，不做成提醒句，立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「边界」：先记欠账、按批立。
++- 踩过的坑做成会红的检查，不做成提醒句，立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`（边界）：先记欠账、按批立。
+ - 已经没人用的，删。
+ 
+ ## 2. 这轮用到的 skill / 规则，有没有该改的？
+@@ -34,8 +34,8 @@
+ 几个会话同时在一个仓里干活时，收尾前逐条对一遍：
+ 
+ - 提交前把改动分成「这一轮的」与「不是这一轮的」，只提交这一轮的。
+-- 门禁红了，判红之前先看失败涉及的文件在不在这一轮的改动里：不在就如实说「红了，但不是这一轮的」，不顺手修，照 `.claude/rules/command-safety-by-review.md`「遇到问题，先找有没有别的 agent 在管这一块」找管它的那一个。提交时那一趟门禁（`gate.sh --staged`）在临时 worktree 上只拿 HEAD 与暂存区跑，红的就是这次提交带进来的；不带 `--staged` 的 `gate.sh` 开跑与收尾各记一次工作区指纹，对不上判红。不为分清是谁的红另起门禁（不指定范围的只在提交时跑：`.claude/rules/verification.md`「一个门禁：两种跑法」）。
+-- 公共编号先到先得：实验号这类大家共用的编号，取号之前先看已有的最大号，取号在写第一个文件的同一条命令里现查；历史条目编号照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`「8. 正文只写现状，历史放文末的「历史版本」」。项目用了 `history-ordinal.sh` 不认的编号形态，才在项目侧补一道会红的检查。
++- 门禁红了，判红之前先看失败涉及的文件在不在这一轮的改动里：不在就如实说「红了，但不是这一轮的」，不顺手修，照 `.claude/rules/command-safety-by-review.md`「遇到问题，先找有没有别的 agent 在管这一块」找管它的那一个。分不清是谁的红、确要跑整轮门禁的，先照 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条弹窗问用户，同意了才跑 `gate.sh --staged`（经服务交 `scripts/gate/gate-staged.sh`，照 `.claude/skills/gate/staged-gate.md`）：它在临时 worktree 上只拿 HEAD 与暂存区跑，这时候红的就是这一次提交带进来的。不带 `--staged` 的 `gate.sh` 开跑与收尾各记一次工作区指纹，对不上就判红；等改动停下再跑，或者用 `--staged`。
++- 公共编号先到先得：实验号这类大家共用的编号，取号之前先看已有的最大号，取号在写第一个文件的同一条命令里现查；历史条目编号照 `.claude/singlefs-ai-sop/rules/kb-discipline.md`（8. 正文只写现状，历史放文末的「历史版本」）。项目用了 `history-ordinal.sh` 不认的编号形态，才在项目侧补一道会红的检查。
+ - 改公共文件只做定点替换，不整篇重写。新建文件用排他方式（`set -o noclobber`、`open(路径, 'x')`）；能在工具层拦（写入前的钩子拒绝覆盖未跟踪的文件）就在工具层拦。
+ - 「只提交这些路径」不等于 `git commit -- <路径>`：带路径的 commit 提交的是这些路径在工作区里的内容。暂存前先确认 `git diff --cached --name-only` 为空；暂存完、提交前再核一遍名单与逐文件的 cached diff，然后不带路径地 `git commit`。
+ - 清索引（`git reset`、`git restore --staged .`）之前先 `git diff --cached --name-only` 看有没有别人暂存的；只清自己的路径：`git restore --staged -- <路径…>`。
+diff -ruN r1-baseline/dot-claude/rules/show-me-test-by-review.md revised/dot-claude/rules/show-me-test-by-review.md
+--- r1-baseline/dot-claude/rules/show-me-test-by-review.md	2026-11-16 12:07:26.584423115 +0000
++++ revised/dot-claude/rules/show-me-test-by-review.md	2026-11-16 12:18:48.262335745 +0000
+@@ -4,12 +4,12 @@
+ ## 新增的测试必须先证明它会红
+ 
+ - 先把被测代码改坏，看着测试变红，再改回来；证明不了会红的测试等于没写。
+-- 两样都要：把「改坏哪里、哪条断言红」做成存进仓里的变异行（`crates/mutations.tsv`）交给门禁反复复跑；变异行之外，commit message 里也写明怎么确认它会红（改坏了哪一行，看到哪个断言失败）。脚本查不了 commit message 那一样，写不出来就是没做。
++- 两样都要：把「改坏哪里、哪条断言红」做成存进仓里的变异清单交给门禁反复复跑（`crates/` 的测试进 `crates/mutations.tsv`，实验装置的进 `scripts/mutation/tables/` 下它那一张表）；变异行之外，commit message 里也写明怎么确认它会红（改坏了哪一行，看到哪个断言失败）。脚本查不了 commit message 那一样，写不出来就是没做。
+ - 设计论证同样照办：对抗轮打中的每一条，先在模型里做成一个必须报非 0 的世界，再改规则。
+ 
+ ## 踩过的坑要做成会失败的检查，不要做成提醒句
+ 
+-形态与立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「推论」与「边界」：做成当场拒绝执行的检查，先记欠账、按批立，正在反复发生的当场立。
++形态与立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`（推论）与「边界」：做成当场拒绝执行的检查，先记欠账、按批立，正在反复发生的当场立。
+ 
+ ### 但要先问这个坑在哪一层：装置里，还是口径上
+ 
+@@ -19,7 +19,7 @@
+ | **建模口径上**（同一个量该怎么算、边界算不算、单位是什么） | **立在装置之间**：两套装置算同一个量，就要有一条检查逼它们落到同一个数，对不上判红 |
+ 
+ - 判据：换一套装置从头把同一件事再做一遍，还会不会再踩一次；会，它就在口径层，检查跨装置立。
+-- 跨装置的检查要钉住「这个名字指的是哪个量」：两个量就登记两个名字，各钉各的值（`.claude/singlefs-ai-sop/rules/code-discipline.md`「名字：光看名字，就说得出它是什么、做什么」里「一个语义概念全仓一个名字」那一行）。
++- 跨装置的检查要钉住「这个名字指的是哪个量」：两个量就登记两个名字，各钉各的值（`.claude/singlefs-ai-sop/rules/code-discipline.md`（名字：光看名字，就说得出它是什么、做什么）里「一个语义概念全仓一个名字」那一行）。
+ 
+ # 一条改动不同步铺满全仓时，排除的每一份都要登记
+ 
+@@ -49,7 +49,7 @@
+ 1. **门禁绿不等于可以不看代码**：人去看测试测的是不是对的东西。
+ 2. 语义对不对写在 `.claude/kb/decisions.md` 和 `crates/singlefs-checker/invariants` 下各类文件里，门禁只保证它们写下来了、实现了、和代码同步；它们本身写得对不对，靠人。
+ 3. **门禁是下限，不是上限。**
+-4. 没实现的阶段一直列出来，`gate.sh` 每次都打印这份清单；项目阶段声明覆盖了某一项（`# gate-covers:`）的，那一项什么时候从清单里换下来照 `.claude/singlefs-ai-sop/rules/show-me-test.md`「最终判据由项目定」（这一轮跑过且通过）。
++4. 没实现的阶段一直列出来，`gate.sh` 每次都打印这份清单；项目阶段声明覆盖了某一项（`# gate-covers:`）的，那一项什么时候从清单里换下来照 `.claude/singlefs-ai-sop/rules/show-me-test.md`（最终判据由项目定）（这一轮跑过且通过）。
+ 5. **交回的清单能被机器核全，不等于判对了**：子 agent 逐项判的活（回扫、复核），能做成检查的是「每一项都有判定、判定是认得的那几种、理由里引了那一项的原话」，拦得住「抽样够了」「整组放行」，拦不住判错。核全之后在全部判定种类里抽查复判，抽中判错的那一段重做、再抽。
+ 
+ ## 不按来源分类，只看证据
+diff -ruN r1-baseline/dot-claude/rules/test-script-discipline.md revised/dot-claude/rules/test-script-discipline.md
+--- r1-baseline/dot-claude/rules/test-script-discipline.md	2026-11-16 12:07:26.584184676 +0000
++++ revised/dot-claude/rules/test-script-discipline.md	2026-11-16 12:20:13.165375584 +0000
+@@ -1,16 +1,16 @@
+ <!-- doc-lint:rule-definition -->
+ # 测试用例与测试脚本的写法
+ 
+-管项目自己的验证代码：单元与集成测试、穷举与长时间随机的验证、真设备与外部工具的装置，以及入口脚本（把一批登记的项组织起来跑的脚本；必须带位置参数、对一张表或一份输入跑的工具与只读日志的辅助脚本不算）。它们同样受 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」、`.claude/rules/test-discipline.md`、`.claude/singlefs-ai-sop/rules/command-safety.md`、`.claude/singlefs-ai-sop/rules/preflight-discipline.md` 管。
++管项目自己的验证代码：单元与集成测试、穷举与长时间随机的验证、真设备与外部工具的装置，以及入口脚本（把一批登记的项组织起来跑的脚本；必须带位置参数、对一张表或一份输入跑的工具与只读日志的辅助脚本不算）。它们同样受 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」、`.claude/rules/test-discipline.md`、`.claude/singlefs-ai-sop/rules/show-me-test.md`（门禁不许假装通过；每一个弄坏开关都必须会红）、`.claude/singlefs-ai-sop/rules/command-safety.md`、`.claude/singlefs-ai-sop/rules/preflight-discipline.md` 管。
+ 
+ ## 用例原子化：每一条都能单独跑
+ 
+ **判据：点名单跑一条用例，与它在不指定范围那一趟里跑，判定相同。** 自证分了格、能点名单跑的，每一格同样守这一条。
+ 
+ - 一条用例一个场景。按参数循环、每一轮重建被测状态的，拆成一个带参数的函数加每个取值一条用例；确是一个场景的（同一份状态上按次序做几步），用例旁写一行注释说明为什么。
+-- 不依赖跑序，不读别的用例（自证里是别的格）留下的文件、全局变量、环境变量与临时目录：每条自己建、自己初始化、自己删（`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」）。
++- 不依赖跑序，不读别的用例（自证里是别的格）留下的文件、全局变量、环境变量与临时目录：每条自己建、自己初始化、自己删（`.claude/singlefs-ai-sop/rules/command-safety.md`（测试镜像一律放临时目录））。
+ - 随机输入带种子，红了打印种子，凭种子能单独复现那一条。
+-- 用例名写场景和预期（`.claude/singlefs-ai-sop/rules/code-discipline.md`「名字：光看名字，就说得出它是什么、做什么」），不带里程碑、步号、批次这类来历；来历进 commit message 或项目 kb。
++- 用例名写场景和预期（`.claude/singlefs-ai-sop/rules/code-discipline.md`（名字：光看名字，就说得出它是什么、做什么）），不带里程碑、步号、批次这类来历；来历进 commit message 或项目 kb。
+ - 红了只重跑红的：入口脚本从上一趟的输出里取出红的用例，给出只跑它们的命令；取出的条数与那一趟汇总报的失败数对不上，判红、不给命令，出路写「整份重跑一次」（`.claude/rules/command-safety-by-review.md`「结果抓取要有完整性闸」）。
+ 
+ ## 入口脚本：不带参数就是不指定范围
+@@ -27,8 +27,8 @@
+ - 门禁阶段不是入口脚本：`gate.sh` 不带参数起阶段；阶段里直接起测试框架或调入口脚本，不指定范围的不带选条参数，指定范围的显式写 `--item` 或测试框架自己的筛选参数。
+ - 不用测试框架自带的标记（`#[ignore]` 这类）分档：不带参数跑到的就是全部，脚本里不带 `--include-ignored`、`--ignored`。
+ - 规模变量（种子数、展开深度这类）被设过，这一趟的产物写出它的取值；缩过规模的那一趟不当门禁通过、不当正式产物。
+-- 整个脚本都离不开的工具、设备、硬件写成 `run-condition`（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`），不满足退 78；只有个别项要的，那几项照 `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」逐项报「本次未跑」，这一趟不说「全部通过」。
+-- 每项结束打一行：项名、退出码、判了多少、红了多少、复用了多少（没有判定复用这一层的项写「不复用」；有这一层、这一趟取不出数的写「取不出」，不并进总计，成功那句点名是哪几项；两种都不写 0）、用了几秒；末行是总计。收回的项数照 `.claude/singlefs-ai-sop/rules/command-safety.md`「并行不许把失败吃掉」核。
++- 整个脚本都离不开的工具、设备、硬件写成 `run-condition`（`.claude/singlefs-ai-sop/rules/preflight-discipline.md`），不满足退 78；只有个别项要的，那几项照 `.claude/singlefs-ai-sop/rules/show-me-test.md`（门禁不许假装通过）逐项报「本次未跑」，这一趟不说「全部通过」。
++- 每项结束打一行：项名、退出码、判了多少、红了多少、复用了多少（没有判定复用这一层的项写「不复用」；有这一层、这一趟取不出数的写「取不出」，不并进总计，成功那句点名是哪几项；两种都不写 0）、用了几秒；末行是总计。收回的项数照 `.claude/singlefs-ai-sop/rules/command-safety.md`（并行不许把失败吃掉）核。
+ - 退出码含义固定：0 跑到的全绿（有项报了「本次未跑」也是 0）、1 有红、2 用法错、77 一项都没跑到、78 准入或运行条件不满足；别的拒绝形态另用退出码的，在文件头逐个列明。
+ 
+ ## 测试脚本自己也要被测试证明有效
+@@ -37,7 +37,7 @@
+ 
+ - 写成能被测的形态：判法写成纯函数，项的驱动、设备、时钟、随机源都能从参数或环境变量换成假的，不写死路径与外部服务；换不掉的那一处在文件头写明。
+ - 自证用 `--selftest`、同包里的测试，或红绿用例（每条带一份写明期望退出码与输出的说明；写成样本目录的，要留的空目录放一个 `.keep`，门禁阶段「脚本执行位」判；写成单文件的，期望值写进文件头）。每一种判定（绿、红、本次未跑、用法错）至少喂一个答案已知的输入，判出来与答案相同；入口脚本的列项、点名、拒绝认不得的项名、失败计数、项数核对各走一遍。
+-- 每一处会判红的分支配一个弄坏开关或一条变异。开关在脚本文件头逐个列明：开关名、弄坏哪一处、打开后哪一项该红；只给自证用，平常跑时不认；逐个打开核红照 `.claude/singlefs-ai-sop/rules/show-me-test.md`「每一个弄坏开关都必须会红」。变异进入库的变异清单（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」）。
++- 每一处会判红的分支配一个弄坏开关或一条变异。开关在脚本文件头逐个列明：开关名、弄坏哪一处、打开后哪一项该红；只给自证用，平常跑时不认；逐个打开核红照 `.claude/singlefs-ai-sop/rules/show-me-test.md`（每一个弄坏开关都必须会红）。变异进入库的变异清单（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」）。
+ - 失败句里不写失败行起头的那种形态（例「✗ <标签> <名>：」）：引样本原文时换写法，取格名的一方会把引文当成又一个红格。
+ - 自证接进门禁，改了测试脚本或判法就跑到；一律用假驱动，不起编译与重活；改了谁，主 agent 经任务服务交谁的 `--selftest`。
+ 
+@@ -50,7 +50,7 @@
+ ## 判定可复用：按输入存，按前缀剪
+ 
+ - 每一份判定按它依赖的全部输入算键存下：被测代码、判法代码、参数、工具链。键相同的直接复用，不设时限。
+-- 判定库不是这一趟的输出：输出照 `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」每趟新写，复用来的判定与现判的分开报；判定库只有一份（`.claude/rules/verification.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」），不随这一趟的临时目录。
++- 判定库不是这一趟的输出：输出照 `.claude/singlefs-ai-sop/rules/show-me-test.md`（门禁不许假装通过）每趟新写，复用来的判定与现判的分开报；判定库只有一份（`.claude/rules/verification.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」），不随这一趟的临时目录。
+ - 状态空间按共享前缀组织：几条流、几个项共有的前缀只判一次，后面的接着它判。
+ - 剪掉的只能是两种：键相同、已经判过的；与已判状态等价的（等价关系写成用例钉住）。按登记整批不判的一类不算剪枝：登记表一行一类、写明为什么不判，成功那句报跳过了多少，照「门禁不许假装通过」列出没判的是哪几类。
+ - 剪枝要自证：在小规模输入上关掉剪枝与复用跑一遍，判定与开着时逐项相同；剪枝自证能用指定范围单点跑。
+diff -ruN r1-baseline/dot-claude/rules/three-way-inference.md revised/dot-claude/rules/three-way-inference.md
+--- r1-baseline/dot-claude/rules/three-way-inference.md	2026-11-16 12:07:26.583929508 +0000
++++ revised/dot-claude/rules/three-way-inference.md	2026-11-16 12:22:52.322514137 +0000
+@@ -32,7 +32,7 @@
+ 主 agent 的职责是**评判**，不是再当一条推论。
+ 
+ - **三方一致 → 继续。** **不一致 → 先核实，再讨论。** 核实指去查能分辨它们的那个事实，不再加一个模型来投票；分歧点写进结论。攻击结果主 agent 逐条现查再采纳，不照单全收。
+-- **腿要跑的都交主 agent**：照 `.claude/agent-common.md`「子 agent 不交任务」写进报告；要腿接着读输出的，新派同立场的腿，派发提示写一行「承接：<前一份报告的路径>」。腿报告里主 agent 还没复跑出的读数一律当「推的」。
++- **腿要跑的都交主 agent**：照 `.claude/agent-common.md`「子 agent 不交任务」写进报告（要写文件时 `--cwd` 给腿自己的草稿目录或输出写绝对路径、并指到输出路径的写法：先读 `.claude/skills/three-way/SKILL.md`「判决由主 agent 做，不由投票做」）；要腿接着读输出的，新派同立场的腿，派发提示写一行「承接：<前一份报告的路径>」。腿报告里主 agent 还没复跑出的读数一律当「推的」。
+ - **一条腿在副本装置上量出来的数，要在入库的装置上重做一次才能引。** 副本上的数不进 kb：主 agent 把它做成入库装置的新一次跑（跑前登记写明核实哪条腿的哪句话），逐字段坐实了才引。
+ - **攻方腿自己提的收严，只在它自己的模型上量过，算「没被攻过」。** 可以写回，交用户时写明「被攻过零轮」，并给它自己的检查记一笔账。
+ - **腿提的、判决里标「零轮」的改法，写进产品代码之前先在探针里对它做 A/B。** 有这一改法与没有它两臂喂同一批输入，量它在被打中的那一支上换不换得到东西（写进或出路），换不到的撤回。A/B 读数由主 agent 经任务服务跑出，任务号写进判决「改法」一节那一条；实现员的派发提示引了零轮改法的，带一行「A/B 读数：<任务号>」（`.claude/hooks/runner-dispatch-guard.sh` 判这一行）。
+@@ -40,7 +40,7 @@
+ 
+ ## 多轮：一次打穿不算数，三轮里多数打穿才算
+ 
+-**开不开下一轮**：第一轮两条腿结论一致、没打中，就停，不开第二轮。有打中的或结论不收敛的，才开第二、三轮：打中的东西先挂起、不直接写进正文，同一个结论再攻两轮，三轮里多数打穿才算打穿；第一轮结论不一致、无法收敛的开第二轮，前两轮不一致、无法收敛的开第三轮。第三轮为最终轮，论证前两轮的结论和判定过程，交主 agent 判断。三轮各换一组攻击面，提示里明令不许重复已攻过的角度：第一轮过度外推与越位 / 内部矛盾与循环依赖 / 哪一条最脆弱；第二轮第一轮的修补本身 / 产生结论的方法 / 从未被看过的地方；第三轮「已定」项撑不撑得住 / 未定项清单的完整性 / 那一轮报出的数字能不能核。其中至少一轮派一条辩方腿复核已有的判决。攻击腿撤回自己先前给的方案，比它打中新东西更有价值。
++**多轮这一套只管设计推论轮**；代码轮的轮数照 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」第 2 步，那里不用「先挂起、三轮多数」。**开不开下一轮**：第一轮两条腿结论一致、没打中，就停，不开第二轮；停是不开下一轮，不是已经能拿这个「没打中」去支撑别的结论，要拿去支撑别的结论时才照「一条腿只抽一次样不算一次观测——否定结论尤其不算」再抽一次。有打中的或结论不收敛的，才开第二、三轮：打中的东西先挂起、不直接写进正文，同一个结论再攻两轮，三轮里多数打穿才算打穿；第一轮结论不一致、无法收敛的开第二轮，前两轮不一致、无法收敛的开第三轮。第三轮为最终轮，论证前两轮的结论和判定过程，交主 agent 判断。三轮各换一组攻击面，提示里明令不许重复已攻过的角度：第一轮过度外推与越位 / 内部矛盾与循环依赖 / 哪一条最脆弱；第二轮第一轮的修补本身 / 产生结论的方法 / 从未被看过的地方；第三轮「已定」项撑不撑得住 / 未定项清单的完整性 / 那一轮报出的数字能不能核。开了第二、三轮的，其中至少一轮派一条辩方腿复核已有的判决。攻击腿撤回自己先前给的方案，比它打中新东西更有价值。
+ 
+ **第三轮之后停，不开第四轮。** 腿提的收严、主 agent 判决里推的组合都算被攻过零轮；第三轮只攻前两轮站住的形态，这一轮里新冒出来的零轮形态不再为它开一轮，写进判决的交用户表、标「零轮」，要么登记实验量代价，要么另立一题。
+ 
+@@ -67,7 +67,7 @@
+ 
+ 模型的答复照 `.claude/rules/test-discipline.md`「单次观测不算数」办。⚠️ **两个方向的门槛不一样**：**打中了**（给出反例、指出矛盾）一次就值得去核，真伪由主 agent 现查坐实；**没打中**（「构造不出反例」「没发现问题」）**一次不算**。
+ 
+-- 拿一条腿的「没打中」支撑任何结论之前，用同一份提示再派一条同立场腿，报告写成 `<轮>-<模型>-s2-output.md`、模型目录写成 `<轮>-<模型>-s2-model/`，不盖掉第一条腿的；两次都没打中才记「没打中」。
++- 拿一条腿的「没打中」支撑任何结论之前，用同一份提示再派一条同立场腿，报告写成 `<轮>-<模型>-s2-output.md`、模型目录写成 `<轮>-<模型>-s2-model/`，不盖掉第一条腿的；两次都没打中才记「没打中」。第一轮「没打中就停」不受「两次都没打中才记」拦：前者只决定开不开下一轮，后者管「没打中」能不能拿去支撑别的结论。
+ - **几份样本一不一致，按每一格答的是哪件事判，不按行号、行标签、措辞、排版与作答次序判**：先按内容对到同一件事上再比，只有一份样本答到的那件事照只有一份样本办。对齐之后结论不同的格记「不稳定」：它不支撑「没打中」，也不算一致；格里任何一份样本给出的反例、矛盾与算出的数，照「打中了」当线索由主 agent 现查，判决里逐条写去向（现查坐实而采、现查推翻而不采、核不动），不整格写「不稳定不采」。
+ 
+ ## 云端腿的报告要分段落盘
+diff -ruN r1-baseline/dot-claude/rules/verification.md revised/dot-claude/rules/verification.md
+--- r1-baseline/dot-claude/rules/verification.md	2026-11-16 12:07:26.583995967 +0000
++++ revised/dot-claude/rules/verification.md	2026-11-16 12:22:52.321846776 +0000
+@@ -20,8 +20,11 @@
+ 
+ - 验证包的测试不分档：`cargo test -p singlefs-verification` 跑到包里全部测试，不按快慢、大小标 `#[ignore]`；谁交、怎么交照 `.claude/agent-common.md`「子 agent 不交任务」。
+ - 红了只重跑红的那几条：交 `python3 scripts/gate/rerun-failed-tests.py <上一趟的日志> -p <包>`，它按测试目标打的命令（`task-server/task log <号> --all` 里取）逐条原样交；它判红、一条命令都不打时才整份重跑。完整的一遍归提交时的整轮门禁。
+-- 崩溃枚举用例：调崩溃枚举函数（`enumerate_crash_states` 一族），或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`，或造 `CrashImage`）的测试，直接做或经同一文件里的函数做都算。它写进 `crates/singlefs-verification/tests/`、登记 `crash-case:`、不标 `#[ignore]`。
++- 崩溃枚举用例：调崩溃枚举函数（`enumerate_crash_states` 一族），或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`，或造 `CrashImage`）的测试，直接做或经同一文件里的函数做都算。它写进 `crates/singlefs-verification/tests/`、登记 `crash-case:`（登记进崩溃点重放合表 `.claude/gate.d/crash-point-replay-items.tsv`，点名 `crash-case:` 行或放量分项）、不标 `#[ignore]`。验证包里导入崩溃引擎模块的测试文件第一行声明它测哪几个模块（照 `scripts/crash/crash-case-check.py` 的 modules；门禁 `crash-point-replay` 开跑前判，红了不起 cargo）。
+ - 一条用例一个场景（`.claude/rules/test-script-discipline.md`「用例原子化：每一条都能单独跑」）：本仓把每一轮新建一个池（`build_pool`、`build_through_*`、`format_pool`、`MemoryPool::with_devices`）的参数循环认作多个场景；确是一个场景的，在用例上面写一行 `// harness-test-granularity:one-scenario <理由>`。
++- 判器调用点（池级 checker、记录核对器、GPU 判器）落在判定段里，或包住它的函数带 `// gpu-exempt: <截名>` 或 `// cpu-reference-for-gpu-comparison` 标记；两样都不是的判红（门禁 checker-independence-and-sync 的 cpu-judging-sites 格，判法 `scripts/crash/cpu-judging-sites-check.py`）。标记写在包住调用点的那个函数前面：属性、文档注释与签名之前紧挨着的 `//` 注释行，或属性与签名之间的注释行；外层函数带了标记，里面嵌套的函数一并算；写在函数体里的不算。
++- 变异行点名的测试要跑得到：`--` 之后的筛选词筛得到点名的测试（门禁 code-source-discipline 的 mutation-tables 格判）。
++- 控制测试线程的只有变异那一路：别的 `cargo test`（门禁 `crash-point-replay` 各趟、`scripts/crash/crash-point-replay.sh`、`scripts/gate/admission.py` 拼的 crash-case 命令、崩溃放量、手跑的 GPU 测试）参数里不带 `--test-threads`，测试线程取登记的每台默认重活线程数（`.claude/heavy-thread-default`，服务经 `RUST_TEST_THREADS` 交下来）；变异那一路怎么带见 `.claude/rules/verification-reference.md`「测试线程」。
+ 
+ ## 一个门禁：两种跑法
+ 
+@@ -29,10 +32,11 @@
+ 
+ | 跑法 | 怎么起 | 谁跑、什么时候 |
+ |---|---|---|
+-| 不指定范围 | 门禁阶段不带 `--check` 与 `--item`；`scripts/crash/crash-point-replay.sh`、`scripts/crash/crash-amplification.sh` 不带 `--item`；`scripts/experiment-apparatus/replay.sh` 不带实验号；`cargo test` 不点名测试目标；`gate.sh` 整轮。范围声明种类 `whole` | 提交时由主 agent 经任务服务交（`.claude/skills/crash-test/commit-stages.md`、`.claude/skills/gate/staged-gate.md`）；提交之外要跑先弹窗问用户 |
++| 不指定范围 | 门禁阶段不带 `--check` 与 `--item`；`scripts/crash/crash-point-replay.sh`、`scripts/crash/crash-amplification.sh` 不带 `--item`；`scripts/experiment-apparatus/replay.sh` 不带实验号；`cargo test` 不点名测试目标；`gate.sh` 整轮。范围声明种类 `whole` | 提交时由主 agent 经任务服务交（`.claude/skills/crash-test/commit-stages.md`、`.claude/skills/gate/staged-gate.md`）；提交之外照「提交之外」那一条 |
+ | 指定范围 | `--item <项>`、`--check <格>`、`cargo test` 点名测试目标（`--test`、`--lib`、`--bin`）。范围声明种类 `items` 或 `target` | 主 agent 随时经任务服务交，点这一次改到的项、格与目标；子 agent 一律不交，写进报告「要主 agent 跑的命令」一节 |
+ 
+-- 判哪些、复用哪些由门禁照每条判定的单元键自己选，只剪键相同、已判过的与等价的。单元键只由判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的闭包真引到的依赖版本与判定自己的内容输入组成；路径、名字、行号、资源上限、限时、提交与树不进键（D13（验证路线） 已定项 17）。崩溃判定库的键不读仓根；断言就是关于真仓、要读活树的测试拒算（照跑、不复用、不入库）。
++- **提交之外**：不指定范围的只在提交时跑；提交之外要跑（包括用户要求的那一趟），一律先弹窗问用户，同意了才跑。提交时那一趟的确认就是带 `--full-gate` 的那一次弹窗。
++- 判哪些、复用哪些由门禁照每条判定的单元键自己选，只剪键相同、已判过的与等价的。单元键只由判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的闭包真引到的依赖版本与判定自己的内容输入组成；路径、名字、行号、资源上限、限时、提交与树不进键（D13（验证路线） 已定项 17）。两种排除不在这句全称里：算键的库自己两份（`scripts/crash/lib_verdict_library.py`、`scripts/gate/lib_function_units.py`）的单元不进任何一份判定的键（crates 变异判法除外，那里照进），一条只打提示、不改判定结局的子进程边按实测排；估「哪些判定要重判」之前先读 `.claude/rules/verification-reference.md`「单元键的组成与排除」。崩溃判定库的键不读仓根；断言就是关于真仓、要读活树的测试拒算（照跑、不复用、不入库）。
+ - 按判定入库：凡起编译、跑自证、现算键的判定都按判定入库、按单元键复用、记红撤绿（判红的照同一把键记红、撤掉这把键原有的绿，下一趟现判），没有每趟整格照跑的格；例外只有 prune-server 与 task-server 自己的自证与只读文本的静态检查格。broad-mutation 的驱动只算翻面（同一把键先抓到、后判没红），不沿用、现判一次。带判定库的门禁与入口登记在 `.claude/gate.d/verdict-library-scripts.tsv`，各道的键与键前缀写在它的文件头。
+ - 每一趟真跑开跑前从键相同、库里有判定的项里随机抽几条当哨兵、再抽一条强制现判（种子打进日志），哨兵有一条被现判、强制现判的判定与库里那一条不同、或强制现判那一条仍复用，整道红。
+ - **缩域**：崩溃域只往小缩；不给缩域参数、不设缩域变量就是全量域。缩过域的那一趟成功句写「缩过域、不算门禁通过」并写出实际值，不当门禁通过。
+@@ -48,19 +52,19 @@
+ ## 判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB
+ 
+ - 全仓只有一份判定库：prune-server 自己的那份 RocksDB。库里只放剪枝按单元键复用时要读的键：Rust 一侧是 `crates/singlefs-verification/src/verdict_store.rs` 文件头登记的各表，Python 一侧是 `scripts/prune-server/prune_server_client.py` 文件头「键空间」点名的各族；各族的键前缀以那两处为准。
+-- 不进库的：运行记录（峰值表、占盘时序、上次红的清单）放多机配置 `NFS_SHARED_ROOTS` 点名的共享根，两台读同一份；进仓的登记表随 git 走；产物、日志、临时现场归各自的目录。
++- 不进库的：运行记录（峰值表、占盘时序、上次红的清单）放多机配置 `NFS_SHARED_ROOTS` 点名的共享根，两台同一绝对路径、读同一份，不经 `~` 与 `$HOME` 取（第二台的家目录是另一个）；进仓的登记表随 git 走；产物、日志、临时现场归各自的目录。
+ - 不许任何测试、门禁、入口脚本、实验装置、agent 新建自己的判定库：另开一个目录存判定文件、另写一张 TSV 或 sqlite、另开一份 RocksDB 都算。要存判定就经 prune-server 的客户端写进那一份（Python `scripts/prune-server/prune_server_client.py`，Rust `prune_server::reliable_client`）。中转库（只在并回服务那一份之前存在、并回即删）不算另开，并不进去的由开它的那一趟报红、不留着。自证与压测一律对自己起的临时服务，格完即删，不写真服务，也不拿真任务当测试。
+ - 不设开关：读写判定库只有经服务这一条路，交任务不带任何选库的变量。服务连不上退 75，不退回本地文件。
+-- 一族「接完」= 三件按次序做完：① 它的入口与门禁缺省走服务，本地文件库那条代码路径删掉、不留开关；② 旧库不导入：那一族还要的判定由它的入口经服务现判、照键写回；③ 只删那一族旧库所在的目录，别的族的目录不碰。旧库不原地打开、不并存。哪族接完以 `.claude/gate.d/verdict-library-scripts.tsv` 第三列现读为准，task-server 按这一列收任务。再写旧库、或悄悄另建一份本地库，都算违例。
++- 一族「接完」= 三件按次序做完：① 它的入口与门禁缺省走服务，本地文件库那条代码路径删掉、不留开关；② 旧库不导入：那一族还要的判定由它的入口经服务现判、照键写回；③ 只删那一族旧库所在的目录，别的族的目录不碰；那一族接完之后旧库由主 agent 删，删法照这一件。旧库不原地打开、不并存。哪族接完以 `.claude/gate.d/verdict-library-scripts.tsv` 第三列现读为准，task-server 按这一列收任务。再写旧库、或悄悄另建一份本地库，都算违例。
+ - 这一条门禁还没判，欠账 C948 在 `.claude/kb/checks-owed.md`；立前靠 review：审改动时见到新的判定存放处就打回。
+ 
+ 查库里有哪几张表、改那张登记表或判一份脚本该怎么登、核库名怎么取之前，先读 `.claude/rules/verification-reference.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」。
+ 
+ ## 所有任务都要多机可用，不许绑定某一台
+ 
+-- 测试、门禁、入口脚本、实验装置、服务的控制命令，派到两台里任何一台都要跑得起、判得对，判出来的结果两台都读得到（判定进那一份库，运行记录与产物放 `NFS_SHARED_ROOTS` 点名的共享根）。派到某一台就红的是缺陷，由脚本那一侧当场修，不登例外；不往 `task-server/task_server.py` 里加只派一台的名单，也不钉台。
++- 测试、门禁、入口脚本、实验装置、服务的控制命令，派到两台里任何一台都要跑得起、判得对，判出来的结果两台都读得到（判定进那一份库，运行记录与产物放 `NFS_SHARED_ROOTS` 点名的共享根）。派到某一台就红的是缺陷，由脚本那一侧当场修，不登例外；不往 `task-server/task_server.py` 里加只派一台的名单（它没有这种名单，文件头 ② 排队的「机器」）：任何命令都派得到两台，哪台由余量定，不钉台。
+ - 不读会改变判定结局的本机独有状态：许读的本机私有状态只有 `~/.config/singlefs/` 下的私有名单与密钥；多机配置 `multi-host.env` 两台用同一份（仓根 `multi-host.env.example` 文件头）；不写死主机名与地址；环境相关的一切只由多机配置定，没写就是没有，不补缺省。
+-- 一条测试自己的配置文件（`qemu.env` 这类）进仓或放共享根，两台都读得到；只在一台有的，是那条测试的缺陷。判本台环境的门禁格（机器干净不干净、本机私有名单）两台结局本来不同，不算违例。
++- 一条测试自己的配置文件（QEMU 的 `qemu.env`、预编库的 `rocksdb-prebuilt.env` 这类）是那条测试的事，不在「环境相关的一切只由多机配置定」之内：进仓或放共享根，两台都读得到；只在一台有的，是那条测试的缺陷。判本台环境的门禁格（机器干净不干净、本机私有名单）两台结局本来不同，不算违例。
+ - 这一条门禁还没判，欠账 C949 在 `.claude/kb/checks-owed.md`；立前靠 review 与服务派到第二台的那几趟。
+ 
+ ## 配置文件读出什么就是什么，脚本不另设自己的变量
+@@ -92,7 +96,7 @@
+ 
+ ## 门禁的结构
+ 
+-每道门禁都能全跑，也能逐格点名跑：每格一个函数、判一件事，经共用库 `.claude/gate.d/lib/stage-cells.sh` 逐格登记，文件头写格名表；按项判的门禁另认 `--list-items` 与 `--item <项>`。写或改一道门禁、读它的参数、汇总与退出码之前，先读 `.claude/rules/verification-reference.md`「门禁的结构」。
++每道门禁都能全跑，也能逐格点名跑：每格一个函数、判一件事，经共用库 `.claude/gate.d/lib/stage-cells.sh` 逐格登记，文件头写格名表；按项判的门禁另认 `--list-items` 与 `--item <项>`；每道阶段认第一个参数当项目根（门禁 code-tooling 的 stage-owners 格判）。写或改一道门禁、读它的参数、汇总与退出码之前，先读 `.claude/rules/verification-reference.md`「门禁的结构」。
+ 
+ ## 门禁管哪一半
+ 
+diff -ruN r1-baseline/dot-claude/rules/verification-reference.md revised/dot-claude/rules/verification-reference.md
+--- r1-baseline/dot-claude/rules/verification-reference.md	2026-11-16 12:07:26.584492085 +0000
++++ revised/dot-claude/rules/verification-reference.md	2026-11-16 12:23:02.249935089 +0000
+@@ -135,7 +135,7 @@
+ 
+ 什么时候读它：要点名 formal-verification 的某一项、或核它的项怎么切时。判法以 `scripts/gate/verus-proof-check.py` 文件头「逐项点名与按条复用」为准。
+ 
+-`.claude/gate.d/verus-pins.tsv` 登记的各 crate 逐个判。证明的项怎么切（哪些单元成项、哪些不成项、项名的写法）在 `scripts/gate/verus-proof-check.py` 文件头 `:55-60`，整格跑时每个 crate 各项验过的义务之和等于登记表里它那一行登记的数（`.claude/gate.d/formal-verification.sh` 文件头 verus-proof 那一行 `# gate-cell:`）。证明整格、工具链、钉全各一项；必红世界每行、空真每处 `requires`、红例钉表每行各一项。点名单跑一项与它在整格里跑的判定相同。每条的单元键：证明项是被验函数单元连同它 `requires`、`ensures`、`decreases` 与函数体用到的 spec fn、proof fn、类型、常量的闭包（`verus-proof-check.py` 文件头 `:151`）；钉表每行是那一行档与参数重放真走到的装置函数单元闭包，连同状态输入与期望逐态行。键与判定库写在 `formal-verification.sh` 文件头「复用」一段。
++`.claude/gate.d/verus-pins.tsv` 登记的各 crate 逐个判。证明的项怎么切（哪些单元成项、哪些不成项、项名的写法）在 `scripts/gate/verus-proof-check.py` 文件头「Verus 逐项验」那一段（`proof_items`），整格跑时每个 crate 各项验过的义务之和等于登记表里它那一行登记的数（`.claude/gate.d/formal-verification.sh` 文件头 verus-proof 那一行 `# gate-cell:`）。证明整格、工具链、钉全各一项；必红世界每行、空真每处 `requires`、红例钉表每行各一项。点名单跑一项与它在整格里跑的判定相同。每条的单元键：证明项是被验函数单元连同它 `requires`、`ensures`、`decreases` 与函数体用到的 spec fn、proof fn、类型、常量的闭包（`verus-proof-check.py` 文件头「被验函数单元闭包」那一段）；钉表每行是那一行档与参数重放真走到的装置函数单元闭包，连同状态输入与期望逐态行。键与判定库写在 `formal-verification.sh` 文件头「复用」一段。
+ 
+ ## 门禁管哪一半
+ 
+@@ -143,7 +143,7 @@
+ 
+ | 判什么 | 谁判 |
+ |---|---|
+-| 崩溃点重放跑了；包里全部测试函数按单元键复用或现判都绿；每条登记的崩溃枚举用例（登记行第三列带 `separate-run=` 的没被 `--item` 点名时不跑、报本次未跑）的崩溃状态块，判器结论与挂在这个点上的观察者结论在判定库里都有单元键相同、不红的判定，缺的在各片里判，有红块判红；登记行第三列写了 `red-blocks=judged-by-test` 的用例按 `cargo test` 的退出码判、块那一行只核 `blocks = reused + fresh + refused`；合并核账那一趟还有键对不上的测试函数或现判了块的判红；登记了 `exhaustive=<前缀>` 的，那一行计数行要带 `exhaustive=true`（缩过域的那一趟不判，`scripts/gate/admission.py` 文件头 `:163-164`）；用例跑了至少两片、没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`admission.py` 的 `judge_worker_threads`，它的 `--selftest` 拿合成日志核，工作线程照单机判）；挂特性的验证包测试文件在不指定范围那一趟至少编进来一次、跑到或复用的用例不为 0；产品 GPU 包的测试包带 `tests-on-a-real-gpu` 的真卡对拍判红整格红 | 门禁 `crash-point-replay` 的 crash-case-replay、feature-gated-tests、product-gpu-real-card-tests 格；判的是合并核账那一趟的日志，各片只看 `cargo test` 的退出码；覆盖声明 `# gate-covers: 崩溃点重放`，键登记在项目根 `.claude/gate-not-implemented.tsv` |
++| 崩溃点重放跑了；包里全部测试函数按单元键复用或现判都绿；每条登记的崩溃枚举用例（登记行第三列带 `separate-run=` 的没被 `--item` 点名时不跑、报本次未跑）的崩溃状态块，判器结论与挂在这个点上的观察者结论在判定库里都有单元键相同、不红的判定，缺的在各片里判，有红块判红；登记行第三列写了 `red-blocks=judged-by-test` 的用例按 `cargo test` 的退出码判、块那一行只核 `blocks = reused + fresh + refused`；合并核账那一趟还有键对不上的测试函数或现判了块的判红；登记了 `exhaustive=<前缀>` 的，那一行计数行要带 `exhaustive=true`（缩过域的那一趟 `exhaustive=false` 不判、成功句写缩过域、不算门禁通过；这一行没有 `exhaustive=` 字段照判红：`scripts/gate/admission.py` 文件头 `exhaustive=<前缀>` 那一条）；用例跑了至少两片、没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`admission.py` 的 `judge_worker_threads`，它的 `--selftest` 拿合成日志核，工作线程照单机判）；挂特性的验证包测试文件在不指定范围那一趟至少编进来一次、跑到或复用的用例不为 0；产品 GPU 包的测试包带 `tests-on-a-real-gpu` 的真卡对拍判红整格红 | 门禁 `crash-point-replay` 的 crash-case-replay、feature-gated-tests、product-gpu-real-card-tests 格；判的是合并核账那一趟的日志，各片只看 `cargo test` 的退出码；覆盖声明 `# gate-covers: 崩溃点重放`，键登记在项目根 `.claude/gate-not-implemented.tsv` |
+ | 崩溃放量的分片驱动只经服务的分片协议起，计划、各片、合并三步都对 | `scripts/crash/crash-amplification-two-hosts.sh --selftest`（假的服务照分片协议逐步起它）；派到第二台的那一片在同一棵共享的树里、同一个绝对路径上跑，不送树、不取回（`task-server/task_server_lib.py` 文件头「挑机器」「分片」） |
+ | 形式化验证：恢复重放取前缀、择根、扫环三截的核与择根取前缀的合判推论经 Verus 验过；E165 的红例都钉进钉表、钉表自己成形、在被判那棵树的实现上逐行重放与原实现相同 | 门禁 formal-verification（`.claude/gate.d/formal-verification.sh`，判法与弄坏开关在 `scripts/gate/verus-proof-check.py` 与 `scripts/experiment-apparatus/e165-pin-red-examples.py` 文件头；各格判什么在「formal-verification 各格」一节） |
+ | 广谱变异：此刻源码上每一条变异都有单元键相同的结论、没有一条没红 | 门禁 broad-mutation 的 gate-verdict 格：判驱动 `--summary` 的 `BROAD_MUTATION_GATE` 行与汇总行；驱动错、只过了第一段算没结论，驱动 `--summary` 退 1（判定库或清单表对不上、结局认不出）照判红；不指定范围那一趟这一格自己先起驱动剪枝跑，`--check gate-verdict` 指定范围时不起驱动、只读库；判定与被停的那一条怎么记在「broad-mutation 的判定与被停」一节 |
+@@ -151,7 +151,7 @@
+ | 崩溃枚举用例住在验证包的 `tests/`、不标 `#[ignore]`、登记进崩溃点重放合表 `.claude/gate.d/crash-point-replay-items.tsv`（点名 `crash-case:` 行或放量分项）；验证包测试文件照 `scripts/crash/crash-case-check.py` 的 modules 那一样声明模块 | 门禁 `crash-point-replay` 开跑前在真仓上跑 `scripts/crash/crash-case-check.py --only placement,modules`（placement 那一样判写在别的包里、标了 `#[ignore]` 或没登记的），红了不起 cargo；门禁 code-tooling 的 research-script-selftests 格跑那份脚本的自证 |
+ | 函数名与类型名不只由空泛词拼成；测试文件不按里程碑起名 | 门禁 code-source-discipline：vague-names 格读 `.claude/naming-vague-words` 与 `.claude/naming-vague-exclude`；test-file-names 格在真仓上跑 `scripts/crash/crash-case-check.py --only file-names` |
+ | 池级 checker 库不依赖实现；RefFS 的依赖只有 `std`（门禁那一格还许 `singlefs-format`，收严记在欠账）、源码零处引实现、池级 checker 与验证包（真名与改名别名都算）、实现与池级 checker 的依赖闭包里没有它 | 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格（⑤⑥⑦ 判 RefFS 那三样；RefFS 包不在时 ⑤⑥ 报本次未跑） |
+-| 判器调用点（池级 checker、记录核对器、GPU 判器）落在判定段里，或包住它的函数带 `// gpu-exempt: <截名>` 或 `// cpu-reference-for-gpu-comparison` 标记；都不是的判红 | 门禁 checker-independence-and-sync 的 cpu-judging-sites 格：判法 `scripts/crash/cpu-judging-sites-check.py`（标记写在哪才算在它文件头 `:14-21`），判定段与判器本体登记在 `.claude/gate.d/cpu-judging-sites.tsv` |
++| 判器调用点（池级 checker、记录核对器、GPU 判器）落在判定段里，或包住它的函数带 `// gpu-exempt: <截名>` 或 `// cpu-reference-for-gpu-comparison` 标记；都不是的判红 | 门禁 checker-independence-and-sync 的 cpu-judging-sites 格：判法 `scripts/crash/cpu-judging-sites-check.py`（合规的几种位置、标记写在包住调用点的函数前面，在它文件头「一处调用点算合规」那一段），判定段与判器本体登记在 `.claude/gate.d/cpu-judging-sites.tsv` |
+ | 验证包一条用例一个场景 | 门禁 model-differential-and-scenarios 的 one-scenario 格（在真仓上跑 `scripts/crash/crash-case-check.py --only one-scenario`，读 `crates/singlefs-verification/tests/` 的用例源码，不跑测试） |
+ | 变异行点名的测试跑得到：`--` 之后的筛选词筛得到点名的测试 | 门禁 code-source-discipline 的 mutation-tables 格 |
+ | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符；缺 herd7 直接红，不静默跳过 | 门禁 lkmm（`.claude/gate.d/lkmm.sh`，逻辑在 `.claude/scripts/lkmm.sh`） |
+@@ -192,7 +192,7 @@
+ 
+ 什么时候读它：要量复用对不对（同一份输入跑第二趟现判 0、哨兵与强制现判那一条）时。
+ 
+-- 快照树用 `python3 scripts/hosts/minimal-copy.py <仓根> <快照树> --with-gate-tables --with-test-inputs` 取（`scripts/hosts/minimal-copy.py:12`），要在树里起的脚本照它的 `--with <条目>=<为什么>` 逐条声明；快照树放在自己认领的草稿目录下，树里起命令要的多机配置照 `scripts/hosts/minimal-copy.py:25` 那一句交。
++- 快照树用 `python3 scripts/hosts/minimal-copy.py <仓根> <快照树> --with-gate-tables --with-test-inputs` 取（用法在 `scripts/hosts/minimal-copy.py` 文件头「用法」一段），要在树里起的脚本照它的 `--with <条目>=<为什么>` 逐条声明；快照树放在自己认领的草稿目录下，树里起命令要的多机配置照 `python3 scripts/hosts/lib_repository_copy.py configuration-path <源树>` 打的那一份显式交给 `SINGLEFS_MULTI_HOST_CONFIG`（多机配置决不拷进副本；`minimal-copy.py` 文件头「副本里起命令的」那一句）。
+ - 两趟都经服务在快照树里交：submit 的 `--cwd` 与门禁、入口的根都写快照树，范围声明照常写；两趟之间谁都不改快照树。
+ - 第二趟有现判的，按它成功句点名变了的函数单元查，查完再判复用对不对；量完删掉快照树。
+ 
+@@ -208,10 +208,10 @@
+ 
+ 什么时候读它：改某道门禁或入口的计划、各片、合并时。服务一侧的协议以 `task-server/task_server_lib.py` 文件头「分片」为准。
+ 
+-各道三步怎么做在各自文件头：门禁 `crash-point-replay` 在它文件头「分片」（片数照这一趟要现判的量定，上界是多机配置点名的卡数）；crates-mutation-replay 在它文件头「分片」与 `scripts/mutation/mutation-shard-run.sh` 文件头（`mutation-shard-run.sh` 只由这道门禁在服务分片里起，单独交退 2；片数按内存定、各片之间按上一次现跑的用时均分）；formal-verification 在它文件头「分片」；broad-mutation 在门禁 `.claude/gate.d/broad-mutation.sh` 文件头「分片」与驱动 `scripts/mutation/broad-mutation.py` 文件头「分片」；崩溃放量的分片驱动是 `scripts/crash/crash-amplification-two-hosts.sh`，只经服务的分片协议起。
++各道三步怎么做在各自文件头：门禁 `crash-point-replay` 在它文件头「分片」（片数照这一趟要现判的量定，不超过上界：多机配置点名的卡数，没开 GPU 取 `HOSTS` 的台数，点名的用例登记了 `shards-at-least=` 的取它与卡数的大者）；crates-mutation-replay 在它文件头「分片」与 `scripts/mutation/mutation-shard-run.sh` 文件头（`mutation-shard-run.sh` 只由这道门禁在服务分片里起，单独交退 2；片数按内存定、各片之间按上一次现跑的用时均分）；formal-verification 在它文件头「分片」；broad-mutation 在门禁 `.claude/gate.d/broad-mutation.sh` 文件头「分片」与驱动 `scripts/mutation/broad-mutation.py` 文件头「分片」；崩溃放量的分片驱动是 `scripts/crash/crash-amplification-two-hosts.sh`，只经服务的分片协议起。
+ 
+-### 门禁管哪一半
++### 工作线程那一半归哪一格
+ 
+ 什么时候读它：要知道门禁判得出的工作线程那一半判的是什么时。
+ 
+-门禁 `crash-point-replay` 判工作线程的那一条在「门禁管哪一半」一节 `crash-point-replay` 那一行；没照登记值取线程数的登记在 `.claude/heavy-thread-exempt`，由门禁 code-tooling 的 heavy-thread-defaults 格判。
++门禁 `crash-point-replay` 判工作线程的那一条在 `.claude/rules/verification-reference.md`「门禁管哪一半」一节 `crash-point-replay` 那一行；没照登记值取线程数的登记在 `.claude/heavy-thread-exempt`，由门禁 code-tooling 的 heavy-thread-defaults 格判。
+diff -ruN r1-baseline/dot-claude/rules/writing-discipline-by-review.md revised/dot-claude/rules/writing-discipline-by-review.md
+--- r1-baseline/dot-claude/rules/writing-discipline-by-review.md	2026-11-16 12:07:26.584467685 +0000
++++ revised/dot-claude/rules/writing-discipline-by-review.md	2026-11-16 12:18:48.263190620 +0000
+@@ -9,7 +9,7 @@
+ | **工程 kb** | 模型检索 | 让模型不编 | `.claude/singlefs-ai-sop/rules/kb-discipline.md` |
+ | **规则** | 执行 | 能变成会失败的检查 | `.claude/singlefs-ai-sop/rules/rules-discipline.md` |
+ 
+-动笔前先问：这份东西是给人从头读的，还是会被模型单条取出来看的。三类通用的只有一条：正文只写现状；历史放不放、放在哪照各自的规则（规则文件不留历史节：`.claude/singlefs-ai-sop/rules/rules-discipline.md`「5. 规则文件不留历史节」；kb 照 `.claude/rules/changelog-format.md`「只有决策与实验有历史，别的文件没有」）。
++动笔前先问：这份东西是给人从头读的，还是会被模型单条取出来看的。三类通用的只有一条：正文只写现状；历史放不放、放在哪照各自的规则（规则文件不留历史节：`.claude/singlefs-ai-sop/rules/rules-discipline.md`（5. 规则文件不留历史节）；kb 照 `.claude/rules/changelog-format.md`「只有决策与实验有历史，别的文件没有」）。
+ 
+ ## 长度要配得上改动的重量
+ 
+@@ -19,11 +19,11 @@
+ 
+ - 正：删掉这句，读的人少知道了什么？说不上来就删；「读着更顺」「显得更周全」不算内容。
+ - 反：留着这句，读的人多知道什么？说得上来就不许删，短了也不行。
+-- 直接删的：同一句换个说法再说一遍、给没人质疑的结论加铺垫、判据正着说一遍再反着说一遍（`.claude/singlefs-ai-sop/rules/writing-discipline.md`「四类不许写」的「过度解释」）。
++- 直接删的：同一句换个说法再说一遍、给没人质疑的结论加铺垫、判据正着说一遍再反着说一遍（`.claude/singlefs-ai-sop/rules/writing-discipline.md`（四类不许写）的「过度解释」）。
+ 
+ ### 「越短越好」不是「越短越对」
+ 
+-拿不准时留着。证据、口径、下一步（`.claude/singlefs-ai-sop/rules/sop-first.md`「每一条拒绝都必须给出下一步」）一样不省。删过头的三种：
++拿不准时留着。证据、口径、下一步（`.claude/singlefs-ai-sop/rules/sop-first.md`（每一条拒绝都必须给出下一步））一样不省。删过头的三种：
+ 
+ | 删成了什么 | 丢掉的是 |
+ |---|---|
+@@ -53,7 +53,7 @@
+ 
+ # 沟通纪律（靠 review 的那一半）
+ 
+-管 agent 对用户、agent 与 agent 之间的对话；有钩子判的几条在 `.claude/singlefs-ai-sop/rules/communication-discipline.md`，射程的例外照它的「射程与例外」。
++管 agent 对用户、agent 与 agent 之间的对话；有钩子判的几条在 `.claude/singlefs-ai-sop/rules/communication-discipline.md`；写给第三方读的产出（邮件、公告、对外文档）按它的读者写，不在射程里。
+ 
+ ## 怎么说
+ 
+@@ -62,4 +62,4 @@
+ - 不复述对方刚说过的话。
+ - 不确定就写「不确定」，加上缺什么，不用语气词绕。
+ - 问用户拍板之前，问句里说范围的那几个词（「只是」「只改了」「全部」「没有别的」）先照 `.claude/rules/evidence-discipline.md`「核了窄的那一句，说出口的却是宽的那一句」现查一次。
+-- 精确不让位于简短：术语、数字、口径、命令、下一步照旧写全（`.claude/singlefs-ai-sop/rules/writing-discipline.md`「别矫枉过正」）。
++- 精确不让位于简短：术语、数字、口径、命令、下一步照旧写全（`.claude/singlefs-ai-sop/rules/writing-discipline.md`（别矫枉过正））。
+diff -ruN r1-baseline/dot-claude/skills/crash-test/commit-stages.md revised/dot-claude/skills/crash-test/commit-stages.md
+--- r1-baseline/dot-claude/skills/crash-test/commit-stages.md	2026-11-16 12:07:26.585255730 +0000
++++ revised/dot-claude/skills/crash-test/commit-stages.md	2026-11-16 12:23:45.169009897 +0000
+@@ -20,8 +20,8 @@
+    1b. 六道与崩溃放量不指定范围的那一趟一律写成 `task-server/task submit --full-gate -- <命令>`：只有它们与 `scripts/gate/gate-staged.sh` 认这个标识；带了它不受四小时硬上限（四小时上限只管开发时指定范围的跑法）；不指定范围而没带它的，服务当场拒，整包确认标识 `--whole-package-confirmed` 顶替不了它。这一条弹窗要用户确认、对话不自己决定，提交时共 7 次（六道与崩溃放量各 1 次；`.claude/skills/gate/staged-gate.md` 的 `gate-staged.sh` 另算 1 次，一次提交合起来 8 次）。崩溃放量点名分项（带 `--item`）的经 `task-server/task submit -- <命令>` 交。交了的每一条都再用 run_in_background 起 `task-server/task wait <号>`。命令写法（不套包装、不写上限线程与挑台参数）、撞内存上限到两台最大时（`memory-cap-at-maximum`）怎么办，照 `.claude/agent-common.md`「子 agent 不交任务」；分片与按需领卡由服务照各自文件头做（`task-server/task_server_lib.py` 文件头「分片」与「GPU」）。结局读 `task wait` 的退出码与末行 `TASK_SERVER_RESULT`（分片的那一件有一步没成，末行另带 `shard=<片号>/<片数>`，计划、合并那一步带 `step=plan`、`step=merge`），跑完 `task-server/task clean <号>`。
+ 2. 只在提交时（或用户要求时）跑这六道，与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行点名的相同，不从阶段归属表取；不跑别的门禁、`gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/project-code-guard.sh` 拒）。
+    - 次序：qemu-device-streams、lkmm、formal-verification 与 `crash-point-replay` 同时交（各自后台 `task wait`，照第 1b 步），crates-mutation-replay 等 `crash-point-replay` 跑完再起，broad-mutation 照第 2b 步。
+-   - 命令都带「跑之前定下来」一节定的前缀与四段范围声明（写法照 `.claude/hooks/run-scope-guard.sh` 文件头，为什么一段填这一次的理由）：`SINGLEFS_RUN_SCOPE='种类=whole; 跑什么=门禁 <文件> 的全部格; 范围=整轮; 为什么=<为什么这么跑、这个范围为什么合适>' task-server/task submit --full-gate -- bash .claude/gate.d/<文件>`；每道记耗时与退出码。
+-   - `crash-point-replay` 只有这一种跑法：不带 `--check` 与 `--item` 就是九格全跑，没有档（门禁文件头「只有一条路」）。服务把它拆成计划、各片、合并，各片与合并各判什么、要卡的三处怎么按需领卡，照 `.claude/rules/verification.md`「一个门禁：两种跑法」与门禁文件头「分片」「显卡与清场」；领卡被拒的那一格判红。
++   - 命令都不带 `SINGLEFS_HEAVY_TESTS` 前缀（「跑之前定下来」一节）、都带四段范围声明（写法照 `.claude/hooks/run-scope-guard.sh` 文件头，为什么一段填这一次的理由）：`SINGLEFS_RUN_SCOPE='种类=whole; 跑什么=门禁 <文件> 的全部格; 范围=整轮; 为什么=<为什么这么跑、这个范围为什么合适>' task-server/task submit --full-gate -- bash .claude/gate.d/<文件>`；每道记耗时与退出码。
++   - `crash-point-replay` 只有这一种跑法：不带 `--check` 与 `--item` 就是九格全跑，没有档（门禁文件头「只有一条路」）。服务把它拆成计划、各片、合并，各片与合并各判什么、要卡的三处怎么按需领卡，照 `.claude/rules/verification-reference.md`「门禁 crash-point-replay 怎么跑」与门禁文件头「分片」「显卡与清场」；领卡被拒的那一格判红。
+    - 崩溃放量全量在主工作区另起：`SINGLEFS_RUN_SCOPE='种类=whole; 跑什么=崩溃放量的全部分项（不带 --item）; 范围=整轮; 为什么=<为什么这么跑、这个范围为什么合适>' task-server/task submit --full-gate -- bash scripts/crash/crash-amplification.sh`（不带 `--crash-expand-up-to`；开发时点名分项的加 `--item`、去掉 `--full-gate`、声明改成 `种类=items; 跑什么=崩溃放量点名的分项 <分项>; 范围=<N> 项`）。开跑前照第 1 步那两条命令核 `crates scripts/crash` 的工作区等于暂存区。服务照入口文件头按项分片（一项一片）、录完一批才领卡（入口文件头「按需领卡」）；一趟以小时计，后台 `task wait` 等。退 78 判「环境」（运行条件不满足、某一项的驱动退 78、按需领卡被拒，照它的「→」），退 1 判红，退 0 才判绿。要复原清场停下的服务，手动跑多机配置 `QUIESCE_START_COMMAND` 那一条私有复原脚本，再跑 `QUIESCE_STARTED_CHECK_COMMAND` 回读到它退 0。原样抄每一行 `CRASH_AMPLIFICATION_ITEM` 与末行总计、成功句；在当前里程碑记录里记一行「上一次全量：<日期> 崩溃放量 <结论>」。
+    - 每道的退出码取 `task wait` 的退出码与末行 `TASK_SERVER_RESULT`，整份输出 `task-server/task log <号> --all > <草稿目录>/<阶段>.log`，结束后读输出。别的会话同时在跑 cargo 时编译卡在「Blocking waiting for file lock」的，照实记等了多久，不算这个阶段的耗时。
+    2b. broad-mutation 等 crates-mutation-replay 跑完再起，在主工作区按次序做两步。判定在 prune-server 的 broad-mutation 族里按每条变异的单元键逐条沿用，不按提交、不按 HEAD 选条，不包暂存树、不换版本；每条变异 CPU 那一趟判定在 `verdicts/` 表，GPU 那一趟在 `gpu-verdicts/` 表（驱动文件头「判定库」「GPU 那一趟」）；库目录 `<数据根>/broad-mutation-units/` 只放这一趟的运行目录、日志与锁。
+diff -ruN r1-baseline/dot-claude/skills/crash-test/SKILL.md revised/dot-claude/skills/crash-test/SKILL.md
+--- r1-baseline/dot-claude/skills/crash-test/SKILL.md	2026-11-16 12:07:26.585228250 +0000
++++ revised/dot-claude/skills/crash-test/SKILL.md	2026-11-16 12:18:48.263417749 +0000
+@@ -9,20 +9,20 @@
+ 
+ ## 验证包
+ 
+-验证包与门禁 qemu-device-streams、lkmm、crates-mutation-replay、formal-verification、broad-mutation、research-build-and-replay 的复跑那一格没有分档：点名测试目标的，改了代码随时跑，实现员把自己动到的 `--test <目标>` 写进报告、主 agent 经 `task-server/task submit` 交；不指定范围的，主 agent 只在提交时或用户要求时交，提交之外要跑先弹窗问用户（`.claude/rules/verification.md`「一个门禁：两种跑法」）。
++验证包与门禁 qemu-device-streams、lkmm、crates-mutation-replay、formal-verification、broad-mutation、research-build-and-replay 的复跑那一格没有分档：点名测试目标的，改了代码随时跑，实现员把自己动到的 `--test <目标>` 写进报告、主 agent 经 `task-server/task submit` 交；不指定范围的，主 agent 只在提交时跑，提交之外要跑照 `.claude/rules/verification.md`「一个门禁：两种跑法」「提交之外」那一条先弹窗。
+ 
+ ## 五样各落一道门禁
+ 
+ | 手段 | 验什么 | 阶段 | 覆盖声明的键（照 `.claude/gate-not-implemented.tsv` 抄） |
+ |---|---|---|---|
+-| 崩溃点重放 | 每个崩溃点截断、恢复、跑池级 checker 与记录核对器 | `.claude/gate.d/crash-point-replay.sh`，各格判什么在 `.claude/rules/verification.md`「一个门禁：两种跑法」 | `崩溃点重放` |
++| 崩溃点重放 | 每个崩溃点截断、恢复、跑池级 checker 与记录核对器 | `.claude/gate.d/crash-point-replay.sh`，各格判什么在 `.claude/rules/verification-reference.md`「门禁管哪一半」 | `崩溃点重放` |
+ | 模型对拍 | 随机历史每一步与只住内存的理想模型比 | `.claude/gate.d/model-differential-and-scenarios.sh`（整轮门禁里跑） | `模型对拍` |
+ | QEMU 真设备 | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 | `.claude/gate.d/qemu-device-streams.sh`（重型） | 不声明覆盖 |
+ | LKMM 内存序 | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符 | `.claude/gate.d/lkmm.sh`，逻辑在 `.claude/scripts/lkmm.sh`（重型；缺 herd7 直接红） | 不声明覆盖 |
+ | Verus 形式化验证 | 恢复重放取前缀、择根、扫环三截的核与择根取前缀的合判推论经 Verus 验过（版本钉住、证明、空真、必红世界），E165 的红例钉进钉表逐行重放 | `.claude/gate.d/formal-verification.sh`，判法在 `scripts/gate/verus-proof-check.py` 与 `scripts/experiment-apparatus/e165-pin-red-examples.py`（重型） | 不声明覆盖 |
+ 
+ - 阶段头部写 `# gate-covers: <键>`，键只能是 `.claude/gate-not-implemented.tsv` 里登记的（本项目登记了 `崩溃点重放`、`模型对拍`）与共享 `gate.sh` 自带的 `最终判据`、`命名纪律（shell）`，写错一个字判红。
+-- 覆盖了什么、报了「本次未跑」与退 77 怎么记，照 `.claude/singlefs-ai-sop/rules/show-me-test.md`「最终判据由项目定」「门禁不许假装通过」。覆盖只说明「有一个阶段在做这件事，这次过了」；覆盖到多大范围，看那个阶段自己的说明与登记表第三列的提醒句（门禁 crash-point-replay：只说到它枚举过的那些写路径为止）。
++- 覆盖了什么、报了「本次未跑」与退 77 怎么记，照 `.claude/singlefs-ai-sop/rules/show-me-test.md`（最终判据由项目定；门禁不许假装通过）。覆盖只说明「有一个阶段在做这件事，这次过了」；覆盖到多大范围，看那个阶段自己的说明与登记表第三列的提醒句（门禁 crash-point-replay：只说到它枚举过的那些写路径为止）。
+ 
+ ## 新写一条崩溃枚举用例
+ 
+diff -ruN r1-baseline/dot-claude/skills/dispatch/SKILL.md revised/dot-claude/skills/dispatch/SKILL.md
+--- r1-baseline/dot-claude/skills/dispatch/SKILL.md	2026-11-16 12:07:26.585153731 +0000
++++ revised/dot-claude/skills/dispatch/SKILL.md	2026-11-16 12:17:59.552819850 +0000
+@@ -1,6 +1,6 @@
+ ---
+ name: dispatch
+-description: 主 agent 会话里第一次派发子 agent 之前整份读它——一轮怎么开怎么收几条的细则、派出去之后怎么盯（看门狗起法与告警处置）、交回怎么读、派发提示怎么写，与派发表各行的细则。
++description: 主 agent 每次派发子 agent 之前读它（正文不在此刻的上下文里就整份重读）——一轮怎么开怎么收几条的细则、派出去之后怎么盯（看门狗起法与告警处置）、交回怎么读、派发提示怎么写，与派发表各行的细则。
+ ---
+ 
+ # 派发与调度的细则
+@@ -11,7 +11,7 @@
+ 
+ **第 1 条**：类别按 agent 定义分（调查、调研、改 `crates/`、改门禁与定义与脚本、写回 kb、跑实验、回扫、分诊、三方腿各是一类）：调查各派各的调查员，实验各派各的执行员（分开实验）；改 `crates/` 的照第 4 条聚簇；写回 kb 的照第 10 条一批一份规格；改 `crates/` 与改门禁不合给一个 agent。有依赖的只串依赖那一环；散的活不排成一串，合成大块。派之前按依赖表问一遍「哪几件能一起做」，答不出就还没规划完。
+ 
+-**第 4 条**：派发提示逐条列问题与各自的验收标准，一个实现员可以关多条，出口是全部达成。互不相交的簇在同一条消息里同时派，各自的「不碰」清单写上兄弟实现员的文件；实现员一律交补丁，只派一个也这样（各在副本里改，交 `crates.patch` 与 `mutations-append.tsv` 等，主 agent 用 `scripts/gate/apply-writer-patch.py` 打），份数不设上限；`crates/mutations.tsv` 只追加、不算撞文件。照第 2 条判为挡着本轮课题的新发现同样并进下一批，不单派；与在跑的实现员撞文件的等它交回、进下一批，不给在跑的追加文件。写与验的次序照 `.claude/main-agent.md`「写与验分两段」。要改一轮还没判决的代码轮快照里的文件，等那一轮判决（派发闸 ⑥）；用户叫停、不写判决的轮，照 `.claude/skills/three-way/SKILL.md`「用户叫停、不写判决的轮」在 `research/prompts/abandoned-rounds.tsv` 登一行，才不再挡。
++**第 4 条**：派发提示逐条列问题与各自的验收标准，一个实现员可以关多条，出口是全部达成。互不相交的簇在同一条消息里同时派，各自的「不碰」清单写上兄弟实现员的文件；实现员一律交补丁，只派一个也这样（调查员「查到就修」那一支除外，在主工作区改；各在副本里改，交 `crates.patch` 与 `mutations-append.tsv` 等，主 agent 用 `scripts/gate/apply-writer-patch.py` 打），份数不设上限；`crates/mutations.tsv` 只追加、不算撞文件。照第 2 条判为挡着本轮课题的新发现同样并进下一批，不单派；与在跑的实现员撞文件的等它交回、进下一批，不给在跑的追加文件。写与验的次序照 `.claude/main-agent.md`「写与验分两段」。要改一轮还没判决的代码轮快照里的文件，等那一轮判决（派发闸 ⑥）；用户叫停、不写判决的轮，照 `.claude/skills/three-way/SKILL.md`「用户叫停、不写判决的轮」在 `research/prompts/abandoned-rounds.tsv` 登一行，才不再挡。
+ 
+ **第 8 条**：「折算与挂钟」那一列的数从 `task-server/task submit -- python3 scripts/agents/agent-cost.py usage --since <开工日期>` 与 `timing` 的输出（`task-server/task log <号> --all`）取。闭窗口结局账交 `task-server/task submit -- python3 scripts/agents/agent-cost.py outcome --since <开工日期> --until <这一天> --summary --out <仓根>/records/<轮>-outcome-<这一天>.txt`，落进这一轮调度记录所在的 `records/`，文件名照 `scripts/agents/agent-cost.py` 文件头；`--out` 只排他新建，那个文件已在就换一个名字。
+ 
+@@ -72,7 +72,7 @@
+ **「跑变异表、看抓到 / 无效 / 没红」那一行**：`research/` 那侧的表照 `mutation-triage` 交回的 `mutate.sh` 命令或主 agent 自己写的同一条跑，`crates/mutations.tsv` 那侧是提交时的 crates-mutation-replay。`crates/` 那侧交实现员时输入给分诊报告。续派执行员带「这一段回答的岔路：…」与「上一段岔路表里还差：…」两句（派发闸 ⑪）。
+ 
+ **「一批阶段任务结束」那一行**：
+-- 事实表那一趟，派发提示的输入给改动范围与做成的事，只用过、没留改动的也写；工作区里有没提交的改动时，主 agent 先交 `task-server/task submit -- python3 scripts/kb/batch-target.py` 只拿这一批的路径与块做一个提交对象，哈希写进派发提示当 `--target`。
++- 事实表那一趟，派发提示的输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `scripts/kb/stale-candidates.py --check-facts` 才切候选表；工作区里有没提交的改动时，主 agent 先交 `task-server/task submit -- python3 scripts/kb/batch-target.py` 只拿这一批的路径与块做一个提交对象，哈希写进派发提示当 `--target`。
+ - 候选表按组切段，每段约 200 行（一组超过就整组一段、不拆组）；逐行判那几趟的输入同样给做成的事。
+ - 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退 0 才往下；每一种判定各抽不少于 5 条（不足 5 条的全看）对着载体的原文核，抽中判错的那一段整段重派、交回再抽，两次都干净才收。
+ - 回扫报告「交实现员」的行是目标在 `crates/` 下的「要改」「要补」；钉值类的照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条先定条款再派 `implementation-writer`，不交写回员。
+diff -ruN r1-baseline/dot-claude/skills/merge-verify/SKILL.md revised/dot-claude/skills/merge-verify/SKILL.md
+--- r1-baseline/dot-claude/skills/merge-verify/SKILL.md	2026-11-16 12:07:26.585096031 +0000
++++ revised/dot-claude/skills/merge-verify/SKILL.md	2026-11-16 12:13:06.239572021 +0000
+@@ -1,6 +1,6 @@
+ ---
+ name: merge-verify
+-description: 主 agent 开始「写与验分两段」验证段之前整份读它——合入后验证六步的命令、各支结局的出路、在快照上验什么、怎么合进主工作区，与新出现的拒算怎么判、拒算补丁目录怎么做。
++description: 主 agent 每次开始「写与验分两段」验证段之前读它（正文不在此刻的上下文里就整份重读）——合入后验证六步的命令、各支结局的出路、在快照上验什么、怎么合进主工作区，与新出现的拒算怎么判、拒算补丁目录怎么做。
+ ---
+ 
+ # 合入后验证的细则
+@@ -11,7 +11,7 @@
+ 
+ **验证段**
+ 
+-**整批重交**：第 1 步连同修补的补丁目录整批重交（不带 `--item` 与 `--fingerprint-of`，键相同的照复用），第 2 步那几条在新留下的快照上重交，再回到原来那一步。验证段各步与拒算各条说「整批重交」都指这一套。
++**整批重交**：第 1 步把这一批的补丁目录（有修补的连同修补的补丁目录，没有的原样）整批重交，不带 `--item` 与 `--fingerprint-of`，键相同的照复用；已经做过第 2 步的，第 2 步那几条再在新留下的快照上重交，再回到原来那一步。第 1 步自己红了、退 2 的，第 2 步还没做过，只重交第 1 步。验证段各步与拒算各条说「整批重交」都指这一套。
+ 
+ 1. 合入后验证这样交，不带 `--skip-apply`，补丁目录照写段打的次序全给（有段树的照打进段树的次序）：
+    `SINGLEFS_RUN_SCOPE='种类=items; 跑什么=合入后验证 <N> 份补丁; 范围=<N> 份补丁; 为什么=<这一批补丁改到哪些测试目标>' task-server/task submit -- env MERGE_AND_VERIFY_KEEP_COPY=1 bash scripts/gate/merge-and-verify.sh <补丁目录…>`
+diff -ruN r1-baseline/dot-claude/skills/three-way/SKILL.md revised/dot-claude/skills/three-way/SKILL.md
+--- r1-baseline/dot-claude/skills/three-way/SKILL.md	2026-11-16 12:07:26.585577858 +0000
++++ revised/dot-claude/skills/three-way/SKILL.md	2026-11-16 12:18:20.928163329 +0000
+@@ -13,8 +13,8 @@
+ 
+ - **别用手抄**：用 `scripts/kb/quote-kb.py` 按「文件:行区间 / 文件@标题 / 文件~正则」把条款整段抽出来，它写完回读产物、与源文件逐字节比对。它是直接跑的文本工具（`.claude/hooks/lib_project_code_runs.py` 的 `TEXT_TOOLS_RUN_DIRECTLY`）：主 agent 与子 agent 都在仓根直接起，不经统一任务服务；清单、正文与出口写草稿目录里的绝对路径。取法、退出码与自证在它的文件头。
+ - **用 `@标题` 取，不用 `:行区间` 取**。例外是分项索引表：`### 已定项` 是 `#### 已定项 N` 的父节时，`@标题` 会把名下分项全带进来、`quote-kb.py --checklist` 退 6；这时索引表在清单里标「不抄」并写明「用 --extra 按行区间取」，行区间从标题的下一行起、到第一个 `####` 之前，被父节带出的子节标「抄」、理由以「随」开头。非用行区间不可时，抄完看一眼被抄内容的最后一行（不是产物最后那行外层围栏）：以 `|---|` 收尾、或内层代码围栏没闭合，就是少了一行（欠账 C244（机械抽取选错行区间，产物本身没有断裂痕迹））。
+-- **材料要带一张小节清单**：写材料时，先把全部小节列成一张表，逐节标「抄 / 不抄 / 为什么不抄」，这张表本身进材料；射程是这一轮要引的每一个 kb 文件，不只被判那一项所在的文件；漏掉的那一节在材料里要留下一行「不抄，因为……」，而不是无声消失。清单用 `scripts/kb/kb-sections.py` 生成（开头那段正文与一级标题下的正文各单独占一行），机器生成的清单整份进材料，不再过滤。
+-- **附录用 `scripts/kb/quote-kb.py --checklist` 抽**：取法从清单里标「抄」的行自动生成，不手写第二份：`scripts/agents/checklist-specs.py 清单.md --cited 正文.md --out 出口.md [--extra 文件:行区间 …]`，它生成取法后用参数列表直接调 `quote-kb.py --checklist`；参数、退出码与自证在两份脚本的文件头。`--cited` 只抓正文里字面出现的 D / E / C / I 编号。
++- **材料要带一张小节清单**：写材料时，先把全部小节列成一张表，逐节标「抄 / 不抄 / 为什么不抄」，这张表本身进材料；射程是这一轮要引的每一个 kb 文件，不只被判那一项所在的文件；漏掉的那一节在材料里要留下一行「不抄，因为……」，而不是无声消失。清单用 `scripts/kb/kb-sections.py` 生成（开头那段正文与一级标题下的正文各单独占一行；顶上是一级标题的文件，`checks-owed.md`、`crates/singlefs-checker/invariants/README.md`、`layout/01-first-txn.md` 这类，一级标题同样要有自己的行，欠账 C273：小节清单不认一级标题，自证用 `KB_SECTIONS_NO_H1=1`），机器生成的清单整份进材料，不再过滤。
++- **附录用 `scripts/kb/quote-kb.py --checklist` 抽**：取法从清单里标「抄」的行自动生成，不手写第二份：`scripts/agents/checklist-specs.py 清单.md --cited 正文.md --out 出口.md [--extra 文件:行区间 …]`，它生成取法后用参数列表直接调 `quote-kb.py --checklist`；参数、退出码与自证在两份脚本的文件头。清单标「不抄」的小节、标题行却出现在附录里同一个源文件的抄录块中（多半是 `--extra 文件:A-B` 整段带进来的）退 6（欠账 C320）；`@标题` 取法的节尾与 `kb-sections.py` 算的不等退 7；「不抄」的理由声称别处抄了并点名一节、附录里没有那一节退 8。`--cited 正文.md` 要求正文里提到的每个 D / E / C / I 编号所在的 kb 文件都有一张清单，缺一张退 5（欠账 C234 第 ① 条的检查）；它只抓正文里字面出现的编号。
+ - **正文没点名的枢纽条款**：写材料时把正文里每一句「已经如何」当成待查的引用，拿它的动词全仓 grep 一遍，命中的欠账行进 `--extra`，命中的条款进清单。
+ - **「不抄」的理由要能被核**：凡是标「不抄，因为它的正文在别处抄了」的行，写之前去数一眼那个小节在不在。
+ - **判据表也要照这条办**：写判据表之前，先把被判那一项的正文从头读一遍，把每一句「要连同 X 一起答」都摘成一格。
+diff -ruN r1-baseline/merge-result.md revised/merge-result.md
+--- r1-baseline/merge-result.md	2026-11-16 12:07:26.585875546 +0000
++++ revised/merge-result.md	2026-11-16 12:26:06.326101748 +0000
+@@ -1,3 +1,5 @@
++> 修稿注（压缩 2c）：这份是第一版合稿的说明，第二版的逐条变动见上一层的 `dispositions.md`。第一版里关于用户定案第 6、13 条（逐个按进程号停、改脚本与钩子）的几句已被用户定案第 20 条撤回；其余数字（字数、指针数）是第一版的，第二版的字数见 `result.md`。
++
+ # 规则压缩合稿（压缩 2a）
+ 
+ 批次：records/2026-11-16-三方豁免取消与存量补轮.md#压缩 2a。仓里一个字没改；六个写手的草稿目录只读，要用的稿拷进本目录 `merged-before-edits/`（拷来的原样）再在 `merged/` 上改。没跑项目代码，没交命令给主 agent 跑；本目录 `tools/` 下的核对小脚本（python3，只读仓与合稿树）直接跑。
+diff -ruN r1-baseline/references.md revised/references.md
+--- r1-baseline/references.md	2026-11-16 12:07:26.585807787 +0000
++++ revised/references.md	2026-11-16 12:19:32.465068772 +0000
+@@ -77,26 +77,6 @@
+ 
+ ## 二、改了名的节与条目
+ 
+-### `.claude/rules/command-safety-by-review.md`「装置起的样本进程，放进它自己的进程组」改名「装置起的样本进程，逐个按进程号停」（用户定案第 6 条）
+-
+-按旧节名引的 13 处，节名照改；这几份代码自己对进程组发信号的，做法另见「四」：
+-
+-| 文件:行 | 现在的写法 | 改成什么 |
+-|---|---|---|
+-| `.claude/gate.d/code-tooling.sh:9441` | `.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」` | `.claude/rules/command-safety-by-review.md「装置起的样本进程，逐个按进程号停」`，做法见「四」 |
+-| `.claude/gate.d/code-tooling.sh:10399` | 同上 | 同上 |
+-| `.claude/gate.d/code-tooling.sh:11259` | 同上（拒绝说明里打给人看的） | 同上 |
+-| `.claude/gate.d/code-tooling.sh:12196` | 同上（拒绝说明里打给人看的） | 同上 |
+-| `.claude/gate.d/doc-registries.sh:5078` | `command-safety.md「装置起的样本进程，放进它自己的进程组」`（文件名本就写错，项目那份是 `command-safety-by-review.md`） | `.claude/rules/command-safety-by-review.md「装置起的样本进程，逐个按进程号停」`，做法见「四」 |
+-| `.claude/gate.d/lib/stage-cells.sh:49` | 同 `code-tooling.sh:9441` | 同上，做法见「四」 |
+-| `.claude/hooks/bash-command-detector.sh:184` | `上游 .claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」` | 节名照改、删「上游」二字（这份规则在项目 `.claude/rules/`）；这一道放行「对自己用新会话起的子进程的进程组发信号」，与新判据相反，见「四」 |
+-| `.claude/hooks/bash-command-detector.sh:4108` | 同上 | 同上 |
+-| `scripts/gate/gate-structure-check.py:24` | 「装置起的样本进程，放进它自己的进程组」 | 「装置起的样本进程，逐个按进程号停」，做法见「四」 |
+-| `scripts/gate/lib_process_group.py:7` | `.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」` | 同上 |
+-| `scripts/kb/move-directory-in-use-check.py:341` | `command-safety.md「装置起的样本进程，放进它自己的进程组」` | `.claude/rules/command-safety-by-review.md「装置起的样本进程，逐个按进程号停」`，做法见「四」 |
+-| `task-server/task_server_lib.py:4529` | `.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」` | 同上 |
+-| `records/` 下 2 份 4 行 | — | 只计数，不改 |
+-
+ ### 共用约束的条目
+ 
+ | 文件:行 | 现在的写法 | 改成什么 |
+@@ -170,7 +150,7 @@
+ | `.claude/gate.d/formal-verification.sh:50`、`.claude/gate.d/code-tooling.sh:12461` | verification.md「门禁的结构」里 `--list-items` / `--item` 的写法 | 同上（常驻稿只留「按项判的门禁另认这两个参数」） | 合稿树外 |
+ | `.claude/gate.d/code-source-discipline.sh:53` | verification.md「门禁的结构」「门禁管哪一半」 | `.claude/rules/verification-reference.md`「门禁管哪一半」 | 合稿树外 |
+ | `scripts/crash/crash-case-check.py:25`、`:617`、`:620` | verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行 | 同上 | 合稿树外 |
+-| `.claude/agents/implementation-writer.md:16` | verification.md「定义与名字」…（括注「测试文件第一行声明模块」：原件只在「门禁管哪一半」那张表里） | 括注那一样改指 `.claude/rules/verification-reference.md`「门禁管哪一半」 | 合稿树里的（节名在，照旧可用；要一步到细则的照右栏改） |
++| `.claude/agents/implementation-writer.md:16` | verification.md「定义与名字」…（括注「测试文件第一行声明模块」：原件只在「门禁管哪一半」那张表里） | 不改：「测试文件第一行声明模块」已放回 `.claude/rules/verification.md`「测试不分档，红了只重跑红的」崩溃枚举用例那一条，括注点名的三节里有 | 合稿树里的 |
+ | `task-server/task_server.py:219` | verification.md「一个门禁：两种跑法」里「控制测试线程的只有变异那一路」 | `.claude/rules/verification-reference.md`「一个门禁：两种跑法」「测试线程」 | 合稿树外 |
+ | `crates/singlefs-verification/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:87` | 同上（GPU 测试线程那一条） | 同上；`crates/` 下的注释改动照只改注释算 | 合稿树外 |
+ | `crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:26` | verification.md「一个门禁：两种跑法」按需领卡那一句 | `.claude/rules/verification-reference.md`「一个门禁：两种跑法」「凡用 GPU 先清场，跑完不复原」 | 合稿树外 |
+@@ -181,41 +161,14 @@
+ 
+ ## 四、做法要跟着改的代码处（不只是改名；归治理文件那一批，走三方）
+ 
+-### 用户定案第 6 条：脚本与装置里也不对进程组发信号
++### 挪进技能的流程细则出了工具员写范围与四道只认 `main-agent.md` 的检查的射程（修稿登记，脚本那一批做）
+ 
+-合稿里 `.claude/rules/command-safety-by-review.md`「装置起的样本进程，逐个按进程号停」、`.claude/agent-common.md`「样本进程逐个按进程号停」、`.claude/agents/tooling-writer.md` 第 5 步改成逐个按进程号停。仓里此刻对进程组发信号的写法（`git grep -n -E 'os\.killpg|kill -[A-Z0-9]+ -- -|kill -- -'`，排除样本目录，量的：110 行、27 份；原样在 `refs-group-signal-code.txt`），其中 `bash-command-detector.sh` 的 48 行多是它认的写法与自证样例。除这些写法外，`task-server/task_server_lib.py:4529`「停法」、`.claude/gate.d/lib/stage-cells.sh:11`、`:45`、`:395`（每格一个子 shell 放进它自己的进程组）、`scripts/gate/verus-proof-check.py:119`、`:1132`、`:1157`、`scripts/gate/refused-test-registry.py:130` 的文件头与文档串写的就是按组停的做法。
++合稿把验证段、派发、三方的流程细则挪进 `.claude/skills/merge-verify/SKILL.md`、`.claude/skills/dispatch/SKILL.md`、`.claude/skills/three-way/SKILL.md`。这三份此刻在两样东西的射程之外（仓里现读，量的）：
+ 
+-| 文件 | 命中行数 |
+-|---|---|
+-| `.claude/hooks/bash-command-detector.sh` | 48 |
+-| `scripts/mutation/crates-mutation-rows.py` | 7 |
+-| `.claude/gate.d/lib/stage-cells.sh` | 6 |
+-| `scripts/kb/move-directory-in-use-check.py` | 5 |
+-| `scripts/prune-server/prune_server_client_selftest.py` | 5 |
+-| `.claude/gate.d/code-tooling.sh` | 3 |
+-| `.claude/gate.d/doc-registries.sh` | 3 |
+-| `crates/singlefs-verification/tests/gpu_task_switch_diagnostic.py` | 3 |
+-| `scripts/experiment-apparatus/long_run_item_verdicts.py` | 3 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py` | 2 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` | 2 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py` | 2 |
+-| `scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/current_tree_row_driver.py` | 2 |
+-| `scripts/experiment-apparatus/e207_strict_scan_steps_process_sampler.py` | 2 |
+-| `scripts/gate/gate-structure-check.py` | 2 |
+-| `scripts/gate/lib_process_group.py` | 2 |
+-| `scripts/mutation/broad-mutation.py` | 2 |
+-| `task-server/task_server_selftest.py` | 2 |
+-| `scripts/agents/tests/test_agents.py` | 1 |
+-| `scripts/crash/gpu-quiesce-run.sh` | 1 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/fake_task_server.py` | 1 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator_segment_two.py` | 1 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py` | 1 |
+-| `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/shard_relay.py` | 1 |
+-| `scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py` | 1 |
+-| `scripts/gate/refused-test-registry.py` | 1 |
+-| `scripts/gate/verus-proof-check.py` | 1 |
++- 写范围：`.claude/hooks/agent-write-scope.tsv` 里 `tooling-writer` 的几行（:33 到 :36）没有 `.claude/skills/**`；合稿的工具员定义「写范围」那一行照门禁 code-tooling 的 agent-write-scope 格要与这张表两向相等，所以这一批把表加一行 `tooling-writer	.claude/skills/**	…`，同一步把工具员定义写范围那一行与第二种活的路径加上 `.claude/skills/*/SKILL.md`；合稿里的定义这一行不动，等这一批一起换。
++- 只认 `.claude/main-agent.md` 与 `.claude/agent-common.md` 的四处，射程扩到上面三份技能：`.claude/gate.d/doc-process-records.sh:2272` agent-def-adversarial-review 格挑被判文件的正则；`.claude/gate.d/code-tooling.sh:4153` 规则行抄进定义那一格的 `judged_files`；`.claude/gate.d/lib-lag-baseline.py:235` 的 `GOVERNED_FILES`；`.claude/gate.d/doc-text.sh:1953` 的 `CODE_FILES`。行号是修稿时现查的，换上时再核。
+ 
+-钩子一侧：`.claude/hooks/bash-command-detector.sh` 文件头 ⑥（:184）与 :4108 放行「对自己用新会话起的那一个子进程的进程组发信号」，新判据下这一放行要撤，连同它的自证样例（文件头 :498–:499 的「终止进程:…进程组」几格）。
++在这一批换上之前，改这三份技能的活派不出去（写闸拒）：照判决改技能要同这一批一起做。
+ 
+ ### 用户定案第 9 条：RefFS 只许 `std`
+ 
+@@ -265,6 +218,5 @@
+ | 旧名 | `research/` | `records/` |
+ |---|---|---|
+ | 被并掉的 8 份文件名（`git grep -c`，命中行数） | 57 行、43 份 | 26 行、15 份 |
+-| 「装置起的样本进程，放进它自己的进程组」 | 0 | 4 行、2 份 |
+ 
+ 照 `.claude/rules/path-moves.md`「怎么做」第 5 步判：说当时情形的留旧名；并掉不是搬迁，`.claude/gate.d/path-moves.tsv` 登不了（常驻稿写手报告「④」）。

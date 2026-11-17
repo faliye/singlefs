@@ -1,0 +1,36 @@
+// 对照：入口点名了 ControlNamedFaulty（该进闭包）；ControlNeverNamed 没人点名（等包装类型的规则该让它出去）；Box<Inner> 与 [Inner] 照旧 blanket
+pub trait ControlDev {
+    fn control_read(&self) -> u8;
+}
+pub struct ControlMem;
+impl ControlDev for ControlMem {
+    fn control_read(&self) -> u8 {
+        1
+    }
+}
+pub struct ControlNamedFaulty<Inner>(pub Inner);
+impl<Inner: ControlDev> ControlDev for ControlNamedFaulty<Inner> {
+    fn control_read(&self) -> u8 {
+        self.0.control_read() ^ 1
+    }
+}
+pub struct ControlNeverNamed<Inner>(pub Inner);
+impl<Inner: ControlDev> ControlDev for ControlNeverNamed<Inner> {
+    fn control_read(&self) -> u8 {
+        self.0.control_read() ^ 2
+    }
+}
+impl<Inner: ControlDev> ControlDev for Box<Inner> {
+    fn control_read(&self) -> u8 {
+        (**self).control_read() ^ 4
+    }
+}
+impl<Inner: ControlDev> ControlDev for [Inner] {
+    fn control_read(&self) -> u8 {
+        self[0].control_read() ^ 8
+    }
+}
+pub fn entry_control() -> u8 {
+    let device = ControlNamedFaulty(ControlMem);
+    device.control_read()
+}

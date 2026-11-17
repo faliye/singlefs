@@ -1,0 +1,754 @@
+E7RESULT name=item_complete item=base__closure_off complete=true
+E7RESULT name=q1 item=base__closure_off point=base arm=closure_off peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=base__closure_off peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=base__closure_off state=same_mount publishes=105 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=base__closure_off state=remounted publishes=105 peak=3 rounds_at_least_3=14 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=base__closure_off chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=base__closure_off rounds_at_least_5=0
+E7RESULT name=clause_checks item=base__closure_off rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=base__closure_off largest_round=1391 sum_of_rounds=2647 sum_over_final_roles=120.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=base__closure_off state=same_mount first_publish=2102 peak=3763 between_rounds_first_publish=1787 between_rounds_peak=2794 unread=0
+E7RESULT name=q8 item=base__closure_off state=remounted first_publish=2197 peak=3630 between_rounds_first_publish=1901 between_rounds_peak=2108 unread=0
+E7RESULT name=control_p3 item=base__closure_off compared=210 different=0 holds=true
+E7RESULT name=reconciliation item=base__closure_off op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=base__closure_off op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=base__closure_off op=W3 image_changed_unit_slots=116 slots_placed=116 equal=true
+E7RESULT name=item_complete item=base__p1 complete=true
+E7RESULT name=q1 item=base__p1 point=base arm=p1 peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=base__p1 peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=base__p1 state=same_mount publishes=105 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=base__p1 state=remounted publishes=105 peak=3 rounds_at_least_3=14 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=base__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=base__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=base__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=base__p1 largest_round=1391 sum_of_rounds=2647 sum_over_final_roles=120.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=base__p1 state=same_mount first_publish=2102 peak=3763 between_rounds_first_publish=1787 between_rounds_peak=2794 unread=0
+E7RESULT name=q8 item=base__p1 state=remounted first_publish=2197 peak=3630 between_rounds_first_publish=1901 between_rounds_peak=2108 unread=0
+E7RESULT name=control_p3 item=base__p1 compared=210 different=0 holds=true
+E7RESULT name=reconciliation item=base__p1 op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=base__p1 op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=base__p1 op=W3 image_changed_unit_slots=116 slots_placed=116 equal=true
+E7RESULT name=item_complete item=base__p2a complete=true
+E7RESULT name=q1 item=base__p2a point=base arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=base__p2a peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=base__p2a state=same_mount publishes=105 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=base__p2a state=remounted publishes=105 peak=3 rounds_at_least_3=14 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=base__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=base__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=base__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=base__p2a largest_round=1391 sum_of_rounds=2647 sum_over_final_roles=120.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=base__p2a state=same_mount first_publish=2102 peak=3763 between_rounds_first_publish=1787 between_rounds_peak=2794 unread=0
+E7RESULT name=q8 item=base__p2a state=remounted first_publish=2197 peak=3630 between_rounds_first_publish=1901 between_rounds_peak=2108 unread=0
+E7RESULT name=control_p3 item=base__p2a compared=210 different=0 holds=true
+E7RESULT name=reconciliation item=base__p2a op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=base__p2a op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=base__p2a op=W3 image_changed_unit_slots=116 slots_placed=116 equal=true
+E7RESULT name=item_complete item=base__plain complete=true
+E7RESULT name=item_complete item=base__single_step complete=true
+E7RESULT name=q1 item=base__single_step point=base arm=single_step peak_rounds=8 at=//0 verdict=not_many first_overwrite_rounds=8 window_rest_peak_rounds=8 history_peak_rounds=8
+E7RESULT name=peaks item=base__single_step peak_round_work=117 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=6.133
+E7RESULT name=q9 item=base__single_step state=same_mount publishes=105 peak=8 rounds_at_least_3=105 rounds_at_least_5=105 rounds_at_least_9=0 last=6 falls_back=false last_window_at_most_4=false recurs=false
+E7RESULT name=q9 item=base__single_step state=remounted publishes=105 peak=8 rounds_at_least_3=105 rounds_at_least_5=105 rounds_at_least_9=0 last=8 falls_back=false last_window_at_most_4=false recurs=false
+E7RESULT name=q10 item=base__single_step chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=base__single_step rounds_at_least_5=253
+E7RESULT name=clause_checks item=base__single_step rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=base__single_step largest_round=1256 sum_of_rounds=2687 sum_over_final_roles=122.136 premise_ratio=0.980 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=base__single_step state=same_mount first_publish=6890 peak=13141 between_rounds_first_publish=1889 between_rounds_peak=3020 unread=0
+E7RESULT name=q8 item=base__single_step state=remounted first_publish=7030 peak=8099 between_rounds_first_publish=2003 between_rounds_peak=2280 unread=0
+E7RESULT name=control_p3 item=base__single_step compared=210 different=0 holds=true
+E7RESULT name=reconciliation item=base__single_step op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=base__single_step op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=base__single_step op=W3 image_changed_unit_slots=116 slots_placed=116 equal=true
+E7RESULT name=item_complete item=data_units_100__p1 complete=true
+E7RESULT name=q1 item=data_units_100__p1 point=data_units_100 arm=p1 peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=data_units_100__p1 peak_round_work=333 peak_final_roles=114 peak_final_nodes=7 peak_effective_rounds=2.921
+E7RESULT name=q9 item=data_units_100__p1 state=same_mount publishes=104 peak=3 rounds_at_least_3=11 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_100__p1 state=remounted publishes=104 peak=3 rounds_at_least_3=18 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_100__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_100__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=data_units_100__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_100__p1 largest_round=7690 sum_of_rounds=10104 sum_over_final_roles=88.632 premise_ratio=12.286 premise=fails memory_bytes=6920 maintenance_steps=2894 unread=0
+E7RESULT name=q8 item=data_units_100__p1 state=same_mount first_publish=2283 peak=17196 between_rounds_first_publish=1946 between_rounds_peak=10251 unread=0
+E7RESULT name=q8 item=data_units_100__p1 state=remounted first_publish=2197 peak=3630 between_rounds_first_publish=1901 between_rounds_peak=2060 unread=0
+E7RESULT name=control_p3 item=data_units_100__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=data_units_100__p2a complete=true
+E7RESULT name=q1 item=data_units_100__p2a point=data_units_100 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=data_units_100__p2a peak_round_work=333 peak_final_roles=114 peak_final_nodes=7 peak_effective_rounds=2.921
+E7RESULT name=q9 item=data_units_100__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=11 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_100__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=18 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_100__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_100__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=data_units_100__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_100__p2a largest_round=7690 sum_of_rounds=10104 sum_over_final_roles=88.632 premise_ratio=12.286 premise=fails memory_bytes=6920 maintenance_steps=2894 unread=0
+E7RESULT name=q8 item=data_units_100__p2a state=same_mount first_publish=2283 peak=17196 between_rounds_first_publish=1946 between_rounds_peak=10251 unread=0
+E7RESULT name=q8 item=data_units_100__p2a state=remounted first_publish=2197 peak=3630 between_rounds_first_publish=1901 between_rounds_peak=2060 unread=0
+E7RESULT name=control_p3 item=data_units_100__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=data_units_1000__p1 complete=true
+E7RESULT name=q1 item=data_units_1000__p1 point=data_units_1000 arm=p1 peak_rounds=4 at=same_mount/W3/2 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=data_units_1000__p1 peak_round_work=1259 peak_final_roles=424 peak_final_nodes=13 peak_effective_rounds=3.118
+E7RESULT name=q9 item=data_units_1000__p1 state=same_mount publishes=104 peak=4 rounds_at_least_3=22 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_1000__p1 state=remounted publishes=104 peak=3 rounds_at_least_3=15 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_1000__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_1000__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=data_units_1000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_1000__p1 largest_round=85778 sum_of_rounds=107776 sum_over_final_roles=254.189 premise_ratio=78.074 premise=fails memory_bytes=51704 maintenance_steps=25396 unread=0
+E7RESULT name=q8 item=data_units_1000__p1 state=same_mount first_publish=5401 peak=179806 between_rounds_first_publish=3144 between_rounds_peak=107965 unread=0
+E7RESULT name=q8 item=data_units_1000__p1 state=remounted first_publish=2307 peak=4481 between_rounds_first_publish=2018 between_rounds_peak=2559 unread=0
+E7RESULT name=control_p3 item=data_units_1000__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=data_units_1000__p2a complete=true
+E7RESULT name=q1 item=data_units_1000__p2a point=data_units_1000 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=data_units_1000__p2a peak_round_work=1259 peak_final_roles=424 peak_final_nodes=13 peak_effective_rounds=2.979
+E7RESULT name=q9 item=data_units_1000__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=21 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_1000__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=13 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_1000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_1000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=data_units_1000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_1000__p2a largest_round=85778 sum_of_rounds=107776 sum_over_final_roles=254.189 premise_ratio=78.074 premise=fails memory_bytes=51704 maintenance_steps=25396 unread=0
+E7RESULT name=q8 item=data_units_1000__p2a state=same_mount first_publish=3627 peak=179806 between_rounds_first_publish=3127 between_rounds_peak=107965 unread=0
+E7RESULT name=q8 item=data_units_1000__p2a state=remounted first_publish=2307 peak=4481 between_rounds_first_publish=2018 between_rounds_peak=2559 unread=0
+E7RESULT name=control_p3 item=data_units_1000__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=data_units_10000__p1 complete=true
+E7RESULT name=q1 item=data_units_10000__p1 point=data_units_10000 arm=p1 peak_rounds=11 at=//0 verdict=many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=11
+E7RESULT name=peaks item=data_units_10000__p1 peak_round_work=4728 peak_final_roles=441 peak_final_nodes=59 peak_effective_rounds=10.721
+E7RESULT name=q9 item=data_units_10000__p1 state=same_mount publishes=105 peak=5 rounds_at_least_3=14 rounds_at_least_5=1 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_10000__p1 state=remounted publishes=105 peak=3 rounds_at_least_3=18 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_10000__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_10000__p1 rounds_at_least_5=2
+E7RESULT name=clause_checks item=data_units_10000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_10000__p1 largest_round=1033610 sum_of_rounds=1379231 sum_over_final_roles=3127.508 premise_ratio=149.898 premise=fails memory_bytes=496920 maintenance_steps=308502 unread=0
+E7RESULT name=q8 item=data_units_10000__p1 state=same_mount first_publish=5958 peak=3231038 between_rounds_first_publish=3449 between_rounds_peak=1379969 unread=0
+E7RESULT name=q8 item=data_units_10000__p1 state=remounted first_publish=2763 peak=5142 between_rounds_first_publish=2394 between_rounds_peak=2936 unread=0
+E7RESULT name=control_p3 item=data_units_10000__p1 compared=210 different=0 holds=true
+E7RESULT name=item_complete item=data_units_10000__p2a complete=true
+E7RESULT name=q1 item=data_units_10000__p2a point=data_units_10000 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=data_units_10000__p2a peak_round_work=1272 peak_final_roles=441 peak_final_nodes=59 peak_effective_rounds=2.979
+E7RESULT name=q9 item=data_units_10000__p2a state=same_mount publishes=105 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=data_units_10000__p2a state=remounted publishes=105 peak=3 rounds_at_least_3=17 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=data_units_10000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=data_units_10000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=data_units_10000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=data_units_10000__p2a largest_round=1033610 sum_of_rounds=1379231 sum_over_final_roles=3127.508 premise_ratio=149.898 premise=fails memory_bytes=496920 maintenance_steps=308502 unread=0
+E7RESULT name=q8 item=data_units_10000__p2a state=same_mount first_publish=4040 peak=3231038 between_rounds_first_publish=3430 between_rounds_peak=1379969 unread=0
+E7RESULT name=q8 item=data_units_10000__p2a state=remounted first_publish=2763 peak=5142 between_rounds_first_publish=2394 between_rounds_peak=2936 unread=0
+E7RESULT name=control_p3 item=data_units_10000__p2a compared=210 different=0 holds=true
+E7RESULT name=item_complete item=files_100__closure_off complete=true
+E7RESULT name=q1 item=files_100__closure_off point=files_100 arm=closure_off peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=files_100__closure_off peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=files_100__closure_off state=same_mount publishes=104 peak=3 rounds_at_least_3=19 rounds_at_least_5=0 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_100__closure_off state=remounted publishes=104 peak=3 rounds_at_least_3=28 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_100__closure_off chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_100__closure_off rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_100__closure_off rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_100__closure_off largest_round=1457 sum_of_rounds=2823 sum_over_final_roles=128.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=files_100__closure_off state=same_mount first_publish=2331 peak=4035 between_rounds_first_publish=1994 between_rounds_peak=2997 unread=0
+E7RESULT name=q8 item=files_100__closure_off state=remounted first_publish=2335 peak=3908 between_rounds_first_publish=1994 between_rounds_peak=2245 unread=0
+E7RESULT name=control_p3 item=files_100__closure_off compared=208 different=0 holds=true
+E7RESULT name=reconciliation item=files_100__closure_off op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=files_100__closure_off op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=files_100__closure_off op=W3 image_changed_unit_slots=120 slots_placed=120 equal=true
+E7RESULT name=item_complete item=files_100__p1 complete=true
+E7RESULT name=q1 item=files_100__p1 point=files_100 arm=p1 peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=files_100__p1 peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=files_100__p1 state=same_mount publishes=104 peak=3 rounds_at_least_3=19 rounds_at_least_5=0 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_100__p1 state=remounted publishes=104 peak=3 rounds_at_least_3=28 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_100__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_100__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_100__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_100__p1 largest_round=1457 sum_of_rounds=2823 sum_over_final_roles=128.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=files_100__p1 state=same_mount first_publish=2331 peak=4035 between_rounds_first_publish=1994 between_rounds_peak=2997 unread=0
+E7RESULT name=q8 item=files_100__p1 state=remounted first_publish=2335 peak=3908 between_rounds_first_publish=1994 between_rounds_peak=2245 unread=0
+E7RESULT name=control_p3 item=files_100__p1 compared=208 different=0 holds=true
+E7RESULT name=reconciliation item=files_100__p1 op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=files_100__p1 op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=files_100__p1 op=W3 image_changed_unit_slots=120 slots_placed=120 equal=true
+E7RESULT name=item_complete item=files_100__p2a complete=true
+E7RESULT name=q1 item=files_100__p2a point=files_100 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=files_100__p2a peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=files_100__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=19 rounds_at_least_5=0 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_100__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=28 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_100__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_100__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_100__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_100__p2a largest_round=1457 sum_of_rounds=2823 sum_over_final_roles=128.318 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=files_100__p2a state=same_mount first_publish=2331 peak=4035 between_rounds_first_publish=1994 between_rounds_peak=2997 unread=0
+E7RESULT name=q8 item=files_100__p2a state=remounted first_publish=2335 peak=3908 between_rounds_first_publish=1994 between_rounds_peak=2245 unread=0
+E7RESULT name=control_p3 item=files_100__p2a compared=208 different=0 holds=true
+E7RESULT name=reconciliation item=files_100__p2a op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=files_100__p2a op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=files_100__p2a op=W3 image_changed_unit_slots=120 slots_placed=120 equal=true
+E7RESULT name=item_complete item=files_100__single_step complete=true
+E7RESULT name=q1 item=files_100__single_step point=files_100 arm=single_step peak_rounds=8 at=//0 verdict=not_many first_overwrite_rounds=8 window_rest_peak_rounds=8 history_peak_rounds=8
+E7RESULT name=peaks item=files_100__single_step peak_round_work=117 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=6.133
+E7RESULT name=q9 item=files_100__single_step state=same_mount publishes=104 peak=8 rounds_at_least_3=104 rounds_at_least_5=104 rounds_at_least_9=0 last=8 falls_back=false last_window_at_most_4=false recurs=false
+E7RESULT name=q9 item=files_100__single_step state=remounted publishes=104 peak=8 rounds_at_least_3=104 rounds_at_least_5=104 rounds_at_least_9=0 last=8 falls_back=false last_window_at_most_4=false recurs=false
+E7RESULT name=q10 item=files_100__single_step chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_100__single_step rounds_at_least_5=341
+E7RESULT name=clause_checks item=files_100__single_step rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_100__single_step largest_round=1366 sum_of_rounds=2876 sum_over_final_roles=130.727 premise_ratio=0.980 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=files_100__single_step state=same_mount first_publish=7578 peak=14190 between_rounds_first_publish=2096 between_rounds_peak=3290 unread=0
+E7RESULT name=q8 item=files_100__single_step state=remounted first_publish=7582 peak=8792 between_rounds_first_publish=2096 between_rounds_peak=2513 unread=0
+E7RESULT name=control_p3 item=files_100__single_step compared=208 different=0 holds=true
+E7RESULT name=reconciliation item=files_100__single_step op=W1 image_changed_unit_slots=32 slots_placed=32 equal=true
+E7RESULT name=reconciliation item=files_100__single_step op=W2 image_changed_unit_slots=30 slots_placed=32 equal=false
+E7RESULT name=reconciliation item=files_100__single_step op=W3 image_changed_unit_slots=120 slots_placed=120 equal=true
+E7RESULT name=item_complete item=files_1000__closure_off complete=true
+E7RESULT name=q1 item=files_1000__closure_off point=files_1000 arm=closure_off peak_rounds=5 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000__closure_off peak_round_work=77 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=3.850
+E7RESULT name=q9 item=files_1000__closure_off state=same_mount publishes=104 peak=4 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000__closure_off state=remounted publishes=104 peak=4 rounds_at_least_3=42 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000__closure_off chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000__closure_off rounds_at_least_5=4
+E7RESULT name=clause_checks item=files_1000__closure_off rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000__closure_off largest_round=2373 sum_of_rounds=5609 sum_over_final_roles=224.360 premise_ratio=3.379 premise=fails memory_bytes=4984 maintenance_steps=2164 unread=0
+E7RESULT name=q8 item=files_1000__closure_off state=same_mount first_publish=6961 peak=8777 between_rounds_first_publish=4106 between_rounds_peak=5650 unread=0
+E7RESULT name=q8 item=files_1000__closure_off state=remounted first_publish=5906 peak=9153 between_rounds_first_publish=3190 between_rounds_peak=5933 unread=0
+E7RESULT name=control_p3 item=files_1000__closure_off compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000__p1 complete=true
+E7RESULT name=q1 item=files_1000__p1 point=files_1000 arm=p1 peak_rounds=5 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000__p1 peak_round_work=77 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=3.850
+E7RESULT name=q9 item=files_1000__p1 state=same_mount publishes=104 peak=4 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000__p1 state=remounted publishes=104 peak=4 rounds_at_least_3=42 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000__p1 rounds_at_least_5=4
+E7RESULT name=clause_checks item=files_1000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000__p1 largest_round=2373 sum_of_rounds=5609 sum_over_final_roles=224.360 premise_ratio=3.379 premise=fails memory_bytes=4984 maintenance_steps=2164 unread=0
+E7RESULT name=q8 item=files_1000__p1 state=same_mount first_publish=6961 peak=8777 between_rounds_first_publish=4106 between_rounds_peak=5650 unread=0
+E7RESULT name=q8 item=files_1000__p1 state=remounted first_publish=5906 peak=9153 between_rounds_first_publish=3190 between_rounds_peak=5933 unread=0
+E7RESULT name=control_p3 item=files_1000__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000__p2a complete=true
+E7RESULT name=q1 item=files_1000__p2a point=files_1000 arm=p2a peak_rounds=4 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=4
+E7RESULT name=peaks item=files_1000__p2a peak_round_work=63 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=3.167
+E7RESULT name=q9 item=files_1000__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=36 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000__p2a state=remounted publishes=104 peak=4 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000__p2a largest_round=2929 sum_of_rounds=4325 sum_over_final_roles=173.000 premise_ratio=3.379 premise=fails memory_bytes=3760 maintenance_steps=1425 unread=0
+E7RESULT name=q8 item=files_1000__p2a state=same_mount first_publish=4595 peak=7029 between_rounds_first_publish=4088 between_rounds_peak=4547 unread=0
+E7RESULT name=q8 item=files_1000__p2a state=remounted first_publish=5906 peak=9031 between_rounds_first_publish=3190 between_rounds_peak=3962 unread=0
+E7RESULT name=control_p3 item=files_1000__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000__plain complete=true
+E7RESULT name=item_complete item=files_1000__single_step complete=true
+E7RESULT name=q1 item=files_1000__single_step point=files_1000 arm=single_step peak_rounds=16 at=same_mount/W1/1 verdict=many first_overwrite_rounds=16 window_rest_peak_rounds=12 history_peak_rounds=12
+E7RESULT name=peaks item=files_1000__single_step peak_round_work=280 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=11.200
+E7RESULT name=q9 item=files_1000__single_step state=same_mount publishes=104 peak=16 rounds_at_least_3=104 rounds_at_least_5=104 rounds_at_least_9=33 last=10 falls_back=false last_window_at_most_4=false recurs=true
+E7RESULT name=q9 item=files_1000__single_step state=remounted publishes=104 peak=14 rounds_at_least_3=104 rounds_at_least_5=104 rounds_at_least_9=43 last=8 falls_back=false last_window_at_most_4=false recurs=true
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W1/1 rounds=16 release_chain_depth=2 release_chain_nodes=15 active_leaves=[6, 6] rewritten_nodes=15
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W1/13 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W1/14 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W1/31 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W1/32 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/1 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/7 rounds=10 release_chain_depth=2 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/8 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/9 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/10 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/11 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/12 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/15 rounds=14 release_chain_depth=3 release_chain_nodes=13 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/16 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/18 rounds=12 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/19 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/20 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/21 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/24 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/25 rounds=12 release_chain_depth=1 release_chain_nodes=11 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/29 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/31 rounds=12 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W2/32 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W3/1 rounds=10 release_chain_depth=2 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W3/5 rounds=10 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W3/8 rounds=10 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W3/8 rounds=12 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/1 rounds=14 release_chain_depth=1 release_chain_nodes=11 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/2 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/4 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/5 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/7 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=same_mount/W4/8 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/1 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/11 rounds=12 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/12 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/16 rounds=10 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/30 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W1/31 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/1 rounds=12 release_chain_depth=2 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/2 rounds=12 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/3 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/4 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/5 rounds=14 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/6 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/7 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/8 rounds=12 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/9 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/10 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/11 rounds=14 release_chain_depth=2 release_chain_nodes=11 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/12 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/13 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/14 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/15 rounds=14 release_chain_depth=2 release_chain_nodes=11 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/16 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/17 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/18 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/19 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/20 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/21 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/22 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/23 rounds=12 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/24 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W2/31 rounds=12 release_chain_depth=2 release_chain_nodes=11 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/1 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/3 rounds=12 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/5 rounds=12 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=11
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/5 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/6 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/7 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/8 rounds=10 release_chain_depth=1 release_chain_nodes=5 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W3/8 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W4/1 rounds=14 release_chain_depth=2 release_chain_nodes=13 active_leaves=[6, 6] rewritten_nodes=13
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W4/2 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W4/4 rounds=10 release_chain_depth=1 release_chain_nodes=7 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10_many_rounds item=files_1000__single_step at=remounted/W4/5 rounds=10 release_chain_depth=1 release_chain_nodes=9 active_leaves=[6, 6] rewritten_nodes=9
+E7RESULT name=q10 item=files_1000__single_step chain_explained_ratio=0.000 release_exit_share=0.756 placement_exit_share=0.152
+E7RESULT name=f2 item=files_1000__single_step rounds_at_least_5=1250
+E7RESULT name=clause_checks item=files_1000__single_step rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000__single_step largest_round=2053 sum_of_rounds=5949 sum_over_final_roles=237.960 premise_ratio=1.048 premise=fails memory_bytes=5080 maintenance_steps=2216 unread=0
+E7RESULT name=q8 item=files_1000__single_step state=same_mount first_publish=30238 peak=30238 between_rounds_first_publish=4328 between_rounds_peak=6305 unread=0
+E7RESULT name=q8 item=files_1000__single_step state=remounted first_publish=16163 peak=27239 between_rounds_first_publish=3377 between_rounds_peak=6813 unread=0
+E7RESULT name=control_p3 item=files_1000__single_step compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_10000__p1 complete=true
+E7RESULT name=q1 item=files_10000__p1 point=files_10000 arm=p1 peak_rounds=22 at=same_mount/W1/1 verdict=many first_overwrite_rounds=22 window_rest_peak_rounds=6 history_peak_rounds=6
+E7RESULT name=peaks item=files_10000__p1 peak_round_work=1201 peak_final_roles=84 peak_final_nodes=73 peak_effective_rounds=14.298
+E7RESULT name=q9 item=files_10000__p1 state=same_mount publishes=105 peak=22 rounds_at_least_3=52 rounds_at_least_5=13 rounds_at_least_9=1 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_10000__p1 state=remounted publishes=105 peak=6 rounds_at_least_3=51 rounds_at_least_5=10 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10_many_rounds item=files_10000__p1 at=same_mount/W1/1 rounds=22 release_chain_depth=21 release_chain_nodes=73 active_leaves=[44, 44] rewritten_nodes=73
+E7RESULT name=q10 item=files_10000__p1 chain_explained_ratio=1.000 release_exit_share=0.955 placement_exit_share=0.000
+E7RESULT name=f2 item=files_10000__p1 rounds_at_least_5=232
+E7RESULT name=clause_checks item=files_10000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_10000__p1 largest_round=6089 sum_of_rounds=16116 sum_over_final_roles=191.857 premise_ratio=3.290 premise=fails memory_bytes=13224 maintenance_steps=5996 unread=0
+E7RESULT name=q8 item=files_10000__p1 state=same_mount first_publish=152344 peak=152344 between_rounds_first_publish=16538 between_rounds_peak=16538 unread=0
+E7RESULT name=q8 item=files_10000__p1 state=remounted first_publish=8818 peak=17692 between_rounds_first_publish=4764 between_rounds_peak=8575 unread=0
+E7RESULT name=control_p3 item=files_10000__p1 compared=210 different=0 holds=true
+E7RESULT name=item_complete item=files_10000__p2a complete=true
+E7RESULT name=q1 item=files_10000__p2a point=files_10000 arm=p2a peak_rounds=4 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=4
+E7RESULT name=peaks item=files_10000__p2a peak_round_work=95 peak_final_roles=84 peak_final_nodes=73 peak_effective_rounds=3.211
+E7RESULT name=q9 item=files_10000__p2a state=same_mount publishes=105 peak=3 rounds_at_least_3=47 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_10000__p2a state=remounted publishes=105 peak=4 rounds_at_least_3=49 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_10000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_10000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_10000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_10000__p2a largest_round=14709 sum_of_rounds=16083 sum_over_final_roles=191.464 premise_ratio=3.558 premise=fails memory_bytes=13224 maintenance_steps=5996 unread=0
+E7RESULT name=q8 item=files_10000__p2a state=same_mount first_publish=15440 peak=15440 between_rounds_first_publish=16185 between_rounds_peak=16185 unread=0
+E7RESULT name=q8 item=files_10000__p2a state=remounted first_publish=8818 peak=12426 between_rounds_first_publish=4764 between_rounds_peak=5922 unread=0
+E7RESULT name=control_p3 item=files_10000__p2a compared=210 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_14__p1 complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_14__p1 point=files_1000_unit_area_2_pow_14 arm=p1 peak_rounds=5 at=//0 verdict=not_many first_overwrite_rounds=4 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_14__p1 peak_round_work=82 peak_final_roles=23 peak_final_nodes=13 peak_effective_rounds=3.905
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_14__p1 state=same_mount publishes=104 peak=5 rounds_at_least_3=45 rounds_at_least_5=1 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_14__p1 state=remounted publishes=104 peak=4 rounds_at_least_3=37 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_14__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_14__p1 rounds_at_least_5=7
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_14__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_14__p1 largest_round=2041 sum_of_rounds=4488 sum_over_final_roles=195.130 premise_ratio=3.333 premise=fails memory_bytes=4016 maintenance_steps=1775 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_14__p1 state=same_mount first_publish=9283 peak=10403 between_rounds_first_publish=3917 between_rounds_peak=4199 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_14__p1 state=remounted first_publish=3039 peak=8359 between_rounds_first_publish=2475 between_rounds_peak=4778 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_14__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_14__p2a complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_14__p2a point=files_1000_unit_area_2_pow_14 arm=p2a peak_rounds=4 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=4
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_14__p2a peak_round_work=54 peak_final_roles=23 peak_final_nodes=13 peak_effective_rounds=3.188
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_14__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=42 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_14__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=35 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_14__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_14__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_14__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_14__p2a largest_round=2379 sum_of_rounds=3977 sum_over_final_roles=172.913 premise_ratio=3.333 premise=fails memory_bytes=3488 maintenance_steps=1337 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_14__p2a state=same_mount first_publish=7337 peak=7337 between_rounds_first_publish=3899 between_rounds_peak=4199 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_14__p2a state=remounted first_publish=3039 peak=6650 between_rounds_first_publish=2475 between_rounds_peak=3636 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_14__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_20__p1 complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_20__p1 point=files_1000_unit_area_2_pow_20 arm=p1 peak_rounds=5 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_20__p1 peak_round_work=77 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=3.850
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_20__p1 state=same_mount publishes=104 peak=4 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_20__p1 state=remounted publishes=104 peak=4 rounds_at_least_3=42 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_20__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_20__p1 rounds_at_least_5=4
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_20__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_20__p1 largest_round=2375 sum_of_rounds=5617 sum_over_final_roles=224.680 premise_ratio=3.379 premise=fails memory_bytes=4984 maintenance_steps=2164 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_20__p1 state=same_mount first_publish=6965 peak=8781 between_rounds_first_publish=4110 between_rounds_peak=5658 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_20__p1 state=remounted first_publish=5910 peak=9161 between_rounds_first_publish=3194 between_rounds_peak=5941 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_20__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_20__p2a complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_20__p2a point=files_1000_unit_area_2_pow_20 arm=p2a peak_rounds=4 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=4
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_20__p2a peak_round_work=63 peak_final_roles=25 peak_final_nodes=15 peak_effective_rounds=3.167
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_20__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=36 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_20__p2a state=remounted publishes=104 peak=4 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_20__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_20__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_20__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_20__p2a largest_round=2933 sum_of_rounds=4329 sum_over_final_roles=173.160 premise_ratio=3.379 premise=fails memory_bytes=3760 maintenance_steps=1425 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_20__p2a state=same_mount first_publish=4599 peak=7037 between_rounds_first_publish=4092 between_rounds_peak=4551 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_20__p2a state=remounted first_publish=5910 peak=9041 between_rounds_first_publish=3194 between_rounds_peak=3970 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_20__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_24__p1 complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_24__p1 point=files_1000_unit_area_2_pow_24 arm=p1 peak_rounds=6 at=same_mount/W2/16 verdict=not_many first_overwrite_rounds=4 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_24__p1 peak_round_work=125 peak_final_roles=27 peak_final_nodes=17 peak_effective_rounds=4.630
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_24__p1 state=same_mount publishes=104 peak=6 rounds_at_least_3=41 rounds_at_least_5=2 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_24__p1 state=remounted publishes=104 peak=5 rounds_at_least_3=45 rounds_at_least_5=1 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_24__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_24__p1 rounds_at_least_5=13
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_24__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_24__p1 largest_round=2617 sum_of_rounds=6244 sum_over_final_roles=231.259 premise_ratio=3.037 premise=fails memory_bytes=5640 maintenance_steps=2460 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_24__p1 state=same_mount first_publish=10903 peak=15399 between_rounds_first_publish=4531 between_rounds_peak=6622 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_24__p1 state=remounted first_publish=6474 peak=9963 between_rounds_first_publish=3454 between_rounds_peak=6493 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_24__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_unit_area_2_pow_24__p2a complete=true
+E7RESULT name=q1 item=files_1000_unit_area_2_pow_24__p2a point=files_1000_unit_area_2_pow_24 arm=p2a peak_rounds=4 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=4
+E7RESULT name=peaks item=files_1000_unit_area_2_pow_24__p2a peak_round_work=67 peak_final_roles=27 peak_final_nodes=17 peak_effective_rounds=3.150
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_24__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=40 rounds_at_least_5=0 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_unit_area_2_pow_24__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=44 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_unit_area_2_pow_24__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_unit_area_2_pow_24__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000_unit_area_2_pow_24__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_unit_area_2_pow_24__p2a largest_round=3053 sum_of_rounds=5102 sum_over_final_roles=188.963 premise_ratio=3.037 premise=fails memory_bytes=4128 maintenance_steps=1597 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_24__p2a state=same_mount first_publish=8529 peak=10747 between_rounds_first_publish=4513 between_rounds_peak=5380 unread=0
+E7RESULT name=q8 item=files_1000_unit_area_2_pow_24__p2a state=remounted first_publish=6474 peak=7834 between_rounds_first_publish=3454 between_rounds_peak=4294 unread=0
+E7RESULT name=control_p3 item=files_1000_unit_area_2_pow_24__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_units_10__p1 complete=true
+E7RESULT name=q1 item=files_1000_units_10__p1 point=files_1000_units_10 arm=p1 peak_rounds=29 at=same_mount/W1/1 verdict=many first_overwrite_rounds=29 window_rest_peak_rounds=3 history_peak_rounds=5
+E7RESULT name=peaks item=files_1000_units_10__p1 peak_round_work=1994 peak_final_roles=99 peak_final_nodes=87 peak_effective_rounds=20.141
+E7RESULT name=q9 item=files_1000_units_10__p1 state=same_mount publishes=104 peak=29 rounds_at_least_3=40 rounds_at_least_5=1 rounds_at_least_9=1 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_units_10__p1 state=remounted publishes=104 peak=4 rounds_at_least_3=38 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10_many_rounds item=files_1000_units_10__p1 at=same_mount/W1/1 rounds=29 release_chain_depth=28 release_chain_nodes=87 active_leaves=[47, 47] rewritten_nodes=87
+E7RESULT name=q10 item=files_1000_units_10__p1 chain_explained_ratio=1.000 release_exit_share=0.966 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_units_10__p1 rounds_at_least_5=2
+E7RESULT name=clause_checks item=files_1000_units_10__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_units_10__p1 largest_round=7041 sum_of_rounds=18889 sum_over_final_roles=190.798 premise_ratio=3.243 premise=fails memory_bytes=15552 maintenance_steps=7029 unread=0
+E7RESULT name=q8 item=files_1000_units_10__p1 state=same_mount first_publish=250526 peak=250526 between_rounds_first_publish=19423 between_rounds_peak=19423 unread=0
+E7RESULT name=q8 item=files_1000_units_10__p1 state=remounted first_publish=7454 peak=9438 between_rounds_first_publish=3865 between_rounds_peak=6375 unread=0
+E7RESULT name=control_p3 item=files_1000_units_10__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_1000_units_10__p2a complete=true
+E7RESULT name=q1 item=files_1000_units_10__p2a point=files_1000_units_10 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=files_1000_units_10__p2a peak_round_work=111 peak_final_roles=99 peak_final_nodes=87 peak_effective_rounds=2.667
+E7RESULT name=q9 item=files_1000_units_10__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=30 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_units_10__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=38 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_units_10__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_units_10__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000_units_10__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_units_10__p2a largest_round=17345 sum_of_rounds=18855 sum_over_final_roles=190.455 premise_ratio=3.568 premise=fails memory_bytes=15552 maintenance_steps=7029 unread=0
+E7RESULT name=q8 item=files_1000_units_10__p2a state=same_mount first_publish=17694 peak=17694 between_rounds_first_publish=18957 between_rounds_peak=18957 unread=0
+E7RESULT name=q8 item=files_1000_units_10__p2a state=remounted first_publish=7454 peak=8354 between_rounds_first_publish=3865 between_rounds_peak=4506 unread=0
+E7RESULT name=control_p3 item=files_1000_units_10__p2a compared=208 different=0 holds=true
+E7RESULT name=void_6 item=files_1000_units_100__p1 problem=refused:AllocationRecordTreeRewriteSetDidNotSettle voided=this_point_this_arm
+E7RESULT name=q1 item=files_1000_units_100__p1 point=files_1000_units_100 arm=p1 peak_rounds=64 at=same_mount/W1/1 verdict=hits_the_limit first_overwrite_rounds=64 window_rest_peak_rounds=0 history_peak_rounds=22
+E7RESULT name=peaks item=files_1000_units_100__p1 peak_round_work=19004 peak_final_roles=171 peak_final_nodes=415 peak_effective_rounds=19.082
+E7RESULT name=q9 item=files_1000_units_100__p1 state=same_mount publishes=1 peak=64 rounds_at_least_3=1 rounds_at_least_5=1 rounds_at_least_9=1 last=64 falls_back=false last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_units_100__p1 state=remounted publishes=0 peak=0 rounds_at_least_3=0 rounds_at_least_5=0 rounds_at_least_9=0 last=0 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10_many_rounds item=files_1000_units_100__p1 at=same_mount/W1/1 rounds=64 release_chain_depth=85 release_chain_nodes=431 active_leaves=[273, 273] rewritten_nodes=415
+E7RESULT name=q10 item=files_1000_units_100__p1 chain_explained_ratio=0.000 release_exit_share=1.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_units_100__p1 rounds_at_least_5=6
+E7RESULT name=clause_checks item=files_1000_units_100__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_units_100__p1 largest_round=3036 sum_of_rounds=60850 sum_over_final_roles=355.848 premise_ratio=0.045 premise=holds memory_bytes=48056 maintenance_steps=19458 unread=0
+E7RESULT name=q8 item=files_1000_units_100__p1 state=same_mount first_publish=2701726 peak=2701726 between_rounds_first_publish=61910 between_rounds_peak=61910 unread=0
+E7RESULT name=q8 item=files_1000_units_100__p1 state=remounted first_publish=unread peak=unread between_rounds_first_publish=unread between_rounds_peak=unread unread=0
+E7RESULT name=control_p3 item=files_1000_units_100__p1 compared=1 different=0 holds=true
+E7RESULT name=f8 item=files_1000_units_100__p1 refused=AllocationRecordTreeRewriteSetDidNotSettle refused_for_not_settling=true
+E7RESULT name=item_complete item=files_1000_units_100__p2a complete=true
+E7RESULT name=q1 item=files_1000_units_100__p2a point=files_1000_units_100 arm=p2a peak_rounds=4 at=remounted/W2/13 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=files_1000_units_100__p2a peak_round_work=917 peak_final_roles=452 peak_final_nodes=433 peak_effective_rounds=2.926
+E7RESULT name=q9 item=files_1000_units_100__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=33 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_1000_units_100__p2a state=remounted publishes=104 peak=4 rounds_at_least_3=55 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_1000_units_100__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_1000_units_100__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=files_1000_units_100__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_1000_units_100__p2a largest_round=95301 sum_of_rounds=97744 sum_over_final_roles=216.248 premise_ratio=7.381 premise=fails memory_bytes=71672 maintenance_steps=36468 unread=0
+E7RESULT name=q8 item=files_1000_units_100__p2a state=same_mount first_publish=168373 peak=168373 between_rounds_first_publish=97862 between_rounds_peak=97862 unread=0
+E7RESULT name=q8 item=files_1000_units_100__p2a state=remounted first_publish=10094 peak=16975 between_rounds_first_publish=5205 between_rounds_peak=11799 unread=0
+E7RESULT name=control_p3 item=files_1000_units_100__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_30000__p1 complete=true
+E7RESULT name=q1 item=files_30000__p1 point=files_30000 arm=p1 peak_rounds=38 at=same_mount/W1/1 verdict=many first_overwrite_rounds=38 window_rest_peak_rounds=7 history_peak_rounds=8
+E7RESULT name=peaks item=files_30000__p1 peak_round_work=4574 peak_final_roles=172 peak_final_nodes=155 peak_effective_rounds=26.593
+E7RESULT name=q9 item=files_30000__p1 state=same_mount publishes=104 peak=38 rounds_at_least_3=58 rounds_at_least_5=26 rounds_at_least_9=3 last=4 falls_back=false last_window_at_most_4=false recurs=true
+E7RESULT name=q9 item=files_30000__p1 state=remounted publishes=104 peak=7 rounds_at_least_3=54 rounds_at_least_5=25 rounds_at_least_9=0 last=2 falls_back=false last_window_at_most_4=false recurs=false
+E7RESULT name=q10_many_rounds item=files_30000__p1 at=same_mount/W1/1 rounds=38 release_chain_depth=36 release_chain_nodes=153 active_leaves=[129, 129] rewritten_nodes=155
+E7RESULT name=q10_many_rounds item=files_30000__p1 at=same_mount/W2/24 rounds=9 release_chain_depth=4 release_chain_nodes=23 active_leaves=[129, 129] rewritten_nodes=31
+E7RESULT name=q10_many_rounds item=files_30000__p1 at=same_mount/W2/27 rounds=10 release_chain_depth=6 release_chain_nodes=25 active_leaves=[129, 129] rewritten_nodes=31
+E7RESULT name=q10 item=files_30000__p1 chain_explained_ratio=0.667 release_exit_share=0.895 placement_exit_share=0.053
+E7RESULT name=f2 item=files_30000__p1 rounds_at_least_5=1202
+E7RESULT name=clause_checks item=files_30000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_30000__p1 largest_round=13346 sum_of_rounds=36363 sum_over_final_roles=211.413 premise_ratio=3.026 premise=fails memory_bytes=27112 maintenance_steps=13760 unread=0
+E7RESULT name=q8 item=files_30000__p1 state=same_mount first_publish=637836 peak=637836 between_rounds_first_publish=37041 between_rounds_peak=37041 unread=0
+E7RESULT name=q8 item=files_30000__p1 state=remounted first_publish=10356 peak=28714 between_rounds_first_publish=5436 between_rounds_peak=12801 unread=0
+E7RESULT name=control_p3 item=files_30000__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=files_30000__p2a complete=true
+E7RESULT name=q1 item=files_30000__p2a point=files_30000 arm=p2a peak_rounds=5 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=4 history_peak_rounds=5
+E7RESULT name=peaks item=files_30000__p2a peak_round_work=357 peak_final_roles=172 peak_final_nodes=155 peak_effective_rounds=3.520
+E7RESULT name=q9 item=files_30000__p2a state=same_mount publishes=104 peak=4 rounds_at_least_3=47 rounds_at_least_5=0 rounds_at_least_9=0 last=3 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=files_30000__p2a state=remounted publishes=104 peak=4 rounds_at_least_3=52 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=files_30000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=files_30000__p2a rounds_at_least_5=1
+E7RESULT name=clause_checks item=files_30000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=files_30000__p2a largest_round=33823 sum_of_rounds=36317 sum_over_final_roles=211.145 premise_ratio=3.085 premise=fails memory_bytes=27112 maintenance_steps=13760 unread=0
+E7RESULT name=q8 item=files_30000__p2a state=same_mount first_publish=63856 peak=63856 between_rounds_first_publish=36435 between_rounds_peak=36435 unread=0
+E7RESULT name=q8 item=files_30000__p2a state=remounted first_publish=10356 peak=16642 between_rounds_first_publish=5436 between_rounds_peak=10949 unread=0
+E7RESULT name=control_p3 item=files_30000__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_100__p1 complete=true
+E7RESULT name=q1 item=unlinks_100__p1 point=unlinks_100 arm=p1 peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=unlinks_100__p1 peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=unlinks_100__p1 state=same_mount publishes=104 peak=3 rounds_at_least_3=10 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_100__p1 state=remounted publishes=104 peak=3 rounds_at_least_3=13 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_100__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_100__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=unlinks_100__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_100__p1 largest_round=1395 sum_of_rounds=2651 sum_over_final_roles=120.500 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=unlinks_100__p1 state=same_mount first_publish=2258 peak=3767 between_rounds_first_publish=1899 between_rounds_peak=2798 unread=0
+E7RESULT name=q8 item=unlinks_100__p1 state=remounted first_publish=2197 peak=3622 between_rounds_first_publish=1901 between_rounds_peak=2055 unread=0
+E7RESULT name=control_p3 item=unlinks_100__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_100__p2a complete=true
+E7RESULT name=q1 item=unlinks_100__p2a point=unlinks_100 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=unlinks_100__p2a peak_round_work=39 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.400
+E7RESULT name=q9 item=unlinks_100__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=10 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_100__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=13 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_100__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_100__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=unlinks_100__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_100__p2a largest_round=1395 sum_of_rounds=2651 sum_over_final_roles=120.500 premise_ratio=3.714 premise=fails memory_bytes=2600 maintenance_steps=914 unread=0
+E7RESULT name=q8 item=unlinks_100__p2a state=same_mount first_publish=2258 peak=3767 between_rounds_first_publish=1899 between_rounds_peak=2798 unread=0
+E7RESULT name=q8 item=unlinks_100__p2a state=remounted first_publish=2197 peak=3622 between_rounds_first_publish=1901 between_rounds_peak=2055 unread=0
+E7RESULT name=control_p3 item=unlinks_100__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_1000__p1 complete=true
+E7RESULT name=q1 item=unlinks_1000__p1 point=unlinks_1000 arm=p1 peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=unlinks_1000__p1 peak_round_work=42 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.471
+E7RESULT name=q9 item=unlinks_1000__p1 state=same_mount publishes=104 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_1000__p1 state=remounted publishes=104 peak=3 rounds_at_least_3=15 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_1000__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_1000__p1 rounds_at_least_5=0
+E7RESULT name=clause_checks item=unlinks_1000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_1000__p1 largest_round=1473 sum_of_rounds=2899 sum_over_final_roles=131.773 premise_ratio=3.440 premise=fails memory_bytes=2872 maintenance_steps=1026 unread=0
+E7RESULT name=q8 item=unlinks_1000__p1 state=same_mount first_publish=2734 peak=4360 between_rounds_first_publish=2272 between_rounds_peak=3106 unread=0
+E7RESULT name=q8 item=unlinks_1000__p1 state=remounted first_publish=2655 peak=4321 between_rounds_first_publish=2221 between_rounds_peak=2415 unread=0
+E7RESULT name=control_p3 item=unlinks_1000__p1 compared=208 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_1000__p2a complete=true
+E7RESULT name=q1 item=unlinks_1000__p2a point=unlinks_1000 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=2 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=unlinks_1000__p2a peak_round_work=42 peak_final_roles=22 peak_final_nodes=7 peak_effective_rounds=2.471
+E7RESULT name=q9 item=unlinks_1000__p2a state=same_mount publishes=104 peak=3 rounds_at_least_3=12 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_1000__p2a state=remounted publishes=104 peak=3 rounds_at_least_3=15 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_1000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_1000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=unlinks_1000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_1000__p2a largest_round=1473 sum_of_rounds=2899 sum_over_final_roles=131.773 premise_ratio=3.440 premise=fails memory_bytes=2872 maintenance_steps=1026 unread=0
+E7RESULT name=q8 item=unlinks_1000__p2a state=same_mount first_publish=2734 peak=4360 between_rounds_first_publish=2272 between_rounds_peak=3106 unread=0
+E7RESULT name=q8 item=unlinks_1000__p2a state=remounted first_publish=2655 peak=4321 between_rounds_first_publish=2221 between_rounds_peak=2415 unread=0
+E7RESULT name=control_p3 item=unlinks_1000__p2a compared=208 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_10000__p1 complete=true
+E7RESULT name=q1 item=unlinks_10000__p1 point=unlinks_10000 arm=p1 peak_rounds=6 at=same_mount/W1/1 verdict=not_many first_overwrite_rounds=6 window_rest_peak_rounds=5 history_peak_rounds=5
+E7RESULT name=peaks item=unlinks_10000__p1 peak_round_work=119 peak_final_roles=26 peak_final_nodes=17 peak_effective_rounds=4.577
+E7RESULT name=q9 item=unlinks_10000__p1 state=same_mount publishes=105 peak=6 rounds_at_least_3=26 rounds_at_least_5=6 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_10000__p1 state=remounted publishes=105 peak=5 rounds_at_least_3=25 rounds_at_least_5=4 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_10000__p1 chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_10000__p1 rounds_at_least_5=29
+E7RESULT name=clause_checks item=unlinks_10000__p1 rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_10000__p1 largest_round=2147 sum_of_rounds=6351 sum_over_final_roles=244.269 premise_ratio=3.360 premise=fails memory_bytes=6056 maintenance_steps=2626 unread=0
+E7RESULT name=q8 item=unlinks_10000__p1 state=same_mount first_publish=12789 peak=12789 between_rounds_first_publish=6577 between_rounds_peak=6577 unread=0
+E7RESULT name=q8 item=unlinks_10000__p1 state=remounted first_publish=3607 peak=9685 between_rounds_first_publish=3163 between_rounds_peak=5483 unread=0
+E7RESULT name=control_p3 item=unlinks_10000__p1 compared=210 different=0 holds=true
+E7RESULT name=item_complete item=unlinks_10000__p2a complete=true
+E7RESULT name=q1 item=unlinks_10000__p2a point=unlinks_10000 arm=p2a peak_rounds=3 at=//0 verdict=not_many first_overwrite_rounds=3 window_rest_peak_rounds=3 history_peak_rounds=3
+E7RESULT name=peaks item=unlinks_10000__p2a peak_round_work=57 peak_final_roles=26 peak_final_nodes=17 peak_effective_rounds=2.500
+E7RESULT name=q9 item=unlinks_10000__p2a state=same_mount publishes=105 peak=3 rounds_at_least_3=26 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q9 item=unlinks_10000__p2a state=remounted publishes=105 peak=3 rounds_at_least_3=24 rounds_at_least_5=0 rounds_at_least_9=0 last=2 falls_back=true last_window_at_most_4=true recurs=false
+E7RESULT name=q10 item=unlinks_10000__p2a chain_explained_ratio=not_seen release_exit_share=0.000 placement_exit_share=0.000
+E7RESULT name=f2 item=unlinks_10000__p2a rounds_at_least_5=0
+E7RESULT name=clause_checks item=unlinks_10000__p2a rewrite_set_shrank=0 settled_round_not_covered=0
+E7RESULT name=q7 item=unlinks_10000__p2a largest_round=2406 sum_of_rounds=3956 sum_over_final_roles=152.154 premise_ratio=3.360 premise=fails memory_bytes=3992 maintenance_steps=1508 unread=0
+E7RESULT name=q8 item=unlinks_10000__p2a state=same_mount first_publish=7184 peak=7184 between_rounds_first_publish=4062 between_rounds_peak=4186 unread=0
+E7RESULT name=q8 item=unlinks_10000__p2a state=remounted first_publish=3607 peak=6017 between_rounds_first_publish=3163 between_rounds_peak=3545 unread=0
+E7RESULT name=control_p3 item=unlinks_10000__p2a compared=210 different=0 holds=true
+E7RESULT name=anchor_measured anchor_identifier=files_10000_first_overwrite rounds=22 expected_rounds=22 round_work=1201 expected_round_work=1201 per_round_roles=[11, 24, 28, 32, 36, 40, 42, 44, 46, 50, 54, 58, 62, 64, 66, 70, 74, 76, 78, 80, 82, 84] matches=true
+E7RESULT name=anchor_measured anchor_identifier=files_10000_second_overwrite rounds=Some(2) expected_rounds=2 matches=true
+E7RESULT name=anchor_measured anchor_identifier=base_first_overwrite rounds=2 expected_rounds=2 round_work=21 expected_round_work=21 per_round_roles=[7, 14] matches=true
+E7RESULT name=control_single_step point=base holds=false voids=p1_round_readings_if_false
+E7RESULT name=control_closure_off point=base holds=true voids=p2a_if_false
+E7RESULT name=control_single_step point=files_100 holds=false voids=p1_round_readings_if_false
+E7RESULT name=control_closure_off point=files_100 holds=true voids=p2a_if_false
+E7RESULT name=control_single_step point=files_1000 holds=false voids=p1_round_readings_if_false
+E7RESULT name=control_closure_off point=files_1000 holds=true voids=p2a_if_false
+E7RESULT name=void_5 point=base plain=Some("a97bb56210604ecb68cd4f689ec0f525a646552bc144c6b0c303b5d4079306bf") today=Some("a97bb56210604ecb68cd4f689ec0f525a646552bc144c6b0c303b5d4079306bf") same=true voids=all_measured_if_false
+E7RESULT name=void_5 point=files_1000 plain=Some("c82a604c4590edda8a2f38f2f8bbad0096f5ccae6508337bf5bf6f574025af19") today=Some("c82a604c4590edda8a2f38f2f8bbad0096f5ccae6508337bf5bf6f574025af19") same=true voids=all_measured_if_false
+E7RESULT name=control_negative arm=p1 axis=files low_final_roles=10 high_final_roles=13 alpha=0.038 rounds=2 holds=true voids=p1_if_false
+E7RESULT name=control_negative arm=p1 axis=data_units low_final_roles=10 high_final_roles=10 alpha=0.000 rounds=2 holds=true voids=p1_if_false
+E7RESULT name=control_negative arm=p1 axis=unlinks low_final_roles=10 high_final_roles=14 alpha=0.049 rounds=2 holds=true voids=p1_if_false
+E7RESULT name=control_negative arm=p2a axis=files low_final_roles=10 high_final_roles=13 alpha=0.038 rounds=2 holds=true voids=p2a_if_false
+E7RESULT name=control_negative arm=p2a axis=data_units low_final_roles=10 high_final_roles=10 alpha=0.000 rounds=2 holds=true voids=p2a_if_false
+E7RESULT name=control_negative arm=p2a axis=unlinks low_final_roles=10 high_final_roles=14 alpha=0.049 rounds=2 holds=true voids=p2a_if_false
+E7RESULT name=control_negative arm=p2b16 axis=files result=unread
+E7RESULT name=control_negative arm=p2b16 axis=data_units result=unread
+E7RESULT name=control_negative arm=p2b16 axis=unlinks result=unread
+E7RESULT name=control_negative arm=p2b256 axis=files result=unread
+E7RESULT name=control_negative arm=p2b256 axis=data_units result=unread
+E7RESULT name=control_negative arm=p2b256 axis=unlinks result=unread
+E7RESULT name=q5_same_final_set item=base__closure_off same=254 compared=254 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=base__closure_off slots_placed=7514 today=7514 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=base__closure_off publishes_with_at_least_3_rounds=26 net_steps_linear=0 net_steps_indexed=0 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=base__p2a same=254 compared=254 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=base__p2a slots_placed=7514 today=7514 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=base__p2a publishes_with_at_least_3_rounds=26 net_steps_linear=1338 net_steps_indexed=936 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=base__single_step same=254 compared=254 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=base__single_step slots_placed=7514 today=7514 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=base__single_step publishes_with_at_least_3_rounds=26 net_steps_linear=110063100 net_steps_indexed=110063100 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=data_units_100__p2a same=252 compared=252 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=data_units_100__p2a slots_placed=7702 today=7702 ratio=1.0000 verdict=acceptable peak_final_roles=114
+E7RESULT name=q5_net_steps item=data_units_100__p2a publishes_with_at_least_3_rounds=29 net_steps_linear=1492 net_steps_indexed=1044 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=data_units_1000__p2a same=254 compared=254 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=data_units_1000__p2a slots_placed=11750 today=11750 ratio=1.0000 verdict=acceptable peak_final_roles=424
+E7RESULT name=q5_net_steps item=data_units_1000__p2a publishes_with_at_least_3_rounds=37 net_steps_linear=-3836827 net_steps_indexed=-3838860 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=data_units_10000__p2a same=278 compared=278 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=data_units_10000__p2a slots_placed=48862 today=48862 ratio=1.0000 verdict=acceptable peak_final_roles=441
+E7RESULT name=q5_net_steps item=data_units_10000__p2a publishes_with_at_least_3_rounds=32 net_steps_linear=-10334626 net_steps_indexed=-10349720 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_100__closure_off same=342 compared=342 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_100__closure_off slots_placed=10110 today=10110 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=files_100__closure_off publishes_with_at_least_3_rounds=47 net_steps_linear=0 net_steps_indexed=0 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_100__p2a same=342 compared=342 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_100__p2a slots_placed=10110 today=10110 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=files_100__p2a publishes_with_at_least_3_rounds=47 net_steps_linear=2432 net_steps_indexed=1692 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=files_100__single_step same=342 compared=342 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_100__single_step slots_placed=10110 today=10110 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=files_100__single_step publishes_with_at_least_3_rounds=47 net_steps_linear=201431938 net_steps_indexed=201431938 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=files_1000__closure_off same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000__closure_off slots_placed=43426 today=43426 ratio=1.0000 verdict=acceptable peak_final_roles=25
+E7RESULT name=q5_net_steps item=files_1000__closure_off publishes_with_at_least_3_rounds=82 net_steps_linear=0 net_steps_indexed=0 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000__p2a same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000__p2a slots_placed=43426 today=43426 ratio=1.0000 verdict=acceptable peak_final_roles=25
+E7RESULT name=q5_net_steps item=files_1000__p2a publishes_with_at_least_3_rounds=82 net_steps_linear=-21674834 net_steps_indexed=-21681554 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000__single_step same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000__single_step slots_placed=43426 today=43426 ratio=1.0000 verdict=acceptable peak_final_roles=25
+E7RESULT name=q5_net_steps item=files_1000__single_step publishes_with_at_least_3_rounds=82 net_steps_linear=609651242 net_steps_indexed=609651242 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=files_10000__p2a same=10343 compared=10343 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_10000__p2a slots_placed=381132 today=381132 ratio=1.0000 verdict=acceptable peak_final_roles=84
+E7RESULT name=q5_net_steps item=files_10000__p2a publishes_with_at_least_3_rounds=103 net_steps_linear=-372091510 net_steps_indexed=-372193553 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000_unit_area_2_pow_14__p2a same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000_unit_area_2_pow_14__p2a slots_placed=38334 today=38334 ratio=1.0000 verdict=acceptable peak_final_roles=23
+E7RESULT name=q5_net_steps item=files_1000_unit_area_2_pow_14__p2a publishes_with_at_least_3_rounds=82 net_steps_linear=-6144074 net_steps_indexed=-6147399 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000_unit_area_2_pow_20__p2a same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000_unit_area_2_pow_20__p2a slots_placed=43426 today=43426 ratio=1.0000 verdict=acceptable peak_final_roles=25
+E7RESULT name=q5_net_steps item=files_1000_unit_area_2_pow_20__p2a publishes_with_at_least_3_rounds=82 net_steps_linear=-140290898 net_steps_indexed=-140297618 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000_unit_area_2_pow_24__p2a same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000_unit_area_2_pow_24__p2a slots_placed=48994 today=48994 ratio=1.0000 verdict=acceptable peak_final_roles=27
+E7RESULT name=q5_net_steps item=files_1000_unit_area_2_pow_24__p2a publishes_with_at_least_3_rounds=86 net_steps_linear=-2071221471 net_steps_indexed=-2071231185 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_1000_units_10__p2a same=1251 compared=1251 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_1000_units_10__p2a slots_placed=81664 today=81664 ratio=1.0000 verdict=acceptable peak_final_roles=99
+E7RESULT name=q5_net_steps item=files_1000_units_10__p2a publishes_with_at_least_3_rounds=78 net_steps_linear=-328136791 net_steps_indexed=-328222922 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=files_30000__p2a same=30541 compared=30541 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=files_30000__p2a slots_placed=1241978 today=1241978 ratio=1.0000 verdict=acceptable peak_final_roles=172
+E7RESULT name=q5_net_steps item=files_30000__p2a publishes_with_at_least_3_rounds=112 net_steps_linear=-2662924587 net_steps_indexed=-2663330038 linear=saves indexed=saves
+E7RESULT name=q5_same_final_set item=unlinks_100__p2a same=522 compared=522 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=unlinks_100__p2a slots_placed=14182 today=14182 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=unlinks_100__p2a publishes_with_at_least_3_rounds=23 net_steps_linear=1186 net_steps_indexed=828 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=unlinks_1000__p2a same=3222 compared=3222 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=unlinks_1000__p2a slots_placed=89694 today=89694 ratio=1.0000 verdict=acceptable peak_final_roles=22
+E7RESULT name=q5_net_steps item=unlinks_1000__p2a publishes_with_at_least_3_rounds=27 net_steps_linear=1390 net_steps_indexed=972 linear=costs_more indexed=costs_more
+E7RESULT name=q5_same_final_set item=unlinks_10000__p2a same=30224 compared=30224 ratio=1.0000 first_difference=None same_image_at_the_history_end=true final_set_differs=false
+E7RESULT name=q6 item=unlinks_10000__p2a slots_placed=897352 today=897352 ratio=1.0000 verdict=acceptable peak_final_roles=26
+E7RESULT name=q5_net_steps item=unlinks_10000__p2a publishes_with_at_least_3_rounds=51 net_steps_linear=-41746236 net_steps_indexed=-41750799 linear=saves indexed=saves
+E7RESULT name=verdict question=q1 arm=p1 points_many=data_units_10000,files_10000,files_1000_units_10,files_30000 points_at_the_limit=files_1000_units_100
+E7RESULT name=verdict question=q4 arm=p1 verdict=not_held_down points_not_held_down=data_units_10000,files_10000,files_1000_unit_area_2_pow_24,files_1000_units_10,files_1000_units_100,files_30000,unlinks_10000
+E7RESULT name=q2 arm=p1 axis=files low_end=39 high_end=1201 alpha=0.496 band=between local_slopes=0.000,0.295,1.193
+E7RESULT name=q3_final_roles arm=p1 axis=files low_end=22 high_end=84 alpha=0.194 band=does_not_grow local_slopes=0.000,0.056,0.526
+E7RESULT name=f5 arm=p1 axis=files triggered=false
+E7RESULT name=q3_final_nodes arm=p1 axis=files low_end=7 high_end=73 alpha=0.339 band=between local_slopes=0.000,0.331,0.687
+E7RESULT name=q7_sum_of_rounds arm=p1 axis=files low_end=2647 high_end=16116 alpha=0.262 band=between local_slopes=0.028,0.298,0.458
+E7RESULT name=q7_memory_bytes arm=p1 axis=files low_end=2600 high_end=13224 alpha=0.235 band=does_not_grow local_slopes=0.000,0.283,0.424
+E7RESULT name=q8_first_publish arm=p1 axis=files low_end=2102 high_end=152344 alpha=0.620 band=grows local_slopes=0.045,0.475,1.340
+E7RESULT name=q8_peak arm=p1 axis=files low_end=3763 high_end=152344 alpha=0.536 band=grows local_slopes=0.030,0.356,1.221
+E7RESULT name=q8_p3_first_publish arm=p1 axis=files low_end=1787 high_end=16538 alpha=0.322 band=between local_slopes=0.048,0.314,0.605
+E7RESULT name=q8_p3_peak arm=p1 axis=files low_end=2794 high_end=16538 alpha=0.257 band=between local_slopes=0.030,0.297,0.445
+E7RESULT name=q2 arm=p1 axis=data_units low_end=39 high_end=4728 alpha=0.695 band=grows local_slopes=0.931,0.578,0.575
+E7RESULT name=q3_final_roles arm=p1 axis=data_units low_end=22 high_end=441 alpha=0.434 band=between local_slopes=0.714,0.570,0.017
+E7RESULT name=f5 arm=p1 axis=data_units triggered=false
+E7RESULT name=q3_final_nodes arm=p1 axis=data_units low_end=7 high_end=59 alpha=0.309 band=between local_slopes=0.000,0.269,0.657
+E7RESULT name=q7_sum_of_rounds arm=p1 axis=data_units low_end=2647 high_end=1379231 alpha=0.906 band=grows local_slopes=0.582,1.028,1.107
+E7RESULT name=q7_memory_bytes arm=p1 axis=data_units low_end=2600 high_end=496920 alpha=0.760 band=grows local_slopes=0.425,0.873,0.983
+E7RESULT name=q8_first_publish arm=p1 axis=data_units low_end=2102 high_end=5958 alpha=0.151 band=does_not_grow local_slopes=0.036,0.374,0.043
+E7RESULT name=q8_peak arm=p1 axis=data_units low_end=3763 high_end=3231038 alpha=0.978 band=grows local_slopes=0.660,1.019,1.255
+E7RESULT name=q8_p3_first_publish arm=p1 axis=data_units low_end=1787 high_end=3449 alpha=0.095 band=does_not_grow local_slopes=0.037,0.208,0.040
+E7RESULT name=q8_p3_peak arm=p1 axis=data_units low_end=2794 high_end=1379969 alpha=0.898 band=grows local_slopes=0.565,1.023,1.107
+E7RESULT name=q2 arm=p1 axis=unlinks low_end=39 high_end=119 alpha=0.161 band=does_not_grow local_slopes=0.000,0.032,0.452
+E7RESULT name=q3_final_roles arm=p1 axis=unlinks low_end=22 high_end=26 alpha=0.024 band=does_not_grow local_slopes=0.000,0.000,0.073
+E7RESULT name=f5 arm=p1 axis=unlinks triggered=false
+E7RESULT name=q3_final_nodes arm=p1 axis=unlinks low_end=7 high_end=17 alpha=0.128 band=does_not_grow local_slopes=0.000,0.000,0.385
+E7RESULT name=q7_sum_of_rounds arm=p1 axis=unlinks low_end=2647 high_end=6351 alpha=0.127 band=does_not_grow local_slopes=0.001,0.039,0.341
+E7RESULT name=q7_memory_bytes arm=p1 axis=unlinks low_end=2600 high_end=6056 alpha=0.122 band=does_not_grow local_slopes=0.000,0.043,0.324
+E7RESULT name=q8_first_publish arm=p1 axis=unlinks low_end=2102 high_end=12789 alpha=0.261 band=between local_slopes=0.031,0.083,0.670
+E7RESULT name=q8_peak arm=p1 axis=unlinks low_end=3763 high_end=12789 alpha=0.177 band=does_not_grow local_slopes=0.000,0.063,0.467
+E7RESULT name=q8_p3_first_publish arm=p1 axis=unlinks low_end=1787 high_end=6577 alpha=0.189 band=does_not_grow local_slopes=0.026,0.078,0.462
+E7RESULT name=q8_p3_peak arm=p1 axis=unlinks low_end=2794 high_end=6577 alpha=0.124 band=does_not_grow local_slopes=0.001,0.045,0.326
+E7RESULT name=verdict question=q2 arm=p1 grows_on=data_units
+E7RESULT name=verdict question=q10 arm=p1 points_the_chain_does_not_explain=files_1000_units_100,files_30000
+E7RESULT name=f4 arm=p1 points=-
+E7RESULT name=verdict question=q1 arm=p2a points_many=- points_at_the_limit=-
+E7RESULT name=verdict question=q4 arm=p2a verdict=held_down points_not_held_down=-
+E7RESULT name=q2 arm=p2a axis=files low_end=39 high_end=95 alpha=0.129 band=does_not_grow local_slopes=0.000,0.208,0.178
+E7RESULT name=q3_final_roles arm=p2a axis=files low_end=22 high_end=84 alpha=0.194 band=does_not_grow local_slopes=0.000,0.056,0.526
+E7RESULT name=f5 arm=p2a axis=files triggered=false
+E7RESULT name=q3_final_nodes arm=p2a axis=files low_end=7 high_end=73 alpha=0.339 band=between local_slopes=0.000,0.331,0.687
+E7RESULT name=q7_sum_of_rounds arm=p2a axis=files low_end=2647 high_end=16083 alpha=0.261 band=between local_slopes=0.028,0.185,0.570
+E7RESULT name=q7_memory_bytes arm=p2a axis=files low_end=2600 high_end=13224 alpha=0.235 band=does_not_grow local_slopes=0.000,0.160,0.546
+E7RESULT name=q8_first_publish arm=p2a axis=files low_end=2102 high_end=15440 alpha=0.289 band=between local_slopes=0.045,0.295,0.526
+E7RESULT name=q8_peak arm=p2a axis=files low_end=3763 high_end=15440 alpha=0.204 band=does_not_grow local_slopes=0.030,0.350,0.233
+E7RESULT name=q8_p3_first_publish arm=p2a axis=files low_end=1787 high_end=16185 alpha=0.319 band=between local_slopes=0.048,0.312,0.598
+E7RESULT name=q8_p3_peak arm=p2a axis=files low_end=2794 high_end=16185 alpha=0.254 band=between local_slopes=0.030,0.181,0.551
+E7RESULT name=q2 arm=p2a axis=data_units low_end=39 high_end=1272 alpha=0.504 band=grows local_slopes=0.931,0.578,0.004
+E7RESULT name=q3_final_roles arm=p2a axis=data_units low_end=22 high_end=441 alpha=0.434 band=between local_slopes=0.714,0.570,0.017
+E7RESULT name=f5 arm=p2a axis=data_units triggered=false
+E7RESULT name=q3_final_nodes arm=p2a axis=data_units low_end=7 high_end=59 alpha=0.309 band=between local_slopes=0.000,0.269,0.657
+E7RESULT name=q7_sum_of_rounds arm=p2a axis=data_units low_end=2647 high_end=1379231 alpha=0.906 band=grows local_slopes=0.582,1.028,1.107
+E7RESULT name=q7_memory_bytes arm=p2a axis=data_units low_end=2600 high_end=496920 alpha=0.760 band=grows local_slopes=0.425,0.873,0.983
+E7RESULT name=q8_first_publish arm=p2a axis=data_units low_end=2102 high_end=4040 alpha=0.095 band=does_not_grow local_slopes=0.036,0.201,0.047
+E7RESULT name=q8_peak arm=p2a axis=data_units low_end=3763 high_end=3231038 alpha=0.978 band=grows local_slopes=0.660,1.019,1.255
+E7RESULT name=q8_p3_first_publish arm=p2a axis=data_units low_end=1787 high_end=3430 alpha=0.094 band=does_not_grow local_slopes=0.037,0.206,0.040
+E7RESULT name=q8_p3_peak arm=p2a axis=data_units low_end=2794 high_end=1379969 alpha=0.898 band=grows local_slopes=0.565,1.023,1.107
+E7RESULT name=q2 arm=p2a axis=unlinks low_end=39 high_end=57 alpha=0.055 band=does_not_grow local_slopes=0.000,0.032,0.133
+E7RESULT name=q3_final_roles arm=p2a axis=unlinks low_end=22 high_end=26 alpha=0.024 band=does_not_grow local_slopes=0.000,0.000,0.073
+E7RESULT name=f5 arm=p2a axis=unlinks triggered=false
+E7RESULT name=q3_final_nodes arm=p2a axis=unlinks low_end=7 high_end=17 alpha=0.128 band=does_not_grow local_slopes=0.000,0.000,0.385
+E7RESULT name=q7_sum_of_rounds arm=p2a axis=unlinks low_end=2647 high_end=3956 alpha=0.058 band=does_not_grow local_slopes=0.001,0.039,0.135
+E7RESULT name=q7_memory_bytes arm=p2a axis=unlinks low_end=2600 high_end=3992 alpha=0.062 band=does_not_grow local_slopes=0.000,0.043,0.143
+E7RESULT name=q8_first_publish arm=p2a axis=unlinks low_end=2102 high_end=7184 alpha=0.178 band=does_not_grow local_slopes=0.031,0.083,0.420
+E7RESULT name=q8_peak arm=p2a axis=unlinks low_end=3763 high_end=7184 alpha=0.094 band=does_not_grow local_slopes=0.000,0.063,0.217
+E7RESULT name=q8_p3_first_publish arm=p2a axis=unlinks low_end=1787 high_end=4062 alpha=0.119 band=does_not_grow local_slopes=0.026,0.078,0.252
+E7RESULT name=q8_p3_peak arm=p2a axis=unlinks low_end=2794 high_end=4186 alpha=0.059 band=does_not_grow local_slopes=0.001,0.045,0.130
+E7RESULT name=verdict question=q2 arm=p2a grows_on=data_units
+E7RESULT name=verdict question=q10 arm=p2a points_the_chain_does_not_explain=-
+E7RESULT name=f4 arm=p2a points=-
+E7RESULT name=f6 item=base__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=data_units_100__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=data_units_1000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=data_units_10000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_100__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_10000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000_unit_area_2_pow_14__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000_unit_area_2_pow_20__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000_unit_area_2_pow_24__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000_units_10__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=files_1000_units_100__p1 premise_ratio_over_the_bound=false roles_changed_over_twice_the_final=true
+E7RESULT name=f6 item=files_30000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=unlinks_100__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=unlinks_1000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=f6 item=unlinks_10000__p1 premise_ratio_over_the_bound=true roles_changed_over_twice_the_final=false
+E7RESULT name=sensitivity arm=p1 knob=unit_area readings=files_1000_unit_area_2_pow_14:5:not_many,files_1000:5:not_many,files_1000_unit_area_2_pow_20:5:not_many,files_1000_unit_area_2_pow_24:6:not_many stable=true
+E7RESULT name=sensitivity arm=p1 knob=active_leaves_source readings=files_10000:22:many,files_1000_units_10:29:many stable=true
+E7RESULT name=sensitivity arm=p1 knob=inode_batch readings=files_10000:22:many stable=true
+E7RESULT name=sensitivity arm=p1 knob=order readings=files_1000:5:not_many stable=true
+E7RESULT name=sensitivity arm=p1 knob=remount readings=files_10000:22:many stable=true
+E7RESULT name=sensitivity arm=p2a knob=unit_area readings=files_1000_unit_area_2_pow_14:4:not_many,files_1000:4:not_many,files_1000_unit_area_2_pow_20:4:not_many,files_1000_unit_area_2_pow_24:4:not_many stable=true
+E7RESULT name=sensitivity arm=p2a knob=active_leaves_source readings=files_10000:4:not_many,files_1000_units_10:3:not_many stable=true
+E7RESULT name=sensitivity arm=p2a knob=inode_batch readings=files_10000:4:not_many stable=true
+E7RESULT name=sensitivity arm=p2a knob=order readings=files_1000:4:not_many stable=true
+E7RESULT name=sensitivity arm=p2a knob=remount readings=files_10000:4:not_many stable=true
+E7RESULT name=sensitivity_mount point=files_1000 same_mount_peak=4 remounted_peak=4
+E7RESULT name=sensitivity_mount point=files_10000 same_mount_peak=22 remounted_peak=6
+E7RESULT name=fork_row row=P1 enough_readings=false
+E7RESULT name=fork_row row=P2 enough_readings=true
+E7RESULT name=fork_row row=P3 enough_readings=false
+E7RESULT name=report_done items=40 complete=39
+E7RESULT name=done emitted=754

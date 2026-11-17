@@ -1,0 +1,13 @@
+# 正推腿的夹具，一行一格，制表符分隔五段：格名、crate 名、Rust 一份的入口、Python 一份的入口（<文件>::之后那一截）、原文（在那个 crate 的 lib.rs 里恰好一次；它所在的那一行落在哪个 fn 单元的行区间里，那个单元就是「被看的 impl 方法」）。
+gap_static_of_a_struct_holding_dyn	fgstructstatic	fgstructstatic::entry_static_of_a_struct	entry_static_of_a_struct	0x51
+control_static_holding_dyn_directly	fgstaticdirect	fgstaticdirect::entry_static_direct	entry_static_direct	0x51
+gap_static_of_an_alias_holding_dyn	fgstaticalias	fgstaticalias::entry_static_of_an_alias	entry_static_of_an_alias	0x51
+gap_any_downcast_to_an_alias_of_dyn	fganyalias	fganyalias::entry_any_alias	entry_any_alias	0x51
+gap_any_downcast_in_a_second_unit	fganysplit	fganysplit::entry_any_split	entry_any_split	0x51
+gap_static_inside_a_function	fgfnstatic	fgfnstatic::entry_static_inside_a_function	entry_static_inside_a_function	0x51
+control_bound_written_with_a_path	fgpathbound	fgpathbound::entry_path_bound	entry_path_bound	0x52
+control_dyn_written_with_a_path	fgpathdyn	fgpathdyn::entry_path_dyn	entry_path_dyn	0x52
+control_bound_written_with_a_use	fgusebound	fgusebound::entry_use_bound	entry_use_bound	0x52
+gap_dyn_after_an_auto_trait_in_a_static	fgautofirst	fgautofirst::entry_auto_trait_first	entry_auto_trait_first	0x51
+control_item_macro_static	fgitemmacro	fgitemmacro::entry_item_macro	entry_item_macro	0x51
+control_entry_type_two_fields_down	fgtwodown	fgtwodown::entry_two_down	entry_two_down	0x51

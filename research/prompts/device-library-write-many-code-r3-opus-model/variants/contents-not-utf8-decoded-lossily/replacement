@@ -1,0 +1,1 @@
+                Some(String::from_utf8_lossy(&contents).into_owned())

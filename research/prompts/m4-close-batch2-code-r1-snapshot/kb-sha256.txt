@@ -1,0 +1,8 @@
+bf8fdac24b9fc813e3defdfbfe55f5eaf88615f09821e0f14abc83cab00fcddf  .claude/kb/decisions/04-校验和位置.md
+790779951a02dfb88ef89f5cd59a1d8923fa933f9688987a46aa8de08314e02c  .claude/kb/decisions/18-块里携带什么信息.md
+9ab294a84b88f42b73e2ae63a4244876592c20466b27c9ad61c9e0d32537d14d  .claude/kb/decisions/26-后台整理与放置回收.md
+bd36fa955cf594636dd5584dd5cf69ca35a29767ff01ac3c9216cdc834409845  .claude/kb/decisions/28-挂载期承诺量.md
+1c58abb2728e189fe0897134027546177e75b8975bba747e5aad863be1927a4b  .claude/kb/decisions/21-权威态与派生态的分界.md
+ab1096b59211733d089afa855e50d647419bf6b26a37f0ad5bd94d34056a5cf5  crates/singlefs-checker/invariants/07-分配器.md
+6110becd6312c4edb65f8070bfafbb5a19d6a60bc7e9cfb602354932ced7d3db  crates/singlefs-checker/invariants/01-块自描述.md
+5d1ff265d6bdd4cea4d2094a12f9d2424b11687523058980d19d2b4fee05d7bc  .claude/kb/decisions/23-journal的角色与格式.md

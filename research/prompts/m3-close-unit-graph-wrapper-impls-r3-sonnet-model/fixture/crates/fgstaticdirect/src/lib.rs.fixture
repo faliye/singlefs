@@ -1,0 +1,20 @@
+// 对照：dyn 直接写在 static 的类型里（入库测试 a_trait_object_written_in_a_static_of_the_closure_is_opened 的形态）
+use std::sync::Mutex;
+pub trait Held {
+    fn read_the_held(&self) -> u8;
+}
+pub struct HeldWrapper<Inner>(pub Inner);
+impl<Inner> Held for HeldWrapper<Inner> {
+    fn read_the_held(&self) -> u8 {
+        0x51
+    }
+}
+pub static REGISTRY: Mutex<Vec<Box<dyn Held + Send>>> = Mutex::new(Vec::new());
+pub fn entry_static_direct() -> u8 {
+    REGISTRY
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|held| held.read_the_held())
+        .sum()
+}

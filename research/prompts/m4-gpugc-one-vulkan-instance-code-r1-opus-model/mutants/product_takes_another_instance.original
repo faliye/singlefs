@@ -1,0 +1,3 @@
+    fn vulkan_instance_for_this_opening(&self) -> VulkanInstanceOfThisProcess {
+        self.clone()
+    }

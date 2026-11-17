@@ -1,0 +1,36 @@
+//! 第三条「同一段模块里没有 `use` 引进同名」只比 use 引进的名字，不看 glob：`#[cfg(not(unix))]` 那一臂是本模块的 struct `Wrapper`，
+//! `#[cfg(unix)]` 那一臂是 `pub use real::*;`，经 glob 引进 `real` 里的别名 `Wrapper`（指 `Real`）。编进来的是别名那一臂，
+//! impl 写在别名上，值照 `Real` 造，`Wrapper` 没人写。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub mod real {
+    pub struct Real<Inner>(pub Inner);
+
+    pub type Wrapper<Inner> = Real<Inner>;
+}
+
+#[cfg(not(unix))]
+pub struct Wrapper<Inner>(pub Inner);
+
+#[cfg(unix)]
+pub use real::*;
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    real::Real(Base).put(3)
+}

@@ -1,0 +1,64 @@
+# fourth/ 里每份文件换到仓里的路径（两列：树里的相对路径、仓里的路径；制表符分隔）。新建的在仓里还不存在：.claude/skills/dispatch/SKILL.md、.claude/skills/merge-verify/SKILL.md、.claude/skills/three-way/SKILL.md、.claude/rules/verification-reference.md
+CLAUDE-merged.md	CLAUDE.md
+dot-claude/agent-common.md	.claude/agent-common.md
+dot-claude/agents/clerk.md	.claude/agents/clerk.md
+dot-claude/agents/experiment-designer.md	.claude/agents/experiment-designer.md
+dot-claude/agents/experiment-runner.md	.claude/agents/experiment-runner.md
+dot-claude/agents/implementation-writer.md	.claude/agents/implementation-writer.md
+dot-claude/agents/investigator.md	.claude/agents/investigator.md
+dot-claude/agents/kb-scribe.md	.claude/agents/kb-scribe.md
+dot-claude/agents/mutation-triage.md	.claude/agents/mutation-triage.md
+dot-claude/agents/prior-art.md	.claude/agents/prior-art.md
+dot-claude/agents/sweep.md	.claude/agents/sweep.md
+dot-claude/agents/three-way-attack.md	.claude/agents/three-way-attack.md
+dot-claude/agents/three-way-defense.md	.claude/agents/three-way-defense.md
+dot-claude/agents/three-way-forward.md	.claude/agents/three-way-forward.md
+dot-claude/agents/three-way-materials.md	.claude/agents/three-way-materials.md
+dot-claude/agents/tooling-writer.md	.claude/agents/tooling-writer.md
+dot-claude/main-agent.md	.claude/main-agent.md
+dot-claude/rules/changelog-format.md	.claude/rules/changelog-format.md
+dot-claude/rules/code-discipline-by-review.md	.claude/rules/code-discipline-by-review.md
+dot-claude/rules/command-safety-by-review.md	.claude/rules/command-safety-by-review.md
+dot-claude/rules/directory-layout.md	.claude/rules/directory-layout.md
+dot-claude/rules/evidence-discipline.md	.claude/rules/evidence-discipline.md
+dot-claude/rules/format-evolution.md	.claude/rules/format-evolution.md
+dot-claude/rules/fs-design.md	.claude/rules/fs-design.md
+dot-claude/rules/implementation-first.md	.claude/rules/implementation-first.md
+dot-claude/rules/implementation-workflow.md	.claude/rules/implementation-workflow.md
+dot-claude/rules/long-run-split.md	.claude/rules/long-run-split.md
+dot-claude/rules/machine-first.md	.claude/rules/machine-first.md
+dot-claude/rules/mutation-sampling.md	.claude/rules/mutation-sampling.md
+dot-claude/rules/path-moves.md	.claude/rules/path-moves.md
+dot-claude/rules/session-wrapup.md	.claude/rules/session-wrapup.md
+dot-claude/rules/show-me-test-by-review.md	.claude/rules/show-me-test-by-review.md
+dot-claude/rules/test-discipline.md	.claude/rules/test-discipline.md
+dot-claude/rules/test-script-discipline.md	.claude/rules/test-script-discipline.md
+dot-claude/rules/three-way-inference.md	.claude/rules/three-way-inference.md
+dot-claude/rules/timer-only-remind.md	.claude/rules/timer-only-remind.md
+dot-claude/rules/verification-reference.md	.claude/rules/verification-reference.md
+dot-claude/rules/verification.md	.claude/rules/verification.md
+dot-claude/rules/writing-discipline-by-review.md	.claude/rules/writing-discipline-by-review.md
+dot-claude/skills/crash-test/SKILL.md	.claude/skills/crash-test/SKILL.md
+dot-claude/skills/crash-test/commit-stages.md	.claude/skills/crash-test/commit-stages.md
+dot-claude/skills/decide/SKILL.md	.claude/skills/decide/SKILL.md
+dot-claude/skills/dispatch/SKILL.md	.claude/skills/dispatch/SKILL.md
+dot-claude/skills/gate/SKILL.md	.claude/skills/gate/SKILL.md
+dot-claude/skills/gate/staged-gate.md	.claude/skills/gate/staged-gate.md
+dot-claude/skills/halt/SKILL.md	.claude/skills/halt/SKILL.md
+dot-claude/skills/merge-verify/SKILL.md	.claude/skills/merge-verify/SKILL.md
+dot-claude/skills/queue-health/SKILL.md	.claude/skills/queue-health/SKILL.md
+dot-claude/skills/remind/SKILL.md	.claude/skills/remind/SKILL.md
+dot-claude/skills/three-way/SKILL.md	.claude/skills/three-way/SKILL.md
+dot-claude/skills/trilingual/SKILL.md	.claude/skills/trilingual/SKILL.md
+
+# 要 git rm 的（8 份被并掉的规则，归主 agent；只一列：仓里的路径）
+.claude/rules/verify-before-claiming.md
+.claude/rules/artifact-line-pointer.md
+.claude/rules/exhaustive-interleaving.md
+.claude/rules/service-stop-readback.md
+.claude/rules/communication-discipline-by-review.md
+.claude/rules/engineering-philosophy.md
+.claude/rules/design-doc-discipline-by-review.md
+.claude/rules/pushback-discipline-by-review.md
+
+# 交付物，不换进仓里的规则目录：树里的 contradictions.md、references.md 随判决留着（主 agent 要冻结就拷到 research/prompts/ 下新建的目录）

@@ -1,0 +1,17 @@
+arm axis | A_ratioRs_at_step_peak B_ratioRs_max C_ratioRs_W1_1 L_ratioFinal_at_step_peak | D_raw_W1_1 E_raw_step_peak | G_raw_W1W4peak_on_records J_ratioRs_W1_1_on_records
+real files | 0.083 0.064 0.070 -0.011 | 0.289 0.204 | 0.385 0.123
+real data_units | 0.021 0.047 0.058 0.167 | 0.095 0.978 | 0.147 0.126
+real unlinks | 0.046 0.031 0.033 0.048 | 0.178 0.094 | 0.349 0.108
+H_scan_every_publish files | 0.217 0.399 0.221 0.110 | 0.440 0.370 | 0.710 0.387
+H_scan_every_publish data_units | -0.048 0.316 0.276 0.086 | 0.312 0.940 | 0.614 0.600
+H_scan_every_publish unlinks | 0.082 0.152 0.087 0.072 | 0.232 0.161 | 0.625 0.282
+H_scan_only_big files | 0.083 0.064 0.070 -0.011 | 0.289 0.204 | 0.385 0.123
+H_scan_only_big data_units | 0.022 0.047 0.058 0.168 | 0.095 0.979 | 0.147 0.126
+H_scan_only_big unlinks | 0.046 0.031 0.033 0.048 | 0.178 0.094 | 0.349 0.108
+H_rewrite_everything files | 0.007 -0.010 0.001 0.001 | 0.756 0.718 | 1.330 0.001
+H_rewrite_everything data_units | 0.013 0.007 0.000 0.107 | 0.753 0.922 | 1.662 0.000
+H_rewrite_everything unlinks | 0.020 0.006 0.013 0.019 | 0.161 0.123 | 0.447 0.043
+out-of-axis W1/1 on records from base: 
+files_30000 raw 0.678 ratioRs 0.116 raw_W1W4peak 0.591
+files_1000_units_10 raw 0.530 ratioRs 0.116 raw_W1W4peak 0.413
+files_1000_units_100 raw 0.789 ratioRs 0.110 raw_W1W4peak 0.715

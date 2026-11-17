@@ -1,0 +1,9 @@
+# 样本名<TAB>期望退出码（run-scope-guard.sh 照主 agent 判：输入里不带 agent_type）
+mutation-row-on-a-crash-target	2
+mutation-row-on-a-crash-target-with-full-domain-reason	0
+crash-case-through-the-gate	0
+amplification-item	0
+cargo-test-on-a-crash-target	2
+prove-red-on-a-crash-row	2
+old-entry-item-on-the-same-flow	2
+merge-and-verify-three-patches	0

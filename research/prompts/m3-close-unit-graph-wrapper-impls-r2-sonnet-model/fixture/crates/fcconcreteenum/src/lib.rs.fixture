@@ -1,0 +1,26 @@
+// 今天的规则本来就漏的一形（全具体类型的 impl，没有泛型参数）：变体经 use 引进来造值，枚举名 Layered 只写在 use 那一行
+pub trait ConcEnumDev {
+    fn conc_enum_read(&self) -> u8;
+}
+pub struct ConcEnumBase;
+impl ConcEnumDev for ConcEnumBase {
+    fn conc_enum_read(&self) -> u8 {
+        1
+    }
+}
+pub enum Layered {
+    Plain(ConcEnumBase),
+    Doubled(ConcEnumBase),
+}
+impl ConcEnumDev for Layered {
+    fn conc_enum_read(&self) -> u8 {
+        match self {
+            Layered::Plain(inner) => inner.conc_enum_read(),
+            Layered::Doubled(inner) => inner.conc_enum_read() * 2,
+        }
+    }
+}
+use crate::Layered::Doubled;
+pub fn entry_concrete_enum() -> u8 {
+    Doubled(ConcEnumBase).conc_enum_read()
+}

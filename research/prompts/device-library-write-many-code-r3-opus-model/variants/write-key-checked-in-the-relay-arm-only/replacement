@@ -1,0 +1,4 @@
+        let asked = format!("写 {relative}");
+        match &*self.backend {
+            Backend::Relay(ends) => {
+                give_up_unless_the_relay_accepts_the_key(relative, &asked);

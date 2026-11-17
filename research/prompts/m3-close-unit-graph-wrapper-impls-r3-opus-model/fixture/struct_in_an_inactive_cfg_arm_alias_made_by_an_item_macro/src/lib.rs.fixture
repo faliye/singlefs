@@ -1,0 +1,43 @@
+//! 第三条「叫这个名字的类型单元个个是 struct、enum 或 union」只看类型单元：`#[cfg(unix)]` 那一臂的同名别名由条目级宏调用造出来，
+//! 不是类型单元。编进来的是别名那一臂，impl 写在别名上；值由 `real::make` 造，入口不写 `Wrapper`、`Real`，也不写宏调用里出现的名字。
+pub trait Store {
+    fn put(&self, amount: u32) -> u32;
+}
+
+pub struct Base;
+
+impl Store for Base {
+    fn put(&self, amount: u32) -> u32 {
+        amount
+    }
+}
+
+pub mod real {
+    pub struct Real<Inner>(pub Inner);
+
+    pub fn make<Inner>(inner: Inner) -> Real<Inner> {
+        Real(inner)
+    }
+}
+
+macro_rules! alias_of_a_type_in_the_real_module {
+    ($alias:ident, $target:ident) => {
+        pub type $alias<Inner> = real::$target<Inner>;
+    };
+}
+
+#[cfg(not(unix))]
+pub struct Wrapper<Inner>(pub Inner);
+
+#[cfg(unix)]
+alias_of_a_type_in_the_real_module!(Wrapper, Real);
+
+impl<Inner: Store> Store for Wrapper<Inner> {
+    fn put(&self, amount: u32) -> u32 {
+        self.0.put(amount) * 2
+    }
+}
+
+pub fn entry() -> u32 {
+    real::make(Base).put(3)
+}
