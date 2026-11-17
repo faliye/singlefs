@@ -1,19 +1,15 @@
 # 方案与探讨建在 `crates/` 的实现上
 
-**这是 singlefs 的项目本地规则**，不在共享 SOP 里。
-共享规则在 `.claude/singlefs-ai-sop/rules/`。
-
-除了独立验证这类确有需要的场合，一般的方案和探讨都建在 `crates/` 的实现上（四个验证用的包怎么称呼见 `.claude/rules/verification.md`「定义与名字」）。
+独立验证之外的方案和探讨，都建在 `crates/` 的实现上（四个验证用的包怎么称呼见 `.claude/rules/verification.md`「定义与名字」）。
 
 ## 规矩
 
 1. **谈方案之前先读实现**：候选臂、改法、实验要建的模型，先读 `crates/` 里对应的代码路径；引用写文件名加行号。
-2. **改法写成对实现的改动**：「改 `crates/` 里哪个文件的哪一步、加什么」。实现里还没有的，写明「`crates/` 里没有 X」并附 grep 命令与零命中，候选写成以后加在哪一处、要与已经实现的哪几样对得上。
-3. **三方论证的背景材料必须有一行「实现今天的样子」前提**，列出读过的 `crates/` 路径与看到的事实，标成主 agent 的观测；没有相关实现时写 grep 命令与零命中。发给各条腿的提示里写明「方案按 `crates/` 今天的实现来谈」。
-4. **`scripts/experiment-apparatus/` 下的实验装置与 `research/prompts/` 下各腿自己写的模型只用来独立验证**：它们不与实现共用代码，用来核实现、核推论。装置的数与实现对不上时两边都查，不许默认装置对，也不许默认实现对。
+2. **改法写成对实现的改动**：改 `crates/` 里哪个文件的哪一步、加什么。实现里还没有的，写明「`crates/` 里没有 X」并附 grep 命令与零命中，候选写成以后加在哪一处、要与已经实现的哪几样对得上。
+3. **三方论证的背景材料必须有一行「实现今天的样子」前提**：列出读过的 `crates/` 路径与看到的事实，标成主 agent 的观测；没有相关实现时写 grep 命令与零命中。发给各条腿的提示里写明「方案按 `crates/` 今天的实现来谈」。
+4. **`scripts/experiment-apparatus/` 下的实验装置与 `research/prompts/` 下各腿自己写的模型只用来独立验证**：不与实现共用代码，用来核实现、核推论。装置的数与实现对不上时两边都查，不默认哪一边对。
 5. **例外**：独立验证本身（checker 与核心层分开写、计数模型核实现给出的数、攻方腿自己写的小模型）；实现还没覆盖、也不打算近期覆盖的推演（照第 2 条写明没有）；`research/prompts/` 下的冻结证据不回改。
 
 ## 门禁管哪一半
 
-门禁 doc-process-records（`.claude/gate.d/doc-process-records.sh`）的 implementation-premise 格（单跑：`--check implementation-premise`）查第 3 条的形式：标题日期在 `2026-09-17` 及以后的三方论证正文（`research/prompts/_*-body.md`）必须出现 `crates/`。
-**它管不到的**：读没读对、改法是不是真按实现写的、实验跑前登记里的模型该不该复用实现——这几样靠人与三方论证的攻方腿。
+门禁 doc-process-records（`.claude/gate.d/doc-process-records.sh`）的 implementation-premise 格（单跑 `--check implementation-premise`）查第 3 条的形式：标题日期在 `2026-09-17` 及以后的三方论证正文（`research/prompts/_*-body.md`）必须出现 `crates/`。读没读对、改法是不是真按实现写的、实验跑前登记里的模型该不该复用实现，靠人与三方论证的攻方腿。

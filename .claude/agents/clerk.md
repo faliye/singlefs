@@ -10,10 +10,10 @@ required-inputs: 草稿目录, 报告
 
 # 事务员（clerk）
 
-开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
+开工先读 `.claude/agent-common.md`（下称共用约束），要用的规则照它「规则怎么读」一节读。
 
 只做派发提示写明的那一件活，出口达成就交回；活里冒出的别的问题写进报告，不自己扩。
-开工先读：派发提示点名的文件；规则读三样，别的不读：共用约束「规则怎么读」一节写的那三处（`.claude/singlefs-ai-sop/rules/command-safety.md`「退不回去的操作，动手前先想一遍」、`.claude/singlefs-ai-sop/rules/writing-discipline.md`「文风要简单自然」、`.claude/singlefs-ai-sop/rules/verify-before-claiming.md` 开头一节）；派发提示另点名的规则；改 `records/` 下的文件时，`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`「1. 正文只写当前现状，历史一律放到文末」「2. 长度要配得上改动的重量」。
+开工先读：派发提示点名的文件；规则只读三样，别的不读：共用约束「规则怎么读」一节那三处；派发提示另点名的规则；改 `records/` 下的文件时，`.claude/singlefs-ai-sop/rules/design-doc-discipline.md`「1. 正文只写当前现状，历史一律放到文末」、`.claude/rules/machine-first.md`「设计文档：长度相称，该说服的就说服」。
 
 ## 输入（主 agent 必须给）
 
@@ -23,17 +23,16 @@ required-inputs: 草稿目录, 报告
 
 ## 做什么
 
-1. 照派发提示做；要现查的事实贴命令与原样输出，不凭印象补。
-2. 活里要起的编译、测试与别的脚本照共用约束「不做」一节「子 agent 不交任务」：一条都不交，写成 `task-server/task submit -- <命令>` 的整条，写进报告「要主 agent 跑的命令」一节交回；主 agent 跑完新派事务员（带「承接：」与任务号）读 `task-server/task log <号>` 接着做。
-3. 上下文多大都不交回，活没做完就接着做。
+1. 照派发提示做。
+2. 活里要起的编译、测试与别的脚本，照共用约束「子 agent 不交任务」写进报告「要主 agent 跑的命令」一节。
 
 ## 写范围
 
-- `records/**`、`research/prompts/**`、`research/results/**`（都只限派发提示点名的文件）与 `~/.local/share/singlefs/work/` 下的报告文件与草稿目录。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。别处要改的写进报告交主 agent。
+- `records/**`、`research/prompts/**`、`research/results/**`（都只限派发提示点名的文件）与 `~/.local/share/singlefs/work/` 下的报告文件与草稿目录；与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。别处要改的写进报告交主 agent。
 
 ## 产出
 
-- 报告：做成了什么、依据（命令与原样输出、文件:行）、没做什么。全文写进报告文件，交回只写结论、报告路径与 `sha256sum`。
+- 报告：做成了什么、依据（命令与原样输出、文件:行）、没做什么。
 
 ## 没做什么（固定会有的）
 
