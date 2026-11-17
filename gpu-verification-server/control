@@ -1,0 +1,1785 @@
+#!/usr/bin/env python3
+"""gpu-verification-server 的装、起、停、查（进程本体的用法写在 src/main.rs 文件头，做到哪、还没做的写在 README.md）。
+
+多机配置里点名了卡的每一台各一个进程（用户级单元 singlefs-gpu-verification-server.service，模板 singlefs-gpu-verification-server.service.in）。
+「点名了卡」：GPU_CARDS_BY_PRIORITY 或 GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED 里有它的台标签（每项 <台标签>:<序号>:<额度>，从右切两刀，
+台标签写 HOSTS 里那一台的地址；写法在仓根 multi-host.env.example）。这一台与第二台的地址只经多机配置的共用取法取
+（scripts/hosts/multi_host_addresses.py 的 resolve：整份配置判过才给，认自己照这一台网卡上的地址）；台标签既不是这一台也不是第二台、
+一项切不出三段、开了 GPU 而哪一台都没点名卡，都判配置写坏、退 78。
+在第二台做的，经 ssh 直连第二台的地址（用户名照这台的 ~/.ssh/config，这里不写），在那台同一绝对路径的仓里起同一条
+python3 <仓根>/gpu-verification-server/control <同样的参数>，带 GPU_VERIFICATION_SERVER_CONTROL_FORWARDED=1：转来的那一条只在它那台做、不再转、不清场。
+ssh 自己失败（退 255）退 78。几台的结局合成一个退出码：都 0 退 0；有退的不是 0 也不是 78 的，退头一个这样的（这一台在前）；其余退 78。
+
+多机配置的 GPU 开关 ENABLE_GPU 要明确写 0 或 1（没写、写别的值退 78，不当关）。用法：
+  python3 gpu-verification-server/control install --dry-run [--binary <编好的 gpu-verification-server>]
+        每台只打要做的每一步（二进制、状态目录、单元文件的全文、systemctl 的几条），一个文件不写、一条 systemctl 不起；退 0
+  python3 gpu-verification-server/control install [--binary <编好的 gpu-verification-server>]
+        没开 GPU 退 78（用不上这个服务）。点名了卡的每一台：给了 --binary 就拷成 ~/.local/share/singlefs/gpu-verification-server/bin/gpu-verification-server
+        （755，回读 sha256；要转去第二台时这条路径（解开符号链接之后）要在多机配置 NFS_SHARED_ROOTS 某一段下、这台读得到，不是退 78）；
+        没给又没装过退 78（出路写编法）；建状态目录 ~/.local/state/singlefs/gpu-verification-server（700）；照模板写用户级单元
+        （@CARGO@ 填这一台的 cargo，下面「单元环境里的 CARGO」；取不到退 78），systemctl --user daemon-reload、start（开机不自起、不 enable；单元带 Restart=always）；
+        回读「在跑」到对上才退 0，限时里没对上退 1。单元已经在跑的 start 不重起：换了二进制或单元之后 stop、start 换上。
+        起任何一台的单元之前，发起的这一台清一次场（下面「开卡之前清场」，没过一台都不起、退 78）
+  python3 gpu-verification-server/control start
+        没开 GPU：一台都不起、退 0（随任务服务与判定库服务一起起的那一步照样调它）。开了：发起的这一台先清一次场，罩住要起的各台点名的卡
+        （下面「开卡之前清场」，没过一台都不起、退 78），再在点名了卡的每一台 systemctl --user start，回读「在跑」，对上退 0，限时里没对上退 1
+  python3 gpu-verification-server/control unit-state
+        只在这一台：打一行 GPU_VERIFICATION_SERVER_UNIT_STATE state=<systemctl --user is-active 打的状态>，退 0，不读 GPU 开关、不转去别的台。
+        发起 start、install 的那一台经 ssh 在第二台起它，问那台的单元在不在跑（下面「开卡之前清场」）
+  python3 gpu-verification-server/control stop
+        点名了卡的每一台，加这一台：单元文件不在而 is-active 打 inactive、failed 的是没装，退 0；别的 systemctl --user stop，
+        回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算；systemctl show 问不到 cgroup、读不了都不算空），
+        隔单元的 RestartSec 加一秒再回读一次 is-active（仍要停着：没被拉起），都对退 0，不对退 1
+  python3 gpu-verification-server/control check
+        没开 GPU：退 0，打一行「没开 GPU，不查」。开了：点名了卡的每一台逐样判二进制在不在、能不能执行，单元文件在不在，
+        单元环境里有没有 CARGO、它指的文件在这台在不在、能不能执行（下面「单元环境里的 CARGO」），服务「在跑」；
+        缺一样退 78、出路写全。开了 GPU 而服务没起来就是毛病：不退回 CPU，出路是把它起来。
+        在跑的再判版本对不上（下面「版本对不上」）：有就退 1，打期待的键、这一份二进制的键与重编换上的出路；都过退 0
+  python3 gpu-verification-server/control --selftest
+        这份文件自己的自证（下面「自证」），不起真 ssh、真 systemctl、真 journalctl、真清场、真服务；全过退 0，有格红退 1
+退出码：0 成了；1 回读不对，或 check 读到版本对不上、读不了日志；2 用法错，或弄坏开关设在了自证之外；
+78 运行条件不满足（出路写在 stderr；含开卡之前清场没过）；几台的照上面合成。
+
+「在跑」：is-active 打 active，且状态目录下 serving 那一行（进程起来时写：GPU_VERIFICATION_SERVER_SERVING pid=<进程号> …，src/main.rs）的进程号
+等于单元此刻的主进程号（systemctl --user show -p MainPID）。旧进程留下的 serving 指着的不是此刻的主进程号，不算。
+
+开卡之前清场（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」：清场复用 scripts/crash/gpu-quiesce-run.sh，清场之后不复原）：
+清场只在发起 install、start 的这一台做一次，在起任何一台的单元之前；经 ssh 转去第二台的那一条（带 GPU_VERIFICATION_SERVER_CONTROL_FORWARDED=1）不清场。
+多机配置的清场命令是「在起活的那一台跑、两台都管」的（gpu-quiesce-run.sh 文件头「两台对称」），写的是发起那一台的私有脚本，第二台上可能没有它。
+先问要起的各台单元在不在跑：这一台照 systemctl --user is-active，第二台经 ssh 起 control unit-state（问不到退 78）；打 active 的那一台不清场
+（卡在它手里，回读会把它自己的计算进程当外人），都在跑就不清场。别的几台要起：跑一趟 bash scripts/crash/gpu-quiesce-run.sh -- true，
+退 0（查卡、清场、回读都过了）才往下起各台的单元；退别的码一台都不起、退 78，出路写它那一趟留下的清场日志（它 GPU_QUIESCE step=quiesce 那一行的 log=；
+没留的写日志目录，默认 <工作根>/gpu-quiesce-logs），它自己的 ✗ 与出路原样转打。install 带 --binary 转去第二台而路径不在共享根下、这一台要装而二进制不在，
+在清场之前就拒（不为装不成的一趟清场）。
+环境：GPU_CARDS_BY_PRIORITY 设成服务开卡照的那一份显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY，同 src/gpu_judges_on_a_card.rs）里
+台标签是要起的那几台的那几项（保持原来的先后）：gpu-quiesce-run.sh 照台标签分成这一台的与第二台的（它的 GPU_QUIESCE_CHECK_LOCAL_CARDS、
+GPU_QUIESCE_CHECK_PEER_CARDS），查卡与回读只看这几张（在跑的那一台的卡正被它的服务持着，回读会把它当外人）；
+SINGLEFS_MULTI_HOST_CONFIG 设成这一次读的多机配置；GPU_QUIESCE_RUN_ADMITTED_BY_TASK_SERVER 设成 gpu-verification-server-control
+（它只认带这个标记的那一层，文件头「只认服务直接起的那一层」；control 是持卡的那一方，不在任务里）；不带 GPU_QUIESCE_ORIGIN_READ_BACK。
+至多等 QUIESCE_SECONDS 秒，到点发 TERM（它停查卡与清场、不复原），再等 QUIESCE_TERMINATE_GRACE_SECONDS 秒还在就发 KILL，照没过办。
+清场放在起单元之前、不放进服务进程或单元：gpu-quiesce-run.sh 是「清场 → 跑一条会结束的命令」的包装（登记、锁、被打断时的守卫都照这个设计），
+套在常驻的服务外面，单元的主进程号就成了包装那一层（「在跑」比 serving 的进程号与主进程号对不上），systemd 每次拉起又清一次场；
+它要的多机配置、工作根与清场命令里连第二台的那一套，在用户级单元的环境里也不全。所以被 systemd 拉起的那一次不清场（清过的场不复原，一直清着）。
+
+单元环境里的 CARGO：写结论时验证包要从环境里的 CARGO 认编这个二进制的工具链（crates/singlefs-verification/src/crash_point_replay_progress.rs 的
+CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test：问 CARGO 与它旁边的 rustc），用户级单元的环境里没有它，进程在写结论时崩。
+install 照模板写 Environment=CARGO=<多机配置 CARGO_BIN_DIRECTORY_BY_HOST 里这一台那一项>/cargo（这一台照 scripts/hosts/multi_host_addresses.py 的 resolve 认；
+两台家目录不同，各台装的时候各取各的，经 ssh 转去的 install 在那台取那台的）；那一项取不到（配置判不过、没写这一台、不是绝对路径）退 78。
+check 读 systemctl --user show -p Environment（含 drop-in，后写的盖前写的）：没有 CARGO、或它指的文件在这台不在、不能执行，退 78。
+单元目录 <单元文件>.d/ 下另有 drop-in 设了 CARGO 的（例 cargo.conf，模板带这一行之前手写的），install 打一行：那一份多余、怎么删
+（rm <那份文件>，再 systemctl --user daemon-reload）；不替用户删。
+
+版本对不上（判段写的待判行期待的 GPU 判器组键或结论版本键，这一份二进制判不出：服务不认领、每行在日志里点名一次，判段那几片一直等）：
+check 读 journalctl --user -u <单元> --since -<VERSION_MISMATCH_LOOKBACK_SECONDS>s -o json 里进程号是单元此刻主进程号的行，
+有以 GPU_VERIFICATION_SERVER_VERSION_MISMATCH 起头的（src/library_pending_pool.rs 的 VERSION_MISMATCH_LINE_PREFIX）就退 1，
+按「期待的键、这一份二进制的键」分组打行数与最早那一行点名的块；别的进程号（换上新二进制之前的那一个）打的不算。journalctl 起不了、退非 0 也退 1（判不了不当没有）。
+
+自证（python3 gpu-verification-server/control --selftest）：每格在临时目录里造一份自证根，起这份文件的子进程，核退出码、输出与假 systemctl、假 ssh 收到的调用。
+设 GPU_VERIFICATION_SERVER_CONTROL_SELFTEST_ROOT=<自证根> 时路径都换到它底下：systemctl 换成根里记状态的 fake-systemctl（调用逐行记进 fake/systemctl-calls.log；
+start 时替服务写 state/serving、主进程号 4242，有 fake/start-writes-no-serving 时不写；show -p Environment 打单元文件与 <单元文件>.d/*.conf 里 Environment= 的值），
+ssh 换成根里的 fake-ssh（参数逐次记进 fake/ssh-calls.log；远端那条命令末尾是 unit-state 的打 GPU_VERIFICATION_SERVER_UNIT_STATE state=<fake/peer-unit-state，没有是 inactive>，
+别的打一行标准输出一行标准错误；都退 fake/ssh-exit），清场脚本换成根里的 fake-quiesce（调用的参数、GPU_CARDS_BY_PRIORITY、准入标记、多机配置路径、
+当时 systemctl start 起过没有与当时 fake-ssh 收到过的远端命令逐次记进 fake/quiesce-calls.log；fake/quiesce-exit 是 0 时打清场过了、起 -- 后面的命令，不是 0 时打回读没过
+与 log=<根>/quiesce-logs/fake.log、不起命令、退那个码），journalctl 换成根里的 fake-journalctl（参数记进 fake/journalctl-calls.log，打 fake/journal 的内容），
+cgroup 根换成根里的 cgroup/，回读的限时变短。多机配置整份判得过：这一台写 127.0.0.1（每一台的 lo 上都有），
+第二台与别的地址用文档段 192.0.2.x（哪一台的网卡上都没有），共用取法照真的判法判、不换网卡地址；CARGO_BIN_DIRECTORY_BY_HOST 这一台写 <根>/cargo-bin
+（里面放一份可执行的假 cargo）、别的台写 <根>/peer-cargo-bin；装好的假单元带 Environment=CARGO=<根>/cargo-bin/cargo。
+各格并行，并行度取每台默认重活线程数（scripts/hosts/heavy_threads.py）；末行 GPU_VERIFICATION_SERVER_CONTROL_SELFTEST cells=<格数> failed=<红的格数> 并行 <N> 路 break=<开关>。
+弄坏开关 GPU_VERIFICATION_SERVER_CONTROL_BREAK=<项>[,<项>…]（只在自证里认：只交给点名的那几格的子进程；别处设了退 2，认不出的项退 2）：
+  gpu-switch-ignored                 GPU 开关一律当开着
+      gpu-off-start-and-check-do-nothing（✗ gpu-off-start-and-check-do-nothing：没开 GPU 时 start 退 78）、
+      install-refused-when-gpu-off（✗ install-refused-when-gpu-off：没开 GPU 时 install 退 0）
+  gpu-switch-missing-taken-as-off    ENABLE_GPU 没写当 0
+      gpu-switch-missing-refused（✗ gpu-switch-missing-refused：check 退 0）
+  addresses-unavailable-taken-as-this-host  共用取法取不到地址（配置判不过）时当只有这一台
+      hosts-missing-refused（✗ hosts-missing-refused：check 没照抄判法的「缺键 HOSTS」，起了 systemctl）
+  card-label-outside-hosts-ignored   台标签既不是这一台也不是第二台的那一项跳过、不判写坏
+      card-label-outside-hosts-refused（✗ card-label-outside-hosts-refused：start 退 0）
+  cardless-configuration-accepted    开了 GPU 而哪一台都没点名卡时当这一台点名了
+      gpu-on-without-cards-refused（✗ gpu-on-without-cards-refused：start 退 0）
+  peer-cards-ignored                 第二台点名了卡也不转去
+      start-reaches-every-host-with-cards（✗ start-reaches-every-host-with-cards：转去第二台的 start 收到 0 次）
+  this-host-always-targeted          这一台没点名卡也照做
+      cards-only-on-the-peer-start-there-only（✗ cards-only-on-the-peer-start-there-only：这一台起了 systemctl start）
+  forwarded-call-forwards-again      转来的那一条也照样再算哪几台、再转
+      forwarded-start-stays-on-this-host（✗ forwarded-start-stays-on-this-host：fake-ssh 收到了调用）
+  peer-exit-dropped                  第二台退的码不进合成
+      check-takes-the-peer-exit（✗ check-takes-the-peer-exit：第二台退 78 时 check 退 0）
+  ssh-failure-passed-through         ssh 退 255 原样退 255，不按连不上报
+      ssh-failure-reported（✗ ssh-failure-reported：start 退 255）
+  binary-shared-root-unchecked       install --binary 转去第二台时不核路径在不在共享根下
+      install-binary-outside-shared-root-refused（✗ install-binary-outside-shared-root-refused：共享根外的 --binary 转去了）
+  dry-run-writes                     install --dry-run 照写文件、照起 systemctl
+      install-dry-run-writes-nothing（✗ install-dry-run-writes-nothing：单元文件写出来了）
+  unit-restart-omitted               写出的单元去掉 Restart=、RestartSec= 两行
+      install-writes-restarting-unit-without-enable（✗ install-writes-restarting-unit-without-enable：单元里没有 Restart=always）
+  unit-cargo-omitted                 写出的单元去掉 Environment=CARGO= 那一行
+      install-writes-restarting-unit-without-enable（✗ install-writes-restarting-unit-without-enable：单元里没有 Environment=CARGO=<这一台的 cargo>）
+  unit-cargo-of-the-peer             @CARGO@ 取 CARGO_BIN_DIRECTORY_BY_HOST 里第二台那一项
+      install-writes-restarting-unit-without-enable（✗ install-writes-restarting-unit-without-enable：单元里没有 Environment=CARGO=<这一台的 cargo>）
+  check-cargo-unchecked              check 不判单元环境里的 CARGO
+      check-refuses-unit-without-cargo（✗ check-refuses-unit-without-cargo：单元环境里没有 CARGO 时 check 退 0）
+  running-readback-skipped           install、start 起完不回读「在跑」
+      start-reads-back-serving-pid（✗ start-reads-back-serving-pid：服务没写 serving 时 start 退 0）
+  check-down-service-passed          check 不判「在跑」
+      check-refuses-when-gpu-on-and-service-down（✗ check-refuses-when-gpu-on-and-service-down：单元停着时 check 退 0）
+  check-ignores-serving-pid          check 判「在跑」时不比 serving 的进程号与主进程号
+      check-refuses-stale-serving-file（✗ check-refuses-stale-serving-file：serving 指着旧进程号时 check 退 0）
+  stop-readback-skipped              stop 不回读，只看 systemctl stop 的退出码
+      stop-reads-back-stopped-unit（✗ stop-reads-back-stopped-unit：cgroup 里还有进程时 stop 退 0）
+  start-without-quiesce              install、start 不清场直接起单元
+      start-quiesces-the-named-cards-before-starting（✗ start-quiesces-the-named-cards-before-starting：起单元之前没清场、清场没过时 start 退 0）
+  quiesce-while-running              单元已经在跑也清场
+      start-quiesces-the-named-cards-before-starting（✗ start-quiesces-the-named-cards-before-starting：单元在跑时 start 清了场）
+  quiesce-on-every-host              经 ssh 转来的 install、start 在那台也照那台点名的卡清一次场
+      forwarded-start-stays-on-this-host（✗ forwarded-start-stays-on-this-host：转来的 start 清了场）
+  quiesce-after-the-first-start      清场挪到起完头一台的单元之后
+      start-quiesces-once-on-this-host-before-any-unit-starts（✗ start-quiesces-once-on-this-host-before-any-unit-starts：清场之前已经起过单元）
+  peer-cards-left-out-of-the-quiesce  清场只交这一台的卡（这一台不用起时不清场），第二台要起的卡不进清场
+      start-quiesces-once-on-this-host-before-any-unit-starts（✗ start-quiesces-once-on-this-host-before-any-unit-starts：清场交的卡不是要起的那几台的）
+  version-mismatch-unread            check 不读日志、不判版本对不上
+      check-reports-version-mismatch-of-this-process（✗ check-reports-version-mismatch-of-this-process：此刻的进程打了版本对不上行时 check 退 0）
+  version-mismatch-of-earlier-processes-counted  别的进程号打的版本对不上行也算
+      check-reports-version-mismatch-of-this-process（✗ check-reports-version-mismatch-of-this-process：只有旧进程打过版本对不上行时 check 退 1）
+"""
+import concurrent.futures
+import hashlib
+import importlib.util
+import ipaddress
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+sys.dont_write_bytecode = True
+SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+REPOSITORY = os.path.dirname(SCRIPT_DIRECTORY)
+CONTROL_SCRIPT = os.path.join(REPOSITORY, "gpu-verification-server", "control")
+UNIT_NAME = "singlefs-gpu-verification-server.service"
+UNIT_TEMPLATE = os.path.join(SCRIPT_DIRECTORY, "singlefs-gpu-verification-server.service.in")
+BINARY_NAME = "gpu-verification-server"
+# src/main.rs 的 SERVING_FILE_NAME、SERVING_LINE_PREFIX，逐字相同
+SERVING_FILE_NAME = "serving"
+SERVING_LINE_PREFIX = "GPU_VERIFICATION_SERVER_SERVING"
+MULTI_HOST_CONFIGURATION_VARIABLE = "SINGLEFS_MULTI_HOST_CONFIG"
+GPU_SWITCH_KEY = "ENABLE_GPU"
+UNQUIESCED_CARD_KEY = "GPU_CARDS_BY_PRIORITY"
+QUIESCED_CARD_KEY = "GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED"
+CARD_KEYS = (UNQUIESCED_CARD_KEY, QUIESCED_CARD_KEY)
+HOSTS_KEY = "HOSTS"
+SHARED_ROOTS_KEY = "NFS_SHARED_ROOTS"
+MULTI_HOST_ADDRESSES = os.path.join(REPOSITORY, "scripts", "hosts", "multi_host_addresses.py")
+HEAVY_THREADS = os.path.join(REPOSITORY, "scripts", "hosts", "heavy_threads.py")
+SELFTEST_ROOT_VARIABLE = "GPU_VERIFICATION_SERVER_CONTROL_SELFTEST_ROOT"
+CONTROL_BREAK_VARIABLE = "GPU_VERIFICATION_SERVER_CONTROL_BREAK"
+FORWARDED_VARIABLE = "GPU_VERIFICATION_SERVER_CONTROL_FORWARDED"
+RUN_CONDITION_EXIT = 78
+USAGE_EXIT = 2
+READBACK_FAILED_EXIT = 1
+SSH_FAILURE_EXIT = 255
+SSH_OPTIONS = ("-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-n")
+STOPPED_STATES = ("inactive", "failed")
+RUNNING_READBACK_SECONDS = 30.0
+FAST_READBACK_SECONDS = 3.0
+READBACK_POLL_SECONDS = 0.2
+# stop 之后隔单元的 RestartSec 加这么多秒再回读一次 is-active（核没被拉起）；自证里只隔 FAST_RESTART_SETTLE_SECONDS
+RESTART_SETTLE_MARGIN_SECONDS = 1.0
+FAST_RESTART_SETTLE_SECONDS = 0.3
+# 开卡之前清场（文件头「开卡之前清场」）
+QUIESCE_SCRIPT = os.path.join(REPOSITORY, "scripts", "crash", "gpu-quiesce-run.sh")
+QUIESCE_ADMISSION_VARIABLE = "GPU_QUIESCE_RUN_ADMITTED_BY_TASK_SERVER"
+QUIESCE_ADMISSION_VALUE = "gpu-verification-server-control"
+QUIESCE_CARDS_VARIABLE = "GPU_CARDS_BY_PRIORITY"
+QUIESCE_ORIGIN_READ_BACK_VARIABLE = "GPU_QUIESCE_ORIGIN_READ_BACK"
+QUIESCE_LINE_PREFIX = "GPU_QUIESCE"
+QUIESCE_LOG_DIRECTORY_SAID = "<工作根>/gpu-quiesce-logs（设了 GPU_QUIESCE_LOG_DIRECTORY 的是它）"
+# 清场的上限：task-server/control start 起这一份至多等 300 秒（它的 GPU_SERVICE_CONTROL_SECONDS），到点对整组发 KILL；
+# 清场要在那之前自己收尾、报出清场日志，余下的留给 systemctl start 与回读「在跑」（RUNNING_READBACK_SECONDS）
+QUIESCE_SECONDS = 240
+# 到点发 TERM 之后等它收尾的秒数：它转发信号的限时上限 10 秒（GPU_QUIESCE_FORWARD_WAIT_CEILING_SECONDS）再宽 5 秒
+QUIESCE_TERMINATE_GRACE_SECONDS = 15
+# 版本对不上（文件头「版本对不上」）：src/library_pending_pool.rs 的 VERSION_MISMATCH_LINE_PREFIX 与那一行的四个键，逐字相同（自证 check-reports-version-mismatch-of-this-process 从源码读来核）
+VERSION_MISMATCH_LINE_PREFIX = "GPU_VERIFICATION_SERVER_VERSION_MISMATCH"
+VERSION_MISMATCH_KEYS = ("expected_gpu_judge", "this_gpu_judge", "expected_conclusion_version", "this_conclusion_versions")
+LIBRARY_PENDING_POOL_SOURCE = os.path.join(SCRIPT_DIRECTORY, "src", "library_pending_pool.rs")
+# check 往回读多久的日志：判段那一侧等结论的任务在统一任务服务里累计至多跑四小时（task-server/task_server_lib.py 异常表 over-four-hours），
+# 更早点名的待判行已没有任务在等
+VERSION_MISMATCH_LOOKBACK_SECONDS = 4 * 3600
+VERSION_MISMATCH_EXIT = 1
+JOURNAL_READ_SECONDS = 120
+# 单元环境里的 CARGO（文件头「单元环境里的 CARGO」）
+CARGO_DIRECTORY_KEY = "CARGO_BIN_DIRECTORY_BY_HOST"
+UNIT_CARGO_VARIABLE = "CARGO"
+CARGO_HOWTO = (f"多机配置 {CARGO_DIRECTORY_KEY} 里这一台那一项写这台的 ~/.cargo/bin（绝对路径，底下有 cargo 与 rustc），再 python3 gpu-verification-server/control install"
+               f"（单元模板带 Environment={UNIT_CARGO_VARIABLE}=<那一项>/cargo）、python3 gpu-verification-server/control stop、python3 gpu-verification-server/control start")
+# 问第二台的单元在不在跑（文件头 unit-state 与「开卡之前清场」）
+UNIT_STATE_LINE_PREFIX = "GPU_VERIFICATION_SERVER_UNIT_STATE"
+PEER_UNIT_STATE_SECONDS = 60
+# 编法：编译目录归任务服务、任务一结束就删，所以编和拷到共享根在同一条提交命令里做完
+BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/gpu-verification-server -- bash -c 'cargo build --release --offline -p gpu-verification-server --bin gpu-verification-server"
+                 " && cp \"${CARGO_TARGET_DIR:?}/release/gpu-verification-server\" <共享根下的目录>/gpu-verification-server.new"
+                 " && mv <共享根下的目录>/gpu-verification-server.new <共享根下的目录>/gpu-verification-server'；task-server/task wait <号>；"
+                 "<共享根下的目录> 取多机配置 NFS_SHARED_ROOTS 某一段下的目录（两台同一路径读得到）")
+START_HOWTO = f"python3 gpu-verification-server/control start；没装过先 python3 gpu-verification-server/control install --binary <编好的二进制>（编法：{BUILD_COMMAND}）"
+VERSION_MISMATCH_HOWTO = ("用此刻的主工作区重编 -p gpu-verification-server --bin gpu-verification-server 的 release 二进制（整条：" + BUILD_COMMAND + "），"
+                          "再 python3 gpu-verification-server/control install --binary <编好的>、python3 gpu-verification-server/control stop、"
+                          "python3 gpu-verification-server/control start")
+
+
+class Paths:
+    """这一次用的路径：平常是用户目录下的固定位置，自证时都在 GPU_VERIFICATION_SERVER_CONTROL_SELFTEST_ROOT 底下。"""
+
+    def __init__(self):
+        root = os.environ.get(SELFTEST_ROOT_VARIABLE)
+        self.is_selftest = bool(root)
+        home = os.path.expanduser("~")
+        if root:
+            self.state_directory = os.path.join(root, "state")
+            self.binary = os.path.join(root, "bin", BINARY_NAME)
+            self.unit_file = os.path.join(root, "systemd", UNIT_NAME)
+            self.configuration = os.path.join(root, "multi-host.env")
+            self.systemctl = os.path.join(root, "fake-systemctl")
+            self.cgroup_root = os.path.join(root, "cgroup")
+            self.ssh = os.path.join(root, "fake-ssh")
+            self.quiesce_command = [os.path.join(root, "fake-quiesce")]
+            self.journalctl = os.path.join(root, "fake-journalctl")
+        else:
+            config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+            self.state_directory = os.path.join(home, ".local", "state", "singlefs", "gpu-verification-server")
+            self.binary = os.path.join(home, ".local", "share", "singlefs", "gpu-verification-server", "bin", BINARY_NAME)
+            self.unit_file = os.path.join(config_home, "systemd", "user", UNIT_NAME)
+            self.configuration = os.environ.get(MULTI_HOST_CONFIGURATION_VARIABLE) or os.path.join(REPOSITORY, "multi-host.env")
+            self.systemctl = "systemctl"
+            self.cgroup_root = "/sys/fs/cgroup"
+            self.ssh = "ssh"
+            self.quiesce_command = ["bash", QUIESCE_SCRIPT]
+            self.journalctl = "journalctl"
+        self.serving = os.path.join(self.state_directory, SERVING_FILE_NAME)
+
+    def readback_seconds(self):
+        return FAST_READBACK_SECONDS if self.is_selftest else RUNNING_READBACK_SECONDS
+
+
+def control_broken(name):
+    """弄坏开关（文件头「自证」）：只在自证根里认。"""
+    if not os.environ.get(SELFTEST_ROOT_VARIABLE):
+        return False
+    return name in [item.strip() for item in os.environ.get(CONTROL_BREAK_VARIABLE, "").split(",")]
+
+
+def say(line):
+    print(line, flush=True)
+
+
+def fail(line, next_step, code):
+    print(f"  ✗ {line}", file=sys.stderr, flush=True)
+    print(f"  → 怎么办：{next_step}", file=sys.stderr, flush=True)
+    return code
+
+
+def configuration_value(path, key):
+    """多机配置里一个键的值（写法照 multi-host.env.example：KEY=值，不做 shell 展开，两头成对的引号去一层）；文件不在回 None、键不在回空串。"""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return None
+    found = ""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        name, value = stripped.split("=", 1)
+        if name.strip() == key:
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            found = value
+    return found
+
+
+def run_systemctl(paths, *arguments, timeout=120):
+    try:
+        completed = subprocess.run([paths.systemctl, "--user", *arguments], capture_output=True, text=True,
+                                   stdin=subprocess.DEVNULL, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return 127, "", f"{type(error).__name__}: {error}"
+    return completed.returncode, completed.stdout.strip(), completed.stderr.strip()
+
+
+def unit_active_state(paths):
+    """is-active 打的状态（照输出判，不看退出码：activating、deactivating 也退非 0）。"""
+    _, output, _ = run_systemctl(paths, "is-active", UNIT_NAME, timeout=30)
+    return output.splitlines()[-1].strip() if output else "（没打状态）"
+
+
+def unit_main_process(paths):
+    """单元此刻的主进程号（systemctl show -p MainPID，没在跑是 0）：(进程号文本, 问不到的原因)。"""
+    code, output, error = run_systemctl(paths, "show", "-p", "MainPID", "--value", UNIT_NAME, timeout=30)
+    if code != 0:
+        return None, f"systemctl show -p MainPID 退 {code}：{error or '（没有标准错误）'}"
+    return output.strip(), ""
+
+
+def unit_processes(paths):
+    """单元 cgroup.procs 里的进程号：(进程号表, 读不到的原因)。systemctl show 失败与 cgroup.procs 读不了都回 (None, 原因)：
+    读不到不能证明为空，照内容判空不空（.claude/rules/command-safety-by-review.md「停 systemd 服务之后，回读输出判停没停」）。"""
+    code, group, error = run_systemctl(paths, "show", "-p", "ControlGroup", "--value", UNIT_NAME, timeout=30)
+    if code != 0:
+        return None, f"systemctl show -p ControlGroup 退 {code}：{error or '（没有标准错误）'}"
+    if not group:
+        return [], ""
+    procs_path = os.path.join(paths.cgroup_root + group, "cgroup.procs")
+    try:
+        with open(procs_path, encoding="utf-8") as handle:
+            return handle.read().split(), ""
+    except FileNotFoundError:
+        return [], ""
+    except OSError as error:
+        return None, f"{procs_path} 读不了（{type(error).__name__}: {error}）"
+
+
+def serving_process(paths):
+    """serving 那一行写的进程号：(进程号文本, 读不到的原因)。"""
+    try:
+        with open(paths.serving, encoding="utf-8") as handle:
+            words = handle.read().split()
+    except OSError as error:
+        return None, f"{paths.serving} 读不了（{type(error).__name__}；服务进程起来时写它）"
+    if not words or words[0] != SERVING_LINE_PREFIX:
+        return None, f"{paths.serving} 不是以 {SERVING_LINE_PREFIX} 起头的一行"
+    for word in words[1:]:
+        if word.startswith("pid="):
+            return word[len("pid="):], ""
+    return None, f"{paths.serving} 那一行没有 pid="
+
+
+def running_problem(paths, compare_processes=True):
+    """服务「在跑」（文件头）就回 (None, 说明)，不在跑回 (原因, None)。"""
+    state = unit_active_state(paths)
+    if state != "active":
+        return f"is-active 打的是「{state}」", None
+    written, unreadable = serving_process(paths)
+    if written is None:
+        return unreadable, None
+    if not compare_processes:
+        return None, f"is-active 打「active」，serving 写的进程号 {written}"
+    main, unasked = unit_main_process(paths)
+    if main is None:
+        return unasked, None
+    if written != main or main == "0":
+        return f"serving 写的进程号 {written} 不是单元此刻的主进程号 {main}（旧进程留下的那一行，服务这一次没写成）", None
+    return None, f"is-active 打「active」，serving 写的进程号 {written} 是单元此刻的主进程号"
+
+
+def wait_until_running(paths):
+    """install、start 起完回读「在跑」：限时里对上回 0，没对上打原因回 1。"""
+    if control_broken("running-readback-skipped"):
+        say(f"  ✓ {UNIT_NAME} 起了（弄坏开关 running-readback-skipped：没回读）")
+        return 0
+    deadline = time.monotonic() + paths.readback_seconds()
+    problem = "还没回读"
+    while time.monotonic() < deadline:
+        problem, detail = running_problem(paths)
+        if problem is None:
+            say(f"  ✓ {UNIT_NAME} 在跑：{detail}")
+            return 0
+        time.sleep(READBACK_POLL_SECONDS)
+    return fail(f"起了但 {paths.readback_seconds():g} 秒里回读不到「在跑」：{problem}",
+                f"看 journalctl --user -u {UNIT_NAME} -n 100；修好之后 python3 gpu-verification-server/control check 回读到退 0", READBACK_FAILED_EXIT)
+
+
+def host_said(target):
+    """要起的那一台在输出里怎么叫："here" 是这一台，别的是第二台的地址。"""
+    return "这一台" if target == "here" else f"第二台 {target}"
+
+
+def cards_of_the_hosts(paths, hosts, multi_host_addresses):
+    """服务开卡照的那一份显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY；同 src/gpu_judges_on_a_card.rs 的
+    open_the_cards_named_for_this_host）里台标签是 hosts（"here" 是这一台，别的是第二台的地址文本）里那几台的项，保持原来的先后：(项表, None)；
+    取不到这一台的地址回 (None, 原因)。"""
+    card_string = ""
+    for key in (QUIESCED_CARD_KEY, UNQUIESCED_CARD_KEY):
+        written = configuration_value(paths.configuration, key) or ""
+        if written.strip():
+            card_string = written
+            break
+    try:
+        this = ipaddress.ip_address(multi_host_addresses.resolve(paths.configuration).this)
+    except ValueError as error:   # AddressesUnavailable 是 ValueError 的子类；地址不是 IP 也落在这里
+        return None, f"取不到主机数组里这一台的地址：{error}"
+    labels = {this if host == "here" else ipaddress.ip_address(host) for host in hosts}
+    return [entry for entry in card_string.split() if card_entry_label(entry) in labels], None
+
+
+def remote_control_command(paths, arguments):
+    """经 ssh 在第二台同一绝对路径的仓里起 control <arguments> 的远端命令：带转来的标记，这一次设了多机配置路径的照带（自证里不带）。"""
+    environment = [f"{FORWARDED_VARIABLE}=1"]
+    if os.environ.get(MULTI_HOST_CONFIGURATION_VARIABLE) and not paths.is_selftest:
+        environment.append(f"{MULTI_HOST_CONFIGURATION_VARIABLE}={paths.configuration}")
+    return " ".join([f"cd {shlex.quote(REPOSITORY)} && exec env", *(shlex.quote(item) for item in environment),
+                     "python3", shlex.quote(CONTROL_SCRIPT), *(shlex.quote(item) for item in arguments)])
+
+
+def peer_unit_state(paths, host):
+    """经 ssh 在第二台 host 起 control unit-state，问那台的单元此刻 is-active 打什么：(状态, None)；问不到回 (None, 退出码)，出路已打。"""
+    try:
+        completed = subprocess.run([paths.ssh, *SSH_OPTIONS, host, remote_control_command(paths, ["unit-state"])], capture_output=True, text=True,
+                                   errors="replace", stdin=subprocess.DEVNULL, timeout=PEER_UNIT_STATE_SECONDS)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return None, fail(f"问不到第二台 {host} 的单元在不在跑（起 ssh 不成或 {PEER_UNIT_STATE_SECONDS} 秒没回：{type(error).__name__}: {error}）；没清场，一台的单元都没起",
+                          f"这台要有 ssh 客户端、ssh -o BatchMode=yes {host} true 要退 0；修好再跑同一条命令", RUN_CONDITION_EXIT)
+    if completed.returncode == SSH_FAILURE_EXIT:
+        if control_broken("ssh-failure-passed-through"):
+            return None, SSH_FAILURE_EXIT
+        return None, fail(f"ssh 到第二台 {host} 连不上（ssh 退 255），问不到那台的单元在不在跑；没清场，一台的单元都没起",
+                          f"ssh -o BatchMode=yes {host} true 要退 0（免密；用户名照这台的 ~/.ssh/config）；修好再跑同一条命令", RUN_CONDITION_EXIT)
+    marker = f"{UNIT_STATE_LINE_PREFIX} state="
+    states = [line[len(marker):].strip() for line in completed.stdout.splitlines() if line.startswith(marker)]
+    if completed.returncode != 0 or len(states) != 1:
+        said = " ".join((completed.stdout + completed.stderr).split())[-300:]   # 压成一行：对端的标准错误里有「  ✗ 」起头的行
+        return None, fail(f"问不到第二台 {host} 的单元在不在跑：control unit-state 退 {completed.returncode}、打了 {len(states)} 行 {UNIT_STATE_LINE_PREFIX}"
+                          f"（{said or '没有输出'}）；没清场，一台的单元都没起",
+                          "在第二台同一路径的仓里单跑 python3 gpu-verification-server/control unit-state 看它打什么（两台的仓是共享根下的同一份）；修好再跑同一条命令",
+                          RUN_CONDITION_EXIT)
+    return states[0], None
+
+
+def unit_states_of_the_targets(paths, targets):
+    """要起的各台的单元此刻 is-active 打什么：({台: 状态}, None)；第二台问不到回 (None, 退出码)，出路已打。"""
+    states = {}
+    for target in targets:
+        if target == "here":
+            states[target] = unit_active_state(paths)
+            continue
+        state, refused = peer_unit_state(paths, target)
+        if state is None:
+            return None, refused
+        states[target] = state
+    return states, None
+
+
+def quiesce_the_cards(paths, cards):
+    """跑一趟 gpu-quiesce-run.sh -- true，查卡与回读只看 cards（文件头「开卡之前清场」）：过了回 0，没过回 78（出路已打）。"""
+    environment = {name: value for name, value in os.environ.items() if name != QUIESCE_ORIGIN_READ_BACK_VARIABLE}
+    environment.update({QUIESCE_ADMISSION_VARIABLE: QUIESCE_ADMISSION_VALUE, QUIESCE_CARDS_VARIABLE: " ".join(cards),
+                        MULTI_HOST_CONFIGURATION_VARIABLE: paths.configuration})
+    say(f"  · 开卡之前清场（只在发起的这一台、一次）：gpu-quiesce-run.sh -- true，查卡与回读只看要起的那几台点名的卡 {' '.join(cards)}")
+    try:
+        process = subprocess.Popen([*paths.quiesce_command, "--", "true"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, errors="replace", env=environment)
+    except OSError as error:
+        return fail(f"起不了清场脚本 {' '.join(paths.quiesce_command)}（{type(error).__name__}: {error}）；一台的 {UNIT_NAME} 都没起",
+                    "这台要有 bash 与仓里的 scripts/crash/gpu-quiesce-run.sh；修好再跑同一条命令", RUN_CONDITION_EXIT)
+    timed_out = False
+    try:
+        _, error_text = process.communicate(timeout=QUIESCE_SECONDS)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        process.terminate()   # 只对自己起的这一个清场脚本：它收到 TERM 停查卡与清场、不复原
+        try:
+            _, error_text = process.communicate(timeout=QUIESCE_TERMINATE_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            _, error_text = process.communicate()
+    quiesce_lines = [line for line in error_text.splitlines() if line.startswith(f"{QUIESCE_LINE_PREFIX} step=quiesce ")]
+    said = quiesce_lines[-1] if quiesce_lines else f"没打 {QUIESCE_LINE_PREFIX} step=quiesce 那一行"
+    if process.returncode == 0 and not timed_out:
+        say(f"  ✓ 清场过了：{said}")
+        return 0
+    for line in error_text.splitlines():   # 它的标准错误不带私有的服务名（它的文件头「清场」），原样转打、缩进一层
+        if line.strip():
+            print(f"    {line.strip()}", file=sys.stderr, flush=True)
+    log = next((word[len("log="):] for word in said.split() if word.startswith("log=")), "")
+    where = (f"清场日志 {log}" if log else
+             f"上面清场脚本自己的 ✗ 行（这一趟没留清场日志：清场命令没跑，配置没写全、查卡没过这类）；别的趟留下的清场日志在 {QUIESCE_LOG_DIRECTORY_SAID}")
+    why = f"{QUIESCE_SECONDS} 秒没清完，发了 TERM" if timed_out else f"gpu-quiesce-run.sh 退 {process.returncode}"
+    return fail(f"开卡之前清场没过（{why}；{said}）：一台的 {UNIT_NAME} 都没起",
+                f"看{where}，照清场脚本自己的出路办完，再 python3 gpu-verification-server/control start", RUN_CONDITION_EXIT)
+
+
+def quiesce_once_before_any_start(paths, targets):
+    """发起 install、start 的这一台清一次场，罩住要起的各台点名的卡（文件头「开卡之前清场」）：清过、或各台都在跑不用清回 0；
+    第二台问不到、清场没过回非 0（出路已打）。"""
+    if control_broken("start-without-quiesce"):
+        return 0
+    states, refused = unit_states_of_the_targets(paths, targets)
+    if states is None:
+        return refused
+    to_start = [target for target in targets if states[target] != "active" or control_broken("quiesce-while-running")]
+    running = [target for target in targets if target not in to_start]
+    if running:
+        say(f"  · {'、'.join(host_said(target) for target in running)}的 {UNIT_NAME} 已在跑（is-active 打「active」）：不清那几台的卡（卡在它手里），不重起")
+    if control_broken("peer-cards-left-out-of-the-quiesce"):
+        to_start = [target for target in to_start if target == "here"]
+    if not to_start:
+        say("  · 要起的各台单元都已在跑：不清场")
+        return 0
+    multi_host_addresses = load_module_by_path("multi_host_addresses", MULTI_HOST_ADDRESSES)
+    cards, unresolved = cards_of_the_hosts(paths, to_start, multi_host_addresses)
+    if cards is None:
+        return fail(f"开卡之前清场：{unresolved}，认不出要起的那几台点名的卡；没清场，一台的 {UNIT_NAME} 都没起", multi_host_addresses.HOWTO, RUN_CONDITION_EXIT)
+    if not cards:
+        return fail(f"服务开卡照的显卡先后（{QUIESCED_CARD_KEY}，没写取 {UNQUIESCED_CARD_KEY}）里没有要起的{'、'.join(host_said(target) for target in to_start)}的卡："
+                    f"起了也开不成；没清场，一台的 {UNIT_NAME} 都没起",
+                    f"在多机配置的 {QUIESCED_CARD_KEY} 写上那几台的卡（<台标签>:<序号>:<额度>），再 python3 gpu-verification-server/control start", RUN_CONDITION_EXIT)
+    return quiesce_the_cards(paths, cards)
+
+
+def start_unit(paths, start_refused_howto):
+    """起这一台的单元：单元已在跑的不重起；systemctl start 退非 0 回 1；起了回读「在跑」。
+    清场不在这里：发起的那一台在起任何一台之前做过一次（文件头「开卡之前清场」），经 ssh 转来的这一条不再清。"""
+    if os.environ.get(FORWARDED_VARIABLE) and control_broken("quiesce-on-every-host"):
+        refused = quiesce_once_before_any_start(paths, ["here"])
+        if refused:
+            return refused
+    if unit_active_state(paths) == "active":
+        say(f"  · {UNIT_NAME} 已在跑（is-active 打「active」）：不重起")
+    code, _, error = run_systemctl(paths, "start", UNIT_NAME)
+    if code != 0:
+        return fail(f"systemctl --user start {UNIT_NAME} 退 {code}：{error}", start_refused_howto, READBACK_FAILED_EXIT)
+    return wait_until_running(paths)
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def install_binary(source, target):
+    """拷成 target（同目录临时文件再换上，755），回读 sha256；回 (成了没有, 说明)。"""
+    os.makedirs(os.path.dirname(target), mode=0o755, exist_ok=True)
+    temporary = target + ".partial"
+    with open(source, "rb") as reader, open(temporary, "wb") as writer:
+        for chunk in iter(lambda: reader.read(1 << 20), b""):
+            writer.write(chunk)
+        writer.flush()
+        os.fsync(writer.fileno())
+    os.chmod(temporary, 0o755)
+    os.replace(temporary, target)
+    expected, actual = file_sha256(source), file_sha256(target)
+    if expected != actual:
+        return False, f"拷完回读 sha256 对不上：源 {expected}、装好的 {actual}"
+    return True, f"sha256 {actual}"
+
+
+def by_host_value_of(values, address):
+    """按台的键切出来的 {地址文本: 值} 里地址是 address（ipaddress 对象）的那一项的值；没有回 None。"""
+    for written, value in values.items():
+        try:
+            if ipaddress.ip_address(written.strip("[]")) == address:
+                return value
+        except ValueError:
+            continue
+    return None
+
+
+def cargo_of_this_host(paths):
+    """单元环境里的 CARGO（文件头「单元环境里的 CARGO」）：多机配置 CARGO_BIN_DIRECTORY_BY_HOST 里这一台那一项下的 cargo：(路径, None)；取不到回 (None, 原因)。"""
+    multi_host_addresses = load_module_by_path("multi_host_addresses", MULTI_HOST_ADDRESSES)
+    try:
+        addresses = multi_host_addresses.resolve(paths.configuration)
+        directories = multi_host_addresses.configured_by_host(paths.configuration, CARGO_DIRECTORY_KEY)
+        this, peer = ipaddress.ip_address(addresses.this), ipaddress.ip_address(addresses.peer)
+    except ValueError as error:   # AddressesUnavailable、ByHostValueUnavailable 都是 ValueError 的子类；地址不是 IP 也落在这里
+        return None, f"取不到多机配置 {CARGO_DIRECTORY_KEY} 里这一台那一项：{error}"
+    chosen = peer if control_broken("unit-cargo-of-the-peer") else this
+    directory = by_host_value_of(directories, chosen)
+    if directory is None:
+        return None, f"多机配置 {CARGO_DIRECTORY_KEY} 里没有这一台（{this}）那一项"
+    if not os.path.isabs(directory):
+        return None, f"多机配置 {CARGO_DIRECTORY_KEY} 里这一台那一项「{directory}」不是绝对路径"
+    return os.path.join(directory, "cargo"), None
+
+
+def render_unit(paths):
+    """照模板填好的单元全文：(全文, None)；@CARGO@ 填不了回 (None, 原因)。"""
+    cargo, unresolved = cargo_of_this_host(paths)
+    if cargo is None:
+        return None, unresolved
+    with open(UNIT_TEMPLATE, encoding="utf-8") as handle:
+        text = handle.read()
+    for name, value in (("BINARY", paths.binary), ("STATE_DIRECTORY", paths.state_directory), ("CARGO", cargo)):
+        text = text.replace(f"@{name}@", value)
+    if control_broken("unit-restart-omitted"):
+        text = "".join(line for line in text.splitlines(keepends=True) if not line.startswith(("Restart=", "RestartSec=")))
+    if control_broken("unit-cargo-omitted"):
+        text = "".join(line for line in text.splitlines(keepends=True) if not line.startswith(f"Environment={UNIT_CARGO_VARIABLE}="))
+    return text, None
+
+
+def drop_ins_setting_cargo(paths):
+    """单元目录 <单元文件>.d/ 下设了 CARGO 的 drop-in（文件头「单元环境里的 CARGO」）：路径表，按名字排；目录不在、读不了的不算。"""
+    directory = paths.unit_file + ".d"
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return []
+    found = []
+    for name in names:
+        path = os.path.join(directory, name)
+        try:
+            with open(path, encoding="utf-8") as handle:
+                lines = handle.read().splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(line.strip().startswith("Environment=") and f"{UNIT_CARGO_VARIABLE}=" in line for line in lines):
+            found.append(path)
+    return found
+
+
+def install_binary_refusal(paths, binary_source, dry_run):
+    """这一台装得成二进制没有：--binary 给的不在、没给而没装过（--dry-run 不拒），拒回 78（出路已打），不拒回 0。"""
+    if binary_source:
+        if os.path.isfile(binary_source):
+            return 0
+        if os.environ.get(FORWARDED_VARIABLE):
+            return fail(f"这台读不到 --binary 给的 {binary_source}（发起那台在共享根下读得到）",
+                        f"在这台核多机配置 {SHARED_ROOTS_KEY} 的各段挂没挂上，挂好再从发起那台跑同一条命令", RUN_CONDITION_EXIT)
+        return fail(f"--binary 给的 {binary_source} 不在", f"先编：{BUILD_COMMAND}", RUN_CONDITION_EXIT)
+    if os.path.isfile(paths.binary) or dry_run:
+        return 0
+    return fail(f"二进制 {paths.binary} 不在，也没给 --binary",
+                f"先编：{BUILD_COMMAND}；再 python3 gpu-verification-server/control install --binary <那个二进制>", RUN_CONDITION_EXIT)
+
+
+def install_here(dry_run, binary_source):
+    paths = Paths()
+    writing = not dry_run or control_broken("dry-run-writes")
+    refused = install_binary_refusal(paths, binary_source, dry_run)
+    if refused:
+        return refused
+    if binary_source:
+        say(f"  · 二进制：{'拷' if writing else '会拷'} {binary_source} → {paths.binary}（755，回读 sha256）")
+        if writing:
+            copied, detail = install_binary(binary_source, paths.binary)
+            if not copied:
+                return fail(detail, "再跑一次 install；还不对就把这一行交主 agent", READBACK_FAILED_EXIT)
+            say(f"    回读：{detail}")
+    elif os.path.isfile(paths.binary):
+        say(f"  · 二进制 {paths.binary}：已在，不动（换新的写 --binary <编好的 gpu-verification-server>）")
+    else:
+        say(f"  · 二进制 {paths.binary}：不在，也没给 --binary")
+    unit_text, unresolved = render_unit(paths)
+    if unit_text is None:
+        return fail(f"单元模板的 @CARGO@ 填不了：{unresolved}；单元没写", CARGO_HOWTO, RUN_CONDITION_EXIT)
+    say(f"  · 状态目录 {paths.state_directory}（700）：{'已在' if os.path.isdir(paths.state_directory) else ('建' if writing else '会建')}")
+    if writing:
+        os.makedirs(paths.state_directory, mode=0o700, exist_ok=True)
+        os.chmod(paths.state_directory, 0o700)
+    say(f"  · 用户级单元 {paths.unit_file}：{'写' if writing else '会写'}成下面这样")
+    for line in unit_text.splitlines():
+        say(f"      {line}")
+    for drop_in in drop_ins_setting_cargo(paths):
+        say(f"  · drop-in {drop_in} 里也设了 {UNIT_CARGO_VARIABLE}：单元模板已带 Environment={UNIT_CARGO_VARIABLE}=…（上面那一行），这一份多余；"
+            f"删法：rm {shlex.quote(drop_in)}，再 systemctl --user daemon-reload（之后 stop、start 起来的进程照模板那一行）")
+    say(f"  · {'跑' if writing else '会跑'}：systemctl --user daemon-reload；systemctl --user start {UNIT_NAME}"
+        f"（不 enable、开机不自起；不是 systemctl stop 停掉的由 systemd 照单元的 Restart= 拉起）；回读「在跑」。"
+        f"起任何一台的单元之前，发起的那一台清一次场（bash scripts/crash/gpu-quiesce-run.sh -- true，罩住要起的各台点名的卡，没过一台都不起；经 ssh 转来的这一条不清场）")
+    if not writing:
+        say("  ✓ --dry-run：只打了要做的事，一个文件没写、systemctl 一条没起")
+        return 0
+    os.makedirs(os.path.dirname(paths.unit_file), mode=0o700, exist_ok=True)
+    temporary = paths.unit_file + ".partial"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(unit_text)
+    os.replace(temporary, paths.unit_file)
+    install_refused_howto = f"看 systemctl --user status {UNIT_NAME}；修好再跑 python3 gpu-verification-server/control install"
+    code, _, error = run_systemctl(paths, "daemon-reload")
+    if code != 0:
+        return fail(f"systemctl --user daemon-reload 退 {code}：{error}", install_refused_howto, READBACK_FAILED_EXIT)
+    return start_unit(paths, install_refused_howto)
+
+
+def start_here():
+    return start_unit(Paths(), f"没装就 python3 gpu-verification-server/control install --binary <编好的二进制>；"
+                               f"装了看 journalctl --user -u {UNIT_NAME} -n 100")
+
+
+def unit_state_here():
+    """unit-state（文件头）：打这一台单元 is-active 的那一行，不转去别的台。"""
+    say(f"{UNIT_STATE_LINE_PREFIX} state={unit_active_state(Paths())}")
+    return 0
+
+
+def unit_restart_seconds(paths):
+    """装好的单元文件的 RestartSec=（写成整数秒，可带 s）；没写、读不了或写成别的样子回 0。"""
+    try:
+        with open(paths.unit_file, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return 0
+    value = ""
+    for line in lines:
+        if line.startswith("RestartSec="):
+            value = line[len("RestartSec="):]
+    text = value.strip().removesuffix("s")
+    return int(text) if text.isdigit() else 0
+
+
+def stop_here():
+    paths = Paths()
+    state = unit_active_state(paths)
+    if not os.path.isfile(paths.unit_file) and state in STOPPED_STATES:
+        say(f"  ✓ {UNIT_NAME} 没装（单元文件 {paths.unit_file} 不在、is-active 打「{state}」），不用停")
+        return 0
+    code, _, error = run_systemctl(paths, "stop", UNIT_NAME, timeout=60)
+    if control_broken("stop-readback-skipped"):
+        return 0 if code == 0 else READBACK_FAILED_EXIT
+    state = unit_active_state(paths)
+    processes, unreadable = unit_processes(paths)
+    if code != 0 or state not in STOPPED_STATES or processes is None or processes:
+        return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、is-active 打的是「{state}」、"
+                    f"cgroup 里进程 {f'读不到（{unreadable}）' if processes is None else f'{len(processes)} 个'}",
+                    f"看 systemctl --user status {UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", READBACK_FAILED_EXIT)
+    settle = FAST_RESTART_SETTLE_SECONDS if paths.is_selftest else unit_restart_seconds(paths) + RESTART_SETTLE_MARGIN_SECONDS
+    time.sleep(settle)
+    later_state = unit_active_state(paths)
+    if later_state not in STOPPED_STATES:
+        return fail(f"停了之后又被拉起：隔 {settle:g} 秒再回读 is-active 打的是「{later_state}」",
+                    f"看 journalctl --user -u {UNIT_NAME} -n 100 是谁起的它；再跑一次 python3 gpu-verification-server/control stop，还被拉起就把这一行交主 agent",
+                    READBACK_FAILED_EXIT)
+    say(f"  ✓ {UNIT_NAME} 停了（is-active 打「{state}」、cgroup 里没有进程；隔 {settle:g} 秒再回读仍是「{later_state}」，没被拉起）")
+    return 0
+
+
+def version_mismatch_lines(paths):
+    """单元此刻的主进程近 VERSION_MISMATCH_LOOKBACK_SECONDS 秒打的版本对不上行（文件头「版本对不上」）：(行表, None)；判不了回 (None, 原因)。"""
+    main, unasked = unit_main_process(paths)
+    if main is None:
+        return None, unasked
+    command = [paths.journalctl, "--user", "-u", UNIT_NAME, "--since", f"-{VERSION_MISMATCH_LOOKBACK_SECONDS}s", "-o", "json",
+               "--output-fields=MESSAGE,_PID", "--no-pager"]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, errors="replace", stdin=subprocess.DEVNULL, timeout=JOURNAL_READ_SECONDS)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return None, f"journalctl 起不了或 {JOURNAL_READ_SECONDS} 秒没跑完（{type(error).__name__}: {error}）"
+    if completed.returncode != 0:
+        return None, f"journalctl 退 {completed.returncode}：{completed.stderr.strip() or '（没有标准错误）'}"
+    lines = []
+    for text in completed.stdout.splitlines():
+        try:
+            entry = json.loads(text)
+        except ValueError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("_PID", "")) != main and not control_broken("version-mismatch-of-earlier-processes-counted"):
+            continue
+        message = entry.get("MESSAGE")
+        if isinstance(message, list):   # journalctl 的 JSON 把不是 UTF-8 的消息写成字节数组
+            message = bytes(message).decode("utf-8", "replace")
+        if isinstance(message, str) and message.startswith(f"{VERSION_MISMATCH_LINE_PREFIX} "):
+            lines.append(message)
+    return lines, None
+
+
+def version_mismatch_groups(lines):
+    """按（期待的键、这一份二进制的键）分组：[(四个键的值, 行数, 这一组最早那一行点名的块)]，照日志里出现的先后。"""
+    groups = {}
+    for line in lines:
+        keys, named = {}, []
+        for word in line.split()[1:]:
+            key, equals, value = word.partition("=")
+            if equals and key in VERSION_MISMATCH_KEYS:
+                keys[key] = value
+            else:
+                named.append(word)
+        values = tuple(keys.get(key, "（没写）") for key in VERSION_MISMATCH_KEYS)
+        count, earliest_named_block = groups.get(values, (0, " ".join(named)))
+        groups[values] = (count + 1, earliest_named_block)
+    return [(values, count, earliest_named_block) for values, (count, earliest_named_block) in groups.items()]
+
+
+def version_mismatch_refusal(paths):
+    """check 判版本对不上：没有回 0；有、或判不了，打出来回 1。"""
+    lines, unreadable = version_mismatch_lines(paths)
+    if lines is None:
+        return fail(f"gpu-verification-server 在跑，但判不了版本对不上：{unreadable}",
+                    f"核 journalctl --user -u {UNIT_NAME} -n 20 读得到这个单元的日志，再 python3 gpu-verification-server/control check", VERSION_MISMATCH_EXIT)
+    if not lines:
+        return 0
+    hours = VERSION_MISMATCH_LOOKBACK_SECONDS / 3600
+    print(f"  ✗ gpu-verification-server 在跑，但单元此刻的进程近 {hours:g} 小时打了 {len(lines)} 行 {VERSION_MISMATCH_LINE_PREFIX}："
+          f"判段写的待判行期待的键这一份二进制判不出，服务不认领，判段那几片一直等", file=sys.stderr, flush=True)
+    for values, count, earliest_named_block in version_mismatch_groups(lines):
+        expected_gpu_judge, this_gpu_judge, expected_conclusion_version, this_conclusion_versions = values
+        print(f"    期待的键：GPU 判器组 {expected_gpu_judge}、结论版本 {expected_conclusion_version}；"
+              f"这一份二进制的键：GPU 判器组 {this_gpu_judge}、结论版本 {this_conclusion_versions}"
+              f"（{count} 行，最早那一行点名 {earliest_named_block}）", file=sys.stderr, flush=True)
+    print(f"  → 怎么办：{VERSION_MISMATCH_HOWTO}", file=sys.stderr, flush=True)
+    return VERSION_MISMATCH_EXIT
+
+
+def unit_cargo_problem(paths):
+    """单元环境里的 CARGO（文件头「单元环境里的 CARGO」）：systemctl --user show -p Environment 里有它、它指的文件在这台在、能执行，回空串；不然回哪一样不对。"""
+    code, output, error = run_systemctl(paths, "show", "-p", "Environment", "--value", UNIT_NAME, timeout=30)
+    if code != 0:
+        return f"问不到单元的环境（systemctl --user show -p Environment 退 {code}：{error or '（没有标准错误）'}），判不了里面有没有 {UNIT_CARGO_VARIABLE}"
+    try:
+        assignments = shlex.split(output)
+    except ValueError as error:
+        return f"单元的环境「{output}」拆不开（{error}），判不了里面有没有 {UNIT_CARGO_VARIABLE}"
+    written = [assignment[len(UNIT_CARGO_VARIABLE) + 1:] for assignment in assignments if assignment.startswith(f"{UNIT_CARGO_VARIABLE}=")]
+    if not written:
+        return (f"单元的环境里没有 {UNIT_CARGO_VARIABLE}（systemctl --user show -p Environment 打的是「{output or '空的'}」）："
+                f"写结论时验证包要从它认编这个二进制的工具链，没有就在写结论时崩")
+    cargo = written[-1]   # 同一个变量写了几遍的，后写的盖前写的（drop-in 排在单元文件之后）
+    if not (os.path.isfile(cargo) and os.access(cargo, os.X_OK)):
+        return f"单元的环境里 {UNIT_CARGO_VARIABLE}={cargo}，这个文件在这台不在或不能执行：写结论时问不了它的版本，进程会崩"
+    return ""
+
+
+def check_here():
+    paths = Paths()
+    problems = []
+    if not (os.path.isfile(paths.binary) and os.access(paths.binary, os.X_OK)):
+        problems.append((f"二进制 {paths.binary} 不在或不能执行",
+                         f"先编：{BUILD_COMMAND}；再 python3 gpu-verification-server/control install --binary <那个二进制>"))
+    if not os.path.isfile(paths.unit_file):
+        problems.append((f"单元文件 {paths.unit_file} 不在（没装过）", "python3 gpu-verification-server/control install --binary <编好的二进制>"))
+    elif not control_broken("check-cargo-unchecked"):
+        cargo_problem = unit_cargo_problem(paths)
+        if cargo_problem:
+            problems.append((cargo_problem, CARGO_HOWTO))
+    detail = "（弄坏开关 check-down-service-passed：没判「在跑」）"
+    if not control_broken("check-down-service-passed"):
+        problem, detail = running_problem(paths, compare_processes=not control_broken("check-ignores-serving-pid"))
+        if problem is not None:
+            problems.append((f"多机配置开了 GPU（{GPU_SWITCH_KEY}=1）而 gpu-verification-server 没在跑：{problem}",
+                             f"{START_HOWTO}；起不来看 journalctl --user -u {UNIT_NAME} -n 100。不退回 CPU：要不用 GPU 就把多机配置改成 {GPU_SWITCH_KEY}=0"))
+    if problems:
+        for line, next_step in problems:
+            fail(line, next_step, RUN_CONDITION_EXIT)
+        return RUN_CONDITION_EXIT
+    mismatch_said = "（弄坏开关下没判版本对不上）"
+    if not control_broken("check-down-service-passed") and not control_broken("version-mismatch-unread"):
+        refused = version_mismatch_refusal(paths)
+        if refused:
+            return refused
+        mismatch_said = f"近 {VERSION_MISMATCH_LOOKBACK_SECONDS / 3600:g} 小时这个进程没打 {VERSION_MISMATCH_LINE_PREFIX}"
+    say(f"  ✓ gpu-verification-server 在跑：二进制 {paths.binary}，{detail}，{mismatch_said}；这个进程起来就开多机配置点名的这一台的全部卡、一直持着，从判定库取活（还没做的几样见 README.md「还没做的」）")
+    return 0
+
+
+def load_module_by_path(name, path):
+    specification = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def gpu_switch(paths):
+    """多机配置的 GPU 开关：("on" | "off", None)；没写、写别的值、配置不在回 ("refused", 退出码)，出路已打。"""
+    written = configuration_value(paths.configuration, GPU_SWITCH_KEY)
+    if written is None:
+        return "refused", fail(f"多机配置 {paths.configuration} 不在", "照仓根 multi-host.env.example 写一份 multi-host.env（两台读同一份）", RUN_CONDITION_EXIT)
+    if written == "" and control_broken("gpu-switch-missing-taken-as-off"):
+        written = "0"
+    if written not in ("0", "1"):
+        return "refused", fail(f"多机配置 {paths.configuration} 的 {GPU_SWITCH_KEY} {'没写' if written == '' else '是「' + written + '」'}：开关要明确写 0 或 1，不当关",
+                               f"要用 GPU 写一行 {GPU_SWITCH_KEY}=1（同时写 {CARD_KEYS[0]}、{CARD_KEYS[1]}），不用写 {GPU_SWITCH_KEY}=0", RUN_CONDITION_EXIT)
+    if control_broken("gpu-switch-ignored"):
+        return "on", None
+    return ("on" if written == "1" else "off"), None
+
+
+def card_entry_label(entry):
+    """显卡键的一项 <台标签>:<序号>:<额度>（从右切两刀）的台标签（IP 地址）；切不出三段、台标签不是 IP 回 None。"""
+    pieces = entry.rsplit(":", 2)
+    if len(pieces) != 3:
+        return None
+    try:
+        return ipaddress.ip_address(pieces[0].strip("[]"))
+    except ValueError:
+        return None
+
+
+def card_host_labels(paths):
+    """两个显卡键里点名的台标签（地址）：(地址集合, None)；有一项切不出三段、台标签不是 IP 回 (None, 退出码)，出路已打。"""
+    labels = set()
+    for key in CARD_KEYS:
+        for entry in (configuration_value(paths.configuration, key) or "").split():
+            label = card_entry_label(entry)
+            if label is None:
+                return None, fail(f"多机配置 {key} 的一项「{entry}」切不出 <台标签>:<序号>:<额度>、或台标签不是 IP",
+                                  f"照仓根 multi-host.env.example 写成 <HOSTS 里那一台的地址>:<nvidia-smi 的序号>:<额度>", RUN_CONDITION_EXIT)
+            labels.add(label)
+    return labels, None
+
+
+def target_hosts(paths, subcommand, gpu_on):
+    """这一条要在哪几台做：(["here" | 第二台的地址文本, …], None)，这一台在前；判不了回 (None, 退出码)，出路已打。"""
+    labels, refused = card_host_labels(paths)
+    if labels is None:
+        return None, refused
+    multi_host_addresses = load_module_by_path("multi_host_addresses", MULTI_HOST_ADDRESSES)
+    try:
+        addresses = multi_host_addresses.resolve(paths.configuration)
+        this, peer = ipaddress.ip_address(addresses.this), ipaddress.ip_address(addresses.peer)
+    except ValueError as error:   # AddressesUnavailable 是 ValueError 的子类；地址不是 IP 也落在这里
+        if control_broken("addresses-unavailable-taken-as-this-host"):
+            return ["here"], None
+        return None, fail(f"取不到主机数组里这一台与第二台的地址，判不了哪几台点名了卡：{error}", multi_host_addresses.HOWTO, RUN_CONDITION_EXIT)
+    targets = []
+    for label in sorted(labels, key=str):
+        if label == this:
+            targets.append("here")
+        elif label == peer:
+            targets.append(str(peer))
+        elif not control_broken("card-label-outside-hosts-ignored"):
+            return None, fail(f"显卡键里的台标签 {label} 既不是主机数组里的这一台（{this}）也不是第二台（{peer}）",
+                              f"把 {CARD_KEYS[0]}、{CARD_KEYS[1]} 的台标签改成 {HOSTS_KEY} 里那一台的地址", RUN_CONDITION_EXIT)
+    if gpu_on and not targets and subcommand != "stop":
+        if not control_broken("cardless-configuration-accepted"):
+            return None, fail(f"多机配置开了 GPU（{GPU_SWITCH_KEY}=1）而 {CARD_KEYS[0]}、{CARD_KEYS[1]} 哪一台的卡都没点名",
+                              f"写上要用的卡（<台标签>:<序号>:<额度>），或不用 GPU 就写 {GPU_SWITCH_KEY}=0", RUN_CONDITION_EXIT)
+        targets.append("here")
+    if subcommand == "stop" or control_broken("this-host-always-targeted"):
+        targets.append("here")
+    if control_broken("peer-cards-ignored"):
+        targets = [target for target in targets if target == "here"]
+    ordered = (["here"] if "here" in targets else []) + sorted({target for target in targets if target != "here"})
+    return ordered, None
+
+
+def shared_binary_refusal(paths, host, binary):
+    """install --binary 转去第二台之前：路径要在 NFS_SHARED_ROOTS 某一段下、这台读得到；不对回 78（出路已打），对了回 0。"""
+    if control_broken("binary-shared-root-unchecked"):
+        return 0
+    roots = configuration_value(paths.configuration, SHARED_ROOTS_KEY) or ""
+    segments = [os.path.normpath(segment) for segment in roots.split(":") if segment.startswith("/")]
+    if not any(os.path.commonpath([binary, segment]) == segment for segment in segments):
+        return fail(f"--binary {binary} 不在共享根（{SHARED_ROOTS_KEY}={roots}）下，第二台 {host} 同一路径上读不到",
+                    "把编好的 gpu-verification-server 拷到共享根某一段下，再 python3 gpu-verification-server/control install --binary <那个路径>", RUN_CONDITION_EXIT)
+    if not (os.path.isfile(binary) and os.access(binary, os.R_OK)):
+        return fail(f"--binary {binary} 在这台就读不到", f"先编：{BUILD_COMMAND}；再给它的路径", RUN_CONDITION_EXIT)
+    return 0
+
+
+def forward(paths, host, arguments):
+    """经 ssh 到第二台 host，在同一绝对路径的仓里起同一条 control：对端的输出原样打、退它的退出码（ssh 自己失败另报）。"""
+    if arguments[:1] == ["install"] and "--binary" in arguments:
+        refused = shared_binary_refusal(paths, host, arguments[arguments.index("--binary") + 1])
+        if refused:
+            return refused
+    say(f"  · 第二台 {host}（多机配置点名了它的卡）：经 ssh 在那台起 control {' '.join(arguments)}")
+    try:
+        code = subprocess.run([paths.ssh, *SSH_OPTIONS, host, remote_control_command(paths, arguments)], stdin=subprocess.DEVNULL).returncode
+    except OSError as error:
+        return fail(f"起不了 ssh（{paths.ssh}）：{type(error).__name__}: {error}", "这台要有 ssh 客户端；装好再跑同一条命令", RUN_CONDITION_EXIT)
+    if code < 0:
+        return 128 - code
+    if code == SSH_FAILURE_EXIT and not control_broken("ssh-failure-passed-through"):
+        return fail(f"ssh 到第二台 {host} 连不上（ssh 退 255），control {' '.join(arguments)} 没在那台起成",
+                    f"ssh -o BatchMode=yes {host} true 要退 0（免密；用户名照这台的 ~/.ssh/config）；修好再跑同一条命令", RUN_CONDITION_EXIT)
+    return code
+
+
+def combined_exit(codes):
+    """几台的退出码合成一个（文件头）：都 0 退 0；有不是 0 也不是 78 的退头一个这样的；其余退 78。"""
+    unusual = [code for code in codes if code not in (0, RUN_CONDITION_EXIT)]
+    if unusual:
+        return unusual[0]
+    return RUN_CONDITION_EXIT if RUN_CONDITION_EXIT in codes else 0
+
+
+def parse_arguments(arguments):
+    """→ (子命令, 在这台做的那一步, 转去时带的参数)；认不出回 None。--binary 在这台取绝对路径，转去时取解开符号链接之后的。"""
+    if arguments[:1] == ["install"]:
+        rest = arguments[1:]
+        dry_run = "--dry-run" in rest
+        rest = [word for word in rest if word != "--dry-run"]
+        head = ["install"] + (["--dry-run"] if dry_run else [])
+        if rest == []:
+            return "install", (lambda: install_here(dry_run, None)), head
+        if len(rest) == 2 and rest[0] == "--binary":
+            return "install", (lambda: install_here(dry_run, os.path.abspath(rest[1]))), head + ["--binary", os.path.realpath(rest[1])]
+        return None
+    here_steps = {"start": start_here, "stop": stop_here, "check": check_here}
+    if len(arguments) == 1 and arguments[0] in here_steps:
+        return arguments[0], here_steps[arguments[0]], list(arguments)
+    return None
+
+
+def run_on_the_hosts(subcommand, here_step, forwarded_arguments):
+    paths = Paths()
+    switch, refused = gpu_switch(paths)
+    if switch == "refused":
+        return refused
+    gpu_on = switch == "on"
+    if not gpu_on and subcommand in ("start", "check"):
+        say(f"  ✓ 多机配置没开 GPU（{GPU_SWITCH_KEY}=0）：用不上 gpu-verification-server，{'不起' if subcommand == 'start' else '不查'}")
+        return 0
+    if not gpu_on and subcommand == "install":
+        return fail(f"多机配置没开 GPU（{GPU_SWITCH_KEY}=0），用不上 gpu-verification-server", f"要用就把多机配置改成 {GPU_SWITCH_KEY}=1 并写上卡，再装", RUN_CONDITION_EXIT)
+    targets, refused = target_hosts(paths, subcommand, gpu_on)
+    if targets is None:
+        return refused
+    # 起单元的两条（install 不带 --dry-run、start）：装不成的先拒，再由发起的这一台清一次场，之后才起各台（文件头「开卡之前清场」）
+    starts_units = subcommand == "start" or (subcommand == "install" and "--dry-run" not in forwarded_arguments)
+    quiesce_pending = False
+    if starts_units:
+        refused = refusal_before_the_quiesce(paths, subcommand, targets, forwarded_arguments)
+        if refused:
+            return refused
+        quiesce_pending = True
+        if not control_broken("quiesce-after-the-first-start"):
+            refused = quiesce_once_before_any_start(paths, targets)
+            if refused:
+                return refused
+            quiesce_pending = False
+    codes = []
+    for target in targets:
+        if target == "here":
+            say(f"  · 这一台：{subcommand}")
+            codes.append(here_step())
+        else:
+            code = forward(paths, target, forwarded_arguments)
+            if not control_broken("peer-exit-dropped"):
+                codes.append(code)
+        if quiesce_pending:   # 弄坏开关 quiesce-after-the-first-start：清场挪到起完头一台之后
+            quiesce_pending = False
+            refused = quiesce_once_before_any_start(paths, targets)
+            if refused:
+                return refused
+    return combined_exit(codes)
+
+
+def refusal_before_the_quiesce(paths, subcommand, targets, forwarded_arguments):
+    """清场之前先拒装不成的（文件头「开卡之前清场」）：install 这一台要装而二进制不在、--binary 转去第二台而路径不在共享根下；拒回 78（出路已打），不拒回 0。"""
+    if subcommand != "install":
+        return 0
+    binary = forwarded_arguments[forwarded_arguments.index("--binary") + 1] if "--binary" in forwarded_arguments else None
+    for target in targets:
+        if target == "here":
+            refused = install_binary_refusal(paths, binary, dry_run=False)
+        elif binary:
+            refused = shared_binary_refusal(paths, target, binary)
+        else:
+            refused = 0
+        if refused:
+            return refused
+    return 0
+
+
+# ── 自证（文件头「自证」）
+SELFTEST_SUMMARY_PREFIX = "GPU_VERIFICATION_SERVER_CONTROL_SELFTEST"
+SELFTEST_RUN_SECONDS = 60
+LOCAL_ADDRESS = "127.0.0.1"     # 每一台的 lo 上都有：共用取法照真的网卡地址认它是这一台
+REMOTE_ADDRESS = "192.0.2.9"    # 文档段（RFC 5737）的地址，哪一台的网卡上都没有：当第二台
+OTHER_ADDRESS = "192.0.2.6"
+FAKE_MAIN_PROCESS = "4242"
+# 共用取法的判法要整份判得过的那几个键（照 scripts/hosts/multi_host_addresses.py 自证的配置）；NFS_SHARED_ROOTS 指自证根
+SELFTEST_BASE_CONFIGURATION = (("QUIESCE_STOP_COMMAND", ""), ("QUIESCE_STOPPED_CHECK_COMMAND", ""), ("QUIESCE_START_COMMAND", ""),
+                               ("QUIESCE_STARTED_CHECK_COMMAND", ""), ("ENABLE_ACROSS_MACHINES", "1"))
+SELFTEST_BY_HOST_VALUES = (("BUILD_ROOT_BY_HOST", "/selftest/builds"), ("SLICE_MEMORY_CAP_BY_HOST", "2G"))
+# CARGO_BIN_DIRECTORY_BY_HOST 在自证根底下：这一台那一项放一份可执行的假 cargo（check 核得到它），别的台那一项是另一个目录（install 取错台就对不上）
+SELFTEST_CARGO_DIRECTORY = "cargo-bin"
+SELFTEST_PEER_CARGO_DIRECTORY = "peer-cargo-bin"
+# 自证起的子进程不带这几个：别的脚本的弄坏开关与换网卡地址的变量会改共用取法的判法
+SELFTEST_DROPPED_VARIABLES = ("MULTI_HOST_CONFIGURATION_BREAK", "MULTI_HOST_ADDRESSES_BREAK", "CONFIGURATION_SELFTEST_LOCAL_ADDRESSES", "HEAVY_THREADS_BREAK")
+FAKE_REMOTE_OUTPUT = "fake-remote stdout"
+FAKE_REMOTE_ERROR = "fake-remote stderr"
+# 假 ssh：参数逐次记进 fake/ssh-calls.log；远端命令末尾是 unit-state 的打那一行（状态取 fake/peer-unit-state，没有是 inactive），别的打一行标准输出一行标准错误；都退 fake/ssh-exit
+FAKE_SSH = """#!{python}
+import json, os, shlex, sys
+root = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(root, "fake", "ssh-calls.log"), "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(sys.argv[1:]) + "\\n")
+with open(os.path.join(root, "fake", "ssh-exit"), encoding="utf-8") as handle:
+    code = int(handle.read().strip())
+if shlex.split(sys.argv[-1])[-1:] == ["unit-state"]:
+    try:
+        with open(os.path.join(root, "fake", "peer-unit-state"), encoding="utf-8") as handle:
+            state = handle.read().strip()
+    except FileNotFoundError:
+        state = "inactive"
+    print({state_prefix!r} + " state=" + state, flush=True)
+else:
+    print({output!r}, flush=True)
+    print({error!r}, file=sys.stderr, flush=True)
+sys.exit(code)
+"""
+# 记状态的假 systemctl：调用逐行记进 fake/systemctl-calls.log，单元状态在 fake/unit-state、主进程号在 fake/main-process；
+# start 把单元记成 active、主进程号 4242、cgroup.procs 里放 4242，并替服务写 state/serving（有 fake/start-writes-no-serving 时不写）；
+# stop 把单元记成 inactive、主进程号 0、清空 cgroup.procs（有 fake/stop-leaves-process 时留着 4242；有 fake/restarted-after-stop 时之后头一次 is-active 打 inactive、再往后打 active）；
+# show -p Environment 打单元文件与 <单元文件>.d/*.conf 里 Environment= 的值，空格连成一行（同 systemd：drop-in 排在单元文件之后）
+FAKE_SYSTEMCTL = f"""#!/bin/sh
+root="$(cd "$(dirname "$0")" && pwd)"
+printf '%s\\n' "$*" >> "$root/fake/systemctl-calls.log"
+[ "$1" = --user ] && shift
+processes="$root/cgroup/fake.slice/cgroup.procs"
+case "$1" in
+  daemon-reload) exit 0 ;;
+  start)
+    echo active > "$root/fake/unit-state"; echo {FAKE_MAIN_PROCESS} > "$root/fake/main-process"; echo {FAKE_MAIN_PROCESS} > "$processes"
+    if [ ! -f "$root/fake/start-writes-no-serving" ]; then
+      mkdir -p "$root/state"; echo "{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS} oldest_pending_wait_limit_milliseconds=500 intake=none" > "$root/state/{SERVING_FILE_NAME}"
+    fi
+    exit 0 ;;
+  stop)
+    echo inactive > "$root/fake/unit-state"; echo 0 > "$root/fake/main-process"
+    if [ -f "$root/fake/stop-leaves-process" ]; then echo {FAKE_MAIN_PROCESS} > "$processes"; else : > "$processes"; fi
+    [ -f "$root/fake/restarted-after-stop" ] && echo 1 > "$root/fake/restart-pending"
+    exit 0 ;;
+  is-active)
+    state="$(cat "$root/fake/unit-state" 2>/dev/null || echo inactive)"
+    if [ -f "$root/fake/restart-pending" ]; then rm -f "$root/fake/restart-pending"; echo active > "$root/fake/unit-state"; fi
+    echo "$state"
+    [ "$state" = active ] ;;
+  show)
+    case "$3" in
+      MainPID) cat "$root/fake/main-process" 2>/dev/null || echo 0 ;;
+      ControlGroup) echo /fake.slice ;;
+      Environment) sed -n 's/^Environment=//p' "$root/systemd/{UNIT_NAME}" "$root/systemd/{UNIT_NAME}.d/"*.conf 2>/dev/null | tr '\\n' ' ' ;;
+      *) echo "假 systemctl show 认不得：$*" >&2; exit 1 ;;
+    esac
+    exit 0 ;;
+  *) echo "假 systemctl 认不得：$*" >&2; exit 1 ;;
+esac
+"""
+# 假清场脚本（文件头「自证」）：记一次调用（含当时 systemctl start 起过没有、fake-ssh 收到过的远端命令）；fake/quiesce-exit 是 0（没有这份也算 0）时打清场过了、起 -- 后面的命令，不是 0 时打回读没过与 log=、不起命令
+FAKE_QUIESCE = """#!{python}
+import json, os, subprocess, sys
+root = os.path.dirname(os.path.abspath(__file__))
+def read(name, default):
+    try:
+        with open(os.path.join(root, "fake", name), encoding="utf-8") as handle:
+            return handle.read()
+    except FileNotFoundError:
+        return default
+record = {{"arguments": sys.argv[1:], "cards": os.environ.get({cards!r}), "admitted": os.environ.get({admission!r}, ""),
+          "configuration": os.environ.get({configuration!r}), "started_before": {start_call!r} in read("systemctl-calls.log", "").splitlines(),
+          "ssh_remote_before": [json.loads(line)[-1] for line in read("ssh-calls.log", "").splitlines() if line.strip()]}}
+with open(os.path.join(root, "fake", "quiesce-calls.log"), "a", encoding="utf-8") as handle:
+    handle.write(json.dumps(record) + "\\n")
+code = int(read("quiesce-exit", "0").strip())
+if code == 0:
+    print("GPU_QUIESCE step=quiesce result=stopped-and-read-back holders=0", file=sys.stderr, flush=True)
+    code = subprocess.run(sys.argv[2:], stdin=subprocess.DEVNULL).returncode
+    print("GPU_QUIESCE step=command result=exit-" + str(code), file=sys.stderr, flush=True)
+else:
+    print("GPU_QUIESCE step=quiesce result=read-back-failed holders=0 log=" + os.path.join(root, "quiesce-logs", "fake.log"), file=sys.stderr, flush=True)
+    print("  ✗ 假清场：回读没过", file=sys.stderr, flush=True)
+    print("  → 怎么办：假清场的出路", file=sys.stderr, flush=True)
+    print("GPU_QUIESCE step=command result=not-started", file=sys.stderr, flush=True)
+print("GPU_QUIESCE step=exit code=" + str(code), file=sys.stderr, flush=True)
+sys.exit(code)
+"""
+FAKE_QUIESCE_LOG = os.path.join("quiesce-logs", "fake.log")
+# 假 journalctl：参数记进 fake/journalctl-calls.log，打 fake/journal 的内容（每行一条 JSON）
+FAKE_JOURNALCTL = """#!/bin/sh
+root="$(cd "$(dirname "$0")" && pwd)"
+printf '%s\\n' "$*" >> "$root/fake/journalctl-calls.log"
+[ -f "$root/fake/journal" ] && cat "$root/fake/journal"
+exit 0
+"""
+FAKE_BINARY = "#!/bin/sh\nexit 0\n"
+# 单元的 RestartSec 上限：被杀之后拉起要快，长了等卡上的活白等
+RESTART_SECONDS_CEILING = 30
+# 每条弄坏开关只交给这几格的子进程（文件头开关表点名的项）
+SELFTEST_SWITCH_CELLS = {
+    "gpu-switch-ignored": ("gpu-off-start-and-check-do-nothing", "install-refused-when-gpu-off"),
+    "gpu-switch-missing-taken-as-off": ("gpu-switch-missing-refused",),
+    "addresses-unavailable-taken-as-this-host": ("hosts-missing-refused",),
+    "card-label-outside-hosts-ignored": ("card-label-outside-hosts-refused",),
+    "cardless-configuration-accepted": ("gpu-on-without-cards-refused",),
+    "peer-cards-ignored": ("start-reaches-every-host-with-cards",),
+    "this-host-always-targeted": ("cards-only-on-the-peer-start-there-only",),
+    "forwarded-call-forwards-again": ("forwarded-start-stays-on-this-host",),
+    "peer-exit-dropped": ("check-takes-the-peer-exit",),
+    "ssh-failure-passed-through": ("ssh-failure-reported",),
+    "binary-shared-root-unchecked": ("install-binary-outside-shared-root-refused",),
+    "dry-run-writes": ("install-dry-run-writes-nothing",),
+    "unit-restart-omitted": ("install-writes-restarting-unit-without-enable",),
+    "running-readback-skipped": ("start-reads-back-serving-pid",),
+    "check-down-service-passed": ("check-refuses-when-gpu-on-and-service-down",),
+    "check-ignores-serving-pid": ("check-refuses-stale-serving-file",),
+    "stop-readback-skipped": ("stop-reads-back-stopped-unit",),
+    "unit-cargo-omitted": ("install-writes-restarting-unit-without-enable",),
+    "unit-cargo-of-the-peer": ("install-writes-restarting-unit-without-enable",),
+    "check-cargo-unchecked": ("check-refuses-unit-without-cargo",),
+    "start-without-quiesce": ("start-quiesces-the-named-cards-before-starting",),
+    "quiesce-while-running": ("start-quiesces-the-named-cards-before-starting",),
+    "quiesce-on-every-host": ("forwarded-start-stays-on-this-host",),
+    "quiesce-after-the-first-start": ("start-quiesces-once-on-this-host-before-any-unit-starts",),
+    "peer-cards-left-out-of-the-quiesce": ("start-quiesces-once-on-this-host-before-any-unit-starts",),
+    "version-mismatch-unread": ("check-reports-version-mismatch-of-this-process",),
+    "version-mismatch-of-earlier-processes-counted": ("check-reports-version-mismatch-of-this-process",),
+}
+
+
+def cards_on(*addresses):
+    """两个显卡键都点名这几台各一张卡。"""
+    entries = " ".join(f"{address}:0:8G" for address in addresses)
+    return [(CARD_KEYS[0], f"'{entries}'"), (CARD_KEYS[1], f"'{entries}'")]
+
+
+def gpu_configuration(*card_addresses, gpu="1", hosts=(LOCAL_ADDRESS, REMOTE_ADDRESS)):
+    """GPU 开关写 gpu（None 不写这一键），卡点名 card_addresses，主机数组写 hosts（空就不写这一键）。"""
+    configuration = [(GPU_SWITCH_KEY, gpu)] if gpu is not None else []
+    configuration += cards_on(*card_addresses) if card_addresses else []
+    return configuration + ([(HOSTS_KEY, " ".join(hosts))] if hosts else [])
+
+
+class SelftestWorld:
+    """一格的自证根：整份判得过的多机配置（configuration 里的键盖过基础那几个）、fake-ssh、fake-systemctl；installed 时另放装好的假二进制与单元文件。"""
+
+    def __init__(self, base, label, configuration, switches, ssh_exit=0, installed=False, unit_state="inactive"):
+        self.root = tempfile.mkdtemp(prefix=f"{label}-", dir=base)
+        self.switches = switches
+        os.makedirs(os.path.join(self.root, "fake"))
+        self.write_configuration(configuration)
+        self.write("fake/ssh-exit", f"{ssh_exit}\n")
+        self.write("fake/unit-state", f"{unit_state}\n")
+        self.write("fake-ssh", FAKE_SSH.format(python=sys.executable, output=FAKE_REMOTE_OUTPUT, error=FAKE_REMOTE_ERROR, state_prefix=UNIT_STATE_LINE_PREFIX),
+                   executable=True)
+        self.write("fake-systemctl", FAKE_SYSTEMCTL, executable=True)
+        self.write("fake-quiesce", FAKE_QUIESCE.format(python=sys.executable, cards=QUIESCE_CARDS_VARIABLE, admission=QUIESCE_ADMISSION_VARIABLE,
+                                                       configuration=MULTI_HOST_CONFIGURATION_VARIABLE, start_call=f"--user start {UNIT_NAME}"),
+                   executable=True)
+        self.write("fake-journalctl", FAKE_JOURNALCTL, executable=True)
+        self.write("cgroup/fake.slice/cgroup.procs", "")
+        self.write("build/gpu-verification-server", FAKE_BINARY, executable=True)
+        self.write(f"{SELFTEST_CARGO_DIRECTORY}/cargo", FAKE_BINARY, executable=True)
+        if installed:
+            self.write(f"bin/{BINARY_NAME}", FAKE_BINARY, executable=True)
+            self.write(f"systemd/{UNIT_NAME}", f"[Service]\nEnvironment={UNIT_CARGO_VARIABLE}={self.cargo()}\nRestartSec=3\n")
+            os.makedirs(os.path.join(self.root, "state"))
+
+    def cargo(self):
+        """多机配置里这一台那一项下的假 cargo。"""
+        return os.path.join(self.root, SELFTEST_CARGO_DIRECTORY, "cargo")
+
+    def write_configuration(self, configuration):
+        given = dict(configuration)
+        hosts = (given.get(HOSTS_KEY) or f"{LOCAL_ADDRESS} {REMOTE_ADDRESS}").split()
+        cargo_directories = " ".join(f"{host}={os.path.join(self.root, SELFTEST_CARGO_DIRECTORY if host == LOCAL_ADDRESS else SELFTEST_PEER_CARGO_DIRECTORY)}"
+                                     for host in hosts)
+        by_host = ((CARGO_DIRECTORY_KEY, cargo_directories),) + tuple((key, " ".join(f"{host}={value}" for host in hosts)) for key, value in SELFTEST_BY_HOST_VALUES)
+        entries = [(key, value) for key, value in SELFTEST_BASE_CONFIGURATION + by_host + ((SHARED_ROOTS_KEY, self.root),) if key not in given]
+        self.write("multi-host.env", "# 自证用的多机配置\n" + "".join(f"{key}={value}\n" for key, value in entries + list(configuration)))
+
+    def write(self, relative, text, executable=False):
+        path = os.path.join(self.root, relative)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        if executable:
+            os.chmod(path, 0o755)
+        return path
+
+    def run(self, arguments, extra=None):
+        """→ (退出码, 标准输出, 标准错误)。"""
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in (CONTROL_BREAK_VARIABLE, FORWARDED_VARIABLE, MULTI_HOST_CONFIGURATION_VARIABLE) + SELFTEST_DROPPED_VARIABLES}
+        environment[SELFTEST_ROOT_VARIABLE] = self.root
+        if self.switches:
+            environment[CONTROL_BREAK_VARIABLE] = ",".join(self.switches)
+        environment.update(extra or {})
+        try:
+            completed = subprocess.run([sys.executable, os.path.realpath(__file__), *arguments], capture_output=True, text=True,
+                                       stdin=subprocess.DEVNULL, env=environment, timeout=SELFTEST_RUN_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            return None, str(error.stdout or ""), f"{SELFTEST_RUN_SECONDS} 秒没跑完"
+        return completed.returncode, completed.stdout, completed.stderr
+
+    def lines_of(self, relative):
+        try:
+            with open(os.path.join(self.root, relative), encoding="utf-8") as handle:
+                return handle.read().splitlines()
+        except FileNotFoundError:
+            return []
+
+    def ssh_calls(self):
+        return [json.loads(line) for line in self.lines_of("fake/ssh-calls.log") if line.strip()]
+
+    def systemctl_calls(self):
+        return self.lines_of("fake/systemctl-calls.log")
+
+    def quiesce_calls(self):
+        return [json.loads(line) for line in self.lines_of("fake/quiesce-calls.log") if line.strip()]
+
+    def journalctl_calls(self):
+        return self.lines_of("fake/journalctl-calls.log")
+
+
+def remote_words(call):
+    """fake-ssh 收到的最后一个参数（远端那条命令）按 shell 拆开。"""
+    return shlex.split(call[-1]) if call else []
+
+
+def expected_remote_words(arguments):
+    return ["cd", REPOSITORY, "&&", "exec", "env", f"{FORWARDED_VARIABLE}=1", "python3", CONTROL_SCRIPT, *arguments]
+
+
+def forwarded_calls(world, subcommand):
+    """fake-ssh 收到的、远端起 control <subcommand …> 的那几次（问单元状态的 unit-state 另算）。"""
+    position = len(expected_remote_words([]))
+    return [call for call in world.ssh_calls() if remote_words(call)[position:position + 1] == [subcommand]]
+
+
+def forwarded_subcommand_of(remote):
+    """fake-quiesce 记下的一条远端命令起的是 control 的哪个子命令（拆不出是空串）。"""
+    words = shlex.split(remote)
+    position = len(expected_remote_words([]))
+    return words[position] if len(words) > position else ""
+
+
+def expect(problems, condition, text):
+    if not condition:
+        problems.append(text)
+
+
+def started_here(world):
+    return f"--user start {UNIT_NAME}" in world.systemctl_calls()
+
+
+def cell_gpu_off_start_and_check_do_nothing(base, switches):
+    world = SelftestWorld(base, "gpu-off", gpu_configuration(gpu="0"), switches)
+    problems = []
+    for subcommand in ("start", "check"):
+        code, output, error = world.run([subcommand])
+        expect(problems, code == 0 and "没开 GPU" in output, f"没开 GPU 时 {subcommand} 该退 0、说没开 GPU，退了 {code}：{output.strip()} {error.strip()}")
+    expect(problems, not world.systemctl_calls() and not world.ssh_calls(),
+           f"没开 GPU 时 start、check 一条 systemctl 与 ssh 都不该起：systemctl {world.systemctl_calls()}，ssh {world.ssh_calls()}")
+    return problems
+
+
+def cell_install_refused_when_gpu_off(base, switches):
+    world = SelftestWorld(base, "install-gpu-off", gpu_configuration(LOCAL_ADDRESS, gpu="0"), switches)
+    code, _, error = world.run(["install", "--binary", os.path.join(world.root, "build", "gpu-verification-server")])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "没开 GPU" in error, f"没开 GPU 时 install 该退 {RUN_CONDITION_EXIT}、说没开 GPU，退了 {code}：{error.strip()}")
+    expect(problems, not world.systemctl_calls(), f"没开 GPU 时 install 不该起 systemctl：{world.systemctl_calls()}")
+    return problems
+
+
+def cell_gpu_switch_missing_refused(base, switches):
+    world = SelftestWorld(base, "switch-missing", gpu_configuration(LOCAL_ADDRESS, gpu=None), switches)
+    code, _, error = world.run(["check"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and GPU_SWITCH_KEY in error and "没写" in error,
+           f"{GPU_SWITCH_KEY} 没写时 check 该退 {RUN_CONDITION_EXIT}、点名它没写，退了 {code}：{error.strip()}")
+    return problems
+
+
+def cell_hosts_missing_refused(base, switches):
+    world = SelftestWorld(base, "hosts-missing", gpu_configuration(LOCAL_ADDRESS, hosts=()), switches)
+    code, _, error = world.run(["check"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "缺键 HOSTS" in error, f"HOSTS 没写时 check 该退 {RUN_CONDITION_EXIT}、照抄判法的「缺键 HOSTS」，退了 {code}：{' '.join(error.split())}")   # 压成一行：check 自己的 stderr 有「  ✗ 」起头的行，原样嵌进来会被读成别的格
+    expect(problems, not world.systemctl_calls() and not world.ssh_calls(), f"判不了哪几台时不该起 systemctl 与 ssh：{world.systemctl_calls()} {world.ssh_calls()}")
+    return problems
+
+
+def cell_card_label_outside_hosts_refused(base, switches):
+    world = SelftestWorld(base, "label-outside", gpu_configuration(LOCAL_ADDRESS, OTHER_ADDRESS), switches)
+    code, _, error = world.run(["start"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and OTHER_ADDRESS in error, f"台标签 {OTHER_ADDRESS} 不是哪一台时 start 该退 {RUN_CONDITION_EXIT}、点名它，退了 {code}：{error.strip()}")
+    expect(problems, not started_here(world) and not world.ssh_calls(), f"配置写坏时不该起服务：{world.systemctl_calls()} {world.ssh_calls()}")
+    return problems
+
+
+def cell_gpu_on_without_cards_refused(base, switches):
+    world = SelftestWorld(base, "no-cards", gpu_configuration() + [(CARD_KEYS[0], ""), (CARD_KEYS[1], "")], switches)
+    code, _, error = world.run(["start"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "都没点名" in error, f"开了 GPU 而没点名卡时 start 该退 {RUN_CONDITION_EXIT}，退了 {code}：{error.strip()}")
+    expect(problems, not started_here(world), f"没点名卡时不该起服务：{world.systemctl_calls()}")
+    return problems
+
+
+def cell_start_reaches_every_host_with_cards(base, switches):
+    world = SelftestWorld(base, "both-hosts", gpu_configuration(LOCAL_ADDRESS, REMOTE_ADDRESS), switches)
+    code, output, error = world.run(["start"])
+    problems = []
+    expect(problems, code == 0, f"两台都点名了卡、都起成时 start 该退 0，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+    expect(problems, started_here(world), f"这一台点名了卡，该 systemctl start：{world.systemctl_calls()}")
+    calls = forwarded_calls(world, "start")
+    expect(problems, len(calls) == 1, f"第二台点名了卡，转去第二台的 start 该有 1 次，有 {len(calls)} 次：{world.ssh_calls()}")
+    if calls:
+        expect(problems, len(calls[0]) >= 2 and calls[0][-2] == REMOTE_ADDRESS and "BatchMode=yes" in calls[0] and "-n" in calls[0],
+               f"ssh 该连 {REMOTE_ADDRESS}、带 -o BatchMode=yes 与 -n：{calls[0]}")
+        expect(problems, remote_words(calls[0]) == expected_remote_words(["start"]), f"远端命令该是 {expected_remote_words(['start'])}，收到 {remote_words(calls[0])}")
+    expect(problems, FAKE_REMOTE_OUTPUT in output and FAKE_REMOTE_ERROR in error, f"对端的输出该原样打出来：{output.strip()[-200:]} ‖ {error.strip()}")
+    return problems
+
+
+def cell_cards_only_on_the_peer_start_there_only(base, switches):
+    world = SelftestWorld(base, "peer-only", gpu_configuration(REMOTE_ADDRESS), switches)
+    code, _, error = world.run(["start"])
+    problems = []
+    expect(problems, code == 0, f"只有第二台点名了卡时 start 该退 0，退了 {code}：{error.strip()}")
+    expect(problems, not started_here(world), f"这一台没点名卡，不该 systemctl start：{world.systemctl_calls()}")
+    expect(problems, len(forwarded_calls(world, "start")) == 1, f"转去第二台的 start 该有 1 次：{world.ssh_calls()}")
+    return problems
+
+
+def cell_forwarded_start_stays_on_this_host(base, switches):
+    world = SelftestWorld(base, "forwarded", gpu_configuration(LOCAL_ADDRESS, REMOTE_ADDRESS), switches)
+    code, _, error = world.run(["start"], extra={FORWARDED_VARIABLE: "1"})
+    problems = []
+    expect(problems, code == 0 and started_here(world), f"转来的 start 该在这台起、退 0，退了 {code}：{error.strip()}；systemctl {world.systemctl_calls()}")
+    expect(problems, not world.ssh_calls(), f"转来的那一条不该再转，fake-ssh 收到了 {world.ssh_calls()}")
+    expect(problems, not world.quiesce_calls(), f"转来的 start 不该清场（清场只在发起的那一台做一次），清场脚本收到了 {world.quiesce_calls()}")
+    return problems
+
+
+def cell_check_takes_the_peer_exit(base, switches):
+    world = SelftestWorld(base, "peer-exit", gpu_configuration(LOCAL_ADDRESS, REMOTE_ADDRESS), switches, ssh_exit=RUN_CONDITION_EXIT,
+                          installed=True)
+    world.run(["start"], extra={FORWARDED_VARIABLE: "1"})
+    code, output, error = world.run(["check"])
+    problems = []
+    expect(problems, "这一台" in output and "在跑" in output, f"这一台起着，check 该说这一台在跑：{output.strip()[-300:]} {error.strip()}")
+    expect(problems, code == RUN_CONDITION_EXIT, f"第二台退 {RUN_CONDITION_EXIT} 时 check 该退 {RUN_CONDITION_EXIT}，退了 {code}")
+    return problems
+
+
+def cell_ssh_failure_reported(base, switches):
+    world = SelftestWorld(base, "ssh-failure", gpu_configuration(REMOTE_ADDRESS), switches, ssh_exit=SSH_FAILURE_EXIT)
+    code, _, error = world.run(["start"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "连不上" in error, f"ssh 退 255 时 start 该退 {RUN_CONDITION_EXIT}、说连不上，退了 {code}：{error.strip()}")
+    return problems
+
+
+def cell_install_binary_outside_shared_root_refused(base, switches):
+    problems = []
+    outside = os.path.realpath(shutil.which("true") or "/bin/true")
+    world = SelftestWorld(base, "binary-outside", gpu_configuration(REMOTE_ADDRESS), switches)
+    code, _, error = world.run(["install", "--binary", outside])
+    expect(problems, code == RUN_CONDITION_EXIT and "共享根" in error, f"共享根外的 --binary 转去第二台时 install 该退 {RUN_CONDITION_EXIT}，退了 {code}：{error.strip()}")
+    expect(problems, not world.ssh_calls(), f"共享根外的 --binary 不该转去，fake-ssh 收到了 {world.ssh_calls()}")
+    inside_world = SelftestWorld(base, "binary-inside", gpu_configuration(REMOTE_ADDRESS), switches)
+    inside = os.path.join(inside_world.root, "build", "gpu-verification-server")
+    code, _, error = inside_world.run(["install", "--binary", inside])
+    calls = forwarded_calls(inside_world, "install")
+    expect(problems, code == 0 and len(calls) == 1 and remote_words(calls[0]) == expected_remote_words(["install", "--binary", os.path.realpath(inside)]),
+           f"共享根下的 --binary 该转去第二台、带解开符号链接之后的路径，退了 {code}：{error.strip()}；ssh {inside_world.ssh_calls()}")
+    return problems
+
+
+def cell_install_dry_run_writes_nothing(base, switches):
+    world = SelftestWorld(base, "dry-run", gpu_configuration(LOCAL_ADDRESS), switches)
+    code, output, error = world.run(["install", "--dry-run", "--binary", os.path.join(world.root, "build", "gpu-verification-server")])
+    problems = []
+    expect(problems, code == 0 and "--dry-run：只打了要做的事" in output and "ExecStart=" in output,
+           f"install --dry-run 该退 0、打出单元全文，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+    expect(problems, not os.path.exists(os.path.join(world.root, "systemd", UNIT_NAME)) and not os.path.exists(os.path.join(world.root, "bin", BINARY_NAME)),
+           "install --dry-run 不该写单元文件与二进制")
+    expect(problems, not world.systemctl_calls(), f"install --dry-run 不该起 systemctl：{world.systemctl_calls()}")
+    return problems
+
+
+def cell_install_writes_restarting_unit_without_enable(base, switches):
+    """install 照模板写单元：Restart=always、RestartSec、不带 [Install]、ExecStart 起 serve、Environment=CARGO=<这一台那一项>/cargo；
+    单元目录下另有设了 CARGO 的 drop-in 的，点名它多余与删法；只 start、不 enable；二进制逐字节拷到位。"""
+    world = SelftestWorld(base, "install", gpu_configuration(LOCAL_ADDRESS), switches)
+    drop_in = world.write(f"systemd/{UNIT_NAME}.d/cargo.conf", f"[Service]\nEnvironment={UNIT_CARGO_VARIABLE}=/elsewhere/cargo\n")
+    source = os.path.join(world.root, "build", "gpu-verification-server")
+    code, output, error = world.run(["install", "--binary", source])
+    problems = []
+    expect(problems, code == 0, f"install 该退 0，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+    unit_lines = world.lines_of(f"systemd/{UNIT_NAME}")
+    expect(problems, "Restart=always" in unit_lines, f"单元里没有 Restart=always：{unit_lines}")
+    expect(problems, f"Environment={UNIT_CARGO_VARIABLE}={world.cargo()}" in unit_lines,
+           f"单元里没有 Environment={UNIT_CARGO_VARIABLE}=<这一台的 cargo>（多机配置 {CARGO_DIRECTORY_KEY} 里 {LOCAL_ADDRESS} 那一项下的 {world.cargo()}）：{unit_lines}")
+    said = " ".join(output.split())
+    expect(problems, f"drop-in {drop_in}" in said and f"rm {drop_in}" in said and "daemon-reload" in said,
+           f"单元目录下设了 {UNIT_CARGO_VARIABLE} 的 drop-in 该点名它多余、写删法（rm 那份文件再 daemon-reload）：{said[-400:]}")
+    restart = [line[len("RestartSec="):] for line in unit_lines if line.startswith("RestartSec=")]
+    expect(problems, len(restart) == 1 and restart[0].isdigit() and 0 < int(restart[0]) <= RESTART_SECONDS_CEILING,
+           f"单元该有一行 RestartSec=<1 到 {RESTART_SECONDS_CEILING} 的整秒数>，有的是 {restart}")
+    expect(problems, "[Install]" not in unit_lines, f"单元里不该有 [Install]（开机不自起）：{unit_lines}")
+    expect(problems, any(line.startswith("ExecStart=") and line.endswith(f"serve --state-directory {os.path.join(world.root, 'state')}") for line in unit_lines),
+           f"单元的 ExecStart 该起装好的二进制的 serve、带状态目录：{unit_lines}")
+    calls = world.systemctl_calls()
+    expect(problems, started_here(world) and f"--user enable {UNIT_NAME}" not in calls, f"install 该只 start、不 enable：{calls}")
+    installed = os.path.join(world.root, "bin", BINARY_NAME)
+    expect(problems, os.path.isfile(installed) and file_sha256(installed) == file_sha256(source), "装好的二进制该与 --binary 给的逐字节相同")
+    return problems
+
+
+def cell_start_reads_back_serving_pid(base, switches):
+    problems = []
+    for writes_serving in (True, False):
+        world = SelftestWorld(base, "start-readback", gpu_configuration(LOCAL_ADDRESS), switches, installed=True)
+        if not writes_serving:
+            world.write("fake/start-writes-no-serving", "")
+        code, output, error = world.run(["start"])
+        if writes_serving:
+            expect(problems, code == 0 and "在跑" in output, f"服务写了 serving 时 start 该退 0、说在跑，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+        else:
+            expect(problems, code == READBACK_FAILED_EXIT and "回读不到" in error, f"服务没写 serving 时 start 该退 {READBACK_FAILED_EXIT}、说回读不到，退了 {code}：{error.strip()}")
+    return problems
+
+
+def cell_check_refuses_when_gpu_on_and_service_down(base, switches):
+    world = SelftestWorld(base, "check-down", gpu_configuration(LOCAL_ADDRESS), switches, installed=True)
+    problems = []
+    code, _, error = world.run(["check"])
+    expect(problems, code == RUN_CONDITION_EXIT and "没在跑" in error and "control start" in error and "不退回 CPU" in error,
+           f"开了 GPU 而单元停着时 check 该退 {RUN_CONDITION_EXIT}、出路写起法、不退回 CPU，退了 {code}：{error.strip()}")
+    world.run(["start"])
+    code, output, error = world.run(["check"])
+    expect(problems, code == 0 and "在跑" in output, f"起来之后 check 该退 0，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+    return problems
+
+
+def cell_check_refuses_stale_serving_file(base, switches):
+    world = SelftestWorld(base, "check-stale", gpu_configuration(LOCAL_ADDRESS), switches, installed=True, unit_state="active")
+    world.write("fake/main-process", f"{FAKE_MAIN_PROCESS}\n")
+    world.write(f"state/{SERVING_FILE_NAME}", f"{SERVING_LINE_PREFIX} pid=1111 oldest_pending_wait_limit_milliseconds=500 intake=none\n")
+    code, _, error = world.run(["check"])
+    problems = []
+    expect(problems, code == RUN_CONDITION_EXIT and "1111" in error and FAKE_MAIN_PROCESS in error,
+           f"serving 指着旧进程号时 check 该退 {RUN_CONDITION_EXIT}、点名两个进程号，退了 {code}：{error.strip()}")
+    return problems
+
+
+def cell_stop_reads_back_stopped_unit(base, switches):
+    problems = []
+    for scenario in ("clean", "process-left", "restarted", "not-installed"):
+        world = SelftestWorld(base, f"stop-{scenario}", gpu_configuration(LOCAL_ADDRESS), switches,
+                              installed=scenario != "not-installed", unit_state="inactive" if scenario == "not-installed" else "active")
+        if scenario == "process-left":
+            world.write("fake/stop-leaves-process", "")
+        if scenario == "restarted":
+            world.write("fake/restarted-after-stop", "")
+        code, output, error = world.run(["stop"])
+        stopped = f"--user stop {UNIT_NAME}" in world.systemctl_calls()
+        if scenario == "clean":
+            expect(problems, code == 0 and stopped and "没被拉起" in output, f"stop 该 systemctl stop、退 0、说没被拉起，退了 {code}：{output.strip()[-300:]} {error.strip()}")
+        elif scenario == "not-installed":
+            expect(problems, code == 0 and not stopped and "没装" in output, f"没装时 stop 该退 0、说没装、不起 systemctl stop，退了 {code}：{output.strip()} {error.strip()}")
+        else:
+            expect(problems, code == READBACK_FAILED_EXIT, f"{scenario}：stop 该退 {READBACK_FAILED_EXIT}，退了 {code}：{output.strip()[-200:]} {error.strip()}")
+    return problems
+
+
+def cell_start_quiesces_the_named_cards_before_starting(base, switches):
+    """清场过了才起（第二台的单元在跑：只看这一台点名的卡）；清场没过不起、退 78、出路点名清场日志（start 与 install 各一回）；单元在跑的不清场。"""
+    problems = []
+    passing = SelftestWorld(base, "quiesce-passes", gpu_configuration(LOCAL_ADDRESS, REMOTE_ADDRESS), switches, installed=True)
+    passing.write("fake/peer-unit-state", "active\n")
+    code, output, error = passing.run(["start"])
+    calls = passing.quiesce_calls()
+    expect(problems, code == 0 and started_here(passing), f"清场过了 start 该起单元、退 0，退了 {code}：{' '.join((output + error).split())[-300:]}")
+    expect(problems, len(calls) == 1 and calls[0]["arguments"] == ["--", "true"] and not calls[0]["started_before"],
+           f"起单元之前该清一次场（gpu-quiesce-run.sh -- true，那时还没 systemctl start）：{calls}")
+    if calls:
+        expect(problems, calls[0]["cards"] == f"{LOCAL_ADDRESS}:0:8G" and calls[0]["admitted"] == QUIESCE_ADMISSION_VALUE
+               and calls[0]["configuration"] == os.path.join(passing.root, "multi-host.env"),
+               f"清场该只看这一台点名的卡（{QUIESCE_CARDS_VARIABLE}={LOCAL_ADDRESS}:0:8G）、带准入标记与这一次的多机配置：{calls[0]}")
+    for subcommand in ("start", "install"):
+        world = SelftestWorld(base, f"quiesce-fails-{subcommand}", gpu_configuration(LOCAL_ADDRESS), switches, installed=subcommand == "start")
+        world.write("fake/quiesce-exit", f"{RUN_CONDITION_EXIT}\n")
+        arguments = ["start"] if subcommand == "start" else ["install", "--binary", os.path.join(world.root, "build", "gpu-verification-server")]
+        code, output, error = world.run(arguments)
+        said = " ".join(error.split())   # 压成一行：control 的 stderr 有「  ✗ 」起头的行，原样嵌进来会被读成别的格
+        expect(problems, code == RUN_CONDITION_EXIT and not started_here(world) and os.path.join(world.root, FAKE_QUIESCE_LOG) in said and "假清场的出路" in said,
+               f"清场没过时 {subcommand} 该不起单元、退 {RUN_CONDITION_EXIT}、出路点名清场日志并转打清场脚本的出路，退了 {code}，"
+               f"systemctl {world.systemctl_calls()}：{said[-400:]}")
+    running = SelftestWorld(base, "quiesce-running", gpu_configuration(LOCAL_ADDRESS), switches, installed=True, unit_state="active")
+    running.write("fake/main-process", f"{FAKE_MAIN_PROCESS}\n")
+    running.write(f"state/{SERVING_FILE_NAME}", f"{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS} oldest_pending_wait_limit_milliseconds=500 intake=none\n")
+    code, _, error = running.run(["start"])
+    expect(problems, code == 0 and not running.quiesce_calls(),
+           f"单元在跑时 start 该退 0、不清场（卡在它手里），退了 {code}，清场 {running.quiesce_calls()}：{' '.join(error.split())[-300:]}")
+    return problems
+
+
+def cell_start_quiesces_once_on_this_host_before_any_unit_starts(base, switches):
+    """两台都点名了卡：发起的这一台只清一次场，在这一台 systemctl start 与转去第二台的 start 之前，罩住要起的那几台的卡（在跑的那一台的卡不进）；
+    两台都在跑不清场。第二台在不在跑经 fake-ssh 起 control unit-state 问。"""
+    problems = []
+    local_card, remote_card = f"{LOCAL_ADDRESS}:0:8G", f"{REMOTE_ADDRESS}:0:8G"
+    for scenario, here_running, peer_running, expected_cards in (("both-stopped", False, False, f"{local_card} {remote_card}"),
+                                                                  ("peer-stopped", True, False, remote_card),
+                                                                  ("both-running", True, True, None)):
+        world = SelftestWorld(base, f"quiesce-once-{scenario}", gpu_configuration(LOCAL_ADDRESS, REMOTE_ADDRESS), switches, installed=True,
+                              unit_state="active" if here_running else "inactive")
+        if here_running:
+            world.write("fake/main-process", f"{FAKE_MAIN_PROCESS}\n")
+            world.write(f"state/{SERVING_FILE_NAME}", f"{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS} oldest_pending_wait_limit_milliseconds=500 intake=none\n")
+        world.write("fake/peer-unit-state", "active\n" if peer_running else "inactive\n")
+        code, output, error = world.run(["start"])
+        said = " ".join((output + error).split())[-300:]   # 压成一行：control 的 stderr 有「  ✗ 」起头的行
+        calls = world.quiesce_calls()
+        expect(problems, code == 0 and len(forwarded_calls(world, "start")) == 1,
+               f"{scenario}：start 该退 0、转去第二台的 start 一次，退了 {code}、ssh {world.ssh_calls()}：{said}")
+        expect(problems, any(remote_words(call)[-1:] == ["unit-state"] for call in world.ssh_calls()),
+               f"{scenario}：清场之前该经 ssh 问第二台的单元在不在跑（control unit-state），ssh 收到 {world.ssh_calls()}")
+        if expected_cards is None:
+            expect(problems, not calls, f"{scenario}：两台都在跑不该清场，清场脚本收到 {calls}")
+            continue
+        expect(problems, len(calls) == 1, f"{scenario}：清场该只起一次（只在发起的这一台），起了 {len(calls)} 次：{calls}")
+        if not calls:
+            continue
+        started_by_ssh = [remote for remote in calls[0]["ssh_remote_before"] if forwarded_subcommand_of(remote) in ("start", "install")]
+        expect(problems, not calls[0]["started_before"] and not started_by_ssh,
+               f"{scenario}：清场该在起任何一台的单元之前（那时这一台没 systemctl start、也没转去第二台起），这一台起过：{calls[0]['started_before']}，"
+               f"转去起过：{started_by_ssh}")
+        expect(problems, calls[0]["cards"] == expected_cards, f"{scenario}：清场该罩住要起的那几台的卡（{QUIESCE_CARDS_VARIABLE}={expected_cards}），交的是 {calls[0]['cards']}")
+    return problems
+
+
+def cell_check_refuses_unit_without_cargo(base, switches):
+    """单元在跑、serving 对得上，而单元环境里没有 CARGO、或 CARGO 指的文件这台没有：check 退 78、点名 CARGO 与出路（装好的单元带它时 check 退 0，
+    check-refuses-when-gpu-on-and-service-down 那一格核）。"""
+    problems = []
+    for scenario in ("no-cargo", "cargo-missing-on-this-host"):
+        world = SelftestWorld(base, f"check-{scenario}", gpu_configuration(LOCAL_ADDRESS), switches, installed=True, unit_state="active")
+        world.write("fake/main-process", f"{FAKE_MAIN_PROCESS}\n")
+        world.write(f"state/{SERVING_FILE_NAME}", f"{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS} oldest_pending_wait_limit_milliseconds=500 intake=none\n")
+        missing = os.path.join(world.root, "nowhere", "cargo")
+        cargo_line = "" if scenario == "no-cargo" else f"Environment={UNIT_CARGO_VARIABLE}={missing}\n"
+        world.write(f"systemd/{UNIT_NAME}", f"[Service]\n{cargo_line}RestartSec=3\n")
+        code, output, error = world.run(["check"])
+        said = " ".join((output + error).split())   # 压成一行：check 的 stderr 有「  ✗ 」起头的行
+        named = f"{UNIT_CARGO_VARIABLE}={missing}" if scenario != "no-cargo" else f"没有 {UNIT_CARGO_VARIABLE}"
+        expect(problems, code == RUN_CONDITION_EXIT and named in said and CARGO_DIRECTORY_KEY in said and "control install" in said,
+               f"{scenario}：check 该退 {RUN_CONDITION_EXIT}、点名「{named}」、出路写 {CARGO_DIRECTORY_KEY} 与重装，退了 {code}：{said[-400:]}")
+    return problems
+
+
+def pool_version_mismatch_format():
+    """src/library_pending_pool.rs 里版本对不上那一行的开头与键：(开头, 键表, None)；读不到回 (None, None, 原因)。"""
+    try:
+        with open(LIBRARY_PENDING_POOL_SOURCE, encoding="utf-8") as handle:
+            source = handle.read()
+    except OSError as error:
+        return None, None, f"读不了 {LIBRARY_PENDING_POOL_SOURCE}（{type(error).__name__}: {error}）"
+    prefix = re.search(r'pub const VERSION_MISMATCH_LINE_PREFIX: &str = "([^"]+)";', source)
+    line = re.search(r'"\{VERSION_MISMATCH_LINE_PREFIX\} \{\}((?: \w+=\{\})+)"', source)
+    if not prefix or not line:
+        return None, None, f"{LIBRARY_PENDING_POOL_SOURCE} 里找不到 VERSION_MISMATCH_LINE_PREFIX 的定义或打那一行的格式串"
+    return prefix.group(1), tuple(word.split("=")[0] for word in line.group(1).split()), None
+
+
+def cell_check_reports_version_mismatch_of_this_process(base, switches):
+    """此刻的进程打了版本对不上行：check 退 1、打两边的键与重编换上的出路；没打、只有旧进程打过：退 0。行的开头与键从 src/library_pending_pool.rs 读来造。"""
+    prefix, keys, unreadable = pool_version_mismatch_format()
+    if prefix is None:
+        return [unreadable]
+    problems = []
+    expect(problems, prefix == VERSION_MISMATCH_LINE_PREFIX and keys == VERSION_MISMATCH_KEYS,
+           f"control 认的开头与键（{VERSION_MISMATCH_LINE_PREFIX} {VERSION_MISMATCH_KEYS}）与服务打的（{prefix} {keys}）不同")
+    values = ("aa11", "bb22", "cc33", "dd44,ee55")
+    mismatch = f"{prefix} stream=selftest block=7 " + " ".join(f"{key}={value}" for key, value in zip(keys, values))
+    serving = {"MESSAGE": f"{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS}", "_PID": FAKE_MAIN_PROCESS}
+    journals = {"no-mismatch": [serving], "this-process": [serving, {"MESSAGE": mismatch, "_PID": FAKE_MAIN_PROCESS}],
+                "earlier-process": [{"MESSAGE": mismatch, "_PID": "1111"}, serving]}
+    for scenario, entries in journals.items():
+        world = SelftestWorld(base, f"mismatch-{scenario}", gpu_configuration(LOCAL_ADDRESS), switches, installed=True, unit_state="active")
+        world.write("fake/main-process", f"{FAKE_MAIN_PROCESS}\n")
+        world.write(f"state/{SERVING_FILE_NAME}", f"{SERVING_LINE_PREFIX} pid={FAKE_MAIN_PROCESS} oldest_pending_wait_limit_milliseconds=500 intake=none\n")
+        world.write("fake/journal", "".join(json.dumps(entry) + "\n" for entry in entries))
+        code, output, error = world.run(["check"])
+        said = " ".join((output + error).split())   # 压成一行：check 的 stderr 有「  ✗ 」起头的行
+        if scenario == "this-process":
+            expect(problems, code == VERSION_MISMATCH_EXIT and all(value in said for value in values) and "block=7" in said
+                   and "--bin gpu-verification-server" in said and "control install --binary" in said and "control stop" in said and "control start" in said,
+                   f"此刻的进程打了版本对不上行时 check 该退 {VERSION_MISMATCH_EXIT}、打两边的键与重编换上的出路，退了 {code}：{said[-400:]}")
+        else:
+            expect(problems, code == 0, f"{scenario}：check 该退 0，退了 {code}：{said[-300:]}")
+        reads = world.journalctl_calls()
+        expect(problems, any(f"-u {UNIT_NAME}" in call and f"--since -{VERSION_MISMATCH_LOOKBACK_SECONDS}s" in call for call in reads),
+               f"{scenario}：check 该读这个单元近 {VERSION_MISMATCH_LOOKBACK_SECONDS} 秒的日志，journalctl 收到 {reads}")
+    return problems
+
+
+SELFTEST_CELLS = {
+    "gpu-off-start-and-check-do-nothing": cell_gpu_off_start_and_check_do_nothing,
+    "install-refused-when-gpu-off": cell_install_refused_when_gpu_off,
+    "gpu-switch-missing-refused": cell_gpu_switch_missing_refused,
+    "hosts-missing-refused": cell_hosts_missing_refused,
+    "card-label-outside-hosts-refused": cell_card_label_outside_hosts_refused,
+    "gpu-on-without-cards-refused": cell_gpu_on_without_cards_refused,
+    "start-reaches-every-host-with-cards": cell_start_reaches_every_host_with_cards,
+    "cards-only-on-the-peer-start-there-only": cell_cards_only_on_the_peer_start_there_only,
+    "forwarded-start-stays-on-this-host": cell_forwarded_start_stays_on_this_host,
+    "check-takes-the-peer-exit": cell_check_takes_the_peer_exit,
+    "ssh-failure-reported": cell_ssh_failure_reported,
+    "install-binary-outside-shared-root-refused": cell_install_binary_outside_shared_root_refused,
+    "install-dry-run-writes-nothing": cell_install_dry_run_writes_nothing,
+    "install-writes-restarting-unit-without-enable": cell_install_writes_restarting_unit_without_enable,
+    "start-reads-back-serving-pid": cell_start_reads_back_serving_pid,
+    "check-refuses-when-gpu-on-and-service-down": cell_check_refuses_when_gpu_on_and_service_down,
+    "check-refuses-stale-serving-file": cell_check_refuses_stale_serving_file,
+    "stop-reads-back-stopped-unit": cell_stop_reads_back_stopped_unit,
+    "start-quiesces-the-named-cards-before-starting": cell_start_quiesces_the_named_cards_before_starting,
+    "start-quiesces-once-on-this-host-before-any-unit-starts": cell_start_quiesces_once_on_this_host_before_any_unit_starts,
+    "check-refuses-unit-without-cargo": cell_check_refuses_unit_without_cargo,
+    "check-reports-version-mismatch-of-this-process": cell_check_reports_version_mismatch_of_this_process,
+}
+
+
+def selftest():
+    switches = [item.strip() for item in os.environ.get(CONTROL_BREAK_VARIABLE, "").split(",") if item.strip()]
+    unknown = [item for item in switches if item not in SELFTEST_SWITCH_CELLS]
+    if unknown:
+        return fail(f"{CONTROL_BREAK_VARIABLE} 里认不出 {'、'.join(unknown)}", f"认得的：{'、'.join(SELFTEST_SWITCH_CELLS)}（文件头「自证」）", USAGE_EXIT)
+    dangling = sorted({cell for cells in SELFTEST_SWITCH_CELLS.values() for cell in cells} - set(SELFTEST_CELLS))
+    if dangling:
+        return fail(f"开关表点名的格 {'、'.join(dangling)} 不在格表里", "改 SELFTEST_SWITCH_CELLS 与 SELFTEST_CELLS 对上", READBACK_FAILED_EXIT)
+    heavy_threads = load_module_by_path("heavy_threads", HEAVY_THREADS)
+    try:
+        parallelism = heavy_threads.default_heavy_threads()
+    except heavy_threads.HeavyThreadDefaultError as error:
+        return fail(f"取不了每台默认重活线程数：{error}", error.howto, READBACK_FAILED_EXIT)
+    base = os.path.realpath(tempfile.mkdtemp(prefix="gpu-verification-server-control-selftest-"))
+    results = {}
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=parallelism) as pool:
+            futures = {name: pool.submit(function, base, [item for item in switches if name in SELFTEST_SWITCH_CELLS[item]])
+                       for name, function in SELFTEST_CELLS.items()}
+            for name, future in futures.items():
+                try:
+                    results[name] = future.result()
+                except Exception as error:   # 一格自己崩了算红，不吃掉
+                    results[name] = [f"这一格自己崩了：{type(error).__name__}: {error}"]
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    failed = [name for name in SELFTEST_CELLS if results.get(name) != []]
+    for name in SELFTEST_CELLS:
+        if name in failed:
+            print(f"  ✗ {name}：{'；'.join(results.get(name) or ['没有结果'])}", flush=True)   # gate-lint:detail
+        else:
+            say(f"  ✓ {name}")
+    say(f"{SELFTEST_SUMMARY_PREFIX} cells={len(SELFTEST_CELLS)} failed={len(failed)} 并行 {parallelism} 路 break={','.join(switches) or '-'}")
+    return 1 if failed or len(results) != len(SELFTEST_CELLS) else 0
+
+
+def main(arguments):
+    if arguments == ["--selftest"]:
+        return selftest()
+    if os.environ.get(CONTROL_BREAK_VARIABLE) and not os.environ.get(SELFTEST_ROOT_VARIABLE):
+        return fail(f"{CONTROL_BREAK_VARIABLE} 只在自证里认（设了 {SELFTEST_ROOT_VARIABLE} 时，或 --selftest）", f"不设 {CONTROL_BREAK_VARIABLE} 再跑", USAGE_EXIT)
+    if arguments == ["unit-state"]:
+        return unit_state_here()
+    parsed = parse_arguments(arguments)
+    if parsed is None:
+        return fail(f"认不出「{' '.join(arguments)}」",
+                    "写成 python3 gpu-verification-server/control install [--dry-run] [--binary <编好的 gpu-verification-server>] | start | stop | check | unit-state | --selftest",
+                    USAGE_EXIT)
+    subcommand, here_step, forwarded_arguments = parsed
+    if os.environ.get(FORWARDED_VARIABLE) and not control_broken("forwarded-call-forwards-again"):
+        return here_step()
+    return run_on_the_hosts(subcommand, here_step, forwarded_arguments)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

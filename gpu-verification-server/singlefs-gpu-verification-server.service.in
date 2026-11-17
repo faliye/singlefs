@@ -1,0 +1,18 @@
+# gpu-verification-server 的用户级 systemd 单元模板：python3 gpu-verification-server/control install 照它填 @BINARY@、@STATE_DIRECTORY@、@CARGO@，
+# 写进 ${XDG_CONFIG_HOME:-~/.config}/systemd/user/。多机配置里点名了卡的每一台各装一份、各起一个进程（control 文件头）。
+# @CARGO@ 是多机配置 CARGO_BIN_DIRECTORY_BY_HOST 里装的那一台那一项下的 cargo（两台家目录不同，各填各的；control 文件头「单元环境里的 CARGO」）：
+# 写结论时验证包要从环境里的 CARGO 认编这个二进制的工具链（crates/singlefs-verification/src/crash_point_replay_progress.rs），没有就在写结论时崩。
+# 开机不自起：没有 [Install]，control install 只 start、不 enable；多机配置开了 GPU（ENABLE_GPU=1）时由 control start 起。
+# 起来之后被杀（被 earlyoom 杀、崩了、退了）隔 RestartSec 秒由 systemd 拉起；systemctl stop（control stop）停的不拉起。
+# 停：SIGTERM，进程照缺省处置结束（在判的块没写回的，待判行留在判定库里，认领到租期过了失效，下一份服务再取；src/main.rs 文件头）。
+[Unit]
+Description=singlefs gpu-verification-server
+After=default.target
+
+[Service]
+Type=simple
+Environment=CARGO=@CARGO@
+ExecStart=@BINARY@ serve --state-directory @STATE_DIRECTORY@
+Restart=always
+RestartSec=3
+TimeoutStopSec=10

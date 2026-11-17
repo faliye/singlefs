@@ -1,0 +1,12 @@
+# GPU 批处理验证服务的配置：src/service_configuration.rs 在编译时读进来、起服务时解（ServiceConfiguration::of_the_repository）。
+# 写法：一行「<名>=<值>」；空行与 # 开头的行不算；下面每一项都要写，认不得的名、少写、写两次都拒。毫秒数是非负整数，
+# 租期与扫库间隔不许是 0（CLAIM_LEASE_MILLISECONDS 还要装得进 u32：认领帧里租期是 u32 毫秒）。
+#
+# 最老待判的限时（毫秒）：池里的态不够把每张空着的卡各填满一次派活时，最老的待判等过它就发一波；等过它、哪张空卡都装不下的流可以整卡腾给它（不饿死）。
+# 取 500 是推的：判器一次派活压在 0.5 秒以内（验证包 crash_judge_dispatch::LONGEST_DISPATCH_SECONDS），凑批最多多等一次派活的工夫。
+OLDEST_PENDING_WAIT_LIMIT_MILLISECONDS=500
+# 隔多久扫一次判定库里的待判行（毫秒）：取 2000 是推的（CPU 一侧等的时候每 5 分钟打一行进度，两秒的取活延迟看不出来）。
+LIBRARY_SCAN_INTERVAL_MILLISECONDS=2000
+# 认领的租期（毫秒）：取走一块时认领 gpu-claim/<流键>/<块号>，判着的时候每过三分之一租期续一次，写结论之前再续一次。
+# 取 120000 是推的：不短于判定库客户端一帧的超时（120 秒），续租那一帧忙、重连时租期还盖得住。
+CLAIM_LEASE_MILLISECONDS=120000
