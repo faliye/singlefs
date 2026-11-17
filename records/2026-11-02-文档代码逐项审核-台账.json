@@ -131878,7 +131878,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/f12_design_strict.rs",
+      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/label_compilation_design_strict.rs",
       "status": "pending",
       "size_bytes": 2357,
       "sha256": "d4674375097a2b9c5d1b22cc335e1f1cc6eace3f543bb8e2b19844b2f7134f9a",
@@ -131888,7 +131888,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/f12_design_weak.rs",
+      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/label_compilation_design_weak.rs",
       "status": "pending",
       "size_bytes": 2537,
       "sha256": "33f323017a564875626eae4966f66362aade48770b56d2c8f6f3333357190abb",
@@ -131898,7 +131898,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/f12_writings.rs",
+      "path": "scripts/experiment-apparatus/e164_crash_amplification_design_function_test/label_compilation_writings.rs",
       "status": "pending",
       "size_bytes": 1264,
       "sha256": "7a85b63b1f28c2089127e5c41505b393ca71624a77328ec608ebb504562e0c17",
