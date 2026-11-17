@@ -18,6 +18,8 @@ target/
 
 # 多机配置：第二台机器的别名、仓副本路径、内存上限、清场命令（崩溃点重放双机分片、门禁 59 号双机分片与通用跨机脚本共用），模板在仓根 multi-host.env.example
 /multi-host.env
+# 多机配置 QUIESCE_* 四条命令指的私有清场脚本（停、复原、回读、健康检查定时器）：里面有私有服务名，不进仓；放仓根是为了两台在同一个绝对路径上都读得到
+/multi-host-quiesce-*.sh
 
 # 本机个人权限规则（含本机路径），不进仓
 .claude/settings.local.json
