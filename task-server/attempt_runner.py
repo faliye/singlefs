@@ -3,33 +3,38 @@
 
   attempt_runner.py <说明 spec.json>
 
-照说明（argv、cwd、environment、log、directory、host、gpu、fast、fake_scope_directory、nvidia_smi、exit_peak_file、memory_peak_file、build_finished_pattern、build_phase_file）做：
+照说明（argv、cwd、environment、log、directory、host、fast、fake_scope_directory、exit_peak_file、memory_peak_file）做：
   ① 在尝试目录里写起跑标记 started（服务据它分「起单元之前没了」与「起了」）；
-  ② 换目录、换环境，起 argv 那一条（内存包装、multi-host-run.sh 或清场包装打头），标准输出与错误都追加进日志；
+  ② 换目录、换环境，起 argv 那一条（内存包装或 multi-host-run.sh 打头），标准输出与错误都追加进日志；
   ③ 跑的时候每 SAMPLE_SECONDS 秒采一次（各 scope 的 CPU 合计每次写进尝试目录的 cpu_usec，服务跑着时读）：这一条的子孙进程所在的 scope（/proc/<进程号>/cgroup 末段是 singlefs-memory-cap-*.scope 的那几个；
      离这一层最近的那一个是内存包装给这一条开的，写进尝试目录的 scope 文件给服务算「还没涨到量」那一截）的 cpu.stat 的 usage_usec，
      与外层 scope 进程用的内存（memory.stat 的 anon 加 shmem，scripts/hosts/memory_peaks_lib.py 的 process_memory_bytes；页缓存与内核挂在 scope 上的不算，
      task-server/README.md「算这台还放得下多少」同一个口径），留见过的最大，涨了就写进说明里 memory_peak_file 那一份（尝试目录下；服务判顶在上限上卡住读它）；
-     编译那一段的峰值：每一轮采之前先从上一轮读到的位置接着读日志的整行（一轮至多 LOG_SCAN_BYTES），找说明里 build_finished_pattern 认的那一行（cargo 编完打的
-     「Finished … target(s) in …」，task_server_lib.py 的 CARGO_FINISHED_PATTERN），还没见到的这一轮采到的进程内存收进编译那一段的最大，见到之后（连同见到它的那一轮）不再收；
-     两样变了就写进说明里 build_phase_file 那一份（尝试目录下；一行「<编译那一段见过的最大，没采到写 0> <见没见到那一行：0|1>」，人与自证核对读它）。第二台那条命令的编译那一段由
-     multi-host-run.sh 照它每一轮的读数另算（那份文件头 ⑤「编译段峰值」），这一层在本机采不到它的进程内存。说明里 build_phase_past_finished 为真时见到那一行之后照收，
-     只给弄坏开关 build-phase-past-finished 用；
-     本机的 GPU 任务另每 GPU_SAMPLE_EVERY 次读一次 nvidia-smi 的计算进程，把这一条子孙进程的显存相加取最大；
+     同一轮读外层 scope 的 memory.current，比见过的最高还高就存一份 memory.stat 的 anon、file、file_dirty、file_writeback、shmem（内存最高那一刻的明细，随结果交回；task_server.py 文件头 ①「内存最高那一刻」：
+     进程被杀之后内存已释放，退出时读的不准）。说明里 memory_stat_at_exit 为真时每一轮都覆盖，只给弄坏开关 peak-memory-stat-read-at-exit 用；
+     同一轮数这一条进程树（自己起的那一个连同它的子孙）里的线程：各进程 /proc/<号>/task/<线程>/stat 的状态字段是 R 的线程数（可跑的）、线程总数与占线程最多的那个进程
+     （它的线程数与 /proc/<号>/comm），连同这一轮的轮数整份写进尝试目录的 THREADS_FILE_NAME（JSON：sample、runnable、total、top_threads、top_name；
+     task_server.py 的 scope_thread_reading 读，CPU 闸的可跑线程数与线程总数远超登记数的提醒用它，task_server.py 文件头 ②「CPU 闸」）。
+     说明里 threads_state_unread 为真时不看状态字段、每个线程都算可跑的，只给弄坏开关 runner-threads-state-unread 用；
      说明里给了编译目录（build_directory，服务给这一次的 CARGO_TARGET_DIR 所在）的，另一个线程每 DISK_SAMPLE_SECONDS 秒量一次它的占盘
      （各文件 st_blocks × 512 之和，不跟符号链接、不跨文件系统），此刻的数写进尝试目录的 build_bytes（服务算「还要涨」那一截），取最大；子进程退了再量一次；
-  ④ 收到 TERM / INT / HUP 只转给自己起的那一个子进程（它是内存包装或清场包装，它们各自停自己那一支），记下收到的是哪个信号；
+     子进程退了再采一次（最后不到一个间隔里的 CPU 与线程；比一个间隔还短的命令整条都靠它；说明里 final_sample_skipped 为真时只在一次都没采到时补，
+     只给弄坏开关 runner-final-sample-skipped 用）；
+  ④ 收到 TERM / INT / HUP 只转给自己起的那一个子进程（它是内存包装或 multi-host-run.sh，它们各自停自己那一支），记下收到的是哪个信号；信号在起命令之前就装上，
+     起命令之前到的照记、命令起来之后照发给它；
+     命令起不来（argv 头一个不在、没有执行权限、格式不对）：日志记一行，result.json 照写（exit_code 找不到是 127、别的 126，start_error 写原因），退同一个码，
+     服务照命令退非 0 记结局，不记 launcher-lost（说明里 start_error_uncaught 为真时照抛出去、result.json 写不出，只给弄坏开关 runner-start-error-uncaught 用）；
   ⑤ 子进程退了，编译目录不删（任务有了结局由服务删，task_server_lib.py 文件头「编译目录」）。
-  ⑥ 写结果 result.json（先写临时文件再改名）：exit_code（被信号杀的记 128 + 信号号）、started_at、ended_at、seconds、memory_peak（③ 按轮采到的进程内存的最大值；
-     按轮一次都没采到（命令比一个采样间隔还短）才取说明里 exit_peak_file 那一份（服务经 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 交给内存包装，包装在 scope 收尾之前读一次
-     scope 的 memory.peak 写进去：进程退了之后读不到进程内存，含页缓存的峰值只给这种短命令兜底）；字节，两样都没有是 null，不记 0；
-     说明里 memory_peak_with_page_cache 为真时照改前按轮读 memory.peak、与 exit_peak_file 那一份取大的，只给弄坏开关 memory-peak-with-page-cache 用）、
-     cpu_usec（各 scope 的 usage_usec 最大值之和）、cores（cpu_usec ÷ 用时，平均在用核数）、gpu_memory_peak（MiB）、stopped_signal、scope、build_directory_peak（编译目录占盘的最大值，字节；没给编译目录或一次都没量到是 null）、
-     build_phase_peak（③ 编译那一段的峰值，字节；子进程退了之后把日志读到底再找一次那一行，日志里没有那一行（编不过、不是 cargo）或那一行之前一轮都没采到是 null）；退出码照子进程的。
+  ⑥ 写结果 result.json（先写临时文件再改名）：exit_code（被信号杀的记 128 + 信号号）、started_at、ended_at、seconds、memory_peak（③ 按轮采到的进程内存的最大值与说明里 exit_peak_file 那一份取大的
+     （服务经 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 交给内存包装，包装退出之前把这一条扣页缓存的峰值写进去：它每 0.1 秒采一次，按轮之间冒出来的也在里面；第二台同一个口径，task_server_lib.py 文件头「资源记录」的退出时峰值）；字节，两样都没有是 null，不记 0；
+     说明里 exit_peak_only_when_unsampled 为真时按轮采到了就不看那一份，只给弄坏开关 exit-peak-only-when-unsampled 用；
+     说明里 memory_peak_with_page_cache 为真时按轮读 memory.peak，只给弄坏开关 memory-peak-with-page-cache 用）、memory_stat_at_peak（③ 内存最高那一刻的明细，{current, anon, file, file_dirty, file_writeback, shmem}，读不到的那一项不带；一轮都没读到是 null）、
+     cpu_usec（各 scope 的 usage_usec 最大值之和）、cores（cpu_usec ÷ 用时，平均在用核数）、stopped_signal、scope、process_ids（③ 每轮采样见过的这一条的子孙进程号，含自己起的那一个，至多 PROCESS_ID_LIMIT 个；
+     服务拿它对 earlyoom 与内核日志里杀进程那一行，认出被不是服务发的信号杀掉的尝试，task_server.py 的 external_kill_note）、build_directory_peak（编译目录占盘的最大值，字节；没给编译目录或一次都没量到是 null）；退出码照子进程的。
      写之前停单元里留下的进程（stop_unit_leftovers）出了没料到的异常的，往日志记一行告警、unit_leftovers 写 null，result.json 照写、退出码照旧
      （records/2026-11-03-task-server与prune-server深入对攻审核.md「TS-02」；说明里 leftovers_error_uncaught 为真时照改前不隔离，只给弄坏开关 leftovers-error-uncaught 用）。
 说明读不了、工作目录进不去：退 2，不写结果（服务按单元不在、没留结果记 launcher-lost；编译目录由服务对账时删）。
-自证换 scope：说明里 fake_scope_directory 非空时把它当外层 scope 读（假的 memory.stat、memory.peak、cpu.stat）。
+自证换 scope：说明里 fake_scope_directory 非空时把它当外层 scope 读（假的 memory.current、memory.stat、memory.peak、cpu.stat）。
 """
 import os
 import sys
@@ -38,7 +43,6 @@ sys.dont_write_bytecode = True
 
 import importlib.util  # noqa: E402
 import json  # noqa: E402
-import re  # noqa: E402
 import signal  # noqa: E402
 import subprocess  # noqa: E402
 import threading  # noqa: E402
@@ -46,12 +50,13 @@ import time  # noqa: E402
 
 SAMPLE_SECONDS = 1.0
 FAST_SAMPLE_SECONDS = 0.1
-GPU_SAMPLE_EVERY = 5
+PROCESS_ID_LIMIT = 20000       # result.json 的 process_ids 至多记这么多个进程号
 DISK_SAMPLE_SECONDS = 30.0      # 量编译目录占盘的间隔：几百 G 的编译目录走一遍要几秒（推的），不跟 1 秒一次的 CPU 采样
 FAST_DISK_SAMPLE_SECONDS = 0.2
 CGROUP_ROOT = "/sys/fs/cgroup"
 SCOPE_PREFIX = "singlefs-memory-cap-"
-LOG_SCAN_BYTES = 4 * 1024 * 1024   # 找 cargo 编完那一行时一轮至多读这么多日志（文件头 ③「编译那一段的峰值」）：读不完的下一轮接着读
+MEMORY_STAT_NAMES = ("anon", "file", "file_dirty", "file_writeback", "shmem")   # 内存最高那一刻存的 memory.stat 那几样（文件头 ③；task_server_lib.py 的同名表与这里一起改）
+THREADS_FILE_NAME = "threads"   # 尝试目录里每轮写线程读数的那一份（文件头 ③；task_server_lib.py 的同名常量与这里一起改）
 
 
 def load_memory_peaks_library():
@@ -179,6 +184,16 @@ def read_integer(path):
         return None
 
 
+def read_memory_stat(directory):
+    """scope 的 memory.stat 里 MEMORY_STAT_NAMES 那几行 → {名字: 字节}（没有的那一行不带）；文件读不了交 None。"""
+    try:
+        with open(os.path.join(directory, "memory.stat"), encoding="utf-8") as handle:
+            pairs = [line.split() for line in handle]
+    except OSError:
+        return None
+    return {pair[0]: int(pair[1]) for pair in pairs if len(pair) == 2 and pair[0] in MEMORY_STAT_NAMES and pair[1].isdigit()}
+
+
 def read_usage_usec(directory):
     try:
         with open(os.path.join(directory, "cpu.stat"), encoding="utf-8") as handle:
@@ -253,64 +268,77 @@ class Sampler:
         self.memory_peak = None
         self.with_page_cache = bool(specification.get("memory_peak_with_page_cache"))   # 弄坏开关 memory-peak-with-page-cache（文件头 ⑥）
         self.peak_file = specification.get("memory_peak_file") or ""   # 进程内存见过的最大写到哪（文件头 ③；task_server.py 的 scope_memory_peak 读它）
+        self.memory_stat_at_peak = None   # 内存最高那一刻的明细（文件头 ③）
+        self.stat_at_exit = bool(specification.get("memory_stat_at_exit"))   # 弄坏开关 peak-memory-stat-read-at-exit（文件头 ③）
         self.usage = {}
-        self.gpu_memory_peak = None
         self.rounds = 0
-        # 编译那一段的峰值（文件头 ③）：日志读到哪、见没见到 cargo 编完那一行、那一行之前采到的最大
-        pattern = specification.get("build_finished_pattern") or ""
-        self.finished_line = re.compile(pattern.encode("utf-8")) if pattern else None
-        self.log_path = specification.get("log") or ""
-        self.log_offset = 0
-        self.build_finished = False
-        self.build_phase_peak = None
-        self.build_phase_written = None
-        self.build_phase_past_finished = bool(specification.get("build_phase_past_finished"))   # 弄坏开关 build-phase-past-finished（文件头 ③）
-        self.build_phase_file = specification.get("build_phase_file") or ""   # 编译那一段的最大与见没见到那一行写到哪（文件头 ③）
+        self.process_ids = {root_process_id}   # 每轮采样见过的这一条的子孙进程号（含自己起的那一个）；服务拿它对 earlyoom 与内核日志里杀进程那一行（task_server.py 的 external_kill_note）
+        self.threads_state_unread = bool(specification.get("threads_state_unread"))   # 弄坏开关 runner-threads-state-unread（文件头 ③）
 
-    def scan_build_log(self):
-        """从上一次读到的位置接着读日志的整行（至多 LOG_SCAN_BYTES；没有换行的半行留到下一回），见到 cargo 编完那一行就记下、不再读。→ 这一回读了几个字节。"""
-        if self.finished_line is None or self.build_finished or not self.log_path:
-            return 0
-        try:
-            with open(self.log_path, "rb") as handle:
-                handle.seek(self.log_offset)
-                chunk = handle.read(LOG_SCAN_BYTES)
-        except OSError:
-            return 0
-        complete = chunk[:chunk.rfind(b"\n") + 1] if len(chunk) < LOG_SCAN_BYTES else chunk
-        for line in complete.splitlines():
-            if self.finished_line.search(line):
-                self.build_finished = True
-                break
-        self.log_offset += len(complete)
-        return len(complete)
+    def note_processes(self, family):
+        """把这一轮见到的子孙进程号并进 process_ids；见过的号超过 PROCESS_ID_LIMIT 个之后不再添（一次大编译里短命的进程也多，被杀的多半是跑得久、占得大的）。"""
+        for process_id in family:
+            if len(self.process_ids) >= PROCESS_ID_LIMIT:
+                return
+            self.process_ids.add(process_id)
 
-    def note_build_phase(self, measured):
-        """这一轮采到的进程内存收进编译那一段的最大（这一轮之前已见到 cargo 编完那一行的不收；弄坏开关下照收），两样变了写 build_phase。"""
-        if measured and (not self.build_finished or self.build_phase_past_finished):
-            self.build_phase_peak = max(measured, self.build_phase_peak or 0)
-        state = (self.build_phase_peak or 0, int(self.build_finished))
-        if state != self.build_phase_written and self.build_phase_file:
-            write_text_atomically(self.build_phase_file, f"{state[0]} {state[1]}\n")
-            self.build_phase_written = state
-
-    def scopes(self):
+    def scopes(self, family):
         if self.fake_scope:   # 自证：一份或几份（os.pathsep 隔开，第一份是外层、后面的是里层包装各开的平级 scope）
             return {directory: level for level, directory in enumerate(self.fake_scope.split(os.pathsep))}
         found = {}
         own_group = cgroup_of(os.getpid())   # 和自己同一层的不是内存包装给这一次开的 scope（没起成单元时那是起服务的那一方的）
-        for process_id, level in descendants_with_depth(self.root_process_id).items():
+        for process_id, level in family.items():
             group = cgroup_of(process_id)
             if group != own_group and os.path.basename(group).startswith(SCOPE_PREFIX) and group.endswith(".scope"):
                 directory = CGROUP_ROOT + group
                 found[directory] = min(level, found.get(directory, level))
         return found
 
+    def note_threads(self, family):
+        """这一轮这一条进程树里的线程（文件头 ③）：自己起的那一个连同 family（它的子孙）里每个进程的 /proc/<号>/task/<线程>/stat，状态字段是 R 的算可跑的；
+        连同线程总数、占线程最多的那个进程的线程数与 comm、这一轮的轮数，整份写进尝试目录的 THREADS_FILE_NAME。读不到的进程与线程跳过（这一轮之间退了的）。"""
+        runnable = total = top_threads = 0
+        top_name = ""
+        for process_id in [self.root_process_id, *family]:
+            try:
+                threads = os.listdir(f"/proc/{process_id}/task")
+            except OSError:
+                continue
+            counted = 0
+            for thread_id in threads:
+                try:
+                    with open(f"/proc/{process_id}/task/{thread_id}/stat", encoding="utf-8", errors="replace") as handle:
+                        state = handle.read().rsplit(")", 1)[1].split()[0]
+                except (OSError, IndexError):
+                    continue
+                counted += 1
+                if state == "R" or self.threads_state_unread:
+                    runnable += 1
+            total += counted
+            if counted > top_threads:
+                try:
+                    with open(f"/proc/{process_id}/comm", encoding="utf-8", errors="replace") as handle:
+                        top_threads, top_name = counted, handle.read().strip()
+                except OSError:
+                    pass
+        write_json_atomically(os.path.join(self.specification["directory"], THREADS_FILE_NAME),
+                              {"sample": self.rounds, "runnable": runnable, "total": total, "top_threads": top_threads, "top_name": top_name})
+
+    def note_memory_stat(self, outer):
+        """这一轮 scope 的 memory.current 比见过的最高还高就存一份 memory.stat（文件头 ③「内存最高那一刻」）；0 是 scope 已收尾、None 是读不了，都不算；弄坏开关下每一轮都覆盖。"""
+        current = read_integer(os.path.join(outer, "memory.current"))
+        if current is None or (not self.stat_at_exit and (not current or current <= (self.memory_stat_at_peak or {}).get("current", 0))):
+            return
+        stat = read_memory_stat(outer)
+        if stat is not None:
+            self.memory_stat_at_peak = dict(stat, current=current)
+
     def sample(self):
         self.rounds += 1
-        self.scan_build_log()   # 先找 cargo 编完那一行：见到它的这一轮采的不算编译那一段（文件头 ③）
         measured = None
-        scopes = self.scopes()
+        family = descendants_with_depth(self.root_process_id)
+        self.note_processes(family)
+        scopes = self.scopes(family)
         if scopes:
             outer = min(scopes, key=lambda directory: (scopes[directory], directory))
             if outer != self.outer_scope:
@@ -325,32 +353,14 @@ class Sampler:
                 self.memory_peak = measured
                 if self.peak_file:
                     write_text_atomically(self.peak_file, f"{measured}\n")
+            self.note_memory_stat(outer)
             for directory in scopes:
                 usage = read_usage_usec(directory)
                 if usage is not None:
                     self.usage[directory] = max(usage, self.usage.get(directory, 0))
             if self.usage:   # 跑着时的 CPU 合计：服务判「在算」与报在用核数读它（与结局的 cpu_usec 同一个口径）
                 write_text_atomically(os.path.join(self.specification["directory"], "cpu_usec"), f"{sum(self.usage.values())}\n")
-        self.note_build_phase(measured)
-        if self.specification.get("gpu") and self.specification.get("host") == "local" and self.rounds % GPU_SAMPLE_EVERY == 1:
-            self.sample_gpu()
-
-    def sample_gpu(self):
-        try:
-            completed = subprocess.run([self.specification.get("nvidia_smi") or "nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],
-                                       capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
-        except (OSError, subprocess.TimeoutExpired):
-            return
-        if completed.returncode != 0:
-            return
-        family = set(descendants_with_depth(self.root_process_id)) | {self.root_process_id}
-        used = 0
-        for line in completed.stdout.splitlines():
-            fields = [piece.strip() for piece in line.split(",")]
-            if len(fields) == 2 and fields[0].isdigit() and fields[1].isdigit() and int(fields[0]) in family:
-                used += int(fields[1])
-        if used:
-            self.gpu_memory_peak = max(used, self.gpu_memory_peak or 0)
+        self.note_threads(family)   # 放在内存与 CPU 之后：读线程出事（采样那一层记一行、接着跑）不少那两样
 
 
 def main(arguments):
@@ -371,14 +381,37 @@ def main(arguments):
     write_text_atomically(os.path.join(directory, "started"), f"{os.getpid()}\n")
     started_at = time.time()
     stopped = {"signal": 0}
-    child = subprocess.Popen(specification["argv"], cwd=specification["cwd"], env=specification["environment"], stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+    started = {"child": None}
 
     def forward(signal_number, _frame):
         stopped["signal"] = signal_number
-        if child.poll() is None:
-            child.send_signal(signal_number)   # 只发给自己起的那一个子进程
+        child_now = started["child"]
+        if child_now is not None and child_now.poll() is None:
+            child_now.send_signal(signal_number)   # 只发给自己起的那一个子进程
+    # 信号先装上再起命令：起命令之前到的 TERM 记下，命令起来之后照发给它（不在两行之间被默认处理掐掉、不写 result.json）
     for signal_number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signal_number, forward)
+    try:
+        child = subprocess.Popen(specification["argv"], cwd=specification["cwd"], env=specification["environment"], stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+    except OSError as error:
+        # 命令起不来（不在、没有执行权限、格式不对）：照 shell 的写法记退出码（找不到 127、别的 126），写 result.json 收尾，服务照命令自己退非 0 记结局，
+        # 不当成「起跑标记在而结果没有」的 launcher-lost。弄坏开关 runner-start-error-uncaught 下（说明里 start_error_uncaught）照抛出去、result.json 写不出
+        if specification.get("start_error_uncaught"):
+            raise
+        exit_code = 127 if isinstance(error, FileNotFoundError) else 126
+        log.write(f"  ✗ attempt_runner.py：命令起不来（{type(error).__name__}: {error}），记退 {exit_code}\n".encode("utf-8"))
+        ended_at = time.time()
+        write_json_atomically(os.path.join(directory, "result.json"), {
+            "runner_pid": os.getpid(), "unit_leftovers": None, "exit_code": exit_code, "started_at": round(started_at, 3), "ended_at": round(ended_at, 3),
+            "seconds": round(ended_at - started_at, 3), "process_ids": [], "memory_peak": None, "memory_stat_at_peak": None, "cpu_usec": None, "cores": None,
+            "stopped_signal": stopped["signal"], "scope": "", "build_directory_peak": None, "start_error": f"{type(error).__name__}: {error}"})
+        log.close()
+        if specification.get("wake_socket") and not specification.get("wake_skipped"):
+            wake_server(specification["wake_socket"])
+        return exit_code
+    started["child"] = child
+    if stopped["signal"]:   # 起命令之前到的信号：照发给它
+        forward(stopped["signal"], None)
     peaks, peaks_problem = load_memory_peaks_library()
     if peaks_problem:
         log.write(f"  ! attempt_runner.py：{peaks_problem}，这一次按轮采不到进程内存，峰值只剩内存包装退出时读的那一个（命令照跑）\n".encode("utf-8"))
@@ -395,20 +428,17 @@ def main(arguments):
         except Exception as error:   # 采样出事不挡命令：记一行进日志，接着跑
             log.write(f"  ! attempt_runner.py：这一次采样出了事（{type(error).__name__}: {error}），接着跑\n".encode("utf-8"))
         time.sleep(interval)
-    if sampler.memory_peak is None:
-        try:   # 一次都没采到（命令比一个间隔还短）：scope 多半已经收尾，读得到就补一次
+    # 命令退了再采一次（最后不到一个间隔里的 CPU 与线程、比一个间隔还短的命令整条都靠它）：scope 多半已经收尾，读得到就算进去。
+    # 弄坏开关 runner-final-sample-skipped 下（说明里 final_sample_skipped）只在一次都没采到时补
+    if sampler.memory_peak is None or not specification.get("final_sample_skipped"):
+        try:
             sampler.sample()
         except Exception:   # 补采出事只是少一个数，不改结局
             pass
     exit_peak = read_integer(specification["exit_peak_file"]) if specification.get("exit_peak_file") else None
-    # 内存包装退出时读的那一个（文件头 ⑥）：按轮一次都没采到才用它；弄坏开关 memory-peak-with-page-cache 下照改前与按轮采到的取大的
-    if exit_peak is not None and exit_peak > 0 and (sampler.memory_peak is None or sampler.with_page_cache):
+    # 内存包装退出时交的扣页缓存的峰值（文件头 ⑥）：与按轮采到的取大的；弄坏开关 exit-peak-only-when-unsampled 下按轮采到了就不看它
+    if exit_peak is not None and exit_peak > 0 and (sampler.memory_peak is None or not specification.get("exit_peak_only_when_unsampled")):
         sampler.memory_peak = max(exit_peak, sampler.memory_peak or 0)
-    try:   # 编译那一段（文件头 ③）：子进程退了，把日志读到底再找一次 cargo 编完那一行（最后一轮之后才打出来的）
-        while sampler.scan_build_log():
-            pass
-    except Exception:   # 读日志出事只是少一个数，不改结局
-        pass
     if disk_sampler is not None:
         disk_sampler.stopped.set()
         disk_sampler.join()
@@ -434,10 +464,10 @@ def main(arguments):
         "runner_pid": os.getpid(),
         "unit_leftovers": unit_leftovers,
         "exit_code": exit_code, "started_at": round(started_at, 3), "ended_at": round(ended_at, 3), "seconds": seconds,
-        "memory_peak": sampler.memory_peak, "cpu_usec": cpu_usec,
+        "process_ids": sorted(sampler.process_ids),
+        "memory_peak": sampler.memory_peak, "memory_stat_at_peak": sampler.memory_stat_at_peak, "cpu_usec": cpu_usec,
         "cores": round(cpu_usec / 1e6 / seconds, 3) if cpu_usec is not None and seconds > 0 else None,
-        "gpu_memory_peak": sampler.gpu_memory_peak, "stopped_signal": stopped["signal"], "scope": sampler.outer_scope,
-        "build_phase_peak": sampler.build_phase_peak if sampler.build_finished else None,
+        "stopped_signal": stopped["signal"], "scope": sampler.outer_scope,
         "build_directory_peak": disk_sampler.peak if disk_sampler is not None else None})
     log.close()
     if specification.get("wake_socket") and not specification.get("wake_skipped"):

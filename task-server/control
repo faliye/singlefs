@@ -10,23 +10,61 @@
                                                   多机配置的 HOSTS 与 SHARED_DATA_ROOT（task_server_lib.py 文件头「主机」「共享数据根」）：NFS 前三项之后判，不过退 78
                                                   （--dry-run 同样判、同样退 78：取不到数据根就算不出分片目录）；出路点名往 multi-host.env 写哪一行
                                                   单元已经在跑的不重起：改过单元之后 control stop、control start 才换上
-  python3 task-server/control check               fastapi、uvicorn 在不在，多机配置在不在，服务通不通（/health 回 ok：库写得进、派活没有判排头能起却连着几轮没起成、看进展没报；task_server.py 文件头「接口」），NFS 共享四项（task_server_lib.py 文件头「NFS 共享」），
+  python3 task-server/control check [--probe [--limit <秒>]]   fastapi、uvicorn 在不在，多机配置在不在，服务通不通（/health 回 ok：库写得进、派活没有判排头能起却连着几轮没起成、看进展没报、
+                                                  读得到在跑尝试的单元状态（problem 里没有「本机读不到在跑尝试的单元状态」那一句，task_server.py 文件头 ①「读不到单元状态」）；
+                                                  task_server.py 文件头「接口」），NFS 共享四项（task_server_lib.py 文件头「NFS 共享」），
                                                   多机配置的 HOSTS 与 SHARED_DATA_ROOT，逐样判：都过退 0；缺一样退 78、出路写全（NFS 的指 task-server/README.md「## NFS 共享」）；
-                                                  服务暂停着另打一行「暂停中（原因：…，起于…）、在跑 N 个」（/health 的 pause 栏；放行了会话的写「…）、放行会话 <号>、在跑 N 个、别的会话在跑 M 个」），不判「派活判排头能起却没起成」、不看进展，暂停不让它退非 0
+                                                  服务暂停着另打一行「暂停中（原因：…，起于…）、在跑 N 个」（/health 的 pause 栏；放行了会话的写「…）、放行会话 <号>、在跑 N 个、别的会话在跑 M 个」），不判「派活判排头能起却没起成」、不看进展，暂停不让它退非 0；
+                                                  服务的记账对账判出漂移的（/health 的 booking_drift：在跑的内存记账之和远大于实测）各打一行「记账漂移」，逐条列记多少、实占多少、为什么，只打不判。
+                                                  上面都过了，多机配置开了 GPU（ENABLE_GPU=1）的最后接着起 python3 gpu-verification-server/control check（输出原样接在后面），
+                                                  它退非 0 时 check 退 78、出路写起它的命令（开了 GPU 而 GPU 批处理验证服务没起来就是毛病）；没开 GPU 的不起它、不判，打一行没开 GPU
+                                                  NFS 共享默认读服务 /health 的 nfs 一栏（服务起来时判的四项、之后每分钟复核的前三项），输出里写明是多久之前判的、第二台最近慢过没有，不现探，几秒内出结论；
+                                                  --probe 现探四项：每一项开始、结束各打一行（带这一项用了几秒），总时长不超过 --limit 秒（缺省 NFS_LIVE_PROBE_LIMIT_SECONDS，task_server_lib.py），
+                                                  到点打出卡在哪一项、退 1（两台都堵时服务看着像卡死，其实是第二台或共享根上的操作被堵住了）；--limit 只跟 --probe 一起写，写成正数
+  python3 task-server/control bookings            只读：逐台打在跑的每条尝试的内存记账（读服务 /health 的 booking_ledger 一栏，不现读余量、不连第二台）：头一行是这台 slice 总额、余量、在跑上限之和、
+                                                  各 scope 实占合计，接着每条一行（任务、第几次、上限、此刻实占、记多少、为什么记这么多：stopped 单元已停不计、no-scope 报告里没有它的 scope 记整份上限、
+                                                  measured 照此刻实测的用量记、cap 实测到了上限记上限），末行是这台的合计与照公式还放得下多少
+                                                  （公式的总额是 slice 总额；末行同时写实测 slice 还放得下多少）；
+                                                  服务通不了退 78；弄坏开关 bookings-ledger-unreported 下服务不报这一栏
+  python3 task-server/control key-stats [--since <时刻>] [--dump <文件>]
+                                                  只读（库以 mode=ro 打开，服务在跑时也能用）：命令键的统计，只取收尾了的、有命令键的、峰值口径是这一版的尝试（与定额度读的同一个判法）。
+                                                  首行写筛前筛后的行数与进统计的行数；接着是键的个数与只跑过一次的、带工作根下副本路径的，近 5 个任务里撞上限与跑成交替的键、
+                                                  撞过上限而最近一个任务跑成的键（这两行按任务数：同一任务的几次尝试折成一条，取第一次尝试的结局），以「按尝试数」起头的近 5 次尝试里交替的键，
+                                                  同键跑成的峰值离散度（最大比最小的中位数、第 90 百分位、到 1.5 倍以上的个数）。--since 只取这一刻之后起跑的尝试（epoch 秒，或 YYYY-MM-DD 取那一天开头，日期照 time.gmtime 算，与 control records 打的起跑日期同一种）。
+                                                  --dump <文件> 不打统计，把收尾了的尝试（带 --since 的同样筛）逐条写成 jsonl，一行一条，列 id、task_id、number、command_key、command、started_at、ended_at、
+                                                  outcome、exit_code、memory_cap、memory_peak、peak_metric、stalled_at_cap、prediction、shard_count、host、item_plan（没有那一栏的写 null）；
+                                                  文件排他新建，已在的拒、退 2。给 records/2026-11-17-subagent账本自上而下清欠.md 八十节 ①④ 的回看数数用，不改任何判法；
+                                                  弄坏开关 key-stats-alternation-ignored 下按任务数交替的键一律数 0，key-stats-metric-unfiltered 下不筛口径，key-stats-retries-unfolded 下重试不折成一条，
+                                                  key-stats-since-ignored 下 --since 不筛，key-stats-dump-overwrites 下 --dump 照覆盖已在的文件
   python3 task-server/control start               起之前判 NFS 共享前三项与多机配置的 HOSTS、SHARED_DATA_ROOT（不过退 78、不起）；
                                                   systemctl --user start 之后回读 is-active 的输出与 /health，都对再判 NFS 共享四项，
-                                                  都过退 0；回读不对退 1，NFS 不过退 78
+                                                  都过退 0；回读不对退 1，NFS 不过退 78。
+                                                  任务服务起好之后，多机配置开了 GPU（ENABLE_GPU=1）的接着起 python3 gpu-verification-server/control start（输出原样接在后面）：
+                                                  它退 78 的 start 退 78，退别的非 0（含限时 GPU_SERVICE_CONTROL_SECONDS 秒里没退、被停掉）的退 1，出路写它的起法；没开 GPU 的不起它
   python3 task-server/control stop                systemctl --user stop 之后回读 is-active 的输出（inactive、failed 才算停了）与单元 cgroup.procs 的内容（空才算），都对退 0，不对退 1；
                                                   停服务不停在跑的任务（它们在各自的单元里）
-  python3 task-server/control clear-queue         服务停着才动（在跑退 1）：库拷一份 .before-clear-<时刻>，删 tasks 与 attempts 的全部行、回读为 0 才退 0；history 不动
+  python3 task-server/control clear-queue         服务停着才动：判停没停与 stop 同一段回读（is-active 的输出是 inactive 或 failed，且单元 cgroup.procs 读出来是空的；
+                                                  .claude/rules/command-safety-by-review.md「停 systemd 服务之后，回读输出判停没停」），不合退 1、库一个字节不动；库里还有 state='running' 的尝试
+                                                  （它们在各自的单元里接着跑，删了行服务重启就不知道它们占着的内存）同样退 1、库不动、不拷备份；
+                                                  合了库拷一份 .before-clear-<时刻>，删 tasks 与 attempts 的全部行、回读为 0 才退 0；history 不动
+  python3 task-server/control records             只读（库以 mode=ro 打开）打各表行数、history 各种 state 的行数与每条钉值（带 id）、attempts 按峰值口径分的行数与起跑日期跨度；服务在跑时也能用
+  python3 task-server/control drop-history [--legacy-imports] [--old-backups] [--pin <id>]…   服务停着才动（与 clear-queue 同一段回读）；库拷一份 .before-drop-history-<时刻>；
+                                                  --legacy-imports 删 history 里 state 是 peak、duration 的旧导入行（服务只读 state=pin 的行），--pin <id> 删那一条钉值，
+                                                  --old-backups 删这一趟之前留下的 <库>.before-* 备份（这一趟拷的那份留着）；
+                                                  --attempt-records-over-gib <N> 删 attempts 里收尾了的、进定额度时会算出超过 N GiB 的尝试行（量到的峰值超过 N GiB，
+                                                  或结局是撞上限而它进定额度的量超过 N GiB：那个量只经 task_server_lib.py 的 cap_hit_record_bytes 算，
+                                                  task_server.py 的 cap_hit_measurement 经同一处：之后这把键没跑完过的取上限乘 CAP_GROWTH_FACTOR，峰值远低于上限的取峰值；
+                                                  「之后跑完过」照服务读记录的次序从新到旧判，这一趟要删的跑完的那一行不算），
+                                                  逐条打 id、任务号、结局、峰值、上限、进定额度的量与命令键；回读删干净才退 0
   python3 task-server/control pin-cap [--] <命令…>     给这条命令钉内存上限（task_server.py 文件头 ②「内存」的钉值：取多机配置 SLICE_MEMORY_CAP_BY_HOST 里派到的那一台那一项，每次定额度现读，
                                                   不记字面的数；键照 scripts/hosts/memory_peaks_lib.py 的 command_key 换算）；经服务的 POST /pins 写（服务在跑时也能用，
-                                                  不绕过服务写库），写完经 POST /pins/show 回读钉上了才退 0；已钉的照退 0、说原来就钉着
+                                                  不绕过服务写库），写完经 POST /pins/show 回读钉上了才退 0；已钉的照退 0、说原来就钉着；钉值超过那一台 slice 总上限减余量的回读时打「!」一句、当那个数用；
+                                                  --help、-h 打用法退 0，不钉（命令真是这两个词的写在 -- 后面）
   python3 task-server/control unpin-cap [--] <命令…>   撤掉这条命令的钉值；回读撤掉了才退 0（原来没钉的照退 0、说原来就没钉）
   python3 task-server/control pause [--reason <一句>] [--allow-session <会话号>]   暂停排队（task_server.py 文件头 ⑤「暂停」）：服务照收提交、照答 status / wait / log / cancel，排队线程不起任何新尝试
-                                                  （插空、分片的子任务与估算子任务、重试重排回队的都不起），在跑的照跑到结局；暂停态记在服务的库里，服务重启后照旧暂停，直到 resume。
+                                                  （分片的子任务、重试重排回队的都不起），在跑的照跑到结局；暂停态记在服务的库里，服务重启后照旧暂停，直到 resume。
                                                   --reason 写一句原因（至多 200 字）。经服务的 POST /pause 写，写完回读 /health 是暂停才退 0；已经暂停着的照退 0、说原来就暂停着，不改原因与起点。
-                                                  --allow-session 放行一个会话：暂停着，这个会话交的任务（已经排着的、之后交的、分片的子任务、估算子任务、重试重排回队的）照常排、照常起，别的会话的照旧排着不起；
+                                                  --allow-session 放行一个会话：暂停着，这个会话交的任务（已经排着的、之后交的、分片的子任务、重试重排回队的）照常排、照常起，别的会话的照旧排着不起；
                                                   会话号就是 task status 打的那一栏「会话 <号>」（task-server/task:393 打的 session，服务照 task_server_lib.py:2387 的 session_of_peer 从调用进程的
                                                   祖先环境读 CLAUDE_CODE_SESSION_ID 取，POST /tasks 时记进任务的 session，task_server.py:4871）：要放行谁，就在那个会话里跑 python3 task-server/task status 抄第一行的号。
                                                   已经暂停着再 pause --allow-session <另一个会话> 照退 0，换放行的会话（原因与起点不改），说明写换了谁；不带 --allow-session 的 pause 不动放行；resume 连放行一起清掉。
@@ -39,7 +77,14 @@
                                                   人手查一次用 control check
 退出码：0 成了；1 回读不对；2 用法错（连同已删的 watch），或只在自证里认的变量设在了别处；78 运行条件不满足（出路写在 stderr）。
 弄坏开关读在 task_server_lib.py 的 broken（开关表在那份文件头）：check-deps-skipped、dry-run-writes、install-readback-skipped、stop-exit-status-only、
-start-readback-skipped、start-exit-status-ignored、data-root-key-unchecked（task_server_lib.py 的 require_configured_data_root）。
+start-readback-skipped、start-exit-status-ignored、pin-cap-help-pinned、data-root-key-unchecked（task_server_lib.py 的 require_configured_data_root）、
+check-nfs-probed-live-by-default（check 不带 --probe 也现探、不读服务的 nfs 一栏）、check-probe-unbounded（--probe 不设总时长），
+clear-queue-active-state-only（clear-queue 判停没停只看 is-active 的输出，单元 cgroup 里还有进程也照清；tests/test_cleanup_protocol.py 的 ClearQueueReadbackTests 那两条红）、
+clear-queue-running-attempts-ignored（clear-queue 不看库里有没有在跑的尝试、照清；ClearQueueReadbackTests 的在跑尝试那一条红）、
+drop-history-cap-hits-ignored（drop-history --attempt-records-over-gib 不看撞上限那一支，只比量到的峰值）、
+gpu-switch-taken-as-on（start、check 不看 ENABLE_GPU、一律当开了 GPU，照样起 gpu-verification-server/control；自证 gpu-service-untouched-when-gpu-off 红）、
+gpu-service-skipped（开了 GPU 也不起 gpu-verification-server/control；自证 gpu-service-required-when-gpu-on 红）。
+自证里 gpu-verification-server/control 换成 TASK_SERVER_GPU_SERVICE_CONTROL 那一份可执行文件（只在自证里认，task_server_lib.py 文件头「自证」）。
 """
 import os
 import sys
@@ -49,6 +94,8 @@ SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, SCRIPT_DIRECTORY)
 import task_server_lib as lib  # noqa: E402
 
+import contextlib  # noqa: E402
+import signal  # noqa: E402
 import subprocess  # noqa: E402
 import time  # noqa: E402
 
@@ -57,6 +104,14 @@ FAST_INSTALL_READBACK_SECONDS = 2.0
 START_READBACK_SECONDS = 30.0
 WATCH_REMOVED_TEXT = "这个子命令已删，task-server 自己盯、出事直接发消息给发起任务的会话"   # control watch 退 2 时那一句（文件头 watch 那一行）
 STOPPED_STATES = ("inactive", "failed")
+# start、check 带上的 GPU 批处理验证服务（文件头 start、check 两行）：多机配置的 GPU 开关写 1 才起它、查它
+GPU_SWITCH_KEY = "ENABLE_GPU"
+GPU_SERVICE_CONTROL = os.path.join(lib.REPOSITORY_ROOT, "gpu-verification-server", "control")
+GPU_SERVICE_CONTROL_OVERRIDE = "TASK_SERVER_GPU_SERVICE_CONTROL"   # 自证里换成的那一份可执行文件（只在自证里认）
+# 起 gpu-verification-server/control start / check 的限时（推的：它照台逐个做，每台 ssh 连接限时 10 秒、回读「在跑」限时 30 秒，两台加起来不到 100 秒，取 3 倍）
+GPU_SERVICE_CONTROL_SECONDS = 300
+GPU_SERVICE_START_HOWTO = ("python3 gpu-verification-server/control start（照多机配置在点名了卡的每一台起；没装过先 python3 gpu-verification-server/control install --binary <编好的二进制>，"
+                           "编法在 gpu-verification-server/control 文件头）；起好再跑 python3 task-server/control check 回读到退 0")
 
 
 def systemctl():
@@ -181,23 +236,99 @@ def install(dry_run):
                 f"看 journalctl --user -u {lib.UNIT_NAME} -n 100；修好之后 python3 task-server/control check 回读到退 0", 1)
 
 
-def check():
+def reported_nfs(health):
+    """control check 默认用的 NFS 共享结论：服务 /health 的 nfs 一栏（服务起来时判的四项、之后每 NFS_RECHECK_SECONDS 复核的前三项）→ (结论, 写明多久之前判的一句)；
+    没带这一栏的、判不过的抛 Unavailable（判不过的出路照 nfs 一栏里的 next_step）。"""
+    nfs = health.get("nfs")
+    if not isinstance(nfs, dict) or "ok" not in nfs:
+        raise lib.Unavailable("服务的 /health 没带 NFS 共享的结论（nfs 一栏）", "python3 task-server/control check --probe 现探一次；服务没跟上这一版的重启它（control stop、control start）")
+    if not nfs["ok"]:
+        raise lib.Unavailable(f"NFS 共享判不过：{nfs.get('problem')}（服务 {time.time() - float(nfs.get('checked_at') or 0):.0f} 秒前判的）", nfs.get("next_step") or lib.NFS_README)
+    now = time.time()
+    probed = nfs.get("probe_checked_at")
+    ages = (f"服务 {now - float(nfs.get('checked_at') or now):.0f} 秒前判的前三项（目录、导出、挂载）、两向探针 {now - float(probed):.0f} 秒前做的" if probed
+            else f"服务 {now - float(nfs.get('checked_at') or now):.0f} 秒前判的前三项（目录、导出、挂载）")
+    slow = nfs.get("slow_last")
+    slowly = f"；第二台最近慢过（{now - float(slow['at']):.0f} 秒前，复查期里回了）：{'；'.join(slow.get('slow') or [])}" if isinstance(slow, dict) and slow.get("at") else ""
+    return nfs, f"{ages}{slowly}；要现探加 --probe"
+
+
+def probed_nfs(configuration, limit):
+    """control check --probe 的现探：NFS 共享四项逐项现判（task_server_lib.nfs_share_report），每一项开始、结束各打一行，总时长不超过 limit 秒；
+    到点抛 NfsProbeTimedOut（写卡在哪一项）。判不过抛 Unavailable。弄坏开关 check-probe-unbounded 下不设总时长。"""
+    budget = lib.NfsProbeBudget(limit if not lib.broken("check-probe-unbounded") else 10 ** 9, progress=say)
+    report = lib.nfs_share_report(configuration.path, probe=True, budget=budget)
+    if not report["ok"]:
+        raise lib.Unavailable(f"NFS 共享判不过：{report['problem']}", report["next_step"])
+    return report
+
+
+def check_options(words):
+    """check 后面的选项：--probe（现探 NFS 共享）、--limit <秒>（现探的总时长上限，正数，只跟 --probe 一起写）；写得不对交 None，对的交 (probe, limit)。"""
+    probe, limit, limit_given, index = False, lib.NFS_LIVE_PROBE_LIMIT_SECONDS, False, 0
+    while index < len(words):
+        if words[index] == "--probe":
+            probe = True
+        elif words[index] == "--limit" and index + 1 < len(words):
+            try:
+                limit = float(words[index + 1])
+            except ValueError:
+                return None
+            limit_given, index = True, index + 1
+        else:
+            return None
+        index += 1
+    return (probe, limit) if limit > 0 and (probe or not limit_given) else None
+
+
+def check(probe=False, limit=lib.NFS_LIVE_PROBE_LIMIT_SECONDS):
     try:
         if not lib.broken("check-deps-skipped"):
             lib.require_modules()
         configuration = lib.read_configuration()
         health = lib.require_server(configuration)
-        nfs = lib.require_nfs_share(configuration, probe=True)
+        if probe or lib.broken("check-nfs-probed-live-by-default"):
+            nfs, nfs_how = probed_nfs(configuration, limit), "刚现探的"
+        else:
+            nfs, nfs_how = reported_nfs(health)
         _, data_root = lib.require_multi_host_keys(configuration)
+    except lib.NfsProbeTimedOut as error:
+        return fail(str(error), f"第二台或共享根上的操作被堵住了（盘写满、NFS 状态恢复这类）：看 {lib.NFS_README}；不现探用 python3 task-server/control check（读服务最近一回判的）", 1)
     except lib.Unavailable as error:
         lib.report_unavailable_and_exit(error, "task-server/control check")
     peer = health.get("peer") or {}
     say(f"  ✓ task-server 通：fastapi、uvicorn 在，多机配置 {configuration.path} 在，socket {configuration.socket}，库 {configuration.database}；"
-        f"在排 {health.get('queued')} 个、在跑 {health.get('running')} 个，排队线程 {health.get('scheduler_seconds_since_tick')} 秒前动过；NFS 共享 {nfs_summary(nfs)}；"
+        f"在排 {health.get('queued')} 个、在跑 {health.get('running')} 个，排队线程 {health.get('scheduler_seconds_since_tick')} 秒前动过；NFS 共享 {nfs_summary(nfs)}（{nfs_how}）；"
         f"共享数据根 {data_root or '没判（弄坏开关 data-root-key-unchecked）'}；"
         f"第二台{'用得了' if peer.get('available', True) else '此刻用不了：' + str(peer.get('why'))}")
+    drift = health.get("booking_drift") or {}   # 记账对账判出的漂移（task_server.py 文件头 ②「内存」的记账对账）：只打出来，不让 check 退非 0
+    for entry in (drift.get("memory") or {}).values():
+        say(f"  ! 记账漂移：{entry.get('text')}")
     if health.get("paused"):   # 暂停是人要的状态：不让 check 退非 0（服务那一侧暂停中也不判「判能起却没起成」、不看进展）
         say(f"  · {(health.get('pause') or {}).get('text') or '暂停中'}")
+    return gpu_service_follows(configuration, "check")
+
+
+def bookings():
+    """逐台打在跑的每条尝试的内存记账（读服务 /health 的 booking_ledger 一栏：记账对账每一轮由服务算好，不现读余量、不连第二台；task_server.py 的 refresh_booking_ledger）：
+    每台一段，头一行是 slice 总额、余量、在跑上限之和与各 scope 实占合计，接着每条尝试一行（任务、第几次、上限、此刻实占、记多少、为什么记这么多），
+    末行是这台的合计与照公式（总额减余量减记账合计）还放得下多少、实测 slice 还放得下多少，服务写好的原样打。只读，退 0；服务通不了照 check 退 78（lib.report_unavailable_and_exit）。"""
+    try:
+        health = lib.require_server(lib.read_configuration())
+    except lib.Unavailable as error:
+        lib.report_unavailable_and_exit(error, "task-server/control bookings")
+    ledger = health.get("booking_ledger") or {}
+    if not ledger:
+        say("  · 服务还没判过在跑记账（记账对账每一轮才算一回，起来之后头一轮还没到），或这一版服务不报这一栏")
+        return 0
+    for host in sorted(ledger, key=lambda name: (name != "local", name)):
+        entry = ledger[host]
+        say(f"  {entry.get('title')}（{max(0, int(time.time() - float(entry.get('at') or 0)))} 秒前判的）")
+        for row in entry.get("rows") or []:
+            used = "读不到" if row.get("used") is None else f"{row['used'] / lib.GIBIBYTE:.1f}G"
+            say(f"    任务 {row.get('task')} 第 {row.get('number')} 次：上限 {row['cap'] / lib.GIBIBYTE:.1f}G、此刻实占 {used}、"
+                f"记 {row['booked'] / lib.GIBIBYTE:.1f}G（{row.get('basis')}）：{row.get('text')}")
+        say(f"  {entry.get('total')}")
     return 0
 
 
@@ -286,6 +417,57 @@ def require_nfs_or_exit(configuration, who, probe=True):
         lib.report_unavailable_and_exit(error, who)
 
 
+def gpu_enabled(configuration):
+    """多机配置开没开 GPU：ENABLE_GPU 是 1 才算开。写没写、写得对不对由 require_multi_host_keys 起的多机配置判法判过（只许 0 或 1，没写判不过），
+    start、check 都在它之后才问这一句。弄坏开关 gpu-switch-taken-as-on 下一律当开着。"""
+    if lib.broken("gpu-switch-taken-as-on"):
+        return True
+    value, _ = lib.configured_value(configuration.path, GPU_SWITCH_KEY)
+    return value == "1"
+
+
+def run_gpu_service_control(subcommand):
+    """起 gpu-verification-server/control <subcommand>，它的标准输出与标准错误直接接在这一份的上面；→ (退出码或 None, 没拿到退出码的原因)。
+    它放在自己的进程组里（start_new_session），GPU_SERVICE_CONTROL_SECONDS 秒里没退的对这一组发 KILL、收掉，交 None。
+    自证里换成 GPU_SERVICE_CONTROL_OVERRIDE 那一份可执行文件。"""
+    fake = lib.selftest_override(GPU_SERVICE_CONTROL_OVERRIDE)
+    command = [fake, subcommand] if fake else [sys.executable, "-B", GPU_SERVICE_CONTROL, subcommand]
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL, start_new_session=True)
+    except OSError as error:
+        return None, f"起不来（{type(error).__name__}: {error}）"
+    try:
+        return process.wait(timeout=GPU_SERVICE_CONTROL_SECONDS), ""
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        return None, f"{GPU_SERVICE_CONTROL_SECONDS} 秒里没退，整组停掉了"
+
+
+def gpu_service_follows(configuration, subcommand):
+    """start、check 带上 GPU 批处理验证服务（文件头 start、check 两行）：多机配置开了 GPU（gpu_enabled）就起 gpu-verification-server/control <subcommand>；
+    → 这一份接着该退的码：没开 GPU、它退 0 交 0；check 里它没退 0 交 78，start 里它退 78 交 78、别的交 1，都在 stderr 写一句与起它的出路（GPU_SERVICE_START_HOWTO）。
+    弄坏开关 gpu-service-skipped 下开了 GPU 也不起它、交 0。"""
+    if not gpu_enabled(configuration):
+        say(f"  · 多机配置没开 GPU（{GPU_SWITCH_KEY} 不是 1）：GPU 批处理验证服务不起、不查")
+        return 0
+    if lib.broken("gpu-service-skipped"):
+        say("  · 开了 GPU，GPU 批处理验证服务没起、没查（弄坏开关 gpu-service-skipped）")
+        return 0
+    say(f"  · 多机配置开了 GPU（{GPU_SWITCH_KEY}=1）：接着起 python3 gpu-verification-server/control {subcommand}")
+    code, why = run_gpu_service_control(subcommand)
+    if code == 0:
+        say(f"  ✓ gpu-verification-server/control {subcommand} 退 0")
+        return 0
+    outcome = f"退 {code}" if code is not None else why
+    if subcommand == "check":
+        return fail(f"开了 GPU 而 GPU 批处理验证服务没起来：gpu-verification-server/control check {outcome}（缺的是哪一样看它在上面打的那几行）",
+                    GPU_SERVICE_START_HOWTO, lib.RUN_CONDITION_EXIT)
+    return fail(f"任务服务起了，GPU 批处理验证服务没起成：gpu-verification-server/control start {outcome}（原因看它在上面打的那几行）",
+                GPU_SERVICE_START_HOWTO, lib.RUN_CONDITION_EXIT if code == lib.RUN_CONDITION_EXIT else 1)
+
+
 def start():
     try:
         lib.require_modules()
@@ -305,33 +487,58 @@ def start():
         if unit_active_state() == "active" and health_or_none(configuration) is not None:
             nfs = require_nfs_or_exit(configuration, "task-server/control start")
             say(f"  ✓ {lib.UNIT_NAME} 在跑，/health 回 ok；NFS 共享 {nfs_summary(nfs)}")
-            return 0
+            return gpu_service_follows(configuration, "start")
         time.sleep(0.2)
     return fail(f"起了但回读不对：is-active 打的是「{unit_active_state()}」、/health {'不通' if health_or_none(configuration) is None else '通'}",
                 f"看 journalctl --user -u {lib.UNIT_NAME} -n 100", 1)
+
+
+def unit_stopped_readback():
+    """服务单元停没停的回读（.claude/rules/command-safety-by-review.md「停 systemd 服务之后，回读输出判停没停」；stop 与 clear-queue 共用这一段）：
+    is-active 的输出是 inactive 或 failed，且单元的 cgroup.procs 读出来是空的，才算停了；cgroup.procs 读不到不当空。
+    → (停了没有, is-active 打的状态, cgroup 里的进程号（读不到是 None）)。"""
+    state = unit_active_state()
+    processes = unit_processes()
+    return state in STOPPED_STATES and processes == [], state, processes
+
+
+def stopped_readback_text(state, processes):
+    """回读的那两样写成一句（stop 与 clear-queue 拒绝时都用）。"""
+    return f"is-active 打的是「{state}」、cgroup 里进程 {'读不到' if processes is None else len(processes)} 个"
 
 
 def stop():
     code, _, error = run_systemctl("stop", lib.UNIT_NAME, timeout=180)
     if lib.broken("stop-exit-status-only"):
         return code
-    state = unit_active_state()
-    processes = unit_processes()
-    if code != 0 or state not in STOPPED_STATES or processes is None or processes:
-        return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、is-active 打的是「{state}」、"
-                    f"cgroup 里进程 {'读不到' if processes is None else len(processes)} 个", f"看 systemctl --user status {lib.UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", 1)
+    stopped, state, processes = unit_stopped_readback()
+    if code != 0 or not stopped:
+        return fail(f"停了但回读不对：systemctl stop 退 {code}{('（' + error + '）') if error else ''}、{stopped_readback_text(state, processes)}",
+                    f"看 systemctl --user status {lib.UNIT_NAME}；再停一次，还停不下就把这一行交主 agent", 1)
     say(f"  ✓ {lib.UNIT_NAME} 停了（is-active 打「{state}」、cgroup 里没有进程）；在跑的任务在各自的单元里接着跑")
     return 0
 
 
 def clear_queue():
-    """服务停着时清掉库里的队列：tasks 与 attempts 两张表的全部行；history（用时与峰值记录）、操作与告警记录不动。先把库拷一份 .before-clear-<时刻> 再删。"""
+    """服务停着时清掉库里的队列：tasks 与 attempts 两张表的全部行；history（用时与峰值记录）、操作与告警记录不动。先把库拷一份 .before-clear-<时刻> 再删。
+    停没停照 unit_stopped_readback 判（与 stop 同一段）：不合就拒，库一个字节不动、不拷备份。库里还有 state='running' 的尝试（停服务不停它们，它们在各自的单元里接着跑）
+    同样拒、库不动、不拷备份。弄坏开关 clear-queue-running-attempts-ignored 下有在跑的尝试也照清。"""
     import shutil
     import sqlite3
-    state = unit_active_state()
-    if state not in STOPPED_STATES:
-        return fail(f"服务还在（is-active 打的是「{state}」）：在跑时清库会和它写的撞上", "先 python3 task-server/control stop，清完再 control start", 1)
+    stopped, state, processes = unit_stopped_readback()
+    if lib.broken("clear-queue-active-state-only"):   # 弄坏开关：只看 is-active 的输出，cgroup 里还有进程也照清
+        stopped = state in STOPPED_STATES
+    if not stopped:
+        return fail(f"服务还没停干净（{stopped_readback_text(state, processes)}）：在跑时清库会和它写的撞上",
+                    "先 python3 task-server/control stop（它回读 is-active 与 cgroup.procs 都对才退 0），清完再 control start", 1)
     configuration = lib.read_configuration()
+    probe = sqlite3.connect(f"file:{configuration.database}?mode=ro", uri=True, timeout=30)
+    running = probe.execute("SELECT id, task_id FROM attempts WHERE state = 'running' ORDER BY id").fetchall()
+    probe.close()
+    # 停服务时在跑的尝试在各自的单元里接着跑：删了它们的行，服务重启就不知道它们占着的内存、结局也没处记。弄坏开关 clear-queue-running-attempts-ignored 下照清
+    if running and not lib.broken("clear-queue-running-attempts-ignored"):
+        return fail(f"库里还有 {len(running)} 次尝试在跑（任务 {'、'.join(str(task_id) for _, task_id in running[:20])}{' 等' if len(running) > 20 else ''}）：它们在各自的单元里接着跑，清了就丢了账",
+                    "先 control start，等它们出结局或 task-server/task cancel <号>，再 control stop、clear-queue", 1)
     backup = f"{configuration.database}.before-clear-{time.strftime('%Y%m%d%H%M%S')}"
     shutil.copy2(configuration.database, backup)
     os.chmod(backup, 0o600)
@@ -346,6 +553,203 @@ def clear_queue():
     if any(left.values()):
         return fail(f"删了但回读还剩 {left}", f"库原样在 {backup}；把这一行交主 agent", 1)
     say(f"  ✓ 清了队列：tasks {counts['tasks']} 行、attempts {counts['attempts']} 行，回读都是 0；history 没动；清之前的库拷在 {backup}")
+    return 0
+
+
+def records_report():
+    """records：只读打库里各表的行数、history 各种 state 的行数与每条钉值、attempts 里峰值口径不是「进程内存」的旧行（定额度已不读）的条数与时间跨度。
+    库以只读方式打开（mode=ro），服务在跑时也能用，一个字节不写。"""
+    import collections
+    import json
+    import sqlite3
+    configuration = lib.read_configuration()
+    connection = sqlite3.connect(f"file:{configuration.database}?mode=ro", uri=True, timeout=30)
+    tables = [name for (name,) in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+    say("表与行数：" + "、".join(f"{name} {connection.execute(f'SELECT COUNT(*) FROM {name}').fetchone()[0]}" for name in tables))
+    if "history" in tables:
+        states = connection.execute("SELECT state, COUNT(*) FROM history GROUP BY state ORDER BY state").fetchall()
+        say("history 按 state：" + "、".join(f"{state} {count}" for state, count in states))
+        for row_id, key, record in connection.execute("SELECT id, command_key, record FROM history WHERE state = ? ORDER BY id", (lib.PIN_STATE,)):
+            say(f"  钉值 id={row_id} 命令键「{key}」记录 {record[:200]}")
+        for state, in [row[:1] for row in states if row[0] != lib.PIN_STATE]:
+            for row_id, key, record in connection.execute("SELECT id, command_key, record FROM history WHERE state = ? ORDER BY id LIMIT 5", (state,)):
+                say(f"  {state} 样例 id={row_id} 命令键「{key[:120]}」记录 {record[:200]}")
+    if "attempts" in tables:
+        metrics, ended, oldest = collections.Counter(), 0, {}
+        for state, record in connection.execute("SELECT state, record FROM attempts"):
+            try:
+                attempt = json.loads(record)
+            except ValueError:
+                metrics["记录读不成"] += 1
+                continue
+            metric = attempt.get("peak_metric") or "没有这一栏"
+            metrics[metric] += 1
+            started = attempt.get("started_at")
+            if isinstance(started, (int, float)):
+                low, high = oldest.get(metric, (started, started))
+                oldest[metric] = (min(low, started), max(high, started))
+            ended += state == "ended"
+        say(f"attempts 共 {sum(metrics.values())} 行（ended {ended}），按峰值口径：")
+        for metric, count in metrics.most_common():
+            span = oldest.get(metric)
+            when = f"，起跑 {time.strftime('%Y-%m-%d', time.gmtime(span[0]))} 到 {time.strftime('%Y-%m-%d', time.gmtime(span[1]))}" if span else ""
+            say(f"  {metric}：{count} 行{when}{'（定额度读）' if metric == lib.PROCESS_MEMORY_PEAK_METRIC else '（定额度不读）'}")
+    connection.close()
+    return 0
+
+
+def key_stats_report(arguments):
+    """key-stats [--since <时刻>] [--dump <文件>]：只读（库以 mode=ro 打开，服务在跑时也能用；task_server_lib.py 的 key_stats、key_stats_lines、key_stats_dump_rows）。
+    不带 --dump 打命令键的统计：首行写筛前筛后的行数与进统计的行数，接着是键的个数与只跑过一次的、带工作根下副本路径的，按任务数的交替与撞过而最近一个任务跑成的键，
+    按尝试数的交替，同键跑成的峰值离散度（最大比最小的中位数、第 90 百分位、到 1.5 倍以上的个数）。
+    带 --dump 把收尾了的尝试逐条写成 jsonl（key_stats_dump：排他新建，已在的拒、退 2）。--since 只取这一刻之后起跑的尝试（epoch 秒或 YYYY-MM-DD，日期照 time.gmtime 算）。
+    给 records/2026-11-17-subagent账本自上而下清欠.md 八十节 ①④ 的回看与 research/prompts/ledger80-key-records-r1-main-verification.md「三、改法」第 2、3 条用；只读，不改任何判法。"""
+    import json
+    import sqlite3
+    options, rest = {}, list(arguments)
+    while rest:
+        word = rest.pop(0)
+        if word not in ("--since", "--dump") or word in options or not rest:
+            return fail(f"key-stats 认不出「{' '.join(arguments)}」", "写成 python3 task-server/control key-stats [--since <epoch 秒或 YYYY-MM-DD>] [--dump <文件>]", lib.USAGE_EXIT)
+        options[word] = rest.pop(0)
+    since = None
+    if "--since" in options:
+        since, problem = lib.key_stats_since(options["--since"])
+        if problem:
+            return fail(problem, "写成 python3 task-server/control key-stats --since 1793318400 或 --since 2026-11-01", lib.USAGE_EXIT)
+    configuration = lib.read_configuration()
+    connection = sqlite3.connect(f"file:{configuration.database}?mode=ro", uri=True, timeout=30)
+    attempts = []
+    for row_id, record in connection.execute("SELECT id, record FROM attempts"):
+        try:
+            attempt = json.loads(record)
+        except ValueError:
+            continue
+        attempts.append(dict(attempt, id=row_id))
+    connection.close()
+    kept = lib.key_stats_after(attempts, since)
+    since_text = "没给 --since，不筛起跑时刻" if since is None else f"只取 {time.strftime('%Y-%m-%d', time.gmtime(since))}（epoch {since:.0f}）之后起跑的"
+    if "--dump" in options:
+        return key_stats_dump(options["--dump"], kept, f"key-stats --dump：attempts 筛前 {len(attempts)} 行、筛后 {len(kept)} 行（{since_text}）")
+    stats = lib.key_stats(kept)
+    say(f"key-stats：attempts 筛前 {len(attempts)} 行、筛后 {len(kept)} 行（{since_text}）；"
+        f"进统计的（收尾了、有命令键、峰值口径是「{lib.PROCESS_MEMORY_PEAK_METRIC}」的）{stats['used']} 行")
+    for line in lib.key_stats_lines(stats):
+        say(f"  {line}")
+    return 0
+
+
+def key_stats_dump(path, attempts, head):
+    """key-stats --dump：收尾了的尝试逐条写成 jsonl（task_server_lib.py 的 key_stats_dump_rows，列是 KEY_STATS_DUMP_COLUMNS，没有的写 null），一行一条。
+    文件排他新建：已在的拒、退 2，一个字节不动；写不进的删掉写了一半的那份、退 1。弄坏开关 key-stats-dump-overwrites 下已在的照覆盖。"""
+    import contextlib
+    import json
+    rows = lib.key_stats_dump_rows(attempts)
+    try:
+        handle = open(path, "w" if lib.broken("key-stats-dump-overwrites") else "x", encoding="utf-8")
+    except FileExistsError:
+        return fail(f"key-stats --dump 的文件 {path} 已经在了，不覆盖", "换一个不存在的文件名再导", lib.USAGE_EXIT)
+    except OSError as error:
+        return fail(f"key-stats --dump 建不了 {path}（{error}）", "看那个目录在不在、有没有写权限", 1)
+    try:
+        with handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError as error:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+        return fail(f"key-stats --dump 写 {path} 写到一半失败（{error}），写了一半的那份已删", "看盘满没满、目录权限，修好再导", 1)
+    empty = [column for column in lib.KEY_STATS_DUMP_COLUMNS if rows and all(row[column] is None for row in rows)]
+    say(f"{head}；收尾了的 {len(rows)} 行写进 {path}（一行一条，列：{'、'.join(lib.KEY_STATS_DUMP_COLUMNS)}）")
+    say(f"  每一行都是 null 的列：{'、'.join(empty) if empty else '无'}")
+    return 0
+
+
+def drop_history(arguments):
+    """drop-history [--legacy-imports] [--old-backups] [--pin <id>]… [--attempt-records-over-gib <N>]：服务停着才动（停没停与 clear-queue 同一段回读）；
+    库拷一份 .before-drop-history-<时刻> 再删：
+    --legacy-imports 删 history 里 state 是 peak 与 duration 的行（从内存包装峰值表、用时表导进来的旧记录；服务只读 state=pin 的行，task_server.py 的 pin_record）；
+    --pin <id> 删那一条钉值（id 照 control records 打的，只认 state=pin 的行）；
+    --attempt-records-over-gib <N> 删进定额度会超过 N GiB 的尝试行：量到的峰值超过 N GiB 的，或撞上限而进定额度的量（lib.cap_hit_record_bytes，服务的 cap_hit_measurement
+    算的同一个数）超过 N GiB 的。删完回读那几类为 0 才退 0。弄坏开关 drop-history-cap-hits-ignored 下不看撞上限那一支。"""
+    import json
+    import shutil
+    import sqlite3
+    legacy, old_backups, pins, rest = False, False, [], list(arguments)
+    attempt_records_over_gib = None
+    while rest:
+        word = rest.pop(0)
+        if word == "--legacy-imports":
+            legacy = True
+        elif word == "--old-backups":
+            old_backups = True
+        elif word == "--pin" and rest and rest[0].isdigit():
+            pins.append(int(rest.pop(0)))
+        elif word == "--attempt-records-over-gib" and rest and rest[0].isdigit() and int(rest[0]) > 0:
+            attempt_records_over_gib = int(rest.pop(0))
+        else:
+            return fail(f"drop-history 认不出「{word}」", "写成 python3 task-server/control drop-history [--legacy-imports] [--pin <id>]… [--attempt-records-over-gib <N>]（id 照 control records 打的，N 是正整数）", lib.USAGE_EXIT)
+    if not legacy and not pins and not old_backups and attempt_records_over_gib is None:
+        return fail("drop-history 没说删什么", "至少给 --legacy-imports、--old-backups、一个 --pin <id> 或 --attempt-records-over-gib <N>", lib.USAGE_EXIT)
+    stopped, state, processes = unit_stopped_readback()
+    if not stopped:
+        return fail(f"服务还没停干净（{stopped_readback_text(state, processes)}）：在跑时删库会和它写的撞上",
+                    "先 python3 task-server/control stop，删完再 control start", 1)
+    configuration = lib.read_configuration()
+    backup = f"{configuration.database}.before-drop-history-{time.strftime('%Y%m%d%H%M%S')}"
+    shutil.copy2(configuration.database, backup)
+    os.chmod(backup, 0o600)
+    connection = sqlite3.connect(configuration.database, timeout=30, isolation_level=None)
+    connection.execute("BEGIN IMMEDIATE")
+    dropped = {}
+    if legacy:
+        dropped["peak、duration"] = connection.execute("DELETE FROM history WHERE state IN ('peak', 'duration')").rowcount
+    for row_id in pins:
+        dropped[f"钉值 id={row_id}"] = connection.execute("DELETE FROM history WHERE id = ? AND state = ?", (row_id, lib.PIN_STATE)).rowcount
+    oversized_attempt_ids = []
+    if attempt_records_over_gib is not None:
+        limit_bytes = attempt_records_over_gib * 1024 ** 3
+        resolved_keys = set()   # 从新到旧读（服务读记录的次序）：读到一行时，它之后这把键有没有一次跑完、又不在这一趟要删的里（cap_hit_record_bytes 的 unresolved）
+        for row_id, task_id, command_key, record_text in connection.execute(
+                "SELECT id, task_id, command_key, record FROM attempts WHERE state = 'ended' ORDER BY id DESC").fetchall():
+            try:
+                record = json.loads(record_text)
+            except ValueError:
+                continue   # 正文读不出的行服务本来就不认（核不过的不进定额度），这里不碰
+            peak, cap = record.get("memory_peak"), record.get("memory_cap")
+            peak = peak if isinstance(peak, int) and not isinstance(peak, bool) else 0
+            cap = cap if isinstance(cap, int) and not isinstance(cap, bool) else 0
+            cap_hit = record.get("outcome") in lib.RECORD_CAP_HIT_OUTCOMES and cap > 0 and not lib.broken("drop-history-cap-hits-ignored")
+            counted = lib.cap_hit_record_bytes(cap, peak, command_key not in resolved_keys) if cap_hit else 0
+            if peak > limit_bytes or counted > limit_bytes:
+                oversized_attempt_ids.append(row_id)
+                say(f"  · 删 attempts id={row_id} 任务 {task_id} 结局 {record.get('outcome')} 峰值 {peak / 1024 ** 3:.1f} GiB 上限 {cap / 1024 ** 3:.1f} GiB"
+                    f"（撞上限进定额度的量 {counted / 1024 ** 3:.1f} GiB）键 {command_key[:120]}")
+            elif record.get("outcome") in lib.RECORD_COMPLETED_OUTCOMES:
+                resolved_keys.add(command_key)
+        for row_id in oversized_attempt_ids:
+            connection.execute("DELETE FROM attempts WHERE id = ?", (row_id,))
+        dropped[f"进定额度超过 {attempt_records_over_gib} GiB 的尝试"] = len(oversized_attempt_ids)
+    connection.execute("COMMIT")
+    left = connection.execute("SELECT COUNT(*) FROM history WHERE state IN ('peak', 'duration')").fetchone()[0] if legacy else 0
+    left += sum(connection.execute("SELECT COUNT(*) FROM history WHERE id = ?", (row_id,)).fetchone()[0] for row_id in pins)
+    left += sum(connection.execute("SELECT COUNT(*) FROM attempts WHERE id = ?", (row_id,)).fetchone()[0] for row_id in oversized_attempt_ids)
+    connection.close()
+    if left:
+        return fail(f"删了但回读还剩 {left} 行", f"库原样在 {backup}；把这一行交主 agent", 1)
+    removed = []
+    if old_backups:   # 这一趟之前留下的 <库>.before-* 备份（clear-queue、换密钥、drop-history 各自拷的）；这一趟刚拷的那份留着
+        directory, base = os.path.split(configuration.database)
+        for name in sorted(os.listdir(directory)):
+            path = os.path.join(directory, name)
+            if name.startswith(base + ".before-") and path != backup and os.path.isfile(path):
+                os.remove(path)
+                removed.append(name)
+        still = [name for name in removed if os.path.exists(os.path.join(directory, name))]
+        if still:
+            return fail(f"旧备份删了但回读还在：{'、'.join(still)}", "把这一行交主 agent", 1)
+    say("  ✓ 删了：" + "、".join([f"{what} {count} 行" for what, count in dropped.items()] + [f"旧备份 {len(removed)} 份（{'、'.join(removed) or '无'}）"])
+        + f"；回读都不在了；删之前的库拷在 {backup}")
     return 0
 
 
@@ -373,6 +777,8 @@ def pin_cap(command, pinned):
     if pinned:
         say(f"  ✓ {'钉上了' if reply.get('changed') else '原来就钉着'}：命令键「{shown.get('command_key')}」的内存上限取多机配置 {shown.get('source')} 里派到的那一台那一项（此刻 {value}），"
             "每次定额度现读；回读钉着")
+        for line in shown.get("over_limit") or []:   # 钉值超过 slice 总上限减余量（task_server.py 的 pin_over_limit_lines）
+            say(f"  ! {line}")
     else:
         say(f"  ✓ {'撤掉了' if reply.get('changed') else '原来就没钉'}：命令键「{shown.get('command_key')}」照记录定额度；回读没钉")
     return 0
@@ -383,6 +789,9 @@ def main(arguments):
     if arguments in (["install"], ["install", "--dry-run"]):
         return install(arguments == ["install", "--dry-run"])
     if arguments[:1] in (["pin-cap"], ["unpin-cap"]):
+        if arguments[1:] in (["--help"], ["-h"]) and not lib.broken("pin-cap-help-pinned"):   # 弄坏开关：把 --help 当命令钉一个值
+            say(f"写成 python3 task-server/control {arguments[0]} [--] <命令…>（与 task-server/task submit -- 后面那条一样）；命令真是 --help、-h 的写在 -- 后面")
+            return 0
         command = arguments[2:] if arguments[1:2] == ["--"] else arguments[1:]
         return pin_cap(command, arguments[0] == "pin-cap")
     if arguments[:1] == ["pause"]:
@@ -391,14 +800,23 @@ def main(arguments):
             return pause_or_resume(True, options.get("--reason", ""), options.get("--allow-session", ""))
     elif arguments == ["resume"]:
         return pause_or_resume(False)
+    if arguments[:1] == ["drop-history"]:
+        return drop_history(arguments[1:])
     if arguments[:1] == ["watch"]:
         return fail(WATCH_REMOVED_TEXT, "不用起它：任务的结局、要处置的提醒与服务健康都由服务发消息给会话（task-server/README.md「## 发消息给会话」）；"
                     "人手查一次服务健康用 python3 task-server/control check，要取结局用 task-server/task wait <号>", lib.USAGE_EXIT)
-    commands = {"check": check, "start": start, "stop": stop, "clear-queue": clear_queue}
-    if len(arguments) == 1 and arguments[0] in commands:
+    if arguments[:1] == ["key-stats"]:
+        return key_stats_report(arguments[1:])
+    if arguments[:1] == ["check"]:
+        options = check_options(arguments[1:])
+        if options is not None:
+            return check(*options)
+    commands = {"check": check, "start": start, "stop": stop, "clear-queue": clear_queue, "records": records_report, "bookings": bookings}
+    if len(arguments) == 1 and arguments[0] in commands and arguments[0] != "check":
         return commands[arguments[0]]()
     return fail(f"认不出「{' '.join(arguments)}」",
-                "写成 python3 task-server/control install [--dry-run] | check | start | stop | clear-queue | pin-cap [--] <命令…> | "
+                "写成 python3 task-server/control install [--dry-run] | check [--probe [--limit <秒>]] | bookings | records | key-stats [--since <时刻>] [--dump <文件>] | start | stop | clear-queue | "
+                "drop-history [--legacy-imports] [--old-backups] [--pin <id>]… [--attempt-records-over-gib <N>] | pin-cap [--] <命令…> | "
                 "unpin-cap [--] <命令…> | pause [--reason <一句，带空格要加引号>] [--allow-session <会话号>] | resume", lib.USAGE_EXIT)
 
 

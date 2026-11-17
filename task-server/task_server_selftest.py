@@ -6,8 +6,10 @@ sys.dont_write_bytecode = True
 
 import concurrent.futures  # noqa: E402
 import contextlib  # noqa: E402
+import dataclasses  # noqa: E402
 import hashlib  # noqa: E402
 import io  # noqa: E402
+import itertools  # noqa: E402
 import json  # noqa: E402
 import re  # noqa: E402
 import shlex  # noqa: E402
@@ -22,6 +24,7 @@ import time  # noqa: E402
 import traceback  # noqa: E402
 import types  # noqa: E402
 import unittest  # noqa: E402
+import unittest.mock  # noqa: E402
 
 import task_server_lib as lib  # noqa: E402
 
@@ -30,7 +33,8 @@ SESSION_A = "selftest-session-a"
 SESSION_B = "selftest-session-b"
 SESSION_FORGED = "selftest-session-forged"
 DEFAULT_INBOX_TOKEN = "selftest-default-inbox-token"   # 各格客户端缺省带的会话令牌（World.client_environment）：没登会话的格里服务找不到 socket、用不上它
-CONFIRM_RETRIES = 3   # World.confirm_submitted：确认的数对不上（这一会儿同会话别的任务起了或收了）照服务打回的数再确认，至多这么多回
+CONFIRM_RETRIES = 3   # World.confirm_submitted：确认的数对不上（这一会儿同会话别的任务起了或收了）照服务打回的数再确认的基本回数（头一回对不上时再按同会话在排在跑的条数放宽）
+CONFIRM_BUDGET_SECONDS = 60.0   # World.confirm_submitted：回数用完之后，只要服务打回的还是「数对不上」（同会话别的任务还在起、收），再追的时限；不随机器忙闲定回数
 GIBIBYTE = 1024 ** 3
 MEBIBYTE = 1024 ** 2
 RECORD_WINDOW_OVERRUN = 6   # 比 task_server.py 的 RECORD_WINDOW（近几次的名额，5）多一次：量不到的那几次要是占了名额，导进来的那一次就被挤出去
@@ -41,6 +45,7 @@ POLL_SECONDS = 0.1
 # 绝对上限 = 安静时限 × WAIT_CEILING_FACTOR（60 秒的等待至多 180 秒，20 秒的至多 60 秒，120 秒的至多 360 秒）：一直在变而永远等不到的（真坏了）到这里为止。
 WAIT_CEILING_FACTOR = 3
 WAIT_SLICE_SECONDS = 1.0          # 等进程退出时每一片等多久；每片之后问一次 keep_waiting
+CLIENT_GROUP_STOP_SECONDS = 10    # World.stop_client：整组发了 SIGKILL 之后等管道关上至多这么久
 PROGRESS_SAMPLE_SECONDS = 1.0     # 世界的进展记号至多每隔这么久采一次
 # 假世界目录里服务活着就一直涨的记录，不是任务有进展：每一轮排队记的读数，与 NFS 复核每 FAST_NFS_RECHECK_SECONDS 起一次假 ssh 记的那一行
 #（任务 7283、7282、7293–7296 里 slow-world-patient-wait 的安静那一头都拖到了绝对上限 18 秒；推的：ssh-calls 算进去时世界永远在变）
@@ -54,18 +59,17 @@ SLOW_WORLD_BASE_SECONDS = 6.0     # slow-world-patient-wait：这一格的安静
 SLOW_WORLD_STEP_SECONDS = 2       # 慢世界里命令每一步睡多久（小于安静时限，大于 0）
 SLOW_WORLD_STEPS = 5              # 一共几步：总共跑 SLOW_WORLD_STEP_SECONDS × SLOW_WORLD_STEPS 秒，超过安静时限
 BLOCK_SCRIPT = 'for round in $(seq 1 600); do [[ -e "$1" ]] && exit 0; sleep 0.1; done; exit 9'
-SIMULATED_RELEASE = "release-simulated"   # simulated-two-host-workload 放重任务的那份放行文件（相对假仓根）
 HUNDRED_RELEASE = "release-hundred"       # hundred-five-minute-tasks-balanced 放那 100 条的放行文件（相对假仓根）
 GRACE_CELL_STALL_SECONDS = 2              # stall-waits-for-grace：卡住阈值；宽限里判到静了它的两倍才放行
 GRACE_CELL_GRACE_SECONDS = 20             # stall-waits-for-grace：宽限只要比「判到静了两倍阈值、放行、命令退出」这一下长
-# stalled-at-cap-retried：库里记一次跑完的峰值 1024 MiB，上限 1024 × 1.5 = 1536M；假 scope 的 memory.peak 钉在 1536 MiB（到上限）；乘 1.5 重排是 2304M
-AT_CAP_SEED_PEAK_BYTES = 1024 * MEBIBYTE
+# stalled-at-cap-retried：库里记一次跑完的峰值 1536 MiB，上限照它 1536M（近五次最大，不乘 1.5）；假 scope 的 memory.peak 钉在 1536 MiB（到上限）；撞了乘 1.5 重排是 2304M
+AT_CAP_SEED_PEAK_BYTES = 1536 * MEBIBYTE
 AT_CAP_PEAK_BYTES = 1536 * MEBIBYTE
 AT_CAP_PINNED_TEXT = "1536M"
 AT_CAP_GROWN_PINNED_TEXT = "2304M"
-# busy-cpu-pinned-at-cap-retried、busy-cpu-below-cap-keeps-running 同一套数：库里 1024 MiB、上限 1536M；前一格假 scope 的 memory.current 钉在 1536 MiB，后一格只到它的八分之一
+# busy-cpu-pinned-at-cap-retried、busy-cpu-below-cap-keeps-running 同一套数：库里 1536 MiB、上限 1536M；前一格假 scope 的 memory.current 钉在 1536 MiB，后一格只到它的八分之一
 # aged-head-at-slice-total-starts：本机 slice 总上限 50G、slice 自己挂着回收不掉的那一截就是假余量 2G（SELFTEST_MARGIN_GIBIBYTES；任务 1713 那一回量到 0.7G，向上取整是 1G）；
-# 峰值 40G 乘 1.5 收到总上限减余量是 48G
+# 峰值正好是总上限减余量 48G（再大一点哪台都装不下，照预算打回）：上限与记账 48G
 AT_TOTAL_CAP_PINNED_TEXT = "49152M"
 # 占着到放行为止、判定比各条起止时刻的格用：至多 200 秒（短于一格的时限 CELL_TIMEOUT_SECONDS），机器忙时也不在放行之前自己退出
 HOLD_UNTIL_RELEASED_SCRIPT = 'for round in $(seq 1 2000); do [[ -e "$1" ]] && exit 0; sleep 0.1; done; exit 9'
@@ -91,11 +95,8 @@ UNRECORDED_DEFAULT_PINNED_TEXT = "4096M"
 # 192.0.2.2 是文档用的保留地址段，当假第二台（假 ssh 不看主机名）
 SELFTEST_LOCAL_ADDRESS = "127.0.0.1"
 SELFTEST_PEER_ADDRESS = "192.0.2.2"
-# 卡的台标签写 HOSTS 里那一台的地址（task_server.py 文件头 ②「GPU」）：各格点名的卡
+# 开了 GPU 的多机配置里点名的那一张卡（gpu-service-* 那几格的配置判法要它；任务服务自己不读卡）：台标签写 HOSTS 里那一台的地址
 LOCAL_CARD_ZERO = f"{SELFTEST_LOCAL_ADDRESS}:0:8G"
-LOCAL_CARD_ONE = f"{SELFTEST_LOCAL_ADDRESS}:1:8G"
-PEER_CARD_ZERO = f"{SELFTEST_PEER_ADDRESS}:0:8G"
-OUTSIDE_HOSTS_CARD = "192.0.2.99:0:8G"   # 台标签不是 HOSTS 里的一项（card-labels-by-address）
 # 各格多机配置里判法要的其余键（scripts/crash/crash-point-replay-shard-configuration-check.sh 整份判过，共用取法才给第二台的地址）：
 # 按台的三个键两台各一项，目录是假的绝对路径（判法不连第二台、不看它们在不在），清场两对写空串，双机开着、GPU 关着；
 # SLICE_MEMORY_CAP_BY_HOST 只许一行（set_slice_cap、set_slice_caps 换它）
@@ -110,13 +111,12 @@ PINNED_LOCAL_TEXT = "18432M"
 PINNED_PEER_TEXT = "28672M"
 # 各格假余量里每台此刻的余量（GiB，task_server.py 文件头 ②「余量」）：自证喂的定值，期望照它算；要别的数的格另给
 SELFTEST_MARGIN_GIBIBYTES = 2
-# margin-measured-per-host：本机余量 1G、第二台余量 3G，两台 slice 总上限都是 50G；记录峰值 40G（上限 60G）的那一条在两台的上限是 50G 减各自的余量
-PER_HOST_LOCAL_MARGIN_GIBIBYTES = 1
-PER_HOST_PEER_MARGIN_GIBIBYTES = 3
-PER_HOST_LOCAL_CAP_TEXT = "50176M"   # 50G − 1G
-PER_HOST_PEER_CAP_TEXT = "48128M"    # 50G − 3G
-PER_HOST_LOCAL_CAP_BYTES = (50 - PER_HOST_LOCAL_MARGIN_GIBIBYTES) * GIBIBYTE   # 记账同上限（task_server.py 的 booked_at_cap）
-PER_HOST_PEER_CAP_BYTES = (50 - PER_HOST_PEER_MARGIN_GIBIBYTES) * GIBIBYTE
+# margin-measured-per-host：两台 slice 总上限都是 50G；记录峰值 48G 的那一条上限与记账都是 49152M（近五次最大，不乘 1.5）：
+# 余量 1G 的台（可用上限 49G）装得下，余量 3G 的台（47G）峰值本身就装不下
+PER_HOST_SMALL_MARGIN_GIBIBYTES = 1
+PER_HOST_LARGE_MARGIN_GIBIBYTES = 3
+PER_HOST_PEAK_BYTES = 48 * GIBIBYTE
+PER_HOST_CAP_TEXT = "49152M"
 
 
 def process_memory_stat(anon_bytes, file_bytes=0, kernel_bytes=0):
@@ -132,8 +132,8 @@ UNRECORDED_GROWTH_PINNED_TEXTS = ("4096M", "6144M", "9216M")
 UNRECORDED_BURST_COUNT = 5      # unrecorded-burst-balanced 连交几条没记录的命令（各记 4096M）：两台都放得下时按剩余占比分到两台
 # 没跑完的尝试量到的峰值：现查的那一次提前退 1 的命令就是这么多（records/2026-10-30-编译绕过内存总上限.md「服务修复两件合起来验」#8），乘 1.5 是 63M
 UNFINISHED_PEAK_BYTES = 42 * MEBIBYTE
-# 库里记一次跑完的峰值 1365 MiB：定的上限是 1365 × 1.5 = 2047.5，按 MiB 向上取整 2048M；撞了它乘 1.5 是 3072M（钉的是验收原话里的两个数）
-CAP_HIT_SEED_PEAK_BYTES = 1365 * MEBIBYTE
+# 库里记一次跑完的峰值 2048 MiB：定的上限照它 2048M（近五次最大，不乘 1.5）；撞了它乘 1.5 是 3072M（钉的是验收原话里的两个数）
+CAP_HIT_SEED_PEAK_BYTES = 2048 * MEBIBYTE
 CAP_HIT_PINNED_TEXT = "2048M"
 CAP_HIT_GROWN_PINNED_TEXT = "3072M"
 # 钉住 task 的 LOG_TAIL_LINES（log 不带 --all 打最后几行）：改它先改这里；每次尝试打的行比它多，截得出来
@@ -146,25 +146,30 @@ ABSENT_TASK_ID = 9999   # 这一格的库里没有这个号（一格只交几件
 UNSHARDED_PINNED_ARGUMENTS = ("--selftest", "--list-items", "--help", "-h")
 SHARD_PLAN_EXIT = 5     # 表外的退出码：计划、合并那一步自己退非 0，记 command-failed、wait 照它退
 SHARD_MERGE_EXIT = 6
-PEER_GONE_RESOURCES = "resources-without-peer.json"   # pinned-peer-unavailable：假第二台跑完时换上的余量（相对仓根写：假第二台照工作目录解）
 FAKE_MEMORY_WRAPPER = r'''#!/usr/bin/env bash
 # task-server 自证的假 run-with-memory-cap.sh：记一行调用（连同线程包装给的线程数与 CARGO_TARGET_DIR），照命令里 fake-wrapper-exits=<码,码,…|run> 按第几次尝试演退出码；
 # run 就起命令，不起真的 cargo、rustc（只放行这一格的假 cargo）；
 # fake-wrapper-exit-peak=<字节> 演真包装在命令退出时读的峰值：先往服务给的 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写这个数；
+# fake-wrapper-exit-peaks=<字节,字节,…> 同上、按第几次尝试取（照 fake-wrapper-exits= 的取法，次数多过列的取最后一个）：演各次撞上限的峰值一次比一次大；
 # fake-wrapper-scene=<码> 演真包装退非 0 时把临时目录搬成现场：建服务给的 RUN_WITH_MEMORY_CAP_SCENE_DIRECTORY、写一份 left-by-command、往标准错误打真包装那一句，退这个码；
 # fake-wrapper-swap-resources=<文件> 第 1 次尝试时拿那一份换掉这一格的两台余量（演「头一次跑完之后本机腾不出地方了」，下一次换台）
-# fake-wrapper-oom-stat 演真包装撞了上限（退 250）那一刻打的内存明细：照 fake-wrapper-exits= 演 250 的那一次先往标准错误打 FAKE_OOM_STAT_LINE 那一行
 cap="$1"; shift
 threads="" command_word="${1:-}"
 if [[ "$(basename -- "${1:-}")" == bash && "$(basename -- "${2:-}")" == capped.sh ]]; then threads="${3:-}"; command_word="${4:-}"; fi
 printf 'wrapper task=%s attempt=%s cap=%s admitted=%s threads=%s target=%s\n' "${TASK_SERVER_TASK:-}" "${TASK_SERVER_ATTEMPT:-}" "$cap" \
   "${RUN_WITH_MEMORY_CAP_ADMITTED_BY_TASK_SERVER:-}" "$threads" "${CARGO_TARGET_DIR:-}" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
-plan="" scene_exit="" oom_stat=""
+plan="" scene_exit=""
 for word in "$@"; do
   case "$word" in
-    fake-wrapper-oom-stat) oom_stat=1 ;;
     fake-wrapper-exits=*) plan="${word#fake-wrapper-exits=}" ;;
     fake-wrapper-exit-peak=*) [[ -n "${RUN_WITH_MEMORY_CAP_PEAK_OUTPUT:-}" ]] && printf '%s\n' "${word#fake-wrapper-exit-peak=}" > "$RUN_WITH_MEMORY_CAP_PEAK_OUTPUT" ;;
+    fake-wrapper-exit-peaks=*)
+      if [[ -n "${RUN_WITH_MEMORY_CAP_PEAK_OUTPUT:-}" ]]; then
+        IFS=, read -r -a exit_peaks <<<"${word#fake-wrapper-exit-peaks=}"
+        peak_position=$(( ${TASK_SERVER_ATTEMPT:-1} - 1 ))
+        (( peak_position < ${#exit_peaks[@]} )) || peak_position=$(( ${#exit_peaks[@]} - 1 ))
+        printf '%s\n' "${exit_peaks[peak_position]}" > "$RUN_WITH_MEMORY_CAP_PEAK_OUTPUT"
+      fi ;;
     fake-wrapper-scene=*) scene_exit="${word#fake-wrapper-scene=}" ;;
     fake-wrapper-swap-resources=*)
       if [[ "${TASK_SERVER_ATTEMPT:-1}" == 1 ]]; then
@@ -184,9 +189,6 @@ if [[ -n "$plan" ]]; then
   IFS=, read -r -a codes <<<"$plan"
   position=$(( ${TASK_SERVER_ATTEMPT:-1} - 1 ))
   (( position < ${#codes[@]} )) || position=$(( ${#codes[@]} - 1 ))
-  if [[ -n "$oom_stat" && "${codes[position]}" == 250 ]]; then
-    echo "RUN_WITH_MEMORY_CAP_OOM_STAT anon=943718400 file=10200547328 file_dirty=8589934592 file_writeback=268435456 shmem=0 oom_kill=1" >&2
-  fi
   if [[ "${codes[position]}" != run ]]; then exit "${codes[position]}"; fi
 fi
 fake_cargo="$(dirname -- "$TASK_SERVER_SELFTEST_WORLD")/fake-cargo/cargo"
@@ -215,6 +217,15 @@ FAKE_PEER_RUNNER = r'''#!/usr/bin/env bash
 # 每一趟（--peer）照真的那样建这一趟的本地目录 builds/<标签>/ 与 runs/ 下三个文件，退出时（连同被 TERM 停、退 143）删掉、回读不在了打真的那样的 ⑥ 那一行
 # （fake_peer_trip_cleanup；带 --keep-build-directory 而命令等到了退出码的留着 builds/ 那一份）。被 TERM 停时照真的那样先停那条命令、等它退，再退 143
 # （fake_peer_stop_and_exit；fake-sharded.py / fake-peer-run 那一支的命令放在后台、wait 它，TERM 一到就接手，不等前台命令自己跑完）。
+# --recover-cleanup <回执> 只在这一格世界目录里有 recover-cleanup-hold 时认（peer-cleanup-off-scheduler 演第二台收尾卡住）：记一行 peer-recover、建 recover-cleanup-reached，
+# 等 recover-cleanup-release 在了（至多 200 秒）再把回执原子写成 confirmed、退 0；没有 hold 的照别的参数一样认不出、退 2（回执照旧 pending）。
+if [[ "${1:-}" == --recover-cleanup && -e "$TASK_SERVER_SELFTEST_WORLD/recover-cleanup-hold" ]]; then
+  printf 'peer-recover receipt=%s\n' "${2:-}" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
+  : > "$TASK_SERVER_SELFTEST_WORLD/recover-cleanup-reached"
+  for round in $(seq 1 2000); do [[ -e "$TASK_SERVER_SELFTEST_WORLD/recover-cleanup-release" ]] && break; sleep 0.1; done
+  printf '{"status": "confirmed"}\n' > "${2:?}.partial" && mv -- "$2.partial" "$2"
+  exit 0
+fi
 if [[ "${1:-}" == --remove-build-directory ]]; then
   printf 'peer-remove label=%s\n' "${2:-}" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
   rm -rf -- "$(dirname -- "$TASK_SERVER_SELFTEST_WORLD").peer-local/builds/${2:?}"
@@ -352,7 +363,10 @@ mkdir -p "$target/debug" && head -c 65536 /dev/zero > "$target/debug/selftest-ar
 FAKE_SHARDED = r'''#!/usr/bin/env python3
 # task-server-shards: *
 """task-server 自证的假分片入口：python3 fake-sharded.py run <规格>。规格是同目录的 JSON：{"shards": [{"pin", "exits": [码或 "run"…], "first_attempt_delay": 秒,
-"block": 放行文件的绝对路径, "label", "exit_peak": 字节}…], "plan_text": 计划的原文（不给照 shards 写）, "plan_exit": 码, "merge_exit": 码}。
+"block": 放行文件的绝对路径, "label", "exit_peak": 字节}…], "plan_text": 计划的原文（不给照 shards 写）, "plan_exit": 码, "merge_exit": 码,
+"plan_binaries": [文件名…], "plan_binaries_link": 计划目录外的目录}。
+给了 plan_binaries 的，计划那一步在计划目录下建 test-binaries/、里面照名字各写一份（演预先编好的测试二进制）；给了 plan_binaries_link 的，那个目录里写一份 kept，
+test-binaries 建成指到它的符号链接；这两种都往调用记录写一行 sharded-plan-binaries（task、计划目录 directory）。
 一片给了 exit_peak 的，跑成（run）那一次往服务给的 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写这个数（演真包装在命令退出时读的峰值，服务照它记这一次尝试的 memory_peak）。
 计划那一步写 plan.json（每片写 label，规格里那一片写了 pin 的连 pin 一起写）、
 退 plan_exit；每片按第几次尝试演退出码，往调用记录写一行，给了 block 的先等那份文件在（至多 60 秒，等不到退 9；退出码不是 run 的同样先等），run 就在产物目录写 done-<片号>；
@@ -383,8 +397,22 @@ def main(arguments):
         record(f"sharded-plan task={task}")
         text = spec.get("plan_text") or json.dumps({"shards": [dict({"label": shard.get("label", "")}, **({"pin": shard["pin"]} if "pin" in shard else {}))
                                                                for shard in spec["shards"]]})
-        with open(os.path.join(os.environ["TASK_SERVER_SHARD_PLAN_DIRECTORY"], "plan.json"), "w", encoding="utf-8") as handle:
+        directory = os.environ["TASK_SERVER_SHARD_PLAN_DIRECTORY"]
+        with open(os.path.join(directory, "plan.json"), "w", encoding="utf-8") as handle:
             handle.write(text)
+        binaries = os.path.join(directory, "test-binaries")
+        if spec.get("plan_binaries_link"):
+            os.makedirs(spec["plan_binaries_link"], exist_ok=True)
+            with open(os.path.join(spec["plan_binaries_link"], "kept"), "w", encoding="utf-8") as handle:
+                handle.write("kept\n")
+            os.symlink(spec["plan_binaries_link"], binaries)
+            record(f"sharded-plan-binaries task={task} directory={directory}")
+        elif spec.get("plan_binaries"):
+            os.makedirs(binaries, exist_ok=True)
+            for name in spec["plan_binaries"]:
+                with open(os.path.join(binaries, name), "w", encoding="utf-8") as handle:
+                    handle.write(name + "\n")
+            record(f"sharded-plan-binaries task={task} directory={directory}")
         return spec.get("plan_exit", 0)
     if phase == "shard":
         index = int(os.environ["TASK_SERVER_SHARD"].split("/")[0])
@@ -430,91 +458,6 @@ def main(arguments):
 
 sys.exit(main(sys.argv[1:]))
 '''
-FAKE_GPU_QUIESCE = r'''#!/usr/bin/env bash
-# task-server 自证的假 gpu-quiesce-run.sh：记一行调用（交给命令的卡），照命令里 fake-quiesce=<结局> 演清场的结局：
-#   card-fault（坏卡清单点名 127.0.0.1:0）、card-fault-on:<那一项>（分到那一项时坏卡清单点名它的台与序号，没分到照跑）、
-#   card-fault-names:<台>:<序号>（不管分到哪张，坏卡清单都点名这一张）、card-fault-unlisted（清场那一行没有坏卡清单）、read-back-failed、block:<放行文件>、
-#   card-fault-on-else-block:<那一项>=<放行文件>（分到那一项时同 card-fault-on，没分到就等放行文件在了再退 0：换卡之后的那一次一直在跑）
-printf 'quiesce task=%s attempt=%s cards=%s\n' "${TASK_SERVER_TASK:-}" "${TASK_SERVER_ATTEMPT:-}" "${GPU_CARDS_BY_PRIORITY:-}" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
-[[ "${1:-}" == -- ]] && shift
-for word in "$@"; do
-  case "$word" in
-    fake-quiesce=card-fault)
-      echo "GPU_QUIESCE step=quiesce result=card-fault faulty-cards=127.0.0.1:0 cards=127.0.0.1/0/selftest-bus/xid-79" >&2
-      echo "GPU_QUIESCE step=command result=not-started" >&2
-      exit 78 ;;
-    fake-quiesce=card-fault-unlisted)
-      echo "GPU_QUIESCE step=quiesce result=card-fault cards=127.0.0.1/1/selftest-bus/xid-79" >&2
-      echo "GPU_QUIESCE step=command result=not-started" >&2
-      exit 78 ;;
-    fake-quiesce=card-fault-names:*)
-      named="${word#fake-quiesce=card-fault-names:}"
-      echo "GPU_QUIESCE step=quiesce result=card-fault faulty-cards=$named cards=${named%:*}/${named##*:}/selftest-bus/xid-62" >&2
-      echo "GPU_QUIESCE step=command result=not-started" >&2
-      exit 78 ;;
-    fake-quiesce=read-back-failed)
-      echo "GPU_QUIESCE step=quiesce result=read-back-failed holders=0" >&2
-      exit 78 ;;
-    fake-quiesce=card-fault-on:*)
-      entry="${word#fake-quiesce=card-fault-on:}"
-      if [[ " ${GPU_CARDS_BY_PRIORITY:-} " == *" $entry "* ]]; then
-        identity="${entry%:*}"
-        echo "GPU_QUIESCE step=quiesce result=card-fault faulty-cards=$identity cards=${identity%:*}/${identity##*:}/selftest-bus/xid-62" >&2
-        echo "GPU_QUIESCE step=command result=not-started" >&2
-        exit 78
-      fi
-      exit 0 ;;
-    fake-quiesce=card-fault-on-else-block:*)
-      spec="${word#fake-quiesce=card-fault-on-else-block:}"
-      entry="${spec%%=*}"
-      release="${spec#*=}"
-      if [[ " ${GPU_CARDS_BY_PRIORITY:-} " == *" $entry "* ]]; then
-        identity="${entry%:*}"
-        echo "GPU_QUIESCE step=quiesce result=card-fault faulty-cards=$identity cards=${identity%:*}/${identity##*:}/selftest-bus/xid-62" >&2
-        echo "GPU_QUIESCE step=command result=not-started" >&2
-        exit 78
-      fi
-      for round in $(seq 1 600); do [[ -e "$release" ]] && exit 0; sleep 0.1; done
-      exit 9 ;;
-    fake-quiesce=block:*)
-      release="${word#fake-quiesce=block:}"
-      for round in $(seq 1 600); do [[ -e "$release" ]] && exit 0; sleep 0.1; done
-      exit 9 ;;
-  esac
-done
-exec "$@"
-'''
-FAKE_NVIDIA_SMI = r'''#!/usr/bin/env bash
-# task-server 自证的假 nvidia-smi：--query-compute-apps 照这一格的 card-busy-pids 与 card-busy-pids-<名字> 那几份（一行一个进程号）打「<进程号>, 100」
-#（演卡上有这些进程的计算负载），一份都没有就一行不打；--query-gpu=utilization.gpu 照 -i 给的每个序号打 card-utilization-<序号> 那一份的内容
-#（演卡的利用率），有一个序号没有那一份就退 9（演利用率读不到）；别的用法退 9
-case "$*" in
-  *--query-compute-apps*)
-    for listed in "$TASK_SERVER_SELFTEST_WORLD"/card-busy-pids "$TASK_SERVER_SELFTEST_WORLD"/card-busy-pids-*; do
-      [[ -f "$listed" ]] && sed 's/$/, 100/' "$listed"
-    done
-    exit 0 ;;
-  *--query-gpu=utilization.gpu*)
-    indexes=""
-    while (( $# )); do
-      [[ "$1" == -i ]] && indexes="${2:-}"
-      shift
-    done
-    [[ -n "$indexes" ]] || exit 9
-    for index in ${indexes//,/ }; do
-      [[ -f "$TASK_SERVER_SELFTEST_WORLD/card-utilization-$index" ]] || exit 9
-      cat -- "$TASK_SERVER_SELFTEST_WORLD/card-utilization-$index"
-    done
-    exit 0 ;;
-  *) exit 9 ;;
-esac
-'''
-# 自证给疑似卡住那两格用的 GPU 跑法（名字照 GPU_SCRIPT_PATTERNS 认成要卡、服务套清场）：给了 $1 就把自己的进程号写进去（演卡上有它的计算负载），之后每 0.25 秒打一行
-SUSPECT_GPU_SCRIPT_NAME = "crash-amplification-suspect-selftest.sh"
-SUSPECT_GPU_SCRIPT = r'''#!/usr/bin/env bash
-[[ -n "${1:-}" ]] && echo "$$" >> "$1"
-for round in $(seq 1 40); do echo "tick $round"; sleep 0.25; done
-'''
 FAKE_SSH = r'''#!/usr/bin/env bash
 # task-server 自证的假 ssh（TASK_SERVER_PEER_SSH；task_server_lib.py 的 peer_shell）：跳过 -o 选项与主机名，往 ssh-calls 记一行；这一格世界目录里的几个文件演第二台：
 # fake-ssh-unreachable 在时一律退 255（连不上）；stat -f（挂载那一项）照 fake-ssh-mount-exit 的内容退（不在退 0），退 0 时打 fake-ssh-mount-type 的内容
@@ -523,6 +466,7 @@ FAKE_SSH = r'''#!/usr/bin/env bash
 #（演第二台写的本机读不回）；fake-ssh-hang 在时复核挂载的那一句（stat -f）把自己的进程号写进 fake-ssh-hang-pid、睡着不退（演停服务时还在跑的探测子进程）；
 # fake-ssh-read-delay 在时头一个读探针的（for try in …）把它改名成 fake-ssh-read-delay.taken、先睡里面写的秒数再读（演两趟探针交错）；
 # fake-ssh-hang-once 在时头一回复核挂载的那一句（stat -f）把它改名成 fake-ssh-hang-once.taken、睡着不退（演第二台一次慢，ssh 到时限被停），之后照常回；
+# fake-ssh-hang-count 里写着一个数 N（大于 0）时，复核挂载的那一句（stat -f）每来一回把它减一、睡着不退（演第二台连着慢 N 回），减到 0 之后照常回；
 # 别的在本机 bash -c 跑（假共享根在本机，「两台」读写的是同一份）
 while [[ "${1:-}" == -o ]]; do shift 2; done
 host="${1:-}"; shift
@@ -538,6 +482,8 @@ case "$script" in
   "stat -f -c %T -- "*)
     if [[ -e "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang" ]]; then echo "$$" > "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang-pid"; exec sleep 120; fi
     if mv -- "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang-once" "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang-once.taken" 2>/dev/null; then exec sleep 120; fi
+    left="$(cat "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang-count" 2>/dev/null || echo 0)"
+    if [[ "$left" -gt 0 ]]; then echo "$((left - 1))" > "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-hang-count"; exec sleep 120; fi
     code="$(cat "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-mount-exit" 2>/dev/null || echo 0)"
     if [[ "$code" != 0 ]]; then echo "stat: cannot read file system information: No such device（自证）" >&2; exit "$code"; fi
     cat "$TASK_SERVER_SELFTEST_WORLD/fake-ssh-mount-type" 2>/dev/null || echo nfs
@@ -575,6 +521,14 @@ FAKE_PRUNE_CHECK = r'''#!/usr/bin/env bash
 echo "prune-check cwd=$PWD" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
 code="$(cat "$TASK_SERVER_SELFTEST_WORLD/prune-check-exit" 2>/dev/null || echo 0)"
 [[ "$code" == 0 ]] || echo "  ✗ prune-server 不通（自证）" >&2
+exit "$code"
+'''
+FAKE_GPU_SERVICE_CONTROL = r'''#!/usr/bin/env bash
+# task-server 自证的假 gpu-verification-server/control（TASK_SERVER_GPU_SERVICE_CONTROL）：记一行「gpu-service-control <子命令>」，
+# 照这一格世界目录里 gpu-service-exit 的内容退（不在退 0：服务在跑）
+echo "gpu-service-control $*" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
+code="$(cat "$TASK_SERVER_SELFTEST_WORLD/gpu-service-exit" 2>/dev/null || echo 0)"
+[[ "$code" == 0 ]] || echo "  ✗ GPU 批处理验证服务没起（自证）" >&2
 exit "$code"
 '''
 FAKE_TEMPORARY_SERVICE = r'''#!/usr/bin/env python3
@@ -632,12 +586,13 @@ esac
 # 错误类型 → 喂到它的那一格（type-table-covered 静态核这张表与 task_server_lib.OUTCOME_TYPES 逐个对上）
 EXERCISED_BY = {
     "succeeded": "error-types", "command-failed": "error-types", "memory-cap-hit": "error-types", "memory-cap-at-maximum": "memory-cap-at-maximum",
-    "squeezed-out": "error-types", "gpu-memory-short": "error-types", "timed-out": "error-types",
+    "squeezed-out": "error-types", "timed-out": "error-types",
     "wrapper-refused": "error-types", "run-condition-unmet": "error-types", "not-run": "error-types", "peer-run-failed": "error-types",
-    "card-fault": "error-types", "launcher-lost": "error-types", "cancelled": "cancel-own-session-only", "record-tampered": "tampered-row-not-started",
-    "never-fits": "error-types", "unit-start-failed": "unit-start-failed", "shard-plan-refused": "shard-retry-isolated",
+    "launcher-lost": "error-types", "cancelled": "cancel-own-session-only", "record-tampered": "tampered-row-not-started",
+    "never-fits": "pinned-peer-unavailable", "unit-start-failed": "unit-start-failed", "shard-plan-refused": "shard-retry-isolated",
     "stalled": "stalled-attempt-stopped", "resubmit-required": "queued-revalidated-on-restart",
-    "prune-server-unavailable": "prune-server-unavailable-outcome", "over-two-hours": "over-two-hours-bounced",
+    "prune-server-unavailable": "prune-server-unavailable-outcome", "over-four-hours": "run-hard-limit-stopped",
+    "killed-externally": "external-kill-recorded-and-retried",
 }
 PEAKS = lib.load_module("memory_peaks_lib", os.path.join(lib.HOSTS_DIRECTORY, "memory_peaks_lib.py"))
 HEAVY_THREADS = lib.load_module("heavy_threads", os.path.join(lib.HOSTS_DIRECTORY, "heavy_threads.py"))
@@ -656,7 +611,11 @@ def write_executable(path, text):
     os.chmod(path, 0o755)
 
 
-def memory_report(free_gibibytes, slice_gibibytes, gpu_cards=None, slice_used_gibibytes=0, margin_gibibytes=SELFTEST_MARGIN_GIBIBYTES, scopes=None):
+# 各格假余量报告里缺省的 CPU（memory_report）：负载 0、核数够大，服务在一台上在跑的线程之和（每条 31）几百条都不到核数 × 2，CPU 闸只红点名的几格
+SELFTEST_IDLE_CPU = {"load1": 0.0, "procs_running": 1, "cpus": 4096}
+
+
+def memory_report(free_gibibytes, slice_gibibytes, slice_used_gibibytes=0, margin_gibibytes=SELFTEST_MARGIN_GIBIBYTES, scopes=None):
     """slice_used_gibibytes：slice 里此刻进程用的内存（memory_peaks_lib 的 headroom 交的 slice_used），slice 放得下的照总上限减它。
     margin_gibibytes：这台此刻的余量（memory_peaks_lib 的 MARGIN_REPORT_KEY，自证喂的定值）；None 演量不到（原因写进 MARGIN_PROBLEM_KEY）。
     scopes：{尝试的 label: 回收不掉的用量（字节）}，写成这台 slice 下各个在跑的 scope（memory_peaks_lib 的 SCOPES_REPORT_KEY，单元名是假的）；不给就不写这一项。"""
@@ -667,11 +626,10 @@ def memory_report(free_gibibytes, slice_gibibytes, gpu_cards=None, slice_used_gi
     report = {"memory": {"mem_total": 512 * GIBIBYTE, "mem_available": free, "pending": 0, "running": 0, "slice_total": slice_total, "slice_used": slice_used,
                          "free": free, "slice_room": slice_total - slice_used, PEAKS.MARGIN_REPORT_KEY: margin, PEAKS.MARGIN_MEASURED_KEY: margin,
                          PEAKS.MARGIN_PROBLEM_KEY: "" if margin is not None else "自证：这台 slice 的 memory.current 读不了"}}
+    report["memory"][PEAKS.CPU_REPORT_KEY] = dict(SELFTEST_IDLE_CPU)   # 读得到的 CPU（读不到的那一台这一轮不派，task_server.py 的 cpu_problem）；local_cpu 给了的格换掉它
     if scopes is not None:
         report["memory"][PEAKS.SCOPES_REPORT_KEY] = {f"singlefs-memory-cap-selftest-{position}.scope": {PEAKS.SCOPE_USED_KEY: int(used), PEAKS.SCOPE_LABEL_KEY: label}
                                                      for position, (label, used) in enumerate(sorted(scopes.items()))}
-    if gpu_cards is not None:
-        report["gpu"] = {"cards": [{"index": index, "total": mebibytes, "free": mebibytes} for index, mebibytes in gpu_cards]}
     return report
 
 
@@ -743,10 +701,10 @@ class World:
         if prepare:
             lib.create_signing_key(self.key)
         fakes = {"fake-wrapper": FAKE_MEMORY_WRAPPER, "fake-peer-runner": FAKE_PEER_RUNNER,
-                 "fake-quiesce": FAKE_GPU_QUIESCE, "fake-systemd-run-refusing": FAKE_SYSTEMD_RUN_REFUSING, "fake-systemd-run-selective": FAKE_SYSTEMD_RUN_SELECTIVE,
+                 "fake-systemd-run-refusing": FAKE_SYSTEMD_RUN_REFUSING, "fake-systemd-run-selective": FAKE_SYSTEMD_RUN_SELECTIVE,
                  "fake-systemctl": FAKE_SYSTEMCTL,
-                 "fake-nvidia-smi": FAKE_NVIDIA_SMI, "fake-ssh": FAKE_SSH, "fake-systemd-run-delayed": FAKE_SYSTEMD_RUN_DELAYED,
-                 "fake-systemd-run-silent": FAKE_SYSTEMD_RUN_SILENT, "fake-prune-check": FAKE_PRUNE_CHECK}
+                 "fake-journalctl-earlyoom": FAKE_JOURNALCTL_EARLYOOM, "fake-ssh": FAKE_SSH, "fake-systemd-run-delayed": FAKE_SYSTEMD_RUN_DELAYED,
+                 "fake-systemd-run-silent": FAKE_SYSTEMD_RUN_SILENT, "fake-prune-check": FAKE_PRUNE_CHECK, "fake-gpu-service-control": FAKE_GPU_SERVICE_CONTROL}
         for name, text in fakes.items():
             write_executable(os.path.join(self.bin, name), text)
         write_executable(os.path.join(self.fake_cargo, "cargo"), FAKE_CARGO)
@@ -764,12 +722,16 @@ class World:
         base = {name: os.environ[name] for name in ("PATH", "HOME", "USER", "LOGNAME", "LANG", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS") if name in os.environ}
         self.server_environment = dict(base, **common, **{
             "TASK_SERVER_FAKE_RESOURCES": self.resources_path, "TASK_SERVER_MEMORY_WRAPPER": os.path.join(self.bin, "fake-wrapper"),
-            "TASK_SERVER_PEER_RUNNER": os.path.join(self.bin, "fake-peer-runner"), "TASK_SERVER_GPU_QUIESCE": os.path.join(self.bin, "fake-quiesce"),
+            "TASK_SERVER_PEER_RUNNER": os.path.join(self.bin, "fake-peer-runner"),
             "TASK_SERVER_SESSION_BOUNDARY_PID": str(os.getpid()), "TASK_SERVER_FAKE_REPOSITORY_ROOT": self.repo, "TASK_SERVER_FAKE_SCOPE_DIRECTORY": self.empty_scope,
             lib.WORK_ROOT_VARIABLE: self.work_root,   # 共享数据根不设 SINGLEFS_DATA_ROOT：服务照多机配置的 SHARED_DATA_ROOT 取（同真服务的单元环境）
-            lib.MEMORY_FLOOR_VARIABLE: "0",   # 弄坏开关 recorded-cap-floored 下兜到的下限，小世界里是 0：开关只红点名的几格（task_server_lib.py 文件头「只在自证里认的变量」）；那几格写空串照真的
+            lib.CPU_OVERSUBSCRIPTION_VARIABLE: "2",   # CPU 闸的倍数，小世界里是 2（线 64）：各格照它搭的；真值由 cpu-gate-line-twice-cores 那一格钉
+            lib.YOUNG_BOOKING_VARIABLE: "0",   # 起跑不满两分钟照整份上限记，小世界里不看：各格的任务几秒就跑完；那一条由 running-young-booked-at-cap 套在假调度器上判
+            lib.SLICE_ROOM_FLOOR_VARIABLE: "0",   # slice 兜底的下限，小世界里是 0（不判）：各格的小 slice 不被 4G 的下限停派，slice-floor-holds-dispatch 那一格自己判
+            lib.UNNAMED_RUN_SELFTEST_VARIABLE: "off",   # 提交时拒 ⑦（启动测试与验证没点名）小世界里不判：各格交的命令演别的规矩；unnamed-* 那几格起服务时写空串照真的判
+            lib.MEMORY_FLOOR_VARIABLE: "0",   # 内存上限的下限，小世界里是 0：各格的小上限不被 1024M 的下限抬走，弄坏开关 cap-floor-skipped 与 recorded-cap-floored 只红点名的几格（task_server_lib.py 文件头「只在自证里认的变量」）；那几格写空串照真的
             "RUN_WITH_MEMORY_CAP_PEAKS": self.peak_table, "HOST_DISPATCH_STATE_DIR": os.path.join(root, "host-dispatch"),
-            "GPU_QUIESCE_STATE_DIRECTORY": os.path.join(root, "quiesce"), lib.SESSIONS_DIRECTORY_OVERRIDE: self.sessions})
+            lib.SESSIONS_DIRECTORY_OVERRIDE: self.sessions})
         # 客户端与 control 的 XDG 目录换到这一格的临时目录：多机配置不在、照缺省路径接着判的那一种（弄坏开关 config-missing-ignored）也连不到本机在跑的那一份服务。
         # 客户端读不到收件地址就拒（task 的 submit）：缺省给一个不在的收件 socket 与一个令牌；会话登记目录里没登这一格的会话，服务照会话号找不到，提醒不发、结局发不出（写告警），
         # wait 照取；要收消息的格起 FakeInbox，它把会话登进会话登记目录
@@ -827,32 +789,35 @@ class World:
         self.write_config(temporary, self.state, self.runtime, self.key, self.builds, self.shared_root, slice_caps=value)
         os.replace(temporary, self.config)
 
-    def resources(self, local=None, peer=None, peer_cap_gibibytes=None, cards="", local_gpu=None, hold=False, path=None, recheck_local=None, local_slice_used=0,
-                  peer_down="", peer_disk_bytes=None, peer_df=None, local_disk_bytes=None, peer_gpu=None,
+    def resources(self, local=None, peer=None, peer_cap_gibibytes=None, hold=False, path=None, recheck_local=None, recheck_peer=None, local_slice_used=0,
+                  peer_down="", peer_disk_bytes=None, peer_df=None, local_disk_bytes=None,
                   local_margin=SELFTEST_MARGIN_GIBIBYTES, peer_margin=SELFTEST_MARGIN_GIBIBYTES, peer_slice_used=0, peer_scopes=None, local_scopes=None, local_cpu=None, local_slice_unstarted=False):
-        """写两台的假余量与卡（服务每次现读）；path 给了就写到那里（假第二台跑完时换上的那一份），不给是这一格服务读的那一份。
-        recheck_local 给了，起之前复核读本机时照它（排队那一轮照 local）；local_slice_used 是本机 slice 里回收不掉的用量（GiB）。
+        """写两台的假余量（服务每次现读）；path 给了就写到那里（假第二台跑完时换上的那一份），不给是这一格服务读的那一份。
+        recheck_local 给了，起之前复核读本机时照它（排队那一轮照 local）；recheck_peer 给了，起之前复核读第二台时照它（不带盘余量，同真的第二台探测：服务照 peer_df 现量）；
+        local_slice_used 是本机 slice 里回收不掉的用量（GiB）。
         peer_down 给了（一句原因），演第二台此刻用不了（照真的那样告警）。
         peer_disk_bytes、local_disk_bytes 给了，那一台的报告里带盘余量（task_server.py 的 DISK_REPORT_KEY）；peer_df 给了，演服务在第二台另起的 df 打出的那几行；都不给的服务当盘够。
         local_margin、peer_margin：两台此刻的余量（GiB，缺省 SELFTEST_MARGIN_GIBIBYTES；None 演那台量不到余量）。
         peer_slice_used：第二台 slice 里此刻进程用的内存（GiB）；peer_scopes、local_scopes：那一台报告里在跑的 scope（{尝试的 label: 回收不掉的用量字节}，memory_report 的 scopes）。"""
-        value = {"cards": cards, "hold": hold, "peer_build_root": self.peer_local}   # 第二台的编译根：假 multi-host-run.sh 在它下面 builds/<标签>/ 建这一趟的编译目录，服务照它记（Resources.build_root_of_peer）
+        value = {"hold": hold, "peer_build_root": self.peer_local}   # 第二台的编译根：假 multi-host-run.sh 在它下面 builds/<标签>/ 建这一趟的编译目录，服务照它记（Resources.build_root_of_peer）
         if peer_df is not None:
             value["df"] = {SERVER.PEER: peer_df}
         if peer_down:
             value["down"] = {SERVER.PEER: peer_down}
         if local:
-            value["local"] = memory_report(local[0], local[1], local_gpu, local_slice_used, local_margin, local_scopes)
+            value["local"] = memory_report(local[0], local[1], local_slice_used, local_margin, local_scopes)
             if local_slice_unstarted:   # 演本机 slice 还没起：slice_total 是估的（memory_peaks_lib 的 SLICE_STARTED_KEY 为假）
                 value["local"]["memory"][PEAKS.SLICE_STARTED_KEY] = False
-            if local_cpu is not None:   # 本机报告里的 CPU 负载（memory_peaks_lib 的 CPU_REPORT_KEY；不给的服务不判 CPU 闸）
+            if local_cpu is not None:   # 本机报告里的 CPU 负载（memory_peaks_lib 的 CPU_REPORT_KEY；不给的照 SELFTEST_IDLE_CPU，memory_report）
                 value["local"]["memory"][PEAKS.CPU_REPORT_KEY] = dict(local_cpu)
             if local_disk_bytes is not None:   # 本机编译目录所在盘的余量（task_server.py 的 DISK_REPORT_KEY）；不给的服务不判本机占盘
                 value["local"][SERVER.DISK_REPORT_KEY] = int(local_disk_bytes)
         if recheck_local:
             value["recheck"] = {"local": memory_report(recheck_local[0], recheck_local[1], margin_gibibytes=local_margin)}
+        if recheck_peer:
+            value.setdefault("recheck", {})["peer"] = memory_report(recheck_peer[0], recheck_peer[1], margin_gibibytes=peer_margin)
         if peer:
-            value["peer"] = memory_report(peer[0], peer[1], peer_gpu, peer_slice_used, peer_margin, peer_scopes)
+            value["peer"] = memory_report(peer[0], peer[1], peer_slice_used, peer_margin, peer_scopes)
             if peer_disk_bytes is not None:
                 value["peer"][SERVER.DISK_REPORT_KEY] = int(peer_disk_bytes)
             value["memory_caps"] = {SERVER.PEER: int((peer_cap_gibibytes or peer[1]) * GIBIBYTE)}
@@ -862,21 +827,27 @@ class World:
             json.dump(value, handle)
         os.replace(temporary, target)
 
-    def seed_peak(self, key, byte_count):
+    def seed_peak(self, key, byte_count, shard_count=None):
         """往这一格服务自己的库里记一次跑完（succeeded）的尝试、量到 byte_count 的峰值：服务定额度只认自己库里的尝试（task_server_lib.py 文件头「资源记录」）。
-        key 是命令键（RUN_WITH_MEMORY_CAP_KEY 的值，或 PEAKS.command_key 换算过的）。"""
-        self.seed_attempt({"command_key": key, "outcome": "succeeded", "memory_peak": int(byte_count)})
+        key 是命令键（RUN_WITH_MEMORY_CAP_KEY 的值，或 PEAKS.command_key 换算过的）。分片的片（键是 lib.shard_child_key 写的那种）要给 shard_count：
+        定额度只认片数与这一趟相同的记录（task_server.py 的 record_fits_task），记的是那一趟共几片。"""
+        fields = {"command_key": key, "outcome": "succeeded", "memory_peak": int(byte_count)}
+        if shard_count is not None:
+            fields["shard_count"] = shard_count
+        self.seed_attempt(fields)
 
     def seed_duration(self, key, seconds, command):
-        """往这一格服务自己的库里记一次跑完的尝试、用时 seconds 秒（峰值量不到，不占定额度的名额）：预计用时只认自己库里命令逐词相同（command）的尝试。"""
+        """往这一格服务自己的库里记一次跑完的尝试、用时 seconds 秒（峰值量不到，不占定额度的名额）：上次运行时长只认自己库里的尝试。"""
         self.seed_attempt({"command_key": key, "command": list(command), "outcome": "succeeded", "memory_peak": None, "seconds": float(seconds)})
 
     def seed_attempt(self, fields, metric=lib.PROCESS_MEMORY_PEAK_METRIC):
-        """记一次结束了的尝试；metric 是峰值口径一栏（task_server_lib.py 文件头「资源记录」）：缺省照这一版服务记的写，给 None 演批 92 之前记的、没有这一栏的旧行。"""
+        """记一次结束了的尝试；metric 是峰值口径一栏（task_server_lib.py 文件头「资源记录」）：缺省照这一版服务记的写，给 None 演批 92 之前记的、没有这一栏的旧行。
+        fields 里给了 task_id、number 的照给的记（control key-stats 那几格按任务折重试），没给的记任务 0、第 1 次。"""
         record = {"peak_metric": metric} if metric is not None else {}
         record.update(fields)
-        self.seeded.append(dict(record, task_id=0, number=1, host="local", state="ended", session="", ended_at=SEEDED_ENDED_AT,
-                                started_at=SEEDED_ENDED_AT - float(fields.get("seconds") or 1)))
+        ended_at = float(fields.get("ended_at") or SEEDED_ENDED_AT)   # 要排先后的格自己给 ended_at
+        self.seeded.append(dict(record, task_id=fields.get("task_id", 0), number=fields.get("number", 1), host="local", state="ended", session="", ended_at=ended_at,
+                                started_at=ended_at - float(fields.get("seconds") or 1)))
         self.flush_seeded()
 
     def flush_seeded(self):
@@ -1147,33 +1118,53 @@ class World:
 
     # ── 客户端与 control ──
     def client(self, arguments, session=SESSION_A, extra=None, forged=None, timeout=90, background=False, script=None, cwd=None):
-        """经一个「会话 shell」起客户端（或 control）：那个 bash 的环境里是 session，客户端自己的环境里换成 forged（给了的话）。"""
+        """经一个「会话 shell」起客户端（或 control，control 是唯一传 script 的）：那个 bash 的环境里是 session，客户端自己的环境里换成 forged（给了的话）。
+        每一条自成一个进程组（start_new_session）：bash、它起的客户端与客户端的子进程同组，超时与收尾经 stop_client 对整组发信号，只停 bash 的话客户端拿着管道写端、communicate 等不到 EOF。"""
         environment = dict(self.client_environment, **(extra or {}))
         environment.pop(lib.SESSION_VARIABLE, None)
         if session:
             environment[lib.SESSION_VARIABLE] = session
-        inner = '"$@"; exit $?' if forged is None else 'CLAUDE_CODE_SESSION_ID="$0" "$@"; exit $?'
-        argv = ["bash", "-c", inner, forged or "session-shell", sys.executable, "-B", script or lib.CLIENT_SCRIPT, *arguments]
+        if forged is None:
+            inner, shell_name = '"$@"; exit $?', "session-shell"
+        else:
+            inner, shell_name = 'CLAUDE_CODE_SESSION_ID="$0" "$@"; exit $?', forged
+        if script is None:
+            target = lib.CLIENT_SCRIPT
+        else:
+            target = lib.CONTROL_SCRIPT
+        argv = ["bash", "-c", inner, shell_name, sys.executable, "-B", target, *arguments]
         if background:
             process = subprocess.Popen(argv, env=environment, cwd=cwd or self.work, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       text=True)
+                                       text=True, start_new_session=True)
             self.background.append(process)
             return process
-        process = subprocess.Popen(argv, env=environment, cwd=cwd or self.work, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(argv, env=environment, cwd=cwd or self.work, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   start_new_session=True)
         try:
             stdout, stderr = self.communicate(process, timeout)   # timeout 是安静时限（上面常量处「等待的判法」）
         except subprocess.TimeoutExpired:
-            process.kill()   # 只停自己起的那一个进程号
-            stdout, stderr = process.communicate()
+            stdout, stderr = self.stop_client(process)
             raise SelftestFailure(f"{' '.join(arguments)[:200]} 跑了 {timeout} 秒没退（安静时限；世界一直在变的话，绝对上限 {timeout * WAIT_CEILING_FACTOR} 秒）", [str(stdout or ""), str(stderr or "")]) from None
         return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+
+    def stop_client(self, process):
+        """停 client 起的那一条（对它自己的进程组发 SIGKILL，进程组是那一次 Popen 建的）、收它的输出 → (stdout, stderr)。组外还有进程拿着管道写端的，至多等 CLIENT_GROUP_STOP_SECONDS 秒，交已经读到的。"""
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        try:
+            return process.communicate(timeout=CLIENT_GROUP_STOP_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            process.poll()
+            return tuple(piece.decode("utf-8", "replace") if isinstance(piece, bytes) else (piece or "") for piece in (error.stdout, error.stderr))
 
     def control(self, arguments, **options):
         return self.client(arguments, script=lib.CONTROL_SCRIPT, **options)
 
     def submit(self, command, session=SESSION_A, extra=None, forged=None, cwd=None):
         """交一条、照确认单一起确认（confirm_submitted；task_server.py 文件头 ⑦），交任务号。"""
-        completed = self.client(["submit", "--cwd", cwd or self.work, "--", *command], session=session, extra=extra, forged=forged)
+        full_gate = (extra or {}).get("SINGLEFS_RUN_SCOPE") == SCOPE_COMMIT and lib.commit_gate_entry(list(command), cwd or self.work)   # 演提交时那一趟：带全量标识
+        completed = self.client(["submit", "--cwd", cwd or self.work, *([] if session else ["--manual"]), *(["--full-gate"] if full_gate else []), "--", *command],
+                                session=session, extra=extra, forged=forged)
         found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
         if completed.returncode != 0 or not found:
             raise SelftestFailure(f"提交 {command} 没拿到任务号（退 {completed.returncode}）", [completed.stdout, completed.stderr] + self.server_log_lines())
@@ -1182,19 +1173,28 @@ class World:
 
     def confirm_submitted(self, completed, session=SESSION_A, extra=None, forged=None, required=True):
         """照提交回复（或确认被拒时）打的 CONFIRM_NEEDED_MARK 那一行确认（自证世界的帮手：自证造的任务照样要确认，不另设跳过确认的开关）：
-        数对不上的（这一会儿同会话别的任务起了或收了）照服务打回的那一行再确认，至多 CONFIRM_RETRIES 回；回复里没有那一行的（弄坏开关 confirm-skipped 下交了就进队）不确认。
+        数对不上的（这一会儿同会话别的任务起了或收了）照服务打回的那一行再确认；回复里没有那一行的（弄坏开关 confirm-skipped 下交了就进队）不确认。
+        服务核数是在会话锁里算了就比（task_server.py 的 confirm、counts_mismatch），每一回对不上都是同会话又有一条在排在跑的收了（本帮手不在确认期间再交）：
+        头一回对不上时服务回的条数就是还能收掉的最多几条，所以重试的回数在 CONFIRM_RETRIES 之外再放宽这么多回（有界；机器忙、几十条一齐收尾时每一回客户端往返比收一条还慢，三回追不上）；
+        回数用完了服务打回的还是「数对不上」（打回的回话里还带着新的确认单）的，再追到 CONFIRM_BUDGET_SECONDS 秒为止：对不上的次数跟着同会话别的任务起、收的次数走，机器忙时次数多，不能拿固定回数判。
+        弄坏开关 confirm-retries-fixed 下只重试 CONFIRM_RETRIES 回。
         → 最后一次 confirm 的 CompletedProcess（不用确认交 None）；required 为真时确认不成判红。"""
         reply = completed
-        for _ in range(CONFIRM_RETRIES):
+        allowed, widened = CONFIRM_RETRIES, False
+        tries, deadline = 0, time.monotonic() + getattr(self, "confirm_budget_seconds", CONFIRM_BUDGET_SECONDS)
+        while tries < allowed or (not lib.broken("confirm-retries-fixed") and reply is not completed and reply.returncode != 0 and time.monotonic() < deadline):
+            tries += 1
             needed = lib.confirm_needed_fields(reply.stdout)
             if needed is None:
                 return None if reply is completed else reply
             task_id, items, tasks = needed
+            if not widened and not lib.broken("confirm-retries-fixed"):
+                allowed, widened = allowed + tasks, True
             reply = self.client(["confirm", str(task_id), "--items", str(items), "--tasks", str(tasks)], session=session, extra=extra, forged=forged)
             if reply.returncode == 0:
                 return reply
         if required:
-            raise SelftestFailure(f"照确认单确认了 {CONFIRM_RETRIES} 回都没成（最后退 {reply.returncode}）", [completed.stdout, reply.stdout, reply.stderr] + self.server_log_lines())
+            raise SelftestFailure(f"照确认单确认了 {tries} 回都没成（最后退 {reply.returncode}）", [completed.stdout, reply.stdout, reply.stderr] + self.server_log_lines())
         return reply
 
     def register_session(self, session, socket_path, name, pid=None, started_milliseconds=None):
@@ -1287,9 +1287,7 @@ class World:
             inbox.close()
         for process in self.background:
             if process.poll() is None:
-                process.kill()   # 只停自己起的那一个进程号
-                with contextlib.suppress(subprocess.TimeoutExpired):
-                    process.wait(timeout=10)
+                self.stop_client(process)
         self.stop_server()
         with contextlib.suppress(OSError, sqlite3.Error, subprocess.SubprocessError):
             for unit in self.database_units():
@@ -1538,28 +1536,82 @@ def cell_queue_holds_unplaceable(world):
     return "放不下的那一条留在库里、没起包装，放出来之后才起"
 
 
-def cell_backfill_when_head_blocked(world):
-    """本机 30G（可用上限 28G、界 23.8G）：头一条（峰值 8G，记 12G）占着，排头（峰值 20G，记 28G）放不下、没满时限，后面两条没记录的（各记 4G）先起、跑完。
-    头一条与后面两条都是碎片、一组装 20G 不到界：判的只是回填。头一条的记账离整片的界远：压在界上的话界随余量一挪它就从整片变成碎片，交替封组会把回填挡住。"""
+def cell_aged_blocked_task_blocks_later(world):
+    """排满时限还起不来的任务挡住排在它后面的全部任务（task_server.py 排队那一轮里 blocked 那一支）：本机 30G，头一条（记 12G）占着，排头（记 28G）放不下；
+    等它排满时限（自证里 2 秒）之后再交两条放得下的小任务：两条都不起，排队原因写「排在任务 N 后面：它已排满时限」；放开头一条之后排头先起，后面两条再起，都跑完。
+    弄坏开关 aged-blocked-lets-others-start 下后面两条照常先起，这一格红。"""
     world.resources(local=(30, 30))
-    for key, peak in (("selftest-backfill-first", 8 * GIBIBYTE), ("selftest-backfill-head", 20 * GIBIBYTE)):
+    for key, peak in (("selftest-aged-block-first", 12 * GIBIBYTE), ("selftest-aged-block-head", 28 * GIBIBYTE)):
         world.seed_peak(key, peak)
-    world.start_server()
+    world.start_server(extra={"TASK_SERVER_SELFTEST_AGED_SECONDS": "2"})
     release = os.path.join(world.root, "release")
-    first = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-backfill-first"})
-    world.running(first)
-    head = world.submit(["bash", "-c", "exit 0"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-backfill-head"})
-    later = [world.submit(["bash", "-c", "exit 0"]) for _ in range(2)]   # 没有记录、也没有用时记录的两条
-    summaries = [world.finished(task_id) for task_id in later]
-    head_state = world.summary(head)["task"].get("state")
-    open(release, "w").close()
-    if any(summary["task"].get("outcome") != "succeeded" for summary in summaries) or head_state != "queued":
-        raise SelftestFailure(f"本机空 30G、头一条记 12G 在跑：排头（记 28G）此刻放不下、没满时限，后面放得下的两条（没有用时记录）应当先起、跑完，排头照排；"
-                              f"实际后面两条 {[describe(summary) for summary in summaries]}、排头 {head_state}", world.server_log_lines())
-    head_summary = world.finished(head)
-    if head_summary["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"头一条放出来之后排头应当起、跑完，实际 {describe(head_summary)}", world.server_log_lines())
-    return "排头放不下、没满时限时，后面放得下的（有没有用时记录都一样）先起跑完；排头空出来之后照起"
+    first = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-aged-block-first"})
+    later, waiting = [], {}
+    try:
+        world.running(first)
+        head = world.submit(["bash", "-c", "exit 0"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-aged-block-head"})
+        time.sleep(3)   # 排头满了时限（下限：机器忙时只会更久）
+        world.next_pass()
+        later = [world.submit(["bash", "-c", "exit 0"]) for _ in range(2)]
+        world.next_pass()
+        world.next_pass()
+        waiting = {task_id: world.summary(task_id) for task_id in later}
+    finally:
+        open(release, "w").close()
+    summaries = {task_id: world.finished(task_id) for task_id in [first, head, *later]}
+    problems = []
+    for task_id in later:
+        found = waiting.get(task_id) or {"task": {}, "attempts": []}
+        if found["attempts"] or f"排在任务 {head} 后面" not in (found.get("waiting_for") or "") or "已排满时限" not in (found.get("waiting_for") or ""):
+            problems.append(f"任务 {task_id}（排在排满时限的任务 {head} 后面）：应当没起、排队原因写「排在任务 {head} 后面：它已排满时限」，实际 {describe(found)}、原因「{found.get("waiting_for")}」")
+    orders = {task_id: attempt_order(summaries[task_id]) for task_id in [head, *later]}
+    if orders[head] is None or any(orders[task_id] is None or orders[task_id] < orders[head] for task_id in later):
+        problems.append(f"放开之后排头应当先于后面两条起，实际尝试号 {orders}")
+    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
+        problems.append(f"放开之后都应当跑完，实际 {[describe(summary) for summary in summaries.values()]}")
+    raise_cell_problems(world, problems, "排满时限还起不来的任务挡住后面的")
+    return f"排头（任务 {head}）排满时限还放不下：后面两条放得下的都不起、原因点名它；放开之后排头先起（尝试 {orders[head]}），后面两条再起，都跑完"
+
+
+def cell_jump_only_shorter_than_running(world):
+    """插队规则（task_server.py 的 jump_refusal；用户定「插队的任务的时长不得超过正在运行的任务剩余的时长。没有上次运行时间的任务不得插队」）：本机 30G，头一条（记 12G、
+    上次跑了 600 秒）占着，排头（记 28G）放不下、还没排满时限。后面交三条放得下的小任务：上次跑了 1 秒的先起、跑完（头一条还占着）；没有上次运行时长的与上次跑了
+    100000 秒的都不起，排队原因写「不插队」。放开头一条之后都跑完。弄坏开关 jump-length-unchecked 下后两条也先起，这一格红。"""
+    world.resources(local=(30, 30))
+    for key, peak in (("selftest-jump-first", 12 * GIBIBYTE), ("selftest-jump-head", 28 * GIBIBYTE)):
+        world.seed_peak(key, peak)
+    release = os.path.join(world.root, "release")
+    blocker = ["bash", "-c", BLOCK_SCRIPT, "block", release]
+    short, lengthy, unrecorded = (["bash", "-c", "exit 0", name] for name in ("jump-short", "jump-lengthy", "jump-unrecorded"))
+    world.seed_duration("selftest-jump-first", 600, blocker)
+    world.seed_duration("selftest-jump-short", 1, short)
+    world.seed_duration("selftest-jump-lengthy", 100000, lengthy)
+    world.start_server()
+    first = world.submit(blocker, extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-jump-first"})
+    waiting, jumped = {}, None
+    try:
+        world.running(first)
+        head = world.submit(["bash", "-c", "exit 0"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-jump-head"})
+        world.next_pass()
+        refused = [world.submit(lengthy, extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-jump-lengthy"}), world.submit(unrecorded)]
+        allowed = world.submit(short, extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-jump-short"})
+        jumped = world.finished(allowed)   # 头一条还占着、排头还没起，这一条先跑完
+        world.next_pass()
+        waiting = {task_id: world.summary(task_id) for task_id in [head, *refused]}
+    finally:
+        open(release, "w").close()
+    summaries = {task_id: world.finished(task_id) for task_id in [first, head, *refused]}
+    problems = []
+    if jumped is None or jumped["task"].get("outcome") != "succeeded" or (waiting.get(head) or {"attempts": [1]})["attempts"]:
+        problems.append(f"上次跑了 1 秒的那一条应当在排头（任务 {head}）起之前跑完，实际 {describe(jumped) if jumped else '没跑完'}、排头 {describe(waiting.get(head) or {'task': {}, 'attempts': []})}")
+    for task_id in refused:
+        found = waiting.get(task_id) or {"task": {}, "attempts": []}
+        if found["attempts"] or "不插队" not in (found.get("waiting_for") or ""):
+            problems.append(f"任务 {task_id}（没有上次运行时长，或上次跑得比在跑的剩余长）应当没起、排队原因写「不插队」，实际 {describe(found)}、原因「{found.get('waiting_for')}」")
+    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
+        problems.append(f"放开之后都应当跑完，实际 {[describe(summary) for summary in summaries.values()]}")
+    raise_cell_problems(world, problems, "插队只许比在跑的剩余短的")
+    return "排头没起时：上次跑了 1 秒的先起、跑完；没有上次运行时长的与上次跑了 100000 秒的不插队；放开之后都跑完"
 
 
 def cell_arrival_order(world):
@@ -1596,7 +1648,7 @@ def cell_pass_reads_resources_once(world):
         world.submit(["bash", "-c", "exit 0"])
     numbers = world.full_passes(PASS_QUEUED_COUNT, PASS_COUNT)
     lines = world.scheduler_reads()
-    expected = ["what=pending host=local", "what=snapshot gpu=0"]   # 只派得了本机、不要卡：一轮读一次本机的余量、一次本机的待涨量
+    expected = ["what=pending host=local", "what=snapshot"]   # 只派得了本机：一轮读一次本机的余量、一次本机的待涨量
     reads = {number: sorted(line.split(" ", 3)[3] for line in lines if line.startswith(f"read view={number} source=pass ")) for number in numbers}
     wrong = {number: got for number, got in reads.items() if got != expected}
     if wrong:
@@ -1652,25 +1704,22 @@ def cell_launch_rechecked(world):
 
 
 def cell_error_types(world):
-    cards = {"cards": LOCAL_CARD_ZERO, "local_gpu": [(0, 16384)]}
-    world.resources(local=(100, 100), **cards)   # 头一段没有第二台：本机的那几种都在本机起（派得到第二台的照余量挑台，不再因工作目录只在本机）
+    """表里的错误类型逐个喂一个假命令或假包装的退出码（EXERCISED_BY 点名这一格的那几种），记下的类型与表对得上；表外的 199 记 command-failed，
+    退 245（表里没有这个码）同样记 command-failed。"""
+    world.resources(local=(100, 100))   # 头一段没有第二台：本机的那几种都在本机起（派得到第二台的照余量挑台，不再因工作目录只在本机）
     world.seed_peak("selftest-peer-only", 120 * GIBIBYTE)
-    world.seed_peak("selftest-never-fits", 150 * GIBIBYTE)
     world.start_server()
     plain = ["bash", "-c", "exit 0"]
     cases = [("succeeded", plain, {}, None, None), ("command-failed", ["bash", "-c", "exit 3"], {}, None, 3),
-             ("command-failed", ["bash", "-c", "exit 199"], {}, None, 199),
+             ("command-failed", ["bash", "-c", "exit 199"], {}, None, 199), ("command-failed", ["bash", "-c", "exit 245"], {}, None, 245),
              ("memory-cap-hit", plain + ["fake-wrapper-exits=250,run"], {}, None, None), ("squeezed-out", plain + ["fake-wrapper-exits=254,run"], {}, None, None),
-             ("gpu-memory-short", plain + ["fake-wrapper-exits=245,run"], {}, None, None),
              ("timed-out", plain + ["fake-wrapper-exits=253"], {}, None, None), ("wrapper-refused", plain + ["fake-wrapper-exits=251"], {}, None, None),
              ("run-condition-unmet", ["bash", "-c", "exit 78"], {}, None, None), ("not-run", ["bash", "-c", "exit 77"], {}, None, None),
-             ("card-fault", ["cargo", "test", "--features", "gpu", "fake-quiesce=card-fault"], {}, None, None),
-             ("launcher-lost", ["bash", "-c", "kill -9 $PPID"], {}, None, None),
-             ("never-fits", plain, {"RUN_WITH_MEMORY_CAP_KEY": "selftest-never-fits"}, None, None)]
+             ("launcher-lost", ["bash", "-c", "kill -9 $PPID"], {}, None, None)]
     submitted = [(expected, world.submit(command, extra=extra, cwd=cwd), exit_code) for expected, command, extra, cwd, exit_code in cases]
     summaries = {task_id: world.finished(task_id) for _, task_id, _ in submitted}
-    # 后一段有第二台：本机永远放不下（120G 记 180G）、第二台放得下的那一条派第二台，假第二台退 255 记 peer-run-failed
-    world.resources(local=(100, 100), peer=(200, 200), peer_cap_gibibytes=190, **cards)
+    # 后一段有第二台：记录 120G 比本机可用上限 98G 大、第二台装得下的那一条不派本机（hosts_short_of_record）、派第二台，假第二台退 255 记 peer-run-failed
+    world.resources(local=(100, 100), peer=(200, 200), peer_cap_gibibytes=190)
     peer_case = ("peer-run-failed", plain + ["fake-peer-exit=255"], {"RUN_WITH_MEMORY_CAP_KEY": "selftest-peer-only"}, world.repo, None)
     cases.append(peer_case)
     peer_id = world.submit(peer_case[1], extra=peer_case[2], cwd=peer_case[3])
@@ -1681,18 +1730,13 @@ def cell_error_types(world):
         summary = summaries[task_id]
         attempts = summary["attempts"]
         seen = attempts[0].get("outcome") if attempts else summary["task"].get("outcome")
-        if expected in ("never-fits",):
-            seen = summary["task"].get("outcome") if not attempts else f"起了 {len(attempts)} 次"
         if seen != expected or (exit_code is not None and (attempts[0].get("exit_code") != exit_code or summary["task"].get("exit_code") != exit_code)):
             wrong.append(f"任务 {task_id} 应当是 {expected}{'、退 ' + str(exit_code) if exit_code is not None else ''}，实际第一次尝试 {seen}、{describe(summary)}")
         if expected == "peer-run-failed" and attempts and attempts[0].get("host") != "peer":
             wrong.append(f"任务 {task_id} 应当派到第二台，实际 {attempts[0].get('host')}")
-    card_fault_task = submitted[[expected for expected, _, _ in submitted].index("card-fault")][1]
-    if not any(alert.get("kind") == "card-fault" and alert.get("task") == card_fault_task for alert in world.alerts()):
-        wrong.append(f"卡坏的任务 {card_fault_task} 应当写一条 card-fault 告警，实际告警 {world.alerts()}")
     if wrong:
         raise SelftestFailure("错误类型对不上：" + "；".join(wrong), world.server_log_lines())
-    return f"{len(cases)} 个假命令或假包装记下的类型都与表对得上（表外的 199 记 command-failed、卡坏写了告警）"
+    return f"{len(cases)} 个假命令或假包装记下的类型都与表对得上（表外的 199、245 记 command-failed）"
 
 
 def cell_unit_start_failed(world):
@@ -1706,7 +1750,7 @@ def cell_unit_start_failed(world):
 
 
 def cell_memory_cap_growth(world):
-    world.seed_peak("selftest-growth", GIBIBYTE)
+    world.seed_peak("selftest-growth", 1536 * MEBIBYTE)   # 上限照近五次最大 1536M 起，不乘 1.5；撞了才乘
     world.start_server()
     task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,250,run"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-growth"})
     summary = world.finished(task_id)
@@ -1776,14 +1820,14 @@ def cell_unrecorded_burst_balanced(world):
 
 def cell_memory_cap_at_maximum(world):
     world.resources(local=(55, 50))   # 总上限 50G（真机上这个数取多机配置 SLICE_MEMORY_CAP_BY_HOST 里本机那一项），没有第二台
-    world.seed_peak("selftest-at-maximum", 20 * GIBIBYTE)
-    world.seed_peak("selftest-at-maximum-switch", 20 * GIBIBYTE)
+    world.seed_peak("selftest-at-maximum", 30 * GIBIBYTE)
+    world.seed_peak("selftest-at-maximum-switch", 30 * GIBIBYTE)
     world.start_server()
     task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,250,250"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-at-maximum"})
     summary = world.finished(task_id)
     caps = [attempt.get("memory_cap_text") for attempt in summary["attempts"]]
     if caps != ["30720M", "46080M"] or summary["task"].get("outcome") != "memory-cap-at-maximum" or summary["task"].get("exit_code") != 236:
-        raise SelftestFailure(f"总上限 50G、没有第二台：记录峰值 20G 起 30720M，撞了乘 1.5 到 46080M，再撞（再乘 1.5 就过总上限）记 memory-cap-at-maximum 打回、退 236，"
+        raise SelftestFailure(f"总上限 50G、没有第二台：记录峰值 30G 起 30720M（不乘 1.5），撞了乘 1.5 到 46080M，再撞（再乘 1.5 就过总上限）记 memory-cap-at-maximum 打回、退 236，"
                               f"实际上限 {caps}、{describe(summary)}")
     completed = world.client(["wait", str(task_id)])
     last = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else ""
@@ -1807,75 +1851,15 @@ def cell_retry_kinds(world):
     world.start_server()
     plain = ["bash", "-c", "exit 0"]
     squeezed = world.submit(plain + ["fake-wrapper-exits=254,run"])
-    short = world.submit(plain + ["fake-wrapper-exits=245,245"])
+    unlisted = world.submit(plain + ["fake-wrapper-exits=245,0"])
     wrong = []
-    for task_id, attempts, outcome in ((squeezed, 2, "succeeded"), (short, 2, "gpu-memory-short")):
+    for task_id, attempts, outcome in ((squeezed, 2, "succeeded"), (unlisted, 1, "command-failed")):
         summary = world.finished(task_id)
         if not task_command_ok(summary, outcome, attempts):
             wrong.append(f"任务 {task_id} 应当尝试 {attempts} 次、结局 {outcome}，实际 {describe(summary)}")
     if wrong:
-        raise SelftestFailure("254 同一上限重排、245 再试一次：" + "；".join(wrong))
-    return "254 重排一次跑完、245 再试一次"
-
-
-def cell_gpu_highest_free_card(world):
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    releases = [os.path.join(world.root, f"release-{number}") for number in (1, 2, 3)]
-    gpu_tasks = []
-    for release in releases:   # 一条起了再交下一条：分卡的先后只由到达次序定
-        gpu_tasks.append(world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=block:{release}"]))
-        if len(gpu_tasks) < len(releases):
-            world.running(gpu_tasks[-1])
-    plain = world.submit(["bash", "-c", "exit 0"])
-    plain_summary = world.finished(plain)
-    waiting = world.summary(gpu_tasks[2])
-    cards = [world.summary(task_id)["attempts"][0].get("card") for task_id in gpu_tasks[:2]]
-    problems = []
-    if cards != [LOCAL_CARD_ZERO, LOCAL_CARD_ONE]:
-        problems.append(f"头两条 GPU 任务应当先后分到 {LOCAL_CARD_ZERO}、{LOCAL_CARD_ONE}，实际 {cards}")
-    if waiting["task"].get("state") != "queued" or waiting["attempts"]:
-        problems.append(f"两张卡都占着时第三条应当排着，实际 {describe(waiting)}")
-    if plain_summary["attempts"][0].get("card") or world.calls_of(plain, "quiesce"):
-        problems.append("不要卡的那一条不分卡、不经清场")
-    if problems:
-        raise SelftestFailure("；".join(problems))
-    open(releases[0], "w").close()
-    summary = world.running(gpu_tasks[2])
-    for release in releases[1:]:
-        open(release, "w").close()
-    if summary["attempts"][0].get("card") != LOCAL_CARD_ZERO:
-        raise SelftestFailure(f"{LOCAL_CARD_ZERO} 放出来之后第三条应当分到它，实际 {summary['attempts'][0].get('card')}")
-    for task_id in gpu_tasks:
-        world.finished(task_id)
-    return "GPU 任务分到优先级最高的空卡、等卡时不挡不要卡的任务、不要卡的不分卡"
-
-
-def cell_gpu_entry_scripts_recognized(world):
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    os.makedirs(os.path.join(world.repo, "crates"), exist_ok=True)
-    with open(os.path.join(world.repo, "crates", "mutations.tsv"), "w", encoding="utf-8") as handle:
-        handle.write("# 自证的变异表\n"
-                     "selftest-gpu-row\tsrc/a.rs\tx\ty\t-p singlefs-verification --features gpu --lib -- t\tt\n"
-                     "selftest-cpu-row\tsrc/b.rs\tx\ty\t-p singlefs-core --lib -- t\tt\n")
-    world.start_server()
-    problems = []
-    for words, expected in ((["bash", "scripts/crash/crash-point-replay.sh", "--item", "selftest-item"], True),
-                            (["bash", "scripts/gate/merge-and-verify.sh", "--skip-apply", "patch"], True),
-                            (["bash", "scripts/crash/crash-point-replay.sh", "--list-items"], False),
-                            (["bash", ".claude/gate.d/crates-mutation-replay.sh", world.repo], True),
-                            (["bash", ".claude/gate.d/crates-mutation-replay.sh", "--list-items", world.repo], False),
-                            (["bash", "scripts/mutation/prove-red.sh", "--copy", world.repo, "singlefs-verification", "selftest-gpu-row"], True),
-                            (["bash", "scripts/mutation/prove-red.sh", "--copy", world.repo, "singlefs-core", "selftest-cpu-row"], False)):
-        task_id = world.submit([*words, "fake-wrapper-exits=0"])
-        summary = world.finished(task_id)
-        if bool(summary["task"].get("gpu")) != expected:
-            problems.append(f"{' '.join(words)} 应当{'认成' if expected else '不认成'} GPU 任务，实际 gpu={summary['task'].get('gpu')}（{describe(summary)}）")
-        elif expected and not world.calls_of(task_id, "quiesce"):
-            problems.append(f"{' '.join(words)} 认成了 GPU 任务，应当由服务在最外层套清场，实际没经清场包装起（{describe(summary)}）")
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return "crash-point-replay.sh、merge-and-verify.sh 认成 GPU 任务、由服务套清场，带 --list-items 的不认；变异门禁 crates-mutation-replay.sh 表里有上卡的行、认成 GPU 任务、由服务套清场，带 --list-items 的不认；prove-red.sh 点名带 gpu 特性那一行的认成要卡、由服务套清场，别的行不认"
+        raise SelftestFailure("254 同一上限重排、表外的 245 不重排：" + "；".join(wrong))
+    return "254 重排一次跑完、表外的 245 记 command-failed 不重排"
 
 
 def cell_cancel_own_session_only(world):
@@ -1922,8 +1906,7 @@ def cell_tampered_row_not_started(world):
     marker = os.path.join(world.root, "bypass-ran")
     record = {"command": ["bash", "-c", ': > "$1"', "touch-marker", marker], "cwd": world.work, "environment": {}, "session": SESSION_A, "submitter_pid": 0,
               "submitted_at": time.time(), "command_key": "selftest-bypass", "state": "queued", "outcome": "", "exit_code": None, "collected": False,
-              "next_cap": None, "next_host": "", "outcome_counts": {}, "note": "", "cancel_requested": False, "attempt_count": 0, "gpu": False,
-              "gpu_reason": ""}
+              "next_cap": None, "next_host": "", "outcome_counts": {}, "note": "", "cancel_requested": False, "attempt_count": 0}
     task_id = world.insert_bypass_row(record)
     summary = world.finished(task_id, timeout=20)
     alerted = [alert for alert in world.alerts() if alert.get("kind") == "record-tampered" and alert.get("task") == task_id]
@@ -2031,11 +2014,14 @@ def cell_resource_record(world):
             or first["seconds"] < 1.0 or not first.get("cores") or abs(first["cores"] - 2.0 / first["seconds"]) > 0.05):
         raise SelftestFailure(f"跑完应当记下用时（≥ 1 秒）、内存峰值 {300 * MEBIBYTE}、usage_usec 2000000 与平均在用核数（2 秒 CPU ÷ 用时），实际 "
                               f"用时 {first.get('seconds')}、峰值 {first.get('memory_peak')}、usage {first.get('cpu_usec')}、核数 {first.get('cores')}")
+    peak_segment = first.get(SERVER.PEAK_SEGMENT_CORES_COLUMN)   # 跑不满一段：整次就是一段，收尾那一刻的累计 2 秒 CPU ÷ 服务量的已跑秒数（比命令自己的用时略长）
+    if not isinstance(peak_segment, (int, float)) or isinstance(peak_segment, bool) or not 0 < peak_segment <= 2.0 / first["seconds"] + 0.05:
+        raise SelftestFailure(f"收尾应当记峰值段核数（{SERVER.PEAK_SEGMENT_CORES_COLUMN}，跑不满一段的照整次：大于 0、不超过 2 秒 CPU ÷ 用时），实际 {peak_segment}、用时 {first.get('seconds')}")
     second_id = world.submit(command)
     second = world.finished(second_id)["attempts"][0]
-    if second.get("memory_cap_text") != "450M" or not any("cap=450M" in line for line in world.calls_of(second_id)):
-        raise SelftestFailure(f"同一命令下一次应当按记录的峰值 300M 定上限 450M，实际 {second.get('memory_cap_text')}、包装调用 {world.calls_of(second_id)}")
-    return f"记下用时 {first['seconds']} 秒、峰值 300M、平均 {first['cores']} 核；下一次上限 450M"
+    if second.get("memory_cap_text") != "300M" or not any("cap=300M" in line for line in world.calls_of(second_id)):
+        raise SelftestFailure(f"同一命令下一次应当按记录的峰值 300M 定上限 300M（近五次最大，不乘 1.5），实际 {second.get('memory_cap_text')}、包装调用 {world.calls_of(second_id)}")
+    return f"记下用时 {first['seconds']} 秒、峰值 300M、平均 {first['cores']} 核；下一次上限 300M"
 
 
 def cell_operation_log(world):
@@ -2193,14 +2179,34 @@ def server_output_text(world):
     return "\n".join(texts)
 
 
+def outcome_head(task_id, outcome):
+    """推给会话的结局那一条首行到「（<种类>」为止的一段（task_server.py 的 outcome_headline）：类别「结局」、任务已结束、任务号、中文名。"""
+    return f"{SERVER.INBOX_HEADLINE}结局（任务已结束）任务 {task_id} {SERVER.kind_label(outcome)}（{outcome}"
+
+
+def unclaimed_head(task_id, outcome):
+    """结局没人取而再推的那一条首行到「（<种类>」为止的一段：状态里另写这条结局还没人取。"""
+    return f"{SERVER.INBOX_HEADLINE}结局（任务已结束，这条结局还没人取）任务 {task_id} {SERVER.kind_label(outcome)}（{outcome}"
+
+
+def reminder_head(task_id, kind, state="任务还在跑"):
+    """推给会话的要处置的提醒首行到「（<种类>」为止的一段（task_server.py 的 reminder_headline）：类别「提醒」、任务此刻的状态（任务还在排 / 任务还在跑，不是结局）、任务号、中文名。"""
+    return f"{SERVER.INBOX_HEADLINE}提醒（{state}，不是结局）任务 {task_id} {SERVER.kind_label(kind)}（{kind}"
+
+
+def reminders_after(messages, seconds):
+    """messages 里正文写着 reminded_after_seconds=<seconds> 的那几条（时长判的提醒照末行机器读的那一行分得出这一回跨过的是哪道提醒门槛）。"""
+    return [message for message in messages if f" reminded_after_seconds={seconds} " in message["text"]]
+
+
 def inbox_outcome_case(world, script, outcome, exit_text):
-    """一条任务有了结局（task_server.py 文件头 ⑥「结局」）：会话的收件 socket 恰好收到一条，先认证行、再 user 那一行，正文第一行「task-server：任务 <号> <结局>」，
+    """一条任务有了结局（task_server.py 文件头 ⑥「结局」）：会话的收件 socket 恰好收到一条，先认证行、再 user 那一行，正文第一行「task-server：结局（任务已结束）任务 <号> <中文名>（<结局>，退 <码>；第 1 回）」，
     后面写原因、出路、日志与 wait 的末行原样；令牌不在 status、日志与服务的输出里。→ (问题表, 任务号, 正文)。"""
     inbox = FakeInbox(world, "a")
     start_inbox_server(world)
     task_id = world.submit(["bash", "-c", script], extra=inbox.environment())
     world.finished(task_id)
-    head = f"task-server：任务 {task_id} {outcome}"
+    head = outcome_head(task_id, outcome)
     found = inbox.wait_for(world, head)
     time.sleep(INBOX_QUIET_SECONDS)   # 结局只发一次：再看几轮不该多一条
     found = inbox.headed(head)
@@ -2228,7 +2234,7 @@ def cell_inbox_outcome_succeeded(world):
         problems.append(f"结局发出去之后任务 {task_id} 应当记成已取、status 不再列成完成了没人取，实际还列着")
     if problems:
         raise SelftestFailure("结局 succeeded 发给会话：" + "；".join(problems), world.server_log_lines())
-    return f"收件 socket 收到一条「task-server：任务 {task_id} succeeded」（认证行在前、令牌对得上），发出去之后记成已取，令牌不进 status 与日志"
+    return f"收件 socket 收到一条「{outcome_head(task_id, 'succeeded')}…」（认证行在前、令牌对得上），发出去之后记成已取，令牌不进 status 与日志"
 
 
 def cell_inbox_outcome_failed(world):
@@ -2237,37 +2243,41 @@ def cell_inbox_outcome_failed(world):
     problems, task_id, _ = inbox_outcome_case(world, "echo inbox-failed; exit 3", "command-failed", "exit=3")
     if problems:
         raise SelftestFailure("结局 command-failed 发给会话：" + "；".join(problems), world.server_log_lines())
-    return f"收件 socket 收到一条「task-server：任务 {task_id} command-failed」（认证行在前、令牌对得上），末尾是 exit=3 的末行"
+    return f"收件 socket 收到一条「{outcome_head(task_id, 'command-failed')}…」（认证行在前、令牌对得上），末尾是 exit=3 的末行"
 
 
 def cell_inbox_queued_too_long_once(world):
-    """排队过久（task_server.py 文件头 ⑥「要处置的提醒」，同 attention-reported-once 的世界：第二台用不了、只有它放得下）：头一档（6 秒）收件 socket 收到一条
-    「task-server：任务 <号> queued-too-long（第 1 档」，正文写依据（已排多久）、原因、出路、日志与 TASK_SERVER_ATTENTION 一行；再看几轮同一档不多一条；排满第二档（12 秒）
-    再收一条第 2 档的。弄坏开关 inbox-not-sent、inbox-auth-omitted、inbox-reported-every-round 下这一格红。"""
+    """排队过久（task_server.py 文件头 ⑥「要处置的提醒」，同 attention-reported-once 的世界：第二台用不了、只有它放得下）：排满 6 秒收件 socket 收到一条
+    「task-server：提醒（任务还在排，不是结局）任务 <号> 排队过久（queued-too-long；第 1 回」，正文写依据（已排多久、排满 12 秒再提醒一回）、原因、出路、日志与
+    TASK_SERVER_ATTENTION 一行（kind=queued-too-long 之后紧接 reminded_after_seconds=6）；再看几轮不多一条；排满 12 秒再收一条 reminded_after_seconds=12 的。
+    弄坏开关 inbox-not-sent、inbox-auth-omitted、inbox-reported-every-round 下这一格红。"""
     inbox = FakeInbox(world, "a")
     world.resources(local=(50, 20), peer_down="自证：第二台在重启")
     world.seed_peak("selftest-inbox-queue", 30 * GIBIBYTE)
     start_inbox_server(world, {"TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS": str(ATTENTION_ONCE_SECONDS)})
     task_id = world.submit(["bash", "-c", "exit 0", "inbox-queue"], extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: "selftest-inbox-queue"}), cwd=world.repo)
-    first_head = f"task-server：任务 {task_id} queued-too-long（第 1 档"
-    inbox.wait_for(world, first_head)
+    head, later = reminder_head(task_id, "queued-too-long", "任务还在排"), 2 * ATTENTION_ONCE_SECONDS
+    inbox.wait_for(world, head)
     time.sleep(ATTENTION_ONCE_QUIET_SECONDS)
-    first = inbox.headed(first_head)
-    problems = inbox_problems(first, first_head, "排队过久头一档")
+    first = reminders_after(inbox.headed(head), ATTENTION_ONCE_SECONDS)
+    problems = inbox_problems(first, head, f"排满 {ATTENTION_ONCE_SECONDS} 秒那一回")
     text = first[0]["text"] if first else ""
-    for wanted in ("依据：已排", "原因：", "出路：", f"{lib.ATTENTION_MARK} task={task_id} type={lib.ATTENTION_TYPE} kind=queued-too-long tier=1"):
+    for wanted in ("依据：已排", f"排满 {later} 秒再提醒一回", "原因：", "出路：",
+                   f"{lib.ATTENTION_MARK} task={task_id} type={lib.ATTENTION_TYPE} kind=queued-too-long reminded_after_seconds={ATTENTION_ONCE_SECONDS} basis="):
         if wanted not in text:
             problems.append(f"排队过久那一条的正文里应当有「{wanted}」，实际「{text[:400]}」")
-    second_head = f"task-server：任务 {task_id} queued-too-long（第 2 档"
-    inbox.wait_for(world, second_head)
+    if "档" in text.split("\n", 1)[0] or any("档" in line for line in text.split("\n") if line.startswith("依据：")):
+        problems.append(f"首行与依据只写事实与下一回什么时候提醒，不该有「档」，实际「{text[:400]}」")
+    inbox.wait_for(world, head, count=2)
     time.sleep(INBOX_QUIET_SECONDS)
-    problems += inbox_problems(inbox.headed(second_head), second_head, "排队过久第二档")
-    problems += [f"排满第二档之后头一档那一条仍该只有一条，实际 {len(inbox.headed(first_head))} 条"] if len(inbox.headed(first_head)) != 1 else []
+    problems += inbox_problems(reminders_after(inbox.headed(head), later), head, f"排满 {later} 秒那一回")
+    if len(reminders_after(inbox.headed(head), ATTENTION_ONCE_SECONDS)) != 1:
+        problems.append(f"排满 {later} 秒之后，{ATTENTION_ONCE_SECONDS} 秒那一条仍该只有一条，实际 {len(reminders_after(inbox.headed(head), ATTENTION_ONCE_SECONDS))} 条")
     world.resources(local=(50, 20), peer=(50, 50), peer_cap_gibibytes=50)
     world.finished(task_id)
     if problems:
         raise SelftestFailure("排队过久发给会话：" + "；".join(problems), world.server_log_lines())
-    return f"排队过久头一档、第二档各收到恰好一条（认证行在前），同一档不重发"
+    return f"排满 {ATTENTION_ONCE_SECONDS} 秒、{later} 秒各收到恰好一条（认证行在前），同一道门槛不重发"
 
 
 INBOX_SHARD_KEY = "selftest-inbox-shard-queue"   # inbox-shard-attention-merged：三片分片的命令键，三片各记过 30G（只有第二台放得下，第二台用不了，三片一齐排着）
@@ -2275,21 +2285,22 @@ INBOX_SHARD_KEY = "selftest-inbox-shard-queue"   # inbox-shard-attention-merged�
 
 def cell_inbox_shard_attention_merged(world):
     """分片的几片同时排久（task_server.py 文件头 ⑥「要处置的提醒」的合成一条，Scheduler.attention_groups）：三片各记过 30G、本机 slice 20G、第二台用不了，
-    三片一齐排着；排满头一档（6 秒）收件 socket 只收到一条「task-server：任务 <父任务号> queued-too-long（第 1 档，子任务 <号的区间>，共 3 片）」，
-    第一行点到三片的号；再看几轮不多一条。弄坏开关 inbox-attention-per-shard 下逐片各发一条（收到三条），这一格红。"""
+    三片一齐排着；排满 6 秒收件 socket 只收到一条「task-server：提醒（任务还在排，不是结局）任务 <父任务号> 排队过久（queued-too-long，子任务 <号的区间>，共 3 片；第 1 回）」，
+    第一行点到三片的号；再看几轮不多一条。弄坏开关 inbox-attention-per-shard 下逐片各发一条（收到三条），
+    inbox-headline-state-omitted 下首行不写「提醒（任务还在排，不是结局）」、照首行认不到那一条（收到 0 条），这一格红。"""
     inbox = FakeInbox(world, "a")
     for index in range(3):
-        world.seed_peak(lib.shard_child_key(INBOX_SHARD_KEY, "shard", index, 3), 30 * GIBIBYTE)
+        world.seed_peak(lib.shard_child_key(INBOX_SHARD_KEY, "shard", index, 3), 30 * GIBIBYTE, shard_count=3)
     world.resources(local=(50, 20), peer_down="自证：第二台此刻用不了")
     start_inbox_server(world, {"TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS": str(ATTENTION_ONCE_SECONDS)})
     task_id = world.submit(world.write_spec("spec-inbox-shards.json", {"shards": [{}, {}, {}]}), cwd=world.repo,
                            extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: INBOX_SHARD_KEY}))
     summary = world.wait_for(task_id, lambda summary: queued_shards(summary) == [0, 1, 2], "三片都排着")
     children = sorted(child["task"]["id"] for child in shard_children(summary).values())
-    head = f"task-server：任务 {task_id} queued-too-long（第 1 档"
+    head = reminder_head(task_id, "queued-too-long", "任务还在排")
     inbox.wait_for(world, head)
     time.sleep(INBOX_QUIET_SECONDS)
-    messages = inbox.headed(head)
+    messages = reminders_after(inbox.headed(head), ATTENTION_ONCE_SECONDS)
     problems = inbox_problems(messages, head, "三片同时排久")
     headline = messages[0]["text"].split("\n", 1)[0] if messages else ""
     children_range = f"子任务 {children[0]}–{children[-1]}" if children == list(range(children[0], children[0] + len(children))) else None
@@ -2300,7 +2311,7 @@ def cell_inbox_shard_attention_merged(world):
     if problems:
         raise SelftestFailure("分片几片同时排久合成一条发给会话：" + "；".join(problems)
                               + f"（收到的第一行：{[message['text'].split(chr(10), 1)[0] for message in inbox.headed(head)]}）", world.server_log_lines())
-    return f"三片同时排满头一档，会话只收到一条：「{headline}」"
+    return f"三片同时排满 {ATTENTION_ONCE_SECONDS} 秒，会话只收到一条：「{headline}」"
 
 
 def cell_inbox_unreachable_task_runs(world):
@@ -2700,8 +2711,8 @@ def cell_blocked_head_not_starved(world):
     return "排头放不下时排着不动，3 秒里 /health 一直回 ok；放得下之后跑完"
 
 
-FORMULA_HEAD_BLOCKER_PEAK_GIBIBYTES = 60   # starved-head-judged-by-the-formula：先占着的那一条的峰值（上限 90G，在 100G、余量 2G 的台上起得来）
-FORMULA_HEAD_PEAK_GIBIBYTES = 8            # 那一格的排头的峰值（上限与记账 12G：judge_host 放得下，公式只剩 100 − 2 − 90 = 8G 放不下）
+FORMULA_HEAD_BLOCKER_PEAK_GIBIBYTES = 90   # starved-head-judged-by-the-formula：先占着的那一条的峰值（上限与记账照它 90G，在 100G、余量 2G 的台上起得来）
+FORMULA_HEAD_PEAK_GIBIBYTES = 12           # 那一格的排头的峰值（上限与记账 12G：judge_host 放得下，公式只剩 100 − 2 − 90 = 8G 放不下）
 FORMULA_HEAD_ROOMY_GIBIBYTES = 200         # 那一格换上的假余量（空闲与 slice 都是这么多）：公式剩 200 − 2 − 90 = 108G，排头放得下
 FORMULA_HEAD_WATCH_SECONDS = 4 * SERVER.FAST_STARVED_SECONDS   # 那一格公式放不下时看 /health 看这么久（过阈值几倍）
 PAUSE_SETTLE_SECONDS = 1.0                 # 那一格停排队之后等这么久再换余量（一轮 0.1 秒：开了头的那一轮早排完，换上的余量不会被它读去起排头）
@@ -2709,7 +2720,7 @@ PAUSE_SETTLE_SECONDS = 1.0                 # 那一格停排队之后等这么�
 
 def cell_starved_head_judged_by_the_formula(world):
     """/health 只读派活给排头的结论（task_server.py 的 starved_problem 读 head_verdict；judge_placement 照 judged_on_host 过公式）：本机 100G、余量 2G，一条上限 90G 的在跑、
-    它的 scope 已用满 90G（不记待涨量），排头上限 12G：judge_host 照余量放得下，公式（配置的总上限 − 余量 − 在跑的上限之和）只剩 8G 放不下，派活判它不能起，
+    它的 scope 已用满 90G（不记待涨量，记账照此刻实测 90G），排头上限 12G：judge_host 照余量放得下，公式（配置的总上限 − 余量 − 在跑的记账之和）只剩 8G 放不下，派活判它不能起，
     /health 一直回 ok；换成 200G 的余量（公式剩 108G）、排队线程照判不起（TASK_SERVER_SELFTEST_PLACEMENT_PAUSED），派活判它能起却没起成，/health 照报「派活判它此刻放得下」；
     放开之后都跑完。弄坏开关 blocked-head-counted-as-starved 下前一半也报，starved-head-unreported 下后一半不报，这一格红。"""
     blocker_key, head_key = "selftest-formula-blocker", "selftest-formula-head"
@@ -2727,14 +2738,14 @@ def cell_starved_head_judged_by_the_formula(world):
         cap, label = int(attempt.get("memory_cap") or 0), attempt.get("label")
         world.resources(local=(100, 100), local_scopes={label: cap} if label else None)
         head = world.submit(["bash", "-c", "exit 0", "formula-head"], extra={lib.KEY_VARIABLE: head_key})
-        waiting = world.wait_for(head, lambda found: "在跑的上限之和" in (found.get("waiting_for") or "") or found["task"].get("state") != "queued",
+        waiting = world.wait_for(head, lambda found: SERVER.RUNNING_BOOKED_SUM_TEXT in (found.get("waiting_for") or "") or found["task"].get("state") != "queued",
                                  "照公式报放不下")
         blocked_health = health_until(world, lambda found: not found.get("ok"), FORMULA_HEAD_WATCH_SECONDS)
-        if cap != int(FORMULA_HEAD_BLOCKER_PEAK_GIBIBYTES * lib.CAP_GROWTH_FACTOR) * GIBIBYTE or not label or waiting["task"].get("state") != "queued" or "在跑的上限之和" not in (waiting.get("waiting_for") or ""):
-            problems.append(f"先占着的那一条应当上限 90G、有 label，排头照公式排着、排队原因写「在跑的上限之和」；实际上限 {cap} 字节、label {label!r}、"
+        if cap != FORMULA_HEAD_BLOCKER_PEAK_GIBIBYTES * GIBIBYTE or not label or waiting["task"].get("state") != "queued" or SERVER.RUNNING_BOOKED_SUM_TEXT not in (waiting.get("waiting_for") or ""):
+            problems.append(f"先占着的那一条应当上限 90G、有 label，排头照公式排着、排队原因写「{SERVER.RUNNING_BOOKED_SUM_TEXT}」；实际上限 {cap} 字节、label {label!r}、"
                             f"排头 {describe(waiting)}、在等「{waiting.get('waiting_for')}」")
         if not blocked_health.get("ok"):
-            problems.append(f"公式放不下（在跑的上限之和占满）时排头排着是正常的，/health 应当一直回 ok，实际 {blocked_health}")
+            problems.append(f"公式放不下（在跑的记账之和占满）时排头排着是正常的，/health 应当一直回 ok，实际 {blocked_health}")
         open(paused, "w").close()
         time.sleep(PAUSE_SETTLE_SECONDS)
         world.resources(local=(FORMULA_HEAD_ROOMY_GIBIBYTES, FORMULA_HEAD_ROOMY_GIBIBYTES), local_scopes={label: cap} if label else None)
@@ -2751,7 +2762,7 @@ def cell_starved_head_judged_by_the_formula(world):
         problems.append(f"放开之后都应当跑完，实际没成的 {failed}")
     if problems:
         raise SelftestFailure("判排头放不放得下照公式：" + "；".join(problems), world.server_log_lines())
-    return (f"在跑的上限之和占满（公式剩 8G、排头要记 12G）时 /health 一直回 ok；公式放得下而没起时报「{starved_health.get('problem')}」；放开之后都跑完")
+    return (f"在跑的记账之和占满（公式剩 8G、排头要记 12G）时 /health 一直回 ok；公式放得下而没起时报「{starved_health.get('problem')}」；放开之后都跑完")
 
 
 def cell_retry_goes_where_it_fits(world):
@@ -2910,40 +2921,6 @@ def cell_computing_quietly_not_stalled(world):
     return "日志过了阈值不涨而 CPU 一直在涨的照跑完（在算不算卡住）"
 
 
-OVERRUN_COMMAND = ["bash", "-c", "echo started; sleep 30"]   # overrun-quiet-log-stopped 记的用时与交的命令逐词相同
-
-
-def cell_overrun_quiet_log_stopped(world):
-    key = "selftest-overrun"
-    world.seed_duration(key, 1, OVERRUN_COMMAND)   # 记录用时 1 秒：跑过 5 秒就算远超
-    scope = os.path.join(world.root, "burning-scope")
-    os.makedirs(scope)
-    stat = os.path.join(scope, "cpu.stat")
-    with open(stat, "w", encoding="utf-8") as handle:
-        handle.write("usage_usec 0\n")
-    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01", "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
-    stop = threading.Event()
-
-    def burn():   # 演占着 CPU 的死循环：假 scope 的 CPU 每 0.2 秒涨 0.2 秒
-        used = 0
-        while not stop.is_set():
-            used += 200000
-            with open(stat + ".partial", "w", encoding="utf-8") as handle:
-                handle.write(f"usage_usec {used}\n")
-            os.replace(stat + ".partial", stat)
-            time.sleep(0.2)
-
-    burner = threading.Thread(target=burn, daemon=True)
-    burner.start()
-    try:
-        summary = world.finished(world.submit(OVERRUN_COMMAND, extra={lib.KEY_VARIABLE: key}), timeout=45)
-    finally:
-        stop.set()
-    if summary["task"].get("outcome") != "stalled":
-        raise SelftestFailure(f"记录用时 1 秒、跑过 5 倍而日志满 2 秒没涨：CPU 在涨也应当停掉、记 stalled，实际 {describe(summary)}", world.server_log_lines())
-    return "跑过记录用时 5 倍、日志满阈值没涨的，CPU 在涨也停掉、记 stalled"
-
-
 def cell_peer_stall_judged_by_peer_cpu(world):
     world.resources(local=(8, 30), peer=(100, 100), peer_cap_gibibytes=64)
     world.seed_peak("selftest-peer-stall", 10 * GIBIBYTE)
@@ -3003,80 +2980,12 @@ def cell_running_status_shows_progress(world):
     shown = world.client(["status", str(task_id)])
     open(release, "w").close()
     world.finished(task_id)
-    if "在跑：已跑" not in shown.stdout or "记录用时 3 秒" not in shown.stdout or "没涨" not in shown.stdout:
-        raise SelftestFailure(f"在跑的任务 status 应当报已跑多久、记录用时、日志多久没涨、在用核数，实际「{shown.stdout.strip()[:400]}」")
-    return "在跑的任务 status 报已跑多久、记录用时 3 秒、日志多久没涨与在用核数"
+    if "在跑：已跑" not in shown.stdout or "没涨" not in shown.stdout:
+        raise SelftestFailure(f"在跑的任务 status 应当报已跑多久、日志多久没涨、在用核数，实际「{shown.stdout.strip()[:400]}」")
+    return "在跑的任务 status 报已跑多久、日志多久没涨与在用核数"
 
 
-SIMULATED_WORKLOAD = (   # (类, 条数, 峰值, 用时记录秒, 中的与轻的真跑几轮×0.25 秒；重的占着到放行为止)：一台 50G 装不下三条 20G，看两台怎么分、轻的等不等重的
-    ("heavy", 3, 20 * GIBIBYTE, 6, 24), ("medium", 4, 8 * GIBIBYTE, 3, 12), ("light", 10, 300 * MEBIBYTE, 1, 2))
 DUTY_SPREAD_SCRIPT = "for i in $(seq 8); do echo spread $i; sleep 0.25; done"   # three-duties-two-sessions 分到两台的那 6 条（记的用时与交的命令逐词相同）
-
-
-def simulated_command(kind, rounds):
-    """simulated-two-host-workload 里一类交的命令（记的用时与交的逐词相同）：重的本机在仓根里等放行文件，第二台那一条由假第二台照 fake-peer-wait 在假仓根里等它。"""
-    if kind == "heavy":
-        return ["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, kind, SIMULATED_RELEASE, f"fake-peer-wait={SIMULATED_RELEASE}"]
-    return ["bash", "-c", f"for i in $(seq {rounds}); do echo {kind} $i; sleep 0.25; done", kind, "fake-peer-run"]
-
-
-def cell_simulated_two_host_workload(world):
-    """两台各 50G：重 3 条（各记 30G 的上限）、中 4 条、轻 10 条一齐放出来。重的占着到放行为止：两条起、第三条等，中的与轻的在它等着的时候起完、跑完。
-    判定只比尝试的记录号（起的先后）与起止时刻的交叠，不比秒数（机器忙闲只改快慢，不改先后）。"""
-    world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50, hold=True)
-    for kind, _, peak, seconds, rounds in SIMULATED_WORKLOAD:
-        world.seed_peak(f"selftest-sim-{kind}", peak)
-        world.seed_duration(f"selftest-sim-{kind}", seconds, simulated_command(kind, rounds))
-    world.start_server()
-    submitted = []
-    plan = [(kind, rounds) for kind, count, _, _, rounds in SIMULATED_WORKLOAD for _ in range(count)]
-    order = plan[0::3] + plan[1::3] + plan[2::3]   # 轻重交错着交
-    for kind, rounds in order:
-        submitted.append((world.submit(simulated_command(kind, rounds), extra={lib.KEY_VARIABLE: f"selftest-sim-{kind}"}, cwd=world.repo), kind))
-    world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50)   # 一齐放出来
-    world.api("POST", "/wake")
-    problems = []
-    try:
-        quick = [(kind, world.finished(task_id, timeout=120)) for task_id, kind in submitted if kind != "heavy"]
-        heavy_started = sorted(task_id for task_id, kind in submitted if kind == "heavy" and world.summary(task_id)["attempts"])
-    finally:
-        open(os.path.join(world.repo, SIMULATED_RELEASE), "w").close()
-    heavy = [(kind, world.finished(task_id, timeout=120)) for task_id, kind in submitted if kind == "heavy"]
-    summaries = quick + heavy
-    if len(heavy_started) != 2:
-        problems.append(f"三条重的各记 30G：一台 50G 只放得下一条，中的与轻的跑完时应当恰好两条起了，实际起了 {heavy_started}")
-    failed = [f"{kind} {describe(summary)}" for kind, summary in summaries if summary["task"].get("outcome") != "succeeded" or not summary["attempts"]]
-    if failed:
-        problems.append(f"都应当跑完，实际没成的 {failed}")
-    peaks = {kind: peak for kind, _, peak, _, _ in SIMULATED_WORKLOAD}
-    intervals, kinds_on = {"local": [], "peer": []}, {"local": set(), "peer": set()}
-    for kind, summary in summaries:
-        if not summary["attempts"]:
-            continue
-        last = summary["attempts"][-1]
-        intervals.setdefault(last.get("host"), []).append((float(last.get("started_at") or 0), float(last.get("ended_at") or 0), peaks[kind]))
-        kinds_on.setdefault(last.get("host"), set()).add(kind)
-    for host, spans in intervals.items():
-        for start, _, _ in spans:
-            booked = sum(peak for begin, end, peak in spans if begin <= start < end)
-            if booked > 50 * GIBIBYTE:
-                problems.append(f"{host} 在 {start:.1f} 时同时跑着峰值合计 {booked / GIBIBYTE:.0f}G 的任务，超过总上限 50G")
-                break
-    if not all(kinds_on.get(host, set()) >= {"heavy", "light"} for host in ("local", "peer")):
-        problems.append(f"两台都应当分到重的与轻的，实际 {({host: sorted(kinds) for host, kinds in kinds_on.items()})}")
-    counts = {host: len(spans) for host, spans in intervals.items()}
-    if min(counts.get("local", 0), counts.get("peer", 0)) * 4 < len(summaries):
-        problems.append(f"两台分到的条数都应当不少于四分之一，实际 {counts}")
-    waited = [summary for kind, summary in heavy if summary["task"]["id"] not in heavy_started]
-    waited_order = attempt_order(waited[0]) if waited else None
-    late_lights = [summary["task"]["id"] for kind, summary in quick if kind == "light" and (waited_order is None or (attempt_order(summary) or waited_order) > waited_order)]
-    if late_lights:
-        problems.append(f"轻任务不该排在等着的那条重任务（尝试记录号 {waited_order}）后面等它起，实际排在它后面的 {late_lights}")
-    if problems:
-        detail = [f"任务 {summary['task']['id']} {kind} {first_attempt(summary).get('host', '-')} 记录号 {first_attempt(summary).get('id', '-')}" for kind, summary in summaries]
-        raise SelftestFailure("模拟负载：" + "；".join(problems), detail + world.server_log_lines())
-    return (f"模拟负载 {len(summaries)} 条（重 3、中 4、轻 10，两台各 50G）全跑完：条数 {counts}，第三条重的等着时中的与轻的都起完、跑完（它的记录号 {waited_order}），"
-            f"每台同时跑着的峰值合计都不超过 50G")
 
 
 def cell_three_duties_two_sessions(world):
@@ -3084,9 +2993,10 @@ def cell_three_duties_two_sessions(world):
     world.seed_peak("selftest-duty-spread", 8 * GIBIBYTE)
     world.seed_duration("selftest-duty-spread", 2, ["bash", "-c", DUTY_SPREAD_SCRIPT, "spread", "fake-peer-run"])
     world.seed_peak("selftest-duty-blocker", 16 * GIBIBYTE)
+    world.seed_duration("selftest-duty-blocker", 600, ["bash", "-c", BLOCK_SCRIPT, "block", os.path.join(world.root, "release")])   # 占着的那条上次跑了 600 秒：剩余时长算得出
     world.seed_peak("selftest-duty-head", 20 * GIBIBYTE)
     world.seed_peak("selftest-duty-small", 100 * MEBIBYTE)
-    world.seed_peak("selftest-duty-never-fits", 40 * GIBIBYTE)
+    world.seed_duration("selftest-duty-small", 1, ["bash", "-c", "exit 0"])   # 小的上次跑了 1 秒：比占着的那条的剩余短，排头没起时许插（jump_refusal）
     world.resources(local=(30, 30), peer=(30, 30), peer_cap_gibibytes=30)
     world.start_server()
     problems = []
@@ -3116,15 +3026,16 @@ def cell_three_duties_two_sessions(world):
     small_start = float(((small_summary or {}).get("attempts") or [{}])[0].get("started_at") or 0)
     if head_summary["task"].get("outcome") != "succeeded" or not head_start:
         problems.append(f"② 本机放出来之后排头应当起来跑完，实际 {describe(head_summary)}")
-    # ③ 会话 A 交一条永远装不下的、会话 B 交一条命令自己失败的：各自的 wait 拿到各自的类型，status 只列自己的
-    never = world.submit(["bash", "-c", "exit 0"], extra={lib.KEY_VARIABLE: "selftest-duty-never-fits"})
+    # ③ 会话 A 交一条跑不了的（入口会编的声明写坏了：派活时打回 run-condition-unmet）、会话 B 交一条命令自己失败的：各自的 wait 拿到各自的类型，status 只列自己的
+    world.resources(local=(30, 30), peer=(10, 30), peer_cap_gibibytes=30)
+    unrunnable = world.submit(write_unmet_script(world, "duty-unmet.sh"))
     failing = world.submit(["bash", "-c", "echo started; sleep 1; exit 3"], session=SESSION_B)   # 跑到一半出错
-    world.finished(never), world.finished(failing)
-    for session, own, other in ((SESSION_A, never, failing), (SESSION_B, failing, never)):   # wait 收下之前：各自只看得见自己的
+    world.finished(unrunnable), world.finished(failing)
+    for session, own, other in ((SESSION_A, unrunnable, failing), (SESSION_B, failing, unrunnable)):   # wait 收下之前：各自只看得见自己的
         listed = {item.get("id") for item in json.loads(world.client(["status", "--json"], session=session).stdout or "{}").get("tasks", [])}
         if own not in listed or other in listed:
             problems.append(f"③ {session} 的 status 应当列自己的任务 {own}、不列别的会话的 {other}，实际列了 {sorted(listed)}")
-    for task_id, session, outcome, code in ((never, SESSION_A, "never-fits", None), (failing, SESSION_B, "command-failed", 3)):
+    for task_id, session, outcome, code in ((unrunnable, SESSION_A, "run-condition-unmet", None), (failing, SESSION_B, "command-failed", 3)):
         waited = world.client(["wait", str(task_id)], session=session)
         if f"type={outcome}" not in waited.stdout + waited.stderr or (code is not None and waited.returncode != code) or waited.returncode == 0:
             problems.append(f"③ 任务 {task_id} 的 wait 应当退非 0{('、退 ' + str(code)) if code else ''}、末行 type={outcome}，实际退 {waited.returncode}、"
@@ -3132,7 +3043,7 @@ def cell_three_duties_two_sessions(world):
     if problems:
         raise SelftestFailure("三件职责：" + "；".join(problems), world.server_log_lines())
     return (f"① 6 条 8G 分在 {sorted(set(hosts))}；② 排头放不下时小的先起（{small_start:.2f}）、本机放出来之后排头起（{head_start:.2f}）；"
-            f"③ 装不下的打回会话 A、命令失败的打回会话 B，各自 wait 拿到类型、status 互不可见")
+            f"③ 跑不了的打回会话 A、命令失败的打回会话 B，各自 wait 拿到类型、status 互不可见")
 
 
 def cell_hundred_five_minute_tasks_balanced(world):
@@ -3205,7 +3116,8 @@ def cell_stalled_at_cap_retried(world):
 
 def start_burning_scope(world, name, files, usec_per_tick=200000):
     """一份假 scope（attempt_runner.py 文件头「自证换 scope」）：files 里的几份（{文件名: 数或正文}，memory.current、memory.peak、memory.stat 这类）照写、末尾补一个换行，
-    cpu.stat 的 usage_usec 每 0.2 秒涨 usec_per_tick 微秒（缺省 0.2 秒：一个核在算），先写临时文件再改名（采样读不到写了一半的）。交 (目录, 停的 Event)：格收尾时设上它。"""
+    cpu.stat 的 usage_usec 照挂钟涨：起了 t 秒就是 t ÷ 0.2 × usec_per_tick 微秒（缺省每 0.2 秒涨 0.2 秒：一个核在算），每 0.2 秒左右写一回，先写临时文件再改名（采样读不到写了一半的）。
+    照挂钟算、不照写了几回累加：机器忙时这条线程排不上、写得稀，读到的平均核数照样是设定的那个数（只差最后一回写到读之间那一截）。交 (目录, 停的 Event)：格收尾时设上它。"""
     scope = os.path.join(world.root, name)
     os.makedirs(scope)
     for file_name, value in files.items():
@@ -3216,10 +3128,11 @@ def start_burning_scope(world, name, files, usec_per_tick=200000):
         handle.write("usage_usec 0\n")
     stop = threading.Event()
 
+    started = time.monotonic()
+
     def keep_burning():
-        used = 0
         while not stop.is_set():
-            used += usec_per_tick
+            used = int((time.monotonic() - started) / 0.2 * usec_per_tick)
             with open(stat + ".partial", "w", encoding="utf-8") as handle:
                 handle.write(f"usage_usec {used}\n")
             os.replace(stat + ".partial", stat)
@@ -3231,7 +3144,7 @@ def start_burning_scope(world, name, files, usec_per_tick=200000):
 
 def cell_busy_cpu_pinned_at_cap_retried(world):
     """日志满卡住阈值没涨、此刻内存贴着上限、CPU 一直在涨（任务 7723：在回收里打转、跑了 37775 秒没人停；task_server.py 的 judge_stall_stop）：CPU 在涨不算在算，
-    停掉、记 memory-cap-hit、乘 1.5 重排、跑完，说明写「顶在上限上卡住」与此刻内存。库里记一次跑完的峰值 1024 MiB（上限 1536M），
+    停掉、记 memory-cap-hit、乘 1.5 重排、跑完，说明写「顶在上限上卡住」与此刻内存。库里记一次跑完的峰值 1536 MiB（上限照它 1536M），
     假 scope 的进程内存（memory.stat 的 anon）、memory.current 与 memory.peak 钉在 1536 MiB，CPU 每 0.2 秒涨 0.2 秒。
     弄坏开关 at-cap-busy-cpu-kept-running 下照改前当在算、第一次睡满 30 秒退 0，这一格红。"""
     scope, stop = start_burning_scope(world, "pinned-busy-scope", {"memory.current": AT_CAP_PEAK_BYTES, "memory.peak": AT_CAP_PEAK_BYTES,
@@ -3274,7 +3187,7 @@ def cell_busy_cpu_below_cap_keeps_running(world):
     return f"此刻内存离上限远、CPU 在涨的照跑完（各次 {seen}）"
 
 
-# page-cache-not-counted-as-process-memory：假 scope 的 memory.current 与 memory.peak 钉在上限 1536M（库里 1024M × 1.5），里面进程用的只有 anon 96M，
+# page-cache-not-counted-as-process-memory：假 scope 的 memory.current 与 memory.peak 钉在上限 1536M（库里记的峰值 1536M，上限照它），里面进程用的只有 anon 96M，
 # 其余是页缓存与内核（任务 8853 的样子：anon 921M、file 22163M、kernel 650M，memory.peak 顶到上限 50176M）
 PAGE_CACHE_ANON_BYTES = 96 * MEBIBYTE
 PAGE_CACHE_KERNEL_BYTES = 32 * MEBIBYTE
@@ -3284,7 +3197,7 @@ PAGE_CACHE_FILE_BYTES = AT_CAP_PEAK_BYTES - PAGE_CACHE_ANON_BYTES - PAGE_CACHE_K
 def cell_page_cache_not_counted_as_process_memory(world):
     """页缓存撑满 scope 不算进程内存（attempt_runner.py 文件头 ③ ⑥、task_server.py 文件头 ①「顶在上限上卡住」）：假 scope 的 memory.stat 是 anon 96M、file 1408M、
     kernel 32M，memory.current 与 memory.peak 钉在上限 1536M，CPU 一直不涨。跑完的那一条记的峰值是进程用的 96M、不是 1536M；
-    日志不涨的那一条（库里 1024M、上限 1536M）满卡住阈值照记 stalled、只一次尝试，不判顶在上限上卡住、不乘 1.5 重排。
+    日志不涨的那一条（库里 1536M、上限 1536M）满卡住阈值照记 stalled、只一次尝试，不判顶在上限上卡住、不乘 1.5 重排。
     弄坏开关 memory-peak-with-page-cache 下照改前读 memory.peak 与 memory.current：记 1536M、判顶在上限上卡住重排，这一格红。"""
     scope = os.path.join(world.root, "page-cache-scope")
     os.makedirs(scope)
@@ -3345,10 +3258,10 @@ def cell_peer_pinned_at_cap_busy_cpu_retried(world):
 
 
 def cell_aged_head_at_slice_total_starts(world):
-    """满时限的排头要记满一整台（峰值 40G、乘 1.5 超过本机 slice 总上限 50G）、slice 自己挂着回收不掉的那一截（这台此刻的余量，假余量 2G）：上限与记账收到总上限减余量（48G），
-    照样起得来、跑完（task_server.py 的 booked_at_cap）；记满总上限的那种写法永远放不下（slice 放得下的减了余量只剩 48G）。看排两轮之后起没起，不比秒数。"""
+    """满时限的排头要记满一整台：峰值 48G，正好是本机 slice 总上限 50G 减 slice 自己挂着回收不掉的那一截（这台此刻的余量，假余量 2G），上限与记账就是 48G，
+    照样起得来、跑完（task_server.py 的 booked_at_cap 与 host_limit）；记满总上限的那种写法永远放不下（slice 放得下的减了余量只剩 48G）。看排两轮之后起没起，不比秒数。"""
     world.resources(local=(50, 50), hold=True)
-    world.seed_peak("selftest-head-at-total", 40 * GIBIBYTE)
+    world.seed_peak("selftest-head-at-total", 48 * GIBIBYTE)
     world.start_server()
     head = world.submit(["bash", "-c", "exit 0", "head-at-total"], extra={lib.KEY_VARIABLE: "selftest-head-at-total"})
     backdate_past_aged(world, [head])
@@ -3401,7 +3314,7 @@ def cell_aged_task_judged_first(world):
 
 def cell_squeezed_at_total_is_cap_hit(world):
     world.resources(local=(55, 50))   # 总上限 50G（真机上取多机配置 SLICE_MEMORY_CAP_BY_HOST 里本机那一项）
-    world.seed_peak("selftest-squeeze-at-total", 40 * GIBIBYTE)   # 40G × 1.5 收到总上限减这台的假余量 2G：上限就是 48G
+    world.seed_peak("selftest-squeeze-at-total", 48 * GIBIBYTE)   # 峰值正好是总上限减这台的假余量 2G：上限就是 48G
     world.start_server()
     task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=254,254,254,254"], extra={"RUN_WITH_MEMORY_CAP_KEY": "selftest-squeeze-at-total"})
     summary = world.finished(task_id)
@@ -3449,7 +3362,7 @@ def cell_peer_starts_throttled(world):
 
 def cell_unmeasured_not_zero(world):
     key = "selftest-unmeasured"
-    world.seed_peak(key, 2 * GIBIBYTE)
+    world.seed_peak(key, 3 * GIBIBYTE)   # 上限照它 3072M（近五次最大，不乘 1.5）
     world.start_server()
     caps, peaks = [], []
     for _ in range(RECORD_WINDOW_OVERRUN):
@@ -3495,8 +3408,9 @@ def cell_unfinished_peak_ignored(world):
 
 
 def cell_completed_after_cap_hit(world):
-    # 跑完那次的峰值大于撞过的上限的一例（取它 × 1.5），与小于撞过的上限的一例（不低于撞过的上限 × 1.5）
-    cases = (("selftest-completed-above-cap-hit", 2500 * MEBIBYTE, "3750M"), ("selftest-completed-below-cap-hit", 1000 * MEBIBYTE, CAP_HIT_GROWN_PINNED_TEXT))
+    # 跑完那次的峰值大于撞过的上限的一例（取它本身），与小于撞过的上限的一例（取撞过的上限）：再交照近五次最大，不乘 1.5；
+    # 假世界两次共用一个峰值，要到上限的一半才算真撞（cap_hit_measurement）
+    cases = (("selftest-completed-above-cap-hit", 2500 * MEBIBYTE, "2500M"), ("selftest-completed-below-cap-hit", 1100 * MEBIBYTE, CAP_HIT_PINNED_TEXT))
     world.start_server(extra={"TASK_SERVER_FAKE_SCOPE_DIRECTORY": world.write_fake_scope(cases[0][1])})
     problems = []
     for key, completed_peak, expected in cases:
@@ -3512,52 +3426,32 @@ def cell_completed_after_cap_hit(world):
         cap = second["attempts"][0].get("memory_cap_text") if second["attempts"] else None
         if cap != expected or wrapper_cap_texts(world, second_id)[:1] != [expected]:
             problems.append(f"{key}：撞过 {CAP_HIT_PINNED_TEXT}、在 {CAP_HIT_GROWN_PINNED_TEXT} 跑完、跑完那次峰值 {completed_peak}，再交同一条上限应当是 {expected}"
-                            f"（跑完那次的峰值 × 1.5，不低于 {CAP_HIT_GROWN_PINNED_TEXT}），实际 {cap}、包装收到 {wrapper_cap_texts(world, second_id)}")
+                            f"（近五次最大：跑完那次的峰值与撞过的上限取大，不乘 1.5），实际 {cap}、包装收到 {wrapper_cap_texts(world, second_id)}")
     if problems:
         raise SelftestFailure("撞过上限后跑完的命令：" + "；".join(problems), world.server_log_lines())
-    return f"撞过 {CAP_HIT_PINNED_TEXT} 后跑完：再交同一条，峰值 2500M 的取 3750M，峰值 1000M 的不低于 {CAP_HIT_GROWN_PINNED_TEXT}"
+    return f"撞过 {CAP_HIT_PINNED_TEXT} 后跑完：再交同一条，峰值 2500M 的取 2500M，峰值 1100M 的取撞过的 {CAP_HIT_PINNED_TEXT}"
 
 
 def cell_cap_hit_starts_above(world):
     key = "selftest-cap-hit-only"
-    world.resources(local=(30, 2), local_margin=0)   # 本机 slice 总上限 2G、余量 0：2048M 撞了就到顶收尾，这条命令只留一次撞上限的尝试、一次跑完的都没有
+    # 本机 slice 总上限 4G、余量 0：2048M 撞了乘 1.5 到 3072M 再撞，再乘就过 4G、到顶收尾；这条命令只留两次撞上限的尝试（与库里记的那一次跑完的 2048M）
+    world.resources(local=(30, 4), local_margin=0)
     world.seed_peak(key, CAP_HIT_SEED_PEAK_BYTES)
     world.start_server()
-    first = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250"], extra={lib.KEY_VARIABLE: key}))
+    first = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,250"], extra={lib.KEY_VARIABLE: key}))
     seen = [(attempt.get("memory_cap_text"), attempt.get("outcome")) for attempt in first["attempts"]]
-    if seen != [(CAP_HIT_PINNED_TEXT, "memory-cap-hit")] or first["task"].get("outcome") != "memory-cap-at-maximum":
-        raise SelftestFailure(f"本机总上限 2G：头一件应当只有一次 {CAP_HIT_PINNED_TEXT} 撞上限、到顶记 memory-cap-at-maximum，实际 {seen}、{describe(first)}")
+    if seen != [(CAP_HIT_PINNED_TEXT, "memory-cap-hit"), (CAP_HIT_GROWN_PINNED_TEXT, "memory-cap-hit")] or first["task"].get("outcome") != "memory-cap-at-maximum":
+        raise SelftestFailure(f"本机总上限 4G：头一件应当 {CAP_HIT_PINNED_TEXT}、{CAP_HIT_GROWN_PINNED_TEXT} 各撞一次上限、到顶记 memory-cap-at-maximum，实际 {seen}、{describe(first)}")
     world.resources(local=(30, 30))
     second_id = world.submit(["bash", "-c", "exit 0"], extra={lib.KEY_VARIABLE: key})
     second = world.finished(second_id)
     attempt = second["attempts"][0] if second["attempts"] else {}
     wrapper_caps = wrapper_cap_texts(world, second_id)
-    if second["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != CAP_HIT_GROWN_PINNED_TEXT or wrapper_caps[:1] != [CAP_HIT_GROWN_PINNED_TEXT]:
-        raise SelftestFailure(f"只撞过一次 {CAP_HIT_PINNED_TEXT}、还没跑完过的命令再交：第一次就应当从 {CAP_HIT_GROWN_PINNED_TEXT} 起（撞过的上限 × 1.5），"
+    above = f"{int(int(CAP_HIT_GROWN_PINNED_TEXT[:-1]) * lib.CAP_GROWTH_FACTOR)}M"   # 撞过、之后这把键没跑完过：照撞过的最大上限再乘 1.5（cap_hit_measurement 的 unresolved）
+    if second["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != above or wrapper_caps[:1] != [above]:
+        raise SelftestFailure(f"撞过 {CAP_HIT_PINNED_TEXT} 与 {CAP_HIT_GROWN_PINNED_TEXT}、之后没跑完过的命令再交：第一次就应当从 {above} 起（撞过的最大上限乘 1.5），"
                               f"实际上限 {attempt.get('memory_cap_text')}、包装收到 {wrapper_caps}、{describe(second)}", world.server_log_lines())
-    return f"只撞过一次 {CAP_HIT_PINNED_TEXT} 的命令再交，第一次就从 {CAP_HIT_GROWN_PINNED_TEXT} 起"
-
-
-def cell_failed_run_estimated(world):
-    """预计用时（task_server_lib.py 文件头「资源记录」的预计用时）：命令自己跑到退出的都算——这条命令只有一次跑了一秒退 1 的尝试，同一条再交、排着时预计用时就是那一次的用时
-    （任务 9730 跑约 1807 秒退 1，同一条再交只照退 0 的那一次报 80 秒）。弄坏开关 estimate-only-succeeded 下只认 succeeded、排着时 estimated_seconds 是 null，这一格红。"""
-    key = "selftest-failed-estimate"
-    world.resources(local=(30, 30))
-    world.start_server()
-    first = world.finished(world.submit(["bash", "-c", "sleep 1; exit 1"], extra={lib.KEY_VARIABLE: key}))
-    seconds = first_attempt(first).get("seconds")
-    world.resources(local=(30, 30), hold=True)
-    task_id = world.submit(["bash", "-c", "sleep 1; exit 1"], extra={lib.KEY_VARIABLE: key})
-    listed = world.client(["status", "--json"])
-    items = [item for item in json.loads(listed.stdout or "{}").get("tasks", []) if item.get("id") == task_id]
-    world.resources(local=(30, 30))
-    world.finished(task_id)
-    estimated = items[0].get("estimated_seconds") if items else None
-    if (first["task"].get("outcome") != "command-failed" or not isinstance(seconds, (int, float)) or not isinstance(estimated, (int, float))
-            or abs(estimated - seconds) > 0.01):
-        raise SelftestFailure(f"这条命令只有一次跑了一阵退 1 的尝试（用时 {seconds}）：它跑到了退出，用时就是预计用时，排着时 estimated_seconds 应当是 {seconds}，"
-                              f"实际头一次 {describe(first)}、列表 {items}")
-    return f"只有一次跑了 {seconds} 秒退 1 的命令再交，排着时预计用时 {estimated} 秒（命令自己跑到退出的都算）"
+    return f"撞过 {CAP_HIT_PINNED_TEXT} 与 {CAP_HIT_GROWN_PINNED_TEXT}、之后没跑完过的命令再交，第一次就从撞过的最大上限乘 1.5 的 {above} 起"
 
 
 def cell_queued_shows_waiting_reason(world):
@@ -3590,22 +3484,6 @@ def cell_attempt_unit_nofile_raised(world):
     return f"尝试单元里打开文件数软、硬上限都是 {wanted}"
 
 
-def cell_queued_estimate(world):
-    key = "selftest-estimate"
-    world.seed_duration(key, 3600, ["bash", "-c", "exit 0"])
-    world.resources(local=(30, 30), hold=True)
-    world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0"], extra={lib.KEY_VARIABLE: key})
-    shown = world.client(["status", str(task_id)])
-    listed = world.client(["status", "--json"])
-    items = [item for item in json.loads(listed.stdout or "{}").get("tasks", []) if item.get("id") == task_id]
-    world.resources(local=(30, 30))
-    world.finished(task_id)
-    if "预计用时 3600 秒" not in shown.stdout or not items or items[0].get("estimated_seconds") != 3600:
-        raise SelftestFailure(f"排队时 status 应当报预计用时 3600 秒（库里记的那一次跑完的用时），实际「{shown.stdout.strip()[:300]}」、列表 {items}")
-    return "排着的任务 status 报预计用时 3600 秒"
-
-
 def recorded_host_line(world, task_id):
     """客户端 status <号> 打的第一次尝试那一行（「第 1 次：本机、上限 …」）；没有交空串。"""
     shown = world.client(["status", str(task_id)])
@@ -3615,7 +3493,7 @@ def recorded_host_line(world, task_id):
 def cell_balanced_when_both_fit(world):
     world.resources(local=(40, 40), peer=(100, 100), peer_cap_gibibytes=64)
     world.seed_peak("selftest-long-and-big", 10 * GIBIBYTE)
-    world.seed_duration("selftest-long-and-big", 7200, ["bash", "-c", "exit 0"])
+    world.seed_duration("selftest-long-and-big", 3600, ["bash", "-c", "exit 0"])
     world.start_server()
     placed, lines = {}, {}
     for name, extra in (("plain", {}), ("long-and-big", {lib.KEY_VARIABLE: "selftest-long-and-big"})):
@@ -3647,7 +3525,7 @@ def cell_peer_when_local_full(world):
 
 def cell_every_command_reaches_peer(world):
     """没有只派一台的名单（task_server.py 的 RESTORED_HOST_LISTS 只是删之前的样子）：删之前只在本机的（scripts/hosts/、.claude/gate.d/ 下的与读本机东西的那几个入口）
-    与第二台在同一棵共享的树里跑之后放开的那几类（task-server/、scripts/agents/、.claude/hooks/、带 --write 的、scripts/kb/、不带 --skip-apply 的 merge-and-verify），
+    与第二台在同一棵共享的树里跑之后放开的那几类（task-server/、scripts/agents/、.claude/hooks/、带 --write 的、scripts/kb/、合入后验证 merge-and-verify），
     本机放不下（各记 15G、本机空 8G）、第二台放得下时都派到第二台跑完；删之前只在第二台跑的 e185-r2-segment-run.sh，第二台用不了时在本机跑完。"""
     world.resources(local=(8, 30), peer=(100, 100), peer_cap_gibibytes=64)
     world.seed_peak("selftest-every-command", 10 * GIBIBYTE)
@@ -3656,7 +3534,7 @@ def cell_every_command_reaches_peer(world):
     commands = {"scripts/hosts/ 下的": "scripts/hosts/multi-host-run.sh", ".claude/gate.d/ 下的": ".claude/gate.d/doc-text.sh",
                 "task-server/ 下的": "task-server/task_server_lib.py", "scripts/agents/ 下的": "scripts/agents/agent-cost.py",
                 ".claude/hooks/ 下的": ".claude/hooks/lib_project_code_runs.py", "带 --write 的": "--write", "scripts/kb/ 下的": "scripts/kb/replace-once.py",
-                "不带 --skip-apply 的 merge-and-verify": "scripts/gate/merge-and-verify.sh", "删之前只在第二台的": SERVER.RESTORED_HOST_LISTS["peer_entries"][0]}
+                "合入后验证 merge-and-verify": "scripts/gate/merge-and-verify.sh", "删之前只在第二台的": SERVER.RESTORED_HOST_LISTS["peer_entries"][0]}
     commands.update({f"删之前读本机东西的入口 {entry}": entry for entry in SERVER.RESTORED_HOST_LISTS["local_entries"]})
     submitted = {name: world.submit(["bash", "-c", "exit 0", "x", word], extra=key, cwd=world.repo) for name, word in commands.items()}
     problems = []
@@ -4033,6 +3911,76 @@ def cell_shard_merge_failed(world):
     return f"合并那一步退 {SHARD_MERGE_EXIT}：整件 command-failed、wait 退 {SHARD_MERGE_EXIT}、末行点名 step=merge"
 
 
+SHARD_BINARIES_NAMES = ("crash_enumeration-5f3a91c0", "power_loss_replay-9b21d4e7", "binaries.tsv")   # shard-binaries-removed-at-outcome：计划那一步放进 test-binaries/ 的几份（两份测试二进制与清单）
+SHARD_BINARIES_NOTE_SECONDS = 10.0   # shard-binaries-removed-at-outcome：整件跑成之后等那一行操作日志的安静时限（结局记下之后才删、才记）
+
+
+def shard_plan_directory_of(world, task_id):
+    """假分片入口计划那一步记下的计划目录（调用记录里的 sharded-plan-binaries 一行；目录是 <库标签>-<父任务号>/plan）；没记的交空串。"""
+    for row in world.sharded_calls("plan-binaries"):
+        if row.get("directory", "").endswith(f"-{task_id}/plan"):
+            return row["directory"]
+    return ""
+
+
+def shard_binaries_notes(world, task_id):
+    """操作日志里这条父任务 shard-binaries 那几行的说明（task_server.py 的 shard_binaries_removal 记的）。"""
+    return [operation.get("note", "") for operation in world.operations() if operation.get("action") == "shard-binaries" and operation.get("task") == task_id]
+
+
+def cell_shard_binaries_removed_at_outcome(world):
+    """分片父任务有了结局时服务删计划目录下的 test-binaries/（task_server.py 的 shard_binaries_removal；文件头 ④）：
+    一片在跑时取消整件：回来时 test-binaries/ 已删、plan.json 还在，操作日志写删了 3 份；再往那里放一份，task clean 照删、plan.json 还在、操作日志写 1 份；
+    计划那一步把 test-binaries 建成指到计划目录外的符号链接、整件跑成：不删，外面那个目录里的文件还在、链接还在，操作日志写没删，服务日志打那一行。
+    弄坏开关 shard-binaries-kept 下取消与 clean 之后都还在，shard-binaries-path-unchecked 下计划目录外那一份被删，这一格红。"""
+    release = os.path.join(world.root, "release-binaries-shard")
+    world.start_server()
+    problems = []
+    cancelled = world.submit(world.write_spec("spec-binaries-cancel.json", {"shards": [{"block": release}], "plan_binaries": list(SHARD_BINARIES_NAMES)}), cwd=world.repo)
+    try:
+        world.wait_for(cancelled, lambda summary: any(attempt.get("state") == "running" for child in shard_children(summary).values() for attempt in child["attempts"]),
+                       "那一片跑起来")
+        completed = world.client(["cancel", str(cancelled)])
+    finally:
+        open(release, "w").close()   # 取消没停下那一片：放它跑完，收尾不等满 60 秒
+    plan = shard_plan_directory_of(world, cancelled)
+    binaries = os.path.join(plan, lib.SHARD_PLAN_BINARIES_NAME)
+    outcome = world.summary(cancelled)["task"].get("outcome")
+    notes = shard_binaries_notes(world, cancelled)
+    if (not plan or completed.returncode != 0 or outcome != "cancelled" or os.path.lexists(binaries) or not os.path.exists(os.path.join(plan, lib.PLAN_FILE))
+            or not any(f"{len(SHARD_BINARIES_NAMES)} 份" in note for note in notes)):
+        problems.append(f"一片在跑时取消整件：应当退 0、记 cancelled，回来时计划目录下的 {lib.SHARD_PLAN_BINARIES_NAME}/ 已删、{lib.PLAN_FILE} 还在、操作日志写删了 "
+                        f"{len(SHARD_BINARIES_NAMES)} 份，实际退 {completed.returncode}、结局 {outcome}、计划目录「{plan or '没记下'}」、"
+                        f"{lib.SHARD_PLAN_BINARIES_NAME}/ {'还在' if os.path.lexists(binaries) else '不在'}、{lib.PLAN_FILE} {'在' if os.path.exists(os.path.join(plan, lib.PLAN_FILE)) else '不在'}、操作日志 {notes}")
+    if plan:
+        os.makedirs(binaries, exist_ok=True)
+        with open(os.path.join(binaries, "late-binary"), "w", encoding="utf-8") as handle:
+            handle.write("late\n")
+        cleaned = world.client(["clean", str(cancelled)])
+        notes = shard_binaries_notes(world, cancelled)
+        if cleaned.returncode != 0 or os.path.lexists(binaries) or not os.path.exists(os.path.join(plan, lib.PLAN_FILE)) or not any("1 份" in note for note in notes):
+            problems.append(f"再往 {lib.SHARD_PLAN_BINARIES_NAME}/ 放一份之后 task clean：应当退 0、那个子目录删了、{lib.PLAN_FILE} 还在、操作日志写删了 1 份，"
+                            f"实际退 {cleaned.returncode}、{lib.SHARD_PLAN_BINARIES_NAME}/ {'还在' if os.path.lexists(binaries) else '不在'}、操作日志 {notes}、"
+                            f"输出「{(cleaned.stdout + cleaned.stderr).strip()[-300:]}」")
+    outside = os.path.join(world.root, "binaries-elsewhere")
+    linked = world.submit(world.write_spec("spec-binaries-link.json", {"shards": [{}], "plan_binaries_link": outside}), cwd=world.repo)
+    done = world.finished(linked)
+    patience = world.patience(SHARD_BINARIES_NOTE_SECONDS)
+    while patience.waiting() and not shard_binaries_notes(world, linked):
+        time.sleep(POLL_SECONDS)
+    notes = shard_binaries_notes(world, linked)
+    link = os.path.join(shard_plan_directory_of(world, linked), lib.SHARD_PLAN_BINARIES_NAME)
+    logged = any("不是这一条任务自己的计划目录下的那一份" in line for line in world.server_log_lines())
+    if (done["task"].get("outcome") != "succeeded" or not os.path.exists(os.path.join(outside, "kept")) or not os.path.islink(link)
+            or not any(note.startswith("没删") for note in notes) or not logged):
+        problems.append(f"{lib.SHARD_PLAN_BINARIES_NAME} 是指到计划目录外的符号链接、整件跑成：应当不删（外面那份 kept 还在、链接还在）、操作日志写没删、服务日志打一行，"
+                        f"实际结局 {done['task'].get('outcome')}、kept {'在' if os.path.exists(os.path.join(outside, 'kept')) else '不在'}、"
+                        f"链接 {'在' if os.path.islink(link) else '不在'}、操作日志 {notes}、服务日志{'有' if logged else '没有'}那一行")
+    raise_cell_problems(world, problems, "分片的测试二进制")
+    return (f"取消整件时计划目录下的 {lib.SHARD_PLAN_BINARIES_NAME}/ 删了（{lib.PLAN_FILE} 留着）、task clean 照删；"
+            f"它是指到计划目录外的符号链接的不删，操作日志写「{notes[0][:60] if notes else ''}…」")
+
+
 def cell_unsharded_arguments(world):
     world.start_server()
     problems = []
@@ -4091,19 +4039,75 @@ def cell_control_start(world):
     return "control start 等到服务起来、回读 is-active 与 /health 都对退 0；服务一直不回话退 1；systemctl start 退非 0 退 1"
 
 
-def cell_gpu_without_cards_unmet(world):
-    world.resources(local=(100, 100), local_gpu=[(0, 16384)])   # 本机有卡，假余量里多机配置点名的卡却是空的
+# 开了 GPU 的多机配置里换掉的那一段：判法要 ENABLE_GPU=1 时两个显卡键都写（这里各写本机一张卡，判法不判值）
+GPU_ON_CONFIGURATION_KEYS = f"ENABLE_GPU=1\nGPU_CARDS_BY_PRIORITY={LOCAL_CARD_ZERO}\nGPU_CARDS_BY_PRIORITY_WHEN_QUIESCED={LOCAL_CARD_ZERO}\n"
+# control 起 gpu-verification-server/control 时给的出路里要有的那一句（control 的 GPU_SERVICE_START_HOWTO 开头）
+GPU_SERVICE_START_TEXT = "python3 gpu-verification-server/control start"
+
+
+def gpu_on_configuration(world):
+    """这一格世界的多机配置抄一份、只把 ENABLE_GPU=0 那一行换成 GPU_ON_CONFIGURATION_KEYS，交新那一份的路径：task-server 读的键与世界那一份相同（同一个服务、同一个 socket）。"""
+    with open(world.config, encoding="utf-8") as handle:
+        text = handle.read()
+    if text.count("\nENABLE_GPU=0\n") != 1:
+        raise SelftestFailure(f"世界的多机配置 {world.config} 里 ENABLE_GPU=0 那一行应当恰好一行，实际 {text.count('ENABLE_GPU=')} 处写了 ENABLE_GPU")
+    path = os.path.join(world.root, "gpu-on-multi-host.env")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text.replace("\nENABLE_GPU=0\n", "\n" + GPU_ON_CONFIGURATION_KEYS))
+    return path
+
+
+def gpu_service_calls(world):
+    """假 gpu-verification-server/control 收到过的调用（calls 里「gpu-service-control 」起头的行，按先后）。"""
+    return [line for line in world.calls() if line.startswith("gpu-service-control ")]
+
+
+def write_gpu_service_exit(world, code):
+    """假 gpu-verification-server/control 之后退几（世界目录里的 gpu-service-exit）。"""
+    with open(os.path.join(world.world, "gpu-service-exit"), "w", encoding="utf-8") as handle:
+        handle.write(f"{code}\n")
+
+
+def cell_gpu_service_required_when_gpu_on(world):
+    """开了 GPU（多机配置 ENABLE_GPU=1）：control check 在任务服务那几样都过之后接着起 gpu-verification-server/control check（假的，照 gpu-service-exit 退），
+    它退 78 时 check 退 78、出路写起它的命令；control start 在任务服务起好之后接着起 gpu-verification-server/control start，它退 78 时 start 退 78；
+    假的退 0 时 check、start 都退 0、各起它一次。"""
     world.start_server()
-    path = f"{world.fake_cargo}:{os.environ.get('PATH', '/usr/bin:/bin')}"
-    task_id = world.submit(["cargo", "test", "--features", "gpu", "gpu_without_cards_sample"], extra={"PATH": path})
-    summary = world.finished(task_id)
-    task = summary["task"]
-    ran = [line for line in world.calls() if line.startswith(("wrapper ", "quiesce ", "cargo "))]
-    if (not task.get("gpu") or task.get("outcome") != "run-condition-unmet" or task.get("exit_code") != lib.RUN_CONDITION_EXIT or summary["attempts"] or ran
-            or "没点名能用的卡" not in (task.get("note") or "")):
-        raise SelftestFailure(f"要卡的命令而多机配置一张卡都没点名：服务应当认成要卡、判 run-condition-unmet（退 {lib.RUN_CONDITION_EXIT}）、说没点名能用的卡、命令一行不跑，"
-                              f"实际认成{'要卡' if task.get('gpu') else '不要卡'}、{describe(summary)}、说明「{task.get('note')}」、起了的调用 {ran}", world.server_log_lines())
-    return f"要卡而多机配置没点名卡：服务判 run-condition-unmet（退 {lib.RUN_CONDITION_EXIT}），清场、内存包装、命令一个都没起"
+    extra = {lib.MULTI_HOST_CONFIG_VARIABLE: gpu_on_configuration(world), "TASK_SERVER_CONTROL_SYSTEMCTL": os.path.join(world.bin, "fake-systemctl"),
+             "TASK_SERVER_GPU_SERVICE_CONTROL": os.path.join(world.bin, "fake-gpu-service-control")}
+    problems = []
+    for service_exit, want in ((78, lib.RUN_CONDITION_EXIT), (0, 0)):
+        write_gpu_service_exit(world, service_exit)
+        for subcommand in ("check", "start"):
+            before = len(gpu_service_calls(world))
+            completed = world.control([subcommand], extra=extra)
+            called = gpu_service_calls(world)[before:]
+            named = service_exit == 0 or GPU_SERVICE_START_TEXT in completed.stderr
+            if completed.returncode != want or called != [f"gpu-service-control {subcommand}"] or not named:
+                problems.append(f"假 GPU 服务退 {service_exit} 时 control {subcommand} 应当起它一次（「gpu-service-control {subcommand}」）、退 {want}"
+                                f"{'、出路写「' + GPU_SERVICE_START_TEXT + '」' if service_exit else ''}，实际退 {completed.returncode}、起了 {called}、"
+                                f"stderr「{completed.stderr.strip()[-300:]}」")
+    if problems:
+        raise SelftestFailure("开了 GPU：" + "；".join(problems))
+    return "开了 GPU：control check、start 都接着起 gpu-verification-server/control；它退 78 时 check、start 退 78、出路写起它的命令，退 0 时都退 0"
+
+
+def cell_gpu_service_untouched_when_gpu_off(world):
+    """没开 GPU（多机配置 ENABLE_GPU=0，各格世界的缺省）：假 gpu-verification-server/control 设着、照 gpu-service-exit 退 78，
+    control check、start 都不起它，照任务服务自己的结论退 0。"""
+    world.start_server()
+    write_gpu_service_exit(world, 78)
+    extra = {"TASK_SERVER_CONTROL_SYSTEMCTL": os.path.join(world.bin, "fake-systemctl"),
+             "TASK_SERVER_GPU_SERVICE_CONTROL": os.path.join(world.bin, "fake-gpu-service-control")}
+    problems = []
+    for subcommand in ("check", "start"):
+        completed = world.control([subcommand], extra=extra)
+        if completed.returncode != 0 or gpu_service_calls(world):
+            problems.append(f"control {subcommand} 应当不起 gpu-verification-server/control、退 0，实际退 {completed.returncode}、起了 {gpu_service_calls(world)}、"
+                            f"stderr「{completed.stderr.strip()[-300:]}」")
+    if problems:
+        raise SelftestFailure("没开 GPU：" + "；".join(problems))
+    return "没开 GPU：control check、start 都不起 gpu-verification-server/control，退 0"
 
 
 def cell_pinned_peer_unavailable(world):
@@ -4124,44 +4128,6 @@ def cell_pinned_peer_unavailable(world):
         raise SelftestFailure(f"钉在第二台重排、第二台用不了：应当只有本机那一次撞上限的尝试、结局 never-fits（退 241）、说钉在第二台而它用不了，"
                               f"实际尝试 {attempts}、{describe(summary)}、说明「{task.get('note')}」", world.server_log_lines())
     return "本机到顶换到第二台钉着重排、第二台随即用不了：判 never-fits（退 241），不在本机另起"
-
-
-def submitted_gpu(world, command, extra=None):
-    """交一条、读 submit 回显的 gpu=；交 (任务号, 0 或 1)。"""
-    completed = world.client(["submit", "--cwd", world.work, "--", *command], extra=extra)
-    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+) \S+ gpu=([01])", completed.stdout)
-    if completed.returncode != 0 or not found:
-        raise SelftestFailure(f"提交 {command} 没拿到任务号与 gpu=（退 {completed.returncode}）", [completed.stdout, completed.stderr] + world.server_log_lines())
-    world.confirm_submitted(completed, extra=extra)   # 照确认单确认（task_server.py 文件头 ⑦）
-    return int(found.group(1)), int(found.group(2))
-
-
-def cell_gpu_runs_only_when_code_runs(world):
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    world.start_server()
-    cases = ((["cargo", "clippy", "--all-targets", "--all-features", "--", "-D", "warnings"], 0),
-             (["cargo", "build", "--features", "gpu", "-p", "singlefs-verification"], 0),
-             (["cargo", "check", "-F", "gpu"], 0), (["cargo", "doc", "--all-features"], 0),
-             (["cargo", "test", "--features", "gpu", "--no-run", "-p", "singlefs-verification"], 0),
-             (["cargo", "bench", "--all-features", "--no-run"], 0),
-             (["bash", "-c", "cargo clippy --all-features && cargo build --features gpu"], 0),
-             (["cargo", "test", "--features", "gpu", "-p", "singlefs-verification"], 1),
-             (["cargo", "+stable", "t", "--features=gpu"], 1), (["cargo", "run", "--all-features", "--bin", "selftest"], 1),
-             (["cargo", "test", "--features", "gpu", "--", "--no-run"], 1),
-             (["cargo", "test", "--features", "tests-on-a-real-gpu", "-p", "singlefs-verification"], 1),
-             (["cargo", "test", "-F", "singlefs-verification/tests-on-a-real-gpu"], 1))
-    problems, submitted = [], []
-    for words, expected in cases:
-        task_id, gpu = submitted_gpu(world, [*words, "fake-wrapper-exits=0"])
-        submitted.append(task_id)
-        if gpu != expected:
-            problems.append(f"{' '.join(words)} 应当回显 gpu={expected}，实际 gpu={gpu}")
-    for task_id in submitted:
-        world.finished(task_id)
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return (f"{len(cases)} 条带 gpu 特性的 cargo：clippy、build、check、doc、test / bench --no-run、bash -c 里的 clippy 加 build 回显 gpu=0，"
-            "test、t、run、-- 之后的 --no-run 与开了 tests-on-a-real-gpu 的 test 回显 gpu=1")
 
 
 def cell_stall_clock_from_log_mtime(world):
@@ -4285,37 +4251,6 @@ def cell_attempt_label_passed_to_command(world):
     return f"本机与第二台那一条都拿到 {lib.ATTEMPT_LABEL_VARIABLE}=<这一次尝试的 label>"
 
 
-def cell_card_labels_by_address(world):
-    """卡的台标签是 HOSTS 里那一台的地址（task_server.py 文件头 ②「GPU」）：多机配置只点名第二台（SELFTEST_PEER_ADDRESS）的一张卡、本机放得下却没卡
-    ⇒ GPU 任务派到第二台，尝试记的卡、清场包装拿到的与 env 那一段带过去的 GPU_CARDS_BY_PRIORITY 都是原样那一项（地址形态）；
-    再换成台标签不在 HOSTS 里的一张 ⇒ 当一张卡都没点名，记 run-condition-unmet、没起、说明点名那一项。"""
-    world.resources(local=(100, 100), peer=(100, 100), peer_cap_gibibytes=64, cards=PEER_CARD_ZERO, peer_gpu=[(0, 16384)])
-    world.start_server()
-    task_id = world.submit(["cargo", "test", "--features", "gpu", "fake-peer-exit=0"], cwd=world.repo)
-    summary = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
-    attempt = first_attempt(summary)
-    calls = world.calls()
-    quiesce = world.calls_of(task_id, "quiesce")
-    marks = [index for index, line in enumerate(calls) if line.startswith(f"peer task={task_id} ")]
-    peer_words = calls[marks[0] + 1] if marks and marks[0] + 1 < len(calls) and calls[marks[0] + 1].startswith("peer-words ") else ""
-    problems = []
-    if attempt.get("host") != "peer" or attempt.get("card") != PEER_CARD_ZERO or summary["task"].get("outcome") != "succeeded":
-        problems.append(f"只点名第二台的卡 {PEER_CARD_ZERO}：GPU 任务应当派到第二台、记这张卡、跑成，实际 {describe(summary)}")
-    if not quiesce or not quiesce[0].endswith(f" cards={PEER_CARD_ZERO}"):
-        problems.append(f"清场包装拿到的 GPU_CARDS_BY_PRIORITY 应当是 {PEER_CARD_ZERO}，实际调用「{quiesce}」")
-    if f"GPU_CARDS_BY_PRIORITY={PEER_CARD_ZERO}" not in peer_words.split():
-        problems.append(f"env 那一段应当带 GPU_CARDS_BY_PRIORITY={PEER_CARD_ZERO}，实际「{peer_words[:400]}」")
-    world.resources(local=(100, 100), peer=(100, 100), peer_cap_gibibytes=64, cards=OUTSIDE_HOSTS_CARD, peer_gpu=[(0, 16384)])
-    unmet_id = world.submit(["cargo", "test", "--features", "gpu", "fake-peer-exit=0"], cwd=world.repo)
-    unmet = world.finished(unmet_id, timeout=PLACEMENT_WAIT_SECONDS)
-    shown = json.dumps(unmet, ensure_ascii=False)
-    if unmet["task"].get("outcome") != "run-condition-unmet" or unmet["attempts"] or OUTSIDE_HOSTS_CARD not in shown or "不是 HOSTS 里的一项" not in shown:
-        problems.append(f"台标签 {OUTSIDE_HOSTS_CARD} 不在 HOSTS 里：应当当一张卡都没点名、记 run-condition-unmet、没起、说明点名那一项，实际 {shown[:600]}")
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return f"台标签 {PEER_CARD_ZERO} 的卡派到第二台、交给命令的是地址形态；台标签不在 HOSTS 里的当没点名、记 run-condition-unmet 并点名"
-
-
 def cell_peer_admission_marked(world):
     """派第二台的那一次（task_server.py 文件头 ③「第二台」）：服务只给那一层 multi-host-run.sh --peer 设 lib.PEER_ADMITTED_VARIABLE=<任务号>.<第几次>，
     env 那一段不带到第二台那条命令；本机那一次的命令看不到它。"""
@@ -4429,7 +4364,10 @@ def suspect_lines(completed):
 
 
 def cell_suspected_stall_notified(world):
-    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
+    """疑似卡住只通知、不停（task_server.py 的 check_suspect、judge_stall_stop）：窗口 6 秒（脚本每 0.25 秒打一行，输出间隔要比窗口小得多：机器忙时输出断档不到 6 秒，
+    不会被判成日志不涨而停掉），假 scope 的 CPU 不涨，约 15 秒的脚本：头一回 wait 打 TASK_SERVER_SUSPECT、退 SUSPECT_EXIT，任务照跑、status 写疑似卡住、记告警；
+    再起 wait 拿到 succeeded，同一段只报一次。弄坏开关 suspect-unreported 下不判，这一格红。"""
+    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "6", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
                               "TASK_SERVER_FAKE_SCOPE_DIRECTORY": idle_cpu_scope(world)})
     task_id = world.submit(["bash", "-c", 'for round in $(seq 1 60); do echo "tick $round"; sleep 0.25; done'])   # 日志一直在涨、CPU 不涨，约 15 秒
     first = world.client(["wait", str(task_id)], timeout=60)
@@ -4455,28 +4393,6 @@ def cell_suspected_stall_notified(world):
             "再起 wait 拿到 succeeded，同一段只报一次")
 
 
-def cell_suspected_stall_card_busy_not_reported(world):
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    write_executable(os.path.join(world.work, SUSPECT_GPU_SCRIPT_NAME), SUSPECT_GPU_SCRIPT)
-    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
-                              "TASK_SERVER_FAKE_SCOPE_DIRECTORY": idle_cpu_scope(world), "TASK_SERVER_NVIDIA_SMI": os.path.join(world.bin, "fake-nvidia-smi")})
-    busy = world.submit(["bash", SUSPECT_GPU_SCRIPT_NAME, os.path.join(world.world, "card-busy-pids")])   # 卡上有它的计算负载
-    busy_wait = world.client(["wait", str(busy)], timeout=60)
-    idle = world.submit(["bash", SUSPECT_GPU_SCRIPT_NAME])   # 卡上没有它的负载
-    idle_wait = world.client(["wait", str(idle)], timeout=60)
-    world.client(["cancel", str(idle)])
-    busy_summary = world.summary(busy)
-    problems = []
-    if not busy_summary["task"].get("gpu") or busy_wait.returncode != 0 or suspect_lines(busy_wait):
-        problems.append(f"要卡的、CPU 不涨而卡上有它的计算负载：不该报疑似卡住，wait 应当拿到真结局退 0，"
-                        f"实际认成{'要卡' if busy_summary['task'].get('gpu') else '不要卡'}、退 {busy_wait.returncode}、「{busy_wait.stdout.strip()[-300:]}」")
-    if idle_wait.returncode != lib.SUSPECT_EXIT or not suspect_lines(idle_wait):
-        problems.append(f"要卡的、CPU 不涨、卡上也没有它的负载：应当报疑似卡住（退 {lib.SUSPECT_EXIT}），实际退 {idle_wait.returncode}、「{idle_wait.stdout.strip()[-300:]}」")
-    if problems:
-        raise SelftestFailure("要卡的疑似卡住看卡：" + "；".join(problems), world.server_log_lines())
-    return f"要卡的 CPU 不涨：卡上有它的计算负载不报、跑完退 0；卡上没有它的负载报疑似卡住、退 {lib.SUSPECT_EXIT}"
-
-
 def shown_local_pin(completed):
     """control pin-cap 打的两台此刻的钉值（lib.pinned_caps_text 的「本机 <数>M、第二台 <数>M」）里本机那一项的 MiB 数；没打出来交 None。"""
     found = re.search(r"本机 (\d+)M", completed.stdout)
@@ -4490,7 +4406,7 @@ def cell_pinned_cap_from_configuration(world):
     world.resources(local=(100, 100))
     probe = ["bash", "-c", "exit 0", "pinned-cap-probe"]
     hit = ["bash", "-c", "exit 0", "pinned-cap-hit", "fake-wrapper-exits=250,run"]
-    world.seed_peak(PEAKS.command_key(probe, None), GIBIBYTE)   # 学到的峰值 1G：没钉时上限 1536M，钉了不顶掉钉值
+    world.seed_peak(PEAKS.command_key(probe, None), 1536 * MEBIBYTE)   # 学到的峰值 1536M：没钉时上限照它 1536M，钉了不顶掉钉值
     world.start_server()
     problems = []
     for command in (hit, probe):
@@ -4528,6 +4444,56 @@ def cell_pinned_cap_from_configuration(world):
         raise SelftestFailure("钉值：" + "；".join(problems), world.server_log_lines())
     return (f"pin-cap 之后第一次上限就是 pin-cap 报的此刻钉值（{before}M）、改配置跟着变（{after}M）、撞上限不放大记 memory-cap-at-maximum；"
             "unpin-cap 之后照记录（1536M）")
+
+
+def cell_pinned_cap_over_limit_reported(world):
+    """钉值不超过 slice 总上限减余量（task_server.py 的 pin_value、pin_over_limit_lines；任务 10289 钉到 51200M 等于 slice 总上限）：配置写 60G、那一台总上限 50G、假余量 2G：
+    control pin-cap 退 0、报本机 48G（49152M）、打一行「!」写超过与当多少用；起的那一次上限就是它。弄坏开关 pinned-over-limit-unreported 下报 58G、不打那一行，这一格红。"""
+    world.set_slice_cap("60G")
+    world.resources(local=(55, 50))
+    probe = ["bash", "-c", "exit 0", "pinned-over-limit"]
+    world.start_server()
+    pinned = world.control(["pin-cap", "--", *probe])
+    problems = []
+    if pinned.returncode != 0 or shown_local_pin(pinned) != 49152 or "超过这台 slice 总上限减余量" not in pinned.stdout:
+        problems.append(f"control pin-cap 应当退 0、报本机 49152M、打一行超过那一句，实际退 {pinned.returncode}、「{(pinned.stdout + pinned.stderr).strip()[-500:]}」")
+    summary = world.finished(world.submit(probe))
+    if first_attempt(summary).get("memory_cap_text") != "49152M":
+        problems.append(f"起的那一次上限应当是 49152M，实际 {describe(summary)}")
+    if problems:
+        raise SelftestFailure("钉值超过 slice 总上限减余量：" + "；".join(problems), world.server_log_lines())
+    return "配置写 60G、总上限 50G、余量 2G：pin-cap 回读报 49152M 与超过那一句，起的那一次照它"
+
+
+def cell_pinned_squeezed_requeued(world):
+    """钉了的命令被 slice 挤掉（task_server.py 文件头 ②「内存」的钉值；任务 10289 内存包装退 254、写「这一条的结果不算数，重跑」，服务却打回 memory-cap-at-maximum）：
+    钉值等于这台单条能给的最大、第一次退 254：记 squeezed-out、同一上限重排、第二次跑完 succeeded。弄坏开关 pinned-squeeze-as-cap-hit 下记撞上限、打回，这一格红。"""
+    world.set_slice_cap("50G")
+    world.resources(local=(55, 50))
+    command = ["bash", "-c", "exit 0", "pinned-squeezed", "fake-wrapper-exits=254,run"]
+    world.start_server()
+    pinned = world.control(["pin-cap", "--", *command])
+    summary = world.finished(world.submit(command))
+    seen = [(attempt.get("memory_cap_text"), attempt.get("outcome")) for attempt in summary["attempts"]]
+    if pinned.returncode != 0 or [outcome for _, outcome in seen] != ["squeezed-out", "succeeded"] or seen[0][0] != seen[1][0] or summary["task"].get("outcome") != "succeeded":
+        raise SelftestFailure(f"钉了的命令退 254 应当记 squeezed-out、同一上限重排、跑完，实际 pin-cap 退 {pinned.returncode}、各次 {seen}、{describe(summary)}", world.server_log_lines())
+    return "钉了的命令退 254 记 squeezed-out、同一上限重排、跑完，不打回"
+
+
+def cell_pin_cap_help_not_pinned(world):
+    """control pin-cap --help、-h 打用法、不钉（操作记录有一条把 --help 钉成命令的）。弄坏开关 pin-cap-help-pinned 下钉上了，这一格红。"""
+    world.start_server()
+    problems = []
+    for word in ("--help", "-h"):
+        shown = world.control(["pin-cap", word])
+        if shown.returncode != 0 or "写成 python3 task-server/control pin-cap" not in shown.stdout or "钉上了" in shown.stdout:
+            problems.append(f"pin-cap {word} 应当退 0、打用法、不钉，实际退 {shown.returncode}、「{(shown.stdout + shown.stderr).strip()[-300:]}」")
+        left = world.control(["unpin-cap", "--", word])
+        if left.returncode != 0 or "原来就没钉" not in left.stdout:
+            problems.append(f"pin-cap {word} 之后命令 {word} 应当没钉，实际 unpin-cap 退 {left.returncode}、「{(left.stdout + left.stderr).strip()[-300:]}」")
+    if problems:
+        raise SelftestFailure("pin-cap 的用法：" + "；".join(problems), world.server_log_lines())
+    return "pin-cap --help、-h 打用法退 0，没钉"
 
 
 def cell_pinned_cap_unreadable_refused(world):
@@ -4669,7 +4635,7 @@ def cell_gate_stages_sent_to_peer(world):
 
 def cell_admission_booked_at_cap(world):
     key = "selftest-booked-at-cap"
-    world.seed_peak(key, 20 * GIBIBYTE)   # 预测 20G、上限 30G
+    world.seed_peak(key, 30 * GIBIBYTE)   # 预测、上限与记账都是 30G（近五次最大，不乘 1.5）
     world.resources(local=(50, 50))
     world.start_server()
     releases = [os.path.join(world.root, f"release-{number}") for number in (1, 2)]
@@ -4689,35 +4655,47 @@ def cell_admission_booked_at_cap(world):
     later = world.finished(second)
     booked = running["attempts"][0].get("booked")
     if waiting["task"].get("state") != "queued" or waiting["attempts"] or booked != 30 * GIBIBYTE or later["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"两条各预测 20G（上限 30G）、本机 50G：头一条按上限记账 30G，第二条（再记 30G 就超过 50G）应当排着、头一条放了才起；"
+        raise SelftestFailure(f"两条各记过峰值 30G（上限与记账都是 30G）、本机 50G：头一条记账 30G，第二条（再记 30G 就超过 50G）应当排着、头一条放了才起；"
                               f"实际头一条记账 {booked} 字节、第二条先是 {waiting['task'].get('state')}、尝试 {len(waiting['attempts'])} 次、最后 {describe(later)}",
                               world.server_log_lines())
-    return "两条各预测 20G（上限 30G）在 50G 的台上：头一条记账 30G（上限）、第二条排着，头一条放了才起"
+    return "两条各记过峰值 30G 在 50G 的台上：头一条记账 30G（上限）、第二条排着，头一条放了才起"
+
+
+SHARD_FITTED_FLOOR_BYTES = 30 * GIBIBYTE   # shard-cap-fitted-to-room 这一格的内存上限下限（TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES）：两片各记过峰值 20G，上限与记账抬到 30G、预测仍是 20G
 
 
 def cell_shard_cap_fitted_to_room(world):
-    """分片的片记满上限放不下、预测放得下时，上限压到放得下的量（task_server_lib.py 文件头「资源记录」的准入）：两片各预测 20G（上限 30G）、本机 54G，两片同时跑，上限之和不超过 54G；
-    不是分片的同样两条照旧排着（admission-booked-at-cap）。弄坏开关 shard-cap-not-fitted 下第二片排着，这一格红。"""
+    """分片的片记满上限放不下、预测放得下时，上限压到放得下的量（task_server_lib.py 文件头「资源记录」的准入；task_server.py 的 shard_cap_fitted_to_room）。
+    记录定的预测、上限与记账相等（近五次最大，不乘 1.5），只有内存上限的下限把上限与记账抬到预测之上时才有「记满上限放不下、预测放得下」，这一格照这一种造：
+    下限设 30G（SHARD_FITTED_FLOOR_BYTES），两片各记过峰值 20G（上限与记账抬到 30G）、本机 54G、余量 2G：第一片上限 30G，第二片压到 54G − 2G − 30G = 22G，
+    两片同时跑、上限之和恰好等于总上限减余量，两片的 prediction 都记 RECORD_HISTORY（照各片自己的键读到了记录），整件成了。
+    弄坏开关 shard-cap-not-fitted 下第二片排着，shard-key-position-folded 下各片读不到自己的记录，这一格红。"""
     key = "selftest-shard-cap-fitted"
     for index in (0, 1):
-        world.seed_peak(lib.shard_child_key(key, "shard", index, 2), 20 * GIBIBYTE)
+        world.seed_peak(lib.shard_child_key(key, "shard", index, 2), 20 * GIBIBYTE, shard_count=2)
     world.resources(local=(54, 54), peer_down="自证：第二台此刻用不了")
     release = os.path.join(world.root, "release-fitted")
     spec = world.write_spec("spec-fitted.json", {"shards": [{"block": release}, {"block": release}]})
-    world.start_server()
+    world.start_server(extra={lib.MEMORY_FLOOR_VARIABLE: str(SHARD_FITTED_FLOOR_BYTES)})
     task_id = world.submit(spec, cwd=world.repo, extra={lib.KEY_VARIABLE: key})
     try:
         summary = world.wait_for(task_id, lambda summary: len(running_shards(summary)) == 2, "两片同时在本机跑起来")
-        caps = sorted(int(child["attempts"][0].get("memory_cap") or 0) for child in shard_children(summary).values())
+        firsts = [child["attempts"][0] for child in shard_children(summary).values()]
+        caps = sorted(int(attempt.get("memory_cap") or 0) for attempt in firsts)
+        histories = sorted({str(attempt.get("prediction")) for attempt in firsts})
     finally:
         open(release, "w").close()
     finished = world.finished(task_id)
-    if caps != [(54 - SELFTEST_MARGIN_GIBIBYTES - 30) * GIBIBYTE, 30 * GIBIBYTE] or finished["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"两片各预测 20G、上限 30G、本机 54G、余量 {SELFTEST_MARGIN_GIBIBYTES}G：第一片上限 30G，第二片压到总上限减余量减第一片（上限之和恰好等于总上限减余量）、整件成了；实际上限 {caps}、整件 {describe(finished)}", world.server_log_lines())
-    return f"两片各预测 20G、本机 54G：上限 {[cap // GIBIBYTE for cap in caps]}G，同时跑、之和不超过总上限"
+    floor = SHARD_FITTED_FLOOR_BYTES
+    if (caps != [(54 - SELFTEST_MARGIN_GIBIBYTES) * GIBIBYTE - floor, floor] or histories != [lib.RECORD_HISTORY]
+            or finished["task"].get("outcome") != "succeeded"):
+        raise SelftestFailure(f"下限 30G、两片各记过峰值 20G、本机 54G、余量 {SELFTEST_MARGIN_GIBIBYTES}G：第一片上限 30G，第二片压到总上限减余量减第一片"
+                              f"（上限之和恰好等于总上限减余量）、两片 prediction 都记 {lib.RECORD_HISTORY}、整件成了；"
+                              f"实际上限 {caps}、prediction {histories}、整件 {describe(finished)}", world.server_log_lines())
+    return f"下限抬到 30G 的两片（峰值各 20G）在本机 54G：上限 {[cap // GIBIBYTE for cap in caps]}G，同时跑、之和不超过总上限减余量"
 
 
-SHARD_KEY_BASES = ("selftest-shard-keys", "bash scripts/crash/crash-point-replay-shard-run.sh --merged-log merged.log")   # shard-keys-kept-apart：交了键的、没交键按命令取的
+SHARD_KEY_BASES = ("selftest-shard-keys", "bash scripts/crash/crash-amplification-two-hosts.sh --merged-log merged.log")   # shard-keys-kept-apart：交了键的、没交键按命令取的
 
 
 def cell_shard_keys_kept_apart(world):
@@ -4771,59 +4749,24 @@ HEALTH_ANSWER_SECONDS = 1.0    # 那一格 /health 答话的中位数要短于�
 HEALTH_PROBES = 5              # 那一格至少问这么多次
 
 
-E174_COMMAND = ["python3", "scripts/experiment-apparatus/device-code-key.py", "run", ".", "--binary", "e174-lease-drop-wait-memory-return", "--feature", "e174-gpu",
-                "--entry", "e7_index_bench::run_child_on_the_card", "--", "run", "--segment", "first",
-                "--limit-jobs", "2"]   # E174（借据丢掉时等待与显存回还）实验页上的那一条（不带外面的清场与内存包装）
-
-
-def cell_python_entry_gpu_recognized(world):
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    world.start_server()
-    feature = E174_COMMAND.index("e174-gpu")
-    cases = ((E174_COMMAND[:feature] + ["e162-block-stores"] + E174_COMMAND[feature + 1:], 0),    # 同一入口不带 gpu 特性
-             (E174_COMMAND[:feature - 1] + E174_COMMAND[feature + 1:] + ["--feature", "gpu"], 0),   # gpu 只写在 -- 之后（交给装置的参数）
-             (["python3", "scripts/experiment-apparatus/device-code-key.py", "key", ".", "--binary", "x", "--feature=e174-gpu"], 0),   # 只取键的子命令
-             (E174_COMMAND, 1))   # 要卡的放最后：同一命令键用过卡的记录不挡前面几条
-    problems, submitted = [], []
-    for words, expected in cases:
-        task_id, gpu = submitted_gpu(world, [*words, "fake-wrapper-exits=0"])
-        submitted.append(task_id)
-        if gpu != expected:
-            problems.append(f"{' '.join(words)} 应当回显 gpu={expected}，实际 gpu={gpu}")
-    for task_id in submitted:
-        world.finished(task_id)
+def cell_resume_declaration_first_word_only(world):
+    """续跑声明的判法（task_server_lib.py 的 resumable_command、declaration_matches）：只看第一个非选项参数，后面的参数对上词不算；* 照旧。静态喂文件头，不起服务。
+    弄坏开关 resume-declaration-any-word 下非选项参数有一个对上就算，这一格红。"""
+    script = os.path.join(world.work, "declared-resume.sh")
+    with open(script, "w", encoding="utf-8") as handle:
+        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_RESUMABLE_MARK} segment\nexit 0\n")
+    everything = os.path.join(world.work, "declared-resume-all.sh")
+    with open(everything, "w", encoding="utf-8") as handle:
+        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_RESUMABLE_MARK} *\nexit 0\n")
+    cases = ((script, ["segment"], True), (script, ["--quick", "segment"], True), (script, ["other", "segment"], False), (script, [], False), (everything, ["other"], True))
+    problems = []
+    for path, arguments, expected in cases:
+        found = lib.resumable_command(["bash", path, *arguments], world.work)
+        if found != expected:
+            problems.append(f"{os.path.basename(path)} {arguments} 应当 {expected}，实际 {found}")
     if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return "E174 那条 device-code-key.py run --feature e174-gpu 回显 gpu=1；同一入口不带 gpu 特性、gpu 只在 -- 之后、只取键的子命令回显 gpu=0"
-
-
-def cell_gpu_argument_declaration_recognized(world):
-    """按脚本文件头的声明认要卡的参数（task_server_lib.py 文件头「GPU」的 # task-server-gpu-arguments:）：bash 起的与 python3 起的假脚本各一份，
-    第一个非选项参数是声明的词就要卡，别的参数不要卡；没写那一行的脚本照不要卡。"""
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    world.start_server()
-    scripts = {"declared-gpu.sh": f"#!/usr/bin/env bash\n{lib.DECLARED_GPU_ARGUMENTS_MARK} card-segment card-drift\nexit 0\n",
-               "declared_gpu.py": f"#!/usr/bin/env python3\n{lib.DECLARED_GPU_ARGUMENTS_MARK} run\n",
-               "undeclared.sh": "#!/usr/bin/env bash\n# 文件头没有要卡的声明\nexit 0\n"}
-    for name, text in scripts.items():
-        with open(os.path.join(world.work, name), "w", encoding="utf-8") as handle:
-            handle.write(text)
-    cases = ((["bash", "declared-gpu.sh", "cpu-segment"], 0), (["bash", "declared-gpu.sh", "--list-items"], 0),
-             (["python3", "declared_gpu.py", "key"], 0), (["bash", "undeclared.sh", "card-segment"], 0),
-             (["bash", "declared-gpu.sh", "card-segment"], 1), (["bash", "declared-gpu.sh", "--quick", "card-drift"], 1),
-             (["python3", "declared_gpu.py", "run"], 1))
-    problems, submitted = [], []
-    for words, expected in cases:
-        task_id, gpu = submitted_gpu(world, [*words, "fake-wrapper-exits=0"])
-        submitted.append(task_id)
-        if gpu != expected:
-            problems.append(f"{' '.join(words)} 应当回显 gpu={expected}，实际 gpu={gpu}")
-    for task_id in submitted:
-        world.finished(task_id)
-    if problems:
-        raise SelftestFailure("文件头声明要卡的参数：" + "；".join(problems), world.server_log_lines())
-    return (f"{len(cases)} 条：声明了 card-segment、card-drift 的 bash 脚本与声明了 run 的 python3 脚本，第一个非选项参数是声明的词回显 gpu=1；"
-            "别的参数、--list-items、没写声明的脚本回显 gpu=0")
+        raise SelftestFailure("续跑声明：" + "；".join(problems))
+    return f"{len(cases)} 条：只看第一个非选项参数，* 照旧"
 
 
 LEFTOVER_GONE_SECONDS = 10.0   # leftover-processes-stopped：结局记下之后至多等这么久看留下的那个孙进程没了
@@ -4865,6 +4808,69 @@ def cell_leftovers_only_in_own_unit(world):
             sleeper.kill()
         sleeper.wait()
     return "自己的 cgroup 不是这一次尝试的单元时不停里面的进程；在自己的单元里照停"
+
+
+RUNNER_THREADS_SPINNING = 3    # runner-threads-file-counts：真进程里空转的线程数（pbkdf2_hmac 在 OpenSSL 里算时放开 GIL，一直是 R）
+RUNNER_THREADS_SLEEPING = 4    # 睡着等事件的线程数（S）
+RUNNER_THREADS_NAME = "spin-and-sleep"   # 那个进程的 comm（不超过 15 个字节，内核不截）
+RUNNER_THREADS_SECONDS = 20.0  # 等读数对上的安静时限
+RUNNER_THREADS_PROGRAM = r'''
+import hashlib, sys, threading
+stop = threading.Event()
+for _ in range(int(sys.argv[2])):
+    threading.Thread(target=lambda: hashlib.pbkdf2_hmac("sha256", b"spin", b"salt", 2 ** 31 - 1), daemon=True).start()
+for _ in range(int(sys.argv[3])):
+    threading.Thread(target=stop.wait, daemon=True).start()
+with open("/proc/self/comm", "w", encoding="utf-8") as handle:
+    handle.write(sys.argv[4])
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write("ready\n")
+stop.wait()
+'''
+
+
+def cell_runner_threads_file_counts(world):
+    """attempt_runner 每轮写的线程读数（attempt_runner.py 文件头 ③ 的 THREADS_FILE_NAME；note_threads）：起一个真的进程树，最上面是在 wait 的 bash，底下一个 python
+    （3 个空转线程、4 个睡着的线程，主线程也睡着，comm 改成 spin-and-sleep），载入 attempt_runner.py 的 Sampler 对这棵树数：
+    读数应当是 runnable 3、total 9（bash 1 个加 python 8 个）、top_threads 8、top_name spin-and-sleep、sample 是这一轮的轮数。整组在它自己的进程组里，收尾对整组发 KILL、核没留下进程。
+    弄坏开关 runner-threads-state-unread 下（说明里 threads_state_unread）每个线程都算可跑的，runnable 成 9，这一格红。"""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("attempt_runner_under_test", lib.RUNNER_SCRIPT)
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    directory = os.path.join(world.work, "runner-threads")
+    os.makedirs(directory, exist_ok=True)
+    ready = os.path.join(directory, "ready")
+    total = 1 + 1 + RUNNER_THREADS_SPINNING + RUNNER_THREADS_SLEEPING
+    process = subprocess.Popen(["bash", "-c", '"$1" -c "$2" "$3" "$4" "$5" "$6" & wait', "runner-threads", sys.executable, RUNNER_THREADS_PROGRAM, ready,
+                                str(RUNNER_THREADS_SPINNING), str(RUNNER_THREADS_SLEEPING), RUNNER_THREADS_NAME], stdin=subprocess.DEVNULL, start_new_session=True)
+    sampler = runner.Sampler({"directory": directory, "threads_state_unread": lib.broken("runner-threads-state-unread")}, process.pid, None)
+    reading, family = {}, {}
+    try:
+        patience = world.patience(RUNNER_THREADS_SECONDS)
+        while patience.waiting():
+            if os.path.exists(ready):
+                sampler.rounds += 1
+                family = runner.descendants_with_depth(process.pid)
+                sampler.note_threads(family)
+                with open(os.path.join(directory, runner.THREADS_FILE_NAME), encoding="utf-8") as handle:
+                    reading = json.load(handle)
+                if reading == {"sample": sampler.rounds, "runnable": RUNNER_THREADS_SPINNING, "total": total, "top_threads": total - 1, "top_name": RUNNER_THREADS_NAME}:
+                    break
+            time.sleep(POLL_SECONDS)
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)   # 整组都是这一格自己起的
+        process.wait()
+    patience = world.patience(RUNNER_THREADS_SECONDS)
+    while patience.waiting() and not all(process_gone(process_id) for process_id in family):
+        time.sleep(POLL_SECONDS)
+    left = [process_id for process_id in family if not process_gone(process_id)]
+    wanted = {"sample": sampler.rounds, "runnable": RUNNER_THREADS_SPINNING, "total": total, "top_threads": total - 1, "top_name": RUNNER_THREADS_NAME}
+    if reading != wanted or left:
+        raise SelftestFailure(f"线程读数应当是 {wanted}（{RUNNER_THREADS_SPINNING} 个空转、{RUNNER_THREADS_SLEEPING} 个睡着、主线程与 bash 也睡着），收尾之后不留进程；"
+                              f"实际最后一回 {reading or '没读到'}、留下的进程 {left}")
+    return f"真进程树（{RUNNER_THREADS_SPINNING} 个空转、{RUNNER_THREADS_SLEEPING} 个睡着）的线程读数 {reading}"
 
 
 LEFTOVERS_ERROR_EXIT = 3   # leftovers-error-isolated：那一条命令自己的退出码（不是 0，看得出照原样带回）
@@ -4939,22 +4945,24 @@ def cell_leftover_processes_stopped(world):
     return "命令退出之后单元里留下的孙进程由服务停掉、结局说明写明；没留下的不写"
 
 
-LONG_RUN_SELFTEST_SECONDS = "1"   # long-run-failure-noted：自证里「跑得久」的界（TASK_SERVER_SELFTEST_LONG_RUN_SECONDS）
+LONG_RUN_SELFTEST_SECONDS = 20   # long-run-failure-noted：自证里「跑得久」的界（TASK_SERVER_SELFTEST_LONG_RUN_SECONDS）；立刻退的那一条在机器忙时起跑、收尾也远不到它
+LONG_RUN_SELFTEST_SLEEP_SECONDS = LONG_RUN_SELFTEST_SECONDS + 1   # 那一格「跑得久」的几条睡这么久：只会比它更久，一定过界
 
 
 def cell_long_run_failure_noted(world):
-    """跑超过时限而失败、又没登记续跑的，结局说明写「这条跑了 N 分钟、没有续跑：重交会从头跑」（task_server.py 的 finished_preface；时限在自证里缩成 1 秒）：
-    登记了续跑的（文件头 # task-server-resumable:）、没到时限的、跑成了的都不写。"""
-    world.start_server(extra={"TASK_SERVER_SELFTEST_LONG_RUN_SECONDS": LONG_RUN_SELFTEST_SECONDS})
+    """跑超过时限而失败、又没登记续跑的，结局说明写「这条跑了 N 分钟、没有续跑：重交会从头跑」（task_server.py 的 finished_preface；时限在自证里缩成 20 秒）：
+    登记了续跑的（文件头 # task-server-resumable:）、没到时限的（立刻退 3）、跑成了的都不写。跑得久的几条睡 21 秒（睡只会更久，一定过界）；四条先都交上再逐条等收尾。"""
+    world.start_server(extra={"TASK_SERVER_SELFTEST_LONG_RUN_SECONDS": str(LONG_RUN_SELFTEST_SECONDS)})
     with open(os.path.join(world.work, "resumable.sh"), "w", encoding="utf-8") as handle:
-        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_RESUMABLE_MARK} segment\nsleep 1.5\nexit 3\n")
-    cases = (("跑了 1.5 秒、退 3、没登记续跑", ["bash", "-c", "sleep 1.5; exit 3"], True),
+        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_RESUMABLE_MARK} segment\nsleep {LONG_RUN_SELFTEST_SLEEP_SECONDS}\nexit 3\n")
+    cases = ((f"跑了 {LONG_RUN_SELFTEST_SLEEP_SECONDS} 秒、退 3、没登记续跑", ["bash", "-c", f"sleep {LONG_RUN_SELFTEST_SLEEP_SECONDS}; exit 3"], True),
              ("登记了续跑", ["bash", "resumable.sh", "segment"], False),
              ("没到时限", ["bash", "-c", "exit 3"], False),
-             ("跑成了", ["bash", "-c", "sleep 1.5; exit 0"], False))
+             ("跑成了", ["bash", "-c", f"sleep {LONG_RUN_SELFTEST_SLEEP_SECONDS}; exit 0"], False))
     problems = []
-    for name, command, expected in cases:
-        summary = world.finished(world.submit(command, cwd=world.work))
+    submitted = [(name, world.submit(command, cwd=world.work), expected) for name, command, expected in cases]
+    for name, task_id, expected in submitted:
+        summary = world.finished(task_id)
         note = summary["task"].get("note") or ""
         if ("没有续跑：重交会从头跑" in note) != expected:
             problems.append(f"{name}：结局说明{'应当' if expected else '不该'}写「没有续跑：重交会从头跑」，实际「{note}」、{describe(summary)}")
@@ -4963,92 +4971,27 @@ def cell_long_run_failure_noted(world):
     return "跑过时限、失败、没登记续跑的结局说明写重交会从头跑；登记了续跑、没到时限、跑成了的不写"
 
 
-ALTERNATION_WHOLE_COUNT = 3     # whole-and-fragment-alternate 交几条整片（峰值 30G、上限与记账 45G）
-ALTERNATION_FRAGMENT_COUNT = 12  # 那一格交几条碎片（没记录、各记 4G）
 ALTERNATION_THRESHOLD_BYTES = int((50 * GIBIBYTE - 2 * GIBIBYTE) * SERVER.WHOLE_FRACTION)   # 50G 的台：可用上限 48G 的 85%（40.8G）
-FAILED_PEAK_BYTES = 3 * GIBIBYTE   # failed-peak-floor：判红那一次量到的峰值
-FAILED_PEAK_PINNED_TEXT = "4608M"  # 3G × 1.5
-MEMORY_FLOOR_SEED_BYTES = 247 * MEBIBYTE   # retry-cap-not-floored：记下的那一次峰值（任务 2419 那一种；× 1.5 是 371M，低于 4G）
-MEMORY_FLOOR_RECORDED_TEXT = "371M"        # 那一格头一次的上限：247M × 1.5 按 MiB 向上取整，有记录的不兜
-MEMORY_FLOOR_RETRY_TEXT = "557M"           # 那一格撞了重排那一次的上限：371M × 1.5 按 MiB 向上取整，不兜到 4G
-RECORDED_SMALL_PEAK_BYTES = 200 * MEBIBYTE  # recorded-cap-not-floored：记下的那一次峰值（批 91 定的样本：有记录、峰值 200M）
-RECORDED_SMALL_CAP_TEXT = "300M"            # 200M × 1.5 按 MiB 向上取整
-CAP_HIT_RERUN_BIG_SEED_BYTES = 4096 * MEBIBYTE        # cap-hit-rerun-from-record 大的一条记下的峰值：× 1.5 是 6144M，撞了之后再交 × 1.5 是 9216M
-CAP_HIT_RERUN_BIG_TEXTS = ("6144M", "9216M")          # 大的一条头一遍撞上限的上限、再交一遍第一次尝试的上限
-CAP_HIT_RERUN_SMALL_TEXTS = (MEMORY_FLOOR_RECORDED_TEXT, MEMORY_FLOOR_RETRY_TEXT)   # 小的一条（记 247M）头一遍撞上限的上限（247M × 1.5）、再交一遍第一次尝试的上限（撞过的 371M × 1.5）
-CAP_HIT_RERUN_VERIFY_PEAK_BYTES = 4096 * MEBIBYTE     # 带验证命令的一条：验证命令那把键记下的峰值
-CAP_HIT_RERUN_VERIFIED_TEXTS = ("6515M", "15917M")    # 带验证命令的一条头一遍的上限 (247M + 4096M) × 1.5 = 6514.5M 向上取整；再交一遍：(6515M + 4096M) × 1.5 = 15916.5M 向上取整
-CAP_HIT_RERUN_SEEDED_HIT_BYTES = 247 * MEBIBYTE       # 记录里只有一次撞上限（没人改工作区的命令）：撞的上限，× 1.5 是 371M，不兜到 4G
-GAP_WHOLE_PEAK_BYTES = 63 * GIBIBYTE // 2  # 插空那三格的整片：上限与记账 47.25G（不小于界 40.8G）；整片之外照样空着的那一份 48G − 47.25G = 0.75G 放不下来插空的 1.5G，
-                                           # 那三格插空只看时长（task_server.py 的 Alternation.gap_fill 的内存那一支不放）
-GAP_HOLDER_PEAK_BYTES = 10 * GIBIBYTE      # 那三格挡路的两条碎片与封组的那一条：各记 15G；两条装进一组 30G，再放一条就 45G、超过界封组
-GAP_PROBE_PEAK_BYTES = GIBIBYTE            # 那三格来插空的碎片：各记 1.5G（封组时照公式还剩 50G − 2G − 30G = 18G，放得下）
-GAP_BLOCKER_ESTIMATE_SECONDS = 600         # sealed-gap-takes-short-task 与 sealed-gap-holds-longer-task 两条挡路碎片记下的用时
-GAP_SHORT_ESTIMATE_SECONDS = 1             # 来插空的短任务记下的用时
-GAP_LONG_ESTIMATE_SECONDS = 6000           # sealed-gap-holds-longer-task 的长任务：超过挡路时长
-GAP_UNESTIMATED_LONG_SECONDS = 3600        # unestimated-blocker-counted-by-elapsed 的长任务：这一格跑完之前挡路的已跑到不了它
-GAP_OVERRUN_ESTIMATE_SECONDS = 0.2         # 那一格一条挡路碎片记下的用时：起来一下就跑过了，照已跑算
-GAP_ELAPSED_WAIT_SECONDS = 20.0            # 那一格等短任务插空起来的时限（挡路的已跑到 1 秒就该起）
-STARTED_AT_ROUNDING_SECONDS = 0.001        # 尝试的 started_at 记到毫秒（task_server.py 的 start_attempt）：比两条起的先后差时让出这一截
-GAP_ADMITTED_TEXT = "插空："                # task_server.py 的 Alternation.gap_fill 插得进时那一句的开头
-GAP_REFUSED_TEXT = "没插空："               # 插不进时接在封组那一句后面的开头
-DRAINED_WHOLE_PEAK_BYTES = 30 * GIBIBYTE      # drained-sealed-group-reopens 的整片：上限与记账 45G（不小于界 40.8G）
-DRAINED_FRAGMENT_PEAK_BYTES = 10 * GIBIBYTE   # 那一格的碎片：上限与记账 15G；两条装进一组是 30G，再放一条就 45G、超过界封组
-DRAINED_FREE_GIBIBYTES = 25                   # 那一格腾空之后本机的空闲：放得下碎片（预测 10G 加余量 2G），放不下整片（预测 30G 加余量 2G）
-SEALED_GROUP_TEXT = "封组，在等这台腾空起整片任务"   # task_server.py 的 Alternation.blocked 写进排队原因的那几个字
-
-
-def started_kinds(summaries):
-    """各条第一次尝试按记录号（起的先后）排好的类别串：[(类别, 任务号)]；没起的不在里面。"""
-    started = [(attempt_order(summary), kind, summary["task"]["id"]) for kind, summary in summaries if attempt_order(summary) is not None]
-    return [(kind, task_id) for _, kind, task_id in sorted(started)]
-
-
-def runs_of(kinds):
-    """把类别串压成连着的段：[(类别, 条数)]。"""
-    runs = []
-    for kind, _ in kinds:
-        if runs and runs[-1][0] == kind:
-            runs[-1] = (kind, runs[-1][1] + 1)
-        else:
-            runs.append((kind, 1))
-    return runs
-
-
-def cell_whole_and_fragment_alternate(world):
-    """一台 50G（可用上限 48G，界 40.8G）：先交 3 条整片（峰值 30G，上限与记账 45G）、再交 12 条碎片（没记录、各记 4G），都没满时限、一齐放出来。
-    起的次序照尝试记录号判（不比秒数）：一组碎片（这一组的记账不超过界）→ 一条整片 → 一组碎片 → 整片（碎片交完了，剩下的整片接着起；task_server.py 的 Alternation）。"""
-    world.resources(local=(50, 50), hold=True)
-    world.seed_peak("selftest-alternate-whole", 30 * GIBIBYTE)
-    world.start_server()
-    tasks = [("整片", world.submit(["bash", "-c", "exit 0", f"whole-{number}"], extra={lib.KEY_VARIABLE: "selftest-alternate-whole"}))
-             for number in range(ALTERNATION_WHOLE_COUNT)]
-    tasks += [("碎片", world.submit(["bash", "-c", "exit 0", f"fragment-{number}"])) for number in range(ALTERNATION_FRAGMENT_COUNT)]
-    world.resources(local=(50, 50))   # 一齐放出来
-    world.api("POST", "/wake")
-    summaries = [(kind, world.finished(task_id, timeout=120)) for kind, task_id in tasks]
-    failed = [f"{kind} {describe(summary)}" for kind, summary in summaries if summary["task"].get("outcome") != "succeeded"]
-    kinds = started_kinds(summaries)
-    runs = runs_of(kinds)
-    fragment = UNRECORDED_DEFAULT_PINNED_TEXT
-    groups = [count for kind, count in runs if kind == "碎片"]
-    problems = []
-    if failed:
-        problems.append(f"都应当跑完，实际没成的 {failed}")
-    if [kind for kind, _ in runs[:4]] != ["碎片", "整片", "碎片", "整片"] or runs[1][1] != 1 or len(kinds) != len(tasks):
-        problems.append(f"起的次序应当是「一组碎片 → 一条整片 → 一组碎片 → 整片」（后面没碎片了，剩下的整片接着起），实际按记录号压成段 {runs}")
-    if any(count * 4 * GIBIBYTE > ALTERNATION_THRESHOLD_BYTES for count in groups):
-        problems.append(f"每一组碎片的记账（各 {fragment}）应当不超过界 {ALTERNATION_THRESHOLD_BYTES / GIBIBYTE:.1f}G，实际各组条数 {groups}")
-    if problems:
-        raise SelftestFailure("整片与碎片交替：" + "；".join(problems), [f"{kind} 任务 {task_id}" for kind, task_id in kinds] + world.server_log_lines())
-    return f"一台 50G：起的次序按记录号压成段 {runs}（每组碎片不超过 {ALTERNATION_THRESHOLD_BYTES / GIBIBYTE:.1f}G）"
+MEMORY_FLOOR_RECORDED_SEED_BYTES = 1371 * MEBIBYTE   # retry-cap-not-floored：记下的那一次峰值，比下限 1024M 大、比 4G 小
+MEMORY_FLOOR_RECORDED_TEXT = "1371M"       # 那一格头一次的上限：记下的峰值本身（近五次最大，不乘 1.5），有记录的不兜
+MEMORY_FLOOR_RETRY_TEXT = "2057M"          # 那一格撞了重排那一次的上限：1371M × 1.5 按 MiB 向上取整，不兜到 4G
+RECORDED_SMALL_PEAK_BYTES = 1300 * MEBIBYTE  # recorded-cap-not-floored：记下的那一次峰值（有记录、比下限 1024M 大）
+RECORDED_SMALL_CAP_TEXT = "1300M"            # 记下的峰值本身（近五次最大，不乘 1.5）
+# 内存上限的下限（lib.MEMORY_FLOOR_BYTES，1024M）：recorded-cap-not-floored 与 retry-cap-not-floored 两格照真的下限（小世界写 0 的换成空串）
+FLOOR_TEXT = "1024M"
+FLOOR_TINY_PEAK_BYTES = 5 * MEBIBYTE        # 记录的峰值很小（任务 11127 那一种）：照它只有 5M，装不下读文件带进来的页缓存，上限取下限
+FLOOR_NEAR_PEAK_BYTES = 200 * MEBIBYTE      # 照它 200M，低于下限，上限仍取下限 1024M
+FLOOR_RETRY_TEXT = "1536M"                  # 撞了重排那一次：1024M × 1.5
+PINNED_BELOW_FLOOR_SLICE_TEXT = "2176M"     # 多机配置里两台那一项：减假余量 2G 是钉值 128M，低于下限
+PINNED_BELOW_FLOOR_BYTES = 128 * MEBIBYTE
+DRAINED_FRAGMENT_PEAK_BYTES = 15 * GIBIBYTE   # 那一格占着的小任务：上限与记账 15G
 
 
 def cell_whole_starts_beside_running_fragment(world):
-    """一台 50G（可用上限 48G、界 40.8G）上一条碎片（4G）长跑着，整片（峰值 28G，上限与记账 42G）放得下就起，不等那台腾空
+    """一台 50G（可用上限 48G、界 40.8G）上一条碎片（4G）长跑着，整片（峰值 42G，上限与记账 42G）放得下就起，不等那台腾空
     （任务 2461 留成孤儿的两小时里本机只用 2G、10 条排着等「腾空」）。"""
     world.resources(local=(50, 50))
-    world.seed_peak("selftest-whole-beside", 28 * GIBIBYTE)
+    world.seed_peak("selftest-whole-beside", 42 * GIBIBYTE)
     world.start_server()
     release = os.path.join(world.root, "release-beside")
     fragment = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "block", release])
@@ -5073,52 +5016,6 @@ def cell_whole_starts_beside_running_fragment(world):
     return "碎片长跑着、整片放得下就起，不等那台腾空"
 
 
-def cell_drained_sealed_group_reopens(world):
-    """封了组的那台腾空了、整片仍放不下（task_server.py 的 Alternation.blocked）：一台 50G（界 40.8G）上先交一条整片（峰值 30G，上限与记账 45G），
-    再交三条碎片（峰值 10G，上限与记账 15G）：两条装进一组（30G）起着，余下那条再放就超过界、封组排着。然后本机空闲降到 25G（放得下碎片、放不下整片）、
-    装进组的两条跑完、服务在本机一条都不在跑：封组排着的那条应当照起，整片接着排着。弄坏开关 sealed-group-held-when-drained 下封组排着的那条一直排着、排队原因写封组在等这台腾空。"""
-    world.resources(local=(50, 50), hold=True)
-    world.seed_peak("selftest-drained-whole", DRAINED_WHOLE_PEAK_BYTES)
-    world.seed_peak("selftest-drained-fragment", DRAINED_FRAGMENT_PEAK_BYTES)
-    world.start_server()
-    release = os.path.join(world.root, "release-drained")
-    fragment_key = {lib.KEY_VARIABLE: "selftest-drained-fragment"}
-    whole = world.submit(["bash", "-c", "exit 0", "drained-whole"], extra={lib.KEY_VARIABLE: "selftest-drained-whole"})
-    held = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "block", release], extra=fragment_key) for _ in range(2)]
-    sealed = world.submit(["bash", "-c", "exit 0", "drained-fragment"], extra=fragment_key)
-    world.resources(local=(50, 50))   # 一齐放出来：整片让一组碎片先起，余下那条碎片封组
-    world.api("POST", "/wake")
-    problems = []
-    try:
-        for task_id in held:
-            world.running(task_id)
-        world.next_pass()
-        before = world.summary(sealed)
-        reason = before.get("waiting_for") or ""
-        if before["attempts"] or SEALED_GROUP_TEXT not in reason:
-            problems.append(f"装进组的两条碎片在跑时余下那条应当封组排着（排队原因带「{SEALED_GROUP_TEXT}」），实际尝试 {len(before['attempts'])} 次、排队原因「{reason}」")
-        world.resources(local=(DRAINED_FREE_GIBIBYTES, 50))   # 腾空之后整片（45G）照样放不下，碎片（15G）放得下
-    finally:
-        open(release, "w").close()
-    for task_id in held:
-        world.finished(task_id)
-    world.next_pass()
-    world.next_pass()
-    drained, waiting_whole = world.summary(sealed), world.summary(whole)
-    reason = drained.get("waiting_for") or ""
-    if not drained["attempts"]:
-        problems.append(f"本机腾空、整片放不下时封组排着的碎片应当照起，实际状态 {drained['task'].get('state')}、排队原因「{reason}」")
-    if waiting_whole["attempts"]:
-        problems.append(f"本机空闲 {DRAINED_FREE_GIBIBYTES}G 时整片（记 45G）应当排着，实际起了：{describe(waiting_whole)}")
-    if problems:
-        raise SelftestFailure("封了组的台腾空：" + "；".join(problems), world.server_log_lines())
-    world.resources(local=(50, 50))
-    summaries = {name: world.finished(task_id) for name, task_id in (("封组排着的碎片", sealed), ("整片", whole))}
-    if any(summary["task"].get("outcome") != "succeeded" for summary in summaries.values()):
-        raise SelftestFailure(f"放开之后都应当跑完，实际 {({name: describe(summary) for name, summary in summaries.items()})}", world.server_log_lines())
-    return f"封了组的台腾空、整片放不下：封组排着的碎片照起（记录号 {attempt_order(summaries['封组排着的碎片'])}），整片等到放得下才起"
-
-
 def cell_ended_attempt_settled_after_restart(world):
     """最新尝试已记成 ended（memory-cap-hit）、任务却还 running（任务 2461：定去向半途抛错留下的孤儿，本机因此两小时算有任务在跑）：
     服务起来对账时补收尾，照撞上限的规矩上限 ×1.5 重排、跑完。"""
@@ -5139,49 +5036,20 @@ def cell_ended_attempt_settled_after_restart(world):
     return "最新尝试 ended、任务 running 的孤儿：对账补收尾，1536M 重排、跑完"
 
 
-def cell_aged_tasks_do_not_hold_fitting_tasks(world):
-    """满时限的放不下时不挡、不留（task_server.py 文件头 ②「满时限」）：本机 50G 被一条碎片占着 40.5G、只剩 9.5G（照公式 50G − 2G − 40.5G = 7.5G），
-    满时限的整片（记 45G）与满时限的碎片（记约 10G）都放不下；后来的没满时限的小任务（没记录，记 4G）排两轮之内照起，那两条还排着；占着的放了之后都跑完。
-    弄坏开关 backfill-disabled 下排在最前的满时限整片放不下就挡住后面整队，小任务排着。"""
-    world.resources(local=(50, 50))
-    world.seed_peak("selftest-unheld-occupant", 27 * GIBIBYTE)    # 上限与记账 40.5G：碎片（界 40.8G）
-    world.seed_peak("selftest-unheld-whole", 30 * GIBIBYTE)       # 上限与记账 45G：整片，放不下
-    world.seed_peak("selftest-unheld-fragment", 6827 * MEBIBYTE)  # 上限与记账 10241M：碎片，放不下
-    world.start_server()
-    release = os.path.join(world.root, "release-occupant")
-    occupant = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "block", release], extra={lib.KEY_VARIABLE: "selftest-unheld-occupant"})
-    world.running(occupant)
-    whole = world.submit(["bash", "-c", "exit 0", "unheld-whole"], extra={lib.KEY_VARIABLE: "selftest-unheld-whole"})
-    fragment = world.submit(["bash", "-c", "exit 0", "unheld-fragment"], extra={lib.KEY_VARIABLE: "selftest-unheld-fragment"})
-    backdate_past_aged(world, [whole, fragment])
-    world.start_server()
-    try:
-        small = world.submit(["bash", "-c", "exit 0", "unheld-small"])
-        world.next_pass()
-        world.next_pass()
-        waiting = {name: world.summary(task_id) for name, task_id in (("小任务", small), ("满时限的整片", whole), ("满时限的碎片", fragment))}
-    finally:
-        open(release, "w").close()
-    summaries = {name: world.finished(task_id) for name, task_id in (("占着的", occupant), ("满时限的整片", whole), ("满时限的碎片", fragment), ("小任务", small))}
-    problems = []
-    if not waiting["小任务"]["attempts"]:
-        problems.append(f"满时限的两条放不下时，放得下的小任务应当排两轮之内照起，实际还排着，排队原因「{waiting['小任务'].get('waiting_for')}」")
-    for name in ("满时限的整片", "满时限的碎片"):
-        if waiting[name]["attempts"]:
-            problems.append(f"{name}本机只剩 9.5G 时应当还排着（这一格的前提），实际起了 {len(waiting[name]['attempts'])} 次")
-    failed = {name: describe(summary) for name, summary in summaries.items() if summary["task"].get("outcome") != "succeeded"}
-    if failed:
-        problems.append(f"占着的放了之后都应当跑完，实际没成的 {failed}")
-    if problems:
-        raise SelftestFailure("满时限的放不下时不挡、不留：" + "；".join(problems), world.server_log_lines())
-    return "满时限的整片与碎片都放不下时不挡、不留：放得下的小任务排两轮之内起了，那两条排着；占着的放了之后都跑完"
+CPU_GATE_BUSY_KEY = "selftest-cpu-gate-busy"   # cpu-gate-holds-busy-host、health-head-cpu-gate-not-starved：库里记过 31 核的命令键（要的核数多，不走要核数少的名额）
+
+
+def seed_busy_cores(world, key):
+    """往这一格服务自己的库里记一次跑成、峰值段 31 核、CPU 闸线程数 31（平均在用核数也是 31）的尝试（task_server.py 的 threads_by_record 读它）：这把键的命令过 CPU 闸照 31 线程记，不走要核数少的名额。"""
+    world.seed_attempt({"command_key": key, "outcome": "succeeded", "memory_peak": None, "cores": 31.0, SERVER.PEAK_SEGMENT_CORES_COLUMN: 31.0, SERVER.CPU_GATE_THREADS_COLUMN: 31.0})
 
 
 def cell_cpu_gate_holds_busy_host(world):
-    """本机内存够、负载 200（32 核 × 3 = 96 放不下再加一条的线程）：任务排着、排队原因写「CPU：」；负载降到 0 之后照常跑完（task_server.py 的 cpu_problem）。"""
+    """本机内存够、负载 200（32 核 × 2 = 64 放不下再加一条的线程）：命令键记过 31 核的任务排着、排队原因写「CPU：」；负载降到 0 之后照常跑完（task_server.py 的 cpu_problem）。"""
     world.resources(local=(50, 50), local_cpu={"load1": 200.0, "procs_running": 150, "cpus": 32})
+    seed_busy_cores(world, CPU_GATE_BUSY_KEY)
     world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0", "cpu-gate"])
+    task_id = world.submit(["bash", "-c", "exit 0", "cpu-gate"], extra={lib.KEY_VARIABLE: CPU_GATE_BUSY_KEY})
     world.next_pass()
     world.next_pass()
     waiting = world.summary(task_id)
@@ -5224,107 +5092,6 @@ def cell_down_host_waits_not_never(world):
     if summary["task"].get("outcome") != "succeeded" or (summary["attempts"] and summary["attempts"][0].get("host") != "peer"):
         raise SelftestFailure(f"第二台回来之后应当派过去跑完，实际 {describe(summary)}", world.server_log_lines())
     return f"第二台用不了时排着（「{(waiting.get('waiting_for') or '')[:80]}」），回来之后派过去跑完"
-
-
-def cell_card_fault_replaced_on_another_card(world):
-    """本机两张卡，0 号卡清场判坏：第一次派到 0 号卡的那一条不判 card-fault 收尾，换 1 号卡重排、跑完；之后交的一条直接派 1 号卡
-    （0 号卡停用 CARD_QUARANTINE_SECONDS 秒，task_server.py 的 quarantined_cards 与 cards_in_service）；写一条 card-fault 告警。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    first = world.finished(world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=card-fault-on:{LOCAL_CARD_ZERO}"]))
-    second = world.finished(world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=card-fault-on:{LOCAL_CARD_ZERO}", "second"]))
-    cards = [attempt.get("card") for attempt in first["attempts"]]
-    problems = []
-    if first["task"].get("outcome") != "succeeded" or cards != [LOCAL_CARD_ZERO, LOCAL_CARD_ONE]:
-        problems.append(f"坏卡上的那一条应当换 {LOCAL_CARD_ONE} 重排、跑完，实际 {describe(first)}、各次的卡 {cards}")
-    if second["task"].get("outcome") != "succeeded" or [attempt.get("card") for attempt in second["attempts"]] != [LOCAL_CARD_ONE]:
-        problems.append(f"0 号卡停用着，之后那一条应当直接派 {LOCAL_CARD_ONE}，实际 {describe(second)}")
-    if not any(alert.get("kind") == "card-fault" for alert in world.alerts()):
-        problems.append(f"应当写一条 card-fault 告警，实际 {world.alerts()}")
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return f"坏卡上的那一条换 {LOCAL_CARD_ONE} 跑完，之后的直接派它"
-
-
-def card_fault_reason_line(world, task_id):
-    """task wait 末行之前那一行 TASK_SERVER_REASON（打回的理由；拿不到交空串）。"""
-    lines = world.client(["wait", str(task_id)]).stdout.strip().splitlines()
-    return lines[-2] if len(lines) >= 2 and lines[-2].startswith(lib.REASON_MARK) else ""
-
-
-def cell_card_fault_quarantines_named_card(world):
-    """本机两张卡，分到 0 号卡（分到的那张）的那一条，清场每次都点名 1 号卡坏（坏卡清单 faulty-cards=127.0.0.1:1）：停用的是 1 号卡、0 号卡照常可派——
-    各次尝试都在 0 号卡上，重排满 CARD_FAULT_RETRIES 次照 card-fault 收尾；告警与结局句（TASK_SERVER_REASON 的 why=）点名 1 号卡；
-    之后交的一条直接派 0 号卡跑完（task_server.py 的 finish_attempt、settle_attempt 与 cards_in_service）。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    named = f"{SELFTEST_LOCAL_ADDRESS}:1"
-    first_id = world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=card-fault-names:{named}"])
-    first = world.finished(first_id, timeout=STATE_TIMEOUT_SECONDS * 2)   # 要起 CARD_FAULT_RETRIES + 1 次尝试，等得比一次的长
-    # 之后那一条没有 fake-quiesce= 演法，假清场照真的那样起命令：PATH 前面放这一格的假 cargo，假内存包装才放行（真 cargo 它退 97）
-    path = f"{world.fake_cargo}:{os.environ.get('PATH', '/usr/bin:/bin')}"
-    second = world.finished(world.submit(["cargo", "test", "--features", "gpu", "after-named-card-fault"], extra={"PATH": path}))
-    ran = [line for line in world.calls() if line.startswith("cargo ") and line.endswith(" after-named-card-fault")]
-    cards = [attempt.get("card") for attempt in first["attempts"]]
-    reason = card_fault_reason_line(world, first_id)
-    alerts = [alert.get("line", "") for alert in world.alerts() if alert.get("kind") == "card-fault"]
-    problems = []
-    if first["task"].get("outcome") != "card-fault" or cards != [LOCAL_CARD_ZERO] * (lib.CARD_FAULT_RETRIES + 1):
-        problems.append(f"清场点名 {named} 坏、分到的是 {LOCAL_CARD_ZERO}：各次尝试应当都派 {LOCAL_CARD_ZERO}、重排满 {lib.CARD_FAULT_RETRIES} 次照 card-fault 收尾，"
-                        f"实际 {describe(first)}、各次的卡 {cards}")
-    if f"清场判出卡 {named} 坏了" not in reason:
-        problems.append(f"结局句（TASK_SERVER_REASON 的 why=）应当点名清场判出的 {named}，实际「{reason[:400]}」")
-    if not alerts or any(f"清场判出卡 {named} 坏" not in line for line in alerts):
-        problems.append(f"card-fault 告警应当每一条都点名 {named}，实际 {alerts}")
-    if second["task"].get("outcome") != "succeeded" or [attempt.get("card") for attempt in second["attempts"]] != [LOCAL_CARD_ZERO] or len(ran) != 1:
-        problems.append(f"停用的是 {named}，之后那一条应当照常派 {LOCAL_CARD_ZERO} 跑完，实际 {describe(second)}、"
-                        f"各次的卡 {[attempt.get('card') for attempt in second['attempts']]}、假 cargo 起了 {len(ran)} 次")
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return f"清场点名 {named} 坏：停用它、{LOCAL_CARD_ZERO} 照派，告警与结局句点名 {named}"
-
-
-def cell_card_fault_unlisted_quarantines_none(world):
-    """清场判出卡坏、清场那一行却没有坏卡清单（faulty-cards=）：一张卡都不停用、不重排，一次尝试照 card-fault 收尾，告警与说明写明取不到坏卡清单；
-    之后交的一条照常派 0 号卡跑完（task_server.py 的 settle_attempt）。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    first_id = world.submit(["cargo", "test", "--features", "gpu", "fake-quiesce=card-fault-unlisted"])
-    first = world.finished(first_id)
-    # 之后那一条没有 fake-quiesce= 演法，假清场照真的那样起命令：PATH 前面放这一格的假 cargo，假内存包装才放行（真 cargo 它退 97）
-    path = f"{world.fake_cargo}:{os.environ.get('PATH', '/usr/bin:/bin')}"
-    second = world.finished(world.submit(["cargo", "test", "--features", "gpu", "after-unlisted-card-fault"], extra={"PATH": path}))
-    ran = [line for line in world.calls() if line.startswith("cargo ") and line.endswith(" after-unlisted-card-fault")]
-    cards = [attempt.get("card") for attempt in first["attempts"]]
-    reason = card_fault_reason_line(world, first_id)
-    alerts = [alert.get("line", "") for alert in world.alerts() if alert.get("kind") == "card-fault"]
-    problems = []
-    if first["task"].get("outcome") != "card-fault" or cards != [LOCAL_CARD_ZERO] or "取不到坏卡清单" not in (first["task"].get("note") or ""):
-        problems.append(f"取不到坏卡清单时应当不重排、一次尝试照 card-fault 收尾、说明写明取不到，实际 {describe(first)}、各次的卡 {cards}、说明「{first['task'].get('note')}」")
-    if "取不到坏卡清单" not in reason:
-        problems.append(f"结局句（TASK_SERVER_REASON 的 why=）应当写明取不到坏卡清单，实际「{reason[:400]}」")
-    if len(alerts) != 1 or "取不到坏卡清单" not in alerts[0]:
-        problems.append(f"应当恰好一条 card-fault 告警、写明取不到坏卡清单，实际 {alerts}")
-    if second["task"].get("outcome") != "succeeded" or [attempt.get("card") for attempt in second["attempts"]] != [LOCAL_CARD_ZERO] or len(ran) != 1:
-        problems.append(f"一张卡都没停用，之后那一条应当照常派 {LOCAL_CARD_ZERO} 跑完，实际 {describe(second)}、假 cargo 起了 {len(ran)} 次")
-    if problems:
-        raise SelftestFailure("；".join(problems), world.server_log_lines())
-    return "取不到坏卡清单：一张卡都没停用、不重排，告警与说明写明取不到"
-
-
-def cell_failed_peak_floor(world):
-    """同一命令键只有一次命令自己退 1 的尝试、量到峰值 3G：再交一条，第一次上限不低于 3G × 1.5（4608M），不退回 4096M（task_server.py 的 failed_peak_floor）。"""
-    key = "selftest-failed-peak"
-    world.start_server(extra={"TASK_SERVER_FAKE_SCOPE_DIRECTORY": world.write_fake_scope(FAILED_PEAK_BYTES)})
-    first = world.finished(world.submit(["bash", "-c", "exit 1"], extra={lib.KEY_VARIABLE: key}))
-    second = world.finished(world.submit(["bash", "-c", "exit 0"], extra={lib.KEY_VARIABLE: key}))
-    attempt = first_attempt(second)
-    if (first["task"].get("outcome") != "command-failed" or first_attempt(first).get("memory_peak") != FAILED_PEAK_BYTES
-            or attempt.get("memory_cap_text") != FAILED_PEAK_PINNED_TEXT or attempt.get("prediction") != lib.FAILED_PEAK_HISTORY):
-        raise SelftestFailure(f"头一条退 1、峰值 {FAILED_PEAK_BYTES}，再交同一条第一次上限应当是 {FAILED_PEAK_PINNED_TEXT}（prediction {lib.FAILED_PEAK_HISTORY}），"
-                              f"实际头一条 {describe(first)}、峰值 {first_attempt(first).get('memory_peak')}，再交的 {describe(second)}、prediction {attempt.get('prediction')}",
-                              world.server_log_lines())
-    return f"只判红过一次（峰值 3G）的命令再交，第一次上限 {FAILED_PEAK_PINNED_TEXT}"
 
 
 def cell_environment_prefix_stripped_from_key(world):
@@ -5397,71 +5164,39 @@ def cell_verdict_library_family_refused(world):
 
 
 def cell_workspace_writer_not_retried(world):
-    """改主工作区的命令（不带 --skip-apply 的 merge-and-verify）撞了上限记 memory-cap-hit、被总上限挤掉记 squeezed-out，都只有一次尝试、打回，不原样重排
-    （WORKSPACE_WRITER_NO_RETRY_OUTCOMES）；带 --skip-apply 的照乘 1.5 重排跑完（task_server.py 的 finish_attempt）。"""
+    """改主工作区的命令（打补丁的 apply-writer-patch.py）撞了上限记 memory-cap-hit、被总上限挤掉记 squeezed-out，都只有一次尝试、打回，不原样重排
+    （WORKSPACE_WRITER_NO_RETRY_OUTCOMES）；合入后验证 merge-and-verify.sh（只在快照上打与验，不算改主工作区）与 hook-swap --feed-only 的照乘 1.5 重排跑完
+    （task_server.py 的 modifies_workspace、finish_attempt）。
+    弄坏开关 workspace-writers-retried 下打补丁的那两条照重排，feed-only-counted-as-writer 下只喂的那一条、merge-and-verify-counted-as-writer 下合入后验证那一条只跑一次、打回，这一格红。"""
     world.resources(local=(30, 30))
     world.start_server()
-    writer = world.finished(world.submit(["bash", "-c", "exit 0", "x", "scripts/gate/merge-and-verify.sh", "fake-wrapper-exits=250,run"], cwd=world.repo))
-    squeezed = world.finished(world.submit(["bash", "-c", "exit 0", "y", "scripts/gate/merge-and-verify.sh", "fake-wrapper-exits=254,run"], cwd=world.repo))
-    skipped = world.finished(world.submit(["bash", "-c", "exit 0", "x", "scripts/gate/merge-and-verify.sh", "--skip-apply", "fake-wrapper-exits=250,run"], cwd=world.repo))
+    writer = world.finished(world.submit(["bash", "-c", "exit 0", "x", "scripts/gate/apply-writer-patch.py", "fake-wrapper-exits=250,run"], cwd=world.repo))
+    squeezed = world.finished(world.submit(["bash", "-c", "exit 0", "y", "scripts/gate/apply-writer-patch.py", "fake-wrapper-exits=254,run"], cwd=world.repo))
+    skipped = world.finished(world.submit(["bash", "-c", "exit 0", "x", "scripts/gate/merge-and-verify.sh", "fake-wrapper-exits=250,run"], cwd=world.repo))
     feed = world.finished(world.submit(["bash", "-c", "exit 0", "x", "scripts/gate/hook-swap.py", "--feed-only", "fake-wrapper-exits=250,run"], cwd=world.repo))
     if (writer["task"].get("outcome") != "memory-cap-hit" or len(writer["attempts"]) != 1
             or squeezed["task"].get("outcome") != "squeezed-out" or len(squeezed["attempts"]) != 1
             or skipped["task"].get("outcome") != "succeeded" or len(skipped["attempts"]) != 2
             or feed["task"].get("outcome") != "succeeded" or len(feed["attempts"]) != 2):
-        raise SelftestFailure(f"不带 --skip-apply 的 merge-and-verify 撞上限应当记 memory-cap-hit、被挤掉应当记 squeezed-out，都只有一次尝试；带 --skip-apply 的与 hook-swap --feed-only 的应当乘 1.5 重排跑完；"
-                              f"实际撞上限的 {describe(writer)}、被挤掉的 {describe(squeezed)}、带的 {describe(skipped)}、只喂的 {describe(feed)}", world.server_log_lines())
-    return "改主工作区的撞上限与被挤掉都只有一次、照那一种结局打回；带 --skip-apply 的与 hook-swap --feed-only 的乘 1.5 重排跑完"
-
-
-WRITER_HEADROOM_KEY = "selftest-writer-headroom"            # workspace-writer-initial-cap-headroom：改工作区的那条（hook-swap.py 带 --verify）的命令键
-WRITER_HEADROOM_READER_KEY = "selftest-writer-headroom-reader"   # 那一格同样带 --verify 而不改工作区的那条的命令键
-WRITER_HEADROOM_VERIFY = "python3 scripts/selftest-swapped.py --selftest"   # 那一格两条的 --verify 给的验证命令（服务照命令键换算，同 task_server.py 的 verify_command_keys）
-WRITER_HEADROOM_OWN_PEAK_BYTES = 400 * MEBIBYTE            # 那一格两条各自那把键记下的峰值：照同键窗口 × 1.5 是 600M（8367 那样的小上限）
-WRITER_HEADROOM_VERIFY_PEAK_BYTES = 500 * MEBIBYTE         # 那一格验证命令那把键记下的峰值
-WRITER_HEADROOM_CAP_BYTES = (400 + 500) * 3 // 2 * MEBIBYTE   # 改工作区的那条首趟的上限：(400M + 500M) × 1.5 = 1350M（这一格的小世界把 4G 下限换成 0）
-WRITER_HEADROOM_READER_CAP_BYTES = 400 * 3 // 2 * MEBIBYTE    # 不改工作区的那条照同键窗口：600M
-
-
-def cell_workspace_writer_initial_cap_headroom(world):
-    """改主工作区的命令首趟给足（task_server.py 文件头 ②「内存」的同名一段；任务 8367：hook-swap.py 带 --verify 照同键窗口只给 857M，撞了、打回、不重排）：
-    hook-swap.py 带 --verify 的一条，同键只记过 400M、它的验证命令那把键记过 500M：首趟上限与记账是 (400M + 500M) × 1.5 = 1350M、prediction 记 WORKSPACE_WRITER_HISTORY
-    （不设 4G 底；这一格的小世界里弄坏开关 recorded-cap-floored 的下限是 0，见 World 的 MEMORY_FLOOR_VARIABLE），跑完；同样带 --verify、同键也只记过 400M 而不改工作区的一条照同键窗口 600M。
-    弄坏开关 workspace-writer-headroom-skipped 下改工作区的那条也只给 600M，这一格红。"""
-    world.seed_peak(WRITER_HEADROOM_KEY, WRITER_HEADROOM_OWN_PEAK_BYTES)
-    world.seed_peak(WRITER_HEADROOM_READER_KEY, WRITER_HEADROOM_OWN_PEAK_BYTES)
-    world.seed_peak(PEAKS.command_key(shlex.split(WRITER_HEADROOM_VERIFY), None), WRITER_HEADROOM_VERIFY_PEAK_BYTES)
-    world.resources(local=(30, 30))
-    world.start_server()
-    cases = (("改工作区的 hook-swap.py 带 --verify", WRITER_HEADROOM_KEY,
-              ["bash", "-c", "exit 0", "x", "scripts/gate/hook-swap.py", "selftest-spec.json", "--scratch", world.work, "--verify", WRITER_HEADROOM_VERIFY],
-              WRITER_HEADROOM_CAP_BYTES, lib.WORKSPACE_WRITER_HISTORY),
-             ("不改工作区的一条带 --verify", WRITER_HEADROOM_READER_KEY,
-              ["bash", "-c", "exit 0", "x", "scripts/selftest-reader.py", "--verify", WRITER_HEADROOM_VERIFY],
-              WRITER_HEADROOM_READER_CAP_BYTES, lib.RECORD_HISTORY))
-    problems = []
-    for name, key, command, cap_bytes, history in cases:
-        summary = world.finished(world.submit(command, extra={lib.KEY_VARIABLE: key}, cwd=world.repo))
-        attempt = first_attempt(summary)
-        if (len(summary["attempts"]) != 1 or attempt.get("memory_cap") != cap_bytes or attempt.get("booked") != cap_bytes
-                or attempt.get("prediction") != history or summary["task"].get("outcome") != "succeeded"):
-            problems.append(f"{name}：首趟上限与记账应当是 {cap_bytes // MEBIBYTE}M、prediction 记 {history}、一次跑完，实际上限 {attempt.get('memory_cap_text')}"
-                            f"（{attempt.get('memory_cap')} 字节）、记账 {attempt.get('booked')}、prediction {attempt.get('prediction')}、{describe(summary)}")
-    if problems:
-        raise SelftestFailure("改主工作区的命令首趟给足：" + "；".join(problems), world.server_log_lines())
-    return (f"改工作区的那条首趟 {WRITER_HEADROOM_CAP_BYTES // MEBIBYTE}M（同键 400M 加验证命令 500M 再 × 1.5），"
-            f"不改工作区的照同键窗口 {WRITER_HEADROOM_READER_CAP_BYTES // MEBIBYTE}M")
+        raise SelftestFailure(f"打补丁的工具（apply-writer-patch.py）撞上限应当记 memory-cap-hit、被挤掉应当记 squeezed-out，都只有一次尝试；合入后验证（只在快照上打与验）与 hook-swap --feed-only 的应当乘 1.5 重排跑完；"
+                              f"实际撞上限的 {describe(writer)}、被挤掉的 {describe(squeezed)}、合入后验证的 {describe(skipped)}、只喂的 {describe(feed)}", world.server_log_lines())
+    return "改主工作区的打补丁工具撞上限与被挤掉都只有一次、照那一种结局打回；合入后验证与 hook-swap --feed-only 的乘 1.5 重排跑完"
 
 
 def cell_retry_cap_not_floored(world):
-    """有记录的照记录、不设 4G 底（task_server.py 文件头 ②「内存」；这一格照真的下限 4G，不用各格小世界的 0，弄坏开关 recorded-cap-floored 下兜的就是它）：
-    同一命令键记下的峰值 247M，头一次照记录取 371M、假包装退 250 撞上限，重排那一次照 371M × 1.5 = 557M（不兜到 4096M）、记账照上限、跑完；
-    钉了上限的命令（多机配置 SLICE_MEMORY_CAP_BY_HOST 两台都写 3G）照 pin-cap 报的钉值（低于 4G）。弄坏开关 recorded-cap-floored 下两次都是 4096M，这一格红。"""
+    """有记录的照记录、不设 4G 底，只设 1024M 的下限（task_server.py 文件头 ②「内存」；这一格照真的下限，不用各格小世界的 0，弄坏开关 recorded-cap-floored 下兜的就是它）：
+    同一命令键记下的峰值 1371M，头一次照记录取 1371M（近五次最大，不乘 1.5）、假包装退 250 撞上限，重排那一次照 1371M × 1.5 = 2057M（不兜到 4096M）、记账照上限、跑完；
+    记下的峰值只有 5M 的命令头一次上限与记账都取下限 1024M（5M 低于下限）、撞上限重排那一次 1536M（1024M × 1.5）；
+    钉了上限的命令（多机配置 SLICE_MEMORY_CAP_BY_HOST 两台都写 2176M）照 pin-cap 报的钉值 128M：低于下限也照钉值，不抬到 1024M。
+    弄坏开关 recorded-cap-floored 下前两条头一次都是 4096M，cap-floor-skipped 下峰值 5M 的那条是 5M、8M，这一格红。"""
     key = "selftest-memory-floor"
-    world.seed_peak(key, MEMORY_FLOOR_SEED_BYTES)
-    world.set_slice_cap("3G")   # 钉值 = 那一项减这台的假余量 2G（pin_value）：1024M，低于 4G
+    tiny_key = "selftest-memory-floor-tiny"
+    world.seed_peak(key, MEMORY_FLOOR_RECORDED_SEED_BYTES)
+    world.seed_peak(tiny_key, FLOOR_TINY_PEAK_BYTES)
+    world.set_slice_cap(PINNED_BELOW_FLOOR_SLICE_TEXT)   # 钉值 = 那一项减这台的假余量 2G（pin_value）：128M，低于下限
     world.start_server(extra={lib.MEMORY_FLOOR_VARIABLE: ""})
     retried = world.finished(world.submit(["bash", "-c", "exit 0", "memory-floor-retried", "fake-wrapper-exits=250,run"], extra={lib.KEY_VARIABLE: key}))
+    floored = world.finished(world.submit(["bash", "-c", "exit 0", "memory-floor-tiny-retried", "fake-wrapper-exits=250,run"], extra={lib.KEY_VARIABLE: tiny_key}))
     probe = ["bash", "-c", "exit 0", "memory-floor-pinned"]
     pinned_reply = world.control(["pin-cap", "--", *probe])
     shown = shown_local_pin(pinned_reply)
@@ -5472,31 +5207,48 @@ def cell_retry_cap_not_floored(world):
     retry_bytes = int(MEMORY_FLOOR_RETRY_TEXT[:-1]) * MEBIBYTE
     if (caps != [(MEMORY_FLOOR_RECORDED_TEXT, "memory-cap-hit"), (MEMORY_FLOOR_RETRY_TEXT, "succeeded")] or booked[1:] != [retry_bytes]
             or retried["task"].get("outcome") != "succeeded"):
-        problems.append(f"记下 247M 的命令头一次应当照记录 {MEMORY_FLOOR_RECORDED_TEXT} 撞上限，重排那一次上限 {MEMORY_FLOOR_RETRY_TEXT}（不兜到 4G）、记账照上限、跑完，"
+        problems.append(f"记下 1371M 的命令头一次应当照记录 {MEMORY_FLOOR_RECORDED_TEXT} 撞上限，重排那一次上限 {MEMORY_FLOOR_RETRY_TEXT}（不兜到 4G）、记账照上限、跑完，"
                         f"实际各次 {caps}、记账 {booked}、{describe(retried)}")
+    floored_caps = [(attempt.get("memory_cap_text"), attempt.get("outcome")) for attempt in floored["attempts"]]
+    floored_booked = [int(attempt.get("booked") or 0) for attempt in floored["attempts"]]
+    floor_bytes = int(FLOOR_TEXT[:-1]) * MEBIBYTE
+    floor_retry_bytes = int(FLOOR_RETRY_TEXT[:-1]) * MEBIBYTE
+    if (floored_caps != [(FLOOR_TEXT, "memory-cap-hit"), (FLOOR_RETRY_TEXT, "succeeded")] or floored_booked != [floor_bytes, floor_retry_bytes]
+            or floored["task"].get("outcome") != "succeeded"):
+        problems.append(f"记下 5M 的命令头一次应当取下限 {FLOOR_TEXT} 撞上限，重排那一次上限 {FLOOR_RETRY_TEXT}（{FLOOR_TEXT} × 1.5）、记账各次照上限、跑完，"
+                        f"实际各次 {floored_caps}、记账 {floored_booked}、{describe(floored)}")
     attempt = first_attempt(pinned)
-    if (pinned_reply.returncode != 0 or shown is None or shown * MEBIBYTE >= lib.MEMORY_FLOOR_BYTES or attempt.get("memory_cap_text") != f"{shown}M"
-            or attempt.get("prediction") != lib.PINNED_HISTORY):
-        problems.append(f"钉了上限的命令（SLICE_MEMORY_CAP_BY_HOST 两台都写 3G）应当照 pin-cap 报的钉值（{shown}M，低于 4G）、不兜到 4G，"
-                        f"实际 pin-cap 退 {pinned_reply.returncode}、上限 {attempt.get('memory_cap_text')}、"
+    if (pinned_reply.returncode != 0 or shown != PINNED_BELOW_FLOOR_BYTES // MEBIBYTE or attempt.get("memory_cap_text") != f"{shown}M"
+            or attempt.get("memory_cap") != PINNED_BELOW_FLOOR_BYTES or attempt.get("prediction") != lib.PINNED_HISTORY):
+        problems.append(f"钉了上限的命令（SLICE_MEMORY_CAP_BY_HOST 两台都写 {PINNED_BELOW_FLOOR_SLICE_TEXT}）应当照 pin-cap 报的钉值（{PINNED_BELOW_FLOOR_BYTES // MEBIBYTE}M，低于下限 {FLOOR_TEXT}）、"
+                        f"不抬到下限，实际 pin-cap 退 {pinned_reply.returncode}、报的钉值 {shown}M、上限 {attempt.get('memory_cap_text')}、"
                         f"prediction {attempt.get('prediction')}")
     if problems:
-        raise SelftestFailure("重排不设 4G 底：" + "；".join(problems), world.server_log_lines())
-    return (f"记下 247M 的命令键：头一次照记录 {MEMORY_FLOOR_RECORDED_TEXT}、撞了重排那一次 {MEMORY_FLOOR_RETRY_TEXT}（不兜到 4G）、记账照上限；"
-            f"配置写 3G 的钉值照 {shown}M")
+        raise SelftestFailure("重排不设 4G 底、设 1024M 的下限：" + "；".join(problems), world.server_log_lines())
+    return (f"记下 1371M 的命令键：头一次照记录 {MEMORY_FLOOR_RECORDED_TEXT}、撞了重排那一次 {MEMORY_FLOOR_RETRY_TEXT}（不兜到 4G）、记账照上限；"
+            f"记下 5M 的头一次 {FLOOR_TEXT}、重排 {FLOOR_RETRY_TEXT}；配置写 {PINNED_BELOW_FLOOR_SLICE_TEXT} 的钉值照 {shown}M（低于下限也照钉值）")
 
 
 def cell_recorded_cap_not_floored(world):
-    """有真实峰值记录的上限照峰值定（task_server.py 文件头 ②「内存」的有记录的照记录；这一格照真的下限 4G，不用各格小世界的 0）：同一命令键记下的峰值 200M，
-    上限与记账都是 300M（200M × 1.5 按 MiB 向上取整）、prediction 记 RECORD_HISTORY、内存包装收到 cap=300M，不兜到 4096M；没记录的照旧 4096M。
-    弄坏开关 recorded-cap-floored 下记录定的也兜到 4096M，这一格红。"""
+    """有真实峰值记录的上限照峰值定（task_server.py 文件头 ②「内存」的有记录的照记录；这一格照真的下限 1024M，不用各格小世界的 0）：同一命令键记下的峰值 1300M，
+    上限与记账都是 1300M（近五次最大，不乘 1.5）、prediction 记 RECORD_HISTORY、内存包装收到 cap=1300M，不兜到 4096M；没记录的照旧 4096M；
+    记下的峰值很小的（5M 与 200M，都不到下限）上限与记账都取下限 1024M，prediction 仍记 RECORD_HISTORY。
+    弄坏开关 recorded-cap-floored 下记录定的也兜到 4096M，cap-floor-skipped 下峰值很小的两条是 5M 与 200M，这一格红。"""
     key = "selftest-recorded-small"
+    tiny_key = "selftest-recorded-tiny"
+    near_key = "selftest-recorded-near-floor"
     world.seed_peak(key, RECORDED_SMALL_PEAK_BYTES)
+    world.seed_peak(tiny_key, FLOOR_TINY_PEAK_BYTES)
+    world.seed_peak(near_key, FLOOR_NEAR_PEAK_BYTES)
     world.start_server(extra={lib.MEMORY_FLOOR_VARIABLE: ""})
     recorded_id = world.submit(["bash", "-c", "exit 0", "recorded-small"], extra={lib.KEY_VARIABLE: key})
     unrecorded_id = world.submit(["bash", "-c", "exit 0", "recorded-small-unrecorded"])
+    tiny_id = world.submit(["bash", "-c", "exit 0", "recorded-tiny"], extra={lib.KEY_VARIABLE: tiny_key})
+    near_id = world.submit(["bash", "-c", "exit 0", "recorded-near-floor"], extra={lib.KEY_VARIABLE: near_key})
     expected = {"有记录的": (recorded_id, RECORDED_SMALL_CAP_TEXT, lib.RECORD_HISTORY),
-                "没记录的": (unrecorded_id, UNRECORDED_DEFAULT_PINNED_TEXT, lib.UNRECORDED_HISTORY)}
+                "没记录的": (unrecorded_id, UNRECORDED_DEFAULT_PINNED_TEXT, lib.UNRECORDED_HISTORY),
+                "记下 5M 的": (tiny_id, FLOOR_TEXT, lib.RECORD_HISTORY),
+                "记下 200M 的": (near_id, FLOOR_TEXT, lib.RECORD_HISTORY)}
     problems = []
     for name, (task_id, cap_text, history) in expected.items():
         summary = world.finished(task_id)
@@ -5510,700 +5262,119 @@ def cell_recorded_cap_not_floored(world):
                             f"prediction {attempt.get('prediction')}、包装收到 {wrapper}、{describe(summary)}")
     if problems:
         raise SelftestFailure("有记录的照峰值定上限：" + "；".join(problems), world.server_log_lines())
-    return f"记下 200M 的命令上限与记账都是 {RECORDED_SMALL_CAP_TEXT}（不兜到 4G），没记录的照旧 {UNRECORDED_DEFAULT_PINNED_TEXT}"
+    return (f"记下 1300M 的命令上限与记账都是 {RECORDED_SMALL_CAP_TEXT}（不兜到 4G），没记录的照旧 {UNRECORDED_DEFAULT_PINNED_TEXT}，"
+            f"记下 5M 与 200M 的取下限 {FLOOR_TEXT}")
 
 
-def sealed_gap_world(world, release, blockers, probes):
-    """插空那三格的世界（task_server.py 的 Alternation.gap_fill）：一台 50G（界 40.8G）上依次交整片（记 47.25G）、两条挡路碎片（各记 15G，跑到 release 在了才退）、
-    一条没有预计用时的碎片（记 15G：装进那一组就超过界，封组）、再交 probes 里来插空的碎片（各记 1.5G）；都没满时限、一齐放出来。
-    blockers 是两条挡路碎片的 [(命令里的名, 记下的用时或 None)]，probes 是来插空的 [(名, 记下的用时)]。等两条挡路的都在跑，
-    交 {名: 任务号}，另带「整片」「封组」与「挡路」（两条的任务号）。每条命令各一把键：预计用时照命令键取（task_server.py 的 command_estimate），
-    同键的别条记下的用时会带到没记用时的那一条上。"""
-    world.resources(local=(50, 50), hold=True)
-    world.seed_peak("selftest-gap-whole", GAP_WHOLE_PEAK_BYTES)
-    world.seed_peak("selftest-gap-sealed", GAP_HOLDER_PEAK_BYTES)
-    holder_commands = [(f"selftest-gap-holder-{name}", ["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, name, release]) for name, _ in blockers]
-    for (key, command), (_, seconds) in zip(holder_commands, blockers):
-        world.seed_peak(key, GAP_HOLDER_PEAK_BYTES)
-        if seconds is not None:
-            world.seed_duration(key, seconds, command)
-    probe_commands = {name: (f"selftest-gap-probe-{seconds}", ["bash", "-c", "exit 0", f"gap-probe-{seconds}"]) for name, seconds in probes}
-    for name, seconds in probes:
-        key, command = probe_commands[name]
-        world.seed_peak(key, GAP_PROBE_PEAK_BYTES)
-        world.seed_duration(key, seconds, command)
-    world.start_server()
-    tasks = {"整片": world.submit(["bash", "-c", "exit 0", "gap-whole"], extra={lib.KEY_VARIABLE: "selftest-gap-whole"})}
-    tasks["挡路"] = [world.submit(command, extra={lib.KEY_VARIABLE: key}) for key, command in holder_commands]
-    tasks["封组"] = world.submit(["bash", "-c", "exit 0", "gap-sealed-unestimated"], extra={lib.KEY_VARIABLE: "selftest-gap-sealed"})
-    for name, (key, command) in probe_commands.items():
-        tasks[name] = world.submit(command, extra={lib.KEY_VARIABLE: key})
-    world.resources(local=(50, 50))   # 一齐放出来：整片让一组碎片先起，两条挡路的装进组，没有预计用时的那条封组
-    world.api("POST", "/wake")
-    for task_id in tasks["挡路"]:
-        world.running(task_id)
-    return tasks
-
-
-def sealed_reason_problem(name, summary, refusal):
-    """封着的那一条应当没起、排队原因带封组那一句与 refusal（没插空的那一句）：对交空串，不对交一句。"""
-    reason = summary.get("waiting_for") or ""
-    if summary["attempts"] or SEALED_GROUP_TEXT not in reason or refusal not in reason:
-        return f"{name}应当封着、排队原因带「{SEALED_GROUP_TEXT}」与「{refusal}」，实际尝试 {len(summary['attempts'])} 次、排队原因「{reason}」"
-    return ""
-
-
-def gap_admitted_problem(name, summary, blockers_running):
-    """插空的那一条应当在挡路的还在跑时跑完、尝试记 gap_fill（插空那一句）：对交空串，不对交一句。"""
-    attempt = first_attempt(summary)
-    note = attempt.get("gap_fill") or ""
-    if summary["task"].get("outcome") != "succeeded" or not note.startswith(GAP_ADMITTED_TEXT) or "不超过挡路时长" not in note or not blockers_running:
-        return (f"{name}应当在挡路的还在跑时插空起来、跑完，尝试的 gap_fill 以「{GAP_ADMITTED_TEXT}」起头、点名挡路时长，"
-                f"实际 {describe(summary)}、gap_fill「{note}」、挡路的{'还在跑' if blockers_running else '已不都在跑'}")
-    return ""
-
-
-def release_gap_blockers(world, release, tasks):
-    """插空那三格收尾：放行挡路的两条、等它们跑完（sealed_gap_world 没交回任务号的，没有要等的）。"""
-    open(release, "w").close()
-    for task_id in tasks.get("挡路", []):
-        world.finished(task_id)
-
-
-def cell_sealed_gap_takes_short_task(world):
-    """封了组的那台放短任务插空：两条挡路碎片各记了 600 秒的用时、刚起，来插空的那条记了 1 秒：1 秒不超过挡路时长（约 600 秒）、内存照公式放得下，
-    挡路的还在跑时它就起、跑完，尝试记 gap_fill；没有预计用时的那条封组碎片照旧封着、排队原因写没插空的原因。
-    弄坏开关 sealed-gap-not-backfilled 下它封着、不起。"""
-    release = os.path.join(world.root, "release-gap-short")
-    tasks, problems = {}, []
+def cell_runaway_process_notified(world):
+    """任务之外的进程空转（task_server.py 的 watch_runaway_processes）：进程表里只有不在任务 slice、不是内核线程、CPU 够久够满的那一条被报，恰好一条，写依据与按号停的出路；
+    任务 slice 里的、内核线程、CPU 不够久的、占比不够的都不报。弄坏开关 runaway-process-unreported、runaway-slice-counted 下这一格红。"""
+    listing = os.path.join(world.root, "process-list")
+    inbox = FakeInbox(world, "a")
+    other_inbox = FakeInbox(world, "b", session=SESSION_B, register=False)
+    bystander = subprocess.Popen(["sleep", "600"])
+    world.register_session(SESSION_B, other_inbox.path, "inbox-b", pid=bystander.pid)
+    release = os.path.join(world.root, "release-runaway")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_PROCESS_LIST": listing})
+    head = "task-server：任务之外的进程空转"
     try:
-        tasks = sealed_gap_world(world, release, (("gap-blocker-estimated", GAP_BLOCKER_ESTIMATE_SECONDS),
-                                                  ("gap-blocker-estimated-also", GAP_BLOCKER_ESTIMATE_SECONDS)),
-                                 (("短任务", GAP_SHORT_ESTIMATE_SECONDS),))
-        world.next_pass()
-        world.next_pass()
-        short = world.summary(tasks["短任务"])
-        if short["attempts"]:
-            short = world.finished(tasks["短任务"])
-        blockers_running = all(world.summary(task_id)["task"].get("state") == "running" for task_id in tasks["挡路"])
-        problems += [problem for problem in (gap_admitted_problem("预计用时 1 秒的短任务", short, blockers_running),
-                                             sealed_reason_problem("没有预计用时的那条碎片", world.summary(tasks["封组"]), f"{GAP_REFUSED_TEXT}这一条没有预计用时"))
-                     if problem]
+        world.running(world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "runaway", release], extra=inbox.environment()))
+        world.running(world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "runaway-other", release], session=SESSION_B, extra=other_inbox.environment()))
+        with open(listing, "w", encoding="utf-8") as handle:
+            handle.write(f"  501 {os.getpid()} 7200 7100 R 0::/user.slice/session-3.scope rev\n  502 {os.getpid()} 7200 7100 R 0::/user.slice/singlefs.slice/a.service in-slice\n"
+                         f"  503 2 7200 7100 R - kworker\n  504 {os.getpid()} 7200 600 S 0::/user.slice/session-3.scope brief\n  505 {os.getpid()} 7200 3000 S 0::/user.slice/session-3.scope low-share\n"
+                         )
+        inbox.wait_for(world, head)
+        time.sleep(INBOX_QUIET_SECONDS)
+        found = inbox.headed(head)
+        strayed = other_inbox.headed(head)
     finally:
-        release_gap_blockers(world, release, tasks)
+        open(release, "w").close()
+        bystander.kill()
+        bystander.wait()
+    problems = inbox_problems(found, head, "任务之外的进程空转")
+    if strayed:
+        problems.append(f"别的会话不该收到，实际收到 {len(strayed)} 条")
+    text = found[0]["text"] if found else ""
+    if found and ("进程 501" not in text.split("\n", 1)[0] or "7100 秒" not in text or "proc.py stop 501" not in text):
+        problems.append(f"应当点名进程 501、写依据与按号停的出路，实际「{text[:400]}」")
     if problems:
-        raise SelftestFailure("封组时放短任务插空：" + "；".join(problems), world.server_log_lines())
-    return f"挡路的两条记了 {GAP_BLOCKER_ESTIMATE_SECONDS} 秒、还在跑：预计用时 {GAP_SHORT_ESTIMATE_SECONDS} 秒的插空起来跑完，没有预计用时的照旧封着"
+        raise SelftestFailure("任务之外的进程空转：" + "；".join(problems), world.server_log_lines())
+    return "五行进程表只报不在 slice、CPU 够久够满的那一条，恰好一次，写了依据与出路"
 
 
-def cell_sealed_gap_holds_longer_task(world):
-    """封了组的那台不放超过挡路时长的：两条挡路碎片各记了 600 秒的用时、刚起，来插空的那条记了 6000 秒：超过挡路时长，照旧封着，
-    排队原因在封组那一句后面写它的预计用时超过挡路时长。弄坏开关 sealed-gap-length-ignored 下它照起。"""
-    release = os.path.join(world.root, "release-gap-long")
-    tasks, problems = {}, []
+def cell_runaway_process_stopped_after_reports(world):
+    """任务之外的进程空转（task_server.py 的 watch_runaway_processes）：认得出发起会话的先报两次，再由服务按号停掉真进程并告诉那个会话；认不出的（进程 1 的子进程）不等、直接终止，不发给任何会话；
+    命令名在不碰名单里的、systemd 单元里的、登记的会话进程不碰。弄坏开关 runaway-process-not-stopped、runaway-unowned-not-stopped、runaway-protected-stopped 下这一格红。"""
+    spinning = subprocess.Popen(["sleep", "600"])
+    orphan = subprocess.Popen(["sleep", "600"])
+    named, in_unit, session_process = (subprocess.Popen(["sleep", "600"]) for _ in range(3))
+    world.register_session("selftest-session-keeper", "", "keeper", pid=session_process.pid)
+    listing = os.path.join(world.root, "process-list-stop")
+    inbox = FakeInbox(world, "a")
+    release = os.path.join(world.root, "release-runaway-stop")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_PROCESS_LIST": listing, "TASK_SERVER_SELFTEST_RUNAWAY_RENOTIFY_SECONDS": "0.3"})
+    head = "task-server：任务之外的进程空转 已停"
     try:
-        tasks = sealed_gap_world(world, release, (("gap-blocker-estimated", GAP_BLOCKER_ESTIMATE_SECONDS),
-                                                  ("gap-blocker-estimated-also", GAP_BLOCKER_ESTIMATE_SECONDS)),
-                                 (("长任务", GAP_LONG_ESTIMATE_SECONDS),))
-        world.next_pass()
-        world.next_pass()
-        problem = sealed_reason_problem(f"预计用时 {GAP_LONG_ESTIMATE_SECONDS} 秒的长任务", world.summary(tasks["长任务"]),
-                                        f"{GAP_REFUSED_TEXT}这一条预计用时 {GAP_LONG_ESTIMATE_SECONDS:.1f} 秒，超过挡路时长")
-        problems += [problem] if problem else []
+        world.running(world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "runaway-stop", release], extra=inbox.environment()))
+        with open(listing, "w", encoding="utf-8") as handle:
+            handle.write(f"  {spinning.pid} {os.getpid()} 7200 7100 R 0::/user.slice/session-3.scope spinning\n  {orphan.pid} 1 7200 7100 R 0::/user.slice/session-3.scope orphan\n"
+                         f"  {named.pid} 1 7200 7100 R 0::/user.slice/session-3.scope claude\n  {in_unit.pid} 1 7200 7100 R 0::/user.slice/user-1000.slice/user@1000.service/app.slice/a.service daemon\n"
+                         f"  {session_process.pid} 1 7200 7100 R 0::/user.slice/session-3.scope registered\n")
+        inbox.wait_for(world, head)
+        time.sleep(0.5)
+        stopped = inbox.headed(head)
+        reported = inbox.headed(f"task-server：任务之外的进程空转 本机进程 {spinning.pid}")
+        spinning_gone, orphan_gone = spinning.poll() is not None, orphan.poll() is not None
+        kept_alive = [name for name, process in (("不碰名单", named), ("systemd 单元", in_unit), ("登记的会话进程", session_process)) if process.poll() is None]
+        unowned_messages = [message for message in inbox.headed("task-server：任务之外的进程空转") if str(orphan.pid) in message["text"]]
     finally:
-        release_gap_blockers(world, release, tasks)
-    if problems:
-        raise SelftestFailure("封组时超过挡路时长的不插空：" + "；".join(problems), world.server_log_lines())
-    return f"挡路的两条记了 {GAP_BLOCKER_ESTIMATE_SECONDS} 秒：预计用时 {GAP_LONG_ESTIMATE_SECONDS} 秒的照旧封着、排队原因写超过挡路时长"
-
-
-def cell_unestimated_blocker_counted_by_elapsed(world):
-    """挡路的没有预计用时（连同已跑过预计用时的）按已跑算：一条挡路碎片没有记录、一条记了 0.2 秒（一起来就跑过了），来插空的两条记了 1 秒与 3600 秒。
-    挡路的已跑不到 1 秒时 1 秒那条照封着，已跑过 1 秒就插空起来、跑完（起的时刻比挡路的最早那条晚至少 1 秒）；3600 秒那条一直封着、排队原因写超过挡路时长。
-    弄坏开关 blocker-remaining-unbounded 下挡路时长没有尽头、3600 秒那条也起，sealed-gap-not-backfilled 下 1 秒那条不起，sealed-gap-length-ignored 下两条一起就起。"""
-    release = os.path.join(world.root, "release-gap-elapsed")
-    tasks, problems = {}, []
-    try:
-        tasks = sealed_gap_world(world, release, (("gap-blocker-unrecorded", None), ("gap-blocker-overrun", GAP_OVERRUN_ESTIMATE_SECONDS)),
-                                 (("短任务", GAP_SHORT_ESTIMATE_SECONDS), ("长任务", GAP_UNESTIMATED_LONG_SECONDS)))
-        try:
-            world.wait_for(tasks["短任务"], lambda summary: bool(summary["attempts"]), "插空起来", timeout=GAP_ELAPSED_WAIT_SECONDS)
-            short = world.finished(tasks["短任务"])
-        except SelftestFailure:
-            short = world.summary(tasks["短任务"])
-        blocker_attempts = [first_attempt(world.summary(task_id)) for task_id in tasks["挡路"]]
-        blockers_running = all(attempt.get("state") == "running" for attempt in blocker_attempts)
-        problem = gap_admitted_problem(f"预计用时 {GAP_SHORT_ESTIMATE_SECONDS} 秒的短任务", short, blockers_running)
-        problems += [problem] if problem else []
-        earliest = min(float(attempt.get("started_at") or 0) for attempt in blocker_attempts)
-        started = float(first_attempt(short).get("started_at") or 0)
-        if short["attempts"] and started - earliest < GAP_SHORT_ESTIMATE_SECONDS - STARTED_AT_ROUNDING_SECONDS:
-            problems.append(f"短任务应当等挡路的已跑过 {GAP_SHORT_ESTIMATE_SECONDS} 秒才插空，实际比挡路的最早那条只晚 {started - earliest:.2f} 秒起")
-        world.next_pass()
-        problem = sealed_reason_problem(f"预计用时 {GAP_UNESTIMATED_LONG_SECONDS} 秒的长任务", world.summary(tasks["长任务"]),
-                                        f"{GAP_REFUSED_TEXT}这一条预计用时 {GAP_UNESTIMATED_LONG_SECONDS:.1f} 秒，超过挡路时长")
-        problems += [problem] if problem else []
-    finally:
-        release_gap_blockers(world, release, tasks)
-    if problems:
-        raise SelftestFailure("挡路的没有预计用时按已跑算：" + "；".join(problems), world.server_log_lines())
-    return (f"挡路的没有记录、或已跑过记下的用时：按已跑算，预计用时 {GAP_SHORT_ESTIMATE_SECONDS} 秒的等已跑过它才插空，"
-            f"{GAP_UNESTIMATED_LONG_SECONDS} 秒的照旧封着")
-
-
-ITEM_ENTRY_RELATIVE = lib.ITEM_ENTRIES[1]   # 按项那几格的假入口放在假仓根下这个相对路径（.claude/gate.d/formal-verification.sh）：服务照路径认出它
-ITEM_SPEC_DIRECTORY = "fake-item-entry"     # 假入口读每项的 ITEM_PLAN、ITEM_DONE 与放行文件的目录（假仓根下）
-ITEM_WAIT_SECONDS = 30.0                    # 按项那几格等估算起来、等父任务进队的时限
-ITEM_PARENT_KEY = "selftest-item-parent"    # item-estimate-summed-from-rates 与 item-estimate-failure-queues-parent 的父任务的命令键：记下 20G 的峰值（上限 30G）
-ITEM_PARENT_PEAK_BYTES = 20 * GIBIBYTE      # 那两格本机空闲 10G：父任务（要的空闲 22G）放不下、排着，估算子任务（没记录，4G）放得下
-ITEM_COMMAND_FAILED_EXIT = 1                # item-estimate-failure-queues-parent 里估算子任务退的码（command-failed）
-FAKE_ITEM_ENTRY = r'''#!/usr/bin/env bash
-# task-server 自证的假按项入口（task_server_lib.py 的 ITEM_ENTRIES 之一）：每次被起往调用记录写一行「item-entry mode=<list|run> task=<号> args=<原样参数>」。
-# 带 --list-items 的那一次（估算子任务）：各项有 list-hold-<项> 的先等 list-release 在了（至多 60 秒，等不到退 9），照 plan-<项> 打 ITEM_PLAN 那一行，
-# 有 list-exit-<项> 的照它的内容退；别的那一次（父任务自己跑）照 done-<项> 打 ITEM_DONE 那几行、退 0。这几份都在假仓根下的 fake-item-entry/ 里。
-spec="$(cd -- "$(dirname -- "$0")/../.." && pwd)/fake-item-entry"
-mode=run
-items=()
-arguments="$*"
-while (( $# )); do
-  case "$1" in
-    --list-items) mode=list ;;
-    --item) items+=("${2:-}"); shift ;;
-  esac
-  shift
-done
-printf 'item-entry mode=%s task=%s args=%s\n' "$mode" "${TASK_SERVER_TASK:-}" "$arguments" >> "$TASK_SERVER_SELFTEST_WORLD/calls"
-if [[ "$mode" == list ]]; then
-  code=0
-  for item in "${items[@]}"; do
-    if [[ -e "$spec/list-hold-$item" ]]; then
-      for round in $(seq 1 600); do [[ -e "$spec/list-release" ]] && break; sleep 0.1; done
-      [[ -e "$spec/list-release" ]] || exit 9
-    fi
-    if [[ -e "$spec/plan-$item" ]]; then cat -- "$spec/plan-$item"; fi
-    if [[ -e "$spec/list-exit-$item" ]]; then code="$(cat -- "$spec/list-exit-$item")"; fi
-  done
-  exit "$code"
-fi
-for item in "${items[@]}"; do
-  if [[ -e "$spec/done-$item" ]]; then cat -- "$spec/done-$item"; fi
-done
-exit 0
-'''
-
-
-def item_entry_world(world, files):
-    """按项那几格的假入口：写进假仓根的 ITEM_ENTRY_RELATIVE，files（{文件名: 内容}）写进假仓根的 ITEM_SPEC_DIRECTORY；交那个目录。"""
-    write_executable(os.path.join(world.repo, ITEM_ENTRY_RELATIVE), FAKE_ITEM_ENTRY)
-    spec = os.path.join(world.repo, ITEM_SPEC_DIRECTORY)
-    os.makedirs(spec, exist_ok=True)
-    for name, text in files.items():
-        with open(os.path.join(spec, name), "w", encoding="utf-8") as handle:
-            handle.write(text)
-    return spec
-
-
-def item_entry_command(world, items):
-    """交给服务的那一条：bash <假入口> --item <项>…  <假仓根>（同三条入口的写法），在假仓根里起。"""
-    return ["bash", ITEM_ENTRY_RELATIVE, *[word for item in items for word in (lib.ITEM_ARGUMENT, item)], world.repo]
-
-
-def item_plan_line(item, to_judge, reusable):
-    return f"ITEM_PLAN item={item} to_judge={to_judge} reusable={reusable}\n"
-
-
-def item_done_line(item, seconds, judged, reused, exit_code=0):
-    return f"ITEM_DONE item={item} seconds={seconds} judged={judged} reused={reused} exit={exit_code}\n"
-
-
-def wait_for_call(world, prefix, timeout):
-    """等调用记录里出现以 prefix 起头的一行，交那一行；等不到交空串。"""
-    patience = world.patience(timeout)
-    while patience.waiting():
-        found = next((line for line in world.calls() if line.startswith(prefix)), "")
-        if found:
-            return found
-        time.sleep(POLL_SECONDS)
-    return ""
-
-
-def item_rate_rows(world):
-    """{项名: item_rates 那一行的正文}（校验过的；入口是假入口的那几行）。"""
-    return {record.get("item"): record for record, valid in world.signed_rows("item_rates") if valid and record.get("entry") == ITEM_ENTRY_RELATIVE}
-
-
-def item_parent_queued(world, task_id):
-    """等估算完、父任务进队（state=queued）：交那时的 summary；等不到交 None。"""
-    try:
-        return world.wait_for(task_id, lambda summary: summary["task"].get("state") == "queued", "估算完进队", timeout=ITEM_WAIT_SECONDS)
-    except SelftestFailure:
-        return None
-
-
-def cell_item_estimate_before_queue(world):
-    """点了 --item 的按项入口先起估算子任务、估算完才进队（task_server_lib.py 文件头「资源记录」的预计用时）：估算那一条照原命令在入口后面接 --list-items --with-keys、
-    两个 --item 与根照原样；它在跑（等放行）时父任务记 estimating、一次都没起，status 的 item_estimate 是 role=estimate 的子任务；放行之后父任务才起、跑成，
-    调用记录里估算那一行在父任务那一行之前。弄坏开关 item-estimate-skipped 下父任务提交了就起，没有估算那一行。"""
-    spec = item_entry_world(world, {"plan-alpha": item_plan_line("alpha", 2, 1), "plan-beta": item_plan_line("beta", 0, 3), "list-hold-alpha": ""})
-    world.start_server()
-    command = item_entry_command(world, ("alpha", "beta"))
-    task_id = world.submit(command, cwd=world.repo)
+        open(release, "w").close()
+        for process in (spinning, orphan, named, in_unit, session_process):
+            process.kill()
+            process.wait()
     problems = []
-    try:
-        listed = wait_for_call(world, "item-entry mode=list ", ITEM_WAIT_SECONDS)
-        summary = world.summary(task_id)
-        estimate = (summary.get("item_estimate") or {}).get("task") or {}
-        wanted = " ".join(list(lib.ITEM_ESTIMATE_ARGUMENTS) + command[2:])
-        if not listed or not listed.endswith(f"args={wanted}"):
-            problems.append(f"估算子任务应当起「{ITEM_ENTRY_RELATIVE} {wanted}」，调用记录里估算那一行是「{listed or '没有'}」")
-        if summary["task"].get("state") != "estimating" or summary["attempts"]:
-            problems.append(f"估算在跑时父任务应当记 estimating、一次都没起，实际 {summary['task'].get('state')}、尝试 {len(summary['attempts'])} 次")
-        if estimate.get("role") != lib.ESTIMATE_ROLE or estimate.get("parent_id") != task_id:
-            problems.append(f"status 的 item_estimate 应当是这一条名下 role={lib.ESTIMATE_ROLE} 的子任务，实际 {json.dumps(estimate, ensure_ascii=False)[:300]}")
-    finally:
-        open(os.path.join(spec, "list-release"), "w").close()
-    finished = world.finished(task_id)
-    calls = world.calls()
-    order = [line.split()[1] for line in calls if line.startswith("item-entry ")]
-    if finished["task"].get("outcome") != "succeeded" or len(finished["attempts"]) != 1 or order != ["mode=list", "mode=run"]:
-        problems.append(f"放行之后父任务应当起一次、跑成，调用记录里先估算后跑，实际 {describe(finished)}、调用次序 {order}")
+    if len(stopped) != 1 or str(spinning.pid) not in stopped[0]["text"] or "回读已不在" not in stopped[0]["text"]:
+        problems.append(f"应当恰好一条「已停」点名进程 {spinning.pid}、写回读已不在，实际 {[message['text'][:200] for message in stopped]}")
+    if len(reported) != 2:
+        problems.append(f"停之前应当恰好报两次，实际 {len(reported)} 次")
+    if not spinning_gone:
+        problems.append("所属会话认得出的那个进程应当被服务停掉，实际还在")
+    if not orphan_gone:
+        problems.append("认不出发起者的那个进程应当被直接终止，实际还在")
+    if unowned_messages:
+        problems.append(f"认不出发起者的不该发给任何会话，实际收到 {len(unowned_messages)} 条")
+    if len(kept_alive) != 3:
+        problems.append(f"不碰的三类都该还在，实际还在的只有 {kept_alive}")
     if problems:
-        raise SelftestFailure("按项先估算后进队：" + "；".join(problems), world.server_log_lines())
-    return "点了 --item 的先起估算子任务（--list-items --with-keys 加原样的 --item），估算在跑时父任务记 estimating、不起，估算完才进队跑成"
-
-
-def cell_item_done_rates_recorded(world):
-    """尝试收尾时照 ITEM_DONE 按（入口、项名）记两个速率（task_server_lib.py 文件头「资源记录」的预计用时）：头一趟 alpha 只现判（20 秒 10 条）记每现判一条 2 秒、
-    beta 只复用（4 秒 8 条）记每复用一条 0.5 秒、gamma 退 1 不记；第二趟 beta 现判 10 条、复用 8 条共 24 秒：照已记的复用速率扣掉 4 秒，记每现判一条 2 秒，复用速率不动。
-    弄坏开关 item-done-unrecorded 下一行都不记。"""
-    spec = item_entry_world(world, {"plan-alpha": item_plan_line("alpha", 10, 0), "plan-beta": item_plan_line("beta", 0, 8), "plan-gamma": item_plan_line("gamma", 3, 0),
-                                    "done-alpha": item_done_line("alpha", 20, 10, 0), "done-beta": item_done_line("beta", 4, 0, 8),
-                                    "done-gamma": item_done_line("gamma", 9, 3, 0, exit_code=1)})
-    world.start_server()
-    first = world.finished(world.submit(item_entry_command(world, ("alpha", "beta", "gamma")), cwd=world.repo))
-    with open(os.path.join(spec, "done-beta"), "w", encoding="utf-8") as handle:
-        handle.write(item_done_line("beta", 24, 10, 8))
-    second = world.finished(world.submit(item_entry_command(world, ("beta",)), cwd=world.repo))
-    rows = item_rate_rows(world)
-    alpha, beta = rows.get("alpha") or {}, rows.get("beta") or {}
-    problems = []
-    if not task_command_ok(first, "succeeded") or not task_command_ok(second, "succeeded"):
-        problems.append(f"两趟都应当跑成，实际头一趟 {describe(first)}、第二趟 {describe(second)}")
-    if alpha.get("seconds_per_judged") != 2.0 or alpha.get("seconds_per_reused") is not None or (alpha.get("judged_from") or {}).get("task") != first["task"]["id"]:
-        problems.append(f"alpha 应当记每现判一条 2 秒（出自任务 {first['task']['id']}）、没有复用速率，实际 {json.dumps(alpha, ensure_ascii=False)[:300]}")
-    if beta.get("seconds_per_reused") != 0.5 or beta.get("seconds_per_judged") != 2.0 or (beta.get("judged_from") or {}).get("task") != second["task"]["id"]:
-        problems.append(f"beta 应当记每复用一条 0.5 秒（头一趟）与每现判一条 2 秒（第二趟扣掉复用的 4 秒），实际 {json.dumps(beta, ensure_ascii=False)[:300]}")
-    if "gamma" in rows:
-        problems.append(f"gamma 那一项退 1，不该记速率，实际记了 {json.dumps(rows['gamma'], ensure_ascii=False)[:200]}")
-    if problems:
-        raise SelftestFailure("ITEM_DONE 记两个速率：" + "；".join(problems), world.server_log_lines())
-    return "ITEM_DONE 照（入口、项名）记最近一次的两个速率：只现判的记现判、只复用的记复用、两样都有的扣掉复用再记现判、退非 0 的不记"
-
-
-def cell_item_estimate_summed_from_rates(world):
-    """预计用时照 ITEM_PLAN 与两个速率相加（task_server_lib.py 文件头「资源记录」的预计用时）：库里 alpha 每现判一条 2 秒、每复用一条 0.5 秒，beta 每现判一条 1 秒、没有复用速率，
-    gamma 没记过；估算报 alpha 现判 3、复用 4，beta 现判 5、复用 0，gamma 现判 1。点 alpha、beta 的那条预计用时 3×2 + 4×0.5 + 5×1 = 13 秒；
-    点 alpha、gamma 的缺 gamma 的速率，预计用时 None。父任务记得放不下（本机空闲 10G）、估算完一直排着，排着时读。
-    弄坏开关 item-estimate-by-command 下照命令逐字相同算、两条都是 None，item-rate-missing-skipped 下缺的当 0、第二条是 8 秒，item-estimate-skipped 下不估、都是 None。"""
-    item_entry_world(world, {"plan-alpha": item_plan_line("alpha", 3, 4), "plan-beta": item_plan_line("beta", 5, 0), "plan-gamma": item_plan_line("gamma", 1, 0)})
-    world.seed_peak(ITEM_PARENT_KEY, ITEM_PARENT_PEAK_BYTES)
-    world.resources(local=(10, 50))
-    world.start_server()
-    for item, judged, reused in (("alpha", 2.0, 0.5), ("beta", 1.0, None)):
-        world.insert_signed_row("item_rates", {"task_id": 0, "state": lib.ITEM_RATE_STATE, "session": "", "command_key": lib.item_rate_key(ITEM_ENTRY_RELATIVE, item),
-                                               "entry": ITEM_ENTRY_RELATIVE, "item": item, "seconds_per_judged": judged, "seconds_per_reused": reused,
-                                               "judged_from": None, "reused_from": None})
-    summed = world.submit(item_entry_command(world, ("alpha", "beta")), cwd=world.repo, extra={lib.KEY_VARIABLE: ITEM_PARENT_KEY})
-    missing = world.submit(item_entry_command(world, ("alpha", "gamma")), cwd=world.repo, extra={lib.KEY_VARIABLE: ITEM_PARENT_KEY})
-    problems = []
-    for task_id, wanted, what in ((summed, 13.0, "点 alpha、beta 的"), (missing, None, "点 alpha、gamma 的（gamma 没有速率）")):
-        summary = item_parent_queued(world, task_id)
-        if summary is None:
-            problems.append(f"{what}估算完应当进队排着，等了 {ITEM_WAIT_SECONDS:.0f} 秒实际 {describe(world.summary(task_id))}")
-            continue
-        if summary.get("estimated_seconds") != wanted:
-            problems.append(f"{what}预计用时应当是 {wanted}，实际 {summary.get('estimated_seconds')}（item_plan {json.dumps(summary['task'].get('item_plan'), ensure_ascii=False)}）")
-    world.resources(local=(50, 50))
-    for task_id in (summed, missing):
-        world.finished(task_id)
-    if problems:
-        raise SelftestFailure("按项的预计用时：" + "；".join(problems), world.server_log_lines())
-    return "预计用时 = 各项 to_judge × 现判速率 + reusable × 复用速率之和（13 秒）；缺一项速率的是 None"
-
-
-def cell_item_estimate_failure_queues_parent(world):
-    """估算子任务没成时父任务照没有预计用时排、不卡住（task_server_lib.py 文件头「资源记录」的预计用时）：一条的估算退 1（打了 ITEM_PLAN 也不认），一条的估算退 0 而一行 ITEM_PLAN 都没打：
-    两条的估算收尾之后父任务都进队、item_plan 是 null、预计用时 None；内存放出来之后都跑成。父任务记得放不下（本机空闲 10G），排着时读。
-    弄坏开关 estimate-failure-holds-parent 下两条一直在估算，item-estimate-skipped 下没有估算子任务。"""
-    item_entry_world(world, {"plan-broken": item_plan_line("broken", 1, 0), "list-exit-broken": str(ITEM_COMMAND_FAILED_EXIT)})
-    world.seed_peak(ITEM_PARENT_KEY, ITEM_PARENT_PEAK_BYTES)
-    world.resources(local=(10, 50))
-    world.start_server()
-    failed = world.submit(item_entry_command(world, ("broken",)), cwd=world.repo, extra={lib.KEY_VARIABLE: ITEM_PARENT_KEY})
-    silent = world.submit(item_entry_command(world, ("silent",)), cwd=world.repo, extra={lib.KEY_VARIABLE: ITEM_PARENT_KEY})
-    problems = []
-    for task_id, outcome, what in ((failed, "command-failed", "估算退 1 的"), (silent, "succeeded", "估算没打 ITEM_PLAN 的")):
-        summary = item_parent_queued(world, task_id)
-        if summary is None:
-            problems.append(f"{what}估算收尾之后父任务应当进队排着，等了 {ITEM_WAIT_SECONDS:.0f} 秒实际 {describe(world.summary(task_id))}")
-            continue
-        estimate = (summary.get("item_estimate") or {}).get("task") or {}
-        if estimate.get("outcome") != outcome or summary["task"].get("item_plan") is not None or summary.get("estimated_seconds") is not None:
-            problems.append(f"{what}估算子任务应当是 {outcome}、父任务 item_plan 是 null、预计用时 None，实际估算 {estimate.get('outcome')}、"
-                            f"item_plan {summary['task'].get('item_plan')}、预计用时 {summary.get('estimated_seconds')}")
-    world.resources(local=(50, 50))
-    for task_id, what in ((failed, "估算退 1 的"), (silent, "估算没打 ITEM_PLAN 的")):
-        try:
-            finished = world.finished(task_id, timeout=ITEM_WAIT_SECONDS)
-        except SelftestFailure:
-            finished = world.summary(task_id)
-        if finished["task"].get("outcome") != "succeeded":
-            problems.append(f"{what}父任务应当照常跑成，实际 {describe(finished)}")
-    if problems:
-        raise SelftestFailure("估算没成时父任务照没有预计用时排：" + "；".join(problems), world.server_log_lines())
-    return "估算子任务退非 0、或没打 ITEM_PLAN 时父任务照样进队、没有预计用时，跑成"
-
-
-def cell_item_estimate_cancelled(world):
-    """还在估算时取消（task_server.py 的 cancel_estimating）：估算子任务在跑（等放行）时取消父任务：客户端退 0，父任务记 cancelled、一次都没起，
-    估算子任务停了、记 cancelled；之后父任务不进队、不起。"""
-    spec = item_entry_world(world, {"plan-alpha": item_plan_line("alpha", 1, 0), "list-hold-alpha": ""})
-    world.start_server()
-    task_id = world.submit(item_entry_command(world, ("alpha",)), cwd=world.repo)
-    problems = []
-    try:
-        if not wait_for_call(world, "item-entry mode=list ", ITEM_WAIT_SECONDS):
-            problems.append(f"估算子任务应当起来、记一行调用，等了 {ITEM_WAIT_SECONDS:.0f} 秒没有")
-        completed = world.client(["cancel", str(task_id)])
-    finally:
-        open(os.path.join(spec, "list-release"), "w").close()
-    summary = world.summary(task_id)
-    child = (summary.get("item_estimate") or {}).get("task") or {}
-    estimate = world.finished(child["id"]) if child.get("id") else {"task": {}}
-    if completed.returncode != 0 or summary["task"].get("outcome") != "cancelled" or summary["attempts"] or estimate["task"].get("outcome") != "cancelled":
-        problems.append(f"估算时取消应当退 0、父任务记 cancelled 且一次没起、估算子任务记 cancelled，实际退 {completed.returncode}（{completed.stdout.strip()[:200]}）、"
-                        f"父任务 {describe(summary)}、估算子任务 {estimate['task'].get('outcome')}")
-    world.next_pass()
-    world.next_pass()
-    if world.summary(task_id)["attempts"] or any(line.startswith("item-entry mode=run ") for line in world.calls()):
-        problems.append("取消之后父任务不该再进队、起来")
-    if problems:
-        raise SelftestFailure("估算时取消：" + "；".join(problems), world.server_log_lines())
-    return "估算时取消：估算子任务停了、记 cancelled，父任务记 cancelled、一次没起"
-
-
-ESTIMATE_FOLDED_TOOL = "fake-estimate-tool.sh"   # estimate-by-folded-command-key 起的假工具（假仓根里，退 0）：两条只差后面那个目录参数
-ESTIMATE_BASIS_KEY = "selftest-estimate-basis"            # estimate-basis-command-sentence 记过 3600 秒用时的命令键
-ESTIMATE_BASIS_SECONDS = 3600
-ESTIMATE_ITEM_ALPHA_RATES = (2.0, 0.5)                    # estimate-basis-items-sentence：alpha 每现判一条、每复用一条几秒；估算报现判 3、复用 4：3×2 + 4×0.5 = 8 秒
-ESTIMATE_ITEM_SECONDS = 8
-SHARD_ESTIMATE_KEY = "selftest-shard-estimate"            # 两格分片估算的这件的键
-SHARD_PLAN_SECONDS = 120                                  # shard-plan-and-merge-estimated-by-command：计划、合并各记过的用时
-SHARD_MERGE_SECONDS = 45
-SHARD_PIECE_SECONDS = {0: 300, 1: 900}                    # shard-pieces-estimated-by-own-history：两片各记过的用时（片号不同、用时不同，不混）
-SHARD_ESTIMATE_PEAK_BYTES = 20 * GIBIBYTE                 # 要排着等的那一步记过的峰值：本机空闲 10G，要的空闲 22G 放不下
-SHARD_ESTIMATE_WAIT_SECONDS = 60.0
-
-
-def estimate_queue_listing(world, task_ids):
-    """客户端 status --json 列的这个会话的任务里，指定几条的 estimated_seconds：{任务号: 秒数或 None}。"""
-    listed = json.loads(world.client(["status", "--json"]).stdout or "{}")
-    return {item["id"]: item.get("estimated_seconds") for item in listed.get("tasks", []) if item.get("id") in task_ids}
-
-
-def estimate_status(world, task_id):
-    """排着的一条：客户端 status <号> 打的文字，与 status <号> --json 里的 estimated_seconds、estimate_basis。"""
-    shown = world.client(["status", str(task_id)])
-    reply = json.loads(world.client(["status", str(task_id), "--json"]).stdout or "{}")
-    return shown.stdout, reply.get("estimated_seconds"), reply.get("estimate_basis")
-
-
-def cell_estimate_by_folded_command_key(world):
-    """预计用时与内存记录同一把键（task_server.py 的 command_estimate；任务 7585 与 7447 只差补丁目录）：bash fake-estimate-tool.sh <跑过的目录> --dry-run 跑成一次，
-    之后排着的 bash fake-estimate-tool.sh <排着的目录> --dry-run（路径照词折成〈文件〉、命令键相同，命令逐词不同）预计用时就是跑成那一次的用时、照命令得的。
-    弄坏开关 estimate-by-exact-command 下照改前只认命令逐词相同的，排着的那条没有预计用时，这一格红。"""
-    with open(os.path.join(world.repo, ESTIMATE_FOLDED_TOOL), "w", encoding="utf-8") as handle:
-        handle.write("exit 0\n")
-    ran_directory, queued_directory = (os.path.join(world.root, name) for name in ("patch-ran", "patch-queued"))
-    world.resources(local=(30, 30))
-    world.start_server()
-    ran = world.finished(world.submit(["bash", ESTIMATE_FOLDED_TOOL, ran_directory, "--dry-run"], cwd=world.repo))
-    seconds = first_attempt(ran).get("seconds")
-    world.resources(local=(30, 30), hold=True)
-    queued_id = world.submit(["bash", ESTIMATE_FOLDED_TOOL, queued_directory, "--dry-run"], cwd=world.repo)
-    text, estimate, basis = estimate_status(world, queued_id)
-    queued = world.summary(queued_id)
-    world.resources(local=(30, 30))
-    world.finished(queued_id)
-    keys = (ran["task"].get("command_key"), queued["task"].get("command_key"))
-    if (ran["task"].get("outcome") != "succeeded" or not isinstance(seconds, (int, float)) or keys[0] != keys[1]
-            or not isinstance(estimate, (int, float)) or abs(estimate - seconds) > 0.01 or basis != lib.ESTIMATE_BASIS_COMMAND):
-        raise SelftestFailure(f"两条只差目录参数的命令同一个命令键：一条跑成（用时 {seconds}）之后，排着的那一条预计用时应当就是它、照命令得的（{lib.ESTIMATE_BASIS_COMMAND}），"
-                              f"实际跑成的那条 {describe(ran)}、两条的命令键 {keys}、预计用时 {estimate}、依据 {basis}、status「{text.strip()[:200]}」", world.server_log_lines())
-    return f"路径不同、折叠后同键的命令：排着时预计用时 {estimate:.2f} 秒，取自同键跑成那一次的用时"
-
-
-def cell_estimate_basis_command_sentence(world):
-    """排着的任务预计用时是照命令得的：服务在回复里交 estimate_basis=command，客户端 status <号> 在预计用时后面打「照这条命令最近一次真跑完的用时」。
-    弄坏开关 estimate-basis-unreported 下服务不交这个字段、客户端没有说明可打，这一格红。"""
-    world.seed_duration(ESTIMATE_BASIS_KEY, ESTIMATE_BASIS_SECONDS, ["bash", "-c", "exit 0"])
-    world.resources(local=(30, 30), hold=True)
-    world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0"], extra={lib.KEY_VARIABLE: ESTIMATE_BASIS_KEY})
-    text, seconds, basis = estimate_status(world, task_id)
-    world.resources(local=(30, 30))
-    world.finished(task_id)
-    if f"预计用时 {ESTIMATE_BASIS_SECONDS} 秒（照这条命令最近一次真跑完的用时）" not in text or seconds != ESTIMATE_BASIS_SECONDS or basis != "command":
-        raise SelftestFailure(f"这条命令记过一次跑成的用时 {ESTIMATE_BASIS_SECONDS} 秒：status 应当打「预计用时 {ESTIMATE_BASIS_SECONDS} 秒（照这条命令最近一次真跑完的用时）」、"
-                              f"回复里 estimate_basis 是 command，实际文字「{text.strip()[:300]}」、estimated_seconds {seconds}、estimate_basis {basis}")
-    return "预计用时照命令得的：回复里 estimate_basis=command，status 打「照这条命令最近一次真跑完的用时」"
-
-
-def cell_estimate_basis_items_sentence(world):
-    """点了 --item 的按项入口估完进队、排着时预计用时是照项相加得的：库里 alpha 每现判一条 2 秒、每复用一条 0.5 秒，估算报现判 3、复用 4，3×2 + 4×0.5 = 8 秒；
-    服务交 estimate_basis=items，客户端 status <号> 在预计用时后面打按项那一句（点到的每一项：要现判的条数 × 每现判一条几秒 + 能复用的条数 × 每复用一条几秒，相加），
-    不打按命令那一句。父任务记得放不下（本机空闲 10G）、估算完一直排着，排着时读。
-    弄坏开关 estimate-basis-unreported 下服务不交、estimate-basis-sentence-fixed 下客户端一律打按命令那一句，item-estimate-by-command 与 item-estimate-skipped 下
-    这个数不是按项得的，这一格红。"""
-    item_entry_world(world, {"plan-alpha": item_plan_line("alpha", 3, 4)})
-    world.seed_peak(ITEM_PARENT_KEY, ITEM_PARENT_PEAK_BYTES)
-    world.resources(local=(10, 50))
-    world.start_server()
-    judged, reused = ESTIMATE_ITEM_ALPHA_RATES
-    world.insert_signed_row("item_rates", {"task_id": 0, "state": lib.ITEM_RATE_STATE, "session": "", "command_key": lib.item_rate_key(ITEM_ENTRY_RELATIVE, "alpha"),
-                                           "entry": ITEM_ENTRY_RELATIVE, "item": "alpha", "seconds_per_judged": judged, "seconds_per_reused": reused,
-                                           "judged_from": None, "reused_from": None})
-    task_id = world.submit(item_entry_command(world, ("alpha",)), cwd=world.repo, extra={lib.KEY_VARIABLE: ITEM_PARENT_KEY})
-    queued = item_parent_queued(world, task_id)
-    text, seconds, basis = estimate_status(world, task_id) if queued is not None else ("", None, None)
-    world.resources(local=(50, 50))
-    world.finished(task_id)
-    if (queued is None or f"预计用时 {ESTIMATE_ITEM_SECONDS} 秒（照点到的每一项" not in text or "照这条命令最近一次真跑完的用时" in text
-            or seconds != ESTIMATE_ITEM_SECONDS or basis != "items"):
-        raise SelftestFailure(f"按项估的任务（现判 3 × 2 秒 + 复用 4 × 0.5 秒）排着时：status 应当打「预计用时 {ESTIMATE_ITEM_SECONDS} 秒（照点到的每一项…」而不打按命令那一句、"
-                              f"回复里 estimate_basis 是 items，实际{'没排上队' if queued is None else ''}文字「{text.strip()[:300]}」、estimated_seconds {seconds}、estimate_basis {basis}")
-    return "预计用时照项相加得的：回复里 estimate_basis=items，status 打按项那一句、不打按命令那一句"
-
-
-def cell_estimate_basis_none_sentence(world):
-    """排着的任务没有预计用时（这条命令从没跑成过）：服务交 estimate_basis=none，客户端 status <号> 打「预计用时 没有记录」与没有可用记录的那一句，
-    不打「照这条命令最近一次真跑完的用时」（没有这样一次用时）。弄坏开关 estimate-basis-unreported 下服务不交、estimate-basis-sentence-fixed 下客户端一律打按命令那一句，这一格红。"""
-    world.resources(local=(30, 30), hold=True)
-    world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0", "x", "never-ran"])
-    text, seconds, basis = estimate_status(world, task_id)
-    world.resources(local=(30, 30))
-    world.finished(task_id)
-    if "预计用时 没有记录（没有可用的记录" not in text or "照这条命令最近一次真跑完的用时" in text or seconds is not None or basis != "none":
-        raise SelftestFailure(f"从没跑成过的命令：status 应当打「预计用时 没有记录（没有可用的记录…」而不打按命令那一句、回复里 estimate_basis 是 none、estimated_seconds 是 null，"
-                              f"实际文字「{text.strip()[:300]}」、estimated_seconds {seconds}、estimate_basis {basis}")
-    return "没有预计用时的：回复里 estimate_basis=none，status 打「没有记录（没有可用的记录…」、不打按命令那一句"
-
-
-def merge_child_queued(summary):
-    """分片父任务的合并那一步已建出来、还排着。"""
-    merge = next((child for child in summary.get("children", []) if child["task"].get("role") == "merge"), None)
-    return merge is not None and merge["task"].get("state") == "queued"
-
-
-def cell_shard_plan_and_merge_estimated_by_command(world):
-    """分片的计划与合并两步照同一条命令最近一次真跑完的用时估（task_server_lib.py 文件头「资源记录」的预计用时）：命令键各带那一步一段，计划记过 120 秒、合并记过 45 秒。
-    计划排着（本机放不下任何东西）时报 120；放出来之后计划与那一片跑完，合并记过 20G 的峰值、本机空闲 10G 放不下，排着时报 45。再放出来整件成了。
-    弄坏开关 shard-plan-merge-unestimated 下两步都没有预计用时，estimate-unreported 下一律没有，这一格红。"""
-    spec = world.write_spec("spec-estimate-plan-merge.json", {"shards": [{}]})
-    plan_key, merge_key = (lib.shard_child_key(SHARD_ESTIMATE_KEY, role, 0, 0) for role in ("plan", "merge"))
-    world.seed_duration(plan_key, SHARD_PLAN_SECONDS, spec)
-    world.seed_duration(merge_key, SHARD_MERGE_SECONDS, spec)
-    world.seed_peak(merge_key, SHARD_ESTIMATE_PEAK_BYTES)
-    world.resources(local=(10, 50), hold=True)
-    world.start_server()
-    task_id = world.submit(spec, cwd=world.repo, extra={lib.KEY_VARIABLE: SHARD_ESTIMATE_KEY})
-    plan = next((child for child in world.summary(task_id).get("children", []) if child["task"].get("role") == "plan"), {})
-    plan_estimate = plan.get("estimated_seconds", "计划那一步没建出来")
-    world.resources(local=(10, 50))
-    middle = world.wait_for(task_id, merge_child_queued, "合并那一步排着", timeout=SHARD_ESTIMATE_WAIT_SECONDS)
-    merge = next(child for child in middle["children"] if child["task"].get("role") == "merge")
-    merge_estimate = merge.get("estimated_seconds", "合并那一步没有这一栏")
-    world.resources(local=(50, 50))
-    finished = world.finished(task_id)
-    if plan_estimate != SHARD_PLAN_SECONDS or merge_estimate != SHARD_MERGE_SECONDS or finished["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"计划记过 {SHARD_PLAN_SECONDS} 秒、合并记过 {SHARD_MERGE_SECONDS} 秒：计划排着时预计用时应当是 {SHARD_PLAN_SECONDS}、合并排着时应当是 {SHARD_MERGE_SECONDS}、整件成了，"
-                              f"实际计划 {plan_estimate}、合并 {merge_estimate}、整件 {describe(finished)}", world.server_log_lines())
-    return f"分片的计划排着时报 {SHARD_PLAN_SECONDS} 秒、合并排着时报 {SHARD_MERGE_SECONDS} 秒（各照自己命令键最近一次跑成的用时）"
-
-
-def cell_shard_pieces_estimated_by_own_history(world):
-    """分片的各片照这一片自己命令键最近一次真跑完的用时估（task_server_lib.py 文件头「资源记录」的预计用时；计划那一步不交每片的项，按项估做不到）：两片的命令键里片号不同，
-    第 0 片记过 300 秒、第 1 片记过 900 秒，各记过 20G 的峰值、本机空闲 10G 两片都放不下，计划跑完之后两片都排着，各报自己的 300、900（不混）。再放出来整件成了。
-    弄坏开关 shard-pieces-unestimated 下各片没有预计用时，shard-key-position-folded 下两片落一个键、各报 900，estimate-unreported 下一律没有，这一格红。"""
-    spec = world.write_spec("spec-estimate-pieces.json", {"shards": [{}, {}]})
-    for index, seconds in SHARD_PIECE_SECONDS.items():
-        piece_key = lib.shard_child_key(SHARD_ESTIMATE_KEY, "shard", index, len(SHARD_PIECE_SECONDS))
-        world.seed_peak(piece_key, SHARD_ESTIMATE_PEAK_BYTES)
-        world.seed_duration(piece_key, seconds, spec)
-    world.resources(local=(10, 50))
-    world.start_server()
-    task_id = world.submit(spec, cwd=world.repo, extra={lib.KEY_VARIABLE: SHARD_ESTIMATE_KEY})
-    middle = world.wait_for(task_id, lambda summary: queued_shards(summary) == sorted(SHARD_PIECE_SECONDS), "两片都排着", timeout=SHARD_ESTIMATE_WAIT_SECONDS)
-    found = {index: child.get("estimated_seconds", "这一片没有这一栏") for index, child in shard_children(middle).items()}
-    world.resources(local=(100, 100))
-    finished = world.finished(task_id)
-    if found != SHARD_PIECE_SECONDS or finished["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"两片的命令键里片号不同、各记过 {SHARD_PIECE_SECONDS} 秒：排着时各片预计用时应当是自己的 {SHARD_PIECE_SECONDS}、整件成了，"
-                              f"实际各片 {found}、整件 {describe(finished)}", world.server_log_lines())
-    return f"分片的各片排着时各报自己那一片记过的用时 {SHARD_PIECE_SECONDS}（片号不同的不混）"
-
-
-ROOM_SLICE_GIBIBYTES = 200                    # 插空看排头那两格的台：总上限 200G、余量 2G，可用 198G，界 168.3G
-ROOM_FILLER_CAP_BYTES = 82 * GIBIBYTE         # 那两格先装进组的两条碎片：上限与记账各 82G（峰值是它的三分之二）
-ROOM_FILLER_KEY = "selftest-room-filler"
-ROOM_FILLER_SECONDS = 100                     # 装组的两条记下的用时（比挡路的短）：挡路时长取挡路那条的，不随弄坏开关 blocker-remaining-unbounded 变
-ROOM_WHOLE_KEY = "selftest-room-whole"
-ROOM_BLOCKER_KEY = "selftest-room-blocker"    # 挡路的那条碎片：没记峰值（4G），记下的用时 ROOM_BLOCKER_SECONDS；装进组之后组是 82 + 82 + 4 = 168G，再放一条 4G 就超过界、封组
-ROOM_BLOCKER_SECONDS = 300
-ROOM_PROBE_KEY = "selftest-room-probe"        # 来插空的五条碎片的命令键前缀（第 n 条接 -n，各一个键）：没记峰值（各 4G），第 n 条记下 600 + n 秒的用时（都比挡路的长）
-ROOM_PROBE_SECONDS = 600                      # 一条比一条长一秒：同一轮里刚起的那几条还要跑满自己的用时，后到的比它们长才看得出「超过挡路时长」
-ROOM_PROBE_COUNT = 5
-ROOM_PROBE_BYTES = 4 * GIBIBYTE
-ROOM_WHOLE_ROOMY_BYTES = 170 * GIBIBYTE       # gap-fill-by-room-skips-length 的排头整片：整片之外照样空着的那一份 198 − 170 = 28G，五条都在跑时还剩 8G，五条都放得下
-ROOM_WHOLE_TIGHT_BYTES = 188 * GIBIBYTE       # gap-fill-room-exhausted-checks-length 的排头整片：那一份 198 − 188 = 10G，放得下两条，第三条只剩 2G
-                                              # （挡路的那条与装组的两条是封组之前起的，不减：task_server.py 的 Alternation.gap_fill）
-ROOM_FREE_GIBIBYTES = 40                      # 先装进组的两条跑完之前把本机空闲换成这么多：整片（要的空闲一百多 G）放不下、一直等，碎片放得下
-ROOM_START_WAIT_SECONDS = 30.0
-ROOM_GAP_ADMITTED_TEXT = "不看预计用时"         # task_server.py 的 Alternation.gap_fill 照排头起来之后还剩多少放进去时那一句的结尾
-
-
-def room_gap_world(world, release, filler_release, whole_bytes):
-    """插空看排头那两格的世界（task_server.py 的 Alternation.gap_fill）：一台 200G 上依次交整片（记 whole_bytes）、两条先装进组的碎片（各 82G，记了 100 秒，跑到 filler_release 在了才退）、
-    一条挡路碎片（4G，记了 300 秒，跑到 release 在了才退）、五条来插空的碎片（各 4G，第 n 条记了 600 + n 秒，跑到 release 在了才退）；一齐放出来：整片让一组碎片先起，
-    两条装组的与挡路的起了，组 168G，五条照封组判：整片之外照样空着的那一份（198G − 整片的记账 − 已插进去的）放得下的照内存那一支起（装组的还在跑也起：
-    它们是封组之前起的，整片本来就等它们跑完），放不下的看时长，600 秒起超过挡路的 300 秒，封着。
-    之后本机空闲换成 40G（整片放不下），放行装组的两条、等它们跑完。交 {名: 任务号}（「整片」「挡路」与「插空」五条的列表）。"""
-    world.resources(local=(ROOM_SLICE_GIBIBYTES, ROOM_SLICE_GIBIBYTES), hold=True)
-    world.seed_peak(ROOM_WHOLE_KEY, whole_bytes * 2 // 3)
-    world.seed_peak(ROOM_FILLER_KEY, ROOM_FILLER_CAP_BYTES * 2 // 3)
-    blocker_command = ["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "room-blocker", release]
-    world.seed_duration(ROOM_BLOCKER_KEY, ROOM_BLOCKER_SECONDS, blocker_command)
-    probe_commands = [["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"room-probe-{number}", release] for number in range(ROOM_PROBE_COUNT)]
-    for number, command in enumerate(probe_commands):
-        world.seed_duration(f"{ROOM_PROBE_KEY}-{number}", ROOM_PROBE_SECONDS + number, command)
-    filler_commands = [["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"room-filler-{number}", filler_release] for number in range(2)]
-    for command in filler_commands:
-        world.seed_duration(ROOM_FILLER_KEY, ROOM_FILLER_SECONDS, command)
-    world.start_server()
-    tasks = {"整片": world.submit(["bash", "-c", "exit 0", "room-whole"], extra={lib.KEY_VARIABLE: ROOM_WHOLE_KEY})}
-    tasks["装组"] = [world.submit(command, extra={lib.KEY_VARIABLE: ROOM_FILLER_KEY}) for command in filler_commands]
-    tasks["挡路"] = world.submit(blocker_command, extra={lib.KEY_VARIABLE: ROOM_BLOCKER_KEY})
-    tasks["插空"] = [world.submit(command, extra={lib.KEY_VARIABLE: f"{ROOM_PROBE_KEY}-{number}"}) for number, command in enumerate(probe_commands)]
-    world.resources(local=(ROOM_SLICE_GIBIBYTES, ROOM_SLICE_GIBIBYTES))
-    world.api("POST", "/wake")
-    for task_id in tasks["装组"] + [tasks["挡路"]]:
-        world.running(task_id)
-    world.resources(local=(ROOM_FREE_GIBIBYTES, ROOM_SLICE_GIBIBYTES))
-    world.next_pass()
-    world.next_pass()
-    open(filler_release, "w").close()
-    for task_id in tasks["装组"]:
-        world.finished(task_id)
-    return tasks
-
-
-def room_probe_started(world, task_id):
-    """来插空的那一条在时限里起没起：交 (起了没有, summary)。"""
-    try:
-        return True, world.wait_for(task_id, lambda summary: bool(summary["attempts"]), "插空起来", timeout=ROOM_START_WAIT_SECONDS)
-    except SelftestFailure:
-        return False, world.summary(task_id)
-
-
-def room_admitted_problem(name, started, summary):
-    note = first_attempt(summary).get("gap_fill") or ""
-    if not started or not note.startswith(GAP_ADMITTED_TEXT) or ROOM_GAP_ADMITTED_TEXT not in note:
-        return f"{name}应当照排头起来之后还剩多少插空起来、gap_fill 写「{ROOM_GAP_ADMITTED_TEXT}」，实际 {describe(summary)}、gap_fill「{note}」、排队原因「{summary.get('waiting_for') or ''}」"
-    return ""
-
-
-def release_room_world(release, filler_release):
-    for path in (release, filler_release):
-        open(path, "w").close()
-
-
-def cell_gap_fill_by_room_skips_length(world):
-    """封着组时不占排头将来要的那部分内存的碎片不看时长（task_server.py 的 Alternation.gap_fill）：排头整片记 170G，五条 4G、记了 600 到 604 秒的碎片先后到，
-    挡路的那条记了 300 秒：整片之外照样空着的那一份（198G − 170G = 28G）五条都放得下，五条都起、尝试记「不看预计用时」，比挡路时长长也照起。
-    弄坏开关 gap-fill-room-ignored 下照改前看时长、一条都不起，sealed-gap-not-backfilled 下一条都不起。"""
-    release, filler_release = os.path.join(world.root, "release-room"), os.path.join(world.root, "release-room-fillers")
-    problems = []
-    try:
-        tasks = room_gap_world(world, release, filler_release, ROOM_WHOLE_ROOMY_BYTES)
-        for number, task_id in enumerate(tasks["插空"]):
-            started, summary = room_probe_started(world, task_id)
-            problem = room_admitted_problem(f"来插空的第 {number} 条", started, summary)
-            problems += [problem] if problem else []
-        whole = world.summary(tasks["整片"])
-        if whole["attempts"]:
-            problems.append(f"整片本机空闲不够、应当一直排着，实际 {describe(whole)}")
-    finally:
-        release_room_world(release, filler_release)
-    if problems:
-        raise SelftestFailure("排头起来之后还放得下的碎片不看时长：" + "；".join(problems), world.server_log_lines())
-    return f"排头整片起来之后照公式还放得下：{ROOM_PROBE_COUNT} 条记了 {ROOM_PROBE_SECONDS} 秒起的碎片都插空起来，不比挡路时长"
-
-
-def cell_gap_fill_room_exhausted_checks_length(world):
-    """封着组时会占排头那部分内存的碎片才看时长（task_server.py 的 Alternation.gap_fill）：排头整片记 188G，整片之外照样空着的那一份（198G − 188G = 10G）只放得下两条 4G 的：
-    前两条不看时长插空起来，第三条起只剩 2G，照预计用时比挡路时长：602 秒起超过挡路时长（前两条刚起，还要跑满它们的 600、601 秒），封着，排队原因写超过挡路时长与排头起来之后只剩多少。
-    弄坏开关 sealed-gap-length-ignored 下第三条起也照起，gap-fill-room-ignored 下前两条也看时长、不起，sealed-gap-not-backfilled 下一条都不起，
-    gap-fill-room-counts-all-running 下照改前连挡路的 4G 一起减、只放得下一条。"""
-    release, filler_release = os.path.join(world.root, "release-room"), os.path.join(world.root, "release-room-fillers")
-    problems = []
-    try:
-        tasks = room_gap_world(world, release, filler_release, ROOM_WHOLE_TIGHT_BYTES)
-        for number, task_id in enumerate(tasks["插空"][:2]):
-            started, summary = room_probe_started(world, task_id)
-            problem = room_admitted_problem(f"来插空的第 {number} 条", started, summary)
-            problems += [problem] if problem else []
-        world.next_pass()
-        world.next_pass()
-        for number, task_id in enumerate(tasks["插空"][2:], start=2):
-            summary = world.summary(task_id)
-            reason = summary.get("waiting_for") or ""
-            refusal = f"{GAP_REFUSED_TEXT}这一条预计用时 {ROOM_PROBE_SECONDS + number:.1f} 秒，超过挡路时长"
-            if summary["attempts"] or refusal not in reason or "放不下这一条的" not in reason:
-                problems.append(f"来插空的第 {number} 条照公式已放不下、应当看时长而封着，排队原因带「{refusal}」与排头起来之后放不下的那一句，"
-                                f"实际尝试 {len(summary['attempts'])} 次、排队原因「{reason}」")
-    finally:
-        release_room_world(release, filler_release)
-    if problems:
-        raise SelftestFailure("排头起来之后放不下的碎片看时长：" + "；".join(problems), world.server_log_lines())
-    return f"排头整片起来之后照公式只放得下两条：前两条不看时长插空起来，第三条起看时长、{ROOM_PROBE_SECONDS + 2} 秒起超过挡路时长封着"
+        raise SelftestFailure("报满次数之后按号停：" + "；".join(problems), world.server_log_lines())
+    return "认得出发起会话的报两次之后被按号停掉、那个会话收到一条；认不出的直接终止、不发消息；不碰的三类都还在"
 
 
 def cell_margin_measured_per_host(world):
-    """余量按台现量（task_server.py 文件头 ②「余量」）：本机此刻余量 1G、第二台 3G，两台 slice 总上限都是 50G：记录峰值 40G（上限 60G）的那一条
-    在本机起上限与记账是 50G 减 1G（PER_HOST_LOCAL_CAP_TEXT）；本机放不下时在第二台起上限与记账是 50G 减 3G（PER_HOST_PEER_CAP_TEXT）。
-    弄坏开关 margin-local-for-both 下第二台也减本机的 1G；booked-up-to-slice-total 下两台的记账都不减（judge_host 另把上限收到总上限减余量，只看上限分不出）。"""
+    """余量按台现量（task_server.py 文件头 ②「余量」；host_capacity、host_margin）：两台 slice 总上限都是 50G，记录峰值 48G 的那一条上限与记账都是 49152M
+    （近五次最大，不乘 1.5），它只在余量不大于 2G 的台上装得下。只有本机、本机余量 1G（可用上限 49G）：在本机起、跑完；
+    本机余量 3G（可用上限 47G，峰值本身就装不下）、第二台余量 1G（49G）：派第二台、跑完。
+    弄坏开关 margin-local-for-both 下第二台也减本机的 3G、两台都比峰值小，照收到的 47G 起跑（上限不是 49152M）；booked-up-to-slice-total 下两台都不减余量、本机装得下、起在本机，这一格红。"""
     key = "selftest-margin-per-host"
-    world.seed_peak(key, 40 * GIBIBYTE)
-    world.resources(local=(100, 50), local_margin=PER_HOST_LOCAL_MARGIN_GIBIBYTES)   # 只有本机：在本机起
+    world.seed_peak(key, PER_HOST_PEAK_BYTES)
+    world.resources(local=(100, 50), local_margin=PER_HOST_SMALL_MARGIN_GIBIBYTES)
     world.start_server()
     problems = []
-    summary = world.finished(world.submit(["bash", "-c", "exit 0", "margin-per-host-local"], extra={lib.KEY_VARIABLE: key}))
-    attempt = first_attempt(summary)
-    if (attempt.get("host") != "local" or attempt.get("memory_cap_text") != PER_HOST_LOCAL_CAP_TEXT or attempt.get("booked") != PER_HOST_LOCAL_CAP_BYTES
-            or summary["task"].get("outcome") != "succeeded"):
-        problems.append(f"本机余量 {PER_HOST_LOCAL_MARGIN_GIBIBYTES}G：应当在本机起、上限与记账 {PER_HOST_LOCAL_CAP_TEXT}（50G 减 1G）、跑完，"
-                        f"实际台 {attempt.get('host')}、记账 {attempt.get('booked')} 字节、{describe(summary)}")
-    world.resources(local=(1, 50), peer=(100, 50), peer_cap_gibibytes=64, local_margin=PER_HOST_LOCAL_MARGIN_GIBIBYTES, peer_margin=PER_HOST_PEER_MARGIN_GIBIBYTES)
-    summary = world.finished(world.submit(["bash", "-c", "exit 0", "margin-per-host-peer"], extra={lib.KEY_VARIABLE: key}), timeout=PLACEMENT_WAIT_SECONDS)
-    attempt = first_attempt(summary)
-    if (attempt.get("host") != "peer" or attempt.get("memory_cap_text") != PER_HOST_PEER_CAP_TEXT or attempt.get("booked") != PER_HOST_PEER_CAP_BYTES
-            or summary["task"].get("outcome") != "succeeded"):
-        problems.append(f"本机只空 1G、第二台余量 {PER_HOST_PEER_MARGIN_GIBIBYTES}G：应当在第二台起、上限与记账 {PER_HOST_PEER_CAP_TEXT}（50G 减 3G，不是减本机的 1G）、跑完，"
-                        f"实际台 {attempt.get('host')}、记账 {attempt.get('booked')} 字节、{describe(summary)}")
+    scenarios = (("只有本机、本机余量 1G", "local", {"local": (100, 50), "local_margin": PER_HOST_SMALL_MARGIN_GIBIBYTES}),
+                 ("本机余量 3G、第二台余量 1G", "peer", {"local": (100, 50), "peer": (100, 50), "peer_cap_gibibytes": 50,
+                                                      "local_margin": PER_HOST_LARGE_MARGIN_GIBIBYTES, "peer_margin": PER_HOST_SMALL_MARGIN_GIBIBYTES}))
+    for what, host, scenario in scenarios:
+        world.resources(**scenario)
+        summary = world.finished(world.submit(["bash", "-c", "exit 0", f"margin-per-host-{host}"], extra={lib.KEY_VARIABLE: key}), timeout=PLACEMENT_WAIT_SECONDS)
+        attempt = first_attempt(summary)
+        if (attempt.get("host") != host or attempt.get("memory_cap_text") != PER_HOST_CAP_TEXT or attempt.get("booked") != PER_HOST_PEAK_BYTES
+                or summary["task"].get("outcome") != "succeeded"):
+            problems.append(f"{what}：应当在{lib.HOST_NAMES.get(host, host)}起、上限与记账 {PER_HOST_CAP_TEXT}、跑完，"
+                            f"实际台 {attempt.get('host')}、记账 {attempt.get('booked')} 字节、{describe(summary)}")
     if problems:
         raise SelftestFailure("余量按台：" + "；".join(problems), world.server_log_lines())
-    return f"本机余量 1G、第二台 3G：同一条在本机起上限 {PER_HOST_LOCAL_CAP_TEXT}、在第二台起上限 {PER_HOST_PEER_CAP_TEXT}，各用各的"
+    return f"峰值 48G 的那一条：余量 1G 的本机起得来；本机余量 3G 装不下时派余量 1G 的第二台，上限都是 {PER_HOST_CAP_TEXT}，两台各用各的余量"
 
 
 def cell_margin_unmeasured_not_placed(world):
@@ -6275,10 +5446,10 @@ def cell_pin_cap_refused_within_margin(world):
     return "那一项不比余量大时 control pin-cap 当场拒、没钉；已钉的命令配置改小到不比余量大之后不派、记 run-condition-unmet"
 
 
-# peer-booked-like-local：峰值 13653M 乘 1.5 按 MiB 向上取整是 20480M（20G）；在跑的每条此刻回收不掉 1G；两台都是 slice 50G、余量 1G、空闲 40G
-BOTH_HOSTS_PEAK_BYTES = 13653 * MEBIBYTE
+# peer-booked-like-local：峰值 20480M（20G），上限与记账照它；在跑的每条此刻回收不掉 1G；两台都是 slice 50G、余量 1G、空闲 40G
+BOTH_HOSTS_PEAK_BYTES = 20480 * MEBIBYTE
 BOTH_HOSTS_CAP_TEXT = "20480M"
-BOTH_HOSTS_USED_BYTES = GIBIBYTE
+BOTH_HOSTS_USED_BYTES = 19 * GIBIBYTE   # 在跑的六条各自此刻回收不掉的：记账照它记 19G（task_server.py 的 running_booking）
 BOTH_HOSTS_RELEASE = "release-both-hosts"   # 相对假仓根：本机那几条在 world.repo 里等它，假第二台照 fake-peer-wait 等同一个名字
 SELFTEST_TIGHT_MARGIN_GIBIBYTES = 1         # 这几格两台此刻的余量（两台相同：margin-local-for-both 下第二台读本机那一项，判定不变）
 
@@ -6302,10 +5473,10 @@ def occupy_hosts(world, command, key, hosts_running):
 
 
 def cell_peer_booked_like_local(world):
-    """第二台与本机同一段（task_server.py 文件头 ②「内存」的准入按上限记账）：两台各三条在跑、各上限 20G、各自此刻回收不掉 1G（两台都照那一台报告里 label
-    对得上的那个 scope）；两台都是 slice 50G、余量 1G、空闲 40G、进程用 3G：在跑的每条记 19G 待涨量，第四条 20G
-    （要的空闲约 14.3G：预测 13653M 加余量 1G）两台都放不下（每台上限之和 60G 加它超过总上限减余量 49G），排两轮之后照排着、排队原因两台都写。放行之后第四条照起、跑完。
-    弄坏开关 server-pending-ignored 下在跑的不记待涨量：第四条放得下、起了。"""
+    """第二台与本机同一段（task_server.py 文件头 ②「内存」的在跑记账）：两台各三条在跑、各上限 20G、各自此刻回收不掉 19G（两台都照那一台报告里 label
+    对得上的那个 scope；记账 = min(上限, 用量) = 19G）；两台都是 slice 50G、余量 1G、空闲 40G、进程用 3G：每台待涨量 0，第四条 20G
+    两台都放不下（每台记账之和 57G 加它超过总上限减余量 49G），排两轮之后照排着、排队原因两台都写。放行之后第四条照起、跑完。
+    挡住第四条的是公式（记账之和），不经待涨量：弄坏开关 server-pending-ignored 下判法不变，这一格不配它。"""
     world.seed_peak("selftest-both-hosts", BOTH_HOSTS_PEAK_BYTES)
     world.resources(local=(100, 100), local_margin=SELFTEST_TIGHT_MARGIN_GIBIBYTES)
     world.start_server()
@@ -6327,7 +5498,7 @@ def cell_peer_booked_like_local(world):
         waiting = world.summary(fourth)
         reason = waiting.get("waiting_for") or ""
         if waiting["task"].get("state") != "queued" or waiting["attempts"] or "本机：" not in reason or "第二台：" not in reason:
-            problems.append(f"两台各三条 20G 在跑（各用 1G）、slice 50G、余量 1G：第四条 20G 两台都放不下，应当排着、排队原因两台都写；"
+            problems.append(f"两台各三条 20G 在跑（各用 19G）、slice 50G、余量 1G：第四条 20G 两台都放不下，应当排着、排队原因两台都写；"
                             f"实际状态 {waiting['task'].get('state')}、{describe(waiting)}、排队原因「{reason[:300]}」")
     finally:
         open(os.path.join(world.repo, BOTH_HOSTS_RELEASE), "w").close()
@@ -6336,25 +5507,29 @@ def cell_peer_booked_like_local(world):
         problems.append(f"放行之后七条都应当跑完，实际 {[describe(summary) for summary in summaries]}")
     if problems:
         raise SelftestFailure("两台同一个口径：" + "；".join(problems), world.server_log_lines())
-    return "两台各三条 20G 在跑、各用 1G：第二台照报告里的 scope 记待涨量、同本机，第四条 20G 两台都排着；放行之后跑完"
+    return "两台各三条 20G 在跑、各用 19G：第二台照报告里的 scope 记账（实测 19G），同本机，第四条 20G 两台都排着；放行之后跑完"
 
 
-# peer-scope-missing-booked-at-cap：峰值 10G，上限与记账 15G（15360M）；报告里那条 scope 此刻回收不掉 6G
-MISSING_SCOPE_PEAK_BYTES = 10 * GIBIBYTE
+# peer-scope-missing-booked-at-cap：记录的峰值 5G；内存上限的下限（TASK_SERVER_SELFTEST_MEMORY_FLOOR_BYTES）15G 把上限与新起的记账抬到 15G（15360M）；
+# 报告里那条 scope 此刻回收不掉 3G
+MISSING_SCOPE_PEAK_BYTES = 5 * GIBIBYTE
+MISSING_SCOPE_FLOOR_BYTES = 15 * GIBIBYTE
 MISSING_SCOPE_CAP_TEXT = "15360M"
-MISSING_SCOPE_USED_BYTES = 6 * GIBIBYTE
+MISSING_SCOPE_USED_BYTES = 3 * GIBIBYTE
 MISSING_SCOPE_RELEASE = "release-missing-scope"
 
 
 def cell_peer_scope_missing_booked_at_cap(world):
-    """第二台报告里缺某条在跑尝试的 scope（还没起来、读不了）：那一条记整份上限，不记 0（task_server.py 的 server_pending）。只派第二台（本机总上限 1G 不比余量 1G 大）。
-    第二台 slice 50G、余量 1G、空闲 30G，两条在跑各上限 15G：报告里只有其中一条的 scope（回收不掉 6G、进程用 6G）时待涨量 9G + 15G、空闲剩 6G，
-    第三条 15G（要的空闲 11G：预测 10G 加余量 1G）放不下、排两轮照排着（缺的记 0 的写法下待涨量 9G、空闲剩 21G，放得下）；
-    报告补上另一条的 scope（也是 6G、进程共用 12G）之后待涨量 9G + 9G、空闲剩 12G、slice 减余量剩 19G：第三条放得下、起在第二台（一律记整份上限的写法下待涨量 30G，照样放不下）。
+    """第二台报告里缺某条在跑尝试的 scope（还没起来、读不了）：那一条记整份上限，不记 0；有 scope 的照实测记、不记上限（task_server.py 的 server_pending、
+    running_booking）。只派第二台（本机总上限 1G 不比余量 1G 大）。三条同一把键：记录的峰值 5G，内存上限的下限 15G 把上限与新起的记账抬到 15G（实测比上限小，才分得出记实测与记上限）。
+    第二台 slice 50G、余量 1G、空闲 20G，两条在跑各上限 15G：报告里只有其中一条的 scope（回收不掉 3G、进程用 3G；记实测 3G）时待涨量 0 + 15G、空闲剩 3G，
+    第三条（要的空闲 6G：预测 5G 加余量 1G；记账 15G）放不下、排两轮照排着（缺的记 0 的写法下待涨量 2G、空闲剩 18G，放得下）；
+    报告补上另一条的 scope（也是 3G、进程共用 6G）之后两条各记 5G、待涨量 2G + 2G、空闲剩 16G、slice 减余量减待涨量剩 39G、公式剩 39G：第三条放得下、起在第二台
+    （有 scope 的也记上限的写法下待涨量 12G + 12G、空闲剩不下，照样放不下；弄坏开关 running-booked-at-cap 下就是这样）。
     弄坏开关 server-pending-ignored 下在跑的不记待涨量：头一段第三条就起了。"""
     world.seed_peak("selftest-missing-scope", MISSING_SCOPE_PEAK_BYTES)
     world.resources(local=(1, 1), local_margin=SELFTEST_TIGHT_MARGIN_GIBIBYTES)
-    world.start_server()
+    world.start_server(extra={lib.MEMORY_FLOOR_VARIABLE: str(MISSING_SCOPE_FLOOR_BYTES)})
     command = ["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "missing-scope", MISSING_SCOPE_RELEASE, f"fake-peer-wait={MISSING_SCOPE_RELEASE}"]
     problems = []
     third = None
@@ -6364,20 +5539,20 @@ def cell_peer_scope_missing_booked_at_cap(world):
         caps = [first_attempt(world.summary(task_id)).get("memory_cap_text") for task_id in started]
         if caps != [MISSING_SCOPE_CAP_TEXT] * 2 or not all(labels):
             problems.append(f"占着第二台的两条应当各上限 {MISSING_SCOPE_CAP_TEXT}、都有 label，实际上限 {caps}、label {labels}")
-        scenario = {"local": (1, 1), "local_margin": SELFTEST_TIGHT_MARGIN_GIBIBYTES, "peer": (30, 50), "peer_cap_gibibytes": 50,
+        scenario = {"local": (1, 1), "local_margin": SELFTEST_TIGHT_MARGIN_GIBIBYTES, "peer": (20, 50), "peer_cap_gibibytes": 50,
                     "peer_margin": SELFTEST_TIGHT_MARGIN_GIBIBYTES}
-        world.resources(**scenario, peer_slice_used=6, peer_scopes={labels[0]: MISSING_SCOPE_USED_BYTES})
+        world.resources(**scenario, peer_slice_used=3, peer_scopes={labels[0]: MISSING_SCOPE_USED_BYTES})
         third = world.submit(["bash", "-c", "exit 0", "missing-scope-third", "fake-peer-run"], extra={lib.KEY_VARIABLE: "selftest-missing-scope"}, cwd=world.repo)
         world.next_pass()
         world.next_pass()
         waiting = world.summary(third)
         if waiting["task"].get("state") != "queued" or waiting["attempts"]:
-            problems.append(f"报告里缺一条在跑的 scope：那一条应当记整份上限 15G，第三条放不下、排着；实际状态 {waiting['task'].get('state')}、{describe(waiting)}、"
+            problems.append(f"报告里缺一条在跑的 scope：那一条应当记整份上限 15G（有 scope 的那一条记实测 3G），第三条放不下、排着；实际状态 {waiting['task'].get('state')}、{describe(waiting)}、"
                             f"排队原因「{(waiting.get('waiting_for') or '')[:300]}」")
-        world.resources(**scenario, peer_slice_used=12, peer_scopes={label: MISSING_SCOPE_USED_BYTES for label in labels})
+        world.resources(**scenario, peer_slice_used=6, peer_scopes={label: MISSING_SCOPE_USED_BYTES for label in labels})
         placed = world.wait_for(third, lambda found: bool(found["attempts"]) or found["task"].get("state") != "queued", "照补上的 scope 起来")
         if first_attempt(placed).get("host") != "peer":
-            problems.append(f"报告补上那一条的 scope 之后第三条应当起在第二台（待涨量 18G），实际 {describe(placed)}、排队原因「{(placed.get('waiting_for') or '')[:300]}」")
+            problems.append(f"报告补上那一条的 scope 之后两条各记实测 3G、不记上限，第三条应当起在第二台（待涨量 0），实际 {describe(placed)}、排队原因「{(placed.get('waiting_for') or '')[:300]}」")
     finally:
         open(os.path.join(world.repo, MISSING_SCOPE_RELEASE), "w").close()
     summaries = [world.finished(task_id, timeout=120) for task_id in [*started, third]] if not problems else []
@@ -6385,11 +5560,11 @@ def cell_peer_scope_missing_booked_at_cap(world):
         problems.append(f"放行之后三条都应当跑完，实际 {[describe(summary) for summary in summaries]}")
     if problems:
         raise SelftestFailure("第二台缺 scope 的记整份上限：" + "；".join(problems), world.server_log_lines())
-    return "第二台报告里缺一条在跑的 scope 时那一条记整份上限、第三条排着；补上之后照「上限 − 用量」记、第三条起在第二台"
+    return "第二台报告里缺一条在跑的 scope 时那一条记整份上限 15G、第三条排着；补上之后两条各记实测 3G（不记上限）、第三条起在第二台"
 
 
-# two-hosts-booked-within-capacity：三种各四条（峰值 10G 记 15G、峰值 6G 记 9G、没记录的记 4G，合计 112G）交给两台各 slice 50G、余量 1G（各能记 49G）
-INVARIANT_KINDS = (("selftest-invariant-large", 10 * GIBIBYTE), ("selftest-invariant-medium", 6 * GIBIBYTE), ("selftest-invariant-small", None))
+# two-hosts-booked-within-capacity：三种各四条（上限与记账等于记录的峰值：15G、9G，没记录的记 4G，合计 112G）交给两台各 slice 50G、余量 1G（各能记 49G）
+INVARIANT_KINDS = (("selftest-invariant-large", 15 * GIBIBYTE), ("selftest-invariant-medium", 9 * GIBIBYTE), ("selftest-invariant-small", None))
 INVARIANT_COUNT_PER_KIND = 4
 INVARIANT_FILL_PASSES = 6      # 放出来之后看几轮（第二台每轮至多起 PEER_STARTS_PER_PASS 条：12 条几轮里就起到装不下为止）
 INVARIANT_DRAIN_PASSES = 40    # 每放行一批之后至多看几轮：在排的起完了就不再看（一轮 0.1 秒，放行的那几条收尾、在排的接着起都在这里面）
@@ -6410,7 +5585,8 @@ def cell_two_hosts_booked_within_capacity(world):
     """总的不变量（task_server_lib.py 文件头「资源记录」的准入按上限记账）：两台各 slice 50G、余量 1G，12 条合计要记 112G、两台一齐放出来跑一段排队，
     分两批放行：每一轮之后读库，每台在起、在跑的尝试的上限之和都不超过那台总上限减余量 49G（这一格的任务峰值都装得下，没有「峰值本身装不下」的那一种例外）；
     装不下的排着，排过的里有一轮还有在排的，两台都分到，放行之后都跑完。第二台在跑的待涨量照报告里的 scope（这一格的报告不报 scope：记整份上限）。
-    弄坏开关 server-pending-ignored 下在跑的不记待涨量，一轮轮接着起、上限之和超过 49G。"""
+    这一格封顶的是公式（verdict_within_the_formula：总上限减余量减在跑的记账之和），不经待涨量（server_pending）：报告的空闲（200G）与 slice 余量（50G）不随在跑的涨落，
+    弄坏开关 server-pending-ignored 下上限之和照样不超过 49G，这个开关不在这一格判红（它红在待涨量与均衡挑台那几格，开关表在 task_server_lib.py 文件头）。"""
     for key, peak in INVARIANT_KINDS:
         if peak is not None:
             world.seed_peak(key, peak)
@@ -6487,49 +5663,12 @@ def cell_judge_error_skips_only_that_task(world):
     return "一条判不了只跳过它（排着、写明判不了），后面那条照起跑完"
 
 
-EXPLICIT_WAIT_HELD_FRAGMENTS = 3   # explicit-wait-not-starved：一台 20G（可用上限 18G、界 15.3G）上先占着的碎片条数（各记 4G，三条 12G 装进一组）
-
-
-def cell_explicit_wait_not_starved(world):
-    """排头在等交替封组（内存上放得下）：/health 一直回 ok，不当成「放得下却没起」；腾空之后照起跑完（task_server.py 的 starved_problem 只读派活给排头的结论、
-    不认排队原因里的字样；任务 2365 那样排头在等一件 /health 不认得的事，合入锁现在不认了，交替封组是同一种：派活判它不能起）。
-    看进展（progress_problem）同样不报：这台封着组、服务在这台还有在跑的，碎片照交替等腾空。
-    弄坏开关 health-head-judged-apart、health-judges-head 下另判只看内存、blocked-head-counted-as-starved 下判不能起也算，progress-gates-ignored 下看进展不看封组，这一格红。
-    一台 20G：三条碎片（没记录、各记 4G）占着装进一组，第四条碎片再放就超过界、又有一条整片（峰值 12G，上限与记账 18G）在等：封组，第四条排着、
-    排队原因带「在等这台腾空」；它是排头、内存上放得下（空闲 8G）。"""
-    world.resources(local=(20, 20), hold=True)
-    world.seed_peak("selftest-explicit-wait-whole", 12 * GIBIBYTE)
-    world.start_server()
-    release = os.path.join(world.root, "release-explicit-wait")
-    held = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"held-{number}", release]) for number in range(EXPLICIT_WAIT_HELD_FRAGMENTS)]
-    head = world.submit(["bash", "-c", "exit 0", "fragment-after-group"])
-    whole = world.submit(["bash", "-c", "exit 0", "whole"], extra={lib.KEY_VARIABLE: "selftest-explicit-wait-whole"})
-    world.resources(local=(20, 20))   # 一齐放出来
-    world.api("POST", "/wake")
-    try:
-        summary = world.wait_for(head, lambda found: "在等这台腾空" in (found.get("waiting_for") or "") or found["task"].get("state") != "queued",
-                                 "报在等这台腾空", timeout=PLACEMENT_WAIT_SECONDS)
-        health = health_until(world, lambda found: not found.get("ok"), 4 * SERVER.FAST_STARVED_SECONDS)
-    finally:
-        open(release, "w").close()
-    finished = {task_id: world.finished(task_id, timeout=120) for task_id in [*held, head, whole]}
-    problems = []
-    if summary["task"].get("state") != "queued" or "在等这台腾空" not in (summary.get("waiting_for") or ""):
-        problems.append(f"三条碎片占着一组、整片在等时第四条碎片应当排着、排队原因带「在等这台腾空」，实际 {describe(summary)}、在等「{summary.get('waiting_for')}」")
-    if not health.get("ok"):
-        problems.append(f"排头在等交替封组时 /health 应当一直回 ok，实际 {health}")
-    failed = [describe(found) for found in finished.values() if found["task"].get("outcome") != "succeeded"]
-    if failed:
-        problems.append(f"腾空之后都应当跑完，实际没成的 {failed}")
-    if problems:
-        raise SelftestFailure("排头在等明确的事：" + "；".join(problems), world.server_log_lines())
-    return "排头在等交替封组（在等这台腾空）时 /health 一直回 ok，腾空之后都跑完"
-
-
 def cell_selftest_variables_refused(world):
     outside = {name: value for name, value in world.client_environment.items() if name != lib.SELFTEST_MARK_VARIABLE}
     outside[lib.BREAK_VARIABLE] = "exit-code-dropped"
-    for script, arguments in ((lib.CLIENT_SCRIPT, ["status"]), (lib.CONTROL_SCRIPT, ["check"]), (lib.SERVER_SCRIPT, ["serve"])):
+    for script in (lib.CLIENT_SCRIPT, lib.CONTROL_SCRIPT, lib.SERVER_SCRIPT):
+        # 参数从表里取（折不出）：闭包把三份脚本整份连进来，各格经 World.client 起它们时走的是 bash 的 "$@"，闭包不沿那一条认脚本
+        arguments = {lib.CLIENT_SCRIPT: ["status"], lib.CONTROL_SCRIPT: ["check"], lib.SERVER_SCRIPT: ["serve"]}[script]
         completed = subprocess.run([sys.executable, "-B", script, *arguments], env=outside, cwd=world.work, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                                    timeout=60)
         if completed.returncode != 2 or "只在自证" not in completed.stderr:
@@ -6654,11 +5793,9 @@ def cell_peer_unavailable_alerted(world):
 REASON_LIVE_CASES = (   # reason-line-per-type 经 task wait 真跑的几种：(类型, 命令, 环境)
     ("command-failed", ["bash", "-c", "echo selftest-reason-last-line; exit 3"], {}),
     ("squeezed-out", ["bash", "-c", "exit 0", "fake-wrapper-exits=254"], {}),
-    ("gpu-memory-short", ["bash", "-c", "exit 0", "fake-wrapper-exits=245"], {}),
     ("timed-out", ["bash", "-c", "exit 0", "fake-wrapper-exits=253"], {}),
     ("run-condition-unmet", ["bash", "-c", "echo selftest-reason-unmet; exit 78"], {}),
     ("not-run", ["bash", "-c", "exit 77"], {}),
-    ("never-fits", ["bash", "-c", "exit 0"], {lib.KEY_VARIABLE: "selftest-reason-never-fits"}),
 )
 
 
@@ -6682,15 +5819,14 @@ def cell_reason_line_per_type(world):
     extra_types = sorted(set(lib.OUTCOME_TYPES) ^ set(lib.REASON_ELEMENTS))
     if extra_types:
         problems.append(f"错误类型表与 REASON_ELEMENTS 对不上：{extra_types}")
-    log_text = "GPU_QUIESCE step=quiesce result=selftest-quiesced\nMULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no\nselftest-last-line\n"
+    log_text = "MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=0 read=no\nselftest-last-line\n"
     for outcome in lib.OUTCOME_TYPES:
         task = {"id": 1, "outcome": outcome, "exit_code": lib.final_exit_code(outcome, 3), "note": f"自证造的说明（{outcome}）", "maximum_host": "local",
                 "maximum_cap_text": "46080M", "outcome_counts": {outcome: 2}}
-        attempt = {"number": 1, "host": "local", "memory_cap_text": "2048M", "memory_peak": 2 * GIBIBYTE, "card": LOCAL_CARD_ZERO, "unit": "singlefs-task-selftest.service",
+        attempt = {"number": 1, "host": "local", "memory_cap_text": "2048M", "memory_peak": 2 * GIBIBYTE, "unit": "singlefs-task-selftest.service",
                    "squeezed_by": "任务 2（上限 4096M）"}
         problems += reason_problems(lib.reason_line(task, [attempt], log_text), outcome)
     world.resources(local=(100, 100))
-    world.seed_peak("selftest-reason-never-fits", 150 * GIBIBYTE)
     world.start_server()
     submitted = [(outcome, world.submit(command, extra=extra)) for outcome, command, extra in REASON_LIVE_CASES]
     for outcome, task_id in submitted:
@@ -6894,8 +6030,9 @@ def cell_sharded_cancel_retried(world):
 
 
 def cell_association_column_verified(world):
-    """TS-05：只改库里一行尝试的 task_id 列（正文与签名不动），把任务 A 的尝试挂到任务 B 名下：B 的记录读回时那一行校验不过，取消 B 回不了 stopped、
-    A 与 B 的单元都不停；只改一个子任务的 task_id 列把它挂到另一件分片名下：取消那一件同样不停任何单元。"""
+    """TS-05：只改库里一行尝试的 task_id 列（正文与签名不动），把任务 A 的尝试挂到任务 B 名下：B 的记录读回时那一行校验不过（对账判出之后照正文挂回 A、记 ended、单元由对账停），
+    取消 B 回不了 stopped；只改一个子任务的 task_id 列把它挂到另一件分片名下：取消那一件时对账还没判出的整件回 409、它自己的片不停，
+    判出之后那一行照正文挂回原来那一件（核得过、记 record-tampered、挂过来那一片的单元由对账停），取消只停那一件自己的片。"""
     releases = [os.path.join(world.root, f"release-association-{index}") for index in range(4)]
     world.start_server()
     problems = []
@@ -6908,11 +6045,16 @@ def cell_association_column_verified(world):
         raw_column_update(world, "attempts", other, owner_summary["attempts"][0]["id"])
         cancelled = world.client(["cancel", str(other)])
         listed = world.summary(other)["attempts"]
-        if cancelled.returncode == 0 or not world.unit_active(owner_unit) or not world.unit_active(other_unit):
-            problems.append(f"尝试的 task_id 列改到任务 {other} 名下：取消 {other} 应当不退 0、一个单元都不停，实际退 {cancelled.returncode}、"
-                            f"{owner} 的单元{'在跑' if world.unit_active(owner_unit) else '停了'}、{other} 的单元{'在跑' if world.unit_active(other_unit) else '停了'}")
-        if not any(attempt.get("id") == owner_summary["attempts"][0]["id"] and attempt.get("valid") is False for attempt in listed):
-            problems.append(f"任务 {other} 名下读回的那一行（正文是任务 {owner} 的）应当校验不过，实际 {[(attempt.get('id'), attempt.get('valid')) for attempt in listed]}")
+        if cancelled.returncode == 0:
+            problems.append(f"尝试的 task_id 列改到任务 {other} 名下：取消 {other} 应当不退 0，实际退 {cancelled.returncode}")
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        while patience.waiting() and (world.unit_active(owner_unit) or world.unit_active(other_unit)):
+            time.sleep(POLL_SECONDS)
+        if world.unit_active(owner_unit) or world.unit_active(other_unit):
+            problems.append(f"关联列被改的两次尝试的单元应当由对账停掉，实际 {owner} 的单元{'在跑' if world.unit_active(owner_unit) else '停了'}、{other} 的单元{'在跑' if world.unit_active(other_unit) else '停了'}")
+        if any(attempt.get("id") == owner_summary["attempts"][0]["id"] and attempt.get("valid") is not False for attempt in listed):
+            problems.append(f"任务 {other} 名下读回的那一行（正文是任务 {owner} 的）应当校验不过（或已被对账挂回 {owner}、不在 {other} 名下），"
+                            f"实际 {[(attempt.get('id'), attempt.get('valid')) for attempt in listed]}")
         first = world.submit(world.write_spec("spec-association-first.json", {"shards": [{"block": releases[2]}]}), cwd=world.repo)
         second = world.submit(world.write_spec("spec-association-second.json", {"shards": [{"block": releases[3]}]}), cwd=world.repo)
         running = lambda summary: len(shard_children(summary)) == 1 and any(attempt.get("state") == "running" for child in shard_children(summary).values()
@@ -6922,15 +6064,17 @@ def cell_association_column_verified(world):
         raw_column_update(world, "tasks", second, first_child["task"]["id"])
         cancelled = world.client(["cancel", str(second)])
         units = [first_child["attempts"][-1].get("unit", ""), second_child["attempts"][-1].get("unit", "")]
-        if cancelled.returncode == 0 or not all(world.unit_active(unit) for unit in units):
-            problems.append(f"子任务 {first_child['task']['id']} 的 task_id 列改到分片的任务 {second} 名下：取消 {second} 应当不退 0、两片的单元都不停，"
-                            f"实际退 {cancelled.returncode}、在跑的单元 {[unit for unit in units if world.unit_active(unit)]}")
+        _, repaired, column = verified_row(world, "tasks", first_child["task"]["id"])
+        if (cancelled.returncode == 0 and not (repaired and column == first)) or (cancelled.returncode != 0 and not world.unit_active(units[1])):
+            problems.append(f"子任务 {first_child['task']['id']} 的 task_id 列改到分片的任务 {second} 名下：没判出时整件不退 0、"
+                            f"它自己的片不停，判出之后那一行挂回 {first}、核得过，实际退 {cancelled.returncode}、在跑的单元 {[unit for unit in units if world.unit_active(unit)]}、"
+                            f"那一行核{'得过' if repaired else '不过'}、关联列 {column}")
     finally:
         for release in releases:
             open(release, "w").close()
     if problems:
         raise SelftestFailure("关联列：" + "；".join(problems), world.server_log_lines())
-    return "只改尝试或子任务的 task_id 列：挂过去的那一行读回校验不过，取消那一件不停任何单元"
+    return "只改尝试或子任务的 task_id 列：挂过去的那一行读回校验不过，取消那一件回不了 stopped，单元由对账停"
 
 
 def cell_start_timeout_read_back(world):
@@ -7053,7 +6197,7 @@ def cell_nfs_automount_recognized(world):
 
 def cell_peer_memory_peak_recorded(world):
     """问题 86：第二台那条命令结束时 multi-host-run.sh 打 MULTI_HOST_RUN_PEER_MEMORY_PEAK bytes=<字节>：那次尝试记下这个峰值，同一命令下一次照它定上限
-    （3G × 1.5 = 4608M）；不打这一行的照旧记「没量到」（null）。"""
+    （近五次最大 3G，3072M，不乘 1.5）；不打这一行的照旧记「没量到」（null）。"""
     world.resources(local=(2, 30), peer=(100, 100), peer_cap_gibibytes=64)   # 本机放不下 4G，只有第二台放得下
     world.start_server()
     key = {lib.KEY_VARIABLE: "selftest-peer-memory"}
@@ -7066,11 +6210,11 @@ def cell_peer_memory_peak_recorded(world):
         problems.append(f"打了那一行的尝试应当在第二台、记峰值 {3 * GIBIBYTE}，实际在 {first.get('host')}、记 {first.get('memory_peak')}")
     if quiet.get("host") != "peer" or quiet.get("memory_peak", "缺这一栏") is not None:
         problems.append(f"没打那一行的应当记「没量到」（null），实际在 {quiet.get('host')}、记 {quiet.get('memory_peak', '缺这一栏')}")
-    if next_one.get("memory_cap_text") != "4608M":
-        problems.append(f"同一命令下一次应当照第二台量到的 3G × 1.5 定上限 4608M，实际 {next_one.get('memory_cap_text')}")
+    if next_one.get("memory_cap_text") != "3072M":
+        problems.append(f"同一命令下一次应当照第二台量到的 3G 定上限 3072M，实际 {next_one.get('memory_cap_text')}")
     if problems:
         raise SelftestFailure("第二台的内存峰值：" + "；".join(problems), world.server_log_lines())
-    return "第二台打了峰值那一行的记下 3G、下一次上限 4608M；不打的记 null"
+    return "第二台打了峰值那一行的记下 3G、下一次上限 3072M；不打的记 null"
 
 
 def cell_prune_server_unavailable_outcome(world):
@@ -7104,7 +6248,7 @@ def cell_prune_server_unavailable_outcome(world):
 
 def cell_temporary_service_wrapper_unwrapped(world):
     """临时 prune-server 的包装（python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary <路径> -- <原命令>）：
-    包着的照原命令算键、--server-binary 的路径不进键（两次包着的给的路径不同，命令键相同、第二次照第一次量到的 300M 定上限 450M）；
+    包着的照原命令算键、--server-binary 的路径不进键（两次包着的给的路径不同，命令键相同、第二次照第一次量到的 300M 定上限 300M）；
     键前面接 TEMPORARY_SERVICE_KEY_MARK，与不包的那一条不共用记录（不包的那次也量到 300M，包着的第一次没有自己的记录、取 4096M）；
     包装本身照旧整条执行（认登记表行同样照原命令认，由 verdict-library-family-refused 判）。"""
     scope = world.write_fake_scope(300 * MEBIBYTE)
@@ -7123,24 +6267,24 @@ def cell_temporary_service_wrapper_unwrapped(world):
     problems = []
     if keys[1] != keys[2] or keys[1] == keys[0] or not keys[1].startswith(lib.TEMPORARY_SERVICE_KEY_MARK):
         problems.append(f"两次包着的应当同一个命令键、以「{lib.TEMPORARY_SERVICE_KEY_MARK}」起头、与不包的不同，实际不包的「{keys[0]}」、包着的「{keys[1]}」与「{keys[2]}」")
-    if caps[1:] != [UNRECORDED_DEFAULT_PINNED_TEXT, "450M"] or any(summary["task"].get("outcome") != "succeeded" for summary in (plain, first, second)):
-        problems.append(f"包着的第一次没有自己的记录应当取 {UNRECORDED_DEFAULT_PINNED_TEXT}（不用不包的那次量到的 300M）、第二次照第一次的 300M 取 450M、都跑完，"
+    if caps[1:] != [UNRECORDED_DEFAULT_PINNED_TEXT, "300M"] or any(summary["task"].get("outcome") != "succeeded" for summary in (plain, first, second)):
+        problems.append(f"包着的第一次没有自己的记录应当取 {UNRECORDED_DEFAULT_PINNED_TEXT}（不用不包的那次量到的 300M）、第二次照第一次的 300M 取 300M、都跑完，"
                         f"实际上限 {caps}、{describe(first)}、{describe(second)}")
     if not all(world.calls_of(summary["task"]["id"], "temporary-service") for summary in (first, second)):
         problems.append("包装本身应当照旧整条执行（假包装记一行），实际没起")
     if problems:
         raise SelftestFailure("临时 prune-server 的包装：" + "；".join(problems), world.server_log_lines())
     return (f"包着的照原命令算键、服务路径不进键、前面接「{lib.TEMPORARY_SERVICE_KEY_MARK}」：与不包的不共用记录（第一次 {UNRECORDED_DEFAULT_PINNED_TEXT}、"
-            "第二次照第一次的 300M 取 450M），包装照旧整条执行")
+            "第二次照第一次的 300M 取 300M），包装照旧整条执行")
 
 
 WRAPPED_SELFTEST_SCRIPT = "scripts/selftest-wrapped-check.sh"   # temporary-service-heavy-refused：包装里照收的那条普通 --selftest 起的假脚本（相对假仓根）
 
 
 def cell_temporary_service_heavy_refused(world):
-    """④ 临时 prune-server 包装里会编或要卡的提交时拒（task_server.py 文件头 ②「提交时拒」④）：包装里套 cargo test（任务 4229 那一条的样子）与
-    带 gpu 特性的 python 入口（E174 那一条）都当场拒（task submit 退 3、不给任务号，说明点名会编或要卡、写明包装只给脚本自证用，出路写去掉包装重交），
-    一条都没进队；包装里普通的 --selftest 照收、包装照旧整条执行、跑完。"""
+    """④ 临时 prune-server 包装里会编的提交时拒（task_server.py 文件头 ②「提交时拒」④）：包装里套 cargo test（任务 4229 那一条的样子）
+    当场拒（task submit 退 3、不给任务号，说明点名会编的 cargo、写明包装只给脚本自证用，出路写去掉包装重交），
+    没进队；包装里普通的 --selftest 照收、包装照旧整条执行、跑完。"""
     world.resources(local=(30, 30))
     world.start_server()
     write_executable(os.path.join(world.repo, WRAPPED_SELFTEST_SCRIPT), "#!/usr/bin/env bash\nexit 0\n")
@@ -7149,9 +6293,8 @@ def cell_temporary_service_heavy_refused(world):
         return ["python3", f"scripts/prune-server/{lib.TEMPORARY_SERVICE_SCRIPT}", lib.TEMPORARY_SERVICE_FLAG, "--server-binary", "/usr/bin/true", "--", *inner]
 
     problems = []
-    refused_cases = (("包装里套 cargo test", wrapped("cargo", "test", "--release", "-p", "singlefs-verification", "--features", "gpu", "--test", "selftest-target",
-                                                 "fake-wrapper-exits=0"), "会编的 cargo"),
-                     ("包装里套带 gpu 特性的 python 入口", wrapped(*E174_COMMAND, "fake-wrapper-exits=0"), "要卡"))
+    refused_cases = (("包装里套 cargo test", wrapped("cargo", "test", "--release", "-p", "singlefs-verification", "--test", "selftest-target",
+                                                 "fake-wrapper-exits=0"), "会编的 cargo"),)
     for name, command, wanted in refused_cases:
         completed = world.client(["submit", "--cwd", world.repo, "--", *command])
         texts = (wanted, "只给脚本自证用", "去掉包装重交")
@@ -7172,8 +6315,8 @@ def cell_temporary_service_heavy_refused(world):
     if listed - set(accepted):
         problems.append(f"拒了的一条都不该进队，实际会话里另列着 {sorted(listed - set(accepted))}")
     if problems:
-        raise SelftestFailure("临时 prune-server 包装里会编或要卡的提交时拒：" + "；".join(problems), world.server_log_lines())
-    return (f"包装里套 cargo test 与带 gpu 特性的 python 入口提交时退 3、说明点名会编或要卡、出路写去掉包装重交；"
+        raise SelftestFailure("临时 prune-server 包装里会编的提交时拒：" + "；".join(problems), world.server_log_lines())
+    return (f"包装里套 cargo test 提交时退 3、说明点名会编的 cargo、出路写去掉包装重交；"
             f"包装里普通的 --selftest 照收、包装照旧整条执行、跑完（{len(refused_cases)} 条拒、{len(accepted)} 条收）")
 
 
@@ -7363,52 +6506,25 @@ def cell_shared_roots_outside_refused(world):
     return f"任务带的 {lib.DATA_ROOT_VARIABLE}、服务的 {lib.WORK_ROOT_VARIABLE} 在共享根外时提交退 3、点名变量与值；都在共享根下的照收、派到第二台跑完"
 
 
-def cell_gpu_binary_declaration_recognized(world):
-    """编出来的二进制按同名源文件头的 // task-server-gpu-arguments: 认要不要卡（task_server_lib.py 的 declared_gpu_binary）：假仓根（TASK_SERVER_FAKE_REPOSITORY_ROOT）
-    crates/ 下写一份 src/bin/selftest_gpu_binary.rs 声明 card-run；<编译目录>/release/selftest_gpu_binary card-run 回显 gpu=1，cpu-run 不要卡，
-    没有同名源的二进制不要卡。"""
-    world.resources(local=(100, 100), cards=LOCAL_CARD_ZERO, local_gpu=[(0, 16384)])
-    world.start_server()
-    source = os.path.join(world.repo, "crates", "selftest-gpu-binary", "src", "bin", "selftest_gpu_binary.rs")
-    os.makedirs(os.path.dirname(source), exist_ok=True)
-    with open(source, "w", encoding="utf-8") as handle:
-        handle.write(f"{lib.DECLARED_BINARY_GPU_ARGUMENTS_MARK} card-run\nfn main() {{}}\n")
-    release = os.path.join(world.work, "selftest-target", "release")
-    cases = (([os.path.join(release, "selftest_gpu_binary"), "card-run"], 1), ([os.path.join(release, "selftest_gpu_binary"), "cpu-run"], 0),
-             ([os.path.join(release, "selftest_undeclared_binary"), "card-run"], 0))
-    problems, submitted = [], []
-    for words, expected in cases:
-        task_id, gpu = submitted_gpu(world, [*words, "fake-wrapper-exits=0"])
-        submitted.append(task_id)
-        if gpu != expected:
-            problems.append(f"{os.path.basename(words[0])} {words[1]} 应当回显 gpu={expected}，实际 gpu={gpu}")
-    for task_id in submitted:
-        world.finished(task_id)
-    if problems:
-        raise SelftestFailure("编出来的二进制按同名源的声明认要卡：" + "；".join(problems), world.server_log_lines())
-    return "同名源声明了 card-run 的二进制带 card-run 回显 gpu=1，带 cpu-run 与没有同名源的二进制回显 gpu=0"
-
-
 NFS_PROBE_READ_DELAY_SECONDS = 8   # nfs-probe-concurrent-runs：头一趟 control check 的第二台读探针那一步先睡这么久，另一趟在这段时间里整个跑完（一趟 control check 一两秒，推的）
 
 
 def cell_nfs_probe_concurrent_runs(world):
-    """两趟 control check 交错跑两向探针（task_server_lib.py 的 nfs_probe）：头一趟写好本机探针、第二台读它之前先睡（假 ssh 的 fake-ssh-read-delay），
+    """两趟 control check --probe 交错跑两向探针（task_server_lib.py 的 nfs_probe）：头一趟写好本机探针、第二台读它之前先睡（假 ssh 的 fake-ssh-read-delay），
     另一趟在这段时间里整个跑完、收尾删自己的探针；头一趟醒来照样读得到它自己写的那一份，两趟都报 NFS 共享过。"""
     world.start_server()
     delay = os.path.join(world.world, "fake-ssh-read-delay")
     with open(delay, "w", encoding="utf-8") as handle:
         handle.write(f"{NFS_PROBE_READ_DELAY_SECONDS}\n")
-    earlier = world.control(["check"], background=True)
+    earlier = world.control(["check", "--probe"], background=True)
     patience = world.patience(STATE_TIMEOUT_SECONDS)
     while not os.path.exists(delay + ".taken") and earlier.poll() is None and patience.waiting():
         time.sleep(POLL_SECONDS)
-    later = world.control(["check"])
+    later = world.control(["check", "--probe"])
     try:
         earlier_output, earlier_error = world.communicate(earlier, STATE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
-        earlier.kill()   # 只停自己起的那一个进程号
-        earlier_output, earlier_error = earlier.communicate(timeout=10)
+        earlier_output, earlier_error = world.stop_client(earlier)
     problems = []
     if not os.path.exists(delay + ".taken"):
         problems.append("头一趟 control check 的第二台没读到探针就收尾了（假 ssh 没走到读探针那一步）")
@@ -7428,10 +6544,10 @@ SHORT_SAMPLED_PEAK_BYTES = 200 * MEBIBYTE   # 同一格后半段：按轮采到�
 
 
 def cell_short_command_peak_recorded(world):
-    """跑 0.1 秒就退的命令：按轮一次都采不到（假 scope 是空目录），结局的 memory_peak 照内存包装退出时读的那一个记（attempt_runner.py 文件头 ⑥，
+    """跑 0.1 秒就退的命令：按轮一次都采不到（假 scope 是空目录），结局的 memory_peak 照内存包装退出时交的那一个记（attempt_runner.py 文件头 ⑥，
     假包装照 fake-wrapper-exit-peak= 往服务给的 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 写），不是 null；两样都没有的照旧 null。
-    后半段换上进程内存 200M 的假 scope 重起服务：按轮采到了的照按轮采到的记，退出时读的（含页缓存的 memory.peak）比它大比它小都不用（attempt_runner.py 文件头 ⑥）。
-    弄坏开关 memory-peak-with-page-cache 下照改前取大的，「400M 比 200M 大」那一例记 400M，这一格红。"""
+    后半段换上进程内存 200M 的假 scope 重起服务：按轮采到了的与退出时交的（扣了页缓存）取大的（attempt_runner.py 文件头 ⑥；一轮之间冒出来的峰值在退出时交的那一个里）。
+    弄坏开关 exit-peak-only-when-unsampled 下按轮采到了就不看它，「400M 比 200M 大」那一例记 200M，这一格红。"""
     world.start_server()
     short = world.finished(world.submit(["bash", "-c", "sleep 0.1", f"fake-wrapper-exit-peak={SHORT_EXIT_PEAK_BYTES}"], extra={lib.KEY_VARIABLE: "selftest-short-peak"}))
     silent = world.finished(world.submit(["bash", "-c", "sleep 0.1", "short-silent"], extra={lib.KEY_VARIABLE: "selftest-short-silent"}))
@@ -7443,14 +6559,30 @@ def cell_short_command_peak_recorded(world):
                                           extra={lib.KEY_VARIABLE: "selftest-short-smaller"}))
     problems = []
     for name, summary, wanted in (("按轮采不到、退出时读到 123M 的", short, SHORT_EXIT_PEAK_BYTES), ("两样都没有的", silent, None),
-                                  ("退出时读的 400M 比按轮的 200M 大的（照按轮的）", larger, SHORT_SAMPLED_PEAK_BYTES),
-                                  ("退出时读的 100M 比按轮的 200M 小的（照按轮的）", smaller, SHORT_SAMPLED_PEAK_BYTES)):
+                                  ("退出时交的 400M 比按轮的 200M 大的（照大的）", larger, 2 * SHORT_SAMPLED_PEAK_BYTES),
+                                  ("退出时交的 100M 比按轮的 200M 小的（照大的）", smaller, SHORT_SAMPLED_PEAK_BYTES)):
         attempt = first_attempt(summary)
         if summary["task"].get("outcome") != "succeeded" or attempt.get("memory_peak", "缺这一栏") != wanted:
             problems.append(f"{name}应当跑完、记 memory_peak {wanted}，实际 {describe(summary)}、记 {attempt.get('memory_peak', '缺这一栏')}")
     if problems:
         raise SelftestFailure("跑得短的命令的内存峰值：" + "；".join(problems), world.server_log_lines())
-    return "跑 0.1 秒就退、按轮采不到的记了退出时读的 123M；两样都没有的记 null；按轮采到了的照按轮的 200M，退出时读的不用"
+    return "跑 0.1 秒就退、按轮采不到的记了退出时交的 123M；两样都没有的记 null；按轮采到了的与退出时交的取大的（400M、200M）"
+
+
+def cell_scene_sessionless_swept(world):
+    """没有会话的现场（task_server_lib.py 文件头「现场」；task_server.py 的 scene_due）：人手 --manual 交的退非 0、留了现场，不起 wait：结局满保留期（快档 1 秒）之后服务照样删。
+    弄坏开关 scene-sessionless-kept 下要等取走、一直不删，这一格红。"""
+    world.start_server()
+    summary = world.finished(world.submit(["bash", "-c", "exit 0", f"fake-wrapper-scene={SCENE_COMMAND_EXIT}"], session=None))
+    scene, _ = scene_of(world, summary)
+    if summary["task"].get("session") or not scene:
+        raise SelftestFailure(f"人手交的应当记无会话、有现场目录，实际会话 {summary['task'].get('session')!r}、现场「{scene}」", world.server_log_lines())
+    patience = world.patience(SCENE_GONE_SECONDS)
+    while os.path.lexists(scene) and patience.waiting():
+        time.sleep(POLL_SECONDS)
+    if os.path.lexists(scene):
+        raise SelftestFailure(f"没有会话的任务结局满保留期之后现场 {scene} 应当删了，实际还在", world.server_log_lines())
+    return "人手交的没起 wait，现场照结局时刻满保留期删了"
 
 
 def cell_merge_on_peer_reads_shard_outputs(world):
@@ -7552,13 +6684,13 @@ QUEUED_SHARD_KEY = "selftest-shard-third-queued"   # 三片分片的命令键：
 TASK_LOCK_ROUNDS = 1000   # task-locks-released 拿放锁的任务条数：表不随它涨才算淘汰了
 
 
-def start_three_shards(world, name, shards):
+def start_three_shards(world, name, shards, extra=None):
     """三片的一件，第 0、1 片同时在本机跑、第 2 片排着：本机 slice 20G、第二台用不了，第 2 片记过的峰值 30G 只有第二台放得下，排着不判永远放不下
-    （同 down-host-waits-not-never）。shards 是规格里三片的写法；等到这个样子交父任务号与 {片号: 子任务号}。"""
+    （同 down-host-waits-not-never）。shards 是规格里三片的写法，extra 是这一格服务的设置；等到这个样子交父任务号与 {片号: 子任务号}。"""
     for index, peak in ((0, 2), (1, 2), (2, 30)):
-        world.seed_peak(lib.shard_child_key(QUEUED_SHARD_KEY, "shard", index, 3), peak * GIBIBYTE)
+        world.seed_peak(lib.shard_child_key(QUEUED_SHARD_KEY, "shard", index, 3), peak * GIBIBYTE, shard_count=3)
     world.resources(local=(50, 20), peer_down="自证：第二台此刻用不了")
-    world.start_server()
+    world.start_server(extra=extra)
     task_id = world.submit(world.write_spec(f"spec-{name}.json", {"shards": shards}), cwd=world.repo, extra={lib.KEY_VARIABLE: QUEUED_SHARD_KEY})
     summary = world.wait_for(task_id, lambda summary: sorted(running_shards(summary)) == [0, 1] and queued_shards(summary) == [2], "第 0、1 片跑起来、第 2 片排着")
     return task_id, {index: child["task"]["id"] for index, child in shard_children(summary).items()}
@@ -7575,33 +6707,38 @@ def shard_outcomes(summary):
 
 
 def cell_shard_failure_waits_for_running(world):
-    """一片 command-failed、一片在跑、一片在排（task_server_lib.py 文件头「分片」的「有一步最终没成」）：在排的那片当场 cancelled、一次不起；在跑的那片照跑到底、
-    结局照收（succeeded）；收齐之后父任务才记那一片的 command-failed、wait 末行点名 shard=0/3，不合并。弄坏开关 shard-siblings-abandoned 下父任务当场收尾，这一格红。"""
+    """一片 command-failed、一片在跑、一片在排（task_server_lib.py 文件头「分片」的「有一步最终没成」）：兄弟片照排、照跑到底，结局照收：
+    第 0 片没成之后再排两轮，父任务没结局、第 1 片照跑、第 2 片照排着不撤；第 2 片记过的峰值 30G 只有第二台放得下（start_three_shards），
+    这时把本机换成 slice 50G，它在本机起、跑完；第 1 片放行跑完；都收齐之后父任务才记第 0 片的 command-failed、wait 末行点名 shard=0/3，不合并。
+    弄坏开关 shard-siblings-abandoned 下父任务当场收尾、在排的那片撤掉，这一格红。"""
     releases = {name: os.path.join(world.root, f"release-failure-{name}") for name in ("failing", "running")}
     task_id, _ = start_three_shards(world, "failure-waits", [{"block": releases["failing"], "exits": [3]}, {"block": releases["running"]}, {}])
     problems = []
     try:
         open(releases["failing"], "w").close()
-        middle = world.wait_for(task_id, lambda summary: shard_outcomes(summary).get(0) == "command-failed" and shard_outcomes(summary).get(2) == "cancelled",
-                                "第 0 片记 command-failed、第 2 片记 cancelled")
-        if middle["task"].get("state") == "finished" or 1 not in running_shards(middle):
-            problems.append(f"第 0 片没成、第 1 片还在跑时：父任务应当还没结局、第 1 片照跑，实际父任务 {middle['task'].get('state')}/{middle['task'].get('outcome')}、"
-                            f"在跑的片 {running_shards(middle)}")
+        world.wait_for(task_id, lambda summary: shard_outcomes(summary).get(0) == "command-failed", "第 0 片记 command-failed")
+        world.next_pass()
+        world.next_pass()
+        middle = world.summary(task_id)
+        if middle["task"].get("state") == "finished" or 1 not in running_shards(middle) or queued_shards(middle) != [2]:
+            problems.append(f"第 0 片没成、第 1 片还在跑时：父任务应当还没结局、第 1 片照跑、第 2 片照排着不撤，实际父任务 {middle['task'].get('state')}/{middle['task'].get('outcome')}、"
+                            f"在跑的片 {running_shards(middle)}、各片 {shard_outcomes(middle)}")
+        world.resources(local=(50, 50), peer_down="自证：第二台此刻用不了")   # 第 2 片（30G）在本机放得下了
     finally:
         open(releases["running"], "w").close()
-    finished = world.finished(task_id)
+    finished = world.finished(task_id, timeout=120)
     code, last = wait_last_line(world, task_id)
     outcomes = shard_outcomes(finished)
     third_runs = world.sharded_calls("shard", index=2)
     if (finished["task"].get("outcome") != "command-failed" or code != 3 or " shard=0/3" not in last
-            or outcomes != {0: "command-failed", 1: "succeeded", 2: "cancelled"} or third_runs
+            or outcomes != {0: "command-failed", 1: "succeeded", 2: "succeeded"} or not third_runs
             or "merge" in child_roles(finished) or world.sharded_calls("merge")):
-        problems.append(f"收齐之后：整件应当是第 0 片的 command-failed、wait 退 3、末行点名 shard=0/3，第 1 片 succeeded、第 2 片 cancelled 一次没起，不合并；"
+        problems.append(f"收齐之后：整件应当是第 0 片的 command-failed、wait 退 3、末行点名 shard=0/3，第 1、2 片都 succeeded（第 2 片照排照跑），不合并；"
                         f"实际 {describe(finished)}、wait 退 {code}、末行「{last}」、各片 {outcomes}、第 2 片跑的记录 {third_runs}、子任务 {child_roles(finished)}、"
                         f"合并的记录 {world.sharded_calls('merge')}")
     if problems:
         raise SelftestFailure("一片没成：" + "；".join(problems), world.server_log_lines())
-    return "一片没成：在排的兄弟片当场撤、在跑的跑完结局照收，收齐之后整件才记那一片的 command-failed、不合并"
+    return "一片没成：兄弟片照排照跑、结局照收，收齐之后整件才记那一片的 command-failed、不合并"
 
 
 def cell_shard_cancel_alone_merges(world):
@@ -7774,12 +6911,12 @@ def cell_task_locks_released(world):
     return f"{TASK_LOCK_ROUNDS} 条任务的锁用完锁表空着；拿着时另一个线程等到放下才拿到"
 
 
-ATTENTION_QUEUE_SECONDS = "2"        # attention-queued-too-long：排队过久的头一档（秒；TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS）
-ATTENTION_ONCE_SECONDS = 6           # attention-reported-once：头一档 6 秒、第二档 12 秒（每档翻倍）
-ATTENTION_ONCE_QUIET_SECONDS = 2.5   # attention-reported-once：头一档叫过之后再起 wait，这么久里不该再叫（离第二档 12 秒还有 6 秒）
+ATTENTION_QUEUE_SECONDS = "2"        # attention-queued-too-long：排队过久的提醒门槛（秒；TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS）
+ATTENTION_ONCE_SECONDS = 6           # attention-reported-once：排满 6 秒提醒一回、排满 12 秒再提醒一回（每翻一倍一回）
+ATTENTION_ONCE_QUIET_SECONDS = 2.5   # attention-reported-once：6 秒那一回叫过之后再起 wait，这么久里不该再叫（离 12 秒那一回还有 6 秒）
 ATTENTION_WAIT_SECONDS = 60          # 各提醒格里 wait 至多等这么久（弄坏开关下它一直等，等满就判红）
-ATTENTION_QUIET_SECONDS = "3"        # attention-quiet-busy-log：日志长期不涨的头一档（秒；TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS），比卡住阈值 2 秒长
-ATTENTION_IO_WAIT_SECONDS = "3"      # io-wait-local-not-stalled：卡在 IO 上的头一档（秒；TASK_SERVER_SELFTEST_IO_WAIT_ATTENTION_SECONDS），比卡住阈值 2 秒长
+ATTENTION_QUIET_SECONDS = "3"        # attention-quiet-busy-log：日志长期不涨的提醒门槛（秒；TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS），比卡住阈值 2 秒长
+ATTENTION_IO_WAIT_SECONDS = "3"      # io-wait-local-not-stalled：卡在 IO 上的提醒门槛（秒；TASK_SERVER_SELFTEST_IO_WAIT_ATTENTION_SECONDS），比卡住阈值 2 秒长
 FAKE_BLOCKED_PROCESS = 4194301       # io-wait-local-not-stalled：假 scope 的 cgroup.procs 点名的进程号，假 /proc 下只有它一份 stat、是 D 状态（服务照假 /proc 读，与真进程号撞了也只读这一份）
 IO_WAIT_SUSPECT_WAITS = 3            # io-wait-local-not-stalled：CPU 不涨先报的疑似卡住照报，至多再起这么多回 wait 等 io-wait 那一行
 
@@ -7811,13 +6948,13 @@ def attention_problems(completed, task_id, kind, expected_exit):
 
 
 def quiet_log_busy_problems(waited, which):
-    """io-wait-local-not-stalled、gpu-busy-quiet-not-stalled 共用：几回 wait 的输出里不该有 kind=quiet-log-busy 的那一行（服务不是因为 CPU 在涨或读不到才没停它）。"""
+    """io-wait-local-not-stalled 用：几回 wait 的输出里不该有 kind=quiet-log-busy 的那一行（服务不是因为 CPU 在涨或读不到才没停它）。"""
     lines = [line for completed in waited for line in attention_lines(completed) if attention_fields(line).get("kind") == "quiet-log-busy"]
     return [f"{which}不该报 quiet-log-busy，实际 wait 打了「{lines[0][:300]}」"] if lines else []
 
 
 def cell_attention_queued_too_long(world):
-    """排队过久（task_server.py 文件头 ①「要处置的提醒」）：第二台用不了、只有它放得下的命令一直排着（同 down-host-waits-not-never），排满头一档（自证里 2 秒）
+    """排队过久（task_server.py 文件头 ①「要处置的提醒」）：第二台用不了、只有它放得下的命令一直排着（同 down-host-waits-not-never），排满提醒门槛（自证里 2 秒）
     wait 打一行 TASK_SERVER_ATTENTION kind=queued-too-long、依据写已排多久、原因写排队原因（第二台用不了）、退 ATTENTION_EXIT；任务照旧在排（没起尝试、没结局），
     第二台回来之后照派过去跑完。"""
     world.resources(local=(50, 20), peer_down="自证：第二台在重启")
@@ -7837,37 +6974,12 @@ def cell_attention_queued_too_long(world):
         problems.append(f"第二台回来之后应当派过去跑完，实际 {describe(done)}")
     if problems:
         raise SelftestFailure("排队过久：" + "；".join(problems), world.server_log_lines())
-    return f"排满头一档 {ATTENTION_QUEUE_SECONDS} 秒：wait 打 {lib.ATTENTION_MARK} kind=queued-too-long（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务照旧在排，第二台回来后跑完"
-
-
-def cell_attention_overrun(world):
-    """跑到记录用时的很多倍（日志在涨、服务不停它）：记录用时 1 秒，跑到 3 倍（3 秒，宽限压到 0.01 秒）wait 打一行 kind=overrun、依据写已跑多久与倍数、
-    退 ATTENTION_EXIT；任务照旧在跑，放行之后跑完。"""
-    key = "selftest-attention-overrun"
-    release = os.path.join(world.root, "release-attention-overrun")
-    command = ["bash", "-c", BLOCK_SCRIPT, "block", release]
-    world.seed_duration(key, 1, command)
-    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01"})
-    task_id = world.submit(command, extra={lib.KEY_VARIABLE: key})
-    completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
-    during = world.summary(task_id)
-    problems, fields = attention_problems(completed, task_id, "overrun", lib.ATTENTION_EXIT)
-    if "记录用时 1 秒" not in fields.get("basis", "") or "倍" not in fields.get("basis", ""):
-        problems.append(f"依据应当写「记录用时 1 秒」与倍数，实际「{fields.get('basis')}」")
-    if during["task"].get("state") != "running" or not [attempt for attempt in during["attempts"] if attempt.get("state") == "running"]:
-        problems.append(f"报了超过预计之后任务应当照旧在跑（running），实际 {describe(during)}、状态 {during['task'].get('state')}")
-    open(release, "w").close()
-    done = world.finished(task_id)
-    if done["task"].get("outcome") != "succeeded":
-        problems.append(f"放行之后应当跑完，实际 {describe(done)}")
-    if problems:
-        raise SelftestFailure("超过预计：" + "；".join(problems), world.server_log_lines())
-    return f"记录用时 1 秒跑到 3 倍：wait 打 {lib.ATTENTION_MARK} kind=overrun（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务照旧在跑，放行后跑完"
+    return f"排满 {ATTENTION_QUEUE_SECONDS} 秒：wait 打 {lib.ATTENTION_MARK} kind=queued-too-long（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务照旧在排，第二台回来后跑完"
 
 
 def cell_attention_quiet_busy_log(world):
-    """日志长期不涨而服务没停它（task_server.py 的 quiet_log_items；任务 7723 日志 37702 秒没涨、没有记录用时，服务一直不停也没人叫）：没有记录用时的一条只打一行
-    就不出声、跑到放行为止，假 scope 的 CPU 一直在涨（卡住阈值 2 秒：CPU 在涨不停），此刻内存读不到（不判贴着上限）；日志满头一档（自证里 3 秒）没涨，
+    """日志长期不涨而服务没停它（task_server.py 的 quiet_log_items；任务 7723 日志 37702 秒没涨，服务一直不停也没人叫）：一条只打一行
+    就不出声、跑到放行为止，假 scope 的 CPU 一直在涨（卡住阈值 2 秒：CPU 在涨不停），此刻内存读不到（不判贴着上限）；日志满提醒门槛（自证里 3 秒）没涨，
     wait 打一行 kind=quiet-log-busy、依据写日志多久没涨、退 ATTENTION_EXIT；任务照旧在跑，放行之后跑完。
     弄坏开关 attention-quiet-busy-unreported 下 wait 不叫醒、等到命令自己退，这一格红。"""
     scope, stop = start_burning_scope(world, "quiet-busy-scope", {})
@@ -7893,16 +7005,16 @@ def cell_attention_quiet_busy_log(world):
         problems.append(f"放行之后应当跑完，实际 {describe(done)}")
     if problems:
         raise SelftestFailure("日志长期不涨而服务没停它：" + "；".join(problems), world.server_log_lines())
-    return f"日志满头一档 {ATTENTION_QUIET_SECONDS} 秒没涨、CPU 在涨：wait 打 {lib.ATTENTION_MARK} kind=quiet-log-busy（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务照旧在跑，放行后跑完"
+    return f"日志满 {ATTENTION_QUIET_SECONDS} 秒没涨、CPU 在涨：wait 打 {lib.ATTENTION_MARK} kind=quiet-log-busy（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务照旧在跑，放行后跑完"
 
 
 def cell_io_wait_local_not_stalled(world):
     """卡在 IO 上（task_server.py 文件头 ①「卡在 IO 上」；任务 8608、8609、8611、8619 在等 NFS 时被当成卡住停掉）：本机一条只打一行就不出声、跑到放行为止，
     假 scope 的 CPU 一直不涨（卡住阈值 2 秒），假 scope 的 cgroup.procs 点名一个进程号，假 /proc（TASK_SERVER_SELFTEST_PROC_ROOT）下它的 stat 是 D 状态：
-    服务不判 stalled、不停；日志没涨的每一轮都有 D 状态的进程满头一档（自证里 3 秒），wait 打一行 kind=io-wait、依据写 D 状态的进程数与 /proc/pressure/io 的 avg60
+    服务不判 stalled、不停；日志没涨的每一轮都有 D 状态的进程满提醒门槛（自证里 3 秒），wait 打一行 kind=io-wait、依据写 D 状态的进程数与 /proc/pressure/io 的 avg60
     （读不到照写读不到）、退 ATTENTION_EXIT（CPU 不涨先报的疑似卡住照报，再起 wait 接着等）；任务照旧在跑，放行之后跑完。
     没有 D 状态的照旧停 stalled 由 stalled-attempt-stopped 那一格判（同一段判法：假 /proc 不换，那一条的真进程都在睡、不在 D 状态）。
-    日志长期不涨的头一档同样压到 3 秒（ATTENTION_QUIET_SECONDS）：按 D 状态免停的不报 quiet-log-busy（task_server.py 的 quiet_log_items），各回 wait 都不该打那一种。
+    日志长期不涨的提醒门槛同样压到 3 秒（ATTENTION_QUIET_SECONDS）：按 D 状态免停的不报 quiet-log-busy（task_server.py 的 quiet_log_items），各回 wait 都不该打那一种。
     弄坏开关 io-wait-ignored 下停掉、记 stalled，attention-io-wait-unreported 下 wait 不叫醒、等到命令自己退，quiet-log-busy-any-exemption 下 wait 另报 quiet-log-busy，这一格红。"""
     scope = os.path.join(world.root, "io-wait-scope")
     os.makedirs(scope)
@@ -7943,7 +7055,7 @@ def cell_io_wait_local_not_stalled(world):
         problems.append(f"放行之后应当跑完，实际 {describe(done)}")
     if problems:
         raise SelftestFailure("本机卡在 IO 上：" + "；".join(problems), world.server_log_lines())
-    return (f"本机日志与 CPU 都不涨而每一轮都有进程在 D 状态：不停，满头一档 {ATTENTION_IO_WAIT_SECONDS} 秒 wait 打 {lib.ATTENTION_MARK} kind=io-wait"
+    return (f"本机日志与 CPU 都不涨而每一轮都有进程在 D 状态：不停，满 {ATTENTION_IO_WAIT_SECONDS} 秒 wait 打 {lib.ATTENTION_MARK} kind=io-wait"
             f"（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，放行后跑完")
 
 
@@ -7976,221 +7088,19 @@ def cell_io_wait_peer_not_stalled(world):
     return "第二台日志与 CPU 都不涨：每轮 blocked=2 read=yes 的不停、跑完；blocked=0 与 read=no 的照原判法记 stalled"
 
 
-ATTENTION_GPU_BUSY_QUIET_SECONDS = "3"   # gpu-busy-quiet-not-stalled：卡上有它的计算进程而日志与 CPU 都不涨的头一档（秒；TASK_SERVER_SELFTEST_GPU_BUSY_QUIET_ATTENTION_SECONDS），比卡住阈值 2 秒长
-# gpu-busy-quiet-not-stalled 与 card-zero-utilization-stalled 的跑法（名字照 GPU_SCRIPT_PATTERNS 认成要卡；没分到卡的那一条用 bash -c 起同一段正文、不认成要卡）：$1 演哪一种，
-# busy 先把自己的进程号写进 $2、之后不动（每一轮卡上都有它的计算负载），flicker 每半秒写进去又删掉（有几轮卡上没有它的负载）；
-# 先写一回、再打一行 started，之后不出声，等放行文件 $3（至多 60 秒，等不到退 9）
-GPU_BUSY_QUIET_SCRIPT_NAME = "crash-amplification-gpu-busy-quiet-selftest.sh"
-GPU_BUSY_QUIET_SCRIPT = r'''#!/usr/bin/env bash
-echo "$$" > "$2"
-echo started
-for round in $(seq 1 600); do
-  [[ -e "$3" ]] && exit 0
-  if [[ "$1" == flicker ]]; then
-    if (( round / 5 % 2 == 1 )); then rm -f "$2"; else echo "$$" > "$2"; fi
-  fi
-  sleep 0.1
-done
-exit 9
-'''
-
-
-def cell_gpu_busy_quiet_not_stalled(world):
-    """卡上有它的计算进程（task_server.py 文件头 ①「卡上有它的计算进程」；任务 8519、8520 两条单条 GPU 对拍日志与 CPU 都不涨、GPU 在算时被当成卡住停掉）：
-    本机两张卡，三条都只打一行就不出声、跑到放行为止，假 scope 的 CPU 一直不涨（卡住阈值 2 秒），假 nvidia-smi 照各自的 card-busy-pids-<名字> 报卡上的计算进程：
-    假 nvidia-smi 不报卡的利用率（这一格不写 card-utilization-<序号>，读利用率退 9）：
-    要卡、分到了卡、每一轮卡上都有它的计算负载的（busy）不判 stalled、不停，满头一档（自证里 3 秒）wait 打一行 kind=gpu-busy-quiet、依据写卡的键、「计算进程」
-    与「利用率读不到」、退 ATTENTION_EXIT（卡上有负载，疑似卡住不报），放行之后跑完；要卡、分到了卡、每半秒有几轮卡上没有它的负载的（flicker）照原判法停、记 stalled；
-    不要卡的（cardless，同一段正文用 bash -c 起，进程号同样写进名单）不读卡，照原判法停、记 stalled。
-    日志长期不涨的头一档同样压到 3 秒（ATTENTION_QUIET_SECONDS）：按卡上负载免停的 busy 不报 quiet-log-busy（task_server.py 的 quiet_log_items）。
-    弄坏开关 stall-card-load-ignored 下 busy 也停掉、记 stalled，attention-gpu-busy-quiet-unreported 下 wait 不叫醒、等到命令自己退，
-    quiet-log-busy-any-exemption 下 wait 另报 quiet-log-busy，这一格红。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    write_executable(os.path.join(world.work, GPU_BUSY_QUIET_SCRIPT_NAME), GPU_BUSY_QUIET_SCRIPT)
-    release = os.path.join(world.root, "release-gpu-busy-quiet")
-    listed = {name: os.path.join(world.world, f"card-busy-pids-{name}") for name in ("busy", "flicker", "cardless")}
-    problems, fields, done = [], {}, None
-    try:
-        world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
-                                  "TASK_SERVER_FAKE_SCOPE_DIRECTORY": idle_cpu_scope(world), "TASK_SERVER_NVIDIA_SMI": os.path.join(world.bin, "fake-nvidia-smi"),
-                                  "TASK_SERVER_SELFTEST_GPU_BUSY_QUIET_ATTENTION_SECONDS": ATTENTION_GPU_BUSY_QUIET_SECONDS,
-                                  "TASK_SERVER_SELFTEST_QUIET_ATTENTION_SECONDS": ATTENTION_QUIET_SECONDS})
-        busy = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "busy", listed["busy"], release])
-        flicker = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "flicker", listed["flicker"], release])
-        cardless = world.submit(["bash", "-c", GPU_BUSY_QUIET_SCRIPT, "gpu-busy-quiet-cardless", "busy", listed["cardless"], release])
-        completed = world.client(["wait", str(busy)], timeout=ATTENTION_WAIT_SECONDS)
-        during = world.summary(busy)
-        flickered = world.finished(flicker, timeout=60)
-        cardless_done = world.finished(cardless, timeout=60)
-        problems, fields = attention_problems(completed, busy, "gpu-busy-quiet", lib.ATTENTION_EXIT)
-        problems += quiet_log_busy_problems([completed], "按卡上负载免停的")
-        basis = fields.get("basis", "")
-        card = ((during["attempts"] or [{}])[-1]).get("card") or ""
-        if not card or card not in basis or "计算进程" not in basis or "利用率读不到" not in basis:
-            problems.append(f"依据应当写卡的键（这一次分到的「{card}」）、「计算进程」与「利用率读不到」（假 nvidia-smi 不报利用率），实际「{basis}」")
-        if not during["task"].get("gpu") or during["task"].get("state") != "running" or not [attempt for attempt in during["attempts"] if attempt.get("state") == "running"]:
-            problems.append(f"要卡、每一轮卡上都有它的负载的应当认成要卡、照旧在跑（running、不判 stalled），实际认成{'要卡' if during['task'].get('gpu') else '不要卡'}、"
-                            f"{describe(during)}、状态 {during['task'].get('state')}")
-        if not flickered["task"].get("gpu") or not (flickered["attempts"] or [{}])[-1].get("card") or flickered["task"].get("outcome") != "stalled":
-            problems.append(f"要卡、分到了卡、有几轮卡上没有它的负载的应当照原判法停、记 stalled，实际认成{'要卡' if flickered['task'].get('gpu') else '不要卡'}、{describe(flickered)}")
-        if cardless_done["task"].get("gpu") or cardless_done["task"].get("outcome") != "stalled":
-            problems.append(f"不要卡的（进程号同样在名单里）应当不读卡、照原判法停、记 stalled，实际认成{'要卡' if cardless_done['task'].get('gpu') else '不要卡'}、{describe(cardless_done)}")
-        open(release, "w").close()
-        done = world.finished(busy)
-    finally:
-        open(release, "w").close()
-    if done is not None and done["task"].get("outcome") != "succeeded":
-        problems.append(f"放行之后应当跑完，实际 {describe(done)}")
-    if problems:
-        raise SelftestFailure("卡上有它的计算进程：" + "；".join(problems), world.server_log_lines())
-    return (f"要卡、每一轮卡上都有它的计算负载、日志与 CPU 都不涨：不停，满头一档 {ATTENTION_GPU_BUSY_QUIET_SECONDS} 秒 wait 打 {lib.ATTENTION_MARK} kind=gpu-busy-quiet"
-            f"（依据「{basis}」）、退 {lib.ATTENTION_EXIT}，放行后跑完；有几轮卡上没有负载的与不要卡的照原判法记 stalled")
-
-
-CARD_IDLE_WAIT_SECONDS = 30   # card-zero-utilization-stalled：利用率是 0 的那一条至多安静等这么久收尾（卡住阈值 2 秒；弄坏开关下它一直在跑，等满判红）
-
-
-def write_card_utilization(world, percent):
-    """假 nvidia-smi 读卡利用率照的那两份（card-utilization-<序号>，本机两张卡的序号 0、1）都写 percent。"""
-    for index in (0, 1):
-        with open(os.path.join(world.world, f"card-utilization-{index}"), "w", encoding="utf-8") as handle:
-            handle.write(f"{percent}\n")
-
-
-def cell_card_zero_utilization_stalled(world):
-    """卡上有它的进程而卡不干活（task_server.py 文件头 ①「卡上有它的计算进程」；任务 9341：显存占着 14129 MiB、利用率 0%，最后几条用例半小时不动）：
-    本机两张卡，假 scope 的 CPU 一直不涨（卡住阈值 2 秒），两条都只打一行就不出声、跑到各自的放行文件为止，假 nvidia-smi 照 card-busy-pids-<名字> 报卡上有它的计算进程、
-    照 card-utilization-<序号> 报卡的利用率。先把两张卡的利用率都写 0：每一轮卡上都有它的负载、利用率每一轮都是 0 的那一条（idle）满窗口判 stalled、停掉，
-    说明写「利用率都是 0」；再都写 37：同一段正文的另一条（computing）照免停，服务记了两个窗口「GPU 在算，不停」、依据写利用率读到过不为 0，还在跑，放行之后跑完。
-    弄坏开关 card-presence-counts-as-busy 下 idle 也免停、一直跑到等满，stall-card-load-ignored 下 computing 也停掉、记 stalled，这一格红。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    write_executable(os.path.join(world.work, GPU_BUSY_QUIET_SCRIPT_NAME), GPU_BUSY_QUIET_SCRIPT)
-    releases = {name: os.path.join(world.root, f"release-card-{name}") for name in ("idle", "computing")}
-    listed = {name: os.path.join(world.world, f"card-busy-pids-{name}") for name in ("idle", "computing")}
-    problems, idle_done, computing, computing_done = [], None, None, None
-    write_card_utilization(world, 0)
-    try:
-        world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
-                                  "TASK_SERVER_FAKE_SCOPE_DIRECTORY": idle_cpu_scope(world), "TASK_SERVER_NVIDIA_SMI": os.path.join(world.bin, "fake-nvidia-smi")})
-        idle = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "busy", listed["idle"], releases["idle"]])
-        try:
-            idle_done = world.finished(idle, timeout=CARD_IDLE_WAIT_SECONDS)
-        except SelftestFailure as failure:
-            problems.append(f"卡上有它的计算进程、利用率每一轮都是 0、日志与 CPU 都不涨的应当满窗口判 stalled、停掉，实际安静 {CARD_IDLE_WAIT_SECONDS} 秒没收尾（{str(failure)[:300]}）")
-        if idle_done is not None:
-            note = first_attempt(idle_done).get("stall_note") or ""
-            if not idle_done["task"].get("gpu") or idle_done["task"].get("outcome") != "stalled" or "利用率都是 0" not in note:
-                problems.append(f"卡上有它的计算进程、利用率每一轮都是 0 的应当认成要卡、记 stalled、说明写「利用率都是 0」，"
-                                f"实际认成{'要卡' if idle_done['task'].get('gpu') else '不要卡'}、{describe(idle_done)}、说明「{note}」")
-        open(releases["idle"], "w").close()
-        write_card_utilization(world, 37)
-        computing = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "busy", listed["computing"], releases["computing"]])
-        log_path = os.path.join(world.root, f"server-{world.server_logs}.log")
-        spared_head = f"任务 {computing} 第 1 次尝试的日志 "
-
-        def spared_twice(summary):   # 服务记了两个窗口「GPU 在算，不停」（依据写利用率读到过不为 0），或已收尾（收尾了下面判红）
-            with contextlib.suppress(OSError):
-                with open(log_path, encoding="utf-8", errors="replace") as handle:
-                    if sum(1 for line in handle if spared_head in line and "利用率读到过不为 0" in line and "GPU 在算，不停" in line) >= 2:
-                        return True
-            return summary["task"].get("state") == "finished"
-        during = world.wait_for(computing, spared_twice, "记两个窗口「GPU 在算，不停」")
-        if during["task"].get("state") != "running" or not [attempt for attempt in during["attempts"] if attempt.get("state") == "running"]:
-            problems.append(f"卡上有它的计算进程、利用率 37% 的应当照免停、两个窗口过后还在跑，实际 {describe(during)}、状态 {during['task'].get('state')}")
-        open(releases["computing"], "w").close()
-        computing_done = world.finished(computing)
-    finally:
-        for release in releases.values():
-            open(release, "w").close()
-    if computing_done is not None and computing_done["task"].get("outcome") != "succeeded":
-        problems.append(f"利用率不为 0 的那一条放行之后应当跑完，实际 {describe(computing_done)}")
-    if problems:
-        raise SelftestFailure("卡上有进程而利用率是 0：" + "；".join(problems), world.server_log_lines())
-    return ("卡上有它的计算进程、利用率每一轮都是 0、日志与 CPU 都不涨的满窗口记 stalled（说明写利用率都是 0）；利用率 37% 的照免停、放行后跑完")
-
-
-CARD_IDLE_POLLING_USEC_PER_TICK = 10000    # card-idle-polling-stalled：假 scope 每 0.2 秒涨 0.01 秒，命令自己的 CPU 平均 0.05 个核（不分卡的门槛 0.01 之上、占卡不用的门槛 1 之下）
-CARD_IDLE_COMPUTING_USEC_PER_TICK = 400000  # card-idle-cpu-computing-not-stalled：每 0.2 秒涨 0.4 秒，平均 2 个核（在 CPU 上算）
-
-
-def card_idle_world(world):
-    """占卡不用那两格的世界：本机两张卡、两张卡的利用率都写 0、写好要卡的跑法（GPU_BUSY_QUIET_SCRIPT）。→ (卡上计算进程的名单文件, 放行文件)。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    write_executable(os.path.join(world.work, GPU_BUSY_QUIET_SCRIPT_NAME), GPU_BUSY_QUIET_SCRIPT)
-    write_card_utilization(world, 0)
-    return os.path.join(world.world, "card-busy-pids-idle"), os.path.join(world.root, "release-card-idle")
-
-
-def cell_card_idle_polling_stalled(world):
-    """占着卡不干活、CPU 上轮询死等（task_server.py 文件头 ①「卡上有它的计算进程」的占卡不用门槛；任务 9341：测试进程轮询死等约 1% 一个核、显存 14129 MiB、利用率 0%）：
-    卡上有它的计算进程、利用率每一轮都是 0，假 scope 的 CPU 平均 0.05 个核（不分卡的 0.01 门槛之上），日志不涨（卡住阈值 2 秒）：满窗口判 stalled、停掉，
-    说明写三样读数（日志多久没涨、「利用率都是 0」、「命令自己的 CPU」几个核）。弄坏开关 card-idle-stall-threshold-ignored 下照 0.01 的门槛当在算、一直跑到等满，这一格红。"""
-    listed, release = card_idle_world(world)
-    scope, stop = start_burning_scope(world, "polling-scope", {}, usec_per_tick=CARD_IDLE_POLLING_USEC_PER_TICK)
-    problems, done = [], None
-    try:
-        world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
-                                  "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope, "TASK_SERVER_NVIDIA_SMI": os.path.join(world.bin, "fake-nvidia-smi")})
-        task_id = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "busy", listed, release])
-        try:
-            done = world.finished(task_id, timeout=CARD_IDLE_WAIT_SECONDS)
-        except SelftestFailure as failure:
-            problems.append(f"卡上有它的进程、利用率每一轮都是 0、命令自己的 CPU 平均 0.05 个核的应当满窗口判 stalled、停掉，实际安静 {CARD_IDLE_WAIT_SECONDS} 秒没收尾（{str(failure)[:300]}）")
-        if done is not None:
-            note = first_attempt(done).get("stall_note") or ""
-            if done["task"].get("outcome") != "stalled" or not all(text in note for text in ("秒没涨", "利用率都是 0", "命令自己的 CPU", "个核")):
-                problems.append(f"占着卡不干活、CPU 上轮询死等的应当记 stalled、说明写日志多久没涨、「利用率都是 0」与「命令自己的 CPU」几个核，实际 {describe(done)}、说明「{note}」")
-    finally:
-        open(release, "w").close()
-        stop.set()
-    if problems:
-        raise SelftestFailure("占卡不用的判卡住：" + "；".join(problems), world.server_log_lines())
-    return "卡上有它的进程、利用率每一轮都是 0、命令自己的 CPU 平均 0.05 个核的满窗口记 stalled，说明写三样读数"
-
-
-def cell_card_idle_cpu_computing_not_stalled(world):
-    """占着卡、利用率 0 而命令在 CPU 上算（任务 9520：利用率 0、日志不涨、命令 CPU 13.8 核）：假 scope 的 CPU 平均 2 个核（占卡不用的门槛 1 之上），
-    服务记两个窗口「在 CPU 上算，不停」、还在跑，放行之后跑完。"""
-    listed, release = card_idle_world(world)
-    scope, stop = start_burning_scope(world, "computing-scope", {}, usec_per_tick=CARD_IDLE_COMPUTING_USEC_PER_TICK)
-    problems, done = [], None
-    try:
-        world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01",
-                                  "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope, "TASK_SERVER_NVIDIA_SMI": os.path.join(world.bin, "fake-nvidia-smi")})
-        task_id = world.submit(["bash", GPU_BUSY_QUIET_SCRIPT_NAME, "busy", listed, release])
-        spared_head = f"任务 {task_id} 第 1 次尝试的日志 "
-
-        def spared_twice(summary):   # 服务记了两个窗口「在 CPU 上算，不停」，或已收尾（收尾了下面判红）
-            return (sum(1 for line in server_output_text(world).splitlines() if spared_head in line and "在 CPU 上算，不停" in line) >= 2
-                    or summary["task"].get("state") == "finished")
-        during = world.wait_for(task_id, spared_twice, "记两个窗口「在 CPU 上算，不停」")
-        if during["task"].get("state") != "running":
-            problems.append(f"利用率 0 而命令 CPU 平均 2 个核的应当照在算、两个窗口过后还在跑，实际 {describe(during)}、状态 {during['task'].get('state')}")
-        open(release, "w").close()
-        done = world.finished(task_id)
-    finally:
-        open(release, "w").close()
-        stop.set()
-    if done is not None and done["task"].get("outcome") != "succeeded":
-        problems.append(f"放行之后应当跑完，实际 {describe(done)}")
-    if problems:
-        raise SelftestFailure("占卡不用而 CPU 在算：" + "；".join(problems), world.server_log_lines())
-    return "利用率 0、命令 CPU 平均 2 个核：服务记两个窗口在 CPU 上算、不停，放行后跑完"
-
-
 PEER_HEALTH_HEAD = "task-server：服务健康 NFS 共享判不过"
 PEER_SLOW_LOG_TEXT = "第二台慢（超时、复查通了）"
 
 
 def cell_peer_health_slow_rechecked(world):
-    """第二台一次超时先当慢（task_server_lib.py 文件头「NFS 共享」的挂载；三个会话各报过一次 30 秒超时的「用不了」）：ssh 时限压到 1 秒、复查前隔 0.2 秒；
+    """第二台一次超时先当慢（task_server_lib.py 文件头「NFS 共享」的挂载；三个会话各报过一次 30 秒超时的「用不了」）：ssh 时限压到 1 秒、复查前隔 0.2 秒、复查期 0.5 秒（一回复查就到期）；
     假 ssh 头一回复核挂载那一句睡着（fake-ssh-hang-once），复查照常回 nfs：服务日志记一行「第二台慢（超时、复查通了）」，会话收不到服务健康；
-    再让每一回都睡着（fake-ssh-hang）：复查也超时，会话收到恰好一条「服务健康 NFS 共享判不过」，正文写「复查又超时」。
+    再让每一回都睡着（fake-ssh-hang）：复查期满都超时，会话收到恰好一条「服务健康 NFS 共享判不过」，正文写「仍不通」。
     弄坏开关 peer-health-single-timeout-reported 下头一回超时就报、服务日志没有那一行，这一格红。"""
     inbox = FakeInbox(world, "a")
     release = os.path.join(world.root, "release-peer-health")
     once, hang = os.path.join(world.world, "fake-ssh-hang-once"), os.path.join(world.world, "fake-ssh-hang")
-    start_inbox_server(world, {"TASK_SERVER_SELFTEST_NFS_SSH_SECONDS": "1", "TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS": "0.2"})
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_NFS_SSH_SECONDS": "1", "TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS": "0.2", "TASK_SERVER_SELFTEST_NFS_SLOW_GRACE_SECONDS": "0.5"})
     problems = []
     try:
         task_id = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "peer-health", release], extra=inbox.environment())
@@ -8208,29 +7118,144 @@ def cell_peer_health_slow_rechecked(world):
         open(hang, "w").close()
         found = inbox.wait_for(world, PEER_HEALTH_HEAD)
         problems += inbox_problems(found, PEER_HEALTH_HEAD, "两次都不通")
-        if found and "复查又超时" not in found[0]["text"]:
-            problems.append(f"两次都不通的那一条应当写「复查又超时」（连不上），实际「{found[0]['text'][:300]}」")
+        if found and "仍不通" not in found[0]["text"]:
+            problems.append(f"复查期满都不通的那一条应当写「仍不通」（连不上），实际「{found[0]['text'][:300]}」")
     finally:
         with contextlib.suppress(FileNotFoundError):
             os.remove(hang)
         open(release, "w").close()
     if problems:
         raise SelftestFailure("第二台一次超时先当慢：" + "；".join(problems), world.server_log_lines())
-    return f"一次超时、复查回了：服务日志记「{PEER_SLOW_LOG_TEXT}」、不推；两次都不通：推恰好一条服务健康，写复查又超时"
+    return f"一次超时、复查回了：服务日志记「{PEER_SLOW_LOG_TEXT}」、不推；复查期满都不通：推恰好一条服务健康，写仍不通"
 
 
-CAP_HIT_STAT_KEY = "selftest-cap-hit-stat"
-CAP_HIT_STAT_TEXTS = ("anon 900M", "file 9728M", "file_dirty 8192M", "file_writeback 256M", "oom_kill 1", "大头是页缓存")
+def cell_peer_health_slow_within_recheck_period(world):
+    """第二台连着慢几回、复查期里回了的只记慢、不群发（task_server_lib.py 的 peer_shell_rechecked；两台的盘被写满那一阵握手超过 30 秒、几分钟后又回来，服务判成连不上、
+    给所有有任务的会话群发服务健康）：ssh 时限压到 1 秒、复查前隔 0.2 秒、复查期 3 秒；假 ssh 头两回复核挂载那一句睡着（fake-ssh-hang-count 写 2）、第三回照常回：
+    服务日志记「第二台慢（超时、复查通了）」且写「复查到第 2 回回了」、/health 的 nfs 一栏带 slow_last、会话收不到服务健康；之后每一回都睡着（fake-ssh-hang）：
+    复查期满仍不通，会话收到恰好一条「服务健康 NFS 共享判不过」。
+    弄坏开关 peer-recheck-once-only 下复查期里只复查一回，头两回超时就报，会话收到服务健康、服务日志没有慢的那一行，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    release = os.path.join(world.root, "release-peer-health-period")
+    counted, hang = os.path.join(world.world, "fake-ssh-hang-count"), os.path.join(world.world, "fake-ssh-hang")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_NFS_SSH_SECONDS": "1", "TASK_SERVER_SELFTEST_NFS_RECHECK_PAUSE_SECONDS": "0.2", "TASK_SERVER_SELFTEST_NFS_SLOW_GRACE_SECONDS": "3"})
+    problems = []
+    try:
+        task_id = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "peer-health-period", release], extra=inbox.environment())
+        world.running(task_id)
+        with open(counted, "w", encoding="utf-8") as handle:
+            handle.write("2\n")
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        while "复查到第 2 回回了" not in server_output_text(world) and patience.waiting():
+            time.sleep(POLL_SECONDS)
+        time.sleep(INBOX_QUIET_SECONDS)
+        if PEER_SLOW_LOG_TEXT not in server_output_text(world) or "复查到第 2 回回了" not in server_output_text(world):
+            problems.append(f"头两回超时、第三回回了的应当在服务日志记「{PEER_SLOW_LOG_TEXT}」并写「复查到第 2 回回了」，实际 fake-ssh-hang-count 剩 {open(counted).read().strip()}")
+        early = inbox.headed(PEER_HEALTH_HEAD)
+        if early:
+            problems.append(f"头两回超时、第三回回了的不该推服务健康，实际收到 {len(early)} 条：「{early[0]['text'][:300]}」")
+        slow_last = health_until(world, lambda health: bool((health.get("nfs") or {}).get("slow_last")), STATE_TIMEOUT_SECONDS).get("nfs", {}).get("slow_last")
+        if not slow_last or "复查到第 2 回回了" not in " ".join(slow_last.get("slow") or []):
+            problems.append(f"/health 的 nfs 一栏应当带 slow_last 并写「复查到第 2 回回了」，实际 {slow_last}")
+        open(hang, "w").close()
+        found = inbox.wait_for(world, PEER_HEALTH_HEAD)
+        problems += inbox_problems(found, PEER_HEALTH_HEAD, "复查期满都不通")
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(hang)
+        open(release, "w").close()
+    if problems:
+        raise SelftestFailure("第二台连着慢几回的复查期：" + "；".join(problems), world.server_log_lines())
+    return "头两回超时、第三回回了：服务日志与 /health 记慢、不推；复查期满都不通：推恰好一条服务健康"
 
 
-def cell_cap_hit_stat_in_note(world):
-    """撞上限那一刻的内存明细（run-with-memory-cap.sh 文件头「撞上限那一刻的内存明细」；任务 9776 推的是页缓存或脏页撑满了 scope）：假包装每次退 250、先打一行
-    RUN_WITH_MEMORY_CAP_OOM_STAT（anon 900M、file 9728M、脏页 8192M、正在写回 256M）：总上限 50G、记录峰值 20G，两次撞上限到顶记 memory-cap-at-maximum，
-    结局说明与 wait 那一行理由都写这几样读数与「大头是页缓存」。弄坏开关 cap-hit-stat-unreported 下不抄，这一格红。"""
-    world.resources(local=(55, 50))
-    world.seed_peak(CAP_HIT_STAT_KEY, 20 * GIBIBYTE)
+CONTROL_CHECK_LIMIT_SECONDS = 3   # control-check-probe-bounded：现探的总时长上限（--limit）
+CONTROL_CHECK_EXTRA_SECONDS = 8   # 到点之后再多给这么久退出（点名卡住那一项、收子进程）
+
+
+def cell_control_check_probe_bounded(world):
+    """control check --probe 的总时长有界、分步可见（task-server/control 的 probed_nfs、task_server_lib.py 的 NfsProbeBudget；两台都堵时 control check 一百秒以上不出结论，
+    各会话以为服务卡死）：服务起着、假 ssh 把挂载那一句（stat -f）睡死（fake-ssh-hang）；control check --probe --limit 3：到点退 1（不退 0、不退 78）、不超过 3 秒加 8 秒才退，
+    标准输出里打了「目录」「导出」各一对开始与结束、「挂载」开始，标准错误点名卡在哪一个根的「挂载」、写总时长到点。
+    弄坏开关 check-probe-unbounded 下现探不设总时长，一直等下去（客户端不在时限里退），这一格红。"""
     world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,250,250", "fake-wrapper-oom-stat"], extra={"RUN_WITH_MEMORY_CAP_KEY": CAP_HIT_STAT_KEY})
+    hang = os.path.join(world.world, "fake-ssh-hang")
+    open(hang, "w").close()
+    problems = []
+    try:
+        started = time.monotonic()
+        checked = world.control(["check", "--probe", "--limit", str(CONTROL_CHECK_LIMIT_SECONDS)], timeout=CONTROL_CHECK_LIMIT_SECONDS + CONTROL_CHECK_EXTRA_SECONDS)
+        took = time.monotonic() - started
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(hang)
+    mount = f"共享根 {world.shared_root} 的「挂载」"
+    if checked.returncode != 1 or took > CONTROL_CHECK_LIMIT_SECONDS + CONTROL_CHECK_EXTRA_SECONDS:
+        problems.append(f"总时长 {CONTROL_CHECK_LIMIT_SECONDS} 秒到点应当退 1、{CONTROL_CHECK_LIMIT_SECONDS + CONTROL_CHECK_EXTRA_SECONDS} 秒内退出，实际退 {checked.returncode}、用了 {took:.0f} 秒")
+    for step in (f"共享根 {world.shared_root} 的「目录」开始", f"共享根 {world.shared_root} 的「目录」结束", f"共享根 {world.shared_root} 的「导出」结束", f"{mount}开始"):
+        if step not in checked.stdout:
+            problems.append(f"现探每一项开始、结束各打一行：标准输出里应当有「{step}」，实际「{checked.stdout.strip()[-400:]}」")
+    if f"卡在 {mount}" not in checked.stderr or "到点" not in checked.stderr:
+        problems.append(f"到点应当打出卡在「{mount}」、写总时长到点，实际标准错误「{checked.stderr.strip()[-400:]}」")
+    if f"{mount}结束" in checked.stdout:
+        problems.append("睡死的那一项不该打「结束」")
+    if problems:
+        raise SelftestFailure("control check --probe 总时长有界、分步可见：" + "；".join(problems), world.server_log_lines())
+    return f"挂载那一句睡死：--limit {CONTROL_CHECK_LIMIT_SECONDS} 到点退 1（用了 {took:.0f} 秒），逐项打了开始与结束、点名卡在「挂载」"
+
+
+def cell_control_check_reads_service_nfs_report(world):
+    """control check 默认不现探，读服务 /health 的 nfs 一栏（task-server/control 的 reported_nfs；写明是多久以前判的）：服务起着、NFS 四项都过，假 ssh 把挂载那一句睡死之后
+    control check 照样几秒内退 0，输出写「秒前判的前三项」与「两向探针」「要现探加 --probe」，没有「开始」「结束」那种现探的逐项行。
+    弄坏开关 check-nfs-probed-live-by-default 下不带 --probe 也现探，睡死的那一句让它一直等，这一格红。"""
+    world.start_server()
+    hang = os.path.join(world.world, "fake-ssh-hang")
+    open(hang, "w").close()
+    problems = []
+    try:
+        started = time.monotonic()
+        checked = world.control(["check"], timeout=CONTROL_CHECK_EXTRA_SECONDS + CONTROL_CHECK_LIMIT_SECONDS)
+        took = time.monotonic() - started
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(hang)
+    if checked.returncode != 0 or took > CONTROL_CHECK_EXTRA_SECONDS + CONTROL_CHECK_LIMIT_SECONDS:
+        problems.append(f"默认读服务最近一份结论、第二台睡死也应当几秒内退 0，实际退 {checked.returncode}、用了 {took:.0f} 秒、「{(checked.stdout + checked.stderr).strip()[-300:]}」")
+    for text in ("秒前判的前三项", "两向探针", "要现探加 --probe"):
+        if text not in checked.stdout:
+            problems.append(f"输出应当写明是多久以前判的（「{text}」），实际「{checked.stdout.strip()[-400:]}」")
+    if "开始" in checked.stdout:
+        problems.append(f"默认路径不该现探（不该有逐项「开始」行），实际「{checked.stdout.strip()[-400:]}」")
+    if problems:
+        raise SelftestFailure("control check 默认读服务最近一份 NFS 结论：" + "；".join(problems), world.server_log_lines())
+    return f"第二台睡死时 control check 默认读 /health 的 nfs 一栏、{took:.0f} 秒退 0，写明多久以前判的，没有现探的逐项行"
+
+
+PEAK_STAT_KEY = "selftest-peak-memory-stat"
+PEAK_STAT_ANON_BYTES = 9216 * MEBIBYTE   # peak-memory-stat-in-note：峰值时的堆
+PEAK_STAT_FILE_BYTES = 1024 * MEBIBYTE   # 同一刻的页缓存
+PEAK_STAT_TEXTS = ("内存最高那一刻", "anon 9216M", "file 1024M", "大头是进程自己的内存")
+# 命令跑到一半把假 scope 换成被杀之后的样子（堆已释放，任务 10279：峰值 45.46 GiB、退出时读到 anon 311296），再退 250
+PEAK_STAT_KILLED_SCRIPT = ('printf "%s\\n" "$2" > "$1/memory.current"; printf "anon %s\\nfile %s\\nshmem 0\\n" "$3" "$4" > "$1/memory.stat"; sleep 0.6; '
+                           'printf "4096\\n" > "$1/memory.current"; printf "anon 0\\nfile 0\\nshmem 0\\n" > "$1/memory.stat"; sleep 0.5; exit 250')
+
+
+def cell_peak_memory_stat_in_note(world):
+    """内存最高那一刻的明细（task_server.py 文件头 ①「内存最高那一刻」）：假 scope 峰值时 anon 9216M、file 1024M，命令退 250 之前换成 anon 0（被杀之后读的样子）：
+    总上限 50G、记录峰值 20G，两次撞上限到顶记 memory-cap-at-maximum，结局说明与 wait 那一行理由都写峰值那一刻的读数与「大头是进程自己的内存」。
+    弄坏开关 peak-memory-stat-read-at-exit 下留最后读到的 anon 0，cap-hit-stat-unreported 下不抄，这一格红。"""
+    world.resources(local=(55, 50))
+    world.seed_peak(PEAK_STAT_KEY, 20 * GIBIBYTE)
+    scope = os.path.join(world.root, "peak-stat-scope")
+    os.makedirs(scope)
+    current = PEAK_STAT_ANON_BYTES + PEAK_STAT_FILE_BYTES
+    with open(os.path.join(scope, "memory.current"), "w", encoding="utf-8") as handle:
+        handle.write(f"{current}\n")
+    with open(os.path.join(scope, "memory.stat"), "w", encoding="utf-8") as handle:
+        handle.write(process_memory_stat(PEAK_STAT_ANON_BYTES, PEAK_STAT_FILE_BYTES))
+    world.start_server(extra={"TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
+    task_id = world.submit(["bash", "-c", PEAK_STAT_KILLED_SCRIPT, "peak-stat", scope, str(current), str(PEAK_STAT_ANON_BYTES), str(PEAK_STAT_FILE_BYTES)],
+                           extra={"RUN_WITH_MEMORY_CAP_KEY": PEAK_STAT_KEY})
     summary = world.finished(task_id)
     note = summary["task"].get("note") or ""
     completed = world.client(["wait", str(task_id)])
@@ -8239,22 +7264,181 @@ def cell_cap_hit_stat_in_note(world):
     if summary["task"].get("outcome") != "memory-cap-at-maximum":
         problems.append(f"两次撞上限应当到顶记 memory-cap-at-maximum，实际 {describe(summary)}")
     for where, text in (("结局说明", note), ("wait 的理由行", reason)):
-        missing = [wanted for wanted in CAP_HIT_STAT_TEXTS if wanted not in text]
+        missing = [wanted for wanted in PEAK_STAT_TEXTS if wanted not in text]
         if missing:
-            problems.append(f"{where}应当写撞上限那一刻的内存明细（缺 {missing}），实际「{text[:500]}」")
+            problems.append(f"{where}应当写内存最高那一刻的明细（缺 {missing}），实际「{text[:500]}」")
     if problems:
-        raise SelftestFailure("撞上限那一刻的内存明细：" + "；".join(problems), world.server_log_lines())
-    return "撞上限那一刻的内存明细抄进了结局说明与 wait 的理由行（anon、file、脏页、正在写回、oom_kill，大头是页缓存）"
+        raise SelftestFailure("内存最高那一刻的明细：" + "；".join(problems), world.server_log_lines())
+    return "假 scope 峰值时堆大、被杀后读 0：结局说明与 wait 的理由行写峰值那一刻的 anon 9216M、file 1024M，大头是进程自己的内存"
+
+
+def peer_world(world, key):
+    """派到第二台那几格的世界：本机只空 8G、第二台 100G，这把命令键记 10G（上限 15G）。"""
+    world.resources(local=(8, 30), peer=(100, 100), peer_cap_gibibytes=64)
+    world.seed_peak(key, PEER_PINNED_SEED_PEAK_BYTES)
+
+
+PEER_STAT_KEY = "selftest-peer-peak-stat"
+PEER_STAT_SCRIPT = ('echo "MULTI_HOST_RUN_PEER_MEMORY_STAT poll=1 current_bytes=$(( $1 + $2 )) anon=$1 file=$2 file_dirty=0 file_writeback=0 shmem=0 read=yes"; '
+                    'echo "MULTI_HOST_RUN_PEER_MEMORY_STAT poll=2 current_bytes=4096 anon=0 file=0 file_dirty=0 file_writeback=0 shmem=0 read=yes"; '
+                    'echo "MULTI_HOST_RUN_PEER_MEMORY_STAT poll=3 current_bytes=0 anon=0 file=0 file_dirty=0 file_writeback=0 shmem=0 read=no"; exit 250')
+
+
+def cell_peer_peak_memory_stat_in_note(world):
+    """第二台内存最高那一刻的明细（task_server.py 文件头 ①「内存最高那一刻」；multi-host-run.sh 每轮一行 MULTI_HOST_RUN_PEER_MEMORY_STAT）：头一行堆大、后两行被杀之后读 0、read=no：
+    第 1 次尝试记的 peak_memory_note 写头一行的读数。弄坏开关 peak-memory-stat-read-at-exit 下留最后一行 read=yes 的 anon 0，cap-hit-stat-unreported 下不记，这一格红。"""
+    peer_world(world, PEER_STAT_KEY)
+    world.start_server()
+    summary = world.finished(world.submit(["bash", "-c", PEER_STAT_SCRIPT, "peer-stat", str(PEAK_STAT_ANON_BYTES), str(PEAK_STAT_FILE_BYTES), "fake-peer-run"],
+                                          extra={lib.KEY_VARIABLE: PEER_STAT_KEY}, cwd=world.repo), timeout=60)
+    attempt = first_attempt(summary)
+    note = attempt.get("peak_memory_note") or ""
+    missing = [wanted for wanted in PEAK_STAT_TEXTS if wanted not in note]
+    if attempt.get("host") != "peer" or attempt.get("outcome") != "memory-cap-hit" or missing:
+        raise SelftestFailure(f"第二台撞上限的那一次应当记内存最高那一刻的明细（缺 {missing}），实际第 1 次在 {attempt.get('host')}、{attempt.get('outcome')}、记「{note[:300]}」", world.server_log_lines())
+    return "第二台每轮报的明细留 current_bytes 最大的那一行：头一行堆大、后面读 0，记的是头一行的读数"
+
+
+LOOP_LEAK_BOUNCE_KEY = "selftest-loop-leak-bounce"
+LOOP_LEAK_BOUNCE_CAPS = ("30720M", "46080M", "69120M")   # 记录峰值 30G 起 30720M（不乘 1.5）、撞了乘 1.5；69120M 再乘 1.5 就过本机可用上限（总上限 80G 减余量 2G）
+LOOP_LEAK_BOUNCE_PEAKS = (30200 * MEBIBYTE, 45500 * MEBIBYTE, 68500 * MEBIBYTE)   # 那三次的峰值：一次比一次大、都不低于那一次上限的 98%（STALL_AT_CAP_FRACTION）
+LOOP_LEAK_SCOPE_FILES = {"memory.current": 10628 * MEBIBYTE, "memory.stat": process_memory_stat(900 * MEBIBYTE, 9728 * MEBIBYTE).rstrip("\n")}   # 那三次内存最高那一刻的明细：大头是页缓存
+
+
+def cell_loop_leak_trend_sentences(world):
+    """连着撞上限那一段的走势句（task_server_lib.py 文件头「打回的理由」；任务 10412 四次都记 18 MiB、写了一次比一次大）：严格变大写「峰值一次比一次大」，全部相等写「峰值没变」，
+    每一次都没顶到上限的另写 LOOP_LEAK_READING_MISMATCH，顶到了的不写。静态喂 lib.loop_leak_check_text，不起服务。
+    弄坏开关 loop-leak-equal-peaks-growing 下相等也写一次比一次大，loop-leak-reading-mismatch-silent 下不写那一句，这一格红。"""
+    def attempts(*peaks, cap=64 * MEBIBYTE):
+        return [{"number": number, "memory_cap": cap, "memory_cap_text": "64M", "memory_peak": peak} for number, peak in enumerate(peaks, 1)]
+    low, mid, high = 18 * MEBIBYTE, 40 * MEBIBYTE, 64 * MEBIBYTE
+    problems = []
+    for what, cap_hits, wanted, unwanted in (
+            ("严格变大", attempts(low, mid, high), ["；峰值一次比一次大；"], ["峰值没变"]),
+            ("全部相等", attempts(low, low, low), ["；峰值没变；", lib.LOOP_LEAK_READING_MISMATCH], ["；峰值一次比一次大；"]),
+            ("都顶到上限", attempts(high, high), ["；峰值没变；", "每次都顶到上限"], [lib.LOOP_LEAK_READING_MISMATCH]),
+            ("先大后小", attempts(mid, low), ["；峰值不是一次比一次大；"], ["峰值没变"])):
+        text = lib.loop_leak_check_text(cap_hits)
+        missing = [piece for piece in wanted if piece not in text]
+        extra = [piece for piece in unwanted if piece in text]
+        if missing or extra:
+            problems.append(f"{what}的那一段缺 {missing}、不该有 {extra}，实际「{text}」")
+    if problems:
+        raise SelftestFailure("连着撞上限的走势句：" + "；".join(problems))
+    return "严格变大写一次比一次大，全部相等写峰值没变，每一次都没顶到上限的另写读数不准那一句"
+
+
+def cell_loop_leak_check_on_bounce(world):
+    """连着撞上限之后打回（task_server_lib.py 文件头「打回的理由」的 loop_leak=）：总上限 80G、记录峰值 30G，假包装三次都退 250、假 scope 给内存最高那一刻的明细，
+    峰值 30200M、45500M、68500M（一次比一次大、都顶满）；第三次再乘 1.5 就到顶，记 memory-cap-at-maximum 打回。wait 的理由行带 loop_leak=，写要查的两类、
+    逐次的上限与峰值、「峰值一次比一次大」「每次都顶到上限」与最后一次的「大头是页缓存」；推给会话的结局正文另起一行写同一句。
+    另静态喂 reason_fields：排队那一刻就打回（一次都没起）的、只撞过一次的不带 loop_leak=。弄坏开关 loop-leak-check-omitted 下不带，这一格红。"""
+    problems = []
+    single = {"number": 1, "state": "ended", "outcome": "memory-cap-hit", "memory_cap": 30720 * MEBIBYTE, "memory_cap_text": LOOP_LEAK_BOUNCE_CAPS[0],
+              "memory_peak": LOOP_LEAK_BOUNCE_PEAKS[0]}
+    for what, attempts in (("排队那一刻就打回、一次都没起的", []), ("只撞过一次就打回的", [single])):
+        fields = dict(lib.reason_fields({"id": 1, "outcome": "memory-cap-at-maximum", "exit_code": 236}, attempts, ""))
+        if "loop_leak" in fields:
+            problems.append(f"{what}不该带 loop_leak=，实际「{fields['loop_leak'][:200]}」")
+    world.resources(local=(85, 80))
+    world.seed_peak(LOOP_LEAK_BOUNCE_KEY, 30 * GIBIBYTE)
+    inbox = FakeInbox(world, "a")
+    scope = os.path.join(world.root, "loop-leak-scope")
+    os.makedirs(scope)
+    for name, value in LOOP_LEAK_SCOPE_FILES.items():
+        with open(os.path.join(scope, name), "w", encoding="utf-8") as handle:
+            handle.write(f"{value}\n")
+    start_inbox_server(world, {"TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
+    peaks = ",".join(str(peak) for peak in LOOP_LEAK_BOUNCE_PEAKS)
+    task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,250,250", f"fake-wrapper-exit-peaks={peaks}"],
+                           extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: LOOP_LEAK_BOUNCE_KEY}))
+    summary = world.finished(task_id)
+    caps = [attempt.get("memory_cap_text") for attempt in summary["attempts"]]
+    if summary["task"].get("outcome") != "memory-cap-at-maximum" or caps != list(LOOP_LEAK_BOUNCE_CAPS):
+        problems.append(f"上限应当 {' → '.join(LOOP_LEAK_BOUNCE_CAPS)}、第三次到顶记 memory-cap-at-maximum，实际上限 {caps}、{describe(summary)}")
+    completed = world.client(["wait", str(task_id)])
+    reason = next((line for line in completed.stdout.splitlines() if line.startswith(lib.REASON_MARK + " ")), "")
+    try:
+        paragraph = dict(word.split("=", 1) for word in shlex.split(reason)[1:] if "=" in word).get("loop_leak", "")
+    except ValueError as error:
+        paragraph = ""
+        problems.append(f"wait 的理由行 shlex 拆不开（{error}）：「{reason[:200]}」")
+    wanted = [lib.LOOP_LEAK_CHECK_HEAD, "连着撞了 3 次内存上限", lib.LOOP_LEAK_KINDS, "峰值一次比一次大", "每次都顶到上限", "大头是页缓存"]
+    wanted += [f"第 {number} 次上限 {cap} 峰值 {lib.size_text(peak)}" for number, (cap, peak) in enumerate(zip(LOOP_LEAK_BOUNCE_CAPS, LOOP_LEAK_BOUNCE_PEAKS), 1)]
+    missing = [text for text in wanted if text not in paragraph]
+    if missing:
+        problems.append(f"wait 的理由行应当带 loop_leak=「{lib.LOOP_LEAK_CHECK_HEAD}…」、写全两类与逐次的依据（缺 {missing}），实际理由行「{reason[:600]}」")
+    head = outcome_head(task_id, "memory-cap-at-maximum")
+    messages = inbox.wait_for(world, head)
+    problems += inbox_problems(messages, head, "连着撞上限打回的结局")
+    lines = messages[0]["text"].split("\n") if messages else []
+    if paragraph and paragraph not in lines:
+        problems.append(f"推给会话的结局正文应当另起一行写 loop_leak= 那一段，实际「{chr(10).join(lines)[:600]}」")
+    if problems:
+        raise SelftestFailure("连着撞上限打回带检查逻辑循环与内存泄漏的那一段：" + "；".join(problems), world.server_log_lines())
+    return "三次撞上限、峰值一次比一次大且都顶满：wait 理由行带 loop_leak=、结局正文另起一行写同一段；一次都没起、只撞过一次的不带"
+
+
+REPEATED_CAP_HITS_KEY = "selftest-repeated-cap-hits"
+REPEATED_CAP_HITS_RELEASE = "release-repeated-cap-hits"   # 第五次尝试等这个放行文件（相对假仓根：本机与假第二台认同一个名字）
+
+
+def cell_repeated_cap_hits_reminded_once(world):
+    """连着撞上限还在重排（task_server.py 文件头 ①「要处置的提醒」的 repeated-cap-hits）：没记录的命令假包装连退四次 250、第五次起命令等放行；
+    第五次跑着的时候收件 socket 恰好收到一条「task-server：提醒（…，不是结局）任务 <号> 连着撞上限（repeated-cap-hits；第 1 回」，出路以异常表那一行的修改意见起头，另起一行写
+    「检查代码有没有逻辑循环或内存泄漏：」那一段（两类、第 1 次到第 3 次的上限与峰值），末尾的 TASK_SERVER_ATTENTION 带 loop_leak=；第四次再撞不再推；
+    放行之后照跑完（四次 memory-cap-hit、第五次 succeeded），结局正文不带那一段。弄坏开关 repeated-cap-hits-silent 下一条都不推，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    world.resources(local=(100, 100))
+    start_inbox_server(world)
+    command = ["bash", "-c", BLOCK_SCRIPT, "block", REPEATED_CAP_HITS_RELEASE, f"fake-peer-wait={REPEATED_CAP_HITS_RELEASE}", "fake-wrapper-exits=250,250,250,250,run"]
+    task_id = world.submit(command, extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: REPEATED_CAP_HITS_KEY}), cwd=world.repo)
+    head = (reminder_head(task_id, "repeated-cap-hits", state="任务还在排"), reminder_head(task_id, "repeated-cap-hits"))   # 撞上限重排的当口是在排还是在跑，推的那一刻都可能
+    problems = []
+    try:
+        world.wait_for(task_id, lambda summary: any(int(attempt.get("number") or 0) >= 5 and attempt.get("state") == "running" for attempt in summary["attempts"]),
+                       "第五次尝试跑起来")
+        inbox.wait_for(world, head)
+        time.sleep(INBOX_QUIET_SECONDS)   # 只推一回：再看几轮不该多一条
+        reminders = inbox.headed(head)
+        problems += inbox_problems(reminders, head, "连着撞上限还在重排")
+        text = reminders[0]["text"] if reminders else ""
+        lines = text.split("\n")
+        wanted = (f"出路：{table_advice('repeated-cap-hits', task_id)}",
+                  f"{lib.ATTENTION_MARK} task={task_id} type={lib.ATTENTION_TYPE} kind=repeated-cap-hits basis=", "loop_leak=")
+        missing = [piece for piece in wanted if piece not in text]
+        paragraph = next((line for line in lines if line.startswith(lib.LOOP_LEAK_CHECK_HEAD)), "")
+        missing += [piece for piece in ("第 1 次上限", "第 3 次上限", lib.LOOP_LEAK_KINDS) if piece not in paragraph]
+        if reminders and missing:
+            problems.append(f"那一条的正文应当带 {missing}（「{lib.LOOP_LEAK_CHECK_HEAD}…」另起一行），实际「{text[:700]}」")
+    finally:
+        open(os.path.join(world.repo, REPEATED_CAP_HITS_RELEASE), "w").close()
+    done = world.finished(task_id)
+    outcomes = [attempt.get("outcome") for attempt in sorted(done["attempts"], key=lambda attempt: int(attempt.get("number") or 0))]
+    if outcomes != ["memory-cap-hit"] * 4 + ["succeeded"] or done["task"].get("outcome") != "succeeded":
+        problems.append(f"只提醒、照跑：应当四次 memory-cap-hit 之后第五次跑完，实际各次 {outcomes}、{describe(done)}")
+    finished = inbox.wait_for(world, outcome_head(task_id, "succeeded"))
+    time.sleep(INBOX_QUIET_SECONDS)
+    if len(inbox.headed(head)) != 1:
+        problems.append(f"同一条任务只推一回：跑完之后 repeated-cap-hits 那一条应当仍只有一条，实际 {len(inbox.headed(head))} 条")
+    if finished and lib.LOOP_LEAK_CHECK_HEAD in finished[0]["text"]:
+        problems.append(f"跑成了的结局正文不该带「{lib.LOOP_LEAK_CHECK_HEAD}」那一段，实际「{finished[0]['text'][:400]}」")
+    if problems:
+        raise SelftestFailure("连着撞上限还在重排的提醒：" + "；".join(problems), world.server_log_lines())
+    return "四次撞上限、照乘 1.5 重排：第五次跑着时收到恰好一条 repeated-cap-hits（另起一行写检查逻辑循环与内存泄漏），第四次撞不再推，照跑完"
 
 
 RUN_LIMIT_SAMPLE_SECONDS = "3"   # 跑满两小时那几格：界压到 3 秒（TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS），不真等两小时
-RUN_LIMIT_ACROSS_SECONDS = "3"   # over-two-hours-across-cap-hits：前两次各跑 2.5 秒撞上限、第三次跑 2 秒，界 3 秒（哪一次都不满，三次加起来满）
+RUN_LIMIT_ACROSS_SECONDS = "6"   # long-run-reminder-across-cap-hits：前四次各跑 1.5 秒撞上限、第五次跑约 1 秒，界 6 秒（哪一次都不到界的一半多，四次加起来满；机器忙时单次放慢到界的 3 倍多才会误判）
+RUN_LIMIT_SHORT_SECONDS = "1"    # long-run-confirm-silences、long-run-sessionless-noted：界压到 1 秒，命令等放行才退
 LONG_TICKS_SCRIPT = 'for round in $(seq 1 30); do echo "tick $round"; sleep 0.2; done'   # 跑 6 秒、每 0.2 秒打一行，比 3 秒的界长
-ACROSS_CAP_HITS_SCRIPT = ('if [[ "$TASK_SERVER_ATTEMPT" -lt 3 ]]; then echo "attempt $TASK_SERVER_ATTEMPT"; sleep 2.5; exit 250; fi; '
-                          'for round in $(seq 1 10); do echo "tick $round"; sleep 0.2; done')
+ACROSS_CAP_HITS_SCRIPT = ('if [[ "$TASK_SERVER_ATTEMPT" -lt 5 ]]; then echo "attempt $TASK_SERVER_ATTEMPT"; sleep 1.5; exit 250; fi; '
+                          'for round in $(seq 1 5); do echo "tick $round"; sleep 0.2; done')   # 前四次各睡 1.5 秒撞上限，第五次约 1 秒跑完
 SCOPE_DAILY = "种类=items; 跑什么=自证造的一条; 范围=1 条; 为什么=自证：日常开发跑一阵子"
 SCOPE_COMMIT = "种类=whole; 跑什么=自证造的门禁; 范围=全部; 为什么=自证：提交前跑整轮"
 LONG_RUN_WHY_SAMPLE = "自证：这一条点的就是要跑的全部范围，确实要跑这么久"
+LONG_RUN_KIND = "long-run-unconfirmed"
+CLIENT_NO_SUCH_TASK_EXIT = 4   # 客户端「没有这个任务」的退出码（task-server/task 的 NO_SUCH_TASK_EXIT）
 FAKE_COMMIT_GATE = ".claude/gate.d/lkmm.sh"   # 假仓里的一道提交时门禁（lib.COMMIT_GATE_ENTRIES 之一）：跑 LONG_TICKS_SCRIPT
 FAKE_MERGE_ENTRY = "scripts/gate/merge-and-verify.sh"
 
@@ -8266,188 +7450,240 @@ def write_fake_entry(world, relative):
     write_executable(path, "#!/usr/bin/env bash\n" + LONG_TICKS_SCRIPT + "\n")
 
 
-def card_world(world):
-    """要卡的入口（merge-and-verify.sh、crash-point-replay.sh 照名字认成要卡）那几格的世界：本机两张卡。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
+def long_run_head(task_id):
+    """推给会话的跑满两小时提醒的第一行到「（long-run-unconfirmed」为止的一段（头一回与再推都以它起头）。"""
+    return reminder_head(task_id, LONG_RUN_KIND)
 
 
-def bounced_problems(summary, what):
-    """跑满两小时被打回的那一条：结局 over-two-hours、退 242、说明写累计用时。→ 问题表。"""
-    note = summary["task"].get("note") or ""
-    if summary["task"].get("outcome") != "over-two-hours" or summary["task"].get("exit_code") != 242 or "累计跑了" not in note:
-        return [f"{what}应当累计满界被停、记 over-two-hours、退 242、说明写累计用时，实际 {describe(summary)}、说明「{note[:300]}」"]
-    return []
+def reminded_problems(world, task_id, what):
+    """没带全量标识的那几条（wait 那一路）：满界 wait 打一行 kind=long-run-unconfirmed、退 ATTENTION_EXIT，任务照跑完 succeeded。→ 问题表。"""
+    completed = world.client(["wait", str(task_id)])
+    problems, _ = attention_problems(completed, task_id, LONG_RUN_KIND, lib.ATTENTION_EXIT)
+    summary = world.finished(task_id)
+    if summary["task"].get("outcome") != "succeeded":
+        problems.append(f"满界服务不停它，应当跑完 succeeded，实际 {describe(summary)}")
+    return [f"{what}{problem}" for problem in problems]
 
 
-def requeue(world, task_id, items, tasks, why=LONG_RUN_WHY_SAMPLE, session=SESSION_A):
-    """task requeue <号> --long-run-confirmed --items <N> --tasks <M> --why <…>：交 CompletedProcess。"""
-    return world.client(["requeue", str(task_id), "--long-run-confirmed", "--items", str(items), "--tasks", str(tasks), "--why", why], session=session)
+def running_attempt_log(world, task_id):
+    """等这条任务有一次在跑的尝试：→ 那一次的日志路径。"""
+    summary = world.wait_for(task_id, lambda seen: bool(seen["attempts"]) and seen["attempts"][-1].get("state") in SERVER.ACTIVE_ATTEMPT_STATES, "有一次在跑的尝试")
+    return summary["attempts"][-1].get("log") or ""
 
 
-def requeued_id(completed):
-    found = re.search(rf"{lib.REQUEUE_MARK} task=(\d+)", completed.stdout)
-    return int(found.group(1)) if found else None
+def read_text(path):
+    with contextlib.suppress(OSError):
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    return ""
 
 
-def cell_over_two_hours_bounced(world):
-    """跑满两小时打回（task_server_lib.py 文件头「错误类型」over-two-hours；界压到 3 秒）：日常开发的一条（范围声明的「为什么」没写提交前）跑 6 秒，
-    满 3 秒被停、记 over-two-hours、退 242；推给会话的那一条写命令、范围声明、累计与各次用时、日志末几行，出路写点名范围与 requeue 那一整行。
-    弄坏开关 over-two-hours-not-bounced 下跑完 succeeded，这一格红。"""
+def cell_long_run_reminded_not_stopped(world):
+    """跑满两小时提醒（task_server_lib.py 文件头「异常表」long-run-unconfirmed；界压到 3 秒）：日常开发的一条跑 6 秒，满 3 秒服务不停它、跑完 succeeded、退 0；
+    推给会话恰好一条（再推要等 30 分钟，这一格到不了），写命令、范围声明、累计与各次用时、日志末几行，出路写 task cancel 与 task confirm <号> --why 整行。
+    弄坏开关 long-run-unconfirmed-silent 下不推，这一格红。"""
     inbox = FakeInbox(world, "a")
     start_inbox_server(world, {"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
     task_id = world.submit(["bash", "-c", LONG_TICKS_SCRIPT], extra=dict(inbox.environment(), SINGLEFS_RUN_SCOPE=SCOPE_DAILY))
-    summary = world.finished(task_id)
-    problems = bounced_problems(summary, "日常开发的一条跑 6 秒，")
-    head = f"task-server：任务 {task_id} over-two-hours"
-    found = inbox.wait_for(world, head)
+    found = inbox.wait_for(world, long_run_head(task_id))
     text = found[0]["text"] if found else ""
-    wanted = ("累计跑了", "各次 第 1 次", "命令：", "范围声明：", "自证：日常开发跑一阵子", "日志末几行：", "tick", "点名范围",
-              f"task-server/task requeue {task_id} --long-run-confirmed --items 0 --tasks 0 --why")
+    summary = world.finished(task_id)
+    problems = []
+    if summary["task"].get("outcome") != "succeeded" or summary["task"].get("exit_code") != 0:
+        problems.append(f"满界服务不停它，应当跑完 succeeded、退 0，实际 {describe(summary)}")
+    wanted = ("累计跑了", "各次 第 1 次", "命令：", "范围声明：", "自证：日常开发跑一阵子", "日志末几行：", "tick", f"task-server/task cancel {task_id}", f"task-server/task confirm {task_id} --why")
     missing = [piece for piece in wanted if piece not in text]
     if not found or missing:
-        problems.append(f"推给会话的那一条应当写命令、范围声明、累计与各次用时、日志末几行与两条出路（缺 {missing}），实际「{text[:600]}」")
+        problems.append(f"推给会话的那一条应当写累计与各次用时、命令、范围声明、日志末几行与两条出路（缺 {missing}），实际「{text[:600]}」")
+    pushed = inbox.headed(long_run_head(task_id))
+    if len(pushed) != 1:
+        problems.append(f"满界应当恰好推一回，实际 {len(pushed)} 回")
     if problems:
-        raise SelftestFailure("跑满两小时打回：" + "；".join(problems), world.server_log_lines())
-    return f"日常开发的一条累计满 {RUN_LIMIT_SAMPLE_SECONDS} 秒被停、记 over-two-hours、退 242，推给会话的写全了命令、范围声明、用时、日志末几行与 requeue 那一行"
+        raise SelftestFailure("跑满两小时提醒：" + "；".join(problems), world.server_log_lines())
+    return f"日常开发的一条累计满 {RUN_LIMIT_SAMPLE_SECONDS} 秒推一回、写全了依据与两条出路，服务不停它、跑完 succeeded"
 
 
-def cell_over_two_hours_across_cap_hits(world):
-    """撞了内存上限重来的计时归零（用户：「撞了内存上限 后重跑的任务两小时计时归零。 不限定要三次。」）：界 3 秒，前两次各跑 2.5 秒退 250（撞上限、乘 1.5 重排），
-    第三次跑 2 秒：三次加起来 7 秒过了界，而每一次撞上限之后都从零算、哪一次都不满 3 秒，跑完 succeeded，三次结局是两次 memory-cap-hit、一次 succeeded。
-    弄坏开关 over-two-hours-cap-hits-counted 下撞上限的那几次也累加，第二次跑到 0.5 秒就满界被停、记 over-two-hours，这一格红。"""
+def cell_long_run_confirm_silences(world):
+    """没确认的再推、确认了不再推（task_server.py 文件头 ⑦「跑满两小时」；界压到 1 秒、再推的门槛 2 秒）：等放行的一条满界推一回，没处置再推「第 1 回再推」；
+    照整行 task confirm <号> --why 确认，退 0，之后不再推，task status、日志与结局那一条都有「长跑已确认：<why>」；放行之后跑完 succeeded。
+    弄坏开关 anomaly-not-repushed 下不再推，long-run-confirmed-still-reminded 下确认了还推，long-run-confirmed-flag-hidden 下没有那一行，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    release = os.path.join(world.root, "release-long-run-confirm")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SHORT_SECONDS, "TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS": REPUSH_SAMPLE_SECONDS})
+    task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra=dict(inbox.environment(), SINGLEFS_RUN_SCOPE=SCOPE_DAILY))
+    problems = []
+    flag = f"长跑已确认：{LONG_RUN_WHY_SAMPLE}"
+    try:
+        log = running_attempt_log(world, task_id)
+        first_head, again_head = f"{long_run_head(task_id)}；", f"{long_run_head(task_id)}，没处置、第 1 回再推；第 2 回"
+        problems += inbox_problems(inbox.wait_for(world, first_head), first_head, "头一回")
+        problems += inbox_problems(inbox.wait_for(world, again_head), again_head, "再推")
+        confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE])
+        if confirmed.returncode != 0 or LONG_RUN_WHY_SAMPLE not in confirmed.stdout:
+            problems.append(f"task confirm <号> --why 应当退 0、打那一句，实际退 {confirmed.returncode}：「{(confirmed.stdout + confirmed.stderr).strip()[-300:]}」")
+        settled = len(inbox.headed(long_run_head(task_id)))
+        time.sleep(3 * float(REPUSH_SAMPLE_SECONDS))
+        if len(inbox.headed(long_run_head(task_id))) != settled:
+            problems.append(f"确认了之后不该再推，实际确认时 {settled} 条、等了之后 {len(inbox.headed(long_run_head(task_id)))} 条")
+        shown = world.client(["status", str(task_id)])
+        if flag not in shown.stdout + shown.stderr:
+            problems.append(f"task status 应当有一行「{flag}」，实际「{(shown.stdout + shown.stderr).strip()[:400]}」")
+        if LONG_RUN_WHY_SAMPLE not in read_text(log):
+            problems.append(f"这一次尝试的日志应当接一行确认的 --why，实际日志「{read_text(log)[-300:]}」")
+    finally:
+        open(release, "w").close()
+    summary = world.finished(task_id)
+    if summary["task"].get("outcome") != "succeeded":
+        problems.append(f"放行之后应当跑完 succeeded，实际 {describe(summary)}")
+    found = inbox.wait_for(world, outcome_head(task_id, "succeeded"))
+    if not found or flag not in found[0]["text"]:
+        problems.append(f"推给会话的结局那一条应当有「{flag}」，实际「{(found[0]['text'] if found else '没收到')[:400]}」")
+    if problems:
+        raise SelftestFailure("跑满两小时确认：" + "；".join(problems), world.server_log_lines())
+    return "满界推一回、没处置再推，确认之后不再推，status、日志与结局都有长跑已确认那一行，跑完 succeeded"
+
+
+def cell_long_run_reminder_across_cap_hits(world):
+    """撞了内存上限重来的计时归零（task_server.py 的 run_limit_accumulated）：界 6 秒，前四次各跑 1.5 秒退 250（撞上限、乘 1.5 重排），第五次跑约 1 秒：五次加起来 7 秒过了界，
+    而每一次撞上限之后都从零算、哪一次都不满 6 秒：一条提醒都没有，跑完 succeeded，五次结局是四次 memory-cap-hit、一次 succeeded。单次用时只占界的四分之一，机器忙时慢到三倍多才会误判。
+    弄坏开关 long-run-cap-hits-counted 下撞上限的那几次也累加，第四次跑到 1.5 秒就满界推一回，这一格红。"""
+    inbox = FakeInbox(world, "a")
     world.resources(local=(100, 100))
-    world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_ACROSS_SECONDS})
-    task_id = world.submit(["bash", "-c", ACROSS_CAP_HITS_SCRIPT], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_ACROSS_SECONDS})
+    task_id = world.submit(["bash", "-c", ACROSS_CAP_HITS_SCRIPT], extra=dict(inbox.environment(), SINGLEFS_RUN_SCOPE=SCOPE_DAILY))
     summary = world.finished(task_id)
     outcomes = [attempt.get("outcome") for attempt in summary["attempts"]]
-    if summary["task"].get("outcome") != "succeeded" or outcomes != ["memory-cap-hit", "memory-cap-hit", "succeeded"]:
-        raise SelftestFailure(f"撞上限重来的计时归零：两次撞上限各 2.5 秒、第三次 2 秒应当跑完 succeeded（各次 memory-cap-hit、memory-cap-hit、succeeded），"
-                              f"实际 {describe(summary)}、各次 {outcomes}", world.server_log_lines())
-    return f"两次撞上限各跑 2.5 秒、第三次跑 2 秒，三次加起来过了 {RUN_LIMIT_ACROSS_SECONDS} 秒的界，每次撞上限后归零、照跑完 succeeded"
+    problems = []
+    if summary["task"].get("outcome") != "succeeded" or outcomes != ["memory-cap-hit"] * 4 + ["succeeded"]:
+        problems.append(f"四次撞上限各 1.5 秒、第五次约 1 秒应当跑完 succeeded（各次四个 memory-cap-hit、一个 succeeded），实际 {describe(summary)}、各次 {outcomes}")
+    inbox.wait_for(world, outcome_head(task_id, "succeeded"))   # 结局那一条之前的提醒都发完了
+    pushed = inbox.headed(long_run_head(task_id))
+    if pushed:
+        problems.append(f"每次撞上限后归零，不该提醒，实际推了 {len(pushed)} 回：「{pushed[0]['text'][:300]}」")
+    if problems:
+        raise SelftestFailure("撞上限重来的计时归零：" + "；".join(problems), world.server_log_lines())
+    return f"四次撞上限各跑 1.5 秒、第五次跑约 1 秒，五次加起来过了 {RUN_LIMIT_ACROSS_SECONDS} 秒的界，每次撞上限后归零、不提醒、照跑完"
 
 
-def cell_over_two_hours_commit_gate_exempt(world):
-    """提交时的门禁豁免：假仓里的 .claude/gate.d/lkmm.sh 不带 --check、范围声明的「为什么」写了「提交前」，跑 6 秒过了 3 秒的界照跑完 succeeded。"""
+def cell_long_run_full_gate_not_reminded(world):
+    """带全量门禁标识的不提醒：假仓里的 .claude/gate.d/lkmm.sh 带 --full-gate，跑 6 秒过了 3 秒的界，一条提醒都没有、跑完 succeeded。弄坏开关 full-gate-flag-ignored 下照提醒，这一格红。"""
+    inbox = FakeInbox(world, "a")
     world.resources(local=(30, 30))
     write_fake_entry(world, FAKE_COMMIT_GATE)
-    world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
-    summary = world.finished(world.submit(["bash", FAKE_COMMIT_GATE], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo))
-    if summary["task"].get("outcome") != "succeeded":
-        raise SelftestFailure(f"提交前跑的提交时门禁（不带 --check）应当豁免、跑完 succeeded，实际 {describe(summary)}", world.server_log_lines())
-    return "提交前跑的提交时门禁过了界照跑完"
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
+    task_id = world.submit(["bash", FAKE_COMMIT_GATE], extra=dict(inbox.environment(), SINGLEFS_RUN_SCOPE=SCOPE_COMMIT), cwd=world.repo)
+    summary = world.finished(task_id)
+    inbox.wait_for(world, outcome_head(task_id, "succeeded"))   # 结局那一条之前的提醒都发完了
+    pushed = inbox.headed(long_run_head(task_id))
+    if summary["task"].get("outcome") != "succeeded" or pushed:
+        raise SelftestFailure(f"提交前跑的提交时门禁带 --full-gate 应当不提醒、跑完 succeeded，实际 {describe(summary)}、推了 {len(pushed)} 回", world.server_log_lines())
+    return "带全量标识的提交时门禁过了界不提醒、照跑完"
 
 
-def cell_over_two_hours_check_not_exempt(world):
-    """豁免要三样都对（task_server_lib.py 的 commit_gate_exempt；任务 9604 那种带 --check 的门禁跑了 6.2 小时）：同一道门禁带 --check（「为什么」写了提交前）的、
-    不带 --check 而「为什么」没写提交前的，都满 3 秒被停、记 over-two-hours。弄坏开关 over-two-hours-commit-exempt-by-command-only 下两条都豁免、跑完，这一格红。"""
+def cell_long_run_check_not_exempt(world):
+    """没带全量标识的门禁提醒（任务 9604 那种带 --check 的门禁跑了 6.2 小时）：同一道门禁带 --check（范围声明写了提交前也不算）的满 3 秒记提醒、照跑完。
+    不带 --check 又没带全量标识的提交时就被拒（whole_package_refusal），这一格不交它。"""
     world.resources(local=(30, 30))
     write_fake_entry(world, FAKE_COMMIT_GATE)
     world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
     checked = world.submit(["bash", FAKE_COMMIT_GATE, "--check", "lkmm-cell"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo)
-    daily = world.submit(["bash", FAKE_COMMIT_GATE], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY}, cwd=world.repo)
-    problems = bounced_problems(world.finished(checked), "带 --check 的门禁，") + bounced_problems(world.finished(daily), "「为什么」没写提交前的门禁，")
+    problems = reminded_problems(world, checked, "带 --check 的门禁，")
     if problems:
-        raise SelftestFailure("提交时门禁的豁免：" + "；".join(problems), world.server_log_lines())
-    return "带 --check 的门禁与「为什么」没写提交前的门禁都满界被停"
+        raise SelftestFailure("提交时门禁的提醒：" + "；".join(problems), world.server_log_lines())
+    return "带 --check 的门禁满界提醒、照跑完"
 
 
-def cell_over_two_hours_merge_and_verify_not_exempt(world):
-    """merge-and-verify 不豁免（给了补丁目录、「为什么」写了提交前也一样）：假仓里的 scripts/gate/merge-and-verify.sh 跑 6 秒，满 3 秒被停、记 over-two-hours。"""
-    card_world(world)
+def cell_long_run_merge_and_verify_not_exempt(world):
+    """merge-and-verify 同样提醒（给了补丁目录、「为什么」写了提交前也一样）：假仓里的 scripts/gate/merge-and-verify.sh 跑 6 秒，满 3 秒记提醒、照跑完。"""
+    world.resources(local=(100, 100))
     write_fake_entry(world, FAKE_MERGE_ENTRY)
     world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
-    summary = world.finished(world.submit(["bash", FAKE_MERGE_ENTRY, "selftest-patch-directory"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo))
-    problems = bounced_problems(summary, "merge-and-verify，")
+    task_id = world.submit(["bash", FAKE_MERGE_ENTRY, "selftest-patch-directory"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo)
+    problems = reminded_problems(world, task_id, "merge-and-verify，")
     if problems:
-        raise SelftestFailure("merge-and-verify 不豁免：" + "；".join(problems), world.server_log_lines())
-    return "merge-and-verify 满界被停、记 over-two-hours"
+        raise SelftestFailure("merge-and-verify 的提醒：" + "；".join(problems), world.server_log_lines())
+    return "merge-and-verify 满界提醒、照跑完"
 
 
-def cell_requeue_goes_to_tail(world):
-    """requeue 排在队尾（task_server.py 文件头 ⑦「跑满两小时」）：本机只放得下一条（6G、每条记 4G），A 跑满 3 秒被打回；hold 住余量交 B（号比 A 大），
-    再 requeue A（新号 C 比 B 大）；放开余量：B 先起、跑完，C 才起。弄坏开关 requeue-keeps-original-position 下原号 A 重开回原位、比 B 先起，这一格红。"""
-    world.resources(local=(6, 6))
-    world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
-    bounced = world.submit(["bash", "-c", LONG_TICKS_SCRIPT], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
-    problems = bounced_problems(world.finished(bounced), "A，")
-    world.resources(local=(6, 6), hold=True)
-    earlier = world.submit(["bash", "-c", "sleep 1; exit 0"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
-    completed = requeue(world, bounced, 0, 1)
-    fresh = requeued_id(completed)
-    world.resources(local=(6, 6))
-    if completed.returncode != 0 or fresh is None:
-        raise SelftestFailure(f"requeue A 应当退 0、打 {lib.REQUEUE_MARK} task=<新号>，实际退 {completed.returncode}：「{completed.stdout.strip()[-300:]}」「{completed.stderr.strip()[-300:]}」",
-                              world.server_log_lines())
-    b, c = world.finished(earlier), world.finished(fresh)
-    b_started, c_started = float(first_attempt(b).get("started_at") or 0), float((c["attempts"] or [{}])[-1].get("started_at") or 0)
-    if fresh <= earlier or not b_started or not c_started or c_started < b_started:
-        problems.append(f"requeue 的那一条应当新号（{fresh}）比先交的 B（{earlier}）大、B 先起它后起，实际 B 起于 {b_started}、它起于 {c_started}")
-    if problems:
-        raise SelftestFailure("requeue 排在队尾：" + "；".join(problems), world.server_log_lines())
-    return f"A 被打回之后 requeue 成新号 {fresh}，排在先交的 B（{earlier}）后面，B 先起"
-
-
-def cell_long_run_confirmed_not_bounced(world):
-    """带「长跑已确认」标识的不再按两小时打回、标识打进 status 与推送（task_server.py 文件头 ⑦「跑满两小时」）：A 跑满 3 秒被打回，requeue 成 C；
-    C 跑 6 秒照跑完 succeeded，task status C 与推给会话的结局那一条都有「长跑已确认（原号 A）：<why>」。
-    弄坏开关 long-run-confirmed-still-bounced 下 C 照样被停，long-run-confirmed-flag-hidden 下没有那一行，这一格红。"""
-    inbox = FakeInbox(world, "a")
-    start_inbox_server(world, {"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
-    bounced = world.submit(["bash", "-c", LONG_TICKS_SCRIPT], extra=dict(inbox.environment(), SINGLEFS_RUN_SCOPE=SCOPE_DAILY))
-    problems = bounced_problems(world.finished(bounced), "A，")
-    completed = requeue(world, bounced, 0, 0)
-    fresh = requeued_id(completed)
-    if completed.returncode != 0 or fresh is None:
-        raise SelftestFailure(f"requeue A 应当退 0、打新号，实际退 {completed.returncode}：「{completed.stderr.strip()[-300:]}」", world.server_log_lines())
-    flag = f"长跑已确认（原号 {bounced}）：{LONG_RUN_WHY_SAMPLE}"
-    shown = world.client(["status", str(fresh)])
-    summary = world.finished(fresh)
-    if summary["task"].get("outcome") != "succeeded":
-        problems.append(f"带长跑已确认的 C 应当过了界照跑完 succeeded，实际 {describe(summary)}")
-    if flag not in shown.stdout + shown.stderr:
-        problems.append(f"task status C 应当有一行「{flag}」，实际「{(shown.stdout + shown.stderr).strip()[:400]}」")
-    found = inbox.wait_for(world, f"task-server：任务 {fresh} succeeded")
-    if not found or flag not in found[0]["text"]:
-        problems.append(f"推给会话的 C 的结局那一条应当有「{flag}」，实际「{(found[0]['text'] if found else '没收到')[:400]}」")
-    if problems:
-        raise SelftestFailure("长跑已确认：" + "；".join(problems), world.server_log_lines())
-    return f"requeue 成 {fresh} 的那一条过了界照跑完，status 与推送都有长跑已确认那一行"
-
-
-def cell_requeue_refusals(world):
-    """requeue 的拒（task_server.py 的 requeue）：别的会话 requeue 退 3、点名不是这个会话提交的；结局 succeeded 的号退 3、点名不是 over-two-hours；
-    --items 对不上退 3、打服务算的确认单（requeue-counts-mismatch）；--why 太短退 3；对的那一回退 0，同一个号再 requeue 退 3、点名 requeue 过；
-    requeue 出来的新号再 requeue 退 3。被拒的那几回原号都没 requeue（库里 requeued_as 不在）。"""
+def cell_long_run_confirm_refused(world):
+    """task confirm <号> --why 不合的（task_server.py 文件头 ⑦「跑满两小时」；界压到 3 秒）：没满界的、--why 去掉空白不到 12 个字或全是空白的、别的会话的、有了结局的、带 --full-gate 的都退 3，
+    没有这个任务退 4，--why 后面没给值退 2；合的退 0，再确认一回照退 0、不改原来那一句。
+    弄坏开关 long-run-short-why-accepted 下太短的也照收，long-run-confirm-unchecked 下没满界、别的会话与有了结局的也照收，这一格红。"""
+    release = os.path.join(world.root, "release-long-run-refused")
     world.resources(local=(30, 30))
+    write_fake_entry(world, FAKE_COMMIT_GATE)
     world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
-    bounced = world.submit(["bash", "-c", LONG_TICKS_SCRIPT], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
-    finished = world.submit(["bash", "-c", "exit 0"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
-    problems = bounced_problems(world.finished(bounced), "A，")
-    world.finished(finished)
-    for what, completed, text in (("别的会话", requeue(world, bounced, 0, 0, session=SESSION_B), "不是这个会话提交的"),
-                                  ("结局 succeeded 的号", requeue(world, finished, 0, 0), "不是 over-two-hours"),
-                                  ("--items 对不上", requeue(world, bounced, 5, 0), "确认单"),
-                                  ("--why 太短", requeue(world, bounced, 0, 0, why="太短"), "至少")):
-        output = completed.stdout + completed.stderr
-        if completed.returncode != 3 or text not in output:
-            problems.append(f"{what}的 requeue 应当退 3、写「{text}」，实际退 {completed.returncode}：「{output.strip()[-300:]}」")
-    if world.summary(bounced)["task"].get("requeued_as"):
-        problems.append("被拒的那几回之后原号不该记 requeued_as")
-    first = requeue(world, bounced, 0, 0)
-    fresh = requeued_id(first)
-    again = requeue(world, bounced, 0, 0)
-    nested = requeue(world, fresh, 0, 1) if fresh is not None else None
-    if first.returncode != 0 or fresh is None:
-        problems.append(f"对的那一回应当退 0、打新号，实际退 {first.returncode}：「{first.stderr.strip()[-300:]}」")
-    if again.returncode != 3 or "requeue 过" not in again.stdout + again.stderr:
-        problems.append(f"同一个号再 requeue 应当退 3、写 requeue 过，实际退 {again.returncode}：「{(again.stdout + again.stderr).strip()[-300:]}」")
-    if nested is not None and nested.returncode != 3:
-        problems.append(f"带长跑已确认的新号再 requeue 应当退 3，实际退 {nested.returncode}：「{(nested.stdout + nested.stderr).strip()[-300:]}」")
-    if fresh is not None:
-        world.finished(fresh)
+    finished_id = world.submit(["bash", "-c", "exit 0", "already-finished"])
+    world.finished(finished_id)
+    task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
+    problems = []
+
+    def confirm_exit(what, words, wanted, session=SESSION_A):
+        completed = world.client(["confirm", *words], session=session)
+        if completed.returncode != wanted:
+            problems.append(f"{what}应当退 {wanted}，实际退 {completed.returncode}：「{(completed.stdout + completed.stderr).strip()[-300:]}」")
+        return completed
+    try:
+        running_attempt_log(world, task_id)
+        confirm_exit("没满界的", [str(task_id), "--why", LONG_RUN_WHY_SAMPLE], 3)
+        time.sleep(float(RUN_LIMIT_SAMPLE_SECONDS) + 0.5)
+        short = confirm_exit("--why 太短的", [str(task_id), "--why", "太短理由"], 3)
+        if f"至少 {lib.LONG_RUN_WHY_MINIMUM_CHARACTERS}" not in short.stderr:
+            problems.append(f"--why 太短的应当写「至少 {lib.LONG_RUN_WHY_MINIMUM_CHARACTERS}」，实际「{short.stderr.strip()[-300:]}」")
+        confirm_exit("--why 全是空白的", [str(task_id), "--why", "   \t  "], 3)
+        confirm_exit("别的会话的", [str(task_id), "--why", LONG_RUN_WHY_SAMPLE], 3, session=SESSION_B)
+        confirm_exit("有了结局的", [str(finished_id), "--why", LONG_RUN_WHY_SAMPLE], 3)
+        confirm_exit("没有这个任务的", ["999999", "--why", LONG_RUN_WHY_SAMPLE], CLIENT_NO_SUCH_TASK_EXIT)
+        confirm_exit("--why 后面没给值的", [str(task_id), "--why"], lib.USAGE_EXIT)
+        confirm_exit("合的", [str(task_id), "--why", LONG_RUN_WHY_SAMPLE], 0)
+        again = confirm_exit("再确认一回的", [str(task_id), "--why", "另一句写够十二个字的理由，不该换掉原来的"], 0)
+        if LONG_RUN_WHY_SAMPLE not in again.stdout:
+            problems.append(f"再确认一回应当说原来就确认过、留原来那一句，实际「{again.stdout.strip()[-300:]}」")
+    finally:
+        open(release, "w").close()
+    world.finished(task_id)
+    gate_id = world.submit(["bash", FAKE_COMMIT_GATE], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo)
+    running_attempt_log(world, gate_id)
+    time.sleep(float(RUN_LIMIT_SAMPLE_SECONDS) + 0.5)
+    confirm_exit("带 --full-gate 的", [str(gate_id), "--why", LONG_RUN_WHY_SAMPLE], 3)
+    world.finished(gate_id)
     if problems:
-        raise SelftestFailure("requeue 的拒：" + "；".join(problems), world.server_log_lines())
-    return "别的会话、结局不对、两个数对不上、--why 太短、同号二次与带标识的再 requeue 都退 3；对的那一回退 0"
+        raise SelftestFailure("task confirm --why 的拒：" + "；".join(problems), world.server_log_lines())
+    return "没满界、--why 太短或全是空白、别的会话、有了结局、带 --full-gate 的退 3，没有这个任务退 4，没给值退 2；合的退 0，再确认照退 0、不改原来那一句"
+
+
+def cell_long_run_sessionless_noted(world):
+    """没有会话的跑满两小时（task_server.py 文件头 ①「要处置的提醒」的 long-run-unconfirmed；界压到 1 秒）：人手 --manual 交的一条不推，这一次尝试的日志接一行 lib.LONG_RUN_LOG_MARK 起头的待确认、
+    恰好一行，status 打「长跑待确认」；同样可以确认（退 0），status 换成「长跑已确认」，放行后跑完。
+    弄坏开关 long-run-sessionless-unnoted 下不写日志那一行，long-run-unconfirmed-silent 下都没有，这一格红。"""
+    release = os.path.join(world.root, "release-long-run-sessionless")
+    world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SHORT_SECONDS})
+    task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], session=None)
+    problems = []
+    mark = f"{lib.LONG_RUN_LOG_MARK} 长跑待确认"
+    try:
+        log = running_attempt_log(world, task_id)
+        patience = world.patience(INBOX_WAIT_SECONDS)
+        while mark not in read_text(log) and patience.waiting():
+            time.sleep(POLL_SECONDS)
+        lines = [line for line in read_text(log).splitlines() if line.startswith(mark)]
+        if len(lines) != 1 or "累计跑了" not in lines[0] or f"task-server/task confirm {task_id} --why" not in lines[0]:
+            problems.append(f"日志里应当恰好一行「{mark}…」写累计与确认的写法，实际 {len(lines)} 行：「{(lines or [''])[0][:300]}」")
+        shown = world.client(["status", str(task_id)], session=None)
+        if "长跑待确认" not in shown.stdout:
+            problems.append(f"task status 应当打「长跑待确认」，实际「{shown.stdout.strip()[:400]}」")
+        confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE], session=None)
+        again = world.client(["status", str(task_id)], session=None)
+        if confirmed.returncode != 0 or f"长跑已确认：{LONG_RUN_WHY_SAMPLE}" not in again.stdout or "长跑待确认" in again.stdout:
+            problems.append(f"人手交的同样可以确认，确认之后 status 换成已确认，实际退 {confirmed.returncode}、status「{again.stdout.strip()[:400]}」")
+    finally:
+        open(release, "w").close()
+    summary = world.finished(task_id)
+    if summary["task"].get("outcome") != "succeeded":
+        problems.append(f"放行之后应当跑完 succeeded，实际 {describe(summary)}")
+    if problems:
+        raise SelftestFailure("没有会话的跑满两小时：" + "；".join(problems), world.server_log_lines())
+    return "人手交的不推，日志接恰好一行待确认、status 打一行，同样可以确认"
 
 
 WHOLE_PACKAGE_COMMANDS = (   # ⑬ 整包测试四种形态（task_server.py 文件头 ②「提交时拒」⑥）：(说什么, 命令, 在哪起)
@@ -8457,10 +7693,22 @@ WHOLE_PACKAGE_COMMANDS = (   # ⑬ 整包测试四种形态（task_server.py 文
     ("不给补丁目录的 merge-and-verify.sh", ["bash", "scripts/gate/merge-and-verify.sh"], "repo"))
 
 
-def submit_raw(world, command, cwd, confirmation="", scope=SCOPE_DAILY):
-    """只交、不确认（交了的待确认、不进队、不跑）：→ CompletedProcess。"""
-    words = ["submit", "--cwd", cwd] + (["--whole-package-confirmed", confirmation] if confirmation else []) + ["--", *command]
+def submit_raw(world, command, cwd, confirmation="", scope=SCOPE_DAILY, full_gate=None):
+    """只交、不确认（交了的待确认、不进队、不跑）：→ CompletedProcess。full_gate 没给的，演提交时那一趟（scope 是 SCOPE_COMMIT 而命令是提交时门禁）带全量标识。"""
+    if full_gate is None:
+        full_gate = scope == SCOPE_COMMIT and lib.commit_gate_entry(list(command), cwd)
+    words = ["submit", "--cwd", cwd] + (["--full-gate"] if full_gate else []) + (["--whole-package-confirmed", confirmation] if confirmation else []) + ["--", *command]
     return world.client(words, extra={"SINGLEFS_RUN_SCOPE": scope})
+
+
+def submit_confirmed(world, command, cwd, confirmation, scope=SCOPE_DAILY):
+    """带整包确认文件交一条、照确认单确认（同 World.submit），交任务号。"""
+    completed = submit_raw(world, command, cwd, confirmation, scope)
+    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+    if completed.returncode != 0 or not found:
+        raise SelftestFailure(f"带确认文件提交 {command} 没拿到任务号（退 {completed.returncode}）", [completed.stdout, completed.stderr] + world.server_log_lines())
+    world.confirm_submitted(completed, extra={"SINGLEFS_RUN_SCOPE": scope})
+    return int(found.group(1))
 
 
 def cell_whole_package_unconfirmed_refused(world):
@@ -8499,7 +7747,7 @@ def cell_whole_package_named_accepted(world):
     return "点名测试目标、带测试名的四种与提交时的门禁都照收"
 
 
-WHOLE_PACKAGE_CONFIRMATION_TEXT = ("① 改到的文件与函数：task-server/task_server.py 的 judge_stall_stop 与 judge_run_limit\n"
+WHOLE_PACKAGE_CONFIRMATION_TEXT = ("① 改到的文件与函数：task-server/task_server.py 的 judge_stall_stop 与 run_limit_accumulated\n"
                                    "② 引到它们的测试目标与函数：task_server_lib.py --selftest 的几格，grep 命中七处\n"
                                    "③ 为什么只点名②不够：自证造的整包确认，演三段都写全的一份\n")
 
@@ -8534,86 +7782,39 @@ def cell_whole_package_confirmation_form(world):
     return "缺 ③、③ 太短、相对路径都退 3；三段写全的照收，status 有整包已确认那一行"
 
 
-def cell_whole_package_confirmed_still_bounced(world):
-    """整包已确认的照样受两小时限、requeue 之后两种标识都带（task_server.py 文件头 ②「提交时拒」⑥ 与 ⑦「跑满两小时」）：不给补丁目录的假 merge-and-verify.sh
-    带三段写全的确认文件交、跑 6 秒，满 3 秒被停、记 over-two-hours；requeue 成新号，新号带原号的整包确认文件与长跑已确认，status 两行都有，过了界照跑完。
-    弄坏开关 whole-package-confirmed-exempts-two-hours 下头一条跑完不打回，whole-package-flag-dropped-on-requeue 下新号丢了整包已确认，这一格红。"""
-    card_world(world)
-    write_fake_entry(world, FAKE_MERGE_ENTRY)
+def cell_whole_package_confirmed_still_reminded(world):
+    """整包已确认的照样受两小时提醒（task_server.py 文件头 ②「提交时拒」⑥ 与 ⑦「跑满两小时」）：不给补丁目录的假 merge-and-verify.sh 带三段写全的确认文件交、跑 6 秒，满 3 秒记提醒、服务不停；
+    照提醒 task confirm <号> --why 确认，status 有整包已确认与长跑已确认两行，照跑完。
+    弄坏开关 whole-package-confirmed-exempts-two-hours 下不提醒，long-run-confirmed-flag-hidden 下没有长跑已确认那一行，这一格红。"""
+    world.resources(local=(100, 100))
+    release = os.path.join(world.root, "release-whole-package-reminded")
+    entry = os.path.join(world.repo, FAKE_MERGE_ENTRY)
+    os.makedirs(os.path.dirname(entry), exist_ok=True)
+    write_executable(entry, f"#!/usr/bin/env bash\nfor round in $(seq 1 600); do [[ -e {shlex.quote(release)} ]] && exit 0; sleep 0.1; done; exit 9\n")
     world.start_server(extra={"TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS": RUN_LIMIT_SAMPLE_SECONDS})
     full = write_confirmation(world, "whole-package-full.md", WHOLE_PACKAGE_CONFIRMATION_TEXT)
-    completed = submit_raw(world, ["bash", FAKE_MERGE_ENTRY], world.repo, confirmation=full)
-    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
-    if completed.returncode != 0 or not found:
-        raise SelftestFailure(f"带确认文件的整包测试应当照收，实际退 {completed.returncode}：「{completed.stderr.strip()[-300:]}」", world.server_log_lines())
-    world.confirm_submitted(completed, extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY})
-    bounced = int(found.group(1))
-    problems = bounced_problems(world.finished(bounced), "整包已确认的那一条，")
-    again = requeue(world, bounced, 0, 0)
-    fresh = requeued_id(again)
-    if again.returncode != 0 or fresh is None:
-        raise SelftestFailure(f"requeue 应当退 0、打新号，实际退 {again.returncode}：「{again.stderr.strip()[-300:]}」", world.server_log_lines())
-    shown = world.client(["status", str(fresh)])
+    task_id = submit_confirmed(world, ["bash", FAKE_MERGE_ENTRY], world.repo, full)
+    waited = world.client(["wait", str(task_id)])
+    problems, _ = attention_problems(waited, task_id, LONG_RUN_KIND, lib.ATTENTION_EXIT)
+    confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE])
+    shown = world.client(["status", str(task_id)])
     text = shown.stdout + shown.stderr
-    for line in (f"整包已确认：{full}", f"长跑已确认（原号 {bounced}）：{LONG_RUN_WHY_SAMPLE}"):
+    if confirmed.returncode != 0:
+        problems.append(f"task confirm <号> --why 应当退 0，实际退 {confirmed.returncode}：「{(confirmed.stdout + confirmed.stderr).strip()[-300:]}」")
+    for line in (f"整包已确认：{full}", f"长跑已确认：{LONG_RUN_WHY_SAMPLE}"):
         if line not in text:
-            problems.append(f"requeue 出来的新号 status 应当有「{line}」，实际「{text.strip()[:400]}」")
-    summary = world.finished(fresh)
-    if summary["task"].get("whole_package_confirmed") != full or summary["task"].get("outcome") != "succeeded":
-        problems.append(f"新号应当带原号的整包确认文件、过了界照跑完，实际标识「{summary['task'].get('whole_package_confirmed')}」、{describe(summary)}")
-    if problems:
-        raise SelftestFailure("整包已确认照样受两小时限：" + "；".join(problems), world.server_log_lines())
-    return f"整包已确认的满 {RUN_LIMIT_SAMPLE_SECONDS} 秒照样打回；requeue 成 {fresh} 两种标识都带、照跑完"
-
-
-def cell_attention_card_replaced(world):
-    """换卡重排（任务还在跑）：本机两张卡，0 号卡清场判坏，换 1 号卡重排；换卡之后的那一次一直在跑（假清场等放行文件），wait 打一行 kind=card-replaced、
-    依据写坏卡与第几次尝试、退 ATTENTION_EXIT；任务不在结局状态，放行之后在 1 号卡上跑完。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    release = os.path.join(world.root, "release-attention-card")
-    task_id = world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=card-fault-on-else-block:{LOCAL_CARD_ZERO}={release}"])
-    completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
-    during = world.summary(task_id)
-    problems, fields = attention_problems(completed, task_id, "card-replaced", lib.ATTENTION_EXIT)
-    bad_card = LOCAL_CARD_ZERO.rsplit(":", 1)[0]
-    if bad_card not in fields.get("basis", "") or "第 1 次" not in fields.get("basis", ""):
-        problems.append(f"依据应当点名坏卡 {bad_card} 与「第 1 次」尝试，实际「{fields.get('basis')}」")
-    if during["task"].get("state") == "finished":
-        problems.append(f"报了换卡重排之后任务应当还没结局，实际 {describe(during)}")
+            problems.append(f"确认之后 status 应当有「{line}」，实际「{text.strip()[:400]}」")
     open(release, "w").close()
-    done = world.finished(task_id)
-    cards = [attempt.get("card") for attempt in done["attempts"]]
-    if done["task"].get("outcome") != "succeeded" or cards != [LOCAL_CARD_ZERO, LOCAL_CARD_ONE]:
-        problems.append(f"放行之后应当换 {LOCAL_CARD_ONE} 跑完，实际 {describe(done)}、各次的卡 {cards}")
+    summary = world.finished(task_id)
+    if summary["task"].get("whole_package_confirmed") != full or summary["task"].get("outcome") != "succeeded":
+        problems.append(f"应当带整包确认文件、过了界照跑完，实际标识「{summary['task'].get('whole_package_confirmed')}」、{describe(summary)}")
     if problems:
-        raise SelftestFailure("换卡重排：" + "；".join(problems), world.server_log_lines())
-    return f"0 号卡清场判坏换 1 号卡重排：wait 打 {lib.ATTENTION_MARK} kind=card-replaced（依据「{fields.get('basis')}」）、退 {lib.ATTENTION_EXIT}，任务不在结局，放行后在 1 号卡跑完"
-
-
-def cell_attention_card_replaced_after_finish(world):
-    """换卡重排已经跑成（结局记 succeeded，同 card-fault-replaced-on-another-card）才来 wait：照样叫一次——末行之前打一行 kind=card-replaced（打在 TASK_SERVER_REASON 之前），
-    退码仍是任务的 0，末行是 succeeded 的 TASK_SERVER_RESULT。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", local_gpu=[(0, 16384), (1, 16384)])
-    world.start_server()
-    task_id = world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=card-fault-on:{LOCAL_CARD_ZERO}"])
-    done = world.finished(task_id)
-    completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
-    problems, fields = attention_problems(completed, task_id, "card-replaced", 0)
-    lines = completed.stdout.strip().splitlines()
-    marks = [index for index, line in enumerate(lines) if line.startswith(lib.ATTENTION_MARK + " ")]
-    reasons = [index for index, line in enumerate(lines) if line.startswith(lib.REASON_MARK + " ")]
-    if not lines or not lines[-1].startswith(f"{lib.RESULT_MARK} task={task_id} type=succeeded ") or not marks or not reasons or marks[0] > reasons[0]:
-        problems.append(f"末行应当是 succeeded 的 {lib.RESULT_MARK}，提醒那一行打在 {lib.REASON_MARK} 之前，实际输出「{completed.stdout.strip()[-500:]}」")
-    if done["task"].get("outcome") != "succeeded":
-        problems.append(f"换卡重排应当跑成，实际 {describe(done)}")
-    if problems:
-        raise SelftestFailure("换卡重排跑成：" + "；".join(problems), world.server_log_lines())
-    return f"换卡重排跑成之后才 wait：{lib.ATTENTION_MARK} kind=card-replaced 打在 {lib.REASON_MARK} 之前，退 0、末行 succeeded"
+        raise SelftestFailure("整包已确认照样受两小时提醒：" + "；".join(problems), world.server_log_lines())
+    return f"整包已确认的满 {RUN_LIMIT_SAMPLE_SECONDS} 秒照样提醒、服务不停；确认之后两种标识都打、照跑完"
 
 
 def cell_attention_cleanup_pending(world):
-    """清场没收尾：派第二台的一条，第二台那一层写 pending 的清理回执（假 multi-host-run.sh 的 fake-peer-cleanup=pending）却一直不确认，服务保留这一次尝试的占用、任务不记结局；
+    """清理没收尾：派第二台的一条，第二台那一层写 pending 的清理回执（假 multi-host-run.sh 的 fake-peer-cleanup=pending）却一直不确认，服务保留这一次尝试的占用、任务不记结局；
     wait 打一行 kind=cleanup-pending、依据带回执未确认的原因、退 ATTENTION_EXIT；回执改成 confirmed 之后任务跑完。"""
     world.resources(local=(1, 30), peer=(100, 100), peer_cap_gibibytes=64)
     world.start_server()
@@ -8622,10 +7823,10 @@ def cell_attention_cleanup_pending(world):
     during = world.summary(task_id)
     problems, fields = attention_problems(completed, task_id, "cleanup-pending", lib.ATTENTION_EXIT)
     attempt = (during["attempts"] or [{}])[-1]
-    if "清场没收尾" not in fields.get("basis", "") or "未确认" not in fields.get("basis", ""):
-        problems.append(f"依据应当写「清场没收尾」与回执未确认的原因，实际「{fields.get('basis')}」")
+    if "清理没收尾" not in fields.get("basis", "") or "未确认" not in fields.get("basis", ""):
+        problems.append(f"依据应当写「清理没收尾」与回执未确认的原因，实际「{fields.get('basis')}」")
     if during["task"].get("state") != "running" or attempt.get("state") not in ("starting", "running") or not attempt.get("cleanup_pending"):
-        problems.append(f"报了清场没收尾之后任务应当照旧在跑、这一次尝试保持在跑并记着 cleanup_pending，实际 {describe(during)}、状态 {during['task'].get('state')}、尝试 {attempt.get('state')}")
+        problems.append(f"报了清理没收尾之后任务应当照旧在跑、这一次尝试保持在跑并记着 cleanup_pending，实际 {describe(during)}、状态 {during['task'].get('state')}、尝试 {attempt.get('state')}")
     receipt = attempt.get("peer_cleanup_file") or ""
     if receipt:
         with open(receipt + ".partial", "w", encoding="utf-8") as handle:
@@ -8637,7 +7838,7 @@ def cell_attention_cleanup_pending(world):
     if done["task"].get("outcome") != "succeeded":
         problems.append(f"回执确认之后应当跑完，实际 {describe(done)}")
     if problems:
-        raise SelftestFailure("清场没收尾：" + "；".join(problems), world.server_log_lines())
+        raise SelftestFailure("清理没收尾：" + "；".join(problems), world.server_log_lines())
     return f"第二台清理回执一直 pending：wait 打 {lib.ATTENTION_MARK} kind=cleanup-pending（依据「{fields.get('basis', '')[:80]}」）、退 {lib.ATTENTION_EXIT}，任务照旧在跑，回执确认后跑完"
 
 
@@ -8668,8 +7869,8 @@ def cell_attention_shard_advance_failed(world):
 
 
 def cell_attention_reported_once(world):
-    """同一条任务同一种提醒、同一档只叫醒一次：排队过久（头一档 6 秒、第二档 12 秒）叫醒过一次，主 agent 重起 wait 之后头一档里不再叫（再起的 wait 这段时间一直等着），
-    排满第二档才再叫一次（tier=2，依据不同）；任务一直是在排。"""
+    """同一条任务同一种提醒、同一道提醒门槛只叫醒一次：排队过久（排满 6 秒、12 秒各一道门槛）叫醒过一次，主 agent 重起 wait 之后到 12 秒之前不再叫（再起的 wait 这段时间一直等着），
+    排满 12 秒才再叫一次（reminded_after_seconds 从 6 到 12，依据不同、写着排满 24 秒再提醒一回）；任务一直是在排。"""
     world.resources(local=(50, 20), peer_down="自证：第二台在重启")
     world.seed_peak("selftest-attention-once", 30 * GIBIBYTE)
     world.start_server(extra={"TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS": str(ATTENTION_ONCE_SECONDS)})
@@ -8682,29 +7883,32 @@ def cell_attention_reported_once(world):
     try:
         output, _ = world.communicate(second, ATTENTION_WAIT_SECONDS)
     except subprocess.TimeoutExpired:
-        second.kill()
-        output, _ = second.communicate()
+        output, _ = world.stop_client(second)
     second_done = subprocess.CompletedProcess(second.args, second.returncode, output, "")
     more, second_fields = attention_problems(second_done, task_id, "queued-too-long", lib.ATTENTION_EXIT)
     problems += more
-    if first_fields.get("tier") != "1" or second_fields.get("tier") != "2" or first_fields.get("basis") == second_fields.get("basis"):
-        problems.append(f"头一回应当 tier=1、再起的 wait 排满第二档才叫 tier=2 且依据不同，实际 tier {first_fields.get('tier')} 与 {second_fields.get('tier')}")
+    later = 2 * ATTENTION_ONCE_SECONDS
+    reached = (first_fields.get("reminded_after_seconds"), second_fields.get("reminded_after_seconds"))
+    if reached != (str(ATTENTION_ONCE_SECONDS), str(later)) or first_fields.get("basis") == second_fields.get("basis") \
+            or f"排满 {2 * later} 秒再提醒一回" not in second_fields.get("basis", ""):
+        problems.append(f"头一回应当 reminded_after_seconds={ATTENTION_ONCE_SECONDS}、再起的 wait 排满 {later} 秒才叫 reminded_after_seconds={later}、"
+                        f"依据不同且写着排满 {2 * later} 秒再提醒一回，实际 {reached}、依据「{first_fields.get('basis')}」与「{second_fields.get('basis')}」")
     if not quiet:
-        problems.append(f"头一档叫过之后再起 wait，{ATTENTION_ONCE_QUIET_SECONDS} 秒里不该再叫，实际它当场退了（退 {second.returncode}）")
+        problems.append(f"{ATTENTION_ONCE_SECONDS} 秒那一回叫过之后再起 wait，{ATTENTION_ONCE_QUIET_SECONDS} 秒里不该再叫，实际它当场退了（退 {second.returncode}）")
     world.resources(local=(50, 20), peer=(50, 50), peer_cap_gibibytes=50)
     world.finished(task_id)
     if problems:
         raise SelftestFailure("提醒只叫醒一次：" + "；".join(problems), world.server_log_lines())
-    return f"头一档叫醒一次（tier=1），重起的 wait 头一档里不再叫，排满第二档才叫 tier=2（依据「{second_fields.get('basis')}」）"
+    return f"排满 {ATTENTION_ONCE_SECONDS} 秒叫醒一次，重起的 wait 到 {later} 秒之前不再叫，排满 {later} 秒才再叫（依据「{second_fields.get('basis')}」）"
 
 
-ATTENTION_RESTART_SECONDS = 8   # attention-reported-survives-restart：头一档 8 秒、第二档 16 秒（头一档报过之后重启服务留得出 8 秒）
+ATTENTION_RESTART_SECONDS = 8   # attention-reported-survives-restart：排满 8 秒、16 秒各一道提醒门槛（8 秒那一回报过之后重启服务留得出 8 秒）
 
 
 def cell_attention_reported_survives_restart(world):
-    """报过的档记进库（task_server.py 文件头 ①「要处置的提醒」；会话 46 的任务 8819 那 30 片在第 3 档发过一轮，主 agent 重启服务之后同一档又发一轮）：
-    排队过久（头一档 8 秒、第二档 16 秒）报过头一档（tier=1），停掉服务、照同一份库重起，再起的 wait 不再报头一档、排满第二档才报 tier=2；任务一直在排。
-    弄坏开关 attention-reported-memory-only 下照改前只记在服务内存里：重起之后再起的 wait 当场又报 tier=1，这一格红。"""
+    """报到的提醒门槛记进库（task_server.py 文件头 ①「要处置的提醒」；会话 46 的任务 8819 那 30 片发过一轮，主 agent 重启服务之后同一道门槛又发一轮）：
+    排队过久（排满 8 秒、16 秒各一道门槛）报过 8 秒那一回，停掉服务、照同一份库重起，再起的 wait 不再报 8 秒那一回、排满 16 秒才报；任务一直在排。
+    弄坏开关 attention-reported-memory-only 下照改前只记在服务内存里：重起之后再起的 wait 当场又报 8 秒那一回，这一格红。"""
     world.resources(local=(50, 20), peer_down="自证：第二台在重启")
     world.seed_peak("selftest-attention-restart", 30 * GIBIBYTE)
     extra = {"TASK_SERVER_SELFTEST_QUEUE_ATTENTION_SECONDS": str(ATTENTION_RESTART_SECONDS)}
@@ -8717,26 +7921,27 @@ def cell_attention_reported_survives_restart(world):
     second = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
     more, second_fields = attention_problems(second, task_id, "queued-too-long", lib.ATTENTION_EXIT)
     problems += more
-    if first_fields.get("tier") != "1" or second_fields.get("tier") != "2":
-        problems.append(f"重启之前应当报 tier=1，重启之后再起的 wait 不再报头一档、排满第二档才报 tier=2，实际 tier {first_fields.get('tier')} 与 {second_fields.get('tier')}"
-                        f"（重启之后那一行的依据「{second_fields.get('basis')}」）")
+    reached = (first_fields.get("reminded_after_seconds"), second_fields.get("reminded_after_seconds"))
+    if reached != (str(ATTENTION_RESTART_SECONDS), str(2 * ATTENTION_RESTART_SECONDS)):
+        problems.append(f"重启之前应当报 reminded_after_seconds={ATTENTION_RESTART_SECONDS}，重启之后再起的 wait 不再报那一回、排满 {2 * ATTENTION_RESTART_SECONDS} 秒才报，"
+                        f"实际 {reached}（重启之后那一行的依据「{second_fields.get('basis')}」）")
     world.resources(local=(50, 20), peer=(50, 50), peer_cap_gibibytes=50)
     done = world.finished(task_id)
     if done["task"].get("outcome") != "succeeded":
         problems.append(f"第二台回来之后应当派过去跑完，实际 {describe(done)}")
     if problems:
-        raise SelftestFailure("报过的提醒档跨重启：" + "；".join(problems), world.server_log_lines())
-    return f"头一档报过（tier=1）之后重启服务，再起的 wait 不再报头一档，排满第二档才报 tier=2（依据「{second_fields.get('basis')}」）"
+        raise SelftestFailure("报到的提醒门槛跨重启：" + "；".join(problems), world.server_log_lines())
+    return f"排满 {ATTENTION_RESTART_SECONDS} 秒那一回报过之后重启服务，再起的 wait 不再报那一回，排满 {2 * ATTENTION_RESTART_SECONDS} 秒才报（依据「{second_fields.get('basis')}」）"
 
 
-REASON_PENDING_QUIET_SECONDS = 3.0   # attention-queue-waits-for-reason：排满头一档（2 秒）之后再看这么久，排队原因一直判不出来的这段时间 wait 不该叫
+REASON_PENDING_QUIET_SECONDS = 3.0   # attention-queue-waits-for-reason：排满提醒门槛（2 秒）之后再看这么久，排队原因一直判不出来的这段时间 wait 不该叫
 
 
 def cell_attention_queue_waits_for_reason(world):
     """排队原因还没判出来的不报排队过久（task_server.py 文件头 ①「要处置的提醒」；会话 46 那一回重启之后头一轮的原因写的是「排队原因此刻读不到」）：
     本机放得下、排队线程照判不起（TASK_SERVER_SELFTEST_PLACEMENT_PAUSED：派活判它放得下就不写排队原因，演服务刚重启、这一轮还没判到它），
-    排满头一档（2 秒）再过 3 秒，在等的 wait 一直不叫；换成本机放不下、第二台用不了，排队线程判出原因（第二台用不了）的那一轮 wait 才叫，原因不空、点名第二台。
-    弄坏开关 attention-queue-reasonless-sent 下照改前照报：头一档一到 wait 就叫、原因写读不到，这一格红。"""
+    排满提醒门槛（2 秒）再过 3 秒，在等的 wait 一直不叫；换成本机放不下、第二台用不了，排队线程判出原因（第二台用不了）的那一轮 wait 才叫，原因不空、点名第二台。
+    弄坏开关 attention-queue-reasonless-sent 下照改前照报：一到提醒门槛 wait 就叫、原因写读不到，这一格红。"""
     world.resources(local=(100, 100))
     world.seed_peak("selftest-attention-reason", 30 * GIBIBYTE)
     paused = os.path.join(world.root, "placement-paused-reason")
@@ -8750,12 +7955,11 @@ def cell_attention_queue_waits_for_reason(world):
     try:
         output, _ = world.communicate(waiting, ATTENTION_WAIT_SECONDS)
     except subprocess.TimeoutExpired:
-        waiting.kill()
-        output, _ = waiting.communicate()
+        output, _ = world.stop_client(waiting)
     completed = subprocess.CompletedProcess(waiting.args, waiting.returncode, output, "")
     problems, fields = attention_problems(completed, task_id, "queued-too-long", lib.ATTENTION_EXIT)
     if not quiet:
-        problems.append(f"排队原因判不出来的那几轮 wait 不该叫，实际它在排满头一档 {ATTENTION_QUEUE_SECONDS} 秒之后 {REASON_PENDING_QUIET_SECONDS} 秒里就退了"
+        problems.append(f"排队原因判不出来的那几轮 wait 不该叫，实际它在排满 {ATTENTION_QUEUE_SECONDS} 秒之后 {REASON_PENDING_QUIET_SECONDS} 秒里就退了"
                         f"（退 {waiting.returncode}，那一行的原因「{fields.get('why')}」）")
     elif "第二台" not in fields.get("why", "") or "读不到" in fields.get("why", ""):
         problems.append(f"判出原因那一轮报的原因应当点名「第二台」、不是读不到，实际「{fields.get('why')}」")
@@ -8769,21 +7973,21 @@ def cell_attention_queue_waits_for_reason(world):
     return f"排队原因判不出来的 {REASON_PENDING_QUIET_SECONDS} 秒里 wait 不叫，判出原因那一轮才报（原因「{fields.get('why')}」）"
 
 
-def cell_attention_type_in_header(world):
-    """文件头「错误类型」与表同步：提醒的类型名、退出码、各种 kind（ATTENTION_KINDS）与那一行的标记都写在文件头；退出码不与错误类型表里的码、疑似卡住的码撞。"""
-    header = lib.__doc__ or ""
+def cell_attention_type_in_anomaly_table(world):
+    """异常表（lib.ANOMALY_TABLE_TEXT）与代码同步：提醒的类型名、退出码、各种 kind（ATTENTION_KINDS）与那一行的标记都写在表里；退出码不与错误类型表里的码、疑似卡住的码撞。"""
+    table = lib.ANOMALY_TABLE_TEXT
     taken = {code for code, _ in lib.OUTCOME_TYPES.values() if code is not None} | set(lib.EXIT_TYPES) | {lib.SUSPECT_EXIT}
     problems = []
     if lib.ATTENTION_EXIT in taken:
         problems.append(f"提醒的退出码 {lib.ATTENTION_EXIT} 不该与错误类型表、疑似卡住的码撞")
-    if not re.search(rf"{re.escape(lib.ATTENTION_TYPE)}[^\n]*\b{lib.ATTENTION_EXIT}\b", header):
-        problems.append(f"文件头「错误类型」该有一行写 {lib.ATTENTION_TYPE} 与退出码 {lib.ATTENTION_EXIT}")
-    missing = [name for name in (lib.ATTENTION_MARK, *lib.ATTENTION_KINDS) if name not in header]
+    if not re.search(rf"{re.escape(lib.ATTENTION_TYPE)}[^\n]*\b{lib.ATTENTION_EXIT}\b", table):
+        problems.append(f"异常表该有一行写 {lib.ATTENTION_TYPE} 与退出码 {lib.ATTENTION_EXIT}")
+    missing = [name for name in (lib.ATTENTION_MARK, *lib.ATTENTION_KINDS) if name not in table]
     if missing:
-        problems.append(f"文件头「错误类型」该写 {missing}")
+        problems.append(f"异常表该写 {missing}")
     if problems:
         raise SelftestFailure("；".join(problems))
-    return f"提醒的类型 {lib.ATTENTION_TYPE}、退出码 {lib.ATTENTION_EXIT}、{len(lib.ATTENTION_KINDS)} 种 kind 与标记都在文件头，码没和错误类型表撞"
+    return f"提醒的类型 {lib.ATTENTION_TYPE}、退出码 {lib.ATTENTION_EXIT}、{len(lib.ATTENTION_KINDS)} 种 kind 与标记都在异常表里，码没和错误类型表撞"
 
 
 def cell_temporary_service_wrapper_compiles(world):
@@ -8874,72 +8078,6 @@ def cell_temporary_service_own_server_compiles(world):
             f"别的模式与别的脚本不给（纯函数表 {len(table)} 条对）")
 
 
-def cell_cap_hit_rerun_from_record(world):
-    """撞过上限的命令再交一遍（task_server.py 文件头 ②「内存」的有记录的照记录与 workspace_writer_headroom；这一格照真的下限 4G，不用各格小世界的 0，
-    弄坏开关 recorded-cap-floored 下兜的就是它）：改主工作区的命令（不带 --skip-apply 的 merge-and-verify、hook-swap.py 带 --verify）撞了上限只有一次尝试、
-    服务不重排，调用方自己再交一遍在服务看来是新任务。两条规则各给一个上限，哪个大用哪个，都不设 4G 底：
-      ① 记录（近 5 次最高 × 1.5，撞过的上限也算进近 5 次最高），prediction 记 RECORD_HISTORY；
-      ② 首趟给足（workspace_writer_headroom）：(这把键近 5 次最高 + 它的验证命令那把键近 5 次最高) × 1.5，比 ① 大才换，prediction 记 WORKSPACE_WRITER_HISTORY。
-    每条的数（单位 MiB，向上取整到 MiB）：
-      小的（merge-and-verify，记 247，没有验证命令）：头一遍 ① ② 都是 247 × 1.5 = 371，record，撞；再交 窗口最高是撞过的 371，371 × 1.5 = 557，record，跑完；再一遍 557，record。
-      大的（merge-and-verify，记 4096）：头一遍 4096 × 1.5 = 6144，record，撞；再交 窗口最高 6144，6144 × 1.5 = 9216，record，跑完；再一遍 9216，record。
-      带验证命令的（hook-swap.py 带 --verify，自己记 247、验证命令那把键记 4096）：头一遍 ② (247 + 4096) × 1.5 = 6514.5 → 6515，① 371，取 6515（workspace-writer），撞；
-        再交 ② (6515 + 4096) × 1.5 = 15916.5 → 15917，① 6515 × 1.5 = 9772.5 → 9773，取大的 15917（workspace-writer），跑完；再一遍 窗口最高仍是 6515，15917，workspace-writer。
-    另有一条没人改工作区的命令，记录里只有一次撞过的 247：① 247 × 1.5 = 371（record），不兜到 4096。
-    弄坏开关 recorded-cap-floored 下照改前兜到 4096：小的头一遍 4096、没人改工作区的那条 4096，这一格红；
-    workspace-writer-headroom-skipped 下 ② 不起：带验证命令的头一遍只照记录 371，红。"""
-    world.resources(local=(30, 30))
-    verify_key = PEAKS.command_key(shlex.split(WRITER_HEADROOM_VERIFY), None)
-    seeded_key = "selftest-cap-hit-rerun-seeded"
-
-    def merge_and_verify(plan):
-        return ["bash", "-c", "exit 0", "x", "scripts/gate/merge-and-verify.sh", f"fake-wrapper-exits={plan}"]
-
-    def hook_swap(plan):
-        return ["bash", "-c", "exit 0", "x", "scripts/gate/hook-swap.py", "selftest-spec.json", "--scratch", world.work, "--verify", WRITER_HEADROOM_VERIFY, f"fake-wrapper-exits={plan}"]
-
-    # 每条：名字、命令键、记下的峰值、起命令的写法、三遍各自的 (上限, prediction)：头一遍撞上限、撞过再交一遍、跑完之后再交一遍
-    writers = (("小的", "selftest-cap-hit-rerun-small", MEMORY_FLOOR_SEED_BYTES, merge_and_verify,
-                ((CAP_HIT_RERUN_SMALL_TEXTS[0], lib.RECORD_HISTORY), (CAP_HIT_RERUN_SMALL_TEXTS[1], lib.RECORD_HISTORY),
-                 (CAP_HIT_RERUN_SMALL_TEXTS[1], lib.RECORD_HISTORY))),
-               ("大的", "selftest-cap-hit-rerun-big", CAP_HIT_RERUN_BIG_SEED_BYTES, merge_and_verify,
-                ((CAP_HIT_RERUN_BIG_TEXTS[0], lib.RECORD_HISTORY), (CAP_HIT_RERUN_BIG_TEXTS[1], lib.RECORD_HISTORY),
-                 (CAP_HIT_RERUN_BIG_TEXTS[1], lib.RECORD_HISTORY))),
-               ("带验证命令的", "selftest-cap-hit-rerun-verified", MEMORY_FLOOR_SEED_BYTES, hook_swap,
-                ((CAP_HIT_RERUN_VERIFIED_TEXTS[0], lib.WORKSPACE_WRITER_HISTORY), (CAP_HIT_RERUN_VERIFIED_TEXTS[1], lib.WORKSPACE_WRITER_HISTORY),
-                 (CAP_HIT_RERUN_VERIFIED_TEXTS[1], lib.WORKSPACE_WRITER_HISTORY))))
-    for _, key, seed_bytes, _, _ in writers:
-        world.seed_peak(key, seed_bytes)
-    world.seed_peak(verify_key, CAP_HIT_RERUN_VERIFY_PEAK_BYTES)
-    world.seed_attempt({"command_key": seeded_key, "outcome": "memory-cap-hit", "memory_cap": CAP_HIT_RERUN_SEEDED_HIT_BYTES, "memory_peak": None})
-    world.start_server(extra={lib.MEMORY_FLOOR_VARIABLE: ""})
-
-    problems = []
-    for name, key, _, build, steps in writers:
-        extra = {lib.KEY_VARIABLE: key}
-        runs = [world.finished(world.submit(build(plan), extra=extra, cwd=world.repo)) for plan in ("250,run", "run", "run")]
-        for step, summary, (cap_text, history), outcome in zip(("头一遍", "撞过上限的命令再交一遍", "跑完之后再交一遍"), runs, steps, ("memory-cap-hit", "succeeded", "succeeded")):
-            attempt = first_attempt(summary)
-            cap_bytes = int(cap_text[:-1]) * MEBIBYTE
-            if (summary["task"].get("outcome") != outcome or len(summary["attempts"]) != 1 or attempt.get("memory_cap") != cap_bytes
-                    or attempt.get("booked") != cap_bytes or attempt.get("prediction") != history):
-                problems.append(f"{name}{step}：应当一次尝试、结局 {outcome}、上限与记账 {cap_text}（{cap_bytes} 字节）、prediction 记 {history}，"
-                                f"实际上限 {attempt.get('memory_cap_text')}、记账 {attempt.get('booked')}、prediction {attempt.get('prediction')}、{describe(summary)}")
-    seeded = world.finished(world.submit(["bash", "-c", "exit 0", "x", "fake-wrapper-exits=run"], extra={lib.KEY_VARIABLE: seeded_key}, cwd=world.repo))
-    seeded_attempt = first_attempt(seeded)
-    seeded_bytes = int(MEMORY_FLOOR_RECORDED_TEXT[:-1]) * MEBIBYTE
-    if (seeded["task"].get("outcome") != "succeeded" or len(seeded["attempts"]) != 1 or seeded_attempt.get("memory_cap") != seeded_bytes
-            or seeded_attempt.get("booked") != seeded_bytes or seeded_attempt.get("prediction") != lib.RECORD_HISTORY):
-        problems.append(f"没人改工作区、记录里只有一次撞过的 {CAP_HIT_RERUN_SEEDED_HIT_BYTES // MEBIBYTE}M：再交一遍应当照它 × 1.5 是 {MEMORY_FLOOR_RECORDED_TEXT}（{seeded_bytes} 字节，"
-                        f"不兜到 4G）、prediction 记 {lib.RECORD_HISTORY}、跑完，实际上限 {seeded_attempt.get('memory_cap_text')}、记账 {seeded_attempt.get('booked')}、"
-                        f"prediction {seeded_attempt.get('prediction')}、{describe(seeded)}")
-    if problems:
-        raise SelftestFailure("撞过上限再交一遍照记录与首趟给足里大的、不设 4G 底：" + "；".join(problems), world.server_log_lines())
-    return (f"改工作区的命令撞过上限再交一遍，两条规则取大、不设 4G 底：小的头一遍 {CAP_HIT_RERUN_SMALL_TEXTS[0]}、再交 {CAP_HIT_RERUN_SMALL_TEXTS[1]}，大的 {CAP_HIT_RERUN_BIG_TEXTS[0]}、"
-            f"{CAP_HIT_RERUN_BIG_TEXTS[1]}，带验证命令的 {CAP_HIT_RERUN_VERIFIED_TEXTS[0]}、{CAP_HIT_RERUN_VERIFIED_TEXTS[1]}（首趟给足比记录大，prediction 记 {lib.WORKSPACE_WRITER_HISTORY}）；"
-            f"跑完之后再交一遍照记录与首趟给足取大；记录里只有一次撞过的 {CAP_HIT_RERUN_SEEDED_HIT_BYTES // MEBIBYTE}M 的（没人改工作区）照记录 {MEMORY_FLOOR_RECORDED_TEXT}")
-
-
 def cell_slow_world_patient_wait(world):
     """慢世界（上面常量处「等待的判法」）：一条命令每 SLOW_WORLD_STEP_SECONDS 秒往日志与世界目录各写一笔、共 SLOW_WORLD_STEPS 步，总共跑得比安静时限
     SLOW_WORLD_BASE_SECONDS 久；等它收尾的 wait_for 与客户端的 wait 都拿这个安静时限等：世界一直在变，应当等到收尾、判绿。另一头：收尾之后世界不再变，
@@ -8987,22 +8125,9 @@ def cell_slow_world_patient_wait(world):
             f"收尾之后世界不再变，{quiet:.1f} 秒就判红（绝对上限 {ceiling:.0f} 秒）")
 
 
-# ── 峰值起步、重试不重编、改主工作区的命令没正常结束、一条任务要几张卡（task_server.py 文件头 ②「内存」「GPU」、①「要处置的提醒」）──
-SHARD_FAMILY_FREE_GIBIBYTES = 7      # shard-siblings-share-peaks：本机空闲 7G，放得下一片 4G 或 6G、放不下两片
-SHARD_FAMILY_RAISED_TEXT = "6144M"   # 兄弟片撞了 4096M 的上限：另一片第一次尝试从 4096M × 1.5 起
-BUILD_FAMILY_PEAK_BYTES = 8 * GIBIBYTE        # build-family-*：同族那一条跑成量到的峰值
-BUILD_FAMILY_RAISED_TEXT = "12288M"           # 8G × 1.5
-BUILD_FAMILY_ARGUMENTS = ("-p", "selftest-family", "--release")   # 同族那一条与入口声明写的 cargo 参数
-FAMILY_ARGUMENT_ENTRY = "family-argument-entry.sh"   # build-family-from-arguments：声明的包取自第三个参数的入口
-FAMILY_OPTION_ENTRY = "family-option-entry.sh"       # 同一格：声明的包取自 --crate 的值的入口
-BUILD_FAMILY_HIT_BYTES = 6144 * MEBIBYTE      # build-family-cap-hit-raises：同族另一条刚撞到的上限（族里没有一条跑成的）
-BUILD_FAMILY_HIT_RAISED_TEXT = "9216M"        # 6144M × 1.5：新提交的第一次、重排的第 2 次都起在这一档（改前一个照 4096M、一个照 6144M）
-BUILD_FAMILY_WINDOW_SMALL_BYTES = 6144 * MEBIBYTE   # build-family-peak-windowed：族里撞过高档之后五条跑成量到的峰值（× 1.5 = 9216M，比没记录的 4096M 大）
+# ── 峰值起步、重试不重编、改主工作区的命令没正常结束（task_server.py 文件头 ②「内存」、①「要处置的提醒」）──
 SPACED_ITEM_NAME = "带 空格的 条目"   # shard-child-key-folded-by-words：条目名里带空格（后半截不该漏进分片子任务的键里）
 SPACED_ITEM_TAIL = "空格的"
-PEER_CARD_ONE = f"{SELFTEST_PEER_ADDRESS}:1:8G"
-PEER_CARD_TWO = f"{SELFTEST_PEER_ADDRESS}:2:8G"
-CARD_FREE_MEBIBYTES = 16384
 FAKE_APPLY_WRITER_PATCH = r'''#!/usr/bin/env python3
 """task-server 自证的假 apply-writer-patch.py：只认 --read-outcome <结局文件>：里面有一行以「完成<TAB>」起头的打「打全了」、退 0，
 没有的逐行打「没打完」、退 3，读不了退 2（真的那一份的退出码，apply-writer-patch.py 文件头「结局文件」）。别的用法退 0、什么都不写（自证里命令本身由假包装演结局）。"""
@@ -9026,219 +8151,41 @@ HALF_APPLIED_OUTCOME = "开始\t/selftest/patch\t/selftest/repo\t1\t0\n文件\tc
 FULLY_APPLIED_OUTCOME = HALF_APPLIED_OUTCOME + "回读\tcrates/a.rs\tbbbb\n完成\t1\t1\n"
 
 
-def attempt_card_and_host(summary):
-    attempt = first_attempt(summary)
-    return attempt.get("card") or "", attempt.get("host") or ""
-
-
-def cell_shard_siblings_share_peaks(world):
-    """同一计划共用峰值（task_server.py 的 shard_family_peak）：本机空闲 7G、一次只放得下一片；第 0 片第一次撞了 4096M 的上限，第 1 片在它后面起，
-    第一次尝试就从兄弟片撞过的上限 × 1.5 起（6144M，prediction 记 shard-family），不从没记录的 4096M 爬。弄坏开关 shard-siblings-unshared 下第 1 片照 4096M 起。"""
-    world.resources(local=(SHARD_FAMILY_FREE_GIBIBYTES, 30))
-    command = world.write_spec("spec-shard-family.json", {"shards": [{"exits": [250, "run"]}, {}]})
-    world.start_server()
-    summary = world.finished(world.submit(command, cwd=world.repo))
-    shards = shard_children(summary)
-    opening_attempts = {index: (child["attempts"] or [{}])[0] for index, child in shards.items()}
-    follower = opening_attempts.get(1, {})
-    if (summary["task"].get("outcome") != "succeeded" or opening_attempts.get(0, {}).get("outcome") != "memory-cap-hit"
-            or follower.get("memory_cap_text") != SHARD_FAMILY_RAISED_TEXT or follower.get("prediction") != lib.SHARD_FAMILY_HISTORY):
-        raise SelftestFailure(f"第 0 片第一次撞了 {UNRECORDED_DEFAULT_PINNED_TEXT} 的上限，兄弟片第 1 片第一次尝试应当从 {SHARD_FAMILY_RAISED_TEXT} 起、prediction 记 "
-                              f"{lib.SHARD_FAMILY_HISTORY}，整件成了；实际 {describe(summary)}、各片第一次 "
-                              f"{ {index: (attempt.get('memory_cap_text'), attempt.get('prediction'), attempt.get('outcome')) for index, attempt in opening_attempts.items()} }",
-                              world.server_log_lines())
-    return f"兄弟片撞了 {UNRECORDED_DEFAULT_PINNED_TEXT} 之后，第 1 片第一次尝试从 {SHARD_FAMILY_RAISED_TEXT} 起（{lib.SHARD_FAMILY_HISTORY}）"
-
-
-def run_build_family_seed(world, extra_arguments=("--lib",)):
-    """往这一格服务自己的库里记同族（cargo test -p selftest-family --release 接 extra_arguments 那一族）一条跑成的尝试，编译那一段的峰值与 memory_peak 都是 BUILD_FAMILY_PEAK_BYTES
-    （编译族只借编译那一段的峰值：task_server.py 的 attempt_measurement；那一栏怎么记由 family-lends-build-phase-only 格钉）；交那一族。"""
-    family = lib.cargo_build_family([*BUILD_FAMILY_ARGUMENTS, *extra_arguments])
-    seed_ended_attempt(world, "selftest-family-lender-" + "-".join(word.strip("-") for word in extra_arguments), SEEDED_ENDED_AT, "succeeded",
-                       memory_peak=BUILD_FAMILY_PEAK_BYTES, build_family=family, build_phase_peak=BUILD_FAMILY_PEAK_BYTES)
-    return family
-
-
-def cell_build_family_peak_shared(world):
-    """会编的 cargo 同键没记录时按编译族起步（task_server.py 的 build_family_peak）：同族（包、档、特性相同）别的命令跑成量到 8G，
-    这一条（测试目标不同、包与档写的次序不同）第一次尝试从 8G × 1.5 = 12288M 起、prediction 记 build-family；特性不同、档不同的另一族照没记录的 4096M 起。
-    弄坏开关 build-family-ignored 下同族那一条也照 4096M 起。"""
-    world.resources(local=(100, 100))
-    world.start_server()
-    seeded_family = run_build_family_seed(world)
-    same = world.finished(world.submit(["cargo", "test", "--release", "-p", "selftest-family", "--test", "other-target", "fake-wrapper-exits=0"], cwd=world.repo))
-    other = world.finished(world.submit(["cargo", "test", "-p", "selftest-family", "--features", "extra", "--lib", "fake-wrapper-exits=0"], cwd=world.repo))
-    problems = []
-    attempt = first_attempt(same)
-    if attempt.get("memory_cap_text") != BUILD_FAMILY_RAISED_TEXT or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY:
-        problems.append(f"同族的另一条应当从 {BUILD_FAMILY_RAISED_TEXT} 起、prediction 记 {lib.BUILD_FAMILY_HISTORY}，"
-                        f"实际 {attempt.get('memory_cap_text')}、{attempt.get('prediction')}（任务记的族「{same['task'].get('build_family')}」，"
-                        f"同族那一条记的「{seeded_family}」）")
-    attempt = first_attempt(other)
-    if attempt.get("memory_cap_text") != UNRECORDED_DEFAULT_PINNED_TEXT:
-        problems.append(f"特性、档不同的另一族应当照没记录的 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，实际 {attempt.get('memory_cap_text')}、{attempt.get('prediction')}")
-    if problems:
-        raise SelftestFailure("编译族起步：" + "；".join(problems), world.server_log_lines())
-    return f"同族别的命令跑成 8G：这一条从 {BUILD_FAMILY_RAISED_TEXT} 起；另一族照 {UNRECORDED_DEFAULT_PINNED_TEXT}"
-
-
-def cell_build_family_declared(world):
-    """入口脚本文件头声明了编哪个包的照声明归族（task_server_lib.py 的 declared_build_family）：入口写「# task-server-cargo-family: -p selftest-family --release --features gpu」，
-    同族的 cargo（cargo test -p selftest-family --release --features gpu --no-run）跑成 8G 之后，这份入口第一次尝试从 12288M 起、prediction 记 build-family；
-    同一份入口单独 --selftest 的不归族、照没记录的 4096M 起。
-    弄坏开关 build-family-ignored 下入口也照 4096M 起。"""
-    world.resources(local=(100, 100))
-    with open(os.path.join(world.repo, "family-entry.sh"), "w", encoding="utf-8") as handle:
-        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_BUILD_FAMILY_MARK} {' '.join(BUILD_FAMILY_ARGUMENTS)} --features gpu\nexit 0\n")
-    world.start_server()
-    gpu_family = run_build_family_seed(world, ("--features", "gpu", "--no-run"))
-    entry = world.finished(world.submit(["bash", "family-entry.sh", "run", "fake-wrapper-exits=0"], cwd=world.repo))
-    selftest = world.finished(world.submit(["bash", "family-entry.sh", "--selftest", "fake-wrapper-exits=0"], cwd=world.repo))
-    problems = []
-    attempt = first_attempt(entry)
-    if attempt.get("memory_cap_text") != BUILD_FAMILY_RAISED_TEXT or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY:
-        problems.append(f"声明了编译族的入口应当照同族跑成的 8G 从 {BUILD_FAMILY_RAISED_TEXT} 起、prediction 记 {lib.BUILD_FAMILY_HISTORY}，"
-                        f"实际 {attempt.get('memory_cap_text')}、{attempt.get('prediction')}（入口记的族「{entry['task'].get('build_family')}」，"
-                        f"同族 cargo 记的「{gpu_family}」）")
-    if first_attempt(selftest).get("memory_cap_text") != UNRECORDED_DEFAULT_PINNED_TEXT or selftest["task"].get("build_family"):
-        problems.append(f"同一份入口单独 --selftest 不归族、应当照 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，实际 {first_attempt(selftest).get('memory_cap_text')}、"
-                        f"族「{selftest['task'].get('build_family')}」")
-    if problems:
-        raise SelftestFailure("入口声明的编译族：" + "；".join(problems), world.server_log_lines())
-    return f"入口文件头声明了包、档、特性：照同族 cargo 跑成的 8G 从 {BUILD_FAMILY_RAISED_TEXT} 起；--selftest 不归族"
-
-
-def cell_build_family_from_arguments(world):
-    """编译族声明里的包取自命令参数（task_server_lib.py 的 filled_family_words）：一份入口写「# task-server-cargo-family: -p $3 --release」（证红那样，包是第三个参数），
-    另一份写「-p $--crate --release」（包是 --crate 的值）。同族的 cargo（cargo test -p selftest-family --release --lib）跑成 8G 之后：
-    第一份带两个不同的变异名各交一条（命令键各不同、都没有自己的记录），两条都归进那一族、第一次尝试从 12288M 起、prediction 记 build-family；
-    第二份写「--crate 值」与「--crate=值」的两条同样；声明点名的参数缺了的（第一份只给两个参数、第二份没给 --crate）不归族、照没记录的 4096M 起。
-    弄坏开关 family-arguments-unfilled 下声明照字面算族，带变异名的那几条照 4096M 起。"""
-    world.resources(local=(100, 100))
-    for name, declared in ((FAMILY_ARGUMENT_ENTRY, f"-p {lib.FAMILY_ARGUMENT_MARK}3 --release"),
-                           (FAMILY_OPTION_ENTRY, f"-p {lib.FAMILY_ARGUMENT_MARK}--crate --release")):
-        with open(os.path.join(world.repo, name), "w", encoding="utf-8") as handle:
-            handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_BUILD_FAMILY_MARK} {declared}\nexit 0\n")
-    world.start_server()
-    family = run_build_family_seed(world)
-    grouped = {
-        "第三个参数、变异名甲": world.finished(world.submit(["bash", FAMILY_ARGUMENT_ENTRY, "--copy", "copy-of-the-tree", "selftest-family", "变异 甲：读者侧",
-                                                       "fake-wrapper-exits=0"], cwd=world.repo)),
-        "第三个参数、变异名乙": world.finished(world.submit(["bash", FAMILY_ARGUMENT_ENTRY, "--copy", "copy-of-the-tree", "selftest-family", "变异 乙：写者侧",
-                                                       "fake-wrapper-exits=0"], cwd=world.repo)),
-        "--crate 值": world.finished(world.submit(["bash", FAMILY_OPTION_ENTRY, "run", "--crate", "selftest-family", "变异 丙", "fake-wrapper-exits=0"], cwd=world.repo)),
-        "--crate=值": world.finished(world.submit(["bash", FAMILY_OPTION_ENTRY, "run", "--crate=selftest-family", "变异 丁", "fake-wrapper-exits=0"], cwd=world.repo)),
-    }
-    ungrouped = {
-        "第三个参数缺了": world.finished(world.submit(["bash", FAMILY_ARGUMENT_ENTRY, "--copy", "fake-wrapper-exits=0"], cwd=world.repo)),
-        "--crate 缺了": world.finished(world.submit(["bash", FAMILY_OPTION_ENTRY, "run", "变异 戊", "fake-wrapper-exits=0"], cwd=world.repo)),
-    }
-    problems = []
-    for what, summary in grouped.items():
-        attempt = first_attempt(summary)
-        if (summary["task"].get("build_family") != family or attempt.get("memory_cap_text") != BUILD_FAMILY_RAISED_TEXT
-                or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY):
-            problems.append(f"{what}：应当归进同族「{family}」、第一次尝试从 {BUILD_FAMILY_RAISED_TEXT} 起、prediction 记 {lib.BUILD_FAMILY_HISTORY}，"
-                            f"实际族「{summary['task'].get('build_family')}」、{attempt.get('memory_cap_text')}、{attempt.get('prediction')}（命令键「{summary['task'].get('command_key')}」）")
-    for what, summary in ungrouped.items():
-        if summary["task"].get("build_family") or first_attempt(summary).get("memory_cap_text") != UNRECORDED_DEFAULT_PINNED_TEXT:
-            problems.append(f"{what}：声明点名的参数缺了应当不归族、照 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，实际族「{summary['task'].get('build_family')}」、"
-                            f"{first_attempt(summary).get('memory_cap_text')}")
-    if problems:
-        raise SelftestFailure("编译族取自命令参数：" + "；".join(problems), world.server_log_lines())
-    return (f"包取自第三个参数与 --crate 的值：{len(grouped)} 条不同变异名的都归进同族、从 {BUILD_FAMILY_RAISED_TEXT} 起；"
-            f"参数缺了的 {len(ungrouped)} 条不归族、照 {UNRECORDED_DEFAULT_PINNED_TEXT}")
-
-
-def family_of_package(package):
-    """cargo test -p <package> --release --lib 提交时记的编译族（lib.cargo_build_family；-p 点了名，工作树目录不进族）：往库里记同族的尝试时用。"""
-    return lib.cargo_build_family(["-p", package, "--release", "--lib"])
-
-
-def cell_build_family_cap_hit_raises(world):
-    """编译族的窗口也收撞过的上限，起点能升（task_server.py 的 build_family_peak、attempt_measurement；用户：「资源的使用记录 服务要有升降的能力 不能只升不降」）：
-    同族另一条（命令键不同）刚撞了 6144M 的上限、族里没有一条跑成的。一、新提交的同族一条（键没有记录）第一次尝试从 6144M × 1.5 = 9216M 起、prediction 记 build-family；
-    二、另一族的一条第 1 次照 4096M 起、停在记尝试之前，这时往库里记同族另一条撞了 6144M，第 1 次撞了 4096M，第 2 次直接 9216M、prediction 记 build-family（改前一级级爬 6144M）。
-    弄坏开关 family-cap-hit-not-counted 下族里只收跑成的，一、二都照 4096M、6144M；build-family-ignored 下不看族。"""
-    pause = os.path.join(world.root, "pause")
-    os.makedirs(pause)
-    world.resources(local=(40, 40))
-    world.start_server(extra={"TASK_SERVER_SELFTEST_PAUSE_POINT": f"start-checked:{pause}"})
-    problems = []
-    fresh_package, retry_package = "selftest-family-hit-fresh", "selftest-family-hit-retry"
-    seed_ended_attempt(world, "selftest-family-hit-sibling-fresh", SEEDED_ENDED_AT - 10, "memory-cap-hit", memory_cap=BUILD_FAMILY_HIT_BYTES,
-                       build_family=family_of_package(fresh_package), build_phase_peak=BUILD_FAMILY_HIT_BYTES)
-    fresh = world.finished(world.submit(["cargo", "test", "-p", fresh_package, "--release", "--lib", "fake-wrapper-exits=0"], cwd=world.repo))
-    attempt = first_attempt(fresh)
-    if (fresh["task"].get("build_family") != family_of_package(fresh_package) or attempt.get("memory_cap_text") != BUILD_FAMILY_HIT_RAISED_TEXT
-            or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY):
-        problems.append(f"同族另一条刚撞了 {BUILD_FAMILY_HIT_BYTES // MEBIBYTE}M、族里没有跑成的：新提交的第一次应当从 {BUILD_FAMILY_HIT_RAISED_TEXT} 起、prediction 记 {lib.BUILD_FAMILY_HISTORY}，"
-                        f"实际 {attempt.get('memory_cap_text')}、{attempt.get('prediction')}（任务记的族「{fresh['task'].get('build_family')}」，"
-                        f"库里记的族「{family_of_package(fresh_package)}」）")
-    open(os.path.join(pause, "arm-start-checked"), "w").close()
-    task_id = world.submit(["cargo", "test", "-p", retry_package, "--release", "--lib", "fake-wrapper-exits=250,0"], cwd=world.repo)
-    wait_path(world, os.path.join(pause, "reached-start-checked"), "第 1 次停在记尝试之前")
-    seed_ended_attempt(world, "selftest-family-hit-sibling-retry", time.time(), "memory-cap-hit", memory_cap=BUILD_FAMILY_HIT_BYTES,
-                       build_family=family_of_package(retry_package), build_phase_peak=BUILD_FAMILY_HIT_BYTES)
-    open(os.path.join(pause, "release-start-checked"), "w").close()
-    retried = world.finished(task_id)
-    seen = [(attempt.get("memory_cap_text"), attempt.get("prediction"), attempt.get("outcome")) for attempt in retried["attempts"]]
-    if (retried["task"].get("outcome") != "succeeded" or len(seen) != 2 or seen[0][:1] != (UNRECORDED_DEFAULT_PINNED_TEXT,) or seen[0][2] != "memory-cap-hit"
-            or seen[1][:2] != (BUILD_FAMILY_HIT_RAISED_TEXT, lib.BUILD_FAMILY_HISTORY)):
-        problems.append(f"第 1 次照 {UNRECORDED_DEFAULT_PINNED_TEXT} 撞了上限、这时同族另一条撞了 {BUILD_FAMILY_HIT_BYTES // MEBIBYTE}M：第 2 次应当直接起在 {BUILD_FAMILY_HIT_RAISED_TEXT}、"
-                        f"prediction 记 {lib.BUILD_FAMILY_HISTORY}、跑完，实际各次（上限、prediction、结局）{seen}、{describe(retried)}")
-    if problems:
-        raise SelftestFailure("编译族收撞过的上限：" + "；".join(problems), world.server_log_lines())
-    return (f"同族另一条撞了 {BUILD_FAMILY_HIT_BYTES // MEBIBYTE}M、族里没有跑成的：新提交的第一次从 {BUILD_FAMILY_HIT_RAISED_TEXT} 起；"
-            f"另一族的一条第 1 次 {UNRECORDED_DEFAULT_PINNED_TEXT} 撞了、第 2 次直接 {BUILD_FAMILY_HIT_RAISED_TEXT}")
-
-
-def cell_build_family_peak_windowed(world):
-    """编译族的起点能降（task_server.py 的 build_family_peak、window_maximum；用户：「资源的使用记录 服务要有升降的能力 不能只升不降」）：同族早先撞过 13824M，
-    之后 RECORD_WINDOW 次（别的命令键的）跑成的峰值都是 6144M：撞过的那一次出了窗口，新提交的同族一条（键没有记录）第一次尝试从 6144M × 1.5 = 9216M 起、
-    prediction 记 build-family，不是 13824M × 1.5 = 20736M。弄坏开关 history-peak-unwindowed 下不截近几次、起在 20736M，这一格红。"""
-    world.resources(local=(40, 40))
-    package = "selftest-family-window"
-    world.start_server()
-    seed_ended_attempt(world, "selftest-family-window-hit", SEEDED_ENDED_AT - 100, "memory-cap-hit", memory_cap=HISTORY_CAP_HIT_BYTES, build_family=family_of_package(package),
-                       build_phase_peak=HISTORY_CAP_HIT_BYTES)
-    for offset in range(RECORD_WINDOW_PINNED):   # task_server.py 的 RECORD_WINDOW：近几次的名额全是小峰值
-        seed_ended_attempt(world, f"selftest-family-window-small-{offset}", SEEDED_ENDED_AT - 50 + offset, "succeeded", memory_peak=BUILD_FAMILY_WINDOW_SMALL_BYTES,
-                           build_family=family_of_package(package), build_phase_peak=BUILD_FAMILY_WINDOW_SMALL_BYTES)
-    summary = world.finished(world.submit(["cargo", "test", "-p", package, "--release", "--lib", "fake-wrapper-exits=0"], cwd=world.repo))
-    attempt = first_attempt(summary)
-    if (summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != BUILD_FAMILY_HIT_RAISED_TEXT
-            or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY):
-        raise SelftestFailure(f"同族早先撞过 {HISTORY_CAP_HIT_BYTES // MEBIBYTE}M、之后 {RECORD_WINDOW_PINNED} 次跑成都是 {BUILD_FAMILY_WINDOW_SMALL_BYTES // MEBIBYTE}M：撞过的那一次出了窗口，"
-                              f"新提交的第一次应当回落到 {BUILD_FAMILY_HIT_RAISED_TEXT}、prediction 记 {lib.BUILD_FAMILY_HISTORY}、跑完，实际上限 {attempt.get('memory_cap_text')}、"
-                              f"prediction {attempt.get('prediction')}、{describe(summary)}（只升不降会是 {HISTORY_CAP_HIT_GROWN_TEXT}）", world.server_log_lines())
-    return (f"同族早先撞过 {HISTORY_CAP_HIT_BYTES // MEBIBYTE}M、之后 {RECORD_WINDOW_PINNED} 次跑成都是 {BUILD_FAMILY_WINDOW_SMALL_BYTES // MEBIBYTE}M："
-            f"新提交的第一次回落到 {BUILD_FAMILY_HIT_RAISED_TEXT}")
-
-
-# ── 按历史最高起跑、打补丁脚本干跑照常重排、第二台重试接着用编译目录（task_server_lib.py 文件头「资源记录」的按历史最高起跑、「编译目录」的重试复用）──
+# ── 近几次最大、打补丁脚本干跑照常重排、第二台重试接着用编译目录（task_server_lib.py 文件头「资源记录」的定额度、「编译目录」的重试复用）──
 HISTORY_CAP_HIT_BYTES = 13824 * MEBIBYTE    # history-peak-first-attempt 与 history-peak-window-raises：同键撞过的上限（任务 7349、7416 撞过的那一档）
-HISTORY_CAP_HIT_GROWN_TEXT = "20736M"       # 13824M × 1.5
-HISTORY_SMALL_PEAK_BYTES = GIBIBYTE         # 跑成的小峰值：history-peak-first-attempt 里近 RECORD_WINDOW 次只有它们，起点回落到 1G × 1.5
-HISTORY_SMALL_PEAK_GROWN_TEXT = "1536M"
-HISTORY_RETRY_SEEDED_BYTES = 9216 * MEBIBYTE   # history-peak-retry-jumps：第 1 次在跑时同键别的任务撞到的上限
-HISTORY_RETRY_JUMP_TEXT = "13824M"             # 9216M × 1.5：第 2 次直接跳到这一档（改前照自己那一次 4096M × 1.5 = 6144M）
+HISTORY_CAP_HIT_TEXT = "13824M"             # 照撞过的上限本身，不乘 1.5
+HISTORY_SMALL_PEAK_BYTES = GIBIBYTE         # 跑成的小峰值：history-peak-first-attempt 里近 RECORD_WINDOW 次只有它们，起点回落到 1G
+HISTORY_SMALL_PEAK_TEXT = "1024M"
 
 
-def seed_ended_attempt(world, key, ended_at, outcome, memory_peak=None, memory_cap=None, build_family="", build_phase_peak=None):
-    """往这一格服务自己的库里记一次结束了的尝试，结束时刻照给的（World.seed_attempt 的结束时刻固定，排不出先后）；build_family 给了的记上那条任务的编译族，
-    build_phase_peak 是编译那一段的峰值（编译族只借这一栏；撞在编译那一段的那一次服务记的是那一次的上限）。"""
-    world.seeded.append(dict({"command_key": key, "outcome": outcome, "memory_peak": memory_peak, "memory_cap": memory_cap, "task_id": 0, "number": 1,
-                              "host": "local", "state": "ended", "session": "", "ended_at": ended_at, "started_at": ended_at - 1,
-                              "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC, "build_phase_peak": build_phase_peak},
-                             **({"build_family": build_family} if build_family else {})))
+def seed_ended_attempt(world, key, ended_at, outcome, memory_peak=None, memory_cap=None):
+    """往这一格服务自己的库里记一次结束了的尝试，结束时刻照给的（World.seed_attempt 的结束时刻固定，排不出先后）。
+    """
+    record = {"command_key": key, "outcome": outcome, "memory_peak": memory_peak, "memory_cap": memory_cap, "task_id": 0, "number": 1,
+              "host": "local", "state": "ended", "session": "", "ended_at": ended_at, "started_at": ended_at - 1,
+              "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC}
+    world.seeded.append(record)
     world.flush_seeded()
 
 
+def cell_cap_hit_low_peak_not_recorded_at_cap(world):
+    """撞上限那一次峰值远低于上限（task_server.py 的 cap_hit_measurement；任务 10731：上限 30.4G、峰值 1.0G）：同键上一次上限 13824M、峰值 1G 记了撞上限，
+    新提交的头一次按峰值起在 1G（1024M）、跑完。弄坏开关 cap-hit-low-peak-counted-at-cap 下照上限起在 13824M，这一格红。"""
+    world.resources(local=(40, 40))
+    key = "selftest-cap-hit-low-peak"
+    world.start_server()
+    seed_ended_attempt(world, key, SEEDED_ENDED_AT, "memory-cap-hit", memory_cap=HISTORY_CAP_HIT_BYTES, memory_peak=HISTORY_SMALL_PEAK_BYTES)
+    summary = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=0"], extra={lib.KEY_VARIABLE: key}))
+    attempt = first_attempt(summary)
+    if summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != HISTORY_SMALL_PEAK_TEXT:
+        raise SelftestFailure(f"同键上一次上限 13824M、峰值 1G 记了撞上限：新提交的头一次应当起在 {HISTORY_SMALL_PEAK_TEXT}、跑完，实际上限 {attempt.get('memory_cap_text')}、{describe(summary)}",
+                              world.server_log_lines())
+    return f"撞上限那一次峰值远低于上限：新提交的头一次按峰值起在 {HISTORY_SMALL_PEAK_TEXT}"
+
+
 def cell_history_peak_first_attempt(world):
-    """起点能降（task_server.py 的 key_recent_peak、history_raised_prediction；用户：「资源的使用记录 服务要有升降的能力 不能只升不降」）：同键早先撞过 13824M，
-    之后 RECORD_WINDOW 次跑成的峰值都是 1G：撞过的那一次出了窗口，新提交的头一次回落到 1G × 1.5 = 1536M、prediction 记 record，跑完。
-    弄坏开关 history-peak-unwindowed 下照改前全部记录里取最大、起在 20736M（只升不降），这一格红。"""
+    """起点能降（task_server.py 的 recorded_prediction 只取近 RECORD_WINDOW 次）：同键早先撞过 13824M，
+    之后 RECORD_WINDOW 次跑成的峰值都是 1G：撞过的那一次出了窗口，新提交的头一次回落到 1G（1024M）、prediction 记 record，跑完。"""
     world.resources(local=(40, 40))
     key = "selftest-history-first"
     world.start_server()
@@ -9247,17 +8194,17 @@ def cell_history_peak_first_attempt(world):
         seed_ended_attempt(world, key, SEEDED_ENDED_AT - 50 + offset, "succeeded", memory_peak=HISTORY_SMALL_PEAK_BYTES)
     summary = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=0"], extra={lib.KEY_VARIABLE: key}))
     attempt = first_attempt(summary)
-    if (summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != HISTORY_SMALL_PEAK_GROWN_TEXT
+    if (summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != HISTORY_SMALL_PEAK_TEXT
             or attempt.get("prediction") != lib.RECORD_HISTORY):
-        raise SelftestFailure(f"同键早先撞过 13824M、之后五次跑成都是 1G：撞过的那一次出了窗口，新提交的头一次应当回落到 {HISTORY_SMALL_PEAK_GROWN_TEXT}、"
+        raise SelftestFailure(f"同键早先撞过 13824M、之后五次跑成都是 1G：撞过的那一次出了窗口，新提交的头一次应当回落到 {HISTORY_SMALL_PEAK_TEXT}、"
                               f"prediction 记 {lib.RECORD_HISTORY}、跑完，实际上限 {attempt.get('memory_cap_text')}、prediction {attempt.get('prediction')}、{describe(summary)}",
                               world.server_log_lines())
-    return f"同键早先撞过 13824M、之后五次跑成都是 1G：新提交的头一次回落到 {HISTORY_SMALL_PEAK_GROWN_TEXT}"
+    return f"同键早先撞过 13824M、之后五次跑成都是 1G：新提交的头一次回落到 {HISTORY_SMALL_PEAK_TEXT}"
 
 
 def cell_history_peak_window_raises(world):
-    """起点能升（task_server.py 的 recorded_prediction、key_recent_peak）：同键近 RECORD_WINDOW 次里有一次撞过 13824M（之后又跑成四次 1G，撞过的那一次还在窗口里），
-    新提交的头一次上限 20736M、prediction 记 record，跑完。弄坏开关 cap-hit-not-counted 下撞过的那一次不进定额度、起在 1536M，这一格红。"""
+    """起点能升（task_server.py 的 recorded_prediction）：同键近 RECORD_WINDOW 次里有一次撞过 13824M（之后又跑成四次 1G，撞过的那一次还在窗口里），
+    新提交的头一次上限 13824M、prediction 记 record，跑完。弄坏开关 cap-hit-not-counted 下撞过的那一次不进定额度、起在 1024M，这一格红。"""
     world.resources(local=(40, 40))
     key = "selftest-history-window"
     world.start_server()
@@ -9266,38 +8213,15 @@ def cell_history_peak_window_raises(world):
         seed_ended_attempt(world, key, SEEDED_ENDED_AT - 50 + offset, "succeeded", memory_peak=HISTORY_SMALL_PEAK_BYTES)
     summary = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=0"], extra={lib.KEY_VARIABLE: key}))
     attempt = first_attempt(summary)
-    if (summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != HISTORY_CAP_HIT_GROWN_TEXT
+    if (summary["task"].get("outcome") != "succeeded" or attempt.get("memory_cap_text") != HISTORY_CAP_HIT_TEXT
             or attempt.get("prediction") != lib.RECORD_HISTORY):
-        raise SelftestFailure(f"同键近五次里撞过 13824M、另四次跑成 1G：新提交的头一次应当起在 {HISTORY_CAP_HIT_GROWN_TEXT}、prediction 记 {lib.RECORD_HISTORY}、跑完，"
+        raise SelftestFailure(f"同键近五次里撞过 13824M、另四次跑成 1G：新提交的头一次应当起在 {HISTORY_CAP_HIT_TEXT}、prediction 记 {lib.RECORD_HISTORY}、跑完，"
                               f"实际上限 {attempt.get('memory_cap_text')}、prediction {attempt.get('prediction')}、{describe(summary)}", world.server_log_lines())
-    return f"窗口里刚撞过 13824M：新提交的头一次起在 {HISTORY_CAP_HIT_GROWN_TEXT}"
-
-
-def cell_history_peak_retry_jumps(world):
-    """撞上限之后的重排直接跳到这把键历史上最高的那一档（task_server.py 的 history_raised_prediction）：没记录的一条第 1 次照 4096M 起、停在记尝试之前，
-    这时同键别的任务撞过 9216M（往库里记一次）；第 1 次撞了上限，第 2 次上限 13824M、prediction 记 key-history，不照自己那一次 × 1.5 的 6144M。
-    弄坏开关 history-peak-ignored 下第 2 次照改前 6144M。"""
-    pause = os.path.join(world.root, "pause")
-    os.makedirs(pause)
-    world.resources(local=(40, 40))
-    world.start_server(extra={"TASK_SERVER_SELFTEST_PAUSE_POINT": f"start-checked:{pause}"})
-    key = "selftest-history-retry"
-    open(os.path.join(pause, "arm-start-checked"), "w").close()
-    task_id = world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=250,run"], extra={lib.KEY_VARIABLE: key})
-    wait_path(world, os.path.join(pause, "reached-start-checked"), "第 1 次停在记尝试之前")
-    seed_ended_attempt(world, key, time.time(), "memory-cap-hit", memory_cap=HISTORY_RETRY_SEEDED_BYTES)
-    open(os.path.join(pause, "release-start-checked"), "w").close()
-    summary = world.finished(task_id)
-    seen = [(attempt.get("memory_cap_text"), attempt.get("prediction"), attempt.get("outcome")) for attempt in summary["attempts"]]
-    if (summary["task"].get("outcome") != "succeeded" or len(seen) != 2 or seen[0][:1] != (UNRECORDED_DEFAULT_PINNED_TEXT,) or seen[0][2] != "memory-cap-hit"
-            or seen[1][:2] != (HISTORY_RETRY_JUMP_TEXT, lib.KEY_HISTORY_PEAK_HISTORY)):
-        raise SelftestFailure(f"第 1 次照 {UNRECORDED_DEFAULT_PINNED_TEXT} 撞了上限、键里另有撞过 9216M 的记录：第 2 次应当直接起在 {HISTORY_RETRY_JUMP_TEXT}、prediction 记 "
-                              f"{lib.KEY_HISTORY_PEAK_HISTORY}、跑完，实际各次（上限、prediction、结局）{seen}、{describe(summary)}", world.server_log_lines())
-    return f"第 1 次 {UNRECORDED_DEFAULT_PINNED_TEXT} 撞了、键里有撞过 9216M 的：第 2 次直接 {HISTORY_RETRY_JUMP_TEXT}"
+    return f"窗口里刚撞过 13824M：新提交的头一次起在 {HISTORY_CAP_HIT_TEXT}"
 
 
 def cell_history_peak_unrecorded_default(world):
-    """没有任何记录的命令照旧从没记录的 4096M 起（按历史最高起跑只往上抬；task_server.py 的 unrecorded_prediction）：prediction 记 default。
+    """没有任何记录的命令从没记录的 4096M 起（task_server.py 的 unrecorded_prediction）：prediction 记 default。
     弄坏开关 unrecorded-default-grown 下照 4096M × 1.5 起。"""
     world.resources(local=(40, 40))
     world.start_server()
@@ -9603,7 +8527,8 @@ def cell_shard_child_key_folded_by_words(world):
         problems.append(f"带空格条目名的分片命令应当拆开跑完，实际 {describe(summary)}")
     for child in summary.get("children", []):
         record = child["task"]
-        wanted = PEAKS.command_key([], parent_key + lib.shard_child_key("", record.get("role"), int(record.get("shard_index") or 0), int(record.get("shard_count") or 0)))
+        wanted = PEAKS.command_key([], parent_key + lib.shard_child_key("", record.get("role"), int(record.get("shard_index") or 0), int(record.get("shard_count") or 0),
+                                                                        compiles=bool(record.get("compiles"))))
         key = record.get("command_key") or ""
         if key != wanted or SPACED_ITEM_TAIL in key.split():
             problems.append(f"{record.get('role')} {record.get('shard_index')} 的键应当是「{wanted}」（父任务的键接那一段），实际「{key}」")
@@ -9671,71 +8596,11 @@ def cell_workspace_write_complete_not_reported(world):
     return "结局文件写着完成的、--dry-run 的、正常跑完的 apply-writer-patch.py 都不报"
 
 
-def write_card_script(world, name, count):
-    """工作目录里一份要卡（# task-server-gpu-arguments: *）、声明要 count 张的假脚本；交提交它的命令。"""
+def write_unmet_script(world, name):
+    """工作目录里一份会编的声明写坏了（# task-server-compiles: maybe）的假脚本：派活时打回 run-condition-unmet（task_server.py 的 judge_placement）；交提交它的命令。"""
     with open(os.path.join(world.work, name), "w", encoding="utf-8") as handle:
-        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_GPU_ARGUMENTS_MARK} *\n{lib.DECLARED_GPU_CARDS_MARK} {count}\nexit 0\n")
+        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_COMPILES_MARK} maybe\nexit 0\n")
     return ["bash", name, "run", "fake-wrapper-exits=0"]
-
-
-def two_host_cards(world, cards, local_count, peer_count):
-    world.resources(local=(100, 100), peer=(100, 100), peer_cap_gibibytes=64, cards=cards,
-                    local_gpu=[(index, CARD_FREE_MEBIBYTES) for index in range(local_count)], peer_gpu=[(index, CARD_FREE_MEBIBYTES) for index in range(peer_count)])
-
-
-def cell_gpu_two_cards_same_host(world):
-    """要两张分到同一台两张（task_server.py 的 place_on_card）：卡的先后是本机 0、第二台 0、本机 1；脚本文件头声明要 2 张的整组分到本机 0 与本机 1；
-    cargo test 点名的包里测试源头写「// task-server-gpu-cards: 2」的同样。弄坏开关 gpu-card-count-ignored 下只分到一张。"""
-    two_host_cards(world, f"{LOCAL_CARD_ZERO} {PEER_CARD_ZERO} {LOCAL_CARD_ONE}", 2, 1)
-    package = os.path.join(world.repo, "crates", "selftest-cards")
-    os.makedirs(os.path.join(package, "tests"), exist_ok=True)
-    with open(os.path.join(package, "Cargo.toml"), "w", encoding="utf-8") as handle:
-        handle.write('[package]\nname = "selftest-cards"\nversion = "0.0.0"\n')
-    with open(os.path.join(package, "tests", "real_gpu.rs"), "w", encoding="utf-8") as handle:
-        handle.write(f"{lib.DECLARED_SOURCE_GPU_CARDS_MARK} 2\n#[test]\nfn each_card_collects() {{}}\n")
-    world.start_server()
-    wanted = (f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE}", "local")
-    script = world.finished(world.submit(write_card_script(world, "two-cards.sh", 2)))
-    cargo = world.finished(world.submit(["cargo", "test", "-p", "selftest-cards", "--features", "gpu", "--tests", "fake-wrapper-exits=0"], cwd=world.repo))
-    problems = [f"{name}应当整组分到 {wanted}，实际 {attempt_card_and_host(summary)}（{describe(summary)}，张数 {summary['task'].get('gpu_cards')}）"
-                for name, summary in (("脚本声明 2 张的", script), ("cargo test 包里源头写 2 张的", cargo)) if attempt_card_and_host(summary) != wanted]
-    if problems:
-        raise SelftestFailure("要两张卡：" + "；".join(problems), world.server_log_lines())
-    return f"脚本声明与 cargo 包的测试源头声明要 2 张的都整组分到本机两张（{wanted[0]}）"
-
-
-def cell_gpu_three_cards_only_where_enough(world):
-    """要三张只落凑得出的那台：本机两张在前、第二台三张在后，声明要 3 张的整组分到第二台的三张；要 1 张的照优先级分到本机 0。
-    弄坏开关 gpu-card-count-ignored 下要 3 张的也分到本机 0 一张。"""
-    two_host_cards(world, f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE} {PEER_CARD_ZERO} {PEER_CARD_ONE} {PEER_CARD_TWO}", 2, 3)
-    world.start_server()
-    three = world.finished(world.submit(write_card_script(world, "three-cards.sh", 3)), timeout=PLACEMENT_WAIT_SECONDS)
-    one = world.finished(world.submit(write_card_script(world, "one-card.sh", 1)))
-    problems = []
-    if attempt_card_and_host(three) != (f"{PEER_CARD_ZERO} {PEER_CARD_ONE} {PEER_CARD_TWO}", "peer"):
-        problems.append(f"要 3 张的应当整组分到第二台三张，实际 {attempt_card_and_host(three)}（{describe(three)}）")
-    if attempt_card_and_host(one) != (LOCAL_CARD_ZERO, "local"):
-        problems.append(f"要 1 张的应当照优先级分到 {LOCAL_CARD_ZERO}，实际 {attempt_card_and_host(one)}")
-    if problems:
-        raise SelftestFailure("要三张卡：" + "；".join(problems), world.server_log_lines())
-    return "要 3 张的整组落到凑得出三张的第二台，要 1 张的照优先级落本机 0"
-
-
-def cell_gpu_cards_short_never_fits(world):
-    """哪台都凑不出打回：本机两张、第二台三张，声明要 4 张的记 never-fits（退 241），说明写哪台都凑不出；张数写坏的（0）记 run-condition-unmet、说明点名声明。
-    弄坏开关 gpu-card-count-ignored 下要 4 张的照一张起、跑完。"""
-    two_host_cards(world, f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE} {PEER_CARD_ZERO} {PEER_CARD_ONE} {PEER_CARD_TWO}", 2, 3)
-    world.start_server()
-    four = world.finished(world.submit(write_card_script(world, "four-cards.sh", 4)))
-    broken_count = world.finished(world.submit(write_card_script(world, "zero-cards.sh", 0)))
-    problems = []
-    if four["task"].get("outcome") != "never-fits" or four["task"].get("exit_code") != 241 or four["attempts"] or "凑不出" not in (four["task"].get("note") or ""):
-        problems.append(f"要 4 张、哪台都凑不出：应当记 never-fits（退 241）、一次没起、说明写凑不出，实际 {describe(four)}、说明「{four['task'].get('note')}」")
-    if broken_count["task"].get("outcome") != "run-condition-unmet" or "张数声明" not in (broken_count["task"].get("note") or ""):
-        problems.append(f"张数写成 0 的应当记 run-condition-unmet、说明点名张数声明，实际 {describe(broken_count)}、说明「{broken_count['task'].get('note')}」")
-    if problems:
-        raise SelftestFailure("凑不出的卡：" + "；".join(problems), world.server_log_lines())
-    return "要 4 张哪台都凑不出的记 never-fits；张数写坏的记 run-condition-unmet"
 
 
 # ── 暂停（task_server.py 文件头 ⑤「暂停」；control pause / resume）──
@@ -10112,39 +8977,17 @@ def cell_pause_allow_reported(world):
     return "control pause --allow-session 点名放行的会话、不带值退 2；check 与 /health 写放行会话与两种在跑数，别的会话的跑完后别的会话在跑 0 个"
 
 
-# ── 调度让资源空着、任务干等的几处（records/2026-10-31-task-server巡检.md 批 66）：/health 判排头与派活同一个判法、一条整片只封一台、要卡的整片不为凑不够的卡封组、
-#    封着的那台没有预计用时的小碎片照公式的余量插空；批 72：要卡的整片在卡被占着的台上照样封组、满时限的整片照样封组 ──
-SEALED_ONE_HOST_FRAGMENTS = 30          # whole-seals-one-host：两台各 50G（界 40.8G）上交的碎片条数（没记录、各记 4G）：每台装满一组 10 条之后还有剩
-SEALED_ONE_HOST_GROUP = 10              # 那一格一台一组至多装的碎片条数（10 × 4G = 40G 不超过界，再放一条就超过）：封了组的台起的不超过它
-SEALED_ONE_HOST_RELEASE = "release-one-whole"   # 那一格碎片的放行文件（相对假仓根；假第二台照 fake-peer-wait 等同一个名字）
-SEALED_ONE_HOST_SETTLE_SECONDS = 3.0    # 那一格每隔这么久数一次两台各起了几条（比第二台起满一轮之后再排的 PEER_REPASS_SECONDS 长）
-SEALED_ONE_HOST_LIMIT_SECONDS = 90.0    # 那一格等两台起的条数不再变的绝对上限
-LOCAL_CARD_TWO = f"{SELFTEST_LOCAL_ADDRESS}:2:8G"
-CARDS_SHORT_HEAD_WANTED = 3   # health-head-cards-short-not-starved：排头要同一台的这么多张（本机三张、一张被占着）
-CARD_WHOLE_PEAK_BYTES = 63 * GIBIBYTE   # card-whole-seals-while-card-busy 的整片：上限与记账 94.5G（100G 的台可用上限 98G，界 83.3G）；整片之外照样空着的那一份 3.5G
-                                        # 放不下 4G 的短碎片，短碎片照预计用时插空（task_server.py 的 Alternation.gap_fill）
-CARD_FRAGMENT_PEAK_BYTES = 10 * GIBIBYTE   # 那一格的碎片：各记 15G；五条 75G 装进一组，再放一条就 90G、超过界
-CARD_FRAGMENT_COUNT = 6
-CARD_OVERFLOW_KEY = "selftest-card-overflow"   # 那一格装不进组的最后一条碎片的命令键，与装组的五条（selftest-card-fragment）分开：同一把键的话，五条里先跑完的给它记下预计用时，
-                                               # 它就按预计用时（不超过还在跑的挡路时长）插空进封着的组，合法地抢在整片前面起（task_server.py 的 Alternation.gap_fill），不是封组失效
-CARD_GAP_COMMAND = ["bash", "-c", "exit 0", "card-gap"]   # 那一格来插空的短碎片：记了 GAP_SHORT_ESTIMATE_SECONDS 秒的用时（逐词相同才认），没有峰值记录、记 4G
-ROOM_UNESTIMATED_WHOLE_PEAK_BYTES = 34 * GIBIBYTE   # sealed-gap-room-takes-unestimated 的整片：上限与记账 51G（60G 的台可用上限 58G，界 49.3G）
-ROOM_UNESTIMATED_FILLER_PEAK_BYTES = 8 * GIBIBYTE   # 那一格先装进组的三条碎片：各记 12G（三条与在跑的小碎片 37.5G，界以内）
-ROOM_UNESTIMATED_SEALED_PEAK_BYTES = 10 * GIBIBYTE  # 那一格封组的那条：记 15G。37.5G + 15G = 52.5G 超过界 49.3G 而封组，照公式（58G − 37.5G = 20.5G）内存上放得下：
-                                                    # 内存放不下的排队原因写内存那一句、不写封组（judge_placement 只在内存放得下时换成交替那一句；任务 7648 里各记 15G，46.5G + 15G 超过 58G）
-ROOM_UNESTIMATED_SMALL_PEAK_BYTES = GIBIBYTE        # 那一格一直在跑的那条小碎片与来插空的那条：各记 1536M（有记录的不兜到 4G）
-ROOM_UNESTIMATED_FREE_GIBIBYTES = 20                # 装组的三条跑完之前把本机空闲换成这么多：整片（51G）放不下，小碎片放得下
-
 
 def cell_health_head_cpu_gate_not_starved(world):
     """/health 只读派活给排头的结论（task_server.py 的 starved_problem 读 head_verdict；任务 7568 卡在 CPU 负载闸被报「放得下却没起」）：本机内存够、负载 200
-    （32 核 × 3 = 96 放不下再加一条的线程），排头排着、排队原因写「CPU：」；过了阈值四倍那么久 /health 一直回 ok：派活判它不能起，不报；
+    （32 核 × 2 = 64 放不下再加一条的线程），排头（命令键记过 31 核，不走要核数少的名额）排着、排队原因写「CPU：」；过了阈值四倍那么久 /health 一直回 ok：派活判它不能起，不报；
     看进展（progress_problem）照余量也不报（这台负载过 CPU 闸）。负载降下来之后跑完。
-    弄坏开关 health-head-judged-apart、health-judges-head 下 /health 照改前另判、只判内存，blocked-head-counted-as-starved 下判不能起也算，
+    弄坏开关 health-head-judged-apart、health-judges-head 下 /health 另判、只判内存，blocked-head-counted-as-starved 下判不能起也算，
     progress-gates-ignored 下看进展不看 CPU 闸，/health 都报，这一格红。"""
     world.resources(local=(50, 50), local_cpu={"load1": 200.0, "procs_running": 150, "cpus": 32})
+    seed_busy_cores(world, CPU_GATE_BUSY_KEY)
     world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0", "cpu-gate-head"])
+    task_id = world.submit(["bash", "-c", "exit 0", "cpu-gate-head"], extra={lib.KEY_VARIABLE: CPU_GATE_BUSY_KEY})
     waiting = world.wait_for(task_id, lambda found: "CPU：" in (found.get("waiting_for") or "") or found["task"].get("state") != "queued", "报 CPU 闸")
     health = health_until(world, lambda found: not found.get("ok"), 4 * SERVER.FAST_STARVED_SECONDS)
     world.resources(local=(50, 50), local_cpu={"load1": 0.0, "procs_running": 1, "cpus": 32})
@@ -10161,389 +9004,7 @@ def cell_health_head_cpu_gate_not_starved(world):
     return f"CPU 闸挡着的排头：/health 一直回 ok（排队原因「{(waiting.get('waiting_for') or '')[:80]}」），负载降下来之后跑完"
 
 
-def cell_health_head_cards_short_not_starved(world):
-    """/health 只读派活给排头的结论（task_server.py 的 starved_problem 读 head_verdict；任务 7615 要同一台 3 张卡而凑不出）：本机三张卡、一条要一张的占着本机 0，
-    排头声明要同一台的 3 张：排着、排队原因写「等空卡」；/health 一直回 ok（派活判它不能起；看进展照余量也不报：这台空卡凑不够它的张数）；占着的放了之后它跑完。
-    弄坏开关 health-head-judged-apart、health-judges-head 下 /health 照改前另判、有一张空卡就算，blocked-head-counted-as-starved 下判不能起也算，
-    progress-gates-ignored 下看进展不看卡，/health 都报，这一格红。"""
-    world.resources(local=(100, 100), cards=f"{LOCAL_CARD_ZERO} {LOCAL_CARD_ONE} {LOCAL_CARD_TWO}",
-                    local_gpu=[(index, CARD_FREE_MEBIBYTES) for index in range(CARDS_SHORT_HEAD_WANTED)])
-    world.start_server()
-    release = os.path.join(world.root, "release-cards-short")
-    holder = world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=block:{release}"])
-    problems = []
-    try:
-        world.running(holder)
-        head = world.submit(write_card_script(world, "three-cards-head.sh", CARDS_SHORT_HEAD_WANTED))
-        waiting = world.wait_for(head, lambda found: "等空卡" in (found.get("waiting_for") or "") or found["task"].get("state") != "queued", "报等空卡")
-        health = health_until(world, lambda found: not found.get("ok"), 4 * SERVER.FAST_STARVED_SECONDS)
-    finally:
-        open(release, "w").close()
-    summary = world.finished(head)
-    world.finished(holder)
-    if waiting["attempts"] or "等空卡" not in (waiting.get("waiting_for") or ""):
-        problems.append(f"只剩两张空卡时要 {CARDS_SHORT_HEAD_WANTED} 张的排头应当排着、排队原因写「等空卡」，实际 {describe(waiting)}、在等「{waiting.get('waiting_for')}」")
-    if not health.get("ok"):
-        problems.append(f"空卡凑不够张数时排头排着是正常的，/health 应当一直回 ok，实际 {health}")
-    if summary["task"].get("outcome") != "succeeded":
-        problems.append(f"占着的放了之后要 {CARDS_SHORT_HEAD_WANTED} 张的应当跑完，实际 {describe(summary)}")
-    if problems:
-        raise SelftestFailure("空卡凑不够排头的张数：" + "；".join(problems), world.server_log_lines())
-    return f"空卡凑不够排头要的同一台 {CARDS_SHORT_HEAD_WANTED} 张：/health 一直回 ok，卡放出来之后跑完"
-
-
-def started_hosts(world, task_ids):
-    """这几条里起了的各在哪一台：{台: 条数}；另交没起的那几条的排队原因。"""
-    counts, reasons = {}, []
-    for task_id in task_ids:
-        summary = world.summary(task_id)
-        if summary["attempts"]:
-            host = first_attempt(summary).get("host")
-            counts[host] = counts.get(host, 0) + 1
-        else:
-            reasons.append(summary.get("waiting_for") or "")
-    return counts, reasons
-
-
-def cell_whole_seals_one_host(world):
-    """一条整片只在一台上等腾空、只封那一台（task_server.py 的 Alternation.waiting_hosts；任务 7585 两台都封组）：两台各 50G（可用上限 48G、界 40.8G），
-    一条整片（峰值 30G，上限与记账 45G）在排、两台都放不下它，再交 30 条碎片（没记录、各记 4G，跑到放行为止）。等两台起的条数不再变：
-    至多一台的排队原因里封了组，另一台照起碎片、起的超过一组的 10 条（照内存装）。弄坏开关 whole-seals-every-host 下两台都封、每台至多 10 条，这一格红。"""
-    world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50, hold=True)
-    world.seed_peak("selftest-one-whole", 30 * GIBIBYTE)
-    world.start_server()
-    whole = world.submit(["bash", "-c", "exit 0", "one-whole"], extra={lib.KEY_VARIABLE: "selftest-one-whole"}, cwd=world.repo)
-    fragments = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"one-whole-fragment-{number}", SEALED_ONE_HOST_RELEASE,
-                               f"fake-peer-wait={SEALED_ONE_HOST_RELEASE}"], cwd=world.repo) for number in range(SEALED_ONE_HOST_FRAGMENTS)]
-    world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50)   # 一齐放出来
-    world.api("POST", "/wake")
-    counts, reasons, previous = {}, [], None
-    deadline = time.monotonic() + SEALED_ONE_HOST_LIMIT_SECONDS
-    try:
-        while time.monotonic() < deadline:
-            world.next_pass()
-            time.sleep(SEALED_ONE_HOST_SETTLE_SECONDS)
-            counts, reasons = started_hosts(world, fragments)
-            settled = all(reason and "这一轮已起" not in reason for reason in reasons)
-            if settled and counts == previous:
-                break
-            previous = counts
-        whole_summary = world.summary(whole)
-    finally:
-        open(os.path.join(world.repo, SEALED_ONE_HOST_RELEASE), "w").close()
-    outcomes = [world.finished(task_id, timeout=120)["task"].get("outcome") for task_id in [*fragments, whole]]
-    sealed = sorted(name for name in lib.HOST_NAMES.values() if any(f"{name}：这台这一组碎片已装到" in reason for reason in reasons))
-    problems = []
-    if counts != previous:
-        problems.append(f"{SEALED_ONE_HOST_LIMIT_SECONDS:.0f} 秒里两台起的条数一直在变：最后一次 {counts}，前一次 {previous}")
-    if whole_summary["attempts"]:
-        problems.append(f"两台都放不下整片（45G）时它应当一直排着，实际 {describe(whole_summary)}")
-    if len(sealed) > 1:
-        problems.append(f"一条整片应当只封一台，实际排队原因里封了组的台 {sealed}")
-    if max(counts.values(), default=0) <= SEALED_ONE_HOST_GROUP:
-        problems.append(f"没封组的那台应当照内存起碎片、超过一组的 {SEALED_ONE_HOST_GROUP} 条，实际两台各起了 {counts}")
-    if set(outcomes) != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted(set(outcomes))}")
-    if problems:
-        raise SelftestFailure("一条整片只封一台：" + "；".join(problems), reasons[:4] + world.server_log_lines())
-    return f"一条整片两台都放不下：封了组的台 {sealed or '无'}，两台各起碎片 {counts}"
-
-
-def cell_card_whole_seals_while_card_busy(world):
-    """要卡的整片在卡被占着的台上照样封组（task_server.py 的 Alternation.waiting_hosts 照那台卡的总张数算；任务 7934 要卡、记 45.6 GiB，两台的卡一直有人占，
-    照空卡数算哪台都不算整片、从不封组，排了一个多钟头）：本机 100G（可用上限 98G、界 83.3G）一张卡，一条要卡的小任务占着它；一条要卡的整片（峰值 63G，
-    上限与记账 94.5G）在等，再交六条碎片（峰值 10G，各记 15G，跑到放行为止；最后一条另用一把命令键 CARD_OVERFLOW_KEY）与一条记了 1 秒用时的短碎片：
-    五条装进一组，最后一条再放就超过界、封组排着；短碎片照插空起来跑完（挡路的还在跑）。放行占卡的与五条碎片之后，整片先于最后一条起，都跑完。
-    弄坏开关 card-whole-counts-free-cards-only 下照改前只数空卡、不为它封组，最后一条与短碎片照内存起，这一格红。"""
-    cards = {"cards": LOCAL_CARD_ZERO, "local_gpu": [(0, CARD_FREE_MEBIBYTES)]}
-    world.resources(local=(100, 100), **cards)
-    world.seed_peak("selftest-card-whole", CARD_WHOLE_PEAK_BYTES)
-    world.seed_peak("selftest-card-fragment", CARD_FRAGMENT_PEAK_BYTES)
-    world.seed_peak(CARD_OVERFLOW_KEY, CARD_FRAGMENT_PEAK_BYTES)
-    world.seed_duration("selftest-card-gap", GAP_SHORT_ESTIMATE_SECONDS, CARD_GAP_COMMAND)
-    world.start_server()
-    holder_release = os.path.join(world.root, "release-card-holder")
-    fragment_release = os.path.join(world.root, "release-card-fragments")
-    holder = world.submit(["cargo", "test", "--features", "gpu", f"fake-quiesce=block:{holder_release}"])
-    fragments, whole, gap, overflow, counts, gapped, blockers_running = [], None, None, {}, {}, {}, False
-    try:
-        world.running(holder)
-        world.resources(local=(100, 100), hold=True, **cards)
-        # 整片照假清场的 block 演法收尾（放行文件在就退 0）：不写演法的，假清场照真的那样起命令，假内存包装不放行真 cargo、退 97，整片记 command-failed（任务 7648）
-        whole = world.submit(["cargo", "test", "--features", "gpu", "--lib", f"fake-quiesce=block:{holder_release}", "card-whole"],
-                             extra={lib.KEY_VARIABLE: "selftest-card-whole"})
-        fragments = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"card-fragment-{number}", fragment_release],
-                                  extra={lib.KEY_VARIABLE: "selftest-card-fragment" if number < CARD_FRAGMENT_COUNT - 1 else CARD_OVERFLOW_KEY})
-                     for number in range(CARD_FRAGMENT_COUNT)]
-        gap = world.submit(CARD_GAP_COMMAND, extra={lib.KEY_VARIABLE: "selftest-card-gap"})
-        world.resources(local=(100, 100), **cards)   # 一齐放出来
-        world.api("POST", "/wake")
-        overflow = world.wait_for(fragments[-1], lambda found: bool(found["attempts"]) or SEALED_GROUP_TEXT in (found.get("waiting_for") or ""),
-                                  "起来或封组", timeout=PLACEMENT_WAIT_SECONDS)
-        gapped = world.finished(gap, timeout=PLACEMENT_WAIT_SECONDS)   # 挡路的已跑过 1 秒就插得进（挡路时长取已跑）
-        counts, _ = started_hosts(world, fragments[:-1])
-        blockers_running = all(world.summary(task_id)["task"].get("state") == "running" for task_id in fragments[:-1])
-        overflow = world.summary(fragments[-1])
-        open(holder_release, "w").close()   # 卡空出来；整片照旧等内存（五条碎片 75G 还在）
-        world.finished(holder)
-    finally:
-        open(holder_release, "w").close()
-        open(fragment_release, "w").close()
-    summaries = {task_id: world.finished(task_id, timeout=120) for task_id in [holder, whole, *fragments] if task_id is not None}
-    problems = []
-    if sum(counts.values()) != CARD_FRAGMENT_COUNT - 1 or overflow.get("attempts"):
-        problems.append(f"卡被占着时整片照样封组：五条碎片应当起、装不进组的最后一条封组排着，实际五条里起了 {counts}、最后一条 {describe(overflow)}、在等「{overflow.get('waiting_for')}」")
-    elif SEALED_GROUP_TEXT not in (overflow.get("waiting_for") or ""):
-        problems.append(f"装不进组的最后一条的排队原因应当写封组（「{SEALED_GROUP_TEXT}」），实际「{overflow.get('waiting_for')}」")
-    problems += [problem for problem in (gap_admitted_problem("记了 1 秒用时的短碎片", gapped, blockers_running),) if problem]
-    last_summary = summaries[fragments[-1]]
-    whole_order, last_order = attempt_order(summaries[whole]), attempt_order(last_summary)
-    if whole_order is None or last_order is None or whole_order > last_order:
-        problems.append(f"卡空出来、五条碎片跑完之后整片应当先于装不进组的最后一条起，实际尝试号整片 {whole_order}、最后一条 {last_order}"
-                        f"（最后一条的 gap_fill「{(last_summary['attempts'] or [{}])[0].get('gap_fill') or ''}」：非空就是它按预计用时插空抢先了）")
-    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted({str(summary['task'].get('outcome')) for summary in summaries.values()})}")
-    if problems:
-        raise SelftestFailure("要卡的整片在卡被占着的台上封组：" + "；".join(problems), world.server_log_lines())
-    return f"卡被占着时整片照样封组：五条碎片起、装不进组的最后一条封着，短碎片插空跑完；卡空出来、碎片跑完之后整片（尝试 {whole_order}）先于最后一条（尝试 {last_order}）起"
-
-
-AGED_SEAL_OCCUPANT_PEAK_BYTES = 27 * GIBIBYTE   # aged-whole-keeps-group-sealed 占着的碎片：上限与记账 40.5G（50G 的台可用上限 48G、界 40.8G：碎片），起了记进这一组
-AGED_SEAL_WHOLE_PEAK_BYTES = 30 * GIBIBYTE      # 那一格的整片：上限与记账 45G，占着的跑着时放不下（照公式 48G − 40.5G = 7.5G）
-AGED_SEAL_FRAGMENT_COUNT = 3                    # 那一格整片之后交的碎片（没记录、各记 4G）：内存上放得下一条，只因封组排着
-AGED_SEAL_SECONDS = "2"                         # 那一格的满时限（TASK_SERVER_SELFTEST_AGED_SECONDS）：交了之后整片与碎片很快都满时限
-
-
-def cell_aged_whole_keeps_group_sealed(world):
-    """满时限的整片照样封组等它（task_server.py 文件头 ②「满时限」；任务 7934 记 45.6 GiB，满两小时不算整片的话封着的组撤掉，碎片又把内存占满，它永远起不来）：
-    本机 50G（可用上限 48G、界 40.8G），一条碎片占着 40.5G（记进这一组）；一条整片（记 45G）放不下、在等，再交三条碎片（各记 4G：内存上放得下一条）：封组排着。
-    满时限压到 2 秒，等整片与碎片都满时限之后再排两轮：组照封着、碎片一条不起（满时限的碎片照样受排在它前面的整片封的组挡）；放行占着的那条之后整片先起，碎片在它之后，都跑完。
-    弄坏开关 aged-whole-not-counted 下满时限的整片不算整片、组撤掉，aged-fragment-bypasses-seal 下满时限的碎片不过交替，碎片都照内存起，这一格红。"""
-    world.resources(local=(50, 50))
-    world.seed_peak("selftest-aged-seal-occupant", AGED_SEAL_OCCUPANT_PEAK_BYTES)
-    world.seed_peak("selftest-aged-seal-whole", AGED_SEAL_WHOLE_PEAK_BYTES)
-    world.start_server(extra={"TASK_SERVER_SELFTEST_AGED_SECONDS": AGED_SEAL_SECONDS})
-    release = os.path.join(world.root, "release-aged-seal-occupant")
-    occupant = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "aged-seal-occupant", release], extra={lib.KEY_VARIABLE: "selftest-aged-seal-occupant"})
-    whole, fragments, waiting = None, [], {}
-    try:
-        world.running(occupant)
-        whole = world.submit(["bash", "-c", "exit 0", "aged-seal-whole"], extra={lib.KEY_VARIABLE: "selftest-aged-seal-whole"})
-        fragments = [world.submit(["bash", "-c", "exit 0", f"aged-seal-fragment-{number}"]) for number in range(AGED_SEAL_FRAGMENT_COUNT)]
-        time.sleep(float(AGED_SEAL_SECONDS) + 1)   # 最后交的那条也满了时限（下限，不比上限：机器忙时只会更久）
-        world.next_pass()
-        world.next_pass()
-        waiting = {task_id: world.summary(task_id) for task_id in [whole, *fragments]}
-    finally:
-        open(release, "w").close()
-    summaries = {task_id: world.finished(task_id) for task_id in [occupant, whole, *fragments] if task_id is not None}
-    problems = []
-    started_early = [task_id for task_id in fragments if waiting.get(task_id, {}).get("attempts")]
-    if started_early or waiting.get(whole, {}).get("attempts"):
-        problems.append(f"占着的跑着时整片与碎片都满了时限，组应当照封着、一条都不起，实际起了的碎片 {started_early}、整片 {describe(waiting.get(whole) or {'task': {}, 'attempts': []})}")
-    unsealed = [task_id for task_id in fragments if task_id not in started_early and SEALED_GROUP_TEXT not in (waiting.get(task_id, {}).get("waiting_for") or "")]
-    if unsealed:
-        problems.append(f"满时限的碎片排队原因应当写封组（「{SEALED_GROUP_TEXT}」），实际 {[(task_id, waiting[task_id].get('waiting_for')) for task_id in unsealed]}")
-    whole_order = attempt_order(summaries[whole])
-    later = [task_id for task_id in fragments
-             if whole_order is None or attempt_order(summaries[task_id]) is None or attempt_order(summaries[task_id]) < whole_order]
-    if later:
-        problems.append(f"放行占着的那条之后整片应当先于碎片起，实际整片尝试号 {whole_order}、比它先起的碎片 {later}")
-    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted({str(summary['task'].get('outcome')) for summary in summaries.values()})}")
-    if problems:
-        raise SelftestFailure("满时限的整片照样封组：" + "；".join(problems), world.server_log_lines())
-    return f"整片与 {AGED_SEAL_FRAGMENT_COUNT} 条碎片都满时限之后组照封着、碎片不起；占着的放了之后整片（尝试 {whole_order}）先起，都跑完"
-
-
-def cell_sealed_gap_room_takes_unestimated(world):
-    """封着的那台没有预计用时的小碎片照公式的余量插空（task_server.py 的 Alternation.gap_fill 的内存那一支）：本机 60G（可用上限 58G、界 49.3G），
-    一条整片（峰值 34G，上限与记账 51G）、三条装组的碎片（各记 12G，跑到放行为止）、一条一直在跑的小碎片（1536M）、一条封组的碎片（15G，没有预计用时：
-    装进那一组就 52.5G、超过界，内存照公式还放得下，排队原因写封组那一句）、一条来插空的小碎片（1536M，没有预计用时）。装组的跑完之前把本机空闲换成 20G（整片放不下），放行装组的：排头整片起来之后照公式这台还剩 58G − 1.5G − 51G = 5.5G，
-    放得下来插空的那条，不看预计用时就起、跑完，尝试记插空那一句；封组的那条（15G）照旧封着。弄坏开关 gap-fill-room-ignored 下没有预计用时的一律封着，这一格红。
-    整片之外照样空着的那一份是 58G − 51G = 7G（在跑的那条小碎片是封组之前起的，不减）：来插空的那条装组的还在跑时就可能起，照样在小碎片还在跑时跑完。"""
-    world.resources(local=(60, 60), hold=True)
-    for key, peak in (("selftest-room-unestimated-whole", ROOM_UNESTIMATED_WHOLE_PEAK_BYTES), ("selftest-room-unestimated-filler", ROOM_UNESTIMATED_FILLER_PEAK_BYTES),
-                      ("selftest-room-unestimated-holder", ROOM_UNESTIMATED_SMALL_PEAK_BYTES), ("selftest-room-unestimated-sealed", ROOM_UNESTIMATED_SEALED_PEAK_BYTES),
-                      ("selftest-room-unestimated-probe", ROOM_UNESTIMATED_SMALL_PEAK_BYTES)):
-        world.seed_peak(key, peak)
-    world.start_server()
-    release = os.path.join(world.root, "release-room-unestimated")
-    filler_release = os.path.join(world.root, "release-room-unestimated-fillers")
-    tasks = {"整片": world.submit(["bash", "-c", "exit 0", "room-unestimated-whole"], extra={lib.KEY_VARIABLE: "selftest-room-unestimated-whole"})}
-    tasks["装组"] = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"room-unestimated-filler-{number}", filler_release],
-                                extra={lib.KEY_VARIABLE: "selftest-room-unestimated-filler"}) for number in range(3)]
-    tasks["在跑"] = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "room-unestimated-holder", release], extra={lib.KEY_VARIABLE: "selftest-room-unestimated-holder"})
-    tasks["封组"] = world.submit(["bash", "-c", "exit 0", "room-unestimated-sealed"], extra={lib.KEY_VARIABLE: "selftest-room-unestimated-sealed"})
-    tasks["插空"] = world.submit(["bash", "-c", "exit 0", "room-unestimated-probe"], extra={lib.KEY_VARIABLE: "selftest-room-unestimated-probe"})
-    world.resources(local=(60, 60))   # 一齐放出来：整片让一组碎片先起，三条装组的与在跑的那条起了，封组的那条装进去就超过界
-    world.api("POST", "/wake")
-    problems = []
-    try:
-        for task_id in [*tasks["装组"], tasks["在跑"]]:
-            world.running(task_id)
-        world.wait_for(tasks["封组"], lambda found: SEALED_GROUP_TEXT in (found.get("waiting_for") or "") or bool(found["attempts"]), "封组")
-        world.resources(local=(ROOM_UNESTIMATED_FREE_GIBIBYTES, 60))
-        open(filler_release, "w").close()
-        for task_id in tasks["装组"]:
-            world.finished(task_id)
-        try:
-            probe = world.finished(tasks["插空"], timeout=PLACEMENT_WAIT_SECONDS)
-        except SelftestFailure:
-            probe = world.summary(tasks["插空"])
-        holder_running = world.summary(tasks["在跑"])["task"].get("state") == "running"
-        world.next_pass()
-        sealed = world.summary(tasks["封组"])
-    finally:
-        open(filler_release, "w").close()
-        open(release, "w").close()
-    world.resources(local=(60, 60))
-    for task_id in (tasks["在跑"], tasks["封组"], tasks["整片"]):
-        world.finished(task_id, timeout=120)
-    note = first_attempt(probe).get("gap_fill") or ""
-    if (probe["task"].get("outcome") != "succeeded" or not note.startswith(GAP_ADMITTED_TEXT) or ROOM_GAP_ADMITTED_TEXT not in note or not holder_running):
-        problems.append(f"没有预计用时的小碎片应当在那条小的还在跑时照公式的余量插空起来、跑完，尝试的 gap_fill 以「{GAP_ADMITTED_TEXT}」起头、写「{ROOM_GAP_ADMITTED_TEXT}」，"
-                        f"实际 {describe(probe)}、gap_fill「{note}」、在跑的那条{'还在跑' if holder_running else '已不在跑'}、在等「{probe.get('waiting_for')}」")
-    problem = sealed_reason_problem("封组的那条（15G，没有预计用时）", sealed, f"{GAP_REFUSED_TEXT}这一条没有预计用时")
-    problems += [problem] if problem else []
-    if problems:
-        raise SelftestFailure("封着的那台没有预计用时的小碎片照余量插空：" + "；".join(problems), world.server_log_lines())
-    return f"封着的那台：没有预计用时的 1536M 碎片照公式的余量插空跑完（「{note[:60]}…」），15G 的那条照旧封着"
-
-
-# ── 批 77（records/2026-10-31-task-server巡检.md）：两台都封着组时没有预计用时的小任务照整片之外照样空着的那一份插空；组的账跑完的跟着减、插空起的不进 ──
-BOTH_SEALED_PEER_GIBIBYTES = 64                      # both-hosts-sealed-small-unestimated-starts：第二台 64G（可用上限 62G、界 52.7G）；本机 50G（可用上限 48G、界 40.8G）
-BOTH_SEALED_CARD_WHOLE_PEAK_BYTES = 30 * GIBIBYTE    # 那一格要卡的整片：上限与记账 45G；卡只在本机，只在本机算整片、只封本机，整片之外本机照样空着 3G
-BOTH_SEALED_WHOLE_PEAK_BYTES = 36 * GIBIBYTE         # 那一格不要卡的整片：上限 54G（本机收到 48G），两台都算整片；一齐放出来时第二台离放得下最近，封第二台，
                                                      # 整片之外第二台照样空着 8G
-BOTH_SEALED_HOLDER_PEAK_BYTES = 10 * GIBIBYTE        # 那一格的碎片：各记 15G、跑到放行为止；本机装两条（30G）、第二台装三条（45G）之后再放一条都超过界，两台都封组
-BOTH_SEALED_HOLDER_COUNT = 6                         # 碎片条数：两台至多装五条，至少剩一条两台都封着排着
-BOTH_SEALED_PROBE_PEAK_BYTES = GIBIBYTE * 2 // 3     # 那一格来插空的小任务：上限与记账 1G、没有预计用时（任务 8370 那一条只补写一行完成）
-BOTH_SEALED_RELEASE = "release-both-sealed"          # 那一格碎片的放行文件（相对假仓根；假第二台照 fake-peer-wait 等同一个名字）
-GROUP_DROP_WHOLE_PEAK_BYTES = 30 * GIBIBYTE          # fragment-group-drops-finished 的整片：上限与记账 45G（50G 的台可用上限 48G、界 40.8G），两条碎片在跑时放不下
-GROUP_DROP_HOLDER_PEAK_BYTES = 10 * GIBIBYTE         # 那一格的两条碎片与封组的那条：各记 15G；两条装进一组 30G，封组的那条再放就 45G、超过界
-GROUP_DROP_PROBE_PEAK_BYTES = GIBIBYTE * 2 // 3      # 那一格来插空的小任务：上限与记账 1G，整片之外照样空着的 3G 放得下，照内存那一支插空
-# task_server.py 的 Alternation.blocked 写的封组那一句里组的账那一段：已装到多少、此刻还在跑几条、它们记多少
-GROUP_ACCOUNT_PATTERN = re.compile(r"这台这一组碎片已装到 ([^（]+)（界 [^；]+；装过的照算，此刻还在跑的 (\d+) 条记 ([^）]+)）")
-
-
-def cell_both_hosts_sealed_small_unestimated_starts(world):
-    """两台都封着组时没有预计用时的小任务起得来（task_server.py 的 Alternation.gap_fill 的内存那一支；任务 8370 两台都封着组、一条只补写一行完成的 hook-swap 一直起不来）：
-    本机 50G 一张卡、第二台 64G 没有卡；一条要卡的整片（45G，只在本机算整片）、一条不要卡的整片（54G，等第二台）、六条碎片（各 15G，跑到放行为止）、
-    一条小任务（1G，没有预计用时）一齐放出来：本机装两条碎片、第二台装三条之后两台都封组，剩下的碎片排着、排队原因两台都写封组；
-    小任务照两台整片之外照样空着的那一份（本机 48G − 45G、第二台 62G − 54G，封组之前起的碎片不减）插空起来、跑完，尝试记「不看预计用时」与 gap_fill_beside_whole，
-    碎片都还在跑。放行之后都跑完。弄坏开关 gap-fill-room-counts-all-running 下照改前连碎片一起减，两台都只剩 0、小任务封着，这一格红。"""
-    cards = {"cards": LOCAL_CARD_ZERO, "local_gpu": [(0, CARD_FREE_MEBIBYTES)]}
-    sizes = {"local": (50, 50), "peer": (BOTH_SEALED_PEER_GIBIBYTES, BOTH_SEALED_PEER_GIBIBYTES), "peer_cap_gibibytes": BOTH_SEALED_PEER_GIBIBYTES}
-    world.resources(hold=True, **sizes, **cards)
-    for key, peak in (("selftest-both-sealed-card-whole", BOTH_SEALED_CARD_WHOLE_PEAK_BYTES), ("selftest-both-sealed-whole", BOTH_SEALED_WHOLE_PEAK_BYTES),
-                      ("selftest-both-sealed-holder", BOTH_SEALED_HOLDER_PEAK_BYTES), ("selftest-both-sealed-probe", BOTH_SEALED_PROBE_PEAK_BYTES)):
-        world.seed_peak(key, peak)
-    world.start_server()
-    release = os.path.join(world.repo, BOTH_SEALED_RELEASE)
-    # 要卡的整片照假清场的 block 演法收尾（放行文件在就退 0；card-whole-seals-while-card-busy 同一写法）
-    card_whole = world.submit(["cargo", "test", "--features", "gpu", "--lib", f"fake-quiesce=block:{release}", "both-sealed-card-whole"],
-                              extra={lib.KEY_VARIABLE: "selftest-both-sealed-card-whole"})
-    whole = world.submit(["bash", "-c", "exit 0", "both-sealed-whole"], extra={lib.KEY_VARIABLE: "selftest-both-sealed-whole"}, cwd=world.repo)
-    holders = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"both-sealed-holder-{number}", BOTH_SEALED_RELEASE, f"fake-peer-wait={BOTH_SEALED_RELEASE}"],
-                            extra={lib.KEY_VARIABLE: "selftest-both-sealed-holder"}, cwd=world.repo) for number in range(BOTH_SEALED_HOLDER_COUNT)]
-    probe = world.submit(["bash", "-c", "exit 0", "both-sealed-probe"], extra={lib.KEY_VARIABLE: "selftest-both-sealed-probe"}, cwd=world.repo)
-    world.resources(**sizes, **cards)   # 一齐放出来
-    world.api("POST", "/wake")
-    reasons, counts, wholes_waiting = [], {}, False
-    try:
-        try:
-            probe_summary = world.wait_for(probe, lambda found: found["task"].get("state") == "finished", "插空起来跑完", timeout=PLACEMENT_WAIT_SECONDS)
-        except SelftestFailure:
-            probe_summary = world.summary(probe)
-        world.next_pass()
-        counts, reasons = started_hosts(world, holders)
-        wholes_waiting = not world.summary(card_whole)["attempts"] and not world.summary(whole)["attempts"]
-    finally:
-        open(release, "w").close()
-    summaries = {task_id: world.finished(task_id, timeout=120) for task_id in [card_whole, whole, *holders, probe]}
-    problems = []
-    sealed = sorted(name for name in lib.HOST_NAMES.values() if any(f"{name}：这台这一组碎片已装到" in reason for reason in reasons))
-    if sealed != sorted(lib.HOST_NAMES.values()) or not wholes_waiting:
-        problems.append(f"两台都应当封着组、两条整片都在等（这一格的前提），实际排着的碎片的排队原因里封了组的台 {sealed}、两台各起碎片 {counts}、"
-                        f"整片{'都在等' if wholes_waiting else '有起了的'}、排队原因 {reasons[:2]}")
-    note = first_attempt(probe_summary).get("gap_fill") or ""
-    if (probe_summary["task"].get("outcome") != "succeeded" or not note.startswith(GAP_ADMITTED_TEXT) or ROOM_GAP_ADMITTED_TEXT not in note
-            or first_attempt(probe_summary).get("gap_fill_beside_whole") is not True or sum(counts.values()) != BOTH_SEALED_HOLDER_COUNT - 1):
-        problems.append(f"没有预计用时的 1G 小任务应当在五条碎片都还在跑时照整片之外照样空着的那一份插空起来、跑完，gap_fill 以「{GAP_ADMITTED_TEXT}」起头、写「{ROOM_GAP_ADMITTED_TEXT}」、"
-                        f"gap_fill_beside_whole 记 True，实际 {describe(probe_summary)}、gap_fill「{note}」、"
-                        f"gap_fill_beside_whole {first_attempt(probe_summary).get('gap_fill_beside_whole')}、起了的碎片 {counts}、在等「{probe_summary.get('waiting_for')}」")
-    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted({str(summary['task'].get('outcome')) for summary in summaries.values()})}")
-    if problems:
-        raise SelftestFailure("两台都封着组时没有预计用时的小任务插空：" + "；".join(problems), world.server_log_lines())
-    return f"两台都封着组（碎片 {counts}）：没有预计用时的 1G 小任务照整片之外照样空着的那一份插空跑完（「{note[:60]}…」）"
-
-
-def group_account(summary):
-    """封组那一句里组的账那一段（GROUP_ACCOUNT_PATTERN）：(已装到, 还在跑的条数, 它们记多少)；排队原因里没有交 None。"""
-    found = GROUP_ACCOUNT_PATTERN.search(summary.get("waiting_for") or "")
-    return found.groups() if found else None
-
-
-def cell_fragment_group_drops_finished(world):
-    """组的账：插空起的不进、这一组还在跑的碎片跑完跟着减（task_server.py 的 Alternation.__init__、started；任务 8370 那一回本机「已装到 95.1 GiB（界 41.6 GiB）」比 slice 还大）：
-    本机 50G（界 40.8G）上一条整片（45G）在等，两条碎片（各 15G，各自跑到自己的放行文件为止）装进一组，封组的那条（15G，没有预计用时）排着，
-    一条 1G 的小任务照整片之外照样空着的 3G 插空起来、跑完。封组那一句写「已装到 X（…；装过的照算，此刻还在跑的 2 条记 X）」：插空的那条不加进已装到的数；
-    放行一条碎片、它跑完之后写「还在跑的 1 条」、记的数跟着减，已装到的数不变（装过的照算），整片照旧在等。放行之后都跑完。
-    弄坏开关 fragment-group-never-drops 下插空的那条加进已装到的数、跑完的碎片照留在还在跑的里，这一格红。"""
-    world.resources(local=(50, 50), hold=True)
-    for key, peak in (("selftest-group-drop-whole", GROUP_DROP_WHOLE_PEAK_BYTES), ("selftest-group-drop-holder", GROUP_DROP_HOLDER_PEAK_BYTES),
-                      ("selftest-group-drop-sealed", GROUP_DROP_HOLDER_PEAK_BYTES), ("selftest-group-drop-probe", GROUP_DROP_PROBE_PEAK_BYTES)):
-        world.seed_peak(key, peak)
-    world.start_server()
-    releases = [os.path.join(world.root, f"release-group-drop-{name}") for name in ("released-midway", "kept-running")]   # 中途放行的那条、跑到收尾的那条
-    whole = world.submit(["bash", "-c", "exit 0", "group-drop-whole"], extra={lib.KEY_VARIABLE: "selftest-group-drop-whole"})
-    holders = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"group-drop-holder-{number}", path], extra={lib.KEY_VARIABLE: "selftest-group-drop-holder"})
-               for number, path in enumerate(releases)]
-    # 封组的那条另用一把键：与碎片同键的话，先跑完的那条给它记下预计用时，它就照时长插空起来，排队原因里读不到组的账
-    sealed = world.submit(["bash", "-c", "exit 0", "group-drop-sealed"], extra={lib.KEY_VARIABLE: "selftest-group-drop-sealed"})
-    probe = world.submit(["bash", "-c", "exit 0", "group-drop-probe"], extra={lib.KEY_VARIABLE: "selftest-group-drop-probe"})
-    world.resources(local=(50, 50))   # 一齐放出来
-    world.api("POST", "/wake")
-    before = after = None
-    whole_waiting = False
-    try:
-        for task_id in holders:
-            world.running(task_id)
-        try:
-            probe_summary = world.finished(probe, timeout=PLACEMENT_WAIT_SECONDS)
-        except SelftestFailure:
-            probe_summary = world.summary(probe)
-        world.next_pass()
-        world.next_pass()
-        before = group_account(world.summary(sealed))
-        midway_release, midway_holder = releases[0], holders[0]   # 中途放行的那条（releases 与 holders 同一个次序）
-        open(midway_release, "w").close()
-        world.finished(midway_holder)
-        world.next_pass()
-        world.next_pass()
-        after = group_account(world.summary(sealed))
-        whole_waiting = not world.summary(whole)["attempts"]
-    finally:
-        for path in releases:
-            open(path, "w").close()
-    summaries = {task_id: world.finished(task_id, timeout=120) for task_id in [whole, *holders, sealed, probe]}
-    problems = []
-    note = first_attempt(probe_summary).get("gap_fill") or ""
-    if probe_summary["task"].get("outcome") != "succeeded" or ROOM_GAP_ADMITTED_TEXT not in note:
-        problems.append(f"1G 的小任务应当照整片之外照样空着的 3G 插空起来、跑完（这一格的前提），实际 {describe(probe_summary)}、gap_fill「{note}」")
-    if before is None or before[1] != "2" or before[0] != before[2]:
-        problems.append(f"两条碎片在跑、插空的那条跑过之后，封组那一句应当写已装到的数与还在跑的 2 条记的数相同（插空的不加进去），实际 {before}")
-    if after is None or before is None or after[1] != "1" or after[0] != before[0] or after[2] == before[2]:
-        problems.append(f"放行的那条跑完之后应当写还在跑的 1 条、记的数跟着减，已装到的数不变，实际改前 {before}、改后 {after}")
-    if not whole_waiting:
-        problems.append("还有一条碎片在跑时整片（45G）放不下，应当照旧在等（这一格的前提）")
-    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted({str(summary['task'].get('outcome')) for summary in summaries.values()})}")
-    if problems:
-        raise SelftestFailure("组的账跑完的跟着减、插空的不进：" + "；".join(problems), world.server_log_lines())
-    return f"组的账：插空起了之后 {before}，放行一条碎片跑完之后 {after}（已装到不变、还在跑的跟着减）"
 
 
 PROGRESS_FREE_GIBIBYTES = 30            # progress-stall-reported：本机空 30G，排头一条没记录的（4G）照公式放得下
@@ -10580,90 +9041,6 @@ def cell_progress_stall_reported(world):
     return f"派活一律判不能起、本机照公式放得下：/health 报「{problem[:100]}」，放开之后跑完、回 ok"
 
 
-CARD_WAIT_PEER_RELEASE = "release-card-wait-peer"   # card-wait-holds-only-its-host：占着第二台两张卡的那一条等假仓根里这份放行文件（假第二台照 fake-peer-wait 等）
-
-
-def cell_card_wait_holds_only_its_host(world):
-    """前面等卡的只在它要的那几台上让（task_server.py 的 place_queued_into 的 gpu_waiting_hosts；任务 7615 要第二台 3 张卡在等，7618 要 1 张也被挡住）：
-    卡的先后是本机 0、第二台 0、1、2；一条声明要 2 张的占着第二台两张（本机只一张，凑不出），一条要同一台 3 张的在等（只有第二台有 3 张），
-    后面一条要 1 张的照优先级分到本机 0、照起跑完，那条要 3 张的仍在等。弄坏开关 card-wait-blocks-later-cards 下前面一条等卡就挡住后面全部要卡的，这一格红。"""
-    two_host_cards(world, f"{LOCAL_CARD_ZERO} {PEER_CARD_ZERO} {PEER_CARD_ONE} {PEER_CARD_TWO}", 1, 3)
-    world.start_server()
-    holder_command = write_card_script(world, "two-peer-cards.sh", 2)[:-1] + [f"fake-peer-wait={CARD_WAIT_PEER_RELEASE}"]   # 不写 fake-wrapper-exits：假第二台等放行
-    holder = world.submit(holder_command)
-    waiting_id, later_id, later, waiting = None, None, {}, {}
-    try:
-        world.running(holder)
-        waiting_id = world.submit(write_card_script(world, "three-peer-cards.sh", 3))
-        waiting = world.wait_for(waiting_id, lambda found: "等空卡" in (found.get("waiting_for") or "") or found["task"].get("state") != "queued", "报等空卡")
-        later_id = world.submit(write_card_script(world, "one-local-card.sh", 1))
-        try:
-            later = world.finished(later_id, timeout=PLACEMENT_WAIT_SECONDS)
-        except SelftestFailure:
-            later = world.summary(later_id)
-        waiting = world.summary(waiting_id)
-    finally:
-        open(os.path.join(world.repo, CARD_WAIT_PEER_RELEASE), "w").close()
-    outcomes = {name: world.finished(task_id, timeout=120)["task"].get("outcome")
-                for name, task_id in (("占着的", holder), ("要 3 张的", waiting_id), ("后面要 1 张的", later_id)) if task_id is not None}
-    held = world.summary(holder)
-    problems = []
-    if attempt_card_and_host(held)[1] != "peer":
-        problems.append(f"要 2 张的应当整组分到第二台（本机只一张），实际 {attempt_card_and_host(held)}")
-    if waiting.get("attempts") or "等空卡" not in (waiting.get("waiting_for") or ""):
-        problems.append(f"要同一台 3 张的在第二台被占着两张时应当排着、在等「等空卡」，实际 {describe(waiting) if waiting else '没交上'}、在等「{waiting.get('waiting_for')}」")
-    if later.get("task", {}).get("outcome") != "succeeded" or attempt_card_and_host(later) != (LOCAL_CARD_ZERO, "local"):
-        problems.append(f"后面要 1 张的应当照优先级分到 {LOCAL_CARD_ZERO}、照起跑完（前面等的是第二台的卡），实际 "
-                        f"{describe(later) if later else '没交上'}、卡与台 {attempt_card_and_host(later) if later else None}、在等「{later.get('waiting_for')}」")
-    if set(outcomes.values()) != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际 {outcomes}")
-    if problems:
-        raise SelftestFailure("等卡的只在它要的那几台上让：" + "；".join(problems), world.server_log_lines())
-    return f"要 3 张的在等第二台的卡：后面要 1 张的照起在 {LOCAL_CARD_ZERO}、跑完"
-
-
-RECORD_WINDOW_PINNED = 5   # 钉住 task_server.py 的 RECORD_WINDOW（近几次的名额）：改它先改这里
-SHARD_WINDOW_SMALL_PEAK_BYTES = GIBIBYTE   # shard-siblings-peak-windowed：撞过上限之后各片跑成量到的峰值（× 1.5 不到没记录的 4G）
-SHARD_WINDOW_SHARDS = 1 + RECORD_WINDOW_PINNED   # 那一格的片数：第 0 片撞过一次再跑成，之后几片一次一片跑成，最后起的那一片之前有五次小的
-
-
-def cell_shard_siblings_peak_windowed(world):
-    """兄弟片按近几次取（task_server.py 的 shard_family_peak 按结束时刻取近 RECORD_WINDOW 个）：本机空闲 7G、一次只放得下一片，每片跑成都量到 1G（假分片入口的 exit_peak）。
-    第 0 片头一次撞了 4096M 的上限、重排跑成，别的片一片片跑。每片头一次起之前：撞过的那一次之后跑成的不到五次（撞过的还在近 5 个里）从 6144M 起（shard-family）；
-    满五次（之后五片都小，撞过的出了窗口）回落到没记录的 4096M、prediction 不记 shard-family。两种都要出现（一次一片：最后起的那一片之前有五次小的）。
-    弄坏开关 history-peak-unwindowed 下照改前不截、满五次的也 6144M；shard-siblings-unshared 下不到五次的也只 4096M，这一格红。"""
-    world.resources(local=(SHARD_FAMILY_FREE_GIBIBYTES, 30))
-    shards = [{"exits": [250, "run"], "exit_peak": SHARD_WINDOW_SMALL_PEAK_BYTES}] + [{"exit_peak": SHARD_WINDOW_SMALL_PEAK_BYTES} for _ in range(SHARD_WINDOW_SHARDS - 1)]
-    command = world.write_spec("spec-shard-window.json", {"shards": shards})
-    world.start_server()
-    summary = world.finished(world.submit(command, cwd=world.repo), timeout=120)
-    children = shard_children(summary)
-    opening = {index: (child["attempts"] or [{}])[0] for index, child in children.items()}
-    succeeded = [attempt for child in children.values() for attempt in child["attempts"] if attempt.get("outcome") == "succeeded"]
-    hit_at = float(opening.get(0, {}).get("ended_at") or 0)
-    problems, seen = [], {}
-    if summary["task"].get("outcome") != "succeeded" or opening.get(0, {}).get("outcome") != "memory-cap-hit":
-        problems.append(f"第 0 片头一次应当撞 {UNRECORDED_DEFAULT_PINNED_TEXT} 的上限、整件跑成，实际 {describe(summary)}、第 0 片头一次 {opening.get(0, {}).get('outcome')}")
-    if [attempt.get("memory_peak") for attempt in succeeded] != [SHARD_WINDOW_SMALL_PEAK_BYTES] * SHARD_WINDOW_SHARDS:
-        problems.append(f"每片跑成那一次都应当记下假分片入口写的峰值 {SHARD_WINDOW_SMALL_PEAK_BYTES}，实际 {[attempt.get('memory_peak') for attempt in succeeded]}")
-    for index in range(1, SHARD_WINDOW_SHARDS):
-        attempt = opening.get(index, {})
-        started = float(attempt.get("started_at") or 0)
-        smaller = sum(1 for done in succeeded if hit_at < float(done.get("ended_at") or 0) <= started)   # 撞过之后、这一片起之前跑成的几次
-        wanted = UNRECORDED_DEFAULT_PINNED_TEXT if smaller >= RECORD_WINDOW_PINNED else SHARD_FAMILY_RAISED_TEXT
-        seen[index] = (smaller, attempt.get("memory_cap_text"), attempt.get("prediction"))
-        if attempt.get("memory_cap_text") != wanted or (attempt.get("prediction") == lib.SHARD_FAMILY_HISTORY) != (wanted == SHARD_FAMILY_RAISED_TEXT):
-            problems.append(f"第 {index} 片起之前撞过之后跑成了 {smaller} 次：头一次应当{'回落到' if smaller >= RECORD_WINDOW_PINNED else '从'} {wanted}"
-                            f"{'、prediction 不记 ' if smaller >= RECORD_WINDOW_PINNED else '（'}{lib.SHARD_FAMILY_HISTORY}{'' if smaller >= RECORD_WINDOW_PINNED else '）'}，"
-                            f"实际 {attempt.get('memory_cap_text')}（{attempt.get('prediction')}）")
-    kinds = {value[0] >= RECORD_WINDOW_PINNED for value in seen.values()}
-    if kinds != {True, False}:
-        problems.append(f"世界没造出要的两种（撞过的还在窗口里、已出了窗口），各片（撞过之后跑成几次、上限、prediction）{seen}")
-    if problems:
-        raise SelftestFailure("兄弟片按近几次取：" + "；".join(problems), world.server_log_lines())
-    return f"兄弟片撞过 {UNRECORDED_DEFAULT_PINNED_TEXT} 之后各片头一次（撞过之后跑成几次、上限、prediction）：{seen}"
-
-
 def cell_parallelism_registration_refused(world):
     """各格并行的路数取不出登记的每台默认重活线程数就判红，不退回按核数（本文件的 parallelism；.claude/heavy-thread-default 文件头：写坏或删掉这份文件，取法一律拒绝，不退回按核数算）：
     造四份样本交给 parallelism：SINGLEFS_THREAD_CAP=abc、登记文件不在、登记那一行没写理由，都交 (None, 原因, 出路)，原因里点名是哪一样（变量名与值、文件路径、第几行），出路不空；
@@ -10691,100 +9068,145 @@ def cell_parallelism_registration_refused(world):
     return f"取不出登记的线程数的 {len(refused)} 份样本都判红、点名了原因；登记值与 SINGLEFS_THREAD_CAP 的 {len(accepted)} 份照取"
 
 
-# ── 批 93（records/2026-10-31-task-server巡检.md）：异常交给交任务的会话、为满时限的整片封着的台不插空、预算、峰值口径 ──
-AGED_GAP_OCCUPANT_PEAK_BYTES = 27 * GIBIBYTE   # aged-seal-no-gap-fill 占着的碎片：上限与记账 40.5G（50G 的台可用上限 48G、界 40.8G：碎片），起了记进这一组
-AGED_GAP_WHOLE_PEAK_BYTES = 30 * GIBIBYTE      # 那一格的整片：上限与记账 45G，占着的跑着时放不下（照公式 48G − 40.5G = 7.5G）
-AGED_GAP_PROBE_PEAK_BYTES = 3 * GIBIBYTE       # 那一格来插空的碎片：上限与记账 4.5G，照公式放得下；排头整片起来之后那一份只剩 48G − 45G = 3G，放不下，照改前要看预计用时
-AGED_GAP_PROBE_SECONDS = 1                     # 它记下的用时：照改前不超过挡路时长（占着的那条没有预计用时、按已跑算，已跑过满时限那么久）就插空
-AGED_GAP_SECONDS = "3"                         # 那一格的满时限（TASK_SERVER_SELFTEST_AGED_SECONDS）
+CLAMP_HOST_SLICE_GIBIBYTES = 50          # cap-hit-record-over-every-host-starts-clamped：只有本机、slice 总上限 50G、假余量 2G：可用上限 48G
+CLAMP_CAP_HIT_BYTES = 45 * GIBIBYTE       # 同键上一次撞的上限（峰值到了上限）、之后没跑完过：进定额度的量按它乘 1.5 是 67.5G，比 48G 大
+CLAMP_HOST_LIMIT_TEXT = "49152M"          # 48G：总上限 50G 减余量 2G
+CLAMP_TINY_SLICE_GIBIBYTES = 5            # booking-within-host-limit-every-history：本机 slice 总上限 5G、假余量 2G，可用上限 3G；四种来历的预测都比它大
+CLAMP_PINNED_ITEM_BYTES = 8 * GIBIBYTE    # 钉值那一条：多机配置里这台那一项 8G，减余量 2G 是 6G
+CLAMP_RECORDED_BYTES = 7 * GIBIBYTE       # 记录那一条：近几次最大 7G
+CLAMP_RETRY_BYTES = 4608 * MEBIBYTE       # 撞上限重排那一条：3072M 撞了乘 1.5
 
 
-def cell_aged_seal_no_gap_fill(world):
-    """为满时限的整片封着的台一条都不插（task_server.py 文件头 ②「满时限」；用户：「一个任务都排了两个小时了 还要有任务插队 明显不合理」）：本机 50G（可用上限 48G、界 40.8G），
-    一条碎片占着 40.5G（记进这一组）；整片（记 45G）与一条记了 1 秒用时的碎片（记 4.5G）交了先不判，等两条都满时限（压到 3 秒）之后一齐放出来：那条碎片装进组就超过界、封组，
-    挡它的整片满了时限：照封组那一句排着、后面接 AGED_SEAL_NO_GAP_TEXT，一条不插；放行占着的那条之后整片先起，碎片在它之后，都跑完。
-    弄坏开关 aged-seal-gap-filled 下照改前按预计用时插空（1 秒不超过挡路时长），这一格红。"""
-    world.resources(local=(50, 50))
-    probe_command = ["bash", "-c", "exit 0", "aged-gap-probe"]
-    world.seed_peak("selftest-aged-gap-occupant", AGED_GAP_OCCUPANT_PEAK_BYTES)
-    world.seed_peak("selftest-aged-gap-whole", AGED_GAP_WHOLE_PEAK_BYTES)
-    world.seed_peak("selftest-aged-gap-probe", AGED_GAP_PROBE_PEAK_BYTES)
-    world.seed_duration("selftest-aged-gap-probe", AGED_GAP_PROBE_SECONDS, probe_command)
-    world.start_server(extra={"TASK_SERVER_SELFTEST_AGED_SECONDS": AGED_GAP_SECONDS})
-    release = os.path.join(world.root, "release-aged-gap-occupant")
-    occupant = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "aged-gap-occupant", release], extra={lib.KEY_VARIABLE: "selftest-aged-gap-occupant"})
-    whole = probe = None
-    waiting = {}
-    try:
-        world.running(occupant)
-        world.resources(local=(50, 50), hold=True)   # 交了先不判：没满时限时那条碎片照改前就插空了，要等两条都满时限再放出来
-        whole = world.submit(["bash", "-c", "exit 0", "aged-gap-whole"], extra={lib.KEY_VARIABLE: "selftest-aged-gap-whole"})
-        probe = world.submit(probe_command, extra={lib.KEY_VARIABLE: "selftest-aged-gap-probe"})
-        time.sleep(float(AGED_GAP_SECONDS) + 1)   # 后交的那条也满了时限（下限，不比上限：机器忙时只会更久）
-        world.resources(local=(50, 50))
-        world.api("POST", "/wake")
-        world.next_pass()
-        world.next_pass()
-        waiting = {task_id: world.summary(task_id) for task_id in (whole, probe)}
-    finally:
-        open(release, "w").close()
-    summaries = {task_id: world.finished(task_id) for task_id in (occupant, whole, probe) if task_id is not None}
-    problems = []
-    probe_waiting = waiting.get(probe) or {"task": {}, "attempts": []}
-    reason = probe_waiting.get("waiting_for") or ""
-    if probe_waiting.get("attempts") or SEALED_GROUP_TEXT not in reason or SERVER.AGED_SEAL_NO_GAP_TEXT not in reason:
-        problems.append(f"排头整片满了时限、那台封着组：记了 {AGED_GAP_PROBE_SECONDS} 秒用时的碎片应当一条都不插，排队原因带「{SEALED_GROUP_TEXT}」与「{SERVER.AGED_SEAL_NO_GAP_TEXT}」，"
-                        f"实际 {describe(probe_waiting)}、排队原因「{reason}」")
-    whole_order = attempt_order(summaries[whole]) if whole is not None else None
-    probe_order = attempt_order(summaries[probe]) if probe is not None else None
-    if whole_order is None or probe_order is None or probe_order < whole_order:
-        problems.append(f"放行占着的那条之后整片应当先于那条碎片起，实际尝试号整片 {whole_order}、碎片 {probe_order}")
-    if {summary["task"].get("outcome") for summary in summaries.values()} != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted({str(summary['task'].get('outcome')) for summary in summaries.values()})}")
-    if problems:
-        raise SelftestFailure("满时限整片封台时短任务也不插：" + "；".join(problems), world.server_log_lines())
-    return f"满时限的整片封着台：记了 {AGED_GAP_PROBE_SECONDS} 秒用时的碎片不插空（「{reason[-60:]}」），整片（尝试 {whole_order}）先于它（尝试 {probe_order}）起，都跑完"
-
-
-BUDGET_TINY_SLICE_GIBIBYTES = 5   # budget-over-maxima-refused：两台 slice 总上限都是 5G、假余量 2G，可用上限 3G；没记录的命令记 4G：比两台可用上限都大、又不比总上限大（judge_host 判不出 never）
-
-
-def cell_budget_over_maxima_refused(world):
-    """预算超过整台（task_server.py 文件头 ②「预算」）：两台可用上限都是 3G，一条没记录的命令记账 4G：照改前 judge_host 判不出永远放不下（不比 slice 总上限 5G 大），
-    永远排着；改后排队那一刻就打回 memory-cap-at-maximum、退 236、一次都没起，说明写记账与两台的可用上限，wait 末行的出路写核实范围、分片与同时起的个数。
-    弄坏开关 budget-over-maxima-waits 下照改前排着，这一格红。"""
-    world.resources(local=(50, BUDGET_TINY_SLICE_GIBIBYTES), peer=(50, BUDGET_TINY_SLICE_GIBIBYTES), peer_cap_gibibytes=BUDGET_TINY_SLICE_GIBIBYTES)
+def cell_cap_hit_record_over_every_host_starts_clamped(world):
+    """记录比每一台都大照收到可用上限起跑（task_server.py 文件头 ②「内存」的准入记账；booked_at_cap、hosts_short_of_record）：只有本机、slice 总上限 50G、余量 2G
+    （可用上限 48G），同键上一次撞了 45G 的上限（峰值到了上限）、之后这把键没跑完过：进定额度的量是上限乘 1.5 的 67.5G，比本机大，也没有别的台；
+    新交的一条不判 never-fits，在本机按 48G（49152M，总上限减余量）起跑、跑完，尝试行的上限与记账都不大于 48G。
+    弄坏开关 booking-over-host-limit 下记账照 67.5G 记、judge_host 判永远放不下，record-over-every-host-never-fits 下本机照永远放不下判，都记 never-fits，这一格红。"""
+    key = "selftest-record-over-every-host"
+    world.resources(local=(100, CLAMP_HOST_SLICE_GIBIBYTES))
     world.start_server()
-    task_id = world.submit(["bash", "-c", "exit 0", "budget-over-maxima"], cwd=world.repo)
-    world.next_pass()
-    world.next_pass()
-    summary = world.summary(task_id)
+    seed_ended_attempt(world, key, SEEDED_ENDED_AT, "memory-cap-hit", memory_cap=CLAMP_CAP_HIT_BYTES, memory_peak=CLAMP_CAP_HIT_BYTES)
+    summary = world.finished(world.submit(["bash", "-c", "exit 0", "fake-wrapper-exits=0"], extra={lib.KEY_VARIABLE: key}))
+    attempt = first_attempt(summary)
+    limit = (CLAMP_HOST_SLICE_GIBIBYTES - SELFTEST_MARGIN_GIBIBYTES) * GIBIBYTE
+    if (summary["task"].get("outcome") != "succeeded" or len(summary["attempts"]) != 1 or attempt.get("host") != "local"
+            or attempt.get("memory_cap_text") != CLAMP_HOST_LIMIT_TEXT or int(attempt.get("memory_cap") or 0) > limit or int(attempt.get("booked") or 0) > limit):
+        raise SelftestFailure(f"同键撞过 45G、之后没跑完过（进定额度 67.5G），只有本机、可用上限 48G：应当在本机按 {CLAMP_HOST_LIMIT_TEXT} 起跑一次、跑完，"
+                              f"上限与记账不大于 48G（{limit} 字节），不判 never-fits；实际台 {attempt.get('host')}、上限 {attempt.get('memory_cap_text')}"
+                              f"（{attempt.get('memory_cap')} 字节）、记账 {attempt.get('booked')} 字节、{describe(summary)}、说明「{summary['task'].get('note')}」",
+                              world.server_log_lines())
+    return f"进定额度 67.5G 比本机可用上限 48G 大：照 {CLAMP_HOST_LIMIT_TEXT} 起跑、跑完，不判 never-fits"
+
+
+def cell_booking_within_host_limit_every_history(world):
+    """任何来历算出的上限与记账都不大于判的那一台的可用上限（task_server.py 的 booked_at_cap；文件头 ②「内存」的准入记账）：本机 slice 总上限 5G、余量 2G，可用上限 3G；
+    钉值（多机配置那一项 8G 减余量是 6G）、记录（7G）、没有记录的缺省（UNRECORDED_MEMORY_DEFAULT_BYTES，4G）、撞上限重排（4608M）四条的预测都比 3G 大：
+    booked_at_cap 交给 judge_host 的预测峰值、上限与记账都不大于 3G。可用上限照这一格自己算（总上限减余量），不读 host_limit。套在假调度器上，不起服务。
+    弄坏开关 booking-over-host-limit 下钉值之外的三条照原样记，booked-at-peak 下四条都照原样，booked-up-to-slice-total 下收到 5G（不减余量），这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.host_dispatch = lib.load_module("host_dispatch_for_booking_cell", os.path.join(lib.HOSTS_DIRECTORY, "host-dispatch.py"))
+    report = memory_report(50, CLAMP_TINY_SLICE_GIBIBYTES)
+    slice_total = int(report["memory"]["slice_total"])
+    snapshot = types.SimpleNamespace(reports={SERVER.LOCAL: report}, down={}, memory_caps={}, total=lambda host: slice_total)
+    limit = (CLAMP_TINY_SLICE_GIBIBYTES - SELFTEST_MARGIN_GIBIBYTES) * GIBIBYTE
+    prediction_type = fake.host_dispatch.Prediction
+    default = lib.UNRECORDED_MEMORY_DEFAULT_BYTES
+    pinned = CLAMP_PINNED_ITEM_BYTES - SELFTEST_MARGIN_GIBIBYTES * GIBIBYTE
+    cases = (("钉值", prediction_type("selftest-booking-pinned", pinned, pinned, pinned, lib.PINNED_HISTORY, memory_by_host={SERVER.LOCAL: CLAMP_PINNED_ITEM_BYTES})),
+             ("记录", prediction_type("selftest-booking-record", CLAMP_RECORDED_BYTES, CLAMP_RECORDED_BYTES, CLAMP_RECORDED_BYTES, lib.RECORD_HISTORY)),
+             ("没有记录的缺省", prediction_type("selftest-booking-default", default, default, default, lib.UNRECORDED_HISTORY)),
+             ("撞上限重排", prediction_type("selftest-booking-retry", CLAMP_RETRY_BYTES, CLAMP_RETRY_BYTES, CLAMP_RETRY_BYTES, "retry")))
     problems = []
-    note = summary["task"].get("note") or ""
-    if (summary["task"].get("outcome") != "memory-cap-at-maximum" or summary["task"].get("exit_code") != 236 or summary["attempts"]
-            or "预算超过整台" not in note or "可用上限" not in note):
-        problems.append(f"记账 4G 比两台的可用上限 3G 都大：应当当场打回 memory-cap-at-maximum、退 236、一次都没起，说明写「预算超过整台」与可用上限，"
-                        f"实际 {describe(summary)}、状态 {summary['task'].get('state')}、说明「{note}」")
-        if summary["task"].get("state") != "finished":
-            world.client(["cancel", str(task_id)])
-    else:
-        completed = world.client(["wait", str(task_id)])
-        last = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else ""
-        if completed.returncode != 236 or "核实这一趟的范围（点的项、测试目标）、分片与同时起的个数" not in last:
-            problems.append(f"wait 应当退 236、末行出路写核实范围、分片与同时起的个数，实际退 {completed.returncode}、末行「{last}」")
+    for what, prediction in cases:
+        if int(prediction.memory_predicted) <= limit:
+            problems.append(f"{what}：样本的预测 {prediction.memory_predicted} 字节应当比可用上限 {limit} 字节大（这一格的样本写坏了）")
+            continue
+        booked = SERVER.Scheduler.booked_at_cap(fake, prediction, SERVER.LOCAL, snapshot)
+        over = {name: int(getattr(booked, name) or 0) for name in ("memory_predicted", "memory_cap", "memory_booked") if int(getattr(booked, name) or 0) > limit}
+        if over:
+            problems.append(f"{what}（{prediction.memory_history}）：预测峰值、上限与记账都应当不大于可用上限 {limit} 字节，实际超过的 {over}")
     if problems:
-        raise SelftestFailure("预算超过整台：" + "；".join(problems), world.server_log_lines())
-    return f"记账 4G、两台可用上限 3G：排队那一刻打回 memory-cap-at-maximum、退 236（「{note[:80]}」）"
+        raise SelftestFailure("记账收到可用上限：" + "；".join(problems))
+    return f"钉值、记录、缺省、撞上限重排 {len(cases)} 条的预测都比可用上限 3G 大：交给 judge_host 的预测峰值、上限与记账都不大于 3G"
+
+
+DROP_HISTORY_LIMIT_GIBIBYTES = 1           # control-drop-history-oversized-records：--attempt-records-over-gib 1
+DROP_HISTORY_CAP_BYTES = 800 * MEBIBYTE    # 撞上限那几行的上限：本身不过 1G，乘 1.5 的 1200M 过 1G
+DROP_HISTORY_NEAR_CAP_PEAK_BYTES = 790 * MEBIBYTE   # 峰值到了上限（不小于一半）：按上限进定额度
+DROP_HISTORY_LOW_PEAK_BYTES = 100 * MEBIBYTE        # 峰值远低于上限（不到一半）：按峰值进定额度
+DROP_HISTORY_SMALL_PEAK_BYTES = 500 * MEBIBYTE
+
+
+def drop_history_rows(world):
+    """control-drop-history-oversized-records：照服务读回的规则读 attempts，交 [(命令键, 结局)]（照行号先后）。"""
+    return [(record.get("command_key"), record.get("outcome")) for record, _ in world.signed_rows("attempts")]
+
+
+def cell_control_drop_history_oversized_records(world):
+    """control drop-history --attempt-records-over-gib（task-server/control 的 drop_history；撞上限那一行进定额度的量照 task_server_lib.py 的 cap_hit_record_bytes 算，
+    服务的 cap_hit_measurement 经同一处）：库里造六行——跑完、峰值 2G（过 1G）；撞了 800M 上限、峰值到了上限、之后这把键没跑完过（进定额度 1200M，过 1G）；
+    跑完、峰值 500M；撞了 800M 上限而峰值只有 100M（远低于上限，按峰值进 100M）；同一把键撞了 800M 上限、之后又跑完一次 500M（撞的那一行按上限本身进 800M）两行。
+    服务在跑（is-active 打 active）时拒：退 1、说服务还没停、一行不删、不拷备份；停了之后 --attempt-records-over-gib 1 删前两行、其余四行都在，
+    删之前的库拷在 .before-drop-history- 那一份里、六行都在。
+    弄坏开关 drop-history-cap-hits-ignored 下撞上限那一行不删，cap-hit-low-peak-counted-at-cap 下峰值 100M 的那一行也删，这一格红。"""
+    world.start_server()
+    rows = (("selftest-drop-peak-over", "succeeded", 2 * GIBIBYTE, None),
+            ("selftest-drop-cap-hit-over", "memory-cap-hit", DROP_HISTORY_NEAR_CAP_PEAK_BYTES, DROP_HISTORY_CAP_BYTES),
+            ("selftest-drop-small", "succeeded", DROP_HISTORY_SMALL_PEAK_BYTES, None),
+            ("selftest-drop-cap-hit-low-peak", "memory-cap-hit", DROP_HISTORY_LOW_PEAK_BYTES, DROP_HISTORY_CAP_BYTES),
+            ("selftest-drop-cap-hit-resolved", "memory-cap-hit", DROP_HISTORY_NEAR_CAP_PEAK_BYTES, DROP_HISTORY_CAP_BYTES),
+            ("selftest-drop-cap-hit-resolved", "succeeded", DROP_HISTORY_SMALL_PEAK_BYTES, None))
+    for offset, (key, outcome, peak, cap) in enumerate(rows):
+        seed_ended_attempt(world, key, SEEDED_ENDED_AT + offset, outcome, memory_peak=peak, memory_cap=cap)
+    world.stop_server()
+    seeded = drop_history_rows(world)
+    extra = {"TASK_SERVER_CONTROL_SYSTEMCTL": os.path.join(world.bin, "fake-systemctl")}
+    state_file = os.path.join(world.world, "systemctl-state")
+    backup_prefix = lib.DATABASE_NAME + ".before-drop-history-"
+    arguments = ["drop-history", "--attempt-records-over-gib", str(DROP_HISTORY_LIMIT_GIBIBYTES)]
+    problems = []
+    if len(seeded) != len(rows):
+        problems.append(f"造的 {len(rows)} 行应当都进了库，实际读回 {seeded}")
+    with open(state_file, "w", encoding="utf-8") as handle:
+        handle.write("active\n")
+    refused = world.control(arguments, extra=extra)
+    refused_text = refused.stdout + refused.stderr
+    backups = [name for name in os.listdir(world.state) if name.startswith(backup_prefix)]
+    if refused.returncode != 1 or "服务还没停干净" not in refused_text or drop_history_rows(world) != seeded or backups:
+        problems.append(f"服务在跑（is-active 打 active）时应当拒：退 1、说服务还没停干净、一行不删、不拷备份；实际退 {refused.returncode}、"
+                        f"库里 {drop_history_rows(world)}、备份 {backups}、输出「{refused_text.strip()[-300:]}」")
+    with open(state_file, "w", encoding="utf-8") as handle:
+        handle.write("inactive\n")
+    dropped = world.control(arguments, extra=extra)
+    dropped_text = dropped.stdout + dropped.stderr
+    left = drop_history_rows(world)
+    wanted = [row for row in seeded if row[0] not in ("selftest-drop-peak-over", "selftest-drop-cap-hit-over")]
+    if dropped.returncode != 0 or left != wanted or f"进定额度超过 {DROP_HISTORY_LIMIT_GIBIBYTES} GiB 的尝试 2 行" not in dropped_text:
+        problems.append(f"停了之后 --attempt-records-over-gib {DROP_HISTORY_LIMIT_GIBIBYTES} 应当退 0、只删峰值 2G 的与撞了 800M 上限而之后没跑完过的那两行（报删了 2 行），"
+                        f"峰值 500M 的、峰值远低于上限的撞上限那一行、之后跑完过的撞上限那一行与它跑完的那一行都留着；实际退 {dropped.returncode}、库里 {left}、"
+                        f"输出「{dropped_text.strip()[-400:]}」")
+    backups = [name for name in os.listdir(world.state) if name.startswith(backup_prefix)]
+    if len(backups) != 1:
+        problems.append(f"删之前的库应当拷一份 {backup_prefix}<时刻>，实际 {backups}")
+    else:
+        with contextlib.closing(sqlite3.connect(os.path.join(world.state, backups[0]), timeout=30)) as connection:
+            kept = connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0]
+        if kept != len(rows):
+            problems.append(f"备份 {backups[0]} 里应当是删之前的 {len(rows)} 行，实际 {kept} 行")
+    if problems:
+        raise SelftestFailure("drop-history 删进定额度超限的尝试行：" + "；".join(problems))
+    return f"服务在跑时拒；停了之后删进定额度超过 {DROP_HISTORY_LIMIT_GIBIBYTES} GiB 的两行、留四行、备份六行都在"
 
 
 def cell_oversized_budget_reported(world):
-    """预算贴着整台（task_server.py 文件头 ①「要处置的提醒」的 oversized-budget）：两台 50G（可用上限 48G、界 40.8G），记过峰值 30G 的命令记账 45G：不超过可用上限、不小于整片界，
+    """预算贴着整台（task_server.py 文件头 ①「要处置的提醒」的 oversized-budget）：两台 50G（可用上限 48G、界 40.8G），记过峰值 45G 的命令记账 45G（不乘 1.5）：不超过可用上限、不小于整片界，
     照常排、起来跑；wait 打一行 kind=oversized-budget、依据写记账、可用上限与记账从哪来、退 ATTENTION_EXIT；放行之后跑完。
     弄坏开关 oversized-budget-silent 下不报，wait 等到命令自己退，这一格红。"""
     key = "selftest-oversized-budget"
     release = os.path.join(world.root, "release-oversized-budget")
     world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50)
-    world.seed_peak(key, 30 * GIBIBYTE)
+    world.seed_peak(key, 45 * GIBIBYTE)
     world.start_server()
     task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra={lib.KEY_VARIABLE: key}, cwd=world.repo)
     completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
@@ -10801,13 +9223,448 @@ def cell_oversized_budget_reported(world):
     return f"记账 45G 不小于整片界 40.8G：wait 打 kind=oversized-budget（依据「{basis[:80]}」），照跑完"
 
 
-LONG_RUN_IDLE_ATTENTION_SECONDS = "2"   # long-run-idle-cores-reported：跑满这么久就看平均在用核数（换掉 LONG_RUN_ATTENTION_SECONDS 的一小时）
+def cell_oversized_budget_acknowledged_after_restart(world):
+    """换服务之后照跑照样记得上（task_server.py 文件头 ⑥「没处置时」）：预算贴着整台的那一条照 oversized-budget-reported 造（记账 45G、界 40.8G），wait 报过 oversized-budget；
+    服务停了再起（budget_notices 只在内存，换上之后这一条没有开着的提醒），提交它的会话 confirm --why 退 0、回「已记照跑（oversized-budget）」。
+    弄坏开关 anomaly-acknowledge-open-only 下只认开着的，回 409「不用确认」，这一格红。"""
+    key = "selftest-oversized-budget-restart"
+    release = os.path.join(world.root, "release-oversized-budget-restart")
+    world.resources(local=(50, 50), peer=(50, 50), peer_cap_gibibytes=50)
+    world.seed_peak(key, 45 * GIBIBYTE)
+    world.start_server()
+    task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra={lib.KEY_VARIABLE: key}, cwd=world.repo)
+    completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
+    problems, _ = attention_problems(completed, task_id, "oversized-budget", lib.ATTENTION_EXIT)
+    world.stop_server()
+    world.start_server()
+    confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE])
+    said = confirmed.stdout + confirmed.stderr
+    if confirmed.returncode != 0 or "已记照跑（oversized-budget）" not in said:
+        problems.append(f"换服务之后 confirm --why 应当退 0、回「已记照跑（oversized-budget）」，实际退 {confirmed.returncode}：{said[-300:]}")
+    open(release, "w").close()
+    world.finished(task_id)
+    if problems:
+        raise SelftestFailure("换服务之后记照跑：" + "；".join(problems), world.server_log_lines())
+    return "oversized-budget 报过、服务停了再起，confirm --why 照样记上照跑"
+
+
+RUNAWAY_RESTART_PID = 601          # 换服务接着数那两格的假空转进程号（进程表是假的：不起真进程、不停真进程）
+RUNAWAY_RESTART_OLD_PID = 602      # runaway-reused-pid-counted-afresh 里换服务前后是同一个的那一个
+RUNAWAY_RESTART_GAP_SECONDS = 10000.0   # runaway-reused-pid-counted-afresh：换服务之前那两次报离此刻这么久（服务停着的空档）
+SHARD_ADVANCE_PARENT_ID = 4242     # advance-episodes-survive-restart 的假分片父任务号
+
+
+def restart_surviving_scheduler(world, database_name):
+    """换服务不丢的那几份（task_server.py 的 RESTART_SURVIVING_STATES）那几格共用的假调度器：这一格临时库上的 Store（同一份库上再建一个就是服务停了再起），
+    Scheduler.__init__ 里那几张表与锁照建，照它末尾那样读回库里那几份（restore_restart_surviving_state）；告警记进 alerts。不起服务。"""
+    scheduler = object.__new__(SERVER.Scheduler)
+    scheduler.environment = dict(os.environ)
+    scheduler.store = SERVER.Store(os.path.join(world.root, database_name), bytes(32), scheduler.environment)
+    scheduler.attention_lock = threading.Lock()
+    scheduler.runaway_notified, scheduler.advance_failures, scheduler.advance_episodes = {}, {}, {}
+    scheduler.suspect_reported, scheduler.suspect_lock, scheduler.health_notified = {}, threading.Lock(), {}
+    scheduler.booking_drift_notified, scheduler.booking_drift_lock = {}, threading.Lock()
+    scheduler.restart_surviving_lock, scheduler.restart_surviving_written = threading.Lock(), {}
+    scheduler.alerts = []
+    scheduler.alert = lambda kind, task_id, line, howto: scheduler.alerts.append((kind, task_id, line))
+    SERVER.Scheduler.restore_restart_surviving_state(scheduler)
+    return scheduler
+
+
+def runaway_restart_scheduler(world, database_name, listing):
+    """restart_surviving_scheduler 再套上 watch_runaway_processes 读写的几样：进程表是这一格给的那一份、所属会话认得出（SESSION_A）、发消息与按号停都是假的，
+    记下发了什么（sent）、停了哪几个（stopped）；隔多久再报是 0（每扫一次都到点）。"""
+    scheduler = restart_surviving_scheduler(world, database_name)
+    scheduler.runaway_renotify_seconds = 0.0
+    scheduler.sent, scheduler.stopped = [], []
+    scheduler.process_listings = lambda: [(SERVER.LOCAL, listing)]
+    scheduler.runaway_owner = lambda pid, listing_text: SESSION_A
+    scheduler.runaway_targets = lambda owner: [{"id": 1, "session": owner}]
+    scheduler.send_to_session = lambda task, text, follow: scheduler.sent.append(text)
+
+    def stop_runaway_process(host, pid):   # 假的按号停：只记下停了谁，回「回读已不在」
+        scheduler.stopped.append(pid)
+        return True
+
+    scheduler.stop_runaway_process = stop_runaway_process
+    return scheduler
+
+
+def runaway_listing_line(pid, elapsed_seconds):
+    """假进程表的一行（lib.parsed_process_list 的列）：登录会话 scope 里、已跑 elapsed_seconds 秒、累计 CPU 比它少 100 秒（够 RUNAWAY_MINIMUM_CPU_SECONDS 与占比）。"""
+    return f"  {pid} 1 {elapsed_seconds} {elapsed_seconds - 100} R 0::/user.slice/session-3.scope spinning\n"
+
+
+def cell_runaway_reports_survive_restart(world):
+    """任务之外的空转进程报过几次换服务后接着数（task_server.py 的 watch_runaway_processes、restore_restart_surviving_state）：认得出所属会话的那一个
+    扫两次报两次（RUNAWAY_REPORTS_BEFORE_STOP），服务停了再起（同一份库上另建调度器），下一次扫到就按号停、发「已停」，不再从零报两次。
+    套在假调度器上，进程表与停进程都是假的，不起服务。弄坏开关 runaway-reports-memory-only 下换服务后又报一次、不停，这一格红。"""
+    listing = runaway_listing_line(RUNAWAY_RESTART_PID, 7200)
+    before = runaway_restart_scheduler(world, "runaway-restart.sqlite3", listing)
+    for _ in range(SERVER.RUNAWAY_REPORTS_BEFORE_STOP):
+        SERVER.Scheduler.watch_runaway_processes(before)
+    after = runaway_restart_scheduler(world, "runaway-restart.sqlite3", listing)
+    SERVER.Scheduler.watch_runaway_processes(after)
+    problems = []
+    if len(before.sent) != SERVER.RUNAWAY_REPORTS_BEFORE_STOP or before.stopped:
+        problems.append(f"换服务之前应当报 {SERVER.RUNAWAY_REPORTS_BEFORE_STOP} 次、不停，实际报 {len(before.sent)} 次、停了 {before.stopped}")
+    if after.stopped != [RUNAWAY_RESTART_PID] or len(after.sent) != 1 or "已停" not in after.sent[0]:
+        problems.append(f"换服务后应当接着数、这一次就按号停 {RUNAWAY_RESTART_PID} 并发一条「已停」，实际停了 {after.stopped}、发了 {[text[:80] for text in after.sent]}")
+    if problems:
+        raise SelftestFailure("空转进程的报数换服务不丢：" + "；".join(problems))
+    return f"报过 {SERVER.RUNAWAY_REPORTS_BEFORE_STOP} 次的进程换服务后接着数，下一次扫到就按号停"
+
+
+def cell_runaway_reused_pid_counted_afresh(world):
+    """换服务的空档里同号换了进程的从零数（task_server.py 的 watch_runaway_processes）：两个进程各报过两次，那两次离此刻 RUNAWAY_RESTART_GAP_SECONDS 秒（服务停着的空档）；
+    服务再起时 602 已跑得比那两次早（同一个），按号停；601 已跑的时长短于那段空档（上次报它之后才起的，是号被复用的另一个），从零数、报一次、不停。
+    套在假调度器上，进程表与停进程都是假的，不起服务。弄坏开关 runaway-reused-pid-carried 下 601 照号接着数、一露面就被停，这一格红。"""
+    before_listing = runaway_listing_line(RUNAWAY_RESTART_PID, 7200) + runaway_listing_line(RUNAWAY_RESTART_OLD_PID, 7200)
+    before = runaway_restart_scheduler(world, "runaway-reused.sqlite3", before_listing)
+    for _ in range(SERVER.RUNAWAY_REPORTS_BEFORE_STOP):
+        SERVER.Scheduler.watch_runaway_processes(before)
+    for entry in before.runaway_notified.values():
+        entry["reported_at"] -= RUNAWAY_RESTART_GAP_SECONDS
+    SERVER.Scheduler.persist_restart_surviving_state(before, "runaway_notified")
+    after_listing = (runaway_listing_line(RUNAWAY_RESTART_PID, int(RUNAWAY_RESTART_GAP_SECONDS // 2))
+                     + runaway_listing_line(RUNAWAY_RESTART_OLD_PID, int(RUNAWAY_RESTART_GAP_SECONDS * 2)))
+    after = runaway_restart_scheduler(world, "runaway-reused.sqlite3", after_listing)
+    SERVER.Scheduler.watch_runaway_processes(after)
+    reported = [text for text in after.sent if f"本机进程 {RUNAWAY_RESTART_PID}" in text.split("\n", 1)[0] and "已停" not in text]
+    problems = []
+    if after.stopped != [RUNAWAY_RESTART_OLD_PID]:
+        problems.append(f"换服务后只该停跑得比上次报早的 {RUNAWAY_RESTART_OLD_PID}，号被复用的 {RUNAWAY_RESTART_PID} 不停，实际停了 {after.stopped}")
+    if len(reported) != 1 or after.runaway_notified.get((SERVER.LOCAL, RUNAWAY_RESTART_PID), {}).get("count") != 1:
+        problems.append(f"号被复用的 {RUNAWAY_RESTART_PID} 应当从零数、报一次（count 1），实际报了 {len(reported)} 次、"
+                        f"账 {after.runaway_notified.get((SERVER.LOCAL, RUNAWAY_RESTART_PID))}")
+    if problems:
+        raise SelftestFailure("换服务的空档里同号换了进程：" + "；".join(problems))
+    return f"同一个的 {RUNAWAY_RESTART_OLD_PID} 接着数、按号停；号被复用的 {RUNAWAY_RESTART_PID} 从零数、报一次"
+
+
+def cell_advance_episodes_survive_restart(world):
+    """分片父任务推不动的这一回与开始过几回换服务后照接（task_server.py 的 note_advance_failure、note_advance_recovered、restore_restart_surviving_state）：
+    推不动一回、推通、再推不动连着两轮（第 2 回、count 2）；服务停了再起（同一份库上另建调度器）：读回的是第 2 回、count 2，再推不动 count 3，推通之后再推不动是第 3 回。
+    套在假调度器上，不起服务。弄坏开关 advance-episodes-memory-only 下换服务后从第 1 回数起，这一格红。"""
+    parent = SHARD_ADVANCE_PARENT_ID
+    before = restart_surviving_scheduler(world, "shard-advance.sqlite3")
+    SERVER.Scheduler.note_advance_failure(before, parent, "推不动：头一回")
+    SERVER.Scheduler.note_advance_recovered(before, parent)
+    SERVER.Scheduler.note_advance_failure(before, parent, "推不动：第二回头一轮")
+    SERVER.Scheduler.note_advance_failure(before, parent, "推不动：第二回第二轮")
+    after = restart_surviving_scheduler(world, "shard-advance.sqlite3")
+    restored = dict(after.advance_failures.get(parent) or {})
+    SERVER.Scheduler.note_advance_failure(after, parent, "推不动：第二回第三轮")
+    continued = dict(after.advance_failures.get(parent) or {})
+    SERVER.Scheduler.note_advance_recovered(after, parent)
+    SERVER.Scheduler.note_advance_failure(after, parent, "推不动：第三回")
+    third = dict(after.advance_failures.get(parent) or {})
+    problems = []
+    if restored != {"episode": 2, "why": "推不动：第二回第二轮", "count": 2}:
+        problems.append(f"换服务后读回的应当是第 2 回、连着 2 轮，实际 {restored}")
+    if continued.get("episode") != 2 or continued.get("count") != 3:
+        problems.append(f"换服务后再推不动应当还是第 2 回、count 3，实际 {continued}")
+    if third.get("episode") != 3 or after.advance_episodes.get(parent) != 3:
+        problems.append(f"推通之后再推不动应当是第 3 回，实际 {third}、开始过 {after.advance_episodes.get(parent)} 回")
+    if problems:
+        raise SelftestFailure("推不动的回数换服务不丢：" + "；".join(problems))
+    return "推不动的这一回（第 2 回、count 2）换服务后照接，推通之后再推不动是第 3 回"
+
+
+REMINDER_RESTART_HEALTH = [("database-unwritable", "库写不进", "试写一行失败")]   # reminders-not-resent-after-restart：服务健康查出的那一样（种类、名字、问题）
+
+
+def reminder_restart_scheduler(world, database_name, drifts=None):
+    """reminders-not-resent-after-restart 的假调度器：restart_surviving_scheduler（同一份临时库上再建一个就是服务停了再起）再套上发消息那几路读写的几样——
+    发消息记下发了什么（sent），收件人只有 SESSION_A，服务健康查出 REMINDER_RESTART_HEALTH 那一样，记账漂移判出 drifts（{(种类, 台): 条目}）。"""
+    scheduler = restart_surviving_scheduler(world, database_name)
+    scheduler.sent = []
+    scheduler.inbox_lock, scheduler.inbox_failed = threading.Lock(), set()
+    scheduler.send_to_session = lambda task, text, event: scheduler.sent.append(text) or True
+    scheduler.inbox_reachable = lambda task: True
+    scheduler.health_recipients = lambda: {SESSION_A: {"id": 1, "session": SESSION_A}}
+    scheduler.health_problems = lambda: list(REMINDER_RESTART_HEALTH)
+    scheduler.booking_drift = {"memory": dict(drifts or {})}
+    scheduler.booking_audit_state = {}
+    scheduler.drift_recipients = lambda: {SESSION_A: {"id": 1, "session": SESSION_A}}
+    return scheduler
+
+
+def cell_reminders_not_resent_after_restart(world):
+    """推给会话的提醒发过一回，服务停了再起（同一份库上另建调度器），同一件不再发；跨过下一道提醒门槛、好了又坏才再发（task_server.py 的 push_suspects、watch_health、push_booking_drift、
+    forget_drift、persist_restart_surviving_state、restore_restart_surviving_state；任务 13493 的子任务 13522 的 suspected-stall 同一段、依据一字不差，同一天到了三回，后两回各落在服务重启之后）。
+    三种去重状态原先只在内存里，现在都记进库：疑似卡住报过的段（suspect_reported）、服务健康每一样发给了哪几个会话（health_notified）、记账漂移每一件推给每个会话推到了哪道提醒门槛
+    （booking_drift_notified）。其余的提醒去重状态本来就在库里：要处置的提醒报到的门槛与推过的几回在任务行（reminded_thresholds、reminder_history）、结局没人取推到第几回在任务行（outcome_repushed）、
+    空转进程的报数、分片推不动的回数、停用的卡在换服务不丢的那几份；发不出去过的事件（inbox_failed）是没送到的，重启后再试不算重发。
+    三趟：疑似卡住第 1 段发过一回，换服务后同一段不再发，第 2 段发；服务健康一样发过一回，换服务后不再发，好了（这一轮查不出）之后又坏再发；记账漂移判出当场推过一回，换服务后同一道门槛不再推，
+    过了门槛（BOOKING_DRIFT_PUSH_SECONDS）再推一回。套在假调度器上，不起服务。
+    弄坏开关 suspect-reported-memory-only、health-notified-memory-only、booking-drift-notified-memory-only 下各自那一趟换服务后又发一回，这一格红。"""
+    problems = []
+    store = SERVER.Store(os.path.join(world.root, "reminder-restart.sqlite3"), bytes(32), dict(os.environ))
+    task = store.insert("tasks", {"task_id": 0, "state": "running", "session": SESSION_A, "command_key": "", "inbox": {"token": INBOX_TOKEN_SAMPLE}})
+    attempt = store.insert("attempts", {"task_id": task["id"], "number": 1, "state": "running", "session": SESSION_A, "command_key": "", "host": SERVER.LOCAL, "log": "x.log",
+                                        "suspect": {"active": True, "segment": 1, "why": "整个单元的 CPU 这 600 秒平均 0.0001 个核"}})
+    del store
+    before = reminder_restart_scheduler(world, "reminder-restart.sqlite3")
+    SERVER.Scheduler.push_suspects(before, task)
+    after = reminder_restart_scheduler(world, "reminder-restart.sqlite3")
+    SERVER.Scheduler.push_suspects(after, task)
+    after.store.update("attempts", dict(after.store.attempts_of(task["id"])[0][0], suspect={"active": True, "segment": 2, "why": "整个单元的 CPU 又静了 600 秒"}))
+    SERVER.Scheduler.push_suspects(after, task)
+    if len(before.sent) != 1 or len(after.sent) != 1 or "第 2 段" not in after.sent[0].split("\n", 1)[0]:
+        problems.append(f"疑似卡住：第 1 段发过一回、换服务后同一段不再发、第 2 段发一回，实际换服务前发 {len(before.sent)} 回、换服务后发 {[text.split(chr(10), 1)[0] for text in after.sent]}")
+    before = reminder_restart_scheduler(world, "reminder-health.sqlite3")
+    SERVER.Scheduler.watch_health(before)
+    after = reminder_restart_scheduler(world, "reminder-health.sqlite3")
+    SERVER.Scheduler.watch_health(after)
+    after.health_problems = lambda: []
+    SERVER.Scheduler.watch_health(after)
+    after.health_problems = lambda: list(REMINDER_RESTART_HEALTH)
+    SERVER.Scheduler.watch_health(after)
+    if len(before.sent) != 1 or len(after.sent) != 1:
+        problems.append(f"服务健康：发过一回、换服务后不再发、好了又坏再发一回，实际换服务前发 {len(before.sent)} 回、换服务后共发 {len(after.sent)} 回")
+    entry = {"since": 1000.0, "rounds": 3, "booked": 0, "used": 0, "attempts": [], "text": "本机内存记账漂移"}
+    before = reminder_restart_scheduler(world, "reminder-drift.sqlite3", {"本机": entry})
+    SERVER.Scheduler.push_booking_drift(before, 1000.0)
+    after = reminder_restart_scheduler(world, "reminder-drift.sqlite3", {"本机": entry})
+    SERVER.Scheduler.push_booking_drift(after, 1000.0 + 1)
+    SERVER.Scheduler.push_booking_drift(after, 1000.0 + SERVER.BOOKING_DRIFT_PUSH_SECONDS * 1.5)
+    if len(before.sent) != 1 or len(after.sent) != 1 or "再推一回" not in after.sent[0].split("\n", 1)[0]:
+        problems.append(f"记账漂移：判出当场推过一回、换服务后同一道门槛不再推、过了门槛再推一回（首行写再推一回），实际换服务前推 {len(before.sent)} 回、换服务后推 {[text.split(chr(10), 1)[0] for text in after.sent]}")
+    if problems:
+        raise SelftestFailure("提醒换服务后不重发：" + "；".join(problems))
+    return "疑似卡住的段、服务健康的会话、记账漂移推到的门槛发过一回，换服务后同一件不再发；新一段、好了又坏、过了门槛才再发"
+
+
+REMINDER_LEDGER_KIND = "queued-too-long"   # reminder-thresholds-every-doubling 与 reminder-ledger-other-shape-read-afresh：照排队过久那一种算提醒门槛
+
+
+def reminder_ledger_task(world, database_name, fields=None):
+    """那两格的临时库里插一条排着的任务（提交它的会话是 SESSION_A），fields 并进任务行；→ 任务号。"""
+    store = SERVER.Store(os.path.join(world.root, database_name), bytes(32), dict(os.environ))
+    return store.insert("tasks", dict({"task_id": 0, "state": "queued", "session": SESSION_A, "command_key": ""}, **(fields or {})))["id"]
+
+
+def queued_reminder_scheduler(world, database_name, waited):
+    """那两格的假调度器：restart_surviving_scheduler（同一份临时库上再建一个就是服务停了再起）再备上要处置的提醒读写的两张内存表；
+    attention_items 换成照 waited[0]（已排多少秒）与服务的 QUEUE_ATTENTION_MINUTES 现算的一项排队过久（没到门槛的交空表）。"""
+    scheduler = restart_surviving_scheduler(world, database_name)
+    scheduler.reminded_thresholds, scheduler.reminder_histories = {}, {}
+    first = SERVER.QUEUE_ATTENTION_MINUTES * 60
+
+    def items(task_id):
+        crossed = SERVER.reminder_threshold(waited[0], first)
+        if not crossed:
+            return []
+        return [SERVER.Scheduler.attention_item(scheduler, REMINDER_LEDGER_KIND, crossed, task_id, f"已排 {waited[0]:.0f} 秒", "自证：一直排着", "",
+                                                first * 2 ** (crossed - 1))]
+
+    scheduler.attention_items = items
+    return scheduler
+
+
+def cell_reminder_thresholds_every_doubling(world):
+    """提醒门槛照 QUEUE_ATTENTION_MINUTES（30 分钟）起、每翻一倍一道，同一道只报一次（task_server.py 的 reminder_threshold、next_reminder_seconds、unreported_attention；
+    文件头 ①「要处置的提醒」）：已排 0、1799 秒没到门槛；1800、3599 秒跨过一道、下一回在 3600 秒；3600、7199 秒两道、下一回 7200 秒；7200 秒三道、下一回 14400 秒。
+    套在假调度器上（queued_reminder_scheduler），不起服务：已排 0 到 7300 秒每隔 100 秒问一回 wait 那一侧，只在 1800、3600、7200 秒各报一回，
+    报的那一项 reminded_after_seconds 依次是 1800、3600、7200，其间不重发。弄坏开关 attention-reported-every-wait 下每一回都报，这一格红。"""
+    first = SERVER.QUEUE_ATTENTION_MINUTES * 60
+    wanted = {0: (0, 1800), 1799: (0, 1800), 1800: (1, 3600), 3599: (1, 3600), 3600: (2, 7200), 7199: (2, 7200), 7200: (3, 14400)}
+    found = {seconds: (SERVER.reminder_threshold(seconds, first), SERVER.next_reminder_seconds(SERVER.reminder_threshold(seconds, first), first)) for seconds in wanted}
+    problems = [] if found == wanted else [f"从 1800 秒起每翻一倍一道门槛：{{已排秒数: (跨过几道, 下一回在几秒)}} 应当 {wanted}，实际 {found}"]
+    task_id = reminder_ledger_task(world, "reminder-thresholds.sqlite3")
+    waited = [0.0]
+    scheduler = queued_reminder_scheduler(world, "reminder-thresholds.sqlite3", waited)
+    reported = []
+    for seconds in range(0, 7301, 100):
+        waited[0] = float(seconds)
+        reported += [(seconds, item.get("reminded_after_seconds")) for item in SERVER.Scheduler.unreported_attention(scheduler, task_id, SESSION_A)]
+    if reported != [(1800, 1800), (3600, 3600), (7200, 7200)]:
+        problems.append(f"每隔 100 秒问一回 wait 那一侧，应当只在 1800、3600、7200 秒各报一回，实际（已排秒数, reminded_after_seconds）{reported}")
+    if problems:
+        raise SelftestFailure("提醒门槛每翻一倍一道：" + "；".join(problems))
+    return "门槛 1800、3600、7200 秒（下一回各在 3600、7200、14400 秒）；问到 7300 秒只在这三处各报一回"
+
+
+def cell_reminder_ledger_other_shape_read_afresh(world):
+    """任务行里的提醒记账不是这一版的两栏（task_server.py 的 stored_reminded_thresholds、reminder_history_of、attention_round、unreported_attention；文件头 ①「要处置的提醒」）：
+    任务行只有别的写法记的账（attention_reported 记着种类到 2、attention_history 里一回带 tier 键），没有 reminded_thresholds 与 reminder_history；同一份临时库上建假调度器
+    （queued_reminder_scheduler，就是服务换上新代码），不起服务：别的写法的账不读、当没报过——已排 3000 秒问 wait 那一侧报一回（reminded_after_seconds=1800），回数从第 1 回起；
+    再问不报；排到 3600 秒报一回（reminded_after_seconds=3600）；任务行写下 reminded_thresholds 记着 2；同一份库上再建一个（服务再重启）问 3600 秒不报。问答都不抛错。
+    弄坏开关 attention-reported-every-wait 下再问照报，attention-reported-memory-only 下再重启之后照报，这一格红。"""
+    other_shape = {"attention_reported": {REMINDER_LEDGER_KIND: 2},
+                   "attention_history": {REMINDER_LEDGER_KIND: [{"tier": 2, "repush": 0, "at": time.time() - 600, "basis": "已排 3700 秒", "round": 2}]}}
+    task_id = reminder_ledger_task(world, "reminder-ledger.sqlite3", other_shape)
+    waited = [3000.0]
+    scheduler = queued_reminder_scheduler(world, "reminder-ledger.sqlite3", waited)
+    problems = []
+    rounds = SERVER.Scheduler.attention_round(scheduler, scheduler.attention_items(task_id)[0])
+    asked = [item.get("reminded_after_seconds") for item in SERVER.Scheduler.unreported_attention(scheduler, task_id, SESSION_A)]
+    again = SERVER.Scheduler.unreported_attention(scheduler, task_id, SESSION_A)
+    waited[0] = 3600.0
+    later = [item.get("reminded_after_seconds") for item in SERVER.Scheduler.unreported_attention(scheduler, task_id, SESSION_A)]
+    if rounds != (1, None) or asked != [1800] or again or later != [3600]:
+        problems.append(f"别的写法的账不读：已排 3000 秒应当第 1 回、报一回 reminded_after_seconds=1800，再问不报，3600 秒报一回 3600；"
+                        f"实际（回数, 上一回）{rounds}、头一问 {asked}、再问 {len(again)} 项、3600 秒 {later}")
+    found = scheduler.store.task(task_id)
+    stored = (found[0] if found is not None and found[1] else {}).get("reminded_thresholds")
+    if stored != {REMINDER_LEDGER_KIND: 2}:
+        problems.append(f"报过之后任务行应当写下 reminded_thresholds {{{REMINDER_LEDGER_KIND}: 2}}，实际 {stored}")
+    restarted = queued_reminder_scheduler(world, "reminder-ledger.sqlite3", waited)
+    if SERVER.Scheduler.unreported_attention(restarted, task_id, SESSION_A):
+        problems.append("同一份库上再建调度器（服务再重启），已排 3600 秒那一回报过了不该再报，实际又报了")
+    if problems:
+        raise SelftestFailure("提醒记账不是这一版的两栏：" + "；".join(problems))
+    return "别的写法的账不读、当没报过：3000 秒报一回（第 1 回，reminded_after_seconds=1800）、再问不报、3600 秒报一回；任务行写下 reminded_thresholds，再重启不重报"
+
+
+SPLIT_EXEMPT_ITEM = "selftest-exempt-item"   # long-run-split-reminded-at-outcome：豁免表里点名的项
+
+
+def long_run_split_scheduler(world, exempt_lines=()):
+    """long-run-split-reminded-at-outcome 的假调度器：仓根是这一格自己的目录（豁免表 .claude/long-run-split-exempt 照 exempt_lines 写），任务行与尝试行由调用方给；
+    attention_of_record 里出了结局的任务走到的几样（改主工作区的核、预算提醒表）照建。→ (假调度器, 它的仓根)。"""
+    root = os.path.join(world.root, f"split-root-{len(os.listdir(world.root))}")
+    os.makedirs(os.path.join(root, ".claude"))
+    with open(os.path.join(root, ".claude", "long-run-split-exempt"), "w", encoding="utf-8") as handle:
+        handle.write("# 跑过两小时也不拆的项，只登记用户点名的\n" + "".join(f"{line}\n" for line in exempt_lines))
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.peer_root = dict(os.environ), root
+    fake.budget_notices, fake.workspace_write_checks = {}, {}
+    return fake, root
+
+
+def split_items_of(fake, record, attempts):
+    """attention_of_record 里 long-run-split 那一项（没有交 None）。"""
+    fake.store = types.SimpleNamespace(attempts_of=lambda task_id: [(dict(attempt), True) for attempt in attempts])
+    found = [item for item in SERVER.Scheduler.attention_of_record(fake, record, time.time()) if item["kind"] == "long-run-split"]
+    return found[0] if found else None
+
+
+def cell_long_run_split_reminded_at_outcome(world):
+    """跑过 7200 秒的项出结局时推一条要拆的提醒（task_server.py 的 attention_of_record、long_run_split_items、settled_run_seconds、long_run_split_exempt；.claude/rules/long-run-split.md「判据」「豁免」）：
+    出了结局的任务服务记的用时（各次尝试记下的 seconds，撞了内存上限、照大一档重来的从最后一次撞上限之后那一次起算）超过 LONG_RUN_SPLIT_SECONDS 又不在豁免表里的，交一项 long-run-split，
+    依据写这是按片或按整条任务的用时判的，出路指到那份规则。假秒，不真等：整条任务跑了 7300 秒的出一项；7100 秒的不出；命令里点名了豁免表里的项的不出（同一份用时，表里没有就出）；
+    撞上限重来的：前两次撞上限各 5000、4000 秒，最后一次跑成 3000 秒的不出（从最后一次撞上限之后那一次起算），最后一次跑成 7300 秒的出；分片的一片跑了 7300 秒的出、依据写第几片、按片判。
+    弄坏开关 long-run-split-silent 下一条都不出，long-run-split-cap-hits-counted 下撞上限的那几次也累加（撞上限重来、最后一次 3000 秒的也出），
+    long-run-split-exempt-ignored 下豁免表不看（点名了豁免项的也出），这一格红。"""
+    def attempt(number, seconds, outcome="succeeded"):
+        return {"number": number, "seconds": seconds, "outcome": outcome, "state": "ended"}
+
+    problems = []
+    command = ["bash", "scripts/gate/some-entry.sh", "--item", "ordinary-item"]
+    exempt_command = ["bash", "scripts/gate/some-entry.sh", "--item", SPLIT_EXEMPT_ITEM]
+    record = {"id": 701, "state": "finished", "outcome": "succeeded", "exit_code": 0, "command": command}
+    fake, _ = long_run_split_scheduler(world, [f"{SPLIT_EXEMPT_ITEM}  # 用户点名豁免（records/selftest.md:1）"])
+    item = split_items_of(fake, record, [attempt(1, 7300.0)])
+    if item is None or item["threshold"] != 1 or "整条任务" not in item["basis"] or "按整条任务的用时判" not in item["basis"] or ".claude/rules/long-run-split.md" not in item["next"]:
+        problems.append(f"整条任务跑了 7300 秒：应当出一项 long-run-split（提醒门槛 1、依据写按整条任务的用时判、出路指到 long-run-split.md），实际 {item}")
+    if split_items_of(fake, record, [attempt(1, 7100.0)]) is not None:
+        problems.append("整条任务跑了 7100 秒：不到界，不该出")
+    if split_items_of(fake, dict(record, command=exempt_command), [attempt(1, 7300.0)]) is not None:
+        problems.append(f"命令点名了豁免表里的项 {SPLIT_EXEMPT_ITEM}：不该出")
+    reset_hits = [attempt(1, 5000.0, "memory-cap-hit"), attempt(2, 4000.0, "memory-cap-hit")]
+    if split_items_of(fake, record, reset_hits + [attempt(3, 3000.0)]) is not None:
+        problems.append("撞上限重来的（5000、4000 秒各撞一次上限，最后一次跑成 3000 秒）：从最后一次撞上限之后那一次起算，3000 秒不到界，不该出")
+    if split_items_of(fake, record, [attempt(1, 9000.0, "memory-cap-hit"), attempt(2, 7300.0)]) is None:
+        problems.append("撞一次上限（9000 秒）之后最后一次跑成 7300 秒：从最后一次撞上限之后那一次起算 7300 秒，应当出")
+    shard = split_items_of(fake, dict(record, id=702, parent_id=700, role="shard", shard_index=3), [attempt(1, 7300.0)])
+    if shard is None or "第 3 片" not in shard["basis"] or "按片的用时判" not in shard["basis"]:
+        problems.append(f"分片的第 3 片跑了 7300 秒：应当出一项、依据写第 3 片、按片的用时判，实际 {shard}")
+    if problems:
+        raise SelftestFailure("跑过 7200 秒的项出结局时推要拆的提醒：" + "；".join(problems))
+    return "整条任务 7300 秒出、7100 秒不出、豁免表里的项不出；撞上限重来的从最后一次之后起算；分片的按片判"
+
+
+def cell_workspace_write_blocked_reminded(world):
+    """换钩子被上一趟没写完成的挡住，提醒发给被挡的这个会话（task_server.py 的 attention_of_record、workspace_write_blocked_items；scripts/gate/hook-swap.py 退 7）：
+    出了结局的任务命令是 scripts/gate/hook-swap.py（不带 --feed-only）、结局 command-failed 退 7：出一项 workspace-write-blocked，依据点名上一趟疑似是库里更早的哪条被杀的换钩子任务；
+    带 --feed-only 的、退 0 的、命令是别的脚本的不出。
+    弄坏开关 workspace-write-blocked-unreported 下一条都不出，这一格红。"""
+    fake, root = long_run_split_scheduler(world)
+    earlier = {"id": 905, "state": "finished", "outcome": "command-failed", "exit_code": 137, "command": ["python3", "scripts/gate/hook-swap.py", "--spec", "old.json"], "cwd": root}
+    swap = ["python3", "scripts/gate/hook-swap.py", "--spec", "new.json"]
+    problems = []
+
+    def blocked(record):
+        found = dict(record, state="finished", cwd=root)
+        fake.store = types.SimpleNamespace(attempts_of=lambda task_id: [], select=lambda table, where="1", parameters=(), order="id": [(earlier, True)])
+        items = [item for item in SERVER.Scheduler.attention_of_record(fake, found, time.time()) if item["kind"] == "workspace-write-blocked"]
+        return items[0] if items else None
+
+    item = blocked({"id": 910, "outcome": "command-failed", "exit_code": 7, "command": swap})
+    if item is None or item["threshold"] != 1 or "任务 905" not in item["basis"] or "退 7" not in item["basis"]:
+        problems.append(f"换钩子退 7：应当出一项 workspace-write-blocked（依据点名上一趟疑似是任务 905），实际 {item}")
+    for what, record in (("带 --feed-only", {"id": 911, "outcome": "command-failed", "exit_code": 7, "command": swap + ["--feed-only"]}),
+                         ("退 0", {"id": 912, "outcome": "succeeded", "exit_code": 0, "command": swap}),
+                         ("命令是别的脚本", {"id": 913, "outcome": "command-failed", "exit_code": 7, "command": ["python3", "scripts/gate/other.py"]})):
+        if blocked(record) is not None:
+            problems.append(f"{what}：不该出")
+    if problems:
+        raise SelftestFailure("换钩子被没写完成的挡住：" + "；".join(problems))
+    return "换钩子退 7 出一项 workspace-write-blocked、点名上一趟的任务；--feed-only、退 0、别的脚本不出"
+
+
+def cell_restart_surviving_tampered_not_adopted(world):
+    """库里换服务不丢的那一份被绕过服务改过（task_server.py 的 Store.restart_surviving_state、restore_restart_surviving_state）：分片父任务推不动的一回记进库，
+    再直接改库里那一行的正文多记一个父任务开始推不动过一回、签名不动；服务停了再起：那一份不认（一项都不读回）、写一条 record-tampered 告警点名 shard_advance。
+    套在假调度器上，不起服务。弄坏开关 restart-surviving-signature-unchecked 下改过的照样读回，这一格红。"""
+    database = os.path.join(world.root, "restart-surviving-tampered.sqlite3")
+    before = restart_surviving_scheduler(world, os.path.basename(database))
+    SERVER.Scheduler.note_advance_failure(before, SHARD_ADVANCE_PARENT_ID, "推不动：头一回")
+    meta_name = SERVER.RESTART_SURVIVING_META_PREFIX + "shard_advance"
+    with contextlib.closing(sqlite3.connect(database)) as connection:
+        row = connection.execute("SELECT value FROM meta WHERE name = ?", (meta_name,)).fetchone()
+        if row is None:
+            raise SelftestFailure(f"记下推不动的一回之后库里应当有 {meta_name} 那一行，实际没有：改不了它、这一格判不了")
+        stored = json.loads(row[0])
+        stored["state"]["episodes"].append([SHARD_ADVANCE_PARENT_ID + 1, 1])
+        connection.execute("UPDATE meta SET value = ? WHERE name = ?", (lib.canonical_json(stored), meta_name))
+        connection.commit()
+    after = restart_surviving_scheduler(world, os.path.basename(database))
+    problems = []
+    if after.advance_failures or after.advance_episodes:
+        problems.append(f"签名对不上的那一份不该读回，实际推不动的记着 {after.advance_failures}、开始过的回数 {after.advance_episodes}")
+    if not any(kind == "record-tampered" and "shard_advance" in line for kind, _, line in after.alerts):
+        problems.append(f"应当写一条 record-tampered 告警点名 shard_advance，实际 {after.alerts}")
+    if problems:
+        raise SelftestFailure("改过的换服务不丢的那一份：" + "；".join(problems))
+    return "库里那一份被绕过服务改过：不读回、写了 record-tampered 告警"
+
+
+def cell_budget_source_names_folded_key(world):
+    """记录来源写出命令键原文，键里有折掉的点名项时写明同一入口各项共用这一份记录、怎么按项记（task_server.py 的 folded_key_note）；没折的只写键原文。
+    套在假调度器上，不起服务。弄坏开关 folded-key-unnamed 下两样都不写，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.host_dispatch = lib.load_module("host_dispatch_for_folded_key_cell", os.path.join(lib.HOSTS_DIRECTORY, "host-dispatch.py"))
+    token = fake.host_dispatch.peaks.FOLD_TOKENS[0]
+    folded = SERVER.Scheduler.folded_key_note(fake, {"command_key": f"bash .claude/gate.d/sample.sh --item {token}"})
+    plain = SERVER.Scheduler.folded_key_note(fake, {"command_key": "bash .claude/gate.d/sample.sh --check one"})
+    problems = []
+    if f"--item {token}」里的 {token}" not in folded or lib.KEY_VARIABLE not in folded or "ITEM_KEPT_CELLS" not in folded:
+        problems.append(f"键里折过项时应当写键原文、点名 {token}、出路带 {lib.KEY_VARIABLE} 与 ITEM_KEPT_CELLS，实际「{folded}」")
+    if plain != "；命令键「bash .claude/gate.d/sample.sh --check one」":
+        problems.append(f"没折的键应当只写键原文，实际「{plain}」")
+    if problems:
+        raise SelftestFailure("记录来源写不写命令键：" + "；".join(problems))
+    return f"记录来源写出命令键原文，折过项的写明各项共用记录与出路（「{folded[:80]}…」）"
+
+
+LONG_RUN_IDLE_ATTENTION_SECONDS = "2"   # long-run-idle-cores 那几格：跑满这么久就看（换掉 LONG_RUN_ATTENTION_SECONDS 的 600 秒）
 
 
 def cell_long_run_idle_cores_reported(world):
-    """跑得久而核没用起来（task_server.py 文件头 ①「要处置的提醒」的 long-run-idle-cores；任务 8856 给 31 线程平均只用 8.881 核）：假 scope 的 CPU 钉着不涨（平均约 0 核），
-    跑满 2 秒（换掉一小时），wait 打一行 kind=long-run-idle-cores、依据写跑了多久与平均核数、退 ATTENTION_EXIT；只提醒、照跑，放行之后跑完。
-    弄坏开关 long-run-idle-silent 下不报，wait 等到命令自己退，这一格红。"""
+    """跑得久而核没用起来（task_server.py 文件头 ①「要处置的提醒」的 long-run-idle-cores）：门槛是跑满 600 秒、平均在用核数不到线程数的 24/31（31 线程时 23.9 核算、24.1 核不算，判法 cores_short_of_threads）；
+    假 scope 的 CPU 钉着不涨（平均约 0 核），跑满 2 秒（换掉 600 秒），wait 打一行 kind=long-run-idle-cores、依据写跑了多久、给几线程与平均核数，原因问资源运用是否合理、脚本能不能并行或切片，退 ATTENTION_EXIT；
+    只提醒、照跑，放行之后跑完。弄坏开关 long-run-idle-silent 下不报，wait 等到命令自己退；long-run-idle-quarter-threshold 下 23.9 核不算，这一格红。"""
+    problems = []
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    if SERVER.LONG_RUN_ATTENTION_SECONDS != 600:
+        problems.append(f"门槛应当是 600 秒，实际 {SERVER.LONG_RUN_ATTENTION_SECONDS}")
+    if not SERVER.Scheduler.cores_short_of_threads(fake, 23.9, 31) or SERVER.Scheduler.cores_short_of_threads(fake, 24.1, 31):
+        problems.append("31 线程：平均 23.9 核应当算没用满、24.1 核不算")
     scope = os.path.join(world.root, "long-run-idle-scope")
     os.makedirs(scope)
     with open(os.path.join(scope, "cpu.stat"), "w", encoding="utf-8") as handle:
@@ -10816,17 +9673,33 @@ def cell_long_run_idle_cores_reported(world):
     world.start_server(extra={"TASK_SERVER_SELFTEST_LONG_RUN_ATTENTION_SECONDS": LONG_RUN_IDLE_ATTENTION_SECONDS, "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
     task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release])
     completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
-    problems, fields = attention_problems(completed, task_id, "long-run-idle-cores", lib.ATTENTION_EXIT)
+    found, fields = attention_problems(completed, task_id, "long-run-idle-cores", lib.ATTENTION_EXIT)
+    problems += found
     basis = fields.get("basis", "")
-    if "平均只用" not in basis or "核" not in basis or "已跑" not in basis:
+    if "平均只用" not in basis or "线程" not in basis or "核" not in basis or "已跑" not in basis:
         problems.append(f"依据应当写已跑多久、给几线程与平均只用几核，实际「{basis}」")
+    if "资源运用是否合理" not in fields.get("why", "") or "并行或切片" not in fields.get("why", ""):
+        problems.append(f"原因应当问资源运用是否合理、脚本能不能并行或切片，实际「{fields.get('why')}」")
     open(release, "w").close()
     done = world.finished(task_id)
     if done["task"].get("outcome") != "succeeded":
         problems.append(f"只提醒、照跑：放行之后应当跑完，实际 {describe(done)}")
     if problems:
         raise SelftestFailure("跑得久而核没用起来：" + "；".join(problems), world.server_log_lines())
-    return f"跑满 {LONG_RUN_IDLE_ATTENTION_SECONDS} 秒、CPU 不涨：wait 打 kind=long-run-idle-cores（依据「{basis[:80]}」），照跑完"
+    return f"界是 24/31；跑满 {LONG_RUN_IDLE_ATTENTION_SECONDS} 秒、CPU 不涨：wait 打 kind=long-run-idle-cores（依据「{basis[:80]}」），照跑完"
+
+
+def attention_of_kind(world, task_id, kind):
+    """接着起 wait，等到一行 kind 是这一种的提醒：交那一行拆出的栏；任务先有了结局、起了三回都没等到的交空表。"""
+    for _ in range(3):
+        completed = world.client(["wait", str(task_id)], timeout=ATTENTION_WAIT_SECONDS)
+        for line in attention_lines(completed):
+            fields = attention_fields(line)
+            if fields.get("kind") == kind:
+                return fields
+        if completed.returncode != lib.ATTENTION_EXIT:
+            return {}
+    return {}
 
 
 FILLS_CAP_SEEDED_CAP_BYTES = 1000 * MEBIBYTE   # fills-any-cap-reported 记下的三次尝试各自的上限
@@ -10856,16 +9729,16 @@ def cell_fills_any_cap_reported(world):
     return f"同键三次峰值都是上限的 95%：wait 打 kind=fills-any-cap（「{fields.get('basis', '')[:80]}」），照跑完"
 
 
-OLD_METRIC_PEAK_BYTES = 20 * GIBIBYTE   # old-metric-peaks-not-counted 那一条旧行记的峰值：照改前起步 30720M
+OLD_METRIC_PEAK_BYTES = 20 * GIBIBYTE   # old-metric-peaks-not-counted 那一条旧行记的峰值：照改前读它就起步 20480M
 
 
 def cell_old_metric_peaks_not_counted(world):
     """旧口径的峰值不进起步（task_server_lib.py 文件头「资源记录」的峰值口径一栏；批 92 之前记的 memory_peak 含页缓存）：同一命令键只有一条没写峰值口径的旧行（峰值 20G），
-    新交的照没有记录办：上限与记账 4096M、prediction 记 UNRECORDED_HISTORY；同键另一条写了这一版口径的（峰值 1G）照它 × 1.5 定 1536M。
-    弄坏开关 old-metric-peaks-read 下旧行照改前进定额度（30720M），这一格红。"""
+    新交的照没有记录办：上限与记账 4096M、prediction 记 UNRECORDED_HISTORY；同键另一条写了这一版口径的（峰值 1536M）照它定 1536M（不乘 1.5）。
+    弄坏开关 old-metric-peaks-read 下旧行照改前进定额度（20480M），这一格红。"""
     old_key, new_key = "selftest-old-metric", "selftest-new-metric"
     world.seed_attempt({"command_key": old_key, "outcome": "succeeded", "memory_peak": OLD_METRIC_PEAK_BYTES}, metric=None)
-    world.seed_peak(new_key, GIBIBYTE)
+    world.seed_peak(new_key, 1536 * MEBIBYTE)
     world.start_server()
     expected = {"只有旧行的": (old_key, UNRECORDED_DEFAULT_PINNED_TEXT, lib.UNRECORDED_HISTORY), "写了这一版口径的": (new_key, "1536M", lib.RECORD_HISTORY)}
     problems = []
@@ -10876,37 +9749,32 @@ def cell_old_metric_peaks_not_counted(world):
             problems.append(f"{name}上限应当是 {cap_text}、prediction 记 {history}、跑完，实际上限 {attempt.get('memory_cap_text')}、prediction {attempt.get('prediction')}、{describe(summary)}")
     if problems:
         raise SelftestFailure("旧口径的峰值不进起步：" + "；".join(problems), world.server_log_lines())
-    return f"只有旧口径那一行的命令照没记录的 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，写了这一版口径的照峰值 × 1.5（1536M）"
+    return f"只有旧口径那一行的命令照没记录的 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，写了这一版口径的照峰值（1536M）"
 
 
-# ── 异常表、再推、按会话号找收件 socket、交任务的二次确认、编译族只借编译那一段、清场协议单测（task_server_lib.py 文件头「异常表」；task_server.py 文件头 ⑥ ⑦ ②「内存」）──
+# ── 异常表、再推、按会话号找收件 socket、交任务的二次确认、收尾协议单测（task_server_lib.py 文件头「异常表」；task_server.py 文件头 ⑥ ⑦ ②「内存」）──
 ADVICE_SAMPLE_TASK = 4242          # anomaly-advice-in-texts 拼正文用的任务号（不进库）
-REPUSH_SAMPLE_SECONDS = "2"        # anomaly-repushed-with-history：同一档报过之后再推的头一档（秒；TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS）
-UNCLAIMED_REPUSH_SAMPLE_SECONDS = "2"   # unclaimed-outcome-repushed：结局没人取再推的头一档（秒；TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS）
+REPUSH_SAMPLE_SECONDS = "2"        # anomaly-repushed-with-history：同一道门槛报过之后再推的门槛（秒；TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS）
+UNCLAIMED_REPUSH_SAMPLE_SECONDS = "2"   # unclaimed-outcome-repushed：结局没人取再推的门槛（秒；TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS）
 CONFIRM_TIMEOUT_SAMPLE_SECONDS = "2"    # unconfirmed-cancelled：交了没确认满这么多秒服务取消（TASK_SERVER_SELFTEST_CONFIRM_TIMEOUT_SECONDS）
 CONFIRM_HOLD_SECONDS = 1.5         # submit-awaits-confirmation：待确认的那一条看这么久（十几轮排队）不该起
 CONFIRM_SCOPE_SAMPLE = "种类=items; 跑什么=自证的确认单; 范围=2 项; 为什么=核确认单打不打范围声明"
-PHASE_BUILD_BYTES = 6 * GIBIBYTE         # family-lends-build-phase-only：Finished 之前假 scope 的进程内存（编译那一段）
-PHASE_RUN_BYTES = 40 * GIBIBYTE          # Finished 之后换上的（跑测试那一段）
-PHASE_SEEDED_RUN_BYTES = 42 * GIBIBYTE   # 同族另记一条没有 Finished 行的（编译那一段 null）跑成的峰值：不该借
-PHASE_RAISED_TEXT = "9216M"              # 6G × 1.5：同族的另一条照编译那一段起步
-PHASE_FAMILY_ENTRY = "family-phase-entry.sh"
-CLEANUP_PROTOCOL_TESTS = 17   # task-server/tests/test_cleanup_protocol.py 的单测条数：跑到的少了（漏载、跳过）也判红；那份文件加减单测时一起改这个数
+CLEANUP_PROTOCOL_TESTS = 25   # task-server/tests/test_cleanup_protocol.py 的单测条数：跑到的少了（漏载、跳过）也判红；那份文件加减单测时一起改这个数
 
 
 def table_advice(kind, task_id):
-    """异常表（task_server_lib.py 文件头）里这一种那一行的修改意见，{task} 换成任务号：照文件头现读（lib.anomaly_rows），不经 lib.anomaly_advice（弄坏开关 attention-next-generic 弄坏的是那一侧）。"""
-    rows = {row.kind: row for row in lib.anomaly_rows(lib.__doc__)}
+    """异常表（lib.ANOMALY_TABLE_TEXT）里这一种那一行的修改意见，{task} 换成任务号：照表现读（lib.anomaly_rows），不经 lib.anomaly_advice（弄坏开关 attention-next-generic 弄坏的是那一侧）。"""
+    rows = {row.kind: row for row in lib.anomaly_rows(lib.ANOMALY_TABLE_TEXT)}
     return rows[kind].advice.replace(lib.ANOMALY_TASK_PLACEHOLDER, str(task_id))
 
 
 def cell_anomaly_table_matches_kinds(world):
-    """异常表（task_server_lib.py 文件头「异常表」）与代码里分别处置的种类逐行对得上：ATTENTION_KINDS 每一种是「提醒照跑」，SUBMIT_REFUSAL_KINDS 是「提交时拒」，
+    """异常表（lib.ANOMALY_TABLE_TEXT）与代码里分别处置的种类逐行对得上：ATTENTION_KINDS 每一种是「提醒照跑」（BOUNCING_ATTENTION_KINDS 那几种是「打回」），SUBMIT_REFUSAL_KINDS 是「提交时拒」，
     SUBMIT_WARNING_KINDS 是「提醒照跑」，错误类型表（OUTCOME_TYPES）里 succeeded 之外每一种是「打回」或「服务自己修」，SERVICE_ANOMALY_KINDS 是「提醒照跑」或「服务自己修」；
     表里不多不少、种类不重、动作在 ANOMALY_ACTIONS 里、修改意见不是那一句通用的；task_server.py 的 ANOMALY_REPUSHED_KINDS 都是表里的提醒。静态核，不起服务。"""
-    rows = lib.anomaly_rows(lib.__doc__)
+    rows = lib.anomaly_rows(lib.ANOMALY_TABLE_TEXT)
     table = {row.kind: row for row in rows}
-    expected = {**{kind: ("提醒照跑",) for kind in lib.ATTENTION_KINDS + lib.SUBMIT_WARNING_KINDS}, **{kind: ("提交时拒",) for kind in lib.SUBMIT_REFUSAL_KINDS},
+    expected = {**{kind: ("提醒照跑",) for kind in lib.ATTENTION_KINDS + lib.SUBMIT_WARNING_KINDS}, **{kind: ("打回",) for kind in lib.BOUNCING_ATTENTION_KINDS}, **{kind: ("提交时拒",) for kind in lib.SUBMIT_REFUSAL_KINDS},
                 **{kind: ("打回", "服务自己修") for kind in lib.OUTCOME_TYPES if kind != "succeeded"},
                 **{kind: ("提醒照跑", "服务自己修") for kind in lib.SERVICE_ANOMALY_KINDS}}
     problems = []
@@ -10933,7 +9801,7 @@ def cell_anomaly_advice_in_texts(world):
     fake = object.__new__(SERVER.Scheduler)
     fake.environment = dict(os.environ)
     fake.store = types.SimpleNamespace(task=lambda task_id: None)   # attention_text 读日志路径：库里没有这一条，写「无（还没起过）」
-    fake.attention_histories, fake.attention_lock, fake.anomaly_repush_seconds = {}, threading.Lock(), SERVER.ANOMALY_REPUSH_SECONDS
+    fake.reminder_histories, fake.attention_lock, fake.anomaly_repush_seconds = {}, threading.Lock(), SERVER.ANOMALY_REPUSH_SECONDS
     task = {"id": ADVICE_SAMPLE_TASK}
     problems = []
     for kind in lib.ATTENTION_KINDS:
@@ -10942,7 +9810,7 @@ def cell_anomaly_advice_in_texts(world):
         text = SERVER.Scheduler.attention_text(fake, task, item)
         if f"出路：{advice}" not in text:
             problems.append(f"{kind} 的正文「出路：」应当以「{advice[:80]}…」起头，实际「{text[:300]}」")
-        fake.attention_histories[(ADVICE_SAMPLE_TASK, kind)] = [{"tier": 1, "repush": 0, "at": time.time() - 60, "basis": "头一回的依据"}]
+        fake.reminder_histories[(ADVICE_SAMPLE_TASK, kind)] = [{"threshold": 1, "repush": 0, "at": time.time() - 60, "basis": "头一回的依据"}]
         repushed = SERVER.Scheduler.attention_text(fake, task, dict(item, repush=1))
         if f"此刻还差：{advice}" not in repushed or "之前推过：" not in repushed or "第 1 回再推" not in repushed:
             problems.append(f"{kind} 再推的正文应当写「之前推过：…」与「此刻还差：{advice[:60]}…」、第一行带「第 1 回再推」，实际「{repushed[:400]}」")
@@ -10953,17 +9821,87 @@ def cell_anomaly_advice_in_texts(world):
     for kind in outcomes:
         fields = dict(lib.reason_fields({"id": ADVICE_SAMPLE_TASK, "outcome": kind, "exit_code": 1}, [], ""))
         wanted = table_advice(kind, ADVICE_SAMPLE_TASK).split("<unit=")[0]   # launcher-lost 那一行的 <unit= 点名的单元> 由 reason_fields 填上单元名，只比它前面那一截
-        if wanted not in fields.get("next", ""):
-            problems.append(f"结局 {kind} 的 next= 应当带异常表那一行的修改意见「{wanted[:80]}…」，实际「{fields.get('next', '')[:300]}」")
+        if wanted not in fields.get("next", "") or lib.BOUNCE_NEW_TASK_REMINDER not in fields.get("next", ""):
+            problems.append(f"结局 {kind} 的 next= 应当带异常表那一行的修改意见「{wanted[:80]}…」与「{lib.BOUNCE_NEW_TASK_REMINDER}」，实际「{fields.get('next', '')[:300]}」")
     if problems:
         raise SelftestFailure("推出去的正文带不带异常表的修改意见：" + "；".join(problems))
     return f"{len(lib.ATTENTION_KINDS)} 种提醒（头一回与再推）、疑似卡住与 {len(outcomes)} 种结局的正文都带异常表那一行的修改意见"
 
 
+HEADLINE_FACTS = re.compile(r"^task-server：(结局|提醒|疑似卡住)（([^）]*)）任务 (\d+) (.+?)（([a-z][a-z-]*)([^）]*)）$")   # 首行：类别、任务此刻的状态、任务号、中文名、英文种类名、括号里其余的
+
+
+def headline_facts(line):
+    """只看推给会话的消息首行，判三件事 → (是结局还是提醒还是疑似卡住, 任务此刻在排在跑还是已结束, 第几回, 上一回的日期或 None, 中文名, 英文种类名)；首行不合写法交 None。"""
+    found = HEADLINE_FACTS.match(line)
+    if found is None:
+        return None
+    category, state, _, name, english, rest = found.groups()
+    after = "任务已结束" if "任务已结束" in state else "任务还在排" if "任务还在排" in state else "任务还在跑" if "任务还在跑" in state else ""
+    rounds, previous = re.search(r"第 (\d+) 回(?!再推)", rest), re.search(r"上一回在 (\d{4}-\d{2}-\d{2})", rest)
+    return category, after, int(rounds.group(1)) if rounds else None, previous.group(1) if previous else None, name, english
+
+
+def cell_inbox_headlines_tell_kind_state_round(world):
+    """推给会话的消息首行说清是什么（task_server.py 的 outcome_headline、reminder_headline、suspect_headline、attention_text、suspect_text；起因是别的会话把一条 suspected-stall 读成了结局）：
+    四类各造一条，只看首行判得出三件事——是结局、提醒还是疑似卡住；任务此刻在排、在跑还是已结束；第几回（重推的另有上一回在哪一天）：
+    结局「结局（任务已结束）…（succeeded，退 0；第 1 回）」；排着的任务的提醒「提醒（任务还在排，不是结局）…」第 1 回；在跑的任务第 2 回再推的提醒第 3 回、上一回在三天前那一天；
+    疑似卡住「疑似卡住（任务还在跑、服务没停它）…」；结局没人取而再推的「结局（任务已结束，这条结局还没人取）…」第 3 回、上一回在两天前那一天。每个种类带中文名、英文种类名在括号里；
+    错误类型表的每一种结局、每一种提醒、疑似卡住、结局没人取在 lib.KIND_NAMES 里都有中文名。正文里确认标识那几行（长跑已确认）在依据与出路之后；机器读的最后一行不动
+    （TASK_SERVER_ATTENTION、TASK_SERVER_SUSPECT 起头）。套在假调度器上，不起服务。
+    弄坏开关 inbox-headline-state-omitted 下首行不写类别与状态，inbox-headline-round-omitted 下不写第几回，inbox-headline-name-omitted 下不写中文名，
+    inbox-flag-lines-before-evidence 下确认标识那几行在依据与出路之前，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.store = types.SimpleNamespace(task=lambda task_id: None)
+    fake.reminder_histories, fake.attention_lock, fake.anomaly_repush_seconds = {}, threading.Lock(), SERVER.ANOMALY_REPUSH_SECONDS
+    fake.flag_lines = lambda found: ["长跑已确认：自证里的一句理由"]
+    now = time.time()
+    day = lambda seconds: time.strftime("%Y-%m-%d", time.localtime(seconds))
+    problems = []
+
+    def check(what, line, expected):
+        facts = headline_facts(line)
+        if facts != expected:
+            problems.append(f"{what}：首行应当判得出 {expected}，实际 {facts}（首行「{line}」）")
+
+    check("结局", SERVER.outcome_headline(701, "succeeded", 0), ("结局", "任务已结束", 1, None, "成功", "succeeded"))
+    queued_item = SERVER.Scheduler.attention_item(fake, "queued-too-long", 1, 702, "已排 30 分钟", "原因")
+    queued_text = SERVER.Scheduler.attention_text(fake, {"id": 702, "state": "queued"}, queued_item)
+    check("排着的任务的提醒", queued_text.split("\n", 1)[0], ("提醒", "任务还在排", 1, None, "排队过久", "queued-too-long"))
+    fake.reminder_histories[(703, "fills-any-cap")] = [{"threshold": 1, "repush": 0, "at": now - 5 * 86400, "round": 1, "basis": "头一回"},
+                                                       {"threshold": 1, "repush": 1, "at": now - 3 * 86400, "round": 2, "basis": "第 1 回再推"}]
+    again_item = dict(SERVER.Scheduler.attention_item(fake, "fills-any-cap", 1, 703, "三次峰值贴着上限", "原因"), repush=2)
+    again_text = SERVER.Scheduler.attention_text(fake, {"id": 703, "state": "running"}, again_item)
+    check("在跑的任务再推的提醒", again_text.split("\n", 1)[0], ("提醒", "任务还在跑", 3, day(now - 3 * 86400), "按给的上限开并行", "fills-any-cap"))
+    suspect_text = SERVER.Scheduler.suspect_text(fake, {"id": 704, "state": "running"}, {"id": 704}, {"id": 9, "number": 1, "host": SERVER.LOCAL, "log": "x.log"},
+                                                 {"segment": 2, "why": "整个单元的 CPU 这 600 秒平均 0.0001 个核"})
+    check("疑似卡住", suspect_text.split("\n", 1)[0], ("疑似卡住", "任务还在跑", 1, None, "疑似卡住", "suspected-stall"))
+    check("结局没人取再推", SERVER.outcome_headline(705, "succeeded", 0, 3, now - 2 * 86400, unclaimed=True),
+          ("结局", "任务已结束", 3, day(now - 2 * 86400), "成功", "succeeded"))
+    if "第 2 段" not in suspect_text.split("\n", 1)[0] or "没处置、第 2 回再推" not in again_text.split("\n", 1)[0] or "还没人取" not in SERVER.outcome_headline(705, "succeeded", 0, 3, now, unclaimed=True):
+        problems.append("疑似卡住应写第几段，再推的写没处置、第几回再推，没人取的写这条结局还没人取")
+    for what, text in (("提醒", again_text), ("疑似卡住", suspect_text)):
+        lines = text.split("\n")
+        flag = lines.index("长跑已确认：自证里的一句理由") if "长跑已确认：自证里的一句理由" in lines else None
+        advice = next((index for index, line in enumerate(lines) if line.startswith("出路：")), None)
+        if what == "提醒" and (flag is None or advice is None or flag < advice or any(line.startswith("依据：") for line in lines[flag:])):
+            problems.append(f"提醒：确认标识那一行应当在依据与出路之后，实际各行 {[line[:20] for line in lines]}")
+    if not again_text.split("\n")[-1].startswith(f"{lib.ATTENTION_MARK} task=703 ") or not suspect_text.split("\n")[-1].startswith(f"{lib.SUSPECT_MARK} task=704 "):
+        problems.append("每条消息最末那一行机器读的行（TASK_SERVER_ATTENTION、TASK_SERVER_SUSPECT）应当一个字不动、仍在最后")
+    kinds = [*lib.OUTCOME_TYPES, *lib.ATTENTION_KINDS, "suspected-stall", "unclaimed-outcome"]
+    unnamed = sorted(kind for kind in kinds if kind not in lib.KIND_NAMES or lib.KIND_NAMES[kind] == kind or not lib.KIND_NAMES[kind].strip())
+    if unnamed:
+        problems.append(f"这些种类在 lib.KIND_NAMES 里没有中文名：{'、'.join(unnamed)}")
+    if problems:
+        raise SelftestFailure("推给会话的消息首行：" + "；".join(problems))
+    return "结局、提醒（在排、在跑再推）、疑似卡住、结局没人取再推四类：只看首行就判得出类别、任务在排在跑还是已结束、第几回；中文名在前、英文种类名在括号里；确认标识那几行在依据与出路之后"
+
+
 def cell_anomaly_repushed_with_history(world):
-    """不随时长涨的提醒同一档推过之后还在（task_server.py 文件头 ⑥「没处置时」；异常表 fills-any-cap 那一行）：同键三次峰值都贴着上限、再交一条一直跑着，
-    收件 socket 先收到一条「fills-any-cap（第 1 档）」，同一档报过满头一档（自证里 2 秒）再收到一条「（第 1 档，没处置、第 1 回再推）」，正文写「之前推过：…」与「此刻还差：<那一行的修改意见>」。
-    弄坏开关 anomaly-not-repushed 下不再推，这一格红。"""
+    """门槛不随时长涨的提醒同一道门槛推过之后还在（task_server.py 文件头 ⑥「没处置时」；异常表 fills-any-cap 那一行）：同键三次峰值都贴着上限、再交一条一直跑着，
+    收件 socket 先收到一条「（fills-any-cap；第 1 回）」，同一道门槛报过满再推的门槛（自证里 2 秒）再收到一条「（fills-any-cap，没处置、第 1 回再推；第 2 回」，正文写「之前推过：…」与「此刻还差：<那一行的修改意见>」。
+    弄坏开关 anomaly-not-repushed 下不再推，inbox-headline-state-omitted 下首行不写类别与状态（「提醒（任务还在跑，不是结局）」那一段）、照首行认不到那一条，这一格红。"""
     key = "selftest-anomaly-repush"
     for _ in range(SERVER.FILLS_CAP_RUNS):
         world.seed_attempt({"command_key": key, "outcome": "succeeded", "memory_peak": FILLS_CAP_SEEDED_PEAK_BYTES, "memory_cap": FILLS_CAP_SEEDED_CAP_BYTES})
@@ -10971,10 +9909,12 @@ def cell_anomaly_repushed_with_history(world):
     release = os.path.join(world.root, "release-anomaly-repush")
     start_inbox_server(world, {"TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS": REPUSH_SAMPLE_SECONDS})
     task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: key}))
-    first_head, again_head = f"task-server：任务 {task_id} fills-any-cap（第 1 档）", f"task-server：任务 {task_id} fills-any-cap（第 1 档，没处置、第 1 回再推）"
+    states = ("任务还在排", "任务还在跑")   # 这一条交的时候就判得出（同键三次峰值贴着上限），排着时就可能推，起了以后也可能推
+    first_head = tuple(f"{reminder_head(task_id, 'fills-any-cap', state)}；" for state in states)
+    again_head = tuple(f"{reminder_head(task_id, 'fills-any-cap', state)}，没处置、第 1 回再推；第 2 回" for state in states)
     problems = inbox_problems(inbox.wait_for(world, first_head), first_head, "头一回")
     again = inbox.wait_for(world, again_head)
-    problems += inbox_problems(again, again_head, "同一档没处置再推")
+    problems += inbox_problems(again, again_head, "同一道门槛没处置再推")
     text = again[0]["text"] if again else ""
     advice = table_advice("fills-any-cap", task_id)
     if again and ("之前推过：" not in text or f"此刻还差：{advice}" not in text):
@@ -10986,9 +9926,76 @@ def cell_anomaly_repushed_with_history(world):
     return f"fills-any-cap 头一回推过、满 {REPUSH_SAMPLE_SECONDS} 秒还在，再推了一回（写了之前推过什么、此刻还差什么）"
 
 
+def cell_anomaly_acknowledged_not_repushed(world):
+    """出路是照跑的提醒记了照跑之后不再推（task_server.py 文件头 ⑥「没处置时」，ACKNOWLEDGED_KINDS）：同键三次峰值贴着上限、再交一条一直跑着，收到 fills-any-cap 头一回之后
+    提交它的会话 confirm --why（还没跑满两小时的界）退 0、回话写「已记照跑」；之后过了再推的时限（自证里 2 秒）两倍多，没再收到「没处置、第 1 回再推」那一条。
+    弄坏开关 anomaly-acknowledgement-ignored 下照推，这一格红。"""
+    key = "selftest-anomaly-acknowledged"
+    for _ in range(SERVER.FILLS_CAP_RUNS):
+        world.seed_attempt({"command_key": key, "outcome": "succeeded", "memory_peak": FILLS_CAP_SEEDED_PEAK_BYTES, "memory_cap": FILLS_CAP_SEEDED_CAP_BYTES})
+    inbox = FakeInbox(world, "a")
+    release = os.path.join(world.root, "release-anomaly-acknowledged")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_ANOMALY_REPUSH_SECONDS": REPUSH_SAMPLE_SECONDS})
+    task_id = world.submit(["bash", "-c", BLOCK_SCRIPT, "block", release], extra=dict(inbox.environment(), **{lib.KEY_VARIABLE: key}))
+    states = ("任务还在排", "任务还在跑")   # 这一条交的时候就判得出（同键三次峰值贴着上限），排着时就可能推，起了以后也可能推
+    first_head = tuple(f"{reminder_head(task_id, 'fills-any-cap', state)}；" for state in states)
+    again_head = tuple(f"{reminder_head(task_id, 'fills-any-cap', state)}，没处置、第 1 回再推；第 2 回" for state in states)
+    problems = inbox_problems(inbox.wait_for(world, first_head), first_head, "头一回")
+    confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE])
+    if confirmed.returncode != 0 or "已记照跑" not in confirmed.stdout + confirmed.stderr:
+        problems.append(f"没满两小时的界、开着 fills-any-cap 时 confirm --why 应当退 0、回「已记照跑」，实际退 {confirmed.returncode}：{(confirmed.stdout + confirmed.stderr)[-300:]}")
+    time.sleep(3 * float(REPUSH_SAMPLE_SECONDS))
+    if inbox.headed(again_head):
+        problems.append(f"记了照跑之后不该再推，实际收到「{again_head}」")
+    open(release, "w").close()
+    world.finished(task_id)
+    if problems:
+        raise SelftestFailure("记了照跑的提醒不再推：" + "；".join(problems), world.server_log_lines())
+    return f"fills-any-cap 头一回推过、confirm --why 记了照跑，过了 {3 * float(REPUSH_SAMPLE_SECONDS):.0f} 秒没再推"
+
+
+PROGRESS_PUSH_SAMPLE_SECONDS = "2"   # running-progress-pushed：在跑的任务每满这么多秒发一条进度（TASK_SERVER_SELFTEST_PROGRESS_PUSH_SECONDS）
+
+
+PROGRESS_LOG_LINE_ROUNDS = 6   # running-progress-pushed：等日志末行出现在进度正文里至多等到第几回
+
+
+def cell_running_progress_pushed(world):
+    """在跑进度（task_server.py 文件头 ⑥「在跑进度」）：一条任务在跑满时限（自证里 2 秒）之后，提交它的会话收到一条首行「进度（任务还在跑，不是结局）任务 N 起跑以来」的消息，
+    写第 1 回、它在哪一台与日志末行；再满一回时限收到第 2 回；放它跑完，结局照发。弄坏开关 progress-not-pushed 下不发，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    start_inbox_server(world, {"TASK_SERVER_SELFTEST_PROGRESS_PUSH_SECONDS": PROGRESS_PUSH_SAMPLE_SECONDS})
+    release = os.path.join(world.root, "release-progress")
+    task_id = world.submit(["bash", "-c", "echo progress-line-sample; " + BLOCK_SCRIPT, "block", release], extra=inbox.environment())
+    world.running(task_id)
+    head = f"{SERVER.INBOX_HEADLINE}进度（任务还在跑，不是结局）任务 {task_id} 起跑以来"
+    found = inbox.wait_for(world, head, count=2)
+    problems = []
+    if len(found) < 2:
+        problems.append(f"在跑满 {PROGRESS_PUSH_SAMPLE_SECONDS} 秒两回应当收到两条首行「{head}」的进度，实际 {len(found)} 条")
+    else:
+        first, second = found[0]["text"], found[1]["text"]
+        if "第 1 回" not in first.splitlines()[0] or "第 2 回" not in second.splitlines()[0]:
+            problems.append(f"两条的首行应当依次写第 1 回、第 2 回，实际「{first.splitlines()[0]}」「{second.splitlines()[0]}」")
+        # 日志末行不钉在第 1 回上：时限从尝试起了那一刻算，机器忙时命令的第一行可能晚于第 1 回才写进日志（load 139 时第 1 回读到「日志还是空的」）；
+        # 接着等后面的回数，至多到第 PROGRESS_LOG_LINE_ROUNDS 回，有一回带上那一行就算。
+        for wanted_count in range(3, PROGRESS_LOG_LINE_ROUNDS + 1):
+            if any("progress-line-sample" in message["text"] for message in found):
+                break
+            found = inbox.wait_for(world, head, count=wanted_count)
+        if f"任务 {task_id} 在 " not in first or not any("progress-line-sample" in message["text"] for message in found):
+            problems.append(f"进度正文应当写这一次尝试在哪一台、收到的 {len(found)} 回里有一回带日志末行（progress-line-sample），实际第 1 回「{first[:400]}」、最后一回「{found[-1]['text'][:400]}」")
+    with open(release, "w", encoding="utf-8"):
+        pass
+    world.finished(task_id)
+    if problems:
+        raise SelftestFailure("在跑进度：" + "；".join(problems), world.server_log_lines())
+    return f"在跑的任务每满 {PROGRESS_PUSH_SAMPLE_SECONDS} 秒给提交它的会话发一条进度，写第几回、在哪一台与日志末行"
+
+
 def cell_unclaimed_outcome_repushed(world):
     """结局没人取（task_server.py 文件头 ⑥「结局没人取」；异常表 unclaimed-outcome）：会话还没登进会话登记时任务跑完，结局那一条发不出去（写 inbox-unreachable 告警）；
-    之后会话登上（演会话重启、换了 socket），结局满头一档（自证里 2 秒）没人取，服务再推一回到新的 socket：第一行「结局还没人取（succeeded」，写此刻还差什么（那一行的修改意见）
+    之后会话登上（演会话重启、换了 socket），结局满再推的门槛（自证里 2 秒）没人取，服务再推一回到新的 socket：第一行「结局还没人取（succeeded」，写此刻还差什么（那一行的修改意见）
     与那条结局的末行；推出去了记成已取，status 不再列成没人取。弄坏开关 unclaimed-outcome-not-repushed 下不再推，这一格红。"""
     inbox = FakeInbox(world, "a", register=False)
     start_inbox_server(world, {"TASK_SERVER_SELFTEST_UNCLAIMED_WARNING_SECONDS": UNCLAIMED_REPUSH_SAMPLE_SECONDS})
@@ -10998,7 +10005,7 @@ def cell_unclaimed_outcome_repushed(world):
     while patience.waiting() and not any(alert.get("kind") == "inbox-unreachable" and alert.get("task") == task_id for alert in world.alerts()):
         time.sleep(POLL_SECONDS)
     world.register_session(SESSION_A, inbox.path, "inbox-a")
-    head = f"task-server：任务 {task_id} 结局还没人取（succeeded"
+    head = unclaimed_head(task_id, "succeeded")
     found = inbox.wait_for(world, head)
     problems = inbox_problems(found, head, "结局没人取再推")
     text = found[0]["text"] if found else ""
@@ -11034,7 +10041,7 @@ def cell_inbox_socket_follows_session(world):
     new = FakeInbox(world, "new", token=old.token)
     open(release, "w").close()
     world.finished(task_id)
-    head = f"task-server：任务 {task_id} succeeded"
+    head = outcome_head(task_id, "succeeded")
     problems = inbox_problems(new.wait_for(world, head), head, "会话重启之后的结局")
     if problems:
         raise SelftestFailure("按会话号找收件 socket：" + "；".join(problems), world.server_log_lines())
@@ -11099,7 +10106,7 @@ def cell_unconfirmed_cancelled(world):
     problems = []
     if summary["task"].get("outcome") != "cancelled" or not str(summary["task"].get("note") or "").startswith("没确认，已取消") or summary["attempts"]:
         problems.append(f"满时限没确认的应当记 cancelled、说明以「没确认，已取消」起头、一次都没起，实际 {describe(summary)}、说明「{summary['task'].get('note')}」")
-    head = f"task-server：任务 {task_id} cancelled"
+    head = outcome_head(task_id, "cancelled")
     messages = inbox.wait_for(world, head)
     problems += inbox_problems(messages, head, "没确认被取消")
     if messages and "没确认，已取消" not in messages[0]["text"]:
@@ -11109,69 +10116,8 @@ def cell_unconfirmed_cancelled(world):
     return f"交了满 {CONFIRM_TIMEOUT_SAMPLE_SECONDS} 秒没确认：服务取消、推了「没确认，已取消」"
 
 
-def cell_family_lends_build_phase_only(world):
-    """编译族只借编译那一段的峰值（task_server.py 文件头 ②「内存」的编译族）：入口声明了编译族、先等放行再打 cargo 的 Finished 那一行、再等放行退 0；
-    Finished 之前假 scope 的进程内存是 6G（attempt_runner 写的 build_phase 读到「6G 0」），见到 Finished 之后（读到「6G 1」）换成 40G：这一次尝试记 build_phase_peak 6G；
-    同族另记一条没有 Finished 行（编译那一段 null）、跑成峰值 42G 的，不借；同族另一条（命令键不同、没有自己的记录）第一次照 6G × 1.5 = 9216M 起、prediction 记 build-family。
-    弄坏开关 family-lends-run-peak 下借 memory_peak（40G、42G 那一档），build-phase-past-finished 下见到 Finished 之后的 40G 也进编译段峰值，这一格红。"""
-    with open(os.path.join(world.repo, PHASE_FAMILY_ENTRY), "w", encoding="utf-8") as handle:
-        handle.write(f"#!/usr/bin/env bash\n{lib.DECLARED_BUILD_FAMILY_MARK} -p selftest-family-phase --release\n"
-                     '[[ "$1" == quick ]] && exit 0\n'
-                     'for round in $(seq 1 600); do [[ -e "$1" ]] && break; sleep 0.1; done\n'
-                     "echo '    Finished `release` profile [optimized] target(s) in 1.00s'\n"
-                     'for round in $(seq 1 600); do [[ -e "$2" ]] && exit 0; sleep 0.1; done\nexit 9\n')
-    world.resources(local=(100, 100))
-    world.start_server(extra={"TASK_SERVER_FAKE_SCOPE_DIRECTORY": world.write_fake_scope(PHASE_BUILD_BYTES)})
-    compiled, finished = os.path.join(world.root, "release-phase-compiled"), os.path.join(world.root, "release-phase-finished")
-    task_id = world.submit(["bash", PHASE_FAMILY_ENTRY, compiled, finished], cwd=world.repo)
-    directory = world.running(task_id)["attempts"][-1].get("directory") or ""
-
-    def sampled(peak, seen):
-        """等 attempt_runner 写的 build_phase 那一份（lib.BUILD_PHASE_FILE_NAME，尝试目录下）读到「<peak> <seen>」：编译那一段见过的最大与见没见到 cargo 编完那一行。"""
-        path = os.path.join(directory, lib.BUILD_PHASE_FILE_NAME)
-        patience = world.patience(STATE_TIMEOUT_SECONDS)
-        read = ""
-        while patience.waiting():
-            with contextlib.suppress(OSError):
-                with open(path, encoding="utf-8") as handle:
-                    read = handle.read().strip()
-            if read == f"{peak} {seen}":
-                return
-            time.sleep(POLL_SECONDS)
-        raise SelftestFailure(f"等了 {patience.elapsed():.0f} 秒，{path} 没读到「{peak} {seen}」，最后读到「{read}」", world.server_log_lines())
-
-    sampled(PHASE_BUILD_BYTES, 0)
-    open(compiled, "w").close()
-    sampled(PHASE_BUILD_BYTES, 1)   # attempt_runner 见到 Finished 之后才换上跑测试那一段的用量：换之前采到的都算编译那一段
-    world.write_fake_scope(PHASE_RUN_BYTES)
-    patience = world.patience(STATE_TIMEOUT_SECONDS)
-    while patience.waiting():   # attempt_runner 按轮采到了跑测试那一段的用量（memory_peak 涨到 40G）再放它退出
-        with contextlib.suppress(OSError, ValueError):
-            with open(os.path.join(directory, lib.MEMORY_PEAK_FILE_NAME), encoding="utf-8") as handle:
-                if int(handle.read().strip()) >= PHASE_RUN_BYTES:
-                    break
-        time.sleep(POLL_SECONDS)
-    open(finished, "w").close()
-    summary = world.finished(task_id)
-    problems = []
-    attempt = first_attempt(summary)
-    if summary["task"].get("outcome") != "succeeded" or attempt.get("build_phase_peak") != PHASE_BUILD_BYTES or attempt.get("memory_peak") != PHASE_RUN_BYTES:
-        problems.append(f"Finished 之前读到 {PHASE_BUILD_BYTES}、之后换成 {PHASE_RUN_BYTES}：尝试应当记 build_phase_peak {PHASE_BUILD_BYTES}、memory_peak {PHASE_RUN_BYTES}、跑完，"
-                        f"实际 {attempt.get('build_phase_peak')}、{attempt.get('memory_peak')}、{describe(summary)}")
-    seed_ended_attempt(world, "selftest-family-phase-unfinished", time.time(), "succeeded", memory_peak=PHASE_SEEDED_RUN_BYTES,
-                       build_family=summary["task"].get("build_family") or "")
-    quick = world.finished(world.submit(["bash", PHASE_FAMILY_ENTRY, "quick"], cwd=world.repo))
-    attempt = first_attempt(quick)
-    if attempt.get("memory_cap_text") != PHASE_RAISED_TEXT or attempt.get("prediction") != lib.BUILD_FAMILY_HISTORY:
-        problems.append(f"同族另一条应当照编译那一段 6G × 1.5 = {PHASE_RAISED_TEXT} 起、prediction 记 {lib.BUILD_FAMILY_HISTORY}（不借跑测试那一段的 40G、42G），"
-                        f"实际 {attempt.get('memory_cap_text')}、{attempt.get('prediction')}（族「{quick['task'].get('build_family')}」）")
-    if problems:
-        raise SelftestFailure("编译族只借编译那一段：" + "；".join(problems), world.server_log_lines())
-    return f"Finished 之前 6G、之后 40G：记编译那一段 6G；同族另一条从 {PHASE_RAISED_TEXT} 起，不借跑测试那一段与没有 Finished 行的峰值"
-
-
 def cell_cleanup_protocol_unit_tests(world):
-    """清场协议的离线单测（task-server/tests/test_cleanup_protocol.py；unittest，在这一格自己的进程里跑，不起服务）：恰好 CLEANUP_PROTOCOL_TESTS 条、全过才绿；
+    """收尾协议的离线单测（task-server/tests/test_cleanup_protocol.py；unittest，在这一格自己的进程里跑，不起服务）：恰好 CLEANUP_PROTOCOL_TESTS 条、全过才绿；
     它的假调度器照 Scheduler.__init__ 的表名现建（scheduler_tables）。弄坏开关 cleanup-tests-tables-hand-listed 下照手抄的旧名单建、收尾那几条红，这一格红。"""
     module = lib.load_module("test_cleanup_protocol", os.path.join(lib.SCRIPT_DIRECTORY, "tests", "test_cleanup_protocol.py"))
     suite = unittest.defaultTestLoader.loadTestsFromModule(module)
@@ -11179,82 +10125,13 @@ def cell_cleanup_protocol_unit_tests(world):
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     bad = [test.id() for test, _ in result.failures + result.errors] + [test.id() for test, _ in result.skipped]
     if result.testsRun != CLEANUP_PROTOCOL_TESTS or bad or suite.countTestCases() != CLEANUP_PROTOCOL_TESTS:
-        raise SelftestFailure(f"清场协议单测应当跑 {CLEANUP_PROTOCOL_TESTS} 条、全过，实际载入 {suite.countTestCases()} 条、跑了 {result.testsRun} 条，不对或跳过的 {bad}",
+        raise SelftestFailure(f"收尾协议单测应当跑 {CLEANUP_PROTOCOL_TESTS} 条、全过，实际载入 {suite.countTestCases()} 条、跑了 {result.testsRun} 条，不对或跳过的 {bad}",
                               stream.getvalue().splitlines()[-40:])
-    return f"清场协议单测 {result.testsRun} 条全过（假调度器的表照 Scheduler.__init__ 现建）"
+    return f"收尾协议单测 {result.testsRun} 条全过（假调度器的表照 Scheduler.__init__ 现建）"
 
 
-SEAL_FIT_HOLDER_PEAK_BYTES = 54 * GIBIBYTE    # whole-not-sealed-where-it-cannot-fit 本机占着的那一条：上限与记账 81G（本机 100G、可用上限 98G、界 83.3G：碎片；第二台 48G 放不下它）
-SEAL_FIT_WHOLE_PEAK_BYTES = 60 * GIBIBYTE     # 那一格的整片：上限与记账 90G；峰值本身比第二台此刻能给的最大上限 48G 大，在本机放得下（不小于本机的界）
-SEAL_FIT_FRAGMENT_PEAK_BYTES = 10 * GIBIBYTE  # 那一格的碎片：上限与记账各 15G；第二台一组装两条（30G）再放就超过界 40.8G，内存装得下三条（45G）
-SEAL_FIT_NOWHERE_PEAK_BYTES = 100 * GIBIBYTE  # 那一格两台都装不下的整片：峰值本身比两台此刻能给的最大上限（本机 98G、第二台 48G）都大，记账 150G 收不到上限为止（booked_at_cap 只收峰值装得下的）
-SEAL_FIT_FRAGMENTS = 6
-SEAL_FIT_PEER_FITS = 3                        # 第二台不为整片封组时照内存起的碎片条数（3 × 15G = 45G ≤ 48G）；为它封组时只起到两条
-SEAL_FIT_RELEASE = "release-seal-fit"         # 那一格占着的与碎片的放行文件（相对假仓根；假第二台照 fake-peer-wait 等同一个名字）
 FILLS_CAP_CLIMB_CAPS = (6144 * MEBIBYTE, 9216 * MEBIBYTE, 13824 * MEBIBYTE)   # fills-any-cap-cap-hits-not-reported：照上限一档档撞上去的三次（6.0、9.0、13.5 GiB）
 FILLS_CAP_CLIMB_PEAK_PERCENT = 99             # 那三次撞上限时的峰值占各自上限的百分数（撞的那一次峰值本来就贴着上限）
-
-
-def cell_whole_not_sealed_where_it_cannot_fit(world):
-    """只在放得下整片的台上为它封组（task_server.py 文件头 ②「整片与碎片按台交替」；Alternation.__init__ 的 fitting）：本机 100G（可用上限 98G、界 83.3G），第二台 50G（48G、界 40.8G）。
-    本机先起一条占着的（记账 81G，第二台放不下它）；再交一条整片（峰值 60G、记账 90G：在两台都算整片，峰值本身比第二台的 48G 大，在本机放得下）与六条碎片（各记 15G，跑到放行为止）。
-    峰值只比一台的 host_limit 大：整片排着等本机、只封本机（排队原因里有本机封组的那一句）；第二台不为它封组，照内存起三条碎片，排队原因里没有第二台封组的那一句。
-    之后另交一条峰值本身比两台的 host_limit 都大的（峰值 100G、记账 150G；峰值装得下的记账照 booked_at_cap 收到 host_limit 为止、照样起得来，不是这一判的场景）：
-    不封组、一次都不起，记 memory-cap-at-maximum。
-    弄坏开关 seal-host-that-cannot-fit 下照改前第二台也算等它的台：它在第二台离放得下更近（90G − 48G 比 90G − 17G 小），第二台为它封组、只起两条，这一格红。"""
-    world.resources(local=(100, 100), peer=(50, 50), peer_cap_gibibytes=50)
-    for key, peak in (("selftest-seal-fit-holder", SEAL_FIT_HOLDER_PEAK_BYTES), ("selftest-seal-fit-whole", SEAL_FIT_WHOLE_PEAK_BYTES),
-                      ("selftest-seal-fit-fragment", SEAL_FIT_FRAGMENT_PEAK_BYTES), ("selftest-seal-fit-nowhere", SEAL_FIT_NOWHERE_PEAK_BYTES)):
-        world.seed_peak(key, peak)
-    world.start_server()
-    release = os.path.join(world.repo, SEAL_FIT_RELEASE)
-    problems, counts, reasons, previous, whole_summary = [], {}, [], None, {"attempts": []}
-    holder = world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, "seal-fit-holder", SEAL_FIT_RELEASE, f"fake-peer-wait={SEAL_FIT_RELEASE}"],
-                          extra={lib.KEY_VARIABLE: "selftest-seal-fit-holder"}, cwd=world.repo)
-    try:
-        held = world.running(holder)
-        if first_attempt(held).get("host") != SERVER.LOCAL:
-            problems.append(f"占着的那一条（记账 81G）应当起在本机，实际 {describe(held)}")
-        world.resources(local=(100, 100), peer=(50, 50), peer_cap_gibibytes=50, hold=True)
-        whole = world.submit(["bash", "-c", "exit 0", "seal-fit-whole"], extra={lib.KEY_VARIABLE: "selftest-seal-fit-whole"}, cwd=world.repo)
-        fragments = [world.submit(["bash", "-c", HOLD_UNTIL_RELEASED_SCRIPT, f"seal-fit-fragment-{number}", SEAL_FIT_RELEASE, f"fake-peer-wait={SEAL_FIT_RELEASE}"],
-                                  extra={lib.KEY_VARIABLE: "selftest-seal-fit-fragment"}, cwd=world.repo) for number in range(SEAL_FIT_FRAGMENTS)]
-        world.resources(local=(100, 100), peer=(50, 50), peer_cap_gibibytes=50)   # 一齐放出来
-        world.api("POST", "/wake")
-        deadline = time.monotonic() + SEALED_ONE_HOST_LIMIT_SECONDS
-        while time.monotonic() < deadline:
-            world.next_pass()
-            time.sleep(SEALED_ONE_HOST_SETTLE_SECONDS)
-            counts, reasons = started_hosts(world, fragments)
-            if all(reason and "这一轮已起" not in reason for reason in reasons) and counts == previous:
-                break
-            previous = counts
-        whole_summary = world.summary(whole)
-    finally:
-        open(release, "w").close()
-    outcomes = [world.finished(task_id, timeout=120)["task"].get("outcome") for task_id in [holder, *fragments, whole]]
-    peer_name = lib.HOST_NAMES.get(SERVER.PEER, SERVER.PEER)
-    sealed_on_peer = [reason for reason in reasons if f"{peer_name}：这台这一组碎片已装到" in reason]
-    local_name = lib.HOST_NAMES.get(SERVER.LOCAL, SERVER.LOCAL)
-    sealed_on_local = [reason for reason in reasons if f"{local_name}：这台这一组碎片已装到" in reason and "封组" in reason]
-    if counts != previous:
-        problems.append(f"{SEALED_ONE_HOST_LIMIT_SECONDS:.0f} 秒里两台起的碎片条数一直在变：最后一次 {counts}，前一次 {previous}")
-    if whole_summary["attempts"]:
-        problems.append(f"本机被占着时整片（记账 90G）应当排着，实际 {describe(whole_summary)}")
-    if sealed_on_peer:
-        problems.append(f"整片峰值本身比第二台能给的最大上限大，第二台不该为它封组，实际排队原因「{sealed_on_peer[0][:300]}」")
-    if not sealed_on_local:
-        problems.append(f"整片峰值只比第二台的最大上限大、本机放得下：应当只封本机等它，实际没起的碎片的排队原因里没有本机封组（{[reason[:200] for reason in reasons[:2]]}）")
-    if counts.get(SERVER.PEER, 0) < SEAL_FIT_PEER_FITS:
-        problems.append(f"第二台不为整片封组时应当照内存起 {SEAL_FIT_PEER_FITS} 条碎片，实际两台各起了 {counts}")
-    if set(outcomes) != {"succeeded"}:
-        problems.append(f"放行之后都应当跑完，实际结局 {sorted(set(outcomes))}")
-    nowhere = world.finished(world.submit(["bash", "-c", "exit 0", "seal-fit-nowhere"], extra={lib.KEY_VARIABLE: "selftest-seal-fit-nowhere"}, cwd=world.repo), timeout=120)
-    if nowhere["task"].get("outcome") != "memory-cap-at-maximum" or nowhere["attempts"]:
-        problems.append(f"峰值本身比两台的最大上限都大的整片（峰值 100G、记账 150G）应当不封组、一次都不起、记 memory-cap-at-maximum，实际 {describe(nowhere)}")
-    if problems:
-        raise SelftestFailure("只在放得下整片的台上封组：" + "；".join(problems), reasons[:4] + world.server_log_lines())
-    return f"整片峰值只比第二台大：只封本机，第二台照内存起了 {counts.get(SERVER.PEER, 0)} 条碎片；峰值比两台都大的打回 memory-cap-at-maximum"
 
 
 def cell_fills_any_cap_cap_hits_not_reported(world):
@@ -11286,40 +10163,4198 @@ def cell_fills_any_cap_cap_hits_not_reported(world):
     return "同键三次都是撞了上限、峰值贴着上限：确认单与 wait 都不报 fills-any-cap，照跑完"
 
 
+FILLS_CAP_RECORD_CAPS = (1400 * MEBIBYTE, 1500 * MEBIBYTE, 1000 * MEBIBYTE)   # fills-any-cap-record-caps-not-reported：照记录定的三次上限（任务 13774 那条命令）
+FILLS_CAP_RECORD_PEAKS = (1400 * MEBIBYTE, 1400 * MEBIBYTE, 1000 * MEBIBYTE)   # 那三次的峰值：贴着各自的上限
+FILLS_CAP_GROWN_CAPS = (4096 * MEBIBYTE, 6144 * MEBIBYTE, 9216 * MEBIBYTE)     # 没记录时起在 4096M、一档档放大的三次上限
+
+
+def cell_fills_any_cap_record_caps_not_reported(world):
+    """上限照记录定的不算按上限开并行（task_server.py 的 fills_any_cap_items；任务 13774 的依据是「上限 1.4 GiB 峰值 1.4 GiB、上限 1.5 GiB 峰值 1.4 GiB、上限 1.0 GiB 峰值 1.0 GiB」，
+    而那条命令不读上限）：同一命令键记下三次跑成的尝试，各自的上限照记下的峰值定（尝试的 prediction 一栏是 record）、峰值贴着上限：确认单里没有 fills-any-cap；
+    另一个命令键三次跑成、上限是没记录时从 4096M 起一档档放大的（prediction 是 unrecorded-default、retry）、峰值都跟着涨到贴着上限：确认单里照列 fills-any-cap。
+    弄坏开关 fills-any-cap-counts-record-caps 下照记录定的上限也算，头一个命令键也被报，这一格红。"""
+    keys = {"record": "selftest-fills-any-cap-record", "grown": "selftest-fills-any-cap-grown"}
+    for cap, peak in zip(FILLS_CAP_RECORD_CAPS, FILLS_CAP_RECORD_PEAKS):
+        world.seed_attempt({"command_key": keys["record"], "outcome": "succeeded", "memory_peak": peak, "memory_cap": cap, "prediction": lib.RECORD_HISTORY})
+    for cap, history in zip(FILLS_CAP_GROWN_CAPS, (lib.UNRECORDED_HISTORY, "retry", "retry")):
+        world.seed_attempt({"command_key": keys["grown"], "outcome": "succeeded", "memory_peak": cap * 97 // 100, "memory_cap": cap, "prediction": history})
+    world.resources(local=(100, 100))
+    world.start_server()
+    problems = []
+    for what, key, reported in (("上限照记录定的", keys["record"], False), ("上限一档档放大的", keys["grown"], True)):
+        submitted = world.client(["submit", "--cwd", world.work, "--", "bash", "-c", "exit 0", f"fills-any-cap-{key[-6:]}"], extra={lib.KEY_VARIABLE: key})
+        found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", submitted.stdout)
+        if submitted.returncode != 0 or not found or lib.confirm_needed_fields(submitted.stdout) is None:
+            raise SelftestFailure(f"交了应当退 0、打任务号与确认单，实际退 {submitted.returncode}", [submitted.stdout, submitted.stderr] + world.server_log_lines())
+        if ("fills-any-cap：" in submitted.stdout) != reported:
+            problems.append(f"{what}三次峰值都贴着上限：确认单里应当{'列' if reported else '不列'} fills-any-cap，实际「{submitted.stdout.strip()[-400:]}」")
+        world.confirm_submitted(submitted)
+        world.client(["wait", found.group(1)], timeout=ATTENTION_WAIT_SECONDS)
+        done = world.finished(int(found.group(1)))
+        if done["task"].get("outcome") != "succeeded":
+            problems.append(f"{what}：应当跑完，实际 {describe(done)}")
+    if problems:
+        raise SelftestFailure("上限照记录定的不报按上限开并行：" + "；".join(problems), world.server_log_lines())
+    return "三次上限照记录定、峰值贴着：不报 fills-any-cap；三次上限是没记录时一档档放大的、峰值跟着涨：照报"
+
+
+STAGED_PEAK_BYTES = 777 * MEBIBYTE   # attempt-row-not-overwritten：演对账在删编译目录的这一会儿记下的那一次的峰值
+
+
+class StagedRemovalMachine:
+    """attempt-row-not-overwritten 的假本机：删编译目录的那一下（remove_build_directory）先演对账在这一会儿记下那一次的结局（staged 里那个目录对应的 ended 整行，
+    照 finish_attempt 那样经 Store.update 写进库），再真删、回读不在了交删成；build_directory_exists 照目录在不在。"""
+
+    def __init__(self, store, staged):
+        self.store = store
+        self.staged = staged   # {目录: 对账记下的那一份尝试正文}
+        self.name = SERVER.LOCAL
+        self.label = "本机"
+
+    def build_directory_exists(self, directory):
+        return os.path.isdir(directory)
+
+    def remove_build_directory(self, directory):
+        ended = self.staged.pop(directory, None)
+        if ended is not None:
+            self.store.update("attempts", ended)
+        shutil.rmtree(directory, ignore_errors=True)
+        return not os.path.lexists(directory), []
+
+    def removal_howto(self, directory):
+        return f"rm -r {shlex.quote(directory)}"
+
+
+def staged_removal_scheduler(world, staged):
+    """只备删编译目录那几段读写的几样（这一格临时库上的 Store、假本机、删目录的锁、环境、记告警）的假调度器：Scheduler 的方法照原样套在它上面跑
+    （task_server.py 的 cancelled_attempt_artifacts、remove_finished_build_directories_locked、mark_build_directory_removed）。"""
+    scheduler = object.__new__(SERVER.Scheduler)
+    scheduler.store = SERVER.Store(os.path.join(world.root, "staged-removal.sqlite3"), bytes(32), dict(os.environ))
+    scheduler.environment = dict(os.environ)
+    scheduler.machines = {SERVER.LOCAL: StagedRemovalMachine(scheduler.store, staged)}
+    scheduler.build_removal_lock = threading.RLock()
+    scheduler.alerts = []
+    scheduler.alert = lambda kind, task_id, line, howto: scheduler.alerts.append((kind, task_id, line))
+    return scheduler
+
+
+def cell_attempt_row_not_overwritten(world):
+    """HTTP 线程手里是先读的那份 running 的尝试、正删它的编译目录，这一会儿对账把那一次记成 ended（结局 cancelled、峰值记下），删完记「已删」
+    （取消分片父任务时删子任务尝试的产物 cancelled_attempt_artifacts、记下结局时删 remove_finished_build_directories_locked 两处，同一个 mark_build_directory_removed）：
+    库里那一次照旧 ended、结局与峰值都在、build_directory_removed 记上，按 state IN ('starting', 'running') 数的记账不再算它；
+    拿那份 running 的旧字典直接 Store.update 抛 StoreRefused("ended")。次序由假本机在删的那一下写进 ended 那一行精确造出；只用 task_server.py 的 Store 与
+    Scheduler 的这几个方法，套在假调度器上，不起服务。弄坏开关 attempt-row-overwritten 下整行写回 running、Store.update 不守，这一格红。"""
+    staged = {}
+    scheduler = staged_removal_scheduler(world, staged)
+    store = scheduler.store
+    problems = []
+    for task_id, name in ((1, "取消之后删产物（cancelled_attempt_artifacts）"), (2, "记下结局时删（remove_finished_build_directories_locked）")):
+        directory = os.path.join(world.root, f"staged-build-{task_id}")
+        os.makedirs(os.path.join(directory, "target"))
+        store.insert("attempts", {"task_id": task_id, "number": 1, "host": SERVER.LOCAL, "state": "running", "session": SESSION_A, "command_key": "selftest-staged-removal",
+                                  "memory_cap": GIBIBYTE, "build_directory": directory})
+        stale = store.attempts_of(task_id)[0][0]
+        staged[directory] = dict(stale, state="ended", outcome="cancelled", ended_at=round(time.time(), 3), seconds=1.0, memory_peak=STAGED_PEAK_BYTES)
+        if task_id == 1:
+            SERVER.Scheduler.cancelled_attempt_artifacts(scheduler, dict(stale), {"sizes": {}, "active": {stale["id"]}}, set())
+        else:
+            SERVER.Scheduler.remove_finished_build_directories_locked(scheduler, {"id": task_id, "environment": {}})
+        found = store.attempts_of(task_id)[0][0]
+        seen = {key: found.get(key) for key in ("state", "outcome", "memory_peak", "build_directory_removed")}
+        wanted = {"state": "ended", "outcome": "cancelled", "memory_peak": STAGED_PEAK_BYTES, "build_directory_removed": True}
+        if seen != wanted or os.path.lexists(directory) or staged:
+            problems.append(f"{name}：删的这一会儿对账记了 ended，删完库里那一次应当是 {wanted}、目录不在，实际 {seen}、目录{'还在' if os.path.lexists(directory) else '不在'}、"
+                            f"{'假本机没被叫去删' if staged else '删过'}")
+        try:
+            store.update("attempts", dict(stale))
+            problems.append(f"{name}：拿那份 running 的旧字典 Store.update 应当被拒（库里已 ended），实际写进去了：库里此刻 {store.attempts_of(task_id)[0][0].get('state')}")
+        except SERVER.StoreRefused as refused:
+            if refused.kind != "ended":
+                problems.append(f"{name}：Store.update 拒的种类应当是 ended，实际 {refused.kind}（{refused}）")
+    active = [record.get("id") for record, _ in store.select("attempts", "state IN ('starting', 'running')")]
+    if active:
+        problems.append(f"两次都收尾之后按在跑数的记账一条都不算，实际算在跑的尝试 {active}")
+    if problems:
+        raise SelftestFailure("删编译目录时尝试表不整行写回：" + "；".join(problems), [str(alert) for alert in scheduler.alerts])
+    return "删编译目录的这一会儿对账记了 ended：取消删产物与记下结局删两处删完都只并进「已删」，结局与峰值都在、不算在跑；旧字典整行写回被拒"
+
+
+CHILD_SETTLE_HOLD_SECONDS = 3.0   # parent-cancel-waits-for-children：对账停在收尾子任务那一次的开头，看这么久里取消回没回话
+
+
+def cell_parent_cancel_waits_for_children(world):
+    """取消在跑的分片整件（一片在跑）：停了那一片的单元之后，对账收尾那一次之前精确停住（TASK_SERVER_SELFTEST_PAUSE_POINT=attempt-finishing），
+    CHILD_SETTLE_HOLD_SECONDS 秒里 task cancel 不该回话（task_server.py 的 cancel_children 等子任务在库里记成 finished）；放开之后回 stopped、退 0，
+    回话那一刻各子任务都已 finished、整件 cancelled，整件的结局时刻不早于任何一个子任务。弄坏开关 parent-finalized-before-children 下停了单元就回，这一格红。"""
+    pause = os.path.join(world.root, "pause")
+    os.makedirs(pause)
+    release = os.path.join(world.root, "release-cancel-waits")
+    command = world.write_spec("spec-cancel-waits.json", {"shards": [{"block": release}]})
+    world.resources(local=(30, 30))
+    world.start_server(extra={"TASK_SERVER_SELFTEST_PAUSE_POINT": f"attempt-finishing:{pause}"})
+    task_id = world.submit(command, cwd=world.repo)
+    problems = []
+    canceller = None
+    try:
+        world.wait_for(task_id, lambda summary: len(shard_children(summary)) == 1 and len(world.sharded_calls("shard")) == 1 and all(
+            any(attempt.get("state") == "running" for attempt in child["attempts"]) for child in shard_children(summary).values()), "那一片跑起来")
+        open(os.path.join(pause, "arm-attempt-finishing"), "w").close()
+        canceller = world.client(["cancel", str(task_id)], background=True)
+        wait_path(world, os.path.join(pause, "reached-attempt-finishing"), "停了那一片的单元之后、对账收尾那一次之前停住")
+        early = exited_within({"task cancel": canceller}, CHILD_SETTLE_HOLD_SECONDS)
+        if early:
+            middle = world.summary(task_id)
+            problems.append(f"对账还没收尾那一片时 task cancel 不该回话（要等子任务在库里记成 finished），实际 {CHILD_SETTLE_HOLD_SECONDS:.0f} 秒里就回了（退 {canceller.returncode}）、"
+                            f"整件 {middle['task'].get('state')}/{middle['task'].get('outcome')}、各子任务 {[(child['task'].get('role'), child['task'].get('state')) for child in middle.get('children', [])]}")
+    finally:
+        open(os.path.join(pause, "release-attempt-finishing"), "w").close()
+        open(release, "w").close()   # 弄坏开关下单元没停的话放它跑完，收尾不等满时限
+    stdout, stderr = world.communicate(canceller, STATE_TIMEOUT_SECONDS)
+    replied = world.summary(task_id)
+    children = replied.get("children", [])
+    unsettled = [(child["task"].get("role"), child["task"]["id"], child["task"].get("state")) for child in children if child["task"].get("state") != "finished"]
+    if not problems and (canceller.returncode != 0 or replied["task"].get("outcome") != "cancelled" or unsettled):
+        problems.append(f"放开之后 task cancel 应当退 0、回话那一刻整件 cancelled、各子任务都已 finished，实际退 {canceller.returncode}、整件 {describe(replied)}、"
+                        f"还没收尾的子任务 {unsettled}（{(stdout + stderr).strip()[-300:]}）")
+    finished = world.finished(task_id)
+    parent_at = float(finished["task"].get("finished_at") or 0)
+    later = [(child["task"]["id"], child["task"].get("finished_at")) for child in world.summary(task_id).get("children", [])
+             if float(child["task"].get("finished_at") or 0) > parent_at]
+    if later:
+        problems.append(f"整件的结局时刻 {parent_at} 不该早于子任务，实际比它晚收尾的子任务 {later}")
+    if problems:
+        raise SelftestFailure("取消整件等子任务收尾：" + "；".join(problems), world.server_log_lines())
+    return f"取消在跑的分片整件：对账收尾那一片之前 task cancel 等着，放开之后回 stopped，回话时各子任务都已 finished、整件结局不早于子任务"
+
+
+def exited_within(processes, seconds):
+    """seconds 秒里 processes（{名: Popen}）有哪几个退了：→ [名…]（照给的次序），一有退的就交；到点都还在跑交空的。"""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        done = [name for name, process in processes.items() if process.poll() is not None]
+        if done:
+            return done
+        time.sleep(POLL_SECONDS)
+    return [name for name, process in processes.items() if process.poll() is not None]
+
+
+CLEAN_RACE_HOLD_SECONDS = 3.0   # clean-waits-for-finished-removal：记下结局那一侧停在删编译目录之前，看这么久里 wait 与 clean 回没回话
+WAITER_SETTLE_SECONDS = 2.0     # clean-waits-for-finished-removal：起了 wait 之后等它连上服务、等在那一条上，再放命令跑完
+
+
+def cell_clean_waits_for_finished_removal(world):
+    """记下结局那一侧拿着 build_removal_lock、删编译目录之前精确停住（TASK_SERVER_SELFTEST_PAUSE_POINT=finished-build-removal；主循环 30 秒一轮，
+    wait 的兜底那一读这一会儿轮不到）：先等着的 wait 不该拿到结局（task_server.py 的 finalize 先删完再叫醒），这时起的 task clean 等在锁上、不该回话
+    （clean 拿同一把锁、锁里现读）；放开之后 wait 退 0、clean 退 0 而删了 0 份（记下结局那一侧删过，两边不重复删），没有 build-directory-left 告警（不报假失败），
+    库里那一次 ended、succeeded、build_directory_removed 记上（记录不互相覆盖）、目录不在。弄坏开关 clean-races-finished-removal 下先叫醒 wait、clean 不拿锁，这一格红。"""
+    pause = os.path.join(world.root, "pause")
+    os.makedirs(pause)
+    release = os.path.join(world.root, "release-clean-race")
+    world.start_server(extra={"TASK_SERVER_TICK_SECONDS": "30", "TASK_SERVER_SELFTEST_PAUSE_POINT": f"finished-build-removal:{pause}"})
+    path = f"{world.fake_cargo}:{os.environ.get('PATH', '/usr/bin:/bin')}"
+    task_id = world.submit(["bash", "-c", "cargo build && " + HOLD_UNTIL_RELEASED_SCRIPT, "clean-race", release], extra={"PATH": path})
+    problems = []
+    waiter = cleaner = None
+    try:
+        attempt = world.running(task_id)["attempts"][-1]
+        build = attempt.get("build_directory") or ""
+        patience = world.patience(CANCEL_ARTIFACT_WAIT_SECONDS)
+        while not (build and os.path.isfile(os.path.join(build, "target", "debug", "selftest-artifact"))):
+            if not patience.waiting():
+                raise SelftestFailure(f"任务 {task_id} 等了 {patience.elapsed():.0f} 秒没往编译目录「{build}」写出产物", world.server_log_lines())
+            time.sleep(POLL_SECONDS)
+        open(os.path.join(pause, "arm-finished-build-removal"), "w").close()
+        waiter = world.client(["wait", str(task_id)], background=True, extra={"TASK_SERVER_SELFTEST_FAST": "0"})   # 照平常 20 秒一问：等在那一条上，不隔一会儿就重查库
+        time.sleep(WAITER_SETTLE_SECONDS)
+        if waiter.poll() is not None:
+            raise SelftestFailure(f"命令还在跑时起的 wait 不该退，实际退 {waiter.returncode}", world.server_log_lines())
+        open(release, "w").close()
+        wait_path(world, os.path.join(pause, "reached-finished-build-removal"), "记下结局之后、删编译目录之前停住")
+        cleaner = world.client(["clean", str(task_id)], background=True)
+        early = exited_within({"task wait": waiter, "task clean": cleaner}, CLEAN_RACE_HOLD_SECONDS)
+        if early:
+            problems.append(f"记下结局那一侧还没删完编译目录时 {'、'.join(early)} 不该回话（wait 要删完才叫醒，clean 要等同一把锁），"
+                            f"实际 {CLEAN_RACE_HOLD_SECONDS:.0f} 秒里就回了、编译目录{'还在' if os.path.lexists(build) else '已不在'}")
+    finally:
+        open(os.path.join(pause, "release-finished-build-removal"), "w").close()
+        open(release, "w").close()
+    wait_out = world.communicate(waiter, STATE_TIMEOUT_SECONDS) if waiter is not None else ("", "")
+    clean_out = world.communicate(cleaner, STATE_TIMEOUT_SECONDS) if cleaner is not None else ("", "")
+    if waiter.returncode != 0:
+        problems.append(f"wait 应当退 0，实际退 {waiter.returncode}（{(wait_out[0] + wait_out[1]).strip()[-200:]}）")
+    if cleaner.returncode != 0 or "删了 0 份" not in clean_out[0]:
+        problems.append(f"clean 应当退 0、删了 0 份（记下结局那一侧删过，两边不重复删），实际退 {cleaner.returncode}、输出「{(clean_out[0] + clean_out[1]).strip()[-300:]}」")
+    left = [alert for alert in world.alerts() if alert.get("kind") == "build-directory-left"]
+    if left:
+        problems.append(f"不该有 build-directory-left 告警（两边没删出假失败），实际 {left}")
+    found = (world.summary(task_id)["attempts"] or [{}])[-1]
+    if found.get("state") != "ended" or found.get("outcome") != "succeeded" or not found.get("build_directory_removed") or os.path.lexists(build):
+        problems.append(f"那一次应当 ended、succeeded、记了已删、目录不在，实际 {found.get('state')}、{found.get('outcome')}、已删 {found.get('build_directory_removed')}、"
+                        f"目录{'还在' if os.path.lexists(build) else '不在'}")
+    if problems:
+        raise SelftestFailure("task clean 与记下结局时删编译目录：" + "；".join(problems), world.server_log_lines())
+    return "记下结局那一侧删编译目录时：等着的 wait 删完才拿到结局，clean 等在锁上、放开后删了 0 份，不报假失败，记录 ended、已删"
+
+
+def cell_recheck_judges_disk(world):
+    """派第二台的那一条起之前复核现读第二台（task_server.py 的 Resources.recheck）：排队那一轮第二台的报告带着够的盘余量、照派；复核读到的报告不带盘余量
+    （同真的第二台探测），服务现量（假 df）：
+    不到下限的这一条不起、排队原因写「第二台盘只剩」；过了下限而放不下这条命令量过的编译目录占盘（30G 加下限）的不起、排队原因写「编译目录占盘」；
+    复核记 fits=0、一次都没起，假 df 放够之后照派第二台跑完。弄坏开关 recheck-disk-unchecked 下复核不判盘、照起，这一格红。"""
+    floor = SERVER.DISK_FLOOR_BYTES
+    world.seed_attempt({"command_key": "selftest-recheck-build", "outcome": "succeeded", "memory_peak": GIBIBYTE, "build_peak": 30 * GIBIBYTE})
+    world.start_server()
+    problems = []
+    cases = (("盘余量不到下限", "selftest-recheck-floor", floor - GIBIBYTE, "第二台盘只剩"),
+             ("编译目录占盘放不下", "selftest-recheck-build", floor + 10 * GIBIBYTE, "编译目录占盘"))
+    for name, key, shown, wanted in cases:
+        # 本机放不下（空 1G）：只派得到第二台；排队那一轮第二台报告里的盘余量够，复核那一份不带、df 演 shown
+        world.resources(local=(1, 30), local_disk_bytes=10 * floor, peer=(100, 100), peer_cap_gibibytes=64, peer_disk_bytes=10 * floor,
+                        peer_df=f"     Avail\n{shown}\n", recheck_peer=(100, 100))
+        task_id = world.submit(["bash", "-c", "exit 0", name], extra={lib.KEY_VARIABLE: key}, cwd=world.repo)
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        rechecks = []
+        while patience.waiting() and not rechecks:
+            rechecks = [line for line in world.scheduler_reads() if line.startswith(f"recheck task={task_id} host=peer fits=")]
+            time.sleep(POLL_SECONDS)
+        world.next_pass()
+        held = world.summary(task_id)
+        waiting = held.get("waiting_for") or ""
+        if rechecks[:1] != [f"recheck task={task_id} host=peer fits=0"] or held["attempts"] or world.calls_of(task_id, "peer") or wanted not in waiting:
+            problems.append(f"{name}（复核时 df 报 {SERVER.gibibytes_text(shown)}）：复核应当记 fits=0、一次都不起、排队原因写「{wanted}」，实际复核 {rechecks[:1]}、"
+                            f"尝试 {len(held['attempts'])} 次、在等「{waiting[:300]}」")
+        world.resources(local=(1, 30), local_disk_bytes=10 * floor, peer=(100, 100), peer_cap_gibibytes=64, peer_disk_bytes=10 * floor,
+                        peer_df=f"     Avail\n{10 * floor}\n", recheck_peer=(100, 100))
+        done = world.finished(task_id)
+        if done["task"].get("outcome") != "succeeded" or (done["attempts"] or [{}])[-1].get("host") != "peer":
+            problems.append(f"{name}：df 放够之后应当照派第二台跑完，实际 {describe(done)}")
+    if problems:
+        raise SelftestFailure("起之前复核判盘余量：" + "；".join(problems), world.server_log_lines())
+    return "起之前复核现量第二台的盘：不到下限、放不下编译目录占盘的都不起，排队原因写盘；df 放够之后照派第二台"
+
+
+def cell_recheck_judges_nfs(world):
+    """派第二台的那一条判过放得下、起之前复核现读之前精确停住（TASK_SERVER_SELFTEST_PAUSE_POINT=launch-recheck），这时第二台没挂上共享根（假 ssh 的 stat -f 退 1，
+    NFS 复核记下，/health 的 nfs 一栏挂载那一项不过）；放开之后复核那一份过 peer_view（task_server.py 的 launch_recheck）：记 fits=0、不在第二台起，
+    排队原因写「没挂上共享根」；挂载好了之后照派第二台跑完。弄坏开关 recheck-nfs-unchecked 下复核那一份不过 peer_view、照派第二台，这一格红。"""
+    pause = os.path.join(world.root, "pause")
+    os.makedirs(pause)
+    mount_exit = os.path.join(world.world, "fake-ssh-mount-exit")
+    world.resources(local=(1, 30), peer=(100, 100), peer_cap_gibibytes=64)   # 本机放不下 4G：只派得到第二台
+    world.start_server(extra={"TASK_SERVER_SELFTEST_PAUSE_POINT": f"launch-recheck:{pause}"})
+    open(os.path.join(pause, "arm-launch-recheck"), "w").close()
+    task_id = world.submit(["bash", "-c", "exit 0", "recheck-nfs"], cwd=world.repo)
+    problems = []
+    try:
+        wait_path(world, os.path.join(pause, "reached-launch-recheck"), "判过放得下、起之前复核现读之前停住")
+        with open(mount_exit, "w", encoding="utf-8") as handle:
+            handle.write("1\n")
+        health = health_until(world, lambda health: any(entry.get("mount") != lib.NFS_PASSED for entry in (health.get("nfs") or {}).get("roots", [])),
+                              STATE_TIMEOUT_SECONDS)
+        if not any(entry.get("mount") != lib.NFS_PASSED for entry in (health.get("nfs") or {}).get("roots", [])):
+            raise SelftestFailure(f"假 ssh 的挂载那一项退 1 之后 /health 的 nfs 一栏应当判挂载不过，实际 {health.get('nfs')}", world.server_log_lines())
+    finally:
+        open(os.path.join(pause, "release-launch-recheck"), "w").close()
+    patience = world.patience(STATE_TIMEOUT_SECONDS)
+    rechecks = []
+    while patience.waiting() and not rechecks:
+        rechecks = [line for line in world.scheduler_reads() if line.startswith(f"recheck task={task_id} host=peer fits=")]
+        time.sleep(POLL_SECONDS)
+    world.next_pass()
+    held = world.summary(task_id)
+    waiting = held.get("waiting_for") or ""
+    if rechecks[:1] != [f"recheck task={task_id} host=peer fits=0"] or held["attempts"] or world.calls_of(task_id, "peer") or "没挂上共享根" not in waiting:
+        problems.append(f"复核这一刻第二台没挂上共享根：复核应当记 fits=0、不在第二台起、排队原因写「没挂上共享根」，实际复核 {rechecks[:1]}、尝试 {len(held['attempts'])} 次、"
+                        f"在等「{waiting[:300]}」")
+    os.remove(mount_exit)
+    done = world.finished(task_id)
+    if done["task"].get("outcome") != "succeeded" or (done["attempts"] or [{}])[-1].get("host") != "peer":
+        problems.append(f"挂载好了之后应当照派第二台跑完，实际 {describe(done)}")
+    if problems:
+        raise SelftestFailure("起之前复核过 NFS 判法：" + "；".join(problems), world.server_log_lines())
+    return "起之前复核那一刻第二台没挂上共享根：复核记 fits=0、不在第二台起、排队原因写明；挂载好了照派第二台"
+
+
+def cell_stall_stop_spares_next_attempt(world):
+    """顶在上限上卡住（同 stalled-at-cap-retried 的假 scope）判停、起了停单元的后台线程，它读库之前精确停住（TASK_SERVER_SELFTEST_PAUSE_POINT=stop-attempts-read）；
+    这时第 1 次自己退 250（撞上限）、照重试规矩重排起了第 2 次（每 0.25 秒打一行，不卡）；放开之后后台线程只停判它的那一次（task_server.py 的 judged_attempt_only）：
+    排队读数里那一行 stopped=-，第 2 次的单元照跑，放行之后跑完、各次 memory-cap-hit、succeeded。弄坏开关 stall-stop-by-task 下按任务号停、把第 2 次也停了，这一格红。"""
+    scope = os.path.join(world.root, "at-cap-scope")
+    os.makedirs(scope)
+    for name, text in (("cpu.stat", "usage_usec 1000\n"), ("memory.peak", f"{AT_CAP_PEAK_BYTES}\n"), ("memory.stat", process_memory_stat(AT_CAP_PEAK_BYTES))):
+        with open(os.path.join(scope, name), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    world.seed_peak("selftest-stall-next", AT_CAP_SEED_PEAK_BYTES)
+    pause = os.path.join(world.root, "pause")
+    os.makedirs(pause)
+    capped, retried = os.path.join(world.root, "release-capped-attempt"), os.path.join(world.root, "release-retried-attempt")
+    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01", "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope,
+                              "TASK_SERVER_SELFTEST_PAUSE_POINT": f"stop-attempts-read:{pause}"})
+    open(os.path.join(pause, "arm-stop-attempts-read"), "w").close()
+    # 第 1 次不出声地等（顶在上限上卡住），放行就退 250；重排之后那一次每 0.25 秒打一行、放行就退 0
+    script = ('if [[ "$TASK_SERVER_ATTEMPT" == 1 ]]; then echo started; for round in $(seq 1 2000); do [[ -e "$1" ]] && exit 250; sleep 0.1; done; exit 9; fi; '
+              'for round in $(seq 1 2000); do [[ -e "$2" ]] && exit 0; echo tick; sleep 0.25; done; exit 9')
+    task_id = world.submit(["bash", "-c", script, "stall-next", capped, retried], extra={lib.KEY_VARIABLE: "selftest-stall-next"})
+    problems = []
+    try:
+        wait_path(world, os.path.join(pause, "reached-stop-attempts-read"), "判停的后台线程读库之前停住")
+        open(capped, "w").close()
+        summary = world.wait_for(task_id, lambda summary: len(summary["attempts"]) >= 2 and summary["attempts"][-1].get("state") == "running", "重排起第 2 次")
+        unit = summary["attempts"][-1].get("unit", "")
+        open(os.path.join(pause, "release-stop-attempts-read"), "w").close()
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        stops = []
+        while patience.waiting() and not stops:
+            stops = [line for line in world.scheduler_reads() if line.startswith(f"stop task={task_id} ")]
+            time.sleep(POLL_SECONDS)
+        current = world.summary(task_id)["attempts"][-1]
+        if not stops or not stops[0].endswith(" stopped=-") or not world.unit_active(unit) or current.get("state") != "running":
+            problems.append(f"判停的后台线程读库时第 1 次已自己退了、第 2 次在跑：它应当一个都不停（stopped=-）、第 2 次的单元照跑，"
+                            f"实际停单元那一行 {stops[:1]}、第 2 次的单元{'在跑' if world.unit_active(unit) else '不在跑'}、状态 {current.get('state')}")
+    finally:
+        open(os.path.join(pause, "release-stop-attempts-read"), "w").close()
+        open(capped, "w").close()
+        open(retried, "w").close()
+    done = world.finished(task_id, timeout=60)
+    seen = [attempt.get("outcome") for attempt in done["attempts"]]
+    if seen != ["memory-cap-hit", "succeeded"] or done["task"].get("outcome") != "succeeded":
+        problems.append(f"放行之后应当各次 memory-cap-hit、succeeded，任务 succeeded，实际各次 {seen}、{describe(done)}")
+    if problems:
+        raise SelftestFailure("判停的后台线程只停判它的那一次：" + "；".join(problems), world.server_log_lines())
+    return "判停的后台线程读库时第 1 次已退、第 2 次在跑：它一个都不停，第 2 次照跑完"
+
+
+FAKE_RECOVER_CLEANUP = r'''#!/usr/bin/env bash
+# peer-cleanup-recovered-once 的假 multi-host-run.sh：只认 --recover-cleanup <回执>：往回执同目录的 recover-calls 记一行，睡 1 秒（演连第二台停、删那一趟），
+# 往标准输出打一行 selftest-recovered，再把回执原子写成 confirmed
+[[ "${1:-}" == --recover-cleanup ]] || { echo "假 multi-host-run.sh：只认 --recover-cleanup" >&2; exit 2; }
+receipt="$2"
+printf 'recover %s\n' "$receipt" >> "$(dirname -- "$receipt")/recover-calls"
+sleep 1
+echo "selftest-recovered $receipt"
+printf '{"status": "confirmed"}\n' > "$receipt.partial" && mv -- "$receipt.partial" "$receipt"
+'''
+
+
+def cell_peer_cleanup_recovered_once(world):
+    """派第二台的一次尝试清理回执是 pending，两个线程（演对账与停单元的后台线程）同一刻确认它（task_server.py 的 confirm_peer_cleanup）：
+    --recover-cleanup 只起一趟、那一次的日志只追加一份，后到的等前一趟放下、读到 confirmed，两边都交确认了；锁用完从锁表（PEER_CLEANUP_LOCKS）删。
+    恢复脚本是假的（FAKE_RECOVER_CLEANUP：睡 1 秒再写 confirmed，两边同时起的话都读得到 pending）；只用 task_server.py 的 confirm_peer_cleanup，
+    套在只备环境与恢复脚本的假调度器上，不起服务。弄坏开关 peer-cleanup-recovered-concurrently 下两趟都起，这一格红。"""
+    directory = os.path.join(world.root, "peer-cleanup")
+    os.makedirs(directory)
+    receipt, log = os.path.join(directory, "peer-cleanup.json"), os.path.join(directory, "attempt.log")
+    with open(receipt, "w", encoding="utf-8") as handle:
+        json.dump({"status": "pending"}, handle)
+    runner = os.path.join(world.bin, "fake-recover-cleanup")
+    write_executable(runner, FAKE_RECOVER_CLEANUP)
+    scheduler = object.__new__(SERVER.Scheduler)
+    scheduler.environment = dict(os.environ)
+    scheduler.peer_runner = runner
+    attempt = {"id": 7, "task_id": 7, "number": 1, "host": SERVER.PEER, "peer_cleanup_file": receipt, "log": log}
+    barrier = threading.Barrier(2)
+    results = {}
+
+    def confirm(name):
+        barrier.wait(timeout=10)
+        results[name] = SERVER.Scheduler.confirm_peer_cleanup(scheduler, dict(attempt))
+    threads = [threading.Thread(target=confirm, args=(name,), daemon=True) for name in ("对账", "停单元的后台线程")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=STATE_TIMEOUT_SECONDS)
+    calls_path = os.path.join(directory, "recover-calls")
+    calls = open(calls_path, encoding="utf-8").read().splitlines() if os.path.exists(calls_path) else []
+    logged = [line for line in (open(log, encoding="utf-8").read().splitlines() if os.path.exists(log) else []) if line.startswith("selftest-recovered ")]
+    alive = [thread.name for thread in threads if thread.is_alive()]
+    if alive or len(calls) != 1 or len(logged) != 1 or sorted(results.values()) != [(True, ""), (True, "")] or SERVER.PEER_CLEANUP_LOCKS:
+        raise SelftestFailure(f"两个线程同时确认同一次尝试的清理：--recover-cleanup 应当只起一趟、日志只追加一份、两边都交确认了、锁表空着，"
+                              f"实际起了 {len(calls)} 趟、日志 {len(logged)} 份、两边交 {results}、还没退的线程 {alive}、锁表 {list(SERVER.PEER_CLEANUP_LOCKS)}")
+    return "两个线程同时确认同一次尝试的清理：恢复只起一趟、日志一份，后到的读到 confirmed；锁表空着"
+
+
+# ── 全量严格审核那一批（records/2026-11-07-task-server全量严格审核报告.md 缺陷一、三、四、五、七、八、九与整包测试的判法）──
+TAMPERED_HOLDER_KEY = "selftest-tampered-holder"   # tampered-attempt-ended-once：在跑那一条的命令键（记 10G 峰值，上限与记账 15G）
+TAMPERED_WAITER_KEY = "selftest-tampered-waiter"   # 那一格后交的那一条：同样 15G；本机 30G 放不下两条，前一条还算在跑就排着
+TAMPERED_FOREIGN_COLUMN = 999999                   # 改到任务行关联列上的号（库里没有这一号的任务）
+TAMPERED_SUMMARY_READS = 3                         # 收尾之后再读几回 status：每读一回都不该多一条告警
+TAMPERED_WAITER_SECONDS = 30.0                     # 后交的那一条等跑起来的安静时限
+CONFIRM_LOCK_PROBE_SECONDS = 5.0                   # concurrent-confirms-serialized：头一条停在核过数之后，第二条至多等这么久看它自己退没退
+
+
+def verifying_store(world, environment=None):
+    """照服务读回的规则（task_server.py 的 Store.verified：校验列、正文与几列、关联列）读这一格的库，不建表、不写：交一个只读用的 Store。
+    environment 缺省是空的（弄坏开关不进判法，判的是真的规则）。"""
+    store = object.__new__(SERVER.Store)
+    store.path, store.key, store.local = os.path.join(world.state, lib.DATABASE_NAME), lib.read_signing_key(world.key), threading.local()
+    store.environment = {} if environment is None else environment
+    return store
+
+
+def verified_row(world, table, row_id):
+    """(正文, 照服务的规则核不核得过, 关联列 task_id)；库里没有交 (None, False, None)。"""
+    store = verifying_store(world)
+    found = store.select(table, "id = ?", (row_id,))
+    if not found:
+        return None, False, None
+    (column,) = store.connection().execute(f"SELECT task_id FROM {table} WHERE id = ?", (row_id,)).fetchone()
+    return found[0][0], found[0][1], column
+
+
+def tampered_alerts(world, task_id):
+    return [alert for alert in world.alerts() if alert.get("kind") == "record-tampered" and alert.get("task") == task_id]
+
+
+def cell_tampered_attempt_ended_once(world):
+    """核不过的行重签之后核得过、只告警一次（缺陷一；task_server.py 的 Store.write_row、Scheduler.tampered、Scheduler.end_tampered_attempt）：
+    一条在排的任务只改它的关联列：服务记 record-tampered，那一行重签之后照服务的规则核得过，之后再读 TAMPERED_SUMMARY_READS 回 status 告警仍只一条；
+    一条在跑的任务（本机 30G 上记 15G）只改它那一次尝试的关联列：对账记任务 record-tampered、那一次记 ended（核得过、关联列照正文挂回它名下），告警一条；
+    之后交的那一条（同样记 15G）不再被它占着的内存挡住、照起。弄坏开关 tampered-rows-left-unrepaired 下关联列不写回、尝试留在在跑里，这一格红。"""
+    world.resources(local=(30, 30), hold=True)
+    world.seed_peak(TAMPERED_HOLDER_KEY, DRAINED_FRAGMENT_PEAK_BYTES)
+    world.seed_peak(TAMPERED_WAITER_KEY, DRAINED_FRAGMENT_PEAK_BYTES)
+    world.start_server()
+    problems = []
+    queued = world.submit(["bash", "-c", "exit 0", "tampered-queued"])
+    raw_column_update(world, "tasks", TAMPERED_FOREIGN_COLUMN, queued)
+    summary = world.finished(queued, timeout=20)
+    for _ in range(TAMPERED_SUMMARY_READS):
+        world.summary(queued)
+    _, valid, column = verified_row(world, "tasks", queued)
+    alerts = tampered_alerts(world, queued)
+    if summary["task"].get("outcome") != "record-tampered" or not valid or column != 0 or len(alerts) != 1:
+        problems.append(f"在排的任务只改了关联列：应当记 record-tampered、重签之后核得过（关联列 0）、再读 {TAMPERED_SUMMARY_READS} 回告警仍只 1 条，"
+                        f"实际 {describe(summary)}、核{'得过' if valid else '不过'}（关联列 {column}）、告警 {len(alerts)} 条")
+    world.resources(local=(30, 30))
+    release = os.path.join(world.root, "release-tampered")
+    try:
+        holder = world.submit(blocking_command(release), extra={lib.KEY_VARIABLE: TAMPERED_HOLDER_KEY})
+        attempt_id = world.running(holder)["attempts"][0]["id"]
+        raw_column_update(world, "attempts", 0, attempt_id)
+        finished = world.finished(holder, timeout=20)
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        record, valid, column = verified_row(world, "attempts", attempt_id)
+        while patience.waiting() and not (valid and (record or {}).get("state") == "ended"):
+            time.sleep(POLL_SECONDS)
+            record, valid, column = verified_row(world, "attempts", attempt_id)
+        if finished["task"].get("outcome") != "record-tampered" or not valid or (record or {}).get("state") != "ended" \
+                or (record or {}).get("outcome") != "record-tampered" or column != holder:
+            problems.append(f"在跑那一次只改了关联列：任务应当记 record-tampered、那一次记 ended 与 record-tampered、核得过、关联列挂回任务 {holder}，"
+                            f"实际任务 {describe(finished)}、那一次 {json.dumps(record, ensure_ascii=False)[:300]}、核{'得过' if valid else '不过'}、关联列 {column}")
+        for _ in range(TAMPERED_SUMMARY_READS):
+            world.summary(holder)
+        if len(tampered_alerts(world, holder)) != 1:
+            problems.append(f"在跑那一次核不过：告警应当只 1 条，实际 {len(tampered_alerts(world, holder))} 条")
+        waiter = world.submit(blocking_command(release), extra={lib.KEY_VARIABLE: TAMPERED_WAITER_KEY})
+        try:
+            world.wait_for(waiter, lambda summary: any(attempt.get("state") == "running" for attempt in summary["attempts"]), "跑起来",
+                           timeout=TAMPERED_WAITER_SECONDS)
+        except SelftestFailure:
+            problems.append(f"核不过的那一次记了 ended 之后不再占内存：后交的那一条（记 15G）应当在本机 30G 上照起，实际 {describe(world.summary(waiter))}、"
+                            f"排队原因「{world.summary(waiter).get('waiting_for')}」")
+    finally:
+        open(release, "w").close()
+    world.finished(waiter)
+    if problems:
+        raise SelftestFailure("核不过的行收尾：" + "；".join(problems), world.server_log_lines())
+    return "关联列被改的任务行与尝试行：重签之后核得过、告警各一条，在跑那一次记 ended、不再占内存，后交的照起"
+
+
+def cell_tampered_attempt_unit_stopped(world):
+    """核不过的在跑尝试，服务停它的单元（task_server.py 的 stop_tampered_unit）：只改那一次尝试的关联列，对账记 ended 之后，它的单元回读不在跑、
+    告警写 tampered-unit-stop 与「已停」。行的正文不可信那一半（单元名不合、是别的在跑尝试的不停）静态调 stop_tampered_unit 核：假 systemctl 没被调。
+    弄坏开关 tampered-unit-left-running 下单元接着跑、没有这条告警，这一格红。"""
+    scheduler = unittest.mock.Mock(environment={})
+    scheduler.store.tag = "selftest"
+    scheduler.store.running_attempts.return_value = [{"unit": "singlefs-task-selftest-1-1.service"}]
+    for name in ("sshd.service", "singlefs-task-other-1-1.service", "singlefs-task-selftest-1-1.service", None):
+        SERVER.Scheduler.stop_tampered_unit(scheduler, name, 1, None)
+    lines = [call.args[2] for call in scheduler.alert.call_args_list]
+    if len(lines) != 4 or not all("没停" in line for line in lines):
+        raise SelftestFailure(f"单元名不是这个服务起的、或是校验过的在跑尝试的，应当都不停、照实报「没停」，实际 {lines}")
+    world.resources(local=(30, 30))
+    world.start_server()
+    release = os.path.join(world.root, "release-tampered-unit")
+    try:
+        holder = world.submit(blocking_command(release))
+        attempt = world.running(holder)["attempts"][0]
+        unit = attempt.get("unit") or ""
+        raw_column_update(world, "attempts", 0, attempt["id"])
+        world.finished(holder, timeout=20)
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        alerts = []
+        while patience.waiting() and not alerts:
+            alerts = [alert for alert in world.alerts() if alert.get("kind") == "tampered-unit-stop" and alert.get("task") == holder]
+            time.sleep(POLL_SECONDS)
+        active = subprocess.run(["systemctl", "--user", "is-active", unit], capture_output=True, text=True).stdout.strip() if unit else ""
+        if not unit or not alerts or "已停" not in alerts[0].get("line", "") or active in lib.RUNNING_UNIT_STATES:
+            raise SelftestFailure(f"核不过的在跑尝试应当被停掉：单元 {unit or '（没记）'} 回读 {active or '没读'}、告警 {alerts}", world.server_log_lines())
+    finally:
+        open(release, "w").close()
+    return "核不过的在跑尝试记 ended 之后，它的单元被停掉、回读不在跑，告警写已停"
+
+
+def cell_full_gate_flag(world):
+    """全量门禁标识（task_server.py 的 full_gate_refusal；异常表 full-gate-not-commit-entry）：提交时门禁带 --full-gate 照收、status 打「全量门禁」；
+    范围声明写了提交前而没带它的退 3、出路写 --full-gate；带它又带 --check 的、带在别的命令上的都退 3。
+    弄坏开关 full-gate-any-command-accepted 下后两条照收，这一格红。"""
+    world.start_server()
+    problems = []
+    gate = ["bash", FAKE_COMMIT_GATE]
+    accepted = submit_raw(world, gate, world.repo, full_gate=True)
+    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", accepted.stdout)
+    if accepted.returncode != 0 or not found or "全量门禁" not in world.client(["status", found.group(1)]).stdout:
+        problems.append(f"提交时门禁带 --full-gate 应当照收、status 打「全量门禁」，实际退 {accepted.returncode}：「{accepted.stderr.strip()[-200:]}」")
+    declared = submit_raw(world, gate, world.repo, scope=SCOPE_COMMIT, full_gate=False)
+    if declared.returncode != 3 or "--full-gate" not in declared.stderr:
+        problems.append(f"范围声明写了提交前而没带 --full-gate 应当退 3、出路写它，实际退 {declared.returncode}：「{declared.stderr.strip()[-200:]}」")
+    undeclared = submit_raw(world, gate, world.repo, full_gate=False)
+    if undeclared.returncode != 3 or "--full-gate" not in undeclared.stderr:
+        problems.append(f"不指定范围的提交时门禁没带 --full-gate（范围声明没写提交前）也应当退 3、出路写它，实际退 {undeclared.returncode}：「{undeclared.stderr.strip()[-200:]}」")
+    confirmed_only = submit_raw(world, ["bash", "scripts/crash/crash-amplification.sh"], world.repo, full_gate=False,
+                                confirmation=write_confirmation(world, "amplification-confirmed.md", WHOLE_PACKAGE_CONFIRMATION_TEXT))
+    if confirmed_only.returncode != 3 or "--full-gate" not in confirmed_only.stderr:
+        problems.append(f"崩溃放量不带 --item、只带整包确认文件而没带 --full-gate 应当退 3、出路写它，实际退 {confirmed_only.returncode}：「{confirmed_only.stderr.strip()[-200:]}」")
+    for what, command in (("带 --check", [*gate, "--check", "lkmm-cell"]), ("别的命令", ["bash", "-c", "exit 0"])):
+        completed = submit_raw(world, command, world.repo, full_gate=True)
+        if completed.returncode != 3 or "--full-gate" not in completed.stderr:
+            problems.append(f"{what}带 --full-gate 应当退 3，实际退 {completed.returncode}：「{completed.stderr.strip()[-200:]}」")
+    if problems:
+        raise SelftestFailure("全量门禁标识：" + "；".join(problems), world.server_log_lines())
+    return "提交时门禁带全量标识照收；写了提交前没带的、带在别处的都退 3"
+
+
+def cell_manual_submit_path(world):
+    """人手交的认法（task_server.py 的 manual_refusal；异常表 manual-from-session、sessionless-unmarked）：没有会话带 --manual 的照收、记无会话、跑完；
+    会话里带 --manual 的退 3；没有会话也没带 --manual 的，环境里填了收件地址也退 3、出路写 --manual。
+    弄坏开关 manual-from-session-accepted、sessionless-unmarked-accepted 下对应那一条照收，这一格红。"""
+    world.start_server()
+    problems = []
+    summary = world.finished(world.submit(["bash", "-c", "exit 0", "manual"], session=None))
+    if summary["task"].get("outcome") != "succeeded" or summary["task"].get("session") != "" or summary["task"].get("inbox"):
+        problems.append(f"人手带 --manual 应当照收、记无会话、不记收件地址，实际 {describe(summary)}、会话 {summary['task'].get('session')!r}")
+    from_session = world.client(["submit", "--cwd", world.work, "--manual", "--", "bash", "-c", "exit 0"])
+    if from_session.returncode != 3 or "--manual" not in from_session.stderr:
+        problems.append(f"会话里带 --manual 应当退 3，实际退 {from_session.returncode}：「{from_session.stderr.strip()[-200:]}」")
+    unmarked = world.client(["submit", "--cwd", world.work, "--", "bash", "-c", "exit 0"], session=None,
+                            extra={lib.INBOX_SOCKET_VARIABLE: "/nonexistent/inbox.sock", lib.INBOX_TOKEN_VARIABLE: INBOX_TOKEN_SAMPLE})
+    if unmarked.returncode != 3 or "--manual" not in unmarked.stderr:
+        problems.append(f"没有会话、环境里填了收件地址而没带 --manual 应当退 3、出路写 --manual，实际退 {unmarked.returncode}：「{unmarked.stderr.strip()[-200:]}」")
+    if problems:
+        raise SelftestFailure("人手交的认法：" + "；".join(problems), world.server_log_lines())
+    return "人手带 --manual 照收、记无会话；会话带它、没有会话又没带它的都退 3"
+
+
+RUNNING_ATTEMPTS_QUERY = "state IN ('starting', 'running')"
+RUNNING_ATTEMPTS_QUERY_HOLDERS = ["reconcile", "running_attempts"]
+
+
+def code_objects_of(module):
+    """module 里定义的函数与方法（staticmethod、classmethod、property 拆开），连同套在里面的函数的代码对象。读编译出来的代码对象、不读源码原文：原文进这一份判定的键，注释一改键就变。"""
+    pending, found = [], []
+    for value in vars(module).values():
+        members = vars(value).values() if isinstance(value, type) and value.__module__ == module.__name__ else (value,)
+        for member in members:
+            unwrapped = getattr(member, "__func__", member)
+            function = getattr(unwrapped, "fget", unwrapped)
+            if isinstance(function, types.FunctionType) and function.__module__ == module.__name__:
+                pending.append(function.__code__)
+    while pending:
+        code = pending.pop()
+        found.append(code)
+        pending += [constant for constant in code.co_consts if isinstance(constant, types.CodeType)]
+    return found
+
+
+def cell_running_attempts_verified_only(world):
+    """取在跑尝试只收校验过的行（缺陷五；task_server.py 的 Store.running_attempts，十处记账都调它）：这一格的临时库里两条在跑的尝试，后一条只改了关联列：
+    running_attempts 只交前一条；server_pending（内存）、server_disk_pending 都只算前一条（套在假调度器上，不起服务）；
+    task_server.py 里取在跑尝试的那一句查询只在 running_attempts 与对账（reconcile）两个函数里（读编译出来的代码对象，code_objects_of）。弄坏开关 running-attempts-unverified 下连那一行一起算，这一格红。"""
+    store = SERVER.Store(os.path.join(world.root, "running.sqlite3"), bytes(32), dict(os.environ))
+    common = {"state": "running", "session": "", "command_key": "", "host": SERVER.LOCAL, "number": 1, "started_at": time.time()}
+    honest = store.insert("attempts", dict(common, task_id=1, memory_cap=4 * GIBIBYTE, disk_booked=2 * GIBIBYTE, threads=4))
+    tampered = store.insert("attempts", dict(common, task_id=2, memory_cap=8 * GIBIBYTE, disk_booked=3 * GIBIBYTE, threads=8))
+    with contextlib.closing(sqlite3.connect(store.path, timeout=30, isolation_level=None)) as connection:
+        connection.execute("UPDATE attempts SET task_id = ? WHERE id = ?", (3, tampered["id"]))   # 只改关联列（TS-05 那一种）
+    fake = object.__new__(SERVER.Scheduler)
+    fake.store, fake.environment = store, dict(os.environ)
+    fake.unit_stopped = set()   # booking_attempts 不数的、单元已确认停了的尝试号（Scheduler.__init__ 建的）
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(build_bytes=lambda attempt: 0)}
+    fake.report_scope_usage = lambda report: {}
+    problems = []
+    listed = [attempt.get("id") for attempt in store.running_attempts()]
+    if listed != [honest["id"]]:
+        problems.append(f"running_attempts 应当只交校验过的那一条 {honest['id']}，实际 {listed}")
+    checks = (("server_pending", SERVER.Scheduler.server_pending(fake, SERVER.LOCAL, None), 4 * GIBIBYTE),
+              ("server_disk_pending", SERVER.Scheduler.server_disk_pending(fake, SERVER.LOCAL), 2 * GIBIBYTE))
+    problems += [f"{name} 应当只算校验过的那一条（{wanted}），实际 {seen}" for name, seen, wanted in checks if seen != wanted]
+    holders = sorted(code.co_name for code in code_objects_of(SERVER) if RUNNING_ATTEMPTS_QUERY in code.co_consts)
+    if holders != RUNNING_ATTEMPTS_QUERY_HOLDERS:
+        problems.append(f"task_server.py 里取在跑尝试的查询应当只在 {RUNNING_ATTEMPTS_QUERY_HOLDERS} 里，实际 {holders}：别处各写的一份不看校验位")
+    if problems:
+        raise SelftestFailure("在跑尝试只收校验过的：" + "；".join(problems))
+    return "关联列被改的那一条在跑尝试不进 running_attempts，内存与盘的记账都不算它；那一句查询只在两个函数里"
+
+
+def cell_concurrent_confirms_serialized(world):
+    """同一会话的确认串行（缺陷七；task_server.py 的 session_lock）：同会话两条待确认、都照确认单（在排在跑 0 条）确认。头一条核过数之后停在改状态之前
+    （TASK_SERVER_SELFTEST_PAUSE_POINT=confirm-counted），第二条在 CONFIRM_LOCK_PROBE_SECONDS 秒里应当一直等着会话锁、不退；放开之后头一条退 0，
+    第二条照头一条进队之后的条数（1 条）核、对不上退 3、打出服务算的条数 1。弄坏开关 confirm-counts-outside-session-lock 下第二条不等、照 0 条核过退 0，这一格红。"""
+    pause = os.path.join(world.root, "pause-confirm")
+    os.makedirs(pause)
+    world.resources(local=(30, 30), hold=True)
+    world.start_server(extra={"TASK_SERVER_SELFTEST_PAUSE_POINT": f"confirm-counted:{pause}"})
+    submitted = [world.client(["submit", "--cwd", world.work, "--", "bash", "-c", "exit 0", f"concurrent-{name}"]) for name in ("first", "second")]
+    needed = [lib.confirm_needed_fields(completed.stdout) for completed in submitted]
+    if any(fields is None for fields in needed):
+        raise SelftestFailure("两条都应当待确认、打出确认单那一行", [completed.stdout + completed.stderr for completed in submitted])
+    (first, first_items, first_tasks), (second, second_items, second_tasks) = needed
+    open(os.path.join(pause, "arm-confirm-counted"), "w").close()
+    leading = world.client(["confirm", str(first), "--items", str(first_items), "--tasks", str(first_tasks)], background=True)
+    problems = []
+    try:
+        wait_path(world, os.path.join(pause, "reached-confirm-counted"), "头一条核过数、停在改状态之前")
+        trailing = world.client(["confirm", str(second), "--items", str(second_items), "--tasks", str(second_tasks)], background=True)
+        deadline = time.monotonic() + CONFIRM_LOCK_PROBE_SECONDS
+        while time.monotonic() < deadline and trailing.poll() is None:
+            time.sleep(POLL_SECONDS)
+        early = trailing.poll() is not None
+    finally:
+        open(os.path.join(pause, "release-confirm-counted"), "w").close()
+    leading_out, _ = leading.communicate(timeout=90)
+    trailing_out, trailing_err = trailing.communicate(timeout=90)
+    recounted = lib.confirm_needed_fields(trailing_out + "\n" + trailing_err)
+    if early:
+        problems.append(f"头一条拿着会话锁时第二条应当等着、不退，实际 {CONFIRM_LOCK_PROBE_SECONDS:.0f} 秒里退了 {trailing.returncode}")
+    if leading.returncode != 0:
+        problems.append(f"头一条应当确认成、退 0，实际退 {leading.returncode}：「{leading_out.strip()[-200:]}」")
+    if trailing.returncode != 3 or recounted is None or recounted[2] != second_tasks + 1:
+        problems.append(f"第二条应当照头一条进队之后的条数核：退 3、确认单那一行写 tasks={second_tasks + 1}，实际退 {trailing.returncode}、"
+                        f"那一行 {recounted}（{(trailing_out + trailing_err).strip()[-300:]}）")
+    world.resources(local=(30, 30))
+    world.finished(first)
+    world.client(["cancel", str(second)])
+    if problems:
+        raise SelftestFailure("同会话的确认串行：" + "；".join(problems), world.server_log_lines())
+    return "同会话两条并发确认：第二条等头一条改完状态、照进队之后的条数核，对不上退 3"
+
+
+def cell_resident_entries_forgotten(world):
+    """按任务号记在内存里的表随结局回收（缺陷九；task_server.py 的 forget_settled_entries，套在假调度器上，不起服务）：这一格的临时库里五条任务——
+    有了结局并被取走的、有了结局没人取而结局才一分钟的、有了结局没人取而结局满 RESIDENT_RETENTION_SECONDS 的、还在排的、库里没有的；
+    七张按任务号记的表与 inbox_failed 里各有它们的项，清一回只留没人取的新结局与还在排的；按尝试号记的只留在跑的那一次。
+    弄坏开关 resident-entries-kept 下一项都不删，这一格红。"""
+    store = SERVER.Store(os.path.join(world.root, "resident.sqlite3"), bytes(32), dict(os.environ))
+    now = time.time()
+
+    def task(**fields):
+        return store.insert("tasks", dict({"task_id": 0, "state": "finished", "session": "", "command_key": "", "collected": False, "finished_at": now - 60}, **fields))["id"]
+
+    collected, fresh = task(collected=True), task()
+    stale, queued = task(finished_at=now - SERVER.RESIDENT_RETENTION_SECONDS - 60), task(state="queued", finished_at=None)
+    gone = queued + 1000
+    running = store.insert("attempts", {"task_id": queued, "number": 1, "state": "running", "session": "", "command_key": ""})["id"]
+    ended = store.insert("attempts", {"task_id": collected, "number": 1, "state": "ended", "session": "", "command_key": ""})["id"]
+    ids = (collected, fresh, stale, queued, gone)
+    fake = object.__new__(SERVER.Scheduler)
+    fake.store, fake.environment, fake.resident_pruned_at, fake.resident_prune_seconds = store, dict(os.environ), 0.0, 0.0
+    fake.alerted_child_refusals = {(task_id, "名下有校验不过的子任务记录") for task_id in ids}
+    fake.reminded_thresholds = {(task_id, "quiet-log-busy"): 1 for task_id in ids}
+    fake.reminder_histories = {(task_id, "quiet-log-busy"): [] for task_id in ids}
+    fake.workspace_write_checks = {task_id: None for task_id in ids}
+    fake.advance_episodes = {task_id: 1 for task_id in ids}
+    # 删了 advance_failures、advance_episodes 的项，库里那一份跟着写（persist_restart_surviving_state）：Scheduler.__init__ 建的那几样照建
+    fake.advance_failures = {task_id: {"episode": 1, "why": "推不动", "count": 1} for task_id in ids}
+    fake.attention_lock = threading.Lock()
+    fake.restart_surviving_lock, fake.restart_surviving_written = threading.Lock(), {}
+    fake.unclaimed_repushed = {task_id: 1 for task_id in ids}
+    fake.suspect_reported, fake.suspect_lock, fake.health_notified = {running: 1, ended: 1}, threading.Lock(), {}   # 报过的段随记进库（persist_restart_surviving_state）：这几样照建
+    fake.booking_drift_notified, fake.booking_drift_lock = {}, threading.Lock()
+    fake.inbox_failed = {("outcome", task_id) for task_id in ids} | {(task_id, "quiet-log-busy", 1) for task_id in ids} | {("suspect", running, 1), ("suspect", ended, 1)}
+    SERVER.Scheduler.forget_settled_entries(fake, now)
+    kept = {fresh, queued}
+    seen = {name: {key[position] if position is not None else key for key in vars(fake)[name]} for name, position in SERVER.RESIDENT_TASK_TABLES.items()}
+    problems = [f"{name} 应当只留任务 {sorted(kept)} 的项，实际 {sorted(found)}" for name, found in seen.items() if found != kept]
+    if set(fake.suspect_reported) != {running}:
+        problems.append(f"suspect_reported 应当只留在跑的那一次 {running}，实际 {sorted(fake.suspect_reported)}")
+    wanted_events = {("outcome", task_id) for task_id in kept} | {(task_id, "quiet-log-busy", 1) for task_id in kept} | {("suspect", running, 1)}
+    if fake.inbox_failed != wanted_events:
+        problems.append(f"inbox_failed 应当只留 {sorted(map(str, wanted_events))}，实际 {sorted(map(str, fake.inbox_failed))}")
+    if problems:
+        raise SelftestFailure("内存里的表随结局回收：" + "；".join(problems))
+    return "取走的、结局满保留时限的、库里没有的任务的项都删了，没人取的新结局与在排的留着；按尝试号记的只留在跑的"
+
+
+WHOLE_PACKAGE_SINGLE_CELLS = (   # whole-package-single-cells-refused：(说什么, 命令, 该不该拒)，都在假仓根起
+    ("单点 feature-gated-tests", ["bash", ".claude/gate.d/crash-point-replay.sh", ".", "--check", "feature-gated-tests"], True),
+    ("单点 product-gpu-real-card-tests", ["bash", ".claude/gate.d/crash-point-replay.sh", ".", "--check", "product-gpu-real-card-tests"], True),
+    ("单点 crash-case-replay 不带 --crash-cases-only", ["bash", ".claude/gate.d/crash-point-replay.sh", ".", "--check", "crash-case-replay"], True),
+    ("merge-and-verify.sh 带 --all-packages", ["bash", "scripts/gate/merge-and-verify.sh", "--all-packages", "selftest-patch-directory"], True),
+    ("--check crash-case-replay --crash-cases-only --item crash-case:x", ["bash", ".claude/gate.d/crash-point-replay.sh", ".", "--check", "crash-case-replay",
+                                                                         "--crash-cases-only", "--item", "crash-case:x"], False))
+FEATURE_GATED_CHECK = ["bash", lib.WHOLE_PACKAGE_CRASH_GATE, ".", "--check", "feature-gated-tests"]   # whole-package-feature-items-* 两格在假仓根起的那一格
+FEATURE_ITEMS_ACCEPTED_CASES = (   # whole-package-feature-items-accepted：(说什么, 命令, 该不该拒)
+    ("--check feature-gated-tests 点一个挂特性的文件", FEATURE_GATED_CHECK + ["--item", lib.CRASH_GATE_FEATURE_ITEM_PREFIX + "selftest_feature.rs"], False),
+    ("--check feature-gated-tests 点库与一个挂特性的文件（--item= 写法）", FEATURE_GATED_CHECK + ["--item=" + lib.CRASH_GATE_FEATURE_ITEM_PREFIX + "lib",
+                                                                                    "--item", lib.CRASH_GATE_FEATURE_ITEM_PREFIX + "selftest_feature.rs"], False))
+FEATURE_ITEMS_OTHERS_REFUSED_CASES = (   # whole-package-feature-items-others-refused：(说什么, 命令, 该不该拒)
+    ("--check feature-gated-tests 只点崩溃枚举用例", FEATURE_GATED_CHECK + ["--item", "crash-case:x"], True),
+    ("--check feature-gated-tests,crash-case-replay --crash-cases-only 只点崩溃枚举用例",
+     ["bash", lib.WHOLE_PACKAGE_CRASH_GATE, ".", "--check", "feature-gated-tests,crash-case-replay", "--crash-cases-only", "--item", "crash-case:x"], True))
+UNSCOPED_RUN_CASES = (   # unscoped-runs-refused：(说什么, 命令, 范围声明, 该不该拒)，都在假仓根起
+    ("提交时的门禁不带 --check、带全量标识", ["bash", ".claude/gate.d/lkmm.sh"], SCOPE_COMMIT, False),
+    ("crash-amplification.sh 不带 --item、带全量标识", ["bash", "scripts/crash/crash-amplification.sh"], SCOPE_COMMIT, False),
+    ("crash-amplification.sh 带 --item", ["bash", "scripts/crash/crash-amplification.sh", "--item", "selftest-part"], SCOPE_DAILY, False),
+    ("scripts/crash/crash-point-replay.sh 不带 --item", ["bash", "scripts/crash/crash-point-replay.sh"], SCOPE_DAILY, True),
+    ("replay.sh 不给实验号", ["bash", "scripts/experiment-apparatus/replay.sh"], SCOPE_DAILY, True),
+    ("replay.sh 给了实验号", ["bash", "scripts/experiment-apparatus/replay.sh", "E1"], SCOPE_DAILY, False))
+
+
+def submitted_refusal_problems(world, cases, refusal_text):
+    """逐条只交不确认（submit_raw）：该拒的应当退 3、stderr 带 refusal_text 与 --whole-package-confirmed 那条出路；该收的退 0、打任务号（收下的随即取消）。→ 不对的那几句。"""
+    problems = []
+    for case in cases:
+        what, command, scope, refused = case if len(case) == 4 else (case[0], case[1], SCOPE_DAILY, case[2])
+        completed = submit_raw(world, command, world.repo, scope=scope)
+        found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+        if found:
+            world.client(["cancel", found.group(1)])
+        if refused and (completed.returncode != 3 or refusal_text not in completed.stderr or "--whole-package-confirmed" not in completed.stderr):
+            problems.append(f"{what}应当退 3、stderr 写「{refusal_text}」与出路，实际退 {completed.returncode}：「{completed.stderr.strip()[-300:]}」")
+        elif not refused and (completed.returncode != 0 or not found):
+            problems.append(f"{what}应当照收、退 0，实际退 {completed.returncode}：「{completed.stderr.strip()[-300:]}」")
+    return problems
+
+
+def cell_whole_package_single_cells_refused(world):
+    """整包测试照命令实际跑什么判（task_server_lib.py 的 whole_package_script；.claude/agent-common.md「日常开发的测试不跑整个包」）：crash-point-replay.sh 的 --check
+    单点 feature-gated-tests、单点 product-gpu-real-card-tests、单点 crash-case-replay 而不带 --crash-cases-only，merge-and-verify.sh 带 --all-packages，没带确认标识都退 3；
+    --check crash-case-replay --crash-cases-only --item crash-case:x 照收。弄坏开关 whole-package-cells-all-three-only 下单点的三条照收，
+    merge-all-packages-accepted 下带 --all-packages 的照收，这一格红。"""
+    world.start_server()
+    problems = submitted_refusal_problems(world, WHOLE_PACKAGE_SINGLE_CELLS, "整包测试没带确认标识")
+    if problems:
+        raise SelftestFailure("整包测试单点一格也算：" + "；".join(problems), world.server_log_lines())
+    return f"{len(WHOLE_PACKAGE_SINGLE_CELLS) - 1} 种整包写法退 3，只判点名崩溃枚举用例的那一条照收"
+
+
+def cell_whole_package_feature_items_accepted(world):
+    """crash-point-replay.sh --check feature-gated-tests 点了 feature-gated:<文件名> 项的不是整包测试（lib.whole_package_script；那一格只编、只跑点名的挂特性文件）：
+    FEATURE_ITEMS_ACCEPTED_CASES 两条（--item 与 --item= 两种写法）都照收、退 0。弄坏开关 whole-package-feature-items-uncounted 下照整包拒，这一格红。"""
+    world.start_server()
+    problems = submitted_refusal_problems(world, FEATURE_ITEMS_ACCEPTED_CASES, "整包测试没带确认标识")
+    if problems:
+        raise SelftestFailure("feature-gated-tests 点了挂特性的文件：" + "；".join(problems), world.server_log_lines())
+    return f"--check feature-gated-tests 点了挂特性文件的 {len(FEATURE_ITEMS_ACCEPTED_CASES)} 种写法都照收"
+
+
+def cell_whole_package_feature_items_others_refused(world):
+    """crash-point-replay.sh --check 点了 feature-gated-tests、--item 只点了崩溃枚举用例的照旧是整包测试（那一格照跑整格）：FEATURE_ITEMS_OTHERS_REFUSED_CASES 两条都退 3、
+    stderr 写「整包测试没带确认标识」与 --whole-package-confirmed 那条出路。弄坏开关 whole-package-any-item-exempts 下带了 --item 就照收，这一格红。"""
+    world.start_server()
+    problems = submitted_refusal_problems(world, FEATURE_ITEMS_OTHERS_REFUSED_CASES, "整包测试没带确认标识")
+    if problems:
+        raise SelftestFailure("feature-gated-tests 没点挂特性的文件：" + "；".join(problems), world.server_log_lines())
+    return f"--check feature-gated-tests 只点崩溃枚举用例的 {len(FEATURE_ITEMS_OTHERS_REFUSED_CASES)} 种写法都退 3"
+
+
+CARD_GATE_ENTRY = ".claude/gate.d/crash-point-replay.sh"   # attempt-gets-no-card：假仓根下的假门禁（把自己的环境写进一份文件，不起真门禁）
+CARD_CHOICE_SAMPLE = {"GPU_CARDS_BY_PRIORITY": LOCAL_CARD_ZERO, "CUDA_VISIBLE_DEVICES": "0"}   # 那一格服务自己的环境里带着的选卡变量
+CARD_CHANNEL_PREFIX = "TASK_SERVER_CARD_LEASE"   # 领卡通道交给命令的变量与客户端打的领卡行都以它起头：命令的环境与尝试的日志里都不该有
+
+
+def cell_attempt_gets_no_card(world):
+    """任务不拿卡（task_server.py 的 start_attempt、attempt_command；.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：服务自己的环境里带着
+    GPU_CARDS_BY_PRIORITY 与 CUDA_VISIBLE_DEVICES，交一条点名的假门禁 crash-point-replay（假仓根下的脚本，把自己的环境写进一份文件，不起真门禁）：
+    命令的环境里两个选卡变量与 CARD_CHANNEL_PREFIX 起头的都没有；尝试的说明里起的那一条外面没套清场包装（gpu-quiesce-run.sh）；
+    尝试的日志里没有 CARD_CHANNEL_PREFIX 起头的行；任务跑完、退 0。弄坏开关 card-variables-passed-to-attempt 下服务环境里的选卡变量照交给命令，这一格红。"""
+    seen = os.path.join(world.root, "card-gate-environment")
+    entry = os.path.join(world.repo, CARD_GATE_ENTRY)
+    os.makedirs(os.path.dirname(entry), exist_ok=True)
+    write_executable(entry, f'#!/usr/bin/env bash\nenv > {shlex.quote(seen)}\necho "假门禁：$*"\nexit 0\n')
+    world.resources(local=(30, 30))
+    world.start_server(extra=CARD_CHOICE_SAMPLE)
+    task_id = world.submit(["bash", CARD_GATE_ENTRY, ".", "--check", "crash-case-replay", "--crash-cases-only", "--item", "crash-case:selftest"],
+                           extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY}, cwd=world.repo)
+    summary = world.finished(task_id)
+    attempt = first_attempt(summary)
+    problems = []
+    if summary["task"].get("outcome") != "succeeded":
+        problems.append(f"假门禁应当照跑完、退 0，实际 {describe(summary)}")
+    try:
+        with open(seen, encoding="utf-8") as handle:
+            names = {line.split("=", 1)[0] for line in handle if "=" in line}
+        leaked = sorted(name for name in names if name in lib.CARD_CHOICE_VARIABLES or name.startswith(CARD_CHANNEL_PREFIX))
+        if leaked:
+            problems.append(f"命令的环境里不该有选卡变量与领卡通道，实际有 {leaked}")
+    except OSError as error:
+        problems.append(f"假门禁没写下它的环境（{error}）")
+    try:
+        with open(attempt.get("spec") or "", encoding="utf-8") as handle:
+            argv = json.load(handle).get("argv") or []
+        wrapped = [word for word in argv if os.path.basename(str(word)) == "gpu-quiesce-run.sh"]
+        if not argv or wrapped:
+            problems.append(f"起的那一条外面不该套清场包装，实际说明里的 argv {argv[:8]}")
+    except (OSError, ValueError) as error:
+        problems.append(f"尝试的说明读不了（{error}）")
+    with contextlib.suppress(OSError):
+        with open(attempt.get("log") or "", encoding="utf-8", errors="replace") as handle:
+            marked = [line.strip() for line in handle if line.startswith(CARD_CHANNEL_PREFIX)]
+        if marked:
+            problems.append(f"尝试的日志里不该有 {CARD_CHANNEL_PREFIX} 起头的行，实际 {marked[:3]}")
+    if problems:
+        raise SelftestFailure("任务不拿卡：" + "；".join(problems), world.server_log_lines())
+    return "假门禁照跑完：命令的环境里没有选卡变量与领卡通道、外面没套清场、日志里没有领卡行"
+
+
+CARD_DECLARATION_SAMPLES = (   # card-declarations-refused：(脚本名, 文件头那一行)，各写一种卡的声明
+    ("declared-card-lease.sh", f"{lib.CARD_DECLARATION_MARKS[0]} on-demand"),
+    ("declared-gpu-cards.sh", f"{lib.CARD_DECLARATION_MARKS[1]} 2"),
+    ("declared-gpu-arguments.sh", f"{lib.CARD_DECLARATION_MARKS[2]} *"),
+)
+
+
+def cell_card_declarations_refused(world):
+    """入口文件头写了领卡、要卡的声明当场拒（task_server.py 文件头 ②「提交时拒」⑧；task_server_lib.py 的 card_declaration_problem）：假仓根下三份脚本
+    各写一种（CARD_DECLARATION_SAMPLES），直接交与套在 bash -c 里交都退 3、不给任务号、stderr 写 lib.CARD_DECLARATION_REFUSAL、点名那份脚本与写了的那一种、
+    出路写删掉那一行；同目录一份不写这几种的照收、跑完；客户端 lease take 认不出（退 2）。弄坏开关 card-declarations-accepted 下写了的照收，这一格红。"""
+    world.resources(local=(30, 30))
+    world.start_server()
+    problems = []
+    for name, header in CARD_DECLARATION_SAMPLES:
+        write_executable(os.path.join(world.repo, name), f"#!/usr/bin/env bash\n{header}\nexit 0\n")
+        for form, command in (("直接交", ["bash", name]), ("bash -c 里交", ["bash", "-c", f"bash {name}"])):
+            completed = submit_raw(world, command, world.repo)
+            found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+            if found:
+                world.client(["cancel", found.group(1)])
+            texts = (lib.CARD_DECLARATION_REFUSAL, name, header.split()[1], "删掉")
+            if completed.returncode != 3 or found or not all(text in completed.stderr for text in texts):
+                problems.append(f"{name}（{form}）应当退 3、不给任务号、stderr 写「{'」「'.join(texts)}」，实际退 {completed.returncode}、"
+                                f"stderr「{completed.stderr.strip()[-300:]}」")
+    write_executable(os.path.join(world.repo, "declared-nothing.sh"), "#!/usr/bin/env bash\nexit 0\n")
+    try:
+        plain = world.finished(world.submit(["bash", "declared-nothing.sh"], extra={"SINGLEFS_RUN_SCOPE": SCOPE_DAILY}, cwd=world.repo))
+        if plain["task"].get("outcome") != "succeeded":
+            problems.append(f"不写卡的声明的那一份应当照收、跑完，实际 {describe(plain)}")
+    except SelftestFailure as failure:
+        problems.append(f"不写卡的声明的那一份应当照收，实际 {failure}")
+    lease = world.client(["lease", "take"])
+    if lease.returncode != lib.USAGE_EXIT:
+        problems.append(f"客户端 lease take 应当认不出、退 {lib.USAGE_EXIT}，实际退 {lease.returncode}、「{(lease.stdout + lease.stderr).strip()[-200:]}」")
+    if problems:
+        raise SelftestFailure("卡的声明当场拒：" + "；".join(problems), world.server_log_lines())
+    return f"{len(CARD_DECLARATION_SAMPLES)} 种卡的声明直接交与 bash -c 里交都退 3、写明卡归 GPU 服务；不写的照收；lease take 认不出"
+
+
+def cell_unscoped_runs_refused(world):
+    """不指定范围的跑法在提交之外交当场拒（task_server_lib.py 的 unscoped_run_entry 与 UNSCOPED_RUN_ENTRIES；.claude/main-agent.md「一轮怎么开、怎么收」）：
+    UNSCOPED_RUN_CASES 里不带选条参数的都退 3、stderr 写「不指定范围的跑法没带确认标识」，带了选条参数的与提交时的门禁（崩溃放量入口在内，带全量标识）照收；
+    不是提交时门禁的入口（scripts/crash/crash-point-replay.sh）不指定范围、带上整包确认文件照收；提交时门禁没带全量标识的拒法归 full-gate-flag 那一格。弄坏开关 unscoped-gate-accepted 下不带选条参数的照收，这一格红。"""
+    world.start_server()
+    problems = submitted_refusal_problems(world, UNSCOPED_RUN_CASES, "不指定范围的跑法没带确认标识")
+    confirmed = submit_raw(world, ["bash", "scripts/crash/crash-point-replay.sh"], world.repo,
+                           confirmation=write_confirmation(world, "unscoped-confirmed.md", WHOLE_PACKAGE_CONFIRMATION_TEXT))
+    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", confirmed.stdout)
+    if found:
+        world.client(["cancel", found.group(1)])
+    if confirmed.returncode != 0 or not found:
+        problems.append(f"不指定范围的那一条带上整包确认文件应当照收、退 0，实际退 {confirmed.returncode}：「{confirmed.stderr.strip()[-300:]}」")
+    if problems:
+        raise SelftestFailure("不指定范围的跑法：" + "；".join(problems), world.server_log_lines())
+    return "不带选条参数的门禁与入口退 3，带了选条参数的、提交时的门禁、带了确认文件的照收"
+
+
+UNNAMED_RUN_JUDGED = {lib.UNNAMED_RUN_SELFTEST_VARIABLE: ""}   # unnamed-* 几格起服务时写空串：提交时拒 ⑦ 照真的判（小世界缺省写 off）
+UNNAMED_PATCH_DIRECTORY = "selftest-patch-directory"
+
+
+def unnamed_run_problems(world, cases):
+    """unnamed-* 几格共用（task_server.py 文件头 ②「提交时拒」⑦，判据 lib.unnamed_run_problem）：起照真的判 ⑦ 的服务，逐条只交不确认（submit_raw；
+    cargo 与 bash -c 在这一格的工作目录起，同 whole-package-named-accepted，别的在假仓根起）。
+    cases 是 (说什么, 命令, 拒绝说明里要有的改法；照收的写 None)：该拒的退 3、stderr 带 lib.UNNAMED_RUN_PROBLEM_HEAD 与那一句改法；该收的退 0、打任务号（随即取消）。→ 不对的那几句。"""
+    world.start_server(extra=UNNAMED_RUN_JUDGED)
+    problems = []
+    for what, command, way_out in cases:
+        completed = submit_raw(world, command, world.work if command[0] == "cargo" or command[:2] == ["bash", "-c"] else world.repo)
+        found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+        if found:
+            world.client(["cancel", found.group(1)])
+        if way_out is not None and (completed.returncode != 3 or lib.UNNAMED_RUN_PROBLEM_HEAD not in completed.stderr or way_out not in completed.stderr):
+            problems.append(f"{what}应当退 3、stderr 写「{lib.UNNAMED_RUN_PROBLEM_HEAD}」与改法「{way_out}」，实际退 {completed.returncode}：「{completed.stderr.strip()[-400:]}」")
+        elif way_out is None and (completed.returncode != 0 or not found):
+            problems.append(f"{what}应当照收、退 0，实际退 {completed.returncode}：「{completed.stderr.strip()[-400:]}」")
+    return problems
+
+
+def cell_unnamed_merge_unnamed_refused(world):
+    """合入后验证不带 --item 当场拒（lib.unnamed_run_problem 的 UNNAMED_RUN_ITEM_ENTRIES）：给了补丁目录而没带 --item 的退 3、说明给出加 --item <包>:<目标根文件> 的样子。
+    弄坏开关 unnamed-entry-item-unchecked、unnamed-run-refusal-skipped 下照收，这一格红。"""
+    problems = unnamed_run_problems(world, (("合入后验证给了补丁目录、不带 --item", ["bash", FAKE_MERGE_ENTRY, UNNAMED_PATCH_DIRECTORY], "--item <包>:<目标根文件>"),))
+    if problems:
+        raise SelftestFailure("合入后验证不带 --item：" + "；".join(problems), world.server_log_lines())
+    return "合入后验证不带 --item 退 3，说明给出加 --item 的样子"
+
+
+def cell_unnamed_merge_named_accepted(world):
+    """合入后验证带 --item 照收（--item <项> 与 --item=<项> 两种写法）。弄坏开关 unnamed-entry-item-uncounted 下带了也拒，这一格红。"""
+    problems = unnamed_run_problems(world, (
+        ("合入后验证带 --item", ["bash", FAKE_MERGE_ENTRY, "--skip-apply", "--item", "selftest-package:tests/selftest_target.rs", UNNAMED_PATCH_DIRECTORY], None),
+        ("合入后验证带 --item=", ["bash", FAKE_MERGE_ENTRY, "--item=selftest-package:src/lib.rs", UNNAMED_PATCH_DIRECTORY], None)))
+    if problems:
+        raise SelftestFailure("合入后验证带 --item：" + "；".join(problems), world.server_log_lines())
+    return "合入后验证带 --item 的两种写法都照收"
+
+
+def cell_unnamed_cargo_target_refused(world):
+    """cargo test 没点到 --exact 的单条测试函数当场拒（lib.unnamed_cargo_test_problem）：只点 --test 目标的、--lib 带筛选词的、bash -c 里只点目标的都退 3，
+    说明给出 `-- <测试全名> --exact` 的样子。弄坏开关 unnamed-cargo-filter-accepted、unnamed-run-refusal-skipped 下照收，shell-inner-scope-unread 下 bash -c 那一条照收，这一格红。"""
+    target = ["cargo", "test", "-p", "singlefs-verification", "--test", "selftest_target"]
+    problems = unnamed_run_problems(world, (
+        ("cargo test 只点 --test 目标", target, "-- <测试全名> --exact"),
+        ("cargo test --lib 带筛选词不带 --exact", ["cargo", "test", "-p", "singlefs-verification", "--lib", "--", "selftest_name"], "-- selftest_name --exact"),
+        ("bash -c 里 cargo test 只点 --test 目标", ["bash", "-c", shlex.join(target)], "-- <测试全名> --exact")))
+    if problems:
+        raise SelftestFailure("cargo test 没点到单条测试函数：" + "；".join(problems), world.server_log_lines())
+    return "cargo test 只点目标、只给筛选词、bash -c 里只点目标的都退 3，说明给出 --exact 的样子"
+
+
+def cell_unnamed_cargo_exact_accepted(world):
+    """cargo test `--` 之后带 --exact 与测试全名的照收（两条全名一起点也算）；只编不跑的 --no-run 照收。弄坏开关 unnamed-cargo-exact-uncounted 下点名的也拒，这一格红。"""
+    base = ["cargo", "test", "-p", "singlefs-verification", "--test", "selftest_target"]
+    problems = unnamed_run_problems(world, (
+        ("cargo test 点一条 --exact", base + ["--", "selftest_module::selftest_case", "--exact"], None),
+        ("cargo test 点两条 --exact", base + ["--", "--exact", "selftest_module::replay_case", "selftest_module::merge_case"], None),
+        ("cargo test --no-run", base + ["--no-run"], None)))
+    if problems:
+        raise SelftestFailure("cargo test 点名 --exact：" + "；".join(problems), world.server_log_lines())
+    return "cargo test 点一条、两条 --exact 与 --no-run 都照收"
+
+
+def cell_unnamed_prove_red_unnamed_refused(world):
+    """证红不给变异名当场拒（lib.unnamed_run_problem 照 prove-red.sh 收参数的写法：--copy <副本> <crate> 之后至少一个变异名）：退 3、说明给出 <变异名…> 的样子。
+    弄坏开关 unnamed-prove-red-unchecked、unnamed-run-refusal-skipped 下照收，这一格红。"""
+    problems = unnamed_run_problems(world, (("证红不给变异名", ["bash", lib.UNNAMED_RUN_PROVE_RED_ENTRY, "--copy", world.repo, "singlefs-verification"], "<变异名…>"),))
+    if problems:
+        raise SelftestFailure("证红不给变异名：" + "；".join(problems), world.server_log_lines())
+    return "证红不给变异名退 3，说明给出写变异名的样子"
+
+
+def cell_unnamed_prove_red_named_accepted(world):
+    """证红点名一个变异照收。弄坏开关 unnamed-prove-red-name-offset 下只点一个的算没点、拒，这一格红。"""
+    problems = unnamed_run_problems(world, (("证红点名一个变异", ["bash", lib.UNNAMED_RUN_PROVE_RED_ENTRY, "--copy", world.repo, "singlefs-verification", "selftest-row"], None),))
+    if problems:
+        raise SelftestFailure("证红点名一个变异：" + "；".join(problems), world.server_log_lines())
+    return "证红点名一个变异照收"
+
+
+def cell_unnamed_exemptions_accepted(world):
+    """两种例外不判点没点名：提交时的门禁不指定范围、带 --full-gate 照收；合入后验证不带 --item、带三段写全的 --whole-package-confirmed 照收；
+    同一条合入后验证两样都不带的退 3（对照）。弄坏开关 unnamed-run-exemptions-ignored 下带了标识的也拒，这一格红。"""
+    world.start_server(extra=UNNAMED_RUN_JUDGED)
+    confirmation = write_confirmation(world, "unnamed-confirmed.md", WHOLE_PACKAGE_CONFIRMATION_TEXT)
+    merge = ["bash", FAKE_MERGE_ENTRY, UNNAMED_PATCH_DIRECTORY]
+    problems = []
+    for what, completed, accepted in (
+            ("提交时的门禁带 --full-gate", submit_raw(world, ["bash", ".claude/gate.d/crash-point-replay.sh"], world.repo, scope=SCOPE_COMMIT), True),
+            ("合入后验证带 --whole-package-confirmed", submit_raw(world, merge, world.repo, confirmation=confirmation), True),
+            ("合入后验证两样都不带", submit_raw(world, merge, world.repo), False)):
+        found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+        if found:
+            world.client(["cancel", found.group(1)])
+        if accepted and (completed.returncode != 0 or not found):
+            problems.append(f"{what}应当照收、退 0，实际退 {completed.returncode}：「{completed.stderr.strip()[-400:]}」")
+        elif not accepted and (completed.returncode != 3 or lib.UNNAMED_RUN_PROBLEM_HEAD not in completed.stderr):
+            problems.append(f"{what}应当退 3、写「{lib.UNNAMED_RUN_PROBLEM_HEAD}」，实际退 {completed.returncode}：「{completed.stderr.strip()[-400:]}」")
+    if problems:
+        raise SelftestFailure("点名的两种例外：" + "；".join(problems), world.server_log_lines())
+    return "带 --full-gate 的提交时门禁与带整包确认文件的合入后验证照收，两样都不带的退 3"
+
+
+def cell_unnamed_gate_cells_judged(world):
+    """门禁阶段（lib.TEST_STARTING_GATE_CELLS）：--check 点了起测试的格（qemu-device-streams 的 device-streams）而没带 --item 的退 3、说明给出 --item 的样子；
+    --item、--check 都不带的（doc-text 全部格）退 3；只点不起测试的格（crash-point-replay 的 crash-knobs）、带 --item 的照收。
+    弄坏开关 unnamed-check-cells-accepted 下点起测试的格照收，unnamed-stage-whole-accepted 下两样都不带的照收，unnamed-run-refusal-skipped 下都照收，这一格红。"""
+    problems = unnamed_run_problems(world, (
+        ("--check 点起测试的格、不带 --item", ["bash", ".claude/gate.d/qemu-device-streams.sh", ".", "--check", "device-streams"], "--item <项>"),
+        ("--item、--check 都不带", ["bash", ".claude/gate.d/doc-text.sh", "."], "--item <项>"),
+        ("只点不起测试的格", ["bash", ".claude/gate.d/crash-point-replay.sh", ".", "--check", "crash-knobs"], None),
+        ("带 --item", ["bash", ".claude/gate.d/qemu-device-streams.sh", ".", "--item", "selftest-mode"], None)))
+    if problems:
+        raise SelftestFailure("门禁阶段点没点名：" + "；".join(problems), world.server_log_lines())
+    return "点起测试的格不带 --item、两样都不带的退 3，只点不起测试的格、带 --item 的照收"
+
+
+UNNAMED_CRASH_GATE = ["bash", lib.WHOLE_PACKAGE_CRASH_GATE, "."]   # unnamed-crash-gate-* 两格在假仓根起的门禁 crash-point-replay
+
+
+def cell_unnamed_crash_gate_whole_items_refused(world):
+    """门禁 crash-point-replay 带了 --item 而 --check 没把起整个验证包的格排掉的当场拒（lib.crash_gate_whole_package_cells）：只点崩溃枚举用例、不带 --check 的
+    （照旧九格，连按条复用那一趟）与带 --crash-cases-only 而不带 --check 的（产品 GPU 与挂特性两格照跑整格）都退 3，说明给出加 --check crash-case-replay --crash-cases-only 的样子。
+    弄坏开关 unnamed-crash-gate-item-whole-accepted、unnamed-run-refusal-skipped 下照收，这一格红。"""
+    problems = unnamed_run_problems(world, (
+        ("点崩溃枚举用例、不带 --check", UNNAMED_CRASH_GATE + ["--item", "crash-case:x"], lib.CRASH_GATE_CASES_ONLY_FORM),
+        ("带 --crash-cases-only、不带 --check", UNNAMED_CRASH_GATE + ["--crash-cases-only", "--item=crash-case:x"], lib.CRASH_GATE_CASES_ONLY_FORM)))
+    if problems:
+        raise SelftestFailure("门禁 crash-point-replay 带 --item 而没排掉整包的格：" + "；".join(problems), world.server_log_lines())
+    return "门禁 crash-point-replay 点崩溃枚举用例而不带 --check 的两种写法都退 3，说明给出加 --check crash-case-replay --crash-cases-only 的样子"
+
+
+def cell_unnamed_crash_gate_cases_only_accepted(world):
+    """门禁 crash-point-replay 带了 --item 而起整个验证包的格都排掉了的照收：--check crash-case-replay --crash-cases-only 点崩溃枚举用例；
+    不带 --check、只点挂特性的文件（只跑 feature-gated-tests 一格、只编点名的文件）。弄坏开关 unnamed-crash-gate-cases-only-uncounted 下前一条拒，这一格红。"""
+    problems = unnamed_run_problems(world, (
+        ("--check crash-case-replay --crash-cases-only 点崩溃枚举用例", UNNAMED_CRASH_GATE + ["--check", "crash-case-replay", "--crash-cases-only", "--item", "crash-case:x"], None),
+        ("不带 --check、只点挂特性的文件", UNNAMED_CRASH_GATE + ["--item", lib.CRASH_GATE_FEATURE_ITEM_PREFIX + "selftest_feature.rs"], None)))
+    if problems:
+        raise SelftestFailure("门禁 crash-point-replay 只跑点名的项：" + "；".join(problems), world.server_log_lines())
+    return "门禁 crash-point-replay 带 --crash-cases-only 点崩溃枚举用例、不带 --check 只点挂特性的文件都照收"
+
+
+def cell_test_starting_cells_listed(world):
+    """起测试的格表（lib.test_starting_gate_cells；手列，各道文件头的格名表不标哪一格起测试）里每一道的阶段文件在仓里、每个格名都在那一道文件头的格名表里
+    （`# gate-cell:` 行，读法只用 scripts/gate/lib_stage_header.py 的 header_cells；那一道 --list 打的就是这张表，scripts/gate/gate-structure-check.py 判两边相同）。
+    静态核，不起服务、不起门禁。弄坏开关 test-starting-cells-misnamed 下 lkmm 那一行的格名写错一个字，这一格红。"""
+    header = lib.load_module("lib_stage_header", os.path.join(lib.REPOSITORY_ROOT, "scripts", "gate", "lib_stage_header.py"))
+    table = lib.test_starting_gate_cells()
+    problems = []
+    for stage, cells in table.items():
+        path = os.path.join(lib.REPOSITORY_ROOT, stage)
+        if not os.path.isfile(path):
+            problems.append(f"{stage} 不在仓里")
+            continue
+        listed = {name for _, name, _ in header.header_cells(path)}
+        missing = [cell for cell in cells if cell not in listed]
+        if missing:
+            problems.append(f"{stage} 的格名表里没有 {'、'.join(missing)}（有 {'、'.join(sorted(listed))}）")
+    if problems:
+        raise SelftestFailure("起测试的格表与各道的格名表对不上（照那一道的 --list 改 task_server_lib.py 的 TEST_STARTING_GATE_CELLS）：" + "；".join(problems))
+    return f"起测试的格表 {len(table)} 道、{sum(len(cells) for cells in table.values())} 格，格名都在各自那一道的格名表里"
+
+
+def cell_queued_whole_package_rechecked(world):
+    """服务起来时重核在排的照交任务那一刻同一份提交时拒判（task_server.py 的 submit_refusal 与 revalidate_queued）：在排的一条绕过服务改成整包测试
+    （cargo test -p 不点名测试目标；演规则加上之前交进来的那一种），重启服务：它记 resubmit-required（退 232、一次没起、说明写整包测试那一句），
+    task wait 拿到这个结局；合规的那一条照排。弄坏开关 queued-refusals-not-rechecked 下只核环境变量、包装与编译目录，整包测试照排，这一格红。"""
+    world.resources(local=(30, 30), hold=True)
+    world.start_server()
+    stale = world.submit(["bash", "-c", "exit 0", "rechecked-stale"])
+    fine = world.submit(["bash", "-c", "exit 0", "rechecked-fine"])
+    world.stop_server()
+    world.rewrite_signed_task(stale, lambda record: record.update(command=["cargo", "test", "-p", "singlefs-verification"]))
+    world.start_server()
+    problems = []
+    try:
+        summary = world.finished(stale, timeout=20)
+    except SelftestFailure:
+        summary = world.summary(stale)
+    waited = world.client(["wait", str(stale)]) if summary["task"].get("state") == "finished" else None   # 没收尾的不等（wait 会一直等下去）
+    waiting = world.summary(fine)
+    world.resources(local=(30, 30))
+    world.finished(fine)
+    if summary["task"].get("outcome") != "resubmit-required" or summary["task"].get("exit_code") != 232 or summary["attempts"] \
+            or "整包测试没带确认标识" not in (summary["task"].get("note") or ""):
+        problems.append(f"在排的整包测试重启之后应当记 resubmit-required（退 232、一次没起、说明写整包测试那一句），实际 {describe(summary)}、"
+                        f"说明「{summary['task'].get('note')}」")
+    if waited is None or "type=resubmit-required" not in waited.stdout:
+        problems.append(f"task wait 应当拿到 resubmit-required 那一行，实际「{(waited.stdout.strip()[-300:] if waited else '没收尾，没等')}」")
+    if waiting["task"].get("state") != "queued":
+        problems.append(f"合规的那一条应当照排，实际 {waiting['task'].get('state')}")
+    if problems:
+        raise SelftestFailure("重启之后照同一份提交时拒重核：" + "；".join(problems), world.server_log_lines())
+    return "在排的整包测试重启之后记 resubmit-required、wait 拿到结局，合规的照排"
+
+
+def cell_retired_outcome_status_generic(world):
+    """库里记着退役结局的旧任务（lib.RETIRED_OUTCOME_KINDS，结局 over-two-hours）：task status <号> 不崩、退 0，TASK_SERVER_REASON 的 next= 用通用那一句（lib.ANOMALY_GENERIC_ADVICE）。
+    弄坏开关 retired-outcome-kinds-unknown 下抛 KeyError，这一格红。"""
+    world.start_server()
+    outcome = lib.RETIRED_OUTCOME_KINDS[0]
+    task_id = world.insert_signed_row("tasks", {"command": ["bash", "-c", "exit 0", "retired-outcome"], "cwd": world.work, "environment": {}, "session": SESSION_A, "submitter_pid": 0,
+                                                "submitted_at": time.time(), "finished_at": time.time(), "command_key": "selftest-retired-outcome", "state": "finished", "outcome": outcome,
+                                                "exit_code": 1, "collected": True, "next_cap": None, "next_host": "", "outcome_counts": {}, "note": "", "cancel_requested": False,
+                                                "attempt_count": 0, "task_id": 0})
+    shown = world.client(["status", str(task_id)])
+    advice = lib.ANOMALY_GENERIC_ADVICE.replace(lib.ANOMALY_TASK_PLACEHOLDER, str(task_id))
+    reason = next((line for line in shown.stdout.splitlines() if line.startswith(lib.REASON_MARK)), "")
+    if shown.returncode != 0 or f"type={outcome}" not in reason or advice not in reason:
+        raise SelftestFailure(f"结局是 {outcome} 的旧任务：status 应当退 0、理由行 next= 用通用那一句「{advice}」，实际退 {shown.returncode}、理由行「{reason}」、"
+                              f"输出「{(shown.stdout + shown.stderr).strip()[-400:]}」", world.server_log_lines())
+    return f"结局是 {outcome} 的旧任务 status 不崩、next= 用通用那一句"
+
+
+RELEASE_HOLD_SCRIPT = 'release="$1"; shift; printf "%s\\n" "$@"; for round in $(seq 1 600); do [[ -e "$release" ]] && exit 0; sleep 0.1; done; exit 9'   # 打几行、等放行才退
+RELEASE_WAIT_SECONDS = 90.0            # 等判到哪一支的安静时限：开关下等不到的要等命令自己 60 秒退（RELEASE_HOLD_SCRIPT），比它长
+HARD_LIMIT_OUT_OF_REACH_SECONDS = "1000000000"   # 起头那一段不该判到硬上限的格的上限（TASK_SERVER_SELFTEST_RUN_HARD_LIMIT_SECONDS）：格里跑多久都够不着
+
+
+def held_command(release, *lines, name="held"):
+    return ["bash", "-c", RELEASE_HOLD_SCRIPT, name, release, *lines]
+
+
+RUN_HARD_LIMIT_EXIT = 229                     # over-four-hours 的退出码（task_server_lib.py 的 OUTCOME_TYPES）
+RUN_HARD_LIMIT_NOTE = "硬上限"                 # 结局说明、推送正文与确认单都写这个词
+RUN_HARD_LIMIT_ADVICE = ".claude/rules/long-run-split.md"   # 修改意见里的出路：指到拆分规则，不再写缩域、收小范围
+RUN_HARD_LIMIT_SHARD_SECONDS = 15             # run-hard-limit-shard-stopped：界要够那一件走到第 0、1 片在跑、第 2 片排着
+RUN_HARD_LIMIT_CONFIRM_SECONDS = 10           # run-hard-limit-why-still-stops：界要够跑满两小时那一道（压到 1 秒）之后填 why
+RUN_HARD_LIMIT_ACROSS_SECONDS = 6             # run-hard-limit-cap-hit-resets：四次撞上限各跑 1.5 秒、第五次约 1 秒：每一次都不到界的一半多，算上撞上限的那几次第四次就满（机器忙时单次放慢到界的 3 倍多才会误判）
+
+
+def hard_limit_settings(seconds, **changed):
+    """四小时硬上限那几格服务的设置：上限压到 seconds 秒。"""
+    return dict({"TASK_SERVER_SELFTEST_RUN_HARD_LIMIT_SECONDS": str(seconds)}, **changed)
+
+
+def hard_limit_problems(summary, what, attempts=1):
+    """四小时硬上限打回的共同判据：记 over-four-hours、退 229、不重排（attempts 次尝试，最后那一次记同一个结局）、说明写硬上限。→ 问题表。"""
+    task, problems = summary["task"], []
+    outcomes = [attempt.get("outcome") for attempt in summary["attempts"]]
+    if task.get("state") != "finished" or task.get("outcome") != lib.RUN_HARD_LIMIT_OUTCOME or task.get("exit_code") != RUN_HARD_LIMIT_EXIT:
+        problems.append(f"{what}：应当记 {lib.RUN_HARD_LIMIT_OUTCOME}、退 {RUN_HARD_LIMIT_EXIT}，实际状态 {task.get('state')}、{describe(summary)}")
+    if len(outcomes) != attempts or (attempts and outcomes[-1] != lib.RUN_HARD_LIMIT_OUTCOME):
+        problems.append(f"{what}：应当有 {attempts} 次尝试、最后那一次记 {lib.RUN_HARD_LIMIT_OUTCOME}，实际 {outcomes}")
+    if RUN_HARD_LIMIT_NOTE not in str(task.get("note")):
+        problems.append(f"{what}：说明应当写{RUN_HARD_LIMIT_NOTE}，实际「{task.get('note')}」")
+    return problems
+
+
+def held_until_finished(world, task_id, release):
+    """等任务收尾，不论等到没有都放行它的命令。→ 那时的 summary。"""
+    try:
+        return world.finished(task_id, timeout=RELEASE_WAIT_SECONDS)
+    finally:
+        open(release, "w").close()
+
+
+def cell_run_hard_limit_arithmetic(world):
+    """四小时硬上限的算术（task_server_lib.py 的 over_run_hard_limit、covered_seconds）：常量是 14400 秒，恰好等于算到、差半秒不算；并集：同时在跑的不重复算、空档不算、套着的不多算。
+    弄坏开关 run-hard-limit-exclusive、run-hard-limit-loose、run-hard-limit-parent-summed 各红。"""
+    problems = []
+    limit = float(SERVER.RUN_HARD_LIMIT_SECONDS)
+    if limit != 14400:
+        problems.append(f"上限应当是 14400 秒，实际 {limit}")
+    for seconds, over in ((14400.0, True), (14400.5, True), (14399.5, False), (7200.0, False)):
+        if lib.over_run_hard_limit(seconds, limit) != over:
+            problems.append(f"{seconds} 秒：到上限应当 {over}，实际 {lib.over_run_hard_limit(seconds, limit)}")
+    for intervals, seconds in (([], 0.0), ([(0.0, 60.0), (0.0, 60.0)], 60.0), ([(0.0, 10.0), (5.0, 20.0)], 20.0), ([(0.0, 10.0), (100.0, 110.0)], 20.0), ([(0.0, 100.0), (10.0, 20.0), (90.0, 200.0)], 200.0)):
+        if abs(lib.covered_seconds(intervals) - seconds) > 0.001:
+            problems.append(f"时段 {intervals} 的并集应当 {seconds} 秒，实际 {lib.covered_seconds(intervals)}")
+    if problems:
+        raise SelftestFailure("四小时硬上限的算术：" + "；".join(problems))
+    return "上限 14400 秒，恰好等于算到；挂钟取时段的并集，同时在跑的不重复算、空档不算"
+
+
+def hard_limit_fake_scheduler(records=()):
+    """判四小时硬上限那两格的假调度器：上限 100 秒，尝试记录 1 的进度 1/1000，records 是 store.task 读得到的几条任务。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    table = {record["id"]: record for record in records}
+    fake.store = types.SimpleNamespace(task=lambda task_id: (table[task_id], True) if task_id in table else None, attempts_of=lambda task_id: [])
+    fake.run_hard_limit_seconds, fake.run_limit_seconds, fake.peer_root = 100.0, 60.0, "/"
+    fake.attempt_progress = {1: (1, 1000)}
+    fake.attempt_progress_baseline = {1: {"at": time.time() - 5, "done": 0, "offset": 0}}
+    return fake
+
+
+def cell_shard_hard_limit_by_each_piece(world):
+    """分片的四小时硬上限按每一片自己的累计（task_server.py 的 parent_run_hard_limit、run_hard_limit_verdict；用户定）：假调度器上限 100 秒（同四小时，缩了比例）。
+    三片依次排队、各跑 75 秒（照挂钟从头到尾 225 秒、每片都不到 100）：整件不判（parent_run_hard_limit 交 None），每一片照自己的累计都不停；
+    一片单跑满 120 秒：那一片停，跑了 50 秒的兄弟片照跑；最先没成的是满界的那一片（first_failed_shard），整件收齐后照它收尾。
+    弄坏开关 shard-whole-by-wall-clock 下整件按挂钟（225 秒到 100）判到，run-hard-limit-skipped、run-hard-limit-children-spared 下满界的那一片不停，这一格红。"""
+    now = time.time()
+    command = {"command": ["bash", "-c", "exit 0"], "cwd": "/"}
+    pieces = [{"id": 10 + index, "parent_id": 9, "role": "shard", "shard_index": index, **command} for index in range(3)]
+
+    def row(number, start, end):
+        return ({"number": number, "state": "ended" if end is not None else "running", "started_at": now - start, "ended_at": None if end is None else now - end,
+                 "outcome": "succeeded", "seconds": None if end is None else float(start - end)}, True)
+    sequential = {10: [row(1, 230, 155)], 11: [row(1, 155, 80)], 12: [row(1, 75, None)]}
+    problems = []
+    fake = hard_limit_fake_scheduler([{"id": 9, **command}])
+    fake.store = types.SimpleNamespace(task=lambda task_id: ({"id": 9, **command}, True) if task_id == 9 else None,
+                                       attempts_of=lambda task_id: sequential.get(task_id, []))
+    whole = SERVER.Scheduler.parent_run_hard_limit(fake, {"id": 9, **command}, pieces)
+    if whole is not None:
+        problems.append(f"三片依次排队各跑 75 秒：整件不应当判到上限，实际 {whole}")
+    for piece in pieces:
+        attempts = sequential[piece["id"]]
+        running = next((record for record, _ in attempts if record["state"] == "running"), None)
+        if running is not None and SERVER.Scheduler.run_hard_limit_verdict(fake, piece, dict(running, id=99)):
+            problems.append(f"第 {piece['shard_index']} 片自己只跑了 75 秒：不应当停")
+    fake.store = types.SimpleNamespace(task=lambda task_id: ({"id": 9, **command}, True) if task_id == 9 else None, attempts_of=lambda task_id: [])
+    if not SERVER.Scheduler.run_hard_limit_verdict(fake, pieces[0], {"id": 98, "number": 1, "started_at": now - 120}):
+        problems.append("一片单跑满 120 秒（上限 100）：那一片应当停")
+    if SERVER.Scheduler.run_hard_limit_verdict(fake, pieces[1], {"id": 97, "number": 1, "started_at": now - 50}):
+        problems.append("兄弟片跑了 50 秒：应当照跑、不停")
+    shards = [dict(pieces[0], state="finished", outcome=lib.RUN_HARD_LIMIT_OUTCOME, finished_at=now), dict(pieces[1], state="running"), dict(pieces[2], state="queued")]
+    failed = SERVER.Scheduler.first_failed_shard(fake, shards)
+    if failed is None or failed.get("id") != pieces[0]["id"]:
+        problems.append(f"最先没成的应当是满界停的第 0 片（整件收齐后照它的 {lib.RUN_HARD_LIMIT_OUTCOME} 收尾），实际 {failed}")
+    if problems:
+        raise SelftestFailure("分片的四小时硬上限按每一片自己的累计：" + "；".join(problems))
+    return "三片依次各跑 75 秒的整件不判；一片单跑满界的停那一片、兄弟片照跑，整件照那一片收尾"
+
+
+def cell_run_hard_limit_stopped(world):
+    """满上限停（task_server.py 文件头 ⑦「四小时硬上限」；上限压到 2 秒）：命令一直等放行：服务停这一次、记 over-four-hours、退 229、不重排，推给提交它的会话，wait 退 229、末行 type=over-four-hours。
+    弄坏开关 run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下结局不对，inbox-not-sent、inbox-auth-omitted 下收不到或收得不对，exit-code-dropped 下 wait 退 0，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    release = os.path.join(world.root, "release-hard-limit-stopped")
+    start_inbox_server(world, hard_limit_settings(2))
+    task_id = world.submit(held_command(release, "tick"), extra=inbox.environment())
+    summary = held_until_finished(world, task_id, release)
+    problems = hard_limit_problems(summary, "满上限的")
+    head = outcome_head(task_id, lib.RUN_HARD_LIMIT_OUTCOME)
+    messages = inbox.wait_for(world, head)
+    problems += inbox_problems(messages, head, "结局那一条")
+    if messages and not all(word in messages[0]["text"] for word in (RUN_HARD_LIMIT_NOTE, RUN_HARD_LIMIT_ADVICE)):
+        problems.append(f"推送正文应当写{RUN_HARD_LIMIT_NOTE}与出路「{RUN_HARD_LIMIT_ADVICE}」，实际「{messages[0]['text'][:400]}」")
+    code, last = wait_last_line(world, task_id)
+    if code != RUN_HARD_LIMIT_EXIT or f"type={lib.RUN_HARD_LIMIT_OUTCOME}" not in last:
+        problems.append(f"wait 应当退 {RUN_HARD_LIMIT_EXIT}、末行 type={lib.RUN_HARD_LIMIT_OUTCOME}，实际退 {code}、末行「{last}」")
+    if problems:
+        raise SelftestFailure("满上限停：" + "；".join(problems), world.server_log_lines())
+    return "累计满上限：停这一次、记 over-four-hours、不重排，推给会话，wait 退 229"
+
+
+def cell_run_hard_limit_why_still_stops(world):
+    """带 --why 照停：跑满两小时那一道压到 1 秒、硬上限压到 10 秒：跑过 1 秒填 why 退 0、记长跑已确认，到了硬上限照样停、记 over-four-hours。
+    弄坏开关 run-hard-limit-confirmed-spared、run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下结局不对，这一格红。"""
+    release = os.path.join(world.root, "release-hard-limit-why")
+    world.start_server(extra=hard_limit_settings(RUN_HARD_LIMIT_CONFIRM_SECONDS, TASK_SERVER_SELFTEST_RUN_LIMIT_SECONDS=RUN_LIMIT_SHORT_SECONDS))
+    task_id = world.submit(held_command(release, "tick"))
+    world.running(task_id)
+    time.sleep(float(RUN_LIMIT_SHORT_SECONDS) + 0.5)
+    confirmed = world.client(["confirm", str(task_id), "--why", LONG_RUN_WHY_SAMPLE])
+    problems = [] if confirmed.returncode == 0 else [f"跑满界填 why 应当退 0，实际退 {confirmed.returncode}：「{(confirmed.stdout + confirmed.stderr).strip()[-300:]}」"]
+    summary = held_until_finished(world, task_id, release)
+    problems += hard_limit_problems(summary, "填过 why 的")
+    if not summary["task"].get("long_run_confirmed"):
+        problems.append(f"应当记着长跑已确认，实际 {summary['task'].get('long_run_confirmed')}")
+    if problems:
+        raise SelftestFailure("带 --why 照停：" + "；".join(problems), world.server_log_lines())
+    return "填了 why 的到了硬上限照停"
+
+
+def cell_run_hard_limit_full_gate_not_stopped(world):
+    """带 --full-gate 的不判：假仓里的提交时门禁跑 3 秒、上限压到 1 秒：跑成。弄坏开关 run-hard-limit-full-gate-judged 下停了，这一格红。"""
+    path = os.path.join(world.repo, FAKE_COMMIT_GATE)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    write_executable(path, "#!/usr/bin/env bash\nsleep 3\nexit 0\n")
+    world.resources(local=(30, 30))
+    world.start_server(extra=hard_limit_settings(1))
+    task_id = world.submit(["bash", FAKE_COMMIT_GATE], extra={"SINGLEFS_RUN_SCOPE": SCOPE_COMMIT}, cwd=world.repo)
+    summary = world.finished(task_id)
+    if summary["task"].get("outcome") != "succeeded" or not summary["task"].get("full_gate") or len(summary["attempts"]) != 1:
+        raise SelftestFailure(f"带 --full-gate 的过了上限不判、跑成、只有一次尝试，实际 {describe(summary)}、全量标识 {summary['task'].get('full_gate')}", world.server_log_lines())
+    return "带 --full-gate 的跑 3 秒过了 1 秒的上限：不停、跑成"
+
+
+def cell_run_hard_limit_cap_hit_resets(world):
+    """撞上限归零后重新计（task_server.py 的 run_limit_accumulated）：上限 6 秒，四次撞上限各跑 1.5 秒、第五次跑约 1 秒，五次加起来过了上限，每一次都不到上限的一半多：跑成，五次结局是四次 memory-cap-hit、一次 succeeded。
+    单次用时只占上限的四分之一，机器忙时慢到三倍多才会误判。弄坏开关 long-run-cap-hits-counted 下第四次就满上限、停了，retry-overwrites-attempts 下尝试的记录没了，这一格红。"""
+    world.resources(local=(100, 100))
+    world.start_server(extra=hard_limit_settings(RUN_HARD_LIMIT_ACROSS_SECONDS))
+    task_id = world.submit(["bash", "-c", ACROSS_CAP_HITS_SCRIPT])
+    summary = world.finished(task_id)
+    outcomes = [attempt.get("outcome") for attempt in summary["attempts"]]
+    if summary["task"].get("outcome") != "succeeded" or outcomes != ["memory-cap-hit"] * 4 + ["succeeded"]:
+        raise SelftestFailure(f"撞上限之后归零：应当跑成，五次结局四个 memory-cap-hit、一个 succeeded，实际 {describe(summary)}、各次 {outcomes}", world.server_log_lines())
+    return f"四次撞上限各跑 1.5 秒、第五次跑约 1 秒：每次撞上限后归零，不满 {RUN_HARD_LIMIT_ACROSS_SECONDS} 秒，跑成"
+
+
+def cell_run_hard_limit_writer_stopped(world):
+    """改主工作区的也停（task_server.py 的 workspace_write_item）：hook-swap.py 跑满 2 秒的上限：停、记 over-four-hours；wait 退 229、在末行之前打一行 kind=workspace-write-interrupted。
+    弄坏开关 run-hard-limit-writers-spared、run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下结局不对，run-hard-limit-writer-unreminded、workspace-write-interrupted-unreported 下不报，这一格红。"""
+    release = os.path.join(world.root, "release-hard-limit-writer")
+    world.start_server(extra=hard_limit_settings(2))
+    task_id = world.submit(held_command(release, "tick", "scripts/gate/hook-swap.py"), cwd=world.repo)
+    summary = held_until_finished(world, task_id, release)
+    problems = hard_limit_problems(summary, "改主工作区的")
+    completed = world.client(["wait", str(task_id)])
+    lines = attention_lines(completed)
+    if completed.returncode != RUN_HARD_LIMIT_EXIT or len(lines) != 1 or "kind=workspace-write-interrupted" not in lines[0]:
+        problems.append(f"wait 应当退 {RUN_HARD_LIMIT_EXIT}、打一行 kind=workspace-write-interrupted，实际退 {completed.returncode}、提醒 {lines}")
+    if problems:
+        raise SelftestFailure("改主工作区的也停：" + "；".join(problems), world.server_log_lines())
+    return "改主工作区的满上限照停，wait 照 workspace-write-interrupted 提醒核现场"
+
+
+def cell_run_hard_limit_shard_stopped(world):
+    """分片的（task_server_lib.py 文件头「分片」、task_server.py 文件头 ⑦「四小时硬上限」：按每一片自己的累计算）：上限压到 15 秒，第 0、1 片一直在跑、第 2 片排着
+    （只有第二台放得下它、第二台用不了）。第 0、1 片各自累计满界：各记 over-four-hours；排着的第 2 片不撤，两片停了之后本机换成 50G 的余量，它照起、跑完（succeeded）；
+    收齐之后整件照没成的那一片收尾：over-four-hours、退 229，不合并，那一片的说明写硬上限。
+    弄坏开关 run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下各片结局不对，shard-whole-by-wall-clock 下整件按挂钟满界、排着的第 2 片被撤（cancelled），这一格红。"""
+    release = os.path.join(world.root, "release-hard-limit-shard")
+    task_id, children = start_three_shards(world, "hard-limit", [{"block": release}, {"block": release}, {}], extra=hard_limit_settings(RUN_HARD_LIMIT_SHARD_SECONDS))
+    problems = []
+    try:
+        stopped = world.wait_for(task_id, lambda found: all(shard_outcomes(found).get(index) for index in (0, 1)) or found["task"].get("state") == "finished",
+                                 "第 0、1 片各自满界收尾", timeout=RELEASE_WAIT_SECONDS)
+        if stopped["task"].get("state") != "finished":
+            world.resources(local=(50, 50), peer_down="自证：第二台此刻用不了")   # 第 2 片（记过 30G）在本机放得下了
+    finally:
+        open(release, "w").close()
+    summary = world.finished(task_id, timeout=RELEASE_WAIT_SECONDS)
+    outcomes = shard_outcomes(summary)
+    failed_note = str(shard_children(summary).get(0, {}).get("task", {}).get("note") or "") + str(shard_children(summary).get(1, {}).get("task", {}).get("note") or "")
+    if (summary["task"].get("outcome") != lib.RUN_HARD_LIMIT_OUTCOME or summary["task"].get("exit_code") != RUN_HARD_LIMIT_EXIT
+            or lib.RUN_HARD_LIMIT_OUTCOME not in str(summary["task"].get("note")) or RUN_HARD_LIMIT_NOTE not in failed_note):
+        problems.append(f"整件应当照没成的那一片记 {lib.RUN_HARD_LIMIT_OUTCOME}、退 {RUN_HARD_LIMIT_EXIT}、说明点名那一片的结局，那一片的说明写{RUN_HARD_LIMIT_NOTE}；"
+                        f"实际 {describe(summary)}、说明「{summary['task'].get('note')}」、第 0、1 片的说明「{failed_note[:300]}」")
+    if outcomes != {0: lib.RUN_HARD_LIMIT_OUTCOME, 1: lib.RUN_HARD_LIMIT_OUTCOME, 2: "succeeded"}:
+        problems.append(f"各片按自己的累计判：在跑满界的两片应当记 {lib.RUN_HARD_LIMIT_OUTCOME}、排着的第 2 片照起、跑完（succeeded），实际 {outcomes}")
+    if not world.sharded_calls("shard", index=2) or "merge" in child_roles(summary) or world.sharded_calls("merge"):
+        problems.append(f"第 2 片应当起过、不合并，实际第 2 片跑的记录 {world.sharded_calls('shard', index=2)}、子任务 {child_roles(summary)}")
+    if problems:
+        raise SelftestFailure("分片的到上限：" + "；".join(problems), world.server_log_lines())
+    return "分片的满上限按每一片自己的累计：满界的两片停、记 over-four-hours，排着的那一片照起、跑完，整件照没成的那一片收尾、不合并"
+
+
+def cell_run_hard_limit_applies_after_restart(world):
+    """服务重启时已在跑的任务同样判：服务起来时上限够大，交一条一直等放行的；停了服务（尝试在它自己的单元里接着跑），换 1 秒的上限再起：判到、停、记 over-four-hours。
+    弄坏开关 run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下结局不对，no-detach 下服务一停命令也没了，这一格红。"""
+    release = os.path.join(world.root, "release-hard-limit-restart")
+    world.start_server(extra=hard_limit_settings(HARD_LIMIT_OUT_OF_REACH_SECONDS))
+    task_id = world.submit(blocking_command(release))
+    world.running(task_id)
+    world.stop_server()
+    world.start_server(extra=hard_limit_settings(1))
+    problems = hard_limit_problems(held_until_finished(world, task_id, release), "重启时已在跑的")
+    if problems:
+        raise SelftestFailure("重启时已在跑的同样判：" + "；".join(problems), world.server_log_lines())
+    return "服务重启时已在跑、累计过了上限的：照判、照停"
+
+
+def cell_run_hard_limit_stop_retried(world):
+    """判了停而头一回没停成的下一轮再停（task_server.py 的 stop_over_limit_attempt；TASK_SERVER_SELFTEST_STOP_FAILS 演一次）：照样记 over-four-hours，演停失败的文件用掉了。
+    弄坏开关 hard-limit-stop-once 下不再停，run-hard-limit-skipped、cancel-no-readback 下不停，run-hard-limit-outcome-unmarked 下结局不对，这一格红。"""
+    release = os.path.join(world.root, "release-hard-limit-stop-retried")
+    stop_fails = os.path.join(world.root, "stop-fails-hard-limit")
+    open(stop_fails, "w").close()
+    world.start_server(extra=hard_limit_settings(2, TASK_SERVER_SELFTEST_STOP_FAILS=stop_fails))
+    task_id = world.submit(held_command(release, "tick"))
+    problems = hard_limit_problems(held_until_finished(world, task_id, release), "头一回没停成的")
+    if os.path.exists(stop_fails):
+        problems.append("演停失败的文件应当用掉了：服务应当起过一回 stop_running")
+    if problems:
+        raise SelftestFailure("没停成的下一轮再停：" + "；".join(problems), world.server_log_lines())
+    return "头一回没停成，下一轮再停：照样记 over-four-hours"
+
+
+def submitted_sheet(world, command, cwd=None):
+    """交一条、不确认：→ (确认单那几行的文字, 任务号)；交不成判红。"""
+    completed = world.client(["submit", "--cwd", cwd or world.work, "--", *command])
+    found = re.search(rf"{lib.SUBMIT_MARK} task=(\d+)", completed.stdout)
+    if completed.returncode != 0 or not found:
+        raise SelftestFailure(f"交 {command} 应当退 0、打任务号，实际退 {completed.returncode}", [completed.stdout, completed.stderr] + world.server_log_lines())
+    return completed.stdout, int(found.group(1))
+
+
+def cell_confirmation_scope_text(world):
+    """确认单的范围（task_server.py 文件头 ⑦）：命令里没点、脚本里面才展开的写「范围由脚本里面定，服务算不出」，不写「整包、不指定范围」；合入后验证另打一行崩溃用例与域；别的 cargo 照写整包。
+    确认单上 --crash-expand-up-to 的值与点名的 crash-case 项数照打。弄坏开关 scope-inside-script-unnamed 下照写整包，crash-scope-unreported 下不打崩溃用例与域，confirm-skipped 下没有确认单，这一格红。"""
+    problems = []
+    for named, whole, expected in (([], True, lib.WHOLE_SCOPE_TEXT), ([], False, lib.SCOPE_INSIDE_SCRIPT_TEXT), ([("--item", "alpha")], False, "--item 1")):
+        if lib.named_scope_text(named, whole) != expected:
+            problems.append(f"named_scope_text({named}, {whole}) 应当是「{expected}」，实际「{lib.named_scope_text(named, whole)}」")
+    merge = ["bash", FAKE_MERGE_ENTRY, "--skip-apply"]
+    for command, words in ((["bash", "-c", "exit 0"], None), ([*merge, "patch"], [lib.SCOPE_INSIDE_SCRIPT_TEXT]),
+                           ([*merge, "--crash-expand-up-to", "6", "patch"], ["--crash-expand-up-to 6", lib.SCOPE_INSIDE_SCRIPT_TEXT]),
+                           ([*merge, "--item", "crash-case:alpha", "--item=crash-case:beta", "--item", "unit:gamma", "patch"], ["2 条", "由脚本定"])):
+        text = lib.crash_scope_text(command, world.repo)
+        if (words is None and text) or (words is not None and not all(word in text for word in words)):
+            problems.append(f"crash_scope_text({command}) 应当{'是空串' if words is None else '写 ' + '、'.join(words)}，实际「{text}」")
+    write_fake_entry(world, FAKE_MERGE_ENTRY)
+    patch = os.path.join(world.root, "patch-scope")
+    os.makedirs(patch)
+    world.start_server()
+    for what, command, cwd, expected, unexpected in (("脚本自己定范围的", ["bash", "-c", "exit 0", "scope-sample"], None, [lib.SCOPE_INSIDE_SCRIPT_TEXT], [lib.WHOLE_SCOPE_TEXT, "崩溃用例与域"]),
+                                                      ("合入后验证", [*merge, patch], world.repo, [f"项数 0：{lib.SCOPE_INSIDE_SCRIPT_TEXT}", f"崩溃用例与域：{lib.SCOPE_INSIDE_SCRIPT_TEXT}"], [lib.WHOLE_SCOPE_TEXT]),
+                                                      ("别的 cargo", ["cargo", "build", "-p", "selftest-scope"], None, [lib.WHOLE_SCOPE_TEXT], [lib.SCOPE_INSIDE_SCRIPT_TEXT])):
+        sheet, task_id = submitted_sheet(world, command, cwd)
+        world.client(["cancel", str(task_id)])
+        if not all(word in sheet for word in expected) or any(word in sheet for word in unexpected):
+            problems.append(f"{what}的确认单应当写 {expected}、不写 {unexpected}，实际「{sheet.strip()[:600]}」")
+    if problems:
+        raise SelftestFailure("确认单的范围：" + "；".join(problems), world.server_log_lines())
+    return "脚本里面才展开的写算不出、不写整包；合入后验证打崩溃用例与域，命令里写了的照打"
+
+
+def raise_cell_problems(world, problems, what):
+    if problems:
+        raise SelftestFailure(f"{what}：" + "；".join(problems), world.server_log_lines())
+
+
+def release_all(paths):
+    for path in paths:
+        open(path, "w").close()
+
+
+OUTER_UNIT_LAUNCHER = ("import json, os, sys\n"
+                       "environment = json.load(open(sys.argv[1], encoding='utf-8'))\n"
+                       "log = os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)\n"
+                       "os.dup2(log, 1)\nos.dup2(log, 2)\n"
+                       "os.execve(sys.executable, [sys.executable, '-B', sys.argv[3], 'serve'], environment)\n")   # 外层单元里起这一格的服务：照这一格服务的环境、输出进这一格的服务日志
+OUTER_UNIT_STOP_SECONDS = 20   # selftest-units-stop-with-outer：停了外层单元之后，等尝试单元停下至多这么久（带 BindsTo 的当场停）
+STOPPED_UNIT_STATES = ("inactive", "failed", "")   # systemctl --user show -p ActiveState 打这几样算停了（单元收掉了的打 inactive）
+ENCLOSING_UNIT_SAMPLES = (("0::/user.slice/user-1000.slice/user@1000.service/app.slice/outer-sample.service\n", "outer-sample.service"),
+                          ("0::/user.slice/user-1000.slice/user@1000.service/singlefs.slice/memory-cap-sample.scope/payload\n", "memory-cap-sample.scope"),
+                          ("0::/user.slice/user-1000.slice/session-3.scope\n", ""), ("0::/system.slice/sample.service\n", ""))
+
+
+def unit_active_state(unit):
+    completed = subprocess.run(["systemctl", "--user", "show", "-p", "ActiveState", "--value", unit], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
+    return completed.stdout.strip()
+
+
+def cell_selftest_units_stop_with_outer(world):
+    """自证里起的尝试单元随外层停（task_server.py 文件头 ③「套在外层单元里的服务」）：这一格的服务起在一个这一格自己起的外层单元里（systemd-run --user，单元名带这一格的进程号），
+    交一条一直等放行文件的命令：它的尝试单元 BindsTo 那个外层单元；停外层单元之后 OUTER_UNIT_STOP_SECONDS 秒里尝试单元停了（不等命令自己退）。
+    另核 lib.enclosing_user_unit 认几种 cgroup 写法。弄坏开关 nested-units-unbound 下不带 BindsTo、外层停了尝试单元照跑，这一格红。"""
+    problems = [f"cgroup「{text.strip()}」应当认成「{unit}」，实际「{lib.enclosing_user_unit(text)}」" for text, unit in ENCLOSING_UNIT_SAMPLES
+                if lib.enclosing_user_unit(text) != unit]
+    outer = f"singlefs-task-selftest-outer-{os.getpid()}-{time.time_ns()}.service"
+    environment_path = os.path.join(world.root, "outer-environment.json")
+    with open(environment_path, "w", encoding="utf-8") as handle:
+        json.dump(world.server_environment, handle)
+    world.server_logs += 1
+    log_path = os.path.join(world.root, f"server-{world.server_logs}.log")
+    release = os.path.join(world.root, "release-outer")
+    write_executable(os.path.join(world.work, "outer-hold.sh"), f"#!/usr/bin/env bash\n{HOLD_UNTIL_RELEASED_SCRIPT}\n")
+    with open("/proc/self/cgroup", encoding="utf-8") as handle:
+        own_unit = lib.enclosing_user_unit(handle.read())   # 外层单元自己也随这一格所在的单元停：整份自证被停时它不留下
+    bound = ["-p", f"BindsTo={own_unit}", "-p", f"After={own_unit}"] if own_unit else []
+    started = subprocess.run(["systemd-run", "--user", f"--unit={outer}", "--collect", "--quiet", "-p", "KillMode=mixed", *bound, f"--working-directory={world.root}", "--",
+                              sys.executable, "-B", "-c", OUTER_UNIT_LAUNCHER, environment_path, log_path, lib.SERVER_SCRIPT],
+                             capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+    if started.returncode != 0:
+        raise SelftestFailure(f"外层单元起不来（systemd-run 退 {started.returncode}）：{(started.stderr + started.stdout).strip()[-300:]}")
+    unit = ""
+    try:
+        patience = world.patience(STATE_TIMEOUT_SECONDS)
+        while patience.waiting():
+            with contextlib.suppress(lib.ServerUnreachable):
+                status, health = world.api("GET", "/health")
+                if status == 200 and health.get("ok"):
+                    break
+            time.sleep(POLL_SECONDS)
+        else:
+            raise SelftestFailure(f"外层单元里的服务 {patience.elapsed():.0f} 秒没起来", world.server_log_lines())
+        task_id = world.submit(["bash", "outer-hold.sh", release])
+        unit = next((attempt.get("unit") for attempt in world.running(task_id)["attempts"] if attempt.get("state") == "running"), "") or ""
+        binds = subprocess.run(["systemctl", "--user", "show", "-p", "BindsTo", "--value", unit], capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                               timeout=30).stdout.split()
+        if outer not in binds:
+            problems.append(f"尝试单元 {unit} 应当 BindsTo 外层单元 {outer}，实际 BindsTo「{' '.join(binds)}」")
+        subprocess.run(["systemctl", "--user", "stop", outer], capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
+        deadline = time.monotonic() + OUTER_UNIT_STOP_SECONDS
+        while unit_active_state(unit) not in STOPPED_UNIT_STATES and time.monotonic() < deadline:
+            time.sleep(POLL_SECONDS)
+        if unit_active_state(unit) not in STOPPED_UNIT_STATES:
+            problems.append(f"外层单元停了 {OUTER_UNIT_STOP_SECONDS} 秒，尝试单元 {unit} 还是 {unit_active_state(unit)}（只能等命令自己超时退）")
+    finally:
+        release_all([release])
+        subprocess.run(["systemctl", "--user", "stop", outer], capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
+        if unit and unit_active_state(unit) not in STOPPED_UNIT_STATES:
+            subprocess.run(["systemctl", "--user", "stop", unit], capture_output=True, stdin=subprocess.DEVNULL, timeout=200)
+    raise_cell_problems(world, problems, "自证里起的单元随外层停")
+    return f"外层单元里的服务起的尝试单元 BindsTo 外层单元，停外层之后 {OUTER_UNIT_STOP_SECONDS} 秒里跟着停了"
+
+
+def loaded_host_dispatch():
+    """假调度器要的 host-dispatch.py（Prediction、Verdict）：这一格的进程里载一份。"""
+    return lib.load_module("host_dispatch_for_scheduling_cells", os.path.join(lib.HOSTS_DIRECTORY, "host-dispatch.py"))
+
+
+RUNNING_BOOKING_LABEL = "task-selftest-running-booking-1"
+
+
+def running_booking_scheduler(peak_bytes, scope_used_bytes, slice_used_gibibytes=0, cap_bytes=20 * GIBIBYTE):
+    """running-booked-at-measured-usage 与 running-booked-unscoped-at-cap 的假调度器与一份本机报告：slice 总上限 30G、余量 1G，一条在跑、上限 cap_bytes，
+    它这一次到此刻的峰值 peak_bytes（Machine.memory_now；在跑记账不读它），报告里它的 scope 此刻回收不掉 scope_used_bytes（None 是报告里没有它的 scope）。
+    → (假调度器, Snapshot, 那份报告)。"""
+    attempt = {"id": 1, "task_id": 1, "host": SERVER.LOCAL, "label": RUNNING_BOOKING_LABEL, "memory_cap": cap_bytes}
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.peaks = PEAKS
+    fake.host_dispatch = loaded_host_dispatch()
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(memory_now=lambda found: (scope_used_bytes, peak_bytes))}
+    fake.store = types.SimpleNamespace(running_attempts=lambda: [dict(attempt)])
+    fake.host_margin = lambda host, snapshot: (GIBIBYTE, "")
+    fake.slice_room_floor = SERVER.SLICE_ROOM_FLOOR_BYTES
+    fake.unit_stopped = set()   # booking_attempts 不数的、单元已确认停了的尝试号（Scheduler.__init__ 建的）
+    report = memory_report(30, 30, slice_used_gibibytes=slice_used_gibibytes,
+                           scopes=None if scope_used_bytes is None else {RUNNING_BOOKING_LABEL: scope_used_bytes})
+    return fake, SERVER.Snapshot({SERVER.LOCAL: report}, {}, {SERVER.LOCAL: True}, {}), report
+
+
+# running-booked-at-measured-usage：(说什么, 上限, 此刻 scope 用量, 该记多少, 取的是哪一个, 公式剩多少, 待涨量)，单位 GiB；slice 30G、余量 1G，公式的总额就是总上限 30G
+RUNNING_BOOKING_CASES = (("上限 20G、此刻 2G", 20, 2, 2, SERVER.BOOKED_FROM_USAGE, 27, 0),
+                         ("上限 20G、此刻 12G", 20, 12, 12, SERVER.BOOKED_FROM_USAGE, 17, 0),
+                         ("上限 8G、此刻 9G", 8, 9, 8, SERVER.BOOKED_FROM_CAP, 21, 0))
+
+
+def cell_running_booked_at_measured_usage(world):
+    """在跑的有 scope 的尝试只照此刻实测记账、不超过上限、不加固定余量、不看任何预先估的数（task_server.py 的 running_booking、room_by_the_formula、server_pending；
+    文件头 ②「内存」的在跑记账）：本机 slice 30G、余量 1G，一条在跑（RUNNING_BOOKING_CASES 三种）——上限 20G、此刻 2G 记 2G（measured）、公式剩 27G、排头 12G 放得下、待涨量 0；
+    此刻 12G 记 12G（measured）、公式剩 17G；上限 8G、此刻 9G 记上限 8G（cap）、公式剩 21G。
+    弄坏开关 running-booked-at-cap 下头一种记 20G，running-booked-with-margin 下记 3G，这一格红。"""
+    dispatch = loaded_host_dispatch()
+    head = types.SimpleNamespace(memory_booked=12 * GIBIBYTE)
+    fits = dispatch.Verdict(SERVER.LOCAL, True, False, 12 * GIBIBYTE, "内存放得下")
+    problems, shown = [], []
+    for what, cap, used, want, basis, want_room, want_pending in RUNNING_BOOKING_CASES:
+        fake, snapshot, report = running_booking_scheduler(used * GIBIBYTE, used * GIBIBYTE, cap_bytes=cap * GIBIBYTE)
+        booked, got_basis = SERVER.Scheduler.running_booking(fake, fake.store.running_attempts()[0], SERVER.Scheduler.report_scope_usage(fake, report))
+        room = SERVER.Scheduler.room_by_the_formula(fake, SERVER.LOCAL, snapshot)
+        verdict = SERVER.Scheduler.verdict_within_the_formula(fake, fits, head, SERVER.LOCAL, snapshot)
+        pending = SERVER.Scheduler.server_pending(fake, SERVER.LOCAL, report)
+        if (booked, got_basis, room, pending) != (want * GIBIBYTE, basis, want_room * GIBIBYTE, want_pending * GIBIBYTE) or not verdict.fits:
+            problems.append(f"{what}：应当记 {want}G（{basis}）、公式剩 {want_room}G、排头 12G 放得下、待涨量 {want_pending}G，"
+                            f"实际记 {booked / GIBIBYTE:g}G（{got_basis}）、公式剩 {room / GIBIBYTE:g}G、判决 {verdict}、待涨量 {pending / GIBIBYTE:g}G")
+        shown.append(f"{what}记 {want}G（{basis}）")
+    if problems:
+        raise SelftestFailure("在跑的只照此刻实测记账：" + "；".join(problems))
+    return "；".join(shown) + "；排头 12G 都放得下"
+
+
+def cell_running_young_booked_at_cap(world):
+    """起跑不满两分钟的在跑尝试照整份上限记（task_server.py 的 running_booking、running_booking_text；任务 15262 到 15299 共 38 条十秒内全起那一回）：
+    时限照 120 秒，上限 20G、此刻 2G 的一条——起跑 10 秒的记 20G（young），为什么那一句写「不算漂移」；起跑 200 秒的记实测 2G（measured）。套在假调度器上，不起服务。
+    弄坏开关 running-young-booked-by-usage 下起跑 10 秒的记 2G，这一格红。"""
+    problems = []
+    for age, want, basis in ((10, 20, SERVER.BOOKED_WHILE_YOUNG), (200, 2, SERVER.BOOKED_FROM_USAGE)):
+        fake, _, report = running_booking_scheduler(2 * GIBIBYTE, 2 * GIBIBYTE)
+        fake.environment = dict(fake.environment, **{lib.YOUNG_BOOKING_VARIABLE: "120"})
+        attempt = dict(fake.store.running_attempts()[0], started_at=time.time() - age)
+        usage = SERVER.Scheduler.report_scope_usage(fake, report)
+        booked, got = SERVER.Scheduler.running_booking(fake, attempt, usage)
+        why = SERVER.Scheduler.running_booking_text(got, usage.get(RUNNING_BOOKING_LABEL), 20 * GIBIBYTE)
+        if (booked, got) != (want * GIBIBYTE, basis) or (basis == SERVER.BOOKED_WHILE_YOUNG and "不算漂移" not in why):
+            problems.append(f"起跑 {age} 秒的应当记 {want}G（{basis}），刚起的那一句写「不算漂移」，实际记 {booked / GIBIBYTE:g}G（{got}）、「{why}」")
+    if problems:
+        raise SelftestFailure("起跑不满两分钟照整份上限记：" + "；".join(problems))
+    return "上限 20G、此刻 2G：起跑 10 秒的记 20G（young，不算漂移）；起跑 200 秒的记实测 2G"
+
+
+def cell_running_booked_unscoped_at_cap(world):
+    """报告里没有在跑尝试的 scope（刚起、读不了）的照整份上限记账（task_server.py 的 running_booked、room_by_the_formula、verdict_within_the_formula）：本机 slice 30G、余量 1G，
+    一条在跑、上限 20G、报告里没有它的 scope：记 20G，公式剩 9G，排头 25G 放不下、原因写「在跑的记账之和」。slice 兜底（slice_floor_problem）：slice 实测只剩 3G
+    （不到 SLICE_ROOM_FLOOR_BYTES）这一轮不派、原因以「slice 兜底」起头，剩 20G 的不挡。
+    弄坏开关 slice-floor-ignored 下不判 slice 兜底，这一格红。"""
+    dispatch = loaded_host_dispatch()
+    head = types.SimpleNamespace(memory_booked=25 * GIBIBYTE, memory_predicted=25 * GIBIBYTE, memory_cap=25 * GIBIBYTE)
+    fits = dispatch.Verdict(SERVER.LOCAL, True, False, 25 * GIBIBYTE, "内存放得下")
+    problems = []
+    fake, snapshot, _ = running_booking_scheduler(GIBIBYTE // 2, None)
+    room = SERVER.Scheduler.room_by_the_formula(fake, SERVER.LOCAL, snapshot)
+    verdict = SERVER.Scheduler.verdict_within_the_formula(fake, fits, head, SERVER.LOCAL, snapshot)
+    if room != 9 * GIBIBYTE or verdict.fits or SERVER.RUNNING_BOOKED_SUM_TEXT not in verdict.why:
+        problems.append(f"报告里没有它的 scope：应当照上限 20G 记、公式剩 9G、排头 25G 放不下、原因写「{SERVER.RUNNING_BOOKED_SUM_TEXT}」，实际公式剩 {room}、判决 {verdict}")
+    for used, held in ((27, True), (10, False)):
+        fake, snapshot, _ = running_booking_scheduler(GIBIBYTE // 2, int(0.4 * GIBIBYTE), slice_used_gibibytes=used)
+        why = SERVER.Scheduler.slice_floor_problem(fake, SERVER.LOCAL, snapshot)
+        if held != why.startswith(SERVER.SLICE_FLOOR_TEXT):
+            problems.append(f"slice 里进程用 {used}G（总上限 30G）：应当{'停派、原因以「' + SERVER.SLICE_FLOOR_TEXT + '」起头' if held else '不挡'}，实际「{why}」")
+    if problems:
+        raise SelftestFailure("没有 scope 的照上限记账、slice 兜底：" + "；".join(problems))
+    return "读不到 scope 的照上限 20G 记、公式剩 9G、排头 25G 放不下；slice 只剩 3G 时停派"
+
+
+ADMISSION_PROBE = ("selftest-admission-probe", 10)   # admission-by-measured-bookings 与 memory-wait-names-both-numbers 再来的那一条：(命令键, 上限与记账 GiB)
+# 那两格的三种在跑：(说什么, [(上限, scope 此刻用量)]（GiB）, slice 里进程用的 GiB)；slice 总额 50G、余量 1G、整机空闲 100G
+ADMISSION_ROOMY = ("上限之和 48G、实测只占 6G", [(12, 1.5)] * 4, 6)
+ADMISSION_CAPS_OVER_TOTAL = ("上限之和 70G（比总额 50G 大）、实测只占 6G", [(14, 1.2)] * 5, 6)
+ADMISSION_MEASURED_TIGHT = ("上限之和 48G、实测占 42G（slice 实测余量 8G）", [(12, 10.5)] * 4, 42)
+
+
+def admission_scheduler(running, slice_used_gibibytes):
+    """照实测记账准入那两格的假调度器（真的 Scheduler 方法，套在假的库与余量报告上）：本机 slice 总额 50G、余量 1G、整机空闲 100G，在跑的 running 是 [(上限, scope 此刻用量)]（GiB），
+    任务号 701 起依次编，slice 里进程用 slice_used_gibibytes。→ (假调度器, Snapshot, 报告)。"""
+    attempts = [{"id": number, "task_id": 700 + number, "host": SERVER.LOCAL, "label": f"task-selftest-admission-{number}", "memory_cap": int(cap * GIBIBYTE)}
+                for number, (cap, _) in enumerate(running, 1)]
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.peaks = PEAKS
+    fake.host_dispatch = loaded_host_dispatch()
+    fake.store = types.SimpleNamespace(running_attempts=lambda: [dict(attempt) for attempt in attempts])
+    fake.host_margin = lambda host, snapshot: (GIBIBYTE, "")
+    fake.slice_room_floor = SERVER.SLICE_ROOM_FLOOR_BYTES
+    fake.unit_stopped = set()
+    report = memory_report(100, 50, slice_used_gibibytes=slice_used_gibibytes,
+                           scopes={attempt["label"]: int(used * GIBIBYTE) for attempt, (_, used) in zip(attempts, running)})
+    return fake, SERVER.Snapshot({SERVER.LOCAL: report}, {}, {SERVER.LOCAL: True}, {}), report
+
+
+def admission_judged(case):
+    """照 case（ADMISSION_* 之一）建假调度器，判再来的那一条（ADMISSION_PROBE）：judged_on_host（judge_host、公式）再过 slice_floor_verdict，同 host_admission 的内存那几步。
+    → (假调度器, Snapshot, 这台上的记账, 判决)。"""
+    _, running, slice_used = case
+    fake, snapshot, report = admission_scheduler(running, slice_used)
+    key, size = ADMISSION_PROBE
+    prediction = fake.host_dispatch.Prediction(key, size * GIBIBYTE, size * GIBIBYTE, size * GIBIBYTE, lib.RECORD_HISTORY)
+    pending = SERVER.Scheduler.server_pending(fake, SERVER.LOCAL, report)
+    on_host, verdict = SERVER.Scheduler.judged_on_host(fake, {"id": 1, "command_key": key}, prediction, SERVER.LOCAL, snapshot, pending)
+    return fake, snapshot, on_host, SERVER.Scheduler.slice_floor_verdict(fake, verdict, on_host, SERVER.LOCAL, snapshot)
+
+
+def cell_admission_by_measured_bookings(world):
+    """准入只看在跑的实测记账之和，在跑的上限之和多大都不挡（task_server.py 的 running_booking、room_by_the_formula、judged_on_host；文件头 ②「内存」的公式；
+    2026-11-12 两台各记 73G、74G 而实占 2.5G、4.6G，排着的几十条起不来）：本机 slice 总额 50G、余量 1G，再来一条上限 10G 的——
+    在跑上限之和 48G、实测只占 6G：起得来；上限之和 70G（比总额大）、实测只占 6G：照样起得来（50 − 1 − 6 ≥ 10）；上限之和 48G 而实测占 42G：排着，
+    原因写「账面还能记 7.0 GiB」。套在假调度器上，不起服务。
+    弄坏开关 running-booked-at-cap 下第二种照上限之和 70G 记、放不下，这一格红。"""
+    problems, shown = [], []
+    for case, fits in ((ADMISSION_ROOMY, True), (ADMISSION_CAPS_OVER_TOTAL, True), (ADMISSION_MEASURED_TIGHT, False)):
+        _, _, _, verdict = admission_judged(case)
+        if verdict.fits != fits:
+            problems.append(f"{case[0]}：上限 10G 的应当{'起得来' if fits else '排着'}，实际判决 {verdict}")
+        shown.append(f"{case[0]}：{'起得来' if verdict.fits else '排着'}")
+    _, _, _, tight = admission_judged(ADMISSION_MEASURED_TIGHT)
+    if "账面还能记 7.0 GiB" not in tight.why:
+        problems.append(f"{ADMISSION_MEASURED_TIGHT[0]}：原因应当写「账面还能记 7.0 GiB」，实际「{tight.why}」")
+    if problems:
+        raise SelftestFailure("准入只看实测记账：" + "；".join(problems))
+    return "；".join(shown)
+
+
+def cell_memory_wait_names_both_numbers(world):
+    """内存放不下的排队原因写明两个数各是什么、点名记账最多的在跑任务（task_server.py 的 memory_wait_text、memory_verdict_reworded、verdict_within_the_formula；
+    judge_host 那一句的「此刻空闲」是整机空闲减待涨量，看着像机器的可用内存）：本机 slice 总额 50G、余量 1G，在跑四条各上限 12G、各实占 10.5G，再来一条 10G 的——
+    原因写「账面还能记 7.0 GiB」（连同总上限、余量与在跑的记账之和 42.0 GiB）、「slice 实测还放得下 8.0 GiB」，点名记账最多的两条（任务 701、702 各记 10.5 GiB、实占 10.5 GiB），
+    第三条不点名，不写「此刻空闲」、不写乘几；judge_host 放得下、只有公式放不下的那一判（verdict_within_the_formula）写同一句。套在假调度器上，不起服务。
+    弄坏开关 memory-wait-text-unnamed 下照 judge_host 与公式原来那一句写，这一格红。"""
+    fake, snapshot, on_host, verdict = admission_judged(ADMISSION_MEASURED_TIGHT)
+    wanted = ("账面还能记 7.0 GiB", f"{SERVER.RUNNING_BOOKED_SUM_TEXT} 42.0 GiB", "slice 实测还放得下 8.0 GiB",
+              "任务 701 记 10.5 GiB、实占 10.5 GiB", "任务 702 记 10.5 GiB、实占 10.5 GiB")
+    problems = []
+    missing = [piece for piece in wanted if piece not in verdict.why]
+    if verdict.fits or missing or "任务 703" in verdict.why or "此刻空闲" in verdict.why or "×" in verdict.why:
+        problems.append(f"judge_host 判放不下：原因应当写 {'、'.join(wanted)}、不点名任务 703、不写「此刻空闲」、不写乘几，缺 {missing}，实际「{verdict.why}」")
+    fits = fake.host_dispatch.Verdict(SERVER.LOCAL, True, False, on_host.memory_cap, "内存放得下")
+    formula = SERVER.Scheduler.verdict_within_the_formula(fake, fits, on_host, SERVER.LOCAL, snapshot)
+    if formula.fits or "账面还能记 7.0 GiB" not in formula.why or "slice 实测还放得下 8.0 GiB" not in formula.why:
+        problems.append(f"只有公式放不下：原因应当写账面还能记 7.0 GiB 与 slice 实测还放得下 8.0 GiB，实际 {formula}")
+    if problems:
+        raise SelftestFailure("内存放不下的排队原因：" + "；".join(problems))
+    return f"原因写「{verdict.why[:160]}」"
+
+
+CARGO_CLASS_BASE = ("cargo", "test", "-p", "singlefs-verification", "--release")   # cargo-test-key-by-package：同包同档的那一类
+CARGO_CLASS_PEAK_BYTES = 3 * GIBIBYTE   # 头一条量到的峰值：比没记录的 4096M 小，第二条照它起就是 3072M
+CARGO_CLASS_FAKE_WORDS = ("fake-wrapper-exits=0",)   # 假包装照它退 0、不起 cargo；它在 cargo test 的位置参数上（测试名筛选），不进键
+
+
+def cell_cargo_test_key_by_package(world):
+    """cargo test 同包同特性同档归一个键（task_server_lib.py 的 cargo_test_class_words、task_server.py 的 command_key；点名验证包测试目标的每条新命令各从 4096M 起、
+    撞三四次才编得过）：cargo test -p singlefs-verification --release --test alpha -- 用例 --exact 跑成、量到 3G；同包同档、点名 --test beta 的那一条命令键与它相同、
+    头一次照它的记录起 3072M；再加 --features selftest-extra 的那一条键不同、没有记录，照 4096M 起。键里不带 --test 的值与 `--` 之后的用例；别的命令的词照原样。
+    弄坏开关 cargo-test-key-whole-command 下整条命令当键，点名 beta 的那一条也照 4096M 起，这一格红。"""
+    world.resources(local=(100, 100))
+    world.start_server()
+    first = world.finished(world.submit([*CARGO_CLASS_BASE, "--test", "selftest-target-alpha", "--", "selftest_case", "--exact",
+                                         f"fake-wrapper-exit-peak={CARGO_CLASS_PEAK_BYTES}", *CARGO_CLASS_FAKE_WORDS]))
+    second = world.finished(world.submit([*CARGO_CLASS_BASE, "--test", "selftest-target-beta", *CARGO_CLASS_FAKE_WORDS]))
+    third = world.finished(world.submit([*CARGO_CLASS_BASE, "--features", "selftest-extra", "--test", "selftest-target-beta", *CARGO_CLASS_FAKE_WORDS]))
+    keys = [summary["task"].get("command_key") or "" for summary in (first, second, third)]
+    caps = [first_attempt(summary).get("memory_cap_text") for summary in (second, third)]
+    other = ["bash", "-c", "exit 0", "--test", "selftest-target-alpha"]
+    problems = []
+    if any(summary["task"].get("outcome") != "succeeded" for summary in (first, second, third)):
+        problems.append(f"三条都应当跑成，实际 {[describe(summary) for summary in (first, second, third)]}")
+    if keys[0] != keys[1] or keys[1] == keys[2] or "selftest-target" in keys[0] or "selftest_case" in keys[0]:
+        problems.append(f"点名 alpha 与 beta 的同包同档两条应当同一个键、键里不带测试目标与用例，加了特性的另一个键；实际 {keys}")
+    if caps != [f"{CARGO_CLASS_PEAK_BYTES // MEBIBYTE}M", UNRECORDED_DEFAULT_PINNED_TEXT]:
+        problems.append(f"点名 beta 的那一条应当照 alpha 量到的 3G 起 {CARGO_CLASS_PEAK_BYTES // MEBIBYTE}M、加了特性的照没记录的 {UNRECORDED_DEFAULT_PINNED_TEXT} 起，实际 {caps}")
+    if lib.cargo_test_class_words(other) != other:
+        problems.append(f"不是 cargo test 的命令应当照原样，实际 {lib.cargo_test_class_words(other)}")
+    if problems:
+        raise SelftestFailure("cargo test 同包同特性同档归一个键：" + "；".join(problems), world.server_log_lines())
+    return f"点名不同测试目标的同包同档两条共用键「{keys[0]}」、第二条照 3G 起 {caps[0]}；加了特性的另一个键、照 {caps[1]} 起"
+
+
+def cell_selection_key_by_script(world):
+    """本仓门禁与入口脚本点名不同格、不同项归一个键（task_server_lib.py 的 selection_class_words、task_server.py 的 command_key）：
+    bash .claude/gate.d/doc-text.sh --check date-once 与 --check=trilingual-files 两条的词相同、都是「--check *」；--item 与 --only 照同样去值；
+    不带选法的整道照原样，与点名的不是一个键；不在本仓脚本目录下的命令（cargo fmt --check）照原样。
+    弄坏开关 selection-key-whole-command 下照原样，点名不同格的两条词不同，这一格红。"""
+    gate = ["bash", ".claude/gate.d/doc-text.sh"]
+    first = lib.selection_class_words([*gate, "--check", "date-once"])
+    second = lib.selection_class_words([*gate, "--check=trilingual-files"])
+    entry = ["env", "A=1", "bash", "/repository/scripts/crash/crash-amplification.sh"]
+    items = lib.selection_class_words([*entry, "--item", "one", "--item", "two"])
+    whole = lib.selection_class_words(gate)
+    other = ["cargo", "fmt", "--check"]
+    problems = []
+    if first != second or first != [*gate, "--check", "*"]:
+        problems.append(f"点名不同格的两条应当同为 {[*gate, '--check', '*']}，实际 {first} 与 {second}")
+    if items != [*entry, "--item", "*"]:
+        problems.append(f"点名两项的入口应当去值只留一个「--item *」，实际 {items}")
+    if whole != gate or whole == first:
+        problems.append(f"不带选法的整道应当照原样、与点名的不同，实际 {whole}")
+    if lib.selection_class_words(other) != other:
+        problems.append(f"不是本仓脚本的命令应当照原样，实际 {lib.selection_class_words(other)}")
+    if problems:
+        raise SelftestFailure("本仓门禁与入口脚本点名不同格、不同项归一个键：" + "；".join(problems), [])
+    return f"点名不同格的两条共用「{' '.join(first)}」，点名两项的入口共用「--item *」，整道与别的命令照原样"
+
+
+ACTIVITY_GROWTH_PER_TICK_BYTES = 16 * MEBIBYTE   # memory-growth-not-stalled：假 scope 的进程内存每 0.2 秒涨这么多（一个 2 秒的窗口涨 160 MiB，过 ACTIVITY_MEMORY_BYTES）
+ACTIVITY_QUIET_COMMAND = "echo started; sleep 8"   # 那一格两条的正文：只打一行、静 8 秒（四个卡住窗口）
+
+
+def cell_memory_growth_not_stalled(world):
+    """进程内存在涨算有进展（task_server.py 的 note_activity、activity_text、judge_stall_stop）：
+    卡住窗口 2 秒、宽限 0.01 秒，假 scope 的 CPU 不涨。头一条只打一行、静 8 秒，这段时间假 scope 的进程内存
+    每 0.2 秒涨 16 MiB：日志与 CPU 都不涨，照样不停、跑完；之后进程内存不动，第二条同样静 8 秒：记 stalled。
+    另静态核 activity_text：进程内存一个窗口里从 100 MiB 涨到 200 MiB 算有进展，只涨 10 MiB 不算，窗口不是这一个的不算。
+    弄坏开关 progress-ignored-for-stall 下头一条也被停、记 stalled，这一格红。"""
+    key = "selftest-memory-growth"
+    scope = os.path.join(world.root, "growing-memory-scope")
+    os.makedirs(scope)
+    with open(os.path.join(scope, "cpu.stat"), "w", encoding="utf-8") as handle:
+        handle.write("usage_usec 1000\n")
+    stat = os.path.join(scope, "memory.stat")
+    with open(stat, "w", encoding="utf-8") as handle:
+        handle.write(process_memory_stat(64 * MEBIBYTE))
+    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01", "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
+    stop = threading.Event()
+
+    def grow():
+        used = 64 * MEBIBYTE
+        while not stop.is_set():
+            used += ACTIVITY_GROWTH_PER_TICK_BYTES
+            with open(stat + ".partial", "w", encoding="utf-8") as handle:
+                handle.write(process_memory_stat(used))
+            os.replace(stat + ".partial", stat)
+            time.sleep(0.2)
+
+    grower = threading.Thread(target=grow, daemon=True)
+    grower.start()
+    try:
+        growing = world.finished(world.submit(["bash", "-c", ACTIVITY_QUIET_COMMAND, "memory-growing"], extra={lib.KEY_VARIABLE: key}), timeout=45)
+    finally:
+        stop.set()
+        grower.join()
+    flat = world.finished(world.submit(["bash", "-c", ACTIVITY_QUIET_COMMAND, "memory-flat"], extra={lib.KEY_VARIABLE: key}), timeout=45)
+    problems = []
+    if growing["task"].get("outcome") != "succeeded":
+        problems.append(f"进程内存每 0.2 秒涨 16 MiB 的那一条（日志与 CPU 都不涨）应当照跑完，实际 {describe(growing)}")
+    if flat["task"].get("outcome") != "stalled":
+        problems.append(f"进程内存不动的那一条应当记 stalled，实际 {describe(flat)}")
+    moving, still = (SERVER.ActivityWindow(1.0, first, None, last, None) for first, last in ((100 * MEBIBYTE, 200 * MEBIBYTE), (100 * MEBIBYTE, 110 * MEBIBYTE)))
+    if not SERVER.activity_text(moving, 1.0) or SERVER.activity_text(still, 1.0) or SERVER.activity_text(moving, 2.0):
+        problems.append(f"进程内存从 100 MiB 涨到 200 MiB 应当算有进展、只涨 10 MiB 与别的窗口的不算，实际「{SERVER.activity_text(moving, 1.0)}」"
+                        f"「{SERVER.activity_text(still, 1.0)}」「{SERVER.activity_text(moving, 2.0)}」")
+    if problems:
+        raise SelftestFailure("有进展的不判卡住：" + "；".join(problems), world.server_log_lines())
+    return "进程内存在涨的那一条照跑完、不动的记 stalled；静态核进程内存涨够了才算有进展"
+
+
+def signal_note_scheduler(stopped_attempt_ids=()):
+    """signal-exit-named 的假调度器：stop_running 对哪几次尝试发过停（service_stopped_attempts）。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.service_stopped_attempts = {attempt_id: time.time() for attempt_id in stopped_attempt_ids}
+    return fake
+
+
+def cell_signal_exit_named(world):
+    """命令被信号终止时原因句写出信号名、点名服务发没发过停的信号（task_server.py 的 signal_note、service_stop_step；task_server_lib.py 的 reason_fields；
+    任务 13455 第 6 次的 SIGTERM，结局只写「命令自己退 1」）：起服务交一条 bash -c 'kill -TERM $$'：结局 command-failed，那一次尝试的 signal_note 与理由行
+    的 why 都写「SIGTERM」与「服务这一次没有发过停的信号」。静态再核两种：尝试单元收到 SIGTERM（stopped_signal 15）、命令退 1，而 stop_running 对它发过停：
+    写「SIGTERM」与「停尝试的单元」；判卡住停的写「判卡住」；退 1、没收到信号的交空串。弄坏开关 signal-exit-unnamed 下一句都不写，这一格红。"""
+    world.start_server()
+    summary = world.finished(world.submit(["bash", "-c", "kill -TERM $$", "signal-self"]))
+    attempt = first_attempt(summary)
+    note = attempt.get("signal_note") or ""
+    why = dict(lib.reason_fields(summary["task"], summary["attempts"], "")).get("why", "")
+    problems = []
+    if summary["task"].get("outcome") != "command-failed" or "SIGTERM" not in note or "服务这一次没有发过停的信号" not in note or note not in why:
+        problems.append(f"自己收到 SIGTERM 的命令应当记 command-failed、signal_note 写 SIGTERM 与「服务这一次没有发过停的信号」、理由行接上它，"
+                        f"实际 {describe(summary)}、signal_note「{note}」、why「{why}」")
+    stopped = SERVER.Scheduler.signal_note(signal_note_scheduler([7]), {"id": 1}, {"id": 7}, {"stopped_signal": 15}, 1)
+    stalled = SERVER.Scheduler.signal_note(signal_note_scheduler(), {"id": 1}, {"id": 8, "stalled": True}, {"stopped_signal": 15}, 1)
+    plain = SERVER.Scheduler.signal_note(signal_note_scheduler(), {"id": 1}, {"id": 9}, {"stopped_signal": 0}, 1)
+    if "SIGTERM" not in stopped or "停尝试的单元" not in stopped or "判卡住" not in stalled or plain:
+        problems.append(f"单元收到 SIGTERM、stop_running 发过的应当写 SIGTERM 与「停尝试的单元」，判卡住的写「判卡住」，没收到信号的空串；"
+                        f"实际「{stopped}」「{stalled}」「{plain}」")
+    if problems:
+        raise SelftestFailure("被信号终止的写出信号名：" + "；".join(problems), world.server_log_lines())
+    return f"自己收到 SIGTERM 的写「{note}」；服务停的点名是哪一步"
+
+
+def cell_shard_key_without_count(world):
+    """片的命令键只带片号、不带片数（task_server_lib.py 的 shard_child_key；admission 审核 F7）：同一件第 3 片在共 5 片与共 64 片时键相同（过了键的换算也相同），
+    与第 2 片不同。弄坏开关 shard-key-count-kept 下键里带片数、片数一变就换新键，这一格红。"""
+    base = "bash .claude/gate.d/selftest-gate.sh"
+    five, sixty_four, other = (PEAKS.command_key([], lib.shard_child_key(base, "shard", index, count)) for index, count in ((3, 5), (3, 64), (2, 64)))
+    if five != sixty_four or five == other:
+        raise SelftestFailure(f"第 3 片共 5 片与共 64 片的键应当相同、与第 2 片不同，实际「{five}」「{sixty_four}」「{other}」")
+    return f"第 3 片的键不随片数变：「{five}」"
+
+
+def cell_stopped_peaks_floor_record(world):
+    """被停、判红的那一次量到的峰值当下限进定额度（task_server.py 的 stopped_peak_floor、recorded_prediction；admission 审核 F6）：撞过 13824M（峰值 13.48G）、之后被取消的那一次
+    量到 15.21G：下一次起步不低于 15.21G（不再从撞过的那一档重撞）；跑成 2G、命令退 1 的那一次 100M：照 2G（小的不拉低）；只有一次取消、量到 6G：照 6G 起（比没记录的 4G 大）；
+    只有一次取消、量到 1G：交 None，照没记录的 4G 起。弄坏开关 stopped-peaks-not-counted 下被停的峰值丢掉（头一种起步 13824M、第三种照 4G），这一格红。"""
+    dispatch = loaded_host_dispatch()
+    default = lib.UNRECORDED_MEMORY_DEFAULT_BYTES
+    base = dispatch.Prediction("selftest-stopped-peaks", default, default, default, lib.UNRECORDED_HISTORY)
+
+    def row(outcome, peak, ended_at, cap=None):
+        return ({"outcome": outcome, "memory_peak": int(peak), "memory_cap": cap, "ended_at": ended_at, "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC}, True)
+    problems = []
+    for what, rows, wanted in (("撞过 13824M、之后取消时量到 15.21G", [row("cancelled", 15.21 * GIBIBYTE, 5), row("memory-cap-hit", 13.48 * GIBIBYTE, 4, 13824 * MEBIBYTE)],
+                                int(13824 * MEBIBYTE * lib.CAP_GROWTH_FACTOR)),   # 撞过、之后没跑完过：照撞过的上限乘 1.5（20736M），比取消时量到的 15.21G 大
+                               ("跑成 2G、命令退 1 时 100M", [row("command-failed", 100 * MEBIBYTE, 5), row("succeeded", 2 * GIBIBYTE, 4)], 2 * GIBIBYTE),
+                               ("只有一次取消、量到 6G", [row("cancelled", 6 * GIBIBYTE, 5)], 6 * GIBIBYTE),
+                               ("只有一次取消、量到 1G", [row("cancelled", GIBIBYTE, 5)], None)):
+        fake = object.__new__(SERVER.Scheduler)
+        fake.environment = dict(os.environ)
+        fake.store = types.SimpleNamespace(select=lambda *arguments, table=rows, **options: list(table))
+        found = SERVER.Scheduler.recorded_prediction(fake, {"command_key": "selftest-stopped-peaks"}, base)
+        predicted = None if found is None else int(found.memory_predicted)
+        if predicted != wanted:
+            problems.append(f"{what}：起步应当 {wanted}，实际 {predicted}")
+    if problems:
+        raise SelftestFailure("被停的峰值当下限：" + "；".join(problems))
+    return "取消那一次的 15.21G 抬过撞过的 13824M；小的不拉低；只有被停的、比缺省大的照它起"
+
+
+def cell_compiles_declared_entry(world):
+    """入口会编的声明（task_server_lib.py 的 declared_compiles、task_server.py 的 compiles；lifecycle 审核 F1）：入口文件头写「# task-server-compiles: yes」的，
+    命令那一层认不出 cargo 也算会编（服务照给编译目录、撞上限重排接着用上一次那一份）；没写的不算；只带 --selftest 的不算；写成别的词的交写坏的那一句（派活打回）。
+    弄坏开关 compiles-declaration-ignored 下声明了也不算，这一格红。"""
+    def entry(name, header):
+        path = os.path.join(world.root, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n" + header + "exit 0\n")
+        return path
+    declared, plain, written_wrong = (entry(name, header) for name, header in (("entry-compiles.sh", f"{lib.DECLARED_COMPILES_MARK} {lib.COMPILES_DECLARED_WORD}\n"),
+                                                                              ("entry-plain.sh", ""), ("entry-wrong.sh", f"{lib.DECLARED_COMPILES_MARK} maybe\n")))
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.cargo_lock = types.SimpleNamespace(cargo_invocations=lambda *arguments: [], BUILDING_SUBCOMMANDS={"build"})
+    fake.project_code_runs = types.SimpleNamespace(shell_words=None)
+
+    def task(path, *rest):
+        return {"command": ["bash", path, *rest], "cwd": world.root, "environment": {}}
+    problems = []
+    for what, found, wanted in (("声明了会编的入口", SERVER.Scheduler.compiles(fake, task(declared, "--item", "selftest")), True),
+                                ("没声明的入口", SERVER.Scheduler.compiles(fake, task(plain, "--item", "selftest")), False),
+                                ("声明了、只带 --selftest", SERVER.Scheduler.compiles(fake, task(declared, "--selftest")), False)):
+        if found != wanted:
+            problems.append(f"{what}：会编应当 {wanted}，实际 {found}")
+    wrong = SERVER.Scheduler.compiles_declared(fake, task(written_wrong))
+    if wrong[0] or "maybe" not in wrong[1]:
+        problems.append(f"写成 maybe 的：应当不算、交写坏的那一句，实际 {wrong}")
+    if problems:
+        raise SelftestFailure("入口会编的声明：" + "；".join(problems))
+    return "声明了 yes 的入口算会编；没声明的、只自证的不算；写坏的交那一句"
+
+
+def cell_parent_cancelling_child_not_claimed(world):
+    """整件正在取消时排着的子任务不起（task_server.py 的 Store.claim_attempt；admission 审核 F10）：父任务记了 cancel_requested、阶段 cancelling，排着的那一片照
+    claim_attempt 起：抛 StoreRefused、kind 是 parent-cancelling，库里没插尝试。服务撤的片理由行照 cancel_origin 写（task_server_lib.py 的 reason_fields）：
+    hard-limit、sibling、parent 各写服务撤的那一句，不写提交它的会话取消。
+    弄坏开关 parent-cancel-unchecked-at-claim 下照起，cancel-origin-unread 下一律写提交它的会话，这一格红。"""
+    store = SERVER.Store(os.path.join(world.root, "claim-parent-cancelling.sqlite3"), bytes(32), dict(os.environ))
+    parent = store.insert("tasks", {"state": "sharded", "session": "", "command_key": "", "task_id": 0, "cancel_requested": True, "phase": "cancelling"})
+    child = store.insert("tasks", {"state": "queued", "session": "", "command_key": "", "task_id": parent["id"], "parent_id": parent["id"], "role": "shard",
+                                   "shard_index": 0, "attempt_count": 0, "cancel_requested": False})
+    problems = []
+    kind = ""
+    try:
+        store.claim_attempt(child["id"], 1, {"state": "starting", "session": "", "command_key": ""}, {"state": "running"})
+    except SERVER.StoreRefused as refused:
+        kind = refused.kind
+    if kind != "parent-cancelling" or store.attempts_of(child["id"]):
+        problems.append(f"父任务整件正在取消：排着的片应当不起（parent-cancelling），实际 kind「{kind}」、库里尝试 {len(store.attempts_of(child['id']))} 次")
+    for origin in ("hard-limit", "sibling", "parent"):
+        fields = dict(lib.reason_fields({"id": child["id"], "outcome": "cancelled", "cancel_origin": origin, "note": "自证"}, [], ""))
+        if fields.get("by") != lib.CANCEL_ORIGIN_TEXTS[origin] or "服务撤的" not in str(fields.get("by")):
+            problems.append(f"cancel_origin={origin} 的理由行应当写「{lib.CANCEL_ORIGIN_TEXTS[origin]}」，实际「{fields.get('by')}」")
+    if problems:
+        raise SelftestFailure("整件取消时不起子任务、服务撤的写对理由：" + "；".join(problems))
+    return "父任务正在取消时排着的片不起；服务撤的片理由行写服务撤的那一句"
+
+
+SHARD_PEAK_KEY = "selftest-shard-peak-count"   # shard-peak-record-count-matched：库里记过峰值的那把片的命令键
+
+
+def cell_shard_peak_record_count_matched(world):
+    """定额度读片的记录只认片数相同的那几趟（task_server.py 的 record_fits_task、recorded_measurements、stopped_peak_floor；片的键不带片数，两片那一趟的第 0 片记过 49.5G，
+    换成几十片之后同一片号落在同一把键上）：共 7 片的一片，库里同一把键有两片那一趟跑成三次各 49.5G（尝试自己记了 shard_count）、7 片那一趟跑成 5G（尝试记了 shard_count）、
+    6G（尝试没记、读子任务的 shard_count 是 7）、尝试没记而子任务是两片那一趟的 48G、尝试没记而子任务读不到的 47G，另有被取消的两片那一趟 30G、7 片那一趟 2G：
+    近几次的量应当只有 5G 与 6G，被停的下限是 2G；不是片的任务照旧三样都认。静态核，不起服务。
+    弄坏开关 record-shard-count-unchecked 下片数不同的也拿来，这一格红。"""
+    def ended(outcome, peak, ended_at, **fields):
+        return ({"command_key": SHARD_PEAK_KEY, "outcome": outcome, "memory_peak": int(peak), "ended_at": ended_at, "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC, **fields}, True)
+    rows = ([ended("succeeded", 49.5 * GIBIBYTE, 100 + number, shard_count=2) for number in range(3)]
+            + [ended("succeeded", 5 * GIBIBYTE, 103, shard_count=7), ended("succeeded", 6 * GIBIBYTE, 104, task_id=71),
+               ended("succeeded", 48 * GIBIBYTE, 105, task_id=72), ended("succeeded", 47 * GIBIBYTE, 106, task_id=73),
+               ended("cancelled", 30 * GIBIBYTE, 107, shard_count=2), ended("cancelled", 2 * GIBIBYTE, 108, shard_count=7)])
+    shard_counts = {71: 7, 72: 2}
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.store = types.SimpleNamespace(
+        select=lambda table, where="1", parameters=(), order="id": [row for row in rows if row[0].get("command_key") == parameters[0]] if table == "attempts" else [],
+        task=lambda task_id: ({"id": task_id, "shard_count": shard_counts[task_id]}, True) if task_id in shard_counts else None)
+    problems = []
+    piece = {"role": "shard", "shard_count": 7, "command_key": SHARD_PEAK_KEY}
+    measured = sorted(value for _, value in SERVER.Scheduler.recorded_measurements(fake, piece))
+    floor = SERVER.Scheduler.stopped_peak_floor(fake, piece)
+    if measured != [5 * GIBIBYTE, 6 * GIBIBYTE] or floor != 2 * GIBIBYTE:
+        problems.append(f"共 7 片的一片：近几次的量应当只有 5G 与 6G、被停的下限 2G，实际量 {[round(value / GIBIBYTE, 1) for value in measured]}G、下限 {None if floor is None else round(floor / GIBIBYTE, 1)}G")
+    plain = {"role": "", "command_key": SHARD_PEAK_KEY}
+    measured_plain = sorted(value for _, value in SERVER.Scheduler.recorded_measurements(fake, plain))
+    floor_plain = SERVER.Scheduler.stopped_peak_floor(fake, plain)
+    if len(measured_plain) != 7 or floor_plain != 30 * GIBIBYTE:
+        problems.append(f"不是片的任务照旧不看片数：应当 7 个量、被停的下限 30G，实际 {len(measured_plain)} 个量、下限 {None if floor_plain is None else round(floor_plain / GIBIBYTE, 1)}G")
+    if problems:
+        raise SelftestFailure("定额度读片的记录只认片数相同的：" + "；".join(problems))
+    return "共 7 片的一片只取 7 片那几趟的 5G、6G（下限 2G），两片那一趟与读不到片数的不取；不是片的照旧都取"
+
+
+HEARTBEAT_ONLY_SCRIPT = 'echo started; for round in $(seq 1 40); do echo "TASK_SERVER_HEARTBEAT 编译中 $round"; sleep 0.5; done'   # 20 秒只打心跳行
+HEARTBEAT_MIXED_SCRIPT = 'echo started; for round in 1 2 3 4 5 6; do echo "TASK_SERVER_HEARTBEAT 编译中 $round"; echo "real output $round"; sleep 0.5; done'   # 心跳行里夹着真输出
+
+
+def cell_heartbeat_lines_not_log_growth(world):
+    """命令自己打的心跳行不算日志在涨（task_server.py 的 log_content、judge_stall_stop；task_server_lib.py 文件头「命令自己打的两种登记行」）：卡住窗口 2 秒、宽限 0.01 秒，
+    假 scope 的 CPU 读得到、一直不涨：每 0.5 秒打一行 TASK_SERVER_HEARTBEAT、跑 20 秒的一条被停、记 stalled；心跳行里夹着每 0.5 秒一行真输出的一条照跑完；
+    理由行里的「日志最后一行」跳过心跳行。弄坏开关 heartbeat-counted-as-log 下只打心跳行的那一条也照跑完，这一格红。"""
+    scope = os.path.join(world.root, "idle-scope")
+    os.makedirs(scope)
+    with open(os.path.join(scope, "cpu.stat"), "w", encoding="utf-8") as handle:
+        handle.write("usage_usec 1000\n")
+    world.start_server(extra={"TASK_SERVER_SELFTEST_STALL_SECONDS": "2", "TASK_SERVER_SELFTEST_STALL_GRACE_SECONDS": "0.01", "TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
+    only = world.finished(world.submit(["bash", "-c", HEARTBEAT_ONLY_SCRIPT, "heartbeat-only"]), timeout=45)
+    mixed = world.finished(world.submit(["bash", "-c", HEARTBEAT_MIXED_SCRIPT, "heartbeat-mixed"]), timeout=45)
+    problems = []
+    if only["task"].get("outcome") != "stalled":
+        problems.append(f"只打心跳行、CPU 不涨的那一条满 2 秒应当被停、记 stalled，实际 {describe(only)}")
+    if mixed["task"].get("outcome") != "succeeded":
+        problems.append(f"心跳行里夹着真输出的那一条应当照跑完，实际 {describe(mixed)}")
+    last = lib.log_last_line("real output 6\nTASK_SERVER_HEARTBEAT 编译中 6\n")
+    if last != "real output 6":
+        problems.append(f"理由行里的日志最后一行应当跳过心跳行取「real output 6」，实际「{last}」")
+    if problems:
+        raise SelftestFailure("心跳行不算日志在涨：" + "；".join(problems), world.server_log_lines())
+    return "只打心跳行、CPU 不涨的满窗口记 stalled；夹着真输出的照跑完；最后一行跳过心跳行"
+
+
+CPU_GATE_PROBE_KEY = "selftest-cpu-gate-recorded"   # cpu-gate-new-task-by-recorded-cores：库里记过平均在用核数的那把命令键
+CPU_GATE_HEAVY_KEY = "selftest-cpu-gate-heavy"      # 库里另记过 heavy_cores 的那把命令键（cpu-gate-running-started-by-recorded-cores）
+
+
+def seed_peak_readings(fake, attempts, usage_at, now):
+    """假调度器的峰值段读数表（Scheduler.note_peak_segment 读写的 running_peak_samples）照服务一路在看记两回：起跑那一刻（累计 0）与 now（usage_at(尝试)）。
+    起了满 CPU_MEASURED_AFTER_SECONDS 的，下一回 running_threads 读到的那一段就是起跑到 now 这一段（各格的假本机一路同一个核数，峰值段就等于它）；不满的照服务还没量满一段办。"""
+    for attempt in attempts:
+        fake.running_peak_samples[attempt["id"]] = {"first_seen": attempt["started_at"], "samples": [(attempt["started_at"], 0.0), (now, usage_at(attempt))]}
+
+
+def cpu_gate_scheduler(running_count, cpu, ages=None, cores=1.0, recorded_cores=(), keys=None, recorded_rows=None, heavy_cores=()):
+    """cpu-gate-counts-running-threads 的假调度器与 Snapshot：本机在跑 running_count 条、各登记 31 线程，起了多少秒照 ages（缺省各 100 秒，不到 CPU_MEASURED_AFTER_SECONDS），
+    一路在用核数都是 cores（假本机的 cpu_usec 照它与建这个假世界那一刻之前的已跑秒数算；峰值段读数照 seed_peak_readings 记起跑与建世界两回）；报告里的 CPU 是 cpu（None 是读不到）。
+    recorded_cores 是 CPU_GATE_PROBE_KEY 这把命令键库里跑成的那几次记的核数，heavy_cores 是 CPU_GATE_HEAVY_KEY 那几次的（峰值段核数、CPU 闸线程数与平均在用核数三栏同值；
+    admission_threads、running_threads 读；空的是没有记录）；keys 是各条在跑的尝试的命令键（缺省都不带命令键）；cores 给 None 是假本机量不到 CPU（cpu_usec 交 None）。
+    recorded_rows 给了就整个换掉 recorded_cores 造的那几行（每行是尝试记录的 outcome、exit_code、cores，峰值段核数与 CPU 闸线程数照 cores 补，命令键补成 CPU_GATE_PROBE_KEY）。
+    线程读数（note_threads 的 running_peak_runnable、thread_overruns）是空的，假本机不报线程读数（各格要的自己换 thread_reading）。"""
+    now = time.time()
+    peak, gate = SERVER.PEAK_SEGMENT_CORES_COLUMN, SERVER.CPU_GATE_THREADS_COLUMN
+    running = [dict({"id": position + 1, "host": SERVER.LOCAL, "threads": 31, "started_at": now - age}, **({"command_key": keys[position]} if keys and keys[position] else {}))
+               for position, age in enumerate(ages or [100] * running_count)]
+    recorded = [({"outcome": "succeeded", "cores": value, peak: value, gate: value, "command_key": CPU_GATE_PROBE_KEY}, True) for value in recorded_cores]
+    if recorded_rows is not None:
+        recorded = [(dict({peak: row.get("cores"), gate: row.get("cores")}, **row, command_key=CPU_GATE_PROBE_KEY), True) for row in recorded_rows]
+    by_key = {(CPU_GATE_PROBE_KEY,): recorded,
+              (CPU_GATE_HEAVY_KEY,): [({"outcome": "succeeded", "cores": value, peak: value, gate: value, "command_key": CPU_GATE_HEAVY_KEY}, True) for value in heavy_cores]}
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.peaks = PEAKS
+    fake.threads = 31
+    fake.admission_threads_cache = {}
+    fake.running_threads_cache = {}
+    fake.running_usage_lock = threading.Lock()   # CPU 闸读数表的锁（Scheduler.__init__ 建的，假调度器照建）
+    fake.unit_stopped = set()   # booking_attempts 不数的、单元已确认停了的尝试号（Scheduler.__init__ 建的）
+    fake.running_peak_samples, fake.running_peak_cores = {}, {}   # note_peak_segment 的读数表与各段最大（Scheduler.__init__ 建的）
+    fake.running_latest_cores, fake.running_latest_runnable = {}, {}   # 最近一段的在用核数与最近一回的可跑线程数（latest_running_cores 读）
+    fake.running_peak_runnable, fake.thread_overruns = {}, {}   # note_threads 记的可跑线程数与线程远超登记数（Scheduler.__init__ 建的）
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(cpu_usec=lambda attempt: None if cores is None else cores * 1e6 * (now - attempt["started_at"]),
+                                                         thread_reading=lambda attempt: None, label="本机")}
+    if cores is not None:
+        seed_peak_readings(fake, running, fake.machines[SERVER.LOCAL].cpu_usec, now)
+    fake.store = types.SimpleNamespace(running_attempts=lambda: [dict(attempt) for attempt in running],
+                                       select=lambda table, where="1", parameters=(), order="id": list(by_key.get(tuple(parameters), [])))
+    report = memory_report(30, 30)
+    if cpu is None:
+        report["memory"].pop(PEAKS.CPU_REPORT_KEY, None)
+    else:
+        report["memory"][PEAKS.CPU_REPORT_KEY] = dict(cpu)
+    return fake, SERVER.Snapshot({SERVER.LOCAL: report}, {}, {SERVER.LOCAL: True}, {})
+
+
+def cell_cpu_gate_counts_running_threads(world):
+    """CPU 闸一直记着在跑的线程、读不到不放行（task_server.py 的 cpu_problem；调度溢出审核 CPU-1、CPU-2）：32 核（线 64）、负载 3，在跑的与要起的这一条的命令键都记过 31 核：
+    在跑一条（31 线程）再起一条 31 线程放得下；在跑两条（起了 100 秒、不到 CPU_MEASURED_AFTER_SECONDS，照记录各记 31 线程共 62，负载里看不出）再起一条超过、原因以「CPU：」起头；
+    报告里没有 CPU 那一项：这一轮不派、原因以 CPU_UNREAD_TEXT 起头。
+    弄坏开关 cpu-threads-settling-only 下只记刚起 5 秒的线程（两条那一种放行），cpu-unread-passed 下读不到的放行，这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for what, count, cpu, starts in (("在跑一条", 1, load, ""), ("在跑两条", 2, load, "CPU："), ("读不到 CPU", 0, None, SERVER.CPU_UNREAD_TEXT)):
+        fake, snapshot = cpu_gate_scheduler(count, cpu, recorded_cores=(31.0,), keys=[CPU_GATE_PROBE_KEY] * count)
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 1, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if (not starts and why) or (starts and not why.startswith(starts)):
+            problems.append(f"{what}：应当{'放行' if not starts else '挡住、原因以「' + starts + '」起头'}，实际「{why}」")
+    if problems:
+        raise SelftestFailure("CPU 闸：" + "；".join(problems))
+    return "在跑一条再起一条放得下；在跑两条再起超过；读不到 CPU 的不派"
+
+
+def cell_cpu_gate_measured_cores(world):
+    """CPU 闸里在跑的照实测核数记（task_server.py 的 running_threads、cpu_problem；任务 13256 排在三条 31 线程的单线程任务后面）：32 核（线 64）、负载 3，
+    三条在跑、各登记 31 线程而一路实测 1 核（峰值段 1 核）、都起了 1000 秒（满 CPU_MEASURED_AFTER_SECONDS）：记 3 线程、第四条照起；其中一条只起了 30 秒、命令键记过 31 核：它照记录记 31、共 33 线程。
+    弄坏开关 cpu-threads-registered-only 下一律照登记数记（共 93），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for what, ages, threads in (("三条都满了时长", [1000, 1000, 1000], 3), ("一条只起了 30 秒", [1000, 1000, 30], 33)):
+        fake, snapshot = cpu_gate_scheduler(3, load, ages=ages, cores=1.0, recorded_cores=(31.0,), keys=[None, None, CPU_GATE_PROBE_KEY])
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 1}, SERVER.LOCAL, snapshot)
+        if counted != threads or why:
+            problems.append(f"{what}：在跑的应当记 {threads} 线程、第四条照起，实际记 {counted} 线程、「{why}」")
+    if problems:
+        raise SelftestFailure("CPU 闸照实测核数记在跑的：" + "；".join(problems))
+    return "满了时长的照实测 1 核记、第四条照起；没满的照命令键的记录 31 记"
+
+
+def cell_cpu_gate_new_task_by_recorded_cores(world):
+    """CPU 闸里新起的这一条照同一命令键近几次跑成的峰值段核数取最大记（task_server.py 的 admission_threads、threads_by_record、cpu_problem；任务 13489 单线程的小脚本照 31 线程排了 30 分钟）：
+    32 核（线 64）、负载 3，三条在跑、都起了 1000 秒、实测各 17.5 核（记 18、共 54 线程）。库里跑成三次、峰值段 1、1、0.7 核的那一条记 1 线程，54 + 1 不超过 64，照起；
+    库里跑成三次、各 20 核的那一条记 20 线程，54 + 20 超过 64，排着、原因写「20 线程」。弄坏开关 cpu-wanted-by-registered-threads 下有记录的也照 31 记（头一种排着），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for what, recorded, blocked in (("记过最大 1 核的", (1.0, 1.0, 0.7), False), ("记过 20 核的", (20.0, 20.0, 20.0), True)):
+        fake, snapshot = cpu_gate_scheduler(3, load, ages=[1000, 1000, 1000], cores=17.5, recorded_cores=recorded)
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 1, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if counted != 54 or bool(why) != blocked or (blocked and "（20 线程" not in why):
+            problems.append(f"{what}：在跑的应当记 54 线程、这一条{'照 20 线程排着、原因写「20 线程」' if blocked else '照 1 线程起'}，实际记 {counted} 线程、「{why}」")
+    if problems:
+        raise SelftestFailure("CPU 闸照记录的核数算新起的：" + "；".join(problems))
+    return "在跑 54 线程：记过最大 1 核的照 1 线程起；记过 20 核的照 20 线程排着"
+
+
+def cell_cpu_gate_new_task_counts_failed_runs(world):
+    """CPU 闸里新起的这一条照历史核数记时，命令自己退非 0、跑到头的几次也算（task_server.py 的 threads_by_record；弄坏开关轮这类按设计退非 0 的命令也照记录记）：
+    32 核（线 64）、负载 3，三条在跑、都起了 1000 秒、实测各 17.5 核（记 18、共 54 线程）。库里三次 command-failed（退 1）各记 20 核的那一条记 20 线程，54 + 20 超过 64，排着；
+    一次 command-failed 退 143（被 TERM 杀的）、一次 killed-externally、一次 memory-cap-hit 各记 20 核的不算，只剩一次跑成的 1 核，记 1 线程，照起（算进去最大 20 核、排着）；
+    跑成两次（1.0 核）加一次 command-failed（退 1、0.3 核）最大 1 核，记 1 线程，照起。
+    弄坏开关 threads-record-succeeded-only 下只认跑成的：头一种没有记录、照登记的 31 线程排着、原因里不是「20 线程」，这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    failed = {"outcome": "command-failed", "exit_code": 1, "cores": 20.0}
+    unfinished = [{"outcome": "command-failed", "exit_code": 143, "cores": 20.0}, {"outcome": "killed-externally", "exit_code": 1, "cores": 20.0},
+                  {"outcome": "memory-cap-hit", "exit_code": 250, "cores": 20.0}, {"outcome": "succeeded", "exit_code": 0, "cores": 1.0}]
+    problems = []
+    for what, rows, blocked in (("三次命令自己退 1", [failed] * 3, True), ("被信号杀的、外部杀的、撞上限的加一次跑成", unfinished, False),
+                                ("跑成两次加一次退 1", [{"outcome": "succeeded", "exit_code": 0, "cores": 1.0}] * 2 + [dict(failed, cores=0.3)], False)):
+        fake, snapshot = cpu_gate_scheduler(3, load, ages=[1000, 1000, 1000], cores=17.5, recorded_rows=rows)
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 1, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if bool(why) != blocked or (blocked and "（20 线程" not in why):
+            problems.append(f"{what}：这一条应当{'照 20 线程排着、原因写「20 线程」' if blocked else '照 1 线程起'}，实际「{why}」")
+    if problems:
+        raise SelftestFailure("CPU 闸照历史核数记新起的（退非 0 跑到头的也算）：" + "；".join(problems))
+    return "历史里命令自己退非 0 的三次照 20 线程排着；被信号杀的、外部杀的、撞上限的不算，照跑成的 1 线程起；跑成加退 1 的混着算"
+
+
+def cell_cpu_gate_unrecorded_by_registered_threads(world):
+    """CPU 闸里没有核数记录的新命令量到之前按登记的线程数记（task_server.py 的 threads_by_record；用户定「按 31 核，量到后改实测」；按 1 核算时任务 15262 到 15299
+    共 38 条新命令十秒内齐起）：命令键库里一次跑到头的都没有、登记 31 线程的记 31 线程，那一句写「先按登记的 31 线程」；没有命令键的同样；登记 4 线程的记 4。
+    库里记过 5 核的照记录记 5。套在假调度器上，不起服务。弄坏开关 cpu-unrecorded-by-one-core 下没有记录的记 1 线程，这一格红。"""
+    fake, _ = cpu_gate_scheduler(0, {"load1": 1.0, "procs_running": 1, "cpus": 32}, recorded_cores=(5.0,))
+    problems = []
+    for what, key, registered, wanted in (("没有记录、登记 31", "selftest-cpu-gate-never-ran", 31, 31), ("没有命令键、登记 31", "", 31, 31),
+                                          ("没有记录、登记 4", "selftest-cpu-gate-never-ran", 4, 4), ("记过 5 核", CPU_GATE_PROBE_KEY, 31, 5)):
+        threads, how = SERVER.Scheduler.threads_by_record(fake, key, registered)
+        if threads != wanted or (wanted == registered and key != CPU_GATE_PROBE_KEY and f"先按登记的 {registered} 线程" not in how):
+            problems.append(f"{what}：应当记 {wanted} 线程，没有记录的那一句写「先按登记的 {registered} 线程」，实际 {threads}、「{how}」")
+    if problems:
+        raise SelftestFailure("CPU 闸里没有记录的新命令按登记线程数：" + "；".join(problems))
+    return "没有核数记录的新命令（连同没有命令键的）量到之前按登记的线程数记：登记 31 的记 31、登记 4 的记 4；记过 5 核的照记录记 5"
+
+
+def cell_cpu_gate_running_after_restart_by_average(world):
+    """服务刚重启、还没量满一段时，起跑已满两分钟的在跑尝试照累计 CPU ÷ 已跑秒数记（task_server.py 的 running_threads）：两条登记 31 线程、没有命令键、起了 1000 秒、一路 3.2 核，
+    读数表是空的（演服务重启）：各记 4 线程、共 8；另一条只起了 30 秒的照旧按登记的 31 线程记。套在假调度器上，不起服务。
+    弄坏开关 cpu-restart-unmeasured-by-record 下起了 1000 秒的两条各记 31 线程，这一格红。"""
+    fake, _ = cpu_gate_scheduler(3, {"load1": 1.0, "procs_running": 1, "cpus": 32}, ages=[1000, 1000, 30], cores=3.2)
+    fake.running_peak_samples, fake.running_peak_cores, fake.running_latest_cores = {}, {}, {}   # 服务重启：读数表从空的起
+    total = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+    if total != 4 + 4 + 31:
+        raise SelftestFailure(f"服务刚重启时的在跑线程数：起了 1000 秒、一路 3.2 核的两条应当各记 4 线程，起了 30 秒的一条记登记的 31 线程，共 39，实际 {total}")
+    return "读数表是空的（服务刚重启）：起了 1000 秒、一路 3.2 核的两条各记 4 线程，起了 30 秒的照登记的 31 线程，共 39"
+
+
+def cell_cpu_gate_running_by_latest_reading(world):
+    """CPU 闸里在跑、量满了一段的那一条照最近一段的在用核数向上取整、与最近一回的可跑线程数取大，不超过登记数（task_server.py 的 latest_running_cores；用户定
+    「各个任务的负载的取值要动态的取」）：一条登记 31 线程、起了 1000 秒、一路 17.5 核——没有线程读数时记 18；最近一回可跑 25 个的记 25；可跑 40 个的收到登记的 31。
+    套在假调度器上，不起服务。弄坏开关 cpu-latest-runnable-ignored 下可跑 25 个的记 18，这一格红。"""
+    fake, _ = cpu_gate_scheduler(1, {"load1": 1.0, "procs_running": 1, "cpus": 32}, ages=[1000], cores=17.5)
+    attempt = fake.store.running_attempts()[0]
+    now = time.time()
+    elapsed = now - attempt["started_at"]
+    usage = fake.machines[SERVER.LOCAL].cpu_usec(attempt)
+    problems = []
+    for runnable, wanted in ((0, 18), (25, 25), (40, 31)):
+        first = SERVER.Scheduler.latest_running_cores(fake, attempt, usage, elapsed, now, 31)   # 先算一回：记下最近一段的在用核数
+        fake.running_latest_runnable[attempt["id"]] = runnable
+        found = SERVER.Scheduler.latest_running_cores(fake, attempt, usage, elapsed, now, 31)
+        if found != wanted:
+            problems.append(f"最近一回可跑 {runnable} 个：应当记 {wanted} 线程，实际 {found}（头一回算出 {first}）")
+    if problems:
+        raise SelftestFailure("CPU 闸里在跑的照最近的读数记：" + "；".join(problems))
+    return "在跑、一路 17.5 核的一条：没有线程读数记 18，最近一回可跑 25 个记 25，可跑 40 个收到登记的 31"
+
+
+def cell_cpu_gate_running_started_by_recorded_cores(world):
+    """CPU 闸里在跑却还没实测到核数的，照同一命令键近几次跑成的平均在用核数记（task_server.py 的 running_threads、unmeasured_threads、threads_by_record）：
+    32 核（线 64）、负载 3，三条在跑、各登记 31 线程、都只起了 30 秒（不到 CPU_MEASURED_AFTER_SECONDS），其中两条的命令键库里记过 1、1、0.7 核（取最大记 1 线程），
+    一条的命令键记过 20 核（记 20）：共 1 + 1 + 20 = 22 线程，第四条照起；起了 1000 秒而假本机量不到 CPU 的同样三条也记 22；
+    在跑名单里不在了的尝试，存的那一份在下一次算时删。没有记录的在跑尝试量到之前按登记的线程数记，由 cpu-gate-unrecorded-by-registered-threads 钉着。
+    弄坏开关 cpu-running-unmeasured-registered 下没实测到的一律照登记数记（共 93），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    keys = [CPU_GATE_PROBE_KEY, CPU_GATE_PROBE_KEY, CPU_GATE_HEAVY_KEY]
+    problems = []
+    for what, ages, cores in (("三条都只起了 30 秒", [30, 30, 30], 1.0), ("起了 1000 秒而量不到 CPU", [1000, 1000, 1000], None)):
+        fake, snapshot = cpu_gate_scheduler(3, load, ages=ages, cores=cores, recorded_cores=(1.0, 1.0, 0.7), keys=keys, heavy_cores=(20.0,))
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 9, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if counted != 22 or why:
+            problems.append(f"{what}：在跑的应当记 1 + 1 + 20 = 22 线程、第四条照起，实际记 {counted} 线程、「{why}」")
+    fake, snapshot = cpu_gate_scheduler(3, load, ages=[30, 30, 30], keys=keys, recorded_cores=(1.0, 1.0, 0.7), heavy_cores=(20.0,))
+    SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+    kept_before = sorted(fake.running_threads_cache)
+    remaining = fake.store.running_attempts()[:1]
+    fake.store.running_attempts = lambda: remaining
+    SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+    if kept_before != [1, 2, 3] or sorted(fake.running_threads_cache) != [1]:
+        problems.append(f"存的取法按尝试号：算过三条应当存 [1, 2, 3]，只剩尝试 1 在跑之后下一次算应当只留 [1]，实际 {kept_before}、{sorted(fake.running_threads_cache)}")
+    if problems:
+        raise SelftestFailure("CPU 闸照记录的核数记没实测到的在跑尝试：" + "；".join(problems))
+    return "起了 30 秒与量不到 CPU 的在跑三条：记过 0.9 核的各记 1、记过 20 核的记 20，共 22 线程、第四条照起；存的按尝试号、收尾的删"
+
+
+def cell_cpu_gate_running_average_capped_by_registered(world):
+    """实测到的在跑尝试在 CPU 闸里记的核数不超过它登记的线程数，峰值段那一支与窗口那一支同一个上界（task_server.py 的 running_threads、latest_running_cores）：
+    32 核（线 64）、负载 3，三条在跑、都起了 1000 秒、一路实测 40 核（峰值段 40 核；命令里编译器、子进程占的比登记线程多）：各登记 4 线程的记 4、共 12；各登记 31 线程的记 31、共 93
+    （不记 40、共 120）；不到登记数的照峰值段记（2.5 核、登记 4 线程：记 3、共 9）。
+    弄坏开关 cpu-running-cores-over-registered 下峰值段那一支不限登记数（共 120、共 120），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for registered, cores, expected in ((4, 40.0, 12), (31, 40.0, 93), (4, 2.5, 9)):
+        fake, _ = cpu_gate_scheduler(3, load, ages=[1000, 1000, 1000], cores=cores)
+        listed = fake.store.running_attempts
+        fake.store.running_attempts = lambda listed=listed, registered=registered: [dict(attempt, threads=registered) for attempt in listed()]
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+        if counted != expected:
+            problems.append(f"三条各登记 {registered} 线程、峰值段 {cores:g} 核：应当共记 {expected} 线程，实际 {counted}")
+    if problems:
+        raise SelftestFailure("CPU 闸记在跑尝试的峰值段核数不超过登记数：" + "；".join(problems))
+    return "峰值段 40 核的：登记 4 线程的记 4、登记 31 线程的记 31；2.5 核、登记 4 线程的照峰值段记 3"
+
+
+def cell_finish_peak_segment_cpu_unread(world):
+    """收尾时累计 CPU 读不到、或接口交的不是数：峰值段核数记 None、结局照记（task_server.py 的 finish_peak_segment_cores、cpu_reading、finish_attempt）。
+    直接算：读到 None、一个别的对象、一串字、NaN 的，一段都没量满过的都交 None、不抛错；量满过一段（各段最大 7.5）而这一刻读不到的交 7.5。
+    整条跑：假 scope 只写内存那几份、没有 cpu.stat（服务一路读不到 CPU），交一条退 0 的：结局 succeeded、退 0，尝试的 peak_segment_cores 是 None。
+    弄坏开关 peak-segment-reading-unchecked 下接口交的东西不核、照数用（别的对象、一串字抛错，NaN 交 NaN），这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.running_usage_lock = threading.Lock()
+    fake.running_peak_samples, fake.running_peak_cores = {}, {}
+    attempt = {"id": 1, "host": SERVER.LOCAL, "started_at": time.time() - 30}
+    problems = []
+    for what, value, measured, expected in (("读到 None", None, None, None), ("接口交了一个别的对象", object(), None, None), ("接口交了一串字", "2000000", None, None),
+                                            ("读到 NaN", float("nan"), None, None), ("量满过一段、这一刻接口交了别的对象", object(), 7.5, 7.5)):
+        fake.running_peak_samples.clear()
+        fake.running_peak_cores.clear()
+        if measured is not None:
+            fake.running_peak_cores[attempt["id"]] = measured
+        machine = types.SimpleNamespace(cpu_usec=lambda attempt, value=value: value)
+        try:
+            recorded = SERVER.Scheduler.finish_peak_segment_cores(fake, attempt, machine, time.time())
+        except Exception as error:   # 这一格判的就是收尾这一步抛不抛：抛了照不对记下
+            problems.append(f"{what}：收尾应当照常往下走、峰值段核数记 {expected}，实际抛了 {type(error).__name__}: {error}")
+            continue
+        if recorded != expected:
+            problems.append(f"{what}：峰值段核数应当记 {expected}，实际 {recorded}")
+    scope = os.path.join(world.root, "unread-cpu-scope")
+    os.makedirs(scope)
+    for name, text in (("memory.stat", process_memory_stat(300 * MEBIBYTE)), ("memory.peak", f"{300 * MEBIBYTE}\n")):
+        with open(os.path.join(scope, name), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    world.start_server(extra={"TASK_SERVER_FAKE_SCOPE_DIRECTORY": scope})
+    done = world.finished(world.submit(["bash", "-c", "exit 0", "unread-cpu"]))
+    attempts = done["attempts"]
+    if done["task"].get("outcome") != "succeeded" or done["task"].get("exit_code") != 0 or len(attempts) != 1 or attempts[0].get(SERVER.PEAK_SEGMENT_CORES_COLUMN) is not None:
+        problems.append(f"一路读不到 CPU、退 0 的：结局应当照记 succeeded、退 0，峰值段核数记 None，实际 {describe(done)}、"
+                        f"峰值段核数 {[attempt.get(SERVER.PEAK_SEGMENT_CORES_COLUMN) for attempt in attempts]}")
+    if problems:
+        raise SelftestFailure("收尾时累计 CPU 读不到：" + "；".join(problems), world.server_log_lines())
+    return "收尾时读不到或交的不是数：峰值段核数记 None（量满过一段的记各段最大），结局照记 succeeded"
+
+
+CPU_GATE_PEAK_KEY = "selftest-cpu-gate-peak-segment"   # cpu-gate-peak-segment-cores：前 240 秒 2 核、之后 30 核的那把命令键
+
+
+def cell_cpu_gate_peak_segment_cores(world):
+    """CPU 闸记峰值段核数、不记整次平均（task_server.py 的 note_peak_segment、latest_running_cores、running_threads、finish_peak_segment_cores、threads_by_record；
+    本机 32 核上四条各登记 31 线程的崩溃点重放同时在抢核：前半段编译、录制用核少，按整次平均每条只记几核，四条都放进来）：
+    一条登记 31 线程的在跑尝试前 240 秒用 2 核、之后用 30 核，服务每 60 秒读一回累计 CPU：起了 480 秒时在跑的记 30 线程（整次平均是 16）；
+    收尾时记的峰值段核数是 30（CPU 闸线程数同是 30：没有线程读数），同键下一条新任务过闸照记录记 30 线程、取法那半句写「CPU 闸线程数」。
+    弄坏开关 cpu-cores-by-average 下在跑的照整次平均记 16、记录照平均在用核数（cores 16）记 16，这一格红。"""
+    fake, _ = cpu_gate_scheduler(0, {"load1": 2.0, "procs_running": 3, "cpus": 32})
+    clock = [float(int(time.time()))]
+    attempt = {"id": 1, "host": SERVER.LOCAL, "threads": 31, "started_at": clock[0], "command_key": CPU_GATE_PEAK_KEY}
+
+    def usage(running):
+        age = clock[0] - running["started_at"]
+        return 1e6 * (2.0 * min(age, 240.0) + 30.0 * max(age - 240.0, 0.0))
+
+    fake.store.running_attempts = lambda: [dict(attempt)]
+    fake.machines[SERVER.LOCAL].cpu_usec = usage
+    counted = None
+    for age in range(0, 481, 60):
+        clock[0] = attempt["started_at"] + age
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, clock[0])
+    recorded = SERVER.Scheduler.finish_peak_segment_cores(fake, attempt, fake.machines[SERVER.LOCAL], clock[0])
+    average = usage(attempt) / 1e6 / 480.0
+    gate = SERVER.Scheduler.finish_cpu_gate_threads(fake, attempt, recorded)
+    rows = [({"outcome": "succeeded", "command_key": CPU_GATE_PEAK_KEY, "cores": average, SERVER.PEAK_SEGMENT_CORES_COLUMN: recorded, SERVER.CPU_GATE_THREADS_COLUMN: gate}, True)]
+    fake.store.select = lambda table, where="1", parameters=(), order="id": list(rows) if tuple(parameters) == (CPU_GATE_PEAK_KEY,) else []
+    wanted, how = SERVER.Scheduler.admission_threads(fake, {"id": 2, "command_key": CPU_GATE_PEAK_KEY})
+    problems = []
+    if counted != 30:
+        problems.append(f"起了 480 秒（前 240 秒 2 核、之后 30 核，整次平均 {average:g}）：在跑的应当记 30 线程，实际 {counted}")
+    if recorded != 30.0 or gate != 30.0 or wanted != 30 or "CPU 闸线程数" not in how:
+        problems.append(f"收尾记的峰值段核数与 CPU 闸线程数应当都是 30、同键新任务照它记 30 线程（「CPU 闸线程数」），实际记 {recorded}、{gate}、新任务 {wanted} 线程「{how}」")
+    if problems:
+        raise SelftestFailure("CPU 闸记峰值段核数：" + "；".join(problems))
+    return f"前 240 秒 2 核、之后 30 核：在跑的记 30（整次平均 {average:g}）；收尾记 30，同键新任务照记录 30 线程"
+
+
+def cell_cpu_gate_runnable_threads(world):
+    """CPU 闸连同可跑线程数记（task_server.py 的 note_threads、peak_segment_running_cores、finish_cpu_gate_threads、threads_by_record；
+    五条各要 31 核的挤在一台上各只拿到七到十核，照在用核数记，下一条同键的照十核放进来）：32 核、负载 3，一条登记 31 线程的在跑尝试起了 1000 秒、一路在用 cores 核，
+    服务读到一回线程读数：在用 8 核、可跑线程 31 的在跑记 31、收尾记 cpu_gate_threads 31、同键新任务过闸照记录记 31；在用 3 核、可跑线程 2 的三样都是 3；
+    读不到线程读数的照在用核数，三样都是 8。
+    弄坏开关 cpu-runnable-threads-unread 下只看在用核数（头一种三样都是 8），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for what, cores, runnable, wanted in (("在用 8 核、可跑线程 31", 8.0, 31, 31), ("在用 3 核、可跑线程 2", 3.0, 2, 3), ("读不到可跑线程数", 8.0, None, 8)):
+        fake, _ = cpu_gate_scheduler(1, load, ages=[1000], cores=cores, keys=[CPU_GATE_PEAK_KEY])
+        fake.machines[SERVER.LOCAL].thread_reading = lambda attempt, runnable=runnable: None if runnable is None else SERVER.ThreadReading(1, runnable, runnable, runnable, "selftest")
+        attempt = fake.store.running_attempts()[0]
+        now = time.time()
+        SERVER.Scheduler.note_threads(fake, attempt)
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, now)
+        recorded = SERVER.Scheduler.finish_cpu_gate_threads(fake, attempt, SERVER.Scheduler.finish_peak_segment_cores(fake, attempt, fake.machines[SERVER.LOCAL], now))
+        rows = [({"outcome": "succeeded", "command_key": CPU_GATE_PEAK_KEY, SERVER.CPU_GATE_THREADS_COLUMN: recorded}, True)]
+        fake.store.select = lambda table, where="1", parameters=(), order="id", rows=rows: list(rows) if tuple(parameters) == (CPU_GATE_PEAK_KEY,) else []
+        admitted, how = SERVER.Scheduler.admission_threads(fake, {"id": 9, "command_key": CPU_GATE_PEAK_KEY})
+        if counted != wanted or recorded is None or round(recorded) != wanted or admitted != wanted:
+            problems.append(f"{what}：在跑的、收尾记的与同键新任务都应当是 {wanted}，实际在跑记 {counted}、收尾记 {recorded}、新任务 {admitted}（{how}）")
+    if problems:
+        raise SelftestFailure("CPU 闸连同可跑线程数记：" + "；".join(problems))
+    return "在用 8 核、可跑线程 31 记 31（收尾与同键新任务同是 31）；在用 3 核、可跑线程 2 记 3；读不到线程读数照在用核数 8"
+
+
+THREADS_OVER_REGISTERED_BINARY = "selftest-test-binary"   # threads-over-registered-reported 里占线程最多的那个进程名
+
+
+def cell_threads_over_registered_reported(world):
+    """线程总数远超登记数推一回提醒（task_server.py 的 note_threads、threads_over_registered_items；文件头 ①「要处置的提醒」的 threads-over-registered；
+    量到过一个测试进程开了 347 个线程、占 1780% CPU，登记 31）：一条登记 31 线程的在跑尝试，服务逐轮读线程读数（采样号、可跑的、总数）：
+    连着三轮 347 个线程、可跑的 40 个，之后掉回 10 个：推一项 threads-over-registered，依据写 347、登记数 31 与占线程最多的进程名；
+    同一个采样号读了三回：只算一轮，不推；连着五轮 347 个线程而可跑的只有 5 个（编译器、链接器开一堆在睡的线程）：不推；超两轮、掉一轮、再超两轮：不推。
+    连着五轮 392 个线程、可跑的 39 个而占线程最多的进程只有 34 个线程（编译时一堆 rustc）：不推。
+    弄坏开关 threads-over-registered-silent 下头一种不推，threads-over-registered-idle-counted 下可跑的只有 5 个的那一种也推，
+    threads-over-registered-many-processes-counted 下占线程最多的进程只有 34 个线程的那一种也推，这一格红。"""
+    def busy(sample, runnable=40):
+        return SERVER.ThreadReading(sample, runnable, 347, 300, THREADS_OVER_REGISTERED_BINARY)
+
+    def calm(sample):
+        return SERVER.ThreadReading(sample, 2, 10, 10, THREADS_OVER_REGISTERED_BINARY)
+
+    cases = (("连着三轮 347 个线程、可跑的 40 个，之后掉回 10 个", [busy(1), busy(2), busy(3), calm(4), calm(5)], True),
+             ("同一个采样号读了三回", [busy(1), busy(1), busy(1)], False),
+             ("连着五轮 347 个线程、可跑的只有 5 个", [busy(sample, runnable=5) for sample in range(1, 6)], False),
+             ("连着五轮 392 个线程、可跑的 39 个、占线程最多的进程只有 34 个线程（编译）", [SERVER.ThreadReading(sample, 39, 392, 34, "cargo") for sample in range(1, 6)], False),
+             ("超两轮、掉一轮、再超两轮", [busy(1), busy(2), calm(3), busy(4), busy(5)], False))
+    problems = []
+    for what, readings, pushed in cases:
+        fake, _ = cpu_gate_scheduler(0, {"load1": 2.0, "procs_running": 3, "cpus": 32})
+        attempt = {"id": 1, "host": SERVER.LOCAL, "threads": 31, "state": "running", "number": 1}
+        queue = list(readings)
+        fake.machines[SERVER.LOCAL].thread_reading = lambda running, queue=queue: queue.pop(0) if queue else None
+        for _ in readings:
+            SERVER.Scheduler.note_threads(fake, attempt)
+        items = SERVER.Scheduler.threads_over_registered_items(fake, {"id": 7}, [attempt])
+        basis = items[0]["basis"] if items else ""
+        if pushed and (len(items) != 1 or items[0]["kind"] != "threads-over-registered" or items[0]["threshold"] != 1
+                       or not all(text in basis for text in ("347", "登记数 31", THREADS_OVER_REGISTERED_BINARY))):
+            problems.append(f"{what}：应当推一项 threads-over-registered、提醒门槛 1、依据写 347、登记数 31 与 {THREADS_OVER_REGISTERED_BINARY}，实际 {items}")
+        if not pushed and items:
+            problems.append(f"{what}：不该推，实际 {items}")
+    if problems:
+        raise SelftestFailure("线程总数远超登记数：" + "；".join(problems))
+    return "连着三轮 347 个线程、可跑的 40 个推一回；同一个采样号、可跑的只有 5 个、中间掉过一轮的都不推"
+
+
+def peer_threads_script(runnable):
+    """threads-over-registered-peer-reported 的第二台那条命令：12 轮、每轮 0.5 秒，每轮打一行 MULTI_HOST_RUN_PEER_THREADS（线程总数 100000、可跑的 runnable）与一行 CPU。"""
+    return ('for i in $(seq 12); do echo "MULTI_HOST_RUN_PEER_THREADS poll=$i runnable=' + str(runnable) + ' total=100000 top=90000:selftest-peer-binary read=yes"; '
+            'echo "MULTI_HOST_RUN_PEER_CPU poll=$i usage_usec=$((i * 1000000)) read=yes"; sleep 0.5; done')
+
+
+def cell_threads_over_registered_peer_reported(world):
+    """第二台的线程读数（task_server.py 的 PEER_THREADS_LINE、log_content 的 peer_threads、PeerMachine.thread_reading）：两条派到第二台、各跑 6 秒，每轮打一行
+    MULTI_HOST_RUN_PEER_THREADS total=100000：可跑的 50000 的那一条 wait 打一行 kind=threads-over-registered、依据写 100000 与 selftest-peer-binary、退 ATTENTION_EXIT，
+    再起 wait 跑完；可跑的 0 的那一条不推、跑完。弄坏开关 threads-over-registered-silent 下头一条不推，这一格红。"""
+    world.resources(local=(8, 30), peer=(100, 100), peer_cap_gibibytes=64)
+    world.seed_peak("selftest-peer-threads", 10 * GIBIBYTE)
+    world.start_server()
+    busy = world.submit(["bash", "-c", peer_threads_script(50000), "busy", "fake-peer-run"], extra={lib.KEY_VARIABLE: "selftest-peer-threads"}, cwd=world.repo)
+    fields = attention_of_kind(world, busy, "threads-over-registered")
+    problems = []
+    if not fields or "100000" not in fields.get("basis", "") or "selftest-peer-binary" not in fields.get("basis", ""):
+        problems.append(f"可跑的 50000 的那一条应当推 threads-over-registered、依据写 100000 与 selftest-peer-binary，实际 {fields}")
+    done = world.finished(busy, timeout=60)
+    host = done["attempts"][0].get("host") if done["attempts"] else None
+    if host != "peer" or done["task"].get("outcome") != "succeeded":
+        problems.append(f"可跑的 50000 的那一条应当在第二台跑完，实际在 {host}、{describe(done)}")
+    calm = world.submit(["bash", "-c", peer_threads_script(0), "calm", "fake-peer-run"], extra={lib.KEY_VARIABLE: "selftest-peer-threads"}, cwd=world.repo)
+    completed = world.client(["wait", str(calm)], timeout=60)
+    pushed = [line for line in attention_lines(completed) if attention_fields(line).get("kind") == "threads-over-registered"]
+    if pushed or completed.returncode != 0:
+        problems.append(f"可跑的 0 的那一条不该推、应当跑完退 0，实际退 {completed.returncode}、推了 {pushed}")
+    if problems:
+        raise SelftestFailure("第二台的线程读数：" + "；".join(problems), world.server_log_lines())
+    return "第二台每轮 100000 个线程：可跑的 50000 的推 threads-over-registered（依据写 100000 与进程名）、跑完；可跑的 0 的不推、跑完"
+
+
+def cell_cpu_gate_line_twice_cores(world):
+    """CPU 闸的线是核数 × 倍数（task_server.py 的 cpu_judgement；小世界的倍数是 2，由 TASK_SERVER_SELFTEST_CPU_OVERSUBSCRIPTION 给）：32 核（线 64）、负载 3，在跑两条各记 31 线程（起了 100 秒、照命令键的记录 31），
+    第三条 31 线程的排着，原因以「CPU：」起头、写「32 核 × 2 = 64」；在跑一条时 31 + 31 = 62 照起。
+    弄坏开关 cpu-oversubscription-three 下线是 192（32 × CPU_OVERSUBSCRIPTION_LOOSE），在跑两条时第三条也照起，这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    problems = []
+    for count, blocked in ((1, False), (2, True)):
+        fake, snapshot = cpu_gate_scheduler(count, load, recorded_cores=(31.0,), keys=[CPU_GATE_PROBE_KEY] * count)
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 9, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if blocked and (not why.startswith("CPU：") or "32 核 × 2 = 64" not in why):
+            problems.append(f"在跑两条各 31 线程：第三条 31 线程应当排着、原因以「CPU：」起头并写「32 核 × 2 = 64」，实际「{why}」")
+        if not blocked and why:
+            problems.append(f"在跑一条 31 线程：再起一条 31 线程（共 62）应当照起，实际「{why}」")
+    if SERVER.CPU_OVERSUBSCRIPTION != 3.4375:
+        problems.append(f"真服务的倍数应当是 3.4375（32 核的台线是 110，用户定的），实际 {SERVER.CPU_OVERSUBSCRIPTION}")
+    if problems:
+        raise SelftestFailure("CPU 闸的线是核数 × 倍数：" + "；".join(problems))
+    return "小世界照 2 倍（32 核线 64）：在跑一条再起一条照起（62）；在跑两条再起一条排着、原因写「32 核 × 2 = 64」；真服务的倍数是 3.4375（32 核线 110）"
+
+
+def query_plan_text(store, query, parameters):
+    """一条查询在这份库上的查询计划（EXPLAIN QUERY PLAN 各行的说明接起来）。"""
+    return " ".join(str(row[-1]) for row in store.connection().execute("EXPLAIN QUERY PLAN " + query, parameters).fetchall())
+
+
+def cell_lookup_indexes_used(world):
+    """查得勤的几种走索引（task_server.py 的 Store.LOOKUP_INDEXES；loop 审核发现 5）：按 task_id 取尝试与子任务、按命令键取结束了的尝试、按会话取任务，
+    查询计划里各用 attempts_task、tasks_task、attempts_key_state、tasks_session，不整表扫。
+    弄坏开关 lookup-indexes-skipped 下不建，这一格红。"""
+    store = SERVER.Store(os.path.join(world.root, "lookup-indexes.sqlite3"), bytes(32), dict(os.environ))
+    problems = []
+    for query, parameters, index in (("SELECT id FROM attempts WHERE task_id = ? ORDER BY id", (1,), "attempts_task"),
+                                     ("SELECT id FROM tasks WHERE task_id = ? ORDER BY id", (1,), "tasks_task"),
+                                     ("SELECT id FROM attempts WHERE command_key = ? AND state = 'ended' ORDER BY id DESC LIMIT 200", ("selftest",), "attempts_key_state"),
+                                     ("SELECT id FROM tasks WHERE session = ? ORDER BY id", ("selftest",), "tasks_session")):
+        plan = query_plan_text(store, query, parameters)
+        if index not in plan:
+            problems.append(f"「{query}」应当用 {index}，实际查询计划「{plan}」")
+    if problems:
+        raise SelftestFailure("查得勤的几种走索引：" + "；".join(problems))
+    return "按 task_id、命令键、会话取的四种都走索引"
+
+
+def cell_running_attempts_read_once(world):
+    """在跑的尝试库没变就不重读（task_server.py 的 Store.running_attempts；loop 审核发现 8）：连读两次只查一次库；本进程写过一行之后、别的连接提交过之后各重读一次；
+    改了交出来的那一份不染到下一次。弄坏开关 running-attempts-reread 下每次都查，这一格红。"""
+    path = os.path.join(world.root, "running-read-once.sqlite3")
+    store = SERVER.Store(path, bytes(32), dict(os.environ))
+    attempt = store.insert("attempts", {"state": "running", "session": "", "command_key": "", "task_id": 0, "host": SERVER.LOCAL})
+    reads = []
+    original = store.select
+
+    def counted(*arguments, **options):
+        reads.append(arguments[0] if arguments else "")
+        return original(*arguments, **options)
+    store.select = counted
+    problems = []
+    first = store.running_attempts()
+    store.running_attempts()
+    if len(reads) != 1:
+        problems.append(f"库没变连读两次：应当只查 1 次，实际 {len(reads)} 次")
+    first[0]["host"] = SERVER.PEER
+    if store.running_attempts()[0].get("host") != SERVER.LOCAL:
+        problems.append("改了交出来的那一份：下一次交的不应当跟着变")
+    store.update("attempts", dict(attempt, note="自证"))
+    store.running_attempts()
+    if len(reads) != 2:
+        problems.append(f"本进程写过一行之后：应当重读（共 2 次），实际 {len(reads)} 次")
+    with contextlib.closing(sqlite3.connect(path, timeout=5)) as connection:
+        connection.execute("INSERT OR REPLACE INTO meta(name, value) VALUES('selftest-poke', '1')")
+        connection.commit()
+    store.running_attempts()
+    if len(reads) != 3:
+        problems.append(f"别的连接提交过之后：应当重读（共 3 次），实际 {len(reads)} 次")
+    if problems:
+        raise SelftestFailure("在跑的尝试库没变就不重读：" + "；".join(problems))
+    return "库没变只读一次；本进程写过、别的连接提交过各重读一次"
+
+
+def cell_budget_source_only_when_reported(world):
+    """预算那一判不记提醒时不为「记账从哪来」扫库（task_server.py 的 budget_check；loop 审核发现 1）：记 4G、本机可用上限 48G、整片界 40G：
+    不记 oversized-budget、一次都不算记账来源。弄坏开关 budget-source-every-pass 下每一轮都算，这一格红。"""
+    calls = []
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.host_dispatch = types.SimpleNamespace(human=lambda size: f"{size / GIBIBYTE:.1f} GiB")
+    fake.prediction_of = lambda task: types.SimpleNamespace(memory_predicted=4 * GIBIBYTE)
+    fake.candidate_hosts = lambda task, snapshot: [SERVER.LOCAL]
+    fake.host_limit = lambda prediction, host, snapshot: (48 * GIBIBYTE, "")
+    fake.booked_at_cap = lambda prediction, host, snapshot: types.SimpleNamespace(memory_booked=4 * GIBIBYTE)
+    fake.whole_threshold = lambda host, snapshot: 40 * GIBIBYTE
+    fake.budget_notices = {}
+    fake.budget_source = lambda task, prediction: calls.append(task["id"]) or "自证"
+    snapshot = types.SimpleNamespace(reports={SERVER.LOCAL: {}}, reachable={SERVER.LOCAL: True, SERVER.PEER: True})
+    SERVER.Scheduler.budget_check(fake, {"id": 7}, types.SimpleNamespace(snapshot=lambda: snapshot))
+    if fake.budget_notices or calls:
+        raise SelftestFailure(f"记 4G、可用上限 48G：应当不记提醒、不算记账来源，实际提醒 {fake.budget_notices}、算了 {len(calls)} 次")
+    return "不记提醒的一条不算记账来源"
+
+
+def cell_repass_cleared_when_idle(world):
+    """队空的一轮也清 repass_soon（task_server.py 的 place_queued_into；loop 审核发现 12）：上一轮第二台起满记了 repass_soon，这一轮队空：清掉，主循环照 TICK_SECONDS 睡。
+    弄坏开关 repass-kept-when-idle 下照留，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.repass_soon = True
+    fake.pause_in_force = lambda: None
+    fake.store = types.SimpleNamespace(select=lambda *arguments, **options: [])
+    fake.selftest_read = lambda line: None
+    SERVER.Scheduler.place_queued_into(fake, {}, {})
+    if fake.repass_soon:
+        raise SelftestFailure("队空的一轮：repass_soon 应当清掉，实际还留着")
+    return "队空的一轮清掉 repass_soon"
+
+
+def peer_probe_resources():
+    """peer-probe-off-scheduler 的假 Resources：只有第二台一台，探测照 outcome 交（每次记进 probes）；不读多机配置、不判盘余量。→ (Resources, probes, outcome)。"""
+    probes, outcome = [], {"report": {"memory": {}}, "why": ""}
+    resources = object.__new__(SERVER.Resources)
+    resources.environment = dict(os.environ)
+    resources.fake_path, resources.cached, resources.peer = "", None, None
+    resources.peer_lock, resources.peer_reading, resources.peer_failed = threading.Lock(), None, None
+    resources.peer_refresh_seconds = 0.1
+    resources.refresh_peer = lambda: None
+    resources.disk_problem = lambda machine, report, fake=None: ""
+    resources.machines = {SERVER.PEER: types.SimpleNamespace(
+        name=SERVER.PEER, label="第二台", always_reachable=False, reachable=lambda found: (True, ""), configured_cap=lambda found: None,
+        probe=lambda found: (probes.append(True), (outcome["report"], outcome["why"]))[1])}
+    return resources, probes, outcome
+
+
+def cell_peer_probe_off_scheduler(world):
+    """第二台的余量不在排队线程里读（task_server.py 的 Resources.peer_probe_round、peer_snapshot_entry；loop 审核发现 3）：探测线程读了一回之后，snapshot 取那一份、不再连；
+    第二台读不成的那一回记下，PEER_PROBE_FAILURE_HOLD_SECONDS 之内探测线程不再去连，snapshot 当它此刻用不了、原因写不再去连。
+    弄坏开关 peer-probe-in-scheduler 下 snapshot 在调用方的线程里现连，这一格红。"""
+    resources, probes, outcome = peer_probe_resources()
+    problems = []
+    resources.peer_probe_round()
+    snapshot = resources.snapshot()
+    if len(probes) != 1 or SERVER.PEER not in snapshot.reports:
+        problems.append(f"探测线程读过一回：snapshot 应当取那一份、不再连，实际连了 {len(probes)} 次、报告里的台 {sorted(snapshot.reports)}")
+    outcome["report"], outcome["why"] = None, "自证：第二台卡住"
+    resources.peer_probe_round()
+    resources.peer_probe_round()
+    resources.cached = None
+    snapshot = resources.snapshot()
+    if len(probes) != 2 or SERVER.PEER in snapshot.reports or "不再去连" not in str(snapshot.down.get(SERVER.PEER)):
+        problems.append(f"读不成之后：探测线程应当只再连 1 回、snapshot 当第二台用不了（原因写不再去连），实际共连了 {len(probes)} 次、"
+                        f"报告里的台 {sorted(snapshot.reports)}、原因「{snapshot.down.get(SERVER.PEER)}」")
+    if problems:
+        raise SelftestFailure("第二台的余量不在排队线程里读：" + "；".join(problems))
+    return "snapshot 取探测线程那一份；读不成的那一回之后一段时间不再去连"
+
+
+PROMOTE_WAIT_SECONDS = 20   # promote-skips-cpu-gate：提前之后等它收尾的安静时限（弄坏开关 promote-cpu-gate-applied 下它一直排着，等满就判红）
+
+
+def cell_promote_skips_cpu_gate(world):
+    """task promote 提前（task_server.py 的 promote、路由 /tasks/{task_id}/promote、cpu_judgement）：本机内存够、负载 200（同 cpu-gate-holds-busy-host），命令键记过 31 核的任务排着、
+    排队原因写「CPU：」；别的会话提前它：客户端退非 0、说不是这个会话提交的，任务照旧在排；提交它的会话提前：退 0、回话写「提前到队头」；负载不降，它照起、跑完（提前过的不过 CPU 闸）。
+    弄坏开关 promote-session-unchecked 下别的会话也提前得了，promote-cpu-gate-applied 下提前过的照过 CPU 闸、一直排着，这一格红。"""
+    world.resources(local=(50, 50), local_cpu={"load1": 200.0, "procs_running": 150, "cpus": 32})
+    seed_busy_cores(world, CPU_GATE_BUSY_KEY)
+    world.start_server()
+    task_id = world.submit(["bash", "-c", "exit 0", "promote-cpu-gate"], extra={lib.KEY_VARIABLE: CPU_GATE_BUSY_KEY})
+    world.next_pass()
+    world.next_pass()
+    waiting = world.summary(task_id)
+    reason = waiting.get("waiting_for") or ""
+    if waiting["attempts"] or "CPU：" not in reason:
+        raise SelftestFailure(f"负载 200 的本机上应当排着、排队原因写「CPU：」，实际尝试 {len(waiting['attempts'])} 次、排队原因「{reason}」", world.server_log_lines())
+    problems = []
+    foreign = world.client(["promote", str(task_id)], session=SESSION_B)
+    after_foreign = world.summary(task_id)
+    if foreign.returncode == 0 or "不是这个会话提交的" not in foreign.stdout + foreign.stderr or after_foreign["task"].get("state") != "queued":
+        problems.append(f"别的会话提前：应当退非 0、说不是这个会话提交的、任务照旧在排，实际退 {foreign.returncode}、「{(foreign.stdout + foreign.stderr).strip()[-200:]}」、"
+                        f"状态 {after_foreign['task'].get('state')}")
+    own = world.client(["promote", str(task_id)])
+    if own.returncode != 0 or "提前到队头" not in own.stdout:
+        problems.append(f"提交它的会话提前：应当退 0、回话写「提前到队头」，实际退 {own.returncode}、「{(own.stdout + own.stderr).strip()[-200:]}」")
+    try:
+        done = world.finished(task_id, timeout=PROMOTE_WAIT_SECONDS)
+    except SelftestFailure as failure:
+        done = None
+        problems.append(f"提前之后负载照旧 200：应当不过 CPU 闸、照起、跑完，实际安静 {PROMOTE_WAIT_SECONDS} 秒没收尾（{str(failure)[:200]}）")
+    if done is not None and done["task"].get("outcome") != "succeeded":
+        problems.append(f"提前之后应当跑完，实际 {describe(done)}")
+    if problems:
+        raise SelftestFailure("task promote 提前：" + "；".join(problems), world.server_log_lines())
+    return f"负载 200 排着（「{reason[:60]}」）；别的会话提前被拒；提交它的会话提前之后不过 CPU 闸、照起、跑完"
+
+
+def cell_promote_queue_order(world):
+    """排队的先后（task_server.py 的 queue_order）：三条在排，提交 7200 秒的（排满 3600 秒的高优先）、提交 60 秒的、提交 30 秒而 task promote 提前过的：先后是提前过的、
+    高优先的、其余的。套在假调度器上，不起服务。弄坏开关 promote-queue-order-ignored 下不看提前过没有（高优先的、其余的、提前过的），这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.aged_seconds = 3600.0
+    now = time.time()
+    queued = [({"id": 1, "submitted_at": now - 7200}, True), ({"id": 2, "submitted_at": now - 60}, True), ({"id": 3, "submitted_at": now - 30, "promoted": {"at": now}}, True)]
+    order = [row[0]["id"] for row in SERVER.Scheduler.queue_order(fake, queued, now)]
+    if order != [3, 1, 2]:
+        raise SelftestFailure(f"排队的先后应当是提前过的 3、高优先的 1、其余的 2，实际 {order}")
+    return "提前过的排最前，再是排满时限的高优先，其余照原来的次序"
+
+
+def cell_progress_line_names_progress(world):
+    """在跑进度里一次在跑的尝试那一行（task_server.py 的 progress_attempt_line）：起跑以来 90 分钟，日志 1800 秒没涨而 120 秒前读到子进程写着的文件在涨：
+    那一行写起跑以来多久、写读到的进展与多少秒前读的、写日志末行。套在假调度器上（running_progress 换成定值），不起服务。
+    弄坏开关 progress-line-progress-unnamed 下不写读到的进展，这一格红。"""
+    log = os.path.join(world.root, "progress-line.log")
+    with open(log, "w", encoding="utf-8") as handle:
+        handle.write("头一行\n末一行在这里\n")
+    note = "子进程写着的 /selftest/record.log 从 10 涨到 20 字节"
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.running_progress = lambda task, attempt, now: {"elapsed_seconds": 5400.0, "cores": 0.0, "log_quiet_seconds": 1800.0, "progress_note": note, "progress_age_seconds": 120.0}
+    line = SERVER.Scheduler.progress_attempt_line(fake, {"id": 17}, {"id": 1, "task_id": 17, "host": SERVER.PEER, "log": log}, time.time())
+    wanted = ["起跑以来 90 分钟", note, "120 秒前读到", "末一行在这里"]
+    missing = [piece for piece in wanted if piece not in line]
+    if missing:
+        raise SelftestFailure(f"在跑进度那一行应当写 {wanted}，缺 {missing}，实际「{line}」")
+    return f"那一行：{line[:160]}"
+
+
+def cell_attempt_progress_readings(world):
+    """日志不涨时的进展读数（task_server_lib.py 的 attempt_progress_readings、attempt_progress_probe_text）：假 /proc 里进程 4100（树根）→ 4101，另有不在树里的 4999；
+    4100 只写着顶层日志（不算），4101 只写着 record.log、只读着 input.txt，4999 写着 outside.log：读数是 record.log 一份（大小照真文件）、
+    进程树 2 个。送到第二台的那一份（源码与请求各 base64 一份的 bash 命令）在本机 bash 起，读数逐项相同。
+    弄坏开关 open-file-write-mode-unchecked 下只读打开的 input.txt 也算写着的，这一格红。"""
+    proc, files = os.path.join(world.root, "progress-proc"), os.path.join(world.root, "progress-files")
+    os.makedirs(files, exist_ok=True)
+    record, top, source, outside = (os.path.join(files, name) for name in ("record.log", "attempt.log", "input.txt", "outside.log"))
+    for path, size in ((record, 10), (top, 20), (source, 30), (outside, 40)):
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("x" * size)
+    write_only, read_only = "0100001", "0100000"
+    layout = {4100: (1, {"1": (top, write_only)}), 4101: (4100, {"1": (record, write_only), "3": (source, read_only)}), 4999: (1, {"1": (outside, write_only)})}
+    for process, (parent, descriptors) in layout.items():
+        for part in ("fd", "fdinfo"):
+            os.makedirs(os.path.join(proc, str(process), part), exist_ok=True)
+        with open(os.path.join(proc, str(process), "stat"), "w", encoding="utf-8") as handle:
+            handle.write(f"{process} (fake) S {parent} 0 0\n")
+        for descriptor, (target, flags) in descriptors.items():
+            os.symlink(target, os.path.join(proc, str(process), "fd", descriptor))
+            with open(os.path.join(proc, str(process), "fdinfo", descriptor), "w", encoding="utf-8") as handle:
+                handle.write(f"pos:\t0\nflags:\t{flags}\nmnt_id:\t1\n")
+    request = {"root_process_ids": [4100], "excluded_files": [top], "proc_root": proc, "file_limit": 16,
+               "write_mode_unchecked": lib.broken("open-file-write-mode-unchecked")}
+    direct = lib.attempt_progress_readings(request)
+    problems = []
+    if direct.get("files") != {os.path.realpath(record): 10} or direct.get("processes") != 2:
+        problems.append(f"读数应当是写着的 record.log 一份（10 字节）、进程树 2 个，实际 {direct}")
+    completed = subprocess.run(["bash", "-c", lib.attempt_progress_probe_text(request)], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60)
+    shipped = lib.attempt_progress_probe_reply(completed.stdout)
+    if shipped != direct:
+        problems.append(f"送到第二台的那一份在本机起应当读数逐项相同，实际退 {completed.returncode}、读数 {shipped}、标准错误「{completed.stderr.strip()[-200:]}」")
+    if problems:
+        raise SelftestFailure("日志不涨时的进展读数：" + "；".join(problems))
+    return "写着的 record.log 一份、进程树 2 个；送到第二台的那一份读数相同"
+
+
+def progress_quiet_scheduler(readings):
+    """quiet-log-busy-spared-by-progress 的假调度器：尝试 7（任务 70）的日志 5000 秒没涨、最近一个窗口因 CPU 在涨没停它（log_growth 的缘由 SPARED_CPU_BUSY），
+    卡住阈值 600 秒、日志长期不涨的提醒门槛 1800 秒；本机的进展读数依次交 readings 里的各份（读到最后一份之后一直交它）。→ (假调度器, 读数开始的那一刻（monotonic）)。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.stall_seconds, fake.quiet_attention_seconds = 600.0, 1800.0
+    now = time.monotonic()
+    fake.log_growth = {7: (100, now - 5000, now - 600, 1.0, SERVER.SPARED_CPU_BUSY)}
+    fake.progress_read_at, fake.progress_files, fake.progress_noted = {}, {}, {}
+    pending = list(readings)
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(attempt_progress_readings=lambda attempt: (pending.pop(0) if len(pending) > 1 else pending[0], ""))}
+    return fake, now
+
+
+def cell_quiet_log_busy_spared_by_progress(world):
+    """日志不涨而有进展的不报 quiet-log-busy（task_server.py 的 note_attempt_progress、quiet_log_items；任务 17334 顶层日志 66200 秒没涨而测试进程写着的 record.log 在涨）：
+    尝试 7 日志 5000 秒没涨、CPU 在涨。子进程写着的 record.log 隔 400 秒读两回从 100 涨到 250 字节：记下进展（写出那份文件与两个大小）、不报；
+    对照：record.log 两回都是 100 字节：报一项 quiet-log-busy。套在假调度器上，不起服务。
+    弄坏开关 open-file-growth-ignored 下不看文件（头一种照报），quiet-log-busy-progress-ignored 下不看读到的进展（照报），这一格红。"""
+    attempt = {"id": 7, "task_id": 70, "number": 1, "host": SERVER.LOCAL, "state": "running"}
+    record = "/selftest-run/record.log"
+    problems = []
+    for what, readings, spared, wanted in (
+            ("record.log 在涨", [{"files": {record: 100}}, {"files": {record: 250}}], True, [record, "100", "250"]),
+            ("都没动", [{"files": {record: 100}}, {"files": {record: 100}}], False, [])):
+        fake, now = progress_quiet_scheduler(readings)
+        SERVER.Scheduler.note_attempt_progress(fake, attempt, now - 400)
+        SERVER.Scheduler.note_attempt_progress(fake, attempt, now)
+        noted = fake.progress_noted.get(7)
+        items = SERVER.Scheduler.quiet_log_items(fake, {"id": 70}, [attempt])
+        kinds = [item.get("kind") for item in items]
+        if spared and (noted is None or any(piece not in noted[1] for piece in wanted) or kinds):
+            problems.append(f"{what}：应当记下进展（写出 {wanted}）、不报 quiet-log-busy，实际记下「{noted[1] if noted else '没有'}」、报了 {kinds}")
+        if not spared and (noted is not None or kinds != ["quiet-log-busy"]):
+            problems.append(f"{what}：不该记进展、应当报一项 quiet-log-busy，实际记下「{noted[1] if noted else '没有'}」、报了 {kinds}")
+    if problems:
+        raise SelftestFailure("日志不涨而有进展：" + "；".join(problems))
+    return "写着的 record.log 在涨的记下进展、不报 quiet-log-busy；没动的照报"
+
+
+def cell_peer_ssh_multiplexed(world):
+    """服务起的 ssh 一律复用连接（task_server_lib.py 的 enable_ssh_multiplexing、ssh_multiplex_options、peer_shell_timed、ssh_multiplexed_environment、ssh_shim_text；
+    第二台 sshd 的 MaxStartups 被一条条新连接打满过）：在一个短的临时目录当服务状态目录起复用，控制目录是它下面的 ssh/：
+    服务自己起的那一路（peer_shell，ssh 换成记参数的假 ssh）参数里带 ControlMaster=auto、ControlPath=<控制目录>/%C、ControlPersist=<秒>，主机名是调用方给的多机配置第二台那一项；
+    host-dispatch.py 那一路（ssh_multiplexed_environment 之后的环境里 bash 起 PATH 上的 ssh）：PATH 头一项是控制目录下的 bin，复用层起 PATH 上下一个 ssh（记参数的假的），参数是这三项
+    接原来的参数；复用层正文里没有写死的主机名。控制目录放不下 socket 路径的判出来（不复用），环境里没记控制目录的（control 这类不是服务起的）不接。
+    弄坏开关 ssh-unmultiplexed 下两路都不接这三项，这一格红。"""
+    # 控制 socket 路径有上限：状态目录要短（系统临时目录接上 tsm-<8 个字符>/ssh/<%C>.<临时后缀> 放不下的用 /tmp）
+    base = tempfile.gettempdir()
+    if len(os.fsencode(base)) + len("/tsm-12345678/") + len(lib.SSH_CONTROL_DIRECTORY_NAME) + 1 + lib.SSH_CONTROL_HASH_CHARACTERS + lib.SSH_CONTROL_TEMPORARY_SUFFIX_CHARACTERS \
+            > lib.SOCKET_PATH_MAXIMUM_BYTES:
+        base = FALLBACK_TEMPORARY_BASE
+    state = tempfile.mkdtemp(prefix="tsm-", dir=base)
+    problems = []
+    try:
+        environment = dict(os.environ)
+        problem = lib.enable_ssh_multiplexing(environment, state)
+        control = os.path.join(state, lib.SSH_CONTROL_DIRECTORY_NAME)
+        expected = ["-o", "ControlMaster=auto", "-o", f"ControlPath={control}/%C", "-o", f"ControlPersist={lib.SSH_CONTROL_PERSIST_SECONDS}"]
+        if problem or environment.get(lib.SSH_CONTROL_VARIABLE) != control:
+            problems.append(f"短的状态目录应当起得了复用、记下控制目录 {control}，实际「{problem}」、记的 {environment.get(lib.SSH_CONTROL_VARIABLE)}")
+        recorder = '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$(dirname "$0")/argv"\n'
+        direct_directory, next_directory = os.path.join(state, "direct"), os.path.join(state, "next")
+        for directory in (direct_directory, next_directory):
+            os.makedirs(directory)
+            with open(os.path.join(directory, "ssh"), "w", encoding="utf-8") as handle:
+                handle.write(recorder)
+            os.chmod(os.path.join(directory, "ssh"), 0o755)
+
+        def recorded(directory):
+            with contextlib.suppress(OSError):
+                with open(os.path.join(directory, "argv"), encoding="utf-8") as handle:
+                    return handle.read().splitlines()
+            return []
+        lib.peer_shell(SELFTEST_PEER_ADDRESS, "true", dict(environment, TASK_SERVER_PEER_SSH=os.path.join(direct_directory, "ssh")))
+        direct = recorded(direct_directory)
+        if direct != [*lib.NFS_SSH_OPTIONS, *expected, SELFTEST_PEER_ADDRESS, "true"]:
+            problems.append(f"服务自己起的 ssh 参数应当是 {[*lib.NFS_SSH_OPTIONS, *expected, SELFTEST_PEER_ADDRESS, 'true']}，实际 {direct}")
+        merged = lib.ssh_multiplexed_environment({"PATH": os.pathsep.join([next_directory, "/usr/bin", "/bin"])}, environment)
+        subprocess.run(["bash", "-c", 'ssh -o BatchMode=yes "$0" true', SELFTEST_PEER_ADDRESS], env=merged, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30)
+        relayed = recorded(next_directory)
+        if merged.get("PATH", "").split(os.pathsep)[0] != os.path.join(control, lib.SSH_SHIM_DIRECTORY_NAME) or relayed != [*expected, "-o", "BatchMode=yes", SELFTEST_PEER_ADDRESS, "true"]:
+            problems.append(f"host-dispatch.py 那一路：PATH 头一项应当是 {os.path.join(control, lib.SSH_SHIM_DIRECTORY_NAME)}、下一个 ssh 收到的参数应当是三项接原来的参数，"
+                            f"实际 PATH「{merged.get('PATH')}」、参数 {relayed}")
+        with contextlib.suppress(OSError):
+            with open(os.path.join(control, lib.SSH_SHIM_DIRECTORY_NAME, "ssh"), encoding="utf-8") as handle:
+                if SELFTEST_PEER_ADDRESS in handle.read():
+                    problems.append("复用层正文里不该写死主机名")
+        if not lib.ssh_control_path_problem(os.path.join("/" + "x" * 80, lib.SSH_CONTROL_DIRECTORY_NAME)):
+            problems.append("80 字节的状态目录接上 %C 与临时后缀放不下 socket 路径，应当判出来，实际没判")
+        if lib.ssh_multiplex_options({}):
+            problems.append(f"环境里没记控制目录的不该接复用的三项，实际 {lib.ssh_multiplex_options({})}")
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    if problems:
+        raise SelftestFailure("服务起的 ssh 复用连接：" + "；".join(problems))
+    return f"两路 ssh 都带 ControlMaster=auto、ControlPath=<状态目录>/ssh/%C、ControlPersist={lib.SSH_CONTROL_PERSIST_SECONDS}；主机名照调用方给的"
+
+
+# ── 收尾不在排队线程里做（task_server.py 的 finish_attempt、finish_off_loop）──
+PEER_RECOVER_HOLD_SECONDS = 20.0           # peer-cleanup-off-scheduler：第二台收尾卡着的这段里，本机那一条跑完的安静时限
+
+
+def unit_unreadable_lines(world, attempt_id, presence=""):
+    """这一格各次服务输出里 TASK_UNIT_UNREADABLE 起头、点名这一次尝试（attempt=<记录号>）的那几行（task_server.py 的 note_unit_unreadable）；给了 presence 的只要 presence=<它> 的。"""
+    lines = []
+    for number in range(1, world.server_logs + 1):
+        text = read_text(os.path.join(world.root, f"server-{number}.log"))
+        lines += [line for line in text.splitlines() if line.startswith("TASK_UNIT_UNREADABLE ") and f" attempt={attempt_id} " in line
+                  and (not presence or f" presence={presence} " in line)]
+    return lines
+
+
+def wait_unit_unreadable_line(world, attempt_id, presence=""):
+    """等服务日志打出点名这一次尝试的 TASK_UNIT_UNREADABLE 行（PLACEMENT_WAIT_SECONDS 的安静时限）；交此刻有的那几行（没有交空表，调用处判）。"""
+    patience = world.patience(PLACEMENT_WAIT_SECONDS)
+    while not unit_unreadable_lines(world, attempt_id, presence) and patience.waiting():
+        time.sleep(POLL_SECONDS)
+    return unit_unreadable_lines(world, attempt_id, presence)
+
+
+UNIT_UNREADABLE_WAIT_SCRIPT = 'for round in $(seq 1 2000); do [[ -e "$1" ]] && exit "$2"; sleep 0.1; done; exit 9'   # 等放行文件在了再退给的码（至多 200 秒）
+UNIT_UNREADABLE_HOLD_SECONDS = 3.0   # unit-unreadable-unverified-health-reported：/health 报了之后再看这么久（对账十来轮、过了 1 秒的宽限），核不出的那一次仍该照记 running
+
+
+def cell_unit_unreadable_exit_file_settles(world):
+    """读不到单元状态、留了 result.json 的照它的退出码收尾（task_server.py 文件头 ①「读不到单元状态」）：一条命令跑起来之后世界目录里放 unit-states-unreadable
+    （unit_states 一律交 None），等服务日志打出点名它的 TASK_UNIT_UNREADABLE 行（进了读不到的那一段）再放它退 3：收尾 command-failed、退 3、只一次。
+    弄坏开关 unit-unreadable-exit-file-unread 下读不到的那一段不认 result.json，命令退了、单元收掉之后照没留结果记 launcher-lost，这一格红。"""
+    world.start_server()
+    unreadable, release = (os.path.join(world.world, name) for name in (SERVER.UNIT_STATES_UNREADABLE_FILE, "unit-unreadable-release"))
+    problems = []
+    task_id = world.submit(["bash", "-c", UNIT_UNREADABLE_WAIT_SCRIPT, "unit-unreadable-exit-file", release, "3"])
+    try:
+        attempt = first_attempt(world.running(task_id))
+        open(unreadable, "w").close()
+        if not wait_unit_unreadable_line(world, attempt.get("id")):
+            problems.append(f"读不到单元状态时服务日志应当打点名第 1 次（attempt={attempt.get('id')}）的 TASK_UNIT_UNREADABLE 行，实际没有")
+    finally:
+        open(release, "w").close()
+    try:
+        done = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(unreadable)
+    first = first_attempt(done)
+    if done["task"].get("outcome") != "command-failed" or first.get("exit_code") != 3 or len(done["attempts"]) != 1:
+        problems.append(f"留了退出码的那一次应当照它收尾（command-failed、退 3、只一次），实际 {describe(done)}、第 1 次 {first.get('outcome')}、退 {first.get('exit_code')}、"
+                        f"{len(done['attempts'])} 次")
+    raise_cell_problems(world, problems, "读不到单元状态、留了退出码的那一次")
+    return "读不到单元状态时留了 result.json 的照它的退出码收尾：command-failed、退 3、只一次"
+
+
+def cell_unit_unreadable_gone_recorded_lost(world):
+    """读不到单元状态、没留 result.json、不经 systemd 核到都没了的记 launcher-lost（task_server.py 文件头 ①「读不到单元状态」）：世界目录里先放 unit-states-unreadable，
+    再交一条把起它的 attempt_runner 杀掉（kill -9 $PPID）、睡 2 秒的：起跑标记记的 runner 进程号不在、单元收掉之后它的 cgroup 在本机用户级管理器的 cgroup 树里找不到（算空），
+    满宽限记 launcher-lost（第 1 次 ended、launcher-lost），服务日志有点名它的 presence=gone 那一行。
+    弄坏开关 unit-unreadable-absent-cgroup-unconfirmed 下不在的 cgroup 目录算核不出，那一次一直照记 running、等收尾等满安静时限，这一格红。"""
+    world.start_server()
+    unreadable = os.path.join(world.world, SERVER.UNIT_STATES_UNREADABLE_FILE)
+    open(unreadable, "w").close()
+    problems = []
+    try:
+        task_id = world.submit(["bash", "-c", 'kill -9 "$PPID"; sleep 2', "unit-unreadable-gone"])
+        done = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
+    finally:
+        os.remove(unreadable)
+    first = first_attempt(done)
+    if done["task"].get("outcome") != "launcher-lost" or first.get("state") != "ended" or first.get("outcome") != "launcher-lost":
+        problems.append(f"核到都没了的那一次应当记 launcher-lost，实际 {describe(done)}、第 1 次 {first.get('state')}/{first.get('outcome')}")
+    if not unit_unreadable_lines(world, first.get("id"), lib.PRESENCE_GONE):
+        problems.append(f"照没留结果收尾之前服务日志应当打点名它（attempt={first.get('id')}）、presence={lib.PRESENCE_GONE} 的 TASK_UNIT_UNREADABLE 行（核到都不在），"
+                        f"实际点名它的是 {unit_unreadable_lines(world, first.get('id'))[-3:]}")
+    raise_cell_problems(world, problems, "读不到单元状态、核到都没了的那一次")
+    return "读不到单元状态、没留结果：不经 systemd 核到 runner 进程号不在、单元的 cgroup 已收掉之后记 launcher-lost，服务日志有 presence=gone 那一行"
+
+
+def cell_unit_unreadable_running_reminded(world):
+    """读不到单元状态、进程还在的不杀、照记 running、提醒发起任务的会话（task_server.py 文件头 ①「读不到单元状态」与「要处置的提醒」的 unit-unreadable）：
+    会话的收件 socket（FakeInbox）在，一条命令跑起来之后世界目录里放 unit-states-unreadable：起跑标记记的 runner 进程号在、单元的 cgroup 里有进程，核到还在；
+    满 FAST_UNIT_UNREADABLE_ATTENTION_SECONDS（2 秒）收到恰好一条「task-server：提醒（任务还在跑，不是结局）任务 <号> 读不到单元状态（unit-unreadable；第 1 回」（reminded_after_seconds=2），
+    依据写本机、单元名、读不到什么与核到的进程号，再看几轮不多一条；满 4 秒再收一条 reminded_after_seconds=4 的；这一段里任务与那一次尝试都照记 running。放行之后照 result.json 收尾 succeeded。
+    弄坏开关 unit-unreadable-lost-unverified 下读不到就当场照没留结果收尾、停掉单元里的进程（launcher-lost），unit-unreadable-unreminded 下收不到提醒，
+    unit-unreadable-exit-file-unread 下放行之后不认 result.json、记 launcher-lost，这一格红。"""
+    inbox = FakeInbox(world, "a")
+    start_inbox_server(world)
+    unreadable, release = (os.path.join(world.world, name) for name in (SERVER.UNIT_STATES_UNREADABLE_FILE, "unit-unreadable-release"))
+    problems = []
+    task_id = world.submit(["bash", "-c", UNIT_UNREADABLE_WAIT_SCRIPT, "unit-unreadable-running", release, "0"], extra=inbox.environment())
+    try:
+        attempt = first_attempt(world.running(task_id))
+        open(unreadable, "w").close()
+        head = reminder_head(task_id, "unit-unreadable")
+        first_after, second_after = round(SERVER.FAST_UNIT_UNREADABLE_ATTENTION_SECONDS), round(2 * SERVER.FAST_UNIT_UNREADABLE_ATTENTION_SECONDS)
+        inbox.wait_for(world, head)
+        time.sleep(INBOX_QUIET_SECONDS)
+        first = reminders_after(inbox.headed(head), first_after)
+        problems += inbox_problems(first, head, f"读不到单元状态满 {first_after} 秒那一回")
+        text = first[0]["text"] if first else ""
+        for wanted in ("依据：", "本机读不到它的单元", str(attempt.get("unit")), "进程号", "出路：",
+                       f"{lib.ATTENTION_MARK} task={task_id} type={lib.ATTENTION_TYPE} kind=unit-unreadable reminded_after_seconds={first_after} basis="):
+            if wanted not in text:
+                problems.append(f"读不到单元状态那一条的正文里应当有「{wanted}」，实际「{text[:500]}」")
+        inbox.wait_for(world, head, count=2)
+        time.sleep(INBOX_QUIET_SECONDS)
+        problems += inbox_problems(reminders_after(inbox.headed(head), second_after), head, f"读不到单元状态满 {second_after} 秒那一回")
+        if len(reminders_after(inbox.headed(head), first_after)) != 1:
+            problems.append(f"满 {second_after} 秒之后，{first_after} 秒那一条仍该只有一条，实际 {len(reminders_after(inbox.headed(head), first_after))} 条")
+        during = world.summary(task_id)
+        if during["task"].get("state") != "running" or first_attempt(during).get("state") != "running":
+            problems.append(f"读不到单元状态而进程还在的那一次应当照记 running，实际任务 {during['task'].get('state')}、第 1 次 {first_attempt(during).get('state')}"
+                            f"/{first_attempt(during).get('outcome')}")
+    finally:
+        open(release, "w").close()
+    try:
+        done = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(unreadable)
+    if done["task"].get("outcome") != "succeeded" or len(done["attempts"]) != 1:
+        problems.append(f"放行之后应当照 result.json 收尾 succeeded、只一次，实际 {describe(done)}、{len(done['attempts'])} 次")
+    raise_cell_problems(world, problems, "读不到单元状态、进程还在的那一次")
+    return "读不到单元状态而进程还在：不杀、照记 running，满 2 秒、满 4 秒各推恰好一条 unit-unreadable（依据写本机、单元与核到的进程号），放行后照退出码收尾 succeeded"
+
+
+def cell_unit_unreadable_unverified_health_reported(world):
+    """读不到单元状态、没留 result.json、cgroup 也读不到的一直等（task_server.py 文件头 ①「读不到单元状态」）：世界目录里先放 unit-states-unreadable 与 unit-cgroups-unreadable
+    （本机核进程的 cgroup 根换成不在的一处），再交一条把起它的 attempt_runner 杀掉、睡 1 秒的：runner 进程号不在而 cgroup 核不出，不杀、不收尾，那一次照记 running；
+    /health 回不健康，problem 写本机读不到在跑尝试的单元状态，unit_unreadable 栏点名这一条（presence=unverified）；control check 退 78、报同一句；
+    再看 UNIT_UNREADABLE_HOLD_SECONDS 仍照记 running。撤掉两份文件之后照读得到的单元状态判，单元不在了记 launcher-lost。
+    弄坏开关 unit-unreadable-health-unreported 下 /health 不报，unit-unreadable-lost-unverified 下当场记 launcher-lost，这一格红。"""
+    world.start_server()
+    flags = [os.path.join(world.world, name) for name in (SERVER.UNIT_STATES_UNREADABLE_FILE, SERVER.UNIT_CGROUPS_UNREADABLE_FILE)]
+    release_all(flags)
+    problems = []
+    try:
+        task_id = world.submit(["bash", "-c", 'kill -9 "$PPID"; sleep 1', "unit-unreadable-unverified"])
+        health = health_until(world, lambda reading: any(entry.get("task") == task_id and entry.get("presence") == lib.PRESENCE_UNVERIFIED
+                                                         for entry in reading.get("unit_unreadable") or []), PLACEMENT_WAIT_SECONDS)
+        entries = [entry for entry in health.get("unit_unreadable") or [] if entry.get("task") == task_id]
+        if (health.get("ok") or SERVER.UNIT_UNREADABLE_HEALTH_TEXT not in (health.get("problem") or "") or not entries
+                or entries[0].get("presence") != lib.PRESENCE_UNVERIFIED):
+            problems.append(f"读不到单元状态、cgroup 也读不到时 /health 应当回不健康、problem 写「{SERVER.UNIT_UNREADABLE_HEALTH_TEXT}」、unit_unreadable 栏点名任务 {task_id}"
+                            f"（presence={lib.PRESENCE_UNVERIFIED}），实际 ok={health.get('ok')}、problem「{(health.get('problem') or '')[:300]}」、栏 {entries}")
+        checked = world.control(["check"])
+        if checked.returncode != 78 or SERVER.UNIT_UNREADABLE_HEALTH_TEXT not in checked.stderr:
+            problems.append(f"control check 应当退 78、报「{SERVER.UNIT_UNREADABLE_HEALTH_TEXT}」，实际退 {checked.returncode}、「{(checked.stdout + checked.stderr).strip()[-300:]}」")
+        time.sleep(UNIT_UNREADABLE_HOLD_SECONDS)
+        during = world.summary(task_id)
+        if during["task"].get("state") != "running" or first_attempt(during).get("state") not in SERVER.ACTIVE_ATTEMPT_STATES:
+            problems.append(f"核不出的那一次应当一直照记 running（不杀、不收尾），实际任务 {during['task'].get('state')}、第 1 次 {first_attempt(during).get('state')}"
+                            f"/{first_attempt(during).get('outcome')}")
+    finally:
+        for path in flags:
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(path)
+    done = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
+    if done["task"].get("outcome") != "launcher-lost":
+        problems.append(f"撤掉两份文件之后单元不在了应当记 launcher-lost，实际 {describe(done)}")
+    raise_cell_problems(world, problems, "读不到单元状态、cgroup 也读不到的那一次")
+    return (f"读不到单元状态、cgroup 也读不到：照记 running 不杀，/health 报「{SERVER.UNIT_UNREADABLE_HEALTH_TEXT}…」、unit_unreadable 栏 presence={lib.PRESENCE_UNVERIFIED}，"
+            "control check 退 78；读得到之后照单元不在记 launcher-lost")
+
+
+def cell_peer_cleanup_off_scheduler(world):
+    """第二台收尾卡住时本机照起（task_server.py 的 finish_off_loop；loop 审核发现 4）：派第二台的一条跑完、清理回执 pending，假 multi-host-run.sh 的 --recover-cleanup 卡着不回
+    （世界目录里 recover-cleanup-hold 在、等 recover-cleanup-release）；卡着的这段里第二台演用不了、本机放得下，交一条本机的：它照起、在 PEER_RECOVER_HOLD_SECONDS 的安静时限里跑完，
+    第二台那一条照旧在跑、不记结局；放开之后它收尾 succeeded。弄坏开关 finish-in-scheduler 下收尾在排队线程里当场做，排队线程卡在 --recover-cleanup 上，本机那一条一直排着，这一格红。"""
+    world.resources(local=(1, 30), peer=(100, 100), peer_cap_gibibytes=64)
+    world.start_server()
+    hold, reached, release = (os.path.join(world.world, name) for name in ("recover-cleanup-hold", "recover-cleanup-reached", "recover-cleanup-release"))
+    open(hold, "w").close()
+    problems = []
+    try:
+        peer_id = world.submit(["bash", "-c", "exit 0", "peer-cleanup-stuck", "fake-peer-cleanup=pending"], cwd=world.repo)
+        wait_path(world, reached, "第二台那一条收尾卡在 --recover-cleanup 上")
+        world.resources(local=(30, 30), peer_down="自证：第二台这一刻不收新活")
+        local_id = world.submit(["bash", "-c", "exit 0", "beside-stuck-peer-cleanup"])
+        local = world.finished(local_id, timeout=PEER_RECOVER_HOLD_SECONDS)
+        during = world.summary(peer_id)
+        if local["task"].get("outcome") != "succeeded" or first_attempt(local).get("host") != SERVER.LOCAL:
+            problems.append(f"第二台收尾卡着时本机那一条应当在本机跑完，实际 {describe(local)}、派到 {first_attempt(local).get('host')}")
+        if during["task"].get("state") != "running" or first_attempt(during).get("state") not in ("starting", "running") or os.path.exists(release):
+            problems.append(f"第二台那一条收尾还卡着：应当照旧在跑、不记结局，实际 {describe(during)}、尝试 {first_attempt(during).get('state')}")
+    finally:
+        open(release, "w").close()
+    done = world.finished(peer_id)
+    if done["task"].get("outcome") != "succeeded" or first_attempt(done).get("host") != SERVER.PEER:
+        problems.append(f"放开之后第二台那一条应当收尾 succeeded，实际 {describe(done)}")
+    raise_cell_problems(world, problems, "第二台收尾卡住时本机照起")
+    return "第二台收尾卡在 --recover-cleanup 上：本机那一条照起、跑完，第二台那一条放开之后收尾"
+
+
+STOPPED_UNIT_ATTEMPT = 3   # unit-stopped-booking-released：单元已停、收尾还没做完的那一条在跑尝试的号
+
+
+def cell_unit_stopped_booking_released(world):
+    """单元确认停了就放掉这一次尝试的 CPU 与内存记账（task_server.py 的 release_stopped_booking、unit_confirmed_stopped、booking_attempts；任务 13716 到 13718 取消后单元已 inactive、
+    两台都没有进程，结局隔了十几分钟才落库，期间 CPU 闸照记各 31 线程）：本机三条在跑（起了 100 秒、命令键记过 31 核，照记录各记 31 线程，共 93 线程），第三条的单元读回 inactive 而且 cgroup.procs 空：
+    放掉它之后 CPU 闸记 62 线程；内存一侧（slice 30G、余量 1G，一条在跑、上限 20G、scope 此刻用满 20G）记账 20G、公式剩 9G、待涨量 0，
+    放掉之后公式剩 29G、待涨量 0。读不到状态（unit_states 交 None）、cgroup.procs 读不到、cgroup.procs 里还有进程、单元还在跑的，都不算停：照数。收尾记 ended 之后（finish_attempt 清）这一条不再留。
+    弄坏开关 unit-stopped-still-booked 下停了的也照数（93 线程、公式剩 9G），这一格红。"""
+    load = {"load1": 2.0, "procs_running": 3, "cpus": 32}
+    attempt = {"id": STOPPED_UNIT_ATTEMPT, "label": RUNNING_BOOKING_LABEL, "unit": "stopped-unit-selftest.service", "host": SERVER.LOCAL}
+    problems = []
+    readings = (("单元 inactive、cgroup.procs 空", ("loaded", "inactive"), [], True), ("读不到单元状态", None, [], False),
+                ("cgroup.procs 读不到", ("loaded", "inactive"), None, False), ("cgroup.procs 里还有进程", ("loaded", "inactive"), [4242], False),
+                ("单元还在跑", ("loaded", "active"), [], False))
+    for what, states, processes, stopped in readings:
+        fake, _ = cpu_gate_scheduler(3, load, recorded_cores=(31.0,), keys=[CPU_GATE_PROBE_KEY] * 3)
+        with unittest.mock.patch.object(SERVER, "unit_states", lambda unit, environment, states=states: states), \
+                unittest.mock.patch.object(SERVER, "unit_processes", lambda unit, environment, processes=processes: processes):
+            confirmed = SERVER.Scheduler.release_stopped_booking(fake, attempt)
+        counted = SERVER.Scheduler.running_threads(fake, SERVER.LOCAL, time.time())
+        wanted_threads = 62 if stopped else 93
+        if confirmed != stopped or counted != wanted_threads:
+            problems.append(f"{what}：应当{'确认停了、记 62 线程' if stopped else '不算停、照记 93 线程'}，实际确认 {confirmed}、记 {counted} 线程")
+        if stopped:
+            fake.store.running_attempts = lambda: []   # 收尾记了 ended：不在在跑名单里，布告栏里这一条清掉
+            SERVER.Scheduler.booking_attempts(fake)
+            if fake.unit_stopped:
+                problems.append(f"{what}：尝试不在在跑名单里之后应当从放掉的名单里清掉，实际还留着 {sorted(fake.unit_stopped)}")
+    memory_attempt = {"id": 1, "label": RUNNING_BOOKING_LABEL, "unit": "stopped-unit-selftest.service", "host": SERVER.LOCAL}
+    for released, wanted_room in ((False, 9 * GIBIBYTE), (True, 29 * GIBIBYTE)):
+        fake, snapshot, report = running_booking_scheduler(20 * GIBIBYTE, 20 * GIBIBYTE)
+        if released:
+            with unittest.mock.patch.object(SERVER, "unit_states", lambda unit, environment: ("loaded", "inactive")), \
+                    unittest.mock.patch.object(SERVER, "unit_processes", lambda unit, environment: []):
+                SERVER.Scheduler.release_stopped_booking(fake, memory_attempt)
+        room = SERVER.Scheduler.room_by_the_formula(fake, SERVER.LOCAL, snapshot)
+        pending = SERVER.Scheduler.server_pending(fake, SERVER.LOCAL, report)
+        if room != wanted_room or pending != 0:
+            problems.append(f"内存{'放掉之后' if released else '没放掉时'}：公式应当剩 {wanted_room / GIBIBYTE:g}G、待涨量 0，"
+                            f"实际剩 {room / GIBIBYTE:g}G、待涨量 {pending / GIBIBYTE:g}G")
+    if problems:
+        raise SelftestFailure("单元已停先放记账：" + "；".join(problems))
+    return "单元回读停了：CPU 闸 93 线程变 62、内存公式剩 9G 变 29G；读不到的、还有进程的、还在跑的照数"
+
+
+def cell_cpu_reason_splits_io_wait(world):
+    """CPU 闸的排队原因把等 IO 的线程拆开写（task_server.py 的 cpu_problem；余量报告 CPU 一项的 blocked_threads，memory_peaks_lib 的 cpu_report）：32 核（线 64）、负载 297，
+    其中状态 D 的线程 249 个：再起一条排着，原因写「负载 297（其中等 IO 的线程 249）」；闸的判法不变（同样的负载、blocked_threads 是 0 或没有这一项，排不排一样，没有这一项的原因里不写括号）。
+    弄坏开关 cpu-load-io-unsplit 下不拆开写，原因只写「负载 297」，这一格红。"""
+    problems = []
+    for what, blocked, wanted_text in (("249 个线程在等 IO", 249, "负载 297（其中等 IO 的线程 249）"), ("报告里没有等 IO 的线程数", None, "负载 297、")):
+        cpu = {"load1": 297.0, "procs_running": 3, "cpus": 32}
+        if blocked is not None:
+            cpu["blocked_threads"] = blocked
+        fake, snapshot = cpu_gate_scheduler(0, cpu, recorded_cores=(31.0,))   # 这一条照记录要 31 核：不走要核数少的名额
+        why = SERVER.Scheduler.cpu_problem(fake, {"id": 1, "command_key": CPU_GATE_PROBE_KEY}, SERVER.LOCAL, snapshot)
+        if not why.startswith("CPU：") or wanted_text not in why:
+            problems.append(f"{what}：应当排着、原因以「CPU：」起头并写「{wanted_text}」，实际「{why}」")
+    if problems:
+        raise SelftestFailure("CPU 闸的原因拆开写等 IO 的线程：" + "；".join(problems))
+    return "负载 297 里 249 个线程在等 IO：原因写「负载 297（其中等 IO 的线程 249）」；报告里没有这一项的不写括号；两种都照旧排着"
+
+
+NO_BORROW_ENTRY_SCRIPT = "scripts/gate/selftest-no-borrow-entry.sh"   # shard-start-borrows-nothing：被分片的入口脚本（父任务的 sharded_entry）
+NO_BORROW_HEAD = f"bash {NO_BORROW_ENTRY_SCRIPT} --check selftest-cell-a"   # 这一趟分片的命令键原文（分片那一段之前）
+NO_BORROW_OTHER_HEAD = f"bash {NO_BORROW_ENTRY_SCRIPT} --check selftest-cell-b"   # 同一入口脚本、别的参数的那一趟
+NO_BORROW_PARENT, NO_BORROW_SIBLING = 90, 92   # 这一趟的父任务与同一趟的兄弟片（共 4 片的第 0 片）的任务号
+
+
+def cell_shard_start_borrows_nothing(world):
+    """自己这把键没有相当记录的片谁的都不借：同一趟的兄弟片、同入口别的参数那一趟、别的片数都不取，照没记录的缺省起（task_server.py 的 computed_prediction，
+    定额度的入口；task_server_lib.py 文件头「资源记录」的定额度）：共 4 片的第 2 片。库里同一趟的兄弟片（同一个父任务名下、共 4 片的第 0 片）跑完峰值 60G，
+    同一入口脚本、别的参数那一趟共 4 片的第 2 片（键不同）跑完 40G、共 8 片的第 1 片跑完 70G：起点应当是没记录的缺省 4096M、来历 unrecorded；
+    对照：库里再有这一片自己这把键、片数相同的 6G 记录，起点就是 6G、来历是 record。
+    弄坏开关 record-ignored-for-cap 下对照那一种也照缺省起，这一格红。"""
+    store_rows = []
+    children = [({"id": 91, "task_id": NO_BORROW_PARENT}, True), ({"id": NO_BORROW_SIBLING, "task_id": NO_BORROW_PARENT}, True)]
+
+    def row(head, index, count, peak, when, task_id):
+        store_rows.append(({"command_key": lib.shard_child_key(head, "shard", index, count), "state": "ended", "outcome": "succeeded", "memory_peak": peak, "memory_cap": peak + GIBIBYTE,
+                            "shard_count": count, "role": "shard", "task_id": task_id, "ended_at": float(when), "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC}, True))
+
+    def select(table, where="1", parameters=(), order="id"):
+        if table == "attempts":
+            return [item for item in store_rows if item[0].get("command_key") == parameters[0]]
+        return list(children) if table == "tasks" and parameters == (NO_BORROW_PARENT,) else []
+
+    parent = {"id": NO_BORROW_PARENT, "command_key": NO_BORROW_HEAD, "sharded_entry": NO_BORROW_ENTRY_SCRIPT}
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.peer_root = dict(os.environ), lib.REPOSITORY_ROOT   # 定额度末了的内存下限（memory_floor_applied）读命令与仓根，认是不是换文件、打补丁的工具
+    fake.host_dispatch = loaded_host_dispatch()
+    fake.reads_log = None
+    fake.prediction_lock = threading.Lock()
+    fake.store = types.SimpleNamespace(select=select, task=lambda task_id: (parent, True) if task_id == NO_BORROW_PARENT else None)
+    shard = {"id": 91, "role": "shard", "parent_id": NO_BORROW_PARENT, "shard_index": 2, "shard_count": 4, "command_key": lib.shard_child_key(NO_BORROW_HEAD, "shard", 2, 4),
+             "command": ["bash", NO_BORROW_ENTRY_SCRIPT, "--check", "selftest-cell-a"], "cwd": lib.REPOSITORY_ROOT}
+
+    def started():
+        found = SERVER.Scheduler.computed_prediction(fake, shard)
+        return found.memory_cap, found.memory_history
+
+    row(NO_BORROW_HEAD, 0, 4, 60 * GIBIBYTE, 100, NO_BORROW_SIBLING)
+    row(NO_BORROW_OTHER_HEAD, 2, 4, 40 * GIBIBYTE, 110, 81)
+    row(NO_BORROW_OTHER_HEAD, 1, 8, 70 * GIBIBYTE, 115, 82)
+    borrowed = started()
+    row(NO_BORROW_HEAD, 2, 4, 6 * GIBIBYTE, 120, 71)
+    own = started()
+    problems = []
+    for what, got, want in (("自己没有记录、库里有同一趟的兄弟片 60G、同一入口别的参数那一趟同片数 40G 与片数不同的 70G", borrowed, (lib.UNRECORDED_MEMORY_DEFAULT_BYTES, lib.UNRECORDED_HISTORY)),
+                            ("对照：自己这把键有片数相同的 6G 记录", own, (6 * GIBIBYTE, lib.RECORD_HISTORY))):
+        if got != want:
+            problems.append(f"{what}：起点与来历应当是 {want}，实际 {got}")
+    if problems:
+        raise SelftestFailure("没有自己记录的片谁的都不借：" + "；".join(problems))
+    return "共 4 片的第 2 片自己没有记录：同一趟的兄弟片 60G、同入口别的趟 40G、片数不同的 70G 都不取，照缺省 4096M 起；自己有 6G 记录就照 6G（record）"
+
+
+PLAN_KEY_HEAD = f"bash {NO_BORROW_ENTRY_SCRIPT} --check selftest-plan-keys"   # plan-key-by-compiles：这一趟分片的命令键原文（计划那一段之前）
+PLAN_KEY_COMPILED_BYTES = 9 * GIBIBYTE     # 编的那一种计划步记下的峰值
+PLAN_KEY_UNCOMPILED_BYTES = 2 * GIBIBYTE   # 不编的那一种计划步记下的峰值
+
+
+def cell_plan_key_by_compiles(world):
+    """计划那一步的命令键带「这一步编不编」（task_server_lib.py 的 shard_child_key；task_server.py 的 child_compiles、child_key_text）：同一父键，编与不编两种计划步落两把键，
+    过了键的换算（memory_peaks_lib 的 command_key）仍不同；定额度各读各的（task_server.py 的 computed_prediction）：库里只有不编的那把键跑完 2G 时，
+    编的那一种照没有记录的缺省 4096M 起（unrecorded）、不编的取 2G；两把键各有记录（编的 9G、不编的 2G）时各取各的。套在假调度器上，不起服务。
+    弄坏开关 plan-key-compile-unmarked 下两种计划步落同一把键：编的那一种取了不编的 2G、不编的那一种取了编的 9G，这一格红。"""
+    store_rows = []
+
+    def select(table, where="1", parameters=(), order="id"):
+        return [item for item in store_rows if item[0].get("command_key") == parameters[0]] if table == "attempts" else []
+
+    def seed(key, peak, when):
+        store_rows.append(({"command_key": key, "state": "ended", "outcome": "succeeded", "memory_peak": peak, "memory_cap": peak + GIBIBYTE,
+                            "role": "plan", "task_id": 80, "ended_at": float(when), "peak_metric": lib.PROCESS_MEMORY_PEAK_METRIC}, True))
+
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.peer_root = dict(os.environ), lib.REPOSITORY_ROOT   # 定额度末了的内存下限（memory_floor_applied）读命令与仓根
+    fake.host_dispatch = loaded_host_dispatch()
+    fake.reads_log = None
+    fake.prediction_lock = threading.Lock()
+    fake.store = types.SimpleNamespace(select=select, task=lambda task_id: None)
+    parent = {"compiles": True}
+    compiled_key = lib.shard_child_key(PLAN_KEY_HEAD, "plan", 0, 0, compiles=SERVER.Scheduler.child_compiles(parent, "plan"))
+    uncompiled_key = lib.shard_child_key(PLAN_KEY_HEAD, "plan", 0, 0, compiles=SERVER.Scheduler.child_compiles(dict(parent, compiles=False), "plan"))
+    plans = {what: {"id": number, "role": "plan", "parent_id": 80, "shard_index": 0, "shard_count": 0, "command_key": key,
+                    "command": ["bash", NO_BORROW_ENTRY_SCRIPT, "--check", "selftest-plan-keys"], "cwd": lib.REPOSITORY_ROOT}
+             for number, (what, key) in enumerate((("编", compiled_key), ("不编", uncompiled_key)), 81)}
+
+    def started():
+        found = {what: SERVER.Scheduler.computed_prediction(fake, task) for what, task in plans.items()}
+        return {what: (prediction.memory_cap, prediction.memory_history) for what, prediction in found.items()}
+
+    problems = []
+    folded = {PEAKS.command_key([], compiled_key), PEAKS.command_key([], uncompiled_key)}
+    if compiled_key == uncompiled_key or len(folded) != 2:
+        problems.append(f"编与不编的计划步应当是两把键（过了键的换算也是），实际「{compiled_key}」「{uncompiled_key}」、换算后 {sorted(folded)}")
+    seed(uncompiled_key, PLAN_KEY_UNCOMPILED_BYTES, 100)
+    only_uncompiled = started()
+    seed(compiled_key, PLAN_KEY_COMPILED_BYTES, 110)
+    both = started()
+    for what, got, want in (("库里只有不编的 2G", only_uncompiled, {"编": (lib.UNRECORDED_MEMORY_DEFAULT_BYTES, lib.UNRECORDED_HISTORY),
+                                                                    "不编": (PLAN_KEY_UNCOMPILED_BYTES, lib.RECORD_HISTORY)}),
+                            ("编的 9G、不编的 2G 各有记录", both, {"编": (PLAN_KEY_COMPILED_BYTES, lib.RECORD_HISTORY), "不编": (PLAN_KEY_UNCOMPILED_BYTES, lib.RECORD_HISTORY)})):
+        if got != want:
+            problems.append(f"{what}：两种计划步的起点与来历应当是 {want}，实际 {got}")
+    if problems:
+        raise SelftestFailure("计划那一步编与不编各记各的：" + "；".join(problems))
+    return "同一父键编与不编的计划步落两把键：只有不编的 2G 时编的照缺省 4096M 起；各有记录时编的取 9G、不编的取 2G"
+
+
+DRIFT_LABELS = ("task-selftest-drift-1", "task-selftest-drift-2")   # booking-drift-reported：两条在跑尝试的标签
+DRIFT_QUEUED_TASK = 90   # 同一格里被挡住、还在排的那条任务
+
+
+def booking_audit_scheduler(attempts):
+    """booking-drift-reported 的假调度器：本机 slice 30G，在跑的 attempts（各上限 12G），排着一条任务（被「在跑的记账之和」挡着、记着会话令牌）；
+    send_to_session 记下发出去的正文。→ (假调度器, 发出去的正文表)。"""
+    fake, sent = object.__new__(SERVER.Scheduler), []
+    queued = {"id": DRIFT_QUEUED_TASK, "state": "queued", "session": SESSION_A, "inbox": {"token": INBOX_TOKEN_SAMPLE}}
+    fake.environment, fake.peaks = dict(os.environ), PEAKS
+    fake.host_dispatch = loaded_host_dispatch()   # audit_bookings 末了的记账明细（refresh_booking_ledger）要读余量报告里的余量
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(label="本机")}
+    fake.store = types.SimpleNamespace(running_attempts=lambda: [dict(attempt) for attempt in attempts],
+                                       select=lambda table, where="1", parameters=(), order="id": [(queued, True)] if table == "tasks" else [],
+                                       task=lambda task_id: (queued, True) if task_id == DRIFT_QUEUED_TASK else None,
+                                       write_restart_surviving_state=lambda name, state: None)   # 推到的提醒门槛记进库（persist_restart_surviving_state）：这里不起库，写成空
+    fake.restart_surviving_lock, fake.restart_surviving_written = threading.Lock(), {}
+    fake.unit_stopped = set()
+    fake.booking_audit_state, fake.booking_drift, fake.booking_drift_notified = {}, {"memory": {}}, {}
+    fake.booking_drift_lock = threading.Lock()
+    fake.waiting_reasons = {DRIFT_QUEUED_TASK: f"内存：要记 12288 MiB，配置的总上限减余量减{SERVER.RUNNING_BOOKED_SUM_TEXT}只剩 0 MiB"}
+    fake.inbox_reachable = lambda task: True
+    fake.send_to_session = lambda task, text, event: sent.append(text) or True
+    return fake, sent
+
+
+def cell_booking_drift_reported(world):
+    """服务自己定时对账（task_server.py 的 audit_bookings、audit_memory_bookings、booking_row、push_booking_drift；不等别的会话汇报）：
+    有 scope 的在跑尝试照实测记账，对账的基准是各 scope 实测之和，漂移只来自报告里没有它的 scope、记整份上限的那几条。
+    本机两条在跑各上限 12G、报告里都没有它们的 scope（各记 12G、实占读不到，实测合计 0），
+    连着三轮：头两轮不判，第三轮判记账漂移，/health 的 booking_drift 一栏（booking_drift_snapshot）列出两条各记 12G、实占读不到、为什么（报告里没有它的 scope，记整份上限）；
+    推给排着的任务所在的会话恰好一次（正文写「记账漂移」与两条的记账与实占），再对两轮不重推；过了门槛（600 秒）再推一回、首行写再推一回；
+    报告里有 scope、各实占 11G 的照实测各记 11G，不报、不推。
+    弄坏开关 booking-audit-skipped 下不对账，这一格红。"""
+    gib, problems = GIBIBYTE, []
+    attempts = [{"id": number, "task_id": 70 + number, "host": SERVER.LOCAL, "label": label, "memory_cap": 12 * gib} for number, label in enumerate(DRIFT_LABELS, 1)]
+    start = time.time()
+
+    def audit(fake, used_each, rounds, first=0):
+        """对 rounds 轮账；used_each 是报告里每条的 scope 回收不掉的用量，None 是报告里没有这两条的 scope。"""
+        report = memory_report(30, 30, scopes={} if used_each is None else {label: used_each for label in DRIFT_LABELS})
+        snapshot = SERVER.Snapshot({SERVER.LOCAL: report}, {}, {SERVER.LOCAL: True}, {})
+        for number in range(first, first + rounds):
+            SERVER.Scheduler.audit_bookings(fake, snapshot, start + 60 * number)
+
+    fake, sent = booking_audit_scheduler(attempts)
+    audit(fake, None, 2)
+    early = SERVER.Scheduler.booking_drift_snapshot(fake)["memory"]
+    audit(fake, None, 1, first=2)
+    drift = SERVER.Scheduler.booking_drift_snapshot(fake)["memory"].get(SERVER.LOCAL) or {}
+    rows = drift.get("attempts") or []
+    if early or [(row["label"], row["booked"], row["used"]) for row in rows] != [(label, 12 * gib, None) for label in DRIFT_LABELS]:
+        problems.append(f"连着三轮记 12G、报告里没有 scope：前两轮不判、第三轮判漂移并逐条列两条的记账与实占（读不到），"
+                        f"实际前两轮 {bool(early)}、第三轮 {[(row.get('label'), row.get('booked'), row.get('used')) for row in rows]}")
+    if rows and not all("没有它的 scope" in row["why"] and "12.0G" in row["why"] for row in rows):
+        problems.append(f"逐条应当写为什么（报告里没有它的 scope，记整份上限 12.0G），实际 {[row['why'] for row in rows]}")
+    if len(sent) != 1 or "记账漂移" not in sent[0] or not all(label in sent[0] for label in DRIFT_LABELS) or "12.0G" not in sent[0] or "读不到" not in sent[0]:
+        problems.append(f"判出的当场应当推给被挡住的会话一回、正文写记账漂移与两条的记账与实占，实际推了 {len(sent)} 回：{[text[:200] for text in sent]}")
+    audit(fake, None, 2, first=3)
+    if len(sent) != 1:
+        problems.append(f"同一件事同一道门槛不重推：再对两轮之后应当还是 1 回，实际 {len(sent)} 回")
+    audit(fake, None, 1, first=2 + int(SERVER.BOOKING_DRIFT_PUSH_SECONDS // 60) + 1)
+    if len(sent) != 2 or "再推一回" not in sent[-1].split("\n", 1)[0]:
+        problems.append(f"过了门槛（{SERVER.BOOKING_DRIFT_PUSH_SECONDS:g} 秒）应当再推一回、首行写再推一回，实际共 {len(sent)} 回：{[text.splitlines()[0] for text in sent]}")
+    calm, calm_sent = booking_audit_scheduler(attempts)
+    audit(calm, 11 * gib, 5)
+    if SERVER.Scheduler.booking_drift_snapshot(calm)["memory"] or calm_sent:
+        problems.append(f"报告里有 scope、各实占 11G（照实测各记 11G）：不该报、不该推，实际 {SERVER.Scheduler.booking_drift_snapshot(calm)['memory']}、推了 {len(calm_sent)} 回")
+    if problems:
+        raise SelftestFailure("服务定时对账：" + "；".join(problems))
+    return "报告里没有 scope 的两条各记 12G 连三轮：判记账漂移、逐条列记账实占与原因、推给排着的会话一回（过了门槛再推）；有 scope 的照实测记、不报"
+
+
+YOUNG_AUDIT_SECONDS = "120"     # booking-audit-young-not-drift：起跑不满这么多秒照整份上限记（YOUNG_BOOKING_VARIABLE），同 running_booking 的两分钟
+YOUNG_AUDIT_AGE_SECONDS = 10    # 两条在跑尝试起跑了这么久：在时限之内
+YOUNG_AUDIT_USED_BYTES = 512 * MEBIBYTE   # 报告里每条 scope 此刻回收不掉的用量：两条合 1G，记整份上限的 24G 是它的 24 倍、多出 23G，照记账算就够漂移的界
+
+
+def cell_booking_audit_young_not_drift(world):
+    """刚起的不报漂移，对账那一层（task_server.py 的 audit_memory_bookings；文件头 ②「内存」的记账对账；running_booking 那一层由 running-young-booked-at-cap 判）：
+    本机两条在跑各上限 12G、起跑 10 秒（时限 120 秒）、报告里有各自的 scope、各实占 512M：booking_row 照规矩记整份上限 12G（young），
+    连着对 BOOKING_DRIFT_ROUNDS 轮再多两轮账：对账照实占算，不判记账漂移、/health 的 booking_drift 一栏空着、不推给排着的会话。套在假调度器上，不起服务。
+    弄坏开关 booking-audit-young-counted 下对账照整份上限算，第三轮判漂移、推一回，这一格红。"""
+    gib = GIBIBYTE
+    start = time.time()
+    attempts = [{"id": number, "task_id": 70 + number, "host": SERVER.LOCAL, "label": label, "memory_cap": 12 * gib, "started_at": start - YOUNG_AUDIT_AGE_SECONDS}
+                for number, label in enumerate(DRIFT_LABELS, 1)]
+    fake, sent = booking_audit_scheduler(attempts)
+    fake.environment = dict(fake.environment, **{lib.YOUNG_BOOKING_VARIABLE: YOUNG_AUDIT_SECONDS})
+    report = memory_report(30, 30, scopes={label: YOUNG_AUDIT_USED_BYTES for label in DRIFT_LABELS})
+    snapshot = SERVER.Snapshot({SERVER.LOCAL: report}, {}, {SERVER.LOCAL: True}, {})
+    usage = SERVER.Scheduler.report_scope_usage(fake, report)
+    problems = []
+    rows = [SERVER.Scheduler.booking_row(fake, attempt, usage) for attempt in attempts]
+    if [(row["booked"], row["basis"]) for row in rows] != [(12 * gib, SERVER.BOOKED_WHILE_YOUNG)] * len(attempts):
+        problems.append(f"起跑 {YOUNG_AUDIT_AGE_SECONDS} 秒的两条应当照规矩记整份上限 12G（{SERVER.BOOKED_WHILE_YOUNG}；这一格的样本前提），"
+                        f"实际 {[(row['booked'], row['basis']) for row in rows]}")
+    rounds = SERVER.BOOKING_DRIFT_ROUNDS + 2
+    for number in range(rounds):
+        SERVER.Scheduler.audit_bookings(fake, snapshot, start + 60 * number)
+    drift = SERVER.Scheduler.booking_drift_snapshot(fake)["memory"]
+    if drift or sent:
+        problems.append(f"刚起的两条各记 12G、各实占 512M，连对 {rounds} 轮：对账照实占算，不该判漂移、不该推，"
+                        f"实际 booking_drift {drift}、推了 {len(sent)} 回：{[text[:200] for text in sent]}")
+    if problems:
+        raise SelftestFailure("刚起的对账不报漂移：" + "；".join(problems))
+    return f"起跑 {YOUNG_AUDIT_AGE_SECONDS} 秒的两条各记整份上限 12G、各实占 512M：连对 {rounds} 轮，对账照实占算、不判漂移、不推"
+
+
+FAKE_JOURNALCTL_EARLYOOM = r'''#!/usr/bin/env bash
+# task-server 自证的假 journalctl（TASK_SERVER_JOURNALCTL；服务读 earlyoom 与内核日志认被外部信号杀掉的尝试，task_server.py 的 kill_log_lines）：
+# 参数里有 -t earlyoom 时，世界目录里的 earlyoom-pid 在、里面有进程号，就打一行 earlyoom 杀进程的日志点名这个号（没有就一行不打）；有 -k 的一行不打；别的参数退 9
+case " $* " in
+  *" -t earlyoom "*)
+    if [[ -s "$TASK_SERVER_SELFTEST_WORLD/earlyoom-pid" ]]; then
+      echo "sending SIGTERM to process $(cat -- "$TASK_SERVER_SELFTEST_WORLD/earlyoom-pid") uid 1000 \"rustc\": badness 1414, VmRSS 9708 MiB"
+    fi
+    exit 0 ;;
+  *" -k "*) exit 0 ;;
+  *) exit 9 ;;
+esac
+'''
+EXTERNAL_KILL_COMMAND = 'echo $$ > "$1"; sleep 2; if [[ -e "$2" ]]; then exit 0; fi; : > "$2"; exit 1'   # 头一次把自己的进程号写给假 journalctl 当 earlyoom 杀掉的那个、退 1；第二次退 0
+
+
+def machine_memory_scheduler():
+    """machine-memory-line-holds-dispatch 的假调度器：只备 machine_memory_problem 用到的几样。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.peaks = PEAKS
+    fake.host_dispatch = loaded_host_dispatch()
+    return fake
+
+
+def machine_memory_snapshot(total_gibibytes, available_gibibytes, swap_total_gibibytes=None, swap_free_gibibytes=None):
+    """本机一份报告：整机内存总量与可用量（GiB），swap 总量与空闲（给了才写这两项）。"""
+    memory = {"mem_total": int(total_gibibytes * GIBIBYTE), "mem_available": int(available_gibibytes * GIBIBYTE)}
+    if swap_total_gibibytes is not None:
+        memory[PEAKS.SWAP_TOTAL_KEY], memory[PEAKS.SWAP_FREE_KEY] = int(swap_total_gibibytes * GIBIBYTE), int(swap_free_gibibytes * GIBIBYTE)
+    return types.SimpleNamespace(reports={SERVER.LOCAL: {"memory": memory}})
+
+
+def cell_machine_memory_line_holds_dispatch(world):
+    """整机可用内存接近 earlyoom 的线时不派新任务（task_server.py 的 machine_memory_problem；文件头 ②「内存」的整机内存线）：整机 100G、swap 10G，线是 12%。
+    可用 9G（9%）、swap 空闲 0.5G（5%）：不派、原因以「整机内存线」起头，写 9.0% 与 5.0% 两个比例；可用 9%、swap 空闲 6G（60%）：仍派；可用 20%、swap 空闲 5%：仍派；
+    没有 swap（总量 0）、可用 9%：不派（swap 空闲按 0% 算）；报告里没有 swap 两项：不判。弄坏开关 machine-memory-line-ignored 下不判，这一格红。"""
+    fake = machine_memory_scheduler()
+    problems = []
+    for what, snapshot, held in (("可用 9%、swap 空闲 5%", machine_memory_snapshot(100, 9, 10, 0.5), True), ("可用 9%、swap 空闲 60%", machine_memory_snapshot(100, 9, 10, 6), False),
+                                 ("可用 20%、swap 空闲 5%", machine_memory_snapshot(100, 20, 10, 0.5), False), ("可用 9%、没有 swap", machine_memory_snapshot(100, 9, 0, 0), True),
+                                 ("报告里没有 swap 两项", machine_memory_snapshot(100, 9), False)):
+        text = SERVER.Scheduler.machine_memory_problem(fake, SERVER.LOCAL, snapshot)
+        if bool(text) != held or (held and not text.startswith(SERVER.MACHINE_MEMORY_LINE_TEXT)):
+            problems.append(f"{what}：应当{'不派、原因以「' + SERVER.MACHINE_MEMORY_LINE_TEXT + '」起头' if held else '照派'}，实际「{text}」")
+        if what == "可用 9%、swap 空闲 5%" and ("9.0%" not in text or "5.0%" not in text):
+            problems.append(f"{what}：原因应当写出两个比例 9.0% 与 5.0%，实际「{text}」")
+    if problems:
+        raise SelftestFailure("整机内存线：" + "；".join(problems))
+    return "可用 9% 且 swap 空闲 5%：不派、原因写两个比例；swap 空闲 60%、可用 20%、报告里没有 swap：照派；没有 swap 的按空闲 0% 算"
+
+
+def external_kill_scheduler(work, log_pid):
+    """external-kill-recorded-and-retried 的假调度器：本机的尝试进程树里见过 4242、4300；假 journalctl（在 work 下）头一路（-t earlyoom）打一行点名 log_pid 的 earlyoom 日志、-k 不打。"""
+    journalctl = os.path.join(work, "fake-journalctl-unit")
+    write_executable(journalctl, f'#!/usr/bin/env bash\n[[ " $* " == *" -t earlyoom "* ]] && echo \'sending SIGTERM to process {log_pid} uid 1000 "rustc": badness 1414, VmRSS 9708 MiB\'\nexit 0\n')
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ, TASK_SERVER_JOURNALCTL=journalctl)
+    fake.journalctl = journalctl
+    fake.service_stopped_attempts = {}
+    fake.peer_external_kill, fake.log_content = {}, lambda attempt: 0   # 第二台的尝试问 peer_external_kill_note：这个假世界里第二台的日志里没有那一行
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(process_ids_seen=lambda attempt, result: {4242, 4300}),
+                     SERVER.PEER: types.SimpleNamespace(process_ids_seen=lambda attempt, result: None)}
+    return fake
+
+
+def external_kill_unit_problems(world):
+    """external-kill-recorded-and-retried 的假调度器那一半：日志点名的进程在这一次尝试的进程树里才记；点名别的进程、服务发过停的信号、结局不是 command-failed、
+    单元收到过停的信号、第二台的尝试（进程号读不到）都不记；retry_decision 对 killed-externally 同一上限重排两次、第三次起打回。"""
+    problems = []
+    now = time.time()
+    task, attempt, result = {}, {"id": 1, "host": SERVER.LOCAL, "started_at": now - 10}, {"ended_at": now, "stopped_signal": 0}
+    fake = external_kill_scheduler(world.root, 4242)
+    note = SERVER.Scheduler.external_kill_note(fake, task, attempt, result, "command-failed")
+    if "earlyoom" not in note or "4242" not in note:
+        problems.append(f"日志点名进程 4242、它在进程树里：应当记、说明写日志来源与进程号，实际「{note}」")
+    others = (("日志点名的进程不在进程树里", external_kill_scheduler(world.root, 5555), task, attempt, result, "command-failed"),
+              ("服务发过停的信号", fake, task, dict(attempt, stalled=True), result, "command-failed"),
+              ("结局不是 command-failed", fake, task, attempt, result, "memory-cap-hit"),
+              ("单元收到过停的信号", fake, task, attempt, dict(result, stopped_signal=15), "command-failed"),
+              ("第二台的尝试", fake, task, dict(attempt, host=SERVER.PEER), result, "command-failed"))
+    for what, scheduler, found_task, found_attempt, found_result, outcome in others:
+        found = SERVER.Scheduler.external_kill_note(scheduler, found_task, found_attempt, found_result, outcome)
+        if found:
+            problems.append(f"{what}：不该记 killed-externally，实际「{found}」")
+    for counts, retried in (({lib.EXTERNAL_KILL_OUTCOME: 1}, True), ({lib.EXTERNAL_KILL_OUTCOME: lib.EXTERNAL_KILL_RETRIES}, True), ({lib.EXTERNAL_KILL_OUTCOME: lib.EXTERNAL_KILL_RETRIES + 1}, False)):
+        decision = lib.retry_decision(counts, lib.EXTERNAL_KILL_OUTCOME, 2 * GIBIBYTE, SERVER.LOCAL, "", {})
+        if decision.retry != retried or (retried and decision.cap_bytes != 2 * GIBIBYTE):
+            problems.append(f"killed-externally 出过 {counts[lib.EXTERNAL_KILL_OUTCOME]} 次：应当{'同一上限重排' if retried else '打回'}，实际 retry={decision.retry}、上限 {decision.cap_bytes}")
+    return problems
+
+
+def cell_external_kill_recorded_and_retried(world):
+    """命令被不是服务发的信号杀掉、earlyoom 或内核日志里有它的进程号：记 killed-externally 并重排（task_server.py 的 external_kill_note、kill_log_lines，task_server_lib.py 的 retry_decision；
+    attempt_runner.py 每轮采样把进程树里见过的进程号记进 result.json 的 process_ids）。假调度器那一半（external_kill_unit_problems）：判法的各支。
+    服务那一半：假 journalctl（只在世界目录的 earlyoom-pid 在时才打一行点名它的 earlyoom 日志）；一条命令把自己的进程号写进 earlyoom-pid、睡 2 秒后头一次退 1、第二次退 0：
+    头一次尝试记 killed-externally（尝试记 external_kill_note）、第二次跑成，共两次；再一条睡 2 秒退 1、进程号不在日志里的：记 command-failed、不重排，一次尝试。
+    弄坏开关 external-kill-unrecognized 下头一条照退出码记 command-failed、不重排，这一格红。"""
+    problems = external_kill_unit_problems(world)
+    raise_cell_problems(world, problems, "被外部信号杀掉（假调度器）")
+    world.start_server(extra={"TASK_SERVER_JOURNALCTL": os.path.join(world.bin, "fake-journalctl-earlyoom")})
+    pid_file = os.path.join(world.world, "earlyoom-pid")
+    flag = os.path.join(world.root, "external-kill-flag")
+    killed = world.submit(["bash", "-c", EXTERNAL_KILL_COMMAND, "external-kill", pid_file, flag])
+    killed_summary = world.finished(killed)
+    unlogged = world.submit(["bash", "-c", "sleep 2; exit 1", "external-kill-unlogged"])
+    unlogged_summary = world.finished(unlogged)
+    outcomes = [attempt.get("outcome") for attempt in killed_summary["attempts"]]
+    first_note = (killed_summary["attempts"] or [{}])[0].get("external_kill_note") or ""
+    if outcomes != [lib.EXTERNAL_KILL_OUTCOME, "succeeded"] or killed_summary["task"].get("outcome") != "succeeded" or "earlyoom" not in first_note:
+        problems.append(f"日志点名了这一次尝试的进程：头一次应当记 {lib.EXTERNAL_KILL_OUTCOME}（尝试记 external_kill_note 写 earlyoom）、重排一次、第二次跑成，"
+                        f"实际各次 {outcomes}、说明「{first_note}」、{describe(killed_summary)}")
+    unlogged_outcomes = [attempt.get("outcome") for attempt in unlogged_summary["attempts"]]
+    if unlogged_outcomes != ["command-failed"] or unlogged_summary["task"].get("exit_code") != 1:
+        problems.append(f"日志里没有这一次尝试的进程号：应当仍记 command-failed、退 1、不重排，实际各次 {unlogged_outcomes}、{describe(unlogged_summary)}")
+    raise_cell_problems(world, problems, "被外部信号杀掉（服务）")
+    return f"日志点名的进程在进程树里：记 {lib.EXTERNAL_KILL_OUTCOME}、重排一次跑成；日志里没有的仍记 command-failed、不重排；假调度器上各支（服务发过停的、第二台的、单元收到停的）都不记，重排至多 {lib.EXTERNAL_KILL_RETRIES} 次"
+
+
+PEER_KILL_LINE = ('MULTI_HOST_RUN_PEER_EXTERNAL_KILL source=earlyoom pid=4242 line=sending SIGTERM to process 4242 uid 1000 "rustc": badness 1414, VmRSS 9708 MiB')   # external-kill-peer-recorded：第二台那一行
+# 那一格内存组到了它自己上限的那一行（内核「Memory cgroup out of memory」：命令自己造的小内存组让进程撞上限，不是整机内存紧张）与整机 OOM 那一行（本机的认法对照）
+PEER_CGROUP_KILL_LINE = ("MULTI_HOST_RUN_PEER_EXTERNAL_KILL source=kernel pid=4243 line=Memory cgroup out of memory: Killed process 4243 (python3) total-vm:812345kB, "
+                         "anon-rss:65536kB, file-rss:0kB, shmem-rss:0kB, UID:1000 pgtables:400kB oom_score_adj:500")
+MACHINE_OOM_KILL_LINE = "Out of memory: Killed process 4244 (rustc) total-vm:9812345kB, anon-rss:9708000kB, file-rss:0kB, shmem-rss:0kB, UID:1000 pgtables:20000kB oom_score_adj:0"
+
+
+def peer_external_kill_scheduler(world, name, lines):
+    """external-kill-peer-recorded 的假调度器：第二台的一次尝试（id 7），日志是 lines 写成的文件，经真的 log_content 记表（peer_external_kill），再问 external_kill_note。"""
+    log = os.path.join(world.root, f"peer-external-kill-{name}.log")
+    with open(log, "w", encoding="utf-8") as handle:
+        handle.write("".join(f"{line}\n" for line in lines))
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.service_stopped_attempts = {}
+    for field in ("log_offsets", "peer_memory", "peer_memory_stat", "attempt_progress", "attempt_progress_baseline", "peer_io_wait",
+                  "peer_external_kill", "peer_io_rounds", "peer_thread_rounds"):
+        setattr(fake, field, {})
+    fake.machines = {SERVER.PEER: SERVER.PeerMachine(fake)}
+    return fake, {"id": 7, "task_id": 77, "number": 1, "host": SERVER.PEER, "label": f"task-selftest-peer-kill-{name}", "log": log, "started_at": time.time() - 10}
+
+
+def cell_external_kill_peer_line_recorded_and_retried(world):
+    """被外部信号杀掉的尝试第二台也认，同本机一套判法（task_server.py 的 log_content、peer_external_kill_note、external_kill_note；scripts/hosts/multi-host-run.sh 在第二台那一侧记下这一趟进程树
+    的进程号、命令退非 0 之后读第二台的 earlyoom 与内核日志、点名这些进程号之一被杀时打一行 MULTI_HOST_RUN_PEER_EXTERNAL_KILL）：第二台的尝试日志里有这一行、结局 command-failed、
+    服务没发过停的信号：记 killed-externally（说明写第二台、来源、被杀的进程号），retry_decision 对第二台同一上限重排；日志里没有这一行的、结局不是 command-failed 的、
+    服务发过停的信号的都不记；那一行是内核「Memory cgroup out of memory」（某个内存组到了它自己的上限）的不记，本机的认法（lib.external_kill_pid）同样不交它的进程号、
+    整机 OOM 的「Out of memory: Killed process」照交。假调度器上跑，不起服务。
+    弄坏开关 peer-external-kill-line-ignored、external-kill-unrecognized 下有这一行的也不记，memory-cgroup-kill-counted 下内存组那一行也记，这一格红。"""
+    problems = []
+    task, result = {}, {"stopped_signal": 0}
+    fake, attempt = peer_external_kill_scheduler(world, "line", ["第二台那条命令的输出", PEER_KILL_LINE, "第二台那条命令退 143"])
+    note = SERVER.Scheduler.external_kill_note(fake, task, attempt, result, "command-failed")
+    if "第二台" not in note or "earlyoom" not in note or "4242" not in note:
+        problems.append(f"第二台日志里有 MULTI_HOST_RUN_PEER_EXTERNAL_KILL 那一行：应当记 killed-externally、说明写第二台、来源与进程号 4242，实际「{note}」")
+    unlogged_fake, unlogged_attempt = peer_external_kill_scheduler(world, "none", ["第二台那条命令的输出"])   # 没有那一行的尝试用它自己的日志文件，不借有那一行的那份
+    for what, scheduler, found_attempt, outcome in (("日志里没有那一行", unlogged_fake, unlogged_attempt, "command-failed"),
+                                                     ("结局不是 command-failed", fake, attempt, "memory-cap-hit"),
+                                                     ("服务发过停的信号", fake, dict(attempt, stalled=True), "command-failed")):
+        found = SERVER.Scheduler.external_kill_note(scheduler, task, found_attempt, result, outcome)
+        if found:
+            problems.append(f"{what}：不该记 killed-externally，实际「{found}」")
+    cgroup_fake, cgroup_attempt = peer_external_kill_scheduler(world, "cgroup", ["第二台那条命令的输出", PEER_CGROUP_KILL_LINE, "第二台那条命令退 1"])
+    cgroup_note = SERVER.Scheduler.external_kill_note(cgroup_fake, task, cgroup_attempt, result, "command-failed")
+    if cgroup_note:
+        problems.append(f"那一行是 Memory cgroup out of memory（内存组到了它自己的上限）：不该记 killed-externally，实际「{cgroup_note}」")
+    local_pids = (lib.external_kill_pid(PEER_CGROUP_KILL_LINE.split("line=", 1)[1]), lib.external_kill_pid(MACHINE_OOM_KILL_LINE))
+    if local_pids != (None, 4244):
+        problems.append(f"本机的认法：Memory cgroup out of memory 那一行应当不交进程号、整机 Out of memory 那一行交 4244，实际 {local_pids}")
+    decision = lib.retry_decision({lib.EXTERNAL_KILL_OUTCOME: 1}, lib.EXTERNAL_KILL_OUTCOME, 2 * GIBIBYTE, SERVER.PEER, "", {})
+    if not decision.retry or decision.cap_bytes != 2 * GIBIBYTE:
+        problems.append(f"第二台的 killed-externally 出过 1 次：应当同一上限重排，实际 retry={decision.retry}、上限 {decision.cap_bytes}")
+    if problems:
+        raise SelftestFailure("第二台被外部信号杀掉：" + "；".join(problems))
+    return (f"第二台日志里有 MULTI_HOST_RUN_PEER_EXTERNAL_KILL 那一行：记 {lib.EXTERNAL_KILL_OUTCOME}、同一上限重排；没有那一行、结局不是 command-failed、服务发过停的信号的、"
+            "那一行是 Memory cgroup out of memory 的都不记；本机的认法同样不认内存组那一行、认整机 OOM 那一行")
+
+
+def cell_confirm_sheet_reads_bash_c_inner_commands(world):
+    """确认单读 bash -c 里命令位置上的脚本与参数（task_server_lib.py 的 shell_inner_commands、named_scope、crash_scope_text，task_server.py 的 scope_is_whole；合入后验证常被包在 bash -c 里，
+    先现生成补丁再合入）：bash -c 里 merge-and-verify.sh 给了补丁目录的不是整包（scope_is_whole 假）、没给补丁目录的是整包（真）、带 --all-packages 的是整包；
+    重定向的目标不当补丁目录（`merge-and-verify.sh > out.log` 仍是没给）；`cd … && crash-point-replay.sh --item crash-case:a --item crash-case:b --crash-expand-up-to 5` 点名 2 项（named_scope）、
+    确认单「崩溃用例与域」写「用例 2 条（命令里点名）；域 --crash-expand-up-to 5」；不是 -c 的命令不钻（shell_inner_commands 交空表）。套在假调度器上，不起服务。
+    弄坏开关 shell-inner-scope-unread 下 bash -c 里的范围一律认不出（项数 0、整包的也判成脚本自己定范围），这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.peer_root = dict(os.environ), lib.REPOSITORY_ROOT
+    fake.cargo_runs = lambda task: []
+    problems = []
+
+    def whole(command):
+        return SERVER.Scheduler.scope_is_whole(fake, {"command": command, "cwd": lib.REPOSITORY_ROOT})
+
+    patch_form = ["bash", "-c", "python3 scripts/gate/patch-of-the-current-tree.py --out p.patch > /dev/null; bash scripts/gate/merge-and-verify.sh p.patch 2>&1 | tail -n 5"]
+    if whole(patch_form):
+        problems.append("bash -c 里 merge-and-verify.sh 给了补丁目录：不是整包，实际判成整包")
+    for what, command in (("bash -c 里 merge-and-verify.sh 没给补丁目录", ["bash", "-c", "bash scripts/gate/merge-and-verify.sh"]),
+                          ("bash -c 里 merge-and-verify.sh 带 --all-packages", ["bash", "-c", "bash scripts/gate/merge-and-verify.sh p.patch --all-packages"]),
+                          ("bash -c 里 merge-and-verify.sh 只有重定向的目标", ["bash", "-c", "bash scripts/gate/merge-and-verify.sh > out.log"])):
+        if not whole(command):
+            problems.append(f"{what}：应当是整包，实际判成脚本自己定范围")
+    item_form = ["bash", "-c", "cd /somewhere && bash scripts/crash/crash-point-replay.sh --item crash-case:a --item crash-case:b --crash-expand-up-to 5"]
+    named = lib.named_scope(item_form)
+    crash_text = lib.crash_scope_text(item_form, lib.REPOSITORY_ROOT)
+    if len(named) != 2 or crash_text != "用例 2 条（命令里点名）；域 --crash-expand-up-to 5":
+        problems.append(f"bash -c 里 crash-point-replay.sh 点了 2 个 --item 与 --crash-expand-up-to 5：项数应当是 2、崩溃用例与域写「用例 2 条（命令里点名）；域 --crash-expand-up-to 5」，实际 {named}、「{crash_text}」")
+    if lib.shell_inner_commands(["bash", "scripts/gate/merge-and-verify.sh", "p.patch"]):
+        problems.append("不是 -c 的命令不钻 bash 的脚本：shell_inner_commands 应当交空表")
+    if problems:
+        raise SelftestFailure("确认单读 bash -c 里的合入后验证：" + "；".join(problems))
+    return "bash -c 里的合入后验证：给了补丁目录的不是整包、没给与带 --all-packages 的是整包、重定向目标不当补丁；crash-point-replay.sh 点的 --item 与域读得到"
+
+
+def cell_workspace_writer_cap_has_headroom(world):
+    """换文件、打补丁的工具内存上限留余量（task_server.py 的 workspace_writer_floor、memory_floor_applied、workspace_swap_tool；撞上限被杀会把换到一半的结局文件留在主工作区，
+    之后所有会话的换上都被挡）：记录的峰值 600 MiB 的预测，换钩子（scripts/gate/hook-swap.py）与打补丁（scripts/gate/apply-writer-patch.py）的上限与记账不低于
+    WORKSPACE_WRITER_FLOOR_BYTES（4 GiB），预测的峰值照原样；同样的预测，别的脚本、hook-swap.py 带 --feed-only（只喂不换）、apply-writer-patch.py 带 --dry-run（只读）、
+    合入后验证（scripts/gate/merge-and-verify.sh，它的内存照这把键的记录定，cap-hit-rerun-from-record 钉着）只取内存下限 MEMORY_FLOOR_BYTES（1 GiB）。套在假调度器上，不起服务。
+    弄坏开关 workspace-writer-cap-unpadded 下换钩子的也只到 1 GiB，recorded-cap-floored 下下限抬到 4G、只取下限的那几样兜到 4096 MiB，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.peer_root = {name: value for name, value in os.environ.items() if name != lib.MEMORY_FLOOR_VARIABLE}, lib.REPOSITORY_ROOT
+    prediction = loaded_host_dispatch().Prediction("selftest-writer-key", 600 * MEBIBYTE, 600 * MEBIBYTE, 600 * MEBIBYTE, lib.RECORD_HISTORY)
+    problems = []
+    for what, command, wanted in (("换钩子", ["python3", "scripts/gate/hook-swap.py", "--spec", "x.json"], SERVER.WORKSPACE_WRITER_FLOOR_BYTES),
+                                  ("打补丁", ["python3", "scripts/gate/apply-writer-patch.py", "p.patch"], SERVER.WORKSPACE_WRITER_FLOOR_BYTES),
+                                  ("别的脚本", ["python3", "scripts/gate/other-tool.py"], lib.MEMORY_FLOOR_BYTES),
+                                  ("打补丁只读", ["python3", "scripts/gate/apply-writer-patch.py", "--dry-run", "p.patch"], lib.MEMORY_FLOOR_BYTES),
+                                  ("合入后验证", ["bash", "scripts/gate/merge-and-verify.sh", "p.patch"], lib.MEMORY_FLOOR_BYTES),
+                                  ("换钩子只喂不换", ["python3", "scripts/gate/hook-swap.py", "--feed-only", "--spec", "x.json"], lib.MEMORY_FLOOR_BYTES)):
+        applied = SERVER.Scheduler.memory_floor_applied(fake, prediction, {"command": command, "cwd": lib.REPOSITORY_ROOT})
+        if applied.memory_cap != wanted or applied.memory_booked != wanted or applied.memory_predicted != 600 * MEBIBYTE:
+            problems.append(f"{what}：600 MiB 的预测应当取上限与记账 {wanted // MEBIBYTE} MiB、预测的峰值仍 600 MiB，实际上限 {applied.memory_cap // MEBIBYTE} MiB、"
+                            f"记账 {applied.memory_booked // MEBIBYTE} MiB、预测 {applied.memory_predicted // MEBIBYTE} MiB")
+    if problems:
+        raise SelftestFailure("换文件、打补丁的工具内存上限留余量：" + "；".join(problems))
+    return "换钩子与打补丁的上限与记账取 4 GiB（预测峰值不变），别的脚本、只喂不换的、只读的打补丁、合入后验证只取 1 GiB 的下限"
+
+
+def key_stats_seeder(world):
+    """control key-stats 那几格往库里记尝试的帮手：每记一次结束时刻往后推 100 秒（起跑是结束前 1 秒，seed_attempt），交 run(键, 结局, 峰值 MiB, 任务号, 第几次, 峰值口径) → 这一次的起跑时刻。"""
+    clock = [SEEDED_ENDED_AT]
+
+    def run(key, outcome, peak=None, task_id=0, number=1, metric=lib.PROCESS_MEMORY_PEAK_METRIC):
+        clock[0] += 100
+        fields = {"command_key": key, "outcome": outcome, "ended_at": clock[0], "task_id": task_id, "number": number}
+        if peak is not None:
+            fields["memory_peak"] = peak * MEBIBYTE
+        world.seed_attempt(fields, metric=metric)
+        return clock[0] - 1
+    return run
+
+
+def cell_control_key_stats_reported(world):
+    """control key-stats 只读打命令键的统计（task-server/control 的 key_stats_report，task_server_lib.py 的 key_stats、key_stats_lines；records/2026-11-17-subagent账本自上而下清欠.md 八十节 ①④ 回看要数的几样）：
+    库里造六把键，每次尝试各是一个任务（任务号各不相同、都是第 1 次）——A 撞上限、跑成、撞上限、跑成（交替；撞过上限而最近一个任务跑成；跑成两次峰值各 100 MiB）；B 撞上限、跑成、跑成；
+    C 跑成三次峰值 100、150、200 MiB；D 只跑过一次；E 跑成两次峰值 100、110 MiB；F 键里带工作根下副本路径、只跑过一次。读数：首行筛前筛后都是 14 行（没给 --since）、进统计的 14 行；
+    命令键 6 个（只跑过一次的 2 个）、带副本路径的 1 个；按任务数交替的键 1 个；按任务数撞过上限、最近一个任务跑成的键 2 个；按尝试数交替的键 1 个；
+    跑成两次以上的 4 个键最大比最小：中位 1.00 倍、第 90 百分位 2.00 倍、到 1.5 倍以上的 1 个；不打告警那一行。服务在跑时用（库只读打开），退 0。
+    弄坏开关 key-stats-alternation-ignored 下按任务数交替的键数成 0，这一格红。"""
+    world.start_server()
+    run, task = key_stats_seeder(world), [0]
+
+    def one(key, outcome, peak=None):
+        task[0] += 1
+        run(key, outcome, peak, task_id=task[0])
+
+    for outcome, peak in (("memory-cap-hit", None), ("succeeded", 100), ("memory-cap-hit", None), ("succeeded", 100)):
+        one("selftest-stats-a", outcome, peak)
+    for outcome, peak in (("memory-cap-hit", None), ("succeeded", 100), ("succeeded", 100)):
+        one("selftest-stats-b", outcome, peak)
+    for peak in (100, 150, 200):
+        one("selftest-stats-c", "succeeded", peak)
+    one("selftest-stats-d", "succeeded", 100)
+    for peak in (100, 110):
+        one("selftest-stats-e", "succeeded", peak)
+    one("selftest-stats-copy-singlefs/work/draft/f", "succeeded", 100)
+    completed = world.control(["key-stats"])
+    text = completed.stdout + completed.stderr
+    problems = []
+    if completed.returncode != 0:
+        problems.append(f"只读的 key-stats 应当退 0，实际退 {completed.returncode}：「{text.strip()[-300:]}」")
+    for wanted in ("attempts 筛前 14 行、筛后 14 行（没给 --since，不筛起跑时刻）", f"峰值口径是「{lib.PROCESS_MEMORY_PEAK_METRIC}」的）14 行",
+                   "命令键 6 个（只跑过一次的 2 个），其中带工作根下副本或草稿目录路径的 1 个", "近 5 个任务里撞上限与跑成交替至少两回的键 1 个",
+                   "近 5 个任务里撞过上限、最近一个任务跑成的键 2 个", "按尝试数：近 5 次尝试里撞上限与跑成交替至少两回的键 1 个",
+                   "中位 1.00 倍、第 90 百分位 2.00 倍", "到 1.5 倍以上的 1 个"):
+        if wanted not in text:
+            problems.append(f"读数里应当有「{wanted}」")
+    if "告警" in text:
+        problems.append("读数里不该有告警那一行（服务不写这种告警）")
+    if problems:
+        raise SelftestFailure("control key-stats：" + "；".join(problems) + f"；实际输出：{text.strip()[-800:]}", world.server_log_lines())
+    return "key-stats 只读打出：筛前筛后 14 行、6 把键（单跑 2、副本路径 1）、按任务数交替 1、撞过又跑成 2、按尝试数交替 1、峰值离散度中位 1.00 倍与第 90 百分位 2.00 倍、1.5 倍以上 1 个"
+
+
+def cell_control_key_stats_by_task(world):
+    """control key-stats 只取这一版峰值口径的尝试、交替按任务数（task_server_lib.py 的 key_stats、key_stats_after、current_peak_metric；
+    research/prompts/ledger80-key-records-r1-main-verification.md「三、改法」第 2 条）：库里造四把键——
+    「中间重试」任务甲跑成、任务乙第一次撞上限重试跑成、任务丙跑成（按尝试数成撞成成、交替；按任务数成撞成、也交替）；
+    「起头重试」任务甲第一次撞、重试成，之后两个任务都成（按尝试数撞成成成、按任务数撞成成，都不交替；按任务数撞过而最近一个任务跑成）；
+    「只有重试」两个任务都是第一次撞、重试成（按尝试数撞成撞成、交替；按任务数撞撞，不交替）；「老口径」三个任务撞、成、撞，尝试没有峰值口径一栏（不进统计）。
+    读数：筛前筛后 15 行、进统计的 12 行；命令键 3 个；按任务数交替的键 1 个（中间重试）；按任务数撞过、最近一个任务跑成的 2 个；按尝试数交替的 2 个。
+    --since 给「起头重试」第一次尝试的起跑时刻：筛后 11 行、进统计的 8 行、命令键 2 个、按任务数交替的 0 个；--since 给种下的那一天的下一天（YYYY-MM-DD）筛后 0 行；认不出的 --since 退 2。
+    弄坏开关 key-stats-metric-unfiltered 下老口径的进统计（命令键 4 个），key-stats-retries-unfolded 下重试不折（按任务数交替的 2 个），
+    key-stats-alternation-ignored 下按任务数交替的 0 个，key-stats-since-ignored 下 --since 不筛，这一格红。"""
+    world.start_server()
+    run = key_stats_seeder(world)
+    for task_id, number, outcome in ((101, 1, "succeeded"), (102, 1, "memory-cap-hit"), (102, 2, "succeeded"), (103, 1, "succeeded")):
+        run("selftest-stats-retry-middle", outcome, task_id=task_id, number=number)
+    since = None
+    for task_id, number, outcome in ((201, 1, "memory-cap-hit"), (201, 2, "succeeded"), (202, 1, "succeeded"), (203, 1, "succeeded")):
+        started = run("selftest-stats-retry-first", outcome, task_id=task_id, number=number)
+        since = started if since is None else since
+    for task_id, number, outcome in ((301, 1, "memory-cap-hit"), (301, 2, "succeeded"), (302, 1, "memory-cap-hit"), (302, 2, "succeeded")):
+        run("selftest-stats-retries-only", outcome, task_id=task_id, number=number)
+    for task_id, outcome in ((401, "memory-cap-hit"), (402, "succeeded"), (403, "memory-cap-hit")):
+        run("selftest-stats-old-metric", outcome, task_id=task_id, metric=None)
+    metric = f"峰值口径是「{lib.PROCESS_MEMORY_PEAK_METRIC}」的）"
+    next_day = time.strftime("%Y-%m-%d", time.gmtime(SEEDED_ENDED_AT + 86400))
+    problems = []
+    for what, arguments, wanted in (
+            ("不筛起跑时刻", [], ("attempts 筛前 15 行、筛后 15 行", f"{metric}12 行", "命令键 3 个（只跑过一次的 0 个）",
+                                  "近 5 个任务里撞上限与跑成交替至少两回的键 1 个（按任务数：同一任务的几次尝试折成一条，取第一次尝试的结局）：selftest-stats-retry-middle",
+                                  "近 5 个任务里撞过上限、最近一个任务跑成的键 2 个", "按尝试数：近 5 次尝试里撞上限与跑成交替至少两回的键 2 个")),
+            ("--since 起头重试的第一次", ["--since", f"{since:.0f}"], ("attempts 筛前 15 行、筛后 11 行", f"{metric}8 行", "命令键 2 个",
+                                                                     "近 5 个任务里撞上限与跑成交替至少两回的键 0 个")),
+            (f"--since {next_day}", ["--since", next_day], ("attempts 筛前 15 行、筛后 0 行", f"{metric}0 行", "命令键 0 个"))):
+        completed = world.control(["key-stats", *arguments])
+        text = completed.stdout + completed.stderr
+        missing = [line for line in wanted if line not in text]
+        if completed.returncode != 0 or missing:
+            problems.append(f"{what}：应当退 0、读数里有{'、'.join('「' + line + '」' for line in missing)}，实际退 {completed.returncode}、输出「{text.strip()[-600:]}」")
+    refused = world.control(["key-stats", "--since", "yesterday"])
+    if refused.returncode != lib.USAGE_EXIT or "--since" not in refused.stderr:
+        problems.append(f"认不出的 --since 应当退 {lib.USAGE_EXIT}、点名 --since，实际退 {refused.returncode}、「{(refused.stdout + refused.stderr).strip()[-300:]}」")
+    if problems:
+        raise SelftestFailure("control key-stats 按任务数、筛口径与起跑时刻：" + "；".join(problems), world.server_log_lines())
+    return ("按任务数：中间重试的交替、起头重试与只有重试的不交替，按尝试数交替 2 个；老口径的键不进统计；--since 筛到 11 行、下一天筛到 0 行；认不出的 --since 退 2")
+
+
+def cell_control_key_stats_dump(world):
+    """control key-stats --dump 只读导出收尾了的尝试（task-server/control 的 key_stats_dump，task_server_lib.py 的 key_stats_dump_rows、KEY_STATS_DUMP_COLUMNS；
+    research/prompts/ledger80-key-records-r1-main-verification.md「三、改法」第 3 条）：服务在跑，库里造 3 条尝试（任务 11 跑成、没记上限；任务 12 第一次撞上限、记了 stalled_at_cap，
+    第二次跑成、记了 shard_count 与 item_plan）：导出 3 行，每行的列与 KEY_STATS_DUMP_COLUMNS 一样、次序一样，任务号与第几次照记的，尝试没有的栏写 null；
+    同一个文件再导退 2、文件一个字节不动；--since 给任务 12 第一次的起跑时刻导到新文件里只有 2 行。
+    弄坏开关 key-stats-dump-overwrites 下已在的照覆盖、退 0，key-stats-since-ignored 下 --since 那一份有 3 行，这一格红。"""
+    world.start_server()
+    world.seed_attempt({"command_key": "selftest-dump-a", "outcome": "succeeded", "exit_code": 0, "memory_peak": 100 * MEBIBYTE, "task_id": 11, "ended_at": SEEDED_ENDED_AT + 100})
+    world.seed_attempt({"command_key": "selftest-dump-b", "outcome": "memory-cap-hit", "exit_code": 250, "memory_cap": GIBIBYTE, "stalled_at_cap": True,
+                        "task_id": 12, "ended_at": SEEDED_ENDED_AT + 200})
+    world.seed_attempt({"command_key": "selftest-dump-b", "outcome": "succeeded", "exit_code": 0, "memory_peak": 300 * MEBIBYTE, "shard_count": 4,
+                        "item_plan": {"selftest-item": {"to_judge": 1, "reusable": 2}}, "task_id": 12, "number": 2, "ended_at": SEEDED_ENDED_AT + 300})
+    since = SEEDED_ENDED_AT + 200 - 1   # 任务 12 第一次的起跑时刻（seed_attempt：结束前 1 秒）
+    path, narrowed = os.path.join(world.root, "key-stats-dump.jsonl"), os.path.join(world.root, "key-stats-dump-since.jsonl")
+    problems = []
+    completed = world.control(["key-stats", "--dump", path])
+    rows = []
+    with contextlib.suppress(OSError, ValueError):
+        with open(path, encoding="utf-8") as handle:
+            rows = [json.loads(line) for line in handle]
+    columns = list(lib.KEY_STATS_DUMP_COLUMNS)
+    if completed.returncode != 0 or len(rows) != 3 or any(list(row) != columns for row in rows):
+        problems.append(f"导出应当退 0、写 3 行、每行的列依次是 {'、'.join(columns)}，实际退 {completed.returncode}、{len(rows)} 行、"
+                        f"列 {[list(row) for row in rows][:1]}、输出「{(completed.stdout + completed.stderr).strip()[-300:]}」")
+    elif ([(row["task_id"], row["number"], row["command_key"]) for row in rows] != [(11, 1, "selftest-dump-a"), (12, 1, "selftest-dump-b"), (12, 2, "selftest-dump-b")]
+          or rows[1]["stalled_at_cap"] is not True or rows[2]["shard_count"] != 4 or rows[0]["stalled_at_cap"] is not None
+          or rows[2]["item_plan"] != {"selftest-item": {"to_judge": 1, "reusable": 2}} or rows[0]["memory_cap"] is not None
+          or rows[0]["memory_peak"] != 100 * MEBIBYTE or rows[0]["peak_metric"] != lib.PROCESS_MEMORY_PEAK_METRIC or not all(isinstance(row["id"], int) for row in rows)):
+        problems.append(f"导出的内容不对：应当按行号排、任务 11、12、12，记了的栏照记、没有的写 null，实际 {rows}")
+    with open(path, "rb") as handle:
+        before = handle.read()
+    again = world.control(["key-stats", "--dump", path])
+    with open(path, "rb") as handle:
+        after = handle.read()
+    if again.returncode != lib.USAGE_EXIT or after != before:
+        problems.append(f"文件已在时应当退 {lib.USAGE_EXIT}、一个字节不动，实际退 {again.returncode}、文件{'没动' if after == before else '变了'}")
+    narrowed_run = world.control(["key-stats", "--since", f"{since:.0f}", "--dump", narrowed])
+    kept = []
+    with contextlib.suppress(OSError, ValueError):
+        with open(narrowed, encoding="utf-8") as handle:
+            kept = [json.loads(line) for line in handle]
+    if narrowed_run.returncode != 0 or [(row["task_id"], row["number"]) for row in kept] != [(12, 1), (12, 2)]:
+        problems.append(f"--since 给任务 12 第一次的起跑时刻，应当只导任务 12 那 2 行，实际退 {narrowed_run.returncode}、{[(row.get('task_id'), row.get('number')) for row in kept]}")
+    if problems:
+        raise SelftestFailure("control key-stats --dump：" + "；".join(problems), world.server_log_lines())
+    return "服务在跑：导出 3 行、列齐、次序对、没有的栏写 null；文件已在退 2 不动；--since 只导 2 行"
+
+
+def ledger_fake():
+    """booking-ledger-rows 的假调度器与 Snapshot：本机 slice 总额 50G、余量 1G，在跑五条——L1（上限 20G，scope 用 5G）、L2（上限 12G，报告里没有它的 scope）、
+    L3（上限 5G，单元已确认停了）、L4（上限 2G，scope 用满 2G）、L5（上限 10G，scope 用 4G）。"""
+    attempts = [{"id": number, "task_id": 100 + number, "number": 1, "host": SERVER.LOCAL, "label": f"L{number}", "memory_cap": cap * GIBIBYTE}
+                for number, cap in ((1, 20), (2, 12), (3, 5), (4, 2), (5, 10))]
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.peaks = PEAKS
+    fake.machines = {SERVER.LOCAL: types.SimpleNamespace(label="本机")}
+    fake.store = types.SimpleNamespace(running_attempts=lambda: [dict(attempt) for attempt in attempts])
+    fake.host_margin = lambda host, snapshot: (GIBIBYTE, "")
+    fake.unit_stopped = {3}
+    fake.booking_drift_lock = threading.Lock()
+    fake.booking_ledger = {}
+    report = memory_report(30, 50, scopes={"L1": 5 * GIBIBYTE, "L4": 2 * GIBIBYTE, "L5": 4 * GIBIBYTE})
+    return fake, types.SimpleNamespace(reports={SERVER.LOCAL: report}, total=lambda host: 50 * GIBIBYTE)
+
+
+def cell_booking_ledger_rows(world):
+    """在跑记账的逐条明细（task_server.py 的 ledger_row、running_booking_text、refresh_booking_ledger、booking_ledger_snapshot；task-server/control bookings 打出来）：
+    假世界里五条各走一支——L1 此刻实测 5G，记 5G（measured）；L2 报告里没有它的 scope，记整份上限 12G（no-scope）；L3 单元已停，不计（0，stopped）；
+    L4 实测 2G 到了它的上限 2G，记上限 2G（cap、at_cap）；L5 此刻实测 4G，记 4G（measured）。每条的原因写清取的是哪一个与几个数。
+    合计记 23G，照公式（50G − 1G − 23G）放得下 26G，在跑上限之和 49G，各 scope 实占合计 11G。
+    control bookings 照 /health 的这一栏逐台打：头一行写 slice 总额、余量与上限之和，每条一行写上限、实占、记多少、取的是哪一个与原因，末行写合计与放得下多少。
+    弄坏开关 bookings-ledger-unreported 下这一栏是空表，running-booked-at-cap 下 L1 记 20G，running-booked-with-margin 下 L1 记 6G，这一格红。"""
+    import importlib.machinery
+    import importlib.util
+    now = time.time()
+    fake, snapshot = ledger_fake()
+    SERVER.Scheduler.refresh_booking_ledger(fake, snapshot, now)
+    entry = SERVER.Scheduler.booking_ledger_snapshot(fake).get(SERVER.LOCAL) or {}
+    rows = {row["label"]: row for row in entry.get("rows") or []}
+    problems = []
+    wanted_rows = (("L1", SERVER.BOOKED_FROM_USAGE, 5, False, ("此刻实测的用量 5.0G",)),
+                   ("L2", SERVER.BOOKED_WITHOUT_SCOPE, 12, True, ("没有它的 scope", "12.0G")), ("L3", "stopped", 0, False, ("单元已确认停了",)),
+                   ("L4", SERVER.BOOKED_FROM_CAP, 2, True, ("到了它的上限", "记上限 2.0G")),
+                   ("L5", SERVER.BOOKED_FROM_USAGE, 4, False, ("此刻实测的用量 4.0G",)))
+    for label, basis, booked, at_cap, words in wanted_rows:
+        row = rows.get(label) or {}
+        if row.get("basis") != basis or row.get("booked") != booked * GIBIBYTE or row.get("at_cap") != at_cap or not all(word in (row.get("text") or "") for word in words):
+            problems.append(f"{label}：应当 {basis}、记 {booked}G、at_cap {at_cap}、原因写 {'、'.join(words)}，实际 {row}")
+    if entry.get("booked") != 23 * GIBIBYTE or entry.get("room") != 26 * GIBIBYTE or entry.get("caps") != 49 * GIBIBYTE or entry.get("used") != 11 * GIBIBYTE:
+        problems.append(f"合计应当记 23G、照公式放得下 26G、上限之和 49G、实占合计 11G，实际 记 {entry.get('booked')}、放得下 {entry.get('room')}、上限之和 {entry.get('caps')}、实占 {entry.get('used')}")
+    if "放得下 26.0G" not in (entry.get("total") or "") or "×" in (entry.get("total") or ""):
+        problems.append(f"合计那一行应当写照公式放得下 26.0G、不写乘几，实际「{entry.get('total')}」")
+    loader = importlib.machinery.SourceFileLoader("control_for_bookings", lib.CONTROL_SCRIPT)
+    control = importlib.util.module_from_spec(importlib.util.spec_from_loader("control_for_bookings", loader))
+    loader.exec_module(control)
+    health = {"booking_ledger": SERVER.Scheduler.booking_ledger_snapshot(fake)}
+    printed = io.StringIO()
+    with unittest.mock.patch.object(lib, "require_server", return_value=health), unittest.mock.patch.object(lib, "read_configuration", return_value=None), contextlib.redirect_stdout(printed):
+        code = control.bookings()
+    lines = [line for line in printed.getvalue().splitlines() if line.strip()]
+    if code != 0 or len(lines) != 7 or "slice 总额 50.0G" not in lines[0] or "放得下 26.0G" not in lines[-1] or sum(1 for line in lines if "第 1 次：上限" in line) != 5:
+        problems.append(f"control bookings 应当退 0、打 7 行（头一行、五条、末行合计）、头一行写 slice 总额 50.0G、末行写放得下 26.0G，实际退 {code}、{len(lines)} 行：{lines}")
+    for label, basis, *_ in wanted_rows:
+        if not any(f"任务 {rows.get(label, {}).get('task')} " in line and f"（{basis}）" in line for line in lines):
+            problems.append(f"control bookings 应当有一行写 {label} 那条任务与（{basis}），实际 {lines}")
+    if problems:
+        raise SelftestFailure("在跑记账的逐条明细：" + "；".join(problems))
+    return ("五条各走一支：实测 5G 记 5G、没有 scope 记上限 12G、单元已停不计、实测到了上限记上限 2G、实测 4G 记 4G；"
+            "合计记 23G、照公式放得下 26G；control bookings 逐条写取的是哪一个与原因、末行写合计")
+
+
+def cell_confirm_retries_follow_churn(world):
+    """自证帮手确认单（World.confirm_submitted）数对不上时按同会话在排在跑的条数放宽重试回数（有界）：服务核数在会话锁里算了就比（task_server.py 的 confirm、counts_mismatch），
+    每回对不上都是同会话又有一条收了，机器忙、十几条一齐收尾时三回追不上。假客户端头 8 回回 409（带新的条数，从 9 条一回少一条）、第 9 回回 0：帮手应当确认成功，共 9 回；
+    头 14 回回 409（多于回数）、第 15 回回 0：回数用完之后打回的还带着新的确认单，再追到时限（CONFIRM_BUDGET_SECONDS），确认成功共 15 回；
+    一直回 409 而时限给 0 的：在 CONFIRM_RETRIES 加头一回条数那么多回之后判红（有界）。弄坏开关 confirm-retries-fixed 下只重试 CONFIRM_RETRIES 回，这一格红。"""
+    def needed(tasks):
+        return subprocess.CompletedProcess([], 0, f"{lib.CONFIRM_NEEDED_MARK} task=5 items=1 tasks={tasks} timeout=1800\n", "")
+
+    def stub(mismatches):
+        calls = []
+
+        def client(arguments, **options):
+            calls.append(arguments)
+            if len(calls) <= mismatches:
+                return subprocess.CompletedProcess([], 3, needed(max(1, 9 - len(calls))).stdout, "mismatch")
+            return subprocess.CompletedProcess([], 0, "confirmed", "")
+        fake = object.__new__(World)
+        fake.client, fake.server_log_lines = client, lambda: []
+        return fake, calls
+    problems = []
+    fake, calls = stub(8)
+    reply = fake.confirm_submitted(needed(9))
+    if reply is None or reply.returncode != 0 or len(calls) != 9:
+        problems.append(f"头 8 回对不上、第 9 回对上：应当确认成功、共 9 回，实际 {len(calls)} 回、{reply}")
+    fake, calls = stub(14)
+    reply = fake.confirm_submitted(needed(9))
+    if reply is None or reply.returncode != 0 or len(calls) != 15:
+        problems.append(f"14 回对不上（多于回数 {CONFIRM_RETRIES + 9}）、第 15 回对上：回数用完之后服务打回的还带着新的确认单，应当再追到时限、确认成功、共 15 回，实际 {len(calls)} 回、{reply}")
+    fake, calls = stub(1000)
+    fake.confirm_budget_seconds = 0
+    try:
+        fake.confirm_submitted(needed(9))
+        problems.append("一直对不上的应当判红")
+    except SelftestFailure:
+        if len(calls) != CONFIRM_RETRIES + 9:
+            problems.append(f"一直对不上：应当在 {CONFIRM_RETRIES + 9} 回之后判红（有界），实际 {len(calls)} 回")
+    if problems:
+        raise SelftestFailure("确认单重试随同会话条数放宽：" + "；".join(problems))
+    return f"同会话条数 9 的时候头 8 回对不上、第 9 回确认成功；头 14 回对不上的追到第 15 回确认成功；一直对不上而时限给 0 的 {CONFIRM_RETRIES + 9} 回判红"
+
+
+SUBMIT_TRACE_STEPS = ("进线程", "提交时拒", "认会话", "认任务", "记库", "提交时警告", "确认单", "回话")   # submit-trace-logged：一条收下的提交走过的几步，照这个先后
+SUBMIT_TRACE_RECEIVED = re.compile(r"\d\d:\d\d:\d\d\.\d{3} 收到；")                                  # 那一行里收到的时刻（时、分、秒与毫秒）
+
+
+def cell_submit_trace_logged(world):
+    """提交那一路的进出日志（task_server.py 的 SubmitTrace、POST /tasks 的 submit 与 submit_in_thread、Scheduler.submit 的 trace）：真服务收下一条提交，服务日志里恰好一行
+    以 SUBMIT_TRACE_TEXT 起头、写「任务 <号>，收下」、收到的时刻，与 SUBMIT_TRACE_STEPS 那几步照先后各带距收到多少秒；另在这一格的进程里造一条 SubmitTrace、
+    演上一步之后过了 SUBMIT_TRACE_SLOW_SECONDS 以上：那一步当场另打一行「…这一步用了 …秒…回话还没出去」，回话时照样打那一行。
+    弄坏开关 submit-trace-silent 下一行都不打，这一格红。"""
+    world.start_server()
+    task_id = world.submit(["bash", "-c", "exit 0", "submit-trace"])
+    done = world.finished(task_id)
+    lines = []
+    for number in range(1, world.server_logs + 1):
+        with open(os.path.join(world.root, f"server-{number}.log"), encoding="utf-8", errors="replace") as handle:
+            lines += [line for line in handle.read().splitlines() if SERVER.SUBMIT_TRACE_TEXT in line]
+    mine = [line for line in lines if f"任务 {task_id}，收下" in line]
+    problems = []
+    if done["task"].get("outcome") != "succeeded":
+        problems.append(f"那一条应当跑成，实际 {describe(done)}")
+    if len(mine) != 1:
+        problems.append(f"服务日志里应当恰好一行「{SERVER.SUBMIT_TRACE_TEXT}（任务 {task_id}，收下）」，实际 {len(mine)} 行：{lines[-5:]}")
+    else:
+        positions = [mine[0].find(f"{step} +") for step in SUBMIT_TRACE_STEPS]
+        if not SUBMIT_TRACE_RECEIVED.search(mine[0]) or -1 in positions or positions != sorted(positions):
+            problems.append(f"那一行应当写收到的时刻、照先后写 {'、'.join(SUBMIT_TRACE_STEPS)} 各距收到多少秒，实际「{mine[0]}」")
+    printed = io.StringIO()
+    with contextlib.redirect_stderr(printed):
+        trace = SERVER.SubmitTrace(dict(os.environ))
+        trace.previous -= SERVER.SUBMIT_TRACE_SLOW_SECONDS + 1   # 演上一步之后过了这么久
+        trace.step("提交时拒")
+        trace.finish("收下")
+    shown = printed.getvalue().splitlines()
+    if len(shown) != 2 or "提交时拒这一步用了" not in shown[0] or "回话还没出去" not in shown[0] or SERVER.SUBMIT_TRACE_TEXT not in shown[1] or "回话 +" not in shown[1]:
+        problems.append(f"一步用了 {SERVER.SUBMIT_TRACE_SLOW_SECONDS + 1:g} 秒以上：应当当场另打一行写那一步慢、回话时再打进出那一行，实际 {shown}")
+    if problems:
+        raise SelftestFailure("提交那一路的进出日志：" + "；".join(problems), world.server_log_lines())
+    return f"收下的提交在服务日志里恰好一行：收到的时刻与 {'、'.join(SUBMIT_TRACE_STEPS)} 各距收到多少秒；一步慢的当场另打一行"
+
+
+def cell_store_write_rolls_back_on_error(world):
+    """库的写事务出事先回滚（task_server.py 的 Store.write_transaction；health_write、delete_row 这几处都经它）：meta 表上一个触发器让写 health 那一行 RAISE(ABORT)
+    （语句回滚、事务还开着，同 SQLITE_BUSY、IO 错那几种），operations 表上一个让删行 RAISE(ABORT)：health_write 交写不进、delete_row 抛出来，
+    之后这条连接不在事务里，另一条连接 BEGIN IMMEDIATE 0.5 秒内拿得到写锁。弄坏开关 store-transaction-left-open 下出事不回滚：连接留在事务里、别的连接拿不到写锁，这一格红。"""
+    path = os.path.join(world.root, "rollback.sqlite3")
+    store = SERVER.Store(path, bytes(32), dict(os.environ))
+    row = store.insert("operations", {"kind": "selftest"})
+    with contextlib.closing(sqlite3.connect(path, timeout=30, isolation_level=None)) as connection:
+        connection.execute("CREATE TRIGGER selftest_health_fails BEFORE UPDATE ON meta WHEN NEW.name = 'health' BEGIN SELECT RAISE(ABORT, 'selftest health write fails'); END")
+        connection.execute("CREATE TRIGGER selftest_delete_fails BEFORE DELETE ON operations BEGIN SELECT RAISE(ABORT, 'selftest delete fails'); END")
+    problems = []
+    for what, action in (("health_write", lambda: store.health_write()), ("delete_row", lambda: store.delete_row("operations", row["id"]))):
+        raised = ""
+        try:
+            outcome = action()
+        except sqlite3.Error as error:
+            outcome, raised = None, f"{type(error).__name__}: {error}"
+        open_after = store.connection().in_transaction
+        locked = ""
+        with contextlib.closing(sqlite3.connect(path, timeout=0.5, isolation_level=None)) as other:
+            try:
+                other.execute("BEGIN IMMEDIATE")
+                other.execute("ROLLBACK")
+            except sqlite3.OperationalError as error:
+                locked = str(error)
+        failed = (outcome is not None and outcome[0] is False) if what == "health_write" else bool(raised)
+        if not failed or open_after or locked:
+            problems.append(f"{what} 撞上 RAISE(ABORT)：应当{'交写不进' if what == 'health_write' else '抛出来'}、之后连接不在事务里、别的连接拿得到写锁，"
+                            f"实际交 {outcome}{('、抛 ' + raised) if raised else ''}、连接{'还在事务里' if open_after else '不在事务里'}、别的连接{'拿不到写锁（' + locked + '）' if locked else '拿得到写锁'}")
+    if problems:
+        raise SelftestFailure("写事务出事先回滚：" + "；".join(problems))
+    return "health_write 与 delete_row 撞上 RAISE(ABORT) 之后连接不在事务里，别的连接照样拿得到写锁"
+
+
+DISK_FLOOR_RECORD_BYTES = 35 * GIBIBYTE   # disk-floor-peer-not-never-fits：同键记录的峰值，比本机可用上限（30G 减余量 2G）大、比第二台的（64G 减 2G）小
+
+
+def cell_disk_floor_peer_not_never_fits(world):
+    """第二台盘余量不到下限时记录比本机大的任务排着、不判 never-fits（task_server.py 的 judge_placement、hosts_short_of_record）：同键上一次跑完峰值 35G，
+    本机可用上限 28G、第二台 62G 而第二台盘只剩不到下限：任务排着（queued、没有尝试），排队原因写第二台盘只剩；第二台盘够了照派第二台跑完。
+    弄坏开关 disk-floor-host-judged-never 下盘不够的第二台不算「回来可能放得下」，本机判永远放不下、任务记 never-fits，这一格红。"""
+    key = "selftest-disk-floor-record"
+    floor = SERVER.DISK_FLOOR_BYTES
+    world.resources(local=(30, 30), peer=(100, 100), peer_cap_gibibytes=64, peer_df=f"     Avail\n{floor - GIBIBYTE}\n")
+    world.start_server()
+    world.seed_peak(key, DISK_FLOOR_RECORD_BYTES)
+    task_id = world.submit(["bash", "-c", "exit 0", "disk-floor-record"], cwd=world.repo, extra={lib.KEY_VARIABLE: key})
+    world.next_pass()
+    world.next_pass()
+    held = world.summary(task_id)
+    problems = []
+    if held["task"].get("state") != "queued" or held["attempts"] or "第二台盘只剩" not in (held.get("waiting_for") or ""):
+        problems.append(f"第二台盘不够、本机放不下：应当排着、没有尝试、排队原因写「第二台盘只剩」，实际 {describe(held)}、排队原因「{held.get('waiting_for')}」、"
+                        f"说明「{held['task'].get('note')}」")
+    else:
+        world.resources(local=(30, 30), peer=(100, 100), peer_cap_gibibytes=64, peer_disk_bytes=floor + GIBIBYTE)
+        done = world.finished(task_id, timeout=PLACEMENT_WAIT_SECONDS)
+        if done["task"].get("outcome") != "succeeded" or (done["attempts"] or [{}])[-1].get("host") != "peer":
+            problems.append(f"第二台盘够了应当照派第二台跑完，实际 {describe(done)}")
+    if problems:
+        raise SelftestFailure("第二台盘不够时不判 never-fits：" + "；".join(problems), world.server_log_lines())
+    return "第二台盘不够、本机放不下 35G 的记录：排着；第二台盘够了派过去跑完"
+
+
+def peer_log_scheduler(world, name, lines=()):
+    """第二台日志那几格的假调度器：第二台的一次尝试（id 7），日志是这一格临时目录里的一份（先写进 lines），经真的 log_content 记表。→ (调度器, 尝试)。"""
+    log = os.path.join(world.root, f"peer-log-{name}.log")
+    with open(log, "w", encoding="utf-8") as handle:
+        handle.write("".join(f"{line}\n" for line in lines))
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    for field in ("log_offsets", "peer_memory", "peer_memory_stat", "peer_io_wait", "peer_threads",
+                  "peer_external_kill", "peer_io_rounds", "peer_thread_rounds"):
+        setattr(fake, field, {})
+    fake.machines = {SERVER.PEER: SERVER.PeerMachine(fake)}
+    return fake, {"id": 7, "task_id": 77, "number": 1, "host": SERVER.PEER, "label": f"task-selftest-peer-{name}", "log": log}
+
+
+def append_lines(path, lines):
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write("".join(f"{line}\n" for line in lines))
+
+
+def cell_stall_reads_log_before_cpu(world):
+    """判卡住每一轮开头先把日志读到底再读 CPU（task_server.py 的 fresh_cpu_usec）：第二台的日志里刚到一行 MULTI_HOST_RUN_PEER_CPU usage_usec=5000000、还没被读过：
+    读到的 CPU 是 5000000。套在假调度器上，不起服务。弄坏开关 stall-cpu-read-before-log 下不先读日志、交读不到，这一格红。"""
+    fake, attempt = peer_log_scheduler(world, "cpu-first", ["MULTI_HOST_RUN_PEER_CPU poll=1 usage_usec=5000000 read=yes"])
+    usage = SERVER.Scheduler.fresh_cpu_usec(fake, attempt)
+    if usage != 5000000:
+        raise SelftestFailure(f"第二台日志里刚到的那一行 CPU 应当读到 5000000，实际 {usage}")
+    return "第二台刚到的 CPU 行当轮读到"
+
+
+def cell_peer_readings_merged_across_reads(world):
+    """两次读之间读日志几回，IO 等待与线程读数一行不丢（task_server.py 的 read_log_content、merge_peer_io_rounds、merge_peer_thread_rounds）：读一回日志接到 blocked=0、
+    runnable=9 那一行，再读一回接到 blocked=3、runnable=2 那一行，之后 io_blocked 交 0（取最少）、thread_reading 的可跑线程数 9（取最大）。套在假调度器上，不起服务。
+    弄坏开关 peer-readings-overwritten 下后一回盖掉前一回（交 3 与 2），这一格红。"""
+    fake, attempt = peer_log_scheduler(world, "merged", ["MULTI_HOST_RUN_PEER_IO_WAIT poll=1 blocked=0 read=yes",
+                                                         "MULTI_HOST_RUN_PEER_THREADS poll=1 runnable=9 total=20 top=12:cargo read=yes"])
+    SERVER.Scheduler.log_content(fake, attempt)
+    append_lines(attempt["log"], ["MULTI_HOST_RUN_PEER_IO_WAIT poll=2 blocked=3 read=yes", "MULTI_HOST_RUN_PEER_THREADS poll=2 runnable=2 total=5 top=3:rustc read=yes"])
+    SERVER.Scheduler.log_content(fake, attempt)
+    machine = fake.machines[SERVER.PEER]
+    blocked, threads = machine.io_blocked(attempt), machine.thread_reading(attempt)
+    if blocked != 0 or threads is None or threads.runnable != 9:
+        raise SelftestFailure(f"两回读到的 IO 等待应当并起来取最少（0）、可跑线程取最大（9），实际 {blocked}、{threads}")
+    return "两回读到的 IO 等待并起来取 0、可跑线程取 9"
+
+
+def cell_log_content_serialized(world):
+    """同一次尝试同一时刻只一个线程读日志（task_server.py 的 log_content、LOG_CONTENT_LOCKS）：两个线程同时读（读那一段换成睡 0.3 秒、记同时在读几个的假的）：至多一个在读。
+    套在假调度器上，不起服务。弄坏开关 log-content-unlocked 下两个同时读，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    guard, active, peak = threading.Lock(), [0], [0]
+
+    def slow_read(attempt):
+        with guard:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        time.sleep(0.3)
+        with guard:
+            active[0] -= 1
+        return 0
+    fake.read_log_content = slow_read
+    readers = [threading.Thread(target=SERVER.Scheduler.log_content, args=(fake, {"id": 7})) for _ in range(2)]
+    for reader in readers:
+        reader.start()
+    for reader in readers:
+        reader.join(10)
+    if peak[0] != 1:
+        raise SelftestFailure(f"同一次尝试的日志同一时刻应当只一个线程在读，实际同时 {peak[0]} 个")
+    return "两个线程读同一次尝试的日志一个接一个"
+
+
+def cell_log_noise_marks_not_growth(world):
+    """第二台收尾那几行与 multi-host-run.sh 每一轮照打的显存行不算日志在涨（task_server.py 的 read_log_content 的 noise_marks）：日志里只有 MULTI_HOST_RUN_PEER_MEMORY_PEAK、
+    MULTI_HOST_RUN_PEER_BUILD_PEAK、MULTI_HOST_RUN_PEER_BUILD_KEPT 与 MULTI_HOST_RUN_PEER_GPU 各一行：算「在涨」的字节数是 0；另接一行命令自己的输出：等于那一行的字节数。
+    套在假调度器上，不起服务。弄坏开关 log-noise-marks-incomplete 下收尾那三行照算，这一格红。"""
+    lines = [f"{lib.PEER_MEMORY_PEAK_MARK} bytes=1024", f"{lib.PEER_BUILD_PEAK_MARK} bytes=2048", f"{lib.PEER_BUILD_KEPT_MARK} label=task-selftest-1-1",
+             "MULTI_HOST_RUN_PEER_GPU poll=1 used_mib=0 read=yes utilization=none on_cards=empty"]
+    fake, attempt = peer_log_scheduler(world, "noise-marks", lines)
+    quiet = SERVER.Scheduler.log_content(fake, attempt)
+    output = "命令自己的一行输出"
+    append_lines(attempt["log"], [output])
+    grown = SERVER.Scheduler.log_content(fake, attempt)
+    if quiet != 0 or grown != len((output + "\n").encode("utf-8")):
+        raise SelftestFailure(f"收尾三行与显存行应当都不算在涨（0 字节）、接一行输出之后是那一行的字节数，实际 {quiet}、{grown}")
+    return "收尾的峰值行、留着编译目录行与每轮的显存行不算日志在涨"
+
+
+def cell_runaway_targets_skip_children(world):
+    """空转进程的提醒找得到会话（task_server.py 的 runaway_targets）：会话 A 先交一条带收件地址的任务，之后它的分片任务建了 25 个子任务（没有收件地址）：
+    找到的是那条带收件地址的任务。套在假调度器上（这一格临时库上的 Store），不起服务。弄坏开关 runaway-targets-counting-children 下子任务占满最近 20 行、找不到，这一格红。"""
+    store = SERVER.Store(os.path.join(world.root, "runaway-targets.sqlite3"), bytes(32), dict(os.environ))
+    parent = store.insert("tasks", {"task_id": 0, "state": "sharded", "session": SESSION_A, "command_key": "", "inbox": {"token": INBOX_TOKEN_SAMPLE}})
+    for index in range(25):
+        store.insert("tasks", {"task_id": parent["id"], "parent_id": parent["id"], "role": "shard", "shard_index": index, "state": "queued", "session": SESSION_A, "command_key": ""})
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.store = dict(os.environ), store
+    fake.inbox_reachable = lambda task: bool(task.get("inbox"))
+    found = [task.get("id") for task in SERVER.Scheduler.runaway_targets(fake, SESSION_A)]
+    if found != [parent["id"]]:
+        raise SelftestFailure(f"会话最近交了 25 片的分片任务：应当找到带收件地址的任务 {parent['id']}，实际 {found}")
+    return "子任务不占最近那 20 行，找得到带收件地址的任务"
+
+
+def promote_fake(rows):
+    """promote-wakes-and-promotes-shards 的假调度器：库是 rows（{任务号: 正文}）上的假 Store（task、change 照真的那样判 guard）。→ (调度器, 叫醒过几回的表)。"""
+    def change(table, row_id, changes, guard=None, reopen=False):
+        record = dict(rows[row_id])
+        why = guard(record) if guard is not None else ""
+        if why:
+            raise SERVER.StoreRefused("guard", why)
+        record.update(changes)
+        rows[row_id] = record
+        return record
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.store = types.SimpleNamespace(task=lambda task_id: (dict(rows[task_id]), True) if task_id in rows else None, change=change,
+                                       insert=lambda table, record: dict(record, id=99))
+    fake.children_of = lambda parent_id: [dict(row) for row in rows.values() if row.get("parent_id") == parent_id]
+    fake.operation = lambda *arguments: None
+    woken = []
+    fake.wake = lambda: woken.append(True)
+    return fake, woken
+
+
+def cell_promote_wakes_and_promotes_shards(world):
+    """task promote 当场叫醒排队、分片的父任务也提前（task_server.py 的 promote、create_child）：分片的父任务 1（sharded）下一片 2 在排、一片 3 在跑：提前退 200、叫醒一回，
+    父任务与在排的 2 记了 promoted，在跑的 3 不记；之后建的子任务带上父任务的 promoted。套在假调度器上，不起服务。
+    弄坏开关 promote-unwoken 下不叫醒，promote-shards-refused 下分片的父任务照「不在排」回 409、子任务不继承，这一格红。"""
+    rows = {1: {"id": 1, "session": SESSION_A, "state": "sharded"}, 2: {"id": 2, "session": SESSION_A, "state": "queued", "parent_id": 1},
+            3: {"id": 3, "session": SESSION_A, "state": "running", "parent_id": 1}}
+    fake, woken = promote_fake(rows)
+    status, reply = SERVER.Scheduler.promote(fake, 1, SESSION_A, 0)
+    fake.find_child = lambda children, role, index: None
+    fake.child_key_text = lambda parent, role, index, count: "selftest-promoted-child"
+    fake.command_key = lambda command, key: "selftest-promoted-child-key"
+    child = SERVER.Scheduler.create_child(fake, dict(rows[1], command=["x"], cwd=world.root, environment={}), "shard", 1, 2)
+    problems = []
+    if status != 200 or not woken:
+        problems.append(f"分片的父任务提前应当退 200、当场叫醒排队，实际 {status}「{reply}」、叫醒 {len(woken)} 回")
+    if not rows[1].get("promoted") or not rows[2].get("promoted") or rows[3].get("promoted"):
+        problems.append(f"父任务与在排的子任务应当记 promoted、在跑的不记，实际父 {rows[1].get('promoted')}、在排 {rows[2].get('promoted')}、在跑 {rows[3].get('promoted')}")
+    if not child.get("promoted"):
+        problems.append("提前过的父任务之后建的子任务应当带 promoted，实际没带")
+    if problems:
+        raise SelftestFailure("task promote 叫醒与分片：" + "；".join(problems))
+    return "分片的父任务提前：退 200、叫醒排队，父任务与在排的片记 promoted，之后建的片继承"
+
+
+def cell_promote_placement_rules(world):
+    """提前过的排队规矩（task_server.py 的 aged、blocks_later）：提交 3 小时、提前过的不算排满时限（不挡后面）、起不来不算
+    「排在前面还没起的」（后面的不照插队判）；同样 3 小时没提前过的照算排满时限、照算排在前面。套在假调度器上，不起服务。
+    弄坏开关 promote-aged-blocks-queue、promote-blocked-counts-as-earlier 下各坏一样，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.aged_seconds = 3600.0
+    now = time.time()
+    promoted = {"id": 1, "submitted_at": now - 3 * 3600, "promoted": {"at": now - 60}}
+    plain = {"id": 2, "submitted_at": now - 3 * 3600}
+    seen = {name: (getattr(SERVER.Scheduler, name)(fake, promoted, *extra), getattr(SERVER.Scheduler, name)(fake, plain, *extra))
+            for name, extra in (("aged", (now,)), ("blocks_later", ()))}
+    wanted = {"aged": (False, True), "blocks_later": (False, True)}
+    problems = [f"{name}：提前过的与没提前过的应当是 {wanted[name]}，实际 {found}" for name, found in seen.items() if found != wanted[name]]
+    if problems:
+        raise SelftestFailure("提前过的排队规矩：" + "；".join(problems))
+    return "提前过的不算排满时限、起不来不挡后面"
+
+
+def cell_pause_keeps_queue_positions(world):
+    """暂停放行一个会话时别的会话排着的任务排位不丢（task_server.py 的 place_queued_into、positions_in）：假余量 hold，放行会话 A；会话 B 先交一条、A 后交一条：
+    两条的 status 排位照全队算（B 那条 1/2、A 那条 2/2）。弄坏开关 pause-queue-positions-filtered 下只照放行的那几条算（B 那条没有排位、A 那条 1/1），这一格红。"""
+    world.resources(local=(30, 30), hold=True)
+    world.start_server()
+    pause_by_api(world, PAUSE_REASON_SAMPLE, allow_session=SESSION_A)
+    other_id = world.submit(["bash", "-c", "exit 0", "paused-other"], session=SESSION_B)
+    allowed_id = world.submit(["bash", "-c", "exit 0", "paused-allowed"], session=SESSION_A)
+    world.next_pass()
+    world.next_pass()
+    other, allowed = (world.summary(task_id).get("queue_position") or {} for task_id in (other_id, allowed_id))
+    seen = ((other.get("position"), other.get("queued")), (allowed.get("position"), allowed.get("queued")))
+    if seen != ((1, 2), (2, 2)):
+        raise SelftestFailure(f"暂停放行 A 时两条的排位应当照全队算（B 那条 1/2、A 那条 2/2），实际 {seen}", world.server_log_lines())
+    return "暂停放行一个会话：别的会话排着的排位照全队算"
+
+
+def cell_stop_joins_peer_probe(world):
+    """停服务时等第二台的余量探测线程（task_server.py 的 Scheduler.stop）：探测线程见到停的信号之后还要 0.5 秒才退（演它正在收一个 ssh）：停自己的子进程那一步之前它已退了。
+    套在假调度器上，不起服务。弄坏开关 peer-probe-thread-unjoined 下不等它，停子进程时它还在，这一格红。"""
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.stopping, fake.inbox_event = threading.Event(), threading.Event()
+    fake.wake = lambda: None
+    for name in ("thread", "nfs_thread", "inbox_thread", "runaway_thread", "booking_audit_thread"):
+        setattr(fake, name, threading.Thread(target=lambda: None))   # 没起：is_alive 为假
+    finished = threading.Event()
+
+    def probe():
+        fake.stopping.wait(30)
+        time.sleep(0.5)
+        finished.set()
+    fake.peer_probe_thread = threading.Thread(target=probe, daemon=True)
+    fake.peer_probe_thread.start()
+    fake.children = []
+    seen = []
+    fake.stop_own_children = lambda: seen.append(finished.is_set())
+    SERVER.Scheduler.stop(fake)
+    if seen != [True]:
+        raise SelftestFailure(f"停自己的子进程之前探测线程应当已退，实际{'没停子进程' if not seen else '还在'}")
+    return "停服务等探测线程退了才停子进程"
+
+
+def cell_peer_cooldown_skips_connect(world):
+    """第二台上一回读不成、还在冷却里，收尾那几处不去连（task_server.py 的 Resources.peer_cooling_down、PeerMachine 的 attempt_presence_readings、
+    remove_build_directory）：两处都当场交「不再去连」、一次都没去重读第二台。套在假调度器上，不起服务。
+    弄坏开关 peer-cooldown-ignored-off-scheduler 下照样去连，这一格红。"""
+    resources = object.__new__(SERVER.Resources)
+    resources.environment, resources.fake_path, resources.peer = dict(os.environ), "", None
+    resources.peer_failed = (time.monotonic(), "自证：ssh 被重置")
+    connects = []
+    resources.refresh_peer = lambda: connects.append(True)
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment, fake.resources = dict(os.environ), resources
+    fake.peer_runner = os.path.join(world.root, "no-such-multi-host-run.sh")
+    machine = SERVER.PeerMachine(fake)
+    presence = machine.attempt_presence_readings({})
+    removed, lines = machine.remove_build_directory(os.path.join(world.root, "builds", "task-1-1"))
+    problems = []
+    if presence[0] is not None or "不再去连" not in presence[1]:
+        problems.append(f"核进程应当当场交「不再去连」，实际 {presence}")
+    if removed or not lines or "不再去连" not in lines[0]:
+        problems.append(f"删第二台的编译目录应当当场交没删成、原因写「不再去连」，实际 {removed}、{lines}")
+    if connects:
+        problems.append(f"冷却里不该去重读第二台，实际去了 {len(connects)} 回")
+    if problems:
+        raise SelftestFailure("冷却里不去连第二台：" + "；".join(problems))
+    return "第二台还在冷却里：核进程、删编译目录都当场交不再去连"
+
+
+def cell_clean_removes_peer_kept_build(world):
+    """task clean 删第二台留着的编译目录（task_server.py 的 clean）：结了局的任务名下一次第二台的尝试留着编译目录（build_directory_kept、没删）：clean 照第二台的删法删它
+    （PeerMachine.remove_build_directory，这里换成记下路径的假的）、记已删、回话里列出它。套在假调度器上，不起服务。
+    弄坏开关 clean-peer-build-left 下照本机那一路判（本机没有这个路径），一份不删，这一格红。"""
+    directory = "/selftest-peer-build-root/builds/task-80-1"
+    task = {"id": 80, "session": SESSION_A, "state": "finished"}
+    attempt = {"id": 81, "task_id": 80, "host": SERVER.PEER, "build_directory": directory, "build_directory_kept": True, "build_directory_removed": False}
+    fake = object.__new__(SERVER.Scheduler)
+    fake.environment = dict(os.environ)
+    fake.store = types.SimpleNamespace(task=lambda task_id: (dict(task), True), attempts_of=lambda owner: [(dict(attempt), True)] if owner == 80 else [])
+    fake.children_of = lambda task_id: []
+    fake.build_removal_lock = threading.Lock()
+    asked, marked = [], []
+    fake.machines = {SERVER.PEER: types.SimpleNamespace(remove_build_directory=lambda path: (asked.append(path) is None, []))}
+    fake.build_directories = types.SimpleNamespace(remove_run_build_directory=lambda path: (True, []))
+    fake.mark_build_directory_removed = lambda found: marked.append(found["id"])
+    fake.remove_scenes = lambda task_id: ([], [])
+    fake.operation = lambda *arguments: None
+    status, reply = SERVER.Scheduler.clean(fake, 80, SESSION_A, 0)
+    if status != 200 or asked != [directory] or marked != [81] or [item.get("path") for item in reply.get("removed") or []] != [directory]:
+        raise SelftestFailure(f"第二台留着的编译目录应当照第二台的删法删、记已删、回话列出，实际 {status}、删了 {asked}、记了 {marked}、回话 {reply}")
+    return "task clean 照第二台的删法删了它留着的编译目录"
+
+
+COMMAND_WORD_SAMPLES = (   # command-word-index-skips-option-values：(argv, 命令词的位置)
+    (["env", "-C", "/tmp", "cargo", "build"], 3), (["env", "A=1", "-u", "B", "cargo"], 4), (["nice", "-n10", "cargo", "build"], 2),
+    (["nice", "--adjustment", "10", "cargo"], 3), (["nice", "-n", "5", "cargo"], 3), (["timeout", "-k", "5", "60", "cargo"], 4),
+    (["python3", "-W", "ignore", "x.py"], 3), (["bash", "-o", "pipefail", "x.sh"], 3),
+)
+
+
+def cell_command_word_index_skips_option_values(world):
+    """剥外层包装时连同选项值跳过（task_server_lib.py 的 command_word_index、whole_package_cargo_test、CARGO_VALUE_OPTIONS）：COMMAND_WORD_SAMPLES 每条的命令词位置照表；
+    cargo test -p 包 --exclude 别的 不当点名了测试（--exclude 的值不是测试名）；-p包 连写的照旧不吞下一个词（后面那个是测试名）。
+    弄坏开关 command-wrapper-values-unskipped 下停在选项值上，cargo-exclude-value-unskipped 下 --exclude 的值当测试名，这一格红。"""
+    wrong = [(argv, wanted, lib.command_word_index(argv)) for argv, wanted in COMMAND_WORD_SAMPLES if lib.command_word_index(argv) != wanted]
+    problems = [f"{' '.join(argv)}：命令词应当在第 {wanted} 个位置，实际 {found}" for argv, wanted, found in wrong]
+    if not lib.whole_package_cargo_test(["-p", "singlefs-core", "--exclude", "singlefs-verification"]):
+        problems.append("cargo test -p singlefs-core --exclude singlefs-verification 应当判整包（--exclude 的值不是测试名），实际当点名了测试")
+    if lib.whole_package_cargo_test(["-psinglefs-core", "some_test"]):
+        problems.append("cargo test -psinglefs-core some_test 应当判点名了测试，实际判整包")
+    if problems:
+        raise SelftestFailure("剥包装的选项值：" + "；".join(problems))
+    return f"{len(COMMAND_WORD_SAMPLES)} 种带值选项的写法命令词位置都对；--exclude 的值不当测试名"
+
+
+def cell_runner_start_error_recorded(world):
+    """命令起不来照写 result.json（attempt_runner.py 的 main）：argv 头一个不在：attempt_runner 退 127、result.json 的 exit_code 127、带 start_error，日志记一行「命令起不来」。
+    弄坏开关 runner-start-error-uncaught 下（说明里 start_error_uncaught）照抛出去、result.json 写不出，这一格红。"""
+    directory = os.path.join(world.work, "runner-start-error")
+    os.makedirs(directory, exist_ok=True)
+    log = os.path.join(directory, "attempt.log")
+    specification_path = os.path.join(directory, "spec.json")
+    with open(specification_path, "w", encoding="utf-8") as handle:
+        json.dump({"argv": [os.path.join(world.work, "no-such-command")], "cwd": world.work, "environment": dict(os.environ), "log": log, "directory": directory,
+                   "fast": True, "unit": "", "start_error_uncaught": lib.broken("runner-start-error-uncaught")}, handle)
+    completed = subprocess.run([sys.executable, "-B", lib.RUNNER_SCRIPT, specification_path], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+    result, logged = None, ""
+    with contextlib.suppress(OSError, ValueError):
+        with open(os.path.join(directory, "result.json"), encoding="utf-8") as handle:
+            result = json.load(handle)
+    with contextlib.suppress(OSError):
+        with open(log, encoding="utf-8", errors="replace") as handle:
+            logged = handle.read()
+    if completed.returncode != 127 or not isinstance(result, dict) or result.get("exit_code") != 127 or not result.get("start_error") or "命令起不来" not in logged:
+        raise SelftestFailure(f"命令起不来：应当退 127、result.json 的 exit_code 127 且带 start_error、日志记一行，实际退 {completed.returncode}、"
+                              f"result.json {'写不出' if result is None else result}、日志「{logged.strip()[-200:]}」", (completed.stdout + completed.stderr).splitlines()[-12:])
+    return "命令起不来：退 127，result.json 照写、带原因"
+
+
+RUNNER_FINAL_SAMPLE_WRAPPER = """import importlib.util, json, os, sys
+specification = importlib.util.spec_from_file_location("attempt_runner_under_test", sys.argv[1])
+runner = importlib.util.module_from_spec(specification)
+specification.loader.exec_module(runner)
+record = sys.argv[2]
+seen = []
+def sample(self):
+    seen.append(os.path.exists(f"/proc/{self.root_process_id}"))
+    self.memory_peak = 1
+runner.Sampler.sample = sample
+code = runner.main(sys.argv[3:])
+with open(record, "w", encoding="utf-8") as handle:
+    json.dump(seen, handle)
+sys.exit(code)
+"""   # runner-final-sample-after-exit：载入 attempt_runner.py、把 Sampler.sample 换成记「这一刻起的那个子进程还在不在 /proc」的假的，再照原样起 main
+
+
+def cell_runner_final_sample_after_exit(world):
+    """命令退了之后再采一次（attempt_runner.py 的 main）：采样换成记下子进程此刻在不在 /proc 的假的（头一次就记上内存峰值），命令睡 0.3 秒退 0：采样记录里最后一次是子进程
+    已收走之后（不在 /proc）。弄坏开关 runner-final-sample-skipped 下（说明里 final_sample_skipped）采到过就不补，最后一次还在跑着，这一格红。"""
+    directory = os.path.join(world.work, "runner-final-sample")
+    os.makedirs(directory, exist_ok=True)
+    wrapper, record = os.path.join(world.work, "runner-final-sample.py"), os.path.join(directory, "samples.json")
+    with open(wrapper, "w", encoding="utf-8") as handle:
+        handle.write(RUNNER_FINAL_SAMPLE_WRAPPER)
+    specification_path = os.path.join(directory, "spec.json")
+    with open(specification_path, "w", encoding="utf-8") as handle:
+        json.dump({"argv": ["bash", "-c", "sleep 0.3"], "cwd": world.work, "environment": dict(os.environ), "log": os.path.join(directory, "attempt.log"),
+                   "directory": directory, "fast": True, "unit": "", "leftovers_kept": True, "final_sample_skipped": lib.broken("runner-final-sample-skipped")}, handle)
+    completed = subprocess.run([sys.executable, "-B", wrapper, lib.RUNNER_SCRIPT, record, specification_path], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+    seen = None
+    with contextlib.suppress(OSError, ValueError):
+        with open(record, encoding="utf-8") as handle:
+            seen = json.load(handle)
+    if completed.returncode != 0 or not seen or seen[-1] is not False:
+        raise SelftestFailure(f"命令退了之后应当再采一次（最后一次采样时子进程已不在），实际退 {completed.returncode}、采样记录 {seen}",
+                              (completed.stdout + completed.stderr).splitlines()[-12:])
+    return f"采了 {len(seen)} 次，最后一次在命令退了之后"
+
+
 CELLS = {
+    "retired-outcome-status-generic": cell_retired_outcome_status_generic,
     "pause-allows-one-session": cell_pause_allows_one_session, "pause-allow-waiting-text": cell_pause_allow_waiting_text,
     "pause-allow-switches-session": cell_pause_allow_switches_session, "resume-clears-allowed-session": cell_resume_clears_allowed_session,
     "pause-allow-survives-restart": cell_pause_allow_survives_restart, "pause-allow-reported": cell_pause_allow_reported,
     "pause-holds-new-attempts": cell_pause_holds_new_attempts, "pause-lets-running-finish": cell_pause_lets_running_finish,
     "pause-survives-restart": cell_pause_survives_restart, "resume-releases-queue": cell_resume_releases_queue, "pause-reported": cell_pause_reported,
     "pause-not-starved": cell_pause_not_starved, "pause-waits-for-starting-attempt": cell_pause_waits_for_starting_attempt,
-    "attention-queued-too-long": cell_attention_queued_too_long, "attention-overrun": cell_attention_overrun, "attention-card-replaced": cell_attention_card_replaced,
-    "attention-card-replaced-after-finish": cell_attention_card_replaced_after_finish, "attention-cleanup-pending": cell_attention_cleanup_pending,
+    "attention-queued-too-long": cell_attention_queued_too_long,
+    "attention-cleanup-pending": cell_attention_cleanup_pending,
     "attention-shard-advance-failed": cell_attention_shard_advance_failed, "attention-reported-once": cell_attention_reported_once,
     "attention-reported-survives-restart": cell_attention_reported_survives_restart, "attention-queue-waits-for-reason": cell_attention_queue_waits_for_reason,
     "page-cache-not-counted-as-process-memory": cell_page_cache_not_counted_as_process_memory,
-    "attention-type-in-header": cell_attention_type_in_header, "temporary-service-wrapper-compiles": cell_temporary_service_wrapper_compiles,
-    "temporary-service-own-server-compiles": cell_temporary_service_own_server_compiles, "cap-hit-rerun-from-record": cell_cap_hit_rerun_from_record,
+    "attention-type-in-anomaly-table": cell_attention_type_in_anomaly_table, "temporary-service-wrapper-compiles": cell_temporary_service_wrapper_compiles,
+    "temporary-service-own-server-compiles": cell_temporary_service_own_server_compiles,
     "slow-world-patient-wait": cell_slow_world_patient_wait,
-    "shard-siblings-share-peaks": cell_shard_siblings_share_peaks, "build-family-peak-shared": cell_build_family_peak_shared,
-    "build-family-declared": cell_build_family_declared, "build-family-from-arguments": cell_build_family_from_arguments,
-    "build-family-cap-hit-raises": cell_build_family_cap_hit_raises, "build-family-peak-windowed": cell_build_family_peak_windowed,
     "parallelism-registration-refused": cell_parallelism_registration_refused,
     "shard-child-key-folded-by-words": cell_shard_child_key_folded_by_words,
     "workspace-write-interrupted-reported": cell_workspace_write_interrupted_reported,
     "workspace-write-complete-not-reported": cell_workspace_write_complete_not_reported,
-    "gpu-two-cards-same-host": cell_gpu_two_cards_same_host, "gpu-three-cards-only-where-enough": cell_gpu_three_cards_only_where_enough,
-    "gpu-cards-short-never-fits": cell_gpu_cards_short_never_fits,
+    "resume-declaration-first-word-only": cell_resume_declaration_first_word_only,
     "check-missing": cell_check_missing, "install": cell_install, "control-readback": cell_control_readback, "server-unreachable": cell_server_unreachable,
     "exit-code-passthrough": cell_exit_code_passthrough, "restart-keeps-running": cell_restart_keeps_running, "start-once": cell_start_once,
     "queue-holds-unplaceable": cell_queue_holds_unplaceable, "arrival-order": cell_arrival_order,
     "prediction-computed-once": cell_prediction_computed_once, "pass-reads-resources-once": cell_pass_reads_resources_once,
     "pass-booking-carried": cell_pass_booking_carried, "launch-rechecked": cell_launch_rechecked, "every-command-reaches-peer": cell_every_command_reaches_peer,
-    "backfill-when-head-blocked": cell_backfill_when_head_blocked, "error-types": cell_error_types,
+    "error-types": cell_error_types,
     "unit-start-failed": cell_unit_start_failed, "memory-cap-growth": cell_memory_cap_growth, "memory-cap-at-maximum": cell_memory_cap_at_maximum,
     "unrecorded-default-small": cell_unrecorded_default_small, "unrecorded-cap-growth": cell_unrecorded_cap_growth,
     "unrecorded-burst-balanced": cell_unrecorded_burst_balanced,
-    "retry-kinds": cell_retry_kinds, "gpu-highest-free-card": cell_gpu_highest_free_card, "gpu-entry-scripts-recognized": cell_gpu_entry_scripts_recognized, "cancel-own-session-only": cell_cancel_own_session_only,
+    "retry-kinds": cell_retry_kinds, "cancel-own-session-only": cell_cancel_own_session_only,
     "tampered-row-not-started": cell_tampered_row_not_started, "queued-revalidated-on-restart": cell_queued_revalidated_on_restart, "forged-session": cell_forged_session, "environment-whitelist": cell_environment_whitelist,
     "retired-variables-refused": cell_retired_variables_refused,
     "nested-dispatch-refused": cell_nested_dispatch_refused, "resource-record": cell_resource_record, "operation-log": cell_operation_log,
@@ -11332,49 +14367,48 @@ CELLS = {
     "retry-keeps-earlier-attempts": cell_retry_keeps_earlier_attempts, "build-directory-outside-repository": cell_build_directory_outside_repository,
     "retry-build-directory-reused": cell_retry_build_directory_reused,
     "history-peak-first-attempt": cell_history_peak_first_attempt, "history-peak-window-raises": cell_history_peak_window_raises,
-    "history-peak-retry-jumps": cell_history_peak_retry_jumps,
     "history-peak-unrecorded-default": cell_history_peak_unrecorded_default, "writer-dry-run-retried": cell_writer_dry_run_retried,
-    "health-head-cpu-gate-not-starved": cell_health_head_cpu_gate_not_starved, "health-head-cards-short-not-starved": cell_health_head_cards_short_not_starved,
-    "whole-seals-one-host": cell_whole_seals_one_host, "card-whole-seals-while-card-busy": cell_card_whole_seals_while_card_busy,
-    "aged-whole-keeps-group-sealed": cell_aged_whole_keeps_group_sealed,
-    "aged-seal-no-gap-fill": cell_aged_seal_no_gap_fill, "budget-over-maxima-refused": cell_budget_over_maxima_refused,
+    "health-head-cpu-gate-not-starved": cell_health_head_cpu_gate_not_starved,
+    "cap-hit-record-over-every-host-starts-clamped": cell_cap_hit_record_over_every_host_starts_clamped,
+    "booking-within-host-limit-every-history": cell_booking_within_host_limit_every_history,
+    "control-drop-history-oversized-records": cell_control_drop_history_oversized_records,
     "oversized-budget-reported": cell_oversized_budget_reported, "long-run-idle-cores-reported": cell_long_run_idle_cores_reported,
     "fills-any-cap-reported": cell_fills_any_cap_reported,
     "old-metric-peaks-not-counted": cell_old_metric_peaks_not_counted,
     "anomaly-table-matches-kinds": cell_anomaly_table_matches_kinds, "anomaly-advice-in-texts": cell_anomaly_advice_in_texts,
-    "anomaly-repushed-with-history": cell_anomaly_repushed_with_history, "unclaimed-outcome-repushed": cell_unclaimed_outcome_repushed,
+    "anomaly-repushed-with-history": cell_anomaly_repushed_with_history, "anomaly-acknowledged-not-repushed": cell_anomaly_acknowledged_not_repushed, "oversized-budget-acknowledged-after-restart": cell_oversized_budget_acknowledged_after_restart, "runaway-reports-survive-restart": cell_runaway_reports_survive_restart, "runaway-reused-pid-counted-afresh": cell_runaway_reused_pid_counted_afresh, "advance-episodes-survive-restart": cell_advance_episodes_survive_restart, "restart-surviving-tampered-not-adopted": cell_restart_surviving_tampered_not_adopted, "budget-source-names-folded-key": cell_budget_source_names_folded_key, "unclaimed-outcome-repushed": cell_unclaimed_outcome_repushed, "running-progress-pushed": cell_running_progress_pushed,
     "inbox-socket-follows-session": cell_inbox_socket_follows_session, "submit-awaits-confirmation": cell_submit_awaits_confirmation,
-    "unconfirmed-cancelled": cell_unconfirmed_cancelled, "family-lends-build-phase-only": cell_family_lends_build_phase_only,
+    "unconfirmed-cancelled": cell_unconfirmed_cancelled,
     "cleanup-protocol-unit-tests": cell_cleanup_protocol_unit_tests,
-    "whole-not-sealed-where-it-cannot-fit": cell_whole_not_sealed_where_it_cannot_fit,
     "fills-any-cap-cap-hits-not-reported": cell_fills_any_cap_cap_hits_not_reported,
     "busy-cpu-pinned-at-cap-retried": cell_busy_cpu_pinned_at_cap_retried, "busy-cpu-below-cap-keeps-running": cell_busy_cpu_below_cap_keeps_running,
     "peer-pinned-at-cap-busy-cpu-retried": cell_peer_pinned_at_cap_busy_cpu_retried, "attention-quiet-busy-log": cell_attention_quiet_busy_log,
     "io-wait-local-not-stalled": cell_io_wait_local_not_stalled, "io-wait-peer-not-stalled": cell_io_wait_peer_not_stalled,
-    "gpu-busy-quiet-not-stalled": cell_gpu_busy_quiet_not_stalled, "card-zero-utilization-stalled": cell_card_zero_utilization_stalled,
-    "card-idle-polling-stalled": cell_card_idle_polling_stalled, "card-idle-cpu-computing-not-stalled": cell_card_idle_cpu_computing_not_stalled,
-    "peer-health-slow-rechecked": cell_peer_health_slow_rechecked, "cap-hit-stat-in-note": cell_cap_hit_stat_in_note,
-    "over-two-hours-bounced": cell_over_two_hours_bounced, "over-two-hours-across-cap-hits": cell_over_two_hours_across_cap_hits,
-    "over-two-hours-commit-gate-exempt": cell_over_two_hours_commit_gate_exempt, "over-two-hours-check-not-exempt": cell_over_two_hours_check_not_exempt,
-    "over-two-hours-merge-and-verify-not-exempt": cell_over_two_hours_merge_and_verify_not_exempt, "requeue-goes-to-tail": cell_requeue_goes_to_tail,
-    "long-run-confirmed-not-bounced": cell_long_run_confirmed_not_bounced, "requeue-refusals": cell_requeue_refusals,
+    "peer-health-slow-rechecked": cell_peer_health_slow_rechecked, "peak-memory-stat-in-note": cell_peak_memory_stat_in_note,
+    "peer-peak-memory-stat-in-note": cell_peer_peak_memory_stat_in_note,
+    "loop-leak-trend-sentences": cell_loop_leak_trend_sentences,
+    "pinned-cap-over-limit-reported": cell_pinned_cap_over_limit_reported, "pinned-squeezed-requeued": cell_pinned_squeezed_requeued,
+    "pin-cap-help-not-pinned": cell_pin_cap_help_not_pinned, "scene-sessionless-swept": cell_scene_sessionless_swept,
+    "loop-leak-check-on-bounce": cell_loop_leak_check_on_bounce, "repeated-cap-hits-reminded-once": cell_repeated_cap_hits_reminded_once,
+    "long-run-reminded-not-stopped": cell_long_run_reminded_not_stopped, "long-run-reminder-across-cap-hits": cell_long_run_reminder_across_cap_hits,
+    "long-run-full-gate-not-reminded": cell_long_run_full_gate_not_reminded, "long-run-check-not-exempt": cell_long_run_check_not_exempt,
+    "long-run-merge-and-verify-not-exempt": cell_long_run_merge_and_verify_not_exempt,
+    "long-run-confirm-silences": cell_long_run_confirm_silences, "long-run-confirm-refused": cell_long_run_confirm_refused,
+    "long-run-sessionless-noted": cell_long_run_sessionless_noted,
     "whole-package-unconfirmed-refused": cell_whole_package_unconfirmed_refused, "whole-package-named-accepted": cell_whole_package_named_accepted,
-    "whole-package-confirmation-form": cell_whole_package_confirmation_form, "whole-package-confirmed-still-bounced": cell_whole_package_confirmed_still_bounced,
-    "sealed-gap-room-takes-unestimated": cell_sealed_gap_room_takes_unestimated,
-    "both-hosts-sealed-small-unestimated-starts": cell_both_hosts_sealed_small_unestimated_starts, "fragment-group-drops-finished": cell_fragment_group_drops_finished,
-    "whole-workspace-cargo-refused": cell_whole_workspace_cargo_refused, "workspace-writer-initial-cap-headroom": cell_workspace_writer_initial_cap_headroom,
-    "progress-stall-reported": cell_progress_stall_reported, "card-wait-holds-only-its-host": cell_card_wait_holds_only_its_host,
-    "shard-siblings-peak-windowed": cell_shard_siblings_peak_windowed,
+    "whole-package-confirmation-form": cell_whole_package_confirmation_form, "whole-package-confirmed-still-reminded": cell_whole_package_confirmed_still_reminded,
+    "whole-workspace-cargo-refused": cell_whole_workspace_cargo_refused,
+    "progress-stall-reported": cell_progress_stall_reported,
     "peer-retry-build-directory-reused": cell_peer_retry_build_directory_reused,
     "repository-target-bypass-warned": cell_repository_target_bypass_warned, "cancelled-artifacts-removed": cell_cancelled_artifacts_removed,
     "cancelled-before-peer-trip-built": cell_cancelled_before_peer_trip_built, "inbox-outcomes-resent-after-error": cell_inbox_outcomes_resent_after_error,
     "thirty-second-tick-prompt": cell_thirty_second_tick_prompt, "starved-head-reported": cell_starved_head_reported,
     "blocked-head-not-starved": cell_blocked_head_not_starved, "starved-head-judged-by-the-formula": cell_starved_head_judged_by_the_formula,
     "aged-task-judged-first": cell_aged_task_judged_first,
-    "unmeasured-not-zero": cell_unmeasured_not_zero, "queued-estimate": cell_queued_estimate, "retry-goes-where-it-fits": cell_retry_goes_where_it_fits,
+    "unmeasured-not-zero": cell_unmeasured_not_zero, "retry-goes-where-it-fits": cell_retry_goes_where_it_fits,
     "peer-runs-in-shared-tree": cell_peer_runs_in_shared_tree, "clean-failure-explained": cell_clean_failure_explained, "stalled-attempt-stopped": cell_stalled_attempt_stopped, "cpu-unread-not-stalled": cell_cpu_unread_not_stalled,
-    "running-status-shows-progress": cell_running_status_shows_progress, "stall-waits-for-grace": cell_stall_waits_for_grace, "computing-quietly-not-stalled": cell_computing_quietly_not_stalled, "overrun-quiet-log-stopped": cell_overrun_quiet_log_stopped, "peer-stall-judged-by-peer-cpu": cell_peer_stall_judged_by_peer_cpu, "simulated-two-host-workload": cell_simulated_two_host_workload, "three-duties-two-sessions": cell_three_duties_two_sessions,
-    "hundred-five-minute-tasks-balanced": cell_hundred_five_minute_tasks_balanced, "stalled-at-cap-retried": cell_stalled_at_cap_retried, "aged-head-at-slice-total-starts": cell_aged_head_at_slice_total_starts, "peer-run-failed-retried": cell_peer_run_failed_retried, "squeezed-at-total-is-cap-hit": cell_squeezed_at_total_is_cap_hit, "peer-starts-throttled": cell_peer_starts_throttled, "attempt-unit-nofile-raised": cell_attempt_unit_nofile_raised, "queued-shows-waiting-reason": cell_queued_shows_waiting_reason, "failed-run-estimated": cell_failed_run_estimated,
+    "running-status-shows-progress": cell_running_status_shows_progress, "stall-waits-for-grace": cell_stall_waits_for_grace, "computing-quietly-not-stalled": cell_computing_quietly_not_stalled, "peer-stall-judged-by-peer-cpu": cell_peer_stall_judged_by_peer_cpu, "three-duties-two-sessions": cell_three_duties_two_sessions,
+    "hundred-five-minute-tasks-balanced": cell_hundred_five_minute_tasks_balanced, "stalled-at-cap-retried": cell_stalled_at_cap_retried, "aged-head-at-slice-total-starts": cell_aged_head_at_slice_total_starts, "peer-run-failed-retried": cell_peer_run_failed_retried, "squeezed-at-total-is-cap-hit": cell_squeezed_at_total_is_cap_hit, "peer-starts-throttled": cell_peer_starts_throttled, "attempt-unit-nofile-raised": cell_attempt_unit_nofile_raised, "queued-shows-waiting-reason": cell_queued_shows_waiting_reason,
     "unfinished-peak-ignored": cell_unfinished_peak_ignored, "completed-after-cap-hit": cell_completed_after_cap_hit,
     "cap-hit-starts-above": cell_cap_hit_starts_above,
     "balanced-when-both-fit": cell_balanced_when_both_fit, "peer-when-local-full": cell_peer_when_local_full, "shard-to-peer-by-plan": cell_shard_to_peer_by_plan,
@@ -11385,46 +14419,32 @@ CELLS = {
     "task-log": cell_task_log, "cancel-queued": cell_cancel_queued, "cancel-finished": cell_cancel_finished,
     "cancel-sharded-in-plan": cell_cancel_sharded_in_plan, "cancel-sharded-running": cell_cancel_sharded_running,
     "shard-plan-failed": cell_shard_plan_failed, "shard-merge-failed": cell_shard_merge_failed, "unsharded-arguments": cell_unsharded_arguments,
-    "control-start": cell_control_start, "gpu-without-cards-unmet": cell_gpu_without_cards_unmet, "pinned-peer-unavailable": cell_pinned_peer_unavailable,
-    "gpu-runs-only-when-code-runs": cell_gpu_runs_only_when_code_runs,
+    "control-start": cell_control_start, "gpu-service-required-when-gpu-on": cell_gpu_service_required_when_gpu_on,
+    "gpu-service-untouched-when-gpu-off": cell_gpu_service_untouched_when_gpu_off, "pinned-peer-unavailable": cell_pinned_peer_unavailable,
     "stall-clock-from-log-mtime": cell_stall_clock_from_log_mtime,
     "memory-cap-passed-to-command": cell_memory_cap_passed_to_command, "source-repository-passed-to-command": cell_source_repository_passed_to_command,
-    "shared-roots-passed-to-command": cell_shared_roots_passed_to_command, "card-labels-by-address": cell_card_labels_by_address,
+    "shared-roots-passed-to-command": cell_shared_roots_passed_to_command,
     "peer-admission-marked": cell_peer_admission_marked, "peer-disk-floor": cell_peer_disk_floor, "suspected-stall-notified": cell_suspected_stall_notified,
-    "suspected-stall-card-busy-not-reported": cell_suspected_stall_card_busy_not_reported, "pinned-cap-from-configuration": cell_pinned_cap_from_configuration,
+    "pinned-cap-from-configuration": cell_pinned_cap_from_configuration,
     "pinned-cap-unreadable-refused": cell_pinned_cap_unreadable_refused,
     "pinned-cap-by-host": cell_pinned_cap_by_host, "by-host-missing-host-refused": cell_by_host_missing_host_refused,
     "by-host-outside-address-refused": cell_by_host_outside_address_refused, "shard-host-is-address": cell_shard_host_is_address,
     "gate-stages-sent-to-peer": cell_gate_stages_sent_to_peer,
     "admission-booked-at-cap": cell_admission_booked_at_cap, "health-answers-while-resources-slow": cell_health_answers_while_resources_slow,
-    "python-entry-gpu-recognized": cell_python_entry_gpu_recognized, "gpu-argument-declaration-recognized": cell_gpu_argument_declaration_recognized,
     "leftover-processes-stopped": cell_leftover_processes_stopped, "leftovers-only-in-own-unit": cell_leftovers_only_in_own_unit, "long-run-failure-noted": cell_long_run_failure_noted,
     "leftovers-error-isolated": cell_leftovers_error_isolated, "inbox-shard-attention-merged": cell_inbox_shard_attention_merged,
     "attempt-label-passed-to-command": cell_attempt_label_passed_to_command,
-    "whole-and-fragment-alternate": cell_whole_and_fragment_alternate, "whole-starts-beside-running-fragment": cell_whole_starts_beside_running_fragment,
-    "drained-sealed-group-reopens": cell_drained_sealed_group_reopens,
+    "whole-starts-beside-running-fragment": cell_whole_starts_beside_running_fragment,
     "ended-attempt-settled-after-restart": cell_ended_attempt_settled_after_restart,
-    "aged-tasks-do-not-hold-fitting-tasks": cell_aged_tasks_do_not_hold_fitting_tasks,
-    "cpu-gate-holds-busy-host": cell_cpu_gate_holds_busy_host, "unstarted-slice-uses-configured-total": cell_unstarted_slice_uses_configured_total, "down-host-waits-not-never": cell_down_host_waits_not_never, "card-fault-replaced-on-another-card": cell_card_fault_replaced_on_another_card,
-    "card-fault-quarantines-named-card": cell_card_fault_quarantines_named_card, "card-fault-unlisted-quarantines-none": cell_card_fault_unlisted_quarantines_none,
-    "failed-peak-floor": cell_failed_peak_floor,
+    "cpu-gate-holds-busy-host": cell_cpu_gate_holds_busy_host, "unstarted-slice-uses-configured-total": cell_unstarted_slice_uses_configured_total, "down-host-waits-not-never": cell_down_host_waits_not_never,
     "environment-prefix-stripped-from-key": cell_environment_prefix_stripped_from_key,
     "verdict-library-family-refused": cell_verdict_library_family_refused, "workspace-writer-not-retried": cell_workspace_writer_not_retried,
     "retry-cap-not-floored": cell_retry_cap_not_floored, "recorded-cap-not-floored": cell_recorded_cap_not_floored,
-    "sealed-gap-takes-short-task": cell_sealed_gap_takes_short_task, "sealed-gap-holds-longer-task": cell_sealed_gap_holds_longer_task,
-    "unestimated-blocker-counted-by-elapsed": cell_unestimated_blocker_counted_by_elapsed, "margin-measured-per-host": cell_margin_measured_per_host,
-    "gap-fill-by-room-skips-length": cell_gap_fill_by_room_skips_length, "gap-fill-room-exhausted-checks-length": cell_gap_fill_room_exhausted_checks_length,
-    "item-estimate-before-queue": cell_item_estimate_before_queue, "item-done-rates-recorded": cell_item_done_rates_recorded,
-    "item-estimate-summed-from-rates": cell_item_estimate_summed_from_rates, "item-estimate-failure-queues-parent": cell_item_estimate_failure_queues_parent,
-    "item-estimate-cancelled": cell_item_estimate_cancelled,
-    "estimate-by-folded-command-key": cell_estimate_by_folded_command_key, "estimate-basis-command-sentence": cell_estimate_basis_command_sentence,
-    "estimate-basis-items-sentence": cell_estimate_basis_items_sentence, "estimate-basis-none-sentence": cell_estimate_basis_none_sentence,
-    "shard-plan-and-merge-estimated-by-command": cell_shard_plan_and_merge_estimated_by_command,
-    "shard-pieces-estimated-by-own-history": cell_shard_pieces_estimated_by_own_history,
+    "cap-hit-low-peak-not-recorded-at-cap": cell_cap_hit_low_peak_not_recorded_at_cap, "runaway-process-notified": cell_runaway_process_notified, "runaway-process-stopped-after-reports": cell_runaway_process_stopped_after_reports,
+    "margin-measured-per-host": cell_margin_measured_per_host,
     "margin-unmeasured-not-placed": cell_margin_unmeasured_not_placed, "pin-cap-refused-within-margin": cell_pin_cap_refused_within_margin,
     "peer-booked-like-local": cell_peer_booked_like_local, "peer-scope-missing-booked-at-cap": cell_peer_scope_missing_booked_at_cap,
     "two-hosts-booked-within-capacity": cell_two_hosts_booked_within_capacity, "judge-error-skips-only-that-task": cell_judge_error_skips_only_that_task,
-    "explicit-wait-not-starved": cell_explicit_wait_not_starved,
     "nfs-share-required": cell_nfs_share_required, "nfs-share-verified": cell_nfs_share_verified,
     "peer-unavailable-alerted": cell_peer_unavailable_alerted, "reason-line-per-type": cell_reason_line_per_type,
     "selftest-variables-refused": cell_selftest_variables_refused, "type-table-covered": cell_type_table_covered,
@@ -11440,12 +14460,123 @@ CELLS = {
     "outside-shared-path-refused": cell_outside_shared_path_refused, "path-check-whole-words": cell_path_check_whole_words,
     "shared-roots-outside-refused": cell_shared_roots_outside_refused,
     "finished-build-removed": cell_finished_build_removed,
-    "nfs-probe-concurrent-runs": cell_nfs_probe_concurrent_runs, "gpu-binary-declaration-recognized": cell_gpu_binary_declaration_recognized,
+    "nfs-probe-concurrent-runs": cell_nfs_probe_concurrent_runs,
     "short-command-peak-recorded": cell_short_command_peak_recorded, "merge-on-peer-reads-shard-outputs": cell_merge_on_peer_reads_shard_outputs,
     "stop-ends-probe-children": cell_stop_ends_probe_children, "failure-scene-kept-until-collected": cell_failure_scene_kept_until_collected,
     "shard-failure-waits-for-running": cell_shard_failure_waits_for_running, "shard-cancel-alone-merges": cell_shard_cancel_alone_merges,
     "parent-cancel-stops-every-shard": cell_parent_cancel_stops_every_shard, "cancel-after-natural-end": cell_cancel_after_natural_end,
     "failed-start-not-counted": cell_failed_start_not_counted, "child-rows-verified": cell_child_rows_verified, "task-locks-released": cell_task_locks_released,
+    "attempt-row-not-overwritten": cell_attempt_row_not_overwritten, "parent-cancel-waits-for-children": cell_parent_cancel_waits_for_children,
+    "clean-waits-for-finished-removal": cell_clean_waits_for_finished_removal, "recheck-judges-disk": cell_recheck_judges_disk,
+    "recheck-judges-nfs": cell_recheck_judges_nfs,
+    "stall-stop-spares-next-attempt": cell_stall_stop_spares_next_attempt, "peer-cleanup-recovered-once": cell_peer_cleanup_recovered_once,
+    "tampered-attempt-ended-once": cell_tampered_attempt_ended_once, "tampered-attempt-unit-stopped": cell_tampered_attempt_unit_stopped,
+    "manual-submit-path": cell_manual_submit_path, "full-gate-flag": cell_full_gate_flag,
+    "running-attempts-verified-only": cell_running_attempts_verified_only,
+    "concurrent-confirms-serialized": cell_concurrent_confirms_serialized,
+    "resident-entries-forgotten": cell_resident_entries_forgotten,
+    "whole-package-single-cells-refused": cell_whole_package_single_cells_refused, "unscoped-runs-refused": cell_unscoped_runs_refused,
+    "whole-package-feature-items-accepted": cell_whole_package_feature_items_accepted,
+    "whole-package-feature-items-others-refused": cell_whole_package_feature_items_others_refused,
+    "attempt-gets-no-card": cell_attempt_gets_no_card, "card-declarations-refused": cell_card_declarations_refused,
+    "queued-whole-package-rechecked": cell_queued_whole_package_rechecked,
+    "unnamed-merge-unnamed-refused": cell_unnamed_merge_unnamed_refused, "unnamed-merge-named-accepted": cell_unnamed_merge_named_accepted,
+    "unnamed-cargo-target-refused": cell_unnamed_cargo_target_refused, "unnamed-cargo-exact-accepted": cell_unnamed_cargo_exact_accepted,
+    "unnamed-prove-red-unnamed-refused": cell_unnamed_prove_red_unnamed_refused, "unnamed-prove-red-named-accepted": cell_unnamed_prove_red_named_accepted,
+    "unnamed-exemptions-accepted": cell_unnamed_exemptions_accepted, "unnamed-gate-cells-judged": cell_unnamed_gate_cells_judged,
+    "unnamed-crash-gate-whole-items-refused": cell_unnamed_crash_gate_whole_items_refused, "unnamed-crash-gate-cases-only-accepted": cell_unnamed_crash_gate_cases_only_accepted,
+    "test-starting-cells-listed": cell_test_starting_cells_listed,
+    "run-hard-limit-arithmetic": cell_run_hard_limit_arithmetic,
+    "shard-hard-limit-by-each-piece": cell_shard_hard_limit_by_each_piece,
+    "run-hard-limit-stopped": cell_run_hard_limit_stopped,
+    "run-hard-limit-why-still-stops": cell_run_hard_limit_why_still_stops,
+    "run-hard-limit-full-gate-not-stopped": cell_run_hard_limit_full_gate_not_stopped,
+    "run-hard-limit-cap-hit-resets": cell_run_hard_limit_cap_hit_resets,
+    "run-hard-limit-writer-stopped": cell_run_hard_limit_writer_stopped,
+    "run-hard-limit-shard-stopped": cell_run_hard_limit_shard_stopped,
+    "run-hard-limit-applies-after-restart": cell_run_hard_limit_applies_after_restart,
+    "run-hard-limit-stop-retried": cell_run_hard_limit_stop_retried,
+    "confirmation-scope-text": cell_confirmation_scope_text,
+    "selftest-units-stop-with-outer": cell_selftest_units_stop_with_outer,
+    "running-booked-unscoped-at-cap": cell_running_booked_unscoped_at_cap,
+    "shard-key-without-count": cell_shard_key_without_count,
+    "stopped-peaks-floor-record": cell_stopped_peaks_floor_record, "compiles-declared-entry": cell_compiles_declared_entry,
+    "parent-cancelling-child-not-claimed": cell_parent_cancelling_child_not_claimed, "cpu-gate-counts-running-threads": cell_cpu_gate_counts_running_threads,
+    "cpu-gate-measured-cores": cell_cpu_gate_measured_cores,
+    "lookup-indexes-used": cell_lookup_indexes_used, "running-attempts-read-once": cell_running_attempts_read_once,
+    "budget-source-only-when-reported": cell_budget_source_only_when_reported, "repass-cleared-when-idle": cell_repass_cleared_when_idle,
+    "peer-probe-off-scheduler": cell_peer_probe_off_scheduler,
+    "peer-cleanup-off-scheduler": cell_peer_cleanup_off_scheduler,
+    "unit-unreadable-exit-file-settles": cell_unit_unreadable_exit_file_settles,
+    "unit-unreadable-gone-recorded-lost": cell_unit_unreadable_gone_recorded_lost, "unit-unreadable-running-reminded": cell_unit_unreadable_running_reminded,
+    "unit-unreadable-unverified-health-reported": cell_unit_unreadable_unverified_health_reported,
+    "running-booked-at-measured-usage": cell_running_booked_at_measured_usage, "running-young-booked-at-cap": cell_running_young_booked_at_cap, "cpu-gate-unrecorded-by-registered-threads": cell_cpu_gate_unrecorded_by_registered_threads, "cpu-gate-running-by-latest-reading": cell_cpu_gate_running_by_latest_reading, "cpu-gate-running-after-restart-by-average": cell_cpu_gate_running_after_restart_by_average, "submit-trace-logged": cell_submit_trace_logged, "cargo-test-key-by-package": cell_cargo_test_key_by_package, "selection-key-by-script": cell_selection_key_by_script,
+    "memory-growth-not-stalled": cell_memory_growth_not_stalled,
+    "cpu-gate-new-task-by-recorded-cores": cell_cpu_gate_new_task_by_recorded_cores,
+    "cpu-gate-running-started-by-recorded-cores": cell_cpu_gate_running_started_by_recorded_cores,
+    "shard-peak-record-count-matched": cell_shard_peak_record_count_matched, "heartbeat-lines-not-log-growth": cell_heartbeat_lines_not_log_growth,
+    "signal-exit-named": cell_signal_exit_named,
+    "finish-peak-segment-cpu-unread": cell_finish_peak_segment_cpu_unread,
+    "fills-any-cap-record-caps-not-reported": cell_fills_any_cap_record_caps_not_reported,
+    "unit-stopped-booking-released": cell_unit_stopped_booking_released,
+    "cpu-reason-splits-io-wait": cell_cpu_reason_splits_io_wait,
+    "peer-health-slow-within-recheck-period": cell_peer_health_slow_within_recheck_period,
+    "control-check-probe-bounded": cell_control_check_probe_bounded,
+    "control-check-reads-service-nfs-report": cell_control_check_reads_service_nfs_report,
+    "promote-skips-cpu-gate": cell_promote_skips_cpu_gate,
+    "promote-queue-order": cell_promote_queue_order,
+    "progress-line-names-progress": cell_progress_line_names_progress,
+    "attempt-progress-readings": cell_attempt_progress_readings,
+    "quiet-log-busy-spared-by-progress": cell_quiet_log_busy_spared_by_progress,
+    "peer-ssh-multiplexed": cell_peer_ssh_multiplexed,
+    "shard-start-borrows-nothing": cell_shard_start_borrows_nothing,
+    "plan-key-by-compiles": cell_plan_key_by_compiles,
+    "booking-drift-reported": cell_booking_drift_reported,
+    "booking-audit-young-not-drift": cell_booking_audit_young_not_drift,
+    "cpu-gate-running-average-capped-by-registered": cell_cpu_gate_running_average_capped_by_registered,
+    "reminders-not-resent-after-restart": cell_reminders_not_resent_after_restart,
+    "reminder-thresholds-every-doubling": cell_reminder_thresholds_every_doubling,
+    "reminder-ledger-other-shape-read-afresh": cell_reminder_ledger_other_shape_read_afresh,
+    "long-run-split-reminded-at-outcome": cell_long_run_split_reminded_at_outcome,
+    "workspace-write-blocked-reminded": cell_workspace_write_blocked_reminded,
+    "inbox-headlines-tell-kind-state-round": cell_inbox_headlines_tell_kind_state_round,
+    "external-kill-peer-line-recorded-and-retried": cell_external_kill_peer_line_recorded_and_retried,
+    "confirm-sheet-reads-bash-c-inner-commands": cell_confirm_sheet_reads_bash_c_inner_commands,
+    "workspace-writer-cap-has-headroom": cell_workspace_writer_cap_has_headroom,
+    "control-key-stats-reported": cell_control_key_stats_reported,
+    "control-key-stats-by-task": cell_control_key_stats_by_task,
+    "control-key-stats-dump": cell_control_key_stats_dump,
+    "machine-memory-line-holds-dispatch": cell_machine_memory_line_holds_dispatch,
+    "external-kill-recorded-and-retried": cell_external_kill_recorded_and_retried,
+    "booking-ledger-rows": cell_booking_ledger_rows,
+    "admission-by-measured-bookings": cell_admission_by_measured_bookings,
+    "aged-blocked-task-blocks-later": cell_aged_blocked_task_blocks_later, "jump-only-shorter-than-running": cell_jump_only_shorter_than_running,
+    "memory-wait-names-both-numbers": cell_memory_wait_names_both_numbers,
+    "cpu-gate-new-task-counts-failed-runs": cell_cpu_gate_new_task_counts_failed_runs,
+    "confirm-retries-follow-churn": cell_confirm_retries_follow_churn,
+    "cpu-gate-peak-segment-cores": cell_cpu_gate_peak_segment_cores,
+    "cpu-gate-line-twice-cores": cell_cpu_gate_line_twice_cores,
+    "cpu-gate-runnable-threads": cell_cpu_gate_runnable_threads,
+    "threads-over-registered-reported": cell_threads_over_registered_reported,
+    "threads-over-registered-peer-reported": cell_threads_over_registered_peer_reported,
+    "shard-binaries-removed-at-outcome": cell_shard_binaries_removed_at_outcome,
+    "runner-threads-file-counts": cell_runner_threads_file_counts,
+    "store-write-rolls-back-on-error": cell_store_write_rolls_back_on_error,
+    "disk-floor-peer-not-never-fits": cell_disk_floor_peer_not_never_fits,
+    "stall-reads-log-before-cpu": cell_stall_reads_log_before_cpu,
+    "peer-readings-merged-across-reads": cell_peer_readings_merged_across_reads,
+    "log-content-serialized": cell_log_content_serialized,
+    "log-noise-marks-not-growth": cell_log_noise_marks_not_growth,
+    "runaway-targets-skip-children": cell_runaway_targets_skip_children,
+    "promote-wakes-and-promotes-shards": cell_promote_wakes_and_promotes_shards,
+    "promote-placement-rules": cell_promote_placement_rules,
+    "pause-keeps-queue-positions": cell_pause_keeps_queue_positions,
+    "stop-joins-peer-probe": cell_stop_joins_peer_probe,
+    "peer-cooldown-skips-connect": cell_peer_cooldown_skips_connect,
+    "clean-removes-peer-kept-build": cell_clean_removes_peer_kept_build,
+    "command-word-index-skips-option-values": cell_command_word_index_skips_option_values,
+    "runner-start-error-recorded": cell_runner_start_error_recorded,
+    "runner-final-sample-after-exit": cell_runner_final_sample_after_exit,
 }
 UNPREPARED_CELLS = ("install",)
 
@@ -11505,13 +14636,17 @@ def parallelism(environment=None, registration_file=None):
 
 
 def run_all(arguments):
+    # 套在假调度器上的格（fake.environment 拷的是本进程环境）同样照小世界的两个数：CPU 闸的倍数 2、刚起跑照上限记那一条不看
+    os.environ.setdefault(lib.CPU_OVERSUBSCRIPTION_VARIABLE, "2")
+    os.environ.setdefault(lib.YOUNG_BOOKING_VARIABLE, "0")
     items = [item for item in os.environ.get(lib.BREAK_VARIABLE, "").split(",") if item]
     unknown = [item for item in items if item not in lib.KNOWN_BREAK_ITEMS]
     if unknown:
         print(f"  ✗ {lib.BREAK_VARIABLE} 里认不出的项：{'、'.join(unknown)}")
         print("  → 怎么办：照 task_server_lib.py 文件头的开关表写")
         return lib.USAGE_EXIT
-    selected = [name for name in os.environ.get("TASK_SERVER_SELFTEST_CELLS", "").split(",") if name] or list(CELLS)
+    # 同一格点了两次只跑一次：两份同名的格并行写同一个格目录、同一份 .out 与 .exit，收回时按格名只数得到一份（任务 13267 点了 46 个名、两格重名，收回 44 份）
+    selected = list(dict.fromkeys(name for name in os.environ.get("TASK_SERVER_SELFTEST_CELLS", "").split(",") if name)) or list(CELLS)
     wrong_names = [name for name in selected if name not in CELLS]
     if wrong_names:
         print(f"  ✗ TASK_SERVER_SELFTEST_CELLS 里没有的格：{'、'.join(wrong_names)}（有 {'、'.join(CELLS)}）")
@@ -11567,41 +14702,7 @@ def run_all(arguments):
             print(f"  ✗ task_server_lib.py 自证 {len(selected)} 格里 {len(failures)} 格不对（逐格在上面）")   # gate-lint:summary
             print("  → 怎么办：按不对的那一格修服务、客户端或 control；设着 TASK_SERVER_BREAK 的话点名的格本来就该红（开关表在 task_server_lib.py 文件头）")
             return 1
-        print(f"  ✓ task_server_lib.py 自证 {len(selected)} 格都对（并行 {workers} 格，每格一份真的 uvicorn 挂在临时 socket 上；"
-              "装与查、服务不通、退出码原样、服务重启任务照跑、只起一次、放不下的留在库里、到达次序、错误类型、起单元失败、撞上限放大与到顶、"
-              "预测每条只算一次、余量一轮只读一次、一轮里起了的记账带到后面、起之前现读复核、"
-              "没记录的先记小、没记录的撞了再放大、连交几条没记录的按剩余占比分到两台、重排的种类、"
-              "GPU 分卡、只许同会话取消、绕过写库不起、伪造会话号不认、环境变量白名单、不许套包装、资源记录定上限、没跑完的峰值不定额度、撞过上限后跑完的取跑完那次、只撞过上限的从撞过的上限 × 1.5 起、操作日志、完成了没人取、状态目录放哪、"
-              "重排留着前几次的记录、编译目录在仓外跑完删、量不到不当 0、排队报预计用时、两台都放得下挑放下之后剩余占比大的、本机放不下就去第二台、"
-              "分片的各片不钉台、计划写 pin 的拒、socket 路径太长报清楚、线程固定、分片只重排那一片、"
-              "task log 的默认、--all、--attempt 与退 4、取消排着的、取消已有结局的、计划时与在跑时取消分片的整件、分片的计划与合并没成、"
-              "带 --selftest 这类参数的不分片、control start 回读、要卡而没点名卡、钉第二台而它用不了、"
-              "只编不跑的 cargo 不要卡、第二台在同一棵共享的树里跑不送树、重启后日志没涨从修改时刻算、"
-              "上限经环境交给命令、疑似卡住只通知不停、要卡的卡上有负载不报疑似、钉值取配置的总上限减余量、钉值按派到的那一台取那一台那一项、"
-              "按台的键少一台与多一项不在 HOSTS 里的地址判写坏、分片拿到它所在那一台的地址、满时限的放不下时不挡放得下的、记满一整台的收到总上限减余量起得来、顶在上限上卡住按撞上限重排、工作目录不是仓根也派得到第二台、"
-              "门禁目录派得到第二台、准入按上限记账、余量读得慢时 /health 照样快、python 入口按特性认卡、封了组的台腾空而整片放不下时碎片照起、"
-              "封了组的台放预计用时不超过挡路时长的短任务插空、超过的与没有预计用时的照旧封着、挡路的没有预计用时按已跑算、"
-              "没写 NFS 共享不起、NFS 四项判、共享根下的路径不送不改写、没有只派一台的名单、第二台用不了要告警、打回的理由按类型写、clean 没删成写原因、"
-              "自证变量平常拒、错误类型表全覆盖、判放得下之后到的取消不起与起了之后到的取消等单元停、分片推进断在哪都能恢复且每步只一份、"
-              "插尝试与改任务一个事务、分片取消没停干净再取消照样重停、关联列改过的不认不停、起单元回执超时照单元名读回、编译目录占盘按记录判、"
-              "第二台那条命令自己的退出码与 multi-host-run.sh 的失败分开、自动挂载认得出、第二台的内存峰值记下、命令退 75 单列并查 prune-server、"
-              "临时 prune-server 的包装剥开认原命令且不与不包的共键、包装里会编或要卡的提交时拒、有记录的重排照乘 1.5 不兜到 4G、有记录的照峰值 × 1.5 不兜到 4G、没写共享数据根不起、"
-              "共享根外的路径（连同 /tmp 下的与 bash -c 词里的）、不在共享根下的共享根、第三列没写 prune-server 的判定库提交时当场拒、"
-              "按脚本文件头的声明认要卡的参数、tests-on-a-real-gpu 认成要卡、命令退出之后单元里留下的进程停掉并写明、跑得久而失败又没登记续跑的写一句、"
-              "尝试标签两台都交给命令、排头在等交替封组时 /health 照回 ok、"
-              "一片没成时在排的兄弟片当场撤而在跑的跑完收齐才收尾、人手只取消一片时别的片照跑而合并点名缺片、取消整件照旧全停、"
-              "取消到的时候命令已自己跑完的不报停了、没起成的尝试不占第二台一轮的名额、子任务行校验不过的不认、任务的锁用完就从锁表删、"
-              "预计用时照命令键取（路径不同、折叠后同键的有预计用时）、status 写明预计用时是按命令、按项还是没有记录、分片的计划与合并照自己命令键的历史估、各片照自己片号的历史估、"
-              "wait 自己报排队过久、超过预计、换卡重排（在跑的与已跑成的）、清场没收尾、分片父任务推不动且同一档只叫一次、不带 --server-binary 的临时 prune-server 包装两台都按会编的算、"
-              "暂停着交的任务与分片的子任务排着不起、暂停之前在跑的照跑到结局而重排回队的不起、暂停态跨服务重启、resume 放开排着的、control 与 status 的暂停字样、暂停着不报饿死、"
-              "pause 等正在起的一条记下再回、暂停时放行一个会话而别的会话照旧排着、放行会话排着的在等字样、换放行的会话、resume 清放行、放行跨服务重启且改库校验不过、"
-              "check 写放行会话与别的会话在跑几个、自带临时服务的两份脚本不带二进制的 --selftest 两台都按会编的算、撞过上限的命令再交一遍第一次尝试照撞过的上限 × 1.5 不兜到 4G、"
-              "慢世界里的等待一直在变就等到收尾而不变满安静时限就判红、起点照近几次最高能升能降、/health 只读派活给排头的结论（卡在 CPU 闸、凑不够同一台 3 张卡的不报）、"
-              "一条整片只封一台、要卡的整片不为凑不够的卡封组、封着的那台没有预计用时的小碎片照公式的余量插空、看进展兜派活判错、"
-              "等卡的只在它要的那几台上让、兄弟片按近几次取、结局与排队过久直接发给会话（认证行在前、同一档只发一次、令牌不外露）、收件 socket 不在时任务照跑并写告警、服务健康（库写不进、单元不在、NFS、第二台用不了）发给有任务在排在跑的会话且好了再坏再发、control watch 已删、交任务时会话名下有结局没人取打严厉警告、"
-              "分片几片同一刻同一档的提醒合成一条发给会话、停单元里留下的进程时抛错 result.json 照写、"
-              "为满时限的整片封着的台不插空、记账超过每一台可用上限的当场打回、预算贴着整台与跑得久而核没用起来与按给的上限开并行都报给会话、"
-              "旧口径的峰值不进起步）")
+        print(f"  ✓ task_server_lib.py 自证 {len(selected)} 格都对（{lib.SELFTEST_PARALLELISM_TEXT.format(workers=workers)}，每格一份真的 uvicorn 挂在临时 socket 上；各格讲什么见上面逐格那一行）")
         return 0
     finally:
         shutil.rmtree(socket_root, ignore_errors=True)
